@@ -146,7 +146,7 @@ static int udf_prepare_write(struct file *file, struct page *page, unsigned from
 	return block_prepare_write(page, from, to, udf_get_block);
 }
 
-static int udf_bmap(struct address_space *mapping, long block)
+static sector_t udf_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,udf_get_block);
 }

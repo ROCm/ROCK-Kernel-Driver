@@ -601,7 +601,7 @@ ext2_prepare_write(struct file *file, struct page *page,
 	return block_prepare_write(page,from,to,ext2_get_block);
 }
 
-static int ext2_bmap(struct address_space *mapping, long block)
+static sector_t ext2_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,ext2_get_block);
 }

@@ -19,7 +19,7 @@ static int efs_readpage(struct file *file, struct page *page)
 {
 	return block_read_full_page(page,efs_get_block);
 }
-static int _efs_bmap(struct address_space *mapping, long block)
+static sector_t _efs_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,efs_get_block);
 }

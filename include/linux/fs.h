@@ -305,7 +305,7 @@ struct address_space_operations {
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
 	/* Unfortunately this kludge is needed for FIBMAP. Don't use it */
-	int (*bmap)(struct address_space *, long);
+	sector_t (*bmap)(struct address_space *, sector_t);
 	int (*invalidatepage) (struct page *, unsigned long);
 	int (*releasepage) (struct page *, int);
 	int (*direct_IO)(int, struct file *, const struct iovec *iov,
@@ -356,7 +356,7 @@ struct block_device {
 	int			bd_holders;
 	struct block_device *	bd_contains;
 	unsigned		bd_block_size;
-	unsigned long		bd_offset;
+	sector_t		bd_offset;
 	unsigned		bd_part_count;
 	int			bd_invalidated;
 };
@@ -1141,7 +1141,7 @@ extern void write_inode_now(struct inode *, int);
 extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(void);
-extern int bmap(struct inode *, int);
+extern sector_t bmap(struct inode *, sector_t);
 extern int notify_change(struct dentry *, struct iattr *);
 extern int permission(struct inode *, int);
 extern int vfs_permission(struct inode *, int);

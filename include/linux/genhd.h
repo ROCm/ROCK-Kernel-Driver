@@ -59,8 +59,8 @@ struct partition {
 #  include <linux/devfs_fs_kernel.h>
 
 struct hd_struct {
-	unsigned long start_sect;
-	unsigned long nr_sects;
+	sector_t start_sect;
+	sector_t nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
 	struct device hd_driverfs_dev;  /* support driverfs hiearchy     */
 };
@@ -95,7 +95,7 @@ extern void add_disk(struct gendisk *disk);
 extern void del_gendisk(struct gendisk *gp);
 extern void unlink_gendisk(struct gendisk *gp);
 extern struct gendisk *get_gendisk(dev_t dev, int *part);
-static inline unsigned long get_start_sect(struct block_device *bdev)
+static inline sector_t get_start_sect(struct block_device *bdev)
 {
 	return bdev->bd_offset;
 }

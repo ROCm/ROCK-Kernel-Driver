@@ -175,8 +175,8 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
                 drv = &h->drv[i];
 		if (drv->block_size == 0)
 			continue;
-                size = sprintf(buffer+len, "cciss/c%dd%d: blksz=%d nr_blocks=%d\n",
-                                ctlr, i, drv->block_size, drv->nr_blocks);
+                size = sprintf(buffer+len, "cciss/c%dd%d: blksz=%d nr_blocks=%llu\n",
+                                ctlr, i, drv->block_size, (unsigned long long)drv->nr_blocks);
                 pos += size; len += size;
         }
 
@@ -405,7 +405,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                 } else {
                         driver_geo.heads = 0xff;
                         driver_geo.sectors = 0x3f;
-                        driver_geo.cylinders = hba[ctlr]->drv[dsk].nr_blocks / (0xff*0x3f);
+                        driver_geo.cylinders = (int)hba[ctlr]->drv[dsk].nr_blocks / (0xff*0x3f);
                 }
                 driver_geo.start= get_start_sect(inode->i_bdev);
                 if (copy_to_user((void *) arg, &driver_geo,
@@ -1179,7 +1179,7 @@ static int register_new_disk(int ctlr)
 			total_size = 0;
 			block_size = BLOCK_SIZE;
 	}	
-	printk(KERN_INFO "      blocks= %d block_size= %d\n", 
+	printk(KERN_INFO "      blocks= %u block_size= %d\n", 
 					total_size, block_size);
 	/* Execute the command to read the disk geometry */
 	memset(inq_buff, 0, sizeof(InquiryData_struct));

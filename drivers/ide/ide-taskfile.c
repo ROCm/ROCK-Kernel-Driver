@@ -286,8 +286,8 @@ u8 taskfile_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 				}
 			}
 			if (HWGROUP(drive)->rq)
-				printk(", sector=%lu",
-					HWGROUP(drive)->rq->sector);
+				printk(", sector=%llu",
+					(unsigned long long)HWGROUP(drive)->rq->sector);
 		}
 media_out:
 #endif  /* FANCY_STATUS_DUMPS */

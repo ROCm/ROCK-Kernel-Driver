@@ -444,7 +444,7 @@ static int qnx4_prepare_write(struct file *file, struct page *page,
 	return cont_prepare_write(page, from, to, qnx4_get_block,
 				  &qnx4_inode->mmu_private);
 }
-static int qnx4_bmap(struct address_space *mapping, long block)
+static sector_t qnx4_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,qnx4_get_block);
 }

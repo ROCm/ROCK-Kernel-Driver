@@ -1163,7 +1163,7 @@ static int cdrom_read_from_buffer (ide_drive_t *drive)
 	if (rq->current_nr_sectors < bio_sectors(rq->bio) &&
 	    (rq->sector % SECTORS_PER_FRAME) != 0) {
 		printk("%s: cdrom_read_from_buffer: buffer botch (%ld)\n",
-			drive->name, rq->sector);
+			drive->name, (long)rq->sector);
 		cdrom_end_request(drive, 0);
 		return -1;
 	}
@@ -1750,7 +1750,7 @@ static ide_startstop_t cdrom_do_block_pc(ide_drive_t *drive, struct request *rq)
  * cdrom driver request routine.
  */
 static ide_startstop_t
-ide_do_rw_cdrom (ide_drive_t *drive, struct request *rq, unsigned long block)
+ide_do_rw_cdrom (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_startstop_t action;
 	struct cdrom_info *info = drive->driver_data;
@@ -2775,11 +2775,13 @@ static void ide_cdrom_add_settings(ide_drive_t *drive)
 static int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
 {
 	int hard_sect = queue_hardsect_size(q);
-	sector_t block = rq->hard_sector / (hard_sect >> 9);
+	long block = (long)rq->hard_sector / (hard_sect >> 9);
 	unsigned long blocks = rq->hard_nr_sectors / (hard_sect >> 9);
 
 	if (!(rq->flags & REQ_CMD))
 		return 0;
+
+	BUG_ON(sizeof(rq->hard_sector) > 4 && (rq->hard_sector >> 32));
 
 	if (rq->hard_nr_sectors != rq->nr_sectors) {
 		printk(KERN_ERR "ide-cd: hard_nr_sectors differs from nr_sectors! %lu %lu\n",

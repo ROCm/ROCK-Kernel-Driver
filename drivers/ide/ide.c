@@ -590,7 +590,7 @@ u8 ide_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 					}
 				}
 				if (HWGROUP(drive) && HWGROUP(drive)->rq)
-					printk(", sector=%ld", HWGROUP(drive)->rq->sector);
+					printk(", sector=%llu", (unsigned long long)HWGROUP(drive)->rq->sector);
 			}
 		}
 #endif	/* FANCY_STATUS_DUMPS */
@@ -3270,7 +3270,7 @@ static int default_flushcache (ide_drive_t *drive)
 	return 0;
 }
 
-static ide_startstop_t default_do_request (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t default_do_request (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_end_request(drive, 0, 0);
 	return ide_stopped;

@@ -43,7 +43,7 @@
 
 
 static int		vxfs_readpage(struct file *, struct page *);
-static int		vxfs_bmap(struct address_space *, long);
+static sector_t		vxfs_bmap(struct address_space *, sector_t);
 
 struct address_space_operations vxfs_aops = {
 	.readpage =		vxfs_readpage,
@@ -186,8 +186,8 @@ vxfs_readpage(struct file *file, struct page *page)
  * Locking status:
  *   We are under the bkl.
  */
-static int
-vxfs_bmap(struct address_space *mapping, long block)
+static sector_t
+vxfs_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping, block, vxfs_getblk);
 }

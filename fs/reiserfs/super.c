@@ -916,8 +916,8 @@ static int read_super_block (struct super_block * s, int offset)
     rs = (struct reiserfs_super_block *)bh->b_data;
     if (sb_blocksize(rs) != s->s_blocksize) {
 	printk ("sh-2011: read_super_block: "
-		"can't find a reiserfs filesystem on (dev %s, block %lu, size %lu)\n",
-		reiserfs_bdevname (s), bh->b_blocknr, s->s_blocksize);
+		"can't find a reiserfs filesystem on (dev %s, block %Lu, size %lu)\n",
+		reiserfs_bdevname (s), (unsigned long long)bh->b_blocknr, s->s_blocksize);
 	brelse (bh);
 	return 1;
     }
@@ -980,8 +980,8 @@ static int reread_meta_blocks(struct super_block *s) {
     ll_rw_block(READ, 1, &(SB_AP_BITMAP(s)[i].bh)) ;
     wait_on_buffer(SB_AP_BITMAP(s)[i].bh) ;
     if (!buffer_uptodate(SB_AP_BITMAP(s)[i].bh)) {
-      printk("reread_meta_blocks, error reading bitmap block number %d at
-      %ld\n", i, SB_AP_BITMAP(s)[i].bh->b_blocknr) ;
+      printk("reread_meta_blocks, error reading bitmap block number %d at %llu\n", 
+        i, (unsigned long long)SB_AP_BITMAP(s)[i].bh->b_blocknr) ;
       return 1 ;
     }
   }

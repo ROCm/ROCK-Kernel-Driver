@@ -45,6 +45,11 @@ typedef __vector128 vector128;
 typedef u32 dma_addr_t;
 typedef u64 dma64_addr_t;
 
+#ifdef CONFIG_LBD
+typedef u64 sector_t;
+#define HAVE_SECTOR_T
+#endif
+
 #endif /* __KERNEL__ */
 
 /*

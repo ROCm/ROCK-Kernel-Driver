@@ -883,7 +883,7 @@ static void i2o_block_biosparam(
 	else
 		heads = 255;
 
-	cylinders = capacity / (heads * sectors);
+	cylinders = (unsigned long)capacity / (heads * sectors);
 
 	*cyls = (unsigned short) cylinders;	/* Stuff return values */ 
 	*secs = (unsigned char) sectors; 

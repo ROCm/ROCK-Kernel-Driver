@@ -1005,8 +1005,8 @@ static void init_gendisk (ide_hwif_t *hwif)
 			 "%s","IDE Drive");
 		disk->disk_dev.parent = &hwif->gendev;
 		disk->disk_dev.bus = &ide_bus_type;
-		device_register(&disk->disk_dev);
-
+		if (hwif->drives[unit].present)
+			device_register(&disk->disk_dev);
 		hwif->drives[unit].disk = disk;
 	}
 

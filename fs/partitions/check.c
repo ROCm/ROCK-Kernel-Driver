@@ -471,13 +471,12 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	return res;
 }
 
-unsigned char *read_dev_sector(struct block_device *bdev, unsigned long n, Sector *p)
+unsigned char *read_dev_sector(struct block_device *bdev, sector_t n, Sector *p)
 {
 	struct address_space *mapping = bdev->bd_inode->i_mapping;
-	int sect = PAGE_CACHE_SIZE / 512;
 	struct page *page;
 
-	page = read_cache_page(mapping, n/sect,
+	page = read_cache_page(mapping, (pgoff_t)(n >> (PAGE_CACHE_SHIFT-9)),
 			(filler_t *)mapping->a_ops->readpage, NULL);
 	if (!IS_ERR(page)) {
 		wait_on_page_locked(page);
@@ -486,7 +485,7 @@ unsigned char *read_dev_sector(struct block_device *bdev, unsigned long n, Secto
 		if (PageError(page))
 			goto fail;
 		p->v = page;
-		return (unsigned char *)page_address(page) + 512 * (n % sect);
+		return (unsigned char *)page_address(page) +  ((n & ((1 << (PAGE_CACHE_SHIFT - 9)) - 1)) << 9);
 fail:
 		page_cache_release(page);
 	}

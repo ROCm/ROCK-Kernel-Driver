@@ -1745,7 +1745,7 @@ static int wd7000_biosparam (Disk *disk, struct block_device *bdev, int *ip)
      */
     ip[0] = 64;
     ip[1] = 32;
-    ip[2] = disk->capacity / (64 * 32);
+    ip[2] = disk->capacity >> 11;
 
     /*
      * for disks >1GB do some guessing
@@ -1764,7 +1764,7 @@ static int wd7000_biosparam (Disk *disk, struct block_device *bdev, int *ip)
 
 	    ip[0] = 255;
 	    ip[1] = 63;
-	    ip[2] = disk->capacity / (255 * 63);
+	    ip[2] = (unsigned long)disk->capacity / (255 * 63);
 	}
 	else {
 	    ip[0] = info[0];

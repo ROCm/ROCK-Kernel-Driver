@@ -4236,13 +4236,13 @@ int megaraid_biosparam (Disk * disk, struct block_device *bdev, int *geom)
 			/* Default heads (64) & sectors (32) */
 			heads = 64;
 			sectors = 32;
-			cylinders = disk->capacity / (heads * sectors);
+			cylinders = (unsigned long)disk->capacity / (heads * sectors);
 
 			/* Handle extended translation size for logical drives > 1Gb */
 			if (disk->capacity >= 0x200000) {
 				heads = 255;
 				sectors = 63;
-				cylinders = disk->capacity / (heads * sectors);
+				cylinders = (unsigned long)disk->capacity / (heads * sectors);
 			}
 
 			/* return result */
@@ -4260,13 +4260,13 @@ int megaraid_biosparam (Disk * disk, struct block_device *bdev, int *geom)
 		/* Default heads (64) & sectors (32) */
 		heads = 64;
 		sectors = 32;
-		cylinders = disk->capacity / (heads * sectors);
+		cylinders = disk->capacity >> 11;
 
 		/* Handle extended translation size for logical drives > 1Gb */
 		if (disk->capacity >= 0x200000) {
 			heads = 255;
 			sectors = 63;
-			cylinders = disk->capacity / (heads * sectors);
+			cylinders = (unsigned long)disk->capacity / (heads * sectors);
 		}
 
 		/* return result */

@@ -29,7 +29,7 @@ typedef struct _drive_info_struct
 {
  	__u32   LunID;	
 	int 	usage_count;
-	int 	nr_blocks;
+	sector_t nr_blocks;
 	int	block_size;
 	int 	heads;
 	int	sectors;

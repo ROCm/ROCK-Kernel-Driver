@@ -2384,17 +2384,18 @@ int ibmmca_reset (Scsi_Cmnd * cmd, unsigned int reset_flags)
 
 int ibmmca_biosparam (Disk * disk, struct block_device *dev, int *info)
 {
+   int size = disk->capacity;
    info[0] = 64;
    info[1] = 32;
-   info[2] = disk->capacity / (info[0] * info[1]);
+   info[2] = size / (info[0] * info[1]);
    if (info[2] >= 1024) {
       info[0] = 128;
       info[1] = 63;
-      info[2] = disk->capacity / (info[0] * info[1]);
+      info[2] = size / (info[0] * info[1]);
       if (info[2] >= 1024) {
 	 info[0] = 255;
 	 info[1] = 63;
-	 info[2] = disk->capacity / (info[0] * info[1]);
+	 info[2] = size / (info[0] * info[1]);
 	 if (info[2] >= 1024)
 	   info[2] = 1023;
       }

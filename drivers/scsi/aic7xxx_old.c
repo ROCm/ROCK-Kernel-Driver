@@ -11812,13 +11812,13 @@ aic7xxx_biosparam(Disk *disk, struct block_device *bdev, int geom[])
   
   heads = 64;
   sectors = 32;
-  cylinders = disk->capacity / (heads * sectors);
+  cylinders = (unsigned long)disk->capacity / (heads * sectors);
 
   if ((p->flags & AHC_EXTEND_TRANS_A) && (cylinders > 1024))
   {
     heads = 255;
     sectors = 63;
-    cylinders = disk->capacity / (heads * sectors);
+    cylinders = (unsigned long)disk->capacity / (heads * sectors);
   }
 
   geom[0] = heads;

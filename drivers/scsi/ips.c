@@ -1882,7 +1882,7 @@ ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
       sectors = IPS_COMP_SECTORS;
    }
 
-   cylinders = disk->capacity / (heads * sectors);
+   cylinders = (unsigned long)disk->capacity / (heads * sectors);
 
    DEBUG_VAR(2, "Geometry: heads: %d, sectors: %d, cylinders: %d",
              heads, sectors, cylinders);

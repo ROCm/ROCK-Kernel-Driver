@@ -492,7 +492,7 @@ static struct floppy_struct *current_type[N_DRIVE];
  */
 static struct floppy_struct user_params[N_DRIVE];
 
-static int floppy_sizes[256];
+static sector_t floppy_sizes[256];
 
 /*
  * The driver is trying to determine the correct media format
@@ -2652,8 +2652,8 @@ static int make_raw_rw_request(void)
 
 	max_sector = _floppy->sect * _floppy->head;
 
-	TRACK = current_req->sector / max_sector;
-	fsector_t = current_req->sector % max_sector;
+	TRACK = (int)current_req->sector / max_sector;
+	fsector_t = (int)current_req->sector % max_sector;
 	if (_floppy->track && TRACK >= _floppy->track) {
 		if (current_req->current_nr_sectors & 1) {
 			current_count_sectors = 1;
@@ -2990,7 +2990,7 @@ static void do_fd_request(request_queue_t * q)
 
 	if (usage_count == 0) {
 		printk("warning: usage count=0, current_req=%p exiting\n", current_req);
-		printk("sect=%ld flags=%lx\n", current_req->sector, current_req->flags);
+		printk("sect=%ld flags=%lx\n", (long)current_req->sector, current_req->flags);
 		return;
 	}
 	if (fdc_busy){

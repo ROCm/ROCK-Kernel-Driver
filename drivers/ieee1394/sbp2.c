@@ -3160,12 +3160,13 @@ static int sbp2scsi_biosparam (Scsi_Disk *disk, struct block_device *dev, int ge
 
 	heads = 64;
 	sectors = 32;
-	cylinders = disk->capacity / (heads * sectors);
+	cylinders = (int)disk->capacity / (heads * sectors);
+	
 
 	if (cylinders > 1024) {
 		heads = 255;
 		sectors = 63;
-		cylinders = disk->capacity / (heads * sectors);
+		cylinders = (int)disk->capacity / (heads * sectors);
 	}
 
 	geom[0] = heads;

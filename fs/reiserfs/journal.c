@@ -1011,15 +1011,15 @@ static int flush_journal_list(struct super_block *s,
     ** is not marked JDirty_wait
     */
     if ((!was_jwait) && !buffer_locked(saved_bh)) {
-printk("journal-813: BAD! buffer %lu %cdirty %cjwait, not in a newer tranasction\n", saved_bh->b_blocknr,
+printk("journal-813: BAD! buffer %llu %cdirty %cjwait, not in a newer tranasction\n", (unsigned long long)saved_bh->b_blocknr,
         was_dirty ? ' ' : '!', was_jwait ? ' ' : '!') ;
     }
     /* kupdate_one_transaction waits on the buffers it is writing, so we
     ** should never see locked buffers here
     */
     if (buffer_locked(saved_bh)) {
-      printk("clm-2083: locked buffer %lu in flush_journal_list\n", 
-              saved_bh->b_blocknr) ;
+      printk("clm-2083: locked buffer %llu in flush_journal_list\n", 
+              (unsigned long long)saved_bh->b_blocknr) ;
       wait_on_buffer(saved_bh) ;
       if (!buffer_uptodate(saved_bh)) {
         reiserfs_panic(s, "journal-923: buffer write failed\n") ;
@@ -1032,8 +1032,8 @@ printk("journal-813: BAD! buffer %lu %cdirty %cjwait, not in a newer tranasction
       submit_logged_buffer(saved_bh) ;
       count++ ;
     } else {
-      printk("clm-2082: Unable to flush buffer %lu in flush_journal_list\n",
-              saved_bh->b_blocknr) ;
+      printk("clm-2082: Unable to flush buffer %llu in flush_journal_list\n",
+              (unsigned long long)saved_bh->b_blocknr) ;
     }
 free_cnode:
     last = cn ;
@@ -2315,7 +2315,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   ** could get to disk too early.  NOT GOOD.
   */
   if (!prepared || buffer_locked(bh)) {
-    printk("journal-1777: buffer %lu bad state %cPREPARED %cLOCKED %cDIRTY %cJDIRTY_WAIT\n", bh->b_blocknr, prepared ? ' ' : '!', 
+    printk("journal-1777: buffer %llu bad state %cPREPARED %cLOCKED %cDIRTY %cJDIRTY_WAIT\n", (unsigned long long)bh->b_blocknr, prepared ? ' ' : '!', 
                             buffer_locked(bh) ? ' ' : '!',
 			    buffer_dirty(bh) ? ' ' : '!',
 			    buffer_journal_dirty(bh) ? ' ' : '!') ;

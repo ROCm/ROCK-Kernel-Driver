@@ -90,7 +90,7 @@ static devfs_handle_t devfs_handle;      /*  For the directory */
  * Transfer functions
  */
 static int transfer_none(struct loop_device *lo, int cmd, char *raw_buf,
-			 char *loop_buf, int size, int real_block)
+			 char *loop_buf, int size, sector_t real_block)
 {
 	if (raw_buf != loop_buf) {
 		if (cmd == READ)
@@ -103,7 +103,7 @@ static int transfer_none(struct loop_device *lo, int cmd, char *raw_buf,
 }
 
 static int transfer_xor(struct loop_device *lo, int cmd, char *raw_buf,
-			char *loop_buf, int size, int real_block)
+			char *loop_buf, int size, sector_t real_block)
 {
 	char	*in, *out, *key;
 	int	i, keysize;
@@ -154,16 +154,25 @@ struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
 	&xor_funcs  
 };
 
-#define MAX_DISK_SIZE 1024*1024*1024
-
-static void figure_loop_size(struct loop_device *lo)
+static int figure_loop_size(struct loop_device *lo)
 {
-	loff_t size = lo->lo_backing_file->f_dentry->d_inode->i_size;
-	set_capacity(disks[lo->lo_number], (size - lo->lo_offset) >> 9);
+	loff_t size = lo->lo_backing_file->f_dentry->d_inode->i_mapping->host->i_size;
+	sector_t x;
+	/*
+	 * Unfortunately, if we want to do I/O on the device,
+	 * the number of 512-byte sectors has to fit into a sector_t.
+	 */
+	size = (size - lo->lo_offset) >> 9;
+	x = (sector_t)size;
+	if ((loff_t)x != size)
+		return -EFBIG;
+
+	set_capacity(disks[lo->lo_number], size);
+	return 0;					
 }
 
 static inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
-				 char *lbuf, int size, int rblock)
+				 char *lbuf, int size, sector_t rblock)
 {
 	if (!lo->transfer)
 		return 0;
@@ -179,18 +188,18 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	struct address_space_operations *aops = mapping->a_ops;
 	struct page *page;
 	char *kaddr, *data;
-	unsigned long index;
+	pgoff_t index;
 	unsigned size, offset;
 	int len;
 	int ret = 0;
 
 	down(&mapping->host->i_sem);
 	index = pos >> PAGE_CACHE_SHIFT;
-	offset = pos & (PAGE_CACHE_SIZE - 1);
+	offset = pos & ((pgoff_t)PAGE_CACHE_SIZE - 1);
 	data = kmap(bvec->bv_page) + bvec->bv_offset;
 	len = bvec->bv_len;
 	while (len > 0) {
-		int IV = index * (PAGE_CACHE_SIZE/bsize) + offset/bsize;
+		sector_t IV = index * (PAGE_CACHE_SIZE/bsize) + offset/bsize;
 		int transfer_result;
 
 		size = PAGE_CACHE_SIZE - offset;
@@ -209,7 +218,7 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 			 * The transfer failed, but we still write the data to
 			 * keep prepare/commit calls balanced.
 			 */
-			printk(KERN_ERR "loop: transfer error block %ld\n", index);
+			printk(KERN_ERR "loop: transfer error block %llu\n", (unsigned long long)index);
 			memset(kaddr + offset, 0, size);
 		}
 		flush_dcache_page(page);
@@ -700,7 +709,11 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->lo_backing_file = file;
 	lo->transfer = NULL;
 	lo->ioctl = NULL;
-	figure_loop_size(lo);
+	if (figure_loop_size(lo)) {
+		error = -EFBIG;
+		fput(file);
+		goto out_putf;
+	}
 	lo->old_gfp_mask = inode->i_mapping->gfp_mask;
 	inode->i_mapping->gfp_mask = GFP_NOIO;
 
@@ -820,6 +833,7 @@ static int loop_set_status(struct loop_device *lo, struct loop_info *arg)
 	struct loop_info info; 
 	int err;
 	unsigned int type;
+	loff_t offset;
 
 	if (lo->lo_encrypt_key_size && lo->lo_key_owner != current->uid && 
 	    !capable(CAP_SYS_ADMIN))
@@ -835,13 +849,23 @@ static int loop_set_status(struct loop_device *lo, struct loop_info *arg)
 		return -EINVAL;
 	if (type == LO_CRYPT_XOR && info.lo_encrypt_key_size == 0)
 		return -EINVAL;
+
 	err = loop_release_xfer(lo);
 	if (!err) 
 		err = loop_init_xfer(lo, type, &info);
+
+	offset = lo->lo_offset;
+	if (offset != info.lo_offset) {
+		lo->lo_offset = info.lo_offset;
+		if (figure_loop_size(lo)){
+			err = -EFBIG;
+			lo->lo_offset = offset;
+		}
+	}
+
 	if (err)
 		return err;	
 
-	lo->lo_offset = info.lo_offset;
 	strncpy(lo->lo_name, info.lo_name, LO_NAME_SIZE);
 
 	lo->transfer = xfer_funcs[type]->transfer;
@@ -854,7 +878,7 @@ static int loop_set_status(struct loop_device *lo, struct loop_info *arg)
 		       info.lo_encrypt_key_size);
 		lo->lo_key_owner = current->uid; 
 	}	
-	figure_loop_size(lo);
+
 	return 0;
 }
 
@@ -1059,7 +1083,7 @@ int __init loop_init(void)
 	for (i = 0; i < max_loop; i++) {
 		struct loop_device *lo = &loop_dev[i];
 		struct gendisk *disk = disks[i];
-		memset(lo, 0, sizeof(struct loop_device));
+		memset(lo, 0, sizeof(*lo));
 		init_MUTEX(&lo->lo_ctl_mutex);
 		init_MUTEX_LOCKED(&lo->lo_sem);
 		init_MUTEX_LOCKED(&lo->lo_bh_mutex);

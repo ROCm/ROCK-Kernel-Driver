@@ -442,8 +442,8 @@ read_next:
 
 #ifdef DEBUG_READ
 	printk(KERN_DEBUG "%s:  promise_read: sectors(%ld-%ld), "
-	       "buf=0x%08lx, rem=%ld\n", drive->name, rq->sector,
-	       rq->sector+nsect-1,
+	       "buf=0x%08lx, rem=%ld\n", drive->name, (long)rq->sector,
+	       (long)rq->sector+nsect-1,
 #ifdef CONFIG_IDE_TASKFILE_IO
 		(unsigned long) to,
 #else /* !CONFIG_IDE_TASKFILE_IO */
@@ -670,8 +670,8 @@ static ide_startstop_t promise_write (ide_drive_t *drive)
 
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: promise_write: sectors(%ld-%ld), "
-	       "buffer=%p\n", drive->name, rq->sector,
-	       rq->sector + rq->nr_sectors - 1, rq->buffer);
+	       "buffer=%p\n", drive->name, (long)rq->sector,
+	       (long)rq->sector + rq->nr_sectors - 1, rq->buffer);
 #endif /* DEBUG_WRITE */
 
 	/*

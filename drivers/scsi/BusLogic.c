@@ -4200,7 +4200,7 @@ int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, struct block_device *Device,
       DiskParameters->Sectors = 32;
     }
   DiskParameters->Cylinders =
-    Disk->capacity / (DiskParameters->Heads * DiskParameters->Sectors);
+    (unsigned long)Disk->capacity / (DiskParameters->Heads * DiskParameters->Sectors);
   buf = scsi_bios_ptable(Device);
   if (buf == NULL) return 0;
   /*
@@ -4244,7 +4244,7 @@ int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, struct block_device *Device,
 	  PartitionEntryEndSector = FirstPartitionEntry->end_sector & 0x3F;
 	}
       DiskParameters->Cylinders =
-	Disk->capacity / (DiskParameters->Heads * DiskParameters->Sectors);
+	(unsigned long)Disk->capacity / (DiskParameters->Heads * DiskParameters->Sectors);
       if (PartitionNumber < 4 &&
 	  PartitionEntryEndSector == DiskParameters->Sectors)
 	{

@@ -130,8 +130,8 @@ int multipath_end_request(struct bio *bio, unsigned int bytes_done, int error)
 		 * oops, IO error:
 		 */
 		md_error (mp_bh->mddev, rdev);
-		printk(KERN_ERR "multipath: %s: rescheduling sector %lu\n", 
-		       bdev_partition_name(rdev->bdev), bio->bi_sector);
+		printk(KERN_ERR "multipath: %s: rescheduling sector %llu\n", 
+		       bdev_partition_name(rdev->bdev), (unsigned long long)bio->bi_sector);
 		multipath_reschedule_retry(mp_bh);
 	}
 	atomic_dec(&rdev->nr_pending);
@@ -320,10 +320,10 @@ abort:
 }
 
 #define IO_ERROR KERN_ALERT \
-"multipath: %s: unrecoverable IO read error for block %lu\n"
+"multipath: %s: unrecoverable IO read error for block %llu\n"
 
 #define REDIRECT_SECTOR KERN_ERR \
-"multipath: %s: redirecting sector %lu to another IO path\n"
+"multipath: %s: redirecting sector %llu to another IO path\n"
 
 /*
  * This is a kernel thread which:
@@ -356,11 +356,11 @@ static void multipathd (void *data)
 		rdev = NULL;
 		if (multipath_map (mddev, &rdev)<0) {
 			printk(IO_ERROR,
-				bdev_partition_name(bio->bi_bdev), bio->bi_sector);
+				bdev_partition_name(bio->bi_bdev), (unsigned long long)bio->bi_sector);
 			multipath_end_bh_io(mp_bh, 0);
 		} else {
 			printk(REDIRECT_SECTOR,
-				bdev_partition_name(bio->bi_bdev), bio->bi_sector);
+				bdev_partition_name(bio->bi_bdev), (unsigned long long)bio->bi_sector);
 			bio->bi_bdev = rdev->bdev;
 			generic_make_request(bio);
 		}

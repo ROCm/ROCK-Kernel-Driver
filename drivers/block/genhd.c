@@ -177,16 +177,16 @@ static int show_partition(struct seq_file *part, void *v)
 		return 0;
 
 	/* show the full disk and all non-0 size partitions of it */
-	seq_printf(part, "%4d  %4d %10ld %s\n",
+	seq_printf(part, "%4d  %4d %10llu %s\n",
 		sgp->major, sgp->first_minor,
-		get_capacity(sgp) >> 1,
+		(unsigned long long)get_capacity(sgp) >> 1,
 		disk_name(sgp, 0, buf));
 	for (n = 0; n < (1<<sgp->minor_shift) - 1; n++) {
 		if (sgp->part[n].nr_sects == 0)
 			continue;
-		seq_printf(part, "%4d  %4d %10ld %s\n",
+		seq_printf(part, "%4d  %4d %10llu %s\n",
 			sgp->major, n + 1 + sgp->first_minor,
-			sgp->part[n].nr_sects >> 1 ,
+			(unsigned long long)sgp->part[n].nr_sects >> 1 ,
 			disk_name(sgp, n + 1, buf));
 	}
 

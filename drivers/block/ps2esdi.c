@@ -535,8 +535,9 @@ static void do_ps2esdi_request(request_queue_t * q)
 	}
 	/* is request is valid */ 
 	else {
-		printk("Grrr. error. ps2esdi_drives: %d, %lu %lu\n", ps2esdi_drives,
-		       CURRENT->sector, get_capacity(ps2esdi_gendisk[unit]));
+		printk("Grrr. error. ps2esdi_drives: %d, %lu %llu\n",
+		    ps2esdi_drives, CURRENT->sector,
+		    (unsigned long long)get_capacity(ps2esdi_gendisk[unit]));
 		end_request(CURRENT, FAIL);
 	}
 

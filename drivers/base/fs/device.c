@@ -90,8 +90,7 @@ int device_create_file(struct device * dev, struct device_attribute * entry)
 {
 	int error = -EINVAL;
 
-	if (dev) {
-		get_device(dev);
+	if (get_device(dev)) {
 		error = driverfs_create_file(&entry->attr,&dev->dir);
 		put_device(dev);
 	}

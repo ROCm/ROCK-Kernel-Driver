@@ -30,7 +30,7 @@
 static int create_strip_zones (mddev_t *mddev)
 {
 	int i, c, j;
-	unsigned long current_offset, curr_zone_offset;
+	sector_t current_offset, curr_zone_offset;
 	raid0_conf_t *conf = mddev_to_conf(mddev);
 	mdk_rdev_t *smallest, *rdev1, *rdev2, *rdev;
 	struct list_head *tmp1, *tmp2;
@@ -46,9 +46,9 @@ static int create_strip_zones (mddev_t *mddev)
 		printk("raid0: looking at %s\n", bdev_partition_name(rdev1->bdev));
 		c = 0;
 		ITERATE_RDEV(mddev,rdev2,tmp2) {
-			printk("raid0:   comparing %s(%ld) with %s(%ld)\n",
-			       bdev_partition_name(rdev1->bdev), rdev1->size,
-			       bdev_partition_name(rdev2->bdev), rdev2->size);
+			printk("raid0:   comparing %s(%llu) with %s(%llu)\n",
+			       bdev_partition_name(rdev1->bdev), (unsigned long long)rdev1->size,
+			       bdev_partition_name(rdev2->bdev), (unsigned long long)rdev2->size);
 			if (rdev2 == rdev1) {
 				printk("raid0:   END\n");
 				break;
@@ -135,7 +135,8 @@ static int create_strip_zones (mddev_t *mddev)
 				c++;
 				if (!smallest || (rdev->size <smallest->size)) {
 					smallest = rdev;
-					printk("  (%ld) is smallest!.\n", rdev->size);
+					printk("  (%llu) is smallest!.\n", 
+					       (unsigned long long)rdev->size);
 				}
 			} else
 				printk(" nope.\n");
@@ -143,7 +144,7 @@ static int create_strip_zones (mddev_t *mddev)
 
 		zone->nb_dev = c;
 		zone->size = (smallest->size - current_offset) * c;
-		printk("raid0: zone->nb_dev: %d, size: %ld\n",zone->nb_dev,zone->size);
+		printk("raid0: zone->nb_dev: %d, size: %llu\n",zone->nb_dev, (unsigned long long)zone->size);
 
 		if (!conf->smallest || (zone->size < conf->smallest->size))
 			conf->smallest = zone;
@@ -152,7 +153,7 @@ static int create_strip_zones (mddev_t *mddev)
 		curr_zone_offset += zone->size;
 
 		current_offset = smallest->size;
-		printk("raid0: current zone offset: %ld\n", current_offset);
+		printk("raid0: current zone offset: %llu\n", (unsigned long long)current_offset);
 	}
 	printk("raid0: done.\n");
 	return 0;
@@ -163,7 +164,9 @@ static int create_strip_zones (mddev_t *mddev)
 
 static int raid0_run (mddev_t *mddev)
 {
-	unsigned long cur=0, i=0, size, zone0_size, nb_zone;
+	unsigned  cur=0, i=0, nb_zone;
+	sector_t zone0_size;
+	s64 size;
 	raid0_conf_t *conf;
 
 	MOD_INC_USE_COUNT;
@@ -176,16 +179,21 @@ static int raid0_run (mddev_t *mddev)
 	if (create_strip_zones (mddev)) 
 		goto out_free_conf;
 
-	printk("raid0 : md_size is %d blocks.\n", md_size[mdidx(mddev)]);
-	printk("raid0 : conf->smallest->size is %ld blocks.\n", conf->smallest->size);
-	nb_zone = md_size[mdidx(mddev)]/conf->smallest->size +
-			(md_size[mdidx(mddev)] % conf->smallest->size ? 1 : 0);
-	printk("raid0 : nb_zone is %ld.\n", nb_zone);
+	printk("raid0 : md_size is %llu blocks.\n", (unsigned long long)md_size[mdidx(mddev)]);
+	printk("raid0 : conf->smallest->size is %llu blocks.\n", (unsigned long long)conf->smallest->size);
+	{
+#if __GNUC__ < 3
+		volatile
+#endif
+		sector_t s = md_size[mdidx(mddev)];
+		int round = sector_div(s, (unsigned long)conf->smallest->size) ? 1 : 0;
+		nb_zone = s + round;
+	}
+	printk("raid0 : nb_zone is %d.\n", nb_zone);
 	conf->nr_zones = nb_zone;
 
-	printk("raid0 : Allocating %ld bytes for hash.\n",
+	printk("raid0 : Allocating %d bytes for hash.\n",
 				nb_zone*sizeof(struct raid0_hash));
-
 	conf->hash_table = vmalloc (sizeof (struct raid0_hash)*nb_zone);
 	if (!conf->hash_table)
 		goto out_free_zone_conf;
@@ -269,15 +277,22 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 	struct raid0_hash *hash;
 	struct strip_zone *zone;
 	mdk_rdev_t *tmp_dev;
-	unsigned long chunk, block, rsect;
+	unsigned long chunk;
+	sector_t block, rsect;
 
 	chunk_size = mddev->chunk_size >> 10;
 	chunksize_bits = ffz(~chunk_size);
 	block = bio->bi_sector >> 1;
-	hash = conf->hash_table + block / conf->smallest->size;
+	
+
+	{
+		sector_t x = block;
+		sector_div(x, (unsigned long)conf->smallest->size);
+		hash = conf->hash_table + x;
+	}
 
 	/* Sanity check */
-	if (chunk_size < (block % chunk_size) + (bio->bi_size >> 10))
+	if (chunk_size < (block & (chunk_size - 1)) + (bio->bi_size >> 10))
 		goto bad_map;
  
 	if (!hash)
@@ -294,8 +309,18 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 		zone = hash->zone0;
     
 	sect_in_chunk = bio->bi_sector & ((chunk_size<<1) -1);
-	chunk = (block - zone->zone_offset) / (zone->nb_dev << chunksize_bits);
-	tmp_dev = zone->dev[(block >> chunksize_bits) % zone->nb_dev];
+
+
+	{
+		sector_t x =  block - zone->zone_offset;
+
+		sector_div(x, (zone->nb_dev << chunksize_bits));
+		chunk = x;
+		BUG_ON(x != (sector_t)chunk);
+
+		x = block >> chunksize_bits;
+		tmp_dev = zone->dev[sector_div(x, zone->nb_dev)];
+	}
 	rsect = (((chunk << chunksize_bits) + zone->dev_offset)<<1)
 		+ sect_in_chunk;
  
@@ -312,16 +337,16 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 	return 1;
 
 bad_map:
-	printk ("raid0_make_request bug: can't convert block across chunks or bigger than %dk %ld %d\n", chunk_size, bio->bi_sector, bio->bi_size >> 10);
+	printk ("raid0_make_request bug: can't convert block across chunks or bigger than %dk %llu %d\n", chunk_size, (unsigned long long)bio->bi_sector, bio->bi_size >> 10);
 	goto outerr;
 bad_hash:
-	printk("raid0_make_request bug: hash==NULL for block %ld\n", block);
+	printk("raid0_make_request bug: hash==NULL for block %llu\n", (unsigned long long)block);
 	goto outerr;
 bad_zone0:
-	printk ("raid0_make_request bug: hash->zone0==NULL for block %ld\n", block);
+	printk ("raid0_make_request bug: hash->zone0==NULL for block %llu\n", (unsigned long long)block);
 	goto outerr;
 bad_zone1:
-	printk ("raid0_make_request bug: hash->zone1==NULL for block %ld\n", block);
+	printk ("raid0_make_request bug: hash->zone1==NULL for block %llu\n", (unsigned long long)block);
  outerr:
 	bio_io_error(bio, bio->bi_size);
 	return 0;

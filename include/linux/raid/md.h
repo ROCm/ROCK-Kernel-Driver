@@ -60,7 +60,7 @@
 #define MD_MINOR_VERSION                90
 #define MD_PATCHLEVEL_VERSION           0
 
-extern int md_size[MAX_MD_DEVS];
+extern sector_t md_size[MAX_MD_DEVS];
 
 extern inline char * bdev_partition_name (struct block_device *bdev)
 {

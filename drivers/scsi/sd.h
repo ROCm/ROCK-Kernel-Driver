@@ -21,7 +21,7 @@
 #endif
 
 typedef struct scsi_disk {
-	unsigned capacity;		/* size in 512-byte sectors */
+	sector_t capacity;		/* size in 512-byte sectors */
 	Scsi_Device *device;
 	unsigned char media_present;
 	unsigned char write_prot;

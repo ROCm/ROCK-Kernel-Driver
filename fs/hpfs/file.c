@@ -111,7 +111,7 @@ static int hpfs_prepare_write(struct file *file, struct page *page, unsigned fro
 	return cont_prepare_write(page,from,to,hpfs_get_block,
 		&hpfs_i(page->mapping->host)->mmu_private);
 }
-static int _hpfs_bmap(struct address_space *mapping, long block)
+static sector_t _hpfs_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,hpfs_get_block);
 }

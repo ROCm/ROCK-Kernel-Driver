@@ -802,9 +802,9 @@ void nftl_request(RQFUNC_ARG)
 
 		DEBUG(MTD_DEBUG_LEVEL2, "NFTL_request\n");
 		DEBUG(MTD_DEBUG_LEVEL3,
-		      "NFTL %s request, from sector 0x%04lx for %d sectors\n",
+		      "NFTL %s request, from sector 0x%04llx for %d sectors\n",
 		      (req->cmd == READ) ? "Read " : "Write",
-		      req->sector, req->current_nr_sectors);
+		      (unsigned long long)req->sector, req->current_nr_sectors);
 
 		dev = minor(req->rq_dev);
 		block = req->sector;

@@ -671,7 +671,7 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 	} while (bit < __REQ_NR_BITS);
 
 	if (rq->flags & REQ_CMD)
-		printk("sector %lu, nr/cnr %lu/%u\n", rq->sector,
+		printk("sector %llu, nr/cnr %lu/%u\n", (unsigned long long)rq->sector,
 						       rq->nr_sectors,
 						       rq->current_nr_sectors);
 
@@ -1817,10 +1817,10 @@ void generic_make_request(struct bio *bio)
 			 * device, e.g., when mounting a device. */
 			printk(KERN_INFO
 			       "attempt to access beyond end of device\n");
-			printk(KERN_INFO "%s: rw=%ld, want=%ld, limit=%Lu\n",
+			printk(KERN_INFO "%s: rw=%ld, want=%Lu, limit=%Lu\n",
 			       bdevname(bio->bi_bdev),
 			       bio->bi_rw,
-			       sector + nr_sectors,
+			       (unsigned long long) sector + nr_sectors,
 			       (long long) maxsector);
 
 			set_bit(BIO_EOF, &bio->bi_flags);
@@ -1849,8 +1849,10 @@ end_io:
 		}
 
 		if (unlikely(bio_sectors(bio) > q->max_sectors)) {
-			printk("bio too big (%u > %u)\n", bio_sectors(bio),
-							q->max_sectors);
+			printk("bio too big device %s (%u > %u)\n", 
+			       bdevname(bio->bi_bdev),
+			       bio_sectors(bio),
+			       q->max_sectors);
 			goto end_io;
 		}
 
@@ -1953,8 +1955,8 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 
 	req->errors = 0;
 	if (!uptodate) {
-		printk("end_request: I/O error, dev %s, sector %lu\n",
-			kdevname(req->rq_dev), req->sector);
+		printk("end_request: I/O error, dev %s, sector %llu\n",
+			kdevname(req->rq_dev), (unsigned long long)req->sector);
 		error = -EIO;
 	}
 

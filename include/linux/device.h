@@ -289,6 +289,7 @@ struct device {
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 
+	u32		present;
 	u32		current_state;  /* Current operating state. In
 					   ACPI-speak, this is D0-D3, D0
 					   being fully functional, and D3
@@ -327,7 +328,7 @@ dev_set_drvdata (struct device *dev, void *data)
  * High level routines for use by the bus drivers
  */
 extern int device_register(struct device * dev);
-
+extern void device_unregister(struct device * dev);
 
 /* driverfs interface for exporting device attributes */
 

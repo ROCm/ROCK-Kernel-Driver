@@ -789,7 +789,7 @@ void usb_disconnect(struct usb_device **pdev)
 			struct usb_interface *interface = &dev->actconfig->interface[i];
 
 			/* remove this interface */
-			put_device(&interface->dev);
+			device_unregister(&interface->dev);
 		}
 	}
 
@@ -797,7 +797,7 @@ void usb_disconnect(struct usb_device **pdev)
 	if (dev->devnum > 0) {
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		usbfs_remove_device(dev);
-		put_device(&dev->dev);
+		device_unregister(&dev->dev);
 	}
 
 	/* Decrement the reference count, it'll auto free everything when */

@@ -145,7 +145,7 @@ static int bfs_prepare_write(struct file *file, struct page *page, unsigned from
 	return block_prepare_write(page, from, to, bfs_get_block);
 }
 
-static int bfs_bmap(struct address_space *mapping, long block)
+static sector_t bfs_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping, block, bfs_get_block);
 }
