@@ -441,6 +441,8 @@ acpi_processor_set_power_policy (
 
 static int acpi_processor_get_power_info_fadt (struct acpi_processor *pr)
 {
+	int i;
+
 	ACPI_FUNCTION_TRACE("acpi_processor_get_power_info_fadt");
 
 	if (!pr)
@@ -448,6 +450,9 @@ static int acpi_processor_get_power_info_fadt (struct acpi_processor *pr)
 
 	if (!pr->pblk)
 		return_VALUE(-ENODEV);
+
+	for (i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++)
+		memset(pr->power.states, 0, sizeof(struct acpi_processor_cx));
 
 	/* if info is obtained from pblk/fadt, type equals state */
 	pr->power.states[ACPI_STATE_C1].type = ACPI_STATE_C1;
@@ -473,6 +478,129 @@ static int acpi_processor_get_power_info_fadt (struct acpi_processor *pr)
 			  pr->power.states[ACPI_STATE_C3].address));
 
 	return_VALUE(0);
+}
+
+
+static int acpi_processor_get_power_info_cst (struct acpi_processor *pr)
+{
+	acpi_status		status = 0;
+	acpi_integer		count;
+	int			i;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object	*cst;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_get_power_info_cst");
+
+	if (errata.smp)
+		return_VALUE(-ENODEV);
+	pr->power.count = 0;
+	for (i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++)
+		memset(pr->power.states, 0, sizeof(struct acpi_processor_cx));
+
+	status = acpi_evaluate_object(pr->handle, "_CST", NULL, &buffer);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "No _CST, giving up\n"));
+		return_VALUE(-ENODEV);
+ 	}
+
+	cst = (union acpi_object *) buffer.pointer;
+
+	/* There must be at least 2 elements */
+	if (!cst || (cst->type != ACPI_TYPE_PACKAGE) || cst->package.count < 2) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "not enough elements in _CST\n"));
+		status = -EFAULT;
+		goto end;
+	}
+
+	count = cst->package.elements[0].integer.value;
+
+	/* Validate number of power states. */
+	if (count < 1 || count != cst->package.count - 1) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "count given by _CST is not valid\n"));
+		status = -EFAULT;
+		goto end;
+	}
+
+	/* We support up to ACPI_PROCESSOR_MAX_POWER. */
+	if (count > ACPI_PROCESSOR_MAX_POWER) {
+		printk(KERN_WARNING "Limiting number of power states to max (%d)\n", ACPI_PROCESSOR_MAX_POWER);
+		printk(KERN_WARNING "Please increase ACPI_PROCESSOR_MAX_POWER if needed.\n");
+		count = ACPI_PROCESSOR_MAX_POWER;
+	}
+
+	/* Tell driver that at least _CST is supported. */
+	pr->flags.has_cst = 1;
+
+	for (i = 1; i <= count; i++) {
+		union acpi_object *element;
+		union acpi_object *obj;
+		struct acpi_power_register *reg;
+		struct acpi_processor_cx cx;
+
+		memset(&cx, 0, sizeof(cx));
+
+		element = (union acpi_object *) &(cst->package.elements[i]);
+		if (element->type != ACPI_TYPE_PACKAGE)
+			continue;
+
+		if (element->package.count != 4)
+			continue;
+
+		obj = (union acpi_object *) &(element->package.elements[0]);
+
+		if (obj->type != ACPI_TYPE_BUFFER)
+			continue;
+
+		reg = (struct acpi_power_register *) obj->buffer.pointer;
+
+		if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO &&
+			(reg->space_id != ACPI_ADR_SPACE_FIXED_HARDWARE))
+			continue;
+
+		cx.address = (reg->space_id == ACPI_ADR_SPACE_FIXED_HARDWARE) ?
+			0 : reg->address;
+
+		/* There should be an easy way to extract an integer... */
+		obj = (union acpi_object *) &(element->package.elements[1]);
+		if (obj->type != ACPI_TYPE_INTEGER)
+			continue;
+
+		cx.type = obj->integer.value;
+
+		if ((cx.type != ACPI_STATE_C1) &&
+		    (reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO))
+			continue;
+
+		if ((cx.type < ACPI_STATE_C1) ||
+		    (cx.type > ACPI_STATE_C3))
+			continue;
+
+		obj = (union acpi_object *) &(element->package.elements[2]);
+		if (obj->type != ACPI_TYPE_INTEGER)
+			continue;
+
+		cx.latency = obj->integer.value;
+
+		obj = (union acpi_object *) &(element->package.elements[3]);
+		if (obj->type != ACPI_TYPE_INTEGER)
+			continue;
+
+		cx.power = obj->integer.value;
+
+		(pr->power.count)++;
+		memcpy(&(pr->power.states[pr->power.count]), &cx, sizeof(cx));
+	}
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %d power states\n", pr->power.count));
+
+	/* Validate number of power states discovered */
+	if (pr->power.count < 2)
+		status = -ENODEV;
+
+end:
+	acpi_os_free(buffer.pointer);
+
+	return_VALUE(status);
 }
 
 
@@ -576,10 +704,15 @@ static void acpi_processor_power_verify_c3(
 static int acpi_processor_power_verify(struct acpi_processor *pr)
 {
 	unsigned int i;
+	unsigned int working = 0;
+
 	for (i=1; i < ACPI_PROCESSOR_MAX_POWER; i++) {
 		struct acpi_processor_cx *cx = &pr->power.states[i];
 
 		switch (cx->type) {
+		case ACPI_STATE_C1:
+			cx->valid = 1;
+			break;
 
 		case ACPI_STATE_C2:
 			acpi_processor_power_verify_c2(cx);
@@ -589,9 +722,12 @@ static int acpi_processor_power_verify(struct acpi_processor *pr)
 			acpi_processor_power_verify_c3(pr, cx);
 			break;
 		}
+
+		if (cx->valid)
+			working++;
 	}
 
-	return 0;
+	return (working);
 }
 
 int acpi_processor_get_power_info (
@@ -605,13 +741,15 @@ int acpi_processor_get_power_info (
 	/* NOTE: the idle thread may not be running while calling
 	 * this function */
 
-	for (i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++)
-		memset(pr->power.states, 0, sizeof(struct acpi_processor_cx));
+	result = acpi_processor_get_power_info_cst(pr);
+	if ((result) || (acpi_processor_power_verify(pr) < 2)) {
+		result = acpi_processor_get_power_info_fadt(pr);
+		if (result)
+			return_VALUE(result);
 
-	acpi_processor_get_power_info_fadt(pr);
-
-	acpi_processor_power_verify(pr);
-
+		if (acpi_processor_power_verify(pr) < 2)
+			return_VALUE(-ENODEV);
+	}
 
 	/*
 	 * Set Default Policy
@@ -629,8 +767,9 @@ int acpi_processor_get_power_info (
 	 * if one state of type C2 or C3 is available, mark this
 	 * CPU as being "idle manageable"
 	 */
-
-	for (i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++) {
+	for (i = 1; i < ACPI_PROCESSOR_MAX_POWER; i++) {
+		if (pr->power.states[i].valid)
+			pr->power.count = i;
 		if ((pr->power.states[i].valid) &&
 		    (pr->power.states[i].type >= ACPI_STATE_C2))
 			pr->flags.power = 1;
@@ -661,7 +800,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 
 	seq_puts(seq, "states:\n");
 
-	for (i = 1; i < ACPI_C_STATE_COUNT; i++) {
+	for (i = 1; i <= pr->power.count; i++) {
 		seq_printf(seq, "   %c%d:                  ",
 			(&pr->power.states[i] == pr->power.state?'*':' '), i);
 

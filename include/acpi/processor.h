@@ -6,7 +6,7 @@
 
 #define ACPI_PROCESSOR_BUSY_METRIC	10
 
-#define ACPI_PROCESSOR_MAX_POWER	ACPI_C_STATE_COUNT
+#define ACPI_PROCESSOR_MAX_POWER	8
 #define ACPI_PROCESSOR_MAX_C2_LATENCY	100
 #define ACPI_PROCESSOR_MAX_C3_LATENCY	1000
 
@@ -17,6 +17,17 @@
 /* Power Management */
 
 struct acpi_processor_cx;
+
+struct acpi_power_register {
+	u8			descriptor;
+	u16			length;
+	u8			space_id;
+	u8			bit_width;
+	u8			bit_offset;
+	u8			reserved;
+	u64			address;
+} __attribute__ ((packed));
+
 
 struct acpi_processor_cx_policy {
 	u32			count;
@@ -45,6 +56,7 @@ struct acpi_processor_power {
 	struct acpi_processor_cx *state;
 	u32			default_state;
 	u32			bm_activity;
+	int			count;
 	struct acpi_processor_cx states[ACPI_PROCESSOR_MAX_POWER];
 };
 
@@ -122,6 +134,7 @@ struct acpi_processor_flags {
 	u8			limit:1;
 	u8			bm_control:1;
 	u8			bm_check:1;
+	u8			has_cst:1;
 	u8			reserved:2;
 };
 
