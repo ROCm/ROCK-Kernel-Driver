@@ -12,7 +12,7 @@
  * add themselves as children of the system bus.
  */
 
-#undef DEBUG
+#define DEBUG
 
 #include <linux/device.h>
 #include <linux/err.h>
@@ -22,130 +22,307 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 
-/* The default system device parent. */
-static struct device system_bus = {
-       .name           = "System Bus",
-       .bus_id         = "sys",
-};
+
+extern struct subsystem devices_subsys;
+
+/* 
+ * declare system_subsys 
+ */
+decl_subsys(system,NULL,NULL);
+
+int sysdev_class_register(struct sysdev_class * cls)
+{
+	pr_debug("Registering sysdev class '%s'\n",cls->kset.kobj.name);
+	INIT_LIST_HEAD(&cls->drivers);
+	cls->kset.subsys = &system_subsys;
+	kset_set_kset_s(cls,system_subsys);
+	return kset_register(&cls->kset);
+}
+
+void sysdev_class_unregister(struct sysdev_class * cls)
+{
+	pr_debug("Unregistering sysdev class '%s'\n",cls->kset.kobj.name);
+	kset_unregister(&cls->kset);
+}
+
+EXPORT_SYMBOL(sysdev_class_register);
+EXPORT_SYMBOL(sysdev_class_unregister);
+
+
+static LIST_HEAD(global_drivers);
+
+/**
+ *	sysdev_driver_register - Register auxillary driver
+ * 	@cls:	Device class driver belongs to.
+ *	@drv:	Driver.
+ *
+ *	If @cls is valid, then @drv is inserted into @cls->drivers to be 
+ *	called on each operation on devices of that class. The refcount
+ *	of @cls is incremented. 
+ *	Otherwise, @drv is inserted into global_drivers, and called for 
+ *	each device.
+ */
+
+int sysdev_driver_register(struct sysdev_class * cls, 
+			   struct sysdev_driver * drv)
+{
+	down_write(&system_subsys.rwsem);
+	if (kset_get(&cls->kset))
+		list_add_tail(&drv->entry,&cls->drivers);
+	else
+		list_add_tail(&drv->entry,&global_drivers);
+	up_write(&system_subsys.rwsem);
+	return 0;
+}
 
 
 /**
- *	sys_register_root - add a subordinate system root
- *	@root:	new root
- *	
- *	This is for NUMA-like systems so they can accurately 
- *	represent the topology of the entire system.
- *	As boards are discovered, a new struct sys_root should 
- *	be allocated and registered. 
- *	The discovery mechanism should initialize the id field
- *	of the struture, as well as much of the embedded device
- *	structure as possible, inlcuding the name, the bus_id
- *	and parent fields.
- *
- *	This simply calls device_register on the embedded device.
- *	On success, it will use the struct @root->sysdev 
- *	device to create a pseudo-parent for system devices
- *	on that board.
- *
- *	The platform code can then use @root to specifiy the
- *	controlling board when discovering and registering 
- *	system devices.
+ *	sysdev_driver_unregister - Remove an auxillary driver.
+ *	@cls:	Class driver belongs to.
+ *	@drv:	Driver.
  */
-int sys_register_root(struct sys_root * root)
+void sysdev_driver_unregister(struct sysdev_class * cls,
+			      struct sysdev_driver * drv)
 {
-	int error = 0;
-
-	if (!root)
-		return -EINVAL;
-
-	if (!root->dev.parent)
-		root->dev.parent = &system_bus;
-
-	pr_debug("Registering system board %d\n",root->id);
-
-	error = device_register(&root->dev);
-	if (!error) {
-		strlcpy(root->sysdev.bus_id,"sys",BUS_ID_SIZE);
-		strlcpy(root->sysdev.name,"System Bus",DEVICE_NAME_SIZE);
-		root->sysdev.parent = &root->dev;
-		error = device_register(&root->sysdev);
-	};
-
-	return error;
+	down_write(&system_subsys.rwsem);
+	list_del_init(&drv->entry);
+	if (cls)
+		kset_put(&cls->kset);
+	up_write(&system_subsys.rwsem);
 }
 
-/**
- *	sys_unregister_root - remove subordinate root from tree
- *	@root:	subordinate root in question.
- *
- *	We only decrement the reference count on @root->sysdev 
- *	and @root->dev.
- *	If both are 0, they will be cleaned up by the core.
- */
-void sys_unregister_root(struct sys_root *root)
-{
-	device_unregister(&root->sysdev);
-	device_unregister(&root->dev);
-}
 
 /**
  *	sys_device_register - add a system device to the tree
  *	@sysdev:	device in question
  *
- *	The hardest part about this is getting the ancestry right.
- *	If the device has a parent - super! We do nothing.
- *	If the device doesn't, but @dev->root is set, then we're
- *	dealing with a NUMA like architecture where each root
- *	has a system pseudo-bus to foster the device.
- *	If not, then we fallback to system_bus (at the top of 
- *	this file). 
- *
- *	One way or another, we call device_register() on it and 
- *	are done.
- *
- *	The caller is also responsible for initializing the bus_id 
- *	and name fields of @sysdev->dev.
  */
 int sys_device_register(struct sys_device * sysdev)
 {
-	if (!sysdev)
+	int error;
+	struct sysdev_class * cls = sysdev->cls;
+
+	if (!cls)
 		return -EINVAL;
 
-	if (!sysdev->dev.parent) {
-		if (sysdev->root)
-			sysdev->dev.parent = &sysdev->root->sysdev;
-		else
-			sysdev->dev.parent = &system_bus;
+	/* Make sure the kset is set */
+	sysdev->kobj.kset = &cls->kset;
+
+	/* set the kobject name */
+	snprintf(sysdev->kobj.name,KOBJ_NAME_LEN,"%s%d",
+		 cls->kset.kobj.name,sysdev->id);
+
+	pr_debug("Registering sys device '%s'\n",sysdev->kobj.name);
+
+	/* Register the object */
+	error = kobject_register(&sysdev->kobj);
+
+	if (!error) {
+		struct sysdev_driver * drv;
+
+		down_read(&system_subsys.rwsem);
+		/* Generic notification is implicit, because it's that 
+		 * code that should have called us. 
+		 */
+
+		/* Notify global drivers */
+		list_for_each_entry(drv,&global_drivers,entry) {
+			if (drv->add)
+				drv->add(sysdev);
+		}
+
+		/* Notify class auxillary drivers */
+		list_for_each_entry(drv,&cls->drivers,entry) {
+			if (drv->add)
+				drv->add(sysdev);
+		}
+		up_read(&system_subsys.rwsem);
 	}
-
-	/* make sure bus type is set */
-	if (!sysdev->dev.bus)
-		sysdev->dev.bus = &system_bus_type;
-
-	/* construct bus_id */
-	snprintf(sysdev->dev.bus_id,BUS_ID_SIZE,"%s%u",sysdev->name,sysdev->id);
-
-	pr_debug("Registering system device %s\n", sysdev->dev.bus_id);
-
-	return device_register(&sysdev->dev);
+	return error;
 }
 
 void sys_device_unregister(struct sys_device * sysdev)
 {
-	if (sysdev)
-		device_unregister(&sysdev->dev);
+	struct sysdev_driver * drv;
+
+	down_read(&system_subsys.rwsem);
+	list_for_each_entry(drv,&global_drivers,entry) {
+		if (drv->remove)
+			drv->remove(sysdev);
+	}
+
+	list_for_each_entry(drv,&sysdev->cls->drivers,entry) {
+		if (drv->remove)
+			drv->remove(sysdev);
+	}
+	up_read(&system_subsys.rwsem);
+
+	kobject_unregister(&sysdev->kobj);
 }
 
-struct bus_type system_bus_type = {
-	.name		= "system",
-};
+
+
+/**
+ *	sys_device_shutdown - Shut down all system devices.
+ *
+ *	Loop over each class of system devices, and the devices in each
+ *	of those classes. For each device, we call the shutdown method for
+ *	each driver registered for the device - the globals, the auxillaries,
+ *	and the class driver. 
+ *
+ *	Note: The list is iterated in reverse order, so that we shut down
+ *	child devices before we shut down thier parents. The list ordering
+ *	is guaranteed by virtue of the fact that child devices are registered
+ *	after their parents. 
+ */
+
+void sys_device_shutdown(void)
+{
+	struct sysdev_class * cls;
+
+	pr_debug("Shutting Down System Devices\n");
+
+	down_write(&system_subsys.rwsem);
+	list_for_each_entry_reverse(cls,&system_subsys.kset.list,
+				    kset.kobj.entry) {
+		struct sys_device * sysdev;
+
+		pr_debug("Shutting down type '%s':\n",cls->kset.kobj.name);
+
+		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
+			struct sysdev_driver * drv;
+			pr_debug(" %s\n",sysdev->kobj.name);
+
+			/* Call global drivers first. */
+			list_for_each_entry(drv,&global_drivers,entry) {
+				if (drv->shutdown)
+					drv->shutdown(sysdev);
+			}
+
+			/* Call auxillary drivers next. */
+			list_for_each_entry(drv,&cls->drivers,entry) {
+				if (drv->shutdown)
+					drv->shutdown(sysdev);
+			}
+
+			/* Now call the generic one */
+			if (cls->shutdown)
+				cls->shutdown(sysdev);
+		}
+	}
+	up_write(&system_subsys.rwsem);
+}
+
+
+/**
+ *	sys_device_suspend - Suspend all system devices.
+ *	@state:		Power state to enter.
+ *
+ *	We perform an almost identical operation as sys_device_shutdown()
+ *	above, though calling ->suspend() instead.
+ *
+ *	Note: Interrupts are disabled when called, so we can't sleep when
+ *	trying to get the subsystem's rwsem. If that happens, print a nasty
+ *	warning and return an error.
+ */
+
+int sys_device_suspend(u32 state)
+{
+	struct sysdev_class * cls;
+
+	pr_debug("Suspending System Devices\n");
+
+	if (!down_write_trylock(&system_subsys.rwsem)) {
+		printk("%s: Cannot acquire semaphore; Failing\n",__FUNCTION__);
+		return -EFAULT;
+	}
+
+	list_for_each_entry_reverse(cls,&system_subsys.kset.list,
+				    kset.kobj.entry) {
+		struct sys_device * sysdev;
+
+		pr_debug("Suspending type '%s':\n",cls->kset.kobj.name);
+
+		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
+			struct sysdev_driver * drv;
+			pr_debug(" %s\n",sysdev->kobj.name);
+
+			/* Call global drivers first. */
+			list_for_each_entry(drv,&global_drivers,entry) {
+				if (drv->suspend)
+					drv->suspend(sysdev,state);
+			}
+
+			/* Call auxillary drivers next. */
+			list_for_each_entry(drv,&cls->drivers,entry) {
+				if (drv->suspend)
+					drv->suspend(sysdev,state);
+			}
+
+			/* Now call the generic one */
+			if (cls->suspend)
+				cls->suspend(sysdev,state);
+		}
+	}
+	up_write(&system_subsys.rwsem);
+
+	return 0;
+}
+
+
+/**
+ *	sys_device_resume - Bring system devices back to life.
+ *
+ *	Similar to sys_device_suspend(), but we iterate the list forwards
+ *	to guarantee that parent devices are resumed before their children.
+ *
+ *	Note: Interrupts are disabled when called.
+ */
+
+int sys_device_resume(void)
+{
+	struct sysdev_class * cls;
+
+	pr_debug("Resuming System Devices\n");
+
+	if(!down_write_trylock(&system_subsys.rwsem))
+		return -EFAULT;
+
+	list_for_each_entry(cls,&system_subsys.kset.list,kset.kobj.entry) {
+		struct sys_device * sysdev;
+
+		pr_debug("Resuming type '%s':\n",cls->kset.kobj.name);
+
+		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
+			struct sysdev_driver * drv;
+			pr_debug(" %s\n",sysdev->kobj.name);
+
+			/* Call global drivers first. */
+			list_for_each_entry(drv,&global_drivers,entry) {
+				if (drv->resume)
+					drv->resume(sysdev);
+			}
+
+			/* Call auxillary drivers next. */
+			list_for_each_entry(drv,&cls->drivers,entry) {
+				if (drv->resume)
+					drv->resume(sysdev);
+			}
+
+			/* Now call the generic one */
+			if (cls->resume)
+				cls->resume(sysdev);
+		}
+	}
+	up_write(&system_subsys.rwsem);
+	return 0;
+}
 
 int __init sys_bus_init(void)
 {
-	bus_register(&system_bus_type);
-	return device_register(&system_bus);
+	system_subsys.kset.kobj.parent = &devices_subsys.kset.kobj;
+	return subsystem_register(&system_subsys);
 }
 
-EXPORT_SYMBOL(system_bus_type);
 EXPORT_SYMBOL(sys_device_register);
 EXPORT_SYMBOL(sys_device_unregister);

@@ -351,24 +351,72 @@ extern int (*platform_notify_remove)(struct device * dev);
 extern struct device * get_device(struct device * dev);
 extern void put_device(struct device * dev);
 
+
 /* drivers/base/sys.c */
 
-struct sys_root {
-	u32		id;
-	struct device 	dev;
-	struct device	sysdev;
+/**
+ * System devices follow a slightly different driver model. 
+ * They don't need to do dynammic driver binding, can't be probed, 
+ * and don't reside on any type of peripheral bus. 
+ * So, we represent and treat them a little differently.
+ * 
+ * We still have a notion of a driver for a system device, because we still
+ * want to perform basic operations on these devices. 
+ *
+ * We also support auxillary drivers binding to devices of a certain class.
+ * 
+ * This allows configurable drivers to register themselves for devices of
+ * a certain type. And, it allows class definitions to reside in generic
+ * code while arch-specific code can register specific drivers.
+ *
+ * Auxillary drivers registered with a NULL cls are registered as drivers
+ * for all system devices, and get notification calls for each device. 
+ */
+
+struct sys_device;
+
+struct sysdev_class {
+	struct list_head	drivers;
+
+	/* Default operations for these types of devices */
+	int	(*shutdown)(struct sys_device *);
+	int	(*suspend)(struct sys_device *, u32 state);
+	int	(*resume)(struct sys_device *);
+	struct kset		kset;
 };
 
-extern int sys_register_root(struct sys_root *);
-extern void sys_unregister_root(struct sys_root *);
 
+extern int sysdev_class_register(struct sysdev_class *);
+extern void sysdev_class_unregister(struct sysdev_class *);
+
+
+/**
+ * Auxillary system device drivers.
+ */
+
+struct sysdev_driver {
+	struct list_head	entry;
+	int	(*add)(struct sys_device *);
+	int	(*remove)(struct sys_device *);
+	int	(*shutdown)(struct sys_device *);
+	int	(*suspend)(struct sys_device *, u32 state);
+	int	(*resume)(struct sys_device *);
+};
+
+
+extern int sysdev_driver_register(struct sysdev_class *, struct sysdev_driver *);
+extern void sysdev_driver_unregister(struct sysdev_class *, struct sysdev_driver *);
+
+
+/**
+ * sys_devices can be simplified a lot from regular devices, because they're
+ * simply not as versatile. 
+ */
 
 struct sys_device {
-	char		* name;
 	u32		id;
-	struct sys_root	* root;
-	struct device	dev;
-	struct class_device class_dev;
+	struct sysdev_class	* cls;
+	struct kobject		kobj;
 };
 
 extern int sys_device_register(struct sys_device *);
