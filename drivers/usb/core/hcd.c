@@ -1273,7 +1273,6 @@ bye:
  */
 static void hcd_endpoint_disable (struct usb_device *udev, int endpoint)
 {
-	unsigned long	flags;
 	struct hcd_dev	*dev;
 	struct usb_hcd	*hcd;
 	struct urb	*urb;
@@ -1281,6 +1280,8 @@ static void hcd_endpoint_disable (struct usb_device *udev, int endpoint)
 
 	dev = udev->hcpriv;
 	hcd = udev->bus->hcpriv;
+
+	local_irq_disable ();
 
 rescan:
 	/* (re)block new requests, as best we can */
@@ -1293,7 +1294,6 @@ rescan:
 	}
 
 	/* then kill any current requests */
-	local_irq_save (flags);
 	spin_lock (&hcd_data_lock);
 	list_for_each_entry (urb, &dev->urb_list, urb_list) {
 		int	tmp = urb->pipe;
@@ -1342,7 +1342,7 @@ rescan:
 		goto rescan;
 	}
 	spin_unlock (&hcd_data_lock);
-	local_irq_restore (flags);
+	local_irq_enable ();
 
 	/* synchronize with the hardware, so old configuration state
 	 * clears out immediately (and will be freed).
