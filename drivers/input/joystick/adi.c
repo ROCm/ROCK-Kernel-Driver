@@ -321,7 +321,7 @@ static void adi_init_digital(struct gameport *gameport)
 
 	for (i = 0; seq[i]; i++) {
 		gameport_trigger(gameport);
-		if (seq[i] > 0) wait_ms(seq[i]);
+		if (seq[i] > 0) msleep(seq[i]);
 		if (seq[i] < 0) mdelay(-seq[i]);
 	}
 }
@@ -513,9 +513,9 @@ static void adi_connect(struct gameport *gameport, struct gameport_dev *dev)
 		return;
 	}
 
-	wait_ms(ADI_INIT_DELAY);
+	msleep(ADI_INIT_DELAY);
 	if (adi_read(port)) {
-		wait_ms(ADI_DATA_DELAY);
+		msleep(ADI_DATA_DELAY);
 		adi_read(port);
 	}
 

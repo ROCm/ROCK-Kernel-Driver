@@ -40,6 +40,7 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/gameport.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
@@ -93,7 +94,7 @@ static int vortex_open(struct gameport *gameport, int mode)
 	switch (mode) {
 		case GAMEPORT_MODE_COOKED:
 			writeb(0x40, vortex->io + VORTEX_GCR);
-			wait_ms(VORTEX_DATA_WAIT);
+			msleep(VORTEX_DATA_WAIT);
 			return 0;
 		case GAMEPORT_MODE_RAW:
 			writeb(0x00, vortex->io + VORTEX_GCR);

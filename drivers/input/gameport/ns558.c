@@ -35,6 +35,7 @@
 #include <linux/ioport.h>
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 #include <linux/gameport.h>
 #include <linux/slab.h>
 #include <linux/pnp.h>
@@ -103,7 +104,7 @@ static void ns558_isa_probe(int io)
 		i = 0;
 		goto out;
 	}
-	wait_ms(3);
+	msleep(3);
 /*
  * After some time (4ms) the axes shouldn't change anymore.
  */
@@ -129,7 +130,7 @@ static void ns558_isa_probe(int io)
 		outb(0xff, io & (-1 << i));
 		for (j = b = 0; j < 1000; j++)
 			if (inb(io & (-1 << i)) != inb((io & (-1 << i)) + (1 << i) - 1)) b++;
-		wait_ms(3);
+		msleep(3);
 
 		if (b > 300) {					/* We allow 30% difference */
 			release_region(io & (-1 << i), (1 << i));

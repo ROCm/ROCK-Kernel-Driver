@@ -1073,7 +1073,7 @@ static int unlink1 (struct usbtest_dev *dev, int pipe, int size, int async)
 	/* unlinking that should always work.  variable delay tests more
 	 * hcd states and code paths, even with little other system load.
 	 */
-	wait_ms (jiffies % (2 * INTERRUPT_RATE));
+	msleep (jiffies % (2 * INTERRUPT_RATE));
 retry:
 	retval = usb_unlink_urb (urb);
 	if (retval == -EBUSY || retval == -EIDRM) {

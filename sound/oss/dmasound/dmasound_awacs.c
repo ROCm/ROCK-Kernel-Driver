@@ -457,9 +457,9 @@ tas_dmasound_init(void)
 			&gpio_headphone_detect_pol);
 
 	write_audio_gpio(gpio_audio_reset, gpio_audio_reset_pol);
-	wait_ms(100);
+	msleep(100);
 	write_audio_gpio(gpio_audio_reset, !gpio_audio_reset_pol);
-	wait_ms(100);
+	msleep(100);
   	if (gpio_headphone_irq) {
 		if (request_irq(gpio_headphone_irq,headphone_intr,0,"Headphone detect",0) < 0) {
     			printk(KERN_ERR "tumbler: Can't request headphone interrupt\n");
@@ -653,7 +653,7 @@ static void PMacIrqCleanup(void)
 	    machine_is_compatible("PowerBook3,2")) && awacs) {
 		awacs_reg[1] |= MASK_PAROUT0 | MASK_PAROUT1;
 		awacs_write(MASK_ADDR1 | awacs_reg[1]);
-		wait_ms(200);
+		msleep(200);
 	}
 	if (awacs)
 		free_irq(awacs_irq, 0);
@@ -775,10 +775,10 @@ awacs_recalibrate(void)
 	/* Sorry for the horrible delays... I hope to get that improved
 	 * by making the whole PM process asynchronous in a future version
 	 */
-	wait_ms(750);
+	msleep(750);
 	awacs_reg[1] |= MASK_CMUTE | MASK_AMUTE;
 	awacs_write(awacs_reg[1] | MASK_RECALIBRATE | MASK_ADDR1);
-	wait_ms(1000);
+	msleep(1000);
 	awacs_write(awacs_reg[1] | MASK_ADDR1);
 }
 
@@ -1405,9 +1405,9 @@ load_awacs(void)
 
 	if (awacs_revision == AWACS_SCREAMER) {
 		awacs_write(awacs_reg[5] + MASK_ADDR5);
-		wait_ms(100);
+		msleep(100);
 		awacs_write(awacs_reg[6] + MASK_ADDR6);
-		wait_ms(2);
+		msleep(2);
 		awacs_write(awacs_reg[1] + MASK_ADDR1);
 		awacs_write(awacs_reg[7] + MASK_ADDR7);
 	}
@@ -1479,7 +1479,7 @@ static int awacs_sleep_notify(struct pmu_sleep_notifier *self, int when)
 		    machine_is_compatible("PowerBook3,2")) && awacs) {
 			awacs_reg[1] |= MASK_PAROUT0 | MASK_PAROUT1;
 			awacs_write(MASK_ADDR1 | awacs_reg[1]);
-			wait_ms(200);
+			msleep(200);
 		}
 		break;
 	case PBOOK_WAKE:
@@ -1487,12 +1487,12 @@ static int awacs_sleep_notify(struct pmu_sleep_notifier *self, int when)
 		pmac_call_feature(PMAC_FTR_SOUND_CHIP_ENABLE, awacs_node, 0, 1);
 		if ((machine_is_compatible("PowerBook3,1") ||
 		    machine_is_compatible("PowerBook3,2")) && awacs) {
-			wait_ms(100);
+			msleep(100);
 			awacs_reg[1] &= ~(MASK_PAROUT0 | MASK_PAROUT1);
 			awacs_write(MASK_ADDR1 | awacs_reg[1]);
-			wait_ms(300);
+			msleep(300);
 		} else
-			wait_ms(1000);
+			msleep(1000);
  		/* restore settings */
 		switch (awacs_revision) {
 			case AWACS_TUMBLER:
@@ -1500,14 +1500,14 @@ static int awacs_sleep_notify(struct pmu_sleep_notifier *self, int when)
 				write_audio_gpio(gpio_headphone_mute, gpio_headphone_mute_pol);
 				write_audio_gpio(gpio_amp_mute, gpio_amp_mute_pol);
 				write_audio_gpio(gpio_audio_reset, gpio_audio_reset_pol);
-				wait_ms(100);
+				msleep(100);
 				write_audio_gpio(gpio_audio_reset, !gpio_audio_reset_pol);
-				wait_ms(150);
+				msleep(150);
 				tas_leave_sleep(); /* Stub for now */
 				headphone_intr(0,0,0);
 				break;
 			case AWACS_DACA:
-				wait_ms(10); /* Check this !!! */
+				msleep(10); /* Check this !!! */
 				daca_leave_sleep();
 				break ;		/* dont know how yet */
 			case AWACS_BURGUNDY:
@@ -2432,7 +2432,7 @@ static void PMacAbortRead(void)
 	 * release the memory.
 	 */
 
-	wait_ms(100) ; /* give it a (small) chance to act */
+	msleep(100) ; /* give it a (small) chance to act */
 
 	/* apply the sledgehammer approach - just stop it now */
 

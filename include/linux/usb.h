@@ -20,19 +20,6 @@
 #include <linux/completion.h>	/* for struct completion */
 #include <linux/sched.h>	/* for current && schedule_timeout */
 
-
-static __inline__ void wait_ms(unsigned int ms)
-{
-	if(!in_interrupt()) {
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(1 + ms * HZ / 1000);
-	}
-	else
-		mdelay(ms);
-}
-
-void usb_uninterruptible_sleep_ms(int msecs);
-
 struct usb_device;
 struct usb_driver;
 

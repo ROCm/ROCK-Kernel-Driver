@@ -248,7 +248,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	/* Then re-enable operations */
 	writel (OHCI_USB_OPER, &ohci->regs->control);
 	(void) readl (&ohci->regs->control);
-	msec_delay (3);
+	msleep (3);
 
 	temp = OHCI_CONTROL_INIT | OHCI_USB_OPER;
 	if (ohci->hcd.can_wakeup)
@@ -258,7 +258,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	(void) readl (&ohci->regs->control);
 
 	/* TRSMRCY */
-	msec_delay (10);
+	msleep (10);
 	root->dev.power.power_state = 0;
 
 	/* keep it alive for ~5x suspend + resume costs */

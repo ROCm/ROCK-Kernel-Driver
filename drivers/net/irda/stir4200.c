@@ -48,6 +48,7 @@
 #include <linux/netdevice.h>
 #include <linux/suspend.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/usb.h>
 #include <linux/crc32.h>
 #include <net/irda/irda.h>
@@ -652,7 +653,7 @@ static int fifo_txwait(struct stir_cb *stir, int space)
 			return 0;
 
 		/* estimate transfer time for remaining chars */
-		wait_ms((count * 8000) / stir->speed);
+		msleep((count * 8000) / stir->speed);
 	}
 			
 	err = write_reg(stir, REG_FIFOCTL, FIFOCTL_CLR);
@@ -810,7 +811,7 @@ static int stir_transmit_thread(void *arg)
 					info("%s: receive usb submit failed",
 					     stir->netdev->name);
 				stir->receiving = 0;
-				wait_ms(10);
+				msleep(10);
 				continue;
 			}
 		}

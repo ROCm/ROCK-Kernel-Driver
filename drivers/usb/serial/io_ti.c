@@ -552,7 +552,7 @@ restart_tx_loop:
 			break;
 
 		/* Block the thread for 10ms */
-		wait_ms (10);
+		msleep(10);
 
 		if (last_count == port->tx.count) {
 			/* No activity.. count down. */
@@ -581,7 +581,7 @@ restart_tx_loop:
 		/* This function takes 4 ms; */
 		if (!TIIsTxActive (port)) {
 			/* Delay a few char times */
-			wait_ms (50);
+			msleep(50);
 			dbg ("%s - Empty", __FUNCTION__);
 			return;
 		}
