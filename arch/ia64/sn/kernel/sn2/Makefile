@@ -32,13 +32,9 @@
 # http://oss.sgi.com/projects/GenInfo/NoticeExplan
 #
 
+USE_STANDARD_AS_RULE := true
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
-
-.S.s:
-	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -o $*.s $<
-.S.o:
-	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
 
 all: sn2.a
 

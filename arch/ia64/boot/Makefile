@@ -10,11 +10,6 @@
 
 LINKFLAGS = -static -T bootloader.lds
 
-.S.s:
-	$(CPP) $(AFLAGS) -traditional -o $*.o $<
-.S.o:
-	$(CC) $(AFLAGS) -traditional -c -o $*.o $<
-
 OBJECTS	= bootloader.o
 
 targets-$(CONFIG_IA64_HP_SIM) += bootloader
