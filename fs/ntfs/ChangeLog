@@ -2,6 +2,13 @@ ToDo:
 	- Find and fix bugs.
 	- Enable NFS exporting of NTFS.
 
+2.0.22 - Cleanups, mainly to ntfs_readdir(), and use C99 initializers.
+
+	- Change fs/ntfs/dir.c::ntfs_reddir() to only read/write ->f_pos once
+	  at entry/exit respectively.
+	- Use C99 initializers for structures.
+	- Remove unused variable blocks from fs/ntfs/aops.c::ntfs_read_block().
+
 2.0.21 - Check for, and refuse to work with too large files/directories/volumes.
 
 	- Limit volume size at mount time to 2TiB on architectures where

@@ -286,6 +286,6 @@ name_err_out:
  * Inode operations for directories.
  */
 struct inode_operations ntfs_dir_inode_ops = {
-	lookup:		ntfs_lookup,	/* VFS: Lookup directory. */
+	.lookup	= ntfs_lookup,	/* VFS: Lookup directory. */
 };
 
