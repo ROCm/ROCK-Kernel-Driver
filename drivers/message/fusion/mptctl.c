@@ -285,7 +285,7 @@ mptctl_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req, MPT_FRAME_HDR *reply)
 				dctlprintk((MYIOC_s_INFO_FMT ": Copying Reply Frame @%p to IOC!\n",
 						ioc->name, reply));
 				memcpy(ioc->ioctl->ReplyFrame, reply,
-					MIN(ioc->reply_sz, 4*reply->u.reply.MsgLength));
+					min(ioc->reply_sz, 4*reply->u.reply.MsgLength));
 				ioc->ioctl->status |= MPT_IOCTL_STATUS_RF_VALID;
 
 				/* Set the command status to GOOD if IOC Status is GOOD
@@ -336,7 +336,7 @@ mptctl_reply(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req, MPT_FRAME_HDR *reply)
 			// NOTE: Expects/requires non-Turbo reply!
 			dctlprintk((MYIOC_s_INFO_FMT ":Caching MPI_FUNCTION_FW_DOWNLOAD reply!\n",
 				ioc->name));
-			memcpy(fwReplyBuffer, reply, MIN(sizeof(fwReplyBuffer), 4*reply->u.reply.MsgLength));
+			memcpy(fwReplyBuffer, reply, min_t(int, sizeof(fwReplyBuffer), 4*reply->u.reply.MsgLength));
 			ReplyMsg = (pMPIDefaultReply_t) fwReplyBuffer;
 		}
 	}
@@ -991,7 +991,7 @@ kbuf_alloc_2_sgl(int bytes, u32 sgdir, int sge_offset, int *frags,
 	MptSge_t	*sgl;
 	int		 numfrags = 0;
 	int		 fragcnt = 0;
-	int		 alloc_sz = MIN(bytes,MAX_KMALLOC_SZ);	// avoid kernel warning msg!
+	int		 alloc_sz = min(bytes,MAX_KMALLOC_SZ);	// avoid kernel warning msg!
 	int		 bytes_allocd = 0;
 	int		 this_alloc;
 	dma_addr_t	 pa;					// phys addr
@@ -1036,7 +1036,7 @@ kbuf_alloc_2_sgl(int bytes, u32 sgdir, int sge_offset, int *frags,
 	sgl = sglbuf;
 	sg_spill = ((ioc->req_sz - sge_offset)/(sizeof(dma_addr_t) + sizeof(u32))) - 1;
 	while (bytes_allocd < bytes) {
-		this_alloc = MIN(alloc_sz, bytes-bytes_allocd);
+		this_alloc = min(alloc_sz, bytes-bytes_allocd);
 		buflist[buflist_ent].len = this_alloc;
 		buflist[buflist_ent].kptr = pci_alloc_consistent(ioc->pcidev,
 								 this_alloc,
@@ -2293,9 +2293,9 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, char *mfPtr, int local)
 		 */
 		if (ioc->ioctl->status & MPT_IOCTL_STATUS_RF_VALID) {
 			if (karg.maxReplyBytes < ioc->reply_sz) {
-				 sz = MIN(karg.maxReplyBytes, 4*ioc->ioctl->ReplyFrame[2]);
+				 sz = min(karg.maxReplyBytes, 4*ioc->ioctl->ReplyFrame[2]);
 			} else {
-				 sz = MIN(ioc->reply_sz, 4*ioc->ioctl->ReplyFrame[2]);
+				 sz = min(ioc->reply_sz, 4*ioc->ioctl->ReplyFrame[2]);
 			}
 
 			if (sz > 0) {
@@ -2314,7 +2314,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, char *mfPtr, int local)
 		/* If valid sense data, copy to user.
 		 */
 		if (ioc->ioctl->status & MPT_IOCTL_STATUS_SENSE_VALID) {
-			sz = MIN(karg.maxSenseBytes, MPT_SENSE_BUFFER_SIZE);
+			sz = min(karg.maxSenseBytes, MPT_SENSE_BUFFER_SIZE);
 			if (sz > 0) {
 				if (copy_to_user((char *)karg.senseDataPtr, ioc->ioctl->sense, sz)) {
 					printk(KERN_ERR "%s@%d::mptctl_do_mpt_command - "

@@ -2,7 +2,7 @@
  *                  QLOGIC LINUX SOFTWARE
  *
  * QLogic ISP2x00 device driver for Linux 2.6.x
- * Copyright (C) 2003 QLogic Corporation
+ * Copyright (C) 2003-2004 QLogic Corporation
  * (www.qlogic.com)
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -110,6 +110,11 @@ MODULE_PARM_DESC(ql2xdoinitscan,
 		"Signal mid-layer to perform scan after driver load: 0 -- no "
 		"signal sent to mid-layer.");
 
+int ql2xloginretrycount = 0;
+module_param(ql2xloginretrycount, int, 0);
+MODULE_PARM_DESC(ql2xloginretrycount,
+		"Specify an alternate value for the NVRAM login retry count.");
+
 /*
  * Proc structures and functions
  */
@@ -175,6 +180,8 @@ static struct scsi_host_template qla2x00_driver_template = {
 	.max_sectors		= 0xFFFF,
 };
 
+static struct scsi_transport_template *qla2xxx_transport_template = NULL;
+
 static void qla2x00_display_fc_names(scsi_qla_host_t *);
 
 void qla2x00_blink_led(scsi_qla_host_t *);
@@ -216,55 +223,7 @@ qla2x00_stop_timer(scsi_qla_host_t *ha)
 	ha->timer_active = 0;
 }
 
-
-static void qla2x00_cmd_timeout(srb_t *sp);
-static __inline__ void qla2x00_add_timer_to_cmd(srb_t *sp, int timeout);
-static __inline__ void qla2x00_delete_timer_from_cmd(srb_t *sp);
-
-/**************************************************************************
-*   qla2x00_add_timer_to_cmd
-*
-* Description:
-*       Creates a timer for the specified command. The timeout is usually
-*       the command time from kernel minus 2 secs.
-*
-* Input:
-*     sp - pointer to validate
-*
-* Returns:
-*     None.
-**************************************************************************/
-static inline void
-qla2x00_add_timer_to_cmd(srb_t *sp, int timeout)
-{
-	init_timer(&sp->timer);
-	sp->timer.expires = jiffies + timeout * HZ;
-	sp->timer.data = (unsigned long) sp;
-	sp->timer.function = (void (*) (unsigned long))qla2x00_cmd_timeout;
-	add_timer(&sp->timer);
-}
-
-/**************************************************************************
-*   qla2x00_delete_timer_from_cmd
-*
-* Description:
-*       Delete the timer for the specified command.
-*
-* Input:
-*     sp - pointer to validate
-*
-* Returns:
-*     None.
-**************************************************************************/
-static inline void 
-qla2x00_delete_timer_from_cmd(srb_t *sp)
-{
-	if (sp->timer.function != NULL) {
-		del_timer(&sp->timer);
-		sp->timer.function =  NULL;
-		sp->timer.data = (unsigned long) NULL;
-	}
-}
+void qla2x00_cmd_timeout(srb_t *);
 
 static __inline__ void qla2x00_callback(scsi_qla_host_t *, struct scsi_cmnd *);
 static __inline__ void sp_put(struct scsi_qla_host * ha, srb_t *sp);
@@ -707,6 +666,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 
 	host = cmd->device->host;
 	ha = (scsi_qla_host_t *) host->hostdata;
+	was_empty = 1;
 
 	cmd->scsi_done = fn;
 
@@ -736,6 +696,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	}
 
 	sp->fo_retry_cnt = 0;
+	sp->err_id = 0;
 
 	/* Generate LU queue on bus, target, LUN */
 	b = cmd->device->channel;
@@ -755,6 +716,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 
 	if (l >= ha->max_luns) {
 		cmd->result = DID_NO_CONNECT << 16;
+		sp->err_id = SRB_ERR_PORT;
 
 		spin_lock_irq(ha->host->host_lock);
 
@@ -801,6 +763,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		    ha->host_no,t,l));
 
 		cmd->result = DID_NO_CONNECT << 16;
+		sp->err_id = SRB_ERR_PORT;
 
 		spin_lock_irq(ha->host->host_lock);
 
@@ -840,20 +803,29 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	 *	Either PORT_DOWN_TIMER OR LINK_DOWN_TIMER Expired.
 	 */
 	if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
-	    atomic_read(&ha->loop_state) == LOOP_DEAD) {
+	    atomic_read(&ha2->loop_state) == LOOP_DEAD) {
 		/*
 		 * Add the command to the done-queue for later failover
 		 * processing
 		 */
 		cmd->result = DID_NO_CONNECT << 16;
+		if (atomic_read(&ha2->loop_state) == LOOP_DOWN) 
+			sp->err_id = SRB_ERR_LOOP;
+		else
+			sp->err_id = SRB_ERR_PORT;
+
 		add_to_done_queue(ha, sp);
-		if (!list_empty(&ha->done_queue))
-			qla2x00_done(ha);
+		qla2x00_done(ha);
 
 		spin_lock_irq(ha->host->host_lock);
 		return (0);
 	}
-	was_empty = add_to_pending_queue(ha, sp);
+	if (tq && test_bit(TQF_SUSPENDED, &tq->flags)) {
+		/* If target suspended put incoming I/O in retry_q. */
+		qla2x00_extend_timeout(sp->cmd, 10);
+		add_to_scsi_retry_queue(ha, sp);
+	} else
+		was_empty = add_to_pending_queue(ha, sp);
 
 	if ((IS_QLA2100(ha) || IS_QLA2200(ha)) && ha->flags.online) {
 		unsigned long flags;
@@ -1379,6 +1351,9 @@ qla2xxx_eh_device_reset(struct scsi_cmnd *cmd)
 	os_tgt_t	*tq;
 	os_lun_t	*lq;
 	fc_port_t	*fcport_to_reset;
+	unsigned long	flags;
+	srb_t		*rp;
+	struct list_head *list, *temp;
 
 	return_status = FAILED;
 	if (cmd == NULL) {
@@ -1410,6 +1385,10 @@ qla2xxx_eh_device_reset(struct scsi_cmnd *cmd)
 	}
 	fcport_to_reset = lq->fclun->fcport;
 
+	/* If we are coming in from the back-door, stall I/O until complete. */
+	if (!cmd->device->host->eh_active)
+		set_bit(TQF_SUSPENDED, &tq->flags);
+
 	qla_printk(KERN_INFO, ha,
 	    "scsi(%ld:%d:%d:%d): DEVICE RESET ISSUED.\n", ha->host_no, b, t, l);
 
@@ -1418,6 +1397,23 @@ qla2xxx_eh_device_reset(struct scsi_cmnd *cmd)
 	    "dpc_flags=%lx, status=%x allowed=%d cmd.state=%x\n",
 	    ha->host_no, cmd, jiffies, cmd->timeout_per_command / HZ,
 	    ha->dpc_flags, cmd->result, cmd->allowed, cmd->state));
+
+ 	/* Clear commands from the retry queue. */
+ 	spin_lock_irqsave(&ha->list_lock, flags);
+ 	list_for_each_safe(list, temp, &ha->retry_queue) {
+ 		rp = list_entry(list, srb_t, list);
+ 
+ 		if (t != rp->cmd->device->id) 
+ 			continue;
+ 
+ 		DEBUG2(printk(KERN_INFO
+		    "qla2xxx_eh_reset: found in retry queue. SP=%p\n", rp));
+ 
+ 		__del_from_retry_queue(ha, rp);
+ 		rp->cmd->result = DID_RESET << 16;
+ 		__add_to_done_queue(ha, rp);
+ 	}
+ 	spin_unlock_irqrestore(&ha->list_lock, flags);
 
 	spin_unlock_irq(ha->host->host_lock);
 
@@ -1485,6 +1481,9 @@ qla2xxx_eh_device_reset(struct scsi_cmnd *cmd)
 	    ha->host_no, b, t, l);
 
 eh_dev_reset_done:
+
+	if (!cmd->device->host->eh_active)
+		clear_bit(TQF_SUSPENDED, &tq->flags);
 
 	return (return_status);
 }
@@ -1766,7 +1765,7 @@ qla2x00_device_reset(scsi_qla_host_t *ha, fc_port_t *reset_fcport)
 }
 
 /**************************************************************************
-* qla2x00_slave_configure
+* qla2xxx_slave_configure
 *
 * Description:
 **************************************************************************/
@@ -2061,6 +2060,8 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	host->max_cmd_len = MAX_CMDSZ;
 	host->max_channel = ha->ports - 1;
 	host->max_lun = ha->max_luns;
+	BUG_ON(qla2xxx_transport_template == NULL);
+	host->transportt = qla2xxx_transport_template;
 	host->unique_id = ha->instance;
 	host->max_id = ha->max_targets;
 
@@ -2310,10 +2311,10 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
     char **start, off_t offset, int length, int inout)
 {
 	struct info_str	info;
-	int             i;
+	int		i;
 	int             retval = -EINVAL;
 	os_lun_t	*up;
-	os_tgt_t	*tq;
+	fc_port_t	*fcport;
 	unsigned int	t, l;
 	uint32_t        tmp_sn;
 	unsigned long   *flags;
@@ -2499,20 +2500,23 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 	    ha->init_cb->port_name[7]);
 
 	/* Print out device port names */
-	for (i = 0; i < MAX_TARGETS; i++) {
-		if ((tq = TGT_Q(ha, i)) == NULL)
+	i = 0;
+ 	list_for_each_entry(fcport, &ha->fcports, list) {
+		if (fcport->port_type != FCT_TARGET)
 			continue;
 
 		copy_info(&info,
 		    "scsi-qla%d-target-%d="
-		    "%02x%02x%02x%02x%02x%02x%02x%02x;\n",
+		    "%02x%02x%02x%02x%02x%02x%02x%02x:%02x%02x%02x;\n",
 		    (int)ha->instance, i,
-		    tq->port_name[0], tq->port_name[1],
-		    tq->port_name[2], tq->port_name[3],
-		    tq->port_name[4], tq->port_name[5],
-		    tq->port_name[6], tq->port_name[7]);
-
-	} /* 2.25 node/port display to proc */
+		    fcport->port_name[0], fcport->port_name[1],
+		    fcport->port_name[2], fcport->port_name[3],
+		    fcport->port_name[4], fcport->port_name[5],
+		    fcport->port_name[6], fcport->port_name[7],
+		    fcport->d_id.b.domain, fcport->d_id.b.area,
+		    fcport->d_id.b.al_pa);
+		i++;
+	}
 
 	copy_info(&info, "\nSCSI LUN Information:\n");
 	copy_info(&info,
@@ -2816,11 +2820,11 @@ void qla2x00_mark_device_lost(scsi_qla_host_t *ha, fc_port_t *fcport,
 void
 qla2x00_mark_all_devices_lost(scsi_qla_host_t *ha) 
 {
-	struct list_head	*fcpl;
-	fc_port_t		*fcport;
+	fc_port_t *fcport;
 
-	list_for_each(fcpl, &ha->fcports) {
-		fcport = list_entry(fcpl, fc_port_t, list);
+	list_for_each_entry(fcport, &ha->fcports, list) {
+		if (fcport->port_type != FCT_TARGET)
+			continue;
 
 		/*
 		 * No point in marking the device as lost, if the device is
@@ -3180,7 +3184,6 @@ qla2x00_do_dpc(void *data)
 {
 	DECLARE_MUTEX_LOCKED(sem);
 	scsi_qla_host_t *ha;
-	struct list_head *fcpl;
 	fc_port_t	*fcport;
 	os_lun_t        *q;
 	srb_t           *sp;
@@ -3188,7 +3191,10 @@ qla2x00_do_dpc(void *data)
 	unsigned long	flags = 0;
 	struct list_head *list, *templist;
 	int	dead_cnt, online_cnt;
+	int	retry_cmds = 0;
 	uint16_t	next_loopid;
+	int t;
+	os_tgt_t *tq;
 
 	ha = (scsi_qla_host_t *)data;
 
@@ -3249,10 +3255,15 @@ qla2x00_do_dpc(void *data)
 
 				if (atomic_read(&fcport->state) ==
 				    FCS_DEVICE_DEAD ||
-				    atomic_read(&ha->loop_state) == LOOP_DEAD) {
+				    atomic_read(&fcport->ha->loop_state) == LOOP_DEAD) {
 
 					__del_from_retry_queue(ha, sp);
 					sp->cmd->result = DID_NO_CONNECT << 16;
+					if (atomic_read(&fcport->ha->loop_state) ==
+					    LOOP_DOWN) 
+						sp->err_id = SRB_ERR_LOOP;
+					else
+						sp->err_id = SRB_ERR_PORT;
 					sp->cmd->host_scribble =
 					    (unsigned char *) NULL;
 					__add_to_done_queue(ha, sp);
@@ -3295,6 +3306,7 @@ qla2x00_do_dpc(void *data)
 
 				sp = list_entry(list, srb_t, list);
 				q = sp->lun_queue;
+				tq = sp->tgt_queue;
 
 				DEBUG3(printk("scsi(%ld): scsi_retry_q: "
 				    "pid=%ld sp=%p, spflags=0x%x, "
@@ -3306,7 +3318,15 @@ qla2x00_do_dpc(void *data)
 				if (q->q_state != LUN_STATE_WAIT) {
 					online_cnt++;
 					__del_from_scsi_retry_queue(ha, sp);
-					__add_to_retry_queue(ha,sp);
+
+					if (test_bit(TQF_RETRY_CMDS,
+					    &tq->flags)) {
+						qla2x00_extend_timeout(sp->cmd,
+						    (sp->cmd->timeout_per_command / HZ) - QLA_CMD_TIMER_DELTA);
+						__add_to_pending_queue(ha, sp);
+						retry_cmds++;
+					} else
+						__add_to_retry_queue(ha, sp);
 				}
 
 				/* Was this command suspended for N secs */
@@ -3321,6 +3341,17 @@ qla2x00_do_dpc(void *data)
 				}
 			}
 			spin_unlock_irqrestore(&ha->list_lock, flags);
+
+			/* Clear all Target Unsuspended bits */
+			for (t = 0; t < ha->max_targets; t++) {
+				if ((tq = ha->otgt[t]) == NULL)
+					continue;
+
+				if (test_bit(TQF_RETRY_CMDS, &tq->flags))
+					clear_bit(TQF_RETRY_CMDS, &tq->flags);
+			}
+			if (retry_cmds)
+				qla2x00_next(ha);
 
 			DEBUG(if (online_cnt > 0))
 			DEBUG(printk("scsi(%ld): dpc() found scsi reqs to "
@@ -3374,9 +3405,10 @@ qla2x00_do_dpc(void *data)
 			    ha->host_no));
 
 			next_loopid = 0;
-			list_for_each(fcpl, &ha->fcports) {
-				fcport = list_entry(fcpl, fc_port_t, list);
-				
+			list_for_each_entry(fcport, &ha->fcports, list) {
+				if (fcport->port_type != FCT_TARGET)
+					continue;
+
 				/*
 				 * If the port is not ONLINE then try to login
 				 * to it if we haven't run out of retries.
@@ -3579,7 +3611,7 @@ qla2x00_rst_aen(scsi_qla_host_t *ha)
 
 
 /*
- * This routine will alloacte SP from the free queue
+ * This routine will allocate SP from the free queue
  * input:
  *        scsi_qla_host_t *
  * output:
@@ -3593,6 +3625,7 @@ qla2x00_get_new_sp(scsi_qla_host_t *ha)
 	sp = mempool_alloc(ha->srb_mempool, GFP_KERNEL);
 	if (sp) {
 		atomic_set(&sp->ref_count, 1);
+		sp->req_cnt = 0;
 	}
 	return (sp);
 }
@@ -3677,7 +3710,6 @@ qla2x00_timer(scsi_qla_host_t *ha)
 {
 	int		t,l;
 	unsigned long	cpu_flags = 0;
-	struct list_head	*fcpl;
 	fc_port_t	*fcport;
 	os_lun_t *lq;
 	os_tgt_t *tq;
@@ -3712,8 +3744,9 @@ qla2x00_timer(scsi_qla_host_t *ha)
 	 * the port it marked DEAD. 
 	 */
 	t = 0;
-	list_for_each(fcpl, &ha->fcports) {
-		fcport = list_entry(fcpl, fc_port_t, list);
+	list_for_each_entry(fcport, &ha->fcports, list) {
+		if (fcport->port_type != FCT_TARGET)
+			continue;
 
 		if (atomic_read(&fcport->state) == FCS_DEVICE_LOST) {
 
@@ -3894,7 +3927,7 @@ qla2x00_extend_timeout(struct scsi_cmnd *cmd, int timeout)
 * None.
 * Note:Need to add the support for if( sp->state == SRB_FAILOVER_STATE).
 **************************************************************************/
-static void
+void
 qla2x00_cmd_timeout(srb_t *sp)
 {
 	int t, l;
@@ -3902,9 +3935,6 @@ qla2x00_cmd_timeout(srb_t *sp)
 	scsi_qla_host_t *vis_ha, *dest_ha;
 	struct scsi_cmnd *cmd;
 	ulong      flags;
-#if defined(QL_DEBUG_LEVEL_3)
-	ulong      cpu_flags;
-#endif
 	fc_port_t	*fcport;
 
 	cmd = sp->cmd;
@@ -3937,8 +3967,12 @@ qla2x00_cmd_timeout(srb_t *sp)
 		 * DID_BUS_BUSY to let the OS  retry this cmd.
 		 */
 		if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
-		    atomic_read(&vis_ha->loop_state) == LOOP_DEAD) {
+		    atomic_read(&fcport->ha->loop_state) == LOOP_DEAD) {
 			cmd->result = DID_NO_CONNECT << 16;
+			if (atomic_read(&fcport->ha->loop_state) == LOOP_DOWN) 
+				sp->err_id = SRB_ERR_LOOP;
+			else
+				sp->err_id = SRB_ERR_PORT;
 		} else {
 			cmd->result = DID_BUS_BUSY << 16;
 		}
@@ -3977,6 +4011,10 @@ qla2x00_cmd_timeout(srb_t *sp)
 		    atomic_read(&dest_ha->loop_state) == LOOP_DEAD) {
 			qla2x00_extend_timeout(cmd, EXTEND_CMD_TIMEOUT);
 			cmd->result = DID_NO_CONNECT << 16;
+			if (atomic_read(&dest_ha->loop_state) == LOOP_DOWN) 
+				sp->err_id = SRB_ERR_LOOP;
+			else
+				sp->err_id = SRB_ERR_PORT;
 		} else {
 			cmd->result = DID_BUS_BUSY << 16;
 		}
@@ -3991,55 +4029,7 @@ qla2x00_cmd_timeout(srb_t *sp)
 
 		 return;
 	}
-/* TODO: Remove this code!!! */
-#if defined(QL_DEBUG_LEVEL_3)
-	spin_lock_irqsave(&dest_ha->list_lock, cpu_flags);
-	if (sp->state == SRB_DONE_STATE) {
-		/* IO in done_q  -- leave it */
-		DEBUG(printk("scsi(%ld): Found in Done queue pid %ld sp=%p.\n",
-		    dest_ha->host_no, cmd->serial_number, sp));
-	} else if (sp->state == SRB_SUSPENDED_STATE) {
-		DEBUG(printk("scsi(%ld): Found SP %p in suspended state  "
-		    "- pid %ld:\n",
-		    dest_ha->host_no, sp, cmd->serial_number));
-		DEBUG(qla2x00_dump_buffer((uint8_t *)sp, sizeof(srb_t));)
-	} else if (sp->state == SRB_ACTIVE_STATE) {
-		/*
-		 * IO is with ISP find the command in our active list.
-		 */
-		spin_unlock_irqrestore(&dest_ha->list_lock, cpu_flags);
-		spin_lock_irqsave(&dest_ha->hardware_lock, flags);
-		if (sp ==
-		    dest_ha->outstanding_cmds[(u_long)sp->cmd->host_scribble]) {
 
-			DEBUG(printk("cmd_timeout: Found in ISP \n");)
-
-			sp->state = SRB_ACTIVE_TIMEOUT_STATE;
-			spin_unlock_irqrestore(&dest_ha->hardware_lock, flags);
-		} else {
-			spin_unlock_irqrestore(&dest_ha->hardware_lock, flags);
-			printk(KERN_INFO 
-				"qla_cmd_timeout: State indicates it is with "
-				"ISP, But not in active array\n");
-		}
-		spin_lock_irqsave(&dest_ha->list_lock, cpu_flags); 	/* 01/03 */
-	} else if (sp->state == SRB_ACTIVE_TIMEOUT_STATE) {
-		DEBUG(printk("qla2100%ld: Found in Active timeout state"
-				"pid %ld, State = %x., \n",
-				dest_ha->host_no,
-				sp->cmd->serial_number, sp->state);)
-	} else {
-		/* EMPTY */
-		DEBUG2(printk("cmd_timeout%ld: LOST command state = "
-				"0x%x, sp=%p\n",
-				vis_ha->host_no, sp->state,sp);)
-
-		qla_printk(KERN_INFO, vis_ha,
-			"cmd_timeout: LOST command state = 0x%x\n", sp->state);
-	}
-	spin_unlock_irqrestore(&dest_ha->list_lock, cpu_flags);
-#endif
-	
 	DEBUG3(printk("cmd_timeout: Leaving\n");)
 }
 
@@ -4236,20 +4226,16 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 
 		/* If device is dead then send request back to OS */
 		if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD) {
-
 			sp->cmd->result = DID_NO_CONNECT << 16;
+			if (atomic_read(&dest_ha->loop_state) == LOOP_DOWN) 
+				sp->err_id = SRB_ERR_LOOP;
+			else
+				sp->err_id = SRB_ERR_PORT;
 
-			if (!atomic_read(&dest_ha->loop_down_timer) &&
-			    atomic_read(&dest_ha->loop_state) == LOOP_DOWN) {
-				sp->err_id = 2;
-			} else {
-				sp->err_id = 1;
-			}
-			DEBUG3(printk("scsi(%ld): loop/port is down - "
-			    "pid=%ld, sp=%p loopid=0x%x queued to dest HBA "
-			    "scsi%ld.\n",
-			    dest_ha->host_no,
-			    sp->cmd->serial_number, sp,
+			DEBUG3(printk("scsi(%ld): loop/port is down - pid=%ld, "
+			    "sp=%p err_id=%d loopid=0x%x queued to dest HBA "
+			    "scsi%ld.\n", dest_ha->host_no,
+			    sp->cmd->serial_number, sp, sp->err_id,
 			    fcport->loop_id, dest_ha->host_no));
 			/* 
 			 * Initiate a failover - done routine will initiate.
@@ -4448,18 +4434,70 @@ qla2x00_down_timeout(struct semaphore *sema, unsigned long timeout)
 	return -ETIMEDOUT;
 }
 
+static void
+qla2xxx_get_port_id(struct scsi_device *sdev)
+{
+	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct fc_port *fc;
+
+	list_for_each_entry(fc, &ha->fcports, list) {
+		if (fc->os_target_id == sdev->id) {
+			fc_port_id(sdev) = fc->d_id.b.domain << 16 |
+				fc->d_id.b.area << 8 | 
+				fc->d_id.b.al_pa;
+			return;
+		}
+	}
+	fc_port_id(sdev) = -1;
+}
+
+static void
+qla2xxx_get_port_name(struct scsi_device *sdev)
+{
+	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct fc_port *fc;
+
+	list_for_each_entry(fc, &ha->fcports, list) {
+		if (fc->os_target_id == sdev->id) {
+			fc_port_name(sdev) =
+				__be64_to_cpu(*(uint64_t *)fc->port_name);
+			return;
+		}
+	}
+	fc_port_name(sdev) = -1;
+}
+
+static void
+qla2xxx_get_node_name(struct scsi_device *sdev)
+{
+	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct fc_port *fc;
+
+	list_for_each_entry(fc, &ha->fcports, list) {
+		if (fc->os_target_id == sdev->id) {
+			fc_node_name(sdev) =
+				__be64_to_cpu(*(uint64_t *)fc->node_name);
+			return;
+		}
+	}
+	fc_node_name(sdev) = -1;
+}
+
+static struct fc_function_template qla2xxx_transport_functions = {
+	.get_port_id = qla2xxx_get_port_id,
+	.show_port_id = 1,
+	.get_port_name = qla2xxx_get_port_name,
+	.show_port_name = 1,
+	.get_node_name = qla2xxx_get_node_name,
+	.show_node_name = 1,
+};
+
 /**
  * qla2x00_module_init - Module initialization.
  **/
 static int __init
 qla2x00_module_init(void)
 {
-	/* Derive version string. */
-	strcpy(qla2x00_version_str, QLA2XXX_VERSION);
-#if DEBUG_QLA2100
-	strcat(qla2x00_version_str, "-debug");
-#endif
-
 	/* Allocate cache for SRBs. */
 	sprintf(srb_cachep_name, "qla2xxx_srbs");
 	srb_cachep = kmem_cache_create(srb_cachep_name, sizeof(srb_t), 0,
@@ -4469,6 +4507,16 @@ qla2x00_module_init(void)
 		    "qla2xxx: Unable to allocate SRB cache...Failing load!\n");
 		return -ENOMEM;
 	}
+
+	/* Derive version string. */
+	strcpy(qla2x00_version_str, QLA2XXX_VERSION);
+#if DEBUG_QLA2100
+	strcat(qla2x00_version_str, "-debug");
+#endif
+
+	qla2xxx_transport_template = fc_attach_transport(&qla2xxx_transport_functions);
+	if (!qla2xxx_transport_template)
+		return -ENODEV;
 
 	printk(KERN_INFO
 	    "QLogic Fibre Channel HBA Driver (%p)\n", qla2x00_set_info);
@@ -4491,6 +4539,8 @@ qla2x00_module_exit(void)
 		}
 		srb_cachep = NULL;
 	}
+
+	fc_release_transport(qla2xxx_transport_template);
 }
 
 module_init(qla2x00_module_init);

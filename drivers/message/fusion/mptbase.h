@@ -81,8 +81,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2004 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"3.01.01"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.01"
+#define MPT_LINUX_VERSION_COMMON	"3.01.03"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.03"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -155,6 +155,28 @@
 
 #define C0_1030				0x08
 #define XL_929				0x01
+
+
+/*
+ *	Try to keep these at 2^N-1
+ */
+#define MPT_FC_CAN_QUEUE	127
+#define MPT_SCSI_CAN_QUEUE	127
+
+/*
+ * Set the MAX_SGE value based on user input.
+ */
+#ifdef  CONFIG_FUSION_MAX_SGE
+#if     CONFIG_FUSION_MAX_SGE  < 16
+#define MPT_SCSI_SG_DEPTH	16
+#elif   CONFIG_FUSION_MAX_SGE  > 128
+#define MPT_SCSI_SG_DEPTH	128
+#else
+#define MPT_SCSI_SG_DEPTH	CONFIG_FUSION_MAX_SGE
+#endif
+#else
+#define MPT_SCSI_SG_DEPTH	40
+#endif
 
 #ifdef __KERNEL__	/* { */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -581,6 +603,12 @@ typedef struct _MPT_ADAPTER
 	int			 alloc_total;
 	u32			 last_state;
 	int			 active;
+	u8			*fifo_pool;	/* dma pool for fifo's */
+	dma_addr_t		 fifo_pool_dma;
+	int			 fifo_pool_sz;	/* allocated size */
+	u8			*chain_alloc;	/* chain buffer alloc ptr */
+	dma_addr_t		chain_alloc_dma;
+	int			chain_alloc_sz;
 	u8			*reply_alloc;	/* Reply frames alloc ptr */
 	dma_addr_t		 reply_alloc_dma;
 	MPT_FRAME_HDR		*reply_frames;	/* Reply msg frames - rounded up! */
@@ -608,9 +636,6 @@ typedef struct _MPT_ADAPTER
 	u32			 sense_buf_low_dma;
 	int			 mtrr_reg;
 	struct pci_dev		*pcidev;	/* struct pci_dev pointer */
-#if defined(MPTBASE_MEM_ALLOC_FIFO_FIX)
-	struct pci_dev		pcidev32;	/* struct pci_dev pointer */
-#endif	
 	u8			*memmap;	/* mmap address */
 	struct Scsi_Host	*sh;		/* Scsi Host pointer */
 	ScsiCfgData		spi_data;	/* Scsi config. data */
@@ -1061,13 +1086,6 @@ extern int		  mpt_ASCQ_TableSz;
 /*
  *  More (public) macros...
  */
-#ifndef MIN
-#define MIN(a, b)   (((a) < (b)) ? (a) : (b))
-#endif
-#ifndef MAX
-#define MAX(a, b)   (((a) > (b)) ? (a) : (b))
-#endif
-
 #ifndef offsetof
 #define offsetof(t, m)	((size_t) (&((t *)0)->m))
 #endif

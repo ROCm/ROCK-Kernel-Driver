@@ -371,15 +371,22 @@ static int aac_eh_reset(struct scsi_cmnd* cmd)
 	 * target (block maximum 60 seconds).
 	 */
 	for (count = 60; count; --count) {
+		int active = 0;
 		__shost_for_each_device(dev, host) {
 			spin_lock_irqsave(&dev->list_lock, flags);
 			list_for_each_entry(command, &dev->cmd_list, list) {
 				if (command->serial_number) {
-					spin_unlock_irqrestore(&dev->list_lock, flags);
-					return SUCCESS;
+					active++;
+					break;
 				}
 			}
 			spin_unlock_irqrestore(&dev->list_lock, flags);
+
+			/*
+			 * We can exit If all the commands are complete
+			 */
+			if (active == 0)
+				return SUCCESS;
 		}
 		spin_unlock_irq(host->host_lock);
 		scsi_sleep(HZ);

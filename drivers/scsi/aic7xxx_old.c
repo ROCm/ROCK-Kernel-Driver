@@ -9033,7 +9033,7 @@ aic7xxx_detect(Scsi_Host_Template *template)
    * PCI-bus probe.
    */
   {
-    struct
+    static struct
     {
       unsigned short      vendor_id;
       unsigned short      device_id;

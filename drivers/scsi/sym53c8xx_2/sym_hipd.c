@@ -50,7 +50,8 @@
  * SUCH DAMAGE.
  */
 
-#define SYM_DRIVER_NAME	"sym-2.1.18i"
+#define SYM_VERSION "2.1.18j"
+#define SYM_DRIVER_NAME	"sym-" SYM_VERSION
 
 #include "sym_glue.h"
 #include "sym_nvram.h"
@@ -3183,7 +3184,7 @@ static void sym_sir_bad_scsi_status(hcb_p np, int num, ccb_p cp)
 		/*
 		 *  patch requested size into sense command
 		 */
-		cp->sensecmd[0]		= 0x03;
+		cp->sensecmd[0]		= REQUEST_SENSE;
 		cp->sensecmd[1]		= 0;
 		if (tp->tinfo.curr.scsi_version <= 2 && cp->lun <= 7)
 			cp->sensecmd[1]	= cp->lun << 5;
@@ -5693,7 +5694,7 @@ if (resid)
 	 *  On standard INQUIRY response (EVPD and CmDt 
 	 *  not set), sniff out device capabilities.
 	 */
-	if (cp->cdb_buf[0] == 0x12 && !(cp->cdb_buf[1] & 0x3))
+	if (cp->cdb_buf[0] == INQUIRY && !(cp->cdb_buf[1] & 0x3))
 		sym_sniff_inquiry(np, cp->cam_ccb, resid);
 #endif
 

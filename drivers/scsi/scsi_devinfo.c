@@ -117,6 +117,7 @@ static struct {
 	 */
 	{"ADAPTEC", "AACRAID", NULL, BLIST_FORCELUN},
 	{"ADAPTEC", "Adaptec 5400S", NULL, BLIST_FORCELUN},
+	{"BELKIN", "USB 2 HS-CF", "1.95",  BLIST_SPARSELUN},
 	{"CANON", "IPUBJD", NULL, BLIST_SPARSELUN},
 	{"CMD", "CRA-7280", NULL, BLIST_SPARSELUN},	/* CMD RAID Controller */
 	{"CNSI", "G7324", NULL, BLIST_SPARSELUN},	/* Chaparral G7324 RAID */
@@ -138,6 +139,7 @@ static struct {
 	{"EMC", "SYMMETRIX", NULL, BLIST_SPARSELUN | BLIST_LARGELUN | BLIST_FORCELUN},
 	{"EMULEX", "MD21/S2     ESDI", NULL, BLIST_SINGLELUN},
 	{"FSC", "CentricStor", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
+	{"Generic", "USB Storage-SMC", "0180", BLIST_FORCELUN},
 	{"Generic", "USB Storage-SMC", "0207", BLIST_FORCELUN},
 	{"HITACHI", "DF400", "*", BLIST_SPARSELUN},
 	{"HITACHI", "DF500", "*", BLIST_SPARSELUN},
@@ -155,6 +157,7 @@ static struct {
 	{"INSITE", "I325VM", NULL, BLIST_KEY},
 	{"LASOUND", "CDX7405", "3.10", BLIST_MAX5LUN | BLIST_SINGLELUN},
 	{"MATSHITA", "PD-1", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"Medion", "Flash XL  MMC/SD", "2.6D", BLIST_FORCELUN},
 	{"MegaRAID", "LD", NULL, BLIST_FORCELUN},
 	{"MICROP", "4110", NULL, BLIST_NOTQ},
 	{"MYLEX", "DACARMRB", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
@@ -171,6 +174,7 @@ static struct {
 	{"SGI", "RAID3", "*", BLIST_SPARSELUN},
 	{"SGI", "RAID5", "*", BLIST_SPARSELUN},
 	{"SGI", "TP9100", "*", BLIST_SPARSELUN | BLIST_LARGELUN},
+	{"SMSC", "USB 2 HS-CF", NULL, BLIST_SPARSELUN},
 	{"SONY", "CD-ROM CDU-8001", NULL, BLIST_BORKEN},
 	{"SONY", "TSL", NULL, BLIST_FORCELUN},		/* DDS3 & DDS4 autoloaders */
 	{"SUN", "T300", "*", BLIST_SPARSELUN},
@@ -329,7 +333,7 @@ int scsi_get_device_flags(struct scsi_device *sdev, unsigned char *vendor,
 	struct scsi_dev_info_list *devinfo;
 	unsigned int bflags;
 
-	bflags = sdev->host->hostt->flags;
+	bflags = sdev->sdev_bflags;
 	if (!bflags)
 		bflags = scsi_default_dev_flags;
 

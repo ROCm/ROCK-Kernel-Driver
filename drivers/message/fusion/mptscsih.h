@@ -66,33 +66,12 @@
  *	SCSI Public stuff...
  */
 
-/*
- *	Try to keep these at 2^N-1
- */
-#define MPT_FC_CAN_QUEUE	127
-#define MPT_SCSI_CAN_QUEUE	127
-
 #define MPT_SCSI_CMD_PER_DEV_HIGH	31
 #define MPT_SCSI_CMD_PER_DEV_LOW	7
 
 #define MPT_SCSI_CMD_PER_LUN		7
 
 #define MPT_SCSI_MAX_SECTORS    8192
-
-/*
- * Set the MAX_SGE value based on user input.
- */
-#ifdef  CONFIG_FUSION_MAX_SGE
-#if     CONFIG_FUSION_MAX_SGE  < 16
-#define MPT_SCSI_SG_DEPTH	16
-#elif   CONFIG_FUSION_MAX_SGE  > 128
-#define MPT_SCSI_SG_DEPTH	128
-#else
-#define MPT_SCSI_SG_DEPTH	CONFIG_FUSION_MAX_SGE
-#endif
-#else
-#define MPT_SCSI_SG_DEPTH	40
-#endif
 
 /* To disable domain validation, uncomment the
  * following line. No effect for FC devices.

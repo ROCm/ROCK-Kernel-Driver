@@ -198,7 +198,7 @@ MODULE_PARM(ips, "s");
  * DRIVER_VER
  */
 #define IPS_VERSION_HIGH        "7.00"
-#define IPS_VERSION_LOW         ".00 "
+#define IPS_VERSION_LOW         ".15 "
 
 #if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
 #warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
@@ -328,7 +328,10 @@ static char ips_adapter_name[][30] = {
 	"ServeRAID 5i",
 	"ServeRAID 5i",
 	"ServeRAID 6M",
-	"ServeRAID 6i"
+	"ServeRAID 6i",
+	"ServeRAID 7t",
+	"ServeRAID 7k",
+	"ServeRAID 7M"
 };
 
 static struct notifier_block ips_notifier = {
@@ -2374,6 +2377,12 @@ ips_identify_controller(ips_ha_t * ha)
 			break;
 		case IPS_SUBDEVICEID_6I:
 			ha->ad_type = IPS_ADTYPE_SERVERAID6I;
+			break;
+		case IPS_SUBDEVICEID_7k:
+			ha->ad_type = IPS_ADTYPE_SERVERAID7k;
+			break;
+		case IPS_SUBDEVICEID_7M:
+			ha->ad_type = IPS_ADTYPE_SERVERAID7M;
 			break;
 		}
 		break;
@@ -6987,6 +6996,8 @@ ips_order_controllers(void)
 			for (j = position; j < ips_num_controllers; j++) {
 				switch (ips_ha[j]->ad_type) {
 				case IPS_ADTYPE_SERVERAID6M:
+				case IPS_ADTYPE_SERVERAID7k:
+				case IPS_ADTYPE_SERVERAID7M:
 					if (nvram->adapter_order[i] == 'M') {
 						ips_shift_controllers(position,
 								      j);
