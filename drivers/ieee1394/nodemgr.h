@@ -73,6 +73,8 @@ struct unit_directory {
 
 	unsigned int id;
 
+	int ignore_driver;
+
 	int length;		/* Number of quadlets */
 
 	struct device device;
@@ -193,7 +195,7 @@ void cleanup_ieee1394_nodemgr(void);
 /* The template for a host device */
 extern struct device nodemgr_dev_template_host;
 
-/* Bus attribute to destroy limbo'd nodes */
-extern struct bus_attribute bus_attr_destroy;
+/* Bus attributes we export */
+extern struct bus_attribute *const fw_bus_attrs[];
 
 #endif /* _IEEE1394_NODEMGR_H */

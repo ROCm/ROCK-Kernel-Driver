@@ -990,6 +990,8 @@ void abort_timedouts(unsigned long __opaque)
 
 static int __init ieee1394_init(void)
 {
+	int i;
+
 	devfs_mk_dir("ieee1394");
 
 	if (register_chrdev_region(IEEE1394_CORE_DEV, 256, "ieee1394")) {
@@ -1003,7 +1005,8 @@ static int __init ieee1394_init(void)
 					      0, 0, NULL, NULL);
 
 	bus_register(&ieee1394_bus_type);
-	bus_create_file(&ieee1394_bus_type, &bus_attr_destroy);
+	for (i = 0; fw_bus_attrs[i]; i++)
+		bus_create_file(&ieee1394_bus_type, fw_bus_attrs[i]);
 	class_register(&hpsb_host_class);
 
 	if (init_csr())
@@ -1019,13 +1022,16 @@ static int __init ieee1394_init(void)
 
 static void __exit ieee1394_cleanup(void)
 {
+	int i;
+
 	if (!disable_nodemgr)
 		cleanup_ieee1394_nodemgr();
 
 	cleanup_csr();
 
 	class_unregister(&hpsb_host_class);
-	bus_remove_file(&ieee1394_bus_type, &bus_attr_destroy);
+	for (i = 0; fw_bus_attrs[i]; i++)
+		bus_remove_file(&ieee1394_bus_type, fw_bus_attrs[i]);
 	bus_unregister(&ieee1394_bus_type);
 
 	kmem_cache_destroy(hpsb_packet_cache);

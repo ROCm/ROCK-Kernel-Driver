@@ -306,10 +306,34 @@ static ssize_t fw_show_ne_tlabels_mask(struct device *dev, char *buf)
 	return sprintf(buf, "0x%016lx\n", ne->tpool->pool[0]);
 #endif
 }
-static DEVICE_ATTR(tlabels_mask,S_IRUGO,fw_show_ne_tlabels_mask,NULL);
+static DEVICE_ATTR(tlabels_mask, S_IRUGO, fw_show_ne_tlabels_mask, NULL);
 
 
-static ssize_t fw_set_destroy(struct bus_type *bus, const char *buf, size_t count)
+static ssize_t fw_set_ignore_driver(struct device *dev, const char *buf, size_t count)
+{
+	struct unit_directory *ud = container_of(dev, struct unit_directory, device);
+	int state = simple_strtoul(buf, NULL, 10);
+
+	if (state == 1) {
+		down_write(&dev->bus->subsys.rwsem);
+		device_release_driver(dev);
+		ud->ignore_driver = 1;
+		up_write(&dev->bus->subsys.rwsem);
+	} else if (!state)
+		ud->ignore_driver = 0;
+
+	return count;
+}
+static ssize_t fw_get_ignore_driver(struct device *dev, char *buf)
+{
+	struct unit_directory *ud = container_of(dev, struct unit_directory, device);
+
+	return sprintf(buf, "%d\n", ud->ignore_driver);
+}	
+static DEVICE_ATTR(ignore_driver, S_IWUSR | S_IRUGO, fw_get_ignore_driver, fw_set_ignore_driver);
+
+
+static ssize_t fw_set_destroy_node(struct bus_type *bus, const char *buf, size_t count)
 {
 	struct node_entry *ne;
 	u64 guid = (u64)simple_strtoull(buf, NULL, 16);
@@ -323,11 +347,34 @@ static ssize_t fw_set_destroy(struct bus_type *bus, const char *buf, size_t coun
 
 	return count;
 }
-static ssize_t fw_get_destroy(struct bus_type *bus, char *buf)
+static ssize_t fw_get_destroy_node(struct bus_type *bus, char *buf)
 {
 	return sprintf(buf, "You can destroy in_limbo nodes by writing their GUID to this file\n");
 }
-BUS_ATTR(destroy, S_IWUSR | S_IRUGO, fw_get_destroy, fw_set_destroy);
+static BUS_ATTR(destroy_node, S_IWUSR | S_IRUGO, fw_get_destroy_node, fw_set_destroy_node);
+
+
+static ssize_t fw_set_rescan(struct bus_type *bus, const char *buf, size_t count)
+{
+	int state = simple_strtoul(buf, NULL, 10);
+
+	if (state == 1)
+		bus_rescan_devices(&ieee1394_bus_type);
+
+	return count;
+}
+static ssize_t fw_get_rescan(struct bus_type *bus, char *buf)
+{
+	return sprintf(buf, "You can force a rescan of the bus for "
+			"drivers by writing a 1 to this file\n");
+}
+static BUS_ATTR(rescan, S_IWUSR | S_IRUGO, fw_get_rescan, fw_set_rescan);
+
+struct bus_attribute *const fw_bus_attrs[] = {
+	&bus_attr_destroy_node,
+	&bus_attr_rescan,
+	NULL
+};
 
 
 fw_attr(ne, struct node_entry, capabilities, unsigned int, "0x%06x\n")
@@ -370,6 +417,7 @@ fw_attr_td(ud, struct unit_directory, model_name_kv)
 static struct device_attribute *const fw_ud_attrs[] = {
 	&dev_attr_ud_address,
 	&dev_attr_ud_length,
+	&dev_attr_ignore_driver,
 };
 
 
@@ -553,7 +601,7 @@ static int nodemgr_bus_match(struct device * dev, struct device_driver * drv)
 	ud = container_of(dev, struct unit_directory, device);
 	driver = container_of(drv, struct hpsb_protocol_driver, driver);
 
-	if (ud->ne->in_limbo)
+	if (ud->ne->in_limbo || ud->ignore_driver)
 		return 0;
 
         for (id = driver->id_table; id->match_flags != 0; id++) {
@@ -1000,7 +1048,7 @@ static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
 
 	ud = container_of(dev, struct unit_directory, device);
 
-	if (ud->ne->in_limbo)
+	if (ud->ne->in_limbo || ud->ignore_driver)
 		return -ENODEV;
 
 	scratch = buffer;
