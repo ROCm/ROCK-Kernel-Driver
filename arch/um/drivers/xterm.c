@@ -93,6 +93,9 @@ int xterm_open(int input, int output, int primary, void *d)
 			 "/usr/lib/uml/port-helper", "-uml-socket",
 			 file, NULL };
 
+	if(access(argv[4], X_OK))
+		argv[4] = "port-helper";
+
 	fd = mkstemp(file);
 	if(fd < 0){
 		printk("xterm_open : mkstemp failed, errno = %d\n", errno);

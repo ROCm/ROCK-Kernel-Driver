@@ -30,7 +30,7 @@ void *fd_init(char *str, int device, struct chan_opts *opts)
 	}
 	str++;
 	n = strtoul(str, &end, 0);
-	if(*end != '\0'){
+	if((*end != '\0') || (end == str)){
 		printk("fd_init : couldn't parse file descriptor '%s'\n", str);
 		return(NULL);
 	}

@@ -40,7 +40,7 @@ void *port_init(char *str, int device, struct chan_opts *opts)
 	}
 	str++;
 	port = strtoul(str, &end, 0);
-	if(*end != '\0'){
+	if((*end != '\0') || (end == str)){
 		printk("port_init : couldn't parse port '%s'\n", str);
 		return(NULL);
 	}
