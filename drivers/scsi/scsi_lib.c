@@ -174,14 +174,18 @@ void scsi_do_req(struct scsi_request *sreq, const void *cmnd,
 		 void (*done)(struct scsi_cmnd *),
 		 int timeout, int retries)
 {
+	struct request_queue *q;
+
 	/*
 	 * If the upper level driver is reusing these things, then
 	 * we should release the low-level block now.  Another one will
 	 * be allocated later when this request is getting queued.
 	 */
 	if (sreq->sr_command) {
+		q = sreq->sr_command->device->request_queue;
 		scsi_put_command(sreq->sr_command);
 		sreq->sr_command = NULL;
+		scsi_queue_next_request(q, NULL);
 	}
 
 	/*
@@ -228,6 +232,7 @@ static void scsi_wait_done(struct scsi_cmnd *cmd)
 void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 		   unsigned bufflen, int timeout, int retries)
 {
+	struct request_queue *q;
 	DECLARE_COMPLETION(wait);
 	
 	sreq->sr_request->waiting = &wait;
@@ -239,7 +244,9 @@ void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 	sreq->sr_request->waiting = NULL;
 
 	if (sreq->sr_command) {
+		q = sreq->sr_command->device->request_queue;
 		scsi_put_command(sreq->sr_command);
+		scsi_queue_next_request(q, NULL);
 		sreq->sr_command = NULL;
 	}
 }
@@ -351,7 +358,7 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
  *		permutations grows as 2**N, and if too many more special cases
  *		get added, we start to get screwed.
  */
-static void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
+void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 {
 	struct scsi_device *sdev, *sdev2;
 	struct Scsi_Host *shost;

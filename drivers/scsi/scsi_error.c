@@ -1681,6 +1681,7 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
 	struct scsi_cmnd *scmd = scsi_get_command(dev, GFP_KERNEL);
 	struct request req;
 	int rtn;
+	struct request_queue *q;
 
 	scmd->request = &req;
 	memset(&scmd->eh_timeout, 0, sizeof(scmd->eh_timeout));
@@ -1735,6 +1736,8 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
 	}
 
 	scsi_delete_timer(scmd);
+	q = scmd->device->request_queue;
 	scsi_put_command(scmd);
+	scsi_queue_next_request(q, NULL);
 	return rtn;
 }

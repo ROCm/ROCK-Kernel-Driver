@@ -417,6 +417,7 @@ extern void scsi_setup_cmd_retry(Scsi_Cmnd *SCpnt);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
 extern int scsi_queue_insert(struct scsi_cmnd *cmd, int reason);
+extern void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd);
 extern request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost);
 extern void scsi_free_queue(request_queue_t *q);
 extern int scsi_init_queue(void);
