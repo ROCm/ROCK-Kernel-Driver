@@ -973,8 +973,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		if (oss) {
 			err = dev->oss.minor_dsp =
 				register_sound_dsp(&saa7134_dsp_fops,
-						   dsp_nr[saa7134_devcount],
-						   &dev->pci->dev);
+						   dsp_nr[saa7134_devcount]);
 			if (err < 0) {
 				goto fail4;
 			}
@@ -983,8 +982,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 			
 			err = dev->oss.minor_mixer =
 				register_sound_mixer(&saa7134_mixer_fops,
-						     mixer_nr[saa7134_devcount],
-						     &dev->pci->dev);
+						     mixer_nr[saa7134_devcount]);
 			if (err < 0)
 				goto fail5;
 			printk(KERN_INFO "%s: registered device mixer%d\n",
