@@ -3457,6 +3457,8 @@ void cpu_attach_domain(struct sched_domain *sd, int cpu)
 	runqueue_t *rq = cpu_rq(cpu);
 	int local = 1;
 
+	lock_cpu_hotplug();
+
 	spin_lock_irqsave(&rq->lock, flags);
 
 	if (cpu == smp_processor_id() || cpu_is_offline(cpu)) {
@@ -3475,6 +3477,8 @@ void cpu_attach_domain(struct sched_domain *sd, int cpu)
 		wake_up_process(rq->migration_thread);
 		wait_for_completion(&req.done);
 	}
+
+	unlock_cpu_hotplug();
 }
 
 #ifdef ARCH_HAS_SCHED_DOMAIN
