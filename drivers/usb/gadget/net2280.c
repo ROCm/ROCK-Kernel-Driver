@@ -717,7 +717,7 @@ fill_dma_desc (struct net2280_ep *ep, struct net2280_request *req, int valid)
 		dmacount |= (1 << DMA_DONE_INTERRUPT_ENABLE);
 
 	/* td->dmadesc = previously set by caller */
-	td->dmaaddr = cpu_to_le32p (&req->req.dma);
+	td->dmaaddr = cpu_to_le32 (req->req.dma);
 
 	/* 2280 may be polling VALID_BIT through ep->dma->dmadesc */
 	wmb ();
@@ -1707,8 +1707,10 @@ show_queues (struct device *_dev, char *buf)
 				td = req->td;
 				t = scnprintf (next, size, "\t    td %08x "
 					" count %08x buf %08x desc %08x\n",
-					req->td_dma, td->dmacount,
-					td->dmaaddr, td->dmadesc);
+					(u32) req->td_dma,
+					le32_to_cpu (td->dmacount),
+					le32_to_cpu (td->dmaaddr),
+					le32_to_cpu (td->dmadesc));
 				if (t <= 0 || t > size)
 					goto done;
 				size -= t;
@@ -2845,6 +2847,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->got_irq = 1;
 
 	/* DMA setup */
+	/* NOTE:  we know only the 32 LSBs of dma addresses may be nonzero */
 	dev->requests = pci_pool_create ("requests", pdev,
 		sizeof (struct net2280_dma),
 		0 /* no alignment requirements */,

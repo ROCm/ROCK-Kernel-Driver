@@ -495,10 +495,10 @@ set_idx_reg (struct net2280_regs __iomem *regs, u32 index, u32 value)
  * use struct net2280_dma_regs bitfields
  */
 struct net2280_dma {
-	u32		dmacount;
-	u32		dmaaddr;		/* the buffer */
-	u32		dmadesc;		/* next dma descriptor */
-	u32		_reserved;
+	__le32		dmacount;
+	__le32		dmaaddr;		/* the buffer */
+	__le32		dmadesc;		/* next dma descriptor */
+	__le32		_reserved;
 } __attribute__ ((aligned (16)));
 
 /*-------------------------------------------------------------------------*/
