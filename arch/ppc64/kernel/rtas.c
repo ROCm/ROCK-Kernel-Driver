@@ -259,6 +259,33 @@ rtas_get_power_level(int powerdomain, int *level)
 }
 
 int
+rtas_set_power_level(int powerdomain, int level, int *setlevel)
+{
+	int token = rtas_token("set-power-level");
+	unsigned int wait_time;
+	long returned_level;
+	int rc;
+
+	if (token == RTAS_UNKNOWN_SERVICE)
+		return RTAS_UNKNOWN_OP;
+
+	while (1) {
+		rc = (int) rtas_call(token, 2, 2, &returned_level, powerdomain,
+					level);
+		if (rc == RTAS_BUSY)
+			udelay(1);
+		else if (rtas_is_extended_busy(rc)) {
+			wait_time = rtas_extended_busy_delay_time(rc);
+			udelay(wait_time * 1000);
+		}
+		else
+			break;
+	}
+	*setlevel = (int) returned_level;
+	return rc;
+}
+
+int
 rtas_get_sensor(int sensor, int index, int *state)
 {
 	int token = rtas_token("get-sensor-state");
@@ -472,4 +499,5 @@ EXPORT_SYMBOL(rtas_data_buf_lock);
 EXPORT_SYMBOL(rtas_extended_busy_delay_time);
 EXPORT_SYMBOL(rtas_get_sensor);
 EXPORT_SYMBOL(rtas_get_power_level);
+EXPORT_SYMBOL(rtas_set_power_level);
 EXPORT_SYMBOL(rtas_set_indicator);

@@ -177,6 +177,7 @@ extern void rtas_power_off(void);
 extern void rtas_halt(void);
 extern int rtas_get_sensor(int sensor, int index, int *state);
 extern int rtas_get_power_level(int powerdomain, int *level);
+extern int rtas_set_power_level(int powerdomain, int level, int *setlevel);
 extern int rtas_set_indicator(int indicator, int index, int new_value);
 
 /* Given an RTAS status code of 9900..9905 compute the hinted delay */
