@@ -88,7 +88,7 @@ static int max_requests = 50;
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.1");
+MODULE_VERSION("1.2");
 
 module_param_named(max_id, max_id, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_id, "Largest ID value for each channel");
@@ -941,7 +941,8 @@ static int ibmvscsi_eh_device_reset_handler(struct scsi_cmnd *cmd)
 	 * responded to, and fail them with DID_RESET
 	 */
 	list_for_each_entry_safe(tmp_evt, pos, &hostdata->sent, list) {
-		if (tmp_evt->cmnd->device == cmd->device) {
+		if ((tmp_evt->cmnd) &&
+		    (tmp_evt->cmnd->device == cmd->device)) {
 			tmp_evt->cmnd->result = (DID_RESET << 16);
 			list_del(&tmp_evt->list);
 			unmap_cmd_data(&tmp_evt->cmd, tmp_evt->hostdata->dev);
@@ -966,12 +967,18 @@ static void purge_requests(struct ibmvscsi_host_data *hostdata)
 
 	spin_lock_irqsave(hostdata->host->host_lock, flags);
 	list_for_each_entry_safe(tmp_evt, pos, &hostdata->sent, list) {
-		tmp_evt->cmnd->result = (DID_ERROR << 16);
-		list_del(&tmp_evt->list);
-		unmap_cmd_data(&tmp_evt->cmd, tmp_evt->hostdata->dev);
+		if (tmp_evt->cmnd) {
+			tmp_evt->cmnd->result = (DID_ERROR << 16);
+			list_del(&tmp_evt->list);
+			unmap_cmd_data(&tmp_evt->cmd, tmp_evt->hostdata->dev);
+			if (tmp_evt->cmnd_done)
+				tmp_evt->cmnd_done(tmp_evt->cmnd);
+		} else {
+			if (tmp_evt->done) {
+				tmp_evt->done(tmp_evt);
+			}
+		}
 		ibmvscsi_free_event_struct(&tmp_evt->hostdata->pool, tmp_evt);
-		if (tmp_evt->cmnd_done)
-			tmp_evt->cmnd_done(tmp_evt->cmnd);
 	}
 	spin_unlock_irqrestore(hostdata->host->host_lock, flags);
 }
