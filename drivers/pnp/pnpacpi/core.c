@@ -26,7 +26,7 @@
 
 static int num = 0;
 
-static char excluded_id_list[] =
+static char __initdata excluded_id_list[] =
 	"PNP0C0A," /* Battery */
 	"PNP0C0C,PNP0C0E,PNP0C0D," /* Button */
 	"PNP0C09," /* EC */
@@ -58,7 +58,7 @@ void *pnpacpi_kmalloc(size_t size, int f)
 #define TEST_ALPHA(c) \
 	if (!('@' <= (c) || (c) <= 'Z')) \
 		return 0
-static int ispnpidacpi(char *id)
+static int __init ispnpidacpi(char *id)
 {
 	TEST_ALPHA(id[0]);
 	TEST_ALPHA(id[1]);
@@ -72,7 +72,7 @@ static int ispnpidacpi(char *id)
 	return 1;
 }
 
-static void pnpidacpi_to_pnpid(char *id, char *str)
+static void __init pnpidacpi_to_pnpid(char *id, char *str)
 {
 	str[0] = id[0];
 	str[1] = id[1];
@@ -131,12 +131,16 @@ struct pnp_protocol pnpacpi_protocol = {
 	.disable = pnpacpi_disable_resources,
 };
 
-static int acpi_pnp_add(struct acpi_device *device)
+static int __init pnpacpi_add_device(struct acpi_device *device)
 {
 	acpi_handle temp = NULL;
 	acpi_status status;
 	struct pnp_id *dev_id;
 	struct pnp_dev *dev;
+
+	if (!ispnpidacpi(acpi_device_hid(device)) ||
+		is_exclusive_device(device))
+		return 0;
 
 	pnp_dbg("ACPI device : hid %s", acpi_device_hid(device));
 	dev =  pnpacpi_kmalloc(sizeof(struct pnp_dev), GFP_KERNEL);
@@ -217,7 +221,6 @@ static int acpi_pnp_add(struct acpi_device *device)
 	pnp_add_device(dev);
 	num ++;
 
-	acpi_driver_data(device) = dev;
 	return AE_OK;
 err1:
 	kfree(dev_id);
@@ -226,33 +229,15 @@ err:
 	return -EINVAL;
 }
 
-static int acpi_pnp_remove (struct acpi_device *device, int type)
+static acpi_status __init pnpacpi_add_device_handler(acpi_handle handle,
+	u32 lvl, void *context, void **rv)
 {
-	struct pnp_dev *dev = acpi_driver_data(device);
-	if (!dev)
-		return AE_ERROR;
+	struct acpi_device *device;
 
-	pnp_remove_device(dev);
+	if (!acpi_bus_get_device(handle, &device))
+		pnpacpi_add_device(device);
 	return AE_OK;
 }
-
-static int acpi_pnp_match(struct acpi_device *device,
-	struct acpi_driver	*driver)
-{
-	return (!ispnpidacpi(acpi_device_hid(device)) ||
-		is_exclusive_device(device));
-}
-
-/* default acpi PNP device driver, support hotplug */
-static struct acpi_driver acpi_pnp_driver = {
-	.name =		"ACPI PNP Driver",
-	.class =	"acpi_pnp",
-	.ops =		{
-				.add = acpi_pnp_add,
-				.remove = acpi_pnp_remove,
-				.match = acpi_pnp_match,
-			},
-};
 
 int __init pnpacpi_init(void)
 {
@@ -262,8 +247,9 @@ int __init pnpacpi_init(void)
 	}
 	pnp_info("PnP ACPI init");
 	pnp_register_protocol(&pnpacpi_protocol);
-	if (acpi_bus_register_driver(&acpi_pnp_driver) < 0)
-		return -ENODEV;
+	acpi_walk_namespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
+			ACPI_UINT32_MAX, pnpacpi_add_device_handler,
+			NULL, NULL);
 	pnp_info("PnP ACPI: found %d devices", num);
 	return 0;
 }
