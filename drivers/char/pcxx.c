@@ -130,7 +130,6 @@ static struct channel    *digi_channels;
 int pcxx_ncook=sizeof(pcxx_cook);
 int pcxx_nbios=sizeof(pcxx_bios);
 
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
 #define pcxxassert(x, msg)  if(!(x)) pcxx_error(__LINE__, msg)
 
 #define FEPTIMEOUT 200000  
@@ -620,7 +619,7 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 		
 		tail &= (size - 1);
 		stlen = (head >= tail) ? (size - (head - tail) - 1) : (tail - head - 1);
-		count = MIN(stlen, count);
+		count = min(stlen, count);
 		memoff(ch);
 		restore_flags(flags);
 
@@ -652,11 +651,11 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 		remain = tail - head - 1;
 		stlen = remain;
 	}
-	count = MIN(remain, count);
+	count = min(remain, count);
 
 	txwinon(ch);
 	while (count > 0) {
-		stlen = MIN(count, stlen);
+		stlen = min(count, stlen);
 		memcpy(ch->txptr + head, buf, stlen);
 		buf += stlen;
 		count -= stlen;
