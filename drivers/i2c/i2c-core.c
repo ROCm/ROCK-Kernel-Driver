@@ -30,6 +30,7 @@
 #include <linux/proc_fs.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 #include <asm/uaccess.h>
 
 
@@ -326,42 +327,45 @@ int i2c_check_addr(struct i2c_adapter *adapter, int addr)
 int i2c_attach_client(struct i2c_client *client)
 {
 	struct i2c_adapter *adapter = client->adapter;
-	int res =  -EBUSY, i;
+	int i;
 
 	down(&adapter->list);
-	if (__i2c_check_addr(client->adapter,client->addr))
+	if (__i2c_check_addr(client->adapter, client->addr))
 		goto out_unlock_list;
 
-	for (i = 0; i < I2C_CLIENT_MAX; i++)
-		if (NULL == adapter->clients[i])
-			break;
-	if (I2C_CLIENT_MAX == i) {
-		printk(KERN_WARNING 
-		       " i2c-core.o: attach_client(%s) - enlarge I2C_CLIENT_MAX.\n",
-			client->name);
-		res = -ENOMEM;
-		goto out_unlock_list;
+	for (i = 0; i < I2C_CLIENT_MAX; i++) {
+		if (!adapter->clients[i])
+			goto free_slot;
 	}
 
-	adapter->clients[i] = client;
-	up(&adapter->list);
-	
-	if (adapter->client_register) 
-		if (adapter->client_register(client)) 
-			printk(KERN_DEBUG "i2c-core.o: warning: client_register seems "
-			       "to have failed for client %02x at adapter %s\n",
-			       client->addr,adapter->name);
-	DEB(printk(KERN_DEBUG "i2c-core.o: client [%s] registered to adapter [%s](pos. %d).\n",
-		client->name, adapter->name,i));
-
-	if(client->flags & I2C_CLIENT_ALLOW_USE)
-		client->usage_count = 0;
-	
-	return 0;
+	printk(KERN_WARNING 
+	       " i2c-core.o: attach_client(%s) - enlarge I2C_CLIENT_MAX.\n",
+	       client->name);
 
  out_unlock_list:
 	up(&adapter->list);
-	return res;
+	return -EBUSY;
+
+ free_slot:
+	adapter->clients[i] = client;
+	up(&adapter->list);
+	
+	if (adapter->client_register)  {
+		if (adapter->client_register(client))  {
+			printk(KERN_DEBUG
+			       "i2c-core.o: warning: client_register seems "
+			       "to have failed for client %02x at adapter %s\n",
+			       client->addr, adapter->name);
+		}
+	}
+
+	DEB(printk(KERN_DEBUG
+		   "i2c-core.o: client [%s] registered to adapter [%s] "
+		   "(pos. %d).\n", client->name, adapter->name, i));
+
+	if (client->flags & I2C_CLIENT_ALLOW_USE)
+		client->usage_count = 0;
+	return 0;
 }
 
 
@@ -376,28 +380,30 @@ int i2c_detach_client(struct i2c_client *client)
 	if (adapter->client_unregister)  {
 		res = adapter->client_unregister(client);
 		if (res) {
-			printk(KERN_ERR "i2c-core.o: client_unregister [%s] failed, "
-			       "client not detached",client->name);
-			return res;
+			printk(KERN_ERR
+			       "i2c-core.o: client_unregister [%s] failed, "
+			       "client not detached", client->name);
+			goto out;
 		}
 	}
 
 	down(&adapter->list);
 	for (i = 0; i < I2C_CLIENT_MAX; i++) {
-		if (client == adapter->clients[i])
-			break;
+		if (client == adapter->clients[i]) {
+			adapter->clients[i] = NULL;
+			goto out_unlock;
+		}
 	}
 
-	if (I2C_CLIENT_MAX == i) {
-		printk(KERN_WARNING " i2c-core.o: unregister_client "
-				    "[%s] not found\n",
-			client->name);
-		return -ENODEV;
-	} else
-		adapter->clients[i] = NULL;
-	up(&adapter->list);
+	printk(KERN_WARNING
+	       " i2c-core.o: unregister_client [%s] not found\n",
+	       client->name);
+	res = -ENODEV;
 
-	return 0;
+ out_unlock:
+	up(&adapter->list);
+ out:
+	return res;
 }
 
 static int i2c_inc_use_client(struct i2c_client *client)
@@ -456,45 +462,7 @@ int i2c_release_client(struct i2c_client *client)
 	return 0;
 }
 
-/* ----------------------------------------------------
- * The /proc functions
- * ----------------------------------------------------
- */
-
 #ifdef CONFIG_PROC_FS
-/* This function generates the output for /proc/bus/i2c */
-static int read_bus_i2c(char *buf, char **start, off_t offset,
-			int len, int *eof, void *private)
-{
-	int i;
-	int nr = 0;
-
-	/* Note that it is safe to write a `little' beyond len. Yes, really. */
-	/* Fuck you.  Will convert this to seq_file later.  --hch */
-
-	down(&core_lists);
-	for (i = 0; (i < I2C_ADAP_MAX) && (nr < len); i++) {
-		if (adapters[i]) {
-			nr += sprintf(buf+nr, "i2c-%d\t", i);
-			if (adapters[i]->algo->smbus_xfer) {
-				if (adapters[i]->algo->master_xfer)
-					nr += sprintf(buf+nr,"smbus/i2c");
-				else
-					nr += sprintf(buf+nr,"smbus    ");
-			} else if (adapters[i]->algo->master_xfer)
-				nr += sprintf(buf+nr,"i2c       ");
-			else
-				nr += sprintf(buf+nr,"dummy     ");
-			nr += sprintf(buf+nr,"\t%-32s\t%-32s\n",
-			              adapters[i]->name,
-			              adapters[i]->algo->name);
-		}
-	}
-	up(&core_lists);
-
-	return nr;
-}
-
 /* This function generates the output for /proc/bus/i2c-? */
 static ssize_t i2cproc_bus_read(struct file *file, char *buf,
 				size_t count, loff_t *ppos)
@@ -564,6 +532,50 @@ static struct file_operations i2cproc_operations = {
 	.read		= i2cproc_bus_read,
 };
 
+/* This function generates the output for /proc/bus/i2c */
+static int bus_i2c_show(struct seq_file *s, void *p)
+{
+	int i;
+
+	down(&core_lists);
+	for (i = 0; i < I2C_ADAP_MAX; i++) {
+		struct i2c_adapter *adapter = adapters[i];
+
+		if (!adapter)
+			continue;
+
+		seq_printf(s, "i2c-%d\t", i);
+
+		if (adapter->algo->smbus_xfer) {
+			if (adapter->algo->master_xfer)
+				seq_printf(s, "smbus/i2c");
+			else
+				seq_printf(s, "smbus    ");
+		} else if (adapter->algo->master_xfer)
+			seq_printf(s ,"i2c       ");
+		else
+			seq_printf(s, "dummy     ");
+
+		seq_printf(s, "\t%-32s\t%-32s\n",
+			      adapter->name, adapter->algo->name);
+	}
+	up(&core_lists);
+
+	return 0;
+}
+
+static int bus_i2c_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, bus_i2c_show, NULL);
+}
+
+static struct file_operations bus_i2c_fops = {
+	.open		= bus_i2c_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+ };
+
 static int i2cproc_register(struct i2c_adapter *adap, int bus)
 {
 	struct proc_dir_entry *proc_entry;
@@ -576,7 +588,7 @@ static int i2cproc_register(struct i2c_adapter *adap, int bus)
 		goto fail;
 
 	proc_entry->proc_fops = &i2cproc_operations;
-	proc_entry->owner = THIS_MODULE;
+	proc_entry->owner = adap->owner;
 	adap->inode = proc_entry->low_ino;
 	return 0;
  fail:
@@ -596,15 +608,16 @@ static int __init i2cproc_init(void)
 {
 	struct proc_dir_entry *proc_bus_i2c;
 
-	proc_bus_i2c = create_proc_entry("i2c",0,proc_bus);
-	if (!proc_bus_i2c) {
-		printk(KERN_ERR "i2c-core.o: Could not create /proc/bus/i2c");
-		return -ENOENT;
- 	}
+	proc_bus_i2c = create_proc_entry("i2c", 0, proc_bus);
+	if (!proc_bus_i2c)
+		goto fail;
+	proc_bus_i2c->proc_fops = &bus_i2c_fops;
+ 	proc_bus_i2c->owner = THIS_MODULE;
+ 	return 0;
 
-	proc_bus_i2c->read_proc = &read_bus_i2c;
-	proc_bus_i2c->owner = THIS_MODULE;
-	return 0;
+ fail:
+	printk(KERN_ERR "i2c-core.o: Could not create /proc/bus/i2c");
+	return -ENOENT;
 }
 
 static void __exit i2cproc_cleanup(void)

@@ -86,7 +86,6 @@ static void multipath_reschedule_retry (struct multipath_bh *mp_bh)
 {
 	unsigned long flags;
 	mddev_t *mddev = mp_bh->mddev;
-	multipath_conf_t *conf = mddev_to_conf(mddev);
 
 	spin_lock_irqsave(&retry_list_lock, flags);
 	if (multipath_retry_list == NULL)
@@ -95,7 +94,7 @@ static void multipath_reschedule_retry (struct multipath_bh *mp_bh)
 	multipath_retry_tail = &mp_bh->next_mp;
 	mp_bh->next_mp = NULL;
 	spin_unlock_irqrestore(&retry_list_lock, flags);
-	md_wakeup_thread(conf->thread);
+	md_wakeup_thread(mddev->thread);
 }
 
 
@@ -185,19 +184,18 @@ static int multipath_make_request (request_queue_t *q, struct bio * bio)
 	return 0;
 }
 
-static int multipath_status (char *page, mddev_t *mddev)
+static void multipath_status (struct seq_file *seq, mddev_t *mddev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
-	int sz = 0, i;
+	int i;
 	
-	sz += sprintf (page+sz, " [%d/%d] [", conf->raid_disks,
+	seq_printf (seq, " [%d/%d] [", conf->raid_disks,
 						 conf->working_disks);
 	for (i = 0; i < conf->raid_disks; i++)
-		sz += sprintf (page+sz, "%s",
+		seq_printf (seq, "%s",
 			       conf->multipaths[i].rdev && 
 			       conf->multipaths[i].rdev->in_sync ? "U" : "_");
-	sz += sprintf (page+sz, "]");
-	return sz;
+	seq_printf (seq, "]");
 }
 
 #define LAST_DISK KERN_ALERT \
@@ -334,14 +332,14 @@ abort:
  *	3.	Performs writes following reads for array syncronising.
  */
 
-static void multipathd (void *data)
+static void multipathd (mddev_t *mddev)
 {
 	struct multipath_bh *mp_bh;
 	struct bio *bio;
 	unsigned long flags;
-	mddev_t *mddev;
 	mdk_rdev_t *rdev;
 
+	md_check_recovery(mddev);
 	for (;;) {
 		spin_lock_irqsave(&retry_list_lock, flags);
 		mp_bh = multipath_retry_list;
@@ -471,10 +469,10 @@ static int multipath_run (mddev_t *mddev)
 	}
 
 	{
-		const char * name = "multipathd";
+		const char * name = "md%d_multipath";
 
-		conf->thread = md_register_thread(multipathd, conf, name);
-		if (!conf->thread) {
+		mddev->thread = md_register_thread(multipathd, mddev, name);
+		if (!mddev->thread) {
 			printk(THREAD_ERROR, mdidx(mddev));
 			goto out_free_conf;
 		}
@@ -513,7 +511,7 @@ static int multipath_stop (mddev_t *mddev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 
-	md_unregister_thread(conf->thread);
+	md_unregister_thread(mddev->thread);
 	mempool_destroy(conf->pool);
 	kfree(conf);
 	mddev->private = NULL;

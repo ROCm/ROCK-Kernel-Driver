@@ -1310,6 +1310,10 @@ static void free_journal_ram(struct super_block *p_s_sb) {
   if (SB_JOURNAL(p_s_sb)->j_header_bh) {
     brelse(SB_JOURNAL(p_s_sb)->j_header_bh) ;
   }
+  /* j_header_bh is on the journal dev, make sure not to release the journal
+   * dev until we brelse j_header_bh
+   */
+  release_journal_dev(p_s_sb, SB_JOURNAL(p_s_sb));
   vfree(SB_JOURNAL(p_s_sb)) ;
 }
 
@@ -1341,7 +1345,6 @@ static int do_journal_release(struct reiserfs_transaction_handle *th, struct sup
     commit_wq = NULL;
   }
 
-  release_journal_dev( p_s_sb, SB_JOURNAL( p_s_sb ) );
   free_journal_ram(p_s_sb) ;
 
   return 0 ;
@@ -1867,24 +1870,18 @@ static int release_journal_dev( struct super_block *super,
     int result;
     
     result = 0;
-	
 
     if( journal -> j_dev_file != NULL ) {
-	/*
-	 * journal block device was taken via filp_open
-	 */
 	result = filp_close( journal -> j_dev_file, NULL );
 	journal -> j_dev_file = NULL;
 	journal -> j_dev_bd = NULL;
     } else if( journal -> j_dev_bd != NULL ) {
-	/*
-	 * journal block device was taken via bdget and blkdev_get
-	 */
 	result = blkdev_put( journal -> j_dev_bd, BDEV_FS );
 	journal -> j_dev_bd = NULL;
     }
+
     if( result != 0 ) {
-	reiserfs_warning("sh-457: release_journal_dev: Cannot release journal device: %i", result );
+	reiserfs_warning("sh-457: release_journal_dev: Cannot release journal device: %i\n", result );
     }
     return result;
 }
@@ -1895,6 +1892,7 @@ static int journal_init_dev( struct super_block *super,
 {
 	int result;
 	dev_t jdev;
+	int blkdev_mode = FMODE_READ | FMODE_WRITE;
 
 	result = 0;
 
@@ -1902,12 +1900,16 @@ static int journal_init_dev( struct super_block *super,
 	journal -> j_dev_file = NULL;
 	jdev = SB_ONDISK_JOURNAL_DEVICE( super ) ?
 		SB_ONDISK_JOURNAL_DEVICE( super ) : super->s_dev;	
+
+	if (bdev_read_only(super->s_bdev))
+	    blkdev_mode = FMODE_READ;
+
 	/* there is no "jdev" option and journal is on separate device */
 	if( ( !jdev_name || !jdev_name[ 0 ] ) ) {
 		journal -> j_dev_bd = bdget(jdev);
 		if( journal -> j_dev_bd )
 			result = blkdev_get( journal -> j_dev_bd, 
-					     FMODE_READ | FMODE_WRITE, 0, 
+					     blkdev_mode, 0, 
 					     BDEV_FS );
 		else
 			result = -ENOMEM;
@@ -1928,10 +1930,10 @@ static int journal_init_dev( struct super_block *super,
 		jdev_inode = journal -> j_dev_file -> f_dentry -> d_inode;
 		journal -> j_dev_bd = jdev_inode -> i_bdev;
 		if( !S_ISBLK( jdev_inode -> i_mode ) ) {
-			printk( "journal_init_dev: '%s' is not a block device", jdev_name );
+			printk( "journal_init_dev: '%s' is not a block device\n", jdev_name );
 			result = -ENOTBLK;
 		} else if( jdev_inode -> i_bdev == NULL ) {
-			printk( "journal_init_dev: bdev uninitialized for '%s'", jdev_name );
+			printk( "journal_init_dev: bdev uninitialized for '%s'\n", jdev_name );
 			result = -ENOMEM;
 		} else  {
 			/* ok */
@@ -1941,12 +1943,12 @@ static int journal_init_dev( struct super_block *super,
 	} else {
 		result = PTR_ERR( journal -> j_dev_file );
 		journal -> j_dev_file = NULL;
-		printk( "journal_init_dev: Cannot open '%s': %i", jdev_name, result );
+		printk( "journal_init_dev: Cannot open '%s': %i\n", jdev_name, result );
 	}
 	if( result != 0 ) {
 		release_journal_dev( super, journal );
 	}
-	printk( "journal_init_dev: journal device: %s", bdevname(journal->j_dev_bd));
+	printk( "journal_init_dev: journal device: %s\n", bdevname(journal->j_dev_bd));
 	return result;
 }
 
@@ -1960,20 +1962,24 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
     struct reiserfs_journal_header *jh;
     struct reiserfs_journal *journal;
 
-  if (sizeof(struct reiserfs_journal_commit) != 4096 ||
-      sizeof(struct reiserfs_journal_desc) != 4096
-     ) {
-    printk("journal-1249: commit or desc struct not 4096 %Zd %Zd\n", sizeof(struct reiserfs_journal_commit), 
+    if (sizeof(struct reiserfs_journal_commit) != 4096 ||
+      sizeof(struct reiserfs_journal_desc) != 4096) {
+	printk("journal-1249: commit or desc struct not 4096 %Zd %Zd\n", sizeof(struct reiserfs_journal_commit), 
         sizeof(struct reiserfs_journal_desc)) ;
-    return 1 ;
-  }
+	return 1 ;
+    }
 
     journal = SB_JOURNAL(p_s_sb) = vmalloc(sizeof (struct reiserfs_journal)) ;
     if (!journal) {
 	printk("journal-1256: unable to get memory for journal structure\n") ;
-    return 1 ;
-  }
+	return 1 ;
+    }
     memset(journal, 0, sizeof(struct reiserfs_journal)) ;
+    INIT_LIST_HEAD(&SB_JOURNAL(p_s_sb)->j_bitmap_nodes) ;
+    INIT_LIST_HEAD (&SB_JOURNAL(p_s_sb)->j_prealloc_list);
+    reiserfs_allocate_list_bitmaps(p_s_sb, SB_JOURNAL(p_s_sb)->j_list_bitmap, 
+ 				   SB_BMAP_NR(p_s_sb)) ;
+    allocate_bitmap_nodes(p_s_sb) ;
 
     /* reserved for journal area support */
     SB_JOURNAL_1st_RESERVED_BLOCK(p_s_sb) = (old_format ?
@@ -1983,7 +1989,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
     
     if( journal_init_dev( p_s_sb, journal, j_dev_name ) != 0 ) {
       printk( "sh-462: unable to initialize jornal device\n");
-      return 1;
+      goto free_and_return;
     }
 
      rs = SB_DISK_SUPER_BLOCK(p_s_sb);
@@ -1993,8 +1999,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
 		   SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + SB_ONDISK_JOURNAL_SIZE(p_s_sb));
      if (!bhjh) {
 	 printk("sh-459: unable to read  journal header\n") ;
-	 release_journal_dev(p_s_sb, journal);
-	 return 1 ;
+	 goto free_and_return;
      }
      jh = (struct reiserfs_journal_header *)(bhjh->b_data);
      
@@ -2005,8 +2010,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
 		jh->jh_journal.jp_journal_magic, bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd ),
 		sb_jp_journal_magic(rs), reiserfs_bdevname (p_s_sb));
 	 brelse (bhjh);
-	 release_journal_dev(p_s_sb, journal);
-	 return 1 ;
+	 goto free_and_return;
   }
      
   SB_JOURNAL_TRANS_MAX(p_s_sb)      = le32_to_cpu (jh->jh_journal.jp_journal_trans_max);
@@ -2064,7 +2068,6 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
 
   brelse (bhjh);
      
-
   SB_JOURNAL(p_s_sb)->j_list_bitmap_index = 0 ;
   SB_JOURNAL_LIST_INDEX(p_s_sb) = -10000 ; /* make sure flush_old_commits does not try to flush a list while replay is on */
 
@@ -2075,12 +2078,8 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   memset(SB_JOURNAL(p_s_sb)->j_list_hash_table, 0, JOURNAL_HASH_SIZE * sizeof(struct reiserfs_journal_cnode *)) ;
   memset(journal_writers, 0, sizeof(char *) * 512) ; /* debug code */
 
-  INIT_LIST_HEAD(&SB_JOURNAL(p_s_sb)->j_bitmap_nodes) ;
   INIT_LIST_HEAD(&SB_JOURNAL(p_s_sb)->j_dirty_buffers) ;
   spin_lock_init(&SB_JOURNAL(p_s_sb)->j_dirty_buffers_lock) ;
-  reiserfs_allocate_list_bitmaps(p_s_sb, SB_JOURNAL(p_s_sb)->j_list_bitmap, 
-                                 SB_BMAP_NR(p_s_sb)) ;
-  allocate_bitmap_nodes(p_s_sb) ;
 
   SB_JOURNAL(p_s_sb)->j_start = 0 ;
   SB_JOURNAL(p_s_sb)->j_len = 0 ;
@@ -2107,19 +2106,14 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   SB_JOURNAL_LIST(p_s_sb)[0].j_list_bitmap = get_list_bitmap(p_s_sb, SB_JOURNAL_LIST(p_s_sb)) ;
   if (!(SB_JOURNAL_LIST(p_s_sb)[0].j_list_bitmap)) {
     reiserfs_warning("journal-2005, get_list_bitmap failed for journal list 0\n") ;
-    release_journal_dev(p_s_sb, journal);
-    return 1 ;
+    goto free_and_return;
   }
   if (journal_read(p_s_sb) < 0) {
     reiserfs_warning("Replay Failure, unable to mount\n") ;
-    free_journal_ram(p_s_sb) ;
-    release_journal_dev(p_s_sb, journal);
-    return 1 ;
+    goto free_and_return;
   }
   SB_JOURNAL_LIST_INDEX(p_s_sb) = 0 ; /* once the read is done, we can set this
                                          where it belongs */
-
-  INIT_LIST_HEAD (&SB_JOURNAL(p_s_sb)->j_prealloc_list);
 
   if (reiserfs_dont_log (p_s_sb))
     return 0;
@@ -2129,7 +2123,9 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
     commit_wq = create_workqueue("reiserfs");
 
   return 0 ;
-
+free_and_return:
+  free_journal_ram(p_s_sb);
+  return 1;
 }
 
 /*
