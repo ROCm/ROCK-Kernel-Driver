@@ -21,8 +21,6 @@ config DVB
 
 source "drivers/media/dvb/dvb-core/Kconfig"
 
-source "drivers/media/dvb/frontends/Kconfig"
-
 comment "Supported SAA7146 based PCI Adapters"
 	depends on DVB_CORE && PCI
 source "drivers/media/dvb/ttpci/Kconfig"
@@ -42,5 +40,8 @@ comment "Supported BT878 Adapters"
 	depends on DVB_CORE && PCI
 source "drivers/media/dvb/bt8xx/Kconfig"
 
-endmenu
+comment "Supported DVB Frontends"
+	depends on DVB_CORE
+source "drivers/media/dvb/frontends/Kconfig"
 
+endmenu
