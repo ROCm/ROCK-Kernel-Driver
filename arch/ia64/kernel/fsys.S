@@ -444,6 +444,9 @@ EX(.fail_efault, ld8 r14=[r33])			// r14 <- *set
 (p7)	cmp.ne.or.andcm p6,p7=r18,r0		// p6/p7 <- signal pending
 	mov r19=0					// i must not leak kernel bits...
 (p6)	br.cond.dpnt.many .sig_pending
+
+	cmp.ne p9,p0=r8,r0			// check for bad HOW value
+(p9)	br.cond.spnt.few 2f
 	;;
 
 1:	ld4 r17=[r9]				// r17 <- current->thread_info->flags
@@ -458,11 +461,11 @@ EX(.fail_efault, ld8 r14=[r33])			// r14 <- *set
 	cmp.ne p6,p0=r17,r14			// update failed?
 (p6)	br.cond.spnt.few 1b			// yes -> retry
 
+2:
 #ifdef CONFIG_SMP
 	st4.rel [r31]=r0			// release the lock
 #endif
 	ssm psr.i
-	cmp.ne p9,p0=r8,r0			// check for bad HOW value
 	;;
 
 	srlz.d					// ensure psr.i is set again
