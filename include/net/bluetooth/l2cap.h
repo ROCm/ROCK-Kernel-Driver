@@ -224,6 +224,8 @@ struct l2cap_pinfo {
 
 	__u8		ident;
 
+	__u16		sport;
+
 	struct l2cap_conn 	*conn;
 	struct sock 		*next_c;
 	struct sock 		*prev_c;

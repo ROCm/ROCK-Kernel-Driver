@@ -613,18 +613,6 @@ static void request_events(void *send_info)
 	atomic_set(&kcs_info->req_events, 1);
 }
 
-static int new_user(void *send_info)
-{
-	if (!try_module_get(THIS_MODULE))
-		return -EBUSY;
-	return 0;
-}
-
-static void user_left(void *send_info)
-{
-	module_put(THIS_MODULE);
-}
-
 /* Call every 10 ms. */
 #define KCS_TIMEOUT_TIME_USEC	10000
 #define KCS_USEC_PER_JIFFY	(1000000/HZ)
@@ -718,11 +706,10 @@ static void kcs_irq_handler(int irq, void *data, struct pt_regs *regs)
 
 static struct ipmi_smi_handlers handlers =
 {
-	sender:		       sender,
-	request_events:        request_events,
-	new_user:	       new_user,
-	user_left:	       user_left,
-	set_run_to_completion: set_run_to_completion
+	.owner			= THIS_MODULE,
+	.sender			= sender,
+	.request_events		= request_events,
+	.set_run_to_completion	= set_run_to_completion,
 };
 
 static unsigned char ipmi_kcs_dev_rev;

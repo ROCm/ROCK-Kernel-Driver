@@ -120,15 +120,6 @@ static inline void free_metapage(struct metapage *mp)
 	mempool_free(mp, metapage_mempool);
 }
 
-static void *mp_mempool_alloc(int gfp_mask, void *pool_data)
-{
-	return kmem_cache_alloc(metapage_cache, gfp_mask);
-}
-static void mp_mempool_free(void *element, void *pool_data)
-{
-	return kmem_cache_free(metapage_cache, element);
-}
-
 int __init metapage_init(void)
 {
 	/*
@@ -139,8 +130,8 @@ int __init metapage_init(void)
 	if (metapage_cache == NULL)
 		return -ENOMEM;
 
-	metapage_mempool = mempool_create(METAPOOL_MIN_PAGES, mp_mempool_alloc,
-					  mp_mempool_free, NULL);
+	metapage_mempool = mempool_create(METAPOOL_MIN_PAGES, mempool_alloc_slab,
+					  mempool_free_slab, metapage_cache);
 
 	if (metapage_mempool == NULL) {
 		kmem_cache_destroy(metapage_cache);

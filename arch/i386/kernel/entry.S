@@ -173,9 +173,10 @@ ENTRY(lcall27)
 
 
 ENTRY(ret_from_fork)
-	# NOTE: this function takes a parameter but it's unused on x86.
+	pushl %eax
 	call schedule_tail
 	GET_THREAD_INFO(%ebp)
+	popl %eax
 	jmp syscall_exit
 
 /*
@@ -497,10 +498,6 @@ ENTRY(invalid_op)
 ENTRY(coprocessor_segment_overrun)
 	pushl $0
 	pushl $do_coprocessor_segment_overrun
-	jmp error_code
-
-ENTRY(double_fault)
-	pushl $do_double_fault
 	jmp error_code
 
 ENTRY(invalid_TSS)
