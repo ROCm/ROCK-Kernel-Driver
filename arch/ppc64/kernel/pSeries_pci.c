@@ -582,11 +582,11 @@ fixup_resources(struct pci_dev *dev)
 		char *loc_code = get_property(dn, "ibm,loc-code", 0);
 		if (loc_code) {
 			int loc_len = strlen(loc_code);
-			if (loc_len < sizeof(dev->name)) {
-				memmove(dev->name+loc_len+1, dev->name, sizeof(dev->name)-loc_len-1);
-				memcpy(dev->name, loc_code, loc_len);
-				dev->name[loc_len] = ' ';
-				dev->name[sizeof(dev->name)-1] = '\0';
+			if (loc_len < sizeof(dev->dev.name)) {
+				memmove(dev->dev.name+loc_len+1, dev->dev.name, sizeof(dev->dev.name)-loc_len-1);
+				memcpy(dev->dev.name, loc_code, loc_len);
+				dev->dev.name[loc_len] = ' ';
+				dev->dev.name[sizeof(dev->dev.name)-1] = '\0';
 			}
 		}
 	}
@@ -595,12 +595,12 @@ fixup_resources(struct pci_dev *dev)
 		if (is_eeh_configured(dev)) {
 			eeh_disable_bit = 0;
 			if (eeh_set_option(dev, EEH_ENABLE) != 0) {
-				printk("PCI: failed to enable EEH for %s %s\n", dev->slot_name, dev->name);
+				printk("PCI: failed to enable EEH for %s %s\n", dev->slot_name, dev->dev.name);
 				eeh_disable_bit = EEH_TOKEN_DISABLED;
 			}
 		} else {
 			/* Assume device is by default EEH_DISABLE'd */
-			printk("PCI: eeh NOT configured for %s %s\n", dev->slot_name, dev->name);
+			printk("PCI: eeh NOT configured for %s %s\n", dev->slot_name, dev->dev.name);
 			eeh_disable_bit = EEH_TOKEN_DISABLED;
 		}
 	}
@@ -610,7 +610,7 @@ fixup_resources(struct pci_dev *dev)
 	PPCDBG(PPCDBG_PHBINIT, "\tphb->pci_io_offset  = 0x%016LX\n", phb->pci_io_offset); 
 	PPCDBG(PPCDBG_PHBINIT, "\tphb->pci_mem_offset = 0x%016LX\n", phb->pci_mem_offset); 
 
-	PPCDBG(PPCDBG_PHBINIT, "\tdev->name   = %s\n", dev->name);
+	PPCDBG(PPCDBG_PHBINIT, "\tdev->dev.name   = %s\n", dev->dev.name);
 	PPCDBG(PPCDBG_PHBINIT, "\tdev->vendor:device = 0x%04X : 0x%04X\n", dev->vendor, dev->device);
 
 	if (phb == NULL)
