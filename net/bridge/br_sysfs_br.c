@@ -300,23 +300,6 @@ static struct bin_attribute bridge_forward = {
 	.read = brforward_read,
 };
 
-
-/*
- * This is a dummy kset so bridge objects don't cause
- * hotplug events 
- */
-decl_subsys_name(bridge, net_bridge, NULL, NULL);
-
-void br_sysfs_init(void)
-{
-	subsystem_register(&bridge_subsys);
-}
-
-void br_sysfs_fini(void)
-{
-	subsystem_unregister(&bridge_subsys);
-}
-
 /*
  * Add entries in sysfs onto the existing network class device
  * for the bridge.
@@ -351,7 +334,7 @@ int br_sysfs_addbr(struct net_device *dev)
 	
 	kobject_set_name(&br->ifobj, SYSFS_BRIDGE_PORT_SUBDIR);
 	br->ifobj.ktype = NULL;
-	br->ifobj.kset = &bridge_subsys.kset;
+	br->ifobj.kset = NULL;
 	br->ifobj.parent = brobj;
 
 	err = kobject_register(&br->ifobj);
