@@ -618,9 +618,6 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		return -ENODEV;
 	probed++;
 
-	if (!pci_present())		/* is PCI support present? */
-		return -ENODEV;
-
 	version_disp = 0;
 
 	while ((pdev = pci_find_class(PCI_CLASS_NETWORK_ETHERNET<<8, pdev))) {
