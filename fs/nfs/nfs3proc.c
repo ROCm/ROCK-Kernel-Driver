@@ -692,6 +692,101 @@ nfs3_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	rpc_call_setup(&data->task, &msg, 0);
 }
 
+static void
+nfs3_write_done(struct rpc_task *task)
+{
+	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+
+	if (nfs_async_handle_jukebox(task))
+		return;
+	nfs_writeback_done(task, data->u.v3.args.stable,
+			   data->u.v3.args.count, data->u.v3.res.count);
+}
+
+static void
+nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
+{
+	struct rpc_task		*task = &data->task;
+	struct inode		*inode = data->inode;
+	struct nfs_page		*req;
+	int			stable;
+	int			flags;
+	struct rpc_message	msg;
+
+	if (how & FLUSH_STABLE) {
+		if (!NFS_I(inode)->ncommit)
+			stable = NFS_FILE_SYNC;
+		else
+			stable = NFS_DATA_SYNC;
+	} else
+		stable = NFS_UNSTABLE;
+	
+	req = nfs_list_entry(data->pages.next);
+	data->u.v3.args.fh     = NFS_FH(inode);
+	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
+	data->u.v3.args.pgbase = req->wb_offset;
+	data->u.v3.args.count  = count;
+	data->u.v3.args.stable = stable;
+	data->u.v3.args.pages  = data->pagevec;
+	data->u.v3.res.fattr   = &data->fattr;
+	data->u.v3.res.count   = count;
+	data->u.v3.res.verf    = &data->verf;
+
+	/* Set the initial flags for the task.  */
+	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
+
+	/* Finalize the task. */
+	rpc_init_task(task, NFS_CLIENT(inode), nfs3_write_done, flags);
+	task->tk_calldata = data;
+	/* Release requests */
+	task->tk_release = nfs_writedata_release;
+
+	msg.rpc_proc = NFS3PROC_WRITE;
+	msg.rpc_argp = &data->u.v3.args;
+	msg.rpc_resp = &data->u.v3.res;
+	msg.rpc_cred = data->cred;
+	rpc_call_setup(&data->task, &msg, 0);
+}
+
+static void
+nfs3_commit_done(struct rpc_task *task)
+{
+	if (nfs_async_handle_jukebox(task))
+		return;
+	nfs_commit_done(task);
+}
+
+static void
+nfs3_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
+{
+	struct rpc_task		*task = &data->task;
+	struct inode		*inode = data->inode;
+	int			flags;
+	struct rpc_message	msg;
+
+	data->u.v3.args.fh     = NFS_FH(data->inode);
+	data->u.v3.args.offset = start;
+	data->u.v3.args.count  = len;
+	data->u.v3.res.count   = len;
+	data->u.v3.res.fattr   = &data->fattr;
+	data->u.v3.res.verf    = &data->verf;
+	
+	/* Set the initial flags for the task.  */
+	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
+
+	/* Finalize the task. */
+	rpc_init_task(task, NFS_CLIENT(inode), nfs3_commit_done, flags);
+	task->tk_calldata = data;
+	/* Release requests */
+	task->tk_release = nfs_writedata_release;
+	
+	msg.rpc_proc = NFS3PROC_COMMIT;
+	msg.rpc_argp = &data->u.v3.args;
+	msg.rpc_resp = &data->u.v3.res;
+	msg.rpc_cred = data->cred;
+	rpc_call_setup(&data->task, &msg, 0);
+}
+
 struct nfs_rpc_ops	nfs_v3_clientops = {
 	.version	= 3,			/* protocol version */
 	.getroot	= nfs3_proc_get_root,
@@ -716,4 +811,6 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 	.statfs		= nfs3_proc_statfs,
 	.decode_dirent	= nfs3_decode_dirent,
 	.read_setup	= nfs3_proc_read_setup,
+	.write_setup	= nfs3_proc_write_setup,
+	.commit_setup	= nfs3_proc_commit_setup,
 };

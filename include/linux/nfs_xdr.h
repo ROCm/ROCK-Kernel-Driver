@@ -326,6 +326,25 @@ struct nfs_read_data {
 	} u;
 };
 
+struct nfs_write_data {
+	struct rpc_task		task;
+	struct inode		*inode;
+	struct rpc_cred		*cred;
+	struct nfs_fattr	fattr;
+	struct nfs_writeverf	verf;
+	struct list_head	pages;		/* Coalesced requests we wish to flush */
+	struct page		*pagevec[NFS_WRITE_MAXIOV];
+	union {
+		struct {
+			struct nfs_writeargs args;
+			struct nfs_writeres  res;
+		} v3;
+#ifdef CONFIG_NFS_V4
+		/* NFSv4 data to come here... */
+#endif
+	} u;
+};
+
 /*
  * RPC procedure vector for NFSv2/NFSv3 demuxing
  */
@@ -374,6 +393,8 @@ struct nfs_rpc_ops {
 			    struct nfs_fsinfo *);
 	u32 *	(*decode_dirent)(u32 *, struct nfs_entry *, int plus);
 	void	(*read_setup)   (struct nfs_read_data *, unsigned int count);
+	void	(*write_setup)  (struct nfs_write_data *, unsigned int count, int how);
+	void	(*commit_setup) (struct nfs_write_data *, u64 start, u32 len, int how);
 };
 
 /*

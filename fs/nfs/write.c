@@ -64,45 +64,12 @@
 #define NFSDBG_FACILITY		NFSDBG_PAGECACHE
 
 /*
- * Local structures
- *
- * This is the struct where the WRITE/COMMIT arguments go.
- */
-struct nfs_write_data {
-	struct rpc_task		task;
-	struct inode		*inode;
-	struct rpc_cred		*cred;
-	struct nfs_fattr	fattr;
-	struct nfs_writeverf	verf;
-	struct list_head	pages;		/* Coalesced requests we wish to flush */
-	struct page		*pagevec[NFS_WRITE_MAXIOV];
-	union {
-		struct {
-			struct nfs_writeargs args;
-			struct nfs_writeres  res;
-		} v3;
-#ifdef CONFIG_NFS_V4
-		/* NFSv4 data to come here... */
-#endif
-	} u;
-};
-
-/*
  * Local function declarations
  */
 static struct nfs_page * nfs_update_request(struct file*, struct inode *,
 					    struct page *,
 					    unsigned int, unsigned int);
 static void	nfs_strategy(struct inode *inode);
-static void	nfs_writeback_done(struct rpc_task *);
-#if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-static void	nfs_commit_done(struct rpc_task *);
-#endif
-
-/* Hack for future NFS swap support */
-#ifndef IS_SWAPFILE
-# define IS_SWAPFILE(inode)	(0)
-#endif
 
 static kmem_cache_t *nfs_wdata_cachep;
 
@@ -113,7 +80,6 @@ static __inline__ struct nfs_write_data *nfs_writedata_alloc(void)
 	if (p) {
 		memset(p, 0, sizeof(*p));
 		INIT_LIST_HEAD(&p->pages);
-		p->u.v3.args.pages = p->pagevec;
 	}
 	return p;
 }
@@ -123,7 +89,7 @@ static __inline__ void nfs_writedata_free(struct nfs_write_data *p)
 	kmem_cache_free(nfs_wdata_cachep, p);
 }
 
-static void nfs_writedata_release(struct rpc_task *task)
+void nfs_writedata_release(struct rpc_task *task)
 {
 	struct nfs_write_data	*wdata = (struct nfs_write_data *)task->tk_calldata;
 	nfs_writedata_free(wdata);
@@ -867,8 +833,10 @@ done:
  * Set up the argument/result storage required for the RPC call.
  */
 static void
-nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data)
+nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data, int how)
 {
+	struct rpc_task		*task = &data->task;
+	struct inode		*inode;
 	struct nfs_page		*req;
 	struct page		**pages;
 	unsigned int		count;
@@ -876,7 +844,7 @@ nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data)
 	/* Set up the RPC argument and reply structs
 	 * NB: take care not to mess about with data->commit et al. */
 
-	pages = data->u.v3.args.pages;
+	pages = data->pagevec;
 	count = 0;
 	while (!list_empty(head)) {
 		req = nfs_list_entry(head->next);
@@ -886,17 +854,18 @@ nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data)
 		count += req->wb_bytes;
 	}
 	req = nfs_list_entry(data->pages.next);
-	data->inode = req->wb_inode;
+	data->inode = inode = req->wb_inode;
 	data->cred = req->wb_cred;
-	data->u.v3.args.fh     = NFS_FH(req->wb_inode);
-	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
-	data->u.v3.args.pgbase = req->wb_offset;
-	data->u.v3.args.count  = count;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.count   = count;
-	data->u.v3.res.verf    = &data->verf;
-}
 
+	NFS_PROTO(inode)->write_setup(data, count, how);
+
+	dprintk("NFS: %4d initiated write call (req %s/%Ld, %u bytes @ offset %Lu)\n",
+		task->tk_pid,
+		inode->i_sb->s_id,
+		(long long)NFS_FILEID(inode),
+		count,
+		(unsigned long long)req_offset(req) + req->wb_offset);
+}
 
 /*
  * Create an RPC task for the given write request and kick it.
@@ -909,64 +878,20 @@ nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data)
 static int
 nfs_flush_one(struct list_head *head, struct inode *inode, int how)
 {
-	struct nfs_inode *nfsi = NFS_I(inode);
 	struct rpc_clnt 	*clnt = NFS_CLIENT(inode);
 	struct nfs_write_data	*data;
-	struct rpc_task		*task;
-	struct rpc_message	msg;
-	int                     flags,
-				nfsvers = NFS_PROTO(inode)->version,
-				async = !(how & FLUSH_SYNC),
-				stable = (how & FLUSH_STABLE);
 	sigset_t		oldset;
-
 
 	data = nfs_writedata_alloc();
 	if (!data)
 		goto out_bad;
-	task = &data->task;
-
-	/* Set the initial flags for the task.  */
-	flags = (async) ? RPC_TASK_ASYNC : 0;
 
 	/* Set up the argument struct */
-	nfs_write_rpcsetup(head, data);
-	if (nfsvers < 3)
-		data->u.v3.args.stable = NFS_FILE_SYNC;
-	else if (stable) {
-		if (!nfsi->ncommit)
-			data->u.v3.args.stable = NFS_FILE_SYNC;
-		else
-			data->u.v3.args.stable = NFS_DATA_SYNC;
-	} else
-		data->u.v3.args.stable = NFS_UNSTABLE;
-
-	/* Finalize the task. */
-	rpc_init_task(task, clnt, nfs_writeback_done, flags);
-	task->tk_calldata = data;
-	/* Release requests */
-	task->tk_release = nfs_writedata_release;
-
-#ifdef CONFIG_NFS_V3
-	msg.rpc_proc = (nfsvers == 3) ? NFS3PROC_WRITE : NFSPROC_WRITE;
-#else
-	msg.rpc_proc = NFSPROC_WRITE;
-#endif
-	msg.rpc_argp = &data->u.v3.args;
-	msg.rpc_resp = &data->u.v3.res;
-	msg.rpc_cred = data->cred;
-
-	dprintk("NFS: %4d initiated write call (req %s/%Ld, %u bytes @ offset %Lu)\n",
-		task->tk_pid,
-		inode->i_sb->s_id,
-		(long long)NFS_FILEID(inode),
-		(unsigned int)data->u.v3.args.count,
-		(unsigned long long)data->u.v3.args.offset);
+	nfs_write_rpcsetup(head, data, how);
 
 	rpc_clnt_sigmask(clnt, &oldset);
-	rpc_call_setup(task, &msg, 0);
 	lock_kernel();
-	rpc_execute(task);
+	rpc_execute(&data->task);
 	unlock_kernel();
 	rpc_clnt_sigunmask(clnt, &oldset);
 	return 0;
@@ -1011,12 +936,11 @@ nfs_flush_list(struct list_head *head, int wpages, int how)
 /*
  * This function is called when the WRITE call is complete.
  */
-static void
-nfs_writeback_done(struct rpc_task *task)
+void
+nfs_writeback_done(struct rpc_task *task, int stable,
+		   unsigned int arg_count, unsigned int res_count)
 {
 	struct nfs_write_data	*data = (struct nfs_write_data *) task->tk_calldata;
-	struct nfs_writeargs	*argp = &data->u.v3.args;
-	struct nfs_writeres	*resp = &data->u.v3.res;
 	struct inode		*inode = data->inode;
 	struct nfs_page		*req;
 	struct page		*page;
@@ -1024,11 +948,8 @@ nfs_writeback_done(struct rpc_task *task)
 	dprintk("NFS: %4d nfs_writeback_done (status %d)\n",
 		task->tk_pid, task->tk_status);
 
-	if (nfs_async_handle_jukebox(task))
-		return;
-
 	/* We can't handle that yet but we check for it nevertheless */
-	if (resp->count < argp->count && task->tk_status >= 0) {
+	if (res_count < arg_count && task->tk_status >= 0) {
 		static unsigned long    complain;
 		if (time_before(complain, jiffies)) {
 			printk(KERN_WARNING
@@ -1040,7 +961,7 @@ nfs_writeback_done(struct rpc_task *task)
 		task->tk_status = -EIO;
 	}
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-	if (resp->verf->committed < argp->stable && task->tk_status >= 0) {
+	if (data->verf.committed < stable && task->tk_status >= 0) {
 		/* We tried a write call, but the server did not
 		 * commit data to stable storage even though we
 		 * requested it.
@@ -1052,10 +973,10 @@ nfs_writeback_done(struct rpc_task *task)
 		static unsigned long    complain;
 
 		if (time_before(complain, jiffies)) {
-			dprintk("NFS: faulty NFSv3 server %s:"
+			dprintk("NFS: faulty NFS server %s:"
 				" (committed = %d) != (stable = %d)\n",
 				NFS_SERVER(inode)->hostname,
-				resp->verf->committed, argp->stable);
+				data->verf.committed, stable);
 			complain = jiffies + 300 * HZ;
 		}
 	}
@@ -1067,7 +988,7 @@ nfs_writeback_done(struct rpc_task *task)
 	 *	  writebacks since the page->count is kept > 1 for as long
 	 *	  as the page has a write request pending.
 	 */
-	nfs_write_attributes(inode, resp->fattr);
+	nfs_write_attributes(inode, &data->fattr);
 	while (!list_empty(&data->pages)) {
 		req = nfs_list_entry(data->pages.next);
 		nfs_list_remove_request(req);
@@ -1090,12 +1011,12 @@ nfs_writeback_done(struct rpc_task *task)
 		}
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-		if (argp->stable != NFS_UNSTABLE || resp->verf->committed == NFS_FILE_SYNC) {
+		if (stable != NFS_UNSTABLE || data->verf.committed == NFS_FILE_SYNC) {
 			nfs_inode_remove_request(req);
 			dprintk(" OK\n");
 			goto next;
 		}
-		memcpy(&req->wb_verf, resp->verf, sizeof(req->wb_verf));
+		memcpy(&req->wb_verf, &data->verf, sizeof(req->wb_verf));
 		req->wb_timeout = jiffies + NFS_COMMIT_DELAY;
 		nfs_mark_request_commit(req);
 		dprintk(" marked for commit\n");
@@ -1113,8 +1034,9 @@ nfs_writeback_done(struct rpc_task *task)
  * Set up the argument/result storage required for the RPC call.
  */
 static void
-nfs_commit_rpcsetup(struct list_head *head, struct nfs_write_data *data)
+nfs_commit_rpcsetup(struct list_head *head, struct nfs_write_data *data, int how)
 {
+	struct rpc_task		*task = &data->task;
 	struct nfs_page		*first, *last;
 	struct inode		*inode;
 	loff_t			start, end, len;
@@ -1140,11 +1062,10 @@ nfs_commit_rpcsetup(struct list_head *head, struct nfs_write_data *data)
 
 	data->inode	  = inode;
 	data->cred	  = first->wb_cred;
-	data->u.v3.args.fh     = NFS_FH(inode);
-	data->u.v3.args.offset = start;
-	data->u.v3.res.count   = data->u.v3.args.count = (u32)len;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.verf    = &data->verf;
+
+	NFS_PROTO(inode)->commit_setup(data, start, len, how);
+	
+	dprintk("NFS: %4d initiated commit call\n", task->tk_pid);
 }
 
 /*
@@ -1153,43 +1074,23 @@ nfs_commit_rpcsetup(struct list_head *head, struct nfs_write_data *data)
 int
 nfs_commit_list(struct list_head *head, int how)
 {
-	struct rpc_message	msg;
 	struct rpc_clnt		*clnt;
 	struct nfs_write_data	*data;
-	struct rpc_task         *task;
 	struct nfs_page         *req;
-	int                     flags,
-				async = !(how & FLUSH_SYNC);
 	sigset_t		oldset;
 
 	data = nfs_writedata_alloc();
 
 	if (!data)
 		goto out_bad;
-	task = &data->task;
-
-	flags = (async) ? RPC_TASK_ASYNC : 0;
 
 	/* Set up the argument struct */
-	nfs_commit_rpcsetup(head, data);
-	req = nfs_list_entry(data->pages.next);
-	clnt = NFS_CLIENT(req->wb_inode);
+	nfs_commit_rpcsetup(head, data, how);
+	clnt = NFS_CLIENT(data->inode);
 
-	rpc_init_task(task, clnt, nfs_commit_done, flags);
-	task->tk_calldata = data;
-	/* Release requests */
-	task->tk_release = nfs_writedata_release;
-
-	msg.rpc_proc = NFS3PROC_COMMIT;
-	msg.rpc_argp = &data->u.v3.args;
-	msg.rpc_resp = &data->u.v3.res;
-	msg.rpc_cred = data->cred;
-
-	dprintk("NFS: %4d initiated commit call\n", task->tk_pid);
 	rpc_clnt_sigmask(clnt, &oldset);
-	rpc_call_setup(task, &msg, 0);
 	lock_kernel();
-	rpc_execute(task);
+	rpc_execute(&data->task);
 	unlock_kernel();
 	rpc_clnt_sigunmask(clnt, &oldset);
 	return 0;
@@ -1206,21 +1107,17 @@ nfs_commit_list(struct list_head *head, int how)
 /*
  * COMMIT call returned
  */
-static void
+void
 nfs_commit_done(struct rpc_task *task)
 {
 	struct nfs_write_data	*data = (struct nfs_write_data *)task->tk_calldata;
-	struct nfs_writeres	*resp = &data->u.v3.res;
 	struct nfs_page		*req;
 	struct inode		*inode = data->inode;
 
         dprintk("NFS: %4d nfs_commit_done (status %d)\n",
                                 task->tk_pid, task->tk_status);
 
-	if (nfs_async_handle_jukebox(task))
-		return;
-
-	nfs_write_attributes(inode, resp->fattr);
+	nfs_write_attributes(inode, &data->fattr);
 	while (!list_empty(&data->pages)) {
 		req = nfs_list_entry(data->pages.next);
 		nfs_list_remove_request(req);
