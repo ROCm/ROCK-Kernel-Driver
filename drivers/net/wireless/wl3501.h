@@ -430,6 +430,8 @@ struct wl3501_card {
 	int				net_type;
 	u8				keep_essid[WL3501_ESSID_MAX_LEN];
 	unsigned char			nick[32];
+	unsigned char			card_name[32];
+	unsigned char			firmware_date[32];
 	u8				chan;
 	u8				def_chan;
 	u8				cap_info;

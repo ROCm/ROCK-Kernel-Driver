@@ -270,6 +270,11 @@ static u16 wl3501_get_flash_id(struct wl3501_card *this)
 
 	id = (byte0 << 8) | byte1;
 
+	wl3501_flash_outb(this, 0, 0x5555, 0xAA);
+	wl3501_flash_outb(this, 0, 0x2AAA, 0x55);
+	wl3501_flash_outb(this, 0, 0x5555, 0x0f0);
+	WL3501_NOPLOOP(10000);
+
 	printk(KERN_INFO "Flash ROM ID = 0x%x\n", id);
 	return id;
 }
@@ -356,7 +361,7 @@ static int wl3501_write_flash(struct wl3501_card *this, unsigned char *bf,
 	bf += 4;
 	len -= 4;
 
-	if (flash_id == 0x0120) {
+	if (flash_id == 0x0120 || flash_id == 0x016E) {
 		/* It's AMD AM29F010, must be erase before programming */
 		/* Erase 1st 16 Kbytes within Page 0 */
 		if (!(bf_addr & 0x3fff)) {
@@ -440,9 +445,6 @@ void wl3501_get_from_wla(struct wl3501_card *this, u16 src, void *dest,
 	/* switch to SRAM Page 0 */
 	wl3501_switch_page(this, (src & 0x8000) ? WL3501_BSS_SPAGE1 :
 						  WL3501_BSS_SPAGE0);
-	/* wl3501_outb(((src>> 11) & 0x18), this->base_addr +
-	  				    WL3501_NIC_BSS); */
-
 	/* set LMAL and LMAH */
 	wl3501_outb(src & 0xff, this->base_addr + WL3501_NIC_LMAL);
 	wl3501_outb((src >> 8) & 0x7f, this->base_addr + WL3501_NIC_LMAH);
@@ -548,7 +550,7 @@ static void wl3501_esbq_req(struct wl3501_card *this, u16 * ptr)
  */
 static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 {
-	u16 bf, sig_bf, next, tmplen, pktlen, tmp;
+	u16 bf, sig_bf, next, tmplen, pktlen;
 	struct wl3501_md_req sig;
 	u8 *pdata = (char *)data;
 
@@ -570,19 +572,15 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 		sig.data = bf;
 		if (this->llc_type == 1) {
 			if (((*pdata) * 256 + (*(pdata + 1))) > 1500) {
+				unsigned char addr4[ETH_ALEN] = {
+					[0] = 0xAA, [1] = 0xAA,
+					[2] = 0x03, [4] = 0x00,
+				};
+
+				wl3501_set_to_wla(this, bf + 2 +
+					 offsetof(struct wl3501_tx_hdr, addr4),
+					 	  addr4, sizeof(addr4));
 				sig.size = pktlen + 24 + 4 + 6;
-				tmp = 0xaaaa;
-				wl3501_set_to_wla(this, bf + 2 +
-						  sizeof(struct wl3501_tx_hdr) -
-						  6, &tmp, sizeof(tmp));
-				tmp = 0x03;
-				wl3501_set_to_wla(this, bf + 2 +
-						  sizeof(struct wl3501_tx_hdr) -
-						  4, &tmp, sizeof(tmp));
-				tmp = 0x0;
-				wl3501_set_to_wla(this, bf + 2 +
-						  sizeof(struct wl3501_tx_hdr) -
-						  2, &tmp, sizeof(tmp));
 				if (pktlen >
 				    (254 - sizeof(struct wl3501_tx_hdr))) {
 					tmplen =
@@ -613,8 +611,8 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 					pktlen = 0;
 				}
 				wl3501_set_to_wla(this, bf + 2 +
-						  sizeof(struct wl3501_tx_hdr) -
-						  6, pdata, tmplen);
+					 offsetof(struct wl3501_tx_hdr, addr4),
+						  pdata, tmplen);
 				pdata += tmplen;
 				wl3501_get_from_wla(this, bf, &next,
 						    sizeof(next));
@@ -632,7 +630,7 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 				pktlen = 0;
 			}
 			wl3501_set_to_wla(this, bf + 2 +
-					  sizeof(struct wl3501_tx_hdr) - 6,
+					  offsetof(struct wl3501_tx_hdr, addr4),
 					  pdata, tmplen);
 			pdata += tmplen;
 			wl3501_get_from_wla(this, bf, &next, sizeof(next));
@@ -1414,6 +1412,17 @@ static int wl3501_init_firmware(struct wl3501_card *this)
 
 	if (rc)
 		goto fail;
+	this->card_name[0] = '\0';
+	wl3501_get_from_wla(this, 0x1a00,
+			    this->card_name, sizeof(this->card_name));
+	this->card_name[sizeof(this->card_name) - 1] = '\0';
+	printk(KERN_INFO "%s: card_name=%s\n", __FUNCTION__, this->card_name);
+	this->firmware_date[0] = '\0';
+	wl3501_get_from_wla(this, 0x1a40,
+			    this->firmware_date, sizeof(this->firmware_date));
+	this->firmware_date[sizeof(this->firmware_date) - 1] = '\0';
+	printk(KERN_INFO "%s: firmware_date=%s\n", __FUNCTION__,
+	       this->firmware_date);
 	/* Switch to SRAM Page 0 */
 	wl3501_switch_page(this, WL3501_BSS_SPAGE0);
 	/* Read parameter from card */
@@ -2246,9 +2255,10 @@ static void wl3501_config(dev_link_t *link)
 
 	SET_MODULE_OWNER(dev);
 
-	/* At this point, the dev_node_t structure(s) should be initialized and
-	 * arranged in a linked list at link->dev. */
-
+	/*
+	 * At this point, the dev_node_t structure(s) should be initialized and
+	 * arranged in a linked list at link->dev.
+	 */
 	link->dev = &((struct wl3501_card *)dev->priv)->node;
 	link->state &= ~DEV_CONFIG_PENDING;
 
@@ -2373,7 +2383,9 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 	case CS_EVENT_CARD_REMOVAL:
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG) {
-			netif_stop_queue(dev);
+			while (link->open > 0)
+				wl3501_close(dev);
+			netif_device_detach(dev);
 			link->release.expires = jiffies +
 						WL3501_RELEASE_TIMEOUT;
 			add_timer(&link->release);
@@ -2389,7 +2401,7 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 	case CS_EVENT_RESET_PHYSICAL:
 		if (link->state & DEV_CONFIG) {
 			if (link->open)
-				netif_stop_queue(dev);
+				netif_device_detach(dev);
 			CardServices(ReleaseConfiguration, link->handle);
 		}
 		break;
@@ -2400,8 +2412,10 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 		if (link->state & DEV_CONFIG) {
 			CardServices(RequestConfiguration, link->handle,
 				     &link->conf);
-			if (link->open)
+			if (link->open) {
 				wl3501_reset(dev);
+				netif_device_attach(dev);
+			}
 		}
 		break;
 	}
@@ -2439,6 +2453,9 @@ static void __exit wl3501_exit_module(void)
 	dprintk(0, ": unloading");
 	pcmcia_unregister_driver(&wl3501_driver);
 	while (wl3501_dev_list) {
+		del_timer(&wl3501_dev_list->release);
+		/* Mark the device as non-existing to minimize calls to card */
+		wl3501_dev_list->state &= ~DEV_PRESENT;
 		if (wl3501_dev_list->state & DEV_CONFIG)
 			wl3501_release((unsigned long)wl3501_dev_list);
 		wl3501_detach(wl3501_dev_list);
