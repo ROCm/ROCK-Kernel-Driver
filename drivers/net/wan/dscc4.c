@@ -551,7 +551,7 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 	skb = dpriv->rx_skbuff[cur];
 	pkt_len = TO_SIZE(rx_fd->state2);
 	pci_dma_sync_single(pdev, rx_fd->data, pkt_len, PCI_DMA_FROMDEVICE);
-	if((skb->data[--pkt_len] & FrameOk) == FrameOk) {
+	if ((skb->data[--pkt_len] & FrameOk) == FrameOk) {
 		pci_unmap_single(pdev, rx_fd->data, skb->len, PCI_DMA_FROMDEVICE);
 		stats->rx_packets++;
 		stats->rx_bytes += pkt_len;
@@ -563,11 +563,11 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 		netif_rx(skb);
 		try_get_rx_skb(dpriv, cur, dev);
 	} else {
-		if(skb->data[pkt_len] & FrameRdo)
+		if (skb->data[pkt_len] & FrameRdo)
 			stats->rx_fifo_errors++;
-		else if(!(skb->data[pkt_len] | ~FrameCrc))
+		else if (!(skb->data[pkt_len] | ~FrameCrc))
 			stats->rx_crc_errors++;
-		else if(!(skb->data[pkt_len] | ~(FrameVfr | FrameRab)))
+		else if (!(skb->data[pkt_len] | ~(FrameVfr | FrameRab)))
 			stats->rx_length_errors++;
 		else
 			stats->rx_errors++;
@@ -844,7 +844,7 @@ static void dscc4_timer(unsigned long data)
 			i = dpriv->tx_dirty%TX_RING_SIZE; 
 			j = dpriv->tx_current - dpriv->tx_dirty;
 			dev_to_hdlc(dev)->stats.tx_dropped += j;
-			while(j--) {
+			while (j--) {
 				skb = dpriv->tx_skbuff[i];
 				tx_fd = dpriv->tx_fd + i;
 				if (skb) {
@@ -990,7 +990,7 @@ static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 #ifdef DSCC4_POLLING
 	spin_lock(&dpriv->lock);
-	while(dscc4_tx_poll(dpriv, dev));
+	while (dscc4_tx_poll(dpriv, dev));
 	spin_unlock(&dpriv->lock);
 #endif
 	/*
@@ -1125,7 +1125,7 @@ static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		break;
 
 	case IF_IFACE_SYNC_SERIAL:
-		if(!capable(CAP_NET_ADMIN))
+		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
 		if (copy_from_user(&dpriv->settings, &line->sync, size))
@@ -1175,7 +1175,7 @@ static int dscc4_clock_setting(struct net_device *dev)
 
 	bps = settings->clock_rate;
 	state = scc_readl(dpriv, CCR0);
-	if(dscc4_set_clock(dev, &bps, &state) < 0)
+	if (dscc4_set_clock(dev, &bps, &state) < 0)
 		return -EOPNOTSUPP;
 	if (bps) { /* DCE */
 		printk(KERN_DEBUG "%s: generated RxClk (DCE)\n", dev->name);
@@ -1436,7 +1436,7 @@ try:
 				writel(dpriv->tx_fd_dma + 
 				       (dpriv->tx_dirty%TX_RING_SIZE)*
 				       sizeof(struct TxFD), scc_addr + CH0BTDA);
-				if(dscc4_do_action(dev, "IDT"))
+				if (dscc4_do_action(dev, "IDT"))
 					goto err_xpr;
 				dpriv->flags &= ~NeedIDT;
 				mb();
@@ -1446,7 +1446,7 @@ try:
 				writel(dpriv->rx_fd_dma + 
 				       (dpriv->rx_current%RX_RING_SIZE)*
 				       sizeof(struct RxFD), scc_addr + CH0BRDA);
-				if(dscc4_do_action(dev, "IDR"))
+				if (dscc4_do_action(dev, "IDR"))
 					goto err_xpr;
 				dpriv->flags &= ~NeedIDR;
 				mb();
@@ -1460,7 +1460,7 @@ try:
 	} else { /* ! SccEvt */
 		if (state & Hi) {
 #ifdef DSCC4_POLLING
-			while(!dscc4_tx_poll(dpriv, dev));
+			while (!dscc4_tx_poll(dpriv, dev));
 #endif
 			state &= ~Hi;
 		}
@@ -1514,7 +1514,7 @@ try:
 			 * RX_RING_SIZE may help.
 			 */
 			//while (dpriv->rx_needs_refill) {
-				while(!(rx_fd->state1 & Hold)) {
+				while (!(rx_fd->state1 & Hold)) {
 					rx_fd++;
 					cur++;
 					if (!(cur = cur%RX_RING_SIZE))
@@ -1623,13 +1623,13 @@ try:
 			       (dpriv->rx_current%RX_RING_SIZE)*
 			       sizeof(struct RxFD), scc_addr + CH0BRDA);
 			writel(MTFi|Rdr|Idr, scc_addr + CH0CFG);
-			if(dscc4_do_action(dev, "RDR")) {
+			if (dscc4_do_action(dev, "RDR")) {
 				printk(KERN_ERR "%s: RDO recovery failed(%s)\n",
 				       dev->name, "RDR");
 				goto rdo_end;
 			}
 			writel(MTFi|Idr, scc_addr + CH0CFG);
-			if(dscc4_do_action(dev, "IDR")) {
+			if (dscc4_do_action(dev, "IDR")) {
 				printk(KERN_ERR "%s: RDO recovery failed(%s)\n",
 				       dev->name, "IDR");
 				goto rdo_end;
