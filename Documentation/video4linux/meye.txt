@@ -41,13 +41,10 @@ little information if any is available for this camera
 Driver options:
 ---------------
 
-Several options can be passed to the meye driver, either by adding them
-to /etc/modprobe.conf file, when the driver is compiled as a module, or
-by adding the following to the kernel command line (in your bootloader):
-
-	meye=gbuffers[,gbufsize[,video_nr]]
-
-where:
+Several options can be passed to the meye driver using the standard
+module argument syntax (<param>=<value> when passing the option to the
+module or meye.<param>=<value> on the kernel boot line when meye is
+statically linked into the kernel). Those options are:
 
 	gbuffers:	number of capture buffers, default is 2 (32 max)
 
