@@ -75,9 +75,6 @@ extern struct task_struct *__switch_to(struct thread_info *, struct thread_info 
 		mb();							\
 	} while (0)
 
-/* For spinlocks etc */
-#define local_irq_save(x)	local_save_flags_cli(x)
-
 #ifdef CONFIG_SMP
 #error SMP not supported
 
@@ -91,12 +88,8 @@ extern struct task_struct *__switch_to(struct thread_info *, struct thread_info 
 #define smp_rmb()		barrier()
 #define smp_wmb()		barrier()
 
-#define cli()			local_irq_disable()
-#define sti()			local_irq_enable()
 #define clf()			__clf()
 #define stf()			__stf()
-#define save_flags(x)		local_save_flags(x)
-#define restore_flags(x)	local_irq_restore(x)
 
 #endif /* CONFIG_SMP */
 
