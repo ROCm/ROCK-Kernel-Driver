@@ -495,22 +495,19 @@ for (err = (sctp_errhdr_t *)((void *)chunk_hdr + \
 #define tv_lt(s, t) \
    (s.tv_sec < t.tv_sec || (s.tv_sec == t.tv_sec && s.tv_usec < t.tv_usec))
 
-/* Stolen from net/profile.h.  Using it from there is more grief than
- * it is worth.
- */
-static inline void tv_add(const struct timeval *entered, struct timeval *leaved)
-{
-	time_t usecs = leaved->tv_usec + entered->tv_usec;
-	time_t secs = leaved->tv_sec + entered->tv_sec;
-
-	if (usecs >= 1000000) {
-		usecs -= 1000000;
-		secs++;
-	}
-	leaved->tv_sec = secs;
-	leaved->tv_usec = usecs;
-}
-
+/* Add tv1 to tv2. */
+#define TIMEVAL_ADD(tv1, tv2) \
+({ \
+        suseconds_t usecs = (tv2).tv_usec + (tv1).tv_usec; \
+        time_t secs = (tv2).tv_sec + (tv1).tv_sec; \
+\
+        if (usecs >= 1000000) { \
+                usecs -= 1000000; \
+                secs++; \
+        } \
+        (tv2).tv_sec = secs; \
+        (tv2).tv_usec = usecs; \
+})
 
 /* External references. */
 

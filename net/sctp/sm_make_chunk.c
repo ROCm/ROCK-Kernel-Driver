@@ -1288,7 +1288,7 @@ sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
 
 	/* Set an expiration time for the cookie.  */
 	do_gettimeofday(&cookie->c.expiration);
-	tv_add(&asoc->cookie_life, &cookie->c.expiration);
+	TIMEVAL_ADD(asoc->cookie_life, cookie->c.expiration);
 
 	/* Copy the peer's init packet.  */
 	memcpy(&cookie->c.peer_init[0], init_chunk->chunk_hdr,
