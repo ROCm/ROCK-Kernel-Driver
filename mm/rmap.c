@@ -161,8 +161,8 @@ unsigned long vma_address(struct vm_area_struct *vma, pgoff_t pgoff)
 	unsigned long address;
 
 	address = vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
-	return (address >= vma->vm_start && address < vma->vm_end)?
-		address: -EFAULT;
+	BUG_ON(address < vma->vm_start || address >= vma->vm_end);
+	return address;
 }
 
 /**
@@ -308,7 +308,8 @@ static inline int page_referenced_file(struct page *page)
 	unsigned int mapcount = page->mapcount;
 	struct address_space *mapping = page->mapping;
 	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma = NULL;
+	struct prio_tree_iter iter;
 	unsigned long address;
 	int referenced = 0;
 	int failed = 0;
@@ -316,16 +317,15 @@ static inline int page_referenced_file(struct page *page)
 	if (!spin_trylock(&mapping->i_mmap_lock))
 		return 0;
 
-	list_for_each_entry(vma, &mapping->i_mmap, shared) {
-		address = vma_address(vma, pgoff);
-		if (address == -EFAULT)
-			continue;
+	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap,
+					&iter, pgoff, pgoff)) != NULL) {
 		if ((vma->vm_flags & (VM_LOCKED|VM_MAYSHARE))
 				  == (VM_LOCKED|VM_MAYSHARE)) {
 			referenced++;
 			goto out;
 		}
 		if (vma->vm_mm->rss) {
+			address = vma_address(vma, pgoff);
 			referenced += page_referenced_one(page,
 				vma->vm_mm, address, &mapcount, &failed);
 			if (!mapcount)
@@ -333,19 +333,18 @@ static inline int page_referenced_file(struct page *page)
 		}
 	}
 
-	list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
+	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
+					&iter, pgoff, pgoff)) != NULL) {
 		if (unlikely(vma->vm_flags & VM_NONLINEAR)) {
 			failed++;
 			continue;
 		}
-		address = vma_address(vma, pgoff);
-		if (address == -EFAULT)
-			continue;
 		if (vma->vm_flags & (VM_LOCKED|VM_RESERVED)) {
 			referenced++;
 			goto out;
 		}
 		if (vma->vm_mm->rss) {
+			address = vma_address(vma, pgoff);
 			referenced += page_referenced_one(page,
 				vma->vm_mm, address, &mapcount, &failed);
 			if (!mapcount)
@@ -353,6 +352,7 @@ static inline int page_referenced_file(struct page *page)
 		}
 	}
 
+	/* Hmm, but what of the nonlinears which pgoff,pgoff skipped? */
 	WARN_ON(!failed);
 out:
 	spin_unlock(&mapping->i_mmap_lock);
@@ -733,7 +733,8 @@ static inline int try_to_unmap_file(struct page *page)
 	unsigned int mapcount = page->mapcount;
 	struct address_space *mapping = page->mapping;
 	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma = NULL;
+	struct prio_tree_iter iter;
 	unsigned long address;
 	int ret = SWAP_AGAIN;
 	unsigned long cursor;
@@ -743,11 +744,10 @@ static inline int try_to_unmap_file(struct page *page)
 	if (!spin_trylock(&mapping->i_mmap_lock))
 		return ret;
 
-	list_for_each_entry(vma, &mapping->i_mmap, shared) {
+	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap,
+					&iter, pgoff, pgoff)) != NULL) {
 		if (vma->vm_mm->rss) {
 			address = vma_address(vma, pgoff);
-			if (address == -EFAULT)
-				continue;
 			ret = try_to_unmap_one(page,
 				vma->vm_mm, address, &mapcount, vma);
 			if (ret == SWAP_FAIL || !mapcount)
@@ -755,27 +755,12 @@ static inline int try_to_unmap_file(struct page *page)
 		}
 	}
 
-	list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
-		if (unlikely(vma->vm_flags & VM_NONLINEAR)) {
-			/*
-			 * Defer unmapping nonlinear to the next loop,
-			 * but take notes while we're here e.g. don't
-			 * want to loop again when no nonlinear vmas.
-			 */
-			if (vma->vm_flags & (VM_LOCKED|VM_RESERVED))
-				continue;
-			cursor = (unsigned long) vma->vm_private_data;
-			if (cursor > max_nl_cursor)
-				max_nl_cursor = cursor;
-			cursor = vma->vm_end - vma->vm_start;
-			if (cursor > max_nl_size)
-				max_nl_size = cursor;
+	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
+					&iter, pgoff, pgoff)) != NULL) {
+		if (unlikely(vma->vm_flags & VM_NONLINEAR))
 			continue;
-		}
 		if (vma->vm_mm->rss) {
 			address = vma_address(vma, pgoff);
-			if (address == -EFAULT)
-				continue;
 			ret = try_to_unmap_one(page,
 				vma->vm_mm, address, &mapcount, vma);
 			if (ret == SWAP_FAIL || !mapcount)
@@ -783,7 +768,20 @@ static inline int try_to_unmap_file(struct page *page)
 		}
 	}
 
-	if (max_nl_size == 0)	/* no nonlinear vmas of this file */
+	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
+					&iter, 0, ULONG_MAX)) != NULL) {
+		if (VM_NONLINEAR != (vma->vm_flags &
+		     (VM_NONLINEAR|VM_LOCKED|VM_RESERVED)))
+			continue;
+		cursor = (unsigned long) vma->vm_private_data;
+		if (cursor > max_nl_cursor)
+			max_nl_cursor = cursor;
+		cursor = vma->vm_end - vma->vm_start;
+		if (cursor > max_nl_size)
+			max_nl_size = cursor;
+	}
+
+	if (max_nl_size == 0)	/* any nonlinears locked or reserved */
 		goto out;
 
 	/*
@@ -801,9 +799,10 @@ static inline int try_to_unmap_file(struct page *page)
 		max_nl_cursor = CLUSTER_SIZE;
 
 	do {
-		list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
+		while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
+					&iter, 0, ULONG_MAX)) != NULL) {
 			if (VM_NONLINEAR != (vma->vm_flags &
-			     (VM_NONLINEAR|VM_LOCKED|VM_RESERVED)))
+		    	     (VM_NONLINEAR|VM_LOCKED|VM_RESERVED)))
 				continue;
 			cursor = (unsigned long) vma->vm_private_data;
 			while (vma->vm_mm->rss &&
@@ -832,7 +831,9 @@ static inline int try_to_unmap_file(struct page *page)
 	 * in locked vmas).  Reset cursor on all unreserved nonlinear
 	 * vmas, now forgetting on which ones it had fallen behind.
 	 */
-	list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
+	vma = NULL;	/* it is already, but above loop might change */
+	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
+					&iter, 0, ULONG_MAX)) != NULL) {
 		if ((vma->vm_flags & (VM_NONLINEAR|VM_RESERVED)) ==
 				VM_NONLINEAR)
 			vma->vm_private_data = 0;

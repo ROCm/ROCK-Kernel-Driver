@@ -66,12 +66,16 @@ EXPORT_SYMBOL(vm_committed_space);
 /*
  * Requires inode->i_mapping->i_mmap_lock
  */
-static inline void
-__remove_shared_vm_struct(struct vm_area_struct *vma, struct file *file)
+static inline void __remove_shared_vm_struct(struct vm_area_struct *vma,
+		struct file *file, struct address_space *mapping)
 {
 	if (vma->vm_flags & VM_DENYWRITE)
 		atomic_inc(&file->f_dentry->d_inode->i_writecount);
-	list_del_init(&vma->shared);
+
+	if (vma->vm_flags & VM_SHARED)
+		vma_prio_tree_remove(vma, &mapping->i_mmap_shared);
+	else
+		vma_prio_tree_remove(vma, &mapping->i_mmap);
 }
 
 /*
@@ -84,7 +88,7 @@ static void remove_shared_vm_struct(struct vm_area_struct *vma)
 	if (file) {
 		struct address_space *mapping = file->f_mapping;
 		spin_lock(&mapping->i_mmap_lock);
-		__remove_shared_vm_struct(vma, file);
+		__remove_shared_vm_struct(vma, file, mapping);
 		spin_unlock(&mapping->i_mmap_lock);
 	}
 }
@@ -259,9 +263,9 @@ static inline void __vma_link_file(struct vm_area_struct *vma)
 			atomic_dec(&file->f_dentry->d_inode->i_writecount);
 
 		if (vma->vm_flags & VM_SHARED)
-			list_add_tail(&vma->shared, &mapping->i_mmap_shared);
+			vma_prio_tree_insert(vma, &mapping->i_mmap_shared);
 		else
-			list_add_tail(&vma->shared, &mapping->i_mmap);
+			vma_prio_tree_insert(vma, &mapping->i_mmap);
 	}
 }
 
@@ -270,6 +274,7 @@ __vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct vm_area_struct *prev, struct rb_node **rb_link,
 	struct rb_node *rb_parent)
 {
+	vma_prio_tree_init(vma);
 	__vma_link_list(mm, vma, prev, rb_parent);
 	__vma_link_rb(mm, vma, rb_link, rb_parent);
 	__vma_link_file(vma);
@@ -318,6 +323,31 @@ __insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 }
 
 /*
+ * Dummy version of vma_prio_tree_next, just for this patch:
+ * no radix priority search tree whatsoever, just implement interface
+ * using the old lists: return the next vma overlapping [begin,end].
+ */
+struct vm_area_struct *vma_prio_tree_next(
+	struct vm_area_struct *vma, struct prio_tree_root *root,
+	struct prio_tree_iter *iter, pgoff_t begin, pgoff_t end)
+{
+	struct list_head *next;
+	pgoff_t vba, vea;
+
+	next = vma? vma->shared.next: root->list.next;
+	while (next != &root->list) {
+		vma = list_entry(next, struct vm_area_struct, shared);
+		vba = vma->vm_pgoff;
+		vea = vba + ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT) - 1;
+		/* Return vma if it overlaps [begin,end] */
+		if (vba <= end && vea >= begin)
+			return vma;
+		next = next->next;
+	}
+	return NULL;
+}
+
+/*
  * We cannot adjust vm_start, vm_end, vm_pgoff fields of a vma that is
  * already present in an i_mmap{_shared} tree without adjusting the tree.
  * The following helper function should be used when such adjustments
@@ -329,17 +359,28 @@ void vma_adjust(struct vm_area_struct *vma, unsigned long start,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct address_space *mapping = NULL;
+	struct prio_tree_root *root = NULL;
 	struct file *file = vma->vm_file;
 
 	if (file) {
 		mapping = file->f_mapping;
+		if (vma->vm_flags & VM_SHARED)
+			root = &mapping->i_mmap_shared;
+		else
+			root = &mapping->i_mmap;
 		spin_lock(&mapping->i_mmap_lock);
 	}
 	spin_lock(&mm->page_table_lock);
 
+	if (root)
+		vma_prio_tree_remove(vma, root);
 	vma->vm_start = start;
 	vma->vm_end = end;
 	vma->vm_pgoff = pgoff;
+	if (root) {
+		vma_prio_tree_init(vma);
+		vma_prio_tree_insert(vma, root);
+	}
 
 	if (next) {
 		if (next == vma->vm_next) {
@@ -349,7 +390,7 @@ void vma_adjust(struct vm_area_struct *vma, unsigned long start,
 			 */
 			__vma_unlink(mm, next, vma);
 			if (file)
-				__remove_shared_vm_struct(next, file);
+				__remove_shared_vm_struct(next, file, mapping);
 		} else {
 			/*
 			 * split_vma has split next from vma, and needs
@@ -677,7 +718,6 @@ munmap_back:
 	vma->vm_private_data = NULL;
 	vma->vm_next = NULL;
 	mpol_set_vma_default(vma);
-	INIT_LIST_HEAD(&vma->shared);
 
 	if (file) {
 		error = -EINVAL;
@@ -1240,8 +1280,6 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	/* most fields are the same, copy all, and then fixup */
 	*new = *vma;
 
-	INIT_LIST_HEAD(&new->shared);
-
 	if (new_below)
 		new->vm_end = addr;
 	else {
@@ -1434,10 +1472,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
 	mpol_set_vma_default(vma);
-	INIT_LIST_HEAD(&vma->shared);
-
 	vma_link(mm, vma, prev, rb_link, rb_parent);
-
 out:
 	mm->total_vm += len >> PAGE_SHIFT;
 	if (flags & VM_LOCKED) {
@@ -1549,7 +1584,6 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 				return NULL;
 			}
 			vma_set_policy(new_vma, pol);
-			INIT_LIST_HEAD(&new_vma->shared);
 			new_vma->vm_start = addr;
 			new_vma->vm_end = addr + len;
 			new_vma->vm_pgoff = pgoff;

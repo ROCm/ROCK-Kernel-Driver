@@ -18,6 +18,7 @@
 #include <linux/stat.h>
 #include <linux/cache.h>
 #include <linux/radix-tree.h>
+#include <linux/prio_tree.h>
 #include <linux/kobject.h>
 #include <asm/atomic.h>
 #include <linux/audit.h>
@@ -329,9 +330,9 @@ struct address_space {
 	unsigned long		nrpages;	/* number of total pages */
 	pgoff_t			writeback_index;/* writeback starts here */
 	struct address_space_operations *a_ops;	/* methods */
-	struct list_head	i_mmap;		/* list of private mappings */
-	struct list_head	i_mmap_shared;	/* list of shared mappings */
-	spinlock_t		i_mmap_lock;	/* protect both above lists */
+	struct prio_tree_root	i_mmap;		/* tree of private mappings */
+	struct prio_tree_root	i_mmap_shared;	/* tree of shared mappings */
+	spinlock_t		i_mmap_lock;	/* protect trees & list above */
 	atomic_t		truncate_count;	/* Cover race condition with truncate */
 	unsigned long		flags;		/* error bits/gfp mask */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
@@ -380,8 +381,8 @@ int mapping_tagged(struct address_space *mapping, int tag);
  */
 static inline int mapping_mapped(struct address_space *mapping)
 {
-	return	!list_empty(&mapping->i_mmap) ||
-		!list_empty(&mapping->i_mmap_shared);
+	return	!prio_tree_empty(&mapping->i_mmap) ||
+		!prio_tree_empty(&mapping->i_mmap_shared);
 }
 
 /*
@@ -392,7 +393,7 @@ static inline int mapping_mapped(struct address_space *mapping)
  */
 static inline int mapping_writably_mapped(struct address_space *mapping)
 {
-	return	!list_empty(&mapping->i_mmap_shared);
+	return	!prio_tree_empty(&mapping->i_mmap_shared);
 }
 
 /*

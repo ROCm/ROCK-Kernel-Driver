@@ -11,6 +11,7 @@
 #include <linux/list.h>
 #include <linux/mmzone.h>
 #include <linux/rbtree.h>
+#include <linux/prio_tree.h>
 #include <linux/fs.h>
 
 struct mempolicy;
@@ -70,8 +71,7 @@ struct vm_area_struct {
 
 	/*
 	 * For areas with an address space and backing store,
-	 * one of the address_space->i_mmap{,shared} lists,
-	 * for shm areas, the list of attaches, otherwise unused.
+	 * one of the address_space->i_mmap{,shared} trees.
 	 */
 	struct list_head shared;
 
@@ -586,6 +586,33 @@ extern void mem_init(void);
 extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);
 extern void si_meminfo_node(struct sysinfo *val, int nid);
+
+static inline void vma_prio_tree_init(struct vm_area_struct *vma)
+{
+	INIT_LIST_HEAD(&vma->shared);
+}
+
+static inline void vma_prio_tree_add(struct vm_area_struct *vma,
+				     struct vm_area_struct *old)
+{
+	list_add(&vma->shared, &old->shared);
+}
+
+static inline void vma_prio_tree_insert(struct vm_area_struct *vma,
+					struct prio_tree_root *root)
+{
+	list_add_tail(&vma->shared, &root->list);
+}
+
+static inline void vma_prio_tree_remove(struct vm_area_struct *vma,
+					struct prio_tree_root *root)
+{
+	list_del_init(&vma->shared);
+}
+
+struct vm_area_struct *vma_prio_tree_next(
+	struct vm_area_struct *, struct prio_tree_root *,
+	struct prio_tree_iter *, pgoff_t begin, pgoff_t end);
 
 /* mmap.c */
 extern void vma_adjust(struct vm_area_struct *vma, unsigned long start,

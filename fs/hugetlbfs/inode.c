@@ -267,39 +267,27 @@ static void hugetlbfs_drop_inode(struct inode *inode)
  * vma->vm_pgoff is in PAGE_SIZE units.
  */
 static void
-hugetlb_vmtruncate_list(struct list_head *list, unsigned long h_pgoff)
+hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
 {
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma = NULL;
+	struct prio_tree_iter iter;
 
-	list_for_each_entry(vma, list, shared) {
+	while ((vma = vma_prio_tree_next(vma, root, &iter,
+					h_pgoff, ULONG_MAX)) != NULL) {
 		unsigned long h_vm_pgoff;
 		unsigned long v_length;
-		unsigned long h_length;
 		unsigned long v_offset;
 
 		h_vm_pgoff = vma->vm_pgoff << (HPAGE_SHIFT - PAGE_SHIFT);
 		v_length = vma->vm_end - vma->vm_start;
-		h_length = v_length >> HPAGE_SHIFT;
 		v_offset = (h_pgoff - h_vm_pgoff) << HPAGE_SHIFT;
 
 		/*
 		 * Is this VMA fully outside the truncation point?
 		 */
-		if (h_vm_pgoff >= h_pgoff) {
-			zap_hugepage_range(vma, vma->vm_start, v_length);
-			continue;
-		}
+		if (h_vm_pgoff >= h_pgoff)
+			v_offset = 0;
 
-		/*
-		 * Is this VMA fully inside the truncaton point?
-		 */
-		if (h_vm_pgoff + (v_length >> HPAGE_SHIFT) <= h_pgoff)
-			continue;
-
-		/*
-		 * The VMA straddles the truncation point.  v_offset is the
-		 * offset (in bytes) into the VMA where the point lies.
-		 */
 		zap_hugepage_range(vma,
 				vma->vm_start + v_offset,
 				v_length - v_offset);
@@ -322,9 +310,9 @@ static int hugetlb_vmtruncate(struct inode *inode, loff_t offset)
 
 	inode->i_size = offset;
 	spin_lock(&mapping->i_mmap_lock);
-	if (!list_empty(&mapping->i_mmap))
+	if (!prio_tree_empty(&mapping->i_mmap))
 		hugetlb_vmtruncate_list(&mapping->i_mmap, pgoff);
-	if (!list_empty(&mapping->i_mmap_shared))
+	if (!prio_tree_empty(&mapping->i_mmap_shared))
 		hugetlb_vmtruncate_list(&mapping->i_mmap_shared, pgoff);
 	spin_unlock(&mapping->i_mmap_lock);
 	truncate_hugepages(mapping, offset);
