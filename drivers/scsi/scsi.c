@@ -1063,6 +1063,7 @@ struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *shost,
 		/* skip devices that we can't get a reference to */
 		if (!scsi_device_get(next))
 			break;
+		next = NULL;
 		list = list->next;
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);

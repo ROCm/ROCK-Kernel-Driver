@@ -7517,6 +7517,7 @@ printk("ncr53c8xx : command successfully queued\n");
      if (sts != DID_OK) {
           unmap_scsi_data(np, cmd);
           done(cmd);
+	  sts = 0;
      }
 
      return sts;
