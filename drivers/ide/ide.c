@@ -175,7 +175,7 @@ static int system_bus_speed;	/* holds what we think is VESA/PCI bus speed */
 static int initializing;	/* set while initializing built-in drivers */
 
 DECLARE_MUTEX(ide_cfg_sem);
-spinlock_t ide_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+ __cacheline_aligned_in_smp DEFINE_SPINLOCK(ide_lock);
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 static int ide_scan_direction; /* THIS was formerly 2.2.x pci=reverse */
@@ -368,8 +368,8 @@ static int ide_open (struct inode * inode, struct file * filp)
  *	list of drivers.  Currently nobody takes both at once.
  */
 
-static spinlock_t drives_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(drives_lock);
+static DEFINE_SPINLOCK(drivers_lock);
 static LIST_HEAD(drivers);
 
 /* Iterator for the driver list. */
