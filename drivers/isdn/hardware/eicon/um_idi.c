@@ -1,4 +1,4 @@
-/* $Id: um_idi.c,v 1.1.2.2 2001/02/11 14:40:41 armin Exp $ */
+/* $Id: um_idi.c,v 1.9 2003/09/09 06:00:47 schindler Exp $ */
 
 #include "platform.h"
 #include "di_defs.h"
@@ -36,6 +36,11 @@ static int process_idi_request(divas_um_idi_entity_t * e,
 static int process_idi_rc(divas_um_idi_entity_t * e, byte rc);
 static int process_idi_ind(divas_um_idi_entity_t * e, byte ind);
 static int write_return_code(divas_um_idi_entity_t * e, byte rc);
+
+/*
+ * include queue functions
+ */
+#include "dlist.c"
 
 /* --------------------------------------------------------------------------
 		MAIN
@@ -171,7 +176,15 @@ static diva_um_idi_adapter_t *diva_um_idi_find_adapter(dword nr)
    ------------------------------------------------------------------------ */
 int diva_um_idi_nr_of_adapters(void)
 {
-	return (diva_q_get_nr_of_entries(&adapter_q));
+	int i = 0;
+	const diva_entity_queue_t * q = &adapter_q;
+	const diva_entity_link_t *diva_current = q->head;
+
+	while (diva_current) {
+		i++;
+		diva_current = diva_current->next;
+	}
+	return(i);
 }
 
 /* ------------------------------------------------------------------------
