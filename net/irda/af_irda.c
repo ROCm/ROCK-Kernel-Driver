@@ -1098,6 +1098,7 @@ static int irda_create(struct socket *sock, int protocol)
 
 	/* Initialise networking socket struct */
 	sock_init_data(sock, sk);	/* Note : set sk->sk_refcnt to 1 */
+	sk_set_owner(sk, THIS_MODULE);
 	sk->sk_family = PF_IRDA;
 	sk->sk_protocol = protocol;
 	/* Link networking socket and IrDA socket structs together */
