@@ -500,7 +500,7 @@ static int x25_asy_open(struct net_device *dev)
 	/*
 	 *	Now attach LAPB
 	 */
-	if((err=lapb_register(sl, &x25_asy_callbacks))==LAPB_OK)
+	if((err=lapb_register(dev, sl, &x25_asy_callbacks))==LAPB_OK)
 		return 0;
 
 	/* Cleanup */

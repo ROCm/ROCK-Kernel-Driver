@@ -453,7 +453,7 @@ static int comxlapb_init(struct net_device *dev)
 	lapbreg.disconnect_indication = comxlapb_disconnected;
 	lapbreg.data_indication = comxlapb_data_indication;
 	lapbreg.data_transmit = comxlapb_data_transmit;
-	if (lapb_register(dev->priv, &lapbreg)) {
+	if (lapb_register(dev, dev->priv, &lapbreg)) {
 		return -ENOMEM;
 	}
 	if (ch->debug_flags & DEBUG_COMX_LAPB) {

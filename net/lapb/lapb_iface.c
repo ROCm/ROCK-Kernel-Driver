@@ -144,7 +144,7 @@ out:
 	return lapb;
 }
 
-int lapb_register(void *token, struct lapb_register_struct *callbacks)
+int lapb_register(struct net_device *dev, void *token, struct lapb_register_struct *callbacks)
 {
 	struct lapb_cb *lapb;
 	int rc = LAPB_BADTOKEN;
@@ -163,6 +163,7 @@ int lapb_register(void *token, struct lapb_register_struct *callbacks)
 		goto out;
 
 	lapb->token     = token;
+	lapb->dev       = dev;
 	lapb->callbacks = *callbacks;
 
 	__lapb_insert_cb(lapb);

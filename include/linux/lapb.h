@@ -44,7 +44,7 @@ struct lapb_parms_struct {
 	unsigned int mode;
 };
 
-extern int lapb_register(void *token, struct lapb_register_struct *callbacks);
+extern int lapb_register(struct net_device *dev, void *token, struct lapb_register_struct *callbacks);
 extern int lapb_unregister(void *token);
 extern int lapb_getparms(void *token, struct lapb_parms_struct *parms);
 extern int lapb_setparms(void *token, struct lapb_parms_struct *parms);
