@@ -988,13 +988,13 @@ static void __init prom_hold_cpus(void)
 			/* Primary Thread of non-boot cpu */
 			prom_printf("%x : starting cpu hw idx %x... ", cpuid, reg);
 			call_prom("start-cpu", 3, 0, node,
-				  secondary_hold, cpuid);
+				  secondary_hold, reg);
 
 			for ( i = 0 ; (i < 100000000) && 
 			      (*acknowledge == ((unsigned long)-1)); i++ )
 				mb();
 
-			if (*acknowledge == cpuid) {
+			if (*acknowledge == reg) {
 				prom_printf("done\n");
 				/* We have to get every CPU out of OF,
 				 * even if we never start it. */

@@ -27,6 +27,7 @@
 #include <asm/paca.h>
 
 extern int boot_cpuid;
+extern int boot_cpuid_phys;
 
 extern void cpu_die(void) __attribute__((noreturn));
 

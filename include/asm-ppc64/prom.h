@@ -56,6 +56,8 @@ struct boot_param_header
 	u32	off_mem_rsvmap;		/* offset to memory reserve map */
 	u32	version;		/* format version */
 	u32	last_comp_version;	/* last compatible version */
+	/* version 2 fields below */
+	u32	boot_cpuid_phys;	/* Which physical CPU id we're booting on */
 };
 
 
