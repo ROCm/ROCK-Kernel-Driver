@@ -8,6 +8,7 @@
  */ 
 
 #include <linux/mm.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 
 unsigned securebits = SECUREBITS_DEFAULT; /* systemwide security settings */
@@ -63,7 +64,7 @@ asmlinkage long sys_capget(cap_user_header_t header, cap_user_data_t dataptr)
      data.permitted = cap_t(target->cap_permitted);
      data.inheritable = cap_t(target->cap_inheritable); 
      data.effective = cap_t(target->cap_effective);
-     ret = security_ops->capget(target, &data.effective, &data.inheritable, &data.permitted);
+     ret = security_capget(target, &data.effective, &data.inheritable, &data.permitted);
 
 out:
      read_unlock(&tasklist_lock); 
@@ -88,7 +89,7 @@ static inline void cap_set_pg(int pgrp, kernel_cap_t *effective,
      do_each_thread(g, target) {
              if (target->pgrp != pgrp)
                      continue;
-	     security_ops->capset_set(target, effective, inheritable, permitted);
+	     security_capset_set(target, effective, inheritable, permitted);
      } while_each_thread(g, target);
 }
 
@@ -105,7 +106,7 @@ static inline void cap_set_all(kernel_cap_t *effective,
      do_each_thread(g, target) {
              if (target == current || target->pid == 1)
                      continue;
-	     security_ops->capset_set(target, effective, inheritable, permitted);
+	     security_capset_set(target, effective, inheritable, permitted);
      } while_each_thread(g, target);
 }
 
@@ -163,7 +164,7 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
 
      ret = -EPERM;
 
-     if (security_ops->capset_check(target, &effective, &inheritable, &permitted))
+     if (security_capset_check(target, &effective, &inheritable, &permitted))
 	     goto out;
 
      if (!cap_issubset(inheritable, cap_combine(target->cap_inheritable,
@@ -190,7 +191,7 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
              else            /* all procs in process group */
                      cap_set_pg(-pid, &effective, &inheritable, &permitted);
      } else {
-	     security_ops->capset_set(target, &effective, &inheritable, &permitted);
+	     security_capset_set(target, &effective, &inheritable, &permitted);
      }
 
 out:

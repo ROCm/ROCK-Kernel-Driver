@@ -7,6 +7,8 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/err.h>
+#include <linux/limits.h>
+#include <linux/stat.h>
 #include "fs.h"
 
 static struct driver_dir_entry class_dir;

@@ -120,7 +120,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_bdev = NULL;
 		inode->i_cdev = NULL;
 		inode->i_security = NULL;
-		if (security_ops->inode_alloc_security(inode)) {
+		if (security_inode_alloc(inode)) {
 			if (inode->i_sb->s_op->destroy_inode)
 				inode->i_sb->s_op->destroy_inode(inode);
 			else
@@ -146,7 +146,7 @@ static void destroy_inode(struct inode *inode)
 {
 	if (inode_has_buffers(inode))
 		BUG();
-	security_ops->inode_free_security(inode);
+	security_inode_free(inode);
 	if (inode->i_sb->s_op->destroy_inode) {
 		inode->i_sb->s_op->destroy_inode(inode);
 	} else {
@@ -922,7 +922,7 @@ void generic_delete_inode(struct inode *inode)
 	if (inode->i_data.nrpages)
 		truncate_inode_pages(&inode->i_data, 0);
 
-	security_ops->inode_delete(inode);
+	security_inode_delete(inode);
 
 	if (op && op->delete_inode) {
 		void (*delete)(struct inode *) = op->delete_inode;

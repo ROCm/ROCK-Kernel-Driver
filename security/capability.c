@@ -19,10 +19,7 @@
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
 
-/* flag to keep track of how we were registered */
-static int secondary;
-
-static int cap_capable (struct task_struct *tsk, int cap)
+int cap_capable (struct task_struct *tsk, int cap)
 {
 	/* Derived from include/linux/sched.h:capable. */
 	if (cap_raised (tsk->cap_effective, cap))
@@ -31,23 +28,7 @@ static int cap_capable (struct task_struct *tsk, int cap)
 		return -EPERM;
 }
 
-static int cap_sys_security (unsigned int id, unsigned int call,
-			     unsigned long *args)
-{
-	return -ENOSYS;
-}
-
-static int cap_quotactl (int cmds, int type, int id, struct super_block *sb)
-{
-	return 0;
-}
-
-static int cap_quota_on (struct file *f)
-{
-	return 0;
-}
-
-static int cap_ptrace (struct task_struct *parent, struct task_struct *child)
+int cap_ptrace (struct task_struct *parent, struct task_struct *child)
 {
 	/* Derived from arch/i386/kernel/ptrace.c:sys_ptrace. */
 	if (!cap_issubset (child->cap_permitted, current->cap_permitted) &&
@@ -57,8 +38,8 @@ static int cap_ptrace (struct task_struct *parent, struct task_struct *child)
 		return 0;
 }
 
-static int cap_capget (struct task_struct *target, kernel_cap_t * effective,
-		       kernel_cap_t * inheritable, kernel_cap_t * permitted)
+int cap_capget (struct task_struct *target, kernel_cap_t *effective,
+		kernel_cap_t *inheritable, kernel_cap_t *permitted)
 {
 	/* Derived from kernel/capability.c:sys_capget. */
 	*effective = cap_t (target->cap_effective);
@@ -67,10 +48,8 @@ static int cap_capget (struct task_struct *target, kernel_cap_t * effective,
 	return 0;
 }
 
-static int cap_capset_check (struct task_struct *target,
-			     kernel_cap_t * effective,
-			     kernel_cap_t * inheritable,
-			     kernel_cap_t * permitted)
+int cap_capset_check (struct task_struct *target, kernel_cap_t *effective,
+		      kernel_cap_t *inheritable, kernel_cap_t *permitted)
 {
 	/* Derived from kernel/capability.c:sys_capset. */
 	/* verify restrictions on target's new Inheritable set */
@@ -95,27 +74,15 @@ static int cap_capset_check (struct task_struct *target,
 	return 0;
 }
 
-static void cap_capset_set (struct task_struct *target,
-			    kernel_cap_t * effective,
-			    kernel_cap_t * inheritable,
-			    kernel_cap_t * permitted)
+void cap_capset_set (struct task_struct *target, kernel_cap_t *effective,
+		     kernel_cap_t *inheritable, kernel_cap_t *permitted)
 {
 	target->cap_effective = *effective;
 	target->cap_inheritable = *inheritable;
 	target->cap_permitted = *permitted;
 }
 
-static int cap_acct (struct file *file)
-{
-	return 0;
-}
-
-static int cap_bprm_alloc_security (struct linux_binprm *bprm)
-{
-	return 0;
-}
-
-static int cap_bprm_set_security (struct linux_binprm *bprm)
+int cap_bprm_set_security (struct linux_binprm *bprm)
 {
 	/* Copied from fs/exec.c:prepare_binprm. */
 
@@ -143,23 +110,13 @@ static int cap_bprm_set_security (struct linux_binprm *bprm)
 	return 0;
 }
 
-static int cap_bprm_check_security (struct linux_binprm *bprm)
-{
-	return 0;
-}
-
-static void cap_bprm_free_security (struct linux_binprm *bprm)
-{
-	return;
-}
-
 /* Copied from fs/exec.c */
 static inline int must_not_trace_exec (struct task_struct *p)
 {
 	return (p->ptrace & PT_PTRACED) && !(p->ptrace & PT_PTRACE_CAP);
 }
 
-static void cap_bprm_compute_creds (struct linux_binprm *bprm)
+void cap_bprm_compute_creds (struct linux_binprm *bprm)
 {
 	/* Derived from fs/exec.c:compute_creds. */
 	kernel_cap_t new_permitted, working;
@@ -202,6 +159,160 @@ static void cap_bprm_compute_creds (struct linux_binprm *bprm)
 		unlock_kernel ();
 
 	current->keep_capabilities = 0;
+}
+
+/* moved from kernel/sys.c. */
+/* 
+ * cap_emulate_setxuid() fixes the effective / permitted capabilities of
+ * a process after a call to setuid, setreuid, or setresuid.
+ *
+ *  1) When set*uiding _from_ one of {r,e,s}uid == 0 _to_ all of
+ *  {r,e,s}uid != 0, the permitted and effective capabilities are
+ *  cleared.
+ *
+ *  2) When set*uiding _from_ euid == 0 _to_ euid != 0, the effective
+ *  capabilities of the process are cleared.
+ *
+ *  3) When set*uiding _from_ euid != 0 _to_ euid == 0, the effective
+ *  capabilities are set to the permitted capabilities.
+ *
+ *  fsuid is handled elsewhere. fsuid == 0 and {r,e,s}uid!= 0 should 
+ *  never happen.
+ *
+ *  -astor 
+ *
+ * cevans - New behaviour, Oct '99
+ * A process may, via prctl(), elect to keep its capabilities when it
+ * calls setuid() and switches away from uid==0. Both permitted and
+ * effective sets will be retained.
+ * Without this change, it was impossible for a daemon to drop only some
+ * of its privilege. The call to setuid(!=0) would drop all privileges!
+ * Keeping uid 0 is not an option because uid 0 owns too many vital
+ * files..
+ * Thanks to Olaf Kirch and Peter Benie for spotting this.
+ */
+static inline void cap_emulate_setxuid (int old_ruid, int old_euid,
+					int old_suid)
+{
+	if ((old_ruid == 0 || old_euid == 0 || old_suid == 0) &&
+	    (current->uid != 0 && current->euid != 0 && current->suid != 0) &&
+	    !current->keep_capabilities) {
+		cap_clear (current->cap_permitted);
+		cap_clear (current->cap_effective);
+	}
+	if (old_euid == 0 && current->euid != 0) {
+		cap_clear (current->cap_effective);
+	}
+	if (old_euid != 0 && current->euid == 0) {
+		current->cap_effective = current->cap_permitted;
+	}
+}
+
+int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid,
+			  int flags)
+{
+	switch (flags) {
+	case LSM_SETID_RE:
+	case LSM_SETID_ID:
+	case LSM_SETID_RES:
+		/* Copied from kernel/sys.c:setreuid/setuid/setresuid. */
+		if (!issecure (SECURE_NO_SETUID_FIXUP)) {
+			cap_emulate_setxuid (old_ruid, old_euid, old_suid);
+		}
+		break;
+	case LSM_SETID_FS:
+		{
+			uid_t old_fsuid = old_ruid;
+
+			/* Copied from kernel/sys.c:setfsuid. */
+
+			/*
+			 * FIXME - is fsuser used for all CAP_FS_MASK capabilities?
+			 *          if not, we might be a bit too harsh here.
+			 */
+
+			if (!issecure (SECURE_NO_SETUID_FIXUP)) {
+				if (old_fsuid == 0 && current->fsuid != 0) {
+					cap_t (current->cap_effective) &=
+					    ~CAP_FS_MASK;
+				}
+				if (old_fsuid != 0 && current->fsuid == 0) {
+					cap_t (current->cap_effective) |=
+					    (cap_t (current->cap_permitted) &
+					     CAP_FS_MASK);
+				}
+			}
+			break;
+		}
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+void cap_task_kmod_set_label (void)
+{
+	cap_set_full (current->cap_effective);
+	return;
+}
+
+void cap_task_reparent_to_init (struct task_struct *p)
+{
+	p->cap_effective = CAP_INIT_EFF_SET;
+	p->cap_inheritable = CAP_INIT_INH_SET;
+	p->cap_permitted = CAP_FULL_SET;
+	p->keep_capabilities = 0;
+	return;
+}
+
+EXPORT_SYMBOL(cap_capable);
+EXPORT_SYMBOL(cap_ptrace);
+EXPORT_SYMBOL(cap_capget);
+EXPORT_SYMBOL(cap_capset_check);
+EXPORT_SYMBOL(cap_capset_set);
+EXPORT_SYMBOL(cap_bprm_set_security);
+EXPORT_SYMBOL(cap_bprm_compute_creds);
+EXPORT_SYMBOL(cap_task_post_setuid);
+EXPORT_SYMBOL(cap_task_kmod_set_label);
+EXPORT_SYMBOL(cap_task_reparent_to_init);
+
+#ifdef CONFIG_SECURITY
+
+static int cap_sys_security (unsigned int id, unsigned int call,
+			     unsigned long *args)
+{
+	return -ENOSYS;
+}
+
+static int cap_quotactl (int cmds, int type, int id, struct super_block *sb)
+{
+	return 0;
+}
+
+static int cap_quota_on (struct file *f)
+{
+	return 0;
+}
+
+static int cap_acct (struct file *file)
+{
+	return 0;
+}
+
+static int cap_bprm_alloc_security (struct linux_binprm *bprm)
+{
+	return 0;
+}
+
+static int cap_bprm_check_security (struct linux_binprm *bprm)
+{
+	return 0;
+}
+
+static void cap_bprm_free_security (struct linux_binprm *bprm)
+{
+	return;
 }
 
 static int cap_sb_alloc_security (struct super_block *sb)
@@ -507,96 +618,6 @@ static int cap_task_setuid (uid_t id0, uid_t id1, uid_t id2, int flags)
 	return 0;
 }
 
-/* moved from kernel/sys.c. */
-/* 
- * cap_emulate_setxuid() fixes the effective / permitted capabilities of
- * a process after a call to setuid, setreuid, or setresuid.
- *
- *  1) When set*uiding _from_ one of {r,e,s}uid == 0 _to_ all of
- *  {r,e,s}uid != 0, the permitted and effective capabilities are
- *  cleared.
- *
- *  2) When set*uiding _from_ euid == 0 _to_ euid != 0, the effective
- *  capabilities of the process are cleared.
- *
- *  3) When set*uiding _from_ euid != 0 _to_ euid == 0, the effective
- *  capabilities are set to the permitted capabilities.
- *
- *  fsuid is handled elsewhere. fsuid == 0 and {r,e,s}uid!= 0 should 
- *  never happen.
- *
- *  -astor 
- *
- * cevans - New behaviour, Oct '99
- * A process may, via prctl(), elect to keep its capabilities when it
- * calls setuid() and switches away from uid==0. Both permitted and
- * effective sets will be retained.
- * Without this change, it was impossible for a daemon to drop only some
- * of its privilege. The call to setuid(!=0) would drop all privileges!
- * Keeping uid 0 is not an option because uid 0 owns too many vital
- * files..
- * Thanks to Olaf Kirch and Peter Benie for spotting this.
- */
-static inline void cap_emulate_setxuid (int old_ruid, int old_euid,
-					int old_suid)
-{
-	if ((old_ruid == 0 || old_euid == 0 || old_suid == 0) &&
-	    (current->uid != 0 && current->euid != 0 && current->suid != 0) &&
-	    !current->keep_capabilities) {
-		cap_clear (current->cap_permitted);
-		cap_clear (current->cap_effective);
-	}
-	if (old_euid == 0 && current->euid != 0) {
-		cap_clear (current->cap_effective);
-	}
-	if (old_euid != 0 && current->euid == 0) {
-		current->cap_effective = current->cap_permitted;
-	}
-}
-
-static int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid,
-				 int flags)
-{
-	switch (flags) {
-	case LSM_SETID_RE:
-	case LSM_SETID_ID:
-	case LSM_SETID_RES:
-		/* Copied from kernel/sys.c:setreuid/setuid/setresuid. */
-		if (!issecure (SECURE_NO_SETUID_FIXUP)) {
-			cap_emulate_setxuid (old_ruid, old_euid, old_suid);
-		}
-		break;
-	case LSM_SETID_FS:
-		{
-			uid_t old_fsuid = old_ruid;
-
-			/* Copied from kernel/sys.c:setfsuid. */
-
-			/*
-			 * FIXME - is fsuser used for all CAP_FS_MASK capabilities?
-			 *          if not, we might be a bit too harsh here.
-			 */
-
-			if (!issecure (SECURE_NO_SETUID_FIXUP)) {
-				if (old_fsuid == 0 && current->fsuid != 0) {
-					cap_t (current->cap_effective) &=
-					    ~CAP_FS_MASK;
-				}
-				if (old_fsuid != 0 && current->fsuid == 0) {
-					cap_t (current->cap_effective) |=
-					    (cap_t (current->cap_permitted) &
-					     CAP_FS_MASK);
-				}
-			}
-			break;
-		}
-	default:
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 static int cap_task_setgid (gid_t id0, gid_t id1, gid_t id2, int flags)
 {
 	return 0;
@@ -657,21 +678,6 @@ static int cap_task_prctl (int option, unsigned long arg2, unsigned long arg3,
 			   unsigned long arg4, unsigned long arg5)
 {
 	return 0;
-}
-
-static void cap_task_kmod_set_label (void)
-{
-	cap_set_full (current->cap_effective);
-	return;
-}
-
-static void cap_task_reparent_to_init (struct task_struct *p)
-{
-	p->cap_effective = CAP_INIT_EFF_SET;
-	p->cap_inheritable = CAP_INIT_INH_SET;
-	p->cap_permitted = CAP_FULL_SET;
-	p->keep_capabilities = 0;
-	return;
 }
 
 static int cap_ipc_permission (struct kern_ipc_perm *ipcp, short flag)
@@ -832,6 +838,10 @@ static struct security_operations capability_ops = {
 #define MY_NAME "capability"
 #endif
 
+/* flag to keep track of how we were registered */
+static int secondary;
+
+
 static int __init capability_init (void)
 {
 	/* register ourselves with the security framework */
@@ -871,3 +881,5 @@ module_exit (capability_exit);
 
 MODULE_DESCRIPTION("Standard Linux Capabilities Security Module");
 MODULE_LICENSE("GPL");
+
+#endif	/* CONFIG_SECURITY */

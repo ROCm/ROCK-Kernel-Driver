@@ -2967,8 +2967,7 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	if ((retval = bprm.envc) < 0)
 		goto out_mm;
 
-	retval = security_ops->bprm_alloc_security(&bprm);
-	if (retval) 
+	if ((retval = security_bprm_alloc(&bprm)))
 		goto out;
 
 	retval = prepare_binprm(&bprm);
@@ -2991,7 +2990,7 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	retval = search_binary_handler(&bprm, regs);
 	if (retval >= 0) {
 		/* execve success */
-		security_ops->bprm_free_security(&bprm);
+		security_bprm_free(&bprm);
 		return retval;
 	}
 
@@ -3004,7 +3003,7 @@ out:
 	}
 
 	if (bprm.security)
-		security_ops->bprm_free_security(&bprm);
+		security_bprm_free(&bprm);
 
 out_mm:
 	mmdrop(bprm.mm);

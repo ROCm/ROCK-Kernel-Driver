@@ -122,6 +122,7 @@
 #include <linux/timer.h>
 #include <linux/time.h>
 #include <linux/fs.h>
+#include <linux/security.h>
 
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
@@ -1174,8 +1175,7 @@ int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
 		return -EACCES;
 	if (!S_ISREG(inode->i_mode))
 		return -EINVAL;
-	error = security_ops->file_lock(filp, arg);
-	if (error)
+	if ((error = security_file_lock(filp, arg)))
 		return error;
 
 	lock_kernel();
@@ -1288,8 +1288,7 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 	if (error)
 		goto out_putf;
 
-	error = security_ops->file_lock(filp, cmd);
-	if (error)
+	if ((error = security_file_lock(filp, cmd)))
 		goto out_free;
 
 	for (;;) {
@@ -1438,8 +1437,7 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 		goto out;
 	}
 
-	error = security_ops->file_lock(filp, file_lock->fl_type);
-	if (error)
+	if ((error = security_file_lock(filp, file_lock->fl_type)))
 		goto out;
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
@@ -1578,8 +1576,7 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 *l)
 		goto out;
 	}
 
-	error = security_ops->file_lock(filp, file_lock->fl_type);
-	if (error)
+	if ((error = security_file_lock(filp, file_lock->fl_type)))
 		goto out;
 
 	if (filp->f_op && filp->f_op->lock != NULL) {

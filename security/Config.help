@@ -1,3 +1,10 @@
+CONFIG_SECURITY
+  This enables the ability to have different security modules
+  in the kernel.  If this option is not selected, the default
+  capabilities functionality will be enabled.
+
+  If you are unsure how to answer this questions, answer N.
+
 CONFIG_SECURITY_CAPABILITIES
   This enables the "default" Linux capabilities functionality.
   If you are unsure how to answer this question, answer Y.

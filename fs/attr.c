@@ -153,13 +153,12 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	}
 
 	if (inode->i_op && inode->i_op->setattr) {
-		error = security_ops->inode_setattr(dentry, attr);
-		if (!error)
+		if (!(error = security_inode_setattr(dentry, attr)))
 			error = inode->i_op->setattr(dentry, attr);
 	} else {
 		error = inode_change_ok(inode, attr);
 		if (!error)
-			error = security_ops->inode_setattr(dentry, attr);
+			error = security_inode_setattr(dentry, attr);
 		if (!error) {
 			if ((ia_valid & ATTR_UID && attr->ia_uid != inode->i_uid) ||
 			    (ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid))

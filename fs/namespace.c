@@ -19,6 +19,7 @@
 #include <linux/seq_file.h>
 #include <linux/namespace.h>
 #include <linux/namei.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 
@@ -288,8 +289,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	struct super_block * sb = mnt->mnt_sb;
 	int retval = 0;
 
-	retval = security_ops->sb_umount(mnt, flags);
-	if (retval)
+	if ((retval = security_sb_umount(mnt, flags)))
 		return retval;
 
 	/*
@@ -341,7 +341,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 		DQUOT_OFF(sb);
 		acct_auto_close(sb);
 		unlock_kernel();
-		security_ops->sb_umount_close(mnt);
+		security_sb_umount_close(mnt);
 		spin_lock(&dcache_lock);
 	}
 	retval = -EBUSY;
@@ -352,7 +352,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	}
 	spin_unlock(&dcache_lock);
 	if (retval)
-		security_ops->sb_umount_busy(mnt);
+		security_sb_umount_busy(mnt);
 	up_write(&current->namespace->sem);
 	return retval;
 }
@@ -470,8 +470,7 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 	if (IS_DEADDIR(nd->dentry->d_inode))
 		goto out_unlock;
 
-	err = security_ops->sb_check_sb(mnt, nd);
-	if (err)
+	if ((err = security_sb_check_sb(mnt, nd)))
 		goto out_unlock;
 
 	spin_lock(&dcache_lock);
@@ -487,7 +486,7 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 out_unlock:
 	up(&nd->dentry->d_inode->i_sem);
 	if (!err)
-		security_ops->sb_post_addmount(mnt, nd);
+		security_sb_post_addmount(mnt, nd);
 	return err;
 }
 
@@ -558,7 +557,7 @@ static int do_remount(struct nameidata *nd,int flags,int mnt_flags,void *data)
 		nd->mnt->mnt_flags=mnt_flags;
 	up_write(&sb->s_umount);
 	if (!err)
-		security_ops->sb_post_remount(nd->mnt, flags, data);
+		security_sb_post_remount(nd->mnt, flags, data);
 	return err;
 }
 
@@ -741,8 +740,7 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	if (retval)
 		return retval;
 
-	retval = security_ops->sb_mount(dev_name, &nd, type_page, flags, data_page);
-	if (retval)
+	if ((retval = security_sb_mount(dev_name, &nd, type_page, flags, data_page)))
 		goto dput_out;
 
 	if (flags & MS_REMOUNT)
@@ -939,8 +937,7 @@ asmlinkage long sys_pivot_root(const char *new_root, const char *put_old)
 	if (error)
 		goto out1;
 
-	error = security_ops->sb_pivotroot(&old_nd, &new_nd);
-	if (error) {
+	if ((error = security_sb_pivotroot(&old_nd, &new_nd))) {
 		path_release(&old_nd);
 		goto out1;
 	}
@@ -989,7 +986,7 @@ asmlinkage long sys_pivot_root(const char *new_root, const char *put_old)
 	attach_mnt(new_nd.mnt, &root_parent);
 	spin_unlock(&dcache_lock);
 	chroot_fs_refs(&user_nd, &new_nd);
-	security_ops->sb_post_pivotroot(&user_nd, &new_nd);
+	security_sb_post_pivotroot(&user_nd, &new_nd);
 	error = 0;
 	path_release(&root_parent);
 	path_release(&parent_nd);

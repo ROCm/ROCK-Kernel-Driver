@@ -49,6 +49,7 @@
 #include <linux/acct.h>
 #include <linux/file.h>
 #include <linux/tty.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 
 /*
@@ -222,8 +223,7 @@ asmlinkage long sys_acct(const char *name)
 		}
 	}
 
-	error = security_ops->acct(file);
-	if (error)
+	if ((error = security_acct(file)))
 		return error;
 
 	spin_lock(&acct_globals.lock);
