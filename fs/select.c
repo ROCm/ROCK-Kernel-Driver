@@ -373,9 +373,10 @@ sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, s
 		ret = 0;
 	}
 
-	set_fd_set(n, inp, fds.res_in);
-	set_fd_set(n, outp, fds.res_out);
-	set_fd_set(n, exp, fds.res_ex);
+	if (set_fd_set(n, inp, fds.res_in) ||
+	    set_fd_set(n, outp, fds.res_out) ||
+	    set_fd_set(n, exp, fds.res_ex))
+		ret = -EFAULT;
 
 out:
 	select_bits_free(bits, size);
