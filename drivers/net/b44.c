@@ -27,8 +27,8 @@
 
 #define DRV_MODULE_NAME		"b44"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"0.94"
-#define DRV_MODULE_RELDATE	"May 4, 2004"
+#define DRV_MODULE_VERSION	"0.95"
+#define DRV_MODULE_RELDATE	"Aug 3, 2004"
 
 #define B44_DEF_MSG_ENABLE	  \
 	(NETIF_MSG_DRV		| \
@@ -57,6 +57,7 @@
 #define B44_DEF_TX_RING_PENDING		(B44_TX_RING_SIZE - 1)
 #define B44_TX_RING_BYTES	(sizeof(struct dma_desc) * \
 				 B44_TX_RING_SIZE)
+#define B44_DMA_MASK 0x3fffffff
 
 #define TX_RING_GAP(BP)	\
 	(B44_TX_RING_SIZE - (BP)->tx_pending)
@@ -67,6 +68,7 @@
 #define NEXT_TX(N)		(((N) + 1) & (B44_TX_RING_SIZE - 1))
 
 #define RX_PKT_BUF_SZ		(1536 + bp->rx_offset + 64)
+#define TX_PKT_BUF_SZ		(B44_MAX_MTU + ETH_HLEN + 8)
 
 /* minimum number of free TX descriptors required to wake up TX process */
 #define B44_TX_WAKEUP_THRESH		(B44_TX_RING_SIZE / 4)
@@ -74,7 +76,7 @@
 static char version[] __devinitdata =
 	DRV_MODULE_NAME ".c:v" DRV_MODULE_VERSION " (" DRV_MODULE_RELDATE ")\n";
 
-MODULE_AUTHOR("David S. Miller (davem@redhat.com)");
+MODULE_AUTHOR("Florian Schirmer, Pekka Pietikainen, David S. Miller");
 MODULE_DESCRIPTION("Broadcom 4400 10/100 PCI ethernet driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM(b44_debug, "i");
@@ -141,41 +143,8 @@ static int b44_wait_bit(struct b44 *bp, unsigned long reg,
  * interrupts disabled.
  */
 
-#define SBID_SDRAM		0
-#define SBID_PCI_MEM		1
-#define SBID_PCI_CFG		2
-#define SBID_PCI_DMA		3
-#define	SBID_SDRAM_SWAPPED	4
-#define SBID_ENUM		5
-#define SBID_REG_SDRAM		6
-#define SBID_REG_ILINE20	7
-#define SBID_REG_EMAC		8
-#define SBID_REG_CODEC		9
-#define SBID_REG_USB		10
-#define SBID_REG_PCI		11
-#define SBID_REG_MIPS		12
-#define SBID_REG_EXTIF		13
-#define	SBID_EXTIF		14
-#define	SBID_EJTAG		15
-#define	SBID_MAX		16
-
-static u32 ssb_get_addr(struct b44 *bp, u32 id, u32 instance)
-{
-	switch (id) {
-	case SBID_PCI_DMA:
-		return 0x40000000;
-	case SBID_ENUM:
-		return 0x18000000;
-	case SBID_REG_EMAC:
-		return 0x18000000;
-	case SBID_REG_CODEC:
-		return 0x18001000;
-	case SBID_REG_PCI:
-		return 0x18002000;
-	default:
-		return 0;
-	};
-}
+#define SB_PCI_DMA             0x40000000      /* Client Mode PCI memory access space (1 GB) */
+#define BCM4400_PCI_CORE_ADDR  0x18002000      /* Address of PCI core on BCM4400 cards */
 
 static u32 ssb_get_core_rev(struct b44 *bp)
 {
@@ -187,8 +156,7 @@ static u32 ssb_pci_setup(struct b44 *bp, u32 cores)
 	u32 bar_orig, pci_rev, val;
 
 	pci_read_config_dword(bp->pdev, SSB_BAR0_WIN, &bar_orig);
-	pci_write_config_dword(bp->pdev, SSB_BAR0_WIN,
-			       ssb_get_addr(bp, SBID_REG_PCI, 0));
+	pci_write_config_dword(bp->pdev, SSB_BAR0_WIN, BCM4400_PCI_CORE_ADDR);
 	pci_rev = ssb_get_core_rev(bp);
 
 	val = br32(bp, B44_SBINTVEC);
@@ -649,10 +617,30 @@ static int b44_alloc_rx_skb(struct b44 *bp, int src_idx, u32 dest_idx_unmasked)
 	if (skb == NULL)
 		return -ENOMEM;
 
-	skb->dev = bp->dev;
 	mapping = pci_map_single(bp->pdev, skb->data,
 				 RX_PKT_BUF_SZ,
 				 PCI_DMA_FROMDEVICE);
+
+	/* Hardware bug work-around, the chip is unable to do PCI DMA
+	   to/from anything above 1GB :-( */
+	if(mapping+RX_PKT_BUF_SZ > B44_DMA_MASK) {
+		/* Sigh... */
+		pci_unmap_single(bp->pdev, mapping, RX_PKT_BUF_SZ,PCI_DMA_FROMDEVICE);
+		dev_kfree_skb_any(skb);
+		skb = __dev_alloc_skb(RX_PKT_BUF_SZ,GFP_DMA);
+		if (skb == NULL)
+			return -ENOMEM;
+		mapping = pci_map_single(bp->pdev, skb->data,
+					 RX_PKT_BUF_SZ,
+					 PCI_DMA_FROMDEVICE);
+		if(mapping+RX_PKT_BUF_SZ > B44_DMA_MASK) {
+			pci_unmap_single(bp->pdev, mapping, RX_PKT_BUF_SZ,PCI_DMA_FROMDEVICE);
+			dev_kfree_skb_any(skb);
+			return -ENOMEM;
+		}
+	}
+
+	skb->dev = bp->dev;
 	skb_reserve(skb, bp->rx_offset);
 
 	rh = (struct rx_header *)
@@ -930,6 +918,12 @@ static int b44_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	entry = bp->tx_prod;
 	mapping = pci_map_single(bp->pdev, skb->data, len, PCI_DMA_TODEVICE);
+	if(mapping+len > B44_DMA_MASK) {
+		/* Chip can't handle DMA to/from >1GB, use bounce buffer */
+		pci_unmap_single(bp->pdev, mapping, len,PCI_DMA_TODEVICE);
+		memcpy(bp->tx_bufs+entry*TX_PKT_BUF_SZ,skb->data,skb->len);
+		mapping = pci_map_single(bp->pdev, bp->tx_bufs+entry*TX_PKT_BUF_SZ, len, PCI_DMA_TODEVICE);
+	}
 
 	bp->tx_buffers[entry].skb = skb;
 	pci_unmap_addr_set(&bp->tx_buffers[entry], mapping, mapping);
@@ -1077,6 +1071,11 @@ static void b44_free_consistent(struct b44 *bp)
 				    bp->tx_ring, bp->tx_ring_dma);
 		bp->tx_ring = NULL;
 	}
+	if (bp->tx_bufs) {
+		pci_free_consistent(bp->pdev, B44_TX_RING_SIZE * TX_PKT_BUF_SZ,
+				    bp->tx_bufs, bp->tx_bufs_dma);
+		bp->tx_bufs = NULL;
+	}
 }
 
 /*
@@ -1098,6 +1097,12 @@ static int b44_alloc_consistent(struct b44 *bp)
 	if (!bp->tx_buffers)
 		goto out_err;
 	memset(bp->tx_buffers, 0, size);
+
+	size = B44_TX_RING_SIZE * TX_PKT_BUF_SZ;
+	bp->tx_bufs = pci_alloc_consistent(bp->pdev, size, &bp->tx_bufs_dma);
+	if (!bp->tx_bufs)
+		goto out_err;
+	memset(bp->tx_bufs, 0, size);
 
 	size = DMA_TABLE_BYTES;
 	bp->rx_ring = pci_alloc_consistent(bp->pdev, size, &bp->rx_ring_dma);
@@ -1358,7 +1363,10 @@ static struct net_device_stats *b44_get_stats(struct net_device *dev)
 				   hwstat->rx_symbol_errs);
 
 	nstat->tx_aborted_errors = hwstat->tx_underruns;
+#if 0
+	/* Carrier lost counter seems to be broken for some devices */
 	nstat->tx_carrier_errors = hwstat->tx_carrier_lost;
+#endif
 
 	return nstat;
 }
@@ -1684,7 +1692,6 @@ static int __devinit b44_get_invariants(struct b44 *bp)
 	bp->dev->dev_addr[5] = eeprom[82];
 
 	bp->phy_addr = eeprom[90] & 0x1f;
-	bp->mdc_port = (eeprom[90] >> 14) & 0x1;
 
 	/* With this, plus the rx_header prepended to the data by the
 	 * hardware, we'll land the ethernet header on a 2-byte boundary.
@@ -1694,7 +1701,7 @@ static int __devinit b44_get_invariants(struct b44 *bp)
 	bp->imask = IMASK_DEF;
 
 	bp->core_unit = ssb_core_unit(bp);
-	bp->dma_offset = ssb_get_addr(bp, SBID_PCI_DMA, 0);
+	bp->dma_offset = SB_PCI_DMA;
 
 	/* XXX - really required? 
 	   bp->flags |= B44_FLAG_BUGGY_TXPTR;
@@ -1738,11 +1745,18 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 
 	pci_set_master(pdev);
 
-	err = pci_set_dma_mask(pdev, (u64) 0xffffffff);
+	err = pci_set_dma_mask(pdev, (u64) B44_DMA_MASK);
 	if (err) {
 		printk(KERN_ERR PFX "No usable DMA configuration, "
 		       "aborting.\n");
 		goto err_out_free_res;
+	}
+	
+	err = pci_set_consistent_dma_mask(pdev, (u64) B44_DMA_MASK);
+	if (err) {
+	  printk(KERN_ERR PFX "No usable DMA configuration, "
+		 "aborting.\n");
+	  goto err_out_free_res;
 	}
 
 	b44reg_base = pci_resource_start(pdev, 0);
