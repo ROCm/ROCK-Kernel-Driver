@@ -131,10 +131,9 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry)
  */
 void __delete_from_swap_cache(struct page *page)
 {
-	if (!PageLocked(page))
-		BUG();
-	if (!PageSwapCache(page))
-		BUG();
+	BUG_ON(!PageLocked(page));
+	BUG_ON(!PageSwapCache(page));
+	BUG_ON(PageWriteback(page));
 	ClearPageDirty(page);
 	__remove_inode_page(page);
 	INC_CACHE_INFO(del_total);

@@ -542,14 +542,6 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	 */
 	if (page_uptodate && !PageError(page))
 		SetPageUptodate(page);
-
-	/*
-	 * swap page handling is a bit hacky.  A standalone completion handler
-	 * for swapout pages would fix that up.  swapin can use this function.
-	 */
-	if (PageSwapCache(page) && PageWriteback(page))
-		end_page_writeback(page);
-
 	unlock_page(page);
 	return;
 
@@ -559,8 +551,9 @@ still_busy:
 }
 
 /*
- * Completion handler for block_write_full_page() - pages which are unlocked
- * during I/O, and which have PageWriteback cleared upon I/O completion.
+ * Completion handler for block_write_full_page() and for brw_page() - pages
+ * which are unlocked during I/O, and which have PageWriteback cleared
+ * upon I/O completion.
  */
 static void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 {
@@ -2281,16 +2274,6 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
  *
  * FIXME: we need a swapper_inode->get_block function to remove
  *        some of the bmap kludges and interface ugliness here.
- *
- * NOTE: unlike file pages, swap pages are locked while under writeout.
- * This is to throttle processes which reuse their swapcache pages while
- * they are under writeout, and to ensure that there is no I/O going on
- * when the page has been successfully locked.  Functions such as
- * free_swap_and_cache() need to guarantee that there is no I/O in progress
- * because they will be freeing up swap blocks, which may then be reused.
- *
- * Swap pages are also marked PageWriteback when they are being written
- * so that memory allocators will throttle on them.
  */
 int brw_page(int rw, struct page *page,
 		struct block_device *bdev, sector_t b[], int size)
@@ -2312,18 +2295,17 @@ int brw_page(int rw, struct page *page,
 		if (rw == WRITE) {
 			set_buffer_uptodate(bh);
 			clear_buffer_dirty(bh);
+			mark_buffer_async_write(bh);
+		} else {
+			mark_buffer_async_read(bh);
 		}
-		/*
-		 * Swap pages are locked during writeout, so use
-		 * buffer_async_read in strange ways.
-		 */
-		mark_buffer_async_read(bh);
 		bh = bh->b_this_page;
 	} while (bh != head);
 
 	if (rw == WRITE) {
 		BUG_ON(PageWriteback(page));
 		SetPageWriteback(page);
+		unlock_page(page);
 	}
 
 	/* Stage 2: start the IO */

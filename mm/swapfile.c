@@ -298,6 +298,8 @@ int remove_exclusive_swap_page(struct page *page)
 		BUG();
 	if (!PageSwapCache(page))
 		return 0;
+	if (PageWriteback(page))
+		return 0;
 	if (page_count(page) - !!PagePrivate(page) != 2) /* 2: us + cache */
 		return 0;
 
@@ -311,7 +313,8 @@ int remove_exclusive_swap_page(struct page *page)
 	if (p->swap_map[swp_offset(entry)] == 1) {
 		/* Recheck the page count with the pagecache lock held.. */
 		write_lock(&swapper_space.page_lock);
-		if (page_count(page) - !!PagePrivate(page) == 2) {
+		if ((page_count(page) - !!page_has_buffers(page) == 2) &&
+					!PageWriteback(page)) {
 			__delete_from_swap_cache(page);
 			/*
 			 * NOTE: if/when swap gets buffer/page coherency
@@ -326,7 +329,6 @@ int remove_exclusive_swap_page(struct page *page)
 	swap_info_put(p);
 
 	if (retval) {
-		BUG_ON(PageWriteback(page));
 		if (page_has_buffers(page) && !try_to_free_buffers(page))
 			BUG();
 		swap_free(entry);
@@ -352,9 +354,12 @@ void free_swap_and_cache(swp_entry_t entry)
 		swap_info_put(p);
 	}
 	if (page) {
+		int one_user;
+
 		page_cache_get(page);
+		one_user = (page_count(page) - !!page_has_buffers(page) == 2);
 		/* Only cache user (+us), or swap space full? Free it! */
-		if (page_count(page) - !!PagePrivate(page) == 2 || vm_swap_full()) {
+		if (!PageWriteback(page) && (one_user || vm_swap_full())) {
 			delete_from_swap_cache(page);
 			SetPageDirty(page);
 		}
@@ -606,6 +611,7 @@ static int try_to_unuse(unsigned int type)
 		wait_on_page_locked(page);
 		wait_on_page_writeback(page);
 		lock_page(page);
+		wait_on_page_writeback(page);
 
 		/*
 		 * Remove all references to entry, without blocking.
@@ -688,8 +694,10 @@ static int try_to_unuse(unsigned int type)
 			rw_swap_page(WRITE, page);
 			lock_page(page);
 		}
-		if (PageSwapCache(page))
+		if (PageSwapCache(page)) {
+			wait_on_page_writeback(page);
 			delete_from_swap_cache(page);
+		}
 
 		/*
 		 * So we could skip searching mms once swap count went
