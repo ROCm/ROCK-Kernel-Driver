@@ -1402,7 +1402,7 @@ ppp_receive_frame(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 				goto err;
 			}
 			skb_reserve(new_skb, 2);
-			memcpy(skb_put(new_skb, len), skb->data, skb->len);
+			memcpy(skb_put(new_skb, skb->len), skb->data, skb->len);
 			kfree_skb(skb);
 			skb = new_skb;
 		}
