@@ -18,12 +18,8 @@
 
 #include <linux/config.h>
 #include <linux/init.h>
-#include <asm/ocp.h>
 
 /* Provide access to ccsrbar for any modules, etc */
 phys_addr_t get_ccsrbar(void);
-
-/* Update the 85xx OCP tables paddr field */
-void mpc85xx_update_paddr_ocp(struct ocp_device *dev, void *ccsrbar);
 
 #endif /* __PPC_SYSLIB_PPC85XX_COMMON_H */

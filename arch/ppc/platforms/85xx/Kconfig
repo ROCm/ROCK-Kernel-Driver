@@ -62,11 +62,6 @@ config 85xx_PCI2
 	depends on MPC8555_CDS
 	default y
 
-config FSL_OCP
-	bool
-	depends on 85xx
-	default y
-
 config PPC_GEN550
 	bool
 	depends on MPC8540 || SBC8560 || MPC8555
