@@ -826,8 +826,6 @@ typedef enum {
 extern const char *scsi_sense_key_text[];
 
 /************************* Large Disk Handling ********************************/
-static __inline int aic_sector_div(u_long capacity, int heads, int sectors);
-
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 static __inline int
 aic_sector_div(u_long capacity, int heads, int sectors)
