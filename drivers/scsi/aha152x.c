@@ -224,7 +224,6 @@
 #include <linux/sched.h>
 #include <asm/irq.h>
 #include <asm/io.h>
-#include <linux/version.h>
 #include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
