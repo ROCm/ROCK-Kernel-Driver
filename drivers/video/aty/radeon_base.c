@@ -1364,7 +1364,7 @@ static void radeon_calc_pll_regs(struct radeonfb_info *rinfo, struct radeon_regs
 		break;
 	}
 #else
-	use_dvo = 1;
+	uses_dvo = 1;
 #endif
 	if (freq > rinfo->pll.ppll_max)
 		freq = rinfo->pll.ppll_max;
