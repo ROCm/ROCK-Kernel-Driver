@@ -425,7 +425,7 @@ static void __blk_queue_bounce(request_queue_t *q, struct bio **bio_orig,
 	 * at least one page was bounced, fill in possible non-highmem
 	 * pages
 	 */
-	bio_for_each_segment(from, *bio_orig, i) {
+	__bio_for_each_segment(from, *bio_orig, i, 0) {
 		to = bio_iovec_idx(bio, i);
 		if (!to->bv_page) {
 			to->bv_page = from->bv_page;
