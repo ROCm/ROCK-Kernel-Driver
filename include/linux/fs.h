@@ -274,7 +274,6 @@ struct iattr {
  */
 struct page;
 struct address_space;
-struct kiobuf;
 
 struct address_space_operations {
 	int (*writepage)(struct page *);
@@ -493,10 +492,6 @@ struct file {
 
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
-
-	/* preallocated helper kiobuf to speedup O_DIRECT */
-	struct kiobuf		*f_iobuf;
-	long			f_iobuf_lock;
 };
 extern spinlock_t files_lock;
 #define file_list_lock() spin_lock(&files_lock);
