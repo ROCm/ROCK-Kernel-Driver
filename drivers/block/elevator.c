@@ -265,6 +265,14 @@ void elv_requeue_request(request_queue_t *q, struct request *rq)
 		q->in_flight--;
 
 	/*
+	 * if this is the flush, requeue the original instead and drop the flush
+	 */
+	if (rq->flags & REQ_BAR_FLUSH) {
+		clear_bit(QUEUE_FLAG_FLUSH, &q->queue_flags);
+		rq = rq->end_io_data;
+	}
+
+	/*
 	 * if iosched has an explicit requeue hook, then use that. otherwise
 	 * just put the request at the front of the queue
 	 */
@@ -330,11 +338,8 @@ static inline struct request *__elv_next_request(request_queue_t *q)
 		BUG_ON(q->ordered == QUEUE_ORDERED_NONE);
 
 		if (q->ordered == QUEUE_ORDERED_FLUSH &&
-		    !blk_barrier_preflush(rq)) {
+		    !blk_barrier_preflush(rq))
 			rq = blk_start_pre_flush(q, rq);
-			if (!rq)
-				blk_plug_device(q);
-		}
 	}
 
 	return rq;

@@ -769,7 +769,7 @@ static int sd_prepare_flush(request_queue_t *q, struct request *rq)
 
 	if (sdkp->WCE) {
 		memset(rq->cmd, 0, sizeof(rq->cmd));
-		rq->flags = REQ_BLOCK_PC | REQ_SOFTBARRIER;
+		rq->flags |= REQ_BLOCK_PC | REQ_SOFTBARRIER;
 		rq->timeout = SD_TIMEOUT;
 		rq->cmd[0] = SYNCHRONIZE_CACHE;
 		return 1;

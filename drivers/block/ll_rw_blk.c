@@ -271,9 +271,10 @@ static inline void rq_init(request_queue_t *q, struct request *rq)
 {
 	INIT_LIST_HEAD(&rq->queuelist);
 
-	rq->errors = 0;
-	rq->rq_status = RQ_ACTIVE;
 	rq->bio = rq->biotail = NULL;
+	rq->ioprio = 0;
+	rq->rq_status = RQ_ACTIVE;
+	rq->errors = 0;
 	rq->buffer = NULL;
 	rq->ref_count = 1;
 	rq->q = q;
@@ -282,6 +283,8 @@ static inline void rq_init(request_queue_t *q, struct request *rq)
 	rq->data_len = 0;
 	rq->data = NULL;
 	rq->sense = NULL;
+	rq->timeout = 0;
+	rq->pm = NULL;
 	rq->end_io = NULL;
 	rq->end_io_data = NULL;
 }
@@ -356,6 +359,7 @@ static void blk_pre_flush_end_io(struct request *flush_rq)
 	else {
 		q->end_flush_fn(q, flush_rq);
 		clear_bit(QUEUE_FLAG_FLUSH, &q->queue_flags);
+		q->request_fn(q);
 	}
 }
 
@@ -368,6 +372,7 @@ static void blk_post_flush_end_io(struct request *flush_rq)
 
 	q->end_flush_fn(q, flush_rq);
 	clear_bit(QUEUE_FLAG_FLUSH, &q->queue_flags);
+	q->request_fn(q);
 }
 
 struct request *blk_start_pre_flush(request_queue_t *q, struct request *rq)
@@ -381,7 +386,7 @@ struct request *blk_start_pre_flush(request_queue_t *q, struct request *rq)
 
 	rq_init(q, flush_rq);
 	flush_rq->elevator_private = NULL;
-	flush_rq->flags = 0;
+	flush_rq->flags = REQ_BAR_FLUSH;
 	flush_rq->rq_disk = rq->rq_disk;
 	flush_rq->rl = NULL;
 
@@ -417,7 +422,7 @@ static void blk_start_post_flush(request_queue_t *q, struct request *rq)
 
 	rq_init(q, flush_rq);
 	flush_rq->elevator_private = NULL;
-	flush_rq->flags = 0;
+	flush_rq->flags = REQ_BAR_FLUSH;
 	flush_rq->rq_disk = rq->rq_disk;
 	flush_rq->rl = NULL;
 
@@ -1932,24 +1937,8 @@ rq_starved:
 	if (ioc_batching(q, ioc))
 		ioc->nr_batch_requests--;
 	
-	INIT_LIST_HEAD(&rq->queuelist);
-
-	rq->errors = 0;
-	rq->rq_status = RQ_ACTIVE;
-	rq->bio = rq->biotail = NULL;
-	rq->ioprio = 0;
-	rq->buffer = NULL;
-	rq->ref_count = 1;
-	rq->q = q;
+	rq_init(q, rq);
 	rq->rl = rl;
-	rq->waiting = NULL;
-	rq->special = NULL;
-	rq->data_len = 0;
-	rq->data = NULL;
-	rq->sense = NULL;
-	rq->end_io = NULL;
-	rq->end_io_data = NULL;
-
 out:
 	put_io_context(ioc);
 	return rq;

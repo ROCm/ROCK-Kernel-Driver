@@ -228,6 +228,7 @@ enum rq_flag_bits {
 	__REQ_PM_SHUTDOWN,	/* shutdown request */
 	__REQ_BAR_PREFLUSH,	/* barrier pre-flush done */
 	__REQ_BAR_POSTFLUSH,	/* barrier post-flush */
+	__REQ_BAR_FLUSH,	/* rq is the flush request */
 	__REQ_NR_BITS,		/* stops here */
 };
 
@@ -255,6 +256,7 @@ enum rq_flag_bits {
 #define REQ_PM_SHUTDOWN	(1 << __REQ_PM_SHUTDOWN)
 #define REQ_BAR_PREFLUSH	(1 << __REQ_BAR_PREFLUSH)
 #define REQ_BAR_POSTFLUSH	(1 << __REQ_BAR_POSTFLUSH)
+#define REQ_BAR_FLUSH	(1 << __REQ_BAR_FLUSH)
 
 /*
  * State information carried for REQ_PM_SUSPEND and REQ_PM_RESUME
