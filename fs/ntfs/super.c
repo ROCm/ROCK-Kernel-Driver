@@ -1263,10 +1263,8 @@ struct super_operations ntfs_sops = {
 	dirty_inode:	ntfs_dirty_inode,	/* VFS: Called from
 						   __mark_inode_dirty(). */
 	//write_inode:	NULL,		/* VFS: Write dirty inode to disk. */
-	//put_inode:	NULL,		/* VFS: Called whenever the reference
-	//				   count (i_count) of the inode is
-	//				   going to be decreased but before the
-	//				   actual decrease. */
+	put_inode:	ntfs_put_inode,	/* VFS: Called just before the inode
+					   reference count is decreased. */
 	//delete_inode:	NULL,		/* VFS: Delete inode from disk. Called
 	//				   when i_count becomes 0 and i_nlink is
 	//				   also 0. */

@@ -7,9 +7,19 @@ ToDo:
 	  truncate the visible i_size? Will the user just get -E2BIG (or
 	  whatever) on open()? Or will (s)he be able to open() but lseek() and
 	  read() will fail when s_maxbytes is reached? -> Investigate this.
-	- Implement/allow non-resident index bitmaps in dir.c::ntfs_readdir()
-	  and then also consider initialized_size w.r.t. the bitmaps, etc.
 	- Enable NFS exporting of NTFS.
+
+2.0.20 - Support non-resident directory index bitmaps, fix page leak in readdir.
+
+	- Move the directory index bitmap to use an attribute inode instead of
+	  having special fields for it inside the ntfs inode structure. This
+	  means that the index bitmaps now use the page cache for i/o, too,
+	  and also as a side effect we get support for non-resident index
+	  bitmaps for free.
+	- Simplify/cleanup error handling in fs/ntfs/dir.c::ntfs_readdir() and
+	  fix a page leak that manifested itself in some cases.
+	- Add fs/ntfs/inode.c::ntfs_put_inode(), which we need to release the
+	  index bitmap inode on the final iput().
 
 2.0.19 - Fix race condition, improvements, and optimizations in i/o interface.
 
