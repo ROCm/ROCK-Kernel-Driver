@@ -38,9 +38,11 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
+#include <linux/vmalloc.h>
+#include <asm/pgalloc.h>
 
-#define CSR1212_MALLOC(size)		kmalloc((size), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
-#define CSR1212_FREE(ptr)		kfree(ptr)
+#define CSR1212_MALLOC(size)		vmalloc((size))
+#define CSR1212_FREE(ptr)		vfree(ptr)
 #define CSR1212_BE16_TO_CPU(quad)	be16_to_cpu(quad)
 #define CSR1212_CPU_TO_BE16(quad)	cpu_to_be16(quad)
 #define CSR1212_BE32_TO_CPU(quad)	be32_to_cpu(quad)
