@@ -33,7 +33,7 @@
 #include "xfs.h"
 #include <linux/proc_fs.h>
 
-struct xfsstats xfsstats;
+DEFINE_PER_CPU(struct xfsstats, xfsstats);
 
 STATIC int
 xfs_read_xfsstats(
@@ -44,7 +44,11 @@ xfs_read_xfsstats(
 	int		*eof,
 	void		*data)
 {
-	int		i, j, len;
+	int		c, i, j, len, val;
+	__uint64_t	xs_xstrat_bytes = 0;
+	__uint64_t	xs_write_bytes = 0;
+	__uint64_t	xs_read_bytes = 0;
+
 	static struct xstats_entry {
 		char	*desc;
 		int	endpoint;
@@ -65,21 +69,32 @@ xfs_read_xfsstats(
 		{ "vnodes",		XFSSTAT_END_VNODE_OPS		},
 	};
 
+	/* Loop over all stats groups */
 	for (i=j=len = 0; i < sizeof(xstats)/sizeof(struct xstats_entry); i++) {
 		len += sprintf(buffer + len, xstats[i].desc);
 		/* inner loop does each group */
 		while (j < xstats[i].endpoint) {
-			len += sprintf(buffer + len, " %u",
-					*(((__u32*)&xfsstats) + j));
+			val = 0;
+			/* sum over all cpus */
+			for (c = 0; c < NR_CPUS; c++) {
+				if (!cpu_possible(c)) continue;
+				val += *(((__u32*)&per_cpu(xfsstats, c) + j));
+			}
+			len += sprintf(buffer + len, " %u", val);
 			j++;
 		}
 		buffer[len++] = '\n';
 	}
 	/* extra precision counters */
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i)) continue;
+		xs_xstrat_bytes += per_cpu(xfsstats, i).xs_xstrat_bytes;
+		xs_write_bytes += per_cpu(xfsstats, i).xs_write_bytes;
+		xs_read_bytes += per_cpu(xfsstats, i).xs_read_bytes;
+	}
+
 	len += sprintf(buffer + len, "xpc %Lu %Lu %Lu\n",
-			xfsstats.xs_xstrat_bytes,
-			xfsstats.xs_write_bytes,
-			xfsstats.xs_read_bytes);
+			xs_xstrat_bytes, xs_write_bytes, xs_read_bytes);
 	len += sprintf(buffer + len, "debug %u\n",
 #if defined(XFSDEBUG)
 		1);

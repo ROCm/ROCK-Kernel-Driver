@@ -141,7 +141,7 @@ pagebuf_param_t pb_params = {
  * Pagebuf statistics variables
  */
 
-struct pbstats pbstats;
+DEFINE_PER_CPU(struct pbstats, pbstats);
 
 /*
  * Pagebuf allocation / freeing.
@@ -1842,14 +1842,18 @@ pb_stats_clear_handler(
 	void			*buffer,
 	size_t			*lenp)
 {
-	int			ret;
+	int			c, ret;
 	int			*valp = ctl->data;
 
 	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
 
 	if (!ret && write && *valp) {
 		printk("XFS Clearing pbstats\n");
-		memset(&pbstats, 0, sizeof(pbstats));
+		for (c = 0; c < NR_CPUS; c++) {
+			if (!cpu_possible(c)) continue;
+				memset(&per_cpu(pbstats, c), 0,
+				       sizeof(struct pbstats));
+		}
 		pb_params.stats_clear.val = 0;
 	}
 
@@ -1903,13 +1907,17 @@ pagebuf_readstats(
 	int			*eof,
 	void			*data)
 {
-	int			i, len;
+	int			c, i, len, val;
 
 	len = 0;
 	len += sprintf(buffer + len, "pagebuf");
-	for (i = 0; i < sizeof(pbstats) / sizeof(u_int32_t); i++) {
-		len += sprintf(buffer + len, " %u",
-			*(((u_int32_t*)&pbstats) + i));
+	for (i = 0; i < sizeof(struct pbstats) / sizeof(u_int32_t); i++) {
+		val = 0;
+		for (c = 0 ; c < NR_CPUS; c++) {
+			if (!cpu_possible(c)) continue;
+			val += *(((u_int32_t*)&per_cpu(pbstats, c) + i));
+		}
+		len += sprintf(buffer + len, " %u", val);
 	}
 	buffer[len++] = '\n';
 
