@@ -111,7 +111,7 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 		ioctl = list_entry(l, dasd_ioctl_list_t, list);
 		if (ioctl->no == no) {
 			/* Found a matching ioctl. Call it. */
-			if (try_module_get(ioctl->owner) != 0)
+			if (!try_module_get(ioctl->owner))
 				continue;
 			rc = ioctl->handler(bdev, no, data);
 			module_put(ioctl->owner);
@@ -263,7 +263,7 @@ dasd_ioctl_reset_profile(struct block_device *bdev, int no, long args)
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	device = = bdev->bd_disk->private_data;
+	device = bdev->bd_disk->private_data;
 	if (device == NULL)
 		return -ENODEV;
 
@@ -279,7 +279,7 @@ dasd_ioctl_read_profile(struct block_device *bdev, int no, long args)
 {
 	dasd_device_t *device;
 
-	device = = bdev->bd_disk->private_data;
+	device = bdev->bd_disk->private_data;
 	if (device == NULL)
 		return -ENODEV;
 

@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.35 $
+ * $Revision: 1.36 $
  *
  * History of changes (starts July 2000)
  * 07/11/00 Enabled rotational position sensing
