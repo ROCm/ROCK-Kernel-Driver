@@ -487,7 +487,7 @@ void __init get_smp_config (void)
 
 	/*
  	 * ACPI may be used to obtain the entire SMP configuration or just to 
- 	 * enumerate/configure processors (CONFIG_ACPI_HT_ONLY).  Note that 
+ 	 * enumerate/configure processors (CONFIG_ACPI_BOOT).  Note that 
  	 * ACPI supports both logical (e.g. Hyper-Threading) and physical 
  	 * processors, where MPS only supports physical.
  	 */
