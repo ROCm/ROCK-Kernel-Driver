@@ -2355,6 +2355,86 @@ static __inline__ void tcp_ack_packets_out(struct sock *sk, struct tcp_opt *tp)
 	}
 }
 
+/* There is one downside to this scheme.  Although we keep the
+ * ACK clock ticking, adjusting packet counters and advancing
+ * congestion window, we do not liberate socket send buffer
+ * space.
+ *
+ * Mucking with skb->truesize and sk->sk_wmem_alloc et al.
+ * then making a write space wakeup callback is a possible
+ * future enhancement.  WARNING: it is not trivial to make.
+ */
+static int tcp_tso_acked(struct tcp_opt *tp, struct sk_buff *skb,
+			 __u32 now, __s32 *seq_rtt)
+{
+	struct tcp_skb_cb *scb = TCP_SKB_CB(skb); 
+	__u32 mss = scb->tso_mss;
+	__u32 snd_una = tp->snd_una;
+	__u32 seq = scb->seq;
+	__u32 packets_acked = 0;
+	int acked = 0;
+
+	/* If we get here, the whole TSO packet has not been
+	 * acked.
+	 */
+	BUG_ON(!after(scb->end_seq, snd_una));
+
+	while (!after(seq + mss, snd_una)) {
+		packets_acked++;
+		seq += mss;
+	}
+
+	if (packets_acked) {
+		__u8 sacked = scb->sacked;
+
+		/* We adjust scb->seq but we do not pskb_pull() the
+		 * SKB.  We let tcp_retransmit_skb() handle this case
+		 * by checking skb->len against the data sequence span.
+		 * This way, we avoid the pskb_pull() work unless we
+		 * actually need to retransmit the SKB.
+		 */
+		scb->seq = seq;
+
+		acked |= FLAG_DATA_ACKED;
+		if (sacked) {
+			if (sacked & TCPCB_RETRANS) {
+				if (sacked & TCPCB_SACKED_RETRANS)
+					tcp_dec_pcount_explicit(&tp->retrans_out,
+								packets_acked);
+				acked |= FLAG_RETRANS_DATA_ACKED;
+				*seq_rtt = -1;
+			} else if (*seq_rtt < 0)
+				*seq_rtt = now - scb->when;
+			if (sacked & TCPCB_SACKED_ACKED)
+				tcp_dec_pcount_explicit(&tp->sacked_out,
+							packets_acked);
+			if (sacked & TCPCB_LOST)
+				tcp_dec_pcount_explicit(&tp->lost_out,
+							packets_acked);
+			if (sacked & TCPCB_URG) {
+				if (tp->urg_mode &&
+				    !before(scb->seq, tp->snd_up))
+					tp->urg_mode = 0;
+			}
+		} else if (*seq_rtt < 0)
+			*seq_rtt = now - scb->when;
+
+		if (tcp_get_pcount(&tp->fackets_out)) {
+			__u32 dval = min(tcp_get_pcount(&tp->fackets_out),
+					 packets_acked);
+			tcp_dec_pcount_explicit(&tp->fackets_out, dval);
+		}
+		tcp_dec_pcount_explicit(&tp->packets_out, packets_acked);
+		scb->tso_factor -= packets_acked;
+
+		BUG_ON(scb->tso_factor == 0);
+		BUG_ON(!before(scb->seq, scb->end_seq));
+	}
+
+	return acked;
+}
+
+
 /* Remove acknowledged frames from the retransmission queue. */
 static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 {
@@ -2373,8 +2453,12 @@ static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 		 * discard it as it's confirmed to have arrived at
 		 * the other end.
 		 */
-		if (after(scb->end_seq, tp->snd_una))
+		if (after(scb->end_seq, tp->snd_una)) {
+			if (scb->tso_factor > 1)
+				acked |= tcp_tso_acked(tp, skb,
+						       now, &seq_rtt);
 			break;
+		}
 
 		/* Initial outgoing SYN's get put onto the write_queue
 		 * just like anything else we transmit.  It is not

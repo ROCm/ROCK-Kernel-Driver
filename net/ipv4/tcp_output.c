@@ -436,6 +436,7 @@ void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss_std)
 		factor /= mss_std;
 		TCP_SKB_CB(skb)->tso_factor = factor;
 	}
+	TCP_SKB_CB(skb)->tso_mss = mss_std;
 }
 
 /* Function to create two new TCP segments.  Shrinks the given segment
@@ -552,7 +553,7 @@ unsigned char * __pskb_trim_head(struct sk_buff *skb, int len)
 	return skb->tail;
 }
 
-static int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
+static int __tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 {
 	if (skb_cloned(skb) &&
 	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
@@ -565,9 +566,18 @@ static int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 			return -ENOMEM;
 	}
 
-	TCP_SKB_CB(skb)->seq += len;
 	skb->ip_summed = CHECKSUM_HW;
 	return 0;
+}
+
+static inline int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
+{
+	int err = __tcp_trim_head(sk, skb, len);
+
+	if (!err)
+		TCP_SKB_CB(skb)->seq += len;
+
+	return err;
 }
 
 /* This function synchronize snd mss to current pmtu/exthdr set.
@@ -949,6 +959,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
  	unsigned int cur_mss = tcp_current_mss(sk, 0);
+	__u32 data_seq, data_end_seq;
 	int err;
 
 	/* Do not sent more than we queued. 1/4 is reserved for possible
@@ -957,6 +968,22 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	if (atomic_read(&sk->sk_wmem_alloc) >
 	    min(sk->sk_wmem_queued + (sk->sk_wmem_queued >> 2), sk->sk_sndbuf))
 		return -EAGAIN;
+
+	/* What is going on here?  When TSO packets are partially ACK'd,
+	 * we adjust the TCP_SKB_CB(skb)->seq value forward but we do
+	 * not adjust the data area of the SKB.  We defer that to here
+	 * so that we can avoid the work unless we really retransmit
+	 * the packet.
+	 */
+	data_seq = TCP_SKB_CB(skb)->seq;
+	data_end_seq = TCP_SKB_CB(skb)->end_seq;
+	if (TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN)
+		data_end_seq--;
+
+	if (skb->len != (data_end_seq - data_seq)) {
+		if (__tcp_trim_head(sk, skb, data_end_seq - data_seq))
+			return -ENOMEM;
+	}		
 
 	if (before(TCP_SKB_CB(skb)->seq, tp->snd_una)) {
 		if (before(TCP_SKB_CB(skb)->end_seq, tp->snd_una))
@@ -1191,6 +1218,7 @@ void tcp_send_fin(struct sock *sk)
 		TCP_SKB_CB(skb)->flags = (TCPCB_FLAG_ACK | TCPCB_FLAG_FIN);
 		TCP_SKB_CB(skb)->sacked = 0;
 		TCP_SKB_CB(skb)->tso_factor = 1;
+		TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
 
 		/* FIN eats a sequence byte, write_seq advanced by tcp_queue_skb(). */
 		TCP_SKB_CB(skb)->seq = tp->write_seq;
@@ -1223,6 +1251,7 @@ void tcp_send_active_reset(struct sock *sk, int priority)
 	TCP_SKB_CB(skb)->flags = (TCPCB_FLAG_ACK | TCPCB_FLAG_RST);
 	TCP_SKB_CB(skb)->sacked = 0;
 	TCP_SKB_CB(skb)->tso_factor = 1;
+	TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
 
 	/* Send it off. */
 	TCP_SKB_CB(skb)->seq = tcp_acceptable_seq(sk, tp);
@@ -1304,6 +1333,7 @@ struct sk_buff * tcp_make_synack(struct sock *sk, struct dst_entry *dst,
 	TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq + 1;
 	TCP_SKB_CB(skb)->sacked = 0;
 	TCP_SKB_CB(skb)->tso_factor = 1;
+	TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
 	th->seq = htonl(TCP_SKB_CB(skb)->seq);
 	th->ack_seq = htonl(req->rcv_isn + 1);
 	if (req->rcv_wnd == 0) { /* ignored for retransmitted syns */
@@ -1406,6 +1436,7 @@ int tcp_connect(struct sock *sk)
 	TCP_ECN_send_syn(sk, tp, buff);
 	TCP_SKB_CB(buff)->sacked = 0;
 	TCP_SKB_CB(buff)->tso_factor = 1;
+	TCP_SKB_CB(buff)->tso_mss = tp->mss_cache_std;
 	buff->csum = 0;
 	TCP_SKB_CB(buff)->seq = tp->write_seq++;
 	TCP_SKB_CB(buff)->end_seq = tp->write_seq;
@@ -1506,6 +1537,7 @@ void tcp_send_ack(struct sock *sk)
 		TCP_SKB_CB(buff)->flags = TCPCB_FLAG_ACK;
 		TCP_SKB_CB(buff)->sacked = 0;
 		TCP_SKB_CB(buff)->tso_factor = 1;
+		TCP_SKB_CB(buff)->tso_mss = tp->mss_cache_std;
 
 		/* Send it off, this clears delayed acks for us. */
 		TCP_SKB_CB(buff)->seq = TCP_SKB_CB(buff)->end_seq = tcp_acceptable_seq(sk, tp);
@@ -1541,6 +1573,7 @@ static int tcp_xmit_probe_skb(struct sock *sk, int urgent)
 	TCP_SKB_CB(skb)->flags = TCPCB_FLAG_ACK;
 	TCP_SKB_CB(skb)->sacked = urgent;
 	TCP_SKB_CB(skb)->tso_factor = 1;
+	TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
 
 	/* Use a previous sequence.  This should cause the other
 	 * end to send an ack.  Don't queue or clone SKB, just

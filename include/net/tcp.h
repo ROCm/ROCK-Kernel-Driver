@@ -1180,7 +1180,8 @@ struct tcp_skb_cb {
 
 	__u16		urg_ptr;	/* Valid w/URG flags is set.	*/
 	__u32		ack_seq;	/* Sequence number ACK'd	*/
-	__u32		tso_factor;
+	__u16		tso_factor;	/* If > 1, TSO frame		*/
+	__u16		tso_mss;	/* MSS that FACTOR's in terms of*/
 };
 
 #define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
