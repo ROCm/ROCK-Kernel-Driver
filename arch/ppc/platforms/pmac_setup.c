@@ -81,8 +81,9 @@ extern void pmac_read_rtc_time(void);
 extern void pmac_calibrate_decr(void);
 extern void pmac_pcibios_fixup(void);
 extern void pmac_find_bridges(void);
-extern int pmac_ide_check_base(ide_ioreg_t base);
-extern ide_ioreg_t pmac_ide_get_base(int index);
+extern unsigned long pmac_ide_get_base(int index);
+extern void pmac_ide_init_hwif_ports(hw_regs_t *hw,
+	unsigned long data_port, unsigned long ctrl_port, int *irq);
 
 extern void pmac_nvram_update(void);
 extern unsigned char pmac_nvram_read_byte(int addr);
@@ -629,6 +630,13 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.find_end_of_memory = pmac_find_end_of_memory;
 
 	ppc_md.feature_call   = pmac_do_feature_call;
+
+#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
+#ifdef CONFIG_BLK_DEV_IDE_PMAC
+        ppc_ide_md.ide_init_hwif	= pmac_ide_init_hwif_ports;
+        ppc_ide_md.default_io_base	= pmac_ide_get_base;
+#endif /* CONFIG_BLK_DEV_IDE_PMAC */
+#endif /* defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE) */
 
 #ifdef CONFIG_BOOTX_TEXT
 	ppc_md.progress = pmac_progress;
