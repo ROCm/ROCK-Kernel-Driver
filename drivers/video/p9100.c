@@ -27,13 +27,13 @@
  * Local functions.
  */
 
-static int p9100_check_var(struct fb_var_screeninfo *, struct fb_info *);
-static int p9100_set_par(struct fb_info *);
 static int p9100_setcolreg(unsigned, unsigned, unsigned, unsigned,
 			   unsigned, struct fb_info *);
 static int p9100_blank(int, struct fb_info *);
 
 static int p9100_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
+static int p9100_ioctl(struct inode *, struct file *, unsigned int,
+		       unsigned long, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -41,14 +41,13 @@ static int p9100_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 
 static struct fb_ops p9100_ops = {
 	.owner			= THIS_MODULE,
-	.fb_check_var		= p9100_check_var,
-	.fb_set_par		= p9100_set_par,
 	.fb_setcolreg		= p9100_setcolreg,
 	.fb_blank		= p9100_blank,
 	.fb_fillrect		= cfb_fillrect,
 	.fb_copyarea		= cfb_copyarea,
 	.fb_imageblit		= cfb_imageblit,
 	.fb_mmap		= p9100_mmap,
+	.fb_ioctl		= p9100_ioctl,
 	.fb_cursor		= soft_cursor,
 };
 
@@ -143,39 +142,6 @@ struct p9100_par {
 };
 
 /**
- *      p9100_check_var - Optional function.  Validates a var passed in.
- *      @var: frame buffer variable screen structure
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int p9100_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
-{
-	if (var->bits_per_pixel != 8)
-		return -EINVAL;
-
-	if (var->xres_virtual != var->xres || var->yres_virtual != var->yres)
-		return -EINVAL;
-	if (var->nonstd)
-		return -EINVAL;
-	if ((var->vmode & FB_VMODE_MASK) != FB_VMODE_NONINTERLACED)
-		return -EINVAL;
-
-	if (var->xres != info->var.xres || var->yres != info->var.yres)
-		return -EINVAL;
-
-	return 0;
-}
-
-/**
- *      p9100_set_par - Optional function.  Alters the hardware state.
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int
-p9100_set_par(struct fb_info *info)
-{
-	return 0;
-}
-
-/**
  *      p9100_setcolreg - Optional function. Sets a color register.
  *      @regno: boolean, 0 copy local, 1 get_user() function
  *      @red: frame buffer colormap structure
@@ -265,6 +231,16 @@ static int p9100_mmap(struct fb_info *info, struct file *file, struct vm_area_st
 				  vma);
 }
 
+static int p9100_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+		       unsigned long arg, struct fb_info *info)
+{
+	struct p9100_par *par = (struct p9100_par *) info->par;
+
+	/* Make it look like a cg3. */
+	return sbusfb_ioctl_helper(cmd, arg, info,
+				   FBTYPE_SUN3COLOR, 8, par->fbsize);
+}
+
 /*
  *  Initialisation
  */
@@ -344,7 +320,6 @@ static void p9100_init_one(struct sbus_dev *sdev)
 		return;
 	}
 
-	p9100_set_par(&all->info);
 	p9100_init_fix(&all->info, linebytes);
 
 	if (register_framebuffer(&all->info) < 0) {

@@ -20,6 +20,7 @@
 #include <asm/io.h>
 #include <asm/upa.h>
 #include <asm/oplib.h>
+#include <asm/fbio.h>
 
 #include "sbuslib.h"
 
@@ -27,8 +28,6 @@
  * Local functions.
  */
 
-static int ffb_check_var(struct fb_var_screeninfo *, struct fb_info *);
-static int ffb_set_par(struct fb_info *);
 static int ffb_setcolreg(unsigned, unsigned, unsigned, unsigned,
 			 unsigned, struct fb_info *);
 static int ffb_blank(int, struct fb_info *);
@@ -39,6 +38,8 @@ static void ffb_fillrect(struct fb_info *, struct fb_fillrect *);
 static void ffb_copyarea(struct fb_info *, struct fb_copyarea *);
 static int ffb_sync(struct fb_info *);
 static int ffb_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
+static int ffb_ioctl(struct inode *, struct file *, unsigned int,
+		     unsigned long, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -46,8 +47,6 @@ static int ffb_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 
 static struct fb_ops ffb_ops = {
 	.owner			= THIS_MODULE,
-	.fb_check_var		= ffb_check_var,
-	.fb_set_par		= ffb_set_par,
 	.fb_setcolreg		= ffb_setcolreg,
 	.fb_blank		= ffb_blank,
 	.fb_fillrect		= ffb_fillrect,
@@ -55,6 +54,7 @@ static struct fb_ops ffb_ops = {
 	.fb_imageblit		= ffb_imageblit,
 	.fb_sync		= ffb_sync,
 	.fb_mmap		= ffb_mmap,
+	.fb_ioctl		= ffb_ioctl,
 
 	/* XXX Use FFB hw cursor once fb cursor API is better understood... */
 	.fb_cursor		= soft_cursor,
@@ -673,41 +673,6 @@ static void ffb_fixup_var_rgb(struct fb_var_screeninfo *var)
 }
 
 /**
- *      ffb_check_var - Optional function.  Validates a var passed in.
- *      @var: frame buffer variable screen structure
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int ffb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
-{
-	if (var->bits_per_pixel != 32)
-		return -EINVAL;
-
-	if (var->xres_virtual != var->xres || var->yres_virtual != var->yres)
-		return -EINVAL;
-	if (var->nonstd)
-		return -EINVAL;
-	if ((var->vmode & FB_VMODE_MASK) != FB_VMODE_NONINTERLACED)
-		return -EINVAL;
-
-	if (var->xres != info->var.xres || var->yres != info->var.yres)
-		return -EINVAL;
-
-	ffb_fixup_var_rgb(var);
-
-	return 0;
-}
-
-/**
- *      ffb_set_par - Optional function.  Alters the hardware state.
- *      @info: frame buffer structure that represents a single frame buffer
- */
-static int
-ffb_set_par(struct fb_info *info)
-{
-	return 0;
-}
-
-/**
  *      ffb_setcolreg - Optional function. Sets a color register.
  *      @regno: boolean, 0 copy local, 1 get_user() function
  *      @red: frame buffer colormap structure
@@ -816,6 +781,15 @@ static int ffb_mmap(struct fb_info *info, struct file *file, struct vm_area_stru
 	return sbusfb_mmap_helper(ffb_mmap_map,
 				  par->physbase, par->fbsize,
 				  0, vma);
+}
+
+static int ffb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+		     unsigned long arg, struct fb_info *info)
+{
+	struct ffb_par *par = (struct ffb_par *) info->par;
+
+	return sbusfb_ioctl_helper(cmd, arg, info,
+				   FBTYPE_CREATOR, 24, par->fbsize);
 }
 
 /*
@@ -972,7 +946,6 @@ static void ffb_init_one(int node, int parent)
 		return;
 	}
 
-	ffb_set_par(&all->info);
 	ffb_init_fix(&all->info);
 
 	if (register_framebuffer(&all->info) < 0) {
