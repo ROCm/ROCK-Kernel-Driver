@@ -784,7 +784,13 @@ static int sched_best_cpu(struct task_struct *p)
 
 	minload = 10000000;
 	for_each_node_with_cpus(i) {
-		load = atomic_read(&node_nr_running[i]);
+		/*
+		 * Node load is always divided by nr_cpus_node to normalise 
+		 * load values in case cpu count differs from node to node.
+		 * We first multiply node_nr_running by 10 to get a little
+		 * better resolution.   
+		 */
+		load = 10 * atomic_read(&node_nr_running[i]) / nr_cpus_node(i);
 		if (load < minload) {
 			minload = load;
 			node = i;
@@ -820,19 +826,26 @@ void sched_balance_exec(void)
  * geometrically deccaying weight to the load measure:
  *      load_{t} = load_{t-1}/2 + nr_node_running_{t}
  * This way sudden load peaks are flattened out a bit.
+ * Node load is divided by nr_cpus_node() in order to compare nodes
+ * of different cpu count but also [first] multiplied by 10 to 
+ * provide better resolution.
  */
 static int find_busiest_node(int this_node)
 {
 	int i, node = -1, load, this_load, maxload;
 
+	if (!nr_cpus_node(this_node))
+		return node;
 	this_load = maxload = (this_rq()->prev_node_load[this_node] >> 1)
-		+ atomic_read(&node_nr_running[this_node]);
+		+ (10 * atomic_read(&node_nr_running[this_node])
+		/ nr_cpus_node(this_node));
 	this_rq()->prev_node_load[this_node] = this_load;
-	for (i = 0; i < numnodes; i++) {
+	for_each_node_with_cpus(i) {
 		if (i == this_node)
 			continue;
 		load = (this_rq()->prev_node_load[i] >> 1)
-			+ atomic_read(&node_nr_running[i]);
+			+ (10 * atomic_read(&node_nr_running[i])
+			/ nr_cpus_node(i));
 		this_rq()->prev_node_load[i] = load;
 		if (load > maxload && (100*load > NODE_THRESHOLD*this_load)) {
 			maxload = load;
