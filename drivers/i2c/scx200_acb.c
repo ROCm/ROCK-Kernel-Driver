@@ -140,7 +140,7 @@ static void scx200_acb_machine(struct scx200_acb_iface *iface, u8 status)
 
 	switch (iface->state) {
 	case state_idle:
-		dev_warn(&iface->adapter.dev, "interrupt in idle state\n",);
+		dev_warn(&iface->adapter.dev, "interrupt in idle state\n");
 		break;
 
 	case state_address:
