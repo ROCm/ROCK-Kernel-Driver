@@ -70,9 +70,6 @@ MODULE_DEVICE_TABLE(pci, aironet4500_card_pci_tbl);
 MODULE_LICENSE("GPL");
 
 
-static int reverse_probe;
-
-
 static int awc_pci_init(struct net_device * dev, struct pci_dev *pdev,
  			int ioaddr, int cis_addr, int mem_addr,u8 pci_irq_line) ;
 
@@ -80,38 +77,29 @@ static int awc_pci_init(struct net_device * dev, struct pci_dev *pdev,
 int awc4500_pci_probe(struct net_device *dev)
 {
 	int cards_found = 0;
-	static int pci_index;	/* Static, for multiple probe calls. */
 	u8 pci_irq_line = 0;
 //	int p;
-
-	unsigned char awc_pci_dev, awc_pci_bus;
-
+	struct pci_dev *pdev = NULL;
+		
 	if (!pci_present()) 
 		return -1;
 
-	for (;pci_index < 0xff; pci_index++) {
-		u16 vendor, device, pci_command, new_command;
+	while ((pdev = pci_find_class (PCI_CLASS_NETWORK_OTHER << 8, pdev))) {
+		u16 pci_command, new_command;
 		u32 pci_memaddr;
 		u32 pci_ioaddr;
 		u32 pci_cisaddr;
-		struct pci_dev *pdev;
 
-		if (pcibios_find_class	(PCI_CLASS_NETWORK_OTHER << 8,
-			 reverse_probe ? 0xfe - pci_index : pci_index,
-				 &awc_pci_bus, &awc_pci_dev) != PCIBIOS_SUCCESSFUL){
-				if (reverse_probe){
-					continue;
-				} else {
-					break;
-				}
-		}
-		pdev = pci_find_slot(awc_pci_bus, awc_pci_dev);
-		if (!pdev)
+		if (pdev->vendor != PCI_VENDOR_ID_AIRONET)
 			continue;
+		if ((pdev->device != PCI_DEVICE_AIRONET_4800_1) &&
+		    (pdev->device != PCI_DEVICE_AIRONET_4800) &&
+		    (pdev->device != PCI_DEVICE_AIRONET_4500))
+			continue;
+
 		if (pci_enable_device(pdev))
 			continue;
-		vendor = pdev->vendor;
-		device = pdev->device;
+
 	        pci_irq_line = pdev->irq;
 		pci_memaddr = pci_resource_start (pdev, 0);
                 pci_cisaddr = pci_resource_start (pdev, 1);
@@ -119,13 +107,6 @@ int awc4500_pci_probe(struct net_device *dev)
 
 //		printk("\n pci capabilities %x and ptr %x \n",pci_caps,pci_caps_ptr);
 		/* Remove I/O space marker in bit 0. */
-
-		if (vendor != PCI_VENDOR_ID_AIRONET)
-			continue;
-		if (device != PCI_DEVICE_AIRONET_4800_1 && 
-				device != PCI_DEVICE_AIRONET_4800 &&
-				device != PCI_DEVICE_AIRONET_4500 )
-                        continue;
 
 //		if (check_region(pci_ioaddr, AIRONET4X00_IO_SIZE) ||
 //			check_region(pci_cisaddr, AIRONET4X00_CIS_SIZE) ||
@@ -151,7 +132,7 @@ int awc4500_pci_probe(struct net_device *dev)
 
 		udelay(1000);
 */
-		if (device == PCI_DEVICE_AIRONET_4800)
+		if (pdev->device == PCI_DEVICE_AIRONET_4800)
 			pci_write_config_dword(pdev, 0x40, 0x40000000);
 
 		if (awc_pci_init(dev, pdev, pci_ioaddr,pci_cisaddr,pci_memaddr,pci_irq_line)){
