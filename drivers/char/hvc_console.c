@@ -41,7 +41,7 @@ extern int hvc_put_chars(int index, const char *buf, int count);
 
 #define TIMEOUT		((HZ + 99) / 100)
 
-struct tty_driver hvc_driver;
+static struct tty_driver *hvc_driver;
 static int hvc_offset;
 #ifdef CONFIG_MAGIC_SYSRQ
 static int sysrq_pressed;
@@ -246,42 +246,48 @@ int khvcd(void *unused)
 	}
 }
 
+static struct tty_operations hvc_ops = {
+	.open = hvc_open,
+	.close = hvc_close,
+	.write = hvc_write,
+	.hangup = hvc_hangup,
+	.write_room = hvc_write_room,
+	.chars_in_buffer = hvc_chars_in_buffer,
+};
+
 int __init hvc_init(void)
 {
+	int num = hvc_count(&hvc_offset);
 	int i;
 
-	memset(&hvc_driver, 0, sizeof(struct tty_driver));
+	if (num > MAX_NR_HVC_CONSOLES)
+		num = MAX_NR_HVC_CONSOLES;
 
-	hvc_driver.magic = TTY_DRIVER_MAGIC;
-	hvc_driver.owner = THIS_MODULE;
-	hvc_driver.driver_name = "hvc";
-	hvc_driver.name = "hvc/";
-	hvc_driver.major = HVC_MAJOR;
-	hvc_driver.minor_start = HVC_MINOR;
-	hvc_driver.num = hvc_count(&hvc_offset);
-	if (hvc_driver.num > MAX_NR_HVC_CONSOLES)
-		hvc_driver.num = MAX_NR_HVC_CONSOLES;
-	hvc_driver.type = TTY_DRIVER_TYPE_SYSTEM;
-	hvc_driver.init_termios = tty_std_termios;
-	hvc_driver.flags = TTY_DRIVER_REAL_RAW;
+	hvc_driver = alloc_tty_driver(num);
+	if (!hvc_driver)
+		return -ENOMEM;
 
-	hvc_driver.open = hvc_open;
-	hvc_driver.close = hvc_close;
-	hvc_driver.write = hvc_write;
-	hvc_driver.hangup = hvc_hangup;
-	hvc_driver.write_room = hvc_write_room;
-	hvc_driver.chars_in_buffer = hvc_chars_in_buffer;
-
-	for (i = 0; i < hvc_driver.num; i++) {
+	hvc_driver->owner = THIS_MODULE;
+	hvc_driver->driver_name = "hvc";
+	hvc_driver->name = "hvc/";
+	hvc_driver->major = HVC_MAJOR;
+	hvc_driver->minor_start = HVC_MINOR;
+	hvc_driver->type = TTY_DRIVER_TYPE_SYSTEM;
+	hvc_driver->init_termios = tty_std_termios;
+	hvc_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(hvc_driver, &hvc_ops);
+	for (i = 0; i < num; i++) {
 		hvc_struct[i].lock = SPIN_LOCK_UNLOCKED;
 		hvc_struct[i].index = i;
-		tty_register_device(&hvc_driver, i, NULL);
 	}
 
-	if (tty_register_driver(&hvc_driver))
+	if (tty_register_driver(hvc_driver))
 		panic("Couldn't register hvc console driver\n");
 
-	if (hvc_driver.num > 0)
+	for (i = 0; i < num; i++)
+		tty_register_device(hvc_driver, i, NULL);
+
+	if (num > 0)
 		kernel_thread(khvcd, NULL, CLONE_KERNEL);
 
 	return 0;
@@ -325,7 +331,7 @@ void hvc_console_print(struct console *co, const char *b, unsigned count)
 static struct tty_driver *hvc_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &hvc_driver;
+	return hvc_driver;
 }
 
 static int __init hvc_console_setup(struct console *co, char *options)
