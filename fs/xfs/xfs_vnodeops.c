@@ -1729,7 +1729,7 @@ xfs_inactive(
 
 	if (ip->i_d.di_nlink == 0 &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_DESTROY)) {
-		(void) XFS_SEND_DESTROY(mp, bdp, DM_RIGHT_NULL);
+		(void) XFS_SEND_DESTROY(mp, vp, DM_RIGHT_NULL);
 	}
 
 	error = 0;

@@ -2450,7 +2450,7 @@ xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 	dabuf->dirty = 0;
 #ifdef XFS_DABUF_DEBUG
 	dabuf->ra = ra;
-	dabuf->dev = XFS_BUF_TARGET_DEV(bps[0]);
+	dabuf->target = XFS_BUF_TARGET(bps[0]);
 	dabuf->blkno = XFS_BUF_ADDR(bps[0]);
 #endif
 	if (nbuf == 1) {
@@ -2480,7 +2480,7 @@ xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 		s = mutex_spinlock(&xfs_dabuf_global_lock);
 		for (p = xfs_dabuf_global_list; p; p = p->next) {
 			ASSERT(p->blkno != dabuf->blkno ||
-			       p->dev != dabuf->dev);
+			       p->target != dabuf->target);
 		}
 		dabuf->prev = NULL;
 		if (xfs_dabuf_global_list)

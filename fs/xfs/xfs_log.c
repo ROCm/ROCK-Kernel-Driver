@@ -65,7 +65,7 @@ STATIC int	 xlog_bdstrat_cb(struct xfs_buf *);
 STATIC int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
 				    xlog_in_core_t **, xfs_lsn_t *);
 STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
-				dev_t		log_dev,
+				xfs_buftarg_t	*log_target,
 				xfs_daddr_t	blk_offset,
 				int		num_bblks);
 STATIC int	 xlog_space_left(xlog_t *log, int cycle, int bytes);
@@ -155,7 +155,7 @@ int xlog_error_mod = 33;
  */
 #if defined(XLOG_NOLOG) || defined(DEBUG)
 int   xlog_debug = 1;
-dev_t xlog_devt  = 0;
+xfs_buftarg_t *xlog_target;
 #endif
 
 #if defined(XFS_LOG_TRACE)
@@ -274,7 +274,7 @@ xfs_log_done(xfs_mount_t	*mp,
 	xfs_lsn_t	lsn	= 0;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
-	if (! xlog_debug && xlog_devt == log->l_dev)
+	if (!xlog_debug && xlog_target == log->l_targ)
 		return 0;
 #endif
 
@@ -339,7 +339,7 @@ xfs_log_force(xfs_mount_t *mp,
 	xlog_t *log = mp->m_log;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
-	if (! xlog_debug && xlog_devt == log->l_dev)
+	if (!xlog_debug && xlog_target == log->l_targ)
 		return 0;
 #endif
 
@@ -378,7 +378,7 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 	int	abortflg, spl;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
-	if (! xlog_debug && xlog_devt == log->l_dev)
+	if (!xlog_debug && xlog_target == log->l_targ)
 		return 0;
 #endif
 	cb->cb_next = 0;
@@ -436,7 +436,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	int		retval;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
-	if (! xlog_debug && xlog_devt == log->l_dev)
+	if (!xlog_debug && xlog_target == log->l_targ)
 		return 0;
 #endif
 	retval = 0;
@@ -472,7 +472,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
  * Mount a log filesystem
  *
  * mp		- ubiquitous xfs mount point structure
- * log_dev	- device number of on-disk log device
+ * log_target	- buftarg of on-disk log device
  * blk_offset	- Start block # where block size is 512 bytes (BBSIZE)
  * num_bblocks	- Number of BBSIZE blocks in on-disk log
  *
@@ -480,7 +480,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
  */
 int
 xfs_log_mount(xfs_mount_t	*mp,
-	      dev_t		log_dev,
+	      xfs_buftarg_t	*log_target,
 	      xfs_daddr_t	blk_offset,
 	      int		num_bblks)
 {
@@ -493,11 +493,11 @@ xfs_log_mount(xfs_mount_t	*mp,
 		ASSERT(XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
 	}
 
-	mp->m_log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
+	mp->m_log = xlog_alloc_log(mp, log_target, blk_offset, num_bblks);
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
-	if (! xlog_debug) {
-		cmn_err(CE_NOTE, "log dev: 0x%x", log_dev);
+	if (!xlog_debug) {
+		cmn_err(CE_NOTE, "log dev: %s", XFS_BUFTARG_NAME(log_target));
 		return 0;
 	}
 #endif
@@ -605,7 +605,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 	} magic = { XLOG_UNMOUNT_TYPE, 0, 0 };
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
-	if (! xlog_debug && xlog_devt == log->l_dev)
+	if (!xlog_debug && xlog_target == log->l_targ)
 		return 0;
 #endif
 
@@ -733,9 +733,9 @@ xfs_log_write(xfs_mount_t *	mp,
 {
 	int	error;
 	xlog_t *log = mp->m_log;
-#if defined(DEBUG) || defined(XLOG_NOLOG)
 
-	if (! xlog_debug && xlog_devt == log->l_dev) {
+#if defined(DEBUG) || defined(XLOG_NOLOG)
+	if (!xlog_debug && xlog_target == log->l_targ) {
 		*start_lsn = 0;
 		return 0;
 	}
@@ -760,7 +760,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 	SPLDECL(s);
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
-	if (!xlog_debug && xlog_devt == log->l_dev)
+	if (!xlog_debug && xlog_target == log->l_targ)
 		return;
 #endif
 	/* XXXsup tmp */
@@ -1058,14 +1058,14 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	/*
 	 * When logbufs == 0, someone has disabled the log from the FSTAB
 	 * file.  This is not a documented feature.  We need to set xlog_debug
-	 * to zero (this deactivates the log) and set xlog_devt to the
+	 * to zero (this deactivates the log) and set xlog_target to the
 	 * appropriate dev_t.  Only one filesystem may be affected as such
 	 * since this is just a performance hack to test what we might be able
 	 * to get if the log were not present.
 	 */
 	if (mp->m_logbufs == 0) {
 		xlog_debug = 0;
-		xlog_devt = log->l_dev;
+		xlog_target = log->l_targ;
 		log->l_iclog_bufs = XLOG_MIN_ICLOGS;
 	} else
 #endif
@@ -1088,8 +1088,8 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
 		/* We are reactivating a filesystem after it was active */
-		if (log->l_dev == xlog_devt) {
-			xlog_devt = 1;
+		if (log->l_targ == xlog_target) {
+			xlog_target = 1; /* XXX(hch): WTF? */
 			xlog_debug = 1;
 		}
 #endif
@@ -1175,7 +1175,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
  */
 STATIC xlog_t *
 xlog_alloc_log(xfs_mount_t	*mp,
-	       dev_t		log_dev,
+	       xfs_buftarg_t	*log_target,
 	       xfs_daddr_t	blk_offset,
 	       int		num_bblks)
 {
@@ -1190,7 +1190,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log = (xlog_t *)kmem_zalloc(sizeof(xlog_t), KM_SLEEP);
 
 	log->l_mp	   = mp;
-	log->l_dev	   = log_dev;
+	log->l_targ	   = log_target;
 	log->l_logsize     = BBTOB(num_bblks);
 	log->l_logBBstart  = blk_offset;
 	log->l_logBBsize   = num_bblks;
