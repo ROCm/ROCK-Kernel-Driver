@@ -46,7 +46,7 @@
 
 #include "bnep.h"
 
-#ifndef CONFIG_BNEP_DEBUG
+#ifndef CONFIG_BLUEZ_BNEP_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #endif
@@ -73,7 +73,7 @@ static struct net_device_stats *bnep_net_get_stats(struct net_device *dev)
 
 static void bnep_net_set_mc_list(struct net_device *dev)
 {
-#ifdef CONFIG_BNEP_MC_FILTER
+#ifdef CONFIG_BLUEZ_BNEP_MC_FILTER
 	struct bnep_session *s = dev->priv;
 	struct sock *sk = s->sock->sk;
 	struct bnep_set_filter_req *r;
@@ -143,7 +143,7 @@ static int bnep_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return -EINVAL;
 }
 
-#ifdef CONFIG_BNEP_MC_FILTER
+#ifdef CONFIG_BLUEZ_BNEP_MC_FILTER
 static inline int bnep_net_mc_filter(struct sk_buff *skb, struct bnep_session *s)
 {
 	struct ethhdr *eh = (void *) skb->data;
@@ -154,7 +154,7 @@ static inline int bnep_net_mc_filter(struct sk_buff *skb, struct bnep_session *s
 }
 #endif
 
-#ifdef CONFIG_BNEP_PROTO_FILTER
+#ifdef CONFIG_BLUEZ_BNEP_PROTO_FILTER
 /* Determine ether protocol. Based on eth_type_trans. */
 static inline u16 bnep_net_eth_proto(struct sk_buff *skb)
 {
@@ -192,14 +192,14 @@ static int bnep_net_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	BT_DBG("skb %p, dev %p", skb, dev);
 
-#ifdef CONFIG_BNEP_MC_FILTER
+#ifdef CONFIG_BLUEZ_BNEP_MC_FILTER
 	if (bnep_net_mc_filter(skb, s)) {
 		kfree_skb(skb);
 		return 0;
 	}
 #endif
 	
-#ifdef CONFIG_BNEP_PROTO_FILTER
+#ifdef CONFIG_BLUEZ_BNEP_PROTO_FILTER
 	if (bnep_net_proto_filter(skb, s)) {
 		kfree_skb(skb);
 		return 0;

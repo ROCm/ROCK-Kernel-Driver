@@ -1,5 +1,5 @@
 #
-# Makefile for Bluetooth HCI device drivers.
+# Makefile for the Linux Bluetooth HCI device drivers.
 #
 
 obj-$(CONFIG_BLUEZ_HCIUSB)	+= hci_usb.o

@@ -53,7 +53,7 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/rfcomm.h>
 
-#ifndef CONFIG_RFCOMM_DEBUG
+#ifndef CONFIG_BLUEZ_RFCOMM_DEBUG
 #undef  BT_DBG
 #define BT_DBG(D...)
 #endif
@@ -704,7 +704,7 @@ static int rfcomm_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned lon
 
 	lock_sock(sk);
 
-#ifdef CONFIG_RFCOMM_TTY
+#ifdef CONFIG_BLUEZ_RFCOMM_TTY
 	err = rfcomm_dev_ioctl(sk, cmd, arg);
 #else
 	err = -EOPNOTSUPP;
