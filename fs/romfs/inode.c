@@ -83,6 +83,12 @@ struct romfs_inode_info {
 	struct inode vfs_inode;
 };
 
+/* instead of private superblock data */
+static inline unsigned long romfs_maxsize(struct super_block *sb)
+{
+	return (unsigned long)sb->u.generic_sbp;
+}
+
 static inline struct romfs_inode_info *ROMFS_I(struct inode *inode)
 {
 	return list_entry(inode, struct romfs_inode_info, vfs_inode);
@@ -113,7 +119,6 @@ static int romfs_fill_super(struct super_block *s, void *data, int silent)
 	/* I would parse the options here, but there are none.. :) */
 
 	sb_set_blocksize(s, ROMBSIZE);
-	s->u.generic_sbp = (void *) 0;
 	s->s_maxbytes = 0xFFFFFFFF;
 
 	bh = sb_bread(s, 0);
@@ -139,7 +144,7 @@ static int romfs_fill_super(struct super_block *s, void *data, int silent)
 	}
 
 	s->s_magic = ROMFS_MAGIC;
-	s->u.romfs_sb.s_maxsize = sz;
+	s->u.generic_sbp = (void *)sz;
 
 	s->s_flags |= MS_RDONLY;
 
@@ -175,7 +180,7 @@ romfs_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_type = ROMFS_MAGIC;
 	buf->f_bsize = ROMBSIZE;
 	buf->f_bfree = buf->f_bavail = buf->f_ffree;
-	buf->f_blocks = (sb->u.romfs_sb.s_maxsize+ROMBSIZE-1)>>ROMBSBITS;
+	buf->f_blocks = (romfs_maxsize(sb)+ROMBSIZE-1)>>ROMBSBITS;
 	buf->f_namelen = ROMFS_MAXFN;
 	return 0;
 }
@@ -188,7 +193,7 @@ romfs_strnlen(struct inode *i, unsigned long offset, unsigned long count)
 	struct buffer_head *bh;
 	unsigned long avail, maxsize, res;
 
-	maxsize = i->i_sb->u.romfs_sb.s_maxsize;
+	maxsize = romfs_maxsize(i->i_sb);
 	if (offset >= maxsize)
 		return -1;
 
@@ -230,7 +235,7 @@ romfs_copyfrom(struct inode *i, void *dest, unsigned long offset, unsigned long 
 	struct buffer_head *bh;
 	unsigned long avail, maxsize, res;
 
-	maxsize = i->i_sb->u.romfs_sb.s_maxsize;
+	maxsize = romfs_maxsize(i->i_sb);
 	if (offset >= maxsize || count > maxsize || offset+count>maxsize)
 		return -1;
 
@@ -275,8 +280,8 @@ romfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	char fsname[ROMFS_MAXFN];	/* XXX dynamic? */
 
 	lock_kernel();
-	
-	maxoff = i->i_sb->u.romfs_sb.s_maxsize;
+
+	maxoff = romfs_maxsize(i->i_sb);
 
 	offset = filp->f_pos;
 	if (!offset) {
@@ -339,7 +344,7 @@ romfs_lookup(struct inode *dir, struct dentry *dentry)
 	if (romfs_copyfrom(dir, &ri, offset, ROMFH_SIZE) <= 0)
 		goto out;
 
-	maxoff = dir->i_sb->u.romfs_sb.s_maxsize;
+	maxoff = romfs_maxsize(dir->i_sb);
 	offset = ntohl(ri.spec) & ROMFH_MASK;
 
 	/* OK, now find the file whose name is in "dentry" in the
