@@ -102,7 +102,7 @@ void ata_to_sense_error(struct ata_queued_cmd *qc)
 	cmd->sense_buffer[7] = 14 - 8;	/* addnl. sense len. FIXME: correct? */
 
 	/* additional-sense-code[-qualifier] */
-	if ((qc->flags & ATA_QCFLAG_WRITE) == 0) {
+	if (cmd->sc_data_direction == SCSI_DATA_READ) {
 		cmd->sense_buffer[12] = 0x11; /* "unrecovered read error" */
 		cmd->sense_buffer[13] = 0x04;
 	} else {
@@ -172,7 +172,6 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 {
 	struct ata_taskfile *tf = &qc->tf;
 	unsigned int lba48 = tf->flags & ATA_TFLAG_LBA48;
-	unsigned int dma = qc->flags & ATA_QCFLAG_DMA;
 
 	qc->cursect = qc->cursg = qc->cursg_ofs = 0;
 	tf->flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
@@ -180,39 +179,15 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 	tf->hob_lbal = 0;
 	tf->hob_lbam = 0;
 	tf->hob_lbah = 0;
+	tf->protocol = qc->dev->xfer_protocol;
 
 	if (scsicmd[0] == READ_10 || scsicmd[0] == READ_6 ||
 	    scsicmd[0] == READ_16) {
-		if (likely(dma)) {
-			if (lba48)
-				tf->command = ATA_CMD_READ_EXT;
-			else
-				tf->command = ATA_CMD_READ;
-			tf->protocol = ATA_PROT_DMA_READ;
-		} else {
-			if (lba48)
-				tf->command = ATA_CMD_PIO_READ_EXT;
-			else
-				tf->command = ATA_CMD_PIO_READ;
-			tf->protocol = ATA_PROT_PIO_READ;
-		}
-		qc->flags &= ~ATA_QCFLAG_WRITE;
+		tf->command = qc->dev->read_cmd;
 		VPRINTK("reading\n");
 	} else {
-		if (likely(dma)) {
-			if (lba48)
-				tf->command = ATA_CMD_WRITE_EXT;
-			else
-				tf->command = ATA_CMD_WRITE;
-			tf->protocol = ATA_PROT_DMA_WRITE;
-		} else {
-			if (lba48)
-				tf->command = ATA_CMD_PIO_WRITE_EXT;
-			else
-				tf->command = ATA_CMD_PIO_WRITE;
-			tf->protocol = ATA_PROT_PIO_WRITE;
-		}
-		qc->flags |= ATA_QCFLAG_WRITE;
+		tf->command = qc->dev->write_cmd;
+		tf->flags |= ATA_TFLAG_WRITE;
 		VPRINTK("writing\n");
 	}
 
@@ -351,7 +326,6 @@ err_out:
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
- *	FIXME: kmap inside spin_lock_irqsave ok?
  *
  *	RETURNS:
  *	Length of response buffer.
@@ -366,7 +340,7 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 		struct scatterlist *sg;
 
 		sg = (struct scatterlist *) cmd->request_buffer;
-		buf = kmap(sg->page) + sg->offset;
+		buf = kmap_atomic(sg->page, KM_USER0) + sg->offset;
 		buflen = sg->length;
 	} else {
 		buf = cmd->request_buffer;
@@ -394,7 +368,7 @@ static inline void ata_scsi_rbuf_put(struct scsi_cmnd *cmd)
 		struct scatterlist *sg;
 
 		sg = (struct scatterlist *) cmd->request_buffer;
-		kunmap(sg->page);
+		kunmap_atomic(sg->page, KM_USER0);
 	}
 }
 
@@ -910,7 +884,7 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 
 	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	if (cmd->sc_data_direction == SCSI_DATA_WRITE) {
-		qc->flags |= ATA_QCFLAG_WRITE;
+		qc->tf.flags |= ATA_TFLAG_WRITE;
 		DPRINTK("direction: write\n");
 	}
 
