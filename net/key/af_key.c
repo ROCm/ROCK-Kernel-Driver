@@ -528,8 +528,7 @@ static struct  xfrm_state *pfkey_xfrm_state_lookup(struct sadb_msg *hdr, void **
 
 	switch (((struct sockaddr *)(addr + 1))->sa_family) {
 	case AF_INET:
-		x = xfrm_state_lookup(
-				      ((struct sockaddr_in*)(addr + 1))->sin_addr.s_addr,
+		x = xfrm_state_lookup(((struct sockaddr_in*)(addr + 1))->sin_addr.s_addr,
 				      sa->sadb_sa_spi, proto);
 		break;
 	case AF_INET6:
@@ -1043,7 +1042,7 @@ static int pfkey_getspi(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	daddr = (struct sockaddr_in*)(addr + 1);
 
 	x = xfrm_find_acq(mode, reqid, proto, daddr->sin_addr.s_addr,
-			  saddr->sin_addr.s_addr);
+			  saddr->sin_addr.s_addr, 1);
 	if (x == NULL)
 		return -ENOENT;
 
@@ -1122,7 +1121,17 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 
 	/* XXX there is race condition */
 	x1 = pfkey_xfrm_state_lookup(hdr, ext_hdrs);
-	if (x1 && hdr->sadb_msg_type == SADB_ADD) {
+	if (!x1) {
+		x1 = xfrm_find_acq(x->props.mode, x->props.reqid, x->id.proto,
+				   x->id.daddr.xfrm4_addr,
+				   x->props.saddr.xfrm4_addr, 0);
+		if (x1 && x1->id.spi != x->id.spi && x1->id.spi) {
+			xfrm_state_put(x1);
+			x1 = NULL;
+		}
+	}
+
+	if (x1 && x1->id.spi && hdr->sadb_msg_type == SADB_ADD) {
 		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
 		xfrm_state_put(x1);
@@ -1131,7 +1140,7 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 
 	xfrm_state_insert(x);
 
-	if (x1 && hdr->sadb_msg_type != SADB_ADD) {
+	if (x1) {
 		xfrm_state_delete(x1);
 		xfrm_state_put(x1);
 	}
@@ -2156,7 +2165,7 @@ static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int 
 	    (!pol->sadb_x_policy_dir || pol->sadb_x_policy_dir > IPSEC_DIR_OUTBOUND))
 		return NULL;
 
-	xp = xfrm_policy_alloc(GFP_KERNEL);
+	xp = xfrm_policy_alloc(GFP_ATOMIC);
 	if (xp == NULL) {
 		*dir = -ENOBUFS;
 		return NULL;
