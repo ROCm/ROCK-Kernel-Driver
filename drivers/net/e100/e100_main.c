@@ -3468,6 +3468,7 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 	u16 first_word, last_word;
 	int i, max_len;
 	void *ptr;
+	u8 *eeprom_data_bytes = (u8 *)eeprom_data;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -3503,7 +3504,9 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 		if (copy_to_user(ifr->ifr_data, &ecmd, sizeof (ecmd)))
 			return -EFAULT;
 
-		if (copy_to_user(usr_eeprom_ptr, eeprom_data, ecmd.len))
+		if(ecmd.offset & 1)
+			eeprom_data_bytes++;
+		if (copy_to_user(usr_eeprom_ptr, eeprom_data_bytes, ecmd.len))
 			return -EFAULT;
 	} else {
 		if (ecmd.magic != E100_EEPROM_MAGIC)
@@ -3796,7 +3799,8 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 		return -EFAULT;
 
 	switch (info.string_set) {
-	case ETH_SS_TEST:
+	case ETH_SS_TEST: {
+		int ret = 0;
 		if (info.len > E100_MAX_TEST_RES)
 			info.len = E100_MAX_TEST_RES;
 		strings = kmalloc(info.len * ETH_GSTRING_LEN, GFP_ATOMIC);
@@ -3808,7 +3812,13 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 			sprintf(strings + i * ETH_GSTRING_LEN, "%-31s",
 				test_strings[i]);
 		}
-		break;
+		if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
+			ret = -EFAULT;
+		if (copy_to_user(usr_strings, strings, info.len * ETH_GSTRING_LEN))
+			ret = -EFAULT;
+		kfree(strings);
+		return ret;
+	}
 	case ETH_SS_STATS: {
 		char *strings = NULL;
 		void *addr = ifr->ifr_data;
@@ -3825,15 +3835,6 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 	default:
 		return -EOPNOTSUPP;
 	}
-
-	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
-		return -EFAULT;
-
-	if (copy_to_user(usr_strings, strings, info.len * ETH_GSTRING_LEN))
-		return -EFAULT;
-
-	kfree(strings);
-	return 0;
 }
 
 static int
