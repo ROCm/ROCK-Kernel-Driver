@@ -450,13 +450,12 @@ retry:
 		xfs_inode_t	*ip;
 		int		newnode;
 
-
 		vp = LINVFS_GET_VP(inode);
 		if (inode->i_state & I_NEW) {
 inode_allocate:
 			vn_initialize(inode);
 			error = xfs_iget_core(vp, mp, tp, ino,
-							lock_flags, ipp, bno);
+						lock_flags, ipp, bno);
 			if (error) {
 				make_bad_inode(inode);
 				if (inode->i_state & I_NEW)

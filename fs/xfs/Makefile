@@ -54,6 +54,9 @@ endif
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
+ifneq ($(CONFIG_XFS_DMAPI),y)
+xfs-y				+= xfs_dmops.o
+endif
 
 xfs-$(CONFIG_XFS_QUOTA)		+= $(addprefix quota/, \
 				   xfs_dquot.o \
@@ -66,10 +69,6 @@ ifeq ($(CONFIG_XFS_QUOTA),y)
 xfs-$(CONFIG_PROC_FS)		+= quota/xfs_qm_stats.o
 else
 xfs-y				+= xfs_qmops.o
-endif
-
-ifneq ($(CONFIG_XFS_DMAPI),y)
-xfs-y				+= xfs_dmops.o
 endif
 
 xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
