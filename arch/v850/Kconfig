@@ -133,6 +133,11 @@ menu "Processor type and features"
 	  depends RTE_CB
 	  default y
 
+   config RTE_CB_MULTI_DBTRAP
+   	  bool "Pass illegal insn trap / dbtrap to kernel"
+	  depends RTE_CB_MULTI
+	  default n
+
    config RTE_CB_MA1_KSRAM
    	  bool "Kernel in SRAM (limits size of kernel)"
 	  depends RTE_CB_MA1 && RTE_CB_MULTI

@@ -2,8 +2,8 @@
  * include/asm-v850/rte_multi.c -- Support for Multi debugger monitor ROM
  * 	on Midas lab RTE-CB series of evaluation boards
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -23,6 +23,9 @@
    the table.  */
 static long multi_intv_install_table[] = {
 	0x40, 0x50,		/* trap vectors */
+#ifdef CONFIG_RTE_CB_MULTI_DBTRAP
+	0x60,			/* illegal insn / dbtrap */
+#endif
 	/* Note -- illegal insn trap is used by the debugger.  */
 	0xD0, 0xE0, 0xF0,	/* GINT1 - GINT3 */
 	0x240, 0x250, 0x260, 0x270, /* timer D interrupts */
