@@ -426,10 +426,10 @@ struct usb_device {
 	struct usb_device *children[USB_MAXCHILDREN];
 };
 
-/* usb_free_dev can be called anywhere from usb_dec_dev_use */
-extern struct usb_device *usb_alloc_dev(struct usb_device *parent,
-	struct usb_bus *);
+extern struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *);
+extern struct usb_device *usb_get_dev(struct usb_device *dev);
 extern void usb_free_dev(struct usb_device *);
+#define usb_put_dev usb_free_dev
 
 /* for when layers above USB add new non-USB drivers */
 extern void usb_scan_devices(void);
@@ -439,34 +439,6 @@ extern int usb_reset_device(struct usb_device *dev);
 
 /* for drivers using iso endpoints */
 extern int usb_get_current_frame_number (struct usb_device *usb_dev);
-
-/**
- * usb_inc_dev_use - record another reference to a device
- * @dev: the device being referenced
- *
- * Each live reference to a device should be refcounted.
- *
- * Drivers for USB interfaces should normally record such references in
- * their probe() methods, when they bind to an interface, and release
- * them usb_dec_dev_use(), in their disconnect() methods.
- */
-static inline void usb_inc_dev_use (struct usb_device *dev)
-{
-	atomic_inc (&dev->refcnt);
-}
-
-/**
- * usb_dec_dev_use - drop a reference to a device
- * @dev: the device no longer being referenced
- *
- * Each live reference to a device should be refcounted.
- */
-static inline void usb_dec_dev_use (struct usb_device *dev)
-{
-	if (atomic_dec_and_test(&dev->refcnt))
-		usb_free_dev(dev);
-}
-
 
 /* used these for multi-interface device registration */
 extern int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned int ifnum);

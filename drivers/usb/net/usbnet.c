@@ -1951,7 +1951,7 @@ static void usbnet_disconnect (struct usb_device *udev, void *ptr)
 	flush_scheduled_tasks ();
 
 	kfree (dev);
-	usb_dec_dev_use (udev);
+	usb_put_dev (udev);
 }
 
 
@@ -1997,7 +1997,7 @@ usbnet_probe (struct usb_device *udev, unsigned ifnum,
 	memset (dev, 0, sizeof *dev);
 
 	init_MUTEX_LOCKED (&dev->mutex);
-	usb_inc_dev_use (udev);
+	usb_get_dev (udev);
 	dev->udev = udev;
 	dev->driver_info = info;
 	dev->msg_level = msg_level;

@@ -969,9 +969,33 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 }
 
 /**
- * usb_free_dev - free a usb device structure (usbcore-internal)
+ * usb_get_dev - increments the reference count of the device
+ * @dev: the device being referenced
+ *
+ * Each live reference to a device should be refcounted.
+ *
+ * Drivers for USB interfaces should normally record such references in
+ * their probe() methods, when they bind to an interface, and release
+ * them by calling usb_put_dev(), in their disconnect() methods.
+ *
+ * A pointer to the device with the incremented reference counter is returned.
+ */
+struct usb_device *usb_get_dev (struct usb_device *dev)
+{
+	if (dev) {
+		atomic_inc (&dev->refcnt);
+		return dev;
+	}
+	return NULL;
+}
+
+/**
+ * usb_free_dev - free a usb device structure when all users of it are finished.
  * @dev: device that's been disconnected
  * Context: !in_interrupt ()
+ *
+ * Must be called when a user of a device is finished with it.  When the last
+ * user of the device calls this function, the memory of the device is freed.
  *
  * Used by hub and virtual root hub drivers.  The device is completely
  * gone, everything is cleaned up, so it's time to get rid of these last
@@ -979,11 +1003,13 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
  */
 void usb_free_dev(struct usb_device *dev)
 {
-	if (dev->bus->op->deallocate)
-		dev->bus->op->deallocate(dev);
-	usb_destroy_configuration (dev);
-	usb_bus_put (dev->bus);
-	kfree (dev);
+	if (atomic_dec_and_test(&dev->refcnt)) {
+		if (dev->bus->op->deallocate)
+			dev->bus->op->deallocate(dev);
+		usb_destroy_configuration (dev);
+		usb_bus_put (dev->bus);
+		kfree (dev);
+	}
 }
 
 /**
@@ -1039,7 +1065,7 @@ void usb_free_urb(struct urb *urb)
 }
 
 /**
- * usb_get_urb - incrementes the reference count of the urb
+ * usb_get_urb - increments the reference count of the urb
  * @urb: pointer to the urb to modify
  *
  * This must be  called whenever a urb is transfered from a device driver to a
@@ -1928,7 +1954,7 @@ void usb_disconnect(struct usb_device **pdev)
 
 	/* Decrement the reference count, it'll auto free everything when */
 	/* it hits 0 which could very well be now */
-	usb_dec_dev_use(dev);
+	usb_put_dev(dev);
 }
 
 /**
@@ -2760,6 +2786,7 @@ EXPORT_SYMBOL(usb_deregister_dev);
 
 EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_free_dev);
+EXPORT_SYMBOL(usb_get_dev);
 EXPORT_SYMBOL(usb_hub_tt_clear_buffer);
 
 EXPORT_SYMBOL(usb_find_interface_driver_for_ifnum);

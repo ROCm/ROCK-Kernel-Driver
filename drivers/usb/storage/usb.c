@@ -676,7 +676,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	}
 
 	/* At this point, we're committed to using the device */
-	usb_inc_dev_use(dev);
+	usb_get_dev(dev);
 
 	/* clear the GUID and fetch the strings */
 	GUID_CLEAR(guid);
@@ -735,14 +735,14 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* allocate an IRQ callback if one is needed */
 		if ((ss->protocol == US_PR_CBI) && usb_stor_allocate_irq(ss)) {
-			usb_dec_dev_use(dev);
+			usb_put_dev(dev);
 			return NULL;
 		}
 
 		/* allocate the URB we're going to use */
 		ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!ss->current_urb) {
-			usb_dec_dev_use(dev);
+			usb_put_dev(dev);
 			return NULL;
 		}
 
@@ -760,7 +760,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		if ((ss = (struct us_data *)kmalloc(sizeof(struct us_data), 
 						    GFP_KERNEL)) == NULL) {
 			printk(KERN_WARNING USB_STORAGE "Out of memory\n");
-			usb_dec_dev_use(dev);
+			usb_put_dev(dev);
 			return NULL;
 		}
 		memset(ss, 0, sizeof(struct us_data));
@@ -769,7 +769,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		ss->current_urb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!ss->current_urb) {
 			kfree(ss);
-			usb_dec_dev_use(dev);
+			usb_put_dev(dev);
 			return NULL;
 		}
 
@@ -919,7 +919,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 			ss->transport_name = "Unknown";
 			kfree(ss->current_urb);
 			kfree(ss);
-			usb_dec_dev_use(dev);
+			usb_put_dev(dev);
 			return NULL;
 			break;
 		}
@@ -974,7 +974,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 			ss->protocol_name = "Unknown";
 			kfree(ss->current_urb);
 			kfree(ss);
-			usb_dec_dev_use(dev);
+			usb_put_dev(dev);
 			return NULL;
 			break;
 		}
@@ -984,7 +984,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		if ((ss->protocol == US_PR_CBI) && usb_stor_allocate_irq(ss)) {
 			kfree(ss->current_urb);
 			kfree(ss);
-			usb_dec_dev_use(dev);
+			usb_put_dev(dev);
 			return NULL;
 		}
 
@@ -1020,7 +1020,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 			       "Unable to start control thread\n");
 			kfree(ss->current_urb);
 			kfree(ss);
-			usb_dec_dev_use(dev);
+			usb_put_dev(dev);
 			return NULL;
 		}
 
@@ -1087,7 +1087,7 @@ static void storage_disconnect(struct usb_device *dev, void *ptr)
 	ss->current_urb = NULL;
 
 	/* mark the device as gone */
-	usb_dec_dev_use(ss->pusb_dev);
+	usb_put_dev(ss->pusb_dev);
 	ss->pusb_dev = NULL;
 	atomic_set(&ss->sm_state, US_STATE_DETACHED);
 

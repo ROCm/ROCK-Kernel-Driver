@@ -1320,7 +1320,7 @@ static void urb_unlink (struct urb *urb)
 	list_del_init (&urb->urb_list);
 	dev = urb->dev;
 	urb->dev = NULL;
-	usb_dec_dev_use (dev);
+	usb_put_dev (dev);
 	spin_unlock_irqrestore (&hcd_data_lock, flags);
 }
 
@@ -1516,7 +1516,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 
 	spin_lock_irqsave (&hcd_data_lock, flags);
 	if (HCD_IS_RUNNING (hcd->state) && hcd->state != USB_STATE_QUIESCING) {
-		usb_inc_dev_use (urb->dev);
+		usb_get_dev (urb->dev);
 		list_add (&urb->urb_list, &dev->urb_list);
 		status = 0;
 	} else {

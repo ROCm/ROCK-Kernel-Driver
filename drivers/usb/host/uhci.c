@@ -165,7 +165,7 @@ static struct uhci_td *uhci_alloc_td(struct uhci *uhci, struct usb_device *dev)
 	INIT_LIST_HEAD(&td->list);
 	INIT_LIST_HEAD(&td->fl_list);
 
-	usb_inc_dev_use(dev);
+	usb_get_dev(dev);
 
 	return td;
 }
@@ -317,7 +317,7 @@ static void uhci_free_td(struct uhci *uhci, struct uhci_td *td)
 		dbg("td is still in URB list!");
 
 	if (td->dev)
-		usb_dec_dev_use(td->dev);
+		usb_put_dev(td->dev);
 
 	pci_pool_free(uhci->td_pool, td, td->dma_handle);
 }
@@ -342,7 +342,7 @@ static struct uhci_qh *uhci_alloc_qh(struct uhci *uhci, struct usb_device *dev)
 	INIT_LIST_HEAD(&qh->list);
 	INIT_LIST_HEAD(&qh->remove_list);
 
-	usb_inc_dev_use(dev);
+	usb_get_dev(dev);
 
 	return qh;
 }
@@ -355,7 +355,7 @@ static void uhci_free_qh(struct uhci *uhci, struct uhci_qh *qh)
 		dbg("qh still in remove_list!");
 
 	if (qh->dev)
-		usb_dec_dev_use(qh->dev);
+		usb_put_dev(qh->dev);
 
 	pci_pool_free(uhci->qh_pool, qh, qh->dma_handle);
 }
@@ -1492,7 +1492,7 @@ static int uhci_submit_urb(struct urb *urb, int mem_flags)
 	uhci = (struct uhci *)urb->dev->bus->hcpriv;
 
 	INIT_LIST_HEAD(&urb->urb_list);
-	usb_inc_dev_use(urb->dev);
+	usb_get_dev(urb->dev);
 
 	spin_lock_irqsave(&uhci->urb_list_lock, flags);
 	spin_lock(&urb->lock);
@@ -1503,7 +1503,7 @@ static int uhci_submit_urb(struct urb *urb, int mem_flags)
 		/* Since we can have problems on the out path */
 		spin_unlock(&urb->lock);
 		spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-		usb_dec_dev_use(urb->dev);
+		usb_put_dev(urb->dev);
 		usb_put_urb(urb);
 
 		return ret;
@@ -2376,7 +2376,7 @@ static void uhci_call_completion(struct urb *urb)
 		} else {
 			/* We decrement the usage count after we're done */
 			/*  with everything */
-			usb_dec_dev_use(dev);
+			usb_put_dev(dev);
 			usb_put_urb(urb);
 		}
 	}
