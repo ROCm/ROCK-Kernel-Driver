@@ -252,6 +252,7 @@ xfs_start_flags(
 			ap->logbufsize);
 		return XFS_ERROR(EINVAL);
 	}
+	mp->m_ihsize = ap->ihashsize;
 	mp->m_logbsize = ap->logbufsize;
 	mp->m_fsname_len = strlen(ap->fsname) + 1;
 	mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
@@ -1646,6 +1647,7 @@ xfs_vget(
 #define MNTOPT_SWIDTH	"swidth"	/* data volume stripe width */
 #define MNTOPT_NOUUID	"nouuid"	/* ignore filesystem UUID */
 #define MNTOPT_MTPT	"mtpt"		/* filesystem mount point */
+#define MNTOPT_IHASHSIZE    "ihashsize"    /* size of inode hash table */
 #define MNTOPT_NORECOVERY   "norecovery"   /* don't run XFS recovery */
 #define MNTOPT_NOLOGFLUSH   "nologflush"   /* don't hard flush on log writes */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
@@ -1734,6 +1736,13 @@ xfs_parseargs(
 			iosize = simple_strtoul(value, &eov, 10);
 			args->flags |= XFSMNT_IOSIZE;
 			args->iosizelog = (uint8_t) iosize;
+		} else if (!strcmp(this_char, MNTOPT_IHASHSIZE)) {
+			if (!value || !*value) {
+				printk("XFS: %s option requires an argument\n",
+					this_char); 
+				return EINVAL;
+			}
+			args->ihashsize = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_WSYNC)) {
 			args->flags |= XFSMNT_WSYNC;
 		} else if (!strcmp(this_char, MNTOPT_OSYNCISOSYNC)) {
