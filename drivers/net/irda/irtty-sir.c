@@ -353,7 +353,8 @@ static inline void irtty_stop_receiver(struct tty_struct *tty, int stop)
 
 /*****************************************************************/
 
-DECLARE_MUTEX(irtty_sem);		/* serialize ldisc open/close with sir_dev */
+/* serialize ldisc open/close with sir_dev */
+static DECLARE_MUTEX(irtty_sem);
 
 /* notifier from sir_dev when irda% device gets opened (ifup) */
 
