@@ -610,9 +610,6 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_check:
 			return config_drive_for_dma (drive);
 		case ide_dma_begin:
-#ifdef DEBUG
-			printk("ide_dma_begin: from %p\n", __builtin_return_address(0));
-#endif
 			if (test_and_set_bit(IDE_DMA, &HWGROUP(drive)->flags))
 				BUG();
 			/* Note that this is done *after* the cmd has
@@ -634,14 +631,13 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_read:
 			reading = 1 << 3;
 		case ide_dma_write:
-			ar = HWGROUP(drive)->rq->special;
+			ar = IDE_CUR_AR(drive);
 
 			if (ide_start_dma(hwif, drive, func))
 				return 1;
 
 			if (drive->type != ATA_DISK)
 				return 0;
-
 			BUG_ON(HWGROUP(drive)->handler);
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
 			if ((ar->ar_rq->flags & REQ_DRIVE_TASKFILE) &&
@@ -655,20 +651,13 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			}
 			return hwif->dmaproc(ide_dma_begin, drive);
 		case ide_dma_end: /* returns 1 on error, 0 otherwise */
-#ifdef DEBUG
-			printk("ide_dma_end: from %p\n", __builtin_return_address(0));
-#endif
-			if (!test_and_clear_bit(IDE_DMA, &HWGROUP(drive)->flags)) {
-				printk("ide_dma_end: dma not going? %p\n", __builtin_return_address(0));
-				return 1;
-			}
+			if (!test_and_clear_bit(IDE_DMA, &HWGROUP(drive)->flags))
+				BUG();
 			drive->waiting_for_dma = 0;
 			outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 			dma_stat = inb(dma_base+2);	/* get DMA status */
 			outb(dma_stat|6, dma_base+2);	/* clear the INTR & ERROR bits */
 			ide_destroy_dmatable(drive);	/* purge DMA mappings */
-			if (drive->tcq)
-				IDE_SET_CUR_TAG(drive, -1);
 			return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
 		case ide_dma_test_irq: /* returns 1 if dma irq issued, 0 otherwise */
 			dma_stat = inb(dma_base+2);

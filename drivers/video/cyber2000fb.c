@@ -1704,8 +1704,8 @@ cyberpro_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	 * Use MCLK from BIOS. FIXME: what about hotplug?
 	 */
 #ifndef __arm__
-	cfb->mclk_mult = cyber2000_grphr(MCLK_MULT, cfb);
-	cfb->mclk_div  = cyber2000_grphr(MCLK_DIV, cfb);
+	cfb->mclk_mult = cyber2000_grphr(EXT_MCLK_MULT, cfb);
+	cfb->mclk_div  = cyber2000_grphr(EXT_MCLK_DIV, cfb);
 #else
 	/*
 	 * MCLK on the NetWinder and the Shark is fixed at 75MHz

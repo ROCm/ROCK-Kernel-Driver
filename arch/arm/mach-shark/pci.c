@@ -20,6 +20,8 @@ static int __init shark_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	else return 255;
 }
 
+extern void __init via82c505_preinit(void *sysdata);
+
 struct hw_pci shark_pci __initdata = {
 	setup:		via82c505_setup,
 	swizzle:       	pci_std_swizzle,

@@ -980,7 +980,7 @@ int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
 
 	/* FIXME: Do we really have to zero out the buffer?
 	 */
-	memset(argbuf, 0, 4 + SECTOR_WORDS * 4 * vals[3]);
+	memset(argbuf, 4, SECTOR_WORDS * 4 * vals[3]);
 	ide_init_drive_cmd(&rq);
 	rq.buffer = argbuf;
 	memcpy(argbuf, vals, 4);

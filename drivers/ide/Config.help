@@ -753,9 +753,17 @@ CONFIG_BLK_DEV_IDE_TCQ
 
   If you have such a drive, say Y here.
 
-CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-  Enabled tagged command queueing unconditionally on drives that report
-  support for it.
+CONFIG_BLK_DEV_IDE_TCQ_FULL
+  When a command completes from the drive, the SERVICE bit is checked to
+  see if other queued commands are ready to be started. Doing this
+  immediately after a command completes has a tendency to 'starve' the
+  device hardware queue, since we risk emptying the queue completely
+  before starting any new commands. This shows up during stressing the
+  drive as a /\/\/\/\ queue size balance, where we could instead try and
+  maintain a minimum queue size and get a /---------\ graph instead.
+
+  Saying Y here will attempt to always keep the queue full when possible
+  at the cost of possibly increasing command turn-around latency.
 
   Generally say Y here.
 
@@ -765,6 +773,18 @@ CONFIG_BLK_DEV_IDE_TCQ_DEPTH
 
   You probably just want the default of 32 here. If you enter an invalid
   number, the default value will be used.
+
+CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+  Enabled tagged command queueing unconditionally on drives that report
+  support for it. Regardless of the chosen value here, tagging can be
+  controlled at run time:
+
+  echo "using_tcq:32" > /proc/ide/hdX/settings
+
+  where any value between 1-32 selects chosen queue depth and enables
+  TCQ, and 0 disables it.
+
+  Generally say Y here.
 
 CONFIG_BLK_DEV_IT8172
   Say Y here to support the on-board IDE controller on the Integrated

@@ -648,6 +648,12 @@ ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigne
 
 	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
 
+	/* The four drives on the two logical (one physical) interfaces
+	   are distinguished by writing the drive number (0-3) to the
+	   Feature register.
+	   FIXME: Is promise_selectproc now redundant??
+	 */
+	taskfile.feature    = (drive->channel->unit << 1) + drive->select.b.unit;
 	taskfile.sector_count	= rq->nr_sectors;
 	taskfile.sector_number	= block;
 	taskfile.low_cylinder	= (block>>=8);
