@@ -462,7 +462,7 @@ module_exit(exit_nlm);
  */
 static struct svc_version	nsmsvc_version1 = {
 		.vs_vers	= 1,
-		.vs_nproc	= 5,
+		.vs_nproc	= 7,
 		.vs_proc	= nsmsvc_procedures,
 		.vs_xdrsize	= SMSVC_XDRSIZE,
 };
