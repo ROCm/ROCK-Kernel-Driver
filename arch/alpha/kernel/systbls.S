@@ -444,6 +444,9 @@ sys_call_table:
 	.quad sys_clock_nanosleep
 	.quad sys_semtimedop
 	.quad sys_tgkill
+	.quad sys_stat64			/* 425 */
+	.quad sys_lstat64
+	.quad sys_fstat64
 
 	.size sys_call_table, . - sys_call_table
 	.type sys_call_table, @object

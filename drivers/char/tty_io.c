@@ -481,12 +481,15 @@ void do_tty_hangup(void *data)
 	if (tty->session > 0) {
 		struct list_head *l;
 		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid) {
-			if (p->tty == tty)
-				p->tty = NULL;
-			if (!p->leader)
-				continue;
-			send_group_sig_info(SIGHUP, SEND_SIG_PRIV, p);
-			send_group_sig_info(SIGCONT, SEND_SIG_PRIV, p);
+			task_t *task = p;
+			do {
+				if (task->tty == tty)
+					task->tty = NULL;
+				if (task->leader) {
+					send_group_sig_info(SIGHUP, SEND_SIG_PRIV, task);
+					send_group_sig_info(SIGCONT, SEND_SIG_PRIV, task);
+				}
+			} while_each_thread(p, task);
 			if (tty->pgrp > 0)
 				p->tty_old_pgrp = tty->pgrp;
 		}
@@ -591,8 +594,12 @@ void disassociate_ctty(int on_exit)
 	tty->pgrp = -1;
 
 	read_lock(&tasklist_lock);
-	for_each_task_pid(current->session, PIDTYPE_SID, p, l, pid)
-		p->tty = NULL;
+	for_each_task_pid(current->session, PIDTYPE_SID, p, l, pid) {
+		task_t *task = p;
+		do {
+			task->tty = NULL;
+		} while_each_thread(p, task);
+	}
 	read_unlock(&tasklist_lock);
 	unlock_kernel();
 }
@@ -1260,11 +1267,20 @@ static void release_dev(struct file * filp)
 		struct pid *pid;
 
 		read_lock(&tasklist_lock);
-		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid)
-			p->tty = NULL;
-		if (o_tty)
-			for_each_task_pid(o_tty->session, PIDTYPE_SID, p,l, pid)
-				p->tty = NULL;
+		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid) {
+			task_t *task = p;
+			do {
+				task->tty = NULL;
+			} while_each_thread(p, task);
+		}
+		if (o_tty) {
+			for_each_task_pid(o_tty->session, PIDTYPE_SID, p,l, pid) {
+				task_t *task = p;
+				do {
+					task->tty = NULL;
+				} while_each_thread(p, task);
+			}
+		}
 		read_unlock(&tasklist_lock);
 	}
 
@@ -1615,8 +1631,12 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 			 */
 
 			read_lock(&tasklist_lock);
-			for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid)
-				p->tty = NULL;
+			for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid) {
+				task_t *task = p;
+				do {
+					task->tty = NULL;
+				} while_each_thread(p, task);
+			}
 			read_unlock(&tasklist_lock);
 		} else
 			return -EPERM;

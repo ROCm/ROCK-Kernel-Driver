@@ -22,7 +22,7 @@ static void __init error(char *x)
 		message = x;
 }
 
-static void __init *malloc(int size)
+static void __init *malloc(size_t size)
 {
 	return kmalloc(size, GFP_KERNEL);
 }

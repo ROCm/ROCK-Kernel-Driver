@@ -69,7 +69,7 @@ static struct pci_device_id pcnet32_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE (pci, pcnet32_pci_tbl);
 
-int cards_found __initdata;
+static int cards_found;
 
 /*
  * VLB I/O addresses
