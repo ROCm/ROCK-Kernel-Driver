@@ -313,6 +313,20 @@ int agp_unbind_memory(agp_memory * curr)
 
 
 /* Generic Agp routines - Start */
+
+void agp_device_command(u32 command)
+{
+	struct pci_dev *device;
+
+	pci_for_each_dev(device) {
+		u8 agp = pci_find_capability(device, PCI_CAP_ID_AGP);
+		if (!agp)
+			continue;
+
+		pci_write_config_dword(device, agp + 8, command);
+	}
+}
+
 void agp_generic_agp_enable(u32 mode)
 {
 	struct pci_dev *device = NULL;
@@ -395,11 +409,7 @@ void agp_generic_agp_enable(u32 mode)
 	 *        command registers.
 	 */
 
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00)
-			pci_write_config_dword(device, cap_ptr + 8, command);
-	}
+	agp_device_command(command);
 }
 
 int agp_generic_create_gatt_table(void)

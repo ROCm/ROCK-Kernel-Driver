@@ -435,11 +435,7 @@ static void agp_x86_64_agp_enable(u32 mode)
 	 *        command registers.
 	 */
 
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00)
-			pci_write_config_dword(device, cap_ptr + 8, command);
-	}
+	agp_device_command(command);
 }
 
 
