@@ -44,6 +44,7 @@ config PCMCIA_3C574
 config PCMCIA_FMVJ18X
 	tristate "Fujitsu FMV-J18x PCMCIA support"
 	depends on NET_PCMCIA && PCMCIA
+	select CRC32
 	help
 	  Say Y here if you intend to attach a Fujitsu FMV-J18x or compatible
 	  PCMCIA (PC-card) Ethernet card to your computer.
@@ -54,6 +55,7 @@ config PCMCIA_FMVJ18X
 config PCMCIA_PCNET
 	tristate "NE2000 compatible PCMCIA support"
 	depends on NET_PCMCIA && PCMCIA
+	select CRC32
 	help
 	  Say Y here if you intend to attach an NE2000 compatible PCMCIA
 	  (PC-card) Ethernet or Fast Ethernet card to your computer.
@@ -74,6 +76,7 @@ config PCMCIA_NMCLAN
 config PCMCIA_SMC91C92
 	tristate "SMC 91Cxx PCMCIA support"
 	depends on NET_PCMCIA && PCMCIA
+	select CRC32
 	help
 	  Say Y here if you intend to attach an SMC 91Cxx compatible PCMCIA
 	  (PC-card) Ethernet or Fast Ethernet card to your computer.
