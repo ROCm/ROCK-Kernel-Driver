@@ -18,8 +18,8 @@ equipment outside of the computer, it will at times contain stale data.
 Therefore, once the route has been computed, there is no need to hold
 the routing table static during transmission of the packet.  After all,
 you can hold the routing table static all you want, but that won't keep
-the external internet from changing, and it is the state of the external
-internet that really matters.  In addition, routing entries are typically
+the external Internet from changing, and it is the state of the external
+Internet that really matters.  In addition, routing entries are typically
 added or deleted, rather than being modified in place.
 
 A straightforward example of this use of RCU may be found in the
@@ -195,7 +195,7 @@ RCU ("read-copy update") its name.  The RCU code is as follows:
 			if (!audit_compare_rule(rule, &e->rule)) {
 				ne = kmalloc(sizeof(*entry), GFP_ATOMIC);
 				if (ne == NULL)
-					return _ENOMEM;
+					return -ENOMEM;
 				audit_copy_rule(&ne->rule, &e->rule);
 				ne->rule.action = newaction;
 				ne->rule.file_count = newfield_count;
@@ -255,6 +255,12 @@ as follows:
 		rcu_read_unlock();
 		return AUDIT_BUILD_CONTEXT;
 	}
+
+Note that this example assumes that entries are only added and deleted.
+Additional mechanism is required to deal correctly with the
+update-in-place performed by audit_upd_rule().  For one thing,
+audit_upd_rule() would need additional memory barriers to ensure
+that the list_add_rcu() was really executed before the list_del_rcu().
 
 The audit_del_rule() function would need to set the "deleted"
 flag under the spinlock as follows:
