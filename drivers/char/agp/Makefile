@@ -16,6 +16,7 @@ agpgart-$(CONFIG_AGP_ALI)	+= ali-agp.o
 agpgart-$(CONFIG_AGP_SWORKS)	+= sworks-agp.o
 agpgart-$(CONFIG_AGP_I460)	+= i460-agp.o
 agpgart-$(CONFIG_AGP_HP_ZX1)	+= hp-agp.o
+agpgart-$(CONFIG_AGP_AMD_8151)	+= k8-agp.o
 agpgart-objs := $(agpgart-y)
 
 obj-$(CONFIG_AGP) += agpgart.o

@@ -50,6 +50,9 @@ EXPORT_SYMBOL(agp_backend_release);
 struct agp_bridge_data agp_bridge = { type: NOT_SUPPORTED };
 static int agp_try_unsupported __initdata = 0;
 
+int agp_memory_reserved;
+__u32 *agp_gatt_table; 
+
 int agp_backend_acquire(void)
 {
 	if (agp_bridge.type == NOT_SUPPORTED)
@@ -243,7 +246,7 @@ static int agp_return_size(void)
 
 /* Routine to copy over information structure */
 
-void agp_copy_info(agp_kern_info * info)
+int agp_copy_info(agp_kern_info * info)
 {
 	unsigned long page_mask = 0;
 	int i;
@@ -251,7 +254,7 @@ void agp_copy_info(agp_kern_info * info)
 	memset(info, 0, sizeof(agp_kern_info));
 	if (agp_bridge.type == NOT_SUPPORTED) {
 		info->chipset = agp_bridge.type;
-		return;
+		return -EIO;
 	}
 	info->version.major = agp_bridge.version->major;
 	info->version.minor = agp_bridge.version->minor;
@@ -268,6 +271,7 @@ void agp_copy_info(agp_kern_info * info)
 		page_mask |= agp_bridge.mask_memory(page_mask, i);
 
 	info->page_mask = ~page_mask;
+	return 0;
 }
 
 /* End - Routine to copy over information structure */
@@ -518,6 +522,7 @@ int agp_generic_create_gatt_table(void)
 		SetPageReserved(page);
 
 	agp_bridge.gatt_table_real = (unsigned long *) table;
+	agp_gatt_table = (void *)table; 
 	CACHE_FLUSH();
 	agp_bridge.gatt_table = ioremap_nocache(virt_to_phys(table),
 					(PAGE_SIZE * (1 << page_order)));
@@ -624,6 +629,9 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 		num_entries = 0;
 		break;
 	}
+
+	num_entries -= agp_memory_reserved/PAGE_SIZE;
+	if (num_entries < 0) num_entries = 0;
 
 	if (type != 0 || mem->type != 0) {
 		/* The generic routines know nothing of memory types */
@@ -824,6 +832,17 @@ static struct {
 	},
 #endif /* CONFIG_AGP_ALI */
 
+#ifdef CONFIG_AGP_AMD_8151
+	{ 
+		.device_id	= PCI_DEVICE_ID_AMD_8151_0,
+		.vendor_id  = PCI_VENDOR_ID_AMD,
+		.chipset    = AMD_8151,
+		.vendor_name = "AMD",
+		.chipset_name = "8151",
+		.chipset_setup = amd_8151_setup 
+	},
+#endif /* CONFIG_AGP_AMD */
+
 #ifdef CONFIG_AGP_AMD
 	{
 		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_7006,
@@ -858,7 +877,6 @@ static struct {
 		.chipset_setup	= amd_irongate_setup,
 	},
 #endif /* CONFIG_AGP_AMD */
-
 #ifdef CONFIG_AGP_INTEL
 	{
 		.device_id	= PCI_DEVICE_ID_INTEL_82443LX_0,
@@ -1632,7 +1650,7 @@ static struct pci_driver agp_pci_driver = {
 	.probe		= agp_probe,
 };
 
-static int __init agp_init(void)
+int __init agp_init(void)
 {
 	int ret_val;
 
@@ -1658,5 +1676,7 @@ static void __exit agp_cleanup(void)
 	}
 }
 
+#ifndef CONFIG_GART_IOMMU
 module_init(agp_init);
 module_exit(agp_cleanup);
+#endif

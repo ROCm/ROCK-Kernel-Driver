@@ -1,12 +1,11 @@
 /*
- * USB Skeleton driver - 0.7
+ * USB Skeleton driver - 0.8
  *
- * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (c) 2001-2002 Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
- *	published by the Free Software Foundation; either version 2 of
- *	the License, or (at your option) any later version.
+ *	published by the Free Software Foundation, version 2.
  *
  *
  * This driver is to be used as a skeleton driver to be able to create a
@@ -22,6 +21,8 @@
  *
  * History:
  *
+ * 2002_09_26 - 0.8 - changes due to USB core conversion to struct device
+ *			driver.
  * 2002_02_12 - 0.7 - zero out dev in probe function for devices that do
  *			not have both a bulk in and bulk out endpoint.
  *			Thanks to Holger Waechtler for the fix.
@@ -133,8 +134,8 @@ static int skel_ioctl		(struct inode *inode, struct file *file, unsigned int cmd
 static int skel_open		(struct inode *inode, struct file *file);
 static int skel_release		(struct inode *inode, struct file *file);
 	
-static void * skel_probe	(struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id);
-static void skel_disconnect	(struct usb_device *dev, void *ptr);
+static int skel_probe		(struct usb_interface *intf, const struct usb_device_id *id);
+static void skel_disconnect	(struct usb_interface *intf);
 
 static void skel_write_bulk_callback	(struct urb *urb);
 
@@ -509,10 +510,10 @@ static void skel_write_bulk_callback (struct urb *urb)
  *	Called by the usb core when a new device is connected that it thinks
  *	this driver might be interested in.
  */
-static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const struct usb_device_id *id)
+static int skel_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
+	struct usb_device *udev = interface_to_usbdev(interface);
 	struct usb_skel *dev = NULL;
-	struct usb_interface *interface;
 	struct usb_interface_descriptor *iface_desc;
 	struct usb_endpoint_descriptor *endpoint;
 	int minor;
@@ -525,7 +526,7 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	/* See if the device offered us matches what we can accept */
 	if ((udev->descriptor.idVendor != USB_SKEL_VENDOR_ID) ||
 	    (udev->descriptor.idProduct != USB_SKEL_PRODUCT_ID)) {
-		return NULL;
+		return -ENODEV;
 	}
 
 	down (&minor_table_mutex);
@@ -544,8 +545,6 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	}
 	memset (dev, 0x00, sizeof (*dev));
 	minor_table[minor] = dev;
-
-	interface = &udev->actconfig->interface[ifnum];
 
 	init_MUTEX (&dev->sem);
 	dev->udev = udev;
@@ -619,7 +618,11 @@ exit_minor:
 
 exit:
 	up (&minor_table_mutex);
-	return dev;
+	if (dev) {
+		dev_set_drvdata (&interface->dev, dev);
+		return 0;
+	}
+	return -ENODEV;
 }
 
 
@@ -628,13 +631,17 @@ exit:
  *
  *	Called by the usb core when the device is removed from the system.
  */
-static void skel_disconnect(struct usb_device *udev, void *ptr)
+static void skel_disconnect(struct usb_interface *interface)
 {
 	struct usb_skel *dev;
 	int minor;
 
-	dev = (struct usb_skel *)ptr;
-	
+	dev = dev_get_drvdata (&interface->dev);
+	dev_set_drvdata (&interface->dev, NULL);
+
+	if (!dev)
+		return;
+
 	down (&minor_table_mutex);
 	down (&dev->sem);
 		

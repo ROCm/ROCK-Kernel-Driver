@@ -365,11 +365,7 @@ int diRead(struct inode *ip)
 
 	if ((lengthPXD(&iagp->inoext[extno]) != imap->im_nbperiext) ||
 	    (addressPXD(&iagp->inoext[extno]) == 0)) {
-		jERROR(1, ("diRead: Bad inoext: 0x%lx, 0x%lx\n",
-			   (ulong) addressPXD(&iagp->inoext[extno]),
-			   (ulong) lengthPXD(&iagp->inoext[extno])));
 		release_metapage(mp);
-		updateSuper(ip->i_sb, FM_DIRTY);
 		return ESTALE;
 	}
 
@@ -416,12 +412,9 @@ int diRead(struct inode *ip)
 		jERROR(1, ("diRead: i_ino != di_number\n"));
 		updateSuper(ip->i_sb, FM_DIRTY);
 		rc = EIO;
-	} else if (le32_to_cpu(dp->di_nlink) == 0) {
-		jERROR(1,
-		       ("diRead: di_nlink is zero. ino=%ld\n", ip->i_ino));
-		updateSuper(ip->i_sb, FM_DIRTY);
+	} else if (le32_to_cpu(dp->di_nlink) == 0)
 		rc = ESTALE;
-	} else
+	else
 		/* copy the disk inode to the in-memory inode */
 		rc = copy_from_dinode(dp, ip);
 
