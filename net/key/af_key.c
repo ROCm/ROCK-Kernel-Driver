@@ -1416,6 +1416,21 @@ static struct sk_buff * pfkey_xfrm_policy2msg_prep(struct xfrm_policy *xp)
 	if (skb == NULL)
 		return ERR_PTR(-ENOBUFS);
 
+	return skb;
+}
+
+static void pfkey_xfrm_policy2msg(struct sk_buff *skb, struct xfrm_policy *xp, int dir)
+{
+	struct sadb_msg *hdr;
+	struct sadb_address *addr;
+	struct sadb_lifetime *lifetime;
+	struct sadb_x_policy *pol;
+	struct sockaddr_in   *sin;
+	int i;
+	int size;
+
+	size = pfkey_xfrm_policy2msg_size(xp);
+
 	/* call should fill header later */
 	hdr = (struct sadb_msg *) skb_put(skb, sizeof(struct sadb_msg));
 	memset(hdr, 0, size);	/* XXX do we need this ? */
