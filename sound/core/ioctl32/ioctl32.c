@@ -111,6 +111,11 @@ struct sndrv_ctl_elem_info32 {
 			s32 step;
 		} integer;
 		struct {
+			u64 min;
+			u64 max;
+			u64 step;
+		} integer64;
+		struct {
 			u32 items;
 			u32 item;
 			char name[64];
@@ -145,6 +150,11 @@ static int snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigned
 		data32.value.integer.max = data.value.integer.min;
 		data32.value.integer.step = data.value.integer.step;
 		break;
+	case SNDRV_CTL_ELEM_TYPE_INTEGER64:
+		data32.value.integer64.min = data.value.integer64.min;
+		data32.value.integer64.max = data.value.integer64.min;
+		data32.value.integer64.step = data.value.integer64.step;
+		break;
 	case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
 		data32.value.enumerated.items = data.value.enumerated.items;
 		data32.value.enumerated.item = data.value.enumerated.item;
@@ -168,6 +178,10 @@ struct sndrv_ctl_elem_value32 {
 			s32 value[128];
 			u32 value_ptr;
 		} integer;
+		union {
+			s64 value[64];
+			u32 value_ptr;
+		} integer64;
 		union {
 			u32 item[128];
 			u32 item_ptr;
@@ -233,6 +247,10 @@ static int snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigne
 			for (i = 0; i < 128; i++)
 				data.value.integer.value[i] = data32.value.integer.value[i];
 			break;
+		case SNDRV_CTL_ELEM_TYPE_INTEGER64:
+			for (i = 0; i < 64; i++)
+				data.value.integer64.value[i] = data32.value.integer64.value[i];
+			break;
 		case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
 			for (i = 0; i < 128; i++)
 				data.value.enumerated.item[i] = data32.value.enumerated.item[i];
@@ -259,6 +277,10 @@ static int snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsigne
 		case SNDRV_CTL_ELEM_TYPE_INTEGER:
 			for (i = 0; i < 128; i++)
 				data.value.integer.value[i] = data32.value.integer.value[i];
+			break;
+		case SNDRV_CTL_ELEM_TYPE_INTEGER64:
+			for (i = 0; i < 64; i++)
+				data.value.integer64.value[i] = data32.value.integer64.value[i];
 			break;
 		case SNDRV_CTL_ELEM_TYPE_ENUMERATED:
 			for (i = 0; i < 128; i++)

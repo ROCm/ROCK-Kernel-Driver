@@ -264,9 +264,9 @@ struct _snd_ymfpci_pcm {
 	snd_ymfpci_pcm_type_t type;
 	snd_pcm_substream_t *substream;
 	ymfpci_voice_t *voices[2];	/* playback only */
-	int running: 1,
-	    spdif: 1,
-	    mode4ch : 1;	
+	int running: 1;
+	int output_front: 1;
+	int output_rear: 1;
 	u32 period_size;		/* cached from runtime->period_size */
 	u32 buffer_size;		/* cached from runtime->buffer_size */
 	u32 period_pos;
@@ -333,6 +333,9 @@ struct _snd_ymfpci {
 	snd_kcontrol_t *ctl_vol_spdifrec;
 	unsigned short spdif_bits, spdif_pcm_bits;
 	snd_kcontrol_t *spdif_pcm_ctl;
+	int mode_dup4ch;
+	int rear_opened;
+	int spdif_opened;
 
 	spinlock_t reg_lock;
 	spinlock_t voice_lock;

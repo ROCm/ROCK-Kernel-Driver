@@ -105,7 +105,7 @@ int snd_iprintf(snd_info_buffer_t * buffer, char *fmt,...)
 	if (buffer->stop || buffer->error)
 		return 0;
 	va_start(args, fmt);
-	res = vsprintf(sbuffer, fmt, args);
+	res = vsnprintf(sbuffer, sizeof(sbuffer), fmt, args);
 	va_end(args);
 	if (buffer->size + res >= buffer->len) {
 		buffer->stop = 1;

@@ -4,7 +4,7 @@
  	Copyright(c) 1999 IEM - Winfried Ritsch
         Copyright (C) 1999 Paul Barton-Davis 
 
-    This module is only needed if you compiled the rme9652 driver with
+    This module is only needed if you compiled the hammerfall driver with
     the PREALLOCATE_MEMORY option. It allocates the memory need to
     run the board and holds it until the module is unloaded. Because
     we need 2 contiguous 1.6MB regions for the board, it can be
@@ -25,7 +25,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
-    $Id: rme9652_mem.c,v 1.6 2002/02/04 10:21:33 tiwai Exp $
+    $Id: hammerfall_mem.c,v 1.2 2002/06/19 08:52:11 perex Exp $
 
 
     Tue Oct 17 2000  Jaroslav Kysela <perex@suse.cz>
@@ -42,14 +42,14 @@
 #include <linux/mm.h>
 #include <sound/initval.h>
 
-#define RME9652_CARDS			8
-#define RME9652_CHANNEL_BUFFER_SAMPLES  (16*1024)
-#define RME9652_CHANNEL_BUFFER_BYTES    (4*RME9652_CHANNEL_BUFFER_SAMPLES)
+#define HAMMERFALL_CARDS			8
+#define HAMMERFALL_CHANNEL_BUFFER_SAMPLES  (16*1024)
+#define HAMMERFALL_CHANNEL_BUFFER_BYTES    (4*HAMMERFALL_CHANNEL_BUFFER_SAMPLES)
 
 /* export */
 
 static int snd_enable[8] = {1,1,1,1,1,1,1,1};
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(RME9652_CARDS) "i");
+MODULE_PARM(snd_enable, "1-" __MODULE_STRING(HAMMERFALL_CARDS) "i");
 MODULE_PARM_DESC(snd_enable, "Enable cards to allocate buffers for.");
 
 MODULE_AUTHOR("Winfried Ritsch, Paul Barton-Davis <pbd@op.net>");
@@ -60,34 +60,37 @@ MODULE_LICENSE("GPL");
 /* Since we don't know at this point if we're allocating memory for a
    Hammerfall or a Hammerfall/Light, assume the worst and allocate
    space for the maximum number of channels.
-		   
-   See note in rme9652.h about why we allocate for an extra channel.  
+
+   The extra channel is allocated because we need a 64kB-aligned
+   buffer in the actual interface driver code (see rme9652.c or hdsp.c
+   for details)
 */
 
-#define TOTAL_SIZE (26+1)*(RME9652_CHANNEL_BUFFER_BYTES)
-#define NBUFS   2*RME9652_CARDS
+#define TOTAL_SIZE (26+1)*(HAMMERFALL_CHANNEL_BUFFER_BYTES)
+#define NBUFS   2*HAMMERFALL_CARDS
 
-#define RME9652_BUF_ALLOCATED 0x1
-#define RME9652_BUF_USED      0x2
+#define HAMMERFALL_BUF_ALLOCATED 0x1
+#define HAMMERFALL_BUF_USED      0x2
 
-typedef struct rme9652_buf_stru rme9652_buf_t;
+typedef struct hammerfall_buf_stru hammerfall_buf_t;
 
-struct rme9652_buf_stru {
+struct hammerfall_buf_stru {
 	struct pci_dev *pci;
 	void *buf;
 	dma_addr_t addr;
 	char flags;
 };
 
-static rme9652_buf_t rme9652_buffers[NBUFS];
+static hammerfall_buf_t hammerfall_buffers[NBUFS];
 
-/* These are here so that we have absolutely no dependencies on any
-   other modules. Dependencies can (1) cause us to lose in the rush
-   for 2x 1.6MB chunks of contiguous memory and (2) make driver
-   debugging difficult because unloading and reloading the snd module
-   causes us to have to do the same for this one. Since on 2.2
-   kernels, and before, we can rarely if ever allocate memory after
-   starting things running, this would be bad.
+/* These are here so that we have absolutely no dependencies
+   on any other modules. Dependencies can (1) cause us to
+   lose in the rush for 2x1.6MB chunks of contiguous memory
+   and (2) make driver debugging difficult because unloading
+   and reloading the snd module causes us to have to do the
+   same for this one. Since we can rarely if ever allocate
+   memory after starting things running, that would be very
+   undesirable.  
 */
 
 /* remove hack for pci_alloc_consistent to avoid dependecy on snd module */
@@ -95,7 +98,7 @@ static rme9652_buf_t rme9652_buffers[NBUFS];
 #undef pci_alloc_consistent
 #endif
 
-static void *rme9652_malloc_pages(struct pci_dev *pci,
+static void *hammerfall_malloc_pages(struct pci_dev *pci,
 				  unsigned long size,
 				  dma_addr_t *dmaaddr)
 {
@@ -119,7 +122,7 @@ static void *rme9652_malloc_pages(struct pci_dev *pci,
 	return res;
 }
 
-static void rme9652_free_pages(struct pci_dev *pci, unsigned long size,
+static void hammerfall_free_pages(struct pci_dev *pci, unsigned long size,
 			       void *ptr, dma_addr_t dmaaddr)
 {
 	struct page *page, *last_page;
@@ -137,7 +140,7 @@ static void rme9652_free_pages(struct pci_dev *pci, unsigned long size,
 		int pg;
 		for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
 		if (bus_to_virt(dmaaddr) != ptr) {
-			printk(KERN_ERR "rme9652_free_pages: dmaaddr != ptr\n");
+			printk(KERN_ERR "hammerfall_free_pages: dmaaddr != ptr\n");
 			return;
 		}
 		free_pages((unsigned long)ptr, pg);
@@ -145,20 +148,16 @@ static void rme9652_free_pages(struct pci_dev *pci, unsigned long size,
 #endif
 }
 
-void *snd_rme9652_get_buffer (int card, dma_addr_t *dmaaddr)
-
+void *snd_hammerfall_get_buffer (struct pci_dev *pcidev, dma_addr_t *dmaaddr)
 {
 	int i;
-	rme9652_buf_t *rbuf;
+	hammerfall_buf_t *rbuf;
 
-	if (card < 0 || card >= RME9652_CARDS) {
-		printk(KERN_ERR "snd_rme9652_get_buffer: card %d is out of range", card);
-		return NULL;
-	}
-	for (i = card * 2; i < card * 2 + 2; i++) {
-		rbuf = &rme9652_buffers[i];
-		if (rbuf->flags == RME9652_BUF_ALLOCATED) {
-			rbuf->flags |= RME9652_BUF_USED;
+	for (i = 0; i < NBUFS; i++) {
+		rbuf = &hammerfall_buffers[i];
+		if (rbuf->flags == HAMMERFALL_BUF_ALLOCATED) {
+			rbuf->flags |= HAMMERFALL_BUF_USED;
+			rbuf->pci = pcidev;
 			MOD_INC_USE_COUNT;
 			*dmaaddr = rbuf->addr;
 			return rbuf->buf;
@@ -168,33 +167,28 @@ void *snd_rme9652_get_buffer (int card, dma_addr_t *dmaaddr)
 	return NULL;
 }
 
-void snd_rme9652_free_buffer (int card, void *addr)
-
+void snd_hammerfall_free_buffer (struct pci_dev *pcidev, void *addr)
 {
 	int i;
-	rme9652_buf_t *rbuf;
+	hammerfall_buf_t *rbuf;
 
-	if (card < 0 || card >= RME9652_CARDS) {
-		printk(KERN_ERR "snd_rme9652_get_buffer: card %d is out of range", card);
-		return;
-	}
-	for (i = card * 2; i < card * 2 + 2; i++) {
-		rbuf = &rme9652_buffers[i];
-		if (rbuf->buf == addr) {
+	for (i = 0; i < NBUFS; i++) {
+		rbuf = &hammerfall_buffers[i];
+		if (rbuf->buf == addr && rbuf->pci == pcidev) {
 			MOD_DEC_USE_COUNT;
-			rbuf->flags &= ~RME9652_BUF_USED;
+			rbuf->flags &= ~HAMMERFALL_BUF_USED;
 			return;
 		}
 	}
 
-	printk ("RME9652 memory allocator: unknown buffer address passed to free buffer");
+	printk ("Hammerfall memory allocator: unknown buffer address or PCI device ID");
 }
 
-static void __exit rme9652_free_buffers (void)
+static void __exit hammerfall_free_buffers (void)
 
 {
 	int i;
-	rme9652_buf_t *rbuf;
+	hammerfall_buf_t *rbuf;
 
 	for (i = 0; i < NBUFS; i++) {
 
@@ -206,26 +200,26 @@ static void __exit rme9652_free_buffers (void)
 		   be unnecessary.
 		*/
 
-		rbuf = &rme9652_buffers[i];
+		rbuf = &hammerfall_buffers[i];
 
-		if (rbuf->flags == RME9652_BUF_ALLOCATED) {
-			rme9652_free_pages (rbuf->pci, TOTAL_SIZE, rbuf->buf, rbuf->addr);
+		if (rbuf->flags == HAMMERFALL_BUF_ALLOCATED) {
+			hammerfall_free_pages (rbuf->pci, TOTAL_SIZE, rbuf->buf, rbuf->addr);
 			rbuf->buf = NULL;
 			rbuf->flags = 0;
 		}
 	}
 }				 
 
-static int __init alsa_rme9652_mem_init(void)
+static int __init alsa_hammerfall_mem_init(void)
 {
 	int i;
 	struct pci_dev *pci;
-	rme9652_buf_t *rbuf;
+	hammerfall_buf_t *rbuf;
 
 	/* make sure our buffer records are clean */
 
 	for (i = 0; i < NBUFS; i++) {
-		rbuf = &rme9652_buffers[i];
+		rbuf = &hammerfall_buffers[i];
 		rbuf->pci = NULL;
 		rbuf->buf = NULL;
 		rbuf->flags = 0;
@@ -238,41 +232,48 @@ static int __init alsa_rme9652_mem_init(void)
 	*/
 	
 	i = 0;	/* card number */
-	rbuf = rme9652_buffers;
+	rbuf = hammerfall_buffers;
 	pci_for_each_dev(pci) {
 		int k;
-		if (pci->vendor != 0x10ee || pci->device != 0x3fc4)
+		
+		/* check for Hammerfall and Hammerfall DSP cards */
+
+		if (pci->vendor != 0x10ee || (pci->device != 0x3fc4 && pci->device != 0x3fc5)) 
 			continue;
 
 		if (!snd_enable[i])
 			continue;
 
 		for (k = 0; k < 2; ++k) {
-			rbuf->buf = rme9652_malloc_pages(pci, TOTAL_SIZE, &rbuf->addr);
+			rbuf->buf = hammerfall_malloc_pages(pci, TOTAL_SIZE, &rbuf->addr);
 			if (rbuf->buf == NULL) {
-				rme9652_free_buffers();
-				printk(KERN_ERR "RME9652 memory allocator: no memory available for card %d buffer %d\n", i, k + 1);
+				hammerfall_free_buffers();
+				printk(KERN_ERR "Hammerfall memory allocator: no memory available for card %d buffer %d\n", i, k + 1);
 				return -ENOMEM;
 			}
-			rbuf->flags = RME9652_BUF_ALLOCATED;
+			rbuf->flags = HAMMERFALL_BUF_ALLOCATED;
 			rbuf++;
 		}
 		i++;
 	}
 
 	if (i == 0)
-		printk(KERN_ERR "RME9652 memory allocator: no RME9652 card found...\n");
-	
+		printk(KERN_ERR "Hammerfall memory allocator: "
+		       "no Hammerfall cards found...\n");
+	else
+		printk(KERN_ERR "Hammerfall memory allocator: "
+		       "buffers allocated for %d cards\n", i);
+
 	return 0;
 }
 
-static void __exit alsa_rme9652_mem_exit(void)
+static void __exit alsa_hammerfall_mem_exit(void)
 {
-	rme9652_free_buffers();
+	hammerfall_free_buffers();
 }
 
-module_init(alsa_rme9652_mem_init)
-module_exit(alsa_rme9652_mem_exit)
+module_init(alsa_hammerfall_mem_init)
+module_exit(alsa_hammerfall_mem_exit)
 
-EXPORT_SYMBOL(snd_rme9652_get_buffer);
-EXPORT_SYMBOL(snd_rme9652_free_buffer);
+EXPORT_SYMBOL(snd_hammerfall_get_buffer);
+EXPORT_SYMBOL(snd_hammerfall_free_buffer);

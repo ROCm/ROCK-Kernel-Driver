@@ -803,7 +803,7 @@ static int __init snd_interwave_probe(int dev)
 		return err;
 	}
 	sprintf(pcm->name + strlen(pcm->name), " rev %c", gus->revision + 'A');
-	strcat(pcm->name, " (chip)");
+	strcat(pcm->name, " (codec)");
 	if ((err = snd_cs4231_timer(cs4231, 2, NULL)) < 0) {
 		snd_card_free(card);
 		return err;

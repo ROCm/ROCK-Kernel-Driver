@@ -22,7 +22,7 @@
  *
  */
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 
 typedef struct _snd_oss_mixer_slot snd_mixer_oss_slot_t;
 typedef struct _snd_oss_file snd_mixer_oss_file_t;
@@ -66,6 +66,6 @@ struct _snd_oss_file {
 	snd_mixer_oss_t *mixer;
 };
 
-#endif /* CONFIG_SND_OSSEMUL */
+#endif /* CONFIG_SND_MIXER_OSS */
 
 #endif /* __SOUND_MIXER_OSS_H */

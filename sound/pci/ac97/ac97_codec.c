@@ -60,7 +60,7 @@ static int patch_sigmatel_stac9721(ac97_t * ac97);
 static int patch_sigmatel_stac9744(ac97_t * ac97);
 static int patch_sigmatel_stac9756(ac97_t * ac97);
 static int patch_cirrus_cs4299(ac97_t * ac97);
-static int patch_cirrus_cs4205(ac97_t * ac97);
+static int patch_cirrus_spdif(ac97_t * ac97);
 static int patch_ad1819(ac97_t * ac97);
 static int patch_ad1881(ac97_t * ac97);
 static int patch_ad1886(ac97_t * ac97);
@@ -107,14 +107,18 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x414c4300, 0xfffffff0, "RL5306",	 	NULL },
 { 0x414c4310, 0xfffffff0, "RL5382", 		NULL },
 { 0x414c4320, 0xfffffff0, "RL5383", 		NULL },
-{ 0x414c4710, 0xffffffff, "ALC200/200P",	NULL },
+{ 0x414c4710, 0xfffffff0, "ALC200/200P",	NULL },
+{ 0x414c4720, 0xfffffff0, "ALC650",		NULL },
+{ 0x414c4730, 0xffffffff, "ALC101",		NULL },
+{ 0x414c4740, 0xfffffff0, "ALC202",		NULL },
+{ 0x414c4750, 0xfffffff0, "ALC250",		NULL },
 { 0x43525900, 0xfffffff8, "CS4297",		NULL },
-{ 0x43525910, 0xfffffff8, "CS4297A",		NULL },
+{ 0x43525910, 0xfffffff8, "CS4297A",		patch_cirrus_spdif },
 { 0x42525920, 0xfffffff8, "CS4294/4298",	NULL },
 { 0x42525928, 0xfffffff8, "CS4294",		NULL },
 { 0x43525930, 0xfffffff8, "CS4299",		patch_cirrus_cs4299 },
 { 0x43525948, 0xfffffff8, "CS4201",		NULL },
-{ 0x43525958, 0xfffffff8, "CS4205",		patch_cirrus_cs4205 },
+{ 0x43525958, 0xfffffff8, "CS4205",		patch_cirrus_spdif },
 { 0x43525960, 0xfffffff8, "CS4291",		NULL },
 { 0x48525300, 0xffffff00, "HMP9701",		NULL },
 { 0x49434501, 0xffffffff, "ICE1230",		NULL },
@@ -158,9 +162,10 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 #define AC97_ID_STAC9721	0x83847609
 #define AC97_ID_STAC9744	0x83847644
 #define AC97_ID_STAC9756	0x83847656
-
-#define SPDIF_CS4205            0x68
-#define MODE_CS4205            0x5e
+#define AC97_ID_CS4297A		0x43525910
+#define AC97_ID_CS4299		0x43525930
+#define AC97_ID_CS4201		0x43525948
+#define AC97_ID_CS4205		0x43525958
 
 static const char *snd_ac97_stereo_enhancements[] =
 {
@@ -260,7 +265,7 @@ void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value
 	spin_lock(&ac97->reg_lock);
 	ac97->write(ac97, reg, ac97->regs[reg] = value);
 	spin_unlock(&ac97->reg_lock);
-	set_bit(reg, ac97->reg_accessed);
+	set_bit(reg, &ac97->reg_accessed);
 }
 
 #ifndef CONFIG_SND_DEBUG
@@ -760,7 +765,7 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 		case 2: x = 0; break;  // 48.0
 		default: x = 0; break; // illegal.
 		}
-		change = snd_ac97_update_bits(ac97, SPDIF_CS4205, 0x3fff, ((val & 0xcfff) | (x << 12)));
+		change = snd_ac97_update_bits(ac97, AC97_CSR_SPDIF, 0x3fff, ((val & 0xcfff) | (x << 12)));
 	} else {
 		change = snd_ac97_update_bits(ac97, AC97_SPDIF, 0x3fff, val);
 	}
@@ -798,9 +803,9 @@ static const snd_kcontrol_new_t snd_ac97_controls_spdif[5] = {
 	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "AC97-SPSA",AC97_EXTENDED_STATUS, 4, 3, 0)
 };
 
-static const snd_kcontrol_new_t snd_ac97_cs4205_controls_spdif[2] = {
-    AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH),SPDIF_CS4205, 15, 1, 0),
-    AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "AC97-SPSA",MODE_CS4205, 0, 3, 0)
+static const snd_kcontrol_new_t snd_ac97_cirrus_controls_spdif[2] = {
+    AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH), AC97_CSR_SPDIF, 15, 1, 0),
+    AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "AC97-SPSA", AC97_CSR_ACMODE, 0, 3, 0)
 };
 
 #define AD18XX_PCM_BITS(xname, codec, shift, mask) \
@@ -1007,6 +1012,21 @@ static void snd_ac97_change_volume_params2(ac97_t * ac97, int reg, int shift, un
 	snd_ac97_write_cache(ac97, reg, 0x8080);
 }
 
+static void snd_ac97_change_volume_params3(ac97_t * ac97, int reg, unsigned char *max)
+{
+	unsigned short val, val1;
+
+	*max = 31;
+	val = 0x8000 | 0x0010;
+	snd_ac97_write(ac97, reg, val);
+	val1 = snd_ac97_read(ac97, reg);
+	if (val != val1) {
+		*max = 15;
+	}
+	/* reset volume to zero */
+	snd_ac97_write_cache(ac97, reg, 0x8000);
+}
+
 static inline int printable(unsigned int x)
 {
 	x &= 0xff;
@@ -1034,7 +1054,7 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 	unsigned char max;
 
 	/* build master controls */
-	/* AD claims to remove this control from AD1887, although spec v2.2 don't allow this */
+	/* AD claims to remove this control from AD1887, although spec v2.2 does not allow this */
 	if (snd_ac97_try_volume_mix(ac97, AC97_MASTER)) {
 		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_master[0], ac97))) < 0)
 			return err;
@@ -1127,17 +1147,27 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 	
 	/* build Phone controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_PHONE)) {
-		for (idx = 0; idx < 2; idx++)
-			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_phone[idx], ac97))) < 0)
-				return err;
-		snd_ac97_write_cache(ac97, AC97_PHONE, 0x801f);
+		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_phone[0], ac97))) < 0)
+			return err;
+		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_phone[1], ac97))) < 0)
+			return err;
+		snd_ac97_change_volume_params3(ac97, AC97_PHONE, &max);
+		kctl->private_value &= ~(0xff << 16);
+		kctl->private_value |= (int)max << 16;
+		snd_ac97_write_cache(ac97, AC97_PHONE, 0x8000 | max);
 	}
 	
 	/* build MIC controls */
-	for (idx = 0; idx < 3; idx++)
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_mic[idx], ac97))) < 0)
+	snd_ac97_change_volume_params3(ac97, AC97_MIC, &max);
+	for (idx = 0; idx < 3; idx++) {
+		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_mic[idx], ac97))) < 0)
 			return err;
-	snd_ac97_write_cache(ac97, AC97_MIC, 0x801f);
+		if (idx == 1) {		// volume
+			kctl->private_value &= ~(0xff << 16);
+			kctl->private_value |= (int)max << 16;
+		}
+	}
+	snd_ac97_write_cache(ac97, AC97_MIC, 0x8000 | max);
 
 	/* build Line controls */
 	for (idx = 0; idx < 2; idx++)
@@ -1301,21 +1331,25 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 			for (idx = 0; idx < 3; idx++)
 				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_spdif[idx], ac97))) < 0)
 					return err;
-			for (idx = 0; idx < 2; idx++)
-				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_cs4205_controls_spdif[idx], ac97))) < 0)
+			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_cirrus_controls_spdif[0], ac97))) < 0)
+				return err;
+			switch (ac97->id) {
+			case AC97_ID_CS4205:
+				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_cirrus_controls_spdif[1], ac97))) < 0)
 					return err;
+				break;
+			}
+			/* set default PCM S/PDIF params */
+			/* consumer,PCM audio,no copyright,no preemphasis,PCM coder,original,48000Hz */
+			snd_ac97_write_cache(ac97, AC97_CSR_SPDIF, 0x0a20);
 		} else {
 			for (idx = 0; idx < 5; idx++)
 				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_spdif[idx], ac97))) < 0)
 					return err;
-		}
-
-		/* set default PCM S/PDIF params */
-		/* consumer,PCM audio,no copyright,no preemphasis,PCM coder,original,48000Hz */
-	        if (ac97->flags & AC97_CS_SPDIF)
-			snd_ac97_write_cache(ac97, SPDIF_CS4205, 0x0a20);
-		else 
+			/* set default PCM S/PDIF params */
+			/* consumer,PCM audio,no copyright,no preemphasis,PCM coder,original,48000Hz */
 			snd_ac97_write_cache(ac97, AC97_SPDIF, 0x2a20);
+		}
 
 		ac97->spdif_status = SNDRV_PCM_DEFAULT_CON_SPDIF;
 	}
@@ -1650,7 +1684,7 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 	}
 	if ((ext & 0x0004) || (ac97->flags & AC97_CS_SPDIF)) {
 	        if (ac97->flags & AC97_CS_SPDIF)
-			val = snd_ac97_read(ac97, SPDIF_CS4205);
+			val = snd_ac97_read(ac97, AC97_CSR_SPDIF);
 		else
 			val = snd_ac97_read(ac97, AC97_SPDIF);
 
@@ -1741,9 +1775,12 @@ static void snd_ac97_proc_regs_read(snd_info_entry_t *entry,
 static void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97)
 {
 	snd_info_entry_t *entry;
-	char name[12];
+	char name[32];
 
-	sprintf(name, "ac97#%d", ac97->addr);
+	if (ac97->num)
+		sprintf(name, "ac97#%d-%d", ac97->addr, ac97->num);
+	else
+		sprintf(name, "ac97#%d", ac97->addr);
 	if ((entry = snd_info_create_card_entry(card, name, card->proc_root)) != NULL) {
 		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->private_data = ac97;
@@ -1756,7 +1793,10 @@ static void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97)
 		}
 	}
 	ac97->proc_entry = entry;
-	sprintf(name, "ac97#%dregs", ac97->addr);
+	if (ac97->num)
+		sprintf(name, "ac97#%d-%dregs", ac97->addr, ac97->num);
+	else
+		sprintf(name, "ac97#%dregs", ac97->addr);
 	if ((entry = snd_info_create_card_entry(card, name, card->proc_root)) != NULL) {
 		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->private_data = ac97;
@@ -1903,30 +1943,31 @@ static int patch_sigmatel_stac9756(ac97_t * ac97)
 	return 0;
 }
 
-static int patch_cirrus_cs4299(ac97_t * ac97)
+static int patch_cirrus_spdif(ac97_t * ac97)
 {
-	ac97->flags |= AC97_HAS_PC_BEEP;	/* force the detection of PC Beep */
-	
-	return 0;
-}
-
-static int patch_cirrus_cs4205(ac97_t * ac97)
-{
-  /* Basically, the cs4205 has non-standard sp/dif registers.
-     WHY CAN'T ANYONE FOLLOW THE BLOODY SPEC?  *sigh*
-      - sp/dif EA ID is not set, but sp/dif is always present.
-        - enable/disable is spdif register bit 15.
-      - sp/dif control register is 0x68.  differs from AC97:
-        - valid is bit 14 (vs 15)
-	- no DRS
-	- only 44.1/48k [00 = 48, 01=44,1] (AC97 is 00=44.1, 10=48)
-      - sp/dif ssource select is in 0x5e bits 0,1.
-  */
+	/* Basically, the cs4201/cs4205/cs4297a has non-standard sp/dif registers.
+	   WHY CAN'T ANYONE FOLLOW THE BLOODY SPEC?  *sigh*
+	   - sp/dif EA ID is not set, but sp/dif is always present.
+	   - enable/disable is spdif register bit 15.
+	   - sp/dif control register is 0x68.  differs from AC97:
+	   - valid is bit 14 (vs 15)
+	   - no DRS
+	   - only 44.1/48k [00 = 48, 01=44,1] (AC97 is 00=44.1, 10=48)
+	   - sp/dif ssource select is in 0x5e bits 0,1.
+	*/
 
 	ac97->flags |= AC97_CS_SPDIF; 
         ac97->ext_id |= AC97_EA_SPDIF;	/* force the detection of spdif */
-	snd_ac97_write_cache(ac97, MODE_CS4205, 0x0080);
+	snd_ac97_write_cache(ac97, AC97_CSR_ACMODE, 0x0080);
 	return 0;
+}
+
+static int patch_cirrus_cs4299(ac97_t * ac97)
+{
+	/* force the detection of PC Beep */
+	ac97->flags |= AC97_HAS_PC_BEEP;
+	
+	return patch_cirrus_spdif(ac97);
 }
 
 static int patch_ad1819(ac97_t * ac97)
@@ -2163,7 +2204,7 @@ void snd_ac97_resume(ac97_t *ac97)
 		 * some chip (e.g. nm256) may hang up when unsupported registers
 		 * are accessed..!
 		 */
-		if (test_bit(i, ac97->reg_accessed))
+		if (test_bit(i, &ac97->reg_accessed))
 			snd_ac97_write(ac97, i, ac97->regs[i]);
 	}
 }

@@ -665,26 +665,26 @@ calc_pan(snd_emux_voice_t *vp)
 	}
 	LIMITVALUE(pan, 0, 255);
 
-#if 1
-	/* using volume table */
-	if (vp->apan != (int)pan_volumes[pan]) {
-		vp->apan = pan_volumes[pan];
-		vp->aaux = pan_volumes[255 - pan];
-		return 1;
-	}
-	return 0;
-#else
-	/* assuming linear volume */
-	if (pan != vp->apan) {
-		vp->apan = pan;
-		if (pan == 0)
-			vp->aaux = 0xff;
-		else
-			vp->aaux = (-pan) & 0xff;
-		return 1;
-	} else
+	if (vp->emu->linear_panning) {
+		/* assuming linear volume */
+		if (pan != vp->apan) {
+			vp->apan = pan;
+			if (pan == 0)
+				vp->aaux = 0xff;
+			else
+				vp->aaux = (-pan) & 0xff;
+			return 1;
+		} else
+			return 0;
+	} else {
+		/* using volume table */
+		if (vp->apan != (int)pan_volumes[pan]) {
+			vp->apan = pan_volumes[pan];
+			vp->aaux = pan_volumes[255 - pan];
+			return 1;
+		}
 		return 0;
-#endif
+	}
 }
 
 

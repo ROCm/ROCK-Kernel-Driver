@@ -23,12 +23,8 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  * 
  * 
- *   ToDo: - Switching to Mono (32, 32/8, 32Pro)
- *         - ADAT (32/8)
- *         - Doublespeed-Bit, 96kHz (32Pro)
- *         - DAC (32Pro)
- *         - full duplex should be possible
- *         - testing, testing, testing ....
+ *   ToDo: - ADAT (32/8)
+ *         - full duplex (32, 32/8, 32Pro)
  */
 
 #include <sound/driver.h>
@@ -65,7 +61,6 @@ MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{RME,Digi32}," "{RME,Digi32/8}," "{RME,Digi32 PRO}}");
 
 /* Defines for RME Digi32 series */
-#define RME32_DRIVER_VERSION "0.3.2"
 #define RME32_SPDIF_NCHANNELS 2
 
 /* Playback and capture buffer size */
@@ -83,7 +78,14 @@ MODULE_DEVICES("{{RME,Digi32}," "{RME,Digi32/8}," "{RME,Digi32 PRO}}");
 
 /* Write control register bits */
 #define RME32_WCR_START     (1 << 0)
-#define RME32_WCR_MONO      (1 << 1)
+#define RME32_WCR_MONO      (1 << 1)    /* 0: stereo, 1: mono
+                                           Setting the whole card to mono
+                                           don't seems to be very useful.
+                                           A software-solution can handle 
+                                           full-duplex with one direction in
+                                           stereo and the other way in mono. 
+                                           So, the hardware should work all 
+                                           the time in stereo! */
 #define RME32_WCR_MODE24    (1 << 2)
 #define RME32_WCR_SEL       (1 << 3)
 #define RME32_WCR_FREQ_0    (1 << 4)
@@ -93,7 +95,7 @@ MODULE_DEVICES("{{RME,Digi32}," "{RME,Digi32/8}," "{RME,Digi32 PRO}}");
 #define RME32_WCR_RESET     (1 << 8)
 #define RME32_WCR_MUTE      (1 << 9)
 #define RME32_WCR_PRO       (1 << 10)
-#define RME32_WCR_DS_BM     (1 << 11)	/* only PRO-Version */
+#define RME32_WCR_DS_BM     (1 << 11)	/* only PRO/Adat-Version */
 #define RME32_WCR_ADAT      (1 << 12)	/* only Adat-Version */
 #define RME32_WCR_AUTOSYNC  (1 << 13)
 #define RME32_WCR_PD        (1 << 14)	/* only PRO-Version */
@@ -169,9 +171,6 @@ typedef struct snd_rme32 {
 
 	u8 rev;			/* card revision number */
 
-	pid_t capture_pid;
-	pid_t playback_pid;
-
 	snd_pcm_substream_t *playback_substream;
 	snd_pcm_substream_t *capture_substream;
 
@@ -224,7 +223,7 @@ snd_rme32_playback_pointer(snd_pcm_substream_t * substream);
 static snd_pcm_uframes_t
 snd_rme32_capture_pointer(snd_pcm_substream_t * substream);
 
-static void __init snd_rme32_proc_init(rme32_t * rme32);
+static void snd_rme32_proc_init(rme32_t * rme32);
 
 static void snd_rme32_proc_done(rme32_t * rme32);
 
@@ -261,8 +260,9 @@ static int snd_rme32_playback_copy(snd_pcm_substream_t * substream, int channel,
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
 	count <<= rme32->playback_frlog;
 	pos <<= rme32->playback_frlog;
-	copy_from_user_toio(rme32->iobase + RME32_IO_DATA_BUFFER + pos,
-			    src, count);
+	if (copy_from_user_toio(rme32->iobase + RME32_IO_DATA_BUFFER + pos,
+			    src, count))
+		return -EFAULT;
 	return 0;
 }
 
@@ -273,9 +273,10 @@ static int snd_rme32_capture_copy(snd_pcm_substream_t * substream, int channel,	
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
 	count <<= rme32->capture_frlog;
 	pos <<= rme32->capture_frlog;
-	copy_to_user_fromio(dst,
+	if (copy_to_user_fromio(dst,
 			    rme32->iobase + RME32_IO_DATA_BUFFER + pos,
-			    count);
+			    count))
+		return -EFAULT;
 	return 0;
 }
 
@@ -285,10 +286,13 @@ static int snd_rme32_capture_copy(snd_pcm_substream_t * substream, int channel,	
 static snd_pcm_hardware_t snd_rme32_playback_spdif_info = {
 	info:		(SNDRV_PCM_INFO_MMAP |
 			 SNDRV_PCM_INFO_MMAP_VALID |
-			 SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_PAUSE),
-	formats:	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE),
+			 SNDRV_PCM_INFO_INTERLEAVED | 
+			 SNDRV_PCM_INFO_PAUSE),
+	formats:	(SNDRV_PCM_FMTBIT_S16_LE | 
+			 SNDRV_PCM_FMTBIT_S32_LE),
 	rates:		(SNDRV_PCM_RATE_32000 |
-			 SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000),
+			 SNDRV_PCM_RATE_44100 | 
+			 SNDRV_PCM_RATE_48000),
 	rate_min:	32000,
 	rate_max:	48000,
 	channels_min:	2,
@@ -323,6 +327,13 @@ static snd_pcm_hardware_t snd_rme32_capture_spdif_info = {
 	fifo_size:	0,
 };
 
+static void snd_rme32_reset_dac(rme32_t *rme32)
+{
+        writel(rme32->wcreg | RME32_WCR_PD,
+               rme32->iobase + RME32_IO_CONTROL_REGISTER);
+        writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
+}
+
 static int snd_rme32_playback_getrate(rme32_t * rme32)
 {
 	int rate;
@@ -342,7 +353,7 @@ static int snd_rme32_playback_getrate(rme32_t * rme32)
 	default:
 		return -1;
 	}
-	return rate;
+	return (rme32->wcreg & RME32_WCR_DS_BM) ? rate << 1 : rate;
 }
 
 static int snd_rme32_capture_getrate(rme32_t * rme32, int *is_adat)
@@ -403,20 +414,57 @@ static int snd_rme32_capture_getrate(rme32_t * rme32, int *is_adat)
 
 static int snd_rme32_playback_setrate(rme32_t * rme32, int rate)
 {
+        int ds;
+
+        ds = rme32->wcreg & RME32_WCR_DS_BM;
 	switch (rate) {
 	case 32000:
-		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) & ~RME32_WCR_FREQ_1;
+		rme32->wcreg &= ~RME32_WCR_DS_BM;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) & 
+			~RME32_WCR_FREQ_1;
 		break;
 	case 44100:
-		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_1) & ~RME32_WCR_FREQ_0;
+		rme32->wcreg &= ~RME32_WCR_DS_BM;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_1) & 
+			~RME32_WCR_FREQ_0;
 		break;
 	case 48000:
-		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) | RME32_WCR_FREQ_1;
+		rme32->wcreg &= ~RME32_WCR_DS_BM;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) | 
+			RME32_WCR_FREQ_1;
+		break;
+	case 64000:
+		if (rme32->pci->device != PCI_DEVICE_ID_DIGI32_PRO)
+			return -EINVAL;
+		rme32->wcreg |= RME32_WCR_DS_BM;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) & 
+			~RME32_WCR_FREQ_1;
+		break;
+	case 88200:
+		if (rme32->pci->device != PCI_DEVICE_ID_DIGI32_PRO)
+			return -EINVAL;
+		rme32->wcreg |= RME32_WCR_DS_BM;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_1) & 
+			~RME32_WCR_FREQ_0;
+		break;
+	case 96000:
+		if (rme32->pci->device != PCI_DEVICE_ID_DIGI32_PRO)
+			return -EINVAL;
+		rme32->wcreg |= RME32_WCR_DS_BM;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) | 
+			RME32_WCR_FREQ_1;
 		break;
 	default:
 		return -EINVAL;
 	}
-	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
+        if ((!ds && rme32->wcreg & RME32_WCR_DS_BM) ||
+            (ds && !(rme32->wcreg & RME32_WCR_DS_BM)))
+        {
+                /* change to/from double-speed: reset the DAC (if available) */
+                snd_rme32_reset_dac(rme32);
+        } else {
+                writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
+	}
 	return 0;
 }
 
@@ -424,16 +472,20 @@ static int snd_rme32_setclockmode(rme32_t * rme32, int mode)
 {
 	switch (mode) {
 	case RME32_CLOCKMODE_SLAVE:
-		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_FREQ_0) & ~RME32_WCR_FREQ_1;
+		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_FREQ_0) & 
+			~RME32_WCR_FREQ_1;
 		break;
 	case RME32_CLOCKMODE_MASTER_32:
-		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) & ~RME32_WCR_FREQ_1;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) & 
+			~RME32_WCR_FREQ_1;
 		break;
 	case RME32_CLOCKMODE_MASTER_44:
-		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_FREQ_0) | RME32_WCR_FREQ_1;
+		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_FREQ_0) | 
+			RME32_WCR_FREQ_1;
 		break;
 	case RME32_CLOCKMODE_MASTER_48:
-		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) | RME32_WCR_FREQ_1;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_FREQ_0) | 
+			RME32_WCR_FREQ_1;
 		break;
 	default:
 		return -EINVAL;
@@ -452,16 +504,20 @@ static int snd_rme32_setinputtype(rme32_t * rme32, int type)
 {
 	switch (type) {
 	case RME32_INPUT_OPTICAL:
-		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_INP_0) & ~RME32_WCR_INP_1;
+		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_INP_0) & 
+			~RME32_WCR_INP_1;
 		break;
 	case RME32_INPUT_COAXIAL:
-		rme32->wcreg = (rme32->wcreg | RME32_WCR_INP_0) & ~RME32_WCR_INP_1;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_INP_0) & 
+			~RME32_WCR_INP_1;
 		break;
 	case RME32_INPUT_INTERNAL:
-		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_INP_0) | RME32_WCR_INP_1;
+		rme32->wcreg = (rme32->wcreg & ~RME32_WCR_INP_0) | 
+			RME32_WCR_INP_1;
 		break;
 	case RME32_INPUT_XLR:
-		rme32->wcreg = (rme32->wcreg | RME32_WCR_INP_0) | RME32_WCR_INP_1;
+		rme32->wcreg = (rme32->wcreg | RME32_WCR_INP_0) | 
+			RME32_WCR_INP_1;
 		break;
 	default:
 		return -EINVAL;
@@ -702,12 +758,13 @@ static int snd_rme32_playback_spdif_open(snd_pcm_substream_t * substream)
 	rme32->playback_substream = substream;
 	rme32->playback_last_appl_ptr = 0;
 	rme32->playback_ptr = 0;
+	spin_unlock_irqrestore(&rme32->lock, flags);
 
 	runtime->hw = snd_rme32_playback_spdif_info;
-	rme32->playback_pid = current->pid;
-	rme32->playback_substream = substream;
-
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	if (rme32->pci->device == PCI_DEVICE_ID_DIGI32_PRO) {
+		runtime->hw.rates |= SNDRV_PCM_RATE_64000 | SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000;
+		runtime->hw.rate_max = 96000;
+	}
 
 	snd_pcm_hw_constraint_minmax(runtime,
 				     SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
@@ -743,7 +800,6 @@ static int snd_rme32_capture_spdif_open(snd_pcm_substream_t * substream)
 
 	spin_lock_irqsave(&rme32->lock, flags);
 
-	rme32->capture_pid = current->pid;
 	rme32->capture_substream = substream;
 	rme32->capture_ptr = 0;
 	spin_unlock_irqrestore(&rme32->lock, flags);
@@ -768,7 +824,6 @@ static int snd_rme32_playback_close(snd_pcm_substream_t * substream)
 	int spdif = 0;
 
 	spin_lock_irqsave(&rme32->lock, flags);
-	rme32->playback_pid = -1;
 	rme32->playback_substream = NULL;
 	rme32->playback_periodsize = 0;
 	spdif = (rme32->wcreg & RME32_WCR_ADAT) == 0;
@@ -788,7 +843,6 @@ static int snd_rme32_capture_close(snd_pcm_substream_t * substream)
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
 
 	spin_lock_irqsave(&rme32->lock, flags);
-	rme32->capture_pid = -1;
 	rme32->capture_substream = NULL;
 	rme32->capture_periodsize = 0;
 	spin_unlock_irqrestore(&rme32->lock, flags);
@@ -829,7 +883,6 @@ static int
 snd_rme32_playback_trigger(snd_pcm_substream_t * substream, int cmd)
 {
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
-	spin_lock(&rme32->lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		if (!RME32_ISWORKING(rme32)) {
@@ -864,7 +917,6 @@ snd_rme32_playback_trigger(snd_pcm_substream_t * substream, int cmd)
 	default:
 		return -EINVAL;
 	}
-	spin_unlock(&rme32->lock);
 	return 0;
 }
 
@@ -1011,7 +1063,7 @@ static void snd_rme32_free_spdif_pcm(snd_pcm_t * pcm)
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
-static int __init snd_rme32_create(rme32_t * rme32)
+static int __devinit snd_rme32_create(rme32_t * rme32)
 {
 	struct pci_dev *pci = rme32->pci;
 	int err;
@@ -1077,6 +1129,9 @@ static int __init snd_rme32_create(rme32_t * rme32)
 	snd_rme32_playback_stop(rme32);
 	snd_rme32_capture_stop(rme32);
 
+        /* reset DAC */
+        snd_rme32_reset_dac(rme32);
+
 	/* reset buffer pointer */
 	writel(0, rme32->iobase + RME32_IO_RESET_POS);
 
@@ -1095,8 +1150,6 @@ static int __init snd_rme32_create(rme32_t * rme32)
 	/* init proc interface */
 	snd_rme32_proc_init(rme32);
 
-	rme32->playback_pid = -1;
-	rme32->capture_pid = -1;
 	rme32->capture_substream = NULL;
 	rme32->playback_substream = NULL;
 
@@ -1119,8 +1172,6 @@ snd_rme32_proc_read(snd_info_entry_t * entry, snd_info_buffer_t * buffer)
 	snd_iprintf(buffer, " (index #%d)\n", rme32->card->number + 1);
 
 	snd_iprintf(buffer, "\nGeneral settings\n");
-	snd_iprintf(buffer, "  driver version: %s\n",
-		    RME32_DRIVER_VERSION);
 	if (RME32_PRO_WITH_8414(rme32)) {
 		snd_iprintf(buffer, "  receiver: CS8414\n");
 	} else {
@@ -1200,7 +1251,7 @@ snd_rme32_proc_read(snd_info_entry_t * entry, snd_info_buffer_t * buffer)
 	}
 }
 
-static void __init snd_rme32_proc_init(rme32_t * rme32)
+static void __devinit snd_rme32_proc_init(rme32_t * rme32)
 {
 	snd_info_entry_t *entry;
 
@@ -1596,7 +1647,7 @@ static void snd_rme32_card_free(snd_card_t * card)
 	snd_rme32_free(card->private_data);
 }
 
-static int __init
+static int __devinit
 snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *id)
 {
 	static int dev = 0;
@@ -1650,7 +1701,7 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *id)
 	return 0;
 }
 
-static void __exit snd_rme32_remove(struct pci_dev *pci)
+static void __devexit snd_rme32_remove(struct pci_dev *pci)
 {
 	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
@@ -1660,7 +1711,7 @@ static struct pci_driver driver = {
 	name:		"RME Digi32",
 	id_table:	snd_rme32_ids,
 	probe:		snd_rme32_probe,
-	remove:		snd_rme32_remove,
+	remove:		__devexit_p(snd_rme32_remove),
 };
 
 static int __init alsa_card_rme32_init(void)

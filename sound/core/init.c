@@ -33,7 +33,7 @@ static unsigned int snd_cards_lock = 0;	/* locked for registering/using */
 snd_card_t *snd_cards[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = NULL};
 rwlock_t snd_card_rwlock = RW_LOCK_UNLOCKED;
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 int (*snd_mixer_oss_notify_callback)(snd_card_t *card, int free_flag);
 #endif
 
@@ -135,7 +135,7 @@ int snd_card_free(snd_card_t * card)
 	snd_cards[card->number] = NULL;
 	snd_cards_count--;
 	write_unlock(&snd_card_rwlock);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	if (snd_mixer_oss_notify_callback)
 		snd_mixer_oss_notify_callback(card, 1);
 #endif
@@ -177,10 +177,15 @@ int snd_card_register(snd_card_t * card)
 	if ((err = snd_device_register_all(card)) < 0)
 		return err;
 	write_lock(&snd_card_rwlock);
+	if (snd_cards[card->number]) {
+		/* already registered */
+		write_unlock(&snd_card_rwlock);
+		return 0;
+	}
 	snd_cards[card->number] = card;
 	snd_cards_count++;
 	write_unlock(&snd_card_rwlock);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	if (snd_mixer_oss_notify_callback)
 		snd_mixer_oss_notify_callback(card, 0);
 #endif

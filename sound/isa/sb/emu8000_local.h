@@ -39,4 +39,7 @@ void snd_emu8000_sample_reset(snd_emux_t *rec);
 /* emu8000_callback.c */
 void snd_emu8000_ops_setup(emu8000_t *emu);
 
+/* emu8000_pcm.c */
+int snd_emu8000_pcm_new(snd_card_t *card, emu8000_t *emu, int index);
+
 #endif	/* __EMU8000_LOCAL_H */

@@ -45,13 +45,11 @@
 #include <asm/prom.h>
 #include <asm/machdep.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) || defined(CONFIG_ADB_CUDA)
-#define PMAC_AMP_AVAIL
-#endif
-
 /* maximum number of fragments */
 #define PMAC_MAX_FRAGS		32
 
+
+#define PMAC_SUPPORT_AUTOMUTE
 
 /*
  * typedefs
@@ -138,13 +136,11 @@ struct snd_pmac {
 	unsigned int can_duplex : 1;
 	unsigned int can_capture : 1;
 
-#ifdef PMAC_AMP_AVAIL
-	unsigned int amp_only;
-	int amp_vol[2];
-#endif
-
+	unsigned int auto_mute : 1;
 	unsigned int initialized : 1;
 	unsigned int feature_is_set : 1;
+
+	unsigned int of_requested;
 
 	int num_freqs;
 	int *freq_table;
@@ -157,6 +153,7 @@ struct snd_pmac {
 	spinlock_t reg_lock;
 	volatile struct awacs_regs *awacs;
 	int awacs_reg[8]; /* register cache */
+	unsigned int hp_stat_mask;
 
 	unsigned char *latch_base;
 	unsigned char *macio_base;
@@ -177,10 +174,14 @@ struct snd_pmac {
 	/* mixer stuffs */
 	void *mixer_data;
 	void (*mixer_free)(pmac_t *);
+	snd_kcontrol_t *master_sw_ctl;
+	snd_kcontrol_t *speaker_sw_ctl;
+	snd_kcontrol_t *hp_detect_ctl;
 
 	/* lowlevel callbacks */
 	void (*set_format)(pmac_t *chip);
-	void (*port_change)(pmac_t *chip);
+	void (*update_automute)(pmac_t *chip, int do_notify);
+	int (*detect_headphone)(pmac_t *chip);
 #ifdef CONFIG_PMAC_PBOOK
 	unsigned int sleep_registered : 1;
 	void (*suspend)(pmac_t *chip);
@@ -203,18 +204,22 @@ int snd_pmac_tumbler_init(pmac_t *chip);
 
 /* i2c functions */
 typedef struct snd_pmac_keywest {
-	unsigned long base;
 	int addr;
-	int steps;
+	struct i2c_client *client;
+	int id;
+	int (*init_client)(struct snd_pmac_keywest *i2c);
+	char *name;
 } pmac_keywest_t;
 
-int snd_pmac_keywest_find(pmac_t *chip, pmac_keywest_t *i2c, int addr, int (*init_client)(pmac_t *, pmac_keywest_t *));
+int snd_pmac_keywest_init(pmac_keywest_t *i2c);
 void snd_pmac_keywest_cleanup(pmac_keywest_t *i2c);
-int snd_pmac_keywest_write(pmac_keywest_t *i2c, unsigned char cmd, int len, unsigned char *data);
-inline static int snd_pmac_keywest_write_byte(pmac_keywest_t *i2c, unsigned char cmd, unsigned char data)
-{
-	return snd_pmac_keywest_write(i2c, cmd, 1, &data);
-}
+#define snd_pmac_keywest_write(i2c,cmd,len,data) i2c_smbus_write_block_data((i2c)->client, cmd, len, data)
+#define snd_pmac_keywest_write_byte(i2c,cmd,data) i2c_smbus_write_byte_data((i2c)->client, cmd, data)
 
+/* misc */
+int snd_pmac_boolean_stereo_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo);
+int snd_pmac_boolean_mono_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo);
+
+int snd_pmac_add_automute(pmac_t *chip);
 
 #endif /* __PMAC_H */
