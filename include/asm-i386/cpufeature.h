@@ -9,9 +9,9 @@
 
 #include <linux/bitops.h>
 
-#define NCAPINTS	4	/* Currently we have 4 32-bit words worth of info */
+#define NCAPINTS	6	/* Currently we have 6 32-bit words worth of info */
 
-/* Intel-defined CPU features, CPUID level 0x00000001, word 0 */
+/* Intel-defined CPU features, CPUID level 0x00000001 (edx), word 0 */
 #define X86_FEATURE_FPU		(0*32+ 0) /* Onboard FPU */
 #define X86_FEATURE_VME		(0*32+ 1) /* Virtual Mode Extensions */
 #define X86_FEATURE_DE		(0*32+ 2) /* Debugging Extensions */
@@ -64,6 +64,11 @@
 #define X86_FEATURE_CYRIX_ARR	(3*32+ 2) /* Cyrix ARRs (= MTRRs) */
 #define X86_FEATURE_CENTAUR_MCR	(3*32+ 3) /* Centaur MCRs (= MTRRs) */
 
+/* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
+
+/* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
+#define X86_FEATURE_XSTORE	(5*32+ 2) /* on-CPU RNG present (xstore insn) */
+
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
@@ -87,6 +92,7 @@
 #define cpu_has_k6_mtrr		boot_cpu_has(X86_FEATURE_K6_MTRR)
 #define cpu_has_cyrix_arr	boot_cpu_has(X86_FEATURE_CYRIX_ARR)
 #define cpu_has_centaur_mcr	boot_cpu_has(X86_FEATURE_CENTAUR_MCR)
+#define cpu_has_xstore		boot_cpu_has(X86_FEATURE_XSTORE)
 
 #endif /* __ASM_I386_CPUFEATURE_H */
 

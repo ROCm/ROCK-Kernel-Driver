@@ -212,18 +212,25 @@ cond_syscall(sys_delete_module)
 
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
+	int no_nice;
+
 	if (p->uid != current->euid &&
 		p->uid != current->uid && !capable(CAP_SYS_NICE)) {
 		error = -EPERM;
 		goto out;
 	}
-
+	if (niceval < task_nice(p) && !capable(CAP_SYS_NICE)) {
+		error = -EACCES;
+		goto out;
+	}
+	no_nice = security_task_setnice(p, niceval);
+	if (no_nice) {
+		error = no_nice;
+		goto out;
+	}
 	if (error == -ESRCH)
 		error = 0;
-	if (niceval < task_nice(p) && !capable(CAP_SYS_NICE))
-		error = -EACCES;
-	else
-		set_user_nice(p, niceval);
+	set_user_nice(p, niceval);
 out:
 	return error;
 }
@@ -941,6 +948,10 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 	}
 
 ok_pgid:
+	err = security_task_setpgid(p, pgid);
+	if (err)
+		goto out;
+
 	if (p->pgrp != pgid) {
 		detach_pid(p, PIDTYPE_PGID);
 		p->pgrp = pgid;

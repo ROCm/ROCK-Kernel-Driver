@@ -29,8 +29,6 @@
 
 #include "saa7134-reg.h"
 #include "saa7134.h"
-#include "tuner.h"
-#include "audiochip.h"
 
 /* ------------------------------------------------------------------ */
 

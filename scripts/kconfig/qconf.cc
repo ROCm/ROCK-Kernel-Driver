@@ -42,15 +42,12 @@ static QSettings *configSettings;
  * menu: entry to be updated
  */
 template <class P>
-static void updateMenuList(P* parent, struct menu* menu)
+void ConfigList::updateMenuList(P* parent, struct menu* menu)
 {
 	struct menu* child;
-	ConfigList* list = parent->listView();
 	ConfigItem* item;
 	ConfigItem* last;
 	bool visible;
-	bool showAll = list->showAll;
-	enum listMode mode = list->mode;
 	enum prop_type type;
 
 	if (!menu) {
@@ -59,7 +56,9 @@ static void updateMenuList(P* parent, struct menu* menu)
 		return;
 	}
 
-	last = 0;
+	last = parent->firstChild();
+	if (last && !last->goParent)
+		last = 0;
 	for (child = menu->list; child; child = child->next) {
 		item = last ? last->nextSibling() : parent->firstChild();
 		type = child->prompt ? child->prompt->type : P_UNKNOWN;
@@ -81,16 +80,8 @@ static void updateMenuList(P* parent, struct menu* menu)
 		if (showAll || visible) {
 			if (!item || item->menu != child)
 				item = new ConfigItem(parent, last, child, visible);
-			else {
-				item->visible = visible;
-				if (item->updateNeeded()) {
-					ConfigItem* i = (ConfigItem*)child->data;
-					for (; i; i = i->nextItem) {
-						i->updateMenu();
-					}
-				} else if (list->updateAll)
-					item->updateMenu();
-			}
+			else
+				item->testUpdateMenu(visible);
 
 			if (mode == fullMode || mode == menuMode ||
 			    (type != P_MENU && type != P_ROOTMENU))
@@ -100,7 +91,7 @@ static void updateMenuList(P* parent, struct menu* menu)
 			last = item;
 			continue;
 		}
-	hide:	
+	hide:
 		if (item && item->menu == child) {
 			last = parent->firstChild();
 			if (last == item)
@@ -131,24 +122,46 @@ void ConfigItem::updateMenu(void)
 {
 	ConfigList* list;
 	struct symbol* sym;
+	struct property *prop;
 	QString prompt;
 	int type;
-	enum prop_type ptype;
 	tristate expr;
 
 	list = listView();
+	if (goParent) {
+		setPixmap(promptColIdx, list->menuBackPix);
+		prompt = "..";
+		goto set_prompt;
+	}
 
 	sym = menu->sym;
-	if (!sym) {
-		setText(promptColIdx, menu_get_prompt(menu));
-		ptype = menu->prompt ? menu->prompt->type : P_UNKNOWN;
-		if ((ptype == P_ROOTMENU || ptype == P_MENU) &&
-		    (list->mode == singleMode || list->mode == symbolMode))
+	prop = menu->prompt;
+	prompt = menu_get_prompt(menu);
+
+	if (prop) switch (prop->type) {
+	case P_MENU:
+	case P_ROOTMENU:
+		if (list->mode == singleMode || list->mode == symbolMode) {
+			/* a menuconfig entry is displayed differently
+			 * depending whether it's at the view root or a child.
+			 */
+			if (sym && list->rootEntry == menu)
+				break;
 			setPixmap(promptColIdx, list->menuPix);
-		else
+		} else {
+			if (sym)
+				break;
 			setPixmap(promptColIdx, 0);
-		return;
+		}
+		goto set_prompt;
+	case P_COMMENT:
+		setPixmap(promptColIdx, 0);
+		goto set_prompt;
+	default:
+		;
 	}
+	if (!sym)
+		goto set_prompt;
 
 	setText(nameColIdx, sym->name);
 
@@ -158,7 +171,6 @@ void ConfigItem::updateMenu(void)
 	case S_TRISTATE:
 		char ch;
 
-		prompt = menu_get_prompt(menu);
 		if (!sym_is_changable(sym) && !list->showAll) {
 			setText(noColIdx, 0);
 			setText(modColIdx, 0);
@@ -211,26 +223,33 @@ void ConfigItem::updateMenu(void)
 #endif
 		setText(dataColIdx, data);
 		if (type == S_STRING)
-			prompt.sprintf("%s: %s", menu_get_prompt(menu), data);
+			prompt.sprintf("%s: %s", prompt.latin1(), data);
 		else
-			prompt.sprintf("(%s) %s", data, menu_get_prompt(menu));
+			prompt.sprintf("(%s) %s", data, prompt.latin1());
 		break;
 	}
 	if (!sym_has_value(sym) && visible)
 		prompt += " (NEW)";
+set_prompt:
 	setText(promptColIdx, prompt);
 }
 
-bool ConfigItem::updateNeeded(void)
+void ConfigItem::testUpdateMenu(bool v)
 {
-	struct symbol* sym = menu->sym;
-	if (sym)
-		sym_calc_value(sym);
+	ConfigItem* i;
+
+	visible = v;
+	if (!menu)
+		return;
+
+	sym_calc_value(menu->sym);
 	if (menu->flags & MENU_CHANGED) {
+		/* the menu entry changed, so update all list items */
 		menu->flags &= ~MENU_CHANGED;
-		return true;
-	}
-	return false;
+		for (i = (ConfigItem*)menu->data; i; i = i->nextItem)
+			i->updateMenu();
+	} else if (listView()->updateAll)
+		updateMenu();
 }
 
 void ConfigItem::paintCell(QPainter* p, const QColorGroup& cg, int column, int width, int align)
@@ -251,14 +270,15 @@ void ConfigItem::paintCell(QPainter* p, const QColorGroup& cg, int column, int w
  */
 void ConfigItem::init(void)
 {
-	ConfigList* list = listView();
-	nextItem = (ConfigItem*)menu->data;
-	menu->data = this;
+	if (menu) {
+		ConfigList* list = listView();
+		nextItem = (ConfigItem*)menu->data;
+		menu->data = this;
 
-	if (list->mode != fullMode)
-		setOpen(TRUE);
-	if (menu->sym)
+		if (list->mode != fullMode)
+			setOpen(TRUE);
 		sym_calc_value(menu->sym);
+	}
 	updateMenu();
 }
 
@@ -267,11 +287,13 @@ void ConfigItem::init(void)
  */
 ConfigItem::~ConfigItem(void)
 {
-	ConfigItem** ip = &(ConfigItem*)menu->data;
-	for (; *ip; ip = &(*ip)->nextItem) {
-		if (*ip == this) {
-			*ip = nextItem;
-			break;
+	if (menu) {
+		ConfigItem** ip = &(ConfigItem*)menu->data;
+		for (; *ip; ip = &(*ip)->nextItem) {
+			if (*ip == this) {
+				*ip = nextItem;
+				break;
+			}
 		}
 	}
 }
@@ -310,7 +332,8 @@ ConfigList::ConfigList(ConfigView* p, ConfigMainWindow* cv)
 	: Parent(p), cview(cv),
 	  updateAll(false),
 	  symbolYesPix(xpm_symbol_yes), symbolModPix(xpm_symbol_mod), symbolNoPix(xpm_symbol_no),
-	  choiceYesPix(xpm_choice_yes), choiceNoPix(xpm_choice_no), menuPix(xpm_menu), menuInvPix(xpm_menu_inv),
+	  choiceYesPix(xpm_choice_yes), choiceNoPix(xpm_choice_no),
+	  menuPix(xpm_menu), menuInvPix(xpm_menu_inv), menuBackPix(xpm_menuback),
 	  showAll(false), showName(false), showRange(false), showData(false),
 	  rootEntry(0)
 {
@@ -366,6 +389,8 @@ void ConfigList::updateSelection(void)
 	cview->setHelp(item);
 
 	menu = item->menu;
+	if (!menu)
+		return;
 	type = menu->prompt ? menu->prompt->type : P_UNKNOWN;
 	if (mode == menuMode && (type == P_MENU || type == P_ROOTMENU))
 		emit menuSelected(menu);
@@ -373,7 +398,27 @@ void ConfigList::updateSelection(void)
 
 void ConfigList::updateList(ConfigItem* item)
 {
-	(void)item;	// unused so far
+	ConfigItem* last = 0;
+
+	if (!rootEntry)
+		goto update;
+
+	if ((mode == singleMode || mode == symbolMode) && rootEntry != &rootmenu) {
+		item = firstChild();
+		if (!item)
+			item = new ConfigItem(this, 0, true);
+		last = item;
+	}
+	if (mode == singleMode && rootEntry->sym && rootEntry->prompt) {
+		item = last ? last->nextSibling() : firstChild();
+		if (!item)
+			item = new ConfigItem(this, last, rootEntry, true);
+
+		updateMenuList(item, rootEntry);
+		triggerUpdate();
+		return;
+	}
+update:
 	updateMenuList(this, rootEntry);
 	triggerUpdate();
 }
@@ -392,7 +437,7 @@ void ConfigList::setValue(ConfigItem* item, tristate val)
 	int type;
 	tristate oldval;
 
-	sym = item->menu->sym;
+	sym = item->menu ? item->menu->sym : 0;
 	if (!sym)
 		return;
 
@@ -418,6 +463,8 @@ void ConfigList::changeValue(ConfigItem* item)
 	int type, oldexpr, newexpr;
 
 	menu = item->menu;
+	if (!menu)
+		return;
 	sym = menu->sym;
 	if (!sym) {
 		if (item->menu->list)
@@ -511,7 +558,13 @@ void ConfigList::keyPressEvent(QKeyEvent* ev)
 	switch (ev->key()) {
 	case Key_Return:
 	case Key_Enter:
+		if (item->goParent) {
+			emit parentSelected();
+			break;
+		}
 		menu = item->menu;
+		if (!menu)
+			break;
 		type = menu->prompt ? menu->prompt->type : P_UNKNOWN;
 		if ((type == P_MENU || type == P_ROOTMENU) && mode != fullMode) {
 			emit menuSelected(menu);
@@ -564,7 +617,11 @@ void ConfigList::contentsMouseReleaseEvent(QMouseEvent* e)
 			int off = header()->sectionPos(0) + itemMargin() +
 				treeStepSize() * (item->depth() + (rootIsDecorated() ? 1 : 0));
 			if (x >= off && x < off + pm->width()) {
-				if (menu->sym)
+				if (item->goParent)
+					emit parentSelected();
+				else if (!menu)
+					break;
+				else if (menu->sym)
 					changeValue(item);
 				else
 					emit menuSelected(menu);
@@ -606,7 +663,13 @@ void ConfigList::contentsMouseDoubleClickEvent(QMouseEvent* e)
 
 	if (!item)
 		goto skip;
+	if (item->goParent) {
+		emit parentSelected();
+		goto skip;
+	}
 	menu = item->menu;
+	if (!menu)
+		goto skip;
 	ptype = menu->prompt ? menu->prompt->type : P_UNKNOWN;
 	if ((ptype == P_ROOTMENU || ptype == P_MENU) &&
 	    (mode == singleMode || mode == symbolMode))
@@ -677,7 +740,6 @@ void ConfigView::updateListAll(void)
  */
 ConfigMainWindow::ConfigMainWindow(void)
 {
-	ConfigView* view;
 	QMenuBar* menu;
 	QSplitter* split1;
 	QSplitter* split2;
@@ -707,15 +769,15 @@ ConfigMainWindow::ConfigMainWindow(void)
 	split1->setOrientation(QSplitter::Horizontal);
 	setCentralWidget(split1);
 
-	view = new ConfigView(split1, this);
-	menuList = view->list;
+	menuView = new ConfigView(split1, this);
+	menuList = menuView->list;
 
 	split2 = new QSplitter(split1);
 	split2->setOrientation(QSplitter::Vertical);
 
 	// create config tree
-	view = new ConfigView(split2, this);
-	configList = view->list;
+	configView = new ConfigView(split2, this);
+	configList = configView->list;
 
 	helpText = new QTextView(split2);
 	helpText->setTextFormat(Qt::RichText);
@@ -864,89 +926,87 @@ static void expr_print_help(void *data, const char *str)
 void ConfigMainWindow::setHelp(QListViewItem* item)
 {
 	struct symbol* sym;
-	struct menu* menu;
+	struct menu* menu = 0;
 
 	configList->parent()->lineEdit->hide();
-	if (item) {
-		QString head, debug, help;
+	if (item)
 		menu = ((ConfigItem*)item)->menu;
-		sym = menu->sym;
-		if (sym) {
-			if (menu->prompt) {
-				head += "<big><b>";
-				head += print_filter(menu->prompt->text);
-				head += "</b></big>";
-				if (sym->name) {
-					head += " (";
-					head += print_filter(sym->name);
-					head += ")";
-				}
-			} else if (sym->name) {
-				head += "<big><b>";
-				head += print_filter(sym->name);
-				head += "</b></big>";
-			}
-			head += "<br><br>";
+	if (!menu) {
+		helpText->setText(NULL);
+		return;
+	}
 
-			if (showDebug) {
-				debug += "type: ";
-				debug += print_filter(sym_type_name(sym->type));
-				debug += "<br>";
-				for (struct property *prop = sym->prop; prop; prop = prop->next) {
-					switch (prop->type) {
-					case P_PROMPT:
-						debug += "prompt: ";
-						debug += print_filter(prop->text);
-						debug += "<br>";
-						if (prop->visible.expr) {
-							debug += "&nbsp;&nbsp;dep: ";
-							expr_print(prop->visible.expr, expr_print_help, &debug, E_NONE);
-							debug += "<br>";
-						}
-						break;
-					case P_DEFAULT:
-						debug += "default: ";
-						if (sym_is_choice(sym))
-							debug += print_filter(prop->def->name);
-						else {
-							sym_calc_value(prop->def);
-							debug += print_filter(sym_get_string_value(prop->def));
-						}
-						debug += "<br>";
-						if (prop->visible.expr) {
-							debug += "&nbsp;&nbsp;dep: ";
-							expr_print(prop->visible.expr, expr_print_help, &debug, E_NONE);
-							debug += "<br>";
-						}
-						break;
-					case P_CHOICE:
-						break;
-					default:
-						debug += "unknown property: ";
-						debug += prop_get_type_name(prop->type);
-						debug += "<br>";
-					}
-				}
-				debug += "<br>";
-			}
-
-			help = print_filter(sym->help);
-		} else if (menu->prompt) {
+	QString head, debug, help;
+	menu = ((ConfigItem*)item)->menu;
+	sym = menu->sym;
+	if (sym) {
+		if (menu->prompt) {
 			head += "<big><b>";
 			head += print_filter(menu->prompt->text);
-			head += "</b></big><br><br>";
-			if (showDebug) {
-				if (menu->prompt->visible.expr) {
-					debug += "&nbsp;&nbsp;dep: ";
-					expr_print(menu->prompt->visible.expr, expr_print_help, &debug, E_NONE);
+			head += "</b></big>";
+			if (sym->name) {
+				head += " (";
+				head += print_filter(sym->name);
+				head += ")";
+			}
+		} else if (sym->name) {
+			head += "<big><b>";
+			head += print_filter(sym->name);
+			head += "</b></big>";
+		}
+		head += "<br><br>";
+
+		if (showDebug) {
+			debug += "type: ";
+			debug += print_filter(sym_type_name(sym->type));
+			debug += "<br>";
+			for (struct property *prop = sym->prop; prop; prop = prop->next) {
+				switch (prop->type) {
+				case P_PROMPT:
+					debug += "prompt: ";
+					debug += print_filter(prop->text);
+					debug += "<br>";
+					if (prop->visible.expr) {
+						debug += "&nbsp;&nbsp;dep: ";
+						expr_print(prop->visible.expr, expr_print_help, &debug, E_NONE);
+						debug += "<br>";
+					}
+					break;
+				case P_DEFAULT:
+					debug += "default: ";
+					debug += print_filter(prop->def->name);
+					debug += "<br>";
+					if (prop->visible.expr) {
+						debug += "&nbsp;&nbsp;dep: ";
+						expr_print(prop->visible.expr, expr_print_help, &debug, E_NONE);
+						debug += "<br>";
+					}
+					break;
+				case P_CHOICE:
+					break;
+				default:
+					debug += "unknown property: ";
+					debug += prop_get_type_name(prop->type);
 					debug += "<br>";
 				}
 			}
+			debug += "<br>";
 		}
-		helpText->setText(head + debug + help);
-		return;
+
+		help = print_filter(sym->help);
+	} else if (menu->prompt) {
+		head += "<big><b>";
+		head += print_filter(menu->prompt->text);
+		head += "</b></big><br><br>";
+		if (showDebug) {
+			if (menu->prompt->visible.expr) {
+				debug += "&nbsp;&nbsp;dep: ";
+				expr_print(menu->prompt->visible.expr, expr_print_help, &debug, E_NONE);
+				debug += "<br>";
+			}
+		}
 	}
-	helpText->setText(NULL);
+	helpText->setText(head + debug + help);
 }
 
 void ConfigMainWindow::loadConfig(void)
@@ -1010,7 +1070,7 @@ void ConfigMainWindow::goBack(void)
 
 void ConfigMainWindow::showSingleView(void)
 {
-	menuList->hide();
+	menuView->hide();
 	menuList->setRootMenu(0);
 	configList->mode = singleMode;
 	if (configList->rootEntry == &rootmenu)
@@ -1032,14 +1092,14 @@ void ConfigMainWindow::showSplitView(void)
 	configApp->processEvents();
 	menuList->mode = menuMode;
 	menuList->setRootMenu(&rootmenu);
-	menuList->show();
 	menuList->setAllOpen(TRUE);
+	menuView->show();
 	menuList->setFocus();
 }
 
 void ConfigMainWindow::showFullView(void)
 {
-	menuList->hide();
+	menuView->hide();
 	menuList->setRootMenu(0);
 	configList->mode = fullMode;
 	if (configList->rootEntry == &rootmenu)

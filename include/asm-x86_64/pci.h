@@ -279,4 +279,7 @@ extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 
 #endif /* __KERNEL__ */
 
+/* generic pci stuff */
+#include <asm-generic/pci.h>
+
 #endif /* __x8664_PCI_H */

@@ -32,9 +32,7 @@ static int affs_symlink_readpage(struct file *file, struct page *page)
 	pr_debug("AFFS: follow_link(ino=%lu)\n",inode->i_ino);
 
 	err = -EIO;
-	lock_kernel();
 	bh = affs_bread(inode->i_sb, inode->i_ino);
-	unlock_kernel();
 	if (!bh)
 		goto fail;
 	i  = 0;
@@ -63,9 +61,7 @@ static int affs_symlink_readpage(struct file *file, struct page *page)
 		j++;
 	}
 	link[i] = '\0';
-	lock_kernel();
 	affs_brelse(bh);
-	unlock_kernel();
 	SetPageUptodate(page);
 	kunmap(page);
 	unlock_page(page);

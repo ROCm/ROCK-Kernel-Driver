@@ -4,7 +4,7 @@
 
 # EXTRA_AFLAGS = -mips3 -mcpu=r4000 # not used?
 
-EXTRA_TARGETS	:= head.o init_task.o
+extra-y				:= head.o init_task.o
 obj-y				+= branch.o process.o signal.o entry.o \
 				   traps.o ptrace.o vm86.o ioport.o reset.o \
 				   semaphore.o setup.o syscall.o sysmips.o \

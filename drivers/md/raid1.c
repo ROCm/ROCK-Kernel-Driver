@@ -225,13 +225,12 @@ static void reschedule_retry(r1bio_t *r1_bio)
 {
 	unsigned long flags;
 	mddev_t *mddev = r1_bio->mddev;
-	conf_t *conf = mddev_to_conf(mddev);
 
 	spin_lock_irqsave(&retry_list_lock, flags);
 	list_add(&r1_bio->retry_list, &retry_list_head);
 	spin_unlock_irqrestore(&retry_list_lock, flags);
 
-	md_wakeup_thread(conf->thread);
+	md_wakeup_thread(mddev->thread);
 }
 
 /*
@@ -320,7 +319,7 @@ static int end_request(struct bio *bio, unsigned int bytes_done, int error)
 		 * already.
 		 */
 		if (atomic_dec_and_test(&r1_bio->remaining)) {
-			md_write_end(r1_bio->mddev,conf->thread);
+			md_write_end(r1_bio->mddev);
 			raid_end_bio_io(r1_bio, uptodate);
 		}	
 	}
@@ -494,7 +493,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 			BUG();
 		r1_bio->read_bio = read_bio;
 
-		read_bio->bi_sector = r1_bio->sector;
+		read_bio->bi_sector = r1_bio->sector + mirror->rdev->data_offset;
 		read_bio->bi_bdev = mirror->rdev->bdev;
 		read_bio->bi_end_io = end_request;
 		read_bio->bi_rw = r1_bio->cmd;
@@ -529,7 +528,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		mbio = bio_clone(bio, GFP_NOIO);
 		r1_bio->write_bios[i] = mbio;
 
-		mbio->bi_sector	= r1_bio->sector;
+		mbio->bi_sector	= r1_bio->sector + conf->mirrors[i].rdev->data_offset;
 		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
 		mbio->bi_end_io	= end_request;
 		mbio->bi_rw = r1_bio->cmd;
@@ -542,7 +541,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		 * If all mirrors are non-operational
 		 * then return an IO error:
 		 */
-		md_write_end(mddev,conf->thread);
+		md_write_end(mddev);
 		raid_end_bio_io(r1_bio, 0);
 		return 0;
 	}
@@ -571,19 +570,18 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	return 0;
 }
 
-static int status(char *page, mddev_t *mddev)
+static void status(struct seq_file *seq, mddev_t *mddev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
-	int sz = 0, i;
+	int i;
 
-	sz += sprintf(page+sz, " [%d/%d] [", conf->raid_disks,
+	seq_printf(seq, " [%d/%d] [", conf->raid_disks,
 						conf->working_disks);
 	for (i = 0; i < conf->raid_disks; i++)
-		sz += sprintf(page+sz, "%s",
+		seq_printf(seq, "%s",
 			      conf->mirrors[i].rdev &&
 			      conf->mirrors[i].rdev->in_sync ? "U" : "_");
-	sz += sprintf (page+sz, "]");
-	return sz;
+	seq_printf(seq, "]");
 }
 
 #define LAST_DISK KERN_ALERT \
@@ -624,10 +622,9 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 		mddev->degraded++;
 		conf->working_disks--;
 		/*
-		 * if recovery was running, stop it now.
+		 * if recovery is running, make sure it aborts.
 		 */
-		if (mddev->recovery_running) 
-			mddev->recovery_running = -EIO;
+		set_bit(MD_RECOVERY_ERR, &mddev->recovery);
 	}
 	rdev->in_sync = 0;
 	rdev->faulty = 1;
@@ -859,7 +856,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		mbio = bio_clone(bio, GFP_NOIO);
 		r1_bio->write_bios[i] = mbio;
 		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
-		mbio->bi_sector = r1_bio->sector;
+		mbio->bi_sector = r1_bio->sector | conf->mirrors[i].rdev->data_offset;
 		mbio->bi_end_io	= end_sync_write;
 		mbio->bi_rw = WRITE;
 		mbio->bi_private = r1_bio;
@@ -900,17 +897,17 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
  *	3.	Performs writes following reads for array syncronising.
  */
 
-static void raid1d(void *data)
+static void raid1d(mddev_t *mddev)
 {
 	struct list_head *head = &retry_list_head;
 	r1bio_t *r1_bio;
 	struct bio *bio;
 	unsigned long flags;
-	mddev_t *mddev;
-	conf_t *conf = data;
+	conf_t *conf = mddev_to_conf(mddev);
 	mdk_rdev_t *rdev;
 
-	md_handle_safemode(conf->mddev);
+	md_check_recovery(mddev);
+	md_handle_safemode(mddev);
 	
 	for (;;) {
 		spin_lock_irqsave(&retry_list_lock, flags);
@@ -937,7 +934,7 @@ static void raid1d(void *data)
 			printk(REDIRECT_SECTOR,
 				bdev_partition_name(rdev->bdev), (unsigned long long)r1_bio->sector);
 			bio->bi_bdev = rdev->bdev;
-			bio->bi_sector = r1_bio->sector;
+			bio->bi_sector = r1_bio->sector + rdev->data_offset;
 			bio->bi_rw = r1_bio->cmd;
 
 			generic_make_request(bio);
@@ -1048,7 +1045,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 
 	read_bio = bio_clone(r1_bio->master_bio, GFP_NOIO);
 
-	read_bio->bi_sector = sector_nr;
+	read_bio->bi_sector = sector_nr + mirror->rdev->data_offset;
 	read_bio->bi_bdev = mirror->rdev->bdev;
 	read_bio->bi_end_io = end_sync_read;
 	read_bio->bi_rw = READ;
@@ -1190,10 +1187,8 @@ static int run(mddev_t *mddev)
 
 
 	{
-		snprintf(conf->thread_name,MD_THREAD_NAME_MAX,"raid1d_md%d",mdidx(mddev));
-
-		conf->thread = md_register_thread(raid1d, conf, conf->thread_name);
-		if (!conf->thread) {
+		mddev->thread = md_register_thread(raid1d, mddev, "md%d_raid1");
+		if (!mddev->thread) {
 			printk(THREAD_ERROR, mdidx(mddev));
 			goto out_free_conf;
 		}
@@ -1219,7 +1214,8 @@ static int stop(mddev_t *mddev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
 
-	md_unregister_thread(conf->thread);
+	md_unregister_thread(mddev->thread);
+	mddev->thread = NULL;
 	if (conf->r1bio_pool)
 		mempool_destroy(conf->r1bio_pool);
 	kfree(conf);

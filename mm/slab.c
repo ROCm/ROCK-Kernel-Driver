@@ -344,8 +344,20 @@ struct kmem_cache_s {
 
 #endif
 
-/* maximum size of an obj (in 2^order pages) */
+/*
+ * Maximum size of an obj (in 2^order pages)
+ * and absolute limit for the gfp order.
+ */
+#if defined(CONFIG_LARGE_ALLOCS)
+#define	MAX_OBJ_ORDER	13	/* up to 32Mb */
+#define	MAX_GFP_ORDER	13	/* up to 32Mb */
+#elif defined(CONFIG_MMU)
 #define	MAX_OBJ_ORDER	5	/* 32 pages */
+#define	MAX_GFP_ORDER	5	/* 32 pages */
+#else
+#define	MAX_OBJ_ORDER	8	/* up to 1Mb */
+#define	MAX_GFP_ORDER	8	/* up to 1Mb */
+#endif
 
 /*
  * Do not go above this order unless 0 objects fit into the slab.
@@ -353,12 +365,6 @@ struct kmem_cache_s {
 #define	BREAK_GFP_ORDER_HI	2
 #define	BREAK_GFP_ORDER_LO	1
 static int slab_break_gfp_order = BREAK_GFP_ORDER_LO;
-
-/*
- * Absolute limit for the gfp order
- */
-#define	MAX_GFP_ORDER	5	/* 32 pages */
-
 
 /* Macros for storing/retrieving the cachep and or slab from the
  * global 'mem_map'. These are used to find the slab an obj belongs to.
@@ -399,6 +405,18 @@ static struct cache_sizes malloc_sizes[] = {
 	{ 32768,	NULL, NULL},
 	{ 65536,	NULL, NULL},
 	{131072,	NULL, NULL},
+#ifndef CONFIG_MMU
+	{262144,	NULL, NULL},
+	{524288,	NULL, NULL},
+	{1048576,	NULL, NULL},
+#ifdef CONFIG_LARGE_ALLOCS
+	{2097152,	NULL, NULL},
+	{4194304,	NULL, NULL},
+	{8388608,	NULL, NULL},
+	{16777216,	NULL, NULL},
+	{33554432,	NULL, NULL},
+#endif /* CONFIG_LARGE_ALLOCS */
+#endif /* CONFIG_MMU */
 	{     0,	NULL, NULL}
 };
 /* Must match cache_sizes above. Out of line to keep cache footprint low. */
@@ -427,7 +445,19 @@ static struct {
 	CN("size-16384"),
 	CN("size-32768"),
 	CN("size-65536"),
-	CN("size-131072")
+	CN("size-131072"),
+#ifndef CONFIG_MMU
+	CN("size-262144"),
+	CN("size-524288"),
+	CN("size-1048576"),
+#ifdef CONFIG_LARGE_ALLOCS
+	CN("size-2097152"),
+	CN("size-4194304"),
+	CN("size-8388608"),
+	CN("size-16777216"),
+	CN("size-33554432"),
+#endif /* CONFIG_LARGE_ALLOCS */
+#endif /* CONFIG_MMU */
 }; 
 #undef CN
 

@@ -118,7 +118,7 @@ struct bulk_cs_wrap {
  */
 
 #define USB_STOR_XFER_GOOD	0	/* good transfer                 */
-#define USB_STOR_XFER_SHORT	1	/* transfered less than expected */
+#define USB_STOR_XFER_SHORT	1	/* transferred less than expected */
 #define USB_STOR_XFER_STALLED	2	/* endpoint stalled              */
 #define USB_STOR_XFER_ERROR	3	/* transfer died in the middle   */
 

@@ -49,7 +49,6 @@ static void fixup_windbond_82c105(struct pci_dev* dev);
 void fixup_resources(struct pci_dev* dev);
 
 void   iSeries_pcibios_init(void);
-void   pSeries_pcibios_init(void);
 
 struct pci_controller* hose_head;
 struct pci_controller** hose_tail = &hose_head;
@@ -126,42 +125,6 @@ struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
 		}
 	}
 	return NULL;
-}
-
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
-					 struct pbus_set_ranges_data *pranges)
-{
-}
-
-void
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			     struct resource *res, int resource)
-{
-	u32 new, check;
-	int reg;
-	struct pci_controller* hose = PCI_GET_PHB_PTR(dev);
-	
-	new = res->start;
-	if (hose && res->flags & IORESOURCE_MEM)
-		new -= hose->pci_mem_offset;
-	new |= (res->flags & PCI_REGION_FLAG_MASK);
-	if (resource < 6) {
-		reg = PCI_BASE_ADDRESS_0 + 4*resource;
-	} else if (resource == PCI_ROM_RESOURCE) {
-		res->flags |= PCI_ROM_ADDRESS_ENABLE;
-		reg = dev->rom_base_reg;
-	} else {
-		/* Somebody might have asked allocation of a non-standard resource */
-		return;
-	}
-
-	pci_write_config_dword(dev, reg, new);
-	pci_read_config_dword(dev, reg, &check);
-	if ((new ^ check) & ((new & PCI_BASE_ADDRESS_SPACE_IO) ? PCI_BASE_ADDRESS_IO_MASK : PCI_BASE_ADDRESS_MEM_MASK)) {
-		printk(KERN_ERR "PCI: Error while updating region "
-		       "%s/%d (%08x != %08x)\n", dev->slot_name, resource,
-		       new, check);
-	}
 }
 
 static void
@@ -363,16 +326,33 @@ pcibios_assign_resources(void)
  * Allocate pci_controller(phb) initialized common variables. 
  */
 struct pci_controller * __init
-pci_alloc_pci_controller(char *model, enum phb_types controller_type)
+pci_alloc_pci_controller(enum phb_types controller_type)
 {
         struct pci_controller *hose;
-        PPCDBG(PPCDBG_PHBINIT, "PCI: Allocate pci_controller for %s\n",model);
+	char *model;
+
         hose = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
         if(hose == NULL) {
                 printk(KERN_ERR "PCI: Allocate pci_controller failed.\n");
                 return NULL;
         }
         memset(hose, 0, sizeof(struct pci_controller));
+
+	switch(controller_type) {
+	case phb_type_python:
+		model = "PHB PY";
+		break;
+	case phb_type_speedwagon:
+		model = "PHB SW";
+		break;
+	case phb_type_winnipeg:
+		model = "PHB WP";
+		break;
+	default:
+		model = "PHB UK";
+		break;
+	}
+
         if(strlen(model) < 8)
 		strcpy(hose->what,model);
         else
@@ -393,9 +373,7 @@ pcibios_init(void)
 	struct pci_bus *bus;
 	int next_busno;
 
-#ifndef CONFIG_PPC_ISERIES
-	pSeries_pcibios_init();
-#else
+#ifdef CONFIG_PPC_ISERIES
 	iSeries_pcibios_init(); 
 #endif
 
@@ -450,54 +428,7 @@ subsys_initcall(pcibios_init);
 
 void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
-#ifndef CONFIG_PPC_ISERIES
-	struct pci_controller *phb = PCI_GET_PHB_PTR(bus);
-	struct resource *res;
-	int i;
-
-	if (bus->parent == NULL) {
-		/* This is a host bridge - fill in its resources */
-		phb->bus = bus;
-		bus->resource[0] = res = &phb->io_resource;
-		if (!res->flags)
-			BUG();	/* No I/O resource for this PHB? */
-
-		for (i = 0; i < 3; ++i) {
-			res = &phb->mem_resources[i];
-			if (!res->flags) {
-				if (i == 0)
-					BUG();	/* No memory resource for this PHB? */
-			}
-			bus->resource[i+1] = res;
-		}
-	} else {
-		/* This is a subordinate bridge */
-		pci_read_bridge_bases(bus);
-
-		for (i = 0; i < 4; ++i) {
-			if ((res = bus->resource[i]) == NULL)
-				continue;
-			if (!res->flags)
-				continue;
-			if (res == pci_find_parent_resource(bus->self, res)) {
-				/* Transparent resource -- don't try to "fix" it. */
-				continue;
-			}
-			if (res->flags & IORESOURCE_IO) {
-				unsigned long offset = (unsigned long)phb->io_base_virt - pci_io_base;
-				res->start += offset;
-				res->end += offset;
-			} else if (phb->pci_mem_offset
-				   && (res->flags & IORESOURCE_MEM)) {
-				if (res->start < phb->pci_mem_offset) {
-					res->start += phb->pci_mem_offset;
-					res->end += phb->pci_mem_offset;
-				}
-			}
-		}
-	}
-#endif	
-	if ( ppc_md.pcibios_fixup_bus )
+	if (ppc_md.pcibios_fixup_bus)
 		ppc_md.pcibios_fixup_bus(bus);
 }
 

@@ -239,7 +239,6 @@ extern inline char *bio_kmap_irq(struct bio *bio, unsigned long *flags)
 	 * balancing is a lot nicer this way
 	 */
 	local_save_flags(*flags);
-	local_irq_disable();
 	addr = (unsigned long) kmap_atomic(bio_page(bio), KM_BIO_SRC_IRQ);
 
 	if (addr & ~PAGE_MASK)

@@ -151,7 +151,7 @@ static int check_powernow(void)
 	}
 
 	if (!(edx & (1 << 1 | 1 << 2))) {
-		printk (" nothing.\n");
+		printk ("nothing.\n");
 		return 0;
 	}
 
@@ -162,9 +162,8 @@ static int check_powernow(void)
 
 static int get_ranges (unsigned char *pst)
 {
-	int j;
+	unsigned int j, speed;
 	u8 fid, vid;
-	unsigned int speed;
 
 	powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table) * (number_scales + 1)), GFP_KERNEL);
 	if (!powernow_table)
@@ -258,7 +257,7 @@ static void change_speed (unsigned int index)
 }
 
 
-int powernow_decode_bios (int maxfid, int startvid)
+static int powernow_decode_bios (int maxfid, int startvid)
 {
 	struct psb_s *psb;
 	struct pst_s *pst;

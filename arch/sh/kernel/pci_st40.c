@@ -380,12 +380,6 @@ static int __init map_harp_irq(struct pci_dev *dev, u8 slot, u8 pin)
 }
 
 
-void __devinit
-pcibios_fixup_pbus_ranges(struct pci_bus *bus,
-			  struct pbus_set_ranges_data *ranges)
-{
-}
-
 void __init pcibios_init(void)
 {
 	extern unsigned long memory_start, memory_end;

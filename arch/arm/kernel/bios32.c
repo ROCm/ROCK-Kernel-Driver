@@ -259,47 +259,6 @@ struct pci_fixup pcibios_fixups[] = {
 	}, { 0 }
 };
 
-void __devinit
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			struct resource *res, int resource)
-{
-	struct pci_sys_data *sys = dev->sysdata;
-	u32 val, check;
-	int reg;
-
-	if (debug_pci)
-		printk("PCI: Assigning %3s %08lx to %s\n",
-			res->flags & IORESOURCE_IO ? "IO" : "MEM",
-			res->start, dev->dev.name);
-
-	if (resource < 6) {
-		reg = PCI_BASE_ADDRESS_0 + 4*resource;
-	} else if (resource == PCI_ROM_RESOURCE) {
-		reg = dev->rom_base_reg;
-	} else {
-		/* Somebody might have asked allocation of a
-		 * non-standard resource.
-		 */
-		return;
-	}
-
-	val = res->start;
-	if (res->flags & IORESOURCE_MEM)
-		val -= sys->mem_offset;
-	else
-		val -= sys->io_offset;
-	val |= res->flags & PCI_REGION_FLAG_MASK;
-
-	pci_write_config_dword(dev, reg, val);
-	pci_read_config_dword(dev, reg, &check);
-	if ((val ^ check) & ((val & PCI_BASE_ADDRESS_SPACE_IO) ?
-	    PCI_BASE_ADDRESS_IO_MASK : PCI_BASE_ADDRESS_MEM_MASK)) {
-		printk(KERN_ERR "PCI: Error while updating region "
-			"%s/%d (%08x != %08x)\n", dev->slot_name,
-			resource, val, check);
-	}
-}
-
 void __devinit pcibios_update_irq(struct pci_dev *dev, int irq)
 {
 	if (debug_pci)
@@ -439,17 +398,25 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
  * Convert from Linux-centric to bus-centric addresses for bridge devices.
  */
 void __devinit
-pcibios_fixup_pbus_ranges(struct pci_bus *bus, struct pbus_set_ranges_data *ranges)
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			 struct resource *res)
 {
-	struct pci_sys_data *root = bus->sysdata;
+	struct pci_sys_data *root = dev->sysdata;
+	unsigned long offset = 0;
 
-	ranges->io_start -= root->io_offset;
-	ranges->io_end -= root->io_offset;
-	ranges->mem_start -= root->mem_offset;
-	ranges->mem_end -= root->mem_offset;
-	ranges->prefetch_start -= root->mem_offset;
-	ranges->prefetch_end -= root->mem_offset;
+	if (res->flags & IORESOURCE_IO)
+		offset = root->io_offset;
+	if (res->flags & IORESOURCE_MEM)
+		offset = root->mem_offset;
+
+	region->start = res->start - offset;
+	region->end   = res->end - offset;
 }
+
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL(pcibios_fixup_bus);
+EXPORT_SYMBOL(pcibios_resource_to_bus);
+#endif
 
 /*
  * This is the standard PCI-PCI bridge swizzling algorithm:

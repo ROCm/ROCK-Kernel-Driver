@@ -30,7 +30,6 @@
 
 #include "saa7134-reg.h"
 #include "saa7134.h"
-#include "tuner.h"
 
 MODULE_DESCRIPTION("v4l2 driver module for saa7130/34 based TV cards");
 MODULE_AUTHOR("Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]");

@@ -7,7 +7,7 @@ ZLDFLAGS	=-p -X -T $(obj)/bootp.lds \
 		 --defsym initrd_addr=$(INITRD_PHYS) \
 		 --defsym params=$(PARAMS_PHYS)
 
-EXTRA_TARGETS := bootp
+extra-y := bootp
 
 # Note that bootp.lds picks up kernel.o and initrd.o
 $(obj)/bootp:	$(addprefix $(obj)/,init.o kernel.o initrd.o bootp.lds)

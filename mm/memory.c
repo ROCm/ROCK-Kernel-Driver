@@ -484,16 +484,6 @@ void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
 #define ZAP_BLOCK_SIZE	(~(0UL))
 #endif
 
-/*
- * hugepage regions must be unmapped with HPAGE_SIZE granularity
- */
-static inline unsigned long zap_block_size(struct vm_area_struct *vma)
-{
-	if (is_vm_hugetlb_page(vma))
-		return HPAGE_SIZE;
-	return ZAP_BLOCK_SIZE;
-}
-
 /**
  * unmap_vmas - unmap a range of memory covered by a list of vma's
  * @tlbp: address of the caller's struct mmu_gather
@@ -524,7 +514,7 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 		struct vm_area_struct *vma, unsigned long start_addr,
 		unsigned long end_addr, unsigned long *nr_accounted)
 {
-	unsigned long zap_bytes = zap_block_size(vma);
+	unsigned long zap_bytes = ZAP_BLOCK_SIZE;
 	unsigned long tlb_start;	/* For tlb_finish_mmu */
 	int tlb_start_valid = 0;
 	int ret = 0;
@@ -554,7 +544,12 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 
 		ret++;
 		while (start != end) {
-			unsigned long block = min(zap_bytes, end - start);
+			unsigned long block;
+
+			if (is_vm_hugetlb_page(vma))
+				block = end - start;
+			else
+				block = min(zap_bytes, end - start);
 
 			if (!tlb_start_valid) {
 				tlb_start = start;
@@ -564,7 +559,7 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 			unmap_page_range(*tlbp, vma, start, start + block);
 			start += block;
 			zap_bytes -= block;
-			if (zap_bytes != 0)
+			if ((long)zap_bytes > 0)
 				continue;
 			if (need_resched()) {
 				tlb_finish_mmu(*tlbp, tlb_start, start);
@@ -572,7 +567,7 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 				*tlbp = tlb_gather_mmu(mm, 0);
 				tlb_start_valid = 0;
 			}
-			zap_bytes = zap_block_size(vma);
+			zap_bytes = ZAP_BLOCK_SIZE;
 		}
 		if (vma->vm_next && vma->vm_next->vm_start < vma->vm_end)
 			printk("%s: VMA list is not sorted correctly!\n",
@@ -1458,7 +1453,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	pgd_t *pgd;
 	pmd_t *pmd;
 
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	pgd = pgd_offset(mm, address);
 
 	inc_page_state(pgfault);

@@ -468,7 +468,7 @@ static int TIIsTxActive (struct edgeport_port *port)
 {
 	int status;
 	struct out_endpoint_desc_block *oedb;
-	__u8 lsr;
+	__u8 *lsr;
 	int bytes_left = 0;
 
 	oedb = kmalloc (sizeof (* oedb), GFP_KERNEL);
@@ -477,6 +477,13 @@ static int TIIsTxActive (struct edgeport_port *port)
 		return -ENOMEM;
 	}
 
+	lsr = kmalloc (1, GFP_KERNEL);	/* Sigh, that's right, just one byte,
+					   as not all platforms can do DMA
+					   from stack */
+	if (!lsr) {
+		kfree(oedb);
+		return -ENOMEM;
+	}
 	/* Read the DMA Count Registers */
 	status = TIReadRam (port->port->serial->dev,
 			    port->dma_address,
@@ -492,22 +499,25 @@ static int TIIsTxActive (struct edgeport_port *port)
 	status = TIReadRam (port->port->serial->dev, 
 			    port->uart_base + UMPMEM_OFFS_UART_LSR,
 			    1,
-			    &lsr);
+			    lsr);
 
 	if (status)
 		goto exit_is_tx_active;
-	dbg ("%s - LSR = 0x%X", __FUNCTION__, lsr);
+	dbg ("%s - LSR = 0x%X", __FUNCTION__, *lsr);
 	
 	/* If either buffer has data or we are transmitting then return TRUE */
 	if ((oedb->XByteCount & 0x80 ) != 0 )
 		bytes_left += 64;
 
-	if ((lsr & UMP_UART_LSR_TX_MASK ) == 0 )
+	if ((*lsr & UMP_UART_LSR_TX_MASK ) == 0 )
 		bytes_left += 1;
 
 	/* We return Not Active if we get any kind of error */
 exit_is_tx_active:
 	dbg ("%s - return %d", __FUNCTION__, bytes_left );
+
+	kfree(lsr);
+	kfree(oedb);
 	return bytes_left;
 }
 
@@ -1151,8 +1161,12 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 				dbg ( "%s - HARDWARE RESET return %d", __FUNCTION__, status);
 
 				/* return an error on purpose. */
+				kfree (firmware_version);
+				kfree (rom_desc);
+				kfree (ti_manuf_desc);
 				return -ENODEV;
 			}
+			kfree (firmware_version);
 		}
 		// Search for type 0xF2 record (firmware blank record)
 		else if ((start_address = TIGetDescriptorAddress (serial, I2C_DESC_TYPE_FIRMWARE_BLANK, rom_desc)) != 0) {

@@ -215,7 +215,7 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 	dbg("%s port %d", __FUNCTION__, port->number);
 
 	/*Start reading from the device*/
-	/* TODO: Look at possibility of submitting mulitple URBs to device to
+	/* TODO: Look at possibility of submitting multiple URBs to device to
 	 *       enhance buffering.  Win trace shows 16 initial read URBs.
 	 */
 	port->read_urb->dev = port->serial->dev;

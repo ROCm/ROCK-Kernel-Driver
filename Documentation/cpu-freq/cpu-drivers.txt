@@ -54,7 +54,7 @@ cpufreq_driver.name -		The name of this driver.
 cpufreq_driver.init -		A pointer to the per-CPU initialization 
 				function.
 
-cpufreq_driver.verify -		A pointer to a "verification" funciton.
+cpufreq_driver.verify -		A pointer to a "verification" function.
 
 cpufreq_driver.setpolicy _or_ 
 cpufreq_driver.target -		See below on the differences.

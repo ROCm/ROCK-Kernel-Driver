@@ -36,7 +36,7 @@
 
 /* For SVR4/S390 the function pointer to be registered with `atexit` is
    passed in R14. */
-#define ELF_PLAT_INIT(_r) \
+#define ELF_PLAT_INIT(_r, load_addr) \
 	do { \
 	_r->gprs[14] = 0; \
 	set_thread_flag(TIF_31BIT); \

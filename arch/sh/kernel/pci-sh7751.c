@@ -250,12 +250,6 @@ struct pci_fixup pcibios_fixups[] = {
 	{ 0 }
 };
 
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *b,
-					 struct pbus_set_ranges_data *range)
-{
-	/* No fixups needed */
-}
-
 /*
  *  Called after each bus is probed, but before its children
  *  are examined.

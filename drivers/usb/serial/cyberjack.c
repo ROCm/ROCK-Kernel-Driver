@@ -302,7 +302,7 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 		short old_rdtodo = priv->rdtodo;
 		int result;
 
-		/* This is a announcement of comming bulk_ins. */
+		/* This is a announcement of coming bulk_ins. */
 		unsigned short size = ((unsigned short)data[3]<<8)+data[2]+3;
 
 		if( (size>259) || (size==0) ) {

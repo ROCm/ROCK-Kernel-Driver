@@ -12,7 +12,7 @@
  * Nov 2000, Ivan Kokshaysky <ink@jurassic.park.msu.ru>
  *	     PCI-PCI bridges cleanup
  */
-
+#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/pci.h>
 #include <linux/init.h>
@@ -264,45 +264,6 @@ pcibios_fixup_bus(struct pci_bus *bus)
 	}
 }
 
-void
-pcibios_update_resource(struct pci_dev *dev, struct resource *parent,
-			struct resource *res, int resource)
-{
-	struct pci_controller *hose = dev->sysdata;
-	struct resource *root;
-	int where;
-	u32 reg;
-
-	if (resource < PCI_ROM_RESOURCE) 
-		where = PCI_BASE_ADDRESS_0 + (resource * 4);
-	else if (resource == PCI_ROM_RESOURCE)
-		where = dev->rom_base_reg;
-	else {
-		return; /* Don't update non-standard resources here. */
-	}
-
-	/* Point root at the hose root. */
-	if (res->flags & IORESOURCE_IO)
-		root = hose->io_space;
-	else if (res->flags & IORESOURCE_MEM)
-		root = hose->mem_space;
-	else {
-		return; /* Don't update non-standard resources here. */
-	}
-
-	reg = (res->start - root->start) | (res->flags & 0xf);
-	pci_write_config_dword(dev, where, reg);
-	if ((res->flags & (PCI_BASE_ADDRESS_SPACE
-			   | PCI_BASE_ADDRESS_MEM_TYPE_MASK))
-	    == (PCI_BASE_ADDRESS_SPACE_MEMORY
-		| PCI_BASE_ADDRESS_MEM_TYPE_64)) {
-		pci_write_config_dword(dev, where+4, 0);
-		printk(KERN_WARNING "PCI: dev %s type 64-bit\n", dev->dev.name);
-	}
-
-	/* ??? FIXME -- record old value for shutdown.  */
-}
-
 void __init
 pcibios_update_irq(struct pci_dev *dev, int irq)
 {
@@ -334,20 +295,24 @@ common_swizzle(struct pci_dev *dev, u8 *pinp)
 }
 
 void __devinit
-pcibios_fixup_pbus_ranges(struct pci_bus * bus,
-			  struct pbus_set_ranges_data * ranges)
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			 struct resource *res)
 {
-	struct pci_controller *hose = (struct pci_controller *)bus->sysdata;
+	struct pci_controller *hose = (struct pci_controller *)dev->sysdata;
+	unsigned long offset = 0;
 
-	ranges->io_start -= hose->io_space->start;
-	ranges->io_end -= hose->io_space->start;
-	ranges->mem_start -= hose->mem_space->start;
-	ranges->mem_end -= hose->mem_space->start;
-/* FIXME: On older alphas we could use dense memory space
-	  to access prefetchable resources. */
-	ranges->prefetch_start -= hose->mem_space->start;
-	ranges->prefetch_end -= hose->mem_space->start;
+	if (res->flags & IORESOURCE_IO)
+		offset = hose->io_space->start;
+	else if (res->flags & IORESOURCE_MEM)
+		offset = hose->mem_space->start;
+
+	region->start = res->start - offset;
+	region->end = res->end - offset;
 }
+
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL(pcibios_resource_to_bus);
+#endif
 
 int
 pcibios_enable_device(struct pci_dev *dev, int mask)

@@ -363,6 +363,9 @@ static int __devinit amd8111_probe(struct pci_dev *dev, const struct pci_device_
 	smbus->adapter.algo = &smbus_algorithm;
 	smbus->adapter.algo_data = smbus;
 
+	/* set up the driverfs linkage to our parent device */
+	smbus->adapter.dev.parent = &dev->dev;
+
 	error = i2c_add_adapter(&smbus->adapter);
 	if (error)
 		goto out_release_region;
@@ -389,7 +392,7 @@ static void __devexit amd8111_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver amd8111_driver = {
-	.name		= "amd8111 smbus 2.0",
+	.name		= "amd8111 smbus",
 	.id_table	= amd8111_ids,
 	.probe		= amd8111_probe,
 	.remove		= __devexit_p(amd8111_remove),

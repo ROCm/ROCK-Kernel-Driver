@@ -562,10 +562,8 @@ int module_finalize(const Elf_Ehdr *hdr,
 #ifdef __LP64__
 	me->init = (void *)get_fdesc(me, (Elf_Addr)me->init);
 #ifdef CONFIG_MODULE_UNLOAD
-	if (me->cleanup)
-		me->cleanup = (void *)get_fdesc(me, (Elf_Addr)me->cleanup);
-	if (me->destroy)
-		me->destroy = (void *)get_fdesc(me, (Elf_Addr)me->destroy);
+	if (me->exit)
+		me->exit = (void *)get_fdesc(me, (Elf_Addr)me->exit);
 #endif
 #endif
 	return 0;

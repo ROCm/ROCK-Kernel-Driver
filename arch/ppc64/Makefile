@@ -18,9 +18,8 @@ KERNELLOAD	= 0xc000000000000000
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 LDFLAGS_BLOB	:= --format binary --oformat elf64-powerpc
-CFLAGS		+= -msoft-float -pipe \
-		-Wno-uninitialized -mminimal-toc -mtraceback=full \
-		-finline-limit-2000 -mcpu=power4
+CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
+		-mtraceback=full -mcpu=power4
 
 head-y := arch/ppc64/kernel/head.o
 
@@ -52,10 +51,6 @@ arch/ppc64/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
 include/asm-ppc64/offsets.h: arch/ppc64/kernel/asm-offsets.s
-	@echo -n '  Generating $@'
-	@$(generate-asm-offsets.h) < $< > $@.tmp
-	@$(update-if-changed)
+	$(call filechk,gen-asm-offsets)
 
-CLEAN_FILES += include/asm-ppc64/offsets.h.tmp \
-	       include/asm-ppc64/offsets.h
-
+CLEAN_FILES += include/asm-ppc64/offsets.h

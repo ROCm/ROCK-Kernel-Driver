@@ -35,9 +35,20 @@
 #include <linux/profile.h>
 #include <linux/rcupdate.h>
 #include <linux/moduleparam.h>
+#include <linux/writeback.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
+
+/*
+ * This is one of the first .c files built. Error out early
+ * if we have compiler trouble..
+ */
+#if __GNUC__ == 2 && __GNUC_MINOR__ == 96
+#ifdef CONFIG_FRAME_POINTER
+#error This compiler cannot compile correctly with frame pointers enabled
+#endif
+#endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
@@ -429,6 +440,8 @@ asmlinkage void __init start_kernel(void)
 	vfs_caches_init(num_physpages);
 	radix_tree_init();
 	signals_init();
+	/* rootfs populating might need page-writeback */
+	page_writeback_init();
 	populate_rootfs();
 #ifdef CONFIG_PROC_FS
 	proc_root_init();

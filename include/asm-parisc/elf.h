@@ -99,6 +99,9 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 typedef double elf_fpreg_t;
 typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 
+extern int dump_task_fpu (struct task_struct *, elf_fpregset_t *);
+#define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)
+
 struct pt_regs;	/* forward declaration... */
 
 
@@ -118,7 +121,7 @@ struct pt_regs;	/* forward declaration... */
    So that we can use the same startup file with static executables,
    we start programs with a value of 0 to indicate that there is no
    such function.  */
-#define ELF_PLAT_INIT(_r)       _r->gr[23] = 0
+#define ELF_PLAT_INIT(_r, load_addr)       _r->gr[23] = 0
 
 #define USE_ELF_CORE_DUMP
 #define ELF_EXEC_PAGESIZE	4096
