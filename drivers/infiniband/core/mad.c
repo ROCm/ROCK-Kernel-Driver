@@ -2017,9 +2017,10 @@ static void local_completions(void *data)
 			wc.status = IB_WC_SUCCESS;
 			wc.opcode = IB_WC_RECV;
 			wc.vendor_err = 0;
-			wc.byte_len = sizeof(struct ib_mad);
+			wc.byte_len = sizeof(struct ib_mad) +
+				      sizeof(struct ib_grh);
 			wc.src_qp = IB_QP0;
-			wc.wc_flags = 0;
+			wc.wc_flags = 0;	/* No GRH */
 			wc.pkey_index = 0;
 			wc.slid = IB_LID_PERMISSIVE;
 			wc.sl = 0;
