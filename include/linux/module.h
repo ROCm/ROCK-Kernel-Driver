@@ -140,6 +140,13 @@ void *__symbol_get(const char *symbol);
 void *__symbol_get_gpl(const char *symbol);
 #define symbol_get(x) ((typeof(&x))(__symbol_get(MODULE_SYMBOL_PREFIX #x)))
 
+#ifdef __GENKSYMS__
+
+/* genksyms doesn't handle GPL-only symbols yet */
+#define EXPORT_SYMBOL_GPL EXPORT_SYMBOL
+	
+#else
+
 #ifdef CONFIG_MODVERSIONING
 /* Mark the CRC weak since genksyms apparently decides not to
  * generate a checksums for some symbols */
@@ -162,8 +169,13 @@ void *__symbol_get_gpl(const char *symbol);
 	__attribute__((section("__ksymtab" sec)))		\
 	= { (unsigned long)&sym, __kstrtab_##sym }
 
-#define EXPORT_SYMBOL(sym)	__EXPORT_SYMBOL(sym, "")
-#define EXPORT_SYMBOL_GPL(sym)	__EXPORT_SYMBOL(sym, "_gpl")
+#define EXPORT_SYMBOL(sym)					\
+	__EXPORT_SYMBOL(sym, "")
+
+#define EXPORT_SYMBOL_GPL(sym)					\
+	__EXPORT_SYMBOL(sym, "_gpl")
+
+#endif
 
 /* We don't mangle the actual symbol anymore, so no need for
  * special casing EXPORT_SYMBOL_NOVERS */
