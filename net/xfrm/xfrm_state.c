@@ -592,7 +592,6 @@ static struct xfrm_state *__xfrm_find_acq_byseq(u32 seq)
 		list_for_each_entry(x, xfrm_state_bydst+i, bydst) {
 			if (x->km.seq == seq) {
 				xfrm_state_hold(x);
-				spin_unlock_bh(&xfrm_state_lock);
 				return x;
 			}
 		}
