@@ -514,10 +514,12 @@ acpi_os_write_pci_configuration (
 
 /* TODO: Change code to take advantage of driver model more */
 void
-acpi_os_derive_pci_id (
+acpi_os_derive_pci_id_2 (
 	acpi_handle		rhandle,        /* upper bound  */
 	acpi_handle		chandle,        /* current node */
-	struct acpi_pci_id	**id)
+	struct acpi_pci_id	**id,
+	int			*is_bridge,
+	u8			*bus_number)
 {
 	acpi_handle		handle;
 	struct acpi_pci_id	*pci_id = *id;
@@ -528,7 +530,7 @@ acpi_os_derive_pci_id (
 
 	acpi_get_parent(chandle, &handle);
 	if (handle != rhandle) {
-		acpi_os_derive_pci_id(rhandle, handle, &pci_id);
+		acpi_os_derive_pci_id_2(rhandle, handle, &pci_id, is_bridge, bus_number);
 
 		status = acpi_get_type(handle, &type);
 		if ( (ACPI_FAILURE(status)) || (type != ACPI_TYPE_DEVICE) )
@@ -539,15 +541,40 @@ acpi_os_derive_pci_id (
 			pci_id->device  = ACPI_HIWORD (ACPI_LODWORD (temp));
 			pci_id->function = ACPI_LOWORD (ACPI_LODWORD (temp));
 
+			if (*is_bridge)
+				pci_id->bus = *bus_number;
+
 			/* any nicer way to get bus number of bridge ? */
 			status = acpi_os_read_pci_configuration(pci_id, 0x0e, &tu8, 8);
-			if (ACPI_SUCCESS(status) && (tu8 & 0x7f) == 1) {
+			if (ACPI_SUCCESS(status) &&
+			    ((tu8 & 0x7f) == 1 || (tu8 & 0x7f) == 2)) {
+				status = acpi_os_read_pci_configuration(pci_id, 0x18, &tu8, 8);
+				if (!ACPI_SUCCESS(status)) {
+					/* Certainly broken...  FIX ME */
+					return;
+				}
+				*is_bridge = 1;
+				pci_id->bus = tu8;
 				status = acpi_os_read_pci_configuration(pci_id, 0x19, &tu8, 8);
-				if (ACPI_SUCCESS(status))
-					pci_id->bus = tu8;
-			}
+				if (ACPI_SUCCESS(status)) {
+					*bus_number = tu8;
+				}
+			} else
+				*is_bridge = 0;
 		}
 	}
+}
+
+void
+acpi_os_derive_pci_id (
+	acpi_handle		rhandle,        /* upper bound  */
+	acpi_handle		chandle,        /* current node */
+	struct acpi_pci_id	**id)
+{
+	int is_bridge = 1;
+	u8 bus_number = (*id)->bus;
+
+	acpi_os_derive_pci_id_2(rhandle, chandle, id, &is_bridge, &bus_number);
 }
 
 #else /*!CONFIG_ACPI_PCI*/
