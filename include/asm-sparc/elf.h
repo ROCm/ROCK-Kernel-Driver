@@ -8,8 +8,11 @@
 
 #include <linux/config.h>
 #include <asm/ptrace.h>
+
+#ifdef __KERNEL__
 #include <asm/mbus.h>
 #include <asm/uaccess.h>
+#endif
 
 /*
  * Sparc section types
