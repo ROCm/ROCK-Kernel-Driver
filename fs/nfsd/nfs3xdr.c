@@ -796,7 +796,7 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 	elen = slen + NFS3_ENTRY_BAGGAGE
 		+ (plus? NFS3_ENTRYPLUS_BAGGAGE : 0);
 	if (cd->buflen < elen) {
-		cd->common.err = nfserr_readdir_nospc;
+		cd->common.err = nfserr_toosmall;
 		return -EINVAL;
 	}
 	*p++ = xdr_one;				 /* mark entry present */

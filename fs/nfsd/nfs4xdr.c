@@ -1688,7 +1688,7 @@ out:
 	return 0;
 
 nospc:
-	cd->common.err = nfserr_readdir_nospc;
+	cd->common.err = nfserr_toosmall;
 	return -EINVAL;
 }
 
@@ -2097,7 +2097,7 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	 */
 	maxcount = (maxcount >> 2) - 4;
 	if (maxcount < 0)
-		return nfserr_readdir_nospc;
+		return nfserr_toosmall;
 
 	svc_take_page(resp->rqstp);
 	page = page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
@@ -2111,9 +2111,9 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 			      &offset,
 			      &readdir->common, nfsd4_encode_dirent);
 	if (nfserr == nfs_ok &&
-	    readdir->common.err == nfserr_readdir_nospc &&
+	    readdir->common.err == nfserr_toosmall &&
 	    readdir->buffer == page) 
-		nfserr = nfserr_readdir_nospc;
+		nfserr = nfserr_toosmall;
 	if (nfserr)
 		return nfserr;
 
