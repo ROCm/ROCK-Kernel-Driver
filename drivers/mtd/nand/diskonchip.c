@@ -62,7 +62,7 @@ static unsigned long __initdata doc_locations[] = {
 static struct mtd_info *doclist = NULL;
 
 struct doc_priv {
-	unsigned long virtadr;
+	void __iomem *virtadr;
 	unsigned long physadr;
 	u_char ChipID;
 	u_char CDSNControl;
@@ -1385,13 +1385,13 @@ static inline int __init doc_probe(unsigned long physadr)
 	struct mtd_info *mtd;
 	struct nand_chip *nand;
 	struct doc_priv *doc;
-	unsigned long virtadr;
+	void __iomem * virtadr;
 	unsigned char save_control;
 	unsigned char tmp, tmpb, tmpc;
 	int reg, len, numchips;
 	int ret = 0;
 
-	virtadr = (unsigned long)ioremap(physadr, DOC_IOREMAP_LEN);
+	virtadr = ioremap(physadr, DOC_IOREMAP_LEN);
 	if (!virtadr) {
 		printk(KERN_ERR "Diskonchip ioremap failed: 0x%x bytes at 0x%lx\n", DOC_IOREMAP_LEN, physadr);
 		return -EIO;
@@ -1585,7 +1585,7 @@ notfound:
 	   actually a DiskOnChip.  */
 	WriteDOC(save_control, virtadr, DOCControl);
 fail:
-	iounmap((void *)virtadr);
+	iounmap(virtadr);
 	return ret;
 }
 
@@ -1622,7 +1622,7 @@ void __exit cleanup_nanddoc(void)
 
 		nextmtd = doc->nextdoc;
 		nand_release(mtd);
-		iounmap((void *)doc->virtadr);
+		iounmap(doc->virtadr);
 		kfree(mtd);
 	}
 }
