@@ -245,12 +245,10 @@ typedef struct {
 #define ISDN_TIMER_MODEMPLUS   2
 #define ISDN_TIMER_MODEMRING   4
 #define ISDN_TIMER_MODEMXMIT   8
-#define ISDN_TIMER_NETHANGUP  32
 #define ISDN_TIMER_CARRIER   256 /* Wait for Carrier */
 #define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD | ISDN_TIMER_MODEMPLUS | \
                               ISDN_TIMER_MODEMXMIT)
-#define ISDN_TIMER_SLOW      (ISDN_TIMER_MODEMRING | ISDN_TIMER_NETHANGUP | \
-                              ISDN_TIMER_CARRIER)
+#define ISDN_TIMER_SLOW      (ISDN_TIMER_MODEMRING | ISDN_TIMER_CARRIER)
 
 /* GLOBAL_FLAGS */
 #define ISDN_GLOBAL_STOPPED 1
@@ -267,10 +265,10 @@ typedef struct {
 #define ISDN_NET_MAGIC      0x49344C02 /* for paranoia-checking             */
 
 /* Phone-list-element */
-typedef struct {
-  void *next;
-  char num[ISDN_MSNLEN];
-} isdn_net_phone;
+struct isdn_net_phone {
+	struct list_head list;
+	char num[ISDN_MSNLEN];
+};
 
 /*
    Principles when extending structures for generic encapsulation protocol
@@ -283,11 +281,13 @@ typedef struct {
 
 /* Local interface-data */
 typedef struct isdn_net_local_s {
+  spinlock_t             lock;
   ulong                  magic;
   char                   name[10];     /* Name of device                   */
-  struct timer_list      dial_timer;   /* dial timeout                     */
+  struct timer_list      dial_timer;   /* dial events timer                */
   int                    dial_event;   /* event in case of timer expiry    */
   struct net_device_stats stats;       /* Ethernet Statistics              */
+  struct timer_list      hup_timer;    /* auto hangup timer                */
   int                    isdn_slot;    /* Index to isdn device/channel     */
   int			 ppp_slot;     /* PPPD device slot number          */
   int                    pre_device;   /* Preselected isdn-device          */
@@ -335,10 +335,10 @@ typedef struct isdn_net_local_s {
   ulong                  sqfull_stamp; /* Start-Time of overload           */
   ulong                  slavedelay;   /* Dynamic bundling delaytime       */
   int                    triggercps;   /* BogoCPS needed for trigger slave */
-  isdn_net_phone         *phone[2];    /* List of remote-phonenumbers      */
+  struct list_head       phone[2];     /* List of remote-phonenumbers      */
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
-  isdn_net_phone         *dial;        /* Pointer to dialed number         */
+  int                    dial;         /* # of phone number just dialed    */
   struct net_device      *master;      /* Ptr to Master device for slaves  */
   struct net_device      *slave;       /* Ptr to Slave device for masters  */
   struct isdn_net_local_s *next;       /* Ptr to next link in bundle       */
