@@ -920,16 +920,30 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 	debug ("flag_io = %x, flag_mem = %x, flag_pfmem = %x\n", flag_io, flag_mem, flag_pfmem);
 
 	if (flag_io && flag_mem && flag_pfmem) {
-		bus = kmalloc (sizeof (struct bus_node), GFP_KERNEL);
+		/* If on bootup, there was a bridged card in this slot,
+		 * then card was removed and ibmphp got unloaded and loaded
+		 * back again, there's no way for us to remove the bus
+		 * struct, so no need to kmalloc, can use existing node
+		 */
+		bus = ibmphp_find_res_bus (sec_number);
 		if (!bus) {
-			err ("out of system memory \n");
-			retval = -ENOMEM;
+			bus = kmalloc (sizeof (struct bus_node), GFP_KERNEL);
+			if (!bus) {
+				err ("out of system memory \n");
+				retval = -ENOMEM;
+				goto error;
+			}
+			memset (bus, 0, sizeof (struct bus_node));
+			bus->busno = sec_number;
+			debug ("b4 adding new bus\n");
+			rc = add_new_bus (bus, io, mem, pfmem, func->busno);
+		} else if (!(bus->rangeIO) && !(bus->rangeMem) && !(bus->rangePFMem))
+			rc = add_new_bus (bus, io, mem, pfmem, 0xFF);
+		else {
+			err ("expected bus structure not empty? \n");
+			retval = -EIO;
 			goto error;
 		}
-		memset (bus, 0, sizeof (struct bus_node));
-		bus->busno = sec_number;
-		debug ("b4 adding new bus\n");
-		rc = add_new_bus (bus, io, mem, pfmem, func->busno);
 		if (rc) {
 			if (rc == -ENOMEM) {
 				ibmphp_remove_bus (bus, func->busno);
@@ -1579,7 +1593,6 @@ int ibmphp_unconfigure_card (struct slot **slot_cur, int the_end)
 	}
 
 	if (sl->func) {
-		debug ("do we come in here? \n");
 		cur_func = sl->func;
 		while (cur_func) {
 			/* TO DO: WILL MOST LIKELY NEED TO GET RID OF THE BUS STRUCTURE FROM RESOURCES AS WELL */
@@ -1619,6 +1632,7 @@ int ibmphp_unconfigure_card (struct slot **slot_cur, int the_end)
 
 	sl->func = NULL;
 	*slot_cur = sl;
+	debug ("%s - exit\n", __FUNCTION__);
 	return 0;
 }
 
@@ -1638,14 +1652,15 @@ static int add_new_bus (struct bus_node *bus, struct resource_node *io, struct r
 	struct bus_node *cur_bus = NULL;
 
 	/* Trying to find the parent bus number */
-	cur_bus	= ibmphp_find_res_bus (parent_busno);
-	if (!cur_bus) {
-		err ("strange, cannot find bus which is supposed to be at the system... something is terribly wrong...\n");
-		return -ENODEV;
+	if (parent_busno != 0xFF) {
+		cur_bus	= ibmphp_find_res_bus (parent_busno);
+		if (!cur_bus) {
+			err ("strange, cannot find bus which is supposed to be at the system... something is terribly wrong...\n");
+			return -ENODEV;
+		}
+	
+		list_add (&bus->bus_list, &cur_bus->bus_list);
 	}
-
-	list_add (&bus->bus_list, &cur_bus->bus_list);
-
 	if (io) {
 		io_range = kmalloc (sizeof (struct range_node), GFP_KERNEL);
 		if (!io_range) {
@@ -1698,6 +1713,7 @@ static u8 find_sec_number (u8 primary_busno, u8 slotno)
 	int min, max;
 	u8 busno;
 	struct bus_info *bus;
+	struct bus_node *bus_cur;
 
 	bus = ibmphp_find_same_bus_num (primary_busno);
 	if (!bus) {
@@ -1712,7 +1728,12 @@ static u8 find_sec_number (u8 primary_busno, u8 slotno)
 	}
 	busno = (u8) (slotno - (u8) min);
 	busno += primary_busno + 0x01;
-	if (!ibmphp_find_res_bus (busno))
+	bus_cur = ibmphp_find_res_bus (busno);
+	/* either there is no such bus number, or there are no ranges, which
+	 * can only happen if we removed the bridged device in previous load
+	 * of the driver, and now only have the skeleton bus struct
+	 */
+	if ((!bus_cur) || (!(bus_cur->rangeIO) && !(bus_cur->rangeMem) && !(bus_cur->rangePFMem)))
 		return busno;
 	return 0xff;
 }
