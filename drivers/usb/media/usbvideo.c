@@ -1802,7 +1802,7 @@ static int usbvideo_CompressIsochronous(uvd_t *uvd, struct urb *urb)
 
 static void usbvideo_IsocIrq(struct urb *urb)
 {
-	int i, len;
+	int i, ret, len;
 	uvd_t *uvd = urb->context;
 
 	/* We don't want to do anything if we are about to be removed! */
@@ -1844,6 +1844,11 @@ urb_done_with:
 		urb->iso_frame_desc[i].status = 0;
 		urb->iso_frame_desc[i].actual_length = 0;
 	}
+	urb->status = 0;
+	urb->dev = uvd->dev;
+	ret = usb_submit_urb (urb, GFP_KERNEL);
+	if(ret)
+		err("usb_submit_urb error (%d)", ret);
 	return;
 }
 
@@ -1889,6 +1894,7 @@ static int usbvideo_StartDataPump(uvd_t *uvd)
 		urb->dev = dev;
 		urb->context = uvd;
 		urb->pipe = usb_rcvisocpipe(dev, uvd->video_endp);
+		urb->interval = 1;
 		urb->transfer_flags = USB_ISO_ASAP;
 		urb->transfer_buffer = uvd->sbuf[i].data;
 		urb->complete = usbvideo_IsocIrq;
@@ -1898,14 +1904,6 @@ static int usbvideo_StartDataPump(uvd_t *uvd)
 			urb->iso_frame_desc[j].offset = k;
 			urb->iso_frame_desc[j].length = uvd->iso_packet_len;
 		}
-	}
-
-	/* Link URBs into a ring so that they invoke each other infinitely */
-	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
-		if ((i+1) < USBVIDEO_NUMSBUF)
-			uvd->sbuf[i].urb->next = uvd->sbuf[i+1].urb;
-		else
-			uvd->sbuf[i].urb->next = uvd->sbuf[0].urb;
 	}
 
 	/* Submit all URBs */
