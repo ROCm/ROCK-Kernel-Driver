@@ -206,7 +206,7 @@ MODULE_PARM(verbose, "i");
 
 #endif				//MODULE
 
-static struct tty_driver moxaDriver;
+static struct tty_driver *moxaDriver;
 static struct moxa_str moxaChannels[MAX_PORTS];
 static unsigned char *moxaXmitBuff;
 static int moxaTimer_on;
@@ -308,13 +308,32 @@ void cleanup_module(void)
 		if (moxaEmptyTimer_on[i])
 			del_timer(&moxaEmptyTimer[i]);
 
-	if (tty_unregister_driver(&moxaDriver))
+	if (tty_unregister_driver(moxaDriver))
 		printk("Couldn't unregister MOXA Intellio family serial driver\n");
+	put_tty_driver(moxaDriver);
 	if (verbose)
 		printk("Done\n");
 
 }
 #endif
+
+static struct tty_operations moxa_ops = {
+	.open = moxa_open,
+	.close = moxa_close,
+	.write = moxa_write,
+	.write_room = moxa_write_room,
+	.flush_buffer = moxa_flush_buffer,
+	.chars_in_buffer = moxa_chars_in_buffer,
+	.flush_chars = moxa_flush_chars,
+	.put_char = moxa_put_char,
+	.ioctl = moxa_ioctl,
+	.throttle = moxa_throttle,
+	.unthrottle = moxa_unthrottle,
+	.set_termios = moxa_set_termios,
+	.stop = moxa_stop,
+	.start = moxa_start,
+	.hangup = moxa_hangup,
+};
 
 int moxa_init(void)
 {
@@ -323,39 +342,24 @@ int moxa_init(void)
 	int ret1, ret2;
 
 	printk(KERN_INFO "MOXA Intellio family driver version %s\n", MOXA_VERSION);
+	moxaDriver = alloc_tty_driver(MAX_PORTS + 1);
+	if (!moxaDriver)
+		return -ENOMEM;
 
 	init_MUTEX(&moxaBuffSem);
-	memset(&moxaDriver, 0, sizeof(struct tty_driver));
-	moxaDriver.magic = TTY_DRIVER_MAGIC;
-	moxaDriver.owner = THIS_MODULE;
-	moxaDriver.name = "ttya";
-	moxaDriver.major = ttymajor;
-	moxaDriver.minor_start = 0;
-	moxaDriver.num = MAX_PORTS + 1;
-	moxaDriver.type = TTY_DRIVER_TYPE_SERIAL;
-	moxaDriver.subtype = SERIAL_TYPE_NORMAL;
-	moxaDriver.init_termios = tty_std_termios;
-	moxaDriver.init_termios.c_iflag = 0;
-	moxaDriver.init_termios.c_oflag = 0;
-	moxaDriver.init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
-	moxaDriver.init_termios.c_lflag = 0;
-	moxaDriver.flags = TTY_DRIVER_REAL_RAW;
-
-	moxaDriver.open = moxa_open;
-	moxaDriver.close = moxa_close;
-	moxaDriver.write = moxa_write;
-	moxaDriver.write_room = moxa_write_room;
-	moxaDriver.flush_buffer = moxa_flush_buffer;
-	moxaDriver.chars_in_buffer = moxa_chars_in_buffer;
-	moxaDriver.flush_chars = moxa_flush_chars;
-	moxaDriver.put_char = moxa_put_char;
-	moxaDriver.ioctl = moxa_ioctl;
-	moxaDriver.throttle = moxa_throttle;
-	moxaDriver.unthrottle = moxa_unthrottle;
-	moxaDriver.set_termios = moxa_set_termios;
-	moxaDriver.stop = moxa_stop;
-	moxaDriver.start = moxa_start;
-	moxaDriver.hangup = moxa_hangup;
+	moxaDriver->owner = THIS_MODULE;
+	moxaDriver->name = "ttya";
+	moxaDriver->major = ttymajor;
+	moxaDriver->minor_start = 0;
+	moxaDriver->type = TTY_DRIVER_TYPE_SERIAL;
+	moxaDriver->subtype = SERIAL_TYPE_NORMAL;
+	moxaDriver->init_termios = tty_std_termios;
+	moxaDriver->init_termios.c_iflag = 0;
+	moxaDriver->init_termios.c_oflag = 0;
+	moxaDriver->init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
+	moxaDriver->init_termios.c_lflag = 0;
+	moxaDriver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(moxaDriver, &moxa_ops);
 
 	moxaXmitBuff = 0;
 
@@ -384,8 +388,9 @@ int moxa_init(void)
 	MoxaDriverInit();
 	printk("Tty devices major number = %d\n", ttymajor);
 
-	if (tty_register_driver(&moxaDriver)) {
+	if (tty_register_driver(moxaDriver)) {
 		printk(KERN_ERR "Couldn't install MOXA Smartio family driver !\n");
+		put_tty_driver(moxaDriver);
 		return -1;
 	}
 	for (i = 0; i < MAX_PORTS; i++) {
