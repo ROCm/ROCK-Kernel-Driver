@@ -1901,7 +1901,8 @@ void smt_send_mbuf(struct s_smc *smc, SMbuf *mb, int fc)
 	}
 
 	if (!smc->hw.mac_ring_is_up || frag_count > queue->tx_free) {
-		if (frame_status &= ~LAN_TX) {
+		frame_status &= ~LAN_TX;
+		if (frame_status) {
 			DB_TX("Ring is down: terminate LAN_TX",0,0,2) ;
 		}
 		else {
