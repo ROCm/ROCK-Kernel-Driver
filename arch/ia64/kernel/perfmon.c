@@ -38,8 +38,8 @@
 #ifdef CONFIG_PERFMON
 
 /*
- * For PMU which rely on the debug registers for some features, you must
- * you must enable the following flag to activate the support for
+ * For PMUs which rely on the debug registers for some features, you
+ * must enable the following flag to activate the support for
  * accessing the registers via the perfmonctl() interface.
  */
 #ifdef CONFIG_ITANIUM
@@ -313,6 +313,9 @@ static unsigned long pfm_spurious_ovfl_intr_count; /* keep track of spurious ovf
 static unsigned long pfm_ovfl_intr_count; /* keep track of spurious ovfl interrupts */
 static unsigned long pfm_recorded_samples_count;
 
+
+static unsigned long reset_pmcs[IA64_NUM_PMC_REGS];	/* contains PAL reset values for PMCS */
+
 static void pfm_vm_close(struct vm_area_struct * area);
 static struct vm_operations_struct pfm_vm_ops={
 	close: pfm_vm_close
@@ -331,7 +334,9 @@ static struct {
  * forward declarations
  */
 static void ia64_reset_pmu(struct task_struct *);
+#ifdef CONFIG_SMP
 static void pfm_fetch_regs(int cpu, struct task_struct *task, pfm_context_t *ctx);
+#endif
 static void pfm_lazy_save_regs (struct task_struct *ta);
 
 static inline unsigned long
@@ -422,7 +427,7 @@ pfm_rvfree(void *mem, unsigned long size)
 
 	if (mem) {
 		adr=(unsigned long) mem;
-		while ((long) size > 0)
+		while ((long) size > 0) {
 			mem_map_unreserve(vmalloc_to_page((void*)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
@@ -1500,11 +1505,12 @@ pfm_restart(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 	 */
 	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
 
-
+#if 0
 	if (ctx->ctx_fl_frozen==0) {
 		printk("task %d without pmu_frozen set\n", task->pid);
 		return -EINVAL;
 	}
+#endif
 
 	if (task == current) {
 		DBprintk(("restarting self %d frozen=%d \n", current->pid, ctx->ctx_fl_frozen));
@@ -1569,6 +1575,119 @@ pfm_restart(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 	return 0;
 }
 
+#ifndef CONFIG_SMP
+/*
+ * On UP kernels, we do not need to constantly set the psr.pp bit
+ * when a task is scheduled. The psr.pp bit can only be changed in
+ * the kernel because of a user request. Given we are on a UP non preeemptive 
+ * kernel we know that no other task is running, so we cna simply update their
+ * psr.pp from their saved state. There is this no impact on the context switch
+ * code compared to the SMP case.
+ */
+static void
+pfm_tasklist_toggle_pp(unsigned int val)
+{
+	struct task_struct *p;
+	struct pt_regs *regs;
+
+	DBprintk(("invoked by [%d] pp=%u\n", current->pid, val));
+
+	read_lock(&tasklist_lock);
+
+	for_each_task(p) {
+       		regs = (struct pt_regs *)((unsigned long) p + IA64_STK_OFFSET);
+
+		/*
+		 * position on pt_regs saved on stack on 1st entry into the kernel
+		 */
+		regs--;
+
+		/*
+		 * update psr.pp
+		 */
+		ia64_psr(regs)->pp = val;
+	}
+	read_unlock(&tasklist_lock);
+}
+#endif
+
+
+
+static int
+pfm_stop(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	 struct pt_regs *regs)
+{
+	/* we don't quite support this right now */
+	if (task != current) return -EINVAL;
+
+	/* 
+	 * Cannot do anything before PMU is enabled 
+	 */
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
+
+	DBprintk(("[%d] fl_system=%d owner=%p current=%p\n",
+				current->pid,
+				ctx->ctx_fl_system, PMU_OWNER(),
+				current));
+	/* simply stop monitoring but not the PMU */
+	if (ctx->ctx_fl_system) {
+
+		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
+
+		/* disable dcr pp */
+		ia64_set_dcr(ia64_get_dcr() & ~IA64_DCR_PP);
+
+#ifdef CONFIG_SMP
+		local_cpu_data->pfm_dcr_pp  = 0;
+#else
+		pfm_tasklist_toggle_pp(0);
+#endif
+
+		ia64_psr(regs)->pp = 0;
+
+	} else {
+		__asm__ __volatile__ ("rum psr.up;;"::: "memory");
+
+		ia64_psr(regs)->up = 0;
+	}
+	return 0;
+}
+
+static int
+pfm_disable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
+	   struct pt_regs *regs)
+{	
+	/* we don't quite support this right now */
+	if (task != current) return -EINVAL;
+
+	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
+
+	/*
+	 * stop monitoring, freeze PMU, and save state in context
+	 * this call will clear IA64_THREAD_PM_VALID for per-task sessions.
+	 */
+	pfm_flush_regs(task);
+
+	if (ctx->ctx_fl_system) {	
+		ia64_psr(regs)->pp = 0;
+	} else {
+		ia64_psr(regs)->up = 0;
+	}
+	/* 
+	 * goes back to default behavior 
+	 * no need to change live psr.sp because useless at the kernel level
+	 */
+	ia64_psr(regs)->sp = 1;
+
+	DBprintk(("enabling psr.sp for [%d]\n", current->pid));
+
+	ctx->ctx_flags.state = PFM_CTX_DISABLED;
+
+	return 0;
+}
+
+
+
 static int
 pfm_destroy_context(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
 	 struct pt_regs *regs)
@@ -1576,25 +1695,30 @@ pfm_destroy_context(struct task_struct *task, pfm_context_t *ctx, void *arg, int
 	/* we don't quite support this right now */
 	if (task != current) return -EINVAL;
 
-		if (ctx->ctx_fl_system) {
+	/*
+	 * if context was never enabled, then there is not much
+	 * to do
+	 */
+	if (!CTX_IS_ENABLED(ctx)) goto skipped_stop;
+
+	/*
+	 * Disable context: stop monitoring, flush regs to software state (useless here), 
+	 * and freeze PMU
+	 * 
+	 * The IA64_THREAD_PM_VALID is cleared by pfm_flush_regs() called from pfm_disable()
+	 */
+	pfm_disable(task, ctx, arg, count, regs);
+
+	if (ctx->ctx_fl_system) {	
 		ia64_psr(regs)->pp = 0;
-		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
 	} else {
 		ia64_psr(regs)->up = 0;
-		__asm__ __volatile__ ("rum psr.up;;"::: "memory");
-
-		task->thread.flags &= ~IA64_THREAD_PM_VALID;
 	}
-
-	SET_PMU_OWNER(NULL);
-
-	/* freeze PMU */
-	ia64_set_pmc(0, 1);
-	ia64_srlz_d();
 
 	/* restore security level */
 	ia64_psr(regs)->sp = 1;
 
+skipped_stop:
 	/*
 	 * remove sampling buffer mapping, if any
 	 */
@@ -1910,8 +2034,13 @@ pfm_start(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 		/* enable dcr pp */
 		ia64_set_dcr(ia64_get_dcr()|IA64_DCR_PP);
 
+#ifdef CONFIG_SMP
 		local_cpu_data->pfm_dcr_pp  = 1;
+#else
+		pfm_tasklist_toggle_pp(1);
+#endif
 		ia64_psr(regs)->pp = 1;
+
 		__asm__ __volatile__ ("ssm psr.pp;;"::: "memory");
 
 	} else {
@@ -1982,80 +2111,6 @@ pfm_enable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 	ia64_set_pmc(0, 0);
 	ia64_srlz_d();
 
-	return 0;
-}
-
-static int
-pfm_disable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
-	   struct pt_regs *regs)
-{	
-	/* we don't quite support this right now */
-	if (task != current) return -EINVAL;
-
-	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
-
-	/*
-	 * stop monitoring, freeze PMU, and save state in context
-	 */
-	pfm_flush_regs(task);
-	
-	/*
-	 * just to make sure nothing starts again when back in user mode.
-	 * pfm_flush_regs() freezes the PMU anyway.
-	 */ 
-	if (ctx->ctx_fl_system) {
-		ia64_psr(regs)->pp = 0;
-	} else {
-		ia64_psr(regs)->up = 0;
-	}
-
-	/* 
-	 * goes back to default behavior 
-	 * no need to change live psr.sp because useless at the kernel level
-	 */
-	ia64_psr(regs)->sp = 1;
-
-	DBprintk(("enabling psr.sp for [%d]\n", current->pid));
-
-	ctx->ctx_flags.state = PFM_CTX_DISABLED;
-
-	return 0;
-}
-
-static int
-pfm_stop(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
-	 struct pt_regs *regs)
-{
-	/* we don't quite support this right now */
-	if (task != current) return -EINVAL;
-
-	/* 
-	 * Cannot do anything before PMU is enabled 
-	 */
-	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
-
-	DBprintk(("[%d] fl_system=%d owner=%p current=%p\n",
-				current->pid,
-				ctx->ctx_fl_system, PMU_OWNER(),
-				current));
-	/* simply stop monitoring but not the PMU */
-	if (ctx->ctx_fl_system) {
-
-		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
-
-		/* disable dcr pp */
-		ia64_set_dcr(ia64_get_dcr() & ~IA64_DCR_PP);
-
-		local_cpu_data->pfm_dcr_pp  = 0;
-
-		ia64_psr(regs)->pp = 0;
-
-		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
-
-	} else {
-		ia64_psr(regs)->up = 0;
-		__asm__ __volatile__ ("rum psr.up;;"::: "memory");
-	}
 	return 0;
 }
 
@@ -2730,10 +2785,12 @@ perfmon_proc_info(char *page)
 	p += sprintf(p, "recorded samples=%lu\n", pfm_recorded_samples_count);
 
 	p += sprintf(p, "CPU%d.pmc[0]=%lx\nPerfmon debug: %s\n", 
-			smp_processor_id(), pmc0, pfm_debug ? "On" : "Off");
+			smp_processor_id(), pmc0, pfm_debug_mode ? "On" : "Off");
 
+#ifdef CONFIG_SMP
 	p += sprintf(p, "CPU%d cpu_data.pfm_syst_wide=%d cpu_data.dcr_pp=%d\n", 
 			smp_processor_id(), local_cpu_data->pfm_syst_wide, local_cpu_data->pfm_dcr_pp);
+#endif
 
 	LOCK_PFS();
 	p += sprintf(p, "proc_sessions=%lu\nsys_sessions=%lu\nsys_use_dbregs=%lu\nptrace_use_dbregs=%lu\n", 
@@ -2772,6 +2829,7 @@ perfmon_read_entry(char *page, char **start, off_t off, int count, int *eof, voi
 	return len;
 }
 
+#ifdef CONFIG_SMP
 void
 pfm_syst_wide_update_task(struct task_struct *task, int mode)
 {
@@ -2784,6 +2842,8 @@ pfm_syst_wide_update_task(struct task_struct *task, int mode)
 	 */
 	ia64_psr(regs)->pp = mode ? local_cpu_data->pfm_dcr_pp : 0;
 }
+#endif
+
 
 void
 pfm_save_regs (struct task_struct *task)
@@ -2873,7 +2933,9 @@ pfm_lazy_save_regs (struct task_struct *task)
 	/* not owned by this CPU */
 	atomic_set(&ctx->ctx_last_cpu, -1);
 
+#ifdef CONFIG_SMP
 do_nothing:
+#endif
 	/*
 	 * declare we are done saving this context
 	 *
@@ -3010,7 +3072,10 @@ pfm_load_regs (struct task_struct *task)
 	struct task_struct *owner;
 	unsigned long mask;
 	u64 psr;
-	int i, cpu;
+	int i;
+#ifdef CONFIG_SMP
+	int cpu;
+#endif
 
 	owner = PMU_OWNER();
 	ctx   = task->thread.pfm_context;
@@ -3119,49 +3184,14 @@ pfm_load_regs (struct task_struct *task)
 
 }
 
-static void
-pfm_model_specific_reset_pmu(struct task_struct *task)
-{
-	int i;
-
-#ifdef CONFIG_ITANIUM
-	/* opcode matcher set to all 1s */
-	ia64_set_pmc(8,~0UL);
-	ia64_set_pmc(9,~0UL);
-
-	/* I-EAR config cleared, plm=0 */
-	ia64_set_pmc(10,0UL);
-
-	/* D-EAR config cleared, PMC[11].pt must be 1 */
-	ia64_set_pmc(11,1UL << 28);
-
-	/* BTB config. plm=0 */
-	ia64_set_pmc(12,0UL);
-
-	/* Instruction address range, PMC[13].ta must be 1 */
-	ia64_set_pmc(13,1UL);
-
-	/* 
-	 * Clear all PMDs 
-	 *
-	 * XXX: may be good enough to rely on the impl_regs to generalize
-	 * this. 
-	 */
-	for(i = 0; i< 18 ; i++) {
-		ia64_set_pmd(i,0UL);
-	}
-#endif
-}
-
 /*
- * XXX: this routine is not very portable for PMCs
  * XXX: make this routine able to work with non current context
  */
 static void
 ia64_reset_pmu(struct task_struct *task)
 {
-	pfm_context_t *ctx = task->thread.pfm_context;
 	struct thread_struct *t = &task->thread;
+	pfm_context_t *ctx = t->pfm_context;
 	unsigned long mask;
 	int i;
 
@@ -3170,34 +3200,36 @@ ia64_reset_pmu(struct task_struct *task)
 		return;
 	}
 
-	/* PMU is frozen, no pending overflow bits */
+	/* Let's make sure the PMU is frozen */
 	ia64_set_pmc(0,1);
 
 	/*
-	 * Let's first do the architected initializations
+	 * install reset values for PMC. We skip PMC0 (done above)
+	 * XX: good up to 64 PMCS
 	 */
-
-	/* clear counters */
-	ia64_set_pmd(4,0UL);
-	ia64_set_pmd(5,0UL);
-	ia64_set_pmd(6,0UL);
-	ia64_set_pmd(7,0UL);
-
-	/* clear overflow status bits */
-	ia64_set_pmc(1,0UL);
-	ia64_set_pmc(2,0UL);
-	ia64_set_pmc(3,0UL);
-
-	/* clear counting monitor configuration */
-	ia64_set_pmc(4,0UL);
-	ia64_set_pmc(5,0UL);
-	ia64_set_pmc(6,0UL);
-	ia64_set_pmc(7,0UL);
-
+	mask = pmu_conf.impl_regs[0] >> 1;
+	for(i=1; mask; mask>>=1, i++) {
+		if (mask & 0x1) {
+			ia64_set_pmc(i, reset_pmcs[i]);
+			/*
+			 * When restoring context, we must restore ALL pmcs, even the ones 
+			 * that the task does not use to avoid leaks and possibly corruption
+			 * of the sesion because of configuration conflicts. So here, we 
+			 * initializaed the table used in the context switch restore routine.
+	 		 */
+			t->pmc[i] = reset_pmcs[i];
+			DBprintk((" pmc[%d]=0x%lx\n", i, reset_pmcs[i]));
+						 
+		}
+	}
 	/*
-	 * Now let's do the CPU model specific initializations
+	 * clear reset values for PMD. 
+	 * XX: good up to 64 PMDS. Suppose that zero is a valid value.
 	 */
-	pfm_model_specific_reset_pmu(task);
+	mask = pmu_conf.impl_regs[4];
+	for(i=0; mask; mask>>=1, i++) {
+		if (mask & 0x1) ia64_set_pmd(i, 0UL);
+	}
 
 	/*
 	 * On context switched restore, we must restore ALL pmc even
@@ -3220,19 +3252,6 @@ ia64_reset_pmu(struct task_struct *task)
 	  * or range restrictions, for instance.
 	  */
 	ctx->ctx_reload_pmcs[0] = pmu_conf.impl_regs[0];
-
-	/*
-	 * make sure we pick up whatever values were installed
-	 * for the CPU model specific reset. We also include
-	 * the architected PMC (pmc4-pmc7)
-	 *
-	 * This step is required in order to restore the correct values in PMC when
-	 * the task is switched out and back in just after the PFM_ENABLE.
-	 */
-	mask = pmu_conf.impl_regs[0];
-	for (i=0; mask; i++, mask>>=1) {
-		if (mask & 0x1) t->pmc[i] = ia64_get_pmc(i);
-	}
 
 	/*
 	 * useful in case of re-enable after disable
@@ -3280,14 +3299,18 @@ pfm_flush_regs (struct task_struct *task)
 	 * By now, we could still have an overflow interrupt in-flight.
 	 */
 	if (ctx->ctx_fl_system) {
+
+		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
+
 		/* disable dcr pp */
 		ia64_set_dcr(ia64_get_dcr() & ~IA64_DCR_PP);
 
+#ifdef CONFIG_SMP
 		local_cpu_data->pfm_syst_wide = 0;
 		local_cpu_data->pfm_dcr_pp    = 0;
-
-
-		__asm__ __volatile__ ("rsm psr.pp;;"::: "memory");
+#else
+		pfm_tasklist_toggle_pp(0);
+#endif
 
 	} else  {
 
@@ -3384,6 +3407,7 @@ pfm_flush_regs (struct task_struct *task)
 	atomic_set(&ctx->ctx_last_cpu, -1);
 
 }
+
 
 
 /*
@@ -3803,6 +3827,17 @@ static struct irqaction perfmon_irqaction = {
 };
 
 
+static void
+pfm_pmu_snapshot(void)
+{
+	int i;
+
+	for (i=0; i < IA64_NUM_PMC_REGS; i++) {
+		if (i >= pmu_conf.num_pmcs) break;
+		if (PMC_IS_IMPL(i)) reset_pmcs[i] = ia64_get_pmc(i);
+	}
+}
+
 /*
  * perfmon initialization routine, called from the initcall() table
  */
@@ -3836,8 +3871,7 @@ perfmon_init (void)
 	pmu_conf.num_pmcs      = find_num_pm_regs(pmu_conf.impl_regs);
 	pmu_conf.num_pmds      = find_num_pm_regs(&pmu_conf.impl_regs[4]);
 
-	printk("perfmon: %u bits counters (max value 0x%016lx)\n", 
-	       pm_info.pal_perf_mon_info_s.width, pmu_conf.perf_ovfl_val);
+	printk("perfmon: %u bits counters\n", pm_info.pal_perf_mon_info_s.width);
 
 	printk("perfmon: %lu PMC/PMD pairs, %lu PMCs, %lu PMDs\n", 
 	       pmu_conf.max_counters, pmu_conf.num_pmcs, pmu_conf.num_pmds);
@@ -3855,6 +3889,19 @@ perfmon_init (void)
 	/* PAL reports the number of pairs */
 	pmu_conf.num_ibrs <<=1;
 	pmu_conf.num_dbrs <<=1;
+
+	/*
+	 * take a snapshot of all PMU registers. PAL is supposed
+	 * to configure them with stable/safe values, i.e., not
+	 * capturing anything.
+	 * We take a snapshot now, before we make any modifications. This
+	 * will become our master copy. Then we will reuse the snapshot
+	 * to reset the PMU in pfm_enable(). Using this technique, perfmon
+	 * does NOT have to know about the specific values to program for
+	 * the PMC/PMD. The safe values may be different from one CPU model to
+	 * the other.
+	 */
+	pfm_pmu_snapshot();
 
 	/* 
 	 * list the pmc registers used to control monitors 
