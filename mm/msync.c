@@ -119,8 +119,8 @@ static inline int filemap_sync_pud_range(pgd_t *pgd,
 	return error;
 }
 
-static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
-	size_t size, unsigned int flags)
+static int __filemap_sync(struct vm_area_struct *vma, unsigned long address,
+			size_t size, unsigned int flags)
 {
 	pgd_t *pgd;
 	unsigned long end = address + size;
@@ -162,6 +162,31 @@ static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 
 	return error;
 }
+
+#ifdef CONFIG_PREEMPT
+static int filemap_sync(struct vm_area_struct *vma, unsigned long address,
+			size_t size, unsigned int flags)
+{
+	const size_t chunk = 64 * 1024;	/* bytes */
+	int error = 0;
+
+	while (size) {
+		size_t sz = min(size, chunk);
+
+		error |= __filemap_sync(vma, address, sz, flags);
+		cond_resched();
+		address += sz;
+		size -= sz;
+	}
+	return error;
+}
+#else
+static int filemap_sync(struct vm_area_struct *vma, unsigned long address,
+			size_t size, unsigned int flags)
+{
+	return __filemap_sync(vma, address, size, flags);
+}
+#endif
 
 /*
  * MS_SYNC syncs the entire file - including mappings.
