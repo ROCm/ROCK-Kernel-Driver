@@ -93,13 +93,17 @@ cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
 	sb->s_blocksize_bits = 14;	/* default 2**14 = CIFS_MAX_MSGSIZE */
 	inode = iget(sb, ROOT_I);
 
-	if (!inode)
+	if (!inode) {
+		rc = -ENOMEM;
 		goto out_no_root;
+	}
 
 	sb->s_root = d_alloc_root(inode);
 
-	if (!sb->s_root)
+	if (!sb->s_root) {
+		rc = -ENOMEM;
 		goto out_no_root;
+	}
 
 	return 0;
 
@@ -113,7 +117,7 @@ out_mount_failed:
 		unload_nls(cifs_sb->local_nls);	
 	if(cifs_sb)
 		kfree(cifs_sb);
-	return -EINVAL;
+	return rc;
 }
 
 void
@@ -331,7 +335,7 @@ struct file_operations cifs_file_ops = {
 	.release = cifs_close,
 	.lock = cifs_lock,
 	.fsync = cifs_fsync,
-    .flush = cifs_flush,
+	.flush = cifs_flush,
 	.mmap  = cifs_file_mmap,
 	.sendfile = generic_file_sendfile,
 };
