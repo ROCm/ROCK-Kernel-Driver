@@ -1,6 +1,8 @@
 Verison 0.95
 ------------
 Fix unsafe global variable usage and password hash failure on gcc 3.3.1
+Fix problem reconnecting secondary mounts to same server after session 
+failure.
  
 Version 0.94
 ------------

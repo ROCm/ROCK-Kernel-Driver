@@ -50,7 +50,6 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 	int rc = 0;
 
 	if(tcon && (tcon->tidStatus == CifsNeedReconnect)) {
-		rc = -EIO;
 		if(tcon->ses) {
 			struct nls_table *nls_codepage = load_nls_default();
 			if(tcon->ses->status == CifsNeedReconnect)
@@ -63,7 +62,8 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 					reopen_files(tcon,nls_codepage);
 			}
 			unload_nls(nls_codepage);
-		}
+		} else
+			rc = -EIO;
 	}
 	if(rc)
 		return rc;
