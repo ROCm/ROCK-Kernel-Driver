@@ -1660,7 +1660,7 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     sb = dir->i_sb;
 
     /* item head of new item */
-    ih.ih_key.k_dir_id = INODE_PKEY (dir)->k_objectid;
+    ih.ih_key.k_dir_id = reiserfs_choose_packing(dir);
     ih.ih_key.k_objectid = cpu_to_le32 (reiserfs_get_unused_objectid (th));
     if (!ih.ih_key.k_objectid) {
 	err = -ENOMEM;
@@ -1729,7 +1729,6 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 	err = -EEXIST;
 	goto out_bad_inode;
     }
-
     if (old_format_only (sb)) {
 	if (inode->i_uid & ~0xffff || inode->i_gid & ~0xffff) {
 	    pathrelse (&path_to_key);

@@ -176,12 +176,13 @@ int reiserfs_allocate_blocks_for_region(
     hint.formatted_node = 0; // We are allocating blocks for unformatted node.
 
     /* only preallocate if this is a small write */
-    if (blocks_to_allocate <
-        REISERFS_SB(inode->i_sb)->s_alloc_options.preallocsize)
+    if (REISERFS_I(inode)->i_prealloc_count ||
+       (!(write_bytes & (inode->i_sb->s_blocksize -1)) &&
+        blocks_to_allocate <
+        REISERFS_SB(inode->i_sb)->s_alloc_options.preallocsize))
         hint.preallocate = 1;
     else
         hint.preallocate = 0;
-
     /* Call block allocator to allocate blocks */
     res = reiserfs_allocate_blocknrs(&hint, allocated_blocks, blocks_to_allocate, blocks_to_allocate);
     if ( res != CARRY_ON ) {
@@ -467,6 +468,12 @@ retry:
     // the inode.
     //
     pathrelse(&path);
+    /*
+     * cleanup prellocation from previous writes
+     * if this is a partial block write
+     */
+    if (write_bytes & (inode->i_sb->s_blocksize -1))
+        reiserfs_discard_prealloc(th, inode);
     reiserfs_write_unlock(inode->i_sb);
 
     // go through all the pages/buffers and map the buffers to newly allocated
@@ -1254,6 +1261,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
 	journal_end(&th, th.t_super, th.t_blocks_allocated);
         reiserfs_write_unlock(inode->i_sb);
     }
+
     if ((file->f_flags & O_SYNC) || IS_SYNC(inode))
 	res = generic_osync_inode(inode, file->f_mapping, OSYNC_METADATA|OSYNC_DATA);
 

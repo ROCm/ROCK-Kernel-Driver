@@ -492,7 +492,6 @@ static void reiserfs_clear_inode (struct inode *inode)
     REISERFS_I(inode)->i_acl_default = NULL;
 }
 
-
 struct super_operations reiserfs_sops = 
 {
   .alloc_inode = reiserfs_alloc_inode,
@@ -651,7 +650,7 @@ static int reiserfs_getopt ( struct super_block * s, char ** cur, opt_desc_t * o
 	reiserfs_warning (s, "head of option \"%s\" is only correct", opt->option_name);
 	return -1;
     }
-	
+
     /* move to the argument, or to next option if argument is not required */
     p ++;
     
@@ -1345,14 +1344,16 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     memset (sbi, 0, sizeof (struct reiserfs_sb_info));
     /* Set default values for options: non-aggressive tails */
     REISERFS_SB(s)->s_mount_opt = ( 1 << REISERFS_SMALLTAIL );
-    /* default block allocator option: skip_busy */
-    REISERFS_SB(s)->s_alloc_options.bits = ( 1 << 5);
-    /* If file grew past 4 blocks, start preallocation blocks for it. */
-    REISERFS_SB(s)->s_alloc_options.preallocmin = 4;
+    /* no preallocation minimum, be smart in
+       reiserfs_file_write instead */
+    REISERFS_SB(s)->s_alloc_options.preallocmin = 0;
     /* Preallocate by 16 blocks (17-1) at once */
     REISERFS_SB(s)->s_alloc_options.preallocsize = 17;
     /* Initialize the rwsem for xattr dir */
     init_rwsem(&REISERFS_SB(s)->xattr_dir_sem);
+
+    /* setup default block allocator options */
+    reiserfs_init_alloc_options(s);
 
     jdev_name = NULL;
     if (reiserfs_parse_options (s, (char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name, &commit_max_age) == 0) {
