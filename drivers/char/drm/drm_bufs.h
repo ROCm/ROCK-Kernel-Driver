@@ -775,7 +775,7 @@ int DRM(addbufs_pci)( struct inode *inode, struct file *filp,
 }
 #endif /* __HAVE_PCI_DMA */
 
-#ifdef __HAVE_SG
+#if __HAVE_SG
 int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
                      unsigned int cmd, unsigned long arg )
 {

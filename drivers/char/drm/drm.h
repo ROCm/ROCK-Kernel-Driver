@@ -46,8 +46,8 @@
 #define DRM_IOC_WRITE		_IOC_WRITE
 #define DRM_IOC_READWRITE	_IOC_READ|_IOC_WRITE
 #define DRM_IOC(dir, group, nr, size) _IOC(dir, group, nr, size)
-#elif defined(__FreeBSD__) || defined(__NetBSD__)
-#if defined(__FreeBSD__) && defined(XFree86Server)
+#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__FreeBSD__) && defined(IN_MODULE)
 /* Prevent name collision when including sys/ioccom.h */
 #undef ioctl
 #include <sys/ioccom.h>
@@ -129,6 +129,18 @@ typedef struct drm_tex_region {
 	unsigned char	padding;
 	unsigned int	age;
 } drm_tex_region_t;
+
+/**
+ * Hardware lock.
+ *
+ * The lock structure is a simple cache-line aligned integer.  To avoid
+ * processor bus contention on a multiprocessor system, there should not be any
+ * other data stored in the same cache line.
+ */
+typedef struct drm_hw_lock {
+	__volatile__ unsigned int lock;		/**< lock variable */
+	char			  padding[60];	/**< Pad to cache line */
+} drm_hw_lock_t;
 
 
 /**
