@@ -798,7 +798,7 @@ nfs_setattr(struct dentry *dentry, struct iattr *attr)
 		if ((attr->ia_valid & ATTR_GID) != 0)
 			inode->i_gid = attr->ia_gid;
 		if ((attr->ia_valid & ATTR_SIZE) != 0) {
-			i_size_write(inode, attr->ia_size);
+			inode->i_size = attr->ia_size;
 			vmtruncate(inode, attr->ia_size);
 		}
 	}
@@ -1161,11 +1161,11 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 		 */
 		if (S_ISREG(inode->i_mode) && data_unstable) {
 			if (new_isize > cur_isize) {
-				i_size_write(inode, new_isize);
+				inode->i_size = new_isize;
 				invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA;
 			}
 		} else {
-			i_size_write(inode, new_isize);
+			inode->i_size = new_isize;
 			invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA;
 		}
 	}
