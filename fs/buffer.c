@@ -314,8 +314,7 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 asmlinkage long sys_fsync(unsigned int fd)
 {
 	struct file * file;
-	struct dentry * dentry;
-	struct inode * inode;
+	struct address_space *mapping;
 	int ret, err;
 
 	ret = -EBADF;
@@ -323,8 +322,7 @@ asmlinkage long sys_fsync(unsigned int fd)
 	if (!file)
 		goto out;
 
-	dentry = file->f_dentry;
-	inode = dentry->d_inode;
+	mapping = file->f_mapping;
 
 	ret = -EINVAL;
 	if (!file->f_op || !file->f_op->fsync) {
@@ -333,17 +331,17 @@ asmlinkage long sys_fsync(unsigned int fd)
 	}
 
 	/* We need to protect against concurrent writers.. */
-	down(&inode->i_sem);
+	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
-	ret = filemap_fdatawrite(inode->i_mapping);
-	err = file->f_op->fsync(file, dentry, 0);
+	ret = filemap_fdatawrite(mapping);
+	err = file->f_op->fsync(file, file->f_dentry, 0);
 	if (!ret)
 		ret = err;
-	err = filemap_fdatawait(inode->i_mapping);
+	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&inode->i_sem);
+	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);
@@ -354,8 +352,7 @@ out:
 asmlinkage long sys_fdatasync(unsigned int fd)
 {
 	struct file * file;
-	struct dentry * dentry;
-	struct inode * inode;
+	struct address_space *mapping;
 	int ret, err;
 
 	ret = -EBADF;
@@ -363,24 +360,23 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	if (!file)
 		goto out;
 
-	dentry = file->f_dentry;
-	inode = dentry->d_inode;
-
 	ret = -EINVAL;
 	if (!file->f_op || !file->f_op->fsync)
 		goto out_putf;
 
-	down(&inode->i_sem);
+	mapping = file->f_mapping;
+
+	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
-	ret = filemap_fdatawrite(inode->i_mapping);
-	err = file->f_op->fsync(file, dentry, 1);
+	ret = filemap_fdatawrite(mapping);
+	err = file->f_op->fsync(file, file->f_dentry, 1);
 	if (!ret)
 		ret = err;
-	err = filemap_fdatawait(inode->i_mapping);
+	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&inode->i_sem);
+	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);

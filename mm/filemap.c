@@ -1970,7 +1970,7 @@ EXPORT_SYMBOL(generic_file_readv);
 ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
 			unsigned long nr_segs, loff_t * ppos) 
 {
-	struct inode *inode = file->f_dentry->d_inode;
+	struct inode *inode = file->f_mapping->host;
 	ssize_t ret;
 
 	down(&inode->i_sem);
