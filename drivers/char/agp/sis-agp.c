@@ -169,6 +169,10 @@ static struct agp_device_ids sis_agp_device_ids[] __devinitdata =
 		.chipset_name	= "630",
 	},
 	{
+		.device_id	= PCI_DEVICE_ID_SI_635,
+		.chipset_name	= "635",
+	},
+	{
 		.device_id	= PCI_DEVICE_ID_SI_645,
 		.chipset_name	= "645",
 	},

@@ -29,6 +29,7 @@
  *	   for IRQ management (e.g. start()->_SRS).
  */
 
+#include <linux/sysdev.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -71,7 +72,7 @@ struct acpi_pci_link_irq {
 	u8			active;			/* Current IRQ */
 	u8			edge_level;		/* All IRQs */
 	u8			active_high_low;	/* All IRQs */
-	u8			setonboot;
+	u8			initialized;
 	u8			resource_type;
 	u8			possible_count;
 	u8			possible[ACPI_PCI_LINK_MAX_POSSIBLE];
@@ -517,7 +518,7 @@ static int acpi_pci_link_allocate(struct acpi_pci_link* link) {
 
 	ACPI_FUNCTION_TRACE("acpi_pci_link_allocate");
 
-	if (link->irq.setonboot)
+	if (link->irq.initialized)
 		return_VALUE(0);
 
 	/*
@@ -571,7 +572,7 @@ static int acpi_pci_link_allocate(struct acpi_pci_link* link) {
 			acpi_device_bid(link->device), link->irq.active);
 	}
 
-	link->irq.setonboot = 1;
+	link->irq.initialized = 1;
 
 	return_VALUE(0);
 }
@@ -695,6 +696,42 @@ end:
 
 
 static int
+acpi_pci_link_resume (
+	struct acpi_pci_link	*link)
+{
+	ACPI_FUNCTION_TRACE("acpi_pci_link_resume");
+	
+	if (link->irq.active && link->irq.initialized)
+		return_VALUE(acpi_pci_link_set(link, link->irq.active));
+	else
+		return_VALUE(0);
+}
+
+
+static int
+irqrouter_resume(
+	struct sys_device *dev)
+{
+	struct list_head        *node = NULL;
+	struct acpi_pci_link    *link = NULL;
+
+	ACPI_FUNCTION_TRACE("irqrouter_resume");
+
+	list_for_each(node, &acpi_link.entries) {
+
+		link = list_entry(node, struct acpi_pci_link, node);
+		if (!link) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid link context\n"));
+			continue;
+		}
+
+		acpi_pci_link_resume(link);
+	}
+	return_VALUE(0);
+}
+
+
+static int
 acpi_pci_link_remove (
 	struct acpi_device	*device,
 	int			type)
@@ -786,11 +823,42 @@ int __init acpi_irq_balance_set(char *str)
 __setup("acpi_irq_balance", acpi_irq_balance_set);
 
 
+static struct sysdev_class irqrouter_sysdev_class = {
+        set_kset_name("irqrouter"),
+        .resume = irqrouter_resume,
+};
+
+
+static struct sys_device device_irqrouter = {
+	.id     = 0,
+	.cls    = &irqrouter_sysdev_class,
+};
+
+
+static int __init irqrouter_init_sysfs(void)
+{
+	int error;
+
+	ACPI_FUNCTION_TRACE("irqrouter_init_sysfs");
+
+	if (acpi_disabled || acpi_noirq)
+		return_VALUE(0);
+
+	error = sysdev_class_register(&irqrouter_sysdev_class);
+	if (!error)
+		error = sysdev_register(&device_irqrouter);
+
+	return_VALUE(error);
+}                                        
+
+device_initcall(irqrouter_init_sysfs);
+
+
 static int __init acpi_pci_link_init (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_pci_link_init");
 
-	if (acpi_pci_disabled)
+	if (acpi_noirq)
 		return_VALUE(0);
 
 	acpi_link.count = 0;

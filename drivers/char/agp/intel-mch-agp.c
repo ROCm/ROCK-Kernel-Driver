@@ -633,5 +633,5 @@ module_init(agp_intelmch_init);
 module_exit(agp_intelmch_cleanup);
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
-MODULE_LICENSE("GPL and additional rights");
+MODULE_LICENSE("GPL");
 
