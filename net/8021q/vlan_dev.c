@@ -244,7 +244,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 			/* TODO:  Add a more specific counter here. */
 			stats->rx_errors++;
 		}
-		rcu_read_lock();
+		rcu_read_unlock();
 		return 0;
 	}
 
