@@ -423,7 +423,7 @@ static unsigned long timer_ticks_per_nsec_quotient;
 
 #define TICK_SIZE (tick_nsec / 1000)
 
-static __inline__ void timer_check_rtc(void)
+static inline void timer_check_rtc(void)
 {
 	/* last time the cmos clock got updated */
 	static long last_rtc_update;
@@ -1139,7 +1139,6 @@ EXPORT_SYMBOL(do_settimeofday);
  */
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags;
 	unsigned long seq;
 	unsigned long usec, sec;
 	unsigned long max_ntp_tick = tick_usec - tickadj;
@@ -1147,7 +1146,7 @@ void do_gettimeofday(struct timeval *tv)
 	do {
 		unsigned long lost;
 
-		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+		seq = read_seqbegin(&xtime_lock);
 		usec = do_gettimeoffset();
 		lost = jiffies - wall_jiffies;
 
@@ -1166,8 +1165,18 @@ void do_gettimeofday(struct timeval *tv)
 			usec += lost * tick_usec;
 
 		sec = xtime.tv_sec;
-		usec += (xtime.tv_nsec / 1000);
-	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
+
+		/* Believe it or not, this divide shows up on
+		 * kernel profiles.  The problem is that it is
+		 * both 64-bit and signed.  Happily, 32-bits
+		 * of precision is all we really need and in
+		 * doing so gcc ends up emitting a cheap multiply.
+		 *
+		 * XXX Why is tv_nsec 'long' and 'signed' in
+		 * XXX the first place, can it even be negative?
+		 */
+		usec += ((unsigned int) xtime.tv_nsec / 1000U);
+	} while (read_seqretry(&xtime_lock, seq));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
