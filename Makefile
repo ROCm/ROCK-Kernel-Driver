@@ -46,6 +46,13 @@ all:	vmlinux
 
 #KBUILD_VERBOSE := 1
 
+# 	Decide whether to build built-in, modular, or both
+
+KBUILD_MODULES :=
+KBUILD_BUILTIN := 1
+
+export KBUILD_MODULES KBUILD_BUILTIN
+
 # Beautify output
 # ---------------------------------------------------------------------------
 #
@@ -379,11 +386,8 @@ MODFLAGS += -include $(HPATH)/linux/modversions.h
 endif
 
 .PHONY: modules
-modules: $(patsubst %, _mod_%, $(SUBDIRS))
-
-.PHONY: $(patsubst %, _mod_%, $(SUBDIRS))
-$(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
-	@$(MAKE) -C $(patsubst _mod_%, %, $@) modules
+modules:
+	@$(MAKE) KBUILD_BUILTIN= KBUILD_MODULES=1 $(SUBDIRS)
 
 #	Install modules
 

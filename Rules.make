@@ -52,9 +52,8 @@ obj-m		:= $(filter-out %/, $(obj-m))
 # add it to $(subdir-m)
 
 both-m          := $(filter $(mod-subdirs), $(subdir-y))
-SUB_DIRS	:= $(subdir-y) $(if $(BUILD_MODULES),$(subdir-m))
-MOD_SUB_DIRS	:= $(sort $(subdir-m) $(both-m))
-ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
+subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
+subdir-ymn	:= $(sort $(subdir-ym) $(subdir-n) $(subdir-))
 
 # export.o is never a composite object, since $(export-objs) has a
 # fixed meaning (== objects which EXPORT_SYMBOL())
@@ -89,8 +88,16 @@ real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m
 # Get things started.
 # ==========================================================================
 
+ifndef O_TARGET
+ifndef L_TARGET
+O_TARGET := built-in.o
+endif
+endif
+
 #	The echo suppresses the "Nothing to be done for first_rule"
-first_rule: vmlinux $(if $(BUILD_MODULES),$(obj-m))
+first_rule: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
+	    $(if $(KBUILD_MODULES),$(obj-m)) \
+	    sub_dirs
 	@echo -n
 
 # Compile C sources (.c)
@@ -169,16 +176,8 @@ cmd_as_o_S       = $(CC) -Wp,-MD,.$(subst /,_,$@).d $(a_flags) -c -o $@ $<
 # If a Makefile does define neither O_TARGET nor L_TARGET,
 # use a standard O_TARGET named "built-in.o"
 
-ifndef O_TARGET
-ifndef L_TARGET
-O_TARGET := built-in.o
-endif
-endif
-
 # Build the compiled-in targets
 # ---------------------------------------------------------------------------
-
-vmlinux: $(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS) sub_dirs
 
 # To build objects in subdirs, we need to descend into the directories
 $(sort $(subdir-obj-y)): sub_dirs ;
@@ -225,61 +224,48 @@ $(multi-used-y) : %.o: $(multi-objs-y) FORCE
 $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 	$(call if_changed,cmd_link_multi)
 
-#
-# This makes module versions
-#
+# Descending when making module versions
+# ---------------------------------------------------------------------------
 
-fastdep: FORCE
-ifdef ALL_SUB_DIRS
-	@$(MAKE) $(patsubst %,_sfdep_%,$(ALL_SUB_DIRS)) _FASTDEP_ALL_SUB_DIRS="$(ALL_SUB_DIRS)"
-endif
+fastdep-list := $(addprefix _sfdep_,$(subdir-ymn))
 
-ifdef _FASTDEP_ALL_SUB_DIRS
-$(patsubst %,_sfdep_%,$(_FASTDEP_ALL_SUB_DIRS)):
+.PHONY: fastdep $(fastdep-list)
+
+fastdep: $(fastdep-list)
+
+$(fastdep-list):
 	@$(MAKE) -C $(patsubst _sfdep_%,%,$@) fastdep
-endif
 
+# Descending when building
+# ---------------------------------------------------------------------------
 
-#
-# A rule to make subdirectories
-#
-subdir-list = $(sort $(patsubst %,_subdir_%,$(SUB_DIRS)))
-sub_dirs: FORCE $(subdir-list)
+subdir-list := $(addprefix _subdir_,$(subdir-ym))
 
-ifdef SUB_DIRS
-$(subdir-list) : FORCE
+.PHONY: sub_dirs $(subdir-list)
+
+sub_dirs: $(subdir-list)
+
+$(subdir-list):
 	@$(MAKE) -C $(patsubst _subdir_%,%,$@)
-endif
 
-#
-# A rule to make modules
-#
-ifneq "$(strip $(MOD_SUB_DIRS))" ""
-.PHONY: $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
-$(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS)) : FORCE
-	@$(MAKE) -C $(patsubst _modsubdir_%,%,$@) modules
+# Descending and installing modules
+# ---------------------------------------------------------------------------
 
-.PHONY: $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
-$(patsubst %,_modinst_%,$(MOD_SUB_DIRS)) : FORCE
-	@$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
-endif
+modinst-list := $(addprefix _modinst_,$(subdir-ym))
 
-.PHONY: modules
-modules: $(obj-m) FORCE $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
-	@echo -n
+.PHONY: modules_install _modinst_ $(modinst-list)
 
-.PHONY: _modinst__
-_modinst__: FORCE
-ifneq "$(strip $(obj-m))" ""
+modules_install: $(modinst-list)
+ifneq ($(obj-m),)
 	@echo Installing modules in $(MODLIB)/kernel/$(RELDIR)
 	@mkdir -p $(MODLIB)/kernel/$(RELDIR)
 	@cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
+else
+	@echo -n
 endif
 
-.PHONY: modules_install
-modules_install: _modinst__ $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
-	@echo -n
-
+$(modinst-list):
+	@$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------
