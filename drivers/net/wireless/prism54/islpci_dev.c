@@ -522,7 +522,12 @@ islpci_reset_if(islpci_private *priv)
 	isl38xx_enable_common_interrupts(priv->device_base);
 
 	down_write(&priv->mib_sem);
-	mgt_commit(priv);
+	result = mgt_commit(priv);
+	if (result) {
+		printk(KERN_ERR "%s: interface reset failure\n", priv->ndev->name);
+		up_write(&priv->mib_sem);
+		return result;
+	}
 	up_write(&priv->mib_sem);
 
 	islpci_set_state(priv, PRV_STATE_READY);

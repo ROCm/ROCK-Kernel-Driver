@@ -48,7 +48,7 @@ void mgt_set(islpci_private *, enum oid_num_t, void *);
 
 void mgt_get(islpci_private *, enum oid_num_t, void *);
 
-void mgt_commit(islpci_private *);
+int mgt_commit(islpci_private *);
 void mgt_unlatch_all(islpci_private *);
 
 int mgt_mlme_answer(islpci_private *);

@@ -697,14 +697,14 @@ mgt_update_addr(islpci_private *priv)
 
 #define VEC_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
-void
+int
 mgt_commit(islpci_private *priv)
 {
 	int rvalue;
 	u32 u;
 
 	if (islpci_get_state(priv) < PRV_STATE_INIT)
-		return;
+		return 0;
 
 	rvalue = mgt_commit_list(priv, commit_part1, VEC_SIZE(commit_part1));
 
@@ -720,6 +720,7 @@ mgt_commit(islpci_private *priv)
 		   incoherent state. We should reset it ! */
 		printk(KERN_DEBUG "%s: mgt_commit: failure\n", priv->ndev->name);
 	}
+	return rvalue;
 }
 
 /* The following OIDs need to be "unlatched":

@@ -340,7 +340,10 @@ prism54_set_mode(struct net_device *ndev, struct iw_request_info *info,
 
 	mgt_set(priv, DOT11_OID_MLMEAUTOLEVEL, &mlmeautolevel);
 
-	mgt_commit(priv);
+	if (mgt_commit(priv)) {
+		up_write(&priv->mib_sem);
+		return -EIO;
+	}
 	priv->ndev->type = (priv->iw_mode == IW_MODE_MONITOR)
 	    ? priv->monitor_type : ARPHRD_ETHER;
 	up_write(&priv->mib_sem);
@@ -1401,7 +1404,10 @@ prism54_set_policy(struct net_device *ndev, struct iw_request_info *info,
 		mlmeautolevel = DOT11_MLME_EXTENDED;
 	mgt_set(priv, DOT11_OID_MLMEAUTOLEVEL, &mlmeautolevel);
 	/* restart the card with our new policy */
-	mgt_commit(priv);
+	if (mgt_commit(priv)) {
+		up_write(&priv->mib_sem);
+		return -EIO;
+	}
 	up_write(&priv->mib_sem);
 
 	return 0;
