@@ -55,6 +55,7 @@ struct sysfs_buffer {
 	char			* page;
 	struct sysfs_ops	* ops;
 	struct semaphore	sem;
+	int			needs_read_fill;
 };
 
 
@@ -82,6 +83,7 @@ static int fill_read_buffer(struct dentry * dentry, struct sysfs_buffer * buffer
 		return -ENOMEM;
 
 	count = ops->show(kobj,attr,buffer->page);
+	buffer->needs_read_fill = 0;
 	BUG_ON(count > (ssize_t)PAGE_SIZE);
 	if (count >= 0)
 		buffer->count = count;
@@ -146,7 +148,7 @@ sysfs_read_file(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	ssize_t retval = 0;
 
 	down(&buffer->sem);
-	if ((!*ppos) || (!buffer->page)) {
+	if (buffer->needs_read_fill) {
 		if ((retval = fill_read_buffer(file->f_dentry,buffer)))
 			goto out;
 	}
@@ -182,6 +184,7 @@ fill_write_buffer(struct sysfs_buffer * buffer, const char __user * buf, size_t 
 	if (count >= PAGE_SIZE)
 		count = PAGE_SIZE - 1;
 	error = copy_from_user(buffer->page,buf,count);
+	buffer->needs_read_fill = 1;
 	return error ? -EFAULT : count;
 }
 
@@ -299,6 +302,7 @@ static int check_perm(struct inode * inode, struct file * file)
 	if (buffer) {
 		memset(buffer,0,sizeof(struct sysfs_buffer));
 		init_MUTEX(&buffer->sem);
+		buffer->needs_read_fill = 1;
 		buffer->ops = ops;
 		file->private_data = buffer;
 	} else
