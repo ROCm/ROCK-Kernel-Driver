@@ -14,7 +14,6 @@ struct chipset_bus_clock_list_entry {
 };
 
 struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	{	XFER_UDMA_6,	0x31,	0x07	},
 	{	XFER_UDMA_5,	0x31,	0x06	},
 	{	XFER_UDMA_4,	0x31,	0x05	},
@@ -26,7 +25,6 @@ struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
 	{	XFER_MW_DMA_2,	0x31,	0x00	},
 	{	XFER_MW_DMA_1,	0x31,	0x00	},
 	{	XFER_MW_DMA_0,	0x0a,	0x00	},
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	{	XFER_PIO_4,	0x31,	0x00	},
 	{	XFER_PIO_3,	0x33,	0x00	},
 	{	XFER_PIO_2,	0x08,	0x00	},
@@ -36,7 +34,6 @@ struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
 };
 
 struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	{	XFER_UDMA_6,	0x41,	0x06	},
 	{	XFER_UDMA_5,	0x41,	0x05	},
 	{	XFER_UDMA_4,	0x41,	0x04	},
@@ -48,7 +45,6 @@ struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
 	{	XFER_MW_DMA_2,	0x41,	0x00	},
 	{	XFER_MW_DMA_1,	0x42,	0x00	},
 	{	XFER_MW_DMA_0,	0x7a,	0x00	},
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	{	XFER_PIO_4,	0x41,	0x00	},
 	{	XFER_PIO_3,	0x43,	0x00	},
 	{	XFER_PIO_2,	0x78,	0x00	},
