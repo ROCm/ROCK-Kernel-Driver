@@ -81,6 +81,9 @@ out:
 
 void scsi_proc_hostdir_add(struct scsi_host_template *sht)
 {
+	if (!sht->proc_info)
+		return;
+
 	down(&global_host_template_sem);
 	if (!sht->present++) {
 		sht->proc_dir = proc_mkdir(sht->proc_name, proc_scsi);
@@ -96,6 +99,9 @@ void scsi_proc_hostdir_add(struct scsi_host_template *sht)
 
 void scsi_proc_hostdir_rm(struct scsi_host_template *sht)
 {
+	if (!sht->proc_info)
+		return;
+
 	down(&global_host_template_sem);
 	if (!--sht->present && sht->proc_dir) {
 		remove_proc_entry(sht->proc_name, proc_scsi);
