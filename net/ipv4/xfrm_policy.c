@@ -192,7 +192,7 @@ struct xfrm_type *xfrm_get_type(u8 proto)
 	type = xfrm_type_map[proto];
 	if (type && !try_inc_mod_count(type->owner))
 		type = NULL;
-	write_unlock(&xfrm_type_lock);
+	read_unlock(&xfrm_type_lock);
 	return type;
 }
 
