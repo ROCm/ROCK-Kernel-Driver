@@ -441,7 +441,7 @@ fork_by_hand(void)
  * Bring one cpu online.
  */
 static int __init
-smp_boot_one_cpu(int cpuid, int cpunum)
+smp_boot_one_cpu(int cpuid)
 {
 	struct task_struct *idle;
 	long timeout;
@@ -578,7 +578,7 @@ smp_boot_cpus(void)
 		if (((hwrpb_cpu_present_mask >> i) & 1) == 0)
 			continue;
 
-		if (smp_boot_one_cpu(i, cpu_count))
+		if (smp_boot_one_cpu(i))
 			continue;
 
 		cpu_present_mask |= 1UL << i;
@@ -603,14 +603,22 @@ smp_boot_cpus(void)
 	smp_num_cpus = cpu_count;
 }
 
-/*
- * Called by smp_init to release the blocking online cpus once they 
- * are all started.
- */
 void __init
-smp_commence(void)
+smp_prepare_cpus(unsigned int max_cpus)
 {
-	/* smp_init sets smp_threads_ready -- that's enough.  */
+	smp_boot_cpus();
+}
+
+int __devinit
+__cpu_up(unsigned int cpu)
+{
+	return cpu_online(cpu) ? 0 : -ENOSYS;
+}
+
+void __init
+smp_cpus_done(unsigned int max_cpus)
+{
+	smp_threads_ready = 1;
 	mb();
 }
 
