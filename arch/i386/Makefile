@@ -86,6 +86,6 @@ install: vmlinux
 	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
 
 archclean:
-	+@$(call makeboot,clean)
+	+@$(call makeboot,subdirclean)
 
 archmrproper:

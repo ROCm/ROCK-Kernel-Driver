@@ -132,6 +132,10 @@ a100u2w-objs	:= inia100.o i60uscsi.o
 cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
 		   cpqfcTSworker.o cpqfcTStrigger.o
 
+# Files generated that shall be removed upon make clean
+clean-files :=	53c8xx_d.h  53c7xx_d.h sim710_d.h  53c700_d.h	\
+		53c8xx_u.h  53c7xx_u.h sim710_u.h 53c700_u.h
+
 include $(TOPDIR)/Rules.make
 
 $(obj)/53c7,8xx.o: $(obj)/53c8xx_d.h $(obj)/53c8xx_u.h
