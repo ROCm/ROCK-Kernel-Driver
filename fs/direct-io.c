@@ -690,8 +690,11 @@ out:
 static void clean_blockdev_aliases(struct dio *dio)
 {
 	unsigned i;
+	unsigned nblocks;
 
-	for (i = 0; i < dio->blocks_available; i++) {
+	nblocks = dio->map_bh.b_size >> dio->inode->i_blkbits;
+
+	for (i = 0; i < nblocks; i++) {
 		unmap_underlying_metadata(dio->map_bh.b_bdev,
 					dio->map_bh.b_blocknr + i);
 	}
