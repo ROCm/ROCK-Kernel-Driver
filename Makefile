@@ -300,39 +300,41 @@ include/linux/version.h: Makefile
 # Helpers built in scripts/
 # ---------------------------------------------------------------------------
 
-scripts/mkdep scripts/split-include : scripts ;
+scripts/fixdep scripts/split-include : scripts ;
 
 .PHONY: scripts
 scripts:
 	@$(MAKE) -C scripts
 
-# Generate dependencies
+# Generate module versions
 # ---------------------------------------------------------------------------
 
-# 	In the same pass, generate module versions, that's why it's
-#	all mixed up here.
+# 	The targets are still named depend / dep for traditional
+#	reasons, but the only thing we do here is generating
+#	the module version checksums.
+#	FIXME: For now, we are also calling "archdep" from here,
+#	which should be replaced by a more sensible solution.
 
 .PHONY: depend dep $(patsubst %,_sfdep_%,$(SUBDIRS))
 
 depend dep: .hdepend
 
-#	.hdepend is missing prerequisites - in fact dependencies need
-#	to be redone basically each time anything changed - since
-#	that's too expensive, we traditionally rely on the user to
-#	run "make dep" manually whenever necessary. In this case,
-#	we make "FORCE" a prequisite, to force redoing the
-#	dependencies. Yeah, that's ugly, and it'll go away soon.
-
-quiet_cmd_depend = Making dependencies (include)
-cmd_depend       = scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > $@
-
-.hdepend: scripts/mkdep include/linux/version.h include/asm \
-	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
-	$(call cmd,cmd_depend)
-	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
 ifdef CONFIG_MODVERSIONS
+
+#	Before descending for the actual build, we need module
+#	versions done. - Still using the old, illogical name
+#	.hdepend
+
+#	.hdepend only indicates if we have generated module
+#	version checksums before now. For now, if they've
+#	been generated once, no rechecking will be done unless
+#	explicitly asked for using "make dep".
+
+.hdepend: scripts/fixdep include/linux/version.h include/asm \
+	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
+	touch $@
+	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
 	@$(MAKE) include/linux/modversions.h
-endif
 	@$(MAKE) archdep
 
 $(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
@@ -357,6 +359,15 @@ include/linux/modversions.h: FORCE
 		echo $@ was updated; \
 		mv -f $@.tmp $@; \
 	fi
+
+else # !CONFIG_MODVERSIONS
+
+.hdepend: include/linux/version.h include/asm \
+	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
+	touch $@
+	@$(MAKE) archdep
+
+endif # CONFIG_MODVERSIONS
 
 # ---------------------------------------------------------------------------
 # Modules
@@ -592,8 +603,8 @@ MRPROPER_FILES += \
 	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
 	.menuconfig.log \
 	include/asm \
-	.hdepend scripts/mkdep scripts/split-include scripts/docproc \
-	$(TOPDIR)/include/linux/modversions.h \
+	.hdepend scripts/split-include scripts/docproc \
+	scripts/fixdep $(TOPDIR)/include/linux/modversions.h \
 	tags TAGS kernel.spec \
 
 # 	directories removed with 'make mrproper'
@@ -607,7 +618,8 @@ include arch/$(ARCH)/Makefile
 
 clean:	archclean
 	@echo 'Cleaning up'
-	@find . \( -name \*.[oas] -o -name core -o -name .\*.cmd \) -type f -print \
+	@find . \( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
+		   -name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
 	@rm -f $(CLEAN_FILES)
 	@rm -rf $(CLEAN_DIRS)

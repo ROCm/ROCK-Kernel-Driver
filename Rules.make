@@ -96,7 +96,7 @@ first_rule: vmlinux $(if $(BUILD_MODULES),$(obj-m))
 # Compile C sources (.c)
 # ---------------------------------------------------------------------------
 
-# FIXME: if we don't know if built-in or modular, assume built-in.
+# If we don't know if built-in or modular, assume built-in.
 # Only happens in Makefiles which override the default first_rule:
 modkern_cflags := $(CFLAGS_KERNEL)
 
@@ -120,25 +120,25 @@ quiet_cmd_cc_s_c = CC     $(RELDIR)/$@
 cmd_cc_s_c       = $(CC) $(c_flags) -S -o $@ $< 
 
 %.s: %.c FORCE
-	$(call if_changed,cmd_cc_s_c)
+	$(call cmd,cmd_cc_s_c)
 
 quiet_cmd_cc_i_c = CPP    $(RELDIR)/$@
 cmd_cc_i_c       = $(CPP) $(c_flags)   -o $@ $<
 
 %.i: %.c FORCE
-	$(call if_changed,cmd_cc_i_c)
+	$(call cmd,cmd_cc_i_c)
 
 quiet_cmd_cc_o_c = CC     $(RELDIR)/$@
-cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
+cmd_cc_o_c       = $(CC) -Wp,-MD,.$(subst /,_,$@).d $(c_flags) -c -o $@ $<
 
 %.o: %.c FORCE
-	$(call if_changed,cmd_cc_o_c)
+	$(call if_changed_dep,cc_o_c)
 
 quiet_cmd_cc_lst_c = Generating $(RELDIR)/$@
 cmd_cc_lst_c     = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makelst $*.o $(TOPDIR)/System.map $(OBJDUMP) > $@
 
 %.lst: %.c FORCE
-	$(call if_changed,cmd_cc_lst_c)
+	$(call cmd,cmd_cc_lst_c)
 
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
@@ -158,13 +158,13 @@ quiet_cmd_as_s_S = CPP    $(RELDIR)/$@
 cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
 
 %.s: %.S FORCE
-	$(call if_changed,cmd_as_s_S)
+	$(call cmd,cmd_as_s_S)
 
 quiet_cmd_as_o_S = AS     $(RELDIR)/$@
-cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
+cmd_as_o_S       = $(CC) -Wp,-MD,.$(subst /,_,$@).d $(a_flags) -c -o $@ $<
 
 %.o: %.S FORCE
-	$(call if_changed,cmd_as_o_S)
+	$(call if_changed_dep,as_o_S)
 
 # If a Makefile does define neither O_TARGET nor L_TARGET,
 # use a standard O_TARGET named "built-in.o"
@@ -226,14 +226,10 @@ $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 	$(call if_changed,cmd_link_multi)
 
 #
-# This make dependencies quickly
+# This makes module versions
 #
 
-quiet_cmd_fastdep = Making dependencies ($(RELDIR))
-cmd_fastdep       = $(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- $(wildcard *.[chS]) > .depend
-
 fastdep: FORCE
-	$(call cmd,cmd_fastdep)
 ifdef ALL_SUB_DIRS
 	@$(MAKE) $(patsubst %,_sfdep_%,$(ALL_SUB_DIRS)) _FASTDEP_ALL_SUB_DIRS="$(ALL_SUB_DIRS)"
 endif
@@ -287,7 +283,9 @@ modules_install: _modinst__ $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------
+
 .PHONY: FORCE
+
 FORCE:
 
 #
@@ -301,7 +299,6 @@ script:
 # Separate the object into "normal" objects and "exporting" objects
 # Exporting objects are: all objects that define symbol tables
 #
-ifdef CONFIG_MODULES
 
 ifdef CONFIG_MODVERSIONS
 ifneq "$(strip $(export-objs))" ""
@@ -323,16 +320,17 @@ endif
 # We don't track dependencies for .ver files, so we FORCE to check
 # them always (i.e. always at "make dep" time).
 
+quiet_cmd_create_ver = Creating $@
 cmd_create_ver = $(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< | \
 		 $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
 
 $(MODINCL)/$(MODPREFIX)%.ver: %.c FORCE
 	@echo $(cmd_create_ver)
-	@$(cmd_create_ver)
+	@$(call cmd,cmd_create_ver)
 	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
 	  echo $@ is unchanged; rm -f $@.tmp; \
 	else \
-	  echo mv $@.tmp $@; mv -f $@.tmp $@; \
+	  mv -f $@.tmp $@; \
 	fi
 
 # updates .ver files but not modversions.h
@@ -340,29 +338,7 @@ fastdep: $(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver))
 
 endif # export-objs 
 
-# make dep cannot correctly figure out the dependency on the generated
-# modversions.h, so we list them here:
-# o files which export symbols and are compiled into the kernel include
-#   it (to generate a correct symbol table)
-# o all modules get compiled with -include modversions.h
-
-$(filter $(export-objs),$(real-objs-y)): $(TOPDIR)/include/linux/modversions.h
-$(real-objs-m): $(TOPDIR)/include/linux/modversions.h
-
 endif # CONFIG_MODVERSIONS
-
-endif # CONFIG_MODULES
-
-#
-# include dependency files if they exist
-#
-ifneq ($(wildcard .depend),)
-include .depend
-endif
-
-ifneq ($(wildcard $(TOPDIR)/.hdepend),)
-include $(TOPDIR)/.hdepend
-endif
 
 # ---------------------------------------------------------------------------
 # Check if command line has changed
@@ -395,7 +371,7 @@ endif
 #   which is saved in .<target>.o, to the current command line using
 #   the two filter-out commands)
 
-# read all saved command lines
+# read all saved command lines and dependencies
 
 cmd_files := $(wildcard .*.cmd)
 ifneq ($(cmd_files),)
@@ -408,6 +384,20 @@ if_changed = $(if $(strip $? \
 		          $(filter-out $($(1)),$(cmd_$(@F)))\
 			  $(filter-out $(cmd_$(@F)),$($(1)))),\
 	       @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
+
+
+# execute the command and also postprocess generated .d dependencies
+# file
+
+if_changed_dep = $(if $(strip $? \
+		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
+			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
+	@set -e; \
+	$(if $($(quiet)cmd_$(1)),echo '$($(quiet)cmd_$(1))';) \
+	$(cmd_$(1)); \
+	$(TOPDIR)/scripts/fixdep $(subst /,_,$@) $(TOPDIR) '$(cmd_$(1))' > .$(subst /,_,$@).tmp; \
+	rm -f .$(subst /,_,$@).d; \
+	mv -f .$(subst /,_,$@).tmp .$(subst /,_,$@).cmd )
 
 # If quiet is set, only print short version of command
 

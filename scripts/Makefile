@@ -7,9 +7,9 @@
 # can't do it
 CHMOD_FILES := docgen gen-all-syms kernel-doc mkcompile_h mkversion_h makelst
 
-all: mkdep split-include $(CHMOD_FILES)
+all: fixdep split-include $(CHMOD_FILES)
 
-mkdep: mkdep.c
+fixdep: fixdep.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
 split-include: split-include.c
