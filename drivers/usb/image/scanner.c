@@ -1,13 +1,16 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.5.54)
+ * Driver for USB Scanners (linux-2.5.60)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
+ * Copyright (C) 2002, 2003 Henning Meier-Geinitz
  *
  * Portions may be copyright Brad Keryan and Michael Gee.
  *
- * Brian Beattie <beattie@beattie-home.net>
+ * Previously maintained by Brian Beattie
+ *
+ * Current maintainer: Henning Meier-Geinitz <henning@meier-geinitz.de>
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -300,8 +303,6 @@
  *      Frank Zago <fzago@greshamstorage.com> and
  *      Oliver Neukum <520047054719-0001@t-online.de> for reviewing/testing.
  *
- * 05/21/02 Currently maintained by Brian Beattie <beattie@beattie-home.net>
- *
  * 0.4.8  5/30/2002
  *    - Added Mustek BearPaw 2400 TA.  Thanks to Sergey
  *      Vlasov <vsu@mivlgu.murom.ru>.
@@ -363,7 +364,7 @@
  *    - All the developers that are working on USB SANE backends or other
  *      applications to use USB scanners.
  *    - Thanks to Greg KH <greg@kroah.com> for setting up Brian Beattie
- *      to be the new USB Scanner maintainer.
+ *      and Henning Meier-Geinitz to be the new USB Scanner maintainer.
  *
  *  Performance:
  *
@@ -371,6 +372,14 @@
  *            300 dpi scan of the entire bed
  *      24 Bit Color ~ 70 secs - 3.6 Mbit/sec
  *       8 Bit Gray ~ 17 secs - 4.2 Mbit/sec */
+
+/*
+ * For documentation, see Documentation/usb/scanner.txt.
+ * Website: http://www.meier-geinitz.de/kernel/
+ * Please contact the maintainer if your scanner is not detected by this
+ * driver automatically.
+ */
+
 
 #include <asm/byteorder.h>
 
