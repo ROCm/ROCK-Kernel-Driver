@@ -560,16 +560,16 @@ static int acm_probe (struct usb_interface *intf,
 
 		for (j = 0; j < cfacm->desc.bNumInterfaces - 1; j++) {
 		    
-			if (usb_interface_claimed(cfacm->interface + j) ||
-			    usb_interface_claimed(cfacm->interface + j + 1))
+			if (usb_interface_claimed(cfacm->interface[j]) ||
+			    usb_interface_claimed(cfacm->interface[j + 1]))
 			continue;
 
-			ifcom = cfacm->interface[j].altsetting + 0;
-			ifdata = cfacm->interface[j + 1].altsetting + 0;
+			ifcom = cfacm->interface[j]->altsetting + 0;
+			ifdata = cfacm->interface[j + 1]->altsetting + 0;
 
 			if (ifdata->desc.bInterfaceClass != 10 || ifdata->desc.bNumEndpoints < 2) {
-				ifcom = cfacm->interface[j + 1].altsetting + 0;
-				ifdata = cfacm->interface[j].altsetting + 0;
+				ifcom = cfacm->interface[j + 1]->altsetting + 0;
+				ifdata = cfacm->interface[j]->altsetting + 0;
 				if (ifdata->desc.bInterfaceClass != 10 || ifdata->desc.bNumEndpoints < 2)
 					continue;
 			}
@@ -610,7 +610,7 @@ static int acm_probe (struct usb_interface *intf,
 			ctrlsize = epctrl->wMaxPacketSize;
 			readsize = epread->wMaxPacketSize;
 			acm->writesize = epwrite->wMaxPacketSize;
-			acm->iface = cfacm->interface + j;
+			acm->iface = cfacm->interface[j];
 			acm->minor = minor;
 			acm->dev = dev;
 

@@ -301,9 +301,13 @@ usb_ep_free_buffer (struct usb_ep *ep, void *buf, dma_addr_t dma, unsigned len)
  * toggle differently.
  *
  * Control endpoints ... after getting a setup() callback, the driver queues
- * one response (optional if it would be zero length).  That enables the
+ * one response (even if it would be zero length).  That enables the
  * status ack, after transfering data as specified in the response.  Setup
  * functions may return negative error codes to generate protocol stalls.
+ * (Note that some USB device controllers disallow protocol stall responses
+ * in some cases.)  When control responses are deferred (the response is
+ * written after the setup callback returns), then usb_ep_set_halt() may be
+ * used on ep0 to trigger protocol stalls.
  *
  * For periodic endpoints, like interrupt or isochronous ones, the usb host
  * arranges to poll once per interval, and the gadget driver usually will

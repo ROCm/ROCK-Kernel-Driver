@@ -1,4 +1,4 @@
-/* (C) 1999-2002 Nemosoft Unv. (webcam@smcc.demon.nl)
+/* (C) 1999-2003 Nemosoft Unv. (webcam@smcc.demon.nl)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -60,8 +60,8 @@
 
 /* Version block */
 #define PWC_MAJOR	8
-#define PWC_MINOR	10
-#define PWC_VERSION 	"8.10"
+#define PWC_MINOR	11
+#define PWC_VERSION 	"8.11"
 #define PWC_NAME 	"pwc"
 
 /* Turn certain features on/off */
@@ -82,7 +82,7 @@
 #define PWC_FRAME_SIZE 		(460800 + TOUCAM_HEADER_SIZE + TOUCAM_TRAILER_SIZE)
 
 /* Absolute maximum number of buffers available for mmap() */
-#define MAX_IMAGES 		4
+#define MAX_IMAGES 		10
 
 struct pwc_coord
 {
@@ -112,6 +112,7 @@ struct pwc_frame_buf
 
 struct pwc_device
 {
+   struct video_device vdev;
 #ifdef PWC_MAGIC
    int magic;
 #endif
@@ -120,22 +121,21 @@ struct pwc_device
    
    int type;                    /* type of cam (645, 646, 675, 680, 690) */
    int release;			/* release number */
-   int unplugged;		/* set when the plug is pulled */
+   int error_status;		/* set when something goes wrong with the cam (unplugged, USB errors) */
    int usb_init;		/* set when the cam has been initialized over USB */
 
    /*** Video data ***/
    int vopen;			/* flag */
-   struct video_device *vdev;
    int vendpoint;		/* video isoc endpoint */
    int vcinterface;		/* video control interface */
    int valternate;		/* alternate interface needed */
    int vframes, vsize;		/* frames-per-second & size (see PSZ_*) */
-   int vpalette;		/* YUV */
    int vframe_count;		/* received frames */
    int vframes_dumped; 		/* counter for dumped frames */
    int vframes_error;		/* frames received in error */
    int vmax_packet_size;	/* USB maxpacket size */
    int vlast_packet_size;	/* for frame synchronisation */
+   int visoc_errors;		/* number of contiguous ISOC errors */
    int vcompression;		/* desired compression factor */
    int vbandlength;		/* compressed band length; 0 is uncompressed */
    char vsnapshot;		/* snapshot mode */
@@ -149,13 +149,13 @@ struct pwc_device
       3b. in case data is uncompressed, copy into image buffer with viewport
       4. data is transferred to the user process
 
-      Note that MAX_ISO_BUFS != MAX_FRAMES != MAX_IMAGES.... 
+      Note that MAX_ISO_BUFS != MAX_FRAMES != MAX_IMAGES....
       We have in effect a back-to-back-double-buffer system.
     */
    /* 1: isoc */
    struct pwc_iso_buf sbuf[MAX_ISO_BUFS];
    char iso_init;
-   
+
    /* 2: frame */
    struct pwc_frame_buf *fbuf;	/* all frames */
    struct pwc_frame_buf *empty_frames, *empty_frames_tail;	/* all empty frames */
@@ -168,7 +168,7 @@ struct pwc_device
 #if PWC_DEBUG
    int sequence;			/* Debugging aid */
 #endif
-   
+
    /* 3: decompression */
    struct pwc_decompressor *decompressor;	/* function block with decompression routines */
    void *decompress_data;		/* private data for decompression engine */
@@ -176,7 +176,7 @@ struct pwc_device
    /* 4: image */
    /* We have an 'image' and a 'view', where 'image' is the fixed-size image
       as delivered by the camera, and 'view' is the size requested by the
-      program. The camera image is centered in this viewport, laced with 
+      program. The camera image is centered in this viewport, laced with
       a gray or black border. view_min <= image <= view <= view_max;
     */
    int image_mask;			/* bitmask of supported sizes */
@@ -196,10 +196,9 @@ struct pwc_device
 
    /*** Misc. data ***/
    wait_queue_head_t frameq;		/* When waiting for a frame to finish... */
-   wait_queue_head_t remove_ok;		/* When we got hot unplugged, we have to avoid a few race conditions */
 #if PWC_INT_PIPE
    void *usb_int_handler;		/* for the interrupt endpoint */
-#endif   
+#endif
 };
 
 /* Enumeration of image sizes */

@@ -1,6 +1,6 @@
 /* Linux driver for Philips webcam 
    Decompression frontend.
-   (C) 1999-2002 Nemosoft Unv. (webcam@smcc.demon.nl)
+   (C) 1999-2003 Nemosoft Unv. (webcam@smcc.demon.nl)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -98,14 +98,6 @@ int pwc_decompress(struct pwc_device *pdev)
 	if (!image)
 		return -EFAULT;
 	
-#if PWC_DEBUG
-	/* This is a quickie */
-	if (pdev->vpalette == VIDEO_PALETTE_RAW) {
-		memcpy(image, fbuf->data, pdev->frame_size);
-		return 0;
-	}
-#endif
-
 	yuv = fbuf->data + pdev->frame_header_size;  /* Skip header */
 	if (pdev->vbandlength == 0) { 
 		/* Uncompressed mode. We copy the data into the output buffer,
@@ -113,8 +105,6 @@ int pwc_decompress(struct pwc_device *pdev)
 		   size). Unfortunately we have to do a bit of byte stuffing
 		   to get the desired output format/size.
 		 */
-		switch (pdev->vpalette) {
-		case VIDEO_PALETTE_YUV420P:
 			/* 
 			 * We do some byte shuffling here to go from the 
 			 * native format to YUV420P.
@@ -149,11 +139,6 @@ int pwc_decompress(struct pwc_device *pdev)
 				else
 					dstu += (stride >> 1);
 			}
-			break;
-		default:
-			Err("Unsupported palette!");
-			break;
-		}
 	}
 	else { 
 		/* Compressed; the decompressor routines will write the data 
