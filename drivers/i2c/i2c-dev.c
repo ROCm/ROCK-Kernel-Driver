@@ -72,24 +72,18 @@ struct i2c_dev *i2c_dev_get_by_minor(unsigned index)
 struct i2c_dev *i2c_dev_get_by_adapter(struct i2c_adapter *adap)
 {
 	struct i2c_dev *i2c_dev = NULL;
-	int i;
 
 	spin_lock(&i2c_dev_array_lock);
-	for (i = 0; i < I2C_MINORS; ++i) {
-		if ((i2c_dev_array[i]) &&
-		    (i2c_dev_array[i]->adap == adap)) {
-			i2c_dev = i2c_dev_array[i];
-			break;
-		}
-	}
+	if ((i2c_dev_array[adap->nr]) &&
+	    (i2c_dev_array[adap->nr]->adap == adap))
+		i2c_dev = i2c_dev_array[adap->nr];
 	spin_unlock(&i2c_dev_array_lock);
 	return i2c_dev;
 }
 
-static struct i2c_dev *get_free_i2c_dev(void)
+static struct i2c_dev *get_free_i2c_dev(struct i2c_adapter *adap)
 {
 	struct i2c_dev *i2c_dev;
-	unsigned int i;
 
 	i2c_dev = kmalloc(sizeof(*i2c_dev), GFP_KERNEL);
 	if (!i2c_dev)
@@ -97,15 +91,16 @@ static struct i2c_dev *get_free_i2c_dev(void)
 	memset(i2c_dev, 0x00, sizeof(*i2c_dev));
 
 	spin_lock(&i2c_dev_array_lock);
-	for (i = 0; i < I2C_MINORS; ++i) {
-		if (i2c_dev_array[i])
-			continue;
-		i2c_dev->minor = i;
-		i2c_dev_array[i] = i2c_dev;
+	if (i2c_dev_array[adap->nr]) {
 		spin_unlock(&i2c_dev_array_lock);
-		return i2c_dev;
+		dev_err(&adap->dev, "i2c-dev already has a device assigned to this adapter\n");
+		goto error;
 	}
+	i2c_dev->minor = adap->nr;
+	i2c_dev_array[adap->nr] = i2c_dev;
 	spin_unlock(&i2c_dev_array_lock);
+	return i2c_dev;
+error:
 	kfree(i2c_dev);
 	return ERR_PTR(-ENODEV);
 }
@@ -123,6 +118,13 @@ static ssize_t show_dev(struct class_device *class_dev, char *buf)
 	return print_dev_t(buf, MKDEV(I2C_MAJOR, i2c_dev->minor));
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
+
+static ssize_t show_adapter_name(struct class_device *class_dev, char *buf)
+{
+	struct i2c_dev *i2c_dev = to_i2c_dev(class_dev);
+	return sprintf(buf, "%s\n", i2c_dev->adap->name);
+}
+static CLASS_DEVICE_ATTR(name, S_IRUGO, show_adapter_name, NULL);
 
 static ssize_t i2cdev_read (struct file *file, char __user *buf, size_t count,
                             loff_t *offset)
@@ -439,7 +441,7 @@ static int i2cdev_attach_adapter(struct i2c_adapter *adap)
 	struct i2c_dev *i2c_dev;
 	int retval;
 
-	i2c_dev = get_free_i2c_dev();
+	i2c_dev = get_free_i2c_dev(adap);
 	if (IS_ERR(i2c_dev))
 		return PTR_ERR(i2c_dev);
 
@@ -459,6 +461,7 @@ static int i2cdev_attach_adapter(struct i2c_adapter *adap)
 	if (retval)
 		goto error;
 	class_device_create_file(&i2c_dev->class_dev, &class_device_attr_dev);
+	class_device_create_file(&i2c_dev->class_dev, &class_device_attr_name);
 	return 0;
 error:
 	return_i2c_dev(i2c_dev);
