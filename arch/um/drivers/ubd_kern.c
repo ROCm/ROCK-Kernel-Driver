@@ -749,8 +749,6 @@ int ubd_init(void)
 		return -1;
 	}
 		
-	elevator_init(ubd_queue, &elevator_noop);
-
 	if (fake_major != MAJOR_NR) {
 		char name[sizeof("ubd_nnn\0")];
 
