@@ -338,25 +338,25 @@ static int attach_inform(struct i2c_client *client)
 }
 
 static struct i2c_algorithm saa7134_algo = {
-	name:          "saa7134",
-	id:            I2C_ALGO_SAA7134,
-	master_xfer:   saa7134_i2c_xfer,
-	algo_control:  algo_control,
-	functionality: functionality,
+	.name          = "saa7134",
+	.id            = I2C_ALGO_SAA7134,
+	.master_xfer   = saa7134_i2c_xfer,
+	.algo_control  = algo_control,
+	.functionality = functionality,
 };
 
 static struct i2c_adapter saa7134_adap_template = {
-	name:	       "saa7134",
-	id:            I2C_ALGO_SAA7134,
-	algo:          &saa7134_algo,
-	inc_use:       inc_use,
-	dec_use:       dec_use,
-	client_register: attach_inform,
+	.name	       = "saa7134",
+	.id            = I2C_ALGO_SAA7134,
+	.algo          = &saa7134_algo,
+	.inc_use       = inc_use,
+	.dec_use       = dec_use,
+	.client_register = attach_inform,
 };
 
 static struct i2c_client saa7134_client_template = {
-        name: "saa7134 internal",
-        id:   -1,
+        .name = "saa7134 internal",
+        .id   = -1,
 };
 
 /* ----------------------------------------------------------- */

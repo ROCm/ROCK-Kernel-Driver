@@ -896,10 +896,10 @@ static void __devexit saa7134_finidev(struct pci_dev *pci_dev)
 }
 
 static struct pci_driver saa7134_pci_driver = {
-        name:     "saa7134",
-        id_table: saa7134_pci_tbl,
-        probe:    saa7134_initdev,
-        remove:   saa7134_finidev,
+        .name     = "saa7134",
+        .id_table = saa7134_pci_tbl,
+        .probe    = saa7134_initdev,
+        .remove   = saa7134_finidev,
 };
 
 static int saa7134_init(void)
