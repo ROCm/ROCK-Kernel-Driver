@@ -32,8 +32,8 @@ struct port_list {
 struct port_dev {
 	struct port_list *port;
 	int fd;
-	int helper_pid;
-	int telnetd_pid;
+ 	int helper_pid;
+ 	int telnetd_pid;
 };
 
 struct connection {
@@ -50,7 +50,7 @@ static void pipe_interrupt(int irq, void *data, struct pt_regs *regs)
 	struct connection *conn = data;
 	int fd;
 
-	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
+ 	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
 	if(fd < 0){
 		if(fd == -EAGAIN)
 			return;
@@ -99,7 +99,8 @@ static int port_accept(struct port_list *port)
 	}
 
 	list_add(&conn->list, &port->pending);
-	return(1);
+	ret = 1;
+	goto out;
 
  out_free:
 	kfree(conn);
@@ -274,8 +275,6 @@ void port_kern_free(void *d)
 {
 	struct port_dev *dev = d;
 
- 	if(dev->helper_pid != -1) os_kill_process(dev->helper_pid, 0);
- 	if(dev->telnetd_pid != -1) os_kill_process(dev->telnetd_pid, 0);
 	kfree(dev);
 }
 

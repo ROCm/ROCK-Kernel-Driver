@@ -1,0 +1,20 @@
+# 
+# Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
+# Licensed under the GPL
+#
+
+PROFILE += -pg
+
+CFLAGS-$(CONFIG_GCOV) += -fprofile-arcs -ftest-coverage
+CFLAGS-$(CONFIG_GPROF) += $(PROFILE)
+LINK-$(CONFIG_GPROF) += $(PROFILE)
+
+MODE_INCLUDE += -I$(TOPDIR)/$(ARCH_DIR)/kernel/skas/include
+
+LINK_SKAS = -Wl,-rpath,/lib 
+LD_SCRIPT_SKAS = dyn.lds.s
+
+GEN_HEADERS += $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h
+
+$(ARCH_DIR)/kernel/skas/include/skas_ptregs.h :
+	$(MAKE) -C $(ARCH_DIR)/kernel/skas include/skas_ptregs.h

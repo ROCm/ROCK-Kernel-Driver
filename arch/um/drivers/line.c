@@ -452,11 +452,19 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 
 void lines_init(struct line *lines, int nlines)
 {
+	struct line *line;
 	int i;
 
 	for(i = 0; i < nlines; i++){
-		INIT_LIST_HEAD(&lines[i].chan_list);
-		sema_init(&lines[i].sem, 1);
+		line = &lines[i];
+		INIT_LIST_HEAD(&line->chan_list);
+		sema_init(&line->sem, 1);
+		if(line->init_str != NULL){
+			line->init_str = uml_strdup(line->init_str);
+			if(line->init_str == NULL)
+				printk("lines_init - uml_strdup returned "
+				       "NULL\n");
+		}
 	}
 }
 
