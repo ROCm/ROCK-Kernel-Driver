@@ -903,9 +903,9 @@ void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
 	if (unlikely(!q))
 		return;
 
-	wq_read_lock_irqsave(&q->lock, flags);
+	spin_lock_irqsave(&q->lock, flags);
 	__wake_up_common(q, mode, nr_exclusive);
-	wq_read_unlock_irqrestore(&q->lock, flags);
+	spin_unlock_irqrestore(&q->lock, flags);
 }
 
 void complete(struct completion *x)
@@ -944,14 +944,14 @@ void wait_for_completion(struct completion *x)
 	init_waitqueue_entry(&wait, current);
 
 #define	SLEEP_ON_HEAD					\
-	wq_write_lock_irqsave(&q->lock,flags);		\
+	spin_lock_irqsave(&q->lock,flags);		\
 	__add_wait_queue(q, &wait);			\
-	wq_write_unlock(&q->lock);
+	spin_unlock(&q->lock);
 
 #define	SLEEP_ON_TAIL						\
-	wq_write_lock_irq(&q->lock);				\
+	spin_lock_irq(&q->lock);				\
 	__remove_wait_queue(q, &wait);				\
-	wq_write_unlock_irqrestore(&q->lock,flags);
+	spin_unlock_irqrestore(&q->lock, flags);
 
 void interruptible_sleep_on(wait_queue_head_t *q)
 {
