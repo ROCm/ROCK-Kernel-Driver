@@ -482,7 +482,7 @@ static int i8042_set_mux_mode(unsigned int mode, unsigned char *mux_version)
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0x0f)
 		return -1;
 	param = mode ? 0x56 : 0xf6;
-	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa9)
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != (mode ? 0xa9 : 0x09))
 		return -1;
 	param = mode ? 0xa4 : 0xa5;
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == (mode ? 0x5b : 0x5a))
@@ -787,7 +787,8 @@ void i8042_controller_reset(void)
  * Disable MUX mode if present.
  */
 
-	i8042_set_mux_mode(0, NULL);
+	if (i8042_mux_present)
+		i8042_set_mux_mode(0, NULL);
 
 /*
  * Restore the original control register setting.
