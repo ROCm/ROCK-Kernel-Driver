@@ -57,7 +57,7 @@ ssize_t cifs_listxattr(struct dentry * direntry, char * ea_data, size_t ea_size)
 	char * full_path;
 	if(direntry == NULL)
 		return -EIO;
-	if(direntry->d_inode)
+	if(direntry->d_inode == NULL)
 		return -EIO;
 	sb = direntry->d_inode->i_sb;
 	if(sb == NULL)

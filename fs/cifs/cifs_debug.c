@@ -190,26 +190,26 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 	struct cifsTconInfo *tcon;
 
 	length = sprintf(buf,
-			"Currently Allocated structures\nCIFS Sessions: %d\n",
+			"Resources in use\nCIFS Session: %d\n",
 			sesInfoAllocCount.counter);
 	buf += length;
 	item_length = 
-		sprintf(buf,"Shares (unique mount targets): %d\n",
+		sprintf(buf,"Share (unique mount targets): %d\n",
 			tconInfoAllocCount.counter);
 	length += item_length;
 	buf += item_length;      
 	item_length = 
-		sprintf(buf,"Allocated SMB Request/Response Buffers: %d\n",
+		sprintf(buf,"SMB Request/Response Buffer: %d\n",
 			bufAllocCount.counter);
 	length += item_length;
 	buf += item_length;      
 	item_length = 
-		sprintf(buf,"Active Operations (MIDs in use): %d\n",
+		sprintf(buf,"Operations (MIDs): %d\n",
 			midCount.counter);
 	length += item_length;
 	buf += item_length;
 	item_length = sprintf(buf,
-		"%d session %d share reconnects\n",
+		"\n%d session %d share reconnects\n",
 		tcpSesReconnectCount.counter,tconInfoReconnectCount.counter);
 	length += item_length;
 	buf += item_length;

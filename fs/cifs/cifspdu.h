@@ -1690,16 +1690,17 @@ struct gealist {
 };
 
 struct fea {
-	unsigned char fEA;
-	unsigned char cbName;
-	unsigned short cbValue;
+	unsigned char EA_flags;
+	__u8 name_len;
+	__u16 value_len;
 	char szName[1];
+	/* optionally followed by value */
 };
 /* flags for _FEA.fEA */
 #define FEA_NEEDEA         0x80	/* need EA bit */
 
 struct fealist {
-	unsigned long cbList;
+	unsigned long list_len;
 	struct fea list[1];
 };
 

@@ -1,7 +1,10 @@
 Version 1.18
 ------------
 Do not rename hardlinked files (since that should be a noop). Flush
-cached write behind data when reopening a file after session abend.
+cached write behind data when reopening a file after session abend,
+except when already in write. Grab per socket sem during reconnect 
+to avoid oops in sendmsg if overlapping with reconnect.
+
 
 Version 1.17
 ------------
