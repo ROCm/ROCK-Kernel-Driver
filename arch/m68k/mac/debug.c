@@ -36,7 +36,7 @@ extern unsigned long mac_videobase;
 extern unsigned long mac_videodepth;
 extern unsigned long mac_rowbytes;
 
-extern void mac_serial_print(char *);
+extern void mac_serial_print(const char *);
 
 #define DEBUG_HEADS
 #undef DEBUG_SCREEN
@@ -137,7 +137,7 @@ void mac_debugging_long(int pos, long addr)
  * TODO: serial debug code
  */
 
-struct SCC
+struct mac_SCC
  {
   u_char cha_b_ctrl;
   u_char char_dummy1;
@@ -148,7 +148,7 @@ struct SCC
   u_char cha_a_data;
  };
 
-# define scc (*((volatile struct SCC*)mac_bi_data.sccbase))
+# define scc (*((volatile struct mac_SCC*)mac_bi_data.sccbase))
 
 /* Flag that serial port is already initialized and used */
 int mac_SCC_init_done = 0;

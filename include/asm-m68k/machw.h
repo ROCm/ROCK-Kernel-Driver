@@ -68,11 +68,11 @@ struct MAC_SCC
 
 /* hardware stuff */
 
-#define MACHW_DECLARE(name)    unsigned name : 1
-#define MACHW_SET(name)                (mac_hw_present.name = 1)
-#define MACHW_PRESENT(name)    (mac_hw_present.name)
+#define MACHW_DECLARE(name)	unsigned name : 1
+#define MACHW_SET(name)		(mac_hw_present.name = 1)
+#define MACHW_PRESENT(name)	(mac_hw_present.name)
 
-struct {
+struct mac_hw_present {
   /* video hardware */
   /* sound hardware */
   /* disk storage interfaces */
@@ -92,9 +92,9 @@ struct {
   MACHW_DECLARE(RBV);             /* Versatile Interface Ad. 2+ */
   /* NUBUS */
   MACHW_DECLARE(NUBUS);           /* NUBUS */
-} mac_hw_present;
+};
 
-/* extern struct mac_hw_present mac_hw_present; */
+extern struct mac_hw_present mac_hw_present;
 
 #endif /* __ASSEMBLY__ */
 
