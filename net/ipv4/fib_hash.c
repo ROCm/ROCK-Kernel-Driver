@@ -115,16 +115,6 @@ static inline struct fib_node * fz_chain(u32 key, struct fn_zone *fz)
 	return fz->fz_hash[fn_hash(key, fz)];
 }
 
-static inline int fn_key_eq(u32 a, u32 b)
-{
-	return a == b;
-}
-
-static inline int fn_key_leq(u32 a, u32 b)
-{
-	return a <= b;
-}
-
 static rwlock_t fib_hash_lock = RW_LOCK_UNLOCKED;
 
 #define FZ_MAX_DIVISOR ((PAGE_SIZE<<MAX_ORDER) / sizeof(struct fib_node *))
@@ -153,7 +143,7 @@ static inline void fn_rebuild_zone(struct fn_zone *fz,
 		for (f=old_ht[i]; f; f=next) {
 			next = f->fn_next;
 			for (fp = fz_chain_p(f->fn_key, fz);
-			     *fp && fn_key_leq((*fp)->fn_key, f->fn_key);
+			     *fp && ((*fp)->fn_key <= f->fn_key);
 			     fp = &(*fp)->fn_next)
 				/* NONE */;
 			f->fn_next = *fp;
@@ -280,8 +270,8 @@ fn_hash_lookup(struct fib_table *tb, const struct flowi *flp, struct fib_result 
 		u32 k = fz_key(flp->fl4_dst, fz);
 
 		for (f = fz_chain(k, fz); f; f = f->fn_next) {
-			if (!fn_key_eq(k, f->fn_key)) {
-				if (fn_key_leq(k, f->fn_key))
+			if (k != f->fn_key) {
+				if (k <= f->fn_key)
 					break;
 				else
 					continue;
@@ -416,13 +406,13 @@ out:
 for ( ; ((f) = *(fp)) != NULL; (fp) = &(f)->fn_next)
 
 #define FIB_SCAN_KEY(f, fp, key) \
-for ( ; ((f) = *(fp)) != NULL && fn_key_eq((f)->fn_key, (key)); (fp) = &(f)->fn_next)
+for ( ; ((f) = *(fp)) != NULL && ((f)->fn_key == (key)); (fp) = &(f)->fn_next)
 
 #ifndef CONFIG_IP_ROUTE_TOS
 #define FIB_SCAN_TOS(f, fp, key, tos) FIB_SCAN_KEY(f, fp, key)
 #else
 #define FIB_SCAN_TOS(f, fp, key, tos) \
-for ( ; ((f) = *(fp)) != NULL && fn_key_eq((f)->fn_key, (key)) && \
+for ( ; ((f) = *(fp)) != NULL && ((f)->fn_key == (key)) && \
      (f)->fn_tos == (tos) ; (fp) = &(f)->fn_next)
 #endif
 
@@ -481,7 +471,7 @@ rta->rta_prefsrc ? *(u32*)rta->rta_prefsrc : 0);
 	 * Scan list to find the first route with the same destination
 	 */
 	FIB_SCAN(f, fp) {
-		if (fn_key_leq(key,f->fn_key))
+		if (key <= f->fn_key)
 			break;
 	}
 
@@ -501,7 +491,7 @@ rta->rta_prefsrc ? *(u32*)rta->rta_prefsrc : 0);
 #ifdef CONFIG_IP_ROUTE_TOS
 	    f->fn_tos == tos &&
 #endif
-	    fn_key_eq(f->fn_key, key)) {
+	    (f->fn_key == key)) {
 		del_fp = fp;
 		fp = &f->fn_next;
 		f = *fp;
@@ -522,7 +512,7 @@ rta->rta_prefsrc ? *(u32*)rta->rta_prefsrc : 0);
 #ifdef CONFIG_IP_ROUTE_TOS
 	    f->fn_tos == tos &&
 #endif
-	    fn_key_eq(f->fn_key, key) &&
+	    (f->fn_key == key) &&
 	    fi->fib_priority == FIB_INFO(f)->fib_priority) {
 		struct fib_node **ins_fp;
 
@@ -644,11 +634,10 @@ FTprint("tb(%d)_delete: %d %08x/%d %d\n", tb->tb_id, r->rtm_type, rta->rta_dst ?
 
 
 	FIB_SCAN(f, fp) {
-		if (fn_key_eq(f->fn_key, key))
+		if (f->fn_key == key)
 			break;
-		if (fn_key_leq(key, f->fn_key)) {
+		if (key <= f->fn_key)
 			return -ESRCH;
-		}
 	}
 #ifdef CONFIG_IP_ROUTE_TOS
 	FIB_SCAN_KEY(f, fp, key) {
