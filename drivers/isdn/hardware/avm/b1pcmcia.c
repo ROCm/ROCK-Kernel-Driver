@@ -39,30 +39,6 @@ static struct capi_driver_interface *di;
 
 /* ------------------------------------------------------------- */
 
-static void b1pcmcia_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
-{
-	avmcard *card;
-
-	card = (avmcard *) devptr;
-
-	if (!card) {
-		printk(KERN_WARNING "b1pcmcia: interrupt: wrong device\n");
-		return;
-	}
-	if (card->interrupt) {
-		printk(KERN_ERR "%s: reentering interrupt hander.\n",
-			card->name);
-		return;
-	}
-
-	card->interrupt = 1;
-
-	b1_handle_interrupt(card);
-
-	card->interrupt = 0;
-}
-/* ------------------------------------------------------------- */
-
 static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -74,10 +50,7 @@ static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 
 	di->detach_ctr(ctrl);
 	free_irq(card->irq, card);
-	/* io addrsses managent by CardServices 
-	 * release_region(card->port, AVMB1_PORTLEN);
-	 */
-	kfree(card);
+	b1_free_card(card);
 
 	MOD_DEC_USE_COUNT;
 }
@@ -96,24 +69,14 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 
 	MOD_INC_USE_COUNT;
 
-	card = (avmcard *) kmalloc(sizeof(avmcard), GFP_ATOMIC);
-
+	card = b1_alloc_card(1);
 	if (!card) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto err;
 	}
-	memset(card, 0, sizeof(avmcard));
-        cinfo = (avmctrl_info *) kmalloc(sizeof(avmctrl_info), GFP_ATOMIC);
-	if (!cinfo) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
-	}
-	memset(cinfo, 0, sizeof(avmctrl_info));
-	card->ctrlinfo = cinfo;
-	cinfo->card = card;
+	cinfo = card->ctrlinfo;
+
 	switch (cardtype) {
 		case avm_m1: sprintf(card->name, "m1-%x", port); break;
 		case avm_m2: sprintf(card->name, "m2-%x", port); break;
@@ -123,37 +86,29 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 	card->irq = irq;
 	card->cardtype = cardtype;
 
+	retval = request_irq(card->irq, b1_interrupt, 0, card->name, card);
+	if (retval) {
+		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
+				driver->name, card->irq);
+		retval = -EBUSY;
+		goto err_free;
+	}
 	b1_reset(card->port);
 	if ((retval = b1_detect(card->port, card->cardtype)) != 0) {
 		printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
 					driver->name, card->port, retval);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EIO;
+		retval = -ENODEV;
+		goto err_free_irq;
 	}
 	b1_reset(card->port);
 	b1_getrevision(card);
-
-	retval = request_irq(card->irq, b1pcmcia_interrupt, 0, card->name, card);
-	if (retval) {
-		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
-				driver->name, card->irq);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
-	}
 
 	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
 				driver->name);
-		free_irq(card->irq, card);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
+		retval = -EBUSY;
+		goto err_free_irq;
 	}
 	switch (cardtype) {
 		case avm_m1: cardname = "M1"; break;
@@ -166,6 +121,14 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 		driver->name, cardname, card->port, card->irq, card->revision);
 
 	return cinfo->capi_ctrl->cnr;
+
+ err_free_irq:
+	free_irq(card->irq, card);
+ err_free:
+	b1_free_card(card);
+ err:
+	MOD_DEC_USE_COUNT;
+	return retval;
 }
 
 /* ------------------------------------------------------------- */

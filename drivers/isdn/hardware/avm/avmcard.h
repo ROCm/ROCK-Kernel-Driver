@@ -10,6 +10,8 @@
 #ifndef _AVMCARD_H_
 #define _AVMCARD_H_
 
+#include <linux/spinlock.h>
+
 #define	AVMB1_PORTLEN		0x1f
 #define AVM_MAXVERSION		8
 #define AVM_NCCI_PER_CHANNEL	4
@@ -55,8 +57,24 @@ typedef struct avmcard_dmainfo {
 	struct pci_dev      *pcidev;
 } avmcard_dmainfo;
 
+typedef	struct avmctrl_info {
+	char cardname[32];
+	
+	int versionlen;
+	char versionbuf[1024];
+	char *version[AVM_MAXVERSION];
+	
+	char infobuf[128];	/* for function procinfo */
+	
+	struct avmcard  *card;
+	struct capi_ctr *capi_ctrl;
+	
+} avmctrl_info;
+
 typedef struct avmcard {
 	char name[32];
+  
+	spinlock_t lock;
 	unsigned int port;
 	unsigned irq;
 	unsigned long membase;
@@ -68,30 +86,14 @@ typedef struct avmcard {
 	char msgbuf[128];	/* capimsg msg part */
 	char databuf[2048];	/* capimsg data part */
 
-	int interrupt;
-
 	void *mbase;
 	volatile u32 csr;
 	avmcard_dmainfo *dma;
 
-	struct avmctrl_info {
-		char cardname[32];
-
-		int versionlen;
-		char versionbuf[1024];
-		char *version[AVM_MAXVERSION];
-
-		char infobuf[128];	/* for function procinfo */
-
-		struct avmcard  *card;
-		struct capi_ctr *capi_ctrl;
-
-	} *ctrlinfo;
+	struct avmctrl_info *ctrlinfo;
 
 	int nlogcontr;
 } avmcard;
-
-typedef struct avmctrl_info avmctrl_info;
 
 extern int b1_irq_table[16];
 
@@ -534,6 +536,8 @@ static inline void b1_setinterrupt(unsigned int base, unsigned irq,
 }
 
 /* b1.c */
+avmcard *b1_alloc_card(int nr_controllers);
+void b1_free_card(avmcard *card);
 int b1_detect(unsigned int base, enum avmcardtype cardtype);
 void b1_getrevision(avmcard *card);
 int b1_load_t4file(avmcard *card, capiloaddatapart * t4file);
@@ -547,7 +551,7 @@ void b1_register_appl(struct capi_ctr *ctrl, u16 appl,
 void b1_release_appl(struct capi_ctr *ctrl, u16 appl);
 void b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
 void b1_parse_version(avmctrl_info *card);
-void b1_handle_interrupt(avmcard * card);
+void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs);
 
 int b1ctl_read_proc(char *page, char **start, off_t off,
         		int count, int *eof, struct capi_ctr *ctrl);

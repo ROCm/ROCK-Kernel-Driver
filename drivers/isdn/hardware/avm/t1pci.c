@@ -59,26 +59,21 @@ static int t1pci_add_card(struct capi_driver *driver,
 
 	MOD_INC_USE_COUNT;
 
-	retval = -ENOMEM;
-	card = kmalloc(sizeof(avmcard), GFP_KERNEL);
+	card = b1_alloc_card(1);
 	if (!card) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		retval = -ENOMEM;
 		goto err;
 	}
-	memset(card, 0, sizeof(avmcard));
+
         card->dma = avmcard_dma_alloc(driver->name, dev, 2048+128, 2048+128);
 	if (!card->dma) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-		goto err_kfree;
+		retval = -ENOMEM;
+		goto err_free;
 	}
-        cinfo = kmalloc(sizeof(avmctrl_info), GFP_KERNEL);
-	if (!cinfo) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-		goto err_dma_free;
-	}
-	memset(cinfo, 0, sizeof(avmctrl_info));
-	card->ctrlinfo = cinfo;
-	cinfo->card = card;
+
+	cinfo = card->ctrlinfo;
 	sprintf(card->name, "t1pci-%x", p->port);
 	card->port = p->port;
 	card->irq = p->irq;
@@ -90,7 +85,7 @@ static int t1pci_add_card(struct capi_driver *driver,
 		       "%s: ports 0x%03x-0x%03x in use.\n",
 		       driver->name, card->port, card->port + AVMB1_PORTLEN);
 		retval = -EBUSY;
-		goto err_kfree_ctrlinfo;
+		goto err_free_dma;
 	}
 
 	card->mbase = ioremap_nocache(card->membase, 64);
@@ -144,12 +139,10 @@ static int t1pci_add_card(struct capi_driver *driver,
 	iounmap(card->mbase);
  err_release_region:
 	release_region(card->port, AVMB1_PORTLEN);
- err_kfree_ctrlinfo:
-	kfree(card->ctrlinfo);
- err_dma_free:
+ err_free_dma:
 	avmcard_dma_free(card->dma);
- err_kfree:
-	kfree(card);
+ err_free:
+	b1_free_card(card);
  err:
 	MOD_DEC_USE_COUNT;
 	return retval;
@@ -169,9 +162,8 @@ static void t1pci_remove_ctr(struct capi_ctr *ctrl)
 	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);
 	ctrl->driverdata = 0;
-	kfree(card->ctrlinfo);
 	avmcard_dma_free(card->dma);
-	kfree(card);
+	b1_free_card(card);
 
 	MOD_DEC_USE_COUNT;
 }

@@ -34,29 +34,6 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static void b1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
-{
-	avmcard *card;
-
-	card = (avmcard *) devptr;
-
-	if (!card) {
-		printk(KERN_WARNING "b1_interrupt: wrong device\n");
-		return;
-	}
-	if (card->interrupt) {
-		printk(KERN_ERR "b1_interrupt: reentering interrupt hander (%s)\n", card->name);
-		return;
-	}
-
-	card->interrupt = 1;
-
-	b1_handle_interrupt(card);
-
-	card->interrupt = 0;
-}
-/* ------------------------------------------------------------- */
-
 static struct capi_driver_interface *di;
 
 /* ------------------------------------------------------------- */
@@ -73,8 +50,7 @@ static void b1isa_remove_ctr(struct capi_ctr *ctrl)
 	di->detach_ctr(ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
-	kfree(card->ctrlinfo);
-	kfree(card);
+	b1_free_card(card);
 
 	MOD_DEC_USE_COUNT;
 }
@@ -89,86 +65,57 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 
 	MOD_INC_USE_COUNT;
 
-	card = (avmcard *) kmalloc(sizeof(avmcard), GFP_ATOMIC);
-
+	card = b1_alloc_card(1);
 	if (!card) {
 		printk(KERN_WARNING "b1isa: no memory.\n");
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto err;
 	}
-	memset(card, 0, sizeof(avmcard));
-        cinfo = (avmctrl_info *) kmalloc(sizeof(avmctrl_info), GFP_ATOMIC);
-	if (!cinfo) {
-		printk(KERN_WARNING "b1isa: no memory.\n");
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
-	}
-	memset(cinfo, 0, sizeof(avmctrl_info));
-	card->ctrlinfo = cinfo;
-	cinfo->card = card;
+
+	cinfo = card->ctrlinfo;
+
 	sprintf(card->name, "b1isa-%x", p->port);
 	card->port = p->port;
 	card->irq = p->irq;
 	card->cardtype = avm_b1isa;
 
-	if (check_region(card->port, AVMB1_PORTLEN)) {
-		printk(KERN_WARNING
-		       "b1isa: ports 0x%03x-0x%03x in use.\n",
-		       card->port, card->port + AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
-	}
-	if (b1_irq_table[card->irq & 0xf] == 0) {
-		printk(KERN_WARNING "b1isa: irq %d not valid.\n", card->irq);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EINVAL;
-	}
 	if (   card->port != 0x150 && card->port != 0x250
 	    && card->port != 0x300 && card->port != 0x340) {
 		printk(KERN_WARNING "b1isa: illegal port 0x%x.\n", card->port);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EINVAL;
+		retval = -EINVAL;
+		goto err_free;
+	}
+	if (b1_irq_table[card->irq & 0xf] == 0) {
+		printk(KERN_WARNING "b1isa: irq %d not valid.\n", card->irq);
+		retval = -EINVAL;
+		goto err_free;
+	}
+	if (!request_region(card->port, AVMB1_PORTLEN, card->name)) {
+		printk(KERN_WARNING "b1isa: ports 0x%03x-0x%03x in use.\n",
+		       card->port, card->port + AVMB1_PORTLEN);
+		retval = -EBUSY;
+		goto err_free;
+	}
+	retval = request_irq(card->irq, b1_interrupt, 0, card->name, card);
+	if (retval) {
+		printk(KERN_ERR "b1isa: unable to get IRQ %d.\n", card->irq);
+		goto err_release_region;
 	}
 	b1_reset(card->port);
 	if ((retval = b1_detect(card->port, card->cardtype)) != 0) {
 		printk(KERN_NOTICE "b1isa: NO card at 0x%x (%d)\n",
-					card->port, retval);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EIO;
+		       card->port, retval);
+		retval = -ENODEV;
+		goto err_free_irq;
 	}
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	request_region(p->port, AVMB1_PORTLEN, card->name);
-
-	retval = request_irq(card->irq, b1isa_interrupt, 0, card->name, card);
-	if (retval) {
-		printk(KERN_ERR "b1isa: unable to get IRQ %d.\n", card->irq);
-		release_region(card->port, AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
-	}
-
 	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "b1isa: attach controller failed.\n");
-		free_irq(card->irq, card);
-		release_region(card->port, AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
+		retval = -EBUSY;
+		goto err_free_irq;
 	}
 
 	printk(KERN_INFO
@@ -176,6 +123,16 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 		driver->name, card->port, card->irq, card->revision);
 
 	return 0;
+
+ err_free_irq:
+	free_irq(card->irq, card);
+ err_release_region:
+	release_region(card->port, AVMB1_PORTLEN);
+ err_free:
+	b1_free_card(card);
+ err:
+	MOD_DEC_USE_COUNT;
+	return retval;
 }
 
 static char *b1isa_procinfo(struct capi_ctr *ctrl)

@@ -57,6 +57,44 @@ int b1_irq_table[16] =
  112,				/* irq 15 */
 };
 
+/* ------------------------------------------------------------- */	
+
+avmcard *b1_alloc_card(int nr_controllers)
+{
+	avmcard *card;
+	avmctrl_info *cinfo;
+	int i;
+
+	card = kmalloc(sizeof(*card), GFP_KERNEL);
+	if (!card)
+		return 0;
+
+	memset(card, 0, sizeof(*card));
+
+        cinfo = kmalloc(sizeof(*cinfo) * nr_controllers, GFP_KERNEL);
+	if (!cinfo) {
+		kfree(card);
+		return 0;
+	}
+	memset(cinfo, 0, sizeof(*cinfo));
+
+	card->ctrlinfo = cinfo;
+	for (i = 0; i < nr_controllers; i++) {
+		cinfo[i].card = card;
+	}
+	spin_lock_init(&card->lock);
+
+	return card;
+}
+
+/* ------------------------------------------------------------- */
+
+void b1_free_card(avmcard *card)
+{
+	kfree(card->ctrlinfo);
+	kfree(card);
+}
+
 /* ------------------------------------------------------------- */
 
 int b1_detect(unsigned int base, enum avmcardtype cardtype)
@@ -438,8 +476,9 @@ void b1_parse_version(avmctrl_info *cinfo)
 
 /* ------------------------------------------------------------- */
 
-void b1_handle_interrupt(avmcard * card)
+void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
+	avmcard *card = devptr;
 	avmctrl_info *cinfo = &card->ctrlinfo[0];
 	struct capi_ctr *ctrl = cinfo->capi_ctrl;
 	unsigned char b1cmd;
@@ -701,6 +740,8 @@ EXPORT_SYMBOL(avmcard_dma_free);
 
 EXPORT_SYMBOL(b1_irq_table);
 
+EXPORT_SYMBOL(b1_alloc_card);
+EXPORT_SYMBOL(b1_free_card);
 EXPORT_SYMBOL(b1_detect);
 EXPORT_SYMBOL(b1_getrevision);
 EXPORT_SYMBOL(b1_load_t4file);
@@ -713,7 +754,7 @@ EXPORT_SYMBOL(b1_release_appl);
 EXPORT_SYMBOL(b1_send_message);
 
 EXPORT_SYMBOL(b1_parse_version);
-EXPORT_SYMBOL(b1_handle_interrupt);
+EXPORT_SYMBOL(b1_interrupt);
 
 EXPORT_SYMBOL(b1ctl_read_proc);
 
