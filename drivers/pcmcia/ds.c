@@ -116,6 +116,130 @@ static int major_dev = -1;
 
 /* code which was in cs.c before */
 
+/*======================================================================
+
+    Register_client() uses the dev_info_t handle to match the
+    caller with a socket.  The driver must have already been bound
+    to a socket with bind_device() -- in fact, bind_device()
+    allocates the client structure that will be used.
+
+======================================================================*/
+
+int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
+{
+	client_t *client = NULL;
+	struct pcmcia_socket *s;
+
+	/* Look for unbound client with matching dev_info */
+	down_read(&pcmcia_socket_list_rwsem);
+	list_for_each_entry(s, &pcmcia_socket_list, socket_list) {
+		client = s->clients;
+		while (client != NULL) {
+			if ((strcmp(client->dev_info, (char *)req->dev_info) == 0)
+			    && (client->state & CLIENT_UNBOUND)) break;
+			client = client->next;
+		}
+		if (client != NULL) break;
+	}
+	up_read(&pcmcia_socket_list_rwsem);
+	if (client == NULL)
+		return CS_OUT_OF_RESOURCE;
+
+	/*
+	 * Prevent this racing with a card insertion.
+	 */
+	down(&s->skt_sem);
+	*handle = client;
+	client->state &= ~CLIENT_UNBOUND;
+	client->Socket = s;
+	client->Attributes = req->Attributes;
+	client->EventMask = req->EventMask;
+	client->event_handler = req->event_handler;
+	client->event_callback_args = req->event_callback_args;
+	client->event_callback_args.client_handle = client;
+
+	if (s->state & SOCKET_CARDBUS)
+		client->state |= CLIENT_CARDBUS;
+
+	if ((!(s->state & SOCKET_CARDBUS)) && (s->functions == 0) &&
+	    (client->Function != BIND_FN_ALL)) {
+		cistpl_longlink_mfc_t mfc;
+		if (pccard_read_tuple(s, client->Function, CISTPL_LONGLINK_MFC, &mfc)
+		    == CS_SUCCESS)
+			s->functions = mfc.nfn;
+		else
+			s->functions = 1;
+		s->config = kmalloc(sizeof(config_t) * s->functions,
+				    GFP_KERNEL);
+		if (!s->config)
+			goto out_no_resource;
+		memset(s->config, 0, sizeof(config_t) * s->functions);
+	}
+
+	ds_dbg(1, "register_client(): client 0x%p, dev %s\n",
+	       client, client->dev_info);
+	if (client->EventMask & CS_EVENT_REGISTRATION_COMPLETE)
+		EVENT(client, CS_EVENT_REGISTRATION_COMPLETE, CS_EVENT_PRI_LOW);
+
+	if ((s->state & (SOCKET_PRESENT|SOCKET_CARDBUS)) == SOCKET_PRESENT) {
+		if (client->EventMask & CS_EVENT_CARD_INSERTION)
+			EVENT(client, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
+		else
+			client->PendingEvents |= CS_EVENT_CARD_INSERTION;
+	}
+
+	up(&s->skt_sem);
+	return CS_SUCCESS;
+
+ out_no_resource:
+	up(&s->skt_sem);
+	return CS_OUT_OF_RESOURCE;
+} /* register_client */
+EXPORT_SYMBOL(pcmcia_register_client);
+
+int pcmcia_deregister_client(client_handle_t handle)
+{
+	client_t **client;
+	struct pcmcia_socket *s;
+	u_long flags;
+	int i;
+
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+
+	s = SOCKET(handle);
+	ds_dbg(1, "deregister_client(%p)\n", handle);
+
+	if (handle->state &
+	    (CLIENT_IRQ_REQ|CLIENT_IO_REQ|CLIENT_CONFIG_LOCKED))
+		return CS_IN_USE;
+	for (i = 0; i < MAX_WIN; i++)
+		if (handle->state & CLIENT_WIN_REQ(i))
+			return CS_IN_USE;
+
+	if ((handle->state & CLIENT_STALE) ||
+	    (handle->Attributes & INFO_MASTER_CLIENT)) {
+		spin_lock_irqsave(&s->lock, flags);
+		client = &s->clients;
+		while ((*client) && ((*client) != handle))
+			client = &(*client)->next;
+		if (*client == NULL) {
+			spin_unlock_irqrestore(&s->lock, flags);
+			return CS_BAD_HANDLE;
+		}
+		*client = handle->next;
+		handle->client_magic = 0;
+		kfree(handle);
+		spin_unlock_irqrestore(&s->lock, flags);
+	} else {
+		handle->state = CLIENT_UNBOUND;
+		handle->event_handler = NULL;
+	}
+
+	return CS_SUCCESS;
+} /* deregister_client */
+EXPORT_SYMBOL(pcmcia_deregister_client);
+
 /* String tables for error messages */
 
 typedef struct lookup_t {
@@ -438,6 +562,7 @@ static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
 {
 	struct pcmcia_bus_socket *s = skt->pcmcia;
 	int ret = 0;
+	client_t *client;
 
 	ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
 	       event, priority, s);
@@ -448,6 +573,8 @@ static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
 		s->state &= ~DS_SOCKET_PRESENT;
 	    	send_event(skt, event, priority);
 		handle_event(s, event);
+		for (client = skt->clients; client; client = client->next)
+			client->state |= CLIENT_STALE;
 		break;
 	
 	case CS_EVENT_CARD_INSERTION:

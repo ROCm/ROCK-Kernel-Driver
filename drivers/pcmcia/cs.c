@@ -132,6 +132,8 @@ socket_state_t dead_socket = {
 /* List of all sockets, protected by a rwsem */
 LIST_HEAD(pcmcia_socket_list);
 DECLARE_RWSEM(pcmcia_socket_list_rwsem);
+EXPORT_SYMBOL(pcmcia_socket_list);
+EXPORT_SYMBOL(pcmcia_socket_list_rwsem);
 
 
 /*====================================================================
@@ -427,15 +429,9 @@ static int send_event(struct pcmcia_socket *s, event_t event, int priority)
 
 static void socket_remove_drivers(struct pcmcia_socket *skt)
 {
-	client_t *client;
-
 	cs_dbg(skt, 4, "remove_drivers\n");
 
 	send_event(skt, CS_EVENT_CARD_REMOVAL, CS_EVENT_PRI_HIGH);
-
-	for (client = skt->clients; client; client = client->next)
-		if (!(client->Attributes & INFO_MASTER_CLIENT))
-			client->state |= CLIENT_STALE;
 }
 
 static void socket_shutdown(struct pcmcia_socket *skt)
@@ -890,49 +886,6 @@ int pccard_access_configuration_register(struct pcmcia_socket *s,
 } /* access_configuration_register */
 EXPORT_SYMBOL(pccard_access_configuration_register);
 
-/*====================================================================*/
-
-int pcmcia_deregister_client(client_handle_t handle)
-{
-    client_t **client;
-    struct pcmcia_socket *s;
-    u_long flags;
-    int i;
-    
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-
-    s = SOCKET(handle);
-    cs_dbg(s, 1, "deregister_client(%p)\n", handle);
-
-    if (handle->state &
-	(CLIENT_IRQ_REQ|CLIENT_IO_REQ|CLIENT_CONFIG_LOCKED))
-	return CS_IN_USE;
-    for (i = 0; i < MAX_WIN; i++)
-	if (handle->state & CLIENT_WIN_REQ(i))
-	    return CS_IN_USE;
-
-    if ((handle->state & CLIENT_STALE) ||
-	(handle->Attributes & INFO_MASTER_CLIENT)) {
-	spin_lock_irqsave(&s->lock, flags);
-	client = &s->clients;
-	while ((*client) && ((*client) != handle))
-	    client = &(*client)->next;
-	if (*client == NULL) {
-	    spin_unlock_irqrestore(&s->lock, flags);
-	    return CS_BAD_HANDLE;
-	}
-	*client = handle->next;
-	handle->client_magic = 0;
-	kfree(handle);
-	spin_unlock_irqrestore(&s->lock, flags);
-    } else {
-	handle->state = CLIENT_UNBOUND;
-	handle->event_handler = NULL;
-    }
-
-    return CS_SUCCESS;
-} /* deregister_client */
 
 /*====================================================================*/
 
@@ -1016,53 +969,6 @@ int pcmcia_get_card_services_info(servinfo_t *info)
     return CS_SUCCESS;
 } /* get_card_services_info */
 
-#ifdef CONFIG_PCMCIA_OBSOLETE
-
-/*======================================================================
-
-    Note that get_first_client() *does* recognize the Socket field
-    in the request structure.
-    
-======================================================================*/
-
-int pcmcia_get_first_client(client_handle_t *handle, client_req_t *req)
-{
-    socket_t s;
-    struct pcmcia_socket *socket;
-    if (req->Attributes & CLIENT_THIS_SOCKET)
-	s = req->Socket;
-    else
-	s = 0;
-    socket = pcmcia_get_socket_by_nr(s);
-    if (!socket)
-	return CS_BAD_SOCKET;
-    if (socket->clients == NULL)
-	return CS_NO_MORE_ITEMS;
-    *handle = socket->clients;
-    return CS_SUCCESS;
-} /* get_first_client */
-EXPORT_SYMBOL(pcmcia_get_first_client);
-
-/*====================================================================*/
-
-int pcmcia_get_next_client(client_handle_t *handle, client_req_t *req)
-{
-    struct pcmcia_socket *s;
-    if ((handle == NULL) || CHECK_HANDLE(*handle))
-	return CS_BAD_HANDLE;
-    if ((*handle)->next == NULL) {
-	if (req->Attributes & CLIENT_THIS_SOCKET)
-	    return CS_NO_MORE_ITEMS;
-	s = (*handle)->Socket;
-	if (s->clients == NULL)
-	    return CS_NO_MORE_ITEMS;
-	*handle = s->clients;
-    } else
-	*handle = (*handle)->next;
-    return CS_SUCCESS;
-} /* get_next_client */
-EXPORT_SYMBOL(pcmcia_get_next_client);
-#endif /* CONFIG_PCMCIA_OBSOLETE */
 
 /*====================================================================*/
 
@@ -1283,87 +1189,6 @@ int pcmcia_modify_window(window_handle_t win, modwin_t *req)
 EXPORT_SYMBOL(pcmcia_modify_window);
 
 #endif /* CONFIG_PCMCIA_OBSOLETE */
-
-
-/*======================================================================
-
-    Register_client() uses the dev_info_t handle to match the
-    caller with a socket.  The driver must have already been bound
-    to a socket with bind_device() -- in fact, bind_device()
-    allocates the client structure that will be used.
-    
-======================================================================*/
-
-int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
-{
-    client_t *client = NULL;
-    struct pcmcia_socket *s;
-    
-    /* Look for unbound client with matching dev_info */
-    down_read(&pcmcia_socket_list_rwsem);
-    list_for_each_entry(s, &pcmcia_socket_list, socket_list) {
-	client = s->clients;
-	while (client != NULL) {
-	    if ((strcmp(client->dev_info, (char *)req->dev_info) == 0)
-		&& (client->state & CLIENT_UNBOUND)) break;
-	    client = client->next;
-	}
-	if (client != NULL) break;
-    }
-    up_read(&pcmcia_socket_list_rwsem);
-    if (client == NULL)
-	return CS_OUT_OF_RESOURCE;
-
-    /*
-     * Prevent this racing with a card insertion.
-     */
-    down(&s->skt_sem);
-    *handle = client;
-    client->state &= ~CLIENT_UNBOUND;
-    client->Socket = s;
-    client->Attributes = req->Attributes;
-    client->EventMask = req->EventMask;
-    client->event_handler = req->event_handler;
-    client->event_callback_args = req->event_callback_args;
-    client->event_callback_args.client_handle = client;
-
-    if (s->state & SOCKET_CARDBUS)
-	client->state |= CLIENT_CARDBUS;
-    
-    if ((!(s->state & SOCKET_CARDBUS)) && (s->functions == 0) &&
-	(client->Function != BIND_FN_ALL)) {
-	cistpl_longlink_mfc_t mfc;
-	if (pccard_read_tuple(s, client->Function, CISTPL_LONGLINK_MFC, &mfc)
-	    == CS_SUCCESS)
-	    s->functions = mfc.nfn;
-	else
-	    s->functions = 1;
-	s->config = kmalloc(sizeof(config_t) * s->functions,
-			    GFP_KERNEL);
-	if (!s->config)
-		goto out_no_resource;
-	memset(s->config, 0, sizeof(config_t) * s->functions);
-    }
-    
-    cs_dbg(s, 1, "register_client(): client 0x%p, dev %s\n",
-	   client, client->dev_info);
-    if (client->EventMask & CS_EVENT_REGISTRATION_COMPLETE)
-	EVENT(client, CS_EVENT_REGISTRATION_COMPLETE, CS_EVENT_PRI_LOW);
-
-    if ((s->state & (SOCKET_PRESENT|SOCKET_CARDBUS)) == SOCKET_PRESENT) {
-	if (client->EventMask & CS_EVENT_CARD_INSERTION)
-	    EVENT(client, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
-	else
-	    client->PendingEvents |= CS_EVENT_CARD_INSERTION;
-    }
-
-    up(&s->skt_sem);
-    return CS_SUCCESS;
-
- out_no_resource:
-    up(&s->skt_sem);
-    return CS_OUT_OF_RESOURCE;
-} /* register_client */
 
 /* register pcmcia_callback */
 int pccard_register_pcmcia(struct pcmcia_socket *s, struct pcmcia_callback *c)
@@ -2085,14 +1910,12 @@ EXPORT_SYMBOL(pcmcia_set_event_mask);
     
 ======================================================================*/
 /* in alpha order */
-EXPORT_SYMBOL(pcmcia_deregister_client);
 EXPORT_SYMBOL(pcmcia_eject_card);
 EXPORT_SYMBOL(pcmcia_get_card_services_info);
 EXPORT_SYMBOL(pcmcia_get_mem_page);
 EXPORT_SYMBOL(pcmcia_insert_card);
 EXPORT_SYMBOL(pcmcia_map_mem_page);
 EXPORT_SYMBOL(pcmcia_modify_configuration);
-EXPORT_SYMBOL(pcmcia_register_client);
 EXPORT_SYMBOL(pcmcia_release_configuration);
 EXPORT_SYMBOL(pcmcia_release_io);
 EXPORT_SYMBOL(pcmcia_release_irq);
