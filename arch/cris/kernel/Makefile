@@ -3,7 +3,6 @@
 # Makefile for the linux kernel.
 #
 
-O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= head.o
 
 export-objs := ksyms.o

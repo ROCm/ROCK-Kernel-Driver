@@ -32,16 +32,16 @@ AFLAGS += -mlinux
 
 HEAD := arch/cris/kernel/head.o
 
-SUBDIRS += arch/cris/kernel arch/cris/mm arch/cris/lib arch/cris/drivers
 ifdef CONFIG_ETRAX_AXISFLASHMAP
 # only build this if axis flash map is used, because they depend on
 # each others config options
 SUBDIRS += arch/cris/boot/rescue
 endif
-CORE_FILES := arch/cris/kernel/kernel.o arch/cris/mm/mm.o $(CORE_FILES)
-DRIVERS += arch/cris/drivers/drivers.o
 LIBGCC = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
-LIBS := $(TOPDIR)/arch/cris/lib/lib.a $(LIBS) $(TOPDIR)/arch/cris/lib/lib.a $(LIBGCC)
+
+core-y		+= arch/cris/kernel/   arch/cris/mm/
+drivers-y	+= arch/cris/drivers/
+libs-y		+= arch/cris/lib/lib.a $(LIBGCC)
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
