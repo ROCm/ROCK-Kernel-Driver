@@ -172,6 +172,8 @@ extern struct scsi_device *scsi_device_lookup(struct Scsi_Host *,
 					      uint, uint, uint);
 extern struct scsi_device *__scsi_device_lookup(struct Scsi_Host *,
 						uint, uint, uint);
+extern void starget_for_each_device(struct scsi_target *, void *,
+		     void (*fn)(struct scsi_device *, void *));
 
 /* only exposed to implement shost_for_each_device */
 extern struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *,
