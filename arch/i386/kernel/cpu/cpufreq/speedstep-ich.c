@@ -308,7 +308,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 
 
 static struct cpufreq_driver speedstep_driver = {
-	.name		= "speedstep",
+	.name		= "speedstep-ich",
 	.verify 	= speedstep_verify,
 	.target 	= speedstep_target,
 	.init		= speedstep_cpu_init,
