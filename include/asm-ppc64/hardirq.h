@@ -15,9 +15,7 @@
 
 typedef struct {
 	unsigned int __softirq_pending;
-	unsigned int __syscall_count;
 	struct task_struct * __ksoftirqd_task;
-	unsigned long idle_timestamp;
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
