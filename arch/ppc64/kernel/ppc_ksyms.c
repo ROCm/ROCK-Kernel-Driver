@@ -115,15 +115,6 @@ EXPORT_SYMBOL(ioremap);
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
 
-#ifdef CONFIG_PCI
-EXPORT_SYMBOL(pci_alloc_consistent);
-EXPORT_SYMBOL(pci_free_consistent);
-EXPORT_SYMBOL(pci_map_single);
-EXPORT_SYMBOL(pci_unmap_single);
-EXPORT_SYMBOL(pci_map_sg);
-EXPORT_SYMBOL(pci_unmap_sg);
-#endif /* CONFIG_PCI */
-
 EXPORT_SYMBOL(start_thread);
 EXPORT_SYMBOL(kernel_thread);
 
