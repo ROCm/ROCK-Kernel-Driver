@@ -279,6 +279,12 @@ UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		US_SC_UFI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN ),
 		
+UNUSUAL_DEV(  0x054c, 0x0069, 0x0000, 0x9999,
+		"Sony",
+		"Memorystick MSC-U03",
+		US_SC_UFI, US_PR_CB, NULL,
+		US_FL_SINGLE_LUN ),
+
 /* Submitted by Nathan Babb <nathan@lexi.com> */
 UNUSUAL_DEV(  0x054c, 0x006d, 0x0000, 0x9999,
 		"Sony",
@@ -407,7 +413,8 @@ UNUSUAL_DEV(  0x0781, 0x0001, 0x0200, 0x0200,
 UNUSUAL_DEV(  0x0781, 0x0002, 0x0009, 0x0009, 
 		"Sandisk",
 		"ImageMate SDDR-31",
-		US_SC_SCSI, US_PR_BULK, NULL, 0 ),
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_IGNORE_SER ),
 
 UNUSUAL_DEV(  0x0781, 0x0100, 0x0100, 0x0100,
 		"Sandisk",
@@ -563,7 +570,7 @@ UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
 		"5-in-1 Card Reader",
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_FIX_CAPACITY ),
-                
+
 UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
 		"Minds@Work",
 		"Digital Wallet",

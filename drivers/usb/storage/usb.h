@@ -71,6 +71,7 @@ struct us_unusual_dev {
 #define US_FL_SINGLE_LUN      0x00000001 /* allow access to only LUN 0	    */
 #define US_FL_MODE_XLATE      0x00000002 /* translate _6 to _10 commands for
 						    Win/MacOS compatibility */
+#define US_FL_IGNORE_SER      0		 /* [no longer used]		    */
 #define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets	    */
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing   */
 #define US_FL_FIX_CAPACITY    0x00000080 /* READ CAPACITY response too big  */
