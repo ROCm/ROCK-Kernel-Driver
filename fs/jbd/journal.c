@@ -78,7 +78,7 @@ EXPORT_SYMBOL(log_wait_commit);
 EXPORT_SYMBOL(log_start_commit);
 EXPORT_SYMBOL(journal_wipe);
 EXPORT_SYMBOL(journal_blocks_per_page);
-EXPORT_SYMBOL(journal_flushpage);
+EXPORT_SYMBOL(journal_invalidatepage);
 EXPORT_SYMBOL(journal_try_to_free_buffers);
 EXPORT_SYMBOL(journal_bmap);
 EXPORT_SYMBOL(journal_force_commit);

@@ -1364,10 +1364,10 @@ ext3_readpages(struct address_space *mapping,
 	return mpage_readpages(mapping, pages, nr_pages, ext3_get_block);
 }
 
-static int ext3_flushpage(struct page *page, unsigned long offset)
+static int ext3_invalidatepage(struct page *page, unsigned long offset)
 {
 	journal_t *journal = EXT3_JOURNAL(page->mapping->host);
-	return journal_flushpage(journal, page, offset);
+	return journal_invalidatepage(journal, page, offset);
 }
 
 static int ext3_releasepage(struct page *page, int wait)
@@ -1385,7 +1385,7 @@ struct address_space_operations ext3_aops = {
 	prepare_write:	ext3_prepare_write,	/* BKL not held.  We take it */
 	commit_write:	ext3_commit_write,	/* BKL not held.  We take it */
 	bmap:		ext3_bmap,		/* BKL held */
-	flushpage:	ext3_flushpage,		/* BKL not held.  Don't need */
+	invalidatepage:	ext3_invalidatepage,	/* BKL not held.  Don't need */
 	releasepage:	ext3_releasepage,	/* BKL not held.  Don't need */
 };
 
@@ -1413,7 +1413,7 @@ struct address_space_operations ext3_writeback_aops = {
 	prepare_write:	ext3_prepare_write,	/* BKL not held.  We take it */
 	commit_write:	ext3_commit_write,	/* BKL not held.  We take it */
 	bmap:		ext3_bmap,		/* BKL held */
-	flushpage:	ext3_flushpage,		/* BKL not held.  Don't need */
+	invalidatepage:	ext3_invalidatepage,	/* BKL not held.  Don't need */
 	releasepage:	ext3_releasepage,	/* BKL not held.  Don't need */
 };
 

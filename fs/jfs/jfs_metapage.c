@@ -537,7 +537,7 @@ void release_metapage(metapage_t * mp)
 
 			if (test_bit(META_discard, &mp->flag)) {
 				lock_page(mp->page);
-				block_flushpage(mp->page, 0);
+				block_invalidatepage(mp->page, 0);
 				unlock_page(mp->page);
 			}
 
@@ -587,13 +587,13 @@ void invalidate_metapages(struct inode *ip, unsigned long addr,
 			set_bit(META_discard, &mp->flag);
 			spin_unlock(&meta_lock);
 			lock_page(mp->page);
-			block_flushpage(mp->page, 0);
+			block_invalidatepage(mp->page, 0);
 			unlock_page(mp->page);
 		} else {
 			spin_unlock(&meta_lock);
 			page = find_lock_page(mapping, lblock>>l2BlocksPerPage);
 			if (page) {
-				block_flushpage(page, 0);
+				block_invalidatepage(page, 0);
 				unlock_page(page);
 			}
 		}

@@ -138,7 +138,7 @@ prototypes:
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*bmap)(struct address_space *, long);
-	int (*flushpage) (struct page *, unsigned long);
+	int (*invalidatepage) (struct page *, unsigned long);
 	int (*releasepage) (struct page *, int);
 	int (*direct_IO)(int, struct inode *, struct kiobuf *, unsigned long, int);
 
@@ -156,7 +156,7 @@ set_page_dirty		no	no
 prepare_write:		no	yes
 commit_write:		no	yes
 bmap:			yes
-flushpage:		no	yes
+invalidatepage:		no	yes
 releasepage:		no	yes
 
 	->prepare_write(), ->commit_write(), ->sync_page() and ->readpage()
@@ -206,10 +206,10 @@ filesystems and by the swapper. The latter will eventually go away. All
 instances do not actually need the BKL. Please, keep it that way and don't
 breed new callers.
 
-	->flushpage() is called when the filesystem must attempt to drop
+	->invalidatepage() is called when the filesystem must attempt to drop
 some or all of the buffers from the page when it is being truncated.  It
-returns zero on success.  If ->flushpage is zero, the kernel uses
-block_flushpage() instead.
+returns zero on success.  If ->invalidatepage is zero, the kernel uses
+block_invalidatepage() instead.
 
 	->releasepage() is called when the kernel is about to try to drop the
 buffers from the page in preparation for freeing it.  It returns zero to

@@ -23,7 +23,7 @@
 /*
  * This is needed for the following functions:
  *  - try_to_release_page
- *  - block_flushpage
+ *  - block_invalidatepage
  *  - page_has_buffers
  *  - generic_osync_inode
  *
@@ -154,30 +154,30 @@ unlock:
 	spin_unlock(&pagemap_lru_lock);
 }
 
-static int do_flushpage(struct page *page, unsigned long offset)
+static int do_invalidatepage(struct page *page, unsigned long offset)
 {
-	int (*flushpage) (struct page *, unsigned long);
-	flushpage = page->mapping->a_ops->flushpage;
-	if (flushpage)
-		return (*flushpage)(page, offset);
-	return block_flushpage(page, offset);
+	int (*invalidatepage)(struct page *, unsigned long);
+	invalidatepage = page->mapping->a_ops->invalidatepage;
+	if (invalidatepage)
+		return (*invalidatepage)(page, offset);
+	return block_invalidatepage(page, offset);
 }
 
 static inline void truncate_partial_page(struct page *page, unsigned partial)
 {
 	memclear_highpage_flush(page, partial, PAGE_CACHE_SIZE-partial);
 	if (PagePrivate(page))
-		do_flushpage(page, partial);
+		do_invalidatepage(page, partial);
 }
 
 /*
  * AKPM: the PagePrivate test here seems a bit bogus.  It bypasses the
- * mapping's ->flushpage, which may still want to be called.
+ * mapping's ->invalidatepage, which may still want to be called.
  */
 static void truncate_complete_page(struct page *page)
 {
 	/* Leave it on the LRU if it gets converted into anonymous buffers */
-	if (!PagePrivate(page) || do_flushpage(page, 0))
+	if (!PagePrivate(page) || do_invalidatepage(page, 0))
 		lru_cache_del(page);
 	ClearPageDirty(page);
 	ClearPageUptodate(page);
@@ -339,7 +339,7 @@ static inline int invalidate_this_page2(struct address_space * mapping,
 
 			page_cache_get(page);
 			write_unlock(&mapping->page_lock);
-			block_flushpage(page, 0);
+			do_invalidatepage(page, 0);
 		} else
 			unlocked = 0;
 
