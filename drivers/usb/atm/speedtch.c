@@ -165,8 +165,7 @@ static void speedtch_got_firmware(struct speedtch_instance_data *instance,
 		goto out;
 	}
 	if ((err = usb_set_interface(instance->u.usb_dev, 1, 1)) < 0) {
-		dbg("speedtch_got_firmware: usb_set_interface returned %d!",
-		    err);
+		dbg("speedtch_got_firmware: usb_set_interface returned %d!", err);
 		instance->u.status = UDSL_NO_FIRMWARE;
 		goto out;
 	}
@@ -572,7 +571,7 @@ static void speedtch_upload_firmware(struct speedtch_instance_data *instance,
 
 	/* Start modem synchronisation */
 	if (speedtch_start_synchro(instance))
-		dbg("speedtch_start_synchro: failed\n");
+		dbg("speedtch_start_synchro: failed");
 
 	speedtch_got_firmware(instance, 1);
 
@@ -585,7 +584,7 @@ static void speedtch_upload_firmware(struct speedtch_instance_data *instance,
 	   the firmware themselves */
 	usb_driver_release_interface(&speedtch_usb_driver, intf);
  fail_free:
-	kfree(buffer);
+	free_page((unsigned long)buffer);
  fail:
 	speedtch_got_firmware(instance, 0);
 }
@@ -596,28 +595,30 @@ static int speedtch_find_firmware(struct speedtch_instance_data
 {
 	char buf[24];
 	const u16 bcdDevice = instance->u.usb_dev->descriptor.bcdDevice;
+	const u8 major_revision = bcdDevice >> 8;
+	const u8 minor_revision = bcdDevice & 0xff;
 
-	sprintf(buf, "speedtch-%d.bin.%x.%02x", phase, bcdDevice >> 8,
-		bcdDevice & 0xff);
-	dbg("speedtch_find_firmware: looking for %s\n", buf);
+	sprintf(buf, "speedtch-%d.bin.%x.%02x", phase, major_revision, minor_revision);
+	dbg("speedtch_find_firmware: looking for %s", buf);
 
-	if (!request_firmware(fw_p, buf, &instance->u.usb_dev->dev))
-		return 0;
+	if (request_firmware(fw_p, buf, &instance->u.usb_dev->dev)) {
+		sprintf(buf, "speedtch-%d.bin.%x", phase, major_revision);
+		dbg("speedtch_find_firmware: looking for %s", buf);
 
-	sprintf(buf, "speedtch-%d.bin.%x", phase, bcdDevice >> 8);
-	dbg("speedtch_find_firmware: looking for %s\n", buf);
+		if (request_firmware(fw_p, buf, &instance->u.usb_dev->dev)) {
+			sprintf(buf, "speedtch-%d.bin", phase);
+			dbg("speedtch_find_firmware: looking for %s", buf);
 
-	if (!request_firmware(fw_p, buf, &instance->u.usb_dev->dev))
-		return 0;
+			if (request_firmware(fw_p, buf, &instance->u.usb_dev->dev)) {
+				dev_warn(&instance->u.usb_dev->dev, "no stage %d firmware found!", phase);
+				return -ENOENT;
+			}
+		}
+	}
 
-	sprintf(buf, "speedtch-%d.bin", phase);
-	dbg("speedtch_find_firmware: looking for %s\n", buf);
+	dev_info(&instance->u.usb_dev->dev, "found stage %d firmware %s\n", phase, buf);
 
-	if (!request_firmware(fw_p, buf, &instance->u.usb_dev->dev))
-		return 0;
-
-	dev_warn(&instance->u.usb_dev->dev, "no stage %d firmware found!", phase);
-	return -ENOENT;
+	return 0;
 }
 
 static int speedtch_load_firmware(void *arg)
