@@ -2030,6 +2030,14 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 		/* 48kHz only */
 		chip->ichd[chip->spdif_idx].pcm->rates = SNDRV_PCM_RATE_48000;
 	}
+	if (chip->device_type == DEVICE_INTEL_ICH4) {
+		/* use slot 10/11 for SPDIF */
+		u32 val;
+		val = igetdword(chip, ICHREG(GLOB_CNT)) & ~ICH_PCM_SPDIF_MASK;
+		val |= ICH_PCM_SPDIF_1011;
+		iputdword(chip, ICHREG(GLOB_CNT), val);
+		snd_ac97_update_bits(chip->ac97[0], AC97_EXTENDED_STATUS, 0x03 << 4, 0x03 << 4);
+	}
 	chip->in_ac97_init = 0;
 	return 0;
 
@@ -2676,6 +2684,9 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	switch (pci_id->driver_data) {
 	case DEVICE_NFORCE:
 		strcpy(card->driver, "NFORCE");
+		break;
+	case DEVICE_INTEL_ICH4:
+		strcpy(card->driver, "ICH4");
 		break;
 	default:
 		strcpy(card->driver, "ICH");
