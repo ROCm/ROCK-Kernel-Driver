@@ -170,7 +170,7 @@ static void *__sym_calloc2(m_pool_p mp, int size, char *name, int uflags)
 	}
 
 	if (p)
-		bzero(p, size);
+		memset(p, 0, size);
 	else if (uflags & SYM_MEM_WARN)
 		printf ("__sym_calloc2: failed to allocate %s[%d]\n", name, size);
 	return p;
