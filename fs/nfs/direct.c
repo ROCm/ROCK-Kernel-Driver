@@ -422,6 +422,8 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	/*
 	 * No support for async yet
 	 */
+	up(&inode->i_sem);
+
 	if (!is_sync_kiocb(iocb))
 		return result;
 
@@ -444,6 +446,8 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	default:
 		break;
 	}
+
+	down(&inode->i_sem);
 	return result;
 }
 

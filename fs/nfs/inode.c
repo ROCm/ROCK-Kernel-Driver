@@ -1382,8 +1382,9 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 	init_nfsv4_state(server);
 
 	if (data->version != NFS_MOUNT_VERSION) {
-		printk("nfs warning: mount version %s than kernel\n",
-			data->version < NFS_MOUNT_VERSION ? "older" : "newer");
+		if (data->version < 3)
+			printk("nfs warning: mount version %d is older "
+			       "than 3\n", data->version);
 		if (data->version < 2)
 			data->namlen = 0;
 		if (data->version < 3)
