@@ -1105,7 +1105,6 @@ static inline void map_kernel(void)
 extern void sparc_context_init(int);
 
 extern int linux_num_cpus;
-extern unsigned long totalhigh_pages;
 
 void (*poke_srmmu)(void) __initdata = NULL;
 

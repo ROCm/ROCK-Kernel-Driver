@@ -1790,17 +1790,3 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	}
 }
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-	val->totalram = num_physpages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-
-	/* These are always zero on Sparc64. */
-	val->totalhigh = 0;
-	val->freehigh = 0;
-
-	val->mem_unit = PAGE_SIZE;
-}

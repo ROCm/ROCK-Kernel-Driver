@@ -358,7 +358,6 @@ void __init mem_init(void)
 	extern int page_is_ram(unsigned long) __init;
 	extern char _text, _etext, _data, _edata;
 	extern char __init_begin, __init_end;
-	extern unsigned long totalram_pages;
 	unsigned long nid, i;
 	mem_map_t * lmem_map;
 

@@ -39,8 +39,6 @@
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 
-static unsigned long totalram_pages;
-
 /*
  * NOTE: pagetable_init alloc all the fixmap pagetables contiguous on the
  * physical space so we can cache the place of the first one and move
@@ -385,15 +383,3 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	}
 }
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = nr_free_highpages();
-	val->mem_unit = PAGE_SIZE;
-	return;
-}

@@ -23,6 +23,8 @@
 #include <linux/compiler.h>
 #include <linux/module.h>
 
+unsigned long totalram_pages;
+unsigned long totalhigh_pages;
 int nr_swap_pages;
 int nr_active_pages;
 int nr_inactive_pages;
@@ -604,6 +606,22 @@ unsigned long get_page_cache_size(void)
 
 	get_page_state(&ps);
 	return ps.nr_pagecache;
+}
+
+void si_meminfo(struct sysinfo *val)
+{
+	val->totalram = totalram_pages;
+	val->sharedram = 0;
+	val->freeram = nr_free_pages();
+	val->bufferram = atomic_read(&buffermem_pages);
+#ifdef CONFIG_HIGHMEM
+	val->totalhigh = totalhigh_pages;
+	val->freehigh = nr_free_highpages();
+#else
+	val->totalhigh = 0;
+	val->freehigh = 0;
+#endif
+	val->mem_unit = PAGE_SIZE;
 }
 
 #define K(x) ((x) << (PAGE_SHIFT-10))

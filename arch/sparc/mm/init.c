@@ -55,8 +55,6 @@ extern unsigned int sparc_ramdisk_image;
 extern unsigned int sparc_ramdisk_size;
 
 unsigned long highstart_pfn, highend_pfn;
-unsigned long totalram_pages;
-unsigned long totalhigh_pages;
 
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
@@ -504,18 +502,6 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	}
 }
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = totalhigh_pages;
-	val->freehigh = nr_free_highpages();
-
-	val->mem_unit = PAGE_SIZE;
-}
 
 void flush_page_to_ram(struct page *page)
 {

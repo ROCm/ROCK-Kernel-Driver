@@ -73,7 +73,6 @@ int mem_init_done;
 unsigned long ioremap_bot = IMALLOC_BASE;
 
 static int boot_mapsize;
-static unsigned long totalram_pages;
 
 extern pgd_t swapper_pg_dir[];
 extern char __init_begin, __init_end;
@@ -136,17 +135,6 @@ void show_mem(void)
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
 	printk("%ld buffermem pages\n", nr_buffermem_pages());
-}
-
-void si_meminfo(struct sysinfo *val)
-{
- 	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = 0;
-	val->mem_unit = PAGE_SIZE;
 }
 
 void *

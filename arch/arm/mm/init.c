@@ -48,7 +48,6 @@
 
 #define TABLE_SIZE	((TABLE_OFFSET + PTRS_PER_PTE) * sizeof(pte_t))
 
-static unsigned long totalram_pages;
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern char _stext, _text, _etext, _end, __init_begin, __init_end;
 
@@ -631,14 +630,3 @@ static int __init keepinitrd_setup(char *__unused)
 
 __setup("keepinitrd", keepinitrd_setup);
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-	val->totalram  = totalram_pages;
-	val->sharedram = 0;
-	val->freeram   = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh  = 0;
-	val->mem_unit  = PAGE_SIZE;
-}

@@ -36,8 +36,6 @@ extern void ia64_tlb_init (void);
 
 unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 
-static unsigned long totalram_pages;
-
 static int pgt_cache_water[2] = { 25, 50 };
 
 void
@@ -156,19 +154,6 @@ free_initrd_mem (unsigned long start, unsigned long end)
 		__free_page(page);
 		++totalram_pages;
 	}
-}
-
-void
-si_meminfo (struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = 0;
-	val->mem_unit = PAGE_SIZE;
-	return;
 }
 
 void
