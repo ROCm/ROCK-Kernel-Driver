@@ -947,6 +947,7 @@ ok:
 				ipv6_ifa_notify((flags&IFA_F_DEPRECATED) ?
 						0 : RTM_NEWADDR, ifp);
 			in6_ifa_put(ifp);
+			addrconf_verify(0);
 		}
 	}
 	in6_dev_put(in6_dev);
