@@ -245,7 +245,7 @@ static struct prio_tree_node *prio_tree_insert(struct prio_tree_root *root,
 		mask >>= 1;
 
 		if (!mask) {
-			mask = 1UL << (root->index_bits - 1);
+			mask = 1UL << (BITS_PER_LONG - 1);
 			size_flag = 1;
 		}
 	}
@@ -334,7 +334,7 @@ static struct prio_tree_node *prio_tree_left(struct prio_tree_iter *iter,
 				iter->mask = ULONG_MAX;
 			} else {
 				iter->size_level = 1;
-				iter->mask = 1UL << (iter->root->index_bits - 1);
+				iter->mask = 1UL << (BITS_PER_LONG - 1);
 			}
 		}
 		return iter->cur;
@@ -376,7 +376,7 @@ static struct prio_tree_node *prio_tree_right(struct prio_tree_iter *iter,
 				iter->mask = ULONG_MAX;
 			} else {
 				iter->size_level = 1;
-				iter->mask = 1UL << (iter->root->index_bits - 1);
+				iter->mask = 1UL << (BITS_PER_LONG - 1);
 			}
 		}
 		return iter->cur;
