@@ -253,9 +253,16 @@ static inline void __netif_rx_complete(struct net_device *dev)
 	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
 }
 
+static inline void netif_tx_disable(struct net_device *dev)
+{
+	netif_stop_queue(dev);
+	spin_lock_bh(&dev->xmit_lock);
+	spin_unlock_bh(&dev->xmit_lock);
+}
+
 static inline void tg3_netif_stop(struct tg3 *tp)
 {
-	netif_stop_queue(tp->dev);
+	netif_tx_disable(tp->dev);
 	netif_poll_disable(tp->dev);
 }
 
