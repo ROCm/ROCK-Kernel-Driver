@@ -1169,7 +1169,7 @@ init_ov_sensor(struct usb_ov511 *ov)
 		return -EIO;
 
 	/* Wait for it to initialize */
-	schedule_timeout(1 + 150 * HZ / 1000);
+	msleep(150);
 
 	for (i = 0, success = 0; i < i2c_detect_tries && !success; i++) {
 		if ((i2c_r(ov, OV7610_REG_ID_HIGH) == 0x7F) &&
@@ -1182,7 +1182,7 @@ init_ov_sensor(struct usb_ov511 *ov)
 		if (i2c_w(ov, 0x12, 0x80) < 0)
 			return -EIO;
 		/* Wait for it to initialize */
-		schedule_timeout(1 + 150 * HZ / 1000);
+		msleep(150);
 		/* Dummy read to sync I2C */
 		if (i2c_r(ov, 0x00) < 0)
 			return -EIO;
@@ -4947,7 +4947,7 @@ ov7xx0_configure(struct usb_ov511 *ov)
 			return -1;
 
 		/* Wait for it to initialize */
-		schedule_timeout(1 + 150 * HZ / 1000);
+		msleep(150);
 
 		i = 0;
 		success = 0;
