@@ -1267,7 +1267,6 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
-	info->event = 0;
 	info->tty = NULL;
 	if (info->blocked_open) {
 		if (info->state->close_delay) {
@@ -1376,7 +1375,6 @@ static void uart_hangup(struct tty_struct *tty)
 		return;
 	}
 	uart_shutdown(info);
-	info->event = 0;
 	state->count = 0;
 	info->flags &= ~UIF_NORMAL_ACTIVE;
 	info->tty = NULL;

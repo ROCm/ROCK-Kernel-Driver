@@ -242,7 +242,6 @@ struct uart_info {
 	unsigned char		*tmpbuf;
 	struct semaphore	tmpbuf_sem;
 
-	unsigned long		event;
 	int			blocked_open;
 
 	struct tasklet_struct	tlet;
