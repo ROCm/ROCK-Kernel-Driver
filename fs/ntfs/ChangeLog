@@ -81,6 +81,8 @@ ToDo/Notes:
 	  where we cannot access any of the ntfs records in a page when a
 	  single one of them had an mst error.  (Thanks to Ken MacFerrin for
 	  the bug report.)
+	- Fix error handling in fs/ntfs/quota.c::ntfs_mark_quotas_out_of_date()
+	  where we failed to release i_sem on the $Quota/$Q attribute inode.
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
