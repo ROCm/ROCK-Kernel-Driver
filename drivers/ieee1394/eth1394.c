@@ -216,7 +216,7 @@ static struct hpsb_highlevel eth1394_highlevel = {
 /* This is called after an "ifup" */
 static int ether1394_open (struct net_device *dev)
 {
-	struct eth1394_priv *priv = dev->priv;
+	struct eth1394_priv *priv = netdev_priv(dev);
 	int ret = 0;
 
 	/* Something bad happened, don't even try */
@@ -261,7 +261,7 @@ static int ether1394_stop (struct net_device *dev)
 /* Return statistics to the caller */
 static struct net_device_stats *ether1394_stats (struct net_device *dev)
 {
-	return &(((struct eth1394_priv *)dev->priv)->stats);
+	return &(((struct eth1394_priv *)netdev_priv(dev))->stats);
 }
 
 /* What to do if we timeout. I think a host reset is probably in order, so
@@ -269,16 +269,16 @@ static struct net_device_stats *ether1394_stats (struct net_device *dev)
 static void ether1394_tx_timeout (struct net_device *dev)
 {
 	ETH1394_PRINT (KERN_ERR, dev->name, "Timeout, resetting host %s\n",
-		       ((struct eth1394_priv *)(dev->priv))->host->driver->name);
+		       ((struct eth1394_priv *)netdev_priv(dev))->host->driver->name);
 
-	highlevel_host_reset (((struct eth1394_priv *)(dev->priv))->host);
+	highlevel_host_reset (((struct eth1394_priv *)netdev_priv(dev))->host);
 
 	netif_wake_queue (dev);
 }
 
 static int ether1394_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct eth1394_priv *priv = dev->priv;
+	struct eth1394_priv *priv = netdev_priv(dev);
 
 	if ((new_mtu < 68) ||
 	    (new_mtu > min(ETH1394_DATA_LEN,
@@ -379,7 +379,7 @@ static int eth1394_probe(struct device *dev)
 	ud->device.driver_data = node_info;
 	new_node->ud = ud;
 
-	priv = (struct eth1394_priv *)hi->dev->priv;
+	priv = netdev_priv(hi->dev);
 	list_add_tail(&new_node->list, &priv->ip_node_list);
 
 	return 0;
@@ -400,7 +400,7 @@ static int eth1394_remove(struct device *dev)
 	if (!hi)
 		return -ENOENT;
 
-	priv = (struct eth1394_priv *)hi->dev->priv;
+	priv = netdev_priv(hi->dev);
 
 	old_node = eth1394_find_node(&priv->ip_node_list, ud);
 
@@ -435,7 +435,7 @@ static int eth1394_update(struct unit_directory *ud)
 	if (!hi)
 		return -ENOENT;
 
-	priv = (struct eth1394_priv *)hi->dev->priv;
+	priv = netdev_priv(hi->dev);
 
 	node = eth1394_find_node(&priv->ip_node_list, ud);
 
@@ -459,7 +459,7 @@ static int eth1394_update(struct unit_directory *ud)
 		ud->device.driver_data = node_info;
 		node->ud = ud;
 
-		priv = (struct eth1394_priv *)hi->dev->priv;
+		priv = netdev_priv(hi->dev);
 		list_add_tail(&node->list, &priv->ip_node_list);
 	}
 
@@ -496,7 +496,7 @@ static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 {
 	unsigned long flags;
 	int i;
-	struct eth1394_priv *priv = dev->priv;
+	struct eth1394_priv *priv = netdev_priv(dev);
 	struct hpsb_host *host = priv->host;
 	u64 guid = *((u64*)&(host->csr.rom->bus_info_data[3]));
 	u16 maxpayload = 1 << (host->csr.max_rec + 1);
@@ -602,7 +602,7 @@ static void ether1394_add_host (struct hpsb_host *host)
 
 	SET_MODULE_OWNER(dev);
 
-	priv = (struct eth1394_priv *)dev->priv;
+	priv = netdev_priv(dev);
 
 	INIT_LIST_HEAD(&priv->ip_node_list);
 
@@ -672,7 +672,7 @@ static void ether1394_remove_host (struct hpsb_host *host)
 
 	hi = hpsb_get_hostinfo(&eth1394_highlevel, host);
 	if (hi != NULL) {
-		struct eth1394_priv *priv = (struct eth1394_priv *)hi->dev->priv;
+		struct eth1394_priv *priv = netdev_priv(hi->dev);
 
 		hpsb_unregister_addrspace(&eth1394_highlevel, host,
 					  priv->local_fifo);
@@ -707,7 +707,7 @@ static void ether1394_host_reset (struct hpsb_host *host)
 		return;
 
 	dev = hi->dev;
-	priv = (struct eth1394_priv *)dev->priv;
+	priv = netdev_priv(dev);
 
 	/* Reset our private host data, but not our mtu */
 	netif_stop_queue (dev);
@@ -882,7 +882,7 @@ static inline u16 ether1394_parse_encap(struct sk_buff *skb,
 					nodeid_t srcid, nodeid_t destid,
 					u16 ether_type)
 {
-	struct eth1394_priv *priv = dev->priv;
+	struct eth1394_priv *priv = netdev_priv(dev);
 	u64 dest_hw;
 	unsigned short ret = 0;
 
@@ -1112,7 +1112,7 @@ static int ether1394_data_handler(struct net_device *dev, int srcid, int destid,
 {
 	struct sk_buff *skb;
 	unsigned long flags;
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = netdev_priv(dev);
 	union eth1394_hdr *hdr = (union eth1394_hdr *)buf;
 	u16 ether_type = 0;  /* initialized to clear warning */
 	int hdr_len;
@@ -1350,7 +1350,7 @@ static void ether1394_iso(struct hpsb_iso *iso)
 				((be32_to_cpu(data[1]) & 0xff000000) >> 24));
 		source_id = be32_to_cpu(data[0]) >> 16;
 
-		priv = (struct eth1394_priv *)dev->priv;
+		priv = netdev_priv(dev);
 
 		if (info->channel != (iso->host->csr.broadcast_channel & 0x3f) ||
 		   specifier_id != ETHER1394_GASP_SPECIFIER_ID) {
@@ -1384,7 +1384,7 @@ static void ether1394_iso(struct hpsb_iso *iso)
 static inline void ether1394_arp_to_1394arp(struct sk_buff *skb,
 					    struct net_device *dev)
 {
-	struct eth1394_priv *priv = (struct eth1394_priv *)(dev->priv);
+	struct eth1394_priv *priv = netdev_priv(dev);
 
 	struct arphdr *arp = (struct arphdr *)skb->data;
 	unsigned char *arp_ptr = (unsigned char *)(arp + 1);
@@ -1582,7 +1582,7 @@ static inline void ether1394_dg_complete(struct packet_task *ptask, int fail)
 {
 	struct sk_buff *skb = ptask->skb;
 	struct net_device *dev = skb->dev;
-	struct eth1394_priv *priv = dev->priv;
+	struct eth1394_priv *priv = netdev_priv(dev);
         unsigned long flags;
 
 	/* Statistics */
@@ -1635,7 +1635,7 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 {
 	int kmflags = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
 	struct eth1394hdr *eth;
-	struct eth1394_priv *priv = dev->priv;
+	struct eth1394_priv *priv = netdev_priv(dev);
 	int proto;
 	unsigned long flags;
 	nodeid_t dest_node;
