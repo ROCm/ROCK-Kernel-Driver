@@ -591,6 +591,8 @@ struct address_space_operations ext2_aops = {
 	commit_write: generic_commit_write,
 	bmap: ext2_bmap,
 	direct_IO: ext2_direct_IO,
+	writeback_mapping: generic_writeback_mapping,
+	vm_writeback: generic_vm_writeback,
 };
 
 /*

@@ -584,7 +584,7 @@ void get_page_state(struct page_state *ret)
 	int pcpu;
 
 	ret->nr_dirty = 0;
-	ret->nr_locked = 0;
+	ret->nr_writeback = 0;
 	ret->nr_pagecache = 0;
 
 	for (pcpu = 0; pcpu < smp_num_cpus; pcpu++) {
@@ -592,7 +592,7 @@ void get_page_state(struct page_state *ret)
 
 		ps = &page_states[cpu_logical_map(pcpu)];
 		ret->nr_dirty += ps->nr_dirty;
-		ret->nr_locked += ps->nr_locked;
+		ret->nr_writeback += ps->nr_writeback;
 		ret->nr_pagecache += ps->nr_pagecache;
 	}
 }

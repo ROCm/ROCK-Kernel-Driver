@@ -13,7 +13,7 @@
  *
  * The PG_private bitflag is set if page->private contains a valid value.
  *
- * During disk I/O, PG_locked_dontuse is used. This bit is set before I/O and
+ * During disk I/O, PG_locked is used. This bit is set before I/O and
  * reset when I/O completes. page_waitqueue(page) is a wait queue of all tasks
  * waiting for the I/O on this page to complete.
  *
@@ -28,7 +28,7 @@
  *
  * Note that the referenced bit, the page->lru list_head and the active,
  * inactive_dirty and inactive_clean lists are protected by the
- * pagemap_lru_lock, and *NOT* by the usual PG_locked_dontuse bit!
+ * pagemap_lru_lock, and *NOT* by the usual PG_locked bit!
  *
  * PG_error is set to indicate that an I/O error occurred on this page.
  *
@@ -47,7 +47,7 @@
  * locked- and dirty-page accounting.  The top eight bits of page->flags are
  * used for page->zone, so putting flag bits there doesn't work.
  */
-#define PG_locked_dontuse	 0	/* Page is locked. Don't touch. */
+#define PG_locked	 0	/* Page is locked. Don't touch. */
 #define PG_error		 1
 #define PG_referenced		 2
 #define PG_uptodate		 3
@@ -71,7 +71,7 @@
  */
 extern struct page_state {
 	unsigned long nr_dirty;
-	unsigned long nr_locked;
+	unsigned long nr_writeback;
 	unsigned long nr_pagecache;
 } ____cacheline_aligned_in_smp page_states[NR_CPUS];
 
@@ -91,37 +91,16 @@ extern void get_page_state(struct page_state *ret);
 /*
  * Manipulation of page state flags
  */
-#define PageLocked(page)	test_bit(PG_locked_dontuse, &(page)->flags)
-#define SetPageLocked(page)						\
-	do {								\
-		if (!test_and_set_bit(PG_locked_dontuse,		\
-				&(page)->flags))			\
-			inc_page_state(nr_locked);			\
-	} while (0)
-#define TestSetPageLocked(page)						\
-	({								\
-		int ret;						\
-		ret = test_and_set_bit(PG_locked_dontuse,		\
-					&(page)->flags);		\
-		if (!ret)						\
-			inc_page_state(nr_locked);			\
-		ret;							\
-	})
-#define ClearPageLocked(page)						\
-	do {								\
-		if (test_and_clear_bit(PG_locked_dontuse,		\
-				&(page)->flags))			\
-			dec_page_state(nr_locked);			\
-	} while (0)
-#define TestClearPageLocked(page)					\
-	({								\
-		int ret;						\
-		ret = test_and_clear_bit(PG_locked_dontuse,		\
-				&(page)->flags);			\
-		if (ret)						\
-			dec_page_state(nr_locked);			\
-		ret;							\
-	})
+#define PageLocked(page)		\
+		test_bit(PG_locked, &(page)->flags)
+#define SetPageLocked(page)		\
+		set_bit(PG_locked, &(page)->flags)
+#define TestSetPageLocked(page)		\
+		test_and_set_bit(PG_locked, &(page)->flags)
+#define ClearPageLocked(page)		\
+		clear_bit(PG_locked, &(page)->flags)
+#define TestClearPageLocked(page)	\
+		test_and_clear_bit(PG_locked, &(page)->flags)
 
 #define PageError(page)		test_bit(PG_error, &(page)->flags)
 #define SetPageError(page)	set_bit(PG_error, &(page)->flags)
@@ -201,12 +180,36 @@ extern void get_page_state(struct page_state *ret);
 #define PagePrivate(page)	test_bit(PG_private, &(page)->flags)
 
 #define PageWriteback(page)	test_bit(PG_writeback, &(page)->flags)
-#define SetPageWriteback(page)	set_bit(PG_writeback, &(page)->flags)
-#define ClearPageWriteback(page) clear_bit(PG_writeback, &(page)->flags)
-#define TestSetPageWriteback(page)	\
-	test_and_set_bit(PG_writeback, &(page)->flags)
-#define TestClearPageWriteback(page)	\
-	test_and_clear_bit(PG_writeback, &(page)->flags)
+#define SetPageWriteback(page)						\
+	do {								\
+		if (!test_and_set_bit(PG_writeback,			\
+				&(page)->flags))			\
+			inc_page_state(nr_writeback);			\
+	} while (0)
+#define TestSetPageWriteback(page)					\
+	({								\
+		int ret;						\
+		ret = test_and_set_bit(PG_writeback,			\
+					&(page)->flags);		\
+		if (!ret)						\
+			inc_page_state(nr_writeback);			\
+		ret;							\
+	})
+#define ClearPageWriteback(page)					\
+	do {								\
+		if (test_and_clear_bit(PG_writeback,			\
+				&(page)->flags))			\
+			dec_page_state(nr_writeback);			\
+	} while (0)
+#define TestClearPageWriteback(page)					\
+	({								\
+		int ret;						\
+		ret = test_and_clear_bit(PG_writeback,			\
+				&(page)->flags);			\
+		if (ret)						\
+			dec_page_state(nr_writeback);			\
+		ret;							\
+	})
 
 /*
  * The PageSwapCache predicate doesn't use a PG_flag at this time,
