@@ -58,7 +58,7 @@ mapped_kernel_page_is_present (unsigned long address)
 	if (pgd_none(*pgd) || pgd_bad(*pgd))
 		return 0;
 
-	pmd = pmd_offset(pgd,address);
+	pmd = pmd_offset(pgd, address);
 	if (pmd_none(*pmd) || pmd_bad(*pmd))
 		return 0;
 

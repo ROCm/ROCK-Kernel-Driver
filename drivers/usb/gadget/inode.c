@@ -232,18 +232,27 @@ static void put_ep (struct ep_data *data)
  * the usb controller exposes.
  */
 
-#ifdef	CONFIG_USB_GADGETFS_NET2280
+#ifdef	CONFIG_USB_GADGET_DUMMY_HCD
+/* act (mostly) like a net2280 */
+#define CONFIG_USB_GADGET_NET2280
+#endif
+
+#ifdef	CONFIG_USB_GADGET_NET2280
 #define CHIP			"net2280"
 #define HIGHSPEED
 #endif
 
-#ifdef	CONFIG_USB_GADGETFS_PXA2XX
+#ifdef	CONFIG_USB_GADGET_PXA2XX
 #define CHIP			"pxa2xx_udc"
 /* earlier hardware doesn't have UDCCFR, races set_{config,interface} */
 #warning works best with pxa255 or newer
 #endif
 
-#ifdef	CONFIG_USB_GADGETFS_SA1100
+#ifdef	CONFIG_USB_GADGET_GOKU
+#define CHIP			"goku_udc"
+#endif
+
+#ifdef	CONFIG_USB_GADGET_SA1100
 #define CHIP			"sa1100"
 #endif
 
@@ -397,7 +406,7 @@ ep_io (struct ep_data *epdata, void *buf, unsigned len)
 
 /* handle a synchronous OUT bulk/intr/iso transfer */
 static ssize_t
-ep_read (struct file *fd, char *buf, size_t len, loff_t *ptr)
+ep_read (struct file *fd, char __user *buf, size_t len, loff_t *ptr)
 {
 	struct ep_data		*data = fd->private_data;
 	void			*kbuf;
@@ -441,7 +450,7 @@ free1:
 
 /* handle a synchronous IN bulk/intr/iso transfer */
 static ssize_t
-ep_write (struct file *fd, const char *buf, size_t len, loff_t *ptr)
+ep_write (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 {
 	struct ep_data		*data = fd->private_data;
 	void			*kbuf;

@@ -14,3 +14,6 @@ extern void usb_enable_endpoint (struct usb_device *dev,
 		struct usb_endpoint_descriptor *epd);
 extern void usb_enable_interface (struct usb_device *dev,
 		struct usb_interface *intf);
+
+extern int usb_get_device_descriptor(struct usb_device *dev,
+		unsigned int size);

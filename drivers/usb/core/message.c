@@ -546,10 +546,10 @@ void usb_sg_cancel (struct usb_sg_request *io)
  *
  * Gets a USB descriptor.  Convenience functions exist to simplify
  * getting some types of descriptors.  Use
- * usb_get_device_descriptor() for USB_DT_DEVICE,
+ * usb_get_device_descriptor() for USB_DT_DEVICE (not exported),
  * and usb_get_string() or usb_string() for USB_DT_STRING.
- * Configuration descriptors (USB_DT_CONFIG) are part of the device
- * structure, at least for the current configuration.
+ * Device (USB_DT_DEVICE) and configuration descriptors (USB_DT_CONFIG)
+ * are part of the device structure.
  * In addition to a number of USB-standard descriptors, some
  * devices also use class-specific or vendor-specific descriptors.
  *
@@ -610,6 +610,7 @@ int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char 
 /**
  * usb_get_device_descriptor - (re)reads the device descriptor
  * @dev: the device whose device descriptor is being updated
+ * @size: how much of the descriptor to read
  * Context: !in_interrupt ()
  *
  * Updates the copy of the device descriptor stored in the device structure,
@@ -618,24 +619,35 @@ int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char 
  * vendors product and version fields (idVendor, idProduct, and bcdDevice).
  * That lets device drivers compare against non-byteswapped constants.
  *
- * There's normally no need to use this call, although some devices
- * will change their descriptors after events like updating firmware.
+ * Not exported, only for use by the core.  If drivers really want to read
+ * the device descriptor directly, they can call usb_get_descriptor() with
+ * type = USB_DT_DEVICE and index = 0.
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
  * Returns the number of bytes received on success, or else the status code
  * returned by the underlying usb_control_msg() call.
  */
-int usb_get_device_descriptor(struct usb_device *dev)
+int usb_get_device_descriptor(struct usb_device *dev, unsigned int size)
 {
-	int ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &dev->descriptor,
-				     sizeof(dev->descriptor));
+	struct usb_device_descriptor *desc;
+	int ret;
+
+	if (size > sizeof(*desc))
+		return -EINVAL;
+	desc = kmalloc(sizeof(*desc), GFP_NOIO);
+	if (!desc)
+		return -ENOMEM;
+
+	ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, desc, size);
 	if (ret >= 0) {
-		le16_to_cpus(&dev->descriptor.bcdUSB);
-		le16_to_cpus(&dev->descriptor.idVendor);
-		le16_to_cpus(&dev->descriptor.idProduct);
-		le16_to_cpus(&dev->descriptor.bcdDevice);
+		le16_to_cpus(&desc->bcdUSB);
+		le16_to_cpus(&desc->idVendor);
+		le16_to_cpus(&desc->idProduct);
+		le16_to_cpus(&desc->bcdDevice);
+		memcpy(&dev->descriptor, desc, size);
 	}
+	kfree(desc);
 	return ret;
 }
 
@@ -1241,7 +1253,6 @@ EXPORT_SYMBOL(usb_sg_wait);
 
 // synchronous control message convenience routines
 EXPORT_SYMBOL(usb_get_descriptor);
-EXPORT_SYMBOL(usb_get_device_descriptor);
 EXPORT_SYMBOL(usb_get_status);
 EXPORT_SYMBOL(usb_get_string);
 EXPORT_SYMBOL(usb_string);

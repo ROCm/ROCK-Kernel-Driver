@@ -115,6 +115,13 @@ UNUSUAL_DEV(  0x04a4, 0x0004, 0x0001, 0x0001,
 		"DVD-CAM DZ-MV100A Camcorder",
 		US_SC_SCSI, US_PR_CB, NULL, US_FL_SINGLE_LUN),
 
+/* Reported by Simon Levitt <simon@whattf.com>
+ * This entry needs Sub and Proto fields */
+UNUSUAL_DEV(  0x04b8, 0x0601, 0x0100, 0x0100,
+		"Epson",
+		"875DC Storage",
+		US_SC_SCSI, US_PR_CB, NULL, US_FL_FIX_INQUIRY),
+
 /* Reported by Khalid Aziz <khalid@gonehiking.org>
  * This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x04b8, 0x0602, 0x0110, 0x0110,
@@ -481,11 +488,6 @@ UNUSUAL_DEV(  0x0781, 0x0200, 0x0000, 0x9999,
 UNUSUAL_DEV(  0x07ab, 0xfc01, 0x0000, 0x9999,
 		"Freecom",
 		"USB-IDE",
-		US_SC_QIC, US_PR_FREECOM, freecom_init, 0),
-
-UNUSUAL_DEV(  0x07ab, 0xfc84, 0x0000, 0x9999,
-		"Freecom",
-		"FX-5/FX-50",
 		US_SC_QIC, US_PR_FREECOM, freecom_init, 0),
 #endif
 
