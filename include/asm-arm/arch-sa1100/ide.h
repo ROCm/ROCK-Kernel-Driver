@@ -49,8 +49,9 @@ ide_init_hwif_ports(hw_regs_t *hw, int data_port, int ctrl_port, int *irq)
 		*irq = 0;
 }
 
-
-
+#ifdef CONFIG_SA1100_TRIZEPS
+#include <asm/arch/trizeps.h>
+#endif
 
 /*
  * This registers the standard ports for this architecture with the IDE
@@ -124,6 +125,23 @@ ide_init_default_hwifs(void)
         ide_register_hw(&hw);
 #endif
     }
+    else if( machine_is_trizeps() ){
+#ifdef CONFIG_SA1100_TRIZEPS
+	hw_regs_t hw;
+
+	/* Enable appropriate GPIOs as interrupt lines */
+	GPDR &= ~GPIO_GPIO(TRIZEPS_IRQ_IDE);
+	set_irq_type( TRIZEPS_IRQ_IDE, IRQT_RISING );
+
+	/* set the pcmcia interface timing */
+	//MECR = 0x00060006; // Done on trizeps init
+
+	/* Take hard drives out of reset */
+	GPSR = GPIO_GPIO(TRIZEPS_IRQ_IDE);
+
+	ide_init_hwif_ports(&hw, TRIZEPS_IDE_CS0 + 0, TRIZEPS_IDE_CS1 + 6, NULL);
+	hw.irq = TRIZEPS_IRQ_IDE;
+	ide_register_hw(&hw, NULL);
+#endif
+    }
 }
-
-
