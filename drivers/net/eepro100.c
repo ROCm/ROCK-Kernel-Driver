@@ -1074,6 +1074,51 @@ static void speedo_resume(struct net_device *dev)
 	outw(CUStart | SCBMaskEarlyRx | SCBMaskFlowCtl, ioaddr + SCBCmd);
 }
 
+/*
+ * Sometimes the receiver stops making progress.  This routine knows how to
+ * get it going again, without losing packets or being otherwise nasty like
+ * a chip reset would be.  Previously the driver had a whole sequence
+ * of if RxSuspended, if it's no buffers do one thing, if it's no resources,
+ * do another, etc.  But those things don't really matter.  Separate logic
+ * in the ISR provides for allocating buffers--the other half of operation
+ * is just making sure the receiver is active.  speedo_rx_soft_reset does that.
+ * This problem with the old, more involved algorithm is shown up under
+ * ping floods on the order of 60K packets/second on a 100Mbps fdx network.
+ */
+static void
+speedo_rx_soft_reset(struct net_device *dev)
+{
+	struct speedo_private *sp = dev->priv;
+	struct RxFD *rfd;
+	long ioaddr;
+
+	ioaddr = dev->base_addr;
+	wait_for_cmd_done(ioaddr + SCBCmd);
+	if (inb(ioaddr + SCBCmd) != 0) {
+		printk("%s: previous command stalled\n", dev->name);
+		return;
+	}
+	/*
+	* Put the hardware into a known state.
+	*/
+	outb(RxAbort, ioaddr + SCBCmd);
+
+	rfd = sp->rx_ringp[sp->cur_rx % RX_RING_SIZE];
+
+	rfd->rx_buf_addr = 0xffffffff;
+
+	wait_for_cmd_done(ioaddr + SCBCmd);
+
+	if (inb(ioaddr + SCBCmd) != 0) {
+		printk("%s: RxAbort command stalled\n", dev->name);
+		return;
+	}
+	outl(sp->rx_ring_dma[sp->cur_rx % RX_RING_SIZE],
+		ioaddr + SCBPointer);
+	outb(RxStart, ioaddr + SCBCmd);
+}
+
+
 /* Media monitoring and control. */
 static void speedo_timer(unsigned long data)
 {
