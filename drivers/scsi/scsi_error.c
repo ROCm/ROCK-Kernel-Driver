@@ -23,6 +23,7 @@
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
 #include <linux/smp_lock.h>
+#include <linux/delay.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_dbg.h>
@@ -42,8 +43,8 @@
  * These should *probably* be handled by the host itself.
  * Since it is allowed to sleep, it probably should.
  */
-#define BUS_RESET_SETTLE_TIME   (10*HZ)
-#define HOST_RESET_SETTLE_TIME  (10*HZ)
+#define BUS_RESET_SETTLE_TIME   (10)
+#define HOST_RESET_SETTLE_TIME  (10)
 
 /* called with shost->host_lock held */
 void scsi_eh_wakeup(struct Scsi_Host *shost)
@@ -1044,7 +1045,7 @@ static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		if (!scmd->device->host->hostt->skip_settle_delay)
-			scsi_sleep(BUS_RESET_SETTLE_TIME);
+			ssleep(BUS_RESET_SETTLE_TIME);
 		spin_lock_irqsave(scmd->device->host->host_lock, flags);
 		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 		spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
@@ -1076,7 +1077,7 @@ static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		if (!scmd->device->host->hostt->skip_settle_delay)
-			scsi_sleep(HOST_RESET_SETTLE_TIME);
+			ssleep(HOST_RESET_SETTLE_TIME);
 		spin_lock_irqsave(scmd->device->host->host_lock, flags);
 		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 		spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
@@ -1213,43 +1214,6 @@ static void scsi_eh_offline_sdevs(struct list_head *work_q,
 		scsi_eh_finish_cmd(scmd, done_q);
 	}
 	return;
-}
-
-/**
- * scsi_sleep_done - timer function for scsi_sleep
- * @sem:	semphore to signal
- *
- **/
-static void scsi_sleep_done(unsigned long data)
-{
-	struct semaphore *sem = (struct semaphore *)data;
-
-	if (sem)
-		up(sem);
-}
-
-/**
- * scsi_sleep - sleep for specified timeout
- * @timeout:	timeout value
- *
- **/
-void scsi_sleep(int timeout)
-{
-	DECLARE_MUTEX_LOCKED(sem);
-	struct timer_list timer;
-
-	init_timer(&timer);
-	timer.data = (unsigned long)&sem;
-	timer.expires = jiffies + timeout;
-	timer.function = (void (*)(unsigned long))scsi_sleep_done;
-
-	SCSI_LOG_ERROR_RECOVERY(5, printk("sleeping for timer tics %d\n",
-					  timeout));
-
-	add_timer(&timer);
-
-	down(&sem);
-	del_timer(&timer);
 }
 
 /**

@@ -69,8 +69,6 @@ EXPORT_SYMBOL(scsi_track_queue_full);
 EXPORT_SYMBOL(scsi_get_host_dev);
 EXPORT_SYMBOL(scsi_free_host_dev);
 
-EXPORT_SYMBOL(scsi_sleep);
-
 EXPORT_SYMBOL(scsi_io_completion);
 
 EXPORT_SYMBOL(scsi_add_device);

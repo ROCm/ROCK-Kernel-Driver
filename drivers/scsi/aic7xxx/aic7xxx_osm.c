@@ -140,6 +140,7 @@
 
 #include <linux/mm.h>		/* For fetching system memory size */
 #include <linux/blkdev.h>		/* For block_size() */
+#include <linux/delay.h>	/* For ssleep/msleep */
 
 /*
  * Lock protecting manipulation of the ahc softc list.
@@ -2822,7 +2823,7 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 				break;
 			}
 			if (status & SSQ_DELAY)
-				scsi_sleep(1 * HZ);
+				ssleep(1);
 
 			break;
 		case SS_START:
@@ -2982,7 +2983,7 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			}
 			if (targ->dv_state_retry <= 10) {
 				if ((status & (SSQ_DELAY_RANDOM|SSQ_DELAY))!= 0)
-					scsi_sleep(ahc->our_id*HZ/10);
+					msleep(ahc->our_id*1000/10);
 				break;
 			}
 #ifdef AHC_DEBUG
@@ -3026,7 +3027,7 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 				targ->dv_state_retry--;
 			} else if (targ->dv_state_retry < 60) {
 				if ((status & SSQ_DELAY) != 0)
-					scsi_sleep(1 * HZ);
+					ssleep(1);
 			} else {
 #ifdef AHC_DEBUG
 				if (ahc_debug & AHC_SHOW_DV) {

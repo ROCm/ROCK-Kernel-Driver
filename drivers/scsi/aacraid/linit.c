@@ -44,6 +44,7 @@
 #include <linux/spinlock.h>
 #include <linux/syscalls.h>
 #include <linux/ioctl32.h>
+#include <linux/delay.h>
 #include <asm/semaphore.h>
 
 #include <scsi/scsi.h>
@@ -430,7 +431,7 @@ static int aac_eh_reset(struct scsi_cmnd* cmd)
 		if (active == 0)
 			return SUCCESS;
 		spin_unlock_irq(host->host_lock);
-		scsi_sleep(HZ);
+		ssleep(1);
 		spin_lock_irq(host->host_lock);
 	}
 	printk(KERN_ERR "%s: SCSI bus appears hung\n", AAC_DRIVERNAME);

@@ -7,6 +7,7 @@
 #include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h>
+#include <linux/delay.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -131,7 +132,7 @@ int sr_do_ioctl(Scsi_CD *cd, struct packet_command *cgc)
 					printk(KERN_INFO "%s: CDROM not ready yet.\n", cd->cdi.name);
 				if (retries++ < 10) {
 					/* sleep 2 sec and try again */
-					scsi_sleep(2 * HZ);
+					ssleep(2);
 					goto retry;
 				} else {
 					/* 20 secs are enough? */

@@ -47,8 +47,9 @@ static int sg_version_num = 30531;	/* 2 digits for each component */
 #include <linux/devfs_fs_kernel.h>
 #include <linux/cdev.h>
 #include <linux/seq_file.h>
-
 #include <linux/blkdev.h>
+#include <linux/delay.h>
+
 #include "scsi.h"
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_driver.h>
@@ -1533,7 +1534,7 @@ sg_remove(struct class_device *cl_dev)
 	}
 
 	if (delay)
-		scsi_sleep(2);	/* dirty detach so delay device destruction */
+		msleep(10);	/* dirty detach so delay device destruction */
 }
 
 /* Set 'perm' (4th argument) to 0 to disable module_param's definition

@@ -61,6 +61,7 @@
 #endif
 
 #include <linux/mm.h>		/* For fetching system memory size */
+#include <linux/delay.h>	/* For ssleep/msleep */
 
 /*
  * Lock protecting manipulation of the ahd softc list.
@@ -3160,7 +3161,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 				break;
 			}
 			if (status & SSQ_DELAY)
-				scsi_sleep(1 * HZ);
+				ssleep(1);
 
 			break;
 		case SS_START:
@@ -3320,7 +3321,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 			}
 			if (targ->dv_state_retry <= 10) {
 				if ((status & (SSQ_DELAY_RANDOM|SSQ_DELAY))!= 0)
-					scsi_sleep(ahd->our_id*HZ/10);
+					msleep(ahd->our_id*1000/10);
 				break;
 			}
 #ifdef AHD_DEBUG
@@ -3364,7 +3365,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 				targ->dv_state_retry--;
 			} else if (targ->dv_state_retry < 60) {
 				if ((status & SSQ_DELAY) != 0)
-					scsi_sleep(1 * HZ);
+					ssleep(1);
 			} else {
 #ifdef AHD_DEBUG
 				if (ahd_debug & AHD_SHOW_DV) {

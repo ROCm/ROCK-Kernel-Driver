@@ -10489,7 +10489,7 @@ aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
       aic_outb(p, lastphase | ATNO, SCSISIGO);
       unpause_sequencer(p, FALSE);
       spin_unlock_irq(p->host->host_lock);
-      scsi_sleep(HZ);
+      ssleep(1);
       spin_lock_irq(p->host->host_lock);
       if(aic_dev->flags & BUS_DEVICE_RESET_PENDING)
         return FAILED;
@@ -10548,7 +10548,7 @@ aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
   aic_outb(p, saved_scbptr, SCBPTR);
   unpause_sequencer(p, FALSE);
   spin_unlock_irq(p->host->host_lock);
-  scsi_sleep(HZ/4);
+  msleep(1000/4);
   spin_lock_irq(p->host->host_lock);
   if(aic_dev->flags & BUS_DEVICE_RESET_PENDING)
     return FAILED;
@@ -10786,7 +10786,7 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
   }
   unpause_sequencer(p, FALSE);
   spin_unlock_irq(p->host->host_lock);
-  scsi_sleep(HZ/4);
+  msleep(1000/4);
   spin_lock_irq(p->host->host_lock);
   if (p->flags & AHC_ABORT_PENDING)
   {
@@ -10887,7 +10887,7 @@ aic7xxx_reset(Scsi_Cmnd *cmd)
   aic7xxx_run_done_queue(p, TRUE);
   unpause_sequencer(p, FALSE);
   spin_unlock_irq(p->host->host_lock);
-  scsi_sleep(2 * HZ);
+  ssleep(2);
   spin_lock_irq(p->host->host_lock);
   return SUCCESS;
 }
