@@ -292,8 +292,9 @@ loader_ok:
 	/* minimum CPUID flags for x86-64 */
 	/* see http://www.x86-64.org/lists/discuss/msg02971.html */		
 #define SSE_MASK ((1<<25)|(1<<26))
-#define REQUIRED_MASK1 ((1<<0)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<8)|(1<<11)| \
-					   (1<<13)|(1<<15)|(1<<24)|(1<<29))
+#define REQUIRED_MASK1 ((1<<0)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<8)|\
+					   (1<<13)|(1<<15)|(1<<24))
+#define REQUIRED_MASK2 (1<<29)
 
 	pushfl				/* standard way to check for cpuid */
 	popl	%eax
@@ -305,10 +306,10 @@ loader_ok:
 	popl	%eax
 	cmpl	%eax,%ebx
 	jz	no_longmode		/* cpu has no cpuid */
-	movl	$0x80000000,%eax
+	movl	$0x0,%eax
 	cpuid
-	cmpl	$0x80000001,%eax
-	jb	no_longmode		/* no extended cpuid */
+	cmpl	$0x1,%eax
+	jb	no_longmode		/* no cpuid 1 */
 	xor	%di,%di
 	cmpl	$0x68747541,%ebx	/* AuthenticAMD */
 	jnz	noamd
@@ -318,11 +319,20 @@ loader_ok:
 	jnz	noamd
 	mov	$1,%di			/* cpu is from AMD */
 noamd:		
-	movl	$0x80000001,%eax		
+	movl    $0x1,%eax
 	cpuid
 	andl	$REQUIRED_MASK1,%edx
 	xorl	$REQUIRED_MASK1,%edx
 	jnz	no_longmode
+	movl    $0x80000000,%eax
+	cpuid
+	cmpl    $0x80000001,%eax
+	jb      no_longmode             /* no extended cpuid */
+	movl    $0x80000001,%eax
+	cpuid
+	andl    $REQUIRED_MASK2,%edx
+	xorl    $REQUIRED_MASK2,%edx
+	jnz     no_longmode
 sse_test:		
 	movl	$1,%eax
 	cpuid
