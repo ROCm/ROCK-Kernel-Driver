@@ -77,3 +77,8 @@
 		VMLINUX_SYMBOL(__sched_text_start) = .;			\
 		*(.sched.text)						\
 		VMLINUX_SYMBOL(__sched_text_end) = .;
+
+#define LOCK_TEXT							\
+		VMLINUX_SYMBOL(__lock_text_start) = .;			\
+		*(.lock.text)						\
+		VMLINUX_SYMBOL(__lock_text_end) = .;
