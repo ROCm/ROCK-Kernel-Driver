@@ -1,4 +1,6 @@
 /*
+    $Id: bttvp.h,v 1.10 2004/10/06 17:30:51 kraxel Exp $
+
     bttv - Bt848 frame grabber driver
 
     bttv's *private* header file  --  nobody other than bttv itself
@@ -127,8 +129,8 @@ struct bttv_buffer {
 struct bttv_buffer_set {
 	struct bttv_buffer     *top;       /* top field buffer    */
 	struct bttv_buffer     *bottom;    /* bottom field buffer */
-	unsigned int           irqflags;
-	unsigned int           topirq;
+	unsigned int           top_irq;
+	unsigned int           frame_irq;
 };
 
 struct bttv_overlay {
@@ -189,7 +191,7 @@ void bttv_calc_geo(struct bttv *btv, struct bttv_geometry *geo,
 void bttv_apply_geo(struct bttv *btv, struct bttv_geometry *geo, int top);
 
 /* control dma register + risc main loop */
-void bttv_set_dma(struct bttv *btv, int override, int irqflags);
+void bttv_set_dma(struct bttv *btv, int override);
 int bttv_risc_init_main(struct bttv *btv);
 int bttv_risc_hook(struct bttv *btv, int slot, struct btcx_riscmem *risc,
 		   int irqflags);
@@ -280,6 +282,7 @@ struct bttv_suspend_state {
 	u32  gpio_enable;
 	u32  gpio_data;
 	int  disabled;
+	int  loop_irq;
 	struct bttv_buffer_set video;
 	struct bttv_buffer     *vbi;
 };
@@ -380,6 +383,7 @@ struct bttv {
 	struct list_head        vcapture;   /* vbi capture queue   */
 	struct bttv_buffer_set  curr;       /* active buffers      */
 	struct bttv_buffer      *cvbi;      /* active vbi buffer   */
+	int                     loop_irq;
 	int                     new_input;
 
 	unsigned long cap_ctl;

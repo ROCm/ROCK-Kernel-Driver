@@ -441,6 +441,7 @@ request_firmware(const struct firmware **firmware_p, const char *name,
 
 error_kfree_fw:
 	kfree(firmware);
+	*firmware_p = NULL;
 out:
 	return retval;
 }

@@ -18,6 +18,7 @@
 #include <linux/irq.h>
 #include <linux/mmzone.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 
 #include <asm/processor.h>
 #include <asm/irq.h>
@@ -28,7 +29,6 @@
 #include <asm/smp.h>
 #include <asm/tlb.h>
 #include <asm/numa.h>
-#include <asm/bitops.h>
 #include <asm/hw_irq.h>
 #include <asm/current.h>
 #include <asm/sn/sn_cpuid.h>

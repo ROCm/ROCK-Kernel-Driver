@@ -40,8 +40,6 @@
 
 #include "dvb_demux.h"
 #include "dvb_net.h"
-#include "dvb_functions.h"
-
 
 static inline __u32 iov_crc32( __u32 c, struct kvec *iov, unsigned int cnt )
 {

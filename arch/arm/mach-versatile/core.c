@@ -808,10 +808,14 @@ static irqreturn_t versatile_timer_interrupt(int irq, void *dev_id, struct pt_re
 {
 	volatile TimerStruct_t *timer0 = (volatile TimerStruct_t *)TIMER0_VA_BASE;
 
+	write_seqlock(&xtime_lock);
+
 	// ...clear the interrupt
 	timer0->TimerClear = 1;
 
 	timer_tick(regs);
+
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }

@@ -207,9 +207,9 @@
 #include <linux/netdevice.h>
 #include <linux/fddidevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
 #include <asm/byteorder.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 
 #include "defxx.h"

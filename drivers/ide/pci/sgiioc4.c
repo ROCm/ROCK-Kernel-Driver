@@ -404,11 +404,7 @@ ide_dma_sgiioc4(ide_hwif_t * hwif, unsigned long dma_base)
 	if (!hwif->dmatable_cpu)
 		goto dma_alloc_failure;
 
-	hwif->sg_table =
-	    kmalloc(sizeof (struct scatterlist) * IOC4_PRD_ENTRIES, GFP_KERNEL);
-
-	if (!hwif->sg_table)
-		goto dma_sgalloc_failure;
+	hwif->sg_max_nents = IOC4_PRD_ENTRIES;
 
 	hwif->dma_base2 = (unsigned long)
 		pci_alloc_consistent(hwif->pci_dev,
@@ -421,9 +417,6 @@ ide_dma_sgiioc4(ide_hwif_t * hwif, unsigned long dma_base)
 	return;
 
 dma_base2alloc_failure:
-	kfree(hwif->sg_table);
-
-dma_sgalloc_failure:
 	pci_free_consistent(hwif->pci_dev,
 			    IOC4_PRD_ENTRIES * IOC4_PRD_BYTES,
 			    hwif->dmatable_cpu, hwif->dmatable_dma);
@@ -584,6 +577,7 @@ static int sgiioc4_ide_dma_setup(ide_drive_t *drive)
 
 	if (!(count = sgiioc4_build_dma_table(drive, rq, ddir))) {
 		/* try PIO instead of DMA */
+		ide_map_sg(drive, rq);
 		return 1;
 	}
 

@@ -70,7 +70,7 @@ static int __init topology_init(void)
 	memset(sysfs_cpus, 0, sizeof(struct cpu) * NR_CPUS);
 
 	for (i = 0; i < numnodes; i++)
-		if ((err = register_node(&sysfs_nodes[i], i, 0)))
+		if ((err = register_node(&sysfs_nodes[i], i, NULL)))
 			goto out;
 
 	for (i = 0; i < NR_CPUS; i++)

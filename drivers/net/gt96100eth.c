@@ -44,9 +44,9 @@
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/ctype.h>
+#include <linux/bitops.h>
 
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 
 #define DESC_BE 1

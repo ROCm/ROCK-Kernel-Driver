@@ -68,8 +68,9 @@ void __init ioctime_init(void)
 static irqreturn_t
 ioc_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
 	timer_tick(regs);
-
+	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
 }
 

@@ -2721,7 +2721,7 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 	host->io_port   = data->BaseAddress;
 	host->unique_id = data->BaseAddress;
 	host->n_io_port	= data->NumAddress;
-	host->base      = data->MmioAddress;
+	host->base      = (unsigned long)data->MmioAddress;
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,63))
 	scsi_set_device(host, &PCIDEV->dev);
 #else
@@ -2939,8 +2939,8 @@ static int nsp32_release(struct Scsi_Host *host)
 		release_region(host->io_port, host->n_io_port);
 	}
 
-	if (data->MmioAddress != 0) {
-		iounmap((void *)(data->MmioAddress));
+	if (data->MmioAddress) {
+		iounmap(data->MmioAddress);
 	}
 
 	return 0;
@@ -3512,8 +3512,7 @@ static int __devinit nsp32_probe(struct pci_dev *pdev, const struct pci_device_i
 	data->IrqNumber   = pdev->irq;
 	data->BaseAddress = pci_resource_start(pdev, 0);
 	data->NumAddress  = pci_resource_len  (pdev, 0);
-	data->MmioAddress = 
-		(unsigned long)ioremap_nocache(pci_resource_start(pdev, 1),
+	data->MmioAddress = ioremap_nocache(pci_resource_start(pdev, 1),
 					       pci_resource_len  (pdev, 1));
 	data->MmioLength  = pci_resource_len  (pdev, 1);
 
@@ -3525,7 +3524,7 @@ static int __devinit nsp32_probe(struct pci_dev *pdev, const struct pci_device_i
 	ret = scsi_register_host(&nsp32_template);
 #endif
 
-	nsp32_msg(KERN_INFO, "irq: %i mmio: 0x%lx+0x%lx slot: %s model: %s",
+	nsp32_msg(KERN_INFO, "irq: %i mmio: %p+0x%lx slot: %s model: %s",
 		  pdev->irq,
 		  data->MmioAddress, data->MmioLength,
 		  pci_name(pdev),

@@ -282,7 +282,7 @@ do {									\
 /*
  * Enable FIQs
  */
-#define __stf()							\
+#define local_fiq_enable()					\
 	({							\
 		unsigned long temp;				\
 	__asm__ __volatile__(					\
@@ -297,7 +297,7 @@ do {									\
 /*
  * Disable FIQs
  */
-#define __clf()							\
+#define local_fiq_disable()					\
 	({							\
 		unsigned long temp;				\
 	__asm__ __volatile__(					\
@@ -331,6 +331,13 @@ do {									\
 	: "r" (x)						\
 	: "memory", "cc")
 
+#define irqs_disabled()			\
+({					\
+	unsigned long flags;		\
+	local_save_flags(flags);	\
+	flags & PSR_I_BIT;		\
+})
+
 #ifdef CONFIG_SMP
 #error SMP not supported
 
@@ -345,16 +352,6 @@ do {									\
 #define smp_rmb()		barrier()
 #define smp_wmb()		barrier()
 #define smp_read_barrier_depends()		do { } while(0)
-
-#define clf()			__clf()
-#define stf()			__stf()
-
-#define irqs_disabled()			\
-({					\
-	unsigned long flags;		\
-	local_save_flags(flags);	\
-	flags & PSR_I_BIT;		\
-})
 
 #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
 /*

@@ -91,7 +91,7 @@
 #include <linux/pci.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/spinlock.h>
 #include <asm/semaphore.h>
 #include <linux/init.h>

@@ -85,9 +85,9 @@ static int full_duplex[MAX_UNITS] = { -1, -1, -1, -1, -1, -1, -1, -1 };
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
 #include <asm/processor.h>	/* Processor type for cache alignment. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 

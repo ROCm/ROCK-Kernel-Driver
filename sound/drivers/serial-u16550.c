@@ -76,30 +76,29 @@ static int outs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};	 /* 1 to 16 */
 static int ins[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};	/* 1 to 16 */
 static int adaptor[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = SNDRV_SERIAL_SOUNDCANVAS};
 static int droponfull[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS -1)] = SNDRV_SERIAL_NORMALBUFF };
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for Serial MIDI.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for Serial MIDI.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable UART16550A chip.");
-module_param_array(port, long, boot_devs, 0444);
+module_param_array(port, long, NULL, 0444);
 MODULE_PARM_DESC(port, "Port # for UART16550A chip.");
-module_param_array(irq, int, boot_devs, 0444);
+module_param_array(irq, int, NULL, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for UART16550A chip.");
-module_param_array(speed, int, boot_devs, 0444);
+module_param_array(speed, int, NULL, 0444);
 MODULE_PARM_DESC(speed, "Speed in bauds.");
-module_param_array(base, int, boot_devs, 0444);
+module_param_array(base, int, NULL, 0444);
 MODULE_PARM_DESC(base, "Base for divisor in bauds.");
-module_param_array(outs, int, boot_devs, 0444);
+module_param_array(outs, int, NULL, 0444);
 MODULE_PARM_DESC(outs, "Number of MIDI outputs.");
-module_param_array(ins, int, boot_devs, 0444);
+module_param_array(ins, int, NULL, 0444);
 MODULE_PARM_DESC(ins, "Number of MIDI inputs.");
-module_param_array(droponfull, bool, boot_devs, 0444);
+module_param_array(droponfull, bool, NULL, 0444);
 MODULE_PARM_DESC(droponfull, "Flag to enable drop-on-full buffer mode");
 
-module_param_array(adaptor, int, boot_devs, 0444);
+module_param_array(adaptor, int, NULL, 0444);
 MODULE_PARM_DESC(adaptor, "Type of adaptor.");
 
 /*#define SNDRV_SERIAL_MS124W_MB_NOCOMBO 1*/  /* Address outs as 0-3 instead of bitmap */

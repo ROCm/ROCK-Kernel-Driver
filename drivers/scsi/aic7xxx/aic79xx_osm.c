@@ -2267,11 +2267,7 @@ ahd_platform_free(struct ahd_softc *ahd)
 			release_region(ahd->bshs[1].ioport, 256);
 		if (ahd->tags[0] == BUS_SPACE_MEMIO
 		 && ahd->bshs[0].maddr != NULL) {
-			u_long base_addr;
-
-			base_addr = (u_long)ahd->bshs[0].maddr;
-			base_addr &= PAGE_MASK;
-			iounmap((void *)base_addr);
+			iounmap(ahd->bshs[0].maddr);
 			release_mem_region(ahd->platform_data->mem_busaddr,
 					   0x1000);
 		}

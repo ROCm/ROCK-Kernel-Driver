@@ -173,6 +173,7 @@
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/bitops.h>
 
 #include <net/ax25.h>
 
@@ -180,7 +181,6 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #include "z8530.h"
 

@@ -49,7 +49,7 @@ static int	ahd_linux_pci_reserve_io_regions(struct ahd_softc *ahd,
 						 u_long *base, u_long *base2);
 static int	ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
 						 u_long *bus_addr,
-						 uint8_t **maddr);
+						 uint8_t __iomem **maddr);
 static void	ahd_linux_pci_dev_remove(struct pci_dev *pdev);
 
 /* Define the macro locally since it's different for different class of chips.
@@ -245,7 +245,7 @@ ahd_linux_pci_reserve_io_regions(struct ahd_softc *ahd, u_long *base,
 static int
 ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
 				 u_long *bus_addr,
-				 uint8_t **maddr)
+				 uint8_t __iomem **maddr)
 {
 	u_long	start;
 	u_long	base_page;
@@ -284,7 +284,7 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 {
 	uint32_t command;
 	u_long	 base;
-	uint8_t	*maddr;
+	uint8_t	__iomem *maddr;
 	int	 error;
 
 	/*
@@ -311,7 +311,7 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 			       ahd_get_pci_bus(ahd->dev_softc),
 			       ahd_get_pci_slot(ahd->dev_softc),
 			       ahd_get_pci_function(ahd->dev_softc));
-			iounmap((void *)((u_long)maddr & PAGE_MASK));
+			iounmap(maddr);
 			release_mem_region(ahd->platform_data->mem_busaddr,
 					   0x1000);
 			ahd->bshs[0].maddr = NULL;

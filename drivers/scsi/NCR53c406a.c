@@ -46,9 +46,9 @@
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-#include <asm/bitops.h>
 #include <asm/irq.h>
 
 #include <linux/blkdev.h>

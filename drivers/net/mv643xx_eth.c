@@ -49,7 +49,7 @@
 #include <linux/etherdevice.h>
 #include <net/ip.h>
 
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/types.h>
 #include <asm/pgtable.h>

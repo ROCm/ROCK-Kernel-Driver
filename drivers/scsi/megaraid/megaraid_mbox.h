@@ -231,7 +231,7 @@ typedef struct {
 	dma_addr_t			mbox_dma;
 	spinlock_t			mailbox_lock;
 	unsigned long			baseport;
-	unsigned long			baseaddr;
+	void __iomem *			baseaddr;
 	struct mraid_pci_blk		mbox_pool[MBOX_MAX_SCSI_CMDS];
 	struct dma_pool			*mbox_pool_handle;
 	struct mraid_pci_blk		epthru_pool[MBOX_MAX_SCSI_CMDS];

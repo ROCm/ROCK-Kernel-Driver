@@ -53,11 +53,11 @@
 #include <linux/slab.h>
 #include <linux/adb.h>
 #include <linux/pmu.h>
+#include <linux/bitops.h>
 #include <asm/sections.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/prom.h>
-#include <asm/bitops.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
 #include <asm/dbdma.h>

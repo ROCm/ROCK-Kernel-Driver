@@ -32,9 +32,9 @@
 #include <linux/skbuff.h>
 /* Used for the temporal inet entries and routing */
 #include <linux/socket.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/pgtable.h>

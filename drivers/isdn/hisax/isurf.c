@@ -126,7 +126,7 @@ void
 release_io_isurf(struct IsdnCardState *cs)
 {
 	release_region(cs->hw.isurf.reset, 1);
-	iounmap((unsigned char *)cs->hw.isurf.isar);
+	iounmap(cs->hw.isurf.isar);
 	release_mem_region(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE);
 }
 
@@ -272,8 +272,7 @@ setup_isurf(struct IsdnCard *card)
 		release_region(cs->hw.isurf.reset, 1);
 		return (0);
 	}
-	cs->hw.isurf.isar =
-		(unsigned long) ioremap(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE);
+	cs->hw.isurf.isar = ioremap(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE);
 	cs->hw.isurf.isac = cs->hw.isurf.isar + ISURF_ISAC_OFFSET;
 	printk(KERN_INFO
 	       "ISurf: defined at 0x%x 0x%lx IRQ %d\n",

@@ -71,7 +71,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/genhd.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 
 int devfs_register_tape(const char *name)
 {

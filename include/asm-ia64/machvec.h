@@ -62,14 +62,14 @@ typedef unsigned int ia64_mv_inl_t (unsigned long);
 typedef void ia64_mv_outb_t (unsigned char, unsigned long);
 typedef void ia64_mv_outw_t (unsigned short, unsigned long);
 typedef void ia64_mv_outl_t (unsigned int, unsigned long);
-typedef unsigned char ia64_mv_readb_t (void *);
-typedef unsigned short ia64_mv_readw_t (void *);
-typedef unsigned int ia64_mv_readl_t (void *);
-typedef unsigned long ia64_mv_readq_t (void *);
-typedef unsigned char ia64_mv_readb_relaxed_t (void *);
-typedef unsigned short ia64_mv_readw_relaxed_t (void *);
-typedef unsigned int ia64_mv_readl_relaxed_t (void *);
-typedef unsigned long ia64_mv_readq_relaxed_t (void *);
+typedef unsigned char ia64_mv_readb_t (const volatile void __iomem *);
+typedef unsigned short ia64_mv_readw_t (const volatile void __iomem *);
+typedef unsigned int ia64_mv_readl_t (const volatile void __iomem *);
+typedef unsigned long ia64_mv_readq_t (const volatile void __iomem *);
+typedef unsigned char ia64_mv_readb_relaxed_t (const volatile void __iomem *);
+typedef unsigned short ia64_mv_readw_relaxed_t (const volatile void __iomem *);
+typedef unsigned int ia64_mv_readl_relaxed_t (const volatile void __iomem *);
+typedef unsigned long ia64_mv_readq_relaxed_t (const volatile void __iomem *);
 
 static inline void
 machvec_noop (void)

@@ -463,9 +463,9 @@ static int sound_mmap(struct file *file, struct vm_area_struct *vma)
 	if (size != dmap->bytes_in_use) {
 		printk(KERN_WARNING "Sound: mmap() size = %ld. Should be %d\n", size, dmap->bytes_in_use);
 	}
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(dmap->raw_buf),
-		vma->vm_end - vma->vm_start,
-		vma->vm_page_prot)) {
+	if (remap_pfn_range(vma, vma->vm_start,
+			virt_to_phys(dmap->raw_buf) >> PAGE_SHIFT,
+			vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
 		unlock_kernel();
 		return -EAGAIN;
 	}

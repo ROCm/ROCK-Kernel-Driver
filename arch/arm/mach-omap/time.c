@@ -177,6 +177,8 @@ omap_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long now, ilatency;
 
+	write_seqlock(&xtime_lock);
+
 	/*
 	 * Mark the time at which the timer interrupt ocurred using
 	 * timer1. We need to remove interrupt latency, which we can
@@ -189,6 +191,8 @@ omap_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	systimer_mark = now - ilatency;
 
 	timer_tick(regs);
+
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }

@@ -42,6 +42,9 @@
 /* Structure describing a CA interface */
 struct dvb_ca_en50221 {
 
+	/* NOTE: the read_*, write_* and poll_slot_status functions must use locks as
+	 * they may be called from several threads at once */
+
 	/* functions for accessing attribute memory on the CAM */
 	int (*read_attribute_mem)(struct dvb_ca_en50221* ca, int slot, int address);
 	int (*write_attribute_mem)(struct dvb_ca_en50221* ca, int slot, int address, u8 value);

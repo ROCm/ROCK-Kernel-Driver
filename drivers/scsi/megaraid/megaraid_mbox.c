@@ -872,8 +872,7 @@ megaraid_init_mbox(adapter_t *adapter)
 		goto out_free_raid_dev;
 	}
 
-	raid_dev->baseaddr = (unsigned long)
-			ioremap_nocache(raid_dev->baseport, 128);
+	raid_dev->baseaddr = ioremap_nocache(raid_dev->baseport, 128);
 
 	if (!raid_dev->baseaddr) {
 
@@ -996,7 +995,7 @@ out_alloc_cmds:
 out_free_irq:
 	free_irq(adapter->irq, adapter);
 out_iounmap:
-	iounmap((caddr_t)raid_dev->baseaddr);
+	iounmap(raid_dev->baseaddr);
 out_release_regions:
 	pci_release_regions(pdev);
 out_free_raid_dev:
@@ -1024,7 +1023,7 @@ megaraid_fini_mbox(adapter_t *adapter)
 
 	free_irq(adapter->irq, adapter);
 
-	iounmap((caddr_t)raid_dev->baseaddr);
+	iounmap(raid_dev->baseaddr);
 
 	pci_release_regions(adapter->pdev);
 

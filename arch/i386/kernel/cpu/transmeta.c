@@ -8,7 +8,7 @@ static void __init init_transmeta(struct cpuinfo_x86 *c)
 {
 	unsigned int cap_mask, uk, max, dummy;
 	unsigned int cms_rev1, cms_rev2;
-	unsigned int cpu_rev, cpu_freq, cpu_flags;
+	unsigned int cpu_rev, cpu_freq, cpu_flags, new_cpu_rev;
 	char cpu_info[65];
 
 	get_model_name(c);	/* Same as AMD/Cyrix */
@@ -16,17 +16,24 @@ static void __init init_transmeta(struct cpuinfo_x86 *c)
 
 	/* Print CMS and CPU revision */
 	max = cpuid_eax(0x80860000);
+	cpu_rev = 0;
 	if ( max >= 0x80860001 ) {
 		cpuid(0x80860001, &dummy, &cpu_rev, &cpu_freq, &cpu_flags); 
-		printk(KERN_INFO "CPU: Processor revision %u.%u.%u.%u, %u MHz\n",
-		       (cpu_rev >> 24) & 0xff,
-		       (cpu_rev >> 16) & 0xff,
-		       (cpu_rev >> 8) & 0xff,
-		       cpu_rev & 0xff,
-		       cpu_freq);
+		if (cpu_rev != 0x02000000) {
+			printk(KERN_INFO "CPU: Processor revision %u.%u.%u.%u, %u MHz\n",
+				(cpu_rev >> 24) & 0xff,
+				(cpu_rev >> 16) & 0xff,
+				(cpu_rev >> 8) & 0xff,
+				cpu_rev & 0xff,
+				cpu_freq);
+		}
 	}
 	if ( max >= 0x80860002 ) {
-		cpuid(0x80860002, &dummy, &cms_rev1, &cms_rev2, &dummy);
+		cpuid(0x80860002, &new_cpu_rev, &cms_rev1, &cms_rev2, &dummy);
+		if (cpu_rev == 0x02000000) {
+			printk(KERN_INFO "CPU: Processor revision %08X, %u MHz\n",
+				new_cpu_rev, cpu_freq);
+		}
 		printk(KERN_INFO "CPU: Code Morphing Software revision %u.%u.%u-%u-%u\n",
 		       (cms_rev1 >> 24) & 0xff,
 		       (cms_rev1 >> 16) & 0xff,

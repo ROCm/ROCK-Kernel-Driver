@@ -29,7 +29,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/devpts_fs.h>
 
 /* These are global because they are accessed in tty_io.c */

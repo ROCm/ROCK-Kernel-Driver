@@ -352,7 +352,7 @@ void __init setup_arch(char **cmdline_p)
 #ifndef CONFIG_SUN3
 	startmem= m68k_memory[0].addr;
 	endmem = startmem + m68k_memory[0].size;
-	high_memory = PAGE_OFFSET;
+	high_memory = (void *)PAGE_OFFSET;
 	for (i = 0; i < m68k_num_memory; i++) {
 		m68k_memory[i].size &= MASK_256K;
 		if (m68k_memory[i].addr < startmem)

@@ -11,11 +11,11 @@
 #include <stddef.h>
 #include <linux/threads.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/naca.h>
 #include <asm/abs_addr.h>
-#include <asm/bitops.h>
 #include <asm/iSeries/ItLpNaca.h>
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpRegSave.h>

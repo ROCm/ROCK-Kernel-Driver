@@ -62,9 +62,14 @@ static int sn_force_interrupt_show(struct seq_file *s, void *p)
 }
 
 static ssize_t sn_force_interrupt_write_proc(struct file *file,
-		const __user char *buffer, size_t count, loff_t *data)
+		const char __user *buffer, size_t count, loff_t *data)
 {
-	sn_force_interrupt_flag = (*buffer == '0') ? 0 : 1;
+	char val;
+
+	if (copy_from_user(&val, buffer, 1))
+		return -EFAULT;
+
+	sn_force_interrupt_flag = (val == '0') ? 0 : 1;
 	return count;
 }
 
@@ -116,7 +121,7 @@ void register_sn_procfs(void)
 	struct proc_dir_entry *e;
 
 	BUG_ON(sgi_proc_dir != NULL);
-	if (!(sgi_proc_dir = proc_mkdir("sgi_sn", 0)))
+	if (!(sgi_proc_dir = proc_mkdir("sgi_sn", NULL)))
 		return;
 
 	sn_procfs_create_entry("partition_id", sgi_proc_dir,

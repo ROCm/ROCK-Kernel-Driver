@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-video.c,v 1.15 2004/10/11 14:53:13 kraxel Exp $
+ *
  * device driver for philips saa7134 based TV cards
  * video4linux video interface
  *
@@ -916,10 +918,10 @@ static int buffer_activate(struct saa7134_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
+static int buffer_prepare(void *priv, struct videobuf_buffer *vb,
 			  enum v4l2_field field)
 {
-	struct saa7134_fh *fh = file->private_data;
+	struct saa7134_fh *fh = priv;
 	struct saa7134_dev *dev = fh->dev;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	unsigned int size;
@@ -978,9 +980,9 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 }
 
 static int
-buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+buffer_setup(void *priv, unsigned int *count, unsigned int *size)
 {
-	struct saa7134_fh *fh = file->private_data;
+	struct saa7134_fh *fh = priv;
 
 	*size = fh->fmt->depth * fh->width * fh->height >> 3;
 	if (0 == *count)
@@ -989,17 +991,17 @@ buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 	return 0;
 }
 
-static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(void *priv, struct videobuf_buffer *vb)
 {
-	struct saa7134_fh *fh = file->private_data;
+	struct saa7134_fh *fh = priv;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	
 	saa7134_buffer_queue(fh->dev,&fh->dev->video_q,buf);
 }
 
-static void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(void *priv, struct videobuf_buffer *vb)
 {
-	struct saa7134_fh *fh = file->private_data;
+	struct saa7134_fh *fh = priv;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	
 	saa7134_dma_free(fh->dev,buf);
@@ -1269,13 +1271,15 @@ video_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 		if (res_locked(fh->dev,RESOURCE_VIDEO))
 			return -EBUSY;
-		return videobuf_read_one(file, saa7134_queue(fh),
-					 data, count, ppos);
+		return videobuf_read_one(file->private_data, saa7134_queue(fh),
+					 data, count, ppos,
+					 file->f_flags & O_NONBLOCK);
 	case V4L2_BUF_TYPE_VBI_CAPTURE:
 		if (!res_get(fh->dev,fh,RESOURCE_VBI))
 			return -EBUSY;
-		return videobuf_read_stream(file, saa7134_queue(fh),
-					    data, count, ppos, 1);
+		return videobuf_read_stream(file->private_data, saa7134_queue(fh),
+					    data, count, ppos, 1,
+					    file->f_flags & O_NONBLOCK);
 		break;
 	default:
 		BUG();
@@ -1290,7 +1294,8 @@ video_poll(struct file *file, struct poll_table_struct *wait)
 	struct videobuf_buffer *buf = NULL;
 
 	if (V4L2_BUF_TYPE_VBI_CAPTURE == fh->type)
-		return videobuf_poll_stream(file, &fh->vbi, wait);
+		return videobuf_poll_stream(file, file->private_data,
+					    &fh->vbi, wait);
 
 	if (res_check(fh,RESOURCE_VIDEO)) {
 		if (!list_empty(&fh->cap.stream))
@@ -1303,11 +1308,11 @@ video_poll(struct file *file, struct poll_table_struct *wait)
                                 up(&fh->cap.lock);
                                 return POLLERR;
                         }
-                        if (0 != fh->cap.ops->buf_prepare(file,fh->cap.read_buf,fh->cap.field)) {
+                        if (0 != fh->cap.ops->buf_prepare(file->private_data,fh->cap.read_buf,fh->cap.field)) {
                                 up(&fh->cap.lock);
                                 return POLLERR;
                         }
-                        fh->cap.ops->buf_queue(file,fh->cap.read_buf);
+                        fh->cap.ops->buf_queue(file->private_data,fh->cap.read_buf);
                         fh->cap.read_off = 0;
 		}
 		up(&fh->cap.lock);
@@ -1340,20 +1345,20 @@ static int video_release(struct inode *inode, struct file *file)
 
 	/* stop video capture */
 	if (res_check(fh, RESOURCE_VIDEO)) {
-		videobuf_streamoff(file,&fh->cap);
+		videobuf_streamoff(file->private_data,&fh->cap);
 		res_free(dev,fh,RESOURCE_VIDEO);
 	}
 	if (fh->cap.read_buf) {
-		buffer_release(file,fh->cap.read_buf);
+		buffer_release(file->private_data,fh->cap.read_buf);
 		kfree(fh->cap.read_buf);
 	}
 
 	/* stop vbi capture */
 	if (res_check(fh, RESOURCE_VBI)) {
 		if (fh->vbi.streaming)
-			videobuf_streamoff(file,&fh->vbi);
+			videobuf_streamoff(file->private_data,&fh->vbi);
 		if (fh->vbi.reading)
-			videobuf_read_stop(file,&fh->vbi);
+			videobuf_read_stop(file->private_data,&fh->vbi);
 		res_free(dev,fh,RESOURCE_VBI);
 	}
 
@@ -2029,7 +2034,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		req.type   = q->type;
 		req.count  = gbuffers;
 		req.memory = V4L2_MEMORY_MMAP;
-		err = videobuf_reqbufs(file,q,&req);
+		err = videobuf_reqbufs(file->private_data,q,&req);
 		if (err < 0)
 			return err;
 		memset(mbuf,0,sizeof(*mbuf));
@@ -2042,16 +2047,17 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		return 0;
 	}
 	case VIDIOC_REQBUFS:
-		return videobuf_reqbufs(file,saa7134_queue(fh),arg);
+		return videobuf_reqbufs(file->private_data,saa7134_queue(fh),arg);
 
 	case VIDIOC_QUERYBUF:
 		return videobuf_querybuf(saa7134_queue(fh),arg);
 
 	case VIDIOC_QBUF:
-		return videobuf_qbuf(file,saa7134_queue(fh),arg);
+		return videobuf_qbuf(file->private_data,saa7134_queue(fh),arg);
 
 	case VIDIOC_DQBUF:
-		return videobuf_dqbuf(file,saa7134_queue(fh),arg);
+		return videobuf_dqbuf(file->private_data,saa7134_queue(fh),arg,
+				      file->f_flags & O_NONBLOCK);
 
 	case VIDIOC_STREAMON:
 	{
@@ -2059,13 +2065,13 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 
                 if (!res_get(dev,fh,res))
 			return -EBUSY;
-		return videobuf_streamon(file,saa7134_queue(fh));
+		return videobuf_streamon(file->private_data,saa7134_queue(fh));
 	}
 	case VIDIOC_STREAMOFF:
 	{
 		int res = saa7134_resource(fh);
 
-		err = videobuf_streamoff(file,saa7134_queue(fh));
+		err = videobuf_streamoff(file->private_data,saa7134_queue(fh));
 		if (err < 0)
 			return err;
 		res_free(dev,fh,res);

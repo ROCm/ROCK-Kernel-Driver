@@ -5,6 +5,11 @@ hostprogs-y  := gen_init_cpio
 
 clean-files := initramfs_data.cpio.gz
 
+# If you want a different list of files in the initramfs_data.cpio
+# then you can either overwrite the cpio_list in this directory
+# or set INITRAMFS_LIST to another filename.
+INITRAMFS_LIST := $(obj)/initramfs_list
+
 # initramfs_data.o contains the initramfs_data.cpio.gz image.
 # The image is included using .incbin, a dependency which is not
 # tracked automatically.
@@ -18,10 +23,28 @@ $(obj)/initramfs_data.o: $(obj)/initramfs_data.cpio.gz FORCE
 # Commented out for now
 # initramfs-y := $(obj)/root/hello
 
-quiet_cmd_cpio = CPIO    $@
-      cmd_cpio = ./$< > $@
+quiet_cmd_gen_list = GEN_INITRAMFS_LIST $@
+      cmd_gen_list = $(shell \
+        if test -f $(CONFIG_INITRAMFS_SOURCE); then \
+	  if [ $(CONFIG_INITRAMFS_SOURCE) != $@ ]; then \
+	    echo 'cp -f $(CONFIG_INITRAMFS_SOURCE) $@'; \
+	  else \
+	    echo 'echo Using shipped $@'; \
+	  fi; \
+	elif test -d $(CONFIG_INITRAMFS_SOURCE); then \
+	  echo 'scripts/gen_initramfs_list.sh $(CONFIG_INITRAMFS_SOURCE) > $@'; \
+	else \
+	  echo 'echo Using shipped $@'; \
+	fi)
 
-$(obj)/initramfs_data.cpio: $(obj)/gen_init_cpio $(initramfs-y) FORCE
+
+$(INITRAMFS_LIST): FORCE
+	$(call cmd,gen_list)
+
+quiet_cmd_cpio = CPIO    $@
+      cmd_cpio = ./$< $(INITRAMFS_LIST) > $@
+
+$(obj)/initramfs_data.cpio: $(obj)/gen_init_cpio $(initramfs-y) $(INITRAMFS_LIST) FORCE
 	$(call if_changed,cpio)
 
 targets += initramfs_data.cpio

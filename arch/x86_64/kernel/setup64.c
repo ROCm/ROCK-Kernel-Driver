@@ -11,11 +11,11 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/bootmem.h>
+#include <linux/bitops.h>
 #include <asm/pda.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
-#include <asm/bitops.h>
 #include <asm/atomic.h>
 #include <asm/mmu_context.h>
 #include <asm/smp.h>

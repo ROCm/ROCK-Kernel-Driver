@@ -38,6 +38,7 @@
 #define _NFSD4_STATE_H
 
 #include <linux/list.h>
+#include <linux/kref.h>
 #include <linux/sunrpc/clnt.h>
 
 #define NFS4_OPAQUE_LIMIT 1024
@@ -168,6 +169,7 @@ struct nfs4_replay {
 *         reaped by laundramat thread after lease period.
 */
 struct nfs4_stateowner {
+	struct kref		so_ref;
 	struct list_head        so_idhash;   /* hash by so_id */
 	struct list_head        so_strhash;   /* hash by op_name */
 	struct list_head        so_perclient; /* nfs4_client->cl_perclient */
@@ -248,4 +250,18 @@ extern void nfs4_lock_state(void);
 extern void nfs4_unlock_state(void);
 extern int nfs4_in_grace(void);
 extern int nfs4_check_open_reclaim(clientid_t *clid);
+extern void nfs4_free_stateowner(struct kref *kref);
+
+static inline void
+nfs4_put_stateowner(struct nfs4_stateowner *so)
+{
+	kref_put(&so->so_ref, nfs4_free_stateowner);
+}
+
+static inline void
+nfs4_get_stateowner(struct nfs4_stateowner *so)
+{
+	kref_get(&so->so_ref);
+}
+
 #endif   /* NFSD4_STATE_H */

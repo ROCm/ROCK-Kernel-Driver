@@ -73,7 +73,7 @@ bad_to_user:
  * rdx count
  *
  * Output:		
- * eax uncopied bytes or 0 if successfull. 
+ * eax uncopied bytes or 0 if successful.
  */
 	.globl copy_user_generic	
 	.p2align 4
@@ -179,9 +179,9 @@ copy_user_generic:
 	movl $8,%r9d
 	subl %ecx,%r9d
 	movl %r9d,%ecx
-	subq %r9,%rdx
-	jz   .Lsmall_align
-	js   .Lsmall_align
+	cmpq %r9,%rdx
+	jz   .Lhandle_7
+	js   .Lhandle_7
 .Lalign_1:		
 .Ls11:	movb (%rsi),%bl
 .Ld11:	movb %bl,(%rdi)
@@ -189,10 +189,8 @@ copy_user_generic:
 	incq %rdi
 	decl %ecx
 	jnz .Lalign_1
+	subq %r9,%rdx
 	jmp .Lafter_bad_alignment
-.Lsmall_align:
-	addq %r9,%rdx
-	jmp .Lhandle_7
 #endif
 	
 	/* table sorted by exception address */	
@@ -219,8 +217,8 @@ copy_user_generic:
 	.quad .Ls10,.Le_byte
 	.quad .Ld10,.Le_byte
 #ifdef FIX_ALIGNMENT	
-	.quad .Ls11,.Le_byte
-	.quad .Ld11,.Le_byte
+	.quad .Ls11,.Lzero_rest
+	.quad .Ld11,.Lzero_rest
 #endif
 	.quad .Le5,.Le_zero
 	.previous

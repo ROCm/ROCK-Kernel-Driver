@@ -135,9 +135,9 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #if ALLOW_DMA
 #include <asm/dma.h>

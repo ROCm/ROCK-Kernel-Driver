@@ -38,13 +38,8 @@
 #include <linux/byteorder/swabb.h>
 #include <linux/smp_lock.h>
 
-#define DEBUG_VARIABLE av7110_debug
-extern int av7110_debug;
-
-#include "dvb_i2c.h"
 #include "av7110.h"
 #include "av7110_hw.h"
-#include "dvb_functions.h"
 
 
 void CI_handle(struct av7110 *av7110, u8 *data, u16 len)

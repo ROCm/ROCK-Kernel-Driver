@@ -185,6 +185,17 @@ static inline int hci_sock_bound_ioctl(struct sock *sk, unsigned int cmd, unsign
 
 		return 0;
 
+	case HCISETSECMGR:
+		if (!capable(CAP_NET_ADMIN))
+			return -EACCES;
+
+		if (arg)
+			set_bit(HCI_SECMGR, &hdev->flags);
+		else
+			clear_bit(HCI_SECMGR, &hdev->flags);
+
+		return 0;
+
 	case HCIGETCONNINFO:
 		return hci_get_conn_info(hdev, (void __user *)arg);
 

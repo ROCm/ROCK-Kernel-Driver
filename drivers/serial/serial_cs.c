@@ -81,7 +81,7 @@ static int do_sound = 1;
 static int buggy_uart;
 
 module_param(irq_mask, uint, 0444);
-module_param_array(irq_list, int, irq_list_count, 0444);
+module_param_array(irq_list, int, &irq_list_count, 0444);
 module_param(do_sound, int, 0444);
 module_param(buggy_uart, int, 0444);
 

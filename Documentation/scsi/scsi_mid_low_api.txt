@@ -1357,9 +1357,7 @@ is created (in scsi_host_alloc() in hosts.c) those common members are
 initialized from the driver's struct scsi_host_template instance. Members
 of interest:
     host_no      - system wide unique number that is used for identifying
-                   this host. Issued in ascending order from 0 (and the
-                   positioning can be influenced by the scsihosts
-                   kernel boot (or module) parameter)
+                   this host. Issued in ascending order from 0.
     can_queue    - must be greater than 0; do not send more than can_queue
                    commands to the adapter.
     this_id      - scsi id of host (scsi initiator) or -1 if not known

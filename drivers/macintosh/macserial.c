@@ -32,6 +32,7 @@
 #include <linux/console.h>
 #endif
 #include <linux/slab.h>
+#include <linux/bitops.h>
 
 #include <asm/sections.h>
 #include <asm/io.h>
@@ -40,7 +41,6 @@
 #include <asm/prom.h>
 #include <asm/system.h>
 #include <asm/segment.h>
-#include <asm/bitops.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
 #include <linux/adb.h>

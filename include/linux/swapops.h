@@ -30,8 +30,7 @@ static inline swp_entry_t swp_entry(unsigned long type, pgoff_t offset)
  */
 static inline unsigned swp_type(swp_entry_t entry)
 {
-	return (entry.val >> SWP_TYPE_SHIFT(entry)) &
-			((1 << MAX_SWAPFILES_SHIFT) - 1);
+	return (entry.val >> SWP_TYPE_SHIFT(entry));
 }
 
 /*

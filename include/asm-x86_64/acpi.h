@@ -166,6 +166,8 @@ extern int acpi_pci_disabled;
 
 extern u8 x86_acpiid_to_apicid[];
 
+extern int acpi_skip_timer_override;
+
 #endif /*__KERNEL__*/
 
 #endif /*_ASM_ACPI_H*/

@@ -51,6 +51,7 @@
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <linux/sched.h>
+#include <linux/bitops.h>
 
 #include <linux/signal.h>
 #include <linux/string.h>
@@ -65,7 +66,6 @@
 #include <asm/io.h>
 #include <asm/ccwdev.h>
 #include <asm/ccwgroup.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 
 #include <asm/idals.h>

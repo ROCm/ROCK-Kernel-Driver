@@ -758,8 +758,15 @@ extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned lon
 extern struct page * vmalloc_to_page(void *addr);
 extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
-extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
-		unsigned long to, unsigned long size, pgprot_t prot);
+int remap_pfn_range(struct vm_area_struct *, unsigned long,
+		unsigned long, unsigned long, pgprot_t);
+
+static inline __deprecated /* since 25 Sept 2004 -- wli */
+int remap_page_range(struct vm_area_struct *vma, unsigned long uvaddr,
+			unsigned long paddr, unsigned long size, pgprot_t prot)
+{
+	return remap_pfn_range(vma, uvaddr, paddr >> PAGE_SHIFT, size, prot);
+}
 
 #ifdef CONFIG_PROC_FS
 void __vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);

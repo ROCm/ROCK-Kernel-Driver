@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-tvaudio.c,v 1.13 2004/09/22 11:47:11 kraxel Exp $
+ *
  * device driver for philips saa7134 based TV cards
  * tv audio decoder (fm stereo, nicam, ...)
  *
@@ -56,9 +58,10 @@ MODULE_PARM_DESC(audio_clock_tweak, "Audio clock tick fine tuning for cards with
 #define print_regb(reg) printk("%s:   reg 0x%03x [%-16s]: 0x%02x\n", \
 		dev->name,(SAA7134_##reg),(#reg),saa_readb((SAA7134_##reg)))
 
-#define SCAN_INITIAL_DELAY     (HZ)
-#define SCAN_SAMPLE_DELAY      (HZ/5)
-#define SCAN_SUBCARRIER_DELAY  (HZ*2)
+/* msecs */
+#define SCAN_INITIAL_DELAY     1000
+#define SCAN_SAMPLE_DELAY       200
+#define SCAN_SUBCARRIER_DELAY  2000
 
 /* ------------------------------------------------------------------ */
 /* saa7134 code                                                       */
@@ -324,11 +327,11 @@ static int tvaudio_sleep(struct saa7134_dev *dev, int timeout)
 	
 	add_wait_queue(&dev->thread.wq, &wait);
 	if (dev->thread.scan1 == dev->thread.scan2 && !dev->thread.shutdown) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (timeout < 0)
+		if (timeout < 0) {
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule();
-		else
-			schedule_timeout(timeout);
+		} else
+			msleep_interruptible(timeout);
 	}
 	remove_wait_queue(&dev->thread.wq, &wait);
 	return dev->thread.scan1 != dev->thread.scan2;
@@ -602,7 +605,7 @@ static int tvaudio_thread(void *data)
 
 		lastmode = 42;
 		for (;;) {
-			if (tvaudio_sleep(dev,5*HZ))
+			if (tvaudio_sleep(dev,5000))
 				goto restart;
 			if (dev->thread.shutdown || signal_pending(current))
 				break;
@@ -735,6 +738,7 @@ static int getstereo_7133(struct saa7134_dev *dev)
 static int mute_input_7133(struct saa7134_dev *dev)
 {
 	u32 reg = 0;
+	int mask;
 	
 	switch (dev->input->amux) {
 	case TV:    reg = 0x02; break;
@@ -744,6 +748,14 @@ static int mute_input_7133(struct saa7134_dev *dev)
 	if (dev->ctl_mute)
 		reg = 0x07;
 	saa_writel(0x594 >> 2, reg);
+
+	/* switch gpio-connected external audio mux */
+        if (0 != card(dev).gpiomask) {
+        	mask = card(dev).gpiomask;
+        	saa_andorl(SAA7134_GPIO_GPMODE0 >> 2,   mask, mask);
+        	saa_andorl(SAA7134_GPIO_GPSTATUS0 >> 2, mask, dev->input->gpio);
+        	saa7134_track_gpio(dev,dev->input->name);
+	}
 	return 0;
 }
 
@@ -777,7 +789,10 @@ static int tvaudio_thread_ddep(void *data)
 			/* insmod option override */
 			norms = (audio_ddep << 2) | 0x01;
 			dprintk("ddep override: %s\n",stdres[audio_ddep]);
-		} else{
+		} else if (&card(dev).radio == dev->input) {
+			dprintk("FM Radio\n");
+			norms = (0x0f << 2) | 0x01;
+		} else {
 			/* (let chip) scan for sound carrier */
 			norms = 0;
 			if (dev->tvnorm->id & V4L2_STD_PAL) {
@@ -810,7 +825,7 @@ static int tvaudio_thread_ddep(void *data)
 		saa_dsp_writel(dev, 0x464 >> 2, 0x000000);
 		saa_dsp_writel(dev, 0x470 >> 2, 0x101010);
 
-		if (tvaudio_sleep(dev,3*HZ))
+		if (tvaudio_sleep(dev,3000))
 			goto restart;
 		value = saa_readl(0x528 >> 2) & 0xffffff;
 

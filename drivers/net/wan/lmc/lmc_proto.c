@@ -36,11 +36,11 @@
 #include <linux/inet.h>
 #include <linux/workqueue.h>
 #include <linux/proc_fs.h>
+#include <linux/bitops.h>
 
 #include <net/syncppp.h>
 
 #include <asm/processor.h>             /* Processor type for cache alignment. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/smp.h>

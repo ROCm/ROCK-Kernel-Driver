@@ -467,6 +467,7 @@ enum reiserfs_mount_options {
     REISERFS_TEST2,
     REISERFS_TEST3,
     REISERFS_TEST4,
+    REISERFS_UNSUPPORTED_OPT,
 };
 
 #define reiserfs_r5_hash(s) (REISERFS_SB(s)->s_mount_opt & (1 << FORCE_R5_HASH))

@@ -60,21 +60,6 @@ static void usbvideo_SoftwareContrastAdjustment(struct uvd *uvd,
 /*******************************/
 /* Memory management functions */
 /*******************************/
-
-/*
- * Here we want the physical address of the memory.
- * This is used when initializing the contents of the area.
- */
-unsigned long usbvideo_kvirt_to_pa(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-	return ret;
-}
-
 static void *usbvideo_rvmalloc(unsigned long size)
 {
 	void *mem;
@@ -1168,8 +1153,8 @@ static int usbvideo_v4l_mmap(struct file *file, struct vm_area_struct *vma)
 
 	pos = (unsigned long) uvd->fbuf;
 	while (size > 0) {
-		page = usbvideo_kvirt_to_pa(pos);
-		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED))
+		page = page_to_pfn(vmalloc_to_page((void *)pos));
+		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED))
 			return -EAGAIN;
 
 		start += PAGE_SIZE;

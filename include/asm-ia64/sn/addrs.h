@@ -69,27 +69,27 @@ typedef union ia64_sn2_pa {
 } ia64_sn2_pa_t;
 #endif
 
-#define TO_PHYS_MASK		0x0001ffcfffffffff	/* Note - clear AS bits */
+#define TO_PHYS_MASK		0x0001ffcfffffffffUL	/* Note - clear AS bits */
 
 
 /* Regions determined by AS */
-#define LOCAL_MMR_SPACE		0xc000008000000000	/* Local MMR space */
-#define LOCAL_PHYS_MMR_SPACE	0x8000008000000000	/* Local PhysicalMMR space */
-#define LOCAL_MEM_SPACE		0xc000010000000000	/* Local Memory space */
+#define LOCAL_MMR_SPACE		0xc000008000000000UL	/* Local MMR space */
+#define LOCAL_PHYS_MMR_SPACE	0x8000008000000000UL	/* Local PhysicalMMR space */
+#define LOCAL_MEM_SPACE		0xc000010000000000UL	/* Local Memory space */
 /* It so happens that setting bit 35 indicates a reference to the SHUB or TIO
  * MMR space.  
  */
-#define GLOBAL_MMR_SPACE	0xc000000800000000	/* Global MMR space */
-#define TIO_MMR_SPACE		0xc000000800000000	/* TIO MMR space */
-#define ICE_MMR_SPACE		0xc000000000000000	/* ICE MMR space */
-#define GLOBAL_PHYS_MMR_SPACE	0x0000000800000000	/* Global Physical MMR space */
-#define GET_SPACE		0xe000001000000000	/* GET space */
-#define AMO_SPACE		0xc000002000000000	/* AMO space */
-#define CACHEABLE_MEM_SPACE	0xe000003000000000	/* Cacheable memory space */
-#define UNCACHED                0xc000000000000000      /* UnCacheable memory space */
-#define UNCACHED_PHYS           0x8000000000000000      /* UnCacheable physical memory space */
+#define GLOBAL_MMR_SPACE	0xc000000800000000UL	/* Global MMR space */
+#define TIO_MMR_SPACE		0xc000000800000000UL	/* TIO MMR space */
+#define ICE_MMR_SPACE		0xc000000000000000UL	/* ICE MMR space */
+#define GLOBAL_PHYS_MMR_SPACE	0x0000000800000000UL	/* Global Physical MMR space */
+#define GET_SPACE		0xe000001000000000UL	/* GET space */
+#define AMO_SPACE		0xc000002000000000UL	/* AMO space */
+#define CACHEABLE_MEM_SPACE	0xe000003000000000UL	/* Cacheable memory space */
+#define UNCACHED                0xc000000000000000UL	/* UnCacheable memory space */
+#define UNCACHED_PHYS           0x8000000000000000UL	/* UnCacheable physical memory space */
 
-#define PHYS_MEM_SPACE		0x0000003000000000	/* physical memory space */
+#define PHYS_MEM_SPACE		0x0000003000000000UL	/* physical memory space */
 
 /* SN2 address macros */
 /* NID_SHFT has the right value for both SHUB and TIO addresses.*/
@@ -105,7 +105,7 @@ typedef union ia64_sn2_pa {
 #define GLOBAL_MEM_ADDR(n,a)	(CACHEABLE_MEM_SPACE | REMOTE_ADDR(n,a))
 
 /* non-II mmr's start at top of big window space (4G) */
-#define BWIN_TOP		0x0000000100000000
+#define BWIN_TOP		0x0000000100000000UL
 
 /*
  * general address defines - for code common to SN0/SN1/SN2
@@ -256,7 +256,7 @@ typedef union ia64_sn2_pa {
         (((~(_x)) & BWIN_TOP)>>9)    | (_x))
 
 #define REMOTE_HUB(_n, _x)						\
-	((volatile uint64_t *)(REMOTE_HUB_BASE(_x) | ((((long)(_n))<<NASID_SHFT))))
+	((uint64_t *)(REMOTE_HUB_BASE(_x) | ((((long)(_n))<<NASID_SHFT))))
 
 
 /*

@@ -12,6 +12,7 @@
 #include <linux/ptrace.h>
 #include <linux/delay.h>
 #include <linux/bootmem.h>
+#include <linux/bitops.h>
 
 #include <asm/setup.h>
 #include <asm/traps.h>
@@ -21,7 +22,6 @@
 #include <asm/pgtable.h>
 #include <asm/sun3mmu.h>
 #include <asm/segment.h>
-#include <asm/bitops.h>
 #include <asm/oplib.h>
 #include <asm/mmu_context.h>
 #include <asm/dvma.h>

@@ -418,8 +418,8 @@ static int __init eisa_init (void)
 	return 0;
 }
 
-module_param_array(enable_dev, int, enable_dev_count, 0444);
-module_param_array(disable_dev, int, disable_dev_count, 0444);
+module_param_array(enable_dev, int, &enable_dev_count, 0444);
+module_param_array(disable_dev, int, &disable_dev_count, 0444);
 
 postcore_initcall (eisa_init);
 

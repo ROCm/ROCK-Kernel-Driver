@@ -246,8 +246,6 @@ hycapi_register_appl(struct capi_ctr *ctrl, __u16 appl,
 	rp->level3cnt = MaxLogicalConnections;
 	memcpy(&hycapi_applications[appl-1].rp, 
 	       rp, sizeof(capi_register_params));
-	
-/*        MOD_INC_USE_COUNT; */
 }
 
 /*********************************************************************
@@ -311,7 +309,6 @@ hycapi_release_appl(struct capi_ctr *ctrl, __u16 appl)
 	{
 		hycapi_release_internal(ctrl, appl);
 	}
-/*        MOD_DEC_USE_COUNT;  */
 }
 
 

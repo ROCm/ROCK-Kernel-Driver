@@ -97,11 +97,10 @@ static char *version =
 /* Bit map of interrupts to choose from */
 static unsigned int irq_mask = 0xdeb8;	/* 3, 6, 7, 9-12, 14, 15 */
 static int irq_list[4] = { -1 };
-static int num_irqs = 1;
 
 module_param(irq_mask, int, 0);
 MODULE_PARM_DESC(irq_mask, "IRQ mask bits (default: 0xdeb8)");
-module_param_array(irq_list, int, num_irqs, 0);
+module_param_array(irq_list, int, NULL, 0);
 MODULE_PARM_DESC(irq_list, "Comma-separated list of up to 4 IRQs to try (default: auto select).");
 
 /* ================================================================== */

@@ -59,10 +59,10 @@
 #include <linux/mm.h>
 #include <linux/console.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/mvme16xhw.h>
 #include <asm/bootinfo.h>
 #include <asm/setup.h>

@@ -28,6 +28,18 @@ config MAGIC_SYSRQ
 	  Enables console device to interpret special characters as
 	  commands to dump state information.
 
+config SCHEDSTATS
+	bool "Collect scheduler statistics"
+	depends on DEBUG_KERNEL && PROC_FS
+	help
+	  If you say Y here, additional code will be inserted into the
+	  scheduler and related routines to collect statistics about
+	  scheduler behavior and provide them in /proc/schedstat.  These
+	  stats may be useful for both tuning and debugging the scheduler
+	  If you aren't debugging the scheduler or trying to tune a specific
+	  application, you can say N to avoid the very slight overhead
+	  this adds.
+
 config DEBUG_SLAB
 	bool "Debug memory allocations"
 	depends on DEBUG_KERNEL && (ALPHA || ARM || X86 || IA64 || M68K || MIPS || PARISC || PPC32 || PPC64 || ARCH_S390 || SPARC32 || SPARC64 || USERMODE || X86_64)

@@ -42,10 +42,10 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 
 #include <asm/bootinfo.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
 #include <asm/hwtest.h>

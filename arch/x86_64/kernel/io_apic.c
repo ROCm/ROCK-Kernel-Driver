@@ -41,10 +41,6 @@
 
 int sis_apic_bug; /* not actually supported, dummy for compile */
 
-#undef APIC_LOCKUP_DEBUG
-
-#define APIC_LOCKUP_DEBUG
-
 static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
 
 /*
@@ -83,7 +79,7 @@ int vector_irq[NR_VECTORS] = { [0 ... NR_VECTORS - 1] = -1};
  * shared ISA-space IRQs, so we have to support them. We are super
  * fast in the common case, and fast for shared ISA-space IRQs.
  */
-static void __init add_pin_to_irq(unsigned int irq, int apic, int pin)
+static void add_pin_to_irq(unsigned int irq, int apic, int pin)
 {
 	static int first_free_entry = NR_IRQS;
 	struct irq_pin_list *entry = irq_2_pin + irq;
@@ -131,10 +127,6 @@ DO_ACTION( __mask,             0, |= 0x00010000, io_apic_sync(entry->apic) )
 						/* mask = 1 */
 DO_ACTION( __unmask,           0, &= 0xfffeffff, )
 						/* mask = 0 */
-DO_ACTION( __mask_and_edge,    0, = (reg & 0xffff7fff) | 0x00010000, )
-						/* mask = 1, trigger = 0 */
-DO_ACTION( __unmask_and_level, 0, = (reg & 0xfffeffff) | 0x00008000, )
-						/* mask = 0, trigger = 1 */
 
 static void mask_IO_APIC_irq (unsigned int irq)
 {
@@ -265,12 +257,14 @@ void __init check_ioapic(void)
 #endif
 					return;
 				case PCI_VENDOR_ID_NVIDIA:
-#ifndef CONFIG_SMP
+#ifdef CONFIG_ACPI
+					/* All timer overrides on Nvidia
+				           seem to be wrong. Skip them. */
+					acpi_skip_timer_override = 1;
 					printk(KERN_INFO 
-     "PCI bridge %02x:%02x from %x found. Setting \"noapic\". Overwrite with \"apic\"\n",
-					       num,slot,vendor); 
-					skip_ioapic_setup = 1;
+	     "Nvidia board detected. Ignoring ACPI timer override.\n");
 #endif
+					/* RED-PEN skip them on mptables too? */
 					return;
 				} 
 
@@ -315,7 +309,7 @@ __setup("pirq=", ioapic_pirq_setup);
 /*
  * Find the IRQ entry number of a certain pin.
  */
-static int __init find_irq_entry(int apic, int pin, int type)
+static int find_irq_entry(int apic, int pin, int type)
 {
 	int i;
 
@@ -399,7 +393,7 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
 /*
  * EISA Edge/Level control register, ELCR
  */
-static int __init EISA_ELCR(unsigned int irq)
+static int EISA_ELCR(unsigned int irq)
 {
 	if (irq < 16) {
 		unsigned int port = 0x4d0 + (irq >> 3);
@@ -504,7 +498,7 @@ static int __init MPBIOS_polarity(int idx)
 	return polarity;
 }
 
-static int __init MPBIOS_trigger(int idx)
+static int MPBIOS_trigger(int idx)
 {
 	int bus = mp_irqs[idx].mpc_srcbus;
 	int trigger;
@@ -1343,61 +1337,7 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
 
 static void end_level_ioapic_irq (unsigned int irq)
 {
-	unsigned long v;
-	int i;
-
-/*
- * It appears there is an erratum which affects at least version 0x11
- * of I/O APIC (that's the 82093AA and cores integrated into various
- * chipsets).  Under certain conditions a level-triggered interrupt is
- * erroneously delivered as edge-triggered one but the respective IRR
- * bit gets set nevertheless.  As a result the I/O unit expects an EOI
- * message but it will never arrive and further interrupts are blocked
- * from the source.  The exact reason is so far unknown, but the
- * phenomenon was observed when two consecutive interrupt requests
- * from a given source get delivered to the same CPU and the source is
- * temporarily disabled in between.
- *
- * A workaround is to simulate an EOI message manually.  We achieve it
- * by setting the trigger mode to edge and then to level when the edge
- * trigger mode gets detected in the TMR of a local APIC for a
- * level-triggered interrupt.  We mask the source for the time of the
- * operation to prevent an edge-triggered interrupt escaping meanwhile.
- * The idea is from Manfred Spraul.  --macro
- */
-	i = IO_APIC_VECTOR(irq);
-	v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
-
 	ack_APIC_irq();
-
-	if (!(v & (1 << (i & 0x1f)))) {
-#ifdef APIC_LOCKUP_DEBUG
-		struct irq_pin_list *entry;
-#endif
-
-#ifdef APIC_MISMATCH_DEBUG
-		atomic_inc(&irq_mis_count);
-#endif
-		spin_lock(&ioapic_lock);
-		__mask_and_edge_IO_APIC_irq(irq);
-#ifdef APIC_LOCKUP_DEBUG
-		for (entry = irq_2_pin + irq;;) {
-			unsigned int reg;
-
-			if (entry->pin == -1)
-				break;
-			reg = io_apic_read(entry->apic, 0x10 + entry->pin * 2);
-			if (reg & 0x00004000)
-				printk(KERN_CRIT "Aieee!!!  Remote IRR"
-					" still set after unlock!\n");
-			if (!entry->next)
-				break;
-			entry = irq_2_pin + entry->next;
-		}
-#endif
-		__unmask_and_level_IO_APIC_irq(irq);
-		spin_unlock(&ioapic_lock);
-	}
 }
 
 static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t mask)
