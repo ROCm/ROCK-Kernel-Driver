@@ -1262,8 +1262,11 @@ xfs_trans_chunk_committed(
 
 		/*
 		 * Now that we've repositioned the item in the AIL,
-		 * unpin it so it can be flushed.
+		 * unpin it so it can be flushed. Pass information
+		 * about buffer stale state down from the log item
+		 * flags, if anyone else stales the buffer we do not
+		 * want to pay any attention to it.
 		 */
-		IOP_UNPIN(lip);
+		IOP_UNPIN(lip, lidp->lid_flags & XFS_LID_BUF_STALE);
 	}
 }
