@@ -242,13 +242,23 @@ struct reiserfs_journal {
   struct reiserfs_journal_cnode *j_list_hash_table[JOURNAL_HASH_SIZE] ; /* hash table for all the real buffer heads in all 
   										the transactions */
   struct list_head j_prealloc_list;     /* list of inodes which have preallocated blocks */
+  int j_persistent_trans;
   unsigned long j_max_trans_size ;
   unsigned long j_max_batch_size ;
+
+  int j_errno;
 
   /* when flushing ordered buffers, throttle new ordered writers */
   struct work_struct j_work;
   atomic_t j_async_throttle;
 };
+
+enum journal_state_bits {
+    J_WRITERS_BLOCKED = 1,   /* set when new writers not allowed */
+    J_WRITERS_QUEUED,        /* set when log is full due to too many writers */
+    J_ABORTED,               /* set when log is aborted */
+};
+
 
 #define JOURNAL_DESC_MAGIC "ReIsErLB" /* ick.  magic string to find desc blocks in the journal */
 
@@ -399,6 +409,7 @@ struct reiserfs_sb_info
     struct dentry *xattr_root; /* root of /.reiserfs_priv/.xa */
     struct rw_semaphore xattr_dir_sem;
 
+    int j_errno;
 };
 
 /* Definitions of reiserfs on-disk properties: */
@@ -447,6 +458,11 @@ enum reiserfs_mount_options {
     REISERFS_BARRIER_NONE,
     REISERFS_BARRIER_FLUSH,
 
+    /* Actions on error */
+    REISERFS_ERROR_PANIC,
+    REISERFS_ERROR_RO,
+    REISERFS_ERROR_CONTINUE,
+
     REISERFS_TEST1,
     REISERFS_TEST2,
     REISERFS_TEST3,
@@ -478,6 +494,10 @@ enum reiserfs_mount_options {
 #define reiserfs_barrier_none(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_BARRIER_NONE))
 #define reiserfs_barrier_flush(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_BARRIER_FLUSH))
 
+#define reiserfs_error_panic(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ERROR_PANIC))
+#define reiserfs_error_ro(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ERROR_RO))
+#define reiserfs_error_continue(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ERROR_CONTINUE))
+
 void reiserfs_file_buffer (struct buffer_head * bh, int list);
 extern struct file_system_type reiserfs_fs_type;
 int reiserfs_resize(struct super_block *, unsigned long) ;
@@ -500,6 +520,12 @@ int reiserfs_resize(struct super_block *, unsigned long) ;
 static inline char *reiserfs_bdevname(struct super_block *s)
 {
         return (s == NULL) ? "Null superblock" : s -> s_id;
+}
+
+#define reiserfs_is_journal_aborted(journal) (unlikely (__reiserfs_is_journal_aborted (journal)))
+static inline int __reiserfs_is_journal_aborted (struct reiserfs_journal *journal)
+{
+    return test_bit (J_ABORTED, &journal->j_state);
 }
 
 #endif	/* _LINUX_REISER_FS_SB */
