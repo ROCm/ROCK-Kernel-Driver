@@ -244,15 +244,15 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	struct usb_device *dev = adapter->usb_dev;
 	struct st5481_ctrl *ctrl = &adapter->ctrl;
 	struct st5481_intr *intr = &adapter->intr;
-	struct usb_interface_descriptor *altsetting;
-	struct usb_endpoint_descriptor *endpoint;
+	struct usb_host_interface *altsetting;
+	struct usb_host_endpoint *endpoint;
 	int status;
 	struct urb *urb;
 	u_char *buf;
 	
 	DBG(1,"");
 	
-	if ((status = usb_set_configuration (dev,dev->config[0].bConfigurationValue)) < 0) {
+	if ((status = usb_set_configuration (dev,dev->config[0].desc.bConfigurationValue)) < 0) {
 		WARN("set_configuration failed,status=%d",status);
 		return status;
 	}
@@ -261,14 +261,14 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	altsetting = &(dev->config->interface[0].altsetting[3]);	
 
 	// Check if the config is sane
-	if ( altsetting->bNumEndpoints != 7 ) {
-		WARN("expecting 7 got %d endpoints!", altsetting->bNumEndpoints);
+	if ( altsetting->desc.bNumEndpoints != 7 ) {
+		WARN("expecting 7 got %d endpoints!", altsetting->desc.bNumEndpoints);
 		return -EINVAL;
 	}
 
 	// The descriptor is wrong for some early samples of the ST5481 chip
-	altsetting->endpoint[3].wMaxPacketSize = 32;
-	altsetting->endpoint[4].wMaxPacketSize = 32;
+	altsetting->endpoint[3].desc.wMaxPacketSize = 32;
+	altsetting->endpoint[4].desc.wMaxPacketSize = 32;
 
 	// Use alternative setting 3 on interface 0 to have 2B+D
 	if ((status = usb_set_interface (dev, 0, 3)) < 0) {
@@ -307,10 +307,10 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 				
 	// Fill the interrupt URB
 	usb_fill_int_urb(urb, dev,
-		     usb_rcvintpipe(dev, endpoint->bEndpointAddress),
+		     usb_rcvintpipe(dev, endpoint->desc.bEndpointAddress),
 		     buf, INT_PKT_SIZE,
 		     usb_int_complete, adapter,
-		     endpoint->bInterval);
+		     endpoint->desc.bInterval);
 		
 	return 0;
 }
