@@ -16,7 +16,22 @@ extern unsigned int ___illegal_use_of_BTFIXUP_SIMM13_in_module(void);
 extern unsigned int ___illegal_use_of_BTFIXUP_SETHI_in_module(void);
 extern unsigned int ___illegal_use_of_BTFIXUP_HALF_in_module(void);
 extern unsigned int ___illegal_use_of_BTFIXUP_INT_in_module(void);
-#endif
+
+#define BTFIXUP_SIMM13(__name) ___illegal_use_of_BTFIXUP_SIMM13_in_module()
+#define BTFIXUP_HALF(__name) ___illegal_use_of_BTFIXUP_HALF_in_module()
+#define BTFIXUP_SETHI(__name) ___illegal_use_of_BTFIXUP_SETHI_in_module()
+#define BTFIXUP_INT(__name) ___illegal_use_of_BTFIXUP_INT_in_module()
+#define BTFIXUP_BLACKBOX(__name) ___illegal_use_of_BTFIXUP_BLACKBOX_in_module
+
+#else
+
+#define BTFIXUP_SIMM13(__name) ___sf_##__name()
+#define BTFIXUP_HALF(__name) ___af_##__name()
+#define BTFIXUP_SETHI(__name) ___hf_##__name()
+#define BTFIXUP_INT(__name) ((unsigned int)&___i_##__name)
+/* This must be written in assembly and present in a sethi */
+#define BTFIXUP_BLACKBOX(__name) ___b_##__name
+#endif /* MODULE */
 
 /* Fixup call xx */
 
@@ -30,12 +45,6 @@ extern unsigned int ___illegal_use_of_BTFIXUP_INT_in_module(void);
 
 #define BTFIXUPDEF_BLACKBOX(__name)							\
 	extern unsigned ___bs_##__name[2];
-#ifdef MODULE
-#define BTFIXUP_BLACKBOX(__name) ___illegal_use_of_BTFIXUP_BLACKBOX_in_module
-#else
-/* This must be written in assembly and present in a sethi */
-#define BTFIXUP_BLACKBOX(__name) ___b_##__name
-#endif
 
 /* Put bottom 13bits into some register variable */
 
@@ -55,11 +64,6 @@ extern unsigned int ___illegal_use_of_BTFIXUP_INT_in_module(void);
 		__asm__ ("or %%g0, ___s_" #__name "__btset_" #__val ", %0" : "=r"(ret));\
 		return ret;								\
 	}
-#ifdef MODULE
-#define BTFIXUP_SIMM13(__name) ___illegal_use_of_BTFIXUP_SIMM13_in_module()
-#else
-#define BTFIXUP_SIMM13(__name) ___sf_##__name()
-#endif
 
 /* Put either bottom 13 bits, or upper 22 bits into some register variable
  * (depending on the value, this will lead into sethi FIX, reg; or
@@ -82,11 +86,6 @@ extern unsigned int ___illegal_use_of_BTFIXUP_INT_in_module(void);
 		__asm__ ("or %%g0, ___a_" #__name "__btset_" #__val ", %0" : "=r"(ret));\
 		return ret;								\
 	}
-#ifdef MODULE
-#define BTFIXUP_HALF(__name) ___illegal_use_of_BTFIXUP_HALF_in_module()
-#else
-#define BTFIXUP_HALF(__name) ___af_##__name()
-#endif
 
 /* Put upper 22 bits into some register variable */
 
@@ -107,22 +106,12 @@ extern unsigned int ___illegal_use_of_BTFIXUP_INT_in_module(void);
 			 "=r"(ret));							\
 		return ret;								\
 	}
-#ifdef MODULE
-#define BTFIXUP_SETHI(__name) ___illegal_use_of_BTFIXUP_SETHI_in_module()
-#else
-#define BTFIXUP_SETHI(__name) ___hf_##__name()
-#endif
 
 /* Put a full 32bit integer into some register variable */
 
 #define BTFIXUPDEF_INT(__name)								\
 	extern unsigned char ___i_##__name;						\
 	extern unsigned ___is_##__name[2];
-#ifdef MODULE
-#define BTFIXUP_INT(__name) ___illegal_use_of_BTFIXUP_INT_in_module()
-#else
-#define BTFIXUP_INT(__name) ((unsigned int)&___i_##__name)
-#endif
 
 #define BTFIXUPCALL_NORM	0x00000000			/* Always call */
 #define BTFIXUPCALL_NOP		0x01000000			/* Possibly optimize to nop */
