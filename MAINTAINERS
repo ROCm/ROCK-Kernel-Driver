@@ -185,6 +185,11 @@ W:	http://www.student.informatik.tu-darmstadt.de/~tek/projects/linux.html
 W:	http://www.tu-darmstadt.de/~tek01/projects/linux.html
 S:	Maintained
 
+ADT746X FAN DRIVER
+P:	Colin Leroy
+M:	colin@colino.net
+S:	Maintained
+
 ADVANSYS SCSI DRIVER
 P:	Bob Frey
 M:	linux@advansys.com
