@@ -799,6 +799,10 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 			 * sector...  If we got here the error is not correctable */
 			ide_dump_status (drive, "media error (bad sector)", stat);
 			do_end_request = 1;
+		} else if (sense_key == BLANK_CHECK) {
+			/* Disk appears blank ?? */
+			ide_dump_status (drive, "media error (blank)", stat);
+			do_end_request = 1;
 		} else if ((err & ~ABRT_ERR) != 0) {
 			/* Go to the default handler
 			   for other errors. */
