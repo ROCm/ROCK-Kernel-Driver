@@ -4582,6 +4582,7 @@ free_local_pdev(struct pci_dev *pdev)
 }
 
 static struct scsi_host_template megaraid_template = {
+	.module				= THIS_MODULE,
 	.name				= "MegaRAID",
 	.proc_name			= "megaraid",
 	.info				= megaraid_info,
