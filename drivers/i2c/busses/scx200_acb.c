@@ -47,9 +47,7 @@ static int base[MAX_DEVICES] = { 0x840 };
 MODULE_PARM(base, "1-4i");
 MODULE_PARM_DESC(base, "Base addresses for the ACCESS.bus controllers");
 
-#define DEBUG 0
-
-#if DEBUG
+#ifdef DEBUG
 #define DBG(x...) printk(KERN_DEBUG NAME ": " x)
 #else
 #define DBG(x...)
@@ -374,7 +372,7 @@ static s32 scx200_acb_smbus_xfer(struct i2c_adapter *adapter,
 	if (rc == 0 && size == I2C_SMBUS_WORD_DATA && rw == I2C_SMBUS_READ)
 	    	data->word = le16_to_cpu(cur_word);
 
-#if DEBUG
+#ifdef DEBUG
 	printk(KERN_DEBUG NAME ": transfer done, result: %d", rc);
 	if (buffer) {
 		int i;
