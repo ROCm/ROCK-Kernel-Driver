@@ -1429,18 +1429,21 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 			struct RxDesc *desc = tp->RxDescArray + entry;
 			struct sk_buff *skb = tp->Rx_skbuff[entry];
 			int pkt_size = (status & 0x00001FFF) - 4;
+			void (*pci_action)(struct pci_dev *, dma_addr_t,
+				size_t, int) = pci_dma_sync_single_for_device;
 
-			pci_dma_sync_single(tp->pci_dev,
-					    le32_to_cpu(desc->buf_addr),
-					    RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
+
+			pci_dma_sync_single_for_cpu(tp->pci_dev,
+				le32_to_cpu(desc->buf_addr), RX_BUF_SIZE,
+				PCI_DMA_FROMDEVICE);
 
 			if (rtl8169_try_rx_copy(&skb, pkt_size, desc, dev)) {
-				pci_unmap_single(tp->pci_dev,
-						 le32_to_cpu(desc->buf_addr),
-						 RX_BUF_SIZE,
-						 PCI_DMA_FROMDEVICE);
+				pci_action = pci_unmap_single;
 				tp->Rx_skbuff[entry] = NULL;
 			}
+
+			pci_action(tp->pci_dev, le32_to_cpu(desc->buf_addr),
+				   RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
 
 			skb_put(skb, pkt_size);
 			skb->protocol = eth_type_trans(skb, dev);
