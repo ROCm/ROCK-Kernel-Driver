@@ -870,6 +870,7 @@ aic_sector_div(sector_t capacity, int heads, int sectors)
 #define	aic_calc_speed			AIC_LIB_ENTRY(_calc_speed)
 #define	aic_inquiry_match		AIC_LIB_ENTRY(_inquiry_match)
 #define	aic_static_inquiry_match	AIC_LIB_ENTRY(_static_inquiry_match)
+#define	aic_parse_brace_option		AIC_LIB_ENTRY(_parse_brace_option)
 
 /******************************************************************************/
 
@@ -905,6 +906,10 @@ int		aic_inquiry_match(caddr_t /*inqbuffer*/,
 int		aic_static_inquiry_match(caddr_t /*inqbuffer*/,
 					 caddr_t /*table_entry*/);
 
+typedef void aic_option_callback_t(void *, int, int, int32_t);
+char *		aic_parse_brace_option(char *opt_name, char *opt_arg,
+				       char *end, int depth,
+				       aic_option_callback_t *, void *);
 
 static __inline void	 scsi_extract_sense(struct scsi_sense_data *sense,
 					    int *error_code, int *sense_key,
