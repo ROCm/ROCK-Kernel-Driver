@@ -46,11 +46,13 @@
 #include <asm/proto.h>
 #include <asm/tlbflush.h>
 
-int acpi_lapic = 0;
-int acpi_ioapic = 0;
-
 #define PREFIX			"ACPI: "
 
+int acpi_noirq __initdata = 0;	/* skip ACPI IRQ initialization */
+int acpi_ht __initdata = 1;	/* enable HT */
+
+int acpi_lapic = 0;
+int acpi_ioapic = 0;
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
@@ -267,7 +269,7 @@ acpi_parse_hpet (
  * ECLR2 is IRQ's 8-15 (IRQ 8, 13 must be 0)
  */
 
-static __initdata	acpi_pic_sci_trigger;	/* 0: level, 1: edge */
+static int __initdata	acpi_pic_sci_trigger;	/* 0: level, 1: edge */
 
 void __init
 acpi_pic_sci_set_trigger(unsigned int irq)
@@ -479,7 +481,7 @@ acpi_boot_init (void)
         * If MPS is present, it will handle them,
         * otherwise the system will stay in PIC mode
         */
-        if (acpi_disabled) {
+        if (acpi_disabled || acpi_noirq) {
                return 1;
 	}
 

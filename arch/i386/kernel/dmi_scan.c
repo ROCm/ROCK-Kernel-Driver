@@ -6,6 +6,7 @@
 #include <linux/module.h>
 #include <linux/apm_bios.h>
 #include <linux/slab.h>
+#include <asm/acpi.h>
 #include <asm/io.h>
 #include <linux/pm.h>
 #include <asm/system.h>
@@ -505,6 +506,7 @@ static __init int print_if_true(struct dmi_blacklist *d)
 }
 
 
+#ifdef	CONFIG_ACPI_BOOT
 extern int acpi_disabled, acpi_force;
 
 static __init __attribute__((unused)) int acpi_disable(struct dmi_blacklist *d) 
@@ -519,8 +521,6 @@ static __init __attribute__((unused)) int acpi_disable(struct dmi_blacklist *d)
 	return 0;
 } 
 
-
-#ifdef	CONFIG_ACPI_BOOT
 extern int acpi_ht;
 
 /*
@@ -543,10 +543,8 @@ static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d)
 #ifdef	CONFIG_ACPI_PCI
 static __init int disable_acpi_pci(struct dmi_blacklist *d) 
 { 
-	extern __init void pci_disable_acpi(void) ;
-
 	printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident); 	
-	pci_disable_acpi();
+	acpi_noirq_set();
 	return 0;
 } 
 #endif

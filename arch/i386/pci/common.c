@@ -9,6 +9,7 @@
 #include <linux/ioport.h>
 #include <linux/init.h>
 
+#include <asm/acpi.h>
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -197,12 +198,10 @@ char * __devinit  pcibios_setup(char *str)
 		return NULL;
 	}
 #endif
-#ifdef CONFIG_ACPI_PCI
 	else if (!strcmp(str, "noacpi")) {
-		pci_probe |= PCI_NO_ACPI_ROUTING;
+		acpi_noirq_set();
 		return NULL;
 	}
-#endif
 #ifndef CONFIG_X86_VISWS
 	else if (!strcmp(str, "usepirqmask")) {
 		pci_probe |= PCI_USE_PIRQ_MASK;
