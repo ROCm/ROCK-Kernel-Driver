@@ -186,6 +186,9 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		goto out;
 	}
 
+	if (psmouse->state == PSMOUSE_INITIALIZING)
+		goto out;
+
 	if (psmouse->state == PSMOUSE_ACTIVATED &&
 	    psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/2)) {
 		printk(KERN_WARNING "psmouse.c: %s at %s lost synchronization, throwing %d bytes away.\n",
@@ -631,7 +634,7 @@ static void psmouse_initialize(struct psmouse *psmouse)
  * is not a concern.
  */
 
-static void psmouse_set_state(struct psmouse *psmouse, unsigned char new_state)
+static void psmouse_set_state(struct psmouse *psmouse, enum psmouse_state new_state)
 {
 	serio_pause_rx(psmouse->serio);
 	psmouse->state = new_state;
@@ -716,7 +719,7 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	psmouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);
 	psmouse->serio = serio;
 	psmouse->dev.private = psmouse;
-	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
+	psmouse_set_state(psmouse, PSMOUSE_INITIALIZING);
 
 	serio->private = psmouse;
 	if (serio_open(serio, drv)) {
@@ -755,6 +758,8 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	input_register_device(&psmouse->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", psmouse->devname, serio->phys);
+
+	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
 
 	psmouse_initialize(psmouse);
 
@@ -795,7 +800,7 @@ static int psmouse_reconnect(struct serio *serio)
 		return -1;
 	}
 
-	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
+	psmouse_set_state(psmouse, PSMOUSE_INITIALIZING);
 
 	if (psmouse->reconnect) {
 	       if (psmouse->reconnect(psmouse))
@@ -807,6 +812,8 @@ static int psmouse_reconnect(struct serio *serio)
 	/* ok, the device type (and capabilities) match the old one,
 	 * we can continue using it, complete intialization
 	 */
+	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
+
 	psmouse_initialize(psmouse);
 
 	if (serio->parent && (serio->type & SERIO_TYPE) == SERIO_PS_PSTHRU)

@@ -17,15 +17,17 @@
 #define PSMOUSE_RET_ACK		0xfa
 #define PSMOUSE_RET_NAK		0xfe
 
-/* psmouse states */
-#define PSMOUSE_CMD_MODE	0
-#define PSMOUSE_ACTIVATED	1
-#define PSMOUSE_IGNORE		2
-
 #define PSMOUSE_FLAG_ACK	0	/* Waiting for ACK/NAK */
 #define PSMOUSE_FLAG_CMD	1	/* Waiting for command to finish */
 #define PSMOUSE_FLAG_CMD1	2	/* First byte of command response */
 #define PSMOUSE_FLAG_ID		3	/* First byte is not keyboard ID */
+
+enum psmouse_state {
+	PSMOUSE_IGNORE,
+	PSMOUSE_INITIALIZING,
+	PSMOUSE_CMD_MODE,
+	PSMOUSE_ACTIVATED,
+};
 
 /* psmouse protocol handler return codes */
 typedef enum {
@@ -48,7 +50,7 @@ struct psmouse {
 	unsigned char model;
 	unsigned long last;
 	unsigned long out_of_sync;
-	unsigned char state;
+	enum psmouse_state state;
 	unsigned char nak;
 	char error;
 	char devname[64];
