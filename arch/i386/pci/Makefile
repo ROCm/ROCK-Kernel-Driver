@@ -1,5 +1,3 @@
-O_TARGET        := pci.o
-
 obj-y		:= i386.o
 
 ifdef	CONFIG_VISWS

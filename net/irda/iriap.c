@@ -58,7 +58,7 @@ static const char *ias_charset_types[] = {
 #endif	/* CONFIG_IRDA_DEBUG */
 
 static hashbin_t *iriap = NULL;
-static __u32 service_handle;
+static void *service_handle;
 
 extern char *lmp_reasons[];
 
@@ -91,11 +91,12 @@ int __init iriap_init(void)
 	__u16 hints;
 
 	/* Allocate master array */
-	iriap = hashbin_new(HB_LOCAL);
+	iriap = hashbin_new(HB_LOCK);
 	if (!iriap)
 		return -ENOMEM;
 
-	objects = hashbin_new(HB_LOCAL);
+	/* Object repository - defined in irias_object.c */
+	objects = hashbin_new(HB_LOCK);
 	if (!objects) {
 		WARNING("%s: Can't allocate objects hashbin!\n", __FUNCTION__);
 		return -ENOMEM;
@@ -182,7 +183,7 @@ struct iriap_cb *iriap_open(__u8 slsap_sel, int mode, void *priv,
 
 	init_timer(&self->watchdog_timer);
 
-	hashbin_insert(iriap, (irda_queue_t *) self, (int) self, NULL);
+	hashbin_insert(iriap, (irda_queue_t *) self, (long) self, NULL);
 
 	/* Initialize state machines */
 	iriap_next_client_state(self, S_DISCONNECT);
@@ -235,7 +236,7 @@ void iriap_close(struct iriap_cb *self)
 		self->lsap = NULL;
 	}
 
-	entry = (struct iriap_cb *) hashbin_remove(iriap, (int) self, NULL);
+	entry = (struct iriap_cb *) hashbin_remove(iriap, (long) self, NULL);
 	ASSERT(entry == self, return;);
 
 	__iriap_close(self);
@@ -973,12 +974,11 @@ int irias_proc_read(char *buf, char **start, off_t offset, int len)
 
 	ASSERT( objects != NULL, return 0;);
 
-	save_flags( flags);
-	cli();
-
 	len = 0;
 
 	len += sprintf(buf+len, "LM-IAS Objects:\n");
+
+	spin_lock_irqsave(&objects->hb_spinlock, flags);
 
 	/* List all objects */
 	obj = (struct ias_object *) hashbin_get_first(objects);
@@ -988,6 +988,11 @@ int irias_proc_read(char *buf, char **start, off_t offset, int len)
 		len += sprintf(buf+len, "name: %s, ", obj->name);
 		len += sprintf(buf+len, "id=%d", obj->id);
 		len += sprintf(buf+len, "\n");
+
+		/* Careful for priority inversions here !
+		 * All other uses of attrib spinlock are independant of
+		 * the object spinlock, so we are safe. Jean II */
+		spin_lock(&obj->attribs->hb_spinlock);
 
 		/* List all attributes for this object */
 		attrib = (struct ias_attrib *)
@@ -1025,9 +1030,11 @@ int irias_proc_read(char *buf, char **start, off_t offset, int len)
 			attrib = (struct ias_attrib *)
 				hashbin_get_next(obj->attribs);
 		}
+		spin_unlock(&obj->attribs->hb_spinlock);
+
 	        obj = (struct ias_object *) hashbin_get_next(objects);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&objects->hb_spinlock, flags);
 
 	return len;
 }

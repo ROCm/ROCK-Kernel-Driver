@@ -124,7 +124,7 @@ int __init irlan_init(void)
 
 	IRDA_DEBUG(0, __FUNCTION__ "()\n");
 	/* Allocate master structure */
-	irlan = hashbin_new(HB_LOCAL); 
+	irlan = hashbin_new(HB_LOCK);	/* protect from /proc */
 	if (irlan == NULL) {
 		printk(KERN_WARNING "IrLAN: Can't allocate hashbin!\n");
 		return -ENOMEM;
@@ -1089,11 +1089,10 @@ static int irlan_proc_read(char *buf, char **start, off_t offset, int len)
 	unsigned long flags;
 	ASSERT(irlan != NULL, return 0;);
      
-	save_flags(flags);
-	cli();
-
 	len = 0;
 	
+	spin_lock_irqsave(&irlan->hb_spinlock, flags);
+
 	len += sprintf(buf+len, "IrLAN instances:\n");
 	
 	self = (struct irlan_cb *) hashbin_get_first(irlan);
@@ -1129,7 +1128,7 @@ static int irlan_proc_read(char *buf, char **start, off_t offset, int len)
 
 		self = (struct irlan_cb *) hashbin_get_next(irlan);
  	} 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irlan->hb_spinlock, flags);
 
 	return len;
 }

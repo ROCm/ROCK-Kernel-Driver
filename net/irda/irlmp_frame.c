@@ -210,6 +210,7 @@ void irlmp_link_unitdata_indication(struct lap_cb *self, struct sk_buff *skb)
 	__u8   dlsap_sel;   /* Destination LSAP address */
 	__u8   pid;         /* Protocol identifier */
 	__u8   *fp;
+	unsigned long flags;
 	
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 
@@ -242,6 +243,8 @@ void irlmp_link_unitdata_indication(struct lap_cb *self, struct sk_buff *skb)
 		return;
 	}
 	
+	/* Search the connectionless LSAP */
+	spin_lock_irqsave(&irlmp->unconnected_lsaps->hb_spinlock, flags);
 	lsap = (struct lsap_cb *) hashbin_get_first(irlmp->unconnected_lsaps);
 	while (lsap != NULL) {
 		/*
@@ -255,6 +258,8 @@ void irlmp_link_unitdata_indication(struct lap_cb *self, struct sk_buff *skb)
 		}
 		lsap = (struct lsap_cb *) hashbin_get_next(irlmp->unconnected_lsaps);
 	}
+	spin_unlock_irqrestore(&irlmp->unconnected_lsaps->hb_spinlock, flags);
+
 	if (lsap)
 		irlmp_connless_data_indication(lsap, skb);
 	else {
@@ -374,6 +379,7 @@ void irlmp_link_discovery_indication(struct lap_cb *self,
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 
+	/* Add to main log, cleanup */
 	irlmp_add_discovery(irlmp->cachelog, discovery);
 	
 	/* Just handle it the same way as a discovery confirm,
@@ -396,6 +402,7 @@ void irlmp_link_discovery_confirm(struct lap_cb *self, hashbin_t *log)
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 	
+	/* Add to main log, cleanup */
 	irlmp_add_discovery_log(irlmp->cachelog, log);
 
 	/* Propagate event to various LSAPs registered for it.
@@ -411,6 +418,8 @@ void irlmp_link_discovery_confirm(struct lap_cb *self, hashbin_t *log)
 static inline void irlmp_update_cache(struct lap_cb *lap,
 				      struct lsap_cb *lsap)
 {
+	/* Prevent concurent read to get garbage */
+	lap->cache.valid = FALSE;
 	/* Update cache entry */
 	lap->cache.dlsap_sel = lsap->dlsap_sel;
 	lap->cache.slsap_sel = lsap->slsap_sel;
@@ -441,6 +450,7 @@ static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 				       hashbin_t *queue) 
 {
 	struct lsap_cb *lsap;
+	unsigned long flags;
 	
 	/* 
 	 *  Optimize for the common case. We assume that the last frame
@@ -455,6 +465,9 @@ static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 		return (self->cache.lsap);
 	}
 #endif
+
+	spin_lock_irqsave(&queue->hb_spinlock, flags);
+
 	lsap = (struct lsap_cb *) hashbin_get_first(queue);
 	while (lsap != NULL) {
 		/* 
@@ -465,29 +478,27 @@ static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 		 */
 		if ((status == CONNECT_CMD) && 
 		    (lsap->slsap_sel == slsap_sel) &&      
-		    (lsap->dlsap_sel == LSAP_ANY)) 
-		{
+		    (lsap->dlsap_sel == LSAP_ANY)) {
+			/* This is where the dest lsap sel is set on incomming
+			 * lsaps */
 			lsap->dlsap_sel = dlsap_sel;
-			
-#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-			irlmp_update_cache(self, lsap);
-#endif
-			return lsap;
+			break;
 		}
 		/*
 		 *  Check if source LSAP and dest LSAP selectors match.
 		 */
 		if ((lsap->slsap_sel == slsap_sel) && 
 		    (lsap->dlsap_sel == dlsap_sel)) 
-		{
-#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-			irlmp_update_cache(self, lsap);
-#endif
-			return lsap;
-		}
+			break;
+
 		lsap = (struct lsap_cb *) hashbin_get_next(queue);
 	}
+#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
+	if(lsap)
+		irlmp_update_cache(self, lsap);
+#endif
+	spin_unlock_irqrestore(&queue->hb_spinlock, flags);
 
-	/* Sorry not found! */
-	return NULL;
+	/* Return what we've found or NULL */
+	return lsap;
 }

@@ -331,6 +331,8 @@ static void ircomm_tty_discovery_indication(discovery_t *discovery,
 	info.daddr = discovery->daddr;
 	info.saddr = discovery->saddr;
 
+	/* FIXME. We probably need to use hashbin_find_next(), but we first
+	 * need to ensure that "line" is unique. - Jean II */
 	self = (struct ircomm_tty_cb *) hashbin_get_first(ircomm_tty);
 	while (self != NULL) {
 		ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);

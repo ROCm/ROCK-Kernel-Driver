@@ -2,8 +2,6 @@
 #               Makefile for wm-FPU-emu
 #
 
-O_TARGET := math.o
-
 #DEBUG	= -DDEBUGGING
 DEBUG	=
 PARANOID = -DPARANOID

@@ -691,6 +691,8 @@ enum {
 	NETIF_MSG_TX_DONE	= 0x0400,
 	NETIF_MSG_RX_STATUS	= 0x0800,
 	NETIF_MSG_PKTDATA	= 0x1000,
+	NETIF_MSG_HW		= 0x2000,
+	NETIF_MSG_WOL		= 0x4000,
 };
 
 #define netif_msg_drv(p)	((p)->msg_enable & NETIF_MSG_DRV)
@@ -706,6 +708,8 @@ enum {
 #define netif_msg_tx_done(p)	((p)->msg_enable & NETIF_MSG_TX_DONE)
 #define netif_msg_rx_status(p)	((p)->msg_enable & NETIF_MSG_RX_STATUS)
 #define netif_msg_pktdata(p)	((p)->msg_enable & NETIF_MSG_PKTDATA)
+#define netif_msg_hw(p)		((p)->msg_enable & NETIF_MSG_HW)
+#define netif_msg_wol(p)	((p)->msg_enable & NETIF_MSG_WOL)
 
 /* Schedule rx intr now? */
 

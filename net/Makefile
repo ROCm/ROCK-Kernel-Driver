@@ -5,9 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-O_TARGET :=	network.o
-
-
 export-objs :=	netsyms.o
 
 obj-y	:= socket.o core/

@@ -3205,7 +3205,7 @@ static int cs4281_ioctl(struct inode *inode, struct file *file,
 			 "cs4281: cs4281_ioctl(): DSP_RESET\n"));
 		if (file->f_mode & FMODE_WRITE) {
 			stop_dac(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_dac.swptr = s->dma_dac.hwptr =
 			    s->dma_dac.count = s->dma_dac.total_bytes =
 			    s->dma_dac.blocks = s->dma_dac.wakeup = 0;
@@ -3213,7 +3213,7 @@ static int cs4281_ioctl(struct inode *inode, struct file *file,
 		}
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(s);
-			synchronize_irq();
+			synchronize_irq(s->irq);
 			s->dma_adc.swptr = s->dma_adc.hwptr =
 			    s->dma_adc.count = s->dma_adc.total_bytes =
 			    s->dma_adc.blocks = s->dma_dac.wakeup = 0;
@@ -4452,7 +4452,7 @@ static void __devinit cs4281_remove(struct pci_dev *pci_dev)
 {
 	struct cs4281_state *s = pci_get_drvdata(pci_dev);
 	// stop DMA controller 
-	synchronize_irq();
+	synchronize_irq(s->irq);
 	free_irq(s->irq, s);
 	unregister_sound_dsp(s->dev_audio);
 	unregister_sound_mixer(s->dev_mixer);

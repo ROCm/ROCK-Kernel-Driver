@@ -40,7 +40,7 @@ SUBDIRS += arch/sparc/kernel arch/sparc/lib arch/sparc/prom \
 CORE_FILES := arch/sparc/kernel/kernel.o arch/sparc/mm/mm.o $(CORE_FILES) \
 	arch/sparc/math-emu/math-emu.o
 
-LIBS := $(LIBS) arch/sparc/prom/promlib.a arch/sparc/lib/lib.a
+LIBS := $(LIBS) arch/sparc/prom/lib.a arch/sparc/lib/lib.a
 
 # This one has to come last
 SUBDIRS += arch/sparc/boot

@@ -162,8 +162,6 @@ objtree := $(TOPDIR)
 
 export srctree objtree
 
-SUBDIRS		:= init kernel mm fs ipc lib drivers sound net security
-
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
 depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
@@ -246,15 +244,35 @@ endif
 # Link components for vmlinux
 # ---------------------------------------------------------------------------
 
-INIT		:= init/init.o
-CORE_FILES	:= kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o security/built-in.o
-LIBS		:= lib/lib.a
-DRIVERS		:= drivers/built-in.o sound/sound.o
-NETWORKS	:= net/network.o
+init-y		:= init/
+drivers-y	:= drivers/ sound/
+networks-y	:= net/
+libs-y		:= lib/
+
+CORE_FILES	:= kernel/built-in.o mm/built-in.o fs/built-in.o \
+		   ipc/built-in.o security/built-in.o
+SUBDIRS		+= kernel mm fs ipc security
 
 include arch/$(ARCH)/Makefile
 
-export	NETWORKS DRIVERS LIBS HEAD LDFLAGS MAKEBOOT ASFLAGS
+SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m)))
+INIT		+= $(patsubst %/, %/built-in.o, $(init-y))
+
+SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(core-y) $(core-m)))
+CORE_FILES	:= $(patsubst %/, %/built-in.o, $(core-y)) $(CORE_FILES)
+
+SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(drivers-y) $(drivers-m)))
+DRIVERS		+= $(patsubst %/, %/built-in.o, $(drivers-y))
+
+SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(networks-y) $(networks-m)))
+NETWORKS	+= $(patsubst %/, %/built-in.o, $(networks-y))
+
+SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(libs-y) $(libs-m)))
+LIBS		+= $(patsubst %/, %/lib.a, $(libs-y))
+
+$(warning $(SUBDIRS))
+
+export	NETWORKS DRIVERS LIBS HEAD LDFLAGS MAKEBOOT
 
 # boot target
 # ---------------------------------------------------------------------------
