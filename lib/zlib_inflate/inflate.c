@@ -255,7 +255,7 @@ int zlib_inflateSync(
 )
 {
   uInt n;       /* number of bytes to look at */
-  Bytef *p;     /* pointer to bytes */
+  Byte *p;      /* pointer to bytes */
   uInt m;       /* number of marker bytes found in a row */
   uLong r, w;   /* temporaries to save total_in and total_out */
 
@@ -332,9 +332,9 @@ static int zlib_inflate_addhistory(inflate_blocks_statef *s,
     uLong b;              /* bit buffer */  /* NOT USED HERE */
     uInt k;               /* bits in bit buffer */ /* NOT USED HERE */
     uInt t;               /* temporary storage */
-    Bytef *p;             /* input data pointer */
+    Byte *p;              /* input data pointer */
     uInt n;               /* bytes available there */
-    Bytef *q;             /* output window write pointer */
+    Byte *q;              /* output window write pointer */
     uInt m;               /* bytes to end of window or read pointer */
 
     if (s->read != s->write)
