@@ -1,5 +1,5 @@
 Text File for the COPS LocalTalk Linux driver (cops.c).
-	By Jay Schulist <jschlst@turbolinux.com>
+	By Jay Schulist <jschlst@samba.org>
 
 This driver has two modes and they are: Dayna mode and Tangent mode.
 Each mode corresponds with the type of card. It has been found

@@ -1,7 +1,7 @@
 /*
  *  smctr.c: A network driver for the SMC Token Ring Adapters.
  *
- *  Written by Jay Schulist <jschlst@turbolinux.com>
+ *  Written by Jay Schulist <jschlst@samba.org>
  *
  *  This software may be used and distributed according to the terms
  *  of the GNU General Public License, incorporated herein by reference.
@@ -14,7 +14,7 @@
  *  	- SMC TokenCard SDK.
  *
  *  Maintainer(s):
- *    JS        Jay Schulist <jschlst@turbolinux.com>
+ *    JS        Jay Schulist <jschlst@samba.org>
  *
  * Changes:
  *    07102000          JS      Fixed a timing problem in smctr_wait_cmd();
@@ -62,7 +62,7 @@
 #include "smctr.h"               /* Our Stuff */
 #include "smctr_firmware.h"      /* SMC adapter firmware */
 
-static char version[] __initdata = KERN_INFO "smctr.c: v1.4 7/12/00 by jschlst@turbolinux.com\n";
+static char version[] __initdata = KERN_INFO "smctr.c: v1.4 7/12/00 by jschlst@samba.org\n";
 static const char cardname[] = "smctr";
 
 

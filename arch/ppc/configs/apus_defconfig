@@ -2,6 +2,8 @@
 # Automatically generated make config: don't edit
 #
 # CONFIG_UID16 is not set
+# CONFIG_RWSEM_GENERIC_SPINLOCK is not set
+CONFIG_RWSEM_XCHGADD_ALGORITHM=y
 
 #
 # Code maturity level options
@@ -24,6 +26,7 @@ CONFIG_6xx=y
 # CONFIG_8xx is not set
 # CONFIG_8260 is not set
 # CONFIG_ALL_PPC is not set
+# CONFIG_GEMINI is not set
 CONFIG_APUS=y
 CONFIG_PPC601_SYNC_FIX=y
 # CONFIG_SMP is not set
@@ -34,7 +37,6 @@ CONFIG_MACH_SPECIFIC=y
 # General setup
 #
 # CONFIG_HIGHMEM is not set
-# CONFIG_MOL is not set
 # CONFIG_ISA is not set
 # CONFIG_EISA is not set
 # CONFIG_SBUS is not set
@@ -115,7 +117,6 @@ CONFIG_BLK_DEV_INITRD=y
 # CONFIG_MD_RAID1 is not set
 # CONFIG_MD_RAID5 is not set
 # CONFIG_BLK_DEV_LVM is not set
-# CONFIG_LVM_PROC_FS is not set
 
 #
 # Networking options
@@ -238,6 +239,7 @@ CONFIG_SR_EXTRA_DEVS=2
 # CONFIG_SCSI_AHA1542 is not set
 # CONFIG_SCSI_AHA1740 is not set
 # CONFIG_SCSI_AIC7XXX is not set
+# CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_ADVANSYS is not set
 # CONFIG_SCSI_IN2000 is not set
 # CONFIG_SCSI_AM53C974 is not set
@@ -290,6 +292,7 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_MACE is not set
 # CONFIG_BMAC is not set
 # CONFIG_GMAC is not set
+# CONFIG_NCR885E is not set
 # CONFIG_OAKNET is not set
 CONFIG_ARIADNE=y
 # CONFIG_NE2K_ZORRO is not set
@@ -316,6 +319,7 @@ CONFIG_HYDRA=y
 # CONFIG_HIPPI is not set
 CONFIG_PPP=y
 CONFIG_PPP_MULTILINK=y
+# CONFIG_PPP_FILTER is not set
 CONFIG_PPP_ASYNC=y
 CONFIG_PPP_SYNC_TTY=y
 CONFIG_PPP_DEFLATE=y
@@ -394,6 +398,7 @@ CONFIG_FB_RETINAZ3=y
 # CONFIG_FB_IMSTT is not set
 # CONFIG_FB_S3TRIO is not set
 # CONFIG_FB_VGA16 is not set
+# CONFIG_FB_E1355 is not set
 # CONFIG_FB_VIRTUAL is not set
 # CONFIG_FBCON_ADVANCED is not set
 CONFIG_FBCON_MFB=y
@@ -479,6 +484,8 @@ CONFIG_SERIAL=y
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_REISERFS_CHECK is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 CONFIG_AFFS_FS=y
@@ -491,6 +498,7 @@ CONFIG_VFAT_FS=y
 # CONFIG_EFS_FS is not set
 # CONFIG_JFFS_FS is not set
 # CONFIG_CRAMFS is not set
+CONFIG_TMPFS=y
 # CONFIG_RAMFS is not set
 CONFIG_ISO9660_FS=y
 # CONFIG_JOLIET is not set
@@ -563,11 +571,13 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 # CONFIG_NLS_CODEPAGE_865 is not set
 # CONFIG_NLS_CODEPAGE_866 is not set
 # CONFIG_NLS_CODEPAGE_869 is not set
-# CONFIG_NLS_CODEPAGE_874 is not set
-# CONFIG_NLS_CODEPAGE_932 is not set
 # CONFIG_NLS_CODEPAGE_936 is not set
-# CONFIG_NLS_CODEPAGE_949 is not set
 # CONFIG_NLS_CODEPAGE_950 is not set
+# CONFIG_NLS_CODEPAGE_932 is not set
+# CONFIG_NLS_CODEPAGE_949 is not set
+# CONFIG_NLS_CODEPAGE_874 is not set
+# CONFIG_NLS_ISO8859_8 is not set
+# CONFIG_NLS_CODEPAGE_1251 is not set
 CONFIG_NLS_ISO8859_1=y
 # CONFIG_NLS_ISO8859_2 is not set
 # CONFIG_NLS_ISO8859_3 is not set
@@ -575,11 +585,12 @@ CONFIG_NLS_ISO8859_1=y
 # CONFIG_NLS_ISO8859_5 is not set
 # CONFIG_NLS_ISO8859_6 is not set
 # CONFIG_NLS_ISO8859_7 is not set
-# CONFIG_NLS_ISO8859_8 is not set
 # CONFIG_NLS_ISO8859_9 is not set
+# CONFIG_NLS_ISO8859_13 is not set
 # CONFIG_NLS_ISO8859_14 is not set
 # CONFIG_NLS_ISO8859_15 is not set
 # CONFIG_NLS_KOI8_R is not set
+# CONFIG_NLS_KOI8_U is not set
 # CONFIG_NLS_UTF8 is not set
 
 #

@@ -2,6 +2,8 @@
 # Automatically generated make config: don't edit
 #
 # CONFIG_UID16 is not set
+# CONFIG_RWSEM_GENERIC_SPINLOCK is not set
+CONFIG_RWSEM_XCHGADD_ALGORITHM=y
 
 #
 # Code maturity level options
@@ -26,9 +28,15 @@ CONFIG_SERIAL_CONSOLE=y
 # CONFIG_RPXLITE is not set
 # CONFIG_RPXCLASSIC is not set
 CONFIG_BSEIP=y
-# CONFIG_TQM8xxL is not set
+# CONFIG_TQM823L is not set
+# CONFIG_TQM850L is not set
+# CONFIG_TQM855L is not set
 # CONFIG_TQM860L is not set
+# CONFIG_FPS850L is not set
 # CONFIG_TQM860 is not set
+# CONFIG_SPD823TS is not set
+# CONFIG_IVMS8 is not set
+# CONFIG_SM850 is not set
 # CONFIG_MBX is not set
 # CONFIG_WINCEPT is not set
 CONFIG_PPC601_SYNC_FIX=y
@@ -41,7 +49,6 @@ CONFIG_MATH_EMULATION=y
 # General setup
 #
 # CONFIG_HIGHMEM is not set
-# CONFIG_MOL is not set
 # CONFIG_ISA is not set
 # CONFIG_EISA is not set
 # CONFIG_SBUS is not set
@@ -100,7 +107,6 @@ CONFIG_BLK_DEV_INITRD=y
 # CONFIG_MD_RAID1 is not set
 # CONFIG_MD_RAID5 is not set
 # CONFIG_BLK_DEV_LVM is not set
-# CONFIG_LVM_PROC_FS is not set
 
 #
 # Networking options
@@ -184,6 +190,7 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_MACE is not set
 # CONFIG_BMAC is not set
 # CONFIG_GMAC is not set
+# CONFIG_NCR885E is not set
 # CONFIG_OAKNET is not set
 # CONFIG_NET_VENDOR_3COM is not set
 # CONFIG_LANCE is not set
@@ -323,6 +330,8 @@ CONFIG_UNIX98_PTY_COUNT=256
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_REISERFS_CHECK is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set
@@ -335,6 +344,7 @@ CONFIG_UNIX98_PTY_COUNT=256
 # CONFIG_EFS_FS is not set
 # CONFIG_JFFS_FS is not set
 # CONFIG_CRAMFS is not set
+CONFIG_TMPFS=y
 # CONFIG_RAMFS is not set
 # CONFIG_ISO9660_FS is not set
 # CONFIG_JOLIET is not set
@@ -407,11 +417,13 @@ CONFIG_PARTITION_ADVANCED=y
 CONFIG_SCC_ENET=y
 # CONFIG_SCC1_ENET is not set
 CONFIG_SCC2_ENET=y
+# CONFIG_SCC3_ENET is not set
 # CONFIG_FEC_ENET is not set
 # CONFIG_ENET_BIG_BUFFERS is not set
-CONFIG_8xxSMC2=y
-# CONFIG_8xx_ALTSMC2 is not set
-# CONFIG_8xxSCC is not set
+CONFIG_SMC2_UART=y
+# CONFIG_ALTSMC2 is not set
+# CONFIG_CONS_SMC2 is not set
+# CONFIG_USE_SCC_IO is not set
 
 #
 # Generic MPC8xx Options

@@ -67,6 +67,7 @@ void rtas_display_progress(char *, unsigned short);
 void rtas_indicator_progress(char *, unsigned short);
 void bootx_text_progress(char *, unsigned short);
 
+extern unsigned long pmac_find_end_of_memory(void);
 extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
 extern int pckbd_getkeycode(unsigned int scancode);
 extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
@@ -194,37 +195,36 @@ static void __init sio_fixup_irq(const char *name, u8 device, u8 level,
 				     u8 type)
 {
 	u8 level0, type0, active;
-	struct device_node *root;
-	
-	root = find_path_device("/");
-	if (root &&
-	    !strncmp(get_property(root, "model", NULL), "IBM,LongTrail", 13 ) )
-	{
-		/* select logical device */
-		sio_write(device, 0x07);
-		active = sio_read(0x30);
-		level0 = sio_read(0x70);
-		type0 = sio_read(0x71);
-		printk("sio: %s irq level %d, type %d, %sactive: ", name, level0, type0,
-		       !active ? "in" : "");
-		if (level0 == level && type0 == type && active)
-			printk("OK\n");
-		else {
-			printk("remapping to level %d, type %d, active\n", level, type);
-			sio_write(0x01, 0x30);
-			sio_write(level, 0x70);
-			sio_write(type, 0x71);
-		}
-	}
 
+	/* select logical device */
+	sio_write(device, 0x07);
+	active = sio_read(0x30);
+	level0 = sio_read(0x70);
+	type0 = sio_read(0x71);
+	printk("sio: %s irq level %d, type %d, %sactive: ", name, level0,
+	       type0, !active ? "in" : "");
+	if (level0 == level && type0 == type && active)
+		printk("OK\n");
+	else {
+		printk("remapping to level %d, type %d, active\n", level,
+		       type);
+		sio_write(0x01, 0x30);
+		sio_write(level, 0x70);
+		sio_write(type, 0x71);
+	}
 }
 
 static void __init sio_init(void)
 {
-	/* logical device 0 (KBC/Keyboard) */
-	sio_fixup_irq("keyboard", 0, 1, 2);
-	/* select logical device 1 (KBC/Mouse) */
-	sio_fixup_irq("mouse", 1, 12, 2);
+	struct device_node *root;
+
+	if ((root = find_path_device("/")) &&
+	    !strncmp(get_property(root, "model", NULL), "IBM,LongTrail", 13)) {
+		/* logical device 0 (KBC/Keyboard) */
+		sio_fixup_irq("keyboard", 0, 1, 2);
+		/* select logical device 1 (KBC/Mouse) */
+		sio_fixup_irq("mouse", 1, 12, 2);
+	}
 }
 
 
@@ -263,16 +263,19 @@ chrp_setup_arch(void)
 
 #ifndef CONFIG_POWER4
 	/* Some IBM machines don't have the hydra -- Cort */
-	if ( !OpenPIC_Addr )
-	{
+	if (!OpenPIC_Addr) {
+		struct device_node *root;
 		unsigned long *opprop;
+		int n;
 
-		opprop = (unsigned long *)get_property(find_path_device("/"),
-						"platform-open-pic", NULL);
+		root = find_path_device("/");
+		opprop = (unsigned long *) get_property
+			(root, "platform-open-pic", NULL);
+		n = prom_n_addr_cells(root);
 		if (opprop != 0) {
 			printk("OpenPIC addrs: %lx %lx %lx\n",
-			       opprop[0], opprop[1], opprop[2]);
-			OpenPIC_Addr = ioremap(opprop[0], 0x40000);
+			       opprop[n-1], opprop[2*n-1], opprop[3*n-1]);
+			OpenPIC_Addr = ioremap(opprop[n-1], 0x40000);
 		}
 	}
 #endif
@@ -281,6 +284,10 @@ chrp_setup_arch(void)
 	 *  Fix the Super I/O configuration
 	 */
 	sio_init();
+
+	/*
+	 *  Setup the console operations
+	 */
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
 #endif
@@ -356,7 +363,7 @@ void __init chrp_init_IRQ(void)
 {
 	struct device_node *np;
 	int i;
-	unsigned long *addrp;
+	unsigned int *addrp;
 	unsigned char* chrp_int_ack_special = 0;
 	unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
 	int nmi_irq = -1;
@@ -365,11 +372,12 @@ void __init chrp_init_IRQ(void)
 #endif
 
 	if (!(np = find_devices("pci"))
-	    || !(addrp = (unsigned long *)
+	    || !(addrp = (unsigned int *)
 		 get_property(np, "8259-interrupt-acknowledge", NULL)))
 		printk("Cannot find pci to get ack address\n");
 	else
-		chrp_int_ack_special = (unsigned char *)ioremap(*addrp, 1);
+		chrp_int_ack_special = (unsigned char *)
+			ioremap(addrp[prom_n_addr_cells(np)-1], 1);
 	/* hydra still sets OpenPIC_InitSenses to a static set of values */
 	if (OpenPIC_InitSenses == NULL) {
 		prom_get_irq_senses(init_senses, NUM_8259_INTERRUPTS, NR_IRQS);
@@ -553,11 +561,9 @@ void __init
 #ifndef CONFIG_POWER4
 	ppc_md.init_IRQ       = chrp_init_IRQ;
 	ppc_md.get_irq        = openpic_get_irq;
-	ppc_md.post_irq	      = NULL;
 #else
 	ppc_md.init_IRQ	      = xics_init_IRQ;
 	ppc_md.get_irq	      = xics_get_irq;
-	ppc_md.post_irq	      = NULL;
 #endif /* CONFIG_POWER4 */
 
 	ppc_md.init           = chrp_init2;
@@ -570,6 +576,8 @@ void __init
 	ppc_md.set_rtc_time   = chrp_set_rtc_time;
 	ppc_md.get_rtc_time   = chrp_get_rtc_time;
 	ppc_md.calibrate_decr = chrp_calibrate_decr;
+
+	ppc_md.find_end_of_memory = pmac_find_end_of_memory;
 
 #ifdef CONFIG_VT
 	/* these are adjusted in chrp_init2 if we have an ADB keyboard */

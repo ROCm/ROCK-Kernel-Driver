@@ -23,7 +23,7 @@ int
 smb_ioctl(struct inode *inode, struct file *filp,
 	  unsigned int cmd, unsigned long arg)
 {
-	struct smb_sb_info *server = SMB_SERVER(inode);
+	struct smb_sb_info *server = server_from_inode(inode);
 	struct smb_conn_opt opt;
 	int result = -EINVAL;
 
@@ -37,7 +37,7 @@ smb_ioctl(struct inode *inode, struct file *filp,
 		break;
 
 	case SMB_IOC_NEWCONN:
-		/* require an argument == the mount data, else it is EINVAL */
+		/* require an argument == smb_conn_opt, else it is EINVAL */
 		if (!arg)
 			break;
 
@@ -45,7 +45,8 @@ smb_ioctl(struct inode *inode, struct file *filp,
 		if (!copy_from_user(&opt, (void *)arg, sizeof(opt)))
 			result = smb_newconn(server, &opt);
 		break;
-	default:;
+	default:
+		break;
 	}
 
 	return result;

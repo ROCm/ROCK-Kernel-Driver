@@ -2892,7 +2892,7 @@ dasd_devices_read (struct file *file, char *user_buf, size_t user_len, loff_t * 
 static ssize_t
 dasd_devices_write (struct file *file, const char *user_buf, size_t user_len, loff_t * offset)
 {
-	char *buffer = vmalloc (user_len);
+	char *buffer = vmalloc (user_len+1);
 	int off = 0;
 	char *temp;
         int irq;

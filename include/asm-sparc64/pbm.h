@@ -1,4 +1,4 @@
-/* $Id: pbm.h,v 1.25 2001/02/28 03:28:55 davem Exp $
+/* $Id: pbm.h,v 1.26 2001/05/15 08:54:30 davem Exp $
  * pbm.h: UltraSparc PCI controller software state.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -177,6 +177,9 @@ struct pci_controller_info {
 	 * error logging purposes.
 	 */
 	int				index;
+
+	/* Do the PBMs both exist in the same PCI domain? */
+	int				pbms_same_domain;
 
 	/* The PCI bus modules controlled by us. */
 	struct pci_pbm_info		pbm_A;

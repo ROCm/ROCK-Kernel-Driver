@@ -208,10 +208,11 @@ void
 xmon_irq(int irq, void *d, struct pt_regs *regs)
 {
 	unsigned long flags;
-	save_flags(flags);cli();
+	__save_flags(flags);
+	__cli();
 	printf("Keyboard interrupt\n");
 	xmon(regs);
-	restore_flags(flags);
+	__restore_flags(flags);
 }
 
 int
@@ -657,7 +658,7 @@ backtrace(struct pt_regs *excp)
 	unsigned stack[2];
 	struct pt_regs regs;
 	extern char ret_from_intercept, ret_from_syscall_1, ret_from_syscall_2;
-	extern char lost_irq_ret, do_bottom_half_ret, do_signal_ret;
+	extern char do_bottom_half_ret, do_signal_ret;
 	extern char ret_from_except;
 
 	printf("backtrace:\n");
@@ -676,7 +677,6 @@ backtrace(struct pt_regs *excp)
 		    || stack[1] == (unsigned) &ret_from_except
 		    || stack[1] == (unsigned) &ret_from_syscall_1
 		    || stack[1] == (unsigned) &ret_from_syscall_2
-		    || stack[1] == (unsigned) &lost_irq_ret
 		    || stack[1] == (unsigned) &do_bottom_half_ret
 		    || stack[1] == (unsigned) &do_signal_ret) {
 			if (mread(sp+16, &regs, sizeof(regs)) != sizeof(regs))

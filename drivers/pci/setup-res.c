@@ -115,7 +115,8 @@ pci_assign_resource(struct pci_dev *dev, int i)
 		 * window (it will just not perform as well).
 		 */
 		if (!(res->flags & IORESOURCE_PREFETCH) || pci_assign_bus_resource(bus, dev, res, size, min, 0, i) < 0) {
-			printk(KERN_ERR "PCI: Failed to allocate resource %d for %s\n", i, dev->name);
+			printk(KERN_ERR "PCI: Failed to allocate resource %d(%lx-%lx) for %s\n",
+			       i, res->start, res->end, dev->slot_name);
 			return -EBUSY;
 		}
 	}

@@ -7,31 +7,18 @@
 #ifndef _PPC_HW_IRQ_H
 #define _PPC_HW_IRQ_H
 
-struct int_control_struct
-{
-	void (*int_cli)(void);
-	void (*int_sti)(void);
-	void (*int_restore_flags)(unsigned long);
-	void (*int_save_flags)(unsigned long *);
-	void (*int_set_lost)(unsigned long);
-};
-extern struct int_control_struct int_control;
 extern unsigned long timer_interrupt_intercept;
 extern unsigned long do_IRQ_intercept;
 int timer_interrupt(struct pt_regs *);
 
-extern void __no_use_sti(void);
-extern void __no_use_cli(void);
-extern void __no_use_restore_flags(unsigned long);
-extern void __no_use_save_flags(unsigned long *);
-extern void __no_use_set_lost(unsigned long);
+extern void __sti(void);
+extern void __cli(void);
+extern void __restore_flags(unsigned long);
+extern void __save_flags_ptr(unsigned long *);
+extern unsigned long __sti_end, __cli_end, __restore_flags_end, __save_flags_ptr_end;
 
-#define __cli() int_control.int_cli()
-#define __sti() int_control.int_sti()
-#define __save_flags(flags) int_control.int_save_flags((unsigned long *)&flags)
-#define __restore_flags(flags) int_control.int_restore_flags((unsigned long)flags)
+#define __save_flags(flags) __save_flags_ptr((unsigned long *)&flags)
 #define __save_and_cli(flags) ({__save_flags(flags);__cli();})
-#define __set_lost(irq) ({ if ((unsigned long)int_control.int_set_lost) int_control.int_set_lost(irq); })
 
 extern void do_lost_interrupts(unsigned long);
 

@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: route.c,v 1.50 2001/04/25 20:46:35 davem Exp $
+ *	$Id: route.c,v 1.51 2001/05/03 07:02:47 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -892,12 +892,6 @@ void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
 	if (!(rt->rt6i_flags&RTF_GATEWAY))
 		goto out;
 
-#if !defined(CONFIG_IPV6_EUI64) || defined(CONFIG_IPV6_NO_PB)
-	/*
-	 *	During transition gateways have more than
-	 *	one link local address. Certainly, it is violation
-	 *	of basic principles, but it is temporary.
-	 */
 	/*
 	 *	RFC 1970 specifies that redirects should only be
 	 *	accepted if they come from the nexthop to the target.
@@ -929,7 +923,6 @@ void rt6_redirect(struct in6_addr *dest, struct in6_addr *saddr,
 	}
 
 source_ok:
-#endif
 
 	/*
 	 *	We have finally decided to accept it.

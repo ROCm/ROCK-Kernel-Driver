@@ -12,6 +12,7 @@
  *  use the PowerTweak utility (see http://powertweak.sourceforge.net).
  */
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
@@ -238,6 +239,30 @@ static void __init quirk_vt82c686_acpi(struct pci_dev *dev)
 	quirk_io_region(dev, smb, 16, PCI_BRIDGE_RESOURCES + 2);
 }
 
+
+#ifdef CONFIG_X86_IO_APIC 
+extern int nr_ioapics;
+
+/*
+ * VIA 686A/B: If an IO-APIC is active, we need to route all on-chip
+ * devices to the external APIC.
+ */
+static void __init quirk_via_ioapic(struct pci_dev *dev)
+{
+	u8 tmp;
+	
+	if (nr_ioapics < 1)
+		tmp = 0;    /* nothing routed to external APIC */
+	else
+		tmp = 0x1f; /* all known bits (4-0) routed to external APIC */
+		
+	/* Offset 0x58: External APIC IRQ output control */
+	pci_write_config_byte (dev, 0x58, tmp);
+}
+
+#endif /* CONFIG_X86_IO_APIC */
+
+
 /*
  * PIIX3 USB: We have to disable USB interrupts that are
  * hardwired to PIRQD# and may be shared with an
@@ -322,6 +347,11 @@ static struct pci_fixup pci_fixups[] __initdata = {
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371SB_2,	quirk_piix3_usb },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_2,	quirk_piix3_usb },
 	{ PCI_FIXUP_FINAL,	PCI_ANY_ID,		PCI_ANY_ID,			quirk_cardbus_legacy },
+
+#ifdef CONFIG_X86_IO_APIC 
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686,	quirk_via_ioapic },
+#endif
+
 	{ 0 }
 };
 

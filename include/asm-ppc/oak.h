@@ -66,5 +66,10 @@ typedef struct board_info {
 }
 #endif
 
+/* Generic 4xx type
+*/
+#define _MACH_4xx (_MACH_oak)
+
+
 #endif /* __OAK_H__ */
 #endif /* __KERNEL__ */

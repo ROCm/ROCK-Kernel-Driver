@@ -92,6 +92,8 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
 #define PKT_BUF_SZ		1536			/* Size of each temporary Rx buffer.*/
 
+#define final_version
+
 #if !defined(__OPTIMIZE__)
 #warning  You must compile this file with the correct options!
 #warning  See the last lines of the source file.

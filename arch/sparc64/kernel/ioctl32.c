@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.111 2001/03/27 07:28:43 davem Exp $
+/* $Id: ioctl32.c,v 1.115 2001/05/12 06:41:58 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -49,6 +49,7 @@
 #include <linux/blk.h>
 #include <linux/elevator.h>
 #include <linux/rtc.h>
+#include <linux/pci.h>
 #if defined(CONFIG_BLK_DEV_LVM) || defined(CONFIG_BLK_DEV_LVM_MODULE)
 /* Ugh. This header really is not clean */
 #define min min
@@ -514,10 +515,19 @@ static inline int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long ar
 			}
 		}
 		if (!err) {
-			if (i <= ifc32.ifc_len)
+			if (ifc32.ifcbuf == 0) {
+				/* Translate from 64-bit structure multiple to
+				 * a 32-bit one.
+				 */
+				i = ifc.ifc_len;
+				i = ((i / sizeof(struct ifreq)) * sizeof(struct ifreq32));
 				ifc32.ifc_len = i;
-			else
-				ifc32.ifc_len = i - sizeof (struct ifreq32);
+			} else {
+				if (i <= ifc32.ifc_len)
+					ifc32.ifc_len = i;
+				else
+					ifc32.ifc_len = i - sizeof (struct ifreq32);
+			}
 			if (copy_to_user((struct ifconf32 *)arg, &ifc32, sizeof(struct ifconf32)))
 				err = -EFAULT;
 		}
@@ -3369,11 +3379,6 @@ COMPATIBLE_IOCTL(SIOCGIFBR)
 COMPATIBLE_IOCTL(SIOCSARP)
 COMPATIBLE_IOCTL(SIOCGARP)
 COMPATIBLE_IOCTL(SIOCDARP)
-#if 0 /* XXX No longer exist in new routing code. XXX */
-COMPATIBLE_IOCTL(OLD_SIOCSARP)
-COMPATIBLE_IOCTL(OLD_SIOCGARP)
-COMPATIBLE_IOCTL(OLD_SIOCDARP)
-#endif
 COMPATIBLE_IOCTL(SIOCSRARP)
 COMPATIBLE_IOCTL(SIOCGRARP)
 COMPATIBLE_IOCTL(SIOCDRARP)
@@ -3714,6 +3719,13 @@ COMPATIBLE_IOCTL(WDIOC_KEEPALIVE)
 COMPATIBLE_IOCTL(WIOCSTART)
 COMPATIBLE_IOCTL(WIOCSTOP)
 COMPATIBLE_IOCTL(WIOCGSTAT)
+/* Misc. */
+COMPATIBLE_IOCTL(0x41545900)		/* ATYIO_CLKR */
+COMPATIBLE_IOCTL(0x41545901)		/* ATYIO_CLKW */
+COMPATIBLE_IOCTL(PCIIOC_CONTROLLER)
+COMPATIBLE_IOCTL(PCIIOC_MMAP_IS_IO)
+COMPATIBLE_IOCTL(PCIIOC_MMAP_IS_MEM)
+COMPATIBLE_IOCTL(PCIIOC_WRITE_COMBINE)
 /* And these ioctls need translation */
 HANDLE_IOCTL(SIOCGIFNAME, dev_ifname32)
 HANDLE_IOCTL(SIOCGIFCONF, dev_ifconf)
@@ -3991,8 +4003,9 @@ asmlinkage int sys32_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	} else {
 		static int count = 0;
 		if (++count <= 20)
-			printk("sys32_ioctl: Unknown cmd fd(%d) "
+			printk("sys32_ioctl(%s:%d): Unknown cmd fd(%d) "
 			       "cmd(%08x) arg(%08x)\n",
+			       current->comm, current->pid,
 			       (int)fd, (unsigned int)cmd, (unsigned int)arg);
 		error = -EINVAL;
 	}

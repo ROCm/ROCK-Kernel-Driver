@@ -14,7 +14,7 @@
  *  - This is an 8K binary image. (MCT.BIN v6.3C1 03/01/95)
  *
  * Authors:
- *  - Jay Schulist <jschlst@turbolinux.com>
+ *  - Jay Schulist <jschlst@samba.org>
  */
 
 #include <linux/config.h>

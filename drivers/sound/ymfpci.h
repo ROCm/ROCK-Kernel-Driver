@@ -135,6 +135,8 @@
 #define PCIR_LEGCTRL			0x40
 #define PCIR_ELEGCTRL			0x42
 #define PCIR_DSXGCTRL			0x48
+#define PCIR_DSXPWRCTRL1		0x4a
+#define PCIR_DSXPWRCTRL2		0x4e
 #define PCIR_OPLADR			0x60
 #define PCIR_SBADR			0x62
 #define PCIR_MPUADR			0x64

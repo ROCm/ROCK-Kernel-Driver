@@ -14,6 +14,8 @@
 
 extern void *finddevice(const char *);
 extern int getprop(void *, const char *, void *, int);
+extern void *claim(unsigned int, unsigned int, unsigned int);
+extern void release(void *ptr, unsigned int len);
 void make_bi_recs(unsigned long);
 void gunzip(void *, int, unsigned char *, int *);
 void stop_imac_ethernet(void);
@@ -78,6 +80,7 @@ boot(int a1, int a2, void *prom)
 	printf("done %u bytes\n", len);
 	printf("%u bytes of heap consumed, max in use %u\n",
 	       avail_high - begin_avail, heap_max);
+	release(begin_avail, SCRATCH_SIZE);
     } else {
 	memmove(dst, im, len);
     }
@@ -98,8 +101,13 @@ boot(int a1, int a2, void *prom)
 void make_bi_recs(unsigned long addr)
 {
 	struct bi_record *rec;
-	rec = (struct bi_record *)_ALIGN((unsigned long)addr+(1<<20)-1,(1<<20));
-	    
+
+	/* leave a 1MB gap then align to the next 1MB boundary */
+	addr = _ALIGN(addr+ (1<<20) - 1, (1<<20));
+	if (addr >= PROG_START + PROG_SIZE)
+		claim(addr, 0x1000, 0);
+
+	rec = (struct bi_record *)addr;
 	rec->tag = BI_FIRST;
 	rec->size = sizeof(struct bi_record);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);

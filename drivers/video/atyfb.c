@@ -561,6 +561,7 @@ static struct aty_features {
     { 0x4c49, 0x4c49, "3D RAGE LT PRO" },
     { 0x4c50, 0x4c50, "3D RAGE LT PRO" },
     { 0x4c54, 0x4c54, "3D RAGE LT" },
+    { 0x4752, 0x4752, "3D RAGE (XL)" },
     { 0x4754, 0x4754, "3D RAGE (GT)" },
     { 0x4755, 0x4755, "3D RAGE II+ (GTB)" },
     { 0x4756, 0x4756, "3D RAGE IIC (PCI)" },
@@ -722,7 +723,7 @@ static void init_engine(const struct atyfb_par *par, struct fb_info_aty *info)
     if (Gx == LB_CHIP_ID || Gx == LD_CHIP_ID || Gx == LI_CHIP_ID ||
     	Gx == LP_CHIP_ID || Gx == GB_CHIP_ID || Gx == GD_CHIP_ID ||
     	Gx == GI_CHIP_ID || Gx == GP_CHIP_ID || Gx == GQ_CHIP_ID ||
-    	Gx == LM_CHIP_ID || Gx == LN_CHIP_ID)
+    	Gx == LM_CHIP_ID || Gx == LN_CHIP_ID || Gx == XL_CHIP_ID)
     	reset_GTC_3D_engine(info);
 
     /* Reset engine, enable, and clear any engine errors */
@@ -2209,10 +2210,14 @@ static void aty_set_pll_ct(const struct fb_info_aty *info,
     if (!(Gx == GX_CHIP_ID || Gx == CX_CHIP_ID || Gx == CT_CHIP_ID ||
 	  Gx == ET_CHIP_ID ||
 	  ((Gx == VT_CHIP_ID || Gx == GT_CHIP_ID) && !(Rev & 0x07)))) {
-	if (info->ram_type >= SDRAM)
-	    aty_st_pll(DLL_CNTL, 0xa6, info);
-	else
-	    aty_st_pll(DLL_CNTL, 0xa0, info);
+	if (Gx == XL_CHIP_ID) {
+	    aty_st_pll(DLL_CNTL, 0x80, info);
+	} else {
+	    if (info->ram_type >= SDRAM)
+		aty_st_pll(DLL_CNTL, 0xa6, info);
+	    else
+		aty_st_pll(DLL_CNTL, 0xa0, info);
+	}
 	aty_st_pll(VFC_CNTL, 0x1b, info);
 	aty_st_le32(DSP_CONFIG, pll->dsp_config, info);
 	aty_st_le32(DSP_ON_OFF, pll->dsp_on_off, info);
@@ -2334,6 +2339,7 @@ static void aty_calc_pll_ct(const struct fb_info_aty *info, struct pll_ct *pll)
 	 (Gx == GV_CHIP_ID) || (Gx == GW_CHIP_ID) || (Gx == GZ_CHIP_ID) ||
 	 (Gx == LG_CHIP_ID) || (Gx == GB_CHIP_ID) || (Gx == GD_CHIP_ID) ||
 	 (Gx == GI_CHIP_ID) || (Gx == GP_CHIP_ID) || (Gx == GQ_CHIP_ID) ||
+	 (Gx == XL_CHIP_ID) ||
 	 (Gx == VU_CHIP_ID)) && (info->ram_type >= SDRAM))
 	pll->pll_gen_cntl = 0x04;
     else
@@ -3214,7 +3220,7 @@ static void atyfb_save_palette(struct fb_info *fb, int enter)
 		if (Gx == GT_CHIP_ID || Gx == GU_CHIP_ID || Gx == GV_CHIP_ID ||
 		    Gx == GW_CHIP_ID || Gx == GZ_CHIP_ID || Gx == LG_CHIP_ID ||
 		    Gx == GB_CHIP_ID || Gx == GD_CHIP_ID || Gx == GI_CHIP_ID ||
-		    Gx == GP_CHIP_ID || Gx == GQ_CHIP_ID)
+		    Gx == GP_CHIP_ID || Gx == GQ_CHIP_ID || Gx == XL_CHIP_ID)
 			tmp |= 0x2;
 		aty_st_8(DAC_CNTL, tmp, info);
 		aty_st_8(DAC_MASK, 0xff, info);
@@ -3367,6 +3373,9 @@ static int __init aty_init(struct fb_info_aty *info, const char *name)
 		/* RAGE PRO or LT PRO */
 		pll = 230;
 		mclk = 100;
+	    } else if (Gx == XL_CHIP_ID) {
+		pll = 230;
+		mclk = 120;
 	    } else if (Gx == LG_CHIP_ID) {
 		/* Rage LT */
 		pll = 230;
@@ -3801,34 +3810,36 @@ int __init atyfb_init(void)
 		j++;
 	    }
 
-	    /*
-	     * Fix PROMs idea of MEM_CNTL settings...
-	     */
-	    mem = aty_ld_le32(MEM_CNTL, info);
-	    chip_id = aty_ld_le32(CONFIG_CHIP_ID, info);
-	    if (((chip_id & CFG_CHIP_TYPE) == VT_CHIP_ID) &&
-		!((chip_id >> 24) & 1)) {
-		switch (mem & 0x0f) {
-		    case 3:
-			mem = (mem & ~(0x0f)) | 2;
-			break;
-		    case 7:
-			mem = (mem & ~(0x0f)) | 3;
-			break;
-		    case 9:
-			mem = (mem & ~(0x0f)) | 4;
-			break;
-		    case 11:
-			mem = (mem & ~(0x0f)) | 5;
-			break;
-		    default:
-			break;
-		}
-		if ((aty_ld_le32(CONFIG_STAT0, info) & 7) >= SDRAM)
-			mem &= ~(0x00700000);
+	    if (pdev->device != XL_CHIP_ID) {
+		    /*
+		     * Fix PROMs idea of MEM_CNTL settings...
+		     */
+		    mem = aty_ld_le32(MEM_CNTL, info);
+		    chip_id = aty_ld_le32(CONFIG_CHIP_ID, info);
+		    if (((chip_id & CFG_CHIP_TYPE) == VT_CHIP_ID) &&
+			!((chip_id >> 24) & 1)) {
+			    switch (mem & 0x0f) {
+			    case 3:
+				    mem = (mem & ~(0x0f)) | 2;
+				    break;
+			    case 7:
+				    mem = (mem & ~(0x0f)) | 3;
+				    break;
+			    case 9:
+				    mem = (mem & ~(0x0f)) | 4;
+				    break;
+			    case 11:
+				    mem = (mem & ~(0x0f)) | 5;
+				    break;
+			    default:
+				    break;
+			    }
+			    if ((aty_ld_le32(CONFIG_STAT0, info) & 7) >= SDRAM)
+				    mem &= ~(0x00700000);
+		    }
+		    mem &= ~(0xcf80e000);	/* Turn off all undocumented bits. */
+		    aty_st_le32(MEM_CNTL, mem, info);
 	    }
-	    mem &= ~(0xcf80e000);	/* Turn off all undocumented bits. */
-	    aty_st_le32(MEM_CNTL, mem, info);
 
 	    /*
 	     * If this is the console device, we will set default video
@@ -3850,7 +3861,7 @@ int __init atyfb_init(void)
 	    if (node == pcp->prom_node) {
 
 		struct fb_var_screeninfo *var = &default_var;
-		unsigned int N, P, Q, M, T;
+		unsigned int N, P, Q, M, T, R;
 		u32 v_total, h_total;
 		struct crtc crtc;
 		u8 pll_regs[16];
@@ -3891,7 +3902,7 @@ int __init atyfb_init(void)
 		N = pll_regs[7 + (clock_cntl & 3)];
 
 		/*
-		 * PLL Post Devider P (Dependant on CLOCK_CNTL):
+		 * PLL Post Divider P (Dependant on CLOCK_CNTL):
 		 */
 		P = 1 << (pll_regs[6] >> ((clock_cntl & 3) << 1));
 
@@ -3907,13 +3918,17 @@ int __init atyfb_init(void)
 		 * Q = -------
 		 *      2 * R
 		 *
-		 * where R is XTALIN (= 14318 kHz).
+		 * where R is XTALIN (= 14318 or 29498 kHz).
 		 */
-		T = 2 * Q * 14318 / M;
+		if (pdev->device == XL_CHIP_ID)
+			R = 29498;
+		else
+			R = 14318;
+
+		T = 2 * Q * R / M;
 
 		default_var.pixclock = 1000000000 / T;
 	    }
-
 #else /* __sparc__ */
 
 	    info->ati_regbase_phys = 0x7ff000 + addr;
@@ -4297,7 +4312,8 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     if (Gx == GT_CHIP_ID || Gx == GU_CHIP_ID || Gx == GV_CHIP_ID ||
 	Gx == GW_CHIP_ID || Gx == GZ_CHIP_ID || Gx == LG_CHIP_ID ||
 	Gx == GB_CHIP_ID || Gx == GD_CHIP_ID || Gx == GI_CHIP_ID ||
-	Gx == GP_CHIP_ID || Gx == GQ_CHIP_ID || Gx == LI_CHIP_ID)
+	Gx == GP_CHIP_ID || Gx == GQ_CHIP_ID || Gx == LI_CHIP_ID ||
+	Gx == XL_CHIP_ID)
 	i |= 0x2;	/*DAC_CNTL|0x2 turns off the extra brightness for gt*/
     aty_st_8(DAC_CNTL, i, info);
     aty_st_8(DAC_MASK, 0xff, info);

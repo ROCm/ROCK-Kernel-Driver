@@ -158,7 +158,7 @@ nfsctl_getfd(struct nfsctl_fdparm *data, __u8 *res)
 			err = -EINVAL;
 		else {
 			memset(res,0, NFS_FHSIZE);
-			memcpy(res, fh.fh_base.fh_pad, fh.fh_size);
+			memcpy(res, &fh.fh_base, fh.fh_size);
 		}
 	}
 
@@ -191,7 +191,7 @@ nfsctl_getfh(struct nfsctl_fhparm *data, __u8 *res)
 			err = -EINVAL;
 		else {
 			memset(res,0, NFS_FHSIZE);
-			memcpy(res, fh.fh_base.fh_pad, fh.fh_size);
+			memcpy(res, &fh.fh_base, fh.fh_size);
 		}
 	}
 

@@ -349,8 +349,6 @@ void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
 #endif
 
   /* this is to prevent panic from syncing this filesystem */
-  if (sb && sb->s_lock)
-    sb->s_lock=0;
   if (sb)
     sb->s_flags |= MS_RDONLY;
 

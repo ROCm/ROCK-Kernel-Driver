@@ -580,30 +580,7 @@ int get_filesystem_info( char *buf )
 #undef MANGLE
 #undef FREEROOM
 }
-
-/**
- *	__wait_on_super	- wait on a superblock
- *	@sb: superblock to wait on
- *
- *	Waits for a superblock to become unlocked and then returns. It does
- *	not take the lock. This is an internal function. See wait_on_super().
- */
  
-void __wait_on_super(struct super_block * sb)
-{
-	DECLARE_WAITQUEUE(wait, current);
-
-	add_wait_queue(&sb->s_wait, &wait);
-repeat:
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	if (sb->s_lock) {
-		schedule();
-		goto repeat;
-	}
-	remove_wait_queue(&sb->s_wait, &wait);
-	current->state = TASK_RUNNING;
-}
-
 /*
  * Note: check the dirty flag before waiting, so we don't
  * hold up the sync while mounting a device. (The newly
@@ -648,7 +625,9 @@ restart:
 	s = sb_entry(super_blocks.next);
 	while (s != sb_entry(&super_blocks))
 		if (s->s_dev == dev) {
-			wait_on_super(s);
+			/* Yes, it sucks. As soon as we get refcounting... */
+			lock_super(s);
+			unlock_super(s);
 			if (s->s_dev == dev)
 				return s;
 			goto restart;
@@ -700,9 +679,7 @@ static struct super_block *get_empty_super(void)
 	     s  = sb_entry(s->s_list.next)) {
 		if (s->s_dev)
 			continue;
-		if (!s->s_lock)
-			return s;
-		printk("VFS: empty superblock %p locked!\n", s);
+		return s;
 	}
 	/* Need a new one... */
 	if (nr_super_blocks >= max_super_blocks)
@@ -714,10 +691,14 @@ static struct super_block *get_empty_super(void)
 		INIT_LIST_HEAD(&s->s_dirty);
 		INIT_LIST_HEAD(&s->s_locked_inodes);
 		list_add (&s->s_list, super_blocks.prev);
-		init_waitqueue_head(&s->s_wait);
 		INIT_LIST_HEAD(&s->s_files);
 		INIT_LIST_HEAD(&s->s_mounts);
 		init_rwsem(&s->s_umount);
+		sema_init(&s->s_lock, 1);
+		sema_init(&s->s_vfs_rename_sem,1);
+		sema_init(&s->s_nfsd_free_path_sem,1);
+		sema_init(&s->s_dquot.dqio_sem, 1);
+		sema_init(&s->s_dquot.dqoff_sem, 1);
 	}
 	return s;
 }
@@ -734,11 +715,7 @@ static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
 	s->s_bdev = bdev;
 	s->s_flags = flags;
 	s->s_dirt = 0;
-	sema_init(&s->s_vfs_rename_sem,1);
-	sema_init(&s->s_nfsd_free_path_sem,1);
 	s->s_type = type;
-	sema_init(&s->s_dquot.dqio_sem, 1);
-	sema_init(&s->s_dquot.dqoff_sem, 1);
 	s->s_dquot.flags = 0;
 	s->s_maxbytes = MAX_NON_LFS;
 	lock_super(s);

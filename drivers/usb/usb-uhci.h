@@ -146,6 +146,7 @@ typedef struct {
 		uhci_qh_t qh;
 	} hw;
 	uhci_desc_type_t type;
+	dma_addr_t dma_addr;
 	struct list_head horizontal;
 	struct list_head vertical;
 	struct list_head desc_list;
@@ -154,6 +155,8 @@ typedef struct {
 
 typedef struct {
 	struct list_head desc_list;	// list pointer to all corresponding TDs/QHs associated with this request
+	dma_addr_t setup_packet_dma;
+	dma_addr_t transfer_buffer_dma;
 	unsigned long started;
 	urb_t *next_queued_urb;         // next queued urb for this EP
 	urb_t *prev_queued_urb;
@@ -195,6 +198,7 @@ typedef struct uhci {
 	struct usb_bus *bus;	// our bus
 
 	__u32 *framelist;
+	dma_addr_t framelist_dma;
 	uhci_desc_t **iso_td;
 	uhci_desc_t *int_chain[8];
 	uhci_desc_t *ls_control_chain;
@@ -213,11 +217,12 @@ typedef struct uhci {
 	long timeout_check;
 	int timeout_urbs;
 	struct pci_dev *uhci_pci;
+	struct pci_pool *desc_pool;
 } uhci_t, *puhci_t;
 
 
-#define MAKE_TD_ADDR(a) (virt_to_bus(a)&~UHCI_PTR_QH)
-#define MAKE_QH_ADDR(a) (virt_to_bus(a)|UHCI_PTR_QH)
+#define MAKE_TD_ADDR(a) ((a)->dma_addr&~UHCI_PTR_QH)
+#define MAKE_QH_ADDR(a) ((a)->dma_addr|UHCI_PTR_QH)
 #define UHCI_GET_CURRENT_FRAME(uhci) (inw ((uhci)->io_addr + USBFRNUM))
 
 /* ------------------------------------------------------------------------------------ 

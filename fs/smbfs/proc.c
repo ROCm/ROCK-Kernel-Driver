@@ -54,18 +54,6 @@ smb_proc_do_getattr(struct smb_sb_info *server, struct dentry *dir,
 		    struct smb_fattr *fattr);
 
 
-static inline void
-smb_lock_server(struct smb_sb_info *server)
-{
-	down(&(server->sem));
-}
-
-static inline void
-smb_unlock_server(struct smb_sb_info *server)
-{
-	up(&(server->sem));
-}
-
 
 static void
 str_upper(char *name, int len)
@@ -661,7 +649,7 @@ smb_retry(struct smb_sb_info *server)
 	pid_t pid = server->conn_pid;
 	int error, result = 0;
 
-	if (server->state != CONN_INVALID)
+	if (server->state == CONN_VALID || server->state == CONN_RETRYING)
 		goto out;
 
 	smb_close_socket(server);
@@ -673,17 +661,18 @@ smb_retry(struct smb_sb_info *server)
 	}
 
 	/*
-	 * Clear the pid to enable the ioctl.
+	 * Change state so that only one retry per server will be started.
 	 */
-	server->conn_pid = 0;
+	server->state = CONN_RETRYING;
 
 	/*
 	 * Note: use the "priv" flag, as a user process may need to reconnect.
 	 */
 	error = kill_proc(pid, SIGUSR1, 1);
 	if (error) {
+		/* FIXME: this is fatal */
 		printk(KERN_ERR "smb_retry: signal failed, error=%d\n", error);
-		goto out_restore;
+		goto out;
 	}
 	VERBOSE("signalled pid %d, waiting for new connection\n", pid);
 
@@ -691,7 +680,9 @@ smb_retry(struct smb_sb_info *server)
 	 * Wait for the new connection.
 	 */
 #ifdef SMB_RETRY_INTR
-	interruptible_sleep_on_timeout(&server->wait,  5*HZ);
+	smb_unlock_server(server);
+	interruptible_sleep_on_timeout(&server->wait,  30*HZ);
+	smb_lock_server(server);
 	if (signal_pending(current))
 		printk(KERN_INFO "smb_retry: caught signal\n");
 #else
@@ -702,8 +693,13 @@ smb_retry(struct smb_sb_info *server)
 	 *
 	 * smbmount should be able to reconnect later, but it can't because
 	 * it will get an -EIO on attempts to open the mountpoint!
+	 *
+	 * FIXME: go back to the interruptable version now that smbmount
+	 * can avoid -EIO on the mountpoint when reconnecting?
 	 */
-	sleep_on_timeout(&server->wait, 5*HZ);
+	smb_unlock_server(server);
+	sleep_on_timeout(&server->wait, 30*HZ);
+	smb_lock_server(server);
 #endif
 
 	/*
@@ -715,14 +711,10 @@ smb_retry(struct smb_sb_info *server)
 		PARANOIA("successful, new pid=%d, generation=%d\n",
 			 server->conn_pid, server->generation);
 		result = 1;
+	} else if (server->state == CONN_RETRYING) {
+		/* allow further attempts later */
+		server->state = CONN_RETRIED;
 	}
-
-	/*
-	 * Restore the original pid if we didn't get a new one.
-	 */
-out_restore:
-	if (!server->conn_pid)
-		server->conn_pid = pid;
 
 out:
 	return result;
@@ -742,19 +734,16 @@ smb_request_ok(struct smb_sb_info *s, int command, int wct, int bcc)
 	s->err = 0;
 
 	/* Make sure we have a connection */
-	if (s->state != CONN_VALID)
-	{
+	if (s->state != CONN_VALID) {
 		if (!smb_retry(s))
 			goto out;
 	}
 
-	if (smb_request(s) < 0)
-	{
+	if (smb_request(s) < 0) {
 		DEBUG1("smb_request failed\n");
 		goto out;
 	}
-	if (smb_valid_packet(s->packet) != 0)
-	{
+	if (smb_valid_packet(s->packet) != 0) {
 		PARANOIA("invalid packet!\n");
 		goto out;
 	}
@@ -764,8 +753,7 @@ smb_request_ok(struct smb_sb_info *s, int command, int wct, int bcc)
 	 * is squashing some error codes, but I don't think this is
 	 * correct: after a server error the packet won't be valid.
 	 */
-	if (s->rcls != 0)
-	{
+	if (s->rcls != 0) {
 		result = -smb_errno(s);
 		if (!result)
 			printk(KERN_DEBUG "smb_request_ok: rcls=%d, err=%d mapped to 0\n",
@@ -785,10 +773,6 @@ out:
 /*
  * This implements the NEWCONN ioctl. It installs the server pid,
  * sets server->state to CONN_VALID, and wakes up the waiting process.
- *
- * Note that this must be called with the server locked, except for
- * the first call made after mounting the volume. The server pid
- * will be set to zero to indicate that smbfs is awaiting a connection.
  */
 int
 smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
@@ -798,11 +782,13 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 
 	VERBOSE("fd=%d, pid=%d\n", opt->fd, current->pid);
 
+	smb_lock_server(server);
+
 	/*
-	 * Make sure we don't already have a pid ...
+	 * Make sure we don't already have a valid connection ...
 	 */
 	error = -EINVAL;
-	if (server->conn_pid)
+	if (server->state == CONN_VALID)
 		goto out;
 
 	error = -EACCES;
@@ -836,9 +822,7 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 	    (server->opt.max_xmit < 0x1000) &&
 	    !(server->opt.capabilities & SMB_CAP_NT_SMBS)) {
 		server->mnt->flags |= SMB_MOUNT_WIN95;
-#ifdef SMBFS_DEBUG_VERBOSE
-		printk(KERN_NOTICE "smb_newconn: detected WIN95 server\n");
-#endif
+		VERBOSE("smb_newconn: detected WIN95 server\n");
 	}
 
 	VERBOSE("protocol=%d, max_xmit=%d, pid=%d capabilities=0x%x\n",
@@ -851,6 +835,8 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 		int len = smb_round_length(server->opt.max_xmit);
 		char *buf = smb_vmalloc(len);
 		if (buf) {
+			if (server->packet)
+				smb_vfree(server->packet);
 			server->packet = buf;
 			server->packet_size = len;
 		} else {
@@ -863,6 +849,8 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 	}
 
 out:
+	smb_unlock_server(server);
+
 #ifdef SMB_RETRY_INTR
 	wake_up_interruptible(&server->wait);
 #else
@@ -1016,7 +1004,7 @@ smb_open(struct dentry *dentry, int wish)
 	}
 
 	if (!smb_is_open(inode)) {
-		struct smb_sb_info *server = SMB_SERVER(inode);
+		struct smb_sb_info *server = server_from_inode(inode);
 		smb_lock_server(server);
 		result = 0;
 		if (!smb_is_open(inode))
@@ -1102,7 +1090,6 @@ smb_proc_close_inode(struct smb_sb_info *server, struct inode * ino)
 
 		result = smb_proc_close(server, ino->u.smbfs_i.fileid,
 						ino->i_mtime);
-		ino->u.smbfs_i.flags &= ~SMB_F_LOCALWRITE;
 		/*
 		 * Force a revalidation after closing ... some servers
 		 * don't post the size until the file has been closed.
@@ -1119,9 +1106,8 @@ smb_close(struct inode *ino)
 {
 	int result = 0;
 
-	if (smb_is_open(ino))
-	{
-		struct smb_sb_info *server = SMB_SERVER(ino);
+	if (smb_is_open(ino)) {
+		struct smb_sb_info *server = server_from_inode(ino);
 		smb_lock_server(server);
 		result = smb_proc_close_inode(server, ino);
 		smb_unlock_server(server);
@@ -1203,14 +1189,15 @@ smb_proc_write(struct inode *inode, off_t offset, int count, const char *data)
 	struct smb_sb_info *server = server_from_inode(inode);
 	int result;
 	__u8 *p;
-	
+	__u16 fileid = inode->u.smbfs_i.fileid;
+
 	VERBOSE("ino=%ld, fileid=%d, count=%d@%ld, packet_size=%d\n",
 		inode->i_ino, inode->u.smbfs_i.fileid, count, offset,
 		server->packet_size);
 
 	smb_lock_server(server);
 	p = smb_setup_header(server, SMBwrite, 5, count + 3);
-	WSET(server->packet, smb_vwv0, inode->u.smbfs_i.fileid);
+	WSET(server->packet, smb_vwv0, fileid);
 	WSET(server->packet, smb_vwv1, count);
 	DSET(server->packet, smb_vwv2, offset);
 	WSET(server->packet, smb_vwv4, 0);
@@ -1222,6 +1209,11 @@ smb_proc_write(struct inode *inode, off_t offset, int count, const char *data)
 	result = smb_request_ok(server, SMBwrite, 1, 0);
 	if (result >= 0)
 		result = WVAL(server->packet, smb_vwv0);
+
+	/* flush to disk, to trigger win9x to update its filesize */
+	/* FIXME: this will be rather costly, won't it? */
+	if (server->mnt->flags & SMB_MOUNT_WIN95)
+		smb_proc_flush(server, fileid);
 
 	smb_unlock_server(server);
 	return result;
@@ -1423,6 +1415,17 @@ out:
 	return result;
 }
 
+/*
+ * Called with the server locked
+ */
+int
+smb_proc_flush(struct smb_sb_info *server, __u16 fileid)
+{
+	smb_setup_header(server, SMBflush, 1, 0);
+	WSET(server->packet, smb_vwv0, fileid);
+	return smb_request_ok(server, SMBflush, 0, 0);
+}
+
 int
 smb_proc_trunc(struct smb_sb_info *server, __u16 fid, __u32 length)
 {
@@ -1431,7 +1434,7 @@ smb_proc_trunc(struct smb_sb_info *server, __u16 fid, __u32 length)
 
 	smb_lock_server(server);
 
-      retry:
+retry:
 	p = smb_setup_header(server, SMBwrite, 5, 3);
 	WSET(server->packet, smb_vwv0, fid);
 	WSET(server->packet, smb_vwv1, 0);
@@ -1445,7 +1448,15 @@ smb_proc_trunc(struct smb_sb_info *server, __u16 fid, __u32 length)
 			goto retry;
 		goto out;
 	}
-	result = 0;
+
+	/*
+	 * win9x doesn't appear to update the size immediately.
+	 * It will return the old file size after the truncate,
+	 * confusing smbfs.
+	 * NT and Samba return the new value immediately.
+	 */
+	if (server->mnt->flags & SMB_MOUNT_WIN95)
+		smb_proc_flush(server, fid);
 out:
 	smb_unlock_server(server);
 	return result;

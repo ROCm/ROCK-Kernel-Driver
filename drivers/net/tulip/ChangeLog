@@ -1,3 +1,163 @@
+2001-05-13  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c: Remove HAS_PCI_MWI flag from Comet, untested.
+
+2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c, tulip.h: Remove Conexant PCI id, no chip
+	docs are available to fix problems with support.
+
+2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (tulip_init_one): Do not call
+	unregister_netdev in error cleanup.  Remnant of old
+	usage of init_etherdev.
+
+2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* media.c (tulip_find_mii): Simple write the updated BMCR
+	twice, as it seems the best thing to do for both broken and
+	sane chips.
+	If the mii_advert value, as read from MII_ADVERTISE, is zero,
+	then generate a value we should advertise from the capability
+	bits in BMSR.
+	Fill in tp->advertising for all cases.
+	Just to be safe, clear all unwanted bits.
+
+2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (private_ioctl):  Fill in tp->advertising
+	when advertising value is changed by the user.
+
+2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c: Mark Comet chips as needed the updated MWI
+	csr0 configuration.
+
+2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* media.c, tulip_core.c:  Move MII scan into
+	from inlined inside tulip_init_one to new function
+	tulip_find_mii in media.c.
+
+2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* media.c (tulip_check_duplex):
+	Only restart Rx/Tx engines if they are active
+	(and csr6 changes)
+
+2001-05-12  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (tulip_mwi_config):
+	Clamp values read from PCI cache line size register to
+	values acceptable to tulip chip.  Done for safety and
+	-almost- certainly unneeded.
+
+2001-05-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (tulip_init_one):
+	Instead of unconditionally enabling autonegotiation, disable
+	autonegotiation if not using the default port.  Further,
+	flip the nway bit immediately, and then update the
+	speed/duplex in a separate MII transaction.  We do this
+	because some boards require that nway be disabled separately,
+	before media selection is forced.
+
+	TODO: Investigate if we can simply write the same value
+	to BMCR twice, to avoid setting unnecessarily changing
+	phy settings.
+
+2001-05-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip.h, tulip_core.c:  If HAS_PCI_MWI is set for a
+	given chip, adjust the csr0 values not according to
+	provided values but according to system cache line size.
+	Currently cache alignment is matched as closely to cache
+	line size as possible.  Currently programmable burst limit
+	is set (ie. never unlimited), and always equal to cache
+	alignment and system cache size.  Currently MWI bit is set
+	only if the MWI bit is present in the PCI command register.
+
+2001-05-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* media.c (tulip_select_media):
+	For media types 1 and 3, only use the provided eeprom
+	advertising value if it is non-zero.
+	(tulip_check_duplex):
+	Do not exit ASAP if full_duplex_lock is set.  This
+	ensures that the csr6 value is written if an update
+	is needed.
+
+2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	Merge PNIC-II-specific stuff from Becker's tulip.c:
+
+	* tulip.h, 21142.c (pnic2_lnk_change): new function
+	* tulip_core.c (tulip_init_one): use it
+
+	* tulip_core.c (tulip_tx_timeout): Add specific
+	debugging for PNIC2.
+
+2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (tulip_init_one): Print out
+	tulip%d instead of PCI device number, for
+	consistency.
+
+2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* Merge changes from Becker's tulip.c:
+	Fix bugs in ioctl.
+	Fix several bugs by distinguishing between MII
+	and SYM advertising values.
+	Set CSR14 autonegotiation bit for media types 2 and 4,
+	where the SIA CSR setup values are not provided.
+
+2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* media.c (tulip_select_media): Only update MII
+	advertising value if startup arg < 2.
+
+	* tulip.h: Do not enable CSR13/14/15 autoconfiguration
+	for 21041.
+
+	* tulip_core.c:
+	21041: add specific code for reset, and do not set CAC bit
+	When resetting media, for media table type 11 media, pass
+	value 2 as 'startup' arg to select_media, to avoid updating
+	MII advertising value.
+
+2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* pnic.c (pnic_check_duplex): remove
+	pnic.c (pnic_lnk_change, pnic_timer): use
+	tulip_check_duplex not pnic_check_duplex.
+
+	* media.c (tulip_check_duplex):
+	Clean up to use symbolic names instead of numeric constants.
+	Set TxThreshold mode as necessary as well as clearing it.
+	Update csr6 if csr6 changes, not simply if duplex changes.
+
+	(found by Manfred Spraul)
+
+2001-05-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* 21142.c, eeprom.c, tulip.h, tulip_core.c:
+	Remove DPRINTK as another, better method of
+	debug message printing is available.
+
+2001-05-09  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* 21142.c (t21142_lnk_change): Pass arg startup==1
+	to tulip_select_media, in order to force csr13 to be
+	zeroed out prior to going to full duplex mode.  Fixes
+	autonegotiation on a quad-port Znyx card.
+	(from Stephen Dengler)
+
+2001-05-09  Russell King  <rmk@arm.linux.org.uk>
+
+	* interrupt.c: Better PCI bus error reporting.
+
 2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	* tulip_core.c: Now that dev->name is only available late
@@ -29,7 +189,7 @@
 	  the following defines existed.  These defines were never used
 	  by normal users in practice: TULIP_FULL_DUPLEX,
 	  TULIP_DEFAULT_MEDIA, and TULIP_NO_MEDIA_SWITCH.
-	  
+
 	* tulip.h, eeprom.c: Move EE_* constants from tulip.h to eeprom.c.
 	* tulip.h, media.c: Move MDIO_* constants from tulip.h to media.c.
 

@@ -1796,6 +1796,7 @@ static int __devinit eni_start(struct atm_dev *dev)
 		return -EAGAIN;
 	}
 	/* @@@ should release IRQ on error */
+	pci_set_master(eni_dev->pci_dev);
 	if ((error = pci_write_config_word(eni_dev->pci_dev,PCI_COMMAND,
 	    PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER |
 	    (eni_dev->asic ? PCI_COMMAND_PARITY | PCI_COMMAND_SERR : 0)))) {

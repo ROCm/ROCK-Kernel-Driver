@@ -1,5 +1,5 @@
 Text File for the SMC TokenCard TokenRing Linux driver (smctr.c).
-        By Jay Schulist <jschlst@turbolinux.com>
+        By Jay Schulist <jschlst@samba.org>
 
 The Linux SMC Token Ring driver works with the SMC TokenCard Elite (8115T) 
 ISA and SMC TokenCard Elite/A (8115T/A) MCA adapters.
@@ -22,7 +22,7 @@ Load the driver either by lilo/loadlin or as a module. When a module using the
 following command will suffice for most:
 
 # modprobe smctr
-smctr.c: v1.00 12/6/99 by jschlst@turbolinux.com
+smctr.c: v1.00 12/6/99 by jschlst@samba.org
 tr0: SMC TokenCard 8115T at Io 0x300, Irq 10, Rom 0xd8000, Ram 0xcc000.
 
 Now just setup the device via ifconfig and set and routes you may have. After

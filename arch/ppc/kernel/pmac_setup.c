@@ -66,6 +66,7 @@
 #include <asm/time.h>
 #include "local_irq.h"
 #include "pmac_pic.h"
+#include "../mm/mem_pieces.h"
 
 #undef SHOW_GATWICK_IRQS
 
@@ -102,6 +103,9 @@ extern int keyboard_sends_linux_keycodes;
 extern void pmac_nvram_update(void);
 
 extern int pmac_pci_enable_device_hook(struct pci_dev *dev, int initial);
+extern void pmac_pcibios_after_init(void);
+
+struct device_node *memory_node;
 
 unsigned char drive_info;
 
@@ -470,7 +474,7 @@ void note_bootable_part(kdev_t dev, int part, int goodness)
 	char *p;
 
 	/* Do nothing if the root has been set already. */
-	if ((goodness < current_root_goodness) &&
+	if ((goodness <= current_root_goodness) &&
 		(ROOT_DEV != to_kdev_t(DEFAULT_ROOT_DEVICE)))
 		return;
 	p = strstr(saved_command_line, "root=");
@@ -635,6 +639,88 @@ void pmac_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t 
 #endif
 #endif
 
+/*
+ * Read in a property describing some pieces of memory.
+ */
+
+static void __init get_mem_prop(char *name, struct mem_pieces *mp)
+{
+	struct reg_property *rp;
+	int i, s;
+	unsigned int *ip;
+	int nac = prom_n_addr_cells(memory_node);
+	int nsc = prom_n_size_cells(memory_node);
+
+	ip = (unsigned int *) get_property(memory_node, name, &s);
+	if (ip == NULL) {
+		printk(KERN_ERR "error: couldn't get %s property on /memory\n",
+		       name);
+		abort();
+	}
+	s /= (nsc + nac) * 4;
+	rp = mp->regions;
+	for (i = 0; i < s; ++i, ip += nac+nsc) {
+		if (nac >= 2 && ip[nac-2] != 0)
+			continue;
+		rp->address = ip[nac-1];
+		if (nsc >= 2 && ip[nac+nsc-2] != 0)
+			rp->size = ~0U;
+		else
+			rp->size = ip[nac+nsc-1];
+		++rp;
+	}
+	mp->n_regions = rp - mp->regions;
+
+	/* Make sure the pieces are sorted. */
+	mem_pieces_sort(mp);
+	mem_pieces_coalesce(mp);
+}
+
+/*
+ * On systems with Open Firmware, collect information about
+ * physical RAM and which pieces are already in use.
+ * At this point, we have (at least) the first 8MB mapped with a BAT.
+ * Our text, data, bss use something over 1MB, starting at 0.
+ * Open Firmware may be using 1MB at the 4MB point.
+ */
+unsigned long __init pmac_find_end_of_memory(void)
+{
+	unsigned long a, total;
+	struct mem_pieces phys_mem;
+
+	memory_node = find_devices("memory");
+	if (memory_node == NULL) {
+		printk(KERN_ERR "can't find memory node\n");
+		abort();
+	}
+
+	/*
+	 * Find out where physical memory is, and check that it
+	 * starts at 0 and is contiguous.  It seems that RAM is
+	 * always physically contiguous on Power Macintoshes.
+	 *
+	 * Supporting discontiguous physical memory isn't hard,
+	 * it just makes the virtual <-> physical mapping functions
+	 * more complicated (or else you end up wasting space
+	 * in mem_map).
+	 */
+	get_mem_prop("reg", &phys_mem);
+	if (phys_mem.n_regions == 0)
+		panic("No RAM??");
+	a = phys_mem.regions[0].address;
+	if (a != 0)
+		panic("RAM doesn't start at physical address 0");
+	total = phys_mem.regions[0].size;
+
+	if (phys_mem.n_regions > 1) {
+		printk("RAM starting at 0x%x is not contiguous\n",
+		       phys_mem.regions[1].address);
+		printk("Using RAM from 0 to 0x%lx\n", total-1);
+	}
+
+	return total;
+}
+
 void __init
 pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	  unsigned long r6, unsigned long r7)
@@ -656,6 +742,7 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	
 	ppc_md.pcibios_fixup  = pmac_pcibios_fixup;
 	ppc_md.pcibios_enable_device_hook = pmac_pci_enable_device_hook;
+	ppc_md.pcibios_after_init = pmac_pcibios_after_init;
 
 	ppc_md.restart        = pmac_restart;
 	ppc_md.power_off      = pmac_power_off;
@@ -665,6 +752,8 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.set_rtc_time   = pmac_set_rtc_time;
 	ppc_md.get_rtc_time   = pmac_get_rtc_time;
 	ppc_md.calibrate_decr = pmac_calibrate_decr;
+
+	ppc_md.find_end_of_memory = pmac_find_end_of_memory;
 
 #ifdef CONFIG_VT
 #ifdef CONFIG_INPUT

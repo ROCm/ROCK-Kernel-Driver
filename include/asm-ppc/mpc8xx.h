@@ -63,11 +63,14 @@
 #define PCI_DRAM_OFFSET 0
 #endif
 #else
+#if !defined(_IO_BASE)  /* defined in board specific header */
 #define _IO_BASE        0
+#endif
 #define _ISA_MEM_BASE   0
 #define PCI_DRAM_OFFSET 0
 #endif
 
+#ifndef __ASSEMBLY__
 extern unsigned long isa_io_base;
 extern unsigned long isa_mem_base;
 extern unsigned long pci_dram_offset;
@@ -82,6 +85,7 @@ extern int request_8xxirq(unsigned int irq,
 		       unsigned long flags, 
 		       const char *device,
 		       void *dev_id);
+#endif /* !__ASSEMBLY__ */
 #endif /* CONFIG_8xx */
 #endif
 #endif /* __KERNEL__ */

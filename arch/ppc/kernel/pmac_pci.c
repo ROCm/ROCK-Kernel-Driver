@@ -24,13 +24,12 @@
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
+#include <asm/feature.h>
 
 #include "pci.h"
 
 #undef DEBUG
 
-extern void process_bridge_ranges(struct pci_controller *hose,
-				  struct device_node *dev, int primary);
 static void add_bridges(struct device_node *dev);
 
 /* XXX Could be per-controller, but I don't think we risk anything by
@@ -382,17 +381,6 @@ setup_uninorth(struct pci_controller* hose, struct reg_property* addr)
 	hose->ops = &macrisc_pci_ops;
 	hose->cfg_addr = ioremap(addr->address + 0x800000, 0x1000);
 	hose->cfg_data = ioremap(addr->address + 0xc00000, 0x1000);
-#if 0 /* done in process_bridge_ranges now - paulus */
-	hose->io_base_phys = addr->address;
-	/* is 0x10000 enough for io space ? */
-	hose->io_base_virt = (void *)ioremap(addr->address, 0x10000);
-
-	/* XXX This is the bridge with the PCI expansion bus. We route
-	 * legacy IOs to it.
-	 */
-	if (addr->address == 0xf2000000)
-		isa_io_base = (unsigned long)hose->io_base_virt;
-#endif
 	/* We "know" that the bridge at f2000000 has the PCI slots. */
 	return addr->address == 0xf2000000;
 }
@@ -405,10 +393,6 @@ setup_bandit(struct pci_controller* hose, struct reg_property* addr)
 		ioremap(addr->address + 0x800000, 0x1000);
 	hose->cfg_data = (volatile unsigned char *)
 		ioremap(addr->address + 0xc00000, 0x1000);
-#if 0 /* done in process_bridge_ranges now - paulus */
-	hose->io_base_phys = addr->address;
-	hose->io_base_virt = (void *) ioremap(addr->address, 0x10000);
-#endif
 	init_bandit(hose);
 }
 
@@ -421,23 +405,12 @@ setup_chaos(struct pci_controller* hose, struct reg_property* addr)
 		ioremap(addr->address + 0x800000, 0x1000);
 	hose->cfg_data = (volatile unsigned char *)
 		ioremap(addr->address + 0xc00000, 0x1000);
-#if 0 /* done in process_bridge_ranges now - paulus */
-	hose->io_base_phys = addr->address;
-	hose->io_base_virt = (void *) ioremap(addr->address, 0x10000);
-#endif
 }
 
 void __init
 setup_grackle(struct pci_controller *hose, unsigned io_space_size)
 {
 	setup_indirect_pci(hose, 0xfec00000, 0xfee00000);
-#if 0 /* done in process_bridge_ranges now - paulus */
-	hose->io_base_phys = 0xfe000000;
-	hose->io_base_virt = (void *) ioremap(0xfe000000, io_space_size);
-	pci_dram_offset = 0;
-	isa_mem_base = 0xfd000000;
-	isa_io_base = (unsigned long) hose->io_base_virt;
-#endif
 	if (machine_is_compatible("AAPL,PowerBook1998"))
 		grackle_set_loop_snoop(hose, 1);
 #if 0	/* Disabled for now, HW problems ??? */
@@ -505,7 +478,7 @@ static void __init add_bridges(struct device_node *dev)
 		
 		/* Interpret the "ranges" property */
 		/* This also maps the I/O region and sets isa_io/mem_base */
-		process_bridge_ranges(hose, dev, primary);
+		pci_process_bridge_OF_ranges(hose, dev, primary);
 
 		/* Fixup "bus-range" OF property */
 		fixup_bus_range(dev);
@@ -557,19 +530,56 @@ pmac_pcibios_fixup(void)
 	pcibios_fixup_OF_interrupts();
 }
 
-/* We don't want to enable USB controllers absent from the OF tree
- * (iBook second controller)
- */
 int
 pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 {
+	struct device_node* node;
+
+	node = pci_device_to_OF_node(dev);
+
+	/* We don't want to enable USB controllers absent from the OF tree
+	 * (iBook second controller)
+	 */
 	if (dev->vendor == PCI_VENDOR_ID_APPLE
-	    && dev->device == PCI_DEVICE_ID_APPLE_KL_USB) {
-		struct device_node* node;
-		node = pci_device_to_OF_node(dev);
-		if (!node)
-			return -EINVAL;
+	    && dev->device == PCI_DEVICE_ID_APPLE_KL_USB && !node)
+		return -EINVAL;
+		
+	/* Firewire was disabled after PCI probe, the driver is claiming it,
+	 * so we must re-enable it now, at least until the driver can do it
+	 * itself.
+	 */
+	if (node && !strcmp(node->name, "firewire") && 
+	    device_is_compatible(node, "pci106b,18")) {
+		feature_set_firewire_cable_power(node, 1);
+		feature_set_firewire_power(node, 1);
 	}
+	
 	return 0;
+}
+
+/* We power down some devices after they have been probed. They'll
+ * be powered back on later on
+ */
+void
+pmac_pcibios_after_init(void)
+{
+	struct device_node* nd;
+
+	nd = find_devices("firewire");
+	while (nd) {
+		if (nd->parent && device_is_compatible(nd, "pci106b,18")
+		    && device_is_compatible(nd->parent, "uni-north")) {
+			feature_set_firewire_power(nd, 0);
+			feature_set_firewire_cable_power(nd, 0);
+		}
+		nd = nd->next;
+	}
+	nd = find_devices("ethernet");
+	while (nd) {
+		if (nd->parent && device_is_compatible(nd, "gmac")
+		    && device_is_compatible(nd->parent, "uni-north"))
+			feature_set_gmac_power(nd, 0);
+		nd = nd->next;
+	}
 }
 

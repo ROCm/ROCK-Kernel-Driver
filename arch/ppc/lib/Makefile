@@ -2,8 +2,7 @@
 # Makefile for ppc-specific library files..
 #
 
-.S.o:
-	$(CC) $(AFLAGS) -c $< -o $*.o
+USE_STANDARD_AS_RULE	:= true
 
 O_TARGET		:= lib.o
 

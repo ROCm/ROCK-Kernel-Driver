@@ -173,6 +173,12 @@ extern inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
 #define sg_dma_address(sg)	(virt_to_bus((sg)->address))
 #define sg_dma_len(sg)		((sg)->length)
 
+/* Return the index of the PCI controller for device. */
+static inline int pci_controller_num(struct pci_dev *dev)
+{
+	return 0;
+}
+
 #endif /* __KERNEL__ */
 
 #endif /* __i386_PCI_H */

@@ -76,9 +76,6 @@ NORET_TYPE void ext2_panic (struct super_block * sb, const char * function,
 	va_start (args, fmt);
 	vsprintf (error_buf, fmt, args);
 	va_end (args);
-	/* this is to prevent panic from syncing this filesystem */
-	if (sb->s_lock)
-		sb->s_lock=0;
 	sb->s_flags |= MS_RDONLY;
 	panic ("EXT2-fs panic (device %s): %s: %s\n",
 	       bdevname(sb->s_dev), function, error_buf);

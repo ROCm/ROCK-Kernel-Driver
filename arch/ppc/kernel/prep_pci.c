@@ -437,8 +437,8 @@ static char ibm8xx_pci_IRQ_map[23] __prepdata = {
 
 static char ibm8xx_pci_IRQ_routes[] __prepdata = {
         0,      /* Line 0 - unused */
-        13,     /* Line 1 */
-        10,     /* Line 2 */
+        15,     /* Line 1 */
+        15,     /* Line 2 */
         15,     /* Line 3 */
         15,     /* Line 4 */
 };

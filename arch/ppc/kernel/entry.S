@@ -30,7 +30,6 @@
 #include <linux/errno.h>
 #include <linux/sys.h>
 #include <linux/config.h>
-#include "mol.h"
 
 #undef SHOW_SYSCALLS
 #undef SHOW_SYSCALLS_TASK
@@ -315,21 +314,12 @@ ret_from_except:
 	lwz	r5,_MSR(r1)
 	andi.	r5,r5,MSR_EE
 	beq	2f
-	.globl	lost_irq_ret
-lost_irq_ret:
-3:	lis	r4,ppc_n_lost_interrupts@ha
-	lwz	r4,ppc_n_lost_interrupts@l(r4)
-	cmpi	0,r4,0
-	beq+	1f
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	bl	do_IRQ
-	b	3b
-1:	lis	r4,irq_stat@ha		/* &softirq_active for cpu 0 */
+	lis	r4,irq_stat@ha		/* &softirq_active for cpu 0 */
 	addi	r4,r4,irq_stat@l
 #ifdef CONFIG_SMP
 	/* get processor # */
 	lwz	r3,PROCESSOR(r2)
-	slwi	r3,r3,5
+	slwi	r3,r3,LG_CACHE_LINE_SIZE
 	add	r4,r4,r3
 #endif /* CONFIG_SMP */
 	lwz	r5,0(r4)		/* softirq_active */
@@ -351,7 +341,6 @@ do_bottom_half_ret:
 	beq+	do_signal_ret
 	li	r3,0
 	addi	r4,r1,STACK_FRAME_OVERHEAD
-	MOL_HOOK_MMU(8,r8)
 	bl	do_signal
 	.globl	do_signal_ret
 do_signal_ret:
@@ -391,7 +380,6 @@ restore:
 	stw	r0,THREAD+KSP(r2)	/* save kernel stack pointer */
 	tophys(r8,r1)
 	CLR_TOP32(r8)
-	MOL_HOOK_MMU(9, r4)		/* mod. r0,r2-r7, lr, ctr */
 	mtspr	SPRG2,r8		/* phys exception stack pointer */	
 1:
 	lwz	r3,_CTR(r1)
@@ -412,29 +400,6 @@ restore:
 	lwz	r1,GPR1(r1)
 	SYNC
 	RFI
-
-/*
- * Fake an interrupt from kernel mode.
- * This is used when enable_irq loses an interrupt.
- * We only fill in the stack frame minimally.
- */
-_GLOBAL(fake_interrupt)
-	mflr	r0
-	stw	r0,4(r1)
-	stwu	r1,-INT_FRAME_SIZE(r1)
-	stw	r0,_NIP(r1)
-	stw	r0,_LINK(r1)
-	mfmsr	r3
-	stw	r3,_MSR(r1)
-	li	r0,0x0fac
-	stw	r0,TRAP(r1)
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	li	r4,1
-	bl	do_IRQ
-	addi	r1,r1,INT_FRAME_SIZE
-	lwz	r0,4(r1)
-	mtlr	r0
-	blr
 
 
 /*

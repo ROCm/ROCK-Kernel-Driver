@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.23 2001/05/02 00:27:27 davem Exp $
+/* $Id: pci_psycho.c,v 1.24 2001/05/15 08:54:30 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -1235,9 +1235,23 @@ static void __init pbm_config_busmastering(struct pci_pbm_info *pbm)
 static void __init pbm_scan_bus(struct pci_controller_info *p,
 				struct pci_pbm_info *pbm)
 {
+	struct pcidev_cookie *cookie = kmalloc(sizeof(*cookie), GFP_KERNEL);
+
+	if (!cookie) {
+		prom_printf("PSYCHO: Critical allocation failure.\n");
+		prom_halt();
+	}
+
+	/* All we care about is the PBM. */
+	memset(cookie, 0, sizeof(*cookie));
+	cookie->pbm = pbm;
+
 	pbm->pci_bus = pci_scan_bus(pbm->pci_first_busno,
 				    p->pci_ops,
 				    pbm);
+	pci_fixup_host_bridge_self(pbm->pci_bus);
+	pbm->pci_bus->self->sysdata = cookie;
+
 	pci_fill_in_pbm_cookies(pbm->pci_bus, pbm, pbm->prom_node);
 	pci_record_assignments(pbm, pbm->pci_bus);
 	pci_assign_unassigned(pbm, pbm->pci_bus);
@@ -1564,6 +1578,7 @@ void __init psycho_init(int node, char *model_name)
 
 	p->portid = upa_portid;
 	p->index = pci_num_controllers++;
+	p->pbms_same_domain = 0;
 	p->scan_bus = psycho_scan_bus;
 	p->irq_build = psycho_irq_build;
 	p->base_address_update = psycho_base_address_update;

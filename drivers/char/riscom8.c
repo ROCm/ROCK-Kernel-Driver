@@ -1217,33 +1217,58 @@ static int rc_write(struct tty_struct * tty, int from_user,
 	if (!tty || !port->xmit_buf || !tmp_buf)
 		return 0;
 
-	if (from_user)
-		down(&tmp_buf_sem);
-
 	save_flags(flags);
-	while (1) {
-		cli();		
-		c = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-				   SERIAL_XMIT_SIZE - port->xmit_head));
-		if (c <= 0)
-			break;
+	if (from_user) {
+		down(&tmp_buf_sem);
+		while (1) {
+			cli();		
+			c = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
+					   SERIAL_XMIT_SIZE - port->xmit_head));
+			if (c <= 0)
+				break;
 
-		if (from_user) {
-			copy_from_user(tmp_buf, buf, c);
+			c -= copy_from_user(tmp_buf, buf, c);
+			if (!c) {
+				if (!total)
+					total = -EFAULT;
+				break;
+			}
+
+			cli();
 			c = MIN(c, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
 				       SERIAL_XMIT_SIZE - port->xmit_head));
 			memcpy(port->xmit_buf + port->xmit_head, tmp_buf, c);
-		} else
-			memcpy(port->xmit_buf + port->xmit_head, buf, c);
-		port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-		port->xmit_cnt += c;
-		restore_flags(flags);
-		buf += c;
-		count -= c;
-		total += c;
-	}
-	if (from_user)
+			port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+			port->xmit_cnt += c;
+			restore_flags(flags);
+
+			buf += c;
+			count -= c;
+			total += c;
+		}
 		up(&tmp_buf_sem);
+	} else {
+		while (1) {
+			cli();		
+			c = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
+					   SERIAL_XMIT_SIZE - port->xmit_head));
+			if (c <= 0) {
+				restore_flags(flags);
+				break;
+			}
+
+			memcpy(port->xmit_buf + port->xmit_head, buf, c);
+			port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+			port->xmit_cnt += c;
+			restore_flags(flags);
+
+			buf += c;
+			count -= c;
+			total += c;
+		}
+	}
+
+	cli();
 	if (port->xmit_cnt && !tty->stopped && !tty->hw_stopped &&
 	    !(port->IER & IER_TXRDY)) {
 		port->IER |= IER_TXRDY;
@@ -1251,6 +1276,7 @@ static int rc_write(struct tty_struct * tty, int from_user,
 		rc_out(bp, CD180_IER, port->IER);
 	}
 	restore_flags(flags);
+
 	return total;
 }
 

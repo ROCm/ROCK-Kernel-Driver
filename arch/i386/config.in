@@ -33,7 +33,7 @@ choice 'Processor family' \
 	 Pentium-Classic			CONFIG_M586TSC \
 	 Pentium-MMX				CONFIG_M586MMX \
 	 Pentium-Pro/Celeron/Pentium-II		CONFIG_M686 \
-	 Pentium-III/Celeron(Coppermine)	CONFIG_MPENTIUMIII \
+	 Pentium-III/Celeron-Coppermine		CONFIG_MPENTIUMIII \
 	 Pentium-4				CONFIG_MPENTIUM4 \
 	 K6/K6-II/K6-III			CONFIG_MK6 \
 	 Athlon/Duron/K7			CONFIG_MK7 \

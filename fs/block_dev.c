@@ -31,7 +31,7 @@ ssize_t block_write(struct file * filp, const char * buf,
 	ssize_t block, blocks;
 	loff_t offset;
 	ssize_t chars;
-	ssize_t written;
+	ssize_t written, retval;
 	struct buffer_head * bhlist[NBUF];
 	size_t size;
 	kdev_t dev = inode->i_rdev;
@@ -41,7 +41,7 @@ ssize_t block_write(struct file * filp, const char * buf,
 	if (is_read_only(dev))
 		return -EPERM;
 
-	written = write_error = buffercount = 0;
+	retval = written = write_error = buffercount = 0;
 	blocksize = BLOCK_SIZE;
 	if (blksize_size[MAJOR(dev)] && blksize_size[MAJOR(dev)][MINOR(dev)])
 		blocksize = blksize_size[MAJOR(dev)][MINOR(dev)];
@@ -61,8 +61,10 @@ ssize_t block_write(struct file * filp, const char * buf,
 	else
 		size = INT_MAX;
 	while (count>0) {
-		if (block >= size)
-			return written ? written : -ENOSPC;
+		if (block >= size) {
+			retval = -ENOSPC;
+			goto cleanup;
+		}
 		chars = blocksize - offset;
 		if (chars > count)
 			chars=count;
@@ -74,15 +76,19 @@ ssize_t block_write(struct file * filp, const char * buf,
 			if (chars != blocksize)
 				fn = bread;
 			bh = fn(dev, block, blocksize);
-			if (!bh)
-				return written ? written : -EIO;
+			if (!bh) {
+				retval = -EIO;
+				goto cleanup;
+			}
 			if (!buffer_uptodate(bh))
 				wait_on_buffer(bh);
 		}
 #else
 		bh = getblk(dev, block, blocksize);
-		if (!bh)
-			return written ? written : -EIO;
+		if (!bh) {
+			retval = -EIO;
+			goto cleanup;
+		}
 
 		if (!buffer_uptodate(bh))
 		{
@@ -106,7 +112,8 @@ ssize_t block_write(struct file * filp, const char * buf,
 		        if (!bhlist[i])
 			{
 			  while(i >= 0) brelse(bhlist[i--]);
-			  return written ? written : -EIO;
+			  retval = -EIO;
+			  goto cleanup;
 		        }
 		      }
 		    }
@@ -115,7 +122,8 @@ ssize_t block_write(struct file * filp, const char * buf,
 		    wait_on_buffer(bh);
 		    if (!buffer_uptodate(bh)) {
 			  brelse(bh);
-			  return written ? written : -EIO;
+			  retval = -EIO;
+			  goto cleanup;
 		    }
 		  };
 		};
@@ -149,6 +157,7 @@ ssize_t block_write(struct file * filp, const char * buf,
 		if (write_error)
 			break;
 	}
+	cleanup:
 	if ( buffercount ){
 		ll_rw_block(WRITE, buffercount, bufferlist);
 		for(i=0; i<buffercount; i++){
@@ -158,10 +167,11 @@ ssize_t block_write(struct file * filp, const char * buf,
 			brelse(bufferlist[i]);
 		}
 	}		
-	filp->f_reada = 1;
+	if(!retval)
+		filp->f_reada = 1;
 	if(write_error)
 		return -EIO;
-	return written;
+	return written ? written : retval;
 }
 
 ssize_t block_read(struct file * filp, char * buf, size_t count, loff_t *ppos)

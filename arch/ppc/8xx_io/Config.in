@@ -18,12 +18,12 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
   fi
   bool 'Use Big CPM Ethernet Buffers' CONFIG_ENET_BIG_BUFFERS
 fi
-bool 'Use SMC2 for UART' CONFIG_8xxSMC2
-if [ "$CONFIG_8xxSMC2" = "y" ]; then
-  bool 'Use Alternate SMC2 I/O (823/850)' CONFIG_8xx_ALTSMC2
-  bool 'Use SMC2 for Console' CONFIG_8xx_CONS_SMC2
+bool 'Use SMC2 for UART' CONFIG_SMC2_UART
+if [ "$CONFIG_SMC2_UART" = "y" ]; then
+  bool 'Use Alternate SMC2 I/O (823/850)' CONFIG_ALTSMC2
+  bool 'Use SMC2 for Console' CONFIG_CONS_SMC2
 fi
-bool 'Enable SCC2 and SCC3 for UART' CONFIG_8xxSCC
+bool 'Enable SCC2 and SCC3 for UART' CONFIG_USE_SCC_IO
 
 # This doesn't really belong here, but it is convenient to ask
 # 8xx specific questions.

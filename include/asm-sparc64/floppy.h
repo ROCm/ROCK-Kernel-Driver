@@ -1,4 +1,4 @@
-/* $Id: floppy.h,v 1.29 2001/03/24 00:07:23 davem Exp $
+/* $Id: floppy.h,v 1.30 2001/05/11 07:05:38 davem Exp $
  * asm-sparc64/floppy.h: Sparc specific parts of the Floppy driver.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -173,11 +173,6 @@ char *pdma_base = 0;
 unsigned long pdma_areasize;
 
 /* Common routines to all controller types on the Sparc. */
-static __inline__ void virtual_dma_init(void)
-{
-	/* nothing... */
-}
-
 static void sun_fd_disable_dma(void)
 {
 	doing_pdma = 0;
@@ -231,7 +226,7 @@ static int sun_fd_request_irq(void)
 		once = 1;
 
 		error = request_fast_irq(FLOPPY_IRQ, floppy_hardint, 
-					SA_INTERRUPT, "floppy", NULL);
+					 SA_INTERRUPT, "floppy", NULL);
 
 		return ((error == 0) ? 0 : -1);
 	}
@@ -267,6 +262,7 @@ static int sun_fd_eject(int drive)
 
 #ifdef CONFIG_PCI
 #include <asm/ebus.h>
+#include <asm/isa.h>
 #include <asm/ns87303.h>
 
 static struct linux_ebus_dma *sun_pci_fd_ebus_dma;
@@ -583,6 +579,83 @@ static int __init ebus_fdthree_p(struct linux_ebus_device *edev)
 }
 #endif
 
+#ifdef CONFIG_PCI
+#undef ISA_FLOPPY_WORKS
+
+#ifdef ISA_FLOPPY_WORKS
+static unsigned long __init isa_floppy_init(void)
+{
+	struct isa_bridge *isa_br;
+	struct isa_device *isa_dev = NULL;
+
+	for_each_isa(isa_br) {
+		for_each_isadev(isa_dev, isa_br) {
+			if (!strcmp(isa_dev->prom_name, "dma")) {
+				struct isa_device *child = isa_dev->child;
+
+				while (child) {
+					if (!strcmp(child->prom_name, "floppy")) {
+						isa_dev = child;
+						goto isa_done;
+					}
+					child = child->next;
+				}
+			}
+		}
+	}
+isa_done:
+	if (!isa_dev)
+		return 0;
+
+	/* We could use DMA on devices behind the ISA bridge, but...
+	 *
+	 * There is a slight problem.  Normally on x86 kit the x86 processor
+	 * delays I/O port instructions when the ISA bus "dma in progress"
+	 * signal is active.  Well, sparc64 systems do not monitor this
+	 * signal thus we would need to block all I/O port accesses in software
+	 * when a dma transfer is active for some device.
+	 */
+
+	sun_fdc = (struct sun_flpy_controller *)isa_dev->resource.start;
+	FLOPPY_IRQ = isa_dev->irq;
+
+	sun_fdops.fd_inb = sun_pci_fd_inb;
+	sun_fdops.fd_outb = sun_pci_fd_outb;
+
+	can_use_virtual_dma = use_virtual_dma = 1;
+	sun_fdops.fd_enable_dma = sun_fd_enable_dma;
+	sun_fdops.fd_disable_dma = sun_fd_disable_dma;
+	sun_fdops.fd_set_dma_mode = sun_fd_set_dma_mode;
+	sun_fdops.fd_set_dma_addr = sun_fd_set_dma_addr;
+	sun_fdops.fd_set_dma_count = sun_fd_set_dma_count;
+	sun_fdops.get_dma_residue = sun_get_dma_residue;
+
+	sun_fdops.fd_enable_irq = sun_fd_enable_irq;
+	sun_fdops.fd_disable_irq = sun_fd_disable_irq;
+	sun_fdops.fd_request_irq = sun_fd_request_irq;
+	sun_fdops.fd_free_irq = sun_fd_free_irq;
+
+	/* Floppy eject is manual.   Actually, could determine this
+	 * via presence of 'manual' property in OBP node.
+	 */
+	sun_fdops.fd_eject = sun_pci_fd_eject;
+
+        fdc_status = (unsigned long) &sun_fdc->status_82077;
+	FLOPPY_MOTOR_MASK = 0xf0;
+
+	allowed_drive_mask = 0;
+	sun_floppy_types[0] = 0;
+	sun_floppy_types[1] = 4;
+
+	sun_pci_broken_drive = 1;
+	sun_fdops.fd_outb = sun_pci_fd_broken_outb;
+
+	return sun_floppy_types[0];
+}
+#endif /* ISA_FLOPPY_WORKS */
+
+#endif
+
 static unsigned long __init sun_floppy_init(void)
 {
 	char state[128];
@@ -615,8 +688,13 @@ static unsigned long __init sun_floppy_init(void)
 			}
 		}
 	ebus_done:
-		if (!edev)
+		if (!edev) {
+#ifdef ISA_FLOPPY_WORKS
+			return isa_floppy_init();
+#else
 			return 0;
+#endif
+		}
 
 		prom_getproperty(edev->prom_node, "status",
 				 state, sizeof(state));

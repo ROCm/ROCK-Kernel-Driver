@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.29 2001/05/02 00:32:56 davem Exp $
+/* $Id: pci_sabre.c,v 1.32 2001/05/15 11:10:01 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -1112,11 +1112,28 @@ static void __init apb_init(struct pci_controller_info *p, struct pci_bus *sabre
 	}
 }
 
+static struct pcidev_cookie *alloc_bridge_cookie(struct pci_pbm_info *pbm)
+{
+	struct pcidev_cookie *cookie = kmalloc(sizeof(*cookie), GFP_KERNEL);
+
+	if (!cookie) {
+		prom_printf("SABRE: Critical allocation failure.\n");
+		prom_halt();
+	}
+
+	/* All we care about is the PBM. */
+	memset(cookie, 0, sizeof(*cookie));
+	cookie->pbm = pbm;
+
+	return cookie;
+}
+
 static void __init sabre_scan_bus(struct pci_controller_info *p)
 {
 	static int once = 0;
 	struct pci_bus *sabre_bus;
 	struct pci_pbm_info *pbm;
+	struct pcidev_cookie *cookie;
 	struct list_head *walk;
 	int sabres_scanned;
 
@@ -1142,10 +1159,15 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 	}
 	once++;
 
+	cookie = alloc_bridge_cookie(&p->pbm_A);
+
 	/* The pci_bus2pbm table has already been setup in sabre_init. */
 	sabre_bus = pci_scan_bus(p->pci_first_busno,
 				 p->pci_ops,
 				 &p->pbm_A);
+	pci_fixup_host_bridge_self(sabre_bus);
+	sabre_bus->self->sysdata = cookie;
+
 	apb_init(p, sabre_bus);
 
 	sabres_scanned = 0;
@@ -1160,6 +1182,9 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 			pbm = &p->pbm_B;
 		} else
 			continue;
+
+		cookie = alloc_bridge_cookie(pbm);
+		pbus->self->sysdata = cookie;
 
 		sabres_scanned++;
 
@@ -1444,6 +1469,11 @@ static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node,
 			memset(&pbm->pbm_intmask, 0, sizeof(pbm->pbm_intmask));
 		}
 
+
+		sprintf(pbm->name, "SABRE%d PBM%c", p->index,
+			(pbm == &p->pbm_A ? 'A' : 'B'));
+		pbm->io_space.name = pbm->mem_space.name = pbm->name;
+
 		/* Hack up top-level resources. */
 		pbm->io_space.start = p->controller_regs + SABRE_IOSPACE;
 		pbm->io_space.end   = pbm->io_space.start + (1UL << 16) - 1UL;
@@ -1512,6 +1542,7 @@ void __init sabre_init(int pnode, char *model_name)
 
 	p->portid = upa_portid;
 	p->index = pci_num_controllers++;
+	p->pbms_same_domain = 1;
 	p->scan_bus = sabre_scan_bus;
 	p->irq_build = sabre_irq_build;
 	p->base_address_update = sabre_base_address_update;

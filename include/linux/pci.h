@@ -279,6 +279,13 @@
 #define PCI_SLOT(devfn)		(((devfn) >> 3) & 0x1f)
 #define PCI_FUNC(devfn)		((devfn) & 0x07)
 
+/* Ioctls for /proc/bus/pci/X/Y nodes. */
+#define PCIIOC_BASE		('P' << 24 | 'C' << 16 | 'I' << 8)
+#define PCIIOC_CONTROLLER	(PCIIOC_BASE | 0x00)	/* Get controller for PCI device. */
+#define PCIIOC_MMAP_IS_IO	(PCIIOC_BASE | 0x01)	/* Set mmap state to I/O space. */
+#define PCIIOC_MMAP_IS_MEM	(PCIIOC_BASE | 0x02)	/* Set mmap state to MEM space. */
+#define PCIIOC_WRITE_COMBINE	(PCIIOC_BASE | 0x03)	/* Enable/disable write-combining. */
+
 #ifdef __KERNEL__
 
 #include <linux/types.h>
@@ -286,6 +293,12 @@
 #include <linux/ioport.h>
 #include <linux/list.h>
 #include <linux/errno.h>
+
+/* File state for mmap()s on /proc/bus/pci/X/Y */
+enum pci_mmap_state {
+	pci_mmap_io,
+	pci_mmap_mem
+};
 
 /* This defines the direction arg to the DMA mapping routines. */
 #define PCI_DMA_BIDIRECTIONAL	0

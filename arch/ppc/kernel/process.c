@@ -378,45 +378,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 }
 
 /*
- * XXX ld.so expects the auxiliary table to start on
- * a 16-byte boundary, so we have to find it and
- * move it up. :-(
- */
-static inline void shove_aux_table(unsigned long sp)
-{
-	int argc;
-	char *p;
-	unsigned long e;
-	unsigned long aux_start, offset;
-
-	if (__get_user(argc, (int *)sp))
-		return;
-	sp += sizeof(int) + (argc + 1) * sizeof(char *);
-	/* skip over the environment pointers */
-	do {
-		if (__get_user(p, (char **)sp))
-			return;
-		sp += sizeof(char *);
-	} while (p != NULL);
-	aux_start = sp;
-	/* skip to the end of the auxiliary table */
-	do {
-		if (__get_user(e, (unsigned long *)sp))
-			return;
-		sp += 2 * sizeof(unsigned long);
-	} while (e != AT_NULL);
-	offset = ((aux_start + 15) & ~15) - aux_start;
-	if (offset != 0) {
-		do {
-			sp -= sizeof(unsigned long);
-			if (__get_user(e, (unsigned long *)sp)
-			    || __put_user(e, (unsigned long *)(sp + offset)))
-				return;
-		} while (sp > aux_start);
-	}
-}
-
-/*
  * Set up a thread for executing a new program
  */
 void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
@@ -425,7 +386,6 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 	regs->nip = nip;
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER;
-	shove_aux_table(sp);
 	if (last_task_used_math == current)
 		last_task_used_math = 0;
 	if (last_task_used_altivec == current)

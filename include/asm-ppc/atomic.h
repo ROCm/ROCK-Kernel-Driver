@@ -86,4 +86,26 @@ static __inline__ int atomic_dec_return(atomic_t *v)
 #define atomic_dec(v)			((void) atomic_dec_return((v)))
 #define atomic_dec_and_test(v)		(atomic_dec_return((v)) == 0)
 
+/*
+ * Atomically test *v and decrement if it is greater than 0.
+ * The function returns the old value of *v minus 1.
+ */
+static __inline__ int atomic_dec_if_positive(atomic_t *v)
+{
+	int t;
+
+	__asm__ __volatile__("\n"
+"1:	lwarx	%0,0,%2\n"
+"	addic.	%0,%0,-1\n"
+"	blt	2f\n"
+"	stwcx.	%0,0,%2\n"
+"	bne	1b\n"
+"2:"
+	: "=&r" (t), "=m" (v->counter)
+	: "r" (&v->counter), "m" (v->counter)
+	: "cc");
+
+	return t;
+}
+
 #endif /* _ASM_PPC_ATOMIC_H_ */

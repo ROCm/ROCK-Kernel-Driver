@@ -1,4 +1,4 @@
-/* $Id: sunhme.c,v 1.117 2001/04/19 22:32:41 davem Exp $
+/* $Id: sunhme.c,v 1.118 2001/05/11 02:09:30 davem Exp $
  * sunhme.c: Sparc HME/BigMac 10/100baseT half/full duplex auto switching,
  *           auto carrier detecting ethernet driver.  Also known as the
  *           "Happy Meal Ethernet" found on SunSwift SBUS cards.
@@ -2206,6 +2206,7 @@ static void quattro_sbus_interrupt(int irq, void *cookie, struct pt_regs *ptregs
 static int happy_meal_open(struct net_device *dev)
 {
 	struct happy_meal *hp = dev->priv;
+	int res;
 
 	HMD(("happy_meal_open: "));
 
@@ -2229,7 +2230,10 @@ static int happy_meal_open(struct net_device *dev)
 	}
 
 	HMD(("to happy_meal_init\n"));
-	return happy_meal_init(hp, 0);
+	res = happy_meal_init(hp, 0);
+	if (res && ((hp->happy_flags & (HFLAG_QUATTRO|HFLAG_PCI)) != HFLAG_QUATTRO))
+		free_irq(dev->irq, dev);
+	return res;
 }
 
 static int happy_meal_close(struct net_device *dev)
@@ -2441,7 +2445,7 @@ static int happy_meal_ioctl(struct net_device *dev,
 	if (copy_from_user(&ecmd, ep_user, sizeof(ecmd)))
 		return -EFAULT;
 
-	if (ecmd.cmd == SPARC_ETH_GSET) {
+	if (ecmd.cmd == ETHTOOL_GSET) {
 		ecmd.supported =
 			(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
 			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
@@ -2480,7 +2484,7 @@ static int happy_meal_ioctl(struct net_device *dev,
 		if (copy_to_user(ep_user, &ecmd, sizeof(ecmd)))
 			return -EFAULT;
 		return 0;
-	} else if (ecmd.cmd == SPARC_ETH_SSET) {
+	} else if (ecmd.cmd == ETHTOOL_SSET) {
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
@@ -2864,7 +2868,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	
 	prom_getstring(node, "name", prom_name, sizeof(prom_name));
 #else
-#warning This needs to be corrected... -DaveM
+/* This needs to be corrected... -DaveM */
 	strcpy(prom_name, "qfe");
 #endif
 

@@ -7,7 +7,7 @@ NOTE: Ethertap is now an obsolete facility, and is scheduled
 Ethertap programming mini-HOWTO
 -------------------------------
 
-The ethertap driver was written by Jay Schulist <jschlst@turbolinux.com>,
+The ethertap driver was written by Jay Schulist <jschlst@samba.org>,
 you should contact him for further information. This document was written by
 bert hubert <bert.hubert@netherlabs.nl>. Updates are welcome.
 

@@ -73,6 +73,12 @@ extern void apus_init(unsigned long r3,
                       unsigned long r6,
                       unsigned long r7);
 
+extern void gemini_init(unsigned long r3,
+                      unsigned long r4,
+                      unsigned long r5,
+                      unsigned long r6,
+                      unsigned long r7);
+
 #ifdef CONFIG_XMON
 extern void xmon_map_scc(void);
 #endif
@@ -80,13 +86,6 @@ extern void xmon_map_scc(void);
 extern boot_infos_t *boot_infos;
 char saved_command_line[256];
 unsigned char aux_device_present;
-struct int_control_struct int_control =
-{
-	__no_use_cli,
-	__no_use_sti,
-	__no_use_restore_flags,
-	__no_use_save_flags
-};
 struct ide_machdep_calls ppc_ide_md;
 int parse_bootinfo(void);
 
@@ -547,6 +546,11 @@ identify_machine(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_APUS
 	case _MACH_apus:
                 apus_init(r3, r4, r5, r6, r7);
+		break;
+#endif
+#ifdef CONFIG_GEMINI
+	case _MACH_gemini:
+		gemini_init(r3, r4, r5, r6, r7);
 		break;
 #endif
 	default:

@@ -1,4 +1,4 @@
-/* $Id: pci_common.c,v 1.14 2001/02/28 03:28:55 davem Exp $
+/* $Id: pci_common.c,v 1.17 2001/05/15 12:32:52 davem Exp $
  * pci_common.c: PCI controller common support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -9,6 +9,29 @@
 #include <linux/init.h>
 
 #include <asm/pbm.h>
+
+/* Fix self device of BUS and hook it into BUS->self.
+ * The pci_scan_bus does not do this for the host bridge.
+ */
+void __init pci_fixup_host_bridge_self(struct pci_bus *pbus)
+{
+	struct list_head *walk = &pbus->devices;
+
+	walk = walk->next;
+	while (walk != &pbus->devices) {
+		struct pci_dev *pdev = pci_dev_b(walk);
+
+		if (pdev->class >> 8 == PCI_CLASS_BRIDGE_HOST) {
+			pbus->self = pdev;
+			return;
+		}
+
+		walk = walk->next;
+	}
+
+	prom_printf("PCI: Critical error, cannot find host bridge PDEV.\n");
+	prom_halt();
+}
 
 /* Find the OBP PROM device tree node for a PCI device.
  * Return zero if not found.
@@ -29,7 +52,10 @@ static int __init find_device_prom_node(struct pci_pbm_info *pbm,
 	 */
 	if ((pdev->bus->number == pbm->pci_bus->number) && (pdev->devfn == 0) &&
 	    (pdev->vendor == PCI_VENDOR_ID_SUN) &&
-	    (pdev->device == PCI_DEVICE_ID_SUN_PBM)) {
+	    (pdev->device == PCI_DEVICE_ID_SUN_PBM ||
+	     pdev->device == PCI_DEVICE_ID_SUN_SCHIZO ||
+	     pdev->device == PCI_DEVICE_ID_SUN_SABRE ||
+	     pdev->device == PCI_DEVICE_ID_SUN_HUMMINGBIRD)) {
 		*nregs = 0;
 		return bus_prom_node;
 	}

@@ -1,8 +1,11 @@
 /* smp.h: PPC specific SMP stuff.
  *
- * Taken from asm-sparc/smp.h
+ * Original was a copy of sparc smp.h.  Now heavily modified
+ * for PPC.
+ *
+ * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
+ * Copyright (C) 1996-2001 Cort Dougan <cort@fsmlabs.com>
  */
-
 #ifdef __KERNEL__
 #ifndef _PPC_SMP_H
 #define _PPC_SMP_H
@@ -21,9 +24,11 @@ struct cpuinfo_PPC {
 	unsigned long *pte_cache;
 	unsigned long pgtable_cache_sz;
 };
-extern struct cpuinfo_PPC cpu_data[NR_CPUS];
 
+extern struct cpuinfo_PPC cpu_data[NR_CPUS];
+extern unsigned long cpu_online_map;
 extern unsigned long smp_proc_in_lock[NR_CPUS];
+extern volatile unsigned long cpu_callin_map[NR_CPUS];
 
 extern void smp_store_cpu_info(int id);
 extern void smp_send_tlb_invalidate(int);
@@ -37,7 +42,6 @@ extern void smp_message_recv(int, struct pt_regs *);
 /* 1 to 1 mapping on PPC -- Cort */
 #define cpu_logical_map(cpu) (cpu)
 #define cpu_number_map(x) (x)
-extern volatile unsigned long cpu_callin_map[NR_CPUS];
 
 #define smp_processor_id() (current->processor)
 

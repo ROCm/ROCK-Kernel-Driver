@@ -414,8 +414,11 @@ asmlinkage long sys_poll(struct pollfd * ufds, unsigned int nfds, long timeout)
 	int nchunks, nleft;
 
 	/* Do a sanity check on nfds ... */
-	if (nfds > current->files->max_fds)
+	if (nfds > NR_OPEN)
 		return -EINVAL;
+
+	if (nfds > current->files->max_fds)
+		nfds = current->files->max_fds;
 
 	if (timeout) {
 		/* Careful about overflow in the intermediate values */

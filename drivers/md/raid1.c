@@ -388,7 +388,7 @@ void raid1_end_request (struct buffer_head *bh, int uptodate)
 	 * this branch is our 'one mirror IO has finished' event handler:
 	 */
 	if (!uptodate)
-		md_error (mddev_to_kdev(r1_bh->mddev), bh->b_dev);
+		md_error (r1_bh->mddev, bh->b_dev);
 	else
 		/*
 		 * Set R1BH_Uptodate in our master buffer_head, so that
@@ -832,6 +832,7 @@ static int raid1_diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 	struct mirror_info *tmp, *sdisk, *fdisk, *rdisk, *adisk;
 	mdp_super_t *sb = mddev->sb;
 	mdp_disk_t *failed_desc, *spare_desc, *added_desc;
+	mdk_rdev_t *spare_rdev, *failed_rdev;
 
 	print_raid1_conf(conf);
 	md_spin_lock_irq(&conf->device_lock);
@@ -989,6 +990,16 @@ static int raid1_diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 		/*
 		 * do the switch finally
 		 */
+		spare_rdev = find_rdev_nr(mddev, spare_desc->number);
+		failed_rdev = find_rdev_nr(mddev, failed_desc->number);
+
+		/* There must be a spare_rdev, but there may not be a
+		 * failed_rdev.  That slot might be empty...
+		 */
+		spare_rdev->desc_nr = failed_desc->number;
+		if (failed_rdev)
+			failed_rdev->desc_nr = spare_desc->number;
+		
 		xchg_values(*spare_desc, *failed_desc);
 		xchg_values(*fdisk, *sdisk);
 
@@ -1415,7 +1426,7 @@ static void end_sync_read(struct buffer_head *bh, int uptodate)
 	 * We don't do much here, just schedule handling by raid1d
 	 */
 	if (!uptodate)
-		md_error (mddev_to_kdev(r1_bh->mddev), bh->b_dev);
+		md_error (r1_bh->mddev, bh->b_dev);
 	else
 		set_bit(R1BH_Uptodate, &r1_bh->state);
 	raid1_reschedule_retry(r1_bh);
@@ -1426,7 +1437,7 @@ static void end_sync_write(struct buffer_head *bh, int uptodate)
  	struct raid1_bh * r1_bh = (struct raid1_bh *)(bh->b_private);
 	
 	if (!uptodate)
- 		md_error (mddev_to_kdev(r1_bh->mddev), bh->b_dev);
+ 		md_error (r1_bh->mddev, bh->b_dev);
 	if (atomic_dec_and_test(&r1_bh->remaining)) {
 		mddev_t *mddev = r1_bh->mddev;
  		unsigned long sect = bh->b_blocknr * (bh->b_size>>9);
@@ -1435,69 +1446,6 @@ static void end_sync_write(struct buffer_head *bh, int uptodate)
 		sync_request_done(sect, mddev_to_conf(mddev));
 		md_done_sync(mddev,size>>10, uptodate);
 	}
-}
-
-/*
- * This will catch the scenario in which one of the mirrors was
- * mounted as a normal device rather than as a part of a raid set.
- *
- * check_consistency is very personality-dependent, eg. RAID5 cannot
- * do this check, it uses another method.
- */
-static int __check_consistency (mddev_t *mddev, int row)
-{
-	raid1_conf_t *conf = mddev_to_conf(mddev);
-	int disks = MD_SB_DISKS;
-	kdev_t dev;
-	struct buffer_head *bh = NULL;
-	int i, rc = 0;
-	char *buffer = NULL;
-
-	for (i = 0; i < disks; i++) {
-		printk("(checking disk %d)\n",i);
-		if (!conf->mirrors[i].operational)
-			continue;
-		printk("(really checking disk %d)\n",i);
-		dev = conf->mirrors[i].dev;
-		set_blocksize(dev, 4096);
-		if ((bh = bread(dev, row / 4, 4096)) == NULL)
-			break;
-		if (!buffer) {
-			buffer = (char *) __get_free_page(GFP_KERNEL);
-			if (!buffer)
-				break;
-			memcpy(buffer, bh->b_data, 4096);
-		} else if (memcmp(buffer, bh->b_data, 4096)) {
-			rc = 1;
-			break;
-		}
-		bforget(bh);
-		fsync_dev(dev);
-		invalidate_buffers(dev);
-		bh = NULL;
-	}
-	if (buffer)
-		free_page((unsigned long) buffer);
-	if (bh) {
-		dev = bh->b_dev;
-		bforget(bh);
-		fsync_dev(dev);
-		invalidate_buffers(dev);
-	}
-	return rc;
-}
-
-static int check_consistency (mddev_t *mddev)
-{
-	if (__check_consistency(mddev, 0))
-/*
- * we do not do this currently, as it's perfectly possible to
- * have an inconsistent array when it's freshly created. Only
- * newly written data has to be consistent.
- */
-		return 0;
-
-	return 0;
 }
 
 #define INVALID_LEVEL KERN_WARNING \
@@ -1529,9 +1477,6 @@ static int check_consistency (mddev_t *mddev)
 
 #define NONE_OPERATIONAL KERN_ERR \
 "raid1: no operational mirrors for md%d\n"
-
-#define RUNNING_CKRAID KERN_ERR \
-"raid1: detected mirror differences -- running resync\n"
 
 #define ARRAY_IS_ACTIVE KERN_INFO \
 "raid1: raid set md%d active with %d out of %d mirrors\n"
@@ -1714,17 +1659,6 @@ static int raid1_run (mddev_t *mddev)
 		start_recovery = 1;
 	}
 
-	if (!start_recovery && (sb->state & (1 << MD_SB_CLEAN))) {
-		/*
-		 * we do sanity checks even if the device says
-		 * it's clean ...
-		 */
-		if (check_consistency(mddev)) {
-			printk(RUNNING_CKRAID);
-			sb->state &= ~(1 << MD_SB_CLEAN);
-		}
-	}
-
 	{
 		const char * name = "raid1d";
 
@@ -1794,7 +1728,6 @@ out:
 #undef OPERATIONAL
 #undef SPARE
 #undef NONE_OPERATIONAL
-#undef RUNNING_CKRAID
 #undef ARRAY_IS_ACTIVE
 
 static int raid1_stop_resync (mddev_t *mddev)

@@ -1,4 +1,4 @@
-/* $Id: pcikbd.c,v 1.53 2001/03/21 00:28:33 davem Exp $
+/* $Id: pcikbd.c,v 1.54 2001/05/11 07:46:28 davem Exp $
  * pcikbd.c: Ultra/AX PC keyboard support.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -28,6 +28,9 @@
 #include <linux/init.h>
 
 #include <asm/ebus.h>
+#if defined(CONFIG_USB) && defined(CONFIG_SPARC64)
+#include <asm/isa.h>
+#endif
 #include <asm/oplib.h>
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -451,6 +454,47 @@ static void pcikbd_kd_mksound(unsigned int hz, unsigned int ticks)
 	}
 	restore_flags(flags);
 }
+
+#if defined(CONFIG_USB) && defined(CONFIG_SPARC64)
+static void isa_kd_nosound(unsigned long __unused)
+{
+	/* disable counter 2 */
+	outb(inb(pcibeep_iobase + 0x61)&0xFC, pcibeep_iobase + 0x61);
+	return;
+}
+
+static void isa_kd_mksound(unsigned int hz, unsigned int ticks)
+{
+	static struct timer_list sound_timer = { function: isa_kd_nosound };
+	unsigned int count = 0;
+	unsigned long flags;
+
+	if (hz > 20 && hz < 32767)
+		count = 1193180 / hz;
+	
+	save_flags(flags);
+	cli();
+	del_timer(&sound_timer);
+	if (count) {
+		/* enable counter 2 */
+		outb(inb(pcibeep_iobase + 0x61)|3, pcibeep_iobase + 0x61);
+		/* set command for counter 2, 2 byte write */
+		outb(0xB6, pcibeep_iobase + 0x43);
+		/* select desired HZ */
+		outb(count & 0xff, pcibeep_iobase + 0x42);
+		outb((count >> 8) & 0xff, pcibeep_iobase + 0x42);
+
+		if (ticks) {
+			sound_timer.expires = jiffies+ticks;
+			add_timer(&sound_timer);
+		}
+	} else
+		isa_kd_nosound(0);
+	restore_flags(flags);
+	return;
+}
+#endif
+
 #endif
 
 static void nop_kd_mksound(unsigned int hz, unsigned int ticks)
@@ -550,6 +594,30 @@ void __init pcikbd_init_hw(void)
 				}
 			}
 		}
+
+#ifdef CONFIG_SPARC64
+		/* Maybe we have one inside the ALI southbridge? */
+		{
+			struct isa_bridge *isa_br;
+			struct isa_device *isa_dev;
+			for_each_isa(isa_br) {
+				for_each_isadev(isa_dev, isa_br) {
+					/* This is a hack, the 'dma' device node has
+					 * the base of the I/O port space for that PBM
+					 * as it's resource, so we use that. -DaveM
+					 */
+					if (!strcmp(isa_dev->prom_name, "dma")) {
+						pcibeep_iobase = isa_dev->resource.start;
+						kd_mksound = isa_kd_mksound;
+						printk("isa(speaker): iobase[%016lx:%016lx]\n",
+						       pcibeep_iobase + 0x42,
+						       pcibeep_iobase + 0x61);
+						return;
+					}
+				}
+			}
+		}
+#endif
 
 		/* No beeper found, ok complain. */
 #endif

@@ -148,7 +148,6 @@ CONFIG_INET=y
 # CONFIG_INET_ECN is not set
 # CONFIG_SYN_COOKIES is not set
 CONFIG_IPV6=m
-# CONFIG_IPV6_EUI64 is not set
 # CONFIG_KHTTPD is not set
 # CONFIG_ATM is not set
 

@@ -1,5 +1,5 @@
 Text file for the Linux SysKonnect Token Ring ISA/PCI Adapter Driver.
-	Text file by: Jay Schulist <jschlst@turbolinux.com>
+	Text file by: Jay Schulist <jschlst@samba.org>
 
 The Linux SysKonnect Token Ring driver works with the SysKonnect TR4/16(+) ISA,
 SysKonnect TR4/16(+) PCI, SysKonnect TR4/16 PCI, and older revisions of the

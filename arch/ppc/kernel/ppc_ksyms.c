@@ -55,12 +55,11 @@
 
 extern void transfer_to_handler(void);
 extern void syscall_trace(void);
-extern void do_IRQ(struct pt_regs *regs, int isfake);
+extern void do_IRQ(struct pt_regs *regs);
 extern void MachineCheckException(struct pt_regs *regs);
 extern void AlignmentException(struct pt_regs *regs);
 extern void ProgramCheckException(struct pt_regs *regs);
 extern void SingleStepException(struct pt_regs *regs);
-extern void do_lost_interrupts(unsigned long);
 extern int do_signal(sigset_t *, struct pt_regs *);
 extern int pmac_newworld;
 extern int sys_sigreturn(struct pt_regs *regs);
@@ -83,7 +82,6 @@ EXPORT_SYMBOL(SingleStepException);
 EXPORT_SYMBOL(sys_sigreturn);
 EXPORT_SYMBOL(ppc_n_lost_interrupts);
 EXPORT_SYMBOL(ppc_lost_interrupts);
-EXPORT_SYMBOL(do_lost_interrupts);
 EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(disable_irq_nosync);
@@ -277,9 +275,11 @@ EXPORT_SYMBOL(feature_set);
 EXPORT_SYMBOL(feature_clear);
 EXPORT_SYMBOL(feature_test);
 EXPORT_SYMBOL(feature_set_gmac_power);
-EXPORT_SYMBOL(feature_set_gmac_phy_reset);
+EXPORT_SYMBOL(feature_gmac_phy_reset);
 EXPORT_SYMBOL(feature_set_usb_power);
 EXPORT_SYMBOL(feature_set_firewire_power);
+EXPORT_SYMBOL(feature_set_firewire_cable_power);
+EXPORT_SYMBOL(feature_set_airport_power);
 #endif /* defined(CONFIG_ALL_PPC) */
 #if defined(CONFIG_BOOTX_TEXT)
 EXPORT_SYMBOL(bootx_update_display);
@@ -314,7 +314,14 @@ EXPORT_SYMBOL(screen_info);
 #endif
 
 EXPORT_SYMBOL(__delay);
-EXPORT_SYMBOL(int_control);
+EXPORT_SYMBOL(__sti);
+EXPORT_SYMBOL(__sti_end);
+EXPORT_SYMBOL(__cli);
+EXPORT_SYMBOL(__cli_end);
+EXPORT_SYMBOL(__save_flags_ptr);
+EXPORT_SYMBOL(__save_flags_ptr_end);
+EXPORT_SYMBOL(__restore_flags);
+EXPORT_SYMBOL(__restore_flags_end);
 EXPORT_SYMBOL(timer_interrupt_intercept);
 EXPORT_SYMBOL(timer_interrupt);
 EXPORT_SYMBOL(do_IRQ_intercept);
@@ -331,9 +338,6 @@ EXPORT_SYMBOL(xmon);
 EXPORT_SYMBOL(__up);
 EXPORT_SYMBOL(__down);
 EXPORT_SYMBOL(__down_interruptible);
-EXPORT_SYMBOL(__down_trylock);
-EXPORT_SYMBOL(down_read_failed);
-EXPORT_SYMBOL(down_write_failed);
 
 #if defined(CONFIG_KGDB) || defined(CONFIG_XMON)
 extern void (*debugger)(struct pt_regs *regs);
@@ -362,6 +366,8 @@ EXPORT_SYMBOL(do_softirq);
 EXPORT_SYMBOL(next_mmu_context);
 EXPORT_SYMBOL(set_context);
 EXPORT_SYMBOL(mmu_context_overflow);
+EXPORT_SYMBOL(flush_hash_page); /* For MOL */
+EXPORT_SYMBOL(handle_mm_fault); /* For MOL */
 EXPORT_SYMBOL_NOVERS(disarm_decr);
 #if !defined(CONFIG_8xx) && !defined(CONFIG_4xx)
 extern long *intercept_table;
@@ -369,17 +375,3 @@ EXPORT_SYMBOL(intercept_table);
 #endif
 extern long *ret_from_intercept;
 EXPORT_SYMBOL(ret_from_intercept);
-
-#ifdef CONFIG_MOL
-extern ulong mol_interface[];
-extern PTE *Hash;
-extern unsigned long Hash_mask;
-extern void (*ret_from_except)(void);
-extern struct task_struct *last_task_used_altivec;
-EXPORT_SYMBOL_NOVERS(mol_interface);
-EXPORT_SYMBOL(Hash);
-EXPORT_SYMBOL(Hash_mask);
-EXPORT_SYMBOL(handle_mm_fault);
-EXPORT_SYMBOL(last_task_used_math);
-EXPORT_SYMBOL(ret_from_except);
-#endif /* CONFIG_MOL */

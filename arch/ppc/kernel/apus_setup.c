@@ -1017,6 +1017,59 @@ struct hw_interrupt_type amiga_irqctrl = {
 	0
 };
 
+#define HARDWARE_MAPPED_SIZE (512*1024)
+unsigned long __init apus_find_end_of_memory(void)
+{
+	int shadow = 0;
+	unsigned long total;
+
+	/* The memory size reported by ADOS excludes the 512KB
+	   reserved for PPC exception registers and possibly 512KB
+	   containing a shadow of the ADOS ROM. */
+	{
+		unsigned long size = memory[0].size;
+
+		/* If 2MB aligned, size was probably user
+                   specified. We can't tell anything about shadowing
+                   in this case so skip shadow assignment. */
+		if (0 != (size & 0x1fffff)){
+			/* Align to 512KB to ensure correct handling
+			   of both memfile and system specified
+			   sizes. */
+			size = ((size+0x0007ffff) & 0xfff80000);
+			/* If memory is 1MB aligned, assume
+                           shadowing. */
+			shadow = !(size & 0x80000);
+		}
+
+		/* Add the chunk that ADOS does not see. by aligning
+                   the size to the nearest 2MB limit upwards.  */
+		memory[0].size = ((size+0x001fffff) & 0xffe00000);
+	}
+
+	total = memory[0].size;
+
+	/* Remove the memory chunks that are controlled by special
+           Phase5 hardware. */
+
+	/* Remove the upper 512KB if it contains a shadow of
+	   the ADOS ROM. FIXME: It might be possible to
+	   disable this shadow HW. Check the booter
+	   (ppc_boot.c) */
+	if (shadow)
+		total -= HARDWARE_MAPPED_SIZE;
+
+	/* Remove the upper 512KB where the PPC exception
+	   vectors are mapped. */
+	total -= HARDWARE_MAPPED_SIZE;
+
+	/* Linux/APUS only handles one block of memory -- the one on
+	   the PowerUP board. Other system memory is horrible slow in
+	   comparison. The user can use other memory for swapping
+	   using the z2ram device. */
+	ram_phys_base = memory[0].addr;
+	return total;
+}
 
 __init
 void apus_init_IRQ(void)
@@ -1037,10 +1090,6 @@ void apus_init_IRQ(void)
 
 	amiga_init_IRQ();
 
-	int_control.int_sti = __no_use_sti;
-	int_control.int_cli = __no_use_cli;
-	int_control.int_save_flags = __no_use_save_flags;
-	int_control.int_restore_flags = __no_use_restore_flags;
 }
 
 __init
@@ -1072,7 +1121,10 @@ void apus_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.irq_cannonicalize = apus_irq_cannonicalize;
 	ppc_md.init_IRQ       = apus_init_IRQ;
 	ppc_md.get_irq        = apus_get_irq;
-	ppc_md.post_irq       = apus_post_irq;
+	
+#error Should use the ->end() member of irq_desc[x]. -- Cort
+	/*ppc_md.post_irq       = apus_post_irq;*/
+	
 #ifdef CONFIG_HEARTBEAT
 	ppc_md.heartbeat      = apus_heartbeat;
 	ppc_md.heartbeat_count = 1;
@@ -1091,6 +1143,8 @@ void apus_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.set_rtc_time   = apus_set_rtc_time;
 	ppc_md.get_rtc_time   = apus_get_rtc_time;
 	ppc_md.calibrate_decr = apus_calibrate_decr;
+
+	ppc_md.find_end_of_memory = apus_find_end_of_memory;
 
 	ppc_md.nvram_read_val = NULL;
 	ppc_md.nvram_write_val = NULL;

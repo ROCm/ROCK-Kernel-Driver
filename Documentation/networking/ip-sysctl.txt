@@ -398,4 +398,117 @@ kuznet@ms2.inr.ac.ru
 Updated by:
 Andi Kleen
 ak@muc.de
-$Id: ip-sysctl.txt,v 1.18 2001/03/16 06:49:20 davem Exp $
+
+
+
+
+
+
+/proc/sys/net/ipv6/* Variables:
+
+IPv6 has no global variables such as tcp_*.  tcp_* settings under ipv4/ also
+apply to IPv6 [XXX?].
+
+conf/default/*:
+	Change the interface-specific default settings.
+
+
+conf/all/*:
+	Change all the interface-specific settings.  
+
+	[XXX:  Other special features than forwarding?]
+
+conf/all/forwarding - BOOLEAN
+	Enable global IPv6 forwarding between all interfaces.  
+
+	IPv4 and IPv6 work differently here; e.g. netfilter must be used 
+	to control which interfaces may forward packets and which not.
+
+	This also sets all interfaces' Host/Router setting 
+	'forwarding' to the specified value.  See below for details.
+
+	This referred to as global forwarding.
+
+conf/interface/*:
+	Change special settings per interface.
+
+	The functional behaviour for certain settings is different 
+	depending on whether local forwarding is enabled or not.
+
+accept_ra - BOOLEAN
+	Accept Router Advertisements; autoconfigure using them.
+	
+	Functional default: enabled if local forwarding is disabled.
+			    disabled if local forwarding is enabled.
+
+accept_redirects - BOOLEAN
+	Accept Redirects.
+
+	Functional default: enabled if local forwarding is disabled.
+			    disabled if local forwarding is enabled.
+
+autoconf - BOOLEAN
+	Configure link-local addresses using L2 hardware addresses.
+
+	Default: TRUE
+
+dad_transmits - INTEGER
+	The amount of Duplicate Address Detection probes to send.
+	Default: 1
+	
+forwarding - BOOLEAN
+	Configure interface-specific Host/Router behaviour.  
+
+	Note: It is recommended to have the same setting on all 
+	interfaces; mixed router/host scenarios are rather uncommon.
+
+	FALSE:
+
+	By default, Host behaviour is assumed.  This means:
+
+	1. IsRouter flag is not set in Neighbour Advertisements.
+	2. Router Solicitations are being sent when necessary.
+	3. If accept_ra is TRUE (default), accept Router 
+	   Advertisements (and do autoconfiguration).
+	4. If accept_redirects is TRUE (default), accept Redirects.
+
+	TRUE:
+
+	If local forwarding is enabled, Router behaviour is assumed. 
+	This means exactly the reverse from the above:
+
+	1. IsRouter flag is set in Neighbour Advertisements.
+	2. Router Solicitations are not sent.
+	3. Router Advertisements are ignored.
+	4. Redirects are ignored.
+
+	Default: FALSE if global forwarding is disabled (default),
+		 otherwise TRUE.
+
+hop_limit - INTEGER
+	Default Hop Limit to set.
+	Default: 64
+
+mtu - INTEGER
+	Default Maximum Transfer Unit
+	Default: 1280 (IPv6 required minimum)
+
+router_solicitation_delay - INTEGER
+	Number of seconds to wait after interface is brought up
+	before sending Router Solicitations.
+	Default: 1
+
+router_solicitation_interval - INTEGER
+	Number of seconds to wait between Router Solicitations.
+	Default: 4
+
+router_solicitations - INTEGER
+	Number of Router Solicitations to send until assuming no 
+	routers are present.
+	Default: 3
+
+IPv6 Update by:
+Pekka Savola
+pekkas@netcore.fi
+
+$Id: ip-sysctl.txt,v 1.19 2001/05/16 17:11:04 davem Exp $

@@ -58,6 +58,19 @@ struct smb_sb_info {
 		       struct nls_table *, struct nls_table *);
 };
 
+
+static inline void
+smb_lock_server(struct smb_sb_info *server)
+{
+	down(&(server->sem));
+}
+
+static inline void
+smb_unlock_server(struct smb_sb_info *server)
+{
+	up(&(server->sem));
+}
+
 #endif /* __KERNEL__ */
 
 #endif

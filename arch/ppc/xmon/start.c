@@ -61,27 +61,37 @@ xmon_map_scc(void)
 		struct device_node *np;
 		unsigned long addr;
 #ifdef CONFIG_BOOTX_TEXT
-		extern boot_infos_t *disp_bi;
+		if (!machine_is_compatible("iMac")) {
+			extern boot_infos_t *disp_bi;
 
-		/* see if there is a keyboard in the device tree
-		   with a parent of type "adb" */
-		for (np = find_devices("keyboard"); np; np = np->next)
-			if (np->parent && np->parent->type
-			    && strcmp(np->parent->type, "adb") == 0)
-				break;
+			/* see if there is a keyboard in the device tree
+			   with a parent of type "adb" */
+			for (np = find_devices("keyboard"); np; np = np->next)
+				if (np->parent && np->parent->type
+				    && strcmp(np->parent->type, "adb") == 0)
+					break;
 
-		/* needs to be hacked if xmon_printk is to be used
- 		   from within find_via_pmu() */
+			/* needs to be hacked if xmon_printk is to be used
+			   from within find_via_pmu() */
 #ifdef CONFIG_ADB_PMU
-		if (np != NULL && disp_bi && find_via_pmu())
-			use_screen = 1;
+			if (np != NULL && disp_bi && find_via_pmu())
+				use_screen = 1;
 #endif
 #ifdef CONFIG_ADB_CUDA
-		if (np != NULL && disp_bi && find_via_cuda())
-			use_screen = 1;
+			if (np != NULL && disp_bi && find_via_cuda())
+				use_screen = 1;
 #endif
+		}
+		prom_drawstring("xmon uses ");
 		if (use_screen)
-			prom_drawstring("xmon uses screen and keyboard\n");
+			prom_drawstring("screen and keyboard\n");
+		else {
+			if (via_modem)
+				prom_drawstring("modem on ");
+			prom_drawstring(xmon_use_sccb? "printer": "modem");
+			prom_drawstring(" port\n");
+		}
+
 #endif /* CONFIG_BOOTX_TEXT */
 
 #ifdef CHRP_ESCC
@@ -100,6 +110,15 @@ xmon_map_scc(void)
 		base = (volatile unsigned char *) ioremap(addr & PAGE_MASK, PAGE_SIZE);
 		sccc = base + (addr & ~PAGE_MASK);
 		sccd = sccc + 0x10;
+	}
+	else if ( _machine & _MACH_gemini )
+	{
+		/* should already be mapped by the kernel boot */
+		sccc = (volatile unsigned char *) 0xffeffb0d;
+		sccd = (volatile unsigned char *) 0xffeffb08;
+		TXRDY = 0x20;
+		RXRDY = 1;
+		console = 1;
 	}
 	else
 	{

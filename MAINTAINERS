@@ -160,7 +160,7 @@ S:	Supported
 
 APPLETALK NETWORK LAYER
 P:	Jay Schulist
-M:	jschlst@turbolinux.com
+M:	jschlst@samba.org
 L:	linux-atalk@lists.netspace.org
 S:	Maintained
 
@@ -682,9 +682,9 @@ P:	Juanjo Ciarlante
 M:	jjciarla@raiz.uncu.edu.ar
 S:	Maintained
 
-IPX/SPX NETWORK LAYER
-P:	Jay Schulist
-M:	jschlst@turbolinux.com
+IPX NETWORK LAYER
+P:	Arnaldo Carvalho de Melo
+M:	acme@conectiva.com.br
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
@@ -931,6 +931,8 @@ P:	Andi Kleen
 M:	ak@muc.de
 P:	Alexey Kuznetsov
 M:	kuznet@ms2.inr.ac.ru
+P:	Pekka Savola (ipv6)
+M:	pekkas@netcore.fi
 L:	netdev@oss.sgi.com
 S:	Maintained
 
@@ -1175,7 +1177,7 @@ S:	Supported
 
 SMB FILESYSTEM
 P:	Urban Widmark
-M:	urban@svenskatest.se
+M:	urban@teststation.com
 W:	http://samba.org/
 L:	samba@samba.org
 S:	Maintained
@@ -1226,13 +1228,13 @@ S:	Supported
 
 SPX NETWORK LAYER
 P:	Jay Schulist
-M:	jschlst@turbolinux.com
+M:	jschlst@samba.org
 L:	linux-net@vger.kernel.org
 S:	Supported
 
 SNA NETWORK LAYER
 P:	Jay Schulist
-M:	jschlst@turbolinux.com
+M:	jschlst@samba.org
 L:	linux-sna@turbolinux.com
 W:	http://www.linux-sna.org
 S:	Supported

@@ -757,14 +757,9 @@ prom_init(int r3, int r4, prom_entry pp)
 		setup_disp_fake_bi(RELOC(prom_disp_node));
 #endif
 
-	/* If pmac, then use quiesce call. We can't rely on prom_version
-	 * since some old iMacs appear to have an incorrect /openprom/model
-	 * entry in the device tree
-	 */
-	if (!chrp) {
-		prom_print(RELOC("Calling quiesce ...\n"));
-		call_prom(RELOC("quiesce"), 0, 0);
-	}
+	/* Use quiesce call to get OF to shut down any devices it's using */
+	prom_print(RELOC("Calling quiesce ...\n"));
+	call_prom(RELOC("quiesce"), 0, 0);
 
 #ifdef CONFIG_BOOTX_TEXT
 	if (!chrp && RELOC(disp_bi)) {
@@ -839,7 +834,7 @@ prom_welcome(boot_infos_t* bi, unsigned long phys)
 	    __asm__ __volatile__ ("mfspr %0, 1008" : "=r" (flags));
 	    prom_drawhex(flags);
 	}
-	if (pvr == 8 || pvr == 12) {
+	if (pvr == 8 || pvr == 12 || pvr == 0x800c) {
 	    prom_drawstring(RELOC("\nICTC             : 0x"));
 	    __asm__ __volatile__ ("mfspr %0, 1019" : "=r" (flags));
 	    prom_drawhex(flags);
@@ -986,9 +981,11 @@ check_display(unsigned long mem)
 			prom_print(RELOC("... failed\n"));
 		} else {
 			prom_print(RELOC("... ok\n"));
-
-			/* Setup a useable color table when the appropriate
-			 * method is available. Should update this to set-colors */
+			/*
+			 * Setup a usable color table when the appropriate
+			 * method is available.
+			 * Should update this to use set-colors.
+			 */
 			for (i = 0; i < 32; i++)
 				if (prom_set_color(ih, i, RELOC(default_colors)[i*3],
 						   RELOC(default_colors)[i*3+1],
@@ -1267,7 +1264,10 @@ finish_node(struct device_node *np, unsigned long mem_start,
 
 	np->name = get_property(np, "name", 0);
 	np->type = get_property(np, "device_type", 0);
-
+#if 0
+	np->n_addr_cells = naddrc;
+	np->n_size_cells = nsizec;
+#endif
 	/* get the device addresses and interrupts */
 	if (ifunc != NULL) {
 		mem_start = ifunc(np, mem_start, naddrc, nsizec);
@@ -1283,6 +1283,16 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	ip = (int *) get_property(np, "#size-cells", 0);
 	if (ip != NULL)
 		nsizec = *ip;
+#if 0
+	if (np->parent == NULL) {
+		/*
+		 * Set the n_addr/size_cells on the root to its
+		 * own values, rather than 0.
+		 */
+		np->n_addr_cells = naddrc;
+		np->n_size_cells = nsizec;
+	}
+#endif	
 
 	/* the f50 sets the name to 'display' and 'compatible' to what we
 	 * expect for the name -- Cort
@@ -1497,6 +1507,34 @@ void relocate_nodes(void)
 	}
 }
 
+int
+prom_n_addr_cells(struct device_node* np)
+{
+	int* ip;
+	do {
+		if (np->parent)
+			np = np->parent;
+		ip = (int *) get_property(np, "#address-cells", 0);
+		if (ip != NULL)
+			return *ip;
+	} while(np->parent);
+	return 0;
+}
+
+int
+prom_n_size_cells(struct device_node* np)
+{
+	int* ip;
+	do {
+		if (np->parent)
+			np = np->parent;
+		ip = (int *) get_property(np, "#size-cells", 0);
+		if (ip != NULL)
+			return *ip;
+	} while(np->parent);
+	return 0;
+}
+
 __init
 static unsigned long
 interpret_pci_props(struct device_node *np, unsigned long mem_start,
@@ -1566,6 +1604,8 @@ interpret_pci_props(struct device_node *np, unsigned long mem_start,
 	}
 
 	ip = (int *) get_property(np, "AAPL,interrupts", &l);
+	if (ip == 0 && np->parent)
+		ip = (int *) get_property(np->parent, "AAPL,interrupts", &l);
 	if (ip == 0)
 		ip = (int *) get_property(np, "interrupts", &l);
 	if (ip != 0) {
@@ -1761,7 +1801,7 @@ interpret_root_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= rpsize) >= 0) {
-			adr[i].space = 0;
+			adr[i].space = (naddrc >= 2? rp[naddrc-2]: 0);
 			adr[i].address = rp[naddrc - 1];
 			adr[i].size = rp[naddrc + nsizec - 1];
 			++i;
@@ -1978,12 +2018,13 @@ get_property(struct device_node *np, const char *name, int *lenp)
 {
 	struct property *pp;
 
-	for (pp = np->properties; pp != 0; pp = pp->next)
-		if (strcmp(pp->name, name) == 0) {
+	for (pp = np->properties; pp != 0; pp = pp->next) {
+		if (name && strcmp(pp->name, name) == 0) {
 			if (lenp != 0)
 				*lenp = pp->length;
 			return pp->value;
 		}
+	}
 	return 0;
 }
 
@@ -2161,9 +2202,10 @@ bootx_update_display(unsigned long phys, int width, int height,
 {
 	if (disp_bi == 0)
 		return;
-	/* check it's the same frame buffer (within 16MB) */
-	if ((phys ^ (unsigned long)disp_bi->dispDeviceBase) & 0xff000000)
+	/* check it's the same frame buffer (within 64MB) */
+	if ((phys ^ (unsigned long)disp_bi->dispDeviceBase) & 0xfc000000) {
 		return;
+	}
 
 	disp_bi->dispDeviceBase = (__u8 *) phys;
 	disp_bi->dispDeviceRect[0] = 0;

@@ -28,7 +28,7 @@
  *  	- Various Madge employees
  *
  *  Maintainer(s):
- *    JS	Jay Schulist		jschlst@turbolinux.com
+ *    JS	Jay Schulist		jschlst@samba.org
  *    CG	Christoph Goos		cgoos@syskonnect.de
  *    AF	Adam Fritzler		mid@auk.cx
  *    MLP       Mike Phillips           phillim@amtrak.com

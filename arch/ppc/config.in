@@ -3,8 +3,8 @@
 # see Documentation/kbuild/config-language.txt.
 #
 define_bool CONFIG_UID16 n
-define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
-define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
+define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
 
 mainmenu_name "Linux/PowerPC Kernel Configuration"
 
@@ -84,6 +84,7 @@ fi
 if [ "$CONFIG_6xx" = "y" -a "$CONFIG_8260" = "n" ]; then
   choice 'Machine Type'		\
 	"PowerMac/PReP/MTX/CHRP	CONFIG_ALL_PPC	\
+	 Gemini         CONFIG_GEMINI           \
 	 APUS		CONFIG_APUS"		PowerMac/PReP/MTX/CHRP
 fi
 
@@ -118,7 +119,6 @@ mainmenu_option next_comment
 comment 'General setup'
 
 bool 'High memory support (experimental)' CONFIG_HIGHMEM
-bool 'Mac-on-Linux support' CONFIG_MOL
 
 define_bool CONFIG_ISA n
 define_bool CONFIG_EISA n

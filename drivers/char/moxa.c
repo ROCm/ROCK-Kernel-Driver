@@ -705,14 +705,24 @@ static int moxa_write(struct tty_struct *tty, int from_user,
 		return (0);
 	port = ch->port;
 	save_flags(flags);
-	cli();
 	if (from_user) {
-		copy_from_user(moxaXmitBuff, buf, count);
-		temp = moxaXmitBuff;
-	} else
-		temp = (unsigned char *) buf;
-	len = MoxaPortWriteData(port, temp, count);
-	restore_flags(flags);
+		down(&moxaBuffSem);
+		if (copy_from_user(moxaXmitBuff, buf, count)) {
+			len = -EFAULT;
+		} else {
+			cli();
+			len = MoxaPortWriteData(port, moxaXmitBuff, count);
+			restore_flags(flags);
+		}
+		up(&moxaBuffSem);
+		if (len < 0)
+			return len;
+	} else {
+		cli();
+		len = MoxaPortWriteData(port, (unsigned char *) buf, count);
+		restore_flags(flags);
+	}
+
 	/*********************************************
 	if ( !(ch->statusflags & LOWWAIT) &&
 	     ((len != count) || (MoxaPortTxFree(port) <= 100)) )

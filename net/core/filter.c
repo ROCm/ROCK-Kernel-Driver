@@ -2,7 +2,7 @@
  * Linux Socket Filter - Kernel level socket filtering
  *
  * Author:
- *     Jay Schulist <jschlst@turbolinux.com>
+ *     Jay Schulist <jschlst@samba.org>
  *
  * Based on the design of:
  *     - The Berkeley Packet Filter
@@ -382,6 +382,9 @@ int sk_chk_filter(struct sock_filter *filter, int flen)
 	struct sock_filter *ftest;
         int pc;
 
+	if ((unsigned int) flen >= (~0U / sizeof(struct sock_filter)))
+		return -EINVAL;
+
        /*
         * Check the filter code now.
         */
@@ -404,7 +407,7 @@ int sk_chk_filter(struct sock_filter *filter, int flen)
 				   jumps below, where offsets are limited. --ANK (981016)
 				 */
 				if (ftest->k >= (unsigned)(flen-pc-1))
-					return (-EINVAL);
+					return -EINVAL;
 			}
                         else
 			{
@@ -412,7 +415,7 @@ int sk_chk_filter(struct sock_filter *filter, int flen)
 				 *	For conditionals both must be safe
 				 */
  				if(pc + ftest->jt +1 >= flen || pc + ftest->jf +1 >= flen)
-					return (-EINVAL);
+					return -EINVAL;
 			}
                 }
 

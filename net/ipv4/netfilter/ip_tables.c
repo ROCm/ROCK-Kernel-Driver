@@ -1243,6 +1243,7 @@ do_ipt_get_ctl(struct sock *sk, int cmd, void *user, int *len)
 			ret = -EFAULT;
 			break;
 		}
+		name[IPT_TABLE_MAXNAMELEN-1] = '\0';
 		t = find_table_lock(name, &ret, &ipt_mutex);
 		if (t) {
 			struct ipt_getinfo info;

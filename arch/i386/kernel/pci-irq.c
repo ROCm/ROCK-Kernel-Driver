@@ -445,8 +445,12 @@ static void __init pirq_find_router(void)
 		return;
 	}
 #endif
+
+	DBG("PCI: Attempting to find IRQ router for %04x:%04x\n",
+	    rt->rtr_vendor, rt->rtr_device);
+
 	/* fall back to default router if nothing else found */
-	pirq_router = pirq_routers + sizeof(pirq_routers) / sizeof(pirq_routers[0]) - 1;
+	pirq_router = &pirq_routers[ARRAY_SIZE(pirq_routers) - 1];
 
 	pirq_router_dev = pci_find_slot(rt->rtr_bus, rt->rtr_devfn);
 	if (!pirq_router_dev) {

@@ -244,6 +244,7 @@ struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 	dev->init = ipip_tunnel_init;
 	dev->features |= NETIF_F_DYNALLOC;
 	memcpy(&nt->parms, parms, sizeof(*parms));
+	nt->parms.name[IFNAMSIZ-1] = '\0';
 	strcpy(dev->name, nt->parms.name);
 	if (dev->name[0] == 0) {
 		int i;

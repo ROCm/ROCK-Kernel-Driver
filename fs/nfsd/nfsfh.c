@@ -245,6 +245,11 @@ struct dentry *nfsd_findparent(struct dentry *child)
 	 */
 	pdentry = child->d_inode->i_op->lookup(child->d_inode, tdentry);
 	d_drop(tdentry); /* we never want ".." hashed */
+	if (!pdentry && tdentry->d_inode == NULL) {
+		/* File system cannot find ".." ... sad but possible */
+		dput(tdentry);
+		pdentry = ERR_PTR(-EINVAL);
+	}
 	if (!pdentry) {
 		/* I don't want to return a ".." dentry.
 		 * I would prefer to return an unconnected "IS_ROOT" dentry,

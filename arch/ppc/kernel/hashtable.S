@@ -27,7 +27,6 @@
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <linux/config.h>
-#include "mol.h"
 
 /*
  * Load a PTE into the hash table, if possible.
@@ -609,11 +608,6 @@ _GLOBAL(flush_hash_segments)
  * flush_hash_page(unsigned context, unsigned long va)
  */
 _GLOBAL(flush_hash_page)
-#ifdef CONFIG_MOL
-	mflr    r10
-	MOL_HOOK_MMU(10, r6)
-	mtlr    r10
-#endif
 	lis	r6,Hash@ha
 	lwz	r6,Hash@l(r6)		/* hash table base */
 	cmpwi	0,r6,0			/* hash table in use? */

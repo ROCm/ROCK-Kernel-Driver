@@ -1484,7 +1484,7 @@ pool_alloc_page (struct pci_pool *pool, int mem_flags)
 	page->vaddr = pci_alloc_consistent (pool->dev,
 				pool->allocation, &page->dma);
 	if (page->vaddr) {
-		memset (page->bitmap, ~0, mapsize);	// bit set == free
+		memset (page->bitmap, 0xff, mapsize);	// bit set == free
 		if (pool->flags & SLAB_POISON)
 			memset (page->vaddr, POOL_POISON_BYTE, pool->allocation);
 		list_add (&page->page_list, &pool->page_list);
@@ -1500,7 +1500,7 @@ static inline int
 is_page_busy (int blocks, unsigned long *bitmap)
 {
 	while (blocks > 0) {
-		if (*bitmap++ != ~0)
+		if (*bitmap++ != ~0UL)
 			return 1;
 		blocks -= BITS_PER_LONG;
 	}
@@ -1589,9 +1589,8 @@ restart:
 				i += BITS_PER_LONG, map++) {
 			if (page->bitmap [map] == 0)
 				continue;
-			block = ffs (page->bitmap [map]);
-			if ((i + block) <= pool->blocks_per_page) {
-				block--;
+			block = ffz (~ page->bitmap [map]);
+			if ((i + block) < pool->blocks_per_page) {
 				clear_bit (block, &page->bitmap [map]);
 				offset = (BITS_PER_LONG * map) + block;
 				offset *= pool->size;
@@ -1687,7 +1686,7 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 	block %= BITS_PER_LONG;
 
 #ifdef	CONFIG_PCIPOOL_DEBUG
-	if (page->bitmap [map] & (1 << block)) {
+	if (page->bitmap [map] & (1UL << block)) {
 		printk (KERN_ERR "pci_pool_free %s/%s, dma %x already free\n",
 			pool->dev ? pool->dev->slot_name : NULL,
 			pool->name, dma);

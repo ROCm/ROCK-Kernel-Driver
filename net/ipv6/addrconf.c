@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: addrconf.c,v 1.64 2001/05/01 23:05:47 davem Exp $
+ *	$Id: addrconf.c,v 1.65 2001/05/03 07:02:47 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -643,14 +643,8 @@ static void addrconf_join_solict(struct net_device *dev, struct in6_addr *addr)
 	if (dev->flags&(IFF_LOOPBACK|IFF_NOARP))
 		return;
 
-#ifndef CONFIG_IPV6_NO_PB
-	addrconf_addr_solict_mult_old(addr, &maddr);
+	addrconf_addr_solict_mult(addr, &maddr);
 	ipv6_dev_mc_inc(dev, &maddr);
-#endif
-#ifdef CONFIG_IPV6_EUI64
-	addrconf_addr_solict_mult_new(addr, &maddr);
-	ipv6_dev_mc_inc(dev, &maddr);
-#endif
 }
 
 static void addrconf_leave_solict(struct net_device *dev, struct in6_addr *addr)
@@ -660,18 +654,11 @@ static void addrconf_leave_solict(struct net_device *dev, struct in6_addr *addr)
 	if (dev->flags&(IFF_LOOPBACK|IFF_NOARP))
 		return;
 
-#ifndef CONFIG_IPV6_NO_PB
-	addrconf_addr_solict_mult_old(addr, &maddr);
+	addrconf_addr_solict_mult(addr, &maddr);
 	ipv6_dev_mc_dec(dev, &maddr);
-#endif
-#ifdef CONFIG_IPV6_EUI64
-	addrconf_addr_solict_mult_new(addr, &maddr);
-	ipv6_dev_mc_dec(dev, &maddr);
-#endif
 }
 
 
-#ifdef CONFIG_IPV6_EUI64
 static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 {
 	switch (dev->type) {
@@ -706,7 +693,6 @@ static int ipv6_inherit_eui64(u8 *eui, struct inet6_dev *idev)
 	read_unlock_bh(&idev->lock);
 	return err;
 }
-#endif
 
 /*
  *	Add prefix route.
@@ -880,7 +866,6 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 
 		plen = pinfo->prefix_len >> 3;
 
-#ifdef CONFIG_IPV6_EUI64
 		if (pinfo->prefix_len == 64) {
 			memcpy(&addr, &pinfo->prefix, 8);
 			if (ipv6_generate_eui64(addr.s6_addr + 8, dev) &&
@@ -890,15 +875,6 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 			}
 			goto ok;
 		}
-#endif
-#ifndef CONFIG_IPV6_NO_PB
-		if (pinfo->prefix_len == ((sizeof(struct in6_addr) - dev->addr_len)<<3)) {
-			memcpy(&addr, &pinfo->prefix, plen);
-			memcpy(addr.s6_addr + plen, dev->dev_addr,
-			       dev->addr_len);
-			goto ok;
-		}
-#endif
 		printk(KERN_DEBUG "IPv6 addrconf: prefix with wrong length %d\n", pinfo->prefix_len);
 		in6_dev_put(in6_dev);
 		return;
@@ -1228,7 +1204,6 @@ static void addrconf_dev_config(struct net_device *dev)
 	if (idev == NULL)
 		return;
 
-#ifdef CONFIG_IPV6_EUI64
 	memset(&addr, 0, sizeof(struct in6_addr));
 
 	addr.s6_addr[0] = 0xFE;
@@ -1236,18 +1211,6 @@ static void addrconf_dev_config(struct net_device *dev)
 
 	if (ipv6_generate_eui64(addr.s6_addr + 8, dev) == 0)
 		addrconf_add_linklocal(idev, &addr);
-#endif
-
-#ifndef CONFIG_IPV6_NO_PB
-	memset(&addr, 0, sizeof(struct in6_addr));
-
-	addr.s6_addr[0] = 0xFE;
-	addr.s6_addr[1] = 0x80;
-
-	memcpy(addr.s6_addr + (sizeof(struct in6_addr) - dev->addr_len), 
-	       dev->dev_addr, dev->addr_len);
-	addrconf_add_linklocal(idev, &addr);
-#endif
 }
 
 static void addrconf_sit_config(struct net_device *dev)
@@ -1518,14 +1481,8 @@ static void addrconf_dad_timer(unsigned long data)
 
 	/* send a neighbour solicitation for our addr */
 	memset(&unspec, 0, sizeof(unspec));
-#ifdef CONFIG_IPV6_EUI64
-	addrconf_addr_solict_mult_new(&ifp->addr, &mcaddr);
+	addrconf_addr_solict_mult(&ifp->addr, &mcaddr);
 	ndisc_send_ns(ifp->idev->dev, NULL, &ifp->addr, &mcaddr, &unspec);
-#endif
-#ifndef CONFIG_IPV6_NO_PB
-	addrconf_addr_solict_mult_old(&ifp->addr, &mcaddr);
-	ndisc_send_ns(ifp->idev->dev, NULL, &ifp->addr, &mcaddr, &unspec);
-#endif
 
 	in6_ifa_put(ifp);
 }

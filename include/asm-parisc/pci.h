@@ -212,4 +212,7 @@ extern int pdc_pat;  /* arch/parisc/kernel/inventory.c */
 #define PCIBIOS_MIN_IO          0x10
 #define PCIBIOS_MIN_MEM         0x1000 /* NBPG - but pci/setup-res.c dies */
 
+/* Return the index of the PCI controller for device PDEV. */
+#define pci_controller_num(PDEV)	(0)
+
 #endif /* __ASM_PARISC_PCI_H */

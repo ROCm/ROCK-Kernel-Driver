@@ -210,10 +210,6 @@ out:
 	return result;
 }
 
-/*
- * Note: in order to allow the smbmount process to open the
- * mount point, we don't revalidate if conn_pid is NULL.
- */
 static int
 smb_dir_open(struct inode *dir, struct file *file)
 {
@@ -230,14 +226,18 @@ smb_dir_open(struct inode *dir, struct file *file)
 	 */
 	lock_kernel();
 	server = server_from_dentry(dentry);
-	if (server->opt.protocol < SMB_PROTOCOL_LANMAN2)
-	{
+	if (server->opt.protocol < SMB_PROTOCOL_LANMAN2) {
 		unsigned long age = jiffies - dir->u.smbfs_i.oldmtime;
 		if (age > 2*HZ)
 			smb_invalid_dir_cache(dir);
 	}
 
-	if (server->conn_pid)
+	/*
+	 * Note: in order to allow the smbmount process to open the
+	 * mount point, we only revalidate if the connection is valid or
+	 * if the process is trying to access something other than the root.
+	 */
+	if (server->state == CONN_VALID || !IS_ROOT(dentry))
 		error = smb_revalidate_inode(dentry);
 	unlock_kernel();
 	return error;

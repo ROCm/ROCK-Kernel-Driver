@@ -852,6 +852,9 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 	if (copy_from_user(&reserve, (void *) arg, sizeof(agp_region))) {
 		return -EFAULT;
 	}
+	if ((unsigned) reserve.seg_count >= ~0U/sizeof(agp_segment))
+		return -EFAULT;
+
 	client = agp_find_client_by_pid(reserve.pid);
 
 	if (reserve.seg_count == 0) {

@@ -50,6 +50,7 @@
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/timex.h>
 #include <linux/kernel_stat.h>
@@ -90,6 +91,10 @@ unsigned tb_last_stamp;
 extern unsigned long wall_jiffies;
 
 static long time_offset;
+
+spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+
+EXPORT_SYMBOL(rtc_lock);
 
 /* Timer interrupt helper function */
 static inline int tb_delta(unsigned *jiffy_stamp) {
@@ -144,14 +149,20 @@ int timer_interrupt(struct pt_regs * regs)
 	int next_dec;
 	unsigned long cpu = smp_processor_id();
 	unsigned jiffy_stamp = last_jiffy_stamp(cpu);
+	extern void do_IRQ(struct pt_regs *);
+
+	if (atomic_read(&ppc_n_lost_interrupts) != 0)
+		do_IRQ(regs);
 
 	hardirq_enter(cpu);
 	
-	if (!user_mode(regs))
-		ppc_do_profile(instruction_pointer(regs));
-	do { 
+	while ((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) < 0) {
 		jiffy_stamp += tb_ticks_per_jiffy;
-	  	if (smp_processor_id()) continue;
+		if (!user_mode(regs))
+			ppc_do_profile(instruction_pointer(regs));
+	  	if (smp_processor_id())
+			continue;
+
 		/* We are in an interrupt, no need to save/restore flags */
 		write_lock(&xtime_lock);
 		tb_last_stamp = jiffy_stamp;
@@ -184,7 +195,7 @@ int timer_interrupt(struct pt_regs * regs)
 				last_rtc_update += 60;
 		}
 		write_unlock(&xtime_lock);
-	} while((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) < 0);
+	}
 	if ( !disarm_decr[smp_processor_id()] )
 		set_dec(next_dec);
 	last_jiffy_stamp(cpu) = jiffy_stamp;
@@ -337,6 +348,8 @@ void __init time_init(void)
         	tz.tz_dsttime = 0;
         	do_sys_settimeofday(NULL, &tz);
         }
+
+       do_get_fast_time = do_gettimeofday;
 }
 
 #define TICK_SIZE tick

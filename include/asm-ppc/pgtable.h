@@ -418,11 +418,11 @@ static inline unsigned long pte_update(pte_t *p, unsigned long clr,
 {
 	unsigned long old, tmp;
 	
-	__asm__ __volatile__("\
-1:	lwarx	%0,0,%3
-	andc	%1,%0,%4
-	or	%1,%1,%5
-	stwcx.	%1,0,%3
+	__asm__ __volatile__("\n\
+1:	lwarx	%0,0,%3 \n\
+	andc	%1,%0,%4 \n\
+	or	%1,%1,%5 \n\
+	stwcx.	%1,0,%3 \n\
 	bne-	1b"
 	: "=&r" (old), "=&r" (tmp), "=m" (*p)
 	: "r" (p), "r" (clr), "r" (set), "m" (*p)

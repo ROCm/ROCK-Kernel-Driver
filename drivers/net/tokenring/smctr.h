@@ -1,7 +1,7 @@
 /* smctr.h: SMC Token Ring driver header for Linux
  *
  * Authors:
- *  - Jay Schulist <jschlst@turbolinux.com>
+ *  - Jay Schulist <jschlst@samba.org>
  */
 
 #ifndef __LINUX_SMCTR_H

@@ -172,6 +172,25 @@ claim(unsigned int virt, unsigned int size, unsigned int align)
     return args.ret;
 }
 
+void
+release(void *virt, unsigned int size)
+{
+    struct prom_args {
+	char *service;
+	int nargs;
+	int nret;
+	void *virt;
+	unsigned int size;
+    } args;
+
+    args.service = "release";
+    args.nargs = 2;
+    args.nret = 0;
+    args.virt = virt;
+    args.size = size;
+    (*prom)(&args);
+}
+
 int
 getprop(void *phandle, const char *name, void *buf, int buflen)
 {

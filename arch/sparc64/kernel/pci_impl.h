@@ -1,4 +1,4 @@
-/* $Id: pci_impl.h,v 1.7 2001/03/28 10:56:34 davem Exp $
+/* $Id: pci_impl.h,v 1.8 2001/05/15 08:54:30 davem Exp $
  * pci_impl.h: Helper definitions for PCI controller support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -19,6 +19,7 @@ extern unsigned char pci_highest_busnum;
 extern int pci_num_controllers;
 
 /* PCI bus scanning and fixup support. */
+extern void pci_fixup_host_bridge_self(struct pci_bus *pbus);
 extern void pci_fill_in_pbm_cookies(struct pci_bus *pbus,
 				    struct pci_pbm_info *pbm,
 				    int prom_node);

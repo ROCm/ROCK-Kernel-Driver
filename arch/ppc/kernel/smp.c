@@ -40,6 +40,7 @@
 #include <asm/residual.h>
 #include <asm/feature.h>
 #include <asm/time.h>
+#include <asm/gemini.h>
 
 #include "open_pic.h"
 int smp_threads_ready;
@@ -55,7 +56,7 @@ unsigned int prof_multiplier[NR_CPUS];
 unsigned int prof_counter[NR_CPUS];
 cycles_t cacheflush_time;
 static int max_cpus __initdata = NR_CPUS;
-
+unsigned long cpu_online_map;
 int smp_hw_index[NR_CPUS];
 
 /* all cpu mappings are 1-1 -- Cort */
@@ -452,32 +453,48 @@ smp_core99_probe(void)
 static void
 smp_core99_kick_cpu(int nr)
 {
-	unsigned long save_int;
+	unsigned long save_vector, new_vector;
 	unsigned long flags;
+#if 1 /* New way... */
+	volatile unsigned long *vector
+		 = ((volatile unsigned long *)(KERNELBASE+0x100));
+	if (nr < 1 || nr > 3)
+		return;
+#else
 	volatile unsigned long *vector
 		 = ((volatile unsigned long *)(KERNELBASE+0x500));
-
 	if (nr != 1)
 		return;
+#endif
 	if (ppc_md.progress) ppc_md.progress("smp_core99_kick_cpu", 0x346);
 
 	local_irq_save(flags);
 	local_irq_disable();
 	
-	/* Save EE vector */
-	save_int = *vector;
+	/* Save reset vector */
+	save_vector = *vector;
 	
-	/* Setup fake EE vector that does	  
+	/* Setup fake reset vector that does	  
 	 *   b __secondary_start_psurge - KERNELBASE
-	 */   
-	*vector = 0x48000002 +
-		((unsigned long)__secondary_start_psurge - KERNELBASE);
+	 */  
+	switch(nr) {
+		case 1:
+			new_vector = (unsigned long)__secondary_start_psurge;
+			break;
+		case 2:
+			new_vector = (unsigned long)__secondary_start_psurge2;
+			break;
+		case 3:
+			new_vector = (unsigned long)__secondary_start_psurge3;
+			break;
+	}
+	*vector = 0x48000002 + new_vector - KERNELBASE;
 	
 	/* flush data cache and inval instruction cache */
 	flush_icache_range((unsigned long) vector, (unsigned long) vector + 4);
 	
 	/* Put some life in our friend */
-	feature_core99_kick_cpu1();
+	feature_core99_kick_cpu(nr);
 	
 	/* FIXME: We wait a bit for the CPU to take the exception, I should
 	 * instead wait for the entry code to set something for me. Well,
@@ -487,11 +504,11 @@ smp_core99_kick_cpu(int nr)
 	mdelay(1);
 	
 	/* Restore our exception vector */
-	*vector = save_int;
+	*vector = save_vector;
 	flush_icache_range((unsigned long) vector, (unsigned long) vector + 4);
 	
 	local_irq_restore(flags);
-	if (ppc_md.progress) ppc_md.progress("smp_core99_probe done", 0x347);
+	if (ppc_md.progress) ppc_md.progress("smp_core99_kick_cpu done", 0x347);
 }
 
 static void
@@ -628,6 +645,43 @@ smp_prep_setup_cpu(int cpu_nr)
 		do_openpic_setup_cpu();
 }
 
+#ifdef CONFIG_GEMINI	
+static int
+smp_gemini_probe(void)
+{
+	int i, nr;
+
+        nr = (readb(GEMINI_CPUSTAT) & GEMINI_CPU_COUNT_MASK) >> 2;
+	if (nr == 0)
+		nr = 4;
+
+	if (nr > 1) {
+		openpic_request_IPIs();
+		for (i = 1; i < nr; ++i)
+			smp_hw_index[i] = i;
+	}
+
+	return nr;
+}
+
+static void
+smp_gemini_kick_cpu(int nr)
+{
+	openpic_init_processor( 1<<i );
+	openpic_init_processor( 0 );
+}
+
+static void
+smp_gemini_setup_cpu(void)
+{
+	if (OpenPIC_Addr)
+		do_openpic_setup_cpu();
+	if (cpu_nr > 0)
+		gemini_init_l2();
+}
+#endif /* CONFIG_GEMINI */
+
+
 static struct smp_ops_t {
 	void  (*message_pass)(int target, int msg, unsigned long data, int wait);
 	int   (*probe)(void);
@@ -684,6 +738,16 @@ static struct smp_ops_t prep_smp_ops = {
 	smp_prep_kick_cpu,
 	smp_prep_setup_cpu,
 };
+
+#ifdef CONFIG_GEMINI	
+/* Gemini */
+static struct smp_ops_t gemini_smp_ops = {
+	smp_openpic_message_pass,
+	smp_gemini_probe,
+	smp_gemini_kick_cpu,
+	smp_gemini_setup_cpu,
+};
+#endif /* CONFIG_GEMINI	*/
 
 /* 
  * Common functions
@@ -925,6 +989,11 @@ void __init smp_boot_cpus(void)
 	case _MACH_prep:
 		smp_ops = &prep_smp_ops;
 		break;
+#ifdef CONFIG_GEMINI		
+	case _MACH_gemini:
+		smp_ops = &gemini_smp_ops;
+		break;
+#endif /* CONFIG_GEMINI	*/
 	default:
 		printk("SMP not supported on this machine.\n");
 		return;
@@ -946,6 +1015,19 @@ void __init smp_boot_cpus(void)
 		/* create a process for the processor */
 		/* we don't care about the values in regs since we'll
 		   never reschedule the forked task. */
+		/* We DO care about one bit in the pt_regs we
+		   pass to do_fork.  That is the MSR_FP bit in 
+		   regs.msr.  If that bit is on, then do_fork
+		   (via copy_thread) will call giveup_fpu.
+		   giveup_fpu will get a pointer to our (current's)
+		   last register savearea via current->thread.regs 
+		   and using that pointer will turn off the MSR_FP,
+		   MSR_FE0 and MSR_FE1 bits.  At this point, this 
+		   pointer is pointing to some arbitrary point within
+		   our stack. */
+
+		memset(&regs, 0, sizeof(struct pt_regs));
+		
 		if (do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0) < 0)
 			panic("failed fork for CPU %d", i);
 		p = init_task.prev_task;
@@ -1114,8 +1196,18 @@ void __init smp_callin(void)
 
 	init_idle();
 
+	/*
+	 * This cpu is now "online".  Only set them online
+	 * before they enter the loop below since write access
+	 * to the below variable is _not_ guaranteed to be
+	 * atomic.
+	 *   -- Cort <cort@fsmlabs.com>
+	 */
+	cpu_online_map |= 1UL << smp_processor_id();
+	
 	while(!smp_commenced)
 		barrier();
+
 	/* see smp_commence for more info */
 	if (!smp_tb_synchronized && smp_num_cpus == 2) {
 		smp_software_tb_sync(cpu);

@@ -21,6 +21,9 @@
 #include "mace.h"
 
 static struct net_device *mace_devs;
+static int port_aaui = -1;
+
+MODULE_PARM(port_aaui, "i");
 
 #define N_RX_RING	8
 #define N_TX_RING	6
@@ -53,6 +56,7 @@ struct mace_data {
     struct net_device_stats stats;
     struct timer_list tx_timeout;
     int timeout_active;
+    int port_aaui;
     struct net_device *next_mace;
 };
 
@@ -178,6 +182,21 @@ static void __init mace_probe1(struct device_node *mace)
 	init_timer(&mp->tx_timeout);
 	mp->timeout_active = 0;
 
+	if (port_aaui >= 0)
+		mp->port_aaui = port_aaui;
+	else {
+		/* Apple Network Server uses the AAUI port */
+		if (machine_is_compatible("AAPL,ShinerESB"))
+			mp->port_aaui = 1;
+		else {
+#ifdef CONFIG_MACE_AAUI_PORT
+			mp->port_aaui = 1;
+#else
+			mp->port_aaui = 0;
+#endif			
+		}
+	}
+
 	dev->open = mace_open;
 	dev->stop = mace_close;
 	dev->hard_start_xmit = mace_xmit_start;
@@ -261,7 +280,10 @@ static void mace_reset(struct net_device *dev)
     /* done changing address */
     out_8(&mb->iac, 0);
 
-    out_8(&mb->plscc, PORTSEL_GPSI + ENPLSIO);
+    if (mp->port_aaui)
+    	out_8(&mb->plscc, PORTSEL_AUI + ENPLSIO);
+    else
+    	out_8(&mb->plscc, PORTSEL_GPSI + ENPLSIO);
 }
 
 static void __mace_set_address(struct net_device *dev, void *addr)

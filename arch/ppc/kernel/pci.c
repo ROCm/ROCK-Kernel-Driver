@@ -399,6 +399,10 @@ pcibios_alloc_controller(void)
 	return hose;
 }
 
+#ifdef CONFIG_ALL_PPC
+/*
+ * Functions below are used on OpenFirmware machines.
+ */
 static void
 make_one_node_map(struct device_node* node, u8 pci_bus)
 {
@@ -579,6 +583,95 @@ pci_device_from_OF_node(struct device_node* node, u8* bus, u8* devfn)
 }
 
 void __init
+pci_process_bridge_OF_ranges(struct pci_controller *hose,
+			   struct device_node *dev, int primary)
+{
+	unsigned int *ranges, *prev;
+	int rlen = 0;
+	int memno = 0;
+	struct resource *res;
+	int np, na = prom_n_addr_cells(dev);
+	np = na + 5;
+
+	/* First we try to merge ranges to fix a problem with some pmacs
+	 * that can have more than 3 ranges, fortunately using contiguous
+	 * addresses -- BenH
+	 */
+	ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
+	prev = NULL;
+	while ((rlen -= np * sizeof(unsigned int)) >= 0) {
+		if (prev) {
+			if (prev[0] == ranges[0] && prev[1] == ranges[1] &&
+				(prev[2] + prev[na+4]) == ranges[2] &&
+				(prev[na+2] + prev[na+4]) == ranges[na+2]) {
+				prev[na+4] += ranges[na+4];
+				ranges[0] = 0;
+				ranges += np;
+				continue;
+			}
+		}
+		prev = ranges;
+		ranges += np;
+	}
+
+	/*
+	 * The ranges property is laid out as an array of elements,
+	 * each of which comprises:
+	 *   cells 0 - 2:	a PCI address
+	 *   cells 3 or 3+4:	a CPU physical address
+	 *			(size depending on dev->n_addr_cells)
+	 *   cells 4+5 or 5+6:	the size of the range
+	 */
+	rlen = 0;
+	hose->io_base_phys = 0;
+	ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
+	while ((rlen -= np * sizeof(unsigned int)) >= 0) {
+		res = NULL;
+		switch (ranges[0] >> 24) {
+		case 1:		/* I/O space */
+			if (ranges[2] != 0)
+				break;
+			hose->io_base_phys = ranges[na+2];
+			hose->io_base_virt = ioremap(ranges[na+2], ranges[na+4]);
+			if (primary)
+				isa_io_base = (unsigned long) hose->io_base_virt;
+			res = &hose->io_resource;
+			res->flags = IORESOURCE_IO;
+			res->start = ranges[2];
+			break;
+		case 2:		/* memory space */
+			memno = 0;
+			if (ranges[1] == 0 && ranges[2] == 0
+			    && ranges[na+4] <= (16 << 20)) {
+				/* 1st 16MB, i.e. ISA memory area */
+				if (primary)
+					isa_mem_base = ranges[na+2];
+				memno = 1;
+			}
+			while (memno < 3 && hose->mem_resources[memno].flags)
+				++memno;
+			if (memno == 0)
+				hose->pci_mem_offset = ranges[na+2] - ranges[2];
+			if (memno < 3) {
+				res = &hose->mem_resources[memno];
+				res->flags = IORESOURCE_MEM;
+				res->start = ranges[na+2];
+			}
+			break;
+		}
+		if (res != NULL) {
+			res->name = dev->full_name;
+			res->end = res->start + ranges[na+4] - 1;
+			res->parent = NULL;
+			res->sibling = NULL;
+			res->child = NULL;
+		}
+		ranges += np;
+	}
+}
+#endif /* CONFIG_ALL_PPC */
+
+void __init
 pcibios_init(void)
 {
 	struct pci_controller *hose;
@@ -632,9 +725,6 @@ pcibios_init(void)
 	/* OF fails to initialize IDE controllers on macs
 	 * (and maybe other machines)
 	 * 
-	 * This late fixup is done here since I want it to happen after
-	 * resource assignement, and there's no "late-init" arch hook
-	 * 
 	 * Ideally, this should be moved to the IDE layer, but we need
 	 * to check specifically with Andre Hedrick how to do it cleanly
 	 * since the common IDE code seem to care about the fact that the
@@ -651,6 +741,9 @@ pcibios_init(void)
 		}
 	}
 #endif /* CONFIG_BLK_DEV_IDE */
+
+	if (ppc_md.pcibios_after_init)
+		ppc_md.pcibios_after_init();
 }
 
 int __init

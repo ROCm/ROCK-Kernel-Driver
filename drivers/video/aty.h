@@ -738,6 +738,7 @@
 #define LI_CHIP_ID	0x4c49	/* RAGE LT PRO */
 #define LP_CHIP_ID	0x4c50	/* RAGE LT PRO */
 #define LT_CHIP_ID	0x4c54	/* RAGE LT */
+#define XL_CHIP_ID	0x4752	/* RAGE (XL) */
 #define GT_CHIP_ID	0x4754	/* RAGE (GT) */
 #define GU_CHIP_ID	0x4755	/* RAGE II/II+ (GTB) */
 #define GV_CHIP_ID	0x4756	/* RAGE IIC, PCI */

@@ -80,7 +80,7 @@ extern int md_check_ordering (mddev_t *mddev);
 extern struct gendisk * find_gendisk (kdev_t dev);
 extern int md_notify_reboot(struct notifier_block *this,
 					unsigned long code, void *x);
-extern int md_error (kdev_t mddev, kdev_t rdev);
+extern int md_error (mddev_t *mddev, kdev_t rdev);
 extern int md_run_setup(void);
 
 extern void md_print_devices (void);

@@ -196,6 +196,9 @@ extern inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 #endif
 }
 
+/* Return the index of the PCI controller for device PDEV. */
+#define pci_controller_num(PDEV)	(0)
+
 /*
  * These macros should be used after a pci_map_sg call has been done
  * to get bus addresses of each of the SG entries and their lengths.

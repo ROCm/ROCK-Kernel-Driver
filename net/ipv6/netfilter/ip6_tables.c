@@ -1286,6 +1286,7 @@ do_ip6t_get_ctl(struct sock *sk, int cmd, void *user, int *len)
 			ret = -EFAULT;
 			break;
 		}
+		name[IP6T_TABLE_MAXNAMELEN-1] = '\0';
 		t = find_table_lock(name, &ret, &ip6t_mutex);
 		if (t) {
 			struct ip6t_getinfo info;

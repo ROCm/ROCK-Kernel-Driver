@@ -94,21 +94,14 @@ struct smb_fattr {
 };
 
 enum smb_conn_state {
-        CONN_VALID,             /* everything's fine */
-        CONN_INVALID,           /* Something went wrong, but did not
-                                   try to reconnect yet. */
-        CONN_RETRIED            /* Tried a reconnection, but was refused */
+	CONN_VALID,		/* everything's fine */
+	CONN_INVALID,		/* Something went wrong, but did not
+				   try to reconnect yet. */
+	CONN_RETRIED,		/* Tried a reconnection, but was refused */
+	CONN_RETRYING		/* Currently trying to reconnect */
 };
 
-/*
- * The readdir cache size controls how many directory entries are cached.
- */
-#define SMB_READDIR_CACHE_SIZE        64
-
 #define SMB_SUPER_MAGIC               0x517B
-
-#define SMB_SERVER(inode)    (&(inode->i_sb->u.smbfs_sb))
-#define SMB_INOP(inode)      (&(inode->u.smbfs_i))
 
 #define SMB_HEADER_LEN   37     /* includes everything up to, but not
                                  * including smb_bcc */

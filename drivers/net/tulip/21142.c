@@ -100,16 +100,14 @@ void t21142_start_nway(struct net_device *dev)
 {
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	long ioaddr = dev->base_addr;
-	int csr14 = ((tp->to_advertise & 0x0780) << 9)  |
-		((tp->to_advertise&0x0020)<<1) | 0xffbf;
-
-	DPRINTK("ENTER\n");
+	int csr14 = ((tp->sym_advertise & 0x0780) << 9)  |
+		((tp->sym_advertise & 0x0020) << 1) | 0xffbf;
 
 	dev->if_port = 0;
 	tp->nway = tp->mediasense = 1;
 	tp->nwayset = tp->lpar = 0;
 	if (tp->chip_id == PNIC2) {
-		tp->csr6 = 0x01000000 | (tp->to_advertise & 0x0040 ? FullDuplex : 0);
+		tp->csr6 = 0x01000000 | (tp->sym_advertise & 0x0040 ? FullDuplex : 0);
 		return;
 	}
 	if (tulip_debug > 1)
@@ -118,7 +116,7 @@ void t21142_start_nway(struct net_device *dev)
 	outl(0x0001, ioaddr + CSR13);
 	udelay(100);
 	outl(csr14, ioaddr + CSR14);
-	tp->csr6 = 0x82420000 | (tp->to_advertise & 0x0040 ? FullDuplex : 0);
+	tp->csr6 = 0x82420000 | (tp->sym_advertise & 0x0040 ? FullDuplex : 0);
 	tulip_outl_csr(tp, tp->csr6, CSR6);
 	if (tp->mtable  &&  tp->mtable->csr15dir) {
 		outl(tp->mtable->csr15dir, ioaddr + CSR15);
@@ -128,6 +126,24 @@ void t21142_start_nway(struct net_device *dev)
 	outl(0x1301, ioaddr + CSR12); 		/* Trigger NWAY. */
 }
 
+
+void pnic2_lnk_change(struct net_device *dev, int csr5)
+{
+	struct tulip_private *tp = (struct tulip_private *)dev->priv;
+	long ioaddr = dev->base_addr;
+	int csr12 = inl(ioaddr + CSR12);
+
+	if (tulip_debug > 1)
+		printk(KERN_INFO"%s: PNIC-2 link status changed, CSR5/12/14 %8.8x"
+			" %8.8x, %8.8x.\n",
+			dev->name, csr12, csr5, (int)inl(ioaddr + CSR14));
+	dev->if_port = 5;
+	tp->lpar = csr12 >> 16;
+	tp->nwayset = 1;
+	tp->csr6 = 0x01000000 | (tp->csr6 & 0xffff);
+	outl(tp->csr6, ioaddr + CSR6);
+
+}
 
 void t21142_lnk_change(struct net_device *dev, int csr5)
 {
@@ -142,7 +158,7 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 	/* If NWay finished and we have a negotiated partner capability. */
 	if (tp->nway  &&  !tp->nwayset  &&  (csr12 & 0x7000) == 0x5000) {
 		int setup_done = 0;
-		int negotiated = tp->to_advertise & (csr12 >> 16);
+		int negotiated = tp->sym_advertise & (csr12 >> 16);
 		tp->lpar = csr12 >> 16;
 		tp->nwayset = 1;
 		if (negotiated & 0x0100)		dev->if_port = 5;
@@ -151,7 +167,7 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 		else if (negotiated & 0x0020)	dev->if_port = 0;
 		else {
 			tp->nwayset = 0;
-			if ((csr12 & 2) == 0  &&  (tp->to_advertise & 0x0180))
+			if ((csr12 & 2) == 0  &&  (tp->sym_advertise & 0x0180))
 				dev->if_port = 3;
 		}
 		tp->full_duplex = (tulip_media_cap[dev->if_port] & MediaAlwaysFD) ? 1:0;
@@ -160,7 +176,7 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 			if (tp->nwayset)
 				printk(KERN_INFO "%s: Switching to %s based on link "
 					   "negotiation %4.4x & %4.4x = %4.4x.\n",
-					   dev->name, medianame[dev->if_port], tp->to_advertise,
+					   dev->name, medianame[dev->if_port], tp->sym_advertise,
 					   tp->lpar, negotiated);
 			else
 				printk(KERN_INFO "%s: Autonegotiation failed, using %s,"
@@ -173,7 +189,7 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 			for (i = 0; i < tp->mtable->leafcount; i++)
 				if (tp->mtable->mleaf[i].media == dev->if_port) {
 					tp->cur_index = i;
-					tulip_select_media(dev, 0);
+					tulip_select_media(dev, 1);
 					setup_done = 1;
 					break;
 				}

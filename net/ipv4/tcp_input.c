@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_input.c,v 1.228 2001/04/20 20:46:19 davem Exp $
+ * Version:	$Id: tcp_input.c,v 1.229 2001/05/13 18:14:46 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -2527,11 +2527,11 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 	struct tcp_opt *tp = &(sk->tp_pinfo.af_tcp);
 	int eaten = -1;
 
+	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq)
+		goto drop;
+
 	th = skb->h.th;
 	__skb_pull(skb, th->doff*4);
-
-        if (skb->len == 0 && !th->fin)
-		goto drop;
 
 	TCP_ECN_accept_cwr(tp, skb);
 

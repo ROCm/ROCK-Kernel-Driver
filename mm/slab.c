@@ -1958,7 +1958,7 @@ int slabinfo_write_proc (struct file *file, const char *buffer,
 				unsigned long count, void *data)
 {
 #ifdef CONFIG_SMP
-	char kbuf[MAX_SLABINFO_WRITE], *tmp;
+	char kbuf[MAX_SLABINFO_WRITE+1], *tmp;
 	int limit, batchcount, res;
 	struct list_head *p;
 	
@@ -1966,6 +1966,7 @@ int slabinfo_write_proc (struct file *file, const char *buffer,
 		return -EINVAL;
 	if (copy_from_user(&kbuf, buffer, count))
 		return -EFAULT;
+	kbuf[MAX_SLABINFO_WRITE] = '\0'; 
 
 	tmp = strchr(kbuf, ' ');
 	if (!tmp)

@@ -46,7 +46,6 @@
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/mmu.h>
-#include <asm/residual.h>
 #include <asm/uaccess.h>
 #ifdef CONFIG_8xx
 #include <asm/8xx_immap.h>
@@ -61,6 +60,7 @@
 #include <asm/machdep.h>
 #include <asm/setup.h>
 #include <asm/amigahw.h>
+#include <asm/gemini.h>
 
 #include "mem_pieces.h"
 
@@ -93,7 +93,6 @@ extern char __chrp_begin, __chrp_end;
 extern char __pmac_begin, __pmac_end;
 extern char __apus_begin, __apus_end;
 extern char __openfirmware_begin, __openfirmware_end;
-struct device_node *memory_node;
 unsigned long ioremap_base;
 unsigned long ioremap_bot;
 unsigned long avail_start;
@@ -111,19 +110,6 @@ pgprot_t kmap_prot;
 
 void MMU_init(void);
 void *early_get_page(void);
-unsigned long prep_find_end_of_memory(void);
-unsigned long pmac_find_end_of_memory(void);
-unsigned long apus_find_end_of_memory(void);
-extern unsigned long find_end_of_memory(void);
-#ifdef CONFIG_8xx
-unsigned long m8xx_find_end_of_memory(void);
-#endif /* CONFIG_8xx */
-#ifdef CONFIG_4xx
-unsigned long oak_find_end_of_memory(void);
-#endif
-#ifdef CONFIG_8260
-unsigned long m8260_find_end_of_memory(void);
-#endif /* CONFIG_8260 */
 static void mapin_ram(void);
 int map_page(unsigned long va, unsigned long pa, int flags);
 void set_phys_avail(unsigned long total_ram);
@@ -436,11 +422,9 @@ __ioremap(unsigned long addr, unsigned long size, unsigned long flags)
 	 * Should check if it is a candidate for a BAT mapping
 	 */
 
-	spin_lock(&init_mm.page_table_lock);
 	err = 0;
 	for (i = 0; i < size && err == 0; i += PAGE_SIZE)
 		err = map_page(v+i, p+i, flags);
-	spin_unlock(&init_mm.page_table_lock);
 	if (err) {
 		if (mem_init_done)
 			vfree((void *)v);
@@ -487,17 +471,21 @@ map_page(unsigned long va, unsigned long pa, int flags)
 {
 	pmd_t *pd;
 	pte_t *pg;
+	int err = -ENOMEM;
 
+	spin_lock(&init_mm.page_table_lock);
 	/* Use upper 10 bits of VA to index the first level map */
 	pd = pmd_offset(pgd_offset_k(va), va);
 	/* Use middle 10 bits of VA to index the second-level map */
 	pg = pte_alloc(&init_mm, pd, va);
-	if (pg == 0)
-		return -ENOMEM;
-	set_pte(pg, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
-	if (mem_init_done)
-		flush_hash_page(0, va);
-	return 0;
+	if (pg != 0) {
+		err = 0;
+		set_pte(pg, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
+		if (mem_init_done)
+			flush_hash_page(0, va);
+	}
+	spin_unlock(&init_mm.page_table_lock);
+	return err;
 }
 
 #ifndef CONFIG_8xx
@@ -668,33 +656,6 @@ void flush_page_to_ram(struct page *page)
 }
 
 #if !defined(CONFIG_4xx) && !defined(CONFIG_8xx)
-static void get_mem_prop(char *, struct mem_pieces *);
-
-#if defined(CONFIG_ALL_PPC)
-/*
- * Read in a property describing some pieces of memory.
- */
-
-static void __init get_mem_prop(char *name, struct mem_pieces *mp)
-{
-	struct reg_property *rp;
-	int s;
-
-	rp = (struct reg_property *) get_property(memory_node, name, &s);
-	if (rp == NULL) {
-		printk(KERN_ERR "error: couldn't get %s property on /memory\n",
-		       name);
-		abort();
-	}
-	mp->n_regions = s / sizeof(mp->regions[0]);
-	memcpy(mp->regions, rp, s);
-
-	/* Make sure the pieces are sorted. */
-	mem_pieces_sort(mp);
-	mem_pieces_coalesce(mp);
-}
-#endif /* CONFIG_ALL_PPC */
-
 /*
  * Set up one of the I/D BAT (block address translation) register pairs.
  * The parameters are not checked; in particular size must be a power
@@ -877,14 +838,13 @@ void free_initmem(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
-	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
-
 	for (; start < end; start += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(start));
 		set_page_count(virt_to_page(start), 1);
 		free_page(start);
 		totalram_pages++;
 	}
+	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 }
 #endif
 
@@ -904,27 +864,28 @@ MMU_init(void)
 	/*
 	 * The Zone Protection Register (ZPR) defines how protection will
 	 * be applied to every page which is a member of a given zone. At
-	 * present, we utilize only two of the 4xx's zones. The first, zone
-	 * 0, is set at '00b and only allows access in supervisor-mode based
-	 * on the EX and WR bits. No user-mode access is allowed. The second,
-	 * zone 1, is set at '10b and in supervisor-mode allows access
-	 * without regard to the EX and WR bits. In user-mode, access is
-	 * allowed based on the EX and WR bits.
+	 * present, we utilize only two of the 4xx's zones.
+	 * The zone index bits (of ZSEL) in the PTE are used for software
+	 * indicators, except the LSB.  For user access, zone 15 is used,
+	 * for kernel access, zone 14 is used.  We set all but zone 15
+	 * to zero, allowing only kernel access as indicated in the PTE.
+	 * For zone 15, we set a 10 binary (I guess a 01 would work too)
+	 * to allow user access as indicated in the PTE.  This also allows
+	 * kernel access as indicated in the PTE.
 	 */
 
-        mtspr(SPRN_ZPR, 0x2aaaaaaa);
+        mtspr(SPRN_ZPR, 0x00000002);
 
-	/* Hardwire any TLB entries necessary here. */
-
-	PPC4xx_tlb_pin(KERNELBASE, 0, TLB_PAGESZ(PAGESZ_16M), 1);
+	flush_instruction_cache();
 
 	/*
 	 * Find the top of physical memory and map all of it in starting
 	 * at KERNELBASE.
 	 */
 
-        total_memory = total_lowmem = oak_find_end_of_memory();
-	end_of_DRAM = __va(total_memory);
+        total_memory = total_lowmem = ppc_md.find_end_of_memory();
+	end_of_DRAM = __va(total_lowmem);
+	set_phys_avail(total_lowmem);
         mapin_ram();
 
 	/*
@@ -943,25 +904,44 @@ MMU_init(void)
         mtspr(SPRN_ICCR, 0x80000000);	/* 128 MB of instr. space at 0x0. */
 }
 
-#elif defined(CONFIG_8xx)
+#else /* !CONFIG_4xx */
 void __init MMU_init(void)
 {
 	if ( ppc_md.progress ) ppc_md.progress("MMU:enter", 0x111);
 
-	total_memory = total_lowmem = m8xx_find_end_of_memory();
-#ifdef CONFIG_HIGHMEM
-	if (total_lowmem > MAX_LOW_MEM) {
-		total_lowmem = MAX_LOW_MEM;
-		mem_pieces_remove(&phys_avail, total_lowmem,
-				  total_memory - total_lowmem, 0);
-	}
+	total_memory = ppc_md.find_end_of_memory();
+
+	if (__max_memory && total_memory > __max_memory)
+		total_memory = __max_memory;
+	total_lowmem = total_memory;
+	if (total_lowmem > __max_low_memory) {
+		total_lowmem = __max_low_memory;
+#ifndef CONFIG_HIGHMEM
+		total_memory = total_lowmem;
 #endif /* CONFIG_HIGHMEM */
+	}
 	end_of_DRAM = __va(total_lowmem);
 	set_phys_avail(total_lowmem);
 
-        /* Map in all of RAM starting at KERNELBASE */
-        mapin_ram();
+#if !defined(CONFIG_8xx)
+	if ( ppc_md.progress ) ppc_md.progress("MMU:hash init", 0x300);
+        hash_init();
+#ifndef CONFIG_PPC64BRIDGE
+        _SDR1 = __pa(Hash) | (Hash_mask >> 10);
+#endif
+	
+	ioremap_base = 0xf8000000;
+#endif /* CONFIG_8xx */
 
+	if ( ppc_md.progress ) ppc_md.progress("MMU:mapin", 0x301);
+	/* Map in all of RAM starting at KERNELBASE */
+	mapin_ram();
+
+#if defined(CONFIG_POWER4)
+	ioremap_base = ioremap_bot = 0xfffff000;
+	isa_io_base = (unsigned long) ioremap(0xffd00000, 0x200000) + 0x100000;
+
+#elif defined(CONFIG_8xx)
         /* Now map in some of the I/O space that is generically needed
          * or shared with multiple devices.
          * All of this fits into the same 4Mbyte region, so it only
@@ -978,64 +958,22 @@ void __init MMU_init(void)
         ioremap(PCI_ISA_IO_ADDR, 0x4000);
         ioremap(PCI_IDE_ADDR, 0x4000);
 #endif
-#ifdef CONFIG_RPXLITE
+#if defined(CONFIG_RPXLITE) || defined(CONFIG_RPXCLASSIC)
 	ioremap(RPX_CSR_ADDR, RPX_CSR_SIZE);
+#if !defined(CONFIG_PCI)
+	ioremap(_IO_BASE,_IO_BASE_SIZE);
+#endif
+#endif
+#ifdef CONFIG_HTDMSOUND
 	ioremap(HIOX_CSR_ADDR, HIOX_CSR_SIZE);
 #endif
-#ifdef CONFIG_RPXCLASSIC
+#ifdef CONFIG_FADS
+	ioremap(BCSR_ADDR, BCSR_SIZE);
+#endif
+#ifdef CONFIG_PCI
         ioremap(PCI_CSR_ADDR, PCI_CSR_SIZE);
-	ioremap(RPX_CSR_ADDR, RPX_CSR_SIZE);
 #endif
-	if ( ppc_md.progress ) ppc_md.progress("MMU:exit", 0x211);
-}
-
-#else /* not 4xx or 8xx */
-void __init MMU_init(void)
-{
-	if ( ppc_md.progress ) ppc_md.progress("MMU:enter", 0x111);
-
-	if (have_of)
-		total_memory = pmac_find_end_of_memory();
-#ifdef CONFIG_APUS
-	else if (_machine == _MACH_apus )
-		total_memory = apus_find_end_of_memory();
-#endif
-#if defined(CONFIG_8260)
-	else
-		total_memory = m8260_find_end_of_memory();
-#else
-	else /* prep */
-		total_memory = prep_find_end_of_memory();
-#endif
-	if (__max_memory && total_memory > __max_memory)
-		total_memory = __max_memory;
-	total_lowmem = total_memory;
-	if (total_lowmem > __max_low_memory) {
-		total_lowmem = __max_low_memory;
-#ifndef CONFIG_HIGHMEM
-		total_memory = total_lowmem;
-#endif /* CONFIG_HIGHMEM */
-	}
-	end_of_DRAM = __va(total_lowmem);
-	set_phys_avail(total_lowmem);
-
-	if ( ppc_md.progress ) ppc_md.progress("MMU:hash init", 0x300);
-        hash_init();
-#ifndef CONFIG_PPC64BRIDGE
-        _SDR1 = __pa(Hash) | (Hash_mask >> 10);
-#endif
-	
-	ioremap_base = 0xf8000000;
-
-	if ( ppc_md.progress ) ppc_md.progress("MMU:mapin", 0x301);
-	/* Map in all of RAM starting at KERNELBASE */
-	mapin_ram();
-
-#ifdef CONFIG_POWER4
-	ioremap_base = ioremap_bot = 0xfffff000;
-	isa_io_base = (unsigned long) ioremap(0xffd00000, 0x200000) + 0x100000;
-
-#else /* CONFIG_POWER4 */
+#else /* !CONFIG_POWER4 && !CONFIG_8xx */
 	/*
 	 * Setup the bat mappings we're going to load that cover
 	 * the io areas.  RAM was mapped by mapin_ram().
@@ -1069,6 +1007,10 @@ void __init MMU_init(void)
 		/* Map chip and ZorroII memory */
 		setbat(1, zTwoBase,   0x00000000, 0x01000000, IO_PAGE);
 		break;
+	case _MACH_gemini:
+		setbat(0, 0xf0000000, 0xf0000000, 0x10000000, IO_PAGE);
+		setbat(1, 0x80000000, 0x80000000, 0x10000000, IO_PAGE);
+		break;
 	case _MACH_8260:
 		/* Map the IMMR, plus anything else we can cover
 		 * in that upper space according to the memory controller
@@ -1081,7 +1023,7 @@ void __init MMU_init(void)
 		break;
 	}
 	ioremap_bot = ioremap_base;
-#endif /* CONFIG_POWER4 */
+#endif /* CONFIG_POWER4 || CONFIG_8xx */
 
 	if ( ppc_md.progress ) ppc_md.progress("MMU:exit", 0x211);
 #ifdef CONFIG_BOOTX_TEXT
@@ -1257,155 +1199,6 @@ void __init mem_init(void)
 }
 
 #if !defined(CONFIG_4xx) && !defined(CONFIG_8xx)
-#if defined(CONFIG_ALL_PPC)
-/*
- * On systems with Open Firmware, collect information about
- * physical RAM and which pieces are already in use.
- * At this point, we have (at least) the first 8MB mapped with a BAT.
- * Our text, data, bss use something over 1MB, starting at 0.
- * Open Firmware may be using 1MB at the 4MB point.
- */
-unsigned long __init pmac_find_end_of_memory(void)
-{
-	unsigned long a, total;
-	struct mem_pieces phys_mem;
-
-	memory_node = find_devices("memory");
-	if (memory_node == NULL) {
-		printk(KERN_ERR "can't find memory node\n");
-		abort();
-	}
-
-	/*
-	 * Find out where physical memory is, and check that it
-	 * starts at 0 and is contiguous.  It seems that RAM is
-	 * always physically contiguous on Power Macintoshes.
-	 *
-	 * Supporting discontiguous physical memory isn't hard,
-	 * it just makes the virtual <-> physical mapping functions
-	 * more complicated (or else you end up wasting space
-	 * in mem_map).
-	 */
-	get_mem_prop("reg", &phys_mem);
-	if (phys_mem.n_regions == 0)
-		panic("No RAM??");
-	a = phys_mem.regions[0].address;
-	if (a != 0)
-		panic("RAM doesn't start at physical address 0");
-	total = phys_mem.regions[0].size;
-
-	if (phys_mem.n_regions > 1) {
-		printk("RAM starting at 0x%x is not contiguous\n",
-		       phys_mem.regions[1].address);
-		printk("Using RAM from 0 to 0x%lx\n", total-1);
-	}
-
-	return total;
-}
-#endif /* CONFIG_ALL_PPC */
-
-#if defined(CONFIG_ALL_PPC)
-/*
- * This finds the amount of physical ram and does necessary
- * setup for prep.  This is pretty architecture specific so
- * this will likely stay separate from the pmac.
- * -- Cort
- */
-unsigned long __init prep_find_end_of_memory(void)
-{
-	unsigned long total;
-#ifdef CONFIG_PREP_RESIDUAL
-	total = res->TotalMemory;
-#else
-	total = 0;
-#endif
-
-	if (total == 0 )
-	{
-		/*
-		 * I need a way to probe the amount of memory if the residual
-		 * data doesn't contain it. -- Cort
-		 */
-		printk("Ramsize from residual data was 0 -- Probing for value\n");
-		total = 0x02000000;
-		printk("Ramsize default to be %ldM\n", total>>20);
-	}
-
-	return (total);
-}
-#endif /* defined(CONFIG_ALL_PPC) */
-
-#ifdef CONFIG_8260
-/*
- * Same hack as 8xx.
- */
-unsigned long __init m8260_find_end_of_memory(void)
-{
-	bd_t	*binfo;
-	extern unsigned char __res[];
-	
-	binfo = (bd_t *)__res;
-
-	return binfo->bi_memsize;
-}
-#endif /* CONFIG_8260 */
-
-#ifdef CONFIG_APUS
-#define HARDWARE_MAPPED_SIZE (512*1024)
-unsigned long __init apus_find_end_of_memory(void)
-{
-	int shadow = 0;
-	unsigned long total;
-
-	/* The memory size reported by ADOS excludes the 512KB
-	   reserved for PPC exception registers and possibly 512KB
-	   containing a shadow of the ADOS ROM. */
-	{
-		unsigned long size = memory[0].size;
-
-		/* If 2MB aligned, size was probably user
-                   specified. We can't tell anything about shadowing
-                   in this case so skip shadow assignment. */
-		if (0 != (size & 0x1fffff)){
-			/* Align to 512KB to ensure correct handling
-			   of both memfile and system specified
-			   sizes. */
-			size = ((size+0x0007ffff) & 0xfff80000);
-			/* If memory is 1MB aligned, assume
-                           shadowing. */
-			shadow = !(size & 0x80000);
-		}
-
-		/* Add the chunk that ADOS does not see. by aligning
-                   the size to the nearest 2MB limit upwards.  */
-		memory[0].size = ((size+0x001fffff) & 0xffe00000);
-	}
-
-	total = memory[0].size;
-
-	/* Remove the memory chunks that are controlled by special
-           Phase5 hardware. */
-
-	/* Remove the upper 512KB if it contains a shadow of
-	   the ADOS ROM. FIXME: It might be possible to
-	   disable this shadow HW. Check the booter
-	   (ppc_boot.c) */
-	if (shadow)
-		total -= HARDWARE_MAPPED_SIZE;
-
-	/* Remove the upper 512KB where the PPC exception
-	   vectors are mapped. */
-	total -= HARDWARE_MAPPED_SIZE;
-
-	/* Linux/APUS only handles one block of memory -- the one on
-	   the PowerUP board. Other system memory is horrible slow in
-	   comparison. The user can use other memory for swapping
-	   using the z2ram device. */
-	ram_phys_base = memory[0].addr;
-	return total;
-}
-#endif /* CONFIG_APUS */
-
 /*
  * Initialize the hash table and patch the instructions in head.S.
  */
@@ -1514,43 +1307,7 @@ static void __init hash_init(void)
 	}
 	if ( ppc_md.progress ) ppc_md.progress("hash:done", 0x205);
 }
-#elif defined(CONFIG_8xx)
-/*
- * This is a big hack right now, but it may turn into something real
- * someday.
- *
- * For the 8xx boards (at this time anyway), there is nothing to initialize
- * associated the PROM.  Rather than include all of the prom.c
- * functions in the image just to get prom_init, all we really need right
- * now is the initialization of the physical memory region.
- */
-unsigned long __init m8xx_find_end_of_memory(void)
-{
-	bd_t	*binfo;
-	extern unsigned char __res[];
-	
-	binfo = (bd_t *)__res;
-
-	return binfo->bi_memsize;
-}
 #endif /* !CONFIG_4xx && !CONFIG_8xx */
-
-#ifdef CONFIG_OAK
-/*
- * Return the virtual address representing the top of physical RAM
- * on the Oak board.
- */
-unsigned long __init
-oak_find_end_of_memory(void)
-{
-	extern unsigned char __res[];
-
-	unsigned long *ret;
-	bd_t *bip = (bd_t *)__res;
-	
-	return bip->bi_memsize;
-}
-#endif
 
 /*
  * Set phys_avail to the amount of physical memory,

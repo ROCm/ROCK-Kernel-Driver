@@ -10,10 +10,13 @@
 #include <linux/mm.h>
 #include <linux/sysctl.h>
 
+#ifndef CONFIG_SYSCTL
+#error This file should not be compiled without CONFIG_SYSCTL defined
+#endif
+
 /* From af_ipx.c */
 extern int sysctl_ipx_pprop_broadcasting;
 
-#ifdef CONFIG_SYSCTL
 ctl_table ipx_table[] = {
 	{ NET_IPX_PPROP_BROADCASTING, "ipx_pprop_broadcasting",
 	  &sysctl_ipx_pprop_broadcasting, sizeof(int), 0644, NULL,
@@ -42,13 +45,3 @@ void ipx_unregister_sysctl(void)
 {
 	unregister_sysctl_table(ipx_table_header);
 }
-
-#else
-void ipx_register_sysctl(void)
-{
-}
-
-void ipx_unregister_sysctl(void)
-{
-}
-#endif

@@ -453,6 +453,8 @@ void ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	{
 		if (!netif_running(dev)) {
 			printk(KERN_WARNING "%s: interrupt from stopped card\n", dev->name);
+			/* rmk - acknowledge the interrupts */
+			outb_p(interrupts, e8390_base + EN0_ISR);
 			interrupts = 0;
 			break;
 		}

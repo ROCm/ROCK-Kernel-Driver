@@ -21,6 +21,7 @@
  *	Janos Farkas			:	kmalloc failure checks
  *	Alexey Kuznetsov		:	state machine reworked
  *						and moved to net/core.
+ *	Pekka Savola			:	RFC2461 validation
  */
 
 /* Set to 3 to get tracing... */
@@ -242,14 +243,8 @@ static int pndisc_constructor(struct pneigh_entry *n)
 
 	if (dev == NULL || __in6_dev_get(dev) == NULL)
 		return -EINVAL;
-#ifndef CONFIG_IPV6_NO_PB
-	addrconf_addr_solict_mult_old(addr, &maddr);
+	addrconf_addr_solict_mult(addr, &maddr);
 	ipv6_dev_mc_inc(dev, &maddr);
-#endif
-#ifdef CONFIG_IPV6_EUI64
-	addrconf_addr_solict_mult_new(addr, &maddr);
-	ipv6_dev_mc_inc(dev, &maddr);
-#endif
 	return 0;
 }
 
@@ -261,14 +256,8 @@ static void pndisc_destructor(struct pneigh_entry *n)
 
 	if (dev == NULL || __in6_dev_get(dev) == NULL)
 		return;
-#ifndef CONFIG_IPV6_NO_PB
-	addrconf_addr_solict_mult_old(addr, &maddr);
+	addrconf_addr_solict_mult(addr, &maddr);
 	ipv6_dev_mc_dec(dev, &maddr);
-#endif
-#ifdef CONFIG_IPV6_EUI64
-	addrconf_addr_solict_mult_new(addr, &maddr);
-	ipv6_dev_mc_dec(dev, &maddr);
-#endif
 }
 
 
@@ -393,6 +382,12 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	int err;
 	int send_llinfo;
 
+	if (saddr == NULL) {
+		if (ipv6_get_lladdr(dev, &addr_buf))
+			return;
+		saddr = &addr_buf;
+	}
+
 	len = sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
 	send_llinfo = dev->addr_len && ipv6_addr_type(saddr) != IPV6_ADDR_ANY;
 	if (send_llinfo)
@@ -403,14 +398,6 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
 		return;
-	}
-
-	if (saddr == NULL) {
-		if (ipv6_get_lladdr(dev, &addr_buf)) {
-			kfree_skb(skb);
-			return;
-		}
-		saddr = &addr_buf;
 	}
 
 	if (ndisc_build_ll_hdr(skb, dev, daddr, neigh, len) == 0) {
@@ -550,14 +537,8 @@ static void ndisc_solicit(struct neighbour *neigh, struct sk_buff *skb)
 		neigh_app_ns(neigh);
 #endif
 	} else {
-#ifdef CONFIG_IPV6_EUI64
-		addrconf_addr_solict_mult_new(target, &mcaddr);
+		addrconf_addr_solict_mult(target, &mcaddr);
 		ndisc_send_ns(dev, NULL, target, &mcaddr, saddr);
-#endif
-#ifndef CONFIG_IPV6_NO_PB
-		addrconf_addr_solict_mult_old(target, &mcaddr);
-		ndisc_send_ns(dev, NULL, target, &mcaddr, saddr);
-#endif
 	}
 }
 
@@ -581,9 +562,9 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 
 	optlen = (skb->tail - skb->h.raw) - sizeof(struct ra_msg);
 
-	if (skb->nh.ipv6h->hop_limit != 255) {
-		printk(KERN_INFO
-		       "NDISC: fake router advertisment received\n");
+	if (!(ipv6_addr_type(&skb->nh.ipv6h->saddr) & IPV6_ADDR_LINKLOCAL)) {
+		if (net_ratelimit())
+			printk(KERN_WARNING "ICMP RA: source address is not linklocal\n");
 		return;
 	}
 
@@ -756,13 +737,9 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 	int on_link = 0;
 	int optlen;
 
-	if (skb->nh.ipv6h->hop_limit != 255) {
-		printk(KERN_WARNING "NDISC: fake ICMP redirect received\n");
-		return;
-	}
-
 	if (!(ipv6_addr_type(&skb->nh.ipv6h->saddr) & IPV6_ADDR_LINKLOCAL)) {
-		printk(KERN_WARNING "ICMP redirect: source address is not linklocal\n");
+		if (net_ratelimit())
+			printk(KERN_WARNING "ICMP redirect: source address is not linklocal\n");
 		return;
 	}
 
@@ -770,7 +747,8 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 	optlen -= sizeof(struct icmp6hdr) + 2 * sizeof(struct in6_addr);
 
 	if (optlen < 0) {
-		printk(KERN_WARNING "ICMP redirect: packet too small\n");
+		if (net_ratelimit())
+			printk(KERN_WARNING "ICMP redirect: packet too small\n");
 		return;
 	}
 
@@ -779,14 +757,16 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 	dest = target + 1;
 
 	if (ipv6_addr_type(dest) & IPV6_ADDR_MULTICAST) {
-		printk(KERN_WARNING "ICMP redirect for multicast addr\n");
+		if (net_ratelimit())
+			printk(KERN_WARNING "ICMP redirect for multicast addr\n");
 		return;
 	}
 
 	if (ipv6_addr_cmp(dest, target) == 0) {
 		on_link = 1;
 	} else if (!(ipv6_addr_type(target) & IPV6_ADDR_LINKLOCAL)) {
-		printk(KERN_WARNING "ICMP redirect: target address is not linklocal\n");
+		if (net_ratelimit())
+			printk(KERN_WARNING "ICMP redirect: target address is not linklocal\n");
 		return;
 	}
 
@@ -798,6 +778,11 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 		return;
 	}
 
+	/* XXX: RFC2461 8.1: 
+	 *	The IP source address of the Redirect MUST be the same as the current
+	 *	first-hop router for the specified ICMP Destination Address.
+	 */
+		
 	/* passed validation tests */
 
 	/*
@@ -974,8 +959,52 @@ int ndisc_rcv(struct sk_buff *skb)
 
 	__skb_push(skb, skb->data-skb->h.raw);
 
+	if (skb->nh.ipv6h->hop_limit != 255) {
+		if (net_ratelimit())
+			printk(KERN_WARNING
+			       "ICMP NDISC: fake message with non-255 Hop Limit received: %d\n",
+			       		skb->nh.ipv6h->hop_limit);
+		return 0;
+	}
+
+	if (msg->icmph.icmp6_code != 0) {
+		if (net_ratelimit())
+			printk(KERN_WARNING "ICMP NDISC: code is not zero\n");
+		return 0;
+	}
+
+	/* XXX: RFC2461 Validation of [all ndisc messages]:
+	 *	All included ndisc options MUST be of non-zero length
+	 *	(Some checking in ndisc_find_option)
+	 */
+
 	switch (msg->icmph.icmp6_type) {
 	case NDISC_NEIGHBOUR_SOLICITATION:
+		/* XXX: import nd_neighbor_solicit from glibc netinet/icmp6.h */
+		if (skb->nh.ipv6h->payload_len < 8+16) {
+			if (net_ratelimit())
+				printk(KERN_WARNING "ICMP NS: packet too short\n");
+			return 0;
+		}
+
+		if (ipv6_addr_type(&msg->target)&IPV6_ADDR_MULTICAST) {
+			if (net_ratelimit())
+				printk(KERN_WARNING "ICMP NS: target address is multicast\n");
+			return 0;
+		}
+
+		/* XXX: RFC2461 7.1.1:
+		 * 	If the IP source address is the unspecified address, there
+		 *	MUST NOT be source link-layer address option in the message.
+		 *
+		 *	NOTE! Linux kernel < 2.4.4 broke this rule.
+		 */
+		 	
+		/* XXX: RFC2461 7.1.1:
+		 *	If the IP source address is the unspecified address, the IP
+      		 *	destination address MUST be a solicited-node multicast address.
+		 */
+
 		if ((ifp = ipv6_get_ifaddr(&msg->target, dev)) != NULL) {
 			int addr_type = ipv6_addr_type(saddr);
 
@@ -1010,7 +1039,9 @@ int ndisc_rcv(struct sk_buff *skb)
 
 				ipv6_addr_all_nodes(&maddr);
 				ndisc_send_na(dev, NULL, &maddr, &ifp->addr, 
-					      ifp->idev->cnf.forwarding, 0, 1, 1);
+					      ifp->idev->cnf.forwarding, 0, 
+					      ipv6_addr_type(&ifp->addr)&IPV6_ADDR_ANYCAST ? 0 : 1, 
+					      1);
 				in6_ifa_put(ifp);
 				return 0;
 			}
@@ -1032,7 +1063,9 @@ int ndisc_rcv(struct sk_buff *skb)
 
 				if (neigh) {
 					ndisc_send_na(dev, neigh, saddr, &ifp->addr, 
-						      ifp->idev->cnf.forwarding, 1, inc, inc);
+						      ifp->idev->cnf.forwarding, 1, 
+						      ipv6_addr_type(&ifp->addr)&IPV6_ADDR_ANYCAST ? 0 : 1, 
+						      1);
 					neigh_release(neigh);
 				}
 			}
@@ -1059,7 +1092,7 @@ int ndisc_rcv(struct sk_buff *skb)
 
 					if (neigh) {
 						ndisc_send_na(dev, neigh, saddr, &msg->target,
-							      0, 1, 0, inc);
+							      0, 1, 0, 1);
 						neigh_release(neigh);
 					}
 				} else {
@@ -1077,11 +1110,25 @@ int ndisc_rcv(struct sk_buff *skb)
 		return 0;
 
 	case NDISC_NEIGHBOUR_ADVERTISEMENT:
+		/* XXX: import nd_neighbor_advert from glibc netinet/icmp6.h */
+		if (skb->nh.ipv6h->payload_len < 16+8 ) {
+			if (net_ratelimit())
+				printk(KERN_WARNING "ICMP NA: packet too short\n");
+			return 0;
+		}
+
+		if (ipv6_addr_type(&msg->target)&IPV6_ADDR_MULTICAST) {
+			if (net_ratelimit())
+				printk(KERN_WARNING "NDISC NA: target address is multicast\n");
+			return 0;
+		}
+
 		if ((ipv6_addr_type(daddr)&IPV6_ADDR_MULTICAST) &&
 		    msg->icmph.icmp6_solicited) {
 			ND_PRINTK0("NDISC: solicited NA is multicasted\n");
 			return 0;
 		}
+		
 		if ((ifp = ipv6_get_ifaddr(&msg->target, dev))) {
 			if (ifp->flags & IFA_F_TENTATIVE) {
 				addrconf_dad_failure(ifp);
@@ -1092,7 +1139,7 @@ int ndisc_rcv(struct sk_buff *skb)
 			   about it. It could be misconfiguration, or
 			   an smart proxy agent tries to help us :-)
 			 */
-			ND_PRINTK0("%s: someone avertise our address!\n",
+			ND_PRINTK0("%s: someone advertises our address!\n",
 				   ifp->idev->dev->name);
 			in6_ifa_put(ifp);
 			return 0;
@@ -1125,11 +1172,34 @@ int ndisc_rcv(struct sk_buff *skb)
 		break;
 
 	case NDISC_ROUTER_ADVERTISEMENT:
+		/* XXX: import nd_router_advert from glibc netinet/icmp6.h */
+		if (skb->nh.ipv6h->payload_len < 8+4+4) {
+			if (net_ratelimit())
+				printk(KERN_WARNING "ICMP RA: packet too short\n");
+			return 0;
+		}
 		ndisc_router_discovery(skb);
 		break;
 
 	case NDISC_REDIRECT:
+		/* XXX: import nd_redirect from glibc netinet/icmp6.h */
+		if (skb->nh.ipv6h->payload_len < 8+16+16) {
+			if (net_ratelimit())
+				printk(KERN_WARNING "ICMP redirect: packet too short\n");
+			return 0;
+		}
 		ndisc_redirect_rcv(skb);
+		break;
+
+	case NDISC_ROUTER_SOLICITATION:
+		/* No RS support in the kernel, but we do some required checks */
+
+		/* XXX: import nd_router_solicit from glibc netinet/icmp6.h */
+		if (skb->nh.ipv6h->payload_len < 8) {
+			if (net_ratelimit())
+				printk(KERN_WARNING "ICMP RS: packet too short\n");
+			return 0;
+		}
 		break;
 	};
 
@@ -1228,7 +1298,7 @@ int __init ndisc_init(struct net_proto_family *ops)
 
 	if((err = ops->create(ndisc_socket, IPPROTO_ICMPV6)) < 0) {
 		printk(KERN_DEBUG 
-		       "Failed to initializee the NDISC control socket (err %d).\n",
+		       "Failed to initialize the NDISC control socket (err %d).\n",
 		       err);
 		sock_release(ndisc_socket);
 		ndisc_socket = NULL; /* For safety. */

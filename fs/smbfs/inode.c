@@ -109,9 +109,20 @@ smb_get_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 		fattr->attr |= aRONLY;
 }
 
+/*
+ * Update the inode, possibly causing it to invalidate its pages if mtime/size
+ * is different from last time.
+ */
 void
 smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 {
+	/*
+	 * A size change should have a different mtime, or same mtime
+	 * but different size.
+	 */
+	time_t last_time = inode->i_mtime;
+	loff_t last_sz = inode->i_size;
+
 	inode->i_mode	= fattr->f_mode;
 	inode->i_nlink	= fattr->f_nlink;
 	inode->i_uid	= fattr->f_uid;
@@ -120,21 +131,24 @@ smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 	inode->i_ctime	= fattr->f_ctime;
 	inode->i_blksize= fattr->f_blksize;
 	inode->i_blocks = fattr->f_blocks;
-	/*
-	 * Don't change the size and mtime/atime fields
-	 * if we're writing to the file.
-	 */
-	if (!(inode->u.smbfs_i.flags & SMB_F_LOCALWRITE)) {
-		inode->i_size  = fattr->f_size;
-		inode->i_mtime = fattr->f_mtime;
-		inode->i_atime = fattr->f_atime;
-	}
-
+	inode->i_size	= fattr->f_size;
+	inode->i_mtime	= fattr->f_mtime;
+	inode->i_atime	= fattr->f_atime;
 	inode->u.smbfs_i.attr = fattr->attr;
 	/*
 	 * Update the "last time refreshed" field for revalidation.
 	 */
 	inode->u.smbfs_i.oldmtime = jiffies;
+
+	if (inode->i_mtime != last_time || inode->i_size != last_sz) {
+		VERBOSE("%s/%s changed, old=%ld, new=%ld, oz=%ld, nz=%ld\n",
+			DENTRY_PATH(dentry),
+			(long) last_time, (long) inode->i_mtime,
+			(long) last_sz, (long) inode->i_size);
+
+		if (!S_ISDIR(inode->i_mode))
+			invalidate_inode_pages(inode);
+	}
 }
 
 /*
@@ -209,8 +223,6 @@ smb_revalidate_inode(struct dentry *dentry)
 {
 	struct smb_sb_info *s = server_from_dentry(dentry);
 	struct inode *inode = dentry->d_inode;
-	time_t last_time;
-	loff_t last_sz;
 	int error = 0;
 
 	DEBUG1("smb_revalidate_inode\n");
@@ -225,22 +237,7 @@ smb_revalidate_inode(struct dentry *dentry)
 		goto out;
 	}
 
-	/*
-	 * Save the last modified time, then refresh the inode.
-	 * (Note: a size change should have a different mtime,
-	 *  or same mtime but different size.)
-	 */
-	last_time = inode->i_mtime;
-	last_sz   = inode->i_size;
 	error = smb_refresh_inode(dentry);
-	if (error || inode->i_mtime != last_time || inode->i_size != last_sz) {
-		VERBOSE("%s/%s changed, old=%ld, new=%ld\n",
-			DENTRY_PATH(dentry),
-			(long) last_time, (long) inode->i_mtime);
-
-		if (!S_ISDIR(inode->i_mode))
-			invalidate_inode_pages(inode);
-	}
 out:
 	unlock_kernel();
 	return error;
@@ -355,8 +352,8 @@ smb_put_super(struct super_block *sb)
 	if (server->conn_pid)
 	       kill_proc(server->conn_pid, SIGTERM, 1);
 
-	kfree(server->mnt);
-	kfree(sb->u.smbfs_sb.temp_buf);
+	smb_kfree(server->mnt);
+	smb_kfree(sb->u.smbfs_sb.temp_buf);
 	if (server->packet)
 		smb_vfree(server->packet);
 
@@ -390,7 +387,6 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 	sb->s_blocksize = 1024;	/* Eh...  Is this correct? */
 	sb->s_blocksize_bits = 10;
 	sb->s_magic = SMB_SUPER_MAGIC;
-	sb->s_flags = 0;
 	sb->s_op = &smb_sops;
 
 	sb->u.smbfs_sb.mnt = NULL;
@@ -400,13 +396,13 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 	sb->u.smbfs_sb.conn_pid = 0;
 	sb->u.smbfs_sb.state = CONN_INVALID; /* no connection yet */
 	sb->u.smbfs_sb.generation = 0;
-	sb->u.smbfs_sb.packet_size = smb_round_length(SMB_INITIAL_PACKET_SIZE);	
+	sb->u.smbfs_sb.packet_size = smb_round_length(SMB_INITIAL_PACKET_SIZE);
 	sb->u.smbfs_sb.packet = smb_vmalloc(sb->u.smbfs_sb.packet_size);
 	if (!sb->u.smbfs_sb.packet)
 		goto out_no_mem;
 
 	/* Allocate the global temp buffer */
-	sb->u.smbfs_sb.temp_buf = kmalloc(2*SMB_MAXPATHLEN + 20, GFP_KERNEL);
+	sb->u.smbfs_sb.temp_buf = smb_kmalloc(2*SMB_MAXPATHLEN+20, GFP_KERNEL);
 	if (!sb->u.smbfs_sb.temp_buf)
 		goto out_no_temp;
 
@@ -417,7 +413,7 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 
 	/* Allocate the mount data structure */
 	/* FIXME: merge this with the other malloc and get a whole page? */
-	mnt = kmalloc(sizeof(struct smb_mount_data_kernel), GFP_KERNEL);
+	mnt = smb_kmalloc(sizeof(struct smb_mount_data_kernel), GFP_KERNEL);
 	if (!mnt)
 		goto out_no_mount;
 	sb->u.smbfs_sb.mnt = mnt;
@@ -482,9 +478,9 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 out_no_root:
 	iput(root_inode);
 out_bad_option:
-	kfree(sb->u.smbfs_sb.mnt);
+	smb_kfree(sb->u.smbfs_sb.mnt);
 out_no_mount:
-	kfree(sb->u.smbfs_sb.temp_buf);
+	smb_kfree(sb->u.smbfs_sb.temp_buf);
 out_no_temp:
 	smb_vfree(sb->u.smbfs_sb.packet);
 out_no_mem:

@@ -56,6 +56,7 @@ int idled(void)
 	case 7:			/* 603ev */
 	case 8:			/* 750 */
 	case 12:		/* 7400 */
+	case 0x800c:		/* 7410 */
 		do_power_save = 1;
 	}
 

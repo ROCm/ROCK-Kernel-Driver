@@ -1247,36 +1247,54 @@ cy_write(struct tty_struct * tty, int from_user,
         return 0;
     }
 
-    while (1) {
-        save_flags(flags); cli();		
-	c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-			   SERIAL_XMIT_SIZE - info->xmit_head));
-	if (c <= 0){
-	    restore_flags(flags);
-	    break;
-	}
-
-	if (from_user) {
+    if (from_user) {
 	    down(&tmp_buf_sem);
-	    if (copy_from_user(tmp_buf, buf, c)) {
-	    	up(&tmp_buf_sem);
-	        restore_flags(flags);
-		return 0;
-	    }
-	    c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-		       SERIAL_XMIT_SIZE - info->xmit_head));
-	    memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
-	    up(&tmp_buf_sem);
-	} else
-	    memcpy(info->xmit_buf + info->xmit_head, buf, c);
-	info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-	info->xmit_cnt += c;
-	restore_flags(flags);
-	buf += c;
-	count -= c;
-	total += c;
-    }
+	    while (1) {
+		    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				       SERIAL_XMIT_SIZE - info->xmit_head));
+		    if (c <= 0)
+			    break;
 
+		    c -= copy_from_user(tmp_buf, buf, c);
+		    if (!c) {
+			    if (!total)
+				    total = -EFAULT;
+			    break;
+		    }
+
+		    cli();
+		    c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				   SERIAL_XMIT_SIZE - info->xmit_head));
+		    memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
+		    info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+		    info->xmit_cnt += c;
+		    restore_flags(flags);
+
+		    buf += c;
+		    count -= c;
+		    total += c;
+	    }
+	    up(&tmp_buf_sem);
+    } else {
+	    while (1) {
+		    cli();
+		    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				       SERIAL_XMIT_SIZE - info->xmit_head));
+		    if (c <= 0) {
+			    restore_flags(flags);
+			    break;
+		    }
+
+		    memcpy(info->xmit_buf + info->xmit_head, buf, c);
+		    info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+		    info->xmit_cnt += c;
+		    restore_flags(flags);
+
+		    buf += c;
+		    count -= c;
+		    total += c;
+	    }
+    }
 
     if (info->xmit_cnt
     && !tty->stopped

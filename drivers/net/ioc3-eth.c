@@ -402,7 +402,7 @@ static int ioc3_mii_init(struct net_device *dev, struct ioc3_private *ip,
 
 static struct net_device_stats *ioc3_get_stats(struct net_device *dev)
 {
-	struct ioc3_private *ip = (struct ioc3_private *) dev->priv;
+	struct ioc3_private *ip = dev->priv;
 	struct ioc3 *ioc3 = ip->regs;
 
 	ip->stats.collisions += (ioc3->etcdc & ETCDC_COLLCNT_MASK);
@@ -566,7 +566,7 @@ ioc3_error(struct net_device *dev, struct ioc3_private *ip,
    after the Tx thread.  */
 static void ioc3_interrupt(int irq, void *_dev, struct pt_regs *regs)
 {
-	struct net_device *dev = (struct net_device *)_dev;
+	struct net_device *dev = _dev;
 	struct ioc3_private *ip = dev->priv;
 	struct ioc3 *ioc3 = ip->regs;
 	const u32 enabled = EISR_RXTIMERINT | EISR_RXOFLO | EISR_RXBUFOFLO |
@@ -595,7 +595,7 @@ static void ioc3_interrupt(int irq, void *_dev, struct pt_regs *regs)
 static void negotiate(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *) data;
-	struct ioc3_private *ip = (struct ioc3_private *) dev->priv;
+	struct ioc3_private *ip = dev->priv;
 	struct ioc3 *ioc3 = ip->regs;
 
 	mod_timer(&ip->negtimer, jiffies + 20 * HZ);
@@ -864,7 +864,7 @@ ioc3_open(struct net_device *dev)
 		return -EAGAIN;
 	}
 
-	ip = (struct ioc3_private *) dev->priv;
+	ip = dev->priv;
 
 	ip->ehar_h = 0;
 	ip->ehar_l = 0;
@@ -1131,7 +1131,7 @@ ioc3_hash(const unsigned char *addr)
 /* Provide ioctl() calls to examine the MII xcvr state. */
 static int ioc3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct ioc3_private *ip = (struct ioc3_private *) dev->priv;
+	struct ioc3_private *ip = dev->priv;
 	u16 *data = (u16 *)&rq->ifr_data;
 	struct ioc3 *ioc3 = ip->regs;
 	int phy = ip->phy;

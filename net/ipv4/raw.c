@@ -5,7 +5,7 @@
  *
  *		RAW - implementation of IP "raw" sockets.
  *
- * Version:	$Id: raw.c,v 1.60 2001/02/23 06:32:11 davem Exp $
+ * Version:	$Id: raw.c,v 1.61 2001/05/03 20:56:04 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -14,8 +14,9 @@
  *		Alan Cox	:	verify_area() fixed up
  *		Alan Cox	:	ICMP error handling
  *		Alan Cox	:	EMSGSIZE if you send too big a packet
- *		Alan Cox	: 	Now uses generic datagrams and shared skbuff
- *					library. No more peek crashes, no more backlogs
+ *		Alan Cox	: 	Now uses generic datagrams and shared
+ *					skbuff library. No more peek crashes,
+ *					no more backlogs
  *		Alan Cox	:	Checks sk->broadcast.
  *		Alan Cox	:	Uses skb_free_datagram/skb_copy_datagram
  *		Alan Cox	:	Raw passes ip options too
@@ -101,11 +102,11 @@ struct sock *__raw_v4_lookup(struct sock *sk, unsigned short num,
 {
 	struct sock *s = sk;
 
-	for(s = sk; s; s = s->next) {
-		if((s->num == num) 				&&
-		   !(s->daddr && s->daddr != raddr) 		&&
-		   !(s->rcv_saddr && s->rcv_saddr != laddr)	&&
-		   !(s->bound_dev_if && s->bound_dev_if != dif))
+	for (s = sk; s; s = s->next) {
+		if (s->num == num 				&&
+		    !(s->daddr && s->daddr != raddr) 		&&
+		    !(s->rcv_saddr && s->rcv_saddr != laddr)	&&
+		    !(s->bound_dev_if && s->bound_dev_if != dif))
 			break; /* gotcha */
 	}
 	return s;
@@ -117,7 +118,7 @@ struct sock *__raw_v4_lookup(struct sock *sk, unsigned short num,
  */
 static __inline__ int icmp_filter(struct sock *sk, struct sk_buff *skb)
 {
-	int    type;
+	int type;
 
 	type = skb->h.icmph->type;
 	if (type < 32)
@@ -145,19 +146,19 @@ struct sock *raw_v4_input(struct sk_buff *skb, struct iphdr *iph, int hash)
 			     iph->saddr, iph->daddr,
 			     skb->dev->ifindex);
 
-	while(sk != NULL) {
+	while (sk) {
 		struct sock *sknext = __raw_v4_lookup(sk->next, iph->protocol,
 						      iph->saddr, iph->daddr,
 						      skb->dev->ifindex);
 		if (iph->protocol != IPPROTO_ICMP ||
-		    ! icmp_filter(sk, skb)) {
+		    !icmp_filter(sk, skb)) {
 			struct sk_buff *clone;
 
-			if(sknext == NULL)
+			if (!sknext)
 				break;
 			clone = skb_clone(skb, GFP_ATOMIC);
 			/* Not releasing hash table! */
-			if(clone)
+			if (clone)
 				raw_rcv(sk, clone);
 		}
 		sk = sknext;
@@ -203,14 +204,15 @@ void raw_err (struct sock *sk, struct sk_buff *skb, u32 info)
 		err = icmp_err_convert[code].errno;
 		harderr = icmp_err_convert[code].fatal;
 		if (code == ICMP_FRAG_NEEDED) {
-			harderr = (sk->protinfo.af_inet.pmtudisc != IP_PMTUDISC_DONT);
+			harderr = sk->protinfo.af_inet.pmtudisc !=
+					IP_PMTUDISC_DONT;
 			err = EMSGSIZE;
 		}
 	}
 
 	if (sk->protinfo.af_inet.recverr) {
 		struct iphdr *iph = (struct iphdr*)skb->data;
-		u8 *payload = skb->data+(iph->ihl<<2);
+		u8 *payload = skb->data + (iph->ihl << 2);
 
 		if (sk->protinfo.af_inet.hdrincl)
 			payload = skb->data;
@@ -227,8 +229,7 @@ static int raw_rcv_skb(struct sock * sk, struct sk_buff * skb)
 {
 	/* Charge it to the socket. */
 	
-	if (sock_queue_rcv_skb(sk,skb)<0)
-	{
+	if (sock_queue_rcv_skb(sk, skb) < 0) {
 		IP_INC_STATS(IpInDiscards);
 		kfree_skb(skb);
 		return NET_RX_DROP;
@@ -240,7 +241,7 @@ static int raw_rcv_skb(struct sock * sk, struct sk_buff * skb)
 
 int raw_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	skb_push(skb, skb->data-skb->nh.raw);
+	skb_push(skb, skb->data - skb->nh.raw);
 
 	raw_rcv_skb(sk, skb);
 	return 0;
@@ -248,9 +249,9 @@ int raw_rcv(struct sock *sk, struct sk_buff *skb)
 
 struct rawfakehdr 
 {
-	struct  iovec *iov;
+	struct	iovec *iov;
 	u32	saddr;
-	struct dst_entry *dst;
+	struct	dst_entry *dst;
 };
 
 /*
@@ -261,7 +262,8 @@ struct rawfakehdr
  *	Callback support is trivial for SOCK_RAW
  */
   
-static int raw_getfrag(const void *p, char *to, unsigned int offset, unsigned int fraglen)
+static int raw_getfrag(const void *p, char *to, unsigned int offset,
+			unsigned int fraglen)
 {
 	struct rawfakehdr *rfh = (struct rawfakehdr *) p;
 	return memcpy_fromiovecend(to, rfh->iov, offset, fraglen);
@@ -271,27 +273,28 @@ static int raw_getfrag(const void *p, char *to, unsigned int offset, unsigned in
  *	IPPROTO_RAW needs extra work.
  */
  
-static int raw_getrawfrag(const void *p, char *to, unsigned int offset, unsigned int fraglen)
+static int raw_getrawfrag(const void *p, char *to, unsigned int offset,
+				unsigned int fraglen)
 {
 	struct rawfakehdr *rfh = (struct rawfakehdr *) p;
 
 	if (memcpy_fromiovecend(to, rfh->iov, offset, fraglen))
 		return -EFAULT;
 
-	if (offset==0) {
+	if (!offset) {
 		struct iphdr *iph = (struct iphdr *)to;
 		if (!iph->saddr)
 			iph->saddr = rfh->saddr;
-		iph->check=0;
-		iph->tot_len=htons(fraglen);	/* This is right as you can't frag
-						   RAW packets */
+		iph->check   = 0;
+		iph->tot_len = htons(fraglen); /* This is right as you can't
+						  frag RAW packets */
 		/*
 	 	 *	Deliberate breach of modularity to keep 
 	 	 *	ip_build_xmit clean (well less messy).
 		 */
 		if (!iph->id)
 			ip_select_ident(iph, rfh->dst, NULL);
-		iph->check=ip_fast_csum((unsigned char *)iph, iph->ihl);
+		iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
 	}
 	return 0;
 }
@@ -317,15 +320,17 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 	   If len was ULONG_MAX-10 it would be cathastrophe  --ANK
 	 */
 
+	err = -EMSGSIZE;
 	if (len < 0 || len > 0xFFFF)
-		return -EMSGSIZE;
+		goto out;
 
 	/*
 	 *	Check the flags.
 	 */
 
-	if (msg->msg_flags & MSG_OOB)		/* Mirror BSD error message compatibility */
-		return -EOPNOTSUPP;
+	err = -EOPNOTSUPP;
+	if (msg->msg_flags & MSG_OOB)	/* Mirror BSD error message */
+		goto out;               /* compatibility */
 			 
 	/*
 	 *	Get and verify the address. 
@@ -333,14 +338,18 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 
 	if (msg->msg_namelen) {
 		struct sockaddr_in *usin = (struct sockaddr_in*)msg->msg_name;
+		err = -EINVAL;
 		if (msg->msg_namelen < sizeof(*usin))
-			return(-EINVAL);
+			goto out;
 		if (usin->sin_family != AF_INET) {
 			static int complained;
 			if (!complained++)
-				printk(KERN_INFO "%s forgot to set AF_INET in raw sendmsg. Fix it!\n", current->comm);
+				printk(KERN_INFO "%s forgot to set AF_INET in "
+						 "raw sendmsg. Fix it!\n",
+						 current->comm);
+			err = -EINVAL;
 			if (usin->sin_family)
-				return -EINVAL;
+				goto out;
 		}
 		daddr = usin->sin_addr.s_addr;
 		/* ANK: I did not forget to get protocol from port field.
@@ -348,8 +357,9 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 		 * IP_HDRINCL is much more convenient.
 		 */
 	} else {
+		err = -EINVAL;
 		if (sk->state != TCP_ESTABLISHED) 
-			return(-EINVAL);
+			goto out;
 		daddr = sk->daddr;
 	}
 
@@ -358,11 +368,11 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 	ipc.oif = sk->bound_dev_if;
 
 	if (msg->msg_controllen) {
-		int tmp = ip_cmsg_send(msg, &ipc);
-		if (tmp)
-			return tmp;
+		err = ip_cmsg_send(msg, &ipc);
+		if (err)
+			goto out;
 		if (ipc.opt)
-			free=1;
+			free = 1;
 	}
 
 	rfh.saddr = ipc.addr;
@@ -385,7 +395,7 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 		}
 	}
 	tos = RT_TOS(sk->protinfo.af_inet.tos) | sk->localroute;
-	if (msg->msg_flags&MSG_DONTROUTE)
+	if (msg->msg_flags & MSG_DONTROUTE)
 		tos |= RTO_ONLINK;
 
 	if (MULTICAST(daddr)) {
@@ -401,31 +411,31 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 		goto done;
 
 	err = -EACCES;
-	if (rt->rt_flags&RTCF_BROADCAST && !sk->broadcast)
+	if (rt->rt_flags & RTCF_BROADCAST && !sk->broadcast)
 		goto done;
 
-	if (msg->msg_flags&MSG_CONFIRM)
+	if (msg->msg_flags & MSG_CONFIRM)
 		goto do_confirm;
 back_from_confirm:
 
-	rfh.iov = msg->msg_iov;
-	rfh.saddr = rt->rt_src;
-	rfh.dst = &rt->u.dst;
+	rfh.iov		= msg->msg_iov;
+	rfh.saddr	= rt->rt_src;
+	rfh.dst		= &rt->u.dst;
 	if (!ipc.addr)
 		ipc.addr = rt->rt_dst;
-	err=ip_build_xmit(sk, sk->protinfo.af_inet.hdrincl ? raw_getrawfrag : raw_getfrag,
-			  &rfh, len, &ipc, rt, msg->msg_flags);
+	err = ip_build_xmit(sk, sk->protinfo.af_inet.hdrincl ? raw_getrawfrag :
+		       	    raw_getfrag, &rfh, len, &ipc, rt, msg->msg_flags);
 
 done:
 	if (free)
 		kfree(ipc.opt);
 	ip_rt_put(rt);
 
-	return err<0 ? err : len;
+out:	return err < 0 ? err : len;
 
 do_confirm:
 	dst_confirm(&rt->u.dst);
-	if (!(msg->msg_flags&MSG_PROBE) || len)
+	if (!(msg->msg_flags & MSG_PROBE) || len)
 		goto back_from_confirm;
 	err = 0;
 	goto done;
@@ -445,19 +455,22 @@ static void raw_close(struct sock *sk, long timeout)
 static int raw_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in *addr = (struct sockaddr_in *) uaddr;
+	int ret = -EINVAL;
 	int chk_addr_ret;
 
-	if((sk->state != TCP_CLOSE) || (addr_len < sizeof(struct sockaddr_in)))
-		return -EINVAL;
+	if (sk->state != TCP_CLOSE || addr_len < sizeof(struct sockaddr_in))
+		goto out;
 	chk_addr_ret = inet_addr_type(addr->sin_addr.s_addr);
-	if(addr->sin_addr.s_addr != 0 && chk_addr_ret != RTN_LOCAL &&
-	   chk_addr_ret != RTN_MULTICAST && chk_addr_ret != RTN_BROADCAST)
-		return -EADDRNOTAVAIL;
+	ret = -EADDRNOTAVAIL;
+	if (addr->sin_addr.s_addr && chk_addr_ret != RTN_LOCAL &&
+	    chk_addr_ret != RTN_MULTICAST && chk_addr_ret != RTN_BROADCAST)
+		goto out;
 	sk->rcv_saddr = sk->saddr = addr->sin_addr.s_addr;
-	if(chk_addr_ret == RTN_MULTICAST || chk_addr_ret == RTN_BROADCAST)
+	if (chk_addr_ret == RTN_MULTICAST || chk_addr_ret == RTN_BROADCAST)
 		sk->saddr = 0;  /* Use device */
 	sk_dst_reset(sk);
-	return 0;
+	ret = 0;
+out:	return ret;
 }
 
 /*
@@ -466,29 +479,30 @@ static int raw_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
  */
 
 int raw_recvmsg(struct sock *sk, struct msghdr *msg, int len,
-		int noblock, int flags,int *addr_len)
+		int noblock, int flags, int *addr_len)
 {
-	int copied=0;
+	int copied = 0;
+	int err = -EOPNOTSUPP;
+	struct sockaddr_in *sin = (struct sockaddr_in *)msg->msg_name;
 	struct sk_buff *skb;
-	int err;
-	struct sockaddr_in *sin=(struct sockaddr_in *)msg->msg_name;
 
 	if (flags & MSG_OOB)
-		return -EOPNOTSUPP;
+		goto out;
 
 	if (addr_len)
-		*addr_len=sizeof(*sin);
+		*addr_len = sizeof(*sin);
 
-	if (flags & MSG_ERRQUEUE)
-		return ip_recv_error(sk, msg, len);
+	if (flags & MSG_ERRQUEUE) {
+		err = ip_recv_error(sk, msg, len);
+		goto out;
+	}
 
-	skb=skb_recv_datagram(sk,flags,noblock,&err);
-	if(skb==NULL)
- 		return err;
+	skb = skb_recv_datagram(sk, flags, noblock, &err);
+	if (!skb)
+		goto out;
 
 	copied = skb->len;
-	if (len < copied)
-	{
+	if (len < copied) {
 		msg->msg_flags |= MSG_TRUNC;
 		copied = len;
 	}
@@ -508,7 +522,7 @@ int raw_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 		ip_cmsg_recv(msg, skb);
 done:
 	skb_free_datagram(sk, skb);
-	return (err ? : copied);
+out:	return err ? : copied;
 }
 
 static int raw_init(struct sock *sk)
@@ -530,19 +544,21 @@ static int raw_seticmpfilter(struct sock *sk, char *optval, int optlen)
 
 static int raw_geticmpfilter(struct sock *sk, char *optval, int *optlen)
 {
-	int len;
+	int len, ret = -EFAULT;
 
-	if (get_user(len,optlen))
-		return -EFAULT;
+	if (get_user(len, optlen))
+		goto out;
+	ret = -EINVAL;
 	if (len < 0)
-		return -EINVAL;
+		goto out;
 	if (len > sizeof(struct icmp_filter))
 		len = sizeof(struct icmp_filter);
-	if (put_user(len, optlen))
-		return -EFAULT;
-	if (copy_to_user(optval, &sk->tp_pinfo.tp_raw4.filter, len))
-		return -EFAULT;
-	return 0;
+	ret = -EFAULT;
+	if (put_user(len, optlen) ||
+	    copy_to_user(optval, &sk->tp_pinfo.tp_raw4.filter, len))
+		goto out;
+	ret = 0;
+out:	return ret;
 }
 
 static int raw_setsockopt(struct sock *sk, int level, int optname, 
@@ -551,13 +567,12 @@ static int raw_setsockopt(struct sock *sk, int level, int optname,
 	if (level != SOL_RAW)
 		return ip_setsockopt(sk, level, optname, optval, optlen);
 
-	switch (optname) {
-	case ICMP_FILTER:
+	if (optname == ICMP_FILTER) {
 		if (sk->num != IPPROTO_ICMP)
 			return -EOPNOTSUPP;
-		return raw_seticmpfilter(sk, optval, optlen);
-	};
-
+		else
+			return raw_seticmpfilter(sk, optval, optlen);
+	}
 	return -ENOPROTOOPT;
 }
 
@@ -567,26 +582,23 @@ static int raw_getsockopt(struct sock *sk, int level, int optname,
 	if (level != SOL_RAW)
 		return ip_getsockopt(sk, level, optname, optval, optlen);
 
-	switch (optname) {
-	case ICMP_FILTER:
+	if (optname == ICMP_FILTER) {
 		if (sk->num != IPPROTO_ICMP)
 			return -EOPNOTSUPP;
-		return raw_geticmpfilter(sk, optval, optlen);
-	};
-
+		else
+			return raw_geticmpfilter(sk, optval, optlen);
+	}
 	return -ENOPROTOOPT;
 }
 
 static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 {
-	switch(cmd) {
-		case SIOCOUTQ:
-		{
+	switch (cmd) {
+		case SIOCOUTQ: {
 			int amount = atomic_read(&sk->wmem_alloc);
 			return put_user(amount, (int *)arg);
 		}
-		case SIOCINQ:
-		{
+		case SIOCINQ: {
 			struct sk_buff *skb;
 			int amount = 0;
 
@@ -609,13 +621,11 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 static void get_raw_sock(struct sock *sp, char *tmpbuf, int i)
 {
-	unsigned int dest, src;
-	__u16 destp, srcp;
+	unsigned int dest = sp->daddr,
+		     src = sp->rcv_saddr;
+	__u16 destp = 0,
+	      srcp  = sp->num;
 
-	dest  = sp->daddr;
-	src   = sp->rcv_saddr;
-	destp = 0;
-	srcp  = sp->num;
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
 		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %ld %d %p",
 		i, src, srcp, dest, destp, sp->state, 
@@ -629,15 +639,15 @@ static void get_raw_sock(struct sock *sp, char *tmpbuf, int i)
 int raw_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	int len = 0, num = 0, i;
-	off_t pos = 0;
+	off_t pos = 128;
 	off_t begin;
 	char tmpbuf[129];
 
 	if (offset < 128) 
 		len += sprintf(buffer, "%-127s\n",
 			       "  sl  local_address rem_address   st tx_queue "
-			       "rx_queue tr tm->when retrnsmt   uid  timeout inode");
-	pos = 128;
+			       "rx_queue tr tm->when retrnsmt   uid  timeout "
+			       "inode");
 	read_lock(&raw_v4_lock);
 	for (i = 0; i < RAWV4_HTABLE_SIZE; i++) {
 		struct sock *sk;
@@ -649,8 +659,8 @@ int raw_get_info(char *buffer, char **start, off_t offset, int length)
 			if (pos <= offset)
 				continue;
 			get_raw_sock(sk, tmpbuf, i);
-			len += sprintf(buffer+len, "%-127s\n", tmpbuf);
-			if(len >= length)
+			len += sprintf(buffer + len, "%-127s\n", tmpbuf);
+			if (len >= length)
 				goto out;
 		}
 	}
@@ -659,7 +669,7 @@ out:
 	begin = len - (pos - offset);
 	*start = buffer + begin;
 	len -= begin;
-	if(len > length)
+	if (len > length)
 		len = length;
 	if (len < 0)
 		len = 0; 

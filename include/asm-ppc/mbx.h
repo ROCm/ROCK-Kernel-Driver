@@ -11,6 +11,7 @@
 #ifndef __MACH_MBX_DEFS
 #define __MACH_MBX_DEFS
 
+#ifndef __ASSEMBLY__
 /* A Board Information structure that is given to a program when
  * EPPC-Bug starts it up.
  */
@@ -25,7 +26,13 @@ typedef struct bd_info {
 	unsigned int	bi_busfreq;	/* Bus Freq, in Hz */
 	unsigned int	bi_clun;	/* Boot device controller */
 	unsigned int	bi_dlun;	/* Boot device logical dev */
-	unsigned int	bi_baudrate;	/* ...to be like everyone else */
+
+	/* These fields are not part of the board information structure
+	 * provided by the boot rom.  They are filled in by embed_config.c
+	 * so we have the information consistent with other platforms.
+	 */
+	unsigned char	bi_enetaddr[6];
+	unsigned int	bi_baudrate;
 } bd_t;
 
 /* Memory map for the MBX as configured by EPPC-Bug.  We could reprogram
@@ -78,6 +85,7 @@ typedef struct bd_info {
 #define ISA_BRIDGE_INT	SIU_IRQ3	/* All those PC things */
 #define COMM_L_INT	SIU_IRQ6	/* MBX Comm expansion connector pin */
 #define STOP_ABRT_INT	SIU_IRQ7	/* Stop/Abort header pin */
+#endif /* !__ASSEMBLY__ */
 
 /* The MBX uses the 8259.
 */

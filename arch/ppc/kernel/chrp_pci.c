@@ -264,6 +264,7 @@ chrp_pcibios_fixup(void)
 	}
 }
 
+#if 0
 static struct {
     /* parent is iomem */
     struct resource ram, pci_mem, isa_mem, pci_io, pci_cfg, rom_exp, flash;
@@ -297,62 +298,7 @@ static void __init gg2_pcibios_fixup_bus(struct pci_bus *bus)
 {
     	bus->resource[1] = &gg2_resources.pci_mem;
 }
-
-/* this is used by the pmac_pci code too... - paulus */
-void process_bridge_ranges(struct pci_controller *hose,
-			   struct device_node *dev, int primary)
-{
-	unsigned int *ranges;
-	int rlen = 0;
-	int memno = 0;
-	struct resource *res;
-
-	hose->io_base_phys = 0;
-	ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
-	while ((rlen -= 6 * sizeof(unsigned int)) >= 0) {
-		res = NULL;
-		switch (ranges[0] >> 24) {
-		case 1:		/* I/O space */
-			if (ranges[2] != 0)
-				break;
-			hose->io_base_phys = ranges[3];
-			hose->io_base_virt = ioremap(ranges[3], ranges[5]);
-			if (primary)
-				isa_io_base = (unsigned long) hose->io_base_virt;
-			res = &hose->io_resource;
-			res->flags = IORESOURCE_IO;
-			res->start = ranges[2];
-			break;
-		case 2:		/* memory space */
-			memno = 0;
-			if (ranges[1] == 0 && ranges[2] == 0
-			    && ranges[5] <= (16 << 20)) {
-				/* 1st 16MB, i.e. ISA memory area */
-				if (primary)
-					isa_mem_base = ranges[3];
-				memno = 1;
-			}
-			while (memno < 3 && hose->mem_resources[memno].flags)
-				++memno;
-			if (memno == 0)
-				hose->pci_mem_offset = ranges[3] - ranges[2];
-			if (memno < 3) {
-				res = &hose->mem_resources[memno];
-				res->flags = IORESOURCE_MEM;
-				res->start = ranges[3];
-			}
-			break;
-		}
-		if (res != NULL) {
-			res->name = dev->full_name;
-			res->end = res->start + ranges[5] - 1;
-			res->parent = NULL;
-			res->sibling = NULL;
-			res->child = NULL;
-		}
-		ranges += 6;
-	}
-}
+#endif /* 0 */
 
 /* this is largely modeled and stolen after the pmac_pci code -- tgall
  */
@@ -366,8 +312,10 @@ ibm_add_bridges(struct device_node *dev)
 	volatile unsigned char *cfg;
 	unsigned int *dma;
 #ifdef CONFIG_POWER3
-	unsigned long *opprop = (unsigned long *)
-		get_property(find_path_device("/"), "platform-open-pic", NULL);
+	struct device_node *root = find_path_device("/");
+	unsigned int *opprop = (unsigned int *)
+		get_property(root, "platform-open-pic", NULL);
+	int i;
 #endif
 
 	for(; dev != NULL; dev = dev->next, ++index) {
@@ -405,10 +353,11 @@ ibm_add_bridges(struct device_node *dev)
        		hose->cfg_addr = (volatile unsigned int *) cfg;
        		hose->cfg_data = cfg + 0x10;
 
-		process_bridge_ranges(hose, dev, index == 0);
+		pci_process_bridge_OF_ranges(hose, dev, index == 0);
 
 #ifdef CONFIG_POWER3
-                openpic_setup_ISU(index, opprop[index+1]);
+		i = prom_n_addr_cells(root) * (index + 2) - 1;
+                openpic_setup_ISU(index, opprop[i]);
 #endif /* CONFIG_POWER3 */
 
 		/* check the first bridge for a property that we can
@@ -442,7 +391,7 @@ power4_add_bridge(void)
 void __init
 chrp_find_bridges(void)
 {
-	struct device_node *py;
+	struct device_node *py, *dev;
 	char *model, *name;
 	struct pci_controller* hose;
 
@@ -453,7 +402,7 @@ chrp_find_bridges(void)
 #else /* CONFIG_POWER4 */
 	model = get_property(find_path_device("/"), "model", NULL);
         if (!strncmp("MOT", model, 3)) {
-		struct pci_controller* hose;
+		struct pci_controller *hose;
 
 		hose = pcibios_alloc_controller();
 		if (!hose)
@@ -463,8 +412,9 @@ chrp_find_bridges(void)
         	/* Check that please. This must be the root of the OF
         	 * PCI tree (the root host bridge
         	 */
-               	hose->arch_data = find_devices("pci");
+               	hose->arch_data = dev = find_devices("pci");
                 setup_grackle(hose, 0x20000);
+		pci_process_bridge_OF_ranges(hose, dev, 1);
 		return;
         }
 
@@ -485,25 +435,22 @@ chrp_find_bridges(void)
 	/* Check that please. This must be the root of the OF
 	 * PCI tree (the root host bridge
 	 */
-	hose->arch_data = find_devices("pci");
+	hose->arch_data = dev = find_devices("pci");
 	name = get_property(find_path_device("/"), "name", NULL);
 	if (!strncmp("IBM,7043-150", name, 12) ||
 	    !strncmp("IBM,7046-155", name, 12) ||
 	    !strncmp("IBM,7046-B50", name, 12) ) {
 		setup_grackle(hose, 0x01000000);
-		isa_mem_base = 0x80000000;
+		pci_process_bridge_OF_ranges(hose, dev, 1);
 		return;
 	}
 
 	/* LongTrail */
 	hose->ops = &gg2_pci_ops;
 	pci_dram_offset = 0;
-	isa_mem_base = 0xf7000000;
-	hose->io_base_phys = (unsigned long) 0xf8000000;
-	hose->io_base_virt = ioremap(hose->io_base_phys, 0x10000);
-	isa_io_base = (unsigned long) hose->io_base_virt;
-	ppc_md.pcibios_fixup = gg2_pcibios_fixup;
-	ppc_md.pcibios_fixup_bus = gg2_pcibios_fixup_bus;
+	pci_process_bridge_OF_ranges(hose, find_devices("pci"), 1);
+//	ppc_md.pcibios_fixup = gg2_pcibios_fixup;
+//	ppc_md.pcibios_fixup_bus = gg2_pcibios_fixup_bus;
 #endif /* CONFIG_POWER4 */
 }
 

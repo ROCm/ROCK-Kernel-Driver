@@ -1,4 +1,4 @@
-/*	$Id: aurora.c,v 1.11 2001/03/08 01:43:30 davem Exp $
+/*	$Id: aurora.c,v 1.13 2001/05/10 01:45:38 davem Exp $
  *	linux/drivers/sbus/char/aurora.c -- Aurora multiport driver
  *
  *	Copyright (c) 1999 by Oliver Aldulea (oli@bv.ro)
@@ -1632,33 +1632,55 @@ static int aurora_write(struct tty_struct * tty, int from_user,
 	if (!tty || !port->xmit_buf || !tmp_buf)
 		return 0;
 
-	if (from_user)
-		down(&tmp_buf_sem);
-
 	save_flags(flags);
-	while (1) {
-		cli();		
-		c = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-				   SERIAL_XMIT_SIZE - port->xmit_head));
-		if (c <= 0)
-			break;
+	if (from_user) {
+		down(&tmp_buf_sem);
+		while (1) {
+			c = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
+					   SERIAL_XMIT_SIZE - port->xmit_head));
+			if (c <= 0)
+				break;
 
-		if (from_user) {
-			copy_from_user(tmp_buf, buf, c);
+			c -= copy_from_user(tmp_buf, buf, c);
+			if (!c) {
+				if (!total)
+					total = -EFAULT;
+				break;
+			}
+			cli();
 			c = MIN(c, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
 				       SERIAL_XMIT_SIZE - port->xmit_head));
 			memcpy(port->xmit_buf + port->xmit_head, tmp_buf, c);
-		} else
-			memcpy(port->xmit_buf + port->xmit_head, buf, c);
-		port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-		port->xmit_cnt += c;
-		restore_flags(flags);
-		buf += c;
-		count -= c;
-		total += c;
-	}
-	if (from_user)
+			port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+			port->xmit_cnt += c;
+			restore_flags(flags);
+
+			buf += c;
+			count -= c;
+			total += c;
+		}
 		up(&tmp_buf_sem);
+	} else {
+		while (1) {
+			cli();
+			c = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
+					   SERIAL_XMIT_SIZE - port->xmit_head));
+			if (c <= 0) {
+				restore_flags(flags);
+				break;
+			}
+			memcpy(port->xmit_buf + port->xmit_head, buf, c);
+			port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+			port->xmit_cnt += c;
+			restore_flags(flags);
+
+			buf += c;
+			count -= c;
+			total += c;
+		}
+	}
+
+	cli();
 	if (port->xmit_cnt && !tty->stopped && !tty->hw_stopped &&
 	    !(port->SRER & SRER_TXRDY)) {
 		port->SRER |= SRER_TXRDY;

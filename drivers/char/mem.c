@@ -653,3 +653,5 @@ int __init chr_dev_init(void)
 #endif
 	return 0;
 }
+
+__initcall(chr_dev_init);

@@ -12,6 +12,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/types.h>
+#include <asm/mpc8xx.h>
 
 /* Machine State Register (MSR) Fields */
 
@@ -31,6 +32,7 @@
 #define MSR_ME		(1<<12)		/* Machine Check Enable */
 #define MSR_FE0		(1<<11)		/* Floating Exception mode 0 */
 #define MSR_SE		(1<<10)		/* Single Step */
+#define MSR_DWE		(1<<10)		/* Debug Wait Enable (4xx) */
 #define MSR_BE		(1<<9)		/* Branch Trace */
 #define MSR_DE		(1<<9) 		/* Debug Exception Enable */
 #define MSR_FE1		(1<<8)		/* Floating Exception mode 1 */
@@ -82,6 +84,7 @@
 
 /* Special Purpose Registers (SPRNs)*/
 
+#define	SPRN_CCR0	0x3B3	/* Core Configuration Register (4xx) */
 #define	SPRN_CDBCR	0x3D7	/* Cache Debug Control Register */
 #define	SPRN_CTR	0x009	/* Count Register */
 #define	SPRN_DABR	0x3F5	/* Data Address Breakpoint Register */
@@ -132,6 +135,8 @@
 #define	SPRN_DBCR0	0x3F2	/* Debug Control Register 0 */
 #define	SPRN_DBCR1	0x3BD	/* Debug Control Register 1 */
 #define	SPRN_DBSR	0x3F0	/* Debug Status Register */
+#define   DBSR_IC	    0x80000000	/* Instruction Completion             */
+#define   DBSR_TIE	    0x10000000	/* Trap Instruction debug Event       */
 #define	SPRN_DCCR	0x3FA	/* Data Cache Cacheability Register */
 #define	  DCCR_NOCACHE		0	/* Noncacheable */
 #define	  DCCR_CACHE		1	/* Cacheable */
@@ -141,6 +146,26 @@
 #define	  DCWR_WRITE		1	/* Write-through */
 #define	SPRN_DEAR	0x3D5	/* Data Error Address Register */
 #define	SPRN_DEC	0x016	/* Decrement Register */
+#define	SPRN_DER	0x095	/* Debug Enable Regsiter */
+#define   DER_RSTE	0x40000000	/* Reset Interrupt */
+#define   DER_CHSTPE	0x20000000	/* Check Stop */
+#define   DER_MCIE	0x10000000	/* Machine Check Interrupt */
+#define   DER_EXTIE	0x02000000	/* External Interrupt */
+#define   DER_ALIE	0x01000000	/* Alignment Interrupt */
+#define   DER_PRIE	0x00800000	/* Program Interrupt */
+#define   DER_FPUVIE	0x00400000	/* FP Unavailable Interrupt */
+#define   DER_DECIE	0x00200000	/* Decrementer Interrupt */
+#define   DER_SYSIE	0x00040000	/* System Call Interrupt */
+#define   DER_TRE	0x00020000	/* Trace Interrupt */
+#define   DER_SEIE	0x00004000	/* FP SW Emulation Interrupt */
+#define   DER_ITLBMSE	0x00002000	/* Imp. Spec. Instruction TLB Miss */
+#define   DER_ITLBERE	0x00001000	/* Imp. Spec. Instruction TLB Error */
+#define   DER_DTLBMSE	0x00000800	/* Imp. Spec. Data TLB Miss */
+#define   DER_DTLBERE	0x00000400	/* Imp. Spec. Data TLB Error */
+#define   DER_LBRKE	0x00000008	/* Load/Store Breakpoint Interrupt */
+#define   DER_IBRKE	0x00000004	/* Instruction Breakpoint Interrupt */
+#define   DER_EBRKE	0x00000002	/* External Breakpoint Interrupt */
+#define   DER_DPIE	0x00000001	/* Dev. Port Nonmaskable Request */
 #define	SPRN_DMISS	0x3D0	/* Data TLB Miss Register */
 #define	SPRN_DSISR	0x012	/* Data Storage Interrupt Status Register */
 #define	SPRN_EAR	0x11A	/* External Address Register */
@@ -178,6 +203,7 @@
 #define   HID0_SPD	(1<<9)		/* Speculative disable */
 #define   HID0_SGE	(1<<7)		/* Store Gathering Enable */
 #define	  HID0_SIED	(1<<7)		/* Serial Instr. Execution [Disable] */
+#define	  HID0_DFCA	(1<<6)		/* Data Cache Flush Assist */
 #define   HID0_BTIC	(1<<5)		/* Branch Target Instruction Cache Enable */
 #define   HID0_ABE	(1<<3)		/* Address Broadcast Enable */
 #define	  HID0_BHTE	(1<<2)		/* Branch History Table Enable */
@@ -203,12 +229,35 @@
 #define	SPRN_IMISS	0x3D4	/* Instruction TLB Miss Register */
 #define	SPRN_IMMR	0x27E  	/* Internal Memory Map Register */
 #define	SPRN_L2CR	0x3F9	/* Level 2 Cache Control Regsiter */
-#define   L2CR_PIPE_LATEWR   (0x01800000)   /* late-write SRAM */
-#define   L2CR_L2CTL         (0x00100000)   /* RAM control */
-#define   L2CR_INST_DISABLE  (0x00400000)   /* disable for insn's */
-#define   L2CR_L2I           (0x00200000)   /* global invalidate */
-#define   L2CR_L2E           (0x80000000)   /* enable */
-#define   L2CR_L2WT          (0x00080000)   /* write-through */
+#define L2CR_L2E		0x80000000	/* L2 enable */
+#define L2CR_L2PE		0x40000000	/* L2 parity enable */
+#define	L2CR_L2SIZ_MASK		0x30000000	/* L2 size mask */
+#define L2CR_L2SIZ_256KB	0x10000000	/* L2 size 256KB */
+#define L2CR_L2SIZ_512KB	0x20000000	/* L2 size 512KB */
+#define L2CR_L2SIZ_1MB		0x30000000	/* L2 size 1MB */
+#define L2CR_L2CLK_MASK		0x0e000000	/* L2 clock mask */
+#define L2CR_L2CLK_DISABLED	0x00000000	/* L2 clock disabled */
+#define L2CR_L2CLK_DIV1		0x02000000	/* L2 clock / 1 */
+#define L2CR_L2CLK_DIV1_5	0x04000000	/* L2 clock / 1.5 */
+#define L2CR_L2CLK_DIV2		0x08000000	/* L2 clock / 2 */
+#define L2CR_L2CLK_DIV2_5	0x0a000000	/* L2 clock / 2.5 */
+#define L2CR_L2CLK_DIV3		0x0c000000	/* L2 clock / 3 */
+#define L2CR_L2RAM_MASK		0x01800000	/* L2 RAM type mask */
+#define L2CR_L2RAM_FLOW		0x00000000	/* L2 RAM flow through */
+#define L2CR_L2RAM_PIPE		0x01000000	/* L2 RAM pipelined */
+#define L2CR_L2RAM_PIPE_LW	0x01800000	/* L2 RAM pipelined latewr */
+#define	L2CR_L2DO		0x00400000	/* L2 data only */
+#define L2CR_L2I		0x00200000	/* L2 global invalidate */
+#define L2CR_L2CTL		0x00100000	/* L2 RAM control */
+#define L2CR_L2WT		0x00080000	/* L2 write-through */
+#define L2CR_L2TS		0x00040000	/* L2 test support */
+#define L2CR_L2OH_MASK		0x00030000	/* L2 output hold mask */
+#define L2CR_L2OH_0_5		0x00000000	/* L2 output hold 0.5 ns */
+#define L2CR_L2OH_1_0		0x00010000	/* L2 output hold 1.0 ns */
+#define L2CR_L2SL		0x00008000	/* L2 DLL slow */
+#define L2CR_L2DF		0x00004000	/* L2 differential clock */
+#define L2CR_L2BYP		0x00002000	/* L2 DLL bypass */
+#define L2CR_L2IP		0x00000001	/* L2 GI in progress */
 #define	SPRN_LR		0x008	/* Link Register */
 #define	SPRN_MMCR0	0x3B8	/* Monitor Mode Control Register 0 */
 #define	SPRN_MMCR1	0x3BC	/* Monitor Mode Control Register 1 */
@@ -235,6 +284,10 @@
 #define	SPRN_SPRG1	0x111	/* Special Purpose Register General 1 */
 #define	SPRN_SPRG2	0x112	/* Special Purpose Register General 2 */
 #define	SPRN_SPRG3	0x113	/* Special Purpose Register General 3 */
+#define	SPRN_SPRG4	0x114	/* Special Purpose Register General 4 (4xx) */
+#define	SPRN_SPRG5	0x115	/* Special Purpose Register General 5 (4xx) */
+#define	SPRN_SPRG6	0x116	/* Special Purpose Register General 6 (4xx) */
+#define	SPRN_SPRG7	0x117	/* Special Purpose Register General 7 (4xx) */
 #define	SPRN_SRR0	0x01A	/* Save/Restore Register 0 */
 #define	SPRN_SRR1	0x01B	/* Save/Restore Register 1 */
 #define	SPRN_SRR2	0x3DE	/* Save/Restore Register 2 */
@@ -243,10 +296,6 @@
 #define	SPRN_TBRU	0x10D	/* Time Base Read Upper Register (user, R/O) */
 #define	SPRN_TBWL	0x11C	/* Time Base Lower Register (supervisor, R/W) */
 #define	SPRN_TBWU	0x11D	/* Time Base Upper Register (supervisor, R/W) */
-#define	SPRN_TBHI	0x3DC	/* Time Base High (4xx) */
-#define	SPRN_TBHU	0x3CC	/* Time Base High User-mode (4xx) */
-#define	SPRN_TBLO	0x3DD	/* Time Base Low (4xx) */
-#define	SPRN_TBLU	0x3CD	/* Time Base Low User-mode (4xx) */
 #define	SPRN_TCR	0x3DA	/* Timer Control Register */
 #define	  TCR_WP(x)		(((x)&0x3)<<30)	/* WDT Period */
 #define	    WP_2_17		0		/* 2^17 clocks */
@@ -343,10 +392,18 @@
 #define	SPR1	SPRN_SPRG1
 #define	SPR2	SPRN_SPRG2
 #define	SPR3	SPRN_SPRG3
+#define	SPR4	SPRN_SPRG4	/* Supervisor Private Registers (4xx) */
+#define	SPR5	SPRN_SPRG5
+#define	SPR6	SPRN_SPRG6
+#define	SPR7	SPRN_SPRG7
 #define	SPRG0   SPRN_SPRG0
 #define	SPRG1   SPRN_SPRG1
 #define	SPRG2   SPRN_SPRG2
 #define	SPRG3   SPRN_SPRG3
+#define	SPRG4   SPRN_SPRG4
+#define	SPRG5   SPRN_SPRG5
+#define	SPRG6   SPRN_SPRG6
+#define	SPRG7   SPRN_SPRG7
 #define	SRR0	SPRN_SRR0	/* Save and Restore Register 0 */
 #define	SRR1	SPRN_SRR1	/* Save and Restore Register 1 */
 #define	TBRL	SPRN_TBRL	/* Time Base Read Lower Register */
@@ -358,84 +415,6 @@
 #define	THRM2	SPRN_THRM2	/* Thermal Management Register 2 */
 #define	THRM3	SPRN_THRM3	/* Thermal Management Register 3 */
 #define	XER	SPRN_XER
-
-
-/* Device Control Registers */
-
-#define	DCRN_BEAR	0x090	/* Bus Error Address Register */
-#define	DCRN_BESR	0x091	/* Bus Error Syndrome Register */
-#define	  BESR_DSES    	0x80000000	/* Data-Side Error Status */
-#define	  BESR_DMES	0x40000000	/* DMA Error Status */
-#define	  BESR_RWS	0x20000000	/* Read/Write Status */
-#define	  BESR_ETMASK	0x1C000000	/* Error Type */
-#define	    ET_PROT	0
-#define	    ET_PARITY	1
-#define	    ET_NCFG	2
-#define	    ET_BUSERR	4
-#define	    ET_BUSTO	6
-#define	DCRN_DMACC0	0x0C4	/* DMA Chained Count Register 0 */
-#define	DCRN_DMACC1	0x0CC	/* DMA Chained Count Register 1 */
-#define	DCRN_DMACC2	0x0D4	/* DMA Chained Count Register 2 */
-#define	DCRN_DMACC3	0x0DC    /* DMA Chained Count Register 3 */
-#define	DCRN_DMACR0	0x0C0    /* DMA Channel Control Register 0 */
-#define	DCRN_DMACR1	0x0C8    /* DMA Channel Control Register 1 */
-#define	DCRN_DMACR2	0x0D0    /* DMA Channel Control Register 2 */
-#define	DCRN_DMACR3	0x0D8    /* DMA Channel Control Register 3 */
-#define	DCRN_DMACT0	0x0C1    /* DMA Count Register 0 */
-#define	DCRN_DMACT1	0x0C9    /* DMA Count Register 1 */
-#define	DCRN_DMACT2	0x0D1    /* DMA Count Register 2 */
-#define	DCRN_DMACT3	0x0D9    /* DMA Count Register 3 */
-#define	DCRN_DMADA0	0x0C2    /* DMA Destination Address Register 0 */
-#define	DCRN_DMADA1	0x0CA    /* DMA Destination Address Register 1 */
-#define	DCRN_DMADA2	0x0D2    /* DMA Destination Address Register 2 */
-#define	DCRN_DMADA3	0x0DA    /* DMA Destination Address Register 3 */
-#define	DCRN_DMASA0	0x0C3    /* DMA Source Address Register 0 */
-#define	DCRN_DMASA1	0x0CB    /* DMA Source Address Register 1 */
-#define	DCRN_DMASA2	0x0D3    /* DMA Source Address Register 2 */
-#define	DCRN_DMASA3	0x0DB    /* DMA Source Address Register 3 */
-#define	DCRN_DMASR	0x0E0    /* DMA Status Register */
-#define	DCRN_EXIER	0x042    /* External Interrupt Enable Register */
-#define	  EXIER_CIE	0x80000000	/* Critical Interrupt Enable */
-#define	  EXIER_SRIE	0x08000000	/* Serial Port Rx Int. Enable */
-#define	  EXIER_STIE	0x04000000	/* Serial Port Tx Int. Enable */
-#define	  EXIER_JRIE	0x02000000	/* JTAG Serial Port Rx Int. Enable */
-#define	  EXIER_JTIE	0x01000000	/* JTAG Serial Port Tx Int. Enable */
-#define	  EXIER_D0IE	0x00800000	/* DMA Channel 0 Interrupt Enable */
-#define	  EXIER_D1IE	0x00400000	/* DMA Channel 1 Interrupt Enable */
-#define	  EXIER_D2IE	0x00200000	/* DMA Channel 2 Interrupt Enable */
-#define	  EXIER_D3IE	0x00100000	/* DMA Channel 3 Interrupt Enable */
-#define	  EXIER_E0IE	0x00000010	/* External Interrupt 0 Enable */
-#define	  EXIER_E1IE	0x00000008	/* External Interrupt 1 Enable */
-#define	  EXIER_E2IE	0x00000004	/* External Interrupt 2 Enable */
-#define	  EXIER_E3IE	0x00000002	/* External Interrupt 3 Enable */
-#define	  EXIER_E4IE	0x00000001	/* External Interrupt 4 Enable */
-#define	DCRN_EXISR	0x040    /* External Interrupt Status Register */
-#define	DCRN_IOCR	0x0A0    /* Input/Output Configuration Register */
-#define	  IOCR_E0TE	0x80000000
-#define	  IOCR_E0LP	0x40000000
-#define	  IOCR_E1TE	0x20000000
-#define	  IOCR_E1LP	0x10000000
-#define	  IOCR_E2TE	0x08000000
-#define	  IOCR_E2LP	0x04000000
-#define	  IOCR_E3TE	0x02000000
-#define	  IOCR_E3LP	0x01000000
-#define	  IOCR_E4TE	0x00800000
-#define	  IOCR_E4LP	0x00400000
-#define	  IOCR_EDT     	0x00080000
-#define	  IOCR_SOR     	0x00040000
-#define	  IOCR_EDO	0x00008000
-#define	  IOCR_2XC	0x00004000
-#define	  IOCR_ATC	0x00002000
-#define	  IOCR_SPD	0x00001000
-#define	  IOCR_BEM	0x00000800
-#define	  IOCR_PTD	0x00000400
-#define	  IOCR_ARE	0x00000080
-#define	  IOCR_DRC	0x00000020
-#define	  IOCR_RDM(x)	(((x) & 0x3) << 3)
-#define	  IOCR_TCS	0x00000004
-#define	  IOCR_SCS	0x00000002
-#define	  IOCR_SPC	0x00000001
-
 
 /* Processor Version Register */
 
@@ -509,15 +488,15 @@
 #define _MACH_rpxlite	0x00000040	/* RPCG RPX-Lite 8xx board */
 #define _MACH_bseip	0x00000080	/* Bright Star Engineering ip-Engine */
 #define _MACH_unused0	0x00000100	/* Now free to be used */
-#define _MACH_unused1	0x00000200	/* Now free to be used */
+#define _MACH_gemini	0x00000200      /* Synergy Microsystems gemini board */
 #define _MACH_classic	0x00000400	/* RPCG RPX-Classic 8xx board */
 #define _MACH_oak	0x00000800	/* IBM "Oak" 403 eval. board */
 #define _MACH_walnut	0x00001000	/* IBM "Walnut" 405GP eval. board */
 #define _MACH_8260	0x00002000	/* Generic 8260 */
 #define _MACH_tqm860	0x00004000	/* TQM860/L */
 #define _MACH_tqm8xxL	0x00008000	/* TQM8xxL */
-#define _MACH_spd8xxL	0x00010000	/* SPD8xx */
-#define _MACH_ibms8	0x00020000	/* IVMS8 */
+#define _MACH_spd8xx	0x00010000	/* SPD8xx */
+#define _MACH_ivms8	0x00020000	/* IVMS8 */
 
 /* see residual.h for these */
 #define _PREP_Motorola 0x01  /* motorola prep */
@@ -711,6 +690,9 @@ void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);
 #define have_of 0
 #elif defined(CONFIG_APUS)
 #define _machine _MACH_apus
+#define have_of 0
+#elif defined(CONFIG_GEMINI)
+#define _machine _MACH_gemini
 #define have_of 0
 #elif defined(CONFIG_8260)
 #define _machine _MACH_8260

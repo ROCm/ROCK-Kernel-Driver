@@ -1,7 +1,7 @@
 Text file for ipddp.c:
 	AppleTalk-IP Decapsulation and AppleTalk-IP Encapsulation
 
-This text file is written by Jay Schulist <jschlst@turbolinux.com>
+This text file is written by Jay Schulist <jschlst@samba.org>
 
 Introduction
 ------------
@@ -72,7 +72,7 @@ EtherTalk only network.
 
 Further Assistance
 -------------------
-You can contact me (Jay Schulist <jschlst@turbolinux.com>) with any
+You can contact me (Jay Schulist <jschlst@samba.org>) with any
 questions regarding decapsulation or encapsulation. Bradford W. Johnson
 <johns393@maroon.tc.umn.edu> originally wrote the ipddp.c driver for IP
 encapsulation in AppleTalk.

@@ -9,6 +9,7 @@
 #ifndef __MACH_RPX_DEFS
 #define __MACH_RPX_DEFS
 
+#ifndef __ASSEMBLY__
 /* A Board Information structure that is given to a program when
  * prom starts it up.
  */
@@ -31,8 +32,6 @@ extern bd_t m8xx_board_info;
 #define RPX_CSR_SIZE		((uint)(4 * 1024))
 #define IMAP_ADDR		((uint)0xfa200000)
 #define IMAP_SIZE		((uint)(64 * 1024))
-#define HIOX_CSR_ADDR		((uint)0xfac00000)
-#define HIOX_CSR_SIZE		((uint)(4 * 1024))
 #define PCMCIA_MEM_ADDR		((uint)0x04000000)
 #define PCMCIA_MEM_SIZE		((uint)(64 * 1024))
 #define PCMCIA_IO_ADDR		((uint)0x04400000)
@@ -52,10 +51,25 @@ extern bd_t m8xx_board_info;
 #define BCSR0_PCMCIA3VOLT	((uint)0x000a0000)
 #define BCSR0_PCMCIA5VOLT	((uint)0x00060000)
 
-/* HIO Expansion card.
-*/
-#define HIOX_CSR_ENAUDIO	((uint)0x00000200)
-#define HIOX_CSR_RSTAUDIO	((uint)0x00000100)	/* 0 == reset */
+#define BCSR1_IPB5SEL          ((uint)0x00100000)
+#define BCSR1_PCVCTL4          ((uint)0x00080000)
+#define BCSR1_PCVCTL5          ((uint)0x00040000)
+#define BCSR1_PCVCTL6          ((uint)0x00020000)
+#define BCSR1_PCVCTL7          ((uint)0x00010000)
+
+#if defined(CONFIG_HTDMSOUND)
+#include <asm/rpxhiox.h>
+#endif
+#endif /* !__ASSEMBLY__ */
+
+/* define IO_BASE for pcmcia */
+#define _IO_BASE 0x80000000
+#define _IO_BASE_SIZE 0x1000
+
+#ifdef CONFIG_IDE
+#define MAX_HWIFS 1
+#define ide_request_irq(irq,hand,flg,dev,id)    request_8xxirq((irq),(hand),(flg),(dev),(id))
+#endif
 
 /* We don't use the 8259.
 */

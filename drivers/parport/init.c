@@ -165,6 +165,8 @@ int __init parport_init (void)
 	return 0;
 }
 
+__initcall(parport_init);
+
 #endif
 
 /* Exported symbols for modules. */

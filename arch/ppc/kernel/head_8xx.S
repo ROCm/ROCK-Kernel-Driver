@@ -30,13 +30,6 @@
 #include <asm/mmu.h>
 #include <asm/cache.h>
 #include <asm/pgtable.h>
-	
-/* XXX need definitions here for 16 byte cachelines on some/all 8xx
-   -- paulus */
-CACHELINE_BYTES = 32
-LG_CACHELINE_BYTES = 5
-CACHELINE_MASK = 0x1f
-CACHELINE_WORDS = 8
 
 	.text
 	.globl	_stext
@@ -757,7 +750,7 @@ relocate_kernel:
 copy_and_flush:
 	addi	r5,r5,-4
 	addi	r6,r6,-4
-4:	li	r0,CACHELINE_WORDS
+4:	li	r0,CACHE_LINE_SIZE/4
 	mtctr	r0
 3:	addi	r6,r6,4			/* copy a cache line */
 	lwzx	r0,r6,r4

@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.175 2001/04/24 01:09:12 davem Exp $
+/*  $Id: init.c,v 1.176 2001/05/16 15:07:11 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -1139,8 +1139,16 @@ void __init paging_init(void)
 	unsigned long second_alias_page = 0;
 	unsigned long pt, flags, end_pfn, pages_avail;
 	unsigned long shift = alias_base - ((unsigned long)&empty_zero_page);
+	unsigned long real_end;
 
 	set_bit(0, mmu_context_bmap);
+
+	real_end = (unsigned long)&_end;
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (sparc_ramdisk_image)
+		real_end = (PAGE_ALIGN(real_end) + PAGE_ALIGN(sparc_ramdisk_size));
+#endif
+
 	/* We assume physical memory starts at some 4mb multiple,
 	 * if this were not true we wouldn't boot up to this point
 	 * anyways.
@@ -1161,7 +1169,7 @@ void __init paging_init(void)
 		: "r" (TLB_TAG_ACCESS), "r" (alias_base), "r" (pt),
 		  "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS), "r" (61 << 3)
 		: "memory");
-		if (((unsigned long)&_end) >= KERNBASE + 0x340000) {
+		if (real_end >= KERNBASE + 0x340000) {
 			second_alias_page = alias_base + 0x400000;
 			__asm__ __volatile__(
 		"	stxa	%1, [%0] %3\n"
@@ -1189,7 +1197,7 @@ void __init paging_init(void)
 		: "r" (TLB_TAG_ACCESS), "r" (alias_base), "r" (pt),
 		  "i" (ASI_DMMU), "i" (ASI_DTLB_DATA_ACCESS), "r" ((0<<16) | (13<<3))
 		: "memory");
-		if (((unsigned long)&_end) >= KERNBASE + 0x340000) {
+		if (real_end >= KERNBASE + 0x340000) {
 			second_alias_page = alias_base + 0x400000;
 			__asm__ __volatile__(
 		"	stxa	%1, [%0] %3\n"

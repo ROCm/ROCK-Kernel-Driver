@@ -42,13 +42,13 @@
 /* Version of the UniNorth chip */
 #define UNI_N_VERSION			0x0000		/* Known versions: 3,7 and 8 */
  
-/* This register is used to enable/disable various parts */
+/* This register is used to enable/disable various clocks */
 #define UNI_N_CLOCK_CNTL		0x0020
-#define UNI_N_CLOCK_CNTL_PCI		0x00000001	/* guess ? */
-#define UNI_N_CLOCK_CNTL_GMAC		0x00000002
-#define UNI_N_CLOCK_CNTL_FW		0x00000004	/* guess ? */
+#define UNI_N_CLOCK_CNTL_PCI		0x00000001	/* PCI2 clock control */
+#define UNI_N_CLOCK_CNTL_GMAC		0x00000002	/* GMAC clock control */
+#define UNI_N_CLOCK_CNTL_FW		0x00000004	/* FireWire clock control */
 
-/* Power Management control ? (from Darwin) */
+/* Power Management control */
 #define UNI_N_POWER_MGT			0x0030
 #define UNI_N_POWER_MGT_NORMAL		0x00
 #define UNI_N_POWER_MGT_IDLE2		0x01
@@ -79,5 +79,7 @@
  * CPU has started and will enter it's sleep loop with IP=0
  */
 #define UNI_N_HWINIT_STATE_CPU1_FLAG	0x10000000
+
+/* Uninorth 1.5 rev. has additional perf. monitor registers at 0xf00-0xf50 */
 
 #endif /* __KERNEL__ */

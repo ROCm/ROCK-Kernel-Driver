@@ -17,8 +17,6 @@
 #include <linux/blk.h>
 #include <linux/init.h>
 
-extern int parport_init(void);
-extern int chr_dev_init(void);
 extern int blk_dev_init(void);
 #ifdef CONFIG_BLK_DEV_DAC960
 extern void DAC960_Initialize(void);
@@ -33,10 +31,6 @@ extern void ieee1394_init(void);
 
 void __init device_init(void)
 {
-#ifdef CONFIG_PARPORT
-	parport_init();
-#endif
-	chr_dev_init();
 	blk_dev_init();
 	sti();
 #ifdef CONFIG_I2O

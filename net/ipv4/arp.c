@@ -1,6 +1,6 @@
 /* linux/net/inet/arp.c
  *
- * Version:	$Id: arp.c,v 1.97 2001/04/30 04:36:12 davem Exp $
+ * Version:	$Id: arp.c,v 1.98 2001/05/16 16:45:35 davem Exp $
  *
  * Copyright (C) 1994 by Florian  La Roche
  *
@@ -344,6 +344,22 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	if (dst_ha)
 		read_unlock_bh(&neigh->lock);
 }
+
+static int arp_filter(__u32 sip, __u32 tip, struct net_device *dev)
+{
+	struct rtable *rt;
+	int flag = 0; 
+	/*unsigned long now; */
+
+	if (ip_route_output(&rt, sip, tip, 0, 0) < 0) 
+		return 1;
+	if (rt->u.dst.dev != dev) { 
+		NET_INC_STATS_BH(ArpFilter);
+		flag = 1;
+	} 
+	ip_rt_put(rt); 
+	return flag; 
+} 
 
 /* OBSOLETE FUNCTIONS */
 
@@ -741,7 +757,12 @@ int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 		if (addr_type == RTN_LOCAL) {
 			n = neigh_event_ns(&arp_tbl, sha, &sip, dev);
 			if (n) {
-				arp_send(ARPOP_REPLY,ETH_P_ARP,sip,dev,tip,sha,dev->dev_addr,sha);
+				int dont_send = 0;
+				if (IN_DEV_ARPFILTER(in_dev))
+					dont_send |= arp_filter(sip,tip,dev); 
+				if (!dont_send)
+					arp_send(ARPOP_REPLY,ETH_P_ARP,sip,dev,tip,sha,dev->dev_addr,sha);
+
 				neigh_release(n);
 			}
 			goto out;

@@ -31,23 +31,10 @@
 #include <asm/page.h>
 #include <linux/config.h>
 #include <asm/mmu.h>
-#include "mol.h"
 
 #ifdef CONFIG_APUS
 #include <asm/amigappc.h>
 #endif
-
-#ifndef CONFIG_PPC64BRIDGE
-CACHELINE_BYTES = 32
-LG_CACHELINE_BYTES = 5
-CACHELINE_MASK = 0x1f
-CACHELINE_WORDS = 8
-#else
-CACHELINE_BYTES = 128
-LG_CACHELINE_BYTES = 7
-CACHELINE_MASK = 0x7f
-CACHELINE_WORDS = 32
-#endif /* CONFIG_PPC64BRIDGE */
 
 #ifdef CONFIG_PPC64BRIDGE
 #define LOAD_BAT(n, reg, RA, RB)	\
@@ -161,6 +148,7 @@ __start:
 	bl	fix_mem_constants
 #endif /* CONFIG_APUS */
 
+#ifndef CONFIG_GEMINI
 /* Switch MMU off, clear BATs and flush TLB. At this point, r3 contains
  * the physical address we are running at, returned by prom_init()
  */
@@ -168,6 +156,7 @@ __start:
 __after_mmu_off:
 	bl	clear_bats
 	bl	flush_tlbs
+#endif
 
 #ifndef CONFIG_POWER4
 	/* POWER4 doesn't have BATs */
@@ -294,21 +283,14 @@ i##n:						\
 	.long	hdlr;				\
 	.long	ret_from_except
 
-#define STD_MOL_EXCEPTION(n, label, hdlr, hook)	\
-	. = n;					\
-label:						\
-	EXCEPTION_PROLOG;			\
-	MOL_HOOK(hook); 			\
-	addi	r3,r1,STACK_FRAME_OVERHEAD;	\
-	li	r20,MSR_KERNEL;			\
-	bl	transfer_to_handler; 		\
-i##n:						\
-	.long	hdlr;				\
-	.long	ret_from_except
-
 /* System reset */
-#ifdef CONFIG_SMP /* MVME/MTX start the secondary here */
+#ifdef CONFIG_SMP /* MVME/MTX and gemini start the secondary here */
+#ifdef CONFIG_GEMINI
+	. = 0x100
+	b	__secondary_start_gemini
+#else /* CONFIG_GEMINI */
 	STD_EXCEPTION(0x100, Reset, __secondary_start_psurge)
+#endif /* CONFIG_GEMINI */
 #else
 	STD_EXCEPTION(0x100, Reset, UnknownException)
 #endif
@@ -325,7 +307,6 @@ DataAccessCont:
 DataAccess:
 	EXCEPTION_PROLOG
 #endif /* CONFIG_PPC64BRIDGE */
-	MOL_HOOK(0)
 	mfspr	r20,DSISR
 	andis.	r0,r20,0xa470		/* weird error? */
 	bne	1f			/* if not, try to put a PTE */
@@ -369,7 +350,6 @@ InstructionAccessCont:
 InstructionAccess:
 	EXCEPTION_PROLOG
 #endif /* CONFIG_PPC64BRIDGE */
-	MOL_HOOK(1)
 	andis.	r0,r23,0x4000		/* no pte found? */
 	beq	1f			/* if so, try to put a PTE */
 	mr	r3,r22			/* into the hash table */
@@ -436,7 +416,6 @@ i0x600:
 	. = 0x700
 ProgramCheck:
 	EXCEPTION_PROLOG
-	MOL_HOOK(2)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	li	r20,MSR_KERNEL
 	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
@@ -449,7 +428,6 @@ i0x700:
 	. = 0x800
 FPUnavailable:
 	EXCEPTION_PROLOG
-	MOL_HOOK_RESTORE(3)
 	bne	load_up_fpu		/* if from user, just load it up */
 	li	r20,MSR_KERNEL
 	bl	transfer_to_handler	/* if from kernel, take a trap */
@@ -460,7 +438,6 @@ i0x800:
 	. = 0x900
 Decrementer:
 	EXCEPTION_PROLOG
-	MOL_HOOK(4)	
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	li	r20,MSR_KERNEL
 	bl	transfer_to_handler
@@ -484,7 +461,7 @@ SystemCall:
 	.long	ret_from_except
 
 /* Single step - not used on 601 */
-	STD_MOL_EXCEPTION(0xd00, SingleStep, SingleStepException, 5)
+	STD_EXCEPTION(0xd00, SingleStep, SingleStepException)
 	STD_EXCEPTION(0xe00, Trap_0e, UnknownException)
 
 /*
@@ -514,7 +491,6 @@ Trap_0f:
  */
 	. = 0x1000
 InstructionTLBMiss:
-	MOL_HOOK_TLBMISS( 14 )
 /*
  * r0:	stored ctr
  * r1:	linux style pte ( later becomes ppc hardware pte )
@@ -586,7 +562,6 @@ InstructionAddressInvalid:
  */
 	. = 0x1100
 DataLoadTLBMiss:
-	MOL_HOOK_TLBMISS( 15 )
 /*
  * r0:	stored ctr
  * r1:	linux style pte ( later becomes ppc hardware pte )
@@ -657,7 +632,6 @@ DataAddressInvalid:
  */
 	. = 0x1200
 DataStoreTLBMiss:
-	MOL_HOOK_TLBMISS( 16 )
 /*
  * r0:	stored ctr
  * r1:	linux style pte ( later becomes ppc hardware pte )
@@ -704,7 +678,7 @@ DataStoreTLBMiss:
 	mtcrf	0x80,r3
 	rfi
 
-	STD_MOL_EXCEPTION(0x1300, Trap_13, InstructionBreakpoint, 11)
+	STD_EXCEPTION(0x1300, Trap_13, InstructionBreakpoint)
 	STD_EXCEPTION(0x1400, SMI, SMIException)
 	STD_EXCEPTION(0x1500, Trap_15, UnknownException)
 	STD_EXCEPTION(0x1600, Trap_16, UnknownException)
@@ -717,7 +691,7 @@ DataStoreTLBMiss:
 	STD_EXCEPTION(0x1d00, Trap_1d, UnknownException)
 	STD_EXCEPTION(0x1e00, Trap_1e, UnknownException)
 	STD_EXCEPTION(0x1f00, Trap_1f, UnknownException)
-	STD_MOL_EXCEPTION(0x2000, RunMode, RunModeException, 5)
+	STD_EXCEPTION(0x2000, RunMode, RunModeException)
 	STD_EXCEPTION(0x2100, Trap_21, UnknownException)
 	STD_EXCEPTION(0x2200, Trap_22, UnknownException)
 	STD_EXCEPTION(0x2300, Trap_23, UnknownException)
@@ -739,7 +713,6 @@ DataStoreTLBMiss:
 #ifdef CONFIG_ALTIVEC
 AltiVecUnavailable:
 	EXCEPTION_PROLOG
-	MOL_HOOK_RESTORE(12)
 	bne	load_up_altivec		/* if from user, just load it up */
 	li	r20,MSR_KERNEL
 	bl	transfer_to_handler	/* if from kernel, take a trap */
@@ -805,7 +778,6 @@ transfer_to_handler:
 	lwz	r24,0(r23)		/* virtual address of handler */
 	lwz	r23,4(r23)		/* where to go when done */
 	FIX_SRR1(r20,r22)
-	MOL_HOOK(6)
 	mtspr	SRR0,r24
 	mtspr	SRR1,r20
 	mtlr	r23
@@ -1016,11 +988,6 @@ KernelAltiVec:
 
 	.globl	giveup_altivec
 giveup_altivec:
-#ifdef CONFIG_MOL
-	mflr	r4
-	MOL_HOOK_MMU(13, r5)
-	mtlr	r4
-#endif
 	mfmsr	r5
 	oris	r5,r5,MSR_VEC@h
 	SYNC
@@ -1057,11 +1024,6 @@ giveup_altivec:
  */
 	.globl	giveup_fpu
 giveup_fpu:
-#ifdef CONFIG_MOL
-	mflr	r4
-	MOL_HOOK_MMU(7, r5)
-	mtlr	r4
-#endif		
 	mfmsr	r5
 	ori	r5,r5,MSR_FP
 	SYNC
@@ -1116,7 +1078,7 @@ relocate_kernel:
 copy_and_flush:
 	addi	r5,r5,-4
 	addi	r6,r6,-4
-4:	li	r0,CACHELINE_WORDS
+4:	li	r0,CACHE_LINE_SIZE/4
 	mtctr	r0
 3:	addi	r6,r6,4			/* copy a cache line */
 	lwzx	r0,r6,r4
@@ -1127,6 +1089,7 @@ copy_and_flush:
 	icbi	r6,r3			/* flush the icache line */
 	cmplw	0,r6,r5
 	blt	4b
+	sync				/* additional sync needed on g4 */
 	isync
 	addi	r5,r5,4
 	addi	r6,r6,4
@@ -1165,6 +1128,7 @@ fix_mem_constants:
 	icbi	r0,r14			 /* flush the icache line */
 	cmpw	r12,r13
 	bne     1b
+	sync				/* additional sync needed on g4 */
 	isync
 
 /*
@@ -1199,6 +1163,7 @@ fix_mem_constants:
 	cmpw	r12,r13
 	bne     1b
 
+	sync				/* additional sync needed on g4 */
 	isync				/* No speculative loading until now */
 	blr
 	
@@ -1266,6 +1231,20 @@ apus_interrupt_entry:
 #endif /* CONFIG_APUS */
 
 #ifdef CONFIG_SMP
+#ifdef CONFIG_GEMINI
+	.globl	__secondary_start_gemini
+__secondary_start_gemini:
+        mfspr   r4,HID0
+        ori     r4,r4,HID0_ICFI
+        li      r3,0
+        ori     r3,r3,HID0_ICE
+        andc    r4,r4,r3
+        mtspr   HID0,r4
+        sync
+        bl      prom_init
+        b       __secondary_start
+#endif /* CONFIG_GEMINI */
+	
 	.globl	__secondary_start_psurge
 __secondary_start_psurge:
 	li	r24,1			/* cpu # */
@@ -1536,6 +1515,7 @@ _GLOBAL(set_context)
  *  -- Cort 
  */
 clear_bats:
+#if !defined(CONFIG_GEMINI)
 	li	r20,0
 	mfspr	r9,PVR
 	rlwinm	r9,r9,16,16,31		/* r9 = 1 for 601, 4 for 604 */
@@ -1559,8 +1539,10 @@ clear_bats:
 	mtspr	IBAT2L,r20
 	mtspr	IBAT3U,r20
 	mtspr	IBAT3L,r20
+#endif /* !defined(CONFIG_GEMINI) */
 	blr
 
+#ifndef CONFIG_GEMINI
 flush_tlbs:
 	lis	r20, 0x40
 1:	addic.	r20, r20, -0x1000
@@ -1579,6 +1561,7 @@ mmu_off:
 	mtspr	SRR1,r3
 	sync
 	RFI
+#endif
 
 #ifndef CONFIG_POWER4	
 /*
@@ -1688,17 +1671,6 @@ m8260_gorom:
 2:
 	mtlr	r4
 	blr
-#endif
-
-#ifdef CONFIG_MOL
-/*
- * Mac-on-linux hook_table. Don't put this in the data section -
- * the base address must be within the first 32KB of RAM.
- */
-	.globl mol_interface
-mol_interface:
-	.long   MOL_INTERFACE_VERSION
-	.fill	24,4,0		/* space for 24 hooks */
 #endif
 
 

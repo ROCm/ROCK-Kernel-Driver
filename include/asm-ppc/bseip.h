@@ -8,6 +8,7 @@
 #ifndef __MACH_BSEIP_DEFS
 #define __MACH_BSEIP_DEFS
 
+#ifndef __ASSEMBLY__
 /* A Board Information structure that is given to a program when
  * prom starts it up.
  */
@@ -29,6 +30,7 @@ extern bd_t m8xx_board_info;
 #define IMAP_SIZE		((uint)(64 * 1024))
 #define PCMCIA_MEM_ADDR		((uint)0x04000000)
 #define PCMCIA_MEM_SIZE		((uint)(64 * 1024))
+#endif	/* !__ASSEMBLY__ */
 
 /* We don't use the 8259.
 */

@@ -1,5 +1,30 @@
 ChangeLog for smbfs.
 
+2001-05-08 Urban Widmark <urban@teststation.com>
+
+	* inode.c: Fix for changes on the server side not being detected
+	  properly. Must always drop cached pages when updating an inode with
+	  new size.
+
+2001-05-05 Urban Widmark <urban@teststation.com>
+
+	* file.c, proc.c: Drop SMB_F_LOCALWRITE to detect changes made on
+	  both server and client, using flush with to force win9x to remember
+	  the right filesize.
+
+2001-04-25 René Scharfe <l.s.r@web.de>
+
+	* inode.c: Don't clear s_flags and allow ro mounts
+
+2001-04-21 Urban Widmark <urban@teststation.com>
+
+	* dir.c, proc.c: replace tests on conn_pid with tests on state to
+	  fix smbmount reconnect on smb_retry timeout and up the timeout to 30s.
+	* proc.c: smb_newconn must have the server locked while updating it.
+	* inode.c, proc.c: need flush after truncate on some servers (win9x)
+	* file.c: add call to send SMBflush on fsync
+	  (as suggested by Jochen Dolze <dolze@epcnet.de>)
+
 2001-03-06 Urban Widmark <urban@teststation.com>
 
 	* cache.c: d_add on hashed dentries corrupts d_hash list and

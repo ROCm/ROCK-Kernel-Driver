@@ -2464,7 +2464,7 @@ static int set_disk_faulty (mddev_t *mddev, kdev_t dev)
 	int ret;
 
 	fsync_dev(mddev_to_kdev(mddev));
-	ret = md_error(mddev_to_kdev(mddev), dev);
+	ret = md_error(mddev, dev);
 	return ret;
 }
 
@@ -2938,13 +2938,11 @@ void md_recover_arrays (void)
 }
 
 
-int md_error (kdev_t dev, kdev_t rdev)
+int md_error (mddev_t *mddev, kdev_t rdev)
 {
-	mddev_t *mddev;
 	mdk_rdev_t * rrdev;
 	int rc;
 
-	mddev = kdev_to_mddev(dev);
 /*	printk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",MAJOR(dev),MINOR(dev),MAJOR(rdev),MINOR(rdev), __builtin_return_address(0),__builtin_return_address(1),__builtin_return_address(2),__builtin_return_address(3));
  */
 	if (!mddev) {

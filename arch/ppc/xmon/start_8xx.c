@@ -15,7 +15,7 @@
 #include <asm/processor.h>
 #include <asm/8xx_immap.h>
 #include <asm/mpc8xx.h>
-#include "commproc.h"
+#include "../8xx_io/commproc.h"
 
 extern void xmon_printf(const char *fmt, ...);
 extern int xmon_8xx_write(char *str, int nb);

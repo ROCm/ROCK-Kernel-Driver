@@ -167,7 +167,8 @@ subsequent_board:
 
 	        /* there is no phy information, don't even try to build mtable */
 	        if (count == 0) {
-			DPRINTK("no phy info, aborting mtable build\n");
+			if (tulip_debug > 0)
+				printk(KERN_WARNING "%s: no phy info, aborting mtable build\n", dev->name);
 		        return;
 		}
 
@@ -259,7 +260,7 @@ subsequent_board:
 				   leaf->type);
 		}
 		if (new_advertise)
-			tp->to_advertise = new_advertise;
+			tp->sym_advertise = new_advertise;
 	}
 }
 /* Reading a serial EEPROM is a "bit" grungy, but we work our way through:->.*/

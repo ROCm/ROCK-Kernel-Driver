@@ -4,7 +4,7 @@
  *
  *	Authors:
  *      - DDP-IP Encap by: Bradford W. Johnson <johns393@maroon.tc.umn.edu>
- *	- DDP-IP Decap by: Jay Schulist <jschlst@turbolinux.com>
+ *	- DDP-IP Decap by: Jay Schulist <jschlst@samba.org>
  *
  *	Derived from:
  *	- Almost all code already existed in net/appletalk/ddp.c I just
@@ -14,7 +14,7 @@
  *        Written 1993-94 by Donald Becker.
  *	- dummy.c: A dummy net driver. By Nick Holloway.
  *	- MacGate: A user space Daemon for Appletalk-IP Decap for
- *	  Linux by Jay Schulist <jschlst@turbolinux.com>
+ *	  Linux by Jay Schulist <jschlst@samba.org>
  *
  *      Copyright 1993 United States Government as represented by the
  *      Director, National Security Agency.
@@ -69,7 +69,7 @@ static int __init ipddp_init(struct net_device *dev)
 		printk("%s: Appletalk-IP Encap. mode by Bradford W. Johnson <johns393@maroon.tc.umn.edu>\n", 
 			dev->name);
 	if(ipddp_mode == IPDDP_DECAP)
-		printk("%s: Appletalk-IP Decap. mode by Jay Schulist <jschlst@turbolinux.com>\n", 
+		printk("%s: Appletalk-IP Decap. mode by Jay Schulist <jschlst@samba.org>\n", 
 			dev->name);
 
 	/* Fill in the device structure with ethernet-generic values. */

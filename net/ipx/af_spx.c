@@ -6,7 +6,7 @@
  *		 Revision Date:  February 9, 1993
  *
  *	Developers:
- *      Jay Schulist    <jschlst@turbolinux.com>
+ *      Jay Schulist    <jschlst@samba.org>
  *	Jim Freeman	<jfree@caldera.com>
  *
  *	Changes:

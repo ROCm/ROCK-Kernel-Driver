@@ -6,14 +6,21 @@
  * Copyright (C) 1997 Paul Mackerras.
  */
 
+/* Front light color on Yikes/B&W G3. 32 bits */
+#define HEATHROW_FRONT_LIGHT		0x32 /* (set to 0 or 0xffffffff) */
+
+/* Brightness/contrast (gossamer iMac ?). 8 bits */
+#define HEATHROW_BRIGHTNESS_CNTL	0x32
+#define HEATHROW_CONTRAST_CNTL		0x33
+
 /* offset from ohare base for feature control register */
-#define HEATHROW_FEATURE_REG	0x38
+#define HEATHROW_FEATURE_REG		0x38
 
 /*
  * Bits in feature control register.
  * Bits postfixed with a _N are in inverse logic
  */
-#define HRW_RESET_SCC		0x00000001	/* Named in_use_led in OF ??? */
+#define HRW_RESET_SCC		0x00000001	/* actually controls transceiver... */
 #define HRW_BAY_POWER_N		0x00000002
 #define HRW_BAY_PCI_ENABLE	0x00000004
 #define HRW_BAY_IDE_ENABLE	0x00000008

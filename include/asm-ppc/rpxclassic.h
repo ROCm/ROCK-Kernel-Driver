@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 
+#ifndef __ASSEMBLY__
 /* A Board Information structure that is given to a program when
  * prom starts it up.
  */
@@ -60,19 +61,37 @@ extern bd_t m8xx_board_info;
 #define BCSR0_PCMCIA3VOLT	((uint)0x000a0000)	/* CLLF */
 #define BCSR0_PCMCIA5VOLT	((uint)0x00060000)	/* CLLF */
 
+#define BCSR1_IPB5SEL           ((uint)0x00100000)
+#define BCSR1_PCVCTL4           ((uint)0x00080000)
+#define BCSR1_PCVCTL5           ((uint)0x00040000)
+#define BCSR1_PCVCTL6           ((uint)0x00020000)
+#define BCSR1_PCVCTL7           ((uint)0x00010000)
+
 #define BCSR2_EN232XCVR		((uint)0x00008000)
 #define BCSR2_QSPACESEL		((uint)0x00004000)
 #define BCSR2_FETHLEDMODE	((uint)0x00000800)	/* CLLF */
 
-#if defined(CONFIG_RPXLCD) || defined(CONFIG_HTDMSOUND)
-/* HIOX Expansion card.
-*/
-#include <asm/rpx_hiox.h>
+#if defined(CONFIG_HTDMSOUND)
+#include <asm/rpxhiox.h>
+#endif
+
+/* define IO_BASE for pcmcia, CLLF only */
+#if !defined(CONFIG_PCI)
+#define _IO_BASE 0x80000000
+#define _IO_BASE_SIZE 0x1000
+
+/* for pcmcia sandisk */
+#ifdef CONFIG_IDE
+#define MAX_HWIFS 1
+#define ide_request_irq(irq,hand,flg,dev,id)    request_8xxirq((irq),(hand),(flg),(dev),(id))
+#endif
 #endif
 
 /* Interrupt level assignments.
 */
 #define FEC_INTERRUPT	SIU_LEVEL1	/* FEC interrupt */
+
+#endif /* !__ASSEMBLY__ */
 
 /* We don't use the 8259.
 */

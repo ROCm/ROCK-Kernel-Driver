@@ -1,7 +1,7 @@
 /*      cops.h: LocalTalk driver for Linux.
  *
  *      Authors:
- *      - Jay Schulist <jschlst@turbolinux.com>
+ *      - Jay Schulist <jschlst@samba.org>
  */
 
 #ifndef __LINUX_COPSLTALK_H

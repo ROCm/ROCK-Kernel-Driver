@@ -156,9 +156,9 @@ static int grow_buffers(struct stripe_head *sh, int num, int b_size, int priorit
 			return 1;
 		memset(bh, 0, sizeof (struct buffer_head));
 		init_waitqueue_head(&bh->b_wait);
-		page = alloc_page(priority);
-		bh->b_data = page_address(page);
-		if (!bh->b_data) {
+		if ((page = alloc_page(priority)))
+			bh->b_data = page_address(page);
+		else {
 			kfree(bh);
 			return 1;
 		}
@@ -412,7 +412,7 @@ static void raid5_end_read_request (struct buffer_head * bh, int uptodate)
 			spin_lock_irqsave(&conf->device_lock, flags);
 		}
 	} else {
-		md_error(mddev_to_kdev(conf->mddev), bh->b_dev);
+		md_error(conf->mddev, bh->b_dev);
 		clear_bit(BH_Uptodate, &bh->b_state);
 	}
 	clear_bit(BH_Lock, &bh->b_state);
@@ -440,7 +440,7 @@ static void raid5_end_write_request (struct buffer_head *bh, int uptodate)
 
 	md_spin_lock_irqsave(&conf->device_lock, flags);
 	if (!uptodate)
-		md_error(mddev_to_kdev(conf->mddev), bh->b_dev);
+		md_error(conf->mddev, bh->b_dev);
 	clear_bit(BH_Lock, &bh->b_state);
 	set_bit(STRIPE_HANDLE, &sh->state);
 	__release_stripe(conf, sh);
@@ -1256,76 +1256,6 @@ static void raid5syncd (void *data)
 	printk("raid5: resync finished.\n");
 }
 
-static int __check_consistency (mddev_t *mddev, int row)
-{
-	raid5_conf_t *conf = mddev->private;
-	kdev_t dev;
-	struct buffer_head *bh[MD_SB_DISKS], *tmp = NULL;
-	int i, ret = 0, nr = 0, count;
-	struct buffer_head *bh_ptr[MAX_XOR_BLOCKS];
-
-	if (conf->working_disks != conf->raid_disks)
-		goto out;
-	tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
-	tmp->b_size = 4096;
-	tmp->b_page = alloc_page(GFP_KERNEL);
-	tmp->b_data = page_address(tmp->b_page);
-	if (!tmp->b_data)
-		goto out;
-	md_clear_page(tmp->b_data);
-	memset(bh, 0, MD_SB_DISKS * sizeof(struct buffer_head *));
-	for (i = 0; i < conf->raid_disks; i++) {
-		dev = conf->disks[i].dev;
-		set_blocksize(dev, 4096);
-		bh[i] = bread(dev, row / 4, 4096);
-		if (!bh[i])
-			break;
-		nr++;
-	}
-	if (nr == conf->raid_disks) {
-		bh_ptr[0] = tmp;
-		count = 1;
-		for (i = 1; i < nr; i++) {
-			bh_ptr[count++] = bh[i];
-			if (count == MAX_XOR_BLOCKS) {
-				xor_block(count, &bh_ptr[0]);
-				count = 1;
-			}
-		}
-		if (count != 1) {
-			xor_block(count, &bh_ptr[0]);
-		}
-		if (memcmp(tmp->b_data, bh[0]->b_data, 4096))
-			ret = 1;
-	}
-	for (i = 0; i < conf->raid_disks; i++) {
-		dev = conf->disks[i].dev;
-		if (bh[i]) {
-			bforget(bh[i]);
-			bh[i] = NULL;
-		}
-		fsync_dev(dev);
-		invalidate_buffers(dev);
-	}
-	free_page((unsigned long) tmp->b_data);
-out:
-	if (tmp)
-		kfree(tmp);
-	return ret;
-}
-
-static int check_consistency (mddev_t *mddev)
-{
-	if (__check_consistency(mddev, 0))
-/*
- * We are not checking this currently, as it's legitimate to have
- * an inconsistent array, at creation time.
- */
-		return 0;
-
-	return 0;
-}
-
 static int raid5_run (mddev_t *mddev)
 {
 	raid5_conf_t *conf;
@@ -1483,12 +1413,6 @@ static int raid5_run (mddev_t *mddev)
 	if (conf->working_disks != sb->raid_disks) {
 		printk(KERN_ALERT "raid5: md%d, not all disks are operational -- trying to recover array\n", mdidx(mddev));
 		start_recovery = 1;
-	}
-
-	if (!start_recovery && (sb->state & (1 << MD_SB_CLEAN)) &&
-			check_consistency(mddev)) {
-		printk(KERN_ERR "raid5: detected raid-5 superblock xor inconsistency -- running resync\n");
-		sb->state &= ~(1 << MD_SB_CLEAN);
 	}
 
 	{
@@ -1704,6 +1628,7 @@ static int raid5_diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 	struct disk_info *tmp, *sdisk, *fdisk, *rdisk, *adisk;
 	mdp_super_t *sb = mddev->sb;
 	mdp_disk_t *failed_desc, *spare_desc, *added_desc;
+	mdk_rdev_t *spare_rdev, *failed_rdev;
 
 	print_raid5_conf(conf);
 	md_spin_lock_irq(&conf->device_lock);
@@ -1875,6 +1800,16 @@ static int raid5_diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 		/*
 		 * do the switch finally
 		 */
+		spare_rdev = find_rdev_nr(mddev, spare_desc->number);
+		failed_rdev = find_rdev_nr(mddev, failed_desc->number);
+
+		/* There must be a spare_rdev, but there may not be a
+		 * failed_rdev.  That slot might be empty...
+		 */
+		spare_rdev->desc_nr = failed_desc->number;
+		if (failed_rdev)
+			failed_rdev->desc_nr = spare_desc->number;
+		
 		xchg_values(*spare_desc, *failed_desc);
 		xchg_values(*fdisk, *sdisk);
 

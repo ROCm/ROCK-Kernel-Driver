@@ -76,6 +76,7 @@ obj-$(CONFIG_YELLOWFIN) += yellowfin.o
 obj-$(CONFIG_ACENIC) += acenic.o
 obj-$(CONFIG_NATSEMI) += natsemi.o
 obj-$(CONFIG_STNIC) += stnic.o 8390.o
+obj-$(CONFIG_FEALNX) += fealnx.o
 
 ifeq ($(CONFIG_SK98LIN),y)
 obj-y += sk98lin/sk98lin.o

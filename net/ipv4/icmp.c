@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.75 2001/04/30 04:40:40 davem Exp $
+ *	Version: $Id: icmp.c,v 1.76 2001/05/10 01:20:58 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -1006,6 +1006,7 @@ void __init icmp_init(struct net_proto_family *ops)
 	icmp_socket->sk->allocation=GFP_ATOMIC;
 	icmp_socket->sk->sndbuf = SK_WMEM_MAX*2;
 	icmp_socket->sk->protinfo.af_inet.ttl = MAXTTL;
+	icmp_socket->sk->protinfo.af_inet.pmtudisc = IP_PMTUDISC_DONT;
 
 	/* Unhash it so that IP input processing does not even
 	 * see it, we do not wish this socket to see incoming

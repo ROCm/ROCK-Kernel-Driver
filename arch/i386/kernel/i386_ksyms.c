@@ -112,6 +112,7 @@ EXPORT_SYMBOL(pci_free_consistent);
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(pcibios_penalize_isa_irq);
+EXPORT_SYMBOL(pci_mem_start);
 #endif
 
 #ifdef CONFIG_X86_USE_3DNOW

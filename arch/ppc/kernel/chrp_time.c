@@ -29,6 +29,8 @@
 #include <asm/init.h>
 #include <asm/time.h>
 
+extern spinlock_t rtc_lock;
+
 static int nvram_as1 = NVRAM_AS1;
 static int nvram_as0 = NVRAM_AS0;
 static int nvram_data = NVRAM_DATA;
@@ -74,6 +76,7 @@ int __chrp chrp_set_rtc_time(unsigned long nowtime)
 	unsigned char save_control, save_freq_select;
 	struct rtc_time tm;
 
+	spin_lock(&rtc_lock);
 	to_tm(nowtime, &tm);
 
 	save_control = chrp_cmos_clock_read(RTC_CONTROL); /* tell the clock it's being set */
@@ -112,6 +115,7 @@ int __chrp chrp_set_rtc_time(unsigned long nowtime)
 
 	if ( (time_state == TIME_ERROR) || (time_state == TIME_BAD) )
 		time_state = TIME_OK;
+	spin_unlock(&rtc_lock);
 	return 0;
 }
 

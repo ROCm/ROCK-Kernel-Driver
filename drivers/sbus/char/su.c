@@ -1,4 +1,4 @@
-/* $Id: su.c,v 1.48 2001/04/27 07:02:42 davem Exp $
+/* $Id: su.c,v 1.49 2001/05/11 05:35:02 davem Exp $
  * su.c: Small serial driver for keyboard/mouse interface on sparc32/PCI
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -75,6 +75,9 @@ do {									\
 #include <asm/oplib.h>
 #include <asm/io.h>
 #include <asm/ebus.h>
+#ifdef CONFIG_SPARC64
+#include <asm/isa.h>
+#endif
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -2220,7 +2223,7 @@ done:
  */
 static __inline__ void __init show_su_version(void)
 {
-	char *revision = "$Revision: 1.48 $";
+	char *revision = "$Revision: 1.49 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');
@@ -2243,6 +2246,10 @@ autoconfig(struct su_struct *info)
 	unsigned char status1, status2, scratch, scratch2;
 	struct linux_ebus_device *dev = 0;
 	struct linux_ebus *ebus;
+#ifdef CONFIG_SPARC64
+	struct isa_bridge *isa_br;
+	struct isa_device *isa_dev;
+#endif
 #ifndef __sparc_v9__
 	struct linux_prom_registers reg0;
 #endif
@@ -2263,6 +2270,18 @@ autoconfig(struct su_struct *info)
 			}
 		}
 	}
+
+#ifdef CONFIG_SPARC64
+	for_each_isa(isa_br) {
+		for_each_isadev(isa_dev, isa_br) {
+			if (isa_dev->prom_node == info->port_node) {
+				info->port = isa_dev->resource.start;
+				info->irq = isa_dev->irq;
+				goto ebus_done;
+			}
+		}
+	}
+#endif
 
 #ifdef __sparc_v9__
 	/*

@@ -16,7 +16,7 @@
 #include <asm/processor.h>
 
 #ifndef MAX_HWIFS
-#define MAX_HWIFS	4
+#define MAX_HWIFS	8
 #endif
 
 #include <asm/hdreg.h>
@@ -159,8 +159,13 @@ typedef union {
 	} b;
 } select_t;
 
+#if !defined(ide_request_irq)
 #define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))
+#endif
+
+#if !defined(ide_free_irq)
 #define ide_free_irq(irq,dev_id)		free_irq((irq), (dev_id))
+#endif
 
 /*
  * The following are not needed for the non-m68k ports

@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp.c,v 1.204 2001/05/01 23:07:49 davem Exp $
+ * Version:	$Id: tcp.c,v 1.205 2001/05/05 22:25:30 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -2357,7 +2357,7 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 		break;
 	case TCP_LINGER2:
 		val = tp->linger2;
-		if (val > 0)
+		if (val >= 0)
 			val = (val ? : sysctl_tcp_fin_timeout)/HZ;
 		break;
 	case TCP_DEFER_ACCEPT:

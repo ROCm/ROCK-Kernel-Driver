@@ -205,11 +205,12 @@ struct net_device *init_etherdev(struct net_device *dev, int sizeof_priv)
 }
 
 /**
- * alloc_etherdev - Register ethernet device
+ * alloc_etherdev - Allocates and sets up an ethernet device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
  *	for this ethernet device
  *
- * Fill in the fields of the device structure with ethernet-generic values.
+ * Fill in the fields of the device structure with ethernet-generic
+ * values. Basically does everything except registering the device.
  *
  * Constructs a new net device, complete with a private data area of
  * size @sizeof_priv.  A 32-byte (not bit) alignment is enforced for

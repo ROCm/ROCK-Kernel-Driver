@@ -2,6 +2,8 @@
 # Automatically generated make config: don't edit
 #
 # CONFIG_UID16 is not set
+# CONFIG_RWSEM_GENERIC_SPINLOCK is not set
+CONFIG_RWSEM_XCHGADD_ALGORITHM=y
 
 #
 # Code maturity level options
@@ -34,7 +36,6 @@ CONFIG_MACH_SPECIFIC=y
 # General setup
 #
 # CONFIG_HIGHMEM is not set
-# CONFIG_MOL is not set
 # CONFIG_ISA is not set
 # CONFIG_EISA is not set
 # CONFIG_SBUS is not set
@@ -93,7 +94,6 @@ CONFIG_BLK_DEV_INITRD=y
 # CONFIG_MD_RAID1 is not set
 # CONFIG_MD_RAID5 is not set
 # CONFIG_BLK_DEV_LVM is not set
-# CONFIG_LVM_PROC_FS is not set
 
 #
 # Networking options
@@ -177,6 +177,7 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_MACE is not set
 # CONFIG_BMAC is not set
 # CONFIG_GMAC is not set
+# CONFIG_NCR885E is not set
 # CONFIG_OAKNET is not set
 # CONFIG_NET_VENDOR_3COM is not set
 # CONFIG_LANCE is not set
@@ -317,6 +318,8 @@ CONFIG_UNIX98_PTY_COUNT=256
 # CONFIG_QUOTA is not set
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
+# CONFIG_REISERFS_FS is not set
+# CONFIG_REISERFS_CHECK is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set
@@ -329,6 +332,7 @@ CONFIG_UNIX98_PTY_COUNT=256
 # CONFIG_EFS_FS is not set
 # CONFIG_JFFS_FS is not set
 # CONFIG_CRAMFS is not set
+CONFIG_TMPFS=y
 # CONFIG_RAMFS is not set
 # CONFIG_ISO9660_FS is not set
 # CONFIG_JOLIET is not set

@@ -722,6 +722,13 @@
 #define MII_ANLPA_CSMA 0x0001      /* CSMA-CD Capable */
 #define MII_ANLPA_PAUS 0x0400 
 
+/* Generic PHYs
+ * 
+ * These GENERIC values assumes that the PHY devices follow 802.3u and
+ * allow parallel detection to set the link partner ability register.
+ * Detection of 100Base-TX [H/F Duplex] and 100Base-T4 is supported.
+ */
+
 /*
  * Model-specific PHY registers
  *
@@ -731,6 +738,7 @@
 
 /* Supported PHYs (phy_type field ) */
 #define PHY_B5400	0x5400
+#define PHY_B5401	0x5401
 #define PHY_B5201	0x5201
 #define PHY_LXT971	0x0971
 #define PHY_UNKNOWN	0
@@ -741,11 +749,21 @@
 #define MII_BCM5201_REV                         0x01
 #define MII_BCM5201_ID                          ((MII_BCM5201_OUI << 10) | (MII_BCM5201_MODEL << 4))
 #define MII_BCM5201_MASK                        0xfffffff0
+#define MII_BCM5221_OUI                         0x001018
+#define MII_BCM5221_MODEL                       0x1e
+#define MII_BCM5221_REV                         0x00
+#define MII_BCM5221_ID                          ((MII_BCM5221_OUI << 10) | (MII_BCM5221_MODEL << 4))
+#define MII_BCM5221_MASK                        0xfffffff0
 #define MII_BCM5400_OUI                         0x000818
 #define MII_BCM5400_MODEL                       0x04
 #define MII_BCM5400_REV                         0x01
 #define MII_BCM5400_ID                          ((MII_BCM5400_OUI << 10) | (MII_BCM5400_MODEL << 4))
 #define MII_BCM5400_MASK                        0xfffffff0
+#define MII_BCM5401_OUI                         0x000818
+#define MII_BCM5401_MODEL                       0x05
+#define MII_BCM5401_REV                         0x01
+#define MII_BCM5401_ID                          ((MII_BCM5401_OUI << 10) | (MII_BCM5401_MODEL << 4))
+#define MII_BCM5401_MASK                        0xfffffff0
 #define MII_LXT971_OUI                          0x0004de
 #define MII_LXT971_MODEL                        0x0e
 #define MII_LXT971_REV                          0x00
@@ -789,7 +807,6 @@
 #define MII_LXT971_STATUS2_LINK			0x0400
 #define MII_LXT971_STATUS2_FULLDUPLEX		0x0200
 #define MII_LXT971_STATUS2_AUTONEG_COMPLETE	0x0080
-
 
 
 	/*
@@ -877,6 +894,7 @@ struct gmac {
 	u8				pci_devfn;
 	spinlock_t			lock;
 	int				opened;
+	int				sleeping;
 	struct net_device		*next_gmac;
 };
 

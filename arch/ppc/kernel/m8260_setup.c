@@ -119,7 +119,7 @@ m8260_set_rtc_time(unsigned long time)
 	return(0);
 }
 
-unsigned long __init
+unsigned long
 m8260_get_rtc_time(void)
 {
 
@@ -206,6 +206,18 @@ m8260_init_IRQ(void)
 
 }
 
+/*
+ * Same hack as 8xx
+ */
+unsigned long __init m8260_find_end_of_memory(void)
+{
+	bd_t	*binfo;
+	extern unsigned char __res[];
+	
+	binfo = (bd_t *)__res;
+
+	return binfo->bi_memsize;
+}
 
 void __init
 m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
@@ -248,18 +260,8 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.get_rtc_time   = m8260_get_rtc_time;
 	ppc_md.calibrate_decr = m8260_calibrate_decr;
 
-#if 0
-	ppc_md.kbd_setkeycode    = pckbd_setkeycode;
-	ppc_md.kbd_getkeycode    = pckbd_getkeycode;
-	ppc_md.kbd_pretranslate  = pckbd_pretranslate;
-	ppc_md.kbd_translate     = pckbd_translate;
-	ppc_md.kbd_unexpected_up = pckbd_unexpected_up;
-	ppc_md.kbd_leds          = pckbd_leds;
-	ppc_md.kbd_init_hw       = pckbd_init_hw;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.kbd_sysrq_xlate	 = pckbd_sysrq_xlate;
-#endif
-#else
+	ppc_md.find_end_of_memory = m8260_find_end_of_memory;
+
 	ppc_md.kbd_setkeycode    = NULL;
 	ppc_md.kbd_getkeycode    = NULL;
 	ppc_md.kbd_translate     = NULL;
@@ -268,7 +270,6 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.kbd_init_hw       = NULL;
 #ifdef CONFIG_MAGIC_SYSRQ
 	ppc_md.kbd_sysrq_xlate	 = NULL;
-#endif
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)

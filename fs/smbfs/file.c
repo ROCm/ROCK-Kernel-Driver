@@ -28,8 +28,23 @@
 static int
 smb_fsync(struct file *file, struct dentry * dentry, int datasync)
 {
+	struct smb_sb_info *server = server_from_dentry(dentry);
+	int result;
+
 	VERBOSE("sync file %s/%s\n", DENTRY_PATH(dentry));
-	return 0;
+
+	/*
+	 * The VFS will writepage() all dirty pages for us, but we
+	 * should send a SMBflush to the server, letting it know that
+	 * we want things synchronized with actual storage.
+	 *
+	 * Note: this function requires all pages to have been written already
+	 *       (should be ok with writepage_sync)
+	 */
+	smb_lock_server(server);
+	result = smb_proc_flush(server, dentry->d_inode->u.smbfs_i.fileid);
+	smb_unlock_server(server);
+	return result;
 }
 
 /*
@@ -138,7 +153,6 @@ smb_writepage_sync(struct inode *inode, struct page *page,
 		inode->i_mtime = inode->i_atime = CURRENT_TIME;
 		if (offset > inode->i_size)
 			inode->i_size = offset;
-		inode->u.smbfs_i.flags |= SMB_F_LOCALWRITE;
 	} while (count);
 
 	kunmap(page);
@@ -207,8 +221,7 @@ smb_file_read(struct file * file, char * buf, size_t count, loff_t *ppos)
 		(unsigned long) count, (unsigned long) *ppos);
 
 	status = smb_revalidate_inode(dentry);
-	if (status)
-	{
+	if (status) {
 		PARANOIA("%s/%s validation failed, error=%Zd\n",
 			 DENTRY_PATH(dentry), status);
 		goto out;
@@ -233,8 +246,7 @@ smb_file_mmap(struct file * file, struct vm_area_struct * vma)
 		DENTRY_PATH(dentry), vma->vm_start, vma->vm_end);
 
 	status = smb_revalidate_inode(dentry);
-	if (status)
-	{
+	if (status) {
 		PARANOIA("%s/%s validation failed, error=%d\n",
 			 DENTRY_PATH(dentry), status);
 		goto out;
@@ -294,8 +306,7 @@ smb_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		(unsigned long) count, (unsigned long) *ppos);
 
 	result = smb_revalidate_inode(dentry);
-	if (result)
-	{
+	if (result) {
 		PARANOIA("%s/%s validation failed, error=%Zd\n",
 			 DENTRY_PATH(dentry), result);
 		goto out;
@@ -305,8 +316,7 @@ smb_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (result)
 		goto out;
 
-	if (count > 0)
-	{
+	if (count > 0) {
 		result = generic_file_write(file, buf, count, ppos);
 		VERBOSE("pos=%ld, size=%ld, mtime=%ld, atime=%ld\n",
 			(long) file->f_pos, (long) dentry->d_inode->i_size,

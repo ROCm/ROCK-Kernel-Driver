@@ -67,8 +67,7 @@ struct hw_interrupt_type ppc8xx_pic = {
 #if 0
 void
 m8xx_do_IRQ(struct pt_regs *regs,
-	   int            cpu,
-           int            isfake)
+	   int            cpu)
 {
 	int irq;
         unsigned long bits = 0;
@@ -158,13 +157,15 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	 */
 	switch (irq) {
 #ifdef	IDE0_INTERRUPT
-	case IDE0_INTERRUPT:		/* fall through */
+		case IDE0_INTERRUPT:	/* IDE0 */
+			return (request_8xxirq(irq, handler, irqflags, devname,
+						dev_id));
 #endif
 #ifdef	IDE1_INTERRUPT
-	case IDE1_INTERRUPT:		/* fall through */
+		case IDE1_INTERRUPT:	/* IDE1 */
+			return (request_8xxirq(irq, handler, irqflags, devname,
+						dev_id));
 #endif
-		return (request_8xxirq(irq, handler, irqflags, devname, dev_id));
-	
 	default:			/* unknown IRQ -> panic */
 		panic("request_irq");
 	}

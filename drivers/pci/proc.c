@@ -191,10 +191,106 @@ proc_bus_pci_write(struct file *file, const char *buf, size_t nbytes, loff_t *pp
 	return nbytes;
 }
 
+struct pci_filp_private {
+	enum pci_mmap_state mmap_state;
+	int write_combine;
+};
+
+static int proc_bus_pci_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+{
+	const struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct pci_dev *dev = dp->data;
+#ifdef HAVE_PCI_MMAP
+	struct pci_filp_private *fpriv = file->private_data;
+#endif /* HAVE_PCI_MMAP */
+	int ret = 0;
+
+	switch (cmd) {
+	case PCIIOC_CONTROLLER:
+		ret = pci_controller_num(dev);
+		break;
+
+#ifdef HAVE_PCI_MMAP
+	case PCIIOC_MMAP_IS_IO:
+		fpriv->mmap_state = pci_mmap_io;
+		break;
+
+	case PCIIOC_MMAP_IS_MEM:
+		fpriv->mmap_state = pci_mmap_mem;
+		break;
+
+	case PCIIOC_WRITE_COMBINE:
+		if (arg)
+			fpriv->write_combine = 1;
+		else
+			fpriv->write_combine = 0;
+		break;
+
+#endif /* HAVE_PCI_MMAP */
+
+	default:
+		ret = -EINVAL;
+		break;
+	};
+
+	return ret;
+}
+
+#ifdef HAVE_PCI_MMAP
+static int proc_bus_pci_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct inode *inode = file->f_dentry->d_inode;
+	const struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct pci_dev *dev = dp->data;
+	struct pci_filp_private *fpriv = file->private_data;
+	int ret;
+
+	ret = pci_mmap_page_range(dev, vma,
+				  fpriv->mmap_state,
+				  fpriv->write_combine);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static int proc_bus_pci_open(struct inode *inode, struct file *file)
+{
+	struct pci_filp_private *fpriv = kmalloc(sizeof(*fpriv), GFP_KERNEL);
+
+	if (!fpriv)
+		return -ENOMEM;
+
+	fpriv->mmap_state = pci_mmap_io;
+	fpriv->write_combine = 0;
+
+	file->private_data = fpriv;
+
+	return 0;
+}
+
+static int proc_bus_pci_release(struct inode *inode, struct file *file)
+{
+	kfree(file->private_data);
+	file->private_data = NULL;
+
+	return 0;
+}
+#endif /* HAVE_PCI_MMAP */
+
 static struct file_operations proc_bus_pci_operations = {
-	llseek:	proc_bus_pci_lseek,
-	read:	proc_bus_pci_read,
-	write:	proc_bus_pci_write,
+	llseek:		proc_bus_pci_lseek,
+	read:		proc_bus_pci_read,
+	write:		proc_bus_pci_write,
+	ioctl:		proc_bus_pci_ioctl,
+#ifdef HAVE_PCI_MMAP
+	open:		proc_bus_pci_open,
+	release:	proc_bus_pci_release,
+	mmap:		proc_bus_pci_mmap,
+#ifdef HAVE_ARCH_PCI_GET_UNMAPPED_AREA
+	get_unmapped_area: get_pci_unmapped_area,
+#endif /* HAVE_ARCH_PCI_GET_UNMAPPED_AREA */
+#endif /* HAVE_PCI_MMAP */
 };
 
 #if BITS_PER_LONG == 32

@@ -158,16 +158,8 @@ static __inline__ u8 ipv6_addr_hash(struct in6_addr *addr)
  *	compute link-local solicited-node multicast address
  */
 
-static inline void addrconf_addr_solict_mult_old(struct in6_addr *addr,
-						     struct in6_addr *solicited)
-{
-	ipv6_addr_set(solicited,
-		      __constant_htonl(0xFF020000), 0,
-		      __constant_htonl(0x1), addr->s6_addr32[3]);
-}
-
-static inline void addrconf_addr_solict_mult_new(struct in6_addr *addr,
-						     struct in6_addr *solicited)
+static inline void addrconf_addr_solict_mult(struct in6_addr *addr,
+					     struct in6_addr *solicited)
 {
 	ipv6_addr_set(solicited,
 		      __constant_htonl(0xFF020000), 0,

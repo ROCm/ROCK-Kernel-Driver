@@ -27,6 +27,11 @@ extern struct pci_controller* pci_bus_to_hose(int bus);
 extern struct pci_controller*
 pci_find_hose_for_OF_device(struct device_node* node);
 
+/* Fill up host controller resources from the OF node */
+extern void
+pci_process_bridge_OF_ranges(struct pci_controller *hose,
+			   struct device_node *dev, int primary);
+
 /*
  * Structure of a PCI controller (host bridge)
  */

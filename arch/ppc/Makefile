@@ -31,7 +31,7 @@ CFLAGS := $(CFLAGS) -mcpu=403
 endif
 
 ifdef CONFIG_8xx
-CFLAGS := $(CFLAGS) -mcpu=860 -I../8xx_io
+CFLAGS := $(CFLAGS) -mcpu=860
 endif
 
 ifdef CONFIG_PPC64BRIDGE
@@ -144,6 +144,9 @@ endif
 .PHONY: clean_config
 clean_config:
 	rm -f .config arch/ppc/defconfig
+
+gemini_config: clean_config
+	cp -f arch/ppc/configs/gemini_defconfig arch/ppc/defconfig
 
 pmac_config: clean_config
 	cp -f arch/ppc/configs/pmac_defconfig arch/ppc/defconfig

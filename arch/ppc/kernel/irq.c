@@ -176,9 +176,19 @@ setup_irq(unsigned int irq, struct irqaction * new)
 	return 0;
 }
 
-/* This could be promoted to a real free_irq() ... */
-static int
-do_free_irq(int irq, void* dev_id)
+#if (defined(CONFIG_8xx) || defined(CONFIG_8260))
+/* Name change so we can catch standard drivers that potentially mess up
+ * the internal interrupt controller on 8xx and 8260.  Just bear with me,
+ * I don't like this either and I am searching a better solution.  For
+ * now, this is what I need. -- Dan
+ */
+#define request_irq	request_8xxirq
+#elif defined(CONFIG_APUS)
+#define request_irq	request_sysirq
+#define free_irq	sys_free_irq
+#endif
+
+void free_irq(unsigned int irq, void* dev_id)
 {
 	irq_desc_t *desc;
 	struct irqaction **p;
@@ -209,26 +219,14 @@ do_free_irq(int irq, void* dev_id)
 				barrier();
 #endif
 			irq_kfree(action);
-			return 0;
+			return;
 		}
 		printk("Trying to free free IRQ%d\n",irq);
 		spin_unlock_irqrestore(&desc->lock,flags);
 		break;
 	}
-	return -ENOENT;
+	return;
 }
-
-#if (defined(CONFIG_8xx) || defined(CONFIG_8260))
-/* Name change so we can catch standard drivers that potentially mess up
- * the internal interrupt controller on 8xx and 8260.  Just bear with me,
- * I don't like this either and I am searching a better solution.  For
- * now, this is what I need. -- Dan
- */
-#define request_irq	request_8xxirq
-#elif defined(CONFIG_APUS)
-#define request_irq	request_sysirq
-#define free_irq	sys_free_irq
-#endif
 
 int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags, const char * devname, void *dev_id)
@@ -239,8 +237,17 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	if (irq >= NR_IRQS)
 		return -EINVAL;
 	if (!handler)
-		/* We could implement really free_irq() instead of that... */
-		return do_free_irq(irq, dev_id);
+	{
+		/*
+		 * free_irq() used to be implemented as a call to
+		 * request_irq() with handler being NULL.  Now we have
+		 * a real free_irq() but need to allow the old behavior
+		 * for old code that hasn't caught up yet.
+		 *  -- Cort <cort@fsmlabs.com>
+		 */
+		free_irq(irq, dev_id);
+		return 0;
+	}
 	
 	action = (struct irqaction *)
 		irq_kmalloc(sizeof(struct irqaction), GFP_KERNEL);
@@ -264,11 +271,6 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	}
 		
 	return 0;
-}
-
-void free_irq(unsigned int irq, void *dev_id)
-{
-	request_irq(irq, NULL, 0, NULL, dev_id);
 }
 
 /*
@@ -524,7 +526,7 @@ out:
 	spin_unlock(&desc->lock);
 }
 
-int do_IRQ(struct pt_regs *regs, int isfake)
+int do_IRQ(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 	int irq;
@@ -546,10 +548,7 @@ int do_IRQ(struct pt_regs *regs, int isfake)
 		goto out;
 	}
 	ppc_irq_dispatch_handler( regs, irq );
-	if (ppc_md.post_irq)
-		ppc_md.post_irq( regs, irq );
-
- out:	
+out:	
         hardirq_exit( cpu );
 	return 1; /* lets ret_from_int know we can do checks */
 }
@@ -851,15 +850,18 @@ void __global_restore_flags(unsigned long flags)
 }
 #endif /* CONFIG_SMP */
 
-static struct proc_dir_entry * root_irq_dir;
-static struct proc_dir_entry * irq_dir [NR_IRQS];
-static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
+static struct proc_dir_entry *root_irq_dir;
+static struct proc_dir_entry *irq_dir[NR_IRQS];
+static struct proc_dir_entry *smp_affinity_entry[NR_IRQS];
 
 #ifdef CONFIG_IRQ_ALL_CPUS
-unsigned int irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = 0xffffffff};
-#else  /* CONFIG_IRQ_ALL_CPUS */
-unsigned int irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = 0x00000000};
-#endif /* CONFIG_IRQ_ALL_CPUS */
+#define DEFAULT_CPU_AFFINITY 0xffffffff
+#else
+#define DEFAULT_CPU_AFFINITY 0x00000001
+#endif
+
+unsigned int irq_affinity [NR_IRQS] =
+	{ [0 ... NR_IRQS-1] = DEFAULT_CPU_AFFINITY };
 
 #define HEX_DIGITS 8
 
@@ -919,16 +921,18 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 
 	err = parse_hex_value(buffer, count, &new_value);
 
-/* Why is this disabled ? --BenH */
-#if 0/*CONFIG_SMP*/
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least
 	 * one online CPU still has to be targeted.
+	 *
+	 * We assume a 1-1 logical<->physical cpu mapping here.  If
+	 * we assume that the cpu indices in /proc/irq/../smp_affinity
+	 * are actually logical cpu #'s then we have no problem.
+	 *  -- Cort <cort@fsmlabs.com>
 	 */
 	if (!(new_value & cpu_online_map))
 		return -EINVAL;
-#endif
 
 	irq_affinity[irq] = new_value;
 	irq_desc[irq].handler->set_affinity(irq, new_value);

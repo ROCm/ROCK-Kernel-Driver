@@ -1,7 +1,7 @@
 /*
  *	NET3	IP device support routines.
  *
- *	Version: $Id: devinet.c,v 1.41 2001/02/18 09:26:26 davem Exp $
+ *	Version: $Id: devinet.c,v 1.42 2001/05/16 16:45:35 davem Exp $
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -1016,7 +1016,7 @@ int devinet_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
 static struct devinet_sysctl_table
 {
 	struct ctl_table_header *sysctl_header;
-	ctl_table devinet_vars[13];
+	ctl_table devinet_vars[14];
 	ctl_table devinet_dev[2];
 	ctl_table devinet_conf_dir[2];
 	ctl_table devinet_proto_dir[2];
@@ -1058,6 +1058,9 @@ static struct devinet_sysctl_table
          &proc_dointvec},
 	{NET_IPV4_CONF_TAG, "tag",
 	 &ipv4_devconf.tag, sizeof(int), 0644, NULL,
+	 &proc_dointvec},
+	{NET_IPV4_CONF_ARPFILTER, "arp_filter",
+	 &ipv4_devconf.arp_filter, sizeof(int), 0644, NULL,
 	 &proc_dointvec},
 	 {0}},
 

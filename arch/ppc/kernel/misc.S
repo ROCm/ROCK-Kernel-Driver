@@ -21,20 +21,6 @@
 #include <asm/cache.h>
 #include "ppc_asm.h"
 
-#if defined(CONFIG_4xx) || defined(CONFIG_8xx)
-#define CACHE_LINE_SIZE		16
-#define LG_CACHE_LINE_SIZE	4
-#define MAX_COPY_PREFETCH	1
-#elif !defined(CONFIG_PPC64BRIDGE)
-#define CACHE_LINE_SIZE		32
-#define LG_CACHE_LINE_SIZE	5
-#define MAX_COPY_PREFETCH	4
-#else
-#define CACHE_LINE_SIZE		128
-#define LG_CACHE_LINE_SIZE	7
-#define MAX_COPY_PREFETCH	1
-#endif /* CONFIG_4xx || CONFIG_8xx */
-
 	.text
 
 	.align	5
@@ -60,14 +46,37 @@ _GLOBAL(reloc_offset)
 	mtlr	r0
 	blr
 
-/* void __no_use_save_flags(unsigned long *flags) */
-_GLOBAL(__no_use_save_flags)
+/* void __save_flags_ptr(unsigned long *flags) */
+_GLOBAL(__save_flags_ptr)
 	mfmsr	r4
 	stw	r4,0(r3)
 	blr
+	/* 
+	 * Need these nops here for taking over save/restore to
+	 * handle lost intrs
+	 * -- Cort
+	 */
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+_GLOBAL(__save_flags_ptr_end)
 
-/* void __no_use_restore_flags(unsigned long flags) */	
-_GLOBAL(__no_use_restore_flags)
+/* void __restore_flags(unsigned long flags) */	
+_GLOBAL(__restore_flags)
 /*
  * Just set/clear the MSR_EE bit through restore/flags but do not
  * change anything else.  This is needed by the RT system and makes
@@ -82,66 +91,95 @@ _GLOBAL(__no_use_restore_flags)
 	 /* Check if things are setup the way we want _already_. */
 	cmpw	0,r3,r4
 	beqlr
-	/* are we enabling interrupts? */
-	rlwinm.	r0,r3,0,16,16
-	beq	1f
-	/* if so, check if there are any lost interrupts */
-	lis	r7,ppc_n_lost_interrupts@ha
-	lwz	r7,ppc_n_lost_interrupts@l(r7)
-	cmpi	0,r7,0		/* lost interrupts to process first? */
-	bne-	do_lost_interrupts
 1:	SYNC
 	mtmsr	r3
 	SYNC
 	blr
-	
-_GLOBAL(__no_use_cli)
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+_GLOBAL(__restore_flags_end)
+
+_GLOBAL(__cli)
 	mfmsr	r0		/* Get current interrupt state */
 	rlwinm	r3,r0,16+1,32-1,31	/* Extract old value of 'EE' */
 	rlwinm	r0,r0,0,17,15	/* clear MSR_EE in r0 */
 	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0		/* Update machine state */
 	blr			/* Done */
+	/* 
+	 * Need these nops here for taking over save/restore to
+	 * handle lost intrs
+	 * -- Cort
+	 */
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+_GLOBAL(__cli_end)
 
-_GLOBAL(__no_use_sti)
-	lis	r4,ppc_n_lost_interrupts@ha
-	lwz	r4,ppc_n_lost_interrupts@l(r4)
+_GLOBAL(__sti)
 	mfmsr	r3		/* Get current state */
 	ori	r3,r3,MSR_EE	/* Turn on 'EE' bit */
-	cmpi	0,r4,0		/* lost interrupts to process first? */
-	bne-	do_lost_interrupts
 	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r3		/* Update machine state */
 	blr
-
-/*
- * We were about to enable interrupts but we have to simulate
- * some interrupts that were lost by enable_irq first.
- */
-_GLOBAL(do_lost_interrupts)
-	stwu	r1,-16(r1)
-	mflr	r0
-	stw	r0,20(r1)
-	stw	r3,8(r1)
-1:	bl	fake_interrupt
-	lis	r4,ppc_n_lost_interrupts@ha
-	lwz	r4,ppc_n_lost_interrupts@l(r4)
-	cmpi	0,r4,0
-	bne-	1b
-	lwz	r3,8(r1)
-	SYNC
-	mtmsr	r3
-	lwz	r0,20(r1)
-	mtlr	r0
-	addi	r1,r1,16
-	blr
+	/* 
+	 * Need these nops here for taking over save/restore to
+	 * handle lost intrs
+	 * -- Cort
+	 */
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+_GLOBAL(__sti_end)
 
 
 /*
  * complement mask on the msr then "or" some values on.
  *     _nmask_and_or_msr(nmask, value_to_or)
  */
-	_GLOBAL(_nmask_and_or_msr)
+_GLOBAL(_nmask_and_or_msr)
 	mfmsr	r0		/* Get current msr */
 	andc	r0,r0,r3	/* And off the bits set in r3 (first parm) */
 	or	r0,r0,r4		/* Or on the bits in r4 (second parm) */
@@ -267,6 +305,7 @@ _GLOBAL(flush_icache_range)
 2:	icbi	0,r6
 	addi	r6,r6,CACHE_LINE_SIZE
 	bdnz	2b
+	sync				/* additional sync needed on g4 */
 	isync
 	blr
 
@@ -1283,7 +1322,7 @@ _GLOBAL(sys_call_table)
 	.long sys_vfork
 	.long sys_getrlimit	/* 190 */
 	.long sys_ni_syscall		/* 191 */	/* Unused */
-	.long sys_ni_syscall		/* 192 - reserved - mmap2 */
+	.long sys_mmap2			/* 192 */
 	.long sys_truncate64		/* 193 */
 	.long sys_ftruncate64		/* 194 */
 	.long sys_stat64		/* 195 */

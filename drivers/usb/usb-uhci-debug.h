@@ -5,7 +5,7 @@ static void __attribute__((__unused__)) uhci_show_qh (puhci_desc_t qh)
 		dbg("qh has not QH_TYPE");
 		return;
 	}
-	dbg("QH @ %p/%08lX:", qh, virt_to_bus (qh));
+	dbg("QH @ %p/%08X:", qh, qh->dma_addr);
 
 	if (qh->hw.qh.head & UHCI_PTR_TERM)
 		dbg("    Head Terminate");
@@ -23,6 +23,7 @@ static void __attribute__((__unused__)) uhci_show_qh (puhci_desc_t qh)
 }
 #endif
 
+#if 0
 static void uhci_show_td (puhci_desc_t td)
 {
 	char *spid;
@@ -42,8 +43,8 @@ static void uhci_show_td (puhci_desc_t td)
 		break;
 	}
 
-	warn("  TD @ %p/%08lX, MaxLen=%02x DT%d EP=%x Dev=%x PID=(%s) buf=%08x",
-	     td, virt_to_bus (td),
+	warn("  TD @ %p/%08X, MaxLen=%02x DT%d EP=%x Dev=%x PID=(%s) buf=%08x",
+	     td, td->dma_addr,
 	     td->hw.td.info >> 21,
 	     ((td->hw.td.info >> 19) & 1),
 	     (td->hw.td.info >> 15) & 15,
@@ -74,10 +75,15 @@ static void uhci_show_td (puhci_desc_t td)
 		     td->hw.td.link & ~UHCI_PTR_BITS,
 		     (td->hw.td.link & UHCI_PTR_DEPTH ? "Depth first" : "Breadth first"));
 }
+#endif
+
 #ifdef DEBUG
 static void __attribute__((__unused__)) uhci_show_td_queue (puhci_desc_t td)
 {
-	//dbg("uhci_show_td_queue %p (%08lX):", td, virt_to_bus (td));
+	//dbg("uhci_show_td_queue %p (%08lX):", td, td->dma_addr);
+#if 1
+	return;
+#else
 	while (1) {
 		uhci_show_td (td);
 		if (td->hw.td.link & UHCI_PTR_TERM)
@@ -89,13 +95,19 @@ static void __attribute__((__unused__)) uhci_show_td_queue (puhci_desc_t td)
 			break;
 		}
 	}
+#endif
 }
 
 static void __attribute__((__unused__)) uhci_show_queue (puhci_desc_t qh)
 {
+#if 0
 	uhci_desc_t *start_qh=qh;
+#endif
 
 	dbg("uhci_show_queue %p:", qh);
+#if 1
+	return;
+#else
 	while (1) {
 		uhci_show_qh (qh);
 
@@ -117,6 +129,7 @@ static void __attribute__((__unused__)) uhci_show_queue (puhci_desc_t qh)
 			break;
 		}
 	}		
+#endif
 }
 
 static void __attribute__((__unused__)) uhci_show_sc (int port, unsigned short status)

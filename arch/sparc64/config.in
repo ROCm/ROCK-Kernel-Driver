@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.141 2001/04/19 01:52:04 davem Exp $
+# $Id: config.in,v 1.142 2001/05/05 07:46:04 davem Exp $
 # For a description of the syntax of this configuration file,
 # see the Configure script.
 #
@@ -337,6 +337,15 @@ endmenu
 source drivers/input/Config.in
 
 source fs/Config.in
+
+mainmenu_option next_comment
+comment 'Sound'
+
+tristate 'Sound card support' CONFIG_SOUND
+if [ "$CONFIG_SOUND" != "n" ]; then
+   source drivers/sound/Config.in
+fi
+endmenu
 
 source drivers/usb/Config.in
 

@@ -4170,22 +4170,6 @@ CONFIG_IPV6
 
   It is safe to say N here for now.
 
-IPv6: enable EUI-64 token format
-CONFIG_IPV6_EUI64
-  6bone, the network of computers using the IPv6 protocol, is moving
-  to a new aggregatable address format and a new link local address
-  assignment (EUI-64). Say Y if your site has upgraded already, or
-  has started to upgrade.
-
-IPv6: disable provider based addresses
-CONFIG_IPV6_NO_PB
-  Linux tries to operate correctly when your site has moved to EUI-64
-  only partially. Unfortunately, the two address formats (old:
-  "provider based" and new: "aggregatable") are incompatible. Say Y if
-  your site finished the upgrade to EUI-64, and/or you encountered
-  some problems caused by the presence of two link-local addresses on
-  an interface.
-
 IPv6: routing messages via old netlink
 CONFIG_IPV6_NETLINK
   You can say Y here to receive routing messages from the IPv6 code
@@ -7188,7 +7172,7 @@ CONFIG_PPPOE
 
   This driver requires a specially patched pppd daemon.  The patch to
   pppd, along with binaries of a patched pppd package can be found at:
-  http://www.math.uwaterloo.ca/~mostrows
+  http://www.shoshin.uwaterloo.ca/~mostrows
  
 Wireless LAN (non-hamradio)
 CONFIG_NET_RADIO
@@ -12081,10 +12065,7 @@ CONFIG_SMB_NLS_DEFAULT
   The nls settings can be changed at mount time, if your smbmount
   supports that, using the codepage and iocharset parameters.
 
-  Currently no smbmount distributed with samba supports this, it is
-  assumed future versions will. In the meantime you can get an
-  unofficial patch for samba 2.0.7 from:
-  http://www.hojdpunkten.ac.se/054/samba/index.html
+  smbmount from samba 2.2.0 or later supports this.
 
 nls support setting
 CONFIG_SMB_NLS_REMOTE
@@ -12096,10 +12077,7 @@ CONFIG_SMB_NLS_REMOTE
   The nls settings can be changed at mount time, if your smbmount
   supports that, using the codepage and iocharset parameters.
 
-  Currently no smbmount distributed with samba supports this, it is
-  assumed future versions will. In the meantime you can get an
-  unofficial patch for samba 2.0.7 from:
-  http://www.hojdpunkten.ac.se/054/samba/index.html
+  smbmount from samba 2.2.0 or later supports this.
 
 Coda file system support (advanced network fs)
 CONFIG_CODA_FS

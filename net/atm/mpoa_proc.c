@@ -175,7 +175,7 @@ static ssize_t proc_mpc_write(struct file *file, const char *buff,
 
         if (nbytes < 0) return -EINVAL;
         if (nbytes == 0) return 0;
-        if (nbytes > PAGE_SIZE) nbytes = PAGE_SIZE-1;
+        if (nbytes >= PAGE_SIZE) nbytes = PAGE_SIZE-1;
 
         error = verify_area(VERIFY_READ, buff, nbytes);
         if (error) return error;

@@ -732,7 +732,7 @@ static void trident_play_setup(struct trident_state *state)
 	struct dmabuf *dmabuf = &state->dmabuf;
 	struct trident_channel *channel = dmabuf->channel;
 
-	channel->lba = virt_to_bus(dmabuf->rawbuf);
+	channel->lba = dmabuf->dma_handle;
 	channel->delta = compute_rate_play(dmabuf->rate);
 
 	channel->eso = dmabuf->dmasize >> sample_shift[dmabuf->fmt];
@@ -808,7 +808,7 @@ static void trident_rec_setup(struct trident_state *state)
 		return;
 	}
 
-	channel->lba = virt_to_bus(dmabuf->rawbuf);
+	channel->lba = dmabuf->dma_handle;
 	channel->delta = compute_rate_rec(dmabuf->rate);
 	if ((card->pci_id == PCI_DEVICE_ID_ALI_5451) && (channel->num == ALI_SPDIF_IN_CHANNEL)) {
 		rate = ali_get_spdif_in_rate(card);
@@ -1074,14 +1074,21 @@ static int prog_dmabuf(struct trident_state *state, unsigned rec)
 				}
 			}
 			else {
-				if ((order = state->dmabuf.buforder - 1) >= DMABUF_MINORDER)
-					dmabuf->rawbuf = (void *)__get_free_pages(GFP_KERNEL | GFP_DMA, order);
+				if ((order = state->dmabuf.buforder - 1) >= DMABUF_MINORDER) {
+					dmabuf->rawbuf = pci_alloc_consistent(state->card->pci_dev,
+									      PAGE_SIZE << order,
+									      &dmabuf->dma_handle);
+				}
 				if (!dmabuf->rawbuf) {
 					free_pages((unsigned long)state->dmabuf.rawbuf, state->dmabuf.buforder);
 					state->dmabuf.rawbuf = NULL;
 					i-=2;
-					for (; i >= 0; i--)
-						free_pages((unsigned long)state->other_states[i]->dmabuf.rawbuf, state->other_states[i]->dmabuf.buforder);
+					for (; i >= 0; i--) {
+						pci_free_consistent(state->card->pci_dev,
+								    PAGE_SIZE << state->other_states[i]->dmabuf.buforder,
+								    state->other_states[i]->dmabuf.rawbuf,
+								    state->other_states[i]->dmabuf.dma_handle);
+					}
 					unlock_set_fmt(state);
 					return -ENOMEM;
 				}
@@ -3157,20 +3164,34 @@ static int ali_write_proc(struct file *file, const char *buffer, unsigned long c
 {
 	struct trident_card *card = (struct trident_card *)data;
 	unsigned long flags;
+	char c;
+
+	if (count<0)
+		return -EINVAL;
+	if (count == 0)
+		return 0;
+	if (get_user(&c, buffer))
+		return -EFAULT;
 	
 	spin_lock_irqsave(&card->lock, flags);
-	if (*buffer == '0') {	//default
+	switch (c) {
+	    case '0':
 		ali_setup_spdif_out(card, ALI_PCM_TO_SPDIF_OUT);
 		ali_disable_special_channel(card, ALI_SPDIF_OUT_CHANNEL);
-	}	
-	else if (*buffer == '1')
+		break;
+	    case '1':
 		ali_setup_spdif_out(card, ALI_SPDIF_OUT_TO_SPDIF_OUT|ALI_SPDIF_OUT_PCM);
-	else if (*buffer == '2')	//AC3 data
+		break;
+	    case '2':
 		ali_setup_spdif_out(card, ALI_SPDIF_OUT_TO_SPDIF_OUT|ALI_SPDIF_OUT_NON_PCM);
-	else if (*buffer == '3') 
+		break;
+	    case '3':
 		ali_disable_spdif_in(card);	//default
-	else if (*buffer == '4')
+		break;
+	    case '4':
 		ali_setup_spdif_in(card);
+		break;
+	}
 	spin_unlock_irqrestore(&card->lock, flags);
 
 	return count;
@@ -3307,14 +3328,23 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 {
 	unsigned long iobase;
 	struct trident_card *card;
+	dma_addr_t mask;
+	int bits;
 	u8 revision;
 
 	if (pci_enable_device(pci_dev))
 	    return -ENODEV;
 
-	if (pci_set_dma_mask(pci_dev, TRIDENT_DMA_MASK)) {
+	if (pci_dev->device == PCI_DEVICE_ID_ALI_5451) {
+		mask = 0xffffffff;
+		bits = 32;
+	} else {
+		mask = TRIDENT_DMA_MASK;
+		bits = 30;
+	}
+	if (pci_set_dma_mask(pci_dev, mask)) {
 		printk(KERN_ERR "trident: architecture does not support"
-		       " 30bit PCI busmaster DMA\n");
+		       " %dbit PCI busmaster DMA\n", bits);
 		return -ENODEV;
 	}
 	pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &revision);

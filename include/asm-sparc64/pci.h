@@ -3,6 +3,9 @@
 
 #ifdef __KERNEL__
 
+#include <linux/fs.h>
+#include <linux/mm.h>
+
 /* Can be used to override the logic in pci_scan_bus for skipping
  * already-configured bus numbers - to be used for buggy BIOSes
  * or architectures with incomplete PCI setup by the loader.
@@ -109,6 +112,20 @@ extern void pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int n
  * you would pass 0x00ffffff as the mask to this function.
  */
 extern int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask);
+
+/* Return the index of the PCI controller for device PDEV. */
+
+extern int pci_controller_num(struct pci_dev *pdev);
+
+/* Platform support for /proc/bus/pci/X/Y mmap()s. */
+
+#define HAVE_PCI_MMAP
+#define HAVE_ARCH_PCI_GET_UNMAPPED_AREA
+#define get_pci_unmapped_area get_fb_unmapped_area
+
+extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+			       enum pci_mmap_state mmap_state,
+			       int write_combine);
 
 #endif /* __KERNEL__ */
 

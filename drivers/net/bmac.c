@@ -76,9 +76,6 @@ struct bmac_data {
 	struct net_device_stats stats;
 	struct timer_list tx_timeout;
 	int timeout_active;
-	int reset_and_enabled;
-	int rx_allocated;
-	int tx_allocated;
 	unsigned short hash_use_count[64];
 	unsigned short hash_table_mask[4];
 	struct net_device *next_bmac;
@@ -126,6 +123,7 @@ static bmac_reg_entry_t reg_entries[N_REG_ENTRIES] = {
 };
 
 static struct net_device *bmac_devs;
+static unsigned char *bmac_emergency_rxbuf;
 
 #ifdef CONFIG_PMAC_PBOOK
 static int bmac_sleep_notify(struct pmu_sleep_notifier *self, int when);
@@ -151,9 +149,9 @@ static int bmac_close(struct net_device *dev);
 static int bmac_transmit_packet(struct sk_buff *skb, struct net_device *dev);
 static struct net_device_stats *bmac_stats(struct net_device *dev);
 static void bmac_set_multicast(struct net_device *dev);
-static int bmac_reset_and_enable(struct net_device *dev, int enable);
+static void bmac_reset_and_enable(struct net_device *dev);
 static void bmac_start_chip(struct net_device *dev);
-static int bmac_init_chip(struct net_device *dev);
+static void bmac_init_chip(struct net_device *dev);
 static void bmac_init_registers(struct net_device *dev);
 static void bmac_reset_chip(struct net_device *dev);
 static int bmac_set_address(struct net_device *dev, void *addr);
@@ -182,17 +180,6 @@ dbdma_ld32(volatile unsigned long *a)
 	unsigned long swap;
 	__asm__ volatile ("lwbrx %0,0,%1" :  "=r" (swap) : "r" (a));
 	return swap;
-}
-
-static void
-dbdma_stop(volatile struct dbdma_regs *dmap)
-{
-	dbdma_st32((volatile unsigned long *)&dmap->control,
-		   DBDMA_CLEAR(RUN) | DBDMA_SET(FLUSH));
-	eieio();
-
-	while (dbdma_ld32((volatile unsigned long *)&dmap->status) & (ACTIVE|FLUSH))
-		eieio();
 }
 
 static void
@@ -467,12 +454,11 @@ bmac_init_phy(struct net_device *dev)
 	}
 }
 
-static int
+static void
 bmac_init_chip(struct net_device *dev)
 {
 	bmac_init_phy(dev);
 	bmac_init_registers(dev);
-	return 1;
 }
 
 #ifdef CONFIG_PMAC_PBOOK
@@ -503,7 +489,7 @@ bmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 		break;
 	case PBOOK_WAKE:
 		/* see if this is enough */
-		bmac_reset_and_enable(bmac_devs, 1);
+		bmac_reset_and_enable(bmac_devs);
 		enable_irq(bmac_devs->irq);
 		enable_irq(bp->tx_dma_intr);
 		enable_irq(bp->rx_dma_intr);
@@ -569,9 +555,12 @@ bmac_construct_xmt(struct sk_buff *skb, volatile struct dbdma_cmd *cp)
 }
 
 static void
-bmac_construct_rxbuff(unsigned char *addr, volatile struct dbdma_cmd *cp)
+bmac_construct_rxbuff(struct sk_buff *skb, volatile struct dbdma_cmd *cp)
 {
-	dbdma_setcmd(cp, (INPUT_LAST | INTR_ALWAYS), RX_BUFLEN, virt_to_bus(addr), 0);
+	unsigned char *addr = skb? skb->data: bmac_emergency_rxbuf;
+
+	dbdma_setcmd(cp, (INPUT_LAST | INTR_ALWAYS), RX_BUFLEN,
+		     virt_to_bus(addr), 0);
 }
 
 /* Bit-reverse one byte of an ethernet hardware address. */
@@ -586,7 +575,7 @@ bitrev(unsigned char b)
 }
 
 
-static int
+static void
 bmac_init_tx_ring(struct bmac_data *bp)
 {
 	volatile struct dbdma_regs *td = bp->tx_dma;
@@ -605,9 +594,6 @@ bmac_init_tx_ring(struct bmac_data *bp)
 	dbdma_reset(td);
 	out_le32(&td->wait_sel, 0x00200020);
 	out_le32(&td->cmdptr, virt_to_bus(bp->tx_cmds));
-
-	return 1;
-
 }
 
 static int
@@ -615,21 +601,19 @@ bmac_init_rx_ring(struct bmac_data *bp)
 {
 	volatile struct dbdma_regs *rd = bp->rx_dma;
 	int i;
+	struct sk_buff *skb;
 
 	/* initialize list of sk_buffs for receiving and set up recv dma */
-	if (!bp->rx_allocated) {
-		for (i = 0; i < N_RX_RING; i++) {
-			bp->rx_bufs[i] = dev_alloc_skb(RX_BUFLEN+2);
-			if (bp->rx_bufs[i] == NULL)
-				return 0;
-			skb_reserve(bp->rx_bufs[i], 2);
+	memset((char *)bp->rx_cmds, 0,
+	       (N_RX_RING + 1) * sizeof(struct dbdma_cmd));
+	for (i = 0; i < N_RX_RING; i++) {
+		if ((skb = bp->rx_bufs[i]) == NULL) {
+			bp->rx_bufs[i] = skb = dev_alloc_skb(RX_BUFLEN+2);
+			if (skb != NULL)
+				skb_reserve(skb, 2);
 		}
-		bp->rx_allocated = 1;
+		bmac_construct_rxbuff(skb, &bp->rx_cmds[i]);
 	}
-
-	memset((char *)bp->rx_cmds, 0, (N_RX_RING+1) * sizeof(struct dbdma_cmd));
-	for (i = 0; i < N_RX_RING; i++)
-		bmac_construct_rxbuff(bp->rx_bufs[i]->data, &bp->rx_cmds[i]);
 
 	bp->rx_empty = 0;
 	bp->rx_fill = i;
@@ -706,27 +690,36 @@ static void bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 		cp = &bp->rx_cmds[i];
 		stat = ld_le16(&cp->xfer_status);
 		residual = ld_le16(&cp->res_count);
-		if ((stat & ACTIVE) == 0) break;
+		if ((stat & ACTIVE) == 0)
+			break;
 		nb = RX_BUFLEN - residual - 2;
 		if (nb < (ETHERMINPACKET - ETHERCRC)) {
 			skb = NULL;
 			bp->stats.rx_length_errors++;
 			bp->stats.rx_errors++;
-		} else skb =  bp->rx_bufs[i];
+		} else {
+			skb = bp->rx_bufs[i];
+			bp->rx_bufs[i] = NULL;
+		}
 		if (skb != NULL) {
 			nb -= ETHERCRC;
 			skb_put(skb, nb);
 			skb->dev = dev;
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);
-			bp->rx_bufs[i] = dev_alloc_skb(RX_BUFLEN+2);
-			skb_reserve(bp->rx_bufs[i], 2);
-			bmac_construct_rxbuff(bp->rx_bufs[i]->data, &bp->rx_cmds[i]);
+			dev->last_rx = jiffies;
 			++bp->stats.rx_packets;
 			bp->stats.rx_bytes += nb;
 		} else {
 			++bp->stats.rx_dropped;
 		}
+		dev->last_rx = jiffies;
+		if ((skb = bp->rx_bufs[i]) == NULL) {
+			bp->rx_bufs[i] = skb = dev_alloc_skb(RX_BUFLEN+2);
+			if (skb != NULL)
+				skb_reserve(bp->rx_bufs[i], 2);
+		}
+		bmac_construct_rxbuff(skb, &bp->rx_cmds[i]);
 		st_le16(&cp->res_count, 0);
 		st_le16(&cp->xfer_status, 0);
 		last = i;
@@ -772,7 +765,13 @@ static void bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 		if (txintcount < 10) {
 			XXDEBUG(("bmac_txdma_xfer_stat=%#0x\n", stat));
 		}
-		if (!(stat & ACTIVE)) break;
+		if (!(stat & ACTIVE)) {
+			/*
+			 * status field might not have been filled by DBDMA
+			 */
+			if (cp == bus_to_virt(in_le32(&bp->tx_dma->cmdptr)))
+				break;
+		}
 
 		if (bp->tx_bufs[bp->tx_empty]) {
 			++bp->stats.tx_packets;
@@ -1215,7 +1214,7 @@ bmac_get_station_address(struct net_device *dev, unsigned char *ea)
 		}
 }
 
-static int bmac_reset_and_enable(struct net_device *dev, int enable)
+static void bmac_reset_and_enable(struct net_device *dev)
 {
 	struct bmac_data *bp = dev->priv;
 	unsigned long flags;
@@ -1223,22 +1222,19 @@ static int bmac_reset_and_enable(struct net_device *dev, int enable)
 	unsigned char *data;
 
 	save_flags(flags); cli();
-	bp->reset_and_enabled = 0;
 	bmac_reset_chip(dev);
-	if (enable) {
-		if (!bmac_init_tx_ring(bp) || !bmac_init_rx_ring(bp))
-			return 0;
-		if (!bmac_init_chip(dev))
-			return 0;
-		bmac_start_chip(dev);
-		bmwrite(dev, INTDISABLE, EnableNormal);
-		bp->reset_and_enabled = 1;
+	bmac_init_tx_ring(bp);
+	bmac_init_rx_ring(bp);
+	bmac_init_chip(dev);
+	bmac_start_chip(dev);
+	bmwrite(dev, INTDISABLE, EnableNormal);
 
-		/*
-		 * It seems that the bmac can't receive until it's transmitted
-		 * a packet.  So we give it a dummy packet to transmit.
-		 */
-		skb = dev_alloc_skb(ETHERMINPACKET);
+	/*
+	 * It seems that the bmac can't receive until it's transmitted
+	 * a packet.  So we give it a dummy packet to transmit.
+	 */
+	skb = dev_alloc_skb(ETHERMINPACKET);
+	if (skb != NULL) {
 		data = skb_put(skb, ETHERMINPACKET);
 		memset(data, 0, ETHERMINPACKET);
 		memcpy(data, dev->dev_addr, 6);
@@ -1246,12 +1242,13 @@ static int bmac_reset_and_enable(struct net_device *dev, int enable)
 		bmac_transmit_packet(skb, dev);
 	}
 	restore_flags(flags);
-	return 1;
 }
 
 static int __init bmac_probe(void)
 {
 	struct device_node *bmac;
+
+	MOD_INC_USE_COUNT;
 
 	for (bmac = find_devices("bmac"); bmac != 0; bmac = bmac->next)
 		bmac_probe1(bmac, 0);
@@ -1265,7 +1262,10 @@ static int __init bmac_probe(void)
 		pmu_register_sleep_notifier(&bmac_sleep_notifier);
 #endif
 	}
-	return 0;
+
+	MOD_DEC_USE_COUNT;
+
+	return bmac_devs? 0: -ENODEV;
 }
 
 static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
@@ -1286,6 +1286,14 @@ static void __init bmac_probe1(struct device_node *bmac, int is_bmac_plus)
 		if (addr == NULL) {
 			printk(KERN_ERR "Can't get mac-address for BMAC %s\n",
 			       bmac->full_name);
+			return;
+		}
+	}
+
+	if (bmac_emergency_rxbuf == NULL) {
+		bmac_emergency_rxbuf = kmalloc(RX_BUFLEN, GFP_KERNEL);
+		if (bmac_emergency_rxbuf == NULL) {
+			printk(KERN_ERR "BMAC: can't allocate emergency RX buffer\n");
 			return;
 		}
 	}
@@ -1390,9 +1398,7 @@ static int bmac_open(struct net_device *dev)
 {
 	/* XXDEBUG(("bmac: enter open\n")); */
 	/* reset the chip */
-	if (!bmac_reset_and_enable(dev, 1))
-		return -ENOMEM;
-
+	bmac_reset_and_enable(dev);
 	dev->flags |= IFF_RUNNING;
 	return 0;
 }
@@ -1428,7 +1434,6 @@ static int bmac_close(struct net_device *dev)
 			bp->rx_bufs[i] = NULL;
 		}
 	}
-	bp->rx_allocated = 0;
 	XXDEBUG(("bmac: free tx bufs\n"));
 	for (i = 0; i<N_TX_RING; i++) {
 		if (bp->tx_bufs[i] != NULL) {
@@ -1436,7 +1441,6 @@ static int bmac_close(struct net_device *dev)
 			bp->tx_bufs[i] = NULL;
 		}
 	}
-	bp->reset_and_enabled = 0;
 	XXDEBUG(("bmac: all bufs freed\n"));
 
 	return 0;
@@ -1607,6 +1611,11 @@ static void __exit bmac_cleanup (void)
 {
 	struct bmac_data *bp;
 	struct net_device *dev;
+
+	if (bmac_emergency_rxbuf != NULL) {
+		kfree(bmac_emergency_rxbuf);
+		bmac_emergency_rxbuf = NULL;
+	}
 
 	if (bmac_devs == 0)
 		return;

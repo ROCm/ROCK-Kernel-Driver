@@ -284,6 +284,34 @@ repeat:
 	spin_unlock(&pagecache_lock);
 }
 
+/*
+ * This function is pretty much like __find_page_nolock(), but it only
+ * requires 2 arguments and doesn't mark the page as touched, making it
+ * ideal for ->writepage() clustering and other places where you don't
+ * want to mark the page referenced.
+ *
+ * The caller needs to hold the pagecache_lock.
+ */
+static struct page * FASTCALL(__find_page_simple(struct address_space *, unsigned long));
+static struct page * __find_page_simple(struct address_space *mapping, unsigned long index)
+{
+	struct page **next = page_hash(mapping, index);;
+
+	for (;;) {
+		struct page *page = *next;
+		if (!page)
+			break;
+		next = &page->next_hash;
+		if (page->mapping != mapping)
+			continue;
+		if (page->index != index)
+			continue;
+		return page;
+	}
+
+	return NULL;
+}
+
 static inline struct page * __find_page_nolock(struct address_space *mapping, unsigned long offset, struct page *page)
 {
 	goto inside;
@@ -298,14 +326,9 @@ inside:
 		if (page->index == offset)
 			break;
 	}
-	/*
-	 * Touching the page may move it to the active list.
-	 * If we end up with too few inactive pages, we wake
-	 * up kswapd.
-	 */
-	age_page_up(page);
-	if (inactive_shortage() > inactive_target / 2 && free_shortage())
-			wakeup_kswapd();
+	/* Mark the page referenced, kswapd will find it later. */
+	SetPageReferenced(page);
+
 not_found:
 	return page;
 }
@@ -331,7 +354,7 @@ static int writeout_one_page(struct page *page)
 	return 0;
 }
 
-static int waitfor_one_page(struct page *page)
+int waitfor_one_page(struct page *page)
 {
 	int error = 0;
 	struct buffer_head *bh, *head = page->buffers;
@@ -762,7 +785,6 @@ static void drop_behind(struct file * file, unsigned long index)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	struct address_space *mapping = inode->i_mapping;
-	struct page **hash;
 	struct page *page;
 	unsigned long start;
 
@@ -783,8 +805,7 @@ static void drop_behind(struct file * file, unsigned long index)
 	 */
 	spin_lock(&pagecache_lock);
 	while (--index >= start) {
-		hash = page_hash(mapping, index);
-		page = __find_page_nolock(mapping, index, *hash);
+		page = __find_page_simple(mapping, index);
 		if (!page)
 			break;
 		deactivate_page(page);

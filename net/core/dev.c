@@ -400,7 +400,7 @@ struct net_device *__dev_get_by_name(const char *name)
 	struct net_device *dev;
 
 	for (dev = dev_base; dev != NULL; dev = dev->next) {
-		if (strcmp(dev->name, name) == 0)
+		if (strncmp(dev->name, name, IFNAMSIZ) == 0)
 			return dev;
 	}
 	return NULL;

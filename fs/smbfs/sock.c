@@ -150,14 +150,14 @@ smb_data_callback(void* ptr)
 	DEBUG1("found=%d, count=%d, result=%d\n", found, count, result);
 	if (found)
 		found_data(job->sk);
-	kfree(ptr);
+	smb_kfree(ptr);
 }
 
 static void
 smb_data_ready(struct sock *sk, int len)
 {
 	struct data_callback* job;
-	job = kmalloc(sizeof(struct data_callback),GFP_ATOMIC);
+	job = smb_kmalloc(sizeof(struct data_callback),GFP_ATOMIC);
 	if(job == 0) {
 		printk("smb_data_ready: lost SESSION KEEPALIVE due to OOM.\n");
 		found_data(sk);

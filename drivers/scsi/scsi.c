@@ -1572,6 +1572,11 @@ static int proc_scsi_gen_write(struct file * file, const char * buf,
 	copy_from_user(buffer, buf, length);
 
 	err = -EINVAL;
+	if (length < PAGE_SIZE)
+		buffer[length] ='\0';
+	else if (buffer[length])
+		goto out;
+
 	if (length < 11 || strncmp("scsi", buffer, 4))
 		goto out;
 

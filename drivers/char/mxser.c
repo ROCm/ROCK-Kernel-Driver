@@ -887,29 +887,56 @@ static int mxser_write(struct tty_struct *tty, int from_user,
 	if (from_user)
 		down(&mxvar_tmp_buf_sem);
 	save_flags(flags);
-	while (1) {
-		cli();
-		c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				   SERIAL_XMIT_SIZE - info->xmit_head));
-		if (c <= 0)
-			break;
+	if (from_user) {
+		down(&mxvar_tmp_buf_sem);
+		while (1) {
+			c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+					   SERIAL_XMIT_SIZE - info->xmit_head));
+			if (c <= 0)
+				break;
 
-		if (from_user) {
-			copy_from_user(mxvar_tmp_buf, buf, c);
+			c -= copy_from_user(mxvar_tmp_buf, buf, c);
+			if (!c) {
+				if (!total)
+					total = -EFAULT;
+				break;
+			}
+
+			cli();
 			c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				    SERIAL_XMIT_SIZE - info->xmit_head));
+				       SERIAL_XMIT_SIZE - info->xmit_head));
 			memcpy(info->xmit_buf + info->xmit_head, mxvar_tmp_buf, c);
-		} else
-			memcpy(info->xmit_buf + info->xmit_head, buf, c);
-		info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
-		info->xmit_cnt += c;
-		restore_flags(flags);
-		buf += c;
-		count -= c;
-		total += c;
-	}
-	if (from_user)
+			info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
+			info->xmit_cnt += c;
+			restore_flags(flags);
+
+			buf += c;
+			count -= c;
+			total += c;
+		}
 		up(&mxvar_tmp_buf_sem);
+	} else {
+		while (1) {
+			cli();
+			c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+					   SERIAL_XMIT_SIZE - info->xmit_head));
+			if (c <= 0) {
+				restore_flags(flags);
+				break;
+			}
+
+			memcpy(info->xmit_buf + info->xmit_head, buf, c);
+			info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
+			info->xmit_cnt += c;
+			restore_flags(flags);
+
+			buf += c;
+			count -= c;
+			total += c;
+		}
+	}
+
+	cli();
 	if (info->xmit_cnt && !tty->stopped && !tty->hw_stopped &&
 	    !(info->IER & UART_IER_THRI)) {
 		info->IER |= UART_IER_THRI;

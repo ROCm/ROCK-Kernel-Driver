@@ -22,7 +22,6 @@ struct machdep_calls {
 	unsigned int	(*irq_cannonicalize)(unsigned int irq);
 	void		(*init_IRQ)(void);
 	int		(*get_irq)(struct pt_regs *);
-	void		(*post_irq)( struct pt_regs *, int );
 	
 	/* A general init function, called by ppc_init in init/main.c.
 	   May be NULL. */
@@ -41,6 +40,7 @@ struct machdep_calls {
 	unsigned long	heartbeat_reset;
 	unsigned long	heartbeat_count;
 
+	unsigned long	(*find_end_of_memory)(void);
   	void		(*progress)(char *, unsigned short);
 
 	unsigned char 	(*nvram_read_val)(int addr);
@@ -79,6 +79,11 @@ struct machdep_calls {
 		 * Returns 0 to allow assignement/enabling of the device
 		 */
 	int  (*pcibios_enable_device_hook)(struct pci_dev *, int initial);
+
+		/* Called at then very end of pcibios_init()
+		 */
+	void (*pcibios_after_init)(void);
+		 
 
 	/* this is for modules, since _machine can be a define -- Cort */
 	int ppc_machine;

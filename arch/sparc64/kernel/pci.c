@@ -1,4 +1,4 @@
-/* $Id: pci.c,v 1.25 2001/05/02 00:27:27 davem Exp $
+/* $Id: pci.c,v 1.29 2001/05/15 08:54:30 davem Exp $
  * pci.c: UltraSparc PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -19,6 +19,7 @@
 #include <asm/pbm.h>
 #include <asm/irq.h>
 #include <asm/ebus.h>
+#include <asm/isa.h>
 
 unsigned long pci_memspace_mask = 0xffffffffUL;
 
@@ -187,6 +188,7 @@ void __init pcibios_init(void)
 	if (pci_device_reorder)
 		pci_reorder_devs();
 
+	isa_init();
 	ebus_init();
 }
 
@@ -232,6 +234,149 @@ char * __init pcibios_setup(char *str)
 		return NULL;
 	}
 	return str;
+}
+
+/* Platform support for /proc/bus/pci/X/Y mmap()s. */
+
+/* Adjust vm_pgoff of VMA such that it is the physical page offset corresponding
+ * to the 32-bit pci bus offset for DEV requested by the user.
+ *
+ * Basically, the user finds the base address for his device which he wishes
+ * to mmap.  They read the 32-bit value from the config space base register,
+ * add whatever PAGE_SIZE multiple offset they wish, and feed this into the
+ * offset parameter of mmap on /proc/bus/pci/XXX for that device.
+ *
+ * Returns negative error code on failure, zero on success.
+ */
+static __inline__ int __pci_mmap_make_offset(struct pci_dev *dev, struct vm_area_struct *vma,
+					     enum pci_mmap_state mmap_state)
+{
+	unsigned long user_offset = vma->vm_pgoff << PAGE_SHIFT;
+	unsigned long user32 = user_offset & 0xffffffffUL;
+	unsigned long largest_base, this_base, addr32;
+	int i;
+
+	/* Figure out which base address this is for. */
+	largest_base = 0UL;
+	for (i = 0; i <= PCI_ROM_RESOURCE; i++) {
+		struct resource *rp = &dev->resource[i];
+
+		/* Active? */
+		if (!rp->flags)
+			continue;
+
+		/* Same type? */
+		if (i == PCI_ROM_RESOURCE) {
+			if (mmap_state != pci_mmap_mem)
+				continue;
+		} else {
+			if ((mmap_state == pci_mmap_io &&
+			     (rp->flags & IORESOURCE_IO) == 0) ||
+			    (mmap_state == pci_mmap_mem &&
+			     (rp->flags & IORESOURCE_MEM) == 0))
+				continue;
+		}
+
+		this_base = rp->start;
+
+		addr32 = (this_base & PAGE_MASK) & 0xffffffffUL;
+
+		if (mmap_state == pci_mmap_io)
+			addr32 &= 0xffffff;
+
+		if (addr32 <= user32 && this_base > largest_base)
+			largest_base = this_base;
+	}
+
+	if (largest_base == 0UL)
+		return -EINVAL;
+
+	/* Now construct the final physical address. */
+	if (mmap_state == pci_mmap_io)
+		vma->vm_pgoff = (((largest_base & ~0xffffffUL) | user32) >> PAGE_SHIFT);
+	else
+		vma->vm_pgoff = (((largest_base & ~0xffffffffUL) | user32) >> PAGE_SHIFT);
+
+	return 0;
+}
+
+/* Set vm_flags of VMA, as appropriate for this architecture, for a pci device
+ * mapping.
+ */
+static __inline__ void __pci_mmap_set_flags(struct pci_dev *dev, struct vm_area_struct *vma,
+					    enum pci_mmap_state mmap_state)
+{
+	vma->vm_flags |= (VM_SHM | VM_LOCKED);
+}
+
+/* Set vm_page_prot of VMA, as appropriate for this architecture, for a pci
+ * device mapping.
+ */
+static __inline__ void __pci_mmap_set_pgprot(struct pci_dev *dev, struct vm_area_struct *vma,
+					     enum pci_mmap_state mmap_state)
+{
+	/* Our io_remap_page_range takes care of this, do nothing. */
+}
+
+extern int io_remap_page_range(unsigned long from, unsigned long offset,
+			       unsigned long size, pgprot_t prot, int space);
+
+/* Perform the actual remap of the pages for a PCI device mapping, as appropriate
+ * for this architecture.  The region in the process to map is described by vm_start
+ * and vm_end members of VMA, the base physical address is found in vm_pgoff.
+ * The pci device structure is provided so that architectures may make mapping
+ * decisions on a per-device or per-bus basis.
+ *
+ * Returns a negative error code on failure, zero on success.
+ */
+int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+			enum pci_mmap_state mmap_state,
+			int write_combine)
+{
+	int ret;
+
+	ret = __pci_mmap_make_offset(dev, vma, mmap_state);
+	if (ret < 0)
+		return ret;
+
+	__pci_mmap_set_flags(dev, vma, mmap_state);
+	__pci_mmap_set_pgprot(dev, vma, mmap_state);
+
+	ret = io_remap_page_range(vma->vm_start,
+				  (vma->vm_pgoff << PAGE_SHIFT |
+				   (write_combine ? 0x1UL : 0x0UL)),
+				  vma->vm_end - vma->vm_start, vma->vm_page_prot, 0);
+	if (ret)
+		return ret;
+
+	vma->vm_flags |= VM_IO;
+	return 0;
+}
+
+/* Return the index of the PCI controller for device PDEV. */
+
+int pci_controller_num(struct pci_dev *pdev)
+{
+	struct pcidev_cookie *cookie = pdev->sysdata;
+	int ret;
+
+	if (cookie != NULL) {
+		struct pci_pbm_info *pbm = cookie->pbm;
+		if (pbm == NULL || pbm->parent == NULL) {
+			ret = -ENXIO;
+		} else {
+			struct pci_controller_info *p = pbm->parent;
+
+			ret = p->index;
+			if (p->pbms_same_domain == 0)
+				ret = ((ret << 1) +
+				       ((pbm == &pbm->parent->pbm_B) ? 1 : 0));
+		}
+	} else {
+		ret = -ENXIO;
+	}
+
+	return ret;
 }
 
 #endif /* !(CONFIG_PCI) */

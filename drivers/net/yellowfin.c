@@ -29,6 +29,11 @@
 	LK1.1.2 (jgarzik):
 	* Merge in becker version 1.05
 
+	LK1.1.3 (jgarzik):
+	* Various cleanups
+	* Update yellowfin_timer to correctly calculate duplex.
+	(suggested by Manfred Spraul)
+	
 */
 
 /* The user-configurable values.
@@ -99,6 +104,7 @@ static int gx_fix;
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/mii.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -111,7 +117,7 @@ static int gx_fix;
 static char version[] __devinitdata =
 KERN_INFO "yellowfin.c:v1.05  1/09/2001  Written by Donald Becker <becker@scyld.com>\n"
 KERN_INFO "  http://www.scyld.com/network/yellowfin.html\n"
-KERN_INFO "  (unofficial 2.4.x port, LK1.1.2, January 11, 2001)\n";
+KERN_INFO "  (unofficial 2.4.x port, LK1.1.3, May 10, 2001)\n";
 
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
@@ -652,22 +658,19 @@ static void yellowfin_timer(unsigned long data)
 	}
 
 	if (yp->mii_cnt) {
-		int mii_reg1 = mdio_read(ioaddr, yp->phys[0], 1);
-		int mii_reg5 = mdio_read(ioaddr, yp->phys[0], 5);
-		int negotiated = mii_reg5 & yp->advertising;
+		int bmsr = mdio_read(ioaddr, yp->phys[0], MII_BMSR);
+		int lpa = mdio_read(ioaddr, yp->phys[0], MII_LPA);
+		int negotiated = lpa & yp->advertising;
 		if (yellowfin_debug > 1)
 			printk(KERN_DEBUG "%s: MII #%d status register is %4.4x, "
 				   "link partner capability %4.4x.\n",
-				   dev->name, yp->phys[0], mii_reg1, mii_reg5);
+				   dev->name, yp->phys[0], bmsr, lpa);
 
-		if ( ! yp->duplex_lock &&
-			 ((negotiated & 0x0300) == 0x0100
-			  || (negotiated & 0x00C0) == 0x0040)) {
-			yp->full_duplex = 1;
-		}
+		yp->full_duplex = mii_duplex(yp->duplex_lock, negotiated);
+			
 		outw(0x101C | (yp->full_duplex ? 2 : 0), ioaddr + Cnfg);
 
-		if (mii_reg1 & 0x0004)
+		if (bmsr & BMSR_LSTATUS)
 			next_tick = 60*HZ;
 		else
 			next_tick = 3*HZ;

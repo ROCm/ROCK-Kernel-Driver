@@ -25,7 +25,7 @@
 #define HSM               6UL
 #define MAX_PERSONALITY   7UL
 
-extern inline int pers_to_level (int pers)
+static inline int pers_to_level (int pers)
 {
 	switch (pers) {
 		case HSM:		return -3;
@@ -72,7 +72,7 @@ typedef struct dev_mapping_s {
 
 extern dev_mapping_t mddev_map [MAX_MD_DEVS];
 
-extern inline mddev_t * kdev_to_mddev (kdev_t dev)
+static inline mddev_t * kdev_to_mddev (kdev_t dev)
 {
 	if (MAJOR(dev) != MD_MAJOR)
 		BUG();
@@ -90,62 +90,62 @@ extern inline mddev_t * kdev_to_mddev (kdev_t dev)
  */
 #define MD_READAHEAD	MAX_READAHEAD
 
-extern inline int disk_faulty(mdp_disk_t * d)
+static inline int disk_faulty(mdp_disk_t * d)
 {
 	return d->state & (1 << MD_DISK_FAULTY);
 }
 
-extern inline int disk_active(mdp_disk_t * d)
+static inline int disk_active(mdp_disk_t * d)
 {
 	return d->state & (1 << MD_DISK_ACTIVE);
 }
 
-extern inline int disk_sync(mdp_disk_t * d)
+static inline int disk_sync(mdp_disk_t * d)
 {
 	return d->state & (1 << MD_DISK_SYNC);
 }
 
-extern inline int disk_spare(mdp_disk_t * d)
+static inline int disk_spare(mdp_disk_t * d)
 {
 	return !disk_sync(d) && !disk_active(d) && !disk_faulty(d);
 }
 
-extern inline int disk_removed(mdp_disk_t * d)
+static inline int disk_removed(mdp_disk_t * d)
 {
 	return d->state & (1 << MD_DISK_REMOVED);
 }
 
-extern inline void mark_disk_faulty(mdp_disk_t * d)
+static inline void mark_disk_faulty(mdp_disk_t * d)
 {
 	d->state |= (1 << MD_DISK_FAULTY);
 }
 
-extern inline void mark_disk_active(mdp_disk_t * d)
+static inline void mark_disk_active(mdp_disk_t * d)
 {
 	d->state |= (1 << MD_DISK_ACTIVE);
 }
 
-extern inline void mark_disk_sync(mdp_disk_t * d)
+static inline void mark_disk_sync(mdp_disk_t * d)
 {
 	d->state |= (1 << MD_DISK_SYNC);
 }
 
-extern inline void mark_disk_spare(mdp_disk_t * d)
+static inline void mark_disk_spare(mdp_disk_t * d)
 {
 	d->state = 0;
 }
 
-extern inline void mark_disk_removed(mdp_disk_t * d)
+static inline void mark_disk_removed(mdp_disk_t * d)
 {
 	d->state = (1 << MD_DISK_FAULTY) | (1 << MD_DISK_REMOVED);
 }
 
-extern inline void mark_disk_inactive(mdp_disk_t * d)
+static inline void mark_disk_inactive(mdp_disk_t * d)
 {
 	d->state &= ~(1 << MD_DISK_ACTIVE);
 }
 
-extern inline void mark_disk_nonsync(mdp_disk_t * d)
+static inline void mark_disk_nonsync(mdp_disk_t * d)
 {
 	d->state &= ~(1 << MD_DISK_SYNC);
 }
@@ -245,12 +245,12 @@ struct mdk_personality_s
  * number. This will have to change to dynamic allocation
  * once we start supporting partitioning of md devices.
  */
-extern inline int mdidx (mddev_t * mddev)
+static inline int mdidx (mddev_t * mddev)
 {
 	return mddev->__minor;
 }
 
-extern inline kdev_t mddev_to_kdev(mddev_t * mddev)
+static inline kdev_t mddev_to_kdev(mddev_t * mddev)
 {
 	return MKDEV(MD_MAJOR, mdidx(mddev));
 }
@@ -304,12 +304,12 @@ extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
 			tmp = tmp->next, tmp->prev != &all_mddevs	\
 		; )
 
-extern inline int lock_mddev (mddev_t * mddev)
+static inline int lock_mddev (mddev_t * mddev)
 {
 	return down_interruptible(&mddev->reconfig_sem);
 }
 
-extern inline void unlock_mddev (mddev_t * mddev)
+static inline void unlock_mddev (mddev_t * mddev)
 {
 	up(&mddev->reconfig_sem);
 }

@@ -382,6 +382,7 @@ CONFIG_NET_PCI=y
 CONFIG_EEPRO100=y
 # CONFIG_EEPRO100_PM is not set
 # CONFIG_LNE390 is not set
+# CONFIG_FEALNX is not set
 # CONFIG_NATSEMI is not set
 # CONFIG_NE2K_PCI is not set
 # CONFIG_NE3210 is not set

@@ -146,6 +146,17 @@ pci_dma_sync_sg(struct pci_dev *dev, struct scatterlist *sg, int nents,
 
 extern int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask);
 
+/* Return the index of the PCI controller for device PDEV. */
+static __inline__ int pci_controller_num(struct pci_dev *pdev)
+{
+	struct pci_controller *hose = pdev->sysdata;
+
+	if (hose != NULL)
+		return hose->index;
+
+	return -ENXIO;
+}
+
 #endif /* __KERNEL__ */
 
 /* Values for the `which' argument to sys_pciconfig_iobase.  */

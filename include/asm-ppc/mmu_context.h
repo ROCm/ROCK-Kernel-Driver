@@ -18,6 +18,12 @@
    of any task that makes a kernel entry.  Shared does not mean they
    are not protected, just that the ASID comparison is not performed.
         -- Dan
+
+   The IBM4xx has 256 contexts, so we can just rotate through these
+   as a way of "switching" contexts.  If the TID of the TLB is zero,
+   the PID/TID comparison is disabled, so we can use a TID of zero
+   to represent all kernel pages as shared among all contexts.
+   	-- Dan
  */
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
@@ -26,12 +32,22 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk,
 #ifdef CONFIG_8xx
 #define NO_CONTEXT      	16
 #define LAST_CONTEXT    	15
+#define BASE_CONTEXT		(-1)
 #define MUNGE_CONTEXT(n)        (n)
+#define flush_hash_segments(X, Y)	do { } while (0)
+
+#elif CONFIG_4xx
+#define NO_CONTEXT      	256
+#define LAST_CONTEXT    	255
+#define BASE_CONTEXT		(0)
+#define MUNGE_CONTEXT(n)        (n)
+#define flush_hash_segments(X, Y)	do { } while (0)
 
 #else
 
 /* PPC 6xx, 7xx CPUs */
 #define NO_CONTEXT      	0
+#define BASE_CONTEXT		(0)
 #define LAST_CONTEXT    	0xfffff
 
 /*

@@ -10,6 +10,7 @@
 #include <asm/smp.h>
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
+#include <asm/time.h>
 
 #include "pmac_pic.h"
 #include "open_pic.h"
@@ -44,10 +45,12 @@ static struct interrupt_info gatwick_int_pool[GATWICK_IRQ_POOL_SIZE];
  * since it can lose interrupts (see pmac_set_irq_mask).
  * -- Cort
  */
-void __pmac __no_use_set_lost(unsigned long irq_nr)
+void __pmac __set_lost(unsigned long irq_nr)
 {
-	if (!test_and_set_bit(irq_nr, ppc_lost_interrupts))
+	if (!test_and_set_bit(irq_nr, ppc_lost_interrupts)) {
 		atomic_inc(&ppc_n_lost_interrupts);
+		set_dec(1);
+	}
 }
 
 static void __pmac pmac_mask_and_ack_irq(unsigned int irq_nr)
@@ -373,7 +376,6 @@ pmac_pic_init(void)
 		irqctrler = NULL;
 	}
 
-	int_control.int_set_lost = __no_use_set_lost;
 	/*
 	 * G3 powermacs and 1999 G3 PowerBooks have 64 interrupts,
 	 * 1998 G3 Series PowerBooks have 128, 

@@ -1,6 +1,6 @@
 /*
  * This file contains sleep low-level functions for PowerBook G3.
- *    Copyright (C) 1999 Benjamin Herrenschmidt (bh40@calva.net)
+ *    Copyright (C) 1999 Benjamin Herrenschmidt (benh@kernel.crashing.org)
  *    and Paul Mackerras (paulus@cs.anu.edu.au).
  *
  * This program is free software; you can redistribute it and/or

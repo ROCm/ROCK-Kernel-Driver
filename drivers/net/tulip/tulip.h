@@ -27,17 +27,7 @@
 
 
 /* undefine, or define to various debugging levels (>4 == obscene levels) */
-#undef TULIP_DEBUG
-
-
-#ifdef TULIP_DEBUG
-/* note: prints function name for you */
-#define DPRINTK(fmt, args...) printk(KERN_DEBUG "%s: " fmt, __FUNCTION__ , ## args)
-#else
-#define DPRINTK(fmt, args...)
-#endif
-
-
+#define TULIP_DEBUG 1
 
 
 struct tulip_chip_table {
@@ -62,6 +52,7 @@ enum tbl_flag {
 	IS_ASIX			= 0x0200,
 	HAS_8023X		= 0x0400,
 	COMET_MAC_ADDR		= 0x0800,
+	HAS_PCI_MWI		= 0x1000,
 };
 
 
@@ -83,7 +74,6 @@ enum chips {
 	COMPEX9881,
 	I21145,
 	DM910X,
-	CONEXANT,
 };
 
 
@@ -145,12 +135,22 @@ enum status_bits {
 };
 
 
-enum tulip_rx_modes {
-	FullDuplex		= 0x0200,
+enum tulip_mode_bits {
+	TxThreshold		= (1 << 22),
+	FullDuplex		= (1 << 9),
 	AcceptBroadcast		= 0x0100,
 	AcceptAllMulticast	= 0x0080,
 	AcceptAllPhys		= 0x0040,
 	AcceptRunt		= 0x0008,
+};
+
+
+enum tulip_busconfig_bits {
+	MWI			= (1 << 24),
+	MRL			= (1 << 23),
+	MRM			= (1 << 21),
+	CALShift		= 14,
+	BurstLenShift		= 8,
 };
 
 
@@ -184,8 +184,8 @@ enum t21041_csr13_bits {
 	csr13_cac = (1<<2), /* CSR13/14/15 autoconfiguration */
 	csr13_srl = (1<<0), /* When reset, resets all SIA functions, machines */
 
-	csr13_mask_auibnc = (csr13_eng | csr13_aui | csr13_cac | csr13_srl),
-	csr13_mask_10bt = (csr13_eng | csr13_cac | csr13_srl),
+	csr13_mask_auibnc = (csr13_eng | csr13_aui | csr13_srl),
+	csr13_mask_10bt = (csr13_eng | csr13_srl),
 };
 
 enum t21143_csr6_bits {
@@ -254,6 +254,18 @@ enum t21143_csr6_bits {
 #define MEDIA_MASK     31
 
 #define PKT_BUF_SZ		1536	/* Size of each temporary Rx buffer. */
+
+#define TULIP_MIN_CACHE_LINE	8	/* in units of 32-bit words */
+
+#if defined(__sparc__) || defined(__hppa__)
+/* The UltraSparc PCI controllers will disconnect at every 64-byte
+ * crossing anyways so it makes no sense to tell Tulip to burst
+ * any more than that.
+ */
+#define TULIP_MAX_CACHE_LINE	16	/* in units of 32-bit words */
+#else
+#define TULIP_MAX_CACHE_LINE	32	/* in units of 32-bit words */
+#endif
 
 
 /* Ring-wrap flag in length field, use for last ring entry.
@@ -345,7 +357,7 @@ struct tulip_private {
 	unsigned int csr6;	/* Current CSR6 control settings. */
 	unsigned char eeprom[EEPROM_SIZE];	/* Serial EEPROM contents. */
 	void (*link_change) (struct net_device * dev, int csr5);
-	u16 to_advertise;	/* NWay capabilities advertised.  */
+	u16 sym_advertise, mii_advertise; /* NWay capabilities advertised.  */
 	u16 lpar;		/* 21143 Link partner ability. */
 	u16 advertising[4];
 	signed char phys[4], mii_cnt;	/* MII device addresses. */
@@ -375,6 +387,7 @@ extern u16 t21142_csr14[];
 void t21142_timer(unsigned long data);
 void t21142_start_nway(struct net_device *dev);
 void t21142_lnk_change(struct net_device *dev, int csr5);
+void pnic2_lnk_change(struct net_device *dev, int csr5);
 
 /* eeprom.c */
 void tulip_parse_eeprom(struct net_device *dev);
@@ -390,6 +403,7 @@ int tulip_mdio_read(struct net_device *dev, int phy_id, int location);
 void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int value);
 void tulip_select_media(struct net_device *dev, int startup);
 int tulip_check_duplex(struct net_device *dev);
+void tulip_find_mii (struct net_device *dev, int board_idx);
 
 /* pnic.c */
 void pnic_do_nway(struct net_device *dev);

@@ -48,8 +48,11 @@
 
 #ifdef DEBUG_SMB_MALLOC
 
+#include <linux/slab.h>
+
 extern int smb_malloced;
 extern int smb_current_vmalloced;
+extern int smb_current_kmalloced;
 
 static inline void *
 smb_vmalloc(unsigned int size)
@@ -66,19 +69,29 @@ smb_vfree(void *obj)
         vfree(obj);
 }
 
+static inline void *
+smb_kmalloc(size_t size, int flags)
+{
+	smb_malloced += 1;
+	smb_current_kmalloced += 1;
+	return kmalloc(size, flags);
+}
+
+static inline void
+smb_kfree(void *obj)
+{
+	smb_current_kmalloced -= 1;
+	kfree(obj);
+}
+
 #else /* DEBUG_SMB_MALLOC */
 
-#define smb_kmalloc(s,p) kmalloc(s,p)
-#define smb_kfree_s(o,s) kfree(o)
-#define smb_vmalloc(s)   vmalloc(s)
-#define smb_vfree(o)     vfree(o)
+#define smb_kmalloc(s,p)	kmalloc(s,p)
+#define smb_kfree(o)		kfree(o)
+#define smb_vmalloc(s)		vmalloc(s)
+#define smb_vfree(o)		vfree(o)
 
 #endif /* DEBUG_SMB_MALLOC */
-
-/*
- * Flags for the in-memory inode
- */
-#define SMB_F_LOCALWRITE	0x02	/* file modified locally */
 
 
 /* NT1 protocol capability bits */
@@ -139,7 +152,7 @@ struct smb_cache_control {
 static inline int
 smb_is_open(struct inode *i)
 {
-	return (i->u.smbfs_i.open == SMB_SERVER(i)->generation);
+	return (i->u.smbfs_i.open == server_from_inode(i)->generation);
 }
 
 
@@ -194,6 +207,7 @@ int smb_proc_settime(struct dentry *, struct smb_fattr *);
 int smb_proc_dskattr(struct super_block *, struct statfs *);
 int smb_proc_disconnect(struct smb_sb_info *);
 int smb_proc_trunc(struct smb_sb_info *, __u16, __u32);
+int smb_proc_flush(struct smb_sb_info *, __u16);
 void smb_init_root_dirent(struct smb_sb_info *, struct smb_fattr *);
 
 /* linux/fs/smbfs/sock.c */

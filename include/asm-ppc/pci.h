@@ -110,6 +110,9 @@ extern inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
 	return 1;
 }
 
+/* Return the index of the PCI controller for device PDEV. */
+#define pci_controller_num(PDEV)	(0)
+
 #define sg_dma_address(sg)	(virt_to_bus((sg)->address))
 #define sg_dma_len(sg)		((sg)->length)
 

@@ -14,7 +14,7 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  *
- *		$Id: snmp.h,v 1.17 2000/09/21 01:31:50 davem Exp $
+ *		$Id: snmp.h,v 1.18 2001/05/16 16:45:35 davem Exp $
  *
  */
  
@@ -199,6 +199,7 @@ struct linux_mib
 	unsigned long	OfoPruned;
 	unsigned long	OutOfWindowIcmps; 
 	unsigned long	LockDroppedIcmps; 
+        unsigned long   ArpFilter;
 	unsigned long	TimeWaited; 
 	unsigned long	TimeWaitRecycled; 
 	unsigned long	TimeWaitKilled; 

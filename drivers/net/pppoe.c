@@ -5,7 +5,7 @@
  * PPPoE --- PPP over Ethernet (RFC 2516)
  *
  *
- * Version:    0.6.5
+ * Version:    0.6.6
  *
  * 030700 :     Fixed connect logic to allow for disconnect.
  * 270700 :	Fixed potential SMP problems; we must protect against
@@ -19,6 +19,7 @@
  * 051000 :	Initialization cleanup.
  * 111100 :	Fix recvmsg.
  * 050101 :	Fix PADT procesing.
+ * 140501 :	Use pppoe_rcv_core to handle all backlog. (Alexey)
  *
  * Author:	Michal Ostrowski <mostrows@styx.uwaterloo.ca>
  * Contributors:
@@ -376,22 +377,6 @@ static int pppoe_rcv(struct sk_buff *skb,
 	return ret;
 }
 
-
-/************************************************************************
- *
- * Receive wrapper called in process context.
- *
- ***********************************************************************/
-int pppoe_backlog_rcv(struct sock *sk, struct sk_buff *skb)
-{
-	lock_sock(sk);
-	pppoe_rcv_core(sk, skb);
-	release_sock(sk);
-	return 0;
-}
-
-
-
 /************************************************************************
  *
  * Receive a PPPoE Discovery frame.
@@ -481,7 +466,7 @@ static int pppoe_create(struct socket *sock)
 	sk->protocol = PX_PROTO_OE;
 	sk->family = PF_PPPOX;
 
-	sk->backlog_rcv = pppoe_backlog_rcv;
+	sk->backlog_rcv = pppoe_rcv_core;
 	sk->next = NULL;
 	sk->pprev = NULL;
 	sk->state = PPPOX_NONE;
