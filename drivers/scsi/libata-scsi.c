@@ -254,6 +254,12 @@ int ata_scsi_error(struct Scsi_Host *host)
 	ap = (struct ata_port *) &host->hostdata[0];
 	ap->ops->eng_timeout(ap);
 
+	/* TODO: this is per-command; when queueing is supported
+	 * this code will either change or move to a more
+	 * appropriate place
+	 */
+	host->host_failed--;
+
 	DPRINTK("EXIT\n");
 	return 0;
 }
