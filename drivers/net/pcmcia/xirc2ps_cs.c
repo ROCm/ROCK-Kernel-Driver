@@ -295,7 +295,7 @@ static void mii_wr(ioaddr_t ioaddr, u_char phyaddr, u_char phyreg,
 
 static int has_ce2_string(dev_link_t * link);
 static void xirc2ps_config(dev_link_t * link);
-static void xirc2ps_release(u_long arg);
+static void xirc2ps_release(dev_link_t * link);
 static int xirc2ps_event(event_t event, int priority,
 			 event_callback_args_t * args);
 
@@ -611,10 +611,6 @@ xirc2ps_attach(void)
     link = &local->link;
     link->priv = dev;
 
-    init_timer(&link->release);
-    link->release.function = &xirc2ps_release;
-    link->release.data = (u_long) link;
-
     /* General socket configuration */
     link->conf.Attributes = CONF_ENABLE_IRQ;
     link->conf.Vcc = 50;
@@ -689,9 +685,8 @@ xirc2ps_detach(dev_link_t * link)
      * the release() function is called, that will trigger a proper
      * detach().
      */
-    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
-	xirc2ps_release((unsigned long)link);
+	xirc2ps_release(link);
 	if (link->state & DEV_STALE_CONFIG) {
 		link->state |= DEV_STALE_LINK;
 		return;
@@ -1164,7 +1159,7 @@ xirc2ps_config(dev_link_t * link)
 
   config_error:
     link->state &= ~DEV_CONFIG_PENDING;
-    xirc2ps_release((u_long)link);
+    xirc2ps_release(link);
     return;
 
   cis_error:
@@ -1179,9 +1174,8 @@ xirc2ps_config(dev_link_t * link)
  * still open, this will be postponed until it is closed.
  */
 static void
-xirc2ps_release(u_long arg)
+xirc2ps_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *) arg;
 
     DEBUG(0, "release(0x%p)\n", link);
 
@@ -1243,7 +1237,7 @@ xirc2ps_event(event_t event, int priority,
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG) {
 	    netif_device_detach(dev);
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    xirc2ps_release(link);
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
@@ -2045,7 +2039,7 @@ do_stop(struct net_device *dev)
 
     link->open--;
     if (link->state & DEV_STALE_CONFIG)
-	mod_timer(&link->release, jiffies + HZ/20);
+	    xirc2ps_release(link);
 
     return 0;
 }

@@ -149,6 +149,7 @@ do {									\
 unsigned long
 clear_user(void __user *to, unsigned long n)
 {
+	might_sleep();
 	if (access_ok(VERIFY_WRITE, to, n))
 		__do_clear_user(to, n);
 	return n;
@@ -187,6 +188,8 @@ long strnlen_user(const char __user *s, long n)
 {
 	unsigned long mask = -__addr_ok(s);
 	unsigned long res, tmp;
+
+	might_sleep();
 
 	__asm__ __volatile__(
 		"	testl %0, %0\n"

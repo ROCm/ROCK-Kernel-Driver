@@ -841,8 +841,6 @@ void do_timer(struct pt_regs *regs)
 
 #if !defined(__alpha__) && !defined(__ia64__)
 
-extern int do_setitimer(int, struct itimerval *, struct itimerval *);
-
 /*
  * For backwards compatibility?  This can be done in libc so Alpha
  * and all newer ports shouldn't need it.

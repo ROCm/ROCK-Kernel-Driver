@@ -110,7 +110,7 @@ MODULE_PARM(hw_addr, "6i");
 
 static void mii_phy_probe(struct net_device *dev);
 static void pcnet_config(dev_link_t *link);
-static void pcnet_release(u_long arg);
+static void pcnet_release(dev_link_t *link);
 static int pcnet_event(event_t event, int priority,
 		       event_callback_args_t *args);
 static int pcnet_open(struct net_device *dev);
@@ -293,9 +293,6 @@ static dev_link_t *pcnet_attach(void)
     link = &info->link; dev = &info->dev;
     link->priv = info;
 
-    init_timer(&link->release);
-    link->release.function = &pcnet_release;
-    link->release.data = (u_long)link;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
     link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
     if (irq_list[0] == -1)
@@ -357,9 +354,8 @@ static void pcnet_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
-	pcnet_release((u_long)link);
+	pcnet_release(link);
 	if (link->state & DEV_STALE_CONFIG) {
 	    link->state |= DEV_STALE_LINK;
 	    return;
@@ -787,7 +783,7 @@ static void pcnet_config(dev_link_t *link)
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    pcnet_release((u_long)link);
+    pcnet_release(link);
     link->state &= ~DEV_CONFIG_PENDING;
     return;
 } /* pcnet_config */
@@ -800,9 +796,8 @@ failed:
 
 ======================================================================*/
 
-static void pcnet_release(u_long arg)
+static void pcnet_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
     pcnet_dev_t *info = link->priv;
 
     DEBUG(0, "pcnet_release(0x%p)\n", link);
@@ -848,7 +843,7 @@ static int pcnet_event(event_t event, int priority,
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG) {
 	    netif_device_detach(&info->dev);
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    pcnet_release(link);
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
@@ -1054,7 +1049,7 @@ static int pcnet_close(struct net_device *dev)
     netif_stop_queue(dev);
     del_timer_sync(&info->watchdog);
     if (link->state & DEV_STALE_CONFIG)
-	mod_timer(&link->release, jiffies + HZ/20);
+	    pcnet_release(link);
 
     return 0;
 } /* pcnet_close */

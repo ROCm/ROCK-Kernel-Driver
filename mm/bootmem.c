@@ -267,7 +267,7 @@ found:
 
 static unsigned long __init free_all_bootmem_core(pg_data_t *pgdat)
 {
-	struct page *page = pgdat->node_mem_map;
+	struct page *page;
 	bootmem_data_t *bdata = pgdat->bdata;
 	unsigned long i, count, total = 0;
 	unsigned long idx;
@@ -276,6 +276,8 @@ static unsigned long __init free_all_bootmem_core(pg_data_t *pgdat)
 	if (!bdata->node_bootmem_map) BUG();
 
 	count = 0;
+	/* first extant page of the node */
+	page = virt_to_page(phys_to_virt(bdata->node_boot_start));
 	idx = bdata->node_low_pfn - (bdata->node_boot_start >> PAGE_SHIFT);
 	map = bdata->node_bootmem_map;
 	for (i = 0; i < idx; ) {

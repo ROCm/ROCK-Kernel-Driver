@@ -428,8 +428,6 @@ put_tv32(struct compat_timeval *o, struct timeval *i)
 	return err; 
 }
 
-extern int do_setitimer(int which, struct itimerval *, struct itimerval *);
-
 asmlinkage long
 sys32_alarm(unsigned int seconds)
 {

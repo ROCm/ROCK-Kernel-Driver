@@ -283,7 +283,7 @@ enum RxCfg { RxAllMulti = 0x0004, RxPromisc = 0x0002,
 static dev_link_t *smc91c92_attach(void);
 static void smc91c92_detach(dev_link_t *);
 static void smc91c92_config(dev_link_t *link);
-static void smc91c92_release(u_long arg);
+static void smc91c92_release(dev_link_t *link);
 static int smc91c92_event(event_t event, int priority,
 			  event_callback_args_t *args);
 
@@ -351,9 +351,6 @@ static dev_link_t *smc91c92_attach(void)
     link->priv = dev;
 
     spin_lock_init(&smc->lock);
-    init_timer(&link->release);
-    link->release.function = &smc91c92_release;
-    link->release.data = (u_long)link;
     link->io.NumPorts1 = 16;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
     link->io.IOAddrLines = 4;
@@ -433,9 +430,8 @@ static void smc91c92_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
-	smc91c92_release((u_long)link);
+	smc91c92_release(link);
 	if (link->state & DEV_STALE_CONFIG) {
 	    link->state |= DEV_STALE_LINK;
 	    return;
@@ -1068,7 +1064,7 @@ static void smc91c92_config(dev_link_t *link)
 config_undo:
     unregister_netdev(dev);
 config_failed:			/* CS_EXIT_TEST() calls jump to here... */
-    smc91c92_release((u_long)link);
+    smc91c92_release(link);
     link->state &= ~DEV_CONFIG_PENDING;
 
 } /* smc91c92_config */
@@ -1081,9 +1077,8 @@ config_failed:			/* CS_EXIT_TEST() calls jump to here... */
 
 ======================================================================*/
 
-static void smc91c92_release(u_long arg)
+static void smc91c92_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
 
     DEBUG(0, "smc91c92_release(0x%p)\n", link);
 
@@ -1132,7 +1127,7 @@ static int smc91c92_event(event_t event, int priority,
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG) {
 	    netif_device_detach(dev);
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    smc91c92_release(link);
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
@@ -1332,7 +1327,7 @@ static int smc_close(struct net_device *dev)
     link->open--;
     del_timer_sync(&smc->media);
     if (link->state & DEV_STALE_CONFIG)
-	mod_timer(&link->release, jiffies + HZ/20);
+	    smc91c92_release(link);
 
     return 0;
 } /* smc_close */

@@ -664,28 +664,6 @@ int presto_do_create(struct presto_file_set *fset, struct dentry *dir,
         return error;
 }
 
-/* from namei.c */
-static struct dentry *lookup_create(struct nameidata *nd, int is_dir)
-{
-        struct dentry *dentry;
-
-        down(&nd->dentry->d_inode->i_sem);
-        dentry = ERR_PTR(-EEXIST);
-        if (nd->last_type != LAST_NORM)
-                goto fail;
-        dentry = lookup_hash(&nd->last, nd->dentry);
-        if (IS_ERR(dentry))
-                goto fail;
-        if (!is_dir && nd->last.name[nd->last.len] && !dentry->d_inode)
-                goto enoent;
-        return dentry;
-enoent:
-        dput(dentry);
-        dentry = ERR_PTR(-ENOENT);
-fail:
-        return dentry;
-}
-
 int lento_create(const char *name, int mode, struct lento_vfs_context *info)
 {
         int error;

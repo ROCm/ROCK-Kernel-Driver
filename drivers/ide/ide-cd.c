@@ -765,10 +765,12 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 		if ((stat & ERR_STAT) != 0)
 			cdrom_queue_request_sense(drive, wait, rq->sense, rq);
 	} else if (blk_fs_request(rq)) {
+		int do_end_request = 0;
+
 		/* Handle errors from READ and WRITE requests. */
 
 		if (blk_noretry_request(rq))
-			cdrom_end_request(drive, 0);
+			do_end_request = 1;
 
 		if (sense_key == NOT_READY) {
 			/* Tray open. */
@@ -776,7 +778,7 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 
 			/* Fail the request. */
 			printk ("%s: tray open\n", drive->name);
-			cdrom_end_request(drive, 0);
+			do_end_request = 1;
 		} else if (sense_key == UNIT_ATTENTION) {
 			/* Media change. */
 			cdrom_saw_media_change (drive);
@@ -785,13 +787,13 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 			   But be sure to give up if we've retried
 			   too many times. */
 			if (++rq->errors > ERROR_MAX)
-				cdrom_end_request(drive, 0);
+				do_end_request = 1;
 		} else if (sense_key == ILLEGAL_REQUEST ||
 			   sense_key == DATA_PROTECT) {
 			/* No point in retrying after an illegal
 			   request or data protect error.*/
 			ide_dump_status (drive, "command error", stat);
-			cdrom_end_request(drive, 0);
+			do_end_request = 1;
 		} else if ((err & ~ABRT_ERR) != 0) {
 			/* Go to the default handler
 			   for other errors. */
@@ -801,11 +803,14 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 			/* No point in re-trying a zillion times on a bad 
 			 * sector...  If we got here the error is not correctable */
 			ide_dump_status (drive, "media error (bad sector)", stat);
-			cdrom_end_request(drive, 0);
+			do_end_request = 1;
 		} else if ((++rq->errors > ERROR_MAX)) {
 			/* We've racked up too many retries.  Abort. */
-			cdrom_end_request(drive, 0);
+			do_end_request = 1;
 		}
+
+		if (do_end_request)
+			cdrom_end_request(drive, 0);
 
 		/* If we got a CHECK_CONDITION status,
 		   queue a request sense command. */
@@ -3228,7 +3233,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 }
 
 static
-unsigned long ide_cdrom_capacity (ide_drive_t *drive)
+sector_t ide_cdrom_capacity (ide_drive_t *drive)
 {
 	unsigned long capacity;
 

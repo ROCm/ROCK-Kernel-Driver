@@ -636,9 +636,6 @@ asmlinkage int irix_stime(int value)
 	return 0;
 }
 
-extern int do_setitimer(int which, struct itimerval *value,
-                        struct itimerval *ovalue);
-
 static inline void jiffiestotv(unsigned long jiffies, struct timeval *value)
 {
 	value->tv_usec = (jiffies % HZ) * (1000000 / HZ);

@@ -418,12 +418,12 @@ static int __table_get_device(struct dm_table *t, struct dm_target *ti,
 	int r;
 	dev_t dev;
 	struct dm_dev *dd;
-	int major, minor;
+	unsigned int major, minor;
 
 	if (!t)
 		BUG();
 
-	if (sscanf(path, "%x:%x", &major, &minor) == 2) {
+	if (sscanf(path, "%u:%u", &major, &minor) == 2) {
 		/* Extract the major/minor numbers */
 		dev = MKDEV(major, minor);
 	} else {

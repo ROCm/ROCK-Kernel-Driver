@@ -169,6 +169,7 @@ static void ipi_handler(void *info)
 		cpu_relax();
 		barrier();
 	}
+	atomic_dec(&data->count);
 	local_irq_restore(flags);
 }
 
@@ -256,8 +257,18 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 		cpu_relax();
 		barrier();
 	}
-	local_irq_restore(flags);
+	atomic_set(&data.count, num_booting_cpus() - 1);
 	atomic_set(&data.gate,0);
+
+	/*
+	 * Wait here for everyone to have seen the gate change
+	 * So we're the last ones to touch 'data'
+	 */
+	while(atomic_read(&data.count)) {
+		cpu_relax();
+		barrier();
+	}
+	local_irq_restore(flags);
 }
 
 /**

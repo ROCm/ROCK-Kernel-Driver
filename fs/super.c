@@ -488,8 +488,16 @@ static void do_emergency_remount(unsigned long foo)
 		sb->s_count++;
 		spin_unlock(&sb_lock);
 		down_read(&sb->s_umount);
-		if (sb->s_root && sb->s_bdev && !(sb->s_flags & MS_RDONLY))
+		if (sb->s_root && sb->s_bdev && !(sb->s_flags & MS_RDONLY)) {
+			/*
+			 * ->remount_fs needs lock_kernel().
+			 *
+			 * What lock protects sb->s_flags??
+			 */
+			lock_kernel();
 			do_remount_sb(sb, MS_RDONLY, NULL, 1);
+			unlock_kernel();
+		}
 		drop_super(sb);
 		spin_lock(&sb_lock);
 	}

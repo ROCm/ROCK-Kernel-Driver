@@ -45,7 +45,6 @@
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/timer.h>
 #include <linux/wireless.h>
 
 #include <net/iw_handler.h>
@@ -112,7 +111,7 @@ static int wl3501_irq_list[4] = { -1 };
  * are invoked from the wl24 event handler.
  */
 static void wl3501_config(dev_link_t *link);
-static void wl3501_release(unsigned long arg);
+static void wl3501_release(dev_link_t *link);
 static int wl3501_event(event_t event, int pri, event_callback_args_t *args);
 
 /*
@@ -218,6 +217,21 @@ static int iw_default_channel(int reg_domain)
 			break;
 		}
 	return rc;
+}
+
+static void iw_set_mgmt_info_element(enum iw_mgmt_info_element_ids id,
+				     struct iw_mgmt_info_element *el,
+				     void *value, int len)
+{
+	el->id  = id;
+	el->len = len;
+	memcpy(el->data, value, len);
+}
+
+static void iw_copy_mgmt_info_element(struct iw_mgmt_info_element *to,
+				      struct iw_mgmt_info_element *from)
+{
+	iw_set_mgmt_info_element(from->id, to, from->data, from->len);
 }
 
 /*
@@ -621,10 +635,12 @@ static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 {
 	struct wl3501_join_req sig = {
-		.sig_id	  = WL3501_SIG_JOIN_REQ,
-		.timeout  = 10,
-		.phy_pset = {
-			[2] = this->chan,
+		.sig_id		  = WL3501_SIG_JOIN_REQ,
+		.timeout	  = 10,
+		.ds_pset = {
+			.el.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+			.el.len = 1,
+			.chan	= this->chan,
 		},
 	};
 
@@ -638,24 +654,42 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 		.sig_id			= WL3501_SIG_START_REQ,
 		.beacon_period		= 400,
 		.dtim_period		= 1,
-		.phy_pset		= {
-			[0] = 3, [1] = 1, [2] = this->chan,
+		.ds_pset = {
+			.el.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+			.el.len = 1,
+			.chan	= this->chan,
 		},
-		.bss_basic_rate_set	= {
-			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
+		.bss_basic_rset	= {
+			.el.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
+			.el.len = 2,
+			.data_rate_labels = {
+				[0] = IW_MGMT_RATE_LABEL_MANDATORY |
+				      IW_MGMT_RATE_LABEL_1MBIT,
+				[1] = IW_MGMT_RATE_LABEL_MANDATORY |
+				      IW_MGMT_RATE_LABEL_2MBIT,
+			},
 		},
-		.operational_rate_set	= {
-			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
+		.operational_rset	= {
+			.el.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
+			.el.len = 2,
+			.data_rate_labels = {
+				[0] = IW_MGMT_RATE_LABEL_MANDATORY |
+				      IW_MGMT_RATE_LABEL_1MBIT,
+				[1] = IW_MGMT_RATE_LABEL_MANDATORY |
+				      IW_MGMT_RATE_LABEL_2MBIT,
+			},
 		},
 		.ibss_pset		= {
-			[0] = 6, [1] = 2, [2] = 10,
+			.el.id	     = IW_MGMT_INFO_ELEMENT_IBSS_PARAMETER_SET,
+			.el.len	     = 2,
+			.atim_window = 10,
 		},
 		.bss_type		= wl3501_fw_bss_type(this),
 		.cap_info		= wl3501_fw_cap_info(this),
 	};
 
-	memcpy(sig.ssid, this->essid, WL3501_ESSID_MAX_LEN);
-	memcpy(this->keep_essid, this->essid, WL3501_ESSID_MAX_LEN);
+	iw_copy_mgmt_info_element(&sig.ssid.el, &this->essid.el);
+	iw_copy_mgmt_info_element(&this->keep_essid.el, &this->essid.el);
 	return wl3501_esbq_exec(this, &sig, sizeof(sig));
 }
 
@@ -674,15 +708,15 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 		    (this->net_type == IW_MODE_ADHOC &&
 		     (sig.cap_info & WL3501_MGMT_CAPABILITY_IBSS)) ||
 		    this->net_type == IW_MODE_AUTO) {
-			if (!this->essid[1])
+			if (!this->essid.el.len)
 				matchflag = 1;
-			else if (this->essid[1] == 3 &&
-				 !strncmp((char *)&this->essid[2], "ANY", 3))
+			else if (this->essid.el.len == 3 &&
+				 !memcmp(this->essid.essid, "ANY", 3))
 				matchflag = 1;
-			else if (this->essid[1] != sig.ssid[1])
+			else if (this->essid.el.len != sig.ssid.el.len)
 				matchflag = 0;
-			else if (memcmp(&this->essid[2], &sig.ssid[2],
-					this->essid[1]))
+			else if (memcmp(this->essid.essid, sig.ssid.essid,
+					this->essid.el.len))
 				matchflag = 0;
 			else
 				matchflag = 1;
@@ -894,17 +928,18 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 				const int i = this->join_sta_bss;
 				memcpy(this->bssid,
 				       this->bss_set[i].bssid, ETH_ALEN);
-				this->chan = this->bss_set[i].phy_pset[2];
-				memcpy(this->keep_essid, this->bss_set[i].ssid,
-				       WL3501_ESSID_MAX_LEN);
+				this->chan = this->bss_set[i].ds_pset.chan;
+				iw_copy_mgmt_info_element(&this->keep_essid.el,
+						     &this->bss_set[i].ssid.el);
 				wl3501_mgmt_auth(this);
 			}
 		} else {
 			const int i = this->join_sta_bss;
-			memcpy(this->bssid, this->bss_set[i].bssid, ETH_ALEN);
-			this->chan = this->bss_set[i].phy_pset[2];
-			memcpy(this->keep_essid,
-			       this->bss_set[i].ssid, WL3501_ESSID_MAX_LEN);
+
+			memcpy(&this->bssid, &this->bss_set[i].bssid, ETH_ALEN);
+			this->chan = this->bss_set[i].ds_pset.chan;
+			iw_copy_mgmt_info_element(&this->keep_essid.el,
+						  &this->bss_set[i].ssid.el);
 			wl3501_online(dev);
 		}
 	} else {
@@ -1262,9 +1297,8 @@ static int wl3501_close(struct net_device *dev)
 	wl3501_block_interrupt(this);
 
 	if (link->state & DEV_STALE_CONFIG) {
-		link->release.expires = jiffies + WL3501_RELEASE_TIMEOUT;
 		link->state |= DEV_RELEASE_PENDING;
-		add_timer(&link->release);
+		wl3501_release(link);
 	}
 	rc = 0;
 	printk(KERN_INFO "%s: WL3501 closed\n", dev->name);
@@ -1688,19 +1722,79 @@ static int wl3501_get_wap(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+static int wl3501_set_scan(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	/*
+	 * FIXME: trigger scanning with a reset, yes, I'm lazy
+	 */
+	return wl3501_reset(dev);
+}
+
+static int wl3501_get_scan(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	struct wl3501_card *this = dev->priv;
+	int i;
+	char *current_ev = extra;
+	struct iw_event iwe;
+
+	for (i = 0; i < this->bss_cnt; ++i) {
+		iwe.cmd			= SIOCGIWAP;
+		iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
+		memcpy(iwe.u.ap_addr.sa_data, this->bss_set[i].bssid, ETH_ALEN);
+		current_ev = iwe_stream_add_event(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe, IW_EV_ADDR_LEN);
+		iwe.cmd		  = SIOCGIWESSID;
+		iwe.u.data.flags  = 1;
+		iwe.u.data.length = this->bss_set[i].ssid.el.len;
+		current_ev = iwe_stream_add_point(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe,
+						  this->bss_set[i].ssid.essid);
+		iwe.cmd	   = SIOCGIWMODE;
+		iwe.u.mode = this->bss_set[i].bss_type;
+		current_ev = iwe_stream_add_event(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe, IW_EV_UINT_LEN);
+		iwe.cmd = SIOCGIWFREQ;
+		iwe.u.freq.m = this->bss_set[i].ds_pset.chan;
+		iwe.u.freq.e = 0;
+		current_ev = iwe_stream_add_event(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe, IW_EV_FREQ_LEN);
+		iwe.cmd = SIOCGIWENCODE;
+		if (this->bss_set[i].cap_info & WL3501_MGMT_CAPABILITY_PRIVACY)
+			iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
+		else
+			iwe.u.data.flags = IW_ENCODE_DISABLED;
+		iwe.u.data.length = 0;
+		current_ev = iwe_stream_add_point(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe, NULL);
+	}
+	/* Length of data */
+	wrqu->data.length = (current_ev - extra);
+	wrqu->data.flags = 0; /* FIXME: set properly these flags */
+	return 0;
+}
+
 static int wl3501_set_essid(struct net_device *dev,
 			    struct iw_request_info *info,
 			    union iwreq_data *wrqu, char *extra)
 {
 	struct wl3501_card *this = dev->priv;
-	int rc = 0;
 
 	if (wrqu->data.flags) {
-		strlcpy(this->essid + 2, extra, min_t(u16, wrqu->data.length,
-						      IW_ESSID_MAX_SIZE));
-		rc = wl3501_reset(dev);
+		iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID,
+					 &this->essid.el,
+					 extra, wrqu->data.length);
+	} else { /* We accept any ESSID */
+		iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID,
+					 &this->essid.el, "ANY", 3);
 	}
-	return rc;
+	return wl3501_reset(dev);
 }
 
 static int wl3501_get_essid(struct net_device *dev,
@@ -1712,8 +1806,8 @@ static int wl3501_get_essid(struct net_device *dev,
 
 	spin_lock_irqsave(&this->lock, flags);
 	wrqu->essid.flags  = 1;
-	wrqu->essid.length = IW_ESSID_MAX_SIZE;
-	strlcpy(extra, this->essid + 2, IW_ESSID_MAX_SIZE);
+	wrqu->essid.length = this->essid.el.len;
+	memcpy(extra, this->essid.essid, this->essid.el.len);
 	spin_unlock_irqrestore(&this->lock, flags);
 	return 0;
 }
@@ -1902,6 +1996,8 @@ static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWTHRSPY	- SIOCIWFIRST] = iw_handler_get_thrspy,
 	[SIOCSIWAP	- SIOCIWFIRST] = wl3501_set_wap,
 	[SIOCGIWAP	- SIOCIWFIRST] = wl3501_get_wap,
+	[SIOCSIWSCAN	- SIOCIWFIRST] = wl3501_set_scan,
+	[SIOCGIWSCAN	- SIOCIWFIRST] = wl3501_get_scan,
 	[SIOCSIWESSID	- SIOCIWFIRST] = wl3501_set_essid,
 	[SIOCGIWESSID	- SIOCIWFIRST] = wl3501_get_essid,
 	[SIOCSIWNICKN	- SIOCIWFIRST] = wl3501_set_nick,
@@ -1944,9 +2040,6 @@ static dev_link_t *wl3501_attach(void)
 	if (!link)
 		goto out;
 	memset(link, 0, sizeof(struct dev_link_t));
-	init_timer(&link->release);
-	link->release.function	= wl3501_release;
-	link->release.data	= (unsigned long)link;
 
 	/* The io structure describes IO port mapping */
 	link->io.NumPorts1	= 16;
@@ -2118,11 +2211,8 @@ static void wl3501_config(dev_link_t *link)
 	this->bss_cnt		= 0;
 	this->join_sta_bss	= 0;
 	this->adhoc_times	= 0;
-	this->essid[0]		= 0;
-	this->essid[1]		= 3;
-	this->essid[2]		= 'A';
-	this->essid[3]		= 'N';
-	this->essid[4]		= 'Y';
+	iw_set_mgmt_info_element(IW_MGMT_INFO_ELEMENT_SSID, &this->essid.el,
+				 "ANY", 3);
 	this->card_name[0]	= '\0';
 	this->firmware_date[0]	= '\0';
 	this->rssi		= 255;
@@ -2135,7 +2225,7 @@ static void wl3501_config(dev_link_t *link)
 cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
 failed:
-	wl3501_release((unsigned long)link);
+	wl3501_release(link);
 out:
 	return;
 }
@@ -2148,9 +2238,8 @@ out:
  * and release the PCMCIA configuration.  If the device is still open, this
  * will be postponed until it is closed.
  */
-static void wl3501_release(unsigned long arg)
+static void wl3501_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
 	struct net_device *dev = link->priv;
 
 	/* If the device is currently in use, we won't release until it is
@@ -2206,9 +2295,7 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 			while (link->open > 0)
 				wl3501_close(dev);
 			netif_device_detach(dev);
-			link->release.expires = jiffies +
-						WL3501_RELEASE_TIMEOUT;
-			add_timer(&link->release);
+			wl3501_release(link);
 		}
 		break;
 	case CS_EVENT_CARD_INSERTION:
@@ -2275,11 +2362,10 @@ static void __exit wl3501_exit_module(void)
 	dprintk(0, ": unloading");
 	pcmcia_unregister_driver(&wl3501_driver);
 	while (wl3501_dev_list) {
-		del_timer(&wl3501_dev_list->release);
 		/* Mark the device as non-existing to minimize calls to card */
 		wl3501_dev_list->state &= ~DEV_PRESENT;
 		if (wl3501_dev_list->state & DEV_CONFIG)
-			wl3501_release((unsigned long)wl3501_dev_list);
+			wl3501_release(wl3501_dev_list);
 		wl3501_detach(wl3501_dev_list);
 	}
 }

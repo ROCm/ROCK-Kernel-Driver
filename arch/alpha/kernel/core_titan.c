@@ -123,7 +123,7 @@ mk_conf_addr(struct pci_bus *pbus, unsigned int device_fn, int where,
 		 "pci_addr=0x%p, type1=0x%p)\n",
 		 bus, device_fn, where, pci_addr, type1));
 
-        if (hose->first_busno == bus)
+        if (hose->bus == pbus)
 		bus = 0;
         *type1 = (bus != 0);
 
