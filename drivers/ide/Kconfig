@@ -1114,9 +1114,6 @@ config IDEDMA_IVB
 config IDEDMA_AUTO
 	def_bool IDEDMA_PCI_AUTO || BLK_DEV_IDEDMA_PMAC_AUTO || IDEDMA_ICS_AUTO
 
-config DMA_NONPCI
-	def_bool BLK_DEV_TIVO
-
 endif
 
 config BLK_DEV_HD_ONLY
