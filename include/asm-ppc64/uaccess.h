@@ -244,7 +244,7 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 			return ret;
 		}
 	}
-	return __copy_tofrom_user((void __user *) to, from, n);
+	return __copy_tofrom_user((__force void __user *) to, from, n);
 }
 
 static inline unsigned long
@@ -269,7 +269,7 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 			return ret;
 		}
 	}
-	return __copy_tofrom_user(to, (const void __user *) from, n);
+	return __copy_tofrom_user(to, (__force const void __user *) from, n);
 }
 
 #define __copy_in_user(to, from, size) \
