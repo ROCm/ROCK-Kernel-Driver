@@ -13,7 +13,6 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#include <stddef.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -37,10 +36,11 @@
 #include <asm/rtas.h>
 
 #define DEFINE(sym, val) \
-	        asm volatile("\n#define\t" #sym "\t%0" : : "i" (val))
+	asm volatile("\n->" #sym " %0 " #val : : "i" (val))
 
-int
-main(void)
+#define BLANK() asm volatile("\n->" : : )
+
+int main(void)
 {
 	/* thread struct on stack */
 	DEFINE(THREAD_SHIFT, THREAD_SHIFT);

@@ -16,6 +16,7 @@
 #include <asm/irq.h>
 
 int timer_interrupt(struct pt_regs *);
+extern void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq);
 
 #ifdef CONFIG_PPC_ISERIES
 
