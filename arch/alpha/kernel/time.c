@@ -57,6 +57,8 @@ static int set_rtc_mmss(unsigned long);
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
+#define TICK_SIZE (tick_nsec / 1000)
+
 /*
  * Shift amount by which scaled_ticks_per_cycle is scaled.  Shifting
  * by 48 gives us 16 bits for HZ while keeping the accuracy good even
@@ -129,8 +131,8 @@ void timer_interrupt(int irq, void *dev, struct pt_regs * regs)
 	 */
 	if ((time_status & STA_UNSYNC) == 0
 	    && xtime.tv_sec > state.last_rtc_update + 660
-	    && xtime.tv_usec >= 500000 - ((unsigned) tick) / 2
-	    && xtime.tv_usec <= 500000 + ((unsigned) tick) / 2) {
+	    && xtime.tv_nsec >= 500000 - ((unsigned) TICK_SIZE) / 2
+	    && xtime.tv_nsec <= 500000 + ((unsigned) TICK_SIZE) / 2) {
 		int tmp = set_rtc_mmss(xtime.tv_sec);
 		state.last_rtc_update = xtime.tv_sec - (tmp ? 600 : 0);
 	}
@@ -365,7 +367,7 @@ time_init(void)
 		year += 100;
 
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	xtime.tv_usec = 0;
+	xtime.tv_nsec = 0;
 
 	if (HZ > (1<<16)) {
 		extern void __you_loose (void);
@@ -414,7 +416,7 @@ do_gettimeofday(struct timeval *tv)
 
 	delta_cycles = rpcc() - state.last_time;
 	sec = xtime.tv_sec;
-	usec = xtime.tv_usec;
+	usec = (xtime.tv_nsec / 1000);
 	partial_tick = state.partial_tick;
 	lost = jiffies - wall_jiffies;
 
@@ -485,7 +487,7 @@ do_settimeofday(struct timeval *tv)
 	}
 
 	xtime.tv_sec = sec;
-	xtime.tv_usec = usec;
+	xtime.tv_nsec = (usec / 1000);
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
