@@ -143,6 +143,9 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog
 #ifndef PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO
 #define PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO	0x00da
 #endif
+#ifndef PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO
+#define PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO	0x00ea
+#endif
 
 enum { DEVICE_INTEL, DEVICE_INTEL_ICH4, DEVICE_SIS, DEVICE_ALI, DEVICE_NFORCE };
 
@@ -443,6 +446,7 @@ static struct pci_device_id snd_intel8x0_ids[] = {
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE */
 	{ 0x10de, 0x006a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE2 */
 	{ 0x10de, 0x00da, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE3 */
+	{ 0x10de, 0x00ea, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* CK8S */
 	{ 0x1022, 0x746d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD8111 */
 	{ 0x1022, 0x7445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD768 */
 	{ 0x10b9, 0x5455, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_ALI },   /* Ali5455 */
@@ -805,12 +809,16 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 	status = igetdword(chip, chip->int_sta_reg);
 	if ((status & chip->int_sta_mask) == 0) {
 		static int err_count = 10;
-		if (status)
+		if (status) {
+			/* ack */
 			iputdword(chip, chip->int_sta_reg, status);
+			status ^= igetdword(chip, chip->int_sta_reg);
+		}
 		spin_unlock(&chip->reg_lock);
 		if (status && err_count) {
 			err_count--;
-			snd_printk(KERN_DEBUG "intel8x0: unknown IRQ bits 0x%x (sta_mask=0x%x)\n", status, chip->int_sta_mask);
+			snd_printd("intel8x0: unknown IRQ bits 0x%x (sta_mask=0x%x)\n",
+				   status, chip->int_sta_mask);
 		}
 		return IRQ_RETVAL(status);
 	}
@@ -2581,6 +2589,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia nForce" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia nForce2" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO, "NVidia nForce3" },
+	{ PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO, "NVidia CK8S" },
 	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
 	{ 0x5455, "ALi M5455" },
