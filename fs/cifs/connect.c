@@ -128,7 +128,8 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		}
 	}
 	read_unlock(&GlobalSMBSeslock);
-
+	/* do not want to be sending data on a socket we are freeing */
+	down(&server->tcpSem); 
 	if(server->ssocket) {
 		cFYI(1,("State: 0x%x Flags: 0x%lx", server->ssocket->state,
 			server->ssocket->flags));
@@ -154,7 +155,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		}
 	}
 	spin_unlock(&GlobalMid_Lock);
-
+	up(&ses->server->tcpSem); 
 
 	while ((server->tcpStatus != CifsExiting) && (server->tcpStatus != CifsGood))
 	{
