@@ -102,7 +102,6 @@ struct rpc_rqst {
 	struct xdr_buf		rq_private_buf;		/* The receive buffer
 							 * used in the softirq.
 							 */
-
 	/*
 	 * For authentication (e.g. auth_des)
 	 */
@@ -153,6 +152,11 @@ struct rpc_xprt {
 				nocong	   : 1,	/* no congestion control */
 				resvport   : 1, /* use a reserved port */
 				stream     : 1;	/* TCP */
+
+	/*
+	 * XID
+	 */
+	__u32			xid;		/* Next XID value to use */
 
 	/*
 	 * State of TCP reply receive stuff

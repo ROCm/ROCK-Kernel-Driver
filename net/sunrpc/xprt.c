@@ -57,6 +57,7 @@
 #include <linux/sunrpc/clnt.h>
 #include <linux/file.h>
 #include <linux/workqueue.h>
+#include <linux/random.h>
 
 #include <net/sock.h>
 #include <net/checksum.h>
@@ -1330,22 +1331,14 @@ do_xprt_reserve(struct rpc_task *task)
 /*
  * Allocate a 'unique' XID
  */
-static u32
-xprt_alloc_xid(void)
+static inline u32 xprt_alloc_xid(struct rpc_xprt *xprt)
 {
-	static spinlock_t xid_lock = SPIN_LOCK_UNLOCKED;
-	static int need_init = 1;
-	static u32 xid;
-	u32 ret;
+	return xprt->xid++;
+}
 
-	spin_lock(&xid_lock);
-	if (unlikely(need_init)) {
-		xid = get_seconds() << 12;
-		need_init = 0;
-	}
-	ret = xid++;
-	spin_unlock(&xid_lock);
-	return ret;
+static inline void xprt_init_xid(struct rpc_xprt *xprt)
+{
+	get_random_bytes(&xprt->xid, sizeof(xprt->xid));
 }
 
 /*
@@ -1359,7 +1352,7 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 	req->rq_timeout = xprt->timeout;
 	req->rq_task	= task;
 	req->rq_xprt    = xprt;
-	req->rq_xid     = xprt_alloc_xid();
+	req->rq_xid     = xprt_alloc_xid(xprt);
 	INIT_LIST_HEAD(&req->rq_list);
 	dprintk("RPC: %4d reserved req %p xid %08x\n", task->tk_pid,
 			req, req->rq_xid);
@@ -1477,6 +1470,8 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 		req->rq_next = req + 1;
 	req->rq_next = NULL;
 	xprt->free = xprt->slot;
+
+	xprt_init_xid(xprt);
 
 	/* Check whether we want to use a reserved port */
 	xprt->resvport = capable(CAP_NET_BIND_SERVICE) ? 1 : 0;
