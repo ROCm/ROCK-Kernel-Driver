@@ -281,9 +281,6 @@ static sector_t max_io_len(struct mapped_device *md,
 	sector_t offset = sector - ti->begin;
 	sector_t len = ti->len - offset;
 
-	/* FIXME: obey io_restrictions ! */
-
-
 	/*
 	 * Does the target need to split even further ?
 	 */
