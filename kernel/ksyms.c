@@ -138,14 +138,9 @@ EXPORT_SYMBOL(page_address);
 EXPORT_SYMBOL(get_user_pages);
 
 /* filesystem internal functions */
-EXPORT_SYMBOL(update_atime);
 EXPORT_SYMBOL(get_fs_type);
 EXPORT_SYMBOL(fput);
 EXPORT_SYMBOL(fget);
-EXPORT_SYMBOL(igrab);
-EXPORT_SYMBOL(iunique);
-EXPORT_SYMBOL(iput);
-EXPORT_SYMBOL(inode_init_once);
 EXPORT_SYMBOL(lookup_mnt);
 EXPORT_SYMBOL(sys_close);
 EXPORT_SYMBOL(dcache_lock);
@@ -157,8 +152,6 @@ EXPORT_SYMBOL(filp_open);
 EXPORT_SYMBOL(filp_close);
 EXPORT_SYMBOL(put_filp);
 EXPORT_SYMBOL(files_lock);
-EXPORT_SYMBOL(invalidate_inodes);
-EXPORT_SYMBOL(__invalidate_device);
 EXPORT_SYMBOL(invalidate_inode_pages);
 EXPORT_SYMBOL_GPL(invalidate_inode_pages2);
 EXPORT_SYMBOL(truncate_inode_pages);
@@ -214,7 +207,6 @@ EXPORT_SYMBOL(tty_unregister_driver);
 EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
-EXPORT_SYMBOL(bmap);
 EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(iov_shorten);
 EXPORT_SYMBOL_GPL(default_backing_dev_info);
@@ -356,11 +348,6 @@ EXPORT_SYMBOL(si_meminfo);
 
 /* Added to make file system as module */
 EXPORT_SYMBOL(sys_tz);
-EXPORT_SYMBOL(clear_inode);
-EXPORT_SYMBOL(init_special_inode);
-EXPORT_SYMBOL(new_inode);
-EXPORT_SYMBOL(__insert_inode_hash);
-EXPORT_SYMBOL(remove_inode_hash);
 EXPORT_SYMBOL(make_bad_inode);
 EXPORT_SYMBOL(is_bad_inode);
 EXPORT_SYMBOL(__inode_dir_notify);
