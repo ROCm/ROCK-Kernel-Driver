@@ -79,7 +79,7 @@ static int video_nr = -1; 		/* next avail video device */
 static struct usb_driver vicam_driver;
 
 static char *buf, *buf2;
-static int change_pending = 0; 
+static volatile int change_pending = 0; 
 
 static int vicam_parameters(struct usb_vicam *vicam);
 
@@ -330,8 +330,14 @@ static int vicam_get_picture(struct usb_vicam *vicam, struct video_picture *p)
 
 static void synchronize(struct usb_vicam *vicam)
 {
+	DECLARE_WAITQUEUE(wait, current);
 	change_pending = 1;
-	interruptible_sleep_on(&vicam->wait);
+	set_current_state(TASK_INTERRUPTIBLE);
+	add_wait_queue(&vicam->wait, &wait);
+	if (change_pending)
+		schedule();
+	remove_wait_queue(&vicam->wait, &wait);
+	set_current_state(TASK_RUNNING);
 	vicam_sndctrl(1, vicam, VICAM_REQ_CAMERA_POWER, 0x00, NULL, 0);
 	mdelay(10);
 	vicam_sndctrl(1, vicam, VICAM_REQ_LED_CONTROL, 0x00, NULL, 0);
