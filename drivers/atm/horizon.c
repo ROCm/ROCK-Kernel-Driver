@@ -2927,7 +2927,6 @@ static void __init hrz_check_args (void) {
   return;
 }
 
-#ifdef MODULE
 MODULE_AUTHOR(maintainer_string);
 MODULE_DESCRIPTION(description_string);
 MODULE_LICENSE("GPL");
@@ -2944,7 +2943,7 @@ MODULE_PARM_DESC(pci_lat, "PCI latency in bus cycles");
 
 /********** module entry **********/
 
-int init_module (void) {
+static int __init hrz_module_init (void) {
   int devs;
   
   // sanity check - cast is needed since printk does not support %Zu
@@ -2977,7 +2976,7 @@ int init_module (void) {
 
 /********** module exit **********/
 
-void cleanup_module (void) {
+static void __exit hrz_module_exit (void) {
   hrz_dev * dev;
   PRINTD (DBG_FLOW, "cleanup_module");
   
@@ -3000,40 +2999,5 @@ void cleanup_module (void) {
   return;
 }
 
-#else
-
-/********** monolithic entry **********/
-
-int __init hrz_detect (void) {
-  int devs;
-  
-  // sanity check - cast is needed since printk does not support %Zu
-  if (sizeof(struct MEMMAP) != 128*1024/4) {
-    PRINTK (KERN_ERR, "Fix struct MEMMAP (is %lu fakewords).",
-	    (unsigned long) sizeof(struct MEMMAP));
-    return 0;
-  }
-  
-  show_version();
-  
-  // what about command line arguments?
-  // check arguments
-  hrz_check_args();
-  
-  // get the juice
-  devs = hrz_probe();
-  
-  if (devs) {
-    init_timer (&housekeeping);
-    housekeeping.function = do_housekeeping;
-    // paranoia
-    housekeeping.data = 1;
-    set_timer (&housekeeping, 0);
-  } else {
-    PRINTK (KERN_ERR, "no (usable) adapters found");
-  }
-
-  return devs;
-}
-
-#endif
+module_init(hrz_module_init);
+module_exit(hrz_module_exit);

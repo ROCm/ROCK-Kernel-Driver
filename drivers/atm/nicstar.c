@@ -276,15 +276,13 @@ MODULE_LICENSE("GPL");
 
 /* Functions*******************************************************************/
 
-#ifdef MODULE
-
-int __init init_module(void)
+static int __init nicstar_module_init(void)
 {
    int i;
    unsigned error = 0;	/* Initialized to remove compile warning */
    struct pci_dev *pcidev;
 
-   XPRINTK("nicstar: init_module() called.\n");
+   XPRINTK("nicstar: nicstar_module_init() called.\n");
    if(!pci_present())
    {
       printk("nicstar: no PCI subsystem found.\n");
@@ -323,7 +321,7 @@ int __init init_module(void)
 #ifdef PHY_LOOPBACK
    printk("nicstar: using PHY loopback.\n");
 #endif /* PHY_LOOPBACK */
-   XPRINTK("nicstar: init_module() returned.\n");
+   XPRINTK("nicstar: nicstar_module_init() returned.\n");
 
    init_timer(&ns_timer);
    ns_timer.expires = jiffies + NS_POLL_PERIOD;
@@ -335,7 +333,7 @@ int __init init_module(void)
 
 
 
-void cleanup_module(void)
+static void __exit nicstar_module_exit(void)
 {
    int i, j;
    unsigned short pci_command;
@@ -418,60 +416,6 @@ void cleanup_module(void)
    }
    XPRINTK("nicstar: cleanup_module() returned.\n");
 }
-
-
-#else
-
-int __init nicstar_detect(void)
-{
-   int i;
-   unsigned error = 0;	/* Initialized to remove compile warning */
-   struct pci_dev *pcidev;
-
-   if(!pci_present())
-   {
-      printk("nicstar: no PCI subsystem found.\n");
-      return -EIO;
-   }
-
-   for(i = 0; i < NS_MAX_CARDS; i++)
-      cards[i] = NULL;
-
-   pcidev = NULL;
-   for(i = 0; i < NS_MAX_CARDS; i++)
-   {
-      if ((pcidev = pci_find_device(PCI_VENDOR_ID_IDT,
-                                    PCI_DEVICE_ID_IDT_IDT77201,
-                                    pcidev)) == NULL)
-         break;
-
-      error = ns_init_card(i, pcidev);
-      if (error)
-         cards[i--] = NULL;	/* Try to find another card but don't increment index */
-   }
-
-   if (i == 0 && error)
-      return -EIO;
-
-   TXPRINTK("nicstar: TX debug enabled.\n");
-   RXPRINTK("nicstar: RX debug enabled.\n");
-   PRINTK("nicstar: General debug enabled.\n");
-#ifdef PHY_LOOPBACK
-   printk("nicstar: using PHY loopback.\n");
-#endif /* PHY_LOOPBACK */
-   XPRINTK("nicstar: init_module() returned.\n");
-
-   init_timer(&ns_timer);
-   ns_timer.expires = jiffies + NS_POLL_PERIOD;
-   ns_timer.data = 0UL;
-   ns_timer.function = ns_poll;
-   add_timer(&ns_timer);
-   return i;
-}
-
-
-#endif /* MODULE */
-
 
 static u32 ns_read_sram(ns_dev *card, u32 sram_address)
 {
@@ -3156,3 +3100,6 @@ static unsigned char ns_phy_get(struct atm_dev *dev, unsigned long addr)
    spin_unlock_irqrestore(&card->res_lock, flags);
    return (unsigned char) data;
 }
+
+module_init(nicstar_module_init);
+module_exit(nicstar_module_exit);

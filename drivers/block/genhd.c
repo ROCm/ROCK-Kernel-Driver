@@ -217,14 +217,6 @@ int __init device_init(void)
 	for (i = 0; i < MAX_BLKDEV; i++)
 		INIT_LIST_HEAD(&gendisks[i].list);
 	blk_dev_init();
-#ifdef CONFIG_FC4_SOC
-	/* This has to be done before scsi_dev_init */
-	soc_probe();
-#endif
-#ifdef CONFIG_ATM
-	(void) atmdev_init();
-#endif
-
 	devclass_register(&disk_devclass);
 	return 0;
 }

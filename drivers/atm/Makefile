@@ -2,61 +2,50 @@
 # Makefile for the Linux network (ATM) device drivers.
 #
 
-export-objs := uPD98402.o suni.o idt77105.o
+EXTRA_CFLAGS := -g
 
-obj-y := atmdev_init.o
+export-objs	:= uPD98402.o suni.o idt77105.o
+fore_200e-objs	:= fore200e.o
+host-progs	:= fore200e_mkfirm
 
-obj-$(CONFIG_ATM_ENI) += eni.o suni.o
-obj-$(CONFIG_ATM_ZATM) += zatm.o uPD98402.o
-obj-$(CONFIG_ATM_NICSTAR) += nicstar.o
-obj-$(CONFIG_ATM_IDT77252) += idt77252.o
+
+obj-$(CONFIG_ATM_ZATM)		+= zatm.o uPD98402.o
+obj-$(CONFIG_ATM_NICSTAR)	+= nicstar.o
+obj-$(CONFIG_ATM_AMBASSADOR)	+= ambassador.o
+obj-$(CONFIG_ATM_HORIZON)	+= horizon.o
+obj-$(CONFIG_ATM_IA)		+= iphase.o suni.o
+obj-$(CONFIG_ATM_FORE200E)	+= fore_200e.o
+obj-$(CONFIG_ATM_ENI)		+= eni.o suni.o
+obj-$(CONFIG_ATM_IDT77252)	+= idt77252.o
 
 ifeq ($(CONFIG_ATM_NICSTAR_USE_SUNI),y)
-  obj-$(CONFIG_ATM_NICSTAR) += suni.o
+  obj-$(CONFIG_ATM_NICSTAR)	+= suni.o
 endif
-
 ifeq ($(CONFIG_ATM_NICSTAR_USE_IDT77105),y)
-  obj-$(CONFIG_ATM_NICSTAR) += idt77105.o
+  obj-$(CONFIG_ATM_NICSTAR)	+= idt77105.o
 endif
-
 ifeq ($(CONFIG_ATM_IDT77252_USE_SUNI),y)
-  obj-$(CONFIG_ATM_IDT77252) += suni.o
+  obj-$(CONFIG_ATM_IDT77252)	+= suni.o
 endif
 
-obj-$(CONFIG_ATM_HORIZON) += horizon.o
-obj-$(CONFIG_ATM_AMBASSADOR) += ambassador.o
-obj-$(CONFIG_ATM_TCP) += atmtcp.o
-obj-$(CONFIG_ATM_IA) += iphase.o suni.o
-obj-$(CONFIG_ATM_FIRESTREAM) += firestream.o
-obj-$(CONFIG_ATM_LANAI) += lanai.o
+obj-$(CONFIG_ATM_TCP)		+= atmtcp.o
+obj-$(CONFIG_ATM_FIRESTREAM)	+= firestream.o
+obj-$(CONFIG_ATM_LANAI)		+= lanai.o
 
 ifeq ($(CONFIG_ATM_FORE200E_PCA),y)
-  FORE200E_FW_OBJS += fore200e_pca_fw.o
-  ifeq ($(strip $(CONFIG_ATM_FORE200E_PCA_FW)),"")
-    CONFIG_ATM_FORE200E_PCA_DEFAULT_FW := y
-  endif
+  fore_200e-objs		+= fore200e_pca_fw.o
+  # guess the target endianess to choose the right PCA-200E firmware image
   ifeq ($(CONFIG_ATM_FORE200E_PCA_DEFAULT_FW),y)
-#   guess the target endianess to choose the right PCA-200E firmware image
-    CONFIG_ATM_FORE200E_PCA_FW := $(shell if test -n "`$(CC) -E -dM ../../include/asm/byteorder.h | grep ' __LITTLE_ENDIAN '`"; then echo pca200e.bin; else echo pca200e_ecd.bin2; fi)
+    CONFIG_ATM_FORE200E_PCA_FW = $(shell if test -n "`$(CC) -E -dM $(src)/../../include/asm/byteorder.h | grep ' __LITTLE_ENDIAN '`"; then echo pca200e.bin; else echo pca200e_ecd.bin2; fi)
   endif
 endif
+
 ifeq ($(CONFIG_ATM_FORE200E_SBA),y)
-  FORE200E_FW_OBJS += fore200e_sba_fw.o
-  ifeq ($(strip $(CONFIG_ATM_FORE200E_SBA_FW)),"")
-    CONFIG_ATM_FORE200E_SBA_DEFAULT_FW := y
-  endif
+  fore_200e-objs		+= fore200e_sba_fw.o
   ifeq ($(CONFIG_ATM_FORE200E_SBA_DEFAULT_FW),y)
-    CONFIG_ATM_FORE200E_SBA_FW := sba200e_ecd.bin2
+    CONFIG_ATM_FORE200E_SBA_FW	:= sba200e_ecd.bin2
   endif
 endif
-
-obj-$(CONFIG_ATM_FORE200E) += fore_200e.o
-
-fore_200e-objs	:= fore200e.o $(FORE200E_FW_OBJS)
-
-host-progs := fore200e_mkfirm
-
-EXTRA_CFLAGS := -g
 
 include $(TOPDIR)/Rules.make
 
