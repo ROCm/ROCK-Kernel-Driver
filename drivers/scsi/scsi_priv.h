@@ -130,5 +130,6 @@ extern struct class_device_attribute *scsi_sysfs_shost_attrs[];
 extern struct device_attribute *scsi_sysfs_sdev_attrs[];
 
 extern struct class shost_class;
+extern struct bus_type scsi_bus_type;
 
 #endif /* _SCSI_PRIV_H */

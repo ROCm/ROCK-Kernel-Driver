@@ -68,7 +68,7 @@ static int scsi_bus_match(struct device *dev, struct device_driver *gendrv)
 	return 1;
 }
 
-static struct bus_type scsi_bus_type = {
+struct bus_type scsi_bus_type = {
         .name		= "scsi",
         .match		= scsi_bus_match,
 };
