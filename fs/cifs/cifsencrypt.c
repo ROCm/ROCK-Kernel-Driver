@@ -142,50 +142,60 @@ int cifs_calculate_mac_key(char * key, const char * rn, const char * password)
 
 int CalcNTLMv2_partial_mac_key(struct cifsSesInfo * ses, struct nls_table * nls_info)
 {
-	char temp_key[16];
+	char temp_hash[16];
 	struct HMACMD5Context ctx;
 	char * ucase_buf;
 	wchar_t * unicode_buf;
-	unsigned int i,user_len,dom_len;
+	unsigned int i,user_name_len,dom_name_len;
 
 	if(ses)
 		return -EINVAL;
 
-	E_md4hash(ses->password_with_pad, temp_key);
+	E_md4hash(ses->password_with_pad, temp_hash);
 
-	hmac_md5_init_limK_to_64(temp_key, 16, &ctx);
-	user_len = strlen(ses->userName);
-	if(user_len > MAX_USERNAME_SIZE)
+	hmac_md5_init_limK_to_64(temp_hash, 16, &ctx);
+	user_name_len = strlen(ses->userName);
+	if(user_name_len > MAX_USERNAME_SIZE)
 		return -EINVAL;
-	dom_len = strlen(ses->domainName);
-	if(dom_len > MAX_USERNAME_SIZE)
+	dom_name_len = strlen(ses->domainName);
+	if(dom_name_len > MAX_USERNAME_SIZE)
 		return -EINVAL;
 
 	
 	ucase_buf = kmalloc((MAX_USERNAME_SIZE+1), GFP_KERNEL);
-        unicode_buf = kmalloc((MAX_USERNAME_SIZE+1)*2, GFP_KERNEL);
+        unicode_buf = kmalloc((MAX_USERNAME_SIZE+1)*4, GFP_KERNEL);
 	
-	for(i=0;i<user_len;i++)
+	for(i=0;i<user_name_len;i++)
 		ucase_buf[i] = nls_info->charset2upper[(int)ses->userName[i]];
 	ucase_buf[i] = 0;
-        user_len = cifs_strtoUCS(unicode_buf, ucase_buf, MAX_USERNAME_SIZE*2, nls_info);
-	/* BB inc user_len + 2 or 2 for trailing nulls? */
+        user_name_len = cifs_strtoUCS(unicode_buf, ucase_buf, MAX_USERNAME_SIZE*2, nls_info);
+	unicode_buf[user_name_len] = 0;
+	user_name_len++;
 
-	/* Add call to hmac md5 user BB */
-
-        for(i=0;i<dom_len;i++)
+        for(i=0;i<dom_name_len;i++)
                 ucase_buf[i] = nls_info->charset2upper[(int)ses->domainName[i]];
         ucase_buf[i] = 0;
-        dom_len = cifs_strtoUCS(unicode_buf, ucase_buf, MAX_USERNAME_SIZE*2, nls_info);
+        dom_name_len = cifs_strtoUCS(unicode_buf+user_name_len, ucase_buf, MAX_USERNAME_SIZE*2, nls_info);
 
-	/* BB inc dom_len + 1 or 2 for trailing nulls? */
+	unicode_buf[user_name_len + dom_name_len] = 0;
+	hmac_md5_update((const unsigned char *) unicode_buf,
+		(user_name_len+dom_name_len)*2,&ctx);
 
-	/* Add call to hmac md5 domain */
-
-	/* BB add hmac md5 final BB */
-
+	hmac_md5_final(ses->mac_signing_key,&ctx);
 	kfree(ucase_buf);
 	kfree(unicode_buf);
 	return 0;
 }
- 
+void CalcNTLMv2_response(const struct cifsSesInfo * ses,char * v2_session_response)
+{
+	struct HMACMD5Context context;
+	memcpy(v2_session_response + 8, ses->server->cryptKey,8);
+	/* gen_blob(v2_session_response + 16); */
+	hmac_md5_init_limK_to_64(ses->mac_signing_key, 16, &context);
+
+	hmac_md5_update(ses->server->cryptKey,8,&context);
+/*	hmac_md5_update(v2_session_response+16)client thing,8,&context); */ /* BB fix */
+
+
+	hmac_md5_final(v2_session_response,&context);
+}

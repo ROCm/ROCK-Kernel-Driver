@@ -229,8 +229,7 @@ extern int cifs_verify_signature(const struct smb_hdr *, const char * mac_key,
 	__u32 expected_sequence_number);
 extern int cifs_calculate_mac_key(char * key,const char * rn,const char * pass);
 extern void CalcNTLMv2_partial_mac_key(struct cifsSesInfo *, struct nls_table *);
-
-/* BB routines below not implemented yet BB */
+extern void CalcNTLMv2_response(const struct cifsSesInfo *,char * );
 
 extern int CIFSBuildServerList(int xid, char *serverBufferList,
 			int recordlength, int *entries,

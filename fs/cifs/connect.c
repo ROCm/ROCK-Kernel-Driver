@@ -665,12 +665,18 @@ int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_tab
 						nls_info);
 			if (!rc) {
 				if(ntlmv2_flag) {
+					char * v2_response;
 					cFYI(1,("Can use more secure NTLM version 2 password hash"));
-			/* SMBNTv2encrypt( ...);  */ /* BB fix this up */
 					CalcNTLMv2_partial_mac_key(pSesInfo, 
 						nls_info);
-/*					cifs_calculate_ntlmv2_mac_key(pSesInfo->mac_signing_key, ntlm_session_key, */
+					v2_response = kmalloc(16 + 64 /* blob */, GFP_KERNEL);
+					if(v2_response) {
+						CalcNTLMv2_response(pSesInfo,v2_response);
+/*						cifs_calculate_ntlmv2_mac_key(pSesInfo->mac_signing_key, response, ntlm_session_key, */
+						kfree(v2_response);
 					/* BB Put dummy sig in SessSetup PDU? */
+					} else
+						rc = -ENOMEM;
 
 				} else {
 					SMBNTencrypt(pSesInfo->password_with_pad,
