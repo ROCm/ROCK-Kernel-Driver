@@ -205,7 +205,7 @@ struct atm_cirange {
 #undef __AAL_STAT_ITEMS
 #else
 
-#include <linux/sched.h> /* wait_queue_head_t */
+#include <linux/wait.h> /* wait_queue_head_t */
 #include <linux/time.h> /* struct timeval */
 #include <linux/net.h>
 #include <linux/skbuff.h> /* struct sk_buff */
