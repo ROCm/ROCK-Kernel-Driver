@@ -18,6 +18,13 @@
 #include <linux/fs.h>
 #include <linux/err.h>
 #include <linux/proc_fs.h>
+#include <linux/mm.h>
+
+#ifdef CONFIG_KALLSYMS_ALL
+#define all_var 1
+#else
+#define all_var 0
+#endif
 
 /* These will be re-linked against their real values during the second link stage */
 extern unsigned long kallsyms_addresses[] __attribute__((weak));
@@ -30,7 +37,7 @@ extern u16 kallsyms_token_index[] __attribute__((weak));
 extern unsigned long kallsyms_markers[] __attribute__((weak));
 
 /* Defined by the linker script. */
-extern char _stext[], _etext[], _sinittext[], _einittext[];
+extern char _stext[], _etext[], _sinittext[], _einittext[], _end[];
 
 static inline int is_kernel_inittext(unsigned long addr)
 {
@@ -44,7 +51,7 @@ static inline int is_kernel_text(unsigned long addr)
 {
 	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_etext)
 		return 1;
-	return 0;
+	return in_gate_area_no_task(addr);
 }
 
 /* expand a compressed symbol data into the resulting uncompressed string,
@@ -147,7 +154,7 @@ const char *kallsyms_lookup(unsigned long addr,
 	namebuf[KSYM_NAME_LEN] = 0;
 	namebuf[0] = 0;
 
-	if (is_kernel_text(addr) || is_kernel_inittext(addr)) {
+	if (all_var || is_kernel_text(addr) || is_kernel_inittext(addr)) {
 		unsigned long symbol_end=0;
 
 		/* do a binary search on the sorted kallsyms_addresses array */
@@ -181,7 +188,7 @@ const char *kallsyms_lookup(unsigned long addr,
 			if (is_kernel_inittext(addr))
 				symbol_end = (unsigned long)_einittext;
 			else
-				symbol_end = (unsigned long)_etext;
+				symbol_end = all_var ? (unsigned long)_end : (unsigned long)_etext;
 		}
 
 		*symbolsize = symbol_end - kallsyms_addresses[low];
