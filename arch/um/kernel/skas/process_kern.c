@@ -24,7 +24,7 @@
 #include "mode.h"
 #include "proc_mm.h"
 
-static atomic_t using_sysemu;
+static atomic_t using_sysemu = ATOMIC_INIT(0);
 int sysemu_supported;
 
 void set_using_sysemu(int value)
