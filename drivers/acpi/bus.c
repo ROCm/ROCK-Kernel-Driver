@@ -672,18 +672,6 @@ acpi_bus_init (void)
 	}
 	acpi_root_dir = acpi_device_dir(acpi_root);
 
-	/*
-	 * Install drivers required for proper enumeration of the
-	 * ACPI namespace.
-	 */
-	acpi_power_init();	/* ACPI Bus Power Management */
-#ifdef CONFIG_ACPI_EC
-	acpi_ec_init();		/* ACPI Embedded Controller */
-#endif
-#ifdef CONFIG_ACPI_PCI
-	acpi_pci_link_init();	/* ACPI PCI Interrupt Link */
-	acpi_pci_root_init();	/* ACPI PCI Root Bridge */
-#endif
 	return_VALUE(0);
 
 	/* Mimic structured exception handling */
