@@ -187,7 +187,7 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 		 * Try to merge with the previous vma.
 		 */
 		if (mprotect_attempt_merge(vma, *pprev, end, newflags))
-			return 0;
+			goto success;
 	} else {
 		error = split_vma(mm, vma, start, 1);
 		if (error)
@@ -209,7 +209,7 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 	vma->vm_flags = newflags;
 	vma->vm_page_prot = newprot;
 	spin_unlock(&mm->page_table_lock);
-
+success:
 	change_protection(vma, start, end, newprot);
 	return 0;
 
