@@ -194,7 +194,6 @@ int isdn_net_online(isdn_net_dev *idev)
 /* Prototypes */
 
 static int isdn_net_force_dial_idev(isdn_net_dev *);
-static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
 static void do_dialout(isdn_net_dev *idev);
 static int isdn_net_handle_event(isdn_net_dev *idev, int pr, void *arg);
 static int isdn_net_set_encap(isdn_net_local *mlp, int encap);
@@ -898,8 +897,6 @@ void isdn_net_writebuf_skb(isdn_net_dev *idev, struct sk_buff *skb)
 
 
 /*
- *  Helper function for isdn_net_start_xmit.
- *  When called, the connection is already established.
  *  Based on cps-calculation, check if device is overloaded.
  *  If so, and if a slave exists, trigger dialing for it.
  *  If any slave is online, deliver packets using a simple round robin
@@ -908,8 +905,8 @@ void isdn_net_writebuf_skb(isdn_net_dev *idev, struct sk_buff *skb)
  *  Return: 0 on success, !0 on failure.
  */
 
-static int
-isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
+int
+isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	isdn_net_dev *idev, *sdev;
 	isdn_net_local *mlp = ndev->priv;
@@ -919,10 +916,6 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 	if (list_empty(&mlp->online))
 		return isdn_net_autodial(skb, ndev);
 
-	/* For the other encaps the header has already been built */
-	if (mlp->p_encap == ISDN_NET_ENCAP_SYNCPPP) {
-		return isdn_ppp_xmit(skb, ndev);
-	}
 	idev = isdn_net_get_locked_dev(mlp);
 	if (!idev) {
 		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", ndev->name);
@@ -1030,24 +1023,6 @@ isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev)
 
 
 /*
- * Try sending a packet.
- * If this interface isn't connected to a ISDN-Channel, find a free channel,
- * and start dialing.
- */
-static int
-isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-{
-	if (mlp->p_encap == ISDN_NET_ENCAP_X25IFACE)
-		return isdn_x25_start_xmit(skb, ndev);
-		
-	/* ISDN connection is established, try sending */
-	if (mlp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-		return isdn_ppp_xmit(skb, ndev);
-
-	return isdn_net_xmit(skb, ndev);
-}
-
-/*
  * Shutdown a net-interface.
  */
 static int
@@ -1131,7 +1106,6 @@ isdn_net_init(struct net_device *ndev)
 	ndev->mtu = 1500;
 	ndev->tx_queue_len = 10;
 	ndev->open = &isdn_net_open;
-	ndev->hard_start_xmit = &isdn_net_start_xmit;
 	ndev->hard_header_len = ETH_HLEN + isdn_hard_header_len();
 	ndev->stop = &isdn_net_close;
 	ndev->get_stats = &isdn_net_get_stats;
@@ -1588,6 +1562,7 @@ isdn_net_set_encap(isdn_net_local *lp, int encap)
 	lp->p_encap = encap;
 	lp->ops = netif_ops[encap];
 
+	lp->dev.hard_start_xmit     = lp->ops->hard_start_xmit;
 	lp->dev.hard_header         = lp->ops->hard_header;
 	lp->dev.do_ioctl            = lp->ops->do_ioctl;
 	lp->dev.flags               = lp->ops->flags;
@@ -2112,6 +2087,7 @@ isdn_iptyp_receive(isdn_net_local *lp, isdn_net_dev *idev,
 }
 
 static struct isdn_netif_ops iptyp_ops = {
+	.hard_start_xmit     = isdn_net_start_xmit,
 	.hard_header         = isdn_iptyp_header,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
 	.type                = ARPHRD_PPP,
@@ -2143,6 +2119,7 @@ isdn_uihdlc_receive(isdn_net_local *lp, isdn_net_dev *idev,
 }
 
 static struct isdn_netif_ops uihdlc_ops = {
+	.hard_start_xmit     = isdn_net_start_xmit,
 	.hard_header         = isdn_uihdlc_header,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
 	.type                = ARPHRD_HDLC,
@@ -2164,6 +2141,7 @@ isdn_rawip_receive(isdn_net_local *lp, isdn_net_dev *idev,
 }
 
 static struct isdn_netif_ops rawip_ops = {
+	.hard_start_xmit     = isdn_net_start_xmit,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
 	.type                = ARPHRD_PPP,
 	.receive             = isdn_rawip_receive,
@@ -2215,6 +2193,7 @@ isdn_ether_init(isdn_net_local *lp)
 }
 
 static struct isdn_netif_ops ether_ops = {
+	.hard_start_xmit     = isdn_net_start_xmit,
 	.hard_header         = eth_header,
 	.receive             = isdn_ether_receive,
 	.init                = isdn_ether_init,

@@ -282,6 +282,8 @@ struct isdn_net_dev_s;
 struct isdn_net_local_s;
 
 struct isdn_netif_ops {
+	int			(*hard_start_xmit) (struct sk_buff *skb,
+						    struct net_device *dev);
 	int			(*hard_header) (struct sk_buff *skb,
 						struct net_device *dev,
 						unsigned short type,

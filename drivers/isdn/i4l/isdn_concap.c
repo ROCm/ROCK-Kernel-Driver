@@ -39,7 +39,8 @@
    */
 
 
-int isdn_concap_dl_data_req(struct concap_proto *concap, struct sk_buff *skb)
+static int
+isdn_concap_dl_data_req(struct concap_proto *concap, struct sk_buff *skb)
 {
 	struct net_device *ndev = concap -> net_dev;
 	isdn_net_dev *nd = ((isdn_net_local *) ndev->priv)->netdev;
@@ -58,7 +59,8 @@ int isdn_concap_dl_data_req(struct concap_proto *concap, struct sk_buff *skb)
 }
 
 
-int isdn_concap_dl_connect_req(struct concap_proto *concap)
+static int
+isdn_concap_dl_connect_req(struct concap_proto *concap)
 {
 	struct net_device *ndev = concap -> net_dev;
 	isdn_net_local *lp = (isdn_net_local *) ndev->priv;
@@ -71,7 +73,8 @@ int isdn_concap_dl_connect_req(struct concap_proto *concap)
 	return ret;
 }
 
-int isdn_concap_dl_disconn_req(struct concap_proto *concap)
+static int
+isdn_concap_dl_disconn_req(struct concap_proto *concap)
 {
 	IX25DEBUG( "isdn_concap_dl_disconn_req: %s \n", concap -> net_dev -> name);
 
@@ -98,7 +101,8 @@ struct concap_device_ops isdn_concap_demand_dial_dops = {
    this sourcefile does not need to include any protocol specific header
    files. For now:
    */
-struct concap_proto * isdn_concap_new( int encap )
+struct concap_proto *
+isdn_concap_new( int encap )
 {
 	switch ( encap ) {
 	case ISDN_NET_ENCAP_X25IFACE:
@@ -158,7 +162,7 @@ isdn_x25_disconnected(isdn_net_local *lp)
 		pops -> disconn_ind(cprot);
 }
 
-int
+static int
 isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 /* At this point hard_start_xmit() passes control to the encapsulation
@@ -237,13 +241,8 @@ isdn_x25_cleanup(isdn_net_dev *p)
 	restore_flags(flags);
 }
 
-void isdn_x25_realrm(isdn_net_dev *p)
-{
-	if( p -> cprot && p -> cprot -> pops )
-		p -> cprot -> pops -> proto_del ( p -> cprot );
-}
-
 struct isdn_netif_ops isdn_x25_ops = {
+	.hard_start_xmit     = isdn_x25_start_xmit,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
 	.type                = ARPHRD_X25,
 	.receive             = isdn_x25_receive,

@@ -20,20 +20,6 @@ extern void isdn_ppp_cleanup(void);
 extern int isdn_ppp_dial_slave(char *);
 extern int isdn_ppp_hangup_slave(char *);
 
-#ifdef CONFIG_ISDN_PPP
-
-int  isdn_ppp_xmit(struct sk_buff *, struct net_device *);
-
-#else
-
-static inline int
-isdn_ppp_xmit(struct sk_buff *, struct net_device *);
-{
-	return 0;
-}
-
-#endif
-
 #define IPPP_OPEN	0x01
 #define IPPP_CONNECT	0x02
 #define IPPP_CLOSEWAIT	0x04

@@ -406,6 +406,7 @@ isdn_ciscohdlck_header(struct sk_buff *skb, struct net_device *dev,
 }
 
 struct isdn_netif_ops ciscohdlck_ops = {
+	.hard_start_xmit     = isdn_net_start_xmit,
 	.hard_header         = isdn_ciscohdlck_header,
 	.do_ioctl            = isdn_ciscohdlck_dev_ioctl,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,

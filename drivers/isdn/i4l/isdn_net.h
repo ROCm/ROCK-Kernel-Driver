@@ -57,6 +57,7 @@ extern void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);
 extern void isdn_net_write_super(isdn_net_dev *, struct sk_buff *skb);
 extern int isdn_net_online(isdn_net_dev *);
 extern int isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev);
+extern int isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev);
 
 #define ISDN_NET_MAX_QUEUE_LENGTH 2
 

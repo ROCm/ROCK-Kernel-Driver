@@ -1112,10 +1112,10 @@ static unsigned char *isdn_ppp_skb_push(struct sk_buff **skb_p,int len)
  * skb isn't allowed!!
  */
 
-int
-isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
+static int
+isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
-	isdn_net_local *mlp = netdev->priv;
+	isdn_net_local *mlp = ndev->priv;
 	isdn_net_dev *idev = list_entry(mlp->online.next, isdn_net_dev, online);
 	unsigned int proto = PPP_IP;     /* 0x21 */
 	struct ippp_struct *ipt,*ipts;
@@ -1137,7 +1137,7 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 	if (!(ipts->pppcfg & SC_ENABLE_IP)) {	/* PPP connected ? */
 		if (ipts->debug & 0x1)
-			printk(KERN_INFO "%s: IP frame delayed.\n", netdev->name);
+			printk(KERN_INFO "%s: IP frame delayed.\n", ndev->name);
 		netif_stop_queue(ndev);
 		return 1;
 	}
@@ -1158,7 +1158,7 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 	idev = isdn_net_get_locked_dev(mlp);
 	if (!idev) {
-		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", netdev->name);
+		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", ndev->name);
 		netif_stop_queue(ndev);
 		return 1;
 	}
@@ -2816,6 +2816,7 @@ isdn_ppp_header(struct sk_buff *skb, struct net_device *dev,
 }
 
 struct isdn_netif_ops isdn_ppp_ops = {
+	.hard_start_xmit     = isdn_ppp_start_xmit,
 	.hard_header         = isdn_ppp_header,
 	.do_ioctl            = isdn_ppp_dev_ioctl,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
