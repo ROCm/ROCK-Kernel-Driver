@@ -986,6 +986,8 @@ genelink_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 		skb2 = skb_copy_expand (skb, (4 + 4*1) , padlen, flags);
 		dev_kfree_skb_any (skb);
 		skb = skb2;
+		if (!skb)
+			return NULL;
 	}
 
 	// attach the packet count to the header
