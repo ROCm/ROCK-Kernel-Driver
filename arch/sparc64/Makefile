@@ -76,6 +76,8 @@ tftpboot.img vmlinux.aout:
 
 archclean:
 
+archmrproper:
+
 define archhelp
   echo  '* vmlinux       - Standard sparc64 kernel'
   echo  '  vmlinux.aout  - a.out kernel for sparc64'
