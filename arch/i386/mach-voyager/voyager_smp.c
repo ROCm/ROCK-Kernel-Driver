@@ -31,8 +31,6 @@
 
 #include <linux/irq.h>
 
-int reboot_smp = 0;
-
 /* TLB state -- visible externally, indexed physically */
 DEFINE_PER_CPU(struct tlb_state, cpu_tlbstate) ____cacheline_aligned = { &init_mm, 0 };
 
