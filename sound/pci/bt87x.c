@@ -307,7 +307,7 @@ static snd_pcm_hardware_t snd_bt87x_analog_hw = {
 		SNDRV_PCM_INFO_MMAP_VALID,
 	.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S8,
 	.rates = SNDRV_PCM_RATE_KNOT,
-	.rate_min = 119467,
+	.rate_min = 119466,
 	.rate_max = 448000,
 	.channels_min = 1,
 	.channels_max = 1,
@@ -349,20 +349,21 @@ static int snd_bt87x_set_digital_hw(bt87x_t *chip, snd_pcm_runtime_t *runtime)
 
 static int snd_bt87x_set_analog_hw(bt87x_t *chip, snd_pcm_runtime_t *runtime)
 {
-	static unsigned int rates[] = {
-		119467, 128000, 137846, 149333, 162909, 179200,
-		199111, 224000, 256000, 298667, 358400, 448000
+	static ratnum_t analog_clock = {
+		.num = 1792000,
+		.den_min = 4,
+		.den_max = 15,
+		.den_step = 1
 	};
-	static snd_pcm_hw_constraint_list_t constraint_rates = {
-		.count = ARRAY_SIZE(rates),
-		.list = rates,
-		.mask = 0,
+	static snd_pcm_hw_constraint_ratnums_t constraint_rates = {
+		.nrats = 1,
+		.rats = &analog_clock
 	};
 
 	chip->reg_control &= ~CTL_DA_IOM_DA;
 	runtime->hw = snd_bt87x_analog_hw;
-	return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-					  &constraint_rates);
+	return snd_pcm_hw_constraint_ratnums(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+					     &constraint_rates);
 }
 
 static int snd_bt87x_pcm_open(snd_pcm_substream_t *substream)
@@ -436,7 +437,7 @@ static int snd_bt87x_prepare(snd_pcm_substream_t *substream)
 
 	spin_lock_irq(&chip->reg_lock);
 	chip->reg_control &= ~(CTL_DA_SDR_MASK | CTL_DA_SBR);
-	decimation = (1792000 + 5) / runtime->rate;
+	decimation = (1792000 + runtime->rate / 4) / runtime->rate;
 	chip->reg_control |= decimation << CTL_DA_SDR_SHIFT;
 	if (runtime->format == SNDRV_PCM_FORMAT_S8)
 		chip->reg_control |= CTL_DA_SBR;
