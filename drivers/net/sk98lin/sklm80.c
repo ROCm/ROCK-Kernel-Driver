@@ -2,8 +2,6 @@
  *
  * Name:	sklm80.c
  * Project:	Gigabit Ethernet Adapters, TWSI-Module
- * Version:	$Revision: 1.22 $
- * Date:	$Date: 2003/10/20 09:08:21 $
  * Purpose:	Functions to access Voltage and Temperature Sensor (LM80)
  *
  ******************************************************************************/
@@ -19,86 +17,6 @@
  *	(at your option) any later version.
  *
  *	The information in this file is provided "AS IS" without warranty.
- *
- ******************************************************************************/
-
-/******************************************************************************
- *
- * History:
- *
- *	$Log: sklm80.c,v $
- *	Revision 1.22  2003/10/20 09:08:21  rschmidt
- *	Editorial changes.
- *	
- *	Revision 1.21  2003/09/23 09:29:04  malthoff
- *	Parameter Dev_Size added to macro SK_I2C_CTL.
- *	
- *	Revision 1.20  2002/08/13 09:16:27  rschmidt
- *	Changed return value for SkLm80ReadSensor() back to 'int'
- *	Editorial changes.
- *	
- *	Revision 1.19  2002/08/06 09:43:31  jschmalz
- *	Extensions and changes for Yukon.
- *	
- *	Revision 1.18  2002/08/02 12:26:57  rschmidt
- *	Editorial changes.
- *	
- *	Revision 1.17  1999/11/22 13:35:51  cgoos
- *	Changed license header to GPL.
- *	
- *	Revision 1.16  1999/05/27 14:05:47  malthoff
- *	Fans: Set SenVal to 0 if the fan value is 0 or 0xff. Both values
- *	are outside the limits (0: div zero error, 0xff: value not in
- *	range, assume 0).
- *	
- *	Revision 1.15  1999/05/27 13:38:51  malthoff
- *	Pervent from Division by zero errors.
- *	
- *	Revision 1.14  1999/05/20 09:20:01  cgoos
- *	Changes for 1000Base-T (Fan sensors).
- *	
- *	Revision 1.13  1998/10/22 09:48:14  gklug
- *	fix: SysKonnectFileId typo
- *	
- *	Revision 1.12  1998/10/09 06:12:06  malthoff
- *	Remove ID_sccs by SysKonnectFileId.
- *	
- *	Revision 1.11  1998/09/04 08:33:48  malthoff
- *	bug fix: SenState = SK_SEN_IDLE when
- *	leaving SK_SEN_VALEXT state
- *	
- *	Revision 1.10  1998/08/20 12:02:10  gklug
- *	fix: compiler warnings type mismatch
- *
- *	Revision 1.9  1998/08/20 11:37:38  gklug
- *	chg: change Ioc to IoC
- *	
- *	Revision 1.8  1998/08/19 12:20:58  gklug
- *	fix: remove struct from C files (see CCC)
- *	
- *	Revision 1.7  1998/08/17 07:04:57  malthoff
- *	Take SkLm80RcvReg() function from ski2c.c.
- *	Add IoC parameter to BREAK_OR_WAIT() macro.
- *	
- *	Revision 1.6  1998/08/14 07:11:28  malthoff
- *	remove pAc with pAC.
- *
- *	Revision 1.5  1998/08/14 06:46:55  gklug
- *	fix: temperature can get negative
- *
- *	Revision 1.4  1998/08/13 08:27:04  gklug
- *	add: temperature reading now o.k.
- *	fix: pSen declaration, SK_ERR_LOG call, ADDR macro
- *
- *	Revision 1.3  1998/08/13 07:28:21  gklug
- *	fix: pSen was wrong initialized
- *	add: correct conversion for voltage readings
- *
- *	Revision 1.2  1998/08/11 07:52:14  gklug
- *	add: Lm80 read sensor function
- *
- *	Revision 1.1  1998/07/17 09:57:12  gklug
- *	initial version
  *
  ******************************************************************************/
 
