@@ -1338,7 +1338,7 @@ static void scsi_eh_lock_door(struct scsi_device *sdev)
 
 	if (unlikely(!sreq)) {
 		printk(KERN_ERR "%s: request allocate failed,"
-		       "prevent media removal cmd not sent", __FUNCTION__);
+		       "prevent media removal cmd not sent\n", __FUNCTION__);
 		return;
 	}
 
