@@ -580,6 +580,8 @@ static void cfq_put_request(request_queue_t *q, struct request *rq)
 {
 	struct cfq_data *cfqd = q->elevator.elevator_data;
 	struct cfq_rq *crq = RQ_DATA(rq);
+	struct request_list *rl;
+	int other_rw;
 
 	if (crq) {
 		BUG_ON(q->last_merge == rq);
@@ -587,6 +589,23 @@ static void cfq_put_request(request_queue_t *q, struct request *rq)
 
 		mempool_free(crq, cfqd->crq_pool);
 		rq->elevator_private = NULL;
+	}
+
+	/*
+	 * work-around for may_queue "bug": if a read gets issued and refused
+	 * to queue because writes ate all the allowed slots and no other
+	 * reads are pending for this queue, it could get stuck infinitely
+	 * since freed_request() only checks the waitqueue for writes when
+	 * freeing them. or vice versa for a single write vs many reads.
+	 * so check here whether "the other" data direction might be able
+	 * to queue and wake them
+	 */
+	rl = &q->rq;
+	other_rw = rq_data_dir(rq) ^ 1;
+	if (rl->count[other_rw] <= q->nr_requests) {
+		smp_mb();
+		if (waitqueue_active(&rl->wait[other_rw]))
+			wake_up(&rl->wait[other_rw]);
 	}
 }
 
