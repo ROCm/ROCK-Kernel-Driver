@@ -43,7 +43,9 @@ int timer_irq_inited = 0;
 
 static int first_tick;
 static unsigned long long prev_tsc;
+#ifdef CONFIG_UML_REAL_TIME_CLOCK
 static long long delta;   		/* Deviation per interval */
+#endif
 
 extern unsigned long long host_hz;
 
@@ -59,7 +61,7 @@ void timer_irq(union uml_pt_regs *regs)
 	}
 
 	if(first_tick){
-#if defined(CONFIG_UML_REAL_TIME_CLOCK)
+#ifdef CONFIG_UML_REAL_TIME_CLOCK
 		unsigned long long tsc;
 		/* We've had 1 tick */
 		tsc = time_stamp();

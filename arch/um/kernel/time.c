@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <errno.h>
+#include <string.h>
 #include "user_util.h"
 #include "kern_util.h"
 #include "user.h"

@@ -59,6 +59,7 @@ static struct inode_operations hostfs_iops;
 static struct inode_operations hostfs_dir_iops;
 static struct address_space_operations hostfs_link_aops;
 
+#ifndef MODULE
 static int __init hostfs_args(char *options, int *add)
 {
 	char *ptr;
@@ -95,6 +96,7 @@ __uml_setup("hostfs=", hostfs_args,
 "    The only flag currently supported is 'append', which specifies that all\n"
 "    files opened by hostfs will be opened in append mode.\n\n"
 );
+#endif
 
 static char *dentry_name(struct dentry *dentry, int extra)
 {
