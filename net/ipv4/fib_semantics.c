@@ -1040,9 +1040,7 @@ int fib_sync_down(u32 local, struct net_device *dev, int force)
 	if (force)
 		scope = -1;
 
-	BUG_ON(!fib_info_laddrhash);
-
-	if (local) {
+	if (local && fib_info_laddrhash) {
 		unsigned int hash = fib_laddr_hashfn(local);
 		struct hlist_head *head = &fib_info_laddrhash[hash];
 		struct hlist_node *node;
