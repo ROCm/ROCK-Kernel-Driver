@@ -606,6 +606,8 @@ void free_irq(unsigned int irq, void *dev_id)
 	}
 }
 
+static DECLARE_MUTEX(probe_sem);
+
 /* Start the interrupt probing.  Unlike other architectures,
  * we don't return a mask of interrupts from probe_irq_on,
  * but return the number of interrupts enabled for the probe.
@@ -616,6 +618,8 @@ unsigned long probe_irq_on(void)
 {
 	unsigned int i, irqs = 0;
 	unsigned long delay;
+
+	down(&probe_sem);
 
 	/*
 	 * first snaffle up any unassigned but
@@ -656,6 +660,21 @@ unsigned long probe_irq_on(void)
 	return irqs;
 }
 
+unsigned int probe_irq_mask(unsigned long irqs)
+{
+	unsigned int mask = 0, i;
+
+	spin_lock_irq(&irq_controller_lock);
+	for(i = 0; i < 16 && i < NR_IRQS; i++)
+		if (irq_desc[i].probing && irq_desc[i].triggered)
+			mask |= 1 << i;
+	spin_unlock_irq(&irq_controller_lock);
+
+	up(&probe_sem);
+
+	return mask;
+}
+
 /*
  * Possible return values:
  *  >= 0 - interrupt number
@@ -686,6 +705,8 @@ int probe_irq_off(unsigned long irqs)
 		irq_found = NO_IRQ;
 out:
 	spin_unlock_irq(&irq_controller_lock);
+
+	up(&probe_sem);
 
 	return irq_found;
 }
