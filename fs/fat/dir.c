@@ -647,21 +647,9 @@ int fat_dir_ioctl(struct inode * inode, struct file * filp,
 		  unsigned int cmd, unsigned long arg)
 {
 	struct fat_ioctl_filldir_callback buf;
-	struct dirent __user *d1 = (struct dirent *)arg;
+	struct dirent __user *d1;
 	int ret, shortname, both;
 
-	if (!access_ok(VERIFY_WRITE, d1, sizeof(struct dirent[2])))
-		return -EFAULT;
-	/*
-	 * Yes, we don't need this put_user() absolutely. However old
-	 * code didn't return the right value. So, app use this value,
-	 * in order to check whether it is EOF.
-	 */
-	if (put_user(0, &d1->d_reclen))
-		return -EFAULT;
-
-	buf.dirent = d1;
-	buf.result = 0;
 	switch (cmd) {
 	case VFAT_IOCTL_READDIR_SHORT:
 		shortname = 1;
@@ -674,8 +662,27 @@ int fat_dir_ioctl(struct inode * inode, struct file * filp,
 	default:
 		return -EINVAL;
 	}
-	ret = fat_readdirx(inode, filp, &buf, fat_ioctl_filldir,
-			   shortname, both);
+
+	d1 = (struct dirent *)arg;
+	if (!access_ok(VERIFY_WRITE, d1, sizeof(struct dirent[2])))
+		return -EFAULT;
+	/*
+	 * Yes, we don't need this put_user() absolutely. However old
+	 * code didn't return the right value. So, app use this value,
+	 * in order to check whether it is EOF.
+	 */
+	if (put_user(0, &d1->d_reclen))
+		return -EFAULT;
+
+	buf.dirent = d1;
+	buf.result = 0;
+	down(&inode->i_sem);
+	ret = -ENOENT;
+	if (!IS_DEADDIR(inode)) {
+		ret = fat_readdirx(inode, filp, &buf, fat_ioctl_filldir,
+				   shortname, both);
+	}
+	up(&inode->i_sem);
 	if (ret >= 0)
 		ret = buf.result;
 	return ret;
