@@ -360,10 +360,8 @@ follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 	BUG_ON(! pmd_hugepage(*pmd));
 
 	page = hugepte_page(*(hugepte_t *)pmd);
-	if (page) {
+	if (page)
 		page += ((address & ~HPAGE_MASK) >> PAGE_SHIFT);
-		get_page(page);
-	}
 	return page;
 }
 
@@ -609,15 +607,6 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 	}
 }
 
-static inline unsigned long computeHugeHptePP(unsigned int hugepte)
-{
-	unsigned long flags = 0x2;
-
-	if (! (hugepte & _HUGEPAGE_RW))
-		flags |= 0x1;
-	return flags;
-}
-
 int hash_huge_page(struct mm_struct *mm, unsigned long access,
 		   unsigned long ea, unsigned long vsid, int local)
 {
@@ -671,7 +660,7 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 	old_pte = *ptep;
 	new_pte = old_pte;
 
-	hpteflags = computeHugeHptePP(hugepte_val(new_pte));
+	hpteflags = 0x2 | (! (hugepte_val(new_pte) & _HUGEPAGE_RW));
 
 	/* Check if pte already has an hpte (case 2) */
 	if (unlikely(hugepte_val(old_pte) & _HUGEPAGE_HASHPTE)) {
@@ -747,7 +736,7 @@ repeat:
 static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
 				hugepte_t pte, int local)
 {
-	unsigned long vsid, vpn, va, hash, secondary, slot;
+	unsigned long vsid, vpn, va, hash, slot;
 
 	BUG_ON(hugepte_bad(pte));
 	BUG_ON(!in_hugepage_area(context, ea));
@@ -757,8 +746,7 @@ static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
 	va = (vsid << 28) | (ea & 0x0fffffff);
 	vpn = va >> LARGE_PAGE_SHIFT;
 	hash = hpt_hash(vpn, 1);
-	secondary = !!(hugepte_val(pte) & _HUGEPAGE_SECONDARY);
-	if (secondary)
+	if (hugepte_val(pte) & _HUGEPAGE_SECONDARY)
 		hash = ~hash;
 	slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
 	slot += (hugepte_val(pte) & _HUGEPAGE_GROUP_IX) >> 5;

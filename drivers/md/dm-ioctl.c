@@ -800,7 +800,7 @@ static void retrieve_status(struct dm_table *table,
 		struct dm_target *ti = dm_table_get_target(table, i);
 
 		remaining = len - (outptr - outbuf);
-		if (remaining < sizeof(struct dm_target_spec)) {
+		if (remaining <= sizeof(struct dm_target_spec)) {
 			param->flags |= DM_BUFFER_FULL_FLAG;
 			break;
 		}
@@ -815,6 +815,10 @@ static void retrieve_status(struct dm_table *table,
 
 		outptr += sizeof(struct dm_target_spec);
 		remaining = len - (outptr - outbuf);
+		if (remaining <= 0) {
+			param->flags |= DM_BUFFER_FULL_FLAG;
+			break;
+		}
 
 		/* Get the status/table string from the target driver */
 		if (ti->type->status) {
@@ -828,7 +832,7 @@ static void retrieve_status(struct dm_table *table,
 		outptr += strlen(outptr) + 1;
 		used = param->data_start + (outptr - outbuf);
 
-		align_ptr(outptr);
+		outptr = align_ptr(outptr);
 		spec->next = outptr - outbuf;
 	}
 

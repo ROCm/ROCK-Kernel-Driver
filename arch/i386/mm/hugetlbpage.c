@@ -206,10 +206,8 @@ follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 	struct page *page;
 
 	page = pte_page(*(pte_t *)pmd);
-	if (page) {
+	if (page)
 		page += ((address & ~HPAGE_MASK) >> PAGE_SHIFT);
-		get_page(page);
-	}
 	return page;
 }
 #endif

@@ -21,6 +21,7 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/tty.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
@@ -117,11 +118,11 @@ static struct old_serial_port old_serial_port[] = {
 
 #define UART_NR	(ARRAY_SIZE(old_serial_port) + CONFIG_SERIAL_8250_NR_UARTS)
 
-#if defined(CONFIG_SERIAL_8250_RSA) && defined(MODULE)
+#ifdef CONFIG_SERIAL_8250_RSA
 
 #define PORT_RSA_MAX 4
-static int probe_rsa[PORT_RSA_MAX];
-static int force_rsa[PORT_RSA_MAX];
+static unsigned long probe_rsa[PORT_RSA_MAX];
+static unsigned int probe_rsa_count;
 #endif /* CONFIG_SERIAL_8250_RSA  */
 
 struct uart_8250_port {
@@ -678,21 +679,16 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 		break;
 	}
 
-#if defined(CONFIG_SERIAL_8250_RSA) && defined(MODULE)
+#ifdef CONFIG_SERIAL_8250_RSA
 	/*
 	 * Only probe for RSA ports if we got the region.
 	 */
 	if (up->port.type == PORT_16550A && probeflags & PROBE_RSA) {
 		int i;
 
-		for (i = 0 ; i < PORT_RSA_MAX ; ++i) {
-			if (!probe_rsa[i] && !force_rsa[i])
-				break;
-			if (((probe_rsa[i] != up->port.iobase) ||
-			     check_region(up->port.iobase + UART_RSA_BASE, 16)) &&
-			    (force_rsa[i] != up->port.iobase))
-				continue;
-			if (__enable_rsa(up)) {
+		for (i = 0 ; i < probe_rsa_count; ++i) {
+			if (probe_rsa[i] == up->port.iobase &&
+			    __enable_rsa(up)) {
 				up->port.type = PORT_RSA;
 				break;
 			}
@@ -2215,14 +2211,12 @@ EXPORT_SYMBOL(serial8250_resume_port);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.90 $");
 
-MODULE_PARM(share_irqs, "i");
+module_param(share_irqs, uint, 0644);
 MODULE_PARM_DESC(share_irqs, "Share IRQs with other non-8250/16x50 devices"
 	" (unsafe)");
 
-#if defined(CONFIG_SERIAL_8250_RSA) && defined(MODULE)
-MODULE_PARM(probe_rsa, "1-" __MODULE_STRING(PORT_RSA_MAX) "i");
+#ifdef CONFIG_SERIAL_8250_RSA
+module_param_array(probe_rsa, ulong, probe_rsa_count, 0444);
 MODULE_PARM_DESC(probe_rsa, "Probe I/O ports for RSA");
-MODULE_PARM(force_rsa, "1-" __MODULE_STRING(PORT_RSA_MAX) "i");
-MODULE_PARM_DESC(force_rsa, "Force I/O ports for RSA");
 #endif
 MODULE_ALIAS_CHARDEV_MAJOR(TTY_MAJOR);

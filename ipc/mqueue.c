@@ -153,7 +153,7 @@ static int mqueue_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_magic = MQUEUE_MAGIC;
 	sb->s_op = &mqueue_super_ops;
 
-	inode = mqueue_get_inode(sb, S_IFDIR | S_IRWXUGO);
+	inode = mqueue_get_inode(sb, S_IFDIR | S_ISVTX | S_IRWXUGO);
 	if (!inode)
 		return -ENOMEM;
 
@@ -685,10 +685,6 @@ asmlinkage long sys_mq_unlink(const char __user *u_name)
 		goto out_err;
 	}
 
-	if (permission(dentry->d_inode, MAY_WRITE, NULL)) {
-		err = -EACCES;
-		goto out_err;
-	}
 	inode = dentry->d_inode;
 	if (inode)
 		atomic_inc(&inode->i_count);

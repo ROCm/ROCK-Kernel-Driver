@@ -62,13 +62,6 @@ struct buffer_head {
 };
 
 /*
- * Debug
- */
-
-void __buffer_error(char *file, int line);
-#define buffer_error() __buffer_error(__FILE__, __LINE__)
-
-/*
  * macro tricks to expand the set_buffer_foo(), clear_buffer_foo()
  * and buffer_foo() functions.
  */
@@ -177,7 +170,7 @@ void free_buffer_head(struct buffer_head * bh);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
 void ll_rw_block(int, int, struct buffer_head * bh[]);
 void sync_dirty_buffer(struct buffer_head *bh);
-int submit_bh(int, struct buffer_head *);
+void submit_bh(int, struct buffer_head *);
 void write_boundary_block(struct block_device *bdev,
 			sector_t bblock, unsigned blocksize);
 

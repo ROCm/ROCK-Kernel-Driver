@@ -129,8 +129,14 @@ struct dm_target_spec {
 	int32_t status;		/* used when reading from kernel only */
 
 	/*
-	 * Offset in bytes (from the start of this struct) to
-	 * next target_spec.
+	 * Location of the next dm_target_spec.
+	 * - When specifying targets on a DM_TABLE_LOAD command, this value is
+	 *   the number of bytes from the start of the "current" dm_target_spec
+	 *   to the start of the "next" dm_target_spec.
+	 * - When retrieving targets on a DM_TABLE_STATUS command, this value
+	 *   is the number of bytes from the start of the first dm_target_spec
+	 *   (that follows the dm_ioctl struct) to the start of the "next"
+	 *   dm_target_spec.
 	 */
 	uint32_t next;
 
@@ -199,6 +205,34 @@ enum {
 	/* Added later */
 	DM_LIST_VERSIONS_CMD,
 };
+
+/*
+ * The dm_ioctl struct passed into the ioctl is just the header
+ * on a larger chunk of memory.  On x86-64 and other
+ * architectures the dm-ioctl struct will be padded to an 8 byte
+ * boundary so the size will be different, which would change the
+ * ioctl code - yes I really messed up.  This hack forces these
+ * architectures to have the correct ioctl code.
+ */
+#ifdef CONFIG_COMPAT
+typedef char ioctl_struct[308];
+#define DM_VERSION_32       _IOWR(DM_IOCTL, DM_VERSION_CMD, ioctl_struct)
+#define DM_REMOVE_ALL_32    _IOWR(DM_IOCTL, DM_REMOVE_ALL_CMD, ioctl_struct)
+#define DM_LIST_DEVICES_32  _IOWR(DM_IOCTL, DM_LIST_DEVICES_CMD, ioctl_struct)
+
+#define DM_DEV_CREATE_32    _IOWR(DM_IOCTL, DM_DEV_CREATE_CMD, ioctl_struct)
+#define DM_DEV_REMOVE_32    _IOWR(DM_IOCTL, DM_DEV_REMOVE_CMD, ioctl_struct)
+#define DM_DEV_RENAME_32    _IOWR(DM_IOCTL, DM_DEV_RENAME_CMD, ioctl_struct)
+#define DM_DEV_SUSPEND_32   _IOWR(DM_IOCTL, DM_DEV_SUSPEND_CMD, ioctl_struct)
+#define DM_DEV_STATUS_32    _IOWR(DM_IOCTL, DM_DEV_STATUS_CMD, ioctl_struct)
+#define DM_DEV_WAIT_32      _IOWR(DM_IOCTL, DM_DEV_WAIT_CMD, ioctl_struct)
+
+#define DM_TABLE_LOAD_32    _IOWR(DM_IOCTL, DM_TABLE_LOAD_CMD, ioctl_struct)
+#define DM_TABLE_CLEAR_32   _IOWR(DM_IOCTL, DM_TABLE_CLEAR_CMD, ioctl_struct)
+#define DM_TABLE_DEPS_32    _IOWR(DM_IOCTL, DM_TABLE_DEPS_CMD, ioctl_struct)
+#define DM_TABLE_STATUS_32  _IOWR(DM_IOCTL, DM_TABLE_STATUS_CMD, ioctl_struct)
+#define DM_LIST_VERSIONS_32 _IOWR(DM_IOCTL, DM_LIST_VERSIONS_CMD, ioctl_struct)
+#endif
 
 #define DM_IOCTL 0xfd
 
