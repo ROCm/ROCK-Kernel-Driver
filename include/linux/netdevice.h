@@ -168,9 +168,9 @@ struct netif_rx_stats
 	unsigned fastroute_deferred_out;
 	unsigned fastroute_latency_reduction;
 	unsigned cpu_collision;
-} ____cacheline_aligned;
+};
 
-extern struct netif_rx_stats netdev_rx_stat[];
+DECLARE_PER_CPU(struct netif_rx_stats, netdev_rx_stat);
 
 
 /*

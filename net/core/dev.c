@@ -1210,7 +1210,7 @@ int no_cong = 20;
 int lo_cong = 100;
 int mod_cong = 290;
 
-struct netif_rx_stats netdev_rx_stat[NR_CPUS];
+DEFINE_PER_CPU(struct netif_rx_stats, netdev_rx_stat) = { 0, };
 
 
 #ifdef CONFIG_NET_HW_FLOWCONTROL
@@ -1359,7 +1359,7 @@ int netif_rx(struct sk_buff *skb)
 	this_cpu = smp_processor_id();
 	queue = &__get_cpu_var(softnet_data);
 
-	netdev_rx_stat[this_cpu].total++;
+	__get_cpu_var(netdev_rx_stat).total++;
 	if (queue->input_pkt_queue.qlen <= netdev_max_backlog) {
 		if (queue->input_pkt_queue.qlen) {
 			if (queue->throttle)
@@ -1389,14 +1389,14 @@ enqueue:
 
 	if (!queue->throttle) {
 		queue->throttle = 1;
-		netdev_rx_stat[this_cpu].throttled++;
+		__get_cpu_var(netdev_rx_stat).throttled++;
 #ifdef CONFIG_NET_HW_FLOWCONTROL
 		atomic_inc(&netdev_dropping);
 #endif
 	}
 
 drop:
-	netdev_rx_stat[this_cpu].dropped++;
+	__get_cpu_var(netdev_rx_stat).dropped++;
 	local_irq_restore(flags);
 
 	kfree_skb(skb);
@@ -1537,11 +1537,11 @@ int netif_receive_skb(struct sk_buff *skb)
 
 	skb_bond(skb);
 
-	netdev_rx_stat[smp_processor_id()].total++;
+	__get_cpu_var(netdev_rx_stat).total++;
 
 #ifdef CONFIG_NET_FASTROUTE
 	if (skb->pkt_type == PACKET_FASTROUTE) {
-		netdev_rx_stat[smp_processor_id()].fastroute_deferred_out++;
+		__get_cpu_var(netdev_rx_stat).fastroute_deferred_out++;
 		return dev_queue_xmit(skb);
 	}
 #endif
@@ -1672,7 +1672,6 @@ job_done:
 
 static void net_rx_action(struct softirq_action *h)
 {
-	int this_cpu = smp_processor_id();
 	struct softnet_data *queue = &__get_cpu_var(softnet_data);
 	unsigned long start_time = jiffies;
 	int budget = netdev_max_backlog;
@@ -1711,7 +1710,7 @@ out:
 	return;
 
 softnet_break:
-	netdev_rx_stat[this_cpu].time_squeeze++;
+	__get_cpu_var(netdev_rx_stat).time_squeeze++;
 	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 	goto out;
 }
@@ -1912,7 +1911,7 @@ static struct netif_rx_stats *softnet_get_online(loff_t *pos)
 
 	while (*pos < NR_CPUS)
 	       	if (cpu_online(*pos)) {
-			rc = &netdev_rx_stat[*pos];
+			rc = &per_cpu(netdev_rx_stat, *pos);
 			break;
 		} else
 			++*pos;
