@@ -49,12 +49,13 @@ static __inline__ void _raw_spin_lock(spinlock_t *lock)
 
 	__asm__ __volatile__(
 	"b		2f		# spin_lock\n\
-1:	or		1,1,1		# spin at low priority\n\
-	lwzx		%0,0,%1\n\
+1:"
+	HMT_LOW
+"	lwzx		%0,0,%1\n\
 	cmpwi		0,%0,0\n\
-	bne+		1b\n\
-	or		2,2,2		# back to medium priority\n\
-2:	lwarx		%0,0,%1\n\
+	bne+		1b\n"
+	HMT_MEDIUM
+"2:	lwarx		%0,0,%1\n\
 	cmpwi		0,%0,0\n\
 	bne-		1b\n\
 	stwcx.		%2,0,%1\n\
@@ -67,7 +68,7 @@ static __inline__ void _raw_spin_lock(spinlock_t *lock)
 
 static __inline__ void _raw_spin_unlock(spinlock_t *lock)
 {
-	__asm__ __volatile__("lwsync	# spin_unlock": : :"memory");
+	__asm__ __volatile__("eieio	# spin_unlock": : :"memory");
 	lock->lock = 0;
 }
 
@@ -115,12 +116,13 @@ static __inline__ void _raw_read_lock(rwlock_t *rw)
 
 	__asm__ __volatile__(
 	"b		2f		# read_lock\n\
-1:	or		1,1,1		# spin at low priority\n\
-	lwax		%0,0,%1\n\
+1:"
+	HMT_LOW
+"	lwax		%0,0,%1\n\
 	cmpwi		0,%0,0\n\
-	blt+		1b\n\
-	or		2,2,2		# back to medium priority\n\
-2:	lwarx		%0,0,%1\n\
+	blt+		1b\n"
+	HMT_MEDIUM
+"2:	lwarx		%0,0,%1\n\
 	extsw		%0,%0\n\
 	addic.		%0,%0,1\n\
 	ble-		1b\n\
@@ -137,7 +139,7 @@ static __inline__ void _raw_read_unlock(rwlock_t *rw)
 	unsigned int tmp;
 
 	__asm__ __volatile__(
-	"lwsync				# read_unlock\n\
+	"eieio				# read_unlock\n\
 1:	lwarx		%0,0,%1\n\
 	addic		%0,%0,-1\n\
 	stwcx.		%0,0,%1\n\
@@ -174,12 +176,13 @@ static __inline__ void _raw_write_lock(rwlock_t *rw)
 
 	__asm__ __volatile__(
 	"b		2f		# write_lock\n\
-1:	or		1,1,1		# spin at low priority\n\
-	lwax		%0,0,%1\n\
+1:"
+	HMT_LOW
+	"lwax		%0,0,%1\n\
 	cmpwi		0,%0,0\n\
-	bne+		1b\n\
-	or		2,2,2		# back to medium priority\n\
-2:	lwarx		%0,0,%1\n\
+	bne+		1b\n"
+	HMT_MEDIUM
+"2:	lwarx		%0,0,%1\n\
 	cmpwi		0,%0,0\n\
 	bne-		1b\n\
 	stwcx.		%2,0,%1\n\
@@ -192,7 +195,7 @@ static __inline__ void _raw_write_lock(rwlock_t *rw)
 
 static __inline__ void _raw_write_unlock(rwlock_t *rw)
 {
-	__asm__ __volatile__("lwsync		# write_unlock": : :"memory");
+	__asm__ __volatile__("eieio		# write_unlock": : :"memory");
 	rw->lock = 0;
 }
 

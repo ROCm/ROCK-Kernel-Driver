@@ -41,4 +41,24 @@ static inline void isync(void)
 #define isync_on_smp()	__asm__ __volatile__("": : :"memory")
 #endif
 
+/* Macros for adjusting thread priority (hardware multi-threading) */
+
+#if defined(CONFIG_PPC_ISERIES) || defined(CONFIG_HMT)
+#define HMT_low()	asm volatile("or 1,1,1		# low priority")
+#define HMT_medium()	asm volatile("or 2,2,2		# medium priority")
+#define HMT_high()	asm volatile("or 3,3,3		# high priority")
+
+#define HMT_LOW		"\tor	1,1,1		# low priority\n"
+#define HMT_MEDIUM	"\tor	2,2,2		# medium priority\n"
+#define HMT_MEDIUM	"\tor	3,3,3		# high priority\n"
+#else
+#define HMT_low()	do { } while(0)
+#define HMT_medium()	do { } while(0)
+#define HMT_high()	do { } while(0)
+
+#define HMT_LOW
+#define HMT_MEDIUM
+#define HMT_LOW
+#endif
+
 #endif

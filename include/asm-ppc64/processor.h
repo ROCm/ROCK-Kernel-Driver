@@ -589,11 +589,6 @@ GLUE(GLUE(.LT,NAME),_procname_end):
 #define CTRLF		0x088
 #define RUNLATCH	0x0001
 
-/* Macros for adjusting thread priority (hardware multi-threading) */
-#define HMT_low()	asm volatile("or 1,1,1")
-#define HMT_medium()	asm volatile("or 2,2,2")
-#define HMT_high()	asm volatile("or 3,3,3")
-
 /* Size of an exception stack frame contained in the paca. */
 #define EXC_FRAME_SIZE 64
 
