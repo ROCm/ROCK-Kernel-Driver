@@ -1,8 +1,8 @@
 /*
-	The all defines and part of code (such as cs461x_*) are 
-	contributed from ALSA 0.5.8 sources. 
+	The all defines and part of code (such as cs461x_*) are
+	contributed from ALSA 0.5.8 sources.
 	See http://www.alsa-project.org/ for sources
-	
+
 	Tested on Linux 686 2.4.0-test9, ALSA 0.5.8a and CS4610
 */
 
@@ -89,8 +89,8 @@ MODULE_LICENSE("GPL");
 #define JSIO_BXOE                               0x00000040
 #define JSIO_BYOE                               0x00000080
 
-/* 
-   The card initialization code is obfuscated; the module cs461x 
+/*
+   The card initialization code is obfuscated; the module cs461x
    need to be loaded after ALSA modules initialized and something
    played on the CS 4610 chip (see sources for details of CS4610
    initialization code from ALSA)
@@ -112,7 +112,7 @@ MODULE_LICENSE("GPL");
 #define BA1_DWORD_SIZE          (13 * 1024 + 512)
 #define BA1_MEMORY_COUNT        3
 
-/* 
+/*
    Only one CS461x card is still suppoted; the code requires
    redesign to avoid this limitatuion.
 */
@@ -163,7 +163,7 @@ static int cs461x_free(struct pci_dev *pdev)
 	if(port){
 	    gameport_unregister_port(port);
 	    kfree(port);
-	}    
+	}
 	if (ba0) iounmap(ba0);
 #ifdef CS461X_FULL_MAP
 	if (ba1.name.data0) iounmap(ba1.name.data0);
@@ -187,13 +187,13 @@ static unsigned char cs461x_gameport_read(struct gameport *gameport)
 static int cs461x_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
 	unsigned js1, js2, jst;
-	
+
 	js1 = cs461x_peekBA0(BA0_JSC1);
 	js2 = cs461x_peekBA0(BA0_JSC2);
 	jst = cs461x_peekBA0(BA0_JSPT);
-	
-	*buttons = (~jst >> 4) & 0x0F; 
-	
+
+	*buttons = (~jst >> 4) & 0x0F;
+
 	axes[0] = ((js1 & JSC1_Y1V_MASK) >> JSC1_Y1V_SHIFT) & 0xFFFF;
 	axes[1] = ((js1 & JSC1_X1V_MASK) >> JSC1_X1V_SHIFT) & 0xFFFF;
 	axes[2] = ((js2 & JSC2_Y2V_MASK) >> JSC2_Y2V_SHIFT) & 0xFFFF;
@@ -228,7 +228,7 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 {
 	int rc;
 	struct gameport* port;
-	
+
 	rc = pci_enable_device(pdev);
 	if (rc) {
 		printk(KERN_ERR "cs461x: Cannot enable PCI gameport (bus %d, devfn %d) error=%d\n",
@@ -240,7 +240,7 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 #ifdef CS461X_FULL_MAP
 	ba1_addr = pci_resource_start(pdev, 1);
 #endif
-	if (ba0_addr == 0 || ba0_addr == ~0 
+	if (ba0_addr == 0 || ba0_addr == ~0
 #ifdef CS461X_FULL_MAP
             || ba1_addr == 0 || ba1_addr == ~0
 #endif
@@ -281,7 +281,7 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	memset(port, 0, sizeof(struct gameport));
 
 	pci_set_drvdata(pdev, port);
-	
+
 	port->open = cs461x_gameport_open;
 	port->trigger = cs461x_gameport_trigger;
 	port->read = cs461x_gameport_read;
@@ -310,7 +310,7 @@ static void __devexit cs461x_pci_remove(struct pci_dev *pdev)
 {
 	cs461x_free(pdev);
 }
-	
+
 static struct pci_driver cs461x_pci_driver = {
         .name =         "CS461x Gameport",
         .id_table =     cs461x_pci_tbl,

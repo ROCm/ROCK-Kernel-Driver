@@ -11,18 +11,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
@@ -67,11 +67,17 @@ struct serio_event {
 	struct list_head node;
 };
 
-static DECLARE_MUTEX(serio_sem);
+
+spinlock_t serio_lock = SPIN_LOCK_UNLOCKED;	/* protects serio_event_list and serio->dev */
+static DECLARE_MUTEX(serio_sem);		/* protects serio_list and serio_dev_list */
 static LIST_HEAD(serio_list);
 static LIST_HEAD(serio_dev_list);
 static LIST_HEAD(serio_event_list);
 static int serio_pid;
+
+/*
+ * serio_find_dev() must be called with serio_sem down.
+ */
 
 static void serio_find_dev(struct serio *serio)
 {
@@ -96,22 +102,42 @@ static DECLARE_COMPLETION(serio_exited);
 static void serio_invalidate_pending_events(struct serio *serio)
 {
 	struct serio_event *event;
+	unsigned long flags;
+
+	spin_lock_irqsave(&serio_lock, flags);
 
 	list_for_each_entry(event, &serio_event_list, node)
 		if (event->serio == serio)
 			event->serio = NULL;
+
+	spin_unlock_irqrestore(&serio_lock, flags);
 }
 
 void serio_handle_events(void)
 {
-	struct list_head *node, *next;
+	struct list_head *node;
 	struct serio_event *event;
+	unsigned long flags;
 
-	list_for_each_safe(node, next, &serio_event_list) {
-		event = container_of(node, struct serio_event, node);	
+	
+	while (1) {
+
+		spin_lock_irqsave(&serio_lock, flags);
+		
+		if (list_empty(&serio_event_list)) {
+			spin_unlock_irqrestore(&serio_lock, flags);
+			break;
+		}
+
+		node = serio_event_list.next;
+		event = container_of(node, struct serio_event, node);
+		list_del_init(node);
+
+		spin_unlock_irqrestore(&serio_lock, flags);
 
 		down(&serio_sem);
-		if (event->serio == NULL)
+
+		if (event->serio == NULL) /*!!!*/
 			goto event_done;
 
 		switch (event->type) {
@@ -139,7 +165,6 @@ void serio_handle_events(void)
 		}
 event_done:
 		up(&serio_sem);
-		list_del_init(node);
 		kfree(event);
 	}
 }
@@ -152,7 +177,7 @@ static int serio_thread(void *nothing)
 
 	do {
 		serio_handle_events();
-		wait_event_interruptible(serio_wait, !list_empty(&serio_event_list)); 
+		wait_event_interruptible(serio_wait, !list_empty(&serio_event_list));
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_FREEZE);
 	} while (!signal_pending(current));
@@ -178,12 +203,18 @@ static void serio_queue_event(struct serio *serio, int event_type)
 
 void serio_rescan(struct serio *serio)
 {
+	unsigned long flags;
+	spin_lock_irqsave(&serio_lock, flags);
 	serio_queue_event(serio, SERIO_RESCAN);
+	spin_unlock_irqrestore(&serio_lock, flags);
 }
 
 void serio_reconnect(struct serio *serio)
 {
+	unsigned long flags;
+	spin_lock_irqsave(&serio_lock, flags);
 	serio_queue_event(serio, SERIO_RECONNECT);
+	spin_unlock_irqrestore(&serio_lock, flags);
 }
 
 irqreturn_t serio_interrupt(struct serio *serio,
@@ -191,17 +222,22 @@ irqreturn_t serio_interrupt(struct serio *serio,
 {
 	irqreturn_t ret = IRQ_NONE;
 
+	spin_lock_irq(&serio_lock);
+
         if (serio->dev && serio->dev->interrupt) {
                 ret = serio->dev->interrupt(serio, data, flags, regs);
 	} else {
 		if (!flags) {
-			if ((serio->type == SERIO_8042 ||
-				serio->type == SERIO_8042_XL) && (data != 0xaa))
-					return ret;
-			serio_rescan(serio);
-			ret = IRQ_HANDLED;
+			if ((serio->type != SERIO_8042 &&
+			     serio->type != SERIO_8042_XL) || (data == 0xaa)) {
+				serio_queue_event(serio, SERIO_RESCAN);
+				ret = IRQ_HANDLED;
+			}
 		}
 	}
+	
+	spin_unlock_irq(&serio_lock);
+
 	return ret;
 }
 
@@ -292,8 +328,12 @@ void serio_unregister_device(struct serio_dev *dev)
 /* called from serio_dev->connect/disconnect methods under serio_sem */
 int serio_open(struct serio *serio, struct serio_dev *dev)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&serio_lock, flags);
 	serio->dev = dev;
-	if (serio->open(serio)) {
+	spin_unlock_irqrestore(&serio_lock, flags);
+	if (serio->open && serio->open(serio)) {
 		serio->dev = NULL;
 		return -1;
 	}
@@ -303,8 +343,13 @@ int serio_open(struct serio *serio, struct serio_dev *dev)
 /* called from serio_dev->connect/disconnect methods under serio_sem */
 void serio_close(struct serio *serio)
 {
-	serio->close(serio);
+	unsigned long flags;
+
+	if (serio->close)
+		serio->close(serio);
+	spin_lock_irqsave(&serio_lock, flags);
 	serio->dev = NULL;
+	spin_unlock_irqrestore(&serio_lock, flags);
 }
 
 static int __init serio_init(void)
