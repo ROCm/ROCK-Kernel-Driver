@@ -973,23 +973,6 @@ ether1_getstats (struct net_device *dev)
 	return &priv->stats;
 }
 
-static int
-ether1_set_mac_address(struct net_device *dev, void *p)
-{
-	struct sockaddr *addr = p;
-
-	if (netif_running(dev))
-		return -EBUSY;
-
-	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
-
-	/*
-	 * We'll set the MAC address on the chip when we open it.
-	 */
-
-	return 0;
-}
-
 /*
  * Set or clear the multicast filter for this adaptor.
  * num_addrs == -1	Promiscuous mode, receive all packets.
@@ -1062,7 +1045,6 @@ ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
 	dev->hard_start_xmit    = ether1_sendpacket;
 	dev->get_stats		= ether1_getstats;
 	dev->set_multicast_list = ether1_setmulticastlist;
-	dev->set_mac_address	= ether1_set_mac_address;
 	dev->tx_timeout		= ether1_timeout;
 	dev->watchdog_timeo	= 5 * HZ / 100;
 

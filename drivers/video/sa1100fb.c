@@ -1590,11 +1590,21 @@ sa1100fb_freq_policy(struct notifier_block *nb, unsigned long val,
 	struct sa1100fb_info *fbi = TO_INF(nb, freq_policy);
 	struct cpufreq_policy *policy = data;
 
-	if (val == CPUFREQ_INCOMPATIBLE) {
+	switch (val) {
+	case CPUFREQ_ADJUST:
+	case CPUFREQ_INCOMPATIBLE:
 		printk(KERN_DEBUG "min dma period: %d ps, "
 			"new clock %d kHz\n", sa1100fb_min_dma_period(fbi),
 			policy->max);
 		/* todo: fill in min/max values */
+		break;
+	case CPUFREQ_NOTIFY:
+		do {} while(0);
+		/* todo: panic if min/max values aren't fulfilled 
+		 * [can't really happen unless there's a bug in the
+		 * CPU policy verififcation process *
+		 */
+		break;
 	}
 	return 0;
 }

@@ -18,7 +18,6 @@
 #include <asm/mach/pci.h>
 
 static int debug_pci;
-int have_isa_bridge;
 
 void pcibios_report_status(u_int status_mask, int warn)
 {
@@ -363,9 +362,8 @@ pbus_assign_bus_resources(struct pci_bus *bus, struct pci_sys_data *root)
 void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct pci_sys_data *root = bus->sysdata;
-	struct list_head *walk;
-	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY;
-	u16 all_status = -1;
+	struct pci_dev *dev;
+	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
 
 	pbus_assign_bus_resources(bus, root);
 
@@ -373,42 +371,43 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 	 * Walk the devices on this bus, working out what we can
 	 * and can't support.
 	 */
-	for (walk = bus->devices.next; walk != &bus->devices; walk = walk->next) {
-		struct pci_dev *dev = pci_dev_b(walk);
+	list_for_each_entry(dev, &bus->devices, bus_list) {
 		u16 status;
 
 		pdev_fixup_device_resources(root, dev);
 
 		pci_read_config_word(dev, PCI_STATUS, &status);
-		all_status &= status;
+
+		/*
+		 * If any device on this bus does not support fast back
+		 * to back transfers, then the bus as a whole is not able
+		 * to support them.  Having fast back to back transfers
+		 * on saves us one PCI cycle per transaction.
+		 */
+		if (!(status & PCI_STATUS_FAST_BACK))
+			features &= ~PCI_COMMAND_FAST_BACK;
 
 		if (pdev_bad_for_parity(dev))
 			features &= ~(PCI_COMMAND_SERR | PCI_COMMAND_PARITY);
 
-		/*
-		 * If this device is an ISA bridge, set the have_isa_bridge
-		 * flag.  We will then go looking for things like keyboard,
-		 * etc
-		 */
-		if (dev->class >> 8 == PCI_CLASS_BRIDGE_ISA ||
-		    dev->class >> 8 == PCI_CLASS_BRIDGE_EISA)
-			have_isa_bridge = !0;
+		switch (dev->class >> 8) {
+#if defined(CONFIG_ISA) || defined(CONFIG_EISA)
+		case PCI_CLASS_BRIDGE_ISA:
+		case PCI_CLASS_BRIDGE_EISA:
+			/*
+			 * If this device is an ISA bridge, set isa_bridge
+			 * to point at this device.  We will then go looking
+			 * for things like keyboard, etc.
+			 */
+			isa_bridge = dev;
+			break;
+#endif
 	}
-
-	/*
-	 * If any device on this bus does not support fast back to back
-	 * transfers, then the bus as a whole is not able to support them.
-	 * Having fast back to back transfers on saves us one PCI cycle
-	 * per transaction.
-	 */
-	if (all_status & PCI_STATUS_FAST_BACK)
-		features |= PCI_COMMAND_FAST_BACK;
 
 	/*
 	 * Now walk the devices again, this time setting them up.
 	 */
-	for (walk = bus->devices.next; walk != &bus->devices; walk = walk->next) {
-		struct pci_dev *dev = pci_dev_b(walk);
+	list_for_each_entry(dev, &bus->devices, bus_list) {
 		u16 cmd;
 
 		pci_read_config_word(dev, PCI_COMMAND, &cmd);
@@ -416,7 +415,17 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 
 		pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE,
-				      SMP_CACHE_BYTES >> 2);
+				      L1_CACHE_BYTES >> 2);
+	}
+
+	/*
+	 * Propagate the flags to the PCI bridge.
+	 */
+	if (bus->self && bus->self->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
+		if (features & PCI_COMMAND_FAST_BACK)
+			bus->bridge_ctl |= PCI_BRIDGE_CTL_FAST_BACK;
+		if (features & PCI_COMMAND_PARITY)
+			bus->bridge_ctl |= PCI_BRIDGE_CTL_PARITY;
 	}
 
 	/*
@@ -454,20 +463,17 @@ pcibios_fixup_pbus_ranges(struct pci_bus *bus, struct pbus_set_ranges_data *rang
  */
 u8 __devinit pci_std_swizzle(struct pci_dev *dev, u8 *pinp)
 {
-	int pin = *pinp;
+	int pin = *pinp - 1;
 
-	if (pin != 0) {
-		pin -= 1;
-		while (dev->bus->self) {
-			pin = (pin + PCI_SLOT(dev->devfn)) & 3;
-			/*
-			 * move up the chain of bridges,
-			 * swizzling as we go.
-			 */
-			dev = dev->bus->self;
-		}
-		*pinp = pin + 1;
+	while (dev->bus->self) {
+		pin = (pin + PCI_SLOT(dev->devfn)) & 3;
+		/*
+		 * move up the chain of bridges,
+		 * swizzling as we go.
+		 */
+		dev = dev->bus->self;
 	}
+	*pinp = pin + 1;
 
 	return PCI_SLOT(dev->devfn);
 }

@@ -110,6 +110,7 @@ extern struct page *empty_zero_page;
 #define pgd_bad(pgd)		(0)
 #define pgd_present(pgd)	(1)
 #define pgd_clear(pgdp)		do { } while (0)
+#define set_pgd(pgd,pgdp)	do { } while (0)
 
 #define page_pte_prot(page,prot)	mk_pte(page, prot)
 #define page_pte(page)		mk_pte(page, __pgprot(0))

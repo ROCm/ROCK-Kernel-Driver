@@ -47,7 +47,6 @@
 #include <linux/notifier.h>
 #include <linux/proc_fs.h>
 #include <linux/version.h>
-#include <linux/cpufreq.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
