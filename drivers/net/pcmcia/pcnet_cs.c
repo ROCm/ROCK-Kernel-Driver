@@ -1224,12 +1224,12 @@ static int ei_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
     u16 *data = (u16 *)&rq->ifr_data;
     ioaddr_t mii_addr = dev->base_addr + DLINK_GPIO;
     switch (cmd) {
-    case SIOCDEVPRIVATE:
+    case SIOCGMIIPHY:
 	data[0] = info->phy_id;
-    case SIOCDEVPRIVATE+1:
+    case SIOCGMIIREG:		/* Read MII PHY register. */
 	data[3] = mdio_read(mii_addr, data[0], data[1] & 0x1f);
 	return 0;
-    case SIOCDEVPRIVATE+2:
+    case SIOCSMIIREG:		/* Write MII PHY register. */
 	if (!capable(CAP_NET_ADMIN))
 	    return -EPERM;
 	mdio_write(mii_addr, data[0], data[1] & 0x1f, data[2]);

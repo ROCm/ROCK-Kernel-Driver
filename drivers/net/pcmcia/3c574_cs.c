@@ -1227,9 +1227,9 @@ static int el3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		  data[0], data[1], data[2], data[3]);
 
 	switch(cmd) {
-	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
+	case SIOCGMIIPHY:		/* Get the address of the PHY in use. */
 		data[0] = phy;
-	case SIOCDEVPRIVATE+1:		/* Read the specified MII register. */
+	case SIOCGMIIREG:		/* Read the specified MII register. */
 		{
 			int saved_window;
 			unsigned long flags;
@@ -1242,7 +1242,7 @@ static int el3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			spin_unlock_irqrestore(&lp->window_lock, flags);
 			return 0;
 		}
-	case SIOCDEVPRIVATE+2:		/* Write the specified MII register */
+	case SIOCSMIIREG:		/* Write the specified MII register */
 		{
 			int saved_window;
                        unsigned long flags;
