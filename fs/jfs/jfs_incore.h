@@ -123,7 +123,7 @@ struct jfs_sb_info {
 	short		nbperpage;	/* 2: blocks per page		*/
 	short		l2nbperpage;	/* 2: log2 blocks per page	*/
 	short		l2niperblk;	/* 2: log2 inodes per page	*/
-	short		reserved;	/* 2: log2 inodes per page	*/
+	kdev_t		logdev;		/* 2: external log device	*/
 	pxd_t		logpxd;		/* 8: pxd describing log	*/
 	pxd_t		ait2;		/* 8: pxd describing AIT copy	*/
 	/* Formerly in ipimap */
