@@ -848,7 +848,7 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 			cFYI(1,(" SetEOF (commit write) rc = %d",rc));
 		}*/
 	}
-        if (!PageUptodate(page)) {
+	if (!PageUptodate(page)) {
 		position =  ((loff_t)page->index << PAGE_CACHE_SHIFT) + offset;
 		/* can not rely on (or let) writepage write this data */
 		if(to < offset) {
@@ -1284,6 +1284,49 @@ cifs_readpage(struct file *file, struct page *page)
 	return rc;
 }
 
+/* We do not want to update the file size from server for inodes
+   open for write - to avoid races with writepage extending
+   the file - in the future we could consider allowing
+   refreshing the inode only on increases in the file size 
+   but this is tricky to do without racing with writebehind
+   page caching in the current Linux kernel design */
+   
+int is_size_safe_to_change(struct cifsInodeInfo * cifsInode)
+{
+	struct list_head *tmp;
+	struct list_head *tmp1;
+	struct cifsFileInfo *open_file = NULL;
+	int rc = TRUE;
+
+	if(cifsInode == NULL)
+		return rc;
+
+	read_lock(&GlobalSMBSeslock); 
+	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
+		open_file = list_entry(tmp,struct cifsFileInfo, flist);
+		if(open_file == NULL)
+			break;
+		if(open_file->closePend)
+			continue;
+	/* We check if file is open for writing,   
+	BB we could supplement this with a check to see if file size
+	changes have been flushed to server - ie inode metadata dirty */
+		if((open_file->pfile) && 
+	   ((open_file->pfile->f_flags & O_RDWR) || 
+		(open_file->pfile->f_flags & O_WRONLY))) {
+			 rc = FALSE;
+			 break;
+		}
+		if(tmp->next == NULL) {
+			cFYI(1,("File instance %p removed",tmp));
+			break;
+		}
+	}
+	read_unlock(&GlobalSMBSeslock);
+	return rc;
+}
+
+
 void
 fill_in_inode(struct inode *tmp_inode,
 	      FILE_DIRECTORY_INFO * pfindData, int *pobject_type)
@@ -1343,11 +1386,15 @@ fill_in_inode(struct inode *tmp_inode,
 		atomic_set(&cifsInfo->inUse,1);
 	}
 
-	i_size_write(tmp_inode,pfindData->EndOfFile);
+	if(is_size_safe_to_change(cifsInfo)) {
+		/* can not safely change the file size here if the 
+		client is writing to it due to potential races */
+		i_size_write(tmp_inode,pfindData->EndOfFile);
 
 	/* 512 bytes (2**9) is the fake blocksize that must be used */
 	/* for this calculation, even though the reported blocksize is larger */
-	tmp_inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
+		tmp_inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
+	}
 
 	if (pfindData->AllocationSize < pfindData->EndOfFile)
 		cFYI(1, ("Possible sparse file: allocation size less than end of file "));
@@ -1419,12 +1466,17 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	tmp_inode->i_nlink = le64_to_cpu(pfindData->Nlinks);
 
 	pfindData->NumOfBytes = le64_to_cpu(pfindData->NumOfBytes);
-	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
-	i_size_write(tmp_inode,pfindData->EndOfFile);
+
+	if(is_size_safe_to_change(cifsInfo)) {
+		/* can not safely change the file size here if the 
+		client is writing to it due to potential races */
+		pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
+		i_size_write(tmp_inode,pfindData->EndOfFile);
 
 	/* 512 bytes (2**9) is the fake blocksize that must be used */
 	/* for this calculation, not the real blocksize */
-	tmp_inode->i_blocks = (512 - 1 + pfindData->NumOfBytes) >> 9;
+		tmp_inode->i_blocks = (512 - 1 + pfindData->NumOfBytes) >> 9;
+	}
 
 	if (S_ISREG(tmp_inode->i_mode)) {
 		cFYI(1, ("File inode"));
@@ -1568,9 +1620,9 @@ cifs_filldir_unix(struct qstr *pqstring,
 	pqstring->len = strnlen(pUnixFindData->FileName, MAX_PATHCONF);
 
 	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
-        if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
-                return -ENOMEM;
-        }
+	if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
+		return -ENOMEM;
+	}
 
 	unix_fill_in_inode(tmp_inode, pUnixFindData, &object_type);
 	rc = filldir(direntry, pUnixFindData->FileName, pqstring->len,
