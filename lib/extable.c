@@ -18,6 +18,7 @@
 extern struct exception_table_entry __start___ex_table[];
 extern struct exception_table_entry __stop___ex_table[];
 
+#ifndef ARCH_HAS_SORT_EXTABLE
 /*
  * The exception table needs to be sorted so that the binary
  * search that we use to find entries in it works properly.
@@ -45,7 +46,9 @@ void sort_extable(struct exception_table_entry *start,
 		}
 	}
 }
+#endif
 
+#ifndef ARCH_HAS_SEARCH_EXTABLE
 /*
  * Search one exception table for an entry corresponding to the
  * given instruction address, and return the address of the entry,
@@ -75,3 +78,4 @@ search_extable(const struct exception_table_entry *first,
         }
         return NULL;
 }
+#endif
