@@ -23,6 +23,8 @@
  * bootup setup stuff..
  */
 
+#undef DEBUG
+
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/errno.h>
@@ -63,7 +65,6 @@
 #include <asm/iommu.h>
 #include <asm/machdep.h>
 #include <asm/dma.h>
-#include <asm/bootx.h>
 #include <asm/btext.h>
 #include <asm/cputable.h>
 #include <asm/pmac_feature.h>
@@ -73,6 +74,13 @@
 
 #include "pmac.h"
 
+#ifdef DEBUG
+#define DBG(fmt...) udbg_printf(fmt)
+#else
+#define DBG(fmt...)
+#endif
+
+
 static int current_root_goodness = -1;
 #define DEFAULT_ROOT_DEVICE Root_SDA1	/* sda1 - slightly silly choice */
 
@@ -80,10 +88,6 @@ extern  int powersave_nap;
 int sccdbg;
 
 extern void udbg_init_scc(struct device_node *np);
-
-#ifdef CONFIG_BOOTX_TEXT
-void pmac_progress(char *s, unsigned short hex);
-#endif
 
 void __pmac pmac_show_cpuinfo(struct seq_file *m)
 {
@@ -134,28 +138,20 @@ void __pmac pmac_show_cpuinfo(struct seq_file *m)
 
 void __init pmac_setup_arch(void)
 {
-	struct device_node *cpu;
-	int *fp;
-	unsigned long pvr;
+	/* init to some ~sane value until calibrate_delay() runs */
+	loops_per_jiffy = 50000000;
 
-	pvr = PVR_VER(mfspr(PVR));
-
-	/* Set loops_per_jiffy to a half-way reasonable value,
-	   for use until calibrate_delay gets called. */
-	cpu = find_type_devices("cpu");
-	if (cpu != 0) {
-		fp = (int *) get_property(cpu, "clock-frequency", NULL);
-		if (fp != 0) {
-			if (pvr == 4 || pvr >= 8)
-				/* 604, G3, G4 etc. */
-				loops_per_jiffy = *fp / HZ;
-			else
-				/* 601, 603, etc. */
-				loops_per_jiffy = *fp / (2*HZ);
-		} else
-			loops_per_jiffy = 50000000 / HZ;
+	/* Probe motherboard chipset */
+	pmac_feature_init();
+#if 0
+	/* Lock-enable the SCC channel used for debug */
+	if (sccdbg) {
+		np = of_find_node_by_name(NULL, "escc");
+		if (np)
+			pmac_call_feature(PMAC_FTR_SCC_ENABLE, np,
+					  PMAC_SCC_ASYNC | PMAC_SCC_FLAG_XMON, 1);
 	}
-	
+#endif
 	/* We can NAP */
 	powersave_nap = 1;
 
@@ -183,67 +179,13 @@ void __init pmac_setup_arch(void)
 #endif
 }
 
-extern char *bootpath;
-extern char *bootdevice;
-void *boot_host;
-int boot_target;
-int boot_part;
-extern dev_t boot_dev;
-
 #ifdef CONFIG_SCSI
-void __init note_scsi_host(struct device_node *node, void *host)
+void note_scsi_host(struct device_node *node, void *host)
 {
-	int l;
-	char *p;
-
-	l = strlen(node->full_name);
-	if (bootpath != NULL && bootdevice != NULL
-	    && strncmp(node->full_name, bootdevice, l) == 0
-	    && (bootdevice[l] == '/' || bootdevice[l] == 0)) {
-		boot_host = host;
-		/*
-		 * There's a bug in OF 1.0.5.  (Why am I not surprised.)
-		 * If you pass a path like scsi/sd@1:0 to canon, it returns
-		 * something like /bandit@F2000000/gc@10/53c94@10000/sd@0,0
-		 * That is, the scsi target number doesn't get preserved.
-		 * So we pick the target number out of bootpath and use that.
-		 */
-		p = strstr(bootpath, "/sd@");
-		if (p != NULL) {
-			p += 4;
-			boot_target = simple_strtoul(p, NULL, 10);
-			p = strchr(p, ':');
-			if (p != NULL)
-				boot_part = simple_strtoul(p + 1, NULL, 10);
-		}
-	}
+	/* Obsolete */
 }
 #endif
 
-#if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
-static dev_t __init find_ide_boot(void)
-{
-	char *p;
-	int n;
-	dev_t __init pmac_find_ide_boot(char *bootdevice, int n);
-
-	if (bootdevice == NULL)
-		return 0;
-	p = strrchr(bootdevice, '/');
-	if (p == NULL)
-		return 0;
-	n = p - bootdevice;
-
-	return pmac_find_ide_boot(bootdevice, n);
-}
-#endif /* CONFIG_BLK_DEV_IDE && CONFIG_BLK_DEV_IDE_PMAC */
-
-void __init find_boot_device(void)
-{
-#if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
-	boot_dev = find_ide_boot();
-#endif
-}
 
 static int initializing = 1;
 
@@ -258,7 +200,7 @@ late_initcall(pmac_late_init);
 /* can't be __init - can be called whenever a disk is first accessed */
 void __pmac note_bootable_part(dev_t dev, int part, int goodness)
 {
-	static int found_boot = 0;
+	extern dev_t boot_dev;
 	char *p;
 
 	if (!initializing)
@@ -270,10 +212,6 @@ void __pmac note_bootable_part(dev_t dev, int part, int goodness)
 	if (p != NULL && (p == saved_command_line || p[-1] == ' '))
 		return;
 
-	if (!found_boot) {
-		find_boot_device();
-		found_boot = 1;
-	}
 	if (!boot_dev || dev == boot_dev) {
 		ROOT_DEV = dev + part;
 		boot_dev = 0;
@@ -313,21 +251,73 @@ static void btext_putc(unsigned char c)
 }
 #endif /* CONFIG_BOOTX_TEXT */
 
+static void __init init_boot_display(void)
+{
+	char *name;
+	struct device_node *np = NULL; 
+	int rc = -ENODEV;
+
+	printk("trying to initialize btext ...\n");
+
+	name = (char *)get_property(of_chosen, "linux,stdout-path", NULL);
+	if (name != NULL) {
+		np = of_find_node_by_path(name);
+		if (np != NULL) {
+			if (strcmp(np->type, "display") != 0) {
+				printk("boot stdout isn't a display !\n");
+				of_node_put(np);
+				np = NULL;
+			}
+		}
+	}
+	if (np)
+		rc = btext_initialize(np);
+	if (rc == 0)
+		return;
+
+	for (np = NULL; (np = of_find_node_by_type(np, "display"));) {
+		if (get_property(np, "linux,opened", NULL)) {
+			printk("trying %s ...\n", np->full_name);
+			rc = btext_initialize(np);
+			printk("result: %d\n", rc);
+		}
+		if (rc == 0)
+			return;
+	}
+}
+
 /* 
  * Early initialization.
- * Relocation is on but do not reference unbolted pages
- * Also, device-tree hasn't been "finished", so don't muck with
- * it too much
  */
 void __init pmac_init_early(void)
 {
-	hpte_init_pSeries();
+	DBG(" -> pmac_init_early\n");
 
+	/* Initialize hash table, from now on, we can take hash faults
+	 * and call ioremap
+	 */
+	hpte_init_native();
+
+	/* Init SCC */
+       	if (strstr(cmd_line, "sccdbg")) {
+		sccdbg = 1;
+       		udbg_init_scc(NULL);
+       	}
+
+	else {
 #ifdef CONFIG_BOOTX_TEXT
-	ppc_md.udbg_putc = btext_putc;
-	ppc_md.udbg_getc = dummy_getc;
-	ppc_md.udbg_getc_poll = dummy_getc_poll;
+		init_boot_display();
+
+		ppc_md.udbg_putc = btext_putc;
+		ppc_md.udbg_getc = dummy_getc;
+		ppc_md.udbg_getc_poll = dummy_getc_poll;
 #endif /* CONFIG_BOOTX_TEXT */
+	}
+
+	/* Setup interrupt mapping options */
+	naca->interrupt_controller = IC_OPEN_PIC;
+
+	DBG(" <- pmac_init_early\n");
 }
 
 extern void* OpenPIC_Addr;
@@ -417,60 +407,19 @@ static int __init pmac_irq_cascade_init(void)
 
 core_initcall(pmac_irq_cascade_init);
 
-void __init pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
-		      unsigned long r6, unsigned long r7)
-{
-	/* Probe motherboard chipset */
-	pmac_feature_init();
-
-	/* Init SCC */
-	if (strstr(cmd_line, "sccdbg")) {
-		sccdbg = 1;
-		udbg_init_scc(NULL);
-	}
-
-	/* Fill up the machine description */
-	ppc_md.setup_arch     = pmac_setup_arch;
-       	ppc_md.get_cpuinfo    = pmac_show_cpuinfo;
-
-	ppc_md.init_IRQ       = pmac_init_IRQ;
-	ppc_md.get_irq        = openpic_get_irq;
-
-	ppc_md.pcibios_fixup  = pmac_pcibios_fixup;
-
-	ppc_md.restart        = pmac_restart;
-	ppc_md.power_off      = pmac_power_off;
-	ppc_md.halt           = pmac_halt;
-
-       	ppc_md.get_boot_time  = pmac_get_boot_time;
-       	ppc_md.set_rtc_time   = pmac_set_rtc_time;
-       	ppc_md.get_rtc_time   = pmac_get_rtc_time;
-      	ppc_md.calibrate_decr = pmac_calibrate_decr;
-
-	ppc_md.feature_call   = pmac_do_feature_call;
-
-
-#ifdef CONFIG_BOOTX_TEXT
-	ppc_md.progress       = pmac_progress;
-#endif /* CONFIG_BOOTX_TEXT */
-
-	if (ppc_md.progress) ppc_md.progress("pmac_init(): exit", 0);
-
-}
-
-#ifdef CONFIG_BOOTX_TEXT
-void __init pmac_progress(char *s, unsigned short hex)
+static void __init pmac_progress(char *s, unsigned short hex)
 {
 	if (sccdbg) {
 		udbg_puts(s);
-		udbg_putc('\n');
+		udbg_puts("\n");
 	}
+#ifdef CONFIG_BOOTX_TEXT
 	else if (boot_text_mapped) {
 		btext_drawstring(s);
-		btext_drawchar('\n');
+		btext_drawstring("\n");
 	}
-}
 #endif /* CONFIG_BOOTX_TEXT */
+}
 
 static int __init pmac_declare_of_platform_devices(void)
 {
@@ -489,3 +438,43 @@ static int __init pmac_declare_of_platform_devices(void)
 }
 
 device_initcall(pmac_declare_of_platform_devices);
+
+/*
+ * Called very early, MMU is off, device-tree isn't unflattened
+ */
+static int __init pmac_probe(int platform)
+{
+	if (platform != PLATFORM_POWERMAC)
+		return 0;
+
+#ifdef CONFIG_PMAC_DART
+	/*
+	 * On U3, the DART (iommu) must be allocated now since it
+	 * has an impact on htab_initialize (due to the large page it
+	 * occupies having to be broken up so the DART itself is not
+	 * part of the cacheable linar mapping
+	 */
+	pmac_iommu_alloc();
+#endif /* CONFIG_PMAC_DART */
+
+	return 1;
+}
+
+struct machdep_calls __initdata pmac_md = {
+	.probe			= pmac_probe,
+	.setup_arch		= pmac_setup_arch,
+	.init_early		= pmac_init_early,
+       	.get_cpuinfo		= pmac_show_cpuinfo,
+	.init_IRQ		= pmac_init_IRQ,
+	.get_irq		= openpic_get_irq,
+	.pcibios_fixup		= pmac_pcibios_fixup,
+	.restart		= pmac_restart,
+	.power_off		= pmac_power_off,
+	.halt			= pmac_halt,
+       	.get_boot_time		= pmac_get_boot_time,
+       	.set_rtc_time		= pmac_set_rtc_time,
+       	.get_rtc_time		= pmac_get_rtc_time,
+      	.calibrate_decr		= pmac_calibrate_decr,
+	.feature_call		= pmac_do_feature_call,
+	.progress		= pmac_progress,
+};

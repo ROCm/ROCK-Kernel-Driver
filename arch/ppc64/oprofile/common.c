@@ -133,7 +133,7 @@ int __init oprofile_arch_init(struct oprofile_operations **ops)
 {
 	unsigned int pvr;
 
-	pvr = _get_PVR();
+	pvr = mfspr(SPRN_PVR);
 
 	switch (PVR_VER(pvr)) {
 		case PV_630:

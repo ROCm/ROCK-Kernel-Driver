@@ -77,11 +77,17 @@ extern void flush_dcache_page(struct page *page);
 #define flush_icache_range(s,e)		do { flush_kernel_dcache_range_asm(s,e); flush_kernel_icache_range_asm(s,e); } while (0)
 
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
-do { memcpy(dst, src, len); \
-     flush_kernel_dcache_range_asm((unsigned long)dst, (unsigned long)dst + len); \
+do { \
+	flush_cache_page(vma, vaddr); \
+	memcpy(dst, src, len); \
+	flush_kernel_dcache_range_asm((unsigned long)dst, (unsigned long)dst + len); \
 } while (0)
+
 #define copy_from_user_page(vma, page, vaddr, dst, src, len) \
-	memcpy(dst, src, len)
+do { \
+	flush_cache_page(vma, vaddr); \
+	memcpy(dst, src, len); \
+} while (0)
 
 static inline void flush_cache_range(struct vm_area_struct *vma,
 		unsigned long start, unsigned long end)

@@ -102,8 +102,9 @@ void ppc64_enable_pmcs(void)
 {
 	/* XXX Implement for iseries */
 }
-#else
+#endif
 
+#ifdef CONFIG_PPC_MULTIPLATFORM
 /*
  * Enabling PMCs will slow partition context switch times so we only do
  * it the first time we write to the PMCs.
@@ -114,9 +115,11 @@ static DEFINE_PER_CPU(char, pmcs_enabled);
 void ppc64_enable_pmcs(void)
 {
 	unsigned long hid0;
+#ifdef CONFIG_PPC_PSERIES
 	unsigned long set, reset;
 	int ret;
 	unsigned int ctrl;
+#endif /* CONFIG_PPC_PSERIES */
 
 	/* Only need to enable them once */
 	if (__get_cpu_var(pmcs_enabled))
@@ -125,38 +128,42 @@ void ppc64_enable_pmcs(void)
 	__get_cpu_var(pmcs_enabled) = 1;
 
 	switch (systemcfg->platform) {
-		case PLATFORM_PSERIES:
-			hid0 = mfspr(HID0);
-			hid0 |= 1UL << (63 - 20);
+	case PLATFORM_PSERIES:
+	case PLATFORM_POWERMAC:
+		hid0 = mfspr(HID0);
+		hid0 |= 1UL << (63 - 20);
 
-			/* POWER4 requires the following sequence */
-			asm volatile(
-				"sync\n"
-				"mtspr	%1, %0\n"
-				"mfspr	%0, %1\n"
-				"mfspr	%0, %1\n"
-				"mfspr	%0, %1\n"
-				"mfspr	%0, %1\n"
-				"mfspr	%0, %1\n"
-				"mfspr	%0, %1\n"
-				"isync" : "=&r" (hid0) : "i" (HID0), "0" (hid0):
-				"memory");
-			break;
+		/* POWER4 requires the following sequence */
+		asm volatile(
+			     "sync\n"
+			     "mtspr	%1, %0\n"
+			     "mfspr	%0, %1\n"
+			     "mfspr	%0, %1\n"
+			     "mfspr	%0, %1\n"
+			     "mfspr	%0, %1\n"
+			     "mfspr	%0, %1\n"
+			     "mfspr	%0, %1\n"
+			     "isync" : "=&r" (hid0) : "i" (HID0), "0" (hid0):
+			     "memory");
+		break;
 
-		case PLATFORM_PSERIES_LPAR:
-			set = 1UL << 63;
-			reset = 0;
-			ret = plpar_hcall_norets(H_PERFMON, set, reset);
-			if (ret)
-				printk(KERN_ERR "H_PERFMON call on cpu %u "
-						"returned %d\n",
-						smp_processor_id(), ret);
-			break;
+#ifdef CONFIG_PPC_PSERIES
+	case PLATFORM_PSERIES_LPAR:
+		set = 1UL << 63;
+		reset = 0;
+		ret = plpar_hcall_norets(H_PERFMON, set, reset);
+		if (ret)
+			printk(KERN_ERR "H_PERFMON call on cpu %u "
+			       "returned %d\n",
+			       smp_processor_id(), ret);
+		break;
+#endif /* CONFIG_PPC_PSERIES */
 
-		default:
-			break;
+	default:
+		break;
 	}
 
+#ifdef CONFIG_PPC_PSERIES
 	/* instruct hypervisor to maintain PMCs */
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		char *ptr = (char *)&paca[smp_processor_id()].lppaca;
@@ -172,8 +179,9 @@ void ppc64_enable_pmcs(void)
 		ctrl |= RUNLATCH;
 		mtspr(CTRLT, ctrl);
 	}
+#endif /* CONFIG_PPC_PSERIES */
 }
-#endif
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 
 EXPORT_SYMBOL(ppc64_enable_pmcs);
 

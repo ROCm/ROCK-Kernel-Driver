@@ -202,8 +202,6 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 		if (bytes > PAGE_SIZE-offset)
 			bytes = PAGE_SIZE-offset;
 
-		flush_cache_page(vma, addr);
-
 		maddr = kmap(page);
 		if (write) {
 			copy_to_user_page(vma, page, addr,

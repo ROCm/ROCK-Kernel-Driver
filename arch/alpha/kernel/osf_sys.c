@@ -1110,46 +1110,47 @@ osf_getrusage(int who, struct rusage32 __user *ru)
 	return copy_to_user(ru, &r, sizeof(r)) ? -EFAULT : 0;
 }
 
-asmlinkage int
-osf_wait4(pid_t pid, int __user *ustatus, int options, struct rusage32 __user *ur)
+asmlinkage long
+osf_wait4(pid_t pid, int __user *ustatus, int options,
+	  struct rusage32 __user *ur)
 {
-	if (!ur) {
+	struct rusage r;
+	long ret, err;
+	mm_segment_t old_fs;
+
+	if (!ur)
 		return sys_wait4(pid, ustatus, options, NULL);
-	} else {
-		struct rusage r;
-		int ret, status;
-		mm_segment_t old_fs = get_fs();
+
+	old_fs = get_fs();
 		
-		set_fs (KERNEL_DS);
-		ret = sys_wait4(pid, &status, options, &r);
-		set_fs (old_fs);
+	set_fs (KERNEL_DS);
+	ret = sys_wait4(pid, ustatus, options, (struct rusage __user *) &r);
+	set_fs (old_fs);
 
-		if (!access_ok(VERIFY_WRITE, ur, sizeof(*ur)))
-			return -EFAULT;
-		__put_user(r.ru_utime.tv_sec, &ur->ru_utime.tv_sec);
-		__put_user(r.ru_utime.tv_usec, &ur->ru_utime.tv_usec);
-		__put_user(r.ru_stime.tv_sec, &ur->ru_stime.tv_sec);
-		__put_user(r.ru_stime.tv_usec, &ur->ru_stime.tv_usec);
-		__put_user(r.ru_maxrss, &ur->ru_maxrss);
-		__put_user(r.ru_ixrss, &ur->ru_ixrss);
-		__put_user(r.ru_idrss, &ur->ru_idrss);
-		__put_user(r.ru_isrss, &ur->ru_isrss);
-		__put_user(r.ru_minflt, &ur->ru_minflt);
-		__put_user(r.ru_majflt, &ur->ru_majflt);
-		__put_user(r.ru_nswap, &ur->ru_nswap);
-		__put_user(r.ru_inblock, &ur->ru_inblock);
-		__put_user(r.ru_oublock, &ur->ru_oublock);
-		__put_user(r.ru_msgsnd, &ur->ru_msgsnd);
-		__put_user(r.ru_msgrcv, &ur->ru_msgrcv);
-		__put_user(r.ru_nsignals, &ur->ru_nsignals);
-		__put_user(r.ru_nvcsw, &ur->ru_nvcsw);
-		if (__put_user(r.ru_nivcsw, &ur->ru_nivcsw))
-			return -EFAULT;
+	if (!access_ok(VERIFY_WRITE, ur, sizeof(*ur)))
+		return -EFAULT;
 
-		if (ustatus && put_user(status, ustatus))
-			return -EFAULT;
-		return ret;
-	}
+	err = 0;
+	err |= __put_user(r.ru_utime.tv_sec, &ur->ru_utime.tv_sec);
+	err |= __put_user(r.ru_utime.tv_usec, &ur->ru_utime.tv_usec);
+	err |= __put_user(r.ru_stime.tv_sec, &ur->ru_stime.tv_sec);
+	err |= __put_user(r.ru_stime.tv_usec, &ur->ru_stime.tv_usec);
+	err |= __put_user(r.ru_maxrss, &ur->ru_maxrss);
+	err |= __put_user(r.ru_ixrss, &ur->ru_ixrss);
+	err |= __put_user(r.ru_idrss, &ur->ru_idrss);
+	err |= __put_user(r.ru_isrss, &ur->ru_isrss);
+	err |= __put_user(r.ru_minflt, &ur->ru_minflt);
+	err |= __put_user(r.ru_majflt, &ur->ru_majflt);
+	err |= __put_user(r.ru_nswap, &ur->ru_nswap);
+	err |= __put_user(r.ru_inblock, &ur->ru_inblock);
+	err |= __put_user(r.ru_oublock, &ur->ru_oublock);
+	err |= __put_user(r.ru_msgsnd, &ur->ru_msgsnd);
+	err |= __put_user(r.ru_msgrcv, &ur->ru_msgrcv);
+	err |= __put_user(r.ru_nsignals, &ur->ru_nsignals);
+	err |= __put_user(r.ru_nvcsw, &ur->ru_nvcsw);
+	err |= __put_user(r.ru_nivcsw, &ur->ru_nivcsw);
+
+	return err ? err : ret;
 }
 
 /*

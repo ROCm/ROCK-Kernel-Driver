@@ -22,6 +22,43 @@
 
 struct lmb lmb;
 
+#undef DEBUG
+
+void lmb_dump_all(void)
+{
+#ifdef DEBUG
+	unsigned long i;
+	struct lmb *_lmb  = &lmb;
+
+	udbg_printf("lmb_dump_all:\n");
+	udbg_printf("    memory.cnt		  = 0x%lx\n",
+		    _lmb->memory.cnt);
+	udbg_printf("    memory.size		  = 0x%lx\n",
+		    _lmb->memory.size);
+	for (i=0; i < _lmb->memory.cnt ;i++) {
+		udbg_printf("    memory.region[0x%x].base       = 0x%lx\n",
+			    i, _lmb->memory.region[i].base);
+		udbg_printf("		      .physbase = 0x%lx\n",
+			    _lmb->memory.region[i].physbase);
+		udbg_printf("		      .size     = 0x%lx\n",
+			    _lmb->memory.region[i].size);
+	}
+
+	udbg_printf("\n    reserved.cnt	  = 0x%lx\n",
+		    _lmb->reserved.cnt);
+	udbg_printf("    reserved.size	  = 0x%lx\n",
+		    _lmb->reserved.size);
+	for (i=0; i < _lmb->reserved.cnt ;i++) {
+		udbg_printf("    reserved.region[0x%x].base       = 0x%lx\n",
+			    i, _lmb->reserved.region[i].base);
+		udbg_printf("		      .physbase = 0x%lx\n",
+			    _lmb->reserved.region[i].physbase);
+		udbg_printf("		      .size     = 0x%lx\n",
+			    _lmb->reserved.region[i].size);
+	}
+#endif /* DEBUG */
+}
+
 static unsigned long __init
 lmb_addrs_overlap(unsigned long base1, unsigned long size1,
                   unsigned long base2, unsigned long size2)
@@ -71,8 +108,7 @@ lmb_coalesce_regions(struct lmb_region *rgn, unsigned long r1, unsigned long r2)
 void __init
 lmb_init(void)
 {
-	unsigned long offset = reloc_offset();
-	struct lmb *_lmb = PTRRELOC(&lmb);
+	struct lmb *_lmb = &lmb;
 
 	/* Create a dummy zero size LMB which will get coalesced away later.
 	 * This simplifies the lmb_add() code below...
@@ -94,8 +130,7 @@ lmb_analyze(void)
 	unsigned long i;
 	unsigned long mem_size = 0;
 	unsigned long size_mask = 0;
-	unsigned long offset = reloc_offset();
-	struct lmb *_lmb = PTRRELOC(&lmb);
+	struct lmb *_lmb = &lmb;
 #ifdef CONFIG_MSCHUNKS
 	unsigned long physbase = 0;
 #endif
@@ -178,8 +213,7 @@ lmb_add_region(struct lmb_region *rgn, unsigned long base, unsigned long size)
 long __init
 lmb_add(unsigned long base, unsigned long size)
 {
-	unsigned long offset = reloc_offset();
-	struct lmb *_lmb = PTRRELOC(&lmb);
+	struct lmb *_lmb = &lmb;
 	struct lmb_region *_rgn = &(_lmb->memory);
 
 	/* On pSeries LPAR systems, the first LMB is our RMO region. */
@@ -193,8 +227,7 @@ lmb_add(unsigned long base, unsigned long size)
 long __init
 lmb_reserve(unsigned long base, unsigned long size)
 {
-	unsigned long offset = reloc_offset();
-	struct lmb *_lmb = PTRRELOC(&lmb);
+	struct lmb *_lmb = &lmb;
 	struct lmb_region *_rgn = &(_lmb->reserved);
 
 	return lmb_add_region(_rgn, base, size);
@@ -227,8 +260,7 @@ lmb_alloc_base(unsigned long size, unsigned long align, unsigned long max_addr)
 {
 	long i, j;
 	unsigned long base = 0;
-	unsigned long offset = reloc_offset();
-	struct lmb *_lmb = PTRRELOC(&lmb);
+	struct lmb *_lmb = &lmb;
 	struct lmb_region *_mem = &(_lmb->memory);
 	struct lmb_region *_rsv = &(_lmb->reserved);
 
@@ -263,8 +295,7 @@ lmb_alloc_base(unsigned long size, unsigned long align, unsigned long max_addr)
 unsigned long __init
 lmb_phys_mem_size(void)
 {
-	unsigned long offset = reloc_offset();
-	struct lmb *_lmb = PTRRELOC(&lmb);
+	struct lmb *_lmb = &lmb;
 #ifdef CONFIG_MSCHUNKS
 	return _lmb->memory.size;
 #else
@@ -282,8 +313,7 @@ lmb_phys_mem_size(void)
 unsigned long __init
 lmb_end_of_DRAM(void)
 {
-	unsigned long offset = reloc_offset();
-	struct lmb *_lmb = PTRRELOC(&lmb);
+	struct lmb *_lmb = &lmb;
 	struct lmb_region *_mem = &(_lmb->memory);
 	int idx = _mem->cnt - 1;
 
@@ -300,8 +330,7 @@ unsigned long __init
 lmb_abs_to_phys(unsigned long aa)
 {
 	unsigned long i, pa = aa;
-	unsigned long offset = reloc_offset();
-	struct lmb *_lmb = PTRRELOC(&lmb);
+	struct lmb *_lmb = &lmb;
 	struct lmb_region *_mem = &(_lmb->memory);
 
 	for (i=0; i < _mem->cnt; i++) {

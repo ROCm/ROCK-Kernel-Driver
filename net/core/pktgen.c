@@ -52,6 +52,9 @@
  *
  * Fixed unaligned access on IA-64 Grant Grundler <grundler@parisc-linux.org>
  *
+ * New xmit() return, do_div and misc clean up by Stephen Hemminger 
+ * <shemminger@osdl.org> 040923
+ *
  * See Documentation/networking/pktgen.txt for how to use this.
  */
 
@@ -94,7 +97,7 @@
 
 #define VERSION "pktgen version 1.32"
 static char version[] __initdata = 
-  "pktgen.c: v1.3: Packet Generator for packet performance testing.\n";
+  "pktgen.c: v1.4: Packet Generator for packet performance testing.\n";
 
 /* Used to help with determining the pkts on receive */
 
@@ -584,15 +587,48 @@ static struct sk_buff *fill_packet(struct net_device *odev, struct pktgen_info* 
 	return skb;
 }
 
+static void show_results(struct pktgen_info* info, int nr_frags)
+{
+	__u64 total, bps, mbps, pps;
+	unsigned long idle;
+	int size = info->pkt_size + 4; /* incl 32bit ethernet CRC */
+	char *p = info->result;
+
+	total = (info->stopped_at.tv_sec - info->started_at.tv_sec) * 1000000ull
+		+ info->stopped_at.tv_usec - info->started_at.tv_usec;
+
+	BUG_ON(cpu_speed == 0);
+
+	idle = info->idle_acc;
+	do_div(idle, cpu_speed);
+
+	p += sprintf(p, "OK: %llu(c%llu+d%lu) usec, %llu (%dbyte,%dfrags)\n",
+		     total, total - idle, idle,
+		     info->sofar, size, nr_frags);
+
+	pps = info->sofar * USEC_PER_SEC;
+	
+	while ((total >> 32) != 0) {
+		pps >>= 1;
+		total >>= 1;
+	}
+
+	do_div(pps, total);
+	
+	bps = pps * 8 * size;
+
+	mbps = bps;
+	do_div(mbps, 1000000);
+	p += sprintf(p, "  %llupps %lluMb/sec (%llubps) errors: %llu",
+		     pps, mbps, bps, info->errors);
+}
 
 static void inject(struct pktgen_info* info)
 {
-	struct net_device *odev = NULL;
+	struct net_device *odev;
 	struct sk_buff *skb = NULL;
-	__u64 total = 0;
-	__u64 idle = 0;
 	__u64 lcount = 0;
-	int nr_frags = 0;
+	int ret;
 	int last_ok = 1;	   /* Was last skb sent? 
 				    * Or a failed transmit of some sort?  This will keep
 				    * sequence numbers in order, for example.
@@ -632,27 +668,29 @@ static void inject(struct pktgen_info* info)
 			}
 		}
 
-		nr_frags = skb_shinfo(skb)->nr_frags;
-		   
 		if (!(odev->features & NETIF_F_LLTX))
 			spin_lock_bh(&odev->xmit_lock);
 		if (!netif_queue_stopped(odev)) {
 
 			atomic_inc(&skb->users);
 
-			if (odev->hard_start_xmit(skb, odev)) {
-
+		retry:
+			ret = odev->hard_start_xmit(skb, odev);
+			if (likely(ret == NETDEV_TX_OK)) {
+				last_ok = 1;	
+				info->sofar++;
+				info->seq_num++;
+			} else if (ret == NETDEV_TX_LOCKED 
+				   && (odev->features & NETIF_F_LLTX)) {
+				cpu_relax();
+				goto retry;
+			} else {
 				atomic_dec(&skb->users);
-				if (net_ratelimit()) {
+				if (debug && net_ratelimit()) {
 				   printk(KERN_INFO "Hard xmit error\n");
 				}
 				info->errors++;
 				last_ok = 0;
-			}
-			else {
-			   last_ok = 1;	
-			   info->sofar++;
-			   info->seq_num++;
 			}
 		}
 		else {
@@ -725,38 +763,7 @@ static void inject(struct pktgen_info* info)
 
 	do_gettimeofday(&(info->stopped_at));
 
-	total = (info->stopped_at.tv_sec - info->started_at.tv_sec) * 1000000 +
-		info->stopped_at.tv_usec - info->started_at.tv_usec;
-
-	idle = (__u32)(info->idle_acc)/(__u32)(cpu_speed);
-
-	{
-		char *p = info->result;
-		__u64 bps, pps = 0;
-
-		if (total > 1000)
-			pps = (__u32)(info->sofar * 1000) / ((__u32)(total) / 1000);
-		else if(total > 100)
-			pps = (__u32)(info->sofar * 10000) / ((__u32)(total) / 100);
-		else if(total > 10)
-			pps = (__u32)(info->sofar * 100000) / ((__u32)(total) / 10);
-		else if(total > 1)
-			pps = (__u32)(info->sofar * 1000000) / (__u32)total;
-
-		bps = pps * 8 * (info->pkt_size + 4); /* take 32bit ethernet CRC into account */
-		p += sprintf(p, "OK: %llu(c%llu+d%llu) usec, %llu (%dbyte,%dfrags) %llupps %lluMb/sec (%llubps)  errors: %llu",
-			     (unsigned long long) total,
-			     (unsigned long long) (total - idle),
-			     (unsigned long long) idle,
-			     (unsigned long long) info->sofar,
-			     skb->len + 4, /* Add 4 to account for the ethernet checksum */
-			     nr_frags,
-			     (unsigned long long) pps,
-			     (unsigned long long) (bps / (u64) 1024 / (u64) 1024),
-			     (unsigned long long) bps,
-			     (unsigned long long) info->errors
-			     );
-	}
+	show_results(info, skb_shinfo(skb)->nr_frags);
 
 	kfree_skb(skb);
 

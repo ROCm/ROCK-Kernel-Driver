@@ -58,15 +58,26 @@ menu "Platform support"
 
 choice
 	prompt "Platform Type"
-	default PPC_PSERIES
+	default PPC_MULTIPLATFORM
 
 config PPC_ISERIES
-	bool "iSeries"
+	bool "IBM Legacy iSeries"
 
-config PPC_PSERIES
-	bool "pSeries / PowerMac G5"
+config PPC_MULTIPLATFORM
+	bool "Generic"
 
 endchoice
+
+config PPC_PSERIES
+	depends on PPC_MULTIPLATFORM
+	bool "  IBM pSeries & new iSeries"
+	default y
+
+config PPC_PMAC
+	depends on PPC_MULTIPLATFORM
+	bool "  Apple G5 based machines"
+	default y
+	select ADB_PMU
 
 config PPC
 	bool
@@ -77,7 +88,7 @@ config PPC64
 	default y
 
 config PPC_OF
-	depends on PPC_PSERIES
+	depends on PPC_MULTIPLATFORM
 	bool
 	default y
 
@@ -85,13 +96,8 @@ config PPC_OF
 # exception vectors for it
 config ALTIVEC
 	bool "Support for VMX (Altivec) vector unit"
-	depends on PPC_PSERIES
+	depends on PPC_MULTIPLATFORM
 	default y
-
-config PPC_PMAC
-	depends on PPC_PSERIES
-	bool "Apple PowerMac G5 support"
-	select ADB_PMU
 
 config PPC_SPLPAR
 	depends on PPC_PSERIES
@@ -163,7 +169,7 @@ config SMP
 
 config IRQ_ALL_CPUS
 	bool "Distribute interrupts on all CPUs by default"
-	depends on SMP && PPC_PSERIES
+	depends on SMP && PPC_MULTIPLATFORM
 	help
 	  This option gives the kernel permission to distribute IRQs across
 	  multiple CPUs.  Saying N here will route all IRQs to the first

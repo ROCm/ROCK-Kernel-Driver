@@ -95,7 +95,7 @@ static inline int _raw_spin_trylock(spinlock_t *lock)
 /***********************************************************/
 
 typedef struct {
-	volatile int write_lock:1, read_counter:31;
+	volatile unsigned int write_lock:1, read_counter:31;
 } /*__attribute__((aligned(32)))*/ rwlock_t;
 
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0 }
@@ -124,7 +124,7 @@ static inline void _raw_write_lock(rwlock_t * lock)
 	"	br	1b\n"
 	".previous"
 	: "=m" (*lock), "=&r" (regx)
-	: "0" (*lock) : "memory");
+	: "m" (*lock) : "memory");
 }
 
 static inline void _raw_read_lock(rwlock_t * lock)

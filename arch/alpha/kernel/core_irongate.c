@@ -310,7 +310,7 @@ irongate_init_arch(void)
 #define GET_GATT_OFF(addr) ((addr & 0x003ff000) >> 12) 
 #define GET_GATT(addr) (gatt_pages[GET_PAGE_DIR_IDX(addr)])
 
-unsigned long
+void __iomem *
 irongate_ioremap(unsigned long addr, unsigned long size)
 {
 	struct vm_struct *area;
@@ -320,7 +320,7 @@ irongate_ioremap(unsigned long addr, unsigned long size)
 	unsigned long gart_bus_addr;
 
 	if (!alpha_agpgart_size)
-		return addr + IRONGATE_MEM;
+		return (void __iomem *)(addr + IRONGATE_MEM);
 
 	gart_bus_addr = (unsigned long)IRONGATE0->bar0 &
 			PCI_BASE_ADDRESS_MEM_MASK; 
@@ -339,7 +339,7 @@ irongate_ioremap(unsigned long addr, unsigned long size)
 		/*
 		 * Not found - assume legacy ioremap
 		 */
-		return addr + IRONGATE_MEM;
+		return (void __iomem *)(addr + IRONGATE_MEM);
 	} while(0);
 
 	mmio_regs = (u32 *)(((unsigned long)IRONGATE0->bar1 &
@@ -353,7 +353,7 @@ irongate_ioremap(unsigned long addr, unsigned long size)
 	if (addr & ~PAGE_MASK) {
 		printk("AGP ioremap failed... addr not page aligned (0x%lx)\n",
 		       addr);
-		return addr + IRONGATE_MEM;
+		return (void __iomem *)(addr + IRONGATE_MEM);
 	}
 	last = addr + size - 1;
 	size = PAGE_ALIGN(last) - addr;
@@ -378,7 +378,7 @@ irongate_ioremap(unsigned long addr, unsigned long size)
 	 * Map it
 	 */
 	area = get_vm_area(size, VM_IOREMAP);
-	if (!area) return (unsigned long)NULL;
+	if (!area) return NULL;
 
 	for(baddr = addr, vaddr = (unsigned long)area->addr; 
 	    baddr <= last; 
@@ -391,7 +391,7 @@ irongate_ioremap(unsigned long addr, unsigned long size)
 					     pte, PAGE_SIZE, 0)) {
 			printk("AGP ioremap: FAILED to map...\n");
 			vfree(area->addr);
-			return (unsigned long)NULL;
+			return NULL;
 		}
 	}
 
@@ -402,13 +402,15 @@ irongate_ioremap(unsigned long addr, unsigned long size)
 	printk("irongate_ioremap(0x%lx, 0x%lx) returning 0x%lx\n",
 	       addr, size, vaddr);
 #endif
-	return vaddr;
+	return (void __iomem *)vaddr;
 }
 
 void
-irongate_iounmap(unsigned long addr)
+irongate_iounmap(volatile void __iomem *xaddr)
 {
+	unsigned long addr = (unsigned long) xaddr;
 	if (((long)addr >> 41) == -2)
 		return;	/* kseg map, nothing to do */
-	if (addr) return vfree((void *)(PAGE_MASK & addr)); 
+	if (addr)
+		return vfree((void *)(PAGE_MASK & addr)); 
 }

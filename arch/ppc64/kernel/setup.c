@@ -10,6 +10,8 @@
  *      2 of the License, or (at your option) any later version.
  */
 
+#undef DEBUG
+
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/string.h>
@@ -27,6 +29,7 @@
 #include <linux/root_dev.h>
 #include <linux/notifier.h>
 #include <linux/cpu.h>
+#include <linux/unistd.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
@@ -48,50 +51,74 @@
 #include <asm/system.h>
 #include <asm/rtas.h>
 
-extern unsigned long klimit;
+#ifdef DEBUG
+#define DBG(fmt...) udbg_printf(fmt)
+#else
+#define DBG(fmt...)
+#endif
+
+/*
+ * Here are some early debugging facilities. You can enable one
+ * but your kernel will not boot on anything else if you do so
+ */
+
+/* This one is for use on LPAR machines that support an HVC console
+ * on vterm 0
+ */
+extern void udbg_init_debug_lpar(void);
+/* This one is for use on Apple G5 machines
+ */
+extern void udbg_init_pmac_realmode(void);
+/* That's RTAS panel debug */
+extern void call_rtas_display_status_delay(unsigned char c);
+
+#define EARLY_DEBUG_INIT() do {} while(0)
+
+#if 0
+#define EARLY_DEBUG_INIT() udbg_init_debug_lpar()
+#define EARLY_DEBUG_INIT() udbg_init_pmac_realmode()
+#define EARLY_DEBUG_INIT()						\
+	do { ppc_md.udbg_putc = call_rtas_display_status_delay; } while(0)
+#endif
+
 /* extern void *stab; */
 extern HTAB htab_data;
+extern unsigned long klimit;
 
-int have_of = 1;
-
-extern void  chrp_init(unsigned long r3,
-		       unsigned long r4,
-		       unsigned long r5,
-		       unsigned long r6,
-		       unsigned long r7);
-
-extern void  pmac_init(unsigned long r3,
-		       unsigned long r4,
-		       unsigned long r5,
-		       unsigned long r6,
-		       unsigned long r7);
-
-extern void fw_feature_init(void);
-extern void iSeries_init_early(void);
-extern void pSeries_init_early(void);
-extern void pSeriesLP_init_early(void);
-extern void pmac_init_early(void);
 extern void mm_init_ppc64(void);
-extern void pseries_secondary_smp_init(unsigned long); 
 extern int  idle_setup(void);
-extern void vpa_init(int cpu);
-extern void iSeries_parse_cmdline(void);
+extern void stab_initialize(unsigned long stab);
+extern void htab_initialize(void);
+extern void early_init_devtree(void *flat_dt);
+extern void unflatten_device_tree(void);
 
 unsigned long decr_overclock = 1;
 unsigned long decr_overclock_proc0 = 1;
 unsigned long decr_overclock_set = 0;
 unsigned long decr_overclock_proc0_set = 0;
 
-unsigned char aux_device_present;
+int have_of = 1;
+
+dev_t boot_dev;
+
+/*
+ * These are used in binfmt_elf.c to put aux entries on the stack
+ * for each elf executable being started.
+ */
+int dcache_bsize;
+int icache_bsize;
+int ucache_bsize;
+
+/* The main machine-dep calls structure
+ */
+struct machdep_calls ppc_md;
 
 #ifdef CONFIG_MAGIC_SYSRQ
 unsigned long SYSRQ_KEY;
 #endif /* CONFIG_MAGIC_SYSRQ */
 
-struct machdep_calls ppc_md;
 
 static int ppc64_panic_event(struct notifier_block *, unsigned long, void *);
-
 static struct notifier_block ppc64_panic_block = {
 	notifier_call: ppc64_panic_event,
 	priority: INT_MIN /* may not return; must be done last */
@@ -115,30 +142,23 @@ struct screen_info screen_info = {
 };
 
 /*
- * These are used in binfmt_elf.c to put aux entries on the stack
- * for each elf executable being started.
- */
-int dcache_bsize;
-int icache_bsize;
-int ucache_bsize;
-
-/*
  * Initialize the PPCDBG state.  Called before relocation has been enabled.
  */
-void ppcdbg_initialize(void) {
-	unsigned long offset = reloc_offset();
-	struct naca_struct *_naca = RELOC(naca);
-
-	_naca->debug_switch = PPC_DEBUG_DEFAULT; /* | PPCDBG_BUSWALK | PPCDBG_PHBINIT | PPCDBG_MM | PPCDBG_MMINIT | PPCDBG_TCEINIT | PPCDBG_TCE */;
+void __init ppcdbg_initialize(void)
+{
+	naca->debug_switch = PPC_DEBUG_DEFAULT; /* | PPCDBG_BUSWALK | */
+	/* PPCDBG_PHBINIT | PPCDBG_MM | PPCDBG_MMINIT | PPCDBG_TCEINIT | PPCDBG_TCE */;
 }
 
+/*
+ * Early boot console based on udbg
+ */
 static struct console udbg_console = {
 	.name	= "udbg",
 	.write	= udbg_console_write,
 	.flags	= CON_PRINTBUFFER,
 	.index	= -1,
 };
-
 static int early_console_initialized;
 
 void __init disable_early_printk(void)
@@ -149,7 +169,7 @@ void __init disable_early_printk(void)
 	early_console_initialized = 0;
 }
 
-#if !defined(CONFIG_PPC_ISERIES) && defined(CONFIG_SMP)
+#if defined(CONFIG_PPC_MULTIPLATFORM) && defined(CONFIG_SMP)
 
 static int smt_enabled_cmdline;
 
@@ -295,146 +315,311 @@ static void __init setup_cpu_maps(void)
 
 	systemcfg->processorCount = num_present_cpus();
 }
+#endif /* defined(CONFIG_PPC_MULTIPLATFORM) && defined(CONFIG_SMP) */
 
-#endif /* !defined(CONFIG_PPC_ISERIES) && defined(CONFIG_SMP) */
 
-#ifdef CONFIG_XMON
-static int __init early_xmon(char *p)
-{
-	/* ensure xmon is enabled */
-	xmon_init();
-	debugger(0);
+#ifdef CONFIG_PPC_MULTIPLATFORM
 
-	return 0;
-}
-early_param("xmon", early_xmon);
-#endif
+extern struct machdep_calls pSeries_md;
+extern struct machdep_calls pmac_md;
 
-/*
- * Do some initial setup of the system.  The parameters are those which 
- * were passed in from the bootloader.
- */
-void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
-		  unsigned long r6, unsigned long r7)
-{
-#if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
-	int ret, i;
-#endif
-
-#ifdef CONFIG_PPC_ISERIES
-	/* pSeries systems are identified in prom.c via OF. */
-	if (itLpNaca.xLparInstalled == 1)
-		systemcfg->platform = PLATFORM_ISERIES_LPAR;
-#endif
-
-	switch (systemcfg->platform) {
-#ifdef CONFIG_PPC_ISERIES
-	case PLATFORM_ISERIES_LPAR:
-		iSeries_init_early();
-		break;
-#endif
-
+/* Ultimately, stuff them in an elf section like initcalls... */
+static struct machdep_calls __initdata *machines[] = {
 #ifdef CONFIG_PPC_PSERIES
-	case PLATFORM_PSERIES:
-		fw_feature_init();
-		pSeries_init_early();
-		break;
-
-	case PLATFORM_PSERIES_LPAR:
-		fw_feature_init();
-		pSeriesLP_init_early();
-		break;
+	&pSeries_md,
 #endif /* CONFIG_PPC_PSERIES */
 #ifdef CONFIG_PPC_PMAC
-	case PLATFORM_POWERMAC:
-		pmac_init_early();
+	&pmac_md,
 #endif /* CONFIG_PPC_PMAC */
+	NULL
+};
+
+/*
+ * Early initialization entry point. This is called by head.S
+ * with MMU translation disabled. We rely on the "feature" of
+ * the CPU that ignores the top 2 bits of the address in real
+ * mode so we can access kernel globals normally provided we
+ * only toy with things in the RMO region. From here, we do
+ * some early parsing of the device-tree to setup out LMB
+ * data structures, and allocate & initialize the hash table
+ * and segment tables so we can start running with translation
+ * enabled.
+ *
+ * It is this function which will call the probe() callback of
+ * the various platform types and copy the matching one to the
+ * global ppc_md structure. Your platform can eventually do
+ * some very early initializations from the probe() routine, but
+ * this is not recommended, be very careful as, for example, the
+ * device-tree is not accessible via normal means at this point.
+ */
+
+void __init early_setup(unsigned long dt_ptr)
+{
+	struct paca_struct *lpaca = get_paca();
+	static struct machdep_calls **mach;
+
+	/*
+	 * Enable early debugging if any specified (see top of
+	 * this file)
+	 */
+	EARLY_DEBUG_INIT();
+
+	DBG(" -> early_setup()\n");
+
+	/*
+	 * Fill the default DBG level in naca (do we want to keep
+	 * that old mecanism around forever ?)
+	 */
+	ppcdbg_initialize();
+
+	/*
+	 * Do early initializations using the flattened device
+	 * tree, like retreiving the physical memory map or
+	 * calculating/retreiving the hash table size
+	 */
+	early_init_devtree(__va(dt_ptr));
+
+	/*
+	 * Iterate all ppc_md structures until we find the proper
+	 * one for the current machine type
+	 */
+	DBG("Probing machine type for platform %x...\n",
+	    systemcfg->platform);
+
+	for (mach = machines; *mach; mach++) {
+		if ((*mach)->probe(systemcfg->platform))
+			break;
+	}
+	/* What can we do if we didn't find ? */
+	if (*mach == NULL) {
+		DBG("No suitable machine found !\n");
+		for (;;);
+	}
+	ppc_md = **mach;
+
+	/* our udbg callbacks got overriden by the above, let's put them
+	 * back in. Ultimately, I want those things to be split from the
+	 * main ppc_md
+	 */
+	EARLY_DEBUG_INIT();
+
+	DBG("Found, Initializing memory management...\n");
+
+	/*
+	 * Initialize stab / SLB management
+	 */
+	stab_initialize(lpaca->stab_real);
+
+	/*
+	 * Initialize the MMU Hash table and create the linear mapping
+	 * of memory
+	 */
+	htab_initialize();
+
+	DBG(" <- early_setup()\n");
+}
+
+
+/*
+ * Initialize some remaining members of the naca and systemcfg structures
+ * (at least until we get rid of them completely). This is mostly some
+ * cache informations about the CPU that will be used by cache flush
+ * routines and/or provided to userland
+ */
+static void __init initialize_naca(void)
+{
+	struct device_node *np;
+	unsigned long num_cpus = 0;
+
+	DBG(" -> initialize_naca()\n");
+
+	for (np = NULL; (np = of_find_node_by_type(np, "cpu"));) {
+		num_cpus += 1;
+
+		/* We're assuming *all* of the CPUs have the same
+		 * d-cache and i-cache sizes... -Peter
+		 */
+
+		if ( num_cpus == 1 ) {
+			u32 *sizep, *lsizep;
+			u32 size, lsize;
+			const char *dc, *ic;
+
+			/* Then read cache informations */
+			if (systemcfg->platform == PLATFORM_POWERMAC) {
+				dc = "d-cache-block-size";
+				ic = "i-cache-block-size";
+			} else {
+				dc = "d-cache-line-size";
+				ic = "i-cache-line-size";
+			}
+
+			size = 0;
+			lsize = cur_cpu_spec->dcache_bsize;
+			sizep = (u32 *)get_property(np, "d-cache-size", NULL);
+			if (sizep != NULL)
+				size = *sizep;
+			lsizep = (u32 *) get_property(np, dc, NULL);
+			if (lsizep != NULL)
+				lsize = *lsizep;
+
+			if (sizep == 0 || lsizep == 0)
+				DBG("Argh, can't find dcache properties ! "
+				    "sizep: %p, lsizep: %p\n", sizep, lsizep);
+
+			systemcfg->dCacheL1Size = size;
+			systemcfg->dCacheL1LineSize = lsize;
+			naca->dCacheL1LogLineSize = __ilog2(lsize);
+			naca->dCacheL1LinesPerPage = PAGE_SIZE/(lsize);
+
+			size = 0;
+			lsize = cur_cpu_spec->icache_bsize;
+			sizep = (u32 *)get_property(np, "i-cache-size", NULL);
+			if (sizep != NULL)
+				size = *sizep;
+			lsizep = (u32 *)get_property(np, ic, NULL);
+			if (lsizep != NULL)
+				lsize = *lsizep;
+			if (sizep == 0 || lsizep == 0)
+				DBG("Argh, can't find icache properties ! "
+				    "sizep: %p, lsizep: %p\n", sizep, lsizep);
+
+			systemcfg->iCacheL1Size = size;
+			systemcfg->iCacheL1LineSize = lsize;
+			naca->iCacheL1LogLineSize = __ilog2(lsize);
+			naca->iCacheL1LinesPerPage = PAGE_SIZE/(lsize);
+
+		}
 	}
 
-#ifdef CONFIG_XMON_DEFAULT
-	xmon_init();
-#endif
+	/* Add an eye catcher and the systemcfg layout version number */
+	strcpy(systemcfg->eye_catcher, "SYSTEMCFG:PPC64");
+	systemcfg->version.major = SYSTEMCFG_MAJOR;
+	systemcfg->version.minor = SYSTEMCFG_MINOR;
+	systemcfg->processor = mfspr(SPRN_PVR);
+
+	DBG(" <- initialize_naca()\n");
+}
+
+static void __init check_for_initrd(void)
+{
+#ifdef CONFIG_BLK_DEV_INITRD
+	u64 *prop;
+
+	DBG(" -> check_for_initrd()\n");
+
+	prop = (u64 *)get_property(of_chosen, "linux,initrd-start", NULL);
+	if (prop != NULL) {
+		initrd_start = (unsigned long)__va(*prop);
+		prop = (u64 *)get_property(of_chosen, "linux,initrd-end", NULL);
+		if (prop != NULL) {
+			initrd_end = (unsigned long)__va(*prop);
+			initrd_below_start_ok = 1;
+		} else
+			initrd_start = 0;
+	}
+
 	/* If we were passed an initrd, set the ROOT_DEV properly if the values
 	 * look sensible. If not, clear initrd reference.
 	 */
-#ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start >= KERNELBASE && initrd_end >= KERNELBASE &&
 	    initrd_end > initrd_start)
 		ROOT_DEV = Root_RAM0;
 	else
 		initrd_start = initrd_end = 0;
+
+	if (initrd_start)
+		printk("Found initrd at 0x%lx:0x%lx\n", initrd_start, initrd_end);
+
+	DBG(" <- check_for_initrd()\n");
 #endif /* CONFIG_BLK_DEV_INITRD */
+}
 
-#ifdef CONFIG_BOOTX_TEXT
-	map_boot_text();
-	if (systemcfg->platform == PLATFORM_POWERMAC) {
-		early_console_initialized = 1;
-		register_console(&udbg_console);
-	}
-#endif /* CONFIG_BOOTX_TEXT */
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 
-#ifdef CONFIG_PPC_PMAC
-	if (systemcfg->platform == PLATFORM_POWERMAC) {
-		finish_device_tree();
-		pmac_init(r3, r4, r5, r6, r7);
-	}
-#endif /* CONFIG_PPC_PMAC */
-
-#ifdef CONFIG_PPC_PSERIES
-	if (systemcfg->platform & PLATFORM_PSERIES) {
-		early_console_initialized = 1;
-		register_console(&udbg_console);
-		__irq_offset_value = NUM_ISA_INTERRUPTS;
-		finish_device_tree();
-		chrp_init(r3, r4, r5, r6, r7);
-	}
-#endif /* CONFIG_PPC_PSERIES */
+/*
+ * Do some initial setup of the system.  The parameters are those which 
+ * were passed in from the bootloader.
+ */
+void __init setup_system(void)
+{
+	DBG(" -> setup_system()\n");
 
 #ifdef CONFIG_PPC_ISERIES
-	iSeries_parse_cmdline();
+	/* pSeries systems are identified in prom.c via OF. */
+	if (itLpNaca.xLparInstalled == 1)
+		systemcfg->platform = PLATFORM_ISERIES_LPAR;
+
+	ppc_md.init_early();
+#else /* CONFIG_PPC_ISERIES */
+
+	/*
+	 * Unflatten the device-tree passed by prom_init or kexec
+	 */
+	unflatten_device_tree();
+
+	/*
+	 * Fill the naca & systemcfg structures with informations
+	 * retreived from the device-tree. Need to be called before
+	 * finish_device_tree() since the later requires some of the
+	 * informations filled up here to properly parse the interrupt
+	 * tree.
+	 * It also sets up the cache line sizes which allows to call
+	 * routines like flush_icache_range (used by the hash init
+	 * later on).
+	 */
+	initialize_naca();
+
+#ifdef CONFIG_PPC_PSERIES
+	/*
+	 * Initialize RTAS if available
+	 */
+	rtas_initialize();
+#endif /* CONFIG_PPC_PSERIES */
+
+	/*
+	 * Check if we have an initrd provided via the device-tree
+	 */
+	check_for_initrd();
+
+	/*
+	 * Do some platform specific early initializations, that includes
+	 * setting up the hash table pointers. It also sets up some interrupt-mapping
+	 * related options that will be used by finish_device_tree()
+	 */
+	ppc_md.init_early();
+
+	/*
+	 * "Finish" the device-tree, that is do the actual parsing of
+	 * some of the properties like the interrupt map
+	 */
+	finish_device_tree();
+
+	/*
+	 * Initialize xmon
+	 */
+#ifdef CONFIG_XMON_DEFAULT
+	xmon_init();
 #endif
+	/*
+	 * Register early console
+	 */
+	early_console_initialized = 1;
+	register_console(&udbg_console);
+
+#endif /* !CONFIG_PPC_ISERIES */
 
 	/* Save unparsed command line copy for /proc/cmdline */
 	strlcpy(saved_command_line, cmd_line, COMMAND_LINE_SIZE);
 
 	parse_early_param();
 
-#ifdef CONFIG_SMP
-#ifndef CONFIG_PPC_ISERIES
+#if defined(CONFIG_SMP) && !defined(CONFIG_PPC_ISERIES)
 	/*
 	 * iSeries has already initialized the cpu maps at this point.
 	 */
 	setup_cpu_maps();
-#endif /* CONFIG_PPC_ISERIES */
-
-#ifdef CONFIG_PPC_PSERIES
-	/* Start secondary threads on SMT systems; primary threads
-	 * are already in the running state.
-	 */
-	for_each_present_cpu(i) {
-		if (query_cpu_stopped(get_hard_smp_processor_id(i)) == 0) {
-			printk("%16.16x : starting thread\n", i);
-			rtas_call(rtas_token("start-cpu"), 3, 1, &ret,
-				  get_hard_smp_processor_id(i),
-				  (u32)*((unsigned long *)pseries_secondary_smp_init),
-				  i);
-		}
-	}
-
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
-		vpa_init(boot_cpuid);
-
-#endif /* CONFIG_PPC_PSERIES */
-#endif /* CONFIG_SMP */
-
-#if defined(CONFIG_HOTPLUG_CPU)
-	rtas_stop_self_args.token = rtas_token("stop-self");
-#endif /* CONFIG_HOTPLUG_CPU */
-
-	/* Finish initializing the hash table (do the dynamic
-	 * patching for the fast-path hashtable.S code)
-	 */
-	htab_finish_init();
+#endif /* defined(CONFIG_SMP) && !defined(CONFIG_PPC_ISERIES) */
 
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
@@ -453,7 +638,10 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("-----------------------------------------------------\n");
 
 	mm_init_ppc64();
+
+	DBG(" <- setup_system()\n");
 }
+
 
 void machine_restart(char *cmd)
 {
@@ -524,7 +712,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 #ifdef CONFIG_SMP
 	pvr = per_cpu(pvr, cpu_id);
 #else
-	pvr = _get_PVR();
+	pvr = mfpvr(PSRN_PVR);
 #endif
 	maj = (pvr >> 8) & 0xFF;
 	min = pvr & 0xFF;
@@ -591,24 +779,60 @@ static int __init early_parsemem(char *p)
 early_param("mem", early_parsemem);
 #endif
 
-#ifdef CONFIG_PPC_PSERIES
+#ifdef CONFIG_PPC_MULTIPLATFORM
 static int __init set_preferred_console(void)
 {
 	struct device_node *prom_stdout;
 	char *name;
 	int offset = 0;
+#if  0
+	phandle *stdout_ph;
+#endif
+	DBG(" -> set_preferred_console()\n");
 
 	/* The user has requested a console so this is already set up. */
-	if (strstr(saved_command_line, "console="))
+	if (strstr(saved_command_line, "console=")) {
+		DBG(" console was specified !\n");
 		return -EBUSY;
+	}
 
-	prom_stdout = find_path_device(of_stdout_device);
-	if (!prom_stdout)
+	if (!of_chosen) {
+		DBG(" of_chosen is NULL !\n");
 		return -ENODEV;
+	}
+	/* We are getting a weird phandle from OF ... */
+#if 0
+	stdout_ph = (phandle *)get_property(of_chosen, "linux,stdout-package", NULL);
+	if (stdout_ph == NULL) {
+		DBG(" no linux,stdout-package !\n");
+		return -ENODEV;
+	}
+	prom_stdout = of_find_node_by_phandle(*stdout_ph);
+	if (!prom_stdout) {
+		DBG(" can't find stdout package for phandle 0x%x !\n", *stdout_ph);
+		return -ENODEV;
+	}
+#endif
+	/* ... So use the full path instead */
+#if 1
+	name = (char *)get_property(of_chosen, "linux,stdout-path", NULL);
+	if (name == NULL) {
+		DBG(" no linux,stdout-path !\n");
+		return -ENODEV;
+	}
+	prom_stdout = of_find_node_by_path(name);
+	if (!prom_stdout) {
+		DBG(" can't find stdout package %s !\n", name);
+		return -ENODEV;
+	}	
+#endif
+	DBG("stdout is %s\n", prom_stdout->full_name);
 
 	name = (char *)get_property(prom_stdout, "name", NULL);
-	if (!name)
-		return -ENODEV;
+	if (!name) {
+		DBG(" stdout package has no name !\n");
+		goto not_found;
+	}
 
 	if (strcmp(name, "serial") == 0) {
 		int i;
@@ -629,10 +853,12 @@ static int __init set_preferred_console(void)
 					break;
 				default:
 					/* We dont recognise the serial port */
-					return -ENODEV;
+					goto not_found;
 			}
 		}
-	} else if (strcmp(name, "vty") == 0) {
+	}
+#ifdef CONFIG_PPC_PSERIES
+	else if (strcmp(name, "vty") == 0) {
  		u32 *reg = (u32 *)get_property(prom_stdout, "reg", NULL);
  		char *compat = (char *)get_property(prom_stdout, "compatible", NULL);
 
@@ -647,38 +873,38 @@ static int __init set_preferred_console(void)
  					offset = 1;
  					break;
  				default:
- 					return -ENODEV;
+					goto not_found;
  			}
+			of_node_put(prom_stdout);
+			DBG("Found hvsi console at offset %d\n", offset);
  			return add_preferred_console("hvsi", offset, NULL);
  		} else {
  			/* pSeries LPAR virtual console */
+			of_node_put(prom_stdout);
+			DBG("Found hvc console\n");
  			return add_preferred_console("hvc", 0, NULL);
  		}
-	} else if (strcmp(name, "ch-a") == 0)
+	}
+#endif /* CONFIG_PPC_PSERIES */
+	else if (strcmp(name, "ch-a") == 0)
 		offset = 0;
 	else if (strcmp(name, "ch-b") == 0)
 		offset = 1;
 	else
-		return -ENODEV;
+		goto not_found;
+	of_node_put(prom_stdout);
+
+	DBG("Found serial console at ttyS%d\n", offset);
 
 	return add_preferred_console("ttyS", offset, NULL);
 
+ not_found:
+	DBG("No preferred console found !\n");
+	of_node_put(prom_stdout);
+	return -ENODEV;
 }
 console_initcall(set_preferred_console);
-#endif
-
-int __init ppc_init(void)
-{
-	/* clear the progress line */
-	ppc_md.progress(" ", 0xffff);
-
-	if (ppc_md.init != NULL) {
-		ppc_md.init();
-	}
-	return 0;
-}
-
-arch_initcall(ppc_init);
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 
 #ifdef CONFIG_IRQSTACKS
 static void __init irqstack_early_init(void)
@@ -739,7 +965,6 @@ void __init setup_arch(char **cmdline_p)
 
 	*cmdline_p = cmd_line;
 
-
 	/*
 	 * Set cache line size based on type of cpu as a default.
 	 * Systems with OF can look in the properties on the cpu node(s)
@@ -773,6 +998,7 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 	ppc64_boot_msg(0x15, "Setup Done");
 }
+
 
 /* ToDo: do something useful if ppc_md is not yet setup. */
 #define PPC64_LINUX_FUNCTION 0x0f000000
@@ -878,3 +1104,16 @@ int set_decr_overclock( char * str )
 __setup("spread_lpevents=", set_spread_lpevents );
 __setup("decr_overclock_proc0=", set_decr_overclock_proc0 );
 __setup("decr_overclock=", set_decr_overclock );
+
+#ifdef CONFIG_XMON
+static int __init early_xmon(char *p)
+{
+	/* ensure xmon is enabled */
+	xmon_init();
+	debugger(0);
+
+	return 0;
+}
+early_param("xmon", early_xmon);
+#endif
+

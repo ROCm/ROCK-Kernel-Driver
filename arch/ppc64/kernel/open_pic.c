@@ -362,7 +362,6 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 	find_ISUs();
 
 	/* Initialize timer interrupts */
-	ppc64_boot_msg(0x21, "OpenPic Timer");
 	for (i = 0; i < OPENPIC_NUM_TIMERS; i++) {
 		/* Disabled, Priority 0 */
 		openpic_inittimer(i, 0, openpic_vec_timer+i);
@@ -372,7 +371,6 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 
 #ifdef CONFIG_SMP
 	/* Initialize IPI interrupts */
-	ppc64_boot_msg(0x22, "OpenPic IPI");
 	openpic_test_broken_IPI();
 	for (i = 0; i < OPENPIC_NUM_IPI; i++) {
 		/* Disabled, Priority 10..13 */
@@ -384,8 +382,6 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 #endif
 
 	/* Initialize external interrupts */
-	ppc64_boot_msg(0x23, "OpenPic Ext");
-
 	openpic_set_priority(0xf);
 
 	/* SIOint (8259 cascade) is special */
@@ -420,7 +416,6 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 		irq_desc[i].handler = &open_pic;
 
 	/* Initialize the spurious interrupt */
-	ppc64_boot_msg(0x24, "OpenPic Spurious");
 	openpic_set_spurious(openpic_vec_spurious);
 
 	openpic_set_priority(0);

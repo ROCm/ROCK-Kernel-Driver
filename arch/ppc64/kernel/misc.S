@@ -127,6 +127,47 @@ _GLOBAL(call_handle_irq_event)
 	blr
 #endif /* CONFIG_IRQSTACKS */
 
+	/*
+ * To be called by C code which needs to do some operations with MMU
+ * disabled. Note that interrupts have to be disabled by the caller
+ * prior to calling us. The code called _MUST_ be in the RMO of course
+ * and part of the linear mapping as we don't attempt to translate the
+ * stack pointer at all. The function is called with the stack switched
+ * to this CPU emergency stack
+ *
+ * prototype is void *call_with_mmu_off(void *func, void *data);
+ *
+ * the called function is expected to be of the form
+ *
+ * void *called(void *data); 
+ */
+_GLOBAL(call_with_mmu_off)
+	mflr	r0			/* get link, save it on stackframe */
+	std	r0,16(r1)
+	mr	r1,r5			/* save old stack ptr */
+	ld	r1,PACAEMERGSP(r13)	/* get emerg. stack */
+	subi	r1,r1,STACK_FRAME_OVERHEAD
+	std	r0,16(r1)		/* save link on emerg. stack */
+	std	r5,0(r1)		/* save old stack ptr in backchain */
+	ld	r3,0(r3)		/* get to real function ptr (assume same TOC) */
+	bl	2f			/* we need LR to return, continue at label 2 */
+
+	ld	r0,16(r1)		/* we return here from the call, get LR and */
+	ld	r1,0(r1)		/* .. old stack ptr */
+	mtspr	SPRN_SRR0,r0		/* and get back to virtual mode with these */
+	mfmsr	r4
+	ori	r4,r4,MSR_IR|MSR_DR
+	mtspr	SPRN_SRR1,r4
+	rfid
+
+2:	mtspr	SPRN_SRR0,r3		/* coming from above, enter real mode */
+	mr	r3,r4			/* get parameter */
+	mfmsr	r0
+	ori	r0,r0,MSR_IR|MSR_DR
+	xori	r0,r0,MSR_IR|MSR_DR
+	mtspr	SPRN_SRR1,r0
+	rfid
+	
 /*
  * Flush instruction cache.
  */
@@ -454,17 +495,6 @@ _GLOBAL(_outsl_ns)
 	sync
 	blr	
 
-_GLOBAL(_get_PVR)
-	mfspr	r3,PVR
-	blr
-
-_GLOBAL(_get_PIR)
-	mfspr	r3,PIR
-	blr
-
-_GLOBAL(_get_HID0)
-	mfspr	r3,HID0
-	blr
 
 _GLOBAL(cvt_fd)
 	lfd	0,0(r5)		/* load up fpscr value */
@@ -561,6 +591,69 @@ _GLOBAL(do_cpu_ftr_fixups)
 	isync
 	b	1b
 
+#ifdef CONFIG_PPC_PMAC
+/*
+ * Do an IO access in real mode
+ */
+_GLOBAL(real_readb)
+	mfmsr	r7
+	ori	r0,r7,MSR_DR
+	xori	r0,r0,MSR_DR
+	sync
+	mtmsrd	r0
+	sync
+	isync
+	mfspr	r6,SPRN_HID4
+	rldicl	r5,r6,32,0
+	ori	r5,r5,0x100
+	rldicl	r5,r5,32,0
+	sync
+	mtspr	SPRN_HID4,r5
+	isync
+	slbia
+	isync
+	lbz	r3,0(r3)
+	sync
+	mtspr	SPRN_HID4,r6
+	isync
+	slbia
+	isync
+	mtmsrd	r7
+	sync
+	isync
+	blr
+
+	/*
+ * Do an IO access in real mode
+ */
+_GLOBAL(real_writeb)
+	mfmsr	r7
+	ori	r0,r7,MSR_DR
+	xori	r0,r0,MSR_DR
+	sync
+	mtmsrd	r0
+	sync
+	isync
+	mfspr	r6,SPRN_HID4
+	rldicl	r5,r6,32,0
+	ori	r5,r5,0x100
+	rldicl	r5,r5,32,0
+	sync
+	mtspr	SPRN_HID4,r5
+	isync
+	slbia
+	isync
+	stb	r3,0(r4)
+	sync
+	mtspr	SPRN_HID4,r6
+	isync
+	slbia
+	isync
+	mtmsrd	r7
+	sync
+	isync
+	blr
+#endif /* CONFIG_PPC_PMAC */
 
 /*
  * Create a kernel thread
@@ -594,7 +687,7 @@ _GLOBAL(kernel_thread)
 	ld	r30,-16(r1)
 	blr
 
-#ifdef CONFIG_PPC_ISERIES	/* hack hack hack */
+#ifndef CONFIG_PPC_PSERIE	/* hack hack hack */
 #define ppc_rtas	sys_ni_syscall
 #endif
 

@@ -496,7 +496,8 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 void pgtable_cache_init(void);
 
-extern void hpte_init_pSeries(void);
+extern void hpte_init_native(void);
+extern void hpte_init_lpar(void);
 extern void hpte_init_iSeries(void);
 
 /* imalloc region types */
@@ -511,14 +512,14 @@ extern struct vm_struct * im_get_area(unsigned long v_addr, unsigned long size,
 			int region_type);
 unsigned long im_free(void *addr);
 
-long pSeries_lpar_hpte_insert(unsigned long hpte_group,
-			      unsigned long va, unsigned long prpn,
-			      int secondary, unsigned long hpteflags,
-			      int bolted, int large);
+extern long pSeries_lpar_hpte_insert(unsigned long hpte_group,
+				     unsigned long va, unsigned long prpn,
+				     int secondary, unsigned long hpteflags,
+				     int bolted, int large);
 
-long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
-			 unsigned long prpn, int secondary,
-			 unsigned long hpteflags, int bolted, int large);
+extern long native_hpte_insert(unsigned long hpte_group, unsigned long va,
+			       unsigned long prpn, int secondary,
+			       unsigned long hpteflags, int bolted, int large);
 
 /*
  * find_linux_pte returns the address of a linux pte for a given 

@@ -30,11 +30,15 @@ struct device_node;
 #define EEH_MODE_SUPPORTED	(1<<0)
 #define EEH_MODE_NOCHECK	(1<<1)
 
+#ifdef CONFIG_PPC_PSERIES
 extern void __init eeh_init(void);
 unsigned long eeh_check_failure(const volatile void __iomem *token, unsigned long val);
 int eeh_dn_check_failure (struct device_node *dn, struct pci_dev *dev);
 void __iomem *eeh_ioremap(unsigned long addr, void __iomem *vaddr);
 void __init pci_addr_cache_build(void);
+#else
+#define eeh_check_failure(token, val) (val)
+#endif
 
 /**
  * eeh_add_device_early

@@ -30,9 +30,8 @@
 #include <asm/time.h>
 #include <asm/iSeries/HvCall.h>
 #include <asm/iSeries/ItLpQueue.h>
+#include <asm/plpar_wrappers.h>
 
-extern long cede_processor(void);
-extern long poll_pending(void);
 extern void power4_idle(void);
 
 static int (*idle_loop)(void);
@@ -152,6 +151,8 @@ static int default_idle(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_PPC_PSERIES
 
 DECLARE_PER_CPU(unsigned long, smt_snooze_delay);
 
@@ -280,9 +281,12 @@ static int shared_idle(void)
 	return 0;
 }
 
-static int powermac_idle(void)
+#endif /* CONFIG_PPC_PSERIES */
+
+static int native_idle(void)
 {
 	while(1) {
+		/* check CPU type here */
 		if (!need_resched())
 			power4_idle();
 		if (need_resched())
@@ -290,7 +294,8 @@ static int powermac_idle(void)
 	}
 	return 0;
 }
-#endif
+
+#endif /* CONFIG_PPC_ISERIES */
 
 int cpu_idle(void)
 {
@@ -332,30 +337,38 @@ __initcall(register_powersave_nap_sysctl);
 
 int idle_setup(void)
 {
+	/*
+	 * Move that junk to each platform specific file, eventually define
+	 * a pSeries_idle for shared processor stuff
+	 */
 #ifdef CONFIG_PPC_ISERIES
 	idle_loop = iSeries_idle;
+	return 1;
 #else
+	idle_loop = default_idle;
+#endif
+#ifdef CONFIG_PPC_PSERIES
 	if (systemcfg->platform & PLATFORM_PSERIES) {
 		if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 			if (get_paca()->lppaca.xSharedProc) {
-				printk("idle = shared_idle\n");
+				printk(KERN_INFO "Using shared processor idle loop\n");
 				idle_loop = shared_idle;
 			} else {
-				printk("idle = dedicated_idle\n");
+				printk(KERN_INFO "Using dedicated idle loop\n");
 				idle_loop = dedicated_idle;
 			}
 		} else {
-			printk("idle = default_idle\n");
+			printk(KERN_INFO "Using default idle loop\n");
 			idle_loop = default_idle;
 		}
-	} else if (systemcfg->platform == PLATFORM_POWERMAC) {
-		printk("idle = powermac_idle\n");
-		idle_loop = powermac_idle;
-	} else {
-		printk("idle_setup: unknown platform, use default_idle\n");
-		idle_loop = default_idle;
 	}
-#endif
+#endif /* CONFIG_PPC_PSERIES */
+#ifdef CONFIG_PPC_PMAC
+	if (systemcfg->platform == PLATFORM_POWERMAC) {
+		printk(KERN_INFO "Using native/NAP idle loop\n");
+		idle_loop = native_idle;
+	}
+#endif /* CONFIG_PPC_PMAC */
 
 	return 1;
 }

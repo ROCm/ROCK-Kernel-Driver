@@ -325,249 +325,48 @@ struct io7 {
  * I/O functions. All access through linear space.
  */
 
-#define vucp	volatile unsigned char *
-#define vusp	volatile unsigned short *
-#define vuip	volatile unsigned int *
-#define vulp	volatile unsigned long *
-
-#ifdef CONFIG_VGA_HOSE
-extern struct pci_controller *pci_vga_hose;
-
-# define __marvel_is_port_vga(a)	\
-        (((a) >= 0x3b0) && ((a) < 0x3e0) && ((a) != 0x3b3) && ((a) != 0x3d3))
-# define __marvel_is_mem_vga(a)	(((a) >= 0xa0000) && ((a) <= 0xc0000))
-# define FIXUP_IOADDR_VGA(a) do {			\
-	if (pci_vga_hose && __marvel_is_port_vga(a))	\
-		a += pci_vga_hose->io_space->start;	\
-    } while(0)
-#else
-# define FIXUP_IOADDR_VGA(a)
-#endif 
-
-#define __marvel_is_port_kbd(a)	(((a) == 0x60) || ((a) == 0x64))
-#define __marvel_is_port_rtc(a)	(((a) == 0x70) || ((a) == 0x71))
-
-#define FIXUP_IOADDR_LEGACY(a)
-
-#define FIXUP_IOADDR(a) do {				\
-	FIXUP_IOADDR_VGA(a);				\
-        FIXUP_IOADDR_LEGACY(a);				\
-    } while(0)
-
-#if 0
-# define IOBUG(x) printk x
-# define IOBUG_FILTER_IOADDR(a, x)	\
-    if (!__marvel_is_port_kbd(a) && !__marvel_is_port_rtc(a)) IOBUG(x)
-#else
-# define IOBUG(x)
-# define IOBUG_FILTER_IOADDR(a, x)
-#endif
-
-extern u8 __marvel_rtc_io(int write, u8 b, unsigned long addr);
-#define __marvel_rtc_inb(a)	__marvel_rtc_io(0, 0, (a))
-#define __marvel_rtc_outb(b, a)	__marvel_rtc_io(1, (b), (a))
-
-__EXTERN_INLINE int marvel_is_ioaddr(unsigned long addr)
-{
-	return (addr & (1UL << 40)) != 0; /*FIXME - hardwire*/
-}
-
-__EXTERN_INLINE u8 marvel_inb(unsigned long addr)
-{
-	FIXUP_IOADDR(addr);
-	if (!marvel_is_ioaddr(addr)) {
-		if (__marvel_is_port_kbd(addr))
-			return (u8)0;
-		if (__marvel_is_port_rtc(addr))
-			return __marvel_rtc_inb(addr);
-		IOBUG_FILTER_IOADDR(addr, 
-				    ("Bad IO addr %lx - reading -1\n", addr));
-		return (u8)-1;
-	}
-	return __kernel_ldbu(*(vucp)addr);
-}
-
-__EXTERN_INLINE void marvel_outb(u8 b, unsigned long addr)
-{
-	FIXUP_IOADDR(addr);
-	if (!marvel_is_ioaddr(addr)) {
-		if (__marvel_is_port_rtc(addr)) 
-			return (void)__marvel_rtc_outb(b, addr);
-		IOBUG_FILTER_IOADDR(addr, 
-				    ("Bad IO addr %lx - reading -1\n", addr));
-		return;
-	}
-	__kernel_stb(b, *(vucp)addr);
-	mb();
-}
-
-__EXTERN_INLINE u16 marvel_inw(unsigned long addr)
-{
-	FIXUP_IOADDR(addr);
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG_FILTER_IOADDR(addr, 
-				    ("Bad IO addr %lx - reading -1\n", addr));
-		return (u16)-1;
-	}
-	return __kernel_ldwu(*(vusp)addr);
-}
-
-__EXTERN_INLINE void marvel_outw(u16 w, unsigned long addr)
-{
-	FIXUP_IOADDR(addr);
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG_FILTER_IOADDR(addr, 
-				    ("Bad IO addr %lx - reading -1\n", addr));
-		return;
-	}
-	__kernel_stw(w, *(vusp)addr);
-	mb();
-}
-
-__EXTERN_INLINE u32 marvel_inl(unsigned long addr)
-{
-	FIXUP_IOADDR(addr);
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG_FILTER_IOADDR(addr, 
-				    ("Bad IO addr %lx - reading -1\n", addr));
-		return (u32)-1;
-	}
-	return *(vuip)addr;
-}
-
-__EXTERN_INLINE void marvel_outl(u32 l, unsigned long addr)
-{
-	FIXUP_IOADDR(addr);
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG_FILTER_IOADDR(addr, 
-				    ("Bad IO addr %lx - reading -1\n", addr));
-		return;
-	}
-	*(vuip)addr = l;
-	mb();
-}
-
 /*
  * Memory functions.  All accesses through linear space.
  */
 
-extern unsigned long marvel_ioremap(unsigned long addr, unsigned long size);
-extern void marvel_iounmap(unsigned long addr);
+#define vucp	volatile unsigned char __force *
+#define vusp	volatile unsigned short __force *
 
-__EXTERN_INLINE u8 marvel_readb(unsigned long addr)
-{
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - reading -1\n", addr));
-		return (u8)-1;
-	}
-	return __kernel_ldbu(*(vucp)addr);
-}
+extern unsigned int marvel_ioread8(void __iomem *);
+extern void marvel_iowrite8(u8 b, void __iomem *);
 
-__EXTERN_INLINE u16 marvel_readw(unsigned long addr)
+__EXTERN_INLINE unsigned int marvel_ioread16(void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - reading -1\n", addr));
-		return (u16)-1;
-	}
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE u32 marvel_readl(unsigned long addr)
+__EXTERN_INLINE void marvel_iowrite16(u16 b, void __iomem *addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - reading -1\n", addr));
-		return (u32)-1;
-	}
-	return *(vuip)addr;
+	__kernel_stw(b, *(vusp)addr);
 }
 
-__EXTERN_INLINE u64 marvel_readq(unsigned long addr)
+extern void __iomem *marvel_ioremap(unsigned long addr, unsigned long size);
+extern void marvel_iounmap(volatile void __iomem *addr);
+extern void __iomem *marvel_ioportmap (unsigned long addr);
+
+__EXTERN_INLINE int marvel_is_ioaddr(unsigned long addr)
 {
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - reading -1\n", addr));
-		return (u64)-1;
-	}
-	return *(vulp)addr;
+	return (addr >> 40) & 1;
 }
 
-__EXTERN_INLINE void marvel_writeb(u8 b, unsigned long addr)
-{
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - dropping store\n", addr));
-		return;
-	}
-	__kernel_stb(b, *(vucp)addr);
-}
-
-__EXTERN_INLINE void marvel_writew(u16 w, unsigned long addr)
-{
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - dropping store\n", addr));
-		return;
-	}
-	__kernel_stw(w, *(vusp)addr);
-}
-
-__EXTERN_INLINE void marvel_writel(u32 l, unsigned long addr)
-{
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - dropping store\n", addr));
-		return;
-	}
-	*(vuip)addr = l;
-}
-
-__EXTERN_INLINE void marvel_writeq(u64 q, unsigned long addr)
-{
-	if (!marvel_is_ioaddr(addr)) {
-		IOBUG(("Bad MEM addr %lx - dropping store\n", addr));
-		return;
-	}
-	*(vulp)addr = q;
-}
-
-#undef FIXUP_IOADDR
-#undef FIXUP_IOADDR_LEGACY
-#undef FIXUP_IOADDR_VGA
+extern int marvel_is_mmio(const volatile void __iomem *);
 
 #undef vucp
 #undef vusp
-#undef vuip
-#undef vulp
 
-#ifdef __WANT_IO_DEF
-
-#define __inb(p)		marvel_inb((unsigned long)(p))
-#define __inw(p)		marvel_inw((unsigned long)(p))
-#define __inl(p)		marvel_inl((unsigned long)(p))
-#define __outb(x,p)		marvel_outb((x),(unsigned long)(p))
-#define __outw(x,p)		marvel_outw((x),(unsigned long)(p))
-#define __outl(x,p)		marvel_outl((x),(unsigned long)(p))
-#define __readb(a)		marvel_readb((unsigned long)(a))
-#define __readw(a)		marvel_readw((unsigned long)(a))
-#define __readl(a)		marvel_readl((unsigned long)(a))
-#define __readq(a)		marvel_readq((unsigned long)(a))
-#define __writeb(x,a)		marvel_writeb((x),(unsigned long)(a))
-#define __writew(x,a)		marvel_writew((x),(unsigned long)(a))
-#define __writel(x,a)		marvel_writel((x),(unsigned long)(a))
-#define __writeq(x,a)		marvel_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		marvel_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		marvel_iounmap((unsigned long)(a))
-#define __is_ioaddr(a)		marvel_is_ioaddr((unsigned long)(a))
-
-/* Disable direct inlining of these calls with the debug checks present.  */
-#if 0
-#define __raw_readb(a)		__readb(a)
-#define __raw_readw(a)		__readw(a)
-#define __raw_readl(a)		__readl(a)
-#define __raw_readq(a)		__readq(a)
-#define __raw_writeb(v,a)	__writeb(v,a)
-#define __raw_writew(v,a)	__writew(v,a)
-#define __raw_writel(v,a)	__writel(v,a)
-#define __raw_writeq(v,a)	__writeq(v,a)
-#endif
-
-#endif /* __WANT_IO_DEF */
+#undef __IO_PREFIX
+#define __IO_PREFIX		marvel
+#define marvel_trivial_rw_bw	1
+#define marvel_trivial_rw_lq	1
+#define marvel_trivial_io_bw	0
+#define marvel_trivial_io_lq	1
+#define marvel_trivial_iounmap	0
+#include <asm/io_trivial.h>
 
 #ifdef __IO_EXTERN_INLINE
 # undef __EXTERN_INLINE

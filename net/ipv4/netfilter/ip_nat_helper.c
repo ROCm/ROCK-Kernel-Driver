@@ -73,7 +73,7 @@ adjust_tcp_sequence(u32 seq,
 
 	LOCK_BH(&ip_nat_seqofs_lock);
 
-	/* SYN adjust. If it's uninitialized, of this is after last
+	/* SYN adjust. If it's uninitialized, or this is after last
 	 * correction, record it: we don't handle more than one
 	 * adjustment in the window, but do deal with common case of a
 	 * retransmit */
