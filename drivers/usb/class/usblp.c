@@ -673,8 +673,12 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 
 		usblp->writeurb->dev = usblp->dev;
 		usblp->wcomplete = 0;
-		if (err = usb_submit_urb(usblp->writeurb, GFP_KERNEL)) {
-			count = err != -ENOMEM ? -EIO : (writecount ? writecount : -ENOMEM);
+		err = usb_submit_urb(usblp->writeurb, GFP_KERNEL);
+		if (err) {
+			if (err != -ENOMEM)
+				count = -EIO;
+			else
+				count = writecount ? writecount : -ENOMEM;
 			up (&usblp->sem);
 			break;
 		}
