@@ -81,14 +81,13 @@ nfs_setxattr(struct dentry *dentry, const char *name,
 		type = ACL_TYPE_DEFAULT;
 	else
 		return -EOPNOTSUPP;
+	if (NFS_PROTO(inode)->version != 3 || !NFS_PROTO(inode)->setacl)
+		return -EOPNOTSUPP;
 
 	acl = posix_acl_from_xattr(value, size);
 	if (IS_ERR(acl))
 		return PTR_ERR(acl);
-
-	error = -EOPNOTSUPP;
-	if (NFS_PROTO(inode)->version == 3 && NFS_PROTO(inode)->setacl)
-		error = NFS_PROTO(inode)->setacl(inode, type, acl);
+	error = NFS_PROTO(inode)->setacl(inode, type, acl);
 	posix_acl_release(acl);
 
 	return error;
