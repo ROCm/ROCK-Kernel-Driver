@@ -469,11 +469,24 @@ static void __init longhaul_setup_voltagescaling (unsigned long lo, unsigned lon
 {
 	int revkey;
 
-	can_scale_voltage = 1;
 
 	minvid = (hi & (1<<20|1<<21|1<<22|1<<23|1<<24)) >> 20; /* 56:52 */
 	maxvid = (hi & (1<<4|1<<5|1<<6|1<<7|1<<8)) >> 4;       /* 40:36 */
 	vrmrev = (lo & (1<<15))>>15;
+
+	if (minvid == 0 || maxvid == 0) {
+		printk ("longhaul: Bogus values Min:%d.%03d Max:%d.%03d. "
+					"Voltage scaling disabled.\n",
+					minvid/1000, minvid%1000, maxvid/1000, maxvid%1000);
+		return;
+	}
+
+	if (minvid == maxvid) {
+		printk ("longhaul: Claims to support voltage scaling but min & max are "
+				"both %d.%03d. Voltage scaling disabled\n",
+				maxvid/1000, maxvid%1000);
+		return;
+	}
 
 	if (vrmrev==0) {
 		dprintk (KERN_INFO "longhaul: VRM 8.5 : ");
@@ -497,6 +510,8 @@ static void __init longhaul_setup_voltagescaling (unsigned long lo, unsigned lon
 	maxvid = voltage_table[maxvid];
 	dprintk ("Min VID=%d.%03d Max VID=%d.%03d, %d possible voltage scales\n",
 		maxvid/1000, maxvid%1000, minvid/1000, minvid%1000, numvscales);
+
+	can_scale_voltage = 1;
 }
 
 
