@@ -27,6 +27,11 @@ static int num_counters;
 static int oprofile_running;
 static int mmcra_has_sihv;
 
+/* mmcr values are set in power4_reg_setup, used in power4_cpu_setup */
+static u32 mmcr0_val;
+static u64 mmcr1_val;
+static u32 mmcra_val;
+
 static void power4_reg_setup(struct op_counter_config *ctr,
 			     struct op_system_config *sys,
 			     int num_ctrs)
@@ -45,18 +50,36 @@ static void power4_reg_setup(struct op_counter_config *ctr,
 	if (cur_cpu_spec->cpu_features & CPU_FTR_MMCRA_SIHV)
 		mmcra_has_sihv = 1;
 
+	/*
+	 * The performance counter event settings are given in the mmcr0,
+	 * mmcr1 and mmcra values passed from the user in the
+	 * op_system_config structure (sys variable).
+	 */
+	mmcr0_val = sys->mmcr0;
+	mmcr1_val = sys->mmcr1;
+	mmcra_val = sys->mmcra;
+
 	for (i = 0; i < num_counters; ++i)
 		reset_value[i] = 0x80000000UL - ctr[i].count;
 
-	/* XXX setup user and kernel profiling */
+	/* setup user and kernel profiling */
+	if (sys->enable_kernel)
+		mmcr0_val &= ~MMCR0_KERNEL_DISABLE;
+	else
+		mmcr0_val |= MMCR0_KERNEL_DISABLE;
+
+	if (sys->enable_user)
+		mmcr0_val &= ~MMCR0_PROBLEM_DISABLE;
+	else
+		mmcr0_val |= MMCR0_PROBLEM_DISABLE;
 }
 
 extern void ppc64_enable_pmcs(void);
 
 static void power4_cpu_setup(void *unused)
 {
-	unsigned int mmcr0 = mfspr(SPRN_MMCR0);
-	unsigned long mmcra = mfspr(SPRN_MMCRA);
+	unsigned int mmcr0 = mmcr0_val;
+	unsigned long mmcra = mmcra_val;
 
 	ppc64_enable_pmcs();
 
@@ -67,6 +90,8 @@ static void power4_cpu_setup(void *unused)
 	mmcr0 |= MMCR0_FCM1|MMCR0_PMXE|MMCR0_FCECE;
 	mmcr0 |= MMCR0_PMC1INTCONTROL|MMCR0_PMCNINTCONTROL;
 	mtspr(SPRN_MMCR0, mmcr0);
+
+	mtspr(SPRN_MMCR1, mmcr1_val);
 
 	mmcra |= MMCRA_SAMPLE_ENABLE;
 	mtspr(SPRN_MMCRA, mmcra);
