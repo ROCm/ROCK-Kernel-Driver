@@ -872,12 +872,10 @@ int try_to_free_pages(struct zone **zones,
 		get_page_state(&ps);
 		nr_reclaimed += shrink_caches(zones, priority, &total_scanned,
 						gfp_mask, nr_pages, &ps);
-		if (zones[0] - zones[0]->zone_pgdat->node_zones < ZONE_HIGHMEM) {
-			shrink_slab(total_scanned, gfp_mask);
-			if (reclaim_state) {
-				nr_reclaimed += reclaim_state->reclaimed_slab;
-				reclaim_state->reclaimed_slab = 0;
-			}
+		shrink_slab(total_scanned, gfp_mask);
+		if (reclaim_state) {
+			nr_reclaimed += reclaim_state->reclaimed_slab;
+			reclaim_state->reclaimed_slab = 0;
 		}
 		if (nr_reclaimed >= nr_pages) {
 			ret = 1;
@@ -964,11 +962,9 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 				max_scan = SWAP_CLUSTER_MAX;
 			reclaimed = shrink_zone(zone, max_scan, GFP_KERNEL,
 					to_reclaim, &total_scanned, ps);
-			if (i < ZONE_HIGHMEM) {
-				reclaim_state->reclaimed_slab = 0;
-				shrink_slab(total_scanned, GFP_KERNEL);
-				reclaimed += reclaim_state->reclaimed_slab;
-			}
+			reclaim_state->reclaimed_slab = 0;
+			shrink_slab(total_scanned, GFP_KERNEL);
+			reclaimed += reclaim_state->reclaimed_slab;
 			to_free -= reclaimed;
 			if (zone->all_unreclaimable)
 				continue;
