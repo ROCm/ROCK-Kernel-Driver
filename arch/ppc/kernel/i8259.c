@@ -11,7 +11,7 @@
 #include <asm/io.h>
 #include <asm/i8259.h>
 
-static volatile char *pci_intack; /* RO, gives us the irq vector */
+static volatile unsigned char *pci_intack; /* RO, gives us the irq vector */
 
 unsigned char cached_8259[2] = { 0xff, 0xff };
 #define cached_A1 (cached_8259[0])
@@ -24,13 +24,13 @@ int i8259_pic_irq_offset;
 /* Acknowledge the irq using the PCI host bridge's interrupt acknowledge
  * feature. (Polling is somehow broken on some IBM and Motorola PReP boxes.)
  */
-int i8259_irq(void)
+int i8259_irq(struct pt_regs *regs)
 {
 	int irq;
 
 	spin_lock/*_irqsave*/(&i8259_lock/*, flags*/);
 
-	irq = *pci_intack & 0xff;
+	irq = *pci_intack;
 	if (irq==7) {
 		/*
 		 * This may be a spurious interrupt.

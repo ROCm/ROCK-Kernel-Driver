@@ -41,16 +41,13 @@ extern int use_of_interrupt_tree;
 static u_int NumProcessors;
 static u_int NumSources;
 static int open_pic_irq_offset;
-static volatile unsigned char* chrp_int_ack_special;
+static volatile unsigned char *chrp_int_ack_special;
 static volatile OpenPIC_Source *ISR[NR_IRQS];
 
 /* Global Operations */
 static void openpic_disable_8259_pass_through(void);
 static void openpic_set_priority(u_int pri);
 static void openpic_set_spurious(u_int vector);
-static void openpic_enable_sie(void);
-static void openpic_eicr_set_clk(u_int clkval);
-static void openpic_eicr_set_clk(u_int clkval);
 
 #ifdef CONFIG_SMP
 /* Interprocessor Interrupts */
@@ -73,7 +70,6 @@ static void openpic_mapirq(u_int irq, u_int cpumask, u_int keepmask);
  * These functions are not used but the code is kept here
  * for completeness and future reference.
  */
-static void openpic_reset(void);
 #ifdef notused
 static void openpic_enable_8259_pass_through(void);
 static u_int openpic_get_priority(void);
@@ -263,6 +259,31 @@ static void openpic_safe_writefield_IPI(volatile u_int *addr, u_int mask, u_int 
 }
 #endif /* CONFIG_SMP */
 
+#if defined(CONFIG_EPIC_SERIAL_MODE) || defined(CONFIG_PMAC_PBOOK)
+static void openpic_reset(void)
+{
+	openpic_setfield(&OpenPIC->Global.Global_Configuration0,
+			 OPENPIC_CONFIG_RESET);
+	while (openpic_readfield(&OpenPIC->Global.Global_Configuration0,
+				 OPENPIC_CONFIG_RESET))
+		mb();
+}
+#endif
+
+#ifdef CONFIG_EPIC_SERIAL_MODE
+static void openpic_enable_sie(void)
+{
+	openpic_setfield(&OpenPIC->Global.Global_Configuration1,
+			 OPENPIC_EICR_SIE);
+}
+
+static void openpic_eicr_set_clk(u_int clkval)
+{
+	openpic_writefield(&OpenPIC->Global.Global_Configuration1,
+			 OPENPIC_EICR_S_CLK_MASK, (clkval << 28));
+}
+#endif
+
 void openpic_set_sources(int first_irq, int num_irqs, void *first_ISR)
 {
 	volatile OpenPIC_Source *src = first_ISR;
@@ -277,7 +298,7 @@ void openpic_set_sources(int first_irq, int num_irqs, void *first_ISR)
 		ISR[i] = src;
 }
 
-void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
+void __init openpic_init(int main_pic, int offset, unsigned char *chrp_ack,
 			 int programmer_switch_irq)
 {
 	u_int t, i;
@@ -331,7 +352,7 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 		return;
 
 	open_pic_irq_offset = offset;
-	chrp_int_ack_special = (volatile unsigned char*)chrp_ack;
+	chrp_int_ack_special = chrp_ack;
 
 	/* Initialize timer interrupts */
 	if ( ppc_md.progress ) ppc_md.progress("openpic timer",0x3ba);
@@ -400,38 +421,14 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 				"82c59 cascade", NULL))
 			printk("Unable to get OpenPIC IRQ 0 for cascade\n");
 	}
-#ifdef CONFIG_EPIC_SERIAL_MODE
  	openpic_disable_8259_pass_through();
+#ifdef CONFIG_EPIC_SERIAL_MODE
 	openpic_eicr_set_clk(7);	/* Slowest value until we know better */
 	openpic_enable_sie();
-	openpic_set_priority(0);
-#else
- 	openpic_disable_8259_pass_through();
- 	openpic_set_priority(0);
 #endif
+	openpic_set_priority(0);
 
 	if (ppc_md.progress) ppc_md.progress("openpic exit",0x222);
-}
-
-static void openpic_reset(void)
-{
-	openpic_setfield(&OpenPIC->Global.Global_Configuration0,
-			 OPENPIC_CONFIG_RESET);
-	while (openpic_readfield(&OpenPIC->Global.Global_Configuration0,
-				 OPENPIC_CONFIG_RESET))
-		mb();
-}
-
-static void openpic_enable_sie(void)
-{
-	openpic_setfield(&OpenPIC->Global.Global_Configuration1,
-			 OPENPIC_EICR_SIE);
-}
-
-static void openpic_eicr_set_clk(u_int clkval)
-{
-	openpic_writefield(&OpenPIC->Global.Global_Configuration1,
-			 OPENPIC_EICR_S_CLK_MASK, (clkval << 28));
 }
 
 #ifdef notused
@@ -533,7 +530,9 @@ void openpic_reset_processor_phys(u_int mask)
 	openpic_write(&OpenPIC->Global.Processor_Initialization, mask);
 }
 
+#if defined(CONFIG_SMP) || defined(CONFIG_PMAC_PBOOK)
 static spinlock_t openpic_setup_lock = SPIN_LOCK_UNLOCKED;
+#endif
 
 #ifdef CONFIG_SMP
 /*

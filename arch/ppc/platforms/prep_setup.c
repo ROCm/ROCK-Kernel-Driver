@@ -685,12 +685,6 @@ prep_irq_cannonicalize(u_int irq)
 	}
 }
 
-static int __prep
-prep_get_irq(struct pt_regs *regs)
-{
-	return i8259_irq();
-}		
-
 static void __init
 prep_init_IRQ(void)
 {
@@ -867,7 +861,7 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.irq_cannonicalize = prep_irq_cannonicalize;
 	ppc_md.init_IRQ       = prep_init_IRQ;
 	/* this gets changed later on if we have an OpenPIC -- Cort */
-	ppc_md.get_irq        = prep_get_irq;
+	ppc_md.get_irq        = i8259_irq;
 	ppc_md.init           = prep_init2;
 
 	ppc_md.restart        = prep_restart;
