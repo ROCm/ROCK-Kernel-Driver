@@ -1749,6 +1749,7 @@ static struct address_space_operations shmem_aops = {
 static struct file_operations shmem_file_operations = {
 	.mmap		= shmem_mmap,
 #ifdef CONFIG_TMPFS
+	.llseek		= generic_file_llseek,
 	.read		= shmem_file_read,
 	.write		= shmem_file_write,
 	.fsync		= simple_sync_file,
