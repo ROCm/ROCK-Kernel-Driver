@@ -34,14 +34,17 @@ config AGP3
 	depends on AGP
 
 config AGP_INTEL
-	tristate "Intel 440LX/BX/GX and I815/I820/I830M/I830MP/I840/I845/I850/I860 support"
+	tristate "Intel 440LX/BX/GX and I815/I820/830M/I830MP/I840/I845/845G/I850/852GM/855GM/I860/865G support"
 	depends on AGP
 	help
 	  This option gives you AGP support for the GLX component of the
-	  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850 and 860 chipsets.
+	  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850
+	  and 860 chipsets and full support for the 810, 815, 830M, 845G,
+	  852GM, 855GM and 865G integrated graphics chipsets.
 
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
-	  use GLX or DRI.  If unsure, say N.
+	  use GLX or DRI, or if you have any Intel integrated graphics
+	  chipsets.  If unsure, say Y.
 
 #config AGP_I810
 #	tristate "Intel I810/I815/I830M (on-board) support"
