@@ -196,6 +196,8 @@ new_range:
 		if (numa_domain >= MAX_NUMNODES)
 			BUG();
 
+		node_set_online(numa_domain);
+
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
