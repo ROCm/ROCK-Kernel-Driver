@@ -834,11 +834,10 @@ void (*wait_timer_tick)(void) = wait_8254_wraparound;
 
 void __setup_APIC_LVTT(unsigned int clocks)
 {
-	unsigned int lvtt1_value, tmp_value;
+	unsigned int lvtt_value, tmp_value;
 
-	lvtt1_value = SET_APIC_TIMER_BASE(APIC_TIMER_BASE_DIV) |
-			APIC_LVT_TIMER_PERIODIC | LOCAL_TIMER_VECTOR;
-	apic_write_around(APIC_LVTT, lvtt1_value);
+	lvtt_value = APIC_LVT_TIMER_PERIODIC | LOCAL_TIMER_VECTOR;
+	apic_write_around(APIC_LVTT, lvtt_value);
 
 	/*
 	 * Divide PICLK by 16
