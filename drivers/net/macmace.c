@@ -319,8 +319,8 @@ static int mace_open(struct net_device *dev)
 
 	/* Allocate the DMA ring buffers */
 
-	mp->rx_ring = (void *) __get_free_pages(GFP_DMA, N_RX_PAGES);
-	mp->tx_ring = (void *) __get_free_pages(GFP_DMA, 0);
+	mp->rx_ring = (void *) __get_free_pages(GFP_KERNEL | GFP_DMA, N_RX_PAGES);
+	mp->tx_ring = (void *) __get_free_pages(GFP_KERNEL | GFP_DMA, 0);
 	
 	if (mp->tx_ring==NULL || mp->rx_ring==NULL) {
 		if (mp->rx_ring) free_pages((u32) mp->rx_ring, N_RX_PAGES);
