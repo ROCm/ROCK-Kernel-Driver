@@ -610,7 +610,7 @@ static int semctl_main(int semid, int semnum, int cmd, int version, union semun 
 	switch (cmd) {
 	case GETALL:
 	{
-		ushort *array = arg.array;
+		ushort __user *array = arg.array;
 		int i;
 
 		if(nsems > SEMMSL_FAST) {
