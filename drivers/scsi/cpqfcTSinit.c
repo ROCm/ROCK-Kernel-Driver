@@ -467,6 +467,7 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
   return NumberOfAdapters;
 }
 
+#ifdef SUPPORT_RESET
 static void my_ioctl_done (Scsi_Cmnd * SCpnt)
 {
     struct request * req;
@@ -477,7 +478,7 @@ static void my_ioctl_done (Scsi_Cmnd * SCpnt)
     if (req->CPQFC_WAITING != NULL)
 	CPQFC_COMPLETE(req->CPQFC_WAITING);
 }   
-
+#endif
 
 static int cpqfc_alloc_private_data_pool(CPQFCHBA *hba)
 {
@@ -1577,6 +1578,8 @@ Done:
 // See dpANS Fibre Channel Protocol for SCSI
 // X3.269-199X revision 12, pg 25
 
+#ifdef SUPPORT_RESET
+
 int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev, 
                                unsigned int reset_flags)
 {
@@ -1592,8 +1595,7 @@ int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev,
 // around the 2.5.30 kernel.  Scsi_Cmnd replaced with 
 // Scsi_Request, etc.
 // For now, so people don't fall into a hole...
-return -ENOTSUPP;
-/*
+
   // printk("   ENTERING cpqfcTS_TargetDeviceReset() - flag=%d \n",reset_flags);
 
   if (ScsiDev->host->eh_active) return FAILED;
@@ -1647,7 +1649,6 @@ return -ENOTSUPP;
 		   SCpnt->sense_buffer[2] & 0xf);
 	    
       };
-*/    
   result = SCpnt->result;
 
   SDpnt = SCpnt->device;
@@ -1658,6 +1659,14 @@ return -ENOTSUPP;
   return SUCCESS;
 }
 
+#else
+int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev, 
+                               unsigned int reset_flags)
+{
+	return -ENOTSUPP;
+}
+
+#endif /* SUPPORT_RESET */
 
 int cpqfcTS_eh_device_reset(Scsi_Cmnd *Cmnd)
 {

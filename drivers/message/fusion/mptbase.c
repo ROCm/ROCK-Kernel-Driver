@@ -44,10 +44,10 @@
  *      for gobs of hard work fixing and optimizing LAN code.
  *      THANK YOU!
  *
- *  Copyright (c) 1999-2002 LSI Logic Corporation
+ *  Copyright (c) 1999-2003 LSI Logic Corporation
  *  Originally By: Steven J. Ralston
  *  (mailto:sjralston1@netscape.net)
- *  (mailto:Pam.Delaney@lsil.com)
+ *  (mailto:mpt_linux_developer@lsil.com)
  *
  *  $Id: mptbase.c,v 1.126 2002/12/16 15:28:45 pdelaney Exp $
  */
@@ -3138,7 +3138,7 @@ KickStart(MPT_ADAPTER *ioc, int force, int sleepFlag)
 {
 	int hard_reset_done = 0;
 	u32 ioc_state;
-	int cnt = 0;
+	int cntdn, cnt = 0;
 
 	dprintk((KERN_WARNING MYNAM ": KickStarting %s!\n", ioc->name));
 	if ((int)ioc->chip_type > (int)FC929) {
@@ -3161,7 +3161,8 @@ KickStart(MPT_ADAPTER *ioc, int force, int sleepFlag)
 	dprintk((MYIOC_s_INFO_FMT "Diagnostic reset successful!\n",
 			ioc->name));
 
-	for (cnt=0; cnt<HZ*20; cnt++) {
+	cntdn = ((sleepFlag == CAN_SLEEP) ? HZ : 1000) * 20;	/* 20 seconds */
+	for (cnt=0; cnt<cntdn; cnt++) {
 		if ((ioc_state = mpt_GetIocState(ioc, 1)) == MPI_IOC_STATE_READY) {
 			dprintk((MYIOC_s_INFO_FMT "KickStart successful! (cnt=%d)\n",
 					ioc->name, cnt));

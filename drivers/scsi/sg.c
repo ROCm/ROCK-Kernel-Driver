@@ -18,8 +18,7 @@
  *
  */
 #include <linux/config.h>
-static char *sg_version_str = "3.5.29 [20030529]";
-static int sg_version_num = 30529;	/* 2 digits for each component */
+static int sg_version_num = 30530;	/* 2 digits for each component */
 /*
  *  D. P. Gilbert (dgilbert@interlog.com, dougg@triode.net.au), notes:
  *      - scsi logging is available via SCSI_LOG_TIMEOUT macros. First
@@ -56,6 +55,8 @@ static int sg_version_num = 30529;	/* 2 digits for each component */
 #include <linux/smp_lock.h>
 #include <linux/moduleparam.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/cdev.h>
+#include <linux/seq_file.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -72,6 +73,8 @@ static int sg_version_num = 30529;	/* 2 digits for each component */
 
 #ifdef CONFIG_SCSI_PROC_FS
 #include <linux/proc_fs.h>
+static char *sg_version_str = "3.5.30 [20031010]";
+
 static int sg_proc_init(void);
 static void sg_proc_cleanup(void);
 #endif
@@ -83,7 +86,7 @@ static void sg_proc_cleanup(void);
 #define SG_ALLOW_DIO_DEF 0
 #define SG_ALLOW_DIO_CODE /* compile out by commenting this define */
 
-#define SG_MAX_DEVS_MASK (256 - 1)
+#define SG_MAX_DEVS 8192
 
 /*
  * Suppose you want to calculate the formula muldiv(x,m,d)=int(x * m / d)
@@ -182,6 +185,7 @@ typedef struct sg_device { /* holds the state of each scsi generic device */
 	volatile char exclude;	/* opened for exclusive access */
 	char sgdebug;		/* 0->off, 1->sense, 9->dump dev, 10-> all devs */
 	struct gendisk *disk;
+	struct cdev * cdev;	/* char_dev [sysfs: /sys/cdev/major/sg<n>] */
 } Sg_device;
 
 static int sg_fasync(int fd, struct file *filp, int mode);
@@ -219,7 +223,6 @@ static int sg_ms_to_jif(unsigned int msecs);
 static inline unsigned sg_jif_to_ms(int jifs);
 static int sg_allow_access(unsigned char opcode, char dev_type);
 static int sg_build_direct(Sg_request * srp, Sg_fd * sfp, int dxfer_len);
-// static void sg_unmap_and(Sg_scatter_hold * schp, int free_also);
 static Sg_device *sg_get_dev(int dev);
 static inline unsigned char *sg_scatg2virt(const struct scatterlist *sclp);
 #ifdef CONFIG_SCSI_PROC_FS
@@ -877,8 +880,8 @@ sg_ioctl(struct inode *inode, struct file *filp,
 		result = get_user(val, (int *) arg);
 		if (result)
 			return result;
-		if (val < 0)
-			return -EINVAL;
+                if (val < 0)
+                        return -EINVAL;
 		if (val != sfp->reserve.bufflen) {
 			if (sg_res_in_use(sfp) || sfp->mmap_called)
 				return -EBUSY;
@@ -1325,18 +1328,22 @@ static struct file_operations sg_fops = {
 };
 
 static int
-sg_add(struct class_device *cdev)
+sg_add(struct class_device *cl_dev)
 {
-	struct scsi_device *scsidp = to_scsi_device(cdev->dev);
+	struct scsi_device *scsidp = to_scsi_device(cl_dev->dev);
 	struct gendisk *disk;
 	Sg_device *sdp = NULL;
 	unsigned long iflags;
+	struct cdev * cdev = NULL;
 	int k, error;
 
 	disk = alloc_disk(1);
 	if (!disk)
 		return -ENOMEM;
 
+	cdev = cdev_alloc();
+	if (! cdev)
+		return -ENOMEM;
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
 	if (sg_nr_dev >= sg_dev_max) {	/* try to resize */
 		Sg_device **tmp_da;
@@ -1364,13 +1371,13 @@ find_empty_slot:
 	for (k = 0; k < sg_dev_max; k++)
 		if (!sg_dev_arr[k])
 			break;
-	if (k > SG_MAX_DEVS_MASK) {
+	if (k >= SG_MAX_DEVS) {
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		printk(KERN_WARNING
 		       "Unable to attach sg device <%d, %d, %d, %d>"
-		       " type=%d, minor number exceed %d\n",
+		       " type=%d, minor number exceeds %d\n",
 		       scsidp->host->host_no, scsidp->channel, scsidp->id,
-		       scsidp->lun, scsidp->type, SG_MAX_DEVS_MASK);
+		       scsidp->lun, scsidp->type, SG_MAX_DEVS - 1);
 		if (NULL != sdp)
 			vfree((char *) sdp);
 		error = -ENODEV;
@@ -1396,15 +1403,14 @@ find_empty_slot:
 	SCSI_LOG_TIMEOUT(3, printk("sg_attach: dev=%d \n", k));
 	memset(sdp, 0, sizeof(*sdp));
 	sprintf(disk->disk_name, "sg%d", k);
+	strncpy(cdev->kobj.name, disk->disk_name, KOBJ_NAME_LEN);
+	cdev->owner = THIS_MODULE;
+	cdev->ops = &sg_fops;
 	disk->major = SCSI_GENERIC_MAJOR;
 	disk->first_minor = k;
 	sdp->disk = disk;
 	sdp->device = scsidp;
 	init_waitqueue_head(&sdp->o_excl_wait);
-	sdp->headfp = NULL;
-	sdp->exclude = 0;
-	sdp->sgdebug = 0;
-	sdp->detached = 0;
 	sdp->sg_tablesize = scsidp->host ? scsidp->host->sg_tablesize : 0;
 
 	sg_nr_dev++;
@@ -1414,6 +1420,22 @@ find_empty_slot:
 	devfs_mk_cdev(MKDEV(SCSI_GENERIC_MAJOR, k),
 			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
 			"%s/generic", scsidp->devfs_name);
+	error = cdev_add(cdev, MKDEV(SCSI_GENERIC_MAJOR, k), 1);
+	if (error) {
+		devfs_remove("%s/generic", scsidp->devfs_name);
+		goto out;
+	}
+	sdp->cdev = cdev;
+	error = sysfs_create_link(&cdev->kobj, &scsidp->sdev_gendev.kobj, 
+				  "device");
+	if (error)
+		printk(KERN_ERR "sg_attach: unable to make symlink 'device'"
+		       " for sg%d\n", k);
+	error = sysfs_create_link(&scsidp->sdev_gendev.kobj, &cdev->kobj, 
+				  "generic");
+	if (error)
+		printk(KERN_ERR "sg_attach: unable to make symlink 'generic'"
+		       " back to sg%d\n", k);
 
 	printk(KERN_NOTICE
 	       "Attached scsi generic sg%d at scsi%d, channel"
@@ -1425,13 +1447,15 @@ find_empty_slot:
 
 out:
 	put_disk(disk);
+	if (cdev)
+		kobject_put(&cdev->kobj);
 	return error;
 }
 
 static void
-sg_remove(struct class_device *cdev)
+sg_remove(struct class_device *cl_dev)
 {
-	struct scsi_device *scsidp = to_scsi_device(cdev->dev);
+	struct scsi_device *scsidp = to_scsi_device(cl_dev->dev);
 	Sg_device *sdp = NULL;
 	unsigned long iflags;
 	Sg_fd *sfp;
@@ -1481,6 +1505,10 @@ sg_remove(struct class_device *cdev)
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 
 	if (sdp) {
+		sysfs_remove_link(&scsidp->sdev_gendev.kobj, "generic");
+		sysfs_remove_link(&sdp->cdev->kobj, "device");
+		cdev_del(sdp->cdev);
+		sdp->cdev = NULL;
 		devfs_remove("%s/generic", scsidp->devfs_name);
 		put_disk(sdp->disk);
 		sdp->disk = NULL;
@@ -1513,12 +1541,14 @@ init_sg(void)
 	if (def_reserved_size >= 0)
 		sg_big_buff = def_reserved_size;
 
-	rc = register_chrdev(SCSI_GENERIC_MAJOR, "sg", &sg_fops);
+	rc = register_chrdev_region(MKDEV(SCSI_GENERIC_MAJOR, 0), 
+				    SG_MAX_DEVS, "sg");
 	if (rc)
 		return rc;
 	rc = scsi_register_interface(&sg_interface);
 	if (rc) {
-		unregister_chrdev(SCSI_GENERIC_MAJOR, "sg");
+		unregister_chrdev_region(MKDEV(SCSI_GENERIC_MAJOR, 0),
+				         SG_MAX_DEVS);
 		return rc;
 	}
 #ifdef CONFIG_SCSI_PROC_FS
@@ -1534,7 +1564,8 @@ exit_sg(void)
 	sg_proc_cleanup();
 #endif				/* CONFIG_SCSI_PROC_FS */
 	scsi_unregister_interface(&sg_interface);
-	unregister_chrdev(SCSI_GENERIC_MAJOR, "sg");
+	unregister_chrdev_region(MKDEV(SCSI_GENERIC_MAJOR, 0),
+				 SG_MAX_DEVS);
 	if (sg_dev_arr != NULL) {
 		vfree((char *) sg_dev_arr);
 		sg_dev_arr = NULL;
@@ -1582,7 +1613,6 @@ sg_finish_rem_req(Sg_request * srp)
 	Sg_scatter_hold *req_schp = &srp->data;
 
 	SCSI_LOG_TIMEOUT(4, printk("sg_finish_rem_req: res_used=%d\n", (int) srp->res_used));
-	// sg_unmap_and(&srp->data, 1);
 	if (srp->res_used)
 		sg_unlink_reserve(sfp, srp);
 	else
@@ -2590,77 +2620,98 @@ static struct proc_dir_entry *sg_proc_sgp = NULL;
 
 static char sg_proc_sg_dirname[] = "scsi/sg";
 
-static int sg_proc_adio_read(char *buffer, char **start, off_t offset,
-			     int size, int *eof, void *data);
-static int sg_proc_adio_info(char *buffer, int *len, off_t * begin,
-			     off_t offset, int size);
-static int sg_proc_adio_write(struct file *filp, const char *buffer,
-			      unsigned long count, void *data);
-static int sg_proc_dressz_read(char *buffer, char **start, off_t offset,
-			       int size, int *eof, void *data);
-static int sg_proc_dressz_info(char *buffer, int *len, off_t * begin,
-			       off_t offset, int size);
-static int sg_proc_dressz_write(struct file *filp, const char *buffer,
-				unsigned long count, void *data);
-static int sg_proc_debug_read(char *buffer, char **start, off_t offset,
-			      int size, int *eof, void *data);
-static int sg_proc_debug_info(char *buffer, int *len, off_t * begin,
-			      off_t offset, int size);
-static int sg_proc_dev_read(char *buffer, char **start, off_t offset,
-			    int size, int *eof, void *data);
-static int sg_proc_dev_info(char *buffer, int *len, off_t * begin,
-			    off_t offset, int size);
-static int sg_proc_devhdr_read(char *buffer, char **start, off_t offset,
-			       int size, int *eof, void *data);
-static int sg_proc_devhdr_info(char *buffer, int *len, off_t * begin,
-			       off_t offset, int size);
-static int sg_proc_devstrs_read(char *buffer, char **start, off_t offset,
-				int size, int *eof, void *data);
-static int sg_proc_devstrs_info(char *buffer, int *len, off_t * begin,
-				off_t offset, int size);
-static int sg_proc_version_read(char *buffer, char **start, off_t offset,
-				int size, int *eof, void *data);
-static int sg_proc_version_info(char *buffer, int *len, off_t * begin,
-				off_t offset, int size);
+static int sg_proc_seq_show_int(struct seq_file *s, void *v);
+
+static int sg_proc_single_open_adio(struct inode *inode, struct file *file);
+static ssize_t sg_proc_write_adio(struct file *filp, const char __user *buffer,
+			          size_t count, loff_t *off);
+static struct file_operations adio_fops = {
+	/* .owner, .read and .llseek added in sg_proc_init() */
+	.open = sg_proc_single_open_adio,
+	.write = sg_proc_write_adio,
+	.release = single_release,
+};
+
+static int sg_proc_single_open_dressz(struct inode *inode, struct file *file);
+static ssize_t sg_proc_write_dressz(struct file *filp, 
+		const char __user *buffer, size_t count, loff_t *off);
+static struct file_operations dressz_fops = {
+	.open = sg_proc_single_open_dressz,
+	.write = sg_proc_write_dressz,
+	.release = single_release,
+};
+
+static int sg_proc_seq_show_version(struct seq_file *s, void *v);
+static int sg_proc_single_open_version(struct inode *inode, struct file *file);
+static struct file_operations version_fops = {
+	.open = sg_proc_single_open_version,
+	.release = single_release,
+};
+
+static int sg_proc_seq_show_devhdr(struct seq_file *s, void *v);
+static int sg_proc_single_open_devhdr(struct inode *inode, struct file *file);
+static struct file_operations devhdr_fops = {
+	.open = sg_proc_single_open_devhdr,
+	.release = single_release,
+};
+
+static int sg_proc_seq_show_dev(struct seq_file *s, void *v);
+static int sg_proc_open_dev(struct inode *inode, struct file *file);
+static void * dev_seq_start(struct seq_file *s, loff_t *pos);
+static void * dev_seq_next(struct seq_file *s, void *v, loff_t *pos);
+static void dev_seq_stop(struct seq_file *s, void *v);
+static struct file_operations dev_fops = {
+	.open = sg_proc_open_dev,
+	.release = seq_release,
+};
+static struct seq_operations dev_seq_ops = {
+	.start = dev_seq_start,
+	.next  = dev_seq_next,
+	.stop  = dev_seq_stop,
+	.show  = sg_proc_seq_show_dev,
+};
+
+static int sg_proc_seq_show_devstrs(struct seq_file *s, void *v);
+static int sg_proc_open_devstrs(struct inode *inode, struct file *file);
+static struct file_operations devstrs_fops = {
+	.open = sg_proc_open_devstrs,
+	.release = seq_release,
+};
+static struct seq_operations devstrs_seq_ops = {
+	.start = dev_seq_start,
+	.next  = dev_seq_next,
+	.stop  = dev_seq_stop,
+	.show  = sg_proc_seq_show_devstrs,
+};
+
+static int sg_proc_seq_show_debug(struct seq_file *s, void *v);
+static int sg_proc_open_debug(struct inode *inode, struct file *file);
+static struct file_operations debug_fops = {
+	.open = sg_proc_open_debug,
+	.release = seq_release,
+};
+static struct seq_operations debug_seq_ops = {
+	.start = dev_seq_start,
+	.next  = dev_seq_next,
+	.stop  = dev_seq_stop,
+	.show  = sg_proc_seq_show_debug,
+};
+
 
 struct sg_proc_leaf {
 	const char * name;
-	read_proc_t * rf;
-	write_proc_t * wf;
+	struct file_operations * fops;
 };
 
 static struct sg_proc_leaf sg_proc_leaf_arr[] = {
-	{"allow_dio", sg_proc_adio_read, sg_proc_adio_write},
-	{"def_reserved_size", sg_proc_dressz_read, sg_proc_dressz_write},
-	{"debug", sg_proc_debug_read, NULL},
-	{"devices", sg_proc_dev_read, NULL},
-	{"device_hdr", sg_proc_devhdr_read, NULL},
-	{"device_strs", sg_proc_devstrs_read, NULL},
-	{"version", sg_proc_version_read, NULL}
+	{"allow_dio", &adio_fops},
+	{"debug", &debug_fops},
+	{"def_reserved_size", &dressz_fops},
+	{"device_hdr", &devhdr_fops},
+	{"devices", &dev_fops},
+	{"device_strs", &devstrs_fops},
+	{"version", &version_fops}
 };
-
-#define PRINT_PROC(fmt,args...)                                 \
-    do {                                                        \
-	*len += sprintf(buffer + *len, fmt, ##args);            \
-	if (*begin + *len > offset + size)                      \
-	    return 0;                                           \
-	if (*begin + *len < offset) {                           \
-	    *begin += *len;                                     \
-	    *len = 0;                                           \
-	}                                                       \
-    } while(0)
-
-#define SG_PROC_READ_FN(infofp)                                 \
-    do {                                                        \
-	int len = 0;                                            \
-	off_t begin = 0;                                        \
-	*eof = infofp(buffer, &len, &begin, offset, size);      \
-	if (offset >= (begin + len))                            \
-	    return 0;                                           \
-	*start = buffer + offset - begin;			\
-	return (size < (begin + len - offset)) ?                \
-				size : begin + len - offset;    \
-    } while(0)
 
 static int
 sg_proc_init(void)
@@ -2677,12 +2728,13 @@ sg_proc_init(void)
 		return 1;
 	for (k = 0; k < num_leaves; ++k) {
 		leaf = &sg_proc_leaf_arr[k];
-		mask = leaf->wf ? S_IRUGO | S_IWUSR : S_IRUGO;
+		mask = leaf->fops->write ? S_IRUGO | S_IWUSR : S_IRUGO;
 		pdep = create_proc_entry(leaf->name, mask, sg_proc_sgp);
 		if (pdep) {
-			pdep->read_proc = leaf->rf;
-			if (leaf->wf)
-				pdep->write_proc = leaf->wf;
+			leaf->fops->owner = THIS_MODULE,
+			leaf->fops->read = seq_read,
+			leaf->fops->llseek = seq_lseek,
+			pdep->proc_fops = leaf->fops;
 		}
 	}
 	return 0;
@@ -2702,23 +2754,21 @@ sg_proc_cleanup(void)
 	remove_proc_entry(sg_proc_sg_dirname, NULL);
 }
 
-static int
-sg_proc_adio_read(char *buffer, char **start, off_t offset,
-		  int size, int *eof, void *data)
+
+static int sg_proc_seq_show_int(struct seq_file *s, void *v)
 {
-	SG_PROC_READ_FN(sg_proc_adio_info);
+	seq_printf(s, "%d\n", *((int *)s->private));
+	return 0;
 }
 
-static int
-sg_proc_adio_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
+static int sg_proc_single_open_adio(struct inode *inode, struct file *file)
 {
-	PRINT_PROC("%d\n", sg_allow_dio);
-	return 1;
+	return single_open(file, sg_proc_seq_show_int, &sg_allow_dio);
 }
 
-static int
-sg_proc_adio_write(struct file *filp, const char *buffer,
-		   unsigned long count, void *data)
+static ssize_t 
+sg_proc_write_adio(struct file *filp, const char __user *buffer,
+		   size_t count, loff_t *off)
 {
 	int num;
 	char buff[11];
@@ -2733,24 +2783,14 @@ sg_proc_adio_write(struct file *filp, const char *buffer,
 	return count;
 }
 
-static int
-sg_proc_dressz_read(char *buffer, char **start, off_t offset,
-		    int size, int *eof, void *data)
+static int sg_proc_single_open_dressz(struct inode *inode, struct file *file)
 {
-	SG_PROC_READ_FN(sg_proc_dressz_info);
+	return single_open(file, sg_proc_seq_show_int, &sg_big_buff);
 }
 
-static int
-sg_proc_dressz_info(char *buffer, int *len, off_t * begin,
-		    off_t offset, int size)
-{
-	PRINT_PROC("%d\n", sg_big_buff);
-	return 1;
-}
-
-static int
-sg_proc_dressz_write(struct file *filp, const char *buffer,
-		     unsigned long count, void *data)
+static ssize_t 
+sg_proc_write_dressz(struct file *filp, const char __user *buffer,
+		     size_t count, loff_t *off)
 {
 	int num;
 	unsigned long k = ULONG_MAX;
@@ -2770,15 +2810,111 @@ sg_proc_dressz_write(struct file *filp, const char *buffer,
 	return -ERANGE;
 }
 
-static int
-sg_proc_debug_read(char *buffer, char **start, off_t offset,
-		   int size, int *eof, void *data)
+static int sg_proc_seq_show_version(struct seq_file *s, void *v)
 {
-	SG_PROC_READ_FN(sg_proc_debug_info);
+	seq_printf(s, "%d\t%s\n", sg_version_num, sg_version_str);
+	return 0;
 }
 
-static int sg_proc_debug_helper(char *buffer, int *len, off_t * begin,
-				off_t offset, int size, Sg_device * sdp)
+static int sg_proc_single_open_version(struct inode *inode, struct file *file)
+{
+	return single_open(file, sg_proc_seq_show_version, NULL);
+}
+
+static int sg_proc_seq_show_devhdr(struct seq_file *s, void *v)
+{
+	seq_printf(s, "host\tchan\tid\tlun\ttype\topens\tqdepth\tbusy\t"
+		   "online\n");
+	return 0;
+}
+
+static int sg_proc_single_open_devhdr(struct inode *inode, struct file *file)
+{
+	return single_open(file, sg_proc_seq_show_devhdr, NULL);
+}
+
+struct sg_proc_deviter {
+	loff_t	index;
+	size_t	max;
+};
+
+static void * dev_seq_start(struct seq_file *s, loff_t *pos)
+{
+	struct sg_proc_deviter * it = kmalloc(sizeof(*it), GFP_KERNEL);
+
+	if (! it)
+		return NULL;
+	if (NULL == sg_dev_arr)
+		goto err1;
+	it->index = *pos;
+	it->max = sg_last_dev();
+	if (it->index >= it->max)
+		goto err1;
+	return it;
+err1:
+	kfree(it);
+	return NULL;
+}
+
+static void * dev_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{
+	struct sg_proc_deviter * it = (struct sg_proc_deviter *) v;
+
+	*pos = ++it->index;
+	return (it->index < it->max) ? it : NULL;
+}
+
+static void dev_seq_stop(struct seq_file *s, void *v)
+{
+	kfree (v);
+}
+
+static int sg_proc_open_dev(struct inode *inode, struct file *file)
+{
+        return seq_open(file, &dev_seq_ops);
+}
+
+static int sg_proc_seq_show_dev(struct seq_file *s, void *v)
+{
+	struct sg_proc_deviter * it = (struct sg_proc_deviter *) v;
+	Sg_device *sdp;
+	struct scsi_device *scsidp;
+
+	sdp = it ? sg_get_dev(it->index) : NULL;
+	if (sdp && (scsidp = sdp->device) && (!sdp->detached))
+		seq_printf(s, "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+			      scsidp->host->host_no, scsidp->channel,
+			      scsidp->id, scsidp->lun, (int) scsidp->type,
+			      1,
+			      (int) scsidp->queue_depth,
+			      (int) scsidp->device_busy,
+			      (int) scsidp->online);
+	else
+		seq_printf(s, "-1\t-1\t-1\t-1\t-1\t-1\t-1\t-1\t-1\n");
+	return 0;
+}
+
+static int sg_proc_open_devstrs(struct inode *inode, struct file *file)
+{
+        return seq_open(file, &devstrs_seq_ops);
+}
+
+static int sg_proc_seq_show_devstrs(struct seq_file *s, void *v)
+{
+	struct sg_proc_deviter * it = (struct sg_proc_deviter *) v;
+	Sg_device *sdp;
+	struct scsi_device *scsidp;
+
+	sdp = it ? sg_get_dev(it->index) : NULL;
+	if (sdp && (scsidp = sdp->device) && (!sdp->detached))
+		seq_printf(s, "%8.8s\t%16.16s\t%4.4s\n",
+			   scsidp->vendor, scsidp->model, scsidp->rev);
+	else
+		seq_printf(s, "<no active device>\n");
+	return 0;
+}
+
+static void sg_proc_debug_helper(struct seq_file *s, Sg_device * sdp)
 {
 	int k, m, new_interface, blen, usg;
 	Sg_request *srp;
@@ -2787,13 +2923,13 @@ static int sg_proc_debug_helper(char *buffer, int *len, off_t * begin,
 	const char * cp;
 
 	for (k = 0; (fp = sg_get_nth_sfp(sdp, k)); ++k) {
-		PRINT_PROC("   FD(%d): timeout=%dms bufflen=%d "
+		seq_printf(s, "   FD(%d): timeout=%dms bufflen=%d "
 			   "(res)sgat=%d low_dma=%d\n", k + 1,
 			   sg_jif_to_ms(fp->timeout),
 			   fp->reserve.bufflen,
 			   (int) fp->reserve.k_use_sg,
 			   (int) fp->low_dma);
-		PRINT_PROC("   cmd_q=%d f_packid=%d k_orphan=%d closed=%d\n",
+		seq_printf(s, "   cmd_q=%d f_packid=%d k_orphan=%d closed=%d\n",
 			   (int) fp->cmd_q, (int) fp->force_packid,
 			   (int) fp->keep_orphan, (int) fp->closed);
 		for (m = 0; (srp = sg_get_nth_request(fp, m)); ++m) {
@@ -2811,165 +2947,74 @@ static int sg_proc_debug_helper(char *buffer, int *len, off_t * begin,
 				else
 					cp = "     ";
 			}
-			PRINT_PROC(cp);
+			seq_printf(s, cp);
 			blen = srp->my_cmdp ? 
 				srp->my_cmdp->sr_bufflen : srp->data.bufflen;
 			usg = srp->my_cmdp ? 
 				srp->my_cmdp->sr_use_sg : srp->data.k_use_sg;
-			PRINT_PROC(srp->done ? 
+			seq_printf(s, srp->done ? 
 				   ((1 == srp->done) ?  "rcv:" : "fin:")
 				   : (srp->my_cmdp ? "act:" : "prior:"));
-			PRINT_PROC(" id=%d blen=%d",
+			seq_printf(s, " id=%d blen=%d",
 				   srp->header.pack_id, blen);
 			if (srp->done)
-				PRINT_PROC(" dur=%d", hp->duration);
+				seq_printf(s, " dur=%d", hp->duration);
 			else
-				PRINT_PROC(" t_o/elap=%d/%d",
+				seq_printf(s, " t_o/elap=%d/%d",
 				  new_interface ? hp->timeout : sg_jif_to_ms(fp->timeout),
 				  sg_jif_to_ms(hp->duration ? (jiffies - hp->duration) : 0));
-			PRINT_PROC("ms sgat=%d op=0x%02x\n", usg,
+			seq_printf(s, "ms sgat=%d op=0x%02x\n", usg,
 				   (int) srp->data.cmd_opcode);
 		}
 		if (0 == m)
-			PRINT_PROC("     No requests active\n");
 	}
-	return 1;
 }
 
-static int
-sg_proc_debug_info(char *buffer, int *len, off_t * begin,
-		   off_t offset, int size)
+static int sg_proc_open_debug(struct inode *inode, struct file *file)
 {
+        return seq_open(file, &debug_seq_ops);
+}
+
+static int sg_proc_seq_show_debug(struct seq_file *s, void *v)
+{
+	struct sg_proc_deviter * it = (struct sg_proc_deviter *) v;
 	Sg_device *sdp;
-	int j, max_dev;
 
-	if (NULL == sg_dev_arr) {
-		PRINT_PROC("sg_dev_arr NULL, driver not initialized\n");
-		return 1;
+	if (it && (0 == it->index)) {
+		seq_printf(s, "dev_max(currently)=%d max_active_device=%d "
+			   "(origin 1)\n", sg_dev_max, (int)it->max);
+		seq_printf(s, " def_reserved_size=%d\n", sg_big_buff);
 	}
-	max_dev = sg_last_dev();
-	PRINT_PROC("dev_max(currently)=%d max_active_device=%d (origin 1)\n",
-		   sg_dev_max, max_dev);
-	PRINT_PROC(" def_reserved_size=%d\n", sg_big_buff);
-	for (j = 0; j < max_dev; ++j) {
-		if ((sdp = sg_get_dev(j))) {
-			struct scsi_device *scsidp = sdp->device;
+	sdp = it ? sg_get_dev(it->index) : NULL;
+	if (sdp) {
+		struct scsi_device *scsidp = sdp->device;
 
-			if (NULL == scsidp) {
-				PRINT_PROC("device %d detached ??\n", j);
-				continue;
-			}
-
-			if (sg_get_nth_sfp(sdp, 0)) {
-				PRINT_PROC(" >>> device=%s ",
-					sdp->disk->disk_name);
-				if (sdp->detached)
-					PRINT_PROC("detached pending close ");
-				else
-					PRINT_PROC
-					    ("scsi%d chan=%d id=%d lun=%d   em=%d",
-					     scsidp->host->host_no,
-					     scsidp->channel, scsidp->id,
-					     scsidp->lun,
-					     scsidp->host->hostt->emulated);
-				PRINT_PROC(" sg_tablesize=%d excl=%d\n",
-					   sdp->sg_tablesize, sdp->exclude);
-			}
-			if (0 == sg_proc_debug_helper(buffer, len, begin,
-						      offset, size, sdp))
-				return 0;
+		if (NULL == scsidp) {
+			seq_printf(s, "device %d detached ??\n", 
+				   (int)it->index);
+			return 0;
 		}
+
+		if (sg_get_nth_sfp(sdp, 0)) {
+			seq_printf(s, " >>> device=%s ",
+				sdp->disk->disk_name);
+			if (sdp->detached)
+				seq_printf(s, "detached pending close ");
+			else
+				seq_printf
+				    (s, "scsi%d chan=%d id=%d lun=%d   em=%d",
+				     scsidp->host->host_no,
+				     scsidp->channel, scsidp->id,
+				     scsidp->lun,
+				     scsidp->host->hostt->emulated);
+			seq_printf(s, " sg_tablesize=%d excl=%d\n",
+				   sdp->sg_tablesize, sdp->exclude);
+		}
+		sg_proc_debug_helper(s, sdp);
 	}
-	return 1;
+	return 0;
 }
 
-static int
-sg_proc_dev_read(char *buffer, char **start, off_t offset,
-		 int size, int *eof, void *data)
-{
-	SG_PROC_READ_FN(sg_proc_dev_info);
-}
-
-static int
-sg_proc_dev_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
-{
-	Sg_device *sdp;
-	int j, max_dev;
-	struct scsi_device *scsidp;
-
-	max_dev = sg_last_dev();
-	for (j = 0; j < max_dev; ++j) {
-		sdp = sg_get_dev(j);
-		if (sdp && (scsidp = sdp->device) && (!sdp->detached))
-			PRINT_PROC("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
-				   scsidp->host->host_no, scsidp->channel,
-				   scsidp->id, scsidp->lun, (int) scsidp->type,
-				   1,
-				   (int) scsidp->queue_depth,
-				   (int) scsidp->device_busy,
-				   (int) scsidp->online);
-		else
-			PRINT_PROC("-1\t-1\t-1\t-1\t-1\t-1\t-1\t-1\t-1\n");
-	}
-	return 1;
-}
-
-static int
-sg_proc_devhdr_read(char *buffer, char **start, off_t offset,
-		    int size, int *eof, void *data)
-{
-	SG_PROC_READ_FN(sg_proc_devhdr_info);
-}
-
-static int
-sg_proc_devhdr_info(char *buffer, int *len, off_t * begin,
-		    off_t offset, int size)
-{
-	PRINT_PROC("host\tchan\tid\tlun\ttype\topens\tqdepth\tbusy\tonline\n");
-	return 1;
-}
-
-static int
-sg_proc_devstrs_read(char *buffer, char **start, off_t offset,
-		     int size, int *eof, void *data)
-{
-	SG_PROC_READ_FN(sg_proc_devstrs_info);
-}
-
-static int
-sg_proc_devstrs_info(char *buffer, int *len, off_t * begin,
-		     off_t offset, int size)
-{
-	Sg_device *sdp;
-	int j, max_dev;
-	struct scsi_device *scsidp;
-
-	max_dev = sg_last_dev();
-	for (j = 0; j < max_dev; ++j) {
-		sdp = sg_get_dev(j);
-		if (sdp && (scsidp = sdp->device) && (!sdp->detached))
-			PRINT_PROC("%8.8s\t%16.16s\t%4.4s\n",
-				   scsidp->vendor, scsidp->model, scsidp->rev);
-		else
-			PRINT_PROC("<no active device>\n");
-	}
-	return 1;
-}
-
-static int
-sg_proc_version_read(char *buffer, char **start, off_t offset,
-		     int size, int *eof, void *data)
-{
-	SG_PROC_READ_FN(sg_proc_version_info);
-}
-
-static int
-sg_proc_version_info(char *buffer, int *len, off_t * begin,
-		     off_t offset, int size)
-{
-	PRINT_PROC("%d\t%s\n", sg_version_num, sg_version_str);
-	return 1;
-}
 #endif				/* CONFIG_SCSI_PROC_FS */
 
 module_init(init_sg);
