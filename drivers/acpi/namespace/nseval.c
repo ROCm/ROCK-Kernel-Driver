@@ -57,14 +57,9 @@
  *
  * FUNCTION:    acpi_ns_evaluate_relative
  *
- * PARAMETERS:  Handle              - The relative containing object
- *              Pathname            - Name of method to execute, If NULL, the
+ * PARAMETERS:  Pathname            - Name of method to execute, If NULL, the
  *                                    handle is the object to execute
- *              Params              - List of parameters to pass to the method,
- *                                    terminated by NULL.  Params itself may be
- *                                    NULL if no parameters are being passed.
- *              return_object       - Where to put method's return value (if
- *                                    any).  If NULL, no value is returned.
+ *              Info                - Method info block
  *
  * RETURN:      Status
  *
@@ -138,8 +133,7 @@ acpi_ns_evaluate_relative (
 	}
 
 	/*
-	 * Now that we have a handle to the object, we can attempt
-	 * to evaluate it.
+	 * Now that we have a handle to the object, we can attempt to evaluate it.
 	 */
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%s [%p] Value %p\n",
 		pathname, node, acpi_ns_get_attached_object (node)));
@@ -165,9 +159,9 @@ cleanup1:
  *
  * PARAMETERS:  Pathname            - Fully qualified pathname to the object
  *              Info                - Contains:
- *              return_object       - Where to put method's return value (if
+ *                  return_object   - Where to put method's return value (if
  *                                    any).  If NULL, no value is returned.
- *              Params              - List of parameters to pass to the method,
+ *                  Params          - List of parameters to pass to the method,
  *                                    terminated by NULL.  Params itself may be
  *                                    NULL if no parameters are being passed.
  *
@@ -213,14 +207,14 @@ acpi_ns_evaluate_by_name (
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Object at [%s] was not found, status=%.4X\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+			"Object at [%s] was not found, status=%.4X\n",
 			pathname, status));
 		goto cleanup;
 	}
 
 	/*
-	 * Now that we have a handle to the object, we can attempt
-	 * to evaluate it.
+	 * Now that we have a handle to the object, we can attempt to evaluate it.
 	 */
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%s [%p] Value %p\n",
 		pathname, info->node, acpi_ns_get_attached_object (info->node)));
@@ -303,9 +297,8 @@ acpi_ns_evaluate_by_handle (
 	}
 
 	/*
-	 * For a method alias, we must grab the actual method node
-	 * so that proper scoping context will be established
-	 * before execution.
+	 * For a method alias, we must grab the actual method node so that proper
+	 * scoping context will be established before execution.
 	 */
 	if (acpi_ns_get_type (info->node) == ACPI_TYPE_LOCAL_METHOD_ALIAS) {
 		info->node = ACPI_CAST_PTR (struct acpi_namespace_node, info->node->object);
@@ -314,11 +307,9 @@ acpi_ns_evaluate_by_handle (
 	/*
 	 * Two major cases here:
 	 * 1) The object is an actual control method -- execute it.
-	 * 2) The object is not a method -- just return it's current
-	 *      value
+	 * 2) The object is not a method -- just return it's current value
 	 *
-	 * In both cases, the namespace is unlocked by the
-	 *  acpi_ns* procedure
+	 * In both cases, the namespace is unlocked by the acpi_ns* procedure
 	 */
 	if (acpi_ns_get_type (info->node) == ACPI_TYPE_METHOD) {
 		/*
@@ -328,15 +319,13 @@ acpi_ns_evaluate_by_handle (
 	}
 	else {
 		/*
-		 * Case 2) Object is NOT a method, just return its
-		 * current value
+		 * Case 2) Object is NOT a method, just return its current value
 		 */
 		status = acpi_ns_get_object_value (info);
 	}
 
 	/*
-	 * Check if there is a return value on the stack that must
-	 * be dealt with
+	 * Check if there is a return value on the stack that must be dealt with
 	 */
 	if (status == AE_CTRL_RETURN_VALUE) {
 		/* Map AE_CTRL_RETURN_VALUE to AE_OK, we are done with it */
@@ -345,8 +334,8 @@ acpi_ns_evaluate_by_handle (
 	}
 
 	/*
-	 * Namespace was unlocked by the handling acpi_ns* function,
-	 * so we just return
+	 * Namespace was unlocked by the handling acpi_ns* function, so we
+	 * just return
 	 */
 	return_ACPI_STATUS (status);
 }
@@ -356,12 +345,7 @@ acpi_ns_evaluate_by_handle (
  *
  * FUNCTION:    acpi_ns_execute_control_method
  *
- * PARAMETERS:  method_node         - The method to execute
- *              Params              - List of parameters to pass to the method,
- *                                    terminated by NULL.  Params itself may be
- *                                    NULL if no parameters are being passed.
- *              return_obj_desc     - List of result objects to be returned
- *                                    from the method.
+ * PARAMETERS:  Info            - Method info block (w/params)
  *
  * RETURN:      Status
  *
@@ -430,8 +414,7 @@ acpi_ns_execute_control_method (
  *
  * FUNCTION:    acpi_ns_get_object_value
  *
- * PARAMETERS:  Node                - The object
- *              return_obj_desc     - Where the objects value is returned
+ * PARAMETERS:  Info            - Method info block (w/params)
  *
  * RETURN:      Status
  *
@@ -453,28 +436,25 @@ acpi_ns_get_object_value (
 
 
 	/*
-	 * Objects require additional resolution steps (e.g., the
-	 * Node may be a field that must be read, etc.) -- we can't just grab
-	 * the object out of the node.
+	 * Objects require additional resolution steps (e.g., the Node may be a
+	 * field that must be read, etc.) -- we can't just grab the object out of
+	 * the node.
 	 */
 
 	/*
-	 * Use resolve_node_to_value() to get the associated value. This call
-	 * always deletes obj_desc (allocated above).
+	 * Use resolve_node_to_value() to get the associated value. This call always
+	 * deletes obj_desc (allocated above).
 	 *
-	 * NOTE: we can get away with passing in NULL for a walk state
-	 * because obj_desc is guaranteed to not be a reference to either
-	 * a method local or a method argument (because this interface can only be
-	 * called from the acpi_evaluate external interface, never called from
-	 * a running control method.)
+	 * NOTE: we can get away with passing in NULL for a walk state because
+	 * obj_desc is guaranteed to not be a reference to either a method local or
+	 * a method argument (because this interface can only be called from the
+	 * acpi_evaluate external interface, never called from a running method.)
 	 *
-	 * Even though we do not directly invoke the interpreter
-	 * for this, we must enter it because we could access an opregion.
-	 * The opregion access code assumes that the interpreter
-	 * is locked.
+	 * Even though we do not directly invoke the interpreter for this, we must
+	 * enter it because we could access an opregion. The opregion access code
+	 * assumes that the interpreter is locked.
 	 *
-	 * We must release the namespace lock before entering the
-	 * intepreter.
+	 * We must release the namespace lock before entering the intepreter.
 	 */
 	status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
@@ -485,16 +465,18 @@ acpi_ns_get_object_value (
 	if (ACPI_SUCCESS (status)) {
 		status = acpi_ex_resolve_node_to_value (&resolved_node, NULL);
 		/*
-		 * If acpi_ex_resolve_node_to_value() succeeded, the return value was
-		 * placed in resolved_node.
+		 * If acpi_ex_resolve_node_to_value() succeeded, the return value was placed
+		 * in resolved_node.
 		 */
 		acpi_ex_exit_interpreter ();
 
 		if (ACPI_SUCCESS (status)) {
 			status = AE_CTRL_RETURN_VALUE;
-			info->return_object = ACPI_CAST_PTR (union acpi_operand_object, resolved_node);
+			info->return_object = ACPI_CAST_PTR
+					 (union acpi_operand_object, resolved_node);
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Returning object %p [%s]\n",
-				info->return_object, acpi_ut_get_object_type_name (info->return_object)));
+				info->return_object,
+				acpi_ut_get_object_type_name (info->return_object)));
 		}
 	}
 

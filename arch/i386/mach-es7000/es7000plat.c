@@ -51,27 +51,29 @@ struct mip_reg		*host_reg;
 int 			mip_port;
 unsigned long		mip_addr, host_addr;
 
-static int __init
+#if defined(CONFIG_X86_IO_APIC) && (defined(CONFIG_ACPI_INTERPRETER) || defined(CONFIG_ACPI_BOOT))
+
+/*
+ * GSI override for ES7000 platforms.
+ */
+
+static unsigned int base;
+
+static int
 es7000_rename_gsi(int ioapic, int gsi)
 {
-	if (ioapic)
-		return gsi;
-	else {
-		if (gsi == 0)
-			return 13;
-		if (gsi == 1)
-			return 16;
-		if (gsi == 4)
-			return 17;
-		if (gsi == 6)
-			return 18;
-		if (gsi == 7)
-			return 19;
-		if (gsi == 8)
-			return 20;
-		return gsi;
-        }
+	if (!base) {
+		int i;
+		for (i = 0; i < nr_ioapics; i++)
+			base += nr_ioapic_registers[i];
+	}
+
+	if (!ioapic && (gsi < 16)) 
+		gsi += base;
+	return gsi;
 }
+
+#endif // (CONFIG_X86_IO_APIC) && (CONFIG_ACPI_INTERPRETER || CONFIG_ACPI_BOOT)
 
 /*
  * Parse the OEM Table

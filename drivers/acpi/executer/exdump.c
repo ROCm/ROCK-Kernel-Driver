@@ -55,7 +55,6 @@
 /*
  * The following routines are used for debug output only
  */
-
 #if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
 
 /*****************************************************************************
@@ -103,8 +102,8 @@ acpi_ex_dump_operand (
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-				"%p is not a node or operand object: [%s]\n",
-				obj_desc, acpi_ut_get_descriptor_name (obj_desc)));
+			"%p is not a node or operand object: [%s]\n",
+			obj_desc, acpi_ut_get_descriptor_name (obj_desc)));
 		ACPI_DUMP_BUFFER (obj_desc, sizeof (union acpi_operand_object));
 		return;
 	}
@@ -125,8 +124,8 @@ acpi_ex_dump_operand (
 
 		case AML_NAME_OP:
 
-			ACPI_DUMP_PATHNAME (obj_desc->reference.object, "Reference: Name: ",
-					  ACPI_LV_INFO, _COMPONENT);
+			ACPI_DUMP_PATHNAME (obj_desc->reference.object,
+				"Reference: Name: ", ACPI_LV_INFO, _COMPONENT);
 			ACPI_DUMP_ENTRY (obj_desc->reference.object, ACPI_LV_INFO);
 			break;
 
@@ -134,27 +133,27 @@ acpi_ex_dump_operand (
 		case AML_INDEX_OP:
 
 			acpi_os_printf ("Reference: Index %p\n",
-					 obj_desc->reference.object);
+				obj_desc->reference.object);
 			break;
 
 
 		case AML_REF_OF_OP:
 
 			acpi_os_printf ("Reference: (ref_of) %p\n",
-					 obj_desc->reference.object);
+				obj_desc->reference.object);
 			break;
 
 
 		case AML_ARG_OP:
 
 			acpi_os_printf ("Reference: Arg%d",
-					 obj_desc->reference.offset);
+				obj_desc->reference.offset);
 
 			if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
 				/* Value is an Integer */
 
 				acpi_os_printf (" value is [%8.8X%8.8x]",
-						 ACPI_FORMAT_UINT64 (obj_desc->integer.value));
+					ACPI_FORMAT_UINT64 (obj_desc->integer.value));
 			}
 
 			acpi_os_printf ("\n");
@@ -164,14 +163,14 @@ acpi_ex_dump_operand (
 		case AML_LOCAL_OP:
 
 			acpi_os_printf ("Reference: Local%d",
-					 obj_desc->reference.offset);
+				obj_desc->reference.offset);
 
 			if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
 
 				/* Value is an Integer */
 
 				acpi_os_printf (" value is [%8.8X%8.8x]",
-						 ACPI_FORMAT_UINT64 (obj_desc->integer.value));
+					ACPI_FORMAT_UINT64 (obj_desc->integer.value));
 			}
 
 			acpi_os_printf ("\n");
@@ -181,7 +180,7 @@ acpi_ex_dump_operand (
 		case AML_INT_NAMEPATH_OP:
 
 			acpi_os_printf ("Reference.Node->Name %X\n",
-					 obj_desc->reference.node->name.integer);
+				obj_desc->reference.node->name.integer);
 			break;
 
 
@@ -201,8 +200,7 @@ acpi_ex_dump_operand (
 	case ACPI_TYPE_BUFFER:
 
 		acpi_os_printf ("Buffer len %X @ %p \n",
-				 obj_desc->buffer.length,
-				 obj_desc->buffer.pointer);
+			obj_desc->buffer.length, obj_desc->buffer.pointer);
 
 		length = obj_desc->buffer.length;
 
@@ -227,14 +225,14 @@ acpi_ex_dump_operand (
 	case ACPI_TYPE_INTEGER:
 
 		acpi_os_printf ("Integer %8.8X%8.8X\n",
-				 ACPI_FORMAT_UINT64 (obj_desc->integer.value));
+			ACPI_FORMAT_UINT64 (obj_desc->integer.value));
 		break;
 
 
 	case ACPI_TYPE_PACKAGE:
 
 		acpi_os_printf ("Package count %X @ %p\n",
-				 obj_desc->package.count, obj_desc->package.elements);
+			obj_desc->package.count, obj_desc->package.elements);
 
 		/*
 		 * If elements exist, package vector pointer is valid,
@@ -277,7 +275,7 @@ acpi_ex_dump_operand (
 	case ACPI_TYPE_STRING:
 
 		acpi_os_printf ("String length %X @ %p ",
-				 obj_desc->string.length, obj_desc->string.pointer);
+			obj_desc->string.length, obj_desc->string.pointer);
 		acpi_ut_print_string (obj_desc->string.pointer, ACPI_UINT8_MAX);
 		acpi_os_printf ("\n");
 		break;
@@ -387,10 +385,13 @@ acpi_ex_dump_operand (
  *
  * FUNCTION:    acpi_ex_dump_operands
  *
- * PARAMETERS:  interpreter_mode     - Load or Exec
- *              *Ident              - Identification
+ * PARAMETERS:  Operands            - Operand list
+ *              interpreter_mode    - Load or Exec
+ *              Ident               - Identification
  *              num_levels          - # of stack entries to dump above line
- *              *Note               - Output notation
+ *              Note                - Output notation
+ *              module_name         - Caller's module name
+ *              line_number         - Caller's invocation line number
  *
  * DESCRIPTION: Dump the object stack
  *
@@ -489,8 +490,7 @@ acpi_ex_out_address (
 #if ACPI_MACHINE_WIDTH == 16
 	acpi_os_printf ("%20s : %p\n", title, value);
 #else
-	acpi_os_printf ("%20s : %8.8X%8.8X\n", title,
-			 ACPI_FORMAT_UINT64 (value));
+	acpi_os_printf ("%20s : %8.8X%8.8X\n", title, ACPI_FORMAT_UINT64 (value));
 #endif
 }
 
@@ -563,22 +563,25 @@ acpi_ex_dump_object_descriptor (
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_NAMED) {
 		acpi_ex_dump_node ((struct acpi_namespace_node *) obj_desc, flags);
-		acpi_os_printf ("\nAttached Object (%p):\n", ((struct acpi_namespace_node *) obj_desc)->object);
-		acpi_ex_dump_object_descriptor (((struct acpi_namespace_node *) obj_desc)->object, flags);
-		return;
+		acpi_os_printf ("\nAttached Object (%p):\n",
+			((struct acpi_namespace_node *) obj_desc)->object);
+		acpi_ex_dump_object_descriptor (
+			((struct acpi_namespace_node *) obj_desc)->object, flags);
+		return_VOID;
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
-		acpi_os_printf ("ex_dump_object_descriptor: %p is not an ACPI operand object: [%s]\n",
-				obj_desc, acpi_ut_get_descriptor_name (obj_desc));
+		acpi_os_printf (
+			"ex_dump_object_descriptor: %p is not an ACPI operand object: [%s]\n",
+			obj_desc, acpi_ut_get_descriptor_name (obj_desc));
 		return_VOID;
 	}
 
 	/* Common Fields */
 
-	acpi_ex_out_string ("Type",          acpi_ut_get_object_type_name (obj_desc));
+	acpi_ex_out_string ("Type",             acpi_ut_get_object_type_name (obj_desc));
 	acpi_ex_out_integer ("Reference Count", obj_desc->common.reference_count);
-	acpi_ex_out_integer ("Flags",        obj_desc->common.flags);
+	acpi_ex_out_integer ("Flags",           obj_desc->common.flags);
 
 	/* Object-specific Fields */
 
@@ -592,7 +595,7 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_STRING:
 
-		acpi_ex_out_integer ("Length",       obj_desc->string.length);
+		acpi_ex_out_integer ("Length",      obj_desc->string.length);
 
 		acpi_os_printf ("%20s : %p ", "Pointer", obj_desc->string.pointer);
 		acpi_ut_print_string (obj_desc->string.pointer, ACPI_UINT8_MAX);
@@ -602,17 +605,17 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_BUFFER:
 
-		acpi_ex_out_integer ("Length",       obj_desc->buffer.length);
-		acpi_ex_out_pointer ("Pointer",      obj_desc->buffer.pointer);
+		acpi_ex_out_integer ("Length",      obj_desc->buffer.length);
+		acpi_ex_out_pointer ("Pointer",     obj_desc->buffer.pointer);
 		ACPI_DUMP_BUFFER (obj_desc->buffer.pointer, obj_desc->buffer.length);
 		break;
 
 
 	case ACPI_TYPE_PACKAGE:
 
-		acpi_ex_out_integer ("Flags",        obj_desc->package.flags);
-		acpi_ex_out_integer ("Count",        obj_desc->package.count);
-		acpi_ex_out_pointer ("Elements",     obj_desc->package.elements);
+		acpi_ex_out_integer ("Flags",       obj_desc->package.flags);
+		acpi_ex_out_integer ("Count",       obj_desc->package.count);
+		acpi_ex_out_pointer ("Elements",    obj_desc->package.elements);
 
 		/* Dump the package contents */
 
@@ -621,7 +624,8 @@ acpi_ex_dump_object_descriptor (
 			for (i = 0; i < obj_desc->package.count; i++) {
 				acpi_os_printf ("[%.3d] %p", i, obj_desc->package.elements[i]);
 				if (obj_desc->package.elements[i]) {
-					acpi_os_printf (" %s", acpi_ut_get_object_type_name (obj_desc->package.elements[i]));
+					acpi_os_printf (" %s",
+						acpi_ut_get_object_type_name (obj_desc->package.elements[i]));
 				}
 				acpi_os_printf ("\n");
 			}
@@ -639,38 +643,38 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_EVENT:
 
-		acpi_ex_out_pointer ("Semaphore",    obj_desc->event.semaphore);
+		acpi_ex_out_pointer ("Semaphore",   obj_desc->event.semaphore);
 		break;
 
 
 	case ACPI_TYPE_METHOD:
 
-		acpi_ex_out_integer ("param_count",  obj_desc->method.param_count);
-		acpi_ex_out_integer ("Concurrency",  obj_desc->method.concurrency);
-		acpi_ex_out_pointer ("Semaphore",    obj_desc->method.semaphore);
-		acpi_ex_out_integer ("owning_id",    obj_desc->method.owning_id);
-		acpi_ex_out_integer ("aml_length",   obj_desc->method.aml_length);
-		acpi_ex_out_pointer ("aml_start",    obj_desc->method.aml_start);
+		acpi_ex_out_integer ("param_count", obj_desc->method.param_count);
+		acpi_ex_out_integer ("Concurrency", obj_desc->method.concurrency);
+		acpi_ex_out_pointer ("Semaphore",   obj_desc->method.semaphore);
+		acpi_ex_out_integer ("owning_id",   obj_desc->method.owning_id);
+		acpi_ex_out_integer ("aml_length",  obj_desc->method.aml_length);
+		acpi_ex_out_pointer ("aml_start",   obj_desc->method.aml_start);
 		break;
 
 
 	case ACPI_TYPE_MUTEX:
 
-		acpi_ex_out_integer ("sync_level",   obj_desc->mutex.sync_level);
+		acpi_ex_out_integer ("sync_level",  obj_desc->mutex.sync_level);
 		acpi_ex_out_pointer ("owner_thread", obj_desc->mutex.owner_thread);
-		acpi_ex_out_integer ("acquisition_depth",obj_desc->mutex.acquisition_depth);
-		acpi_ex_out_pointer ("Semaphore",    obj_desc->mutex.semaphore);
+		acpi_ex_out_integer ("acquire_depth", obj_desc->mutex.acquisition_depth);
+		acpi_ex_out_pointer ("Semaphore",   obj_desc->mutex.semaphore);
 		break;
 
 
 	case ACPI_TYPE_REGION:
 
-		acpi_ex_out_integer ("space_id",     obj_desc->region.space_id);
-		acpi_ex_out_integer ("Flags",        obj_desc->region.flags);
-		acpi_ex_out_address ("Address",      obj_desc->region.address);
-		acpi_ex_out_integer ("Length",       obj_desc->region.length);
-		acpi_ex_out_pointer ("Handler",      obj_desc->region.handler);
-		acpi_ex_out_pointer ("Next",         obj_desc->region.next);
+		acpi_ex_out_integer ("space_id",    obj_desc->region.space_id);
+		acpi_ex_out_integer ("Flags",       obj_desc->region.flags);
+		acpi_ex_out_address ("Address",     obj_desc->region.address);
+		acpi_ex_out_integer ("Length",      obj_desc->region.length);
+		acpi_ex_out_pointer ("Handler",     obj_desc->region.handler);
+		acpi_ex_out_pointer ("Next",        obj_desc->region.next);
 		break;
 
 
@@ -686,11 +690,11 @@ acpi_ex_dump_object_descriptor (
 	case ACPI_TYPE_PROCESSOR:
 
 		acpi_ex_out_integer ("Processor ID", obj_desc->processor.proc_id);
-		acpi_ex_out_integer ("Length",       obj_desc->processor.length);
-		acpi_ex_out_address ("Address",      (acpi_physical_address) obj_desc->processor.address);
+		acpi_ex_out_integer ("Length",      obj_desc->processor.length);
+		acpi_ex_out_address ("Address",     (acpi_physical_address) obj_desc->processor.address);
 		acpi_ex_out_pointer ("system_notify", obj_desc->processor.system_notify);
 		acpi_ex_out_pointer ("device_notify", obj_desc->processor.device_notify);
-		acpi_ex_out_pointer ("Handler",      obj_desc->processor.handler);
+		acpi_ex_out_pointer ("Handler",     obj_desc->processor.handler);
 		break;
 
 
@@ -698,7 +702,7 @@ acpi_ex_dump_object_descriptor (
 
 		acpi_ex_out_pointer ("system_notify", obj_desc->thermal_zone.system_notify);
 		acpi_ex_out_pointer ("device_notify", obj_desc->thermal_zone.device_notify);
-		acpi_ex_out_pointer ("Handler",      obj_desc->thermal_zone.handler);
+		acpi_ex_out_pointer ("Handler",     obj_desc->thermal_zone.handler);
 		break;
 
 
@@ -707,35 +711,35 @@ acpi_ex_dump_object_descriptor (
 	case ACPI_TYPE_LOCAL_BANK_FIELD:
 	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
-		acpi_ex_out_integer ("field_flags",  obj_desc->common_field.field_flags);
-		acpi_ex_out_integer ("access_byte_width", obj_desc->common_field.access_byte_width);
-		acpi_ex_out_integer ("bit_length",   obj_desc->common_field.bit_length);
+		acpi_ex_out_integer ("field_flags", obj_desc->common_field.field_flags);
+		acpi_ex_out_integer ("access_byte_width",obj_desc->common_field.access_byte_width);
+		acpi_ex_out_integer ("bit_length",  obj_desc->common_field.bit_length);
 		acpi_ex_out_integer ("fld_bit_offset", obj_desc->common_field.start_field_bit_offset);
 		acpi_ex_out_integer ("base_byte_offset", obj_desc->common_field.base_byte_offset);
 		acpi_ex_out_integer ("datum_valid_bits", obj_desc->common_field.datum_valid_bits);
-		acpi_ex_out_integer ("end_fld_valid_bits", obj_desc->common_field.end_field_valid_bits);
-		acpi_ex_out_integer ("end_buf_valid_bits", obj_desc->common_field.end_buffer_valid_bits);
-		acpi_ex_out_pointer ("parent_node",  obj_desc->common_field.node);
+		acpi_ex_out_integer ("end_fld_valid_bits",obj_desc->common_field.end_field_valid_bits);
+		acpi_ex_out_integer ("end_buf_valid_bits",obj_desc->common_field.end_buffer_valid_bits);
+		acpi_ex_out_pointer ("parent_node", obj_desc->common_field.node);
 
 		switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 		case ACPI_TYPE_BUFFER_FIELD:
-			acpi_ex_out_pointer ("buffer_obj",   obj_desc->buffer_field.buffer_obj);
+			acpi_ex_out_pointer ("buffer_obj", obj_desc->buffer_field.buffer_obj);
 			break;
 
 		case ACPI_TYPE_LOCAL_REGION_FIELD:
-			acpi_ex_out_pointer ("region_obj",   obj_desc->field.region_obj);
+			acpi_ex_out_pointer ("region_obj", obj_desc->field.region_obj);
 			break;
 
 		case ACPI_TYPE_LOCAL_BANK_FIELD:
-			acpi_ex_out_integer ("Value",        obj_desc->bank_field.value);
-			acpi_ex_out_pointer ("region_obj",   obj_desc->bank_field.region_obj);
-			acpi_ex_out_pointer ("bank_obj",     obj_desc->bank_field.bank_obj);
+			acpi_ex_out_integer ("Value",   obj_desc->bank_field.value);
+			acpi_ex_out_pointer ("region_obj", obj_desc->bank_field.region_obj);
+			acpi_ex_out_pointer ("bank_obj", obj_desc->bank_field.bank_obj);
 			break;
 
 		case ACPI_TYPE_LOCAL_INDEX_FIELD:
-			acpi_ex_out_integer ("Value",        obj_desc->index_field.value);
-			acpi_ex_out_pointer ("Index",        obj_desc->index_field.index_obj);
-			acpi_ex_out_pointer ("Data",         obj_desc->index_field.data_obj);
+			acpi_ex_out_integer ("Value",   obj_desc->index_field.value);
+			acpi_ex_out_pointer ("Index",   obj_desc->index_field.index_obj);
+			acpi_ex_out_pointer ("Data",    obj_desc->index_field.data_obj);
 			break;
 
 		default:
@@ -747,29 +751,29 @@ acpi_ex_dump_object_descriptor (
 
 	case ACPI_TYPE_LOCAL_REFERENCE:
 
-		acpi_ex_out_integer ("target_type",  obj_desc->reference.target_type);
-		acpi_ex_out_string ("Opcode",        (acpi_ps_get_opcode_info (obj_desc->reference.opcode))->name);
-		acpi_ex_out_integer ("Offset",       obj_desc->reference.offset);
-		acpi_ex_out_pointer ("obj_desc",     obj_desc->reference.object);
-		acpi_ex_out_pointer ("Node",         obj_desc->reference.node);
-		acpi_ex_out_pointer ("Where",        obj_desc->reference.where);
+		acpi_ex_out_integer ("target_type", obj_desc->reference.target_type);
+		acpi_ex_out_string ("Opcode",       (acpi_ps_get_opcode_info (obj_desc->reference.opcode))->name);
+		acpi_ex_out_integer ("Offset",      obj_desc->reference.offset);
+		acpi_ex_out_pointer ("obj_desc",    obj_desc->reference.object);
+		acpi_ex_out_pointer ("Node",        obj_desc->reference.node);
+		acpi_ex_out_pointer ("Where",       obj_desc->reference.where);
 		break;
 
 
 	case ACPI_TYPE_LOCAL_ADDRESS_HANDLER:
 
-		acpi_ex_out_integer ("space_id",     obj_desc->address_space.space_id);
-		acpi_ex_out_pointer ("Next",         obj_desc->address_space.next);
-		acpi_ex_out_pointer ("region_list",  obj_desc->address_space.region_list);
-		acpi_ex_out_pointer ("Node",         obj_desc->address_space.node);
-		acpi_ex_out_pointer ("Context",      obj_desc->address_space.context);
+		acpi_ex_out_integer ("space_id",    obj_desc->address_space.space_id);
+		acpi_ex_out_pointer ("Next",        obj_desc->address_space.next);
+		acpi_ex_out_pointer ("region_list", obj_desc->address_space.region_list);
+		acpi_ex_out_pointer ("Node",        obj_desc->address_space.node);
+		acpi_ex_out_pointer ("Context",     obj_desc->address_space.context);
 		break;
 
 
 	case ACPI_TYPE_LOCAL_NOTIFY:
 
-		acpi_ex_out_pointer ("Node",         obj_desc->notify.node);
-		acpi_ex_out_pointer ("Context",      obj_desc->notify.context);
+		acpi_ex_out_pointer ("Node",        obj_desc->notify.node);
+		acpi_ex_out_pointer ("Context",     obj_desc->notify.context);
 		break;
 
 
@@ -779,7 +783,8 @@ acpi_ex_dump_object_descriptor (
 	case ACPI_TYPE_LOCAL_DATA:
 	default:
 
-		acpi_os_printf ("ex_dump_object_descriptor: Display not implemented for object type %s\n",
+		acpi_os_printf (
+			"ex_dump_object_descriptor: Display not implemented for object type %s\n",
 			acpi_ut_get_object_type_name (obj_desc));
 		break;
 	}

@@ -77,7 +77,8 @@ acpi_ns_initialize_objects (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 		"**** Starting initialization of namespace objects ****\n"));
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "Completing Region/Field/Buffer/Package initialization:"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT,
+		"Completing Region/Field/Buffer/Package initialization:"));
 
 	/* Set all init info to zero */
 
@@ -142,7 +143,8 @@ acpi_ns_initialize_devices (
 	info.num_STA = 0;
 	info.num_INI = 0;
 
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "Executing all Device _STA and_INI methods:"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT,
+		"Executing all Device _STA and_INI methods:"));
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
@@ -257,8 +259,8 @@ acpi_ns_init_one_object (
 	}
 
 	/*
-	 * Each of these types can contain executable AML code within
-	 * the declaration.
+	 * Each of these types can contain executable AML code within the
+	 * declaration.
 	 */
 	switch (type) {
 	case ACPI_TYPE_REGION:
@@ -267,20 +269,17 @@ acpi_ns_init_one_object (
 		status = acpi_ds_get_region_arguments (obj_desc);
 		break;
 
-
 	case ACPI_TYPE_BUFFER_FIELD:
 
 		info->field_init++;
 		status = acpi_ds_get_buffer_field_arguments (obj_desc);
 		break;
 
-
 	case ACPI_TYPE_BUFFER:
 
 		info->buffer_init++;
 		status = acpi_ds_get_buffer_arguments (obj_desc);
 		break;
-
 
 	case ACPI_TYPE_PACKAGE:
 
@@ -301,15 +300,17 @@ acpi_ns_init_one_object (
 				acpi_format_exception (status)));
 	}
 
-	/* Print a dot for each object unless we are going to print the entire pathname */
-
+	/*
+	 * Print a dot for each object unless we are going to print the entire
+	 * pathname
+	 */
 	if (!(acpi_dbg_level & ACPI_LV_INIT_NAMES)) {
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "."));
 	}
 
 	/*
-	 * We ignore errors from above, and always return OK, since
-	 * we don't want to abort the walk on any single error.
+	 * We ignore errors from above, and always return OK, since we don't want
+	 * to abort the walk on any single error.
 	 */
 	acpi_ex_exit_interpreter ();
 	return (AE_OK);
@@ -363,7 +364,8 @@ acpi_ns_init_one_device (
 		return_ACPI_STATUS (AE_OK);
 	}
 
-	if ((acpi_dbg_level <= ACPI_LV_ALL_EXCEPTIONS) && (!(acpi_dbg_level & ACPI_LV_INFO))) {
+	if ((acpi_dbg_level <= ACPI_LV_ALL_EXCEPTIONS) &&
+		(!(acpi_dbg_level & ACPI_LV_INFO))) {
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "."));
 	}
 
@@ -428,7 +430,6 @@ acpi_ns_init_one_device (
 
 		status = acpi_gbl_init_handler (pinfo.node, ACPI_INIT_DEVICE_INI);
 	}
-
 
 	return_ACPI_STATUS (status);
 }
