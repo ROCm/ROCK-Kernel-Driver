@@ -83,9 +83,6 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 {
 	struct slot *slot;
 	
-	dbg("Enter alloc_slot_struct(): dn->full_name=%s drc_index=0x%x drc_name=%s\n",
-		dn->full_name, drc_index, drc_name);
-
 	slot = kmalloc(sizeof (struct slot), GFP_KERNEL);
 	if (!slot)
 		return (NULL);
@@ -128,8 +125,7 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 	slot->hotplug_slot->private = slot;
 	slot->hotplug_slot->ops = &rpaphp_hotplug_slot_ops;
 	slot->hotplug_slot->release = &rpaphp_release_slot;
-	dbg("Exit alloc_slot_struct(): slot->dn->full_name=%s drc_index=0x%x drc_name=%s\n",
-		slot->dn->full_name, slot->index, slot->name);
+	
 	return (slot);
 }
 
