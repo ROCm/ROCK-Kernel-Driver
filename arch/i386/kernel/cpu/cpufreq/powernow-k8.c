@@ -37,6 +37,9 @@
 #define VERSION "version 1.00.08a"
 #include "powernow-k8.h"
 
+/* serialize freq changes  */
+static DECLARE_MUTEX(fidvid_sem);
+
 static struct powernow_k8_data *powernow_data[NR_CPUS];
 
 /* Return a frequency in MHz, given an input fid */
@@ -697,7 +700,9 @@ static int transition_frequency(struct powernow_k8_data *data, unsigned int inde
 	freqs.new = find_freq_from_fid(fid);
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
+	down(&fidvid_sem);
 	res = transition_fid_vid(data, fid, vid);
+	up(&fidvid_sem);
 
 	freqs.new = find_freq_from_fid(data->currfid);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
