@@ -544,6 +544,92 @@ static struct kset_hotplug_ops block_hotplug_ops = {
 static decl_subsys(block, &ktype_block, &block_hotplug_ops);
 
 
+/*
+ * aggregate disk stat collector.  Uses the same stats that the sysfs
+ * entries do, above, but makes them available through one seq_file.
+ * Watching a few disks may be efficient through sysfs, but watching
+ * all of them will be more efficient through this interface.
+ *
+ * The output looks suspiciously like /proc/partitions with a bunch of
+ * extra fields.
+ */
+
+/* iterator */
+static void *diskstats_start(struct seq_file *part, loff_t *pos)
+{
+	loff_t k = *pos;
+	struct list_head *p;
+
+	down_read(&block_subsys.rwsem);
+	list_for_each(p, &block_subsys.kset.list)
+		if (!k--)
+			return list_entry(p, struct gendisk, kobj.entry);
+	return NULL;
+}
+
+static void *diskstats_next(struct seq_file *part, void *v, loff_t *pos)
+{
+	struct list_head *p = ((struct gendisk *)v)->kobj.entry.next;
+	++*pos;
+	return p==&block_subsys.kset.list ? NULL :
+		list_entry(p, struct gendisk, kobj.entry);
+}
+
+static void diskstats_stop(struct seq_file *part, void *v)
+{
+	up_read(&block_subsys.rwsem);
+}
+
+static int diskstats_show(struct seq_file *s, void *v)
+{
+	struct gendisk *gp = v;
+	char buf[64];
+	int n = 0;
+
+	/*
+	if (&sgp->kobj.entry == block_subsys.kset.list.next)
+		seq_puts(s,	"major minor name"
+				"     rio rmerge rsect ruse wio wmerge "
+				"wsect wuse running use aveq"
+				"\n\n");
+	*/
+ 
+	disk_round_stats(gp);
+	seq_printf(s, "%4d %4d %s %u %u %llu %u %u %u %llu %u %u %u %u\n",
+		gp->major, n + gp->first_minor, disk_name(gp, n, buf),
+		disk_stat_read(gp, reads), disk_stat_read(gp, read_merges),
+		(unsigned long long)disk_stat_read(gp, read_sectors),
+		jiffies_to_msec(disk_stat_read(gp, read_ticks)),
+		disk_stat_read(gp, writes), disk_stat_read(gp, write_merges),
+		(unsigned long long)disk_stat_read(gp, write_sectors),
+		jiffies_to_msec(disk_stat_read(gp, write_ticks)),
+		disk_stat_read(gp, in_flight),
+		jiffies_to_msec(disk_stat_read(gp, io_ticks)),
+		jiffies_to_msec(disk_stat_read(gp, time_in_queue)));
+
+	/* now show all non-0 size partitions of it */
+	for (n = 0; n < gp->minors - 1; n++) {
+		struct hd_struct *hd = gp->part[n];
+
+		if (hd && hd->nr_sects)
+			seq_printf(s, "%4d %4d %s %u %u %u %u\n",
+				gp->major, n + gp->first_minor + 1,
+				disk_name(gp, n + 1, buf),
+				hd->reads, hd->read_sectors,
+				hd->writes, hd->write_sectors);
+	}
+ 
+	return 0;
+}
+
+struct seq_operations diskstats_op = {
+	start:	diskstats_start,
+	next:	diskstats_next,
+	stop:	diskstats_stop,
+	show:	diskstats_show
+};
+
+
 struct gendisk *alloc_disk(int minors)
 {
 	struct gendisk *disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
