@@ -408,13 +408,14 @@ void irlmp_link_discovery_confirm(struct lap_cb *self, hashbin_t *log)
 }
 
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-inline void irlmp_update_cache(struct lsap_cb *self)
+static inline void irlmp_update_cache(struct lap_cb *lap,
+				      struct lsap_cb *lsap)
 {
 	/* Update cache entry */
-	irlmp->cache.dlsap_sel = self->dlsap_sel;
-	irlmp->cache.slsap_sel = self->slsap_sel;
-	irlmp->cache.lsap = self;
-	irlmp->cache.valid = TRUE;
+	lap->cache.dlsap_sel = lsap->dlsap_sel;
+	lap->cache.slsap_sel = lsap->slsap_sel;
+	lap->cache.lsap = lsap;
+	lap->cache.valid = TRUE;
 }
 #endif
 
@@ -423,6 +424,17 @@ inline void irlmp_update_cache(struct lsap_cb *self)
  *
  *    Find handle assosiated with destination and source LSAP
  *
+ * Any IrDA connection (LSAP/TSAP) is uniquely identified by
+ * 3 parameters, the local lsap, the remote lsap and the remote address. 
+ * We may initiate multiple connections to the same remote service
+ * (they will have different local lsap), a remote device may initiate
+ * multiple connections to the same local service (they will have
+ * different remote lsap), or multiple devices may connect to the same
+ * service and may use the same remote lsap (and they will have
+ * different remote address).
+ * So, where is the remote address ? Each LAP connection is made with
+ * a single remote device, so imply a specific remote address.
+ * Jean II
  */
 static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 				       __u8 slsap_sel, int status,
@@ -436,11 +448,11 @@ static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 	 *  cache first to avoid the linear search
 	 */
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-	if ((irlmp->cache.valid) && 
-	    (irlmp->cache.slsap_sel == slsap_sel) && 
-	    (irlmp->cache.dlsap_sel == dlsap_sel)) 
+	if ((self->cache.valid) && 
+	    (self->cache.slsap_sel == slsap_sel) && 
+	    (self->cache.dlsap_sel == dlsap_sel)) 
 	{
-		return (irlmp->cache.lsap);
+		return (self->cache.lsap);
 	}
 #endif
 	lsap = (struct lsap_cb *) hashbin_get_first(queue);
@@ -458,7 +470,7 @@ static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 			lsap->dlsap_sel = dlsap_sel;
 			
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-			irlmp_update_cache(lsap);
+			irlmp_update_cache(self, lsap);
 #endif
 			return lsap;
 		}
@@ -469,7 +481,7 @@ static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 		    (lsap->dlsap_sel == dlsap_sel)) 
 		{
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-			irlmp_update_cache(lsap);
+			irlmp_update_cache(self, lsap);
 #endif
 			return lsap;
 		}

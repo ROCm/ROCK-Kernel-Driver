@@ -100,7 +100,7 @@ struct lsap_cb {
 	irda_queue_t queue;      /* Must be first */
 	magic_t magic;
 
-	int  connected;
+	unsigned long connected;	/* set_bit used on this */
 	int  persistent;
 
 	__u8 slsap_sel;   /* Source (this) LSAP address */
@@ -118,6 +118,21 @@ struct lsap_cb {
 
 	struct lap_cb *lap; /* Pointer to LAP connection structure */
 };
+
+/*
+ *  Used for caching the last slsap->dlsap->handle mapping
+ *
+ * We don't need to keep/match the remote address in the cache because
+ * we are associated with a specific LAP (which implies it).
+ * Jean II
+ */
+typedef struct {
+	int valid;
+
+	__u8 slsap_sel;
+	__u8 dlsap_sel;
+	struct lsap_cb *lsap;
+} CACHE_ENTRY;
 
 /*
  *  Information about each registred IrLAP layer
@@ -140,18 +155,14 @@ struct lap_cb {
 	
 	struct qos_info *qos;  /* LAP QoS for this session */
 	struct timer_list idle_timer;
+	
+#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
+	/* The lsap cache was moved from struct irlmp_cb to here because
+	 * it must be associated with the specific LAP. Also, this
+	 * improves performance. - Jean II */
+	CACHE_ENTRY cache;  /* Caching last slsap->dlsap->handle mapping */
+#endif
 };
-
-/*
- *  Used for caching the last slsap->dlsap->handle mapping
- */
-typedef struct {
-	int valid;
-
-	__u8 slsap_sel;
-	__u8 dlsap_sel;
-	struct lsap_cb *lsap;
-} CACHE_ENTRY;
 
 /*
  *  Main structure for IrLMP
@@ -166,9 +177,6 @@ struct irlmp_cb {
 
 	int free_lsap_sel;
 
-#ifdef CONFIG_IRDA_CACHE_LAST_LSAP
-	CACHE_ENTRY cache;  /* Caching last slsap->dlsap->handle mapping */
-#endif
 	struct timer_list discovery_timer;
 
  	hashbin_t *links;         /* IrLAP connection table */

@@ -409,8 +409,8 @@ typedef struct irnet_socket
 
   /* ------------------------ IrTTP part ------------------------ */
   /* We create a pseudo "socket" over the IrDA tranport */
-  int			ttp_open;	/* Set when IrTTP is ready */
-  int			ttp_connect;	/* Set when IrTTP is connecting */
+  unsigned long		ttp_open;	/* Set when IrTTP is ready */
+  unsigned long		ttp_connect;	/* Set when IrTTP is connecting */
   struct tsap_cb *	tsap;		/* IrTTP instance (the connection) */
 
   char			rname[NICKNAME_MAX_LEN + 1];
