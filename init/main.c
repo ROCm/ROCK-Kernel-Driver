@@ -533,8 +533,8 @@ static int init(void * unused)
 	lock_kernel();
 	/* Sets up cpus_possible() */
 	smp_prepare_cpus(max_cpus);
-	do_basic_setup();
 	smp_init();
+	do_basic_setup();
 
 	prepare_namespace();
 
