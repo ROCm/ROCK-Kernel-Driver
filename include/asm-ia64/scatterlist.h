@@ -2,8 +2,8 @@
 #define _ASM_IA64_SCATTERLIST_H
 
 /*
- * Copyright (C) 1998-1999, 2001-2002 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Modified 1998-1999, 2001-2002
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  */
 
 struct scatterlist {

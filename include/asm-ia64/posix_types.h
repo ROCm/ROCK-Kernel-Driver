@@ -6,7 +6,9 @@
  * be a little careful about namespace pollution etc.  Also, we cannot
  * assume GCC is being used.
  *
- * Copyright (C) 1998-2000, 2003 Hewlett-Packard Co
+ * Based on <asm-alpha/posix_types.h>.
+ *
+ * Modified 1998-2000, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 

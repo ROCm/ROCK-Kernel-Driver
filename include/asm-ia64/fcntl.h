@@ -1,10 +1,10 @@
 #ifndef _ASM_IA64_FCNTL_H
 #define _ASM_IA64_FCNTL_H
 /*
- * This is mostly compatible with Linux/x86.
+ * Based on <asm-i386/fcntl.h>.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Modified 1998-2000
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co.
  */
 
 /*
