@@ -68,6 +68,7 @@ static const char *version =
 #include <linux/if_ltalk.h>	/* For ltalk_setup() */
 #include <linux/delay.h>	/* For udelay() */
 #include <linux/atalk.h>
+#include <linux/spinlock.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
