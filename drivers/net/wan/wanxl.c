@@ -31,12 +31,12 @@
 
 #include "wanxl.h"
 
-static const char* version = "wanXL serial card driver version: 0.46";
+static const char* version = "wanXL serial card driver version: 0.47";
 
 #define PLX_CTL_RESET   0x40000000 /* adapter reset */
 
 #undef DEBUG_PKT
-#define DEBUG_PCI
+#undef DEBUG_PCI
 
 /* MAILBOX #1 - PUTS COMMANDS */
 #define MBX1_CMD_ABORTJ 0x85000000 /* Abort and Jump */
@@ -125,7 +125,8 @@ static inline dma_addr_t pci_map_single_debug(struct pci_dev *pdev, void *ptr,
 	dma_addr_t addr = pci_map_single(pdev, ptr, size, direction);
 	if (addr + size > 0x100000000LL)
 		printk(KERN_CRIT "wanXL %s: pci_map_single() returned memory"
-		       " at 0x%X!\n", card_name(pdev), addr);
+		       " at 0x%LX!\n", card_name(pdev),
+		       (unsigned long long)addr);
 	return addr;
 }
 
@@ -180,8 +181,7 @@ static inline void wanxl_cable_intr(port_t *port)
 static inline void wanxl_tx_intr(port_t *port)
 {
 	while (1) {
-                desc_t *desc;
-		desc = &get_status(port)->tx_descs[port->tx_in];
+                desc_t *desc = &get_status(port)->tx_descs[port->tx_in];
 		struct sk_buff *skb = port->tx_skbs[port->tx_in];
 
 		switch (desc->stat) {
@@ -292,10 +292,11 @@ static int wanxl_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
         port_t *port = hdlc_to_port(hdlc);
+	desc_t *desc;
 
         spin_lock(&port->lock);
 
-	desc_t *desc = &get_status(port)->tx_descs[port->tx_out];
+	desc = &get_status(port)->tx_descs[port->tx_out];
         if (desc->stat != PACKET_EMPTY) {
                 /* should never happen - previous xmit should stop queue */
 #ifdef DEBUG_PKT
@@ -578,6 +579,14 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 	u8 *mem;		/* memory virtual base addr */
 	int i, ports, alloc_size;
 
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version) {
+		printed_version++;
+		printk(KERN_INFO "%s\n", version);
+	}
+#endif
+
 	i = pci_enable_device(pdev);
 	if (i)
 		return i;
@@ -628,7 +637,8 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 
 #ifdef DEBUG_PCI
 	printk(KERN_DEBUG "wanXL %s: pci_alloc_consistent() returned memory"
-	       " at 0x%X\n", card_name(pdev), card->status_address);
+	       " at 0x%LX\n", card_name(pdev),
+	       (unsigned long long)card->status_address);
 #endif
 
 	/* FIXME when PCI/DMA subsystems are fixed.
