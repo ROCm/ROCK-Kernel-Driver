@@ -1,8 +1,9 @@
 /*
  *	X.25 Packet Layer release 002
  *
- *	This is ALPHA test software. This code may break your machine, randomly fail to work with new 
- *	releases, misbehave and/or generally screw up. It might even work. 
+ *	This is ALPHA test software. This code may break your machine,
+ *	randomly fail to work with new releases, misbehave and/or generally
+ *	screw up. It might even work. 
  *
  *	This code REQUIRES 2.1.15 or higher
  *
@@ -102,8 +103,7 @@ int x25_addr_ntoa(unsigned char *p, struct x25_address *called_addr,
 		}
 	}
 
-	*called  = '\0';
-	*calling = '\0';
+	*called = *calling = '\0';
 
 	return 1 + (called_len + calling_len + 1) / 2;
 }
@@ -535,7 +535,8 @@ static int x25_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 	x25_cb *x25;
 
-	if (sk == NULL) return 0;
+	if (!sk)
+		goto out;
 
 	x25 = x25_sk(sk);
 
@@ -560,14 +561,11 @@ static int x25_release(struct socket *sock)
 			sk->dead                = 1;
 			sk->destroy             = 1;
 			break;
-
-		default:
-			break;
 	}
 
 	sock->sk   = NULL;	
 	sk->socket = NULL;	/* Not used, but we should do this */
-
+out:
 	return 0;
 }
 
@@ -765,7 +763,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *neigh, unsigned i
 	x25_cb *makex25;
 	struct x25_address source_addr, dest_addr;
 	struct x25_facilities facilities;
-	int len;
+	int len, rc;
 
 	/*
 	 *	Remove the LCI and frame type.
@@ -786,18 +784,14 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *neigh, unsigned i
 	/*
 	 *	We can't accept the Call Request.
 	 */
-	if (!sk || sk->ack_backlog == sk->max_ack_backlog) {
-		x25_transmit_clear_request(neigh, lci, 0x01);
-		return 0;
-	}
+	if (!sk || sk->ack_backlog == sk->max_ack_backlog)
+		goto out_clear_request;
 
 	/*
 	 *	Try to reach a compromise on the requested facilities.
 	 */
-	if ((len = x25_negotiate_facilities(skb, sk, &facilities)) == -1) {
-		x25_transmit_clear_request(neigh, lci, 0x01);
-		return 0;
-	}
+	if ((len = x25_negotiate_facilities(skb, sk, &facilities)) == -1)
+		goto out_clear_request;
 
 	/*
 	 * current neighbour/link might impose additional limits
@@ -810,10 +804,8 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *neigh, unsigned i
 	 *	Try to create a new socket.
 	 */
 	make = x25_make_new(sk);
-	if (!make) {
-		x25_transmit_clear_request(neigh, lci, 0x01);
-		return 0;
-	}
+	if (!make)
+		goto out_clear_request;
 
 	/*
 	 *	Remove the facilities, leaving any Call User Data.
@@ -854,8 +846,13 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *neigh, unsigned i
 
 	if (!sk->dead)
 		sk->data_ready(sk, skb->len);
-
-	return 1;
+	rc = 1;
+out:
+	return rc;
+out_clear_request:
+	rc = 0;
+	x25_transmit_clear_request(neigh, lci, 0x01);
+	goto out;
 }
 
 static int x25_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct scm_cookie *scm)
@@ -1123,6 +1120,7 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
 	x25_cb *x25 = x25_sk(sk);
+	int rc;
 
 	switch (cmd) {
 		case TIOCOUTQ: {
@@ -1130,26 +1128,33 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
 			if (amount < 0)
 				amount = 0;
-			return put_user(amount, (unsigned int *)arg);
+			rc = put_user(amount, (unsigned int *)arg);
+			break;
 		}
 
 		case TIOCINQ: {
 			struct sk_buff *skb;
 			int amount = 0;
-			/* These two are safe on a single CPU system as only user tasks fiddle here */
+			/*
+			 * These two are safe on a single CPU system as
+			 * only user tasks fiddle here
+			 */
 			if ((skb = skb_peek(&sk->receive_queue)) != NULL)
 				amount = skb->len;
-			return put_user(amount, (unsigned int *)arg);
+			rc = put_user(amount, (unsigned int *)arg);
+			break;
 		}
 
 		case SIOCGSTAMP:
-			if (sk != NULL) {
-				if (sk->stamp.tv_sec == 0)
-					return -ENOENT;
-				return copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
+			if (sk) {
+				rc = -ENOENT;
+				if (!sk->stamp.tv_sec)
+					break;
+				rc = copy_to_user((void *)arg, &sk->stamp,
+						  sizeof(struct timeval)) ? -EFAULT : 0;
 			}
-			return -EINVAL;
-
+			rc = -EINVAL;
+			break;
 		case SIOCGIFADDR:
 		case SIOCSIFADDR:
 		case SIOCGIFDSTADDR:
@@ -1160,74 +1165,90 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCSIFNETMASK:
 		case SIOCGIFMETRIC:
 		case SIOCSIFMETRIC:
-			return -EINVAL;
-
+			rc = -EINVAL;
+			break;
 		case SIOCADDRT:
 		case SIOCDELRT:
-			if (!capable(CAP_NET_ADMIN)) return -EPERM;
-			return x25_route_ioctl(cmd, (void *)arg);
-
+			rc = -EPERM;
+			if (!capable(CAP_NET_ADMIN))
+				break;
+			rc = x25_route_ioctl(cmd, (void *)arg);
+			break;
 		case SIOCX25GSUBSCRIP:
-			return x25_subscr_ioctl(cmd, (void *)arg);
-
+			rc = x25_subscr_ioctl(cmd, (void *)arg);
+			break;
 		case SIOCX25SSUBSCRIP:
-			if (!capable(CAP_NET_ADMIN)) return -EPERM;
-			return x25_subscr_ioctl(cmd, (void *)arg);
-
+			rc = -EPERM;
+			if (!capable(CAP_NET_ADMIN))
+				break;
+			rc = x25_subscr_ioctl(cmd, (void *)arg);
+			break;
 		case SIOCX25GFACILITIES: {
-			struct x25_facilities facilities;
-			facilities = x25->facilities;
-			return copy_to_user((void *)arg, &facilities, sizeof(facilities)) ? -EFAULT : 0;
+			struct x25_facilities fac = x25->facilities;
+			rc = copy_to_user((void *)arg, &fac, sizeof(fac)) ? -EFAULT : 0;
+			break;
 		}
 
 		case SIOCX25SFACILITIES: {
 			struct x25_facilities facilities;
+			rc = -EFAULT;
 			if (copy_from_user(&facilities, (void *)arg, sizeof(facilities)))
-				return -EFAULT;
+				break;
+			rc = -EINVAL;
 			if (sk->state != TCP_LISTEN && sk->state != TCP_CLOSE)
-				return -EINVAL;
-			if (facilities.pacsize_in < X25_PS16 || facilities.pacsize_in > X25_PS4096)
-				return -EINVAL;
-			if (facilities.pacsize_out < X25_PS16 || facilities.pacsize_out > X25_PS4096)
-				return -EINVAL;
-			if (facilities.winsize_in < 1 || facilities.winsize_in > 127)
-				return -EINVAL;
-			if (facilities.throughput < 0x03 || facilities.throughput > 0xDD)
-				return -EINVAL;
-			if (facilities.reverse != 0 && facilities.reverse != 1)
-				return -EINVAL;
+				break;
+			if (facilities.pacsize_in < X25_PS16 ||
+			    facilities.pacsize_in > X25_PS4096)
+				break;
+			if (facilities.pacsize_out < X25_PS16 ||
+			    facilities.pacsize_out > X25_PS4096)
+				break;
+			if (facilities.winsize_in < 1 ||
+			    facilities.winsize_in > 127)
+				break;
+			if (facilities.throughput < 0x03 ||
+			    facilities.throughput > 0xDD)
+				break;
+			if (facilities.reverse && facilities.reverse != 1)
+				break;
 			x25->facilities = facilities;
-			return 0;
+			rc = 0;
+			break;
 		}
 
 		case SIOCX25GCALLUSERDATA: {
-			struct x25_calluserdata calluserdata;
-			calluserdata = x25->calluserdata;
-			return copy_to_user((void *)arg, &calluserdata, sizeof(calluserdata)) ? -EFAULT : 0;
+			struct x25_calluserdata cud = x25->calluserdata;
+			rc = copy_to_user((void *)arg, &cud, sizeof(cud)) ? -EFAULT : 0;
+			break;
 		}
 
 		case SIOCX25SCALLUSERDATA: {
 			struct x25_calluserdata calluserdata;
+
+			rc = -EFAULT;
 			if (copy_from_user(&calluserdata, (void *)arg, sizeof(calluserdata)))
-				return -EFAULT;
+				break;
+			rc = -EINVAL;
 			if (calluserdata.cudlength > X25_MAX_CUD_LEN)
-				return -EINVAL;
+				break;
 			x25->calluserdata = calluserdata;
-			return 0;
+			rc = 0;
+			break;
 		}
 
 		case SIOCX25GCAUSEDIAG: {
 			struct x25_causediag causediag;
 			causediag = x25->causediag;
-			return copy_to_user((void *)arg, &causediag, sizeof(causediag)) ? -EFAULT : 0;
+			rc = copy_to_user((void *)arg, &causediag, sizeof(causediag)) ? -EFAULT : 0;
+			break;
 		}
 
  		default:
-			return dev_ioctl(cmd, (void *)arg);
+			rc = dev_ioctl(cmd, (void *)arg);
+			break;
 	}
 
-	/*NOTREACHED*/
-	return 0;
+	return rc;
 }
 
 static int x25_get_info(char *buffer, char **start, off_t offset, int length)
@@ -1235,13 +1256,14 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 	struct sock *s;
 	struct net_device *dev;
 	const char *devname;
-	int len = 0;
+	int len;
 	off_t pos = 0;
 	off_t begin = 0;
 
 	cli();
 
-	len += sprintf(buffer, "dest_addr  src_addr   dev   lci st vs vr va   t  t2 t21 t22 t23 Snd-Q Rcv-Q inode\n");
+	len = sprintf(buffer, "dest_addr  src_addr   dev   lci st vs vr va   "
+			      "t  t2 t21 t22 t23 Snd-Q Rcv-Q inode\n");
 
 	for (s = x25_list; s; s = s->next) {
 		x25_cb *x25 = x25_sk(s);
@@ -1251,7 +1273,9 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 		else
 			devname = x25->neighbour->dev->name;
 
-		len += sprintf(buffer + len, "%-10s %-10s %-5s %3.3X  %d  %d  %d  %d %3lu %3lu %3lu %3lu %3lu %5d %5d %ld\n",
+		len += sprintf(buffer + len, "%-10s %-10s %-5s %3.3X  %d  %d  "
+					     "%d  %d %3lu %3lu %3lu %3lu %3lu "
+					     "%5d %5d %ld\n",
 			!x25->dest_addr.x25_addr[0] ? "*" :
 						x25->dest_addr.x25_addr,
 			!x25->source_addr.x25_addr[0] ? "*" :
