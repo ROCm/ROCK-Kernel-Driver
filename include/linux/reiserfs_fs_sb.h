@@ -106,7 +106,6 @@ typedef enum {
 #define JOURNAL_MAX_CNODE   1500 /* max cnodes to allocate. */
 #define JOURNAL_HASH_SIZE 8192   
 #define JOURNAL_NUM_BITMAPS 5 /* number of copies of the bitmaps to have floating.  Must be >= 2 */
-#define JOURNAL_LIST_COUNT 64
 
 /* these are bh_state bit flag offset numbers, for use in the buffer head */
 
@@ -121,6 +120,7 @@ typedef enum {
 */
 #define BH_JPrepared 20		/* block has been prepared for the log */
 #define BH_JRestore_dirty 22    /* restore the dirty bit later */
+#define BH_JTest 23             /* debugging use only */
 
 /* One of these for every block in every transaction
 ** Each one is in two hash tables.  First, a hash of the current transaction, and after journal_end, a
@@ -154,26 +154,6 @@ struct reiserfs_list_bitmap {
 } ;
 
 /*
-** transaction handle which is passed around for all journal calls
-*/
-struct reiserfs_transaction_handle {
-  struct super_block *t_super ; /* super for this FS when journal_begin was
-				   called. saves calls to reiserfs_get_super
-				   also used by nested transactions to make
-				   sure they are nesting on the right FS
-				   _must_ be first in the handle
-				*/
-  int t_refcount;
-  int t_blocks_logged ;         /* number of blocks this writer has logged */
-  int t_blocks_allocated ;      /* number of blocks this writer allocated */
-  unsigned long t_trans_id ;    /* sanity check, equals the current trans id */
-  void *t_handle_save ;		/* save existing current->journal_info */
-  int displace_new_blocks:1;	/* if new block allocation occurres, that block
-				   should be displaced from others */
-
-} ;
-
-/*
 ** one of these for each transaction.  The most important part here is the j_realblock.
 ** this list of cnodes is used to hash all the blocks in all the commits, to mark all the
 ** real buffer heads dirty once all the commits hit the disk,
@@ -181,23 +161,25 @@ struct reiserfs_transaction_handle {
 ** to be overwritten */
 struct reiserfs_journal_list {
   unsigned long j_start ;
+  unsigned long j_state;
   unsigned long j_len ;
   atomic_t j_nonzerolen ;
   atomic_t j_commit_left ;
-  atomic_t j_flushing ;
-  atomic_t j_commit_flushing ;
   atomic_t j_older_commits_done ;      /* all commits older than this on disk*/
+  struct semaphore j_commit_lock;
   unsigned long j_trans_id ;
   time_t j_timestamp ;
   struct reiserfs_list_bitmap *j_list_bitmap ;
   struct buffer_head *j_commit_bh ; /* commit buffer head */
   struct reiserfs_journal_cnode *j_realblock  ;
   struct reiserfs_journal_cnode *j_freedlist ; /* list of buffers that were freed during this trans.  free each of these on flush */
-  wait_queue_head_t j_commit_wait ; /* wait for all the commit blocks to be flushed */
-  wait_queue_head_t j_flush_wait ; /* wait for all the real blocks to be flushed */
-} ;
+  /* time ordered list of all active transactions */
+  struct list_head j_list;
 
-struct reiserfs_page_list  ; /* defined in reiserfs_fs.h */
+  /* time ordered list of all transactions we haven't tried to flush yet */
+  struct list_head j_working_list;
+  int j_refcount;
+} ;
 
 struct reiserfs_journal {
   struct buffer_head ** j_ap_blocks ; /* journal blocks on disk */
@@ -220,16 +202,11 @@ struct reiserfs_journal {
   unsigned long j_last_flush_trans_id ;    /* last fully flushed journal timestamp */
   struct buffer_head *j_header_bh ;   
 
-  /* j_flush_pages must be flushed before the current transaction can
-  ** commit
-  */
-  struct reiserfs_page_list *j_flush_pages ;
   time_t j_trans_start_time ;         /* time this transaction started */
-  wait_queue_head_t j_wait ;         /* wait  journal_end to finish I/O */
-  atomic_t j_wlock ;                       /* lock for j_wait */
+  struct semaphore j_lock;
+  struct semaphore j_flush_sem;
   wait_queue_head_t j_join_wait ;    /* wait for current transaction to finish before starting new one */
   atomic_t j_jlock ;                       /* lock for j_join_wait */
-  int j_journal_list_index ;	      /* journal list number of the current trans */
   int j_list_bitmap_index ;	      /* number of next list bitmap to use */
   int j_must_wait ;		       /* no more journal begins allowed. MUST sleep on j_join_wait */
   int j_next_full_flush ;             /* next journal_end will flush all journal list */
@@ -246,19 +223,37 @@ struct reiserfs_journal {
   struct reiserfs_journal_cnode *j_cnode_free_list ;
   struct reiserfs_journal_cnode *j_cnode_free_orig ; /* orig pointer returned from vmalloc */
 
+  struct reiserfs_journal_list *j_current_jl;
   int j_free_bitmap_nodes ;
   int j_used_bitmap_nodes ;
+
+  int j_num_lists;      /* total number of active transactions */
+  int j_num_work_lists; /* number that need attention from kreiserfsd */
+
+  /* debugging to make sure things are flushed in order */
+  int j_last_flush_id;
+
+  /* debugging to make sure things are committed in order */
+  int j_last_commit_id;
+
   struct list_head j_bitmap_nodes ;
   struct list_head j_dirty_buffers ;
   spinlock_t j_dirty_buffers_lock ; /* protects j_dirty_buffers */
+
+  /* list of all active transactions */
+  struct list_head j_journal_list;
+  /* lists that haven't been touched by writeback attempts */
+  struct list_head j_working_list;
+
   struct reiserfs_list_bitmap j_list_bitmap[JOURNAL_NUM_BITMAPS] ;	/* array of bitmaps to record the deleted blocks */
-  struct reiserfs_journal_list j_journal_list[JOURNAL_LIST_COUNT] ;	    /* array of all the journal lists */
   struct reiserfs_journal_cnode *j_hash_table[JOURNAL_HASH_SIZE] ; 	    /* hash table for real buffer heads in current trans */ 
   struct reiserfs_journal_cnode *j_list_hash_table[JOURNAL_HASH_SIZE] ; /* hash table for all the real buffer heads in all 
   										the transactions */
   struct list_head j_prealloc_list;     /* list of inodes which have preallocated blocks */
   unsigned long j_max_trans_size ;
   unsigned long j_max_batch_size ;
+
+  struct work_struct j_work;
 };
 
 #define JOURNAL_DESC_MAGIC "ReIsErLB" /* ick.  magic string to find desc blocks in the journal */
@@ -417,7 +412,6 @@ struct reiserfs_sb_info
 #define REISERFS_LARGETAIL 0  /* large tails will be created in a session */
 #define REISERFS_SMALLTAIL 17  /* small (for files less than block size) tails will be created in a session */
 #define REPLAYONLY 3 /* replay journal and return 0. Use by fsck */
-#define REISERFS_NOLOG 4      /* -o nolog: turn journalling off */
 #define REISERFS_CONVERT 5    /* -o conv: causes conversion of old
                                  format super block to the new
                                  format. If not specified - old
@@ -473,8 +467,6 @@ struct reiserfs_sb_info
 
 void reiserfs_file_buffer (struct buffer_head * bh, int list);
 extern struct file_system_type reiserfs_fs_type;
-int journal_mark_dirty(struct reiserfs_transaction_handle *, struct super_block *, struct buffer_head *bh) ;
-int flush_old_commits(struct super_block *s, int) ;
 int reiserfs_resize(struct super_block *, unsigned long) ;
 
 #define CARRY_ON                0
@@ -484,8 +476,6 @@ int reiserfs_resize(struct super_block *, unsigned long) ;
 #define SB_BUFFER_WITH_SB(s) (REISERFS_SB(s)->s_sbh)
 #define SB_JOURNAL(s) (REISERFS_SB(s)->s_journal)
 #define SB_JOURNAL_1st_RESERVED_BLOCK(s) (SB_JOURNAL(s)->j_1st_reserved_block)
-#define SB_JOURNAL_LIST(s) (SB_JOURNAL(s)->j_journal_list)
-#define SB_JOURNAL_LIST_INDEX(s) (SB_JOURNAL(s)->j_journal_list_index) 
 #define SB_JOURNAL_LEN_FREE(s) (SB_JOURNAL(s)->j_journal_len_free) 
 #define SB_AP_BITMAP(s) (REISERFS_SB(s)->s_ap_bitmap)
 

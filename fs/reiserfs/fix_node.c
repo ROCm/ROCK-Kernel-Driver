@@ -2106,9 +2106,9 @@ static void tb_buffer_sanity_check (struct super_block * p_s_sb,
 {;}
 #endif
 
-static void clear_all_dirty_bits(struct super_block *s, 
+static int clear_all_dirty_bits(struct super_block *s,
                                  struct buffer_head *bh) {
-  reiserfs_prepare_for_journal(s, bh, 0) ;
+  return reiserfs_prepare_for_journal(s, bh, 0) ;
 }
 
 static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
@@ -2137,11 +2137,11 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 					    p_s_tb->tb_path->path_length - i);
 		}
 #endif
-		clear_all_dirty_bits(p_s_tb->tb_sb, 
-				     PATH_OFFSET_PBUFFER (p_s_tb->tb_path, i)) ;
-
-		if ( buffer_locked (PATH_OFFSET_PBUFFER (p_s_tb->tb_path, i)) )
+		if (!clear_all_dirty_bits(p_s_tb->tb_sb,
+				     PATH_OFFSET_PBUFFER (p_s_tb->tb_path, i)))
+		{
 		    locked = PATH_OFFSET_PBUFFER (p_s_tb->tb_path, i);
+		}
 	    }
 	}
 
@@ -2151,22 +2151,19 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 
 		if ( p_s_tb->L[i] ) {
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->L[i], "L", i);
-		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->L[i]) ;
-		    if ( buffer_locked (p_s_tb->L[i]) )
+		    if (!clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->L[i]))
 			locked = p_s_tb->L[i];
 		}
 
 		if ( !locked && p_s_tb->FL[i] ) {
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->FL[i], "FL", i);
-		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FL[i]) ;
-		    if ( buffer_locked (p_s_tb->FL[i]) )
+		    if (!clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FL[i]))
 			locked = p_s_tb->FL[i];
 		}
 
 		if ( !locked && p_s_tb->CFL[i] ) {
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->CFL[i], "CFL", i);
-		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->CFL[i]) ;
-		    if ( buffer_locked (p_s_tb->CFL[i]) )
+		    if (!clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->CFL[i]))
 			locked = p_s_tb->CFL[i];
 		}
 
@@ -2176,23 +2173,20 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 
 		if ( p_s_tb->R[i] ) {
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->R[i], "R", i);
-		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->R[i]) ;
-		    if ( buffer_locked (p_s_tb->R[i]) )
+		    if (!clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->R[i]))
 			locked = p_s_tb->R[i];
 		}
 
        
 		if ( !locked && p_s_tb->FR[i] ) {
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->FR[i], "FR", i);
-		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FR[i]) ;
-		    if ( buffer_locked (p_s_tb->FR[i]) )
+		    if (!clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FR[i]))
 			locked = p_s_tb->FR[i];
 		}
 
 		if ( !locked && p_s_tb->CFR[i] ) {
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->CFR[i], "CFR", i);
-		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->CFR[i]) ;
-		    if ( buffer_locked (p_s_tb->CFR[i]) )
+		    if (!clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->CFR[i]))
 			locked = p_s_tb->CFR[i];
 		}
 	    }
@@ -2207,10 +2201,8 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 	*/
 	for ( i = 0; !locked && i < MAX_FEB_SIZE; i++ ) { 
 	    if ( p_s_tb->FEB[i] ) {
-		clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FEB[i]) ;
-		if (buffer_locked(p_s_tb->FEB[i])) {
+		if (!clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FEB[i]))
 		    locked = p_s_tb->FEB[i] ;
-		}
 	    }
 	}
 

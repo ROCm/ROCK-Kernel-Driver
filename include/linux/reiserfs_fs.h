@@ -1702,23 +1702,39 @@ struct reiserfs_journal_header {
 	 (((block)<<(JBH_HASH_SHIFT - 6)) ^ ((block) >> 13) ^ ((block) << (JBH_HASH_SHIFT - 12))))
 #define journal_hash(t,sb,block) ((t)[_jhashfn((sb),(block)) & JBH_HASH_MASK])
 
-/* finds n'th buffer with 0 being the start of this commit.  Needs to go away, j_ap_blocks has changed
-** since I created this.  One chunk of code in journal.c needs changing before deleting it
-*/
-#define JOURNAL_BUFFER(j,n) ((j)->j_ap_blocks[((j)->j_start + (n)) % JOURNAL_BLOCK_COUNT])
-
 // We need these to make journal.c code more readable
 #define journal_find_get_block(s, block) __find_get_block(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
 #define journal_getblk(s, block) __getblk(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
 #define journal_bread(s, block) __bread(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
 
+/*
+** transaction handle which is passed around for all journal calls
+*/
+struct reiserfs_transaction_handle {
+  struct super_block *t_super ; /* super for this FS when journal_begin was
+				   called. saves calls to reiserfs_get_super
+				   also used by nested transactions to make
+				   sure they are nesting on the right FS
+				   _must_ be first in the handle
+				*/
+  int t_refcount;
+  int t_blocks_logged ;         /* number of blocks this writer has logged */
+  int t_blocks_allocated ;      /* number of blocks this writer allocated */
+  unsigned long t_trans_id ;    /* sanity check, equals the current trans id */
+  void *t_handle_save ;		/* save existing current->journal_info */
+  int displace_new_blocks:1;	/* if new block allocation occurres, that block
+				   should be displaced from others */
+} ;
+
+int journal_mark_dirty(struct reiserfs_transaction_handle *, struct super_block *, struct buffer_head *bh) ;
+int reiserfs_flush_old_commits(struct super_block *);
 void reiserfs_commit_for_inode(struct inode *) ;
 void reiserfs_update_inode_transaction(struct inode *) ;
 void reiserfs_wait_on_write_block(struct super_block *s) ;
 void reiserfs_block_writes(struct reiserfs_transaction_handle *th) ;
 void reiserfs_allow_writes(struct super_block *s) ;
 void reiserfs_check_lock_depth(char *caller) ;
-void reiserfs_prepare_for_journal(struct super_block *, struct buffer_head *bh, int wait) ;
+int reiserfs_prepare_for_journal(struct super_block *, struct buffer_head *bh, int wait) ;
 void reiserfs_restore_prepared_buffer(struct super_block *, struct buffer_head *bh) ;
 int journal_init(struct super_block *, const char * j_dev_name, int old_format, unsigned int) ;
 int journal_release(struct reiserfs_transaction_handle*, struct super_block *) ;
@@ -1730,7 +1746,6 @@ int journal_mark_freed(struct reiserfs_transaction_handle *, struct super_block 
 int journal_transaction_should_end(struct reiserfs_transaction_handle *, int) ;
 int reiserfs_in_journal(struct super_block *p_s_sb, int bmap_nr, int bit_nr, int searchall, b_blocknr_t *next) ;
 int journal_begin(struct reiserfs_transaction_handle *, struct super_block *p_s_sb, unsigned long) ;
-void flush_async_commits(struct super_block *p_s_sb) ;
 
 int buffer_journaled(const struct buffer_head *bh) ;
 int mark_buffer_journal_new(struct buffer_head *bh) ;

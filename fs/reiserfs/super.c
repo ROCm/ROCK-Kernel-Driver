@@ -59,22 +59,26 @@ static int is_any_reiserfs_magic_string (struct reiserfs_super_block * rs)
 static int reiserfs_remount (struct super_block * s, int * flags, char * data);
 static int reiserfs_statfs (struct super_block * s, struct kstatfs * buf);
 
-static void reiserfs_write_super (struct super_block * s)
+static void reiserfs_sync_fs (struct super_block * s)
 {
+    if (!(s->s_flags & MS_RDONLY)) {
+        struct reiserfs_transaction_handle th;
+	reiserfs_write_lock(s);
+	journal_begin(&th, s, 1);
+	journal_end_sync(&th, s, 1);
+	reiserfs_flush_old_commits(s);
+	s->s_dirt = 0;
+	reiserfs_write_unlock(s);
+    }
+}
 
-  int dirty = 0 ;
-  reiserfs_write_lock(s);
-  if (!(s->s_flags & MS_RDONLY)) {
-    dirty = flush_old_commits(s, 1) ;
-  }
-  s->s_dirt = dirty;
-  reiserfs_write_unlock(s);
+static void reiserfs_write_super(struct super_block *s)
+{
+    reiserfs_sync_fs(s);
 }
 
 static void reiserfs_write_super_lockfs (struct super_block * s)
 {
-
-  int dirty = 0 ;
   struct reiserfs_transaction_handle th ;
   reiserfs_write_lock(s);
   if (!(s->s_flags & MS_RDONLY)) {
@@ -84,7 +88,7 @@ static void reiserfs_write_super_lockfs (struct super_block * s)
     reiserfs_block_writes(&th) ;
     journal_end(&th, s, 1) ;
   }
-  s->s_dirt = dirty;
+  s->s_dirt = 0;
   reiserfs_write_unlock(s);
 }
 
@@ -805,7 +809,6 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
     set_sb_umount_state( rs, REISERFS_SB(s)->s_mount_state );
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
-    s->s_dirt = 0;
   } else {
     /* remount read-write */
     if (!(s->s_flags & MS_RDONLY))
@@ -822,12 +825,12 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
     set_sb_umount_state( rs, REISERFS_ERROR_FS );
     /* mark_buffer_dirty (SB_BUFFER_WITH_SB (s), 1); */
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
-    s->s_dirt = 0;
     REISERFS_SB(s)->s_mount_state = REISERFS_VALID_FS ;
   }
   /* this will force a full flush of all journal lists */
   SB_JOURNAL(s)->j_must_wait = 1 ;
   journal_end(&th, s, 10) ;
+  s->s_dirt = 0;
 
   if (!( *mount_flags & MS_RDONLY ) )
     finish_unfinished( s );
@@ -1392,8 +1395,6 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 	
 	/* look for files which were to be removed in previous session */
 	finish_unfinished (s);
-
-	s->s_dirt = 0;
     } else {
 	if ( old_format_only(s) && !silent) {
 	    reiserfs_warning("reiserfs: using 3.5.x disk format\n") ;

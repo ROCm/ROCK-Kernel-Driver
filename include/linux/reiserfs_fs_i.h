@@ -3,6 +3,8 @@
 
 #include <linux/list.h>
 
+struct reiserfs_journal_list;
+
 /** bitmasks for i_flags field in reiserfs-specific part of inode */
 typedef enum {
     /** this says what format of key do all items (but stat data) of
@@ -48,7 +50,7 @@ struct reiserfs_inode_info {
     ** needs to be committed in order for this inode to be properly
     ** flushed */
     unsigned long i_trans_id ;
-    unsigned long i_trans_index ;
+    struct reiserfs_journal_list *i_jl;
     struct inode vfs_inode;
 };
 

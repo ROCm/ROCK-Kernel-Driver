@@ -964,7 +964,7 @@ static void init_inode (struct inode * inode, struct path * path)
     REISERFS_I(inode)->i_prealloc_block = 0;
     REISERFS_I(inode)->i_prealloc_count = 0;
     REISERFS_I(inode)->i_trans_id = 0;
-    REISERFS_I(inode)->i_trans_index = 0;
+    REISERFS_I(inode)->i_jl = NULL;
 
     if (stat_data_v1 (ih)) {
 	struct stat_data_v1 * sd = (struct stat_data_v1 *)B_I_PITEM (bh, ih);
@@ -1621,7 +1621,7 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     REISERFS_I(inode)->i_prealloc_block = 0;
     REISERFS_I(inode)->i_prealloc_count = 0;
     REISERFS_I(inode)->i_trans_id = 0;
-    REISERFS_I(inode)->i_trans_index = 0;
+    REISERFS_I(inode)->i_jl = 0;
     REISERFS_I(inode)->i_attrs =
 	REISERFS_I(dir)->i_attrs & REISERFS_INHERIT_MASK;
     sd_attrs_to_i_attrs( REISERFS_I(inode) -> i_attrs, inode );
