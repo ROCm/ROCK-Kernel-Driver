@@ -24,6 +24,7 @@
 ** 1998/08/30 David Kilzer: Added support for font_desc structures
 **            for linux-2.1.115
 ** 9/02/11  Richard Zidlicky: added Q40 support (initial vesion 99/01/01)
+** 2004/05/13 Kars de Jong: Finalised HP300 support
 **
 ** This file is subject to the terms and conditions of the GNU General Public
 ** License. See the file README.legal in the main directory of this archive
@@ -313,9 +314,6 @@
 #ifdef CONFIG_Q40
 .globl q40_mem_cptr
 #endif
-#ifdef CONFIG_HP300
-.globl hp300_phys_ram_base
-#endif
 
 CPUTYPE_040	= 1	/* indicates an 040 */
 CPUTYPE_060	= 2	/* indicates an 060 */
@@ -467,7 +465,7 @@ func_define	mmu_get_ptr_table_entry,2
 func_define	mmu_get_page_table_entry,2
 func_define	mmu_print
 func_define	get_new_page
-#ifdef CONFIG_HP300
+#if defined(CONFIG_HP300) || defined(CONFIG_APOLLO)
 func_define	set_leds
 #endif
 
@@ -594,6 +592,7 @@ ENTRY(_stext)
 	.long	MACH_BVME6000, BVME6000_BOOTI_VERSION
 	.long	MACH_MAC, MAC_BOOTI_VERSION
 	.long	MACH_Q40, Q40_BOOTI_VERSION
+	.long	MACH_HP300, HP300_BOOTI_VERSION
 	.long	0
 1:	jra	__start
 
@@ -605,65 +604,6 @@ ENTRY(_start)
 	jra	__start
 __INIT
 ENTRY(__start)
-
-#ifdef CONFIG_HP300
-/* This is a hack.  The HP NetBSD bootloader loads us at an arbitrary
-   address (apparently 0xff002000 in practice) which is not good if we need
-   to be able to map this to VA 0x1000.  We could do it with pagetables but
-   a better solution seems to be to relocate the kernel in physical memory
-   before we start.
-
-   So, we copy the entire kernel image (code+data+bss) down to the 16MB
-   boundary that marks the start of RAM.  This is slightly tricky because
-   we must not overwrite the copying code itself. :-)  */
-
-/* 15/5/98.  The start address of physical RAM changes depending on how much
-   RAM is present.  This is actually a blessing in disguise as it provides
-   a way for us to work out the RAM size rather than hardwiring it.  */
-
-	lea	%pc@(_start),%a0
-	movel	%a0,%d6
-	and	#0xffff0000, %d6
-	lea	%pc@(hp300_phys_ram_base),%a0
-	movel	%d6, %a0@
-	movel	%pc@(L(custom)),%a3
-	moveb	#0xfe,%d7
-	moveb	%d7,%a3@(0x1ffff)
-	lea	%pc@(Lcopystart),%a0
-	lea	%pc@(Lcopyend),%a1
-	movel	%d6,%a2			/* Start of physical RAM */
-1:	moveb	%a0@+,%d0
-	moveb	%d0,%a2@+
-	cmpl	%a0,%a1
-	jbne	1b
-	movel	%d6,%a2
-	moveb	#0xfd,%d7
-	moveb	%d7,%a3@(0x1ffff)
-	lea	%pc@(_stext),%a0
-	lea	%pc@(_end),%a1
-	jmp	%a2@
-
-Lcopystart:
-	moveb	#0xf7,%d7
-	moveb	%d7,%a3@(0x1ffff)
-	movel	%d6,%a2	/* Start of kernel */
-	add	#0x1000,%a2
-1:	moveb	%a0@+,%d0
-	moveb	%d0,%a2@+
-	cmpl	%a0,%a1
-	jbne	1b
-	moveb	#0,%d7
-	moveb	%d7,%a3@(0x1ffff)
-	movel	%d6,%a0
-	addl	#Lstart1,%a0
-	jmp	%a0@
-Lcopyend:
-
-Lstart1:
-	moveb	#0x3f,%d7
-	moveb	%d7,%a3@(0x1ffff)
-#endif /* CONFIG_HP300 */
-
 /*
  * Setup initial stack pointer
  */
@@ -672,8 +612,6 @@ Lstart1:
 /*
  * Record the CPU and machine type.
  */
-
-#ifndef CONFIG_HP300
 	get_bi_record	BI_MACHTYPE
 	lea	%pc@(m68k_machtype),%a1
 	movel	%a0@,%a1@
@@ -689,23 +627,8 @@ Lstart1:
 	get_bi_record	BI_CPUTYPE
 	lea	%pc@(m68k_cputype),%a1
 	movel	%a0@,%a1@
-#else /* CONFIG_HP300 */
-	/* FIXME HP300 doesn't use bootinfo yet */
-	movel	#MACH_HP300,%d4
-	lea	%pc@(m68k_machtype),%a0
-	movel	%d4,%a0@
-	movel	#FPU_68881,%d0
-	lea	%pc@(m68k_fputype),%a0
-	movel	%d0,%a0@
-	movel	#MMU_68030,%d0
-	lea	%pc@(m68k_mmutype),%a0
-	movel	%d0,%a0@
-	movel	#CPU_68030,%d0
-	lea	%pc@(m68k_cputype),%a0
-	movel	%d0,%a0@
 
-	leds(0x1)
-#endif /* CONFIG_HP300 */
+	leds	0x1
 
 #ifdef CONFIG_MAC
 /*
@@ -956,6 +879,26 @@ L(gvtdone):
 
 #endif
 
+#ifdef CONFIG_HP300
+	is_not_hp300(L(nothp))
+
+	/* Get the address of the UART for serial debugging */
+	get_bi_record	BI_HP300_UART_ADDR
+	tstl	%d0
+	jbmi	1f
+	movel	%a0@,%d3
+	lea	%pc@(L(uartbase)),%a0
+	movel	%d3,%a0@
+	get_bi_record	BI_HP300_UART_SCODE
+	tstl	%d0
+	jbmi	1f
+	movel	%a0@,%d3
+	lea	%pc@(L(uart_scode)),%a0
+	movel	%d3,%a0@
+1:
+L(nothp):
+#endif
+
 /*
  * Initialize serial port
  */
@@ -979,9 +922,7 @@ L(nocon):
 
 	putc	'\n'
 	putc	'A'
-#ifdef CONFIG_HP300
-	leds(0x2)
-#endif /* CONFIG_HP300 */
+	leds	0x2
 	dputn	%pc@(L(cputype))
 	dputn	%pc@(m68k_supervisor_cachemode)
 	dputn	%pc@(m68k_pgtable_cachemode)
@@ -1124,16 +1065,30 @@ L(notq40):
 #ifdef CONFIG_HP300
 	is_not_hp300(L(nothp300))
 
-/* On the HP300, we map the ROM, INTIO and DIO regions (phys. 0x00xxxxxx)
-   by mapping 32MB from 0xf0xxxxxx -> 0x00xxxxxx) using an 030 early
-   termination page descriptor.  The ROM mapping is needed because the LEDs
-   are mapped there too.  */
+	/* On the HP300, we map the ROM, INTIO and DIO regions (phys. 0x00xxxxxx)
+	 * by mapping 32MB (on 020/030) or 16 MB (on 040) from 0xf0xxxxxx -> 0x00xxxxxx).
+	 * The ROM mapping is needed because the LEDs are mapped there too.
+	 */
 
+	is_040(1f)
+
+	/*
+	 * 030: Map the 32Meg range physical 0x0 upto logical 0xf000.0000
+	 */
 	mmu_map	#0xf0000000,#0,#0x02000000,#_PAGE_NOCACHE030
 
-L(nothp300):
+	jbra	L(mmu_init_done)
 
-#endif
+1:
+	/*
+	 * 040: Map the 16Meg range physical 0x0 upto logical 0xf000.0000
+	 */
+	mmu_map #0xf0000000,#0,#0x01000000,#_PAGE_NOCACHE_S
+
+	jbra	L(mmu_init_done)
+
+L(nothp300):
+#endif /* CONFIG_HP300 */
 
 #ifdef CONFIG_MVME147
 
@@ -1480,15 +1435,23 @@ L(mmu_fixup_done):
 #ifdef CONFIG_HP300
 	is_not_hp300(1f)
 	/*
-	 * Fix up the custom register to point to the new location of the LEDs.
+	 * Fix up the iobase register to point to the new location of the LEDs.
 	 */
-	movel	#0xf0000000,L(custom)
+	movel	#0xf0000000,L(iobase)
 
 	/*
 	 * Energise the FPU and caches.
 	 */
+	is_040(1f)
 	movel	#0x60,0xf05f400c
-1:
+	jbra	2f
+
+	/*
+	 * 040: slightly different, apparently.
+	 */
+1:	movew	#0,0xf05f400e
+	movew	#0x64,0xf05f400e
+2:
 #endif
 
 #ifdef CONFIG_SUN3X
@@ -1585,7 +1548,6 @@ func_start	get_bi_record,%d1
 
 	movel	ARG1,%d0
 	lea	%pc@(_end),%a0
-#ifndef CONFIG_HP300
 1:	tstw	%a0@(BIR_TAG)
 	jeq	3f
 	cmpw	%a0@(BIR_TAG),%d0
@@ -1599,7 +1561,6 @@ func_start	get_bi_record,%d1
 3:	moveq	#-1,%d0
 	lea	%a0@(BIR_SIZE),%a0
 4:
-#endif /* CONFIG_HP300 */
 func_return	get_bi_record
 
 
@@ -3013,6 +2974,10 @@ L(serial_init_not_mac):
 /* We count on the PROM initializing SIO1 */
 #endif
 
+#ifdef CONFIG_HP300
+/* We count on the boot loader initialising the UART */
+#endif
+
 L(serial_init_done):
 func_return	serial_init
 
@@ -3205,9 +3170,31 @@ func_start	serial_putc,%d0/%d1/%a0/%a1
 1:      moveb   %a1@(LSRB0),%d0
 	andb	#0x4,%d0
 	beq	1b
+	jbra	L(serial_putc_done)
 2:
 #endif
 
+#ifdef CONFIG_HP300
+	is_not_hp300(3f)
+	movl    %pc@(L(iobase)),%a1
+	addl	%pc@(L(uartbase)),%a1
+	movel	%pc@(L(uart_scode)),%d1	/* Check the scode */
+	jmi	3f			/* Unset? Exit */
+	cmpi	#256,%d1		/* APCI scode? */
+	jeq	2f
+1:      moveb   %a1@(DCALSR),%d1	/* Output to DCA */
+	andb	#0x20,%d1
+	beq	1b
+	moveb	%d0,%a1@(DCADATA)
+	jbra	L(serial_putc_done)
+2:	moveb	%a1@(APCILSR),%d1	/* Output to APCI */
+	andb	#0x20,%d1
+	beq	2b
+	moveb	%d0,%a1@(APCIDATA)
+	jbra	L(serial_putc_done)
+3:
+#endif
+	
 L(serial_putc_done):
 func_return	serial_putc
 
@@ -3295,7 +3282,7 @@ func_start	set_leds,%d0/%a0
 	movel	ARG1,%d0
 #ifdef CONFIG_HP300
 	is_not_hp300(1f)
-	movel	%pc@(L(custom)),%a0
+	movel	%pc@(L(iobase)),%a0
 	moveb	%d0,%a0@(0x1ffff)
 	jra	2f
 #endif
@@ -3829,10 +3816,6 @@ L(showtest):
 __INITDATA
 	.align	4
 
-#ifdef CONFIG_HP300
-hp300_phys_ram_base:
-#endif
-
 #if defined(CONFIG_ATARI) || defined(CONFIG_AMIGA) || \
     defined(CONFIG_HP300) || defined(CONFIG_APOLLO)
 L(custom):
@@ -3922,6 +3905,17 @@ L(mac_sccbase):
 LSRB0        = 0x10412
 LTHRB0       = 0x10416
 LCPUCTRL     = 0x10100
+#endif
+
+#if defined(CONFIG_HP300)
+DCADATA	     = 0x11
+DCALSR	     = 0x1b
+APCIDATA     = 0x00
+APCILSR      = 0x14
+L(uartbase):
+	.long	0
+L(uart_scode):
+	.long	-1
 #endif
 
 __FINIT
