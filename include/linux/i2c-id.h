@@ -87,18 +87,19 @@
 #define I2C_DRIVERID_TDA8444	39     /* octuple 6-bit DAC             */
 #define I2C_DRIVERID_BT819	40     /* video decoder			*/
 #define I2C_DRIVERID_BT856	41     /* video encoder			*/
-#define I2C_DRIVERID_VPX32XX	42     /* video decoder+vbi/vtxt	*/
+#define I2C_DRIVERID_VPX3220	42     /* video decoder+vbi/vtxt	*/
 #define I2C_DRIVERID_DRP3510	43     /* ADR decoder (Astra Radio)	*/
 #define I2C_DRIVERID_SP5055	44     /* Satellite tuner		*/
 #define I2C_DRIVERID_STV0030	45     /* Multipurpose switch		*/
 #define I2C_DRIVERID_SAA7108	46     /* video decoder, image scaler   */
 #define I2C_DRIVERID_DS1307	47     /* DS1307 real time clock	*/
-#define I2C_DRIVERID_ADV717x	48     /* ADV 7175/7176 video encoder	*/
-#define I2C_DRIVERID_ZR36067	49     /* Zoran 36067 video encoder	*/
+#define I2C_DRIVERID_ADV7175	48     /* ADV 7175/7176 video encoder	*/
+#define I2C_DRIVERID_SAA7114	49	/* video decoder		*/
 #define I2C_DRIVERID_ZR36120	50     /* Zoran 36120 video encoder	*/
 #define I2C_DRIVERID_24LC32A	51	/* Microchip 24LC32A 32k EEPROM	*/
 #define I2C_DRIVERID_STM41T00	52	/* real time clock		*/
 #define I2C_DRIVERID_UDA1342	53	/* UDA1342 audio codec		*/
+#define I2C_DRIVERID_ADV7170	54	/* video encoder		*/
 
 
 
@@ -218,6 +219,7 @@
 #define I2C_HW_B_IXP2000 0x16	/* GPIO on IXP2000 systems              */
 #define I2C_HW_B_IXP425 0x17	/* GPIO on IXP425 systems		*/
 #define I2C_HW_B_S3VIA	0x18	/* S3Via ProSavage adapter		*/
+#define I2C_HW_B_ZR36067 0x19	/* Zoran-36057/36067 based boards	*/
 
 /* --- PCF 8584 based algorithms					*/
 #define I2C_HW_P_LP	0x00	/* Parallel port interface		*/
