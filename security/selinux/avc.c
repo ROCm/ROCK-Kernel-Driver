@@ -21,6 +21,7 @@
 #include <linux/dcache.h>
 #include <linux/init.h>
 #include <linux/skbuff.h>
+#include <linux/percpu.h>
 #include <net/sock.h>
 #include <linux/un.h>
 #include <net/af_unix.h>
@@ -38,9 +39,19 @@
 #include "av_perm_to_string.h"
 #include "objsec.h"
 
-#define AVC_CACHE_SLOTS		512
-#define AVC_CACHE_THRESHOLD	512
-#define AVC_CACHE_RECLAIM	16
+#define AVC_CACHE_SLOTS			512
+#define AVC_DEF_CACHE_THRESHOLD		512
+#define AVC_CACHE_RECLAIM		16
+
+#ifdef CONFIG_SECURITY_SELINUX_AVC_STATS
+#define avc_cache_stats_incr(field) 				\
+do {								\
+	per_cpu(avc_cache_stats, get_cpu()).field++;		\
+	put_cpu();						\
+} while (0)
+#else
+#define avc_cache_stats_incr(field)	do {} while (0)
+#endif
 
 struct avc_entry {
 	u32			ssid;
@@ -76,8 +87,14 @@ struct avc_callback_node {
 	struct avc_callback_node *next;
 };
 
+/* Exported via selinufs */
+unsigned int avc_cache_threshold = AVC_DEF_CACHE_THRESHOLD;
+
+#ifdef CONFIG_SECURITY_SELINUX_AVC_STATS
+DEFINE_PER_CPU(struct avc_cache_stats, avc_cache_stats) = { 0 };
+#endif
+
 static struct avc_cache avc_cache;
-static unsigned avc_cache_stats[AVC_NSTATS];
 static struct avc_callback_node *avc_callbacks;
 static kmem_cache_t *avc_node_cachep;
 
@@ -85,24 +102,6 @@ static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
 {
 	return (ssid ^ (tsid<<2) ^ (tclass<<4)) & (AVC_CACHE_SLOTS - 1);
 }
-
-#ifdef AVC_CACHE_STATS
-static inline void avc_cache_stats_incr(int type)
-{
-	avc_cache_stats[type]++;
-}
-
-static inline void avc_cache_stats_add(int type, unsigned val)
-{
-	avc_cache_stats[type] += val;
-}
-#else
-static inline void avc_cache_stats_incr(int type)
-{ }
-
-static inline void avc_cache_stats_add(int type, unsigned val)
-{ }
-#endif
 
 /**
  * avc_dump_av - Display an access vector in human-readable form.
@@ -208,8 +207,7 @@ void __init avc_init(void)
 	audit_log(current->audit_context, "AVC INITIALIZED\n");
 }
 
-#if 0
-static void avc_hash_eval(char *tag)
+int avc_get_hash_stats(char *page)
 {
 	int i, chain_len, max_chain_len, slots_used;
 	struct avc_node *node;
@@ -231,20 +229,17 @@ static void avc_hash_eval(char *tag)
 
 	rcu_read_unlock();
 
-	printk(KERN_INFO "\n");
-	printk(KERN_INFO "%s avc:  %d entries and %d/%d buckets used, longest "
-	       "chain length %d\n", tag, atomic_read(&avc_cache.active_nodes),
-		slots_used, AVC_CACHE_SLOTS, max_chain_len);
+	return scnprintf(page, PAGE_SIZE, "entries: %d\nbuckets used: %d/%d\n"
+			 "longest chain: %d\n",
+			 atomic_read(&avc_cache.active_nodes),
+			 slots_used, AVC_CACHE_SLOTS, max_chain_len);
 }
-#else
-static inline void avc_hash_eval(char *tag)
-{ }
-#endif
 
 static void avc_node_free(struct rcu_head *rhead)
 {
 	struct avc_node *node = container_of(rhead, struct avc_node, rhead);
 	kmem_cache_free(avc_node_cachep, node);
+	avc_cache_stats_incr(frees);
 }
 
 static void avc_node_delete(struct avc_node *node)
@@ -284,6 +279,7 @@ static inline int avc_reclaim_node(void)
 			if (atomic_dec_and_test(&node->ae.used)) {
 				/* Recently Unused */
 				avc_node_delete(node);
+				avc_cache_stats_incr(reclaims);
 				ecx++;
 				if (ecx >= AVC_CACHE_RECLAIM) {
 					spin_unlock_irqrestore(&avc_cache.slots_lock[hvalue], flags);
@@ -309,8 +305,9 @@ static struct avc_node *avc_alloc_node(void)
 	INIT_RCU_HEAD(&node->rhead);
 	INIT_LIST_HEAD(&node->list);
 	atomic_set(&node->ae.used, 1);
+	avc_cache_stats_incr(allocations);
 
-	if (atomic_inc_return(&avc_cache.active_nodes) > AVC_CACHE_THRESHOLD)
+	if (atomic_inc_return(&avc_cache.active_nodes) > avc_cache_threshold)
 		avc_reclaim_node();
 
 out:
@@ -325,12 +322,10 @@ static void avc_node_populate(struct avc_node *node, u32 ssid, u32 tsid, u16 tcl
 	memcpy(&node->ae.avd, &ae->avd, sizeof(node->ae.avd));
 }
 
-static inline struct avc_node *avc_search_node(u32 ssid, u32 tsid,
-                                               u16 tclass, int *probes)
+static inline struct avc_node *avc_search_node(u32 ssid, u32 tsid, u16 tclass)
 {
 	struct avc_node *node, *ret = NULL;
 	int hvalue;
-	int tprobes = 1;
 
 	hvalue = avc_hash(ssid, tsid, tclass);
 	list_for_each_entry_rcu(node, &avc_cache.slots[hvalue], list) {
@@ -340,7 +335,6 @@ static inline struct avc_node *avc_search_node(u32 ssid, u32 tsid,
 			ret = node;
 			break;
 		}
-		tprobes++;
 	}
 
 	if (ret == NULL) {
@@ -349,8 +343,6 @@ static inline struct avc_node *avc_search_node(u32 ssid, u32 tsid,
 	}
 
 	/* cache hit */
-	if (probes)
-		*probes = tprobes;
 	if (atomic_read(&ret->ae.used) != 1)
 		atomic_set(&ret->ae.used, 1);
 out:
@@ -374,19 +366,17 @@ out:
 static struct avc_node *avc_lookup(u32 ssid, u32 tsid, u16 tclass, u32 requested)
 {
 	struct avc_node *node;
-	int probes;
 
-	avc_cache_stats_incr(AVC_CAV_LOOKUPS);
-	node = avc_search_node(ssid, tsid, tclass,&probes);
+	avc_cache_stats_incr(lookups);
+	node = avc_search_node(ssid, tsid, tclass);
 
 	if (node && ((node->ae.avd.decided & requested) == requested)) {
-		avc_cache_stats_incr(AVC_CAV_HITS);
-		avc_cache_stats_add(AVC_CAV_PROBES,probes);
+		avc_cache_stats_incr(hits);
 		goto out;
 	}
 
 	node = NULL;
-	avc_cache_stats_incr(AVC_CAV_MISSES);
+	avc_cache_stats_incr(misses);
 out:
 	return node;
 }
@@ -939,17 +929,12 @@ int avc_ss_reset(u32 seqno)
 	unsigned long flag;
 	struct avc_node *node;
 
-	avc_hash_eval("reset");
-
 	for (i = 0; i < AVC_CACHE_SLOTS; i++) {
 		spin_lock_irqsave(&avc_cache.slots_lock[i], flag);
 		list_for_each_entry(node, &avc_cache.slots[i], list)
 			avc_node_delete(node);
 		spin_unlock_irqrestore(&avc_cache.slots_lock[i], flag);
 	}
-
-	for (i = 0; i < AVC_NSTATS; i++)
-		avc_cache_stats[i] = 0;
 
 	for (c = avc_callbacks; c; c = c->next) {
 		if (c->events & AVC_CALLBACK_RESET) {
@@ -1034,7 +1019,6 @@ int avc_has_perm_noaudit(u32 ssid, u32 tsid,
 	u32 denied;
 
 	rcu_read_lock();
-	avc_cache_stats_incr(AVC_ENTRY_LOOKUPS);
 
 	node = avc_lookup(ssid, tsid, tclass, requested);
 	if (!node) {

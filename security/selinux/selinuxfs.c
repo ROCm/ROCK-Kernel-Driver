@@ -3,6 +3,7 @@
  * 	Added conditional policy language extensions
  *
  * Copyright (C) 2003 - 2004 Tresys Technology, LLC
+ * Copyright (C) 2004 Red Hat, Inc., James Morris <jmorris@redhat.com>
  *	This program is free software; you can redistribute it and/or modify
  *  	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation, version 2.
@@ -18,6 +19,8 @@
 #include <linux/string.h>
 #include <linux/security.h>
 #include <linux/major.h>
+#include <linux/seq_file.h>
+#include <linux/percpu.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 
@@ -66,7 +69,8 @@ enum sel_inos {
 	SEL_POLICYVERS,	/* return policy version for this kernel */
 	SEL_COMMIT_BOOLS, /* commit new boolean values */
 	SEL_MLS,	/* return if MLS policy is enabled */
-	SEL_DISABLE	/* disable SELinux until next reboot */
+	SEL_DISABLE,	/* disable SELinux until next reboot */
+	SEL_AVC,	/* AVC management directory */
 };
 
 #define TMPBUFLEN	12
@@ -887,6 +891,213 @@ err:
 
 struct dentry *selinux_null = NULL;
 
+static ssize_t sel_read_avc_cache_threshold(struct file *filp, char __user *buf,
+					    size_t count, loff_t *ppos)
+{
+	char tmpbuf[TMPBUFLEN];
+	ssize_t length;
+
+	length = scnprintf(tmpbuf, TMPBUFLEN, "%u", avc_cache_threshold);
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
+}
+
+static ssize_t sel_write_avc_cache_threshold(struct file * file,
+					     const char __user * buf,
+					     size_t count, loff_t *ppos)
+
+{
+	char *page;
+	ssize_t ret;
+	int new_value;
+
+	if (count < 0 || count >= PAGE_SIZE) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	if (*ppos != 0) {
+		/* No partial writes. */
+		ret = -EINVAL;
+		goto out;
+	}
+
+	page = (char*)get_zeroed_page(GFP_KERNEL);
+	if (!page) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	if (copy_from_user(page, buf, count)) {
+		ret = -EFAULT;
+		goto out_free;
+	}
+
+	if (sscanf(page, "%u", &new_value) != 1) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (new_value != avc_cache_threshold) {
+		ret = task_has_security(current, SECURITY__SETSECPARAM);
+		if (ret)
+			goto out_free;
+		avc_cache_threshold = new_value;
+	}
+	ret = count;
+out_free:
+	free_page((unsigned long)page);
+out:
+	return ret;
+}
+
+static ssize_t sel_read_avc_hash_stats(struct file *filp, char __user *buf,
+				       size_t count, loff_t *ppos)
+{
+	char *page;
+	ssize_t ret = 0;
+
+	page = (char *)__get_free_page(GFP_KERNEL);
+	if (!page) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	ret = avc_get_hash_stats(page);
+	if (ret >= 0)
+		ret = simple_read_from_buffer(buf, count, ppos, page, ret);
+	free_page((unsigned long)page);
+out:
+	return ret;
+}
+
+static struct file_operations sel_avc_cache_threshold_ops = {
+	.read		= sel_read_avc_cache_threshold,
+	.write		= sel_write_avc_cache_threshold,
+};
+
+static struct file_operations sel_avc_hash_stats_ops = {
+	.read		= sel_read_avc_hash_stats,
+};
+
+#ifdef CONFIG_SECURITY_SELINUX_AVC_STATS
+static struct avc_cache_stats *sel_avc_get_stat_idx(loff_t *idx)
+{
+	int cpu;
+
+	for (cpu = *idx; cpu < NR_CPUS; ++cpu) {
+		if (!cpu_possible(cpu))
+			continue;
+		*idx = cpu + 1;
+		return &per_cpu(avc_cache_stats, cpu);
+	}
+	return NULL;
+}
+
+static void *sel_avc_stats_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	loff_t n = *pos - 1;
+
+	if (*pos == 0)
+		return SEQ_START_TOKEN;
+
+	return sel_avc_get_stat_idx(&n);
+}
+
+static void *sel_avc_stats_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	return sel_avc_get_stat_idx(pos);
+}
+
+static int sel_avc_stats_seq_show(struct seq_file *seq, void *v)
+{
+	struct avc_cache_stats *st = v;
+
+	if (v == SEQ_START_TOKEN)
+		seq_printf(seq, "lookups hits misses allocations reclaims "
+			   "frees\n");
+	else
+		seq_printf(seq, "%u %u %u %u %u %u\n", st->lookups,
+			   st->hits, st->misses, st->allocations,
+			   st->reclaims, st->frees);
+	return 0;
+}
+
+static void sel_avc_stats_seq_stop(struct seq_file *seq, void *v)
+{ }
+
+static struct seq_operations sel_avc_cache_stats_seq_ops = {
+	.start		= sel_avc_stats_seq_start,
+	.next		= sel_avc_stats_seq_next,
+	.show		= sel_avc_stats_seq_show,
+	.stop		= sel_avc_stats_seq_stop,
+};
+
+static int sel_open_avc_cache_stats(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &sel_avc_cache_stats_seq_ops);
+}
+
+static struct file_operations sel_avc_cache_stats_ops = {
+	.open		= sel_open_avc_cache_stats,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+#endif
+
+static int sel_make_avc_files(struct dentry *dir)
+{
+	int i, ret = 0;
+	static struct tree_descr files[] = {
+		{ "cache_threshold",
+		  &sel_avc_cache_threshold_ops, S_IRUGO|S_IWUSR },
+		{ "hash_stats", &sel_avc_hash_stats_ops, S_IRUGO },
+#ifdef CONFIG_SECURITY_SELINUX_AVC_STATS
+		{ "cache_stats", &sel_avc_cache_stats_ops, S_IRUGO },
+#endif
+	};
+
+	for (i = 0; i < sizeof (files) / sizeof (files[0]); i++) {
+		struct inode *inode;
+		struct dentry *dentry;
+
+		dentry = d_alloc_name(dir, files[i].name);
+		if (!dentry) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		inode = sel_make_inode(dir->d_sb, S_IFREG|files[i].mode);
+		if (!inode) {
+			ret = -ENOMEM;
+			goto err;
+		}
+		inode->i_fop = files[i].ops;
+		d_add(dentry, inode);
+	}
+out:
+	return ret;
+err:
+	d_genocide(dir);
+	goto out;
+}
+
+static int sel_make_dir(struct super_block *sb, struct dentry *dentry)
+{
+	int ret = 0;
+	struct inode *inode;
+
+	inode = sel_make_inode(sb, S_IFDIR | S_IRUGO | S_IXUGO);
+	if (!inode) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	inode->i_op = &simple_dir_inode_operations;
+	inode->i_fop = &simple_dir_operations;
+	d_add(dentry, inode);
+out:
+	return ret;
+}
+
 static int sel_fill_super(struct super_block * sb, void * data, int silent)
 {
 	int ret;
@@ -942,6 +1153,18 @@ static int sel_fill_super(struct super_block * sb, void * data, int silent)
 	init_special_inode(inode, S_IFCHR | S_IRUGO | S_IWUGO, MKDEV(MEM_MAJOR, 3));
 	d_add(dentry, inode);
 	selinux_null = dentry;
+
+	dentry = d_alloc_name(sb->s_root, "avc");
+	if (!dentry)
+		return -ENOMEM;
+
+	ret = sel_make_dir(sb, dentry);
+	if (ret)
+		goto out;
+
+	ret = sel_make_avc_files(dentry);
+	if (ret)
+		goto out;
 
 	return 0;
 out:
