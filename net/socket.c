@@ -149,10 +149,12 @@ static __inline__ void net_family_bug(int family)
 
 int net_family_get(int family)
 {
+	struct net_proto_family *prot = net_families[family];
 	int rc = 1;
 
-	if (likely(net_families[family] != NULL))
-		rc = try_module_get(net_families[family]->owner);
+	barrier();
+	if (likely(prot != NULL))
+		rc = try_module_get(prot->owner);
 	else
 		net_family_bug(family);
 	return rc;
@@ -160,8 +162,11 @@ int net_family_get(int family)
 
 void net_family_put(int family)
 {
-	if (likely(net_families[family] != NULL))
-		module_put(net_families[family]->owner);
+	struct net_proto_family *prot = net_families[family];
+
+	barrier();
+	if (likely(prot != NULL))
+		module_put(prot->owner);
 	else
 		net_family_bug(family);
 }
