@@ -48,7 +48,7 @@ struct cpuinfo_um boot_cpu_data = {
 unsigned long thread_saved_pc(struct task_struct *task)
 {
 	return(os_process_pc(CHOOSE_MODE_PROC(thread_pid_tt, thread_pid_skas,
-					      thread)));
+					      task)));
 }
 
 static int show_cpuinfo(struct seq_file *m, void *v)
@@ -190,8 +190,8 @@ __uml_setup("ncpus=", uml_ncpus_setup,
 
 int force_tt = 0;
 
-if defined(CONFIG_MODE_TT) && defined(CONFIG_MODE_SKAS)
-+#define DEFAULT_TT 0
+#if defined(CONFIG_MODE_TT) && defined(CONFIG_MODE_SKAS)
+#define DEFAULT_TT 0
 
 static int __init mode_tt_setup(char *line, int *add)
 {

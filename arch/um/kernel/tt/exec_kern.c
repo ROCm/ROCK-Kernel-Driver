@@ -9,6 +9,7 @@
 #include "asm/ptrace.h"
 #include "asm/uaccess.h"
 #include "asm/pgalloc.h"
+#include "asm/tlbflush.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "irq_user.h"

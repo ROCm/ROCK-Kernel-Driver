@@ -298,7 +298,10 @@ void initial_thread_cb_skas(void (*proc)(void *), void *arg)
 	cb_back = &here;
 	if(setjmp(here) == 0)
 		longjmp(initial_jmpbuf, 2);
-	
+
+	cb_proc = NULL;
+	cb_arg = NULL;
+	cb_back = NULL;
 }
 
 void halt_skas(void)

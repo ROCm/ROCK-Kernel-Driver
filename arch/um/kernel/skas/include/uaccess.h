@@ -37,7 +37,7 @@ static inline unsigned long maybe_map(unsigned long virt, int is_write)
 	int dummy_code;
 
 	if(IS_ERR(phys) || (is_write && !pte_write(pte))){
-		if(!handle_page_fault(virt, 0, is_write, 0, &dummy_code))
+		if(handle_page_fault(virt, 0, is_write, 0, &dummy_code))
 			return(0);
 		phys = um_virt_to_phys(current, virt, NULL);
 	}

@@ -75,6 +75,7 @@ extern void debugger_parent_signal(int status, int pid);
 extern void child_signal(int pid, int status);
 extern int init_ptrace_proxy(int idle_pid, int startup, int stop);
 extern int init_parent_proxy(int pid);
+extern int singlestepping(void *t);
 extern void check_stack_overflow(void *ptr);
 extern void relay_signal(int sig, struct uml_pt_regs *regs);
 extern void not_implemented(void);

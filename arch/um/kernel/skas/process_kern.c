@@ -137,6 +137,7 @@ int copy_thread_skas(int nr, unsigned long clone_flags, unsigned long sp,
 void init_idle_skas(void)
 {
 	cpu_tasks[current->thread_info->cpu].pid = os_getpid();
+	default_idle();
 }
 
 extern void start_kernel(void);
@@ -177,7 +178,7 @@ int external_pid_skas(struct task_struct *task)
 	return(userspace_pid);
 }
 
-int thread_pid_skas(struct thread_struct *thread)
+int thread_pid_skas(struct task_struct *task)
 {
 	return(userspace_pid);
 }

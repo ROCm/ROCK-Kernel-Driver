@@ -9,6 +9,7 @@
 #include "asm/system.h"
 #include "asm/pgalloc.h"
 #include "asm/ptrace.h"
+#include "asm/tlbflush.h"
 #include "irq_user.h"
 #include "signal_user.h"
 #include "kern_util.h"
@@ -480,9 +481,9 @@ int external_pid_tt(struct task_struct *task)
 	return(task->thread.mode.tt.extern_pid);
 }
 
-int thread_pid_tt(struct thread_struct *thread)
+int thread_pid_tt(struct task_struct *task)
 {
-	return(thread->mode.tt.extern_pid);
+	return(task->thread.mode.tt.extern_pid);
 }
 
 int is_valid_pid(int pid)
