@@ -18,6 +18,13 @@
 #define KEYLARGO_FCR4		0x48
 #define KEYLARGO_FCR5		0x4c	/* Pangea only */
 
+/* K2 aditional FCRs */
+#define K2_FCR6			0x34
+#define K2_FCR7			0x30
+#define K2_FCR8			0x2c
+#define K2_FCR9			0x28
+#define K2_FCR10		0x24
+
 /* GPIO registers */
 #define KEYLARGO_GPIO_LEVELS0		0x50
 #define KEYLARGO_GPIO_LEVELS1		0x54
@@ -29,6 +36,10 @@
 #define KEYLARGO_GPIO_OUTPUT_ENABLE	0x04
 #define KEYLARGO_GPIO_OUTOUT_DATA	0x01
 #define KEYLARGO_GPIO_INPUT_DATA	0x02
+
+/* K2 does only extint GPIOs and does 51 of them */
+#define K2_GPIO_EXTINT_0		0x58
+#define K2_GPIO_EXTINT_CNT		51
 
 /* Specific GPIO regs */
 
@@ -67,7 +78,8 @@
 #define KL_GPIO_AIRPORT_4		(KEYLARGO_GPIO_0+0x0f)
 
 /*
- * Bits in feature control register
+ * Bits in feature control register. Those bits different for K2 are
+ * listed separately
  */
 #define KL_MBCR_MB0_PCI_ENABLE		0x00000800	/* exist ? */
 #define KL_MBCR_MB0_IDE_ENABLE		0x00001000
@@ -202,9 +214,30 @@
 #define KL4_PORT_DISCONNECT_STAT(p)	(0x00000010 << ((p)<<3))
 
 /* Pangea and Intrepid only */
-#define KL5_VIA_USE_CLK31		0x000000001	/* Pangea Only */
-#define KL5_SCC_USE_CLK31		0x000000002	/* Pangea Only */
-#define KL5_PWM_CLK32_EN		0x000000004
-#define KL5_CLK3_68_EN			0x000000010
-#define KL5_CLK32_EN			0x000000020
+#define KL5_VIA_USE_CLK31		0000000001	/* Pangea Only */
+#define KL5_SCC_USE_CLK31		0x00000002	/* Pangea Only */
+#define KL5_PWM_CLK32_EN		0x00000004
+#define KL5_CLK3_68_EN			0x00000010
+#define KL5_CLK32_EN			0x00000020
+
+
+/* K2 definitions */
+#define K2_FCR0_USB0_SWRESET		0x00200000
+#define K2_FCR0_USB1_SWRESET		0x02000000
+#define K2_FCR0_RING_PME_DISABLE	0x08000000
+
+#define K2_FCR1_PCI1_BUS_RESET_N	0x00000010
+#define K2_FCR1_PCI1_SLEEP_RESET_EN	0x00000020
+#define K2_FCR1_PCI1_CLK_ENABLE		0x00004000
+#define K2_FCR1_FW_CLK_ENABLE		0x00008000
+#define K2_FCR1_FW_RESET_N		0x00010000
+#define K2_FCR1_GMAC_CLK_ENABLE		0x00400000
+#define K2_FCR1_GMAC_POWER_DOWN		0x00800000
+#define K2_FCR1_GMAC_RESET_N		0x01000000
+#define K2_FCR1_SATA_CLK_ENABLE		0x02000000
+#define K2_FCR1_SATA_POWER_DOWN		0x04000000
+#define K2_FCR1_SATA_RESET_N		0x08000000
+#define K2_FCR1_UATA_CLK_ENABLE		0x10000000
+#define K2_FCR1_UATA_RESET_N		0x40000000
+#define K2_FCR1_UATA_CHOOSE_CLK66	0x80000000
 

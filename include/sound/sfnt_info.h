@@ -22,16 +22,22 @@
  *
  */
 
-#include "seq_oss_legacy.h"
+#include <sound/asound.h>
 
 /*
  * patch information record
  */
 
+#ifdef SNDRV_BIG_ENDIAN
+#define SNDRV_OSS_PATCHKEY(id) (0xfd00|id)
+#else
+#define SNDRV_OSS_PATCHKEY(id) ((id<<8)|0xfd)
+#endif
+
 /* patch interface header: 16 bytes */
 typedef struct soundfont_patch_info_t {
 	unsigned short key;		/* use the key below */
-#define SNDRV_OSS_SOUNDFONT_PATCH		_PATCHKEY(0x07)
+#define SNDRV_OSS_SOUNDFONT_PATCH		SNDRV_OSS_PATCHKEY(0x07)
 
 	short device_no;		/* synthesizer number */
 	unsigned short sf_id;		/* file id (should be zero) */
@@ -180,5 +186,29 @@ typedef struct soundfont_voice_map_t {
 	int src_bank, src_instr, src_key;
 } soundfont_voice_map_t;
 
+
+/*
+ * ioctls for hwdep
+ */
+
+#define SNDRV_EMUX_HWDEP_NAME	"Emux WaveTable"
+
+#define SNDRV_EMUX_VERSION	((1 << 16) | (0 << 8) | 0)	/* 1.0.0 */
+
+struct sndrv_emux_misc_mode {
+	int port;	/* -1 = all */
+	int mode;
+	int value;
+	int value2;	/* reserved */
+};
+
+enum {
+	SNDRV_EMUX_IOCTL_VERSION = _IOR('H', 0x80, unsigned int),
+	SNDRV_EMUX_IOCTL_LOAD_PATCH = _IOWR('H', 0x81, soundfont_patch_info_t),
+	SNDRV_EMUX_IOCTL_RESET_SAMPLES = _IO('H', 0x82),
+	SNDRV_EMUX_IOCTL_REMOVE_LAST_SAMPLES = _IO('H', 0x83),
+	SNDRV_EMUX_IOCTL_MEM_AVAIL = _IOW('H', 0x84, int),
+	SNDRV_EMUX_IOCTL_MISC_MODE = _IOWR('H', 0x84, struct sndrv_emux_misc_mode),
+};
 
 #endif /* __SOUND_SFNT_INFO_H */

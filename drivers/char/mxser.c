@@ -509,6 +509,7 @@ static int __init mxser_module_init(void)
 
 	mxvar_sdriver->owner = THIS_MODULE;
 	mxvar_sdriver->name = "ttyM";
+	mxvar_sdriver->devfs_name = "tts/M";
 	mxvar_sdriver->major = ttymajor;
 	mxvar_sdriver->minor_start = 0;
 	mxvar_sdriver->type = TTY_DRIVER_TYPE_SERIAL;

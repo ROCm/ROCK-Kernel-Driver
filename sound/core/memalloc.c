@@ -39,7 +39,7 @@ MODULE_LICENSE("GPL");
 #ifndef SNDRV_CARDS
 #define SNDRV_CARDS	8
 #endif
-static int enable[8] = {[0 ... (SNDRV_CARDS-1)] = 1};
+static int enable[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
 MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable cards to allocate buffers.");
 
@@ -94,26 +94,29 @@ static void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
 				    dma_addr_t *dma_handle)
 {
 	void *ret;
-	u64 dma_mask;
-	unsigned long rmask;
+	u64 dma_mask, cdma_mask;
+	unsigned long mask;
 
 	if (hwdev == NULL)
 		return pci_alloc_consistent(hwdev, size, dma_handle);
 	dma_mask = hwdev->dma_mask;
-	rmask = ~((unsigned long)dma_mask);
+	cdma_mask = hwdev->consistent_dma_mask;
+	mask = (unsigned long)dma_mask && (unsigned long)cdma_mask;
 	hwdev->dma_mask = 0xffffffff; /* do without masking */
+	hwdev->consistent_dma_mask = 0xffffffff; /* do without masking */
 	ret = pci_alloc_consistent(hwdev, size, dma_handle);
 	hwdev->dma_mask = dma_mask; /* restore */
+	hwdev->consistent_dma_mask = cdma_mask; /* restore */
 	if (ret) {
 		/* obtained address is out of range? */
-		if (((unsigned long)*dma_handle + size - 1) & rmask) {
+		if (((unsigned long)*dma_handle + size - 1) & ~mask) {
 			/* reallocate with the proper mask */
 			pci_free_consistent(hwdev, size, ret, *dma_handle);
 			ret = pci_alloc_consistent(hwdev, size, dma_handle);
 		}
 	} else {
 		/* wish to success now with the proper mask... */
-		if (dma_mask != 0xffffffff)
+		if (mask != 0xffffffffUL)
 			ret = pci_alloc_consistent(hwdev, size, dma_handle);
 	}
 	return ret;
@@ -207,8 +210,9 @@ int snd_dma_alloc_pages(const struct snd_dma_device *dev, size_t size,
 		dmab->addr = 0;
 		return -ENXIO;
 	}
-	if (dmab->area)
-		dmab->bytes = size;
+	if (! dmab->area)
+		return -ENOMEM;
+	dmab->bytes = size;
 	return 0;
 }
 
@@ -342,6 +346,8 @@ int snd_dma_set_reserved(const struct snd_dma_device *dev, struct snd_dma_buffer
 	down(&list_mutex);
 	mem = mem_list_find(dev, 0);
 	if (mem) {
+		if (mem->used)
+			printk(KERN_WARNING "snd-page-alloc: releasing the used block (type=%d, id=0x%x\n", mem->dev.type, mem->dev.id);
 		snd_dma_free_pages(dev, &mem->buffer);
 		if (! dmab || ! dmab->bytes) {
 			/* remove the entry */
@@ -361,7 +367,7 @@ int snd_dma_set_reserved(const struct snd_dma_device *dev, struct snd_dma_buffer
 			return -ENOMEM;
 		}
 		mem->dev = *dev;
-		list_add(&mem->list, &mem_list_head);
+		list_add_tail(&mem->list, &mem_list_head);
 	}
 	/* store the entry */
 	mem->used = 1;
@@ -640,13 +646,13 @@ void *snd_malloc_pci_page(struct pci_dev *pci, dma_addr_t *addrp)
 {
 	void *ptr;
 	dma_addr_t addr;
-	unsigned long rmask;
+	unsigned long mask;
 
-	rmask = ~(unsigned long)(pci ? pci->dma_mask : 0x00ffffff);
+	mask = pci ? (unsigned long)pci->consistent_dma_mask : 0x00ffffffUL;
 	ptr = (void *)__get_free_page(GFP_KERNEL);
 	if (ptr) {
 		addr = virt_to_phys(ptr);
-		if (((unsigned long)addr + PAGE_SIZE - 1) & rmask) {
+		if (((unsigned long)addr + PAGE_SIZE - 1) & ~mask) {
 			/* try to reallocate with the GFP_DMA */
 			free_page((unsigned long)ptr);
 			/* use GFP_ATOMIC for the DMA zone to avoid stall */
@@ -783,6 +789,7 @@ void snd_free_sbus_pages(struct sbus_dev *sdev,
  * allocation of buffers for pre-defined devices
  */
 
+#ifdef CONFIG_PCI
 /* FIXME: for pci only - other bus? */
 struct prealloc_dev {
 	unsigned short vendor;
@@ -823,37 +830,48 @@ static void __init preallocate_cards(void)
 
 	while ((pci = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci)) != NULL) {
 		struct prealloc_dev *dev;
+		unsigned int i;
 		if (card >= SNDRV_CARDS)
 			break;
 		for (dev = prealloc_devices; dev->vendor; dev++) {
-			unsigned int i;
-			if (dev->vendor != pci->vendor || dev->device != pci->device)
-				continue;
-			if (! enable[card++])
-				continue;
+			if (dev->vendor == pci->vendor && dev->device == pci->device)
+				break;
+		}
+		if (! dev->vendor)
+			continue;
+		if (! enable[card++]) {
+			printk(KERN_DEBUG "snd-page-alloc: skipping card %d, device %04x:%04x\n", card, pci->vendor, pci->device);
+			continue;
+		}
 			
-			if (pci_set_dma_mask(pci, dev->dma_mask) < 0) {
-				printk(KERN_ERR "snd-page-alloc: cannot set DMA mask %lx for pci %04x:%04x\n", dev->dma_mask, dev->vendor, dev->device);
-				continue;
+		if (pci_set_dma_mask(pci, dev->dma_mask) < 0 ||
+		    pci_set_consistent_dma_mask(pci, dev->dma_mask) < 0) {
+			printk(KERN_ERR "snd-page-alloc: cannot set DMA mask %lx for pci %04x:%04x\n", dev->dma_mask, dev->vendor, dev->device);
+			continue;
+		}
+		for (i = 0; i < dev->buffers; i++) {
+			struct snd_mem_list *mem;
+			mem = kmalloc(sizeof(*mem), GFP_KERNEL);
+			if (! mem) {
+				printk(KERN_WARNING "snd-page-alloc: can't malloc memlist\n");
+				break;
 			}
-
-			for (i = 0; i < dev->buffers; i++) {
-				struct snd_dma_device dma;
-				struct snd_dma_buffer buf;
-				snd_dma_device_pci(&dma, pci, SNDRV_DMA_DEVICE_UNUSED);
-				memset(&buf, 0, sizeof(buf));
-				snd_dma_alloc_pages(&dma, dev->size, &buf);
-				if (buf.bytes) {
-					if (snd_dma_set_reserved(&dma, &buf) < 0) {
-						printk(KERN_WARNING "snd-page-alloc: cannot reserve buffer\n");
-						snd_dma_free_pages(&dma, &buf);
-					}
-				} else
-					printk(KERN_WARNING "snd-page-alloc: cannot allocate buffer pages (size = %d)\n", dev->size);
+			memset(mem, 0, sizeof(*mem));
+			snd_dma_device_pci(&mem->dev, pci, SNDRV_DMA_DEVICE_UNUSED);
+			if (snd_dma_alloc_pages(&mem->dev, dev->size, &mem->buffer) < 0) {
+				printk(KERN_WARNING "snd-page-alloc: cannot allocate buffer pages (size = %d)\n", dev->size);
+				kfree(mem);
+			} else {
+				down(&list_mutex);
+				list_add_tail(&mem->list, &mem_list_head);
+				up(&list_mutex);
 			}
 		}
 	}
 }
+#else
+#define preallocate_cards()	/* NOP */
+#endif
 
 
 #ifdef CONFIG_PROC_FS
@@ -890,7 +908,8 @@ static int snd_mem_proc_read(char *page, char **start, off_t off,
 		case SNDRV_DMA_TYPE_PCI:
 		case SNDRV_DMA_TYPE_PCI_SG:
 			if (mem->dev.dev.pci) {
-				len += sprintf(page + len, "PCI [%04x:%04x]",
+				len += sprintf(page + len, "%s [%04x:%04x]",
+					       mem->dev.type == SNDRV_DMA_TYPE_PCI ? "PCI" : "PCI-SG",
 					       mem->dev.dev.pci->vendor,
 					       mem->dev.dev.pci->device);
 			}

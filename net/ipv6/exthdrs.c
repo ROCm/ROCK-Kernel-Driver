@@ -218,7 +218,6 @@ static int ipv6_rthdr_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 	struct inet6_skb_parm *opt = (struct inet6_skb_parm *)skb->cb;
 	struct in6_addr *addr;
 	struct in6_addr daddr;
-	int addr_type;
 	int n, i;
 
 	struct ipv6_rt_hdr *hdr;
@@ -233,7 +232,7 @@ static int ipv6_rthdr_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 
 	hdr = (struct ipv6_rt_hdr *) skb->h.raw;
 
-	if ((ipv6_addr_type(&skb->nh.ipv6h->daddr)&IPV6_ADDR_MULTICAST) ||
+	if (ipv6_addr_is_multicast(&skb->nh.ipv6h->daddr) ||
 	    skb->pkt_type != PACKET_HOST) {
 		kfree_skb(skb);
 		return -1;
@@ -293,9 +292,7 @@ looped_back:
 	addr = rthdr->addr;
 	addr += i - 1;
 
-	addr_type = ipv6_addr_type(addr);
-
-	if (addr_type&IPV6_ADDR_MULTICAST) {
+	if (ipv6_addr_is_multicast(addr)) {
 		kfree_skb(skb);
 		return -1;
 	}

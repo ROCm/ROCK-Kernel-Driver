@@ -25,7 +25,7 @@ int iph5526_queuecommand(Scsi_Cmnd *Cmnd, void (*done) (Scsi_Cmnd *));
 int iph5526_release(struct Scsi_Host *host);
 int iph5526_abort(Scsi_Cmnd *Cmnd);
 const char *iph5526_info(struct Scsi_Host *host);
-int iph5526_biosparam(Disk * disk, struct block_device *n, int ip[]);
+int iph5526_biosparam(struct Scsi_Disk * disk, struct block_device *n, int ip[]);
 
 #endif
 

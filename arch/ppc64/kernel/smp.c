@@ -575,9 +575,11 @@ extern struct gettimeofday_struct do_gtod;
 
 struct thread_info *current_set[NR_CPUS];
 
+DECLARE_PER_CPU(unsigned int, pvr);
+
 static void __devinit smp_store_cpu_info(int id)
 {
-	paca[id].pvr = _get_PVR();
+	per_cpu(pvr, id) = _get_PVR();
 }
 
 void __init smp_prepare_cpus(unsigned int max_cpus)

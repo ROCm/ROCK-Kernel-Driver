@@ -427,6 +427,10 @@ struct _snd_pcm_str {
 	snd_minor_t *reg;
 	snd_info_entry_t *proc_root;
 	snd_info_entry_t *proc_info_entry;
+#ifdef CONFIG_SND_DEBUG
+	unsigned int xrun_debug: 1;
+	snd_info_entry_t *proc_xrun_debug_entry;
+#endif
 };
 
 struct _snd_pcm {
@@ -460,8 +464,6 @@ typedef struct _snd_pcm_notify {
 
 extern snd_pcm_t *snd_pcm_devices[];
 extern snd_minor_t snd_pcm_reg[2];
-
-void snd_pcm_lock(int unlock);
 
 int snd_pcm_new(snd_card_t * card, char *id, int device,
 		int playback_count, int capture_count,

@@ -200,12 +200,14 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 			if (!hwif->ide_dma_read(drive))
 				return ide_started;
 			break;
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
 		case WIN_READDMA_QUEUED:
 		case WIN_READDMA_QUEUED_EXT:
-			return hwif->ide_dma_queued_read(drive);
+			return __ide_dma_queued_read(drive);
 		case WIN_WRITEDMA_QUEUED:
 		case WIN_WRITEDMA_QUEUED_EXT:
-			return hwif->ide_dma_queued_write(drive);
+			return __ide_dma_queued_write(drive);
+#endif
 		default:
 			if (task->handler == NULL)
 				return ide_stopped;
@@ -772,14 +774,20 @@ EXPORT_SYMBOL(task_mulout_intr);
 static u8 wait_drive_not_busy(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
-	int retries = 5;
+	int retries = 100;
 	u8 stat;
+
 	/*
-	 * (ks) Last sector was transfered, wait until drive is ready.
-	 * This can take up to 10 usec. We willl wait max 50 us.
+	 * Last sector was transfered, wait until drive is ready.
+	 * This can take up to 10 usec, but we will wait max 1 ms
+	 * (drive_cmd_intr() waits that long).
 	 */
 	while (((stat = hwif->INB(IDE_STATUS_REG)) & BUSY_STAT) && retries--)
 		udelay(10);
+
+	if (!retries)
+		printk(KERN_ERR "%s: drive still BUSY!\n", drive->name);
+
 	return stat;
 }
 

@@ -101,15 +101,15 @@ accumulator. ALSA uses accumulators 4 and 5 for left and right PCM.
 The result is forwarded to the ADC capture FIFO (thus to the standard capture
 PCM device).
 
-name='Surround Digital Playback Volume',index=0
+name='Surround Playback Volume',index=0
 
 This control is used to attenuate samples for left and right rear PCM FX-bus
 accumulators. ALSA uses accumulators 2 and 3 for left and right rear PCM samples.
 The result samples are forwarded to the rear I2S DACs. These DACs operate
 separately (they are not inside the AC97 codec).
 
-name='Surround Digital Capture Volume',index=0
-name='Surround Digital Capture Switch',index=0
+name='Surround Capture Volume',index=0
+name='Surround Capture Switch',index=0
 
 These controls are used to attenuate samples for left and right rear PCM FX-bus
 accumulators. ALSA uses accumulators 2 and 3 for left and right rear PCM samples.
@@ -172,13 +172,13 @@ This control is used to attenuate samples from left and right zoom video
 digital inputs (usually used by a CDROM drive). The result samples are
 forwarded to the ADC capture FIFO (thus to the standard capture PCM device).
 
-name='IEC958 Optical Playback Volume',index=0
+name='IEC958 LiveDrive Playback Volume',index=0
 
 This control is used to attenuate samples from left and right IEC958 optical
 digital input. The result samples are forwarded to the front DAC PCM slots
 of the AC97 codec.
 
-name='IEC958 Optical Capture Volume',index=0
+name='IEC958 LiveDrive Capture Volume',index=0
 
 This control is used to attenuate samples from left and right IEC958 optical
 digital inputs. The result samples are forwarded to the ADC capture FIFO

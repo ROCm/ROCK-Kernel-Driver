@@ -67,6 +67,7 @@ int snd_emux_new(snd_emux_t **remu)
  */
 int snd_emux_register(snd_emux_t *emu, snd_card_t *card, int index, char *name)
 {
+	int err;
 	snd_sf_callback_t sf_cb;
 
 	snd_assert(emu->hw != NULL, return -EINVAL);
@@ -89,6 +90,9 @@ int snd_emux_register(snd_emux_t *emu, snd_card_t *card, int index, char *name)
 	emu->sflist = snd_sf_new(&sf_cb, emu->memhdr);
 	if (emu->sflist == NULL)
 		return -ENOMEM;
+
+	if ((err = snd_emux_init_hwdep(emu)) < 0)
+		return err;
 
 	snd_emux_init_voices(emu);
 
@@ -127,6 +131,8 @@ int snd_emux_free(snd_emux_t *emu)
 	snd_emux_detach_seq_oss(emu);
 #endif
 	snd_emux_detach_seq(emu);
+
+	snd_emux_delete_hwdep(emu);
 
 	if (emu->sflist)
 		snd_sf_free(emu->sflist);

@@ -183,6 +183,7 @@ void of_release_dev(struct device *dev)
 	struct of_device *ofdev;
 
         ofdev = to_of_device(dev);
+	of_node_put(ofdev->node);
 	kfree(ofdev);
 }
 
@@ -242,7 +243,7 @@ struct of_device* of_platform_device_create(struct device_node *np, const char *
 		return NULL;
 	memset(dev, 0, sizeof(*dev));
 
-	dev->node = np;
+	dev->node = of_node_get(np);
 	dev->dma_mask = 0xffffffffUL;
 	dev->dev.dma_mask = &dev->dma_mask;
 	dev->dev.parent = NULL;

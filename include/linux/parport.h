@@ -311,6 +311,8 @@ struct parport {
 
 	int spintime;
 	atomic_t ref_count;
+
+	struct list_head full_list;
 };
 
 #define DEFAULT_SPIN_TIME 500 /* us */

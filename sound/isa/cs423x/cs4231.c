@@ -103,8 +103,6 @@ static int __init snd_card_cs4231_probe(int dev)
 	if (card == NULL)
 		return -ENOMEM;
 	acard = (struct snd_card_cs4231 *)card->private_data;
-	if (mpu_port[dev] < 0)
-		mpu_port[dev] = SNDRV_AUTO_PORT;
 	if ((err = snd_cs4231_create(card, port[dev], -1,
 				     irq[dev],
 				     dma1[dev],
@@ -119,6 +117,14 @@ static int __init snd_card_cs4231_probe(int dev)
 		snd_card_free(card);
 		return err;
 	}
+
+	strcpy(card->driver, "CS4231");
+	strcpy(card->shortname, pcm->name);
+	sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
+		pcm->name, chip->port, irq[dev], dma1[dev]);
+	if (dma2[dev] >= 0)
+		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
+
 	if ((err = snd_cs4231_mixer(chip)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -128,19 +134,16 @@ static int __init snd_card_cs4231_probe(int dev)
 		return err;
 	}
 
-	if (mpu_irq[dev] >= 0 && mpu_irq[dev] != SNDRV_AUTO_IRQ) {
+	if (mpu_port[dev] > 0 && mpu_port[dev] != SNDRV_AUTO_PORT) {
+		if (mpu_irq[dev] == SNDRV_AUTO_IRQ)
+			mpu_irq[dev] = -1;
 		if (snd_mpu401_uart_new(card, 0, MPU401_HW_CS4232,
 					mpu_port[dev], 0,
-					mpu_irq[dev], SA_INTERRUPT,
+					mpu_irq[dev],
+					mpu_irq[dev] >= 0 ? SA_INTERRUPT : 0,
 					NULL) < 0)
 			printk(KERN_ERR "cs4231: MPU401 not detected\n");
 	}
-	strcpy(card->driver, "CS4231");
-	strcpy(card->shortname, pcm->name);
-	sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
-		pcm->name, chip->port, irq[dev], dma1[dev]);
-	if (dma2[dev] >= 0)
-		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -194,8 +197,8 @@ static int __init alsa_card_cs4231_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&mpu_irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&

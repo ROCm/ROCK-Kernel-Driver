@@ -4,6 +4,7 @@
  *    Copyright (c) 2003 IBM Corp.
  *     Dave Engebretsen engebret@us.ibm.com
  *     Santiago Leon santil@us.ibm.com
+ *     Hollis Blanchard <hollisb@us.ibm.com>
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -16,14 +17,17 @@
 #include <linux/pci.h>
 #include <linux/version.h>
 #include <linux/module.h>
+#include <linux/kobject.h>
+#include <linux/mm.h>
 #include <asm/rtas.h>
 #include <asm/pci_dma.h>
 #include <asm/dma.h>
 #include <asm/ppcdebug.h>
 #include <asm/vio.h>
 #include <asm/hvcall.h>
-#include <linux/mm.h>
-#include "open_pic.h" 	/* temporary, until we merge large irq support */
+#include "open_pic.h"
+
+#define DBGENTER() pr_debug("%s entered\n", __FUNCTION__)
 
 extern struct TceTable *build_tce_table(struct TceTable *tbl);
 
@@ -32,83 +36,74 @@ extern dma_addr_t get_tces(struct TceTable *, unsigned order,
 extern void tce_free(struct TceTable *tbl, dma_addr_t dma_addr,
 		     unsigned order, unsigned num_pages);
 
+static int vio_num_address_cells;
+static struct vio_dev *vio_bus_device; /* fake "parent" device */
 
-static struct vio_bus vio_bus;
-static LIST_HEAD(registered_vio_drivers);
-int vio_num_address_cells;
-EXPORT_SYMBOL(vio_num_address_cells);
+/* convert from struct device to struct vio_dev and pass to driver.
+ * dev->driver has already been set by generic code because vio_bus_match
+ * succeeded. */
+static int vio_bus_probe(struct device *dev)
+{
+	struct vio_dev *viodev = to_vio_dev(dev);
+	struct vio_driver *viodrv = to_vio_driver(dev->driver);
+	const struct vio_device_id *id;
+	int error = -ENODEV;
 
-/* TODO:
- *   really fit into driver model (see include/linux/device.h)
- *   locking around list accesses
- */
+	DBGENTER();
+
+	if (!viodrv->probe)
+		return error;
+
+	id = vio_match_device(viodrv->id_table, viodev);
+	if (id) {
+		error = viodrv->probe(viodev, id);
+	}
+
+	return error;
+}
+
+/* convert from struct device to struct vio_dev and pass to driver. */
+static int vio_bus_remove(struct device *dev)
+{
+	struct vio_dev *viodev = to_vio_dev(dev);
+	struct vio_driver *viodrv = to_vio_driver(dev->driver);
+
+	DBGENTER();
+
+	if (viodrv->remove) {
+		return viodrv->remove(viodev);
+	}
+
+	/* driver can't remove */
+	return 1;
+}
 
 /**
  * vio_register_driver: - Register a new vio driver
  * @drv:	The vio_driver structure to be registered.
- *
- * Adds the driver structure to the list of registered drivers
- * Returns the number of vio devices which were claimed by the driver
- * during registration.  The driver remains registered even if the
- * return value is zero.
  */
-int vio_register_driver(struct vio_driver *drv)
+int vio_register_driver(struct vio_driver *viodrv)
 {
-	int count = 0;
-	struct vio_dev *dev;
+	printk(KERN_DEBUG "%s: driver %s registering\n", __FUNCTION__,
+		viodrv->name);
 
-	printk(KERN_DEBUG "%s: driver %s/%s registering\n", __FUNCTION__,
-		drv->id_table[0].type, drv->id_table[0].type);
+	/* fill in 'struct driver' fields */
+	viodrv->driver.name = viodrv->name;
+	viodrv->driver.bus = &vio_bus_type;
+	viodrv->driver.probe = vio_bus_probe;
+	viodrv->driver.remove = vio_bus_remove;
 
-	/* find matching devices not already claimed by other drivers and pass
-	 * them to probe() */
-	list_for_each_entry(dev, &vio_bus.devices, devices_list) {
-		const struct vio_device_id* id;
-
-		if (dev->driver)
-			continue; /* this device is already owned */
-
-		id = vio_match_device(drv->id_table, dev);
-		if (drv && id) {
-			if (0 == drv->probe(dev, id)) {
-				printk(KERN_DEBUG "  took device %p\n", dev);
-				dev->driver = drv;
-				count++;
-			}
-		}
-	}
-
-	list_add_tail(&drv->node, &registered_vio_drivers);
-
-	return count;
+	return driver_register(&viodrv->driver);
 }
 EXPORT_SYMBOL(vio_register_driver);
 
 /**
  * vio_unregister_driver - Remove registration of vio driver.
  * @driver:	The vio_driver struct to be removed form registration
- *
- * Searches for devices that are assigned to the driver and calls
- * driver->remove() for each one.  Removes the driver from the list
- * of registered drivers.  Returns the number of devices that were
- * assigned to that driver.
  */
-int vio_unregister_driver(struct vio_driver *driver)
+void vio_unregister_driver(struct vio_driver *viodrv)
 {
-	struct vio_dev *dev;
-	int devices_found = 0;
-
-	list_for_each_entry(dev, &vio_bus.devices, devices_list) {
-		if (dev->driver == driver) {
-			driver->remove(dev);
-			dev->driver = NULL;
-			devices_found++;
-		}
-	}
-
-	list_del(&driver->node);
-
-	return devices_found;
+	driver_unregister(&viodrv->driver);
 }
 EXPORT_SYMBOL(vio_unregister_driver);
 
@@ -121,9 +116,11 @@ EXPORT_SYMBOL(vio_unregister_driver);
  * system is in its list of supported devices. Returns the matching
  * vio_device_id structure or NULL if there is no match.
  */
-const struct vio_device_id *
-vio_match_device(const struct vio_device_id *ids, const struct vio_dev *dev)
+const struct vio_device_id * vio_match_device(const struct vio_device_id *ids,
+	const struct vio_dev *dev)
 {
+	DBGENTER();
+
 	while (ids->type) {
 		if ((strncmp(dev->archdata->type, ids->type, strlen(ids->type)) == 0) &&
 			device_is_compatible((struct device_node*)dev->archdata, ids->compat))
@@ -136,18 +133,33 @@ vio_match_device(const struct vio_device_id *ids, const struct vio_dev *dev)
 /**
  * vio_bus_init: - Initialize the virtual IO bus
  */
-int __init
-vio_bus_init(void)
+static int __init vio_bus_init(void)
 {
-	struct device_node *node_vroot, *node_vdev;
+	struct device_node *node_vroot, *of_node;
+	int err;
 
-	INIT_LIST_HEAD(&vio_bus.devices);
+	err = bus_register(&vio_bus_type);
+	if (err) {
+		printk(KERN_ERR "failed to register VIO bus\n");
+		return err;
+	}
 
-	/*
-	 * Create device node entries for each virtual device
-	 * identified in the device tree.
-	 * Functionally takes the place of pci_scan_bus
-	 */
+	/* the fake parent of all vio devices, just to give us a nice directory */
+	vio_bus_device = kmalloc(sizeof(struct vio_dev), GFP_KERNEL);
+	if (!vio_bus_device) {
+		return 1;
+	}
+	memset(vio_bus_device, 0, sizeof(struct vio_dev));
+	strcpy(vio_bus_device->dev.bus_id, "vdevice");
+
+	err = device_register(&vio_bus_device->dev);
+	if (err) {
+		printk(KERN_WARNING "%s: device_register returned %i\n", __FUNCTION__,
+			err);
+		kfree(vio_bus_device);
+		return err;
+	}
+
 	node_vroot = find_devices("vdevice");
 	if ((node_vroot == NULL) || (node_vroot->child == NULL)) {
 		printk(KERN_INFO "VIO: missing or empty /vdevice node; no virtual IO"
@@ -157,12 +169,16 @@ vio_bus_init(void)
 
 	vio_num_address_cells = prom_n_addr_cells(node_vroot->child);
 
-	for (node_vdev = node_vroot->child;
-			node_vdev != NULL;
-			node_vdev = node_vdev->sibling) {
-		printk(KERN_DEBUG "%s: processing %p\n", __FUNCTION__, node_vdev);
+	/*
+	 * Create struct vio_devices for each virtual device in the device tree.
+	 * Drivers will associate with them later.
+	 */
+	for (of_node = node_vroot->child;
+			of_node != NULL;
+			of_node = of_node->sibling) {
+		printk(KERN_DEBUG "%s: processing %p\n", __FUNCTION__, of_node);
 
-		vio_register_device(node_vdev);
+		vio_register_device(of_node);
 	}
 
 	return 0;
@@ -171,98 +187,91 @@ vio_bus_init(void)
 __initcall(vio_bus_init);
 
 
-/**
- * vio_probe_device - attach dev to appropriate driver
- * @dev:	device to find a driver for
- *
- * Walks the list of registered VIO drivers looking for one to take this
- * device.
- *
- * Returns a pointer to the matched driver or NULL if driver is not
- * found.
- */
-struct vio_driver * __devinit vio_probe_device(struct vio_dev* dev)
+/* vio_dev refcount hit 0 */
+static void __devinit vio_dev_release(struct device *dev)
 {
-	struct vio_driver *driver;
+	struct vio_dev *viodev = to_vio_dev(dev);
 
-	list_for_each_entry(driver, &registered_vio_drivers, node) {
-		const struct vio_device_id* id;
+	DBGENTER();
 
-		id = vio_match_device(driver->id_table, dev);
-		if (id && (0 < driver->probe(dev, id))) {
-			printk(KERN_DEBUG "%s: driver %s/%s took device %p\n",
-				__FUNCTION__, id->type, id->compat, dev);
-			dev->driver = driver;
-			return driver;
-		}
-	}
-
-	printk(KERN_DEBUG "%s: device %p found no driver\n", __FUNCTION__, dev);
-	return NULL;
+	/* XXX free TCE table */
+	of_node_put(viodev->archdata);
+	kfree(viodev);
 }
 
 /**
  * vio_register_device: - Register a new vio device.
- * @archdata:	The OF node for this device.
+ * @of_node:	The OF node for this device.
  *
  * Creates and initializes a vio_dev structure from the data in
- * node_vdev (archdata) and adds it to the list of virtual devices.
+ * of_node (archdata) and adds it to the list of virtual devices.
  * Returns a pointer to the created vio_dev or NULL if node has
  * NULL device_type or compatible fields.
  */
-struct vio_dev * __devinit vio_register_device(struct device_node *node_vdev)
+struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 {
-	struct vio_dev *dev;
+	struct vio_dev *viodev;
 	unsigned int *unit_address;
 	unsigned int *irq_p;
 
-	/* guarantee all vio_devs have 'device_type' field*/
-	if ((NULL == node_vdev->type)) {
+	DBGENTER();
+
+	/* we need the 'device_type' property, in order to match with drivers */
+	if ((NULL == of_node->type)) {
 		printk(KERN_WARNING
 			"%s: node %s missing 'device_type'\n", __FUNCTION__,
-			node_vdev->name ? node_vdev->name : "<unknown>");
+			of_node->name ? of_node->name : "<unknown>");
 		return NULL;
 	}
 
-	unit_address = (unsigned int *)get_property(node_vdev, "reg", NULL);
+	unit_address = (unsigned int *)get_property(of_node, "reg", NULL);
 	if (!unit_address) {
 		printk(KERN_WARNING "%s: node %s missing 'reg'\n", __FUNCTION__,
-			node_vdev->name ? node_vdev->name : "<unknown>");
+			of_node->name ? of_node->name : "<unknown>");
 		return NULL;
 	}
 
 	/* allocate a vio_dev for this node */
-	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
-	if (!dev)
+	viodev = kmalloc(sizeof(struct vio_dev), GFP_KERNEL);
+	if (!viodev) {
 		return NULL;
-	memset(dev, 0, sizeof(*dev));
+	}
+	memset(viodev, 0, sizeof(struct vio_dev));
 
-	dev->archdata = (void*)of_node_get(node_vdev);
-	dev->bus = &vio_bus;
-	dev->unit_address = *unit_address;
-	dev->tce_table = vio_build_tce_table(dev);
+	viodev->archdata = (void *)of_node_get(of_node);
+	viodev->unit_address = *unit_address;
+	viodev->tce_table = vio_build_tce_table(viodev);
 
-	irq_p = (unsigned int *) get_property(node_vdev, "interrupts", 0);
-	if(irq_p) {
-		dev->irq = openpic_to_irq(virt_irq_create_mapping(*irq_p));
-	} else {
-		dev->irq = (unsigned int) -1;
+	viodev->irq = (unsigned int) -1;
+	irq_p = (unsigned int *)get_property(of_node, "interrupts", 0);
+	if (irq_p) {
+		viodev->irq = openpic_to_irq(virt_irq_create_mapping(*irq_p));
 	}
 
-	list_add_tail(&dev->devices_list, &vio_bus.devices);
+	/* init generic 'struct device' fields: */
+	viodev->dev.parent = &vio_bus_device->dev;
+	viodev->dev.bus = &vio_bus_type;
+	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%s@%lx",
+		of_node->name, viodev->unit_address);
+	viodev->dev.release = vio_dev_release;
 
-	vio_probe_device(dev); /* finally, assign it to a driver */
+	/* register with generic device framework */
+	if (device_register(&viodev->dev)) {
+		printk(KERN_ERR "%s: failed to register device %s\n", __FUNCTION__,
+			viodev->dev.bus_id);
+		/* XXX free TCE table */
+		kfree(viodev);
+		return NULL;
+	}
 
-	return dev;
+	return viodev;
 }
 EXPORT_SYMBOL(vio_register_device);
 
-int __devinit vio_unregister_device(struct vio_dev *dev)
+void __devinit vio_unregister_device(struct vio_dev *viodev)
 {
-	list_del(&dev->devices_list);
-	of_node_put(dev->archdata);
-
-	return 0;
+	DBGENTER();
+	device_unregister(&viodev->dev);
 }
 EXPORT_SYMBOL(vio_unregister_device);
 
@@ -531,6 +540,30 @@ void vio_free_consistent(struct vio_dev *dev, size_t size,
 	}
 }
 EXPORT_SYMBOL(vio_free_consistent);
+
+static int vio_bus_match(struct device *dev, struct device_driver *drv)
+{
+	const struct vio_dev *vio_dev = to_vio_dev(dev);
+	struct vio_driver *vio_drv = to_vio_driver(drv);
+	const struct vio_device_id *ids = vio_drv->id_table;
+	const struct vio_device_id *found_id;
+
+	DBGENTER();
+
+	if (!ids)
+		return 0;
+
+	found_id = vio_match_device(ids, vio_dev);
+	if (found_id)
+		return 1;
+
+	return 0;
+}
+
+struct bus_type vio_bus_type = {
+	.name = "vio",
+	.match = vio_bus_match,
+};
 
 EXPORT_SYMBOL(plpar_hcall_norets);
 EXPORT_SYMBOL(plpar_hcall_8arg_2ret);

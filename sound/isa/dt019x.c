@@ -210,6 +210,7 @@ static int __devinit snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard,
 		return -ENOMEM;
 	acard = (struct snd_card_dt019x *)card->private_data;
 
+	snd_card_set_dev(card, &pcard->card->dev);
 	if ((error = snd_card_dt019x_pnp(dev, acard, pcard, pid))) {
 		snd_card_free(card);
 		return error;
@@ -226,6 +227,12 @@ static int __devinit snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard,
 		return error;
 	}
 
+	strcpy(card->driver, "DT-019X");
+	strcpy(card->shortname, "Diamond Tech. DT-019X");
+	sprintf(card->longname, "%s, %s at 0x%lx, irq %d, dma %d",
+		card->shortname, chip->name, chip->port,
+		irq[dev], dma8[dev]);
+
 	if ((error = snd_sb16dsp_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return error;
@@ -235,18 +242,20 @@ static int __devinit snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard,
 		return error;
 	}
 
-	if (mpu_port[dev] > 0) {
+	if (mpu_port[dev] > 0 && mpu_port[dev] != SNDRV_AUTO_PORT) {
+		if (mpu_irq[dev] == SNDRV_AUTO_IRQ)
+			mpu_irq[dev] = -1;
 		if (snd_mpu401_uart_new(card, 0,
 /*					MPU401_HW_SB,*/
 					MPU401_HW_MPU401,
 					mpu_port[dev], 0,
 					mpu_irq[dev],
-					SA_INTERRUPT,
+					mpu_irq[dev] >= 0 ? SA_INTERRUPT : 0,
 					NULL) < 0)
 			snd_printk(KERN_ERR PFX "no MPU-401 device at 0x%lx ?\n", mpu_port[dev]);
 	}
 
-	if (fm_port[dev] > 0) {
+	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_opl3_create(card,
 				    fm_port[dev],
 				    fm_port[dev] + 2,
@@ -265,11 +274,6 @@ static int __devinit snd_card_dt019x_probe(int dev, struct pnp_card_link *pcard,
 		}
 	}
 
-	strcpy(card->driver, "DT-019X");
-	strcpy(card->shortname, "Diamond Tech. DT-019X");
-	sprintf(card->longname, "%s soundcard, %s at 0x%lx, irq %d, dma %d",
-		card->shortname, chip->name, chip->port,
-		irq[dev], dma8[dev]);
 	if ((error = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return error;
@@ -347,9 +351,9 @@ static int __init alsa_card_dt019x_setup(char *str)
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&mpu_irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma8[nr_dev]) == 2);

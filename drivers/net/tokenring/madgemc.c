@@ -197,7 +197,7 @@ static int __init madgemc_probe(void)
 		card = kmalloc(sizeof(struct madgemc_card), GFP_KERNEL);
 		if (card==NULL) {
 			printk("madgemc: unable to allocate card struct\n");
-			kfree(dev);
+			free_netdev(dev);
 			if (madgemc_card_list)
 				return 0;
 			return -1;
@@ -360,7 +360,7 @@ static int __init madgemc_probe(void)
 			
 			kfree(card);
 			tmsdev_term(dev);
-			kfree(dev);
+			free_netdev(dev);
 			if (madgemc_card_list)
 				return 0;
 			return -1;
@@ -399,7 +399,7 @@ static int __init madgemc_probe(void)
 			       MADGEMC_IO_EXTENT); 
 	getout1:
 		kfree(card);
-		kfree(dev);
+		free_netdev(dev);
 		slot++;
 	}
 

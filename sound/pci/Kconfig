@@ -15,6 +15,13 @@ config SND_AZT3328
 	help
 	  Say 'Y' or 'M' to include support for Aztech AZF3328 (PCI168) soundcards.
 
+config SND_BT87X
+        tristate "Bt87x Audio Capture"
+        depends on SND
+        help
+          Say 'Y' or 'M' to include support for recording audio from TV cards
+          based on Brooktree Bt878/Bt879 chips.
+
 config SND_CS46XX
 	tristate "Cirrus Logic (Sound Fusion) CS4280/CS461x/CS462x/CS463x"
 	depends on SND
@@ -146,6 +153,13 @@ config SND_FM801
 	depends on SND
 	help
 	  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards.
+
+config CONFIG_SND_FM801_TEA575X
+	tristate "ForteMedia FM801 + TEA5757 tuner"
+	depends on SND_FM801 && CONFIG_VIDEO_DEV
+	help
+	  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards
+          with TEA5757 tuner connected to GPIO1-3 pins (Media Forte SF256-PCS-02).
 
 config SND_ICE1712
 	tristate "ICEnsemble ICE1712 (Envy24)"

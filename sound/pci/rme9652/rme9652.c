@@ -1618,7 +1618,6 @@ RME9652_SYNC_PREF("Preferred Sync Source", 0),
 RME9652_SPDIF_RATE("IEC958 Sample Rate", 0),
 RME9652_ADAT_SYNC("ADAT1 Sync Check", 0, 0),
 RME9652_ADAT_SYNC("ADAT2 Sync Check", 0, 1),
-RME9652_ADAT_SYNC("ADAT3 Sync Check", 0, 2),
 RME9652_TC_VALID("Timecode Valid", 0),
 RME9652_PASSTHRU("Passthru", 0)
 };
@@ -1835,7 +1834,7 @@ static void __devinit snd_rme9652_proc_init(rme9652_t *rme9652)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(rme9652->card, "rme9652", &entry))
-		snd_info_set_text_ops(entry, rme9652, snd_rme9652_proc_read);
+		snd_info_set_text_ops(entry, rme9652, 1024, snd_rme9652_proc_read);
 }
 
 static void snd_rme9652_free_buffers(rme9652_t *rme9652)
@@ -2705,6 +2704,7 @@ static int __devinit snd_rme9652_probe(struct pci_dev *pci,
 	card->private_free = snd_rme9652_card_free;
 	rme9652->dev = dev;
 	rme9652->pci = pci;
+	snd_card_set_dev(card, &pci->dev);
 
 	if ((err = snd_rme9652_create(card, rme9652, precise_ptr[dev])) < 0) {
 		snd_card_free(card);

@@ -192,6 +192,8 @@ static int __devinit snd_vx222_create(snd_card_t *card, struct pci_dev *pci,
 		return err;
 	}
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*rchip = vx;
 	return 0;
 }

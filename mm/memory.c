@@ -55,6 +55,7 @@
 #include <asm/pgtable.h>
 
 #include <linux/swapops.h>
+#include <linux/elf.h>
 
 #ifndef CONFIG_DISCONTIGMEM
 /* use the per-pgdat data instead for discontigmem - mbligh */
@@ -1688,7 +1689,9 @@ struct page * vmalloc_to_page(void * vmalloc_addr)
 
 EXPORT_SYMBOL(vmalloc_to_page);
 
-#if !defined(CONFIG_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR)
+#if !defined(CONFIG_ARCH_GATE_AREA)
+
+#if defined(AT_SYSINFO_EHDR)
 struct vm_area_struct gate_vma;
 
 static int __init gate_vma_init(void)
@@ -1701,4 +1704,24 @@ static int __init gate_vma_init(void)
 	return 0;
 }
 __initcall(gate_vma_init);
+#endif
+
+struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
+{
+#ifdef AT_SYSINFO_EHDR
+	return &gate_vma;
+#else
+	return 0;
+#endif
+}
+
+int in_gate_area(struct task_struct *task, unsigned long addr)
+{
+#ifdef AT_SYSINFO_EHDR
+	if ((addr >= FIXADDR_USER_START) && (addr < FIXADDR_USER_END))
+		return 1;
+#endif
+	return 0;
+}
+
 #endif

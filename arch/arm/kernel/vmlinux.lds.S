@@ -102,6 +102,12 @@ SECTIONS
 		 */
 		*(.init.task)
 
+		. = ALIGN(4096);
+		__nosave_begin = .;
+		*(.data.nosave)
+		. = ALIGN(4096);
+		__nosave_end = .;
+
 		/*
 		 * then the cacheline aligned data
 		 */

@@ -99,10 +99,6 @@ obj-$(CONFIG_SND_YMFPCI) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-raw
 obj-$(CONFIG_SND_POWERMAC) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 obj-$(CONFIG_SND_SA11XX_UDA1341) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 obj-$(CONFIG_SND_PC98_CS4232) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o snd-hwdep.o
-ifeq ($(CONFIG_SND_SB16_CSP),y)
-  obj-$(CONFIG_SND_SB16) += snd-hwdep.o
-  obj-$(CONFIG_SND_SBAWE) += snd-hwdep.o
-endif
 obj-$(CONFIG_SND_USB_AUDIO) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_SUN_AMD7930) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 obj-$(CONFIG_SND_SUN_CS4231) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
@@ -110,5 +106,6 @@ obj-$(CONFIG_SND_HARMONY) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 obj-$(CONFIG_SND_VXPOCKET) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-hwdep.o
 obj-$(CONFIG_SND_VXP440) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-hwdep.o
 obj-$(CONFIG_SND_VX222) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-hwdep.o
+obj-$(CONFIG_SND_BT87X) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 
 obj-m := $(sort $(obj-m))

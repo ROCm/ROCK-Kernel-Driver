@@ -5,11 +5,7 @@
  * Tobias Sargeant <tobias.sargeant@bigpond.com>
  * Based upon tas3001c.c by Christopher C. Chimelis <chris@debian.org>:
  *
- *   TODO:
- *   -----
- *   * Enable control over input line 2 (is this connected?)
- *   * Implement sleep support (at least mute everything and
- *   * set gains to minimum during sleep)
+ * Input support by Renzo Davoli <renzo@cs.unibo.it>
  *
  */
 
@@ -293,7 +289,8 @@ tas3004_write_register(	struct tas3004_data_t *self,
 {
 	if (reg_num==TAS3004_REG_MCR ||
 	    reg_num==TAS3004_REG_BASS ||
-	    reg_num==TAS3004_REG_TREBLE) {
+	    reg_num==TAS3004_REG_TREBLE ||
+	    reg_num==TAS3004_REG_ANALOG_CTRL) {
 		return tas_write_byte_register(&self->super,
 					       (uint)reg_num,
 					       *data,
@@ -313,7 +310,8 @@ tas3004_sync_register(	struct tas3004_data_t *self,
 {
 	if (reg_num==TAS3004_REG_MCR ||
 	    reg_num==TAS3004_REG_BASS ||
-	    reg_num==TAS3004_REG_TREBLE) {
+	    reg_num==TAS3004_REG_TREBLE ||
+	    reg_num==TAS3004_REG_ANALOG_CTRL) {
 		return tas_sync_byte_register(&self->super,
 					      (uint)reg_num,
 					      register_width(reg_num));
@@ -354,7 +352,9 @@ tas3004_supported_mixers(struct tas3004_data_t *self)
 		SOUND_MASK_ALTPCM |
 		SOUND_MASK_IMIX |
 		SOUND_MASK_TREBLE |
-		SOUND_MASK_BASS;
+		SOUND_MASK_BASS |
+		SOUND_MASK_MIC |
+		SOUND_MASK_LINE;
 }
 
 static int
@@ -447,6 +447,28 @@ tas3004_set_mixer_level(struct tas3004_data_t *self, int mixer, uint level)
 		shadow[TAS3004_REG_BASS][0]=temp&0xff;
 		rc = tas3004_sync_register(self,TAS3004_REG_BASS);
 		break;
+	case SOUND_MIXER_MIC:
+		if ((level&0xff)>0) {
+			software_input_volume = SW_INPUT_VOLUME_SCALE * (level&0xff);
+			if (self->super.mixer[mixer] == 0) {
+				self->super.mixer[SOUND_MIXER_LINE] = 0;
+				shadow[TAS3004_REG_ANALOG_CTRL][0]=0xc2;
+				rc = tas3004_sync_register(self,TAS3004_REG_ANALOG_CTRL);
+			} else rc=0;
+		} else {
+			self->super.mixer[SOUND_MIXER_LINE] = SW_INPUT_VOLUME_DEFAULT;
+			software_input_volume = SW_INPUT_VOLUME_SCALE *
+				(self->super.mixer[SOUND_MIXER_LINE]&0xff);
+			shadow[TAS3004_REG_ANALOG_CTRL][0]=0x00;
+			rc = tas3004_sync_register(self,TAS3004_REG_ANALOG_CTRL);
+		}
+		break;
+	case SOUND_MIXER_LINE:
+		if (self->super.mixer[SOUND_MIXER_MIC] == 0) {
+			software_input_volume = SW_INPUT_VOLUME_SCALE * (level&0xff);
+			rc=0;
+		}
+		break;
 	default:
 		rc = -1;
 		break;
@@ -496,6 +518,7 @@ tas3004_leave_sleep(struct tas3004_data_t *self)
 	(void)tas3004_sync_register(self,TAS3004_REG_RIGHT_MIXER);
 	(void)tas3004_sync_register(self,TAS3004_REG_TREBLE);
 	(void)tas3004_sync_register(self,TAS3004_REG_BASS);
+	(void)tas3004_sync_register(self,TAS3004_REG_ANALOG_CTRL);
 
 	return 0;
 }
@@ -1050,6 +1073,8 @@ tas3004_init_mixer(struct tas3004_data_t *self)
 	tas3004_set_mixer_level(self, SOUND_MIXER_BASS, BASS_DEFAULT);
 	tas3004_set_mixer_level(self, SOUND_MIXER_TREBLE, TREBLE_DEFAULT);
 
+	tas3004_set_mixer_level(self, SOUND_MIXER_LINE,SW_INPUT_VOLUME_DEFAULT);
+
 	return 0;
 }
 
@@ -1063,6 +1088,8 @@ tas3004_uninit_mixer(struct tas3004_data_t *self)
 
 	tas3004_set_mixer_level(self, SOUND_MIXER_BASS, 0);
 	tas3004_set_mixer_level(self, SOUND_MIXER_TREBLE, 0);
+
+	tas3004_set_mixer_level(self, SOUND_MIXER_LINE, 0);
 
 	return 0;
 }

@@ -28,6 +28,9 @@
 #define GREG_CFG_IBURST		0x00000001	/* Infinite Burst		*/
 #define GREG_CFG_TXDMALIM	0x0000003e	/* TX DMA grant limit		*/
 #define GREG_CFG_RXDMALIM	0x000007c0	/* RX DMA grant limit		*/
+#define GREG_CFG_RONPAULBIT	0x00000800	/* Use mem read multiple for PCI read
+						 * after infinite burst (Apple) */
+#define GREG_CFG_ENBUG2FIX	0x00001000	/* Fix Rx hang after overflow */
 
 /* Global Interrupt Status Register.
  *

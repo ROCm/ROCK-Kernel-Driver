@@ -142,7 +142,7 @@ setup_7410_workarounds:
 	sync
 	isync
 	blr
-	
+
 /* 740/750/7400/7410
  * Enable Store Gathering (SGE), Address Brodcast (ABE),
  * Branch History Table (BHTE), Branch Target ICache (BTIC)
@@ -213,7 +213,7 @@ setup_745x_specifics:
 	li	r7,CPU_FTR_CAN_NAP
 	andc	r6,r6,r7
 	stw	r6,CPU_SPEC_FEATURES(r5)
-1:	
+1:
 	mfspr	r11,HID0
 
 	/* All of the bits we have to set.....
@@ -248,20 +248,21 @@ END_FTR_SECTION_IFCLR(CPU_FTR_NO_DPM)
 /* Definitions for the table use to save CPU states */
 #define CS_HID0		0
 #define CS_HID1		4
-#define	CS_MSSCR0	8
-#define CS_MSSSR0	12
-#define CS_ICTRL	16
-#define CS_LDSTCR	20
-#define CS_LDSTDB	24
-#define CS_SIZE		28
+#define CS_HID2		8
+#define	CS_MSSCR0	12
+#define CS_MSSSR0	16
+#define CS_ICTRL	20
+#define CS_LDSTCR	24
+#define CS_LDSTDB	28
+#define CS_SIZE		32
 
 	.data
 	.balign	L1_CACHE_LINE_SIZE
-cpu_state_storage:	
+cpu_state_storage:
 	.space	CS_SIZE
 	.balign	L1_CACHE_LINE_SIZE,0
 	.text
-	
+
 /* Called in normal context to backup CPU 0 state. This
  * does not include cache settings. This function is also
  * called for machine sleep. This does not include the MMU
@@ -311,11 +312,18 @@ _GLOBAL(__save_cpu_setup)
 	stw	r4,CS_LDSTCR(r5)
 	mfspr	r4,SPRN_LDSTDB
 	stw	r4,CS_LDSTDB(r5)
-1:	
+1:
 	bne	cr5,1f
 	/* Backup 750FX specific registers */
 	mfspr	r4,SPRN_HID1
 	stw	r4,CS_HID1(r5)
+	/* If rev 2.x, backup HID2 */
+	mfspr	r3,PVR
+	andi.	r3,r3,0xff00
+	cmpi	cr0,r3,0x0200
+	bne	1f
+	mfspr	r4,SPRN_HID2
+	stw	r4,CS_HID2(r5)
 1:
 	mtcr	r7
 	blr
@@ -395,9 +403,19 @@ _GLOBAL(__restore_cpu_setup)
 	sync
 2:	bne	cr5,1f
 	/* Restore 750FX specific registers
-	 * that is restore PLL config & switch
-	 * to PLL 0
+	 * that is restore HID2 on rev 2.x and PLL config & switch
+	 * to PLL 0 on all
 	 */
+	/* If rev 2.x, restore HID2 with low voltage bit cleared */
+	mfspr	r3,PVR
+	andi.	r3,r3,0xff00
+	cmpi	cr0,r3,0x0200
+	bne	4f
+	lwz	r4,CS_HID2(r5)
+	rlwinm	r4,r4,0,19,17
+	mtspr	SPRN_HID2,r4
+	sync
+4:
 	lwz	r4,CS_HID1(r5)
 	rlwinm  r5,r4,0,16,14
 	mtspr	SPRN_HID1,r5

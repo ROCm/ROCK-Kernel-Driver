@@ -28,10 +28,8 @@
 
 #ifdef __KERNEL__
 #include <asm/sn/dmamap.h>
-#include <asm/sn/alenlist.h>
 #else
 #include <dmamap.h>
-#include <alenlist.h>
 #endif
 
 typedef int pciio_vendor_id_t;
@@ -99,10 +97,6 @@ typedef int pciio_space_t;		/* PCI address space designation */
  *	sleep waiting for resoruces, return an error
  *	instead. (PIOMAP_NOSLEEP and DMAMAP_NOSLEEP are
  *	the same numeric value and are acceptable).
- * PCIIO_INPLACE: when operating on alenlist structures,
- *	reuse the source alenlist rather than creating a
- *	new one. (PIOMAP_INPLACE and DMAMAP_INPLACE are
- *	the same numeric value and are acceptable).
  *
  * PCIIO_DMA_CMD: configure this stream as a
  *	generic "command" stream. Generally this
@@ -162,7 +156,6 @@ typedef int pciio_space_t;		/* PCI address space designation */
 
 #define	PCIIO_FIXED		DMAMAP_FIXED
 #define	PCIIO_NOSLEEP		DMAMAP_NOSLEEP
-#define	PCIIO_INPLACE		DMAMAP_INPLACE
 
 #define PCIIO_DMA_CMD		0x0010
 #define PCIIO_DMA_DATA		0x0020
@@ -398,9 +391,6 @@ pciio_dmaaddr_drain_f	(vertex_hdl_t vhdl,
 			 paddr_t addr,
 			 size_t bytes);
 
-typedef void
-pciio_dmalist_drain_f	(vertex_hdl_t vhdl,
-			 alenlist_t list);
 
 /* INTERRUPT MANAGEMENT */
 
@@ -494,7 +484,6 @@ typedef struct pciio_provider_s {
     pciio_dmatrans_addr_f  *dmatrans_addr;
     pciio_dmamap_drain_f   *dmamap_drain;
     pciio_dmaaddr_drain_f  *dmaaddr_drain;
-    pciio_dmalist_drain_f  *dmalist_drain;
 
     /* INTERRUPT MANAGEMENT */
     pciio_intr_alloc_f     *intr_alloc;
@@ -536,7 +525,6 @@ extern pciio_dmamap_done_f pciio_dmamap_done;
 extern pciio_dmatrans_addr_f pciio_dmatrans_addr;
 extern pciio_dmamap_drain_f pciio_dmamap_drain;
 extern pciio_dmaaddr_drain_f pciio_dmaaddr_drain;
-extern pciio_dmalist_drain_f pciio_dmalist_drain;
 extern pciio_intr_alloc_f pciio_intr_alloc;
 extern pciio_intr_free_f pciio_intr_free;
 extern pciio_intr_connect_f pciio_intr_connect;

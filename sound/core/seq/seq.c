@@ -1,6 +1,6 @@
 /*
  *  ALSA sequencer main module
- *  Copyright (c) 1998-1999 by Frank van de Pol <fvdpol@home.nl>
+ *  Copyright (c) 1998-1999 by Frank van de Pol <fvdpol@coil.demon.nl>
  *
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -42,7 +42,7 @@ int seq_default_timer_device = SNDRV_TIMER_GLOBAL_SYSTEM;
 int seq_default_timer_subdevice = 0;
 int seq_default_timer_resolution = 0;	/* Hz */
 
-MODULE_AUTHOR("Frank van de Pol <fvdpol@home.nl>, Jaroslav Kysela <perex@suse.cz>");
+MODULE_AUTHOR("Frank van de Pol <fvdpol@coil.demon.nl>, Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture sequencer.");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");

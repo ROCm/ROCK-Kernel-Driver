@@ -142,19 +142,22 @@ static struct tgfx __init *tgfx_probe(int *config)
 	if (config[0] < 0)
 		return NULL;
 
-	for (pp = parport_enumerate(); pp && (config[0] > 0); pp = pp->next)
-		config[0]--;
+	pp = parport_find_number(config[0]);
 
 	if (!pp) {
 		printk(KERN_ERR "turbografx.c: no such parport\n");
 		return NULL;
 	}
 
-	if (!(tgfx = kmalloc(sizeof(struct tgfx), GFP_KERNEL)))
+	if (!(tgfx = kmalloc(sizeof(struct tgfx), GFP_KERNEL))) {
+		parport_put_port(pp);
 		return NULL;
+	}
 	memset(tgfx, 0, sizeof(struct tgfx));
 
 	tgfx->pd = parport_register_device(pp, "turbografx", NULL, NULL, NULL, PARPORT_DEV_EXCL, NULL);
+		
+	parport_put_port(pp);
 
 	if (!tgfx->pd) {
 		printk(KERN_ERR "turbografx.c: parport busy already - lp.o loaded?\n");

@@ -45,6 +45,7 @@
 
 static struct pci_dev *triflex_dev;
 
+#ifdef CONFIG_PROC_FS
 static int triflex_get_info(char *buf, char **addr, off_t offset, int count)
 {
 	char *p = buf;
@@ -91,6 +92,7 @@ static int triflex_get_info(char *buf, char **addr, off_t offset, int count)
 	
 	return len > count ? count : len;
 }
+#endif
 
 static int triflex_tune_chipset(ide_drive_t *drive, u8 xferspeed)
 {

@@ -185,7 +185,7 @@ static int wm_dac_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 		if (nvol <= 0x1a && ovol <= 0x1a)
 			change = 0;
 		else
-			wm_put(ice, idx, nvol | 0x100);
+			wm_put(ice, idx, nvol | 0x180); /* update on zero detect */
 	}
 	snd_ice1712_restore_gpio_status(ice);
 	return change;
@@ -366,9 +366,15 @@ static int __devinit aureon_add_controls(ice1712_t *ice)
 static int __devinit aureon_init(ice1712_t *ice)
 {
 	static unsigned short wm_inits[] = {
+		/* These come first to reduce init pop noise */
+		0x1b, 0x000,		/* ADC Mux */
+		0x1c, 0x009,		/* Out Mux1 */
+		0x1d, 0x009,		/* Out Mux2 */
+
+		0x18, 0x000,		/* All power-up */
+
 		0x16, 0x122,		/* I2S, normal polarity, 24bit */
 		0x17, 0x022,		/* 256fs, slave mode */
-		0x18, 0x000,		/* All power-up */
 		0x00, 0,		/* DAC1 analog mute */
 		0x01, 0,		/* DAC2 analog mute */
 		0x02, 0,		/* DAC3 analog mute */
@@ -393,9 +399,6 @@ static int __devinit aureon_init(ice1712_t *ice)
 		0x15, 0x000,		/* no deemphasis, no ZFLG */
 		0x19, 0x000,		/* -12dB ADC/L */
 		0x1a, 0x000,		/* -12dB ADC/R */
-		0x1b, 0x000,		/* ADC Mux */
-		0x1c, 0x009,		/* Out Mux1 */
-		0x1d, 0x009,		/* Out Mux2 */
 	};
 	static unsigned short cs_inits[] = {
 		0x0441, /* RUN */

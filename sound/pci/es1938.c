@@ -1398,11 +1398,11 @@ static int __devinit snd_es1938_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
         /* check, if we can restrict PCI DMA transfers to 24 bits */
-        if (!pci_dma_supported(pci, 0x00ffffff)) {
+	if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
+	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
                 snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
                 return -ENXIO;
         }
-	pci_set_dma_mask(pci, 0x00ffffff);
 
 	chip = snd_magic_kcalloc(es1938_t, 0, GFP_KERNEL);
 	if (chip == NULL)
@@ -1482,6 +1482,8 @@ static int __devinit snd_es1938_create(snd_card_t * card,
 		snd_es1938_free(chip);
 		return err;
 	}
+
+	snd_card_set_dev(card, &pci->dev);
 
 	*rchip = chip;
 	return 0;
@@ -1633,6 +1635,14 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+
+	strcpy(card->driver, "ES1938");
+	strcpy(card->shortname, "ESS ES1938 (Solo-1)");
+	sprintf(card->longname, "%s rev %i, irq %i",
+		card->shortname,
+		chip->revision,
+		chip->irq);
+
 	if ((err = snd_es1938_new_pcm(chip, 0, &pcm)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -1667,13 +1677,6 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 	chip->gameport.io = chip->game_port;
 	gameport_register_port(&chip->gameport);
 #endif
-
-	strcpy(card->driver, "ES1938");
-	strcpy(card->shortname, "ESS ES1938 (Solo-1)");
-	sprintf(card->longname, "%s rev %i, irq %i",
-		card->shortname,
-		chip->revision,
-		chip->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

@@ -33,6 +33,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
@@ -40,6 +41,9 @@
 #include <sound/mpu401.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+/* for 440MX workaround */
+#include <asm/pgtable.h>
+#include <asm/cacheflush.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Intel 82801AA,82901AB,i810,i820,i830,i840,i845,MX440; SiS 7012; Ali 5455");
@@ -59,20 +63,18 @@ MODULE_DEVICES("{{Intel,82801AA-ICH},"
 		"{AMD,AMD8111},"
 	        "{ALI,M5455}}");
 
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 #define SUPPORT_JOYSTICK 1
+#endif
 #define SUPPORT_MIDI 1
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 #ifdef SUPPORT_JOYSTICK
-static int joystick_port[SNDRV_CARDS] =
-#ifdef CONFIG_ISA
-	{0x200};	/* enable as default */
-#else
-	{0};	/* disabled */
-#endif
+static int joystick[SNDRV_CARDS];
 #endif
 #ifdef SUPPORT_MIDI
 static int mpu_port[SNDRV_CARDS]; /* disabled */
@@ -90,10 +92,13 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:0");
+MODULE_PARM(ac97_quirk, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
+MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",allows:{{-1,3}},dialog:list,default:-1");
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(joystick_port, "Joystick port address for Intel i8x0 soundcard. (0 = disabled)");
-MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{0x200}},dialog:list");
+MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(joystick, "Enable joystick for Intel i8x0 soundcard.");
+MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 #endif
 #ifdef SUPPORT_MIDI
 MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
@@ -368,9 +373,8 @@ typedef struct {
 	unsigned int roff_picb;
 	unsigned int int_sta_mask;		/* interrupt status mask */
 	unsigned int ali_slot;			/* ALI DMA slot */
-	ac97_t *ac97;
-	unsigned short ac97_rate_regs[3];
-	int ac97_rates_idx;
+	struct ac97_pcm *pcm;
+	int pcm_open_flag;
 } ichdev_t;
 
 typedef struct _snd_intel8x0 intel8x0_t;
@@ -404,7 +408,9 @@ struct _snd_intel8x0 {
 	    smp20bit: 1;
 	int in_ac97_init: 1,
 	    in_sdin_init: 1;
+	int fix_nocache: 1; /* workaround for 440MX */
 
+	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
 	unsigned int ac97_sdin[3];
 
@@ -723,6 +729,23 @@ static void snd_intel8x0_setup_periods(intel8x0_t *chip, ichdev_t *ichdev)
 	iputbyte(chip, port + ichdev->roff_sr, ICH_FIFOE | ICH_BCIS | ICH_LVBCI);
 }
 
+#ifdef __i386__
+/*
+ * Intel 82443MX running a 100MHz processor system bus has a hardware bug,
+ * which aborts PCI busmaster for audio transfer.  A workaround is to set
+ * the pages as non-cached.  For details, see the errata in
+ *	http://www.intel.com/design/chipsets/specupdt/245051.htm
+ */
+static void fill_nocache(void *buf, int size, int nocache)
+{
+	size = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	change_page_attr(virt_to_page(buf), size, nocache ? PAGE_KERNEL_NOCACHE : PAGE_KERNEL);
+	global_flush_tlb();
+}
+#else
+#define fill_nocache(buf,size,nocache)
+#endif
+
 /*
  *  Interrupt handler
  */
@@ -888,11 +911,46 @@ static int snd_intel8x0_ali_trigger(snd_pcm_substream_t *substream, int cmd)
 static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 				  snd_pcm_hw_params_t * hw_params)
 {
-	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
+	intel8x0_t *chip = snd_pcm_substream_chip(substream);
+	ichdev_t *ichdev = get_ichdev(substream);
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	size_t size = params_buffer_bytes(hw_params);
+	int err;
+
+	if (chip->fix_nocache && runtime->dma_area && runtime->dma_bytes < size)
+		fill_nocache(runtime->dma_area, runtime->dma_bytes, 0); /* clear */
+	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
+	if (err < 0)
+		return err;
+	if (chip->fix_nocache && err > 0)
+		fill_nocache(runtime->dma_area, runtime->dma_bytes, 1);
+	if (ichdev->pcm_open_flag) {
+		snd_ac97_pcm_close(ichdev->pcm);
+		ichdev->pcm_open_flag = 0;
+	}
+	err = snd_ac97_pcm_open(ichdev->pcm, params_rate(hw_params),
+				params_channels(hw_params),
+				ichdev->pcm->r[0].slots);
+	if (err >= 0) {
+		ichdev->pcm_open_flag = 1;
+		/* FIXME: hack to enable spdif support */
+		if (ichdev->ichd == ICHD_PCMOUT && chip->device_type == DEVICE_SIS)
+			snd_ac97_set_rate(ichdev->pcm->r[0].codec[0], AC97_SPDIF, params_rate(hw_params));
+	}
+	return err;
 }
 
 static int snd_intel8x0_hw_free(snd_pcm_substream_t * substream)
 {
+	intel8x0_t *chip = snd_pcm_substream_chip(substream);
+	ichdev_t *ichdev = get_ichdev(substream);
+
+	if (ichdev->pcm_open_flag) {
+		snd_ac97_pcm_close(ichdev->pcm);
+		ichdev->pcm_open_flag = 0;
+	}
+	if (chip->fix_nocache && substream->runtime->dma_area)
+		fill_nocache(substream->runtime->dma_area, substream->runtime->dma_bytes, 0);
 	return snd_pcm_lib_free_pages(substream);
 }
 
@@ -925,6 +983,13 @@ static void snd_intel8x0_setup_multi_channels(intel8x0_t *chip, int channels)
 			cnt |= ICH_PCM_4;
 		else if (chip->multi6 && channels == 6)
 			cnt |= ICH_PCM_6;
+		if (chip->device_type == DEVICE_NFORCE) {
+			/* reset to 2ch once to keep the 6 channel data in alignment,
+			 * to start from Front Left always
+			 */
+			iputdword(chip, ICHREG(GLOB_CNT), (cnt & 0xcfffff));
+			mdelay(50); /* grrr... */
+		}
 		iputdword(chip, ICHREG(GLOB_CNT), cnt);
 		break;
 	}
@@ -935,7 +1000,6 @@ static int snd_intel8x0_pcm_prepare(snd_pcm_substream_t * substream)
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	ichdev_t *ichdev = get_ichdev(substream);
-	int i;
 
 	ichdev->physbuf = runtime->dma_addr;
 	ichdev->size = snd_pcm_lib_buffer_bytes(substream);
@@ -944,14 +1008,6 @@ static int snd_intel8x0_pcm_prepare(snd_pcm_substream_t * substream)
 		spin_lock(&chip->reg_lock);
 		snd_intel8x0_setup_multi_channels(chip, runtime->channels);
 		spin_unlock(&chip->reg_lock);
-	}
-	if (ichdev->ac97) {
-		for (i = 0; i < 3; i++)
-			if (ichdev->ac97_rate_regs[i])
-				snd_ac97_set_rate(ichdev->ac97, ichdev->ac97_rate_regs[i], runtime->rate);
-		/* FIXME: hack to enable spdif support */
-		if (ichdev->ichd == ICHD_PCMOUT && chip->device_type == DEVICE_SIS)
-			snd_ac97_set_rate(ichdev->ac97, AC97_SPDIF, runtime->rate);
 	}
 	snd_intel8x0_setup_periods(chip, ichdev);
 	return 0;
@@ -1031,13 +1087,11 @@ static int snd_intel8x0_pcm_open(snd_pcm_substream_t * substream, ichdev_t *ichd
 
 	ichdev->substream = substream;
 	runtime->hw = snd_intel8x0_stream;
-	if (ichdev->ac97 && ichdev->ac97_rates_idx >= 0) {
-		runtime->hw.rates = ichdev->ac97->rates[ichdev->ac97_rates_idx];
-		for (i = 0; i < ARRAY_SIZE(rates); i++) {
-			if (runtime->hw.rates & (1 << i)) {
-				runtime->hw.rate_min = rates[i];
-				break;
-			}
+	runtime->hw.rates = ichdev->pcm->rates;
+	for (i = 0; i < ARRAY_SIZE(rates); i++) {
+		if (runtime->hw.rates & (1 << i)) {
+			runtime->hw.rate_min = rates[i];
+			break;
 		}
 	}
 	if (chip->device_type == DEVICE_SIS) {
@@ -1057,6 +1111,9 @@ static int snd_intel8x0_playback_open(snd_pcm_substream_t * substream)
 	int err;
 
 	err = snd_intel8x0_pcm_open(substream, &chip->ichd[ICHD_PCMOUT]);
+	if (err < 0)
+		return err;
+
 	if (chip->multi6) {
 		runtime->hw.channels_max = 6;
 		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels6);
@@ -1513,7 +1570,7 @@ static int __devinit snd_intel8x0_pcm(intel8x0_t *chip)
 		rec = tbl + i;
 		if (i > 0 && rec->ac97_idx) {
 			/* activate PCM only when associated AC'97 codec */
-			if (! chip->ichd[rec->ac97_idx].ac97)
+			if (! chip->ichd[rec->ac97_idx].pcm)
 				continue;
 		}
 		err = snd_intel8x0_pcm1(chip, device, rec);
@@ -1531,76 +1588,100 @@ static int __devinit snd_intel8x0_pcm(intel8x0_t *chip)
  *  Mixer part
  */
 
+static void snd_intel8x0_mixer_free_ac97_bus(ac97_bus_t *bus)
+{
+	intel8x0_t *chip = snd_magic_cast(intel8x0_t, bus->private_data, return);
+	chip->ac97_bus = NULL;
+}
+
 static void snd_intel8x0_mixer_free_ac97(ac97_t *ac97)
 {
 	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return);
 	chip->ac97[ac97->num] = NULL;
 }
 
-struct _ac97_rate_regs {
-	unsigned int ichd;
-	unsigned short regs[3];
-	short rates_idx;
-};
-
-static struct _ac97_rate_regs intel_ac97_rate_regs[] __devinitdata = {
-	{ ICHD_PCMOUT, { AC97_PCM_FRONT_DAC_RATE, AC97_PCM_SURR_DAC_RATE, AC97_PCM_LFE_DAC_RATE }, AC97_RATES_FRONT_DAC },
-	{ ICHD_PCMIN, { AC97_PCM_LR_ADC_RATE, 0, 0 }, AC97_RATES_ADC },
-	{ ICHD_MIC, { AC97_PCM_MIC_ADC_RATE, 0, 0 }, AC97_RATES_MIC_ADC },
-	{ ICHD_MIC2, { AC97_PCM_MIC_ADC_RATE, 0, 0 }, AC97_RATES_MIC_ADC },
-	{ ICHD_PCM2IN, { AC97_PCM_LR_ADC_RATE, 0, 0 }, AC97_RATES_ADC },
-	{ ICHD_SPBAR, { AC97_SPDIF, 0, 0 }, AC97_RATES_SPDIF },
-};
-
-static struct _ac97_rate_regs nforce_ac97_rate_regs[] __devinitdata = {
-	{ NVD_PCMOUT, { AC97_PCM_FRONT_DAC_RATE, AC97_PCM_SURR_DAC_RATE, AC97_PCM_LFE_DAC_RATE }, AC97_RATES_FRONT_DAC },
-	{ NVD_PCMIN, { AC97_PCM_LR_ADC_RATE, 0, 0 }, AC97_RATES_ADC },
-	{ NVD_MIC, { AC97_PCM_MIC_ADC_RATE, 0, 0 }, AC97_RATES_MIC_ADC },
-	{ NVD_SPBAR, { AC97_SPDIF, AC97_PCM_FRONT_DAC_RATE, 0 }, -1 }, /* spdif is 48k only */
-};
-
-static struct _ac97_rate_regs ali_ac97_rate_regs[] __devinitdata = {
-#if 0 /* FIXME: my test board doens't work well with VRA... */
-	{ ALID_PCMOUT, { AC97_PCM_FRONT_DAC_RATE, AC97_PCM_SURR_DAC_RATE, AC97_PCM_LFE_DAC_RATE }, AC97_RATES_FRONT_DAC },
-	{ ALID_PCMIN, { AC97_PCM_LR_ADC_RATE, 0, 0 }, AC97_RATES_ADC },
-	{ ALID_MIC, { AC97_PCM_MIC_ADC_RATE, 0, 0 }, AC97_RATES_MIC_ADC },
-	{ ALID_AC97SPDIFOUT, { AC97_SPDIF, 0, 0 }, AC97_RATES_SPDIF },
-	{ ALID_SPDIFOUT, { 0, 0, 0 }, -1 },
-	{ ALID_SPDIFIN, { 0, 0, 0 }, -1 },
-#else
-	{ ALID_PCMOUT, { AC97_PCM_FRONT_DAC_RATE }, -1 },
-	{ ALID_PCMIN, { AC97_PCM_LR_ADC_RATE }, -1 },
-	{ ALID_MIC, { AC97_PCM_MIC_ADC_RATE }, -1 },
-	{ ALID_AC97SPDIFOUT, { AC97_SPDIF }, -1 },
-	{ ALID_SPDIFOUT, { }, -1 },
-	{ ALID_SPDIFIN, { }, -1 },
-#endif
+static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
+	/* front PCM */
+	{
+		.exclusive = 1,
+		.r = {	{
+				.slots = (1 << AC97_SLOT_PCM_LEFT) |
+					 (1 << AC97_SLOT_PCM_RIGHT) |
+					 (1 << AC97_SLOT_PCM_CENTER) |
+					 (1 << AC97_SLOT_PCM_SLEFT) |
+					 (1 << AC97_SLOT_PCM_SRIGHT) |
+					 (1 << AC97_SLOT_LFE)
+			}
+		}
+	},
+	/* PCM IN #1 */
+	{
+		.stream = 1,
+		.exclusive = 1,
+		.r = {	{
+				.slots = (1 << AC97_SLOT_PCM_LEFT) |
+					 (1 << AC97_SLOT_PCM_RIGHT)
+			}
+		}
+	},
+	/* MIC IN #1 */
+	{
+		.stream = 1,
+		.exclusive = 1,
+		.r = {	{
+				.slots = (1 << AC97_SLOT_MIC)
+			}
+		}
+	},
+	/* S/PDIF PCM */
+	{
+		.exclusive = 1,
+		.spdif = 1,
+		.r = {	{
+				.slots = (1 << AC97_SLOT_SPDIF_LEFT2) |
+					 (1 << AC97_SLOT_SPDIF_RIGHT2)
+			}
+		}
+	},
+	/* PCM IN #2 */
+	{
+		.stream = 1,
+		.exclusive = 1,
+		.r = {	{
+				.slots = (1 << AC97_SLOT_PCM_LEFT) |
+					 (1 << AC97_SLOT_PCM_RIGHT)
+			}
+		}
+	},
+	/* MIC IN #2 */
+	{
+		.stream = 1,
+		.exclusive = 1,
+		.r = {	{
+				.slots = (1 << AC97_SLOT_MIC)
+			}
+		}
+	},
 };
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
 		.vendor = 0x1028,
 		.device = 0x00d8,
-		.name = "Dell Precision 530",
+		.name = "Dell Precision 530",	/* AD1885 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
 		.vendor = 0x1028,
 		.device = 0x0126,
-		.name = "Dell Optiplex GX260",
+		.name = "Dell Optiplex GX260",	/* AD1981A */
 		.type = AC97_TUNE_HP_ONLY
 	},
-	{
-		.vendor = 0x1028,
-		.device = 0x0157,
-		.name = "Dell Dimension 8300",
-		.type = AC97_TUNE_SWAP_SURROUND
-	},
-	{
-		.vendor = 0x1043,
-		.device =0x80b0,
-		.name = "ASUS P4PE Mobo",
-		.type = AC97_TUNE_SWAP_SURROUND
+	{	/* FIXME: which codec? */
+		.vendor = 0x103c,
+		.device = 0x00c3,
+		.name = "Hewlett-Packard onboard",
+		.type = AC97_TUNE_HP_ONLY
 	},
  	{
 		.vendor = 0x1043,
@@ -1611,13 +1692,19 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
 		.vendor = 0x10f1,
 		.device = 0x2665,
-		.name = "Fujitsu-Siemens Celcius",
+		.name = "Fujitsu-Siemens Celsius",	/* AD1981? */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x10f1,
+		.device = 0x2885,
+		.name = "AMD64 Mobo",	/* ALC650 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
 		.vendor = 0x110a,
 		.device = 0x0056,
-		.name = "Fujitsu-Siemens Scenic",
+		.name = "Fujitsu-Siemens Scenic",	/* AD1981? */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
@@ -1627,26 +1714,23 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.vendor = 0x1734,
-		.device = 0x0088,
-		.name = "Fujitsu-Siemens D1522",
+		.vendor = 0x1462,
+		.device = 0x5470,
+		.name = "MSI P4 ATX 645 Ultra",
 		.type = AC97_TUNE_HP_ONLY
 	},
-#if 0
-	/* FIXME: this seems invalid */
 	{
-		.vendor = 0x4144,
-		.device = 0x5360,
-		.type = "AMD64 Motherboard",
-		.name = AC97_TUNE_HP_ONLY
+		.vendor = 0x1734,
+		.device = 0x0088,
+		.name = "Fujitsu-Siemens D1522",	/* AD1981 */
+		.type = AC97_TUNE_HP_ONLY
 	},
-#endif
 	{
 		.vendor = 0x8086,
 		.device = 0x2000,
 		.mask = 0xfff0,
-		.name = "Intel ICH5/AD1985 (discrete)",
-		.type = AC97_TUNE_HP_ONLY
+		.name = "Intel ICH5/AD1985",
+		.type = AC97_TUNE_AD_SHARING
 	},
 	{
 		.vendor = 0x8086,
@@ -1658,7 +1742,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
 		.vendor = 0x8086,
 		.device = 0x4d44,
-		.name = "Intel D850EMV2",
+		.name = "Intel D850EMV2",	/* AD1885 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
@@ -1679,64 +1763,50 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.vendor = 0x8086,
 		.device = 0xa000,
 		.mask = 0xfff0,
-		.name = "Intel ICH5/AD1985 (discrete)",
-		.type = AC97_TUNE_HP_ONLY
-	},
-	{
-		.vendor = 0x103c,
-		.device = 0x00c3,
-		.name = "Hewlett-Packard onboard",
+		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{ } /* terminator */
 };
 
-static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
+static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac97_quirk)
 {
+	ac97_bus_t bus, *pbus;
 	ac97_t ac97, *x97;
-	ichdev_t *ichdev;
 	int err;
-	unsigned int i, num, codecs, _codecs;
+	unsigned int i, codecs;
 	unsigned int glob_sta = 0;
-	struct _ac97_rate_regs *tbl;
 	int spdif_idx = -1; /* disabled */
 
 	switch (chip->device_type) {
 	case DEVICE_NFORCE:
-		tbl = nforce_ac97_rate_regs;
 		spdif_idx = NVD_SPBAR;
 		break;
 	case DEVICE_ALI:
-		tbl = ali_ac97_rate_regs;
 		spdif_idx = ALID_AC97SPDIFOUT;
 		break;
 	default:
-		tbl = intel_ac97_rate_regs;
 		if (chip->device_type == DEVICE_INTEL_ICH4)
 			spdif_idx = ICHD_SPBAR;
 		break;
 	};
-	for (i = 0; i < chip->bdbars_count; i++) {
-		struct _ac97_rate_regs *aregs = tbl + i;
-		ichdev = &chip->ichd[aregs->ichd];
-		ichdev->ac97_rate_regs[0] = aregs->regs[0];
-		ichdev->ac97_rate_regs[1] = aregs->regs[1];
-		ichdev->ac97_rate_regs[2] = aregs->regs[2];
-		ichdev->ac97_rates_idx = aregs->rates_idx;
-	}
 
 	chip->in_ac97_init = 1;
+	memset(&bus, 0, sizeof(bus));
+	bus.private_data = chip;
+	bus.private_free = snd_intel8x0_mixer_free_ac97_bus;
+	if (ac97_clock >= 8000 && ac97_clock <= 48000)
+		bus.clock = ac97_clock;
+	else
+		bus.clock = 48000;
+	
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
 	ac97.private_free = snd_intel8x0_mixer_free_ac97;
-	if (ac97_clock >= 8000 && ac97_clock <= 48000)
-		ac97.clock = ac97_clock;
-	else
-		ac97.clock = 48000;
 	if (chip->device_type != DEVICE_ALI) {
 		glob_sta = igetdword(chip, ICHREG(GLOB_STA));
-		ac97.write = snd_intel8x0_codec_write;
-		ac97.read = snd_intel8x0_codec_read;
+		bus.write = snd_intel8x0_codec_write;
+		bus.read = snd_intel8x0_codec_read;
 		if (chip->device_type == DEVICE_INTEL_ICH4) {
 			codecs = 0;
 			if (glob_sta & ICH_PCR)
@@ -1756,9 +1826,10 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		} else {
 			codecs = glob_sta & ICH_SCR ? 2 : 1;
 		}
+		bus.vra = 1;
 	} else {
-		ac97.write = snd_intel8x0_ali_codec_write;
-		ac97.read = snd_intel8x0_ali_codec_read;
+		bus.write = snd_intel8x0_ali_codec_write;
+		bus.read = snd_intel8x0_ali_codec_read;
 		codecs = 1;
 		/* detect the secondary codec */
 		for (i = 0; i < 100; i++) {
@@ -1770,144 +1841,82 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 			iputdword(chip, ICHREG(ALI_RTSR), reg | 0x40);
 			udelay(1);
 		}
+		/* FIXME: my test board doens't work well with VRA... */
+		bus.vra = 0;
 	}
+	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+		goto __err;
+	chip->ac97_bus = pbus;
 	ac97.pci = chip->pci;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0) {
-		/* clear the cold-reset bit for the next chance */
-		if (chip->device_type != DEVICE_ALI)
-			iputdword(chip, ICHREG(GLOB_CNT), igetdword(chip, ICHREG(GLOB_CNT)) & ~ICH_AC97COLD);
-		return err;
+	for (i = 0; i < codecs; i++) {
+		ac97.num = i;
+		if ((err = snd_ac97_mixer(pbus, &ac97, &x97)) < 0) {
+			snd_printk(KERN_ERR "Unable to initialize codec #%d\n", i);
+			if (i == 0)
+				goto __err;
+			continue;
+		}
+		chip->ac97[i] = x97;
 	}
-	chip->ac97[0] = x97;
 	/* tune up the primary codec */
-	snd_ac97_tune_hardware(chip->ac97[0], ac97_quirks);
-	/* the following three entries are common among all devices */
-	chip->ichd[ICHD_PCMOUT].ac97 = x97;
-	chip->ichd[ICHD_PCMIN].ac97 = x97;
-	if (x97->ext_id & AC97_EI_VRM)
-		chip->ichd[ICHD_MIC].ac97 = x97;
-	/* spdif */
-	if ((x97->ext_id & AC97_EI_SPDIF) && spdif_idx >= 0)
-		chip->ichd[spdif_idx].ac97 = x97;
-	/* make sure, that we have DACs at right slot for rev2.2 */
-	if (ac97_is_rev22(x97))
-		snd_ac97_update_bits(x97, AC97_EXTENDED_ID, AC97_EI_DACS_SLOT_MASK, 0);
-	/* AnalogDevices CNR boards uses special codec chaining */
-	/* skip standard test method for secondary codecs in this case */
-	if (x97->flags & AC97_AD_MULTI)
-		codecs = 1;
-	if (codecs < 2)
-		goto __skip_secondary;
-	for (i = 1, num = 1, _codecs = codecs; num < _codecs; num++) {
-		ac97.num = num;
-		if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0) {
-			snd_printk("Unable to initialize codec #%i [device = %i, GLOB_STA = 0x%x]\n", i, chip->device_type, glob_sta);
-			codecs--;
-			continue;
-		}
-		chip->ac97[i++] = x97;
-		if (!ac97_is_audio(x97))
-			continue;
-		switch (chip->device_type) {
-		case DEVICE_INTEL_ICH4:
-			if (chip->ichd[ICHD_PCM2IN].ac97 == NULL)
-				chip->ichd[ICHD_PCM2IN].ac97 = x97;
-			if (x97->ext_id & AC97_EI_VRM) {
-				if (chip->ichd[ICHD_MIC].ac97 == NULL)
-					chip->ichd[ICHD_MIC].ac97 = x97;
-				else if (chip->ichd[ICHD_MIC2].ac97 == NULL &&
-					 chip->ichd[ICHD_PCM2IN].ac97 == x97)
-					chip->ichd[ICHD_MIC2].ac97 = x97;
-			}
-			break;
-		default:
-			if (x97->ext_id & AC97_EI_VRM) {
-				if (chip->ichd[ICHD_MIC].ac97 == NULL)
-					chip->ichd[ICHD_MIC].ac97 = x97;
-			}
-			break;
-		}
-		if ((x97->ext_id & AC97_EI_SPDIF) && spdif_idx >= 0) {
-			if (chip->ichd[spdif_idx].ac97 == NULL)
-				chip->ichd[spdif_idx].ac97 = x97;
-		}
-	}
-	
-      __skip_secondary:
+	snd_ac97_tune_hardware(chip->ac97[0], ac97_quirks, ac97_quirk);
+	/* enable separate SDINs for ICH4 */
+	if (chip->device_type == DEVICE_INTEL_ICH4)
+		pbus->isdin = 1;
+	/* find the available PCM streams */
+	i = ARRAY_SIZE(ac97_pcm_defs);
+	if (chip->device_type != DEVICE_INTEL_ICH4)
+		i -= 2;		/* do not allocate PCM2IN and MIC2 */
+	if (spdif_idx < 0)
+		i--;		/* do not allocate S/PDIF */
+	err = snd_ac97_pcm_assign(pbus, i, ac97_pcm_defs);
+	if (err < 0)
+		goto __err;
+	chip->ichd[ICHD_PCMOUT].pcm = &pbus->pcms[0];
+	chip->ichd[ICHD_PCMIN].pcm = &pbus->pcms[1];
+	chip->ichd[ICHD_MIC].pcm = &pbus->pcms[2];
+	if (spdif_idx >= 0)
+		chip->ichd[spdif_idx].pcm = &pbus->pcms[3];
 	if (chip->device_type == DEVICE_INTEL_ICH4) {
+		chip->ichd[ICHD_PCM2IN].pcm = &pbus->pcms[4];
+		chip->ichd[ICHD_MIC2].pcm = &pbus->pcms[5];
+	}
+	/* enable separate SDINs for ICH4 */
+	if (chip->device_type == DEVICE_INTEL_ICH4) {
+		struct ac97_pcm *pcm = chip->ichd[ICHD_PCM2IN].pcm;
 		u8 tmp = igetbyte(chip, ICHREG(SDM));
 		tmp &= ~(ICH_DI2L_MASK|ICH_DI1L_MASK);
-		if (chip->ichd[ICHD_PCM2IN].ac97) {
+		if (pcm) {
 			tmp |= ICH_SE;	/* steer enable for multiple SDINs */
 			tmp |= chip->ac97_sdin[0] << ICH_DI1L_SHIFT;
-			tmp |= chip->ac97_sdin[chip->ichd[ICHD_PCM2IN].ac97->num] << ICH_DI2L_SHIFT;
+			for (i = 1; i < 4; i++) {
+				if (pcm->r[0].codec[i]) {
+					tmp |= chip->ac97_sdin[pcm->r[0].codec[1]->num] << ICH_DI2L_SHIFT;
+					break;
+				}
+			}
 		} else {
-			tmp &= ~ICH_SE;
+			tmp &= ~ICH_SE; /* steer disable */
 		}
 		iputbyte(chip, ICHREG(SDM), tmp);
 	}
-      	for (i = 0; i < codecs; i++) {
-		x97 = chip->ac97[i];
-		if (!ac97_is_audio(x97))
-			continue;
-		if (x97->scaps & AC97_SCAP_SURROUND_DAC)
-			chip->multi4 = 1;
-	}
-      	for (i = 0; i < codecs && chip->multi4; i++) {
-		x97 = chip->ac97[i];
-		if (!ac97_is_audio(x97))
-			continue;
-		if (x97->scaps & AC97_SCAP_CENTER_LFE_DAC)
+	if (pbus->pcms[0].r[0].slots & (1 << AC97_SLOT_PCM_SLEFT)) {
+		chip->multi4 = 1;
+		if (pbus->pcms[0].r[0].slots & (1 << AC97_SLOT_LFE))
 			chip->multi6 = 1;
 	}
-	if (chip->device_type == DEVICE_ALI && chip->ac97[1]) {
-		/* set secondary codec id */
-		iputdword(chip, ICHREG(ALI_SSR),
-			  (igetdword(chip, ICHREG(ALI_SSR)) & ~ICH_ALI_SS_SEC_ID) |
-			  (chip->ac97[1]->addr << 5));
-	}
-	if (codecs > 1 && !chip->multi6) {
-		/* assign right slots for rev2.2 codecs */
-		i = 1;
-		for ( ; i < codecs && !chip->multi4; i++) {
-			x97 = chip->ac97[i];
-			if (!ac97_is_audio(x97))
-				continue;
-			if (ac97_is_rev22(x97)) {
-				snd_ac97_update_bits(x97, AC97_EXTENDED_ID, AC97_EI_DACS_SLOT_MASK, 1);
-				chip->multi4 = 1;
-			}
-		}
-		for ( ; i < codecs && chip->multi4; i++) {
-			x97 = chip->ac97[i];
-			if (!ac97_is_audio(x97))
-				continue;
-			if (ac97_is_rev22(x97)) {
-				snd_ac97_update_bits(x97, AC97_EXTENDED_ID, AC97_EI_DACS_SLOT_MASK, 2);
-				chip->multi6 = 1;
-				break;
-			}
-		}
-		/* ok, some older codecs might support only AMAP */
-		if (!chip->multi4) {
-			int cnums = 0;
-			for (i = 1; i < codecs; i++) {
-				x97 = chip->ac97[i];
-				if (!ac97_is_audio(x97))
-					continue;
-				if (ac97_can_amap(x97)) {
-					if (x97->addr > 0)
-						cnums++;
-				}
-			}
-			if (cnums >= 2)
-				chip->multi6 = 1;
-			if (cnums >= 1)
-				chip->multi4 = 1;
-		}
+	if (chip->device_type == DEVICE_NFORCE) {
+		/* 48kHz only */
+		chip->ichd[spdif_idx].pcm->rates = SNDRV_PCM_RATE_48000;
 	}
 	chip->in_ac97_init = 0;
 	return 0;
+
+ __err:
+	/* clear the cold-reset bit for the next chance */
+	if (chip->device_type != DEVICE_ALI)
+		iputdword(chip, ICHREG(GLOB_CNT), igetdword(chip, ICHREG(GLOB_CNT)) & ~ICH_AC97COLD);
+	return err;
 }
 
 
@@ -2107,8 +2116,11 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	/* --- */
 	synchronize_irq(chip->irq);
       __hw_end:
-	if (chip->bdbars)
+	if (chip->bdbars) {
+		if (chip->fix_nocache)
+			fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 0);
 		snd_free_pci_pages(chip->pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
+	}
 	if (chip->remap_addr)
 		iounmap((void *) chip->remap_addr);
 	if (chip->remap_bmaddr)
@@ -2212,7 +2224,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	unsigned long flags;
 	struct timeval start_time, stop_time;
 
-	if (chip->ac97[0]->clock != 48000)
+	if (chip->ac97_bus->clock != 48000)
 		return; /* specified in module option */
 
 	subs = chip->pcm[0]->streams[0].substream;
@@ -2227,7 +2239,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 
 	/* set rate */
 	if (snd_ac97_set_rate(chip->ac97[0], AC97_PCM_FRONT_DAC_RATE, 48000) < 0) {
-		snd_printk(KERN_ERR "cannot set ac97 rate: clock = %d\n", chip->ac97[0]->clock);
+		snd_printk(KERN_ERR "cannot set ac97 rate: clock = %d\n", chip->ac97_bus->clock);
 		return;
 	}
 	snd_intel8x0_setup_periods(chip, ichdev);
@@ -2271,10 +2283,8 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 
 	t = stop_time.tv_sec - start_time.tv_sec;
 	t *= 1000000;
-	if (stop_time.tv_usec < start_time.tv_usec)
-		t -= start_time.tv_usec - stop_time.tv_usec;
-	else
-		t += stop_time.tv_usec - start_time.tv_usec;
+	t += stop_time.tv_usec - start_time.tv_usec;
+	printk(KERN_INFO "%s: measured %lu usecs\n", __FUNCTION__, t);
 	if (t == 0) {
 		snd_printk(KERN_ERR "?? calculation error..\n");
 		return;
@@ -2286,8 +2296,8 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 		printk(KERN_INFO "intel8x0: measured clock %ld rejected\n", pos);
 	else if (pos < 47500 || pos > 48500)
 		/* not 48000Hz, tuning the clock.. */
-		chip->ac97[0]->clock = (chip->ac97[0]->clock * 48000) / pos;
-	printk(KERN_INFO "intel8x0: clocking to %d\n", chip->ac97[0]->clock);
+		chip->ac97_bus->clock = (chip->ac97_bus->clock * 48000) / pos;
+	printk(KERN_INFO "intel8x0: clocking to %d\n", chip->ac97_bus->clock);
 }
 
 static void snd_intel8x0_proc_read(snd_info_entry_t * entry,
@@ -2321,7 +2331,7 @@ static void __devinit snd_intel8x0_proc_init(intel8x0_t * chip)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(chip->card, "intel8x0", &entry))
-		snd_info_set_text_ops(entry, chip, snd_intel8x0_proc_read);
+		snd_info_set_text_ops(entry, chip, 1024, snd_intel8x0_proc_read);
 }
 
 static int snd_intel8x0_dev_free(snd_device_t *device)
@@ -2397,6 +2407,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	snd_intel8x0_proc_init(chip);
 	sprintf(chip->ac97_name, "%s - AC'97", card->shortname);
 	sprintf(chip->ctrl_name, "%s - Controller", card->shortname);
+	if (pci->vendor == PCI_VENDOR_ID_INTEL &&
+	    pci->device == PCI_DEVICE_ID_INTEL_440MX)
+		chip->fix_nocache = 1; /* enable workaround */
 	if (device_type == DEVICE_ALI) {
 		/* ALI5455 has no ac97 region */
 		chip->bmaddr = pci_resource_start(pci, 0);
@@ -2505,6 +2518,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	}
 	/* tables must be aligned to 8 bytes here, but the kernel pages
 	   are much bigger, so we don't care (on i386) */
+	/* workaround for 440MX */
+	if (chip->fix_nocache)
+		fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 1);
 	int_sta_masks = 0;
 	for (i = 0; i < chip->bdbars_count; i++) {
 		ichdev = &chip->ichd[i];
@@ -2529,6 +2545,8 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 		snd_intel8x0_free(chip);
 		return err;
 	}
+
+	snd_card_set_dev(card, &pci->dev);
 
 	*r_intel8x0 = chip;
 	return 0;
@@ -2591,14 +2609,13 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 			break;
 		}
 	}
-	card->dev = &pci->dev;
 
 	if ((err = snd_intel8x0_create(card, pci, pci_id->driver_data, &chip)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
 
-	if ((err = snd_intel8x0_mixer(chip, ac97_clock[dev])) < 0) {
+	if ((err = snd_intel8x0_mixer(chip, ac97_clock[dev], ac97_quirk[dev])) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -2657,9 +2674,16 @@ static struct pci_driver driver = {
  * initialize joystick/midi addresses
  */
 
+#ifdef SUPPORT_JOYSTICK
+/* there is only one available device, so we keep it here */
+static struct pci_dev *ich_gameport_pci;
+static struct gameport ich_gameport = { .io = 0x200 };
+#endif
+
 static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 						 const struct pci_device_id *id)
 {
+	u16 val;
 	static int dev;
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
@@ -2668,17 +2692,24 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 		return -ENOENT;
 	}
 
-	if (joystick_port[dev] > 0 || mpu_port[dev] > 0) {
-		u16 val;
-		pci_read_config_word(pci, 0xe6, &val);
-		if (joystick_port[dev] > 0)
+	pci_read_config_word(pci, 0xe6, &val);
+#ifdef SUPPORT_JOYSTICK
+	if (joystick[dev]) {
+		if (! request_region(ich_gameport.io, 8, "ICH gameport")) {
+			printk(KERN_WARNING "intel8x0: cannot grab gameport 0x%x\n",  ich_gameport.io);
+			joystick[dev] = 0;
+		} else {
+			ich_gameport_pci = pci;
+			gameport_register_port(&ich_gameport);
 			val |= 0x100;
-		if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330)
-			val |= 0x20;
-		pci_write_config_word(pci, 0xe6, val | 0x100);
-
+		}
+	}
+#endif
+#ifdef SUPPORT_MIDI
+	if (mpu_port[dev] > 0) {
 		if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330) {
 			u8 b;
+			val |= 0x20;
 			pci_read_config_byte(pci, 0xe2, &b);
 			if (mpu_port[dev] == 0x300)
 				b |= 0x08;
@@ -2687,7 +2718,25 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 			pci_write_config_byte(pci, 0xe2, b);
 		}
 	}
+#endif
+	pci_write_config_word(pci, 0xe6, val);
 	return 0;
+}
+
+static void __devexit snd_intel8x0_joystick_remove(struct pci_dev *pci)
+{
+	u16 val;
+#ifdef SUPPORT_JOYSTICK
+	if (ich_gameport_pci == pci) {
+		gameport_unregister_port(&ich_gameport);
+		release_region(ich_gameport.io, 8);
+		ich_gameport_pci = NULL;
+	}
+#endif
+	/* disable joystick and MIDI */
+	pci_read_config_word(pci, 0xe6, &val);
+	val &= ~0x120;
+	pci_write_config_word(pci, 0xe6, val);
 }
 
 static struct pci_device_id snd_intel8x0_joystick_ids[] = {
@@ -2708,6 +2757,7 @@ static struct pci_driver joystick_driver = {
 	.name = "Intel ICH Joystick",
 	.id_table = snd_intel8x0_joystick_ids,
 	.probe = snd_intel8x0_joystick_probe,
+	.remove = __devexit_p(snd_intel8x0_joystick_remove),
 };
 
 static int have_joystick;
@@ -2750,7 +2800,7 @@ module_exit(alsa_card_intel8x0_exit)
 
 #ifndef MODULE
 
-/* format is: snd-intel8x0=enable,index,id,ac97_clock */
+/* format is: snd-intel8x0=enable,index,id,ac97_clock,ac97_quirk,mpu_port,joystick */
 
 static int __init alsa_card_intel8x0_setup(char *str)
 {
@@ -2761,7 +2811,15 @@ static int __init alsa_card_intel8x0_setup(char *str)
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&ac97_clock[nr_dev]) == 2);
+	       get_option(&str,&ac97_clock[nr_dev]) == 2 &&
+	       get_option(&str,&ac97_quirk[nr_dev]) == 2
+#ifdef SUPPORT_MIDI
+	       && get_option(&str,&mpu_port[nr_dev]) == 2
+#endif
+#ifdef SUPPORT_JOYSTICK
+	       && get_option(&str,&joystick[nr_dev]) == 2
+#endif
+	       );
 	nr_dev++;
 	return 1;
 }

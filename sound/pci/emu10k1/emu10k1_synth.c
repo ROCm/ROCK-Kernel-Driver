@@ -58,6 +58,7 @@ int snd_emu10k1_synth_new_device(snd_seq_device_t *dev)
 	emu->midi_ports = arg->seq_ports < 2 ? arg->seq_ports : 2; /* maximum two ports */
 	emu->midi_devidx = hw->audigy ? 2 : 1; /* audigy has two external midis */
 	emu->linear_panning = 0;
+	emu->hwdep_idx = 2; /* FIXED */
 
 	if (snd_emux_register(emu, dev->card, arg->index, "Emu10k1") < 0) {
 		snd_emux_free(emu);

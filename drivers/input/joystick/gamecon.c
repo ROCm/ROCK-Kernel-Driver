@@ -478,19 +478,22 @@ static struct gc __init *gc_probe(int *config)
 	if (config[0] < 0)
 		return NULL;
 
-	for (pp = parport_enumerate(); pp && (config[0] > 0); pp = pp->next)
-		config[0]--;
+	pp = parport_find_number(config[0]);
 
 	if (!pp) {
 		printk(KERN_ERR "gamecon.c: no such parport\n");
 		return NULL;
 	}
 
-	if (!(gc = kmalloc(sizeof(struct gc), GFP_KERNEL)))
+	if (!(gc = kmalloc(sizeof(struct gc), GFP_KERNEL))) {
+		parport_put_port(pp);
 		return NULL;
+	}
 	memset(gc, 0, sizeof(struct gc));
 
 	gc->pd = parport_register_device(pp, "gamecon", NULL, NULL, NULL, PARPORT_DEV_EXCL, NULL);
+
+	parport_put_port(pp);
 
 	if (!gc->pd) {
 		printk(KERN_ERR "gamecon.c: parport busy already - lp.o loaded?\n");

@@ -481,10 +481,13 @@ static int __devinit snd_cmi8330_probe(int dev,
 	acard->card = card;
 
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && (err = snd_cmi8330_pnp(dev, acard, pcard, pid)) < 0) {
-		snd_printk("PnP detection failed\n");
-		snd_card_free(card);
-		return err;
+	if (isapnp[dev]) {
+		if ((err = snd_cmi8330_pnp(dev, acard, pcard, pid)) < 0) {
+			snd_printk("PnP detection failed\n");
+			snd_card_free(card);
+			return err;
+		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
 
@@ -658,11 +661,11 @@ static int __init alsa_card_cmi8330_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&sbport[nr_dev]) == 2 &&
+	       get_option_long(&str,&sbport[nr_dev]) == 2 &&
 	       get_option(&str,&sbirq[nr_dev]) == 2 &&
 	       get_option(&str,&sbdma8[nr_dev]) == 2 &&
 	       get_option(&str,&sbdma16[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&wssport[nr_dev]) == 2 &&
+	       get_option_long(&str,&wssport[nr_dev]) == 2 &&
 	       get_option(&str,&wssirq[nr_dev]) == 2 &&
 	       get_option(&str,&wssdma[nr_dev]) == 2);
 #ifdef CONFIG_PNP

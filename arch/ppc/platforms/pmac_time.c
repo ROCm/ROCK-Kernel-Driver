@@ -266,6 +266,14 @@ pmac_calibrate_decr(void)
 		if (via_calibrate_decr())
 			return;
 
+	/* Special case: QuickSilver G4s seem to have a badly calibrated
+	 * timebase-frequency in OF, VIA is much better on these. We should
+	 * probably implement calibration based on the KL timer on these
+	 * machines anyway... -BenH
+	 */
+	if (machine_is_compatible("PowerMac3,5"))
+		if (via_calibrate_decr())
+			return;
 	/*
 	 * The cpu node should have a timebase-frequency property
 	 * to tell us the rate at which the decrementer counts.

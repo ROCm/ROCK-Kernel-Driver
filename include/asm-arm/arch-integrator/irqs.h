@@ -45,6 +45,13 @@
 #define IRQ_AP_CPINT1			19
 #define IRQ_AP_LBUSTIMEOUT 		20
 #define IRQ_AP_APCINT			21
+#define IRQ_CP_CLCDCINT			22
+#define IRQ_CP_MMCIINT0			23
+#define IRQ_CP_MMCIINT1			24
+#define IRQ_CP_AACIINT			25
+#define IRQ_CP_CPPLDINT			26
+#define IRQ_CP_ETHINT			27
+#define IRQ_CP_TSPENINT			28
 #define IRQ_PIC_END			31
 
 #define IRQ_CIC_START			32
@@ -52,6 +59,24 @@
 #define IRQ_CM_COMMRX			33
 #define IRQ_CM_COMMTX			34
 #define IRQ_CIC_END			34
+
+/*
+ * IntegratorCP only
+ */
+#define IRQ_SIC_START			35
+#define IRQ_SIC_CP_SOFTINT		35
+#define IRQ_SIC_CP_RI0			36
+#define IRQ_SIC_CP_RI1			37
+#define IRQ_SIC_CP_CARDIN		38
+#define IRQ_SIC_CP_LMINT0		39
+#define IRQ_SIC_CP_LMINT1		40
+#define IRQ_SIC_CP_LMINT2		41
+#define IRQ_SIC_CP_LMINT3		42
+#define IRQ_SIC_CP_LMINT4		43
+#define IRQ_SIC_CP_LMINT5		44
+#define IRQ_SIC_CP_LMINT6		45
+#define IRQ_SIC_CP_LMINT7		46
+#define IRQ_SIC_END			46
 
 #define NR_IRQS                         47
 

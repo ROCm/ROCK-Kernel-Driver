@@ -59,7 +59,6 @@ typedef struct xtalk_piomap_s *xtalk_piomap_t;
 
 #include <asm/types.h>
 #include <asm/sn/types.h>
-#include <asm/sn/alenlist.h>
 #include <asm/sn/ioerror.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/dmamap.h>
@@ -78,14 +77,9 @@ struct xwidget_hwid_s;
  *	sleep waiting for resoruces, return an error
  *	instead. (PIOMAP_NOSLEEP and DMAMAP_NOSLEEP are
  *	the same numeric value and are acceptable).
- * XTALK_INPLACE: when operating on alenlist structures,
- *	reuse the source alenlist rather than creating a
- *	new one. (PIOMAP_INPLACE and DMAMAP_INPLACE are
- *	the same numeric value and are acceptable).
  */
 #define	XTALK_FIXED		DMAMAP_FIXED
 #define	XTALK_NOSLEEP		DMAMAP_NOSLEEP
-#define	XTALK_INPLACE		DMAMAP_INPLACE
 
 /* PIO MANAGEMENT */
 typedef xtalk_piomap_t
@@ -139,11 +133,6 @@ xtalk_dmamap_addr_f     (xtalk_dmamap_t dmamap,		/* use these mapping resources 
 			 paddr_t paddr,		/* map for this address */
 			 size_t byte_count);	/* map this many bytes */
 
-typedef alenlist_t
-xtalk_dmamap_list_f     (xtalk_dmamap_t dmamap,		/* use these mapping resources */
-			 alenlist_t alenlist,	/* map this address/length list */
-			 unsigned int flags);
-
 typedef void
 xtalk_dmamap_done_f     (xtalk_dmamap_t dmamap);
 
@@ -154,12 +143,6 @@ xtalk_dmatrans_addr_f   (vertex_hdl_t dev,	/* translate for this device */
 			 size_t byte_count,	/* length */
 			 unsigned int flags);
 
-typedef alenlist_t
-xtalk_dmatrans_list_f   (vertex_hdl_t dev,	/* translate for this device */
-			 device_desc_t dev_desc,	/* device descriptor */
-			 alenlist_t palenlist,	/* system address/length list */
-			 unsigned int flags);
-
 typedef void
 xtalk_dmamap_drain_f	(xtalk_dmamap_t map);	/* drain this map's channel */
 
@@ -167,11 +150,6 @@ typedef void
 xtalk_dmaaddr_drain_f	(vertex_hdl_t vhdl,	/* drain channel from this device */
 			 paddr_t addr,		/* to this physical address */
 			 size_t bytes);		/* for this many bytes */
-
-typedef void
-xtalk_dmalist_drain_f	(vertex_hdl_t vhdl,	/* drain channel from this device */
-			 alenlist_t list);	/* for this set of physical blocks */
-
 
 /* INTERRUPT MANAGEMENT */
 
@@ -260,13 +238,10 @@ typedef struct xtalk_provider_s {
     xtalk_dmamap_alloc_f   *dmamap_alloc;
     xtalk_dmamap_free_f    *dmamap_free;
     xtalk_dmamap_addr_f    *dmamap_addr;
-    xtalk_dmamap_list_f    *dmamap_list;
     xtalk_dmamap_done_f    *dmamap_done;
     xtalk_dmatrans_addr_f  *dmatrans_addr;
-    xtalk_dmatrans_list_f  *dmatrans_list;
     xtalk_dmamap_drain_f   *dmamap_drain;
     xtalk_dmaaddr_drain_f  *dmaaddr_drain;
-    xtalk_dmalist_drain_f  *dmalist_drain;
 
     /* INTERRUPT MANAGEMENT */
     xtalk_intr_alloc_f     *intr_alloc;
@@ -289,13 +264,10 @@ extern xtalk_piotrans_addr_f xtalk_piotrans_addr;
 extern xtalk_dmamap_alloc_f xtalk_dmamap_alloc;
 extern xtalk_dmamap_free_f xtalk_dmamap_free;
 extern xtalk_dmamap_addr_f xtalk_dmamap_addr;
-extern xtalk_dmamap_list_f xtalk_dmamap_list;
 extern xtalk_dmamap_done_f xtalk_dmamap_done;
 extern xtalk_dmatrans_addr_f xtalk_dmatrans_addr;
-extern xtalk_dmatrans_list_f xtalk_dmatrans_list;
 extern xtalk_dmamap_drain_f xtalk_dmamap_drain;
 extern xtalk_dmaaddr_drain_f xtalk_dmaaddr_drain;
-extern xtalk_dmalist_drain_f xtalk_dmalist_drain;
 extern xtalk_intr_alloc_f xtalk_intr_alloc;
 extern xtalk_intr_alloc_f xtalk_intr_alloc_nothd;
 extern xtalk_intr_free_f xtalk_intr_free;

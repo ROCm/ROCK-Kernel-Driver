@@ -2,6 +2,7 @@
  *   ALSA driver for ICEnsemble ICE1712 (Envy24)
  *
  *   Lowlevel functions for M-Audio Delta 1010, 44, 66, Dio2496, Audiophile
+ *                          Digigram VX442
  *
  *	Copyright (c) 2000 Jaroslav Kysela <perex@suse.cz>
  *
@@ -83,12 +84,19 @@ static unsigned char ap_cs8427_codec_select(ice1712_t *ice)
 {
 	unsigned char tmp;
 	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
-	if (ice->eeprom.subvendor == ICE1712_SUBDEVICE_DELTA1010LT) {
+	switch (ice->eeprom.subvendor) {
+	case ICE1712_SUBDEVICE_DELTA1010LT:
 		tmp &= ~ICE1712_DELTA_1010LT_CS;
 		tmp |= ICE1712_DELTA_1010LT_CCLK | ICE1712_DELTA_1010LT_CS_CS8427;
-	} else { /* Audiophile */
+		break;
+	case ICE1712_SUBDEVICE_AUDIOPHILE:
 		tmp |= ICE1712_DELTA_AP_CCLK | ICE1712_DELTA_AP_CS_CODEC;
 		tmp &= ~ICE1712_DELTA_AP_CS_DIGITAL;
+		break;
+	case ICE1712_SUBDEVICE_VX442:
+		tmp |= ICE1712_VX442_CCLK | ICE1712_VX442_CODEC_CHIP_A | ICE1712_VX442_CODEC_CHIP_B;
+		tmp &= ~ICE1712_VX442_CS_DIGITAL;
+		break;
 	}
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 	udelay(5);
@@ -98,11 +106,17 @@ static unsigned char ap_cs8427_codec_select(ice1712_t *ice)
 /* deassert chip select */
 static void ap_cs8427_codec_deassert(ice1712_t *ice, unsigned char tmp)
 {
-	if (ice->eeprom.subvendor == ICE1712_SUBDEVICE_DELTA1010LT) {
+	switch (ice->eeprom.subvendor) {
+	case ICE1712_SUBDEVICE_DELTA1010LT:
 		tmp &= ~ICE1712_DELTA_1010LT_CS;
 		tmp |= ICE1712_DELTA_1010LT_CS_NONE;
-	} else { /* Audiophile */
+		break;
+	case ICE1712_SUBDEVICE_AUDIOPHILE:
 		tmp |= ICE1712_DELTA_AP_CS_DIGITAL;
+		break;
+	case ICE1712_SUBDEVICE_VX442:
+		tmp |= ICE1712_VX442_CS_DIGITAL;
+		break;
 	}
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 }
@@ -257,6 +271,40 @@ static void delta1010lt_ak4524_lock(akm4xxx_t *ak, int chip)
 }
 
 /*
+ * AK4528 on VX442 to choose the chip mask
+ */
+static void vx442_ak4524_lock(akm4xxx_t *ak, int chip)
+{
+        struct snd_ak4xxx_private *priv = (void *)ak->private_value[0];
+        ice1712_t *ice = ak->private_data[0];
+
+	snd_ice1712_save_gpio_status(ice);
+	priv->cs_mask =
+	priv->cs_addr = chip == 0 ? ICE1712_VX442_CODEC_CHIP_A :
+				    ICE1712_VX442_CODEC_CHIP_B;
+}
+
+/*
+ * change the DFS bit according rate for Delta1010
+ */
+static void delta_1010_set_rate_val(ice1712_t *ice, unsigned int rate)
+{
+	unsigned char tmp, tmp2;
+
+	if (rate == 0)	/* no hint - S/PDIF input is master, simply return */
+		return;
+
+	down(&ice->gpio_mutex);
+	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
+	tmp2 = tmp & ~ICE1712_DELTA_DFS;
+	if (rate > 48000)
+		tmp2 |= ICE1712_DELTA_DFS;
+	if (tmp != tmp2)
+		snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp2);
+	up(&ice->gpio_mutex);
+}
+
+/*
  * change the rate of AK4524 on Delta 44/66, AP, 1010LT
  */
 static void delta_ak4524_set_rate_val(akm4xxx_t *ak, unsigned int rate)
@@ -271,8 +319,7 @@ static void delta_ak4524_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 	down(&ice->gpio_mutex);
 	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
 	up(&ice->gpio_mutex);
-	tmp2 = tmp;
-	tmp2 &= ~ICE1712_DELTA_DFS; 
+	tmp2 = tmp & ~ICE1712_DELTA_DFS; 
 	if (rate > 48000)
 		tmp2 |= ICE1712_DELTA_DFS;
 	if (tmp == tmp2)
@@ -287,6 +334,23 @@ static void delta_ak4524_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 	up(&ice->gpio_mutex);
 	snd_akm4xxx_reset(ak, 0);
+}
+
+/*
+ * change the rate of AK4524 on VX442
+ */
+static void vx442_ak4524_set_rate_val(akm4xxx_t *ak, unsigned int rate)
+{
+	unsigned char val;
+
+	val = (rate > 48000) ? 0x65 : 0x60;
+	if (snd_akm4xxx_get(ak, 0, 0x02) != val ||
+	    snd_akm4xxx_get(ak, 1, 0x02) != val) {
+		snd_akm4xxx_reset(ak, 1);
+		snd_akm4xxx_write(ak, 0, 0x02, val);
+		snd_akm4xxx_write(ak, 1, 0x02, val);
+		snd_akm4xxx_reset(ak, 0);
+	}
 }
 
 
@@ -416,6 +480,28 @@ static struct snd_ak4xxx_private akm_delta44_priv __devinitdata = {
 	.mask_flags = 0,
 };
 
+static akm4xxx_t akm_vx442 __devinitdata = {
+	.type = SND_AK4524,
+	.num_adcs = 4,
+	.num_dacs = 4,
+	.ops = {
+		.lock = vx442_ak4524_lock,
+		.set_rate_val = vx442_ak4524_set_rate_val
+	}
+};
+
+static struct snd_ak4xxx_private akm_vx442_priv __devinitdata = {
+	.caddr = 2,
+	.cif = 0,
+	.data_mask = ICE1712_VX442_DOUT,
+	.clk_mask = ICE1712_VX442_CCLK,
+	.cs_mask = 0,
+	.cs_addr = 0, /* set later */
+	.cs_none = 0,
+	.add_flags = 0,
+	.mask_flags = 0,
+};
+
 static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 {
 	int err;
@@ -437,6 +523,9 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA1010LT:
 		ice->num_total_dacs = 8;
 		break;
+	case ICE1712_SUBDEVICE_VX442:
+		ice->num_total_dacs = 4;
+		break;
 	}
 
 	/* initialize spdif */
@@ -444,6 +533,7 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
 	case ICE1712_SUBDEVICE_DELTA410:
 	case ICE1712_SUBDEVICE_DELTA1010LT:
+	case ICE1712_SUBDEVICE_VX442:
 		if ((err = snd_i2c_bus_create(ice->card, "ICE1712 GPIO 1", NULL, &ice->i2c)) < 0) {
 			snd_printk("unable to create I2C bus\n");
 			return err;
@@ -454,7 +544,11 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 			return err;
 		break;
 	case ICE1712_SUBDEVICE_DELTA1010:
+		ice->gpio.set_pro_rate = delta_1010_set_rate_val;
+		break;
 	case ICE1712_SUBDEVICE_DELTADIO2496:
+		ice->gpio.set_pro_rate = delta_1010_set_rate_val;
+		/* fall thru */
 	case ICE1712_SUBDEVICE_DELTA66:
 		ice->spdif.ops.open = delta_open_spdif;
 		ice->spdif.ops.setup_rate = delta_setup_spdif;
@@ -493,6 +587,9 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA66:
 	case ICE1712_SUBDEVICE_DELTA44:
 		err = snd_ice1712_akm4xxx_init(ak, &akm_delta44, &akm_delta44_priv, ice);
+		break;
+	case ICE1712_SUBDEVICE_VX442:
+		err = snd_ice1712_akm4xxx_init(ak, &akm_vx442, &akm_vx442_priv, ice);
 		break;
 	default:
 		snd_BUG();
@@ -574,11 +671,13 @@ static int __devinit snd_ice1712_delta_add_controls(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA410:
 	case ICE1712_SUBDEVICE_DELTA44:
 	case ICE1712_SUBDEVICE_DELTA66:
+	case ICE1712_SUBDEVICE_VX442:
 		err = snd_ice1712_akm4xxx_build_controls(ice);
 		if (err < 0)
 			return err;
 		break;
 	}
+
 	return 0;
 }
 
@@ -629,6 +728,13 @@ struct snd_ice1712_card_info snd_ice1712_delta_cards[] __devinitdata = {
 		"M Audio Delta 1010LT",
 		snd_ice1712_delta_init,
 		snd_ice1712_delta_add_controls,
+	},
+	{
+		ICE1712_SUBDEVICE_VX442,
+		"Digigram VX442",
+		snd_ice1712_delta_init,
+		snd_ice1712_delta_add_controls,
+		1, /* NO MPU */
 	},
 	{ } /* terminator */
 };

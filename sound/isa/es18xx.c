@@ -1471,8 +1471,10 @@ static int __devinit snd_es18xx_identify(es18xx_t *chip)
 		chip->ctrl_port = inb(chip->port + 0x05) << 8;
 		chip->ctrl_port += inb(chip->port + 0x05);
 
-		if ((chip->res_ctrl_port = request_region(chip->ctrl_port, 8, "ES18xx - CTRL")) == NULL)
+		if ((chip->res_ctrl_port = request_region(chip->ctrl_port, 8, "ES18xx - CTRL")) == NULL) {
+			snd_printk(KERN_ERR PFX "unable go grab port 0x%lx\n", chip->ctrl_port);
 			return -EBUSY;
+		}
 
 		return 0;
 	}
@@ -2056,9 +2058,12 @@ static int __devinit snd_audiodrive_probe(int dev, struct pnp_card_link *pcard,
 		return -ENOMEM;
 	acard = (struct snd_audiodrive *)card->private_data;
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && (err = snd_audiodrive_pnp(dev, acard, pcard, pid)) < 0) {
-		snd_card_free(card);
-		return err;
+	if (isapnp[dev]) {
+		if ((err = snd_audiodrive_pnp(dev, acard, pcard, pid)) < 0) {
+			snd_card_free(card);
+			return err;
+		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
 
@@ -2096,6 +2101,20 @@ static int __devinit snd_audiodrive_probe(int dev, struct pnp_card_link *pcard,
 		snd_card_free(card);
 		return err;
 	}
+
+	sprintf(card->driver, "ES%x", chip->version);
+	sprintf(card->shortname, "ESS AudioDrive ES%x", chip->version);
+	if (xdma1 != xdma2)
+		sprintf(card->longname, "%s at 0x%lx, irq %d, dma1 %d, dma2 %d",
+			card->shortname,
+			chip->port,
+			xirq, xdma1, xdma2);
+	else
+		sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
+			card->shortname,
+			chip->port,
+			xirq, xdma1);
+
 	if ((err = snd_es18xx_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -2137,18 +2156,6 @@ static int __devinit snd_audiodrive_probe(int dev, struct pnp_card_link *pcard,
 		card->power_state_private_data = chip;
 	}
 #endif
-	sprintf(card->driver, "ES%x", chip->version);
-	sprintf(card->shortname, "ESS AudioDrive ES%x", chip->version);
-	if (xdma1 != xdma2)
-		sprintf(card->longname, "%s at 0x%lx, irq %d, dma1 %d, dma2 %d",
-			card->shortname,
-			chip->port,
-			xirq, xdma1, xdma2);
-	else
-		sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
-			card->shortname,
-			chip->port,
-			xirq, xdma1);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -2286,9 +2293,9 @@ static int __init alsa_card_es18xx_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&
 	       get_option(&str,&dma2[nr_dev]) == 2);

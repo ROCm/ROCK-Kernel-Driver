@@ -645,7 +645,7 @@ vertex_to_name(vertex_hdl_t vhdl, char *buf, unsigned int buflen)
 
 
 void
-hwgraph_debug(char *file, char * function, int line, vertex_hdl_t vhdl1, vertex_hdl_t vhdl2, char *format, ...)
+hwgraph_debug(char *file, const char * function, int line, vertex_hdl_t vhdl1, vertex_hdl_t vhdl2, char *format, ...)
 {
 
 	int pos;

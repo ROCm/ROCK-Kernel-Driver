@@ -210,6 +210,7 @@ static int __devinit snd_card_ad1816a_probe(int dev, struct pnp_card_link *pcard
 		snd_card_free(card);
 		return error;
 	}
+	snd_card_set_dev(card, &pcard->card->dev);
 
 	if ((error = snd_ad1816a_create(card, port[dev],
 					irq[dev],
@@ -219,6 +220,11 @@ static int __devinit snd_card_ad1816a_probe(int dev, struct pnp_card_link *pcard
 		snd_card_free(card);
 		return error;
 	}
+
+	strcpy(card->driver, "AD1816A");
+	strcpy(card->shortname, "ADI SoundPort AD1816A");
+	sprintf(card->longname, "%s, SS at 0x%lx, irq %d, dma %d&%d",
+		card->shortname, chip->port, irq[dev], dma1[dev], dma2[dev]);
 
 	if ((error = snd_ad1816a_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
@@ -253,11 +259,6 @@ static int __devinit snd_card_ad1816a_probe(int dev, struct pnp_card_link *pcard
 			}
 		}
 	}
-
-	strcpy(card->driver, "AD1816A");
-	strcpy(card->shortname, "ADI SoundPort AD1816A");
-	sprintf(card->longname, "%s soundcard, SS at 0x%lx, irq %d, dma %d&%d",
-		card->shortname, chip->port, irq[dev], dma1[dev], dma2[dev]);
 
 	if ((error = snd_card_register(card)) < 0) {
 		snd_card_free(card);
@@ -338,9 +339,9 @@ static int __init alsa_card_ad1816a_setup(char *str)
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&mpu_irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&

@@ -130,6 +130,10 @@ static int __init snd_audiodrive_probe(int dev)
 		return err;
 	}
 
+	strcpy(card->driver, "ES1688");
+	strcpy(card->shortname, pcm->name);
+	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %i", pcm->name, chip->port, xirq, xdma);
+
 	if ((snd_opl3_create(card, chip->port, chip->port + 2, OPL3_HW_OPL3, 0, &opl3)) < 0) {
 		printk(KERN_ERR "es1688: opl3 not detected at 0x%lx\n", chip->port);
 	} else {
@@ -139,7 +143,7 @@ static int __init snd_audiodrive_probe(int dev)
 		}
 	}
 
-	if (xmpu_irq >= 0) {
+	if (xmpu_irq >= 0 && xmpu_irq != SNDRV_AUTO_IRQ && chip->mpu_port > 0) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_ES1688,
 					       chip->mpu_port, 0,
 					       xmpu_irq,
@@ -149,9 +153,6 @@ static int __init snd_audiodrive_probe(int dev)
 			return err;
 		}
 	}
-	strcpy(card->driver, "ES1688");
-	strcpy(card->shortname, pcm->name);
-	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %i", pcm->name, chip->port, xirq, xdma);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -226,8 +227,8 @@ static int __init alsa_card_es1688_setup(char *str)
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&mpu_irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma8[nr_dev]) == 2);

@@ -107,6 +107,7 @@ snd_emux_init_seq(snd_emux_t *emu, snd_card_t *card, int index)
 		p->port_mode =  SNDRV_EMUX_PORT_MODE_MIDI;
 		snd_emux_init_port(p);
 		emu->ports[i] = p->chset.port;
+		emu->portptrs[i] = p;
 	}
 
 	return 0;

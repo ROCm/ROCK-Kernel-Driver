@@ -1341,6 +1341,7 @@ int vga16fb_setup(char *options)
 int __init vga16fb_init(void)
 {
 	int i;
+	int ret;
 
 	printk(KERN_DEBUG "vga16fb: initializing\n");
 
@@ -1349,7 +1350,8 @@ int __init vga16fb_init(void)
         vga16fb.screen_base = ioremap(VGA_FB_PHYS, VGA_FB_PHYS_LEN);
 	if (!vga16fb.screen_base) {
 		printk(KERN_ERR "vga16fb: unable to map device\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto err_ioremap;
 	}
 	printk(KERN_INFO "vga16fb: mapped to 0x%p\n", vga16fb.screen_base);
 
@@ -1371,30 +1373,45 @@ int __init vga16fb_init(void)
 	vga16fb.flags = FBINFO_FLAG_DEFAULT;
 
 	i = (vga16fb_defined.bits_per_pixel == 8) ? 256 : 16;
-	fb_alloc_cmap(&vga16fb.cmap, i, 0);
+	ret = fb_alloc_cmap(&vga16fb.cmap, i, 0);
+	if (ret) {
+		printk(KERN_ERR "vga16fb: unable to allocate colormap\n");
+		ret = -ENOMEM;
+		goto err_alloc_cmap;
+	}
 
 	if (vga16fb_check_var(&vga16fb.var, &vga16fb)) {
-		iounmap(vga16fb.screen_base);
-		return -EINVAL;
+		printk(KERN_ERR "vga16fb: unable to validate variable\n");
+		ret = -EINVAL;
+		goto err_check_var;
 	}
 
 	vga16fb_update_fix(&vga16fb);
 
 	if (register_framebuffer(&vga16fb) < 0) {
-		iounmap(vga16fb.screen_base);
-		return -EINVAL;
+		printk(KERN_ERR "vga16fb: unable to register framebuffer\n");
+		ret = -EINVAL;
+		goto err_check_var;
 	}
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
 	       vga16fb.node, vga16fb.fix.id);
 
 	return 0;
+
+ err_check_var:
+	fb_dealloc_cmap(&vga16fb.cmap);
+ err_alloc_cmap:
+	iounmap(vga16fb.screen_base);
+ err_ioremap:
+	return ret;
 }
 
 static void __exit vga16fb_exit(void)
 {
     unregister_framebuffer(&vga16fb);
     iounmap(vga16fb.screen_base);
+    fb_dealloc_cmap(&vga16fb.cmap);
     /* XXX unshare VGA regions */
 }
 

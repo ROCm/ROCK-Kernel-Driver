@@ -21,8 +21,8 @@
  *  Non-offset'ed vector numbers
  */
 
-#define OPENPIC_VEC_TIMER	64	/* and up */
-#define OPENPIC_VEC_IPI		72	/* and up */
+#define OPENPIC_VEC_TIMER	110	/* and up */
+#define OPENPIC_VEC_IPI		118	/* and up */
 #define OPENPIC_VEC_SPURIOUS	127
 
 /* OpenPIC IRQ controller structure */
@@ -51,6 +51,7 @@ extern void openpic_setup_ISU(int isu_num, unsigned long addr);
 extern void openpic_cause_IPI(u_int ipi, u_int cpumask);
 extern void smp_openpic_message_pass(int target, int msg, unsigned long data,
 				     int wait);
+extern void openpic_set_k2_cascade(int irq);
 
 extern inline int openpic_to_irq(int irq)
 {
@@ -64,5 +65,25 @@ extern inline int openpic_to_irq(int irq)
 		return 0;
 	}
 }
-/*extern int open_pic_irq_offset;*/
+/* Support for second openpic on G5 macs */
+
+// FIXME: To be replaced by sane cascaded controller management */
+
+#define PMAC_OPENPIC2_OFFSET	128
+
+#define OPENPIC2_VEC_TIMER	110	/* and up */
+#define OPENPIC2_VEC_IPI	118	/* and up */
+#define OPENPIC2_VEC_SPURIOUS	127
+
+
+extern void* OpenPIC2_Addr;
+
+/* Exported functions */
+extern void openpic2_set_sources(int first_irq, int num_irqs, void *isr);
+extern void openpic2_init(int linux_irq_offset);
+extern void openpic2_init_nmi_irq(u_int irq);
+extern u_int openpic2_irq(void);
+extern void openpic2_eoi(void);
+extern int openpic2_get_irq(struct pt_regs *regs);
+extern void openpic2_setup_ISU(int isu_num, unsigned long addr);
 #endif /* _PPC_KERNEL_OPEN_PIC_H */

@@ -268,12 +268,10 @@ out:
 static int do_remove_node(char *buf)
 {
 	struct device_node *node;
-	int rv = 0;
+	int rv = -ENODEV;
 
 	if ((node = of_find_node_by_path(buf)))
-		of_remove_node(node);
-	else
-		rv = -ENODEV;
+		rv = of_remove_node(node);
 
 	of_node_put(node);
 	return rv;

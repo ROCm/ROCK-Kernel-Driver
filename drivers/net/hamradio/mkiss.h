@@ -56,6 +56,7 @@ struct ax_disp {
 #define CRC_MODE_NONE   0
 #define CRC_MODE_FLEX   1
 #define CRC_MODE_SMACK  2
+	spinlock_t          buflock;	/* lock for rbuf and xbuf */
 };
 
 #define AX25_MAGIC		0x5316

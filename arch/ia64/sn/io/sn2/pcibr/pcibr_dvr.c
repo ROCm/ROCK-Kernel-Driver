@@ -106,7 +106,6 @@ cnodeid_t		pcibr_get_dmatrans_node(vertex_hdl_t);
 iopaddr_t               pcibr_dmatrans_addr(vertex_hdl_t, device_desc_t, paddr_t, size_t, unsigned);
 void                    pcibr_dmamap_drain(pcibr_dmamap_t);
 void                    pcibr_dmaaddr_drain(vertex_hdl_t, paddr_t, size_t);
-void                    pcibr_dmalist_drain(vertex_hdl_t, alenlist_t);
 iopaddr_t               pcibr_dmamap_pciaddr_get(pcibr_dmamap_t);
 
 void                    pcibr_provider_startup(vertex_hdl_t);
@@ -2325,17 +2324,6 @@ pcibr_dmaaddr_drain(vertex_hdl_t pconn_vhdl,
     vertex_hdl_t            xconn_vhdl = pcibr_soft->bs_conn;
 
     xtalk_dmaaddr_drain(xconn_vhdl, paddr, bytes);
-}
-
-void
-pcibr_dmalist_drain(vertex_hdl_t pconn_vhdl,
-		    alenlist_t list)
-{
-    pciio_info_t            pciio_info = pciio_info_get(pconn_vhdl);
-    pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
-    vertex_hdl_t            xconn_vhdl = pcibr_soft->bs_conn;
-
-    xtalk_dmalist_drain(xconn_vhdl, list);
 }
 
 /*

@@ -136,7 +136,7 @@ pxm_to_nasid(int pxm)
 	int nid;
 
 	nid = pxm_to_nid_map[pxm];
-	for (i = 0; i < num_memblks; i++) {
+	for (i = 0; i < num_node_memblks; i++) {
 		if (node_memblk[i].nid == nid) {
 			return NASID_GET(node_memblk[i].start_paddr);
 		}

@@ -1720,7 +1720,8 @@ static void *dn_rt_cache_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void dn_rt_cache_seq_stop(struct seq_file *seq, void *v)
 {
-	rcu_read_unlock();
+	if (v)
+		rcu_read_unlock();
 }
 
 static int dn_rt_cache_seq_show(struct seq_file *seq, void *v)

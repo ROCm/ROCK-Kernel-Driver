@@ -236,8 +236,10 @@ static int __init snd_opl3sa2_detect(opl3sa2_t *chip)
 
 	card = chip->card;
 	port = chip->port;
-	if ((chip->res_port = request_region(port, 2, "OPL3-SA control")) == NULL)
+	if ((chip->res_port = request_region(port, 2, "OPL3-SA control")) == NULL) {
+		snd_printk(KERN_ERR "opl3sa2: can't grab port 0x%lx\n", port);
 		return -EBUSY;
+	}
 	// snd_printk("REG 0A = 0x%x\n", snd_opl3sa2_read(chip, 0x0a));
 	chip->version = 0;
 	tmp = snd_opl3sa2_read(chip, OPL3SA2_MISC);
@@ -757,8 +759,11 @@ static int __devinit snd_opl3sa2_probe(int dev,
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0)
 		goto __error;
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && (err = snd_opl3sa2_pnp(dev, chip, pcard, pid)) < 0)
-		goto __error;
+	if (isapnp[dev]) {
+		if ((err = snd_opl3sa2_pnp(dev, chip, pcard, pid)) < 0)
+			goto __error;
+		snd_card_set_dev(card, &pcard->card->dev);
+	}
 #endif
 	chip->ymode = opl3sa3_ymode[dev] & 0x03 ; /* initialise this card from supplied (or default) parameter*/ 
 	chip->card = card;
@@ -771,6 +776,7 @@ static int __devinit snd_opl3sa2_probe(int dev,
 	if ((err = snd_opl3sa2_detect(chip)) < 0)
 		goto __error;
 	if (request_irq(xirq, snd_opl3sa2_interrupt, SA_INTERRUPT, "OPL3-SA2/3", (void *)chip)) {
+		snd_printk(KERN_ERR "opl3sa2: can't grab IRQ %d\n", xirq);
 		err = -ENODEV;
 		goto __error;
 	}
@@ -945,11 +951,11 @@ static int __init alsa_card_opl3sa2_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&sb_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&wss_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&midi_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&sb_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&wss_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&midi_port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&
 	       get_option(&str,&dma2[nr_dev]) == 2 &&

@@ -12,7 +12,6 @@
 #include <linux/mmzone.h>
 #include <linux/rbtree.h>
 #include <linux/fs.h>
-#include <linux/elf.h>
 
 #ifndef CONFIG_DISCONTIGMEM          /* Don't use mapnrs, do it properly */
 extern unsigned long max_mapnr;
@@ -644,24 +643,8 @@ kernel_map_pages(struct page *page, int numpages, int enable)
 #endif
 
 #ifndef CONFIG_ARCH_GATE_AREA
-static inline int in_gate_area(struct task_struct *task, unsigned long addr)
-{
-#ifdef AT_SYSINFO_EHDR
-	if ((addr >= FIXADDR_USER_START) && (addr < FIXADDR_USER_END))
-		return 1;
-#endif
-	return 0;
-}
-
-extern struct vm_area_struct gate_vma;
-static inline struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
-{
-#ifdef AT_SYSINFO_EHDR
-	return &gate_vma;
-#else
-	return 0;
-#endif
-}
+extern struct vm_area_struct *get_gate_vma(struct task_struct *tsk);
+int in_gate_area(struct task_struct *task, unsigned long addr);
 #endif
 
 #endif /* __KERNEL__ */

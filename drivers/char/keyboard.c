@@ -972,11 +972,6 @@ extern void sun_do_break(void);
 static int emulate_raw(struct vc_data *vc, unsigned int keycode, 
 		       unsigned char up_flag)
 {
-#ifdef CONFIG_MAC_EMUMOUSEBTN
-	if (mac_hid_mouse_emulate_buttons(1, keycode, !up_flag))
-		return 0;
-#endif /* CONFIG_MAC_EMUMOUSEBTN */
-
 	if (keycode > 255 || !x86_keycodes[keycode])
 		return -1; 
 
@@ -1054,6 +1049,11 @@ void kbd_keycode(unsigned int keycode, int down, struct pt_regs *regs)
 #endif
 
 	rep = (down == 2);
+
+#ifdef CONFIG_MAC_EMUMOUSEBTN
+	if (mac_hid_mouse_emulate_buttons(1, keycode, down))
+		return;
+#endif /* CONFIG_MAC_EMUMOUSEBTN */
 
 	if ((raw_mode = (kbd->kbdmode == VC_RAW)))
 		if (emulate_raw(vc, keycode, !down << 7))

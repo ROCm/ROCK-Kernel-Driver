@@ -74,19 +74,19 @@ typedef void (*TIMER_CALLBACK)(void *);
 void irda_start_timer(struct timer_list *ptimer, int timeout, void* data,
 		      TIMER_CALLBACK callback);
 
-inline void irlap_start_slot_timer(struct irlap_cb *self, int timeout);
-inline void irlap_start_query_timer(struct irlap_cb *self, int timeout);
-inline void irlap_start_final_timer(struct irlap_cb *self, int timeout);
-inline void irlap_start_wd_timer(struct irlap_cb *self, int timeout);
-inline void irlap_start_backoff_timer(struct irlap_cb *self, int timeout);
+void irlap_start_slot_timer(struct irlap_cb *self, int timeout);
+void irlap_start_query_timer(struct irlap_cb *self, int timeout);
+void irlap_start_final_timer(struct irlap_cb *self, int timeout);
+void irlap_start_wd_timer(struct irlap_cb *self, int timeout);
+void irlap_start_backoff_timer(struct irlap_cb *self, int timeout);
 
 void irlap_start_mbusy_timer(struct irlap_cb *self, int timeout);
 void irlap_stop_mbusy_timer(struct irlap_cb *);
 
-inline void irlmp_start_watchdog_timer(struct lsap_cb *, int timeout);
-inline void irlmp_start_discovery_timer(struct irlmp_cb *, int timeout);
-inline void irlmp_start_idle_timer(struct lap_cb *, int timeout);
-inline void irlmp_stop_idle_timer(struct lap_cb *self); 
+void irlmp_start_watchdog_timer(struct lsap_cb *, int timeout);
+void irlmp_start_discovery_timer(struct irlmp_cb *, int timeout);
+void irlmp_start_idle_timer(struct lap_cb *, int timeout);
+void irlmp_stop_idle_timer(struct lap_cb *self);
 
 #endif
 

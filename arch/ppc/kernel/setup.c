@@ -35,6 +35,7 @@
 #include <asm/system.h>
 #include <asm/pmac_feature.h>
 #include <asm/sections.h>
+#include <asm/nvram.h>
 #include <asm/xmon.h>
 
 #if defined CONFIG_KGDB
@@ -111,6 +112,9 @@ struct screen_info screen_info = {
 
 void machine_restart(char *cmd)
 {
+#ifdef CONFIG_NVRAM
+	nvram_sync();
+#endif
 	ppc_md.restart(cmd);
 }
 
@@ -118,6 +122,9 @@ EXPORT_SYMBOL(machine_restart);
 
 void machine_power_off(void)
 {
+#ifdef CONFIG_NVRAM
+	nvram_sync();
+#endif
 	ppc_md.power_off();
 }
 
@@ -125,6 +132,9 @@ EXPORT_SYMBOL(machine_power_off);
 
 void machine_halt(void)
 {
+#ifdef CONFIG_NVRAM
+	nvram_sync();
+#endif
 	ppc_md.halt();
 }
 
@@ -558,24 +568,30 @@ int __init ppc_setup_l2cr(char *str)
 __setup("l2cr=", ppc_setup_l2cr);
 
 #ifdef CONFIG_NVRAM
-/* Generic nvram hooks we now look into ppc_md.nvram_read_val
- * on pmac too ;)
- * //XX Those 2 could be moved to headers
- */
-unsigned char
-nvram_read_byte(int addr)
+
+/* Generic nvram hooks used by drivers/char/gen_nvram.c */
+unsigned char nvram_read_byte(int addr)
 {
 	if (ppc_md.nvram_read_val)
 		return ppc_md.nvram_read_val(addr);
 	return 0xff;
 }
+EXPORT_SYMBOL(nvram_read_byte);
 
-void
-nvram_write_byte(unsigned char val, int addr)
+void nvram_write_byte(unsigned char val, int addr)
 {
 	if (ppc_md.nvram_write_val)
-		ppc_md.nvram_write_val(val, addr);
+		ppc_md.nvram_write_val(addr, val);
 }
+EXPORT_SYMBOL(nvram_write_byte);
+
+void nvram_sync(void)
+{
+	if (ppc_md.nvram_sync)
+		ppc_md.nvram_sync();
+}
+EXPORT_SYMBOL(nvram_sync);
+
 #endif /* CONFIG_NVRAM */
 
 static struct cpu cpu_devices[NR_CPUS];

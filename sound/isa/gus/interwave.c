@@ -151,6 +151,8 @@ static struct pnp_card_device_id snd_interwave_pnpids[] = {
 	{ .id = "CDC1111", .devs = { { .id = "CDC1112" } } },
 	/* Panasonic PCA761AW Audio Card */
 	{ .id = "ADV55ff", .devs = { { .id = "ADV0010" } } },
+	/* InterWave STB without TEA6330T */
+	{ .id = "ADV550a", .devs = { { .id = "ADV0010" } } },
 #else
 	/* InterWave STB with TEA6330T */
 	{ .id = "ADV550a", .devs = { { .id = "ADV0010" }, { .id = "ADV0015" } } },
@@ -229,12 +231,14 @@ static int __devinit snd_interwave_detect_stb(struct snd_interwave *iwcard,
 				break;
 			port += 0x10;
 		}
-		if (port > 0x380)
-			return -ENODEV;
 	} else {
-		if ((iwcard->i2c_res = request_region(port, 1, "InterWave (I2C bus)")) != NULL)
-			return -ENODEV;
+		iwcard->i2c_res = request_region(port, 1, "InterWave (I2C bus)");
 	}
+	if (iwcard->i2c_res == NULL) {
+		snd_printk(KERN_ERR "interwave: can't grab i2c bus port\n");
+		return -ENODEV;
+	}
+
 	sprintf(name, "InterWave-%i", card->number);
 	if ((err = snd_i2c_bus_create(card, name, NULL, &bus)) < 0)
 		return err;
@@ -626,7 +630,7 @@ static int __devinit snd_interwave_pnp(int dev, struct snd_interwave *iwcard,
 		return -ENOENT;
 	}
 	port[dev] = pnp_port_start(pdev, 0);
-	dma1[dev] = pnp_dma(pdev, 1);
+	dma1[dev] = pnp_dma(pdev, 0);
 	if (dma2[dev] >= 0)
 		dma2[dev] = pnp_dma(pdev, 1);
 	irq[dev] = pnp_irq(pdev, 0);
@@ -699,9 +703,12 @@ static int __devinit snd_interwave_probe(int dev, struct pnp_card_link *pcard,
 	iwcard->irq = -1;
 	card->private_free = snd_interwave_free;
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && snd_interwave_pnp(dev, iwcard, pcard, pid)) {
-		snd_card_free(card);
-		return -ENODEV;
+	if (isapnp[dev]) {
+		if (snd_interwave_pnp(dev, iwcard, pcard, pid)) {
+			snd_card_free(card);
+			return -ENODEV;
+		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
 	xirq = irq[dev];
@@ -994,9 +1001,9 @@ static int __init alsa_card_interwave_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
 #ifdef SNDRV_STB
-	       get_option(&str,(int *)&port_tc[nr_dev]) == 2 &&
+	       get_option_long(&str,&port_tc[nr_dev]) == 2 &&
 #endif
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&

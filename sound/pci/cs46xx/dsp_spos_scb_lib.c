@@ -1391,7 +1391,7 @@ int cs46xx_dsp_pcm_channel_set_period (cs46xx_t * chip,
 		temp |= DMA_RQ_C1_SOURCE_MOD16;
 		break; 
 	default:
-		snd_printdd ("period size (%d) not supported by HW\n");
+		snd_printdd ("period size (%d) not supported by HW\n", period_size);
 		return -EINVAL;
 	}
 
@@ -1429,7 +1429,7 @@ int cs46xx_dsp_pcm_ostream_set_period (cs46xx_t * chip,
 		temp |= DMA_RQ_C1_DEST_MOD16;
 		break; 
 	default:
-		snd_printdd ("period size (%d) not supported by HW\n");
+		snd_printdd ("period size (%d) not supported by HW\n", period_size);
 		return -EINVAL;
 	}
 

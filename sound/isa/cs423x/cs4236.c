@@ -307,7 +307,7 @@ static int __devinit snd_card_cs4236_pnp(int dev, struct snd_card_cs4236 *acard,
 	pnp_init_resource_table(cfg);
 	if (port[dev] != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[0], port[dev], 4);
-	if (fm_port[dev] != SNDRV_AUTO_PORT && fm_port[dev] >= 0)
+	if (fm_port[dev] != SNDRV_AUTO_PORT && fm_port[dev] > 0)
 		pnp_resource_change(&cfg->port_resource[1], fm_port[dev], 4);
 	if (sb_port[dev] != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[2], sb_port[dev], 16);
@@ -327,7 +327,7 @@ static int __devinit snd_card_cs4236_pnp(int dev, struct snd_card_cs4236 *acard,
 		return -EBUSY;
 	}
 	port[dev] = pnp_port_start(pdev, 0);
-	if (fm_port[dev] >= 0)
+	if (fm_port[dev] > 0)
 		fm_port[dev] = pnp_port_start(pdev, 1);
 	sb_port[dev] = pnp_port_start(pdev, 2);
 	irq[dev] = pnp_irq(pdev, 0);
@@ -338,7 +338,7 @@ static int __devinit snd_card_cs4236_pnp(int dev, struct snd_card_cs4236 *acard,
 	snd_printdd("isapnp WSS: irq=%i, dma1=%i, dma2=%i\n",
 			irq[dev], dma1[dev], dma2[dev]);
 	/* CTRL initialization */
-	if (acard->ctrl && cport[dev] >= 0) {
+	if (acard->ctrl && cport[dev] > 0) {
 		pdev = acard->ctrl;
 		pnp_init_resource_table(cfg);
 		if (cport[dev] != SNDRV_AUTO_PORT)
@@ -356,12 +356,13 @@ static int __devinit snd_card_cs4236_pnp(int dev, struct snd_card_cs4236 *acard,
 		snd_printdd("isapnp CTRL: control port=0x%lx\n", cport[dev]);
 	}
 	/* MPU initialization */
-	if (acard->mpu && mpu_port[dev] >= 0) {
+	if (acard->mpu && mpu_port[dev] > 0) {
 		pdev = acard->mpu;
 		pnp_init_resource_table(cfg);
 		if (mpu_port[dev] != SNDRV_AUTO_PORT)
 			pnp_resource_change(&cfg->port_resource[0], mpu_port[dev], 2);
-		if (mpu_irq[dev] != SNDRV_AUTO_IRQ && mpu_irq[dev] >= 0)
+		if (mpu_irq[dev] != SNDRV_AUTO_IRQ && mpu_irq[dev] >= 0 &&
+		    pnp_irq_valid(pdev, 0))
 			pnp_resource_change(&cfg->irq_resource[0], mpu_irq[dev], 1);
 		err = pnp_manual_config_dev(pdev, cfg, 0);
 		if (err < 0)
@@ -373,7 +374,8 @@ static int __devinit snd_card_cs4236_pnp(int dev, struct snd_card_cs4236 *acard,
 			mpu_irq[dev] = SNDRV_AUTO_IRQ;
 		} else {
 			mpu_port[dev] = pnp_port_start(pdev, 0);
-			if (pnp_irq_valid(pdev, 0) && pnp_irq(pdev, 0) >= 0) {
+			if (mpu_irq[dev] >= 0 &&
+			    pnp_irq_valid(pdev, 0) && pnp_irq(pdev, 0) >= 0) {
 				mpu_irq[dev] = pnp_irq(pdev, 0);
 			} else {
 				mpu_irq[dev] = -1;	/* disable interrupt */
@@ -429,19 +431,16 @@ static int __devinit snd_card_cs423x_probe(int dev, struct pnp_card_link *pcard,
 	acard = (struct snd_card_cs4236 *)card->private_data;
 	card->private_free = snd_card_cs4236_free;
 #ifdef CONFIG_PNP
-	if (isapnp[dev] && (err = snd_card_cs4236_pnp(dev, acard, pcard, pid))<0) {
-		printk(KERN_ERR "isapnp detection failed and probing for " IDENT " is not supported\n");
-		snd_card_free(card);
-		return -ENXIO;
+	if (isapnp[dev]) {
+		if ((err = snd_card_cs4236_pnp(dev, acard, pcard, pid))<0) {
+			printk(KERN_ERR "isapnp detection failed and probing for " IDENT " is not supported\n");
+			snd_card_free(card);
+			return -ENXIO;
+		}
+		snd_card_set_dev(card, &pcard->card->dev);
 	}
 #endif
-	if (mpu_port[dev] < 0)
-		mpu_port[dev] = SNDRV_AUTO_PORT;
-	if (fm_port[dev] < 0)
-		fm_port[dev] = SNDRV_AUTO_PORT;
-	if (sb_port[dev] < 0)
-		sb_port[dev] = SNDRV_AUTO_PORT;
-	if (sb_port[dev] != SNDRV_AUTO_PORT)
+	if (sb_port[dev] > 0 && sb_port[dev] != SNDRV_AUTO_PORT)
 		if ((acard->res_sb_port = request_region(sb_port[dev], 16, IDENT " SB")) == NULL) {
 			printk(KERN_ERR IDENT ": unable to register SB port at 0x%lx\n", sb_port[dev]);
 			snd_card_free(card);
@@ -492,13 +491,22 @@ static int __devinit snd_card_cs423x_probe(int dev, struct pnp_card_link *pcard,
 		return err;
 	}
 #endif
+	strcpy(card->driver, pcm->name);
+	strcpy(card->shortname, pcm->name);
+	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %i",
+		pcm->name,
+		chip->port,
+		irq[dev],
+		dma1[dev]);
+	if (dma2[dev] >= 0)
+		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
 
 	if ((err = snd_cs4231_timer(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
 
-	if (fm_port[dev] != SNDRV_AUTO_PORT) {
+	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_opl3_create(card,
 				    fm_port[dev], fm_port[dev] + 2,
 				    OPL3_HW_OPL3_CS, 0, &opl3) < 0) {
@@ -511,22 +519,15 @@ static int __devinit snd_card_cs423x_probe(int dev, struct pnp_card_link *pcard,
 		}
 	}
 
-	if (mpu_port[dev] != SNDRV_AUTO_PORT) {
+	if (mpu_port[dev] > 0 && mpu_port[dev] != SNDRV_AUTO_PORT) {
+		if (mpu_irq[dev] == SNDRV_AUTO_IRQ)
+			mpu_irq[dev] = -1;
 		if (snd_mpu401_uart_new(card, 0, MPU401_HW_CS4232,
 					mpu_port[dev], 0,
 					mpu_irq[dev],
 					mpu_irq[dev] >= 0 ? SA_INTERRUPT : 0, NULL) < 0)
 			printk(KERN_ERR IDENT ": MPU401 not detected\n");
 	}
-	strcpy(card->driver, pcm->name);
-	strcpy(card->shortname, pcm->name);
-	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %i",
-		pcm->name,
-		chip->port,
-		irq[dev],
-		dma1[dev]);
-	if (dma2[dev] >= 0)
-		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -546,7 +547,7 @@ static int __devinit snd_cs423x_pnp_detect(struct pnp_card_link *card,
 	int res;
 
 	for ( ; dev < SNDRV_CARDS; dev++) {
-		if (!enable[dev])
+		if (!enable[dev] || !isapnp[dev])
 			continue;
 		res = snd_card_cs423x_probe(dev, card, id);
 		if (res < 0)
@@ -638,11 +639,11 @@ static int __init alsa_card_cs423x_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&cport[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&sb_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&cport[nr_dev]) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&sb_port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&mpu_irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&

@@ -308,6 +308,10 @@ int snd_component_add(snd_card_t *card, const char *component);
 int snd_card_file_add(snd_card_t *card, struct file *file);
 int snd_card_file_remove(snd_card_t *card, struct file *file);
 
+#ifndef snd_card_set_dev
+#define snd_card_set_dev(card,devptr) ((card)->dev = (devptr))
+#endif
+
 /* device.c */
 
 int snd_device_new(snd_card_t *card, snd_device_type_t type,
@@ -331,10 +335,12 @@ unsigned int snd_dma_pointer(unsigned long dma, unsigned int size);
 
 int snd_task_name(struct task_struct *task, char *name, size_t size);
 #ifdef CONFIG_SND_VERBOSE_PRINTK
-void snd_verbose_printk(const char *file, int line, const char *format, ...);
+void snd_verbose_printk(const char *file, int line, const char *format, ...)
+     __attribute__ ((format (printf, 3, 4)));
 #endif
 #if defined(CONFIG_SND_DEBUG) && defined(CONFIG_SND_VERBOSE_PRINTK)
-void snd_verbose_printd(const char *file, int line, const char *format, ...);
+void snd_verbose_printd(const char *file, int line, const char *format, ...)
+     __attribute__ ((format (printf, 3, 4)));
 #endif
 
 /* --- */

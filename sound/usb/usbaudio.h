@@ -142,7 +142,8 @@ struct snd_usb_audio {
  * Information about devices with broken descriptors
  */
 
-#define QUIRK_ANY_INTERFACE -1
+#define QUIRK_NO_INTERFACE		-2
+#define QUIRK_ANY_INTERFACE		-1
 
 #define QUIRK_MIDI_FIXED_ENDPOINT	0
 #define QUIRK_MIDI_YAMAHA		1

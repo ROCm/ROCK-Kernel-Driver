@@ -63,7 +63,7 @@ typedef struct snd_emux_operators {
 	int (*sample_new)(snd_emux_t *emu, snd_sf_sample_t *sp, snd_util_memhdr_t *hdr, const void *data, long count);
 	int (*sample_free)(snd_emux_t *emu, snd_sf_sample_t *sp, snd_util_memhdr_t *hdr);
 	void (*sample_reset)(snd_emux_t *emu);
-	int (*load_fx)(snd_emux_t *emu, int type, int arg, const void *data, long count);
+	int (*load_fx)(snd_emux_t *emu, int type, int arg, const void __user *data, long count);
 	void (*sysex)(snd_emux_t *emu, char *buf, int len, int parsed, snd_midi_channel_set_t *chset);
 #ifdef CONFIG_SND_SEQUENCER_OSS
 	int (*oss_ioctl)(snd_emux_t *emu, int cmd, int p1, int p2);
@@ -103,6 +103,8 @@ struct snd_emux {
 	int midi_ports;		/* number of virtual midi devices */
 	int midi_devidx;	/* device offset of virtual midi */
 	unsigned int linear_panning: 1; /* panning is linear (sbawe = 1, emu10k1 = 0) */
+	int hwdep_idx;		/* hwdep device index */
+	snd_hwdep_t *hwdep;	/* hwdep device */
 
 	/* private */
 	int num_voices;		/* current number of voices */
@@ -113,6 +115,7 @@ struct snd_emux {
 	struct semaphore register_mutex;
 	int client;		/* For the sequencer client */
 	int ports[SNDRV_EMUX_MAX_PORTS];	/* The ports for this device */
+	snd_emux_port_t *portptrs[SNDRV_EMUX_MAX_PORTS];
 	int used;	/* use counter */
 	char *name;	/* name of the device (internal) */
 	snd_rawmidi_t **vmidi;

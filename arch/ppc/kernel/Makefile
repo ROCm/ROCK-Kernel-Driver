@@ -22,11 +22,12 @@ obj-y				:= entry.o traps.o irq.o idle.o time.o misc.o \
 					semaphore.o syscalls.o setup.o \
 					cputable.o ppc_htab.o
 obj-$(CONFIG_6xx)		+= l2cr.o cpu_setup_6xx.o
+obj-$(CONFIG_POWER4)		+= cpu_setup_power4.o
 obj-$(CONFIG_MODULES)		+= module.o ppc_ksyms.o
 obj-$(CONFIG_PCI)		+= pci.o
 obj-$(CONFIG_PCI)		+= pci-dma.o
 obj-$(CONFIG_KGDB)		+= ppc-stub.o
-obj-$(CONFIG_SMP)		+= smp.o
+obj-$(CONFIG_SMP)		+= smp.o smp-tbsync.o
 obj-$(CONFIG_TAU)		+= temp.o
 
 ifdef CONFIG_MATH_EMULATION

@@ -255,6 +255,7 @@ static int __devinit snd_card_azt2320_probe(int dev,
 		snd_card_free(card);
 		return error;
 	}
+	snd_card_set_dev(card, &pcard->card->dev);
 
 	if ((error = snd_card_azt2320_enable_wss(port[dev]))) {
 		snd_card_free(card);
@@ -270,6 +271,11 @@ static int __devinit snd_card_azt2320_probe(int dev,
 		return error;
 	}
 
+	strcpy(card->driver, "AZT2320");
+	strcpy(card->shortname, "Aztech AZT2320");
+	sprintf(card->longname, "%s, WSS at 0x%lx, irq %i, dma %i&%i",
+		card->shortname, chip->port, irq[dev], dma1[dev], dma2[dev]);
+
 	if ((error = snd_cs4231_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return error;
@@ -283,7 +289,7 @@ static int __devinit snd_card_azt2320_probe(int dev,
 		return error;
 	}
 
-	if (mpu_port[dev] > 0) {
+	if (mpu_port[dev] > 0 && mpu_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_mpu401_uart_new(card, 0, MPU401_HW_AZT2320,
 				mpu_port[dev], 0,
 				mpu_irq[dev], SA_INTERRUPT,
@@ -291,7 +297,7 @@ static int __devinit snd_card_azt2320_probe(int dev,
 			snd_printk(KERN_ERR PFX "no MPU-401 device at 0x%lx\n", mpu_port[dev]);
 	}
 
-	if (fm_port[dev] > 0) {
+	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_opl3_create(card,
 				    fm_port[dev], fm_port[dev] + 2,
 				    OPL3_HW_AUTO, 0, &opl3) < 0) {
@@ -308,11 +314,6 @@ static int __devinit snd_card_azt2320_probe(int dev,
 			}
 		}
 	}
-
-	strcpy(card->driver, "AZT2320");
-	strcpy(card->shortname, "Aztech AZT2320");
-	sprintf(card->longname, "%s soundcard, WSS at 0x%lx, irq %i, dma %i&%i",
-		card->shortname, chip->port, irq[dev], dma1[dev], dma2[dev]);
 
 	if ((error = snd_card_register(card)) < 0) {
 		snd_card_free(card);
@@ -393,9 +394,9 @@ static int __init alsa_card_azt2320_setup(char *str)
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&wss_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&wss_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&mpu_irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&

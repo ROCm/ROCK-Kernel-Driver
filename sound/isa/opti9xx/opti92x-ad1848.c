@@ -543,11 +543,11 @@ static int __devinit snd_opti9xx_configure(opti9xx_t *chip)
 
 __skip_base:
 	switch (chip->irq) {
-#ifdef OPTi93X
+//#ifdef OPTi93X
 	case 5:
 		irq_bits = 0x05;
 		break;
-#endif	/* OPTi93X */
+//#endif	/* OPTi93X */
 	case 7:
 		irq_bits = 0x01;
 		break;
@@ -604,6 +604,7 @@ __skip_base:
 __skip_resources:
 	if (chip->hardware > OPTi9XX_HW_82C928) {
 		switch (chip->mpu_port) {
+		case 0:
 		case -1:
 			break;
 		case 0x300:
@@ -644,7 +645,7 @@ __skip_resources:
 		}
 
 		snd_opti9xx_write_mask(chip, OPTi9XX_MC_REG(6),
-			(chip->mpu_port == -1) ? 0x00 :
+			(chip->mpu_port <= 0) ? 0x00 :
 				0x80 | mpu_port_bits << 5 | mpu_irq_bits << 3,
 			0xf8);
 	}
@@ -1304,23 +1305,27 @@ int snd_opti93x_create(snd_card_t *card, opti9xx_t *chip,
 	codec->dma2 = -1;
 
 	if ((codec->res_port = request_region(chip->wss_base + 4, 4, "OPTI93x CODEC")) == NULL) {
+		snd_printk(KERN_ERR "opti9xx: can't grab port 0x%lx\n", chip->wss_base + 4);
 		snd_opti93x_free(codec);
 		return -EBUSY;
 	}
 	if (request_dma(dma1, "OPTI93x - 1")) {
+		snd_printk(KERN_ERR "opti9xx: can't grab DMA1 %d\n", dma1);
 		snd_opti93x_free(codec);
 		return -EBUSY;
 	}
 	codec->dma1 = chip->dma1;
 	if (request_dma(dma2, "OPTI93x - 2")) {
+		snd_printk(KERN_ERR "opti9xx: can't grab DMA2 %d\n", dma2);
 		snd_opti93x_free(codec);
 		return -EBUSY;
 	}
 	codec->dma2 = chip->dma2;
 
 	if (request_irq(chip->irq, snd_opti93x_interrupt, SA_INTERRUPT, DRIVER_NAME" - WSS", codec)) {
-	  snd_opti93x_free(codec);
-	  return -EBUSY;
+		snd_printk(KERN_ERR "opti9xx: can't grab IRQ %d\n", chip->irq);
+		snd_opti93x_free(codec);
+		return -EBUSY;
 	}
 
 	codec->card = card;
@@ -1734,15 +1739,23 @@ static int __devinit snd_card_opti9xx_pnp(opti9xx_t *chip, struct pnp_card_link 
 #if defined(CS4231) || defined(OPTi93X)
 	if (dma2 != SNDRV_AUTO_DMA)
 		pnp_resource_change(&cfg->dma_resource[1], dma2, 1);
+#else
+#ifdef snd_opti9xx_fixup_dma2
+	snd_opti9xx_fixup_dma2(pdev);
+#endif
 #endif	/* CS4231 || OPTi93X */
-	if (fm_port != SNDRV_AUTO_PORT)
+#ifdef OPTi93X
+	if (fm_port > 0 && fm_port != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[1], fm_port, 4);
-
+#else
+	if (fm_port > 0 && fm_port != SNDRV_AUTO_PORT)
+		pnp_resource_change(&cfg->port_resource[2], fm_port, 4);
+#endif
 	if (pnp_manual_config_dev(pdev, cfg, 0) < 0)
 		snd_printk(KERN_ERR "AUDIO the requested resources are invalid, using auto config\n");
 	err = pnp_activate_dev(pdev);
 	if (err < 0) {
-		snd_printk(KERN_ERR "AUDIO pnp configure failure\n");
+		snd_printk(KERN_ERR "AUDIO pnp configure failure: %d\n", err);
 		kfree(cfg);
 		return err;
 	}
@@ -1762,7 +1775,7 @@ static int __devinit snd_card_opti9xx_pnp(opti9xx_t *chip, struct pnp_card_link 
 #endif	/* CS4231 || OPTi93X */
 
 	pdev = chip->devmpu;
-	if (pdev) {
+	if (pdev && mpu_port > 0) {
 		pnp_init_resource_table(cfg);
 
 		if (mpu_port != SNDRV_AUTO_PORT)
@@ -1960,6 +1973,7 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 		}
 		if (hw <= OPTi9XX_HW_82C930)
 			chip->mc_base -= 0x80;
+		snd_card_set_dev(card, &pcard->card->dev);
 	} else {
 #endif	/* CONFIG_PNP */
 		if ((error = snd_card_opti9xx_detect(card, chip)) < 0) {
@@ -1985,9 +1999,6 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 	chip->dma2 = dma2;
 #endif
 
-#ifdef CONFIG_PNP
-	if (!isapnp) {
-#endif
 	if (chip->wss_base == SNDRV_AUTO_PORT) {
 		if ((chip->wss_base = snd_legacy_find_free_ioport(possible_ports, 4)) < 0) {
 			snd_card_free(card);
@@ -1995,6 +2006,9 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 			return -EBUSY;
 		}
 	}
+#ifdef CONFIG_PNP
+	if (!isapnp) {
+#endif
 	if (chip->mpu_port == SNDRV_AUTO_PORT) {
 		if ((chip->mpu_port = snd_legacy_find_free_ioport(possible_mpu_ports, 2)) < 0) {
 			snd_card_free(card);
@@ -2092,8 +2106,19 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 		return error;
 	}
 #endif
+	strcpy(card->driver, chip->name);
+	sprintf(card->shortname, "OPTi %s", card->driver);
+#if defined(CS4231) || defined(OPTi93X)
+	sprintf(card->longname, "%s, %s at 0x%lx, irq %d, dma %d&%d",
+		card->shortname, pcm->name, chip->wss_base + 4,
+		chip->irq, chip->dma1, chip->dma2);
+#else
+	sprintf(card->longname, "%s, %s at 0x%lx, irq %d, dma %d",
+		card->shortname, pcm->name, chip->wss_base + 4,
+		chip->irq, chip->dma1);
+#endif	/* CS4231 || OPTi93X */
 
-	if (chip->mpu_port <= 0)
+	if (chip->mpu_port <= 0 || chip->mpu_port == SNDRV_AUTO_PORT)
 		rmidi = NULL;
 	else
 		if ((error = snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
@@ -2101,7 +2126,7 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 				&rmidi)))
 			snd_printk("no MPU-401 device at 0x%lx?\n", chip->mpu_port);
 
-	if (chip->fm_port > 0) {
+	if (chip->fm_port > 0 && chip->fm_port != SNDRV_AUTO_PORT) {
 		opl3_t *opl3 = NULL;
 #ifndef OPTi93X
 		if (chip->hardware == OPTi9XX_HW_82C928 ||
@@ -2145,17 +2170,6 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 		}
 	}
 
-	strcpy(card->driver, chip->name);
-	sprintf(card->shortname, "OPTi %s", card->driver);
-#if defined(CS4231) || defined(OPTi93X)
-	sprintf(card->longname, "%s soundcard, %s at 0x%lx, irq %d, dma %d&%d",
-		card->shortname, pcm->name, chip->wss_base + 4,
-		chip->irq, chip->dma1, chip->dma2);
-#else
-	sprintf(card->longname, "%s soundcard, %s at 0x%lx, irq %d, dma %d",
-		card->shortname, pcm->name, chip->wss_base + 4,
-		chip->irq, chip->dma1);
-#endif	/* CS4231 || OPTi93X */
 	if ((error = snd_card_register(card))) {
 		snd_card_free(card);
 		return error;
@@ -2240,9 +2254,9 @@ static int __init alsa_card_opti9xx_setup(char *str)
 	       get_option(&str,&index) == 2 &&
 	       get_id(&str,&id) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&port) == 2 &&
-	       get_option(&str,(int *)&mpu_port) == 2 &&
-	       get_option(&str,(int *)&fm_port) == 2 &&
+	       get_option_long(&str,&port) == 2 &&
+	       get_option_long(&str,&mpu_port) == 2 &&
+	       get_option_long(&str,&fm_port) == 2 &&
 	       get_option(&str,&irq) == 2 &&
 	       get_option(&str,&mpu_irq) == 2 &&
 	       get_option(&str,&dma1) == 2

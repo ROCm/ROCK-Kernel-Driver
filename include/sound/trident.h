@@ -443,6 +443,7 @@ struct _snd_trident {
 	snd_rawmidi_t *rmidi;
 	snd_seq_device_t *seq_dev;
 
+	ac97_bus_t *ac97_bus;
 	ac97_t *ac97;
 	ac97_t *ac97_sec;
 
