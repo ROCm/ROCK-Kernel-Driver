@@ -100,13 +100,6 @@ void __init smp_commence(void)
 	local_flush_tlb_all();
 }
 
-/* Only broken Intel needs this, thus it should not even be referenced
- * globally...
- */
-void __init initialize_secondary(void)
-{
-}
-
 extern int cpu_idle(void);
 
 /* Activate a secondary processor. */
