@@ -364,7 +364,7 @@ static void fd_motor_off_timer( unsigned long dummy );
 static void check_change( unsigned long dummy );
 static __inline__ void set_head_settle_flag( void );
 static __inline__ int get_head_settle_flag( void );
-static void floppy_irq (int irq, void *dummy, struct pt_regs *fp);
+static irqreturn_t floppy_irq (int irq, void *dummy, struct pt_regs *fp);
 static void fd_error( void );
 static int do_format(int drive, int type, struct atari_format_descr *desc);
 static void do_fd_action( int drive );
@@ -597,7 +597,7 @@ static __inline__ int get_head_settle_flag( void )
 
 static void (*FloppyIRQHandler)( int status ) = NULL;
 
-static void floppy_irq (int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t floppy_irq (int irq, void *dummy, struct pt_regs *fp)
 {
 	unsigned char status;
 	void (*handler)( int );
@@ -613,6 +613,7 @@ static void floppy_irq (int irq, void *dummy, struct pt_regs *fp)
 	else {
 		DPRINT(("FDC irq, no handler\n"));
 	}
+	return IRQ_HANDLED;
 }
 
 
