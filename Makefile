@@ -260,6 +260,20 @@ ifndef CONFIG_FRAME_POINTER
 CFLAGS		+= -fomit-frame-pointer
 endif
 
+#	When we're building modules with modversions, we need to consider
+#	the built-in objects during the descend as well, in order to
+#	make sure the checksums are uptodate before we use them.
+
+ifdef CONFIG_MODVERSIONING
+ifeq ($(KBUILD_MODULES),1)
+ifneq ($(KBUILD_BUILTIN),1)
+  KBUILD_BUILTIN := 1
+endif
+endif
+endif
+
+export MODVERDIR := .tmp_versions
+
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
 # images.  Uncomment if you want to place them anywhere other than root.
@@ -388,6 +402,16 @@ $(SUBDIRS): prepare
 
 .PHONY: prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
+ifdef CONFIG_MODVERSIONING
+ifdef KBUILD_MODULES
+ifeq ($(origin SUBDIRS),file)
+	$(Q)rm -rf $(MODVERDIR)
+else
+	@echo '*** Warning: Overriding SUBDIRS on the command line can cause'
+	@echo '***          inconsistencies with module symbol versions'
+endif
+endif
+endif
 	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
 
 #	We need to build init/vermagic.o before descending since all modules

@@ -45,8 +45,15 @@ O_TARGET := $(obj)/built-in.o
 endif
 endif
 
+ifdef CONFIG_MODVERSIONING
+modules := $(obj-m)
+touch-module = @mkdir -p $(MODVERDIR)/$(@D); touch $(MODVERDIR)/$(@:.o=.ko)
+else
+modules := $(obj-m:.o=.ko)
+endif
+
 __build: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
-	 $(if $(KBUILD_MODULES),$(obj-m:.o=.ko)) \
+	 $(if $(KBUILD_MODULES),$(modules)) \
 	 $(subdir-ym) $(build-targets)
 	@:
 
@@ -152,6 +159,15 @@ else
 	$(call if_changed_dep,cc_o_c)
 endif
 
+# For modversioning, we need to special case single-part modules
+# to mark them in $(MODVERDIR)
+
+ifdef CONFIG_MODVERSIONING
+$(single-used-m): %.o: %.c FORCE
+	$(touch-module)
+	$(call if_changed_rule,vcc_o_c)
+endif
+
 quiet_cmd_cc_lst_c = MKLST   $@
       cmd_cc_lst_c = $(CC) $(c_flags) -g -c -o $*.o $< && \
 		     $(CONFIG_SHELL) $(srctree)/scripts/makelst $*.o \
@@ -242,6 +258,11 @@ targets += $(multi-used-y) $(multi-used-m)
 #
 # Rule to link modules ( .o -> .ko )
 #
+
+# With CONFIG_MODVERSIONING, generation of the final .ko is handled
+# by scripts/Makefile.modver
+ifndef CONFIG_MODVERSIONING
+
 quiet_cmd_link_module = LD [M]  $@
 cmd_link_module = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_MODULE) -o $@ $< init/vermagic.o
 
@@ -254,6 +275,8 @@ $(single-used-m:.o=.ko) $(multi-used-m:.o=.ko): %.ko: %.o init/vermagic.o FORCE
 	$(call if_changed,link_module)
 
 targets += $(single-used-m:.o=.ko) $(multi-used-m:.o=.ko)
+
+endif
 
 # Compile programs on the host
 # ===========================================================================
