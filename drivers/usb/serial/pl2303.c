@@ -403,7 +403,7 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct termios tmp_termios;
 	struct usb_serial *serial = port->serial;
-	unsigned char buf[10];
+	unsigned char *buf;
 	int result;
 
 	if (port_paranoia_check (port, __FUNCTION__))
@@ -413,6 +413,10 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 
 	usb_clear_halt(serial->dev, port->write_urb->pipe);
 	usb_clear_halt(serial->dev, port->read_urb->pipe);
+
+	buf = kmalloc(10, GFP_KERNEL);
+	if (buf==NULL)
+		return -ENOMEM;
 
 #define FISH(a,b,c,d)								\
 	result=usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev,0),	\
@@ -432,6 +436,8 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0x0404, 1);
 	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
 	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8383, 0);
+
+	kfree(buf);
 
 	/* Setup termios */
 	if (port->tty) {
