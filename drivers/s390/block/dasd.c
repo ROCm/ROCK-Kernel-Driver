@@ -1949,27 +1949,21 @@ dasd_generic_set_offline (struct ccw_device *cdev)
  * readonly controls the readonly status of a dasd
  */
 static ssize_t
-dasd_ro_show(struct device *dev, char *buf, size_t count, loff_t off)
+dasd_ro_show(struct device *dev, char *buf)
 {
 	dasd_device_t *device;
 
-	if (off)
-		return 0;
-
 	device = dev->driver_data;
 	if (!device)
-		return snprintf(buf, count, "n/a\n");
+		return snprintf(buf, PAGE_SIZE, "n/a\n");
 
-	return snprintf(buf, count, device->ro_flag ? "1\n" : "0\n");
+	return snprintf(buf, PAGE_SIZE, device->ro_flag ? "1\n" : "0\n");
 }
 
 static ssize_t
-dasd_ro_store(struct device *dev, const char *buf, size_t count, loff_t off)
+dasd_ro_store(struct device *dev, const char *buf, size_t count)
 {
 	dasd_device_t *device = dev->driver_data;
-
-	if (off)
-		return 0;
 
 	if (device)
 		device->ro_flag = (buf[0] == '1') ? 1 : 0;
@@ -1984,28 +1978,21 @@ static DEVICE_ATTR(readonly, 0644, dasd_ro_show, dasd_ro_store);
  */
 /* TODO: Implement */
 static ssize_t 
-dasd_use_diag_show(struct device *dev, char *buf, size_t count, loff_t off)
+dasd_use_diag_show(struct device *dev, char *buf)
 {
 	dasd_device_t *device;
 
-	if (off)
-		return 0;
-
 	device = dev->driver_data;
 	if (!device)
-		return snprintf(buf, count, "n/a\n");
+		return sprintf(buf, "n/a\n");
 
-	return snprintf(buf, count, device->use_diag_flag ? "1\n" : "0\n");
+	return sprintf(buf, device->use_diag_flag ? "1\n" : "0\n");
 }
 
 static ssize_t
-dasd_use_diag_store(struct device *dev, const char *buf, 
-		    size_t count, loff_t off)
+dasd_use_diag_store(struct device *dev, const char *buf, size_t count)
 {
 	dasd_device_t *device = dev->driver_data;
-
-	if (off)
-		return 0;
 
 	if (device)
 		device->use_diag_flag = (buf[0] == '1') ? 1 : 0;
@@ -2020,14 +2007,11 @@ DEVICE_ATTR(use_diag, 0644, dasd_use_diag_show, dasd_use_diag_store);
  * an inaccaptable interface */
 /* TODO: Split this up into smaller files! */
 static ssize_t
-dasd_devices_show(struct device *dev, char *buf, size_t count, loff_t off)
+dasd_devices_show(struct device *dev, char *buf)
 {
 	
 	dasd_device_t *device;
 	dasd_devmap_t *devmap;
-
-	if (off)	/* ignore partial write */
-		return 0;
 
 	devmap = NULL;
 	device = dev->driver_data;
@@ -2035,28 +2019,26 @@ dasd_devices_show(struct device *dev, char *buf, size_t count, loff_t off)
 		devmap = dasd_devmap_from_devno(device->devno);
 
 	if (!devmap)
-		return snprintf(buf, count, "unused\n");
+		return sprintf(buf, "unused\n");
 
-	return min ((size_t) dasd_devices_print(devmap, buf), count);
+	return min ((size_t) dasd_devices_print(devmap, buf), PAGE_SIZE);
 }
 
 static DEVICE_ATTR(dasd, 0444, dasd_devices_show, 0);
 #endif
 
 static ssize_t
-dasd_discipline_show(struct device *dev, char *buf, size_t count, loff_t off)
+dasd_discipline_show(struct device *dev, char *buf)
 {
 	dasd_device_t *device;
 
-	if (off)
-		return 0;
 	device = dev->driver_data;
 	if (!device || !device->discipline)
-		return snprintf(buf, count, "none\n");
-	return snprintf(buf, count, "%s\n", device->discipline->name);
+		return sprintf(buf, "none\n");
+	return snprintf(buf, PAGE_SIZE, "%s\n", device->discipline->name);
 }
 
-static DEVICE_ATTR(discipline, 0444, dasd_discipline_show, 0);
+static DEVICE_ATTR(discipline, 0444, dasd_discipline_show, NULL);
 
 static int
 dasd_add_sysfs_files(struct ccw_device *cdev)

@@ -185,14 +185,10 @@ ccwgroup_set_offline(struct ccwgroup_device *gdev)
 }
 
 static ssize_t
-ccwgroup_online_store (struct device *dev, const char *buf, size_t count,
-			loff_t off)
+ccwgroup_online_store (struct device *dev, const char *buf, size_t count)
 {
 	struct ccwgroup_device *gdev;
 	unsigned int value;
-
-	if (off)
-		return 0;
 
 	gdev = to_ccwgroupdev(dev);
 	if (!dev->driver)
@@ -209,16 +205,13 @@ ccwgroup_online_store (struct device *dev, const char *buf, size_t count,
 }
 
 static ssize_t
-ccwgroup_online_show (struct device *dev, char *buf, size_t count, loff_t off)
+ccwgroup_online_show (struct device *dev, char *buf)
 {
 	int online;
 
-	if (off)
-		return 0;
-
 	online = (to_ccwgroupdev(dev)->state == CCWGROUP_ONLINE);
 
-	return snprintf(buf, count, online ? "1\n" : "0\n");
+	return sprintf(buf, online ? "1\n" : "0\n");
 }
 
 static DEVICE_ATTR(online, 0644, ccwgroup_online_show, ccwgroup_online_store);

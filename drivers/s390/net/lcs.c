@@ -1637,32 +1637,30 @@ lcs_open_device(struct net_device *dev)
  * show function for portno called by cat or similar things
  */
 static ssize_t
-lcs_portno_show (struct device *dev, char *buf, size_t count,
-		 loff_t off)
+lcs_portno_show (struct device *dev, char *buf)
 {
         struct lcs_card *card;
 
 	card = (struct lcs_card *)dev->driver_data;
 
-        if (off || !card)
+        if (!card)
                 return 0;
 
-        return snprintf(buf, count, "%d\n", card->portno);
+        return sprintf(buf, "%d\n", card->portno);
 }
 
 /**
  * store the value which is piped to file portno
  */
 static ssize_t
-lcs_portno_store (struct device *dev, const char *buf, size_t count,
-		  loff_t off)
+lcs_portno_store (struct device *dev, const char *buf, size_t count)
 {
         struct lcs_card *card;
         int value;
 
 	card = (struct lcs_card *)dev->driver_data;
 
-        if (off || !card)
+        if (!card)
                 return 0;
 
         sscanf(buf, "%u", &value);
