@@ -24,6 +24,8 @@ struct pt_regs;
 
 #include "uxio.h"
 
+static struct tasklet_struct DivasTask;
+
 int Divas4BRIInitPCI(card_t *card, dia_card_t *cfg)
 {
 	/* Use UxPciConfigWrite	routines to initialise PCI config space */
@@ -79,28 +81,21 @@ int DivasBRIInitPCI(card_t *card, dia_card_t *cfg)
 
 int	DivasDpcSchedule(void)
 {
-	static	struct tq_struct DivasTask;
-
-	DivasTask.routine = DivasDoDpc;
-	DivasTask.data = (void *) 0;
-
-	queue_task(&DivasTask, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	tasklet_schedule(&DivasTask);
 
 	return 0;
 }
 
 int	DivasScheduleRequestDpc(void)
 {
-	static	struct tq_struct DivasTask;
-
-	DivasTask.routine = DivasDoRequestDpc;
-	DivasTask.data = (void *) 0;
-
-	queue_task(&DivasTask, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	tasklet_schedule(&DivasTask);
 
 	return 0;
+}
+
+void DivasInitDpc(void)
+{
+	tasklet_init(&DivasTask, DivasDoDpc, 0);
 }
 
 void    DivasLogAdd(void *buffer, int length)

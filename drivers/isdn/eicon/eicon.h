@@ -1,4 +1,4 @@
-/* $Id: eicon.h,v 1.23.6.5 2001/09/23 22:24:37 kai Exp $
+/* $Id: eicon.h,v 1.1.4.1.2.3 2002/10/01 11:29:13 armin Exp $
  *
  * ISDN low-level module for Eicon active ISDN-Cards.
  *
@@ -321,9 +321,9 @@ typedef struct eicon_card {
 	struct sk_buff_head sackq;       /* Data-Ack-Message queue           */
 	struct sk_buff_head statq;       /* Status-Message queue             */
 	int statq_entries;
-	struct tq_struct snd_tq;         /* Task struct for xmit bh          */
-	struct tq_struct rcv_tq;         /* Task struct for rcv bh           */
-	struct tq_struct ack_tq;         /* Task struct for ack bh           */
+	struct tasklet_struct snd_tq;    /* Task struct for xmit bh          */
+	struct tasklet_struct rcv_tq;    /* Task struct for rcv bh           */
+	struct tasklet_struct ack_tq;    /* Task struct for ack bh           */
 	eicon_chan*	IdTable[256];	 /* Table to find entity   */
 	__u16  ref_in;
 	__u16  ref_out;
@@ -349,20 +349,17 @@ extern char *eicon_ctype_name[];
 
 extern __inline__ void eicon_schedule_tx(eicon_card *card)
 {
-        queue_task(&card->snd_tq, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+	tasklet_schedule(&card->snd_tq);
 }
 
 extern __inline__ void eicon_schedule_rx(eicon_card *card)
 {
-        queue_task(&card->rcv_tq, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+	tasklet_schedule(&card->rcv_tq);
 }
 
 extern __inline__ void eicon_schedule_ack(eicon_card *card)
 {
-        queue_task(&card->ack_tq, &tq_immediate);
-        mark_bh(IMMEDIATE_BH);
+	tasklet_schedule(&card->ack_tq);
 }
 
 extern int eicon_addcard(int, int, int, char *, int);
