@@ -1286,8 +1286,23 @@ found:
 			struct sem * sem = &sma->sem_base[i];
 			if (u->semadj[i]) {
 				sem->semval += u->semadj[i];
+				/*
+				 * Range checks of the new semaphore value,
+				 * not defined by sus:
+				 * - Some unices ignore the undo entirely
+				 *   (e.g. HP UX 11i 11.22, Tru64 V5.1)
+				 * - some cap the value (e.g. FreeBSD caps
+				 *   at 0, but doesn't enforce SEMVMX)
+				 *
+				 * Linux caps the semaphore value, both at 0
+				 * and at SEMVMX.
+				 *
+				 * 	Manfred <manfred@colorfullife.com>
+				 */
 				if (sem->semval < 0)
-					sem->semval = 0; /* shouldn't happen */
+					sem->semval = 0;
+				if (sem->semval > SEMVMX)
+					sem->semval = SEMVMX;
 				sem->sempid = current->tgid;
 			}
 		}
