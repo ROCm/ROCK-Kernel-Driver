@@ -939,167 +939,113 @@ static int pegasus_close(struct net_device *net)
 
 	return 0;
 }
-#ifdef	CONFIG_MII
-static int pegasus_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
-{
 
-	u32 ethcmd;
+void pegasus_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
 	pegasus_t *pegasus = netdev_priv(dev);
-
-	if (copy_from_user(&ethcmd, useraddr, sizeof (ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	/* get driver-specific version/etc. info */
-	case ETHTOOL_GDRVINFO:{
-			struct ethtool_drvinfo info;
-			memset (&info, 0, sizeof (info));
-			info.cmd = ETHTOOL_GDRVINFO;
-			strncpy(info.driver, driver_name,
-				sizeof (info.driver) - 1);
-			strncpy(info.version, DRIVER_VERSION,
-				sizeof (info.version) - 1);
-			usb_make_path(pegasus->usb, info.bus_info,
-				      sizeof (info.bus_info));
-			if (copy_to_user(useraddr, &info, sizeof (info)))
-				return -EFAULT;
-			return 0;
-		}
-
-	/* get settings */
-	case ETHTOOL_GSET:{
-			struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-			mii_ethtool_gset(&pegasus->mii, &ecmd);
-			if (copy_to_user(useraddr, &ecmd, sizeof (ecmd)))
-				return -EFAULT;
-			return 0;
-		}
-	/* set settings */
-	case ETHTOOL_SSET:{
-			int r;
-			struct ethtool_cmd ecmd;
-			if (copy_from_user(&ecmd, useraddr, sizeof (ecmd)))
-				return -EFAULT;
-			r = mii_ethtool_sset(&pegasus->mii, &ecmd);
-			return r;
-		}
-	/* restart autonegotiation */
-	case ETHTOOL_NWAY_RST:{
-			return mii_nway_restart(&pegasus->mii);
-		}
-
-	/* get link status */
-	case ETHTOOL_GLINK:{
-			struct ethtool_value edata = { ETHTOOL_GLINK };
-			edata.data = mii_link_ok(&pegasus->mii);
-			if (copy_to_user(useraddr, &edata, sizeof (edata)))
-				return -EFAULT;
-			return 0;
-		}
-	/* get message-level */
-	case ETHTOOL_GMSGLVL:{
-			struct ethtool_value edata = { ETHTOOL_GMSGLVL };
-			/* edata.data = pegasus->msg_enable; FIXME */
-			if (copy_to_user(useraddr, &edata, sizeof (edata)))
-				return -EFAULT;
-			return 0;
-		}
-	/* set message-level */
-	case ETHTOOL_SMSGLVL:{
-			struct ethtool_value edata;
-			if (copy_from_user(&edata, useraddr, sizeof (edata)))
-				return -EFAULT;
-			/* sp->msg_enable = edata.data; FIXME */
-			return 0;
-		}
-
-	}
-
-	return -EOPNOTSUPP;
-
+	strncpy(info->driver, driver_name, sizeof (info->driver) - 1);
+	strncpy(info->version, DRIVER_VERSION, sizeof (info->version) - 1);
+	usb_make_path(pegasus->usb, info->bus_info, sizeof (info->bus_info));
 }
-#else
-static int pegasus_ethtool_ioctl(struct net_device *net, void __user *uaddr)
+
+#ifdef	CONFIG_MII
+static int pegasus_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
-	pegasus_t *pegasus;
-	int cmd;
-
-	pegasus = netdev_priv(net);
-	if (get_user(cmd, (int __user *) uaddr))
-		return -EFAULT;
-	switch (cmd) {
-	case ETHTOOL_GDRVINFO:{
-			struct ethtool_drvinfo info;
-			memset (&info, 0, sizeof (info));
-			info.cmd = ETHTOOL_GDRVINFO;
-			strncpy(info.driver, driver_name,
-				sizeof (info.driver) - 1);
-			strncpy(info.version, DRIVER_VERSION,
-				sizeof (info.version) - 1);
-			usb_make_path(pegasus->usb, info.bus_info,
-				      sizeof (info.bus_info));
-			if (copy_to_user(uaddr, &info, sizeof (info)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_GSET:{
-			struct ethtool_cmd ecmd;
-			short lpa, bmcr;
-			u8 port;
-
-			memset(&ecmd, 0, sizeof (ecmd));
-			ecmd.supported = (SUPPORTED_10baseT_Half |
-					  SUPPORTED_10baseT_Full |
-					  SUPPORTED_100baseT_Half |
-					  SUPPORTED_100baseT_Full |
-					  SUPPORTED_Autoneg |
-					  SUPPORTED_TP | SUPPORTED_MII);
-			get_registers(pegasus, Reg7b, 1, &port);
-			if (port == 0)
-				ecmd.port = PORT_MII;
-			else
-				ecmd.port = PORT_TP;
-			ecmd.transceiver = XCVR_INTERNAL;
-			ecmd.phy_address = pegasus->phy;
-			read_mii_word(pegasus, pegasus->phy, MII_BMCR, &bmcr);
-			read_mii_word(pegasus, pegasus->phy, MII_LPA, &lpa);
-			if (bmcr & BMCR_ANENABLE) {
-				ecmd.autoneg = AUTONEG_ENABLE;
-				ecmd.speed = lpa & (LPA_100HALF | LPA_100FULL) ?
-				    SPEED_100 : SPEED_10;
-				if (ecmd.speed == SPEED_100)
-					ecmd.duplex = lpa & LPA_100FULL ?
-					    DUPLEX_FULL : DUPLEX_HALF;
-				else
-					ecmd.duplex = lpa & LPA_10FULL ?
-					    DUPLEX_FULL : DUPLEX_HALF;
-			} else {
-				ecmd.autoneg = AUTONEG_DISABLE;
-				ecmd.speed = bmcr & BMCR_SPEED100 ?
-				    SPEED_100 : SPEED_10;
-				ecmd.duplex = bmcr & BMCR_FULLDPLX ?
-				    DUPLEX_FULL : DUPLEX_HALF;
-			}
-			if (copy_to_user(uaddr, &ecmd, sizeof (ecmd)))
-				return -EFAULT;
-
-			return 0;
-		}
-	case ETHTOOL_SSET:{
-			return -EOPNOTSUPP;
-		}
-	case ETHTOOL_GLINK:{
-			struct ethtool_value edata = { ETHTOOL_GLINK };
-			edata.data = netif_carrier_ok(net);
-			if (copy_to_user(uaddr, &edata, sizeof (edata)))
-				return -EFAULT;
-			return 0;
-		}
-	default:
-		return -EOPNOTSUPP;
-	}
+	pegasus_t *pegasus = netdev_priv(dev);
+	mii_ethtool_gset(&pegasus->mii, ecmd);
+	return 0;
 }
+static int pegasus_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	pegasus_t *pegasus = netdev_priv(dev);
+	return mii_ethtool_sset(&pegasus->mii, &ecmd);
+}
+
+static int pegasus_nway_reset(struct net_device *dev)
+{
+	pegasus_t *pegasus = netdev_priv(dev);
+	return mii_nway_restart(&pegasus->mii);
+}
+
+static u32 pegasus_get_link(struct net_device *dev)
+{
+	pegasus_t *pegasus = netdev_priv(dev);
+	return mii_link_ok(&pegasus->mii);
+}
+
+static u32 pegasus_get_msglevel(struct net_device *dev)
+{
+	pegasus_t *pegasus = netdev_priv(dev);
+	/* return pegasus->msg_enable; FIXME */
+	return 0;
+}
+
+static void pegasus_set_msglevel(struct net_device *dev, u32 v)
+{
+	pegasus_t *pegasus = netdev_priv(dev);
+	/* pegasus->msg_enable = edata.data; FIXME */
+}
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = pegasus_get_drvinfo,
+	.get_settings = pegasus_get_settings,
+	.set_settings = pegasus_set_settings,
+	.nway_reset = pegasus_nway_reset,
+	.get_link = pegasus_get_link,
+	.get_msglevel = pegasus_get_msglevel,
+	.set_msglevel = pegasus_set_msglevel,
+};
+
+#else
+
+static int pegasus_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	pegasus_t *pegasus = netdev_priv(dev);
+	short lpa, bmcr;
+	u8 port;
+
+	ecmd->supported = (SUPPORTED_10baseT_Half |
+			  SUPPORTED_10baseT_Full |
+			  SUPPORTED_100baseT_Half |
+			  SUPPORTED_100baseT_Full |
+			  SUPPORTED_Autoneg |
+			  SUPPORTED_TP | SUPPORTED_MII);
+	get_registers(pegasus, Reg7b, 1, &port);
+	if (port == 0)
+		ecmd->port = PORT_MII;
+	else
+		ecmd->port = PORT_TP;
+	ecmd->transceiver = XCVR_INTERNAL;
+	ecmd->phy_address = pegasus->phy;
+	read_mii_word(pegasus, pegasus->phy, MII_BMCR, &bmcr);
+	read_mii_word(pegasus, pegasus->phy, MII_LPA, &lpa);
+	if (bmcr & BMCR_ANENABLE) {
+		ecmd->autoneg = AUTONEG_ENABLE;
+		ecmd->speed = lpa & (LPA_100HALF | LPA_100FULL) ?
+		    SPEED_100 : SPEED_10;
+		if (ecmd->speed == SPEED_100)
+			ecmd->duplex = lpa & LPA_100FULL ?
+			    DUPLEX_FULL : DUPLEX_HALF;
+		else
+			ecmd->duplex = lpa & LPA_10FULL ?
+			    DUPLEX_FULL : DUPLEX_HALF;
+	} else {
+		ecmd->autoneg = AUTONEG_DISABLE;
+		ecmd->speed = bmcr & BMCR_SPEED100 ?
+		    SPEED_100 : SPEED_10;
+		ecmd->duplex = bmcr & BMCR_FULLDPLX ?
+		    DUPLEX_FULL : DUPLEX_HALF;
+	}
+	return 0;
+}
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = pegasus_get_drvinfo,
+	.get_settings = pegasus_get_settings,
+	.get_link = ethtool_op_get_link,
+};
 #endif
+
 static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
 	__u16 *data = (__u16 *) & rq->ifr_ifru;
@@ -1107,9 +1053,6 @@ static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 	int res;
 
 	switch (cmd) {
-	case SIOCETHTOOL:
-		res = pegasus_ethtool_ioctl(net, rq->ifr_data);
-		break;
 	case SIOCDEVPRIVATE:
 		data[0] = pegasus->phy;
 	case SIOCDEVPRIVATE + 1:
@@ -1234,6 +1177,7 @@ static int pegasus_probe(struct usb_interface *intf,
 	net->set_multicast_list = pegasus_set_multicast;
 	net->get_stats = pegasus_netdev_stats;
 	net->mtu = PEGASUS_MTU;
+	SET_ETHTOOL_OPS(net, &ops);
 	pegasus->mii.dev = net;
 	pegasus->mii.mdio_read = mdio_read;
 	pegasus->mii.mdio_write = mdio_write;
