@@ -23,7 +23,7 @@ struct nfs_fattr {
 			__u64	used;
 		} nfs3;
 	} du;
-	__u32			rdev;
+	dev_t			rdev;
 	union {
 		__u64		nfs3;		/* also nfs2 */
 		struct {
