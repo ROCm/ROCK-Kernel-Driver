@@ -572,6 +572,22 @@ struct sched_domain {
 	unsigned int nr_balance_failed; /* initialise to 0 */
 };
 
+/* Common values for SMT siblings */
+#define SD_SIBLING_INIT (struct sched_domain) {		\
+	.span			= CPU_MASK_NONE,	\
+	.parent			= NULL,			\
+	.groups			= NULL,			\
+	.min_interval		= 1,			\
+	.max_interval		= 2,			\
+	.busy_factor		= 8,			\
+	.imbalance_pct		= 110,			\
+	.cache_hot_time		= 0,			\
+	.cache_nice_tries	= 0,			\
+	.flags			= SD_FLAG_FASTMIGRATE | SD_FLAG_NEWIDLE | SD_FLAG_WAKE,\
+	.balance_interval	= 1,			\
+	.nr_balance_failed	= 0,			\
+}
+
 /* Common values for CPUs */
 #define SD_CPU_INIT (struct sched_domain) {		\
 	.span			= CPU_MASK_NONE,	\

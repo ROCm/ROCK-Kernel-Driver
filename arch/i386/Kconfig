@@ -479,6 +479,16 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
+config SCHED_SMT
+	bool "SMT (Hyperthreading) scheduler support"
+	depends on SMP
+	default off
+	help
+	  SMT scheduler support improves the CPU scheduler's decision making
+	  when dealing with Intel Pentium 4 chips with HyperThreading at a
+	  cost of slightly increased overhead in some places. If unsure say
+	  N here.
+
 config PREEMPT
 	bool "Preemptible Kernel"
 	help

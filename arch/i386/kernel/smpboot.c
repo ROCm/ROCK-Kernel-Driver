@@ -39,6 +39,7 @@
 #include <linux/kernel.h>
 
 #include <linux/mm.h>
+#include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/smp_lock.h>
 #include <linux/irq.h>
@@ -955,6 +956,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
+	cpus_clear(cpu_sibling_map[0]);
+	cpu_set(0, cpu_sibling_map[0]);
 
 	/*
 	 * If we couldn't find an SMP configuration at boot time,
@@ -1085,7 +1088,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * efficiently.
 	 */
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
-		cpu_sibling_map[cpu] = CPU_MASK_NONE;
+		cpus_clear(cpu_sibling_map[cpu]);
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		int siblings = 0;
@@ -1121,6 +1124,207 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	if (cpu_has_tsc && cpucount && cpu_khz)
 		synchronize_tsc_bp();
 }
+
+#ifdef CONFIG_SCHED_SMT
+#ifdef CONFIG_NUMA
+static struct sched_group sched_group_cpus[NR_CPUS];
+static struct sched_group sched_group_phys[NR_CPUS];
+static struct sched_group sched_group_nodes[MAX_NUMNODES];
+static DEFINE_PER_CPU(struct sched_domain, phys_domains);
+static DEFINE_PER_CPU(struct sched_domain, node_domains);
+__init void arch_init_sched_domains(void)
+{
+	int i;
+	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
+
+	/* Set up domains */
+	for_each_cpu_mask(i, cpu_online_map) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
+		struct sched_domain *node_domain = &per_cpu(node_domains, i);
+		int node = cpu_to_node(i);
+		cpumask_t nodemask = node_to_cpumask(node);
+
+		*cpu_domain = SD_SIBLING_INIT;
+		cpu_domain->span = cpu_sibling_map[i];
+
+		*phys_domain = SD_CPU_INIT;
+		phys_domain->span = nodemask;
+		phys_domain->flags |= SD_FLAG_IDLE;
+
+		*node_domain = SD_NODE_INIT;
+		node_domain->span = cpu_online_map;
+	}
+
+	/* Set up CPU (sibling) groups */
+	for_each_cpu_mask(i, cpu_online_map) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		int j;
+		first_cpu = last_cpu = NULL;
+
+		if (i != first_cpu(cpu_domain->span))
+			continue;
+
+		for_each_cpu_mask(j, cpu_domain->span) {
+			struct sched_group *cpu = &sched_group_cpus[j];
+
+			cpu->cpumask = CPU_MASK_NONE;
+			cpu_set(j, cpu->cpumask);
+
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
+		}
+		last_cpu->next = first_cpu;
+	}
+
+	for (i = 0; i < MAX_NUMNODES; i++) {
+		int j;
+		cpumask_t nodemask;
+		cpus_and(nodemask, node_to_cpumask(i), cpu_online_map);
+
+		if (cpus_empty(nodemask))
+			continue;
+
+		first_cpu = last_cpu = NULL;
+		/* Set up physical groups */
+		for_each_cpu_mask(j, nodemask) {
+			struct sched_domain *cpu_domain = cpu_sched_domain(j);
+			struct sched_group *cpu = &sched_group_phys[j];
+
+			if (j != first_cpu(cpu_domain->span))
+				continue;
+
+			cpu->cpumask = cpu_domain->span;
+
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
+		}
+		last_cpu->next = first_cpu;
+	}
+
+	/* Set up nodes */
+	first_cpu = last_cpu = NULL;
+	for (i = 0; i < MAX_NUMNODES; i++) {
+		struct sched_group *cpu = &sched_group_nodes[i];
+		cpumask_t nodemask;
+		cpus_and(nodemask, node_to_cpumask(i), cpu_online_map);
+
+		if (cpus_empty(nodemask))
+			continue;
+
+		cpu->cpumask = nodemask;
+
+		if (!first_cpu)
+			first_cpu = cpu;
+		if (last_cpu)
+			last_cpu->next = cpu;
+		last_cpu = cpu;
+	}
+	last_cpu->next = first_cpu;
+
+
+	mb();
+	for_each_cpu_mask(i, cpu_online_map) {
+		int node = cpu_to_node(i);
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
+		struct sched_domain *node_domain = &per_cpu(node_domains, i);
+		struct sched_group *cpu_group = &sched_group_cpus[i];
+		struct sched_group *phys_group = &sched_group_phys[first_cpu(cpu_domain->span)];
+		struct sched_group *node_group = &sched_group_nodes[node];
+
+		cpu_domain->parent = phys_domain;
+		phys_domain->parent = node_domain;
+
+		node_domain->groups = node_group;
+		phys_domain->groups = phys_group;
+		cpu_domain->groups = cpu_group;
+	}
+}
+#else /* CONFIG_NUMA */
+static struct sched_group sched_group_cpus[NR_CPUS];
+static struct sched_group sched_group_phys[NR_CPUS];
+static DEFINE_PER_CPU(struct sched_domain, phys_domains);
+__init void arch_init_sched_domains(void)
+{
+	int i;
+	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
+
+	/* Set up domains */
+	for_each_cpu_mask(i, cpu_online_map) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
+
+		*cpu_domain = SD_SIBLING_INIT;
+		cpu_domain->span = cpu_sibling_map[i];
+
+		*phys_domain = SD_CPU_INIT;
+		phys_domain->span = cpu_online_map;
+		phys_domain->flags |= SD_FLAG_IDLE;
+	}
+
+	/* Set up CPU (sibling) groups */
+	for_each_cpu_mask(i, cpu_online_map) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		int j;
+		first_cpu = last_cpu = NULL;
+
+		if (i != first_cpu(cpu_domain->span))
+			continue;
+
+		for_each_cpu_mask(j, cpu_domain->span) {
+			struct sched_group *cpu = &sched_group_cpus[j];
+
+			cpus_clear(cpu->cpumask);
+			cpu_set(j, cpu->cpumask);
+
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
+		}
+		last_cpu->next = first_cpu;
+	}
+
+	first_cpu = last_cpu = NULL;
+	/* Set up physical groups */
+	for_each_cpu_mask(i, cpu_online_map) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_group *cpu = &sched_group_phys[i];
+
+		if (i != first_cpu(cpu_domain->span))
+			continue;
+
+		cpu->cpumask = cpu_domain->span;
+
+		if (!first_cpu)
+			first_cpu = cpu;
+		if (last_cpu)
+			last_cpu->next = cpu;
+		last_cpu = cpu;
+	}
+	last_cpu->next = first_cpu;
+
+	mb();
+	for_each_cpu_mask(i, cpu_online_map) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		struct sched_domain *phys_domain = &per_cpu(phys_domains, i);
+		struct sched_group *cpu_group = &sched_group_cpus[i];
+		struct sched_group *phys_group = &sched_group_phys[first_cpu(cpu_domain->span)];
+		cpu_domain->parent = phys_domain;
+		phys_domain->groups = phys_group;
+		cpu_domain->groups = cpu_group;
+	}
+}
+#endif /* CONFIG_NUMA */
+#endif /* CONFIG_SCHED_SMT */
 
 /* These are wrappers to interface to the new boot process.  Someone
    who understands all this stuff should rewrite it properly. --RR 15/Jul/02 */
