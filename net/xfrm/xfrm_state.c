@@ -345,7 +345,8 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 			}
 			x->lft.hard_add_expires_seconds = XFRM_ACQ_EXPIRES;
 			xfrm_state_hold(x);
-			mod_timer(&x->timer, XFRM_ACQ_EXPIRES*HZ);
+			x->timer.expires = jiffies + XFRM_ACQ_EXPIRES*HZ;
+			add_timer(&x->timer);
 		} else {
 			x->km.state = XFRM_STATE_DEAD;
 			xfrm_state_put(x);
