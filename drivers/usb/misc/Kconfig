@@ -4,9 +4,22 @@
 comment "USB Miscellaneous drivers"
 	depends on USB
 
+config USB_EMI62
+	tristate "EMI 6|2m USB Audio interface support"
+	---help---
+	  This driver loads firmware to Emagic EMI 6|2m low latency USB
+	  Audio and Midi interface.
+
+	  After firmware load the device is handled with standard linux
+	  USB Audio driver.
+
+	  This code is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called audio. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
 config USB_EMI26
 	tristate "EMI 2|6 USB Audio interface support"
-	depends on USB_AUDIO
 	---help---
 	  This driver loads firmware to Emagic EMI 2|6 low latency USB
 	  Audio interface.
