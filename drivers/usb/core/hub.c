@@ -1175,7 +1175,7 @@ void usb_hub_cleanup(void)
 int usb_reset_device(struct usb_device *dev)
 {
 	struct usb_device *parent = dev->parent;
-	struct usb_device_descriptor descriptor;
+	struct usb_device_descriptor *descriptor;
 	int i, ret, port = -1;
 
 	if (!parent) {
@@ -1224,17 +1224,24 @@ int usb_reset_device(struct usb_device *dev)
 	 * If nothing changed, we reprogram the configuration and then
 	 * the alternate settings.
 	 */
-	ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &descriptor,
-			sizeof(descriptor));
-	if (ret < 0)
+	descriptor = kmalloc(sizeof *descriptor, GFP_NOIO);
+	if (!descriptor) {
+		return -ENOMEM;
+	}
+	ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, descriptor,
+			sizeof(*descriptor));
+	if (ret < 0) {
+		kfree(descriptor);
 		return ret;
+	}
 
-	le16_to_cpus(&descriptor.bcdUSB);
-	le16_to_cpus(&descriptor.idVendor);
-	le16_to_cpus(&descriptor.idProduct);
-	le16_to_cpus(&descriptor.bcdDevice);
+	le16_to_cpus(&descriptor->bcdUSB);
+	le16_to_cpus(&descriptor->idVendor);
+	le16_to_cpus(&descriptor->idProduct);
+	le16_to_cpus(&descriptor->bcdDevice);
 
-	if (memcmp(&dev->descriptor, &descriptor, sizeof(descriptor))) {
+	if (memcmp(&dev->descriptor, descriptor, sizeof(*descriptor))) {
+		kfree(descriptor);
 		usb_destroy_configuration(dev);
 
 		ret = usb_get_device_descriptor(dev);
@@ -1267,6 +1274,8 @@ int usb_reset_device(struct usb_device *dev)
 
 		return 1;
 	}
+
+	kfree(descriptor);
 
 	ret = usb_set_configuration(dev, dev->actconfig->desc.bConfigurationValue);
 	if (ret < 0) {

@@ -100,7 +100,7 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 
 	if ((err = snd_trident_create(card, pci,
 				      pcm_channels[dev],
-				      2,
+				      ((pci->vendor << 16) | pci->device) == TRIDENT_DEVICE_ID_SI7018 ? 1 : 2,
 				      wavetable_size[dev],
 				      &trident)) < 0) {
 		snd_card_free(card);

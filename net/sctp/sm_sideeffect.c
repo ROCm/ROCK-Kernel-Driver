@@ -105,8 +105,8 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *, sctp_association_t *,
 #define DEBUG_POST_SFX \
 	SCTP_DEBUG_PRINTK("sctp_do_sm post sfx: error %d, asoc %p[%s]\n", \
 			  error, asoc, \
-			  sctp_state_tbl[sctp_id2assoc(ep->base.sk, \
-			  sctp_assoc2id(asoc))?asoc->state:SCTP_STATE_CLOSED])
+			  sctp_state_tbl[(asoc && sctp_id2assoc(ep->base.sk, \
+			  sctp_assoc2id(asoc)))?asoc->state:SCTP_STATE_CLOSED])
 
 /*
  * This is the master state machine processing function.
@@ -256,7 +256,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	sctp_cmd_t *cmd;
 	sctp_chunk_t *new_obj;
 	sctp_chunk_t *chunk = NULL;
-	sctp_packet_t *packet;
+	struct sctp_packet *packet;
 	struct list_head *pos;
 	struct timer_list *timer;
 	unsigned long timeout;
@@ -716,12 +716,11 @@ int sctp_gen_sack(sctp_association_t *asoc, int force, sctp_cmd_seq_t *commands)
 		asoc->peer.sack_needed = 1;
 		goto out;
 	} else {
+		if (asoc->a_rwnd > asoc->rwnd)
+			asoc->a_rwnd = asoc->rwnd;
 		sack = sctp_make_sack(asoc);
 		if (!sack)
 			goto nomem;
-
-		/* Update the last advertised rwnd value. */
-		asoc->a_rwnd = asoc->rwnd;
 
 		asoc->peer.sack_needed = 0;
 
@@ -1223,13 +1222,35 @@ static void sctp_cmd_setup_t2(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 			       sctp_state_t state)
 {
+
+	struct sock *sk = asoc->base.sk;
+	struct sctp_opt *sp = sctp_sk(sk);
+
 	asoc->state = state;
 	asoc->state_timestamp = jiffies;
 
-	/* Wake up any process waiting for the association to
-	 * get established.
+	if ((SCTP_STATE_ESTABLISHED == asoc->state) ||
+	    (SCTP_STATE_CLOSED == asoc->state)) { 
+		/* Wake up any processes waiting in the asoc's wait queue in
+		 * sctp_wait_for_connect() or sctp_wait_for_sndbuf(). 
+	 	 */
+		if (waitqueue_active(&asoc->wait))
+			wake_up_interruptible(&asoc->wait);
+
+		/* Wake up any processes waiting in the sk's sleep queue of
+		 * a TCP-style or UDP-style peeled-off socket in
+		 * sctp_wait_for_accept() or sctp_wait_for_packet().
+		 * For a UDP-style socket, the waiters are woken up by the
+		 * notifications.
+		 */
+		if (SCTP_SOCKET_UDP != sp->type)
+			sk->state_change(sk);
+	}
+
+	/* Change the sk->state of a TCP-style socket that has sucessfully
+	 * completed a connect() call.
 	 */
 	if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
-	    (waitqueue_active(&asoc->wait)))
-		wake_up_interruptible(&asoc->wait);
+	    (SCTP_SOCKET_TCP == sp->type) && (SCTP_SS_CLOSED == sk->state))
+	    sk->state = SCTP_SS_ESTABLISHED;
 }

@@ -65,6 +65,8 @@ struct ipv6_mreq {
 	int		ipv6mr_ifindex;
 };
 
+#define ipv6mr_acaddr	ipv6mr_multiaddr
+
 struct in6_flowlabel_req
 {
 	struct in6_addr	flr_dst;
@@ -166,6 +168,8 @@ struct in6_flowlabel_req
 #define IPV6_MTU		24
 #define IPV6_RECVERR		25
 #define IPV6_V6ONLY		26
+#define IPV6_JOIN_ANYCAST	27
+#define IPV6_LEAVE_ANYCAST	28
 
 /* IPV6_MTU_DISCOVER values */
 #define IPV6_PMTUDISC_DONT		0

@@ -91,8 +91,12 @@ checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ipt_match tcpmss_match
-= { { NULL, NULL }, "tcpmss", &match, &checkentry, NULL, THIS_MODULE };
+static struct ipt_match tcpmss_match = {
+	.name		= "tcpmss",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

@@ -1199,11 +1199,23 @@ static void __devinit init_timers_cpu(int cpu)
 		INIT_LIST_HEAD(base->tv1.vec + j);
 
 	base->timer_jiffies = INITIAL_JIFFIES;
-	base->tv1.index = INITIAL_JIFFIES & TVR_MASK;
-	base->tv2.index = (INITIAL_JIFFIES >> TVR_BITS) & TVN_MASK;
-	base->tv3.index = (INITIAL_JIFFIES >> (TVR_BITS+TVN_BITS)) & TVN_MASK;
-	base->tv4.index = (INITIAL_JIFFIES >> (TVR_BITS+2*TVN_BITS)) & TVN_MASK;
-	base->tv5.index = (INITIAL_JIFFIES >> (TVR_BITS+3*TVN_BITS)) & TVN_MASK;
+	/*
+	 * The tv indices are always larger by one compared to the
+	 * respective parts of timer_jiffies. If all lower indices are
+	 * zero at initialisation, this is achieved by an (otherwise
+	 * unneccessary) invocation of the timer cascade on the first
+	 * timer interrupt. If not, we need to take it into account
+	 * here:
+	 */
+	j  = (base->tv1.index = INITIAL_JIFFIES & TVR_MASK) !=0;
+	j |= (base->tv2.index = ((INITIAL_JIFFIES >> TVR_BITS) + j)
+	                        & TVN_MASK) !=0;
+	j |= (base->tv3.index = ((INITIAL_JIFFIES >> (TVR_BITS+TVN_BITS)) + j)
+	                        & TVN_MASK) !=0;
+	j |= (base->tv4.index = ((INITIAL_JIFFIES >> (TVR_BITS+2*TVN_BITS)) + j)
+	                        & TVN_MASK) !=0;
+	      base->tv5.index = ((INITIAL_JIFFIES >> (TVR_BITS+3*TVN_BITS)) + j)
+	                        & TVN_MASK;
 }
 	
 static int __devinit timer_cpu_notify(struct notifier_block *self, 

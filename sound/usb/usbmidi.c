@@ -131,7 +131,7 @@ static int snd_usbmidi_submit_urb(struct urb* urb, int flags)
 {
 	int err = usb_submit_urb(urb, flags);
 	if (err < 0 && err != -ENODEV)
-		printk(KERN_ERR "snd-usb-midi: usb_submit_urb: %d\n", err);
+		snd_printk(KERN_ERR "usb_submit_urb: %d\n", err);
 	return err;
 }
 
@@ -146,7 +146,7 @@ static int snd_usbmidi_urb_error(int status)
 	    status == -EILSEQ ||
 	    status == -ETIMEDOUT)
 		return -ENODEV; /* device removed */
-	printk(KERN_ERR "snd-usb-midi: urb status %d\n", status);
+	snd_printk(KERN_ERR "urb status %d\n", status);
 	return 0; /* continue */
 }
 
@@ -435,8 +435,10 @@ static int snd_usbmidi_output_open(snd_rawmidi_substream_t* substream)
 					port = &umidi->endpoints[i].out->ports[j];
 					break;
 				}
-	if (!port)
+	if (!port) {
+		snd_BUG();
 		return -ENXIO;
+	}
 	substream->runtime->private_data = port;
 	port->state = STATE_UNKNOWN;
 	return 0;
@@ -526,6 +528,8 @@ static struct usb_endpoint_descriptor* snd_usbmidi_get_int_epd(snd_usb_midi_t* u
 	    (get_endpoint(hostif, 1)->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_INT)
 		return NULL;
 
+	snd_printdd(KERN_INFO "switching to altsetting %d with int ep\n",
+		    intfd->bAlternateSetting);
 	usb_set_interface(umidi->chip->dev, intfd->bInterfaceNumber,
 			  intfd->bAlternateSetting);
 	return get_endpoint(hostif, 1);
@@ -774,8 +778,8 @@ static int snd_usbmidi_create_endpoints(snd_usb_midi_t* umidi,
 			}
 		}
 	}
-	printk(KERN_INFO "snd-usb-midi: created %d output and %d input ports\n",
-	       out_ports, in_ports);
+	snd_printdd(KERN_INFO "created %d output and %d input ports\n",
+		    out_ports, in_ports);
 	return 0;
 }
 
@@ -804,10 +808,10 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
 	    ms_header->bLength >= 7 &&
 	    ms_header->bDescriptorType == USB_DT_CS_INTERFACE &&
 	    ms_header->bDescriptorSubtype == HEADER)
-		printk(KERN_INFO "snd-usb-midi: MIDIStreaming version %02x.%02x\n",
-		       ms_header->bcdMSC[1], ms_header->bcdMSC[0]);
+		snd_printdd(KERN_INFO "MIDIStreaming version %02x.%02x\n",
+			    ms_header->bcdMSC[1], ms_header->bcdMSC[0]);
 	else
-		printk(KERN_WARNING "snd-usb-midi: MIDIStreaming interface descriptor not found\n");
+		snd_printk(KERN_WARNING "MIDIStreaming interface descriptor not found\n");
 
 	epidx = 0;
 	for (i = 0; i < intfd->bNumEndpoints; ++i) {
@@ -824,25 +828,25 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
 		if ((ep->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT) {
 			if (endpoints[epidx].out_ep) {
 				if (++epidx >= MIDI_MAX_ENDPOINTS) {
-					printk(KERN_WARNING "snd-usb-midi: too many endpoints\n");
+					snd_printk(KERN_WARNING "too many endpoints\n");
 					break;
 				}
 			}
 			endpoints[epidx].out_ep = ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 			endpoints[epidx].out_cables = (1 << ms_ep->bNumEmbMIDIJack) - 1;
-			printk(KERN_INFO "snd-usb-midi: EP %02X: %d jack(s)\n",
-			       ep->bEndpointAddress, ms_ep->bNumEmbMIDIJack);
+			snd_printdd(KERN_INFO "EP %02X: %d jack(s)\n",
+				    ep->bEndpointAddress, ms_ep->bNumEmbMIDIJack);
 		} else {
 			if (endpoints[epidx].in_ep) {
 				if (++epidx >= MIDI_MAX_ENDPOINTS) {
-					printk(KERN_WARNING "snd-usb-midi: too many endpoints\n");
+					snd_printk(KERN_WARNING "too many endpoints\n");
 					break;
 				}
 			}
 			endpoints[epidx].in_ep = ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 			endpoints[epidx].in_cables = (1 << ms_ep->bNumEmbMIDIJack) - 1;
-			printk(KERN_INFO "snd-usb-midi: EP %02X: %d jack(s)\n",
-			       ep->bEndpointAddress, ms_ep->bNumEmbMIDIJack);
+			snd_printdd(KERN_INFO "EP %02X: %d jack(s)\n",
+				    ep->bEndpointAddress, ms_ep->bNumEmbMIDIJack);
 		}
 	}
 	return 0;

@@ -570,7 +570,7 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 		mss_now = tp->mss_clamp;
 
 	/* Now subtract optional transport overhead */
-	mss_now -= tp->ext_header_len;
+	mss_now -= tp->ext_header_len + tp->ext2_header_len;
 
 	/* Then reserve room for full set of TCP options and 8 bytes of data */
 	if (mss_now < 48)
@@ -591,7 +591,7 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 		int large_mss;
 
 		large_mss = 65535 - tp->af_specific->net_header_len -
-			tp->ext_header_len - tp->tcp_header_len;
+			tp->ext_header_len - tp->ext2_header_len - tp->tcp_header_len;
 
 		if (tp->max_window && large_mss > (tp->max_window>>1))
 			large_mss = max((tp->max_window>>1), 68U - tp->tcp_header_len);

@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 Intel Corp.
+ * Copyright (c) 2001-2003 Intel Corp.
  * Copyright (c) 2001-2003 International Business Machines Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -62,6 +62,43 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 				   sctp_sackhdr_t *sack,
 				   __u32 highest_new_tsn);
 
+/* Add data to the front of the queue. */
+static inline void sctp_outq_head_data(struct sctp_outq *q,
+					struct sctp_chunk *ch)
+{
+	__skb_queue_head(&q->out, (struct sk_buff *)ch);
+	q->out_qlen += ch->skb->len;
+	return;
+}
+
+/* Take data from the front of the queue. */
+static inline struct sctp_chunk *sctp_outq_dequeue_data(struct sctp_outq *q)
+{
+	struct sctp_chunk *ch;
+	ch = (struct sctp_chunk *)__skb_dequeue(&q->out);
+	if (ch)
+		q->out_qlen -= ch->skb->len;
+	return ch;
+}
+/* Add data chunk to the end of the queue. */
+static inline void sctp_outq_tail_data(struct sctp_outq *q,
+				       struct sctp_chunk *ch)
+{
+	__skb_queue_tail(&q->out, (struct sk_buff *)ch);
+	q->out_qlen += ch->skb->len;
+	return;
+}
+
+/* Insert a chunk behind chunk 'pos'. */
+static inline void sctp_outq_insert_data(struct sctp_outq *q,
+					 struct sctp_chunk *ch,
+					 struct sctp_chunk *pos)
+{
+	__skb_insert((struct sk_buff *)ch, (struct sk_buff *)pos->prev, 
+		     (struct sk_buff *)pos, pos->list);
+	q->out_qlen += ch->skb->len;
+}
+
 /* Generate a new outqueue.  */
 struct sctp_outq *sctp_outq_new(sctp_association_t *asoc)
 {
@@ -97,6 +134,7 @@ void sctp_outq_init(sctp_association_t *asoc, struct sctp_outq *q)
 	q->empty = 1;
 
 	q->malloced = 0;
+	q->out_qlen = 0;
 }
 
 /* Free the outqueue structure and any related pending chunks.
@@ -125,7 +163,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		sctp_free_chunk(chunk);
 	}
 
-	/* Throw away any chunks in the retransmit queue. */ 
+	/* Throw away any chunks in the retransmit queue. */
 	list_for_each_safe(lchunk, temp, &q->retransmit) {
 		list_del(lchunk);
 		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
@@ -133,7 +171,7 @@ void sctp_outq_teardown(struct sctp_outq *q)
 	}
 
 	/* Throw away any leftover data chunks. */
-	while ((chunk = (sctp_chunk_t *) skb_dequeue(&q->out)))
+	while ((chunk = sctp_outq_dequeue_data(q)))
 		sctp_free_chunk(chunk);
 
 	/* Throw away any leftover control chunks. */
@@ -192,7 +230,7 @@ int sctp_outq_tail(struct sctp_outq *q, sctp_chunk_t *chunk)
 			  sctp_cname(SCTP_ST_CHUNK(chunk->chunk_hdr->type))
 			  : "Illegal Chunk");
 
-			skb_queue_tail(&q->out, (struct sk_buff *) chunk);
+			sctp_outq_tail_data(q, chunk);
 			if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
 				SCTP_INC_STATS(SctpOutUnorderChunks);
 			else
@@ -201,7 +239,7 @@ int sctp_outq_tail(struct sctp_outq *q, sctp_chunk_t *chunk)
 			break;
 		};
 	} else {
-		skb_queue_tail(&q->control, (struct sk_buff *) chunk);
+		__skb_queue_tail(&q->control, (struct sk_buff *) chunk);
 		SCTP_INC_STATS(SctpOutCtrlChunks);
 	}
 
@@ -241,7 +279,7 @@ void sctp_retransmit_insert(struct list_head *tlchunk, struct sctp_outq *q)
 }
 
 /* Mark all the eligible packets on a transport for retransmission.  */
-void sctp_retransmit_mark(struct sctp_outq *q, 
+void sctp_retransmit_mark(struct sctp_outq *q,
 			  struct sctp_transport *transport,
 			  __u8 fast_retransmit)
 {
@@ -351,7 +389,7 @@ void sctp_retransmit(struct sctp_outq *q, struct sctp_transport *transport,
  *
  * The return value is a normal kernel error return value.
  */
-static int sctp_outq_flush_rtx(struct sctp_outq *q, sctp_packet_t *pkt,
+static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 			       int rtx_timeout, int *start_timer)
 {
 	struct list_head *lqueue;
@@ -385,17 +423,6 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, sctp_packet_t *pkt,
 
 	while (lchunk) {
 		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
-#if 0
-		/* If a chunk has been tried for more than SCTP_DEF_MAX_SEND
-		 * times, discard it, and check the empty flag of the outqueue.
-		 *
-		 * --xguo
-		 */
-		if (chunk->snd_count > SCTP_DEF_MAX_SEND) {
-			sctp_free_chunk(chunk);
-			continue;
-		}
-#endif
 
 		/* Make sure that Gap Acked TSNs are not retransmitted.  A
 		 * simple approach is just to move such TSNs out of the
@@ -461,8 +488,8 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, sctp_packet_t *pkt,
  * queue.  'pos' points to the next chunk in the output queue after the
  * chunk that is currently in the process of fragmentation.
  */
-void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
-		    sctp_packet_t *packet, sctp_chunk_t *frag, __u32 tsn)
+void sctp_xmit_frag(struct sctp_outq *q, struct sctp_chunk *pos,
+		struct sctp_packet *packet, struct sctp_chunk *frag, __u32 tsn)
 {
 	struct sctp_transport *transport = packet->transport;
 	struct sk_buff_head *queue = &q->out;
@@ -480,11 +507,10 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
 		SCTP_DEBUG_PRINTK("sctp_xmit_frag: q not empty. "
 				  "adding 0x%x to outqueue\n",
 				  ntohl(frag->subh.data_hdr->tsn));
-		if (pos) {
-			skb_insert(pos, (struct sk_buff *) frag);
-		} else {
-			skb_queue_tail(queue, (struct sk_buff *) frag);
-		}
+		if (pos)		
+			sctp_outq_insert_data(q, frag, pos);
+		else
+			sctp_outq_tail_data(q, frag);
 		return;
 	}
 
@@ -496,11 +522,10 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
 		SCTP_DEBUG_PRINTK("sctp_xmit_frag: rwnd full. "
 				  "adding 0x%x to outqueue\n",
 				  ntohl(frag->subh.data_hdr->tsn));
-		if (pos) {
-			skb_insert(pos, (struct sk_buff *) frag);
-		} else {
-			skb_queue_tail(queue, (struct sk_buff *) frag);
-		}
+		if (pos)
+			sctp_outq_insert_data(q, frag, pos);
+		else
+			sctp_outq_tail_data(q, frag);
 		break;
 
 	case SCTP_XMIT_OK:
@@ -512,11 +537,10 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
 			SCTP_DEBUG_PRINTK("sctp_xmit_frag: force output "
 					  "failed. adding 0x%x to outqueue\n",
 					  ntohl(frag->subh.data_hdr->tsn));
-			if (pos) {
-				skb_insert(pos, (struct sk_buff *) frag);
-			} else {
-				skb_queue_tail(queue, (struct sk_buff *) frag);
-			}
+			if (pos)
+				sctp_outq_insert_data(q, frag, pos);
+			else
+				sctp_outq_tail_data(q, frag);
 		} else {
 			SCTP_DEBUG_PRINTK("sctp_xmit_frag: force output "
 					  "success. 0x%x sent\n",
@@ -537,14 +561,14 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
  * The argument 'frag' point to the first fragment and it holds the list
  * of all the other fragments in the 'frag_list' field.
  */
-void sctp_xmit_fragmented_chunks(struct sctp_outq *q, sctp_packet_t *packet,
+void sctp_xmit_fragmented_chunks(struct sctp_outq *q, struct sctp_packet *pkt,
 				 sctp_chunk_t *frag)
 {
 	sctp_association_t *asoc = frag->asoc;
 	struct list_head *lfrag, *frag_list;
 	__u32 tsn;
 	int nfrags = 1;
-	struct sk_buff *pos;
+	struct sctp_chunk *pos;
 
 	/* Count the number of fragments. */
 	frag_list = &frag->frag_list;
@@ -553,17 +577,17 @@ void sctp_xmit_fragmented_chunks(struct sctp_outq *q, sctp_packet_t *packet,
 	}
 
 	/* Get a TSN block of nfrags TSNs. */
-	tsn = __sctp_association_get_tsn_block(asoc, nfrags);
+	tsn = sctp_association_get_tsn_block(asoc, nfrags);
 
-	pos = skb_peek(&q->out);
+	pos = (struct sctp_chunk *)skb_peek(&q->out);
 	/* Transmit the first fragment. */
-	sctp_xmit_frag(q, pos, packet, frag, tsn++);
+	sctp_xmit_frag(q, pos, pkt, frag, tsn++);
 
 	/* Transmit the rest of fragments. */
 	frag_list = &frag->frag_list;
 	list_for_each(lfrag, frag_list) {
 		frag = list_entry(lfrag, sctp_chunk_t, frag_list);
-		sctp_xmit_frag(q, pos, packet, frag, tsn++);
+		sctp_xmit_frag(q, pos, pkt, frag, tsn++);
 	}
 }
 
@@ -595,7 +619,7 @@ sctp_chunk_t *sctp_fragment_chunk(sctp_chunk_t *chunk,
  	old_flags = chunk->chunk_hdr->flags;
 	if (old_flags & SCTP_DATA_FIRST_FRAG)
 		flags = SCTP_DATA_FIRST_FRAG;
-	else 
+	else
 		flags = SCTP_DATA_MIDDLE_FRAG;
 
 	/* Make the first fragment. */
@@ -672,15 +696,14 @@ err:
  *
  * Description: Send everything in q which we legally can, subject to
  * congestion limitations.
- *
- * Note: This function can be called from multiple contexts so appropriate
+ * * Note: This function can be called from multiple contexts so appropriate
  * locking concerns must be made.  Today we use the sock lock to protect
  * this function.
  */
 int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 {
-	sctp_packet_t *packet;
-	sctp_packet_t singleton;
+	struct sctp_packet *packet;
+	struct sctp_packet singleton;
 	sctp_association_t *asoc = q->asoc;
 	int ecn_capable = asoc->peer.ecn_capable;
 	__u16 sport = asoc->base.bind_addr.port;
@@ -719,7 +742,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 	}
 
 	queue = &q->control;
-	while (NULL != (chunk = (sctp_chunk_t *)skb_dequeue(queue))) {
+	while ((chunk = (sctp_chunk_t *)skb_dequeue(queue))) {
 		/* Pick the right transport to use. */
 		new_transport = chunk->transport;
 
@@ -852,7 +875,8 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 		/* Finally, transmit new packets.  */
 		start_timer = 0;
 		queue = &q->out;
-		while (NULL != (chunk = (sctp_chunk_t *) skb_dequeue(queue))) {
+
+		while (NULL != (chunk = sctp_outq_dequeue_data(q))) {
 			/* RFC 2960 6.5 Every DATA chunk MUST carry a valid
 			 * stream identifier.
 			 */
@@ -925,6 +949,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 			switch (status) {
 			case SCTP_XMIT_PMTU_FULL:
 			case SCTP_XMIT_RWND_FULL:
+			case SCTP_XMIT_NAGLE_DELAY:
 				/* We could not append this chunk, so put
 				 * the chunk back on the output queue.
 				 */
@@ -932,7 +957,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 					"not transmit TSN: 0x%x, status: %d\n",
 					ntohl(chunk->subh.data_hdr->tsn),
 					status);
-				skb_queue_head(queue, (struct sk_buff *)chunk);
+				sctp_outq_head_data(q, chunk);
 				goto sctp_flush_out;
 				break;
 
@@ -994,6 +1019,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 	}
 
 sctp_flush_out:
+
 	/* Before returning, examine all the transports touched in
 	 * this call.  Right now, we bluntly force clear all the
 	 * transports.  Things might change after we implement Nagle.
@@ -1003,7 +1029,7 @@ sctp_flush_out:
 	 */
 	while ((ltransport = sctp_list_dequeue(&transport_list)) != NULL ) {
 		struct sctp_transport *t = list_entry(ltransport,
-						      struct sctp_transport, 
+						      struct sctp_transport,
 						      send_ready);
 		if (t != transport)
 			transport = t;
@@ -1125,7 +1151,7 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 	 * This is a MASSIVE candidate for optimization.
 	 */
 	list_for_each(pos, transport_list) {
-		transport  = list_entry(pos, struct sctp_transport, 
+		transport  = list_entry(pos, struct sctp_transport,
 					transports);
 		sctp_check_transmitted(q, &transport->transmitted,
 				       transport, sack, highest_new_tsn);
@@ -1163,11 +1189,10 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 	sack_a_rwnd = ntohl(sack->a_rwnd);
 	outstanding = q->outstanding_bytes;
 
-	if (outstanding < sack_a_rwnd) {
+	if (outstanding < sack_a_rwnd)
 		sack_a_rwnd -= outstanding;
-	} else {
+	else
 		sack_a_rwnd = 0;
-	}
 
 	asoc->peer.rwnd = sack_a_rwnd;
 
@@ -1179,7 +1204,7 @@ int sctp_outq_sack(struct sctp_outq *q, sctp_sackhdr_t *sack)
 		goto finish;
 
 	list_for_each(pos, transport_list) {
-		transport  = list_entry(pos, struct sctp_transport, 
+		transport  = list_entry(pos, struct sctp_transport,
 					transports);
 		q->empty = q->empty && list_empty(&transport->transmitted);
 		if (!q->empty)

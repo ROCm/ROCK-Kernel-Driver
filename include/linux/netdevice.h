@@ -90,6 +90,11 @@ struct vlan_group;
 #define MAX_HEADER (LL_MAX_HEADER + 48)
 #endif
 
+/* Reserve 16byte aligned hard_header_len, but at least 16.
+ * Alternative is: dev->hard_header_len ? (dev->hard_header_len + 15)&~15 : 0
+ */
+#define LL_RESERVED_SPACE(dev) (((dev)->hard_header_len&~15) + 16)
+
 /*
  *	Network device statistics. Akin to the 2.0 ether stats but
  *	with byte counters.
@@ -360,7 +365,6 @@ struct net_device
 #define NETIF_F_IP_CSUM		2	/* Can checksum only TCP/UDP over IPv4. */
 #define NETIF_F_NO_CSUM		4	/* Does not require checksum. F.e. loopack. */
 #define NETIF_F_HW_CSUM		8	/* Can checksum all the packets. */
-#define NETIF_F_DYNALLOC	16	/* Self-dectructable device. */
 #define NETIF_F_HIGHDMA		32	/* Can DMA to high memory. */
 #define NETIF_F_FRAGLIST	64	/* Scatter/gather IO. */
 #define NETIF_F_HW_VLAN_TX	128	/* Transmit VLAN hw acceleration */
@@ -469,6 +473,10 @@ extern struct net_device    *dev_getbyhwaddr(unsigned short type, char *hwaddr);
 extern void		dev_add_pack(struct packet_type *pt);
 extern void		dev_remove_pack(struct packet_type *pt);
 extern int		dev_get(const char *name);
+extern struct net_device	*dev_get_by_flags(unsigned short flags,
+						  unsigned short mask);
+extern struct net_device	*__dev_get_by_flags(unsigned short flags,
+						    unsigned short mask);
 extern struct net_device	*dev_get_by_name(const char *name);
 extern struct net_device	*__dev_get_by_name(const char *name);
 extern struct net_device	*dev_alloc(const char *name, int *err);

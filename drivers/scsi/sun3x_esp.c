@@ -374,11 +374,44 @@ static void dma_advance_sg (Scsi_Cmnd *sp)
     sp->SCp.ptr = (char *)((unsigned long)sp->SCp.buffer->dvma_address);
 }
 
+
+static int esp_slave_alloc(Scsi_Device *SDptr)
+{
+	struct esp_device *esp_dev =
+		kmalloc(sizeof(struct esp_device), GFP_ATOMIC);
+
+	if (!esp_dev)
+		return -ENOMEM;
+	memset(esp_dev, 0, sizeof(struct esp_device));
+	SDptr->hostdata = esp_dev;
+	return 0;
+}
+
+static void esp_slave_destroy(Scsi_Device *SDptr)
+{
+	struct NCR_ESP *esp = (struct NCR_ESP *) SDptr->host->hostdata;
+
+	esp->targets_present &= ~(1 << SDptr->id);
+	kfree(SDptr->hostdata);
+	SDptr->hostdata = NULL;
+}
+
+
+static int sun3x_esp_release(struct Scsi_Host *instance)
+{
+	/* this code does not support being compiled as a module */	 
+	return 1;
+
+}
+
 static Scsi_Host_Template driver_template = {
 	.proc_name		= "esp",
 	.proc_info		= &esp_proc_info,
 	.name			= "Sun ESP 100/100a/200",
 	.detect			= sun3x_esp_detect,
+	.release                = sun3x_esp_release,
+	.slave_alloc		= esp_slave_alloc,
+	.slave_destroy		= esp_slave_destroy,
 	.info			= esp_info,
 	.command		= esp_command,
 	.queuecommand		= esp_queue,

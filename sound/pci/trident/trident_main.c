@@ -41,7 +41,6 @@
 #include <sound/control.h>
 #include <sound/trident.h>
 #include <sound/asoundef.h>
-#include <sound/pcm_sgbuf.h>
 
 #include <asm/io.h>
 
@@ -514,6 +513,29 @@ static void snd_trident_write_cso_reg(trident_t * trident, snd_trident_voice_t *
 }
 
 /*---------------------------------------------------------------------------
+   snd_trident_write_eso_reg
+  
+   Description: This routine will write the new ESO offset
+                register to hardware.
+  
+   Paramters:   trident - pointer to target device class for 4DWave.
+                voice - synthesizer voice structure
+                ESO - new ESO value
+  
+  ---------------------------------------------------------------------------*/
+
+static void snd_trident_write_eso_reg(trident_t * trident, snd_trident_voice_t * voice, unsigned int ESO)
+{
+	voice->ESO = ESO;
+	outb(voice->number, TRID_REG(trident, T4D_LFO_GC_CIR));
+	if (trident->device != TRIDENT_DEVICE_ID_NX) {
+		outw(voice->ESO, TRID_REG(trident, CH_DX_ESO_DELTA) + 2);
+	} else {
+		outl(((voice->Delta << 16) & 0xff000000) | (voice->ESO & 0x00ffffff), TRID_REG(trident, CH_NX_DELTA_ESO));
+	}
+}
+
+/*---------------------------------------------------------------------------
    snd_trident_write_vol_reg
   
    Description: This routine will write the new voice volume
@@ -924,7 +946,7 @@ static int snd_trident_playback_prepare(snd_pcm_substream_t * substream)
 		evoice->spurious_threshold = voice->spurious_threshold;
 		evoice->LBA = voice->LBA;
 		evoice->CSO = 0;
-		evoice->ESO = (runtime->period_size * 2) - 1; /* in samples */
+		evoice->ESO = (runtime->period_size * 2) + 4 - 1; /* in samples */
 		evoice->CTRL = voice->CTRL;
 		evoice->FMC = 3;
 		evoice->GVSel = trident->device == TRIDENT_DEVICE_ID_SI7018 ? 0 : 1;
@@ -941,6 +963,9 @@ static int snd_trident_playback_prepare(snd_pcm_substream_t * substream)
 		evoice->Attribute = 0;
 #endif
 		snd_trident_write_voice_regs(trident, evoice);
+		evoice->isync2 = 1;
+		evoice->isync_mark = runtime->period_size;
+		evoice->ESO = (runtime->period_size * 2) - 1;
 	}
 
 	spin_unlock(&trident->reg_lock);
@@ -984,6 +1009,8 @@ static int snd_trident_capture_prepare(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *voice = (snd_trident_voice_t *) runtime->private_data;
 	unsigned int val, ESO_bytes;
 
+	snd_assert(substream->dma_device.type == SNDRV_DMA_TYPE_PCI, return -EIO);
+
 	spin_lock(&trident->reg_lock);
 
 	// Initilize the channel and set channel Mode
@@ -992,13 +1019,11 @@ static int snd_trident_capture_prepare(snd_pcm_substream_t * substream)
 	// Set DMA channel operation mode register
 	outb(0x54, TRID_REG(trident, LEGACY_DMAR11));
 
-	// Set channel buffer Address
-	/* FIXME: LEGACY_DMAR0 correctly set? */
+	// Set channel buffer Address, DMAR0 expects contiguous PCI memory area	
+	voice->LBA = runtime->dma_addr;
+	outl(voice->LBA, TRID_REG(trident, LEGACY_DMAR0));
 	if (voice->memblk)
 		voice->LBA = voice->memblk->offset;
-	else
-		voice->LBA = runtime->dma_addr;
-	outl(voice->LBA, TRID_REG(trident, LEGACY_DMAR0));
 
 	// set ESO
 	ESO_bytes = snd_pcm_lib_buffer_bytes(substream) - 1;
@@ -1007,7 +1032,7 @@ static int snd_trident_capture_prepare(snd_pcm_substream_t * substream)
 	ESO_bytes++;
 
 	// Set channel sample rate, 4.12 format
-	val = ((unsigned int) 48000L << 12) / runtime->rate;
+	val = (((unsigned int) 48000L << 12) + (runtime->rate/2)) / runtime->rate;
 	outw(val, TRID_REG(trident, T4D_SBDELTA_DELTA_R));
 
 	// Set channel interrupt blk length
@@ -1034,15 +1059,13 @@ static int snd_trident_capture_prepare(snd_pcm_substream_t * substream)
 
 	voice->Delta = snd_trident_convert_rate(runtime->rate);
 	voice->spurious_threshold = snd_trident_spurious_threshold(runtime->rate, runtime->period_size);
+	voice->isync = 1;
+	voice->isync_mark = runtime->period_size;
+	voice->isync_max = runtime->buffer_size;
 
 	// Set voice parameters
 	voice->CSO = 0;
-	/* the +2 is a correction for a h/w problem. if not
-	   used, the ESO interrupt is received before the capture pointer
-	   has actually reached the ESO point. this causes errors in
-	   the mid-level code.
-	*/
-	voice->ESO = (runtime->period_size * 2) + 2 - 1;
+	voice->ESO = voice->isync_ESO = (runtime->period_size * 2) + 6 - 1;
 	voice->CTRL = snd_trident_control_mode(substream);
 	voice->FMC = 3;
 	voice->RVol = 0x7f;
@@ -1160,7 +1183,7 @@ static int snd_trident_si7018_capture_prepare(snd_pcm_substream_t * substream)
 		evoice->spurious_threshold = voice->spurious_threshold;
 		evoice->LBA = voice->LBA;
 		evoice->CSO = 0;
-		evoice->ESO = (runtime->period_size * 2) + 8 - 1; /* in samples, 8 means correction */
+		evoice->ESO = (runtime->period_size * 2) + 20 - 1; /* in samples, 20 means correction */
 		evoice->CTRL = voice->CTRL;
 		evoice->FMC = 3;
 		evoice->GVSel = 0;
@@ -1172,6 +1195,9 @@ static int snd_trident_si7018_capture_prepare(snd_pcm_substream_t * substream)
 		evoice->Pan = 0x7f;			/* mute */
 		evoice->Attribute = 0;
 		snd_trident_write_voice_regs(trident, evoice);
+		evoice->isync2 = 1;
+		evoice->isync_mark = runtime->period_size;
+		evoice->ESO = (runtime->period_size * 2) - 1;
 	}
 	
 	spin_unlock(&trident->reg_lock);
@@ -1234,7 +1260,7 @@ static int snd_trident_foldback_prepare(snd_pcm_substream_t * substream)
 		evoice->spurious_threshold = voice->spurious_threshold;
 		evoice->LBA = voice->LBA;
 		evoice->CSO = 0;
-		evoice->ESO = (runtime->period_size * 2) - 1; /* in samples */
+		evoice->ESO = (runtime->period_size * 2) + 4 - 1; /* in samples */
 		evoice->CTRL = voice->CTRL;
 		evoice->FMC = 3;
 		evoice->GVSel = trident->device == TRIDENT_DEVICE_ID_SI7018 ? 0 : 1;
@@ -1246,6 +1272,9 @@ static int snd_trident_foldback_prepare(snd_pcm_substream_t * substream)
 		evoice->Pan = 0x7f;			/* mute */
 		evoice->Attribute = 0;
 		snd_trident_write_voice_regs(trident, evoice);
+		evoice->isync2 = 1;
+		evoice->isync_mark = runtime->period_size;
+		evoice->ESO = (runtime->period_size * 2) - 1;
 	}
 
 	spin_unlock(&trident->reg_lock);
@@ -1348,16 +1377,20 @@ static int snd_trident_spdif_prepare(snd_pcm_substream_t * substream)
 		voice->spurious_threshold = snd_trident_spurious_threshold(runtime->rate, runtime->period_size);
 
 		/* set Loop Back Address */
-		/* FIXME: LBAO?? */
 		LBAO = runtime->dma_addr;
 		if (voice->memblk)
 			voice->LBA = voice->memblk->offset;
 		else
 			voice->LBA = LBAO;
 
+		voice->isync = 1;
+		voice->isync3 = 1;
+		voice->isync_mark = runtime->period_size;
+		voice->isync_max = runtime->buffer_size;
+
 		/* set target ESO for channel */
 		RESO = runtime->buffer_size - 1;
-		voice->ESO = (runtime->period_size * 2) - 1;
+		voice->ESO = voice->isync_ESO = (runtime->period_size * 2) + 6 - 1;
 
 		/* set ctrl mode */
 		voice->CTRL = snd_trident_control_mode(substream);
@@ -1421,7 +1454,7 @@ static int snd_trident_spdif_prepare(snd_pcm_substream_t * substream)
 			evoice->spurious_threshold = voice->spurious_threshold;
 			evoice->LBA = voice->LBA;
 			evoice->CSO = 0;
-			evoice->ESO = (runtime->period_size * 2) - 1; /* in samples */
+			evoice->ESO = (runtime->period_size * 2) + 4 - 1; /* in samples */
 			evoice->CTRL = voice->CTRL;
 			evoice->FMC = 3;
 			evoice->GVSel = trident->device == TRIDENT_DEVICE_ID_SI7018 ? 0 : 1;
@@ -1433,6 +1466,9 @@ static int snd_trident_spdif_prepare(snd_pcm_substream_t * substream)
 			evoice->Pan = 0x7f;			/* mute */
 			evoice->Attribute = 0;
 			snd_trident_write_voice_regs(trident, evoice);
+			evoice->isync2 = 1;
+			evoice->isync_mark = runtime->period_size;
+			evoice->ESO = (runtime->period_size * 2) - 1;
 		}
 
 		outl(trident->spdif_pcm_bits, TRID_REG(trident, SI_SPDIF_CS));
@@ -1499,6 +1535,8 @@ static int snd_trident_trigger(snd_pcm_substream_t *substream,
 			} else {
 				what |= 1 << (evoice->number & 0x1f);
 				whati |= 1 << (evoice->number & 0x1f);
+				if (go)
+					evoice->stimer = val;
 			}
 			if (go) {
 				voice->running = 1;
@@ -1579,7 +1617,7 @@ static snd_pcm_uframes_t snd_trident_playback_pointer(snd_pcm_substream_t * subs
 
 	spin_unlock(&trident->reg_lock);
 
-	if (++cso >= runtime->buffer_size)
+	if (cso >= runtime->buffer_size)
 		cso = 0;
 
 	return cso;
@@ -1611,8 +1649,6 @@ static snd_pcm_uframes_t snd_trident_capture_pointer(snd_pcm_substream_t * subst
 		result >>= 1;
 	if (result > 0)
 		result = runtime->buffer_size - result;
-
-	// printk("capture result = 0x%x, cso = 0x%x\n", result, cso);
 
 	return result;
 }
@@ -1833,6 +1869,7 @@ static int snd_trident_spdif_open(snd_pcm_substream_t * substream)
 		return -EAGAIN;
 	voice->spdif = 1;
 	voice->substream = substream;
+	spin_lock_irq(&trident->reg_lock);
 	trident->spdif_pcm_bits = trident->spdif_bits;
 	spin_unlock_irq(&trident->reg_lock);
 
@@ -2023,18 +2060,6 @@ static snd_pcm_ops_t snd_trident_capture_ops = {
 	.pointer =	snd_trident_capture_pointer,
 };
 
-static snd_pcm_ops_t snd_trident_nx_capture_ops = {
-	.open =		snd_trident_capture_open,
-	.close =	snd_trident_capture_close,
-	.ioctl =	snd_trident_ioctl,
-	.hw_params =	snd_trident_capture_hw_params,
-	.hw_free =	snd_trident_hw_free,
-	.prepare =	snd_trident_capture_prepare,
-	.trigger =	snd_trident_trigger,
-	.pointer =	snd_trident_capture_pointer,
-	.page =		snd_pcm_sgbuf_ops_page,
-};
-
 static snd_pcm_ops_t snd_trident_si7018_capture_ops = {
 	.open =		snd_trident_capture_open,
 	.close =	snd_trident_capture_close,
@@ -2078,18 +2103,6 @@ static snd_pcm_ops_t snd_trident_spdif_ops = {
 	.prepare =	snd_trident_spdif_prepare,
 	.trigger =	snd_trident_trigger,
 	.pointer =	snd_trident_spdif_pointer,
-};
-
-static snd_pcm_ops_t snd_trident_nx_spdif_ops = {
-	.open =		snd_trident_spdif_open,
-	.close =	snd_trident_spdif_close,
-	.ioctl =	snd_trident_ioctl,
-	.hw_params =	snd_trident_spdif_hw_params,
-	.hw_free =	snd_trident_hw_free,
-	.prepare =	snd_trident_spdif_prepare,
-	.trigger =	snd_trident_trigger,
-	.pointer =	snd_trident_spdif_pointer,
-	.page =		snd_pcm_sgbuf_ops_page,
 };
 
 static snd_pcm_ops_t snd_trident_spdif_7018_ops = {
@@ -2160,24 +2173,27 @@ int __devinit snd_trident_pcm(trident_t * trident, int device, snd_pcm_t ** rpcm
 
 	if (trident->tlb.entries) {
 		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_nx_playback_ops);
-		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_trident_nx_capture_ops);
 	} else {
 		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_playback_ops);
-		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE,
-				trident->device != TRIDENT_DEVICE_ID_SI7018 ?
-				&snd_trident_capture_ops :
-				&snd_trident_si7018_capture_ops);
 	}
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE,
+			trident->device != TRIDENT_DEVICE_ID_SI7018 ?
+			&snd_trident_capture_ops :
+			&snd_trident_si7018_capture_ops);
 
 	pcm->info_flags = 0;
 	pcm->dev_subclass = SNDRV_PCM_SUBCLASS_GENERIC_MIX;
 	strcpy(pcm->name, "Trident 4DWave");
 	trident->pcm = pcm;
 
-	if (trident->tlb.entries)
-		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, pcm, 64*1024, 128*1024);
-	else
+	if (trident->tlb.entries) {
+		snd_pcm_substream_t *substream;
+		for (substream = pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream; substream; substream = substream->next)
+			snd_pcm_lib_preallocate_sg_pages(trident->pci, substream, 64*1024, 128*1024);
+		snd_pcm_lib_preallocate_pci_pages(trident->pci, pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream, 64*1024, 128*1024);
+	} else {
 		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, pcm, 64*1024, 128*1024);
+	}
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -2262,9 +2278,7 @@ int __devinit snd_trident_spdif_pcm(trident_t * trident, int device, snd_pcm_t *
 
 	spdif->private_data = trident;
 	spdif->private_free = snd_trident_spdif_pcm_free;
-	if (trident->tlb.entries) {
-		snd_pcm_set_ops(spdif, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_nx_spdif_ops);
-	} else if (trident->device != TRIDENT_DEVICE_ID_SI7018) {
+	if (trident->device != TRIDENT_DEVICE_ID_SI7018) {
 		snd_pcm_set_ops(spdif, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_spdif_ops);
 	} else {
 		snd_pcm_set_ops(spdif, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_spdif_7018_ops);
@@ -2273,10 +2287,7 @@ int __devinit snd_trident_spdif_pcm(trident_t * trident, int device, snd_pcm_t *
 	strcpy(spdif->name, "Trident 4DWave IEC958");
 	trident->spdif = spdif;
 
-	if (trident->tlb.entries)
-		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, spdif, 64*1024, 128*1024);
-	else
-		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, spdif, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, spdif, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = spdif;
@@ -2947,6 +2958,7 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 	_ac97.read = snd_trident_codec_read;
 	_ac97.private_data = trident;
 	trident->ac97_detect = 1;
+
       __again:
 	if ((err = snd_ac97_mixer(trident->card, &_ac97, &trident->ac97)) < 0) {
 		if (trident->device == TRIDENT_DEVICE_ID_SI7018) {
@@ -2958,6 +2970,24 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 		}
 		return err;
 	}
+	
+	/* secondary codec? */
+	if (trident->device == TRIDENT_DEVICE_ID_SI7018 &&
+	    (inl(TRID_REG(trident, SI_SERIAL_INTF_CTRL)) & SI_AC97_PRIMARY_READY) != 0) {
+		_ac97.num = 1;
+		err = snd_ac97_mixer(trident->card, &_ac97, &trident->ac97_sec);
+		if (err < 0)
+			snd_printk("SI7018: the secondary codec - invalid access\n");
+#if 0	// only for my testing purpose --jk
+		{
+			ac97_t *mc97;
+			err = snd_ac97_modem(trident->card, &_ac97, &mc97);
+			if (err < 0)
+				snd_printk("snd_ac97_modem returned error %i\n", err);
+		}
+#endif
+	}
+	
 	trident->ac97_detect = 0;
 
 	if (trident->device != TRIDENT_DEVICE_ID_SI7018) {
@@ -3012,17 +3042,29 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 		kctl->put(kctl, &uctl);
 	}
 	if (trident->device == TRIDENT_DEVICE_ID_NX || trident->device == TRIDENT_DEVICE_ID_SI7018) {
+
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_control, trident))) < 0)
 			return err;
+		if (trident->ac97->ext_id & AC97_EI_SPDIF)
+			kctl->id.index++;
+		if (trident->ac97_sec && (trident->ac97_sec->ext_id & AC97_EI_SPDIF))
+			kctl->id.index++;
+		idx = kctl->id.index;
 		kctl->put(kctl, &uctl);
+
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_default, trident))) < 0)
 			return err;
+		kctl->id.index = idx;
 		kctl->id.device = pcm_spdif_device;
+
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_mask, trident))) < 0)
 			return err;
+		kctl->id.index = idx;
 		kctl->id.device = pcm_spdif_device;
+
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_trident_spdif_stream, trident))) < 0)
 			return err;
+		kctl->id.index = idx;
 		kctl->id.device = pcm_spdif_device;
 		trident->spdif_pcm_ctl = kctl;
 	}
@@ -3181,6 +3223,12 @@ static int snd_trident_sis_reset(trident_t *trident)
 		goto __si7018_retry;
 	}
       __si7018_ok:
+	/* wait for the second codec */
+	do {
+		if ((inl(TRID_REG(trident, SI_SERIAL_INTF_CTRL)) & SI_AC97_SECONDARY_READY) != 0)
+			break;
+		do_delay(trident);
+	} while (time_after_eq(end_time, jiffies));
 	/* enable 64 channel mode */
 	outl(BANK_B_EN, TRID_REG(trident, T4D_LFO_GC_CIR));
 	return 0;
@@ -3640,7 +3688,7 @@ int snd_trident_free(trident_t *trident)
 static void snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	trident_t *trident = snd_magic_cast(trident_t, dev_id, return);
-	unsigned int audio_int, chn_int, stimer, channel, mask;
+	unsigned int audio_int, chn_int, stimer, channel, mask, tmp;
 	int delta;
 	snd_trident_voice_t *voice;
 
@@ -3679,16 +3727,42 @@ static void snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				continue;
 			}
 			voice->stimer = stimer;
+			if (voice->isync) {
+				if (!voice->isync3) {
+					tmp = inw(TRID_REG(trident, T4D_SBBL_SBCL));
+					if (trident->bDMAStart & 0x40)
+						tmp >>= 1;
+					if (tmp > 0)
+						tmp = voice->isync_max - tmp;
+				} else {
+					tmp = inl(TRID_REG(trident, NX_SPCTRL_SPCSO)) & 0x00ffffff;
+				}
+				if (tmp < voice->isync_mark) {
+					if (tmp > 0x10)
+						tmp = voice->isync_ESO - 7;
+					else
+						tmp = voice->isync_ESO + 2;
+					/* update ESO for IRQ voice to preserve sync */
+					snd_trident_stop_voice(trident, voice->number);
+					snd_trident_write_eso_reg(trident, voice, tmp);
+					snd_trident_start_voice(trident, voice->number);
+				}
+			} else if (voice->isync2) {
+				voice->isync2 = 0;
+				/* write original ESO and update CSO for IRQ voice to preserve sync */
+				snd_trident_stop_voice(trident, voice->number);
+				snd_trident_write_cso_reg(trident, voice, voice->isync_mark);
+				snd_trident_write_eso_reg(trident, voice, voice->ESO);
+				snd_trident_start_voice(trident, voice->number);
+			}
+#if 0
 			if (voice->extra) {
 				/* update CSO for extra voice to preserve sync */
 				snd_trident_stop_voice(trident, voice->extra->number);
 				snd_trident_write_cso_reg(trident, voice->extra, 0);
 				snd_trident_start_voice(trident, voice->extra->number);
-			} else if (voice->spdif) {
-				snd_trident_stop_voice(trident, voice->number);
-				snd_trident_write_cso_reg(trident, voice, 0);
-				snd_trident_start_voice(trident, voice->number);
 			}
+#endif
 			spin_unlock(&trident->reg_lock);
 			snd_pcm_period_elapsed(voice->substream);
 			spin_lock(&trident->reg_lock);

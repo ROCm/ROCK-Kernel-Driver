@@ -48,7 +48,6 @@ static void dn_heartbeat(int on);
 static void dn_timer_int(int irq,void *, struct pt_regs *);
 static void (*sched_timer_handler)(int, void *, struct pt_regs *)=NULL;
 static void dn_get_model(char *model);
-static int dn_cpuctrl=0xff00;
 static const char *apollo_models[] = {
 	"DN3000 (Otter)",
 	"DN3010 (Otter)",
@@ -290,6 +289,8 @@ static void dn_get_model(char *model)
 }
 
 #ifdef CONFIG_HEARTBEAT
+static int dn_cpuctrl=0xff00;
+
 static void dn_heartbeat(int on) {
 
 	if(on) { 

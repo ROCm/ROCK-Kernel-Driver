@@ -58,7 +58,7 @@
 #include <net/inet_common.h>
 
 /* Global data structures. */
-sctp_protocol_t sctp_proto;
+struct sctp_protocol sctp_proto;
 struct proc_dir_entry	*proc_net_sctp;
 DEFINE_SNMP_STAT(struct sctp_mib, sctp_statistics);
 
@@ -152,7 +152,7 @@ static void sctp_v4_copy_addrlist(struct list_head *addrlist,
 /* Extract our IP addresses from the system and stash them in the
  * protocol structure.
  */
-static void __sctp_get_local_addr_list(sctp_protocol_t *proto)
+static void __sctp_get_local_addr_list(struct sctp_protocol *proto)
 {
 	struct net_device *dev;
 	struct list_head *pos;
@@ -168,7 +168,7 @@ static void __sctp_get_local_addr_list(sctp_protocol_t *proto)
 	read_unlock(&dev_base_lock);
 }
 
-static void sctp_get_local_addr_list(sctp_protocol_t *proto)
+static void sctp_get_local_addr_list(struct sctp_protocol *proto)
 {
 	long flags __attribute__ ((unused));
 
@@ -178,7 +178,7 @@ static void sctp_get_local_addr_list(sctp_protocol_t *proto)
 }
 
 /* Free the existing local addresses.  */
-static void __sctp_free_local_addr_list(sctp_protocol_t *proto)
+static void __sctp_free_local_addr_list(struct sctp_protocol *proto)
 {
 	struct sockaddr_storage_list *addr;
 	struct list_head *pos, *temp;
@@ -191,7 +191,7 @@ static void __sctp_free_local_addr_list(sctp_protocol_t *proto)
 }
 
 /* Free the existing local addresses.  */
-static void sctp_free_local_addr_list(sctp_protocol_t *proto)
+static void sctp_free_local_addr_list(struct sctp_protocol *proto)
 {
 	long flags __attribute__ ((unused));
 
@@ -201,8 +201,9 @@ static void sctp_free_local_addr_list(sctp_protocol_t *proto)
 }
 
 /* Copy the local addresses which are valid for 'scope' into 'bp'.  */
-int sctp_copy_local_addr_list(sctp_protocol_t *proto, sctp_bind_addr_t *bp,
-			      sctp_scope_t scope, int priority, int copy_flags)
+int sctp_copy_local_addr_list(struct sctp_protocol *proto,
+			      struct sctp_bind_addr *bp, sctp_scope_t scope,
+			      int priority, int copy_flags)
 {
 	struct sockaddr_storage_list *addr;
 	int error = 0;
@@ -331,7 +332,7 @@ static int sctp_v4_addr_valid(union sctp_addr *addr)
 static int sctp_v4_available(const union sctp_addr *addr)
 {
 	int ret = inet_addr_type(addr->v4.sin_addr.s_addr);
-	
+
 	/* FIXME: ip_nonlocal_bind sysctl support. */
 
 	if (addr->v4.sin_addr.s_addr != INADDR_ANY && ret != RTN_LOCAL)
@@ -380,7 +381,7 @@ static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
 
 /* Returns a valid dst cache entry for the given source and destination ip
  * addresses. If an association is passed, trys to get a dst entry with a
- * source adddress that matches an address in the bind address list. 
+ * source adddress that matches an address in the bind address list.
  */
 struct dst_entry *sctp_v4_get_dst(sctp_association_t *asoc,
 				  union sctp_addr *daddr,
@@ -479,6 +480,61 @@ void sctp_v4_get_saddr(sctp_association_t *asoc,
 
 }
 
+/* Create and initialize a new sk for the socket returned by accept(). */ 
+struct sock *sctp_v4_create_accept_sk(struct sock *sk,
+				      struct sctp_association *asoc)
+{
+	struct sock *newsk;
+	struct inet_opt *inet = inet_sk(sk);
+	struct inet_opt *newinet;
+
+	newsk = sk_alloc(PF_INET, GFP_KERNEL, sizeof(struct sctp_sock),
+			 sk->slab);
+	if (!newsk)
+		goto out;
+
+	sock_init_data(NULL, newsk);
+
+	newsk->type = SOCK_STREAM;
+
+	newsk->prot = sk->prot;
+	newsk->no_check = sk->no_check;
+	newsk->reuse = sk->reuse;
+
+	newsk->destruct = inet_sock_destruct;
+	newsk->zapped = 0;
+	newsk->family = PF_INET;
+	newsk->protocol = IPPROTO_SCTP;
+	newsk->backlog_rcv = sk->prot->backlog_rcv;
+	
+	newinet = inet_sk(newsk);
+	newinet->sport = inet->sport;
+	newinet->saddr = inet->saddr;
+	newinet->rcv_saddr = inet->saddr;
+	newinet->dport = asoc->peer.port;
+	newinet->daddr = asoc->peer.primary_addr.v4.sin_addr.s_addr;
+	newinet->pmtudisc = inet->pmtudisc;
+      	newinet->id = 0;
+	
+	newinet->ttl = sysctl_ip_default_ttl;
+	newinet->mc_loop = 1;
+	newinet->mc_ttl = 1;
+	newinet->mc_index = 0;
+	newinet->mc_list = NULL;
+
+#ifdef INET_REFCNT_DEBUG
+	atomic_inc(&inet_sock_nr);
+#endif
+
+	if (0 != newsk->prot->init(newsk)) {
+		inet_sock_release(newsk);
+		newsk = NULL;
+	}
+
+out:
+	return newsk;
+}
+
 /* Event handler for inet address addition/deletion events.
  * Basically, whenever there is an event, we re-build our local address list.
  */
@@ -501,10 +557,13 @@ static int sctp_inetaddr_event(struct notifier_block *this, unsigned long event,
  */
 int sctp_ctl_sock_init(void)
 {
-	int err = 0;
-	int family = PF_INET;
+	int err;
+	sa_family_t family;
 
-	SCTP_V6(family = PF_INET6;)
+	if (sctp_get_pf_specific(PF_INET6))
+		family = PF_INET6;
+	else 
+		family = PF_INET;
 
 	err = sock_create(family, SOCK_SEQPACKET, IPPROTO_SCTP,
 			  &sctp_ctl_socket);
@@ -630,6 +689,16 @@ static int sctp_inet_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 	return sctp_v4_available(addr);
 }
 
+/* Fill in Supported Address Type information for INIT and INIT-ACK
+ * chunks.  Returns number of addresses supported.
+ */
+static int sctp_inet_supported_addrs(const struct sctp_opt *opt, 
+				     __u16 *types)
+{
+	types[0] = SCTP_PARAM_IPV4_ADDRESS;
+	return 1;
+}
+
 /* Wrapper routine that calls the ip transmit routine. */
 static inline int sctp_v4_xmit(struct sk_buff *skb,
 			       struct sctp_transport *transport, int ipfragok)
@@ -652,6 +721,8 @@ static struct sctp_pf sctp_pf_inet = {
 	.af_supported  = sctp_inet_af_supported,
 	.cmp_addr      = sctp_inet_cmp_addr,
 	.bind_verify   = sctp_inet_bind_verify,
+	.supported_addrs = sctp_inet_supported_addrs,
+	.create_accept_sk = sctp_v4_create_accept_sk,
 	.af            = &sctp_ipv4_specific,
 };
 
@@ -682,8 +753,17 @@ struct proto_ops inet_seqpacket_ops = {
 };
 
 /* Registration with AF_INET family.  */
-struct inet_protosw sctp_protosw = {
+static struct inet_protosw sctp_seqpacket_protosw = {
 	.type       = SOCK_SEQPACKET,
+	.protocol   = IPPROTO_SCTP,
+	.prot       = &sctp_prot,
+	.ops        = &inet_seqpacket_ops,
+	.capability = -1,
+	.no_check   = 0,
+	.flags      = SCTP_PROTOSW_FLAG
+};
+static struct inet_protosw sctp_stream_protosw = {
+	.type       = SOCK_STREAM,
 	.protocol   = IPPROTO_SCTP,
 	.prot       = &sctp_prot,
 	.ops        = &inet_seqpacket_ops,
@@ -756,7 +836,7 @@ int sctp_register_pf(struct sctp_pf *pf, sa_family_t family)
 static int __init init_sctp_mibs(void)
 {
 	int i;
-	
+
 	sctp_statistics[0] = kmalloc_percpu(sizeof (struct sctp_mib),
 					    GFP_KERNEL);
 	if (!sctp_statistics[0])
@@ -778,7 +858,7 @@ static int __init init_sctp_mibs(void)
 		}
 	}
 	return 0;
-	
+
 }
 
 static void cleanup_sctp_mibs(void)
@@ -797,14 +877,15 @@ __init int sctp_init(void)
 	if (inet_add_protocol(&sctp_protocol, IPPROTO_SCTP) < 0)
 		return -EAGAIN;
 
-	/* Add SCTP to inetsw linked list.  */
-	inet_register_protosw(&sctp_protosw);
+	/* Add SCTP(TCP and UDP style) to inetsw linked list.  */
+	inet_register_protosw(&sctp_seqpacket_protosw);
+	inet_register_protosw(&sctp_stream_protosw);
 
 	/* Allocate and initialise sctp mibs.  */
 	status = init_sctp_mibs();
-	if (status) 
+	if (status)
 		goto err_init_mibs;
-		
+
 	/* Initialize proc fs directory.  */
 	sctp_proc_init();
 
@@ -831,7 +912,7 @@ __init int sctp_init(void)
 	/* Valid.Cookie.Life        - 60  seconds */
 	sctp_proto.valid_cookie_life	= 60 * HZ;
 
-	/* Whether Cookie Preservative is enabled(1) or not(0) */ 
+	/* Whether Cookie Preservative is enabled(1) or not(0) */
 	sctp_proto.cookie_preserve_enable = 1;
 
 	/* Max.Burst		    - 4 */
@@ -920,7 +1001,7 @@ __init int sctp_init(void)
 	INIT_LIST_HEAD(&sctp_proto.local_addr_list);
 	sctp_proto.local_addr_lock = SPIN_LOCK_UNLOCKED;
 
-	/* Register notifier for inet address additions/deletions. */ 
+	/* Register notifier for inet address additions/deletions. */
 	register_inetaddr_notifier(&sctp_inetaddr_notifier);
 
 	sctp_get_local_addr_list(&sctp_proto);
@@ -942,9 +1023,10 @@ err_ahash_alloc:
 	sctp_dbg_objcnt_exit();
 	sctp_proc_exit();
 	cleanup_sctp_mibs();
-err_init_mibs:	
+err_init_mibs:
 	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
-	inet_unregister_protosw(&sctp_protosw);
+	inet_unregister_protosw(&sctp_seqpacket_protosw);
+	inet_unregister_protosw(&sctp_stream_protosw);
 	return status;
 }
 
@@ -977,7 +1059,8 @@ __exit void sctp_exit(void)
 	cleanup_sctp_mibs();
 
 	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
-	inet_unregister_protosw(&sctp_protosw);
+	inet_unregister_protosw(&sctp_seqpacket_protosw);
+	inet_unregister_protosw(&sctp_stream_protosw);
 }
 
 module_init(sctp_init);

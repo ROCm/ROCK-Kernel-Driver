@@ -2623,12 +2623,8 @@ int __init cciss_init(void)
 {
 	printk(KERN_INFO DRIVER_NAME "\n");
 
-	/* Register for out PCI devices */
-	if (pci_register_driver(&cciss_pci_driver) > 0 )
-		return 0;
-	else 
-		return -ENODEV;
-
+	/* Register for our PCI devices */
+	return pci_register_driver(&cciss_pci_driver);
 }
 
 static int __init init_cciss_module(void)

@@ -109,8 +109,8 @@ static const struct isapnp_card_id *snd_ad1816a_isapnp_id[SNDRV_CARDS] __devinit
 #define ISAPNP_AD1816A(_va, _vb, _vc, _device, _fa, _fb, _fc, _audio, _mpu401) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID(_fa, _fb, _fc, _audio), \
-			 ISAPNP_DEVICE_ID(_fa, _fb, _fc, _mpu401), } \
+		.devs = { ISAPNP_DEVICE_ID(_fa, _fb, _fc, _audio), \
+			  ISAPNP_DEVICE_ID(_fa, _fb, _fc, _mpu401), } \
 	}
 
 static struct isapnp_card_id snd_ad1816a_pnpids[] __devinitdata = {

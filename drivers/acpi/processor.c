@@ -1356,7 +1356,8 @@ acpi_processor_write_throttling (
         loff_t			*data)
 {
 	int			result = 0;
-	struct acpi_processor	*pr = (struct acpi_processor *) data;
+        struct seq_file 	*m = (struct seq_file *)file->private_data;
+	struct acpi_processor	*pr = (struct acpi_processor *)m->private;
 	char			state_string[12] = {'\0'};
 
 	ACPI_FUNCTION_TRACE("acpi_processor_write_throttling");
@@ -1418,7 +1419,8 @@ acpi_processor_write_limit (
 	loff_t			*data)
 {
 	int			result = 0;
-	struct acpi_processor	*pr = (struct acpi_processor *) data;
+        struct seq_file 	*m = (struct seq_file *)file->private_data;
+	struct acpi_processor	*pr = (struct acpi_processor *)m->private;
 	char			limit_string[25] = {'\0'};
 	int			px = 0;
 	int			tx = 0;

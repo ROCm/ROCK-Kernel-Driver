@@ -207,7 +207,7 @@ MIDI CONTROLLER
 ---------------
 
 The MPU401-UART interface is enabled as default only for the first
-(CMIPCI) card.  You need to set module option "snd_midi_port" properly
+(CMIPCI) card.  You need to set module option "midi_port" properly
 for the 2nd (CMIPCI) card.
 
 There is _no_ hardware wavetable function on this chip (except for
@@ -221,7 +221,7 @@ FM OPL/3 Synth
 --------------
 
 The FM OPL/3 is also enabled as default only for the first card.
-Set "snd_fm_port" module option for more cards.
+Set "fm_port" module option for more cards.
 
 The output quality of FM OPL/3 is, however, very weird.
 I don't know why..

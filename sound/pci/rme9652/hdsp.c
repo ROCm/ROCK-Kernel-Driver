@@ -72,7 +72,7 @@ MODULE_AUTHOR("Paul Davis <pbd@op.net>");
 MODULE_DESCRIPTION("RME Hammerfall DSP");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{RME,Hammerfall-DSP},");
+MODULE_DEVICES("{{RME,Hammerfall-DSP}}");
 
 typedef enum {
 	Digiface,
@@ -2310,7 +2310,8 @@ static int snd_hdsp_playback_copy(snd_pcm_substream_t *substream, int channel,
 
 	channel_buf = hdsp_channel_buffer_location (hdsp, substream->pstr->stream, channel);
 	snd_assert(channel_buf != NULL, return -EIO);
-	copy_from_user(channel_buf + pos * 4, src, count * 4);
+	if (copy_from_user(channel_buf + pos * 4, src, count * 4))
+		return -EFAULT;
 	return count;
 }
 
@@ -2324,7 +2325,8 @@ static int snd_hdsp_capture_copy(snd_pcm_substream_t *substream, int channel,
 
 	channel_buf = hdsp_channel_buffer_location (hdsp, substream->pstr->stream, channel);
 	snd_assert(channel_buf != NULL, return -EIO);
-	copy_to_user(dst, channel_buf + pos * 4, count * 4);
+	if (copy_to_user(dst, channel_buf + pos * 4, count * 4))
+		return -EFAULT;
 	return count;
 }
 
@@ -2634,16 +2636,16 @@ static int snd_hdsp_hw_rule_channels_rate(snd_pcm_hw_params_t *params,
 	snd_interval_t *r = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	if (r->min > 48000) {
 		snd_interval_t t = {
-			min: hdsp->ds_channels,
-			max: hdsp->ds_channels,
-			integer: 1,
+			.min = hdsp->ds_channels,
+			.max = hdsp->ds_channels,
+			.integer = 1,
 		};
 		return snd_interval_refine(c, &t);
 	} else if (r->max < 64000) {
 		snd_interval_t t = {
-			min: hdsp->ss_channels,
-			max: hdsp->ss_channels,
-			integer: 1,
+			.min = hdsp->ss_channels,
+			.max = hdsp->ss_channels,
+			.integer = 1,
 		};
 		return snd_interval_refine(c, &t);
 	}
@@ -2658,16 +2660,16 @@ static int snd_hdsp_hw_rule_rate_channels(snd_pcm_hw_params_t *params,
 	snd_interval_t *r = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	if (c->min >= hdsp->ss_channels) {
 		snd_interval_t t = {
-			min: 32000,
-			max: 48000,
-			integer: 1,
+			.min = 32000,
+			.max = 48000,
+			.integer = 1,
 		};
 		return snd_interval_refine(r, &t);
 	} else if (c->max <= hdsp->ds_channels) {
 		snd_interval_t t = {
-			min: 64000,
-			max: 96000,
-			integer: 1,
+			.min = 64000,
+			.max = 96000,
+			.integer = 1,
 		};
 		return snd_interval_refine(r, &t);
 	}

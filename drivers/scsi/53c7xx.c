@@ -1463,9 +1463,9 @@ NCR53c7x0_init_fixup (struct Scsi_Host *host) {
     patch_abs_32 (hostdata->script, 0, test_src, 
 	virt_to_bus(&hostdata->test_source));
     patch_abs_32 (hostdata->script, 0, saved_dsa,
-	virt_to_bus(&hostdata->saved2_dsa));
+	virt_to_bus((void *)&hostdata->saved2_dsa));
     patch_abs_32 (hostdata->script, 0, emulfly,
-	virt_to_bus(&hostdata->emulated_intfly));
+	virt_to_bus((void *)&hostdata->emulated_intfly));
 
     patch_abs_rwri_data (hostdata->script, 0, dsa_check_reselect, 
 	(unsigned char)(Ent_dsa_code_check_reselect - Ent_dsa_zero));
@@ -1759,7 +1759,7 @@ NCR53c7xx_run_tests (struct Scsi_Host *host) {
 static void 
 NCR53c7xx_dsa_fixup (struct NCR53c7x0_cmd *cmd) {
     Scsi_Cmnd *c = cmd->cmd;
-    struct Scsi_Host *host = c->host;
+    struct Scsi_Host *host = c->device->host;
     struct NCR53c7x0_hostdata *hostdata = (struct NCR53c7x0_hostdata *)
     	host->hostdata[0];
     int i;
@@ -1784,18 +1784,18 @@ NCR53c7xx_dsa_fixup (struct NCR53c7x0_cmd *cmd) {
      */
 
     patch_abs_tci_data (cmd->dsa, Ent_dsa_code_template / sizeof(u32),
-    	dsa_temp_lun, c->lun);
+    	dsa_temp_lun, c->device->lun);
     patch_abs_32 (cmd->dsa, Ent_dsa_code_template / sizeof(u32),
 	dsa_temp_addr_next, virt_to_bus(&cmd->dsa_next_addr));
     patch_abs_32 (cmd->dsa, Ent_dsa_code_template / sizeof(u32),
     	dsa_temp_next, virt_to_bus(cmd->dsa) + Ent_dsa_zero -
 	Ent_dsa_code_template + A_dsa_next);
     patch_abs_32 (cmd->dsa, Ent_dsa_code_template / sizeof(u32), 
-    	dsa_temp_sync, virt_to_bus((void *)hostdata->sync[c->target].script));
+    	dsa_temp_sync, virt_to_bus((void *)hostdata->sync[c->device->id].script));
     patch_abs_32 (cmd->dsa, Ent_dsa_code_template / sizeof(u32), 
-    	dsa_sscf_710, virt_to_bus((void *)&hostdata->sync[c->target].sscf_710));
+    	dsa_sscf_710, virt_to_bus((void *)&hostdata->sync[c->device->id].sscf_710));
     patch_abs_tci_data (cmd->dsa, Ent_dsa_code_template / sizeof(u32),
-    	    dsa_temp_target, 1 << c->target);
+    	    dsa_temp_target, 1 << c->device->id);
     /* XXX - new pointer stuff */
     patch_abs_32 (cmd->dsa, Ent_dsa_code_template / sizeof(u32),
     	dsa_temp_addr_saved_pointer, virt_to_bus(&cmd->saved_data_pointer));
@@ -1856,7 +1856,7 @@ run_process_issue_queue(void) {
 static void 
 abnormal_finished (struct NCR53c7x0_cmd *cmd, int result) {
     Scsi_Cmnd *c = cmd->cmd;
-    struct Scsi_Host *host = c->host;
+    struct Scsi_Host *host = c->device->host;
     struct NCR53c7x0_hostdata *hostdata = (struct NCR53c7x0_hostdata *)
     	host->hostdata[0];
     unsigned long flags;
@@ -1940,7 +1940,7 @@ abnormal_finished (struct NCR53c7x0_cmd *cmd, int result) {
 	    host->host_no, c->pid);
     else if (linux_search) {
 	*linux_prev = linux_search->next;
-	--hostdata->busy[c->target][c->lun];
+	--hostdata->busy[c->device->id][c->device->lun];
     }
 
     /* Return the NCR command structure to the free list */
@@ -2287,9 +2287,9 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 	    hostdata->dsp_changed = 1;
 	    if (cmd && (cmd->flags & CMD_FLAG_SDTR)) {
 		printk ("scsi%d : target %d rejected SDTR\n", host->host_no, 
-		    c->target);
+		    c->device->id);
 		cmd->flags &= ~CMD_FLAG_SDTR;
-		asynchronous (host, c->target);
+		asynchronous (host, c->device->id);
 		print = 0;
 	    } 
 	    break;
@@ -2311,7 +2311,7 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 	if (print) {
 	    printk ("scsi%d : received message", host->host_no);
 	    if (c) 
-	    	printk (" from target %d lun %d ", c->target, c->lun);
+	    	printk (" from target %d lun %d ", c->device->id, c->device->lun);
 	    print_msg ((unsigned char *) hostdata->msg_buf);
 	    printk("\n");
 	}
@@ -2331,7 +2331,7 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 
 	if (cmd) {
 	    char buf[80];
-	    sprintf (buf, "scsi%d : target %d %s ", host->host_no, c->target,
+	    sprintf (buf, "scsi%d : target %d %s ", host->host_no, c->device->id,
 		(cmd->flags & CMD_FLAG_SDTR) ? "accepting" : "requesting");
 	    print_synchronous (buf, (unsigned char *) hostdata->msg_buf);
 
@@ -2346,10 +2346,10 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 	    if (cmd->flags & CMD_FLAG_SDTR) {
 		cmd->flags &= ~CMD_FLAG_SDTR; 
 		if (hostdata->msg_buf[4]) 
-		    synchronous (host, c->target, (unsigned char *) 
+		    synchronous (host, c->device->id, (unsigned char *) 
 		    	hostdata->msg_buf);
 		else 
-		    asynchronous (host, c->target);
+		    asynchronous (host, c->device->id);
 		hostdata->dsp = hostdata->script + hostdata->E_accept_message /
 		    sizeof(u32);
 		hostdata->dsp_changed = 1;
@@ -2357,11 +2357,11 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 	    } else {
 		if (hostdata->options & OPTION_SYNCHRONOUS)  {
 		    cmd->flags |= CMD_FLAG_DID_SDTR;
-		    synchronous (host, c->target, (unsigned char *) 
+		    synchronous (host, c->device->id, (unsigned char *) 
 			hostdata->msg_buf);
 		} else {
 		    hostdata->msg_buf[4] = 0;		/* 0 offset = async */
-		    asynchronous (host, c->target);
+		    asynchronous (host, c->device->id);
 		}
 		patch_dsa_32 (cmd->dsa, dsa_msgout_other, 0, 5);
 		patch_dsa_32 (cmd->dsa, dsa_msgout_other, 1, (u32) 
@@ -2545,9 +2545,9 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 		    host->host_no, NCR53c7x0_read8(SXFER_REG));
 	    if (c) {
 		print_insn (host, (u32 *) 
-		    hostdata->sync[c->target].script, "", 1);
+		    hostdata->sync[c->device->id].script, "", 1);
 		print_insn (host, (u32 *) 
-		    hostdata->sync[c->target].script + 2, "", 1);
+		    hostdata->sync[c->device->id].script + 2, "", 1);
 	    }
 	}
     	return SPECIFIC_INT_RESTART;
@@ -2658,7 +2658,7 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 	if (hostdata->options & (OPTION_DEBUG_SCRIPT|OPTION_DEBUG_INTR)) {
 	    if (c)
 		printk("scsi%d : target %d lun %d disconnecting\n", 
-		    host->host_no, c->target, c->lun);
+		    host->host_no, c->device->id, c->device->lun);
 	    else
 		printk("scsi%d : unknown target disconnecting\n",
 		    host->host_no);
@@ -2680,9 +2680,9 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 #endif
 	    if (c) {
 		print_insn (host, (u32 *) 
-		    hostdata->sync[c->target].script, "", 1);
+		    hostdata->sync[c->device->id].script, "", 1);
 		print_insn (host, (u32 *) 
-		    hostdata->sync[c->target].script + 2, "", 1);
+		    hostdata->sync[c->device->id].script + 2, "", 1);
 	    }
 	}
 	return SPECIFIC_INT_RESTART;
@@ -2734,8 +2734,8 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 	    if ((hostdata->chip / 100) == 8) {
 		scntl3 = NCR53c7x0_read8 (SCNTL3_REG_800);
 		if (c) {
-		  if (sxfer != hostdata->sync[c->target].sxfer_sanity ||
-		    scntl3 != hostdata->sync[c->target].scntl3_sanity) {
+		  if (sxfer != hostdata->sync[c->device->id].sxfer_sanity ||
+		    scntl3 != hostdata->sync[c->device->id].scntl3_sanity) {
 		   	printk ("scsi%d :  sync sanity check failed sxfer=0x%x, scntl3=0x%x",
 			    host->host_no, sxfer, scntl3);
 			NCR53c7x0_write8 (SXFER_REG, sxfer);
@@ -2746,12 +2746,12 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 		    host->host_no, (int) sxfer, (int) scntl3);
 	    } else {
 		if (c) {
-		  if (sxfer != hostdata->sync[c->target].sxfer_sanity) {
+		  if (sxfer != hostdata->sync[c->device->id].sxfer_sanity) {
 		   	printk ("scsi%d :  sync sanity check failed sxfer=0x%x",
 			    host->host_no, sxfer);
 			NCR53c7x0_write8 (SXFER_REG, sxfer);
 			NCR53c7x0_write8 (SBCL_REG,
-				hostdata->sync[c->target].sscf_710);
+				hostdata->sync[c->device->id].sscf_710);
 		    }
 		} else 
     	    	  printk ("scsi%d : unknown command sxfer=0x%x\n",
@@ -2807,9 +2807,9 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 			(DCMD_REG)) == hostdata->script + 
 		    	Ent_select_check_dsa / sizeof(u32) ?
 		    "selection" : "reselection";
-		if (c && sdid != c->target) {
+		if (c && sdid != c->device->id) {
 		    printk ("scsi%d : SDID target %d != DSA target %d at %s\n",
-			host->host_no, sdid, c->target, where);
+			host->host_no, sdid, c->device->id, where);
 		    print_lots(host);
 		    dump_events (host, 20);
 		    return SPECIFIC_INT_PANIC;
@@ -2855,7 +2855,7 @@ NCR53c7x0_dstat_sir_intr (struct Scsi_Host *host, struct
 		if (event->event == EVENT_RESELECT)
 		    event->lun = hostdata->reselected_identify & 0xf;
 		else if (c)
-		    event->lun = c->lun;
+		    event->lun = c->device->lun;
 		else
 		    event->lun = 255;
 		do_gettimeofday(&(event->time));
@@ -3049,7 +3049,7 @@ my_free_page (void *addr, int dummy)
 
 static struct NCR53c7x0_cmd *
 allocate_cmd (Scsi_Cmnd *cmd) {
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = 
 	(struct NCR53c7x0_hostdata *) host->hostdata[0];
     u32 real;			/* Real address */
@@ -3061,8 +3061,8 @@ allocate_cmd (Scsi_Cmnd *cmd) {
 	printk ("scsi%d : num_cmds = %d, can_queue = %d\n"
 		"         target = %d, lun = %d, %s\n",
 	    host->host_no, hostdata->num_cmds, host->can_queue,
-	    cmd->target, cmd->lun, (hostdata->cmd_allocated[cmd->target] &
-		(1 << cmd->lun)) ? "already allocated" : "not allocated");
+	    cmd->device->id, cmd->device->lun, (hostdata->cmd_allocated[cmd->device->id] &
+		(1 << cmd->device->lun)) ? "already allocated" : "not allocated");
 
 /*
  * If we have not yet reserved commands for this I_T_L nexus, and
@@ -3070,11 +3070,11 @@ allocate_cmd (Scsi_Cmnd *cmd) {
  * being allocated under 1.3.x, or being outside of scan_scsis in
  * 1.2.x), do so now.
  */
-    if (!(hostdata->cmd_allocated[cmd->target] & (1 << cmd->lun)) &&
+    if (!(hostdata->cmd_allocated[cmd->device->id] & (1 << cmd->device->lun)) &&
 				cmd->device && cmd->device->has_cmdblocks) {
       if ((hostdata->extra_allocate + hostdata->num_cmds) < host->can_queue)
           hostdata->extra_allocate += host->cmd_per_lun;
-      hostdata->cmd_allocated[cmd->target] |= (1 << cmd->lun);
+      hostdata->cmd_allocated[cmd->device->id] |= (1 << cmd->device->lun);
     }
 
     for (; hostdata->extra_allocate > 0 ; --hostdata->extra_allocate, 
@@ -3130,7 +3130,7 @@ allocate_cmd (Scsi_Cmnd *cmd) {
     local_irq_restore(flags);
     if (!tmp)
 	printk ("scsi%d : can't allocate command for target %d lun %d\n",
-	    host->host_no, cmd->target, cmd->lun);
+	    host->host_no, cmd->device->id, cmd->device->lun);
     return tmp;
 }
 
@@ -3150,7 +3150,7 @@ allocate_cmd (Scsi_Cmnd *cmd) {
 static struct NCR53c7x0_cmd *
 create_cmd (Scsi_Cmnd *cmd) {
     NCR53c7x0_local_declare();
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = (struct NCR53c7x0_hostdata *)
         host->hostdata[0];	
     struct NCR53c7x0_cmd *tmp; 	/* NCR53c7x0_cmd structure for this command */
@@ -3166,7 +3166,7 @@ create_cmd (Scsi_Cmnd *cmd) {
 #endif
     unsigned long flags;
     u32 exp_select_indirect;	/* Used in sanity check */
-    NCR53c7x0_local_setup(cmd->host);
+    NCR53c7x0_local_setup(cmd->device->host);
 
     if (!(tmp = allocate_cmd (cmd)))
 	return NULL;
@@ -3322,45 +3322,45 @@ create_cmd (Scsi_Cmnd *cmd) {
 
     if (hostdata->options & OPTION_DEBUG_SYNCHRONOUS) {
 
-	exp_select_indirect = ((1 << cmd->target) << 16) |
-			(hostdata->sync[cmd->target].sxfer_sanity << 8);
+	exp_select_indirect = ((1 << cmd->device->id) << 16) |
+			(hostdata->sync[cmd->device->id].sxfer_sanity << 8);
 
-	if (hostdata->sync[cmd->target].select_indirect != 
+	if (hostdata->sync[cmd->device->id].select_indirect !=
 				exp_select_indirect) {
 	    printk ("scsi%d :  sanity check failed select_indirect=0x%x\n",
-		host->host_no, hostdata->sync[cmd->target].select_indirect);
+		host->host_no, hostdata->sync[cmd->device->id].select_indirect);
 	    FATAL(host);
 
 	}
     }
 
     patch_dsa_32(tmp->dsa, dsa_select, 0,
-		hostdata->sync[cmd->target].select_indirect);
+		hostdata->sync[cmd->device->id].select_indirect);
 
     /*
      * Right now, we'll do the WIDE and SYNCHRONOUS negotiations on
      * different commands; although it should be trivial to do them
      * both at the same time.
      */
-    if (hostdata->initiate_wdtr & (1 << cmd->target)) {
+    if (hostdata->initiate_wdtr & (1 << cmd->device->id)) {
 	memcpy ((void *) (tmp->select + 1), (void *) wdtr_message,
 	    sizeof(wdtr_message));
     	patch_dsa_32(tmp->dsa, dsa_msgout, 0, 1 + sizeof(wdtr_message));
 	local_irq_save(flags);
-	hostdata->initiate_wdtr &= ~(1 << cmd->target);
+	hostdata->initiate_wdtr &= ~(1 << cmd->device->id);
 	local_irq_restore(flags);
-    } else if (hostdata->initiate_sdtr & (1 << cmd->target)) {
+    } else if (hostdata->initiate_sdtr & (1 << cmd->device->id)) {
 	memcpy ((void *) (tmp->select + 1), (void *) sdtr_message, 
 	    sizeof(sdtr_message));
     	patch_dsa_32(tmp->dsa, dsa_msgout, 0, 1 + sizeof(sdtr_message));
 	tmp->flags |= CMD_FLAG_SDTR;
 	local_irq_save(flags);
-	hostdata->initiate_sdtr &= ~(1 << cmd->target);
+	hostdata->initiate_sdtr &= ~(1 << cmd->device->id);
 	local_irq_restore(flags);
     
     }
 #if 1
-    else if (!(hostdata->talked_to & (1 << cmd->target)) && 
+    else if (!(hostdata->talked_to & (1 << cmd->device->id)) &&
 		!(hostdata->options & OPTION_NO_ASYNC)) {
 
 	memcpy ((void *) (tmp->select + 1), (void *) async_message, 
@@ -3372,9 +3372,9 @@ create_cmd (Scsi_Cmnd *cmd) {
     else 
     	patch_dsa_32(tmp->dsa, dsa_msgout, 0, 1);
 
-    hostdata->talked_to |= (1 << cmd->target);
+    hostdata->talked_to |= (1 << cmd->device->id);
     tmp->select[0] = (hostdata->options & OPTION_DISCONNECT) ? 
-	IDENTIFY (1, cmd->lun) : IDENTIFY (0, cmd->lun);
+	IDENTIFY (1, cmd->device->lun) : IDENTIFY (0, cmd->device->lun);
     patch_dsa_32(tmp->dsa, dsa_msgout, 1, virt_to_bus(tmp->select));
     patch_dsa_32(tmp->dsa, dsa_cmdout, 0, cmd->cmd_len);
     patch_dsa_32(tmp->dsa, dsa_cmdout, 1, virt_to_bus(tmp->cmnd));
@@ -3591,7 +3591,7 @@ create_cmd (Scsi_Cmnd *cmd) {
 
 int
 NCR53c7xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *)) {
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = 
 	(struct NCR53c7x0_hostdata *) host->hostdata[0];
     unsigned long flags;
@@ -3604,9 +3604,9 @@ NCR53c7xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *)) {
 
 #ifdef VALID_IDS
     /* Ignore commands on invalid IDs */
-    if (!hostdata->valid_ids[cmd->target]) {
+    if (!hostdata->valid_ids[cmd->device->id]) {
         printk("scsi%d : ignoring target %d lun %d\n", host->host_no,
-            cmd->target, cmd->lun);
+            cmd->device->id, cmd->device->lun);
         cmd->result = (DID_BAD_TARGET << 16);
         done(cmd);
         return 0;
@@ -3616,16 +3616,16 @@ NCR53c7xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *)) {
     local_irq_save(flags);
     if ((hostdata->options & (OPTION_DEBUG_INIT_ONLY|OPTION_DEBUG_PROBE_ONLY)) 
 	|| ((hostdata->options & OPTION_DEBUG_TARGET_LIMIT) &&
-	    !(hostdata->debug_lun_limit[cmd->target] & (1 << cmd->lun))) 
+	    !(hostdata->debug_lun_limit[cmd->device->id] & (1 << cmd->device->lun)))
 #ifdef LINUX_1_2
-	|| cmd->target > 7
+	|| cmd->device->id > 7
 #else
-	|| cmd->target > host->max_id
+	|| cmd->device->id > host->max_id
 #endif
-	|| cmd->target == host->this_id
+	|| cmd->device->id == host->this_id
 	|| hostdata->state == STATE_DISABLED) {
 	printk("scsi%d : disabled or bad target %d lun %d\n", host->host_no,
-	    cmd->target, cmd->lun);
+	    cmd->device->id, cmd->device->lun);
 	cmd->result = (DID_BAD_TARGET << 16);
 	done(cmd);
 	local_irq_restore(flags);
@@ -3738,7 +3738,7 @@ to_schedule_list (struct Scsi_Host *host, struct NCR53c7x0_hostdata *hostdata,
 	--i, ncrcurrent += 2 /* JUMP instructions are two words */);
 
     if (i > 0) {
-	++hostdata->busy[tmp->target][tmp->lun];
+	++hostdata->busy[tmp->device->id][tmp->device->lun];
 	cmd->next = hostdata->running_list;
 	hostdata->running_list = cmd;
 
@@ -3799,7 +3799,7 @@ busyp (struct Scsi_Host *host, struct NCR53c7x0_hostdata *hostdata,
     /* FIXME : in the future, this needs to accommodate SCSI-II tagged
        queuing, and we may be able to play with fairness here a bit.
      */
-    return hostdata->busy[cmd->target][cmd->lun];
+    return hostdata->busy[cmd->device->id][cmd->device->lun];
 }
 
 /*
@@ -3873,7 +3873,7 @@ process_issue_queue (unsigned long flags) {
 			    if (tmp->host_scribble) {
 				if (hostdata->options & OPTION_DEBUG_QUEUES) 
 				    printk ("scsi%d : moving command for target %d lun %d to start list\n",
-					host->host_no, tmp->target, tmp->lun);
+					host->host_no, tmp->device->id, tmp->device->lun);
 		
 
 			    	to_schedule_list (host, hostdata, 
@@ -3937,7 +3937,7 @@ intr_scsi (struct Scsi_Host *host, struct NCR53c7x0_cmd *cmd) {
 	    printk ("scsi%d : Selection Timeout\n", host->host_no);
     	    if (cmd) {
     	    	printk("scsi%d : target %d, lun %d, command ",
-    	    	    host->host_no, cmd->cmd->target, cmd->cmd->lun);
+		    host->host_no, cmd->cmd->device->id, cmd->cmd->device->lun);
     	    	print_command (cmd->cmd->cmnd);
 		printk("scsi%d : dsp = 0x%x (virt 0x%p)\n", host->host_no,
 		    NCR53c7x0_read32(DSP_REG),
@@ -3975,7 +3975,7 @@ intr_scsi (struct Scsi_Host *host, struct NCR53c7x0_cmd *cmd) {
 	fatal = 1;
 	if (cmd) {
 	    printk("scsi%d : target %d lun %d unexpected disconnect\n",
-		host->host_no, cmd->cmd->target, cmd->cmd->lun);
+		host->host_no, cmd->cmd->device->id, cmd->cmd->device->lun);
 	    print_lots (host);
 	    abnormal_finished(cmd, DID_ERROR << 16);
 	} else 
@@ -3991,7 +3991,7 @@ intr_scsi (struct Scsi_Host *host, struct NCR53c7x0_cmd *cmd) {
 	fatal = 1;
 	if (cmd && cmd->cmd) {
 	    printk("scsi%d : target %d lun %d parity error.\n",
-		host->host_no, cmd->cmd->target, cmd->cmd->lun);
+		host->host_no, cmd->cmd->device->id, cmd->cmd->device->lun);
 	    abnormal_finished (cmd, DID_PARITY << 16); 
 	} else
 	    printk("scsi%d : parity error\n", host->host_no);
@@ -4199,7 +4199,7 @@ restart:
 	if (cmd_prev_ptr)
 	    *cmd_prev_ptr = (struct NCR53c7x0_cmd *) cmd->next;
 
-	--hostdata->busy[tmp->target][tmp->lun];
+	--hostdata->busy[tmp->device->id][tmp->device->lun];
 	cmd->next = hostdata->free;
 	hostdata->free = cmd;
 
@@ -4207,7 +4207,7 @@ restart:
 
 	if (hostdata->options & OPTION_DEBUG_INTR) {
 	    printk ("scsi%d : command complete : pid %lu, id %d,lun %d result 0x%x ", 
-		  host->host_no, tmp->pid, tmp->target, tmp->lun, tmp->result);
+		  host->host_no, tmp->pid, tmp->device->id, tmp->device->lun, tmp->result);
 	    print_command (tmp->cmnd);
 	}
 
@@ -4292,8 +4292,8 @@ NCR53c7x0_intr (int irq, void *dev_id, struct pt_regs * regs) {
 	if (hostdata->options & OPTION_DEBUG_INTR) {
 	    if (cmd) {
 		printk("scsi%d : interrupt for pid %lu, id %d, lun %d ", 
-		    host->host_no, cmd->cmd->pid, (int) cmd->cmd->target,
-		    (int) cmd->cmd->lun);
+		    host->host_no, cmd->cmd->pid, (int) cmd->cmd->device->id,
+		    (int) cmd->cmd->device->lun);
 		print_command (cmd->cmd->cmnd);
 	    } else {
 		printk("scsi%d : no active command\n", host->host_no);
@@ -4671,7 +4671,7 @@ intr_phase_mismatch (struct Scsi_Host *host, struct NCR53c7x0_cmd *cmd) {
 	    hostdata->dsp = dsp + 2 /* two _words_ */;
 	    hostdata->dsp_changed = 1;
 	    printk ("scsi%d : target %d ignored SDTR and went into COMMAND OUT\n", 
-		host->host_no, cmd->cmd->target);
+		host->host_no, cmd->cmd->device->id);
 	    cmd->flags &= ~CMD_FLAG_SDTR;
 	    action = ACTION_CONTINUE;
 	    break;
@@ -5136,7 +5136,7 @@ print_insn (struct Scsi_Host *host, const u32 *insn,
 int 
 NCR53c7xx_abort (Scsi_Cmnd *cmd) {
     NCR53c7x0_local_declare();
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = host ? (struct NCR53c7x0_hostdata *) 
 	host->hostdata[0] : NULL;
     unsigned long flags;
@@ -5242,7 +5242,7 @@ NCR53c7xx_abort (Scsi_Cmnd *cmd) {
 	    return SCSI_ABORT_NOT_RUNNING;
 	} else {
 	    printk ("scsi%d : DANGER : command running, can not abort.\n",
-		cmd->host->host_no);
+		cmd->device->host->host_no);
 	    local_irq_restore(flags);
 	    return SCSI_ABORT_BUSY;
 	}
@@ -5273,7 +5273,7 @@ NCR53c7xx_abort (Scsi_Cmnd *cmd) {
  * command was ever counted as BUSY, so if we end up here we can
  * decrement the busy count if and only if it is necessary.
  */
-        --hostdata->busy[cmd->target][cmd->lun];
+        --hostdata->busy[cmd->device->id][cmd->device->lun];
     }
     local_irq_restore(flags);
     cmd->scsi_done(cmd);
@@ -5318,7 +5318,7 @@ NCR53c7xx_reset (Scsi_Cmnd *cmd, unsigned int reset_flags) {
      * each command.  
      */
     Scsi_Cmnd *nuke_list = NULL;
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     struct NCR53c7x0_hostdata *hostdata = 
     	(struct NCR53c7x0_hostdata *) host->hostdata[0];
 
@@ -5388,7 +5388,7 @@ NCR53c7xx_reset (Scsi_Cmnd *cmd, unsigned int reset_flags) {
 static int 
 insn_to_offset (Scsi_Cmnd *cmd, u32 *insn) {
     struct NCR53c7x0_hostdata *hostdata = 
-	(struct NCR53c7x0_hostdata *) cmd->host->hostdata[0];
+	(struct NCR53c7x0_hostdata *) cmd->device->host->hostdata[0];
     struct NCR53c7x0_cmd *ncmd = 
 	(struct NCR53c7x0_cmd *) cmd->host_scribble;
     int offset = 0, buffers;
@@ -5418,7 +5418,7 @@ insn_to_offset (Scsi_Cmnd *cmd, u32 *insn) {
     	    	     --buffers, offset += segment->length, ++segment)
 #if 0
 		    printk("scsi%d: comparing 0x%p to 0x%p\n", 
-			cmd->host->host_no, saved, page_address(segment->page+segment->offset);
+			cmd->device->host->host_no, saved, page_address(segment->page+segment->offset);
 #else
 		    ;
 #endif
@@ -5456,7 +5456,7 @@ print_progress (Scsi_Cmnd *cmd) {
     int offset, i;
     char *where;
     u32 *ptr;
-    NCR53c7x0_local_setup (cmd->host);
+    NCR53c7x0_local_setup (cmd->device->host);
 
     if (check_address ((unsigned long) ncmd,sizeof (struct NCR53c7x0_cmd)) == 0)
     {
@@ -5484,15 +5484,15 @@ print_progress (Scsi_Cmnd *cmd) {
 
 	if (offset != -1) 
 	    printk ("scsi%d : %s data pointer at offset %d\n",
-		cmd->host->host_no, where, offset);
+		cmd->device->host->host_no, where, offset);
 	else {
 	    int size;
 	    printk ("scsi%d : can't determine %s data pointer offset\n",
-		cmd->host->host_no, where);
+		cmd->device->host->host_no, where);
 	    if (ncmd) {
-		size = print_insn (cmd->host, 
+		size = print_insn (cmd->device->host,
 		    bus_to_virt(ncmd->saved_data_pointer), "", 1);
-		print_insn (cmd->host, 
+		print_insn (cmd->device->host,
 		    bus_to_virt(ncmd->saved_data_pointer) + size * sizeof(u32),
 		    "", 1);
 	    }
@@ -5549,7 +5549,7 @@ print_dsa (struct Scsi_Host *host, u32 *dsa, const char *prefix) {
     /* XXX Maybe we should access cmd->host_scribble->result here. RGH */
     if (cmd) {
 	printk("               result = 0x%x, target = %d, lun = %d, cmd = ",
-	    cmd->result, cmd->target, cmd->lun);
+	    cmd->result, cmd->device->id, cmd->device->lun);
 	print_command(cmd->cmnd);
     } else
 	printk("\n");
@@ -5558,11 +5558,11 @@ print_dsa (struct Scsi_Host *host, u32 *dsa, const char *prefix) {
     if (cmd) { 
 	printk("scsi%d target %d : sxfer_sanity = 0x%x, scntl3_sanity = 0x%x\n"
 	       "                   script : ",
-	    host->host_no, cmd->target,
-	    hostdata->sync[cmd->target].sxfer_sanity,
-	    hostdata->sync[cmd->target].scntl3_sanity);
-	for (i = 0; i < (sizeof(hostdata->sync[cmd->target].script) / 4); ++i)
-	    printk ("0x%x ", hostdata->sync[cmd->target].script[i]);
+	    host->host_no, cmd->device->id,
+	    hostdata->sync[cmd->device->id].sxfer_sanity,
+	    hostdata->sync[cmd->device->id].scntl3_sanity);
+	for (i = 0; i < (sizeof(hostdata->sync[cmd->device->id].script) / 4); ++i)
+	    printk ("0x%x ", hostdata->sync[cmd->device->id].script[i]);
 	printk ("\n");
     	print_progress (cmd);
     }
@@ -5604,7 +5604,7 @@ print_queues (struct Scsi_Host *host) {
 		    -> dsa, "");
 	} else 
 	    printk ("scsi%d : scsi pid %ld for target %d lun %d has no NCR53c7x0_cmd\n",
-		host->host_no, cmd->pid, cmd->target, cmd->lun);
+		host->host_no, cmd->pid, cmd->device->id, cmd->device->lun);
 	local_irq_restore(flags);
     }
 

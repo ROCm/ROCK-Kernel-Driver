@@ -3649,6 +3649,8 @@ static void __init config_types(void)
 				name = default_drive_params[type].name;
 				allowed_drive_mask |= 1 << drive;
 			}
+			else
+				allowed_drive_mask &= ~(1 << drive);
 		} else {
 			params = &default_drive_params[0].params;
 			sprintf(temparea, "unknown type %d (usb?)", type);

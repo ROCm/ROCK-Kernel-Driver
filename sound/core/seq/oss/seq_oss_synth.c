@@ -302,29 +302,36 @@ snd_seq_oss_synth_cleanup(seq_oss_devinfo_t *dp)
 	seq_oss_synth_t *rec;
 	seq_oss_synthinfo_t *info;
 
+	snd_assert(dp->max_synthdev <= SNDRV_SEQ_OSS_MAX_SYNTH_DEVS, return);
 	for (i = 0; i < dp->max_synthdev; i++) {
 		info = &dp->synths[i];
 		if (! info->opened)
 			continue;
 		if (info->is_midi) {
-			snd_seq_oss_midi_close(dp, info->midi_mapped);
-			midi_synth_dev.opened--;
+			if (midi_synth_dev.opened > 0) {
+				snd_seq_oss_midi_close(dp, info->midi_mapped);
+				midi_synth_dev.opened--;
+			}
 		} else {
 			rec = get_sdev(i);
 			if (rec == NULL)
 				continue;
-			if (rec->opened) {
+			if (rec->opened > 0) {
 				debug_printk(("synth %d closed\n", i));
 				rec->oper.close(&info->arg);
 				module_put(rec->oper.owner);
-				rec->opened--;
+				rec->opened = 0;
 			}
 			snd_use_lock_free(&rec->use_lock);
 		}
-		if (info->sysex)
+		if (info->sysex) {
 			kfree(info->sysex);
-		if (info->ch)
+			info->sysex = NULL;
+		}
+		if (info->ch) {
 			kfree(info->ch);
+			info->ch = NULL;
+		}
 	}
 	dp->synth_opened = 0;
 	dp->max_synthdev = 0;
@@ -401,15 +408,21 @@ snd_seq_oss_synth_reset(seq_oss_devinfo_t *dp, int dev)
 		info->sysex->len = 0; /* reset sysex */
 	reset_channels(info);
 	if (info->is_midi) {
+		if (midi_synth_dev.opened <= 0)
+			return;
 		snd_seq_oss_midi_reset(dp, info->midi_mapped);
 		if (snd_seq_oss_midi_open(dp, info->midi_mapped,
 					  dp->file_mode) < 0) {
 			midi_synth_dev.opened--;
 			info->opened = 0;
-			if (info->sysex)
+			if (info->sysex) {
 				kfree(info->sysex);
-			if (info->ch)
+				info->sysex = NULL;
+			}
+			if (info->ch) {
 				kfree(info->ch);
+				info->ch = NULL;
+			}
 		}
 		return;
 	}

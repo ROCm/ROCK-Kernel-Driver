@@ -238,9 +238,12 @@ ipt_tcpmss_checkentry(const char *tablename,
 	return 0;
 }
 
-static struct ipt_target ipt_tcpmss_reg
-= { { NULL, NULL }, "TCPMSS",
-    ipt_tcpmss_target, ipt_tcpmss_checkentry, NULL, THIS_MODULE };
+static struct ipt_target ipt_tcpmss_reg = {
+	.name		= "TCPMSS",
+	.target		= ipt_tcpmss_target,
+	.checkentry	= ipt_tcpmss_checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

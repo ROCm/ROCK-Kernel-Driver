@@ -93,9 +93,9 @@ SENSORS_INSMOD_8(adm1021, adm1023, max1617, max1617a, thmc10, lm84, gl523sm, mc1
 
 /* Initial values */
 
-/* Note: Eventhough I left the low and high limits named os and hyst, 
+/* Note: Even though I left the low and high limits named os and hyst, 
 they don't quite work like a thermostat the way the LM75 does.  I.e., 
-a lower temp than THYST actuall triggers an alarm instead of 
+a lower temp than THYST actually triggers an alarm instead of 
 clearing it.  Weird, ey?   --Phil  */
 #define adm1021_INIT_TOS 60
 #define adm1021_INIT_THYST 20

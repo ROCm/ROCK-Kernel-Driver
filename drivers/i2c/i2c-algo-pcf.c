@@ -152,7 +152,7 @@ static int pcf_init_8584 (struct i2c_algo_pcf_data *adap)
 
 	/* load own address in S0, effective address is (own << 1)	*/
 	i2c_outb(adap, get_own(adap));
-	/* check it's realy writen */
+	/* check it's really written */
 	if ((temp = i2c_inb(adap)) != get_own(adap)) {
 		DEB2(printk(KERN_ERR "i2c-algo-pcf.o: PCF detection failed -- can't set S0 (0x%02x).\n", temp));
 		return -ENXIO;
@@ -168,7 +168,7 @@ static int pcf_init_8584 (struct i2c_algo_pcf_data *adap)
 
 	/* load clock register S2					*/
 	i2c_outb(adap, get_clock(adap));
-	/* check it's realy writen, the only 5 lowest bits does matter */
+	/* check it's really written, the only 5 lowest bits does matter */
 	if (((temp = i2c_inb(adap)) & 0x1f) != get_clock(adap)) {
 		DEB2(printk(KERN_ERR "i2c-algo-pcf.o: PCF detection failed -- can't set S2 (0x%02x).\n", temp));
 		return -ENXIO;
@@ -177,7 +177,7 @@ static int pcf_init_8584 (struct i2c_algo_pcf_data *adap)
 	/* Enable serial interface, idle, S0 selected			*/
 	set_pcf(adap, 1, I2C_PCF_IDLE);
 
-	/* check to see PCF is realy idled and we can access status register */
+	/* check to see PCF is really idled and we can access status register */
 	if ((temp = get_pcf(adap, 1)) != (I2C_PCF_PIN | I2C_PCF_BB)) {
 		DEB2(printk(KERN_ERR "i2c-algo-pcf.o: PCF detection failed -- can't select S1` (0x%02x).\n", temp));
 		return -ENXIO;

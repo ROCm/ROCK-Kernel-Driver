@@ -555,9 +555,8 @@ struct snd_es1968 {
 	unsigned int clock;		/* clock */
 
 	/* buffer */
-	void *dma_buf;
-	dma_addr_t dma_buf_addr;
-	unsigned long dma_buf_size;
+	struct snd_dma_device dma_dev;
+	struct snd_dma_buffer dma;
 
 	/* Resources... */
 	int irq;
@@ -1076,7 +1075,7 @@ static void snd_es1968_playback_setup(es1968_t *chip, esschan_t *es,
 
 		/* Offset to PCMBAR */
 		pa = es->memory->addr;
-		pa -= chip->dma_buf_addr;
+		pa -= chip->dma.addr;
 		pa >>= 1;	/* words */
 
 		pa |= 0x00400000;	/* System RAM (Bit 22) */
@@ -1222,7 +1221,7 @@ static void snd_es1968_capture_setup(es1968_t *chip, esschan_t *es,
 		snd_es1968_program_wavecache(chip, es, channel, pa, 1);
 
 		/* Offset to PCMBAR */
-		pa -= chip->dma_buf_addr;
+		pa -= chip->dma.addr;
 		pa >>= 1;	/* words */
 
 		/* base offset of dma calcs when reading the pointer
@@ -1499,9 +1498,9 @@ static void snd_es1968_free_dmabuf(es1968_t *chip)
 {
 	struct list_head *p;
 
-	if (! chip->dma_buf)
+	if (! chip->dma.area)
 		return;
-	snd_free_pci_pages(chip->pci, chip->dma_buf_size, chip->dma_buf, chip->dma_buf_addr);
+	snd_dma_free_reserved(&chip->dma_dev);
 	while ((p = chip->buf_list.next) != &chip->buf_list) {
 		esm_memory_t *chunk = list_entry(p, esm_memory_t, list);
 		list_del(p);
@@ -1513,18 +1512,22 @@ static int __devinit
 snd_es1968_init_dmabuf(es1968_t *chip)
 {
 	esm_memory_t *chunk;
-	chip->dma_buf = snd_malloc_pci_pages_fallback(chip->pci, chip->total_bufsize,
-						      &chip->dma_buf_addr, &chip->dma_buf_size);
-	//snd_printd("es1968: allocated buffer size %ld at %p\n", chip->dma_buf_size, chip->dma_buf);
-	if (chip->dma_buf == NULL) {
-		snd_printk("es1968: can't allocate dma pages for size %d\n",
-			   chip->total_bufsize);
-		return -ENOMEM;
-	}
-	if ((chip->dma_buf_addr + chip->dma_buf_size - 1) & ~((1 << 28) - 1)) {
-		snd_es1968_free_dmabuf(chip);
-		snd_printk("es1968: DMA buffer beyond 256MB.\n");
-		return -ENOMEM;
+
+	snd_dma_device_pci(&chip->dma_dev, chip->pci, 0);
+	if (! snd_dma_get_reserved(&chip->dma_dev, &chip->dma)) {
+		chip->dma.area = snd_malloc_pci_pages_fallback(chip->pci, chip->total_bufsize,
+							       &chip->dma.addr, &chip->dma.bytes);
+		if (chip->dma.area == NULL) {
+			snd_printk("es1968: can't allocate dma pages for size %d\n",
+				   chip->total_bufsize);
+			return -ENOMEM;
+		}
+		if ((chip->dma.addr + chip->dma.bytes - 1) & ~((1 << 28) - 1)) {
+			snd_dma_free_pages(&chip->dma_dev, &chip->dma);
+			snd_printk("es1968: DMA buffer beyond 256MB.\n");
+			return -ENOMEM;
+		}
+		snd_dma_set_reserved(&chip->dma_dev, &chip->dma);
 	}
 
 	INIT_LIST_HEAD(&chip->buf_list);
@@ -1534,10 +1537,10 @@ snd_es1968_init_dmabuf(es1968_t *chip)
 		snd_es1968_free_dmabuf(chip);
 		return -ENOMEM;
 	}
-	memset(chip->dma_buf, 0, 512);
-	chunk->buf = chip->dma_buf + 512;
-	chunk->addr = chip->dma_buf_addr + 512;
-	chunk->size = chip->dma_buf_size - 512;
+	memset(chip->dma.area, 0, 512);
+	chunk->buf = chip->dma.area + 512;
+	chunk->addr = chip->dma.addr + 512;
+	chunk->size = chip->dma.bytes - 512;
 	chunk->empty = 1;
 	list_add(&chunk->list, &chip->buf_list);
 
@@ -1812,7 +1815,7 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 
 	wave_set_register(chip, apu << 3, (memory->addr - 0x10) & 0xfff8);
 
-	pa = (unsigned int)((memory->addr - chip->dma_buf_addr) >> 1);
+	pa = (unsigned int)((memory->addr - chip->dma.addr) >> 1);
 	pa |= 0x00400000;	/* System RAM (Bit 22) */
 
 	/* initialize apu */
@@ -1902,10 +1905,10 @@ snd_es1968_pcm(es1968_t *chip, int device)
 		return err;
 
 	/* set PCMBAR */
-	wave_set_register(chip, 0x01FC, chip->dma_buf_addr >> 12);
-	wave_set_register(chip, 0x01FD, chip->dma_buf_addr >> 12);
-	wave_set_register(chip, 0x01FE, chip->dma_buf_addr >> 12);
-	wave_set_register(chip, 0x01FF, chip->dma_buf_addr >> 12);
+	wave_set_register(chip, 0x01FC, chip->dma.addr >> 12);
+	wave_set_register(chip, 0x01FD, chip->dma.addr >> 12);
+	wave_set_register(chip, 0x01FE, chip->dma.addr >> 12);
+	wave_set_register(chip, 0x01FF, chip->dma.addr >> 12);
 
 	if ((err = snd_pcm_new(chip->card, "ESS Maestro", device,
 			       chip->playback_streams,
@@ -2329,7 +2332,7 @@ static void snd_es1968_chip_init(es1968_t *chip)
 	outb(0x88, iobase+0x1f);
 
 	/* it appears some maestros (dell 7500) only work if these are set,
-	   regardless of whether we use the assp or not. */
+	   regardless of wether we use the assp or not. */
 
 	outb(0, iobase + ASSP_CONTROL_B);
 	outb(3, iobase + ASSP_CONTROL_A);	/* M: Reserved bits... */
@@ -2443,9 +2446,9 @@ static void es1968_resume(es1968_t *chip)
 	snd_es1968_chip_init(chip);
 
 	/* need to restore the base pointers.. */ 
-	if (chip->dma_buf_addr) {
+	if (chip->dma.addr) {
 		/* set PCMBAR */
-		wave_set_register(chip, 0x01FC, chip->dma_buf_addr >> 12);
+		wave_set_register(chip, 0x01FC, chip->dma.addr >> 12);
 	}
 
 	/* restore ac97 state */
@@ -2603,7 +2606,7 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 	/* just to be sure */
 	pci_set_master(pci);
 
-	if (do_pm) {
+	if (do_pm > 1) {
 		/* disable power-management if not maestro2e or
 		 * if not on the whitelist
 		 */

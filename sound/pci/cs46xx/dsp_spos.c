@@ -1371,11 +1371,11 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 
 	/* SPDIF input sampel rate converter */
 	src_task_scb = cs46xx_dsp_create_src_task_scb(chip,"SrcTaskSCB_SPDIFI",
-						      48000,
+						      ins->spdif_in_sample_rate,
 						      SRC_OUTPUT_BUF1,
 						      SRC_DELAY_BUF1,SRCTASK_SCB_ADDR,
 						      master_mix_scb,
-						      SCB_ON_PARENT_SUBLIST_SCB);
+						      SCB_ON_PARENT_SUBLIST_SCB,0);
 
 	if (!src_task_scb) goto _fail_end;
 
@@ -1564,9 +1564,32 @@ int cs46xx_dsp_async_init (cs46xx_t *chip, dsp_scb_descriptor_t * fg_entry)
 	return 0;
 }
 
+
+static void cs46xx_dsp_disable_spdif_hw (cs46xx_t *chip)
+{
+	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
+
+	/* set SPDIF output FIFO slot */
+	snd_cs46xx_pokeBA0(chip, BA0_ASER_FADDR, 0);
+
+	/* SPDIF output MASTER ENABLE */
+	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CONTROL, 0);
+
+	/* right and left validate bit */
+	/*cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, ins->spdif_csuv_default);*/
+	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, 0x0);
+
+	/* monitor state */
+	ins->spdif_status_out &= ~DSP_SPDIF_STATUS_HW_ENABLED;
+}
+
 int cs46xx_dsp_enable_spdif_hw (cs46xx_t *chip)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
+
+	/* if hw-ctrl already enabled, turn off to reset logic ... */
+	cs46xx_dsp_disable_spdif_hw (chip);
+	udelay(50);
 
 	/* set SPDIF output FIFO slot */
 	snd_cs46xx_pokeBA0(chip, BA0_ASER_FADDR, ( 0x8000 | ((SP_SPDOUT_FIFO >> 4) << 4) ));

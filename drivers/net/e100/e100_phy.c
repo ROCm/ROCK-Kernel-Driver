@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -636,7 +636,6 @@ e100_force_speed_duplex(struct e100_private *bdp)
 	control &= ~BMCR_ANENABLE;
 	control &= ~BMCR_LOOPBACK;
 
-	/* Check e100.c values */
 	switch (bdp->params.e100_speed_duplex) {
 	case E100_SPEED_10_HALF:
 		control &= ~BMCR_SPEED100;
@@ -680,6 +679,41 @@ e100_force_speed_duplex(struct e100_private *bdp)
 		}
 
 	} while (true);
+}
+
+void
+e100_force_speed_duplex_to_phy(struct e100_private *bdp)
+{
+	u16 control;
+
+	e100_mdi_read(bdp, MII_BMCR, bdp->phy_addr, &control);
+	control &= ~BMCR_ANENABLE;
+	control &= ~BMCR_LOOPBACK;
+
+	switch (bdp->params.e100_speed_duplex) {
+	case E100_SPEED_10_HALF:
+		control &= ~BMCR_SPEED100;
+		control &= ~BMCR_FULLDPLX;
+		break;
+
+	case E100_SPEED_10_FULL:
+		control &= ~BMCR_SPEED100;
+		control |= BMCR_FULLDPLX;
+		break;
+
+	case E100_SPEED_100_HALF:
+		control |= BMCR_SPEED100;
+		control &= ~BMCR_FULLDPLX;
+		break;
+
+	case E100_SPEED_100_FULL:
+		control |= BMCR_SPEED100;
+		control |= BMCR_FULLDPLX;
+		break;
+	}
+
+	/* Send speed/duplex command to PHY layer. */
+	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, control);
 }
 
 /* 

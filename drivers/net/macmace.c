@@ -331,8 +331,8 @@ static int mace_open(struct net_device *dev)
 		return -ENOMEM;
 	}
 
-	mp->rx_ring_phys = (unsigned char *) virt_to_bus(mp->rx_ring);
-	mp->tx_ring_phys = (unsigned char *) virt_to_bus(mp->tx_ring);
+	mp->rx_ring_phys = (unsigned char *) virt_to_bus((void *)mp->rx_ring);
+	mp->tx_ring_phys = (unsigned char *) virt_to_bus((void *)mp->tx_ring);
 
 	/* We want the Rx buffer to be uncached and the Tx buffer to be writethrough */
 

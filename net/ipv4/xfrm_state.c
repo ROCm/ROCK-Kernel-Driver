@@ -501,7 +501,7 @@ int xfrm_state_check_expire(struct xfrm_state *x)
 
 int xfrm_state_check_space(struct xfrm_state *x, struct sk_buff *skb)
 {
-	int nhead = x->props.header_len + skb->dst->dev->hard_header_len
+	int nhead = x->props.header_len + LL_RESERVED_SPACE(skb->dst->dev)
 		- skb_headroom(skb);
 
 	if (nhead > 0)

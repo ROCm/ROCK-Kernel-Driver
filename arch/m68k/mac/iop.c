@@ -236,7 +236,7 @@ static void iop_free_msg(struct iop_msg *msg)
 
 /*
  * This is called by the startup code before anything else. Its purpose
- * is to find and initalize the IOPs early in the boot sequence, so that
+ * is to find and initialize the IOPs early in the boot sequence, so that
  * the serial IOP can be placed into bypass mode _before_ we try to
  * initialize the serial console.
  */

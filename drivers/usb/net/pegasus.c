@@ -121,7 +121,7 @@ static int get_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 	char *buffer;
 	DECLARE_WAITQUEUE(wait, current);
 
-	buffer = kmalloc(size, GFP_DMA);
+	buffer = kmalloc(size, GFP_KERNEL);
 	if (!buffer) {
 		warn("%s: looks like we're out of memory", __FUNCTION__);
 		return -ENOMEM;
@@ -170,7 +170,7 @@ static int set_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 	char *buffer;
 	DECLARE_WAITQUEUE(wait, current);
 
-	buffer = kmalloc(size, GFP_DMA);
+	buffer = kmalloc(size, GFP_KERNEL);
 	if (!buffer) {
 		warn("%s: looks like we're out of memory", __FUNCTION__);
 		return -ENOMEM;
@@ -218,7 +218,7 @@ static int set_register(pegasus_t * pegasus, __u16 indx, __u8 data)
 	char *tmp;
 	DECLARE_WAITQUEUE(wait, current);
 
-	tmp = kmalloc(1, GFP_DMA);
+	tmp = kmalloc(1, GFP_KERNEL);
 	if (!tmp) {
 		warn("%s: looks like we're out of memory", __FUNCTION__);
 		return -ENOMEM;

@@ -142,8 +142,12 @@ checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ip6t_match owner_match
-= { { NULL, NULL }, "owner", &match, &checkentry, NULL, THIS_MODULE };
+static struct ip6t_match owner_match = {
+	.name		= "owner",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

@@ -386,10 +386,10 @@ static void snd_pcm_substream_proc_status_read(snd_info_entry_t *entry, snd_info
 		return;
 	}
 	snd_iprintf(buffer, "state: %s\n", snd_pcm_state_name(status.state));
-	snd_iprintf(buffer, "trigger_time: %ld.%06ld\n",
-		status.trigger_tstamp.tv_sec, status.trigger_tstamp.tv_usec);
-	snd_iprintf(buffer, "tstamp      : %ld.%06ld\n",
-		status.tstamp.tv_sec, status.tstamp.tv_usec);
+	snd_iprintf(buffer, "trigger_time: %ld.%09ld\n",
+		status.trigger_tstamp.tv_sec, status.trigger_tstamp.tv_nsec);
+	snd_iprintf(buffer, "tstamp      : %ld.%09ld\n",
+		status.tstamp.tv_sec, status.tstamp.tv_nsec);
 	snd_iprintf(buffer, "delay       : %ld\n", status.delay);
 	snd_iprintf(buffer, "avail       : %ld\n", status.avail);
 	snd_iprintf(buffer, "avail_max   : %ld\n", status.avail_max);
@@ -595,8 +595,6 @@ int snd_pcm_new_stream(snd_pcm_t *pcm, int stream, int substream_count)
 			snd_magic_kfree(substream);
 			return err;
 		}
-		substream->dma_type = SNDRV_PCM_DMA_TYPE_UNKNOWN;
-		substream->dma_private = NULL;
 		spin_lock_init(&substream->timer_lock);
 		prev = substream;
 	}

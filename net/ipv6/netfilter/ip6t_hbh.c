@@ -29,17 +29,6 @@ MODULE_AUTHOR("Andras Kis-Szabo <kisza@sch.bme.hu>");
 #define DEBUGP(format, args...)
 #endif
 
-int ipv6_ext_hdr(u8 nexthdr)
-{
-        return ( (nexthdr == NEXTHDR_HOP)       ||
-                 (nexthdr == NEXTHDR_ROUTING)   ||
-                 (nexthdr == NEXTHDR_FRAGMENT)  ||
-                 (nexthdr == NEXTHDR_AUTH)      ||
-                 (nexthdr == NEXTHDR_ESP)       ||
-                 (nexthdr == NEXTHDR_NONE)      ||
-                 (nexthdr == NEXTHDR_DEST) );
-}
-
 /*
  * (Type & 0xC0) >> 6
  * 	0	-> ignorable
@@ -84,7 +73,7 @@ match(const struct sk_buff *skb,
        len = skb->len - ptr;
        temp = 0;
 
-        while (ipv6_ext_hdr(nexthdr)) {
+        while (ip6t_ext_hdr(nexthdr)) {
                struct ipv6_opt_hdr *hdr;
 
               DEBUGP("ipv6_opts header iteration \n");
@@ -265,12 +254,16 @@ checkentry(const char *tablename,
        return 1;
 }
 
-static struct ip6t_match opts_match
+static struct ip6t_match opts_match = {
 #if HOPBYHOP
-= { { NULL, NULL }, "hbh", &match, &checkentry, NULL, THIS_MODULE };
+	.name		= "hbh",
 #else
-= { { NULL, NULL }, "dst", &match, &checkentry, NULL, THIS_MODULE };
+	.name		= "dst",
 #endif
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

@@ -76,6 +76,24 @@ config I2C_I801
 	  in the lm_sensors package, which you can download at 
 	  http://www.lm-sensors.nu
 
+config I2C_ISA
+	tristate "  ISA Bus support"
+	depends on I2C && I2C_PROC && ISA && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for i2c
+	  interfaces that are on the ISA bus.
+
+	  This can also be built as a module which can be inserted and removed 
+	  while the kernel is running.  If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>.
+
+	  The module will be called i2c-isa.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+
+
 config I2C_PIIX4
 	tristate "  Intel PIIX4"
 	depends on I2C && I2C_PROC && PCI && EXPERIMENTAL

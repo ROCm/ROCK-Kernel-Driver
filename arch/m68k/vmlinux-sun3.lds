@@ -16,11 +16,12 @@ SECTIONS
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x4e75
+	RODATA
 
   _etext = .;			/* End of text section */
 
   .data : {			/* Data */
-	RODATA
+	*(.data)
 	CONSTRUCTORS
   	. = ALIGN(16);		/* Exception table */
   	__start___ex_table = .;

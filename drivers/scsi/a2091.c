@@ -52,7 +52,7 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
 {
     unsigned short cntr = CNTR_PDMD | CNTR_INTEN;
     unsigned long addr = virt_to_bus(cmd->SCp.ptr);
-    struct Scsi_Host *instance = cmd->host;
+    struct Scsi_Host *instance = cmd->device->host;
 
     /* don't allow DMA if the physical address is bad */
     if (addr & A2091_XFER_MASK ||
@@ -102,12 +102,12 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
 	cntr |= CNTR_DDIR;
 
     /* remember direction */
-    HDATA(cmd->host)->dma_dir = dir_in;
+    HDATA(cmd->device->host)->dma_dir = dir_in;
 
-    DMA(cmd->host)->CNTR = cntr;
+    DMA(cmd->device->host)->CNTR = cntr;
 
     /* setup DMA *physical* address */
-    DMA(cmd->host)->ACR = addr;
+    DMA(cmd->device->host)->ACR = addr;
 
     if (dir_in){
 	/* invalidate any cache */
@@ -117,7 +117,7 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
 	cache_push (addr, cmd->SCp.this_residual);
       }
     /* start DMA */
-    DMA(cmd->host)->ST_DMA = 1;
+    DMA(cmd->device->host)->ST_DMA = 1;
 
     /* return success */
     return 0;

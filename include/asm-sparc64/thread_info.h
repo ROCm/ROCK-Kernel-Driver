@@ -97,7 +97,7 @@ struct thread_info {
 #define TI_PCR		0x00000490
 #define TI_CEE_STUFF	0x00000498
 #define TI_RESTART_BLOCK 0x000004a0
-#define TI_FPREGS	0x000004c0
+#define TI_FPREGS	0x00000500
 
 /* We embed this in the uppermost byte of thread_info->flags */
 #define FAULT_CODE_WRITE	0x01	/* Write access, implies D-TLB		*/

@@ -927,7 +927,8 @@ static __inline__ unsigned int tcp_current_mss(struct sock *sk, int large)
 
 	if (dst) {
 		u32 mtu = dst_pmtu(dst);
-		if (mtu != tp->pmtu_cookie)
+		if (mtu != tp->pmtu_cookie ||
+		    tp->ext2_header_len != dst->header_len)
 			mss_now = tcp_sync_mss(sk, mtu);
 	}
 	if (tp->eff_sacks)

@@ -92,7 +92,7 @@ int ip_forward(struct sk_buff *skb)
 		goto sr_failed;
 
 	/* We are about to mangle packet. Copy it! */
-	if (skb_cow(skb, rt->u.dst.dev->hard_header_len+rt->u.dst.header_len))
+	if (skb_cow(skb, LL_RESERVED_SPACE(rt->u.dst.dev)+rt->u.dst.header_len))
 		goto drop;
 	iph = skb->nh.iph;
 

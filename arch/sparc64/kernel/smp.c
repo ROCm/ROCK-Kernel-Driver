@@ -18,6 +18,7 @@
 #include <linux/fs.h>
 #include <linux/seq_file.h>
 #include <linux/cache.h>
+#include <linux/jiffies.h>
 
 #include <asm/head.h>
 #include <asm/ptrace.h>
@@ -115,7 +116,6 @@ extern void cpu_probe(void);
 void __init smp_callin(void)
 {
 	int cpuid = hard_smp_processor_id();
-	unsigned long pstate;
 	extern int bigkernel;
 	extern unsigned long kern_locked_tte_data;
 
@@ -132,50 +132,6 @@ void __init smp_callin(void)
 	__flush_tlb_all();
 
 	cpu_probe();
-
-	/* Guarentee that the following sequences execute
-	 * uninterrupted.
-	 */
-	__asm__ __volatile__("rdpr	%%pstate, %0\n\t"
-			     "wrpr	%0, %1, %%pstate"
-			     : "=r" (pstate)
-			     : "i" (PSTATE_IE));
-
-	/* Set things up so user can access tick register for profiling
-	 * purposes.  Also workaround BB_ERRATA_1 by doing a dummy
-	 * read back of %tick after writing it.
-	 */
-	__asm__ __volatile__(
-	"sethi	%%hi(0x80000000), %%g1\n\t"
-	"ba,pt	%%xcc, 1f\n\t"
-	" sllx	%%g1, 32, %%g1\n\t"
-	".align	64\n"
-"1:	rd	%%tick, %%g2\n\t"
-	"add	%%g2, 6, %%g2\n\t"
-	"andn	%%g2, %%g1, %%g2\n\t"
-	"wrpr	%%g2, 0, %%tick\n\t"
-	"rdpr	%%tick, %%g0"
-	: /* no outputs */
-	: /* no inputs */
-	: "g1", "g2");
-
-	if (SPARC64_USE_STICK) {
-		/* Let the user get at STICK too. */
-		__asm__ __volatile__(
-			"sethi	%%hi(0x80000000), %%g1\n\t"
-			"sllx	%%g1, 32, %%g1\n\t"
-			"rd	%%asr24, %%g2\n\t"
-			"andn	%%g2, %%g1, %%g2\n\t"
-			"wr	%%g2, 0, %%asr24"
-		: /* no outputs */
-		: /* no inputs */
-		: "g1", "g2");
-	}
-
-	/* Restore PSTATE_IE. */
-	__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
-			     : /* no outputs */
-			     : "r" (pstate));
 
 	smp_setup_percpu_timer();
 
@@ -211,7 +167,7 @@ void cpu_panic(void)
 
 static unsigned long current_tick_offset;
 
-/* This stick register synchronization scheme is taken entirely from
+/* This tick register synchronization scheme is taken entirely from
  * the ia64 port, see arch/ia64/kernel/smpboot.c for details and credit.
  *
  * The only change I've made is to rework it so that the master
@@ -227,16 +183,7 @@ static unsigned long current_tick_offset;
 static spinlock_t itc_sync_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long go[SLAVE + 1];
 
-#define DEBUG_STICK_SYNC	0
-
-static inline unsigned long get_stick(void)
-{
-	unsigned long val;
-
-	__asm__ __volatile__("rd	%%asr24, %0"
-			     : "=r" (val));
-	return val;
-}
+#define DEBUG_TICK_SYNC	0
 
 static inline long get_delta (long *rt, long *master)
 {
@@ -245,14 +192,14 @@ static inline long get_delta (long *rt, long *master)
 	unsigned long i;
 
 	for (i = 0; i < NUM_ITERS; i++) {
-		t0 = get_stick();
+		t0 = tick_ops->get_tick();
 		go[MASTER] = 1;
 		membar("#StoreLoad");
 		while (!(tm = go[SLAVE]))
 			membar("#LoadLoad");
 		go[SLAVE] = 0;
 		membar("#StoreStore");
-		t1 = get_stick();
+		t1 = tick_ops->get_tick();
 
 		if (t1 - t0 < best_t1 - best_t0)
 			best_t0 = t0, best_t1 = t1, best_tm = tm;
@@ -268,32 +215,11 @@ static inline long get_delta (long *rt, long *master)
 	return tcenter - best_tm;
 }
 
-static void adjust_stick(long adj)
-{
-	unsigned long tmp, pstate;
-
-	__asm__ __volatile__(
-		"rdpr	%%pstate, %0\n\t"
-		"ba,pt	%%xcc, 1f\n\t"
-		" wrpr	%0, %4, %%pstate\n\t"
-		".align	16\n\t"
-		"1:nop\n\t"
-		"rd	%%asr24, %1\n\t"
-		"add	%1, %2, %1\n\t"
-		"wr	%1, 0x0, %%asr24\n\t"
-		"add	%1, %3, %1\n\t"
-		"wr	%1, 0x0, %%asr25\n\t"
-		"wrpr	%0, 0x0, %%pstate"
-		: "=&r" (pstate), "=&r" (tmp)
-		: "r" (adj), "r" (current_tick_offset),
-		  "i" (PSTATE_IE));
-}
-
-void smp_synchronize_stick_client(void)
+void smp_synchronize_tick_client(void)
 {
 	long i, delta, adj, adjust_latency = 0, done = 0;
 	unsigned long flags, rt, master_time_stamp, bound;
-#if DEBUG_STICK_SYNC
+#if DEBUG_TICK_SYNC
 	struct {
 		long rt;	/* roundtrip time */
 		long master;	/* master's timestamp */
@@ -323,9 +249,9 @@ void smp_synchronize_stick_client(void)
 				} else
 					adj = -delta;
 
-				adjust_stick(adj);
+				tick_ops->add_tick(adj, current_tick_offset);
 			}
-#if DEBUG_STICK_SYNC
+#if DEBUG_TICK_SYNC
 			t[i].rt = rt;
 			t[i].master = master_time_stamp;
 			t[i].diff = delta;
@@ -335,25 +261,25 @@ void smp_synchronize_stick_client(void)
 	}
 	local_irq_restore(flags);
 
-#if DEBUG_STICK_SYNC
+#if DEBUG_TICK_SYNC
 	for (i = 0; i < NUM_ROUNDS; i++)
 		printk("rt=%5ld master=%5ld diff=%5ld adjlat=%5ld\n",
 		       t[i].rt, t[i].master, t[i].diff, t[i].lat);
 #endif
 
-	printk(KERN_INFO "CPU %d: synchronized STICK with master CPU (last diff %ld cycles,"
+	printk(KERN_INFO "CPU %d: synchronized TICK with master CPU (last diff %ld cycles,"
 	       "maxerr %lu cycles)\n", smp_processor_id(), delta, rt);
 }
 
-static void smp_start_sync_stick_client(int cpu);
+static void smp_start_sync_tick_client(int cpu);
 
-static void smp_synchronize_one_stick(int cpu)
+static void smp_synchronize_one_tick(int cpu)
 {
 	unsigned long flags, i;
 
 	go[MASTER] = 0;
 
-	smp_start_sync_stick_client(cpu);
+	smp_start_sync_tick_client(cpu);
 
 	/* wait for client to be ready */
 	while (!go[MASTER])
@@ -370,7 +296,7 @@ static void smp_synchronize_one_stick(int cpu)
 				membar("#LoadLoad");
 			go[MASTER] = 0;
 			membar("#StoreStore");
-			go[SLAVE] = get_stick();
+			go[SLAVE] = tick_ops->get_tick();
 			membar("#StoreLoad");
 		}
 	}
@@ -638,11 +564,11 @@ static void smp_cross_call_masked(unsigned long *func, u32 ctx, u64 data1, u64 d
 	/* NOTE: Caller runs local copy on master. */
 }
 
-extern unsigned long xcall_sync_stick;
+extern unsigned long xcall_sync_tick;
 
-static void smp_start_sync_stick_client(int cpu)
+static void smp_start_sync_tick_client(int cpu)
 {
-	smp_cross_call_masked(&xcall_sync_stick,
+	smp_cross_call_masked(&xcall_sync_tick,
 			      0, 0, 0,
 			      (1UL << cpu));
 }
@@ -1118,12 +1044,7 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 	 * Check for level 14 softint.
 	 */
 	{
-		unsigned long tick_mask;
-
-		if (SPARC64_USE_STICK)
-			tick_mask = (1UL << 16);
-		else
-			tick_mask = (1UL << 0);
+		unsigned long tick_mask = tick_ops->softint_mask;
 
 		if (!(get_softint() & tick_mask)) {
 			extern void handler_irq(int, struct pt_regs *);
@@ -1159,47 +1080,14 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 				     : "=r" (pstate)
 				     : "i" (PSTATE_IE));
 
-		/* Workaround for Spitfire Errata (#54 I think??), I discovered
-		 * this via Sun BugID 4008234, mentioned in Solaris-2.5.1 patch
-		 * number 103640.
-		 *
-		 * On Blackbird writes to %tick_cmpr can fail, the
-		 * workaround seems to be to execute the wr instruction
-		 * at the start of an I-cache line, and perform a dummy
-		 * read back from %tick_cmpr right after writing to it. -DaveM
-		 *
-		 * Just to be anal we add a workaround for Spitfire
-		 * Errata 50 by preventing pipeline bypasses on the
-		 * final read of the %tick register into a compare
-		 * instruction.  The Errata 50 description states
-		 * that %tick is not prone to this bug, but I am not
-		 * taking any chances.
-		 */
-		if (!SPARC64_USE_STICK) {
-		__asm__ __volatile__("rd	%%tick_cmpr, %0\n\t"
-				     "ba,pt	%%xcc, 1f\n\t"
-				     " add	%0, %2, %0\n\t"
-				     ".align	64\n"
-				  "1: wr	%0, 0x0, %%tick_cmpr\n\t"
-				     "rd	%%tick_cmpr, %%g0\n\t"
-				     "rd	%%tick, %1\n\t"
-				     "mov	%1, %1"
-				     : "=&r" (compare), "=r" (tick)
-				     : "r" (current_tick_offset));
-		} else {
-		__asm__ __volatile__("rd	%%asr25, %0\n\t"
-				     "add	%0, %2, %0\n\t"
-				     "wr	%0, 0x0, %%asr25\n\t"
-				     "rd	%%asr24, %1\n\t"
-				     : "=&r" (compare), "=r" (tick)
-				     : "r" (current_tick_offset));
-		}
+		compare = tick_ops->add_compare(current_tick_offset);
+		tick = tick_ops->get_tick();
 
 		/* Restore PSTATE_IE. */
 		__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
 				     : /* no outputs */
 				     : "r" (pstate));
-	} while (tick >= compare);
+	} while (time_after_eq(tick, compare));
 }
 
 static void __init smp_setup_percpu_timer(void)
@@ -1217,35 +1105,7 @@ static void __init smp_setup_percpu_timer(void)
 			     : "=r" (pstate)
 			     : "i" (PSTATE_IE));
 
-	/* Workaround for Spitfire Errata (#54 I think??), I discovered
-	 * this via Sun BugID 4008234, mentioned in Solaris-2.5.1 patch
-	 * number 103640.
-	 *
-	 * On Blackbird writes to %tick_cmpr can fail, the
-	 * workaround seems to be to execute the wr instruction
-	 * at the start of an I-cache line, and perform a dummy
-	 * read back from %tick_cmpr right after writing to it. -DaveM
-	 */
-	if (!SPARC64_USE_STICK) {
-	__asm__ __volatile__(
-		"rd	%%tick, %%g1\n\t"
-		"ba,pt	%%xcc, 1f\n\t"
-		" add	%%g1, %0, %%g1\n\t"
-		".align	64\n"
-	"1:	wr	%%g1, 0x0, %%tick_cmpr\n\t"
-		"rd	%%tick_cmpr, %%g0"
-	: /* no outputs */
-	: "r" (current_tick_offset)
-	: "g1");
-	} else {
-	__asm__ __volatile__(
-		"rd	%%asr24, %%g1\n\t"
-		"add	%%g1, %0, %%g1\n\t"
-		"wr	%%g1, 0x0, %%asr25"
-	: /* no outputs */
-	: "r" (current_tick_offset)
-	: "g1");
-	}
+	tick_ops->init_tick(current_tick_offset);
 
 	/* Restore PSTATE_IE. */
 	__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
@@ -1314,44 +1174,23 @@ static void __init smp_tune_scheduling(void)
 		     p += (64 / sizeof(unsigned long)))
 			*((volatile unsigned long *)p);
 
-		/* Now the real measurement. */
-		if (!SPARC64_USE_STICK) {
-		__asm__ __volatile__("b,pt	%%xcc, 1f\n\t"
-				     " rd	%%tick, %0\n\t"
-				     ".align	64\n"
-				     "1:\tldx	[%2 + 0x000], %%g1\n\t"
-				     "ldx	[%2 + 0x040], %%g2\n\t"
-				     "ldx	[%2 + 0x080], %%g3\n\t"
-				     "ldx	[%2 + 0x0c0], %%g5\n\t"
-				     "add	%2, 0x100, %2\n\t"
-				     "cmp	%2, %4\n\t"
+		tick1 = tick_ops->get_tick();
+
+		__asm__ __volatile__("1:\n\t"
+				     "ldx	[%0 + 0x000], %%g1\n\t"
+				     "ldx	[%0 + 0x040], %%g2\n\t"
+				     "ldx	[%0 + 0x080], %%g3\n\t"
+				     "ldx	[%0 + 0x0c0], %%g5\n\t"
+				     "add	%0, 0x100, %0\n\t"
+				     "cmp	%0, %2\n\t"
 				     "bne,pt	%%xcc, 1b\n\t"
-				     " nop\n\t"
-				     "rd	%%tick, %1\n\t"
-				     : "=&r" (tick1), "=&r" (tick2),
-				       "=&r" (flush_base)
-				     : "2" (flush_base),
+				     " nop"
+				     : "=&r" (flush_base)
+				     : "0" (flush_base),
 				       "r" (flush_base + ecache_size)
 				     : "g1", "g2", "g3", "g5");
-		} else {
-		__asm__ __volatile__("b,pt	%%xcc, 1f\n\t"
-				     " rd	%%asr24, %0\n\t"
-				     ".align	64\n"
-				     "1:\tldx	[%2 + 0x000], %%g1\n\t"
-				     "ldx	[%2 + 0x040], %%g2\n\t"
-				     "ldx	[%2 + 0x080], %%g3\n\t"
-				     "ldx	[%2 + 0x0c0], %%g5\n\t"
-				     "add	%2, 0x100, %2\n\t"
-				     "cmp	%2, %4\n\t"
-				     "bne,pt	%%xcc, 1b\n\t"
-				     " nop\n\t"
-				     "rd	%%asr24, %1\n\t"
-				     : "=&r" (tick1), "=&r" (tick2),
-				       "=&r" (flush_base)
-				     : "2" (flush_base),
-				       "r" (flush_base + ecache_size)
-				     : "g1", "g2", "g3", "g5");
-		}
+
+		tick2 = tick_ops->get_tick();
 
 		local_irq_restore(flags);
 
@@ -1370,6 +1209,8 @@ static void __init smp_tune_scheduling(void)
 report:
 	/* Convert ticks/sticks to jiffies. */
 	cache_decay_ticks = cacheflush_time / timer_tick_offset;
+	if (cache_decay_ticks < 1)
+		cache_decay_ticks = 1;
 
 	printk("Using heuristic of %ld cycles, %ld ticks.\n",
 	       cacheflush_time, cache_decay_ticks);
@@ -1438,8 +1279,7 @@ int __devinit __cpu_up(unsigned int cpu)
 		if (!test_bit(cpu, &cpu_online_map)) {
 			ret = -ENODEV;
 		} else {
-			if (SPARC64_USE_STICK)
-				smp_synchronize_one_stick(cpu);
+			smp_synchronize_one_tick(cpu);
 		}
 	}
 	return ret;

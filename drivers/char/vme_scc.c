@@ -1091,7 +1091,7 @@ static struct console sercons = {
 };
 
 
-static void __init vme_scc_console_init(void)
+static int __init vme_scc_console_init(void)
 {
 	if (vme_brdtype == VME_TYPE_MVME147 ||
 			vme_brdtype == VME_TYPE_MVME162 ||
@@ -1099,5 +1099,6 @@ static void __init vme_scc_console_init(void)
 			vme_brdtype == VME_TYPE_BVME4000 ||
 			vme_brdtype == VME_TYPE_BVME6000)
 		register_console(&sercons);
+	return 0;
 }
 console_initcall(vme_scc_console_init);

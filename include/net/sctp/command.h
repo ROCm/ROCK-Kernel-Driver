@@ -110,13 +110,13 @@ typedef union {
 	sctp_event_timeout_t to;
 	sctp_counter_t counter;
 	void *ptr;
-	sctp_chunk_t *chunk;
-	sctp_association_t *asoc;
+	struct sctp_chunk *chunk;
+	struct sctp_association *asoc;
 	struct sctp_transport *transport;
-	sctp_bind_addr_t  *bp;
+	struct sctp_bind_addr *bp;
 	sctp_init_chunk_t *init;
 	struct sctp_ulpevent *ulpevent;
-	sctp_packet_t *packet;
+	struct sctp_packet *packet;
 	sctp_sackhdr_t *sackh;
 } sctp_arg_t;
 
@@ -158,13 +158,13 @@ SCTP_ARG_CONSTRUCTOR(STATE,	sctp_state_t, state)
 SCTP_ARG_CONSTRUCTOR(COUNTER,	sctp_counter_t, counter)
 SCTP_ARG_CONSTRUCTOR(TO,	sctp_event_timeout_t, to)
 SCTP_ARG_CONSTRUCTOR(PTR,	void *, ptr)
-SCTP_ARG_CONSTRUCTOR(CHUNK,	sctp_chunk_t *, chunk)
-SCTP_ARG_CONSTRUCTOR(ASOC,	sctp_association_t *, asoc)
+SCTP_ARG_CONSTRUCTOR(CHUNK,	struct sctp_chunk *, chunk)
+SCTP_ARG_CONSTRUCTOR(ASOC,	struct sctp_association *, asoc)
 SCTP_ARG_CONSTRUCTOR(TRANSPORT,	struct sctp_transport *, transport)
-SCTP_ARG_CONSTRUCTOR(BA,	sctp_bind_addr_t *, bp)
+SCTP_ARG_CONSTRUCTOR(BA,	struct sctp_bind_addr *, bp)
 SCTP_ARG_CONSTRUCTOR(PEER_INIT,	sctp_init_chunk_t *, init)
 SCTP_ARG_CONSTRUCTOR(ULPEVENT,  struct sctp_ulpevent *, ulpevent)
-SCTP_ARG_CONSTRUCTOR(PACKET,	sctp_packet_t *, packet)
+SCTP_ARG_CONSTRUCTOR(PACKET,	struct sctp_packet *, packet)
 SCTP_ARG_CONSTRUCTOR(SACKH,	sctp_sackhdr_t *, sackh)
 
 typedef struct {

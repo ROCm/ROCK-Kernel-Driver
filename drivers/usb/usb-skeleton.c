@@ -1,5 +1,5 @@
 /*
- * USB Skeleton driver - 0.9
+ * USB Skeleton driver - 1.0
  *
  * Copyright (c) 2001-2002 Greg Kroah-Hartman (greg@kroah.com)
  *
@@ -12,14 +12,17 @@
  * USB driver quickly.  The design of it is based on the usb-serial and
  * dc2xx drivers.
  *
- * Thanks to Oliver Neukum and David Brownell for their help in debugging
- * this driver.
+ * Thanks to Oliver Neukum, David Brownell, and Alan Stern for their help
+ * in debugging this driver.
  *
- * TODO:
- *	- fix urb->status race condition in write sequence
  *
  * History:
  *
+ * 2003-02-25 - 1.0 - fix races involving urb->status, unlink_urb(), and
+ *			disconnect.  Fix transfer amount in read().  Use
+ *			macros instead of magic numbers in probe().  Change
+ *			size variables to size_t.  Show how to eliminate
+ *			DMA bounce buffer.
  * 2002_12_12 - 0.9 - compile fixes and got rid of fixed minor array.
  * 2002_09_26 - 0.8 - changes due to USB core conversion to struct device
  *			driver.
@@ -33,7 +36,7 @@
  * 2001_05_29 - 0.3 - more bug fixes based on review from linux-usb-devel
  * 2001_05_24 - 0.2 - bug fixes based on review from linux-usb-devel people
  * 2001_05_01 - 0.1 - first version
- * 
+ *
  */
 
 #include <linux/config.h>
@@ -42,8 +45,8 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <linux/completion.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
@@ -60,7 +63,7 @@
 
 
 /* Version Information */
-#define DRIVER_VERSION "v0.4"
+#define DRIVER_VERSION "v1.0"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com"
 #define DRIVER_DESC "USB Skeleton Driver"
 
@@ -101,15 +104,16 @@ struct usb_skel {
 	char			num_bulk_out;		/* number of bulk out endpoints we have */
 
 	unsigned char *		bulk_in_buffer;		/* the buffer to receive data */
-	int			bulk_in_size;		/* the size of the receive buffer */
+	size_t			bulk_in_size;		/* the size of the receive buffer */
 	__u8			bulk_in_endpointAddr;	/* the address of the bulk in endpoint */
 
 	unsigned char *		bulk_out_buffer;	/* the buffer to send data */
-	int			bulk_out_size;		/* the size of the send buffer */
+	size_t			bulk_out_size;		/* the size of the send buffer */
 	struct urb *		write_urb;		/* the urb used to send data */
 	__u8			bulk_out_endpointAddr;	/* the address of the bulk out endpoint */
+	atomic_t		write_busy;		/* true iff write urb is busy */
+	struct completion	write_finished;		/* wait for the write to finish */
 
-	struct work_struct	work;			/* work queue entry for line discipline waking up */
 	int			open;			/* if the port is open or not */
 	struct semaphore	sem;			/* locks this structure */
 };
@@ -118,6 +122,8 @@ struct usb_skel {
 /* the global usb devfs handle */
 extern devfs_handle_t usb_devfs_handle;
 
+/* prevent races between open() and disconnect() */
+static DECLARE_MUTEX (disconnect_sem);
 
 /* local function prototypes */
 static ssize_t skel_read	(struct file *file, char *buffer, size_t count, loff_t *ppos);
@@ -125,7 +131,7 @@ static ssize_t skel_write	(struct file *file, const char *buffer, size_t count, 
 static int skel_ioctl		(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 static int skel_open		(struct inode *inode, struct file *file);
 static int skel_release		(struct inode *inode, struct file *file);
-	
+
 static int skel_probe		(struct usb_interface *intf, const struct usb_device_id *id);
 static void skel_disconnect	(struct usb_interface *intf);
 
@@ -138,7 +144,7 @@ static void skel_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
  * to have a node in the /dev directory. If the USB
  * device were for a network interface then the driver
  * would use "struct net_driver" instead, and a serial
- * device would use "struct tty_driver". 
+ * device would use "struct tty_driver".
  */
 static struct file_operations skel_fops = {
 	/*
@@ -167,7 +173,7 @@ static struct file_operations skel_fops = {
 	.ioctl =	skel_ioctl,
 	.open =		skel_open,
 	.release =	skel_release,
-};      
+};
 
 
 /* usb specific object needed to register this driver with the usb subsystem */
@@ -188,8 +194,8 @@ static inline void usb_skel_debug_data (const char *function, int size, const un
 
 	if (!debug)
 		return;
-	
-	printk (KERN_DEBUG __FILE__": %s - length = %d, data = ", 
+
+	printk (KERN_DEBUG __FILE__": %s - length = %d, data = ",
 		function, size);
 	for (i = 0; i < size; ++i) {
 		printk ("%.2x ", data[i]);
@@ -206,7 +212,9 @@ static inline void skel_delete (struct usb_skel *dev)
 	if (dev->bulk_in_buffer != NULL)
 		kfree (dev->bulk_in_buffer);
 	if (dev->bulk_out_buffer != NULL)
-		kfree (dev->bulk_out_buffer);
+		usb_buffer_free (dev->udev, dev->bulk_out_size,
+				dev->bulk_out_buffer,
+				dev->write_urb->transfer_dma);
 	if (dev->write_urb != NULL)
 		usb_free_urb (dev->write_urb);
 	kfree (dev);
@@ -222,22 +230,28 @@ static int skel_open (struct inode *inode, struct file *file)
 	struct usb_interface *interface;
 	int subminor;
 	int retval = 0;
-	
+
 	dbg("%s", __FUNCTION__);
 
 	subminor = minor (inode->i_rdev);
+
+	/* prevent disconnects */
+	down (&disconnect_sem);
 
 	interface = usb_find_interface (&skel_driver,
 					mk_kdev(USB_MAJOR, subminor));
 	if (!interface) {
 		err ("%s - error, can't find device for minor %d",
 		     __FUNCTION__, subminor);
-		return -ENODEV;
+		retval = -ENODEV;
+		goto exit_no_device;
 	}
-			
+
 	dev = usb_get_intfdata(interface);
-	if (!dev)
-		return -ENODEV;
+	if (!dev) {
+		retval = -ENODEV;
+		goto exit_no_device;
+	}
 
 	/* lock this device */
 	down (&dev->sem);
@@ -251,6 +265,8 @@ static int skel_open (struct inode *inode, struct file *file)
 	/* unlock this device */
 	up (&dev->sem);
 
+exit_no_device:
+	up (&disconnect_sem);
 	return retval;
 }
 
@@ -280,17 +296,18 @@ static int skel_release (struct inode *inode, struct file *file)
 		goto exit_not_opened;
 	}
 
+	/* wait for any bulk writes that might be going on to finish up */
+	if (atomic_read (&dev->write_busy))
+		wait_for_completion (&dev->write_finished);
+
+	dev->open = 0;
+
 	if (dev->udev == NULL) {
 		/* the device was unplugged before the file was released */
 		up (&dev->sem);
 		skel_delete (dev);
 		return 0;
 	}
-
-	/* shutdown any bulk writes that might be going on */
-	usb_unlink_urb (dev->write_urb);
-
-	dev->open = 0;
 
 exit_not_opened:
 	up (&dev->sem);
@@ -308,7 +325,7 @@ static ssize_t skel_read (struct file *file, char *buffer, size_t count, loff_t 
 	int retval = 0;
 
 	dev = (struct usb_skel *)file->private_data;
-	
+
 	dbg("%s - minor %d, count = %d", __FUNCTION__, dev->minor, count);
 
 	/* lock this object */
@@ -319,12 +336,13 @@ static ssize_t skel_read (struct file *file, char *buffer, size_t count, loff_t 
 		up (&dev->sem);
 		return -ENODEV;
 	}
-	
-	/* do an immediate bulk read to get data from the device */
+
+	/* do a blocking bulk read to get data from the device */
 	retval = usb_bulk_msg (dev->udev,
-			       usb_rcvbulkpipe (dev->udev, 
+			       usb_rcvbulkpipe (dev->udev,
 						dev->bulk_in_endpointAddr),
-			       dev->bulk_in_buffer, dev->bulk_in_size,
+			       dev->bulk_in_buffer,
+			       min (dev->bulk_in_size, count),
 			       &count, HZ*10);
 
 	/* if the read was successful, copy the data to userspace */
@@ -334,7 +352,7 @@ static ssize_t skel_read (struct file *file, char *buffer, size_t count, loff_t 
 		else
 			retval = count;
 	}
-	
+
 	/* unlock the device */
 	up (&dev->sem);
 	return retval;
@@ -343,6 +361,18 @@ static ssize_t skel_read (struct file *file, char *buffer, size_t count, loff_t 
 
 /**
  *	skel_write
+ *
+ *	A device driver has to decide how to report I/O errors back to the
+ *	user.  The safest course is to wait for the transfer to finish before
+ *	returning so that any errors will be reported reliably.  skel_read()
+ *	works like this.  But waiting for I/O is slow, so many drivers only
+ *	check for errors during I/O initiation and do not report problems
+ *	that occur during the actual transfer.  That's what we will do here.
+ *
+ *	A driver concerned with maximum I/O throughput would use double-
+ *	buffering:  Two urbs would be devoted to write transfers, so that
+ *	one urb could always be active while the other was waiting for the
+ *	user to send more data.
  */
 static ssize_t skel_write (struct file *file, const char *buffer, size_t count, loff_t *ppos)
 {
@@ -369,37 +399,38 @@ static ssize_t skel_write (struct file *file, const char *buffer, size_t count, 
 		goto exit;
 	}
 
-	/* see if we are already in the middle of a write */
-	if (dev->write_urb->status == -EINPROGRESS) {
-		dbg ("%s - already writing", __FUNCTION__);
-		goto exit;
-	}
+	/* wait for a previous write to finish up; we don't use a timeout
+	 * and so a nonresponsive device can delay us indefinitely.
+	 */
+	if (atomic_read (&dev->write_busy))
+		wait_for_completion (&dev->write_finished);
 
-	/* we can only write as much as 1 urb will hold */
-	bytes_written = (count > dev->bulk_out_size) ? 
-				dev->bulk_out_size : count;
+	/* we can only write as much as our buffer will hold */
+	bytes_written = min (dev->bulk_out_size, count);
 
-	/* copy the data from userspace into our urb */
-	if (copy_from_user(dev->write_urb->transfer_buffer, buffer, 
+	/* copy the data from userspace into our transfer buffer;
+	 * this is the only copy required.
+	 */
+	if (copy_from_user(dev->write_urb->transfer_buffer, buffer,
 			   bytes_written)) {
 		retval = -EFAULT;
 		goto exit;
 	}
 
-	usb_skel_debug_data (__FUNCTION__, bytes_written, 
+	usb_skel_debug_data (__FUNCTION__, bytes_written,
 			     dev->write_urb->transfer_buffer);
 
-	/* set up our urb */
-	usb_fill_bulk_urb(dev->write_urb, dev->udev, 
-		      usb_sndbulkpipe(dev->udev, dev->bulk_out_endpointAddr),
-		      dev->write_urb->transfer_buffer, bytes_written,
-		      skel_write_bulk_callback, dev);
+	/* this urb was already set up, except for this write size */
+	dev->write_urb->transfer_buffer_length = bytes_written;
 
 	/* send the data out the bulk port */
 	/* a character device write uses GFP_KERNEL,
 	 unless a spinlock is held */
+	init_completion (&dev->write_finished);
+	atomic_set (&dev->write_busy, 1);
 	retval = usb_submit_urb(dev->write_urb, GFP_KERNEL);
 	if (retval) {
+		atomic_set (&dev->write_busy, 0);
 		err("%s - failed submitting write urb, error %d",
 		    __FUNCTION__, retval);
 	} else {
@@ -435,12 +466,11 @@ static int skel_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 	dbg("%s - minor %d, cmd 0x%.4x, arg %ld", __FUNCTION__,
 	    dev->minor, cmd, arg);
 
-
 	/* fill in your device specific stuff here */
-	
+
 	/* unlock the device */
 	up (&dev->sem);
-	
+
 	/* return that we did not understand this ioctl call */
 	return -ENOTTY;
 }
@@ -455,14 +485,16 @@ static void skel_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s - minor %d", __FUNCTION__, dev->minor);
 
-	if ((urb->status != -ENOENT) && 
-	    (urb->status != -ECONNRESET)) {
+	/* sync/async unlink faults aren't errors */
+	if (urb->status && !(urb->status == -ENOENT ||
+				urb->status == -ECONNRESET)) {
 		dbg("%s - nonzero write bulk status received: %d",
 		    __FUNCTION__, urb->status);
-		return;
 	}
 
-	return;
+	/* notify anyone waiting that the write has finished */
+	atomic_set (&dev->write_busy, 0);
+	complete (&dev->write_finished);
 }
 
 
@@ -479,12 +511,12 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	struct usb_host_interface *iface_desc;
 	struct usb_endpoint_descriptor *endpoint;
 	int minor;
-	int buffer_size;
+	size_t buffer_size;
 	int i;
 	int retval;
 	char name[10];
 
-	
+
 	/* See if the device offered us matches what we can accept */
 	if ((udev->descriptor.idVendor != USB_SKEL_VENDOR_ID) ||
 	    (udev->descriptor.idProduct != USB_SKEL_PRODUCT_ID)) {
@@ -513,12 +545,15 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 
 	/* set up the endpoint information */
 	/* check out the endpoints */
+	/* use only the first bulk-in and bulk-out endpoints */
 	iface_desc = &interface->altsetting[0];
 	for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {
 		endpoint = &iface_desc->endpoint[i].desc;
 
-		if ((endpoint->bEndpointAddress & 0x80) &&
-		    ((endpoint->bmAttributes & 3) == 0x02)) {
+		if (!dev->bulk_in_endpointAddr &&
+		    (endpoint->bEndpointAddress & USB_DIR_IN) &&
+		    ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+					== USB_ENDPOINT_XFER_BULK)) {
 			/* we found a bulk in endpoint */
 			buffer_size = endpoint->wMaxPacketSize;
 			dev->bulk_in_size = buffer_size;
@@ -529,9 +564,11 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 				goto error;
 			}
 		}
-		
-		if (((endpoint->bEndpointAddress & 0x80) == 0x00) &&
-		    ((endpoint->bmAttributes & 3) == 0x02)) {
+
+		if (!dev->bulk_out_endpointAddr &&
+		    !(endpoint->bEndpointAddress & USB_DIR_IN) &&
+		    ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+					== USB_ENDPOINT_XFER_BULK)) {
 			/* we found a bulk out endpoint */
 			/* a probe() may sleep and has no restrictions on memory allocations */
 			dev->write_urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -539,40 +576,56 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 				err("No free urbs available");
 				goto error;
 			}
+			dev->bulk_out_endpointAddr = endpoint->bEndpointAddress;
+
+			/* on some platforms using this kind of buffer alloc
+			 * call eliminates a dma "bounce buffer".
+			 *
+			 * NOTE: you'd normally want i/o buffers that hold
+			 * more than one packet, so that i/o delays between
+			 * packets don't hurt throughput.
+			 */
 			buffer_size = endpoint->wMaxPacketSize;
 			dev->bulk_out_size = buffer_size;
-			dev->bulk_out_endpointAddr = endpoint->bEndpointAddress;
-			dev->bulk_out_buffer = kmalloc (buffer_size, GFP_KERNEL);
+			dev->write_urb->transfer_flags = (URB_NO_DMA_MAP |
+					URB_ASYNC_UNLINK);
+			dev->bulk_out_buffer = usb_buffer_alloc (udev,
+					buffer_size, GFP_KERNEL,
+					&dev->write_urb->transfer_dma);
 			if (!dev->bulk_out_buffer) {
 				err("Couldn't allocate bulk_out_buffer");
 				goto error;
 			}
-			usb_fill_bulk_urb(dev->write_urb, udev, 
-				      usb_sndbulkpipe(udev, 
+			usb_fill_bulk_urb(dev->write_urb, udev,
+				      usb_sndbulkpipe(udev,
 						      endpoint->bEndpointAddress),
 				      dev->bulk_out_buffer, buffer_size,
 				      skel_write_bulk_callback, dev);
 		}
 	}
+	if (!(dev->bulk_in_endpointAddr && dev->bulk_out_endpointAddr)) {
+		err("Couldn't find both bulk-in and bulk-out endpoints");
+		goto error;
+	}
 
 	/* initialize the devfs node for this device and register it */
 	sprintf(name, "skel%d", dev->minor);
-	
+
 	dev->devfs = devfs_register (usb_devfs_handle, name,
 				     DEVFS_FL_DEFAULT, USB_MAJOR,
 				     dev->minor,
-				     S_IFCHR | S_IRUSR | S_IWUSR | 
-				     S_IRGRP | S_IWGRP | S_IROTH, 
+				     S_IFCHR | S_IRUSR | S_IWUSR |
+				     S_IRGRP | S_IWGRP | S_IROTH,
 				     &skel_fops, NULL);
 
 	/* let the user know what node this device is now attached to */
-	info ("USB Skeleton device now attached to USBSkel%d", dev->minor);
+	info ("USB Skeleton device now attached to USBSkel-%d", dev->minor);
 
 	/* add device id so the device works when advertised */
 	interface->kdev = mk_kdev(USB_MAJOR, dev->minor);
 
 	goto exit;
-	
+
 error:
 	skel_delete (dev);
 	dev = NULL;
@@ -593,11 +646,20 @@ exit:
  *	skel_disconnect
  *
  *	Called by the usb core when the device is removed from the system.
+ *
+ *	This routine guarantees that the driver will not submit any more urbs
+ *	by clearing dev->udev.  It is also supposed to terminate any currently
+ *	active urbs.  Unfortunately, usb_bulk_msg(), used in skel_read(), does
+ *	not provide any way to do this.  But at least we can cancel an active
+ *	write.
  */
 static void skel_disconnect(struct usb_interface *interface)
 {
 	struct usb_skel *dev;
 	int minor;
+
+	/* prevent races with open() */
+	down (&disconnect_sem);
 
 	dev = usb_get_intfdata (interface);
 	usb_set_intfdata (interface, NULL);
@@ -606,7 +668,7 @@ static void skel_disconnect(struct usb_interface *interface)
 		return;
 
 	down (&dev->sem);
-		
+
 	/* remove device id to disable open() */
 	interface->kdev = NODEV;
 
@@ -617,15 +679,21 @@ static void skel_disconnect(struct usb_interface *interface)
 
 	/* give back our dynamic minor */
 	usb_deregister_dev (1, minor);
-	
-	/* if the device is not opened, then we clean up right now */
-	if (!dev->open) {
-		up (&dev->sem);
-		skel_delete (dev);
-	} else {
-		dev->udev = NULL;
-		up (&dev->sem);
+
+	/* terminate an ongoing write */
+	if (atomic_read (&dev->write_busy)) {
+		usb_unlink_urb (dev->write_urb);
+		wait_for_completion (&dev->write_finished);
 	}
+
+	dev->udev = NULL;
+	up (&dev->sem);
+
+	/* if the device is not opened, then we clean up right now */
+	if (!dev->open)
+		skel_delete (dev);
+
+	up (&disconnect_sem);
 
 	info("USB Skeleton #%d now disconnected", minor);
 }
@@ -668,4 +736,3 @@ module_exit (usb_skel_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
-

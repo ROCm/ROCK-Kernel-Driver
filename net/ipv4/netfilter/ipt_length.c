@@ -38,8 +38,12 @@ checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ipt_match length_match
-= { { NULL, NULL }, "length", &match, &checkentry, NULL, THIS_MODULE };
+static struct ipt_match length_match = {
+	.name		= "length",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

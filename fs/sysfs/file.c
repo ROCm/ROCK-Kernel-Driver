@@ -80,7 +80,7 @@ static int fill_read_buffer(struct file * file, struct sysfs_buffer * buffer)
 	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
 	struct sysfs_ops * ops = buffer->ops;
 	int ret = 0;
-	size_t count;
+	ssize_t count;
 
 	if (!buffer->page)
 		buffer->page = (char *) __get_free_page(GFP_KERNEL);

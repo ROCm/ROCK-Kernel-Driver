@@ -92,13 +92,12 @@ void __init paging_init(void)
 	}
 
 	mmu_emu_init(bootmem_end);
-	
+
 	current->mm = NULL;
 
 	/* memory sizing is a hack stolen from motorola.c..  hope it works for us */
-	zones_size[1] = ((unsigned long)high_memory - PAGE_OFFSET) >> PAGE_SHIFT;
-	zones_size[0] = zones_size[1]/2;
-	zones_size[1] -= zones_size[0];
+	zones_size[0] = ((unsigned long)high_memory - PAGE_OFFSET) >> PAGE_SHIFT;
+	zones_size[1] = 0;
 	
 	free_area_init(zones_size);
 

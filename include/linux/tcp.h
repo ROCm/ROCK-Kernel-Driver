@@ -245,6 +245,7 @@ struct tcp_opt {
 	__u16	mss_cache_std;	/* Like mss_cache, but without TSO */
 	__u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
 	__u16	ext_header_len;	/* Network protocol overhead (IP/IPv6 options) */
+	__u16	ext2_header_len;/* Options depending on route */
 	__u8	ca_state;	/* State of fast-retransmit machine 	*/
 	__u8	retransmits;	/* Number of unrecovered RTO timeouts.	*/
 

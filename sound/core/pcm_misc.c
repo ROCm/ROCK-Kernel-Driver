@@ -527,7 +527,7 @@ u_int8_t snd_pcm_format_silence(snd_pcm_format_t format)
  *
  * Sets the silence data on the buffer for the given samples.
  *
- * Returns zero if sucessful, or a negative error code on failure.
+ * Returns zero if successful, or a negative error code on failure.
  */
 int snd_pcm_format_set_silence(snd_pcm_format_t format, void *data, unsigned int samples)
 {

@@ -1315,9 +1315,7 @@ int ipfw_device_event(struct notifier_block *this, unsigned long event, void *pt
 }
 
 static struct notifier_block ipfw_dev_notifier={
-	ipfw_device_event,
-	NULL,
-	0
+	.notifier_call	= ipfw_device_event,
 };
 
 #endif

@@ -174,7 +174,7 @@ snd_seq_port_callback_t *snd_port_alloc_callback(void);
 
 /* port attach/detach */
 int snd_seq_event_port_attach(int client, snd_seq_port_callback_t *pcbp,
-			      int cap, int type, int midi_channels, char *portname);
+			      int cap, int type, int midi_channels, int midi_voices, char *portname);
 int snd_seq_event_port_detach(int client, int port);
 
 #endif /* __SOUND_SEQ_KERNEL_H */

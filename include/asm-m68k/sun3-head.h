@@ -9,4 +9,4 @@
 #define FC_SUPERD    5
 #define FC_CPU      7
 
-#endif __SUN3_HEAD_H
+#endif /* __SUN3_HEAD_H */

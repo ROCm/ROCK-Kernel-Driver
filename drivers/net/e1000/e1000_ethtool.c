@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -38,6 +38,7 @@ extern char e1000_driver_version[];
 extern int e1000_up(struct e1000_adapter *adapter);
 extern void e1000_down(struct e1000_adapter *adapter);
 extern void e1000_reset(struct e1000_adapter *adapter);
+extern int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
 
 static char e1000_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"rx_packets", "tx_packets", "rx_bytes", "tx_bytes", "rx_errors",
@@ -129,30 +130,9 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 		hw->autoneg = 1;
 		hw->autoneg_advertised = 0x002F;
 		ecmd->advertising = 0x002F;
-	} else {
-		hw->autoneg = 0;
-		switch(ecmd->speed + ecmd->duplex) {
-		case SPEED_10 + DUPLEX_HALF:
-			hw->forced_speed_duplex = e1000_10_half;
-			break;
-		case SPEED_10 + DUPLEX_FULL:
-			hw->forced_speed_duplex = e1000_10_full;
-			break;
-		case SPEED_100 + DUPLEX_HALF:
-			hw->forced_speed_duplex = e1000_100_half;
-			break;
-		case SPEED_100 + DUPLEX_FULL:
-			hw->forced_speed_duplex = e1000_100_full;
-			break;
-		case SPEED_1000 + DUPLEX_FULL:
-			hw->autoneg = 1;
-			hw->autoneg_advertised = ADVERTISE_1000_FULL;
-			break;
-		case SPEED_1000 + DUPLEX_HALF: /* not supported */
-		default:
+	} else
+		if(e1000_set_spd_dplx(adapter, ecmd->speed + ecmd->duplex))
 			return -EINVAL;
-		}
-	}
 
 	/* reset the link */
 
@@ -163,16 +143,6 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 		e1000_reset(adapter);
 
 	return 0;
-}
-
-static inline int
-e1000_eeprom_size(struct e1000_hw *hw)
-{
-	if((hw->mac_type > e1000_82544) &&
-	   (E1000_READ_REG(hw, EECD) & E1000_EECD_SIZE))
-		return 512;
-	else
-		return 128;
 }
 
 static void
@@ -186,7 +156,7 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 	drvinfo->n_stats = E1000_STATS_LEN;
 #define E1000_REGS_LEN 32
 	drvinfo->regdump_len  = E1000_REGS_LEN * sizeof(uint32_t);
-	drvinfo->eedump_len  = e1000_eeprom_size(&adapter->hw);
+	drvinfo->eedump_len = adapter->hw.eeprom.word_size * 2;
 }
 
 static void
@@ -220,9 +190,8 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, uint16_t *eeprom_buff)
 {
 	struct e1000_hw *hw = &adapter->hw;
-	int max_len, first_word, last_word;
+	int first_word, last_word;
 	int ret_val = 0;
-	int i;
 
 	if(eeprom->len == 0) {
 		ret_val = -EINVAL;
@@ -231,22 +200,28 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 
 	eeprom->magic = hw->vendor_id | (hw->device_id << 16);
 
-	max_len = e1000_eeprom_size(hw);
-
 	if(eeprom->offset > eeprom->offset + eeprom->len) {
 		ret_val = -EINVAL;
 		goto geeprom_error;
 	}
 
-	if((eeprom->offset + eeprom->len) > max_len)
-		eeprom->len = (max_len - eeprom->offset);
+	if((eeprom->offset + eeprom->len) > (hw->eeprom.word_size * 2))
+		eeprom->len = ((hw->eeprom.word_size * 2) - eeprom->offset);
 
 	first_word = eeprom->offset >> 1;
 	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
 
-	for(i = 0; i <= (last_word - first_word); i++)
-		e1000_read_eeprom(hw, first_word + i, &eeprom_buff[i]);
-
+	if(hw->eeprom.type == e1000_eeprom_spi)
+		ret_val = e1000_read_eeprom(hw, first_word,
+					    last_word - first_word + 1,
+					    eeprom_buff);
+	else {
+		uint16_t i;
+		for (i = 0; i < last_word - first_word + 1; i++)
+			if((ret_val = e1000_read_eeprom(hw, first_word + i, 1,
+						       &eeprom_buff[i])))
+				break;
+	}
 geeprom_error:
 	return ret_val;
 }
@@ -257,9 +232,8 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 {
 	struct e1000_hw *hw = &adapter->hw;
 	uint16_t *eeprom_buff;
-	int max_len, first_word, last_word;
 	void *ptr;
-	int i;
+	int max_len, first_word, last_word, ret_val = 0;
 
 	if(eeprom->len == 0)
 		return -EOPNOTSUPP;
@@ -267,7 +241,7 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	if(eeprom->magic != (hw->vendor_id | (hw->device_id << 16)))
 		return -EFAULT;
 
-	max_len = e1000_eeprom_size(hw);
+	max_len = hw->eeprom.word_size * 2;
 
 	if((eeprom->offset + eeprom->len) > max_len)
 		eeprom->len = (max_len - eeprom->offset);
@@ -283,30 +257,31 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	if(eeprom->offset & 1) {
 		/* need read/modify/write of first changed EEPROM word */
 		/* only the second byte of the word is being modified */
-		e1000_read_eeprom(hw, first_word, &eeprom_buff[0]);
+		ret_val = e1000_read_eeprom(hw, first_word, 1,
+					    &eeprom_buff[0]);
 		ptr++;
 	}
-	if((eeprom->offset + eeprom->len) & 1) {
+	if(((eeprom->offset + eeprom->len) & 1) && (ret_val == 0)) {
 		/* need read/modify/write of last changed EEPROM word */
 		/* only the first byte of the word is being modified */
-		e1000_read_eeprom(hw, last_word,
+		ret_val = e1000_read_eeprom(hw, last_word, 1,
 		                  &eeprom_buff[last_word - first_word]);
 	}
-	if(copy_from_user(ptr, user_data, eeprom->len)) {
-		kfree(eeprom_buff);
-		return -EFAULT;
+	if((ret_val != 0) || copy_from_user(ptr, user_data, eeprom->len)) {
+		ret_val = -EFAULT;
+		goto seeprom_error;
 	}
 
-	for(i = 0; i <= (last_word - first_word); i++)
-		e1000_write_eeprom(hw, first_word + i, eeprom_buff[i]);
+	ret_val = e1000_write_eeprom(hw, first_word,
+				     last_word - first_word + 1, eeprom_buff);
 
 	/* Update the checksum over the first part of the EEPROM if needed */
-	if(first_word <= EEPROM_CHECKSUM_REG)
+	if((ret_val == 0) && first_word <= EEPROM_CHECKSUM_REG)
 		e1000_update_eeprom_checksum(hw);
 
+seeprom_error:
 	kfree(eeprom_buff);
-
-	return 0;
+	return ret_val;
 }
 
 static void
@@ -333,8 +308,8 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		/* Fall Through */
 
 	default:
-		wol->supported = WAKE_UCAST | WAKE_MCAST
-			         | WAKE_BCAST | WAKE_MAGIC;
+		wol->supported = WAKE_UCAST | WAKE_MCAST |
+				 WAKE_BCAST | WAKE_MAGIC;
 
 		wol->wolopts = 0;
 		if(adapter->wol & E1000_WUFC_EX)
@@ -368,7 +343,7 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		/* Fall Through */
 
 	default:
-		if(wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE | WAKE_PHY))
+		if(wol->wolopts & (WAKE_PHY | WAKE_ARP | WAKE_MAGICSECURE))
 			return -EOPNOTSUPP;
 
 		adapter->wol = 0;
@@ -542,13 +517,12 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 	}
 	case ETHTOOL_GEEPROM: {
 		struct ethtool_eeprom eeprom = {ETHTOOL_GEEPROM};
+		struct e1000_hw *hw = &adapter->hw;
 		uint16_t *eeprom_buff;
 		void *ptr;
-		int max_len, err = 0;
+		int err = 0;
 
-		max_len = e1000_eeprom_size(&adapter->hw);
-
-		eeprom_buff = kmalloc(max_len, GFP_KERNEL);
+		eeprom_buff = kmalloc(hw->eeprom.word_size * 2, GFP_KERNEL);
 
 		if(eeprom_buff == NULL)
 			return -ENOMEM;

@@ -101,21 +101,24 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
 	case 1:
 		tmp = *(u8 *)ptr;
 		*(u8 *)ptr = x;
+		x = tmp;
 		break;
 	case 2:
 		tmp = *(u16 *)ptr;
 		*(u16 *)ptr = x;
+		x = tmp;
 		break;
 	case 4:
 		tmp = *(u32 *)ptr;
 		*(u32 *)ptr = x;
+		x = tmp;
 		break;
 	default:
 		BUG();
 	}
 
 	local_irq_restore(flags);
-	return tmp;
+	return x;
 }
 #else
 static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int size)

@@ -547,6 +547,50 @@ struct net_device *dev_getbyhwaddr(unsigned short type, char *ha)
 }
 
 /**
+ *	dev_get_by_flags - find any device with given flags
+ *	@if_flags: IFF_* values
+ *	@mask: bitmask of bits in if_flags to check
+ *
+ *	Search for any interface with the given flags. Returns NULL if a device
+ *	is not found or a pointer to the device. The device returned has 
+ *	had a reference added and the pointer is safe until the user calls
+ *	dev_put to indicate they have finished with it.
+ */
+
+struct net_device * dev_get_by_flags(unsigned short if_flags, unsigned short mask)
+{
+	struct net_device *dev;
+
+	read_lock(&dev_base_lock);
+	dev = __dev_get_by_flags(if_flags, mask);
+	if (dev)
+		dev_hold(dev);
+	read_unlock(&dev_base_lock);
+	return dev;
+}
+
+/**
+ *	__dev_get_by_flags - find any device with given flags
+ *	@if_flags: IFF_* values
+ *	@mask: bitmask of bits in if_flags to check
+ *
+ *	Search for any interface with the given flags. Returns NULL if a device
+ *	is not found or a pointer to the device. The caller must hold either
+ *	the RTNL semaphore or @dev_base_lock.
+ */
+
+struct net_device *__dev_get_by_flags(unsigned short if_flags, unsigned short mask)
+{
+	struct net_device *dev;
+
+	for (dev = dev_base; dev != NULL; dev = dev->next) {
+		if (((dev->flags ^ if_flags) & mask) == 0)
+			return dev;
+	}
+	return NULL;
+}
+
+/**
  *	dev_alloc_name - allocate a name for a device
  *	@dev: device
  *	@name: name format string
@@ -2595,12 +2639,10 @@ int netdev_finish_unregister(struct net_device *dev)
 	}
 #ifdef NET_REFCNT_DEBUG
 	printk(KERN_DEBUG "netdev_finish_unregister: %s%s.\n", dev->name,
-	       (dev->features & NETIF_F_DYNALLOC)?"":", old style");
+	       (dev->destructor != NULL)?"":", old style");
 #endif
 	if (dev->destructor)
 		dev->destructor(dev);
-	if (dev->features & NETIF_F_DYNALLOC)
-		kfree(dev);
 	return 0;
 }
 
@@ -2680,7 +2722,7 @@ int unregister_netdevice(struct net_device *dev)
 	free_divert_blk(dev);
 #endif
 
-	if (dev->features & NETIF_F_DYNALLOC) {
+	if (dev->destructor != NULL) {
 #ifdef NET_REFCNT_DEBUG
 		if (atomic_read(&dev->refcnt) != 1)
 			printk(KERN_DEBUG "unregister_netdevice: holding %s "

@@ -646,7 +646,7 @@ static int init_i596_mem(struct net_device *dev)
 
 	/* change the scp address */
 
-	MPU_PORT(dev, PORT_ALTSCP, (void *)virt_to_bus(&lp->scp));
+	MPU_PORT(dev, PORT_ALTSCP, (void *)virt_to_bus((void *)&lp->scp));
 
 #elif defined(ENABLE_APRICOT)
 
@@ -677,8 +677,8 @@ static int init_i596_mem(struct net_device *dev)
 		lp->scp.sysbus = 0x00440000;
 #endif
 
-	lp->scp.iscp = WSWAPiscp(virt_to_bus(&(lp->iscp)));
-	lp->iscp.scb = WSWAPscb(virt_to_bus(&(lp->scb)));
+	lp->scp.iscp = WSWAPiscp(virt_to_bus((void *)&lp->iscp));
+	lp->iscp.scb = WSWAPscb(virt_to_bus((void *)&lp->scb));
 	lp->iscp.stat = ISCP_BUSY;
 	lp->cmd_backlog = 0;
 

@@ -449,6 +449,9 @@ extern unsigned int ip6t_do_table(struct sk_buff **pskb,
 				  struct ip6t_table *table,
 				  void *userdata);
 
+/* Check for an extension */
+extern int ip6t_ext_hdr(u8 nexthdr);
+
 #define IP6T_ALIGN(s) (((s) + (__alignof__(struct ip6t_entry)-1)) & ~(__alignof__(struct ip6t_entry)-1))
 
 #endif /*__KERNEL__*/

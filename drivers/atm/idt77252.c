@@ -730,7 +730,7 @@ push_on_scq(struct idt77252_dev *card, struct vc_map *vc, struct sk_buff *skb)
 		struct atm_vcc *vcc = vc->tx_vcc;
 
 		vc->estimator->cells += (skb->len + 47) / 48;
-		if (atomic_read(&vcc->tx_inuse) > (vcc->sk->sndbuf >> 1)) {
+		if (atomic_read(&vcc->sk->wmem_alloc) > (vcc->sk->sndbuf >> 1)) {
 			u32 cps = vc->estimator->maxcps;
 
 			vc->estimator->cps = cps;
@@ -2025,7 +2025,7 @@ idt77252_send_oam(struct atm_vcc *vcc, void *cell, int flags)
 		atomic_inc(&vcc->stats->tx_err);
 		return -ENOMEM;
 	}
-	atomic_add(skb->truesize + ATM_PDU_OVHD, &vcc->tx_inuse);
+	atomic_add(skb->truesize + ATM_PDU_OVHD, &vcc->sk->wmem_alloc);
 	ATM_SKB(skb)->iovcnt = 0;
 
 	memcpy(skb_put(skb, 52), cell, 52);

@@ -75,7 +75,7 @@ __initcall(rs_init);
 /* serial_console_init handles the special case of starting
  *   up the console on the serial port
  */
-static void __init decserial_console_init(void)
+static int __init decserial_console_init(void)
 {
 #if defined(CONFIG_ZS) && defined(CONFIG_DZ)
     if (IOASIC)
@@ -93,6 +93,7 @@ static void __init decserial_console_init(void)
 #endif
 
 #endif
+    return 0;
 }
 console_initcall(decserial_console_init);
 

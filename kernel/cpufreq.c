@@ -46,7 +46,7 @@ static struct notifier_block    *cpufreq_transition_notifier_list;
 static DECLARE_RWSEM		(cpufreq_notifier_rwsem);
 
 
-LIST_HEAD(cpufreq_governor_list);
+static LIST_HEAD(cpufreq_governor_list);
 static DECLARE_MUTEX		(cpufreq_governor_sem);
 
 static struct device_interface cpufreq_interface;

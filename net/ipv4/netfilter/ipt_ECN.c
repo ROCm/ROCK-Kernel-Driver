@@ -164,8 +164,12 @@ checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ipt_target ipt_ecn_reg
-= { { NULL, NULL }, "ECN", target, checkentry, NULL, THIS_MODULE };
+static struct ipt_target ipt_ecn_reg = {
+	.name		= "ECN",
+	.target		= target,
+	.checkentry	= checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

@@ -68,11 +68,9 @@ static inline int connection_based(struct sock *sk)
 static int wait_for_packet(struct sock *sk, int *err, long *timeo_p)
 {
 	int error;
+	DEFINE_WAIT(wait);
 
-	DECLARE_WAITQUEUE(wait, current);
-
-	__set_current_state(TASK_INTERRUPTIBLE);
-	add_wait_queue_exclusive(sk->sleep, &wait);
+	prepare_to_wait_exclusive(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 
 	/* Socket errors? */
 	error = sock_error(sk);
@@ -101,8 +99,7 @@ static int wait_for_packet(struct sock *sk, int *err, long *timeo_p)
 	error = 0;
 	*timeo_p = schedule_timeout(*timeo_p);
 out:
-	current->state = TASK_RUNNING;
-	remove_wait_queue(sk->sleep, &wait);
+	finish_wait(sk->sleep, &wait);
 	return error;
 interrupted:
 	error = sock_intr_errno(*timeo_p);

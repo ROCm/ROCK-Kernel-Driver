@@ -81,6 +81,7 @@ typedef struct client_port_t {
 
 	/* supported channels */
 	int midi_channels;
+	int midi_voices;
 	int synth_voices;
 		
 } client_port_t;

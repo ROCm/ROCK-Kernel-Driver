@@ -520,19 +520,34 @@ Module parameters
 
     Module for Envy24 (ICE1712) based PCI soundcards.
 			* MidiMan M Audio Delta 1010
+			* MidiMan M Audio Delta 1010LT
 			* MidiMan M Audio Delta DiO 2496
 			* MidiMan M Audio Delta 66
 			* MidiMan M Audio Delta 44
+			* MidiMan M Audio Delta 410
 			* MidiMan M Audio Audiophile 2496
                         * TerraTec EWS 88MT
                         * TerraTec EWS 88D
                         * TerraTec EWX 24/96
+                        * TerraTec DMX 6Fire
+                        * Hoontech SoundTrack DSP 24
+                        * Hoontech SoundTrack DSP 24 Value
+                        * Hoontech SoundTrack DSP 24 Media 7.1
 
     omni	- Omni I/O support for MidiMan M-Audio Delta44/66
 
     Module supports up to 8 cards and autoprobe. Note: The consumer part
     is not used with all Envy24 based cards (for example in the MidiMan Delta
     serie).
+
+  Module snd-ice1724
+  ------------------
+
+    Module for Envy24HT (VT/ICE1724) based PCI soundcards.
+			* MidiMan M Audio Revolution 7.1
+			* AMP Ltd AUDIO2000
+
+    Module supports up to 8 cards and autoprobe.
 
   Module snd-intel8x0
   -------------------
@@ -659,7 +674,7 @@ Module parameters
     Module supports autoprobe and multiple chips (max 8).
     Note: on some notebooks the buffer address cannot be detected
     automatically, or causes hang-up during initialization.
-    In such a case, specify the buffer top address explicitly via
+    In such a case, specify the buffer top address explicity via
     buffer_top option.
     For example,
       Sony F250: buffer_top=0x25a800
@@ -966,6 +981,19 @@ Module parameters
     Module supports autoprobe and multiple chips (max 8).
     
     The power-management is supported.
+
+
+Configuring Non-ISAPNP Cards
+============================
+
+When the kernel is configured with ISA-PnP support, the modules
+supporting the isapnp cards will have module options "isapnp".
+If this option is set, *only* the ISA-PnP devices will be probed.
+For probing the non ISA-PnP cards, you have to pass "isapnp=0" option
+together with the proper i/o and irq configuration.
+
+When the kernel is configured without ISA-PnP support, isapnp option
+will be not built in.
 
 
 modprobe/kmod support

@@ -267,14 +267,14 @@ static struct pci_device_id snd_sonic_ids[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, snd_sonic_ids);
 
 static ratden_t sonicvibes_adc_clock = {
-	num_min: 4000 * 65536,
-	num_max: 48000UL * 65536,
-	num_step: 1,
-	den: 65536,
+	.num_min = 4000 * 65536,
+	.num_max = 48000UL * 65536,
+	.num_step = 1,
+	.den = 65536,
 };
 static snd_pcm_hw_constraint_ratdens_t snd_sonicvibes_hw_constraints_adc_clock = {
-	nrats: 1,
-	rats: &sonicvibes_adc_clock,
+	.nrats = 1,
+	.rats = &sonicvibes_adc_clock,
 };
 
 /*

@@ -413,10 +413,13 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 		   struct in6_addr *daddr, struct in6_addr *solicited_addr,
 	 	   int router, int solicited, int override, int inc_opt) 
 {
+	static struct in6_addr tmpaddr;
+	struct inet6_ifaddr *ifp;
 	struct flowi fl;
 	struct rt6_info *rt = NULL;
 	struct dst_entry* dst;
         struct sock *sk = ndisc_socket->sk;
+	struct in6_addr *src_addr;
         struct nd_msg *msg;
         int len;
         struct sk_buff *skb;
@@ -428,7 +431,18 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 	if (!rt) 
 		return;
 
-	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_ADVERTISEMENT, solicited_addr, daddr);
+	/* for anycast or proxy, solicited_addr != src_addr */
+	ifp = ipv6_get_ifaddr(solicited_addr, dev);
+ 	if (ifp) {
+		src_addr = solicited_addr;
+		in6_ifa_put(ifp);
+	} else {
+		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0))
+			return;
+		src_addr = &tmpaddr;
+	}
+
+	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_ADVERTISEMENT, src_addr, daddr);
 	ndisc_rt_init(rt, dev, neigh);	
 
 	dst = (struct dst_entry*)rt;
@@ -456,7 +470,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 	}
 
 	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
-	ip6_nd_hdr(sk, skb, dev, solicited_addr, daddr, IPPROTO_ICMPV6, len);
+	ip6_nd_hdr(sk, skb, dev, src_addr, daddr, IPPROTO_ICMPV6, len);
 
 	skb->h.raw = (unsigned char*) msg = (struct nd_msg *) skb_put(skb, len);
 
@@ -470,13 +484,13 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
         msg->icmph.icmp6_override  = !!override;
 
         /* Set the target address. */
-	ipv6_addr_copy(&msg->target, solicited_addr);
+	ipv6_addr_copy(&msg->target, src_addr);
 
 	if (inc_opt)
 		ndisc_fill_option(msg->opt, ND_OPT_TARGET_LL_ADDR, dev->dev_addr, dev->addr_len);
 
 	/* checksum */
-	msg->icmph.icmp6_cksum = csum_ipv6_magic(solicited_addr, daddr, len, 
+	msg->icmph.icmp6_cksum = csum_ipv6_magic(src_addr, daddr, len, 
 						 IPPROTO_ICMPV6,
 						 csum_partial((__u8 *) msg, 
 							      len, 0));
@@ -793,6 +807,50 @@ void ndisc_recv_ns(struct sk_buff *skb)
 			}
 		}
 		in6_ifa_put(ifp);
+	} else if (ipv6_chk_acast_addr(dev, &msg->target)) {
+		struct inet6_dev *idev = in6_dev_get(dev);
+		int addr_type = ipv6_addr_type(saddr);
+	
+		/* anycast */
+	
+		if (!idev) {
+			/* XXX: count this drop? */
+			return;
+		}
+	
+		if (addr_type == IPV6_ADDR_ANY) {
+			struct in6_addr maddr;
+	
+			ipv6_addr_all_nodes(&maddr);
+			ndisc_send_na(dev, NULL, &maddr, &msg->target,
+				      idev->cnf.forwarding, 0, 0, 1);
+			in6_dev_put(idev);
+			return;
+		}
+
+		if (addr_type & IPV6_ADDR_UNICAST) {
+			int inc = ipv6_addr_type(daddr)&IPV6_ADDR_MULTICAST;
+			if (inc)  
+				nd_tbl.stats.rcv_probes_mcast++;
+			else
+				nd_tbl.stats.rcv_probes_ucast++;
+	
+			/*
+			 *   update / create cache entry
+			 *   for the source adddress
+			 */
+
+			neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, skb->dev);
+
+			if (neigh || !dev->hard_header) {
+				ndisc_send_na(dev, neigh, saddr,
+					      &msg->target, 
+					      idev->cnf.forwarding, 1, 0, inc);
+				if (neigh)
+					neigh_release(neigh);
+			}
+		}
+		in6_dev_put(idev);
 	} else {
 		struct inet6_dev *in6_dev = in6_dev_get(dev);
 		int addr_type = ipv6_addr_type(saddr);

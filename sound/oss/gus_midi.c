@@ -179,7 +179,7 @@ static int gus_midi_buffer_status(int dev)
 		qhead++;
 	}
 	spin_unlock_irqrestore(&lock,flags);
-	return (qlen > 0) | !(GUS_MIDI_STATUS() & MIDI_XMIT_EMPTY);
+	return (qlen > 0) || !(GUS_MIDI_STATUS() & MIDI_XMIT_EMPTY);
 }
 
 #define MIDI_SYNTH_NAME	"Gravis Ultrasound Midi"
