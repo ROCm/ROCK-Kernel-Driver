@@ -157,26 +157,23 @@ advwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int
 advwdt_open(struct inode *inode, struct file *file)
 {
-	switch (minor(inode->i_rdev)) {
-		case WATCHDOG_MINOR:
-			spin_lock(&advwdt_lock);
-			if (advwdt_is_open) {
-				spin_unlock(&advwdt_lock);
-				return -EBUSY;
-			}
-			if (nowayout) {
-				MOD_INC_USE_COUNT;
-			}
-			/*
-			 *	Activate 
-			 */
-	 
-			advwdt_is_open = 1;
-			advwdt_ping();
+	if (minor(inode->i_rdev) = WATCHDOG_MINOR) {
+		spin_lock(&advwdt_lock);
+		if (advwdt_is_open) {
 			spin_unlock(&advwdt_lock);
-			return 0;
-		default:
-			return -ENODEV;
+			return -EBUSY;
+		}
+
+		if (nowayout)
+			MOD_INC_USE_COUNT;
+
+		/* Activate */
+		advwdt_is_open = 1;
+		advwdt_ping();
+		spin_unlock(&advwdt_lock);
+		return 0;
+	} else {
+		return -ENODEV;
 	}
 }
 
@@ -185,9 +182,9 @@ advwdt_close(struct inode *inode, struct file *file)
 {
 	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 		spin_lock(&advwdt_lock);
-		if (!nowayout) {
+		if (!nowayout)
 			inb_p(WDT_STOP);
-		}
+
 		advwdt_is_open = 0;
 		spin_unlock(&advwdt_lock);
 	}
@@ -202,10 +199,10 @@ static int
 advwdt_notify_sys(struct notifier_block *this, unsigned long code,
 	void *unused)
 {
-	if (code == SYS_DOWN || code == SYS_HALT) {
+	if (code == SYS_DOWN || code == SYS_HALT)
 		/* Turn the WDT off */
 		inb_p(WDT_STOP);
-	}
+
 	return NOTIFY_DONE;
 }
  
@@ -223,9 +220,9 @@ static struct file_operations advwdt_fops = {
 };
 
 static struct miscdevice advwdt_miscdev = {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&advwdt_fops
+	.minor = WATCHDOG_MINOR,
+	.name = "watchdog",
+	.fops = &advwdt_fops
 };
 
 /*
@@ -234,9 +231,9 @@ static struct miscdevice advwdt_miscdev = {
  */
  
 static struct notifier_block advwdt_notifier = {
-	advwdt_notify_sys,
-	NULL,
-	0
+	.self = advwdt_notify_sys,
+	.next = NULL,
+	.priority = 0
 };
 
 static void __init
@@ -289,6 +286,4 @@ module_init(advwdt_init);
 module_exit(advwdt_exit);
 
 MODULE_LICENSE("GPL");
-
-/* end of advantechwdt.c */
 
