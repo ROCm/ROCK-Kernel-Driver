@@ -12,11 +12,11 @@
  * it under the terms of the GNU General Public License version 2,
  * as published by the Free Software Foundation.
  */
+#include <linux/init.h>
 #include <linux/types.h>
 #include <linux/stddef.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
-#include <linux/init.h>
 #include <linux/notifier.h>
 #include <linux/netdevice.h>
 #include <linux/rcupdate.h>

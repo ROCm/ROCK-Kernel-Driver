@@ -74,6 +74,16 @@ static void mce_timerfunc (unsigned long data)
 
 static int __init init_nonfatal_mce_checker(void)
 {
+	struct cpuinfo_x86 *c = &boot_cpu_data;
+
+	/* Check for MCE support */
+	if (!cpu_has(c, X86_FEATURE_MCE))
+		return -ENODEV;
+
+	/* Check for PPro style MCA */
+	if (!cpu_has(c, X86_FEATURE_MCA))
+		return -ENODEV;
+
 	/* Some Athlons misbehave when we frob bank 0 */
 	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
 		boot_cpu_data.x86 == 6)

@@ -377,6 +377,8 @@ config MAGIC_SYSRQ
 	  unless you really know what this hack does.
 
 choice
+	optional
+	depends on DEBUG_KERNEL
 	prompt "Kernel Debugger"
 
 config XMON
