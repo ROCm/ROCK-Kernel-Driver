@@ -41,7 +41,7 @@ end-y := elf
 # if present on 'classic' PPC.
 cacheflag-y	:= -DCLEAR_CACHES=""
 # This file will flush / disable the L2, and L3 if present.
-clear_L2_L3	:= $(boot)/simple/clear.S
+clear_L2_L3	:= $(srctree)/$(boot)/simple/clear.S
 
 #
 # See arch/ppc/kconfig and arch/ppc/platforms/Kconfig
@@ -125,7 +125,7 @@ EXTRA_AFLAGS := $(extra-aflags-y)
 AFLAGS_head.o				+= $(cacheflag-y)
 
 # Linker args.  This specifies where the image will be run at.
-LD_ARGS				:= -T $(boot)/ld.script \
+LD_ARGS					:= -T $(srctree)/$(boot)/ld.script \
 				   -Ttext $(CONFIG_BOOT_LOAD) -Bstatic
 OBJCOPY_ARGS			:= -O elf32-powerpc
 
@@ -159,8 +159,8 @@ MKTREE				:= $(utils)/mktree
 
 targets := dummy.o
 
-$(obj)/zvmlinux: $(OBJS) $(LIBS) $(boot)/ld.script $(images)/vmlinux.gz \
-		$(obj)/dummy.o
+$(obj)/zvmlinux: $(OBJS) $(LIBS) $(srctree)/$(boot)/ld.script \
+		$(images)/vmlinux.gz $(obj)/dummy.o
 	$(OBJCOPY) $(OBJCOPY_ARGS) \
 		--add-section=.image=$(images)/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data \
@@ -169,7 +169,7 @@ $(obj)/zvmlinux: $(OBJS) $(LIBS) $(boot)/ld.script $(images)/vmlinux.gz \
 	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab \
 		-R .stabstr -R .ramdisk -R .sysmap
 
-$(obj)/zvmlinux.initrd: $(OBJS) $(LIBS) $(boot)/ld.script \
+$(obj)/zvmlinux.initrd: $(OBJS) $(LIBS) $(srctree)/$(boot)/ld.script \
 		$(images)/vmlinux.gz $(obj)/dummy.o
 	$(OBJCOPY) $(OBJCOPY_ARGS) \
 		--add-section=.ramdisk=$(images)/ramdisk.image.gz \
@@ -210,10 +210,10 @@ $(images)/zImage.initrd-TREE: $(obj)/zvmlinux.initrd $(MKTREE)
 	$(MKTREE) $(obj)/zvmlinux.initrd $(images)/zImage.initrd.$(end-y) \
 		$(ENTRYPOINT)
 
-$(images)/zImage-PPLUS: $(obj)/zvmlinux $(utils)/mkprep $(MKBUGBOOT)
+$(images)/zImage-PPLUS: $(obj)/zvmlinux $(MKPREP) $(MKBUGBOOT)
 	$(MKPREP) -pbp $(obj)/zvmlinux $(images)/zImage.$(end-y)
 	$(MKBUGBOOT) $(obj)/zvmlinux $(images)/zImage.bugboot
 
-$(images)/zImage.initrd-PPLUS: $(obj)/zvmlinux.initrd $(utils)/mkprep $(MKBUGBOOT)
+$(images)/zImage.initrd-PPLUS: $(obj)/zvmlinux.initrd $(MKPREP) $(MKBUGBOOT)
 	$(MKPREP) -pbp $(obj)/zvmlinux.initrd $(images)/zImage.initrd.$(end-y)
 	$(MKBUGBOOT) $(obj)/zvmlinux.initrd $(images)/zImage.initrd.bugboot

@@ -800,8 +800,7 @@ prom_init(int r3, int r4, prom_entry pp)
 
 	/* First get a handle for the stdout device */
 	prom = pp;
-	prom_chosen = call_prom("finddevice", 1, 1,
-				       "/chosen");
+	prom_chosen = call_prom("finddevice", 1, 1, "/chosen");
 	if (prom_chosen == (void *)-1)
 		prom_exit();
 	if ((int) call_prom("getprop", 4, 1, prom_chosen,

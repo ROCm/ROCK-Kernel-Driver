@@ -522,6 +522,7 @@ static int multipath_stop (mddev_t *mddev)
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 
 	md_unregister_thread(mddev->thread);
+	mddev->thread = NULL;
 	mempool_destroy(conf->pool);
 	kfree(conf->multipaths);
 	kfree(conf);

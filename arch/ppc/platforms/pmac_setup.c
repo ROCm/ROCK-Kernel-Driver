@@ -136,7 +136,7 @@ pmac_show_cpuinfo(struct seq_file *m)
 
 	if (pmac_call_feature(PMAC_FTR_GET_MB_INFO, NULL, PMAC_MB_INFO_NAME, (int)&mbname) != 0)
 		mbname = "Unknown";
-	
+
 	/* find motherboard type */
 	seq_printf(m, "machine\t\t: ");
 	np = find_devices("device-tree");
@@ -196,7 +196,7 @@ pmac_show_cpuinfo(struct seq_file *m)
 		int n;
 		struct reg_property *reg = (struct reg_property *)
 			get_property(np, "reg", &n);
-	
+
 		if (reg != 0) {
 			unsigned long total = 0;
 
@@ -207,9 +207,9 @@ pmac_show_cpuinfo(struct seq_file *m)
 	}
 
 	/* Checks "l2cr-value" property in the registry */
-	np = find_devices("cpus");	
+	np = find_devices("cpus");
 	if (np == 0)
-		np = find_type_devices("cpu");	
+		np = find_type_devices("cpu");
 	if (np != 0) {
 		unsigned int *l2cr = (unsigned int *)
 			get_property(np, "l2cr-value", NULL);
@@ -277,9 +277,9 @@ pmac_setup_arch(void)
 
 	/* Checks "l2cr-value" property in the registry */
 	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR) {
-		struct device_node *np = find_devices("cpus");	
+		struct device_node *np = find_devices("cpus");
 		if (np == 0)
-			np = find_type_devices("cpu");	
+			np = find_type_devices("cpu");
 		if (np != 0) {
 			unsigned int *l2cr = (unsigned int *)
 				get_property(np, "l2cr-value", NULL);
@@ -478,11 +478,11 @@ pmac_restart(char *cmd)
 			cuda_poll();
 		break;
 #endif /* CONFIG_ADB_CUDA */
-#ifdef CONFIG_ADB_PMU	
+#ifdef CONFIG_ADB_PMU
 	case SYS_CTRLER_PMU:
 		pmu_restart();
 		break;
-#endif /* CONFIG_ADB_PMU */	
+#endif /* CONFIG_ADB_PMU */
 	default: ;
 	}
 }

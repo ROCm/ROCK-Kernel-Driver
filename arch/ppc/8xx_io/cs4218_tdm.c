@@ -1456,21 +1456,10 @@ static void cs_mksound(unsigned int hz, unsigned int ticks)
 	restore_flags(flags);
 }
 
-static void CS_open(void)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void CS_release(void)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 static MACHINE mach_cs4218 = {
+	.owner =	THIS_MODULE,
 	.name =		"HIOX CS4218",
 	.name2 =	"Built-in Sound",
-	.open =		CS_open,
-	.release =	CS_release,
 	.dma_alloc =	CS_Alloc,
 	.dma_free =	CS_Free,
 	.irqinit =	CS_IrqInit,

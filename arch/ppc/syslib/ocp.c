@@ -203,10 +203,6 @@ struct bus_type ocp_bus_type = {
  *	NOTE: Detection of devices is a 2 pass step on this implementation,
  *	hotswap isn't supported. First, all OCP devices are put in the device
  *	list, _then_ all drivers are probed on each match.
- *
- *	This function returns a count of how many devices actually matched
- *	(whether the probe routine returned 0 or -ENODEV, a different error
- *	code isn't considered as a match).
  */
 int
 ocp_register_driver(struct ocp_driver *drv)
@@ -220,9 +216,7 @@ ocp_register_driver(struct ocp_driver *drv)
 	drv->driver.remove = ocp_device_remove;
 
 	/* register with core */
-	count = driver_register(&drv->driver);
-
-	return count ? count : 1;
+	return driver_register(&drv->driver);
 }
 
 /**

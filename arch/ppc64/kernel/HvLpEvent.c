@@ -8,6 +8,7 @@
  */
 #include <linux/stddef.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <asm/system.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/iSeries/HvCallEvent.h>
@@ -41,6 +42,8 @@ int HvLpEvent_unregisterHandler( HvLpEvent_Type eventType )
 	}
 	return rc;
 }
+EXPORT_SYMBOL(HvLpEvent_registerHandler);
+EXPORT_SYMBOL(HvLpEvent_unregisterHandler);
 
 /* (lpIndex is the partition index of the target partition.  
  * needed only for VirtualIo, VirtualLan and SessionMgr.  Zero

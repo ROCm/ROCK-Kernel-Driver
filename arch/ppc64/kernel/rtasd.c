@@ -372,7 +372,7 @@ static int rtasd(void *unused)
 	if (event_scan == RTAS_UNKNOWN_SERVICE || get_eventscan_parms() == -1)
 		goto error;
 
-	rtas_log_buf = vmalloc(rtas_error_log_max*LOG_NUMBER);
+	rtas_log_buf = vmalloc(rtas_error_log_buffer_max*LOG_NUMBER);
 	if (!rtas_log_buf) {
 		printk(KERN_ERR "rtasd: no memory\n");
 		goto error;
@@ -450,7 +450,7 @@ static int __init rtas_init(void)
 		return 1;
 	}
 
-	entry = create_proc_entry("ppc64/error_log", S_IRUSR, NULL);
+	entry = create_proc_entry("ppc64/rtas/error_log", S_IRUSR, NULL);
 	if (entry)
 		entry->proc_fops = &proc_rtas_log_operations;
 	else

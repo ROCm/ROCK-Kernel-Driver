@@ -260,7 +260,7 @@ pmac_fix_gatwick_interrupts(struct device_node *gw, int irq_base)
 					node->child->intrs = &gatwick_int_pool[count];
 					count += 3;
 				}
-				node->child->n_intrs = 3;			
+				node->child->n_intrs = 3;
 				node->child->intrs[0].line = 15+irq_base;
 				node->child->intrs[1].line =  4+irq_base;
 				node->child->intrs[2].line =  5+irq_base;
@@ -279,7 +279,7 @@ pmac_fix_gatwick_interrupts(struct device_node *gw, int irq_base)
 			node->intrs[0].line = 29+irq_base;
 			printk(KERN_INFO "irq: fixed media-bay on second controller (%d)\n",
 					node->intrs[0].line);
-		
+
 			ya_node = node->child;
 			while(ya_node)
 			{
@@ -501,7 +501,7 @@ void __init pmac_pic_init(void)
 				pmac_irq_hw[i] = (volatile struct pmac_irq_hw*)
 					(addr + (2 - i) * 0x10);
 		}
-	
+
 		/* get addresses of second controller */
 		irqctrler = irqctrler->next;
 		if (irqctrler && irqctrler->n_addrs > 0) {

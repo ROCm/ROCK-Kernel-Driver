@@ -345,7 +345,7 @@ rtas_flash_firmware(void)
 	rtas_firmware_flash_list.num_blocks = 0;
 	flist = (struct flash_block_list *)&rtas_firmware_flash_list;
 	rtas_block_list = virt_to_abs(flist);
-	if (rtas_block_list >= (4UL << 20)) {
+	if (rtas_block_list >= 4UL*1024*1024*1024) {
 		printk(KERN_ALERT "FLASH: kernel bug...flash list header addr above 4GB\n");
 		return;
 	}
