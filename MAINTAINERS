@@ -920,8 +920,6 @@ L:	autofs@linux.kernel.org
 S:	Maintained
 
 KERNEL BUILD (Makefile, Rules.make, scripts/*)
-P:	Keith Owens
-M:	kaos@ocs.com.au
 P:	Michael Elizabeth Chastain
 M:	mec@shout.net
 L:	kbuild-devel@lists.sourceforge.net
@@ -1061,12 +1059,6 @@ M:	Project MCA Team <mcalinux@acc.umu.se>
 M:	David Weinehall <tao@acc.umu.se>
 W:	http://www.acc.umu.se/~tao/
 W:	http://www.acc.umu.se/~mcalinux/
-L:	linux-kernel@vger.kernel.org
-S:	Maintained
-
-MODULE SUPPORT [GENERAL], KMOD
-P:	Keith Owens
-M:	kaos@ocs.com.au
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
