@@ -34,6 +34,7 @@
 
 #define I2C_ADDR_MT312		0x0e
 #define I2C_ADDR_SL1935		0x61
+#define I2C_ADDR_TSA5059	0x61
 
 #define MT312_DEBUG		0
 
@@ -207,12 +208,32 @@ static int sl1935_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq, u32 sr)
 	return mt312_pll_write(i2c, I2C_ADDR_SL1935, buf, sizeof(buf));
 }
 
+static int tsa5059_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq, u32 sr)
+{
+	u8 buf[4];
+
+	u32 ref = mt312_div(freq, 125);
+
+	buf[0] = (ref >> 8) & 0x7f;
+	buf[1] = (ref >> 0) & 0xff;
+	buf[2] = 0x84 | ((ref >> 10) & 0x60);
+	buf[3] = 0x80;
+	
+	if (freq < 1550000)
+		buf[3] |= 0x02;
+
+	printk(KERN_INFO "synth dword = %02x%02x%02x%02x\n", buf[0],
+	       buf[1], buf[2], buf[3]);
+
+	return mt312_pll_write(i2c, I2C_ADDR_TSA5059, buf, sizeof(buf));
+}
+
 static int mt312_reset(struct dvb_i2c_bus *i2c, const u8 full)
 {
 	return mt312_writereg(i2c, RESET, full ? 0x80 : 0x40);
 }
 
-static int mt312_init(struct dvb_i2c_bus *i2c)
+static int mt312_init(struct dvb_i2c_bus *i2c, const long id)
 {
 	int ret;
 	u8 buf[2];
@@ -238,6 +259,9 @@ static int mt312_init(struct dvb_i2c_bus *i2c)
 		return ret;
 
 	if ((ret = mt312_writereg(i2c, SNR_THS_HIGH, 0x32)) < 0)
+		return ret;
+
+	if ((ret = mt312_writereg(i2c, OP_CTRL, 0x53)) < 0)
 		return ret;
 
 	/* TS_SW_LIM */
@@ -427,7 +451,8 @@ static int mt312_read_ubc(struct dvb_i2c_bus *i2c, u32 * ubc)
 }
 
 static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
-			      const struct dvb_frontend_parameters *p)
+			      const struct dvb_frontend_parameters *p,
+			      const long id)
 {
 	int ret;
 	u8 buf[5];
@@ -436,6 +461,8 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 	const u8 fec_tab[10] =
 	    { 0x00, 0x01, 0x02, 0x04, 0x3f, 0x08, 0x10, 0x20, 0x3f, 0x3f };
 	const u8 inv_tab[3] = { 0x00, 0x40, 0x80 };
+
+	int (*set_tv_freq)(struct dvb_i2c_bus *i2c, u32 freq, u32 sr);
 
 	if ((p->frequency < mt312_info.frequency_min)
 	    || (p->frequency > mt312_info.frequency_max))
@@ -457,8 +484,18 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 	    || (p->u.qpsk.fec_inner == FEC_8_9))
 		return -EINVAL;
 
-	if ((ret =
-	     sl1935_set_tv_freq(i2c, p->frequency, p->u.qpsk.symbol_rate)) < 0)
+	switch (id) {
+	case ID_VP310:
+		set_tv_freq = tsa5059_set_tv_freq;
+		break;
+	case ID_MT312:
+		set_tv_freq = sl1935_set_tv_freq;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if ((ret = set_tv_freq(i2c, p->frequency, p->u.qpsk.symbol_rate)) < 0)
 		return ret;
 
 	/* sr = (u16)(sr * 256.0 / 1000000.0) */
@@ -552,9 +589,7 @@ static int mt312_get_code_rate(struct dvb_i2c_bus *i2c, fe_code_rate_t * cr)
 {
 	const fe_code_rate_t fec_tab[8] =
 	    { FEC_1_2, FEC_2_3, FEC_3_4, FEC_5_6, FEC_6_7, FEC_7_8,
-		FEC_AUTO,
-		FEC_AUTO
-	};
+		FEC_AUTO, FEC_AUTO };
 
 	int ret;
 	u8 fec_status;
@@ -652,7 +687,7 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return mt312_read_ubc(i2c, arg);
 
 	case FE_SET_FRONTEND:
-		return mt312_set_frontend(i2c, arg);
+		return mt312_set_frontend(i2c, arg, (long) fe->data);
 
 	case FE_GET_FRONTEND:
 		return mt312_get_frontend(i2c, arg);
@@ -664,7 +699,7 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return mt312_sleep(i2c);
 
 	case FE_INIT:
-		return mt312_init(i2c);
+		return mt312_init(i2c, (long) fe->data);
 
 	case FE_RESET:
 		return mt312_reset(i2c, 0);
