@@ -553,11 +553,9 @@ static int sr_probe(struct device *dev)
 	struct gendisk *disk;
 	struct scsi_cd *cd;
 	int minor, error;
-	int pq = (sdev->inquiry[0] >> 5) & 7;
 
 	error = -ENODEV;
-	if ((sdev->type != TYPE_ROM && sdev->type != TYPE_WORM) ||
-	    pq != SCSI_INQ_PQ_CON)
+	if (sdev->type != TYPE_ROM && sdev->type != TYPE_WORM)
 		goto fail;
 
 	if ((error = scsi_device_get(sdev)) != 0)

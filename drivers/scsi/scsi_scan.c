@@ -559,8 +559,8 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	 * 011 the same. Stay compatible with previous code, and create a
 	 * Scsi_Device for a PQ of 1
 	 *
-	 * 2004-04-20: Don't set the device offline here; rather let the 
-	 * upper level drivers eval the PQ to decide whether they should
+	 * Don't set the device offline here; rather let the upper
+	 * level drivers eval the PQ to decide whether they should
 	 * attach. So remove ((inq_result[0] >> 5) & 7) == 1 check.
 	 */ 
 
