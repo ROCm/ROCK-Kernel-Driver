@@ -14,11 +14,10 @@
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/irq.h>
-#include <linux/sched.h>	/* For some unfathomable reason,
-				   request_irq/free_irq are declared here.  */
+#include <linux/interrupt.h>
+#include <linux/signal.h>
 
 #include <asm/machdep.h>
-#include <asm/irq.h>
 
 
 /* The number of shared GINT interrupts. */
