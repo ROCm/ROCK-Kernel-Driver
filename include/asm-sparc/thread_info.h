@@ -60,7 +60,7 @@ struct thread_info {
 	.cpu		=	0,			\
 	.restart_block	= {				\
 		.fn	=	do_no_restart_syscall,	\
-	},
+	},						\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)

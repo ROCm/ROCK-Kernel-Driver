@@ -7,7 +7,6 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/threads.h>	/* NR_CPUS */
-#include <linux/thread_info.h>
 
 #include <asm/segment.h>
 #include <asm/page.h>

@@ -3,7 +3,6 @@
 #define __SPARC64_SYSTEM_H
 
 #include <linux/config.h>
-#include <linux/thread_info.h>
 #include <asm/ptrace.h>
 #include <asm/processor.h>
 #include <asm/visasm.h>
