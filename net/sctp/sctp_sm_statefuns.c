@@ -786,9 +786,6 @@ sctp_disposition_t sctp_sf_backbeat_8_3(const sctp_endpoint_t *ep,
 			SCTP_TRANSPORT(link));
 
 	return SCTP_DISPOSITION_CONSUME;
-
-nomem:__attribute__((unused))
-	return SCTP_DISPOSITION_NOMEM;
 }
 
 /* Populate the verification/tie tags based on overlapping INIT
@@ -1962,7 +1959,7 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 	datalen -= sizeof(sctp_data_chunk_t);
 
 	if (!asoc->rwnd || (datalen > asoc->frag_point)) {
-		SCTP_DEBUG_PRINTK("Discarding tsn: %u datalen: %d, "
+		SCTP_DEBUG_PRINTK("Discarding tsn: %u datalen: %Zd, "
 				  "rwnd: %d\n", tsn, datalen, asoc->rwnd);
 		goto discard_noforce;
 	}
