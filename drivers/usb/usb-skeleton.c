@@ -117,7 +117,7 @@ struct usb_skel {
 	struct urb *		write_urb;		/* the urb used to send data */
 	__u8			bulk_out_endpointAddr;	/* the address of the bulk out endpoint */
 
-	struct tq_struct	tqueue;			/* task queue for line discipline waking up */
+	struct work_struct			work;			/* work queue entry for line discipline waking up */
 	int			open_count;		/* number of times this port has been opened */
 	struct semaphore	sem;			/* locks this structure */
 };

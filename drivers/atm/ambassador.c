@@ -926,8 +926,7 @@ static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs)
   
     if (irq_work) {
 #ifdef FILL_RX_POOLS_IN_BH
-      queue_task (&dev->bh, &tq_immediate);
-      mark_bh (IMMEDIATE_BH);
+      schedule_work (&dev->bh);
 #else
       fill_rx_pools (dev);
 #endif
@@ -2402,10 +2401,7 @@ static int __init amb_probe (void) {
       
 #ifdef FILL_RX_POOLS_IN_BH
       // initialise bottom half
-      INIT_LIST_HEAD(&dev->bh.list);
-      dev->bh.sync = 0;
-      dev->bh.routine = (void (*)(void *)) fill_rx_pools;
-      dev->bh.data = dev;
+      INIT_WORK(&dev->bh, (void (*)(void *)) fill_rx_pools, dev);
 #endif
       
       // semaphore for txer/rxer modifications - we cannot use a

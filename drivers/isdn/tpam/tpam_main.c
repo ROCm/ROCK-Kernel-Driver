@@ -176,10 +176,8 @@ static int __devinit tpam_probe(struct pci_dev *dev, const struct pci_device_id 
 	card->loopmode = 0;
 	skb_queue_head_init(&card->sendq);
 	skb_queue_head_init(&card->recvq);
-	card->recv_tq.routine = (void *) (void *) tpam_recv_tq;
-	card->recv_tq.data = card;
-	card->send_tq.routine = (void *) (void *) tpam_send_tq;
-	card->send_tq.data = card;
+	INIT_WORK(&card->recv_tq, (void *) (void *) tpam_recv_tq, card);
+	INIT_WORK(&card->send_tq, (void *) (void *) tpam_send_tq, card);
 
 	/* add the board at the end of the list of boards */
 	card->next = NULL;

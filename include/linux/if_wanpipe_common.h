@@ -39,7 +39,7 @@ typedef struct {
 	int   (*func) (struct sk_buff *, netdevice_t *, 
                        struct sock *);
 
-	struct tq_struct wanpipe_task;    /* Immediate BH handler task */
+	struct work_struct wanpipe_work;    /* deferred keventd work */
 	unsigned char rw_bind;			  /* Sock bind state */
 	unsigned char usedby;
 	unsigned char state;

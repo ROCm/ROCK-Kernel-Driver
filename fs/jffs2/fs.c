@@ -303,7 +303,7 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent)
 			return -ENOMEM;
 
 		/* Initialize process for timed wbuf flush */
-		INIT_TQUEUE(&c->wbuf_task,(void*) jffs2_wbuf_process, (void *)c);
+		INIT_WORK(&c->wbuf_task,(void*) jffs2_wbuf_process, (void *)c);
 		/* Initialize timer for timed wbuf flush */
 		init_timer(&c->wbuf_timer);
 		c->wbuf_timer.function = jffs2_wbuf_timeout;

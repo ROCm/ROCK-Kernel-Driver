@@ -67,7 +67,7 @@
 #include <asm/bitops.h>
 #include <asm/types.h>
 #include <linux/termios.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #ifdef CONFIG_SYNCLINK_SYNCPPP_MODULE
 #define CONFIG_SYNCLINK_SYNCPPP 1
@@ -194,7 +194,7 @@ typedef struct _synclinkmp_info {
 	struct timer_list	status_timer;	/* input signal status check timer */
 
 	spinlock_t lock;		/* spinlock for synchronizing with ISR */
-	struct tq_struct task;	 		/* task structure for scheduling bh */
+	struct work_struct task;	 		/* task structure for scheduling bh */
 
 	u32 max_frame_size;			/* as set by device config */
 
@@ -2572,8 +2572,7 @@ static void synclinkmp_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			if ( debug_level >= DEBUG_LEVEL_ISR )
 				printk("%s(%d):%s queueing bh task.\n",
 					__FILE__,__LINE__,port->device_name);
-			queue_task(&port->task, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
+			schedule_work(&port->task);
 			port->bh_requested = 1;
 		}
 	}
@@ -3736,9 +3735,7 @@ SLMP_INFO *alloc_dev(int adapter_num, int port_num, struct pci_dev *pdev)
 	} else {
 		memset(info, 0, sizeof(SLMP_INFO));
 		info->magic = MGSL_MAGIC;
-		info->task.sync = 0;
-		info->task.routine = bh_handler;
-		info->task.data    = info;
+		INIT_WORK(&info->task, bh_handler, info);
 		info->max_frame_size = 4096;
 		info->close_delay = 5*HZ/10;
 		info->closing_wait = 30*HZ;

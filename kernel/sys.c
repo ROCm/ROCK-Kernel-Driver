@@ -16,7 +16,7 @@
 #include <linux/init.h>
 #include <linux/highuid.h>
 #include <linux/fs.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/device.h>
 #include <linux/times.h>
 #include <linux/security.h>
@@ -442,12 +442,10 @@ static void deferred_cad(void *dummy)
  */
 void ctrl_alt_del(void)
 {
-	static struct tq_struct cad_tq = {
-		.routine = deferred_cad,
-	};
+	static DECLARE_WORK(cad_work, deferred_cad, NULL);
 
 	if (C_A_D)
-		schedule_task(&cad_tq);
+		schedule_work(&cad_work);
 	else
 		kill_proc(cad_pid, SIGINT, 1);
 }

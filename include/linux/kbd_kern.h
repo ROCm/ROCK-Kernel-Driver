@@ -150,7 +150,7 @@ extern unsigned int keymap_count;
 
 static inline void con_schedule_flip(struct tty_struct *t)
 {
-	schedule_task(&t->flip.tqueue);
+	schedule_work(&t->flip.work);
 }
 
 #endif

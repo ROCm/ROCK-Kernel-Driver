@@ -143,7 +143,7 @@ struct acm {
 	struct tty_struct *tty;				/* the coresponding tty */
 	struct urb *ctrlurb, *readurb, *writeurb;	/* urbs */
 	struct acm_line line;				/* line coding (bits, stop, parity) */
-	struct tq_struct tqueue;			/* task queue for line discipline waking up */
+	struct work_struct work;					/* work queue entry for line discipline waking up */
 	unsigned int ctrlin;				/* input control lines (DCD, DSR, RI, break, overruns) */
 	unsigned int ctrlout;				/* output control lines (DTR, RTS) */
 	unsigned int writesize;				/* max packet size for the output bulk endpoint */
@@ -272,7 +272,7 @@ static void acm_write_bulk(struct urb *urb)
 	if (urb->status)
 		dbg("nonzero write bulk status received: %d", urb->status);
 
-	schedule_task(&acm->tqueue);
+	schedule_work(&acm->work);
 }
 
 static void acm_softint(void *private)
@@ -578,8 +578,7 @@ static int acm_probe (struct usb_interface *intf,
 		acm->minor = minor;
 		acm->dev = dev;
 
-		acm->tqueue.routine = acm_softint;
-		acm->tqueue.data = acm;
+		INIT_WORK(&acm->work, acm_softint, acm);
 
 		if (!(buf = kmalloc(ctrlsize + readsize + acm->writesize, GFP_KERNEL))) {
 			err("out of memory");

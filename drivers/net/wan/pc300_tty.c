@@ -106,8 +106,8 @@ typedef	struct _st_cpc_tty_area {
 	pc300dev_t*	pc300dev;	/* ptr. to info struct in PC300 driver */
 	unsigned char	name[20];	/* interf. name + "-tty" */
 	struct tty_struct *tty;		
-	struct tq_struct tty_tx_task_queue; /* tx task - tx interrupt */
-	struct tq_struct tty_rx_task_queue; /* rx task - rx interrupt */
+	struct work_struct tty_tx_work; /* tx work - tx interrupt */
+	struct work_struct tty_rx_work; /* rx work - rx interrupt */
 	} st_cpc_tty_area;
 
 /* TTY data structures */
@@ -134,8 +134,8 @@ static int cpc_tty_ioctl(struct tty_struct *tty, struct file *file,
 				unsigned int cmd, unsigned long arg);
 static void cpc_tty_flush_buffer(struct tty_struct *tty);
 static void cpc_tty_hangup(struct tty_struct *tty);
-static void cpc_tty_rx_task(void *data);
-static void cpc_tty_tx_task(void *data);
+static void cpc_tty_rx_work(void *data);
+static void cpc_tty_tx_work(void *data);
 static int cpc_tty_send_to_card(pc300dev_t *dev,void *buf, int len);
 static void cpc_tty_trace(pc300dev_t *dev, char* buf, int len, char rxtx);
 static void cpc_tty_dtr_off(pc300dev_t *pc300dev);
@@ -288,12 +288,9 @@ void cpc_tty_init(pc300dev_t *pc300dev)
 	cpc_tty->num_open= 0;
 	cpc_tty->tty_minor = port + CPC_TTY_MINOR_START;
 	cpc_tty->pc300dev = pc300dev; 
-	
-	cpc_tty->tty_tx_task_queue.routine = cpc_tty_tx_task; 
-	cpc_tty->tty_tx_task_queue.data = (void *)cpc_tty; 
-	
-	cpc_tty->tty_rx_task_queue.routine = cpc_tty_rx_task; 
-	cpc_tty->tty_rx_task_queue.data = (void *) port; 
+
+	INIT_WORK(&cpc_tty->tty_tx_work, cpc_tty_tx_work, (void *)cpc_tty);
+	INIT_WORK(&cpc_tty->tty_rx_work, cpc_tty_rx_work, (void *)port);
 	
 	cpc_tty->buf_rx.first = cpc_tty->buf_rx.last = 0;
 
@@ -706,13 +703,13 @@ static void cpc_tty_hangup(struct tty_struct *tty)
 }
 
 /*
- * PC300 TTY RX task routine
- * This routine treats RX task
+ * PC300 TTY RX work routine
+ * This routine treats RX work
  * o verify read buffer
  * o call the line disc. read
  * o free memory
  */
-static void cpc_tty_rx_task(void * data)
+static void cpc_tty_rx_work(void * data)
 {
 	int port, i, j;
 	st_cpc_tty_area *cpc_tty; 
@@ -745,7 +742,7 @@ static void cpc_tty_rx_task(void * data)
 } 
 
 /*
- * PC300 TTY RX task routine
+ * PC300 TTY RX work routine
  *
  * This routine treats RX interrupt. 
  * o read all frames in card
@@ -912,25 +909,25 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 				cpc_tty->buf_rx.last->next = new;
 				cpc_tty->buf_rx.last = new;
 			}
-			schedule_task(&(cpc_tty->tty_rx_task_queue));
+			schedule_work(&(cpc_tty->tty_rx_work));
 			stats->rx_packets++;
 		}
 	} 
 } 
 
 /*
- * PC300 TTY TX task routine
+ * PC300 TTY TX work routine
  * 
  * This routine treats TX interrupt. 
  * o if need call line discipline wakeup
  * o call wake_up_interruptible
  */
-static void cpc_tty_tx_task(void *data)
+static void cpc_tty_tx_work(void *data)
 {
 	st_cpc_tty_area *cpc_tty = (st_cpc_tty_area *) data; 
 	struct tty_struct *tty; 
 
-	CPC_TTY_DBG("%s: cpc_tty_tx_task init\n",cpc_tty->name);
+	CPC_TTY_DBG("%s: cpc_tty_tx_work init\n",cpc_tty->name);
 	
 	if ((tty = cpc_tty->tty) == 0) { 
 		CPC_TTY_DBG("%s: the interface is not opened\n",cpc_tty->name);
@@ -1124,7 +1121,7 @@ void cpc_tty_trigger_poll(pc300dev_t *pc300dev)
 	if (!cpc_tty) {
 		return;
 	}
-	schedule_task(&(cpc_tty->tty_tx_task_queue)); 
+	schedule_work(&(cpc_tty->tty_tx_work)); 
 } 
 
 /*

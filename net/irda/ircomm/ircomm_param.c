@@ -29,7 +29,7 @@
  ********************************************************************/
 
 #include <linux/sched.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 
 #include <net/irda/irda.h>
@@ -166,8 +166,7 @@ int ircomm_param_request(struct ircomm_tty_cb *self, __u8 pi, int flush)
 
 	if (flush) {
 		/* ircomm_tty_do_softint will take care of the rest */
-		queue_task(&self->tqueue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&self->tqueue);
 	}
 
 	return count;

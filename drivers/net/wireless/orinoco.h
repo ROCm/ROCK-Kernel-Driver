@@ -11,7 +11,7 @@
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>
 #include <linux/wireless.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include "hermes.h"
 
 /* To enable debug messages */
@@ -42,7 +42,7 @@ struct orinoco_private {
 	/* Synchronisation stuff */
 	spinlock_t lock;
 	int hw_unavailable;
-	struct tq_struct timeout_task;
+	struct work_struct timeout_task;
 
 	int open;
 

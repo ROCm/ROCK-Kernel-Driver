@@ -453,8 +453,8 @@ struct amd7930_hw {
 	int rv_buff_out;
 	struct sk_buff *rv_skb;
 	struct hdlc_state *hdlc_state;
-	struct tq_struct tq_rcv;
-	struct tq_struct tq_xmt;
+	struct work_struct tq_rcv;
+	struct work_struct tq_xmt;
 };
 
 #define BC_FLG_INIT	1
@@ -495,7 +495,7 @@ struct BCState {
 	u_char *blog;
 	u_char *conmsg;
 	struct timer_list transbusy;
-	struct tq_struct tqueue;
+	struct work_struct tqueue;
 	unsigned long event;
 	int  (*BC_SetStack) (struct PStack *, struct BCState *);
 	void (*BC_Close) (struct BCState *);
@@ -954,7 +954,7 @@ struct IsdnCardState {
 	struct sk_buff *tx_skb;
 	int tx_cnt;
 	long event;
-	struct tq_struct tqueue;
+	struct work_struct tqueue;
 	struct timer_list dbusytimer;
 #ifdef ERROR_STATISTIC
 	int err_crc;

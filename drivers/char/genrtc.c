@@ -48,7 +48,7 @@
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -82,7 +82,7 @@ unsigned char days_in_mo[] =
 static int irq_active;
 
 #ifdef CONFIG_GEN_RTC_X
-struct tq_struct genrtc_task;
+struct work_struct genrtc_task;
 static struct timer_list timer_task;
 
 static unsigned int oldsecs;
@@ -91,7 +91,7 @@ static int tt_exp;
 
 void gen_rtc_timer(unsigned long data);
 
-static volatile int stask_active;              /* schedule_task */
+static volatile int stask_active;              /* schedule_work */
 static volatile int ttask_active;              /* timer_task */
 static int stop_rtc_timers;                    /* don't requeue tasks */
 static spinlock_t gen_rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -120,7 +120,7 @@ void genrtc_troutine(void *data)
 		add_timer(&timer_task);
 
 		gen_rtc_interrupt(0);
-	} else if (schedule_task(&genrtc_task) == 0)
+	} else if (schedule_work(&genrtc_task) == 0)
 		stask_active = 0;
 }
 
@@ -134,7 +134,7 @@ void gen_rtc_timer(unsigned long data)
 		       jiffies-tt_exp);
 	ttask_active=0;
 	stask_active=1;
-	if ((schedule_task(&genrtc_task) == 0))
+	if ((schedule_work(&genrtc_task) == 0))
 		stask_active = 0;
 }
 
@@ -253,12 +253,12 @@ static inline int gen_set_rtc_irq_bit(unsigned char bit)
 		irq_active = 1;
 		stop_rtc_timers = 0;
 		lostint = 0;
-		genrtc_task.routine = genrtc_troutine;
+		INIT_WORK(&genrtc_task, genrtc_troutine, NULL);
 		oldsecs = get_rtc_ss();
 		init_timer(&timer_task);
 
 		stask_active = 1;
-		if (schedule_task(&genrtc_task) == 0){
+		if (schedule_work(&genrtc_task) == 0){
 			stask_active = 0;
 		}
 	}

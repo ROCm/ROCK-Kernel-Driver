@@ -195,7 +195,7 @@ struct usb_bluetooth {
 
 	wait_queue_head_t	write_wait;
 
-	struct tq_struct	tqueue;		/* task queue for line discipline waking up */
+	struct work_struct			work;	/* work queue entry for line discipline waking up */
 	
 	unsigned int		int_packet_pos;
 	unsigned char		int_buffer[EVENT_BUFFER_SIZE];
@@ -1006,7 +1006,7 @@ static void bluetooth_write_bulk_callback (struct urb *urb)
 	}
 
 	/* wake up our little function to let the tty layer know that something happened */
-	schedule_task(&bluetooth->tqueue);
+	schedule_work(&bluetooth->work);
 }
 
 
@@ -1112,8 +1112,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 	bluetooth->magic = USB_BLUETOOTH_MAGIC;
 	bluetooth->dev = dev;
 	bluetooth->minor = minor;
-	bluetooth->tqueue.routine = bluetooth_softint;
-	bluetooth->tqueue.data = bluetooth;
+	INIT_WORK(&bluetooth->work, bluetooth_softint, bluetooth);
 	init_MUTEX(&bluetooth->lock);
 
 	/* record the interface number for the control out */

@@ -323,7 +323,7 @@
  *	  the card from hard sleep.
  *
  * v0.13beta1 -> v0.13 - 27 Sep 2002 - David Gibson
- *	o Re-introduced full resets (via schedule_task()) on Tx
+ *	o Re-introduced full resets (via schedule_work()) on Tx
  *	  timeout.
  *
  * v0.13 -> v0.13a - 30 Sep 2002 - David Gibson
@@ -378,7 +378,7 @@
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include "hermes.h"
 #include "hermes_rid.h"
@@ -889,7 +889,7 @@ static int orinoco_reconfigure(struct orinoco_private *priv)
 }
 
 /* This must be called from user context, without locks held - use
- * schedule_task() */
+ * schedule_work() */
 static void orinoco_reset(struct net_device *dev)
 {
 	struct orinoco_private *priv = dev->priv;
@@ -2317,7 +2317,7 @@ orinoco_tx_timeout(struct net_device *dev)
 
 	stats->tx_errors++;
 
-	schedule_task(&priv->timeout_task);
+	schedule_work(&priv->timeout_task);
 }
 
 static int
@@ -3708,7 +3708,7 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		
 		printk(KERN_DEBUG "%s: Force scheduling reset!\n", dev->name);
 
-		schedule_task(&priv->timeout_task);
+		schedule_work(&priv->timeout_task);
 		break;
 
 	case SIOCIWFIRSTPRIV + 0x2: /* set_port3 */
@@ -4241,7 +4241,7 @@ struct net_device *alloc_orinocodev(int sizeof_card, int (*hard_reset)(struct or
 	priv->hw_unavailable = 1; /* orinoco_init() must clear this
 				   * before anything else touches the
 				   * hardware */
-	INIT_TQUEUE(&priv->timeout_task, (void (*)(void *))orinoco_reset, dev);
+	INIT_WORK(&priv->timeout_task, (void (*)(void *))orinoco_reset, dev);
 
 	return dev;
 

@@ -12,7 +12,7 @@
 #ifndef PCBIT_H
 #define PCBIT_H
 
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #define MAX_PCBIT_CARDS 4
 
@@ -74,7 +74,7 @@ struct pcbit_dev {
 
 	struct timer_list error_recover_timer;
 
-	struct tq_struct qdelivery;
+	struct work_struct qdelivery;
 
 	u_char w_busy;
 	u_char r_busy;

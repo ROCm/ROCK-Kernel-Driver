@@ -10,7 +10,7 @@
 
 #include <linux/sched.h>
 #undef N_DATA
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <linux/smp.h>
 struct pt_regs;
@@ -79,26 +79,20 @@ int DivasBRIInitPCI(card_t *card, dia_card_t *cfg)
 
 int	DivasDpcSchedule(void)
 {
-	static	struct tq_struct DivasTask;
+	static	struct work_struct DivasTask;
 
-	DivasTask.routine = DivasDoDpc;
-	DivasTask.data = (void *) 0;
-
-	queue_task(&DivasTask, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	INIT_WORK(&DivasTask, DivasDoDpc, NULL);
+	schedule_work(&DivasTask);
 
 	return 0;
 }
 
 int	DivasScheduleRequestDpc(void)
 {
-	static	struct tq_struct DivasTask;
+	static	struct work_struct DivasTask;
 
-	DivasTask.routine = DivasDoRequestDpc;
-	DivasTask.data = (void *) 0;
-
-	queue_task(&DivasTask, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	INIT_WORK(&DivasTask, DivasDoRequestDpc, NULL);
+	schedule_work(&DivasTask);
 
 	return 0;
 }

@@ -159,7 +159,7 @@ struct moxa_str {
 	struct termios callout_termios;
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
-	struct tq_struct tqueue;
+	struct work_struct tqueue;
 };
 
 struct mxser_mstatus {
@@ -384,8 +384,7 @@ int moxa_init(void)
 	for (i = 0, ch = moxaChannels; i < MAX_PORTS; i++, ch++) {
 		ch->type = PORT_16550A;
 		ch->port = i;
-		ch->tqueue.routine = do_moxa_softint;
-		ch->tqueue.data = ch;
+		INIT_WORK(&ch->tqueue, do_moxa_softint, ch);
 		ch->tty = 0;
 		ch->close_delay = 5 * HZ / 10;
 		ch->closing_wait = 30 * HZ;
@@ -1026,7 +1025,7 @@ static void moxa_poll(unsigned long ignored)
 					else {
 						set_bit(MOXA_EVENT_HANGUP, &ch->event);
 						MOD_DEC_USE_COUNT;
-						if (schedule_task(&ch->tqueue) == 0)
+						if (schedule_work(&ch->tqueue) == 0)
 							MOD_INC_USE_COUNT;
 					}
 				}

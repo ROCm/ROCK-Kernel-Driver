@@ -36,7 +36,7 @@
 
 #include <linux/ptrace.h>
 #include <linux/skbuff.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 
 /*****************************************************************************/
@@ -365,7 +365,7 @@ struct idt77252_dev
 	unsigned long		softstat;
 	unsigned long		flags;		/* see blow */
 
-	struct tq_struct	tqueue;
+	struct work_struct	tqueue;
 
 	unsigned long		tct_base;	/* TCT base address in SRAM */
         unsigned long		rct_base;	/* RCT base address in SRAM */

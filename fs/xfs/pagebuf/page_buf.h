@@ -324,9 +324,6 @@ extern void pagebuf_unlock(		/* unlock buffer		*/
 
 #define pagebuf_geterror(pb)	((pb)->pb_error)
 
-extern void pagebuf_queue_task(
-		struct tq_struct *);
-
 extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
 		page_buf_t *);		/* buffer to mark		*/
 

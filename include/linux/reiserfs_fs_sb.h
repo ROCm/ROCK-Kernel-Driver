@@ -5,7 +5,7 @@
 #define _LINUX_REISER_FS_SB
 
 #ifdef __KERNEL__
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #endif
 
 

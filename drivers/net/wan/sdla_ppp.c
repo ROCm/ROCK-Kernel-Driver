@@ -220,10 +220,10 @@ typedef struct ppp_private_area
 
 	unsigned long router_up_time; 
 
-	/* Polling task queue. Each interface
-         * has its own task queue, which is used
+	/* Polling work queue entry. Each interface
+         * has its own work queue entry, which is used
          * to defer events from the interrupt */
-	struct tq_struct poll_task;
+	struct work_struct poll_work;
 	struct timer_list poll_delay_timer;
 
 	u8 gateway;
@@ -631,13 +631,8 @@ static int new_if(wan_device_t *wandev, netdevice_t *dev, wanif_conf_t *conf)
 	dev->priv = ppp_priv_area;
 	dev->mtu = min_t(unsigned int, dev->mtu, card->wandev.mtu);
 
-	/* Initialize the polling task routine */
-#ifndef LINUX_2_4
-	ppp_priv_area->poll_task.next = NULL;
-#endif
-	ppp_priv_area->poll_task.sync=0;
-	ppp_priv_area->poll_task.routine = (void*)(void*)ppp_poll;
-	ppp_priv_area->poll_task.data = dev;
+	/* Initialize the polling work routine */
+	INIT_WORK(&ppp_priv_area->poll_work, (void*)(void*)ppp_poll, dev);
 
 	/* Initialize the polling delay timer */
 	init_timer(&ppp_priv_area->poll_delay_timer);
@@ -3667,11 +3662,7 @@ static void trigger_ppp_poll (netdevice_t *dev)
 			return;
 		}
 
-#ifdef LINUX_2_4
-		schedule_task(&ppp_priv_area->poll_task);
-#else
-		queue_task(&ppp_priv_area->poll_task, &tq_scheduler);
-#endif
+		schedule_work(&ppp_priv_area->poll_work);
 	}
 	return;
 }

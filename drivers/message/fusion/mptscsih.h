@@ -157,12 +157,11 @@ struct mptscsih_driver_setup
 #ifdef HAVE_TQ_SCHED
 #define SCHEDULE_TASK(x)		\
 	/*MOD_INC_USE_COUNT*/;		\
-	(x)->next = NULL;		\
-	queue_task(x, &tq_scheduler)
+	schedule_work(x)
 #else
 #define SCHEDULE_TASK(x)		\
 	/*MOD_INC_USE_COUNT*/;		\
-	if (schedule_task(x) == 0) {	\
+	if (schedule_work(x) == 0) {	\
 		/*MOD_DEC_USE_COUNT*/;	\
 	}
 #endif

@@ -605,7 +605,7 @@ struct cyclades_port {
 	struct cyclades_monitor	mon;
 	struct cyclades_idle_stats	idle_stats;
 	struct cyclades_icount	icount;
-	struct tq_struct	tqueue;
+	struct work_struct	tqueue;
 	wait_queue_head_t       open_wait;
 	wait_queue_head_t       close_wait;
 	wait_queue_head_t       shutdown_wait;

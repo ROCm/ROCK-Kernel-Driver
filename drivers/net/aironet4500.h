@@ -1478,8 +1478,8 @@ struct awc_private {
 	u8			link_status_changed;
 	
 	volatile int		ejected;
-	volatile int		bh_running;
-	volatile int		bh_active;
+	volatile int		work_running;
+	volatile int		work_active;
 	volatile long		tx_chain_active;
 	volatile u16		enabled_interrupts;
 	volatile u16		waiting_interrupts;
@@ -1499,7 +1499,7 @@ struct awc_private {
         struct awc_command	cmd;
         long long		async_command_start;
         volatile int		command_semaphore_on;
-        struct tq_struct 	immediate_bh;
+        struct work_struct			work;
 	volatile int		process_tx_results;
 
 	u8			p2p[6];
@@ -1559,7 +1559,7 @@ extern int	awc_receive_packet(struct net_device * dev);
 extern int	awc_transmit_packet(struct net_device * dev, struct awc_fid * tx_buff) ;
 extern int	awc_tx_complete_check(struct net_device * dev);
 extern int	awc_interrupt_process(struct net_device * dev);
-extern void 	awc_bh(struct net_device *dev);
+extern void 	awc_work(struct net_device *dev);
 extern int 	awc_802_11_find_copy_path(struct net_device * dev, struct awc_fid * rx_buff);
 extern void 	awc_802_11_router_rx(struct net_device * dev,struct awc_fid * rx_buff);
 extern int 	awc_802_11_tx_find_path_and_post(struct net_device * dev, struct sk_buff * skb);

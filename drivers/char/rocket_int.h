@@ -1143,7 +1143,6 @@ struct r_port {
 	int			cps;
 	struct termios		normal_termios;
 	struct termios		callout_termios;
-	struct tq_struct	tqueue;
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
 };

@@ -45,7 +45,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/string.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/fs.h>
 #include <linux/parport.h>
 #include <linux/smp_lock.h>
@@ -194,8 +194,8 @@ struct baycom_state {
 	int magic;
 
         struct pardevice *pdev;
-	unsigned int bh_running;
-	struct tq_struct run_bh;
+	unsigned int work_running;
+	struct work_struct run_work;
 	unsigned int modem;
 	unsigned int bitrate;
 	unsigned char stat;
@@ -829,7 +829,7 @@ static void epp_bh(struct net_device *dev)
 	
 	baycom_paranoia_check_void(dev, "epp_bh");
 	bc = (struct baycom_state *)dev->priv;
-	if (!bc->bh_running)
+	if (!bc->work_running)
 		return;
 	baycom_int_freq(bc);
 	pp = bc->pdev->port;
@@ -928,7 +928,7 @@ static void epp_bh(struct net_device *dev)
 	bc->debug_vals.mod_cycles = time2 - time1;
 	bc->debug_vals.demod_cycles = time3 - time2;
 #endif /* BAYCOM_DEBUG */
-	queue_task(&bc->run_bh, &tq_timer);
+	schedule_delayed_work(&bc->run_work, 1);
 	if (!bc->skb)
 		netif_wake_queue(dev);
 	return;
@@ -1019,10 +1019,6 @@ static int epp_open(struct net_device *dev)
 {
 	struct baycom_state *bc;
         struct parport *pp;
-	const struct tq_struct run_bh = {
-		.routine = (void *)(void *)epp_bh,
-		.data = dev
-	};
 	unsigned int i, j;
 	unsigned char tmp[128];
 	unsigned char stat;
@@ -1060,8 +1056,8 @@ static int epp_open(struct net_device *dev)
                 return -EBUSY;
         }
         dev->irq = /*pp->irq*/ 0;
-	bc->run_bh = run_bh;
-	bc->bh_running = 1;
+	INIT_WORK(&bc->run_work, (void *)(void *)epp_bh, dev);
+	bc->work_running = 1;
 	bc->modem = EPP_CONVENTIONAL;
 	if (eppconfig(bc))
 		printk(KERN_INFO "%s: no FPGA detected, assuming conventional EPP modem\n", bc_drvname);
@@ -1121,7 +1117,7 @@ static int epp_open(struct net_device *dev)
 	bc->hdlctx.slotcnt = bc->ch_params.slottime;
 	bc->hdlctx.calibrate = 0;
 	/* start the bottom half stuff */
-	queue_task(&bc->run_bh, &tq_timer);
+	schedule_delayed_work(&bc->run_work, 1);
 	netif_start_queue(dev);
 	MOD_INC_USE_COUNT;
 	return 0;
@@ -1145,8 +1141,8 @@ static int epp_close(struct net_device *dev)
 	baycom_paranoia_check(dev, "epp_close", -EINVAL);
 	bc = (struct baycom_state *)dev->priv;
 	pp = bc->pdev->port;
-	bc->bh_running = 0;
-	run_task_queue(&tq_timer);  /* dequeue bottom half */
+	bc->work_running = 0;
+	flush_scheduled_work();
 	bc->stat = EPP_DCDBIT;
 	tmp[0] = 0;
 	pp->ops->epp_write_addr(pp, tmp, 1, 0);

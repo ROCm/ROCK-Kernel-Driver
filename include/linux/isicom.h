@@ -154,8 +154,8 @@ struct	isi_port {
 	struct tty_struct 	* tty;
 	wait_queue_head_t	close_wait;
 	wait_queue_head_t	open_wait;
-	struct tq_struct	hangup_tq;
-	struct tq_struct	bh_tqueue;
+	struct work_struct	hangup_tq;
+	struct work_struct	bh_tqueue;
 	unsigned char		* xmit_buf;
 	int			xmit_head;
 	int			xmit_tail;

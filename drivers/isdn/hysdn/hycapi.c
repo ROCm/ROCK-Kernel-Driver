@@ -131,8 +131,7 @@ hycapi_sendmsg_internal(struct capi_ctr *ctrl, struct sk_buff *skb)
 	}
 	cinfo->tx_skb = skb;
 	spin_unlock_irq(&cinfo->lock);
-	queue_task(&card->irq_queue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&card->irq_queue);
 }
 
 /***********************************************************

@@ -43,7 +43,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <asm/io.h>
 
 #include <linux/errno.h>
@@ -116,11 +116,8 @@ static struct i2o_handler i2o_lan_handler = {
 };
 static int lan_context;
 
-DECLARE_TASK_QUEUE(i2o_post_buckets_task);
-struct tq_struct run_i2o_post_buckets_task = {
-	routine: (void (*)(void *)) run_task_queue,
-	data: (void *) 0
-};
+struct DECLARE_WORK(run_i2o_post_buckets_task,
+			(void (*)(void *)) run_task_queue, NULL);
 
 /* Functions to handle message failures and transaction errors:
 ==============================================================*/
@@ -386,8 +383,7 @@ static void i2o_lan_receive_post_reply(struct i2o_handler *h,
 
 	if (atomic_read(&priv->buckets_out) <= priv->max_buckets_out - priv->bucket_thresh) {
 		run_i2o_post_buckets_task.data = (void *)dev;
-		queue_task(&run_i2o_post_buckets_task, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&run_i2o_post_buckets_task);
 	}
 
 	return;
@@ -908,7 +904,7 @@ static int i2o_lan_sdu_send(struct sk_buff *skb, struct net_device *dev)
 		if ((priv->tx_batch_mode & 0x01) && !priv->send_active) {
 			priv->send_active = 1;
 			MOD_INC_USE_COUNT;
-			if (schedule_task(&priv->i2o_batch_send_task) == 0)
+			if (schedule_work(&priv->i2o_batch_send_task) == 0)
 				MOD_DEC_USE_COUNT;
 		}
 	} else {  /* Add new SGL element to the previous message frame */
@@ -996,7 +992,7 @@ static int i2o_lan_packet_send(struct sk_buff *skb, struct net_device *dev)
 		if ((priv->tx_batch_mode & 0x01) && !priv->send_active) {
 			priv->send_active = 1;
 			MOD_INC_USE_COUNT;
-			if (schedule_task(&priv->i2o_batch_send_task) == 0)
+			if (schedule_work(&priv->i2o_batch_send_task) == 0)
 				MOD_DEC_USE_COUNT;
 		}
 	} else {  /* Add new SGL element to the previous message frame */
@@ -1409,8 +1405,8 @@ struct net_device *i2o_lan_register_device(struct i2o_device *i2o_dev)
 
 	INIT_LIST_HEAD(&priv->i2o_batch_send_task.list);
 	priv->i2o_batch_send_task.sync    = 0;
-	priv->i2o_batch_send_task.routine = (void *)i2o_lan_batch_send;
-	priv->i2o_batch_send_task.data    = (void *)dev;
+	INIT_WORK(&priv->i2o_batch_send_task, (void *)i2o_lan_batch_send,
+			(void *)dev);
 
 	dev->open		= i2o_lan_open;
 	dev->stop		= i2o_lan_close;

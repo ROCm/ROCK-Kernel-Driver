@@ -29,7 +29,7 @@ typedef struct {
     int mode;			/* Transfer mode                */
     int host;			/* Host number (for proc)       */
     Scsi_Cmnd *cur_cmd;		/* Current queued command       */
-    struct tq_struct ppa_tq;	/* Polling interrupt stuff       */
+    struct work_struct ppa_tq;	/* Polling interrupt stuff       */
     unsigned long jstart;	/* Jiffies at start             */
     unsigned long recon_tmo;    /* How many usecs to wait for reconnection (6th bit) */
     unsigned int failed:1;	/* Failure flag                 */
@@ -801,7 +801,7 @@ static void ppa_interrupt(void *data)
     if (ppa_engine(tmp, cmd)) {
 	tmp->ppa_tq.data = (void *) tmp;
 	tmp->ppa_tq.sync = 0;
-	queue_task(&tmp->ppa_tq, &tq_timer);
+	schedule_delayed_work(&tmp->ppa_tq, 1);
 	return;
     }
     /* Command must of completed hence it is safe to let go... */
@@ -986,8 +986,7 @@ int ppa_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 
     ppa_hosts[host_no].ppa_tq.data = ppa_hosts + host_no;
     ppa_hosts[host_no].ppa_tq.sync = 0;
-    queue_task(&ppa_hosts[host_no].ppa_tq, &tq_immediate);
-    mark_bh(IMMEDIATE_BH);
+    schedule_work(&ppa_hosts[host_no].ppa_tq);
 
     return 0;
 }

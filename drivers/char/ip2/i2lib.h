@@ -27,6 +27,7 @@
 #include "i2ellis.h"
 #include "i2pack.h"
 #include "i2cmd.h"
+#include <linux/workqueue.h>
 
 //------------------------------------------------------------------------------
 // i2ChanStr -- Channel Structure:
@@ -224,9 +225,9 @@ typedef struct _i2ChanStr
 	/*
 	 *	Task queues for processing input packets from the board.
 	 */
-	struct tq_struct	tqueue_input;
-	struct tq_struct	tqueue_status;
-	struct tq_struct	tqueue_hangup;
+	struct work_struct	tqueue_input;
+	struct work_struct	tqueue_status;
+	struct work_struct	tqueue_hangup;
 
 	rwlock_t Ibuf_spinlock;
 	rwlock_t Obuf_spinlock;

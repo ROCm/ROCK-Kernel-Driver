@@ -95,7 +95,7 @@ struct ircomm_tty_cb {
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
 	struct timer_list watchdog_timer;
-	struct tq_struct  tqueue;
+	struct work_struct  tqueue;
 
         unsigned short    close_delay;
         unsigned short    closing_wait; /* time to wait before closing */
