@@ -39,7 +39,6 @@
  * fit into the literal area of the inode.
  */
 
-struct dirent;
 struct uio;
 struct xfs_dabuf;
 struct xfs_da_args;

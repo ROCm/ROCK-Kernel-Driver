@@ -87,6 +87,7 @@ extern int  xfs_blkdev_get (const char *, struct block_device **);
 extern void xfs_blkdev_put (struct block_device *);
 
 extern struct pb_target *xfs_alloc_buftarg (struct block_device *);
+extern void xfs_size_buftarg (struct pb_target *, unsigned int, unsigned int);
 extern void xfs_free_buftarg (struct pb_target *);
 
 #endif	/* __XFS_SUPER_H__ */

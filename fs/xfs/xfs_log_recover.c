@@ -1839,10 +1839,9 @@ xlog_recover_do_dquot_buffer(
 	uint type;
 
 	/*
-	 * Non-root filesystems are required to send in quota flags
-	 * at mount time.
+	 * Filesystems are required to send in quota flags at mount time.
 	 */
-	if (mp->m_qflags == 0 && mp->m_dev != rootdev) {
+	if (mp->m_qflags == 0) {
 		return;
 	}
 	
@@ -2289,30 +2288,28 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	mp = log->l_mp;
 
 	/*
-	 * Non-root filesystems are required to send in quota flags
-	 * at mount time.
+	 * Filesystems are required to send in quota flags at mount time.
 	 */
-	if (mp->m_qflags == 0 && mp->m_dev != rootdev) {
+	if (mp->m_qflags == 0)
 		return (0);
-	}
 
 	recddq = (xfs_disk_dquot_t *)item->ri_buf[1].i_addr;
 	ASSERT(recddq);
 	/*
 	 * This type of quotas was turned off, so ignore this record.
 	 */
-	type = INT_GET(recddq->d_flags, ARCH_CONVERT)&(XFS_DQ_USER|XFS_DQ_GROUP);
+	type = INT_GET(recddq->d_flags, ARCH_CONVERT) &
+			(XFS_DQ_USER | XFS_DQ_GROUP);
 	ASSERT(type);
 	if (log->l_quotaoffs_flag & type)
 		return (0);
 
 	/*
-	 * At this point we know that if we are recovering a root filesystem
-	 * then quota was _not_ turned off. Since there is no other flag
-	 * indicate to us otherwise, this must mean that quota's on,
-	 * and the dquot needs to be replayed. Remember that we may not have
-	 * fully recovered the superblock yet, so we can't do the usual trick
-	 * of looking at the SB quota bits.
+	 * At this point we know that quota was _not_ turned off.
+	 * Since the mount flags are not indicating to us otherwise, this
+	 * must mean that quota is on, and the dquot needs to be replayed.
+	 * Remember that we may not have fully recovered the superblock yet,
+	 * so we can't do the usual trick of looking at the SB quota bits.
 	 *
 	 * The other possibility, of course, is that the quota subsystem was
 	 * removed since the last mount - ENOSYS.
@@ -2323,7 +2320,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 			   dq_f->qlf_id,
 			   0, XFS_QMOPT_DOWARN,
 			   "xlog_recover_do_dquot_trans (log copy)"))) {
-	  if (error == ENOSYS)
+		if (error == ENOSYS)
 			return (0);
 		return XFS_ERROR(EIO);
 	}
