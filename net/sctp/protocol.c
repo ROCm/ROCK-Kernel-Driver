@@ -56,6 +56,7 @@
 #include <net/sctp/sctp.h>
 #include <net/addrconf.h>
 #include <net/inet_common.h>
+#include <net/inet_ecn.h>
 
 /* Global data structures. */
 struct sctp_protocol sctp_proto;
@@ -491,9 +492,15 @@ void sctp_v4_get_saddr(struct sctp_association *asoc,
 }
 
 /* What interface did this skb arrive on? */
-int sctp_v4_skb_iif(const struct sk_buff *skb)
+static int sctp_v4_skb_iif(const struct sk_buff *skb)
 {
      	return ((struct rtable *)skb->dst)->rt_iif;
+}
+
+/* Was this packet marked by Explicit Congestion Notification? */
+static int sctp_v4_is_ce(const struct sk_buff *skb)
+{
+	return INET_ECN_is_ce(skb->nh.iph->tos);
 }
 
 /* Create and initialize a new sk for the socket returned by accept(). */
@@ -829,6 +836,7 @@ struct sctp_af sctp_ipv4_specific = {
 	.available      = sctp_v4_available,
 	.scope          = sctp_v4_scope,
 	.skb_iif        = sctp_v4_skb_iif,
+	.is_ce          = sctp_v4_is_ce,
 	.net_header_len = sizeof(struct iphdr),
 	.sockaddr_len   = sizeof(struct sockaddr_in),
 	.sa_family      = AF_INET,

@@ -239,6 +239,7 @@ struct sctp_af {
 	int             (*is_any)       (const union sctp_addr *);
 	int             (*available)    (const union sctp_addr *);
 	int             (*skb_iif)      (const struct sk_buff *sk);
+	int             (*is_ce)        (const struct sk_buff *sk); 
 	__u16		net_header_len;
 	int		sockaddr_len;
 	sa_family_t	sa_family;

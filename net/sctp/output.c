@@ -221,8 +221,8 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 		 */
 		if (packet_empty) {
 
-			/* We no longer do refragmentation at all.  
-			 * Just fragment at the IP layer, if we 
+			/* We no longer do refragmentation at all.
+			 * Just fragment at the IP layer, if we
 			 * actually hit this condition
 			 */
 
@@ -419,17 +419,13 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	 *   data sender to indicate that the end-points of the
 	 *   transport protocol are ECN-capable."
 	 *
-	 * If ECN capable && negotiated && it makes sense for
-	 * this packet to support it (e.g. post ECN negotiation)
-	 * then lets set the ECT bit
+	 * Now setting the ECT bit all the time, as it should not cause
+	 * any problems protocol-wise even if our peer ignores it.
 	 *
-	 * FIXME:  Need to do something else for IPv6
+	 * Note: The works for IPv6 layer checks this bit too later
+	 * in transmission.  See IP6_ECN_flow_xmit().
 	 */
-	if (packet->ecn_capable) {
-		INET_ECN_xmit(nskb->sk);
-	} else {
-		INET_ECN_dontxmit(nskb->sk);
-	}
+	INET_ECN_xmit(nskb->sk);
 
 	/* Set up the IP options.  */
 	/* BUG: not implemented

@@ -2310,9 +2310,7 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 	skb_pull(chunk->skb, sizeof(sctp_datahdr_t));
 
 	tsn = ntohl(data_hdr->tsn);
-
 	SCTP_DEBUG_PRINTK("eat_data: TSN 0x%x.\n", tsn);
-	SCTP_DEBUG_PRINTK("eat_data: skb->head %p.\n", chunk->skb->head);
 
 	/* ASSERT:  Now skb->data is really the user data.  */
 
@@ -2327,11 +2325,15 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 	 */
 
 	if (!chunk->ecn_ce_done) {
+		struct sctp_af *af;
 		chunk->ecn_ce_done = 1;
-		if (INET_ECN_is_ce(chunk->skb->nh.iph->tos) &&
-		    asoc->peer.ecn_capable) {
+
+		af = sctp_get_af_specific(
+			ipver2af(chunk->skb->nh.iph->version));
+
+		if (af && af->is_ce(chunk->skb) && asoc->peer.ecn_capable) {
 			/* Do real work as sideffect. */
-			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE,
+			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE, 
 					SCTP_U32(tsn));
 		}
 	}
@@ -2583,11 +2585,15 @@ sctp_disposition_t sctp_sf_eat_data_fast_4_4(const struct sctp_endpoint *ep,
 	 * chunk later.
 	 */
 	if (!chunk->ecn_ce_done) {
+		struct sctp_af *af;
 		chunk->ecn_ce_done = 1;
-		if (INET_ECN_is_ce(chunk->skb->nh.iph->tos) &&
-		    asoc->peer.ecn_capable) {
+
+		af = sctp_get_af_specific(
+			ipver2af(chunk->skb->nh.iph->version));
+
+		if (af && af->is_ce(chunk->skb) && asoc->peer.ecn_capable) {
 			/* Do real work as sideffect. */
-			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE,
+			sctp_add_cmd_sf(commands, SCTP_CMD_ECN_CE, 
 					SCTP_U32(tsn));
 		}
 	}

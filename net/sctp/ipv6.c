@@ -572,6 +572,12 @@ static int sctp_v6_skb_iif(const struct sk_buff *skb)
 	return opt->iif;
 }
 
+/* Was this packet marked by Explicit Congestion Notification? */
+static int sctp_v6_is_ce(const struct sk_buff *skb)
+{
+	return *((__u32 *)(skb->nh.ipv6h)) & htonl(1<<20);
+}
+
 /* Initialize a PF_INET6 socket msg_name. */
 static void sctp_inet6_msgname(char *msgname, int *addr_len)
 {
@@ -832,6 +838,7 @@ static struct sctp_af sctp_ipv6_specific = {
 	.is_any          = sctp_v6_is_any,
 	.available       = sctp_v6_available,
 	.skb_iif         = sctp_v6_skb_iif,
+	.is_ce           = sctp_v6_is_ce,
 	.net_header_len  = sizeof(struct ipv6hdr),
 	.sockaddr_len    = sizeof(struct sockaddr_in6),
 	.sa_family       = AF_INET6,
