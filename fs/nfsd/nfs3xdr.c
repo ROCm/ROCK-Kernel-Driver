@@ -825,6 +825,8 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 			dchild = lookup_one_len(name, dparent,namlen);
 		if (IS_ERR(dchild))
 			goto noexec;
+		if (d_mountpoint(dchild))
+			goto noexec;
 		if (fh_compose(&fh, exp, dchild, &cd->fh) != 0 || !dchild->d_inode)
 			goto noexec;
 		p = encode_post_op_attr(cd->rqstp, p, &fh);
