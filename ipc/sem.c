@@ -241,25 +241,6 @@ asmlinkage long sys_semget (key_t key, int nsems, int semflg)
 	return err;
 }
 
-/* doesn't acquire the sem_lock on error! */
-static int sem_revalidate(int semid, struct sem_array* sma, int nsems, short flg)
-{
-	struct sem_array* smanew;
-
-	smanew = sem_lock(semid);
-	if(smanew==NULL)
-		return -EIDRM;
-	if(smanew != sma || sem_checkid(sma,semid) || sma->sem_nsems != nsems) {
-		sem_unlock(smanew);
-		return -EIDRM;
-	}
-
-	if (flg && ipcperms(&sma->sem_perm, flg)) {
-		sem_unlock(smanew);
-		return -EACCES;
-	}
-	return 0;
-}
 /* Manage the doubly linked list sma->sem_pending as a FIFO:
  * insert new queue elements at the tail sma->sem_pending_last.
  */
@@ -614,13 +595,24 @@ static int semctl_main(int semid, int semnum, int cmd, int version, union semun 
 		int i;
 
 		if(nsems > SEMMSL_FAST) {
+			ipc_rcu_getref(sma);
 			sem_unlock(sma);			
+
 			sem_io = ipc_alloc(sizeof(ushort)*nsems);
-			if(sem_io == NULL)
+			if(sem_io == NULL) {
+				ipc_lock_by_ptr(&sma->sem_perm);
+				ipc_rcu_putref(sma);
+				sem_unlock(sma);
 				return -ENOMEM;
-			err = sem_revalidate(semid, sma, nsems, S_IRUGO);
-			if(err)
+			}
+
+			ipc_lock_by_ptr(&sma->sem_perm);
+			ipc_rcu_putref(sma);
+			if (sma->sem_perm.deleted) {
+				sem_unlock(sma);
+				err = -EIDRM;
 				goto out_free;
+			}
 		}
 
 		for (i = 0; i < sma->sem_nsems; i++)
@@ -636,28 +628,43 @@ static int semctl_main(int semid, int semnum, int cmd, int version, union semun 
 		int i;
 		struct sem_undo *un;
 
+		ipc_rcu_getref(sma);
 		sem_unlock(sma);
 
 		if(nsems > SEMMSL_FAST) {
 			sem_io = ipc_alloc(sizeof(ushort)*nsems);
-			if(sem_io == NULL)
+			if(sem_io == NULL) {
+				ipc_lock_by_ptr(&sma->sem_perm);
+				ipc_rcu_putref(sma);
+				sem_unlock(sma);
 				return -ENOMEM;
+			}
 		}
 
 		if (copy_from_user (sem_io, arg.array, nsems*sizeof(ushort))) {
+			ipc_lock_by_ptr(&sma->sem_perm);
+			ipc_rcu_putref(sma);
+			sem_unlock(sma);
 			err = -EFAULT;
 			goto out_free;
 		}
 
 		for (i = 0; i < nsems; i++) {
 			if (sem_io[i] > SEMVMX) {
+				ipc_lock_by_ptr(&sma->sem_perm);
+				ipc_rcu_putref(sma);
+				sem_unlock(sma);
 				err = -ERANGE;
 				goto out_free;
 			}
 		}
-		err = sem_revalidate(semid, sma, nsems, S_IWUGO);
-		if(err)
+		ipc_lock_by_ptr(&sma->sem_perm);
+		ipc_rcu_putref(sma);
+		if (sma->sem_perm.deleted) {
+			sem_unlock(sma);
+			err = -EIDRM;
 			goto out_free;
+		}
 
 		for (i = 0; i < nsems; i++)
 			sma->sem_base[i].semval = sem_io[i];
@@ -977,11 +984,16 @@ static struct sem_undo *find_undo(int semid)
 		goto out;
 	}
 	nsems = sma->sem_nsems;
+	ipc_rcu_getref(sma);
 	sem_unlock(sma);
 
 	new = (struct sem_undo *) kmalloc(sizeof(struct sem_undo) + sizeof(short)*nsems, GFP_KERNEL);
-	if (!new)
+	if (!new) {
+		ipc_lock_by_ptr(&sma->sem_perm);
+		ipc_rcu_putref(sma);
+		sem_unlock(sma);
 		return ERR_PTR(-ENOMEM);
+	}
 	memset(new, 0, sizeof(struct sem_undo) + sizeof(short)*nsems);
 	new->semadj = (short *) &new[1];
 	new->semid = semid;
@@ -991,13 +1003,18 @@ static struct sem_undo *find_undo(int semid)
 	if (un) {
 		unlock_semundo();
 		kfree(new);
+		ipc_lock_by_ptr(&sma->sem_perm);
+		ipc_rcu_putref(sma);
+		sem_unlock(sma);
 		goto out;
 	}
-	error = sem_revalidate(semid, sma, nsems, 0);
-	if (error) {
+	ipc_lock_by_ptr(&sma->sem_perm);
+	ipc_rcu_putref(sma);
+	if (sma->sem_perm.deleted) {
+		sem_unlock(sma);
 		unlock_semundo();
 		kfree(new);
-		un = ERR_PTR(error);
+		un = ERR_PTR(-EIDRM);
 		goto out;
 	}
 	new->proc_next = ulp->proc_list;
