@@ -520,7 +520,7 @@ cli_caclulate_sign_mac(struct smb_hdr *outbuf, __u8 * mac_key,
 		  be32_to_cpu(outbuf->smb_buf_length));
 	MD5Final(calc_md5_mac, &md5_ctx);
 
-	memcpy(outbuf->SecuritySignature, calc_md5_mac, 8);
+	memcpy(outbuf->Signature.SecuritySignature, calc_md5_mac, 8);
 	(*send_seq_num)++;
 	*reply_seq_num = *send_seq_num;
 	(*send_seq_num)++;

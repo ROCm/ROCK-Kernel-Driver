@@ -106,9 +106,6 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 	pSMB->hdr.Flags2 |= SMBFLG2_UNICODE;
 	if (extended_security)
 		pSMB->hdr.Flags2 |= SMBFLG2_EXT_SEC;
-	if (sign_CIFS_PDUs) {
-		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
-	}
 
 	pSMB->ByteCount = strlen(protocols[0].name) + 1;
 	strncpy(pSMB->DialectsArray, protocols[0].name, 30);	
@@ -260,10 +257,13 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 		up(&ses->sesSem);
 		return -EBUSY;
 	}
-	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+
 	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, 0 /* no tcon anymore */,
 		 (void **) &pSMB, (void **) &smb_buffer_response);
+
+        if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+                pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+
 	if (rc) {
 		up(&ses->sesSem);
 		return rc;
@@ -1657,8 +1657,6 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 	if (ses->capabilities & CAP_DFS) {
 		pSMB->hdr.Flags2 |= SMBFLG2_DFS;
 	}
-	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	if (ses->capabilities & CAP_UNICODE) {
 		pSMB->hdr.Flags2 |= SMBFLG2_UNICODE;
