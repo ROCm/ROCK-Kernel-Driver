@@ -331,12 +331,6 @@ struct address_space {
 	struct address_space	*assoc_mapping;	/* ditto */
 };
 
-struct char_device {
-	struct list_head	hash;
-	atomic_t		count;
-	dev_t			dev;
-};
-
 struct block_device {
 	struct list_head	bd_hash;
 	atomic_t		bd_count;
@@ -388,7 +382,6 @@ struct inode {
 	struct list_head	i_devices;
 	struct pipe_inode_info	*i_pipe;
 	struct block_device	*i_bdev;
-	struct char_device	*i_cdev;
 
 	unsigned long		i_dnotify_mask; /* Directory notify events */
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
@@ -1046,8 +1039,6 @@ extern struct block_device *bdget(dev_t);
 extern int bd_acquire(struct inode *inode);
 extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
-extern struct char_device *cdget(dev_t);
-extern void cdput(struct char_device *);
 extern int blkdev_open(struct inode *, struct file *);
 extern int blkdev_close(struct inode *, struct file *);
 extern struct file_operations def_blk_fops;

@@ -128,7 +128,6 @@ static struct inode *alloc_inode(struct super_block *sb)
 		memset(&inode->i_dquot, 0, sizeof(inode->i_dquot));
 		inode->i_pipe = NULL;
 		inode->i_bdev = NULL;
-		inode->i_cdev = NULL;
 		inode->i_rdev = to_kdev_t(0);
 		inode->i_security = NULL;
 		if (security_inode_alloc(inode)) {
@@ -242,10 +241,6 @@ void clear_inode(struct inode *inode)
 		inode->i_sb->s_op->clear_inode(inode);
 	if (inode->i_bdev)
 		bd_forget(inode);
-	else if (inode->i_cdev) {
-		cdput(inode->i_cdev);
-		inode->i_cdev = NULL;
-	}
 	inode->i_state = I_CLEAR;
 }
 
@@ -1315,7 +1310,6 @@ void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 	if (S_ISCHR(mode)) {
 		inode->i_fop = &def_chr_fops;
 		inode->i_rdev = to_kdev_t(rdev);
-		inode->i_cdev = cdget(rdev);
 	} else if (S_ISBLK(mode)) {
 		inode->i_fop = &def_blk_fops;
 		inode->i_rdev = to_kdev_t(rdev);
@@ -1324,5 +1318,6 @@ void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 	else if (S_ISSOCK(mode))
 		inode->i_fop = &bad_sock_fops;
 	else
-		printk(KERN_DEBUG "init_special_inode: bogus i_mode (%o)\n", mode);
+		printk(KERN_DEBUG "init_special_inode: bogus i_mode (%o)\n",
+		       mode);
 }

@@ -23,109 +23,9 @@
 
 /* serial module kmod load support */
 struct tty_driver *get_tty_driver(kdev_t device);
-#define isa_tty_dev(ma)	(ma == TTY_MAJOR || ma == TTYAUX_MAJOR)
+#define is_a_tty_dev(ma)	(ma == TTY_MAJOR || ma == TTYAUX_MAJOR)
 #define need_serial(ma,mi) (get_tty_driver(mk_kdev(ma,mi)) == NULL)
 #endif
-
-#define HASH_BITS	6
-#define HASH_SIZE	(1UL << HASH_BITS)
-#define HASH_MASK	(HASH_SIZE-1)
-static struct list_head cdev_hashtable[HASH_SIZE];
-static spinlock_t cdev_lock = SPIN_LOCK_UNLOCKED;
-static kmem_cache_t * cdev_cachep;
-
-#define alloc_cdev() \
-	 ((struct char_device *) kmem_cache_alloc(cdev_cachep, SLAB_KERNEL))
-#define destroy_cdev(cdev) kmem_cache_free(cdev_cachep, (cdev))
-
-static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
-{
-	struct char_device *cdev = (struct char_device *) foo;
-
-	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
-	    SLAB_CTOR_CONSTRUCTOR)
-		memset(cdev, 0, sizeof(*cdev));
-}
-
-void __init cdev_cache_init(void)
-{
-	int i;
-	struct list_head *head = cdev_hashtable;
-
-	i = HASH_SIZE;
-	do {
-		INIT_LIST_HEAD(head);
-		head++;
-		i--;
-	} while (i);
-
-	cdev_cachep = kmem_cache_create("cdev_cache",
-					 sizeof(struct char_device),
-					 0, SLAB_HWCACHE_ALIGN, init_once,
-					 NULL);
-	if (!cdev_cachep)
-		panic("Cannot create cdev_cache SLAB cache");
-}
-
-/*
- * Most likely _very_ bad one - but then it's hardly critical for small
- * /dev and can be fixed when somebody will need really large one.
- */
-static inline unsigned long hash(dev_t dev)
-{
-	unsigned long tmp = dev;
-	tmp = tmp + (tmp >> HASH_BITS) + (tmp >> HASH_BITS*2);
-	return tmp & HASH_MASK;
-}
-
-static struct char_device *cdfind(dev_t dev, struct list_head *head)
-{
-	struct list_head *p;
-	struct char_device *cdev;
-	list_for_each(p, head) {
-		cdev = list_entry(p, struct char_device, hash);
-		if (cdev->dev != dev)
-			continue;
-		atomic_inc(&cdev->count);
-		return cdev;
-	}
-	return NULL;
-}
-
-struct char_device *cdget(dev_t dev)
-{
-	struct list_head * head = cdev_hashtable + hash(dev);
-	struct char_device *cdev, *new_cdev;
-	spin_lock(&cdev_lock);
-	cdev = cdfind(dev, head);
-	spin_unlock(&cdev_lock);
-	if (cdev)
-		return cdev;
-	new_cdev = alloc_cdev();
-	if (!new_cdev)
-		return NULL;
-	atomic_set(&new_cdev->count,1);
-	new_cdev->dev = dev;
-	spin_lock(&cdev_lock);
-	cdev = cdfind(dev, head);
-	if (!cdev) {
-		list_add(&new_cdev->hash, head);
-		spin_unlock(&cdev_lock);
-		return new_cdev;
-	}
-	spin_unlock(&cdev_lock);
-	destroy_cdev(new_cdev);
-	return cdev;
-}
-
-void cdput(struct char_device *cdev)
-{
-	if (atomic_dec_and_lock(&cdev->count, &cdev_lock)) {
-		list_del(&cdev->hash);
-		spin_unlock(&cdev_lock);
-		destroy_cdev(cdev);
-	}
-}
 
 struct device_struct {
 	const char * name;
@@ -144,7 +44,8 @@ int get_chrdev_list(char *page)
 	read_lock(&chrdevs_lock);
 	for (i = 0; i < MAX_CHRDEV ; i++) {
 		if (chrdevs[i].fops) {
-			len += sprintf(page+len, "%3d %s\n", i, chrdevs[i].name);
+			len += sprintf(page+len, "%3d %s\n",
+				       i, chrdevs[i].name);
 		}
 	}
 	read_unlock(&chrdevs_lock);
@@ -152,13 +53,14 @@ int get_chrdev_list(char *page)
 }
 
 /*
-	Return the function table of a device.
-	Load the driver if needed.
-	Increment the reference count of module in question.
-*/
-static struct file_operations * get_chrfops(unsigned int major, unsigned int minor)
+ *	Return the function table of a device.
+ *	Load the driver if needed.
+ *	Increment the reference count of module in question.
+ */
+static struct file_operations *
+get_chrfops(unsigned int major, unsigned int minor)
 {
-	struct file_operations *ret = NULL;
+	struct file_operations *ret;
 
 	if (!major || major >= MAX_CHRDEV)
 		return NULL;
@@ -167,10 +69,12 @@ static struct file_operations * get_chrfops(unsigned int major, unsigned int min
 	ret = fops_get(chrdevs[major].fops);
 	read_unlock(&chrdevs_lock);
 #ifdef CONFIG_KMOD
-	if (ret && isa_tty_dev(major)) {
+	if (ret && is_a_tty_dev(major)) {
 		lock_kernel();
 		if (need_serial(major,minor)) {
 			/* Force request_module anyway, but what for? */
+			/* The reason is that we may have a driver for
+			   /dev/tty1 already, but need one for /dev/ttyS1. */
 			fops_put(ret);
 			ret = NULL;
 		}
@@ -189,7 +93,8 @@ static struct file_operations * get_chrfops(unsigned int major, unsigned int min
 	return ret;
 }
 
-int register_chrdev(unsigned int major, const char * name, struct file_operations *fops)
+int register_chrdev(unsigned int major, const char *name,
+		    struct file_operations *fops)
 {
 	if (major == 0) {
 		write_lock(&chrdevs_lock);
