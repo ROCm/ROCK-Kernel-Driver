@@ -156,6 +156,7 @@ static struct pci_device_id rtl8169_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, rtl8169_pci_tbl);
 
 static int rx_copybreak = 200;
+static int use_dac;
 
 enum RTL8169_registers {
 	MAC0 = 0,		/* Ethernet hardware address. */
@@ -358,6 +359,8 @@ MODULE_AUTHOR("Realtek");
 MODULE_DESCRIPTION("RealTek RTL-8169 Gigabit Ethernet driver");
 MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(rx_copybreak, "i");
+MODULE_PARM(use_dac, "i");
+MODULE_PARM_DESC(use_dac, "Enable PCI DAC. Unsafe on 32 bit PCI slot.");
 MODULE_LICENSE("GPL");
 
 static int rtl8169_open(struct net_device *dev);
@@ -375,7 +378,7 @@ static int rtl8169_poll(struct net_device *dev, int *budget);
 #endif
 
 static const u16 rtl8169_intr_mask =
-	LinkChg | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
+	SYSErr | LinkChg | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
 static const u16 rtl8169_napi_event =
 	RxOK | RxOverflow | RxFIFOOver | TxOK | TxErr;
 static const unsigned int rtl8169_rx_config =
@@ -984,7 +987,7 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	tp->cp_cmd = PCIMulRW | RxChkSum;
 
 	if ((sizeof(dma_addr_t) > 4) &&
-	    !pci_set_dma_mask(pdev, DMA_64BIT_MASK))
+	    !pci_set_dma_mask(pdev, DMA_64BIT_MASK) && use_dac)
 		tp->cp_cmd |= PCIDAC;
 	else {
 		rc = pci_set_dma_mask(pdev, DMA_32BIT_MASK);
@@ -1760,6 +1763,15 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 		if (!(status & rtl8169_intr_mask))
 			break;
+
+		if (unlikely(status & SYSErr)) {
+			printk(KERN_ERR PFX "%s: PCI error (status: 0x%04x)."
+			       " Device disabled.\n", dev->name, status);
+			RTL_W8(ChipCmd, 0x00);
+			RTL_W16(IntrMask, 0x0000);
+			RTL_R16(IntrMask);
+			break;
+		}
 
 		if (status & LinkChg)
 			rtl8169_check_link_status(dev, tp, ioaddr);
