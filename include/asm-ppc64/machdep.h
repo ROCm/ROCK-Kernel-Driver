@@ -55,10 +55,8 @@ struct machdep_calls {
 				     long tcenum,
 				     unsigned long uaddr,
 				     int direction);
-	void		(*tce_free)(struct TceTable *tbl,
-				    dma_addr_t dma_addr, 
-				    unsigned order,
-				    unsigned numPages);
+	void		(*tce_free_one)(struct TceTable *tbl,
+				        long tcenum);    
 
 	void		(*smp_message_pass)(int target,
 					    int msg, 

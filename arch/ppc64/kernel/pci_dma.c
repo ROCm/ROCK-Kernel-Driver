@@ -43,7 +43,9 @@
 
 #include "pci.h"
 
-// #define DEBUG_TCE 1
+/* #define DEBUG_TCE 1   */
+/* #define MONITOR_TCE 1 */ /* Turn on to sanity check TCE generation. */
+
 
 /* Initialize so this guy does not end up in the BSS section.
  * Only used to pass OF initialization data set in prom.c into the main 
@@ -53,12 +55,13 @@ extern struct _of_tce_table of_tce_table[];
 
 extern struct pci_controller* hose_head;
 extern struct pci_controller** hose_tail;
+extern struct list_head iSeries_Global_Device_List;
 
 struct TceTable   virtBusVethTceTable;	/* Tce table for virtual ethernet */
 struct TceTable   virtBusVioTceTable;	/* Tce table for virtual I/O */
 
-struct device_node iSeries_veth_dev_node = { tce_table: &virtBusVethTceTable };
-struct device_node iSeries_vio_dev_node  = { tce_table: &virtBusVioTceTable };
+struct iSeries_Device_Node iSeries_veth_dev_node = { LogicalSlot: 0xFF, DevTceTable: &virtBusVethTceTable };
+struct iSeries_Device_Node iSeries_vio_dev_node  = { LogicalSlot: 0xFF, DevTceTable: &virtBusVioTceTable };
 
 struct pci_dev    iSeries_veth_dev_st = { sysdata: &iSeries_veth_dev_node };
 struct pci_dev    iSeries_vio_dev_st  = { sysdata: &iSeries_vio_dev_node  };
@@ -66,7 +69,8 @@ struct pci_dev    iSeries_vio_dev_st  = { sysdata: &iSeries_vio_dev_node  };
 struct pci_dev  * iSeries_veth_dev = &iSeries_veth_dev_st;
 struct pci_dev  * iSeries_vio_dev  = &iSeries_vio_dev_st;
 
-struct TceTable * tceTables[256];	/* Tce tables for 256 busses
+/* Device TceTable is stored in Device Node */
+/* struct TceTable * tceTables[256]; */	/* Tce tables for 256 busses
 					 * Bus 255 is the virtual bus
 					 * zero indicates no bus defined
 					 */
@@ -116,6 +120,9 @@ static dma_addr_t create_tces_sg( struct TceTable *tbl,
 				  unsigned numTces,
 				  int direction );
 
+static void getTceTableParmsiSeries(struct iSeries_Device_Node* DevNode,
+				      struct TceTable *tce_table_parms );
+
 static void getTceTableParmsPSeries( struct pci_controller *phb, 
 				     struct device_node *dn,
 				     struct TceTable *tce_table_parms );
@@ -123,6 +130,8 @@ static void getTceTableParmsPSeries( struct pci_controller *phb,
 static void getTceTableParmsPSeriesLP(struct pci_controller *phb,
 				    struct device_node *dn,
 				    struct TceTable *newTceTable );
+
+static struct TceTable* findHwTceTable(struct TceTable * newTceTable );
 
 void create_pci_bus_tce_table( unsigned long token );
 
@@ -137,11 +146,11 @@ static inline struct TceTable *get_tce_table(struct pci_dev *dev)
 		dev = ppc64_isabridge_dev;
 	if (!dev)
 		return NULL;
-	if ( ( naca->platform == PLATFORM_ISERIES_LPAR ) && ( dev->bus ) ) 
-		return tceTables[dev->bus->number];
-	/* On the iSeries, the virtual bus will take this path.  There is a */
-	/* fake pci_dev and dev_node built and used.                        */
-	return PCI_GET_DN(dev)->tce_table;
+	if (naca->platform == PLATFORM_ISERIES_LPAR) {
+ 		return ISERIES_DEVNODE(dev)->DevTceTable;
+	} else {
+		return PCI_GET_DN(dev)->tce_table;
+	}
 }
 
 static unsigned long __inline__ count_leading_zeros64( unsigned long x )
@@ -180,13 +189,8 @@ static void tce_build_iSeries(struct TceTable *tbl, long tcenum,
 	setTceRc = HvCallXm_setTce((u64)tbl->index, 
 				   (u64)tcenum, 
 				   tce.wholeTce );
-
 	if(setTceRc) {
-		printk("PCI: tce_build failed 0x%lx tcenum: 0x%lx\n", setTceRc, (u64)tcenum);
-		//PPCDBG(PPCDBG_TCE, "setTce failed. rc=%ld\n", setTceRc);
-		//PPCDBG(PPCDBG_TCE, "\tindex   = 0x%lx\n", (u64)tbl->index);
-		//PPCDBG(PPCDBG_TCE, "\ttce num = 0x%lx\n", (u64)tcenum);
-		//PPCDBG(PPCDBG_TCE, "\ttce val = 0x%lx\n", tce.wholeTce );
+		panic("PCI_DMA: HvCallXm_setTce failed, Rc: 0x%lx\n", setTceRc);
 	}
 }
 
@@ -209,8 +213,6 @@ static void tce_build_pSeries(struct TceTable *tbl, long tcenum,
 	tce_addr = ((union Tce *)tbl->base) + tcenum;
 	*tce_addr = (union Tce)tce.wholeTce;
 
-	/* Make sure the update is visible to hardware. */
-	__asm__ __volatile__ ("sync" : : : "memory");
 }
 
 /* 
@@ -245,18 +247,18 @@ static struct TceTable *build_tce_table( struct TceTable * tbl )
 	}
 	PPCDBG(PPCDBG_TCEINIT, "build_tce_table: totalBytes=%ld\n", totalBytes );
 	
-	pos = (char *)__get_free_pages( GFP_ATOMIC, get_order( totalBytes )); 
-	if ( !pos )
-		return NULL;
+	pos = (char *)__get_free_pages( GFP_ATOMIC, get_order( totalBytes ));
+ 
+	if ( pos == NULL ) {
+		panic("PCI_DMA: Allocation failed in build_tce_table!\n");
+	}
 
-	memset( pos, 0, totalBytes );
-	
 	/* For each level, fill in the pointer to the bit map,
 	 * and turn on the last bit in the bit map (if the
 	 * number of bits in the map is odd).  The highest
 	 * level will get all of its bits turned on.
 	 */
-	
+	memset( pos, 0, totalBytes );
 	for (i=0; i<NUM_TCE_LEVELS; ++i) {
 		if ( numBytes[i] ) {
 			tbl->mlbm.level[i].map = pos;
@@ -333,9 +335,9 @@ static long alloc_tce_range_nolock( struct TceTable *tbl, unsigned order )
 	 * biggest, indicate failure
 	 */
 	if(order >= NUM_TCE_LEVELS) {
-		PPCDBG(PPCDBG_TCE,
-		       "alloc_tce_range_nolock: invalid order: %d\n", order );
-		return -1;
+		/* This can happen if block of TCE's are not found. This code      */
+		/*  maybe in a recursive loop looking up the bit map for the range.*/
+		panic("PCI_DMA: alloc_tce_range_nolock: invalid order: %d\n",order);
 	}
 	
 	numBits =  tbl->mlbm.level[order].numBits;
@@ -352,7 +354,7 @@ static long alloc_tce_range_nolock( struct TceTable *tbl, unsigned order )
 			 * number (of this size)
 			 */
 			bit = count_leading_zeros64( *map );
-			block = (i * 64) + bit;
+			block = (i * 64) + bit;    /* Bit count to free entry */
 
 			/* turn off the bit in the map to indicate
 			 * that the block is now in use
@@ -373,10 +375,12 @@ static long alloc_tce_range_nolock( struct TceTable *tbl, unsigned order )
 #ifdef DEBUG_TCE
 	if ( tcenum == -1 ) {
 		PPCDBG(PPCDBG_TCE, "alloc_tce_range_nolock: no available blocks of order = %d\n", order );
-		if ( order < tbl->mlbm.maxLevel )
+		if ( order < tbl->mlbm.maxLevel ) {
 			PPCDBG(PPCDBG_TCE, "alloc_tce_range_nolock: trying next bigger size\n" );
-		else
-			PPCDBG(PPCDBG_TCE, "alloc_tce_range_nolock: maximum size reached...failing\n");
+		}
+		else {
+			panic("PCI_DMA: alloc_tce_range_nolock: maximum size reached...failing\n");
+		}
 	}
 #endif	
 	
@@ -395,7 +399,6 @@ static long alloc_tce_range_nolock( struct TceTable *tbl, unsigned order )
 	 * (or -1 if we failed)
 	 */
 	return tcenum;
-	
 }
 
 static inline void free_tce_range(struct TceTable *tbl, 
@@ -422,37 +425,25 @@ void free_tce_range_nolock(struct TceTable *tbl,
 	unsigned char  * map, * bytep;
 
 	if (order >= NUM_TCE_LEVELS) {
-		PPCDBG(PPCDBG_TCE, 
-		       "free_tce_range: invalid order: %d, tcenum = %d\n", 
-		       order, tcenum );
+		panic("PCI_DMA: free_tce_range: invalid order: 0x%x\n",order);
 		return;
 	}
 
 	block = tcenum >> order;
 
-#ifdef DEBUG_TCE
+#ifdef MONITOR_TCE
 	if ( tcenum != (block << order ) ) {
-		PPCDBG(PPCDBG_TCE, 
-		       "free_tce_range: tcenum %lx misaligned for order %x\n",
-		       tcenum, order );
+		printk("PCI_DMA: Free_tce_range: tcenum %lx misaligned for order %x\n",tcenum, order);
 		return;
 	}
-
-
 	if ( block >= tbl->mlbm.level[order].numBits ) {
-		PPCDBG(PPCDBG_TCE, 
-		       "free_tce_range: tcenum %lx is outside the range of this map (order %x, numBits %lx\n", 
+		printk("PCI_DMA: Free_tce_range: tcenum %lx is outside the range of this map (order %x, numBits %lx\n", 
 		       tcenum, order, tbl->mlbm.level[order].numBits );
 		return;
 	}
-
-
 	if ( test_tce_range( tbl, tcenum, order ) ) {
-		PPCDBG(PPCDBG_TCE, 
-		       "free_tce_range: freeing range not allocated.\n");
-		PPCDBG(PPCDBG_TCE, 
-		       "\tTceTable %p, tcenum %lx, order %x\n", 
-		       tbl, tcenum, order );
+		printk("PCI_DMA: Freeing range not allocated: tTceTable %p, tcenum %lx, order %x\n",tbl, tcenum, order );
+		return;
 	}
 #endif
 
@@ -463,13 +454,14 @@ void free_tce_range_nolock(struct TceTable *tbl,
 	bytep = map + byte;
 
 #ifdef DEBUG_TCE
-	PPCDBG(PPCDBG_TCE, 
-	       "free_tce_range_nolock: freeing block %ld (byte=%d, bit=%d) of order %d\n",
+	PPCDBG(PPCDBG_TCE,"free_tce_range_nolock: freeing block %ld (byte=%d, bit=%d) of order %d\n",
 	       block, byte, bit, order);
-	if ( *bytep & mask )
-		PPCDBG(PPCDBG_TCE, 
-		       "free_tce_range: already free: TceTable %p, tcenum %lx, order %x\n", 
-		       tbl, tcenum, order );
+#endif	
+
+#ifdef MONITOR_TCE
+	if ( *bytep & mask ) {
+		panic("PCI_DMA: Tce already free: TceTable %p, tcenum %lx, order %x\n",tbl,tcenum,order);
+	}
 #endif	
 
 	*bytep |= mask;
@@ -481,7 +473,8 @@ void free_tce_range_nolock(struct TceTable *tbl,
 	 *      we are freeing the last block we can't buddy up
 	 * Don't buddy up if it's in the first 1/4 of the level
 	 */
-	if (( block > (tbl->mlbm.level[order].numBits/4) ) &&
+	if (( order < tbl->mlbm.maxLevel ) &&
+	    ( block > (tbl->mlbm.level[order].numBits/4) ) &&
 	    (( block < tbl->mlbm.level[order].numBits-1 ) ||
 	      ( 0 == ( tbl->mlbm.level[order].numBits & 1)))) {
 		/* See if we can buddy up the block we just freed */
@@ -555,101 +548,78 @@ static inline dma_addr_t get_tces( struct TceTable *tbl, unsigned order, void *p
 			++tcenum;
 			uaddr += PAGE_SIZE;
 		}
+		/* Make sure the update is visible to hardware. 
+		   sync required to synchronize the update to 
+		   the TCE table with the MMIO that will send
+		   the bus address to the IOA */
+		__asm__ __volatile__ ("sync" : : : "memory");
 	}
-	else
-		PPCDBG(PPCDBG_TCE, "alloc_tce_range failed\n");
+	else {
+		panic("PCI_DMA: Tce Allocation failure in get_tces. 0x%p\n",tbl);
+	}
+
 	return retTce; 
 }
 
-static void tce_free_iSeries(struct TceTable *tbl, dma_addr_t dma_addr, 
-			     unsigned order, unsigned numPages)
+static void tce_free_one_iSeries( struct TceTable *tbl, long tcenum )
 {
-	u64 setTceRc;
-	long tcenum, freeTce, maxTcenum;
-	unsigned i;
+	u64 set_tce_rc;
 	union Tce tce;
+	tce.wholeTce = 0;
+	set_tce_rc = HvCallXm_setTce((u64)tbl->index,
+				   (u64)tcenum,
+				   tce.wholeTce);
+	if ( set_tce_rc ) 
+		panic("PCI_DMA: HvCallXm_setTce failed, Rc: 0x%lx\n", set_tce_rc);
 
-	maxTcenum = (tbl->size * (PAGE_SIZE / sizeof(union Tce))) - 1;
-	
-	tcenum = dma_addr >> PAGE_SHIFT;
-
-	freeTce = tcenum - tbl->startOffset;
-
-	if ( freeTce > maxTcenum ) {
-		PPCDBG(PPCDBG_TCE, "free_tces: tcenum > maxTcenum\n");
-		PPCDBG(PPCDBG_TCE, "\ttcenum    = 0x%lx\n", tcenum); 
-		PPCDBG(PPCDBG_TCE, "\tmaxTcenum = 0x%lx\n", maxTcenum); 
-		PPCDBG(PPCDBG_TCE, "\tTCE Table = 0x%lx\n", (u64)tbl);
-		PPCDBG(PPCDBG_TCE, "\tbus#      = 0x%lx\n", (u64)tbl->busNumber );
-		PPCDBG(PPCDBG_TCE, "\tsize      = 0x%lx\n", (u64)tbl->size);
-		PPCDBG(PPCDBG_TCE, "\tstartOff  = 0x%lx\n", (u64)tbl->startOffset );
-		PPCDBG(PPCDBG_TCE, "\tindex     = 0x%lx\n", (u64)tbl->index);
-		return;
-	}
-	
-	for (i=0; i<numPages; ++i) {
-		tce.wholeTce = 0;
-		setTceRc = HvCallXm_setTce((u64)tbl->index, 
-					   (u64)tcenum, 
-					   tce.wholeTce );
-
-		if ( setTceRc ) {
-			printk("PCI: tce_free failed 0x%lx tcenum: 0x%lx\n", setTceRc, (u64)tcenum);
-			//PPCDBG(PPCDBG_TCE, "tce_free: setTce failed\n");
-			//PPCDBG(PPCDBG_TCE, "\trc      = 0x%lx\n", setTceRc);
-			//PPCDBG(PPCDBG_TCE, "\tindex   = 0x%lx\n", (u64)tbl->index);
-			//PPCDBG(PPCDBG_TCE, "\ttce num = 0x%lx\n", (u64)tcenum);
-			//PPCDBG(PPCDBG_TCE, "\ttce val = 0x%lx\n", tce.wholeTce );
-		}
-
-		++tcenum;
-	}
-
-	free_tce_range( tbl, freeTce, order );
 }
 
-static void tce_free_pSeries(struct TceTable *tbl, dma_addr_t dma_addr, 
-			     unsigned order, unsigned numPages)
+static void tce_free_one_pSeries( struct TceTable *tbl, long tcenum )
 {
-	long tcenum, freeTce, maxTcenum;
-	unsigned i;
 	union Tce tce;
 	union Tce *tce_addr;
 
-	maxTcenum = (tbl->size * (PAGE_SIZE / sizeof(union Tce))) - 1;
+	tce.wholeTce = 0;
+
+	tce_addr  = ((union Tce *)tbl->base) + tcenum;
+	*tce_addr = (union Tce)tce.wholeTce;
+
+}
+
+static void tce_free(struct TceTable *tbl, dma_addr_t dma_addr, 
+			     unsigned order, unsigned num_pages)
+{
+	long tcenum, total_tces, free_tce;
+	unsigned i;
+
+	total_tces = (tbl->size * (PAGE_SIZE / sizeof(union Tce)));
 	
 	tcenum = dma_addr >> PAGE_SHIFT;
-	// tcenum -= tbl->startOffset;
+	free_tce = tcenum - tbl->startOffset;
 
-	freeTce = tcenum - tbl->startOffset;
-
-	if ( freeTce > maxTcenum ) {
-		PPCDBG(PPCDBG_TCE, "free_tces: tcenum > maxTcenum\n");
-		PPCDBG(PPCDBG_TCE, "\ttcenum    = 0x%lx\n", tcenum); 
-		PPCDBG(PPCDBG_TCE, "\tmaxTcenum = 0x%lx\n", maxTcenum); 
-		PPCDBG(PPCDBG_TCE, "\tTCE Table = 0x%lx\n", (u64)tbl);
-		PPCDBG(PPCDBG_TCE, "\tbus#      = 0x%lx\n", 
-		       (u64)tbl->busNumber );
-		PPCDBG(PPCDBG_TCE, "\tsize      = 0x%lx\n", (u64)tbl->size);
-		PPCDBG(PPCDBG_TCE, "\tstartOff  = 0x%lx\n", 
-		       (u64)tbl->startOffset );
-		PPCDBG(PPCDBG_TCE, "\tindex     = 0x%lx\n", (u64)tbl->index);
+	if ( ( (free_tce + num_pages) > total_tces ) ||
+	     ( tcenum < tbl->startOffset ) ) {
+		printk("tce_free: invalid tcenum\n");
+		printk("\ttcenum    = 0x%lx\n", tcenum); 
+		printk("\tTCE Table = 0x%lx\n", (u64)tbl);
+		printk("\tbus#      = 0x%lx\n", (u64)tbl->busNumber );
+		printk("\tsize      = 0x%lx\n", (u64)tbl->size);
+		printk("\tstartOff  = 0x%lx\n", (u64)tbl->startOffset );
+		printk("\tindex     = 0x%lx\n", (u64)tbl->index);
 		return;
 	}
 	
-	for (i=0; i<numPages; ++i) {
-		tce.wholeTce = 0;
-
-		tce_addr  = ((union Tce *)tbl->base) + tcenum;
-		*tce_addr = (union Tce)tce.wholeTce;
-
+	for (i=0; i<num_pages; ++i) {
+		ppc_md.tce_free_one(tbl, tcenum);
 		++tcenum;
 	}
 
-	/* Make sure the update is visible to hardware. */
-	__asm__ __volatile__ ("sync" : : : "memory");
+	/* No sync (to make TCE change visible) is required here.
+	   The lwsync when acquiring the lock in free_tce_range
+	   is sufficient to synchronize with the bitmap.
+	*/
 
-	free_tce_range( tbl, freeTce, order );
+	free_tce_range( tbl, free_tce, order );
 }
 
 void __init create_virtual_bus_tce_table(void)
@@ -679,7 +649,8 @@ void __init create_virtual_bus_tce_table(void)
 
 	t = build_tce_table( &virtBusVethTceTable );
 	if ( t ) {
-		tceTables[255] = t;
+		/* tceTables[255] = t; */
+		//VirtBusVethTceTable = t;
 		printk( "Virtual Bus VETH TCE table built successfully.\n");
 		printk( "  TCE table size = %ld entries\n", 
 				(unsigned long)t->size*(PAGE_SIZE/sizeof(union Tce)) );
@@ -688,11 +659,11 @@ void __init create_virtual_bus_tce_table(void)
 		printk( "  TCE table start entry = 0x%lx\n",
 				(unsigned long)t->startOffset );
 	}
-	else 
-		printk( "Virtual Bus VETH TCE table failed.\n");
+	else printk( "Virtual Bus VETH TCE table failed.\n");
 
 	t = build_tce_table( &virtBusVioTceTable );
 	if ( t ) {
+		//VirtBusVioTceTable = t;
 		printk( "Virtual Bus VIO TCE table built successfully.\n");
 		printk( "  TCE table size = %ld entries\n", 
 				(unsigned long)t->size*(PAGE_SIZE/sizeof(union Tce)) );
@@ -701,8 +672,7 @@ void __init create_virtual_bus_tce_table(void)
 		printk( "  TCE table start entry = 0x%lx\n",
 				(unsigned long)t->startOffset );
 	}
-	else 
-		printk( "Virtual Bus VIO TCE table failed.\n");
+	else printk( "Virtual Bus VIO TCE table failed.\n");
 }
 
 void create_tce_tables_for_buses(struct list_head *bus_list)
@@ -765,11 +735,12 @@ void create_tce_tables(void) {
 	struct pci_dev *dev;
 	struct device_node *dn, *mydn;
 
-	if (naca->platform == PLATFORM_PSERIES_LPAR)
+	if (naca->platform == PLATFORM_PSERIES_LPAR) {
 		create_tce_tables_for_busesLP(&pci_root_buses);
-	else
-	create_tce_tables_for_buses(&pci_root_buses);
-
+	}
+	else {
+		create_tce_tables_for_buses(&pci_root_buses);
+	}
 	/* Now copy the tce_table ptr from the bus devices down to every
 	 * pci device_node.  This means get_tce_table() won't need to search
 	 * up the device tree to find it.
@@ -784,77 +755,46 @@ void create_tce_tables(void) {
 	}
 }
 
+
 /*
- * iSeries token = busNumber 
+ * iSeries token = iSeries_device_Node*
  * pSeries token = pci_controller*
+ *
  */
 void create_pci_bus_tce_table( unsigned long token ) {
-	struct TceTable * builtTceTable;
 	struct TceTable * newTceTable;
-	struct TceTableManagerCB pciBusTceTableParms;
-	u64 parmsPtr;
 
 	PPCDBG(PPCDBG_TCE, "Entering create_pci_bus_tce_table.\n");
 	PPCDBG(PPCDBG_TCE, "\ttoken = 0x%lx\n", token);
 
-	newTceTable = kmalloc( sizeof(struct TceTable), GFP_KERNEL );
+	newTceTable = (struct TceTable *)kmalloc( sizeof(struct TceTable), GFP_KERNEL );
 
+	/*****************************************************************/
+ 	/* For the iSeries machines, the HvTce Table can be one of three */
+ 	/* flavors,                                                      */
+ 	/* - Single bus TCE table,                                       */
+ 	/* - Tce Table Share between buses,                              */
+ 	/* - Tce Table per logical slot.                                 */
+	/*****************************************************************/
 	if(naca->platform == PLATFORM_ISERIES_LPAR) {
-		if ( token > 254 ) {
-			printk("PCI: Bus TCE table failed, invalid bus number %lu\n", token );
-			return;
-		}
 
-		pciBusTceTableParms.busNumber = token;
-		pciBusTceTableParms.virtualBusFlag = 0; 
-		parmsPtr = virt_to_absolute( (u64)&pciBusTceTableParms );
+		struct iSeries_Device_Node* DevNode = (struct iSeries_Device_Node*)token;
+		getTceTableParmsiSeries(DevNode,newTceTable);
 
-		/* 
-		 * Call HV with the architected data structure to get TCE table
-		 * info. Put the returned data into the Linux representation
-		 * of the TCE table data.
-		 */
-		HvCallXm_getTceTableParms( parmsPtr );
-		printk("PCI: getTceTableParms: Bus: 0x%lx Size: 0x%lx, Start: 0x%lx, Index: 0x%lx\n",
-		       pciBusTceTableParms.busNumber,
-		       pciBusTceTableParms.size,
-		       pciBusTceTableParms.startOffset,
-		       pciBusTceTableParms.index);
-
-		/* Determine if the table identified by the index and startOffset      */
-		/* returned by the hypervisor for this bus has already been created.   */
-		/* If so, set the tceTable entry to point to the linux shared tceTable.*/ 
-		int BusIndex;
-		for ( BusIndex=0; BusIndex<255; ++BusIndex) {
-			if (tceTables[BusIndex] != NULL) { 
-				struct TceTable* CmprTceTable = tceTables[BusIndex];
-				if ( ( CmprTceTable->index       == pciBusTceTableParms.index ) &&
-				     ( CmprTceTable->startOffset == pciBusTceTableParms.startOffset ) ) {
-					tceTables[token] = CmprTceTable;
-					printk("PCI: Bus %lu Shares a TCE table with bus %d\n",token,BusIndex);
-					break;
-				}
-			}
-		}	
-		/* No shared table, build a new table for this bus. */
-		if (tceTables[token] == NULL) {
-			newTceTable->size = pciBusTceTableParms.size;
-			newTceTable->busNumber = pciBusTceTableParms.busNumber;
-			newTceTable->startOffset = pciBusTceTableParms.startOffset;
-			newTceTable->index = pciBusTceTableParms.index;
-
-			builtTceTable = build_tce_table( newTceTable );
-			builtTceTable->tceType = TCE_PCI;
-			tceTables[token] = builtTceTable;
+		/* Look for existing TCE table for this device.          */
+		DevNode->DevTceTable = findHwTceTable(newTceTable );
+		if( DevNode->DevTceTable == NULL) {
+			DevNode->DevTceTable = build_tce_table( newTceTable );
 		}
 		else {
-		    /* We're using the shared table, not this new one. */
+		    /* We're using a shared table, free this new one.    */
 		    kfree(newTceTable);
 		}
-		    
-		printk("PCI: Pci bus %lu TceTable: %p\n",token,tceTables[token]);
+		printk("Pci Device 0x%p TceTable: %p\n",DevNode,DevNode->DevTceTable);
  		return;
-	} else {
+	}
+	/* pSeries Leg */
+	else {
 		struct device_node *dn;
 		struct pci_controller *phb;
 
@@ -864,15 +804,85 @@ void create_pci_bus_tce_table( unsigned long token ) {
 			getTceTableParmsPSeries(phb, dn, newTceTable);
 		else
 			getTceTableParmsPSeriesLP(phb, dn, newTceTable);
-		builtTceTable = build_tce_table( newTceTable );
-		dn->tce_table = builtTceTable;
+
+		dn->tce_table  = build_tce_table( newTceTable );
 	}
-	
-	if(builtTceTable == NULL ) {
-		kfree( newTceTable );
-		PPCDBG(PPCDBG_TCE, "PCI Bus TCE table failed.\n");
-		return;
+}
+
+/***********************************************************************/
+/* This function compares the known Tce tables to find a TceTable that */
+/* has already been built for hardware TCEs.                           */
+/* Search the complete(all devices) for a TCE table assigned.  If the  */
+/* startOffset, index, and size match, then the TCE for this device has*/
+/* already been built and it should be shared with this device         */
+/***********************************************************************/
+static struct TceTable* findHwTceTable(struct TceTable * newTceTable )
+{
+	struct list_head* Device_Node_Ptr    = iSeries_Global_Device_List.next;
+	/* Cache the compare values. */
+	u64  startOffset = newTceTable->startOffset;
+	u64  index       = newTceTable->index;
+	u64  size        = newTceTable->size;
+
+	while(Device_Node_Ptr != &iSeries_Global_Device_List) {
+		struct iSeries_Device_Node* CmprNode = (struct iSeries_Device_Node*)Device_Node_Ptr;
+		if( CmprNode->DevTceTable != NULL &&
+		    CmprNode->DevTceTable->tceType == TCE_PCI) {
+			if( CmprNode->DevTceTable->startOffset == startOffset &&
+			    CmprNode->DevTceTable->index       == index       &&
+			    CmprNode->DevTceTable->size        == size        ) {
+				printk("PCI TCE table matches 0x%p \n",CmprNode->DevTceTable);
+				return CmprNode->DevTceTable;
+			}
+		}
+		/* Get next Device Node in List             */
+		Device_Node_Ptr = Device_Node_Ptr->next;
 	}
+	return NULL;
+}
+
+/***********************************************************************/
+/* Call Hv with the architected data structure to get TCE table info.  */
+/* info. Put the returned data into the Linux representation of the    */
+/* TCE table data.                                                     */
+/* The Hardware Tce table comes in three flavors.                      */ 
+/* 1. TCE table shared between Buses.                                  */
+/* 2. TCE table per Bus.                                               */
+/* 3. TCE Table per IOA.                                               */
+/***********************************************************************/
+static void getTceTableParmsiSeries(struct iSeries_Device_Node* DevNode,
+				    struct TceTable* newTceTable )
+{
+	struct TceTableManagerCB* pciBusTceTableParms = (struct TceTableManagerCB*)kmalloc( sizeof(struct TceTableManagerCB), GFP_KERNEL );
+	if(pciBusTceTableParms == NULL) panic("PCI_DMA: TCE Table Allocation failed.");
+
+	memset( (void*)pciBusTceTableParms,0,sizeof(struct TceTableManagerCB) );
+	pciBusTceTableParms->busNumber      = ISERIES_BUS(DevNode);
+	pciBusTceTableParms->logicalSlot    = DevNode->LogicalSlot;
+	pciBusTceTableParms->virtualBusFlag = 0;
+
+	HvCallXm_getTceTableParms( REALADDR(pciBusTceTableParms) );
+
+        /* PciTceTableParms Bus:0x18 Slot:0x04 Start:0x000000 Offset:0x04c000 Size:0x0020 */
+	printk("PciTceTableParms Bus:0x%02lx Slot:0x%02x Start:0x%06lx Offset:0x%06lx Size:0x%04lx\n",
+	       pciBusTceTableParms->busNumber,
+	       pciBusTceTableParms->logicalSlot,
+	       pciBusTceTableParms->start,
+	       pciBusTceTableParms->startOffset,
+	       pciBusTceTableParms->size);
+
+	if(pciBusTceTableParms->size == 0) {
+		printk("PCI_DMA: Possible Structure mismatch, 0x%p\n",pciBusTceTableParms);
+		panic( "PCI_DMA: pciBusTceTableParms->size is zero, halt here!");
+	}
+
+	newTceTable->size        = pciBusTceTableParms->size;
+	newTceTable->busNumber   = pciBusTceTableParms->busNumber;
+	newTceTable->startOffset = pciBusTceTableParms->startOffset;
+	newTceTable->index       = pciBusTceTableParms->index;
+	newTceTable->tceType     = TCE_PCI;
+
+	kfree(pciBusTceTableParms);
 }
 
 static void getTceTableParmsPSeries(struct pci_controller *phb,
@@ -927,8 +937,7 @@ static void getTceTableParmsPSeries(struct pci_controller *phb,
 
 			/* Test if we are going over 2GB of DMA space.  */
 			if(phb->dma_window_base_cur > (1 << 19)) { 
-				udbg_printf("Unexpected number of IOAs under this PHB"); 
-				panic("Unexpected number of IOAs under this PHB"); 
+				panic("PCI_DMA: Unexpected number of IOAs under this PHB.\n"); 
 			}
 
 			newTceTable->base = of_tce_table[i].base;
@@ -967,7 +976,7 @@ static void getTceTableParmsPSeriesLP(struct pci_controller *phb,
 				    struct TceTable *newTceTable ) {
 	u32 *dma_window = (u32 *)get_property(dn, "ibm,dma-window", 0);
 	if (!dma_window) {
-		panic("getTceTableParmsPSeriesLP:  device %s has no ibm,dma-window property!\n", dn->full_name);
+		panic("PCI_DMA: getTceTableParmsPSeriesLP: device %s has no ibm,dma-window property!\n", dn->full_name);
 	}
 
 	newTceTable->busNumber = dn->busno;
@@ -1002,6 +1011,13 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	size = PAGE_ALIGN(size);
 	order = get_order(size);
 	nPages = 1 << order;
+
+ 	/* Client asked for way to much space.  This is checked later anyway */
+	/* It is easier to debug here for the drivers than in the tce tables.*/
+ 	if(order >= NUM_TCE_LEVELS) {
+ 		printk("PCI_DMA: pci_alloc_consistent size to large: 0x%lx \n",size);
+ 		return (void *)NO_TCE;
+ 	}
 
 	tbl = get_tce_table(hwdev); 
 
@@ -1045,14 +1061,17 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 	order = get_order(size);
 	nPages = 1 << order;
 
-	if ( order > 10 )
-		PPCDBG(PPCDBG_TCE, "pci_free_consistent: order=%d, size=%d, nPages=%d, dma_handle=%016lx, vaddr=%016lx\n",
-			order, size, nPages, (unsigned long)dma_handle, (unsigned long)vaddr );
+ 	/* Client asked for way to much space.  This is checked later anyway */
+	/* It is easier to debug here for the drivers than in the tce tables.*/
+ 	if(order >= NUM_TCE_LEVELS) {
+ 		printk("PCI_DMA: pci_free_consistent size to large: 0x%lx \n",size);
+ 		return;
+ 	}
 	
 	tbl = get_tce_table(hwdev); 
 
 	if ( tbl ) {
-		ppc_md.tce_free(tbl, dma_handle, order, nPages);
+		tce_free(tbl, dma_handle, order, nPages);
 		free_pages( (unsigned long)vaddr, order );
 	}
 }
@@ -1081,6 +1100,13 @@ dma_addr_t pci_map_single(struct pci_dev *hwdev, void *vaddr,
 	order = get_order( nPages & PAGE_MASK );
 	nPages >>= PAGE_SHIFT;
 	
+ 	/* Client asked for way to much space.  This is checked later anyway */
+	/* It is easier to debug here for the drivers than in the tce tables.*/
+ 	if(order >= NUM_TCE_LEVELS) {
+ 		printk("PCI_DMA: pci_map_single size to large: 0x%lx \n",size);
+ 		return NO_TCE;
+ 	}
+
 	tbl = get_tce_table(hwdev); 
 
 	if ( tbl ) {
@@ -1105,14 +1131,17 @@ void pci_unmap_single( struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size
 	order = get_order( nPages & PAGE_MASK );
 	nPages >>= PAGE_SHIFT;
 
-	if ( order > 10 )
-		PPCDBG(PPCDBG_TCE, "pci_unmap_single: order=%d, size=%d, nPages=%d, dma_handle=%016lx\n",
-			order, size, nPages, (unsigned long)dma_handle );
+ 	/* Client asked for way to much space.  This is checked later anyway */
+	/* It is easier to debug here for the drivers than in the tce tables.*/
+ 	if(order >= NUM_TCE_LEVELS) {
+ 		printk("PCI_DMA: pci_unmap_single size to large: 0x%lx \n",size);
+ 		return;
+ 	}
 	
 	tbl = get_tce_table(hwdev); 
 
 	if ( tbl ) 
-		ppc_md.tce_free(tbl, dma_handle, order, nPages);
+		tce_free(tbl, dma_handle, order, nPages);
 
 }
 
@@ -1261,6 +1290,13 @@ static dma_addr_t create_tces_sg( struct TceTable *tbl, struct scatterlist *sg,
 	dmaAddr = NO_TCE;
 
 	order = get_order( numTces << PAGE_SHIFT );
+ 	/* Client asked for way to much space.  This is checked later anyway */
+	/* It is easier to debug here for the drivers than in the tce tables.*/
+ 	if(order >= NUM_TCE_LEVELS) {
+		printk("PCI_DMA: create_tces_sg size to large: 0x%x \n",(numTces << PAGE_SHIFT));
+ 		return NO_TCE;
+ 	}
+
 	/* allocate a block of tces */
 	tcenum = alloc_tce_range( tbl, order );
 	if ( tcenum != -1 ) {
@@ -1291,10 +1327,16 @@ static dma_addr_t create_tces_sg( struct TceTable *tbl, struct scatterlist *sg,
 			  ++tcenum;
 			  uaddr += PAGE_SIZE;
 			}
-			
+		
 			prevEndPage = endPage;
 			sg++;
 		}
+		/* Make sure the update is visible to hardware. 
+		   sync required to synchronize the update to 
+		   the TCE table with the MMIO that will send
+		   the bus address to the IOA */
+		__asm__ __volatile__ ("sync" : : : "memory");
+
 		if ((tcenum - starttcenum) != numTces)
 	    		PPCDBG(PPCDBG_TCE, "create_tces_sg: numTces %d, tces used %d\n",
 		   		numTces, (unsigned)(tcenum - starttcenum));
@@ -1364,14 +1406,17 @@ void pci_unmap_sg( struct pci_dev *hwdev, struct scatterlist *sg, int nelms, int
 	numTces = ((dma_end_page - dma_start_page ) >> PAGE_SHIFT) + 1;
 	order = get_order( numTces << PAGE_SHIFT );
 
-	if ( order > 10 )
-		PPCDBG(PPCDBG_TCE, "pci_unmap_sg: order=%d, numTces=%d, nelms=%d, dma_start_page=%016lx, dma_end_page=%016lx\n",
-			order, numTces, nelms, (unsigned long)dma_start_page, (unsigned long)dma_end_page );
+ 	/* Client asked for way to much space.  This is checked later anyway */
+	/* It is easier to debug here for the drivers than in the tce tables.*/
+ 	if(order >= NUM_TCE_LEVELS) {
+		printk("PCI_DMA: pci_unmap_sg size to large: 0x%x \n",(numTces << PAGE_SHIFT));
+ 		return;
+ 	}
 	
 	tbl = get_tce_table(hwdev); 
 
 	if ( tbl ) 
-		ppc_md.tce_free( tbl, dma_start_page, order, numTces );
+		tce_free( tbl, dma_start_page, order, numTces );
 
 }
 #else
@@ -1385,7 +1430,8 @@ int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
 				       sglist->offset);
 
 		sglist->dma_address = pci_map_single(pdev, vaddr,
-					sglist->length, direction);
+						     sglist->length,
+						     direction);
 		sglist->dma_length = sglist->length;
 		sglist++;
 	}
@@ -1471,11 +1517,11 @@ unsigned long phb_tce_table_init(struct pci_controller *phb) {
 void tce_init_pSeries(void)
 {
 	ppc_md.tce_build = tce_build_pSeries;
-	ppc_md.tce_free  = tce_free_pSeries;
+	ppc_md.tce_free_one = tce_free_one_pSeries;
 }
 
 void tce_init_iSeries(void)
 {
 	ppc_md.tce_build = tce_build_iSeries;
-	ppc_md.tce_free  = tce_free_iSeries;
+	ppc_md.tce_free_one = tce_free_one_iSeries;
 }

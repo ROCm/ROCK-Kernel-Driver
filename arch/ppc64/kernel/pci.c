@@ -63,6 +63,8 @@ int    pci_assign_all_busses = 0;
 struct pci_controller* hose_head;
 struct pci_controller** hose_tail = &hose_head;
 
+LIST_HEAD(iSeries_Global_Device_List);
+
 /*******************************************************************
  * Counters and control flags. 
  *******************************************************************/
