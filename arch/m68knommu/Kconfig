@@ -499,6 +499,7 @@ config KCORE_AOUT
 	default y
 
 config KCORE_ELF
+	bool
 	default y
 
 source "fs/Kconfig.binfmt"
