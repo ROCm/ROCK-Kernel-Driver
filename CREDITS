@@ -2025,12 +2025,14 @@ D: GCC + libraries hacker
 
 N: Michal Ludvig
 E: michal@logix.cz
+E: michal.ludvig@asterisk.co.nz
 W: http://www.logix.cz/michal
 P: 1024D/C45B2218 1162 6471 D391 76E0 9F99  29DA 0C3A 2509 C45B 2218
 D: VIA PadLock driver
 D: Netfilter pkttype module
-S: Prague 4
-S: Czech Republic
+S: Asterisk Ltd.
+S: Auckland
+S: New Zealand
 
 N: Tuomas J. Lukka
 E: Tuomas.Lukka@Helsinki.FI
