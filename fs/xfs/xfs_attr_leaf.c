@@ -486,8 +486,7 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 			i < INT_GET(sf->hdr.count, ARCH_CONVERT); i++) {
 		if (unlikely(
 		    ((char *)sfe < (char *)sf) ||
-		    ((char *)sfe >= ((char *)sf + dp->i_afp->if_bytes)) ||
-		    (sfe->namelen >= MAXNAMELEN))) {
+		    ((char *)sfe >= ((char *)sf + dp->i_afp->if_bytes)))) {
 			XFS_CORRUPTION_ERROR("xfs_attr_shortform_list",
 					     XFS_ERRLEVEL_LOW,
 					     context->dp->i_mount, sfe);
