@@ -330,7 +330,7 @@ struct acpi_table_ecdt {
 	acpi_generic_address	ec_data;
 	u32			uid;
 	u8			gpe_bit;
-	char			*ec_id;
+	char			ec_id[0];
 } __attribute__ ((packed));
 
 /* Table Handlers */
