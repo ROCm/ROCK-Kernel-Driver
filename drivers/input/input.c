@@ -58,8 +58,11 @@ EXPORT_SYMBOL(input_event);
 #define INPUT_MAJOR	13
 #define INPUT_DEVICES	256
 
-static struct input_dev *input_dev;
+static LIST_HEAD(input_dev_list);
+static LIST_HEAD(input_handler_list);
+
 static struct input_handler *input_handler;
+
 static struct input_handler *input_table[8];
 static devfs_handle_t input_devfs_handle;
 
@@ -465,9 +468,7 @@ void input_register_device(struct input_dev *dev)
 /*
  * Add the device.
  */
-
-	dev->next = input_dev;	
-	input_dev = dev;
+	list_add_tail(&dev->node,&input_dev_list);
 
 /*
  * Notify handlers.
@@ -539,7 +540,7 @@ void input_unregister_device(struct input_dev *dev)
 /*
  * Remove the device.
  */
-	input_find_and_remove(struct input_dev, input_dev, dev, next);
+	list_del_init(&dev->node);
 
 /*
  * Notify /proc.
@@ -553,7 +554,7 @@ void input_unregister_device(struct input_dev *dev)
 
 void input_register_handler(struct input_handler *handler)
 {
-	struct input_dev *dev = input_dev;
+	struct list_head * node;
 	struct input_handle *handle;
 	struct input_device_id *id;
 
@@ -577,11 +578,11 @@ void input_register_handler(struct input_handler *handler)
  * Notify it about all existing devices.
  */
 
-	while (dev) {
+	list_for_each(node,&input_dev_list) {
+		struct input_dev *dev = container_of(node,struct input_dev,node);
 		if ((id = input_match_device(handler->id_table, dev)))
 			if ((handle = handler->connect(handler, dev, id)))
 				input_link_handle(handle);
-		dev = dev->next;
 	}
 
 /*
@@ -715,13 +716,14 @@ static unsigned int input_devices_poll(struct file *file, poll_table *wait)
 
 static int input_devices_read(char *buf, char **start, off_t pos, int count, int *eof, void *data)
 {
-	struct input_dev *dev = input_dev;
+	struct list_head * node;
 	struct input_handle *handle;
 
 	off_t at = 0;
 	int i, len, cnt = 0;
 
-	while (dev) {
+	list_for_each(node,&input_dev_list) {
+		struct input_dev *dev = container_of(node,struct input_dev,node);
 
 		len = sprintf(buf, "I: Bus=%04x Vendor=%04x Product=%04x Version=%04x\n",
 			dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version);
@@ -761,11 +763,10 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 			if (cnt >= count)
 				break;
 		}
-
-		dev = dev->next;
 	}
 
-	if (!dev) *eof = 1;
+	if (node == &input_dev_list)
+		*eof = 1;
 
 	return (count > cnt) ? cnt : count;
 }

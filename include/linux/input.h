@@ -812,7 +812,7 @@ struct input_dev {
 	int (*erase_effect)(struct input_dev *dev, int effect_id);
 
 	struct input_handle *handle;
-	struct input_dev *next;
+	struct list_head	node;
 };
 
 /*
