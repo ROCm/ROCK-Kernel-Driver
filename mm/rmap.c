@@ -537,11 +537,7 @@ out:
  * there there won't be many ptes located within the scan cluster.  In this case
  * maybe we could scan further - to the end of the pte page, perhaps.
  */
-#define CLUSTER_SIZE	(32 * PAGE_SIZE)
-#if     CLUSTER_SIZE  >	PMD_SIZE
-#undef  CLUSTER_SIZE
-#define CLUSTER_SIZE	PMD_SIZE
-#endif
+#define CLUSTER_SIZE	min(32*PAGE_SIZE, PMD_SIZE)
 #define CLUSTER_MASK	(~(CLUSTER_SIZE - 1))
 
 static int try_to_unmap_cluster(unsigned long cursor,
