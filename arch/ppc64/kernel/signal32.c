@@ -104,8 +104,6 @@ struct rt_sigframe_32 {
  *
  *  System Calls
  *       sigaction                sys32_sigaction
- *       sigpending               sys32_sigpending
- *       sigprocmask              sys32_sigprocmask
  *       sigreturn                sys32_sigreturn
  *
  *  Note sigsuspend has no special 32 bit routine - uses the 64 bit routine
@@ -161,7 +159,7 @@ long sys32_sigaction(int sig, struct old_sigaction32 *act,
 		sig = -sig;
 
 	if (act) {
-		old_sigset_t32 mask;
+		compat_old_sigset_t mask;
 
 		if (get_user((long)new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user((long)new_ka.sa.sa_restorer, &act->sa_restorer) ||
@@ -182,54 +180,6 @@ long sys32_sigaction(int sig, struct old_sigaction32 *act,
 
 	return ret;
 }
-
-
-extern long sys_sigpending(old_sigset_t *set);
-
-long sys32_sigpending(old_sigset_t32 *set)
-{
-	old_sigset_t s;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-
-	set_fs(KERNEL_DS);
-	ret = sys_sigpending(&s);
-	set_fs(old_fs);
-	if (put_user(s, set))
-		return -EFAULT;
-	return ret;
-}
-
-
-extern long sys_sigprocmask(int how, old_sigset_t *set,
-		old_sigset_t *oset);
-
-/*
- * Note: it is necessary to treat how as an unsigned int, with the
- * corresponding cast to a signed int to insure that the proper
- * conversion (sign extension) between the register representation
- * of a signed int (msr in 32-bit mode) and the register representation
- * of a signed int (msr in 64-bit mode) is performed.
- */
-long sys32_sigprocmask(u32 how, old_sigset_t32 *set,
-		old_sigset_t32 *oset)
-{
-	old_sigset_t s;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-
-	if (set && get_user(s, set))
-		return -EFAULT;
-	set_fs(KERNEL_DS);
-	ret = sys_sigprocmask((int)how, set ? &s : NULL, oset ? &s : NULL);
-	set_fs(old_fs);
-	if (ret)
-		return ret;
-	if (oset && put_user (s, oset))
-		return -EFAULT;
-	return 0;
-}
-
 
 
 /*
@@ -565,16 +515,16 @@ long sys32_rt_sigaction(int sig, const struct sigaction32 *act,
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
-	sigset32_t set32;
+	compat_sigset_t set32;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (sigsetsize != sizeof(sigset32_t))
+	if (sigsetsize != sizeof(compat_sigset_t))
 		return -EINVAL;
 
 	if (act) {
 		ret = get_user((long)new_ka.sa.sa_handler, &act->sa_handler);
 		ret |= __copy_from_user(&set32, &act->sa_mask,
-					sizeof(sigset32_t));
+					sizeof(compat_sigset_t));
 		switch (_NSIG_WORDS) {
 		case 4: new_ka.sa.sa_mask.sig[3] = set32.sig[6]
 				| (((long)set32.sig[7]) << 32);
@@ -608,7 +558,7 @@ long sys32_rt_sigaction(int sig, const struct sigaction32 *act,
 		}
 		ret = put_user((long)old_ka.sa.sa_handler, &oact->sa_handler);
 		ret |= __copy_to_user(&oact->sa_mask, &set32,
-				      sizeof(sigset32_t));
+				      sizeof(compat_sigset_t));
 		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 	}
 	return ret;
@@ -625,16 +575,16 @@ extern long sys_rt_sigprocmask(int how, sigset_t *set,
  * of a signed int (msr in 32-bit mode) and the register representation
  * of a signed int (msr in 64-bit mode) is performed.
  */
-long sys32_rt_sigprocmask(u32 how, sigset32_t *set,
-		sigset32_t *oset, size_t sigsetsize)
+long sys32_rt_sigprocmask(u32 how, compat_sigset_t *set,
+		compat_sigset_t *oset, size_t sigsetsize)
 {
 	sigset_t s;
-	sigset32_t s32;
+	compat_sigset_t s32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
 	if (set) {
-		if (copy_from_user (&s32, set, sizeof(sigset32_t)))
+		if (copy_from_user (&s32, set, sizeof(compat_sigset_t)))
 			return -EFAULT;
     
 		switch (_NSIG_WORDS) {
@@ -658,7 +608,7 @@ long sys32_rt_sigprocmask(u32 how, sigset32_t *set,
 		case 2: s32.sig[3] = (s.sig[1] >> 32); s32.sig[2] = s.sig[1];
 		case 1: s32.sig[1] = (s.sig[0] >> 32); s32.sig[0] = s.sig[0];
 		}
-		if (copy_to_user (oset, &s32, sizeof(sigset32_t)))
+		if (copy_to_user (oset, &s32, sizeof(compat_sigset_t)))
 			return -EFAULT;
 	}
 	return 0;
@@ -668,10 +618,10 @@ long sys32_rt_sigprocmask(u32 how, sigset32_t *set,
 extern long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
 
 
-long sys32_rt_sigpending(sigset32_t *set, compat_size_t sigsetsize)
+long sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 {
 	sigset_t s;
-	sigset32_t s32;
+	compat_sigset_t s32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
@@ -685,7 +635,7 @@ long sys32_rt_sigpending(sigset32_t *set, compat_size_t sigsetsize)
 		case 2: s32.sig[3] = (s.sig[1] >> 32); s32.sig[2] = s.sig[1];
 		case 1: s32.sig[1] = (s.sig[0] >> 32); s32.sig[0] = s.sig[0];
 		}
-		if (copy_to_user (set, &s32, sizeof(sigset32_t)))
+		if (copy_to_user (set, &s32, sizeof(compat_sigset_t)))
 			return -EFAULT;
 	}
 	return ret;
@@ -739,17 +689,17 @@ extern long sys_rt_sigtimedwait(const sigset_t *uthese,
 		siginfo_t *uinfo, const struct timespec *uts,
 		size_t sigsetsize);
 
-long sys32_rt_sigtimedwait(sigset32_t *uthese, siginfo_t32 *uinfo,
+long sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 		struct compat_timespec *uts, compat_size_t sigsetsize)
 {
 	sigset_t s;
-	sigset32_t s32;
+	compat_sigset_t s32;
 	struct timespec t;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	siginfo_t info;
 
-	if (copy_from_user(&s32, uthese, sizeof(sigset32_t)))
+	if (copy_from_user(&s32, uthese, sizeof(compat_sigset_t)))
 		return -EFAULT;
 	switch (_NSIG_WORDS) {
 	case 4: s.sig[3] = s32.sig[6] | (((long)s32.sig[7]) << 32);
@@ -837,11 +787,11 @@ long sys32_rt_sigqueueinfo(u32 pid, u32 sig, siginfo_t32 *uinfo)
 	return ret;
 }
 
-int sys32_rt_sigsuspend(sigset32_t* unewset, size_t sigsetsize, int p3,
+int sys32_rt_sigsuspend(compat_sigset_t* unewset, size_t sigsetsize, int p3,
 		int p4, int p6, int p7, struct pt_regs *regs)
 {
 	sigset_t saveset, newset;
-	sigset32_t s32;
+	compat_sigset_t s32;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
 	if (sigsetsize != sizeof(sigset_t))
