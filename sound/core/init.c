@@ -281,7 +281,8 @@ int snd_card_free(snd_card_t * card)
 	}
 	if (card->private_free)
 		card->private_free(card);
-	snd_info_unregister(card->proc_id);
+	if (card->proc_id)
+		snd_info_unregister(card->proc_id);
 	if (snd_info_card_free(card) < 0) {
 		snd_printk(KERN_WARNING "unable to free card info\n");
 		/* Not fatal error */
