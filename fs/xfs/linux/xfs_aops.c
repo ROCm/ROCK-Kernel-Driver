@@ -31,9 +31,7 @@
  */
 
 #include <xfs.h>
-#include <linux/mm.h>
 #include <linux/mpage.h>
-#include <linux/pagemap.h>
 
 STATIC void convert_page(struct inode *, struct page *,
 			page_buf_bmap_t *, void *, int, int);
