@@ -1934,7 +1934,7 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 	return 0;
 }
 
-int ext3_statfs (struct super_block * sb, struct statfs * buf)
+int ext3_statfs (struct super_block * sb, struct kstatfs * buf)
 {
 	struct ext3_super_block *es = EXT3_SB(sb)->s_es;
 	unsigned long overhead;

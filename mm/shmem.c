@@ -1352,7 +1352,7 @@ static ssize_t shmem_file_sendfile(struct file *in_file, loff_t *ppos,
 	return desc.error;
 }
 
-static int shmem_statfs(struct super_block *sb, struct statfs *buf)
+static int shmem_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct shmem_sb_info *sbinfo = SHMEM_SB(sb);
 

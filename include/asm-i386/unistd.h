@@ -273,8 +273,10 @@
 #define __NR_clock_gettime	(__NR_timer_create+6)
 #define __NR_clock_getres	(__NR_timer_create+7)
 #define __NR_clock_nanosleep	(__NR_timer_create+8)
+#define __NR_statfs64		268
+#define __NR_fstatfs64		269
 
-#define NR_syscalls 268
+#define NR_syscalls 270
 
 /* user-visible error numbers are in the range -1 - -124: see <asm-i386/errno.h> */
 

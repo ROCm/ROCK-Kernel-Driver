@@ -973,7 +973,7 @@ int ufs_remount (struct super_block * sb, int * mount_flags, char * data)
 	return 0;
 }
 
-int ufs_statfs (struct super_block * sb, struct statfs * buf)
+int ufs_statfs (struct super_block * sb, struct kstatfs * buf)
 {
 	struct ufs_sb_private_info * uspi;
 	struct ufs_super_block_first * usb1;
@@ -988,8 +988,8 @@ int ufs_statfs (struct super_block * sb, struct statfs * buf)
 	buf->f_blocks = uspi->s_dsize;
 	buf->f_bfree = ufs_blkstofrags(fs32_to_cpu(sb, usb1->fs_cstotal.cs_nbfree)) +
 		fs32_to_cpu(sb, usb1->fs_cstotal.cs_nffree);
-	buf->f_bavail = (buf->f_bfree > ((buf->f_blocks / 100) * uspi->s_minfree))
-		? (buf->f_bfree - ((buf->f_blocks / 100) * uspi->s_minfree)) : 0;
+	buf->f_bavail = (buf->f_bfree > (((long)buf->f_blocks / 100) * uspi->s_minfree))
+		? (buf->f_bfree - (((long)buf->f_blocks / 100) * uspi->s_minfree)) : 0;
 	buf->f_files = uspi->s_ncg * uspi->s_ipg;
 	buf->f_ffree = fs32_to_cpu(sb, usb1->fs_cstotal.cs_nifree);
 	buf->f_namelen = UFS_MAXNAMLEN;

@@ -74,7 +74,7 @@ static void isofs_put_super(struct super_block *sb)
 }
 
 static void isofs_read_inode(struct inode *);
-static int isofs_statfs (struct super_block *, struct statfs *);
+static int isofs_statfs (struct super_block *, struct kstatfs *);
 
 static kmem_cache_t *isofs_inode_cachep;
 
@@ -884,7 +884,7 @@ out_freesbi:
 	return -EINVAL;
 }
 
-static int isofs_statfs (struct super_block *sb, struct statfs *buf)
+static int isofs_statfs (struct super_block *sb, struct kstatfs *buf)
 {
 	buf->f_type = ISOFS_SUPER_MAGIC;
 	buf->f_bsize = sb->s_blocksize;

@@ -87,8 +87,15 @@ asmlinkage long compat_sys_newfstat(unsigned int fd,
 	return error;
 }
 
-static int put_compat_statfs(struct compat_statfs *ubuf, struct statfs *kbuf)
+static int put_compat_statfs(struct compat_statfs *ubuf, struct kstatfs *kbuf)
 {
+	
+	if (sizeof ubuf->f_blocks == 4) {
+		if ((kbuf->f_blocks | kbuf->f_bfree |
+		     kbuf->f_bavail | kbuf->f_files | kbuf->f_ffree) &
+		    0xffffffff00000000ULL)
+			return -EOVERFLOW;
+	}
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(*ubuf)) ||
 	    __put_user(kbuf->f_type, &ubuf->f_type) ||
 	    __put_user(kbuf->f_bsize, &ubuf->f_bsize) ||
@@ -99,7 +106,8 @@ static int put_compat_statfs(struct compat_statfs *ubuf, struct statfs *kbuf)
 	    __put_user(kbuf->f_ffree, &ubuf->f_ffree) ||
 	    __put_user(kbuf->f_namelen, &ubuf->f_namelen) ||
 	    __put_user(kbuf->f_fsid.val[0], &ubuf->f_fsid.val[0]) ||
-	    __put_user(kbuf->f_fsid.val[1], &ubuf->f_fsid.val[1]))
+	    __put_user(kbuf->f_fsid.val[1], &ubuf->f_fsid.val[1]) ||
+	    __put_user(kbuf->f_frsize, &ubuf->f_frsize))
 		return -EFAULT;
 	return 0;
 }
@@ -115,7 +123,7 @@ asmlinkage long compat_sys_statfs(const char *path, struct compat_statfs *buf)
 
 	error = user_path_walk(path, &nd);
 	if (!error) {
-		struct statfs tmp;
+		struct kstatfs tmp;
 		error = vfs_statfs(nd.dentry->d_inode->i_sb, &tmp);
 		if (!error && put_compat_statfs(buf, &tmp))
 			error = -EFAULT;
@@ -127,7 +135,7 @@ asmlinkage long compat_sys_statfs(const char *path, struct compat_statfs *buf)
 asmlinkage long compat_sys_fstatfs(unsigned int fd, struct compat_statfs *buf)
 {
 	struct file * file;
-	struct statfs tmp;
+	struct kstatfs tmp;
 	int error;
 
 	error = -EBADF;

@@ -409,7 +409,7 @@ asmlinkage long sys_ustat(dev_t dev, struct ustat __user * ubuf)
 {
         struct super_block *s;
         struct ustat tmp;
-        struct statfs sbuf;
+        struct kstatfs sbuf;
 	int err = -EINVAL;
 
         s = user_get_super(dev);

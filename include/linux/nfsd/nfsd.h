@@ -113,7 +113,7 @@ int		nfsd_truncate(struct svc_rqst *, struct svc_fh *,
 int		nfsd_readdir(struct svc_rqst *, struct svc_fh *,
 			     loff_t *, struct readdir_cd *, encode_dent_fn);
 int		nfsd_statfs(struct svc_rqst *, struct svc_fh *,
-				struct statfs *);
+				struct kstatfs *);
 
 int		nfsd_notify_change(struct inode *, struct iattr *);
 int		nfsd_permission(struct svc_export *, struct dentry *, int);

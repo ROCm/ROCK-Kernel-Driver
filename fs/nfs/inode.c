@@ -53,7 +53,7 @@ static void nfs_delete_inode(struct inode *);
 static void nfs_put_super(struct super_block *);
 static void nfs_clear_inode(struct inode *);
 static void nfs_umount_begin(struct super_block *);
-static int  nfs_statfs(struct super_block *, struct statfs *);
+static int  nfs_statfs(struct super_block *, struct kstatfs *);
 static int  nfs_show_options(struct seq_file *, struct vfsmount *);
 
 static struct super_operations nfs_sops = { 
@@ -474,7 +474,7 @@ out_fail:
 }
 
 static int
-nfs_statfs(struct super_block *sb, struct statfs *buf)
+nfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct nfs_server *server = NFS_SB(sb);
 	unsigned char blockbits;

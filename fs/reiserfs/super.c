@@ -62,7 +62,7 @@ int is_reiserfs_super (struct super_block *s)
 }
 
 static int reiserfs_remount (struct super_block * s, int * flags, char * data);
-static int reiserfs_statfs (struct super_block * s, struct statfs * buf);
+static int reiserfs_statfs (struct super_block * s, struct kstatfs * buf);
 
 static void reiserfs_write_super (struct super_block * s)
 {
@@ -1414,13 +1414,11 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 }
 
 
-static int reiserfs_statfs (struct super_block * s, struct statfs * buf)
+static int reiserfs_statfs (struct super_block * s, struct kstatfs * buf)
 {
   struct reiserfs_super_block * rs = SB_DISK_SUPER_BLOCK (s);
   
   buf->f_namelen = (REISERFS_MAX_NAME (s->s_blocksize));
-  buf->f_ffree   = -1;
-  buf->f_files   = -1;
   buf->f_bfree   = sb_free_blocks(rs);
   buf->f_bavail  = buf->f_bfree;
   buf->f_blocks  = sb_block_count(rs) - sb_bmap_nr(rs) - 1;
