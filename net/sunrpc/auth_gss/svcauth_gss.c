@@ -686,7 +686,7 @@ svcauth_gss_accept(struct svc_rqst *rqstp, u32 *authp)
 	u32		*reject_stat = resv->iov_base;
 	int		ret;
 
-	dprintk("RPC: svcauth_gss: argv->iov_len = %d\n",argv->iov_len);
+	dprintk("RPC: svcauth_gss: argv->iov_len = %zd\n",argv->iov_len);
 
 	*authp = rpc_autherr_badcred;
 	if (!svcdata)
