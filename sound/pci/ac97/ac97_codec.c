@@ -2140,10 +2140,28 @@ static int tune_ad_sharing(ac97_t *ac97)
 	return 0;
 }
 
+static int apply_quirk(ac97_t *ac97, int quirk)
+{
+	switch (quirk) {
+	case AC97_TUNE_NONE:
+		return 0;
+	case AC97_TUNE_HP_ONLY:
+		return swap_headphone(ac97, 1);
+	case AC97_TUNE_SWAP_HP:
+		return swap_headphone(ac97, 0);
+	case AC97_TUNE_SWAP_SURROUND:
+		return swap_surround(ac97);
+	case AC97_TUNE_AD_SHARING:
+		return tune_ad_sharing(ac97);
+	}
+	return -EINVAL;
+}
+
 /**
  * snd_ac97_tune_hardware - tune up the hardware
  * @ac97: the ac97 instance
  * @quirk: quirk list
+ * @override: explicit quirk value (overrides the list if not AC97_TUNE_DEFAULT)
  *
  * Do some workaround for each pci device, such as renaming of the
  * headphone (true line-out) control as "Master".
@@ -2152,9 +2170,18 @@ static int tune_ad_sharing(ac97_t *ac97)
  * Returns zero if successful, or a negative error code on failure.
  */
 
-int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk)
+int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, int override)
 {
+	int result;
+
 	snd_assert(quirk, return -EINVAL);
+
+	if (override != AC97_TUNE_DEFAULT) {
+		result = apply_quirk(ac97, override);
+		if (result < 0)
+			snd_printk(KERN_ERR "applying quirk type %d failed (%d)\n", override, result);
+		return result;
+	}
 
 	for (; quirk->vendor; quirk++) {
 		if (quirk->vendor != ac97->subsystem_vendor)
@@ -2162,18 +2189,10 @@ int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk)
 		if ((! quirk->mask && quirk->device == ac97->subsystem_device) ||
 		    quirk->device == (quirk->mask & ac97->subsystem_device)) {
 			snd_printdd("ac97 quirk for %s (%04x:%04x)\n", quirk->name, ac97->subsystem_vendor, ac97->subsystem_device);
-			switch (quirk->type) {
-			case AC97_TUNE_HP_ONLY:
-				return swap_headphone(ac97, 1);
-			case AC97_TUNE_SWAP_HP:
-				return swap_headphone(ac97, 0);
-			case AC97_TUNE_SWAP_SURROUND:
-				return swap_surround(ac97);
-			case AC97_TUNE_AD_SHARING:
-				return tune_ad_sharing(ac97);
-			}
-			snd_printk(KERN_ERR "invalid quirk type %d for %s\n", quirk->type, quirk->name);
-			return -EINVAL;
+			result = apply_quirk(ac97, quirk->type);
+			if (result < 0)
+				snd_printk(KERN_ERR "applying quirk type %d for %s failed (%d)\n", quirk->type, quirk->name, result);
+			return result;
 		}
 	}
 	return 0;

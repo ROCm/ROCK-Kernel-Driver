@@ -82,6 +82,7 @@ static long mpu_port[SNDRV_CARDS];
 static int joystick[SNDRV_CARDS];
 #endif
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
+static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 static int dxs_support[SNDRV_CARDS];
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
@@ -104,6 +105,9 @@ MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLE_DESC "," SNDRV_BOOLEAN_FALSE_DESC);
 MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
+MODULE_PARM(ac97_quirk, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
+MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",default:-1");
 MODULE_PARM(dxs_support, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only, 4 = no VRA)");
 MODULE_PARM_SYNTAX(dxs_support, SNDRV_ENABLED ",allows:{{0,4}},dialog:list");
@@ -1559,7 +1563,7 @@ static struct ac97_quirk ac97_quirks[] = {
 	{ } /* terminator */
 };
 
-static int __devinit snd_via82xx_mixer_new(via82xx_t *chip)
+static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, int ac97_quirk)
 {
 	ac97_bus_t bus;
 	ac97_t ac97;
@@ -1582,7 +1586,7 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip)
 	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97)) < 0)
 		return err;
 
-	snd_ac97_tune_hardware(chip->ac97, ac97_quirks);
+	snd_ac97_tune_hardware(chip->ac97, ac97_quirks, ac97_quirk);
 
 	if (chip->chip_type != TYPE_VIA686) {
 		/* use slot 10/11 */
@@ -2087,7 +2091,7 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		
 	if ((err = snd_via82xx_create(card, pci, chip_type, revision, ac97_clock[dev], &chip)) < 0)
 		goto __error;
-	if ((err = snd_via82xx_mixer_new(chip)) < 0)
+	if ((err = snd_via82xx_mixer_new(chip, ac97_quirk[dev])) < 0)
 		goto __error;
 
 	if (chip_type == TYPE_VIA686) {
@@ -2169,7 +2173,8 @@ module_exit(alsa_card_via82xx_exit)
 #ifndef MODULE
 
 /* format is: snd-via82xx=enable,index,id,
-			  mpu_port,joystick,ac97_clock,dxs_support */
+			  mpu_port,joystick,
+			  ac97_quirk,ac97_clock,dxs_support */
 
 static int __init alsa_card_via82xx_setup(char *str)
 {
@@ -2184,6 +2189,7 @@ static int __init alsa_card_via82xx_setup(char *str)
 #ifdef SUPPORT_JOYSTICK
 	       get_option(&str,&joystick[nr_dev]) == 2 &&
 #endif
+	       get_option(&str,&ac97_quirk[nr_dev]) == 2 &&
 	       get_option(&str,&ac97_clock[nr_dev]) == 2 &&
 	       get_option(&str,&dxs_support[nr_dev]) == 2);
 	nr_dev++;
