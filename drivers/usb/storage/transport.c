@@ -875,11 +875,8 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	unsigned char data;
 	int result;
 
-	/* Issue the command -- use usb_control_msg() because this is
-	 * not a scsi queued-command.  Also note that at this point the
-	 * cached pipe values have not yet been stored. */
-	result = usb_control_msg(us->pusb_dev,
-				 usb_rcvctrlpipe(us->pusb_dev, 0),
+	/* issue the command */
+	result = usb_stor_control_msg(us, us->recv_ctrl_pipe,
 				 US_BULK_GET_MAX_LUN, 
 				 USB_DIR_IN | USB_TYPE_CLASS | 
 				 USB_RECIP_INTERFACE,
@@ -1027,10 +1024,12 @@ static int usb_stor_reset_common(struct us_data *us,
 		return FAILED;
 	}
 
-	/* long wait for reset */
+	/* long wait for reset, so unlock to allow disconnects */
+	up(&us->dev_semaphore);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ*6);
 	set_current_state(TASK_RUNNING);
+	down(&us->dev_semaphore);
 
 	US_DEBUGP("Soft reset: clearing bulk-in endpoint halt\n");
 	result = usb_stor_clear_halt(us, us->recv_bulk_pipe);

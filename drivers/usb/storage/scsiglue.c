@@ -219,7 +219,7 @@ static int usb_storage_device_reset( Scsi_Cmnd *srb )
 	int state = atomic_read(&us->sm_state);
 	int result;
 
-	US_DEBUGP("device_reset() called\n" );
+	US_DEBUGP("%s called\n", __FUNCTION__);
 	if (state != US_STATE_IDLE) {
 		printk(KERN_ERR USB_STORAGE "Error in %s: "
 			"invalid state %d\n", __FUNCTION__, state);
@@ -245,39 +245,49 @@ static int usb_storage_device_reset( Scsi_Cmnd *srb )
 	return result;
 }
 
-/* This resets the device port */
+/* This resets the device's USB port. */
 /* It refuses to work if there's more than one interface in
-   this device, so that other users are not affected. */
+ * the device, so that other users are not affected. */
 /* This is always called with scsi_lock(srb->host) held */
-
 static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 {
-	struct us_data *us;
+	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
+	int state = atomic_read(&us->sm_state);
 	int result;
 
-	/* we use the usb_reset_device() function to handle this for us */
-	US_DEBUGP("bus_reset() called\n");
+	US_DEBUGP("%s called\n", __FUNCTION__);
+	if (state != US_STATE_IDLE) {
+		printk(KERN_ERR USB_STORAGE "Error in %s: "
+			"invalid state %d\n", __FUNCTION__, state);
+		return FAILED;
+	}
+
+	/* set the state and release the lock */
+	atomic_set(&us->sm_state, US_STATE_RESETTING);
 	scsi_unlock(srb->device->host);
-	us = (struct us_data *)srb->device->host->hostdata[0];
 
 	/* The USB subsystem doesn't handle synchronisation between
 	   a device's several drivers. Therefore we reset only devices
-	   with one interface which we of course own.
+	   with just one interface, which we of course own.
 	*/
-	
+
 	//FIXME: needs locking against config changes
-	
-	if ( us->pusb_dev->actconfig->desc.bNumInterfaces == 1) {
-		/* attempt to reset the port */
+
+	if (us->pusb_dev->actconfig->desc.bNumInterfaces == 1) {
+
+		/* lock the device and attempt to reset the port */
+		down(&(us->dev_semaphore));
 		result = usb_reset_device(us->pusb_dev);
+		up(&(us->dev_semaphore));
 		US_DEBUGP("usb_reset_device returns %d\n", result);
 	} else {
 		result = -EBUSY;
-		US_DEBUGP("cannot reset a multiinterface device. failing to reset.\n");
+		US_DEBUGP("Refusing to reset a multi-interface device\n");
 	}
 
-	US_DEBUGP("bus_reset() complete\n");
+	/* lock access to the state and clear it */
 	scsi_lock(srb->device->host);
+	atomic_set(&us->sm_state, US_STATE_IDLE);
 	return result < 0 ? FAILED : SUCCESS;
 }
 
