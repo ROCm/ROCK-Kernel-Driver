@@ -1,6 +1,6 @@
 /*
  *   ALSA sequencer Timer
- *   Copyright (c) 1998-1999 by Frank van de Pol <fvdpol@home.nl>
+ *   Copyright (c) 1998-1999 by Frank van de Pol <fvdpol@coil.demon.nl>
  *                              Jaroslav Kysela <perex@suse.cz>
  *
  *
