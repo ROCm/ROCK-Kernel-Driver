@@ -215,7 +215,7 @@ hci_read1(u32 reg, u32* out1, u32* result)
 	return status;
 }
 
-static struct proc_dir_entry*	toshiba_proc_dir = NULL;
+static struct proc_dir_entry*	toshiba_proc_dir;
 static int			force_fan;
 static int			last_key_event;
 static int			key_event_valid;

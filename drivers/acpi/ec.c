@@ -475,7 +475,7 @@ acpi_ec_space_handler (
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-struct proc_dir_entry		*acpi_ec_dir = NULL;
+struct proc_dir_entry		*acpi_ec_dir;
 
 
 static int
