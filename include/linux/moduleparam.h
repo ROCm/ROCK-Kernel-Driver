@@ -23,7 +23,7 @@ static const char __module_cat(name,__LINE__)[]				  \
 #else  /* !MODULE */
 #define __MODULE_INFO(tag, name, info)
 #endif
-#define __MODULE_PARM_TYPE(parm, _type)					  \
+#define __MODULE_PARM_TYPE(name, _type)					  \
   __MODULE_INFO(parmtype, name##type, #name ":" _type)
 
 struct kernel_param;
