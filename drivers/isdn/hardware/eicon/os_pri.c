@@ -419,8 +419,9 @@ diva_pri_write_sdram_block(PISDN_ADAPTER IoAdapter,
 	}
 	mem += address;
 
+	/* memcpy_toio(), maybe? */
 	while (length--) {
-		*mem++ = *data++;
+		WRITE_BYTE(mem++, *data++);
 	}
 
 	DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, p);
@@ -737,7 +738,7 @@ diva_pri_cmd_card_proc(struct _diva_os_xdi_adapter *a,
 						src += cmd->command_data.read_sdram.offset;
 
 						while (len--) {
-							*dst++ = *src++;
+							*dst++ = READ_BYTE(src++);
 						}
 						a->xdi_mbox.status = DIVA_XDI_MBOX_BUSY;
 						DIVA_OS_MEM_DETACH_ADDRESS(&a->xdi_adapter, p);
@@ -766,16 +767,18 @@ static int pri_get_serial_number(diva_os_xdi_adapter_t * a)
 	dword len = sizeof(data);
 	volatile byte __iomem *config;
 	volatile byte __iomem *flash;
+	byte c;
 
 /*
  *  First set some GT6401x config registers before accessing the BOOT-ROM
  */
  	config = DIVA_OS_MEM_ATTACH_CONFIG(&a->xdi_adapter);
-	if (!(config[0xc3c] & 0x08)) {
-		config[0xc3c] |= 0x08;	/* Base Address enable register */
+	c = READ_BYTE(&config[0xc3c]);
+	if (!(c & 0x08)) {
+		WRITE_BYTE(&config[0xc3c], c);	/* Base Address enable register */
 	}
-	config[LOW_BOOTCS_DREG] = 0x00;
-	config[HI_BOOTCS_DREG] = 0xFF;
+	WRITE_BYTE(&config[LOW_BOOTCS_DREG], 0x00);
+	WRITE_BYTE(&config[HI_BOOTCS_DREG], 0xFF);
  	DIVA_OS_MEM_DETACH_CONFIG(&a->xdi_adapter, config);
 /*
  *  Read only the last 64 bytes of manufacturing data
@@ -783,13 +786,13 @@ static int pri_get_serial_number(diva_os_xdi_adapter_t * a)
 	memset(data, '\0', len);
  	flash = DIVA_OS_MEM_ATTACH_PROM(&a->xdi_adapter);
 	for (i = 0; i < len; i++) {
-		data[i] = flash[0x8000 - len + i];
+		data[i] = READ_BYTE(&flash[0x8000 - len + i]);
 	}
  	DIVA_OS_MEM_DETACH_PROM(&a->xdi_adapter, flash);
 
  	config = DIVA_OS_MEM_ATTACH_CONFIG(&a->xdi_adapter);
-	config[LOW_BOOTCS_DREG] = 0xFC;	/* Disable FLASH EPROM access */
-	config[HI_BOOTCS_DREG] = 0xFF;
+	WRITE_BYTE(&config[LOW_BOOTCS_DREG], 0xFC);	/* Disable FLASH EPROM access */
+	WRITE_BYTE(&config[HI_BOOTCS_DREG], 0xFF);
  	DIVA_OS_MEM_DETACH_CONFIG(&a->xdi_adapter, config);
 
 	if (memcmp(&data[48], "DIVAserverPR", 12)) {
@@ -972,7 +975,7 @@ static dword diva_pri_detect_dsps(diva_os_xdi_adapter_t * a)
 	}
 
 	p = DIVA_OS_MEM_ATTACH_RESET(&a->xdi_adapter);
-	*(volatile byte *) p = _MP_RISC_RESET | _MP_DSP_RESET;
+	WRITE_BYTE(p, _MP_RISC_RESET | _MP_DSP_RESET);
 	DIVA_OS_MEM_DETACH_RESET(&a->xdi_adapter, p);
 	diva_os_wait(5);
 
@@ -999,7 +1002,7 @@ static dword diva_pri_detect_dsps(diva_os_xdi_adapter_t * a)
 	DIVA_OS_MEM_DETACH_CONTROL(&a->xdi_adapter, base);
 
 	p = DIVA_OS_MEM_ATTACH_RESET(&a->xdi_adapter);
-	*(volatile byte *) p = _MP_RISC_RESET | _MP_LED1 | _MP_LED2;
+	WRITE_BYTE(p, _MP_RISC_RESET | _MP_LED1 | _MP_LED2);
 	DIVA_OS_MEM_DETACH_RESET(&a->xdi_adapter, p);
 	diva_os_wait(5);
 

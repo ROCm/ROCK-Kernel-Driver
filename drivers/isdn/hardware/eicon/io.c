@@ -596,7 +596,7 @@ byte mem_in (ADAPTER *a, void *addr)
 {
  byte val;
  volatile byte __iomem *Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- val = *(Base + (unsigned long)addr);
+ val = READ_BYTE(Base + (unsigned long)addr);
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
  return (val);
 }
@@ -620,7 +620,7 @@ void mem_in_dw (ADAPTER *a, void *addr, dword* data, int dwords)
 void mem_in_buffer (ADAPTER *a, void *addr, void *buffer, word length)
 {
  volatile byte __iomem *Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- memcpy (buffer, (void *)(Base + (unsigned long)addr), length);
+ memcpy_fromio(buffer, (Base + (unsigned long)addr), length);
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
 }
 void mem_look_ahead (ADAPTER *a, PBUFFER *RBuffer, ENTITY *e)
@@ -634,7 +634,7 @@ void mem_look_ahead (ADAPTER *a, PBUFFER *RBuffer, ENTITY *e)
 void mem_out (ADAPTER *a, void *addr, byte data)
 {
  volatile byte __iomem *Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- *(Base + (unsigned long)addr) = data ;
+ WRITE_BYTE(Base + (unsigned long)addr, data);
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
 }
 void mem_outw (ADAPTER *a, void *addr, word data)
@@ -656,14 +656,14 @@ void mem_out_dw (ADAPTER *a, void *addr, const dword* data, int dwords)
 void mem_out_buffer (ADAPTER *a, void *addr, void *buffer, word length)
 {
  volatile byte __iomem * Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- memcpy ((void *)(Base + (unsigned long)addr), buffer, length) ;
+ memcpy_toio((Base + (unsigned long)addr), buffer, length) ;
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
 }
 void mem_inc (ADAPTER *a, void *addr)
 {
  volatile byte __iomem *Base = DIVA_OS_MEM_ATTACH_RAM((PISDN_ADAPTER)a->io);
- byte  x = *(Base + (unsigned long)addr);
- *(Base + (unsigned long)addr) = x + 1 ;
+ byte  x = READ_BYTE(Base + (unsigned long)addr);
+ WRITE_BYTE(Base + (unsigned long)addr, x + 1);
  DIVA_OS_MEM_DETACH_RAM((PISDN_ADAPTER)a->io, Base);
 }
 /*------------------------------------------------------------------*/

@@ -339,9 +339,11 @@ diva_os_atomic_decrement(diva_os_atomic_t* pv)
 ** If only...  In some cases we did use them for endianness conversion;
 ** unfortunately, other uses were real iomem accesses.
 */
+#define READ_BYTE(addr)   readb(addr)
 #define READ_WORD(addr)   readw(addr)
 #define READ_DWORD(addr)  readl(addr)
 
+#define WRITE_BYTE(addr,v)  writeb(v,addr)
 #define WRITE_WORD(addr,v)  writew(v,addr)
 #define WRITE_DWORD(addr,v) writel(v,addr)
 

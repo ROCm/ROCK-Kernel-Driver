@@ -424,7 +424,7 @@ int diva_4bri_init_card(diva_os_xdi_adapter_t * a)
 	   reset contains the base address for the PLX 9054 register set
 	 */
 	p = DIVA_OS_MEM_ATTACH_RESET(&a->xdi_adapter);
-	p[PLX9054_INTCSR] = 0x00;	/* disable PCI interrupts */
+	WRITE_BYTE(&p[PLX9054_INTCSR], 0x00);	/* disable PCI interrupts */
 	DIVA_OS_MEM_DETACH_RESET(&a->xdi_adapter, p);
 
 	/*
@@ -796,7 +796,7 @@ diva_4bri_cmd_card_proc(struct _diva_os_xdi_adapter *a,
 						src += cmd->command_data.read_sdram.offset;
 
 						while (len--) {
-							*dst++ = *src++;
+							*dst++ = READ_BYTE(src++);
 						}
 						DIVA_OS_MEM_DETACH_ADDRESS(&a->xdi_adapter, p);
 						a->xdi_mbox.status = DIVA_XDI_MBOX_BUSY;
@@ -922,7 +922,7 @@ diva_4bri_write_sdram_block(PISDN_ADAPTER IoAdapter,
 	mem += address;
 
 	while (length--) {
-		*mem++ = *data++;
+		WRITE_BYTE(mem++, *data++);
 	}
 
 	DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, p);
@@ -1019,7 +1019,7 @@ static int check_qBri_interrupt(PISDN_ADAPTER IoAdapter)
 		return (-1);
 
 	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
-	p[PLX9054_INTCSR] = PLX9054_INT_ENABLE;
+	WRITE_BYTE(&p[PLX9054_INTCSR], PLX9054_INT_ENABLE);
 	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 	/*
 	   interrupt test
@@ -1047,7 +1047,7 @@ static int check_qBri_interrupt(PISDN_ADAPTER IoAdapter)
 	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 
 	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
-	p[PLX9054_INTCSR] = PLX9054_INT_ENABLE;
+	WRITE_BYTE(&p[PLX9054_INTCSR], PLX9054_INT_ENABLE);
 	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 
 	diva_os_wait(100);

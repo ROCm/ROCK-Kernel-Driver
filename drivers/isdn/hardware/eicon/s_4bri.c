@@ -83,7 +83,7 @@ static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 		size = offset + (IoAdapter->MemorySize >> factor) - regs[0] ;
 		if ( size > MAX_XLOG_SIZE )
 			size = MAX_XLOG_SIZE ;
-		memcpy (Xlog, &base[regs[0]], size) ;
+		memcpy_fromio (Xlog, &base[regs[0]], size) ;
 		xlogDesc.buf = Xlog ;
 		xlogDesc.cnt = READ_WORD(&base[regs[1] & (IoAdapter->MemorySize - 1)]) ;
 		xlogDesc.out = READ_WORD(&base[regs[2] & (IoAdapter->MemorySize - 1)]) ;
@@ -166,7 +166,7 @@ static void stop_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 	
 	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
-	p[PLX9054_INTCSR] = 0x00 ;	/* disable PCI interrupts */
+	WRITE_BYTE(&p[PLX9054_INTCSR], 0x00);	/* disable PCI interrupts */
 	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 	
 	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
@@ -874,7 +874,7 @@ static int qBri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
 
 	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
 
-	if ( !(p[PLX9054_INTCSR] & 0x80) ) {
+	if ( !(READ_BYTE(&p[PLX9054_INTCSR]) & 0x80) ) {
 		DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 		return (0) ;
 	}
@@ -917,7 +917,7 @@ static void disable_qBri_interrupt (PISDN_ADAPTER IoAdapter) {
  *	clear interrupt line (reset Local Interrupt Test Register)
  */
 	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
-	p[PLX9054_INTCSR] = 0x00 ;	/* disable PCI interrupts */
+	WRITE_BYTE(&p[PLX9054_INTCSR], 0x00);	/* disable PCI interrupts */
 	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 
 	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);

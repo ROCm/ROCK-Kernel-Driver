@@ -75,7 +75,7 @@ static void pri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
   size = IoAdapter->MemorySize - regs[0] ;
   if ( size > MAX_XLOG_SIZE )
    size = MAX_XLOG_SIZE ;
-  memcpy (Xlog, &base[regs[0]], size) ;
+  memcpy_fromio(Xlog, &base[regs[0]], size) ;
   xlogDesc.buf = Xlog ;
   xlogDesc.cnt = READ_WORD(&base[regs[1] & (IoAdapter->MemorySize - 1)]) ;
   xlogDesc.out = READ_WORD(&base[regs[2] & (IoAdapter->MemorySize - 1)]) ;
@@ -90,9 +90,9 @@ static void pri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
   ------------------------------------------------------------------------- */
 static void reset_pri_hardware (PISDN_ADAPTER IoAdapter) {
  byte __iomem *p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
- *p = _MP_RISC_RESET | _MP_LED1 | _MP_LED2 ;
+ WRITE_BYTE(p, _MP_RISC_RESET | _MP_LED1 | _MP_LED2);
  diva_os_wait (50) ;
- *p = 0x00 ;
+ WRITE_BYTE(p, 0x00);
  diva_os_wait (50) ;
  DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 }
@@ -103,8 +103,8 @@ static void stop_pri_hardware (PISDN_ADAPTER IoAdapter) {
  dword i;
  byte __iomem *p;
  dword volatile __iomem *cfgReg = (void __iomem *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
- cfgReg[3] = 0x00000000 ;
- cfgReg[1] = 0x00000000 ;
+ WRITE_DWORD(&cfgReg[3], 0);
+ WRITE_DWORD(&cfgReg[1], 0);
  DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfgReg);
  IoAdapter->a.ram_out (&IoAdapter->a, &RAM->SWReg, SWREG_HALT_CPU) ;
  i = 0 ;
@@ -119,7 +119,7 @@ static void stop_pri_hardware (PISDN_ADAPTER IoAdapter) {
  DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfgReg);
  diva_os_wait (1) ;
  p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
- *p = _MP_RISC_RESET | _MP_LED1 | _MP_LED2 ;
+ WRITE_BYTE(p, _MP_RISC_RESET | _MP_LED1 | _MP_LED2);
  DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 }
 #if !defined(DIVA_USER_MODE_CARD_CONFIG) /* { */
@@ -513,8 +513,8 @@ static int pri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
   ------------------------------------------------------------------------- */
 static void disable_pri_interrupt (PISDN_ADAPTER IoAdapter) {
  dword volatile __iomem *cfgReg = (dword volatile __iomem *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter) ;
- cfgReg[3] = 0x00000000 ;
- cfgReg[1] = 0x00000000 ;
+ WRITE_DWORD(&cfgReg[3], 0);
+ WRITE_DWORD(&cfgReg[1], 0);
  WRITE_DWORD(&cfgReg[0], (dword)(~0x03E00000)) ;
  DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfgReg);
 }
