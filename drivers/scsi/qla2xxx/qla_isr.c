@@ -568,8 +568,8 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 			rscn_fcport = qla2x00_alloc_rscn_fcport(ha, GFP_ATOMIC);
 			if (rscn_fcport) {
 				DEBUG14(printk("scsi(%ld): Port Update -- "
-				    "creating RSCN fcport %p for login.\n",
-				    ha->host_no, rscn_fcport));
+				    "creating RSCN fcport %p for %x/%x.\n",
+				    ha->host_no, rscn_fcport, mb[1], mb[2]));
 
 				rscn_fcport->loop_id = mb[1];
 				rscn_fcport->d_id.b24 = INVALID_PORT_ID;
@@ -1204,8 +1204,9 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 
 	case CS_TIMEOUT:
 		DEBUG2(printk(KERN_INFO
-		    "scsi(%ld:%d:%d:%d): TIMEOUT status detected 0x%x-0x%x.\n",
-		    ha->host_no, b, t, l, comp_status, scsi_status));
+		    "scsi(%ld:%d:%d:%d): TIMEOUT status detected 0x%x-0x%x "
+		    "sflags=%x.\n", ha->host_no, b, t, l, comp_status,
+		    scsi_status, le16_to_cpu(pkt->status_flags)));
 
 		cp->result = DID_BUS_BUSY << 16;
 

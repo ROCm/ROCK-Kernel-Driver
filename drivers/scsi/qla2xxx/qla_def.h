@@ -1103,13 +1103,13 @@ typedef struct {
 	uint8_t alternate_node_name[WWN_SIZE];
 
 	/*
-	 * BIT 0 = Boot Zoning
+	 * BIT 0 = Selective Login
 	 * BIT 1 = Alt-Boot Enable
-	 * BIT 2 = Report SCSI Path
-	 * BIT 3 = unused
-	 * BIT 4 = unused
-	 * BIT 5 = unused
-	 * BIT 6 = unused
+	 * BIT 2 =
+	 * BIT 3 = Boot Order List
+	 * BIT 4 =
+	 * BIT 5 = Selective LUN
+	 * BIT 6 =
 	 * BIT 7 = unused
 	 */
 	uint8_t efi_parameters;
@@ -1379,6 +1379,7 @@ typedef struct {
 /*
  * Status entry status flags
  */
+#define SF_ABTS_TERMINATED	BIT_10
 #define SF_LOGOUT_SENT		BIT_13
 
 /*
@@ -1637,6 +1638,7 @@ typedef struct os_lun {
     	spinlock_t q_lock;		/* Lun Lock */
 
 	unsigned long q_flag;
+#define LUN_MPIO_RESET_CNTS	1	/* Lun */
 #define LUN_MPIO_BUSY		2	/* Lun is changing paths  */
 #define LUN_EXEC_DELAYED	7	/* Lun execution is delayed */
 
@@ -1759,6 +1761,8 @@ typedef struct fc_port {
 #define FCF_MSA_PORT_ACTIVE	BIT_20
 #define FCF_FAILBACK_DISABLE	BIT_21
 #define FCF_FAILOVER_DISABLE	BIT_22
+#define FCF_DSXXX_DEVICE	BIT_23
+#define FCF_AA_EVA_DEVICE	BIT_24
 
 /* No loop ID flag. */
 #define FC_NO_LOOP_ID		0x1000
@@ -2126,6 +2130,7 @@ typedef struct scsi_qla_host {
 #define FCPORT_RESCAN_NEEDED	21      /* IO descriptor processing needed */
 #define IODESC_PROCESS_NEEDED	22      /* IO descriptor processing needed */
 #define IOCTL_ERROR_RECOVERY	23      
+#define LOOP_RESET_NEEDED	24
 
 	uint32_t	device_flags;
 #define DFLG_LOCAL_DEVICES		BIT_0

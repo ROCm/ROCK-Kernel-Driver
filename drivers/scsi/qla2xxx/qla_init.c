@@ -3596,7 +3596,7 @@ qla2x00_lun_alloc(scsi_qla_host_t *ha, uint16_t tgt, uint16_t lun)
 			DEBUG2(printk("scsi(%ld): Alloc Lun %d @ tgt %d.\n",
 			    ha->host_no, lun, tgt));
 
-			memset(lq, 0, sizeof (os_lun_t));
+			memset(lq, 0, sizeof(os_lun_t));
 			LUN_Q(ha, tgt, lun) = lq;
 
 			/*

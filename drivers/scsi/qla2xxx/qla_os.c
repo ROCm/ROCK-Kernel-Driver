@@ -751,7 +751,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	cmd->host_scribble = (unsigned char *)handle;
 
 	/* Bookkeeping information */
-	sp->r_start = jiffies;       /* time the request was received */
+	sp->r_start = jiffies;		/* Time the request was recieved. */
 	sp->u_start = 0;
 
 	/* Setup device queue pointers. */
@@ -832,6 +832,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		spin_lock_irq(ha->host->host_lock);
 		return (0);
 	}
+
 	if (tq && test_bit(TQF_SUSPENDED, &tq->flags) &&
 	    (sp->flags & SRB_TAPE) == 0) {
 		/* If target suspended put incoming I/O in retry_q. */
@@ -3905,9 +3906,9 @@ qla2x00_cmd_timeout(srb_t *sp)
 	if (sp->state == SRB_PENDING_STATE) {
 		__del_from_pending_queue(vis_ha, sp);
 		DEBUG2(printk("scsi(%ld): Found in Pending queue pid %ld, "
-		    "State = %x., fcport state=%d jiffies=%lx\n",
+		    "State = %x., fcport state=%d sjiffs=%lx njiffs=%lx\n",
 		    vis_ha->host_no, cmd->serial_number, sp->state,
-		    atomic_read(&fcport->state), jiffies));
+		    atomic_read(&fcport->state), sp->r_start, jiffies));
 
 		/*
 		 * If FC_DEVICE is marked as dead return the cmd with
@@ -4139,13 +4140,13 @@ qla2x00_done(scsi_qla_host_t *old_ha)
 
 			default:
 				DEBUG2(printk("scsi(%ld:%d:%d) %s: did_error "
-				    "= %d, comp-scsi= 0x%x-0x%x.\n",
+				    "= %d, comp-scsi= 0x%x-0x%x pid=%ld.\n",
 				    vis_ha->host_no,
 				    cmd->device->id, cmd->device->lun,
 				    __func__,
 				    host_byte(cmd->result),
 				    CMD_COMPL_STATUS(cmd),
-				    CMD_SCSI_STATUS(cmd)));
+				    CMD_SCSI_STATUS(cmd), cmd->serial_number));
 				break;
 		}
 
@@ -4266,11 +4267,10 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 			test_bit(ABORT_ISP_ACTIVE, &dest_ha->dpc_flags) ||
 			atomic_read(&dest_ha->loop_state) != LOOP_READY)) {
 
-			DEBUG3(printk("scsi(%ld): port=(0x%x) retry_q(%d) "
-			    "loop state = %d, loop counter = 0x%x dpc flags "
-			    "= 0x%lx\n",
-			    dest_ha->host_no,
-			    fcport->loop_id,
+			DEBUG3(printk("scsi(%ld): pid=%ld port=0x%x state=%d "
+			    "loop state=%d, loop counter=0x%x "
+			    "dpc_flags=0x%lx\n", sp->cmd->serial_number,
+			    dest_ha->host_no, fcport->loop_id,
 			    atomic_read(&fcport->state),
 			    atomic_read(&dest_ha->loop_state),
 			    atomic_read(&dest_ha->loop_down_timer),
