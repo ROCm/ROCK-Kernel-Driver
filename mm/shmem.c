@@ -889,7 +889,7 @@ repeat:
 			}
 			if (error || swap.val ||
 			    (error = add_to_page_cache_lru(
-					filepage, mapping, idx))) {
+					filepage, mapping, idx, GFP_ATOMIC))) {
 				spin_unlock(&info->lock);
 				page_cache_release(filepage);
 				shmem_free_block(inode);

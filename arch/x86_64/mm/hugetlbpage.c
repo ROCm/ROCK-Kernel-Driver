@@ -232,8 +232,12 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				ret = -ENOMEM;
 				goto out;
 			}
-			add_to_page_cache(page, mapping, idx);
+			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
 			unlock_page(page);
+			if (ret) {
+				free_huge_page(page);
+				goto out;
+			}
 		}
 		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
 	}
