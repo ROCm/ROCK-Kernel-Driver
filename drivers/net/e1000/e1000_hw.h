@@ -92,6 +92,8 @@ typedef enum {
     e1000_82543,
     e1000_82544,
     e1000_82540,
+    e1000_82545,
+    e1000_82546,
     e1000_num_macs
 } e1000_mac_type;
 
@@ -272,7 +274,11 @@ void e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 #define E1000_DEV_ID_82544GC_LOM    0x100D
 #define E1000_DEV_ID_82540EM        0x100E
 #define E1000_DEV_ID_82540EM_LOM    0x1015
-#define NUM_DEV_IDS 9
+#define E1000_DEV_ID_82545EM_COPPER 0x100F
+#define E1000_DEV_ID_82545EM_FIBER  0x1011
+#define E1000_DEV_ID_82546EB_COPPER 0x1010
+#define E1000_DEV_ID_82546EB_FIBER  0x1012
+#define NUM_DEV_IDS 13
 
 #define NODE_ADDRESS_SIZE 6
 #define ETH_LENGTH_OF_ADDRESS 6

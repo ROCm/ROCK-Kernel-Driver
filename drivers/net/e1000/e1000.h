@@ -107,16 +107,20 @@
 #include <linux/udp.h>
 #include <net/pkt_sched.h>
 #include <linux/list.h>
+#include <linux/reboot.h>
 #include <linux/ethtool.h>
 #ifdef NETIF_F_HW_VLAN_TX
 #include <linux/if_vlan.h>
 #endif
 
+#define BAR_0		0
+#define PCI_DMA_64BIT	0xffffffffffffffffULL
+#define PCI_DMA_32BIT	0x00000000ffffffffULL
+
+
 struct e1000_adapter;
 
 #include "e1000_hw.h"
-
-#define BAR_0 0
 
 #if DBG
 #define E1000_DBG(args...) printk(KERN_DEBUG "e1000: " args)
@@ -233,5 +237,7 @@ struct e1000_adapter {
 	struct e1000_phy_stats phy_stats;
 
 
+
+	uint32_t pci_state[16];
 };
 #endif /* _E1000_H_ */

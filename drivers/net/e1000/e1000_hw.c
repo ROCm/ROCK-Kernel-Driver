@@ -2070,6 +2070,8 @@ e1000_detect_gig_phy(struct e1000_hw *hw)
         if(hw->phy_id == M88E1000_I_PHY_ID) match = TRUE;
         break;
     case e1000_82540:
+    case e1000_82545:
+    case e1000_82546:
         if(hw->phy_id == M88E1011_I_PHY_ID) match = TRUE;
         break;
     default:
@@ -2530,6 +2532,13 @@ e1000_read_mac_addr(struct e1000_hw * hw)
         hw->perm_mac_addr[i] = (uint8_t) (eeprom_data & 0x00FF);
         hw->perm_mac_addr[i+1] = (uint8_t) (eeprom_data >> 8);
     }
+    if((hw->mac_type == e1000_82546) &&
+       (E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)) {
+        if(hw->perm_mac_addr[5] & 0x01)
+            hw->perm_mac_addr[5] &= ~(0x01);
+        else
+            hw->perm_mac_addr[5] |= 0x01;
+    }
     for(i = 0; i < NODE_ADDRESS_SIZE; i++)
         hw->mac_addr[i] = hw->perm_mac_addr[i];
     return 0;
@@ -2884,8 +2893,22 @@ e1000_setup_led(struct e1000_hw *hw)
     case E1000_DEV_ID_82544GC_LOM:
         /* No setup necessary */
         break;
+    case E1000_DEV_ID_82545EM_FIBER:
+    case E1000_DEV_ID_82546EB_FIBER:
+        ledctl = E1000_READ_REG(hw, LEDCTL);
+        /* Save current LEDCTL settings */
+        hw->ledctl_default = ledctl;
+        /* Turn off LED0 */
+        ledctl &= ~(E1000_LEDCTL_LED0_IVRT |
+                    E1000_LEDCTL_LED0_BLINK | 
+                    E1000_LEDCTL_LED0_MODE_MASK);
+        ledctl |= (E1000_LEDCTL_MODE_LED_OFF << E1000_LEDCTL_LED0_MODE_SHIFT);
+        E1000_WRITE_REG(hw, LEDCTL, ledctl);
+        break;
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
+    case E1000_DEV_ID_82545EM_COPPER:
+    case E1000_DEV_ID_82546EB_COPPER:
         E1000_WRITE_REG(hw, LEDCTL, hw->ledctl_mode1);
         break;
     default:
@@ -2917,6 +2940,10 @@ e1000_cleanup_led(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
+    case E1000_DEV_ID_82545EM_COPPER:
+    case E1000_DEV_ID_82545EM_FIBER:
+    case E1000_DEV_ID_82546EB_COPPER:
+    case E1000_DEV_ID_82546EB_FIBER:
         /* Restore LEDCTL settings */
         E1000_WRITE_REG(hw, LEDCTL, hw->ledctl_default);
         break;
@@ -2953,6 +2980,8 @@ e1000_led_on(struct e1000_hw *hw)
     case E1000_DEV_ID_82544EI_COPPER:
     case E1000_DEV_ID_82544GC_COPPER:
     case E1000_DEV_ID_82544GC_LOM:
+    case E1000_DEV_ID_82545EM_FIBER:
+    case E1000_DEV_ID_82546EB_FIBER:
         ctrl = E1000_READ_REG(hw, CTRL);
         /* Clear SW Defineable Pin 0 to turn on the LED */
         ctrl &= ~E1000_CTRL_SWDPIN0;
@@ -2961,6 +2990,8 @@ e1000_led_on(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
+    case E1000_DEV_ID_82545EM_COPPER:
+    case E1000_DEV_ID_82546EB_COPPER:
         E1000_WRITE_REG(hw, LEDCTL, hw->ledctl_mode2);
         break;
     default:
@@ -2996,6 +3027,8 @@ e1000_led_off(struct e1000_hw *hw)
     case E1000_DEV_ID_82544EI_COPPER:
     case E1000_DEV_ID_82544GC_COPPER:
     case E1000_DEV_ID_82544GC_LOM:
+    case E1000_DEV_ID_82545EM_FIBER:
+    case E1000_DEV_ID_82546EB_FIBER:
         ctrl = E1000_READ_REG(hw, CTRL);
         /* Set SW Defineable Pin 0 to turn off the LED */
         ctrl |= E1000_CTRL_SWDPIN0;
@@ -3004,6 +3037,8 @@ e1000_led_off(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
+    case E1000_DEV_ID_82545EM_COPPER:
+    case E1000_DEV_ID_82546EB_COPPER:
         E1000_WRITE_REG(hw, LEDCTL, hw->ledctl_mode1);
         break;
     default:

@@ -82,7 +82,6 @@ extern char e1000_driver_version[];
 
 extern int e1000_up(struct e1000_adapter *adapter);
 extern void e1000_down(struct e1000_adapter *adapter);
-extern void e1000_enable_WOL(struct e1000_adapter *adapter);
 
 static void
 e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
@@ -127,7 +126,11 @@ e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 				     SUPPORTED_Autoneg);
 
 		ecmd->port = PORT_FIBRE;
-		ecmd->transceiver = XCVR_EXTERNAL;
+
+		if(hw->mac_type >= e1000_82545)
+			ecmd->transceiver = XCVR_INTERNAL;
+		else
+			ecmd->transceiver = XCVR_EXTERNAL;
 	}
 
 	if(netif_carrier_ok(adapter->netdev)) {
@@ -263,27 +266,50 @@ static void
 e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
 	struct e1000_hw *hw = &adapter->hw;
-	
-	if(hw->mac_type < e1000_82544) {
+
+	switch(adapter->hw.device_id) {
+	case E1000_DEV_ID_82542:
+	case E1000_DEV_ID_82543GC_FIBER:
+	case E1000_DEV_ID_82543GC_COPPER:
+	case E1000_DEV_ID_82544EI_FIBER:
+	default:
 		wol->supported = 0;
 		wol->wolopts   = 0;
 		return;
-	}
 
-	wol->supported = WAKE_PHY | WAKE_UCAST | 
-	                 WAKE_MCAST | WAKE_BCAST | WAKE_MAGIC;
-	
-	wol->wolopts = 0;
-	if(adapter->wol & E1000_WUFC_LNKC)
-		wol->wolopts |= WAKE_PHY;
-	if(adapter->wol & E1000_WUFC_EX)
-		wol->wolopts |= WAKE_UCAST;
-	if(adapter->wol & E1000_WUFC_MC)
-		wol->wolopts |= WAKE_MCAST;
-	if(adapter->wol & E1000_WUFC_BC)
-		wol->wolopts |= WAKE_BCAST;
-	if(adapter->wol & E1000_WUFC_MAG)
-		wol->wolopts |= WAKE_MAGIC;
+	case E1000_DEV_ID_82546EB_FIBER:
+		/* Wake events only supported on port A for dual fiber */
+		if(E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1) {
+			wol->supported = 0;
+			wol->wolopts   = 0;
+			return;
+		}
+		/* Fall Through */
+
+	case E1000_DEV_ID_82544EI_COPPER:
+	case E1000_DEV_ID_82544GC_COPPER:
+	case E1000_DEV_ID_82544GC_LOM:
+	case E1000_DEV_ID_82540EM:
+	case E1000_DEV_ID_82540EM_LOM:
+	case E1000_DEV_ID_82545EM_COPPER:
+	case E1000_DEV_ID_82545EM_FIBER:
+	case E1000_DEV_ID_82546EB_COPPER:
+		wol->supported = WAKE_PHY | WAKE_UCAST | 
+				 WAKE_MCAST | WAKE_BCAST | WAKE_MAGIC;
+		
+		wol->wolopts = 0;
+		if(adapter->wol & E1000_WUFC_LNKC)
+			wol->wolopts |= WAKE_PHY;
+		if(adapter->wol & E1000_WUFC_EX)
+			wol->wolopts |= WAKE_UCAST;
+		if(adapter->wol & E1000_WUFC_MC)
+			wol->wolopts |= WAKE_MCAST;
+		if(adapter->wol & E1000_WUFC_BC)
+			wol->wolopts |= WAKE_BCAST;
+		if(adapter->wol & E1000_WUFC_MAG)
+			wol->wolopts |= WAKE_MAGIC;
+		return;
+	}
 }
 
 static int
@@ -291,23 +317,45 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
 	struct e1000_hw *hw = &adapter->hw;
 
-	if(hw->mac_type < e1000_82544)
+	switch(adapter->hw.device_id) {
+	case E1000_DEV_ID_82542:
+	case E1000_DEV_ID_82543GC_FIBER:
+	case E1000_DEV_ID_82543GC_COPPER:
+	case E1000_DEV_ID_82544EI_FIBER:
+	default:
 		return wol->wolopts ? -EOPNOTSUPP : 0;
 
-	adapter->wol = 0;
+	case E1000_DEV_ID_82546EB_FIBER:
+		/* Wake events only supported on port A for dual fiber */
+		if(E1000_READ_REG(hw, STATUS) & E1000_STATUS_FUNC_1)
+			return wol->wolopts ? -EOPNOTSUPP : 0;
+		/* Fall Through */
 
-	if(wol->wolopts & WAKE_PHY)
-		adapter->wol |= E1000_WUFC_LNKC;
-	if(wol->wolopts & WAKE_UCAST)
-		adapter->wol |= E1000_WUFC_EX;
-	if(wol->wolopts & WAKE_MCAST)
-		adapter->wol |= E1000_WUFC_MC;
-	if(wol->wolopts & WAKE_BCAST)
-		adapter->wol |= E1000_WUFC_BC;
-	if(wol->wolopts & WAKE_MAGIC)
-		adapter->wol |= E1000_WUFC_MAG;
+	case E1000_DEV_ID_82544EI_COPPER:
+	case E1000_DEV_ID_82544GC_COPPER:
+	case E1000_DEV_ID_82544GC_LOM:
+	case E1000_DEV_ID_82540EM:
+	case E1000_DEV_ID_82540EM_LOM:
+	case E1000_DEV_ID_82545EM_COPPER:
+	case E1000_DEV_ID_82545EM_FIBER:
+	case E1000_DEV_ID_82546EB_COPPER:
+		if(wol->wolopts & WAKE_ARP)
+			return -EOPNOTSUPP;
 
-	e1000_enable_WOL(adapter);
+		adapter->wol = 0;
+
+		if(wol->wolopts & WAKE_PHY)
+			adapter->wol |= E1000_WUFC_LNKC;
+		if(wol->wolopts & WAKE_UCAST)
+			adapter->wol |= E1000_WUFC_EX;
+		if(wol->wolopts & WAKE_MCAST)
+			adapter->wol |= E1000_WUFC_MC;
+		if(wol->wolopts & WAKE_BCAST)
+			adapter->wol |= E1000_WUFC_BC;
+		if(wol->wolopts & WAKE_MAGIC)
+			adapter->wol |= E1000_WUFC_MAG;
+	}
+
 	return 0;
 }
 
