@@ -62,7 +62,7 @@ static void kill_bdev(struct block_device *bdev)
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 }	
 
-int __set_blocksize(struct block_device *bdev, int size, int sync)
+int set_blocksize(struct block_device *bdev, int size)
 {
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
@@ -74,8 +74,7 @@ int __set_blocksize(struct block_device *bdev, int size, int sync)
 
 	/* Don't change the size if it is same as current */
 	if (bdev->bd_block_size != size) {
-		if (sync)
-			sync_blockdev(bdev);
+		sync_blockdev(bdev);
 		bdev->bd_block_size = size;
 		bdev->bd_inode->i_blkbits = blksize_bits(size);
 		kill_bdev(bdev);
@@ -83,7 +82,7 @@ int __set_blocksize(struct block_device *bdev, int size, int sync)
 	return 0;
 }
 
-EXPORT_SYMBOL(__set_blocksize);
+EXPORT_SYMBOL(set_blocksize);
 
 int sb_set_blocksize(struct super_block *sb, int size)
 {
@@ -239,6 +238,7 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
  */
 
 static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(bdev_lock);
+static DECLARE_WAIT_QUEUE_HEAD(bdev_wq);
 static kmem_cache_t * bdev_cachep;
 
 static struct inode *bdev_alloc_inode(struct super_block *sb)
@@ -444,20 +444,33 @@ void bd_forget(struct inode *inode)
 	spin_unlock(&bdev_lock);
 }
 
-int bd_claim(struct block_device *bdev, void *holder)
+/*
+ * flags:
+ * BD_NONE: No special behavior.
+ * BD_EXCL: Must have sole access to device, even if holder is the same.
+ *          This is really enforced by the holder always using BD_EXCL.
+ * BD_WAIT: Wait until access is available before returning.
+ */
+int __bd_claim(struct block_device *bdev, void *holder, int flags)
 {
 	int res;
+	DEFINE_WAIT (wait);
+
+retry:
 	spin_lock(&bdev_lock);
+	prepare_to_wait (&bdev_wq, &wait, TASK_UNINTERRUPTIBLE);
 
 	/* first decide result */
-	if (bdev->bd_holder == holder)
+	if (bdev->bd_holder == holder) {
 		res = 0;	 /* already a holder */
-	else if (bdev->bd_holder != NULL)
+		if (flags & BD_EXCL)
+			res = -EBUSY;
+	} else if (bdev->bd_holder != NULL)
 		res = -EBUSY; 	 /* held by someone else */
 	else if (bdev->bd_contains == bdev)
 		res = 0;  	 /* is a whole device which isn't held */
 
-	else if (bdev->bd_contains->bd_holder == bd_claim)
+	else if (bdev->bd_contains->bd_holder == __bd_claim)
 		res = 0; 	 /* is a partition of a device that is being partitioned */
 	else if (bdev->bd_contains->bd_holder != NULL)
 		res = -EBUSY;	 /* is a partition of a held device */
@@ -471,29 +484,34 @@ int bd_claim(struct block_device *bdev, void *holder)
 		 * be set to bd_claim before being set to holder
 		 */
 		bdev->bd_contains->bd_holders ++;
-		bdev->bd_contains->bd_holder = bd_claim;
+		bdev->bd_contains->bd_holder = __bd_claim;
 		bdev->bd_holders++;
 		bdev->bd_holder = holder;
+	} else if (flags & BD_WAIT) {
+		spin_unlock (&bdev_lock);
+		schedule();
+		goto retry;
 	}
+
+	finish_wait (&bdev_wq, &wait);
 	spin_unlock(&bdev_lock);
 	return res;
 }
 
-EXPORT_SYMBOL(bd_claim);
+EXPORT_SYMBOL(__bd_claim);
 
-void __bd_release(struct block_device *bdev, int size)
+void bd_release(struct block_device *bdev)
 {
 	spin_lock(&bdev_lock);
 	if (!--bdev->bd_contains->bd_holders)
 		bdev->bd_contains->bd_holder = NULL;
-	if (!--bdev->bd_holders) {
+	if (!--bdev->bd_holders)
 		bdev->bd_holder = NULL;
-		set_blocksize_nosync (bdev, size);
-	}
 	spin_unlock(&bdev_lock);
+	wake_up_all (&bdev_wq);
 }
 
-EXPORT_SYMBOL(__bd_release);
+EXPORT_SYMBOL(bd_release);
 
 /*
  * Tries to open block device by device number.  Use it ONLY if you
@@ -879,7 +897,8 @@ fail:
  * Open the blockdevice described by the special file at @path, claim it
  * for the @holder.
  */
-struct block_device *open_bdev_excl(const char *path, int flags, void *holder)
+struct block_device *__open_bdev_excl(const char *path, int flags,
+                                      void *holder, int bdflags)
 {
 	struct block_device *bdev;
 	mode_t mode = FMODE_READ;
@@ -897,7 +916,7 @@ struct block_device *open_bdev_excl(const char *path, int flags, void *holder)
 	error = -EACCES;
 	if (!(flags & MS_RDONLY) && bdev_read_only(bdev))
 		goto blkdev_put;
-	error = bd_claim(bdev, holder);
+	error = __bd_claim(bdev, holder, bdflags);
 	if (error)
 		goto blkdev_put;
 
@@ -908,7 +927,7 @@ blkdev_put:
 	return ERR_PTR(error);
 }
 
-EXPORT_SYMBOL(open_bdev_excl);
+EXPORT_SYMBOL(__open_bdev_excl);
 
 /**
  * close_bdev_excl  -  release a blockdevice openen by open_bdev_excl()
@@ -917,10 +936,10 @@ EXPORT_SYMBOL(open_bdev_excl);
  *
  * This is the counterpart to open_bdev_excl().
  */
-void __close_bdev_excl(struct block_device *bdev, int size)
+void close_bdev_excl(struct block_device *bdev)
 {
-	__bd_release(bdev, size);
+	bd_release(bdev);
 	blkdev_put(bdev);
 }
 
-EXPORT_SYMBOL(__close_bdev_excl);
+EXPORT_SYMBOL(close_bdev_excl);

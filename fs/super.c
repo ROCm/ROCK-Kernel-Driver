@@ -677,7 +677,7 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	struct super_block *s;
 	int error = 0;
 
-	bdev = open_bdev_excl(dev_name, flags, fs_type);
+	bdev = __open_bdev_excl(dev_name, flags, fs_type, BD_EXCL|BD_WAIT);
 	if (IS_ERR(bdev))
 		return (struct super_block *)bdev;
 
@@ -732,8 +732,8 @@ void kill_block_super(struct super_block *sb)
 
 	bdev_uevent(bdev, KOBJ_UMOUNT);
 	generic_shutdown_super(sb);
-	sync_blockdev(bdev);
-	__close_bdev_excl(bdev, sb->s_old_blocksize);
+	set_blocksize(bdev, sb->s_old_blocksize);
+	close_bdev_excl(bdev);
 }
 
 EXPORT_SYMBOL(kill_block_super);
