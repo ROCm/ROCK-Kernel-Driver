@@ -590,6 +590,9 @@ static int __init alsa_card_cs423x_init(void)
 	cards += pnp_register_card_driver(&cs423x_pnpc_driver);
 #endif
 	if (!cards) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&cs423x_pnpc_driver);
+#endif
 #ifdef MODULE
 		printk(KERN_ERR IDENT " soundcard not found or device busy\n");
 #endif

@@ -126,7 +126,7 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 	}
 }
 
-int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
+static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_uframes_t pos;
@@ -1976,18 +1976,20 @@ void snd_pcm_tick_prepare(snd_pcm_substream_t *substream)
 void snd_pcm_tick_elapsed(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime;
+	unsigned long flags;
+	
 	snd_assert(substream != NULL, return);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return);
 
-	spin_lock_irq(&runtime->lock);
+	snd_pcm_stream_lock_irqsave(substream, flags);
 	if (!snd_pcm_running(substream) ||
 	    snd_pcm_update_hw_ptr(substream) < 0)
 		goto _end;
 	if (runtime->sleep_min)
 		snd_pcm_tick_prepare(substream);
  _end:
-	spin_unlock_irq(&runtime->lock);
+	snd_pcm_stream_unlock_irqrestore(substream, flags);
 }
 
 /**
@@ -2004,6 +2006,8 @@ void snd_pcm_tick_elapsed(snd_pcm_substream_t *substream)
 void snd_pcm_period_elapsed(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime;
+	unsigned long flags;
+
 	snd_assert(substream != NULL, return);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return);
@@ -2011,7 +2015,7 @@ void snd_pcm_period_elapsed(snd_pcm_substream_t *substream)
 	if (runtime->transfer_ack_begin)
 		runtime->transfer_ack_begin(substream);
 
-	spin_lock(&runtime->lock);
+	snd_pcm_stream_lock_irqsave(substream, flags);
 	if (!snd_pcm_running(substream) ||
 	    snd_pcm_update_hw_ptr_interrupt(substream) < 0)
 		goto _end;
@@ -2021,7 +2025,7 @@ void snd_pcm_period_elapsed(snd_pcm_substream_t *substream)
 	if (runtime->sleep_min)
 		snd_pcm_tick_prepare(substream);
  _end:
-	spin_unlock(&runtime->lock);
+	snd_pcm_stream_unlock_irqrestore(substream, flags);
 	if (runtime->transfer_ack_end)
 		runtime->transfer_ack_end(substream);
 	kill_fasync(&runtime->fasync, SIGIO, POLL_IN);
@@ -2065,7 +2069,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 	if (size > runtime->xfer_align)
 		size -= size % runtime->xfer_align;
 
-	spin_lock_irq(&runtime->lock);
+	snd_pcm_stream_lock_irq(substream);
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_PREPARED:
 	case SNDRV_PCM_STATE_RUNNING:
@@ -2107,16 +2111,16 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 					state = SIGNALED;
 					break;
 				}
-				spin_unlock_irq(&runtime->lock);
+				snd_pcm_stream_unlock_irq(substream);
 				if (schedule_timeout(10 * HZ) == 0) {
-					spin_lock_irq(&runtime->lock);
+					snd_pcm_stream_lock_irq(substream);
 					if (runtime->status->state != SNDRV_PCM_STATE_PREPARED &&
 					    runtime->status->state != SNDRV_PCM_STATE_PAUSED) {
 						state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
 						break;
 					}
 				}
-				spin_lock_irq(&runtime->lock);
+				snd_pcm_stream_lock_irq(substream);
 				switch (runtime->status->state) {
 				case SNDRV_PCM_STATE_XRUN:
 				case SNDRV_PCM_STATE_DRAINING:
@@ -2162,15 +2166,13 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 		cont = runtime->buffer_size - runtime->control->appl_ptr % runtime->buffer_size;
 		if (frames > cont)
 			frames = cont;
-		snd_assert(frames != 0,
-			   spin_unlock_irq(&runtime->lock);
-			   return -EINVAL);
+		snd_assert(frames != 0, snd_pcm_stream_unlock_irq(substream); return -EINVAL);
 		appl_ptr = runtime->control->appl_ptr;
 		appl_ofs = appl_ptr % runtime->buffer_size;
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(substream);
 		if ((err = transfer(substream, appl_ofs, (void *)data, offset, frames)) < 0)
 			goto _end;
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(substream);
 		switch (runtime->status->state) {
 		case SNDRV_PCM_STATE_XRUN:
 			err = -EPIPE;
@@ -2204,7 +2206,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 			snd_pcm_tick_prepare(substream);
 	}
  _end_unlock:
-	spin_unlock_irq(&runtime->lock);
+	snd_pcm_stream_unlock_irq(substream);
  _end:
 	return xfer > 0 ? (snd_pcm_sframes_t)xfer : err;
 }
@@ -2348,7 +2350,7 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 	if (size > runtime->xfer_align)
 		size -= size % runtime->xfer_align;
 
-	spin_lock_irq(&runtime->lock);
+	snd_pcm_stream_lock_irq(substream);
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_PREPARED:
 		if (size >= runtime->start_threshold) {
@@ -2403,16 +2405,16 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 					state = SIGNALED;
 					break;
 				}
-				spin_unlock_irq(&runtime->lock);
+				snd_pcm_stream_unlock_irq(substream);
 				if (schedule_timeout(10 * HZ) == 0) {
-					spin_lock_irq(&runtime->lock);
+					snd_pcm_stream_lock_irq(substream);
 					if (runtime->status->state != SNDRV_PCM_STATE_PREPARED &&
 					    runtime->status->state != SNDRV_PCM_STATE_PAUSED) {
 						state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
 						break;
 					}
 				}
-				spin_lock_irq(&runtime->lock);
+				snd_pcm_stream_lock_irq(substream);
 				switch (runtime->status->state) {
 				case SNDRV_PCM_STATE_XRUN:
 					state = ERROR;
@@ -2459,15 +2461,13 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 		cont = runtime->buffer_size - runtime->control->appl_ptr % runtime->buffer_size;
 		if (frames > cont)
 			frames = cont;
-		snd_assert(frames != 0,
-			   spin_unlock_irq(&runtime->lock);
-			   return -EINVAL);
+		snd_assert(frames != 0, snd_pcm_stream_unlock_irq(substream); return -EINVAL);
 		appl_ptr = runtime->control->appl_ptr;
 		appl_ofs = appl_ptr % runtime->buffer_size;
-		spin_unlock_irq(&runtime->lock);
+		snd_pcm_stream_unlock_irq(substream);
 		if ((err = transfer(substream, appl_ofs, (void *)data, offset, frames)) < 0)
 			goto _end;
-		spin_lock_irq(&runtime->lock);
+		snd_pcm_stream_lock_irq(substream);
 		switch (runtime->status->state) {
 		case SNDRV_PCM_STATE_XRUN:
 			err = -EPIPE;
@@ -2495,7 +2495,7 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
 			snd_pcm_tick_prepare(substream);
 	}
  _end_unlock:
-	spin_unlock_irq(&runtime->lock);
+	snd_pcm_stream_unlock_irq(substream);
  _end:
 	return xfer > 0 ? (snd_pcm_sframes_t)xfer : err;
 }

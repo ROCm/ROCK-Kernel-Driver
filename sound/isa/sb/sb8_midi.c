@@ -33,7 +33,7 @@
 
  */
 
-void snd_sb8dsp_midi_interrupt(sb_t * chip)
+irqreturn_t snd_sb8dsp_midi_interrupt(sb_t * chip)
 {
 	snd_rawmidi_t *rmidi;
 	int max = 64;
@@ -41,7 +41,7 @@ void snd_sb8dsp_midi_interrupt(sb_t * chip)
 
 	if (chip == NULL || (rmidi = chip->rmidi) == NULL) {
 		inb(SBP(chip, READ));	/* ack interrupt */
-		return;
+		return IRQ_NONE;
 	}
 	while (max-- > 0) {
 		spin_lock(&chip->midi_input_lock);
@@ -53,6 +53,7 @@ void snd_sb8dsp_midi_interrupt(sb_t * chip)
 			spin_unlock(&chip->midi_input_lock);
 		}
 	}
+	return IRQ_HANDLED;
 }
 
 /*

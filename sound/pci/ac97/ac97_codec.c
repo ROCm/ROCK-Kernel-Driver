@@ -143,10 +143,12 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x54584e20, 0xffffffff, "TLC320AD9xC",	NULL,		NULL },
 { 0x56494161, 0xffffffff, "VIA1612A",		NULL,		NULL }, // modified ICE1232 with S/PDIF
 { 0x57454301, 0xffffffff, "W83971D",		NULL,		NULL },
-{ 0x574d4c00, 0xffffffff, "WM9701A",		patch_wolfson00,NULL },
-{ 0x574d4c03, 0xffffffff, "WM9703/9707",	patch_wolfson03,NULL },
-{ 0x574d4c04, 0xffffffff, "WM9704/quad",	patch_wolfson04,NULL },
-{ 0x574d4c05, 0xffffffff, "WM9705",		NULL,		NULL },	// patch?
+{ 0x574d4c00, 0xffffffff, "WM9701A",		NULL,		NULL },
+{ 0x574d4C03, 0xffffffff, "WM9703/WM9707/WM9708/WM9717", patch_wolfson03, NULL},
+{ 0x574d4C04, 0xffffffff, "WM9704M/WM9704Q",	patch_wolfson04, NULL},
+{ 0x574d4C05, 0xffffffff, "WM9705/WM9710",	patch_wolfson05, NULL},
+{ 0x574d4C09, 0xffffffff, "WM9709",		NULL,		NULL},
+{ 0x574d4C12, 0xffffffff, "WM9711/WM9712",	patch_wolfson11, NULL},
 { 0x594d4800, 0xffffffff, "YMF743",		NULL,		NULL },
 { 0x594d4802, 0xffffffff, "YMF752",		NULL,		NULL },
 { 0x594d4803, 0xffffffff, "YMF753",		patch_yamaha_ymf753,	NULL },

@@ -33,22 +33,24 @@
 irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	emu10k1_t *emu = snd_magic_cast(emu10k1_t, dev_id, return IRQ_NONE);
-	unsigned int status;
+	unsigned int status, orig_status;
 	int handled = 0;
 
 	while ((status = inl(emu->port + IPR)) != 0) {
 		// printk("irq - status = 0x%x\n", status);
+		orig_status = status;
 		handled = 1;
 		if (status & IPR_PCIERROR) {
 			snd_printk("interrupt: PCI error\n");
 			snd_emu10k1_intr_disable(emu, INTE_PCIERRORENABLE);
+			status &= ~IPR_PCIERROR;
 		}
 		if (status & (IPR_VOLINCR|IPR_VOLDECR|IPR_MUTE)) {
 			if (emu->hwvol_interrupt)
 				emu->hwvol_interrupt(emu, status);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_VOLINCRENABLE|INTE_VOLDECRENABLE|INTE_MUTEENABLE);
-			outl(status & (IPR_VOLINCR|IPR_VOLDECR|IPR_MUTE), emu->port + IPR);
+			status &= ~(IPR_VOLINCR|IPR_VOLDECR|IPR_MUTE);
 		}
 		if (status & IPR_CHANNELLOOP) {
 			int voice;
@@ -88,64 +90,69 @@ irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 					pvoice++;
 				}
 			}
-			outl(IPR_CHANNELLOOP | (status & IPR_CHANNELNUMBERMASK), emu->port + IPR);
+			status &= ~IPR_CHANNELLOOP;
 		}
+		status &= ~IPR_CHANNELNUMBERMASK;
 		if (status & (IPR_ADCBUFFULL|IPR_ADCBUFHALFFULL)) {
 			if (emu->capture_interrupt)
 				emu->capture_interrupt(emu, status);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_ADCBUFENABLE);
-			outl(status & (IPR_ADCBUFFULL|IPR_ADCBUFHALFFULL), emu->port + IPR);
+			status &= ~(IPR_ADCBUFFULL|IPR_ADCBUFHALFFULL);
 		}
 		if (status & (IPR_MICBUFFULL|IPR_MICBUFHALFFULL)) {
 			if (emu->capture_mic_interrupt)
 				emu->capture_mic_interrupt(emu, status);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_MICBUFENABLE);
-			outl(status & (IPR_MICBUFFULL|IPR_MICBUFHALFFULL), emu->port + IPR);
+			status &= ~(IPR_MICBUFFULL|IPR_MICBUFHALFFULL);
 		}
 		if (status & (IPR_EFXBUFFULL|IPR_EFXBUFHALFFULL)) {
 			if (emu->capture_efx_interrupt)
 				emu->capture_efx_interrupt(emu, status);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_EFXBUFENABLE);
-			outl(status & (IPR_EFXBUFFULL|IPR_EFXBUFHALFFULL), emu->port + IPR);
+			status &= ~(IPR_EFXBUFFULL|IPR_EFXBUFHALFFULL);
 		}
 		if (status & (IPR_MIDITRANSBUFEMPTY|IPR_MIDIRECVBUFEMPTY)) {
 			if (emu->midi.interrupt)
 				emu->midi.interrupt(emu, status);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_MIDITXENABLE|INTE_MIDIRXENABLE);
-			outl(status & (IPR_MIDITRANSBUFEMPTY|IPR_MIDIRECVBUFEMPTY), emu->port + IPR);
+			status &= ~(IPR_MIDITRANSBUFEMPTY|IPR_MIDIRECVBUFEMPTY);
 		}
 		if (status & (IPR_A_MIDITRANSBUFEMPTY2|IPR_A_MIDIRECVBUFEMPTY2)) {
 			if (emu->midi2.interrupt)
 				emu->midi2.interrupt(emu, status);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_A_MIDITXENABLE2|INTE_A_MIDIRXENABLE2);
-			outl(status & (IPR_A_MIDITRANSBUFEMPTY2|IPR_A_MIDIRECVBUFEMPTY2), emu->port + IPR);
+			status &= ~(IPR_A_MIDITRANSBUFEMPTY2|IPR_A_MIDIRECVBUFEMPTY2);
 		}
 		if (status & IPR_INTERVALTIMER) {
 			if (emu->timer_interrupt)
 				emu->timer_interrupt(emu);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_INTERVALTIMERENB);
-			outl(IPR_INTERVALTIMER, emu->port + IPR);
+			status &= ~IPR_INTERVALTIMER;
 		}
 		if (status & (IPR_GPSPDIFSTATUSCHANGE|IPR_CDROMSTATUSCHANGE)) {
 			if (emu->spdif_interrupt)
 				emu->spdif_interrupt(emu, status);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_GPSPDIFENABLE|INTE_CDSPDIFENABLE);
-			outl(status & (IPR_GPSPDIFSTATUSCHANGE|IPR_CDROMSTATUSCHANGE), emu->port + IPR);
+			status &= ~(IPR_GPSPDIFSTATUSCHANGE|IPR_CDROMSTATUSCHANGE);
 		}
 		if (status & IPR_FXDSP) {
 			if (emu->dsp_interrupt)
 				emu->dsp_interrupt(emu);
 			else
 				snd_emu10k1_intr_disable(emu, INTE_FXDSPENABLE);
-			outl(IPR_FXDSP, emu->port + IPR);
+			status &= ~IPR_FXDSP;
 		}
+		if (status) {
+			snd_printd(KERN_WARNING "emu10k1: unhandled interrupt: 0x%08x\n", status);
+		}
+		outl(orig_status, emu->port + IPR); /* ack */
 	}
 	return IRQ_RETVAL(handled);
 }

@@ -335,6 +335,7 @@ static int __init alsa_sound_init(void)
 	devfs_mk_dir("snd");
 	if (register_chrdev(major, "alsa", &snd_fops)) {
 		snd_printk(KERN_ERR "unable to register native major device number %d\n", major);
+		devfs_remove("snd");
 		return -EIO;
 	}
 #ifdef CONFIG_SND_DEBUG_MEMORY
@@ -344,6 +345,8 @@ static int __init alsa_sound_init(void)
 #ifdef CONFIG_SND_DEBUG_MEMORY
 		snd_memory_done();
 #endif
+		unregister_chrdev(major, "alsa");
+		devfs_remove("snd");
 		return -ENOMEM;
 	}
 #ifdef CONFIG_SND_OSSEMUL

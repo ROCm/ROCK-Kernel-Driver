@@ -26,6 +26,7 @@
 #include <sound/ac97_codec.h>
 #include <sound/rawmidi.h>
 #include <sound/i2c.h>
+#include <sound/ak4xxx-adda.h>
 #include <sound/pcm.h>
 
 
@@ -214,7 +215,6 @@
  */
 
 typedef struct _snd_ice1712 ice1712_t;
-typedef struct snd_ak4xxx akm4xxx_t;
 
 typedef struct {
 	unsigned int subvendor;	/* PCI[2c-2f] */
@@ -254,17 +254,7 @@ enum {
 #define ice_has_con_ac97(ice)	(!((ice)->eeprom.data[ICE_EEP1_CODEC] & ICE1712_CFG_NO_CON_AC97))
 
 
-struct snd_ak4xxx {
-	unsigned int num_adcs;		/* AK4524 or AK4528 ADCs */
-	unsigned int num_dacs;		/* AK4524 or AK4528 DACs */
-	unsigned char images[4][16];	/* saved register image */
-	unsigned char ipga_gain[4][2];	/* saved register image for IPGA (AK4528) */
-	ice1712_t *chip;
-	/* template should fill the following fields */
-	unsigned int idx_offset;	/* control index offset */
-	enum {
-		SND_AK4524, SND_AK4528, SND_AK4529, SND_AK4355, SND_AK4381
-	} type;
+struct snd_ak4xxx_private {
 	unsigned int cif: 1;		/* CIF mode */
 	unsigned char caddr;		/* C0 and C1 bits */
 	unsigned int data_mask;		/* DATA gpio bit */
@@ -275,8 +265,6 @@ struct snd_ak4xxx {
 	unsigned int add_flags;		/* additional bits at init */
 	unsigned int mask_flags;	/* total mask bits */
 	struct snd_akm4xxx_ops {
-		int (*start)(akm4xxx_t *ak, int chip);
-		void (*stop)(akm4xxx_t *ak);
 		void (*set_rate_val)(akm4xxx_t *ak, unsigned int rate);
 	} ops;
 };
@@ -439,9 +427,8 @@ static inline void snd_ice1712_gpio_write_bits(ice1712_t *ice, unsigned int mask
 
 int snd_ice1712_spdif_build_controls(ice1712_t *ice);
 
-void snd_ice1712_akm4xxx_write(akm4xxx_t *ice, int chip, unsigned char addr, unsigned char data);
-void snd_ice1712_akm4xxx_reset(akm4xxx_t *ice, int state);
-void snd_ice1712_akm4xxx_init(akm4xxx_t *ak, const akm4xxx_t *template, ice1712_t *ice);
+int snd_ice1712_akm4xxx_init(akm4xxx_t *ak, const akm4xxx_t *template, const struct snd_ak4xxx_private *priv, ice1712_t *ice);
+void snd_ice1712_akm4xxx_free(ice1712_t *ice);
 int snd_ice1712_akm4xxx_build_controls(ice1712_t *ice);
 
 int snd_ice1712_init_cs8427(ice1712_t *ice, int addr);

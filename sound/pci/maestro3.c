@@ -1968,7 +1968,7 @@ static void snd_m3_ac97_reset(m3_t *chip, int busywait)
 #endif
 }
 
-static int snd_m3_mixer(m3_t *chip)
+static int __devinit snd_m3_mixer(m3_t *chip)
 {
 	ac97_t ac97;
 	int err;
@@ -1994,7 +1994,7 @@ static int snd_m3_mixer(m3_t *chip)
  * DSP Code images
  */
 
-static u16 assp_kernel_image[] = {
+static u16 assp_kernel_image[] __devinitdata = {
     0x7980, 0x0030, 0x7980, 0x03B4, 0x7980, 0x03B4, 0x7980, 0x00FB, 0x7980, 0x00DD, 0x7980, 0x03B4, 
     0x7980, 0x0332, 0x7980, 0x0287, 0x7980, 0x03B4, 0x7980, 0x03B4, 0x7980, 0x03B4, 0x7980, 0x03B4, 
     0x7980, 0x031A, 0x7980, 0x03B4, 0x7980, 0x022F, 0x7980, 0x03B4, 0x7980, 0x03B4, 0x7980, 0x03B4, 
@@ -2081,7 +2081,7 @@ static u16 assp_kernel_image[] = {
  * Mini sample rate converter code image
  * that is to be loaded at 0x400 on the DSP.
  */
-static u16 assp_minisrc_image[] = {
+static u16 assp_minisrc_image[] __devinitdata = {
 
     0xBF80, 0x101E, 0x906E, 0x006E, 0x8B88, 0x6980, 0xEF88, 0x906F, 0x0D6F, 0x6900, 0xEB08, 0x0412, 
     0xBC20, 0x696E, 0xB801, 0x906E, 0x7980, 0x0403, 0xB90E, 0x8807, 0xBE43, 0xBF01, 0xBE47, 0xBE41, 
@@ -2124,12 +2124,12 @@ static u16 assp_minisrc_image[] = {
  */
 
 #define MINISRC_LPF_LEN 10
-static u16 minisrc_lpf[MINISRC_LPF_LEN] = {
+static u16 minisrc_lpf[MINISRC_LPF_LEN] __devinitdata = {
 	0X0743, 0X1104, 0X0A4C, 0XF88D, 0X242C,
 	0X1023, 0X1AA9, 0X0B60, 0XEFDD, 0X186F
 };
 
-static void snd_m3_assp_init(m3_t *chip)
+static void __devinit snd_m3_assp_init(m3_t *chip)
 {
 	unsigned int i;
 
@@ -2218,7 +2218,7 @@ static void snd_m3_assp_init(m3_t *chip)
 }
 
 
-static int snd_m3_assp_client_init(m3_t *chip, m3_dma_t *s, int index)
+static int __devinit snd_m3_assp_client_init(m3_t *chip, m3_dma_t *s, int index)
 {
 	int data_bytes = 2 * ( MINISRC_TMP_BUFFER_SIZE / 2 + 
 			       MINISRC_IN_BUFFER_SIZE / 2 +
@@ -2387,6 +2387,8 @@ static void m3_suspend(m3_t *chip)
 	snd_card_t *card = chip->card;
 	int i, index;
 
+	if (chip->suspend_mem == NULL)
+		return;
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		return;
 
@@ -2416,6 +2418,8 @@ static void m3_resume(m3_t *chip)
 	snd_card_t *card = chip->card;
 	int i, index;
 
+	if (chip->suspend_mem == NULL)
+		return;
 	if (card->power_state == SNDRV_CTL_POWER_D0)
 		return;
 
@@ -2585,8 +2589,8 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	chip->iobase = pci_resource_start(pci, 0);
 	if ((chip->iobase_res = request_region(chip->iobase, 256,
 					       card->driver)) == NULL) {
-		snd_m3_free(chip);
 		snd_printk("unable to grab i/o ports %ld\n", chip->iobase);
+		snd_m3_free(chip);
 		return -EBUSY;
 	}
 	
@@ -2598,14 +2602,14 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 
 	snd_m3_ac97_reset(chip, 0);
 
+	snd_m3_assp_init(chip);
+	snd_m3_amp_enable(chip, 1);
+    
 	if ((err = snd_m3_mixer(chip)) < 0) {
 		snd_m3_free(chip);
 		return err;
 	}
 
-	snd_m3_assp_init(chip);
-	snd_m3_amp_enable(chip, 1);
-    
 	for (i = 0; i < chip->num_substreams; i++) {
 		m3_dma_t *s = &chip->substreams[i];
 		s->chip = chip;
@@ -2622,8 +2626,8 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
     
 	if (request_irq(pci->irq, snd_m3_interrupt, SA_INTERRUPT|SA_SHIRQ,
 			card->driver, (void *)chip)) {
-		snd_m3_free(chip);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_m3_free(chip);
 		return -ENOMEM;
 	}
 	chip->irq = pci->irq;
@@ -2632,8 +2636,10 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	chip->suspend_mem = vmalloc(sizeof(u16) * (REV_B_CODE_MEMORY_LENGTH + REV_B_DATA_MEMORY_LENGTH));
 	if (chip->suspend_mem == NULL)
 		snd_printk("can't allocate apm buffer\n");
-	card->set_power_state = snd_m3_set_power_state;
-	card->power_state_private_data = chip;
+	else {
+		card->set_power_state = snd_m3_set_power_state;
+		card->power_state_private_data = chip;
+	}
 #endif
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
