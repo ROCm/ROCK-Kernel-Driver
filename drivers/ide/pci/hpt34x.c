@@ -44,65 +44,6 @@
 
 #include "hpt34x.h"
 
-#if defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 hpt34x_proc = 0;
-
-#define HPT34X_MAX_DEVS		8
-static struct pci_dev *hpt34x_devs[HPT34X_MAX_DEVS];
-static int n_hpt34x_devs;
-
-static int hpt34x_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	int i, len;
-
-	p += sprintf(p, "\n                             "
-			"HPT34X Chipset.\n");
-	for (i = 0; i < n_hpt34x_devs; i++) {
-		struct pci_dev *dev = hpt34x_devs[i];
-		unsigned long bibma = pci_resource_start(dev, 4);
-		u8  c0 = 0, c1 = 0;
-
-		/*
-		 * at that point bibma+0x2 et bibma+0xa are byte registers
-		 * to investigate:
-		 */
-		c0 = inb_p((u16)bibma + 0x02);
-		c1 = inb_p((u16)bibma + 0x0a);
-		p += sprintf(p, "\nController: %d\n", i);
-		p += sprintf(p, "--------------- Primary Channel "
-				"---------------- Secondary Channel "
-				"-------------\n");
-		p += sprintf(p, "                %sabled "
-				"                        %sabled\n",
-				(c0&0x80) ? "dis" : " en",
-				(c1&0x80) ? "dis" : " en");
-		p += sprintf(p, "--------------- drive0 --------- drive1 "
-				"-------- drive0 ---------- drive1 ------\n");
-		p += sprintf(p, "DMA enabled:    %s              %s"
-				"             %s               %s\n",
-				(c0&0x20) ? "yes" : "no ",
-				(c0&0x40) ? "yes" : "no ",
-				(c1&0x20) ? "yes" : "no ",
-				(c1&0x40) ? "yes" : "no " );
-
-		p += sprintf(p, "UDMA\n");
-		p += sprintf(p, "DMA\n");
-		p += sprintf(p, "PIO\n");
-	}
-	p += sprintf(p, "\n");
-
-	/* p - buffer must be less than 4k! */
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-#endif  /* defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static u8 hpt34x_ratemask (ide_drive_t *drive)
 {
 	return 1;
@@ -276,15 +217,6 @@ static unsigned int __devinit init_chipset_hpt34x(struct pci_dev *dev, const cha
 	pci_write_config_word(dev, PCI_COMMAND, cmd);
 
 	local_irq_restore(flags);
-
-#if defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS)
-	hpt34x_devs[n_hpt34x_devs++] = dev;
-
-	if (!hpt34x_proc) {
-		hpt34x_proc = 1;
-		ide_pci_create_host_proc("hpt34x", hpt34x_get_info);
-	}
-#endif /* DISPLAY_HPT34X_TIMINGS && CONFIG_PROC_FS */
 
 	return dev->irq;
 }
