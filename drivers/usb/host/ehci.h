@@ -418,6 +418,7 @@ struct ehci_iso_stream {
 	u32			refcount;
 	u8			bEndpointAddress;
 	u8			highspeed;
+	u16			depth;		/* depth in uframes */
 	struct list_head	td_list;	/* queued itds/sitds */
 	struct list_head	free_list;	/* list of unused itds/sitds */
 	struct usb_device	*udev;
@@ -426,6 +427,7 @@ struct ehci_iso_stream {
 	unsigned long		start;		/* jiffies */
 	unsigned long		rescheduled;
 	int			next_uframe;
+	u32			splits;
 
 	/* the rest is derived from the endpoint descriptor,
 	 * trusting urb->interval == f(epdesc->bInterval) and
@@ -434,6 +436,7 @@ struct ehci_iso_stream {
 	u8			interval;
 	u8			usecs, c_usecs;
 	u16			maxp;
+	u16			raw_mask;
 	unsigned		bandwidth;
 
 	/* This is used to initialize iTD's hw_bufp fields */
@@ -441,7 +444,8 @@ struct ehci_iso_stream {
 	u32			buf1;		
 	u32			buf2;
 
-	/* ... sITD won't use buf[012], and needs TT access ... */
+	/* this is used to initialize sITD's tt info */
+	u32			address;
 };
 
 /*-------------------------------------------------------------------------*/

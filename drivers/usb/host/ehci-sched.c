@@ -169,6 +169,93 @@ periodic_usecs (struct ehci_hcd *ehci, unsigned frame, unsigned uframe)
 
 /*-------------------------------------------------------------------------*/
 
+static int same_tt (struct usb_device *dev1, struct usb_device *dev2)
+{
+	if (!dev1->tt || !dev2->tt)
+		return 0;
+	if (dev1->tt != dev2->tt)
+		return 0;
+	if (dev1->tt->multi)
+		return dev1->ttport == dev2->ttport;
+	else
+		return 1;
+}
+
+/* return true iff the device's transaction translator is available
+ * for a periodic transfer starting at the specified frame, using
+ * all the uframes in the mask.
+ */
+static int tt_no_collision (
+	struct ehci_hcd		*ehci,
+	unsigned		period,
+	struct usb_device	*dev,
+	unsigned		frame,
+	u32			uf_mask
+)
+{
+	if (period == 0)	/* error */
+		return 0;
+
+	/* note bandwidth wastage:  split never follows csplit
+	 * (different dev or endpoint) until the next uframe.
+	 * calling convention doesn't make that distinction.
+	 */
+	for (; frame < ehci->periodic_size; frame += period) {
+		union ehci_shadow	here;
+		u32			type;
+
+		here = ehci->pshadow [frame];
+		type = Q_NEXT_TYPE (ehci->periodic [frame]);
+		while (here.ptr) {
+			switch (type) {
+			case Q_TYPE_ITD:
+				type = Q_NEXT_TYPE (here.itd->hw_next);
+				here = here.itd->itd_next;
+				continue;
+			case Q_TYPE_QH:
+				if (same_tt (dev, here.qh->dev)) {
+					u32		mask;
+
+					mask = le32_to_cpu (here.qh->hw_info2);
+					/* "knows" no gap is needed */
+					mask |= mask >> 8;
+					if (mask & uf_mask)
+						break;
+				}
+				type = Q_NEXT_TYPE (here.qh->hw_next);
+				here = here.qh->qh_next;
+				continue;
+			case Q_TYPE_SITD:
+				if (same_tt (dev, here.itd->urb->dev)) {
+					u16		mask;
+
+					mask = le32_to_cpu (here.sitd->hw_uframe);
+					/* FIXME assumes no gap for IN! */
+					mask |= mask >> 8;
+					if (mask & uf_mask)
+						break;
+				}
+				type = Q_NEXT_TYPE (here.qh->hw_next);
+				here = here.sitd->sitd_next;
+				break;
+			// case Q_TYPE_FSTN:
+			default:
+				ehci_dbg (ehci,
+					"periodic frame %d bogus type %d\n",
+					frame, type);
+			}
+
+			/* collision or error */
+			return 0;
+		}
+	}
+
+	/* no collision */
+	return 1;
+}
+
+/*-------------------------------------------------------------------------*/
+
 static int enable_periodic (struct ehci_hcd *ehci)
 {
 	u32	cmd;
@@ -517,8 +604,10 @@ iso_stream_init (
 	unsigned		interval
 )
 {
+	static const u8 smask_out [] = { 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f };
+
 	u32			buf1;
-	unsigned		epnum, maxp, multi;
+	unsigned		epnum, maxp;
 	int			is_input;
 	long			bandwidth;
 
@@ -536,30 +625,62 @@ iso_stream_init (
 		buf1 = 0;
 	}
 
-	stream->highspeed = 1;
+	/* knows about ITD vs SITD */
+	if (dev->speed == USB_SPEED_HIGH) {
+		unsigned multi = hb_mult(maxp);
 
-	multi = hb_mult(maxp);
-	maxp = max_packet(maxp);
-	buf1 |= maxp;
-	maxp *= multi;
+		stream->highspeed = 1;
+
+		maxp = max_packet(maxp);
+		buf1 |= maxp;
+		maxp *= multi;
+
+		stream->buf0 = cpu_to_le32 ((epnum << 8) | dev->devnum);
+		stream->buf1 = cpu_to_le32 (buf1);
+		stream->buf2 = cpu_to_le32 (multi);
+
+		/* usbfs wants to report the average usecs per frame tied up
+		 * when transfers on this endpoint are scheduled ...
+		 */
+		stream->usecs = HS_USECS_ISO (maxp);
+		bandwidth = stream->usecs * 8;
+		bandwidth /= 1 << (interval - 1);
+
+	} else {
+		u32		addr;
+
+		addr = dev->ttport << 24;
+		addr |= dev->tt->hub->devnum << 16;
+		addr |= epnum << 8;
+		addr |= dev->devnum;
+		stream->usecs = HS_USECS_ISO (maxp);
+		if (is_input) {
+			u32	tmp;
+
+			addr |= 1 << 31;
+			stream->c_usecs = stream->usecs;
+			stream->usecs = HS_USECS_ISO (1);
+			stream->raw_mask = 1;
+
+			/* pessimistic c-mask */
+			tmp = usb_calc_bus_time (USB_SPEED_FULL, 1, 0, maxp)
+					/ (125 * 1000);
+			stream->raw_mask |= 3 << (tmp + 9);
+		} else
+			stream->raw_mask = smask_out [maxp / 188];
+		bandwidth = stream->usecs + stream->c_usecs;
+		bandwidth /= 1 << (interval + 2);
+
+		/* stream->splits gets created from raw_mask later */
+		stream->address = cpu_to_le32 (addr);
+	}
+	stream->bandwidth = bandwidth;
 
 	stream->udev = dev;
 
 	stream->bEndpointAddress = is_input | epnum;
 	stream->interval = interval;
 	stream->maxp = maxp;
-
-	stream->buf0 = cpu_to_le32 ((epnum << 8) | dev->devnum);
-	stream->buf1 = cpu_to_le32 (buf1);
-	stream->buf2 = cpu_to_le32 (multi);
-
-	/* usbfs wants to report the average usecs per frame tied up
-	 * when transfers on this endpoint are scheduled ...
-	 */
-	stream->usecs = HS_USECS_ISO (maxp);
-	bandwidth = stream->usecs * 8;
-	bandwidth /= 1 << (interval - 1);
-	stream->bandwidth = bandwidth;
 }
 
 static void
@@ -781,6 +902,98 @@ itd_urb_transaction (
 	return 0;
 }
 
+/*-------------------------------------------------------------------------*/
+
+static inline int
+itd_slot_ok (
+	struct ehci_hcd		*ehci,
+	u32			mod,
+	u32			uframe,
+	u32			end,
+	u8			usecs,
+	u32			period
+)
+{
+	do {
+		/* can't commit more than 80% periodic == 100 usec */
+		if (periodic_usecs (ehci, uframe >> 3, uframe & 0x7)
+				> (100 - usecs))
+			return 0;
+
+		/* we know urb->interval is 2^N uframes */
+		uframe += period;
+		uframe %= mod;
+	} while (uframe != end);
+	return 1;
+}
+
+static inline int
+sitd_slot_ok (
+	struct ehci_hcd		*ehci,
+	u32			mod,
+	struct ehci_iso_stream	*stream,
+	u32			uframe,
+	u32			end,
+	struct ehci_iso_sched	*sched,
+	u32			period_uframes
+)
+{
+	u32			mask, tmp;
+	u32			frame, uf;
+
+	mask = stream->raw_mask << (uframe & 7);
+
+	/* for IN, don't wrap CSPLIT into the next frame */
+	if (mask & ~0xffff)
+		return 0;
+
+	/* this multi-pass logic is simple, but performance may
+	 * suffer when the schedule data isn't cached.
+	 */
+
+	/* check bandwidth */
+	do {
+		u32		max_used;
+
+		frame = uframe >> 3;
+		uf = uframe & 7;
+
+		/* check starts (OUT uses more than one) */
+		max_used = 100 - stream->usecs;
+		for (tmp = stream->raw_mask & 0xff; tmp; tmp >>= 1, uf++) {
+			if (periodic_usecs (ehci, frame, uf) > max_used)
+				return 0;
+		}
+
+		/* for IN, check CSPLIT */
+		if (stream->c_usecs) {
+			max_used = 100 - stream->c_usecs;
+			do {
+				/* tt is busy in the gap before CSPLIT */
+				tmp = 1 << uf;
+				mask |= tmp;
+				tmp <<= 8;
+				if (stream->raw_mask & tmp)
+					break;
+			} while (++uf < 8);
+			if (periodic_usecs (ehci, frame, uf) > max_used)
+				return 0;
+		}
+
+		/* we know urb->interval is 2^N uframes */
+		uframe += period_uframes;
+		uframe %= mod;
+	} while (uframe != end);
+
+	/* tt must be idle for start(s), any gap, and csplit */
+	if (!tt_no_collision (ehci, period_uframes, stream->udev, frame, mask))
+		return 0;
+
+	stream->splits = stream->raw_mask << (uframe & 7);
+	cpu_to_le32s (&stream->splits);
+	return 1;
+}
+
 /*
  * This scheduler plans almost as far into the future as it has actual
  * periodic schedule slots.  (Affected by TUNE_FLS, which defaults to
@@ -795,19 +1008,26 @@ itd_urb_transaction (
 #define SCHEDULE_SLOP	10	/* frames */
 
 static int
-itd_stream_schedule (
+iso_stream_schedule (
 	struct ehci_hcd		*ehci,
 	struct urb		*urb,
 	struct ehci_iso_stream	*stream
 )
 {
-	u32			now, start, end, max;
+	u32			now, start, end, max, period;
 	int			status;
 	unsigned		mod = ehci->periodic_size << 3;
 	struct ehci_iso_sched	*sched = urb->hcpriv;
 
-	if (unlikely (sched->span > (mod - 8 * SCHEDULE_SLOP))) {
+	if (sched->span > (mod - 8 * SCHEDULE_SLOP)) {
 		ehci_dbg (ehci, "iso request %p too long\n", urb);
+		status = -EFBIG;
+		goto fail;
+	}
+
+	if ((stream->depth + sched->span) > mod) {
+		ehci_dbg (ehci, "request %p would overflow (%d+%d>%d)\n",
+			urb, stream->depth, sched->span, mod);
 		status = -EFBIG;
 		goto fail;
 	}
@@ -823,18 +1043,12 @@ itd_stream_schedule (
 	 * and no gaps from host falling behind (irq delays etc)
 	 */
 	if (likely (!list_empty (&stream->td_list))) {
-
 		start = stream->next_uframe;
 		if (start < now)
 			start += mod;
 		if (likely (start < max))
 			goto ready;
-
-		/* two cases:
-		 * (a) we missed some uframes ... can reschedule
-		 * (b) trying to overcommit the schedule
-		 * FIXME (b) should be a hard failure
-		 */
+		/* else fell behind; try to reschedule */
 	}
 
 	/* need to schedule; when's the next (u)frame we could start?
@@ -844,42 +1058,36 @@ itd_stream_schedule (
 	 * jump until after the queue is primed.
 	 */
 	start = SCHEDULE_SLOP * 8 + (now & ~0x07);
+	start %= mod;
 	end = start;
-
-	ehci_vdbg (ehci, "%s schedule from %d (%d..%d), was %d\n",
-			__FUNCTION__, now, start, max,
-			stream->next_uframe);
 
 	/* NOTE:  assumes URB_ISO_ASAP, to limit complexity/bugs */
 
-	if (likely (max > (start + urb->interval)))
-		max = start + urb->interval;
+	period = urb->interval;
+	if (!stream->highspeed)
+		period <<= 3;
+	if (max > (start + period))
+		max = start + period;
 
 	/* hack:  account for itds already scheduled to this endpoint */
-	if (unlikely (list_empty (&stream->td_list)))
+	if (list_empty (&stream->td_list))
 		end = max;
 
 	/* within [start..max] find a uframe slot with enough bandwidth */
 	end %= mod;
 	do {
-		unsigned	uframe;
-		int		enough_space = 1;
+		int		enough_space;
 
 		/* check schedule: enough space? */
-		uframe = start;
-		do {
-			uframe %= mod;
-
-			/* can't commit more than 80% periodic == 100 usec */
-			if (periodic_usecs (ehci, uframe >> 3, uframe & 0x7)
-					> (100 - stream->usecs)) {
-				enough_space = 0;
-				break;
-			}
-
-			/* we know urb->interval is 2^N uframes */
-			uframe += urb->interval;
-		} while (uframe != end);
+		if (stream->highspeed)
+			enough_space = itd_slot_ok (ehci, mod, start, end,
+					stream->usecs, period);
+		else {
+			if ((start % 8) >= 6)
+				continue;
+			enough_space = sitd_slot_ok (ehci, mod, stream,
+					start, end, sched, period);
+		}
 
 		/* (re)schedule it here if there's enough bandwidth */
 		if (enough_space) {
@@ -1035,6 +1243,7 @@ itd_link_urb (
 		first = 0;
 
 		next_uframe += stream->interval;
+		stream->depth += stream->interval;
 		next_uframe %= mod;
 		packet++;
 
@@ -1081,6 +1290,7 @@ itd_complete (
 
 		t = le32_to_cpup (&itd->hw_transaction [uframe]);
 		itd->hw_transaction [uframe] = 0;
+		stream->depth -= stream->interval;
 
 		/* report transfer status */
 		if (unlikely (t & ISO_ERRS)) {
@@ -1183,7 +1393,7 @@ static int itd_submit (struct ehci_hcd *ehci, struct urb *urb, int mem_flags)
 
 	/* schedule ... need to lock */
 	spin_lock_irqsave (&ehci->lock, flags);
-	status = itd_stream_schedule (ehci, urb, stream);
+	status = iso_stream_schedule (ehci, urb, stream);
  	if (likely (status == 0))
 		itd_link_urb (ehci, urb, ehci->periodic_size << 3, stream);
 	spin_unlock_irqrestore (&ehci->lock, flags);
