@@ -69,8 +69,9 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 /* See Documentation/x86_64/mm.txt for a description of the memory map. */
 #define __START_KERNEL		0xffffffff80100000
 #define __START_KERNEL_map	0xffffffff80000000
-#define __PAGE_OFFSET           0x0000010000000000
-#define __PHYSICAL_MASK		0x000000ffffffffff
+#define __PAGE_OFFSET           0x0000010000000000	/* 1 << 40 */
+#define __PHYSICAL_MASK_SHIFT	40
+#define __PHYSICAL_MASK		((1UL << __PHYSICAL_MASK_SHIFT) - 1)
 
 #define KERNEL_TEXT_SIZE  (40UL*1024*1024)
 #define KERNEL_TEXT_START 0xffffffff80000000UL 

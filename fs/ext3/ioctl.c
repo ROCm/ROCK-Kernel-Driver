@@ -90,7 +90,7 @@ int ext3_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 
 		err = ext3_mark_iloc_dirty(handle, inode, &iloc);
 flags_err:
-		ext3_journal_stop(handle, inode);
+		ext3_journal_stop(handle);
 		if (err)
 			return err;
 		
@@ -126,7 +126,7 @@ flags_err:
 		inode->i_generation = generation;
 
 		err = ext3_mark_iloc_dirty(handle, inode, &iloc);
-		ext3_journal_stop(handle, inode);
+		ext3_journal_stop(handle);
 		return err;
 	}
 #ifdef CONFIG_JBD_DEBUG

@@ -2016,7 +2016,6 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
     if ( S_ISCHR (de->mode) )
     {
 	inode->i_rdev = to_kdev_t(de->u.cdev.dev);
-	inode->i_cdev = cdget(de->u.cdev.dev);
     }
     else if ( S_ISBLK (de->mode) )
     {

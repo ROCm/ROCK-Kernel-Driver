@@ -384,6 +384,8 @@ unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
 {
 	pte_t pte = *dir;
 
+	if (pte_file(pte))
+		return;
 	if (likely(pte_to_swp_entry(pte).val != entry.val))
 		return;
 	if (unlikely(pte_none(pte) || pte_present(pte)))

@@ -637,11 +637,13 @@ int journal_bmap(journal_t *journal, unsigned long blocknr,
 		if (ret)
 			*retp = ret;
 		else {
+			char b[BDEVNAME_SIZE];
+
 			printk(KERN_ALERT "%s: journal block not found "
 					"at offset %lu on %s\n",
 				__FUNCTION__,
 				blocknr,
-				bdevname(journal->j_dev));
+				bdevname(journal->j_dev, b));
 			err = -EIO;
 			__journal_abort_soft(journal, err);
 		}
@@ -1398,7 +1400,7 @@ int journal_wipe (journal_t *journal, int write)
  * device this journal is present.
  */
 
-const char * journal_dev_name(journal_t *journal)
+const char *journal_dev_name(journal_t *journal, char *buffer)
 {
 	struct block_device *bdev;
 
@@ -1407,7 +1409,7 @@ const char * journal_dev_name(journal_t *journal)
 	else
 		bdev = journal->j_dev;
 
-	return bdevname(bdev);
+	return bdevname(bdev, buffer);
 }
 
 /*
@@ -1424,12 +1426,13 @@ const char * journal_dev_name(journal_t *journal)
 void __journal_abort_hard (journal_t *journal)
 {
 	transaction_t *transaction;
+	char b[BDEVNAME_SIZE];
 
 	if (journal->j_flags & JFS_ABORT)
 		return;
 
 	printk (KERN_ERR "Aborting journal on device %s.\n",
-		journal_dev_name(journal));
+		journal_dev_name(journal, b));
 
 	journal->j_flags |= JFS_ABORT;
 	transaction = journal->j_running_transaction;

@@ -365,8 +365,8 @@ fail:
 	kmsg->msg_control = (void *) orig_cmsg_uptr;
 }
 
-extern asmlinkage int sys_setsockopt(int fd, int level, int optname,
-				     char *optval, int optlen);
+extern asmlinkage long sys_setsockopt(int fd, int level, int optname,
+				      char *optval, int optlen);
 
 static int do_netfilter_replace(int fd, int level, int optname,
 				char *optval, int optlen)
@@ -530,7 +530,7 @@ static int do_set_sock_timeout(int fd, int level, int optname, char *optval, int
 	return err;
 }
 
-asmlinkage int compat_sys_setsockopt(int fd, int level, int optname,
+asmlinkage long compat_sys_setsockopt(int fd, int level, int optname,
 				char *optval, int optlen)
 {
 	if (optname == IPT_SO_SET_REPLACE)

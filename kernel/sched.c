@@ -1902,7 +1902,7 @@ out_unlock:
  * @len: length in bytes of the bitmask pointed to by user_mask_ptr
  * @user_mask_ptr: user-space pointer to the new cpu mask
  */
-asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
+asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 				      unsigned long *user_mask_ptr)
 {
 	unsigned long new_mask;
@@ -1954,7 +1954,7 @@ out_unlock:
  * @len: length in bytes of the bitmask pointed to by user_mask_ptr
  * @user_mask_ptr: user-space pointer to hold the current cpu mask
  */
-asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
+asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
 				      unsigned long *user_mask_ptr)
 {
 	unsigned int real_len;

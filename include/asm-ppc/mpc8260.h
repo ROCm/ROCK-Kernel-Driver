@@ -9,51 +9,35 @@
 #define __CONFIG_8260_DEFS
 
 #include <linux/config.h>
+#include <platforms/mpc82xx.h>
 
-#ifdef CONFIG_8260
-
-#ifdef CONFIG_EST8260
-#include <platforms/est8260.h>
-#endif
-
-#ifdef CONFIG_SBS8260
-#include <platforms/sbs8260.h>
-#endif
-
-#ifdef CONFIG_RPX6
-#include <platforms/rpxsuper.h>
-#endif
-
-#ifdef CONFIG_WILLOW
-#include <platforms/willow.h>
-#endif
-
-#ifdef CONFIG_TQM8260
-#include <platforms/tqm8260.h>
-#endif
-
-/* I don't yet have the ISA or PCI stuff done....no 8260 with
- * such thing.....
+/* Make sure the memory translation stuff is there if PCI not used.
  */
+#ifndef _IO_BASE
 #define _IO_BASE        0
+#endif
+
+#ifndef _ISA_MEM_BASE
 #define _ISA_MEM_BASE   0
+#endif
+
+#ifndef PCI_DRAM_OFFSET
 #define PCI_DRAM_OFFSET 0
+#endif
+
+/* Map 256MB I/O region
+ */
+#ifndef IO_PHYS_ADDR
+#define IO_PHYS_ADDR	0xe0000000
+#endif
+#ifndef IO_VIRT_ADDR
+#define IO_VIRT_ADDR	IO_PHYS_ADDR
+#endif
 
 /* The "residual" data board information structure the boot loader
  * hands to us.
  */
 extern unsigned char __res[];
 
-/* I need this to get pt_regs.......
-*/
-#include <asm/ptrace.h>
-
-extern int request_8xxirq(unsigned int irq,
-		       void (*handler)(int, void *, struct pt_regs *),
-		       unsigned long flags, 
-		       const char *device,
-		       void *dev_id);
-
-#endif /* CONFIG_8260 */
 #endif /* !__CONFIG_8260_DEFS */
 #endif /* __KERNEL__ */

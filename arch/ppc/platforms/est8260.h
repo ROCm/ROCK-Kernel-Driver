@@ -3,8 +3,12 @@
  * will soon be removed.  All of the clock values are computed from
  * the configuration SCMR and the Power-On-Reset word.
  */
+#ifndef __EST8260_PLATFORM
+#define __EST8260_PLATFORM
 
-#define IMAP_ADDR	((uint)0xf0000000)
+#define IMAP_ADDR		((uint)0xf0000000)
+
+#define BOOTROM_RESTART_ADDR	((uint)0xff000104)
 
 
 /* A Board Information structure that is given to a program when
@@ -25,3 +29,4 @@ typedef struct bd_info {
 
 extern bd_t m8xx_board_info;
 
+#endif 	/* __EST8260_PLATFORM */

@@ -2071,8 +2071,8 @@ long sys32_module_warning(void)
 	return -ENOSYS ;
 } 
 
-int sys_sched_getaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
-int sys_sched_setaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
+long sys_sched_getaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
+long sys_sched_setaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
 
 /* only works on LE */
 long sys32_sched_setaffinity(pid_t pid, unsigned int len,

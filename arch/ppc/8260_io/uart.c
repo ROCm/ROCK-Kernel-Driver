@@ -3,6 +3,8 @@
  *  Copyright (c) 1999 Dan Malek (dmalek@jlc.net)
  *  Copyright (c) 2000 MontaVista Software, Inc. (source@mvista.com)
  *	2.3.99 updates
+ *  Copyright (c) 2002 Allen Curtis, Ones and Zeros, Inc. (acurtis@onz.com)
+ *	2.5.50 updates
  *
  * I used the 8xx uart.c driver as the framework for this driver.
  * The original code was written for the EST8260 board.  I tried to make
@@ -28,6 +30,7 @@
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/timer.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
@@ -69,9 +72,7 @@
 #define TX_WAKEUP	ASYNC_SHARE_IRQ
 
 static char *serial_name = "CPM UART driver";
-static char *serial_version = "0.01";
-
-static DECLARE_TASK_QUEUE(tq_serial);
+static char *serial_version = "0.02";
 
 static struct tty_driver serial_driver, callout_driver;
 static int serial_refcount;
@@ -201,8 +202,8 @@ typedef struct serial_info {
 	int			blocked_open; /* # of blocked opens */
 	long			session; /* Session of opening process */
 	long			pgrp; /* pgrp of opening process */
-	struct tq_struct	tqueue;
-	struct tq_struct	tqueue_hangup;
+	struct work_struct	tqueue;
+	struct work_struct	tqueue_hangup;
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
 
@@ -331,8 +332,7 @@ static _INLINE_ void rs_sched_event(ser_info_t *info,
 				  int event)
 {
 	info->event |= 1 << event;
-	queue_task(&info->tqueue, &tq_serial);
-	mark_bh(SERIAL_BH);
+	schedule_work(&info->tqueue);
 }
 
 static _INLINE_ void receive_chars(ser_info_t *info)
@@ -479,7 +479,7 @@ static _INLINE_ void receive_chars(ser_info_t *info)
 
 	info->rx_cur = (cbd_t *)bdp;
 
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_delayed_work(&tty->flip.work, 1);
 }
 
 static _INLINE_ void transmit_chars(ser_info_t *info)
@@ -537,7 +537,7 @@ static _INLINE_ void check_modem_status(struct async_struct *info)
 			printk("scheduling hangup...");
 #endif
 			MOD_INC_USE_COUNT;
-			if (schedule_task(&info->tqueue_hangup) == 0)
+			if (schedule_work(&info->tqueue_hangup) == 0)
 				MOD_DEC_USE_COUNT;
 		}
 	}
@@ -628,11 +628,6 @@ static void rs_8xx_interrupt(int irq, void * dev_id, struct pt_regs * regs)
  * interrupt driver proper are done; the interrupt driver schedules
  * them using rs_sched_event(), and they get done here.
  */
-static void do_serial_bh(void)
-{
-	run_task_queue(&tq_serial);
-}
-
 static void do_softint(void *private_)
 {
 	ser_info_t	*info = (ser_info_t *) private_;
@@ -651,7 +646,7 @@ static void do_softint(void *private_)
 }
 
 /*
- * This routine is called from the scheduler tqueue when the interrupt
+ * This routine is called from the scheduler work queue when the interrupt
  * routine has signalled that a hangup has occurred.  The path of
  * hangup processing is:
  *
@@ -1308,7 +1303,7 @@ static void begin_break(ser_info_t *info)
 {
 	volatile cpm8260_t *cp;
 	uint	page, sblock;
-	ushort	num;
+	int	num;
 
 	cp = cpmp;
 
@@ -1352,7 +1347,7 @@ static void end_break(ser_info_t *info)
 {
 	volatile cpm8260_t *cp;
 	uint	page, sblock;
-	ushort	num;
+	int	num;
 
 	cp = cpmp;
 
@@ -1756,7 +1751,7 @@ static void rs_8xx_wait_until_sent(struct tty_struct *tty, int timeout)
 	 */
 	char_time = 1;
 	if (timeout)
-		char_time = min(char_time, timeout);
+		char_time = min(char_time, (unsigned long)timeout);
 #ifdef SERIAL_DEBUG_RS_WAIT_UNTIL_SENT
 	printk("In rs_wait_until_sent(%d) check=%lu...", timeout, char_time);
 	printk("jiff=%lu...", jiffies);
@@ -1980,7 +1975,7 @@ static int rs_8xx_open(struct tty_struct *tty, struct file * filp)
 	ser_info_t	*info;
 	int 		retval, line;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if ((line < 0) || (line >= NR_PORTS))
 		return -ENODEV;
 	retval = get_async_struct(line, &info);
@@ -2455,7 +2450,7 @@ void kgdb_map_scc(void)
 
 static kdev_t serial_console_device(struct console *c)
 {
-	return MKDEV(TTY_MAJOR, 64 + c->index);
+	return mk_kdev(TTY_MAJOR, 64 + c->index);
 }
 
 
@@ -2503,8 +2498,6 @@ int __init rs_8xx_init(void)
 	volatile	immap_t		*immap;
 	volatile	iop8260_t	*io;
 	
-	init_bh(SERIAL_BH, do_serial_bh);
-
 	show_serial_version();
 
 	/* Initialize the tty_driver structure */
@@ -2680,10 +2673,8 @@ int __init rs_8xx_init(void)
 			init_waitqueue_head(&info->close_wait);
 			info->magic = SERIAL_MAGIC;
 			info->flags = state->flags;
-			info->tqueue.routine = do_softint;
-			info->tqueue.data = info;
-			info->tqueue_hangup.routine = do_serial_hangup;
-			info->tqueue_hangup.data = info;
+			INIT_WORK(&info->tqueue, do_softint, info);
+			INIT_WORK(&info->tqueue_hangup, do_serial_hangup, info);
 			info->line = i;
 			info->state = state;
 			state->info = (struct async_struct *)info;
@@ -2874,7 +2865,7 @@ int __init rs_8xx_init(void)
 
 			/* Install interrupt handler.
 			*/
-			request_8xxirq(state->irq, rs_8xx_interrupt, 0, "uart", info);
+			request_irq(state->irq, rs_8xx_interrupt, 0, "uart", info);
 
 			/* Set up the baud rate generator.
 			*/

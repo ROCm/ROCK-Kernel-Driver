@@ -138,7 +138,7 @@ int snd_dma_alloc_pages(const struct snd_dma_device *dev, size_t size,
 #endif
 #ifdef CONFIG_SBUS
 	case SNDRV_DMA_TYPE_SBUS:
-		dmab->area = snd_malloc_pci_pages(dev->dev.sbus, size, &dmab->addr);
+		dmab->area = snd_malloc_sbus_pages(dev->dev.sbus, size, &dmab->addr);
 		break;
 #endif
 	default:
@@ -181,7 +181,7 @@ void snd_dma_free_pages(const struct snd_dma_device *dev, struct snd_dma_buffer 
 #endif
 #ifdef CONFIG_SBUS
 	case SNDRV_DMA_TYPE_SBUS:
-		snd_free_sbus_pages(dev->dev.sbus, dmab->size, dmab->are, dmab->addr);
+		snd_free_sbus_pages(dev->dev.sbus, dmab->bytes, dmab->area, dmab->addr);
 		break;
 #endif
 	default:

@@ -245,6 +245,7 @@ void __init mount_block_root(char *name, int flags)
 {
 	char *fs_names = __getname();
 	char *p;
+	char b[BDEVNAME_SIZE];
 
 	get_fs_names(fs_names);
 retry:
@@ -263,12 +264,13 @@ retry:
 		 * Allow the user to distinguish between failed open
 		 * and bad superblock on root device.
 		 */
+		__bdevname(ROOT_DEV, b);
 		printk("VFS: Cannot open root device \"%s\" or %s\n",
-			root_device_name, __bdevname(ROOT_DEV));
+				root_device_name, b);
 		printk("Please append a correct \"root=\" boot option\n");
-		panic("VFS: Unable to mount root fs on %s", __bdevname(ROOT_DEV));
+		panic("VFS: Unable to mount root fs on %s", b);
 	}
-	panic("VFS: Unable to mount root fs on %s", __bdevname(ROOT_DEV));
+	panic("VFS: Unable to mount root fs on %s", __bdevname(ROOT_DEV, b));
 out:
 	putname(fs_names);
 }

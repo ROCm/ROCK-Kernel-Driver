@@ -23,21 +23,10 @@
 /* Constants */
 /*************/
 
-/* Device major numbers
- * The first set are the major numbers allocated from the Linux Device Registry.
- * This was expanded from 64 to 128 with version 2.0.26. If this code is built
- * under earlier versions we use majors from the LOCAL/EXPERIMENTAL range.
- */
-#if MAX_CHRDEV > 64
-#	define IP2_TTY_MAJOR      71
-#	define IP2_CALLOUT_MAJOR  72
-#	define IP2_IPL_MAJOR      73
-#else
-#	define IP2_TTY_MAJOR      60
-#	define IP2_CALLOUT_MAJOR  61
-#	define IP2_IPL_MAJOR      62
-#endif
-
+/* Device major numbers - since version 2.0.26. */
+#define IP2_TTY_MAJOR      71
+#define IP2_CALLOUT_MAJOR  72
+#define IP2_IPL_MAJOR      73
 
 /* Board configuration array.
  * This array defines the hardware irq and address for up to IP2_MAX_BOARDS

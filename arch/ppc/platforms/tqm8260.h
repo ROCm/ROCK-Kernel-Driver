@@ -4,8 +4,8 @@
  * Copyright (c) 2001 Wolfgang Denk (wd@denx.de)
  */
 
-#ifndef __MACH_TQM8260_H
-#define __MACH_TQM8260_H
+#ifndef __TQM8260_PLATFORM
+#define __TQM8260_PLATFORM
 
 #include <linux/config.h>
  
@@ -14,4 +14,6 @@
 #define IMAP_ADDR		((uint)0xFFF00000)
 #define PHY_INTERRUPT		25
 
-#endif	/* __MACH_TQM8260_H */
+#define BOOTROM_RESTART_ADDR	((uint)0x40000104)
+
+#endif	/* __TQM8260_PLATFORM */

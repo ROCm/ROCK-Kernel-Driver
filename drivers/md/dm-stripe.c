@@ -209,6 +209,7 @@ static int stripe_status(struct dm_target *ti,
 	struct stripe_c *sc = (struct stripe_c *) ti->private;
 	int offset;
 	int i;
+	char b[BDEVNAME_SIZE];
 
 	switch (type) {
 	case STATUSTYPE_INFO:
@@ -222,7 +223,7 @@ static int stripe_status(struct dm_target *ti,
 			offset +=
 			    snprintf(result + offset, maxlen - offset,
 				     " %s " SECTOR_FORMAT,
-		       bdevname(sc->stripe[i].dev->bdev),
+		       bdevname(sc->stripe[i].dev->bdev, b),
 				     sc->stripe[i].physical_start);
 		}
 		break;

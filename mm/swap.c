@@ -16,6 +16,7 @@
 #include <linux/mm.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
+#include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/pagevec.h>
 #include <linux/init.h>
@@ -346,6 +347,32 @@ unsigned int pagevec_lookup(struct pagevec *pvec, struct address_space *mapping,
 	pvec->nr = find_get_pages(mapping, start, nr_pages, pvec->pages);
 	return pagevec_count(pvec);
 }
+
+
+#ifdef CONFIG_SMP
+/*
+ * We tolerate a little inaccuracy to avoid ping-ponging the counter between
+ * CPUs
+ */
+#define ACCT_THRESHOLD	max(16, NR_CPUS * 2)
+
+static DEFINE_PER_CPU(long, committed_space) = 0;
+
+void vm_acct_memory(long pages)
+{
+	long *local;
+
+	preempt_disable();
+	local = &__get_cpu_var(committed_space);
+	*local += pages;
+	if (*local > ACCT_THRESHOLD || *local < -ACCT_THRESHOLD) {
+		atomic_add(*local, &vm_committed_space);
+		*local = 0;
+	}
+	preempt_enable();
+}
+#endif
+
 
 /*
  * Perform any setup for the swap system

@@ -1017,7 +1017,7 @@ prep_init_IRQ(void)
  * IDE stuff.
  */
 static int __prep
-prep_ide_default_irq(ide_ioreg_t base)
+prep_ide_default_irq(unsigned long base)
 {
 	switch (base) {
 		case 0x1f0: return 13;
@@ -1030,7 +1030,7 @@ prep_ide_default_irq(ide_ioreg_t base)
 	}
 }
 
-static ide_ioreg_t __prep
+static unsigned long __prep
 prep_ide_default_io_base(int index)
 {
 	switch (index) {

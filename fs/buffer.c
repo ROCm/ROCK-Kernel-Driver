@@ -155,8 +155,10 @@ __clear_page_buffers(struct page *page)
 
 static void buffer_io_error(struct buffer_head *bh)
 {
+	char b[BDEVNAME_SIZE];
+
 	printk(KERN_ERR "Buffer I/O error on device %s, logical block %Lu\n",
-			bdevname(bh->b_bdev),
+			bdevname(bh->b_bdev, b),
 			(unsigned long long)bh->b_blocknr);
 }
 
