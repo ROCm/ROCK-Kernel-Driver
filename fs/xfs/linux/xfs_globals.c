@@ -41,12 +41,6 @@ uint64_t	xfs_panic_mask;		/* set to cause more panics */
 unsigned long	xfs_physmem;
 
 /*
- * restricted_chown = 1	 bsd style chown(2), only super-user can give away files
- * restricted_chown = 0	 sysV style chown(2), non super-user can give away files
- */
-int		restricted_chown = 1;
-
-/*
  * Used to serialize atomicIncWithWrap.
  */
 spinlock_t Atomic_spin = SPIN_LOCK_UNLOCKED;
@@ -69,3 +63,6 @@ mutex_t		xfs_Gqm_lock;
 EXPORT_SYMBOL(xfs_Gqm);
 EXPORT_SYMBOL(xfs_next_bit);
 EXPORT_SYMBOL(xfs_contig_bits);
+EXPORT_SYMBOL(xfs_bmbt_get_all);
+EXPORT_SYMBOL(xfs_bmbt_disk_get_all);
+

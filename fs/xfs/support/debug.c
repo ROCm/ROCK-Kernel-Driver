@@ -40,6 +40,11 @@ int			doass = 1;
 static char		message[256];	/* keep it off the stack */
 static spinlock_t 	xfs_err_lock = SPIN_LOCK_UNLOCKED;
 
+/* Translate from CE_FOO to KERN_FOO, err_level(CE_FOO) == KERN_FOO */
+static char		*err_level[8] = {KERN_EMERG, KERN_ALERT, KERN_CRIT,
+					 KERN_ERR, KERN_WARNING, KERN_NOTICE,
+					 KERN_INFO, KERN_DEBUG};
+
 void
 assfail(char *a, char *f, int l)
 {
@@ -71,10 +76,7 @@ get_thread_id(void)
 	return current->pid;
 }
 
-# define xdprintk(format...)	printk(format)
-#else
-# define xdprintk(format...)	do { } while (0)
-#endif
+#endif /* DEBUG */
 
 void
 cmn_err(register int level, char *fmt, ...)
@@ -86,18 +88,7 @@ cmn_err(register int level, char *fmt, ...)
 	va_start(ap, fmt);
 	if (*fmt == '!') fp++;
 	vsprintf(message, fp, ap);
-	switch (level) {
-	case CE_CONT:
-	case CE_WARN:
-		printk("%s", message);
-		break;
-	case CE_DEBUG:
-		xdprintk("%s", message);
-		break;
-	default:
-		printk("%s\n", message);
-		break;
-	}
+	printk("%s%s\n", err_level[level], message);
 	va_end(ap);
 	spin_unlock(&xfs_err_lock);
 
@@ -111,18 +102,8 @@ icmn_err(register int level, char *fmt, va_list ap)
 {
 	spin_lock(&xfs_err_lock);
 	vsprintf(message, fmt, ap);
-	switch (level) {
-	case CE_CONT:
-	case CE_WARN:
-		printk("%s", message);
-		break;
-	case CE_DEBUG:
-		xdprintk("%s", message);
-		break;
-	default:
-		printk("cmn_err level %d ", level);
-		printk("%s\n", message);
-		break;
-	}
 	spin_unlock(&xfs_err_lock);
+	printk("%s%s\n", err_level[level], message);
+	if (level == CE_PANIC)
+		BUG();
 }

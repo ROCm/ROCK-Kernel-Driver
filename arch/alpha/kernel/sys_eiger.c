@@ -81,13 +81,13 @@ eiger_end_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type eiger_irq_type = {
-	typename:	"EIGER",
-	startup:	eiger_startup_irq,
-	shutdown:	eiger_disable_irq,
-	enable:		eiger_enable_irq,
-	disable:	eiger_disable_irq,
-	ack:		eiger_disable_irq,
-	end:		eiger_end_irq,
+	.typename	= "EIGER",
+	.startup	= eiger_startup_irq,
+	.shutdown	= eiger_disable_irq,
+	.enable		= eiger_enable_irq,
+	.disable	= eiger_disable_irq,
+	.ack		= eiger_disable_irq,
+	.end		= eiger_end_irq,
 };
 
 static void
@@ -225,26 +225,26 @@ eiger_swizzle(struct pci_dev *dev, u8 *pinp)
  */
 
 struct alpha_machine_vector eiger_mv __initmv = {
-	vector_name:		"Eiger",
+	.vector_name		= "Eiger",
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TSUNAMI_IO,
 	DO_TSUNAMI_BUS,
-	machine_check:		tsunami_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	DEFAULT_MEM_BASE,
-	pci_dac_offset:		TSUNAMI_DAC_OFFSET,
+	.machine_check		= tsunami_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= DEFAULT_MEM_BASE,
+	.pci_dac_offset		= TSUNAMI_DAC_OFFSET,
 
-	nr_irqs:		128,
-	device_interrupt:	eiger_device_interrupt,
+	.nr_irqs		= 128,
+	.device_interrupt	= eiger_device_interrupt,
 
-	init_arch:		tsunami_init_arch,
-	init_irq:		eiger_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		common_init_pci,
-	kill_arch:		tsunami_kill_arch,
-	pci_map_irq:		eiger_map_irq,
-	pci_swizzle:		eiger_swizzle,
+	.init_arch		= tsunami_init_arch,
+	.init_irq		= eiger_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= common_init_pci,
+	.kill_arch		= tsunami_kill_arch,
+	.pci_map_irq		= eiger_map_irq,
+	.pci_swizzle		= eiger_swizzle,
 };
 ALIAS_MV(eiger)

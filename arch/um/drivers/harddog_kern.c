@@ -51,8 +51,8 @@
 
 MODULE_LICENSE("GPL");
 
+/* Locked by the BKL in harddog_open and harddog_release */
 static int timer_alive;
-
 static int harddog_in_fd = -1;
 static int harddog_out_fd = -1;
 
@@ -67,6 +67,7 @@ static int harddog_open(struct inode *inode, struct file *file)
 	int err;
 	char *sock = NULL;
 
+	lock_kernel();
 	if(timer_alive)
 		return -EBUSY;
 #ifdef CONFIG_HARDDOG_NOWAYOUT	 
@@ -80,6 +81,7 @@ static int harddog_open(struct inode *inode, struct file *file)
 	if(err) return(err);
 
 	timer_alive = 1;
+	unlock_kernel();
 	return 0;
 }
 

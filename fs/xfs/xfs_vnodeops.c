@@ -208,7 +208,7 @@ xfs_getattr(
 				(mp->m_sb.sb_rextsize << mp->m_sb.sb_blocklog);
 		}
 	} else {
-		vap->va_rdev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
+		vap->va_rdev = ip->i_df.if_u2.if_rdev;
 		vap->va_blksize = BLKDEV_IOSIZE;
 	}
 
@@ -1970,7 +1970,7 @@ xfs_create(
 	vnode_t			*vp=NULL;
 	xfs_trans_t		*tp;
 	xfs_mount_t		*mp;
-	dev_t			rdev;
+	xfs_dev_t		rdev;
 	int			error;
 	xfs_bmap_free_t		free_list;
 	xfs_fsblock_t		first_block;
@@ -2955,8 +2955,7 @@ xfs_mkdir(
 	xfs_inode_t		*cdp;	/* inode of created dir */
 	vnode_t			*cvp;	/* vnode of created dir */
 	xfs_trans_t		*tp;
-	dev_t			rdev;
-	mode_t			mode;
+	xfs_dev_t		rdev;
 	xfs_mount_t		*mp;
 	int			cancel_flags;
 	int			error;
@@ -3062,8 +3061,9 @@ xfs_mkdir(
 	 * create the directory inode.
 	 */
 	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : 0;
-	mode = IFDIR | (vap->va_mode & ~IFMT);
-	error = xfs_dir_ialloc(&tp, dp, mode, 2, rdev, credp, prid, resblks > 0,
+	error = xfs_dir_ialloc(&tp, dp, 
+			MAKEIMODE(vap->va_type,vap->va_mode), 2,
+			rdev, credp, prid, resblks > 0,
 		&cdp, NULL);
 	if (error) {
 		if (error == ENOSPC)
@@ -3521,7 +3521,7 @@ xfs_symlink(
 	xfs_inode_t		*ip;
 	int			error;
 	int			pathlen;
-	dev_t			rdev;
+	xfs_dev_t		rdev;
 	xfs_bmap_free_t		free_list;
 	xfs_fsblock_t		first_block;
 	boolean_t		dp_joined_to_trans;
@@ -3702,7 +3702,7 @@ xfs_symlink(
 	 */
 	if (pathlen <= XFS_IFORK_DSIZE(ip)) {
 		xfs_idata_realloc(ip, pathlen, XFS_DATA_FORK);
-		bcopy(target_path, ip->i_df.if_u1.if_data, pathlen);
+		memcpy(ip->i_df.if_u1.if_data, target_path, pathlen);
 		ip->i_d.di_size = pathlen;
 
 		/*
@@ -3743,7 +3743,7 @@ xfs_symlink(
 			}
 			pathlen -= byte_cnt;
 
-			bcopy(cur_chunk, XFS_BUF_PTR(bp), byte_cnt);
+			memcpy(XFS_BUF_PTR(bp), cur_chunk, byte_cnt);
 			cur_chunk += byte_cnt;
 
 			xfs_trans_log_buf(tp, bp, 0, byte_cnt - 1);
@@ -3859,10 +3859,10 @@ xfs_fid2(
 	xfid->fid_len = sizeof(xfs_fid2_t) - sizeof(xfid->fid_len);
 	xfid->fid_pad = 0;
 	/*
-	 * use bcopy because the inode is a long long and there's no
+	 * use memcpy because the inode is a long long and there's no
 	 * assurance that xfid->fid_ino is properly aligned.
 	 */
-	bcopy(&ip->i_ino, &xfid->fid_ino, sizeof xfid->fid_ino);
+	memcpy(&xfid->fid_ino, &ip->i_ino, sizeof(xfid->fid_ino));
 	xfid->fid_gen = ip->i_d.di_gen;
 
 	return 0;
@@ -4504,9 +4504,9 @@ xfs_zero_remaining_bytes(
 					  mp, bp, XFS_BUF_ADDR(bp));
 			break;
 		}
-		bzero(XFS_BUF_PTR(bp) +
+		memset(XFS_BUF_PTR(bp) +
 			(offset - XFS_FSB_TO_B(mp, imap.br_startoff)),
-		      lastoffset - offset + 1);
+		      0, lastoffset - offset + 1);
 		XFS_BUF_UNDONE(bp);
 		XFS_BUF_UNREAD(bp);
 		XFS_BUF_WRITE(bp);
@@ -4937,7 +4937,6 @@ vnodeops_t xfs_vnodeops = {
 	.vop_rwlock		= xfs_rwlock,
 	.vop_rwunlock		= xfs_rwunlock,
 	.vop_bmap		= xfs_bmap,
-	.vop_strategy		= xfs_strategy,
 	.vop_reclaim		= xfs_reclaim,
 	.vop_attr_get		= xfs_attr_get,
 	.vop_attr_set		= xfs_attr_set,

@@ -30,6 +30,7 @@ static struct mconsole_command commands[] = {
 	{ "go", mconsole_go, 1 },
 };
 
+/* Initialized in mconsole_init, which is an initcall */
 char mconsole_socket_name[256];
 
 int mconsole_reply_v0(struct mc_request *req, char *reply)
@@ -162,16 +163,21 @@ int mconsole_notify(char *sock_name, int type, const void *data, int len)
 {
 	struct sockaddr_un target;
 	struct mconsole_notify packet;
-	int n, err;
+	int n, err = 0;
 
+	lock_notify();
 	if(notify_sock < 0){
 		notify_sock = socket(PF_UNIX, SOCK_DGRAM, 0);
 		if(notify_sock < 0){
 			printk("mconsole_notify - socket failed, errno = %d\n",
 			       errno);
-			return(-errno);
+			err = -errno;
 		}
 	}
+	unlock_notify();
+	
+	if(err)
+		return(err);
 
 	target.sun_family = AF_UNIX;
 	strcpy(target.sun_path, sock_name);

@@ -291,8 +291,6 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	if (cmd != BLKFLSBUF)
 		return -EINVAL;
 
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
 	/* special: we want to release the ramdisk memory,
 	   it's not like with the other blockdevices where
 	   this ioctl only flushes away the buffer cache. */
@@ -383,6 +381,7 @@ static int rd_open(struct inode * inode, struct file * filp)
 		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
 		rd_bdev[unit]->bd_inode->i_size = rd_length[unit];
 		rd_bdev[unit]->bd_queue = &blk_dev[MAJOR_NR].request_queue;
+		rd_bdev[unit]->bd_disk = get_disk(rd_disks[unit]);
 	}
 
 	return 0;
@@ -431,17 +430,16 @@ static int __init rd_init (void)
 	}
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	initrd_disk = alloc_disk();
+	initrd_disk = alloc_disk(1);
 	if (!initrd_disk)
 		return -ENOMEM;
 	initrd_disk->major = MAJOR_NR;
 	initrd_disk->first_minor = INITRD_MINOR;
-	initrd_disk->minor_shift = 0;
 	initrd_disk->fops = &rd_bd_op;	
 	sprintf(initrd_disk->disk_name, "initrd");
 #endif
 	for (i = 0; i < NUM_RAMDISKS; i++) {
-		rd_disks[i] = alloc_disk();
+		rd_disks[i] = alloc_disk(1);
 		if (!rd_disks[i])
 			goto out;
 	}
@@ -460,7 +458,6 @@ static int __init rd_init (void)
 		rd_length[i] = rd_size << 10;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
-		disk->minor_shift = 0;
 		disk->fops = &rd_bd_op;
 		sprintf(disk->disk_name, "rd%d", i);
 		set_capacity(disk, rd_size * 2);

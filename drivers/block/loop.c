@@ -1075,7 +1075,7 @@ int __init loop_init(void)
 		goto out_mem;
 
 	for (i = 0; i < max_loop; i++) {
-		disks[i] = alloc_disk();
+		disks[i] = alloc_disk(1);
 		if (!disks[i])
 			goto out_mem2;
 	}

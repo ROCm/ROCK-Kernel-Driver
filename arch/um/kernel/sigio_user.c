@@ -21,9 +21,11 @@
 #include "helper.h"
 #include "os.h"
 
+/* Changed during early boot */
 int pty_output_sigio = 0;
 int pty_close_sigio = 0;
 
+/* Used as a flag during SIGIO testing early in boot */
 static int got_sigio = 0;
 
 void __init handler(int sig)
@@ -151,7 +153,15 @@ void __init check_sigio(void)
 	check_one_sigio(tty_close);
 }
 
+/* Protected by sigio_lock(), also used by sigio_cleanup, which is an 
+ * exitcall.
+ */
 static int write_sigio_pid = -1;
+
+/* These arrays are initialized before the sigio thread is started, and
+ * the descriptors closed after it is killed.  So, it can't see them change.
+ * On the UML side, they are changed under the sigio_lock.
+ */
 static int write_sigio_fds[2] = { -1, -1 };
 static int sigio_private[2] = { -1, -1 };
 
@@ -161,6 +171,9 @@ struct pollfds {
 	int used;
 };
 
+/* Protected by sigio_lock().  Used by the sigio thread, but the UML thread
+ * synchronizes with it.
+ */
 struct pollfds current_poll = {
 	poll : 		NULL,
 	size :		0,
@@ -217,8 +230,6 @@ static int write_sigio_thread(void *unused)
 	}
 }
 
-/* XXX SMP locking needed here too */
-
 static int need_poll(int n)
 {
 	if(n <= next_poll.size){
@@ -260,25 +271,31 @@ static void update_thread(void)
 	set_signals(flags);
 	return;
  fail:
+	sigio_lock();
 	if(write_sigio_pid != -1) kill(write_sigio_pid, SIGKILL);
 	write_sigio_pid = -1;
 	close(sigio_private[0]);
 	close(sigio_private[1]);	
 	close(write_sigio_fds[0]);
 	close(write_sigio_fds[1]);
+	sigio_unlock();
 	set_signals(flags);
 }
 
 int add_sigio_fd(int fd, int read)
 {
-	int err, i, n, events;
+	int err = 0, i, n, events;
 
-	for(i = 0; i < current_poll.used; i++)
-		if(current_poll.poll[i].fd == fd) return(0);
+	sigio_lock();
+	for(i = 0; i < current_poll.used; i++){
+		if(current_poll.poll[i].fd == fd) 
+			goto out;
+	}
 
 	n = current_poll.used + 1;
 	err = need_poll(n);
-	if(err) return(err);
+	if(err) 
+		goto out;
 
 	for(i = 0; i < current_poll.used; i++)
 		next_poll.poll[i] = current_poll.poll[i];
@@ -290,21 +307,26 @@ int add_sigio_fd(int fd, int read)
 						   events :	events,
 						   revents :	0 });
 	update_thread();
-	return(0);
+ out:
+	sigio_unlock();
+	return(err);
 }
 
 int ignore_sigio_fd(int fd)
 {
 	struct pollfd *p;
-	int err, i, n = 0;
+	int err = 0, i, n = 0;
 
+	sigio_lock();
 	for(i = 0; i < current_poll.used; i++){
 		if(current_poll.poll[i].fd == fd) break;
 	}
-	if(i == current_poll.used) return(0);
+	if(i == current_poll.used)
+		goto out;
 	
 	err = need_poll(current_poll.used - 1);
-	if(err) return(err);
+	if(err)
+		goto out;
 
 	for(i = 0; i < current_poll.used; i++){
 		p = &current_poll.poll[i];
@@ -312,11 +334,14 @@ int ignore_sigio_fd(int fd)
 	}
 	if(n == i){
 		printk("ignore_sigio_fd : fd %d not found\n", fd);
-		return(-1);
+		err = -1;
+		goto out;
 	}
 
 	update_thread();
-	return(0);
+ out:
+	sigio_unlock();
+	return(err);
 }
 
 static int setup_initial_poll(int fd)
@@ -342,14 +367,15 @@ void write_sigio_workaround(void)
 	unsigned long stack;
 	int err;
 
-	if(write_sigio_pid != -1) return;
+	sigio_lock();
+	if(write_sigio_pid != -1)
+		goto out;
 
-	/* XXX This needs SMP locking */
 	err = os_pipe(write_sigio_fds, 1, 1);
 	if(err){
 		printk("write_sigio_workaround - os_pipe 1 failed, "
 		       "errno = %d\n", -err);
-		return;
+		goto out;
 	}
 	err = os_pipe(sigio_private, 1, 1);
 	if(err){
@@ -368,6 +394,8 @@ void write_sigio_workaround(void)
 	if(write_sigio_irq(write_sigio_fds[0])) 
 		goto out_kill;
 
+ out:
+	sigio_unlock();
 	return;
 
  out_kill:
@@ -379,6 +407,7 @@ void write_sigio_workaround(void)
  out_close1:
 	close(write_sigio_fds[0]);
 	close(write_sigio_fds[1]);
+	sigio_unlock();
 }
 
 int read_sigio_fd(int fd)

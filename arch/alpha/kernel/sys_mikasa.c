@@ -70,13 +70,13 @@ mikasa_end_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type mikasa_irq_type = {
-	typename:	"MIKASA",
-	startup:	mikasa_startup_irq,
-	shutdown:	mikasa_disable_irq,
-	enable:		mikasa_enable_irq,
-	disable:	mikasa_disable_irq,
-	ack:		mikasa_disable_irq,
-	end:		mikasa_end_irq,
+	.typename	= "MIKASA",
+	.startup	= mikasa_startup_irq,
+	.shutdown	= mikasa_disable_irq,
+	.enable		= mikasa_enable_irq,
+	.disable	= mikasa_disable_irq,
+	.ack		= mikasa_disable_irq,
+	.end		= mikasa_end_irq,
 };
 
 static void 
@@ -217,51 +217,51 @@ mikasa_apecs_machine_check(unsigned long vector, unsigned long la_ptr,
 
 #if defined(CONFIG_ALPHA_GENERIC) || !defined(CONFIG_ALPHA_PRIMO)
 struct alpha_machine_vector mikasa_mv __initmv = {
-	vector_name:		"Mikasa",
+	.vector_name		= "Mikasa",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_APECS_IO,
 	DO_APECS_BUS,
-	machine_check:		mikasa_apecs_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= mikasa_apecs_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		32,
-	device_interrupt:	mikasa_device_interrupt,
+	.nr_irqs		= 32,
+	.device_interrupt	= mikasa_device_interrupt,
 
-	init_arch:		apecs_init_arch,
-	init_irq:		mikasa_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		common_init_pci,
-	kill_arch:		NULL,
-	pci_map_irq:		mikasa_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= apecs_init_arch,
+	.init_irq		= mikasa_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= common_init_pci,
+	.kill_arch		= NULL,
+	.pci_map_irq		= mikasa_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(mikasa)
 #endif
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_PRIMO)
 struct alpha_machine_vector mikasa_primo_mv __initmv = {
-	vector_name:		"Mikasa-Primo",
+	.vector_name		= "Mikasa-Primo",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_CIA_IO,
 	DO_CIA_BUS,
-	machine_check:		cia_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	CIA_DEFAULT_MEM_BASE,
+	.machine_check		= cia_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		32,
-	device_interrupt:	mikasa_device_interrupt,
+	.nr_irqs		= 32,
+	.device_interrupt	= mikasa_device_interrupt,
 
-	init_arch:		cia_init_arch,
-	init_irq:		mikasa_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		cia_init_pci,
-	pci_map_irq:		mikasa_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= cia_init_arch,
+	.init_irq		= mikasa_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= cia_init_pci,
+	.pci_map_irq		= mikasa_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(mikasa_primo)
 #endif

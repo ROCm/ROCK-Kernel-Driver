@@ -41,14 +41,12 @@ void __attach_vcache(vcache_t *vcache,
 
 	hash_head = hash_vcache(address, mm);
 
-	list_add(&vcache->hash_entry, hash_head);
+	list_add_tail(&vcache->hash_entry, hash_head);
 }
 
-void detach_vcache(vcache_t *vcache)
+void __detach_vcache(vcache_t *vcache)
 {
-	spin_lock(&vcache_lock);
-	list_del(&vcache->hash_entry);
-	spin_unlock(&vcache_lock);
+	list_del_init(&vcache->hash_entry);
 }
 
 void invalidate_vcache(unsigned long address, struct mm_struct *mm,
@@ -61,12 +59,11 @@ void invalidate_vcache(unsigned long address, struct mm_struct *mm,
 
 	hash_head = hash_vcache(address, mm);
 	/*
-	 * This is safe, because this path is called with the mm
-	 * semaphore read-held, and the add/remove path calls with the
-	 * mm semaphore write-held. So while other mm's might add new
-	 * entries in parallel, and *this* mm is locked out, so if the
-	 * list is empty now then we do not have to take the vcache
-	 * lock to see it's really empty.
+	 * This is safe, because this path is called with the pagetable
+	 * lock held. So while other mm's might add new entries in
+	 * parallel, *this* mm is locked out, so if the list is empty
+	 * now then we do not have to take the vcache lock to see it's
+	 * really empty.
 	 */
 	if (likely(list_empty(hash_head)))
 		return;

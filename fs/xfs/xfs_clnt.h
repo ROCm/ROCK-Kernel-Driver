@@ -112,15 +112,14 @@ struct xfs_mount_args {
 						/* only) */
 #define XFSMNT_NOTSERVER	0x00100000	/* give up being the server */
 						/* (remount only) */
-#define XFSMNT_DMAPI		0x00200000	/* enable dmapi/xdsm */
+#define XFSMNT_32BITINODES	0x00200000	/* restrict inodes to 32
+						 * bits of address space */
 #define XFSMNT_GQUOTA		0x00400000	/* group quota accounting */
 #define XFSMNT_GQUOTAENF	0x00800000	/* group quota limit
 						 * enforcement */
 #define XFSMNT_NOUUID		0x01000000	/* Ignore fs uuid */
-#define XFSMNT_32BITINODES	0x02000000	/* restrict inodes to 32
-						 * bits of address space */
-#define XFSMNT_IRIXSGID		0x04000000	/* Irix-style sgid inheritance */
-#define XFSMNT_NOLOGFLUSH	0x08000000	/* Don't flush for log blocks */
+#define XFSMNT_DMAPI		0x02000000	/* enable dmapi/xdsm */
+#define XFSMNT_NOLOGFLUSH	0x04000000	/* Don't flush for log blocks */
 
 /* Did we get any args for CXFS to consume? */
 #define XFSARGS_FOR_CXFSARR(ap)		\

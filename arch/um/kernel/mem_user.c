@@ -46,10 +46,9 @@
 #include "mem_user.h"
 #include "init.h"
 #include "os.h"
+#include "tempfile.h"
 
-struct mem_region physmem_region;
-
-struct mem_region *mem_list = &physmem_region;
+extern struct mem_region physmem_region;
 
 #define TEMPNAME_TEMPLATE "vm_file-XXXXXX"
 

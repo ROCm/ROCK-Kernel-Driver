@@ -340,7 +340,7 @@ xfs_dir2_data_freescan(
 	/*
 	 * Start by clearing the table.
 	 */
-	bzero(d->hdr.bestfree, sizeof(d->hdr.bestfree));
+	memset(d->hdr.bestfree, 0, sizeof(d->hdr.bestfree));
 	*loghead = 1;
 	/*
 	 * Set up pointers.

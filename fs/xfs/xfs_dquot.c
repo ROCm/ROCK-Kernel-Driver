@@ -94,7 +94,7 @@ xfs_qm_dqinit(
 #endif
 	} else {
 		/*
-		 * Only the q_core portion was bzeroed in dqreclaim_one().
+		 * Only the q_core portion was zeroed in dqreclaim_one().
 		 * So, we need to reset others.
 		 */
 		 dqp->q_nrefs = 0;
@@ -156,7 +156,7 @@ xfs_qm_dqinit_core(
 	xfs_dqblk_t	 *d)
 {
 	/*
-	 * Caller has bzero'd the entire dquot 'chunk' already.
+	 * Caller has zero'd the entire dquot 'chunk' already.
 	 */
 	INT_SET(d->dd_diskdq.d_magic, ARCH_CONVERT, XFS_DQUOT_MAGIC);
 	INT_SET(d->dd_diskdq.d_version, ARCH_CONVERT, XFS_DQUOT_VERSION);
@@ -351,7 +351,7 @@ xfs_qm_init_dquot_blk(
 	 */
 	curid = id - (id % XFS_QM_DQPERBLK(mp));
 	ASSERT(curid >= 0);
-	bzero(d, BBTOB(XFS_QI_DQCHUNKLEN(mp)));
+	memset(d, 0, BBTOB(XFS_QI_DQCHUNKLEN(mp)));
 	for (i = 0; i < XFS_QM_DQPERBLK(mp); i++, d++, curid++)
 		xfs_qm_dqinit_core(curid, type, d);
 	xfs_trans_dquot_buf(tp, bp,
@@ -614,7 +614,7 @@ xfs_qm_dqread(
 	}
 
 	/* copy everything from disk dquot to the incore dquot */
-	bcopy(ddqp, &dqp->q_core, sizeof(xfs_disk_dquot_t));
+	memcpy(&dqp->q_core, ddqp, sizeof(xfs_disk_dquot_t));
 	ASSERT(INT_GET(dqp->q_core.d_id, ARCH_CONVERT) == id);
 	xfs_qm_dquot_logitem_init(dqp);
 
@@ -1209,7 +1209,7 @@ xfs_qm_dqflush(
 	}
 
 	/* This is the only portion of data that needs to persist */
-	bcopy(&(dqp->q_core), ddqp, sizeof(xfs_disk_dquot_t));
+	memcpy(ddqp, &(dqp->q_core), sizeof(xfs_disk_dquot_t));
 
 	/*
 	 * Clear the dirty field and remember the flush lsn for later use.
@@ -1475,7 +1475,7 @@ xfs_qm_dqpurge(
 	dqp->q_mount = NULL;;
 	dqp->q_hash = NULL;
 	dqp->dq_flags = XFS_DQ_INACTIVE;
-	bzero(&dqp->q_core, sizeof(dqp->q_core));
+	memset(&dqp->q_core, 0, sizeof(dqp->q_core));
 	xfs_dqfunlock(dqp);
 	xfs_dqunlock(dqp);
 	XFS_DQ_HASH_UNLOCK(thishash);
@@ -1585,7 +1585,7 @@ xfs_qm_dqcheck(
 	 */
 	ASSERT(id != -1);
 	ASSERT(flags & XFS_QMOPT_DQREPAIR);
-	bzero(ddq, sizeof(xfs_dqblk_t));
+	memset(ddq, 0, sizeof(xfs_dqblk_t));
 	xfs_qm_dqinit_core(id, type, (xfs_dqblk_t *)ddq);
 	return (errs);
 }

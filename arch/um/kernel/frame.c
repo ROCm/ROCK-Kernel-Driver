@@ -130,6 +130,7 @@ static void child_common(void *sp, int size, sighandler_t handler, int flags)
 	os_stop_process(os_getpid());
 }
 
+/* Changed only during early boot */
 struct sc_frame signal_frame_sc;
 
 struct sc_frame_raw {
@@ -142,6 +143,7 @@ struct sc_frame_raw {
 	struct arch_frame_data_raw arch;
 };
 
+/* Changed only during early boot */
 static struct sc_frame_raw *raw_sc = NULL;
 
 static void sc_handler(int sig, struct sigcontext sc)
@@ -163,6 +165,7 @@ static int sc_child(void *arg)
 	return(-1);
 }
 
+/* Changed only during early boot */
 struct si_frame signal_frame_si;
 
 struct si_frame_raw {
@@ -175,6 +178,7 @@ struct si_frame_raw {
 	unsigned long sp;
 };
 
+/* Changed only during early boot */
 static struct si_frame_raw *raw_si = NULL;
 
 static void si_handler(int sig, siginfo_t *si)

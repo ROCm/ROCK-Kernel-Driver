@@ -23,7 +23,7 @@
 */
 
 /*
- * BlueZ HCI socket layer.
+ * Bluetooth HCI socket layer.
  *
  * $Id: hci_sock.c,v 1.4 2002/04/18 22:26:14 maxk Exp $
  */
@@ -53,7 +53,7 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 
-#ifndef HCI_SOCK_DEBUG
+#ifndef CONFIG_BT_HCI_SOCK_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #endif
@@ -79,7 +79,7 @@ static struct hci_sec_filter hci_sec_filter = {
 	}
 };
 
-static struct bluez_sock_list hci_sk_list = {
+static struct bt_sock_list hci_sk_list = {
 	.lock = RW_LOCK_UNLOCKED
 };
 
@@ -144,7 +144,7 @@ static int hci_sock_release(struct socket *sock)
 	if (!sk)
 		return 0;
 
-	bluez_sock_unlink(&hci_sk_list, sk);
+	bt_sock_unlink(&hci_sk_list, sk);
 
 	if (hdev) {
 		atomic_dec(&hdev->promisc);
@@ -310,7 +310,7 @@ static inline void hci_sock_cmsg(struct sock *sk, struct msghdr *msg, struct sk_
 	__u32 mask = hci_pi(sk)->cmsg_mask;
 
 	if (mask & HCI_CMSG_DIR)
-        	put_cmsg(msg, SOL_HCI, HCI_CMSG_DIR, sizeof(int), &bluez_cb(skb)->incomming);
+        	put_cmsg(msg, SOL_HCI, HCI_CMSG_DIR, sizeof(int), &bt_cb(skb)->incoming);
 
 	if (mask & HCI_CMSG_TSTAMP)
         	put_cmsg(msg, SOL_HCI, HCI_CMSG_TSTAMP, sizeof(skb->stamp), &skb->stamp);
@@ -378,7 +378,7 @@ static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msgh
 		goto done;
 	}
 
-	if (!(skb = bluez_skb_send_alloc(sk, len, msg->msg_flags & MSG_DONTWAIT, &err)))
+	if (!(skb = bt_skb_send_alloc(sk, len, msg->msg_flags & MSG_DONTWAIT, &err)))
 		goto done;
 
 	if (memcpy_fromiovec(skb_put(skb, len), msg->msg_iov, len)) {
@@ -454,7 +454,7 @@ int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optva
 		break;
 
 	case HCI_FILTER:
-		len = MIN(len, sizeof(uf));
+		len = min_t(unsigned int, len, sizeof(uf));
 		if (copy_from_user(&uf, optval, len)) {
 			err = -EFAULT;
 			break;
@@ -472,7 +472,7 @@ int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optva
 			f->type_mask = uf.type_mask;
 			f->opcode    = uf.opcode;
 			*((u32 *) f->event_mask + 0) = uf.event_mask[0];
-			*((u32 *) f->event_mask + 1) = uf.event_mask[0];
+			*((u32 *) f->event_mask + 1) = uf.event_mask[1];
 		}
 		break; 
 
@@ -522,10 +522,10 @@ int hci_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 			uf.type_mask = f->type_mask;
 			uf.opcode    = f->opcode;
 			uf.event_mask[0] = *((u32 *) f->event_mask + 0);
-			uf.event_mask[0] = *((u32 *) f->event_mask + 1);
+			uf.event_mask[1] = *((u32 *) f->event_mask + 1);
 		}
 
-		len = MIN(len, sizeof(uf));
+		len = min_t(unsigned int, len, sizeof(uf));
 		if (copy_to_user(optval, &uf, len))
 			return -EFAULT;
 		break;
@@ -568,14 +568,14 @@ static int hci_sock_create(struct socket *sock, int protocol)
 
 	sock->ops = &hci_sock_ops;
 
-	sk = bluez_sock_alloc(sock, protocol, sizeof(struct hci_pinfo), GFP_KERNEL);
+	sk = bt_sock_alloc(sock, protocol, sizeof(struct hci_pinfo), GFP_KERNEL);
 	if (!sk)
 		return -ENOMEM;
 
 	sock->state = SS_UNCONNECTED;
 	sk->state   = BT_OPEN;
 
-	bluez_sock_link(&hci_sk_list, sk);
+	bt_sock_link(&hci_sk_list, sk);
 
 	MOD_INC_USE_COUNT;
 	return 0;
@@ -627,7 +627,7 @@ struct notifier_block hci_sock_nblock = {
 
 int hci_sock_init(void)
 {
-	if (bluez_sock_register(BTPROTO_HCI, &hci_sock_family_ops)) {
+	if (bt_sock_register(BTPROTO_HCI, &hci_sock_family_ops)) {
 		BT_ERR("Can't register HCI socket");
 		return -EPROTO;
 	}
@@ -638,7 +638,7 @@ int hci_sock_init(void)
 
 int hci_sock_cleanup(void)
 {
-	if (bluez_sock_unregister(BTPROTO_HCI))
+	if (bt_sock_unregister(BTPROTO_HCI))
 		BT_ERR("Can't unregister HCI socket");
 
 	hci_unregister_notifier(&hci_sock_nblock);

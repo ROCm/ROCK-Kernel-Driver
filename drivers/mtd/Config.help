@@ -21,35 +21,61 @@ CONFIG_MTD_PARTITIONS
   devices. Partitioning on NFTL 'devices' is a different - that's the
   'normal' form of partitioning used on a block device.
 
+CONFIG_MTD_CONCAT
+  Support for concatenating several MTD devices into a single
+  (virtual) one. This allows you to have -for example- a JFFS(2)
+  file system spanning multiple physical flash chips. If unsure,
+  say 'Y'.
+
 CONFIG_MTD_REDBOOT_PARTS
   RedBoot is a ROM monitor and bootloader which deals with multiple
-  'images' in flash devices by putting a table in the last erase block
-  of the device, similar to a partition table, which gives the
-  offsets, lengths and names of all the images stored in the flash.
+  'images' in flash devices by putting a table in the last erase
+  block of the device, similar to a partition table, which gives
+  the offsets, lengths and names of all the images stored in the
+  flash.
 
   If you need code which can detect and parse this table, and register
   MTD 'partitions' corresponding to each image in the table, enable
-  this option.
-
-  You will still need the parsing functions to be called by the driver
-  for your particular device. It won't happen automatically. The
-  SA1100 map driver (CONFIG_MTD_SA1100) has an option for this, for
-  example.
-
-CONFIG_MTD_BOOTLDR_PARTS
-  The Compaq bootldr deals with multiple 'images' in flash devices
-  by putting a table in one of the first erase blocks of the device,
-  similar to a partition table, which gives the offsets, lengths and
-  names of all the images stored in the flash.
-
-  If you need code which can detect and parse this table, and register
-  MTD 'partitions' corresponding to each image in the table, enable
-  this option.
+  this option. 
 
   You will still need the parsing functions to be called by the driver
   for your particular device. It won't happen automatically. The 
   SA1100 map driver (CONFIG_MTD_SA1100) has an option for this, for 
   example.
+
+CONFIG_MTD_CMDLINE_PARTS
+  Allow generic configuration of the MTD paritition tables via the kernel
+  command line. Multiple flash resources are supported for hardware where
+  different kinds of flash memory are available. 
+  
+  You will still need the parsing functions to be called by the driver
+  for your particular device. It won't happen automatically. The 
+  SA1100 map driver (CONFIG_MTD_SA1100) has an option for this, for 
+  example.
+
+  The format for the command line is as follows:
+
+  mtdparts=<mtddef>[;<mtddef]
+  <mtddef>  := <mtd-id>:<partdef>[,<partdef>]
+  <partdef> := <size>[@offset][<name>][ro]
+  <mtd-id>  := unique id used in mapping driver/device
+  <size>    := standard linux memsize OR "-" to denote all 
+               remaining space
+  <name>    := (NAME)
+
+  Due to the way Linux handles the command line, no spaces are 
+  allowed in the partition definition, including mtd id's and partition 
+  names.
+
+  Examples:
+
+  1 flash resource (mtd-id "sa1100"), with 1 single writable partition:
+  mtdparts=sa1100:-
+
+  Same flash, but 2 named partitions, the first one being read-only:
+  mtdparts=sa1100:256k(ARMboot)ro,-(root)
+
+  If unsure, say 'N'.
 
 CONFIG_MTD_AFS_PARTS
   The ARM Firmware Suite allows the user to divide flash devices into
@@ -61,7 +87,7 @@ CONFIG_MTD_AFS_PARTS
   enable this option.
 
   You will still need the parsing functions to be called by the driver
-  for your particular device.  It won't happen automatically.  The 
+  for your particular device. It won't happen automatically. The
   'armflash' map driver (CONFIG_MTD_ARMFLASH) does this, for example.
 
 CONFIG_MTD_DEBUG_VERBOSE

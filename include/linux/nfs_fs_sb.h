@@ -30,6 +30,16 @@ struct nfs_server {
 				lru_busy;
 	struct nfs_fh		fh;
 	struct sockaddr_in	addr;
+#if CONFIG_NFS_V4
+	/* Our own IP address, as a null-terminated string.
+	 * This is used to generate the clientid, and the callback address.
+	 */
+	char			ip_addr[16];
+	char *			mnt_path;
+	struct nfs4_client *	nfs4_state;	/* all NFSv4 state starts here */
+	unsigned long		lease_time;	/* in jiffies */
+	unsigned long		last_renewal;	/* in jiffies */
+#endif
 };
 
 /* Server capabilities */

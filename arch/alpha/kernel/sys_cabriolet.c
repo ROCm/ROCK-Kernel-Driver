@@ -73,13 +73,13 @@ cabriolet_end_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type cabriolet_irq_type = {
-	typename:	"CABRIOLET",
-	startup:	cabriolet_startup_irq,
-	shutdown:	cabriolet_disable_irq,
-	enable:		cabriolet_enable_irq,
-	disable:	cabriolet_disable_irq,
-	ack:		cabriolet_disable_irq,
-	end:		cabriolet_end_irq,
+	.typename	= "CABRIOLET",
+	.startup	= cabriolet_startup_irq,
+	.shutdown	= cabriolet_disable_irq,
+	.enable		= cabriolet_enable_irq,
+	.disable	= cabriolet_disable_irq,
+	.ack		= cabriolet_disable_irq,
+	.end		= cabriolet_end_irq,
 };
 
 static void 
@@ -321,26 +321,26 @@ alphapc164_init_pci(void)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_CABRIOLET)
 struct alpha_machine_vector cabriolet_mv __initmv = {
-	vector_name:		"Cabriolet",
+	.vector_name		= "Cabriolet",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_APECS_IO,
 	DO_APECS_BUS,
-	machine_check:		apecs_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= apecs_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		35,
-	device_interrupt:	cabriolet_device_interrupt,
+	.nr_irqs		= 35,
+	.device_interrupt	= cabriolet_device_interrupt,
 
-	init_arch:		apecs_init_arch,
-	init_irq:		cabriolet_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		cabriolet_init_pci,
-	kill_arch:		NULL,
-	pci_map_irq:		cabriolet_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= apecs_init_arch,
+	.init_irq		= cabriolet_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= cabriolet_init_pci,
+	.kill_arch		= NULL,
+	.pci_map_irq		= cabriolet_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 #ifndef CONFIG_ALPHA_EB64P
 ALIAS_MV(cabriolet)
@@ -349,101 +349,101 @@ ALIAS_MV(cabriolet)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_EB164)
 struct alpha_machine_vector eb164_mv __initmv = {
-	vector_name:		"EB164",
+	.vector_name		= "EB164",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_CIA_IO,
 	DO_CIA_BUS,
-	machine_check:		cia_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	CIA_DEFAULT_MEM_BASE,
+	.machine_check		= cia_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		35,
-	device_interrupt:	cabriolet_device_interrupt,
+	.nr_irqs		= 35,
+	.device_interrupt	= cabriolet_device_interrupt,
 
-	init_arch:		cia_init_arch,
-	init_irq:		cabriolet_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		cia_cab_init_pci,
-	pci_map_irq:		cabriolet_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= cia_init_arch,
+	.init_irq		= cabriolet_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= cia_cab_init_pci,
+	.pci_map_irq		= cabriolet_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(eb164)
 #endif
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_EB66P)
 struct alpha_machine_vector eb66p_mv __initmv = {
-	vector_name:		"EB66+",
+	.vector_name		= "EB66+",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_LCA_IO,
 	DO_LCA_BUS,
-	machine_check:		lca_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= lca_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		35,
-	device_interrupt:	cabriolet_device_interrupt,
+	.nr_irqs		= 35,
+	.device_interrupt	= cabriolet_device_interrupt,
 
-	init_arch:		lca_init_arch,
-	init_irq:		cabriolet_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		cabriolet_init_pci,
-	pci_map_irq:		eb66p_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= lca_init_arch,
+	.init_irq		= cabriolet_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= cabriolet_init_pci,
+	.pci_map_irq		= eb66p_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(eb66p)
 #endif
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_LX164)
 struct alpha_machine_vector lx164_mv __initmv = {
-	vector_name:		"LX164",
+	.vector_name		= "LX164",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_PYXIS_IO,
 	DO_CIA_BUS,
-	machine_check:		cia_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	DEFAULT_MEM_BASE,
-	pci_dac_offset:		PYXIS_DAC_OFFSET,
+	.machine_check		= cia_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= DEFAULT_MEM_BASE,
+	.pci_dac_offset		= PYXIS_DAC_OFFSET,
 
-	nr_irqs:		35,
-	device_interrupt:	cabriolet_device_interrupt,
+	.nr_irqs		= 35,
+	.device_interrupt	= cabriolet_device_interrupt,
 
-	init_arch:		pyxis_init_arch,
-	init_irq:		cabriolet_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		alphapc164_init_pci,
-	pci_map_irq:		alphapc164_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= pyxis_init_arch,
+	.init_irq		= cabriolet_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= alphapc164_init_pci,
+	.pci_map_irq		= alphapc164_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(lx164)
 #endif
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_PC164)
 struct alpha_machine_vector pc164_mv __initmv = {
-	vector_name:		"PC164",
+	.vector_name		= "PC164",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_CIA_IO,
 	DO_CIA_BUS,
-	machine_check:		cia_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	CIA_DEFAULT_MEM_BASE,
+	.machine_check		= cia_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		35,
-	device_interrupt:	pc164_device_interrupt,
+	.nr_irqs		= 35,
+	.device_interrupt	= pc164_device_interrupt,
 
-	init_arch:		cia_init_arch,
-	init_irq:		pc164_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		alphapc164_init_pci,
-	pci_map_irq:		alphapc164_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= cia_init_arch,
+	.init_irq		= pc164_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= alphapc164_init_pci,
+	.pci_map_irq		= alphapc164_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(pc164)
 #endif

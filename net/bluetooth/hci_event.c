@@ -52,7 +52,7 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 
-#ifndef HCI_CORE_DEBUG
+#ifndef CONFIG_BT_HCI_CORE_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #endif
@@ -68,7 +68,7 @@ static void hci_cc_link_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb
 	default:
 		BT_DBG("%s Command complete: ogf LINK_CTL ocf %x", hdev->name, ocf);
 		break;
-	};
+	}
 }
 
 /* Command Complete OGF LINK_POLICY  */
@@ -103,7 +103,7 @@ static void hci_cc_link_policy(struct hci_dev *hdev, __u16 ocf, struct sk_buff *
 		BT_DBG("%s: Command complete: ogf LINK_POLICY ocf %x", 
 				hdev->name, ocf);
 		break;
-	};
+	}
 }
 
 /* Command Complete OGF HOST_CTL  */
@@ -213,7 +213,7 @@ static void hci_cc_host_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb
 	default:
 		BT_DBG("%s Command complete: ogf HOST_CTL ocf %x", hdev->name, ocf);
 		break;
-	};
+	}
 }
 
 /* Command Complete OGF INFO_PARAM  */
@@ -287,7 +287,7 @@ static void hci_cc_info_param(struct hci_dev *hdev, __u16 ocf, struct sk_buff *s
 	default:
 		BT_DBG("%s Command complete: ogf INFO_PARAM ocf %x", hdev->name, ocf);
 		break;
-	};
+	}
 }
 
 /* Command Status OGF LINK_CTL  */
@@ -376,7 +376,7 @@ static void hci_cs_link_ctl(struct hci_dev *hdev, __u16 ocf, __u8 status)
 		BT_DBG("%s Command status: ogf LINK_CTL ocf %x status %d", 
 			hdev->name, ocf, status);
 		break;
-	};
+	}
 }
 
 /* Command Status OGF LINK_POLICY */
@@ -388,7 +388,7 @@ static void hci_cs_link_policy(struct hci_dev *hdev, __u16 ocf, __u8 status)
 	default:
 		BT_DBG("%s Command status: ogf HOST_POLICY ocf %x", hdev->name, ocf);
 		break;
-	};
+	}
 }
 
 /* Command Status OGF HOST_CTL */
@@ -400,7 +400,7 @@ static void hci_cs_host_ctl(struct hci_dev *hdev, __u16 ocf, __u8 status)
 	default:
 		BT_DBG("%s Command status: ogf HOST_CTL ocf %x", hdev->name, ocf);
 		break;
-	};
+	}
 }
 
 /* Command Status OGF INFO_PARAM  */
@@ -412,7 +412,7 @@ static void hci_cs_info_param(struct hci_dev *hdev, __u16 ocf, __u8 status)
 	default:
 		BT_DBG("%s Command status: ogf INFO_PARAM ocf %x", hdev->name, ocf);
 		break;
-	};
+	}
 }
 
 /* Inquiry Complete */
@@ -849,7 +849,7 @@ void hci_si_event(struct hci_dev *hdev, int type, int dlen, void *data)
 	void *ptr;
 
 	size = HCI_EVENT_HDR_SIZE + EVT_STACK_INTERNAL_SIZE + dlen;
-	skb  = bluez_skb_alloc(size, GFP_ATOMIC);
+	skb  = bt_skb_alloc(size, GFP_ATOMIC);
 	if (!skb)
 		return;
 

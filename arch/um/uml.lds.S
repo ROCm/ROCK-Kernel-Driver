@@ -67,6 +67,9 @@ SECTIONS
   __setup_start = .;
   .setup.init : { *(.setup.init) }
   __setup_end = .;
+  __per_cpu_start = . ; 
+  .data.percpu : { *(.data.percpu) }
+  __per_cpu_end = . ; 
   __initcall_start = .;
   .initcall.init : {
 	*(.initcall1.init) 

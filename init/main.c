@@ -30,6 +30,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
 #include <linux/workqueue.h>
+#include <linux/profile.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -52,7 +53,6 @@
 #error Sorry, your GCC is too old. It builds incorrect kernels.
 #endif
 
-extern char _stext, _etext;
 extern char *linux_banner;
 
 static int init(void *);
@@ -129,13 +129,6 @@ __setup("maxcpus=", maxcpus);
 
 static char * argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
 char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
-
-static int __init profile_setup(char *str)
-{
-    int par;
-    if (get_option(&str,&par)) prof_shift = par;
-	return 1;
-}
 
 __setup("profile=", profile_setup);
 
@@ -411,16 +404,7 @@ asmlinkage void __init start_kernel(void)
 #ifdef CONFIG_MODULES
 	init_modules();
 #endif
-	if (prof_shift) {
-		unsigned int size;
-		/* only text is profiled */
-		prof_len = (unsigned long) &_etext - (unsigned long) &_stext;
-		prof_len >>= prof_shift;
-		
-		size = prof_len * sizeof(unsigned int) + PAGE_SIZE-1;
-		prof_buffer = (unsigned int *) alloc_bootmem(size);
-	}
-
+	profile_init();
 	kmem_cache_init();
 	local_irq_enable();
 	calibrate_delay();

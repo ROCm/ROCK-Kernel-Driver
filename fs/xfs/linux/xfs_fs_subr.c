@@ -135,7 +135,6 @@ fs_flushinval_pages(
 	struct inode	*ip = LINVFS_GET_IP(vp);
 
 	if (VN_CACHED(vp)) {
-		filemap_fdatawait(ip->i_mapping);
 		filemap_fdatawrite(ip->i_mapping);
 		filemap_fdatawait(ip->i_mapping);
 
@@ -159,7 +158,6 @@ fs_flush_pages(
 	struct inode	*ip = LINVFS_GET_IP(vp);
 
 	if (VN_CACHED(vp)) {
-		filemap_fdatawait(ip->i_mapping);
 		filemap_fdatawrite(ip->i_mapping);
 		filemap_fdatawait(ip->i_mapping);
 	}

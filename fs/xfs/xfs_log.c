@@ -1586,8 +1586,8 @@ xlog_unalloc_log(xlog_t *log)
  *		1. If first write of transaction, write start record
  *		2. Write log operation header (header per region)
  *		3. Find out if we can fit entire region into this iclog
- *		4. Potentially, verify destination bcopy ptr
- *		5. Bcopy (partial) region
+ *		4. Potentially, verify destination memcpy ptr
+ *		5. Memcpy (partial) region
  *		6. If partial copy, release iclog; otherwise, continue
  *			copying more regions into current iclog
  *	4. Mark want sync bit (in simulation mode)
@@ -1628,8 +1628,8 @@ xlog_write(xfs_mount_t *	mp,
     int		     start_rec_copy; /* # bytes to copy for start record */
     int		     partial_copy;   /* did we split a region? */
     int		     partial_copy_len;/* # bytes copied if split region */
-    int		     need_copy;	     /* # bytes need to bcopy this region */
-    int		     copy_len;	     /* # bytes actually bcopy'ing */
+    int		     need_copy;	     /* # bytes need to memcpy this region */
+    int		     copy_len;	     /* # bytes actually memcpy'ing */
     int		     copy_off;	     /* # bytes from entry start */
     int		     contwr;	     /* continued write of in-core log? */
     int		     firstwr = 0;    /* first write of transaction */
@@ -1733,7 +1733,7 @@ xlog_write(xfs_mount_t *	mp,
 
 	    /* Partial write last time? => (partial_copy != 0)
 	     * need_copy is the amount we'd like to copy if everything could
-	     * fit in the current bcopy.
+	     * fit in the current memcpy.
 	     */
 	    need_copy = reg[index].i_len - partial_copy_len;
 
@@ -1759,7 +1759,7 @@ xlog_write(xfs_mount_t *	mp,
 
 	    /* copy region */
 	    ASSERT(copy_len >= 0);
-	    bcopy(reg[index].i_addr + copy_off, (xfs_caddr_t)ptr, copy_len);
+	    memcpy((xfs_caddr_t)ptr, reg[index].i_addr + copy_off, copy_len);
 	    xlog_write_adv_cnt(ptr, len, log_offset, copy_len);
 
 	    /* make copy_len total bytes copied, including headers */
@@ -1836,7 +1836,7 @@ xlog_state_clean_log(xlog_t *log)
 				changed = 2;
 			}
 			INT_ZERO(iclog->ic_header.h_num_logops, ARCH_CONVERT);
-			bzero(iclog->ic_header.h_cycle_data,
+			memset(iclog->ic_header.h_cycle_data, 0,
 			      sizeof(iclog->ic_header.h_cycle_data));
 			INT_ZERO(iclog->ic_header.h_lsn, ARCH_CONVERT);
 		} else if (iclog->ic_state == XLOG_STATE_ACTIVE)
@@ -2064,7 +2064,7 @@ xlog_state_do_callback(
 		} while (first_iclog != iclog);
 		if (repeats && (repeats % 10) == 0) {
 			xfs_fs_cmn_err(CE_WARN, log->l_mp,
-				"xlog_state_do_callback: looping %d\n", repeats);
+				"xlog_state_do_callback: looping %d", repeats);
 		}
 	} while (!ioerrors && loopdidcallbacks);
 
@@ -2155,20 +2155,13 @@ xlog_state_done_syncing(
 		iclog->ic_state = XLOG_STATE_DONE_SYNC;
 	}
 
-	/*
-	 * Someone could be sleeping on the next iclog even though it is
-	 * in the ACTIVE state.	 We kick off one thread to force the
-	 * iclog buffer out.
-	 */
-	if (iclog->ic_next->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_IOERROR))
-		sv_signal(&iclog->ic_next->ic_forcesema);
 	LOG_UNLOCK(log, s);
 	xlog_state_do_callback(log, aborted, iclog);	/* also cleans log */
 }	/* xlog_state_done_syncing */
 
 
 /*
- * Update counters atomically now that bcopy is done.
+ * Update counters atomically now that memcpy is done.
  */
 /* ARGSUSED */
 static inline void
@@ -2984,11 +2977,9 @@ xlog_state_sync(xlog_t	  *log,
 		uint	  flags)
 {
     xlog_in_core_t	*iclog;
-    int			already_slept = 0;
     SPLDECL(s);
 
 
-try_again:
     s = LOG_LOCK(log);
     iclog = log->l_iclog;
 
@@ -3009,39 +3000,12 @@ try_again:
 	}
 
 	if (iclog->ic_state == XLOG_STATE_ACTIVE) {
-		/*
-		 * We sleep here if we haven't already slept (e.g.
-		 * this is the first time we've looked at the correct
-		 * iclog buf) and the buffer before us is going to
-		 * be sync'ed.	We have to do that to ensure that the
-		 * log records go out in the proper order.  When it's
-		 * done, someone waiting on this buffer will be woken up
-		 * (maybe us) to flush this buffer out.
-		 *
-		 * Otherwise, we mark the buffer WANT_SYNC, and bump
-		 * up the refcnt so we can release the log (which drops
-		 * the ref count).  The state switch keeps new transaction
-		 * commits from using this buffer.  When the current commits
-		 * finish writing into the buffer, the refcount will drop to
-		 * zero and the buffer will go out then.
-		 */
-		if (!already_slept &&
-		    (iclog->ic_prev->ic_state & (XLOG_STATE_WANT_SYNC |
-						 XLOG_STATE_SYNCING))) {
-			ASSERT(!(iclog->ic_state & XLOG_STATE_IOERROR));
-			XFS_STATS_INC(xfsstats.xs_log_force_sleep);
-			sv_wait(&iclog->ic_prev->ic_forcesema, PSWP,
-				&log->l_icloglock, s);
-			already_slept = 1;
-			goto try_again;
-		} else {
-			iclog->ic_refcnt++;
-			xlog_state_switch_iclogs(log, iclog, 0);
-			LOG_UNLOCK(log, s);
-			if (xlog_state_release_iclog(log, iclog))
-				return XFS_ERROR(EIO);
-			s = LOG_LOCK(log);
-		}
+		iclog->ic_refcnt++;
+		xlog_state_switch_iclogs(log, iclog, 0);
+		LOG_UNLOCK(log, s);
+		if (xlog_state_release_iclog(log, iclog))
+			return XFS_ERROR(EIO);
+		s = LOG_LOCK(log);
 	}
 
 	if ((flags & XFS_LOG_SYNC) && /* sleep */

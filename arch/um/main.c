@@ -18,15 +18,22 @@
 #include "user.h"
 #include "init.h"
 
+/* Set in set_stklim, which is called from main and __wrap_malloc.  
+ * __wrap_malloc only calls it if main hasn't started.
+ */
 unsigned long stacksizelim;
 
+/* Set in main */
 char *linux_prog;
 
 #define PGD_BOUND (4 * 1024 * 1024)
 #define STACKSIZE (8 * 1024 * 1024)
 #define THREAD_NAME_LEN (256)
 
-char padding[THREAD_NAME_LEN] = { [ 0 ...  THREAD_NAME_LEN - 2] = ' ', '\0' };
+/* Never changed */
+static char padding[THREAD_NAME_LEN] = { 
+	[ 0 ...  THREAD_NAME_LEN - 2] = ' ', '\0' 
+};
 
 static void set_stklim(void)
 {
@@ -129,7 +136,8 @@ int main(int argc, char **argv, char **envp)
 	return(uml_exitcode);
 }
 
-int allocating_monbuf = 0;
+/* Changed in  __wrap___monstartup and __wrap_malloc very early */
+static int allocating_monbuf = 0;
 
 #ifdef PROFILING
 extern void __real___monstartup (unsigned long, unsigned long);
@@ -146,6 +154,7 @@ void __wrap___monstartup (unsigned long lowpc, unsigned long highpc)
 extern void *__real_malloc(int);
 extern unsigned long host_task_size;
 
+/* Set in __wrap_malloc early */
 static void *gmon_buf = NULL;
 
 void *__wrap_malloc(int size)

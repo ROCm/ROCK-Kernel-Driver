@@ -23,7 +23,7 @@
 */
 
 /*
- * BlueZ SCO sockets.
+ * Bluetooth SCO sockets.
  *
  * $Id: sco.c,v 1.3 2002/04/17 17:37:16 maxk Exp $
  */
@@ -56,14 +56,14 @@
 #include <net/bluetooth/hci_core.h>
 #include <net/bluetooth/sco.h>
 
-#ifndef SCO_DEBUG
+#ifndef CONFIG_BT_SCO_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #endif
 
 static struct proto_ops sco_sock_ops;
 
-static struct bluez_sock_list sco_sk_list = {
+static struct bt_sock_list sco_sk_list = {
 	.lock = RW_LOCK_UNLOCKED
 };
 
@@ -200,8 +200,8 @@ static inline int sco_chan_add(struct sco_conn *conn, struct sock *sk, struct so
 
 int sco_connect(struct sock *sk)
 {
-	bdaddr_t *src = &bluez_sk(sk)->src;
-	bdaddr_t *dst = &bluez_sk(sk)->dst;
+	bdaddr_t *src = &bt_sk(sk)->src;
+	bdaddr_t *dst = &bt_sk(sk)->dst;
 	struct sco_conn *conn;
 	struct hci_conn *hcon;
 	struct hci_dev  *hdev;
@@ -258,8 +258,8 @@ static inline int sco_send_frame(struct sock *sk, struct msghdr *msg, int len)
 
 	BT_DBG("sk %p len %d", sk, len);
 
-	count = MIN(conn->mtu, len);
-	if (!(skb = bluez_skb_send_alloc(sk, count, msg->msg_flags & MSG_DONTWAIT, &err)))
+	count = min_t(unsigned int, conn->mtu, len);
+	if (!(skb = bt_skb_send_alloc(sk, count, msg->msg_flags & MSG_DONTWAIT, &err)))
 		return err;
 
 	if (memcpy_fromiovec(skb_put(skb, count), msg->msg_iov, count)) {
@@ -303,7 +303,7 @@ static struct sock *__sco_get_sock_by_addr(bdaddr_t *ba)
 	struct sock *sk;
 
 	for (sk = sco_sk_list.head; sk; sk = sk->next) {
-		if (!bacmp(&bluez_sk(sk)->src, ba))
+		if (!bacmp(&bt_sk(sk)->src, ba))
 			break;
 	}
 
@@ -324,11 +324,11 @@ static struct sock *sco_get_sock_listen(bdaddr_t *src)
 			continue;
 
 		/* Exact match. */
-		if (!bacmp(&bluez_sk(sk)->src, src))
+		if (!bacmp(&bt_sk(sk)->src, src))
 			break;
 
 		/* Closest match */
-		if (!bacmp(&bluez_sk(sk)->src, BDADDR_ANY))
+		if (!bacmp(&bt_sk(sk)->src, BDADDR_ANY))
 			sk1 = sk;
 	}
 
@@ -357,7 +357,7 @@ static void sco_sock_cleanup_listen(struct sock *parent)
 	BT_DBG("parent %p", parent);
 
 	/* Close not yet accepted channels */
-	while ((sk = bluez_accept_dequeue(parent, NULL)))
+	while ((sk = bt_accept_dequeue(parent, NULL)))
 		sco_sock_close(sk);
 
 	parent->state  = BT_CLOSED;
@@ -375,7 +375,7 @@ static void sco_sock_kill(struct sock *sk)
 	BT_DBG("sk %p state %d", sk, sk->state);
 
 	/* Kill poor orphan */
-	bluez_sock_unlink(&sco_sk_list, sk);
+	bt_sock_unlink(&sco_sk_list, sk);
 	sk->dead = 1;
 	sock_put(sk);
 }
@@ -429,7 +429,7 @@ static struct sock *sco_sock_alloc(struct socket *sock, int proto, int prio)
 {
 	struct sock *sk;
 
-	sk = bluez_sock_alloc(sock, proto, sizeof(struct sco_pinfo), prio);
+	sk = bt_sock_alloc(sock, proto, sizeof(struct sco_pinfo), prio);
 	if (!sk)
 		return NULL;
 
@@ -439,7 +439,7 @@ static struct sock *sco_sock_alloc(struct socket *sock, int proto, int prio)
 
 	sco_sock_init_timer(sk);
 
-	bluez_sock_link(&sco_sk_list, sk);
+	bt_sock_link(&sco_sk_list, sk);
 
 	MOD_INC_USE_COUNT;
 	return sk;
@@ -490,7 +490,7 @@ static int sco_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 		err = -EADDRINUSE;
 	} else {
 		/* Save source address */
-		bacpy(&bluez_sk(sk)->src, &sa->sco_bdaddr);
+		bacpy(&bt_sk(sk)->src, &sa->sco_bdaddr);
 		sk->state = BT_BOUND;
 	}
 	
@@ -522,12 +522,12 @@ static int sco_sock_connect(struct socket *sock, struct sockaddr *addr, int alen
 	lock_sock(sk);
 
 	/* Set destination address and psm */
-	bacpy(&bluez_sk(sk)->dst, &sa->sco_bdaddr);
+	bacpy(&bt_sk(sk)->dst, &sa->sco_bdaddr);
 
 	if ((err = sco_connect(sk)))
 		goto done;
 
-	err = bluez_sock_w4_connect(sk, flags);
+	err = bt_sock_w4_connect(sk, flags);
 
 done:
 	release_sock(sk);
@@ -577,7 +577,7 @@ int sco_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 
 	/* Wait for an incoming connection. (wake-one). */
 	add_wait_queue_exclusive(sk->sleep, &wait);
-	while (!(ch = bluez_accept_dequeue(sk, newsock))) {
+	while (!(ch = bt_accept_dequeue(sk, newsock))) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (!timeo) {
 			err = -EAGAIN;
@@ -624,9 +624,9 @@ static int sco_sock_getname(struct socket *sock, struct sockaddr *addr, int *len
 	*len = sizeof(struct sockaddr_sco);
 
 	if (peer)
-		bacpy(&sa->sco_bdaddr, &bluez_sk(sk)->dst);
+		bacpy(&sa->sco_bdaddr, &bt_sk(sk)->dst);
 	else
-		bacpy(&sa->sco_bdaddr, &bluez_sk(sk)->src);
+		bacpy(&sa->sco_bdaddr, &bt_sk(sk)->src);
 
 	return 0;
 }
@@ -699,7 +699,7 @@ int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 
 		BT_INFO("mtu %d", opts.mtu);
 
-		len = MIN(len, sizeof(opts));
+		len = min_t(unsigned int, len, sizeof(opts));
 		if (copy_to_user(optval, (char *)&opts, len))
 			err = -EFAULT;
 
@@ -713,7 +713,7 @@ int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 
 		cinfo.hci_handle = sco_pi(sk)->conn->hcon->handle;
 
-		len = MIN(len, sizeof(cinfo));
+		len = min_t(unsigned int, len, sizeof(cinfo));
 		if (copy_to_user(optval, (char *)&cinfo, len))
 			err = -EFAULT;
 
@@ -751,7 +751,7 @@ static void __sco_chan_add(struct sco_conn *conn, struct sock *sk, struct sock *
 	conn->sk = sk;
 
 	if (parent)
-		bluez_accept_enqueue(parent, sk);
+		bt_accept_enqueue(parent, sk);
 }
 
 /* Delete channel. 
@@ -808,8 +808,8 @@ static void sco_conn_ready(struct sco_conn *conn)
 
 		sco_sock_init(sk, parent);
 
-		bacpy(&bluez_sk(sk)->src, conn->src);
-		bacpy(&bluez_sk(sk)->dst, conn->dst);
+		bacpy(&bt_sk(sk)->src, conn->src);
+		bacpy(&bt_sk(sk)->dst, conn->dst);
 
 		hci_conn_hold(conn->hcon);
         	__sco_chan_add(conn, sk, parent);
@@ -849,7 +849,7 @@ int sco_connect_cfm(struct hci_conn *hcon, __u8 status)
 		if (conn)
 			sco_conn_ready(conn);
 	} else 
-		sco_conn_del(hcon, bterr(status));
+		sco_conn_del(hcon, bt_err(status));
 	
 	return 0;
 }
@@ -861,7 +861,7 @@ int sco_disconn_ind(struct hci_conn *hcon, __u8 reason)
 	if (hcon->type != SCO_LINK)
 		return 0;
 
-	sco_conn_del(hcon, bterr(reason));
+	sco_conn_del(hcon, bt_err(reason));
 	return 0;
 }
 
@@ -885,7 +885,7 @@ drop:
 }
 
 /* ----- Proc fs support ------ */
-static int sco_sock_dump(char *buf, struct bluez_sock_list *list)
+static int sco_sock_dump(char *buf, struct bt_sock_list *list)
 {
 	struct sco_pinfo *pi;
 	struct sock *sk;
@@ -896,7 +896,7 @@ static int sco_sock_dump(char *buf, struct bluez_sock_list *list)
 	for (sk = list->head; sk; sk = sk->next) {
 		pi = sco_pi(sk);
 		ptr += sprintf(ptr, "%s %s %d\n",
-				batostr(&bluez_sk(sk)->src), batostr(&bluez_sk(sk)->dst),
+				batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst),
 				sk->state); 
 	}
 
@@ -940,8 +940,8 @@ static struct proto_ops sco_sock_ops = {
 	.accept  =      sco_sock_accept,
 	.getname =      sco_sock_getname,
 	.sendmsg =      sco_sock_sendmsg,
-	.recvmsg =      bluez_sock_recvmsg,
-	.poll    =      bluez_sock_poll,
+	.recvmsg =      bt_sock_recvmsg,
+	.poll    =      bt_sock_poll,
 	.ioctl   =      sock_no_ioctl,
 	.mmap    =      sock_no_mmap,
 	.socketpair =   sock_no_socketpair,
@@ -968,7 +968,7 @@ int __init sco_init(void)
 {
 	int err;
 
-	if ((err = bluez_sock_register(BTPROTO_SCO, &sco_sock_family_ops))) {
+	if ((err = bt_sock_register(BTPROTO_SCO, &sco_sock_family_ops))) {
 		BT_ERR("Can't register SCO socket layer");
 		return err;
 	}
@@ -980,7 +980,7 @@ int __init sco_init(void)
 
 	create_proc_read_entry("bluetooth/sco", 0, 0, sco_read_proc, NULL);
 
-	BT_INFO("BlueZ SCO ver %s Copyright (C) 2000,2001 Qualcomm Inc", VERSION);
+	BT_INFO("Bluetooth SCO ver %s Copyright (C) 2000,2001 Qualcomm Inc", VERSION);
 	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 	return 0;
 }
@@ -992,7 +992,7 @@ void sco_cleanup(void)
 	remove_proc_entry("bluetooth/sco", NULL);
 
 	/* Unregister socket, protocol and notifier */
-	if ((err = bluez_sock_unregister(BTPROTO_SCO)))
+	if ((err = bt_sock_unregister(BTPROTO_SCO)))
 		BT_ERR("Can't unregister SCO socket layer %d", err);
 
 	if ((err = hci_unregister_proto(&sco_hci_proto)))
@@ -1003,5 +1003,5 @@ module_init(sco_init);
 module_exit(sco_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
-MODULE_DESCRIPTION("BlueZ SCO ver " VERSION);
+MODULE_DESCRIPTION("Bluetooth SCO ver " VERSION);
 MODULE_LICENSE("GPL");

@@ -912,14 +912,13 @@ nfs3_xdr_linkres(struct rpc_rqst *req, u32 *p, struct nfs3_linkres *res)
  * Decode FSSTAT reply
  */
 static int
-nfs3_xdr_fsstatres(struct rpc_rqst *req, u32 *p, struct nfs_fsinfo *res)
+nfs3_xdr_fsstatres(struct rpc_rqst *req, u32 *p, struct nfs_fsstat *res)
 {
-	struct nfs_fattr dummy;
 	int		status;
 
 	status = ntohl(*p++);
 
-	p = xdr_decode_post_op_attr(p, &dummy);
+	p = xdr_decode_post_op_attr(p, res->fattr);
 	if (status != 0)
 		return -nfs_stat_to_errno(status);
 
@@ -940,12 +939,11 @@ nfs3_xdr_fsstatres(struct rpc_rqst *req, u32 *p, struct nfs_fsinfo *res)
 static int
 nfs3_xdr_fsinfores(struct rpc_rqst *req, u32 *p, struct nfs_fsinfo *res)
 {
-	struct nfs_fattr dummy;
 	int		status;
 
 	status = ntohl(*p++);
 
-	p = xdr_decode_post_op_attr(p, &dummy);
+	p = xdr_decode_post_op_attr(p, res->fattr);
 	if (status != 0)
 		return -nfs_stat_to_errno(status);
 
@@ -959,6 +957,7 @@ nfs3_xdr_fsinfores(struct rpc_rqst *req, u32 *p, struct nfs_fsinfo *res)
 	p = xdr_decode_hyper(p, &res->maxfilesize);
 
 	/* ignore time_delta and properties */
+	res->lease_time = 0;
 	return 0;
 }
 
@@ -966,18 +965,17 @@ nfs3_xdr_fsinfores(struct rpc_rqst *req, u32 *p, struct nfs_fsinfo *res)
  * Decode PATHCONF reply
  */
 static int
-nfs3_xdr_pathconfres(struct rpc_rqst *req, u32 *p, struct nfs_fsinfo *res)
+nfs3_xdr_pathconfres(struct rpc_rqst *req, u32 *p, struct nfs_pathconf *res)
 {
-	struct nfs_fattr dummy;
 	int		status;
 
 	status = ntohl(*p++);
 
-	p = xdr_decode_post_op_attr(p, &dummy);
+	p = xdr_decode_post_op_attr(p, res->fattr);
 	if (status != 0)
 		return -nfs_stat_to_errno(status);
-	res->linkmax = ntohl(*p++);
-	res->namelen = ntohl(*p++);
+	res->max_link = ntohl(*p++);
+	res->max_namelen = ntohl(*p++);
 
 	/* ignore remaining fields */
 	return 0;

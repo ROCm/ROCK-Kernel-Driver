@@ -1008,17 +1008,9 @@ int setup_profiling_timer(unsigned int multiplier)
 
 inline void smp_local_timer_interrupt(struct pt_regs * regs)
 {
-	int user = user_mode(regs);
 	int cpu = smp_processor_id();
 
-	/*
-	 * The profiling function is SMP safe. (nothing can mess
-	 * around with "current", and the profiling counters are
-	 * updated with atomic operations). This is especially
-	 * useful with a profiling multiplier != 1
-	 */
-	if (!user)
-		x86_do_profile(regs->eip);
+	x86_do_profile(regs);
 
 	if (--prof_counter[cpu] <= 0) {
 		/*
@@ -1036,7 +1028,7 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
 		}
 
 #ifdef CONFIG_SMP
-		update_process_times(user);
+		update_process_times(user_mode(regs));
 #endif
 	}
 

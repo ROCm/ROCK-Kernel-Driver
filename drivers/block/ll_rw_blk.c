@@ -1427,7 +1427,19 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 	int rw = rq_data_dir(rq);
 	unsigned int index;
 
-	index = disk_index(rq->rq_dev);
+	if (!rq->rq_disk)
+		return;
+
+	if (rw == READ) {
+		rq->rq_disk->rio += new_io;
+		rq->rq_disk->reads += nr_sectors;
+	} else if (rw == WRITE) {
+		rq->rq_disk->wio += new_io;
+		rq->rq_disk->writes += nr_sectors;
+	}
+
+	index = rq->rq_disk->first_minor >> rq->rq_disk->minor_shift;
+
 	if ((index >= DK_MAX_DISK) || (major >= DK_MAX_MAJOR))
 		return;
 
@@ -1747,6 +1759,7 @@ get_rq:
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
 	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
+	req->rq_disk = bio->bi_bdev->bd_disk;
 	add_request(q, req, insert_here);
 out:
 	if (freereq)

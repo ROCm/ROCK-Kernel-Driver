@@ -27,6 +27,7 @@
 #include "init.h"
 #include "irq_user.h"
 
+static spinlock_t opened_lock = SPIN_LOCK_UNLOCKED;
 LIST_HEAD(opened);
 
 static int uml_net_rx(struct net_device *dev)
@@ -118,7 +119,9 @@ static int uml_net_open(struct net_device *dev)
 	lp->tl.data = (unsigned long) &lp->user;
 	netif_start_queue(dev);
 
+	spin_lock(&opened_lock);
 	list_add(&lp->list, &opened);
+	spin_unlock(&opened_lock);
 	MOD_INC_USE_COUNT;
  out:
 	spin_unlock(&lp->lock);
@@ -135,8 +138,10 @@ static int uml_net_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 	if(lp->close != NULL) (*lp->close)(lp->fd, &lp->user);
 	lp->fd = -1;
+	spin_lock(&opened_lock);
 	list_del(&lp->list);
-	
+	spin_unlock(&opened_lock);
+
 	MOD_DEC_USE_COUNT;
 	spin_unlock(&lp->lock);
 	return 0;
@@ -245,6 +250,7 @@ void uml_net_user_timer_expire(unsigned long _conn)
 #endif
 }
 
+static spinlock_t devices_lock = SPIN_LOCK_UNLOCKED;
 static struct list_head devices = LIST_HEAD_INIT(devices);
 
 static int eth_configure(int n, void *init, char *mac,
@@ -261,7 +267,10 @@ static int eth_configure(int n, void *init, char *mac,
 		return(1);
 	}
 
+	spin_lock(&devices_lock);
 	list_add(&device->list, &devices);
+	spin_unlock(&devices_lock);
+
 	device->index = n;
 
 	size = transport->private_size + sizeof(struct uml_net_private) + 
@@ -373,12 +382,16 @@ static struct uml_net *find_device(int n)
 	struct uml_net *device;
 	struct list_head *ele;
 
+	spin_lock(&devices_lock);
 	list_for_each(ele, &devices){
 		device = list_entry(ele, struct uml_net, list);
 		if(device->index == n)
-			return(device);
+			goto out;
 	}
-	return(NULL);
+	device = NULL;
+ out:
+	spin_unlock(&devices_lock);
+	return(device);
 }
 
 static int eth_parse(char *str, int *index_out, char **str_out)
@@ -418,8 +431,12 @@ struct eth_init {
 	int index;
 };
 
+/* Filled in at boot time.  Will need locking if the transports become
+ * modular.
+ */
 struct list_head transports = LIST_HEAD_INIT(transports);
 
+/* Filled in during early boot */
 struct list_head eth_cmd_line = LIST_HEAD_INIT(eth_cmd_line);
 
 static int check_transport(struct transport *transport, char *eth, int n,
@@ -518,8 +535,6 @@ __uml_help(eth_setup,
 "eth[0-9]+=<transport>,<options>\n"
 "    Configure a network device.\n\n"
 );
-
-int ndev = 0;
 
 static int eth_init(void)
 {

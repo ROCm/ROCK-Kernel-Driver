@@ -677,20 +677,10 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 	}
 }
 
-static int hd_open(struct inode * inode, struct file * filp)
-{
-	int target =  DEVICE_NR(inode->i_rdev);
-	if (target >= NR_HD)
-		return -ENODEV;
-	return 0;
-}
-
 /*
  * Releasing a block device means we sync() it, so that it can safely
  * be forgotten about...
  */
-
-extern struct block_device_operations hd_fops;
 
 static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -705,7 +695,6 @@ static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct block_device_operations hd_fops = {
-	.open =		hd_open,
 	.ioctl =	hd_ioctl,
 };
 
@@ -802,12 +791,11 @@ static int __init hd_init(void)
 		goto out;
 
 	for (drive=0 ; drive < NR_HD ; drive++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(64);
 		if (!disk)
 			goto Enomem;
 		disk->major = MAJOR_NR;
 		disk->first_minor = drive << 6;
-		disk->minor_shift = 6;
 		disk->fops = &hd_fops;
 		sprintf(disk->disk_name, "hd%c", 'a'+drive);
 		hd_gendisk[drive] = disk;

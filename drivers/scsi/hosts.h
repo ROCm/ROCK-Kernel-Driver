@@ -266,14 +266,6 @@ typedef struct	SHT
      */
     int (* bios_param)(Disk *, struct block_device *, int []);
 
-
-    /*
-     * Used to set the queue depth for a specific device.
-     *
-     * Once the slave_attach() function is in full use, this will go away.
-     */
-    void (*select_queue_depths)(struct Scsi_Host *, Scsi_Device *);
-
     /*
      * This determines if we will use a non-interrupt driven
      * or an interrupt driven scheme,  It is set to the maximum number
@@ -384,6 +376,8 @@ struct Scsi_Host
      */
     struct Scsi_Host      * next;
     Scsi_Device           * host_queue;
+    struct list_head	  all_scsi_hosts;
+    struct list_head	  my_devices;
 
     spinlock_t		  default_lock;
     spinlock_t		  *host_lock;
@@ -488,8 +482,6 @@ struct Scsi_Host
      * Value host_blocked counts down from
      */
     unsigned int max_host_blocked;
-
-    void (*select_queue_depths)(struct Scsi_Host *, Scsi_Device *);
 
     /*
      * For SCSI hosts which are PCI devices, set pci_dev so that

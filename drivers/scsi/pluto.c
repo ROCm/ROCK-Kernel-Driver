@@ -71,17 +71,21 @@ static void __init pluto_detect_scsi_done(Scsi_Cmnd *SCpnt)
 		up(&fc_sem);
 }
 
-static void pluto_select_queue_depths(struct Scsi_Host *host, Scsi_Device *devlist)
+int pluto_slave_attach(Scsi_Device *device)
 {
-	Scsi_Device *device;
-	
-	for (device = devlist; device; device = device->next) {
-		if (device->host != host) continue;
-		if (device->tagged_supported)
-			device->queue_depth = /* 254 */ 8;
-		else
-			device->queue_depth = 2;
-	}
+	int depth_to_use;
+
+	if (device->tagged_supported)
+		depth_to_use = /* 254 */ 8;
+	else
+		depth_to_use = 2;
+
+	scsi_adjust_queue_depth(device,
+				(device->tagged_supported ?
+				 MSG_SIMPLE_TAG : 0),
+				depth_to_use);
+
+	return 0;
 }
 
 /* Detect all SSAs attached to the machine.
@@ -241,7 +245,6 @@ int __init pluto_detect(Scsi_Host_Template *tpnt)
 				host->unchecked_isa_dma = 1;
 #endif
 
-				host->select_queue_depths = pluto_select_queue_depths;
 
 				fc->channels = inq->channels + 1;
 				fc->targets = inq->targets;

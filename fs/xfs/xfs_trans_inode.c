@@ -414,20 +414,8 @@ xfs_trans_inode_broot_debug(
 		iip->ili_root_size = ip->i_df.if_broot_bytes;
 		iip->ili_orig_root =
 			(char*)kmem_alloc(iip->ili_root_size, KM_SLEEP);
-		bcopy((char*)(ip->i_df.if_broot), iip->ili_orig_root,
+		memcpy(iip->ili_orig_root, (char*)(ip->i_df.if_broot),
 		      iip->ili_root_size);
 	}
 }
 #endif
-
-
-
-
-
-
-
-
-
-
-
-

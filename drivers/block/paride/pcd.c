@@ -281,7 +281,7 @@ static void pcd_init_units(void)
 
 	pcd_drive_count = 0;
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			continue;
 		cd->disk = disk;
@@ -303,7 +303,6 @@ static void pcd_init_units(void)
 		cd->info.mask = 0;
 		disk->major = major;
 		disk->first_minor = unit;
-		disk->minor_shift = 0;
 		strcpy(disk->disk_name, cd->name);	/* umm... */
 		disk->fops = &pcd_bdops;
 	}

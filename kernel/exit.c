@@ -19,6 +19,7 @@
 #include <linux/file.h>
 #include <linux/binfmts.h>
 #include <linux/ptrace.h>
+#include <linux/profile.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -59,11 +60,12 @@ void release_task(struct task_struct * p)
 {
 	struct dentry *proc_dentry;
 	task_t *leader;
-
-	if (p->state < TASK_ZOMBIE)
-		BUG();
+ 
+	BUG_ON(p->state < TASK_ZOMBIE);
+ 
 	if (p != current)
 		wait_task_inactive(p);
+
 	atomic_dec(&p->user->processes);
 	security_ops->task_free_security(p);
 	free_uid(p->user);
@@ -635,6 +637,8 @@ NORET_TYPE void do_exit(long code)
 				current->comm, current->pid,
 				preempt_count());
 
+	profile_exit_task(tsk);
+ 
 fake_volatile:
 	acct_process(code);
 	__exit_mm(tsk);

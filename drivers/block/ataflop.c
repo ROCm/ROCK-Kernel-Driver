@@ -1358,12 +1358,6 @@ static int fd_device[4] = { 0,0,0,0 };
 static int check_floppy_change (kdev_t dev)
 {
 	unsigned int drive = minor(dev) & 0x03;
-
-	if (major(dev) != MAJOR_NR) {
-		printk(KERN_ERR "floppy_changed: not a floppy\n");
-		return 0;
-	}
-	
 	if (test_bit (drive, &fake_change)) {
 		/* simulated change (e.g. after formatting) */
 		return 1;
@@ -1855,17 +1849,11 @@ static void __init config_types( void )
 
 static int floppy_open( struct inode *inode, struct file *filp )
 {
-	int drive, type;
-	int old_dev;
+	int drive = minor(inode->i_rdev) & 3;
+	int type  = minor(inode->i_rdev) >> 2;
+	int old_dev = fd_device[drive];
 
-	drive = minor(inode->i_rdev) & 3;
-	type  = minor(inode->i_rdev) >> 2;
 	DPRINT(("fd_open: type=%d\n",type));
-	if (drive >= FD_MAX_UNITS || type > NUM_DISK_MINORS)
-		return -ENXIO;
-
-	old_dev = fd_device[drive];
-
 	if (fd_ref[drive] && old_dev != minor(inode->i_rdev))
 		return -EBUSY;
 
@@ -1949,7 +1937,7 @@ int __init atari_floppy_init (void)
 	}
 
 	for (i = 0; i < FD_MAX_UNITS; i++) {
-		unit[i].disk = alloc_disk();
+		unit[i].disk = alloc_disk(1);
 		if (!unit[i].disk)
 			goto Enomem;
 	}

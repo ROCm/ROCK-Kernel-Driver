@@ -1,12 +1,12 @@
 #
 # Makefile for the memory technology device drivers.
 #
-#
-# $Id: Makefile,v 1.63 2001/06/13 09:43:07 dwmw2 Exp $
+# Based on:
+# $Id: Makefile,v 1.66 2002/04/23 13:52:14 mag Exp $
 
-export-objs	:= mtdcore.o mtdpart.o redboot.o bootldr.o afs.o
+export-objs	:= mtdcore.o mtdpart.o redboot.o cmdline.o afs.o mtdconcat.o
 
-obj-y           += chips/ maps/	devices/ nand/
+obj-y           += chips/ maps/ devices/ nand/
 
 #                       *** BIG UGLY NOTE ***
 #
@@ -26,9 +26,10 @@ obj-y           += chips/ maps/	devices/ nand/
 
 # Core functionality.
 obj-$(CONFIG_MTD)		+= mtdcore.o
+obj-$(CONFIG_MTD_CONCAT)	+= mtdconcat.o
 obj-$(CONFIG_MTD_PARTITIONS)	+= mtdpart.o
 obj-$(CONFIG_MTD_REDBOOT_PARTS) += redboot.o
-obj-$(CONFIG_MTD_BOOTLDR_PARTS) += bootldr.o
+obj-$(CONFIG_MTD_CMDLINE_PARTS) += cmdline.o
 obj-$(CONFIG_MTD_AFS_PARTS)	+= afs.o
 
 # 'Users' - code which presents functionality to userspace.

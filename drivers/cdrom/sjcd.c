@@ -1689,14 +1689,13 @@ static int __init sjcd_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_sjcd_request, &sjcd_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
 
-	sjcd_disk = alloc_disk();
+	sjcd_disk = alloc_disk(1);
 	if (!sjcd_disk) {
 		printk(KERN_ERR "SJCD: can't allocate disk");
 		goto out1;
 	}
 	sjcd_disk->major = MAJOR_NR,
 	sjcd_disk->first_minor = 0,
-	sjcd_disk->minor_shift = 0,
 	sjcd_disk->fops = &sjcd_fops,
 	sprintf(sjcd_disk->disk_name, "sjcd");
 

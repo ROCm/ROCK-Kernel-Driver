@@ -52,7 +52,7 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 
-#ifndef HCI_CORE_DEBUG
+#ifndef CONFIG_BT_HCI_CORE_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #endif

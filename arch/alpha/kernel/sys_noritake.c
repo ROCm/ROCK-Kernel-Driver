@@ -68,13 +68,13 @@ noritake_startup_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type noritake_irq_type = {
-	typename:	"NORITAKE",
-	startup:	noritake_startup_irq,
-	shutdown:	noritake_disable_irq,
-	enable:		noritake_enable_irq,
-	disable:	noritake_disable_irq,
-	ack:		noritake_disable_irq,
-	end:		noritake_enable_irq,
+	.typename	= "NORITAKE",
+	.startup	= noritake_startup_irq,
+	.shutdown	= noritake_disable_irq,
+	.enable		= noritake_enable_irq,
+	.disable	= noritake_disable_irq,
+	.ack		= noritake_disable_irq,
+	.end		= noritake_enable_irq,
 };
 
 static void 
@@ -299,51 +299,51 @@ noritake_apecs_machine_check(unsigned long vector, unsigned long la_ptr,
 
 #if defined(CONFIG_ALPHA_GENERIC) || !defined(CONFIG_ALPHA_PRIMO)
 struct alpha_machine_vector noritake_mv __initmv = {
-	vector_name:		"Noritake",
+	.vector_name		= "Noritake",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_APECS_IO,
 	DO_APECS_BUS,
-	machine_check:		noritake_apecs_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		EISA_DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= noritake_apecs_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= EISA_DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		48,
-	device_interrupt:	noritake_device_interrupt,
+	.nr_irqs		= 48,
+	.device_interrupt	= noritake_device_interrupt,
 
-	init_arch:		apecs_init_arch,
-	init_irq:		noritake_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		common_init_pci,
-	kill_arch:		NULL,
-	pci_map_irq:		noritake_map_irq,
-	pci_swizzle:		noritake_swizzle,
+	.init_arch		= apecs_init_arch,
+	.init_irq		= noritake_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= common_init_pci,
+	.kill_arch		= NULL,
+	.pci_map_irq		= noritake_map_irq,
+	.pci_swizzle		= noritake_swizzle,
 };
 ALIAS_MV(noritake)
 #endif
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_PRIMO)
 struct alpha_machine_vector noritake_primo_mv __initmv = {
-	vector_name:		"Noritake-Primo",
+	.vector_name		= "Noritake-Primo",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_CIA_IO,
 	DO_CIA_BUS,
-	machine_check:		cia_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		EISA_DEFAULT_IO_BASE,
-	min_mem_address:	CIA_DEFAULT_MEM_BASE,
+	.machine_check		= cia_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= EISA_DEFAULT_IO_BASE,
+	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		48,
-	device_interrupt:	noritake_device_interrupt,
+	.nr_irqs		= 48,
+	.device_interrupt	= noritake_device_interrupt,
 
-	init_arch:		cia_init_arch,
-	init_irq:		noritake_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		cia_init_pci,
-	pci_map_irq:		noritake_map_irq,
-	pci_swizzle:		noritake_swizzle,
+	.init_arch		= cia_init_arch,
+	.init_irq		= noritake_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= cia_init_pci,
+	.pci_map_irq		= noritake_map_irq,
+	.pci_swizzle		= noritake_swizzle,
 };
 ALIAS_MV(noritake_primo)
 #endif

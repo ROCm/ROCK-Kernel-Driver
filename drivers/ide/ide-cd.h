@@ -105,13 +105,6 @@ struct ide_cd_state_flags {
 #define CDROM_STATE_FLAGS(drive) (&(((struct cdrom_info *)(drive->driver_data))->state_flags))
 
 struct packet_command {
-	char *buffer;
-	int buflen;
-	int stat;
-	int quiet;
-	int timeout;
-	struct request_sense *sense;
-	unsigned char c[12];
 };
 
 /* Structure of a MSF cdrom address. */
