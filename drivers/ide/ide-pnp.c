@@ -1,5 +1,4 @@
-/*
- * linux/drivers/ide/ide-pnp.c
+/**** vi:set ts=8 sts=8 sw=8:************************************************
  *
  * This file provides autodetection for ISA PnP IDE interfaces.
  * It was tested with "ESS ES1868 Plug and Play AudioDrive" IDE interface.
@@ -33,19 +32,27 @@
 
 #define DEV_NAME(dev) (dev->bus->name ? dev->bus->name : "ISA PnP")
 
-#define GENERIC_HD_DATA		0
-#define GENERIC_HD_ERROR	1
-#define GENERIC_HD_NSECTOR	2
-#define GENERIC_HD_SECTOR	3
-#define GENERIC_HD_LCYL		4
-#define GENERIC_HD_HCYL		5
-#define GENERIC_HD_SELECT	6
-#define GENERIC_HD_STATUS	7
+enum {
+	GENERIC_HD_DATA,
+	GENERIC_HD_ERROR,
+	GENERIC_HD_NSECTOR,
+	GENERIC_HD_SECTOR,
+	GENERIC_HD_LCYL,
+	GENERIC_HD_HCYL,
+	GENERIC_HD_SELECT,
+	GENERIC_HD_STATUS
+};
 
 static int generic_ide_offsets[IDE_NR_PORTS] __initdata = {
-	GENERIC_HD_DATA, GENERIC_HD_ERROR, GENERIC_HD_NSECTOR, 
-	GENERIC_HD_SECTOR, GENERIC_HD_LCYL, GENERIC_HD_HCYL,
-	GENERIC_HD_SELECT, GENERIC_HD_STATUS, -1, -1
+	GENERIC_HD_DATA,
+	GENERIC_HD_ERROR,
+	GENERIC_HD_NSECTOR,
+	GENERIC_HD_SECTOR,
+	GENERIC_HD_LCYL,
+	GENERIC_HD_HCYL,
+	GENERIC_HD_SELECT,
+	GENERIC_HD_STATUS,
+	-1, -1
 };
 
 /* ISA PnP device table entry */
@@ -83,11 +90,13 @@ static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 }
 
 /* Add your devices here :)) */
-struct pnp_dev_t idepnp_devices[] __initdata = {
-  	/* Generic ESDI/IDE/ATA compatible hard disk controller */
-	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+static struct pnp_dev_t pnp_devices[] __initdata = {
+	/* Generic ESDI/IDE/ATA compatible hard disk controller */
+	{
+		ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('P', 'N', 'P'), ISAPNP_DEVICE(0x0600),
-		pnpide_generic_init },
+		pnpide_generic_init
+	},
 	{	0 }
 };
 
@@ -125,14 +134,14 @@ void __init pnpide_init(int enable)
 		return;
 	}
 #endif
-	for (dev_type = idepnp_devices; dev_type->vendor; dev_type++) {
+	for (dev_type = pnp_devices; dev_type->vendor; dev_type++) {
 		while ((dev = isapnp_find_dev(NULL, dev_type->vendor,
 			dev_type->device, dev))) {
 
 			if (dev->active)
 				continue;
 
-       			if (PREPARE_FUNC(dev) && (PREPARE_FUNC(dev))(dev) < 0) {
+			if (PREPARE_FUNC(dev) && (PREPARE_FUNC(dev))(dev) < 0) {
 				printk(KERN_ERR "ide: %s prepare failed\n", DEV_NAME(dev));
 				continue;
 			}

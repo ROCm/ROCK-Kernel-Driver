@@ -2036,7 +2036,7 @@ static void idefloppy_attach(struct ata_device *drive)
 	channel = drive->channel;
 	unit = drive - channel->drives;
 
-	ide_revalidate_disk(mk_kdev(channel->major, unit << PARTN_BITS));
+	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
 }
 
 MODULE_DESCRIPTION("ATAPI FLOPPY Driver");

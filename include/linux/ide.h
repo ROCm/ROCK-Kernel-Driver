@@ -742,9 +742,6 @@ struct ata_taskfile {
 extern void ata_read(struct ata_device *, void *, unsigned int);
 extern void ata_write(struct ata_device *, void *, unsigned int);
 
-extern void atapi_read(struct ata_device *, void *, unsigned int);
-extern void atapi_write(struct ata_device *, void *, unsigned int);
-
 extern ide_startstop_t ata_taskfile(struct ata_device *,
 	struct ata_taskfile *, struct request *);
 
@@ -811,7 +808,8 @@ extern int idescsi_init (void);
 
 extern int ide_register_subdriver(struct ata_device *, struct ata_operations *);
 extern int ide_unregister_subdriver(struct ata_device *drive);
-extern int ide_revalidate_disk(kdev_t i_rdev);
+extern int ata_revalidate(kdev_t i_rdev);
+extern void ide_driver_module(void);
 
 #ifdef CONFIG_PCI
 # define ON_BOARD		0

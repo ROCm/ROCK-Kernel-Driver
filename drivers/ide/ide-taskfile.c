@@ -161,53 +161,6 @@ void ata_write(struct ata_device *drive, void *buffer, unsigned int wcount)
 }
 
 /*
- * The following routines are mainly used by the ATAPI drivers.
- *
- * These routines will round up any request for an odd number of bytes,
- * so if an odd bytecount is specified, be sure that there's at least one
- * extra byte allocated for the buffer.
- */
-void atapi_read(struct ata_device *drive, void *buffer, unsigned int bytecount)
-{
-	if (drive->channel->atapi_read) {
-		drive->channel->atapi_read(drive, buffer, bytecount);
-		return;
-	}
-
-	++bytecount;
-#if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
-	if (MACH_IS_ATARI || MACH_IS_Q40) {
-		/* Atari has a byte-swapped IDE interface */
-		insw_swapw(IDE_DATA_REG, buffer, bytecount / 2);
-		return;
-	}
-#endif
-	ata_read(drive, buffer, bytecount / 4);
-	if ((bytecount & 0x03) >= 2)
-		insw(IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
-}
-
-void atapi_write(struct ata_device *drive, void *buffer, unsigned int bytecount)
-{
-	if (drive->channel->atapi_write) {
-		drive->channel->atapi_write(drive, buffer, bytecount);
-		return;
-	}
-
-	++bytecount;
-#if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
-	if (MACH_IS_ATARI || MACH_IS_Q40) {
-		/* Atari has a byte-swapped IDE interface */
-		outsw_swapw(IDE_DATA_REG, buffer, bytecount / 2);
-		return;
-	}
-#endif
-	ata_write(drive, buffer, bytecount / 4);
-	if ((bytecount & 0x03) >= 2)
-		outsw(IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
-}
-
-/*
  * Needed for PCI irq sharing
  */
 int drive_is_ready(struct ata_device *drive)
@@ -1032,8 +985,6 @@ abort:
 EXPORT_SYMBOL(drive_is_ready);
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
-EXPORT_SYMBOL(atapi_read);
-EXPORT_SYMBOL(atapi_write);
 EXPORT_SYMBOL(ata_taskfile);
 EXPORT_SYMBOL(recal_intr);
 EXPORT_SYMBOL(task_no_data_intr);

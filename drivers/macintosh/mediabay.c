@@ -555,17 +555,21 @@ media_bay_step(int i)
 	    	break;
 	    
 	case mb_ide_waiting:
-	    	if (bay->cd_base == 0) {
+		if (bay->cd_base == 0) {
 			bay->timer = 0;
 			bay->state = mb_up;
 			MBDBG("mediabay%d: up before IDE init\n", i);
 			break;
-	    	} else if (MB_IDE_READY(i)) {
+		} else if (MB_IDE_READY(i)) {
 			bay->timer = 0;
 			bay->state = mb_up;
 			if (bay->cd_index < 0) {
+				hw_regs_t hw;
+
 				pmu_suspend();
-				bay->cd_index = ide_register(bay->cd_base, 0, bay->cd_irq);
+				ide_init_hwif_ports(&hw, (ide_ioreg_t) bay->cd_base, (ide_ioreg_t) 0, NULL);
+				hw.irq = bay->cd_irq;
+				bay->cd_index = ide_register_hw(&hw, NULL);
 				pmu_resume();
 			}
 			if (bay->cd_index == -1) {

@@ -314,6 +314,7 @@
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
+#include <linux/atapi.h>
 #include "ide-cd.h"
 
 /****************************************************************************
@@ -2988,7 +2989,7 @@ static void ide_cdrom_attach(struct ata_device *drive)
 	channel = drive->channel;
 	unit = drive - channel->drives;
 
-	ide_revalidate_disk(mk_kdev(channel->major, unit << PARTN_BITS));
+	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
 }
 
 MODULE_PARM(ignore, "s");

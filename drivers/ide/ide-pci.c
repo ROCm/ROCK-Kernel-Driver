@@ -27,10 +27,6 @@
 
 #include "pcihost.h"
 
-/* Missing PCI device IDs: */
-#define PCI_VENDOR_ID_HINT 0x3388
-#define PCI_DEVICE_ID_HINT 0x8013
-
 /*
  * This is the list of registered PCI chipset driver data structures.
  */
@@ -756,7 +752,7 @@ static struct ata_pci_device chipsets[] __initdata = {
 	},
 	{
 		vendor: PCI_VENDOR_ID_HINT,
-		device: PCI_DEVICE_ID_HINT,
+		device: PCI_DEVICE_ID_HINT_VXPROII_IDE,
 		bootable: ON_BOARD
 	},
 	{
