@@ -48,8 +48,8 @@ struct mpu_rate {
 #define VIRTUAL_CLOCK		8
 #define ALWAYS_ENABLED		16
 #define ENABLE_REG_32BIT	32
-#define DOES_NOT_EXIST_ON_1510	64
-#define DOES_NOT_EXIST_ON_1610	128 /* Including 1710 */
+#define CLOCK_IN_OMAP16XX	64
+#define CLOCK_IN_OMAP1510	128
 
 /* ARM_CKCTL bit shifts */
 #define CKCTL_PERDIV_OFFSET	0
