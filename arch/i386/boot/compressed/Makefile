@@ -20,7 +20,8 @@ BZIMAGE_OFFSET = 0x100000
 ZLINKFLAGS = -Ttext $(ZIMAGE_OFFSET) $(ZLDFLAGS)
 BZLINKFLAGS = -Ttext $(BZIMAGE_OFFSET) $(ZLDFLAGS)
 
-EXTRA_TARGETS := vmlinux.bin vmlinux.bin.gz
+EXTRA_TARGETS	:= vmlinux.bin vmlinux.bin.gz head.o misc.o
+EXTRA_AFLAGS	:= -traditional
 
 include $(TOPDIR)/Rules.make
 
@@ -29,14 +30,6 @@ vmlinux: piggy.o $(OBJECTS)
 
 bvmlinux: piggy.o $(OBJECTS)
 	$(LD) $(LDFLAGS) $(BZLINKFLAGS) -o bvmlinux $(OBJECTS) piggy.o
-
-head.o: head.S
-	$(CC) $(AFLAGS) -traditional -c head.S
-
-comma	:= ,
-
-misc.o: misc.c
-	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c misc.c
 
 vmlinux.bin: $(TOPDIR)/vmlinux FORCE
 	$(call if_changed,objcopy)

@@ -25,15 +25,14 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
 #RAMDISK := -DRAMDISK=512
 
-EXTRA_TARGETS := vmlinux.bin bvmlinux.bin
+EXTRA_TARGETS	:= vmlinux.bin bvmlinux.bin bootsect.o bbootsect.o \
+		   setup.o bsetup.o
+
+host-progs	:= tools/build
 
 include $(TOPDIR)/Rules.make
 
 # ---------------------------------------------------------------------------
-
-BOOT_INCL =	$(TOPDIR)/include/linux/config.h \
-		$(TOPDIR)/include/linux/autoconf.h \
-		$(TOPDIR)/include/asm/boot.h
 
 zImage: bootsect setup vmlinux.bin tools/build
 	tools/build bootsect setup vmlinux.bin $(ROOT_DEV) > $@
@@ -66,44 +65,24 @@ zlilo: $(BOOTIMAGE)
 install: $(BOOTIMAGE)
 	sh -x ./install.sh $(KERNELRELEASE) $(BOOTIMAGE) $(TOPDIR)/System.map "$(INSTALL_PATH)"
 
-tools/build: tools/build.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $< -I$(TOPDIR)/include
+EXTRA_AFLAGS		:= -traditional $(SVGA_MODE) $(RAMDISK)
+AFLAGS_bbootsect.o	:= -D__BIG_KERNEL__
+AFLAGS_bsetup.o	  	:= -D__BIG_KERNEL__
 
 bootsect: bootsect.o
 	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary -o $@ $<
 
-bootsect.o: bootsect.s
-	$(AS) -o $@ $<
-
-bootsect.s: bootsect.S Makefile $(BOOT_INCL)
-	$(CPP) $(CPPFLAGS) -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
-
 bbootsect: bbootsect.o
 	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary $< -o $@
-
-bbootsect.o: bbootsect.s
-	$(AS) -o $@ $<
-
-bbootsect.s: bootsect.S Makefile $(BOOT_INCL)
-	$(CPP) $(CPPFLAGS) -D__BIG_KERNEL__ -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
 
 setup: setup.o
 	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary -e begtext -o $@ $<
 
-setup.o: setup.s
-	$(AS) -o $@ $<
-
-setup.s: setup.S video.S Makefile $(BOOT_INCL) $(TOPDIR)/include/linux/version.h $(TOPDIR)/include/linux/compile.h
-	$(CPP) $(CPPFLAGS) -D__ASSEMBLY__ -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
-
 bsetup: bsetup.o
 	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary -e begtext -o $@ $<
 
-bsetup.o: bsetup.s
-	$(AS) -o $@ $<
-
-bsetup.s: setup.S video.S Makefile $(BOOT_INCL) $(TOPDIR)/include/linux/version.h $(TOPDIR)/include/linux/compile.h
-	$(CPP) $(CPPFLAGS) -D__BIG_KERNEL__ -D__ASSEMBLY__ -traditional $(SVGA_MODE) $(RAMDISK) $< -o $@
+b%.S: %.S
+	cp $< $@
 
 clean:
 	@echo 'Cleaning up (boot)'
