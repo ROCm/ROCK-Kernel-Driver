@@ -2137,15 +2137,18 @@ e1000_clean(struct net_device *netdev, int *budget)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 	int work_to_do = min(*budget, netdev->quota);
+	int tx_cleaned;
 	int work_done = 0;
 	
-	e1000_clean_tx_irq(adapter);
+	tx_cleaned = e1000_clean_tx_irq(adapter);
 	e1000_clean_rx_irq(adapter, &work_done, work_to_do);
 
 	*budget -= work_done;
 	netdev->quota -= work_done;
 	
-	if(work_done < work_to_do || !netif_running(netdev)) {
+	/* if no Rx and Tx cleanup work was done, exit the polling mode */
+	if(!tx_cleaned || (work_done < work_to_do) || 
+				!netif_running(netdev)) {
 		netif_rx_complete(netdev);
 		e1000_irq_enable(adapter);
 		return 0;
