@@ -12,8 +12,8 @@ mod-subdirs :=	dio mtd sbus video macintosh usb input telephony sgi ide \
 		input/gameport parport hotplug \
 		base char block misc net media cdrom
 
-obj-$(CONFIG_ACPI)		+= acpi/
 obj-$(CONFIG_PCI)		+= pci/
+obj-$(CONFIG_ACPI)		+= acpi/
 obj-$(CONFIG_PARPORT)		+= parport/
 obj-y 				+= base/ char/ block/ misc/ net/ media/
 obj-$(CONFIG_NUBUS)		+= nubus/
