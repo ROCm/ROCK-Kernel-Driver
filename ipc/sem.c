@@ -188,8 +188,12 @@ asmlinkage long sys_semget (key_t key, int nsems, int semflg)
 			err = -EINVAL;
 		else if (ipcperms(&sma->sem_perm, semflg))
 			err = -EACCES;
-		else
-			err = sem_buildid(id, sma->sem_perm.seq);
+		else {
+			int semid = sem_buildid(id, sma->sem_perm.seq);
+			err = security_sem_associate(sma, semflg);
+			if (!err)
+				err = semid;
+		}
 		sem_unlock(sma);
 	}
 
@@ -466,6 +470,10 @@ static int semctl_nolock(int semid, int semnum, int cmd, int version, union semu
 		struct seminfo seminfo;
 		int max_id;
 
+		err = security_sem_semctl(NULL, cmd);
+		if (err)
+			return err;
+		
 		memset(&seminfo,0,sizeof(seminfo));
 		seminfo.semmni = sc_semmni;
 		seminfo.semmns = sc_semmns;
@@ -506,6 +514,11 @@ static int semctl_nolock(int semid, int semnum, int cmd, int version, union semu
 		err = -EACCES;
 		if (ipcperms (&sma->sem_perm, S_IRUGO))
 			goto out_unlock;
+
+		err = security_sem_semctl(sma, cmd);
+		if (err)
+			goto out_unlock;
+
 		id = sem_buildid(semid, sma->sem_perm.seq);
 
 		kernel_to_ipc64_perm(&sma->sem_perm, &tbuf.sem_perm);
@@ -549,6 +562,11 @@ static int semctl_main(int semid, int semnum, int cmd, int version, union semun 
 	if (ipcperms (&sma->sem_perm, (cmd==SETVAL||cmd==SETALL)?S_IWUGO:S_IRUGO))
 		goto out_unlock;
 
+	err = security_sem_semctl(sma, cmd);
+	if (err)
+		goto out_unlock;
+
+	err = -EACCES;
 	switch (cmd) {
 	case GETALL:
 	{
@@ -739,6 +757,10 @@ static int semctl_down(int semid, int semnum, int cmd, int version, union semun 
 	    	err=-EPERM;
 		goto out_unlock;
 	}
+
+	err = security_sem_semctl(sma, cmd);
+	if (err)
+		goto out_unlock;
 
 	switch(cmd){
 	case IPC_RMID:
@@ -1035,6 +1057,12 @@ asmlinkage long sys_semtimedop(int semid, struct sembuf *tsops,
 	error = -EACCES;
 	if (ipcperms(&sma->sem_perm, alter ? S_IWUGO : S_IRUGO))
 		goto out_unlock_semundo_free;
+
+	error = security_sem_semop(sma, sops, nsops, alter);
+	if (error)
+		goto out_unlock_semundo_free;
+
+	error = -EACCES;		
 	if (undos) {
 		/* Make sure we have an undo structure
 		 * for this process and this semaphore set.
