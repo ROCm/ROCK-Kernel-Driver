@@ -165,6 +165,7 @@ typedef enum {
 	NI_Sparse,		/* 1: Unnamed data attr is sparse (f).
 				   1: Create sparse files by default (d).
 				   1: Attribute is sparse (a). */
+	NI_TruncateFailed,	/* 1: Last ntfs_truncate() call failed. */
 } ntfs_inode_state_bits;
 
 /*
@@ -216,6 +217,7 @@ NINO_FNS(IndexAllocPresent)
 NINO_FNS(Compressed)
 NINO_FNS(Encrypted)
 NINO_FNS(Sparse)
+NINO_FNS(TruncateFailed)
 
 /*
  * The full structure containing a ntfs_inode and a vfs struct inode. Used for
@@ -300,7 +302,8 @@ extern int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt);
 
 #ifdef NTFS_RW
 
-extern void ntfs_truncate(struct inode *vi);
+extern int ntfs_truncate(struct inode *vi);
+extern void ntfs_truncate_vfs(struct inode *vi);
 
 extern int ntfs_setattr(struct dentry *dentry, struct iattr *attr);
 

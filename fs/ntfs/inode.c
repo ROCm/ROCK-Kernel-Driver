@@ -2263,13 +2263,15 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
  * This implies for us that @vi is a file inode rather than a directory, index,
  * or attribute inode as well as that @vi is a base inode.
  *
+ * Returns 0 on success or -errno on error.
+ *
  * Called with ->i_sem held.  In all but one case ->i_alloc_sem is held for
  * writing.  The only case where ->i_alloc_sem is not held is
  * mm/filemap.c::generic_file_buffered_write() where vmtruncate() is called
  * with the current i_size as the offset which means that it is a noop as far
  * as ntfs_truncate() is concerned.
  */
-void ntfs_truncate(struct inode *vi)
+int ntfs_truncate(struct inode *vi)
 {
 	ntfs_inode *ni = NTFS_I(vi);
 	ntfs_volume *vol = ni->vol;
@@ -2323,7 +2325,8 @@ done:
 	ntfs_attr_put_search_ctx(ctx);
 	unmap_mft_record(ni);
 	ntfs_debug("Done.");
-	return;
+	NInoClearTruncateFailed(ni);
+	return 0;
 err_out:
 	if (err != -ENOMEM) {
 		NVolSetErrors(vol);
@@ -2333,7 +2336,20 @@ err_out:
 		ntfs_attr_put_search_ctx(ctx);
 	if (m)
 		unmap_mft_record(ni);
-	return;
+	NInoSetTruncateFailed(ni);
+	return err;
+}
+
+/**
+ * ntfs_truncate_vfs - wrapper for ntfs_truncate() that has no return value
+ * @vi:		inode for which the i_size was changed
+ *
+ * Wrapper for ntfs_truncate() that has no return value.
+ *
+ * See ntfs_truncate() description above for details.
+ */
+void ntfs_truncate_vfs(struct inode *vi) {
+	ntfs_truncate(vi);
 }
 
 /**

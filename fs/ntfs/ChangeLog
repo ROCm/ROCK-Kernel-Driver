@@ -24,6 +24,11 @@ ToDo/Notes:
 2.1.22-WIP
 
 	- Improve error handling in fs/ntfs/inode.c::ntfs_truncate().
+	- Change fs/ntfs/inode.c::ntfs_truncate() to return an error code
+	  instead of void and provide a helper ntfs_truncate_vfs() for the
+	  vfs ->truncate method.
+	- Add a new ntfs inode flag NInoTruncateFailed() and modify
+	  fs/ntfs/inode.c::ntfs_truncate() to set and clear it appropriately.
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
