@@ -654,7 +654,6 @@ EXPORT_SYMBOL(unregister_trdev);
 
 #endif /* CONFIG_TR */
 
-
 #ifdef CONFIG_NET_FC
 
 void fc_setup(struct net_device *dev)
@@ -675,28 +674,6 @@ void fc_setup(struct net_device *dev)
 }
 
 /**
- * init_fcdev - Register fibre channel device
- * @dev: A fibre channel device structure to be filled in, or %NULL if a new
- *	struct should be allocated.
- * @sizeof_priv: Size of additional driver-private structure to be allocated
- *	for this ethernet device
- *
- * Fill in the fields of the device structure with fibre channel-generic values.
- *
- * If no device structure is passed, a new one is constructed, complete with
- * a private data area of size @sizeof_priv.  A 32-byte (not bit)
- * alignment is enforced for this private data area.
- *
- * If an empty string area is passed as dev->name, or a new structure is made,
- * a new name string is constructed.
- */
-
-struct net_device *init_fcdev(struct net_device *dev, int sizeof_priv)
-{
-	return init_netdev(dev, sizeof_priv, "fc%d", fc_setup);
-}
-
-/**
  * alloc_fcdev - Register fibre channel device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
  *	for this fibre channel device
@@ -713,21 +690,8 @@ struct net_device *alloc_fcdev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "fc%d", fc_setup);
 }
 
-int register_fcdev(struct net_device *dev)
-{
-	return __register_netdev(dev);
-}                                               
-        
-void unregister_fcdev(struct net_device *dev)
-{
-	unregister_netdev(dev);
-}
-
 EXPORT_SYMBOL(fc_setup);
-EXPORT_SYMBOL(init_fcdev);
 EXPORT_SYMBOL(alloc_fcdev);
-EXPORT_SYMBOL(register_fcdev);
-EXPORT_SYMBOL(unregister_fcdev);
 
 #endif /* CONFIG_NET_FC */
 
