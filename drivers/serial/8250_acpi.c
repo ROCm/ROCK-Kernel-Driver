@@ -38,8 +38,11 @@ static acpi_status acpi_serial_mmio(struct serial_struct *req,
 static acpi_status acpi_serial_port(struct serial_struct *req,
 				    struct acpi_resource_io *io)
 {
-	req->port = io->min_base_address;
-	req->io_type = SERIAL_IO_PORT;
+	if (io->range_length) {
+		req->port = io->min_base_address;
+		req->io_type = SERIAL_IO_PORT;
+	} else
+		printk(KERN_ERR "%s: zero-length IO port range?\n", __FUNCTION__);
 	return AE_OK;
 }
 
