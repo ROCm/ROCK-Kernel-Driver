@@ -56,9 +56,7 @@
 #define BT_DBG( A... )
 #endif
 
-#ifdef CONFIG_PROC_FS
 struct proc_dir_entry *proc_bt;
-#endif
 
 /* Bluetooth sockets */
 #define BT_MAX_PROTO	5
