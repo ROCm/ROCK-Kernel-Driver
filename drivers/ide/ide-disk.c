@@ -481,7 +481,7 @@ static int idedisk_open (struct inode *inode, struct file *filp, ide_drive_t *dr
 static void idedisk_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
 {
 	if (drive->removable && !drive->usage) {
-		invalidate_buffers(inode->i_rdev);
+		invalidate_bdev(inode->i_bdev, 0);
 		if (drive->doorlocking && ide_wait_cmd(drive, WIN_DOORUNLOCK, 0, 0, 0, NULL))
 			drive->doorlocking = 0;
 	}

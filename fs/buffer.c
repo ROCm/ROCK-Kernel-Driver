@@ -86,7 +86,6 @@ static int nr_unused_buffer_heads;
 static spinlock_t unused_list_lock = SPIN_LOCK_UNLOCKED;
 static DECLARE_WAIT_QUEUE_HEAD(buffer_wait);
 
-static void truncate_buffers(kdev_t dev);
 static int grow_buffers(kdev_t dev, unsigned long block, int size);
 static void __refile_buffer(struct buffer_head *);
 
@@ -633,10 +632,11 @@ int inode_has_buffers(struct inode *inode)
    we think the disk contains more recent information than the buffercache.
    The update == 1 pass marks the buffers we need to update, the update == 2
    pass does the actual I/O. */
-void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
+void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 {
 	int i, nlist, slept;
 	struct buffer_head * bh, * bh_next;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);	/* will become bdev */
 
  retry:
 	slept = 0;
@@ -691,30 +691,16 @@ out:
 		goto retry;
 
 	/* Get rid of the page cache */
-	truncate_buffers(dev);
+	invalidate_inode_pages(bdev->bd_inode);
 }
 
-void set_blocksize(kdev_t dev, int size)
+void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
 {
-	extern int *blksize_size[];
-
-	if (!blksize_size[MAJOR(dev)])
-		return;
-
-	/* Size must be a power of two, and between 512 and PAGE_SIZE */
-	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
-		panic("Invalid blocksize passed to set_blocksize");
-
-	if (blksize_size[MAJOR(dev)][MINOR(dev)] == 0 && size == BLOCK_SIZE) {
-		blksize_size[MAJOR(dev)][MINOR(dev)] = size;
-		return;
+	struct block_device *bdev = bdget(dev);
+	if (bdev) {
+		invalidate_bdev(bdev, destroy_dirty_buffers);
+		bdput(bdev);
 	}
-	if (blksize_size[MAJOR(dev)][MINOR(dev)] == size)
-		return;
-
-	sync_buffers(dev, 2);
-	blksize_size[MAJOR(dev)][MINOR(dev)] = size;
-	invalidate_buffers(dev);
 }
 
 static void free_more_memory(void)
@@ -2343,13 +2329,6 @@ static int grow_buffers(kdev_t dev, unsigned long block, int size)
 	UnlockPage(page);
 	page_cache_release(page);
 	return 1;
-}
-
-static void truncate_buffers(kdev_t dev)
-{
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
-	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
-	atomic_dec(&bdev->bd_count);
 }
 
 static int sync_page_buffers(struct buffer_head *bh, unsigned int gfp_mask)

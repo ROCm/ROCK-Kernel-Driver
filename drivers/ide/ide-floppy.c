@@ -1750,7 +1750,7 @@ static void idefloppy_release (struct inode *inode, struct file *filp, ide_drive
 	if (!drive->usage) {
 		idefloppy_floppy_t *floppy = drive->driver_data;
 
-		invalidate_buffers (inode->i_rdev);
+		invalidate_bdev (inode->i_bdev, 0);
 
 		/* IOMEGA Clik! drives do not support lock/unlock commands */
                 if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {

@@ -719,7 +719,7 @@ static int loop_init_xfer(struct loop_device *lo, int type,struct loop_info *i)
 	return err;
 }  
 
-static int loop_clr_fd(struct loop_device *lo, kdev_t dev)
+static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 {
 	struct file *filp = lo->lo_backing_file;
 	int gfp = lo->old_gfp_mask;
@@ -752,7 +752,7 @@ static int loop_clr_fd(struct loop_device *lo, kdev_t dev)
 	memset(lo->lo_encrypt_key, 0, LO_KEY_SIZE);
 	memset(lo->lo_name, 0, LO_NAME_SIZE);
 	loop_sizes[lo->lo_number] = 0;
-	invalidate_buffers(dev);
+	invalidate_bdev(bdev, 0);
 	filp->f_dentry->d_inode->i_mapping->gfp_mask = gfp;
 	lo->lo_state = Lo_unbound;
 	fput(filp);
@@ -852,7 +852,7 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 		err = loop_set_fd(lo, file, inode->i_rdev, arg);
 		break;
 	case LOOP_CLR_FD:
-		err = loop_clr_fd(lo, inode->i_rdev);
+		err = loop_clr_fd(lo, inode->i_bdev);
 		break;
 	case LOOP_SET_STATUS:
 		err = loop_set_status(lo, (struct loop_info *) arg);

@@ -172,11 +172,7 @@ void invalidate_inode_pages(struct inode * inode)
 		page = list_entry(curr, struct page, list);
 		curr = curr->next;
 
-		/* We cannot invalidate something in use.. */
-		if (page_count(page) != 1)
-			continue;
-
-		/* ..or dirty.. */
+		/* We cannot invalidate something in dirty.. */
 		if (PageDirty(page))
 			continue;
 
@@ -184,10 +180,20 @@ void invalidate_inode_pages(struct inode * inode)
 		if (TryLockPage(page))
 			continue;
 
+		if (page->buffers && !try_to_free_buffers(page, 0))
+			goto unlock;
+
+		if (page_count(page) != 1)
+			goto unlock;
+
 		__lru_cache_del(page);
 		__remove_inode_page(page);
 		UnlockPage(page);
 		page_cache_release(page);
+		continue;
+unlock:
+		UnlockPage(page);
+		continue;
 	}
 
 	spin_unlock(&pagemap_lru_lock);
