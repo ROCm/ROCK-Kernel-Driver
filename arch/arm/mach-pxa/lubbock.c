@@ -29,12 +29,13 @@
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
+#include <asm/hardware/sa1111.h>
+
 #include <asm/arch/pxa-regs.h>
 #include <asm/arch/lubbock.h>
 #include <asm/arch/udc.h>
 #include <asm/arch/pxafb.h>
 #include <asm/arch/mmc.h>
-#include <asm/hardware/sa1111.h>
 
 #include "generic.h"
 
