@@ -550,7 +550,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		    || (fl->oif && fl->oif != dst->dev->ifindex)) {
 			dst = NULL;
 		} else
-			dst_clone(dst);
+			dst_hold(dst);
 	}
 
 	if (dst == NULL)
