@@ -200,6 +200,11 @@ static void dummy_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 	dummy_capget(current, &current->cap_effective, &current->cap_inheritable, &current->cap_permitted);
 }
 
+static void dummy_bprm_post_apply_creds (struct linux_binprm *bprm)
+{
+	return;
+}
+
 static int dummy_bprm_set_security (struct linux_binprm *bprm)
 {
 	return 0;
@@ -916,6 +921,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, bprm_alloc_security);
 	set_to_dummy_if_null(ops, bprm_free_security);
 	set_to_dummy_if_null(ops, bprm_apply_creds);
+	set_to_dummy_if_null(ops, bprm_post_apply_creds);
 	set_to_dummy_if_null(ops, bprm_set_security);
 	set_to_dummy_if_null(ops, bprm_check_security);
 	set_to_dummy_if_null(ops, bprm_secureexec);

@@ -1795,10 +1795,7 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 	struct task_security_struct *tsec;
 	struct bprm_security_struct *bsec;
 	u32 sid;
-	struct av_decision avd;
-	struct itimerval itimer;
-	struct rlimit *rlim, *initrlim;
-	int rc, i;
+	int rc;
 
 	secondary_ops->bprm_apply_creds(bprm, unsafe);
 
@@ -1808,91 +1805,101 @@ static void selinux_bprm_apply_creds(struct linux_binprm *bprm, int unsafe)
 	sid = bsec->sid;
 
 	tsec->osid = tsec->sid;
+	bsec->unsafe = 0;
 	if (tsec->sid != sid) {
 		/* Check for shared state.  If not ok, leave SID
 		   unchanged and kill. */
 		if (unsafe & LSM_UNSAFE_SHARE) {
-			rc = avc_has_perm_noaudit(tsec->sid, sid,
-					  SECCLASS_PROCESS, PROCESS__SHARE, &avd);
+			rc = avc_has_perm(tsec->sid, sid, SECCLASS_PROCESS,
+					PROCESS__SHARE, NULL);
 			if (rc) {
-				task_unlock(current);
-				avc_audit(tsec->sid, sid, SECCLASS_PROCESS,
-				    PROCESS__SHARE, &avd, rc, NULL);
-				force_sig_specific(SIGKILL, current);
-				goto lock_out;
+				bsec->unsafe = 1;
+				return;
 			}
 		}
 
 		/* Check for ptracing, and update the task SID if ok.
 		   Otherwise, leave SID unchanged and kill. */
 		if (unsafe & (LSM_UNSAFE_PTRACE | LSM_UNSAFE_PTRACE_CAP)) {
-			rc = avc_has_perm_noaudit(tsec->ptrace_sid, sid,
-					  SECCLASS_PROCESS, PROCESS__PTRACE, &avd);
-			if (!rc)
-				tsec->sid = sid;
-			task_unlock(current);
-			avc_audit(tsec->ptrace_sid, sid, SECCLASS_PROCESS,
-				  PROCESS__PTRACE, &avd, rc, NULL);
+			rc = avc_has_perm(tsec->ptrace_sid, sid,
+					  SECCLASS_PROCESS, PROCESS__PTRACE,
+					  NULL);
 			if (rc) {
-				force_sig_specific(SIGKILL, current);
-				goto lock_out;
-			}
-		} else {
-			tsec->sid = sid;
-			task_unlock(current);
-		}
-
-		/* Close files for which the new task SID is not authorized. */
-		flush_unauthorized_files(current->files);
-
-		/* Check whether the new SID can inherit signal state
-		   from the old SID.  If not, clear itimers to avoid
-		   subsequent signal generation and flush and unblock
-		   signals. This must occur _after_ the task SID has
-                  been updated so that any kill done after the flush
-                  will be checked against the new SID. */
-		rc = avc_has_perm(tsec->osid, tsec->sid, SECCLASS_PROCESS,
-				  PROCESS__SIGINH, NULL);
-		if (rc) {
-			memset(&itimer, 0, sizeof itimer);
-			for (i = 0; i < 3; i++)
-				do_setitimer(i, &itimer, NULL);
-			flush_signals(current);
-			spin_lock_irq(&current->sighand->siglock);
-			flush_signal_handlers(current, 1);
-			sigemptyset(&current->blocked);
-			recalc_sigpending();
-			spin_unlock_irq(&current->sighand->siglock);
-		}
-
-		/* Check whether the new SID can inherit resource limits
-		   from the old SID.  If not, reset all soft limits to
-		   the lower of the current task's hard limit and the init
-		   task's soft limit.  Note that the setting of hard limits 
-		   (even to lower them) can be controlled by the setrlimit 
-		   check. The inclusion of the init task's soft limit into
-	           the computation is to avoid resetting soft limits higher
-		   than the default soft limit for cases where the default
-		   is lower than the hard limit, e.g. RLIMIT_CORE or 
-		   RLIMIT_STACK.*/
-		rc = avc_has_perm(tsec->osid, tsec->sid, SECCLASS_PROCESS,
-				  PROCESS__RLIMITINH, NULL);
-		if (rc) {
-			for (i = 0; i < RLIM_NLIMITS; i++) {
-				rlim = current->signal->rlim + i;
-				initrlim = init_task.signal->rlim+i;
-				rlim->rlim_cur = min(rlim->rlim_max,initrlim->rlim_cur);
+				bsec->unsafe = 1;
+				return;
 			}
 		}
+		tsec->sid = sid;
+	}
+}
 
-		/* Wake up the parent if it is waiting so that it can
-		   recheck wait permission to the new task SID. */
-		wake_up_interruptible(&current->parent->signal->wait_chldexit);
+/*
+ * called after apply_creds without the task lock held
+ */
+static void selinux_bprm_post_apply_creds(struct linux_binprm *bprm)
+{
+	struct task_security_struct *tsec;
+	struct rlimit *rlim, *initrlim;
+	struct itimerval itimer;
+	struct bprm_security_struct *bsec;
+	int rc, i;
 
-lock_out:
-		task_lock(current);
+	tsec = current->security;
+	bsec = bprm->security;
+
+	if (bsec->unsafe) {
+		force_sig_specific(SIGKILL, current);
 		return;
 	}
+	if (tsec->osid == tsec->sid)
+		return;
+
+	/* Close files for which the new task SID is not authorized. */
+	flush_unauthorized_files(current->files);
+
+	/* Check whether the new SID can inherit signal state
+	   from the old SID.  If not, clear itimers to avoid
+	   subsequent signal generation and flush and unblock
+	   signals. This must occur _after_ the task SID has
+	  been updated so that any kill done after the flush
+	  will be checked against the new SID. */
+	rc = avc_has_perm(tsec->osid, tsec->sid, SECCLASS_PROCESS,
+			  PROCESS__SIGINH, NULL);
+	if (rc) {
+		memset(&itimer, 0, sizeof itimer);
+		for (i = 0; i < 3; i++)
+			do_setitimer(i, &itimer, NULL);
+		flush_signals(current);
+		spin_lock_irq(&current->sighand->siglock);
+		flush_signal_handlers(current, 1);
+		sigemptyset(&current->blocked);
+		recalc_sigpending();
+		spin_unlock_irq(&current->sighand->siglock);
+	}
+
+	/* Check whether the new SID can inherit resource limits
+	   from the old SID.  If not, reset all soft limits to
+	   the lower of the current task's hard limit and the init
+	   task's soft limit.  Note that the setting of hard limits
+	   (even to lower them) can be controlled by the setrlimit
+	   check. The inclusion of the init task's soft limit into
+	   the computation is to avoid resetting soft limits higher
+	   than the default soft limit for cases where the default
+	   is lower than the hard limit, e.g. RLIMIT_CORE or
+	   RLIMIT_STACK.*/
+	rc = avc_has_perm(tsec->osid, tsec->sid, SECCLASS_PROCESS,
+			  PROCESS__RLIMITINH, NULL);
+	if (rc) {
+		for (i = 0; i < RLIM_NLIMITS; i++) {
+			rlim = current->signal->rlim + i;
+			initrlim = init_task.signal->rlim+i;
+			rlim->rlim_cur = min(rlim->rlim_max,initrlim->rlim_cur);
+		}
+	}
+
+	/* Wake up the parent if it is waiting so that it can
+	   recheck wait permission to the new task SID. */
+	wake_up_interruptible(&current->parent->signal->wait_chldexit);
 }
 
 /* superblock security operations */
@@ -4212,6 +4219,7 @@ struct security_operations selinux_ops = {
 	.bprm_alloc_security =		selinux_bprm_alloc_security,
 	.bprm_free_security =		selinux_bprm_free_security,
 	.bprm_apply_creds =		selinux_bprm_apply_creds,
+	.bprm_post_apply_creds =	selinux_bprm_post_apply_creds,
 	.bprm_set_security =		selinux_bprm_set_security,
 	.bprm_check_security =		selinux_bprm_check_security,
 	.bprm_secureexec =		selinux_bprm_secureexec,

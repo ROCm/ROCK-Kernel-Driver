@@ -963,6 +963,7 @@ void compute_creds(struct linux_binprm *bprm)
 	unsafe = unsafe_exec(current);
 	security_bprm_apply_creds(bprm, unsafe);
 	task_unlock(current);
+	security_bprm_post_apply_creds(bprm);
 }
 
 EXPORT_SYMBOL(compute_creds);
