@@ -112,9 +112,7 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 	if (vma->vm_file)
 		fput(vma->vm_file);
 	vma->vm_file = file;
-#ifdef CONFIG_MMU
 	vma->vm_ops = &generic_file_vm_ops;
-#endif
 	return 0;
 }
 
