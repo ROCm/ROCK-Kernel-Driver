@@ -3,10 +3,9 @@
 
 #define NR_CHPIDS 256
 
-#define CHP_OFFLINE 0
-#define CHP_LOGICALLY_OFFLINE 1
-#define CHP_STANDBY 2
-#define CHP_ONLINE 3
+#define CHP_STANDBY 1
+#define CHP_LOGICALLY_OFFLINE 2
+#define CHP_ONLINE 4
 
 #define CHSC_SEI_ACC_CHPID        1
 #define CHSC_SEI_ACC_LINKADDR     2
@@ -19,7 +18,10 @@ struct chsc_header {
 
 struct channel_path {
 	int id;
-	int state;
+	struct {
+		unsigned int online:1;
+		unsigned int logically_online:1;
+	}__attribute__((packed)) state;
 	struct device dev;
 };
 

@@ -17,6 +17,10 @@ enum dev_state {
 	/* states to wait for i/o completion before doing something */
 	DEV_STATE_CLEAR_VERIFY,
 	DEV_STATE_TIMEOUT_KILL,
+	DEV_STATE_WAIT4IO,
+	/* special states for devices gone not operational */
+	DEV_STATE_DISCONNECTED,
+	DEV_STATE_DISCONNECTED_SENSE_ID,
 	/* last element! */
 	NR_DEV_STATES
 };
@@ -63,7 +67,9 @@ extern struct workqueue_struct *ccw_device_work;
 
 void io_subchannel_recog_done(struct ccw_device *cdev);
 
-void ccw_device_unregister(void *);
+int ccw_device_register(struct ccw_device *);
+void ccw_device_do_unreg_rereg(void *);
+
 
 int ccw_device_recognition(struct ccw_device *);
 int ccw_device_online(struct ccw_device *);

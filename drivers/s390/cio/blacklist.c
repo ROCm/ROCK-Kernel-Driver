@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/blacklist.c
  *   S/390 common I/O routines -- blacklisting of specific devices
- *   $Revision: 1.24 $
+ *   $Revision: 1.27 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -62,51 +62,117 @@ blacklist_range (range_action action, unsigned int from, unsigned int to)
 }
 
 /*
- * function: blacklist_strtoul
- * Strip leading '0x' and interpret the values as Hex
+ * Function: blacklist_busid
+ * Get devno/busid from given string.
+ * Shamelessly grabbed from dasd_devmap.c.
  */
 static inline int
-blacklist_strtoul (const char *str, char **stra)
+blacklist_busid(char **str, int *id0, int *id1, int *devno)
 {
-	if (*str == '0') {
-		if (*(++str) == 'x')  /* strip leading zero */
-			str++;	      /* strip leading x */
+	int val, old_style;
+ 
+	/* check for leading '0x' */
+	old_style = 0;
+	if ((*str)[0] == '0' && (*str)[1] == 'x') {
+		*str += 2;
+		old_style = 1;
 	}
-	return simple_strtoul (str, stra, 16); /* interpret anything as hex */
+	if (!isxdigit((*str)[0]))	/* We require at least one hex digit */
+		return -EINVAL;
+	val = simple_strtoul(*str, str, 16);
+	if (old_style || (*str)[0] != '.') {
+		*id0 = *id1 = 0;
+		if (val < 0 || val > 0xffff)
+			return -EINVAL;
+		*devno = val;
+		return 0;
+	}
+	/* New style x.y.z busid */
+	if (val < 0 || val > 0xff)
+		return -EINVAL;
+	*id0 = val;
+	(*str)++;
+	if (!isxdigit((*str)[0]))	/* We require at least one hex digit */
+		return -EINVAL;
+	val = simple_strtoul(*str, str, 16);
+	if (val < 0 || val > 0xff || (*str)++[0] != '.')
+		return -EINVAL;
+	*id1 = val;
+	if (!isxdigit((*str)[0]))	/* We require at least one hex digit */
+		return -EINVAL;
+	val = simple_strtoul(*str, str, 16);
+	if (val < 0 || val > 0xffff)
+		return -EINVAL;
+	*devno = val;
+	return 0;
 }
 
 static inline int
 blacklist_parse_parameters (char *str, range_action action)
 {
-	unsigned int from, to;
+	unsigned int from, to, from_id0, to_id0, from_id1, to_id1;
+	char *sav;
 
+	sav = str;
 	while (*str != 0 && *str != '\n') {
-		if (!isxdigit(*str)) {
-			printk(KERN_WARNING "blacklist_setup: error parsing "
-			       "\"%s\"\n", str);
-			return 0;
+		range_action ra = action;
+		if (*str == '!') {
+			ra = !action;
+			++str;
 		}
 
-		from = blacklist_strtoul (str, &str);
-		to = (*str == '-') ? blacklist_strtoul (str+1, &str) : from;
+		/*
+		 * Since we have to parse the proc commands and the
+		 * kernel arguments we have to check four cases
+		 */
+		if (strncmp(str,"all,",4) == 0 || strcmp(str,"all") == 0 ||
+		    strncmp(str,"all\n",4) == 0 || strncmp(str,"all ",4) == 0) {
+			from = 0;
+			to = __MAX_SUBCHANNELS;
+			str += 3;
+		} else {
+			int rc;
 
+			rc = blacklist_busid(&str, &from_id0,
+					     &from_id1, &from);
+			if (rc)
+				goto out_err;
+			to = from;
+			to_id0 = from_id0;
+			to_id1 = from_id1;
+			if (*str == '-') {
+				str++;
+				rc = blacklist_busid(&str, &to_id0, &to_id1,
+						     &to);
+				if (rc)
+					goto out_err;
+			}
+			if ((from_id0 != to_id0) || (from_id1 != to_id1))
+				goto out_err;
+		}
+		/* FIXME: ignoring id0 and id1 here. */
 		pr_debug("blacklist_setup: adding range "
-			 "from 0x%04x to 0x%04x\n", from, to);
-		blacklist_range (action, from, to);
+			 "from 0.0.%04x to 0.0.%04x\n", from, to);
+		blacklist_range (ra, from, to);
 
 		if (*str == ',')
 			str++;
 	}
 	return 1;
+out_err:
+	printk(KERN_WARNING "blacklist_setup: error parsing \"%s\"\n", sav);
+	return 0;
 }
 
 /* Parsing the commandline for blacklist parameters, e.g. to blacklist
- * device IDs 0x1234, 0x1235 and 0x1236, you could use any of:
+ * bus ids 0.0.1234, 0.0.1235 and 0.0.1236, you could use any of:
  * - cio_ignore=1234-1236
  * - cio_ignore=0x1234-0x1235,1236
  * - cio_ignore=0x1234,1235-1236
  * - cio_ignore=1236 cio_ignore=1234-0x1236
  * - cio_ignore=1234 cio_ignore=1236 cio_ignore=0x1235
+ * - cio_ignore=0.0.1234-0.0.1236
+ * - cio_ignore=0.0.1234,0x1235,1236
  * - ...
  */
 static int __init
@@ -134,6 +200,7 @@ is_blacklisted (int devno)
 
 #ifdef CONFIG_PROC_FS
 
+extern void css_reiterate_subchannels(void);
 /*
  * Function: s390_redo_validation
  * Look for no longer blacklisted devices
@@ -141,12 +208,9 @@ is_blacklisted (int devno)
 static inline void
 s390_redo_validation (void)
 {
-	int irq;
-
 	CIO_TRACE_EVENT (0, "redoval");
 
-	for (irq = 0; irq <= highest_subchannel; irq++)
-		css_probe_device(irq);
+	css_reiterate_subchannels();
 }
 
 /*
@@ -157,10 +221,7 @@ static inline void
 blacklist_parse_proc_parameters (char *buf)
 {
 	if (strncmp (buf, "free ", 5) == 0) {
-		if (strstr (buf + 5, "all"))
-			blacklist_range (free, 0, __MAX_SUBCHANNELS);
-		else
-			blacklist_parse_parameters (buf + 5, free);
+		blacklist_parse_parameters (buf + 5, free);
 	} else if (strncmp (buf, "add ", 4) == 0) {
 		/* 
 		 * We don't need to check for known devices since
@@ -179,10 +240,11 @@ blacklist_parse_proc_parameters (char *buf)
 	s390_redo_validation ();
 }
 
+/* FIXME: These should be real bus ids and not home-grown ones! */
 static int cio_ignore_read (char *page, char **start, off_t off,
 			    int count, int *eof, void *data)
 {
-	const unsigned int entry_size = 14; /* "0xABCD-0xEFGH\n" */
+	const unsigned int entry_size = 18; /* "0.0.ABCD-0.0.EFGH\n" */
 	long devno;
 	int len;
 
@@ -192,12 +254,12 @@ static int cio_ignore_read (char *page, char **start, off_t off,
 	     devno <= __MAX_SUBCHANNELS && len + entry_size < count; devno++) {
 		if (!test_bit(devno, bl_dev))
 			continue;
-		len += sprintf(page + len, "0x%04lx", devno);
+		len += sprintf(page + len, "0.0.%04lx", devno);
 		if (test_bit(devno + 1, bl_dev)) { /* print range */
 			while (++devno < __MAX_SUBCHANNELS)
 				if (!test_bit(devno, bl_dev))
 					break;
-			len += sprintf(page + len, "-0x%04lx", --devno);
+			len += sprintf(page + len, "-0.0.%04lx", --devno);
 		}
 		len += sprintf(page + len, "\n");
 	}

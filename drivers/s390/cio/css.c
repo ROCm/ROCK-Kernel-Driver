@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.49 $
+ *   $Revision: 1.65 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -14,15 +14,11 @@
 #include <linux/slab.h>
 #include <linux/errno.h>
 
-#include <asm/ccwdev.h> // FIXME: layering violation, remove this
-
 #include "css.h"
 #include "cio.h"
 #include "cio_debug.h"
-#include "device.h" // FIXME: dito
 #include "ioasm.h"
 
-struct subchannel *ioinfo[__MAX_SUBCHANNELS];
 unsigned int highest_subchannel;
 int css_init_done = 0;
 
@@ -30,23 +26,19 @@ struct device css_bus_device = {
 	.bus_id = "css0",
 };
 
-static int
+static struct subchannel *
 css_alloc_subchannel(int irq)
 {
 	struct subchannel *sch;
 	int ret;
 
-	if (ioinfo[irq])
-		/* There already is a struct subchannel for this irq. */
-		return -EBUSY;
-
 	sch = kmalloc (sizeof (*sch), GFP_KERNEL | GFP_DMA);
 	if (sch == NULL)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	ret = cio_validate_subchannel (sch, irq);
 	if (ret < 0) {
 		kfree(sch);
-		return ret;
+		return ERR_PTR(ret);
 	}
 	if (irq > highest_subchannel)
 		highest_subchannel = irq;
@@ -54,26 +46,46 @@ css_alloc_subchannel(int irq)
 	if (sch->st != SUBCHANNEL_TYPE_IO) {
 		/* For now we ignore all non-io subchannels. */
 		kfree(sch);
-		return -EINVAL;
+		return ERR_PTR(-EINVAL);
 	}
 
-	ioinfo[irq] = sch;
-
-	return 0;
+	/* 
+	 * Set intparm to subchannel address.
+	 * This is fine even on 64bit since the subchannel is always located
+	 * under 2G.
+	 */
+	sch->schib.pmcw.intparm = (__u32)(unsigned long)sch;
+	ret = cio_modify(sch);
+	if (ret) {
+		kfree(sch);
+		return ERR_PTR(ret);
+	}
+	return sch;
 }
 
 static void
-css_free_subchannel(int irq)
+css_free_subchannel(struct subchannel *sch)
 {
-	struct subchannel *sch;
-
-	sch = ioinfo[irq];
 	if (sch) {
-		ioinfo[irq] = NULL;
+		/* Reset intparm to zeroes. */
+		sch->schib.pmcw.intparm = 0;
+		cio_modify(sch);
 		kfree(sch);
 	}
 	
 }
+
+static void
+css_subchannel_release(struct device *dev)
+{
+	struct subchannel *sch;
+
+	sch = to_subchannel(dev);
+	if (!cio_is_console(sch->irq))
+		kfree(sch);
+}
+
+extern int css_get_ssd_info(struct subchannel *sch);
 
 static int
 css_register_subchannel(struct subchannel *sch)
@@ -83,15 +95,15 @@ css_register_subchannel(struct subchannel *sch)
 	/* Initialize the subchannel structure */
 	sch->dev.parent = &css_bus_device;
 	sch->dev.bus = &css_bus_type;
-
-	/* Set a name for the subchannel */
-	snprintf (sch->dev.bus_id, BUS_ID_SIZE, "0.0.%04x", sch->irq);
-
+	sch->dev.release = &css_subchannel_release;
+	
 	/* make it known to the system */
 	ret = device_register(&sch->dev);
 	if (ret)
 		printk (KERN_WARNING "%s: could not register %s\n",
 			__func__, sch->dev.bus_id);
+	else
+		css_get_ssd_info(sch);
 	return ret;
 }
 
@@ -99,28 +111,159 @@ int
 css_probe_device(int irq)
 {
 	int ret;
+	struct subchannel *sch;
 
-	ret = css_alloc_subchannel(irq);
+	sch = css_alloc_subchannel(irq);
+	if (IS_ERR(sch))
+		return PTR_ERR(sch);
+	ret = css_register_subchannel(sch);
 	if (ret)
-		return ret;
-	ret = css_register_subchannel(ioinfo[irq]);
-	if (ret)
-		css_free_subchannel(irq);
+		css_free_subchannel(sch);
+	return ret;
+}
+
+static struct subchannel *
+__get_subchannel_by_stsch(int irq)
+{
+	struct subchannel *sch;
+	int cc;
+	struct schib schib;
+
+	cc = stsch(irq, &schib);
+	if (cc)
+		return NULL;
+	sch = (struct subchannel *)(unsigned long)schib.pmcw.intparm;
+	if (!sch)
+		return NULL;
+	if (get_device(&sch->dev))
+		return sch;
+	return NULL;
+}
+
+struct subchannel *
+get_subchannel_by_schid(int irq)
+{
+	struct subchannel *sch;
+	struct list_head *entry;
+	struct device *dev;
+
+	if (!get_bus(&css_bus_type))
+		return NULL;
+
+	/* Try to get subchannel from pmcw first. */ 
+	sch = __get_subchannel_by_stsch(irq);
+	if (sch)
+		goto out;
+	if (!get_driver(&io_subchannel_driver.drv))
+		goto out;
+	down_read(&css_bus_type.subsys.rwsem);
+
+	list_for_each(entry, &io_subchannel_driver.drv.devices) {
+		dev = get_device(container_of(entry,
+					      struct device, driver_list));
+		if (!dev)
+			continue;
+		sch = to_subchannel(dev);
+		if (sch->irq == irq)
+			break;
+		put_device(dev);
+		sch = NULL;
+	}
+	up_read(&css_bus_type.subsys.rwsem);
+	put_driver(&io_subchannel_driver.drv);
+out:
+	put_bus(&css_bus_type);
+
+	return sch;
+}
+
+static inline int
+css_get_subchannel_status(struct subchannel *sch, int schid)
+{
+	struct schib schib;
+	int cc;
+
+	cc = stsch(schid, &schib);
+	if (cc)
+		return CIO_GONE;
+	if (!schib.pmcw.dnv)
+		return CIO_GONE;
+	if (sch && (schib.pmcw.dev != sch->schib.pmcw.dev))
+		return CIO_REVALIDATE;
+	return CIO_OPER;
+}
+	
+static inline int
+css_evaluate_subchannel(int irq)
+{
+	int event, ret, disc;
+	struct subchannel *sch;
+
+	sch = get_subchannel_by_schid(irq);
+	disc = sch ? device_is_disconnected(sch) : 0;
+	event = css_get_subchannel_status(sch, irq);
+	switch (event) {
+	case CIO_GONE:
+		if (!sch) {
+			/* Never used this subchannel. Ignore. */
+			ret = 0;
+			break;
+		}
+		if (sch->driver && sch->driver->notify &&
+		    sch->driver->notify(&sch->dev, CIO_GONE)) {
+			device_set_disconnected(sch);
+			ret = 0;
+			break;
+		}
+		/*
+		 * Unregister subchannel.
+		 * The device will be killed automatically.
+		 */
+		device_unregister(&sch->dev);
+		/* Reset intparm to zeroes. */
+		sch->schib.pmcw.intparm = 0;
+		cio_modify(sch);
+		put_device(&sch->dev);
+		ret = 0;
+		break;
+	case CIO_REVALIDATE:
+		/* 
+		 * Revalidation machine check. Sick.
+		 * We don't notify the driver since we have to throw the device
+		 * away in any case.
+		 */
+		device_unregister(&sch->dev);
+		/* Reset intparm to zeroes. */
+		sch->schib.pmcw.intparm = 0;
+		cio_modify(sch);
+		put_device(&sch->dev);
+		ret = css_probe_device(irq);
+		break;
+	case CIO_OPER:
+		if (disc)
+			/* Get device operational again. */
+			device_trigger_reprobe(sch);
+		ret = sch ? 0 : css_probe_device(irq);
+		break;
+	default:
+		BUG();
+		ret = 0;
+	}
 	return ret;
 }
 
 /*
  * Rescan for new devices. FIXME: This is slow.
+ * This function is called when we have lost CRWs due to overflows and we have
+ * to do subchannel housekeeping.
  */
-static void
-do_process_crw(void *ignore)
+void
+css_reiterate_subchannels(void)
 {
 	int irq, ret;
 
-	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
-		if (ioinfo[irq])
-			continue;
-		ret = css_probe_device(irq);
+	for (irq = 0; irq <= __MAX_SUBCHANNELS; irq++) {
+		ret = css_evaluate_subchannel(irq);
 		/* No more memory. It doesn't make sense to continue. No
 		 * panic because this can happen in midflight and just
 		 * because we can't use a new device is no reason to crash
@@ -135,39 +278,25 @@ do_process_crw(void *ignore)
 
 /*
  * Called from the machine check handler for subchannel report words.
- * Note: this is called disabled from the machine check handler itself.
  */
 void
 css_process_crw(int irq)
 {
-	static DECLARE_WORK(work, do_process_crw, 0);
-	struct subchannel *sch;
-	int ccode, devno;
-
 	CIO_CRW_EVENT(2, "source is subchannel %04X\n", irq);
 
-	sch = ioinfo[irq];
-	if (sch == NULL) {
-		queue_work(ccw_device_work, &work);
-		return;
-	}
-	if (!sch->dev.driver_data)
-		return;
-	devno = sch->schib.pmcw.dev;
-	/* FIXME: css_process_crw must not know about ccw_device */
-	dev_fsm_event(sch->dev.driver_data, DEV_EVENT_NOTOPER);
-	ccode = stsch(irq, &sch->schib);
-	if (!ccode)
-		if (devno != sch->schib.pmcw.dev)
-			queue_work(ccw_device_work, &work);
+	/* 
+	 * Since we are always presented with IPI in the CRW, we have to
+	 * use stsch() to find out if the subchannel in question has come
+	 * or gone.
+	 */
+	css_evaluate_subchannel(irq);
 }
 
 /*
  * some of the initialization has already been done from init_IRQ(),
  * here we do the rest now that the driver core is running.
- * Currently, this functions scans all the subchannel structures for
- * devices. The long term plan is to remove ioinfo[] and then the
- * struct subchannel's will be created during probing. 
+ * The struct subchannel's are created during probing (except for the
+ * static console subchannel).
  */
 static int __init
 init_channel_subsystem (void)
@@ -184,8 +313,16 @@ init_channel_subsystem (void)
 	ctl_set_bit(6, 28);
 
 	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
-		if (!ioinfo[irq]) {
-			ret = css_alloc_subchannel(irq);
+		struct subchannel *sch;
+
+		if (cio_is_console(irq))
+			sch = cio_get_console_subchannel();
+		else {
+			sch = css_alloc_subchannel(irq);
+			if (IS_ERR(sch))
+				ret = PTR_ERR(sch);
+			else
+				ret = 0;
 			if (ret == -ENOMEM)
 				panic("Out of memory in "
 				      "init_channel_subsystem\n");
@@ -202,7 +339,7 @@ init_channel_subsystem (void)
 		 * not working) so we do it now. This is true e.g. for the
 		 * console subchannel.
 		 */
-		css_register_subchannel(ioinfo[irq]);
+		css_register_subchannel(sch);
 	}
 	return 0;
 
@@ -236,6 +373,46 @@ struct bus_type css_bus_type = {
 
 subsys_initcall(init_channel_subsystem);
 
+/*
+ * Register root devices for some drivers. The release function must not be
+ * in the device drivers, so we do it here.
+ */
+static void
+s390_root_dev_release(struct device *dev)
+{
+	kfree(dev);
+}
+
+struct device *
+s390_root_dev_register(const char *name)
+{
+	struct device *dev;
+	int ret;
+
+	if (!strlen(name))
+		return ERR_PTR(-EINVAL);
+	dev = kmalloc(sizeof(struct device), GFP_KERNEL);
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+	memset(dev, 0, sizeof(struct device));
+	strncpy(dev->bus_id, name, min(strlen(name), (size_t)BUS_ID_SIZE));
+	dev->release = s390_root_dev_release;
+	ret = device_register(dev);
+	if (ret) {
+		kfree(dev);
+		return ERR_PTR(ret);
+	}
+	return dev;
+}
+
+void
+s390_root_dev_unregister(struct device *dev)
+{
+	if (dev)
+		device_unregister(dev);
+}
+
 MODULE_LICENSE("GPL");
 EXPORT_SYMBOL(css_bus_type);
-
+EXPORT_SYMBOL(s390_root_dev_register);
+EXPORT_SYMBOL(s390_root_dev_unregister);
