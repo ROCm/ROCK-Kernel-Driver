@@ -431,6 +431,13 @@ static void __init set_max_mapnr_init(void)
 extern void set_max_mapnr_init(void);
 #endif /* !CONFIG_DISCONTIGMEM */
 
+#ifdef CONFIG_HUGETLB_PAGE
+long    htlbpagemem = 0;
+int     htlbpage_max;
+long    htlbzone_pages;
+extern struct list_head htlbpage_freelist;
+#endif
+
 void __init mem_init(void)
 {
 	extern int ppro_with_ram_bug(void);
@@ -492,6 +499,30 @@ void __init mem_init(void)
 	 */
 #ifndef CONFIG_SMP
 	zap_low_mappings();
+#endif
+#ifdef CONFIG_HUGETLB_PAGE
+	{
+		long	i, j;
+		struct	page	*page, *map;
+		/*For now reserve quarter for hugetlb_pages.*/
+		htlbzone_pages = (max_low_pfn >> ((HPAGE_SHIFT - PAGE_SHIFT) + 2)) ;
+		/*Will make this kernel command line. */
+		INIT_LIST_HEAD(&htlbpage_freelist);
+		for (i=0; i<htlbzone_pages; i++) {
+			page = alloc_pages(GFP_ATOMIC, HUGETLB_PAGE_ORDER);
+			if (page == NULL)
+				break;
+			map = page;
+			for (j=0; j<(HPAGE_SIZE/PAGE_SIZE); j++) {
+				SetPageReserved(map);
+				map++;
+			}
+			list_add(&page->list, &htlbpage_freelist);
+		}
+		printk("Total Huge_TLB_Page memory pages allocated %ld\n", i);
+		htlbzone_pages = htlbpagemem = i;
+		htlbpage_max = i;
+	}
 #endif
 }
 

@@ -1031,10 +1031,14 @@ static struct vm_area_struct *touched_by_munmap(struct mm_struct *mm,
 	touched = NULL;
 	do {
 		struct vm_area_struct *next = mpnt->vm_next;
-		mpnt->vm_next = touched;
-		touched = mpnt;
-		mm->map_count--;
-		rb_erase(&mpnt->vm_rb, &mm->mm_rb);
+		if (!(is_vm_hugetlb_page(mpnt))) {
+			mpnt->vm_next = touched;
+			touched = mpnt;
+			rb_erase(&mpnt->vm_rb, &mm->mm_rb);
+			mm->map_count--;
+		}
+		else
+			free_hugepages(mpnt);
 		mpnt = next;
 	} while (mpnt && mpnt->vm_start < end);
 	*npp = mpnt;
@@ -1273,7 +1277,10 @@ void exit_mmap(struct mm_struct * mm)
 			vm_unacct_memory((end - start) >> PAGE_SHIFT);
 
 		mm->map_count--;
-		unmap_page_range(tlb, mpnt, start, end);
+		if (!(is_vm_hugetlb_page(mpnt)))
+			unmap_page_range(tlb, mpnt, start, end);
+		else
+			mpnt->vm_ops->close(mpnt);
 		mpnt = mpnt->vm_next;
 	}
 

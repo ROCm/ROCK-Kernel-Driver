@@ -128,6 +128,7 @@ enum
 	KERN_TAINTED=53,	/* int: various kernel tainted flags */
 	KERN_CADPID=54,		/* int: PID of the process to notify on CAD */
 	KERN_PIDMAX=55,		/* int: PID # limit */
+	KERN_HUGETLB_PAGE_NUM=56, /* int: Number of available Huge Pages */
 };
 
 

@@ -208,6 +208,9 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 	unsigned long end = vma->vm_end;
 	unsigned long cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
 
+	if (is_vm_hugetlb_page(vma))
+		return copy_hugetlb_page_range(dst, src, vma);
+
 	src_pgd = pgd_offset(src, address)-1;
 	dst_pgd = pgd_offset(dst, address)-1;
 
@@ -530,6 +533,11 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				|| !(flags & vma->vm_flags))
 			return i ? : -EFAULT;
 
+		if (is_vm_hugetlb_page(vma)) {
+			i = follow_hugetlb_page(mm, vma, pages, vmas,
+						&start, &len, i);
+			continue;
+		}
 		spin_lock(&mm->page_table_lock);
 		do {
 			struct page *map;

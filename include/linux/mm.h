@@ -104,6 +104,7 @@ struct vm_area_struct {
 #define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */
 #define VM_RESERVED	0x00080000	/* Don't unmap it from swap_out */
 #define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
+#define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 
 #define VM_STACK_FLAGS	(0x00000100 | VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT)
 
@@ -376,6 +377,20 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
+
+#ifdef CONFIG_HUGETLB_PAGE
+#define is_vm_hugetlb_page(vma) (vma->vm_flags & VM_HUGETLB)
+extern int copy_hugetlb_page_range(struct mm_struct *, struct mm_struct *, struct vm_area_struct *);
+extern int follow_hugetlb_page(struct mm_struct *, struct vm_area_struct *, struct page **, struct vm_area_struct **, unsigned long *, int *, int);
+extern	int free_hugepages(struct vm_area_struct *);
+
+#else
+#define is_vm_hugetlb_page(vma) (0)
+#define follow_hugetlb_page(mm, vma, pages, vmas, start, len, i) (0)
+#define copy_hugetlb_page_range(dst, src, vma) (0)
+#define free_hugepages(mpnt)  do { } while(0)
+#endif
+
 
 /*
  * If the mapping doesn't provide a set_page_dirty a_op, then
