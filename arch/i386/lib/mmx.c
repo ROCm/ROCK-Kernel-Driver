@@ -31,7 +31,7 @@ void *_mmx_memcpy(void *to, const void *from, size_t len)
 	void *p;
 	int i;
 
-	if (in_interrupt())
+	if (unlikely(in_interrupt()))
 		return __memcpy(to, from, len);
 
 	p = to;
@@ -57,7 +57,7 @@ void *_mmx_memcpy(void *to, const void *from, size_t len)
 		: : "r" (from) );
 		
 	
-	for(; i>0; i--)
+	for(; i>5; i--)
 	{
 		__asm__ __volatile__ (
 		"1:  prefetch 320(%0)\n"
@@ -372,7 +372,7 @@ static void slow_zero_page(void * page)
  
 void mmx_clear_page(void * page)
 {
-	if(in_interrupt())
+	if(unlikely(in_interrupt()))
 		slow_zero_page(page);
 	else
 		fast_clear_page(page);
@@ -392,7 +392,7 @@ static void slow_copy_page(void *to, void *from)
 
 void mmx_copy_page(void *to, void *from)
 {
-	if(in_interrupt())
+	if(unlikely(in_interrupt()))
 		slow_copy_page(to, from);
 	else
 		fast_copy_page(to, from);

@@ -238,7 +238,7 @@ found:
 unsigned int
 adfs_map_free(struct super_block *sb)
 {
-	struct adfs_sb_info *asb = &sb->u.adfs_sb;
+	struct adfs_sb_info *asb = ADFS_SB(sb);
 	struct adfs_discmap *dm;
 	unsigned int total = 0;
 	unsigned int zone;

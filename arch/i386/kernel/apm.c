@@ -1792,7 +1792,7 @@ static int __init apm_setup(char *str)
 			idle_threshold = simple_strtol(str + 15, NULL, 0);
 		if ((strncmp(str, "idle-period=", 12) == 0) ||
 		    (strncmp(str, "idle_period=", 12) == 0))
-			idle_threshold = simple_strtol(str + 15, NULL, 0);
+			idle_period = simple_strtol(str + 12, NULL, 0);
 		invert = (strncmp(str, "no-", 3) == 0) ||
 			(strncmp(str, "no_", 3) == 0);
 		if (invert)

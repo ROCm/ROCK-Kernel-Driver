@@ -66,6 +66,7 @@ static spinlock_t hd_lock = SPIN_LOCK_UNLOCKED;
 
 static int revalidate_hddisk(kdev_t, int);
 
+#define TIMEOUT_VALUE	(6*HZ)
 #define	HD_DELAY	0
 
 #define MAX_ERRORS     16	/* Max read/write errors/sector */
@@ -833,7 +834,7 @@ int __init hd_init(void)
 		printk("hd: unable to get major %d for hard disk\n",MAJOR_NR);
 		return -1;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &hd_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_hd_request, &hd_lock);
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 255);
 	add_gendisk(&hd_gendisk);
 	init_timer(&device_timer);

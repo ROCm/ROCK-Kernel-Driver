@@ -2476,9 +2476,13 @@ static _INLINE_ int autoconfig(struct esp_struct * info, int *region_start)
 			} else
 				*region_start = info->port;
 
-			request_region(*region_start,
+			if (!request_region(*region_start,
 				       info->port - *region_start + 8,
-				       "esp serial");
+				       "esp serial"))
+			{
+				restore_flags(flags);
+				return -EIO;
+			}
 
 			/* put card in enhanced mode */
 			/* this prevents access through */

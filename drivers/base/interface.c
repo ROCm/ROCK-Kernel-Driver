@@ -9,75 +9,6 @@
 #include <linux/err.h>
 #include <linux/stat.h>
 
-/**
- * device_read_status - report some device information
- * @page:	page-sized buffer to write into
- * @count:	number of bytes requested
- * @off:	offset into buffer
- * @data:	device-specific data
- *
- * Report some human-readable information about the device.
- * This includes the name, the bus id, and the current power state.
- */
-static ssize_t device_read_status(struct device * dev, char * page, size_t count, loff_t off)
-{
-	return off ? 0 : sprintf(page,"%s\n",dev->bus_id);
-}
-
-/**
- * device_write_status - forward a command to a driver
- * @buf:	encoded command
- * @count:	number of bytes in buffer
- * @off:	offset into buffer to start with
- * @data:	device-specific data
- *
- * Send a comamnd to a device driver.
- * The following actions are supported:
- * probe - scan slot for device
- * remove - detach driver from slot
- * suspend <state> <stage> - perform <stage> for entering <state>
- * resume <stage> - perform <stage> for waking device up.
- * (See Documentation/driver-model.txt for the theory of an n-stage
- * suspend sequence).
- */
-static ssize_t device_write_status(struct device * dev, const char* buf, size_t count, loff_t off)
-{
-	char command[20];
-	int num;
-	int arg = 0;
-	int error = 0;
-
-	if (off)
-		return 0;
-
-	/* everything involves dealing with the driver. */
-	if (!dev->driver)
-		return 0;
-
-	num = sscanf(buf,"%10s %d",command,&arg);
-
-	if (!num)
-		return 0;
-
-	if (!strcmp(command,"probe")) {
-		if (dev->driver->probe)
-			error = dev->driver->probe(dev);
-
-	} else if (!strcmp(command,"remove")) {
-		if (dev->driver->remove)
-			error = dev->driver->remove(dev,REMOVE_NOTIFY);
-	} else
-		error = -EFAULT;
-	return error < 0 ? error : count;
-}
-
-static struct driver_file_entry device_status_entry = {
-	name:		"status",
-	mode:		S_IWUSR | S_IRUGO,
-	show:		device_read_status,
-	store:		device_write_status,
-};
-
 static ssize_t device_read_name(struct device * dev, char * buf, size_t count, loff_t off)
 {
 	return off ? 0 : sprintf(buf,"%s\n",dev->name);
@@ -166,7 +97,6 @@ static struct driver_file_entry device_power_entry = {
 };
 
 struct driver_file_entry * device_default_files[] = {
-	&device_status_entry,
 	&device_name_entry,
 	&device_power_entry,
 	NULL,

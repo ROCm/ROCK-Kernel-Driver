@@ -68,17 +68,10 @@
 #include "pcihost.h"
 
 
-#undef DISPLAY_HPT366_TIMINGS
-
 /* various tuning parameters */
 #define HPT_RESET_STATE_ENGINE
 /*#define HPT_DELAY_INTERRUPT*/
 /*#define HPT_SERIALIZE_IO*/
-
-#if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-#endif  /* defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS) */
 
 static const char *quirk_drives[] = {
 	"QUANTUM FIREBALLlct08 08",
@@ -483,98 +476,7 @@ static struct chipset_bus_clock_list_entry sixty_six_base_hpt374[] = {
 #define F_LOW_PCI_50      0x2d
 #define F_LOW_PCI_66      0x42
 
-static struct pci_dev *hpt_devs[HPT366_MAX_DEVS];
-static int n_hpt_devs;
-
 static unsigned int hpt_min_rev(struct pci_dev *dev, int rev);
-
-#if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
-static u8 hpt366_proc = 0;
-static int hpt366_get_info(char *, char **, off_t, int);
-extern int (*hpt366_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-
-static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p	= buffer;
-	char *chipset_nums[] = {"366", "366",  "368",
-				"370", "370A", "372",
-				"??",  "374" };
-	int i;
-
-	p += sprintf(p, "\n                             "
-		"HighPoint HPT366/368/370/372/374\n");
-	for (i = 0; i < n_hpt_devs; i++) {
-		struct pci_dev *dev = hpt_devs[i];
-		unsigned short iobase = dev->resource[4].start;
-		u32 class_rev;
-		u8 c0, c1;
-
-		pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
-		class_rev &= 0xff;
-
-		p += sprintf(p, "\nController: %d\n", i);
-		p += sprintf(p, "Chipset: HPT%s\n",
-			class_rev < sizeof(chipset_nums) / sizeof(char *) ? chipset_nums[class_rev] : "???");
-		p += sprintf(p, "--------------- Primary Channel "
-				"--------------- Secondary Channel "
-				"--------------\n");
-
-		/* get the bus master status registers */
-		c0 = inb_p(iobase + 0x2);
-		c1 = inb_p(iobase + 0xa);
-		p += sprintf(p, "Enabled:        %s"
-				"                             %s\n",
-			(c0 & 0x80) ? "no" : "yes",
-			(c1 & 0x80) ? "no" : "yes");
-
-		if (hpt_min_rev(dev, 3)) {
-			u8 cbl;
-			cbl = inb_p(iobase + 0x7b);
-			outb_p(cbl | 1, iobase + 0x7b);
-			outb_p(cbl & ~1, iobase + 0x7b);
-			cbl = inb_p(iobase + 0x7a);
-			p += sprintf(p, "Cable:          ATA-%d"
-					"                          ATA-%d\n",
-				(cbl & 0x02) ? 33 : 66,
-				(cbl & 0x01) ? 33 : 66);
-			p += sprintf(p, "\n");
-		}
-
-		p += sprintf(p, "--------------- drive0 --------- drive1 "
-				"------- drive0 ---------- drive1 -------\n");
-		p += sprintf(p, "DMA capable:    %s              %s" 
-				"            %s               %s\n",
-			(c0 & 0x20) ? "yes" : "no ", 
-			(c0 & 0x40) ? "yes" : "no ",
-			(c1 & 0x20) ? "yes" : "no ", 
-			(c1 & 0x40) ? "yes" : "no ");
-
-		{
-			u8 c2, c3;
-			/* older revs don't have these registers mapped
-			 * into io space */
-			pci_read_config_byte(dev, 0x43, &c0);
-			pci_read_config_byte(dev, 0x47, &c1);
-			pci_read_config_byte(dev, 0x4b, &c2);
-			pci_read_config_byte(dev, 0x4f, &c3);
-
-			p += sprintf(p, "Mode:           %s             %s"
-					"           %s              %s\n",
-				(c0 & 0x10) ? "UDMA" : (c0 & 0x20) ? "DMA " :
-					(c0 & 0x80) ? "PIO " : "off ",
-				(c1 & 0x10) ? "UDMA" : (c1 & 0x20) ? "DMA " :
-					(c1 & 0x80) ? "PIO " : "off ",
-				(c2 & 0x10) ? "UDMA" : (c2 & 0x20) ? "DMA " :
-					(c2 & 0x80) ? "PIO " : "off ",
-				(c3 & 0x10) ? "UDMA" : (c3 & 0x20) ? "DMA " :
-					(c3 & 0x80) ? "PIO " : "off ");
-		}
-	}
-	p += sprintf(p, "\n");
-
-	return p-buffer;/* => must be less than 4k! */
-}
-#endif  /* defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS) */
 
 static int check_in_drive_lists(struct ata_device *drive, const char **list)
 {
@@ -1419,16 +1321,6 @@ static unsigned int __init hpt366_init_chipset(struct pci_dev *dev)
 		hpt37x_init(dev);
 	else
 		hpt366_init(dev);
-
-	if (n_hpt_devs < HPT366_MAX_DEVS)
-		hpt_devs[n_hpt_devs++] = dev;
-
-#if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
-	if (!hpt366_proc) {
-		hpt366_proc = 1;
-		hpt366_display_info = &hpt366_get_info;
-	}
-#endif
 
 	return dev->irq;
 }

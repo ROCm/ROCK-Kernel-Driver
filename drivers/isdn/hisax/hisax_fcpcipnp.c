@@ -370,7 +370,7 @@ static void hdlc_fill_fifo(struct fritz_bcs *bcs)
 	unsigned long flags;
 	unsigned char *p;
 
-	DBG(0x40, "");
+	DBG(0x40, "hdlc_fill_fifo");
 
 	if (skb->len == 0)
 		BUG();

@@ -82,123 +82,6 @@
 #define UDIDETCR1	0x7B
 #define DTPR1		0x7C
 
-#undef DISPLAY_CMD64X_TIMINGS
-
-#if defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static int cmd64x_get_info(char *, char **, off_t, int);
-static int cmd680_get_info(char *, char **, off_t, int);
-extern int (*cmd64x_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-static struct pci_dev *bmide_dev;
-
-static int cmd64x_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	u8 reg53 = 0, reg54 = 0, reg55 = 0, reg56 = 0;	/* primary */
-	u8 reg57 = 0, reg58 = 0, reg5b;			/* secondary */
-	u8 reg72 = 0, reg73 = 0;			/* primary */
-	u8 reg7a = 0, reg7b = 0;			/* secondary */
-	u8 reg50 = 0, reg71 = 0;			/* extra */
-	u8 hi_byte = 0, lo_byte = 0;
-
-	switch(bmide_dev->device) {
-		case PCI_DEVICE_ID_CMD_649:
-			p += sprintf(p, "\n                                CMD649 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_CMD_648:
-			p += sprintf(p, "\n                                CMD648 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_CMD_646:
-			p += sprintf(p, "\n                                CMD646 Chipset.\n");
-			break;
-		case PCI_DEVICE_ID_CMD_643:
-			p += sprintf(p, "\n                                CMD643 Chipset.\n");
-			break;
-		default:
-			p += sprintf(p, "\n                                CMD64? Chipse.\n");
-			break;
-	}
-	(void) pci_read_config_byte(bmide_dev, CFR,       &reg50);
-	(void) pci_read_config_byte(bmide_dev, ARTTIM0,   &reg53);
-	(void) pci_read_config_byte(bmide_dev, DRWTIM0,   &reg54);
-	(void) pci_read_config_byte(bmide_dev, ARTTIM1,   &reg55);
-	(void) pci_read_config_byte(bmide_dev, DRWTIM1,   &reg56);
-	(void) pci_read_config_byte(bmide_dev, ARTTIM2,   &reg57);
-	(void) pci_read_config_byte(bmide_dev, DRWTIM2,   &reg58);
-	(void) pci_read_config_byte(bmide_dev, DRWTIM3,   &reg5b);
-	(void) pci_read_config_byte(bmide_dev, MRDMODE,   &reg71);
-	(void) pci_read_config_byte(bmide_dev, BMIDESR0,  &reg72);
-	(void) pci_read_config_byte(bmide_dev, UDIDETCR0, &reg73);
-	(void) pci_read_config_byte(bmide_dev, BMIDESR1,  &reg7a);
-	(void) pci_read_config_byte(bmide_dev, UDIDETCR1, &reg7b);
-
-	p += sprintf(p, "--------------- Primary Channel ---------------- Secondary Channel -------------\n");
-	p += sprintf(p, "                %sabled                         %sabled\n",
-		(reg72&0x80)?"dis":" en",(reg7a&0x80)?"dis":" en");
-	p += sprintf(p, "--------------- drive0 --------- drive1 -------- drive0 ---------- drive1 ------\n");
-	p += sprintf(p, "DMA enabled:    %s              %s             %s               %s\n",
-		(reg72&0x20)?"yes":"no ",(reg72&0x40)?"yes":"no ",(reg7a&0x20)?"yes":"no ",(reg7a&0x40)?"yes":"no ");
-	p += sprintf(p, "DMA Mode:       %s(%s)          %s(%s)         %s(%s)           %s(%s)\n",
-		(reg72&0x20)?((reg73&0x01)?"UDMA":" DMA"):" PIO",
-		(reg72&0x20)?(  ((reg73&0x30)==0x30)?(((reg73&0x35)==0x35)?"3":"0"):
-				((reg73&0x20)==0x20)?(((reg73&0x25)==0x25)?"3":"1"):
-				((reg73&0x10)==0x10)?(((reg73&0x15)==0x15)?"4":"2"):
-				((reg73&0x00)==0x00)?(((reg73&0x05)==0x05)?"5":"2"):"X"):"?",
-		(reg72&0x40)?((reg73&0x02)?"UDMA":" DMA"):" PIO",
-		(reg72&0x40)?(	((reg73&0xC0)==0xC0)?(((reg73&0xC5)==0xC5)?"3":"0"):
-				((reg73&0x80)==0x80)?(((reg73&0x85)==0x85)?"3":"1"):
-				((reg73&0x40)==0x40)?(((reg73&0x4A)==0x4A)?"4":"2"):
-				((reg73&0x00)==0x00)?(((reg73&0x0A)==0x0A)?"5":"2"):"X"):"?",
-		(reg7a&0x20)?((reg7b&0x01)?"UDMA":" DMA"):" PIO",
-		(reg7a&0x20)?(	((reg7b&0x30)==0x30)?(((reg7b&0x35)==0x35)?"3":"0"):
-				((reg7b&0x20)==0x20)?(((reg7b&0x25)==0x25)?"3":"1"):
-				((reg7b&0x10)==0x10)?(((reg7b&0x15)==0x15)?"4":"2"):
-				((reg7b&0x00)==0x00)?(((reg7b&0x05)==0x05)?"5":"2"):"X"):"?",
-		(reg7a&0x40)?((reg7b&0x02)?"UDMA":" DMA"):" PIO",
-		(reg7a&0x40)?(	((reg7b&0xC0)==0xC0)?(((reg7b&0xC5)==0xC5)?"3":"0"):
-				((reg7b&0x80)==0x80)?(((reg7b&0x85)==0x85)?"3":"1"):
-				((reg7b&0x40)==0x40)?(((reg7b&0x4A)==0x4A)?"4":"2"):
-				((reg7b&0x00)==0x00)?(((reg7b&0x0A)==0x0A)?"5":"2"):"X"):"?" );
-	p += sprintf(p, "PIO Mode:       %s                %s               %s                 %s\n",
-		"?", "?", "?", "?");
-	p += sprintf(p, "                %s                     %s\n",
-		(reg50 & CFR_INTR_CH0) ? "interrupting" : "polling     ",
-		(reg57 & ARTTIM23_INTR_CH1) ? "interrupting" : "polling");
-	p += sprintf(p, "                %s                          %s\n",
-		(reg71 & MRDMODE_INTR_CH0) ? "pending" : "clear  ",
-		(reg71 & MRDMODE_INTR_CH1) ? "pending" : "clear");
-	p += sprintf(p, "                %s                          %s\n",
-		(reg71 & MRDMODE_BLK_CH0) ? "blocked" : "enabled",
-		(reg71 & MRDMODE_BLK_CH1) ? "blocked" : "enabled");
-
-	SPLIT_BYTE(reg50, hi_byte, lo_byte);
-	p += sprintf(p, "CFR       = 0x%02x, HI = 0x%02x, LOW = 0x%02x\n", reg50, hi_byte, lo_byte);
-	SPLIT_BYTE(reg57, hi_byte, lo_byte);
-	p += sprintf(p, "ARTTIM23  = 0x%02x, HI = 0x%02x, LOW = 0x%02x\n", reg57, hi_byte, lo_byte);
-	SPLIT_BYTE(reg71, hi_byte, lo_byte);
-	p += sprintf(p, "MRDMODE   = 0x%02x, HI = 0x%02x, LOW = 0x%02x\n", reg71, hi_byte, lo_byte);
-
-	return p-buffer;	/* => must be less than 4k! */
-}
-
-static int cmd680_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	p += sprintf(p, "\n                                CMD680 Chipset.\n");
-	p += sprintf(p, "--------------- Primary Channel ---------------- Secondary Channel -------------\n");
-	p += sprintf(p, "--------------- drive0 --------- drive1 -------- drive0 ---------- drive1 ------\n");
-	p += sprintf(p, "PIO Mode:       %s                %s               %s                 %s\n",
-		"?", "?", "?", "?");
-	return p-buffer;	/* => must be less than 4k! */
-}
-
-#endif	/* defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS) */
-
-byte cmd64x_proc = 0;
-byte cmd680_proc = 0;
-
 /*
  * Registers and masks for easy access by drive index:
  */
@@ -887,13 +770,6 @@ static unsigned int cmd680_pci_init(struct pci_dev *dev)
 	pci_write_config_dword(dev, 0xB8, 0x4392);
 	pci_write_config_dword(dev, 0xBC, 0x4009);
 
-#if defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS)
-	if (!cmd64x_proc) {
-		cmd64x_proc = 1;
-		bmide_dev = dev;
-		cmd64x_display_info = &cmd680_get_info;
-	}
-#endif /* DISPLAY_CMD64X_TIMINGS && CONFIG_PROC_FS */
 	return 0;
 }
 
@@ -974,14 +850,6 @@ static unsigned int cmd64x_pci_init(struct pci_dev *dev)
 #ifdef CONFIG_PPC
 	(void) pci_write_config_byte(dev, UDIDETCR0, 0xf0);
 #endif /* CONFIG_PPC */
-
-#if defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS)
-	if (!cmd64x_proc) {
-		cmd64x_proc = 1;
-		bmide_dev = dev;
-		cmd64x_display_info = &cmd64x_get_info;
-	}
-#endif
 
 	return 0;
 }

@@ -102,9 +102,10 @@ adfs_atts2mode(struct super_block *sb, struct inode *inode)
 {
 	unsigned int filetype, attr = ADFS_I(inode)->attr;
 	umode_t mode, rmask;
+	struct adfs_sb_info *asb = ADFS_SB(sb);
 
 	if (attr & ADFS_NDA_DIRECTORY) {
-		mode = S_IRUGO & sb->u.adfs_sb.s_owner_mask;
+		mode = S_IRUGO & asb->s_owner_mask;
 		return S_IFDIR | S_IXUGO | mode;
 	}
 
@@ -125,16 +126,16 @@ adfs_atts2mode(struct super_block *sb, struct inode *inode)
 	mode = S_IFREG;
 
 	if (attr & ADFS_NDA_OWNER_READ)
-		mode |= rmask & sb->u.adfs_sb.s_owner_mask;
+		mode |= rmask & asb->s_owner_mask;
 
 	if (attr & ADFS_NDA_OWNER_WRITE)
-		mode |= S_IWUGO & sb->u.adfs_sb.s_owner_mask;
+		mode |= S_IWUGO & asb->s_owner_mask;
 
 	if (attr & ADFS_NDA_PUBLIC_READ)
-		mode |= rmask & sb->u.adfs_sb.s_other_mask;
+		mode |= rmask & asb->s_other_mask;
 
 	if (attr & ADFS_NDA_PUBLIC_WRITE)
-		mode |= S_IWUGO & sb->u.adfs_sb.s_other_mask;
+		mode |= S_IWUGO & asb->s_other_mask;
 	return mode;
 }
 
@@ -147,6 +148,7 @@ adfs_mode2atts(struct super_block *sb, struct inode *inode)
 {
 	umode_t mode;
 	int attr;
+	struct adfs_sb_info *asb = ADFS_SB(sb);
 
 	/* FIXME: should we be able to alter a link? */
 	if (S_ISLNK(inode->i_mode))
@@ -157,14 +159,14 @@ adfs_mode2atts(struct super_block *sb, struct inode *inode)
 	else
 		attr = 0;
 
-	mode = inode->i_mode & sb->u.adfs_sb.s_owner_mask;
+	mode = inode->i_mode & asb->s_owner_mask;
 	if (mode & S_IRUGO)
 		attr |= ADFS_NDA_OWNER_READ;
 	if (mode & S_IWUGO)
 		attr |= ADFS_NDA_OWNER_WRITE;
 
-	mode = inode->i_mode & sb->u.adfs_sb.s_other_mask;
-	mode &= ~sb->u.adfs_sb.s_owner_mask;
+	mode = inode->i_mode & asb->s_other_mask;
+	mode &= ~asb->s_owner_mask;
 	if (mode & S_IRUGO)
 		attr |= ADFS_NDA_PUBLIC_READ;
 	if (mode & S_IWUGO)
@@ -247,8 +249,8 @@ adfs_iget(struct super_block *sb, struct object_info *obj)
 	if (!inode)
 		goto out;
 
-	inode->i_uid	 = sb->u.adfs_sb.s_uid;
-	inode->i_gid	 = sb->u.adfs_sb.s_gid;
+	inode->i_uid	 = ADFS_SB(sb)->s_uid;
+	inode->i_gid	 = ADFS_SB(sb)->s_gid;
 	inode->i_ino	 = obj->file_id;
 	inode->i_size	 = obj->size;
 	inode->i_nlink	 = 2;
@@ -310,8 +312,8 @@ adfs_notify_change(struct dentry *dentry, struct iattr *attr)
 	 * we can't change the UID or GID of any file -
 	 * we have a global UID/GID in the superblock
 	 */
-	if ((ia_valid & ATTR_UID && attr->ia_uid != sb->u.adfs_sb.s_uid) ||
-	    (ia_valid & ATTR_GID && attr->ia_gid != sb->u.adfs_sb.s_gid))
+	if ((ia_valid & ATTR_UID && attr->ia_uid != ADFS_SB(sb)->s_uid) ||
+	    (ia_valid & ATTR_GID && attr->ia_gid != ADFS_SB(sb)->s_gid))
 		error = -EPERM;
 
 	if (error)

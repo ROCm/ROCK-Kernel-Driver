@@ -69,6 +69,7 @@
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
+#include <linux/sysctl.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -140,6 +141,7 @@ static int rtc_read_proc(char *page, char **start, off_t off,
 static unsigned long rtc_status = 0;	/* bitmapped status byte.	*/
 static unsigned long rtc_freq = 0;	/* Current periodic IRQ rate	*/
 static unsigned long rtc_irq_data = 0;	/* our output to the world	*/
+static unsigned long rtc_max_user_freq = 64; /* > this, need CAP_SYS_RESOURCE */
 
 #if RTC_IRQ
 static spinlock_t rtc_task_lock = SPIN_LOCK_UNLOCKED;
@@ -196,6 +198,38 @@ static void rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	kill_fasync (&rtc_async_queue, SIGIO, POLL_IN);
 }
 #endif
+
+/*
+ * sysctl-tuning infrastructure.
+ */
+static ctl_table rtc_table[] = {
+    { 1, "max-user-freq", &rtc_max_user_freq, sizeof(int), 0644, NULL,
+      &proc_dointvec, NULL, },
+    { 0, }
+};
+
+static ctl_table rtc_root[] = {
+    { 1, "rtc", NULL, 0, 0555, rtc_table, },
+    { 0, }
+};
+
+static ctl_table dev_root[] = {
+    { CTL_DEV, "dev", NULL, 0, 0555, rtc_root, },
+    { 0, }
+};
+
+static struct ctl_table_header *sysctl_header;
+
+static int __init init_sysctl(void)
+{
+    sysctl_header = register_sysctl_table(dev_root, 0);
+    return 0;
+}
+
+static void __exit cleanup_sysctl(void)
+{
+    unregister_sysctl_table(sysctl_header);
+}
 
 /*
  *	Now all the various file operations that we export.
@@ -305,7 +339,8 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 		 * We don't really want Joe User enabling more
 		 * than 64Hz of interrupts on a multi-user machine.
 		 */
-		if (!kernel && (rtc_freq > 64) && (!capable(CAP_SYS_RESOURCE)))
+		if (!kernel && (rtc_freq > rtc_max_user_freq) &&
+			(!capable(CAP_SYS_RESOURCE)))
 			return -EACCES;
 
 		if (!(rtc_status & RTC_TIMER_ON)) {
@@ -503,7 +538,7 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 		 * We don't really want Joe User generating more
 		 * than 64Hz of interrupts on a multi-user machine.
 		 */
-		if (!kernel && (arg > 64) && (!capable(CAP_SYS_RESOURCE)))
+		if (!kernel && (arg > rtc_max_user_freq) && (!capable(CAP_SYS_RESOURCE)))
 			return -EACCES;
 
 		while (arg > (1<<tmp))
@@ -833,7 +868,12 @@ no_irq:
 
 #endif /* __sparc__ vs. others */
 
-	misc_register(&rtc_dev);
+	if (misc_register(&rtc_dev))
+		{
+		free_irq(RTC_IRQ, NULL);
+		release_region(RTC_PORT(0), RTC_IO_EXTENT);
+		return -ENODEV;
+		}
 	create_proc_read_entry ("driver/rtc", 0, 0, rtc_read_proc, NULL);
 
 #if defined(__alpha__) || defined(__mips__)
@@ -893,6 +933,8 @@ no_irq:
 no_irq2:
 #endif
 
+	(void) init_sysctl();
+
 	printk(KERN_INFO "Real Time Clock Driver v" RTC_VERSION "\n");
 
 	return 0;
@@ -900,6 +942,7 @@ no_irq2:
 
 static void __exit rtc_exit (void)
 {
+	cleanup_sysctl();
 	remove_proc_entry ("driver/rtc", NULL);
 	misc_deregister(&rtc_dev);
 
