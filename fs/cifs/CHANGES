@@ -1,3 +1,8 @@
+Version 0.97
+------------
+Fix byte range locking bug (endian problem) causing bad offset and
+length.
+
 Version 0.96
 ------------
 Fix oops (in send_sig) caused by CIFS unmount code trying to

@@ -192,7 +192,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		/* check if SMB session is bad because we are setting it up */
 		if((in_buf->Command != SMB_COM_SESSION_SETUP_ANDX) && 
 			(in_buf->Command != SMB_COM_NEGOTIATE)) {
-			return - EAGAIN;
+			return -EAGAIN;
 		} /* else ok - we are setting up session */
 	}
 

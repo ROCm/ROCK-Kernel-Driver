@@ -727,8 +727,10 @@ typedef struct smb_com_read_rsp {
 typedef struct locking_andx_range {
 	__u16 Pid;
 	__u16 Pad;
-	__u64 Offset;
-	__u64 Length;
+	__u32 OffsetHigh;
+	__u32 OffsetLow;
+	__u32 LengthHigh;
+	__u32 LengthLow;
 } LOCKING_ANDX_RANGE;
 
 #define LOCKING_ANDX_SHARED_LOCK     0x01
