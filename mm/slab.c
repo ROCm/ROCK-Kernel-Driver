@@ -1201,41 +1201,54 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 		size = (size+align-1)&(~(align-1));
 	}
 
-	/* Cal size (in pages) of slabs, and the num of objs per slab.
-	 * This could be made much more intelligent.  For now, try to avoid
-	 * using high page-orders for slabs.  When the gfp() funcs are more
-	 * friendly towards high-order requests, this should be changed.
-	 */
-	do {
-		unsigned int break_flag = 0;
-cal_wastage:
+	if ((flags & SLAB_RECLAIM_ACCOUNT) && size <= PAGE_SIZE) {
+		/*
+		* A VFS-reclaimable slab tends to have most allocations
+		* as GFP_NOFS and we really don't want to have to be allocating
+		* higher-order pages when we are unable to shrink dcache.
+		*/
+		cachep->gfporder = 0;
 		cache_estimate(cachep->gfporder, size, flags,
 						&left_over, &cachep->num);
-		if (break_flag)
-			break;
-		if (cachep->gfporder >= MAX_GFP_ORDER)
-			break;
-		if (!cachep->num)
-			goto next;
-		if (flags & CFLGS_OFF_SLAB && cachep->num > offslab_limit) {
-			/* Oops, this num of objs will cause problems. */
-			cachep->gfporder--;
-			break_flag++;
-			goto cal_wastage;
-		}
-
+	} else {
 		/*
-		 * Large num of objs is good, but v. large slabs are currently
-		 * bad for the gfp()s.
-		 */
-		if (cachep->gfporder >= slab_break_gfp_order)
-			break;
+		* Calculate size (in pages) of slabs, and the num of objs per
+		* slab.  This could be made much more intelligent.  For now,
+		* try to avoid using high page-orders for slabs.  When the
+		* gfp() funcs are more friendly towards high-order requests,
+		* this should be changed.
+		*/
+		do {
+			unsigned int break_flag = 0;
+cal_wastage:
+			cache_estimate(cachep->gfporder, size, flags,
+						&left_over, &cachep->num);
+			if (break_flag)
+				break;
+			if (cachep->gfporder >= MAX_GFP_ORDER)
+				break;
+			if (!cachep->num)
+				goto next;
+			if (flags & CFLGS_OFF_SLAB &&
+					cachep->num > offslab_limit) {
+				/* This num of objs will cause problems. */
+				cachep->gfporder--;
+				break_flag++;
+				goto cal_wastage;
+			}
+			/*
+			* Large num of objs is good, but v. large slabs are
+			* currently bad for the gfp()s.
+			*/
+			if (cachep->gfporder >= slab_break_gfp_order)
+				break;
 
-		if ((left_over*8) <= (PAGE_SIZE<<cachep->gfporder))
-			break;	/* Acceptable internal fragmentation. */
+			if ((left_over*8) <= (PAGE_SIZE<<cachep->gfporder))
+				break;  /* Acceptable internal fragmentation. */
 next:
-		cachep->gfporder++;
-	} while (1);
+			cachep->gfporder++;
+		} while (1);
+	}
 
 	if (!cachep->num) {
 		printk("kmem_cache_create: couldn't create cache %s.\n", name);
