@@ -152,36 +152,6 @@ static inline unsigned int sa1100_pcmcia_cmd_time(unsigned int cpu_clock_khz,
 
 struct pcmcia_low_level;
 
-/* This structure encapsulates per-socket state which we might need to
- * use when responding to a Card Services query of some kind.
- */
-struct sa1100_pcmcia_socket {
-  /*
-   * Core PCMCIA state
-   */
-  int			nr;
-  struct resource	res;
-  socket_state_t        cs_state;
-  pccard_io_map         io_map[MAX_IO_WIN];
-  pccard_mem_map        pc_mem_map[MAX_WIN];
-  void                  (*handler)(void *, unsigned int);
-  void                  *handler_info;
-
-  struct pcmcia_state   k_state;
-  ioaddr_t              phys_attr, phys_mem;
-  void			*virt_io;
-  unsigned short        speed_io, speed_attr, speed_mem;
-
-  /*
-   * Info from low level handler
-   */
-  unsigned int          irq;
-  unsigned int		irq_state;
-
-  struct pcmcia_low_level *ops;
-};
-
-
 /* I/O pins replacing memory pins
  * (PCMCIA System Architecture, 2nd ed., by Don Anderson, p.75)
  *
@@ -190,60 +160,5 @@ struct sa1100_pcmcia_socket {
  */
 #define iostschg bvd1
 #define iospkr   bvd2
-
-
-/*
- * Declaration for all machine specific init/exit functions.
- */
-extern int pcmcia_adsbitsy_init(struct device *);
-extern void pcmcia_adsbitsy_exit(struct device *);
-
-extern int pcmcia_assabet_init(struct device *);
-extern void pcmcia_assabet_exit(struct device *);
-
-extern int pcmcia_badge4_init(struct device *);
-extern void pcmcia_badge4_exit(struct device *);
-
-extern int pcmcia_cerf_init(struct device *);
-extern void pcmcia_cerf_exit(struct device *);
-
-extern int pcmcia_flexanet_init(struct device *);
-extern void pcmcia_flexanet_exit(struct device *);
-
-extern int pcmcia_freebird_init(struct device *);
-extern void pcmcia_freebird_exit(struct device *);
-
-extern int pcmcia_gcplus_init(struct device *);
-extern void pcmcia_gcplus_exit(struct device *);
-
-extern int pcmcia_graphicsmaster_init(struct device *);
-extern void pcmcia_graphicsmaster_exit(struct device *);
-
-extern int pcmcia_pangolin_init(struct device *);
-extern void pcmcia_pangolin_exit(struct device *);
-
-extern int pcmcia_pfs168_init(struct device *);
-extern void pcmcia_pfs168_exit(struct device *);
-
-extern int pcmcia_shannon_init(struct device *);
-extern void pcmcia_shannon_exit(struct device *);
-
-extern int pcmcia_simpad_init(struct device *);
-extern void pcmcia_simpad_exit(struct device *);
-
-extern int pcmcia_stork_init(struct device *);
-extern void pcmcia_stork_exit(struct device *);
-
-extern int pcmcia_system3_init(struct device *);
-extern void pcmcia_system3_exit(struct device *);
-
-extern int pcmcia_trizeps_init(struct device *);
-extern void pcmcia_trizeps_exit(struct device *);
-
-extern int pcmcia_xp860_init(struct device *);
-extern void pcmcia_xp860_exit(struct device *);
-
-extern int pcmcia_yopy_init(struct device *);
-extern void pcmcia_yopy_exit(struct device *);
 
 #endif  /* !defined(_PCMCIA_SA1100_H) */

@@ -1072,14 +1072,6 @@ static void scsi_request_fn(request_queue_t *q)
 		if (shost->in_recovery || blk_queue_plugged(q))
 			return;
 
-		/*
-		 * get next queueable request.  We do this early to make sure
-		 * that the request is fully prepared even if we cannot 
-		 * accept it.  If there is no request, we'll detect this
-		 * lower down.
-		 */
-		req = elv_next_request(q);
-
 		if (sdev->device_busy >= sdev->queue_depth)
 			break;
 
@@ -1134,11 +1126,12 @@ static void scsi_request_fn(request_queue_t *q)
 			sdev->starved = 0;
 
 		/*
-		 * If we couldn't find a request that could be queued, then we
-		 * can also quit.
+		 * get next queueable request.  We do this early to make sure
+		 * that the request is fully prepared even if we cannot 
+		 * accept it.  If there is no request, we'll detect this
+		 * lower down.
 		 */
-		if (blk_queue_empty(q))
-			break;
+		req = elv_next_request(q);
 
 		if (!req) {
 			/* If the device is busy, a returning I/O

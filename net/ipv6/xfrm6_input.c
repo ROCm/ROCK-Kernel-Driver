@@ -186,6 +186,8 @@ int xfrm6_rcv(struct sk_buff **pskb)
 
 		xfrm_vec[xfrm_nr++] = x;
 
+		iph = skb->nh.ipv6h;
+
 		if (x->props.mode) { /* XXX */
 			if (iph->nexthdr != IPPROTO_IPV6)
 				goto drop;
@@ -199,9 +201,11 @@ int xfrm6_rcv(struct sk_buff **pskb)
 			goto drop;
 	} while (!err);
 
-	memcpy(skb->nh.raw, tmp_hdr, hdr_len);
-	skb->nh.raw[nh_offset] = nexthdr;
-	skb->nh.ipv6h->payload_len = htons(hdr_len + skb->len - sizeof(struct ipv6hdr));
+	if (!decaps) {
+		memcpy(skb->nh.raw, tmp_hdr, hdr_len);
+		skb->nh.raw[nh_offset] = nexthdr;
+		skb->nh.ipv6h->payload_len = htons(hdr_len + skb->len - sizeof(struct ipv6hdr));
+	}
 
 	/* Allocate new secpath or COW existing one. */
 	if (!skb->sp || atomic_read(&skb->sp->refcnt) != 1) {

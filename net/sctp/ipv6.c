@@ -680,6 +680,7 @@ static int sctp6_rcv(struct sk_buff **pskb)
 static struct inet6_protocol sctpv6_protocol = {
 	.handler      = sctp6_rcv,
 	.err_handler  = sctp_v6_err,
+	.no_policy    = 1,
 };
 
 static struct sctp_af sctp_ipv6_specific = {

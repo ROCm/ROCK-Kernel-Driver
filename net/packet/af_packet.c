@@ -401,9 +401,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 	struct packet_opt *po;
 	u8 * skb_head = skb->data;
 	int skb_len = skb->len;
-#ifdef CONFIG_FILTER
 	unsigned snaplen;
-#endif
 
 	if (skb->pkt_type == PACKET_LOOPBACK)
 		goto drop;
@@ -429,7 +427,6 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 		}
 	}
 
-#ifdef CONFIG_FILTER
 	snaplen = skb->len;
 
 	if (sk->filter) {
@@ -446,7 +443,6 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 		if (snaplen > res)
 			snaplen = res;
 	}
-#endif /* CONFIG_FILTER */
 
 	if (atomic_read(&sk->rmem_alloc) + skb->truesize >= (unsigned)sk->rcvbuf)
 		goto drop_n_acct;
@@ -475,10 +471,8 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,  struct packe
 	if (dev->hard_header_parse)
 		sll->sll_halen = dev->hard_header_parse(skb, sll->sll_addr);
 
-#ifdef CONFIG_FILTER
 	if (pskb_trim(skb, snaplen))
 		goto drop_n_acct;
-#endif
 
 	skb_set_owner_r(skb, sk);
 	skb->dev = NULL;
@@ -494,9 +488,7 @@ drop_n_acct:
 	po->stats.tp_drops++;
 	spin_unlock(&sk->receive_queue.lock);
 
-#ifdef CONFIG_FILTER
 drop_n_restore:
-#endif
 	if (skb_head != skb->data && skb_shared(skb)) {
 		skb->data = skb_head;
 		skb->len = skb_len;
@@ -539,7 +531,6 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 
 	snaplen = skb->len;
 
-#ifdef CONFIG_FILTER
 	if (sk->filter) {
 		unsigned res = snaplen;
 		struct sk_filter *filter;
@@ -554,7 +545,6 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,  struct pack
 		if (snaplen > res)
 			snaplen = res;
 	}
-#endif
 
 	if (sk->type == SOCK_DGRAM) {
 		macoff = netoff = TPACKET_ALIGN(TPACKET_HDRLEN) + 16;

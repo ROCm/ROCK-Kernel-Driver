@@ -776,6 +776,7 @@ static struct inet_protosw sctp_stream_protosw = {
 static struct inet_protocol sctp_protocol = {
 	.handler     = sctp_rcv,
 	.err_handler = sctp_v4_err,
+	.no_policy   = 1,
 };
 
 /* IPv4 address related functions.  */

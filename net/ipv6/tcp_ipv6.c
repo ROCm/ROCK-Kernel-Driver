@@ -2193,6 +2193,7 @@ struct proto tcpv6_prot = {
 static struct inet6_protocol tcpv6_protocol = {
 	.handler	=	tcp_v6_rcv,
 	.err_handler	=	tcp_v6_err,
+	.no_policy	=	1,
 };
 
 extern struct proto_ops inet6_stream_ops;

@@ -17,10 +17,9 @@
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 
-#include "sa1100_generic.h"
 #include "sa1111_generic.h"
 
-static int graphicsmaster_pcmcia_init(struct pcmcia_init *init)
+static int graphicsmaster_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 {
   int return_val=0;
 
@@ -33,65 +32,67 @@ static int graphicsmaster_pcmcia_init(struct pcmcia_init *init)
   /* why? */
   MECR = 0x09430943;
 
-  return sa1111_pcmcia_init(init);
+  return sa1111_pcmcia_hwinit(skt);
 }
 
 static int
-graphicsmaster_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
+graphicsmaster_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+				       const socket_state_t *state)
 {
-  unsigned int pa_dwr_mask, pa_dwr_set;
-  int ret;
+	unsigned int pa_dwr_mask, pa_dwr_set;
+	int ret;
 
-  switch (sock) {
-  case 0:
-    pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1;
+	switch (skt->nr) {
+	case 0:
+		pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1;
 
-    switch (conf->vcc) {
-    default:
-    case 0:	pa_dwr_set = GPIO_GPIO0 | GPIO_GPIO1;	break;
-    case 33:	pa_dwr_set = GPIO_GPIO1;		break;
-    case 50:	pa_dwr_set = GPIO_GPIO0;		break;
-    }
-    break;
+		switch (state->Vcc) {
+		default:
+		case 0:  pa_dwr_set = GPIO_GPIO0 | GPIO_GPIO1;	break;
+		case 33: pa_dwr_set = GPIO_GPIO1;		break;
+		case 50: pa_dwr_set = GPIO_GPIO0;		break;
+		}
+		break;
 
-  case 1:
-    pa_dwr_mask = GPIO_GPIO2 | GPIO_GPIO3;
+	case 1:
+		pa_dwr_mask = GPIO_GPIO2 | GPIO_GPIO3;
 
-    switch (conf->vcc) {
-    default:
-    case 0:	pa_dwr_set = GPIO_GPIO2 | GPIO_GPIO3;	break;
-    case 33:	pa_dwr_set = GPIO_GPIO3;		break;
-    case 50:	pa_dwr_set = GPIO_GPIO2;		break;
-    }
-  }
+		switch (state->Vcc) {
+		default:
+		case 0:  pa_dwr_set = GPIO_GPIO2 | GPIO_GPIO3;	break;
+		case 33: pa_dwr_set = GPIO_GPIO3;		break;
+		case 50: pa_dwr_set = GPIO_GPIO2;		break;
+		}
+		break;
+	}
 
-  if (conf->vpp != conf->vcc && conf->vpp != 0) {
-    printk(KERN_ERR "%s(): CF slot cannot support Vpp %u\n", __FUNCTION__,
-	   conf->vpp);
-    return -1;
-  }
+	if (state->Vpp != state->Vcc && state->Vpp != 0) {
+		printk(KERN_ERR "%s(): CF slot cannot support Vpp %u\n",
+			__FUNCTION__, state->Vpp);
+		return -1;
+	}
 
-  ret = sa1111_pcmcia_configure_socket(sock, conf);
-  if (ret == 0) {
-    unsigned long flags;
+	ret = sa1111_pcmcia_configure_socket(skt, state);
+	if (ret == 0) {
+		unsigned long flags;
 
-    local_irq_save(flags);
-    PA_DWR = (PA_DWR & ~pa_dwr_mask) | pa_dwr_set;
-    local_irq_restore(flags);
-  }
+		local_irq_save(flags);
+		PA_DWR = (PA_DWR & ~pa_dwr_mask) | pa_dwr_set;
+		local_irq_restore(flags);
+	}
 
-  return ret;
+	return ret;
 }
 
 static struct pcmcia_low_level graphicsmaster_pcmcia_ops = {
-  .owner		= THIS_MODULE,
-  .init			= graphicsmaster_pcmcia_init,
-  .shutdown		= sa1111_pcmcia_shutdown,
-  .socket_state		= sa1111_pcmcia_socket_state,
-  .configure_socket	= graphicsmaster_pcmcia_configure_socket,
+	.owner			= THIS_MODULE,
+	.hw_init		= graphicsmaster_pcmcia_init,
+	.hw_shutdown		= sa1111_pcmcia_hw_shutdown,
+	.socket_state		= sa1111_pcmcia_socket_state,
+	.configure_socket	= graphicsmaster_pcmcia_configure_socket,
 
-  .socket_init		= sa1111_pcmcia_socket_init,
-  .socket_suspend	= sa1111_pcmcia_socket_suspend,
+	.socket_init		= sa1111_pcmcia_socket_init,
+	.socket_suspend		= sa1111_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_graphicsmaster_init(struct device *dev)
@@ -99,13 +100,7 @@ int __init pcmcia_graphicsmaster_init(struct device *dev)
 	int ret = -ENODEV;
 
 	if (machine_is_graphicsmaster())
-		ret = sa1100_register_pcmcia(&graphicsmaster_pcmcia_ops, dev);
+		ret = sa11xx_drv_pcmcia_probe(dev, &graphicsmaster_pcmcia_ops, 0, 2);
 
 	return ret;
 }
-
-void __exit pcmcia_graphicsmaster_exit(struct device *dev)
-{
-	sa1100_unregister_pcmcia(&graphicsmaster_pcmcia_ops, dev);
-}
-

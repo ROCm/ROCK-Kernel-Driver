@@ -50,6 +50,7 @@ struct inet6_protocol
 			       struct inet6_skb_parm *opt,
 			       int type, int code, int offset,
 			       __u32 info);
+	int	no_policy;
 };
 
 #endif

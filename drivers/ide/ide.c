@@ -2019,7 +2019,7 @@ int __init ide_setup (char *s)
 				goto done;
 			}
 #endif /* CONFIG_BLK_DEV_HT6560B */
-#if CONFIG_BLK_DEV_QD65XX
+#ifdef CONFIG_BLK_DEV_QD65XX
 			case -12: /* "qd65xx" */
 			{
 				extern void init_qd65xx (void);

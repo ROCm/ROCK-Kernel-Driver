@@ -20,5 +20,6 @@ obj-$(CONFIG_CRYPTO_BLOWFISH) += blowfish.o
 obj-$(CONFIG_CRYPTO_TWOFISH) += twofish.o
 obj-$(CONFIG_CRYPTO_SERPENT) += serpent.o
 obj-$(CONFIG_CRYPTO_AES) += aes.o
+obj-$(CONFIG_CRYPTO_DEFLATE) += deflate.o
 
 obj-$(CONFIG_CRYPTO_TEST) += tcrypt.o
