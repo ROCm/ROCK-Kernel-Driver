@@ -31,9 +31,7 @@
  */
 
 #include "budget.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-        #define KBUILD_MODNAME budget_patch
-#endif
+#include "av7110.h"
 
 #define budget_patch budget
 
@@ -48,45 +46,6 @@ struct pci_device_id pci_tbl[] = {
                 .vendor    = 0,
         }
 };
-
-
-#define COMMAND (DPRAM_BASE + 0x0FC)
-#define DPRAM_BASE 0x4000
-#define DEBINOSWAP 0x000e0000
-
-
-typedef enum  { 
-        AudioDAC,
-        CabADAC,
-        ON22K,
-        OFF22K,
-        MainSwitch,
-        ADSwitch,
-        SendDiSEqC,
-        SetRegister
-} AUDCOM;
-
-
-typedef enum  { 
-        COMTYPE_NOCOM,
-        COMTYPE_PIDFILTER,
-        COMTYPE_MPEGDECODER,
-        COMTYPE_OSD,
-        COMTYPE_BMP,
-        COMTYPE_ENCODER,
-        COMTYPE_AUDIODAC,
-        COMTYPE_REQUEST,
-        COMTYPE_SYSTEM,
-        COMTYPE_REC_PLAY,
-        COMTYPE_COMMON_IF,
-        COMTYPE_PID_FILTER,
-        COMTYPE_PES,
-        COMTYPE_TS,
-        COMTYPE_VIDEO,
-        COMTYPE_AUDIO,
-        COMTYPE_CI_LL,
-} COMTYPE;
-
 
 static
 int wdebi(struct budget_patch *budget, u32 config, int addr, u32 val, int count)
@@ -235,31 +194,34 @@ int budget_patch_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_d
 **      (74HCT4040, LVC74) for the generation of this VSYNC signal, 
 **      which seems that can be done perfectly without this :-)).
 */                                                      
+
+#define WRITE_RPS1(x) dev->d_rps1.cpu_addr[ cnt++ ] = cpu_to_le32(x)
+
         cnt = 0;                                // Setup RPS1 "program" (p35)
         // Wait reset Source Line Counter Threshold                     (p36)
-        dev->rps1[cnt++]=cpu_to_le32(CMD_PAUSE | RPS_INV | EVT_HS);
+        WRITE_RPS1(cpu_to_le32(CMD_PAUSE | RPS_INV | EVT_HS));
         // Wait Source Line Counter Threshold                           (p36)
-        dev->rps1[cnt++]=cpu_to_le32(CMD_PAUSE | EVT_HS);
+        WRITE_RPS1(cpu_to_le32(CMD_PAUSE | EVT_HS));
         // Set GPIO3=1                                                  (p42)
-        dev->rps1[cnt++]=cpu_to_le32(CMD_WR_REG_MASK | (GPIO_CTRL>>2));
-        dev->rps1[cnt++]=cpu_to_le32(GPIO3_MSK);
-        dev->rps1[cnt++]=cpu_to_le32(SAA7146_GPIO_OUTHI<<24);
+        WRITE_RPS1(cpu_to_le32(CMD_WR_REG_MASK | (GPIO_CTRL>>2)));
+        WRITE_RPS1(cpu_to_le32(GPIO3_MSK));
+        WRITE_RPS1(cpu_to_le32(SAA7146_GPIO_OUTHI<<24));
         // Wait reset Source Line Counter Threshold                     (p36)
-        dev->rps1[cnt++]=cpu_to_le32(CMD_PAUSE | RPS_INV | EVT_HS);
+        WRITE_RPS1(cpu_to_le32(CMD_PAUSE | RPS_INV | EVT_HS));
         // Wait Source Line Counter Threshold
-        dev->rps1[cnt++]=cpu_to_le32(CMD_PAUSE | EVT_HS);
+        WRITE_RPS1(cpu_to_le32(CMD_PAUSE | EVT_HS));
         // Set GPIO3=0                                                  (p42)
-        dev->rps1[cnt++]=cpu_to_le32(CMD_WR_REG_MASK | (GPIO_CTRL>>2));
-        dev->rps1[cnt++]=cpu_to_le32(GPIO3_MSK);
-        dev->rps1[cnt++]=cpu_to_le32(SAA7146_GPIO_OUTLO<<24);
+        WRITE_RPS1(cpu_to_le32(CMD_WR_REG_MASK | (GPIO_CTRL>>2)));
+        WRITE_RPS1(cpu_to_le32(GPIO3_MSK));
+        WRITE_RPS1(cpu_to_le32(SAA7146_GPIO_OUTLO<<24));
         // Jump to begin of RPS program                                 (p37)
-        dev->rps1[cnt++]=cpu_to_le32(CMD_JUMP);
-        dev->rps1[cnt++]=cpu_to_le32(virt_to_bus(&dev->rps1[0]));
+        WRITE_RPS1(cpu_to_le32(CMD_JUMP));
+        WRITE_RPS1(cpu_to_le32(dev->d_rps1.dma_handle));
 
         // Fix VSYNC level
         saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO);
         // Set RPS1 Address register to point to RPS code               (r108 p42)
-        saa7146_write(dev, RPS_ADDR1, virt_to_bus(&dev->rps1[0]));
+        saa7146_write(dev, RPS_ADDR1, dev->d_rps1.dma_handle);
         // Set Source Line Counter Threshold, using BRS                 (rCC p43)
         saa7146_write(dev, RPS_THRESH1, ((TS_HEIGHT/2) | MASK_12));
         // Enable RPS1                                                  (rFC p33)

@@ -1,9 +1,10 @@
 #include "dvb_filter.h"
 #include "av7110_ipack.h"
 #include <linux/string.h>	/* for memcpy() */
+#include <linux/vmalloc.h>
 
 
-void av7110_ipack_reset(ipack *p)
+void av7110_ipack_reset(struct ipack *p)
 {
 	p->found = 0;
 	p->cid = 0;
@@ -19,7 +20,7 @@ void av7110_ipack_reset(ipack *p)
 }
 
 
-void av7110_ipack_init(ipack *p, int size,
+void av7110_ipack_init(struct ipack *p, int size,
 		       void (*func)(u8 *buf, int size, void *priv))
 {
 	if ( !(p->buf = vmalloc(size*sizeof(u8))) ){
@@ -32,17 +33,18 @@ void av7110_ipack_init(ipack *p, int size,
 }
 
 
-void av7110_ipack_free(ipack * p)
+void av7110_ipack_free(struct ipack * p)
 {
-	if (p->buf) vfree(p->buf);
+	if (p->buf)
+		vfree(p->buf);
 }
 
 
 static
-void send_ipack(ipack *p)
+void send_ipack(struct ipack *p)
 {
 	int off;
-	AudioInfo ai;
+	struct dvb_audio_info ai;
 	int ac3_off = 0;
 	int streamid=0;
 	int nframes= 0;
@@ -109,7 +111,7 @@ void send_ipack(ipack *p)
 }
 
 
-void av7110_ipack_flush(ipack *p)
+void av7110_ipack_flush(struct ipack *p)
 {
 	if (p->plength != MMAX_PLENGTH-6 || p->found<=6)
 		return;
@@ -121,7 +123,7 @@ void av7110_ipack_flush(ipack *p)
 
 
 static 
-void write_ipack(ipack *p, const u8 *data, int count)
+void write_ipack(struct ipack *p, const u8 *data, int count)
 {
 	u8 headr[3] = { 0x00, 0x00, 0x01} ;
 
@@ -144,7 +146,7 @@ void write_ipack(ipack *p, const u8 *data, int count)
 }
 
 
-int av7110_ipack_instant_repack (const u8 *buf, int count, ipack *p)
+int av7110_ipack_instant_repack (const u8 *buf, int count, struct ipack *p)
 {
 	int l;
 	int c=0;

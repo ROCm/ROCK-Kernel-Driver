@@ -1,6 +1,8 @@
 #ifndef __BUDGET_DVB__
 #define __BUDGET_DVB__
 
+#include <media/saa7146.h>
+
 #include "dvb_i2c.h"
 #include "dvb_frontend.h"
 #include "dvbdev.h"
@@ -9,8 +11,6 @@
 #include "dmxdev.h"
 #include "dvb_filter.h"
 #include "dvb_net.h"
-
-#include <media/saa7146.h>
 
 extern int budget_debug;
 
@@ -24,7 +24,7 @@ struct budget {
 
         /* devices */
         struct dvb_device       dvb_dev;
-        dvb_net_t               dvb_net;
+        struct dvb_net               dvb_net;
 
         struct saa7146_dev	*dev;
 
@@ -37,12 +37,11 @@ struct budget {
 	struct tasklet_struct   fidb_tasklet;
 	struct tasklet_struct   vpe_tasklet;
 
-        dmxdev_t                dmxdev;
+        struct dmxdev                dmxdev;
         struct dvb_demux	demux;
-        char                    demux_id[16];
 
-        dmx_frontend_t          hw_frontend;
-        dmx_frontend_t          mem_frontend;
+        struct dmx_frontend          hw_frontend;
+        struct dmx_frontend          mem_frontend;
 
         int                     fe_synced; 
         struct semaphore        pid_mutex;

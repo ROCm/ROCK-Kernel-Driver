@@ -30,18 +30,7 @@
  */
 
 #include "budget.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-        #define KBUILD_MODNAME budget
-#endif
-
-
-
-static inline void ddelay(int i)
-{
-	current->state=TASK_INTERRUPTIBLE;
-	schedule_timeout((HZ*i)/100);
-}
-
+#include "dvb_functions.h"
 
 static
 void Set22K (struct budget *budget, int state)
@@ -87,7 +76,7 @@ void DiseqcSendByte (struct budget *budget, int data)
 
 
 static
-int SendDiSEqCMsg (struct budget *budget, int len, u8 *msg, int burst)
+int SendDiSEqCMsg (struct budget *budget, int len, u8 *msg, unsigned long burst)
 {
 	struct saa7146_dev *dev=budget->dev;
 	int i;
@@ -110,7 +99,7 @@ int SendDiSEqCMsg (struct budget *budget, int len, u8 *msg, int burst)
 			udelay(12500);
 			saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO);
 		}
-		ddelay(2);
+		dvb_delay(20);
 	}
 
 	return 0;
@@ -146,7 +135,7 @@ int budget_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
        }
 
        case FE_DISEQC_SEND_BURST:
-               SendDiSEqCMsg (budget, 0, NULL, (int) arg);
+               SendDiSEqCMsg (budget, 0, NULL, (unsigned long)arg);
                break;
 
        default:
@@ -160,15 +149,18 @@ int budget_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 static
 int budget_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *info)
 {
-	struct budget *budget;
+	struct budget *budget = NULL;
 	int err;
 
-	if (!(budget = kmalloc (sizeof(struct budget), GFP_KERNEL)))
+	budget = kmalloc(sizeof(struct budget), GFP_KERNEL);
+	if( NULL == budget ) {
 		return -ENOMEM;
+	}
 
-	DEB_EE(("budget: %p\n",budget));
+	DEB_EE(("dev:%p, info:%p, budget:%p\n",dev,info,budget));
 
 	if ((err = ttpci_budget_init (budget, dev, info))) {
+		printk("==> failed\n");
 		kfree (budget);
 		return err;
 	}
@@ -194,6 +186,7 @@ int budget_detach (struct saa7146_dev* dev)
 	err = ttpci_budget_deinit (budget);
 
 	kfree (budget);
+	dev->ext_priv = NULL;
 
 	return err;
 }
@@ -222,7 +215,7 @@ struct pci_device_id pci_tbl[] = {
 	}
 };
 
-
+MODULE_DEVICE_TABLE(pci, pci_tbl);
 
 static
 struct saa7146_extension budget_extension = {

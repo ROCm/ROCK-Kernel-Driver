@@ -28,22 +28,12 @@
  */
 
 #include "budget.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-        #define KBUILD_MODNAME budget
-#endif
-
 
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/input.h>
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-#include "input_fake.h"
-#endif
-
-
 
 struct budget_ci {
 	struct budget budget;
@@ -388,7 +378,7 @@ struct pci_device_id pci_tbl[] = {
 	}
 };
 
-
+MODULE_DEVICE_TABLE(pci, pci_tbl);
 
 static
 struct saa7146_extension budget_extension = {

@@ -30,13 +30,10 @@
  * the project's page is at http://www.linuxtv.org/dvb/
  */
 
-#include "budget.h"
 #include <media/saa7146_vv.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-        #define KBUILD_MODNAME budget_av
-#endif
-
+#include "budget.h"
+#include "dvb_functions.h"
 
 struct budget_av {
 	struct budget budget;
@@ -47,13 +44,6 @@ struct budget_av {
 /****************************************************************************
  * INITIALIZATION
  ****************************************************************************/
-
-static inline
-void ddelay(int i) 
-{
-        current->state=TASK_INTERRUPTIBLE;
-        schedule_timeout((HZ*i)/100);
-}
 
 
 static
@@ -175,7 +165,7 @@ int budget_av_detach (struct saa7146_dev *dev)
 
 	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
 
-	ddelay(20);
+	dvb_delay(200);
 
 	saa7146_unregister_device (&budget_av->vd, dev);
 
@@ -221,7 +211,7 @@ int budget_av_attach (struct saa7146_dev* dev,
 	//test_knc_ci(av7110);
 
 	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTHI);
-	ddelay(50);
+	dvb_delay(500);
 
 	if ((err = saa7113_init (budget_av))) {
 		budget_av_detach(dev);
@@ -245,9 +235,11 @@ int budget_av_attach (struct saa7146_dev* dev,
 
 	/* what is this? since we don't support open()/close()
 	   notifications, we simply put this into the release handler... */
-//	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
-	ddelay(20);
-
+/*
+	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
+	set_current_state(TASK_INTERRUPTIBLE);
+	schedule_timeout (20);
+*/
 	/* fixme: find some sane values here... */
 	saa7146_write(dev, PCI_BT_V1, 0x1c00101f);
 
@@ -348,7 +340,7 @@ struct pci_device_id pci_tbl [] = {
 	}
 };
 
-
+MODULE_DEVICE_TABLE(pci, pci_tbl);
 
 static
 struct saa7146_extension budget_extension = {

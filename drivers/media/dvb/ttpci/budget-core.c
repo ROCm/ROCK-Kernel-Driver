@@ -1,19 +1,6 @@
 #include "budget.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-        #define KBUILD_MODNAME budget
-#endif
 
 int budget_debug = 0;
-
-/****************************************************************************
- * General helper functions
- ****************************************************************************/
-
-static inline void ddelay(int i) 
-{
-        current->state=TASK_INTERRUPTIBLE;
-        schedule_timeout((HZ*i)/100);
-}
 
 /****************************************************************************
  * TT budget / WinTV Nova
@@ -142,14 +129,11 @@ int budget_stop_feed(struct dvb_demux_feed *feed)
 static
 int budget_register(struct budget *budget)
 {
-        int ret;
-        dmx_frontend_t *dvbfront=&budget->hw_frontend;
         struct dvb_demux *dvbdemux=&budget->demux;
+        int ret;
 
 	DEB_EE(("budget: %p\n",budget));
 
-        memcpy(budget->demux_id, "demux0_0", 9);
-        budget->demux_id[5] = budget->dvb_adapter->num + '0';
         dvbdemux->priv = (void *) budget;
 
 	dvbdemux->filternum = 256;
@@ -158,18 +142,10 @@ int budget_register(struct budget *budget)
         dvbdemux->stop_feed = budget_stop_feed;
         dvbdemux->write_to_decoder = NULL;
 
-        dvbdemux->dmx.vendor = "CIM";
-        dvbdemux->dmx.model = "sw";
-        dvbdemux->dmx.id = budget->demux_id;
         dvbdemux->dmx.capabilities = (DMX_TS_FILTERING | DMX_SECTION_FILTERING |
                                       DMX_MEMORY_BASED_FILTERING);
 
         dvb_dmx_init(&budget->demux);
-
-        dvbfront->id = "hw_frontend";
-        dvbfront->vendor = "VLSI";
-        dvbfront->model = "DVB Frontend";
-        dvbfront->source = DMX_FRONTEND_0;
 
         budget->dmxdev.filternum = 256;
         budget->dmxdev.demux = &dvbdemux->dmx;
@@ -177,14 +153,13 @@ int budget_register(struct budget *budget)
 
         dvb_dmxdev_init(&budget->dmxdev, budget->dvb_adapter);
 
-        ret=dvbdemux->dmx.add_frontend (&dvbdemux->dmx, 
-                                        &budget->hw_frontend);
+        budget->hw_frontend.source = DMX_FRONTEND_0;
+
+        ret = dvbdemux->dmx.add_frontend(&dvbdemux->dmx, &budget->hw_frontend);
+
         if (ret < 0)
                 return ret;
         
-        budget->mem_frontend.id = "mem_frontend";
-        budget->mem_frontend.vendor = "memory";
-        budget->mem_frontend.model = "sw";
         budget->mem_frontend.source = DMX_MEMORY_FE;
         ret=dvbdemux->dmx.add_frontend (&dvbdemux->dmx, 
                                         &budget->mem_frontend);
@@ -278,9 +253,9 @@ int ttpci_budget_init (struct budget *budget,
 
 	saa7146_setgpio(dev, 2, SAA7146_GPIO_OUTHI); /* frontend power on */
 
-        if (budget_register(budget) == 0)
+        if (budget_register(budget) == 0) {
 		return 0;
-
+	}
 err:
 	if (budget->grabbing)
 		vfree(budget->grabbing);
@@ -312,7 +287,6 @@ int ttpci_budget_deinit (struct budget *budget)
 	saa7146_pgtable_free (dev->pci, &budget->pt);
 
 	vfree (budget->grabbing);
-	kfree (budget);
 
 	return 0;
 }

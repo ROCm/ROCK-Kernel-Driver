@@ -7,12 +7,7 @@
 
 #include "av7110.h"
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-#include "input_fake.h"
-#endif
-
-
-#define UP_TIMEOUT (HZ/2)
+#define UP_TIMEOUT (HZ/4)
 
 static int av7110_ir_debug = 0;
 
@@ -21,11 +16,12 @@ static int av7110_ir_debug = 0;
 
 static struct input_dev input_dev;
 
+static u32 ir_config;
 
 static
 u16 key_map [256] = {
 	KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7,
-	KEY_8, KEY_9, KEY_MHP, 0, KEY_POWER, KEY_MUTE, 0, KEY_INFO,
+	KEY_8, KEY_9, KEY_BACK, 0, KEY_POWER, KEY_MUTE, 0, KEY_INFO,
 	KEY_VOLUMEUP, KEY_VOLUMEDOWN, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 	KEY_CHANNELUP, KEY_CHANNELDOWN, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
@@ -64,32 +60,61 @@ struct timer_list keyup_timer = { function: av7110_emit_keyup };
 static
 void av7110_emit_key (u32 ircom)
 {
-	int down = ircom & (0x80000000);
-	u16 keycode = key_map[ircom & 0xff];
+	u8 data;
+	u8 addr;
+	static u16 old_toggle = 0;
+	u16 new_toggle;
+	u16 keycode;
 
-	dprintk ("#########%08x######### key %02x %s (keycode %i)\n",
-		 ircom, ircom & 0xff, down ? "pressed" : "released", keycode);
+	/* extract device address and data */
+	if (ir_config & 0x0001) {
+		/* TODO RCMM: ? bits device address, 8 bits data */
+		data = ircom & 0xff;
+		addr = (ircom >> 8) & 0xff;
+	} else {
+		/* RC5: 5 bits device address, 6 bits data */
+		data = ircom & 0x3f;
+		addr = (ircom >> 6) & 0x1f;
+	}
+
+	keycode = key_map[data];
+	
+	dprintk ("#########%08x######### addr %i data 0x%02x (keycode %i)\n",
+		 ircom, addr, data, keycode);
+
+	/* check device address (if selected) */
+	if (ir_config & 0x4000)
+		if (addr != ((ir_config >> 16) & 0xff))
+			return;
 
 	if (!keycode) {
 		printk ("%s: unknown key 0x%02x!!\n",
-			__FUNCTION__, ircom & 0xff);
+			__FUNCTION__, data);
 		return;
 	}
 
+	if (ir_config & 0x0001) 
+		new_toggle = 0; /* RCMM */
+	else
+		new_toggle = (ircom & 0x800); /* RC5 */
+
 	if (timer_pending (&keyup_timer)) {
 		del_timer (&keyup_timer);
-		if (keyup_timer.data != keycode)
+		if (keyup_timer.data != keycode || new_toggle != old_toggle) {
 			input_event (&input_dev, EV_KEY, keyup_timer.data, !!0);
-	}
+			input_event (&input_dev, EV_KEY, keycode, !0);
+		} else
+			input_event (&input_dev, EV_KEY, keycode, 2);
 
-	clear_bit (keycode, input_dev.key);
-
+	} else
 	input_event (&input_dev, EV_KEY, keycode, !0);
 
 	keyup_timer.expires = jiffies + UP_TIMEOUT;
 	keyup_timer.data = keycode;
 
 	add_timer (&keyup_timer);
+
+	old_toggle = new_toggle;
 }
 
 static
@@ -108,17 +133,36 @@ void input_register_keys (void)
 }
 
 
+static void input_repeat_key(unsigned long data)
+{
+       /* dummy routine to disable autorepeat in the input driver */
+}
+
+
 static
 int av7110_ir_write_proc (struct file *file, const char *buffer,
 	                  unsigned long count, void *data)
 {
-	u32 ir_config;
+	char *page;
+	int size = 4 + 256 * sizeof(u16);
 
-	if (count < 4 + 256 * sizeof(u16))
+	if (count < size)
 		return -EINVAL;
 	
-	memcpy (&ir_config, buffer, 4);
-	memcpy (&key_map, buffer + 4, 256 * sizeof(u16));
+	page = (char *)vmalloc(size);
+	if( NULL == page ) {
+		return -ENOMEM;
+	}
+	
+	if (copy_from_user(page, buffer, size)) {
+		vfree(page);
+		return -EFAULT;
+	}
+
+	memcpy (&ir_config, page, 4);
+	memcpy (&key_map, page + 4, 256 * sizeof(u16));
+
+	vfree(page);
 
 	av7110_setup_irc_config (NULL, ir_config);
 
@@ -141,10 +185,12 @@ int __init av7110_ir_init (void)
          *  enable keys
          */
         set_bit (EV_KEY, input_dev.evbit);
+        set_bit (EV_REP, input_dev.evbit);
 
 	input_register_keys ();
 
 	input_register_device(&input_dev);
+	input_dev.timer.function = input_repeat_key;
 
 	av7110_setup_irc_config (NULL, 0x0001);
 	av7110_register_irc_handler (av7110_emit_key);
