@@ -1348,7 +1348,7 @@ static void apm_event_handler(void)
  * decide if we should just power down.
  *
  */
-#define system_idle() (nr_running == 1)
+#define system_idle() (nr_running() == 1)
 
 static void apm_mainloop(void)
 {
