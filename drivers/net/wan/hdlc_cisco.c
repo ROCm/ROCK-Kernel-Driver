@@ -116,7 +116,7 @@ static unsigned short cisco_type_trans(struct sk_buff *skb,
 }
 
 
-static void cisco_rx(struct sk_buff *skb)
+static int cisco_rx(struct sk_buff *skb)
 {
 	hdlc_device *hdlc = dev_to_hdlc(skb->dev);
 	hdlc_header *data = (hdlc_header*)skb->data;
@@ -131,24 +131,22 @@ static void cisco_rx(struct sk_buff *skb)
 	    data->address != CISCO_UNICAST)
 		goto rx_error;
 
-	skb_pull(skb, sizeof(hdlc_header));
-
 	switch(ntohs(data->protocol)) {
 	case CISCO_SYS_INFO:
 		/* Packet is not needed, drop it. */
 		dev_kfree_skb_any(skb);
-		return;
+		return NET_RX_SUCCESS;
 
 	case CISCO_KEEPALIVE:
-		if (skb->len != CISCO_PACKET_LEN &&
-		    skb->len != CISCO_BIG_PACKET_LEN) {
+		if (skb->len != sizeof(hdlc_header) + CISCO_PACKET_LEN &&
+		    skb->len != sizeof(hdlc_header) + CISCO_BIG_PACKET_LEN) {
 			printk(KERN_INFO "%s: Invalid length of Cisco "
 			       "control packet (%d bytes)\n",
 			       hdlc_to_name(hdlc), skb->len);
 			goto rx_error;
 		}
 
-		cisco_data = (cisco_packet*)skb->data;
+		cisco_data = (cisco_packet*)(skb->data + sizeof(hdlc_header));
 
 		switch(ntohl (cisco_data->type)) {
 		case CISCO_ADDR_REQ: /* Stolen from syncppp.c :-) */
@@ -173,7 +171,7 @@ static void cisco_rx(struct sk_buff *skb)
 						     addr, mask);
 			}
 			dev_kfree_skb_any(skb);
-			return;
+			return NET_RX_SUCCESS;
 
 		case CISCO_ADDR_REPLY:
 			printk(KERN_INFO "%s: Unexpected Cisco IP address "
@@ -199,18 +197,19 @@ static void cisco_rx(struct sk_buff *skb)
 			}
 
 			dev_kfree_skb_any(skb);
-			return;
+			return NET_RX_SUCCESS;
 		} /* switch(keepalive type) */
 	} /* switch(protocol) */
 
 	printk(KERN_INFO "%s: Unsupported protocol %x\n", hdlc_to_name(hdlc),
 	       data->protocol);
 	dev_kfree_skb_any(skb);
-	return;
+	return NET_RX_DROP;
 
  rx_error:
 	hdlc->stats.rx_errors++; /* Mark error */
 	dev_kfree_skb_any(skb);
+	return NET_RX_DROP;
 }
 
 
