@@ -180,12 +180,11 @@ static unsigned char zs_init_regs[16] __initdata = {
 
 DECLARE_TASK_QUEUE(tq_zs_serial);
 
-struct tty_driver serial_driver, callout_driver;
+struct tty_driver serial_driver;
 static int serial_refcount;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
@@ -526,7 +525,7 @@ static _INLINE_ void status_handle(struct dec_serial *info)
 		    && info->tty && !C_CLOCAL(info->tty)) {
 			if (stat & DCD) {
 				wake_up_interruptible(&info->open_wait);
-			} else if (!(info->flags & ZILOG_CALLOUT_ACTIVE)) {
+			} else {
 				tty_hangup(info->tty);
 			}
 		}
@@ -1397,8 +1396,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	 */
 	if (info->flags & ZILOG_NORMAL_ACTIVE)
 		info->normal_termios = *tty->termios;
-	if (info->flags & ZILOG_CALLOUT_ACTIVE)
-		info->callout_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -1438,8 +1435,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(ZILOG_NORMAL_ACTIVE|ZILOG_CALLOUT_ACTIVE|
-			 ZILOG_CLOSING);
+	info->flags &= ~(ZILOG_NORMAL_ACTIVE|ZILOG_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	restore_flags(flags);
 }
@@ -1492,7 +1488,7 @@ void rs_hangup(struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	info->count = 0;
-	info->flags &= ~(ZILOG_NORMAL_ACTIVE|ZILOG_CALLOUT_ACTIVE);
+	info->flags &= ~ZILOG_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1527,20 +1523,6 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & ZILOG_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ZILOG_CALLOUT_ACTIVE) &&
-		    (info->flags & ZILOG_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ZILOG_CALLOUT_ACTIVE) &&
-		    (info->flags & ZILOG_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ZILOG_CALLOUT_ACTIVE;
-		return 0;
-	}
 	
 	/*
 	 * If non-blocking mode is set, or the port is not enabled,
@@ -1548,20 +1530,13 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (info->flags & ZILOG_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ZILOG_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ZILOG_CALLOUT_ACTIVE) {
-		if (info->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1582,8 +1557,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	info->blocked_open++;
 	while (1) {
 		cli();
-		if (!(info->flags & ZILOG_CALLOUT_ACTIVE) &&
-		    (tty->termios->c_cflag & CBAUD))
+		if (tty->termios->c_cflag & CBAUD)
 			zs_rtsdtr(info, RTS | DTR, 1);
 		sti();
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -1599,8 +1573,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 			break;
 		}
-		if (!(info->flags & ZILOG_CALLOUT_ACTIVE) &&
-		    !(info->flags & ZILOG_CLOSING) &&
+		if (!(info->flags & ZILOG_CLOSING) &&
 		    (do_clocal || (read_zsreg(info->zs_channel, 0) & DCD)))
 			break;
 		if (signal_pending(current)) {
@@ -1689,10 +1662,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ZILOG_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->normal_termios;
-		else 
-			*tty->termios = info->callout_termios;
+		*tty->termios = info->normal_termios;
 		change_speed(info);
 	}
 #ifdef CONFIG_SERIAL_CONSOLE
@@ -1702,9 +1672,6 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 		change_speed(info);
 	}
 #endif
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
 	printk("rs_open %s successful...", tty->name);
@@ -1910,23 +1877,8 @@ int __init zs_init(void)
 	serial_driver.break_ctl = rs_break;
 	serial_driver.wait_until_sent = rs_wait_until_sent;
 
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	callout_driver = serial_driver;
-#if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
-	callout_driver.name = "cua/";
-#else
-	callout_driver.name = "cua";
-#endif
-	callout_driver.major = TTYAUX_MAJOR;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
 	if (tty_register_driver(&serial_driver))
 		panic("Couldn't register serial driver\n");
-	if (tty_register_driver(&callout_driver))
-		panic("Couldn't register callout driver\n");
 
 	save_flags(flags); cli();
 
@@ -1964,7 +1916,6 @@ int __init zs_init(void)
 		info->blocked_open = 0;
 		info->tqueue.routine = do_softint;
 		info->tqueue.data = info;
-		info->callout_termios = callout_driver.init_termios;
 		info->normal_termios = serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
@@ -1972,8 +1923,6 @@ int __init zs_init(void)
 		       info->port, info->irq);
 		printk(" is a Z85C30 SCC\n");
 		tty_register_device(&serial_driver, info->line, NULL);
-		tty_register_device(&callout_driver, info->line, NULL);
-
 	}
 
 	restore_flags(flags);

@@ -38,7 +38,7 @@ static kmem_cache_t *bio_slab;
  * basically we just need to survive
  */
 #define BIO_SPLIT_ENTRIES 8	
-static mempool_t *bio_split_pool;
+mempool_t *bio_split_pool;
 
 struct biovec_pool {
 	int nr_vecs;
@@ -916,3 +916,4 @@ EXPORT_SYMBOL(bio_map_user);
 EXPORT_SYMBOL(bio_unmap_user);
 EXPORT_SYMBOL(bio_pair_release);
 EXPORT_SYMBOL(bio_split);
+EXPORT_SYMBOL(bio_split_pool);

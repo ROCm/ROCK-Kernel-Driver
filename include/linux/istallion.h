@@ -66,8 +66,6 @@ typedef struct {
 	int			rc;
 	int			argsize;
 	void			*argp;
-	long			session;
-	long			pgrp;
 	unsigned int		rxmarkmsk;
 	struct tty_struct	*tty;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
@@ -81,7 +79,6 @@ typedef struct {
 #endif
 	struct work_struct	tqhangup;
 	struct termios		normaltermios;
-	struct termios		callouttermios;
 	asysigs_t		asig;
 	unsigned long		addr;
 	unsigned long		rxoffset;

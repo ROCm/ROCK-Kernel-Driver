@@ -92,8 +92,6 @@ typedef struct _i2ChanStr
 	int      throttled;		// Set if upper layer can take no data
 
 	int      flags;         // Defined in tty.h
-	int      session;       // Defined in tty.h
-	int      pgrp;          // Defined in tty.h
 
 	PWAITQ   open_wait;     // Pointer for OS sleep function.
 	PWAITQ   close_wait;    // Pointer for OS sleep function.
@@ -104,7 +102,6 @@ typedef struct _i2ChanStr
 	wait_queue_head_t pBookmarkWait;   // Used by i2DrainOutput
 
 	struct termios NormalTermios;
-	struct termios CalloutTermios;
 
 	int      BaudBase;
 	int      BaudDivisor;

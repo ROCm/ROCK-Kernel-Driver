@@ -662,7 +662,6 @@ static struct Scsi_Device_Template *scsi_get_request_dev(struct request *req)
  *
  *		b) We can just use scsi_requeue_command() here.  This would
  *		   be used if we just wanted to retry, for example.
- *
  */
 void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 			int block_sectors)
@@ -796,17 +795,20 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 				}
 			}
 		}
-		/* If we had an ILLEGAL REQUEST returned, then we may have
-		 * performed an unsupported command.  The only thing this should be
-		 * would be a ten byte read where only a six byte read was supported.
-		 * Also, on a system where READ CAPACITY failed, we have have read
-		 * past the end of the disk.
+		/*
+		 * If we had an ILLEGAL REQUEST returned, then we may have
+		 * performed an unsupported command.  The only thing this
+		 * should be would be a ten byte read where only a six byte
+		 * read was supported.  Also, on a system where READ CAPACITY
+		 * failed, we may have read past the end of the disk.
 		 */
 
 		switch (cmd->sense_buffer[2]) {
 		case ILLEGAL_REQUEST:
-			if (cmd->device->ten) {
-				cmd->device->ten = 0;
+			if (cmd->device->use_10_for_rw &&
+			    (cmd->cmnd[0] == READ_10 ||
+			     cmd->cmnd[0] == WRITE_10)) {
+				cmd->device->use_10_for_rw = 0;
 				/*
 				 * This will cause a retry with a 6-byte
 				 * command.

@@ -23,7 +23,6 @@
  */
 
 #include <linux/raid/raid1.h>
-#include <linux/bio.h>
 
 #define MAJOR_NR MD_MAJOR
 #define MD_DRIVER
@@ -41,9 +40,12 @@ static LIST_HEAD(retry_list_head);
 
 static void * r1bio_pool_alloc(int gfp_flags, void *data)
 {
+	mddev_t *mddev = data;
 	r1bio_t *r1_bio;
 
-	r1_bio = kmalloc(sizeof(r1bio_t), gfp_flags);
+	/* allocate a r1bio with room for raid_disks entries in the write_bios array */
+	r1_bio = kmalloc(sizeof(r1bio_t) + sizeof(struct bio*)*mddev->raid_disks,
+			 gfp_flags);
 	if (r1_bio)
 		memset(r1_bio, 0, sizeof(*r1_bio));
 
@@ -68,8 +70,9 @@ static void * r1buf_pool_alloc(int gfp_flags, void *data)
 	struct bio *bio;
 	int i, j;
 
-	r1_bio = mempool_alloc(conf->r1bio_pool, gfp_flags);
-
+	r1_bio = r1bio_pool_alloc(gfp_flags, conf->mddev);
+	if (!r1_bio)
+		return NULL;
 	bio = bio_alloc(gfp_flags, RESYNC_PAGES);
 	if (!bio)
 		goto out_free_r1_bio;
@@ -102,7 +105,7 @@ out_free_pages:
 		__free_page(bio->bi_io_vec[j].bv_page);
 	bio_put(bio);
 out_free_r1_bio:
-	mempool_free(r1_bio, conf->r1bio_pool);
+	r1bio_pool_free(r1_bio, conf->mddev);
 	return NULL;
 }
 
@@ -122,7 +125,7 @@ static void r1buf_pool_free(void *__r1_bio, void *data)
 	if (atomic_read(&bio->bi_cnt) != 1)
 		BUG();
 	bio_put(bio);
-	mempool_free(r1bio, conf->r1bio_pool);
+	r1bio_pool_free(r1bio, conf->mddev);
 }
 
 static void put_all_bios(conf_t *conf, r1bio_t *r1_bio)
@@ -305,8 +308,9 @@ static int raid1_end_request(struct bio *bio, unsigned int bytes_done, int error
 			/*
 			 * oops, read error:
 			 */
+			char b[BDEVNAME_SIZE];
 			printk(KERN_ERR "raid1: %s: rescheduling sector %llu\n",
-				bdev_partition_name(conf->mirrors[mirror].rdev->bdev), (unsigned long long)r1_bio->sector);
+				bdevname(conf->mirrors[mirror].rdev->bdev,b), (unsigned long long)r1_bio->sector);
 			reschedule_retry(r1_bio);
 		}
 	} else {
@@ -594,6 +598,7 @@ static void status(struct seq_file *seq, mddev_t *mddev)
 
 static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
+	char b[BDEVNAME_SIZE];
 	conf_t *conf = mddev_to_conf(mddev);
 
 	/*
@@ -622,7 +627,7 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 	mddev->sb_dirty = 1;
 	printk(KERN_ALERT "raid1: Disk failure on %s, disabling device. \n"
 		"	Operation continuing on %d devices\n",
-		bdev_partition_name(rdev->bdev), conf->working_disks);
+		bdevname(rdev->bdev,b), conf->working_disks);
 }
 
 static void print_conf(conf_t *conf)
@@ -639,11 +644,12 @@ static void print_conf(conf_t *conf)
 		conf->raid_disks);
 
 	for (i = 0; i < conf->raid_disks; i++) {
+		char b[BDEVNAME_SIZE];
 		tmp = conf->mirrors + i;
 		if (tmp->rdev)
 			printk(" disk %d, wo:%d, o:%d, dev:%s\n",
 				i, !tmp->rdev->in_sync, !tmp->rdev->faulty,
-				bdev_partition_name(tmp->rdev->bdev));
+				bdevname(tmp->rdev->bdev,b));
 	}
 }
 
@@ -811,9 +817,10 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * There is no point trying a read-for-reconstruct as
 		 * reconstruct is about to be aborted
 		 */
+		char b[BDEVNAME_SIZE];
 		printk(KERN_ALERT "raid1: %s: unrecoverable I/O read error"
 			" for block %llu\n",
-			bdev_partition_name(bio->bi_bdev), 
+			bdevname(bio->bi_bdev,b), 
 			(unsigned long long)r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		put_buf(r1_bio);
@@ -826,7 +833,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		if (!conf->mirrors[i].rdev || 
 		    conf->mirrors[i].rdev->faulty)
 			continue;
-		if (i == conf->last_used)
+		if (conf->mirrors[i].rdev->bdev == bio->bi_bdev)
 			/*
 			 * we read from here, no need to write
 			 */
@@ -903,6 +910,7 @@ static void raid1d(mddev_t *mddev)
 	md_handle_safemode(mddev);
 	
 	for (;;) {
+		char b[BDEVNAME_SIZE];
 		spin_lock_irqsave(&retry_list_lock, flags);
 		if (list_empty(head))
 			break;
@@ -922,14 +930,14 @@ static void raid1d(mddev_t *mddev)
 			if (map(mddev, &rdev) == -1) {
 				printk(KERN_ALERT "raid1: %s: unrecoverable I/O"
 				" read error for block %llu\n",
-				bdev_partition_name(bio->bi_bdev), 
+				bdevname(bio->bi_bdev,b),
 				(unsigned long long)r1_bio->sector);
 				raid_end_bio_io(r1_bio);
 				break;
 			}
 			printk(KERN_ERR "raid1: %s: redirecting sector %llu to"
 				" another mirror\n",
-				bdev_partition_name(rdev->bdev), 
+				bdevname(rdev->bdev,b),
 				(unsigned long long)r1_bio->sector);
 			bio->bi_bdev = rdev->bdev;
 			bio->bi_sector = r1_bio->sector + rdev->data_offset;
@@ -1086,13 +1094,20 @@ static int run(mddev_t *mddev)
 		goto out;
 	}
 	memset(conf, 0, sizeof(*conf));
+	conf->mirrors = kmalloc(sizeof(struct mirror_info)*mddev->raid_disks, 
+				 GFP_KERNEL);
+	if (!conf->mirrors) {
+		printk(KERN_ERR "raid1: couldn't allocate memory for md%d\n",
+		       mdidx(mddev));
+		goto out_free_conf;
+	}
 
 	conf->r1bio_pool = mempool_create(NR_RAID1_BIOS, r1bio_pool_alloc,
-						r1bio_pool_free, NULL);
+						r1bio_pool_free, mddev);
 	if (!conf->r1bio_pool) {
 		printk(KERN_ERR "raid1: couldn't allocate memory for md%d\n", 
 			mdidx(mddev));
-		goto out;
+		goto out_free_conf;
 	}
 
 
@@ -1170,6 +1185,8 @@ static int run(mddev_t *mddev)
 out_free_conf:
 	if (conf->r1bio_pool)
 		mempool_destroy(conf->r1bio_pool);
+	if (conf->mirrors)
+		kfree(conf->mirrors);
 	kfree(conf);
 	mddev->private = NULL;
 out:
@@ -1184,6 +1201,8 @@ static int stop(mddev_t *mddev)
 	mddev->thread = NULL;
 	if (conf->r1bio_pool)
 		mempool_destroy(conf->r1bio_pool);
+	if (conf->mirrors)
+		kfree(conf->mirrors);
 	kfree(conf);
 	mddev->private = NULL;
 	return 0;

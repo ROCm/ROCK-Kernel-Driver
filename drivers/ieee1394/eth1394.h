@@ -24,6 +24,8 @@
 #ifndef __ETH1394_H
 #define __ETH1394_H
 
+#include "ieee1394.h"
+
 /* Register for incoming packets. This is 8192 bytes, which supports up to
  * 1600mbs. We'll need to change this if that ever becomes "small" :)  */
 #define ETHER1394_REGION_ADDR_LEN	8192
@@ -32,13 +34,23 @@
 
 /* GASP identifier numbers for IPv4 over IEEE 1394 */
 #define ETHER1394_GASP_SPECIFIER_ID	0x00005E
+#define ETHER1394_GASP_SPECIFIER_ID_HI	((ETHER1394_GASP_SPECIFIER_ID >> 8) & 0xffff)
+#define ETHER1394_GASP_SPECIFIER_ID_LO	(ETHER1394_GASP_SPECIFIER_ID & 0xff)
 #define ETHER1394_GASP_VERSION		1
+
+#define ETHER1394_OVERHEAD (2 * sizeof(quadlet_t))  /* GASP header overhead */
 
 /* Node set == 64 */
 #define NODE_SET			(ALL_NODES + 1)
 
 enum eth1394_bc_states { ETHER1394_BC_CLOSED, ETHER1394_BC_OPENED,
 			 ETHER1394_BC_CHECK };
+
+struct pdg_list {
+	struct list_head list;		/* partial datagram list per node */
+	unsigned int sz;		/* partial datagram list size per node	*/
+	spinlock_t lock;		/* partial datagram lock		*/
+};
 
 /* Private structure for our ethernet driver */
 struct eth1394_priv {
@@ -53,6 +65,8 @@ struct eth1394_priv {
 	int broadcast_channel;		/* Async stream Broadcast Channel */
 	enum eth1394_bc_states bc_state; /* broadcast channel state	 */
 	struct hpsb_iso *iso;		/* Async stream recv handle	 */
+	struct pdg_list pdg[ALL_NODES]; /* partial RX datagram lists     */
+	int dgl[NODE_SET];              /* Outgoing datagram label per node */
 };
 
 struct host_info {
@@ -62,29 +76,20 @@ struct host_info {
 
 typedef enum {ETH1394_GASP, ETH1394_WRREQ} eth1394_tx_type;
 
-/* This is our task struct. It's used for the packet complete callback.  */
-struct packet_task {
-	struct sk_buff *skb;	/* Socket buffer we are sending */
-	nodeid_t dest_node;	/* Destination of the packet */
-	u64 addr;		/* Address */
-	struct work_struct tq;	/* The task */
-	eth1394_tx_type tx_type;	/* Send data via GASP or Write Req. */
-};
-
 /* IP1394 headers */
 #include <asm/byteorder.h>
 
 /* Unfragmented */
 #if defined __BIG_ENDIAN_BITFIELD
 struct eth1394_uf_hdr {
-	u8 lf:2;
+	u16 lf:2;
 	u16 res:14;
 	u16 ether_type;		/* Ethernet packet type */
 } __attribute__((packed));
 #elif defined __LITTLE_ENDIAN_BITFIELD
 struct eth1394_uf_hdr {
 	u16 res:14;
-	u8 lf:2;
+	u16 lf:2;
 	u16 ether_type;
 } __attribute__((packed));
 #else
@@ -94,8 +99,8 @@ struct eth1394_uf_hdr {
 /* First fragment */
 #if defined __BIG_ENDIAN_BITFIELD
 struct eth1394_ff_hdr {
-	u8 lf:2;
-	u8 res1:2;
+	u16 lf:2;
+	u16 res1:2;
 	u16 dg_size:12;		/* Datagram size */
 	u16 ether_type;		/* Ethernet packet type */
 	u16 dgl;		/* Datagram label */
@@ -104,8 +109,8 @@ struct eth1394_ff_hdr {
 #elif defined __LITTLE_ENDIAN_BITFIELD
 struct eth1394_ff_hdr {
 	u16 dg_size:12;
-	u8 res1:2;
-	u8 lf:2;
+	u16 res1:2;
+	u16 lf:2;
 	u16 ether_type;
 	u16 dgl;
 	u16 res2;
@@ -117,21 +122,21 @@ struct eth1394_ff_hdr {
 /* XXX: Subsequent fragments, including last */
 #if defined __BIG_ENDIAN_BITFIELD
 struct eth1394_sf_hdr {
-	u8 lf:2;
-	u8 res1:2;
+	u16 lf:2;
+	u16 res1:2;
 	u16 dg_size:12;		/* Datagram size */
-	u8 res2:6;
-	u16 fg_off:10;		/* Fragment offset */
+	u16 res2:4;
+	u16 fg_off:12;		/* Fragment offset */
 	u16 dgl;		/* Datagram label */
 	u16 res3;
 } __attribute__((packed));
 #elif defined __LITTLE_ENDIAN_BITFIELD
 struct eth1394_sf_hdr {
 	u16 dg_size:12;
-	u8 res1:2;
-	u8 lf:2;
-	u16 fg_off:10;
-	u8 res2:6;
+	u16 res1:2;
+	u16 lf:2;
+	u16 fg_off:12;
+	u16 res2:4;
 	u16 dgl;
 	u16 res3;
 } __attribute__((packed));
@@ -141,13 +146,13 @@ struct eth1394_sf_hdr {
 
 #if defined __BIG_ENDIAN_BITFIELD
 struct eth1394_common_hdr {
-	u8 lf:2;
+	u16 lf:2;
 	u16 pad1:14;
 } __attribute__((packed));
 #elif defined __LITTLE_ENDIAN_BITFIELD
 struct eth1394_common_hdr {
 	u16 pad1:14;
-	u8 lf:2;
+	u16 lf:2;
 } __attribute__((packed));
 #else
 #error Unknown bit field type
@@ -198,5 +203,18 @@ struct eth1394_arp {
 
 /* Network timeout */
 #define ETHER1394_TIMEOUT	100000
+
+/* This is our task struct. It's used for the packet complete callback.  */
+struct packet_task {
+	struct sk_buff *skb;
+	int outstanding_pkts;
+	eth1394_tx_type tx_type;
+	int max_payload;
+	struct hpsb_packet *packet;
+	struct eth1394_priv *priv;
+	union eth1394_hdr hdr;
+	u64 addr;
+	u16 dest_node;
+};
 
 #endif /* __ETH1394_H */

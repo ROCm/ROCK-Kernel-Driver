@@ -118,13 +118,11 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 		}
 	}
 
-#ifdef CONFIG_COLDFIRE
 	if (flags & IRQ_FLG_FAST) {
 		extern asmlinkage void fasthandler(void);
 		extern void set_evector(int vecnum, void (*handler)(void));
 		set_evector(irq, fasthandler);
 	}
-#endif
 
 	irq_list[irq].handler = handler;
 	irq_list[irq].flags   = flags;
@@ -144,13 +142,11 @@ void free_irq(unsigned int irq, void *dev_id)
 		printk("%s: Removing probably wrong IRQ %d from %s\n",
 		       __FUNCTION__, irq, irq_list[irq].devname);
 
-#ifdef CONFIG_COLDFIRE
 	if (irq_list[irq].flags & IRQ_FLG_FAST) {
 		extern asmlinkage void inthandler(void);
 		extern void set_evector(int vecnum, void (*handler)(void));
 		set_evector(irq, inthandler);
 	}
-#endif
 
 	if (mach_default_handler)
 		irq_list[irq].handler = (*mach_default_handler)[irq];

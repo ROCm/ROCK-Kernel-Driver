@@ -1135,14 +1135,11 @@ struct r_port {
 	int			xmit_head;
 	int			xmit_tail;
 	int			xmit_cnt;
-	int			session;
-	int			pgrp;
 	int			cd_status;
 	int		        ignore_status_mask;
 	int			read_status_mask;
 	int			cps;
 	struct termios		normal_termios;
-	struct termios		callout_termios;
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
 };
@@ -1171,7 +1168,6 @@ struct r_port {
  *
  */
 #define SERIAL_TYPE_NORMAL 1
-#define SERIAL_TYPE_CALLOUT 2
 
 /*
  * Assigned major numbers for the Comtrol Rocketport

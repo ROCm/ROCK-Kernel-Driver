@@ -286,7 +286,7 @@ static int nsp32_eh_bus_reset(Scsi_Cmnd *);
 static int nsp32_eh_host_reset(Scsi_Cmnd *);
 static int nsp32_reset(Scsi_Cmnd *, unsigned int);
 static int nsp32_release(struct Scsi_Host *);
-static int nsp32_proc_info(char *, char **, off_t, int, int, int);
+static int nsp32_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 static int __devinit nsp32_probe(struct pci_dev *, const struct pci_device_id *);
 static void __devexit nsp32_remove(struct pci_dev *);
 static int __init init_nsp32(void);
@@ -1555,18 +1555,16 @@ static irqreturn_t do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 #undef SPRINTF
 #define SPRINTF(args...) \
         do { if(pos < buffer + length) pos += sprintf(pos, ## args); } while(0)
-static int nsp32_proc_info(char  *buffer,
+static int nsp32_proc_info(struct Scsi_Host *host, char  *buffer,
 			   char **start,
 			   off_t  offset,
 			   int    length,
-			   int    hostno,
 			   int    inout)
 {
 	char *pos = buffer;
 	int thislength;
 	unsigned long flags;
 	nsp32_hw_data *data;
-	struct Scsi_Host *host = NULL;
 	unsigned int base;
 	unsigned char mode_reg;
 
@@ -1575,19 +1573,12 @@ static int nsp32_proc_info(char  *buffer,
 		return -EINVAL;
 	}
 
-	/* search this HBA host */
-	
-	host = scsi_host_hn_get(hostno);
-	
-	if (host == NULL) {
-		return -ESRCH;
-	}
 	data = (nsp32_hw_data *)host->hostdata;
 	base = host->io_port;
 
 	SPRINTF("NinjaSCSI-32 status\n\n");
 	SPRINTF("Driver version:        %s\n",		nsp32_release_version);
-	SPRINTF("SCSI host No.:         %d\n",		hostno);
+	SPRINTF("SCSI host No.:         %d\n",		host->host_no);
 	SPRINTF("IRQ:                   %d\n",		host->irq);
 	SPRINTF("IO:                    0x%lx-0x%lx\n", host->io_port, host->io_port + host->n_io_port - 1);
 	SPRINTF("MMIO(virtual address): 0x%lx\n",	host->base);

@@ -74,7 +74,7 @@
 static char *serial_name = "CPM UART driver";
 static char *serial_version = "0.02";
 
-static struct tty_driver serial_driver, callout_driver;
+static struct tty_driver serial_driver;
 static int serial_refcount;
 static int serial_console_setup(struct console *co, char *options);
 
@@ -200,8 +200,6 @@ typedef struct serial_info {
 	unsigned long		event;
 	unsigned long		last_active;
 	int			blocked_open; /* # of blocked opens */
-	long			session; /* Session of opening process */
-	long			pgrp; /* pgrp of opening process */
 	struct work_struct	tqueue;
 	struct work_struct	tqueue_hangup;
 	wait_queue_head_t	open_wait;
@@ -531,8 +529,7 @@ static _INLINE_ void check_modem_status(struct async_struct *info)
 #endif		
 		if (status & UART_MSR_DCD)
 			wake_up_interruptible(&info->open_wait);
-		else if (!((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-			   (info->flags & ASYNC_CALLOUT_NOHUP))) {
+		else {
 #ifdef SERIAL_DEBUG_OPEN
 			printk("scheduling hangup...");
 #endif
@@ -1667,8 +1664,6 @@ static void rs_8xx_close(struct tty_struct *tty, struct file * filp)
 	 */
 	if (info->flags & ASYNC_NORMAL_ACTIVE)
 		info->state->normal_termios = *tty->termios;
-	if (info->flags & ASYNC_CALLOUT_ACTIVE)
-		info->state->callout_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -1716,8 +1711,7 @@ static void rs_8xx_close(struct tty_struct *tty, struct file * filp)
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
 	MOD_DEC_USE_COUNT;
 	restore_flags(flags);
@@ -1799,7 +1793,7 @@ static void rs_8xx_hangup(struct tty_struct *tty)
 	shutdown(info);
 	info->event = 0;
 	state->count = 0;
-	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	info->flags &= ~ASYNC_NORMAL_ACTIVE;
 	info->tty = 0;
 	wake_up_interruptible(&info->open_wait);
 }
@@ -1838,25 +1832,6 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	}
 
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
-		if (info->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (info->session != current->session))
-		    return -EBUSY;
-		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (info->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (info->pgrp != current->pgrp))
-		    return -EBUSY;
-		info->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-	
-	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 * If this is an SMC port, we don't have modem control to wait
@@ -1865,20 +1840,13 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR)) ||
 	    (info->state->smc_scc_num < SCC_NUM_BASE)) {
-		if (info->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		info->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (info->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (state->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	} else {
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1900,8 +1868,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	info->blocked_open++;
 	while (1) {
 		cli();
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (tty->termios->c_cflag & CBAUD))
+		if (tty->termios->c_cflag & CBAUD)
 			serial_out(info, UART_MCR,
 				   serial_inp(info, UART_MCR) |
 				   (UART_MCR_DTR | UART_MCR_RTS));
@@ -1919,8 +1886,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 #endif
 			break;
 		}
-		if (!(info->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(info->flags & ASYNC_CLOSING) &&
+		if (!(info->flags & ASYNC_CLOSING) &&
 		    (do_clocal || (serial_in(info, UART_MSR) &
 				   UART_MSR_DCD)))
 			break;
@@ -2010,15 +1976,9 @@ static int rs_8xx_open(struct tty_struct *tty, struct file * filp)
 
 	if ((info->state->count == 1) &&
 	    (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = info->state->normal_termios;
-		else 
-			*tty->termios = info->state->callout_termios;
+		*tty->termios = info->state->normal_termios;
 		change_speed(info);
 	}
-
-	info->session = current->session;
-	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
 	printk("rs_open %s successful...", line);
@@ -2544,26 +2504,9 @@ int __init rs_8xx_init(void)
 	serial_driver.wait_until_sent = rs_8xx_wait_until_sent;
 	serial_driver.read_proc = rs_8xx_read_proc;
 	
-	/*
-	 * The callout device is just like normal device except for
-	 * major number and the subtype code.
-	 */
-	callout_driver = serial_driver;
-#ifdef CONFIG_DEVFS_FS
-	callout_driver.name = "cua/";
-#else
-	callout_driver.name = "cua";
-#endif
-	callout_driver.major = TTYAUX_MAJOR;
-	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-	callout_driver.read_proc = 0;
-	callout_driver.proc_entry = 0;
-
 	if (tty_register_driver(&serial_driver))
 		panic("Couldn't register serial driver\n");
-	if (tty_register_driver(&callout_driver))
-		panic("Couldn't register callout driver\n");
-	
+
 	immap = immr;
 	cp = &immap->im_cpm;
 	io = &immap->im_ioport;
@@ -2644,7 +2587,6 @@ int __init rs_8xx_init(void)
 		state->custom_divisor = 0;
 		state->close_delay = 5*HZ/10;
 		state->closing_wait = 30*HZ;
-		state->callout_termios = callout_driver.init_termios;
 		state->normal_termios = serial_driver.init_termios;
 		state->icount.cts = state->icount.dsr = 
 			state->icount.rng = state->icount.dcd = 0;

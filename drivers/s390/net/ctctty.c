@@ -48,7 +48,6 @@
 #define CTC_ASYNC_SPLIT_TERMIOS      0x0008 /* Sep. termios for dialin/out  */
 #define CTC_TTY_XMIT_SIZE              1024 /* Default bufsize for write    */
 #define CTC_SERIAL_XMIT_MAX            4000 /* Maximum bufsize for write    */
-#define CTC_SERIAL_TYPE_NORMAL            1
 
 /* Private data (similar to async_struct in <linux/serial.h>) */
 typedef struct {
@@ -1176,7 +1175,7 @@ ctc_tty_init(void)
 	device->minor_start = 0;
 	device->num = CTC_TTY_MAX_DEVICES;
 	device->type = TTY_DRIVER_TYPE_SERIAL;
-	device->subtype = CTC_SERIAL_TYPE_NORMAL;
+	device->subtype = SERIAL_TYPE_NORMAL;
 	device->init_termios = tty_std_termios;
 	device->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	device->flags = TTY_DRIVER_REAL_RAW;
