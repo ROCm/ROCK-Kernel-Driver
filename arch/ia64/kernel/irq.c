@@ -966,7 +966,7 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 	return len;
 }
 
-static int irq_affinity_write_proc (struct file *file, const char *buffer,
+static int irq_affinity_write_proc (struct file *file, const char __user *buffer,
 				    unsigned long count, void *data)
 {
 	unsigned int irq = (unsigned long) data;
@@ -1180,7 +1180,7 @@ void init_irq_proc (void)
 	int i;
 
 	/* create /proc/irq */
-	root_irq_dir = proc_mkdir("irq", 0);
+	root_irq_dir = proc_mkdir("irq", NULL);
 
 	/* create /proc/irq/prof_cpu_mask */
 	create_prof_cpu_mask(root_irq_dir);

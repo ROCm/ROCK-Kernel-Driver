@@ -41,10 +41,10 @@ match(const struct sk_buff *skb,
     
     memset(eui64, 0, sizeof(eui64));
 
-    if (skb->mac.ethernet->h_proto == ntohs(ETH_P_IPV6)) {
+    if (eth_hdr(skb)->h_proto == ntohs(ETH_P_IPV6)) {
       if (skb->nh.ipv6h->version == 0x6) { 
-         memcpy(eui64, skb->mac.ethernet->h_source, 3);
-         memcpy(eui64 + 5, skb->mac.ethernet->h_source + 3, 3);
+         memcpy(eui64, eth_hdr(skb)->h_source, 3);
+         memcpy(eui64 + 5, eth_hdr(skb)->h_source + 3, 3);
 	 eui64[3]=0xff;
 	 eui64[4]=0xfe;
 	 eui64[0] |= 0x02;

@@ -19,12 +19,12 @@
 #include <asm/pal.h>
 #include <asm/percpu.h>
 
-#define GATE_ADDR		(0xa000000000000000)
+#define GATE_ADDR		__IA64_UL_CONST(0xa000000000000000)
 /*
  * 0xa000000000000000+2*PERCPU_PAGE_SIZE
  * - 0xa000000000000000+3*PERCPU_PAGE_SIZE remain unmapped (guard page)
  */
-#define KERNEL_START		 0xa000000100000000
+#define KERNEL_START		 __IA64_UL_CONST(0xa000000100000000)
 #define PERCPU_ADDR		(-PERCPU_PAGE_SIZE)
 
 #ifndef __ASSEMBLY__
