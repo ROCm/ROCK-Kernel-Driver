@@ -671,6 +671,19 @@ static inline pid_t process_group(struct task_struct *tsk)
 	return tsk->signal->pgrp;
 }
 
+/**
+ * pid_alive - check that a task structure is not stale
+ * @p: Task structure to be checked.
+ *
+ * Test if a process is not yet dead (at most zombie state)
+ * If pid_alive fails, then pointers within the task structure
+ * can be stale and must not be dereferenced.
+ */
+static inline int pid_alive(struct task_struct *p)
+{
+	return p->pids[PIDTYPE_PID].nr != 0;
+}
+
 extern void free_task(struct task_struct *tsk);
 extern void __put_task_struct(struct task_struct *tsk);
 #define get_task_struct(tsk) do { atomic_inc(&(tsk)->usage); } while(0)
