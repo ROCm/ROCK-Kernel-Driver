@@ -45,27 +45,26 @@ int nfsd_acceptable(void *expv, struct dentry *dentry)
 	struct svc_export *exp = expv;
 	int rv;
 	struct dentry *tdentry;
+	struct dentry *parent;
 
 	if (exp->ex_flags & NFSEXP_NOSUBTREECHECK)
 		return 1;
 
-	dget(dentry);
-	read_lock(&dparent_lock);
-	for (tdentry = dentry;
-	     tdentry != exp->ex_dentry && ! IS_ROOT(tdentry);
-	     (dget(tdentry->d_parent),
-	      dput(tdentry),
-	      tdentry = tdentry->d_parent)
-		) {
+	tdentry = dget(dentry);
+	while (tdentry != exp->ex_dentry && ! IS_ROOT(tdentry)) {
 		/* make sure parents give x permission to user */
 		int err;
-		read_unlock(&dparent_lock);
-		err = permission(tdentry->d_parent->d_inode, S_IXOTH);
 		read_lock(&dparent_lock);
-		if (err < 0)
+		parent = dget(tdentry->d_parent);
+		read_unlock(&dparent_lock);
+		err = permission(parent->d_inode, S_IXOTH);
+		if (err < 0) {
+			dput(parent);
 			break;
+		}
+		dput(tdentry);
+		tdentry = parent;
 	}
-	read_unlock(&dparent_lock);
 	if (tdentry != exp->ex_dentry)
 		dprintk("nfsd_acceptable failed at %p %s\n", tdentry, tdentry->d_name.name);
 	rv = (tdentry == exp->ex_dentry);
