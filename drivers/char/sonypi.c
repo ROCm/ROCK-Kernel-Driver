@@ -50,18 +50,80 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
-static int verbose; /* = 0 */
-
 #include "sonypi.h"
 #include <linux/sonypi.h>
 
-static struct sonypi_device sonypi_device;
+MODULE_AUTHOR("Stelian Pop <stelian@popies.net>");
+MODULE_DESCRIPTION("Sony Programmable I/O Control Device driver");
+MODULE_LICENSE("GPL");
+MODULE_VERSION(SONYPI_DRIVER_VERSION);
+
 static int minor = -1;
-static int fnkeyinit; /* = 0 */
-static int camera; /* = 0 */
-static int compat; /* = 0 */
-static int useinput = 1;
+module_param(minor, int, 0);
+MODULE_PARM_DESC(minor,
+		 "minor number of the misc device, default is -1 (automatic)");
+
+static int verbose;		/* = 0 */
+module_param(verbose, int, 0644);
+MODULE_PARM_DESC(verbose, "be verbose, default is 0 (no)");
+
+static int fnkeyinit;		/* = 0 */
+module_param(fnkeyinit, int, 0444);
+MODULE_PARM_DESC(fnkeyinit,
+		 "set this if your Fn keys do not generate any event");
+
+static int camera;		/* = 0 */
+module_param(camera, int, 0444);
+MODULE_PARM_DESC(camera,
+		 "set this if you have a MotionEye camera (PictureBook series)");
+
+static int compat;		/* = 0 */
+module_param(compat, int, 0444);
+MODULE_PARM_DESC(compat,
+		 "set this if you want to enable backward compatibility mode");
+
 static unsigned long mask = 0xffffffff;
+module_param(mask, ulong, 0644);
+MODULE_PARM_DESC(mask,
+		 "set this to the mask of event you want to enable (see doc)");
+
+static int useinput = 1;
+module_param(useinput, int, 0444);
+MODULE_PARM_DESC(useinput,
+		 "set this if you would like sonypi to feed events to the input subsystem");
+
+static struct sonypi_device sonypi_device;
+
+static int sonypi_ec_write(u8 addr, u8 value)
+{
+#ifdef CONFIG_ACPI_EC
+	if (SONYPI_ACPI_ACTIVE)
+		return ec_write(addr, value);
+#endif
+	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3, ITERATIONS_LONG);
+	outb_p(0x81, SONYPI_CST_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	outb_p(addr, SONYPI_DATA_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	outb_p(value, SONYPI_DATA_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	return 0;
+}
+
+static int sonypi_ec_read(u8 addr, u8 *value)
+{
+#ifdef CONFIG_ACPI_EC
+	if (SONYPI_ACPI_ACTIVE)
+		return ec_read(addr, value);
+#endif
+	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3, ITERATIONS_LONG);
+	outb_p(0x80, SONYPI_CST_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	outb_p(addr, SONYPI_DATA_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	*value = inb_p(SONYPI_DATA_IOPORT);
+	return 0;
+}
 
 /* Inits the queue */
 static inline void sonypi_initq(void) {
@@ -437,6 +499,8 @@ u8 sonypi_camera_command(int command, u8 value) {
 	return ret;
 }
 
+EXPORT_SYMBOL(sonypi_camera_command);
+
 static int sonypi_misc_fasync(int fd, struct file *filp, int on) {
 	int retval;
 
@@ -780,9 +844,8 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
 		outb(0xf0, 0xb2);
 
-	printk(KERN_INFO "sonypi: Sony Programmable I/O Controller Driver v%d.%d.\n",
-	       SONYPI_DRIVER_MAJORVERSION,
-	       SONYPI_DRIVER_MINORVERSION);
+	printk(KERN_INFO "sonypi: Sony Programmable I/O Controller Driver v%s.\n",
+	       SONYPI_DRIVER_VERSION);
 	printk(KERN_INFO "sonypi: detected %s model, "
 	       "verbose = %d, fnkeyinit = %s, camera = %s, "
 	       "compat = %s, mask = 0x%08lx, useinput = %s, acpi = %s\n",
@@ -887,7 +950,7 @@ static struct dmi_system_id __initdata sonypi_dmi_table[] = {
 	{ }
 };
 
-static int __init sonypi_init_module(void)
+static int __init sonypi_init(void)
 {
 	struct pci_dev *pcidev = NULL;
 	if (dmi_check_system(sonypi_dmi_table)) {
@@ -900,65 +963,9 @@ static int __init sonypi_init_module(void)
 		return -ENODEV;
 }
 
-static void __exit sonypi_cleanup_module(void) {
+static void __exit sonypi_exit(void) {
 	sonypi_remove();
 }
 
-#ifndef MODULE
-static int __init sonypi_setup(char *str)  {
-	int ints[8];
-
-	str = get_options(str, ARRAY_SIZE(ints), ints);
-	if (ints[0] <= 0) 
-		goto out;
-	minor = ints[1];
-	if (ints[0] == 1)
-		goto out;
-	verbose = ints[2];
-	if (ints[0] == 2)
-		goto out;
-	fnkeyinit = ints[3];
-	if (ints[0] == 3)
-		goto out;
-	camera = ints[4];
-	if (ints[0] == 4)
-		goto out;
-	compat = ints[5];
-	if (ints[0] == 5)
-		goto out;
-	mask = ints[6];
-	if (ints[0] == 6)
-		goto out;
-	useinput = ints[7];
-out:
-	return 1;
-}
-
-__setup("sonypi=", sonypi_setup);
-#endif /* !MODULE */
-	
-/* Module entry points */
-module_init(sonypi_init_module);
-module_exit(sonypi_cleanup_module);
-
-MODULE_AUTHOR("Stelian Pop <stelian@popies.net>");
-MODULE_DESCRIPTION("Sony Programmable I/O Control Device driver");
-MODULE_LICENSE("GPL");
-
-
-MODULE_PARM(minor,"i");
-MODULE_PARM_DESC(minor, "minor number of the misc device, default is -1 (automatic)");
-MODULE_PARM(verbose,"i");
-MODULE_PARM_DESC(verbose, "be verbose, default is 0 (no)");
-MODULE_PARM(fnkeyinit,"i");
-MODULE_PARM_DESC(fnkeyinit, "set this if your Fn keys do not generate any event");
-MODULE_PARM(camera,"i");
-MODULE_PARM_DESC(camera, "set this if you have a MotionEye camera (PictureBook series)");
-MODULE_PARM(compat,"i");
-MODULE_PARM_DESC(compat, "set this if you want to enable backward compatibility mode");
-MODULE_PARM(mask, "i");
-MODULE_PARM_DESC(mask, "set this to the mask of event you want to enable (see doc)");
-MODULE_PARM(useinput, "i");
-MODULE_PARM_DESC(useinput, "if you have a jogdial, set this if you would like it to use the modern Linux Input Driver system");
-
-EXPORT_SYMBOL(sonypi_camera_command);
+module_init(sonypi_init);
+module_exit(sonypi_exit);
