@@ -250,7 +250,6 @@ extern int of_add_node(const char *path, struct property *proplist);
 extern int of_remove_node(struct device_node *np);
 
 /* Other Prototypes */
-extern void abort(void);
 extern unsigned long prom_init(unsigned long, unsigned long, unsigned long,
 	unsigned long, unsigned long);
 extern void prom_print(const char *msg);

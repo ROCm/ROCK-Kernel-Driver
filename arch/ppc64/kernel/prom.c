@@ -163,7 +163,7 @@ unsigned short virt_irq_to_real_map[NR_IRQS];
 int last_virt_irq = 2;	/* index of last virt_irq.  Skip through IPI */
 
 static unsigned long call_prom(const char *service, int nargs, int nret, ...);
-static void prom_exit(void);
+static void prom_panic(const char *reason);
 static unsigned long copy_device_tree(unsigned long);
 static unsigned long inspect_node(phandle, struct device_node *, unsigned long,
 				  unsigned long, struct device_node ***);
@@ -235,10 +235,12 @@ call_prom(const char *service, int nargs, int nret, ...)
 
 
 static void __init
-prom_exit()
+prom_panic(const char *reason)
 {
 	unsigned long offset = reloc_offset();
 
+	prom_print(reason);
+	/* ToDo: should put up an SRC here */
 	call_prom(RELOC("exit"), 0, 0);
 
 	for (;;)			/* should never get here */
@@ -800,8 +802,7 @@ prom_initialize_tce_table(void)
 		base = lmb_alloc(minsize, align);
 
 		if ( !base ) {
-			prom_print(RELOC("ERROR, cannot find space for TCE table.\n"));
-			prom_exit();
+			prom_panic(RELOC("ERROR, cannot find space for TCE table.\n"));
 		}
 
 		vbase = absolute_to_virt(base);
@@ -1250,12 +1251,12 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 				       RELOC("/chosen"));
 
 	if ((long)_prom->chosen <= 0)
-		prom_exit();
+		prom_panic(RELOC("cannot find chosen")); /* msg won't be printed :( */
 
         if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
 			    RELOC("stdout"), &getprop_rval,
 			    sizeof(getprop_rval)) <= 0)
-                prom_exit();
+                prom_panic(RELOC("cannot find stdout"));
 
         _prom->stdout = (ihandle)(unsigned long)getprop_rval;
 
@@ -1281,7 +1282,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
         if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
 			    RELOC("cpu"), &getprop_rval,
 			    sizeof(getprop_rval)) <= 0)
-                prom_exit();
+                prom_panic(RELOC("cannot find boot cpu"));
 
 	prom_cpu = (ihandle)(unsigned long)getprop_rval;
 	cpu_pkg = call_prom(RELOC("instance-to-package"), 1, 1, prom_cpu);
@@ -1538,8 +1539,7 @@ copy_device_tree(unsigned long mem_start)
 
 	root = call_prom(RELOC("peer"), 1, 1, (phandle)0);
 	if (root == (phandle)0) {
-		prom_print(RELOC("couldn't get device tree root\n"));
-		prom_exit();
+		prom_panic(RELOC("couldn't get device tree root\n"));
 	}
 	allnextp = &RELOC(allnodes);
 	mem_start = DOUBLEWORD_ALIGN(mem_start);
@@ -2801,17 +2801,6 @@ print_properties(struct device_node *np)
 	}
 }
 #endif
-
-
-void __init
-abort()
-{
-#ifdef CONFIG_XMON
-	xmon(NULL);
-#endif
-	for (;;)
-		prom_exit();
-}
 
 
 /* Verify bi_recs are good */
