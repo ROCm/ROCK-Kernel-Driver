@@ -557,7 +557,7 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 			 * a normal stop since it's no longer being
 			 * traced.
 			 */
-			p->state = TASK_STOPPED;
+			ptrace_untrace(p);
 		}
 	}
 

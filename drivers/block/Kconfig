@@ -446,4 +446,12 @@ source "drivers/s390/block/Kconfig"
 
 source "drivers/block/Kconfig.iosched"
 
+config ATA_OVER_ETH
+	tristate "ATA over Ethernet support"
+	depends on NET
+	default m
+	help
+	This driver provides Support for ATA over Ethernet block
+	devices like the Coraid EtherDrive (R) Storage Blade.
+
 endmenu

@@ -69,7 +69,7 @@
 #define ETH_P_ATMFATE	0x8884		/* Frame-based ATM Transport
 					 * over Ethernet
 					 */
-#define ETH_P_EDP2	0x88A2		/* Coraid EDP2			*/
+#define ETH_P_AOE	0x88A2		/* ATA over Ethernet		*/
 
 /*
  *	Non DIX types. Won't clash for 1500 types.

@@ -179,6 +179,22 @@ void class_device_remove_file(struct class_device * class_dev,
 		sysfs_remove_file(&class_dev->kobj, &attr->attr);
 }
 
+int class_device_create_bin_file(struct class_device *class_dev,
+				 struct bin_attribute *attr)
+{
+	int error = -EINVAL;
+	if (class_dev)
+		error = sysfs_create_bin_file(&class_dev->kobj, attr);
+	return error;
+}
+
+void class_device_remove_bin_file(struct class_device *class_dev,
+				  struct bin_attribute *attr)
+{
+	if (class_dev)
+		sysfs_remove_bin_file(&class_dev->kobj, attr);
+}
+
 static int class_device_dev_link(struct class_device * class_dev)
 {
 	if (class_dev->dev)
@@ -576,6 +592,8 @@ EXPORT_SYMBOL_GPL(class_device_get);
 EXPORT_SYMBOL_GPL(class_device_put);
 EXPORT_SYMBOL_GPL(class_device_create_file);
 EXPORT_SYMBOL_GPL(class_device_remove_file);
+EXPORT_SYMBOL_GPL(class_device_create_bin_file);
+EXPORT_SYMBOL_GPL(class_device_remove_bin_file);
 
 EXPORT_SYMBOL_GPL(class_interface_register);
 EXPORT_SYMBOL_GPL(class_interface_unregister);

@@ -1335,13 +1335,60 @@ out:
 	return prev ? prev->vm_next : vma;
 }
 
+/*
+ * Verify that the stack growth is acceptable and
+ * update accounting. This is shared with both the
+ * grow-up and grow-down cases.
+ */
+static int acct_stack_growth(struct vm_area_struct * vma, unsigned long size, unsigned long grow)
+{
+	struct mm_struct *mm = vma->vm_mm;
+	struct rlimit *rlim = current->signal->rlim;
+
+	/* address space limit tests */
+	rlim = current->signal->rlim;
+	if (mm->total_vm + grow > rlim[RLIMIT_AS].rlim_cur >> PAGE_SHIFT)
+		return -ENOMEM;
+
+	/* Stack limit test */
+	if (size > rlim[RLIMIT_STACK].rlim_cur)
+		return -ENOMEM;
+
+	/* mlock limit tests */
+	if (vma->vm_flags & VM_LOCKED) {
+		unsigned long locked;
+		unsigned long limit;
+		locked = mm->locked_vm + grow;
+		limit = rlim[RLIMIT_MEMLOCK].rlim_cur >> PAGE_SHIFT;
+		if (locked > limit)
+			return -ENOMEM;
+	}
+
+	/*
+	 * Overcommit..  This must be the final test, as it will
+	 * update security statistics.
+	 */
+	if (security_vm_enough_memory(grow))
+		return -ENOMEM;
+
+	/* Ok, everything looks good - let it rip */
+	mm->total_vm += grow;
+	if (vma->vm_flags & VM_LOCKED)
+		mm->locked_vm += grow;
+	__vm_stat_account(mm, vma->vm_flags, vma->vm_file, grow);
+	acct_update_integrals();
+	update_mem_hiwater();
+	return 0;
+}
+
 #ifdef CONFIG_STACK_GROWSUP
 /*
  * vma is the first one with address > vma->vm_end.  Have to extend vma.
  */
 int expand_stack(struct vm_area_struct * vma, unsigned long address)
 {
-	unsigned long grow;
+	int error;
+	unsigned long size, grow;
 
 	if (!(vma->vm_flags & VM_GROWSUP))
 		return -EFAULT;
@@ -1361,30 +1408,14 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	 */
 	address += 4 + PAGE_SIZE - 1;
 	address &= PAGE_MASK;
+	size = address - vma->vm_start;
 	grow = (address - vma->vm_end) >> PAGE_SHIFT;
 
-	/* Overcommit.. */
-	if (security_vm_enough_memory(grow)) {
-		anon_vma_unlock(vma);
-		return -ENOMEM;
-	}
-	
-	if (address - vma->vm_start > current->signal->rlim[RLIMIT_STACK].rlim_cur ||
-			((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
-			current->signal->rlim[RLIMIT_AS].rlim_cur) {
-		anon_vma_unlock(vma);
-		vm_unacct_memory(grow);
-		return -ENOMEM;
-	}
-	vma->vm_end = address;
-	vma->vm_mm->total_vm += grow;
-	if (vma->vm_flags & VM_LOCKED)
-		vma->vm_mm->locked_vm += grow;
-	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file, grow);
-	acct_update_integrals();
-	update_mem_hiwater();
+	error = acct_stack_growth(vma, size, grow);
+	if (!error)
+		vma->vm_end = address;
 	anon_vma_unlock(vma);
-	return 0;
+	return error;
 }
 
 struct vm_area_struct *
@@ -1409,7 +1440,8 @@ find_extend_vma(struct mm_struct *mm, unsigned long addr)
  */
 int expand_stack(struct vm_area_struct *vma, unsigned long address)
 {
-	unsigned long grow;
+	int error;
+	unsigned long size, grow;
 
 	/*
 	 * We must make sure the anon_vma is allocated
@@ -1425,31 +1457,16 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	 * anon_vma lock to serialize against concurrent expand_stacks.
 	 */
 	address &= PAGE_MASK;
+	size = vma->vm_end - address;
 	grow = (vma->vm_start - address) >> PAGE_SHIFT;
 
-	/* Overcommit.. */
-	if (security_vm_enough_memory(grow)) {
-		anon_vma_unlock(vma);
-		return -ENOMEM;
+	error = acct_stack_growth(vma, size, grow);
+	if (!error) {
+		vma->vm_start = address;
+		vma->vm_pgoff -= grow;
 	}
-	
-	if (vma->vm_end - address > current->signal->rlim[RLIMIT_STACK].rlim_cur ||
-			((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
-			current->signal->rlim[RLIMIT_AS].rlim_cur) {
-		anon_vma_unlock(vma);
-		vm_unacct_memory(grow);
-		return -ENOMEM;
-	}
-	vma->vm_start = address;
-	vma->vm_pgoff -= grow;
-	vma->vm_mm->total_vm += grow;
-	if (vma->vm_flags & VM_LOCKED)
-		vma->vm_mm->locked_vm += grow;
-	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file, grow);
-	acct_update_integrals();
-        update_mem_hiwater();
 	anon_vma_unlock(vma);
-	return 0;
+	return error;
 }
 
 struct vm_area_struct *

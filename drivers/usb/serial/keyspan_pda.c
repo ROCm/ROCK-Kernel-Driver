@@ -713,12 +713,12 @@ static int keyspan_pda_fake_startup (struct usb_serial *serial)
 	response = ezusb_set_reset(serial, 1);
 
 #ifdef KEYSPAN
-	if (serial->dev->descriptor.idVendor == KEYSPAN_VENDOR_ID)
+	if (le16_to_cpu(serial->dev->descriptor.idVendor) == KEYSPAN_VENDOR_ID)
 		record = &keyspan_pda_firmware[0];
 #endif
 #ifdef XIRCOM
-	if ((serial->dev->descriptor.idVendor == XIRCOM_VENDOR_ID) ||
-	    (serial->dev->descriptor.idVendor == ENTREGRA_VENDOR_ID))
+	if ((le16_to_cpu(serial->dev->descriptor.idVendor) == XIRCOM_VENDOR_ID) ||
+	    (le16_to_cpu(serial->dev->descriptor.idVendor) == ENTREGRA_VENDOR_ID))
 		record = &xircom_pgs_firmware[0];
 #endif
 	if (record == NULL) {

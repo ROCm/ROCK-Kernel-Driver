@@ -287,6 +287,11 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/CORGI MACHINE SUPPORT
+P:	Richard Purdie
+M:	rpurdie@rpsys.net
+S:	Maintained
+
 ARM/PLEB SUPPORT
 P:	Peter Chubb
 M:	pleb@gelato.unsw.edu.au
@@ -341,6 +346,12 @@ L:	acpi4asus-user@lists.sourceforge.net
 W:	http://sourceforge.net/projects/acpi4asus
 W:	http://julien.lerouge.free.fr
 S:	Maintained
+
+ATA OVER ETHERNET DRIVER
+P:	Ed L. Cashin
+M:	ecashin@coraid.com
+W:	http://www.coraid.com/support/linux
+S:	Supported
 
 ATM
 P:	Chas Williams
@@ -1012,8 +1023,8 @@ W:	http://www.kernelconcepts.de/
 S:	Maintained
 
 IA64 (Itanium) PLATFORM
-P:	David Mosberger-Tang
-M:	davidm@hpl.hp.com
+P:	Tony Luck
+M:	tony.luck@intel.com
 L:	linux-ia64@vger.kernel.org
 W:	http://www.ia64-linux.org/
 S:	Maintained
@@ -1747,7 +1758,6 @@ S:	Supported
 PCI HOTPLUG CORE
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
-M:	gregkh@us.ibm.com
 S:	Supported
 
 PCI HOTPLUG COMPAQ DRIVER

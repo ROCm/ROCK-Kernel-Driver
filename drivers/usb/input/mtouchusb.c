@@ -223,9 +223,9 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
         mtouch->input.name = mtouch->name;
         mtouch->input.phys = mtouch->phys;
         mtouch->input.id.bustype = BUS_USB;
-        mtouch->input.id.vendor = udev->descriptor.idVendor;
-        mtouch->input.id.product = udev->descriptor.idProduct;
-        mtouch->input.id.version = udev->descriptor.bcdDevice;
+        mtouch->input.id.vendor = le16_to_cpu(udev->descriptor.idVendor);
+        mtouch->input.id.product = le16_to_cpu(udev->descriptor.idProduct);
+        mtouch->input.id.version = le16_to_cpu(udev->descriptor.bcdDevice);
         mtouch->input.dev = &intf->dev;
 
         mtouch->input.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);

@@ -196,7 +196,7 @@ static int hci_usb_intr_rx_submit(struct hci_usb *husb)
 
 	BT_DBG("%s", husb->hdev->name);
 
-	size = husb->intr_in_ep->desc.wMaxPacketSize;
+	size = le16_to_cpu(husb->intr_in_ep->desc.wMaxPacketSize);
 
 	buf = kmalloc(size, GFP_ATOMIC);
 	if (!buf)
@@ -271,7 +271,7 @@ static int hci_usb_isoc_rx_submit(struct hci_usb *husb)
 	int err, mtu, size;
 	void *buf;
 
-	mtu  = husb->isoc_in_ep->desc.wMaxPacketSize;
+	mtu  = le16_to_cpu(husb->isoc_in_ep->desc.wMaxPacketSize);
 	size = mtu * HCI_MAX_ISOC_FRAMES;
 
 	buf = kmalloc(size, GFP_ATOMIC);
@@ -528,7 +528,7 @@ static inline int hci_usb_send_isoc(struct hci_usb *husb, struct sk_buff *skb)
 	urb->transfer_buffer = skb->data;
 	urb->transfer_buffer_length = skb->len;
 
-	__fill_isoc_desc(urb, skb->len, husb->isoc_out_ep->desc.wMaxPacketSize);
+	__fill_isoc_desc(urb, skb->len, le16_to_cpu(husb->isoc_out_ep->desc.wMaxPacketSize));
 
 	_urb->priv = skb;
 	return __tx_submit(husb, _urb);
@@ -900,10 +900,10 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 
 				switch (ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
 				case USB_ENDPOINT_XFER_ISOC:
-					if (ep->desc.wMaxPacketSize < size ||
+					if (le16_to_cpu(ep->desc.wMaxPacketSize) < size ||
 							uif->desc.bAlternateSetting != isoc)
 						break;
-					size = ep->desc.wMaxPacketSize;
+					size = le16_to_cpu(ep->desc.wMaxPacketSize);
 
 					isoc_alts = uif->desc.bAlternateSetting;
 

@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/s3c2410.c
  *
- * Copyright (c) 2003,2004 Simtec Electronics
+ * Copyright (c) 2003-2005 Simtec Electronics
  *	Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.simtec.co.uk/products/EB2410ITX/
@@ -17,6 +17,7 @@
  *     21-Aug-2004 BJD  Added new struct s3c2410_board handler
  *     28-Sep-2004 BJD  Updates for new serial port bits
  *     04-Nov-2004 BJD  Updated UART configuration process
+ *     10-Jan-2004 BJD  Removed s3c2410_clock_tick_rate
 */
 
 #include <linux/kernel.h>
@@ -41,8 +42,6 @@
 #include "s3c2410.h"
 #include "cpu.h"
 #include "clock.h"
-
-int s3c2410_clock_tick_rate = 12*1000*1000;  /* current timers at 12MHz */
 
 /* Initial IO mappings */
 

@@ -413,6 +413,7 @@ static void prep_new_page(struct page *page, int order)
 			1 << PG_checked | 1 << PG_mappedtodisk);
 	page->private = 0;
 	set_page_refs(page, order);
+	kernel_map_pages(page, 1 << order, 1);
 }
 
 /* 
@@ -590,19 +591,20 @@ void fastcall free_cold_page(struct page *page)
 	free_hot_cold_page(page, 1);
 }
 
+static inline void prep_zero_page(struct page *page, int order, int gfp_flags)
+{
+	int i;
+
+	BUG_ON((gfp_flags & (__GFP_WAIT | __GFP_HIGHMEM)) == __GFP_HIGHMEM);
+	for(i = 0; i < (1 << order); i++)
+		clear_highpage(page + i);
+}
+
 /*
  * Really, prep_compound_page() should be called from __rmqueue_bulk().  But
  * we cheat by calling it from here, in the order > 0 path.  Saves a branch
  * or two.
  */
-static inline void prep_zero_page(struct page *page, int order)
-{
-	int i;
-
-	for(i = 0; i < (1 << order); i++)
-		clear_highpage(page + i);
-}
-
 static struct page *
 buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
 {
@@ -639,7 +641,7 @@ buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
 		prep_new_page(page, order);
 
 		if (gfp_flags & __GFP_ZERO)
-			prep_zero_page(page, order);
+			prep_zero_page(page, order, gfp_flags);
 
 		if (order && (gfp_flags & __GFP_COMP))
 			prep_compound_page(page, order);
@@ -823,7 +825,6 @@ nopage:
 	return NULL;
 got_pg:
 	zone_statistics(zonelist, z);
-	kernel_map_pages(page, 1 << order, 1);
 	return page;
 }
 

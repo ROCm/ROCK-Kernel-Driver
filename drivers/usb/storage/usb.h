@@ -74,6 +74,7 @@ struct us_unusual_dev {
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs faking   */
 #define US_FL_FIX_CAPACITY    0x00000080 /* READ CAPACITY response too big  */
 #define US_FL_IGNORE_RESIDUE  0x00000100 /* reported residue is wrong	    */
+#define US_FL_BULK32          0x00000200 /* Uses 32-byte CBW length         */
 
 /* Dynamic flag definitions: used in set_bit() etc. */
 #define US_FLIDX_URB_ACTIVE	18  /* 0x00040000  current_urb is in use  */

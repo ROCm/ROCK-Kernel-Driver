@@ -1371,7 +1371,8 @@ static int stv680_probe (struct usb_interface *intf, const struct usb_device_id 
 
 	interface = &intf->altsetting[0];
 	/* Is it a STV680? */
-	if ((dev->descriptor.idVendor == USB_PENCAM_VENDOR_ID) && (dev->descriptor.idProduct == USB_PENCAM_PRODUCT_ID)) {
+	if ((le16_to_cpu(dev->descriptor.idVendor) == USB_PENCAM_VENDOR_ID) &&
+	    (le16_to_cpu(dev->descriptor.idProduct) == USB_PENCAM_PRODUCT_ID)) {
 		camera_name = "STV0680";
 		PDEBUG (0, "STV(i): STV0680 camera found.");
 	} else {
