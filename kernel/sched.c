@@ -1847,7 +1847,6 @@ void fastcall __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exc
 		__wake_up_common(q, mode, nr_exclusive, 0);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
-
 EXPORT_SYMBOL_GPL(__wake_up_sync);	/* For internal use only */
 
 void fastcall complete(struct completion *x)
@@ -1860,7 +1859,6 @@ void fastcall complete(struct completion *x)
 			 1, 0);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
-
 EXPORT_SYMBOL(complete);
 
 void fastcall complete_all(struct completion *x)
@@ -1873,6 +1871,7 @@ void fastcall complete_all(struct completion *x)
 			 0, 0);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
+EXPORT_SYMBOL(complete_all);
 
 void fastcall __sched wait_for_completion(struct completion *x)
 {
@@ -1894,7 +1893,6 @@ void fastcall __sched wait_for_completion(struct completion *x)
 	x->done--;
 	spin_unlock_irq(&x->wait.lock);
 }
-
 EXPORT_SYMBOL(wait_for_completion);
 
 #define	SLEEP_ON_VAR					\
