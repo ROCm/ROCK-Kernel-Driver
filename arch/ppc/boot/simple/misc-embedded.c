@@ -83,7 +83,7 @@ load_kernel(unsigned long load_addr, int num_words, unsigned long cksum, bd_t *b
 	 * initialize the serial console port.
 	 */
 	embed_config(&bp);
-#if defined(CONFIG_SERIAL_CONSOLE) || defined(CONFIG_SERIAL_8250_CONSOLE)
+#if defined(CONFIG_SERIAL_CPM_CONSOLE) || defined(CONFIG_SERIAL_8250_CONSOLE)
 	com_port = serial_init(0, bp);
 #endif
 
@@ -260,7 +260,9 @@ load_kernel(unsigned long load_addr, int num_words, unsigned long cksum, bd_t *b
 		rec = (struct bi_record *)((unsigned long)rec + rec->size);
 	}
 	puts("Now booting the kernel\n");
+#if defined(CONFIG_SERIAL_CPM_CONSOLE) || defined(CONFIG_SERIAL_8250_CONSOLE)
 	serial_close(com_port);
+#endif
 
 	return (unsigned long)hold_residual;
 }

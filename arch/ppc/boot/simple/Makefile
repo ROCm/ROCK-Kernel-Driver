@@ -139,11 +139,11 @@ boot-$(CONFIG_MBX)		+= iic.o pci.o qspan_pci.o
 boot-$(CONFIG_RPXCLASSIC)	+= iic.o pci.o qspan_pci.o
 boot-$(CONFIG_RPXLITE)		+= iic.o
 # Different boards need different serial implementations.
-ifeq ($(CONFIG_SERIAL_CONSOLE),y)
+ifeq ($(CONFIG_SERIAL_CPM_CONSOLE),y)
 boot-$(CONFIG_8xx)		+= m8xx_tty.o
 boot-$(CONFIG_8260)		+= m8260_tty.o
-boot-$(CONFIG_GT64260_CONSOLE)	+= gt64260_tty.o
 endif
+boot-$(CONFIG_GT64260_CONSOLE)	+= gt64260_tty.o
 
 LIBS				:= $(common)/lib.a $(bootlib)/lib.a
 ifeq ($(CONFIG_PPC_PREP),y)
