@@ -133,7 +133,7 @@ static int __init blockops_check(void)
 	unsigned int cache_type;
 	int i;
 
-	asm("mcr p15, 0, %0, c0, c0, 1" : "=r" (cache_type));
+	asm("mrc p15, 0, %0, c0, c0, 1" : "=r" (cache_type));
 
 	printk("Checking V6 block cache operations:\n");
 	register_undef_hook(&blockops_hook);

@@ -2204,7 +2204,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 			rinfo->mapped_vram /= 2;
 			continue;
 		}
-		memset(rinfo->fb_base, 0, rinfo->mapped_vram);
+		memset_io(rinfo->fb_base, 0, rinfo->mapped_vram);
 		break;
 	}
 

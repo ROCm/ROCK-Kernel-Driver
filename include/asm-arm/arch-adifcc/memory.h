@@ -33,8 +33,6 @@
 /*
  * physical vs virtual ram conversion
  */
-#define __virt_to_phys__is_a_macro
-#define __phys_to_virt__is_a_macro
 #define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
 #define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
 
@@ -47,8 +45,6 @@
  *
  * These are dummies for now.
  */
-#define __virt_to_bus__is_a_macro
-#define __bus_to_virt__is_a_macro
 #define __virt_to_bus(x)	 __virt_to_phys(x)
 #define __bus_to_virt(x)	 __phys_to_virt(x)
 

@@ -32,14 +32,6 @@ pc300-objs			:= $(pc300-y)
 
 obj-$(CONFIG_HOSTESS_SV11)	+= z85230.o	syncppp.o	hostess_sv11.o
 obj-$(CONFIG_SEALEVEL_4021)	+= z85230.o	syncppp.o	sealevel.o
-obj-$(CONFIG_COMX)		+= 				comx.o
-obj-$(CONFIG_COMX_HW_COMX)	+= 				comx-hw-comx.o
-obj-$(CONFIG_COMX_HW_LOCOMX)	+= z85230.o	syncppp.o	comx-hw-locomx.o
-obj-$(CONFIG_COMX_HW_MIXCOM)	+=				comx-hw-mixcom.o
-obj-$(CONFIG_COMX_HW_MUNICH)	+=				comx-hw-munich.o
-obj-$(CONFIG_COMX_PROTO_PPP)	+=		syncppp.o	comx-proto-ppp.o
-obj-$(CONFIG_COMX_PROTO_LAPB)	+=				comx-proto-lapb.o
-obj-$(CONFIG_COMX_PROTO_FR)	+=				comx-proto-fr.o
 obj-$(CONFIG_COSA)		+=		syncppp.o	cosa.o
 obj-$(CONFIG_FARSYNC)		+=		syncppp.o	farsync.o
 obj-$(CONFIG_DSCC4)             +=				dscc4.o

@@ -18,7 +18,7 @@
 
 #include "sa1111_generic.h"
 
-static int pfs168_pcmcia_init(struct sa1100_pcmcia_socket *skt)
+static int pfs168_pcmcia_init(struct soc_pcmcia_socket *skt)
 {
   /* TPS2211 to standby mode: */
   PA_DWR &= ~(GPIO_GPIO0 | GPIO_GPIO1 | GPIO_GPIO2 | GPIO_GPIO3);
@@ -30,7 +30,7 @@ static int pfs168_pcmcia_init(struct sa1100_pcmcia_socket *skt)
 }
 
 static int
-pfs168_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+pfs168_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 			       const socket_state_t *state)
 {
   unsigned int pa_dwr_mask = 0, pa_dwr_set = 0;

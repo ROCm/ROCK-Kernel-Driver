@@ -326,6 +326,22 @@ static struct sa1100fb_mach_info brutus_info __initdata = {
 };
 #endif
 
+#ifdef CONFIG_SA1100_COLLIE
+static struct sa1100fb_mach_info collie_info __initdata = {
+	pixclock:	171521,		bpp:		16,
+	xres:		320,		yres:		240,
+
+	hsync_len:	5,		vsync_len:	1,
+	left_margin:	11,		upper_margin:	2,
+	right_margin:	30,		lower_margin:	0,
+
+	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+
+	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+};
+#endif
+
 #ifdef CONFIG_SA1100_FREEBIRD
 #warning Please check this carefully
 static struct sa1100fb_mach_info freebird_info __initdata = {
@@ -633,6 +649,11 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 #ifdef CONFIG_SA1100_BRUTUS
 	if (machine_is_brutus()) {
 		inf = &brutus_info;
+	}
+#endif
+#ifdef CONFIG_SA1100_COLLIE
+	if (machine_is_collie()) {
+		inf = &collie_info;
 	}
 #endif
 #ifdef CONFIG_SA1100_FREEBIRD

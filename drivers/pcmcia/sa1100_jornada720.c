@@ -23,7 +23,7 @@
 #warning *** Does SOCKET1_3V actually do anything?
 #define SOCKET1_3V	GPIO_GPIO3
 
-static int jornada720_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int jornada720_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
   /*
    * What is all this crap for?
@@ -49,7 +49,7 @@ static int jornada720_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 }
 
 static int
-jornada720_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
+jornada720_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
 {
   unsigned int pa_dwr_mask, pa_dwr_set;
   int ret;

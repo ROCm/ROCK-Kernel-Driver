@@ -87,6 +87,7 @@ unsigned long __virt_to_bus(unsigned long res)
 
 	return (res - PAGE_OFFSET) + (*CSR_PCISDRAMBASE & 0xfffffff0);
 }
+EXPORT_SYMBOL(__virt_to_bus);
 
 unsigned long __bus_to_virt(unsigned long res)
 {
@@ -97,5 +98,6 @@ unsigned long __bus_to_virt(unsigned long res)
 
 	return res;
 }
+EXPORT_SYMBOL(__bus_to_virt);
 
 #endif

@@ -134,6 +134,8 @@ enum {
 
 	/* ATAPI stuff */
 	ATAPI_PKT_DMA		= (1 << 0),
+	ATAPI_DMADIR		= (1 << 2),	/* ATAPI data dir:
+						   0=to device, 1=to host */
 
 	/* cable types */
 	ATA_CBL_NONE		= 0,

@@ -8,6 +8,7 @@
  * published by the Free Software Foundation.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 #include <linux/ioport.h>
@@ -61,10 +62,20 @@ extern int _stext, _text, _etext, _edata, _end;
 
 unsigned int processor_id;
 unsigned int __machine_arch_type;
+EXPORT_SYMBOL(__machine_arch_type);
+
 unsigned int system_rev;
+EXPORT_SYMBOL(system_rev);
+
 unsigned int system_serial_low;
+EXPORT_SYMBOL(system_serial_low);
+
 unsigned int system_serial_high;
+EXPORT_SYMBOL(system_serial_high);
+
 unsigned int elf_hwcap;
+EXPORT_SYMBOL(elf_hwcap);
+
 
 #ifdef MULTI_CPU
 struct processor processor;
@@ -80,7 +91,10 @@ struct cpu_cache_fns cpu_cache;
 #endif
 
 unsigned char aux_device_present;
+
 char elf_platform[ELF_PLATFORM_SIZE];
+EXPORT_SYMBOL(elf_platform);
+
 char saved_command_line[COMMAND_LINE_SIZE];
 unsigned long phys_initrd_start __initdata = 0;
 unsigned long phys_initrd_size __initdata = 0;

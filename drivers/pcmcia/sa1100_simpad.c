@@ -24,19 +24,19 @@ static struct pcmcia_irqs irqs[] = {
 	{ 1, IRQ_GPIO_CF_CD, "CF_CD" },
 };
 
-static int simpad_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
+static int simpad_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 {
 
 	clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
 
 	skt->irq = IRQ_GPIO_CF_IRQ;
 
-	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	return soc_pcmcia_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void simpad_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
+static void simpad_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
 
 	/* Disable CF bus: */
 	//set_cs3_bit(PCMCIA_BUFF_DIS);
@@ -44,7 +44,7 @@ static void simpad_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 }
 
 static void
-simpad_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
+simpad_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 			   struct pcmcia_state *state)
 {
 	unsigned long levels = GPLR;
@@ -66,7 +66,7 @@ simpad_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
 }
 
 static int
-simpad_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
+simpad_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 			       const socket_state_t *state)
 {
 	unsigned long flags;
@@ -103,14 +103,14 @@ simpad_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 	return 0;
 }
 
-static void simpad_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
+static void simpad_pcmcia_socket_init(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
-static void simpad_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
+static void simpad_pcmcia_socket_suspend(struct soc_pcmcia_socket *skt)
 {
-	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
+	soc_pcmcia_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 	set_cs3_bit(PCMCIA_RESET);
 }
 

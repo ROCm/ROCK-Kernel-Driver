@@ -75,6 +75,7 @@
 #include <linux/proc_fs.h>
 #include <linux/security.h>
 #include <linux/kmod.h>
+#include <linux/pagemap.h>
 
 #include <asm/uaccess.h>
 
@@ -547,7 +548,7 @@ static struct dquot *get_empty_dquot(struct super_block *sb, int type)
 {
 	struct dquot *dquot;
 
-	dquot = kmem_cache_alloc(dquot_cachep, SLAB_KERNEL);
+	dquot = kmem_cache_alloc(dquot_cachep, SLAB_NOFS);
 	if(!dquot)
 		return NODQUOT;
 
@@ -1366,9 +1367,21 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 	error = -EINVAL;
 	if (!fmt->qf_ops->check_quota_file(sb, type))
 		goto out_file_init;
-	/* We don't want quota and atime on quota files (deadlocks possible) */
+	/* We don't want quota and atime on quota files (deadlocks possible)
+	 * We also need to set GFP mask differently because we cannot recurse
+	 * into filesystem when allocating page for quota inode */
 	down_write(&dqopt->dqptr_sem);
 	inode->i_flags |= S_NOQUOTA | S_NOATIME;
+
+	/*
+	 * We write to quota files deep within filesystem code.  We don't want
+	 * the VFS to reenter filesystem code when it tries to allocate a
+	 * pagecache page for the quota file write.  So clear __GFP_FS in
+	 * the quota file's allocation flags.
+	 */
+	mapping_set_gfp_mask(inode->i_mapping,
+		mapping_gfp_mask(inode->i_mapping) & ~__GFP_FS);
+
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		to_drop[cnt] = inode->i_dquot[cnt];
 		inode->i_dquot[cnt] = NODQUOT;

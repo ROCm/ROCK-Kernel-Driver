@@ -305,27 +305,27 @@ static struct mem_types mem_types[] __initdata = {
 	[MT_DEVICE] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_WRITE,
-		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
-		.prot_sect = PMD_TYPE_SECT | PMD_BIT4 | PMD_SECT_UNCACHED |
+		.prot_l1   = PMD_TYPE_TABLE,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_UNCACHED |
 				PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_IO,
 	},
 	[MT_CACHECLEAN] = {
-		.prot_sect = PMD_TYPE_SECT | PMD_BIT4,
+		.prot_sect = PMD_TYPE_SECT,
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_MINICLEAN] = {
-		.prot_sect = PMD_TYPE_SECT | PMD_BIT4 | PMD_SECT_MINICACHE,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_MINICACHE,
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_VECTORS] = {
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 				L_PTE_EXEC,
-		.prot_l1   = PMD_TYPE_TABLE | PMD_BIT4,
+		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_USER,
 	},
 	[MT_MEMORY] = {
-		.prot_sect = PMD_TYPE_SECT | PMD_BIT4 | PMD_SECT_AP_WRITE,
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
 	}
 };
@@ -351,6 +351,15 @@ static void __init build_mem_type_table(void)
 		if (cachepolicy >= CPOLICY_WRITEALLOC)
 			cachepolicy = CPOLICY_WRITEBACK;
 		ecc_mask = 0;
+	}
+
+	if (cpu_arch <= CPU_ARCH_ARMv5) {
+		mem_types[MT_DEVICE].prot_l1       |= PMD_BIT4;
+		mem_types[MT_DEVICE].prot_sect     |= PMD_BIT4;
+		mem_types[MT_CACHECLEAN].prot_sect |= PMD_BIT4;
+		mem_types[MT_MINICLEAN].prot_sect  |= PMD_BIT4;
+		mem_types[MT_VECTORS].prot_l1      |= PMD_BIT4;
+		mem_types[MT_MEMORY].prot_sect     |= PMD_BIT4;
 	}
 
 	/*
@@ -482,6 +491,7 @@ void setup_mm_for_reboot(char mode)
 	pgd_t *pgd;
 	pmd_t *pmd;
 	int i;
+	int cpu_arch = cpu_architecture();
 
 	if (current->mm && current->mm->pgd)
 		pgd = current->mm->pgd;
@@ -491,7 +501,9 @@ void setup_mm_for_reboot(char mode)
 	for (i = 0; i < FIRST_USER_PGD_NR + USER_PTRS_PER_PGD; i++) {
 		pmdval = (i << PGDIR_SHIFT) |
 			 PMD_SECT_AP_WRITE | PMD_SECT_AP_READ |
-			 PMD_BIT4 | PMD_TYPE_SECT;
+			 PMD_TYPE_SECT;
+		if (cpu_arch <= CPU_ARCH_ARMv5)
+			pmdval |= PMD_BIT4;
 		pmd = pmd_offset(pgd + i, i << PGDIR_SHIFT);
 		set_pmd(pmd, __pmd(pmdval));
 	}
