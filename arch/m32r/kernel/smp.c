@@ -1,8 +1,7 @@
 /*
  *  linux/arch/m32r/kernel/smp.c
- *    orig : i386 2.4.10
  *
- *  MITSUBISHI M32R SMP support routines.
+ *  M32R SMP support routines.
  *
  *  Copyright (c) 2001, 2002  Hitoshi Yamamoto
  *
@@ -14,8 +13,6 @@
  *  later.
  */
 
-/* $Id$ */
-
 #undef DEBUG_SMP
 
 #include <linux/irq.h>
@@ -23,6 +20,7 @@
 #include <linux/spinlock.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
+#include <linux/profile.h>
 
 #include <asm/cacheflush.h>
 #include <asm/pgalloc.h>
@@ -109,7 +107,7 @@ static void send_IPI_mask(cpumask_t, int, int);
 unsigned long send_IPI_mask_phys(cpumask_t, int, int);
 
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
-/* Rescheduling request Routins                                              */
+/* Rescheduling request Routines                                             */
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
 
 /*==========================================================================*
@@ -750,7 +748,7 @@ void smp_local_timer_interrupt(struct pt_regs *regs)
 	 * useful with a profiling multiplier != 1
 	 */
 
-	m32r_do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 
 	if (--per_cpu(prof_counter, cpu_id) <= 0) {
 		/*

@@ -1,14 +1,15 @@
-#ifndef _M32R_PTRACE_H
-#define _M32R_PTRACE_H
-
-/* $Id$ */
+#ifndef _ASM_M32R_PTRACE_H
+#define _ASM_M32R_PTRACE_H
 
 /*
+ * linux/include/asm-m32r/ptrace.h
+ *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2001, 2002, 2004  Hirokazu Takata
+ * M32R version:
+ *   Copyright (C) 2001-2002, 2004  Hirokazu Takata <takata at linux-m32r.org>
  */
 
 #include <linux/config.h>
@@ -153,6 +154,7 @@ struct pt_regs {
 #endif
 
 #define instruction_pointer(regs) ((regs)->bpc)
+#define profile_pc(regs) instruction_pointer(regs)
 
 extern void show_regs(struct pt_regs *);
 
@@ -160,4 +162,4 @@ extern void withdraw_debug_trap(struct pt_regs *regs);
 
 #endif /* __KERNEL */
 
-#endif /* _M32R_PTRACE_H */
+#endif /* _ASM_M32R_PTRACE_H */

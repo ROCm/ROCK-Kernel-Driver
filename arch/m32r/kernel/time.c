@@ -15,8 +15,6 @@
  *    Copyright (C) 2000  Philipp Rumpf <prumpf@tux.org>
  */
 
-/* $Id$ */
-
 #undef  DEBUG_TIMER
 
 #include <linux/config.h>
@@ -29,6 +27,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/profile.h>
 
 #include <asm/io.h>
 #include <asm/m32r.h>
@@ -243,7 +242,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	write_sequnlock(&xtime_lock);
 
 #ifndef CONFIG_SMP
-	m32r_do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 #endif
 
 	return IRQ_HANDLED;
