@@ -1,4 +1,4 @@
-/* $Id: math.c,v 1.12 2002/02/09 19:49:31 davem Exp $
+/* $Id: math.c,v 1.11 1999/12/20 05:02:25 davem Exp $
  * arch/sparc64/math-emu/math.c
  *
  * Copyright (C) 1997,1999 Jakub Jelinek (jj@ultra.linux.cz)
@@ -58,6 +58,12 @@
 #define FSTOD	0x0c9
 #define FSTOI	0x0d1
 #define FDTOI	0x0d2
+#define FXTOS	0x084 /* Only Ultra-III generates this. */
+#define FXTOD	0x088 /* Only Ultra-III generates this. */
+#if 0	/* Optimized inline in sparc64/kernel/entry.S */
+#define FITOS	0x0c4 /* Only Ultra-III generates this. */
+#endif
+#define FITOD	0x0c8 /* Only Ultra-III generates this. */
 /* FPOP2 */
 #define FCMPQ	0x053
 #define FCMPEQ	0x057
@@ -98,18 +104,18 @@ static inline int record_exception(struct pt_regs *regs, int eflag)
 	would_trap = (fsr & ((long)eflag << FSR_TEM_SHIFT)) != 0UL;
 
 	/* If trapping, we only want to signal one bit. */
-	if (would_trap != 0) {
+	if(would_trap != 0) {
 		eflag &= ((fsr & FSR_TEM_MASK) >> FSR_TEM_SHIFT);
-		if ((eflag & (eflag - 1)) != 0) {
-			if (eflag & FP_EX_INVALID)
+		if((eflag & (eflag - 1)) != 0) {
+			if(eflag & FP_EX_INVALID)
 				eflag = FP_EX_INVALID;
-			else if (eflag & FP_EX_OVERFLOW)
+			else if(eflag & FP_EX_OVERFLOW)
 				eflag = FP_EX_OVERFLOW;
-			else if (eflag & FP_EX_UNDERFLOW)
+			else if(eflag & FP_EX_UNDERFLOW)
 				eflag = FP_EX_UNDERFLOW;
-			else if (eflag & FP_EX_DIVZERO)
+			else if(eflag & FP_EX_DIVZERO)
 				eflag = FP_EX_DIVZERO;
-			else if (eflag & FP_EX_INEXACT)
+			else if(eflag & FP_EX_INEXACT)
 				eflag = FP_EX_INEXACT;
 		}
 	}
@@ -129,11 +135,11 @@ static inline int record_exception(struct pt_regs *regs, int eflag)
 	 *    CEXC just generated is OR'd into the
 	 *    existing value of AEXC.
 	 */
-	if (would_trap == 0)
+	if(would_trap == 0)
 		fsr |= ((long)eflag << FSR_AEXC_SHIFT);
 
 	/* If trapping, indicate fault trap type IEEE. */
-	if (would_trap != 0)
+	if(would_trap != 0)
 		fsr |= (1UL << 14);
 
 	current_thread_info()->xfsr[0] = fsr;
@@ -141,7 +147,7 @@ static inline int record_exception(struct pt_regs *regs, int eflag)
 	/* If we will not trap, advance the program counter over
 	 * the instruction being handled.
 	 */
-	if (would_trap == 0) {
+	if(would_trap == 0) {
 		regs->tpc = regs->tnpc;
 		regs->tnpc += 4;
 	}
@@ -176,9 +182,9 @@ int do_mathemu(struct pt_regs *regs, struct fpustate *f)
 	long XR, xfsr;
 
 	if (tstate & TSTATE_PRIV)
-		die_if_kernel("FPQuad from kernel", regs);
+		die_if_kernel("unfinished/unimplemented FPop from kernel", regs);
 	if (test_thread_flag(TIF_32BIT))
-		pc &= 0xffffffff;
+		pc = (u32)pc;
 	if (get_user(insn, (u32 *)pc) != -EFAULT) {
 		if ((insn & 0xc1f80000) == 0x81a00000) /* FPOP1 */ {
 			switch ((insn >> 5) & 0x1ff) {
@@ -218,6 +224,14 @@ int do_mathemu(struct pt_regs *regs, struct fpustate *f)
 			case FSTOD: TYPE(2,2,1,1,1,0,0); break;
 			case FSTOI: TYPE(2,1,0,1,1,0,0); break;
 			case FDTOI: TYPE(2,1,0,2,1,0,0); break;
+
+			/* Only Ultra-III generates these */
+			case FXTOS: TYPE(2,1,1,2,0,0,0); break;
+			case FXTOD: TYPE(2,2,1,2,0,0,0); break;
+#if 0			/* Optimized inline in sparc64/kernel/entry.S */
+			case FITOS: TYPE(2,1,1,1,0,0,0); break;
+#endif
+			case FITOD: TYPE(2,2,1,1,0,0,0); break;
 			}
 		}
 		else if ((insn & 0xc1f80000) == 0x81a80000) /* FPOP2 */ {
@@ -421,6 +435,13 @@ int do_mathemu(struct pt_regs *regs, struct fpustate *f)
 		/* int to float */
 		case FITOQ: IR = rs2->s; FP_FROM_INT_Q (QR, IR, 32, int); break;
 		case FXTOQ: XR = rs2->d; FP_FROM_INT_Q (QR, XR, 64, long); break;
+		/* Only Ultra-III generates these */
+		case FXTOS: XR = rs2->d; FP_FROM_INT_S (SR, XR, 64, long); break;
+		case FXTOD: XR = rs2->d; FP_FROM_INT_D (DR, XR, 64, long); break;
+#if 0		/* Optimized inline in sparc64/kernel/entry.S */
+		case FITOS: IR = rs2->s; FP_FROM_INT_S (SR, IR, 32, int); break;
+#endif
+		case FITOD: IR = rs2->s; FP_FROM_INT_D (DR, IR, 32, int); break;
 		/* float to float */
 		case FSTOD: FP_CONV (D, S, 1, 1, DR, SB); break;
 		case FSTOQ: FP_CONV (Q, S, 2, 1, QR, SB); break;
@@ -459,7 +480,7 @@ int do_mathemu(struct pt_regs *regs, struct fpustate *f)
 			}
 		}
 
-		if (_fex != 0)
+		if(_fex != 0)
 			return record_exception(regs, _fex);
 
 		/* Success and no exceptions detected. */

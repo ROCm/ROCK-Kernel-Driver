@@ -16,6 +16,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/mm.h>
+#include <linux/init.h>
 
 #include <asm/delay.h>
 #include <asm/system.h>
@@ -397,7 +398,7 @@ extern unsigned int cheetah_fecc_trap_vector[], cheetah_fecc_trap_vector_tl1[];
 extern unsigned int cheetah_cee_trap_vector[], cheetah_cee_trap_vector_tl1[];
 extern unsigned int cheetah_deferred_trap_vector[], cheetah_deferred_trap_vector_tl1[];
 
-void cheetah_ecache_flush_init(void)
+void __init cheetah_ecache_flush_init(void)
 {
 	unsigned long largest_size, smallest_linesize, order;
 	char type[16];
@@ -528,12 +529,39 @@ static void cheetah_flush_ecache_line(unsigned long physaddr)
 }
 
 #ifdef CONFIG_SMP
-unsigned long cheetah_tune_scheduling(void)
+unsigned long __init cheetah_tune_scheduling(void)
 {
 	unsigned long tick1, tick2, raw;
+	unsigned long flush_base = ecache_flush_physbase;
+	unsigned long flush_linesize = ecache_flush_linesize;
+	unsigned long flush_size = ecache_flush_size;
+
+	/* Run through the whole cache to guarentee the timed loop
+	 * is really displacing cache lines.
+	 */
+	__asm__ __volatile__("1: subcc	%0, %4, %0\n\t"
+			     "   bne,pt	%%xcc, 1b\n\t"
+			     "    ldxa	[%2 + %0] %3, %%g0\n\t"
+			     : "=&r" (flush_size)
+			     : "0" (flush_size), "r" (flush_base),
+			       "i" (ASI_PHYS_USE_EC), "r" (flush_linesize));
+
+	/* The flush area is 2 X Ecache-size, so cut this in half for
+	 * the timed loop.
+	 */
+	flush_base = ecache_flush_physbase;
+	flush_linesize = ecache_flush_linesize;
+	flush_size = ecache_flush_size >> 1;
 
 	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick1));
-	cheetah_flush_ecache();
+
+	__asm__ __volatile__("1: subcc	%0, %4, %0\n\t"
+			     "   bne,pt	%%xcc, 1b\n\t"
+			     "    ldxa	[%2 + %0] %3, %%g0\n\t"
+			     : "=&r" (flush_size)
+			     : "0" (flush_size), "r" (flush_base),
+			       "i" (ASI_PHYS_USE_EC), "r" (flush_linesize));
+
 	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick2));
 
 	raw = (tick2 - tick1);
@@ -1257,7 +1285,7 @@ void cheetah_deferred_handler(struct pt_regs *regs, unsigned long afsr, unsigned
 	/* "Recoverable" here means we try to yank the page from ever
 	 * being newly used again.  This depends upon a few things:
 	 * 1) Must be main memory, and AFAR must be valid.
-	 * 2) If we trapped from use, OK.
+	 * 2) If we trapped from user, OK.
 	 * 3) Else, if we trapped from kernel we must find exception
 	 *    table entry (ie. we have to have been accessing user
 	 *    space).
@@ -1678,7 +1706,7 @@ void do_getpsr(struct pt_regs *regs)
 extern void thread_info_offsets_are_bolixed_dave(void);
 
 /* Only invoked on boot processor. */
-void trap_init(void)
+void __init trap_init(void)
 {
 	/* Compile time sanity check. */
 	if (TI_TASK != offsetof(struct thread_info, task) ||

@@ -804,9 +804,10 @@ static int sbusfb_blank(int blank, struct fb_info *info)
     struct fb_info_sbusfb *fb = sbusfbinfo(info);
     
     if (blank && fb->blank)
-    	return fb->blank(fb);
+	    return fb->blank(fb);
     else if (!blank && fb->unblank)
-    	return fb->unblank(fb);
+	    return fb->unblank(fb);
+    return 0;
 }
 
     /*

@@ -16,7 +16,7 @@
 typedef unsigned long cycles_t;
 #define get_cycles() \
 ({	cycles_t ret; \
-	__asm__("rd	%%tick, %0" : "=r" (ret)); \
+	__asm__ __volatile__("rd	%%tick, %0" : "=r" (ret)); \
 	ret; \
 })
 

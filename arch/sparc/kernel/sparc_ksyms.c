@@ -22,6 +22,7 @@
 #ifdef CONFIG_PCI
 #include <linux/pci.h>
 #endif
+#include <linux/pm.h>
 
 #include <asm/oplib.h>
 #include <asm/delay.h>
@@ -295,3 +296,6 @@ EXPORT_SYMBOL_DOT(mul);
 EXPORT_SYMBOL_DOT(umul);
 EXPORT_SYMBOL_DOT(div);
 EXPORT_SYMBOL_DOT(udiv);
+
+/* Sun Power Management Idle Handler */
+EXPORT_SYMBOL(pm_idle);

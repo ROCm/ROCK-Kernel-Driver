@@ -27,6 +27,7 @@
 #include <linux/smp_lock.h>
 #include <linux/reboot.h>
 #include <linux/delay.h>
+#include <linux/pm.h>
 
 #include <asm/auxio.h>
 #include <asm/oplib.h>
@@ -39,6 +40,19 @@
 #include <asm/processor.h>
 #include <asm/psr.h>
 #include <asm/elf.h>
+
+/* 
+ * Power management idle function 
+ * Set in pm platform drivers
+ */
+void (*pm_idle)(void);
+
+/* 
+ * Power-off handler instantiation for pm.h compliance
+ * This is done via auxio, but could be used as a fallback
+ * handler when auxio is not present-- unused for now...
+ */
+void (*pm_power_off)(void);
 
 extern void fpsave(unsigned long *, unsigned long *, void *, unsigned long *);
 
@@ -91,8 +105,13 @@ int cpu_idle(void)
 			}
 			restore_flags(flags);
 		}
-		check_pgt_cache();
+
+		while((!current->need_resched) && pm_idle) {
+				(*pm_idle)();
+		}
+
 		schedule();
+		check_pgt_cache();
 	}
 	ret = 0;
 out:

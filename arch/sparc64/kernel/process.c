@@ -42,6 +42,13 @@
 
 /* #define VERBOSE_SHOWREGS */
 
+/*
+ * Nothing special yet...
+ */
+void default_idle(void)
+{
+}
+
 #ifndef CONFIG_SMP
 
 /*
@@ -107,10 +114,8 @@ void kpreempt_maybe(void)
 
 	if (local_irq_count(cpu) == 0 &&
 	    local_bh_count(cpu) == 0 &&
-	    test_thread_flag(TIF_NEED_RESCHED)) {
-		current->state = TASK_RUNNING;
+	    test_thread_flag(TIF_NEED_RESCHED))
 		schedule();
-	}
 }
 #endif
 
@@ -422,6 +427,9 @@ void exit_thread(void)
 void flush_thread(void)
 {
 	struct thread_info *t = current_thread_info();
+
+	if (t->flags & _TIF_ABI_PENDING)
+		t->flags ^= (_TIF_ABI_PENDING | _TIF_32BIT);
 
 	if (t->task->mm) {
 		unsigned long pgd_cache = 0UL;
