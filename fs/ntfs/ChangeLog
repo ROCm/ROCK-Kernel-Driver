@@ -19,9 +19,23 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
-2.1.10 - .
+2.1.10 - Force read-only (re)mounting of volumes with unsupported volume flags.
 
 	- Finish off the white space cleanups (remove trailing spaces, etc).
+	- Clean up ntfs_fill_super() and ntfs_read_inode_mount() by removing
+	  the kludges around the first iget().  Instead of (re)setting ->s_op
+	  we have the $MFT inode set up by explicit new_inode() / set ->i_ino /
+	  insert_inode_hash() / call ntfs_read_inode_mount() directly.  This
+	  kills the need for second super_operations and allows to return error
+	  from ntfs_read_inode_mount() without resorting to ugly "poisoning"
+	  tricks.  (Al Viro)
+	- Force read-only (re)mounting if any of the following bits are set in
+	  the volume information flags:
+	  	VOLUME_IS_DIRTY, VOLUME_RESIZE_LOG_FILE,
+		VOLUME_UPGRADE_ON_MOUNT, VOLUME_DELETE_USN_UNDERWAY,
+		VOLUME_REPAIR_OBJECT_ID, VOLUME_MODIFIED_BY_CHKDSK
+	  To make this easier we define VOLUME_MUST_MOUNT_RO_MASK with all the
+	  above bits set so the test is made easy.
 
 2.1.9 - Fix two bugs in decompression engine.
 

@@ -314,7 +314,9 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 #else /* ! NTFS_RW */
 	/*
 	 * For the read-write compiled driver, if we are remounting read-write,
-	 * make sure there aren't any volume errors and empty the lofgile.
+	 * make sure there are no volume errors and that no unsupported volume
+	 * flags are set.  Also, empty the logfile journal as it would become
+	 * stale as soon as something is written to the volume.
 	 */
 	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
 		static const char *es = ".  Cannot remount read-write.";
@@ -322,6 +324,11 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 		if (NVolErrors(vol)) {
 			ntfs_error(sb, "Volume has errors and is read-only%s",
 					es);
+			return -EROFS;
+		}
+		if (vol->vol_flags & VOLUME_MUST_MOUNT_RO_MASK) {
+			ntfs_error(sb, "Volume has unsupported flags set and "
+					"is read-only%s", es);
 			return -EROFS;
 		}
 		if (!ntfs_empty_logfile(vol->logfile_ino)) {
@@ -1133,6 +1140,31 @@ get_ctx_vol_failed:
 	printk(KERN_INFO "NTFS volume version %i.%i.\n", vol->major_ver,
 			vol->minor_ver);
 #ifdef NTFS_RW
+	/* Make sure that no unsupported volume flags are set. */
+	if (vol->vol_flags & VOLUME_MUST_MOUNT_RO_MASK) {
+		static const char *es1 = "Volume has unsupported flags set ";
+		static const char *es2 = ".  Run chkdsk and mount in Windows.";
+
+		/* If a read-write mount, convert it to a read-only mount. */
+		if (!(sb->s_flags & MS_RDONLY)) {
+			if (!(vol->on_errors & (ON_ERRORS_REMOUNT_RO |
+					ON_ERRORS_CONTINUE))) {
+				ntfs_error(sb, "%s and neither on_errors="
+						"continue nor on_errors="
+						"remount-ro was specified%s",
+						es1, es2);
+				goto iput_vol_err_out;
+			}
+			sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+			ntfs_error(sb, "%s.  Mounting read-only%s", es1, es2);
+		} else
+			ntfs_warning(sb, "%s.  Will not be able to remount "
+					"read-write%s", es1, es2);
+		/*
+		 * Do not set NVolErrors() because ntfs_remount() re-checks the
+		 * flags which we need to do in case any flags have changed.
+		 */
+	}
 	/*
 	 * Get the inode for the logfile, check it and determine if the volume
 	 * was shutdown cleanly.
@@ -1240,6 +1272,7 @@ iput_logfile_err_out:
 #ifdef NTFS_RW
 	if (vol->logfile_ino)
 		iput(vol->logfile_ino);
+iput_vol_err_out:
 #endif /* NTFS_RW */
 	iput(vol->vol_ino);
 iput_lcnbmp_err_out:

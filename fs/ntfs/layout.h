@@ -1090,7 +1090,7 @@ typedef enum {					/* Identifier authority. */
 	SECURITY_NULL_RID		  = 0,	/* S-1-0 */
 	SECURITY_WORLD_RID		  = 0,	/* S-1-1 */
 	SECURITY_LOCAL_RID		  = 0,	/* S-1-2 */
-	
+
 	SECURITY_CREATOR_OWNER_RID	  = 0,	/* S-1-3 */
 	SECURITY_CREATOR_GROUP_RID	  = 1,	/* S-1-3 */
 
@@ -1110,10 +1110,10 @@ typedef enum {					/* Identifier authority. */
 	SECURITY_AUTHENTICATED_USER_RID	  = 0xb,
 	SECURITY_RESTRICTED_CODE_RID	  = 0xc,
 	SECURITY_TERMINAL_SERVER_RID	  = 0xd,
-	
+
 	SECURITY_LOGON_IDS_RID		  = 5,
 	SECURITY_LOGON_IDS_RID_COUNT	  = 3,
-	
+
 	SECURITY_LOCAL_SYSTEM_RID	  = 0x12,
 
 	SECURITY_NT_NON_UNIQUE		  = 0x15,
@@ -1123,12 +1123,12 @@ typedef enum {					/* Identifier authority. */
 	/*
 	 * Well-known domain relative sub-authority values (RIDs).
 	 */
-	
+
 	/* Users. */
 	DOMAIN_USER_RID_ADMIN		  = 0x1f4,
 	DOMAIN_USER_RID_GUEST		  = 0x1f5,
 	DOMAIN_USER_RID_KRBTGT		  = 0x1f6,
-	
+
 	/* Groups. */
 	DOMAIN_GROUP_RID_ADMINS		  = 0x200,
 	DOMAIN_GROUP_RID_USERS		  = 0x201,
@@ -1145,12 +1145,12 @@ typedef enum {					/* Identifier authority. */
 	DOMAIN_ALIAS_RID_USERS		  = 0x221,
 	DOMAIN_ALIAS_RID_GUESTS		  = 0x222,
 	DOMAIN_ALIAS_RID_POWER_USERS	  = 0x223,
-	
+
 	DOMAIN_ALIAS_RID_ACCOUNT_OPS	  = 0x224,
 	DOMAIN_ALIAS_RID_SYSTEM_OPS	  = 0x225,
 	DOMAIN_ALIAS_RID_PRINT_OPS	  = 0x226,
 	DOMAIN_ALIAS_RID_BACKUP_OPS	  = 0x227,
-	
+
 	DOMAIN_ALIAS_RID_REPLICATOR	  = 0x228,
 	DOMAIN_ALIAS_RID_RAS_SERVERS	  = 0x229,
 	DOMAIN_ALIAS_RID_PREW2KCOMPACCESS = 0x22a,
@@ -1258,7 +1258,7 @@ typedef enum {
 
 	ACCESS_ALLOWED_COMPOUND_ACE_TYPE= 4,
 	ACCESS_MAX_MS_V3_ACE_TYPE	= 4,
-	
+
 	/* The following are Win2k only. */
 	ACCESS_MIN_MS_OBJECT_ACE_TYPE	= 5,
 	ACCESS_ALLOWED_OBJECT_ACE_TYPE	= 5,
@@ -1325,33 +1325,33 @@ typedef enum {
 	 */
 
 	/* Specific rights for files and directories are as follows: */
-	
+
 	/* Right to read data from the file. (FILE) */
 	FILE_READ_DATA			= const_cpu_to_le32(0x00000001),
 	/* Right to list contents of a directory. (DIRECTORY) */
 	FILE_LIST_DIRECTORY		= const_cpu_to_le32(0x00000001),
-	
+
 	/* Right to write data to the file. (FILE) */
 	FILE_WRITE_DATA			= const_cpu_to_le32(0x00000002),
 	/* Right to create a file in the directory. (DIRECTORY) */
 	FILE_ADD_FILE			= const_cpu_to_le32(0x00000002),
-	
+
 	/* Right to append data to the file. (FILE) */
 	FILE_APPEND_DATA		= const_cpu_to_le32(0x00000004),
 	/* Right to create a subdirectory. (DIRECTORY) */
 	FILE_ADD_SUBDIRECTORY		= const_cpu_to_le32(0x00000004),
-	
+
 	/* Right to read extended attributes. (FILE/DIRECTORY) */
 	FILE_READ_EA			= const_cpu_to_le32(0x00000008),
-	
+
 	/* Right to write extended attributes. (FILE/DIRECTORY) */
 	FILE_WRITE_EA			= const_cpu_to_le32(0x00000010),
-	
+
 	/* Right to execute a file. (FILE) */
 	FILE_EXECUTE			= const_cpu_to_le32(0x00000020),
 	/* Right to traverse the directory. (DIRECTORY) */
 	FILE_TRAVERSE			= const_cpu_to_le32(0x00000020),
-	
+
 	/*
 	 * Right to delete a directory and all the files it contains (its
 	 * children), even if the files are read-only. (DIRECTORY)
@@ -1360,10 +1360,10 @@ typedef enum {
 
 	/* Right to read file attributes. (FILE/DIRECTORY) */
 	FILE_READ_ATTRIBUTES		= const_cpu_to_le32(0x00000080),
-	
+
 	/* Right to change file attributes. (FILE/DIRECTORY) */
 	FILE_WRITE_ATTRIBUTES		= const_cpu_to_le32(0x00000100),
-	
+
 	/*
 	 * The standard rights (bits 16 to 23). Are independent of the type of
 	 * object being secured.
@@ -1396,15 +1396,15 @@ typedef enum {
 	 * The following STANDARD_RIGHTS_* are combinations of the above for
 	 * convenience and are defined by the Win32 API.
 	 */
-	
+
 	/* These are currently defined to READ_CONTROL. */
 	STANDARD_RIGHTS_READ		= const_cpu_to_le32(0x00020000),
 	STANDARD_RIGHTS_WRITE		= const_cpu_to_le32(0x00020000),
 	STANDARD_RIGHTS_EXECUTE		= const_cpu_to_le32(0x00020000),
-	
+
 	/* Combines DELETE, READ_CONTROL, WRITE_DAC, and WRITE_OWNER access. */
 	STANDARD_RIGHTS_REQUIRED	= const_cpu_to_le32(0x000f0000),
-	
+
 	/*
 	 * Combines DELETE, READ_CONTROL, WRITE_DAC, WRITE_OWNER, and
 	 * SYNCHRONIZE access.
@@ -1790,6 +1790,9 @@ typedef enum {
 	VOLUME_REPAIR_OBJECT_ID		= const_cpu_to_le16(0x0020),
 	VOLUME_MODIFIED_BY_CHKDSK	= const_cpu_to_le16(0x8000),
 	VOLUME_FLAGS_MASK		= const_cpu_to_le16(0x803f),
+
+	/* To make our life easier when checking if we must mount read-only. */
+	VOLUME_MUST_MOUNT_RO_MASK	= const_cpu_to_le16(0x8037),
 } __attribute__ ((__packed__)) VOLUME_FLAGS;
 
 /*
@@ -1973,7 +1976,7 @@ typedef enum {
 
 	QUOTA_FLAG_USER_MASK		= const_cpu_to_le32(0x00000007),
 		/* Bit mask for user quota flags. */
-	
+
 	/* These flags are only present in the quota defaults index entry,
 	   i.e. in the entry where owner_id = QUOTA_DEFAULTS_ID. */
 	QUOTA_FLAG_TRACKING_ENABLED	= const_cpu_to_le32(0x00000010),
@@ -2177,7 +2180,7 @@ typedef enum {
 	IO_REPARSE_TAG_IS_ALIAS		= const_cpu_to_le32(0x20000000),
 	IO_REPARSE_TAG_IS_HIGH_LATENCY	= const_cpu_to_le32(0x40000000),
 	IO_REPARSE_TAG_IS_MICROSOFT	= const_cpu_to_le32(0x80000000),
-	
+
 	IO_REPARSE_TAG_RESERVED_ZERO	= const_cpu_to_le32(0x00000000),
 	IO_REPARSE_TAG_RESERVED_ONE	= const_cpu_to_le32(0x00000001),
 	IO_REPARSE_TAG_RESERVED_RANGE	= const_cpu_to_le32(0x00000001),

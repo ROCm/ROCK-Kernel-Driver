@@ -273,6 +273,9 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.10:
+	- Force read-only (re)mounting of volumes with unsupported volume
+	  flags and various cleanups.
 2.1.9:
 	- Fix two bugs in handling of corner cases in the decompression engine.
 2.1.8:
