@@ -24,7 +24,7 @@ static int __init serial_bast_register(unsigned long port, unsigned int irq)
 	printk("BAST: SuperIO serial (%08lx,%d)\n", port, irq);
 #endif
 
-	serial_req.flags      = UPF_AUTOPROBE | UPF_RESOURCES | UPF_SHARE_IRQ;
+	serial_req.flags      = UPF_AUTOPROBE | UPF_SHARE_IRQ;
 	serial_req.baud_base  = BASE_BAUD;
 	serial_req.irq        = irq;
 	serial_req.io_type    = UPIO_MEM;
