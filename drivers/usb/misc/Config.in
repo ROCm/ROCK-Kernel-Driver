@@ -8,3 +8,4 @@ dep_tristate '  USB Auerswald ISDN support (EXPERIMENTAL)' CONFIG_USB_AUERSWALD 
 dep_tristate '  USB Diamond Rio500 support (EXPERIMENTAL)' CONFIG_USB_RIO500 $CONFIG_USB $CONFIG_EXPERIMENTAL
 dep_tristate '  Tieman Voyager USB Braille display support (EXPERIMENTAL)' CONFIG_USB_BRLVGER $CONFIG_USB $CONFIG_EXPERIMENTAL
 dep_tristate '  USB LCD driver support' CONFIG_USB_LCD $CONFIG_USB
+dep_tristate '  Alcatel Speedtouch ADSL USB Modem' CONFIG_USB_SPEEDTOUCH $CONFIG_USB    
