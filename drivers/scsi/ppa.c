@@ -201,6 +201,8 @@ int ppa_detect(Scsi_Host_Template * host)
 	default:		/* Never gets here */
 	    continue;
 	}
+	
+	INIT_WORK(&ppa_hosts[i].ppa_tq, ppa_interrupt, &ppa_hosts[i]);
 
 	host->can_queue = PPA_CAN_QUEUE;
 	host->sg_tablesize = ppa_sg;
