@@ -12,10 +12,6 @@
  * It still needs lots of work........When it was easy, I included code
  * to support the SCCs, but this has never been tested, nor is it complete.
  * Only the SCCs support modem control, so that is not complete either.
- *
- * This module exports the following rs232 io functions:
- *
- *	int rs_8xx_init(void);
  */
 
 #include <linux/config.h>
@@ -2499,7 +2495,7 @@ static struct tty_operations rs_8xx_ops = {
 /*
  * The serial driver boot-time initialization code!
  */
-int __init rs_8xx_init(void)
+static int __init rs_8xx_init(void)
 {
 	struct serial_state * state;
 	ser_info_t	*info;
@@ -2846,6 +2842,7 @@ int __init rs_8xx_init(void)
 
 	return 0;
 }
+module_init(rs_8xx_init);
 
 /* This must always be called before the rs_8xx_init() function, otherwise
  * it blows away the port control information.

@@ -138,12 +138,7 @@ static int tty_release(struct inode *, struct file *);
 int tty_ioctl(struct inode * inode, struct file * file,
 	      unsigned int cmd, unsigned long arg);
 static int tty_fasync(int fd, struct file * filp, int on);
-extern int vme_scc_init (void);
-extern int serial167_init(void);
-extern int rs_8xx_init(void);
-extern void tub3270_init(void);
 extern void rs_360_init(void);
-extern void tx3912_rs_init(void);
 
 static struct tty_struct *alloc_tty_struct(void)
 {
@@ -2461,53 +2456,6 @@ static int __init tty_init(void)
 	tty_add_class_device ("tty0", MKDEV(TTY_MAJOR, 0), NULL);
 
 	vty_init();
-#endif
-
-#ifdef CONFIG_ESPSERIAL  /* init ESP before rs, so rs doesn't see the port */
-	espserial_init();
-#endif
-#if defined(CONFIG_MVME162_SCC) || defined(CONFIG_BVME6000_SCC) || defined(CONFIG_MVME147_SCC)
-	vme_scc_init();
-#endif
-#ifdef CONFIG_SERIAL_TX3912
-	tx3912_rs_init();
-#endif
-#ifdef CONFIG_ROCKETPORT
-	rp_init();
-#endif
-#ifdef CONFIG_SERIAL167
-	serial167_init();
-#endif
-#ifdef CONFIG_CYCLADES
-	cy_init();
-#endif
-#ifdef CONFIG_STALLION
-	stl_init();
-#endif
-#ifdef CONFIG_ISTALLION
-	stli_init();
-#endif
-#ifdef CONFIG_DIGI
-	pcxe_init();
-#endif
-#ifdef CONFIG_DIGIEPCA
-	pc_init();
-#endif
-#ifdef CONFIG_SPECIALIX
-	specialix_init();
-#endif
-#if (defined(CONFIG_8xx) || defined(CONFIG_8260))
-	rs_8xx_init();
-#endif /* CONFIG_8xx */
-	pty_init();
-#ifdef CONFIG_MOXA_INTELLIO
-	moxa_init();
-#endif	
-#ifdef CONFIG_TN3270
-	tub3270_init();
-#endif
-#ifdef CONFIG_A2232
-	a2232board_init();
 #endif
 	return 0;
 }

@@ -1274,7 +1274,7 @@ static int irix_xstat64_xlate(struct kstat *stat, void *ubuf)
 	ks.st_pad4[4] = ks.st_pad4[5] = ks.st_pad4[6] = ks.st_pad4[7] = 0;
 
 	/* Now write it all back. */
-	return copy_to_user(ubuf, &ub, sizeof(ub)) ? -EFAULT : 0;
+	return copy_to_user(ubuf, &ks, sizeof(ks)) ? -EFAULT : 0;
 }
 
 asmlinkage int irix_xstat(int version, char *filename, struct stat *statbuf)

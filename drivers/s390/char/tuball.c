@@ -74,8 +74,6 @@ unsigned char tub_ebcgraf[64] =
 	  0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
 	  0xf8, 0xf9, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f };
 
-int tub3270_init(void);
-
 #ifndef MODULE
 
 /*
@@ -193,31 +191,18 @@ int tub3270_con_copy(tub_t *tubp)
 	return rc;
 }
 #endif /* CONFIG_TN3270_CONSOLE */
-#else /* If generated as a MODULE */
-/*
- * module init:  find tubes; get a major nbr
- */
-int
-init_module(void)
-{
-	if (tubnummins != 0) {
-		printk(KERN_ERR "EEEK!!  Tube driver cobbigling!!\n");
-		return -1;
-	}
-	return tub3270_init();
-}
+#endif
 
 /*
  * remove driver:  unregister the major number
  */
-void
-cleanup_module(void)
+static void __exit
+tub3270_exit(void)
 {
 	fs3270_fini();
 	tty3270_fini();
 	tubfiniminors();
 }
-#endif /* Not a MODULE or a MODULE */
 
 static int
 tub3270_is_ours(s390_dev_info_t *dp)
@@ -232,11 +217,18 @@ tub3270_is_ours(s390_dev_info_t *dp)
 /*
  * tub3270_init() called by kernel or module initialization
  */
-int
+static int __init
 tub3270_init(void)
 {
 	s390_dev_info_t d;
 	int i, rc;
+
+#ifdef MODULE
+	if (tubnummins != 0) {
+		printk(KERN_ERR "EEEK!!  Tube driver cobbigling!!\n");
+		return -1;
+	}
+#endif
 
 	/*
 	 * Copy and correct ebcdic - ascii translate tables
@@ -624,3 +616,6 @@ tubfiniirqs(void)
 		tubirqs = NULL;
 	}
 }
+
+module_init(tub3270_init);
+module_exit(tub3270_exit);

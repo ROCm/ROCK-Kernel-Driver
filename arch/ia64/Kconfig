@@ -304,9 +304,6 @@ config FORCE_MAX_ZONEORDER
 	int
 	default "18"
 
-config HUGETLB_PAGE
-	bool "IA-64 Huge TLB Page Support"
-
 choice
 	prompt "IA-64 Huge TLB Page Size"
 	depends on HUGETLB_PAGE

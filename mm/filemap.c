@@ -1449,9 +1449,9 @@ void remove_suid(struct dentry *dentry)
 	if (!(mode & S_IXGRP))
 		mode &= S_ISUID;
 
-	/* was any of the uid bits set? */
+	/* were any of the uid bits set? */
 	if (mode && !capable(CAP_FSETID)) {
-		newattrs.ia_valid = ATTR_KILL_SUID | ATTR_KILL_SGID;
+		newattrs.ia_valid = ATTR_KILL_SUID|ATTR_KILL_SGID|ATTR_FORCE;
 		notify_change(dentry, &newattrs);
 	}
 }

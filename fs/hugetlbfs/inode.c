@@ -47,7 +47,6 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	struct address_space *mapping = inode->i_mapping;
-	struct hugetlbfs_sb_info *sbinfo = HUGETLBFS_SB(inode->i_sb);
 	loff_t len, vma_len;
 	int ret;
 
@@ -61,19 +60,8 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EINVAL;
 
 	vma_len = (loff_t)(vma->vm_end - vma->vm_start);
-	if (sbinfo->free_blocks >= 0) { /* Check if there is any size limit. */
-		spin_lock(&sbinfo->stat_lock);
-		if ((vma_len >> HPAGE_SHIFT) <= sbinfo->free_blocks) {
-			sbinfo->free_blocks -= (vma_len >> HPAGE_SHIFT);
-			spin_unlock(&sbinfo->stat_lock);
-		} else {
-			spin_unlock(&sbinfo->stat_lock);
-			return -ENOMEM;
-		}
-	}
 
 	down(&inode->i_sem);
-
 	update_atime(inode);
 	vma->vm_flags |= VM_HUGETLB | VM_RESERVED;
 	vma->vm_ops = &hugetlb_vm_ops;
@@ -82,15 +70,6 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	if (ret == 0 && inode->i_size < len)
 		inode->i_size = len;
 	up(&inode->i_sem);
-
-	/*
-	 * If the huge page allocation has failed then increment free_blocks.
-	 */
-	if ((ret != 0) && (sbinfo->free_blocks >= 0)) {
-		spin_lock(&sbinfo->stat_lock);
-		sbinfo->free_blocks += (vma_len >> HPAGE_SHIFT);
-		spin_unlock(&sbinfo->stat_lock);
-	}
 
 	return ret;
 }
@@ -178,7 +157,6 @@ void truncate_huge_page(struct page *page)
 
 void truncate_hugepages(struct address_space *mapping, loff_t lstart)
 {
-	struct hugetlbfs_sb_info *sbinfo = HUGETLBFS_SB(mapping->host->i_sb);
 	const pgoff_t start = lstart >> HPAGE_SHIFT;
 	struct pagevec pvec;
 	pgoff_t next;
@@ -203,11 +181,7 @@ void truncate_hugepages(struct address_space *mapping, loff_t lstart)
 			++next;
 			truncate_huge_page(page);
 			unlock_page(page);
-			if (sbinfo->free_blocks >= 0) {
-				spin_lock(&sbinfo->stat_lock);
-				sbinfo->free_blocks++;
-				spin_unlock(&sbinfo->stat_lock);
-			}
+			hugetlb_put_quota(mapping);
 		}
 		huge_pagevec_release(&pvec);
 	}
@@ -710,6 +684,34 @@ hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	sb->s_root = root;
 	return 0;
+}
+
+int hugetlb_get_quota(struct address_space *mapping)
+{
+	int ret = 0;
+	struct hugetlbfs_sb_info *sbinfo = HUGETLBFS_SB(mapping->host->i_sb);
+
+	if (sbinfo->free_blocks > -1) {
+		spin_lock(&sbinfo->stat_lock);
+		if (sbinfo->free_blocks > 0)
+			sbinfo->free_blocks--;
+		else
+			ret = -ENOMEM;
+		spin_unlock(&sbinfo->stat_lock);
+	}
+
+	return ret;
+}
+
+void hugetlb_put_quota(struct address_space *mapping)
+{
+	struct hugetlbfs_sb_info *sbinfo = HUGETLBFS_SB(mapping->host->i_sb);
+
+	if (sbinfo->free_blocks > -1) {
+		spin_lock(&sbinfo->stat_lock);
+		sbinfo->free_blocks++;
+		spin_unlock(&sbinfo->stat_lock);
+	}
 }
 
 static struct super_block *hugetlbfs_get_sb(struct file_system_type *fs_type,

@@ -2490,8 +2490,7 @@ static struct tty_operations serial_ops = {
 	.read_proc = macserial_read_proc,
 };
 
-/* rs_init inits the driver */
-int macserial_init(void)
+static int macserial_init(void)
 {
 	int channel, i;
 	struct mac_serial *info;

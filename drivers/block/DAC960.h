@@ -2248,7 +2248,6 @@ typedef struct DAC960_Command
   int	DmaDirection;
   struct scatterlist *cmd_sglist;
   struct request *Request;
-  struct pci_dev *PciDevice;
   union {
     struct {
       DAC960_V1_CommandMailbox_T CommandMailbox;

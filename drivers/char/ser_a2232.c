@@ -122,8 +122,6 @@ static void a2232_init_portstructs(void);
 /* Initialize and register TTY drivers. */
 /* returns 0 IFF successful */
 static int a2232_init_drivers(void); 
-/* Initialize all A2232 boards; main entry point. */
-int a2232board_init(void);
 
 /* BEGIN GENERIC_SERIAL PROTOTYPES */
 static void a2232_disable_tx_interrupts(void *ptr);
@@ -720,7 +718,7 @@ static int a2232_init_drivers(void)
 	return 0;
 }
 
-int a2232board_init(void)
+static int __init a2232board_init(void)
 {
 	struct zorro_dev *z;
 
@@ -813,13 +811,7 @@ int a2232board_init(void)
 	return 0;
 }
 
-#ifdef MODULE
-int init_module(void)
-{
-	return a2232board_init();
-}
-
-void cleanup_module(void)
+static void __exit a2232board_exit(void)
 {
 	int i;
 
@@ -831,8 +823,9 @@ void cleanup_module(void)
 	put_tty_driver(a2232_driver);
 	free_irq(IRQ_AMIGA_VERTB, a2232_driver_ID);
 }
-#endif
-/***************************** End of Functions *********************/
+
+module_init(a2232board_init);
+module_exit(a2232board_exit);
 
 MODULE_AUTHOR("Enver Haase");
 MODULE_DESCRIPTION("Amiga A2232 multi-serial board driver");

@@ -390,6 +390,16 @@ static int (*destroy_f[SYM_NUM]) (void *key, void *datum, void *datap) =
 	mls_destroy_f
 };
 
+void ocontext_destroy(struct ocontext *c, int i)
+{
+	context_destroy(&c->context[0]);
+	context_destroy(&c->context[1]);
+	if (i == OCON_ISID || i == OCON_FS ||
+	    i == OCON_NETIF || i == OCON_FSUSE)
+		kfree(c->u.name);
+	kfree(c);
+}
+
 /*
  * Free any memory allocated by a policy database structure.
  */
@@ -423,12 +433,7 @@ void policydb_destroy(struct policydb *p)
 		while (c) {
 			ctmp = c;
 			c = c->next;
-			context_destroy(&ctmp->context[0]);
-			context_destroy(&ctmp->context[1]);
-			if (i == OCON_ISID || i == OCON_FS ||
-			    i == OCON_NETIF || i == OCON_FSUSE)
-				kfree(ctmp->u.name);
-			kfree(ctmp);
+			ocontext_destroy(ctmp,i);
 		}
 	}
 
@@ -439,9 +444,7 @@ void policydb_destroy(struct policydb *p)
 		while (c) {
 			ctmp = c;
 			c = c->next;
-			context_destroy(&ctmp->context[0]);
-			kfree(ctmp->u.name);
-			kfree(ctmp);
+			ocontext_destroy(ctmp,OCON_FSUSE);
 		}
 		gtmp = g;
 		g = g->next;
@@ -762,6 +765,13 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 			goto bad;
 		}
 		memset(c, 0, sizeof(*c));
+
+		if (lc) {
+			lc->next = c;
+		} else {
+			cladatum->constraints = c;
+		}
+
 		buf = next_entry(fp, sizeof(u32)*2);
 		if (!buf)
 			goto bad;
@@ -776,67 +786,50 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 				goto bad;
 			}
 			memset(e, 0, sizeof(*e));
-			buf = next_entry(fp, sizeof(u32)*3);
-			if (!buf) {
-				kfree(e);
-				goto bad;
+
+			if (le) {
+				le->next = e;
+			} else {
+				c->expr = e;
 			}
+
+			buf = next_entry(fp, sizeof(u32)*3);
+			if (!buf)
+				goto bad;
 			e->expr_type = le32_to_cpu(buf[0]);
 			e->attr = le32_to_cpu(buf[1]);
 			e->op = le32_to_cpu(buf[2]);
 
 			switch (e->expr_type) {
 			case CEXPR_NOT:
-				if (depth < 0) {
-					kfree(e);
+				if (depth < 0)
 					goto bad;
-				}
 				break;
 			case CEXPR_AND:
 			case CEXPR_OR:
-				if (depth < 1) {
-					kfree(e);
+				if (depth < 1)
 					goto bad;
-				}
 				depth--;
 				break;
 			case CEXPR_ATTR:
-				if (depth == (CEXPR_MAXDEPTH-1)) {
-					kfree(e);
+				if (depth == (CEXPR_MAXDEPTH-1))
 					goto bad;
-				}
 				depth++;
 				break;
 			case CEXPR_NAMES:
-				if (depth == (CEXPR_MAXDEPTH-1)) {
-					kfree(e);
+				if (depth == (CEXPR_MAXDEPTH-1))
 					goto bad;
-				}
 				depth++;
-				if (ebitmap_read(&e->names, fp)) {
-					kfree(e);
+				if (ebitmap_read(&e->names, fp))
 					goto bad;
-				}
 				break;
 			default:
-				kfree(e);
 				goto bad;
-				break;
-			}
-			if (le) {
-				le->next = e;
-			} else {
-				c->expr = e;
 			}
 			le = e;
 		}
 		if (depth != 0)
 			goto bad;
-		if (lc) {
-			lc->next = c;
-		} else {
-			cladatum->constraints = c;
-		}
 		lc = c;
 	}
 
@@ -1331,12 +1324,6 @@ int policydb_read(struct policydb *p, void *fp)
 	genfs_p = NULL;
 	rc = -EINVAL;
 	for (i = 0; i < nel; i++) {
-		newgenfs = kmalloc(sizeof(*newgenfs), GFP_KERNEL);
-		if (!newgenfs) {
-			rc = -ENOMEM;
-			goto bad;
-		}
-		memset(newgenfs, 0, sizeof(*newgenfs));
 		buf = next_entry(fp, sizeof(u32));
 		if (!buf)
 			goto bad;
@@ -1344,9 +1331,17 @@ int policydb_read(struct policydb *p, void *fp)
 		buf = next_entry(fp, len);
 		if (!buf)
 			goto bad;
+		newgenfs = kmalloc(sizeof(*newgenfs), GFP_KERNEL);
+		if (!newgenfs) {
+			rc = -ENOMEM;
+			goto bad;
+		}
+		memset(newgenfs, 0, sizeof(*newgenfs));
+
 		newgenfs->fstype = kmalloc(len + 1,GFP_KERNEL);
 		if (!newgenfs->fstype) {
 			rc = -ENOMEM;
+			kfree(newgenfs);
 			goto bad;
 		}
 		memcpy(newgenfs->fstype, buf, len);
@@ -1356,6 +1351,8 @@ int policydb_read(struct policydb *p, void *fp)
 			if (strcmp(newgenfs->fstype, genfs->fstype) == 0) {
 				printk(KERN_ERR "security:  dup genfs "
 				       "fstype %s\n", newgenfs->fstype);
+				kfree(newgenfs->fstype);
+				kfree(newgenfs);
 				goto bad;
 			}
 			if (strcmp(newgenfs->fstype, genfs->fstype) < 0)
@@ -1371,12 +1368,6 @@ int policydb_read(struct policydb *p, void *fp)
 			goto bad;
 		nel2 = le32_to_cpu(buf[0]);
 		for (j = 0; j < nel2; j++) {
-			newc = kmalloc(sizeof(*newc), GFP_KERNEL);
-			if (!newc) {
-				rc = -ENOMEM;
-				goto bad;
-			}
-			memset(newc, 0, sizeof(*newc));
 			buf = next_entry(fp, sizeof(u32));
 			if (!buf)
 				goto bad;
@@ -1384,19 +1375,27 @@ int policydb_read(struct policydb *p, void *fp)
 			buf = next_entry(fp, len);
 			if (!buf)
 				goto bad;
+
+			newc = kmalloc(sizeof(*newc), GFP_KERNEL);
+			if (!newc) {
+				rc = -ENOMEM;
+				goto bad;
+			}
+			memset(newc, 0, sizeof(*newc));
+
 			newc->u.name = kmalloc(len + 1,GFP_KERNEL);
 			if (!newc->u.name) {
 				rc = -ENOMEM;
-				goto bad;
+				goto bad_newc;
 			}
 			memcpy(newc->u.name, buf, len);
 			newc->u.name[len] = 0;
 			buf = next_entry(fp, sizeof(u32));
 			if (!buf)
-				goto bad;
+				goto bad_newc;
 			newc->v.sclass = le32_to_cpu(buf[0]);
 			if (context_read_and_validate(&newc->context[0], p, fp))
-				goto bad;
+				goto bad_newc;
 			for (l = NULL, c = newgenfs->head; c;
 			     l = c, c = c->next) {
 				if (!strcmp(newc->u.name, c->u.name) &&
@@ -1405,13 +1404,14 @@ int policydb_read(struct policydb *p, void *fp)
 					printk(KERN_ERR "security:  dup genfs "
 					       "entry (%s,%s)\n",
 					       newgenfs->fstype, c->u.name);
-					goto bad;
+					goto bad_newc;
 				}
 				len = strlen(newc->u.name);
 				len2 = strlen(c->u.name);
 				if (len > len2)
 					break;
 			}
+
 			newc->next = c;
 			if (l)
 				l->next = newc;
@@ -1425,6 +1425,8 @@ int policydb_read(struct policydb *p, void *fp)
 		goto bad;
 out:
 	return rc;
+bad_newc:
+	ocontext_destroy(newc,OCON_FSUSE);
 bad:
 	policydb_destroy(p);
 	goto out;
