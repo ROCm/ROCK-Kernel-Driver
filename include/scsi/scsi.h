@@ -10,6 +10,12 @@
 
 #include <linux/types.h>
 
+/*
+ *	The maximum sg list length SCSI can cope with
+ *	(currently must be a power of 2 between 32 and 256)
+ */
+#define SCSI_MAX_PHYS_SEGMENTS	MAX_PHYS_SEGMENTS
+
 
 /*
  *	SCSI command lengths

@@ -24,7 +24,7 @@
 #include "scsi_logging.h"
 
 
-#define SG_MEMPOOL_NR		5
+#define SG_MEMPOOL_NR		(sizeof(scsi_sg_pools)/sizeof(struct scsi_host_sg_pool))
 #define SG_MEMPOOL_SIZE		32
 
 struct scsi_host_sg_pool {
@@ -34,9 +34,27 @@ struct scsi_host_sg_pool {
 	mempool_t	*pool;
 };
 
+#if (SCSI_MAX_PHYS_SEGMENTS < 32)
+#error SCSI_MAX_PHYS_SEGMENTS is too small
+#endif
+
 #define SP(x) { x, "sgpool-" #x } 
-struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR] = { 
-	SP(8), SP(16), SP(32), SP(64), SP(MAX_PHYS_SEGMENTS)
+struct scsi_host_sg_pool scsi_sg_pools[] = { 
+	SP(8),
+	SP(16),
+	SP(32),
+#if (SCSI_MAX_PHYS_SEGMENTS > 32)
+	SP(64),
+#if (SCSI_MAX_PHYS_SEGMENTS > 64)
+	SP(128),
+#if (SCSI_MAX_PHYS_SEGMENTS > 128)
+	SP(256),
+#if (SCSI_MAX_PHYS_SEGMENTS > 256)
+#error SCSI_MAX_PHYS_SEGMENTS is too large
+#endif
+#endif
+#endif
+#endif
 }; 	
 #undef SP
 
@@ -558,12 +576,21 @@ static struct scatterlist *scsi_alloc_sgtable(struct scsi_cmnd *cmd, int gfp_mas
 	case 17 ... 32:
 		cmd->sglist_len = 2;
 		break;
+#if (SCSI_MAX_PHYS_SEGMENTS > 32)
 	case 33 ... 64:
 		cmd->sglist_len = 3;
 		break;
-	case 65 ... MAX_PHYS_SEGMENTS:
+#if (SCSI_MAX_PHYS_SEGMENTS > 64)
+	case 65 ... 128:
 		cmd->sglist_len = 4;
 		break;
+#if (SCSI_MAX_PHYS_SEGMENTS  > 128)
+	case 129 ... 256:
+		cmd->sglist_len = 5;
+		break;
+#endif
+#endif
+#endif
 	default:
 		return NULL;
 	}
@@ -1286,7 +1313,7 @@ struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 	blk_queue_prep_rq(q, scsi_prep_fn);
 
 	blk_queue_max_hw_segments(q, shost->sg_tablesize);
-	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
+	blk_queue_max_phys_segments(q, SCSI_MAX_PHYS_SEGMENTS);
 	blk_queue_max_sectors(q, shost->max_sectors);
 	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
 	blk_queue_segment_boundary(q, shost->dma_boundary);
