@@ -598,7 +598,7 @@ GLUE(GLUE(.LT,NAME),_procname_end):
 extern int have_of;
 
 struct task_struct;
-void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp);
+void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp);
 void release_thread(struct task_struct *);
 
 /*

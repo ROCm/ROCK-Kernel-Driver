@@ -189,12 +189,20 @@ _GLOBAL(__secondary_hold)
 	std	r22,EX_SRR0(r21);	/* Save SRR0 in exc. frame    */ \
 	mfspr   r23,SRR1;               /* machine state at interrupt */ \
 	std	r23,EX_SRR1(r21);	/* Save SRR1 in exc. frame    */ \
+                                                                         \
+	mfspr   r23,DAR;                /* Save DAR in exc. frame      */ \
+	std	r23,EX_DAR(r21);	                                  \
+	mfspr	r23,DSISR;		/* Save DSISR in exc. frame    */ \
+	stw	r23,EX_DSISR(r21);	                                  \
+	mfspr	r23,SPRG2;		/* Save r20 in exc. frame      */ \
+	std	r23,EX_R20(r21);	                                  \
+                                                                         \
 	clrrdi  r22,r20,60;             /* Get 0xc part of the vaddr  */ \
 	ori	r22,r22,(label)@l;      /* add in the vaddr offset    */ \
 		                        /*   assumes *_common < 16b   */ \
 	mfmsr   r23;                                                     \
 	rotldi  r23,r23,4;                                               \
-	ori     r23,r23,0x30B;          /* Set IR, DR, SF, ISF, HV    */ \
+	ori     r23,r23,0x32B;          /* Set IR, DR, RI, SF, ISF, HV*/ \
 	rotldi  r23,r23,60;             /* for generic handlers       */ \
 	mtspr   SRR0,r22;                                                \
 	mtspr   SRR1,r23;                                                \
@@ -231,16 +239,10 @@ _GLOBAL(__secondary_hold)
  * frame on entry, r23 contains the saved CR, and relocation is on.
  */
 #define EXCEPTION_PROLOG_COMMON                                           \
-	mfspr	r22,SPRG2;		/* Save r20 in exc. frame      */ \
-	std	r22,EX_R20(r21);	                                  \
 	mfspr	r22,SPRG1;		/* Save r21 in exc. frame      */ \
 	std	r22,EX_R21(r21);	                                  \
-	mfspr   r22,DAR;                /* Save DAR in exc. frame      */ \
-	std	r22,EX_DAR(r21);	                                  \
 	std     r21,PACAEXCSP(r20);     /* update exception stack ptr  */ \
 		                        /*   iff no protection flt     */ \
-	mfspr	r22,DSISR;		/* Save DSISR in exc. frame    */ \
-	stw	r22,EX_DSISR(r21);	                                  \
 	ld	r22,EX_SRR1(r21);	/* Get SRR1 from exc. frame    */ \
 	andi.   r22,r22,MSR_PR;         /* Set CR for later branch     */ \
 	mr      r22,r1;                 /* Save r1                     */ \
@@ -556,6 +558,12 @@ fast_exception_return:
 	REST_GPR(0, r1)
 	REST_8GPRS(2, r1)
 	REST_4GPRS(10, r1)
+
+	mfmsr	r20
+	li	r21, MSR_RI
+	andc	r20,r20,r21
+	mtmsrd	r20
+
 	mtspr   SRR1,r23
 	mtspr   SRR0,r22
 	REST_4GPRS(20, r1)
@@ -977,6 +985,12 @@ _GLOBAL(do_stab_bolted)
 	lwz	r23,EX_CCR(r21)		/* get saved CR */
 	/* note that this is almost identical to maskable_exception_exit */
 	mtcr    r23                     /* restore CR */
+
+	mfmsr	r22
+	li	r23, MSR_RI
+	andc	r22,r22,r23
+	mtmsrd	r22
+
 	ld	r22,EX_SRR0(r21)	/* Get SRR0 from exc. frame */
 	ld	r23,EX_SRR1(r21)	/* Get SRR1 from exc. frame */
 	mtspr	SRR0,r22
@@ -1076,6 +1090,12 @@ SLB_NUM_ENTRIES = 64
 	lwz	r23,EX_CCR(r21)		/* get saved CR */
 	/* note that this is almost identical to maskable_exception_exit */
 	mtcr    r23                     /* restore CR */
+
+	mfmsr	r22
+	li	r23, MSR_RI
+	andc	r22,r22,r23
+	mtmsrd	r22
+
 	ld	r22,EX_SRR0(r21)	/* Get SRR0 from exc. frame */
 	ld	r23,EX_SRR1(r21)	/* Get SRR1 from exc. frame */
 	mtspr	SRR0,r22
@@ -1189,7 +1209,6 @@ do_profile:
  * At entry, r3 = this processor's number (in Linux terms, not hardware).
  */
 _GLOBAL(pseries_secondary_smp_init)
-
 	/* turn on 64-bit mode */
 	bl	.enable_64b_mode
 	isync
@@ -1543,15 +1562,23 @@ _GLOBAL(__secondary_start)
 	sc				/* HvCall_setASR */
 #else
 	/* set the ASR */
-	addi  r3,0,0x4000     /* r3 = ptr to naca */
-	lhz   r3,PLATFORM(r3) /* r3 = platform flags */
-	cmpldi r3,PLATFORM_PSERIES_LPAR
-	bne   98f
-	li	r3,H_SET_ASR  /* hcall = H_SET_ASR */
-	HSC     			    /* Invoking hcall */
-	b     99f
-98:             /* This is not a hypervisor machine */
-	mtasr	r4			/* set the stab location            */
+	addi	r3,0,0x4000     /* r3 = ptr to naca */
+	lhz   	r3,PLATFORM(r3) /* r3 = platform flags */
+	cmpldi 	r3,PLATFORM_PSERIES_LPAR
+	bne   	98f
+	mfspr	r3,PVR
+	srwi	r3,r3,16
+	cmpwi	r3,0x37         /* SStar  */
+	beq	97f
+	cmpwi	r3,0x36         /* IStar  */
+	beq	97f
+	cmpwi	r3,0x34         /* Pulsar */
+	bne	98f
+97:	li	r3,H_SET_ASR    /* hcall = H_SET_ASR */
+	HSC     		/* Invoking hcall */
+	b	99f
+98:                             /* !(rpa hypervisor) || !(star)  */
+	mtasr	r4	        /* set the stab location         */
 99:
 #endif
 	li	r7,0
@@ -1689,15 +1716,23 @@ _STATIC(start_here_pSeries)
 	ori	r4,r3,1			/* turn on valid bit                */
 	
 	/* set the ASR */
-	addi  r3,0,0x4000     /* r3 = ptr to naca */
-	lhz   r3,PLATFORM(r3) /* r3 = platform flags */
-	cmpldi r3,PLATFORM_PSERIES_LPAR
-	bne   98f
-	li	r3,H_SET_ASR  /* hcall = H_SET_ASR */
-	HSC     			    /* Invoking hcall */
-	b     99f
-98:                 /* This is not a hypervisor machine */
-	mtasr	r4			/* set the stab location            */
+	addi	r3,0,0x4000     /* r3 = ptr to naca */
+	lhz   	r3,PLATFORM(r3) /* r3 = platform flags */
+	cmpldi 	r3,PLATFORM_PSERIES_LPAR
+	bne   	98f
+	mfspr	r3,PVR
+	srwi	r3,r3,16
+	cmpwi	r3,0x37         /* SStar */
+	beq	97f
+	cmpwi	r3,0x36         /* IStar  */
+	beq	97f
+	cmpwi	r3,0x34         /* Pulsar */
+	bne	98f
+97:	li	r3,H_SET_ASR    /* hcall = H_SET_ASR */
+	HSC     	        /* Invoking hcall */
+	b     	99f
+98:                             /* !(rpa hypervisor) || !(star) */
+	mtasr	r4	        /* set the stab location         */
 99:
 	mfspr	r6,SPRG3
 	ld	r3,PACASTABREAL(r6)     /* restore r3 for stab_initialize */
