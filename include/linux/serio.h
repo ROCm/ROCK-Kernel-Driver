@@ -27,6 +27,8 @@ struct serio {
 	char name[32];
 	char phys[32];
 
+	unsigned int manual_bind;
+
 	unsigned short idbus;
 	unsigned short idvendor;
 	unsigned short idproduct;
@@ -55,7 +57,7 @@ struct serio_driver {
 	void *private;
 	char *description;
 
-	int manual_bind;
+	unsigned int manual_bind;
 
 	void (*write_wakeup)(struct serio *);
 	irqreturn_t (*interrupt)(struct serio *, unsigned char,

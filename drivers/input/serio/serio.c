@@ -283,9 +283,33 @@ static ssize_t serio_rebind_driver(struct device *dev, const char *buf, size_t c
 	return retval;
 }
 
+static ssize_t serio_show_bind_mode(struct device *dev, char *buf)
+{
+	struct serio *serio = to_serio_port(dev);
+	return sprintf(buf, "%s\n", serio->manual_bind ? "manual" : "auto");
+}
+
+static ssize_t serio_set_bind_mode(struct device *dev, const char *buf, size_t count)
+{
+	struct serio *serio = to_serio_port(dev);
+	int retval;
+
+	retval = count;
+	if (!strncmp(buf, "manual", count)) {
+		serio->manual_bind = 1;
+	} else if (!strncmp(buf, "auto", count)) {
+		serio->manual_bind = 0;
+	} else {
+		retval = -EINVAL;
+	}
+
+	return retval;
+}
+
 static struct device_attribute serio_device_attrs[] = {
 	__ATTR(description, S_IRUGO, serio_show_description, NULL),
 	__ATTR(driver, S_IWUSR | S_IRUGO, serio_show_driver, serio_rebind_driver),
+	__ATTR(bind_mode, S_IWUSR | S_IRUGO, serio_show_bind_mode, serio_set_bind_mode),
 	__ATTR_NULL
 };
 
@@ -353,7 +377,7 @@ static void serio_connect_port(struct serio *serio, struct serio_driver *drv)
 
 	if (drv)
 		serio_bind_driver(serio, drv);
-	else
+	else if (!serio->manual_bind)
 		serio_find_driver(serio);
 
 	/* Ok, now bind children, if any */
@@ -365,13 +389,15 @@ static void serio_connect_port(struct serio *serio, struct serio_driver *drv)
 
 		serio_create_port(serio);
 
-		/*
-		 * With children we just _prefer_ passed in driver,
-		 * but we will try other options in case preferred
-		 * is not the one
-		 */
-		if (!drv || !serio_bind_driver(serio, drv))
-			serio_find_driver(serio);
+		if (!serio->manual_bind) {
+			/*
+			 * With children we just _prefer_ passed in driver,
+			 * but we will try other options in case preferred
+			 * is not the one
+			 */
+			if (!drv || !serio_bind_driver(serio, drv))
+				serio_find_driver(serio);
+		}
 	}
 }
 
@@ -485,8 +511,34 @@ static ssize_t serio_driver_show_description(struct device_driver *drv, char *bu
 	return sprintf(buf, "%s\n", driver->description ? driver->description : "(none)");
 }
 
+static ssize_t serio_driver_show_bind_mode(struct device_driver *drv, char *buf)
+{
+	struct serio_driver *serio_drv = to_serio_driver(drv);
+	return sprintf(buf, "%s\n", serio_drv->manual_bind ? "manual" : "auto");
+}
+
+static ssize_t serio_driver_set_bind_mode(struct device_driver *drv, const char *buf, size_t count)
+{
+	struct serio_driver *serio_drv = to_serio_driver(drv);
+	int retval;
+
+	retval = count;
+	if (!strncmp(buf, "manual", count)) {
+		serio_drv->manual_bind = 1;
+	} else if (!strncmp(buf, "auto", count)) {
+		serio_drv->manual_bind = 0;
+	} else {
+		retval = -EINVAL;
+	}
+
+	return retval;
+}
+
+
 static struct driver_attribute serio_driver_attrs[] = {
 	__ATTR(description, S_IRUGO, serio_driver_show_description, NULL),
+	__ATTR(bind_mode, S_IWUSR | S_IRUGO,
+		serio_driver_show_bind_mode, serio_driver_set_bind_mode),
 	__ATTR_NULL
 };
 
