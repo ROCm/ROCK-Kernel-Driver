@@ -200,7 +200,7 @@ static int grow_buffers(struct stripe_head *sh, int num)
 
 static void raid6_build_block (struct stripe_head *sh, int i);
 
-static inline void init_stripe(struct stripe_head *sh, unsigned long sector, int pd_idx)
+static inline void init_stripe(struct stripe_head *sh, sector_t sector, int pd_idx)
 {
 	raid6_conf_t *conf = sh->raid_conf;
 	int disks = conf->raid_disks, i;
@@ -237,25 +237,25 @@ static inline void init_stripe(struct stripe_head *sh, unsigned long sector, int
 	insert_hash(conf, sh);
 }
 
-static struct stripe_head *__find_stripe(raid6_conf_t *conf, unsigned long sector)
+static struct stripe_head *__find_stripe(raid6_conf_t *conf, sector_t sector)
 {
 	struct stripe_head *sh;
 
 	CHECK_DEVLOCK();
-	PRINTK("__find_stripe, sector %lu\n", sector);
+	PRINTK("__find_stripe, sector %llu\n", (unsigned long long)sector);
 	for (sh = stripe_hash(conf, sector); sh; sh = sh->hash_next)
 		if (sh->sector == sector)
 			return sh;
-	PRINTK("__stripe %lu not in cache\n", sector);
+	PRINTK("__stripe %llu not in cache\n", (unsigned long long)sector);
 	return NULL;
 }
 
-static struct stripe_head *get_active_stripe(raid6_conf_t *conf, unsigned long sector,
+static struct stripe_head *get_active_stripe(raid6_conf_t *conf, sector_t sector,
 					     int pd_idx, int noblock)
 {
 	struct stripe_head *sh;
 
-	PRINTK("get_stripe, sector %lu\n", sector);
+	PRINTK("get_stripe, sector %llu\n", (unsigned long long)sector);
 
 	spin_lock_irq(&conf->device_lock);
 
@@ -516,7 +516,7 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
  * Input: a 'big' sector number,
  * Output: index of the data and parity disk, and the sector # in them.
  */
-static unsigned long raid6_compute_sector(sector_t r_sector, unsigned int raid_disks,
+static sector_t raid6_compute_sector(sector_t r_sector, unsigned int raid_disks,
 			unsigned int data_disks, unsigned int * dd_idx,
 			unsigned int * pd_idx, raid6_conf_t *conf)
 {
@@ -588,7 +588,7 @@ static unsigned long raid6_compute_sector(sector_t r_sector, unsigned int raid_d
 	/*
 	 * Finally, compute the new sector number
 	 */
-	new_sector = stripe * sectors_per_chunk + chunk_offset;
+	new_sector = (sector_t) stripe * sectors_per_chunk + chunk_offset;
 	return new_sector;
 }
 
@@ -599,7 +599,7 @@ static sector_t compute_blocknr(struct stripe_head *sh, int i)
 	int raid_disks = conf->raid_disks, data_disks = raid_disks - 2;
 	sector_t new_sector = sh->sector, check;
 	int sectors_per_chunk = conf->chunk_size >> 9;
-	long stripe;
+	sector_t stripe;
 	int chunk_offset;
 	int chunk_number, dummy1, dummy2, dd_idx = i;
 	sector_t r_sector;
@@ -1550,7 +1550,7 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 	unsigned long stripe;
 	int chunk_offset;
 	int dd_idx, pd_idx;
-	unsigned long first_sector;
+	sector_t first_sector;
 	int raid_disks = conf->raid_disks;
 	int data_disks = raid_disks - 2;
 
@@ -1563,7 +1563,7 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 	stripe = x;
 	BUG_ON(x != stripe);
 
-	first_sector = raid6_compute_sector(stripe*data_disks*sectors_per_chunk
+	first_sector = raid6_compute_sector((sector_t)stripe*data_disks*sectors_per_chunk
 		+ chunk_offset, raid_disks, data_disks, &dd_idx, &pd_idx, conf);
 	sh = get_active_stripe(conf, sector_nr, pd_idx, 1);
 	if (sh == NULL) {
