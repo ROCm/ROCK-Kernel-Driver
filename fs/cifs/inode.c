@@ -126,9 +126,13 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		findData.NumOfBytes = le64_to_cpu(findData.NumOfBytes);
 		findData.EndOfFile = le64_to_cpu(findData.EndOfFile);
 		inode->i_size = findData.EndOfFile;
-		inode->i_blksize =
-		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
-		inode->i_blocks = do_div(findData.NumOfBytes, inode->i_blksize);
+/* blksize needs to be multiple of two. So safer to default to blksize
+	and blkbits set in superblock so 2**blkbits and blksize will match */
+/*		inode->i_blksize =
+		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;*/
+		inode->i_blocks = 
+	                (inode->i_blksize - 1 + findData.NumOfBytes) >> inode->i_blkbits;
+
 		if (findData.NumOfBytes < findData.EndOfFile)
 			cFYI(1, ("Server inconsistency Error: it says allocation size less than end of file "));
 		cFYI(1,
@@ -236,8 +240,11 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		cFYI(1, (" New time %ld ", cifsInfo->time));
 		atomic_inc(&cifsInfo->inUse);	/* inc on every refresh of inode */
 
-		inode->i_blksize =
-		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
+/* blksize needs to be multiple of two. So safer to default to blksize
+        and blkbits set in superblock so 2**blkbits and blksize will match */
+/*		inode->i_blksize =
+		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;*/
+
 		/* Linux can not store file creation time unfortunately so we ignore it */
 		inode->i_atime =
 		    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastAccessTime));
@@ -268,7 +275,8 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		inode->i_size = le64_to_cpu(pfindData->EndOfFile);
 		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
 		inode->i_blocks =
-		    do_div(pfindData->AllocationSize, inode->i_blksize);
+	                (inode->i_blksize - 1 + pfindData->AllocationSize) >> inode->i_blkbits;
+
 		cFYI(1,
 		     (" Size %ld and blocks %ld ",
 		      (unsigned long) inode->i_size, inode->i_blocks));

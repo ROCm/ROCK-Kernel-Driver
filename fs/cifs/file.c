@@ -985,7 +985,7 @@ fill_in_inode(struct inode *tmp_inode,
 	/* can not fill in nlink here as in qpathinfo version and Unx search */
 	tmp_inode->i_size = pfindData->EndOfFile;
 	tmp_inode->i_blocks =
-	    do_div(pfindData->AllocationSize, tmp_inode->i_blksize);
+		(tmp_inode->i_blksize - 1 + pfindData->AllocationSize) >> tmp_inode->i_blkbits;
 	if (pfindData->AllocationSize < pfindData->EndOfFile)
 		cFYI(1, ("Possible sparse file: allocation size less than end of file "));
 	cFYI(1,
@@ -1059,7 +1059,8 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
 	tmp_inode->i_size = pfindData->EndOfFile;
 	tmp_inode->i_blocks =
-	    do_div(pfindData->NumOfBytes, tmp_inode->i_blksize);
+                (tmp_inode->i_blksize - 1 + pfindData->NumOfBytes) >> tmp_inode->i_blkbits;
+
 	if (S_ISREG(tmp_inode->i_mode)) {
 		cFYI(1, (" File inode "));
 		tmp_inode->i_op = &cifs_file_inode_ops;
@@ -1255,7 +1256,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			renew_parental_timestamps(file->f_dentry);
 			lastFindData = 
 				(FILE_DIRECTORY_INFO *) ((char *) pfindData + 
-					le32_to_cpu(findParms.LastNameOffset));
+					findParms.LastNameOffset);
 			if((char *)lastFindData > (char *)pfindData + bufsize) {
 				cFYI(1,("last search entry past end of packet"));
 				rc = -EIO;
@@ -1415,7 +1416,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			/* BB save off resume key, key name and name length  */
 				lastFindData = 
 					(FILE_DIRECTORY_INFO *) ((char *) pfindData 
-						+ le32_to_cpu(findNextParms.LastNameOffset));
+						+ findNextParms.LastNameOffset);
 				if((char *)lastFindData > (char *)pfindData + bufsize) {
 					cFYI(1,("last search entry past end of packet"));
 					rc = -EIO;

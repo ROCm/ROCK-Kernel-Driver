@@ -90,10 +90,10 @@ cifs_read_super(struct super_block *sb, void *data,
 
 	sb->s_magic = CIFS_MAGIC_NUMBER;
 	sb->s_op = &cifs_super_ops;
-	if(cifs_sb->tcon->ses->server->maxBuf > MAX_CIFS_HDR_SIZE + 512)
-	    sb->s_blocksize = cifs_sb->tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE;
-	else
-		sb->s_blocksize = CIFSMaximumBufferSize;
+/*	if(cifs_sb->tcon->ses->server->maxBuf > MAX_CIFS_HDR_SIZE + 512)
+	    sb->s_blocksize = cifs_sb->tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE; */
+
+	sb->s_blocksize = CIFS_MAX_MSGSIZE;
 	sb->s_blocksize_bits = 14;	/* default 2**14 = CIFS_MAX_MSGSIZE */
 	inode = iget(sb, ROOT_I);
 
@@ -281,6 +281,27 @@ cifs_get_sb(struct file_system_type *fs_type,
 	sb->s_flags |= MS_ACTIVE;
 	return sb;
 }
+
+ssize_t
+cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
+          loff_t * poffset)
+{
+	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead)
+		return generic_file_read(file,read_data,read_size,poffset);
+	else
+		return cifs_read(file,read_data,read_size,poffset);	
+}
+
+ssize_t
+cifs_write_wrapper(struct file * file, const char *write_data,
+           size_t write_size, loff_t * poffset) 
+{
+	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheAll)    /* check caching for write */
+		return generic_file_write(file,write_data, write_size,poffset);
+	else
+		return cifs_write(file,write_data,write_size,poffset);
+}
+
 
 static struct file_system_type cifs_fs_type = {
 	.owner = THIS_MODULE,
