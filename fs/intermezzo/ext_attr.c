@@ -105,9 +105,8 @@ int presto_set_ext_attr(struct inode *inode,
                         printk("InterMezzo: out of memory!!!\n");
                         return -ENOMEM;
                 }
-                error = copy_from_user(buf, buffer, buffer_len);
-                if (error) 
-                        return error;
+                if (copy_from_user(buf, buffer, buffer_len))
+                        return -EFAULT;
             } else 
                 buf = buffer;
         } else

@@ -759,6 +759,9 @@ struct inode_operations {
 
 struct seq_file;
 
+extern ssize_t vfs_read(struct file *, char *, size_t, loff_t *);
+extern ssize_t vfs_write(struct file *, const char *, size_t, loff_t *);
+
 /*
  * NOTE: write_inode, delete_inode, clear_inode, put_inode can be called
  * without the big kernel lock held in all filesystems.

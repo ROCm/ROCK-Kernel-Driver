@@ -414,11 +414,13 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 {
 	struct dentry	*dentry;
 	struct inode	*inode;
-	int		err;
+	int		flags = O_RDONLY|O_LARGEFILE, mode = FMODE_READ, err;
 
-	/* If we get here, then the client has already done an "open", and (hopefully)
-	 * checked permission - so allow OWNER_OVERRIDE in case a chmod has now revoked
-	 * permission */
+	/*
+	 * If we get here, then the client has already done an "open",
+	 * and (hopefully) checked permission - so allow OWNER_OVERRIDE
+	 * in case a chmod has now revoked permission.
+	 */
 	err = fh_verify(rqstp, fhp, type, access | MAY_OWNER_OVERRIDE);
 	if (err)
 		goto out;
@@ -443,37 +445,24 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 	if (err)
 		goto out_nfserr;
 
-	if ((access & MAY_WRITE) && (err = get_write_access(inode)) != 0)
-		goto out_nfserr;
-
-	memset(filp, 0, sizeof(*filp));
-	filp->f_op    = fops_get(inode->i_fop);
-	atomic_set(&filp->f_count, 1);
-	filp->f_dentry = dentry;
-	filp->f_vfsmnt = fhp->fh_export->ex_mnt;
 	if (access & MAY_WRITE) {
-		filp->f_flags = O_WRONLY|O_LARGEFILE;
-		filp->f_mode  = FMODE_WRITE;
+		err = get_write_access(inode);
+		if (err)
+			goto out_nfserr;
+
+		flags = O_WRONLY|O_LARGEFILE;
+		mode  = FMODE_WRITE;
+
 		DQUOT_INIT(inode);
-	} else {
-		filp->f_flags = O_RDONLY|O_LARGEFILE;
-		filp->f_mode  = FMODE_READ;
 	}
 
-	err = 0;
-	if (filp->f_op && filp->f_op->open) {
-		err = filp->f_op->open(inode, filp);
-		if (err) {
-			fops_put(filp->f_op);
-			if (access & MAY_WRITE)
-				put_write_access(inode);
+	err = init_private_file(filp, dentry, mode);
+	if (!err) {
+		filp->f_flags = flags;
+		filp->f_vfsmnt = fhp->fh_export->ex_mnt;
+	} else if (access & MAY_WRITE)
+		put_write_access(inode);
 
-			/* I nearly added put_filp() call here, but this filp
-			 * is really on callers stack frame. -DaveM
-			 */
-			atomic_dec(&filp->f_count);
-		}
-	}
 out_nfserr:
 	if (err)
 		err = nfserrno(err);
@@ -490,9 +479,8 @@ nfsd_close(struct file *filp)
 	struct dentry	*dentry = filp->f_dentry;
 	struct inode	*inode = dentry->d_inode;
 
-	if (filp->f_op && filp->f_op->release)
+	if (filp->f_op->release)
 		filp->f_op->release(inode, filp);
-	fops_put(filp->f_op);
 	if (filp->f_mode & FMODE_WRITE)
 		put_write_access(inode);
 }
