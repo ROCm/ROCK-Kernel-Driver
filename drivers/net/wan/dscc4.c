@@ -172,7 +172,7 @@ struct RxFD {
  */
 #define TO_STATE_TX(len)	cpu_to_le32(((len) & TxSizeMax) << 16)
 #define TO_STATE_RX(len)	cpu_to_le32((RX_MAX(len) % RxSizeMax) << 16)
-#define RX_MAX(len)		((((len) >> 5) + 1) << 5)
+#define RX_MAX(len)		((((len) >> 5) + 1) << 5)	/* Cf RLCR */
 #define SCC_REG_START(dpriv)	(SCC_START+(dpriv->dev_id)*SCC_OFFSET)
 
 struct dscc4_pci_priv {
@@ -1131,7 +1131,7 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 		}
 		brr = (m << 8) | n;
 		divider = n << m;
-		if (!(*state & 0x00000001)) /* Clock mode 6b */
+		if (!(*state & 0x00000001)) /* ?b mode mask => clock mode 6b */
 			divider <<= 4;
 		*bps = xtal / divider;
 	} else {
