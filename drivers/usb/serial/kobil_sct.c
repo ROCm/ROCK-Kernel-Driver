@@ -183,7 +183,7 @@ static int kobil_startup (struct usb_serial *serial)
 	pdev = serial->dev;
  	actconfig = pdev->actconfig;
  	interface = actconfig->interface[0];
-	altsetting = interface->altsetting;
+	altsetting = interface->cur_altsetting;
  	endpoint = altsetting->endpoint;
   
  	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {
