@@ -131,7 +131,7 @@ static int xl_xmit(struct sk_buff *skb, struct net_device *dev);
 static void xl_dn_comp(struct net_device *dev); 
 static int xl_close(struct net_device *dev);
 static void xl_set_rx_mode(struct net_device *dev);
-static void xl_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t xl_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static struct net_device_stats * xl_get_stats(struct net_device *dev);
 static int xl_set_mac_address(struct net_device *dev, void *addr) ; 
 static void xl_arb_cmd(struct net_device *dev);
@@ -1027,7 +1027,7 @@ static void xl_freemem(struct net_device *dev)
 	return  ; 
 }
 
-static void xl_interrupt(int irq, void *dev_id, struct pt_regs *regs) 
+static irqreturn_t xl_interrupt(int irq, void *dev_id, struct pt_regs *regs) 
 {
 	struct net_device *dev = (struct net_device *)dev_id;
  	struct xl_private *xl_priv =(struct xl_private *)dev->priv;
@@ -1036,13 +1036,13 @@ static void xl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (!dev) { 
 		printk(KERN_WARNING "Device structure dead, aaahhhh !\n") ;
-		return ; 
+		return IRQ_NONE; 
 	}
 
 	intstatus = readw(xl_mmio + MMIO_INTSTATUS) ;  
 
 	if (!(intstatus & 1)) /* We didn't generate the interrupt */
-		return ; 
+		return IRQ_NONE;
 
 	spin_lock(&xl_priv->xl_lock) ; 
 
@@ -1074,7 +1074,7 @@ static void xl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				xl_reset(dev) ; 
 				writel(ACK_INTERRUPT | LATCH_ACK, xl_mmio + MMIO_COMMAND) ; 
 				spin_unlock(&xl_priv->xl_lock) ; 
-				return ; 
+				return IRQ_HANDLED;
 			} /* Host Error */
 
 			if (intstatus & SRBRINT ) {  /* Srbc interrupt */
@@ -1134,7 +1134,7 @@ static void xl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				xl_reset(dev) ; 
 				writel(ACK_INTERRUPT | LATCH_ACK, xl_mmio + MMIO_COMMAND) ; 
 				spin_unlock(&xl_priv->xl_lock) ; 
-				return ; 
+				return IRQ_HANDLED;
 			}
 		} else { 
 			printk(KERN_WARNING "%s: Received Unknown interrupt : %04x \n", dev->name, intstatus) ;
@@ -1147,7 +1147,8 @@ static void xl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	writel( SETINDENABLE | INT_MASK, xl_mmio + MMIO_COMMAND) ; 
 	writel( SETINTENABLE | INT_MASK, xl_mmio + MMIO_COMMAND) ; 
 
-	spin_unlock(&xl_priv->xl_lock) ; 
+	spin_unlock(&xl_priv->xl_lock) ;
+	return IRQ_HANDLED;
 }	
 
 /*

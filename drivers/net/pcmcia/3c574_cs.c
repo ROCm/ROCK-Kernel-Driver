@@ -247,7 +247,7 @@ static void tc574_reset(struct net_device *dev);
 static void media_check(unsigned long arg);
 static int el3_open(struct net_device *dev);
 static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void update_stats(struct net_device *dev);
 static struct net_device_stats *el3_get_stats(struct net_device *dev);
 static int el3_rx(struct net_device *dev, int worklimit);
@@ -947,15 +947,16 @@ static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 /* The EL3 interrupt handler. */
-static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct el3_private *lp = dev_id;
 	struct net_device *dev = &lp->dev;
 	ioaddr_t ioaddr, status;
 	int work_budget = max_interrupt_work;
+	int handled = 0;
 
 	if (!netif_device_present(dev))
-		return;
+		return IRQ_NONE;
 	ioaddr = dev->base_addr;
 
 	DEBUG(3, "%s: interrupt, status %4.4x.\n",
@@ -970,6 +971,8 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			DEBUG(1, "%s: Interrupt from dead card\n", dev->name);
 			break;
 		}
+
+		handled = 1;
 
 		if (status & RxComplete)
 			work_budget = el3_rx(dev, work_budget);
@@ -1029,7 +1032,7 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		  dev->name, inw(ioaddr + EL3_STATUS));
 		  
 	spin_unlock(&lp->window_lock);
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 /*

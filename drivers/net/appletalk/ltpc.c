@@ -789,13 +789,14 @@ static int sendup_buffer (struct net_device *dev)
 
 /* the handler for the board interrupt */
  
-static void ltpc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
+static irqreturn_t
+ltpc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
 {
 	struct net_device *dev = dev_id;
 
 	if (dev==NULL) {
 		printk("ltpc_interrupt: unknown device.\n");
-		return;
+		return IRQ_NONE;
 	}
 
 	inb_p(dev->base_addr+6);  /* disable further interrupts from board */
@@ -804,7 +805,7 @@ static void ltpc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
  
 	/* idle re-enables interrupts from board */ 
 
-	return;
+	return IRQ_HANDLED;
 }
 
 /***

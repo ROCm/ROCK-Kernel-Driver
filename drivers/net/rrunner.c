@@ -1045,7 +1045,7 @@ static void rx_int(struct net_device *dev, u32 rxlimit, u32 index)
 }
 
 
-static void rr_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
+static irqreturn_t rr_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	struct rr_private *rrpriv;
 	struct rr_regs *regs;
@@ -1056,7 +1056,7 @@ static void rr_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	regs = rrpriv->regs;
 
 	if (!(readl(&regs->HostCtrl) & RR_INT))
-		return;
+		return IRQ_NONE;
 
 	spin_lock(&rrpriv->lock);
 
@@ -1127,6 +1127,7 @@ static void rr_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	wmb();
 
 	spin_unlock(&rrpriv->lock);
+	return IRQ_HANDLED;
 }
 
 static void rr_timer(unsigned long data)

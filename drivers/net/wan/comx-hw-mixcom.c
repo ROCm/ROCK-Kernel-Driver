@@ -412,7 +412,7 @@ static inline void mixcom_extended_interrupt(struct net_device *dev)
 }
 
 
-static void MIXCOM_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t MIXCOM_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
 	struct net_device *dev = (struct net_device *)dev_id;
@@ -422,7 +422,7 @@ static void MIXCOM_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (dev==NULL) {
 		printk(KERN_ERR "comx_interrupt: irq %d for unknown device\n",irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	ch = dev->priv; 
@@ -480,7 +480,7 @@ static void MIXCOM_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	restore_flags(flags);
-	return;
+	return IRQ_HANDLED;
 }
 
 static int MIXCOM_open(struct net_device *dev)
