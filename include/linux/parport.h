@@ -459,7 +459,10 @@ extern void parport_ieee1284_interrupt (int, void *, struct pt_regs *);
 extern int parport_negotiate (struct parport *, int mode);
 extern ssize_t parport_write (struct parport *, const void *buf, size_t len);
 extern ssize_t parport_read (struct parport *, void *buf, size_t len);
+
+#define PARPORT_INACTIVITY_O_NONBLOCK 1
 extern long parport_set_timeout (struct pardevice *, long inactivity);
+
 extern int parport_wait_event (struct parport *, long timeout);
 extern int parport_wait_peripheral (struct parport *port,
 				    unsigned char mask,

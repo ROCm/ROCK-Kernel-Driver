@@ -818,8 +818,9 @@ size_t parport_pc_compat_write_block_pio (struct parport *port,
 	long int expire;
 	const struct parport_pc_private *priv = port->physport->private_data;
 
-	/* Special case: a timeout of zero means we cannot call schedule(). */
-	if (!port->physport->cad->timeout)
+	/* Special case: a timeout of zero means we cannot call schedule().
+	 * Also if O_NONBLOCK is set then use the default implementation. */
+	if (port->physport->cad->timeout <= PARPORT_INACTIVITY_O_NONBLOCK)
 		return parport_ieee1284_write_compat (port, buf,
 						      length, flags);
 
@@ -894,8 +895,9 @@ size_t parport_pc_ecp_write_block_pio (struct parport *port,
 	long int expire;
 	const struct parport_pc_private *priv = port->physport->private_data;
 
-	/* Special case: a timeout of zero means we cannot call schedule(). */
-	if (!port->physport->cad->timeout)
+	/* Special case: a timeout of zero means we cannot call schedule().
+	 * Also if O_NONBLOCK is set then use the default implementation. */
+	if (port->physport->cad->timeout <= PARPORT_INACTIVITY_O_NONBLOCK)
 		return parport_ieee1284_ecp_write_data (port, buf,
 							length, flags);
 
@@ -1014,8 +1016,9 @@ size_t parport_pc_ecp_read_block_pio (struct parport *port,
 DPRINTK (KERN_DEBUG "parport_pc: parport_pc_ecp_read_block_pio\n");
 dump_parport_state ("enter fcn", port);
 
-	/* Special case: a timeout of zero means we cannot call schedule(). */
-	if (!port->cad->timeout)
+	/* Special case: a timeout of zero means we cannot call schedule().
+	 * Also if O_NONBLOCK is set then use the default implementation. */
+	if (port->cad->timeout <= PARPORT_INACTIVITY_O_NONBLOCK)
 		return parport_ieee1284_ecp_read_data (port, buf,
 						       length, flags);
 
