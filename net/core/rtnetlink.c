@@ -52,7 +52,7 @@
 
 DECLARE_MUTEX(rtnl_sem);
 
-void rtnl_lock()
+void rtnl_lock(void)
 {
 	rtnl_shlock();
 	rtnl_exlock();
