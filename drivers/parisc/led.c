@@ -97,13 +97,13 @@ struct pdc_chassis_lcd_info_ret_block {
 static struct pdc_chassis_lcd_info_ret_block
 lcd_info __attribute__((aligned(8))) =
 {
-      model:		DISPLAY_MODEL_LCD,
-      lcd_width:	16,
-      lcd_cmd_reg_addr:	(char *) KITTYHAWK_LCD_CMD,
-      lcd_data_reg_addr:(char *) KITTYHAWK_LCD_DATA,
-      min_cmd_delay:	40,
-      reset_cmd1:	0x80,
-      reset_cmd2:	0xc0,
+	.model =		DISPLAY_MODEL_LCD,
+	.lcd_width =		16,
+	.lcd_cmd_reg_addr =	(char *) KITTYHAWK_LCD_CMD,
+	.lcd_data_reg_addr =	(char *) KITTYHAWK_LCD_DATA,
+	.min_cmd_delay =	40,
+	.reset_cmd1 =		0x80,
+	.reset_cmd2 =		0xc0,
 };
 
 

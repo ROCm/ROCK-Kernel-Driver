@@ -135,7 +135,7 @@ static struct parisc_device_id wax_tbl[] = {
 MODULE_DEVICE_TABLE(parisc, wax_tbl);
 
 struct parisc_driver wax_driver = {
-	name:		"Wax",
-	id_table:	wax_tbl,
-	probe:		wax_init_chip,
+	.name =		"Wax",
+	.id_table =	wax_tbl,
+	.probe =	wax_init_chip,
 };

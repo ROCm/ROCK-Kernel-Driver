@@ -79,8 +79,8 @@ static int pdc_chassis_panic_event(struct notifier_block *this,
 
 
 static struct notifier_block pdc_chassis_panic_block = {
-	notifier_call: pdc_chassis_panic_event,
-	priority: INT_MAX,
+	.notifier_call = pdc_chassis_panic_event,
+	.priority = INT_MAX,
 };
 
 
@@ -99,8 +99,8 @@ static int pdc_chassis_reboot_event(struct notifier_block *this,
 
 
 static struct notifier_block pdc_chassis_reboot_block = {
-	notifier_call: pdc_chassis_reboot_event,
-	priority: INT_MAX,
+	.notifier_call = pdc_chassis_reboot_event,
+	.priority = INT_MAX,
 };
 
 

@@ -1919,9 +1919,9 @@ static struct parisc_device_id sba_tbl[] = {
 int sba_driver_callback(struct parisc_device *);
 
 static struct parisc_driver sba_driver = {
-	name:		MODULE_NAME,
-	id_table:	sba_tbl,
-	probe:		sba_driver_callback,
+	.name =		MODULE_NAME,
+	.id_table =	sba_tbl,
+	.probe =	sba_driver_callback,
 };
 
 /*

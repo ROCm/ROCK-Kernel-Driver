@@ -79,12 +79,12 @@ static int eisa_eeprom_release(struct inode *inode, struct file *file)
  *	The various file operations we support.
  */
 static struct file_operations eisa_eeprom_fops = {
-	owner:		THIS_MODULE,
-	llseek:		eisa_eeprom_llseek,
-	read:		eisa_eeprom_read,
-	ioctl:		eisa_eeprom_ioctl,
-	open:		eisa_eeprom_open,
-	release:	eisa_eeprom_release,
+	.owner =	THIS_MODULE,
+	.llseek =	eisa_eeprom_llseek,
+	.read =		eisa_eeprom_read,
+	.ioctl =	eisa_eeprom_ioctl,
+	.open =		eisa_eeprom_open,
+	.release =	eisa_eeprom_release,
 };
 
 static struct miscdevice eisa_eeprom_dev=

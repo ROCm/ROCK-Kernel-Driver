@@ -1596,9 +1596,9 @@ static struct parisc_device_id ccio_tbl[] = {
 };
 
 static struct parisc_driver ccio_driver = {
-	name:		"U2/Uturn",
-	id_table:	ccio_tbl,
-	probe:		ccio_probe,
+	.name =		"U2/Uturn",
+	.id_table =	ccio_tbl,
+	.probe =	ccio_probe,
 };
 
 /**
