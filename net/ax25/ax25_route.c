@@ -41,22 +41,6 @@ static rwlock_t ax25_route_lock = RW_LOCK_UNLOCKED;
 
 static ax25_route *ax25_get_route(ax25_address *, struct net_device *);
 
-/*
- * small macro to drop non-digipeated digipeaters and reverse path
- */
-static inline void ax25_route_invert(ax25_digi *in, ax25_digi *out)
-{
-	int k;
-
-	for (k = 0; k < in->ndigi; k++)
-		if (!in->repeated[k])
-			break;
-
-	in->ndigi = k;
-
-	ax25_digi_invert(in, out);
-}
-
 void ax25_rt_device_down(struct net_device *dev)
 {
 	ax25_route *s, *t, *ax25_rt;
