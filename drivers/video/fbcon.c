@@ -305,14 +305,6 @@ void gen_set_disp(int con, struct fb_info *info)
         }
         */
 
-        if (info->var.bits_per_pixel == 24) {
-#ifdef FBCON_HAS_CFB24
-                display->scrollmode = SCROLL_YREDRAW;
-                display->dispsw = &fbcon_cfb24;
-                return;
-#endif
-        }
-
 #ifdef FBCON_HAS_ACCEL
         display->scrollmode = SCROLL_YNOMOVE;
         display->dispsw = &fbcon_accel;
@@ -775,11 +767,16 @@ static void fbcon_setup(int con, int init, int logo)
     	    kfree(save);
 	}
     }
-	
-    if (logo) {
-	logo_shown = -2;
-    	conp->vc_top = logo_lines;
-    }
+
+    if (logo) {	 
+	if (logo_lines > conp->vc_bottom) {
+		logo_shown = -1;
+		printk(KERN_INFO "fbcon_startup: disable boot-logo (boot-logo bigger than screen).\n");
+	} else {
+		logo_shown = -2;
+		conp->vc_top = logo_lines;
+	}
+    }		
     
     if (con == fg_console && softback_buf) {
     	int l = fbcon_softback_size / conp->vc_size_row;
@@ -2170,6 +2167,10 @@ static int __init fbcon_show_logo( void )
 {
     struct display *p = &fb_display[fg_console]; /* draw to vt in foreground */
     struct fb_info *info = p->fb_info;
+#ifdef CONFIG_FBCON_ACCEL    
+    struct fb_image image;
+    u32 *palette = NULL, *saved_palette = NULL;
+#endif
     int depth = info->var.bits_per_pixel;
     int line = p->next_line;
     unsigned char *fb = info->screen_base;
@@ -2220,13 +2221,54 @@ static int __init fbcon_show_logo( void )
 	logo = linux_logo_bw;
 	logo_depth = 1;
     }
-    
+   
+#if defined(CONFIG_FBCON_ACCEL)
+	if (info->fix.visual == FB_VISUAL_TRUECOLOR) {
+		unsigned char mask[9] = { 0,0x80,0xc0,0xe0,0xf0,0xf8,0xfc,0xfe,0xff };
+		unsigned char redmask, greenmask, bluemask;
+		int redshift, greenshift, blueshift;
+
+		/* Bug: Doesn't obey msb_right ... (who needs that?) */
+		redmask   = mask[info->var.red.length   < 8 ? info->var.red.length   : 8];
+		greenmask = mask[info->var.green.length < 8 ? info->var.green.length : 8];
+		bluemask  = mask[info->var.blue.length  < 8 ? info->var.blue.length  : 8];
+		redshift   = info->var.red.offset   - (8 - info->var.red.length);
+		greenshift = info->var.green.offset - (8 - info->var.green.length);
+		blueshift  = info->var.blue.offset  - (8 - info->var.blue.length);
+
+		/*
+	 	 * We have to create a temporary palette since console palette is only
+		 * 16 colors long.
+	 	 */
+		palette = kmalloc(256 * 4, GFP_KERNEL);
+		if (palette == NULL)
+			return (LOGO_H + fontheight(p) - 1) / fontheight(p);
+
+		for ( i = 0; i < LINUX_LOGO_COLORS; i++) {
+			palette[i+32] = (safe_shift((linux_logo_red[i]   & redmask), redshift) |
+					safe_shift((linux_logo_green[i] & greenmask), greenshift) |
+					safe_shift((linux_logo_blue[i]  & bluemask), blueshift));
+		}
+		saved_palette = info->pseudo_palette;
+		info->pseudo_palette = palette;
+		image.width = LOGO_W;
+		image.height = LOGO_H;
+		image.depth = depth;
+		image.data = logo;
+		image.dy = 0;
+	}
+#endif
+ 
     if (info->fbops->fb_rasterimg)
     	info->fbops->fb_rasterimg(info, 1);
 
     for (x = 0; x < num_online_cpus() * (LOGO_W + 8) &&
     	 x < info->var.xres - (LOGO_W + 8); x += (LOGO_W + 8)) {
-    	 
+#if defined (CONFIG_FBCON_ACCEL)
+	image.dx = x;
+	info->fbops->fb_imageblit(info, &image);
+	done = 1;
+#else    	 
 #if defined(CONFIG_FBCON_CFB16) || defined(CONFIG_FBCON_CFB24) || \
     defined(CONFIG_FBCON_CFB32) || defined(CONFIG_FB_SBUS)
         if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
@@ -2483,12 +2525,19 @@ static int __init fbcon_show_logo( void )
 		}
 		done = 1;
 	}
-#endif			
+#endif
+#endif	/* CONFIG_FBCON_ACCEL */		
     }
-    
+   
     if (info->fbops->fb_rasterimg)
     	info->fbops->fb_rasterimg(info, 0);
 
+#if defined (CONFIG_FBCON_ACCEL)
+	if (palette != NULL)
+		kfree(palette);
+	if (saved_palette != NULL)
+		info->pseudo_palette = saved_palette;
+#endif
     /* Modes not yet supported: packed pixels with depth != 8 (does such a
      * thing exist in reality?) */
 
