@@ -146,7 +146,7 @@ __error:
 
 
 /*
- * MODULE sutff
+ * MODULE stuff
  */
 
 static int __init alsa_card_pmac_init(void)
