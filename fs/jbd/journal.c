@@ -342,7 +342,7 @@ repeat:
 		tmp = jbd_rep_kmalloc(bh_in->b_size, GFP_NOFS);
 		jbd_lock_bh_state(bh_in);
 		if (jh_in->b_frozen_data) {
-			kfree(new_page);
+			kfree(tmp);
 			goto repeat;
 		}
 
