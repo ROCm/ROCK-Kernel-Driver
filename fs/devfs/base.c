@@ -916,7 +916,7 @@ static struct devfs_entry *devfs_get (struct devfs_entry *de)
  *	@de:  The handle to the devfs entry.
  */
 
-void devfs_put (devfs_handle_t de)
+static void devfs_put (devfs_handle_t de)
 {
     if (!de) return;
     VERIFY_ENTRY (de);

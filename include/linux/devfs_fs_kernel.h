@@ -37,7 +37,6 @@ struct unique_numspace
 
 #define UNIQUE_NUMBERSPACE_INITIALISER {SPIN_LOCK_UNLOCKED, 0, 0, 0, NULL}
 
-extern void devfs_put (devfs_handle_t de);
 extern devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 				      unsigned int flags,
 				      unsigned int major, unsigned int minor,
@@ -66,10 +65,6 @@ struct unique_numspace
 
 #define UNIQUE_NUMBERSPACE_INITIALISER {0}
 
-static inline void devfs_put (devfs_handle_t de)
-{
-    return;
-}
 static inline devfs_handle_t devfs_register (devfs_handle_t dir,
 					     const char *name,
 					     unsigned int flags,
