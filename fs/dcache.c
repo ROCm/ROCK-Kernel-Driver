@@ -1351,9 +1351,9 @@ already_unhashed:
  *
  * "buflen" should be positive. Caller holds the dcache_lock.
  */
-static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
-			struct dentry *root, struct vfsmount *rootmnt,
-			char *buffer, int buflen)
+char * __d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
+		struct dentry *root, struct vfsmount *rootmnt,
+		char *buffer, int buflen)
 {
 	char * end = buffer+buflen;
 	char * retval;
@@ -1758,3 +1758,4 @@ EXPORT_SYMBOL(have_submounts);
 EXPORT_SYMBOL(names_cachep);
 EXPORT_SYMBOL(shrink_dcache_parent);
 EXPORT_SYMBOL(shrink_dcache_sb);
+EXPORT_SYMBOL(__d_path);
