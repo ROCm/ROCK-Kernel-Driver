@@ -530,37 +530,30 @@ inline int task_curr(task_t *p)
 typedef struct {
 	struct list_head list;
 	task_t *task;
+	int dest_cpu;
 	struct completion done;
 } migration_req_t;
 
 /*
- * The task's runqueue lock must be held, and the new mask must be valid.
+ * The task's runqueue lock must be held.
  * Returns true if you have to wait for migration thread.
  */
-static int __set_cpus_allowed(task_t *p, cpumask_t new_mask,
-				migration_req_t *req)
+static int migrate_task(task_t *p, int dest_cpu, migration_req_t *req)
 {
 	runqueue_t *rq = task_rq(p);
-
-	p->cpus_allowed = new_mask;
-	/*
-	 * Can the task run on the task's current CPU? If not then
-	 * migrate the thread off to a proper CPU.
-	 */
-	if (cpu_isset(task_cpu(p), new_mask))
-		return 0;
 
 	/*
 	 * If the task is not on a runqueue (and not running), then
 	 * it is sufficient to simply update the task's cpu field.
 	 */
 	if (!p->array && !task_running(rq, p)) {
-		set_task_cpu(p, any_online_cpu(p->cpus_allowed));
+		set_task_cpu(p, dest_cpu);
 		return 0;
 	}
 
 	init_completion(&req->done);
 	req->task = p;
+	req->dest_cpu = dest_cpu;
 	list_add(&req->list, &rq->migration_queue);
 	return 1;
 }
@@ -1044,7 +1037,7 @@ unsigned long nr_running(void)
 {
 	unsigned long i, sum = 0;
 
-	for (i = 0; i < NR_CPUS; i++)
+	for_each_cpu(i)
 		sum += cpu_rq(i)->nr_running;
 
 	return sum;
@@ -1134,29 +1127,19 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 	runqueue_t *rq;
 	migration_req_t req;
 	unsigned long flags;
-	cpumask_t old_mask, new_mask = cpumask_of_cpu(dest_cpu);
 
 	lock_cpu_hotplug();
 	rq = task_rq_lock(p, &flags);
-	old_mask = p->cpus_allowed;
-	if (!cpu_isset(dest_cpu, old_mask) || !cpu_online(dest_cpu))
+	if (!cpu_isset(dest_cpu, p->cpus_allowed))
 		goto out;
 
 	/* force the process onto the specified CPU */
-	if (__set_cpus_allowed(p, new_mask, &req)) {
+	if (migrate_task(p, dest_cpu, &req)) {
 		/* Need to wait for migration thread. */
 		task_rq_unlock(rq, &flags);
 		wake_up_process(rq->migration_thread);
 		wait_for_completion(&req.done);
-
-		/* If we raced with sys_sched_setaffinity, don't
-		 * restore mask. */
-		rq = task_rq_lock(p, &flags);
-		if (likely(cpus_equal(p->cpus_allowed, new_mask))) {
-			/* Restore old mask: won't need migration
-			 * thread, since current cpu is allowed. */
-			BUG_ON(__set_cpus_allowed(p, old_mask, NULL));
-		}
+		return;
 	}
 out:
 	task_rq_unlock(rq, &flags);
@@ -1174,7 +1157,7 @@ static int sched_best_cpu(struct task_struct *p, struct sched_domain *domain)
 	best_cpu = this_cpu = task_cpu(p);
 	min_load = INT_MAX;
 
-	for (i = 0; i < NR_CPUS; i++) {
+	for_each_online_cpu(i) {
 		unsigned long load;
 		if (!cpu_isset(i, domain->span))
 			continue;
@@ -3071,7 +3054,12 @@ int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 		goto out;
 	}
 
-	if (__set_cpus_allowed(p, new_mask, &req)) {
+	p->cpus_allowed = new_mask;
+	/* Can the task run on the task's current CPU? If so, we're done */
+	if (cpu_isset(task_cpu(p), new_mask))
+		goto out;
+
+	if (migrate_task(p, any_online_cpu(new_mask), &req)) {
 		/* Need help from migration thread: drop lock and wait. */
 		task_rq_unlock(rq, &flags);
 		wake_up_process(rq->migration_thread);
@@ -3085,16 +3073,28 @@ out:
 
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
 
-/* Move (not current) task off this cpu, onto dest cpu. */
-static void move_task_away(struct task_struct *p, int dest_cpu)
+/*
+ * Move (not current) task off this cpu, onto dest cpu.  We're doing
+ * this because either it can't run here any more (set_cpus_allowed()
+ * away from this CPU, or CPU going down), or because we're
+ * attempting to rebalance this task on exec (sched_balance_exec).
+ *
+ * So we race with normal scheduler movements, but that's OK, as long
+ * as the task is no longer on this CPU.
+ */
+static void __migrate_task(struct task_struct *p, int dest_cpu)
 {
 	runqueue_t *rq_dest;
 
 	rq_dest = cpu_rq(dest_cpu);
 
 	double_rq_lock(this_rq(), rq_dest);
+	/* Already moved. */
 	if (task_cpu(p) != smp_processor_id())
-		goto out; /* Already moved */
+		goto out;
+	/* Affinity changed (again). */
+	if (!cpu_isset(dest_cpu, p->cpus_allowed))
+		goto out;
 
 	set_task_cpu(p, dest_cpu);
 	if (p->array) {
@@ -3147,8 +3147,7 @@ static int migration_thread(void * data)
 		list_del_init(head->next);
 		spin_unlock(&rq->lock);
 
-		move_task_away(req->task,
-			       any_online_cpu(req->task->cpus_allowed));
+		__migrate_task(req->task, req->dest_cpu);
 		local_irq_enable();
 		complete(&req->done);
 	}
@@ -3205,7 +3204,7 @@ void migrate_all_tasks(void)
 				       tsk->pid, tsk->comm, src_cpu);
 		}
 
-		move_task_away(tsk, dest_cpu);
+		__migrate_task(tsk, dest_cpu);
 	} while_each_thread(t, tsk);
 
 	write_unlock(&tasklist_lock);
