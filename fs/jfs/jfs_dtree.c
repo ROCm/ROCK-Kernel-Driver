@@ -134,7 +134,7 @@ struct dtsplit {
 			BT_PUTPAGE(MP);\
 			updateSuper((IP)->i_sb, FM_DIRTY);\
 			MP = NULL;\
-			RC = EIO;\
+			RC = -EIO;\
 		}\
 	}\
 }
@@ -404,7 +404,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		     xtInsert(tid, ip, 0, 0, sbi->nbperpage,
 			      &xaddr, 0))) {
 			jfs_warn("add_index: xtInsert failed!");
-			return -1;
+			return -EPERM;
 		}
 		ip->i_size = PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
@@ -412,7 +412,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		if ((mp = get_index_page(ip, 0)) == 0) {
 			jfs_err("add_index: get_metapage failed!");
 			xtTruncate(tid, ip, 0, COMMIT_PWMAP);
-			return -1;
+			return -EPERM;
 		}
 		tlck = txLock(tid, ip, mp, tlckDATA);
 		llck = (struct linelock *) & tlck->lock;
@@ -447,7 +447,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 			      &xaddr, 0))) {
 			jfs_warn("add_index: xtInsert failed!");
 			jfs_ip->next_index--;
-			return -1;
+			return -EPERM;
 		}
 		ip->i_size += PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
@@ -461,7 +461,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 
 	if (mp == 0) {
 		jfs_err("add_index: get/read_metapage failed!");
-		return -1;
+		return -EPERM;
 	}
 
 	lock_index(tid, ip, mp, index);
@@ -588,7 +588,7 @@ int dtSearch(struct inode *ip, struct component_name * key, ino_t * data,
 	    (wchar_t *) kmalloc((JFS_NAME_MAX + 1) * sizeof(wchar_t),
 				GFP_NOFS);
 	if (ciKey.name == 0) {
-		rc = ENOMEM;
+		rc = -ENOMEM;
 		goto dtSearch_Exit2;
 	}
 
@@ -674,7 +674,7 @@ int dtSearch(struct inode *ip, struct component_name * key, ino_t * data,
 					 */
 					if (flag == JFS_CREATE) {
 						*data = inumber;
-						rc = EEXIST;
+						rc = -EEXIST;
 						goto out;
 					}
 
@@ -684,7 +684,7 @@ int dtSearch(struct inode *ip, struct component_name * key, ino_t * data,
 					if ((flag == JFS_REMOVE ||
 					     flag == JFS_RENAME) &&
 					    *data != inumber) {
-						rc = ESTALE;
+						rc = -ESTALE;
 						goto out;
 					}
 
@@ -732,7 +732,7 @@ int dtSearch(struct inode *ip, struct component_name * key, ino_t * data,
 			 */
 			if (flag == JFS_LOOKUP || flag == JFS_REMOVE ||
 			    flag == JFS_RENAME) {
-				rc = ENOENT;
+				rc = -ENOENT;
 				goto out;
 			}
 
@@ -770,7 +770,7 @@ int dtSearch(struct inode *ip, struct component_name * key, ino_t * data,
 			 */
 			jfs_err("stack overrun in dtSearch!");
 			updateSuper(sb, FM_DIRTY);
-			rc = EIO;
+			rc = -EIO;
 			goto out;
 		}
 		btstack->nsplit++;
@@ -840,7 +840,7 @@ int dtInsert(tid_t tid, struct inode *ip,
 	if (DO_INDEX(ip)) {
 		if (JFS_IP(ip)->next_index == DIREND) {
 			DT_PUTPAGE(mp);
-			return EMLINK;
+			return -EMLINK;
 		}
 		n = NDTLEAF(name->namlen);
 		data.leaf.tid = tid;
@@ -953,7 +953,7 @@ static int dtSplitUp(tid_t tid,
 				GFP_NOFS);
 	if (key.name == 0) {
 		DT_PUTPAGE(smp);
-		rc = ENOMEM;
+		rc = -ENOMEM;
 		goto dtSplitUp_Exit;
 	}
 
@@ -1579,7 +1579,7 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 
 	ip->i_blocks += LBLK2PBLK(sb, lengthPXD(pxd));
 
-	return 0;
+	return rc;
 }
 
 
@@ -2628,7 +2628,7 @@ static int dtSearchNode(struct inode *ip, s64 lmxaddr, pxd_t * kpxd,
 		 * descend down to leftmost child page
 		 */
 		if (p->header.flag & BT_LEAF)
-			return ESTALE;
+			return -ESTALE;
 
 		/* get the leftmost entry */
 		stbl = DT_GETSTBL(p);
@@ -2666,7 +2666,7 @@ static int dtSearchNode(struct inode *ip, s64 lmxaddr, pxd_t * kpxd,
 		bn = le64_to_cpu(p->header.next);
 	else {
 		DT_PUTPAGE(mp);
-		return ESTALE;
+		return -ESTALE;
 	}
 
 	/* unpin current page */
@@ -2908,7 +2908,7 @@ static void add_missing_indices(struct inode *inode, s64 bn)
 			d->index = cpu_to_le32(add_index(tid, inode, bn, i));
 			if (dtlck->index >= dtlck->maxcnt)
 				dtlck = (struct dt_lock *) txLinelock(dtlck);
-			lv = dtlck->lv;
+			lv = &dtlck->lv[dtlck->index];
 			lv->offset = stbl[i];
 			lv->length = 1;
 			dtlck->index++;
@@ -3068,7 +3068,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			}
 
 			if ((rc = dtReadFirst(ip, &btstack)))
-				return -rc;
+				return rc;
 
 			DT_GETSEARCH(ip, btstack.top, bn, mp, p, index);
 		}
@@ -3268,7 +3268,7 @@ skip_one:
 		DT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 		if (rc) {
 			free_page(dirent_buf);
-			return -rc;
+			return rc;
 		}
 	}
 
@@ -4434,8 +4434,8 @@ static void dtLinelockFreelist(dtpage_t * p,	/* directory page */
  *	flag	- JFS_RENAME
  *
  * RETURNS:
- *	ESTALE	- If entry found does not match orig_ino passed in
- *	ENOENT	- If no entry can be found to match key
+ *	-ESTALE	- If entry found does not match orig_ino passed in
+ *	-ENOENT	- If no entry can be found to match key
  *	0	- If successfully modified entry
  */
 int dtModify(tid_t tid, struct inode *ip,

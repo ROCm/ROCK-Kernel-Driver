@@ -23,6 +23,15 @@ resize=value	Resize the volume to <value> blocks.  JFS only supports
 		read-write.  The resize keyword with no value will grow
 		the volume to the full size of the partition.
 
+nointegrity	Do not write to the journal.  The primary use of this option
+		is to allow for higher performance when restoring a volume
+		from backup media.  The integrity of the volume is not
+		guaranteed if the system abnormally abends.
+
+integrity	Default.  Commit metadata changes to the journal.  Use this
+		option to remount a volume where the nointegrity option was
+		previously specified in order to restore normal behavior.
+
 JFS TODO list:
 
 Plans for our near term development items

@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2001
+ *   Copyright (c) International Business Machines Corp., 2000-2003
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -29,6 +29,9 @@
 /*
  *	 file system option (superblock flag)
  */
+/* mount time flag to disable journaling to disk */
+#define JFS_NOINTEGRITY 0x00000010
+
 /* platform option (conditional compilation) */
 #define JFS_AIX		0x80000000	/* AIX support */
 /*	POSIX name/directory  support */

@@ -259,7 +259,7 @@ jfs_get_blocks(struct inode *ip, sector_t lblock, unsigned long max_blocks,
 		else
 			IREAD_UNLOCK(ip);
 	}
-	return -rc;
+	return rc;
 }
 
 static int jfs_get_block(struct inode *ip, sector_t lblock,
