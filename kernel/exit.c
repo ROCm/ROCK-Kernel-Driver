@@ -35,6 +35,9 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
+/* tng related changes */
+int (*tng_exitfunc)(int) = NULL;
+
 extern void sem_exit (void);
 extern struct task_struct *child_reaper;
 
@@ -814,6 +817,8 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	numtasks_put_ref(tsk->taskclass);
 #endif
 	exit_notify(tsk);
+	if (unlikely(tng_exitfunc))
+        	(*tng_exitfunc)((int) code);
 	schedule();
 	BUG();
 	/* Avoid "noreturn function does return".  */

@@ -44,6 +44,9 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
+/* tng related changes */
+int (*tng_forkfunc)(struct task_struct *) = NULL;
+
 extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
 extern void exit_sem(struct task_struct *tsk);
 
@@ -1221,6 +1224,8 @@ long do_fork(unsigned long clone_flags,
 		struct completion vfork;
 
 		ckrm_cb_fork(p);
+		if (unlikely(tng_forkfunc))
+			(*tng_forkfunc)((struct task_struct *) p);
 
 		if (clone_flags & CLONE_VFORK) {
 			p->vfork_done = &vfork;
