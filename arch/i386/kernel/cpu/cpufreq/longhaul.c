@@ -373,7 +373,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 	case 6:
 		cpuname = "C3 'Samuel' [C5A]";
 		longhaul_version=1;
-		memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
+		memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 		memcpy (eblcr_table, samuel1_eblcr, sizeof(samuel1_eblcr));
 		break;
 
@@ -382,7 +382,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		case 0:
 			cpuname = "C3 'Samuel 2' [C5B]";
 			longhaul_version=1;
-			memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
+			memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 			memcpy (eblcr_table, samuel2_eblcr, sizeof(samuel2_eblcr));
 			break;
 		case 1 ... 15:

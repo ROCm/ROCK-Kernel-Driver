@@ -56,7 +56,7 @@ union msr_longhaul {
 /*
  * VIA C3 Samuel 1  & Samuel 2 (stepping 0)
  */
-static int __initdata longhaul1_clock_ratio[16] = {
+static int __initdata samuel1_clock_ratio[16] = {
 	-1, /* 0000 -> RESERVED */
 	30, /* 0001 ->  3.0x */
 	40, /* 0010 ->  4.0x */
