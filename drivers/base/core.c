@@ -70,6 +70,8 @@ int device_register(struct device *dev)
 	if ((error = device_make_dir(dev)))
 		goto register_done;
 
+	bus_add_device(dev);
+
 	/* notify platform of device entry */
 	if (platform_notify)
 		platform_notify(dev);
@@ -101,6 +103,8 @@ void put_device(struct device * dev)
 	 */
 	if (platform_notify_remove)
 		platform_notify_remove(dev);
+
+	bus_remove_device(dev);
 
 	/* Tell the driver to clean up after itself.
 	 * Note that we likely didn't allocate the device,

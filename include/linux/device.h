@@ -55,6 +55,34 @@ enum {
 
 struct device;
 
+
+struct bus_type {
+	char			* name;
+	rwlock_t		lock;
+	atomic_t		refcount;
+
+	list_t			node;
+	list_t			devices;
+	list_t			drivers;
+
+	struct driver_dir_entry	dir;
+	struct driver_dir_entry	device_dir;
+	struct driver_dir_entry	driver_dir;
+};
+
+
+extern int bus_register(struct bus_type * bus);
+
+static inline struct bus_type * get_bus(struct bus_type * bus)
+{
+	BUG_ON(!atomic_read(&bus->refcount));
+	atomic_inc(&bus->refcount);
+	return bus;
+}
+
+extern void put_bus(struct bus_type * bus);
+
+
 struct device_driver {
 	int	(*probe)	(struct device * dev);
 	int 	(*remove)	(struct device * dev, u32 flags);
@@ -66,6 +94,7 @@ struct device_driver {
 struct device {
 	struct list_head g_list;        /* node in depth-first order list */
 	struct list_head node;		/* node in sibling list */
+	struct list_head bus_list;	/* node in bus's list */
 	struct list_head children;
 	struct device 	* parent;
 
@@ -78,6 +107,7 @@ struct device {
 	atomic_t	refcount;	/* refcount to make sure the device
 					 * persists for the right amount of time */
 
+	struct bus_type	* bus;		/* type of bus device is on */
 	struct driver_dir_entry	dir;
 
 	struct device_driver *driver;	/* which driver has allocated this

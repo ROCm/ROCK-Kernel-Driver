@@ -164,6 +164,17 @@ struct device_driver pci_device_driver = {
 	resume:		pci_device_resume,
 };
 
+struct bus_type pci_bus_type = {
+	name:	"pci",
+};
+
+static int __init pci_driver_init(void)
+{
+	return bus_register(&pci_bus_type);
+}
+
+subsys_initcall(pci_driver_init);
+
 EXPORT_SYMBOL(pci_match_device);
 EXPORT_SYMBOL(pci_register_driver);
 EXPORT_SYMBOL(pci_unregister_driver);
