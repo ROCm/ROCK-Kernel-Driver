@@ -27,8 +27,6 @@
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 int nr_swap_pages;
-int nr_active_pages;
-int nr_inactive_pages;
 struct list_head inactive_list;
 struct list_head active_list;
 pg_data_t *pgdat_list;
@@ -528,7 +526,7 @@ void free_pages(unsigned long addr, unsigned int order)
 /*
  * Total amount of free (allocatable) RAM:
  */
-unsigned int nr_free_pages (void)
+unsigned int nr_free_pages(void)
 {
 	unsigned int sum;
 	zone_t *zone;
@@ -608,10 +606,7 @@ void get_page_state(struct page_state *ret)
 {
 	int pcpu;
 
-	ret->nr_dirty = 0;
-	ret->nr_writeback = 0;
-	ret->nr_pagecache = 0;
-
+	memset(ret, 0, sizeof(*ret));
 	for (pcpu = 0; pcpu < smp_num_cpus; pcpu++) {
 		struct page_state *ps;
 
@@ -619,6 +614,8 @@ void get_page_state(struct page_state *ret)
 		ret->nr_dirty += ps->nr_dirty;
 		ret->nr_writeback += ps->nr_writeback;
 		ret->nr_pagecache += ps->nr_pagecache;
+		ret->nr_active += ps->nr_active;
+		ret->nr_inactive += ps->nr_inactive;
 	}
 }
 
@@ -658,6 +655,9 @@ void show_free_areas_core(pg_data_t *pgdat)
  	unsigned int order;
 	unsigned type;
 	pg_data_t *tmpdat = pgdat;
+	struct page_state ps;
+
+	get_page_state(&ps);
 
 	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
 		K(nr_free_pages()),
@@ -678,10 +678,12 @@ void show_free_areas_core(pg_data_t *pgdat)
 		tmpdat = tmpdat->node_next;
 	}
 
-	printk("( Active: %d, inactive: %d, free: %d )\n",
-	       nr_active_pages,
-	       nr_inactive_pages,
-	       nr_free_pages());
+	printk("( Active:%lu inactive:%lu dirty:%lu writeback:%lu free:%u )\n",
+		ps.nr_active,
+		ps.nr_inactive,
+		ps.nr_dirty,
+		ps.nr_writeback,
+		nr_free_pages());
 
 	for (type = 0; type < MAX_NR_ZONES; type++) {
 		struct list_head *head, *curr;

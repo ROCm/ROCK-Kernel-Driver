@@ -1415,16 +1415,19 @@ asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t 
 	return ret;
 }
 
-static ssize_t do_readahead(struct file *file, unsigned long index, unsigned long nr)
+static ssize_t
+do_readahead(struct file *file, unsigned long index, unsigned long nr)
 {
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	unsigned long max;
+	struct page_state ps;
 
 	if (!mapping || !mapping->a_ops || !mapping->a_ops->readpage)
 		return -EINVAL;
 
 	/* Limit it to a sane percentage of the inactive list.. */
-	max = nr_inactive_pages / 2;
+	get_page_state(&ps);
+	max = ps.nr_inactive / 2;
 	if (nr > max)
 		nr = max;
 

@@ -102,8 +102,6 @@ extern unsigned long totalhigh_pages;
 extern unsigned int nr_free_pages(void);
 extern unsigned int nr_free_buffer_pages(void);
 extern unsigned int nr_free_pagecache_pages(void);
-extern int nr_active_pages;
-extern int nr_inactive_pages;
 extern void __remove_inode_page(struct page *);
 
 /* Incomplete types for prototype declarations: */
@@ -191,27 +189,27 @@ do {						\
 	DEBUG_LRU_PAGE(page);			\
 	SetPageActive(page);			\
 	list_add(&(page)->lru, &active_list);	\
-	nr_active_pages++;			\
+	inc_page_state(nr_active);		\
 } while (0)
 
 #define add_page_to_inactive_list(page)		\
 do {						\
 	DEBUG_LRU_PAGE(page);			\
 	list_add(&(page)->lru, &inactive_list);	\
-	nr_inactive_pages++;			\
+	inc_page_state(nr_inactive);		\
 } while (0)
 
 #define del_page_from_active_list(page)		\
 do {						\
 	list_del(&(page)->lru);			\
 	ClearPageActive(page);			\
-	nr_active_pages--;			\
+	dec_page_state(nr_active);		\
 } while (0)
 
 #define del_page_from_inactive_list(page)	\
 do {						\
 	list_del(&(page)->lru);			\
-	nr_inactive_pages--;			\
+	dec_page_state(nr_inactive);		\
 } while (0)
 
 extern spinlock_t swaplock;
