@@ -622,11 +622,11 @@ unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file * file,
 			return -EINVAL;
 		case MAP_PRIVATE:
 			vm_flags &= ~(VM_SHARED | VM_MAYSHARE);
-			/* fall through */
+			pgoff = addr >> PAGE_SHIFT;
+			break;
 		case MAP_SHARED:
 			break;
 		}
-		pgoff = addr >> PAGE_SHIFT;
 	}
 
 	error = security_file_mmap(file, prot, flags);
