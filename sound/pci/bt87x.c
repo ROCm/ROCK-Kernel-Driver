@@ -45,6 +45,7 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int digital_rate[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 }; /* digital input rate */
+static int load_all;	/* allow to load the non-whitelisted cards */
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for Bt87x soundcard");
@@ -54,6 +55,8 @@ module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable Bt87x soundcard");
 module_param_array(digital_rate, int, NULL, 0444);
 MODULE_PARM_DESC(digital_rate, "Digital input rate for Bt87x soundcard");
+module_param(load_all, bool, 0444);
+MODULE_PARM_DESC(load_all, "Allow to load the non-whitelisted cards");
 
 
 #ifndef PCI_VENDOR_ID_BROOKTREE
@@ -737,13 +740,73 @@ static int __devinit snd_bt87x_create(snd_card_t *card,
 	return 0;
 }
 
+#define BT_DEVICE(chip, subvend, subdev, rate) \
+	{ .vendor = PCI_VENDOR_ID_BROOKTREE, \
+	  .device = PCI_DEVICE_ID_BROOKTREE_##chip, \
+	  .subvendor = subvend, .subdevice = subdev, \
+	  .driver_data = rate }
+
+/* driver_data is the default digital_rate value for that device */
+static struct pci_device_id snd_bt87x_ids[] = {
+	BT_DEVICE(878, 0x0070, 0x13eb, 32000), /* Hauppauge WinTV series */
+	BT_DEVICE(879, 0x0070, 0x13eb, 32000), /* Hauppauge WinTV series */
+	BT_DEVICE(878, 0x0070, 0xff01, 44100), /* Viewcast Osprey 200 */
+	{ }
+};
+MODULE_DEVICE_TABLE(pci, snd_bt87x_ids);
+
+/* cards known not to have audio
+ * (DVB cards use the audio function to transfer MPEG data) */
+static struct {
+	unsigned short subvendor, subdevice;
+} blacklist[] __devinitdata = {
+	{0x0071, 0x0101}, /* Nebula Electronics DigiTV */
+	{0x11bd, 0x0026}, /* Pinnacle PCTV SAT CI */
+	{0x1461, 0x0761}, /* AVermedia AverTV DVB-T */
+	{0x1461, 0x0771}, /* AVermedia DVB-T 771 */
+	{0x1822, 0x0001}, /* Twinhan VisionPlus DVB-T */
+	{0x18ac, 0xdb10}, /* DVICO FusionHDTV DVB-T Lite */
+	{0x270f, 0xfc00}, /* Chaintech Digitop DST-1000 DVB-S */
+};
+
+/* return the rate of the card, or a negative value if it's blacklisted */
+static int __devinit snd_bt87x_detect_card(struct pci_dev *pci)
+{
+	int i;
+	const struct pci_device_id *supported;
+
+	supported = pci_match_device(snd_bt87x_ids, pci);
+	if (supported)
+		return supported->driver_data;
+
+	for (i = 0; i < ARRAY_SIZE(blacklist); ++i)
+		if (blacklist[i].subvendor == pci->subsystem_vendor &&
+		    blacklist[i].subdevice == pci->subsystem_device) {
+			snd_printdd(KERN_INFO "card %#04x:%#04x has no audio\n",
+				    pci->subsystem_vendor, pci->subsystem_device);
+			return -EBUSY;
+		}
+
+	snd_printk(KERN_INFO "unknown card %#04x:%#04x, using default rate 32000\n",
+		   pci->subsystem_vendor, pci->subsystem_device);
+	snd_printk(KERN_DEBUG "please mail id, board name, and, "
+		   "if it works, the correct digital_rate option to "
+		   "<alsa-devel@lists.sf.net>\n");
+	return 32000; /* default rate */
+}
+
 static int __devinit snd_bt87x_probe(struct pci_dev *pci,
 				     const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
 	bt87x_t *chip;
-	int err;
+	int err, rate;
+
+	rate = pci_id->driver_data;
+	if (! rate)
+		if ((rate = snd_bt87x_detect_card(pci)) <= 0)
+			return -ENODEV;
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
@@ -763,7 +826,7 @@ static int __devinit snd_bt87x_probe(struct pci_dev *pci,
 	if (digital_rate[dev] > 0)
 		chip->dig_rate = digital_rate[dev];
 	else
-		chip->dig_rate = (int)pci_id->driver_data;
+		chip->dig_rate = rate;
 
 	err = snd_bt87x_pcm(chip, DEVICE_DIGITAL, "Bt87x Digital");
 	if (err < 0)
@@ -807,22 +870,13 @@ static void __devexit snd_bt87x_remove(struct pci_dev *pci)
 	pci_set_drvdata(pci, NULL);
 }
 
-#define BT_DEVICE(chip, subvend, subdev, rate) \
-	{ .vendor = PCI_VENDOR_ID_BROOKTREE, \
-	  .device = PCI_DEVICE_ID_BROOKTREE_##chip, \
-	  .subvendor = subvend, .subdevice = subdev, \
-	  .driver_data = rate }
-
-/* driver_data is the default digital_rate value for that device */
-static struct pci_device_id snd_bt87x_ids[] = {
-	BT_DEVICE(878, 0x0070, 0xff01, 44100), /* Osprey 200 */
-
-	/* default entries for 32kHz and generic Bt87x cards */
-	BT_DEVICE(878, PCI_ANY_ID, PCI_ANY_ID, 32000),
-	BT_DEVICE(879, PCI_ANY_ID, PCI_ANY_ID, 32000),
+/* default entries for all Bt87x cards - it's not exported */
+/* driver_data is set to 0 to call detection */
+static struct pci_device_id snd_bt87x_default_ids[] = {
+	BT_DEVICE(878, PCI_ANY_ID, PCI_ANY_ID, 0),
+	BT_DEVICE(879, PCI_ANY_ID, PCI_ANY_ID, 0),
 	{ }
 };
-MODULE_DEVICE_TABLE(pci, snd_bt87x_ids);
 
 static struct pci_driver driver = {
 	.name = "Bt87x",
@@ -833,6 +887,8 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_bt87x_init(void)
 {
+	if (load_all)
+		driver.id_table = snd_bt87x_default_ids;
 	return pci_module_init(&driver);
 }
 
