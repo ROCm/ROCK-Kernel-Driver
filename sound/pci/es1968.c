@@ -1642,28 +1642,6 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	return 0;
 }
 
-static int snd_es1968_capture_copy(snd_pcm_substream_t *substream,
-				   int channel, snd_pcm_uframes_t pos,
-				   void *buf, snd_pcm_uframes_t count)
-{
-	//es1968_t *chip = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	esschan_t *es = snd_magic_cast(esschan_t, runtime->private_data, return -ENXIO);
-	char *src = runtime->dma_area;
-
-	if (runtime->channels == 1)
-		return copy_to_user(buf, src + pos, count) ? -EFAULT : 0;
-	else {
-		count /= 2;
-		pos /= 2;
-		if (copy_to_user(buf, src + pos, count))
-			return -EFAULT;
-		if (copy_to_user(buf + count, src + pos + es->dma_size/2, count))
-			return -EFAULT;
-		return 0;
-	}
-}
-
 static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -1778,7 +1756,6 @@ static snd_pcm_ops_t snd_es1968_capture_ops = {
 	.prepare =	snd_es1968_pcm_prepare,
 	.trigger =	snd_es1968_pcm_trigger,
 	.pointer =	snd_es1968_pcm_pointer,
-	.copy =		snd_es1968_capture_copy,
 };
 
 
