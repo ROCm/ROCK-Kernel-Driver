@@ -307,6 +307,14 @@ acpi_pci_link_try_get_current (
 	return 0;
 }
 
+static int acpi_link_tolerant; 
+static int __init enable_link_tolerant(char *s)
+{ 
+	acpi_link_tolerant = 1;
+	return 0;
+} 
+__setup("acpi_link_tolerant",enable_link_tolerant); 
+
 static int
 acpi_pci_link_set (
 	struct acpi_pci_link	*link,
@@ -411,8 +419,12 @@ retry_programming:
 		return_VALUE(result);
 	}
 	if (!link->device->status.enabled) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Link disabled\n"));
-		return_VALUE(-ENODEV);
+		if (acpi_link_tolerant) { 
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Link disabled: VIA chipset? Trying to continue\n"));
+		} else { 
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Link disabled\n"));
+			return_VALUE(-ENODEV);
+		}
 	}
 
 	/* Make sure the active IRQ is the one we requested. */
@@ -422,12 +434,21 @@ retry_programming:
 	}
    
 	if (link->irq.active != irq) {
+		if (acpi_link_tolerant) { 
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+ "Attempt to enable at IRQ %d resulted in IRQ %d: VIA chipset? Using irq %d\n",
+					  irq, link->irq.active, irq));
+			link->irq.active = irq;
+
+		} else { 
+
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 			"Attempt to enable at IRQ %d resulted in IRQ %d\n", 
 			irq, link->irq.active));
 		link->irq.active = 0;
 		acpi_ut_evaluate_object (link->handle, "_DIS", 0, NULL);	   
 		return_VALUE(-ENODEV);
+		}
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Set IRQ %d\n", link->irq.active));
