@@ -155,9 +155,6 @@ static void ext3_handle_error(struct super_block *sb)
 	if (sb->s_flags & MS_RDONLY)
 		return;
 
-	if (test_opt (sb, ERRORS_PANIC))
-		panic ("EXT3-fs (device %s): panic forced after error\n",
-		       sb->s_id);
 	if (test_opt (sb, ERRORS_RO)) {
 		printk (KERN_CRIT "Remounting filesystem read-only\n");
 		sb->s_flags |= MS_RDONLY;
@@ -168,6 +165,9 @@ static void ext3_handle_error(struct super_block *sb)
 		if (journal)
 			journal_abort(journal, -EIO);
 	}
+	if (test_opt(sb, ERRORS_PANIC))
+		panic("EXT3-fs (device %s): panic forced after error\n",
+			sb->s_id);
 	ext3_commit_super(sb, es, 1);
 }
 
