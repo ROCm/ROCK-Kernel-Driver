@@ -213,7 +213,7 @@ static dev_link_t *netwave_attach(void);     /* Create instance */
 static void netwave_detach(dev_link_t *);    /* Destroy instance */
 
 /* Hardware configuration */
-static void netwave_doreset(ioaddr_t iobase, u_char* ramBase);
+static void netwave_doreset(ioaddr_t iobase, u_char __iomem *ramBase);
 static void netwave_reset(struct net_device *dev);
 
 /* Misc device stuff */
@@ -322,7 +322,7 @@ typedef struct netwave_private {
     dev_link_t link;
     spinlock_t	spinlock;	/* Serialize access to the hardware (SMP) */
     dev_node_t node;
-    u_char     *ramBase;
+    u_char     __iomem *ramBase;
     int        timeoutCounter;
     int        lastExec;
     struct timer_list      watchdog;	/* To avoid blocking state */
@@ -341,12 +341,12 @@ static struct net_device_stats *netwave_get_stats(struct net_device *dev);
  * The Netwave card is little-endian, so won't work for big endian
  * systems.
  */
-static inline unsigned short get_uint16(u_char* staddr) 
+static inline unsigned short get_uint16(u_char __iomem *staddr) 
 {
     return readw(staddr); /* Return only 16 bits */
 }
 
-static inline short get_int16(u_char* staddr)
+static inline short get_int16(u_char __iomem * staddr)
 {
     return readw(staddr);
 }
@@ -363,7 +363,7 @@ static inline void wait_WOC(unsigned int iobase)
 }
 
 #ifdef WIRELESS_EXT
-static void netwave_snapshot(netwave_private *priv, u_char *ramBase, 
+static void netwave_snapshot(netwave_private *priv, u_char __iomem *ramBase, 
 			     ioaddr_t iobase) { 
     u_short resultBuffer;
 
@@ -399,7 +399,7 @@ static struct iw_statistics *netwave_get_wireless_stats(struct net_device *dev)
     unsigned long flags;
     ioaddr_t iobase = dev->base_addr;
     netwave_private *priv = netdev_priv(dev);
-    u_char *ramBase = priv->ramBase;
+    u_char __iomem *ramBase = priv->ramBase;
     struct iw_statistics* wstats;
 	
     wstats = &priv->iw_stats;
@@ -592,7 +592,7 @@ static int netwave_set_nwid(struct net_device *dev,
 	unsigned long flags;
 	ioaddr_t iobase = dev->base_addr;
 	netwave_private *priv = netdev_priv(dev);
-	u_char *ramBase = priv->ramBase;
+	u_char __iomem *ramBase = priv->ramBase;
 
 	/* Disable interrupts & save flags */
 	spin_lock_irqsave(&priv->spinlock, flags);
@@ -650,7 +650,7 @@ static int netwave_set_scramble(struct net_device *dev,
 	unsigned long flags;
 	ioaddr_t iobase = dev->base_addr;
 	netwave_private *priv = netdev_priv(dev);
-	u_char *ramBase = priv->ramBase;
+	u_char __iomem *ramBase = priv->ramBase;
 
 	/* Disable interrupts & save flags */
 	spin_lock_irqsave(&priv->spinlock, flags);
@@ -766,7 +766,7 @@ static int netwave_get_snap(struct net_device *dev,
 	unsigned long flags;
 	ioaddr_t iobase = dev->base_addr;
 	netwave_private *priv = netdev_priv(dev);
-	u_char *ramBase = priv->ramBase;
+	u_char __iomem *ramBase = priv->ramBase;
 
 	/* Disable interrupts & save flags */
 	spin_lock_irqsave(&priv->spinlock, flags);
@@ -1005,7 +1005,7 @@ static void netwave_pcmcia_config(dev_link_t *link) {
     u_char buf[64];
     win_req_t req;
     memreq_t mem;
-    u_char *ramBase = NULL;
+    u_char __iomem *ramBase = NULL;
 
     DEBUG(0, "netwave_pcmcia_config(0x%p)\n", link);
 
@@ -1151,7 +1151,8 @@ static void netwave_release(dev_link_t *link)
  *
  */
 static int netwave_event(event_t event, int priority,
-			 event_callback_args_t *args) {
+			 event_callback_args_t *args)
+{
     dev_link_t *link = args->client_data;
     struct net_device *dev = link->priv;
 	
@@ -1204,7 +1205,8 @@ static int netwave_event(event_t event, int priority,
  *
  *    Proper hardware reset of the card.
  */
-static void netwave_doreset(ioaddr_t ioBase, u_char* ramBase) {
+static void netwave_doreset(ioaddr_t ioBase, u_char __iomem *ramBase)
+{
     /* Reset card */
     wait_WOC(ioBase);
     outb(0x80, ioBase + NETWAVE_REG_PMR);
@@ -1220,7 +1222,7 @@ static void netwave_doreset(ioaddr_t ioBase, u_char* ramBase) {
 static void netwave_reset(struct net_device *dev) {
     /* u_char state; */
     netwave_private *priv = netdev_priv(dev);
-    u_char *ramBase = priv->ramBase;
+    u_char __iomem *ramBase = priv->ramBase;
     ioaddr_t iobase = dev->base_addr;
 
     DEBUG(0, "netwave_reset: Done with hardware reset\n");
@@ -1311,7 +1313,7 @@ static int netwave_hw_xmit(unsigned char* data, int len,
     int tmpcount; 
 	
     netwave_private *priv = netdev_priv(dev);
-    u_char* ramBase = priv->ramBase;
+    u_char __iomem * ramBase = priv->ramBase;
     ioaddr_t iobase = dev->base_addr;
 
     /* Disable interrupts & save flags */
@@ -1402,9 +1404,10 @@ static int netwave_start_xmit(struct sk_buff *skb, struct net_device *dev) {
  *	     ready to transmit another packet.
  *	  3. A command has completed execution.
  */
-static irqreturn_t netwave_interrupt(int irq, void* dev_id, struct pt_regs *regs) {
+static irqreturn_t netwave_interrupt(int irq, void* dev_id, struct pt_regs *regs)
+{
     ioaddr_t iobase;
-    u_char *ramBase;
+    u_char __iomem *ramBase;
     struct net_device *dev = (struct net_device *)dev_id;
     struct netwave_private *priv = netdev_priv(dev);
     dev_link_t *link = &priv->link;
@@ -1569,9 +1572,10 @@ static void update_stats(struct net_device *dev) {
     //spin_unlock_irqrestore(&priv->spinlock, flags);
 }
 
-static int netwave_rx(struct net_device *dev) {
+static int netwave_rx(struct net_device *dev)
+{
     netwave_private *priv = netdev_priv(dev);
-    u_char *ramBase = priv->ramBase;
+    u_char __iomem *ramBase = priv->ramBase;
     ioaddr_t iobase = dev->base_addr;
     u_char rxStatus;
     struct sk_buff *skb = NULL;
@@ -1722,7 +1726,7 @@ static void set_multicast_list(struct net_device *dev)
 {
     ioaddr_t iobase = dev->base_addr;
     netwave_private *priv = netdev_priv(dev);
-    u_char* ramBase = priv->ramBase;
+    u_char __iomem * ramBase = priv->ramBase;
     u_char  rcvMode = 0;
    
 #ifdef PCMCIA_DEBUG
