@@ -29,6 +29,7 @@
 #define MANUFACTURER_AMD	0x0001
 #define MANUFACTURER_ATMEL	0x001f
 #define MANUFACTURER_FUJITSU	0x0004
+#define MANUFACTURER_HYUNDAI	0x00AD
 #define MANUFACTURER_INTEL	0x0089
 #define MANUFACTURER_MACRONIX	0x00C2
 #define MANUFACTURER_PMC	0x009D
@@ -56,6 +57,7 @@
 #define AM29F040	0x00A4
 #define AM29LV040B	0x004F
 #define AM29F032B	0x0041
+#define AM29F002T	0x00B0
 
 /* Atmel */
 #define AT49BV512	0x0003
@@ -77,6 +79,8 @@
 #define MBM29LV400TC	0x22B9
 #define MBM29LV400BC	0x22BA
 
+/* Hyundai */
+#define HY29F002T	0x00B0
 
 /* Intel */
 #define I28F004B3T	0x00d4
@@ -106,6 +110,7 @@
 #define MX29LV160T	0x22C4
 #define MX29LV160B	0x2249
 #define MX29F016	0x00AD
+#define MX29F002T	0x00B0
 #define MX29F004T	0x0045
 #define MX29F004B	0x0046
 
@@ -507,6 +512,17 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x10000,8),
 		}
 	}, {
+		mfr_id: MANUFACTURER_AMD,
+		dev_id: AM29F002T,
+		name: "AMD AM29F002T",
+		DevSize: SIZE_256KiB,
+		NumEraseRegions: 4,
+		regions: {ERASEINFO(0x10000,3),
+			  ERASEINFO(0x08000,1),
+			  ERASEINFO(0x02000,2),
+			  ERASEINFO(0x04000,1)
+		}
+	}, {
 		.mfr_id		= MANUFACTURER_ATMEL,
 		.dev_id		= AT49BV512,
 		.name		= "Atmel AT49BV512",
@@ -750,6 +766,17 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x08000,1),
 			ERASEINFO(0x02000,2),
 			ERASEINFO(0x04000,1)
+		}
+	}, {
+		mfr_id: MANUFACTURER_HYUNDAI,
+		dev_id: HY29F002T,
+		name: "Hyundai HY29F002T",
+		DevSize: SIZE_256KiB,
+		NumEraseRegions: 4,
+		regions: {ERASEINFO(0x10000,3),
+			  ERASEINFO(0x08000,1),
+			  ERASEINFO(0x02000,2),
+			  ERASEINFO(0x04000,1)
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_INTEL,
@@ -1133,6 +1160,17 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x02000,2),
 			ERASEINFO(0x08000,1),
 			ERASEINFO(0x10000,7),
+		}
+	}, {
+		mfr_id: MANUFACTURER_MACRONIX,
+		dev_id: MX29F002T,
+		name: "Macronix MX29F002T",
+		DevSize: SIZE_256KiB,
+		NumEraseRegions: 4,
+		regions: {ERASEINFO(0x10000,3),
+			  ERASEINFO(0x08000,1),
+			  ERASEINFO(0x02000,2),
+			  ERASEINFO(0x04000,1)
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_PMC,
@@ -1570,7 +1608,7 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x02000, 2),
 			ERASEINFO(0x04000, 1),
 		}
-	} 
+	}
 };
 
 

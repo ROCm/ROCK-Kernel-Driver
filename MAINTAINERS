@@ -199,6 +199,12 @@ M:	Thorsten Knabe <linux@thorsten-knabe.de>
 W:	http://linux.thorsten-knabe.de
 S:	Maintained
 
+ADM1025 HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
+S:	Maintained
+
 ADT746X FAN DRIVER
 P:	Colin Leroy
 M:	colin@colino.net
@@ -1327,6 +1333,18 @@ L:	linux-security-module@wirex.com
 W:	http://lsm.immunix.org
 S:	Supported
 
+LM83 HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
+S:	Maintained
+
+LM90 HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
+S:	Maintained
+
 LOGICAL DISK MANAGER SUPPORT (LDM, Windows 2000/XP Dynamic Disks)
 P:	Richard Russon (FlatCap)
 M:	ldm@flatcap.org
@@ -1906,6 +1924,12 @@ M:	thomas@winischhofer.net
 W:	http://www.winischhofer.net/linuxsisvga.shtml
 S:	Maintained	
 
+SMSC47M1 HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
+S:	Odd Fixes
+
 SMB FILESYSTEM
 P:	Urban Widmark
 M:	urban@teststation.com
@@ -2409,6 +2433,12 @@ P:	Evgeniy Polyakov
 M:	johnpol@2ka.mipt.ru
 L:	sensors@stimpy.netroedge.com
 S:	Maintained
+
+W83L785TS HARDWARE MONITOR DRIVER
+P:	Jean Delvare
+M:	khali@linux-fr.org
+L:	sensors@stimpy.netroedge.com
+S:	Odd Fixes
 
 WAN ROUTER & SANGOMA WANPIPE DRIVERS & API (X.25, FRAME RELAY, PPP, CISCO HDLC)
 P:	Nenad Corbic

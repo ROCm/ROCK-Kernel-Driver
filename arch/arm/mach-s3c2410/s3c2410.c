@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/s3c2410.c
  *
- * Copyright (c) 2003 Simtec Electronics
+ * Copyright (c) 2003,2004 Simtec Electronics
  * Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.simtec.co.uk/products/EB2410ITX/
@@ -13,7 +13,8 @@
  *     16-May-2003 BJD  Created initial version
  *     16-Aug-2003 BJD  Fixed header files and copyright, added URL
  *     05-Sep-2003 BJD  Moved to kernel v2.6
- *     18-Jan-2003 BJD  Added serial port configuration
+ *     18-Jan-2004 BJD  Added serial port configuration
+ *     21-Aug-2004 BJD  Added new struct s3c2410_board handler
 */
 
 #include <linux/kernel.h>
@@ -34,6 +35,8 @@
 
 #include <asm/arch/regs-clock.h>
 #include <asm/arch/regs-serial.h>
+
+#include "s3c2410.h"
 
 int s3c2410_clock_tick_rate = 12*1000*1000;  /* current timers at 12MHz */
 
@@ -56,24 +59,15 @@ unsigned long s3c2410_pclk;
 #define IODESC_ENT(x) { S3C2410_VA_##x, S3C2410_PA_##x, S3C2410_SZ_##x, MT_DEVICE }
 
 static struct map_desc s3c2410_iodesc[] __initdata = {
-  IODESC_ENT(IRQ),
-  IODESC_ENT(MEMCTRL),
-  IODESC_ENT(USBHOST),
-  IODESC_ENT(DMA),
-  IODESC_ENT(CLKPWR),
-  IODESC_ENT(LCD),
-  IODESC_ENT(NAND),
-  IODESC_ENT(UART),
-  IODESC_ENT(TIMER),
-  IODESC_ENT(USBDEV),
-  IODESC_ENT(WATCHDOG),
-  IODESC_ENT(IIC),
-  IODESC_ENT(IIS),
-  IODESC_ENT(GPIO),
-  IODESC_ENT(RTC),
-  IODESC_ENT(ADC),
-  IODESC_ENT(SPI),
-  IODESC_ENT(SDI)
+	IODESC_ENT(IRQ),
+	IODESC_ENT(MEMCTRL),
+	IODESC_ENT(USBHOST),
+	IODESC_ENT(CLKPWR),
+	IODESC_ENT(LCD),
+	IODESC_ENT(UART),
+	IODESC_ENT(TIMER),
+	IODESC_ENT(GPIO),
+	IODESC_ENT(ADC),
 };
 
 static struct resource s3c_uart0_resource[] = {
@@ -175,6 +169,12 @@ void __init s3c2410_map_io(struct map_desc *mach_desc, int size)
 	       print_mhz(s3c2410_pclk));
 }
 
+static struct s3c2410_board *board;
+
+void s3c2410_set_board(struct s3c2410_board *b)
+{
+	board = b;
+}
 
 static int __init s3c2410_init(void)
 {
@@ -183,6 +183,22 @@ static int __init s3c2410_init(void)
 	printk("S3C2410: Initialising architecture\n");
 
 	ret = platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
+	if (ret)
+		return ret;
+
+	if (board != NULL) {
+		if (board->devices != NULL) {
+			ret = platform_add_devices(board->devices,
+						   board->devices_count);
+
+			if (ret) {
+				printk(KERN_ERR "s3c2410: failed to add board devices (%d)\n", ret);
+			}
+		}
+
+		/* not adding board devices may not be fatal */
+		ret = 0;
+	}
 
 	return ret;
 }

@@ -182,16 +182,14 @@ static struct scsi_disk *scsi_disk_get(struct gendisk *disk)
 	if (disk->private_data == NULL)
 		goto out;
 	sdkp = scsi_disk(disk);
-	if (!kref_get(&sdkp->kref))
-		goto out_sdkp;
+	kref_get(&sdkp->kref);
 	if (scsi_device_get(sdkp->device))
 		goto out_put;
 	up(&sd_ref_sem);
 	return sdkp;
 
  out_put:
-	kref_put(&sdkp->kref);
- out_sdkp:
+	kref_put(&sdkp->kref, scsi_disk_release);
 	sdkp = NULL;
  out:
 	up(&sd_ref_sem);
@@ -202,7 +200,7 @@ static void scsi_disk_put(struct scsi_disk *sdkp)
 {
 	down(&sd_ref_sem);
 	scsi_device_put(sdkp->device);
-	kref_put(&sdkp->kref);
+	kref_put(&sdkp->kref, scsi_disk_release);
 	up(&sd_ref_sem);
 }
 
@@ -1420,7 +1418,7 @@ static int sd_probe(struct device *dev)
 		goto out;
 
 	memset (sdkp, 0, sizeof(*sdkp));
-	kref_init(&sdkp->kref, scsi_disk_release);
+	kref_init(&sdkp->kref);
 
 	/* Note: We can accomodate 64 partitions, but the genhd code
 	 * assumes partitions allocate consecutive minors, which they don't.
@@ -1522,7 +1520,7 @@ static int sd_remove(struct device *dev)
 	del_gendisk(sdkp->disk);
 	sd_shutdown(dev);
 	down(&sd_ref_sem);
-	kref_put(&sdkp->kref);
+	kref_put(&sdkp->kref, scsi_disk_release);
 	up(&sd_ref_sem);
 
 	return 0;

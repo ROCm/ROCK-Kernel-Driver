@@ -502,10 +502,10 @@ static int pd6729_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map 
 		return -EINVAL;
 	}
 
-	if ((mem->sys_start > mem->sys_stop) || (mem->speed > 1000)) {
+	if ((mem->res->start > mem->res->end) || (mem->speed > 1000)) {
 		printk("pd6729_set_mem_map: invalid address / speed");
 		/* printk("invalid mem map for socket %i : %lx to %lx with a start of %x\n",
-			 sock, mem->sys_start, mem->sys_stop, mem->card_start); */
+			 sock, mem->res->start, mem->res->end, mem->card_start); */
 		return -EINVAL;
 	}
 
@@ -515,7 +515,7 @@ static int pd6729_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map 
 
 	/* write the start address */
 	base = I365_MEM(map);
-	i = (mem->sys_start >> 12) & 0x0fff;
+	i = (mem->res->start >> 12) & 0x0fff;
 	if (mem->flags & MAP_16BIT)
 		i |= I365_MEM_16BIT;
 	if (mem->flags & MAP_0WS)
@@ -524,7 +524,7 @@ static int pd6729_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map 
 
 	/* write the stop address */
 
-	i= (mem->sys_stop >> 12) & 0x0fff;
+	i= (mem->res->end >> 12) & 0x0fff;
 	switch (to_cycles(mem->speed)) {
 	case 0:
 		break;
@@ -543,11 +543,11 @@ static int pd6729_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map 
 
 	/* Take care of high byte */
 	indirect_write(socket, PD67_EXT_INDEX, PD67_MEM_PAGE(map));
-	indirect_write(socket, PD67_EXT_DATA, mem->sys_start >> 24);
+	indirect_write(socket, PD67_EXT_DATA, mem->res->start >> 24);
 
 	/* card start */
 
-	i = ((mem->card_start - mem->sys_start) >> 12) & 0x3fff;
+	i = ((mem->card_start - mem->res->start) >> 12) & 0x3fff;
 	if (mem->flags & MAP_WRPROT)
 		i |= I365_MEM_WRPROT;
 	if (mem->flags & MAP_ATTRIB) {
@@ -577,7 +577,7 @@ static int pd6729_init(struct pcmcia_socket *sock)
 	int i;
 	struct resource res = { .end = 0x0fff };
 	pccard_io_map io = { 0, 0, 0, 0, 1 };
-	pccard_mem_map mem = { .res = &res, .sys_stop = 0x0fff };
+	pccard_mem_map mem = { .res = &res, };
 
 	pd6729_set_socket(sock, &dead_socket);
 	for (i = 0; i < 2; i++) {

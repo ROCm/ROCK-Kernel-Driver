@@ -636,18 +636,16 @@ static int hs_set_mem_map(struct pcmcia_socket *s, struct pccard_mem_map *mem)
     	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
 	struct pccard_mem_map *smem;
 	int map = mem->map;
-	unsigned long paddr, size;
+	unsigned long paddr;
 
 #if 0
-    	DPRINTK("hs_set_mem_map(sock=%d, map=%d, flags=0x%x, sys_start=0x%08lx, sys_end=0x%08lx, card_start=0x%08x)\n",
-	    sock, map, mem->flags, mem->sys_start, mem->sys_stop, mem->card_start);
+    	DPRINTK("hs_set_mem_map(sock=%d, map=%d, flags=0x%x, card_start=0x%08x)\n",
+	    sock, map, mem->flags, mem->card_start);
 #endif
 
 	if (map >= MAX_WIN)
 	    return -EINVAL;
 	smem = &sp->mem_maps[map];
-	
-	size = mem->sys_stop - mem->sys_start + 1;
 	
 	paddr = sp->mem_base;	    	    /* base of Attribute mapping */
 	if (!(mem->flags & MAP_ATTRIB))
@@ -660,8 +658,7 @@ static int hs_set_mem_map(struct pcmcia_socket *s, struct pccard_mem_map *mem)
 	 * queries our fixed mapping.  I wish this fact had been
 	 * documented - Greg Banks.
 	 */
-    	mem->sys_start = paddr;
-	mem->sys_stop = paddr + size - 1;
+    	mem->static_start = paddr;
 	
 	*smem = *mem;
 	

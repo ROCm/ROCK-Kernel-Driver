@@ -1188,12 +1188,12 @@ typedef struct {
 	unsigned int cid_rec_codec;
 	unsigned int cid_rec_volume;
 	unsigned char cid_rec_flag;
-	char rec_mode;
+	signed char rec_mode;
 	unsigned int play_codec;
 	unsigned int cid_play_codec;
 	unsigned int cid_play_volume;
 	unsigned char cid_play_flag;
-	char play_mode;
+	signed char play_mode;
 	IXJ_FLAGS flags;
 	unsigned long busyflags;
 	unsigned int rec_frame_size;

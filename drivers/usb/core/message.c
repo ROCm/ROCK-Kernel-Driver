@@ -1196,7 +1196,7 @@ static void release_interface(struct device *dev)
 	struct usb_interface_cache *intfc =
 			altsetting_to_usb_interface_cache(intf->altsetting);
 
-	kref_put(&intfc->ref);
+	kref_put(&intfc->ref, usb_release_interface_cache);
 	kfree(intf);
 }
 

@@ -1141,7 +1141,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct device *gendev)
 	lp->asBitValid = TRUE;
 	lp->timeout = -1;
 	lp->gendev = gendev;
-	lp->lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
+	lp->lock = SPIN_LOCK_UNLOCKED;
 	init_timer(&lp->timer);
 	de4x5_parse_params(dev);
 
@@ -1316,7 +1316,7 @@ de4x5_open(struct net_device *dev)
     ** Re-initialize the DE4X5... 
     */
     status = de4x5_init(dev);
-    lp->lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
+    lp->lock = SPIN_LOCK_UNLOCKED;
     lp->state = OPEN;
     de4x5_dbg_open(dev);
     
