@@ -26,7 +26,6 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/workqueue.h>
-#include <linux/timer.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
@@ -173,22 +172,23 @@ struct atkbd {
 	unsigned char keycode[512];
 	struct input_dev dev;
 	struct serio *serio;
-	struct timer_list timer;
+
 	char name[64];
 	char phys[32];
+	unsigned short id;
+	unsigned char set;
+	unsigned int translated:1;
+	unsigned int extra:1;
+	unsigned int write:1;
+
 	unsigned char cmdbuf[4];
 	unsigned char cmdcnt;
-	unsigned char set;
-	unsigned char extra;
-	unsigned char release;
-	int lastkey;
 	volatile signed char ack;
 	unsigned char emul;
-	unsigned short id;
-	unsigned char write;
-	unsigned char translated;
-	unsigned char resend;
-	unsigned char bat_xl;
+	unsigned int resend:1;
+	unsigned int release:1;
+	unsigned int bat_xl:1;
+
 	unsigned int last;
 	unsigned long time;
 };
