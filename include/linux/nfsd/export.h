@@ -45,13 +45,9 @@
 
 #ifdef __KERNEL__
 
-/* The following are hashtable sizes and must be powers of 2 */
-#define NFSCLNT_EXPMAX		16
-
 struct svc_client {
 	struct svc_client *	cl_next;
 	char			cl_ident[NFSCLNT_IDMAX];
-	struct list_head	cl_export[NFSCLNT_EXPMAX];
 	struct list_head	cl_list;
 };
 

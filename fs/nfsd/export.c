@@ -48,14 +48,23 @@ static int		exp_verify_string(char *cp, int max);
 #define CLIENT_HASH(a) \
 		((((a)>>24) ^ ((a)>>16) ^ ((a)>>8) ^(a)) & CLIENT_HASHMASK)
 
-static inline int expkey_hash(int type, u32 *fsidv)
+#define	EXPKEY_HASHBITS		8
+#define	EXPKEY_HASHMAX		(1 << EXPKEY_HASHBITS)
+#define	EXPKEY_HASHMASK		(EXPKEY_HASHMAX -1)
+static struct list_head expkey_table[EXPKEY_HASHMAX];
+
+static inline int expkey_hash(struct svc_client *clp, int type, u32 *fsidv)
 {
 	int hash = type;
 	char * cp = (char*)fsidv;
 	int len = (type==0)?8:4;
 	while (len--)
 		hash += *cp++;
-	return hash & (NFSCLNT_EXPMAX-1);
+	cp = (char*)&clp;
+	len = sizeof(clp);
+	while (len--)
+		hash += *cp++;
+	return hash & EXPKEY_HASHMASK;
 }
 
 struct svc_clnthash {
@@ -97,7 +106,7 @@ exp_find_key(svc_client *clp, int fsid_type, u32 *fsidv)
 	if (!clp)
 		return NULL;
 
-	head = &clp->cl_export[expkey_hash(fsid_type, fsidv)];
+	head = &expkey_table[expkey_hash(clp, fsid_type, fsidv)];
 	list_for_each_entry(ek, head, ek_hash)
 		if (ek->ek_fsidtype == fsid_type &&
 		    fsidv[0] == ek->ek_fsid[0] &&
@@ -258,7 +267,7 @@ static int exp_fsid_hash(struct svc_client *clp, struct svc_export *exp)
 
 	mk_fsid_v1(ek->ek_fsid, exp->ex_fsid);
 	
-	head = &clp->cl_export[expkey_hash(1, ek->ek_fsid)];
+	head = &expkey_table[expkey_hash(clp, 1, ek->ek_fsid)];
 	list_add(&ek->ek_hash, head);
 	return 0;
 }
@@ -280,7 +289,7 @@ static int exp_hash(struct svc_client *clp, struct svc_export *exp)
 	inode = exp->ex_dentry->d_inode;
 	mk_fsid_v0(ek->ek_fsid, inode->i_sb->s_dev, inode->i_ino);
 	
-	head = &clp->cl_export[expkey_hash(0, ek->ek_fsid)];
+	head = &expkey_table[expkey_hash(clp, 0, ek->ek_fsid)];
 	list_add(&ek->ek_hash, head);
 	return 0;
 }
@@ -772,8 +781,6 @@ exp_addclient(struct nfsctl_client *ncp)
 		if (!(clp = kmalloc(sizeof(*clp), GFP_KERNEL)))
 			goto out_unlock;
 		memset(clp, 0, sizeof(*clp));
-		for (i = 0; i < NFSCLNT_EXPMAX; i++)
-			INIT_LIST_HEAD(&clp->cl_export[i]);
 
 		INIT_LIST_HEAD(&clp->cl_list);
 
@@ -928,6 +935,9 @@ nfsd_export_init(void)
 
 	for (i = 0; i < EXPORT_HASHMAX ; i++)
 		INIT_LIST_HEAD(&export_table[i]);
+
+	for (i = 0; i < EXPKEY_HASHMAX; i++)
+		INIT_LIST_HEAD(&expkey_table[i]);
 
 }
 
