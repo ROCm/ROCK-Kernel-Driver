@@ -69,14 +69,14 @@ __asm__(
 
 #define Q_SET_SEL(cpu, selname, address, size) \
 do { \
-set_base(cpu_gdt_table[cpu][(selname) >> 3], __va((u32)(address))); \
-set_limit(cpu_gdt_table[cpu][(selname) >> 3], size); \
+set_base(per_cpu(cpu_gdt_table,cpu)[(selname) >> 3], __va((u32)(address))); \
+set_limit(per_cpu(cpu_gdt_table,cpu)[(selname) >> 3], size); \
 } while(0)
 
 #define Q2_SET_SEL(cpu, selname, address, size) \
 do { \
-set_base(cpu_gdt_table[cpu][(selname) >> 3], (u32)(address)); \
-set_limit(cpu_gdt_table[cpu][(selname) >> 3], size); \
+set_base(per_cpu(cpu_gdt_table,cpu)[(selname) >> 3], (u32)(address)); \
+set_limit(per_cpu(cpu_gdt_table,cpu)[(selname) >> 3], size); \
 } while(0)
 
 static struct desc_struct bad_bios_desc = { 0, 0x00409200 };
@@ -115,8 +115,8 @@ static inline u16 call_pnp_bios(u16 func, u16 arg1, u16 arg2, u16 arg3,
 		return PNP_FUNCTION_NOT_SUPPORTED;
 
 	cpu = get_cpu();
-	save_desc_40 = cpu_gdt_table[cpu][0x40 / 8];
-	cpu_gdt_table[cpu][0x40 / 8] = bad_bios_desc;
+	save_desc_40 = per_cpu(cpu_gdt_table,cpu)[0x40 / 8];
+	per_cpu(cpu_gdt_table,cpu)[0x40 / 8] = bad_bios_desc;
 
 	/* On some boxes IRQ's during PnP BIOS calls are deadly.  */
 	spin_lock_irqsave(&pnp_bios_lock, flags);
@@ -158,7 +158,7 @@ static inline u16 call_pnp_bios(u16 func, u16 arg1, u16 arg2, u16 arg3,
 	);
 	spin_unlock_irqrestore(&pnp_bios_lock, flags);
 
-	cpu_gdt_table[cpu][0x40 / 8] = save_desc_40;
+	per_cpu(cpu_gdt_table,cpu)[0x40 / 8] = save_desc_40;
 	put_cpu();
 
 	/* If we get here and this is set then the PnP BIOS faulted on us. */
