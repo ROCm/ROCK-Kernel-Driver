@@ -13,6 +13,7 @@
  *  the only supported cache operation.
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/constants.h>
 
 	.text
@@ -63,7 +64,7 @@ ENTRY(v4wt_clear_user_page)
 	mcr	p15, 0, r2, c7, c7, 0		@ flush ID cache
 	ldr	pc, [sp], #4
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 ENTRY(v4wt_user_fns)
 	.long	v4wt_clear_user_page

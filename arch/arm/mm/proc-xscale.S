@@ -21,6 +21,7 @@
  */
 
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
@@ -668,7 +669,7 @@ cpu_pxa250_name:
 
 	.align
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 __xscale_setup:
 	mov	r0, #PSR_F_BIT|PSR_I_BIT|SVC_MODE

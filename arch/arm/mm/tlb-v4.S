@@ -13,6 +13,7 @@
  * Processors: ARM720T
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/constants.h>
 #include <asm/tlbflush.h>
 #include "proc-macros.S"
@@ -55,7 +56,7 @@ ENTRY(v4_flush_user_tlb_range)
 .globl v4_flush_kern_tlb_range
 .equ v4_flush_kern_tlb_range, .v4_flush_kern_tlb_range
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 	.type	v4_tlb_fns, #object
 ENTRY(v4_tlb_fns)

@@ -13,6 +13,7 @@
  *  and memory functions on ARM2, ARM250 and ARM3 processors.
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
@@ -280,7 +281,7 @@ _arm2_name:	.asciz	"ARM 2"
 _arm250_name:	.asciz	"ARM 250"
 _arm3_name:	.asciz	"ARM 3"
 
-		.section ".text.init", #alloc, #execinstr
+		__INIT
 /*
  * Purpose : Function pointers used to access above functions - all calls
  *	     come through these

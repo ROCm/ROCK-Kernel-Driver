@@ -27,6 +27,7 @@
  */
 #include <linux/linkage.h>
 #include <linux/config.h>
+#include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
@@ -442,7 +443,7 @@ ENTRY(cpu_arm922_name)
 	.ascii	"\0"
 	.align
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 __arm922_setup:
 	mov	r0, #0
