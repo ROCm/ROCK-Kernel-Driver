@@ -410,11 +410,6 @@ static ax25_route *ax25_get_route(ax25_address *addr, struct net_device *dev)
 	return ax25_rt;
 }
 
-static inline void ax25_put_route(ax25_route *ax25_rt)
-{
-	atomic_dec(&ax25_rt->ref);
-}
-
 /*
  *	Adjust path: If you specify a default route and want to connect
  *      a target on the digipeater path but w/o having a special route
