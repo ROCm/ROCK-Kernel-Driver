@@ -29,7 +29,7 @@
 #include "smberr.h"
 #include "nterr.h"
 
-#ifdef CIFS_EXPERIMENTAL
+#ifdef CONFIG_CIFS_EXPERIMENTAL
 extern mempool_t *cifs_sm_req_poolp;
 #endif /* CIFS_EXPERIMENTAL */
 extern mempool_t *cifs_req_poolp;
@@ -187,7 +187,7 @@ cifs_buf_release(void *buf_to_free)
 	return;
 }
 
-#ifdef CIFS_EXPERIMENTAL
+#ifdef CONFIG_CIFS_EXPERIMENTAL
 struct smb_hdr *
 cifs_small_buf_get(void)
 {

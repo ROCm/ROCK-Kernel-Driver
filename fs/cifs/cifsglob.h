@@ -330,7 +330,7 @@ struct oplock_q_entry {
 #define   MID_RESPONSE_RECEIVED 4
 #define   MID_RETRY_NEEDED      8 /* session closed while this request out */
 #define   MID_NO_RESP_NEEDED 0x10
-#define   MID_SMALL_BUFFER   0x20 /* 120 byte response buffer instead of 4K */
+#define   MID_SMALL_BUFFER   0x20 /* 112 byte response buffer instead of 4K */
 
 /*
  *****************************************************************
@@ -413,6 +413,9 @@ GLOBAL_EXTERN atomic_t tconInfoReconnectCount;
 
 /* Various Debug counters to remove someday (BB) */
 GLOBAL_EXTERN atomic_t bufAllocCount;
+#ifdef CONFIG_CIFS_EXPERIMENTAL
+GLOBAL_EXTERN atomic_t smBufAllocCount;      
+#endif /* CIFS_EXPERIMENTAL */
 GLOBAL_EXTERN atomic_t midCount;
 
 /* Misc globals */

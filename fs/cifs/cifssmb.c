@@ -78,6 +78,99 @@ static void mark_open_files_invalid(struct cifsTconInfo * pTcon)
 	/* BB Add call to invalidate_inodes(sb) for all superblocks mounted to this tcon */
 }
 
+#ifdef CONFIG_CIFS_EXPERIMENTAL
+static int
+small_smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
+	 void **request_buf /* returned */)
+{
+	int rc = 0;
+
+	/* SMBs NegProt, SessSetup, uLogoff do not have tcon yet so
+	   check for tcp and smb session status done differently
+	   for those three - in the calling routine */
+	if(tcon) {
+		if((tcon->ses) && (tcon->ses->server)){
+			struct nls_table *nls_codepage;
+				/* Give Demultiplex thread up to 10 seconds to 
+					reconnect, should be greater than cifs socket
+					timeout which is 7 seconds */
+			while(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
+				wait_event_interruptible_timeout(tcon->ses->server->response_q,
+					(tcon->ses->server->tcpStatus == CifsGood), 10 * HZ);
+				if(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
+					/* on "soft" mounts we wait once */
+					if((tcon->retry == FALSE) || 
+					   (tcon->ses->status == CifsExiting)) {
+						cFYI(1,("gave up waiting on reconnect in smb_init"));
+						return -EHOSTDOWN;
+					} /* else "hard" mount - keep retrying until 
+					process is killed or server comes back up */
+				} else /* TCP session is reestablished now */
+					break;
+				 
+			}
+			
+			nls_codepage = load_nls_default();
+		/* need to prevent multiple threads trying to
+		simultaneously reconnect the same SMB session */
+			down(&tcon->ses->sesSem);
+			if(tcon->ses->status == CifsNeedReconnect)
+				rc = cifs_setup_session(0, tcon->ses, nls_codepage);
+			if(!rc && (tcon->tidStatus == CifsNeedReconnect)) {
+				mark_open_files_invalid(tcon);
+				rc = CIFSTCon(0, tcon->ses, tcon->treeName, tcon,
+					nls_codepage);
+				up(&tcon->ses->sesSem);
+				if(rc == 0)
+					atomic_inc(&tconInfoReconnectCount);
+
+				cFYI(1, ("reconnect tcon rc = %d", rc));
+				/* Removed call to reopen open files here - 
+					it is safer (and faster) to reopen files
+					one at a time as needed in read and write */
+
+				/* Check if handle based operation so we 
+					know whether we can continue or not without
+					returning to caller to reset file handle */
+				switch(smb_command) {
+					case SMB_COM_READ_ANDX:
+					case SMB_COM_WRITE_ANDX:
+					case SMB_COM_CLOSE:
+					case SMB_COM_FIND_CLOSE2:
+					case SMB_COM_LOCKING_ANDX: {
+						unload_nls(nls_codepage);
+						return -EAGAIN;
+					}
+				}
+			} else {
+				up(&tcon->ses->sesSem);
+			}
+			unload_nls(nls_codepage);
+
+		} else {
+			return -EIO;
+		}
+	}
+	if(rc)
+		return rc;
+
+	*request_buf = cifs_small_buf_get();
+	if (*request_buf == 0) {
+		/* BB should we add a retry in here if not a writepage? */
+		return -ENOMEM;
+	}
+
+	header_assemble((struct smb_hdr *) *request_buf, smb_command, tcon,wct);
+
+#ifdef CONFIG_CIFS_STATS
+        if(tcon != NULL) {
+                atomic_inc(&tcon->num_smbs_sent);
+        }
+#endif /* CONFIG_CIFS_STATS */
+	return rc;
+}  
+#endif /* CIFS_EXPERIMENTAL */
+
 static int
 smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 	 void **request_buf /* returned */ ,
@@ -172,9 +265,10 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
         if(tcon != NULL) {
                 atomic_inc(&tcon->num_smbs_sent);
         }
-#endif
+#endif /* CONFIG_CIFS_STATS */
 	return rc;
 }
+
 static int validate_t2(struct smb_t2_rsp * pSMB) 
 {
 	int rc = -EINVAL;
@@ -893,8 +987,13 @@ CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 	cFYI(1, ("In CIFSSMBClose"));
 
 /* do not retry on dead session on close */
+#ifdef CONFIG_CIFS_EXPERIMENTAL
+	rc = small_smb_init(SMB_COM_CLOSE, 3, tcon, (void **) &pSMB);
+	pSMBr = (CLOSE_RSP *)pSMB; /* BB removeme BB */
+#else 
 	rc = smb_init(SMB_COM_CLOSE, 3, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
+#endif /* CIFS_EXPERIMENTAL */
 	if(rc == -EAGAIN)
 		return 0;
 	if (rc)
@@ -911,8 +1010,14 @@ CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 			cERROR(1, ("Send error in Close = %d", rc));
 		}
 	}
+
+#ifdef CONFIG_CIFS_EXPERIMENTAL 
+	if (pSMB)
+		cifs_small_buf_release(pSMB);
+#else
 	if (pSMB)
 		cifs_buf_release(pSMB);
+#endif /* CIFS_EXPERIMENTAL */
 
 	/* Since session is dead, file will be closed on server already */
 	if(rc == -EAGAIN)
@@ -2053,7 +2158,7 @@ UnixQPathInfoRetry:
 	return rc;
 }
 
-#ifdef CIFS_EXPERIMENTAL  /* function unused at present */
+#ifdef CONFIG_CIFS_EXPERIMENTAL  /* function unused at present */
 int
 CIFSFindSingle(const int xid, struct cifsTconInfo *tcon,
 	       const char *searchName, FILE_ALL_INFO * findData,
@@ -2635,7 +2740,7 @@ CIFSFindClose(const int xid, struct cifsTconInfo *tcon, const __u16 searchHandle
 	return rc;
 }
 
-#ifdef CIFS_EXPERIMENTAL
+#ifdef CONFIG_CIFS_EXPERIMENTAL
 int
 CIFSGetSrvInodeNumber(const int xid, struct cifsTconInfo *tcon,
                 const unsigned char *searchName,

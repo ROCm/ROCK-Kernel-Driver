@@ -207,7 +207,7 @@ static kmem_cache_t *cifs_inode_cachep;
 static kmem_cache_t *cifs_req_cachep;
 static kmem_cache_t *cifs_mid_cachep;
 kmem_cache_t *cifs_oplock_cachep;
-#ifdef CIFS_EXPERIMENTAL
+#ifdef CONFIG_CIFS_EXPERIMENTAL
 static kmem_cache_t *cifs_sm_req_cachep;
 mempool_t *cifs_sm_req_poolp;
 #endif /* CIFS_EXPERIMENTAL */
@@ -608,15 +608,16 @@ cifs_init_request_bufs(void)
 		kmem_cache_destroy(cifs_req_cachep);
 		return -ENOMEM;
 	}
-#ifdef CIFS_EXPERIMENTAL
+#ifdef CONFIG_CIFS_EXPERIMENTAL
 	/* 120 bytes is enough for most SMB responses and handle
 	based requests (but not write response, nor is it
-	sufficient for path based requests).  120 bytes is 83 
-	more than sizeof(struct smb_hdr) and smaller than 128 byte
-	cutoff which should make it easy to alloc off the slab 
-	compared to 17K (5page) alloc of large cifs buffers */
+	sufficient for path based requests).  112 bytes is 75 more than
+	sizeof(struct smb_hdr) but still (with slab hdr) just smaller than
+	128 byte cutoff which should make it easy to alloc off the slab 
+	compared to 17K (5page) alloc of large cifs buffers and not 
+	so large as to force a single page alloc for each slab entry */
 	cifs_sm_req_cachep = kmem_cache_create("cifs_small_rq",
-			120, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+			112, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (cifs_sm_req_cachep == NULL) {
 		mempool_destroy(cifs_req_poolp);
 		kmem_cache_destroy(cifs_req_cachep);
@@ -646,7 +647,7 @@ cifs_destroy_request_bufs(void)
 	if (kmem_cache_destroy(cifs_req_cachep))
 		printk(KERN_WARNING
 		       "cifs_destroy_request_cache: error not all structures were freed\n");
-#ifdef CIFS_EXPERIMENTAL
+#ifdef CONFIG_CIFS_EXPERIMENTAL
 	mempool_destroy(cifs_sm_req_poolp);
 	if (kmem_cache_destroy(cifs_sm_req_cachep))
 		printk(KERN_WARNING

@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/cifsproto.h
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (c) International Business Machines  Corp., 2002,2004
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -32,6 +32,10 @@ struct statfs;
 
 extern struct smb_hdr *cifs_buf_get(void);
 extern void cifs_buf_release(void *);
+#ifdef CONFIG_CIFS_EXPERIMENTAL
+extern struct smb_hdr *cifs_small_buf_get(void);
+extern void cifs_small_buf_release(void *);
+#endif /* CIFS_EXPERIMENTAL */
 extern int smb_send(struct socket *, struct smb_hdr *,
 			unsigned int /* length */ , struct sockaddr *);
 extern unsigned int _GetXid(void);
