@@ -116,7 +116,7 @@ int __init w83977af_init(void)
 {
         int i;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	for (i=0; (io[i] < 2000) && (i < 4); i++) { 
 		int ioaddr = io[i];
@@ -138,7 +138,7 @@ void __exit w83977af_cleanup(void)
 {
 	int i;
 
-        IRDA_DEBUG(4, __FUNCTION__ "()\n");
+        IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	for (i=0; i < 4; i++) {
 		if (dev_self[i])
@@ -160,7 +160,7 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	void *ret;
 	int err;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	if (w83977af_probe(iobase, irq, dma) == -1)
 		return -1;
@@ -190,8 +190,8 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	/* Lock the port that we need */
 	ret = request_region(self->io.fir_base, self->io.fir_ext, driver_name);
 	if (!ret) { 
-		IRDA_DEBUG(0, __FUNCTION__ "(), can't get iobase of 0x%03x\n",
-		      self->io.fir_base);
+		IRDA_DEBUG(0, "%s(), can't get iobase of 0x%03x\n",
+		      __FUNCTION__ , self->io.fir_base);
 		/* w83977af_cleanup( self);  */
 		return -ENODEV;
 	}
@@ -273,7 +273,7 @@ static int w83977af_close(struct w83977af_ir *self)
 {
 	int iobase;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
         iobase = self->io.fir_base;
 
@@ -297,8 +297,8 @@ static int w83977af_close(struct w83977af_ir *self)
 	}
 
 	/* Release the PORT that this driver is using */
-	IRDA_DEBUG(0 , __FUNCTION__ "(), Releasing Region %03x\n", 
-	      self->io.fir_base);
+	IRDA_DEBUG(0 , "%s(), Releasing Region %03x\n", 
+	      __FUNCTION__ , self->io.fir_base);
 	release_region(self->io.fir_base, self->io.fir_ext);
 
 	if (self->tx_buff.head)
@@ -318,7 +318,7 @@ int w83977af_probe( int iobase, int irq, int dma)
 	int i;
   	
  	for (i=0; i < 2; i++) {
- 		IRDA_DEBUG( 0, __FUNCTION__ "()\n");
+ 		IRDA_DEBUG( 0, "%s()\n", __FUNCTION__ );
 #ifdef CONFIG_USE_W977_PNP
  		/* Enter PnP configuration mode */
 		w977_efm_enter(efbase[i]);
@@ -405,7 +405,7 @@ int w83977af_probe( int iobase, int irq, int dma)
 			return 0;
 		} else {
 			/* Try next extented function register address */
-			IRDA_DEBUG( 0, __FUNCTION__ "(), Wrong chip version");
+			IRDA_DEBUG( 0, "%s(), Wrong chip version", __FUNCTION__ );
 		}
   	}   	
 	return -1;
@@ -441,19 +441,19 @@ void w83977af_change_speed(struct w83977af_ir *self, __u32 speed)
 	case 115200: outb(0x01, iobase+ABLL); break;
 	case 576000:
 		ir_mode = HCR_MIR_576;
-		IRDA_DEBUG(0, __FUNCTION__ "(), handling baud of 576000\n");
+		IRDA_DEBUG(0, "%s(), handling baud of 576000\n", __FUNCTION__ );
 		break;
 	case 1152000:
 		ir_mode = HCR_MIR_1152;
-		IRDA_DEBUG(0, __FUNCTION__ "(), handling baud of 1152000\n");
+		IRDA_DEBUG(0, "%s(), handling baud of 1152000\n", __FUNCTION__ );
 		break;
 	case 4000000:
 		ir_mode = HCR_FIR;
-		IRDA_DEBUG(0, __FUNCTION__ "(), handling baud of 4000000\n");
+		IRDA_DEBUG(0, "%s(), handling baud of 4000000\n", __FUNCTION__ );
 		break;
 	default:
 		ir_mode = HCR_FIR;
-		IRDA_DEBUG(0, __FUNCTION__ "(), unknown baud rate of %d\n", speed);
+		IRDA_DEBUG(0, "%s(), unknown baud rate of %d\n", __FUNCTION__ , speed);
 		break;
 	}
 
@@ -503,7 +503,7 @@ int w83977af_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	iobase = self->io.fir_base;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(%ld), skb->len=%d\n", jiffies, 
+	IRDA_DEBUG(4, "%s(%ld), skb->len=%d\n", __FUNCTION__ , jiffies, 
 		   (int) skb->len);
 	
 	/* Lock transmit buffer */
@@ -550,7 +550,7 @@ int w83977af_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 			outb(ICR_ETMRI, iobase+ICR);
 		} else {
 #endif
-			IRDA_DEBUG(4,__FUNCTION__ "(%ld), mtt=%d\n", jiffies, mtt);
+			IRDA_DEBUG(4, "%s(%ld), mtt=%d\n", __FUNCTION__ , jiffies, mtt);
 			if (mtt)
 				udelay(mtt);
 
@@ -591,7 +591,7 @@ static void w83977af_dma_write(struct w83977af_ir *self, int iobase)
 	unsigned long flags;
 	__u8 hcr;
 #endif
-        IRDA_DEBUG(4, __FUNCTION__ "(), len=%d\n", self->tx_buff.len);
+        IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__ , self->tx_buff.len);
 
 	/* Save current set */
 	set = inb(iobase+SSR);
@@ -643,19 +643,19 @@ static int w83977af_pio_write(int iobase, __u8 *buf, int len, int fifo_size)
 	int actual = 0;
 	__u8 set;
 	
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	/* Save current bank */
 	set = inb(iobase+SSR);
 
 	switch_bank(iobase, SET0);
 	if (!(inb_p(iobase+USR) & USR_TSRE)) {
-		IRDA_DEBUG(4, __FUNCTION__ 
-			   "(), warning, FIFO not empty yet!\n");
+		IRDA_DEBUG(4,
+			   "%s(), warning, FIFO not empty yet!\n", __FUNCTION__  );
 
 		fifo_size -= 17;
-		IRDA_DEBUG(4, __FUNCTION__ "%d bytes left in tx fifo\n", 
-			   fifo_size);
+		IRDA_DEBUG(4, "%s(), %d bytes left in tx fifo\n", 
+			   __FUNCTION__ , fifo_size);
 	}
 
 	/* Fill FIFO with current frame */
@@ -664,8 +664,8 @@ static int w83977af_pio_write(int iobase, __u8 *buf, int len, int fifo_size)
 		outb(buf[actual++], iobase+TBR);
 	}
         
-	IRDA_DEBUG(4, __FUNCTION__ "(), fifo_size %d ; %d sent of %d\n", 
-		   fifo_size, actual, len);
+	IRDA_DEBUG(4, "%s(), fifo_size %d ; %d sent of %d\n", 
+		   __FUNCTION__ , fifo_size, actual, len);
 
 	/* Restore bank */
 	outb(set, iobase+SSR);
@@ -685,7 +685,7 @@ void w83977af_dma_xmit_complete(struct w83977af_ir *self)
 	int iobase;
 	__u8 set;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(%ld)\n", jiffies);
+	IRDA_DEBUG(4, "%s(%ld)\n", __FUNCTION__ , jiffies);
 
 	ASSERT(self != NULL, return;);
 
@@ -700,7 +700,7 @@ void w83977af_dma_xmit_complete(struct w83977af_ir *self)
 	
 	/* Check for underrrun! */
 	if (inb(iobase+AUDR) & AUDR_UNDR) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), Transmit underrun!\n");
+		IRDA_DEBUG(0, "%s(), Transmit underrun!\n", __FUNCTION__ );
 		
 		self->stats.tx_errors++;
 		self->stats.tx_fifo_errors++;
@@ -741,7 +741,7 @@ int w83977af_dma_receive(struct w83977af_ir *self)
 #endif
 	ASSERT(self != NULL, return -1;);
 
-	IRDA_DEBUG(4, __FUNCTION__ "\n");
+	IRDA_DEBUG(4, "%s\n", __FUNCTION__ );
 
 	iobase= self->io.fir_base;
 
@@ -812,7 +812,7 @@ int w83977af_dma_receive_complete(struct w83977af_ir *self)
 	__u8 set;
 	__u8 status;
 
-	IRDA_DEBUG(4, __FUNCTION__ "\n");
+	IRDA_DEBUG(4, "%s\n", __FUNCTION__ );
 
 	st_fifo = &self->st_fifo;
 
@@ -939,7 +939,7 @@ static void w83977af_pio_receive(struct w83977af_ir *self)
 	__u8 byte = 0x00;
 	int iobase;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	
@@ -966,7 +966,7 @@ static __u8 w83977af_sir_interrupt(struct w83977af_ir *self, int isr)
 	__u8 set;
 	int iobase;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), isr=%#x\n", isr);
+	IRDA_DEBUG(4, "%s(), isr=%#x\n", __FUNCTION__ , isr);
 	
 	iobase = self->io.fir_base;
 	/* Transmit FIFO low on data */
@@ -1002,8 +1002,8 @@ static __u8 w83977af_sir_interrupt(struct w83977af_ir *self, int isr)
 	if (isr & ISR_TXEMP_I) {		
 		/* Check if we need to change the speed? */
 		if (self->new_speed) {
-			IRDA_DEBUG(2, __FUNCTION__ 
-				   "(), Changing speed!\n");
+			IRDA_DEBUG(2,
+				   "%s(), Changing speed!\n", __FUNCTION__ );
 			w83977af_change_speed(self, self->new_speed);
 			self->new_speed = 0;
 		}
@@ -1185,7 +1185,7 @@ static int w83977af_is_receiving(struct w83977af_ir *self)
  */
 static int w83977af_net_init(struct net_device *dev)
 {
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	/* Set up to be a normal IrDA network device driver */
 	irda_device_setup(dev);
@@ -1209,7 +1209,7 @@ static int w83977af_net_open(struct net_device *dev)
 	char hwname[32];
 	__u8 set;
 	
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 	
 	ASSERT(dev != NULL, return -1;);
 	self = (struct w83977af_ir *) dev->priv;
@@ -1274,7 +1274,7 @@ static int w83977af_net_close(struct net_device *dev)
 	int iobase;
 	__u8 set;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	ASSERT(dev != NULL, return -1;);
 	
@@ -1331,7 +1331,7 @@ static int w83977af_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	ASSERT(self != NULL, return -1;);
 
-	IRDA_DEBUG(2, __FUNCTION__ "(), %s, (cmd=0x%X)\n", dev->name, cmd);
+	IRDA_DEBUG(2, "%s(), %s, (cmd=0x%X)\n", __FUNCTION__ , dev->name, cmd);
 	
 	spin_lock_irqsave(&self->lock, flags);
 

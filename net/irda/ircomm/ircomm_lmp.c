@@ -50,7 +50,7 @@ int ircomm_open_lsap(struct ircomm_cb *self)
 {
 	notify_t notify;
 	
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 	
         /* Register callbacks */
         irda_notify_init(&notify);
@@ -63,7 +63,7 @@ int ircomm_open_lsap(struct ircomm_cb *self)
 
 	self->lsap = irlmp_open_lsap(LSAP_ANY, &notify, 0);
 	if (!self->lsap) {
-		IRDA_DEBUG(0,__FUNCTION__"failed to allocate tsap\n");
+		IRDA_DEBUG(0,"%sfailed to allocate tsap\n", __FUNCTION__ );
 		return -1;
 	}
 	self->slsap_sel = self->lsap->slsap_sel;
@@ -91,7 +91,7 @@ int ircomm_lmp_connect_request(struct ircomm_cb *self,
 {
 	int ret = 0;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	ret = irlmp_connect_request(self->lsap, info->dlsap_sel,
 				    info->saddr, info->daddr, NULL, userdata); 
@@ -109,7 +109,7 @@ int ircomm_lmp_connect_response(struct ircomm_cb *self, struct sk_buff *userdata
 	struct sk_buff *skb;
 	int ret;
 
-	IRDA_DEBUG(0, __FUNCTION__"()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 	
 	/* Any userdata supplied? */
 	if (userdata == NULL) {
@@ -140,7 +140,7 @@ int ircomm_lmp_disconnect_request(struct ircomm_cb *self,
         struct sk_buff *skb;
 	int ret;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
         if (!userdata) {
                 skb = dev_alloc_skb(64);
@@ -173,13 +173,13 @@ void ircomm_lmp_flow_control(struct sk_buff *skb)
 
 	cb = (struct irda_skb_cb *) skb->cb;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
  
         line = cb->line;
 
 	self = (struct ircomm_cb *) hashbin_lock_find(ircomm, line, NULL);
         if (!self) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), didn't find myself\n");
+		IRDA_DEBUG(2, "%s(), didn't find myself\n", __FUNCTION__ );
                 return;
 	}
 
@@ -189,7 +189,7 @@ void ircomm_lmp_flow_control(struct sk_buff *skb)
 	self->pkt_count--;
 
         if ((self->pkt_count < 2) && (self->flow_status == FLOW_STOP)) {
-                IRDA_DEBUG(2, __FUNCTION__ "(), asking TTY to start again!\n");
+                IRDA_DEBUG(2, "%s(), asking TTY to start again!\n", __FUNCTION__ );
                 self->flow_status = FLOW_START;
                 if (self->notify.flow_indication)
                         self->notify.flow_indication(self->notify.instance, 
@@ -215,12 +215,12 @@ int ircomm_lmp_data_request(struct ircomm_cb *self, struct sk_buff *skb,
 	
         cb->line = self->line;
 
-	IRDA_DEBUG(4, __FUNCTION__"(), sending frame\n");
+	IRDA_DEBUG(4, "%s(), sending frame\n", __FUNCTION__ );
 
 	skb->destructor = ircomm_lmp_flow_control;
 	
         if ((self->pkt_count++ > 7) && (self->flow_status == FLOW_START)) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), asking TTY to slow down!\n");
+		IRDA_DEBUG(2, "%s(), asking TTY to slow down!\n", __FUNCTION__ );
 	        self->flow_status = FLOW_STOP;
                 if (self->notify.flow_indication)
              	        self->notify.flow_indication(self->notify.instance, 
@@ -246,7 +246,7 @@ int ircomm_lmp_data_indication(void *instance, void *sap,
 {
 	struct ircomm_cb *self = (struct ircomm_cb *) instance;
 
-	IRDA_DEBUG(4, __FUNCTION__"()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_MAGIC, return -1;);
@@ -273,7 +273,7 @@ void ircomm_lmp_connect_confirm(void *instance, void *sap,
 	struct ircomm_cb *self = (struct ircomm_cb *) instance;
 	struct ircomm_info info;
 
-	IRDA_DEBUG(0, __FUNCTION__"()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_MAGIC, return;);
@@ -303,7 +303,7 @@ void ircomm_lmp_connect_indication(void *instance, void *sap,
 	struct ircomm_cb *self = (struct ircomm_cb *)instance;
 	struct ircomm_info info;
 
-	IRDA_DEBUG(0, __FUNCTION__"()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_MAGIC, return;);
@@ -330,7 +330,7 @@ void ircomm_lmp_disconnect_indication(void *instance, void *sap,
 	struct ircomm_cb *self = (struct ircomm_cb *) instance;
 	struct ircomm_info info;
 
-	IRDA_DEBUG(0, __FUNCTION__"()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_MAGIC, return;);
