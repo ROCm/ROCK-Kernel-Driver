@@ -693,15 +693,9 @@ UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
                 US_SC_DEVICE, US_PR_DEVICE, NULL,
                 US_FL_FIX_INQUIRY ),
 
-/* This entry from <matthias@ma-c.de> in the Debian mailing list */
-UNUSUAL_DEV( 0x0a17, 0x0006, 0x0000, 0xffff,
-		"Pentax",
-		"Optio 330GS",
-		US_SC_8070, US_PR_CB, NULL,
-		US_FL_MODE_XLATE | US_FL_FIX_INQUIRY ),
 
 /* Submitted by Per Winkvist <per.winkvist@uk.com> */
-UNUSUAL_DEV( 0x0a17, 0x006, 0x1000, 0x9009,
+UNUSUAL_DEV( 0x0a17, 0x006, 0x0000, 0xffff,
                 "Pentax",
                 "Optio S/S4",
                 US_SC_DEVICE, US_PR_DEVICE, NULL,
