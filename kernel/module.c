@@ -939,12 +939,12 @@ EXPORT_SYMBOL_GPL(__symbol_get);
 /* Change all symbols so that sh_value encodes the pointer directly. */
 static int simplify_symbols(Elf_Shdr *sechdrs,
 			    unsigned int symindex,
-			    unsigned int strindex,
+			    const char *strtab,
 			    unsigned int versindex,
 			    struct module *mod)
 {
 	Elf_Sym *sym = (void *)sechdrs[symindex].sh_addr;
-	const char *strtab = (char *)sechdrs[strindex].sh_addr;
+	
 	unsigned int i, n = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
 	int ret = 0;
 
@@ -1063,13 +1063,9 @@ static inline int license_is_gpl_compatible(const char *license)
 		|| strcmp(license, "Dual MPL/GPL") == 0);
 }
 
-static void set_license(struct module *mod, Elf_Shdr *sechdrs, int licenseidx)
+static void set_license(struct module *mod, const char *license)
 {
-	char *license;
-
-	if (licenseidx) 
-		license = (char *)sechdrs[licenseidx].sh_addr;
-	else
+	if (!license)
 		license = "unspecified";
 
 	mod->license_gplok = license_is_gpl_compatible(license);
@@ -1080,6 +1076,40 @@ static void set_license(struct module *mod, Elf_Shdr *sechdrs, int licenseidx)
 	}
 }
 
+/* Parse tag=value strings from .modinfo section */
+static char *next_string(char *string, unsigned long *secsize)
+{
+	/* Skip non-zero chars */
+	while (string[0]) {
+		string++;
+		if ((*secsize)-- <= 1)
+			return NULL;
+	}
+
+	/* Skip any zero padding. */
+	while (!string[0]) {
+		string++;
+		if ((*secsize)-- <= 1)
+			return NULL;
+	}
+	return string;
+}
+
+static char *get_modinfo(Elf_Shdr *sechdrs,
+			 unsigned int info,
+			 const char *tag)
+{
+	char *p;
+	unsigned int taglen = strlen(tag);
+	unsigned long size = sechdrs[info].sh_size;
+
+	for (p = (char *)sechdrs[info].sh_addr; p; p = next_string(p, &size)) {
+		if (strncmp(p, tag, taglen) == 0 && p[taglen] == '=')
+			return p + taglen + 1;
+	}
+	return NULL;
+}
+
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
 static struct module *load_module(void __user *umod,
@@ -1088,9 +1118,9 @@ static struct module *load_module(void __user *umod,
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
-	char *secstrings, *args;
-	unsigned int i, symindex, exportindex, strindex, setupindex, exindex,
-		modindex, obsparmindex, licenseindex, gplindex, vmagindex,
+	char *secstrings, *args, *modmagic, *strtab = NULL;
+	unsigned int i, symindex = 0, strindex = 0, setupindex, exindex,
+		exportindex, modindex, obsparmindex, infoindex, gplindex,
 		crcindex, gplcrcindex, versindex;
 	long arglen;
 	struct module *mod;
@@ -1124,6 +1154,7 @@ static struct module *load_module(void __user *umod,
 	/* Convenience variables */
 	sechdrs = (void *)hdr + hdr->e_shoff;
 	secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
+	sechdrs[0].sh_addr = 0;
 
 	/* And these should exist, but gcc whinges if we don't init them */
 	symindex = strindex = 0;
@@ -1137,6 +1168,7 @@ static struct module *load_module(void __user *umod,
 		if (sechdrs[i].sh_type == SHT_SYMTAB) {
 			symindex = i;
 			strindex = sechdrs[i].sh_link;
+			strtab = (char *)hdr + sechdrs[strindex].sh_offset;
 		}
 #ifndef CONFIG_MODULE_UNLOAD
 		/* Don't load .exit sections */
@@ -1144,12 +1176,6 @@ static struct module *load_module(void __user *umod,
 			sechdrs[i].sh_flags &= ~(unsigned long)SHF_ALLOC;
 #endif
 	}
-
-#ifdef CONFIG_KALLSYMS
-	/* Keep symbol and string tables for decoding later. */
-	sechdrs[symindex].sh_flags |= SHF_ALLOC;
-	sechdrs[strindex].sh_flags |= SHF_ALLOC;
-#endif
 
 	modindex = find_sec(hdr, sechdrs, secstrings,
 			    ".gnu.linkonce.this_module");
@@ -1168,9 +1194,16 @@ static struct module *load_module(void __user *umod,
 	setupindex = find_sec(hdr, sechdrs, secstrings, "__param");
 	exindex = find_sec(hdr, sechdrs, secstrings, "__ex_table");
 	obsparmindex = find_sec(hdr, sechdrs, secstrings, "__obsparm");
-	licenseindex = find_sec(hdr, sechdrs, secstrings, ".init.license");
-	vmagindex = find_sec(hdr, sechdrs, secstrings, "__vermagic");
 	versindex = find_sec(hdr, sechdrs, secstrings, "__versions");
+	infoindex = find_sec(hdr, sechdrs, secstrings, ".modinfo");
+
+	/* Don't keep modinfo section */
+	sechdrs[infoindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
+#ifdef CONFIG_KALLSYMS
+	/* Keep symbol and string tables for decoding later. */
+	sechdrs[symindex].sh_flags |= SHF_ALLOC;
+	sechdrs[strindex].sh_flags |= SHF_ALLOC;
+#endif
 
 	/* Check module struct version now, before we try to use module. */
 	if (!check_modstruct_version(sechdrs, versindex, mod)) {
@@ -1178,14 +1211,15 @@ static struct module *load_module(void __user *umod,
 		goto free_hdr;
 	}
 
+	modmagic = get_modinfo(sechdrs, infoindex, "vermagic");
 	/* This is allowed: modprobe --force will invalidate it. */
-	if (!vmagindex) {
+	if (!modmagic) {
 		tainted |= TAINT_FORCED_MODULE;
 		printk(KERN_WARNING "%s: no version magic, tainting kernel.\n",
 		       mod->name);
-	} else if (!same_magic((char *)sechdrs[vmagindex].sh_addr, vermagic)) {
+	} else if (!same_magic(modmagic, vermagic)) {
 		printk(KERN_ERR "%s: version magic '%s' should be '%s'\n",
-		       mod->name, (char*)sechdrs[vmagindex].sh_addr, vermagic);
+		       mod->name, modmagic, vermagic);
 		err = -ENOEXEC;
 		goto free_hdr;
 	}
@@ -1265,11 +1299,11 @@ static struct module *load_module(void __user *umod,
 	/* Now we've moved module, initialize linked lists, etc. */
 	module_unload_init(mod);
 
-	/* Set up license info based on contents of section */
-	set_license(mod, sechdrs, licenseindex);
+	/* Set up license info based on the info section */
+	set_license(mod, get_modinfo(sechdrs, infoindex, "license"));
 
 	/* Fix up syms, so that st_value is a pointer to location. */
-	err = simplify_symbols(sechdrs, symindex, strindex, versindex, mod);
+	err = simplify_symbols(sechdrs, symindex, strtab, versindex, mod);
 	if (err < 0)
 		goto cleanup;
 
@@ -1300,8 +1334,7 @@ static struct module *load_module(void __user *umod,
 	for (i = 1; i < hdr->e_shnum; i++) {
 		const char *strtab = (char *)sechdrs[strindex].sh_addr;
 		if (sechdrs[i].sh_type == SHT_REL)
-			err = apply_relocate(sechdrs, strtab, symindex, i,
-					     mod);
+			err = apply_relocate(sechdrs, strtab, symindex, i,mod);
 		else if (sechdrs[i].sh_type == SHT_RELA)
 			err = apply_relocate_add(sechdrs, strtab, symindex, i,
 						 mod);

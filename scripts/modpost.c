@@ -404,9 +404,7 @@ add_header(struct buffer *b)
 	buf_printf(b, "#include <linux/vermagic.h>\n");
 	buf_printf(b, "#include <linux/compiler.h>\n");
 	buf_printf(b, "\n");
-	buf_printf(b, "const char vermagic[]\n");
-	buf_printf(b, "__attribute__((section(\"__vermagic\"))) =\n");
-	buf_printf(b, "VERMAGIC_STRING;\n");
+	buf_printf(b, "MODULE_INFO(vermagic, VERMAGIC_STRING);\n");
 }
 
 /* Record CRCs for unresolved symbols */

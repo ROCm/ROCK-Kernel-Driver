@@ -20,10 +20,7 @@
 #include <asm/module.h>
 
 /* Not Yet Implemented */
-#define MODULE_AUTHOR(name)
-#define MODULE_DESCRIPTION(desc)
 #define MODULE_SUPPORTED_DEVICE(name)
-#define MODULE_PARM_DESC(var,desc)
 #define print_modules()
 
 /* v850 toolchain uses a `_' prefix for all user symbols */
@@ -58,18 +55,30 @@ search_extable(const struct exception_table_entry *first,
 	       unsigned long value);
 
 #ifdef MODULE
-#define ___module_cat(a,b) a ## b
+#define ___module_cat(a,b) __mod_ ## a ## b
 #define __module_cat(a,b) ___module_cat(a,b)
-/* For userspace: you can also call me... */
-#define MODULE_ALIAS(alias)					\
-	static const char __module_cat(__alias_,__LINE__)[]	\
-		__attribute__((section(".modinfo"),unused)) = "alias=" alias
+#define __MODULE_INFO(tag, name, info)					  \
+static const char __module_cat(name,__LINE__)[]				  \
+  __attribute__((section(".modinfo"),unused)) = __stringify(tag) "=" info
 
 #define MODULE_GENERIC_TABLE(gtype,name)			\
 extern const struct gtype##_id __mod_##gtype##_table		\
   __attribute__ ((unused, alias(__stringify(name))))
 
 #define THIS_MODULE (&__this_module)
+
+#else  /* !MODULE */
+
+#define MODULE_GENERIC_TABLE(gtype,name)
+#define __MODULE_INFO(tag, name, info)
+#define THIS_MODULE ((struct module *)0)
+#endif
+
+/* Generic info of form tag = "info" */
+#define MODULE_INFO(tag, info) __MODULE_INFO(tag, tag, info)
+
+/* For userspace: you can also call me... */
+#define MODULE_ALIAS(_alias) MODULE_INFO(alias, _alias)
 
 /*
  * The following license idents are currently accepted as indicating free
@@ -97,17 +106,18 @@ extern const struct gtype##_id __mod_##gtype##_table		\
  * 2.	So the community can ignore bug reports including proprietary modules
  * 3.	So vendors can do likewise based on their own policies
  */
-#define MODULE_LICENSE(license)					\
-	static const char __module_license[]			\
-		__attribute__((section(".init.license"), unused)) = license
+#define MODULE_LICENSE(_license) MODULE_INFO(license, _license)
 
-#else  /* !MODULE */
+/* Author, ideally of form NAME <EMAIL>[, NAME <EMAIL>]*[ and NAME <EMAIL>] */
+#define MODULE_AUTHOR(_author) MODULE_INFO(author, _author)
+  
+/* What your module does. */
+#define MODULE_DESCRIPTION(_description) MODULE_INFO(description, _description)
 
-#define MODULE_ALIAS(alias)
-#define MODULE_GENERIC_TABLE(gtype,name)
-#define THIS_MODULE ((struct module *)0)
-#define MODULE_LICENSE(license)
-#endif
+/* One for each parameter, describing how to use it.  Some files do
+   multiple of these per line, so can't just use MODULE_INFO. */
+#define MODULE_PARM_DESC(_parm, desc) \
+	__MODULE_INFO(parm, _parm, #_parm ":" desc)
 
 #define MODULE_DEVICE_TABLE(type,name)		\
   MODULE_GENERIC_TABLE(type##_device,name)
