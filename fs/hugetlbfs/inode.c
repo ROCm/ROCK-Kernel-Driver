@@ -34,6 +34,7 @@ static struct super_operations hugetlbfs_ops;
 static struct address_space_operations hugetlbfs_aops;
 struct file_operations hugetlbfs_file_operations;
 static struct inode_operations hugetlbfs_dir_inode_operations;
+static struct inode_operations hugetlbfs_inode_operations;
 
 static struct backing_dev_info hugetlbfs_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
@@ -326,44 +327,29 @@ static void hugetlb_vmtruncate_list(struct list_head *list, unsigned long pgoff)
 	}
 }
 
+/*
+ * Expanding truncates are not allowed.
+ */
 static int hugetlb_vmtruncate(struct inode *inode, loff_t offset)
 {
 	unsigned long pgoff;
 	struct address_space *mapping = inode->i_mapping;
-	unsigned long limit;
 
-	pgoff = (offset + HPAGE_SIZE - 1) >> HPAGE_SHIFT;
+	if (offset > inode->i_size)
+		return -EINVAL;
 
-	if (inode->i_size < offset)
-		goto do_expand;
+	BUG_ON(offset & ~HPAGE_MASK);
+	pgoff = offset >> HPAGE_SHIFT;
 
 	inode->i_size = offset;
 	down(&mapping->i_shared_sem);
-	if (list_empty(&mapping->i_mmap) && list_empty(&mapping->i_mmap_shared))
-		goto out_unlock;
 	if (!list_empty(&mapping->i_mmap))
 		hugetlb_vmtruncate_list(&mapping->i_mmap, pgoff);
 	if (!list_empty(&mapping->i_mmap_shared))
 		hugetlb_vmtruncate_list(&mapping->i_mmap_shared, pgoff);
-
-out_unlock:
 	up(&mapping->i_shared_sem);
 	truncate_hugepages(mapping, offset);
 	return 0;
-
-do_expand:
-	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
-	if (limit != RLIM_INFINITY && offset > limit)
-		goto out_sig;
-	if (offset > inode->i_sb->s_maxbytes)
-		goto out;
-	inode->i_size = offset;
-	return 0;
-
-out_sig:
-	send_sig(SIGXFSZ, current, 0);
-out:
-	return -EFBIG;
 }
 
 static int hugetlbfs_setattr(struct dentry *dentry, struct iattr *attr)
@@ -390,7 +376,9 @@ static int hugetlbfs_setattr(struct dentry *dentry, struct iattr *attr)
 		goto out;
 
 	if (ia_valid & ATTR_SIZE) {
-		error = hugetlb_vmtruncate(inode, attr->ia_size);
+		error = -EINVAL;
+		if (!(attr->ia_size & ~HPAGE_MASK))
+			error = hugetlb_vmtruncate(inode, attr->ia_size);
 		if (error)
 			goto out;
 		attr->ia_valid &= ~ATTR_SIZE;
@@ -425,6 +413,7 @@ hugetlbfs_get_inode(struct super_block *sb, int mode, dev_t dev)
 			init_special_inode(inode, mode, dev);
 			break;
 		case S_IFREG:
+			inode->i_op = &hugetlbfs_inode_operations;
 			inode->i_fop = &hugetlbfs_file_operations;
 			break;
 		case S_IFDIR:
@@ -522,6 +511,10 @@ static struct inode_operations hugetlbfs_dir_inode_operations = {
 	.rmdir		= simple_rmdir,
 	.mknod		= hugetlbfs_mknod,
 	.rename		= simple_rename,
+	.setattr	= hugetlbfs_setattr,
+};
+
+static struct inode_operations hugetlbfs_inode_operations = {
 	.setattr	= hugetlbfs_setattr,
 };
 
