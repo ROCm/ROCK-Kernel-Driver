@@ -171,32 +171,11 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 /*
  * Changing the IRQ level on the Sparc.
  */
-extern __inline__ void setipl(unsigned long __orig_psr)
-{
-	__asm__ __volatile__(
-		"wr	%0, 0x0, %%psr\n\t"
-		"nop; nop; nop\n"
-		: /* no outputs */
-		: "r" (__orig_psr)
-		: "memory", "cc");
-}
+extern void local_irq_restore(unsigned long);
+extern unsigned long __local_irq_save(void);
+extern void local_irq_enable(void);
 
-extern __inline__ void local_irq_enable(void)
-{
-	unsigned long tmp;
-
-	__asm__ __volatile__(
-		"rd	%%psr, %0\n\t"
-		"nop; nop; nop;\n\t"	/* Sun4m + Cypress + SMP bug */
-		"andn	%0, %1, %0\n\t"
-		"wr	%0, 0x0, %%psr\n\t"
-		"nop; nop; nop\n"
-		: "=r" (tmp)
-		: "i" (PSR_PIL)
-		: "memory");
-}
-
-extern __inline__ unsigned long getipl(void)
+static inline unsigned long getipl(void)
 {
 	unsigned long retval;
 
@@ -204,75 +183,10 @@ extern __inline__ unsigned long getipl(void)
 	return retval;
 }
 
-#if 0 /* not used */
-extern __inline__ unsigned long swap_pil(unsigned long __new_psr)
-{
-	unsigned long retval;
-
-	__asm__ __volatile__(
-		"rd	%%psr, %0\n\t"
-		"nop; nop; nop;\n\t"	/* Sun4m + Cypress + SMP bug */
-		"and	%0, %2, %%g1\n\t"
-		"and	%1, %2, %%g2\n\t"
-		"xorcc	%%g1, %%g2, %%g0\n\t"
-		"be	1f\n\t"
-		" nop\n\t"
-		"wr	%0, %2, %%psr\n\t"
-		"nop; nop; nop;\n"
-		"1:\n"
-		: "=&r" (retval)
-		: "r" (__new_psr), "i" (PSR_PIL)
-		: "g1", "g2", "memory", "cc");
-
-	return retval;
-}
-#endif
-
-extern __inline__ unsigned long read_psr_and_cli(void)
-{
-	unsigned long retval;
-
-	__asm__ __volatile__(
-		"rd	%%psr, %0\n\t"
-		"nop; nop; nop;\n\t"	/* Sun4m + Cypress + SMP bug */
-		"or	%0, %1, %%g1\n\t"
-		"wr	%%g1, 0x0, %%psr\n\t"
-		"nop; nop; nop\n\t"
-		: "=r" (retval)
-		: "i" (PSR_PIL)
-		: "g1", "memory");
-
-	return retval;
-}
-
 #define local_save_flags(flags)	((flags) = getipl())
-#define local_irq_save(flags)	((flags) = read_psr_and_cli())
-#define local_irq_restore(flags)	setipl((flags))
-#define local_irq_disable()	((void) read_psr_and_cli())
-
+#define local_irq_save(flags)	((flags) = __local_irq_save())
+#define local_irq_disable()	((void) __local_irq_save())
 #define irqs_disabled()		((getipl() & PSR_PIL) != 0)
-
-#ifdef CONFIG_SMP
-
-extern unsigned char global_irq_holder;
-
-#define save_and_cli(flags)   do { save_flags(flags); cli(); } while(0)
-
-extern void __global_cli(void);
-extern void __global_sti(void);
-extern unsigned long __global_save_flags(void);
-extern void __global_restore_flags(unsigned long flags);
-#define cli()			__global_cli()
-#define sti()			__global_sti()
-#define save_flags(flags)	((flags)=__global_save_flags())
-#define restore_flags(flags)	__global_restore_flags(flags)
-
-#else
-
-#define cli() local_irq_disable()
-#define sti() local_irq_enable()
-
-#endif
 
 /* XXX Change this if we ever use a PSO mode kernel. */
 #define mb()	__asm__ __volatile__ ("" : : : "memory")
