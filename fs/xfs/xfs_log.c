@@ -3427,8 +3427,8 @@ xlog_verify_iclog(xlog_t	 *log,
 		if (syncing == B_FALSE || (field_offset & 0x1ff)) {
 			clientid = ophead->oh_clientid;
 		} else {
-			idx = BTOBB((xfs_caddr_t)&(ophead->oh_clientid) - iclog->ic_datap);
-			if (idx > (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
+			idx = BTOBBT((xfs_caddr_t)&(ophead->oh_clientid) - iclog->ic_datap);
+			if (idx >= (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
 				j = idx / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 				k = idx % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 				clientid = GET_CLIENT_ID(xhdr[j].hic_xheader.xh_cycle_data[k], ARCH_CONVERT);
@@ -3445,9 +3445,9 @@ xlog_verify_iclog(xlog_t	 *log,
 		if (syncing == B_FALSE || (field_offset & 0x1ff)) {
 			op_len = INT_GET(ophead->oh_len, ARCH_CONVERT);
 		} else {
-			idx = BTOBB((__psint_t)&ophead->oh_len -
+			idx = BTOBBT((__psint_t)&ophead->oh_len -
 				    (__psint_t)iclog->ic_datap);
-			if (idx > (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
+			if (idx >= (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
 				j = idx / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 				k = idx % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
 				op_len = INT_GET(xhdr[j].hic_xheader.xh_cycle_data[k], ARCH_CONVERT);
