@@ -648,6 +648,11 @@
     20020820   Richard Gooch <rgooch@atnf.csiro.au>
 	       Fixed module unload race in <devfs_open>.
   v1.21
+    20021013   Richard Gooch <rgooch@atnf.csiro.au>
+	       Removed DEVFS_ FL_AUTO_OWNER.
+	       Switched lingering structure field initialiser to ISO C.
+	       Added locking when updating FCB flags.
+  v1.22
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -680,7 +685,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.21 (20020820)"
+#define DEVFS_VERSION            "1.22 (20021013)"
 
 #define DEVFS_NAME "devfs"
 
@@ -778,7 +783,7 @@ struct fcb_type  /*  File, char, block type  */
 	struct device_type device;
     }
     u;
-    unsigned char auto_owner:1;
+    spinlock_t lock;            /*  Lock for changes                         */
     unsigned char aopen_notify:1;
     unsigned char removable:1;  /*  Belongs in device_type, but save space   */
     unsigned char open:1;       /*  Not entirely correct                     */
@@ -860,7 +865,7 @@ struct fs_info                  /*  This structure is for the mounted devfs  */
     wait_queue_head_t revalidate_wait_queue;  /*  Wake when devfsd sleeps    */
 };
 
-static struct fs_info fs_info = {devfsd_buffer_lock: SPIN_LOCK_UNLOCKED};
+static struct fs_info fs_info = {.devfsd_buffer_lock = SPIN_LOCK_UNLOCKED};
 static kmem_cache_t *devfsd_buf_cache;
 #ifdef CONFIG_DEVFS_DEBUG
 static unsigned int devfs_debug_init __initdata = DEBUG_NONE;
@@ -1011,6 +1016,8 @@ static struct devfs_entry *_devfs_alloc_entry (const char *name,
     memset (new, 0, sizeof *new + namelen);  /*  Will set '\0' on name  */
     new->mode = mode;
     if ( S_ISDIR (mode) ) rwlock_init (&new->u.dir.lock);
+    else if ( S_ISREG (mode) || S_ISCHR (mode) || S_ISBLK (mode) )
+	spin_lock_init (&new->u.fcb.lock);
     atomic_set (&new->refcount, 1);
     spin_lock (&counter_lock);
     new->inode.ino = inode_counter++;
@@ -1480,6 +1487,7 @@ static int wait_for_devfsd_finished (struct fs_info *fs_info)
  *	@uid: The user ID.
  *	@gid: The group ID.
  *	@fs_info: The filesystem info.
+ *	@atomic: If TRUE, an atomic allocation is required.
  *
  *	Returns %TRUE if an event was queued and devfsd woken up, else %FALSE.
  */
@@ -1626,7 +1634,6 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 	de->inode.gid = 0;
     }
     de->u.fcb.ops = ops;
-    de->u.fcb.auto_owner = (flags & DEVFS_FL_AUTO_OWNER) ? TRUE : FALSE;
     de->u.fcb.aopen_notify = (flags & DEVFS_FL_AOPEN_NOTIFY) ? TRUE : FALSE;
     de->hide = (flags & DEVFS_FL_HIDE) ? TRUE : FALSE;
     if (flags & DEVFS_FL_REMOVABLE) de->u.fcb.removable = TRUE;
@@ -1893,7 +1900,7 @@ void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
 					  type, traverse_symlinks);
     devfs_unregister (de);
     devfs_put (de);
-}
+}   /*  End Function devfs_find_and_unregister  */
 
 
 /**
@@ -1913,7 +1920,6 @@ int devfs_get_flags (devfs_handle_t de, unsigned int *flags)
     if (de->hide) fl |= DEVFS_FL_HIDE;
     if ( S_ISCHR (de->mode) || S_ISBLK (de->mode) || S_ISREG (de->mode) )
     {
-	if (de->u.fcb.auto_owner) fl |= DEVFS_FL_AUTO_OWNER;
 	if (de->u.fcb.aopen_notify) fl |= DEVFS_FL_AOPEN_NOTIFY;
 	if (de->u.fcb.removable) fl |= DEVFS_FL_REMOVABLE;
     }
@@ -1938,8 +1944,9 @@ int devfs_set_flags (devfs_handle_t de, unsigned int flags)
     de->hide = (flags & DEVFS_FL_HIDE) ? TRUE : FALSE;
     if ( S_ISCHR (de->mode) || S_ISBLK (de->mode) || S_ISREG (de->mode) )
     {
-	de->u.fcb.auto_owner = (flags & DEVFS_FL_AUTO_OWNER) ? TRUE : FALSE;
+	spin_lock (&de->u.fcb.lock);
 	de->u.fcb.aopen_notify = (flags & DEVFS_FL_AOPEN_NOTIFY) ? TRUE:FALSE;
+	spin_unlock (&de->u.fcb.lock);
     }
     return 0;
 }   /*  End Function devfs_set_flags  */
@@ -2484,13 +2491,9 @@ static int devfs_notify_change (struct dentry *dentry, struct iattr *iattr)
 	     (int) inode->i_mode, (int) inode->i_uid, (int) inode->i_gid);
     /*  Inode is not on hash chains, thus must save permissions here rather
 	than in a write_inode() method  */
-    if ( ( !S_ISREG (inode->i_mode) && !S_ISCHR (inode->i_mode) &&
-	   !S_ISBLK (inode->i_mode) ) || !de->u.fcb.auto_owner )
-    {
-	de->mode = inode->i_mode;
-	de->inode.uid = inode->i_uid;
-	de->inode.gid = inode->i_gid;
-    }
+    de->mode = inode->i_mode;
+    de->inode.uid = inode->i_uid;
+    de->inode.gid = inode->i_gid;
     de->inode.atime = inode->i_atime;
     de->inode.mtime = inode->i_mtime;
     de->inode.ctime = inode->i_ctime;
@@ -2589,9 +2592,7 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
 	inode->i_op = &devfs_symlink_iops;
 	inode->i_size = de->u.symlink.length;
     }
-    if (is_fcb && de->u.fcb.auto_owner)
-	inode->i_mode = (de->mode & S_IFMT) | S_IRUGO | S_IWUGO;
-    else inode->i_mode = de->mode;
+    inode->i_mode = de->mode;
     inode->i_uid = de->inode.uid;
     inode->i_gid = de->inode.gid;
     inode->i_atime = de->inode.atime;
@@ -2708,15 +2709,11 @@ static int devfs_open (struct inode *inode, struct file *file)
     }
     if (err < 0) return err;
     /*  Open was successful  */
-    if (df->open) return 0;
-    df->open = TRUE;  /*  This is the first open  */
-    if (df->auto_owner)
-    {
-	/*  Change the ownership/protection to what driver specified  */
-	inode->i_mode = de->mode;
-	inode->i_uid = current->euid;
-	inode->i_gid = current->egid;
-    }
+    spin_lock (&df->lock);
+    err = df->open;
+    if (!err) df->open = TRUE;  /*  Was not already open    */
+    spin_unlock (&df->lock);
+    if (err) return 0;          /*  Was already open        */
     if ( df->aopen_notify && !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_ASYNC_OPEN, inode->i_mode,
 			  current->euid, current->egid, fs_info, 0);
@@ -2796,6 +2793,7 @@ static struct dentry_operations devfs_wait_dops =
 
 static int devfs_d_delete (struct dentry *dentry)
 {
+    int was_open;
     struct inode *inode = dentry->d_inode;
     struct devfs_entry *de;
     struct fs_info *fs_info;
@@ -2814,16 +2812,14 @@ static int devfs_d_delete (struct dentry *dentry)
     if (de == NULL) return 0;
     if ( !S_ISCHR (de->mode) && !S_ISBLK (de->mode) && !S_ISREG (de->mode) )
 	return 0;
-    if (!de->u.fcb.open) return 0;
-    de->u.fcb.open = FALSE;
+    spin_lock (&de->u.fcb.lock);
+    was_open = de->u.fcb.open;
+    if (was_open) de->u.fcb.open = FALSE;
+    spin_unlock (&de->u.fcb.lock);
+    if (!was_open) return 0;
     if (de->u.fcb.aopen_notify)
 	devfsd_notify_de (de, DEVFSD_NOTIFY_CLOSE, inode->i_mode,
 			  current->euid, current->egid, fs_info, 1);
-    if (!de->u.fcb.auto_owner) return 0;
-    /*  Change the ownership/protection back  */
-    inode->i_mode = (de->mode & S_IFMT) | S_IRUGO | S_IWUGO;
-    inode->i_uid = de->inode.uid;
-    inode->i_gid = de->inode.gid;
     return 0;
 }   /*  End Function devfs_d_delete  */
 
