@@ -33,60 +33,6 @@ void tulip_timer(unsigned long data)
 			   inl(ioaddr + CSR14), inl(ioaddr + CSR15));
 	}
 	switch (tp->chip_id) {
-	case DC21040:
-		if (!tp->medialock  &&  csr12 & 0x0002) { /* Network error */
-			printk(KERN_INFO "%s: No link beat found.\n",
-				   dev->name);
-			dev->if_port = (dev->if_port == 2 ? 0 : 2);
-			tulip_select_media(dev, 0);
-			dev->trans_start = jiffies;
-		}
-		break;
-	case DC21041:
-		if (tulip_debug > 2)
-			printk(KERN_DEBUG "%s: 21041 media tick  CSR12 %8.8x.\n",
-				   dev->name, csr12);
-		if (tp->medialock) break;
-		switch (dev->if_port) {
-		case 0: case 3: case 4:
-		  if (csr12 & 0x0004) { /*LnkFail */
-			/* 10baseT is dead.  Check for activity on alternate port. */
-			tp->mediasense = 1;
-			if (csr12 & 0x0200)
-				dev->if_port = 2;
-			else
-				dev->if_port = 1;
-			printk(KERN_INFO "%s: No 21041 10baseT link beat, Media switched to %s.\n",
-				   dev->name, medianame[dev->if_port]);
-			outl(0, ioaddr + CSR13); /* Reset */
-			outl(t21041_csr14[dev->if_port], ioaddr + CSR14);
-			outl(t21041_csr15[dev->if_port], ioaddr + CSR15);
-			outl(t21041_csr13[dev->if_port], ioaddr + CSR13);
-			next_tick = 10*HZ;			/* 2.4 sec. */
-		  } else
-			next_tick = 30*HZ;
-		  break;
-		case 1:					/* 10base2 */
-		case 2:					/* AUI */
-			if (csr12 & 0x0100) {
-				next_tick = (30*HZ);			/* 30 sec. */
-				tp->mediasense = 0;
-			} else if ((csr12 & 0x0004) == 0) {
-				printk(KERN_INFO "%s: 21041 media switched to 10baseT.\n",
-					   dev->name);
-				dev->if_port = 0;
-				tulip_select_media(dev, 0);
-				next_tick = (24*HZ)/10;				/* 2.4 sec. */
-			} else if (tp->mediasense || (csr12 & 0x0002)) {
-				dev->if_port = 3 - dev->if_port; /* Swap ports. */
-				tulip_select_media(dev, 0);
-				next_tick = 20*HZ;
-			} else {
-				next_tick = 20*HZ;
-			}
-			break;
-		}
-		break;
 	case DC21140:
 	case DC21142:
 	case MX98713:

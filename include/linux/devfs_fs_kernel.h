@@ -47,14 +47,6 @@
 
 typedef struct devfs_entry * devfs_handle_t;
 
-
-#ifdef CONFIG_BLK_DEV_INITRD
-#  define ROOT_DEVICE_NAME ((real_root_dev ==ROOT_DEV) ? root_device_name:NULL)
-#else
-#  define ROOT_DEVICE_NAME root_device_name
-#endif
-
-
 #ifdef CONFIG_DEVFS_FS
 
 struct unique_numspace

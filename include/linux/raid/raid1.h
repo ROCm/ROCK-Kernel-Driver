@@ -3,6 +3,8 @@
 
 #include <linux/raid/md.h>
 
+typedef struct mirror_info mirror_info_t;
+
 struct mirror_info {
 	int		number;
 	int		raid_disk;
@@ -20,34 +22,21 @@ struct mirror_info {
 	int		used_slot;
 };
 
-struct raid1_private_data {
+typedef struct r1bio_s r1bio_t;
+
+struct r1_private_data_s {
 	mddev_t			*mddev;
-	struct mirror_info	mirrors[MD_SB_DISKS];
+	mirror_info_t		mirrors[MD_SB_DISKS];
 	int			nr_disks;
 	int			raid_disks;
 	int			working_disks;
 	int			last_used;
-	unsigned long		next_sect;
+	sector_t		next_sect;
 	int			sect_count;
 	mdk_thread_t		*thread, *resync_thread;
 	int			resync_mirrors;
-	struct mirror_info	*spare;
-	md_spinlock_t		device_lock;
-
-	/* buffer pool */
-	/* buffer_heads that we have pre-allocated have b_pprev -> &freebh
-	 * and are linked into a stack using b_next
-	 * raid1_bh that are pre-allocated have R1BH_PreAlloc set.
-	 * All these variable are protected by device_lock
-	 */
-	struct buffer_head	*freebh;
-	int			freebh_cnt;	/* how many are on the list */
-	int			freebh_blocked;
-	struct raid1_bh		*freer1;
-	int			freer1_blocked;
-	int			freer1_cnt;
-	struct raid1_bh		*freebuf; 	/* each bh_req has a page allocated */
-	md_wait_queue_head_t	wait_buffer;
+	mirror_info_t		*spare;
+	spinlock_t		device_lock;
 
 	/* for use when syncing mirrors: */
 	unsigned long	start_active, start_ready,
@@ -56,18 +45,21 @@ struct raid1_private_data {
 		cnt_pending, cnt_future;
 	int	phase;
 	int	window;
-	md_wait_queue_head_t	wait_done;
-	md_wait_queue_head_t	wait_ready;
-	md_spinlock_t		segment_lock;
+	wait_queue_head_t	wait_done;
+	wait_queue_head_t	wait_ready;
+	spinlock_t		segment_lock;
+
+	mempool_t *r1bio_pool;
+	mempool_t *r1buf_pool;
 };
 
-typedef struct raid1_private_data raid1_conf_t;
+typedef struct r1_private_data_s conf_t;
 
 /*
  * this is the only point in the RAID code where we violate
  * C type safety. mddev->private is an 'opaque' pointer.
  */
-#define mddev_to_conf(mddev) ((raid1_conf_t *) mddev->private)
+#define mddev_to_conf(mddev) ((conf_t *) mddev->private)
 
 /*
  * this is our 'private' 'collective' RAID1 buffer head.
@@ -75,20 +67,32 @@ typedef struct raid1_private_data raid1_conf_t;
  * for this RAID1 operation, and about their status:
  */
 
-struct raid1_bh {
+struct r1bio_s {
 	atomic_t		remaining; /* 'have we finished' count,
 					    * used from IRQ handlers
 					    */
 	int			cmd;
+	sector_t		sector;
 	unsigned long		state;
 	mddev_t			*mddev;
-	struct buffer_head	*master_bh;
-	struct buffer_head	*mirror_bh_list;
-	struct buffer_head	bh_req;
-	struct raid1_bh		*next_r1;	/* next for retry or in free list */
+	/*
+	 * original bio going to /dev/mdx
+	 */
+	struct bio		*master_bio;
+	/*
+	 * if the IO is in READ direction, then this bio is used:
+	 */
+	struct bio		*read_bio;
+	/*
+	 * if the IO is in WRITE direction, then multiple bios are used:
+	 */
+	struct bio		*write_bios[MD_SB_DISKS];
+
+	r1bio_t			*next_r1; /* next for retry or in free list */
+	struct list_head	retry_list;
 };
-/* bits for raid1_bh.state */
-#define	R1BH_Uptodate	1
-#define	R1BH_SyncPhase	2
-#define	R1BH_PreAlloc	3	/* this was pre-allocated, add to free list */
+
+/* bits for r1bio.state */
+#define	R1BIO_Uptodate	1
+#define	R1BIO_SyncPhase	2
 #endif

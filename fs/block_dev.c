@@ -324,6 +324,7 @@ struct block_device *bdget(dev_t dev)
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_op = NULL;
 			new_bdev->bd_inode = inode;
+			inode->i_mode = S_IFBLK;
 			inode->i_rdev = kdev;
 			inode->i_dev = kdev;
 			inode->i_bdev = new_bdev;

@@ -254,6 +254,12 @@ void blk_queue_segment_boundary(request_queue_t *q, unsigned long mask)
 	q->seg_boundary_mask = mask;
 }
 
+void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
+{
+	spin_lock_init(lock);
+	q->queue_lock = lock;
+}
+
 static char *rq_flags[] = { "REQ_RW", "REQ_RW_AHEAD", "REQ_BARRIER",
 			   "REQ_CMD", "REQ_NOMERGE", "REQ_STARTED",
 			   "REQ_DONTPREP", "REQ_DRIVE_CMD", "REQ_DRIVE_TASK",
@@ -536,9 +542,9 @@ void generic_unplug_device(void *data)
 	request_queue_t *q = (request_queue_t *) data;
 	unsigned long flags;
 
-	spin_lock_irqsave(&q->queue_lock, flags);
+	spin_lock_irqsave(q->queue_lock, flags);
 	__generic_unplug_device(q);
-	spin_unlock_irqrestore(&q->queue_lock, flags);
+	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 static int __blk_cleanup_queue(struct request_list *list)
@@ -624,7 +630,6 @@ static int blk_init_free_list(request_queue_t *q)
 
 	init_waitqueue_head(&q->rq[READ].wait);
 	init_waitqueue_head(&q->rq[WRITE].wait);
-	spin_lock_init(&q->queue_lock);
 	return 0;
 nomem:
 	blk_cleanup_queue(q);
@@ -661,7 +666,7 @@ static int __make_request(request_queue_t *, struct bio *);
  *    blk_init_queue() must be paired with a blk_cleanup_queue() call
  *    when the block device is deactivated (such as at module unload).
  **/
-int blk_init_queue(request_queue_t *q, request_fn_proc *rfn)
+int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 {
 	int ret;
 
@@ -682,6 +687,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn)
 	q->plug_tq.routine	= &generic_unplug_device;
 	q->plug_tq.data		= q;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
+	q->queue_lock		= lock;
 	
 	/*
 	 * by default assume old behaviour and bounce for any highmem page
@@ -728,7 +734,7 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 	struct request_list *rl = &q->rq[rw];
 	struct request *rq;
 
-	spin_lock_prefetch(&q->queue_lock);
+	spin_lock_prefetch(q->queue_lock);
 
 	generic_unplug_device(q);
 	add_wait_queue(&rl->wait, &wait);
@@ -736,9 +742,9 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		if (rl->count < batch_requests)
 			schedule();
-		spin_lock_irq(&q->queue_lock);
+		spin_lock_irq(q->queue_lock);
 		rq = get_request(q, rw);
-		spin_unlock_irq(&q->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 	} while (rq == NULL);
 	remove_wait_queue(&rl->wait, &wait);
 	current->state = TASK_RUNNING;
@@ -949,9 +955,9 @@ void blk_attempt_remerge(request_queue_t *q, struct request *rq)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&q->queue_lock, flags);
+	spin_lock_irqsave(q->queue_lock, flags);
 	__blk_attempt_remerge(q, rq);
-	spin_unlock_irqrestore(&q->queue_lock, flags);
+	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 static int __make_request(request_queue_t *q, struct bio *bio)
@@ -974,7 +980,7 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 	 */
 	blk_queue_bounce(q, &bio);
 
-	spin_lock_prefetch(&q->queue_lock);
+	spin_lock_prefetch(q->queue_lock);
 
 	latency = elevator_request_latency(elevator, rw);
 	barrier = test_bit(BIO_RW_BARRIER, &bio->bi_rw);
@@ -983,7 +989,7 @@ again:
 	req = NULL;
 	head = &q->queue_head;
 
-	spin_lock_irq(&q->queue_lock);
+	spin_lock_irq(q->queue_lock);
 
 	insert_here = head->prev;
 	if (blk_queue_empty(q) || barrier) {
@@ -1066,7 +1072,7 @@ get_rq:
 		freereq = NULL;
 	} else if ((req = get_request(q, rw)) == NULL) {
 
-		spin_unlock_irq(&q->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 
 		/*
 		 * READA bit set
@@ -1111,7 +1117,7 @@ get_rq:
 out:
 	if (freereq)
 		blkdev_release_request(freereq);
-	spin_unlock_irq(&q->queue_lock);
+	spin_unlock_irq(q->queue_lock);
 	return 0;
 
 end_io:
@@ -1608,3 +1614,4 @@ EXPORT_SYMBOL(blk_nohighio);
 EXPORT_SYMBOL(blk_dump_rq_flags);
 EXPORT_SYMBOL(submit_bio);
 EXPORT_SYMBOL(blk_contig_segment);
+EXPORT_SYMBOL(blk_queue_assign_lock);

@@ -307,7 +307,7 @@ __inline static int __scsi_back_merge_fn(request_queue_t * q,
 	}
 
 #ifdef DMA_CHUNK_SIZE
-	if (MERGEABLE_BUFFERS(bio, req->bio))
+	if (MERGEABLE_BUFFERS(req->biotail, bio))
 		return scsi_new_mergeable(q, req, bio);
 #endif
 
@@ -461,9 +461,7 @@ inline static int scsi_merge_requests_fn(request_queue_t * q,
  *              (mainly because we don't need queue management functions
  *              which keep the tally uptodate.
  */
-__inline static int __init_io(Scsi_Cmnd * SCpnt,
-			      int sg_count_valid,
-			      int dma_host)
+__inline static int __init_io(Scsi_Cmnd * SCpnt, int dma_host)
 {
 	struct bio	   * bio;
 	char		   * buff;
@@ -480,11 +478,7 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 	/*
 	 * First we need to know how many scatter gather segments are needed.
 	 */
-	if (!sg_count_valid) {
-		count = __count_segments(req, dma_host, NULL);
-	} else {
-		count = req->nr_segments;
-	}
+	count = req->nr_segments;
 
 	/*
 	 * If the dma pool is nearly empty, then queue a minimal request
@@ -721,20 +715,14 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 	return 1;
 }
 
-#define INITIO(_FUNCTION, _VALID, _DMA)		\
+#define INITIO(_FUNCTION, _DMA)			\
 static int _FUNCTION(Scsi_Cmnd * SCpnt)		\
 {						\
-    return __init_io(SCpnt, _VALID, _DMA);	\
+    return __init_io(SCpnt, _DMA);		\
 }
 
-/*
- * ll_rw_blk.c now keeps track of the number of segments in
- * a request.  Thus we don't have to do it any more here.
- * We always force "_VALID" to 1.  Eventually clean this up
- * and get rid of the extra argument.
- */
-INITIO(scsi_init_io_v, 1, 0)
-INITIO(scsi_init_io_vd, 1, 1)
+INITIO(scsi_init_io_v, 0)
+INITIO(scsi_init_io_vd, 1)
 
 /*
  * Function:    initialize_merge_fn()

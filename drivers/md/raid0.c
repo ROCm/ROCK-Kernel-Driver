@@ -334,7 +334,7 @@ static mdk_personality_t raid0_personality=
 	status:		raid0_status,
 };
 
-static int md__init raid0_init (void)
+static int __init raid0_init (void)
 {
 	return register_md_personality (RAID0, &raid0_personality);
 }

@@ -136,23 +136,6 @@ void __devinit tulip_parse_eeprom(struct net_device *dev)
 subsequent_board:
 
 	if (ee_data[27] == 0) {		/* No valid media table. */
-	} else if (tp->chip_id == DC21041) {
-		unsigned char *p = (void *)ee_data + ee_data[27 + controller_index*3];
-		int media = get_u16(p);
-		int count = p[2];
-		p += 3;
-
-		printk(KERN_INFO "%s: 21041 Media table, default media %4.4x (%s).\n",
-			   dev->name, media,
-			   media & 0x0800 ? "Autosense" : medianame[media & MEDIA_MASK]);
-		for (i = 0; i < count; i++) {
-			unsigned char media_block = *p++;
-			int media_code = media_block & MEDIA_MASK;
-			if (media_block & 0x40)
-				p += 6;
-			printk(KERN_INFO "%s:  21041 media #%d, %s.\n",
-				   dev->name, media_code, medianame[media_code]);
-		}
 	} else {
 		unsigned char *p = (void *)ee_data + ee_data[27];
 		unsigned char csr12dir = 0;

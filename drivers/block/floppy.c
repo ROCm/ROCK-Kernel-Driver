@@ -204,6 +204,8 @@ static int use_virtual_dma;
  * record each buffers capabilities
  */
 
+static spinlock_t floppy_lock;
+
 static unsigned short virtual_dma_port=0x3f0;
 void floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 static int set_dor(int fdc, char mask, char data);
@@ -2296,7 +2298,7 @@ static void request_done(int uptodate)
 			DRS->maxtrack = 1;
 
 		/* unlock chained buffers */
-		spin_lock_irqsave(&QUEUE->queue_lock, flags);
+		spin_lock_irqsave(QUEUE->queue_lock, flags);
 		while (current_count_sectors && !QUEUE_EMPTY &&
 		       current_count_sectors >= CURRENT->current_nr_sectors){
 			current_count_sectors -= CURRENT->current_nr_sectors;
@@ -2304,7 +2306,7 @@ static void request_done(int uptodate)
 			CURRENT->sector += CURRENT->current_nr_sectors;
 			end_request(1);
 		}
-		spin_unlock_irqrestore(&QUEUE->queue_lock, flags);
+		spin_unlock_irqrestore(QUEUE->queue_lock, flags);
 
 		if (current_count_sectors && !QUEUE_EMPTY){
 			/* "unlock" last subsector */
@@ -2329,9 +2331,9 @@ static void request_done(int uptodate)
 			DRWE->last_error_sector = CURRENT->sector;
 			DRWE->last_error_generation = DRS->generation;
 		}
-		spin_lock_irqsave(&QUEUE->queue_lock, flags);
+		spin_lock_irqsave(QUEUE->queue_lock, flags);
 		end_request(0);
-		spin_unlock_irqrestore(&QUEUE->queue_lock, flags);
+		spin_unlock_irqrestore(QUEUE->queue_lock, flags);
 	}
 }
 
@@ -2433,17 +2435,20 @@ static void rw_interrupt(void)
 static int buffer_chain_size(void)
 {
 	struct bio *bio;
-	int size;
+	struct bio_vec *bv;
+	int size, i;
 	char *base;
 
-	base = CURRENT->buffer;
+	base = bio_data(CURRENT->bio);
 	size = 0;
 
 	rq_for_each_bio(bio, CURRENT) {
-		if (bio_data(bio) != base + size)
-			break;
+		bio_for_each_segment(bv, bio, i) {
+			if (page_address(bv->bv_page) + bv->bv_offset != base + size)
+				break;
 
-		size += bio->bi_size;
+			size += bv->bv_len;
+		}
 	}
 
 	return size >> 9;
@@ -2469,9 +2474,10 @@ static int transfer_size(int ssize, int max_sector, int max_size)
 static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 {
 	int remaining; /* number of transferred 512-byte sectors */
+	struct bio_vec *bv;
 	struct bio *bio;
 	char *buffer, *dma_buffer;
-	int size;
+	int size, i;
 
 	max_sector = transfer_size(ssize,
 				   minimum(max_sector, max_sector_2),
@@ -2501,12 +2507,17 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 
 	dma_buffer = floppy_track_buffer + ((fsector_t - buffer_min) << 9);
 
-	bio = CURRENT->bio;
 	size = CURRENT->current_nr_sectors << 9;
-	buffer = CURRENT->buffer;
 
-	while (remaining > 0){
-		SUPBOUND(size, remaining);
+	rq_for_each_bio(bio, CURRENT) {
+		bio_for_each_segment(bv, bio, i) {
+			if (!remaining)
+				break;
+
+			size = bv->bv_len;
+			SUPBOUND(size, remaining);
+
+			buffer = page_address(bv->bv_page) + bv->bv_offset;
 #ifdef FLOPPY_SANITY_CHECK
 		if (dma_buffer + size >
 		    floppy_track_buffer + (max_buffer_sectors << 10) ||
@@ -2526,24 +2537,14 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 		if (((unsigned long)buffer) % 512)
 			DPRINT("%p buffer not aligned\n", buffer);
 #endif
-		if (CT(COMMAND) == FD_READ)
-			memcpy(buffer, dma_buffer, size);
-		else
-			memcpy(dma_buffer, buffer, size);
-		remaining -= size;
-		if (!remaining)
-			break;
+			if (CT(COMMAND) == FD_READ)
+				memcpy(buffer, dma_buffer, size);
+			else
+				memcpy(dma_buffer, buffer, size);
 
-		dma_buffer += size;
-		bio = bio->bi_next;
-#ifdef FLOPPY_SANITY_CHECK
-		if (!bio){
-			DPRINT("bh=null in copy buffer after copy\n");
-			break;
+			remaining -= size;
+			dma_buffer += size;
 		}
-#endif
-		size = bio->bi_size;
-		buffer = bio_data(bio);
 	}
 #ifdef FLOPPY_SANITY_CHECK
 	if (remaining){
@@ -4169,7 +4170,7 @@ int __init floppy_init(void)
 
 	blk_size[MAJOR_NR] = floppy_sizes;
 	blksize_size[MAJOR_NR] = floppy_blocksizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &floppy_lock);
 	reschedule_timeout(MAXTIMEOUT, "floppy init", MAXTIMEOUT);
 	config_types();
 
@@ -4477,6 +4478,7 @@ MODULE_LICENSE("GPL");
 #else
 
 __setup ("floppy=", floppy_setup);
+module_init(floppy_init)
 
 /* eject the boot floppy (if we need the drive for a different root floppy) */
 /* This should only be called at boot time when we're sure that there's no

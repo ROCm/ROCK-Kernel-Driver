@@ -1,6 +1,9 @@
 /*
  *      eata.c - Low-level driver for EATA/DMA SCSI host adapters.
  *
+ *      11 Dec 2001 Rev. 7.00 for linux 2.5.1
+ *        + Use host->host_lock instead of io_request_lock.
+ *
  *       1 May 2001 Rev. 6.05 for linux 2.4.4
  *        + Clean up all pci related routines.
  *        + Fix data transfer direction for opcode SEND_CUE_SHEET (0x5d)
@@ -437,13 +440,6 @@ MODULE_AUTHOR("Dario Ballabio");
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/spinlock.h>
-
-#define SPIN_FLAGS unsigned long spin_flags;
-#define SPIN_LOCK spin_lock_irq(&io_request_lock);
-#define SPIN_LOCK_SAVE spin_lock_irqsave(&io_request_lock, spin_flags);
-#define SPIN_UNLOCK spin_unlock_irq(&io_request_lock);
-#define SPIN_UNLOCK_RESTORE \
-                  spin_unlock_irqrestore(&io_request_lock, spin_flags);
 
 /* Subversion values */
 #define ISA  0
@@ -1589,10 +1585,12 @@ static inline int do_reset(Scsi_Cmnd *SCarg) {
 #endif
 
    HD(j)->in_reset = TRUE;
-   SPIN_UNLOCK
+
+   spin_unlock_irq(&sh[j]->host_lock);
    time = jiffies;
    while ((jiffies - time) < (10 * HZ) && limit++ < 200000) udelay(100L);
-   SPIN_LOCK
+   spin_lock_irq(&sh[j]->host_lock);
+
    printk("%s: reset, interrupts disabled, loops %d.\n", BN(j), limit);
 
    for (i = 0; i < sh[j]->can_queue; i++) {
@@ -2036,14 +2034,14 @@ static inline void ihdlr(int irq, unsigned int j) {
 
 static void do_interrupt_handler(int irq, void *shap, struct pt_regs *regs) {
    unsigned int j;
-   SPIN_FLAGS
+   unsigned long spin_flags;
 
    /* Check if the interrupt must be processed by this handler */
    if ((j = (unsigned int)((char *)shap - sha)) >= num_boards) return;
 
-   SPIN_LOCK_SAVE
+   spin_lock_irqsave(&sh[j]->host_lock, spin_flags);
    ihdlr(irq, j);
-   SPIN_UNLOCK_RESTORE
+   spin_unlock_irqrestore(&sh[j]->host_lock, spin_flags);
 }
 
 int eata2x_release(struct Scsi_Host *shpnt) {
@@ -2077,4 +2075,4 @@ static Scsi_Host_Template driver_template = EATA;
 #ifndef MODULE
 __setup("eata=", option_setup);
 #endif /* end MODULE */
-MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("GPL");

@@ -158,9 +158,9 @@ static inline void mark_disk_nonsync(mdp_disk_t * d)
  */
 struct mdk_rdev_s
 {
-	struct md_list_head same_set;	/* RAID devices within the same set */
-	struct md_list_head all;	/* all RAID devices */
-	struct md_list_head pending;	/* undetected RAID devices */
+	struct list_head same_set;	/* RAID devices within the same set */
+	struct list_head all;		/* all RAID devices */
+	struct list_head pending;	/* undetected RAID devices */
 
 	kdev_t dev;			/* Device number */
 	kdev_t old_dev;			/*  "" when it was last imported */
@@ -197,7 +197,7 @@ struct mddev_s
 	int				__minor;
 	mdp_super_t			*sb;
 	int				nb_dev;
-	struct md_list_head 		disks;
+	struct list_head 		disks;
 	int				sb_dirty;
 	mdu_param_t			param;
 	int				ro;
@@ -212,9 +212,9 @@ struct mddev_s
 	atomic_t			active;
 
 	atomic_t			recovery_active; /* blocks scheduled, but not written */
-	md_wait_queue_head_t		recovery_wait;
+	wait_queue_head_t		recovery_wait;
 
-	struct md_list_head		all_mddevs;
+	struct list_head		all_mddevs;
 };
 
 struct mdk_personality_s
@@ -240,7 +240,7 @@ struct mdk_personality_s
 
 	int (*stop_resync)(mddev_t *mddev);
 	int (*restart_resync)(mddev_t *mddev);
-	int (*sync_request)(mddev_t *mddev, unsigned long block_nr);
+	int (*sync_request)(mddev_t *mddev, sector_t sector_nr);
 };
 
 
@@ -269,9 +269,9 @@ extern mdp_disk_t *get_spare(mddev_t *mddev);
  */
 #define ITERATE_RDEV_GENERIC(head,field,rdev,tmp)			\
 									\
-	for (tmp = head.next;						\
-		rdev = md_list_entry(tmp, mdk_rdev_t, field),		\
-			tmp = tmp->next, tmp->prev != &head		\
+	for ((tmp) = (head).next;					\
+		(rdev) = (list_entry((tmp), mdk_rdev_t, field)),	\
+			(tmp) = (tmp)->next, (tmp)->prev != &(head)	\
 		; )
 /*
  * iterates through the 'same array disks' ringlist
@@ -305,7 +305,7 @@ extern mdp_disk_t *get_spare(mddev_t *mddev);
 #define ITERATE_MDDEV(mddev,tmp)					\
 									\
 	for (tmp = all_mddevs.next;					\
-		mddev = md_list_entry(tmp, mddev_t, all_mddevs),	\
+		mddev = list_entry(tmp, mddev_t, all_mddevs),	\
 			tmp = tmp->next, tmp->prev != &all_mddevs	\
 		; )
 
@@ -325,7 +325,7 @@ static inline void unlock_mddev (mddev_t * mddev)
 typedef struct mdk_thread_s {
 	void			(*run) (void *data);
 	void			*data;
-	md_wait_queue_head_t	wqueue;
+	wait_queue_head_t	wqueue;
 	unsigned long           flags;
 	struct completion	*event;
 	struct task_struct	*tsk;
@@ -337,7 +337,7 @@ typedef struct mdk_thread_s {
 #define MAX_DISKNAME_LEN 64
 
 typedef struct dev_name_s {
-	struct md_list_head list;
+	struct list_head list;
 	kdev_t dev;
 	char namebuf [MAX_DISKNAME_LEN];
 	char *name;

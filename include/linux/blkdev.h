@@ -160,7 +160,7 @@ struct request_queue
 	/*
 	 * protects queue structures from reentrancy
 	 */
-	spinlock_t		queue_lock;
+	spinlock_t		*queue_lock;
 
 	/*
 	 * queue settings
@@ -258,13 +258,14 @@ extern void blk_put_request(struct request *);
 extern void blk_plug_device(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern inline int blk_contig_segment(request_queue_t *q, struct bio *, struct bio *);
+extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
 
 extern int block_ioctl(kdev_t, unsigned int, unsigned long);
 
 /*
  * Access functions for manipulating queue properties
  */
-extern int blk_init_queue(request_queue_t *, request_fn_proc *);
+extern int blk_init_queue(request_queue_t *, request_fn_proc *, spinlock_t *);
 extern void blk_cleanup_queue(request_queue_t *);
 extern void blk_queue_make_request(request_queue_t *, make_request_fn *);
 extern void blk_queue_bounce_limit(request_queue_t *, u64);

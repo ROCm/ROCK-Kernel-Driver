@@ -37,8 +37,12 @@
 #include <linux/kernel_stat.h>
 #include <asm/io.h>
 #include <linux/completion.h>
+#include <linux/mempool.h>
+#include <linux/list.h>
+#include <linux/reboot.h>
+#include <linux/vmalloc.h>
+#include <linux/blkpg.h>
 
-#include <linux/raid/md_compatible.h>
 /*
  * 'md_p.h' holds the 'physical' layout of RAID devices
  * 'md_u.h' holds the user <=> kernel API

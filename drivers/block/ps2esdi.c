@@ -189,6 +189,8 @@ int __init ps2esdi_init(void)
 	return 0;
 }				/* ps2esdi_init */
 
+module_init(ps2esdi_init);
+
 #ifdef MODULE
 
 static int cyl[MAX_HD] = {-1,-1};

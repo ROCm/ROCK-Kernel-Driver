@@ -1,9 +1,9 @@
 /*
  *  linux/mm/mempool.c
  *
- *  memory buffer pool support. Such pools are mostly used to
- *  guarantee deadlock-free IO operations even during extreme
- *  VM load.
+ *  memory buffer pool support. Such pools are mostly used
+ *  for guaranteed, deadlock-free memory allocations during
+ *  extreme VM load.
  *
  *  started by Ingo Molnar, Copyright (C) 2001
  */
@@ -75,6 +75,71 @@ mempool_t * mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
 }
 
 /**
+ * mempool_resize - resize an existing memory pool
+ * @pool:       pointer to the memory pool which was allocated via
+ *              mempool_create().
+ * @new_min_nr: the new minimum number of elements guaranteed to be
+ *              allocated for this pool.
+ * @gfp_mask:   the usual allocation bitmask.
+ *
+ * This function shrinks/grows the pool. In the case of growing,
+ * it cannot be guaranteed that the pool will be grown to the new
+ * size immediately, but new mempool_free() calls will refill it.
+ *
+ * Note, the caller must guarantee that no mempool_destroy is called
+ * while this function is running. mempool_alloc() & mempool_free()
+ * might be called (eg. from IRQ contexts) while this function executes.
+ */
+void mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask)
+{
+	int delta;
+	void *element;
+	unsigned long flags;
+	struct list_head *tmp;
+
+	if (new_min_nr <= 0)
+		BUG();
+
+	spin_lock_irqsave(&pool->lock, flags);
+	if (new_min_nr < pool->min_nr) {
+		pool->min_nr = new_min_nr;
+		/*
+		 * Free possible excess elements.
+		 */
+		while (pool->curr_nr > pool->min_nr) {
+			tmp = pool->elements.next;
+			if (tmp == &pool->elements)
+				BUG();
+			list_del(tmp);
+			element = tmp;
+			pool->curr_nr--;
+			spin_unlock_irqrestore(&pool->lock, flags);
+
+			pool->free(element, pool->pool_data);
+
+			spin_lock_irqsave(&pool->lock, flags);
+		}
+		spin_unlock_irqrestore(&pool->lock, flags);
+		return;
+	}
+	delta = new_min_nr - pool->min_nr;
+	pool->min_nr = new_min_nr;
+	spin_unlock_irqrestore(&pool->lock, flags);
+
+	/*
+	 * We refill the pool up to the new treshold - but we dont
+	 * (cannot) guarantee that the refill succeeds.
+	 */
+	while (delta) {
+		element = pool->alloc(gfp_mask, pool->pool_data);
+		if (!element)
+			break;
+		mempool_free(element, pool);
+		delta--;
+	}
+}
+
+/**
  * mempool_destroy - deallocate a memory pool
  * @pool:      pointer to the memory pool which was allocated via
  *             mempool_create().
@@ -110,7 +175,7 @@ void mempool_destroy(mempool_t *pool)
  * @gfp_mask:  the usual allocation bitmask.
  *
  * this function only sleeps if the alloc_fn function sleeps or
- * returns NULL. Note that due to preallocation guarantees this function
+ * returns NULL. Note that due to preallocation, this function
  * *never* fails.
  */
 void * mempool_alloc(mempool_t *pool, int gfp_mask)
@@ -175,7 +240,7 @@ repeat_alloc:
 
 /**
  * mempool_free - return an element to the pool.
- * @gfp_mask:  pool element pointer.
+ * @element:   pool element pointer.
  * @pool:      pointer to the memory pool which was allocated via
  *             mempool_create().
  *
@@ -200,6 +265,7 @@ void mempool_free(void *element, mempool_t *pool)
 }
 
 EXPORT_SYMBOL(mempool_create);
+EXPORT_SYMBOL(mempool_resize);
 EXPORT_SYMBOL(mempool_destroy);
 EXPORT_SYMBOL(mempool_alloc);
 EXPORT_SYMBOL(mempool_free);

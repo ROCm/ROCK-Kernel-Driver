@@ -1,6 +1,9 @@
 /*
  *      u14-34f.c - Low-level driver for UltraStor 14F/34F SCSI host adapters.
  *
+ *      11 Dec 2001 Rev. 7.00 for linux 2.5.1
+ *        + Use host->host_lock instead of io_request_lock.
+ *
  *       1 May 2001 Rev. 6.05 for linux 2.4.4
  *        + Fix data transfer direction for opcode SEND_CUE_SHEET (0x5d)
  *
@@ -334,7 +337,6 @@
  *  the driver sets host->wish_block = TRUE for all ISA boards.
  */
 
-#include <linux/module.h>
 #include <linux/version.h>
 
 #ifndef LinuxVersionCode
@@ -342,6 +344,9 @@
 #endif
 
 #define MAX_INT_PARAM 10
+
+#if defined(MODULE)
+#include <linux/module.h>
 
 MODULE_PARM(boot_options, "s");
 MODULE_PARM(io_port, "1-" __MODULE_STRING(MAX_INT_PARAM) "i");
@@ -351,6 +356,8 @@ MODULE_PARM(link_statistics, "i");
 MODULE_PARM(max_queue_depth, "i");
 MODULE_PARM(ext_tran, "i");
 MODULE_AUTHOR("Dario Ballabio");
+
+#endif
 
 #include <linux/string.h>
 #include <linux/sched.h>
@@ -373,13 +380,6 @@ MODULE_AUTHOR("Dario Ballabio");
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/spinlock.h>
-
-#define SPIN_FLAGS unsigned long spin_flags;
-#define SPIN_LOCK spin_lock_irq(&io_request_lock);
-#define SPIN_LOCK_SAVE spin_lock_irqsave(&io_request_lock, spin_flags);
-#define SPIN_UNLOCK spin_unlock_irq(&io_request_lock);
-#define SPIN_UNLOCK_RESTORE \
-                  spin_unlock_irqrestore(&io_request_lock, spin_flags);
 
 /* Values for the PRODUCT_ID ports for the 14/34F */
 #define PRODUCT_ID1  0x56
@@ -672,10 +672,8 @@ static int board_inquiry(unsigned int j) {
    /* Issue OGM interrupt */
    outb(CMD_OGM_INTR, sh[j]->io_port + REG_LCL_INTR);
 
-   SPIN_UNLOCK
    time = jiffies;
    while ((jiffies - time) < HZ && limit++ < 20000) udelay(100L);
-   SPIN_LOCK
 
    if (cpp->adapter_status || HD(j)->cp_stat[0] != FREE) {
       HD(j)->cp_stat[0] = FREE;
@@ -1274,10 +1272,12 @@ static inline int do_reset(Scsi_Cmnd *SCarg) {
 #endif
 
    HD(j)->in_reset = TRUE;
-   SPIN_UNLOCK
+   
+   spin_unlock_irq(&sh[j]->host_lock);
    time = jiffies;
    while ((jiffies - time) < (10 * HZ) && limit++ < 200000) udelay(100L);
-   SPIN_LOCK
+   spin_lock_irq(&sh[j]->host_lock);
+   
    printk("%s: reset, interrupts disabled, loops %d.\n", BN(j), limit);
 
    for (i = 0; i < sh[j]->can_queue; i++) {
@@ -1718,14 +1718,14 @@ static inline void ihdlr(int irq, unsigned int j) {
 
 static void do_interrupt_handler(int irq, void *shap, struct pt_regs *regs) {
    unsigned int j;
-   SPIN_FLAGS
+   unsigned long spin_flags;
 
    /* Check if the interrupt must be processed by this handler */
    if ((j = (unsigned int)((char *)shap - sha)) >= num_boards) return;
 
-   SPIN_LOCK_SAVE
+   spin_lock_irqsave(&sh[j]->host_lock, spin_flags);
    ihdlr(irq, j);
-   SPIN_UNLOCK_RESTORE
+   spin_unlock_irqrestore(&sh[j]->host_lock, spin_flags);
 }
 
 int u14_34f_release(struct Scsi_Host *shpnt) {
@@ -1752,7 +1752,6 @@ int u14_34f_release(struct Scsi_Host *shpnt) {
    return FALSE;
 }
 
-MODULE_LICENSE("BSD without advertisement clause");
 static Scsi_Host_Template driver_template = ULTRASTOR_14_34F;
 
 #include "scsi_module.c"
@@ -1760,3 +1759,4 @@ static Scsi_Host_Template driver_template = ULTRASTOR_14_34F;
 #ifndef MODULE
 __setup("u14-34f=", option_setup);
 #endif /* end MODULE */
+MODULE_LICENSE("GPL");

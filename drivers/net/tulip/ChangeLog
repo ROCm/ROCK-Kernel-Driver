@@ -1,3 +1,8 @@
+2001-12-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* eeprom.c, timer.c, media.c, tulip_core.c:
+	Remove 21040 and 21041 chip support.
+
 2001-11-13  David S. Miller  <davem@redhat.com>
 
 	* tulip_core.c (tulip_mwi_config): Kill unused label early_out.

@@ -25,6 +25,7 @@ struct mempool_s {
 };
 extern mempool_t * mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
 				 mempool_free_t *free_fn, void *pool_data);
+extern void mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask);
 extern void mempool_destroy(mempool_t *pool);
 extern void * mempool_alloc(mempool_t *pool, int gfp_mask);
 extern void mempool_free(void *element, mempool_t *pool);

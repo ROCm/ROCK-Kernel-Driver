@@ -1237,7 +1237,7 @@ queue:
 
 	blkdev_dequeue_request(creq);
 
-	spin_unlock_irq(&q->queue_lock);
+	spin_unlock_irq(q->queue_lock);
 
 	c->cmd_type = CMD_RWREQ;
 	c->rq = creq;
@@ -1298,7 +1298,7 @@ queue:
 	c->Request.CDB[8]= creq->nr_sectors & 0xff; 
 	c->Request.CDB[9] = c->Request.CDB[11] = c->Request.CDB[12] = 0;
 
-	spin_lock_irq(&q->queue_lock);
+	spin_lock_irq(q->queue_lock);
 
 	addQ(&(h->reqQ),c);
 	h->Qdepth++;
@@ -1866,7 +1866,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
         q->queuedata = hba[i];
-        blk_init_queue(q, do_cciss_request);
+        blk_init_queue(q, do_cciss_request, &hba[i]->lock);
 	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
 	blk_queue_max_segments(q, MAXSGENTRIES);
 	blk_queue_max_sectors(q, 512);

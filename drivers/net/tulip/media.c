@@ -21,12 +21,6 @@
 #include "tulip.h"
 
 
-/* This is a mysterious value that can be written to CSR11 in the 21040 (only)
-   to support a pre-NWay full-duplex signaling mechanism using short frames.
-   No one knows what it should be, but if left at its default value some
-   10base2(!) packets trigger a full-duplex-request interrupt. */
-#define FULL_DUPLEX_MAGIC	0x6969
-
 /* The maximum data clock rate is 2.5 Mhz.  The minimum timing is usually
    met by back-to-back PCI I/O cycles, but we insert a delay to avoid
    "overclocking" issues or future 66Mhz PCI. */
@@ -326,17 +320,6 @@ void tulip_select_media(struct net_device *dev, int startup)
 			printk(KERN_DEBUG "%s: Using media type %s, CSR12 is %2.2x.\n",
 				   dev->name, medianame[dev->if_port],
 				   inl(ioaddr + CSR12) & 0xff);
-	} else if (tp->chip_id == DC21041) {
-		int port = dev->if_port <= 4 ? dev->if_port : 0;
-		if (tulip_debug > 1)
-			printk(KERN_DEBUG "%s: 21041 using media %s, CSR12 is %4.4x.\n",
-				   dev->name, medianame[port == 3 ? 12: port],
-				   inl(ioaddr + CSR12));
-		outl(0x00000000, ioaddr + CSR13); /* Reset the serial interface */
-		outl(t21041_csr14[port], ioaddr + CSR14);
-		outl(t21041_csr15[port], ioaddr + CSR15);
-		outl(t21041_csr13[port], ioaddr + CSR13);
-		new_csr6 = 0x80020000;
 	} else if (tp->chip_id == LC82C168) {
 		if (startup && ! tp->medialock)
 			dev->if_port = tp->mii_cnt ? 11 : 0;
@@ -363,26 +346,6 @@ void tulip_select_media(struct net_device *dev, int startup)
 			new_csr6 = 0x00420000;
 			outl(0x1F078, ioaddr + 0xB8);
 		}
-	} else if (tp->chip_id == DC21040) {					/* 21040 */
-		/* Turn on the xcvr interface. */
-		int csr12 = inl(ioaddr + CSR12);
-		if (tulip_debug > 1)
-			printk(KERN_DEBUG "%s: 21040 media type is %s, CSR12 is %2.2x.\n",
-				   dev->name, medianame[dev->if_port], csr12);
-		if (tulip_media_cap[dev->if_port] & MediaAlwaysFD)
-			tp->full_duplex = 1;
-		new_csr6 = 0x20000;
-		/* Set the full duplux match frame. */
-		outl(FULL_DUPLEX_MAGIC, ioaddr + CSR11);
-		outl(0x00000000, ioaddr + CSR13); /* Reset the serial interface */
-		if (t21040_csr13[dev->if_port] & 8) {
-			outl(0x0705, ioaddr + CSR14);
-			outl(0x0006, ioaddr + CSR15);
-		} else {
-			outl(0xffff, ioaddr + CSR14);
-			outl(0x0000, ioaddr + CSR15);
-		}
-		outl(0x8f01 | t21040_csr13[dev->if_port], ioaddr + CSR13);
 	} else {					/* Unknown chip type with no media table. */
 		if (tp->default_port == 0)
 			dev->if_port = tp->mii_cnt ? 11 : 3;

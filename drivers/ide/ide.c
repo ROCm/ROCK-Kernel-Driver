@@ -177,8 +177,6 @@ static int	initializing;     /* set while initializing built-in drivers */
 /*
  * protects global structures etc, we want to split this into per-hwgroup
  * instead.
- *
- * anti-deadlock ordering: ide_lock -> DRIVE_LOCK
  */
 spinlock_t ide_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 
@@ -583,11 +581,9 @@ inline int __ide_end_request(ide_hwgroup_t *hwgroup, int uptodate, int nr_secs)
 
 	if (!end_that_request_first(rq, uptodate, nr_secs)) {
 		add_blkdev_randomness(MAJOR(rq->rq_dev));
-		spin_lock(DRIVE_LOCK(drive));
 		blkdev_dequeue_request(rq);
         	hwgroup->rq = NULL;
 		end_that_request_last(rq);
-		spin_unlock(DRIVE_LOCK(drive));
 		ret = 0;
 	}
 
@@ -900,11 +896,9 @@ void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
 		}
 	}
 
-	spin_lock(DRIVE_LOCK(drive));
 	blkdev_dequeue_request(rq);
 	HWGROUP(drive)->rq = NULL;
 	end_that_request_last(rq);
-	spin_unlock(DRIVE_LOCK(drive));
 
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
@@ -1368,7 +1362,7 @@ repeat:
 
 /*
  * Issue a new request to a drive from hwgroup
- * Caller must have already done spin_lock_irqsave(DRIVE_LOCK(drive), ...)
+ * Caller must have already done spin_lock_irqsave(&ide_lock, ...)
  *
  * A hwgroup is a serialized group of IDE interfaces.  Usually there is
  * exactly one hwif (interface) per hwgroup, but buggy controllers (eg. CMD640)
@@ -1456,9 +1450,7 @@ static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 		/*
 		 * just continuing an interrupted request maybe
 		 */
-		spin_lock(DRIVE_LOCK(drive));
 		rq = hwgroup->rq = elv_next_request(&drive->queue);
-		spin_unlock(DRIVE_LOCK(drive));
 
 		/*
 		 * Some systems have trouble with IDE IRQs arriving while
@@ -1496,19 +1488,7 @@ request_queue_t *ide_get_queue (kdev_t dev)
  */
 void do_ide_request(request_queue_t *q)
 {
-	unsigned long flags;
-
-	/*
-	 * release queue lock, grab IDE global lock and restore when
-	 * we leave...
-	 */
-	spin_unlock(&q->queue_lock);
-
-	spin_lock_irqsave(&ide_lock, flags);
 	ide_do_request(q->queuedata, 0);
-	spin_unlock_irqrestore(&ide_lock, flags);
-
-	spin_lock(&q->queue_lock);
 }
 
 /*
@@ -1875,7 +1855,6 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	if (action == ide_wait)
 		rq->waiting = &wait;
 	spin_lock_irqsave(&ide_lock, flags);
-	spin_lock(DRIVE_LOCK(drive));
 	if (blk_queue_empty(&drive->queue) || action == ide_preempt) {
 		if (action == ide_preempt)
 			hwgroup->rq = NULL;
@@ -1886,7 +1865,6 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 			queue_head = queue_head->next;
 	}
 	q->elevator.elevator_add_req_fn(q, rq, queue_head);
-	spin_unlock(DRIVE_LOCK(drive));
 	ide_do_request(hwgroup, 0);
 	spin_unlock_irqrestore(&ide_lock, flags);
 	if (action == ide_wait) {

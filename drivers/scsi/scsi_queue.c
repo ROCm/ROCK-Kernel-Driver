@@ -80,7 +80,6 @@ int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 {
 	struct Scsi_Host *host;
 	unsigned long flags;
-	request_queue_t *q = &cmd->device->request_queue;
 
 	SCSI_LOG_MLQUEUE(1, printk("Inserting command %p into mlqueue\n", cmd));
 
@@ -138,10 +137,10 @@ int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 	 * Decrement the counters, since these commands are no longer
 	 * active on the host/device.
 	 */
-	spin_lock_irqsave(&q->queue_lock, flags);
+	spin_lock_irqsave(&cmd->host->host_lock, flags);
 	cmd->host->host_busy--;
 	cmd->device->device_busy--;
-	spin_unlock_irqrestore(&q->queue_lock, flags);
+	spin_unlock_irqrestore(&cmd->host->host_lock, flags);
 
 	/*
 	 * Insert this command at the head of the queue for it's device.

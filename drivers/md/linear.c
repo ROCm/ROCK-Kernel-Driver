@@ -189,7 +189,7 @@ static mdk_personality_t linear_personality=
 	status:		linear_status,
 };
 
-static int md__init linear_init (void)
+static int __init linear_init (void)
 {
 	return register_md_personality (LINEAR, &linear_personality);
 }

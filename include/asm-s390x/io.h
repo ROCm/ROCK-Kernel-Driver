@@ -19,7 +19,7 @@
 #define IO_SPACE_LIMIT 0xffffffff
 
 #define __io_virt(x)            ((void *)(PAGE_OFFSET | (unsigned long)(x)))
-#define __io_phys(x)            ((unsigned long)(x) & ~PAGE_OFFSET)
+
 /*
  * Change virtual addresses to physical addresses and vv.
  * These are pretty trivial

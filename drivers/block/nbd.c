@@ -62,6 +62,8 @@ static u64 nbd_bytesizes[MAX_NBD];
 static struct nbd_device nbd_dev[MAX_NBD];
 static devfs_handle_t devfs_handle;
 
+static spinlock_t nbd_lock;
+
 #define DEBUG( s )
 /* #define DEBUG( s ) printk( s ) 
  */
@@ -347,22 +349,22 @@ static void do_nbd_request(request_queue_t * q)
 #endif
 		req->errors = 0;
 		blkdev_dequeue_request(req);
-		spin_unlock_irq(&q->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 
 		down (&lo->queue_lock);
 		list_add(&req->queuelist, &lo->queue_head);
 		nbd_send_req(lo->sock, req);	/* Why does this block?         */
 		up (&lo->queue_lock);
 
-		spin_lock_irq(&q->queue_lock);
+		spin_lock_irq(q->queue_lock);
 		continue;
 
 	      error_out:
 		req->errors++;
 		blkdev_dequeue_request(req);
-		spin_unlock(&q->queue_lock);
+		spin_unlock(q->queue_lock);
 		nbd_end_request(req);
-		spin_lock(&q->queue_lock);
+		spin_lock(q->queue_lock);
 	}
 	return;
 }
@@ -515,7 +517,7 @@ static int __init nbd_init(void)
 #endif
 	blksize_size[MAJOR_NR] = nbd_blksizes;
 	blk_size[MAJOR_NR] = nbd_sizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request, &nbd_lock);
 	for (i = 0; i < MAX_NBD; i++) {
 		nbd_dev[i].refcnt = 0;
 		nbd_dev[i].file = NULL;

@@ -146,6 +146,8 @@ static int pcd_drive_count;
 
 #include <asm/uaccess.h>
 
+static spinlock_t pcd_lock;
+
 #ifndef MODULE
 
 #include "setup.h"
@@ -355,7 +357,7 @@ int pcd_init (void)	/* preliminary initialisation */
 		}
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &pcd_lock);
 	read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB) read ahead */
 
 	for (i=0;i<PCD_UNITS;i++) pcd_blocksizes[i] = 1024;
@@ -821,11 +823,11 @@ static void pcd_start( void )
 
 	if (pcd_command(unit,rd_cmd,2048,"read block")) {
 		pcd_bufblk = -1; 
-		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+		spin_lock_irqsave(&pcd_lock,saved_flags);
 		pcd_busy = 0;
 		end_request(0);
 		do_pcd_request(NULL);
-		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+		spin_unlock_irqrestore(&pcd_lock,saved_flags);
 		return;
 	}
 
@@ -845,11 +847,11 @@ static void do_pcd_read( void )
 	pcd_retries = 0;
 	pcd_transfer();
 	if (!pcd_count) {
-		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+		spin_lock_irqsave(&pcd_lock,saved_flags);
 		end_request(1);
 		pcd_busy = 0;
 		do_pcd_request(NULL);
-		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+		spin_unlock_irqrestore(&pcd_lock,saved_flags);
 		return;
 	}
 
@@ -868,19 +870,19 @@ static void do_pcd_read_drq( void )
 			pi_do_claimed(PI,pcd_start);
                         return;
                         }
-		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+		spin_lock_irqsave(&pcd_lock,saved_flags);
 		pcd_busy = 0;
 		pcd_bufblk = -1;
 		end_request(0);
 		do_pcd_request(NULL);
-		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+		spin_unlock_irqrestore(&pcd_lock,saved_flags);
 		return;
 	}
 
 	do_pcd_read();
-	spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+	spin_lock_irqsave(&pcd_lock,saved_flags);
 	do_pcd_request(NULL);
-	spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags); 
+	spin_unlock_irqrestore(&pcd_lock,saved_flags); 
 }
 
 /* the audio_ioctl stuff is adapted from sr_ioctl.c */

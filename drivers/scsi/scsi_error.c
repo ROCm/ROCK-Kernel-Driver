@@ -1254,9 +1254,7 @@ STATIC void scsi_restart_operations(struct Scsi_Host *host)
 			break;
 		}
 
-		spin_lock(&q->queue_lock);
 		q->request_fn(q);
-		spin_unlock(&q->queue_lock);
 	}
 	spin_unlock_irqrestore(&host->host_lock, flags);
 }

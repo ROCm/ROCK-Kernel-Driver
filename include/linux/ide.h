@@ -1001,7 +1001,6 @@ unsigned long ide_get_or_set_dma_base (ide_hwif_t *hwif, int extra, const char *
 
 void hwif_unregister (ide_hwif_t *hwif);
 
-#define DRIVE_LOCK(drive)	(&(drive)->queue.queue_lock)
 extern spinlock_t ide_lock;
 
 #endif /* _IDE_H */

@@ -164,6 +164,8 @@ static int pf_drive_count;
 
 #include <asm/uaccess.h>
 
+static spinlock_t pf_spin_lock;
+
 #ifndef MODULE
 
 #include "setup.h"
@@ -358,7 +360,7 @@ int pf_init (void)      /* preliminary initialisation */
                 return -1;
         }
 	q = BLK_DEFAULT_QUEUE(MAJOR_NR);
-	blk_init_queue(q, DEVICE_REQUEST);
+	blk_init_queue(q, DEVICE_REQUEST, &pf_spin_lock);
 	blk_queue_max_segments(q, cluster);
         read_ahead[MAJOR_NR] = 8;       /* 8 sector (4kB) read ahead */
         
@@ -876,9 +878,9 @@ static void pf_next_buf( int unit )
 
 {	long	saved_flags;
 
-	spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+	spin_lock_irqsave(&pf_spin_lock,saved_flags);
 	end_request(1);
-	if (!pf_run) { spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+	if (!pf_run) { spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
 		       return; 
 	}
 	
@@ -894,7 +896,7 @@ static void pf_next_buf( int unit )
 
 	pf_count = CURRENT->current_nr_sectors;
 	pf_buf = CURRENT->buffer;
-	spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+	spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
 }
 
 static void do_pf_read( void )
@@ -918,11 +920,11 @@ static void do_pf_read_start( void )
                         pi_do_claimed(PI,do_pf_read_start);
 			return;
                 }
-		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+		spin_lock_irqsave(&pf_spin_lock,saved_flags);
                 end_request(0);
                 pf_busy = 0;
 		do_pf_request(NULL);
-		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
                 return;
         }
 	pf_mask = STAT_DRQ;
@@ -944,11 +946,11 @@ static void do_pf_read_drq( void )
                         pi_do_claimed(PI,do_pf_read_start);
                         return;
                 }
-		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+		spin_lock_irqsave(&pf_spin_lock,saved_flags);
                 end_request(0);
                 pf_busy = 0;
 		do_pf_request(NULL);
-		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
                 return;
             }
             pi_read_block(PI,pf_buf,512);
@@ -959,11 +961,11 @@ static void do_pf_read_drq( void )
 	    if (!pf_count) pf_next_buf(unit);
         }
         pi_disconnect(PI);
-	spin_lock_irqsave(&QUEUE->queue_lock,saved_flags); 
+	spin_lock_irqsave(&pf_spin_lock,saved_flags); 
         end_request(1);
         pf_busy = 0;
 	do_pf_request(NULL);
-	spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+	spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
 }
 
 static void do_pf_write( void )
@@ -985,11 +987,11 @@ static void do_pf_write_start( void )
                         pi_do_claimed(PI,do_pf_write_start);
 			return;
                 }
-		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+		spin_lock_irqsave(&pf_spin_lock,saved_flags);
                 end_request(0);
                 pf_busy = 0;
 		do_pf_request(NULL);
-		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
                 return;
         }
 
@@ -1002,11 +1004,11 @@ static void do_pf_write_start( void )
                         pi_do_claimed(PI,do_pf_write_start);
                         return;
                 }
-		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+		spin_lock_irqsave(&pf_spin_lock,saved_flags);
                 end_request(0);
                 pf_busy = 0;
 		do_pf_request(NULL);
-		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
                 return;
             }
             pi_write_block(PI,pf_buf,512);
@@ -1032,19 +1034,19 @@ static void do_pf_write_done( void )
 			pi_do_claimed(PI,do_pf_write_start);
                         return;
                 }
-		spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+		spin_lock_irqsave(&pf_spin_lock,saved_flags);
                 end_request(0);
                 pf_busy = 0;
 		do_pf_request(NULL);
-		spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
                 return;
         }
         pi_disconnect(PI);
-	spin_lock_irqsave(&QUEUE->queue_lock,saved_flags);
+	spin_lock_irqsave(&pf_spin_lock,saved_flags);
         end_request(1);
         pf_busy = 0;
 	do_pf_request(NULL);
-	spin_unlock_irqrestore(&QUEUE->queue_lock,saved_flags);
+	spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
 }
 
 /* end of pf.c */

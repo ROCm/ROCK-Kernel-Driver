@@ -467,7 +467,7 @@ int __init cpqarray_init(void)
 
 		q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
 		q->queuedata = hba[i];
-		blk_init_queue(q, do_ida_request);
+		blk_init_queue(q, do_ida_request, &hba[i]->lock);
 		blk_queue_bounce_limit(q, hba[i]->pci_dev->dma_mask);
 		blk_queue_max_segments(q, SG_MAX);
 		blksize_size[MAJOR_NR+i] = ida_blocksizes + (i*256);
@@ -882,7 +882,7 @@ queue_next:
 
 	blkdev_dequeue_request(creq);
 
-	spin_unlock_irq(&q->queue_lock);
+	spin_unlock_irq(q->queue_lock);
 
 	c->ctlr = h->ctlr;
 	c->hdr.unit = MINOR(creq->rq_dev) >> NWD_SHIFT;
@@ -915,7 +915,7 @@ DBGPX(	printk("Submitting %d sectors in %d segments\n", creq->nr_sectors, seg); 
 	c->req.hdr.cmd = (rq_data_dir(creq) == READ) ? IDA_READ : IDA_WRITE;
 	c->type = CMD_RWREQ;
 
-	spin_lock_irq(&q->queue_lock);
+	spin_lock_irq(q->queue_lock);
 
 	/* Put the request on the tail of the request queue */
 	addQ(&h->reqQ, c);

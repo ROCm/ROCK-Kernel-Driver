@@ -46,7 +46,7 @@ nbd_end_request(struct request *req)
 #ifdef PARANOIA
 	requests_out++;
 #endif
-	spin_lock_irqsave(&q->queue_lock, flags);
+	spin_lock_irqsave(q->queue_lock, flags);
 	while((bio = req->bio) != NULL) {
 		nsect = bio_sectors(bio);
 		blk_finished_io(nsect);
@@ -55,7 +55,7 @@ nbd_end_request(struct request *req)
 		bio_endio(bio, uptodate, nsect);
 	}
 	blkdev_release_request(req);
-	spin_unlock_irqrestore(&q->queue_lock, flags);
+	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 #define MAX_NBD 128

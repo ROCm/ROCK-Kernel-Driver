@@ -15,8 +15,8 @@
 */
 
 #define DRV_NAME	"tulip"
-#define DRV_VERSION	"0.9.15-pre9"
-#define DRV_RELDATE	"Nov 6, 2001"
+#define DRV_VERSION	"1.1.0"
+#define DRV_RELDATE	"Dec 11, 2001"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -130,12 +130,8 @@ int tulip_debug = 1;
  */
 
 struct tulip_chip_table tulip_tbl[] = {
-  /* DC21040 */
-  { "Digital DC21040 Tulip", 128, 0x0001ebef, 0, tulip_timer },
-
-  /* DC21041 */
-  { "Digital DC21041 Tulip", 128, 0x0001ebef,
-	HAS_MEDIA_TABLE | HAS_NWAY, tulip_timer },
+  { }, /* placeholder for array, slot unused currently */
+  { }, /* placeholder for array, slot unused currently */
 
   /* DC21140 */
   { "Digital DS21140 Tulip", 128, 0x0001ebef,
@@ -192,8 +188,6 @@ struct tulip_chip_table tulip_tbl[] = {
 
 
 static struct pci_device_id tulip_pci_tbl[] __devinitdata = {
-	{ 0x1011, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DC21040 },
-	{ 0x1011, 0x0014, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DC21041 },
 	{ 0x1011, 0x0009, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DC21140 },
 	{ 0x1011, 0x0019, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DC21143 },
 	{ 0x11AD, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, LC82C168 },
@@ -224,19 +218,6 @@ MODULE_DEVICE_TABLE(pci, tulip_pci_tbl);
 /* A full-duplex map for media types. */
 const char tulip_media_cap[32] =
 {0,0,0,16,  3,19,16,24,  27,4,7,5, 0,20,23,20,  28,31,0,0, };
-u8 t21040_csr13[] = {2,0x0C,8,4,  4,0,0,0, 0,0,0,0, 4,0,0,0};
-
-/* 21041 transceiver register settings: 10-T, 10-2, AUI, 10-T, 10T-FD*/
-u16 t21041_csr13[] = {
-	csr13_mask_10bt,		/* 10-T */
-	csr13_mask_auibnc,		/* 10-2 */
-	csr13_mask_auibnc,		/* AUI */
-	csr13_mask_10bt,		/* 10-T */
-	csr13_mask_10bt,		/* 10T-FD */
-};
-u16 t21041_csr14[] = { 0xFFFF, 0xF7FD, 0xF7FD, 0x7F3F, 0x7F3D, };
-u16 t21041_csr15[] = { 0x0008, 0x0006, 0x000E, 0x0008, 0x0008, };
-
 
 static void tulip_tx_timeout(struct net_device *dev);
 static void tulip_init_ring(struct net_device *dev);
@@ -388,19 +369,6 @@ media_picked:
 			outl(0x0008, ioaddr + CSR15);
 		}
 		tulip_select_media(dev, 1);
-	} else if (tp->chip_id == DC21041) {
-		dev->if_port = 0;
-		tp->nway = tp->mediasense = 1;
-		tp->nwayset = tp->lpar = 0;
-		outl(0x00000000, ioaddr + CSR13);
-		outl(0xFFFFFFFF, ioaddr + CSR14);
-		outl(0x00000008, ioaddr + CSR15); /* Listen on AUI also. */
-		tp->csr6 = 0x80020000;
-		if (tp->sym_advertise & 0x0040)
-			tp->csr6 |= FullDuplex;
-		outl(tp->csr6, ioaddr + CSR6);
-		outl(0x0000EF01, ioaddr + CSR13);
-
 	} else if (tp->chip_id == DC21142) {
 		if (tp->mii_cnt) {
 			tulip_select_media(dev, 1);
@@ -538,33 +506,6 @@ static void tulip_tx_timeout(struct net_device *dev)
 		if (tulip_debug > 1)
 			printk(KERN_WARNING "%s: Transmit timeout using MII device.\n",
 				   dev->name);
-	} else if (tp->chip_id == DC21040) {
-		if ( !tp->medialock  &&  inl(ioaddr + CSR12) & 0x0002) {
-			dev->if_port = (dev->if_port == 2 ? 0 : 2);
-			printk(KERN_INFO "%s: 21040 transmit timed out, switching to "
-				   "%s.\n",
-				   dev->name, medianame[dev->if_port]);
-			tulip_select_media(dev, 0);
-		}
-		goto out;
-	} else if (tp->chip_id == DC21041) {
-		int csr12 = inl(ioaddr + CSR12);
-
-		printk(KERN_WARNING "%s: 21041 transmit timed out, status %8.8x, "
-			   "CSR12 %8.8x, CSR13 %8.8x, CSR14 %8.8x, resetting...\n",
-			   dev->name, inl(ioaddr + CSR5), csr12,
-			   inl(ioaddr + CSR13), inl(ioaddr + CSR14));
-		tp->mediasense = 1;
-		if ( ! tp->medialock) {
-			if (dev->if_port == 1 || dev->if_port == 2)
-				if (csr12 & 0x0004) {
-					dev->if_port = 2 - dev->if_port;
-				} else
-					dev->if_port = 0;
-			else
-				dev->if_port = 1;
-			tulip_select_media(dev, 0);
-		}
 	} else if (tp->chip_id == DC21140 || tp->chip_id == DC21142
 			   || tp->chip_id == MX98713 || tp->chip_id == COMPEX9881
 			   || tp->chip_id == DM910X) {
@@ -636,7 +577,6 @@ static void tulip_tx_timeout(struct net_device *dev)
 
 	tp->stats.tx_errors++;
 
-out:
 	spin_unlock_irqrestore (&tp->lock, flags);
 	dev->trans_start = jiffies;
 	netif_wake_queue (dev);
@@ -802,10 +742,6 @@ static void tulip_down (struct net_device *dev)
 	/* release any unconsumed transmit buffers */
 	tulip_clean_tx_ring(tp);
 
-	/* 21040 -- Leave the card in 10baseT state. */
-	if (tp->chip_id == DC21040)
-		outl (0x00000004, ioaddr + CSR13);
-
 	if (inl (ioaddr + CSR6) != 0xffffffff)
 		tp->stats.rx_missed_errors += inl (ioaddr + CSR8) & 0xffff;
 
@@ -966,16 +902,14 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 					0x1848 +
 					((csr12&0x7000) == 0x5000 ? 0x20 : 0) +
 					((csr12&0x06) == 6 ? 0 : 4);
-                                if (tp->chip_id != DC21041)
-                                        data->val_out |= 0x6048;
+                                data->val_out |= 0x6048;
 				break;
 			case 4:
                                 /* Advertised value, bogus 10baseTx-FD value from CSR6. */
                                 data->val_out =
 					((inl(ioaddr + CSR6) >> 3) & 0x0040) +
 					((csr14 >> 1) & 0x20) + 1;
-                                if (tp->chip_id != DC21041)
-                                         data->val_out |= ((csr14 >> 9) & 0x03C0);
+                                data->val_out |= ((csr14 >> 9) & 0x03C0);
 				break;
 			case 5: data->val_out = tp->lpar; break;
 			default: data->val_out = 0; break;
@@ -1358,7 +1292,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	long ioaddr;
 	static int board_idx = -1;
 	int chip_idx = ent->driver_data;
-	unsigned int t2104x_mode = 0;
 	unsigned int eeprom_missing = 0;
 	unsigned int force_csr0 = 0;
 
@@ -1527,31 +1460,12 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	/* Clear the missed-packet counter. */
 	inl(ioaddr + CSR8);
 
-	if (chip_idx == DC21041) {
-		if (inl(ioaddr + CSR9) & 0x8000) {
-			chip_idx = DC21040;
-			t2104x_mode = 1;
-		} else {
-			t2104x_mode = 2;
-		}
-	}
-
 	/* The station address ROM is read byte serially.  The register must
 	   be polled, waiting for the value to be read bit serially from the
 	   EEPROM.
 	   */
 	sum = 0;
-	if (chip_idx == DC21040) {
-		outl(0, ioaddr + CSR9);		/* Reset the pointer with a dummy write. */
-		for (i = 0; i < 6; i++) {
-			int value, boguscnt = 100000;
-			do
-				value = inl(ioaddr + CSR9);
-			while (value < 0  && --boguscnt > 0);
-			dev->dev_addr[i] = value;
-			sum += value & 0xff;
-		}
-	} else if (chip_idx == LC82C168) {
+	if (chip_idx == LC82C168) {
 		for (i = 0; i < 3; i++) {
 			int value, boguscnt = 100000;
 			outl(0x600 | i, ioaddr + 0x98);
@@ -1719,10 +1633,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	       dev->name, tulip_tbl[chip_idx].chip_name, chip_rev, ioaddr);
 	pci_set_drvdata(pdev, dev);
 
-	if (t2104x_mode == 1)
-		printk(" 21040 compatible mode,");
-	else if (t2104x_mode == 2)
-		printk(" 21041 mode,");
 	if (eeprom_missing)
 		printk(" EEPROM not present,");
 	for (i = 0; i < 6; i++)
@@ -1731,26 +1641,13 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 
         if (tp->chip_id == PNIC2)
 		tp->link_change = pnic2_lnk_change;
-	else if ((tp->flags & HAS_NWAY)  || tp->chip_id == DC21041)
+	else if (tp->flags & HAS_NWAY)
 		tp->link_change = t21142_lnk_change;
 	else if (tp->flags & HAS_PNICNWAY)
 		tp->link_change = pnic_lnk_change;
 
 	/* Reset the xcvr interface and turn on heartbeat. */
 	switch (chip_idx) {
-	case DC21041:
-		if (tp->sym_advertise == 0)
-			tp->sym_advertise = 0x0061;
-		outl(0x00000000, ioaddr + CSR13);
-		outl(0xFFFFFFFF, ioaddr + CSR14);
-		outl(0x00000008, ioaddr + CSR15); /* Listen on AUI also. */
-		outl(inl(ioaddr + CSR6) | csr6_fd, ioaddr + CSR6);
-		outl(0x0000EF01, ioaddr + CSR13);
-		break;
-	case DC21040:
-		outl(0x00000000, ioaddr + CSR13);
-		outl(0x00000004, ioaddr + CSR13);
-		break;
 	case DC21140:
 	case DM910X:
 	default:

@@ -70,7 +70,7 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 {
 	unsigned long flags;
 
-	ASSERT_LOCK(&q->queue_lock, 0);
+	ASSERT_LOCK(q->queue_lock, 0);
 
 	/*
 	 * tell I/O scheduler that this isn't a regular read/write (ie it
@@ -91,10 +91,10 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 	 * head of the queue for things like a QUEUE_FULL message from a
 	 * device, or a host that is unable to accept a particular command.
 	 */
-	spin_lock_irqsave(&q->queue_lock, flags);
+	spin_lock_irqsave(q->queue_lock, flags);
 	__elv_add_request(q, rq, !at_head, 0);
 	q->request_fn(q);
-	spin_unlock_irqrestore(&q->queue_lock, flags);
+	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 
@@ -250,9 +250,9 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *SHpnt;
 
-	ASSERT_LOCK(&q->queue_lock, 0);
+	ASSERT_LOCK(q->queue_lock, 0);
 
-	spin_lock_irqsave(&q->queue_lock, flags);
+	spin_lock_irqsave(q->queue_lock, flags);
 	if (SCpnt != NULL) {
 
 		/*
@@ -325,7 +325,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 			SHpnt->some_device_starved = 0;
 		}
 	}
-	spin_unlock_irqrestore(&q->queue_lock, flags);
+	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
 /*
@@ -360,7 +360,7 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 	request_queue_t *q = &SCpnt->device->request_queue;
 	struct request *req = &SCpnt->request;
 
-	ASSERT_LOCK(&q->queue_lock, 0);
+	ASSERT_LOCK(q->queue_lock, 0);
 
 	/*
 	 * If there are blocks left over at the end, set up the command
@@ -445,7 +445,7 @@ static void scsi_release_buffers(Scsi_Cmnd * SCpnt)
 {
 	struct request *req = &SCpnt->request;
 
-	ASSERT_LOCK(&SCpnt->device->request_queue.queue_lock, 0);
+	ASSERT_LOCK(&SCpnt->host->host_lock, 0);
 
 	/*
 	 * Free up any indirection buffers we allocated for DMA purposes. 
@@ -518,7 +518,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 	 *	would be used if we just wanted to retry, for example.
 	 *
 	 */
-	ASSERT_LOCK(&q->queue_lock, 0);
+	ASSERT_LOCK(q->queue_lock, 0);
 
 	/*
 	 * Free up any indirection buffers we allocated for DMA purposes. 
@@ -746,8 +746,6 @@ struct Scsi_Device_Template *scsi_get_request_dev(struct request *req)
 	kdev_t dev = req->rq_dev;
 	int major = MAJOR(dev);
 
-	ASSERT_LOCK(&req->q->queue_lock, 1);
-
 	for (spnt = scsi_devicelist; spnt; spnt = spnt->next) {
 		/*
 		 * Search for a block device driver that supports this
@@ -804,7 +802,7 @@ void scsi_request_fn(request_queue_t * q)
 	struct Scsi_Host *SHpnt;
 	struct Scsi_Device_Template *STpnt;
 
-	ASSERT_LOCK(&q->queue_lock, 1);
+	ASSERT_LOCK(q->queue_lock, 1);
 
 	SDpnt = (Scsi_Device *) q->queuedata;
 	if (!SDpnt) {
@@ -871,9 +869,9 @@ void scsi_request_fn(request_queue_t * q)
 			 */
 			SDpnt->was_reset = 0;
 			if (SDpnt->removable && !in_interrupt()) {
-				spin_unlock_irq(&q->queue_lock);
+				spin_unlock_irq(q->queue_lock);
 				scsi_ioctl(SDpnt, SCSI_IOCTL_DOORLOCK, 0);
-				spin_lock_irq(&q->queue_lock);
+				spin_lock_irq(q->queue_lock);
 				continue;
 			}
 		}
@@ -982,7 +980,7 @@ void scsi_request_fn(request_queue_t * q)
 		 * another.  
 		 */
 		req = NULL;
-		spin_unlock_irq(&q->queue_lock);
+		spin_unlock_irq(q->queue_lock);
 
 		if (SCpnt->request.flags & REQ_CMD) {
 			/*
@@ -1012,7 +1010,7 @@ void scsi_request_fn(request_queue_t * q)
 				{
 					panic("Should not have leftover blocks\n");
 				}
-				spin_lock_irq(&q->queue_lock);
+				spin_lock_irq(q->queue_lock);
 				SHpnt->host_busy--;
 				SDpnt->device_busy--;
 				continue;
@@ -1028,7 +1026,7 @@ void scsi_request_fn(request_queue_t * q)
 				{
 					panic("Should not have leftover blocks\n");
 				}
-				spin_lock_irq(&q->queue_lock);
+				spin_lock_irq(q->queue_lock);
 				SHpnt->host_busy--;
 				SDpnt->device_busy--;
 				continue;
@@ -1049,7 +1047,7 @@ void scsi_request_fn(request_queue_t * q)
 		 * Now we need to grab the lock again.  We are about to mess
 		 * with the request queue and try to find another command.
 		 */
-		spin_lock_irq(&q->queue_lock);
+		spin_lock_irq(q->queue_lock);
 	}
 }
 

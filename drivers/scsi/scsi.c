@@ -183,7 +183,7 @@ void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 	request_queue_t *q = &SDpnt->request_queue;
 	int max_segments = SHpnt->sg_tablesize;
 
-	blk_init_queue(q, scsi_request_fn);
+	blk_init_queue(q, scsi_request_fn, &SHpnt->host_lock);
 	q->queuedata = (void *) SDpnt;
 
 #ifdef DMA_CHUNK_SIZE

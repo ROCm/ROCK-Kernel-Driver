@@ -1221,8 +1221,10 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 	 */
 	if (write_access && !(vma->vm_flags & VM_SHARED)) {
 		struct page * page = alloc_page(GFP_HIGHUSER);
-		if (!page)
+		if (!page) {
+			page_cache_release(new_page);
 			return -1;
+		}
 		copy_highpage(page, new_page);
 		page_cache_release(new_page);
 		lru_cache_add(page);
