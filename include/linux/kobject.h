@@ -60,4 +60,13 @@ static inline void subsys_put(struct subsystem * s)
 	kobject_put(&s->kobj);
 }
 
+struct subsys_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct subsystem *, char *, size_t, loff_t);
+	ssize_t (*store)(struct subsystem *, const char *, size_t, loff_t); 
+};
+
+extern int subsys_create_file(struct subsystem * , struct subsys_attribute *);
+extern void subsys_remove_file(struct subsystem * , struct subsys_attribute *);
+
 #endif /* _KOBJECT_H_ */
