@@ -70,12 +70,12 @@ unsigned int aac_response_normal(struct aac_queue * q)
 	 */
 	while(aac_consumer_get(dev, q, &entry))
 	{
-		u32 fast ;
-		fast = (entry->addr & cpu_to_le32(0x01));
-		hwfib = (struct hw_fib *)((char *)dev->hw_fib_va + 
-				((entry->addr & ~0x01) - dev->hw_fib_pa));
-		fib = &dev->fibs[hwfib->header.SenderData];
-
+		int fast;
+		u32 index = le32_to_cpu(entry->addr);
+		fast = index & 0x01;
+		fib = &dev->fibs[index >> 1];
+		hwfib = fib->hw_fib;
+		
 		aac_consumer_free(dev, q, HostNormRespQueue);
 		/*
 		 *	Remove this fib from the Outstanding I/O queue.
@@ -169,29 +169,44 @@ unsigned int aac_command_normal(struct aac_queue *q)
 	 */
 	while(aac_consumer_get(dev, q, &entry))
 	{
+		struct fib fibctx;
 		struct hw_fib * hw_fib;
-		hw_fib = (struct hw_fib *)((char *)dev->hw_fib_va + 
-				((entry->addr & ~0x01) - dev->hw_fib_pa));
-
-		if (dev->aif_thread) {
-		        aac_list_add_tail(&hw_fib->header.FibLinks, &q->cmdq);
+		u32 index;
+		struct fib *fib = &fibctx;
+		
+		index = le32_to_cpu(entry->addr) / sizeof(struct hw_fib);
+		hw_fib = &dev->aif_base_va[index];
+		
+		/*
+		 *	Allocate a FIB at all costs. For non queued stuff
+		 *	we can just use the stack so we are happy. We need
+		 *	a fib object in order to manage the linked lists
+		 */
+		if (dev->aif_thread)
+			if((fib = kmalloc(sizeof(struct fib), GFP_ATOMIC)) == NULL)
+				fib = &fibctx;
+		
+		memset(fib, 0, sizeof(struct fib));
+		INIT_LIST_HEAD(&fib->fiblink);
+		fib->type = FSAFS_NTC_FIB_CONTEXT;
+		fib->size = sizeof(struct fib);
+		fib->hw_fib = hw_fib;
+		fib->data = hw_fib->data;
+		fib->dev = dev;
+		
+				
+		if (dev->aif_thread && fib != &fibctx) {
+		        list_add_tail(&fib->fiblink, &q->cmdq);
 	 	        aac_consumer_free(dev, q, HostNormCmdQueue);
 		        wake_up_interruptible(&q->cmdready);
 		} else {
-			struct fib fibctx;
 	 	        aac_consumer_free(dev, q, HostNormCmdQueue);
 			spin_unlock_irqrestore(q->lock, flags);
-			memset(&fibctx, 0, sizeof(struct fib));
-			fibctx.type = FSAFS_NTC_FIB_CONTEXT;
-			fibctx.size = sizeof(struct fib);
-			fibctx.hw_fib = hw_fib;
-			fibctx.data = hw_fib->data;
-			fibctx.dev = dev;
 			/*
 			 *	Set the status of this FIB
 			 */
 			*(u32 *)hw_fib->data = cpu_to_le32(ST_OK);
-			fib_adapter_complete(&fibctx, sizeof(u32));
+			fib_adapter_complete(fib, sizeof(u32));
 			spin_lock_irqsave(q->lock, flags);
 		}		
 	}

@@ -514,11 +514,12 @@ int aac_get_adapter_info(struct aac_dev* dev)
 		dev->nondasd_support = (nondasd!=0);
 	}
 	if(dev->nondasd_support != 0){
-		printk(KERN_INFO"%s%d: Non-DASD support enabled\n",dev->name, dev->id);
+		printk(KERN_INFO "%s%d: Non-DASD support enabled.\n",dev->name, dev->id);
 	}
 
 	dev->pae_support = 0;
 	if( (sizeof(dma_addr_t) > 4) && (dev->adapter_info.options & AAC_OPT_SGMAP_HOST64)){
+		printk(KERN_INFO "%s%d: 64bit support enabled.\n", dev->name, dev->id);
 		dev->pae_support = 1;
 	}
 
@@ -726,7 +727,10 @@ int aac_read(struct scsi_cmnd * scsicmd, int cid)
 	 *	Check that the command queued to the controller
 	 */
 	if (status == -EINPROGRESS) 
+	{
+		dprintk("read queued.\n");
 		return 0;
+	}
 		
 	printk(KERN_WARNING "aac_read: fib_send failed with status: %d.\n", status);
 	/*
@@ -832,7 +836,10 @@ static int aac_write(struct scsi_cmnd * scsicmd, int cid)
 	 *	Check that the command queued to the controller
 	 */
 	if (status == -EINPROGRESS)
+	{
+		dprintk("write queued.\n");
 		return 0;
+	}
 
 	printk(KERN_WARNING "aac_write: fib_send failed with status: %d\n", status);
 	/*

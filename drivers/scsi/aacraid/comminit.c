@@ -81,9 +81,9 @@ static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long co
 	 *	Adapter Fibs are the first thing allocated so that they
 	 *	start page aligned
 	 */
-	dev->fib_base_va = (ulong)base;
+	dev->aif_base_va = (struct hw_fib *)base;
 	
-	init->AdapterFibsVirtualAddress = cpu_to_le32((u32)(ulong)phys);
+	init->AdapterFibsVirtualAddress = cpu_to_le32(0);
 	init->AdapterFibsPhysicalAddress = cpu_to_le32((u32)phys);
 	init->AdapterFibsSize = cpu_to_le32(fibsize);
 	init->AdapterFibAlign = cpu_to_le32(sizeof(struct hw_fib));
@@ -94,11 +94,19 @@ static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long co
 	 * mapping system, but older Firmware did, and had *troubles* dealing
 	 * with the math overloading past 32 bits, thus we must limit this
 	 * field.
+	 *
+	 * This assumes the memory is mapped zero->n, which isnt
+	 * always true on real computers. It also has some slight problems
+	 * with the GART on x86-64. I've btw never tried DMA from PCI space
+	 * on this platform but don't be suprised if its problematic.
 	 */
+#ifndef CONFIG_GART_IOMMU
 	if ((num_physpages << (PAGE_SHIFT - 12)) <= AAC_MAX_HOSTPHYSMEMPAGES) {
 		init->HostPhysMemPages = 
 			cpu_to_le32(num_physpages << (PAGE_SHIFT-12));
-	} else {
+	} else 
+#endif	
+	{
 		init->HostPhysMemPages = cpu_to_le32(AAC_MAX_HOSTPHYSMEMPAGES);
 	}
 
@@ -140,7 +148,7 @@ static void aac_queue_init(struct aac_dev * dev, struct aac_queue * q, u32 *mem,
 	q->dev = dev;
 	INIT_LIST_HEAD(&q->pendingq);
 	init_waitqueue_head(&q->cmdready);
-	AAC_INIT_LIST_HEAD(&q->cmdq);
+	INIT_LIST_HEAD(&q->cmdq);
 	init_waitqueue_head(&q->qfull);
 	spin_lock_init(&q->lockdata);
 	q->lock = &q->lockdata;
