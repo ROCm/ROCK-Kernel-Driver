@@ -2,6 +2,14 @@
 #include <linux/module.h>
 #include "pci.h"
 
+#undef DEBUG
+
+#ifdef DEBUG
+#define DBG(x...) printk(x)
+#else
+#define DBG(x...)
+#endif
+
 
 #ifdef CONFIG_HOTPLUG
 int pci_hotplug (struct device *dev, char **envp, int num_envp,
@@ -57,13 +65,179 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 
 	return 0;
 }
-#else
+
+static int pci_visit_bus (struct pci_visit * fn, struct pci_bus_wrapped *wrapped_bus, struct pci_dev_wrapped *wrapped_parent)
+{
+	struct list_head *ln;
+	struct pci_dev *dev;
+	struct pci_dev_wrapped wrapped_dev;
+	int result = 0;
+
+	DBG("scanning bus %02x\n", wrapped_bus->bus->number);
+
+	if (fn->pre_visit_pci_bus) {
+		result = fn->pre_visit_pci_bus(wrapped_bus, wrapped_parent);
+		if (result)
+			return result;
+	}
+
+	ln = wrapped_bus->bus->devices.next; 
+	while (ln != &wrapped_bus->bus->devices) {
+		dev = pci_dev_b(ln);
+		ln = ln->next;
+
+		memset(&wrapped_dev, 0, sizeof(struct pci_dev_wrapped));
+		wrapped_dev.dev = dev;
+
+		result = pci_visit_dev(fn, &wrapped_dev, wrapped_bus);
+		if (result)
+			return result;
+	}
+
+	if (fn->post_visit_pci_bus)
+		result = fn->post_visit_pci_bus(wrapped_bus, wrapped_parent);
+
+	return result;
+}
+
+static int pci_visit_bridge (struct pci_visit * fn,
+			     struct pci_dev_wrapped *wrapped_dev,
+			     struct pci_bus_wrapped *wrapped_parent)
+{
+	struct pci_bus *bus;
+	struct pci_bus_wrapped wrapped_bus;
+	int result = 0;
+
+	DBG("scanning bridge %02x, %02x\n", PCI_SLOT(wrapped_dev->dev->devfn),
+	    PCI_FUNC(wrapped_dev->dev->devfn));
+
+	if (fn->visit_pci_dev) {
+		result = fn->visit_pci_dev(wrapped_dev, wrapped_parent);
+		if (result)
+			return result;
+	}
+
+	bus = wrapped_dev->dev->subordinate;
+	if(bus) {
+		memset(&wrapped_bus, 0, sizeof(struct pci_bus_wrapped));
+		wrapped_bus.bus = bus;
+
+		result = pci_visit_bus(fn, &wrapped_bus, wrapped_dev);
+	}
+	return result;
+}
+
+/**
+ * pci_visit_dev - scans the pci buses.
+ * Every bus and every function is presented to a custom
+ * function that can act upon it.
+ */
+int pci_visit_dev (struct pci_visit *fn, struct pci_dev_wrapped *wrapped_dev,
+		   struct pci_bus_wrapped *wrapped_parent)
+{
+	struct pci_dev* dev = wrapped_dev ? wrapped_dev->dev : NULL;
+	int result = 0;
+
+	if (!dev)
+		return 0;
+
+	if (fn->pre_visit_pci_dev) {
+		result = fn->pre_visit_pci_dev(wrapped_dev, wrapped_parent);
+		if (result)
+			return result;
+	}
+
+	switch (dev->class >> 8) {
+		case PCI_CLASS_BRIDGE_PCI:
+			result = pci_visit_bridge(fn, wrapped_dev,
+						  wrapped_parent);
+			if (result)
+				return result;
+			break;
+		default:
+			DBG("scanning device %02x, %02x\n",
+			    PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+			if (fn->visit_pci_dev) {
+				result = fn->visit_pci_dev (wrapped_dev,
+							    wrapped_parent);
+				if (result)
+					return result;
+			}
+	}
+
+	if (fn->post_visit_pci_dev)
+		result = fn->post_visit_pci_dev(wrapped_dev, wrapped_parent);
+
+	return result;
+}
+EXPORT_SYMBOL(pci_visit_dev);
+
+/**
+ * pci_is_dev_in_use - query devices' usage
+ * @dev: PCI device to query
+ *
+ * Queries whether a given PCI device is in use by a driver or not.
+ * Returns 1 if the device is in use, 0 if it is not.
+ */
+int pci_is_dev_in_use(struct pci_dev *dev)
+{
+	/* 
+	 * dev->driver will be set if the device is in use by a new-style 
+	 * driver -- otherwise, check the device's regions to see if any
+	 * driver has claimed them.
+	 */
+
+	int i;
+	int inuse = 0;
+
+	if (dev->driver) {
+		/* Assume driver feels responsible */
+		return 1;
+	}
+
+	for (i = 0; !dev->driver && !inuse && (i < 6); i++) {
+		if (!pci_resource_start(dev, i))
+			continue;
+		if (pci_resource_flags(dev, i) & IORESOURCE_IO) {
+			inuse = check_region(pci_resource_start(dev, i),
+					     pci_resource_len(dev, i));
+		} else if (pci_resource_flags(dev, i) & IORESOURCE_MEM) {
+			inuse = check_mem_region(pci_resource_start(dev, i),
+						 pci_resource_len(dev, i));
+		}
+	}
+	return inuse;
+}
+EXPORT_SYMBOL(pci_is_dev_in_use);
+
+/**
+ * pci_remove_device_safe - remove an unused hotplug device
+ * @dev: the device to remove
+ *
+ * Delete the device structure from the device lists and 
+ * notify userspace (/sbin/hotplug), but only if the device
+ * in question is not being used by a driver.
+ * Returns 0 on success.
+ */
+int pci_remove_device_safe(struct pci_dev *dev)
+{
+	if (pci_is_dev_in_use(dev)) {
+		return -EBUSY;
+	}
+	pci_remove_device(dev);
+	return 0;
+}
+EXPORT_SYMBOL(pci_remove_device_safe);
+
+#else /* CONFIG_HOTPLUG */
+
 int pci_hotplug (struct device *dev, char **envp, int num_envp,
 		 char *buffer, int buffer_size)
 {
 	return -ENODEV;
 }
-#endif
+
+#endif /* CONFIG_HOTPLUG */
 
 /**
  * pci_insert_device - insert a pci device

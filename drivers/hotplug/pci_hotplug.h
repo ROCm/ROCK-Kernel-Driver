@@ -142,37 +142,5 @@ extern int pci_hp_deregister		(struct hotplug_slot *slot);
 extern int pci_hp_change_slot_info	(struct hotplug_slot *slot,
 					 struct hotplug_slot_info *info);
 
-struct pci_dev_wrapped {
-	struct pci_dev	*dev;
-	void		*data;
-};
-
-struct pci_bus_wrapped {
-	struct pci_bus	*bus;
-	void		*data;
-};
-
-struct pci_visit {
-	int (* pre_visit_pci_bus)	(struct pci_bus_wrapped *,
-					 struct pci_dev_wrapped *);
-	int (* post_visit_pci_bus)	(struct pci_bus_wrapped *,
-					 struct pci_dev_wrapped *);
-
-	int (* pre_visit_pci_dev)	(struct pci_dev_wrapped *,
-					 struct pci_bus_wrapped *);
-	int (* visit_pci_dev)		(struct pci_dev_wrapped *,
-					 struct pci_bus_wrapped *);
-	int (* post_visit_pci_dev)	(struct pci_dev_wrapped *,
-					 struct pci_bus_wrapped *);
-};
-
-extern int pci_visit_dev	(struct pci_visit *fn,
-				 struct pci_dev_wrapped *wrapped_dev,
-				 struct pci_bus_wrapped *wrapped_parent);
-
-int pci_is_dev_in_use(struct pci_dev *dev);
-
-int pci_remove_device_safe(struct pci_dev *dev);
-
 #endif
 
