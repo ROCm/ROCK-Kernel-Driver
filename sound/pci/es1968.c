@@ -2532,6 +2532,18 @@ static int snd_es1968_dev_free(snd_device_t *device)
 	return snd_es1968_free(chip);
 }
 
+struct pm_whitelist {
+	unsigned short type;	/* chip type */
+	unsigned short vendor;	/* subsystem vendor id */
+};
+
+static struct pm_whitelist whitelist[] __devinitdata = {
+	{ TYPE_MAESTRO2E, 0x1028 },
+	{ TYPE_MAESTRO2E, 0x103c },
+	{ TYPE_MAESTRO2E, 0x1179 },
+	{ TYPE_MAESTRO2E, 0x14c0 },
+};
+
 static int __devinit snd_es1968_create(snd_card_t * card,
 				       struct pci_dev *pci,
 				       int total_bufsize,
@@ -2607,12 +2619,18 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 	pci_set_master(pci);
 
 	if (do_pm > 1) {
-		/* disable power-management if not maestro2e or
-		 * if not on the whitelist
-		 */
+		/* disable power-management if not on the whitelist */
 		unsigned short vend;
 		pci_read_config_word(chip->pci, PCI_SUBSYSTEM_VENDOR_ID, &vend);
-		if (chip->type != TYPE_MAESTRO2E || (vend != 0x1028 && vend != 0x1179)) {
+		for (i = 0; i < (int)ARRAY_SIZE(whitelist); i++) {
+			if (chip->type == whitelist[i].type &&
+			    vend == whitelist[i].vendor) {
+				do_pm = 1;
+				break;
+			}
+		}
+		if (do_pm > 1) {
+			/* not matched; disabling pm */
 			printk(KERN_INFO "es1968: not attempting power management.\n");
 			do_pm = 0;
 		}
