@@ -64,7 +64,8 @@ int isofs_name_translate(struct iso_directory_record *de, char *new, struct inod
 			break;
 
 		/* Convert remaining ';' to '.' */
-		if (c == ';')
+		/* Also '/' to '.' (broken Acorn-generated ISO9660 images) */
+		if (c == ';' || c == '/')
 			c = '.';
 
 		new[i] = c;
