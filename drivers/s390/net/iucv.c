@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.14 2003/09/23 16:48:17 mschwide Exp $
+ * $Id: iucv.c,v 1.15 2003/10/01 09:25:15 mschwide Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.14 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.15 $
  *
  */
 
@@ -79,6 +79,11 @@ iucv_bus_match (struct device *dev, struct device_driver *drv)
 	return 0;
 }
 
+static void
+iucv_root_release (struct device *dev)
+{
+}
+
 struct bus_type iucv_bus = {
 	.name = "iucv",
 	.match = iucv_bus_match,
@@ -86,6 +91,7 @@ struct bus_type iucv_bus = {
 
 struct device iucv_root = {
 	.bus_id = "iucv",
+	.release = iucv_root_release,
 };
 
 /* General IUCV interrupt structure */
@@ -349,7 +355,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.14 $";
+	char vbuf[] = "$Revision: 1.15 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
