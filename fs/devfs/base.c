@@ -645,6 +645,9 @@
     20020728   Richard Gooch <rgooch@atnf.csiro.au>
 	       Removed deprecated <devfs_find_handle>.
   v1.20
+    20020820   Richard Gooch <rgooch@atnf.csiro.au>
+	       Fixed module unload race in <devfs_open>.
+  v1.21
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -677,7 +680,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "1.20 (20020728)"
+#define DEVFS_VERSION            "1.21 (20020820)"
 
 #define DEVFS_NAME "devfs"
 
@@ -2232,6 +2235,7 @@ const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen)
  *
  *	If "devfs=only" this function will return 1, otherwise 0 is returned.
  */
+
 int devfs_only (void)
 {
     return (boot_options & OPTION_ONLY) ? 1 : 0;
@@ -2382,7 +2386,7 @@ static int check_disc_changed (struct devfs_entry *de)
     extern int warn_no_part;
 
     if ( !S_ISBLK (de->mode) ) return 0;
-    bdev = bdget(kdev_t_to_nr(dev));
+    bdev = bdget (kdev_t_to_nr (dev) );
     if (!bdev) return 0;
     bdops = devfs_get_ops (de);
     if (!bdops) return 0;
@@ -2390,7 +2394,7 @@ static int check_disc_changed (struct devfs_entry *de)
     /*  Ugly hack to disable messages about unable to read partition table  */
     tmp = warn_no_part;
     warn_no_part = 0;
-    retval = full_check_disk_change(bdev);
+    retval = full_check_disk_change (bdev);
     warn_no_part = tmp;
 out:
     devfs_put_ops (de);
@@ -2692,21 +2696,23 @@ static int devfs_open (struct inode *inode, struct file *file)
     struct fcb_type *df;
     struct devfs_entry *de;
     struct fs_info *fs_info = inode->i_sb->u.generic_sbp;
+    void *ops;
 
     de = get_devfs_entry_from_vfs_inode (inode);
     if (de == NULL) return -ENODEV;
     if ( S_ISDIR (de->mode) ) return 0;
     df = &de->u.fcb;
     file->private_data = de->info;
+    ops = devfs_get_ops (de);  /*  Now have module refcount  */
     if ( S_ISBLK (inode->i_mode) )
     {
 	file->f_op = &def_blk_fops;
-	if (df->ops) inode->i_bdev->bd_op = df->ops;
-	err = def_blk_fops.open (inode, file);
+	if (ops) inode->i_bdev->bd_op = ops;
+	err = def_blk_fops.open (inode, file); /* Module refcount unchanged */
     }
     else
     {
-	file->f_op = fops_get ( (struct file_operations *) df->ops );
+	file->f_op = ops;
 	if (file->f_op)
 	{
 	    lock_kernel ();
@@ -2714,7 +2720,7 @@ static int devfs_open (struct inode *inode, struct file *file)
 	    unlock_kernel ();
 	}
 	else
-	{   /*  Fallback to legacy scheme  */
+	{   /*  Fallback to legacy scheme (I don't have a module refcount)  */
 	    if ( S_ISCHR (inode->i_mode) ) err = chrdev_open (inode, file);
 	    else err = -ENODEV;
 	}
