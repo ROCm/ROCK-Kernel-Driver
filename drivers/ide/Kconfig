@@ -133,11 +133,6 @@ config BLK_DEV_HD_IDE98
 	  Normally, just say N here; you will then use the new driver for all
 	  4 interfaces.
 
-config BLK_DEV_HD
-	bool
-	default BLK_DEV_HD_ONLY if BLK_DEV_IDE=n
-	default BLK_DEV_HD_IDE if BLK_DEV_IDE
-
 config BLK_DEV_IDEDISK
 	tristate "Include IDE/ATA-2 DISK support"
 	depends on BLK_DEV_IDE
@@ -337,10 +332,6 @@ config BLK_DEV_IDEPCI
 	  This option helps the IDE driver to automatically detect and
 	  configure all PCI-based IDE interfaces in your system.
 
-config BLK_DEV_GENERIC
-	bool "Generic PCI IDE Chipset Support"
-	depends on PCI && BLK_DEV_IDEPCI
-
 config IDEPCI_SHARE_IRQ
 	bool "Sharing PCI IDE interrupts support"
 	depends on PCI && BLK_DEV_IDEPCI
@@ -351,6 +342,60 @@ config IDEPCI_SHARE_IRQ
 
 	  It is safe to say Y to this question, in most cases.
 	  If unsure, say N.
+
+config BLK_DEV_OFFBOARD
+	bool "Boot off-board chipsets first support"
+	depends on PCI && BLK_DEV_IDEPCI
+	help
+	  Normally, IDE controllers built into the motherboard (on-board
+	  controllers) are assigned to ide0 and ide1 while those on add-in PCI
+	  cards (off-board controllers) are relegated to ide2 and ide3.
+	  Answering Y here will allow you to reverse the situation, with
+	  off-board controllers on ide0/1 and on-board controllers on ide2/3.
+	  This can improve the usability of some boot managers such as lilo
+	  when booting from a drive on an off-board controller.
+
+	  If you say Y here, and you actually want to reverse the device scan
+	  order as explained above, you also need to issue the kernel command
+	  line option "ide=reverse". (Try "man bootparam" or see the
+	  documentation of your boot loader (lilo or loadlin) about how to
+	  pass options to the kernel at boot time.)
+
+	  Note that, if you do this, the order of the hd* devices will be
+	  rearranged which may require modification of fstab and other files.
+
+	  If in doubt, say N.
+
+config BLK_DEV_GENERIC
+	bool "Generic PCI IDE Chipset Support"
+	depends on PCI && BLK_DEV_IDEPCI
+
+config BLK_DEV_OPTI621
+	tristate "OPTi 82C621 chipset enhanced support (EXPERIMENTAL)"
+	depends on PCI && BLK_DEV_IDEPCI && EXPERIMENTAL
+	help
+	  This is a driver for the OPTi 82C621 EIDE controller.
+	  Please read the comments at the top of <file:drivers/ide/pci/opti621.c>.
+
+config BLK_DEV_RZ1000
+	tristate "RZ1000 chipset bugfix/support"
+	depends on PCI && BLK_DEV_IDEPCI && X86
+	help
+	  The PC-Technologies RZ1000 IDE chip is used on many common 486 and
+	  Pentium motherboards, usually along with the "Neptune" chipset.
+	  Unfortunately, it has a rather nasty design flaw that can cause
+	  severe data corruption under many conditions. Say Y here to include
+	  code which automatically detects and corrects the problem under
+	  Linux. This may slow disk throughput by a few percent, but at least
+	  things will operate 100% reliably.
+
+config BLK_DEV_SL82C105
+	tristate "Winbond SL82c105 support"
+	depends on PCI && (PPC || ARM) && BLK_DEV_IDEPCI
+	help
+	  If you have a Winbond SL82c105 IDE controller, say Y here to enable
+	  special configuration for this chip. This is common on various CHRP
+	  motherboards, but could be used elsewhere. If in doubt, say Y.
 
 config BLK_DEV_IDEDMA_PCI
 	bool "Generic PCI bus-master DMA support"
@@ -412,29 +457,6 @@ config BLK_DEV_IDE_TCQ_DEPTH
 	  You probably just want the default of 32 here. If you enter an invalid
 	  number, the default value will be used.
 
-config BLK_DEV_OFFBOARD
-	bool "Boot off-board chipsets first support"
-	depends on PCI && BLK_DEV_IDEPCI
-	---help---
-	  Normally, IDE controllers built into the motherboard (on-board
-	  controllers) are assigned to ide0 and ide1 while those on add-in PCI
-	  cards (off-board controllers) are relegated to ide2 and ide3.
-	  Answering Y here will allow you to reverse the situation, with
-	  off-board controllers on ide0/1 and on-board controllers on ide2/3.
-	  This can improve the usability of some boot managers such as lilo
-	  when booting from a drive on an off-board controller.
-
-	  If you say Y here, and you actually want to reverse the device scan
-	  order as explained above, you also need to issue the kernel command
-	  line option "ide=reverse". (Try "man bootparam" or see the
-	  documentation of your boot loader (lilo or loadlin) about how to
-	  pass options to the kernel at boot time.)
-
-	  Note that, if you do this, the order of the hd* devices will be
-	  rearranged which may require modification of fstab and other files.
-
-	  If in doubt, say N.
-
 config BLK_DEV_IDEDMA_FORCED
 	bool "Force enable legacy 2.0.X HOSTS to use DMA"
 	depends on BLK_DEV_IDEDMA_PCI
@@ -467,13 +489,6 @@ config IDEDMA_ONLYDISK
 	  Transfers.
 
 	  Generally say N here.
-
-config BLK_DEV_IDEDMA
-	bool
-	depends on BLK_DEV_IDE
-	default BLK_DEV_IDEDMA_ICS if ARCH_ACORN
-	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDE_PMAC
-	default BLK_DEV_IDEDMA_PCI if PCI && BLK_DEV_IDEPCI
 
 config IDEDMA_PCI_WIP
 	bool "ATA Work(s) In Progress (EXPERIMENTAL)"
@@ -670,13 +685,6 @@ config BLK_DEV_NS87415
 
 	  Please read the comments at the top of <file:drivers/ide/pci/ns87415.c>.
 
-config BLK_DEV_OPTI621
-	tristate "OPTi 82C621 chipset enhanced support (EXPERIMENTAL)"
-	depends on PCI && BLK_DEV_IDEPCI && EXPERIMENTAL
-	help
-	  This is a driver for the OPTi 82C621 EIDE controller.
-	  Please read the comments at the top of <file:drivers/ide/pci/opti621.c>.
-
 config BLK_DEV_PDC202XX_OLD
 	tristate "PROMISE PDC202{46|62|65|67} support"
 	depends on BLK_DEV_IDEDMA_PCI
@@ -729,18 +737,6 @@ config PDC202XX_FORCE
 	depends on BLK_DEV_PDC202XX_NEW=y
 	help
 	  For FastTrak enable overriding BIOS.
-
-config BLK_DEV_RZ1000
-	tristate "RZ1000 chipset bugfix/support"
-	depends on PCI && BLK_DEV_IDEPCI && X86
-	help
-	  The PC-Technologies RZ1000 IDE chip is used on many common 486 and
-	  Pentium motherboards, usually along with the "Neptune" chipset.
-	  Unfortunately, it has a rather nasty design flaw that can cause
-	  severe data corruption under many conditions. Say Y here to include
-	  code which automatically detects and corrects the problem under
-	  Linux. This may slow disk throughput by a few percent, but at least
-	  things will operate 100% reliably.
 
 config BLK_DEV_SVWKS
 	tristate "ServerWorks OSB4/CSB5/CSB6 chipsets support"
@@ -807,14 +803,6 @@ config BLK_DEV_VIA82CXXX
 	  This driver adds explicit support for VIA BusMastering IDE chips.
 	  This allows the kernel to change PIO, DMA and UDMA speeds and to
 	  configure the chip to optimum performance.
-
-config BLK_DEV_SL82C105
-	tristate "Winbond SL82c105 support"
-	depends on PCI && (PPC || ARM) && BLK_DEV_IDEPCI
-	help
-	  If you have a Winbond SL82c105 IDE controller, say Y here to enable
-	  special configuration for this chip. This is common on various CHRP
-	  motherboards, but could be used elsewhere. If in doubt, say Y.
 
 config BLK_DEV_IDE_PMAC
 	bool "Builtin PowerMac IDE support"
@@ -1084,29 +1072,12 @@ config BLK_DEV_UMC8672
 	  See the files <file:Documentation/ide.txt> and
 	  <file:drivers/ide/legacy/umc8672.c> for more info.
 
-config BLK_DEV_HD_ONLY
-	bool "Old hard disk (MFM/RLL/IDE) driver"
-	depends on BLK_DEV_IDE=n
-	---help---
-	  There are two drivers for MFM/RLL/IDE hard disks. Most people use
-	  the newer enhanced driver, but this old one is still around for two
-	  reasons. Some older systems have strange timing problems and seem to
-	  work only with the old driver (which itself does not work with some
-	  newer systems). The other reason is that the old driver is smaller,
-	  since it lacks the enhanced functionality of the new one. This makes
-	  it a good choice for systems with very tight memory restrictions, or
-	  for systems with only older MFM/RLL/ESDI drives. Choosing the old
-	  driver can save 13 KB or so of kernel memory.
-
-	  If you are unsure, then just choose the Enhanced IDE/MFM/RLL driver
-	  instead of this one. For more detailed information, read the
-	  Disk-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-config IDEDMA_AUTO
+config BLK_DEV_IDEDMA
 	bool
-	depends on IDEDMA_PCI_AUTO || BLK_DEV_IDEDMA_PMAC_AUTO || IDEDMA_ICS_AUTO
-	default y
+	depends on BLK_DEV_IDE
+	default BLK_DEV_IDEDMA_ICS if ARCH_ACORN
+	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDE_PMAC
+	default BLK_DEV_IDEDMA_PCI if PCI && BLK_DEV_IDEPCI
 
 config IDEDMA_IVB
 	bool "IGNORE word93 Validation BITS"
@@ -1124,10 +1095,39 @@ config IDEDMA_IVB
 
 	  It is normally safe to answer Y; however, the default is N.
 
+config IDEDMA_AUTO
+	bool
+	depends on IDEDMA_PCI_AUTO || BLK_DEV_IDEDMA_PMAC_AUTO || IDEDMA_ICS_AUTO
+	default y
+
 config DMA_NONPCI
 	bool
 	depends on BLK_DEV_TIVO
 	default y
+
+config BLK_DEV_HD_ONLY
+	bool "Old hard disk (MFM/RLL/IDE) driver"
+	depends on BLK_DEV_IDE=n
+	help
+	  There are two drivers for MFM/RLL/IDE hard disks. Most people use
+	  the newer enhanced driver, but this old one is still around for two
+	  reasons. Some older systems have strange timing problems and seem to
+	  work only with the old driver (which itself does not work with some
+	  newer systems). The other reason is that the old driver is smaller,
+	  since it lacks the enhanced functionality of the new one. This makes
+	  it a good choice for systems with very tight memory restrictions, or
+	  for systems with only older MFM/RLL/ESDI drives. Choosing the old
+	  driver can save 13 KB or so of kernel memory.
+
+	  If you are unsure, then just choose the Enhanced IDE/MFM/RLL driver
+	  instead of this one. For more detailed information, read the
+	  Disk-HOWTO, available from
+	  <http://www.tldp.org/docs.html#howto>.
+
+config BLK_DEV_HD
+	bool
+	default BLK_DEV_HD_ONLY if BLK_DEV_IDE=n
+	default BLK_DEV_HD_IDE if BLK_DEV_IDE
 
 endif
 
