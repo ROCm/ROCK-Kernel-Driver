@@ -781,7 +781,8 @@ static void uhci_dec_fsbr(struct uhci_hcd *uhci, struct urb *urb)
 /*
  * Map status to standard result codes
  *
- * <status> is (td->status & 0xFE0000) [a.k.a. uhci_status_bits(td->status)]
+ * <status> is (td->status & 0xF60000) [a.k.a. uhci_status_bits(td->status)]
+ * Note: status does not include the TD_CTRL_NAK bit.
  * <dir_out> is True for output TDs and False for input TDs.
  */
 static int uhci_map_status(int status, int dir_out)
@@ -792,22 +793,18 @@ static int uhci_map_status(int status, int dir_out)
 		return -EPROTO;
 	if (status & TD_CTRL_CRCTIMEO) {		/* CRC/Timeout */
 		if (dir_out)
-			return -ETIMEDOUT;
+			return -EPROTO;
 		else
 			return -EILSEQ;
 	}
-	if (status & TD_CTRL_NAK)			/* NAK */
-		return -ETIMEDOUT;
 	if (status & TD_CTRL_BABBLE)			/* Babble */
 		return -EOVERFLOW;
 	if (status & TD_CTRL_DBUFERR)			/* Buffer error */
 		return -ENOSR;
 	if (status & TD_CTRL_STALLED)			/* Stalled */
 		return -EPIPE;
-	if (status & TD_CTRL_ACTIVE)			/* Active */
-		return 0;
-
-	return -EINVAL;
+	WARN_ON(status & TD_CTRL_ACTIVE);		/* Active */
+	return 0;
 }
 
 /*
@@ -832,7 +829,7 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb, struct ur
 		status |= TD_CTRL_LS;
 
 	/*
-	 * Build the TD for the control request
+	 * Build the TD for the control request setup packet
 	 */
 	td = uhci_alloc_td(uhci, urb->dev);
 	if (!td)
@@ -990,13 +987,13 @@ static int uhci_result_control(struct uhci_hcd *uhci, struct urb *urb)
 
 	if (urbp->short_control_packet) {
 		tmp = head->prev;
-		goto status_phase;
+		goto status_stage;
 	}
 
 	tmp = head->next;
 	td = list_entry(tmp, struct uhci_td, list);
 
-	/* The first TD is the SETUP phase, check the status, but skip */
+	/* The first TD is the SETUP stage, check the status, but skip */
 	/*  the count */
 	status = uhci_status_bits(td_status(td));
 	if (status & TD_CTRL_ACTIVE)
@@ -1037,10 +1034,10 @@ static int uhci_result_control(struct uhci_hcd *uhci, struct urb *urb)
 		}
 	}
 
-status_phase:
+status_stage:
 	td = list_entry(tmp, struct uhci_td, list);
 
-	/* Control status phase */
+	/* Control status stage */
 	status = td_status(td);
 
 #ifdef I_HAVE_BUGGY_APC_BACKUPS
@@ -1053,10 +1050,11 @@ status_phase:
 		return 0;
 #endif
 
+	status = uhci_status_bits(status);
 	if (status & TD_CTRL_ACTIVE)
 		return -EINPROGRESS;
 
-	if (uhci_status_bits(status))
+	if (status)
 		goto td_error;
 
 	return 0;
@@ -1403,7 +1401,8 @@ static int uhci_result_isochronous(struct uhci_hcd *uhci, struct urb *urb)
 		urb->iso_frame_desc[i].actual_length = actlength;
 		urb->actual_length += actlength;
 
-		status = uhci_map_status(uhci_status_bits(td_status(td)), usb_pipeout(urb->pipe));
+		status = uhci_map_status(uhci_status_bits(td_status(td)),
+				usb_pipeout(urb->pipe));
 		urb->iso_frame_desc[i].status = status;
 		if (status) {
 			urb->error_count++;
