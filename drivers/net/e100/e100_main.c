@@ -1588,9 +1588,22 @@ e100_alloc_tcb_pool(struct e100_private *bdp)
 void
 e100_free_tcb_pool(struct e100_private *bdp)
 {
+	tcb_t *tcb;
+	int i;
+	/* Return tx skbs */ 
+	for (i = 0; i < bdp->params.TxDescriptors; i++) {
+	  	tcb = bdp->tcb_pool.data;
+		tcb += bdp->tcb_pool.head;
+  		e100_tx_skb_free(bdp, tcb);
+		if (NEXT_TCB_TOUSE(bdp->tcb_pool.head) == bdp->tcb_pool.tail)
+		  	break;
+		bdp->tcb_pool.head = NEXT_TCB_TOUSE(bdp->tcb_pool.head);
+	}
 	pci_free_consistent(bdp->pdev,
 			    sizeof (tcb_t) * bdp->params.TxDescriptors,
 			    bdp->tcb_pool.data, bdp->tcb_phys);
+	bdp->tcb_pool.head = 0;
+	bdp->tcb_pool.tail = 1;	
 	bdp->tcb_phys = 0;
 }
 
