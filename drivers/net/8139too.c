@@ -892,8 +892,11 @@ match:
 		}
 		if (rtl_chip_info[tp->chipset].flags & HasLWake) {
 			tmp8 = RTL_R8 (Config4);
-			if (tmp8 & LWPTN)
+			if (tmp8 & LWPTN) {
+				RTL_W8 (Cfg9346, Cfg9346_Unlock);
 				RTL_W8 (Config4, tmp8 & ~LWPTN);
+				RTL_W8 (Cfg9346, Cfg9346_Lock);
+			}
 		}
 	} else {
 		DPRINTK("Old chip wakeup\n");
