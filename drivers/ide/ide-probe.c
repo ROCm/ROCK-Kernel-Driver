@@ -861,7 +861,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 		sprintf(names + 4*unit, "hd%c",'a'+hwif->index*MAX_DRIVES+unit);
 		gd[unit].major_name = names + 4*unit;
 		gd[unit].minor_shift = PARTN_BITS; 
-		gd[unit].nr_real = 1;
 		gd[unit].fops = ide_fops;
 		hwif->gd[unit] = gd + unit;
 	}

@@ -162,9 +162,8 @@ static int show_partition(struct seq_file *part, void *v)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
 	/* show the full disk and all non-0 size partitions of it */
-	for (n = 0; n < (sgp->nr_real << sgp->minor_shift); n++) {
-		int minormask = (1<<sgp->minor_shift) - 1;
-		if ((n & minormask) && sgp->part[n].nr_sects == 0)
+	for (n = 0; n < 1<<sgp->minor_shift; n++) {
+		if (n && sgp->part[n].nr_sects == 0)
 			continue;
 		seq_printf(part, "%4d  %4d %10ld %s\n",
 			sgp->major, n + sgp->first_minor,

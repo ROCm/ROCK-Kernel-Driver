@@ -1773,7 +1773,6 @@ int i2o_block_init(void)
 		disk->minor_shift = 4;
 		disk->part = i2ob + (i<<4);
 		disk->fops = &i2ob_fops;
-		disk->nr_real = 1;
 		disk->major_name = i2o_names + i*8;
 		sprintf(disk->major_name, "i2o/hd%c", 'a' + i);
 	}

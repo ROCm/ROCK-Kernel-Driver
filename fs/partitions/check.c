@@ -89,14 +89,12 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
 
 char *disk_name (struct gendisk *hd, int minor, char *buf)
 {
-	unsigned int unit = (minor >> hd->minor_shift);
-	unsigned int part = (minor & ((1 << hd->minor_shift) -1 ));
-	struct hd_struct *p = hd->part + minor - hd->first_minor;
+	unsigned int part = minor - hd->first_minor;
+	struct hd_struct *p = hd->part + part;
 	char s[40];
 	const char *maj;
 
-	if ((((minor - hd->first_minor) >> hd->minor_shift) < hd->nr_real) &&
-	     p->de) {
+	if (part < 1<<hd->minor_shift && p->de) {
 		int pos;
 
 		pos = devfs_generate_path(p->de, buf, 64);
@@ -104,23 +102,7 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 			return buf + pos;
 	}
 
-	/*
-	 * Yes, I know, ... in cases is gccism and not a pretty one.  
-	 * However, the first variant will eventually consume _all_ cases
-	 * and switch will disappear.
-	 */
-	switch (hd->major) {
-		default:
-			maj = hd->major_name;
-			break;
-		case MD_MAJOR:
-			sprintf(s, "%s%d", "md", unit);
-			maj = s;
-			break;
-		case I2O_MAJOR:
-			sprintf(s, "%s%c", hd->major_name, unit + 'a');
-			maj = s;
-	}
+	maj = hd->major_name;
 	if (!part)
 		sprintf(buf, "%s", maj);
 	else if (isdigit(maj[strlen(maj)-1]))
@@ -150,7 +132,6 @@ static DEVICE_ATTR(type,S_IRUGO,partition_device_type_read,NULL);
 void driverfs_create_partitions(struct gendisk *hd, int minor)
 {
 	int pos = -1;
-	int devnum = (minor - hd->first_minor) >> hd->minor_shift;
 	char dirname[256];
 	struct device *parent = 0;
 	int max_p;
@@ -160,13 +141,13 @@ void driverfs_create_partitions(struct gendisk *hd, int minor)
 	
 	/* get parent driverfs device structure */
 	if (hd->driverfs_dev_arr)
-		parent = hd->driverfs_dev_arr[devnum];
+		parent = hd->driverfs_dev_arr[0];
 	else /* if driverfs not supported by subsystem, skip partitions */
 		return;
 	
 	/* get parent device node directory name */
 	if (hd->de_arr) {
-		dir = hd->de_arr[devnum];
+		dir = hd->de_arr[0];
 		if (dir)
 			pos = devfs_generate_path (dir, dirname, 
 						   sizeof dirname);
@@ -268,7 +249,7 @@ void check_partition(struct gendisk *hd, struct block_device *bdev)
 		return;
 
 	if (hd->de_arr)
-		de = hd->de_arr[(minor(dev)-hd->first_minor)>>hd->minor_shift];
+		de = hd->de_arr[0];
 	i = devfs_generate_path (de, buf, sizeof buf);
 	if (i >= 0) {
 		printk(KERN_INFO " /dev/%s:", buf + i);
@@ -315,7 +296,6 @@ out:
 #ifdef CONFIG_DEVFS_FS
 static void devfs_register_partition (struct gendisk *dev, int minor, int part)
 {
-	int devnum = (minor - dev->first_minor) >> dev->minor_shift;
 	devfs_handle_t dir;
 	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
 	struct hd_struct *p = dev->part + minor - dev->first_minor;
@@ -326,7 +306,7 @@ static void devfs_register_partition (struct gendisk *dev, int minor, int part)
 	dir = devfs_get_parent(p[0].de);
 	if (!dir)
 		return;
-	if ( dev->flags && (dev->flags[devnum] & GENHD_FL_REMOVABLE) )
+	if ( dev->flags && (dev->flags[0] & GENHD_FL_REMOVABLE) )
 		devfs_flags |= DEVFS_FL_REMOVABLE;
 	sprintf (devname, "part%d", part);
 	p[part].de = devfs_register (dir, devname, devfs_flags,
@@ -340,7 +320,6 @@ static struct unique_numspace disc_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
 static void devfs_register_disc (struct gendisk *dev, int minor)
 {
 	int pos = 0;
-	int devnum = (minor - dev->first_minor) >> dev->minor_shift;
 	devfs_handle_t dir, slave;
 	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
 	char dirname[64], symlink[16];
@@ -349,10 +328,10 @@ static void devfs_register_disc (struct gendisk *dev, int minor)
 
 	if (p[0].de)
 		return;
-	if ( dev->flags && (dev->flags[devnum] & GENHD_FL_REMOVABLE) )
+	if ( dev->flags && (dev->flags[0] & GENHD_FL_REMOVABLE) )
 		devfs_flags |= DEVFS_FL_REMOVABLE;
 	if (dev->de_arr) {
-		dir = dev->de_arr[devnum];
+		dir = dev->de_arr[0];
 		if (!dir)  /*  Aware driver wants to block disc management  */
 			return;
 		pos = devfs_generate_path(dir, dirname + 3, sizeof dirname-3);
@@ -362,7 +341,7 @@ static void devfs_register_disc (struct gendisk *dev, int minor)
 	} else {
 		/*  Unaware driver: construct "real" directory  */
 		sprintf(dirname, "../%s/disc%d", dev->major_name,
-			(dev->first_minor >> dev->minor_shift) + devnum);
+			dev->first_minor >> dev->minor_shift);
 		dir = devfs_mk_dir(NULL, dirname + 3, NULL);
 	}
 	if (!devfs_handle)

@@ -687,7 +687,6 @@ static int pd_detect( void )
 			PD.gd.major_name = PD.name;
 			PD.gd.minor_shift = PD_BITS;
 			PD.gd.fops = &pd_fops;
-			PD.gd.nr_real = 1;
 			PD.gd.major = major;
 			PD.gd.first_minor = unit << PD_BITS;
 			PD.gd.part = pd_hd + (unit << PD_BITS);

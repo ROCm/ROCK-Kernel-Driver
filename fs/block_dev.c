@@ -602,8 +602,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		struct gendisk *g = get_gendisk(dev);
 		bdev->bd_contains = bdev;
 		if (g) {
-			int shift = g->minor_shift;
-			unsigned minor0 = (minor >> shift) << shift;
+			unsigned minor0 = g->first_minor;
 			if (minor != minor0) {
 				struct block_device *disk;
 				disk = bdget(MKDEV(major(dev), minor0));

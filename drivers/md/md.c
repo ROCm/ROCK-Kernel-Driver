@@ -1459,7 +1459,6 @@ static int do_md_run(mddev_t * mddev)
 	sprintf(major_name, "md%d", mdidx(mddev));
 	disk->major_name = major_name;
 	disk->part = md_hd_struct + mdidx(mddev);
-	disk->nr_real = 1;
 	disk->fops = &md_fops;
 
 	mddev->pers = pers[pnum];

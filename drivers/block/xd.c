@@ -135,7 +135,6 @@ static struct gendisk xd_gendisk[2] = {
 	.minor_shift =	6,
 	.part =		xd_struct,
 	.fops =		&xd_fops,
-	.nr_real =	1
 },{
 	.major =	MAJOR_NR,
 	.first_minor =	64,
@@ -143,7 +142,6 @@ static struct gendisk xd_gendisk[2] = {
 	.minor_shift =	6,
 	.part =		xd_struct + 64,
 	.fops =		&xd_fops,
-	.nr_real =	1
 }
 };
 

@@ -2447,7 +2447,6 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		disk->major_name = NULL;
 		disk->minor_shift = NWD_SHIFT;
 		disk->part = hba[i]->hd + (j << NWD_SHIFT);
-		disk->nr_real = 1;
 		if( !(drv->nr_blocks))
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->block_size;

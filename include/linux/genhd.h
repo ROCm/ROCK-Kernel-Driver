@@ -76,8 +76,6 @@ struct gendisk {
 					   get real minor */
 
 	struct hd_struct *part;		/* [indexed by minor] */
-	int nr_real;			/* number of real devices */
-
 	struct gendisk *next;
 	struct block_device_operations *fops;
 

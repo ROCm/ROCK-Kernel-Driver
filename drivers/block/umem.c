@@ -1193,7 +1193,6 @@ int __init mm_init(void)
 		sprintf(mm_names + i*6, "umem%c", 'a'+i);
 		spin_lock_init(&cards[i].lock);
 		disk->part  = mm_partitions + (i << MM_SHIFT);
-		disk->nr_real = 1;
 		disk->major = major_nr;
 		disk->first_minor  = i << MM_SHIFT;
 		disk->major_name = mm_names + i*6;

@@ -1704,7 +1704,6 @@ static void acsi_geninit(void)
 		disk->minor_shift = (acsi_info[i].type==HARDDISK)?4:0;
 		disk->part = acsi_part + (i<<4);
 		disk->fops = &acsi_fops;
-		disk->nr_real = 1;
 		add_gendisk(disk);
 		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
 				1<<disk->minor_shift,

@@ -451,7 +451,6 @@ int __init cpqarray_init(void)
 			disk->first_minor = j<<NWD_SHIFT;
 			disk->minor_shift = NWD_SHIFT;
 			disk->part = ida + i*256 + (j<<NWD_SHIFT);
-			disk->nr_real = 1; 
 			disk->de_arr = &de_arr[i][j]; 
 			disk->fops = &ida_fops; 
 			if (!drv->nr_blks)

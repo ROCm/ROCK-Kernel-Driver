@@ -1280,7 +1280,6 @@ static void mfm_geninit (void)
 		outw(0x80, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
 
 	for (i = 0; i < mfm_drives; i++) {
-		mfm_gendisk[i].nr_real = 1;
 		add_gendisk(mfm_gendisk + i);
 		mfm_geometry (i);
 		register_disk(mfm_gendisk + i, mk_kdev(MAJOR_NR,i<<6), 1<<6,

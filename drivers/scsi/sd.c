@@ -1351,7 +1351,6 @@ static int sd_attach(Scsi_Device * sdp)
 	}
 
 	sd_template.nr_dev++;
-	gd->nr_real = 1;
         gd->de_arr[0] = sdp->de;
         gd->driverfs_dev_arr[0] = &sdp->sdev_driverfs_dev;
 	gd->major = SD_MAJOR(dsk_nr>>4);

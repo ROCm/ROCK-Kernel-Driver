@@ -154,7 +154,6 @@ static struct gendisk ps2esdi_gendisk[2] = {
 	minor_shift:	6,
 	part:		ps2esdi,
 	fops:		&ps2esdi_fops,
-	nr_real:	1
 },{
 	major:		MAJOR_NR,
 	first_minor:	64,
@@ -162,7 +161,6 @@ static struct gendisk ps2esdi_gendisk[2] = {
 	minor_shift:	6,
 	part:		ps2esdi+64,
 	fops:		&ps2esdi_fops,
-	nr_real:	1
 }
 };
 

@@ -1254,7 +1254,6 @@ static void ftl_notify_add(struct mtd_info *mtd)
 	disk->minor_shift = PART_BITS;
 	disk->part = ftl_hd + (device << 4);
 	disk->fops = &ftl_blk_fops;
-	disk->nr_real = 1;
 	partition->mtd = mtd;
 	partition->disk = disk;
 

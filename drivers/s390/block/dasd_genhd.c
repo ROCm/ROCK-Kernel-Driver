@@ -106,7 +106,6 @@ dasd_register_major(int major)
 		disk->major = new_major;
 		disk->first_minor = i << DASD_PARTN_BITS;
 		disk->minor_shift = DASD_PARTN_BITS;
-		disk->nr_real = 1;
 		disk->fops = &dasd_device_operations;
 		disk->de_arr = mi->de_arr + i;
 		disk->flags = mi->flags + i;

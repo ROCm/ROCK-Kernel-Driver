@@ -1973,7 +1973,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 	disk->first_minor = n << DAC960_MaxPartitionsBits;
 	disk->major_name = names + 9 * n;
 	disk->minor_shift = DAC960_MaxPartitionsBits;
-	disk->nr_real = 1;
 	disk->fops = &DAC960_BlockDeviceOperations;
 	add_gendisk(disk);
    }
