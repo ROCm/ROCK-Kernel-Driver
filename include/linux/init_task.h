@@ -45,8 +45,8 @@
     thread_info:	&init_thread_info,				\
     flags:		0,						\
     lock_depth:		-1,						\
-    prio:		120,						\
-    static_prio:	120,						\
+    prio:		MAX_PRIO-20,					\
+    static_prio:	MAX_PRIO-20,					\
     policy:		SCHED_OTHER,					\
     cpus_allowed:	-1,						\
     mm:			NULL,						\
