@@ -82,12 +82,17 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 
 	/* get current state */
 	rdmsr(MSR_IA32_THERM_CONTROL, l, h);
-	l = l >> 1;
-	l &= 0x7;
-
+	if (l & 0x10) {
+		l = l >> 1;
+		l &= 0x7;
+	} else
+		l = DC_DISABLE;
+	
 	if (l == newstate) {
 		set_cpus_allowed(current, cpus_allowed);
 		return 0;
+	} else if (l == DC_RESV) {
+		printk(KERN_ERR PFX "BIG FAT WARNING: currently in invalid setting\n");
 	}
 
 	/* notifiers */
@@ -141,13 +146,18 @@ static int cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 	unsigned int    i;
 	unsigned int    newstate = 0;
 	unsigned int    number_states = 0;
+	unsigned int    minstate = 1;
 
-	if (!cpufreq_p4_driver || !stock_freq || !policy)
+	if (!cpufreq_p4_driver || !stock_freq || 
+	    !policy || !cpu_online(policy->cpu))
 		return -EINVAL;
+
+	if (has_N44_O17_errata)
+		minstate = 3;
 
 	if (policy->policy == CPUFREQ_POLICY_POWERSAVE)
 	{
-		for (i=8; i>0; i--)
+		for (i=8; i>=minstate; i--)
 			if ((policy->min <= ((stock_freq / 8) * i)) &&
 			    (policy->max >= ((stock_freq / 8) * i))) 
 			{
@@ -155,7 +165,7 @@ static int cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 				number_states++;
 			}
 	} else {
-		for (i=1; i<=8; i++)
+		for (i=minstate; i<=8; i++)
 			if ((policy->min <= ((stock_freq / 8) * i)) &&
 			    (policy->max >= ((stock_freq / 8) * i))) 
 			{
@@ -164,25 +174,8 @@ static int cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 			}
 	}
 
-	/* if (number_states == 1) */
-	{
-		if (policy->cpu == CPUFREQ_ALL_CPUS) {
-			for (i=0; i<NR_CPUS; i++)
-				if (cpu_online(i))
-					cpufreq_p4_setdc(i, newstate);
-		} else {
-			cpufreq_p4_setdc(policy->cpu, newstate);
-		}
-	}
-	/* else {
-		if (policy->policy == CPUFREQ_POLICY_POWERSAVE) {
-			min_state = newstate;
-			max_state = newstate + (number_states - 1);
-		} else {
-			max_state = newstate;
-			min_state = newstate - (number_states - 1);
-		}
-	} */
+	cpufreq_p4_setdc(policy->cpu, newstate);
+
 	return 0;
 }
 
@@ -190,17 +183,21 @@ static int cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 static int cpufreq_p4_verify(struct cpufreq_policy *policy)
 {
 	unsigned int    number_states = 0;
-	unsigned int    i;
+	unsigned int    i = 1;
 
-	if (!cpufreq_p4_driver || !stock_freq || !policy)
+	if (!cpufreq_p4_driver || !stock_freq || 
+	    !policy || !cpu_online(policy->cpu))
 		return -EINVAL;
 
-	if (!cpu_online(policy->cpu))
-		policy->cpu = CPUFREQ_ALL_CPUS;
-	cpufreq_verify_within_limits(policy, (stock_freq / 8), stock_freq);
+	cpufreq_verify_within_limits(policy, 
+				     policy->cpuinfo.min_freq, 
+				     policy->cpuinfo.max_freq);
 
-	/* is there at least one state within limit? */
-	for (i=1; i<=8; i++)
+	if (has_N44_O17_errata)
+		i = 3;
+
+	/* is there at least one state within the limit? */
+	for (; i<=8; i++)
 		if ((policy->min <= ((stock_freq / 8) * i)) &&
 		    (policy->max >= ((stock_freq / 8) * i)))
 			number_states++;
@@ -209,11 +206,14 @@ static int cpufreq_p4_verify(struct cpufreq_policy *policy)
 		return 0;
 
 	policy->max = (stock_freq / 8) * (((unsigned int) ((policy->max * 8) / stock_freq)) + 1);
+	cpufreq_verify_within_limits(policy, 
+				     policy->cpuinfo.min_freq, 
+				     policy->cpuinfo.max_freq);
 	return 0;
 }
 
 
-int __init cpufreq_p4_init(void)
+static int __init cpufreq_p4_init(void)
 {	
 	struct cpuinfo_x86 *c = cpu_data;
 	int cpuid;
@@ -245,15 +245,22 @@ int __init cpufreq_p4_init(void)
 	}
 
 	printk(KERN_INFO PFX "P4/Xeon(TM) CPU On-Demand Clock Modulation available\n");
+
+	if (!stock_freq) {
+		if (cpu_khz)
+			stock_freq = cpu_khz;
+		else {
+			printk(KERN_INFO PFX "unknown core frequency - please use module parameter 'stock_freq'\n");
+			return -EINVAL;
+		}
+	}
+
 	driver = kmalloc(sizeof(struct cpufreq_driver) +
 			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
 	if (!driver)
 		return -ENOMEM;
 
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
-
-	if (!stock_freq)
-		stock_freq = cpu_khz;
 
 #ifdef CONFIG_CPU_FREQ_24_API
 	for (i=0;i<NR_CPUS;i++) {
@@ -290,15 +297,16 @@ int __init cpufreq_p4_init(void)
 }
 
 
-void __exit cpufreq_p4_exit(void)
+static void __exit cpufreq_p4_exit(void)
 {
-	u32 l, h;
+	unsigned int i;
 
 	if (cpufreq_p4_driver) {
+		for (i=0; i<NR_CPUS; i++) {
+			if (cpu_online(i)) 
+				cpufreq_p4_setdc(i, DC_DISABLE);
+		}
 		cpufreq_unregister();
-		/* return back to a non modulated state */
-		rdmsr(MSR_IA32_THERM_CONTROL, l, h);
-		wrmsr(MSR_IA32_THERM_CONTROL, l & ~(1<<4), h);
 		kfree(cpufreq_p4_driver);
 	}
 }

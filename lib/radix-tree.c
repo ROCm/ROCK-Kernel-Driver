@@ -20,10 +20,11 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/mempool.h>
 #include <linux/module.h>
 #include <linux/radix-tree.h>
+#include <linux/percpu.h>
 #include <linux/slab.h>
+#include <linux/gfp.h>
 #include <linux/string.h>
 
 /*
@@ -49,18 +50,74 @@ struct radix_tree_path {
  * Radix tree node cache.
  */
 static kmem_cache_t *radix_tree_node_cachep;
-static mempool_t *radix_tree_node_pool;
 
-static inline struct radix_tree_node *
+/*
+ * Per-cpu pool of preloaded nodes
+ */
+struct radix_tree_preload {
+	int nr;
+	struct radix_tree_node *nodes[RADIX_TREE_MAX_PATH];
+};
+DEFINE_PER_CPU(struct radix_tree_preload, radix_tree_preloads) = { 0, };
+
+/*
+ * This assumes that the caller has performed appropriate preallocation, and
+ * that the caller has pinned this thread of control to the current CPU.
+ */
+static struct radix_tree_node *
 radix_tree_node_alloc(struct radix_tree_root *root)
 {
-	return mempool_alloc(radix_tree_node_pool, root->gfp_mask);
+	struct radix_tree_node *ret;
+
+	ret = kmem_cache_alloc(radix_tree_node_cachep, root->gfp_mask);
+	if (ret == NULL && !(root->gfp_mask & __GFP_WAIT)) {
+		struct radix_tree_preload *rtp;
+
+		rtp = &__get_cpu_var(radix_tree_preloads);
+		if (rtp->nr) {
+			ret = rtp->nodes[rtp->nr - 1];
+			rtp->nodes[rtp->nr - 1] = NULL;
+			rtp->nr--;
+		}
+	}
+	return ret;
 }
 
 static inline void
 radix_tree_node_free(struct radix_tree_node *node)
 {
-	mempool_free(node, radix_tree_node_pool);
+	kmem_cache_free(radix_tree_node_cachep, node);
+}
+
+/*
+ * Load up this CPU's radix_tree_node buffer with sufficient objects to
+ * ensure that the addition of a single element in the tree cannot fail.  On
+ * success, return zero, with preemption disabled.  On error, return -ENOMEM
+ * with preemption not disabled.
+ */
+int radix_tree_preload(int gfp_mask)
+{
+	struct radix_tree_preload *rtp;
+	struct radix_tree_node *node;
+	int ret = -ENOMEM;
+
+	preempt_disable();
+	rtp = &__get_cpu_var(radix_tree_preloads);
+	while (rtp->nr < ARRAY_SIZE(rtp->nodes)) {
+		preempt_enable();
+		node = kmem_cache_alloc(radix_tree_node_cachep, gfp_mask);
+		if (node == NULL)
+			goto out;
+		preempt_disable();
+		rtp = &__get_cpu_var(radix_tree_preloads);
+		if (rtp->nr < ARRAY_SIZE(rtp->nodes))
+			rtp->nodes[rtp->nr++] = node;
+		else
+			kmem_cache_free(radix_tree_node_cachep, node);
+	}
+	ret = 0;
+out:
+	return ret;
 }
 
 /*
@@ -339,26 +396,12 @@ int radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 }
 EXPORT_SYMBOL(radix_tree_delete);
 
-static void radix_tree_node_ctor(void *node, kmem_cache_t *cachep, unsigned long flags)
+static void
+radix_tree_node_ctor(void *node, kmem_cache_t *cachep, unsigned long flags)
 {
 	memset(node, 0, sizeof(struct radix_tree_node));
 }
 
-static void *radix_tree_node_pool_alloc(int gfp_mask, void *data)
-{
-	return kmem_cache_alloc(radix_tree_node_cachep, gfp_mask);
-}
-
-static void radix_tree_node_pool_free(void *node, void *data)
-{
-	kmem_cache_free(radix_tree_node_cachep, node);
-}
-
-/*
- * FIXME!  512 nodes is 200-300k of memory.  This needs to be
- * scaled by the amount of available memory, and hopefully
- * reduced also.
- */
 void __init radix_tree_init(void)
 {
 	radix_tree_node_cachep = kmem_cache_create("radix_tree_node",
@@ -366,8 +409,4 @@ void __init radix_tree_init(void)
 			0, radix_tree_node_ctor, NULL);
 	if (!radix_tree_node_cachep)
 		panic ("Failed to create radix_tree_node cache\n");
-	radix_tree_node_pool = mempool_create(512, radix_tree_node_pool_alloc,
-			radix_tree_node_pool_free, NULL);
-	if (!radix_tree_node_pool)
-		panic ("Failed to create radix_tree_node pool\n");
 }

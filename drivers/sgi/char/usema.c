@@ -176,9 +176,12 @@ static struct miscdevice dev_usemaclone = {
 void
 usema_init(void)
 {
+	if (misc_register(&dev_usemaclone) < 0) {
+		printk(KERN_ERR "usemaclone: cannot register misc device.\n");
+		return;
+	}
 	printk("usemaclone misc device registered (minor: %d)\n",
-	       SGI_USEMACLONE);
-	misc_register(&dev_usemaclone);
+		SGI_USEMACLONE);
 }
 
 EXPORT_SYMBOL(usema_init);

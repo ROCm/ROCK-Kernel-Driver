@@ -103,7 +103,7 @@ static unsigned long get_plt_size(const Elf32_Ehdr *hdr,
 
 int module_frob_arch_sections(Elf32_Ehdr *hdr,
 			      Elf32_Shdr *sechdrs,
-			      const char *secstrings,
+			      char *secstrings,
 			      struct module *me)
 {
 	unsigned int i;

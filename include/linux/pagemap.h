@@ -66,10 +66,10 @@ extern struct page * read_cache_page(struct address_space *mapping,
 extern int read_cache_pages(struct address_space *mapping,
 		struct list_head *pages, filler_t *filler, void *data);
 
-extern int add_to_page_cache(struct page *page,
-		struct address_space *mapping, unsigned long index);
-extern int add_to_page_cache_lru(struct page *page,
-		struct address_space *mapping, unsigned long index);
+int add_to_page_cache(struct page *page, struct address_space *mapping,
+				unsigned long index, int gfp_mask);
+int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
+				unsigned long index, int gfp_mask);
 extern void remove_from_page_cache(struct page *page);
 extern void __remove_from_page_cache(struct page *page);
 

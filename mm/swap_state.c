@@ -78,7 +78,7 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry)
 		INC_CACHE_INFO(noent_race);
 		return -ENOENT;
 	}
-	error = add_to_page_cache(page, &swapper_space, entry.val);
+	error = add_to_page_cache(page, &swapper_space, entry.val, GFP_ATOMIC);
 	/*
 	 * Anon pages are already on the LRU, we don't run lru_cache_add here.
 	 */
@@ -149,7 +149,8 @@ int add_to_swap(struct page * page)
 		/*
 		 * Add it to the swap cache and mark it dirty
 		 */
-		err = add_to_page_cache(page, &swapper_space, entry.val);
+		err = add_to_page_cache(page, &swapper_space,
+					entry.val, GFP_ATOMIC);
 
 		if (pf_flags & PF_MEMALLOC)
 			current->flags |= PF_MEMALLOC;

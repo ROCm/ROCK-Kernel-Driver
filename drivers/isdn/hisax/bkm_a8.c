@@ -270,13 +270,11 @@ BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 int __init
 sct_alloc_io(u_int adr, u_int len)
 {
-	if (check_region(adr, len)) {
+	if (!request_region(adr, len, "scitel")) {
 		printk(KERN_WARNING
 			"HiSax: Scitel port %#x-%#x already in use\n",
 			adr, adr + len);
 		return (1);
-	} else {
-		request_region(adr, len, "scitel");
 	}
 	return(0);
 }

@@ -189,8 +189,7 @@ static int sa1100_irda_set_speed(struct sa1100_irda *si, int speed)
 		break;
 
 	case 4000000:
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 
 		si->hscr0 = 0;
 
@@ -210,7 +209,7 @@ static int sa1100_irda_set_speed(struct sa1100_irda *si, int speed)
 		sa1100_irda_rx_alloc(si);
 		sa1100_irda_rx_dma_start(si);
 
-		restore_flags(flags);
+		local_irq_restore(flags);
 
 		break;
 

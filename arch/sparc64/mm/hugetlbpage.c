@@ -476,9 +476,16 @@ try_again:
 			page = alloc_hugetlb_page();
 			if (page == NULL) {
 				pte_unmap(pte);
+				retval = -ENOMEM;
 				goto out;
 			}
-			add_to_page_cache(page, mapping, idx);
+			retval = add_to_page_cache(page, mapping,
+						idx, GFP_ATOMIC);
+			if (retval) {
+				pte_unmap(pte);
+				free_hugetlb_page(page);
+				goto out;
+			}
 		}
 		set_huge_pte(mm, vma, page, pte,
 			     (vma->vm_flags & VM_WRITE));

@@ -474,6 +474,7 @@ int tosh_probe(void)
 
 int __init tosh_init(void)
 {
+	int retval;
 	/* are we running on a Toshiba laptop */
 
 	if (tosh_probe()!=0)
@@ -483,17 +484,21 @@ int __init tosh_init(void)
 		TOSH_VERSION"\n");
 
 	/* set the port to use for Fn status if not specified as a parameter */
-
 	if (tosh_fn==0x00)
 		tosh_set_fn_port();
 
 	/* register the device file */
+	retval = misc_register(&tosh_device);
+	if(retval < 0)
+		return retval;
 
-	misc_register(&tosh_device);
-
+#ifdef CONFIG_PROC_FS
 	/* register the proc entry */
-
-	create_proc_info_entry("toshiba", 0, NULL, tosh_get_info);
+	if(create_proc_info_entry("toshiba", 0, NULL, tosh_get_info) == NULL){
+		misc_deregister(&tosh_device);
+		return -ENOMEM;
+	}
+#endif
 
 	return 0;
 }

@@ -2499,6 +2499,11 @@ static int __init sx_init(void)
 		sx_debug=-1;
 	}
 
+	if (misc_register(&sx_fw_device) < 0) {
+		printk(KERN_ERR "SX: Unable to register firmware loader driver.\n");
+		return -EIO;
+	}
+
 #ifdef CONFIG_PCI
 	if (pci_present ()) {
 #ifndef TWO_ZERO
@@ -2643,11 +2648,8 @@ static int __init sx_init(void)
 	}
 	if (found) {
 		printk (KERN_INFO "sx: total of %d boards detected.\n", found);
-
-		if (misc_register(&sx_fw_device) < 0) {
-			printk(KERN_ERR "SX: Unable to register firmware loader driver.\n");
-			return -EIO;
-		}
+	} else {
+		misc_deregister(&sx_fw_device);
 	}
 
 	func_exit();

@@ -19,6 +19,8 @@
 #ifndef _LINUX_RADIX_TREE_H
 #define _LINUX_RADIX_TREE_H
 
+#include <linux/preempt.h>
+
 struct radix_tree_node;
 
 struct radix_tree_root {
@@ -45,5 +47,11 @@ extern int radix_tree_delete(struct radix_tree_root *, unsigned long);
 extern unsigned int
 radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
 			unsigned long first_index, unsigned int max_items);
+int radix_tree_preload(int gfp_mask);
+
+static inline void radix_tree_preload_end(void)
+{
+	preempt_enable();
+}
 
 #endif /* _LINUX_RADIX_TREE_H */

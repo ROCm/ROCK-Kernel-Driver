@@ -149,10 +149,10 @@ void data_access_exception (struct pt_regs *regs,
 
 	if (regs->tstate & TSTATE_PRIV) {
 		/* Test if this comes from uaccess places. */
-		unsigned long fixup, g2;
+		unsigned long fixup;
+		unsigned long g2 = regs->u_regs[UREG_G2];
 
-		g2 = regs->u_regs[UREG_G2];
-		if ((fixup = search_exception_table (regs->tpc, &g2))) {
+		if ((fixup = search_extables_range(regs->tpc, &g2))) {
 			/* Ouch, somebody is trying ugly VM hole tricks on us... */
 #ifdef DEBUG_EXCEPTIONS
 			printk("Exception: PC<%016lx> faddr<UNKNOWN>\n", regs->tpc);
@@ -1370,7 +1370,7 @@ void cheetah_deferred_handler(struct pt_regs *regs, unsigned long afsr, unsigned
 			recoverable = 1;
 		} else {
 			unsigned long g2 = regs->u_regs[UREG_G2];
-			unsigned long fixup = search_exception_table(regs->tpc, &g2);
+			unsigned long fixup = search_extables_range(regs->tpc, &g2);
 
 			if (fixup != 0UL) {
 				/* OK, kernel access to userspace. */
@@ -1390,7 +1390,7 @@ void cheetah_deferred_handler(struct pt_regs *regs, unsigned long afsr, unsigned
 				/* Only perform fixup if we still have a
 				 * recoverable condition.
 				 */
-				if (fixup != 0UL && recoverable) {
+				if (recoverable) {
 					regs->tpc = fixup;
 					regs->tnpc = regs->tpc + 4;
 					regs->u_regs[UREG_G2] = g2;

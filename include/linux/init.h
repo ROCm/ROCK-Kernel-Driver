@@ -111,7 +111,8 @@ struct obs_kernel_param {
  * 
  * module_init() will either be called during do_initcalls (if
  * builtin) or at module insertion time (if a module).  There can only
- * be one per module. */
+ * be one per module.
+ */
 #define module_init(x)	__initcall(x);
 
 /**

@@ -688,9 +688,10 @@ static int __init nwflash_init(void)
 		printk("Flash ROM driver v.%s, flash device ID 0x%04X, size %d Mb.\n",
 		       NWFLASH_VERSION, id, gbFlashSize / (1024 * 1024));
 
-		misc_register(&flash_miscdev);
-
-		ret = 0;
+		ret = misc_register(&flash_miscdev);
+		if (ret < 0) {
+			iounmap((void *)FLASH_BASE);
+		}
 	}
 out:
 	return ret;

@@ -202,28 +202,31 @@ restart:
  *
  * This function does not add the page to the LRU.  The caller must do that.
  */
-int add_to_page_cache(struct page *page,
-		struct address_space *mapping, pgoff_t offset)
+int add_to_page_cache(struct page *page, struct address_space *mapping,
+		pgoff_t offset, int gfp_mask)
 {
-	int error;
+	int error = radix_tree_preload(gfp_mask & ~__GFP_HIGHMEM);
 
-	page_cache_get(page);
-	write_lock(&mapping->page_lock);
-	error = radix_tree_insert(&mapping->page_tree, offset, page);
-	if (!error) {
-		SetPageLocked(page);
-		___add_to_page_cache(page, mapping, offset);
-	} else {
-		page_cache_release(page);
+	if (error == 0) {
+		page_cache_get(page);
+		write_lock(&mapping->page_lock);
+		error = radix_tree_insert(&mapping->page_tree, offset, page);
+		if (!error) {
+			SetPageLocked(page);
+			___add_to_page_cache(page, mapping, offset);
+		} else {
+			page_cache_release(page);
+		}
+		write_unlock(&mapping->page_lock);
+		radix_tree_preload_end();
 	}
-	write_unlock(&mapping->page_lock);
 	return error;
 }
 
-int add_to_page_cache_lru(struct page *page,
-		struct address_space *mapping, pgoff_t offset)
+int add_to_page_cache_lru(struct page *page, struct address_space *mapping,
+				pgoff_t offset, int gfp_mask)
 {
-	int ret = add_to_page_cache(page, mapping, offset);
+	int ret = add_to_page_cache(page, mapping, offset, gfp_mask);
 	if (ret == 0)
 		lru_cache_add(page);
 	return ret;
@@ -432,7 +435,8 @@ repeat:
 			if (!cached_page)
 				return NULL;
 		}
-		err = add_to_page_cache_lru(cached_page, mapping, index);
+		err = add_to_page_cache_lru(cached_page, mapping,
+					index, gfp_mask);
 		if (!err) {
 			page = cached_page;
 			cached_page = NULL;
@@ -488,6 +492,7 @@ struct page *
 grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 {
 	struct page *page = find_get_page(mapping, index);
+	int gfp_mask;
 
 	if (page) {
 		if (!TestSetPageLocked(page))
@@ -495,8 +500,9 @@ grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 		page_cache_release(page);
 		return NULL;
 	}
-	page = alloc_pages(mapping->gfp_mask & ~__GFP_FS, 0);
-	if (page && add_to_page_cache_lru(page, mapping, index)) {
+	gfp_mask = mapping->gfp_mask & ~__GFP_FS;
+	page = alloc_pages(gfp_mask, 0);
+	if (page && add_to_page_cache_lru(page, mapping, index, gfp_mask)) {
 		page_cache_release(page);
 		page = NULL;
 	}
@@ -648,7 +654,8 @@ no_cached_page:
 				break;
 			}
 		}
-		error = add_to_page_cache_lru(cached_page, mapping, index);
+		error = add_to_page_cache_lru(cached_page, mapping,
+						index, GFP_KERNEL);
 		if (error) {
 			if (error == -EEXIST)
 				goto find_page;
@@ -940,7 +947,7 @@ static int page_cache_read(struct file * file, unsigned long offset)
 	if (!page)
 		return -ENOMEM;
 
-	error = add_to_page_cache_lru(page, mapping, offset);
+	error = add_to_page_cache_lru(page, mapping, offset, GFP_KERNEL);
 	if (!error) {
 		error = mapping->a_ops->readpage(file, page);
 		page_cache_release(page);
@@ -1327,7 +1334,8 @@ repeat:
 			if (!cached_page)
 				return ERR_PTR(-ENOMEM);
 		}
-		err = add_to_page_cache_lru(cached_page, mapping, index);
+		err = add_to_page_cache_lru(cached_page, mapping,
+					index, GFP_KERNEL);
 		if (err == -EEXIST)
 			goto repeat;
 		if (err < 0) {
@@ -1406,7 +1414,8 @@ repeat:
 			if (!*cached_page)
 				return NULL;
 		}
-		err = add_to_page_cache(*cached_page, mapping, index);
+		err = add_to_page_cache(*cached_page, mapping,
+					index, GFP_KERNEL);
 		if (err == -EEXIST)
 			goto repeat;
 		if (err == 0) {

@@ -84,6 +84,7 @@ extern unsigned long long memparse(char *ptr, char **retptr);
 extern void dev_probe_lock(void);
 extern void dev_probe_unlock(void);
 
+extern int kernel_text_address(unsigned long addr);
 extern int session_of_pgrp(int pgrp);
 
 asmlinkage int printk(const char * fmt, ...)
@@ -105,7 +106,7 @@ extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in 
 
 extern int tainted;
 extern const char *print_tainted(void);
-#define TAINT_PROPRIETORY_MODULE	(1<<0)
+#define TAINT_PROPRIETARY_MODULE	(1<<0)
 #define TAINT_FORCED_MODULE		(1<<1)
 #define TAINT_UNSAFE_SMP		(1<<2)
 #define TAINT_FORCED_RMMOD		(1<<3)

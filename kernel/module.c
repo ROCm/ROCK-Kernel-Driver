@@ -51,9 +51,14 @@
 #define symbol_is(literal, string)				\
 	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
 
-/* List of modules, protected by module_mutex */
+/* Protects extables and symbols lists */
+static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
+
+/* List of modules, protected by module_mutex AND modlist_lock */
 static DECLARE_MUTEX(module_mutex);
-LIST_HEAD(modules); /* FIXME: Accessed w/o lock on oops by some archs */
+static LIST_HEAD(modules);
+static LIST_HEAD(symbols);
+static LIST_HEAD(extables);
 
 /* We require a truly strong try_module_get() */
 static inline int strong_try_module_get(struct module *mod)
@@ -72,13 +77,16 @@ EXPORT_SYMBOL(init_module);
 
 /* Find a symbol, return value and the symbol group */
 static unsigned long __find_symbol(const char *name,
-				   struct kernel_symbol_group **group)
+				   struct kernel_symbol_group **group,
+				   int gplok)
 {
 	struct kernel_symbol_group *ks;
  
 	list_for_each_entry(ks, &symbols, list) {
  		unsigned int i;
 
+		if (ks->gplonly && !gplok)
+			continue;
 		for (i = 0; i < ks->num_syms; i++) {
 			if (strcmp(ks->syms[i].name, name) == 0) {
 				*group = ks;
@@ -481,19 +489,29 @@ sys_delete_module(const char *name_user, unsigned int flags)
 static void print_unload_info(struct seq_file *m, struct module *mod)
 {
 	struct module_use *use;
+	int printed_something = 0;
 
-	seq_printf(m, " %u", module_refcount(mod));
+	seq_printf(m, " %u ", module_refcount(mod));
 
-	list_for_each_entry(use, &mod->modules_which_use_me, list)
-		seq_printf(m, " %s", use->module_which_uses->name);
+	/* Always include a trailing , so userspace can differentiate
+           between this and the old multi-field proc format. */
+	list_for_each_entry(use, &mod->modules_which_use_me, list) {
+		printed_something = 1;
+		seq_printf(m, "%s,", use->module_which_uses->name);
+	}
 
-	if (mod->unsafe)
-		seq_printf(m, " [unsafe]");
+	if (mod->unsafe) {
+		printed_something = 1;
+		seq_printf(m, "[unsafe],");
+	}
 
-	if (mod->init != init_module && mod->exit == cleanup_module)
-		seq_printf(m, " [permanent]");
+	if (mod->init != init_module && mod->exit == cleanup_module) {
+		printed_something = 1;
+		seq_printf(m, "[permanent],");
+	}
 
-	seq_printf(m, "\n");
+	if (!printed_something)
+		seq_printf(m, "-");
 }
 
 void __symbol_put(const char *symbol)
@@ -502,7 +520,7 @@ void __symbol_put(const char *symbol)
 	unsigned long flags;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	if (!__find_symbol(symbol, &ksg))
+	if (!__find_symbol(symbol, &ksg, 1))
 		BUG();
 	module_put(ksg->owner);
 	spin_unlock_irqrestore(&modlist_lock, flags);
@@ -534,7 +552,8 @@ EXPORT_SYMBOL_GPL(symbol_put_addr);
 #else /* !CONFIG_MODULE_UNLOAD */
 static void print_unload_info(struct seq_file *m, struct module *mod)
 {
-	seq_printf(m, "\n");
+	/* We don't know the usage count, or what modules are using. */
+	seq_printf(m, " - -");
 }
 
 static inline void module_unload_free(struct module *mod)
@@ -721,7 +740,7 @@ unsigned long find_symbol_internal(Elf_Shdr *sechdrs,
 	}
 	/* Look in other modules... */
 	spin_lock_irq(&modlist_lock);
-	ret = __find_symbol(name, ksg);
+	ret = __find_symbol(name, ksg, mod->license_gplok);
 	if (ret) {
 		/* This can fail due to OOM, or module unloading */
 		if (!use_module(mod, (*ksg)->owner))
@@ -735,9 +754,10 @@ unsigned long find_symbol_internal(Elf_Shdr *sechdrs,
 static void free_module(struct module *mod)
 {
 	/* Delete from various lists */
-	list_del(&mod->list);
 	spin_lock_irq(&modlist_lock);
+	list_del(&mod->list);
 	list_del(&mod->symbols.list);
+	list_del(&mod->gpl_symbols.list);
 	list_del(&mod->extable.list);
 	spin_unlock_irq(&modlist_lock);
 
@@ -758,7 +778,7 @@ void *__symbol_get(const char *symbol)
 	unsigned long value, flags;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	value = __find_symbol(symbol, &ksg);
+	value = __find_symbol(symbol, &ksg, 1);
 	if (value && !strong_try_module_get(ksg->owner))
 		value = 0;
 	spin_unlock_irqrestore(&modlist_lock, flags);
@@ -930,7 +950,34 @@ static void layout_sections(struct module *mod,
 	}
 }
 
-/* Allocate and load the module */
+static inline int license_is_gpl_compatible(const char *license)
+{
+	return (strcmp(license, "GPL") == 0
+		|| strcmp(license, "GPL v2") == 0
+		|| strcmp(license, "GPL and additional rights") == 0
+		|| strcmp(license, "Dual BSD/GPL") == 0
+		|| strcmp(license, "Dual MPL/GPL") == 0);
+}
+
+static void set_license(struct module *mod, Elf_Shdr *sechdrs, int licenseidx)
+{
+	char *license;
+
+	if (licenseidx) 
+		license = (char *)sechdrs[licenseidx].sh_addr;
+	else
+		license = "unspecified";
+
+	mod->license_gplok = license_is_gpl_compatible(license);
+	if (!mod->license_gplok) {
+		printk(KERN_WARNING "%s: module license '%s' taints kernel.\n",
+		       mod->name, license);
+		tainted |= TAINT_PROPRIETARY_MODULE;
+	}
+}
+
+/* Allocate and load the module: note that size of section 0 is always
+   zero, and we rely on this for optional sections. */
 static struct module *load_module(void *umod,
 				  unsigned long len,
 				  const char *uargs)
@@ -939,7 +986,7 @@ static struct module *load_module(void *umod,
 	Elf_Shdr *sechdrs;
 	char *secstrings, *args;
 	unsigned int i, symindex, exportindex, strindex, setupindex, exindex,
-		modindex, obsparmindex;
+		modindex, obsparmindex, licenseindex, gplindex;
 	long arglen;
 	struct module *mod;
 	long err = 0;
@@ -975,7 +1022,7 @@ static struct module *load_module(void *umod,
 
 	/* May not export symbols, or have setup params, so these may
            not exist */
-	exportindex = setupindex = obsparmindex = 0;
+	exportindex = setupindex = obsparmindex = gplindex = licenseindex = 0;
 
 	/* And these should exist, but gcc whinges if we don't init them */
 	symindex = strindex = exindex = modindex = 0;
@@ -1018,6 +1065,16 @@ static struct module *load_module(void *umod,
 			/* Obsolete MODULE_PARM() table */
 			DEBUGP("Obsolete param found in section %u\n", i);
 			obsparmindex = i;
+		} else if (strcmp(secstrings+sechdrs[i].sh_name,".init.license")
+			   == 0) {
+			/* MODULE_LICENSE() */
+			DEBUGP("Licence found in section %u\n", i);
+			licenseindex = i;
+		} else if (strcmp(secstrings+sechdrs[i].sh_name,
+				  "__gpl_ksymtab") == 0) {
+			/* EXPORT_SYMBOL_GPL() */
+			DEBUGP("GPL symbols found in section %u\n", i);
+			gplindex = i;
 		}
 #ifdef CONFIG_KALLSYMS
 		/* symbol and string tables for decoding later. */
@@ -1113,17 +1170,21 @@ static struct module *load_module(void *umod,
 	/* Now we've moved module, initialize linked lists, etc. */
 	module_unload_init(mod);
 
+	/* Set up license info based on contents of section */
+	set_license(mod, sechdrs, licenseindex);
+
 	/* Fix up syms, so that st_value is a pointer to location. */
 	err = simplify_symbols(sechdrs, symindex, strindex, mod);
 	if (err < 0)
 		goto cleanup;
 
-	/* Set up EXPORTed symbols */
-	if (exportindex) {
-		mod->symbols.num_syms = (sechdrs[exportindex].sh_size
-					/ sizeof(*mod->symbols.syms));
-		mod->symbols.syms = (void *)sechdrs[exportindex].sh_addr;
-	}
+	/* Set up EXPORTed & EXPORT_GPLed symbols (section 0 is 0 length) */
+	mod->symbols.num_syms = (sechdrs[exportindex].sh_size
+				 / sizeof(*mod->symbols.syms));
+	mod->symbols.syms = (void *)sechdrs[exportindex].sh_addr;
+	mod->gpl_symbols.num_syms = (sechdrs[gplindex].sh_size
+				 / sizeof(*mod->symbols.syms));
+	mod->gpl_symbols.syms = (void *)sechdrs[gplindex].sh_addr;
 
 	/* Set up exception table */
 	if (exindex) {
@@ -1228,8 +1289,9 @@ sys_init_module(void *umod,
 	spin_lock_irq(&modlist_lock);
 	list_add(&mod->extable.list, &extables);
 	list_add_tail(&mod->symbols.list, &symbols);
-	spin_unlock_irq(&modlist_lock);
+	list_add_tail(&mod->gpl_symbols.list, &symbols);
 	list_add(&mod->list, &modules);
+	spin_unlock_irq(&modlist_lock);
 
 	/* Drop lock so they can recurse */
 	up(&module_mutex);
@@ -1256,28 +1318,17 @@ sys_init_module(void *umod,
 	mod->state = MODULE_STATE_LIVE;
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
+	mod->init_size = 0;
 
 	return 0;
+}
+
+static inline int within(unsigned long addr, void *start, unsigned long size)
+{
+	return ((void *)addr >= start && (void *)addr < start + size);
 }
 
 #ifdef CONFIG_KALLSYMS
-static inline int inside_init(struct module *mod, unsigned long addr)
-{
-	if (mod->module_init
-	    && (unsigned long)mod->module_init <= addr
-	    && (unsigned long)mod->module_init + mod->init_size > addr)
-		return 1;
-	return 0;
-}
-
-static inline int inside_core(struct module *mod, unsigned long addr)
-{
-	if ((unsigned long)mod->module_core <= addr
-	    && (unsigned long)mod->module_core + mod->core_size > addr)
-		return 1;
-	return 0;
-}
-
 static const char *get_ksymbol(struct module *mod,
 			       unsigned long addr,
 			       unsigned long *size,
@@ -1287,7 +1338,7 @@ static const char *get_ksymbol(struct module *mod,
 	unsigned long nextval;
 
 	/* At worse, next value is at end of module */
-	if (inside_core(mod, addr))
+	if (within(addr, mod->module_init, mod->init_size))
 		nextval = (unsigned long)mod->module_core+mod->core_size;
 	else 
 		nextval = (unsigned long)mod->module_init+mod->init_size;
@@ -1325,7 +1376,8 @@ const char *module_address_lookup(unsigned long addr,
 	struct module *mod;
 
 	list_for_each_entry(mod, &modules, list) {
-		if (inside_core(mod, addr) || inside_init(mod, addr)) {
+		if (within(addr, mod->module_init, mod->init_size)
+		    || within(addr, mod->module_core, mod->core_size)) {
 			*modname = mod->name;
 			return get_ksymbol(mod, addr, size, offset);
 		}
@@ -1370,14 +1422,82 @@ static int m_show(struct seq_file *m, void *p)
 	seq_printf(m, "%s %lu",
 		   mod->name, mod->init_size + mod->core_size);
 	print_unload_info(m, mod);
+	seq_printf(m, "\n");
 	return 0;
 }
+
+/* Format: modulename size refcount deps
+
+   Where refcount is a number or -, and deps is a comma-separated list
+   of depends or -.
+*/
 struct seq_operations modules_op = {
 	.start	= m_start,
 	.next	= m_next,
 	.stop	= m_stop,
 	.show	= m_show
 };
+
+/* Given an address, look for it in the module exception tables. */
+const struct exception_table_entry *search_module_extables(unsigned long addr)
+{
+	unsigned long flags;
+	const struct exception_table_entry *e = NULL;
+	struct exception_table *i;
+
+	spin_lock_irqsave(&modlist_lock, flags);
+	list_for_each_entry(i, &extables, list) {
+		if (i->num_entries == 0)
+			continue;
+				
+		e = search_extable(i->entry, i->entry+i->num_entries-1, addr);
+		if (e)
+			break;
+	}
+	spin_unlock_irqrestore(&modlist_lock, flags);
+
+	/* Now, if we found one, we are running inside it now, hence
+           we cannot unload the module, hence no refcnt needed. */
+	return e;
+}
+
+/* Is this a valid kernel address?  We don't grab the lock: we are oopsing. */
+int module_text_address(unsigned long addr)
+{
+	struct module *mod;
+
+	list_for_each_entry(mod, &modules, list)
+		if (within(addr, mod->module_init, mod->init_size)
+		    || within(addr, mod->module_core, mod->core_size))
+			return 1;
+	return 0;
+}
+
+/* Provided by the linker */
+extern const struct kernel_symbol __start___ksymtab[];
+extern const struct kernel_symbol __stop___ksymtab[];
+extern const struct kernel_symbol __start___gpl_ksymtab[];
+extern const struct kernel_symbol __stop___gpl_ksymtab[];
+
+static struct kernel_symbol_group kernel_symbols, kernel_gpl_symbols;
+
+static int __init symbols_init(void)
+{
+	/* Add kernel symbols to symbol table */
+	kernel_symbols.num_syms = (__stop___ksymtab - __start___ksymtab);
+	kernel_symbols.syms = __start___ksymtab;
+	kernel_symbols.gplonly = 0;
+	list_add(&kernel_symbols.list, &symbols);
+	kernel_gpl_symbols.num_syms = (__stop___gpl_ksymtab
+				       - __start___gpl_ksymtab);
+	kernel_gpl_symbols.syms = __start___gpl_ksymtab;
+	kernel_gpl_symbols.gplonly = 1;
+	list_add(&kernel_gpl_symbols.list, &symbols);
+
+	return 0;
+}
+
+__initcall(symbols_init);
 
 /* Obsolete lvalue for broken code which asks about usage */
 int module_dummy_usage = 1;

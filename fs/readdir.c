@@ -11,6 +11,7 @@
 #include <linux/file.h>
 #include <linux/smp_lock.h>
 #include <linux/fs.h>
+#include <linux/dirent.h>
 #include <linux/security.h>
 
 #include <asm/uaccess.h>
@@ -193,17 +194,6 @@ out_putf:
 out:
 	return error;
 }
-
-/*
- * And even better one including d_type field and 64bit d_ino and d_off.
- */
-struct linux_dirent64 {
-	u64		d_ino;
-	s64		d_off;
-	unsigned short	d_reclen;
-	unsigned char	d_type;
-	char		d_name[0];
-};
 
 #define ROUND_UP64(x) (((x)+sizeof(u64)-1) & ~(sizeof(u64)-1))
 

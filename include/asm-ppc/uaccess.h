@@ -56,8 +56,6 @@ struct exception_table_entry
 	unsigned long insn, fixup;
 };
 
-/* Returns 0 if exception not found and fixup otherwise.  */
-extern unsigned long search_exception_table(unsigned long);
 extern void sort_exception_table(void);
 
 /*

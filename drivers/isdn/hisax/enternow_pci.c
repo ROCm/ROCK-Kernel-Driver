@@ -357,15 +357,13 @@ setup_enternow_pci(struct IsdnCard *card)
 	printk(KERN_INFO
 		"enter:now PCI: PCI card configured at 0x%lx IRQ %d\n",
 		cs->hw.njet.base, cs->irq);
-	if (check_region(cs->hw.njet.base, bytecnt)) {
+	if (!request_region(cs->hw.njet.base, bytecnt, "Fn_ISDN")) {
 		printk(KERN_WARNING
 			   "HiSax: %s config port %lx-%lx already in use\n",
 			   CardType[card->typ],
 			   cs->hw.njet.base,
 			   cs->hw.njet.base + bytecnt);
 		return (0);
-	} else {
-		request_region(cs->hw.njet.base, bytecnt, "Fn_ISDN");
 	}
 	reset_enpci(cs);
 	cs->hw.njet.last_is0 = 0;

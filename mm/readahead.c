@@ -65,7 +65,7 @@ int read_cache_pages(struct address_space *mapping, struct list_head *pages,
 	while (!list_empty(pages)) {
 		page = list_entry(pages->prev, struct page, list);
 		list_del(&page->list);
-		if (add_to_page_cache(page, mapping, page->index)) {
+		if (add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
 			page_cache_release(page);
 			continue;
 		}
@@ -93,7 +93,8 @@ static int read_pages(struct address_space *mapping, struct file *filp,
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, list);
 		list_del(&page->list);
-		if (!add_to_page_cache(page, mapping, page->index)) {
+		if (!add_to_page_cache(page, mapping,
+					page->index, GFP_KERNEL)) {
 			mapping->a_ops->readpage(filp, page);
 			if (!pagevec_add(&lru_pvec, page))
 				__pagevec_lru_add(&lru_pvec);

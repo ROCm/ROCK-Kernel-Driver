@@ -5,6 +5,8 @@
 #include <linux/sunrpc/svcsock.h>
 #include <linux/sunrpc/svcauth.h>
 #include <linux/err.h>
+#include <linux/seq_file.h>
+#include <linux/hash.h>
 
 #define RPCDBG_FACILITY	RPCDBG_AUTH
 
@@ -107,7 +109,8 @@ void ip_map_put(struct cache_head *item, struct cache_detail *cd)
 
 static inline int ip_map_hash(struct ip_map *item)
 {
-	return (name_hash(item->m_class, IP_HASHMAX) ^ item->m_addr.s_addr) & IP_HASHMASK;
+	return hash_str(item->m_class, IP_HASHBITS) ^ 
+		hash_long((unsigned long)item->m_addr.s_addr, IP_HASHBITS);
 }
 static inline int ip_map_match(struct ip_map *item, struct ip_map *tmp)
 {
@@ -210,6 +213,33 @@ static int ip_map_parse(struct cache_detail *cd,
 	return 0;
 }
 
+static int ip_map_show(struct seq_file *m,
+		       struct cache_detail *cd,
+		       struct cache_head *h,
+		       char *pbuf)
+{
+	struct ip_map *im;
+	struct in_addr addr;
+
+	if (h == NULL) {
+		seq_puts(m, "#class IP domain\n");
+		return 0;
+	}
+	im = container_of(h, struct ip_map, h);
+	/* class addr domain */
+	addr = im->m_addr;
+	seq_printf(m, "%s %d.%d.%d.%d %s\n",
+		   im->m_class,
+		   htonl(addr.s_addr) >> 24 & 0xff,
+		   htonl(addr.s_addr) >> 16 & 0xff,
+		   htonl(addr.s_addr) >>  8 & 0xff,
+		   htonl(addr.s_addr) >>  0 & 0xff,
+		   im->m_client->h.name
+		   );
+	return 0;
+}
+	
+
 struct cache_detail ip_map_cache = {
 	.hash_size	= IP_HASHMAX,
 	.hash_table	= ip_table,
@@ -217,6 +247,7 @@ struct cache_detail ip_map_cache = {
 	.cache_put	= ip_map_put,
 	.cache_request	= ip_map_request,
 	.cache_parse	= ip_map_parse,
+	.cache_show	= ip_map_show,
 };
 
 static DefineSimpleCacheLookup(ip_map)
@@ -268,20 +299,17 @@ struct auth_domain *auth_unix_lookup(struct in_addr addr)
 
 	if (!ipm)
 		return NULL;
+	if (cache_check(&ip_map_cache, &ipm->h, NULL))
+		return NULL;
 
-	if (test_bit(CACHE_VALID, &ipm->h.flags) &&
-	    (ipm->m_client->addr_changes - ipm->m_add_change) >0)
+	if ((ipm->m_client->addr_changes - ipm->m_add_change) >0) {
 		set_bit(CACHE_NEGATIVE, &ipm->h.flags);
-
-	if (!test_bit(CACHE_VALID, &ipm->h.flags))
 		rv = NULL;
-	else if (test_bit(CACHE_NEGATIVE, &ipm->h.flags))
-		rv = NULL;
-	else {
+	} else {
 		rv = &ipm->m_client->h;
 		cache_get(&rv->h);
 	}
-	if (ipm) ip_map_put(&ipm->h, &ip_map_cache);
+	ip_map_put(&ipm->h, &ip_map_cache);
 	return rv;
 }
 

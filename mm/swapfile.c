@@ -20,6 +20,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/init.h>
+#include <linux/rmap-locking.h>
 
 #include <asm/pgtable.h>
 #include <linux/swapops.h>
@@ -377,8 +378,9 @@ void free_swap_and_cache(swp_entry_t entry)
  * what to do if a write is requested later.
  */
 /* mmlist_lock and vma->vm_mm->page_table_lock are held */
-static inline void unuse_pte(struct vm_area_struct * vma, unsigned long address,
-	pte_t *dir, swp_entry_t entry, struct page* page)
+static void
+unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
+	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
 {
 	pte_t pte = *dir;
 
@@ -388,7 +390,7 @@ static inline void unuse_pte(struct vm_area_struct * vma, unsigned long address,
 		return;
 	get_page(page);
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
-	page_add_rmap(page, dir);
+	*pte_chainp = page_add_rmap(page, dir, *pte_chainp);
 	swap_free(entry);
 	++vma->vm_mm->rss;
 }
@@ -400,6 +402,7 @@ static void unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 {
 	pte_t * pte;
 	unsigned long end;
+	struct pte_chain *pte_chain = NULL;
 
 	if (pmd_none(*dir))
 		return;
@@ -415,11 +418,18 @@ static void unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 	if (end > PMD_SIZE)
 		end = PMD_SIZE;
 	do {
-		unuse_pte(vma, offset+address-vma->vm_start, pte, entry, page);
+		/*
+		 * FIXME: handle pte_chain_alloc() failures
+		 */
+		if (pte_chain == NULL)
+			pte_chain = pte_chain_alloc(GFP_ATOMIC);
+		unuse_pte(vma, offset+address-vma->vm_start,
+				pte, entry, page, &pte_chain);
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
 	pte_unmap(pte - 1);
+	pte_chain_free(pte_chain);
 }
 
 /* mmlist_lock and vma->vm_mm->page_table_lock are held */

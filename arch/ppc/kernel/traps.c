@@ -29,6 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/module.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -115,7 +116,7 @@ void
 MachineCheckException(struct pt_regs *regs)
 {
 #ifdef CONFIG_ALL_PPC
-	unsigned long fixup;
+	const struct exception_table_entry *entry;
 #endif /* CONFIG_ALL_PPC */
 	unsigned long msr = regs->msr;
 
@@ -148,7 +149,7 @@ MachineCheckException(struct pt_regs *regs)
 	 *  -- paulus.
 	 */
 	if (((msr & 0xffff0000) == 0 || (msr & (0x80000 | 0x40000)))
-	    && (fixup = search_exception_table(regs->nip)) != 0) {
+	    && (entry = search_exception_tables(regs->nip)) != NULL) {
 		/*
 		 * Check that it's a sync instruction, or somewhere
 		 * in the twi; isync; nop sequence that inb/inw/inl uses.

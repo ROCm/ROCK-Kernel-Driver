@@ -153,7 +153,8 @@ insert:
 	CACHE_FLUSH();
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		OUTREG32(intel_i810_private.registers,
-			 I810_PTE_BASE + (j * 4), mem->memory[i]);
+			I810_PTE_BASE + (j * 4),
+			agp_bridge.mask_memory(mem->memory[i], mem->type));
 	}
 	CACHE_FLUSH();
 
@@ -219,11 +220,11 @@ static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 			agp_free_memory(new);
 			return NULL;
 		}
-		new->memory[0] = agp_bridge.mask_memory(virt_to_phys(addr), type);
+		new->memory[0] = virt_to_phys(addr);
 		new->page_count = 1;
 		new->num_scratch_pages = 1;
 		new->type = AGP_PHYS_MEMORY;
-		new->physical = virt_to_phys((void *) new->memory[0]);
+		new->physical = new->memory[0];
 		return new;
 	}
 	return NULL;
@@ -251,7 +252,6 @@ static int __init intel_i810_setup(struct pci_dev *i810_dev)
 	intel_i810_private.i810_dev = i810_dev;
 
 	agp_bridge.masks = intel_i810_masks;
-	agp_bridge.num_of_masks = 2;
 	agp_bridge.aperture_sizes = (void *) intel_i810_sizes;
 	agp_bridge.size_type = FIXED_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 2;
@@ -454,7 +454,8 @@ static int intel_i830_insert_entries(agp_memory *mem,off_t pg_start,int type)
 	CACHE_FLUSH();
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++)
-		OUTREG32(intel_i830_private.registers,I810_PTE_BASE + (j * 4),mem->memory[i]);
+		OUTREG32(intel_i830_private.registers,I810_PTE_BASE + (j * 4),
+			agp_bridge.mask_memory(mem->memory[i], mem->type));
 
 	CACHE_FLUSH();
 
@@ -514,11 +515,11 @@ static agp_memory *intel_i830_alloc_by_type(size_t pg_count,int type)
 			return(NULL);
 		}
 
-		nw->memory[0] = agp_bridge.mask_memory(virt_to_phys(addr),type);
+		nw->memory[0] = virt_to_phys(addr);
 		nw->page_count = 1;
 		nw->num_scratch_pages = 1;
 		nw->type = AGP_PHYS_MEMORY;
-		nw->physical = virt_to_phys(addr);
+		nw->physical = nw->memory[0];
 		return(nw);
 	}
 
@@ -530,7 +531,6 @@ static int __init intel_i830_setup(struct pci_dev *i830_dev)
 	intel_i830_private.i830_dev = i830_dev;
 
 	agp_bridge.masks = intel_i810_masks;
-	agp_bridge.num_of_masks = 3;
 	agp_bridge.aperture_sizes = (void *) intel_i830_sizes;
 	agp_bridge.size_type = FIXED_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 2;
@@ -974,7 +974,6 @@ static struct aper_size_info_8 intel_830mp_sizes[4] =
 static int __init intel_generic_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = intel_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) intel_generic_sizes;
 	agp_bridge.size_type = U16_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 7;
@@ -1004,7 +1003,6 @@ static int __init intel_generic_setup (struct pci_dev *pdev)
 static int __init intel_815_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = intel_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) intel_815_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 2;
@@ -1035,7 +1033,6 @@ static int __init intel_815_setup (struct pci_dev *pdev)
 static int __init intel_820_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = intel_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) intel_8xx_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 7;
@@ -1065,7 +1062,6 @@ static int __init intel_820_setup (struct pci_dev *pdev)
 static int __init intel_830mp_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = intel_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) intel_830mp_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 4;
@@ -1095,7 +1091,6 @@ static int __init intel_830mp_setup (struct pci_dev *pdev)
 static int __init intel_840_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = intel_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) intel_8xx_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 7;
@@ -1125,7 +1120,6 @@ static int __init intel_840_setup (struct pci_dev *pdev)
 static int __init intel_845_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = intel_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) intel_8xx_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 7;
@@ -1155,7 +1149,6 @@ static int __init intel_845_setup (struct pci_dev *pdev)
 static int __init intel_850_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = intel_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) intel_8xx_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 7;
@@ -1185,7 +1178,6 @@ static int __init intel_850_setup (struct pci_dev *pdev)
 static int __init intel_860_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = intel_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) intel_8xx_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 7;

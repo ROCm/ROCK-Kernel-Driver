@@ -385,15 +385,14 @@ setup_asuscom(struct IsdnCard *card)
 	bytecnt = 8;
 	cs->hw.asus.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
-	if (check_region((cs->hw.asus.cfg_reg), bytecnt)) {
+	if (!request_region((cs->hw.asus.cfg_reg), bytecnt,
+			    "asuscom isdn")) {
 		printk(KERN_WARNING
 		       "HiSax: %s config port %x-%x already in use\n",
 		       CardType[card->typ],
 		       cs->hw.asus.cfg_reg,
 		       cs->hw.asus.cfg_reg + bytecnt);
 		return (0);
-	} else {
-		request_region(cs->hw.asus.cfg_reg, bytecnt, "asuscom isdn");
 	}
 	printk(KERN_INFO "ISDNLink: defined at 0x%x IRQ %d\n",
 		cs->hw.asus.cfg_reg, cs->irq);

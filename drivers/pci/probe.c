@@ -558,9 +558,15 @@ struct pci_bus * __devinit pci_alloc_primary_bus_parented(struct device *parent,
 	b = pci_alloc_bus();
 	if (!b)
 		return NULL;
+	
+	b->dev = kmalloc(sizeof(*(b->dev)),GFP_KERNEL);
+	if (!b->dev){
+		kfree(b);
+		return NULL;
+	}
+	
 	list_add_tail(&b->node, &pci_root_buses);
 
-	b->dev = kmalloc(sizeof(*(b->dev)),GFP_KERNEL);
 	memset(b->dev,0,sizeof(*(b->dev)));
 	sprintf(b->dev->bus_id,"pci%d",bus);
 	strcpy(b->dev->name,"Host/PCI Bridge");

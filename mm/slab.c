@@ -335,8 +335,8 @@ struct kmem_cache_s {
 /* Magic nums for obj red zoning.
  * Placed in the first word before and the first word after an obj.
  */
-#define	RED_MAGIC1	0x5A2CF071UL	/* when obj is active */
-#define	RED_MAGIC2	0x170FC2A5UL	/* when obj is inactive */
+#define	RED_INACTIVE	0x5A2CF071UL	/* when obj is inactive */
+#define	RED_ACTIVE	0x170FC2A5UL	/* when obj is active */
 
 /* ...and for poisoning */
 #define	POISON_BEFORE	0x5a	/* for use-uninitialised poisoning */
@@ -497,6 +497,19 @@ static void cache_estimate (unsigned long gfporder, size_t size,
 	wastage -= L1_CACHE_ALIGN(base+i*extra);
 	*left_over = wastage;
 }
+
+#if DEBUG
+
+#define slab_error(cachep, msg) __slab_error(__FUNCTION__, cachep, msg)
+
+static void __slab_error(char *function, kmem_cache_t *cachep, char *msg)
+{
+	printk(KERN_ERR "slab error in %s(): cache `%s': %s\n",
+		function, cachep->name, msg);
+	dump_stack();
+}
+
+#endif
 
 /*
  * Start the reap timer running on the target CPU.  We run at around 1 to 2Hz.
@@ -780,16 +793,19 @@ static void slab_destroy (kmem_cache_t *cachep, struct slab *slabp)
 #if DEBUG
 	int i;
 	for (i = 0; i < cachep->num; i++) {
-		void* objp = slabp->s_mem+cachep->objsize*i;
+		void *objp = slabp->s_mem + cachep->objsize * i;
+
 		if (cachep->flags & SLAB_POISON)
 			check_poison_obj(cachep, objp);
 
 		if (cachep->flags & SLAB_RED_ZONE) {
-			if (*((unsigned long*)(objp)) != RED_MAGIC1)
-				BUG();
+			if (*((unsigned long*)(objp)) != RED_INACTIVE)
+				slab_error(cachep, "start of a freed object "
+							"was overwritten");
 			if (*((unsigned long*)(objp + cachep->objsize -
-					BYTES_PER_WORD)) != RED_MAGIC1)
-				BUG();
+					BYTES_PER_WORD)) != RED_INACTIVE)
+				slab_error(cachep, "end of a freed object "
+							"was overwritten");
 			objp += BYTES_PER_WORD;
 		}
 		if (cachep->dtor && !(cachep->flags & SLAB_POISON))
@@ -1270,9 +1286,9 @@ static void cache_init_objs (kmem_cache_t * cachep,
 			poison_obj(cachep, objp, POISON_BEFORE);
 
 		if (cachep->flags & SLAB_RED_ZONE) {
-			*((unsigned long*)(objp)) = RED_MAGIC1;
+			*((unsigned long*)(objp)) = RED_INACTIVE;
 			*((unsigned long*)(objp + cachep->objsize -
-					BYTES_PER_WORD)) = RED_MAGIC1;
+					BYTES_PER_WORD)) = RED_INACTIVE;
 			objp += BYTES_PER_WORD;
 		}
 		/*
@@ -1285,11 +1301,13 @@ static void cache_init_objs (kmem_cache_t * cachep,
 
 		if (cachep->flags & SLAB_RED_ZONE) {
 			objp -= BYTES_PER_WORD;
-			if (*((unsigned long*)(objp)) != RED_MAGIC1)
-				BUG();
+			if (*((unsigned long*)(objp)) != RED_INACTIVE)
+				slab_error(cachep, "constructor overwrote the"
+							" start of an object");
 			if (*((unsigned long*)(objp + cachep->objsize -
-					BYTES_PER_WORD)) != RED_MAGIC1)
-				BUG();
+					BYTES_PER_WORD)) != RED_INACTIVE)
+				slab_error(cachep, "constructor overwrote the"
+							" end of an object");
 		}
 #else
 		if (cachep->ctor)
@@ -1444,13 +1462,13 @@ static inline void *cache_free_debugcheck (kmem_cache_t * cachep, void * objp)
 
 	if (cachep->flags & SLAB_RED_ZONE) {
 		objp -= BYTES_PER_WORD;
-		if (xchg((unsigned long *)objp, RED_MAGIC1) != RED_MAGIC2)
-			/* Either write before start, or a double free. */
-			BUG();
+		if (xchg((unsigned long *)objp, RED_INACTIVE) != RED_ACTIVE)
+			slab_error(cachep, "double free, or memory before"
+						" object was overwritten");
 		if (xchg((unsigned long *)(objp+cachep->objsize -
-				BYTES_PER_WORD), RED_MAGIC1) != RED_MAGIC2)
-			/* Either write past end, or a double free. */
-			BUG();
+				BYTES_PER_WORD), RED_INACTIVE) != RED_ACTIVE)
+			slab_error(cachep, "double free, or memory after "
+						" object was overwritten");
 	}
 
 	objnr = (objp-slabp->s_mem)/cachep->objsize;
@@ -1614,12 +1632,13 @@ cache_alloc_debugcheck_after(kmem_cache_t *cachep,
 			BUG();
 	if (cachep->flags & SLAB_RED_ZONE) {
 		/* Set alloc red-zone, and check old one. */
-		if (xchg((unsigned long *)objp, RED_MAGIC2) !=
-							 RED_MAGIC1)
-			BUG();
+		if (xchg((unsigned long *)objp, RED_ACTIVE) != RED_INACTIVE)
+			slab_error(cachep, "memory before object was "
+						"overwritten");
 		if (xchg((unsigned long *)(objp+cachep->objsize -
-			  BYTES_PER_WORD), RED_MAGIC2) != RED_MAGIC1)
-			BUG();
+			  BYTES_PER_WORD), RED_ACTIVE) != RED_INACTIVE)
+			slab_error(cachep, "memory after object was "
+						"overwritten");
 		objp += BYTES_PER_WORD;
 	}
 	if (cachep->ctor && cachep->flags & SLAB_POISON) {

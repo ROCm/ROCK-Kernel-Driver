@@ -14,6 +14,7 @@
 #include <linux/tty.h>
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
+#include <linux/module.h>
 
 #include <asm/gentrap.h>
 #include <asm/uaccess.h>
@@ -465,7 +466,7 @@ do_entUna(void * va, unsigned long opcode, unsigned long reg,
 {
 	long error, tmp1, tmp2, tmp3, tmp4;
 	unsigned long pc = regs.pc - 4;
-	unsigned fixup;
+	const struct exception_table_entry *fixup;
 
 	unaligned[0].count++;
 	unaligned[0].va = (unsigned long) va;
@@ -638,7 +639,7 @@ do_entUna(void * va, unsigned long opcode, unsigned long reg,
 got_exception:
 	/* Ok, we caught the exception, but we don't want it.  Is there
 	   someone to pass it along to?  */
-	if ((fixup = search_exception_table(pc)) != 0) {
+	if ((fixup = search_exception_tables(pc)) != 0) {
 		unsigned long newpc;
 		newpc = fixup_exception(una_reg, fixup, pc);
 

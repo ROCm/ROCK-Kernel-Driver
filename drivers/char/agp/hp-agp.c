@@ -331,7 +331,6 @@ static unsigned long hp_zx1_mask_memory(unsigned long addr, int type)
 static int __init hp_zx1_setup (struct pci_dev *pdev __attribute__((unused)))
 {
 	agp_bridge.masks = hp_zx1_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.dev_private_data = NULL;
 	agp_bridge.size_type = FIXED_APER_SIZE;
 	agp_bridge.needs_scratch_page = FALSE;

@@ -5,32 +5,25 @@
  */
 #include <linux/types.h>
 
-#define COMPAT_USER_HZ 100
+#define COMPAT_USER_HZ	100
 
 typedef u32		compat_size_t;
 typedef s32		compat_ssize_t;
 typedef s32		compat_time_t;
 typedef s32		compat_clock_t;
-
-struct compat_stat {
-	__kernel_dev_t32	st_dev;
-	__kernel_ino_t32	st_ino;
-	__kernel_mode_t32	st_mode;
-	s16			st_nlink;
-	__kernel_uid_t32	st_uid;
-	__kernel_gid_t32	st_gid;
-	__kernel_dev_t32	st_rdev;
-	__kernel_off_t32	st_size;
-	compat_time_t		st_atime;
-	u32			__unused1;
-	compat_time_t		st_mtime;
-	u32			__unused2;
-	compat_time_t		st_ctime;
-	u32			__unused3;
-	__kernel_off_t32	st_blksize;
-	__kernel_off_t32	st_blocks;
-	u32			__unused4[2];
-};
+typedef s32		compat_pid_t;
+typedef u16		compat_uid_t;
+typedef u16		compat_gid_t;
+typedef u16		compat_mode_t;
+typedef u32		compat_ino_t;
+typedef u16		compat_dev_t;
+typedef s32		compat_off_t;
+typedef s64		compat_loff_t;
+typedef s16		compat_nlink_t;
+typedef u16		compat_ipc_pid_t;
+typedef s32		compat_daddr_t;
+typedef u32		compat_caddr_t;
+typedef __kernel_fsid_t	compat_fsid_t;
 
 struct compat_timespec {
 	compat_time_t	tv_sec;
@@ -42,13 +35,33 @@ struct compat_timeval {
 	s32		tv_usec;
 };
 
+struct compat_stat {
+	compat_dev_t	st_dev;
+	compat_ino_t	st_ino;
+	compat_mode_t	st_mode;
+	compat_nlink_t	st_nlink;
+	compat_uid_t	st_uid;
+	compat_gid_t	st_gid;
+	compat_dev_t	st_rdev;
+	compat_off_t	st_size;
+	compat_time_t	st_atime;
+	u32		__unused1;
+	compat_time_t	st_mtime;
+	u32		__unused2;
+	compat_time_t	st_ctime;
+	u32		__unused3;
+	compat_off_t	st_blksize;
+	compat_off_t	st_blocks;
+	u32		__unused4[2];
+};
+
 struct compat_flock {
-	short			l_type;
-	short			l_whence;
-	__kernel_off_t32	l_start;
-	__kernel_off_t32	l_len;
-	__kernel_pid_t32	l_pid;
-	short			__unused;
+	short		l_type;
+	short		l_whence;
+	compat_off_t	l_start;
+	compat_off_t	l_len;
+	compat_pid_t	l_pid;
+	short		__unused;
 };
 
 #endif /* _ASM_SPARC64_COMPAT_H */
