@@ -68,6 +68,7 @@ static struct map_desc s3c2410_iodesc[] __initdata = {
 	IODESC_ENT(TIMER),
 	IODESC_ENT(GPIO),
 	IODESC_ENT(ADC),
+	IODESC_ENT(WATCHDOG)
 };
 
 static struct resource s3c_uart0_resource[] = {
