@@ -88,6 +88,10 @@ static unsigned long get_plt_size(const Elf32_Ehdr *hdr,
 		    != is_init)
 			continue;
 
+		/* We don't want to look at debug sections. */
+		if (strstr(secstrings + sechdrs[i].sh_name, ".debug") != 0)
+			continue;
+
 		if (sechdrs[i].sh_type == SHT_RELA) {
 			DEBUGP("Found relocations in section %u\n", i);
 			DEBUGP("Ptr: %p.  Number: %u\n",
