@@ -1261,6 +1261,8 @@ struct pci_bus * __devinit pcibios_scan_root(int busnum)
 
 void __devinit pcibios_config_init(void)
 {
+	struct pci_ops *tmp=NULL;
+
 	/*
 	 * Try all known PCI access methods. Note that we support using 
 	 * both PCI BIOS and direct access, with a preference for direct.
@@ -1275,6 +1277,7 @@ void __devinit pcibios_config_init(void)
 		pci_config_write = pci_bios_write;
 	}
 #endif
+	tmp = pci_root_ops;
 
 #ifdef CONFIG_PCI_DIRECT
 	if ((pci_probe & (PCI_PROBE_CONF1 | PCI_PROBE_CONF2)) 
@@ -1289,6 +1292,10 @@ void __devinit pcibios_config_init(void)
 		}
 	}
 #endif
+
+	/* if direct access failed, fall back to BIOS access. */
+	if (pci_root_ops == NULL)
+		pci_root_ops = tmp;
 
 	return;
 }
