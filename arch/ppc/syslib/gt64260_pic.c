@@ -1,5 +1,5 @@
 /*
- * arch/ppc/kernel/gt64260_pic.c
+ * arch/ppc/syslib/gt64260_pic.c
  * 
  * Interrupt controller support for Galileo's GT64260.
  *
@@ -8,12 +8,10 @@
  *
  * Based on sources from Rabeeh Khoury / Galileo Technology
  *
- * Copyright 2001 MontaVista Software Inc.
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
+ * 2001 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 
 /*

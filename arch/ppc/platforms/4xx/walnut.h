@@ -1,23 +1,19 @@
 /*
+ * arch/ppc/platforms/4xx/walnut.h
  *
- *    Copyright (c) 1999 Grant Erickson <grant@lcse.umn.edu>
+ * Macros, definitions, and data structures specific to the IBM PowerPC
+ * 405GP "Walnut" evaluation board.
  *
- *    Copyright 2000 MontaVista Software Inc.
- *	PPC405 modifications
- * 	Author: MontaVista Software, Inc.
- *         	frank_rowand@mvista.com or source@mvista.com
- * 	   	debbie_chu@mvista.com
+ * Authors: Grant Erickson <grant@lcse.umn.edu>, Frank Rowand
+ * <frank_rowand@mvista.com>, Debbie Chu <debbie_chu@mvista.com> or
+ * source@mvista.com
  *
- *    Module name: ppc405.h
+ * Copyright (c) 1999 Grant Erickson <grant@lcse.umn.edu>
  *
- *    Description:
- *      Macros, definitions, and data structures specific to the IBM PowerPC
- *      based boards.
- *
- *      This includes:
- *
- *         405GP "Walnut" evaluation board
- *
+ * 2000 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 
 #ifdef __KERNEL__

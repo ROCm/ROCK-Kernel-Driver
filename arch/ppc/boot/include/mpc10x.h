@@ -12,12 +12,10 @@
  * Author: Mark A. Greer
  *         mgreer@mvista.com
  *
- * Copyright 2001-2002 MontaVista Software Inc.
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
+ * 2001-2002 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 #ifndef __BOOT_MPC10X_H__
 #define __BOOT_MPC10X_H__
