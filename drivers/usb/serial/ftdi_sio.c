@@ -1361,15 +1361,16 @@ static void ftdi_close (struct usb_serial_port *port, struct file *filp)
 			/* drop RTS */
 			if (set_rts(port, LOW) < 0) {
 				err("Error from RTS LOW urb");
-			}	
-			/* shutdown our bulk read */
-			if (port->read_urb) {
-				usb_unlink_urb (port->read_urb);	
 			}
-			/* unlink the running write urbs */
-			
+		} /* Note change no line if hupcl is off */
+		
+		/* shutdown our bulk read */
+		if (port->read_urb) {
+			if (usb_unlink_urb (port->read_urb) < 0) {
+				err("Error unlinking read urb");
+			}
+		}
 
-		} /* Note change no line is hupcl is off */
 	} /* if (serial->dev) */
 
 
