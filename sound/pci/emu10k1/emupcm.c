@@ -871,7 +871,7 @@ static int snd_emu10k1_capture_mic_open(snd_pcm_substream_t * substream)
 	epcm->capture_inte = INTE_MICBUFENABLE;
 	epcm->capture_ba_reg = MICBA;
 	epcm->capture_bs_reg = MICBS;
-	epcm->capture_idx_reg = MICIDX;
+	epcm->capture_idx_reg = emu->audigy ? A_MICIDX : MICIDX;
 	substream->runtime->private_data = epcm;
 	substream->runtime->private_free = snd_emu10k1_pcm_free_substream;
 	runtime->hw = snd_emu10k1_capture;

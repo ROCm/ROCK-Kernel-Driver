@@ -465,7 +465,7 @@ static int __init snd_sb16_probe(int dev,
 		return -ENXIO;
 	}
 
-	if (chip->mpu_port) {
+	if (chip->mpu_port > 0 && chip->mpu_port != SNDRV_AUTO_PORT) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_SB,
 					       chip->mpu_port, 0,
 					       xirq, 0, &chip->rmidi)) < 0) {
@@ -475,7 +475,12 @@ static int __init snd_sb16_probe(int dev,
 		chip->rmidi_callback = snd_mpu401_uart_interrupt;
 	}
 
-	if (fm_port[dev] > 0) {
+#ifdef SNDRV_SBAWE_EMU8000
+	if (awe_port[dev] == SNDRV_AUTO_PORT)
+		awe_port[dev] = 0; /* disable */
+#endif
+
+	if (fm_port[dev] > 0 && fm_port[dev] != SNDRV_AUTO_PORT) {
 		if (snd_opl3_create(card, fm_port[dev], fm_port[dev] + 2,
 				    OPL3_HW_OPL3,
 				    fm_port[dev] == port[dev] || fm_port[dev] == 0x388,
@@ -696,9 +701,9 @@ static int __init alsa_card_sb16_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma8[nr_dev]) == 2 &&
 	       get_option(&str,&dma16[nr_dev]) == 2 &&
@@ -709,7 +714,7 @@ static int __init alsa_card_sb16_setup(char *str)
 #endif
 #ifdef SNDRV_SBAWE_EMU8000
 	       &&
-	       get_option(&str,(int *)&awe_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&awe_port[nr_dev]) == 2 &&
 	       get_option(&str,&seq_ports[nr_dev]) == 2
 #endif
 	       );

@@ -779,7 +779,8 @@ static irqreturn_t snd_ymfpci_interrupt(int irq, void *dev_id, struct pt_regs *r
 
 	status = snd_ymfpci_readw(chip, YDSXGR_INTFLAG);
 	if (status & 1) {
-		/* timer handler */
+		if (chip->timer)
+			snd_timer_interrupt(chip->timer, chip->timer->sticks);
 	}
 	snd_ymfpci_writew(chip, YDSXGR_INTFLAG, status);
 
@@ -1135,7 +1136,7 @@ int __devinit snd_ymfpci_pcm2(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 
 	if (rpcm)
 		*rpcm = NULL;
-	if ((err = snd_pcm_new(chip->card, "YMFPCI - AC'97", device, 0, 1, &pcm)) < 0)
+	if ((err = snd_pcm_new(chip->card, "YMFPCI - PCM2", device, 0, 1, &pcm)) < 0)
 		return err;
 	pcm->private_data = chip;
 	pcm->private_free = snd_ymfpci_pcm2_free;
@@ -1144,7 +1145,8 @@ int __devinit snd_ymfpci_pcm2(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 
 	/* global setup */
 	pcm->info_flags = 0;
-	strcpy(pcm->name, "YMFPCI - AC'97");
+	sprintf(pcm->name, "YMFPCI - %s",
+		chip->device_id == PCI_DEVICE_ID_YAMAHA_754 ? "Direct Recording" : "AC'97");
 	chip->pcm2 = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
@@ -1366,6 +1368,61 @@ static snd_kcontrol_new_t snd_ymfpci_spdif_stream __devinitdata =
 	.info =		snd_ymfpci_spdif_stream_info,
 	.get =		snd_ymfpci_spdif_stream_get,
 	.put =		snd_ymfpci_spdif_stream_put
+};
+
+static int snd_ymfpci_drec_source_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *info)
+{
+	static char *texts[3] = {"AC'97", "IEC958", "ZV Port"};
+
+	info->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	info->count = 1;
+	info->value.enumerated.items = 3;
+	if (info->value.enumerated.item > 2)
+		info->value.enumerated.item = 2;
+	strcpy(info->value.enumerated.name, texts[info->value.enumerated.item]);
+	return 0;
+}
+
+static int snd_ymfpci_drec_source_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *value)
+{
+	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
+	unsigned long flags;
+	u16 reg;
+
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	reg = snd_ymfpci_readw(chip, YDSXGR_GLOBALCTRL);
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	if (!(reg & 0x100))
+		value->value.enumerated.item[0] = 0;
+	else
+		value->value.enumerated.item[0] = 1 + ((reg & 0x200) != 0);
+	return 0;
+}
+
+static int snd_ymfpci_drec_source_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *value)
+{
+	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
+	unsigned long flags;
+	u16 reg, old_reg;
+
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	old_reg = snd_ymfpci_readw(chip, YDSXGR_GLOBALCTRL);
+	if (value->value.enumerated.item[0] == 0)
+		reg = old_reg & ~0x100;
+	else
+		reg = (old_reg & ~0x300) | 0x100 | ((value->value.enumerated.item[0] == 2) << 9);
+	snd_ymfpci_writew(chip, YDSXGR_GLOBALCTRL, reg);
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	return reg != old_reg;
+}
+
+static snd_kcontrol_new_t snd_ymfpci_drec_source __devinitdata = {
+	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE,
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		"Direct Recording Source",
+	.info =		snd_ymfpci_drec_source_info,
+	.get =		snd_ymfpci_drec_source_get,
+	.put =		snd_ymfpci_drec_source_put
 };
 
 /*
@@ -1651,6 +1708,12 @@ static snd_kcontrol_new_t snd_ymfpci_rear_shared __devinitdata = {
  *  Mixer routines
  */
 
+static void snd_ymfpci_mixer_free_ac97_bus(ac97_bus_t *bus)
+{
+	ymfpci_t *chip = snd_magic_cast(ymfpci_t, bus->private_data, return);
+	chip->ac97_bus = NULL;
+}
+
 static void snd_ymfpci_mixer_free_ac97(ac97_t *ac97)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, ac97->private_data, return);
@@ -1659,17 +1722,24 @@ static void snd_ymfpci_mixer_free_ac97(ac97_t *ac97)
 
 int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
 {
+	ac97_bus_t bus;
 	ac97_t ac97;
 	snd_kcontrol_t *kctl;
 	unsigned int idx;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_ymfpci_codec_write;
+	bus.read = snd_ymfpci_codec_read;
+	bus.private_data = chip;
+	bus.private_free = snd_ymfpci_mixer_free_ac97_bus;
+	if ((err = snd_ac97_bus(chip->card, &bus, &chip->ac97_bus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_ymfpci_codec_write;
-	ac97.read = snd_ymfpci_codec_read;
 	ac97.private_data = chip;
 	ac97.private_free = snd_ymfpci_mixer_free_ac97;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
+	if ((err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97)) < 0)
 		return err;
 
 	for (idx = 0; idx < YMFPCI_CONTROLS; idx++) {
@@ -1690,6 +1760,11 @@ int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
 	kctl->id.device = chip->pcm_spdif->device;
 	chip->spdif_pcm_ctl = kctl;
 
+	/* direct recording source */
+	if (chip->device_id == PCI_DEVICE_ID_YAMAHA_754 &&
+	    (err = snd_ctl_add(chip->card, kctl = snd_ctl_new1(&snd_ymfpci_drec_source, chip))) < 0)
+		return err;
+
 	/*
 	 * shared rear/line-in
 	 */
@@ -1703,174 +1778,74 @@ int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
 
 
 /*
- * joystick support
+ * timer
  */
 
-#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
-static int ymfpci_joystick_ports[4] = {
-	0x201, 0x202, 0x204, 0x205
+static int snd_ymfpci_timer_start(snd_timer_t *timer)
+{
+	ymfpci_t *chip;
+	unsigned long flags;
+	unsigned int count;
+
+	chip = snd_timer_chip(timer);
+	count = timer->sticks - 1;
+	if (count == 0) /* minimum time is 20.8 us */
+		count = 1;
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	snd_ymfpci_writew(chip, YDSXGR_TIMERCOUNT, count);
+	snd_ymfpci_writeb(chip, YDSXGR_TIMERCTRL, 0x03);
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	return 0;
+}
+
+static int snd_ymfpci_timer_stop(snd_timer_t *timer)
+{
+	ymfpci_t *chip;
+	unsigned long flags;
+
+	chip = snd_timer_chip(timer);
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	snd_ymfpci_writeb(chip, YDSXGR_TIMERCTRL, 0x00);
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	return 0;
+}
+
+static int snd_ymfpci_timer_precise_resolution(snd_timer_t *timer,
+					       unsigned long *num, unsigned long *den)
+{
+	*num = 1;
+	*den = 96000;
+	return 0;
+}
+
+static struct _snd_timer_hardware snd_ymfpci_timer_hw = {
+	.flags = SNDRV_TIMER_HW_AUTO,
+	.resolution = 10417, /* 1/2fs = 10.41666...us */
+	.ticks = 65536,
+	.start = snd_ymfpci_timer_start,
+	.stop = snd_ymfpci_timer_stop,
+	.precise_resolution = snd_ymfpci_timer_precise_resolution,
 };
 
-static int snd_ymfpci_get_joystick_port(ymfpci_t *chip, int index)
+int __devinit snd_ymfpci_timer(ymfpci_t *chip, int device)
 {
-	if (index < 4)
-		return ymfpci_joystick_ports[index];
-	else
-		return pci_resource_start(chip->pci, 2);
-}
-
-static void setup_joystick_base(ymfpci_t *chip)
-{
-	if (chip->device_id >= 0x0010) /* YMF 744/754 */
-		pci_write_config_word(chip->pci, PCIR_DSXG_JOYBASE,
-				      snd_ymfpci_get_joystick_port(chip, chip->joystick_port));
-	else {
-		u16 legacy_ctrl2;
-		pci_read_config_word(chip->pci, PCIR_DSXG_ELEGACY, &legacy_ctrl2);
-		legacy_ctrl2 &= ~YMFPCI_LEGACY2_JSIO;
-		legacy_ctrl2 |= chip->joystick_port << 6;
-		pci_write_config_word(chip->pci, PCIR_DSXG_ELEGACY, legacy_ctrl2);
-	}
-}
-
-static int snd_ymfpci_enable_joystick(ymfpci_t *chip)
-{
-	u16 val;
-
-	chip->gameport.io = snd_ymfpci_get_joystick_port(chip, chip->joystick_port);
-	chip->joystick_res = request_region(chip->gameport.io, 1, "YMFPCI gameport");
-	if (!chip->joystick_res) {
-		snd_printk(KERN_WARNING "gameport port %#x in use\n", chip->gameport.io);
-		return 0;
-	}
-	setup_joystick_base(chip);
-	pci_read_config_word(chip->pci, PCIR_DSXG_LEGACY, &val);
-	val |= YMFPCI_LEGACY_JPEN;
-	pci_write_config_word(chip->pci, PCIR_DSXG_LEGACY, val);
-	gameport_register_port(&chip->gameport);
-	return 1;
-}
-
-static int snd_ymfpci_disable_joystick(ymfpci_t *chip)
-{
-	u16 val;
-
-	gameport_unregister_port(&chip->gameport);
-	pci_read_config_word(chip->pci, PCIR_DSXG_LEGACY, &val);
-	val &= ~YMFPCI_LEGACY_JPEN;
-	pci_write_config_word(chip->pci, PCIR_DSXG_LEGACY, val);
-	release_resource(chip->joystick_res);
-	kfree_nocheck(chip->joystick_res);
-	chip->joystick_res = NULL;
-	return 1;
-}
-
-static int snd_ymfpci_joystick_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
-	return 0;
-}
-
-static int snd_ymfpci_joystick_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	u16 val;
-
-	pci_read_config_word(chip->pci, PCIR_DSXG_LEGACY, &val);
-	ucontrol->value.integer.value[0] = (val & YMFPCI_LEGACY_JPEN) ? 1 : 0;
-	return 0;
-}
-
-static int snd_ymfpci_joystick_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	int enabled, change;
-
-	down(&chip->joystick_mutex);
-	enabled = chip->joystick_res != NULL;
-	change = enabled != !! ucontrol->value.integer.value[0];
-	if (change) {
-		if (!enabled)
-			change = snd_ymfpci_enable_joystick(chip);
-		else
-			change = snd_ymfpci_disable_joystick(chip);
-	}
-	up(&chip->joystick_mutex);
-	return change;
-}
-
-static int snd_ymfpci_joystick_addr_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
-{
-	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	int ports = chip->device_id >= 0x0010 ? 5 : 4;
-
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
-	uinfo->count = 1;
-	uinfo->value.enumerated.items = ports;
-	if (uinfo->value.enumerated.item >= ports)
-		uinfo->value.enumerated.item = ports - 1;
-	sprintf(uinfo->value.enumerated.name, "port 0x%x",
-		snd_ymfpci_get_joystick_port(chip, uinfo->value.enumerated.item));
-	return 0;
-}
-
-static int snd_ymfpci_joystick_addr_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	ucontrol->value.enumerated.item[0] = chip->joystick_port;
-	return 0;
-}
-
-static int snd_ymfpci_joystick_addr_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	int change, enabled;
-
-	down(&chip->joystick_mutex);
-	change = ucontrol->value.enumerated.item[0] != chip->joystick_port;
-	if (change) {
-		enabled = chip->joystick_res != NULL;
-		if (enabled)
-			snd_ymfpci_disable_joystick(chip);
-		chip->joystick_port = ucontrol->value.enumerated.item[0];
-		if (enabled)
-			snd_ymfpci_enable_joystick(chip);
-	}
-	up(&chip->joystick_mutex);
-	return change;
-}
-
-static snd_kcontrol_new_t snd_ymfpci_control_joystick __devinitdata = {
-	.name = "Joystick",
-	.iface = SNDRV_CTL_ELEM_IFACE_CARD,
-	.info = snd_ymfpci_joystick_info,
-	.get = snd_ymfpci_joystick_get,
-	.put = snd_ymfpci_joystick_put,
-};
-
-static snd_kcontrol_new_t snd_ymfpci_control_joystick_addr __devinitdata = {
-	.name = "Joystick Address",
-	.iface = SNDRV_CTL_ELEM_IFACE_CARD,
-	.info = snd_ymfpci_joystick_addr_info,
-	.get = snd_ymfpci_joystick_addr_get,
-	.put = snd_ymfpci_joystick_addr_put,
-};
-
-int __devinit snd_ymfpci_joystick(ymfpci_t *chip)
-{
+	snd_timer_t *timer = NULL;
+	snd_timer_id_t tid;
 	int err;
 
-	chip->joystick_port = 0; /* default */
-	if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_ymfpci_control_joystick, chip))) < 0)
-		return err;
-	if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_ymfpci_control_joystick_addr, chip))) < 0)
-		return err;
-	return 0;
+	tid.dev_class = SNDRV_TIMER_CLASS_CARD;
+	tid.dev_sclass = SNDRV_TIMER_SCLASS_NONE;
+	tid.card = chip->card->number;
+	tid.device = device;
+	tid.subdevice = 0;
+	if ((err = snd_timer_new(chip->card, "YMFPCI", &tid, &timer)) >= 0) {
+		strcpy(timer->name, "YMFPCI timer");
+		timer->private_data = chip;
+		timer->hw = snd_ymfpci_timer_hw;
+	}
+	chip->timer = timer;
+	return err;
 }
-#endif /* CONFIG_GAMEPORT */
 
 
 /*
@@ -1893,7 +1868,7 @@ static int __devinit snd_ymfpci_proc_init(snd_card_t * card, ymfpci_t *chip)
 	snd_info_entry_t *entry;
 	
 	if (! snd_card_proc_new(card, "ymfpci", &entry))
-		snd_info_set_text_ops(entry, chip, snd_ymfpci_proc_read);
+		snd_info_set_text_ops(entry, chip, 1024, snd_ymfpci_proc_read);
 	return 0;
 }
 
@@ -2122,9 +2097,13 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 		release_resource(chip->fm_res);
 		kfree_nocheck(chip->fm_res);
 	}
-#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
-	if (chip->joystick_res)
-		snd_ymfpci_disable_joystick(chip);
+#ifdef SUPPORT_JOYSTICK
+	if (chip->joystick_res) {
+		if (chip->gameport.io)
+			gameport_unregister_port(&chip->gameport);
+		release_resource(chip->joystick_res);
+		kfree_nocheck(chip->joystick_res);
+	}
 #endif
 	if (chip->reg_area_virt)
 		iounmap((void *)chip->reg_area_virt);
@@ -2221,10 +2200,11 @@ void snd_ymfpci_resume(ymfpci_t *chip)
 
 	/* start hw again */
 	if (chip->start_count > 0) {
-		spin_lock(&chip->reg_lock);
+		unsigned long flags;
+		spin_lock_irqsave(&chip->reg_lock, flags);
 		snd_ymfpci_writel(chip, YDSXGR_MODE, chip->saved_ydsxgr_mode);
 		chip->active_bank = snd_ymfpci_readl(chip, YDSXGR_CTRLSELECT);
-		spin_unlock(&chip->reg_lock);
+		spin_unlock_irqrestore(&chip->reg_lock, flags);
 	}
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 }
@@ -2275,9 +2255,6 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	spin_lock_init(&chip->voice_lock);
 	init_waitqueue_head(&chip->interrupt_sleep);
 	atomic_set(&chip->interrupt_sleep_count, 0);
-#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
-	init_MUTEX(&chip->joystick_mutex);
-#endif
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;

@@ -31,7 +31,7 @@ struct _snd_pcm_oss_setup {
 		     direct:1,
 		     block:1,
 		     nonblock:1,
-		     wholefrag:1,
+		     partialfrag:1,
 		     nosilence:1;
 	unsigned int periods;
 	unsigned int period_size;

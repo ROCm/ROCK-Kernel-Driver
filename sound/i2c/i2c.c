@@ -84,7 +84,7 @@ int snd_i2c_bus_create(snd_card_t *card, const char *name, snd_i2c_bus_t *master
 	bus = (snd_i2c_bus_t *)snd_magic_kcalloc(snd_i2c_bus_t, 0, GFP_KERNEL);
 	if (bus == NULL)
 		return -ENOMEM;
-	spin_lock_init(&bus->lock);
+	init_MUTEX(&bus->lock_mutex);
 	INIT_LIST_HEAD(&bus->devices);
 	INIT_LIST_HEAD(&bus->buses);
 	bus->card = card;

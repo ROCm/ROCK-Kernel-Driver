@@ -334,9 +334,11 @@ static int snd_gf1_pcm_poke_block(snd_gus_card_t *gus, unsigned char *buf,
 					snd_gf1_poke(gus, pos++, *buf++ ^ invert);
 			}
 		}
-		schedule_timeout(1);
-		if (signal_pending(current))
-			return -EAGAIN;
+		if (count > 0 && !in_interrupt()) {
+			schedule_timeout(1);
+			if (signal_pending(current))
+				return -EAGAIN;
+		}
 	}
 	return 0;
 }
@@ -813,6 +815,15 @@ static snd_kcontrol_new_t snd_gf1_pcm_volume_control =
 	.put = snd_gf1_pcm_volume_put
 };
 
+static snd_kcontrol_new_t snd_gf1_pcm_volume_control1 =
+{
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "GPCM Playback Volume",
+	.info = snd_gf1_pcm_volume_info,
+	.get = snd_gf1_pcm_volume_get,
+	.put = snd_gf1_pcm_volume_put
+};
+
 static snd_pcm_ops_t snd_gf1_pcm_playback_ops = {
 	.open =		snd_gf1_pcm_playback_open,
 	.close =	snd_gf1_pcm_playback_close,
@@ -880,7 +891,11 @@ int snd_gf1_pcm_new(snd_gus_card_t * gus, int pcm_dev, int control_index, snd_pc
 	strcat(pcm->name, " (synth)");
 	gus->pcm = pcm;
 
-	if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_gf1_pcm_volume_control, gus))) < 0)
+	if (gus->codec_flag)
+		kctl = snd_ctl_new1(&snd_gf1_pcm_volume_control1, gus);
+	else
+		kctl = snd_ctl_new1(&snd_gf1_pcm_volume_control, gus);
+	if ((err = snd_ctl_add(card, kctl)) < 0)
 		return err;
 	kctl->id.index = control_index;
 

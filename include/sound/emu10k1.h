@@ -679,6 +679,9 @@
 #define A_ADCIDX		0x63
 #define A_ADCIDX_IDX		0x10000063
 
+#define A_MICIDX		0x64
+#define A_MICIDX_IDX		0x10000064
+
 #define FXIDX			0x65		/* FX recording buffer index register		*/
 #define FXIDX_MASK		0x0000ffff	/* 16-bit value					*/
 #define FXIDX_IDX		0x10000065
@@ -1152,10 +1155,12 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define FXBUS_MIDI_RIGHT	0x05
 #define FXBUS_PCM_CENTER	0x06
 #define FXBUS_PCM_LFE		0x07
-#define FXBUS_PT_LEFT		20
-#define FXBUS_PT_RIGHT		21
+#define FXBUS_PCM_LEFT_FRONT	0x08
+#define FXBUS_PCM_RIGHT_FRONT	0x09
 #define FXBUS_MIDI_REVERB	0x0c
 #define FXBUS_MIDI_CHORUS	0x0d
+#define FXBUS_PT_LEFT		0x14
+#define FXBUS_PT_RIGHT		0x15
 
 /* Inputs */
 #define EXTIN_AC97_L	   0x00	/* AC'97 capture channel - left */
@@ -1199,8 +1204,8 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define A_EXTIN_OPT_SPDIF_R     0x05    /*                              right */ 
 #define A_EXTIN_LINE2_L		0x08	/* audigy drive line2/mic2 - left */
 #define A_EXTIN_LINE2_R		0x09	/*                           right */
-#define A_EXTIN_RCA_SPDIF_L     0x0a    /* audigy drive RCA SPDIF - left */
-#define A_EXTIN_RCA_SPDIF_R     0x0b    /*                          right */
+#define A_EXTIN_ADC_L		0x0a    /* Philips ADC - left */
+#define A_EXTIN_ADC_R		0x0b    /*               right */
 #define A_EXTIN_AUX2_L		0x0c	/* audigy drive aux2 - left */
 #define A_EXTIN_AUX2_R		0x0d	/*                   - right */
 
@@ -1225,6 +1230,7 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define A_EXTOUT_AC97_R		0x11	/*      right */
 #define A_EXTOUT_ADC_CAP_L	0x16	/* ADC capture buffer left */
 #define A_EXTOUT_ADC_CAP_R	0x17	/*                    right */
+#define A_EXTOUT_MIC_CAP	0x18	/* Mic capture buffer */
 
 /* Audigy constants */
 #define A_C_00000000	0xc0
@@ -1249,8 +1255,8 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define A_C_4f1bbcdc	0xd3
 #define A_C_5a7ef9db	0xd4
 #define A_C_00100000	0xd5
-/* 0xd6 = 0x7fffffff  (?) ACCUM? */
-/* 0xd7 = 0x0000000   CCR */
+#define A_GPR_ACCU	0xd6		/* ACCUM, accumulator */
+#define A_GPR_COND	0xd7		/* CCR, condition register */
 /* 0xd8 = noise1 */
 /* 0xd9 = noise2 */
 
