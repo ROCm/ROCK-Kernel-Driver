@@ -74,6 +74,9 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"DMB1032",		0	},
 	/* Creative Modem Blaster V.90 DI5660 */
 	{	"DMB2001",		0	},
+	/* E-Tech */
+	/* E-Tech CyberBULLET PC56RVP */
+	{	"ETT0002",		0	},
 	/* FUJITSU */
 	/* Fujitsu 33600 PnP-I2 R Plug & Play */
 	{	"FUJ0202",		0	},
