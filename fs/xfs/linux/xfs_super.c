@@ -833,10 +833,10 @@ undo_inodecache:
 STATIC void __exit
 exit_xfs_fs( void )
 {
-	unregister_filesystem(&xfs_fs_type);
-	xfs_cleanup();
 	vfs_exitquota();
 	vfs_exitdmapi();
+	unregister_filesystem(&xfs_fs_type);
+	xfs_cleanup();
 	pagebuf_terminate();
 	destroy_inodecache();
 	ktrace_uninit();
