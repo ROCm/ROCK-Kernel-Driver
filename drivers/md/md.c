@@ -440,30 +440,6 @@ static unsigned int calc_sb_csum(mdp_super_t * sb)
 	return csum;
 }
 
-/* csum_partial is not consistent between different architectures.
- * Some (i386) do a 32bit csum.  Some (alpha) do 16 bit.
- * This makes it hard for user-space to know what to do.
- * So we use calc_sb_csum to set the checksum to allow working
- * with older kernels, but allow calc_sb_csum_common to
- * be used when checking if a checksum is correct, to
- * make life easier for user-space tools that might write
- * a superblock.
- */
-static unsigned int calc_sb_csum_common(mdp_super_t *super)
-{
-	unsigned int  disk_csum = super->sb_csum;
-	unsigned long long newcsum = 0;
-	unsigned int csum;
-	int i;
-	unsigned int *superc = (int*) super;
-	super->sb_csum = 0;
-
-	for (i=0; i<MD_SB_BYTES/4; i++)
-		newcsum+= superc[i];
-	csum = (newcsum& 0xffffffff) + (newcsum>>32);
-	super->sb_csum = disk_csum;
-	return csum;
-}
 
 /*
  * Handle superblock details.
@@ -547,8 +523,7 @@ static int super_90_load(mdk_rdev_t *rdev, mdk_rdev_t *refdev, int minor_version
 	if (sb->raid_disks <= 0)
 		goto abort;
 
-	if (calc_sb_csum(sb) != sb->sb_csum &&
-		calc_sb_csum_common(sb) != sb->sb_csum) {
+	if (csum_fold(calc_sb_csum(sb)) != csum_fold(sb->sb_csum)) {
 		printk(KERN_WARNING "md: invalid superblock checksum on %s\n",
 			b);
 		goto abort;
