@@ -949,8 +949,7 @@ static int pmz_startup(struct uart_port *port)
 	 */
 	if (pwr_delay != 0) {
 		pmz_debug("pmz: delaying %d ms\n", pwr_delay);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((pwr_delay * HZ)/1000);
+		msleep(pwr_delay);
 	}
 
 	/* IrDA reset is done now */
@@ -1684,8 +1683,7 @@ static int pmz_resume(struct macio_dev *mdev)
 	 */
 	if (pwr_delay != 0) {
 		pmz_debug("pmz: delaying %d ms\n", pwr_delay);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((pwr_delay * HZ)/1000);
+		msleep(pwr_delay);
 	}
 
 	pmz_debug("resume, switching complete\n");

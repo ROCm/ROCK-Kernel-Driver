@@ -40,11 +40,8 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
-#include <linux/tty.h>
-#include <linux/serial.h>
 #include <linux/serial_core.h>
 #include <linux/major.h>
-#include <linux/8250.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -55,6 +52,8 @@
 #include <pcmcia/ciscode.h>
 #include <pcmcia/ds.h>
 #include <pcmcia/cisreg.h>
+
+#include "8250.h"
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
@@ -147,7 +146,7 @@ static void serial_remove(dev_link_t *link)
 	 */
 	if (info->link.state & DEV_CONFIG) {
 		for (i = 0; i < info->ndev; i++)
-			unregister_serial(info->line[i]);
+			serial8250_unregister_port(info->line[i]);
 
 		info->link.dev = NULL;
 
@@ -303,21 +302,22 @@ static void serial_detach(dev_link_t * link)
 
 /*====================================================================*/
 
-static int setup_serial(struct serial_info * info, ioaddr_t port, int irq)
+static int setup_serial(struct serial_info * info, ioaddr_t iobase, int irq)
 {
-	struct serial_struct serial;
+	struct uart_port port;
 	int line;
 
-	memset(&serial, 0, sizeof (serial));
-	serial.port = port;
-	serial.irq = irq;
-	serial.flags = UPF_SKIP_TEST | UPF_SHARE_IRQ;
+	memset(&port, 0, sizeof (struct uart_port));
+	port.iobase = iobase;
+	port.irq = irq;
+	port.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_SHARE_IRQ;
+	port.uartclk = 1843200;
 	if (buggy_uart)
-		serial.flags |= UPF_BUGGY_UART;
-	line = register_serial(&serial);
+		port.flags |= UPF_BUGGY_UART;
+	line = serial8250_register_port(&port);
 	if (line < 0) {
-		printk(KERN_NOTICE "serial_cs: register_serial() at 0x%04lx,"
-		       " irq %d failed\n", (u_long) serial.port, serial.irq);
+		printk(KERN_NOTICE "serial_cs: serial8250_register_port() at "
+		       "0x%04lx, irq %d failed\n", (u_long)iobase, irq);
 		return -EINVAL;
 	}
 
