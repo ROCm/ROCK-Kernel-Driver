@@ -14,6 +14,9 @@
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/module.h>       /* for EXPORT_SYMBOL */
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 
 #include <asm/fpswa.h>
 #include <asm/hardirq.h>
@@ -95,6 +98,9 @@ die (const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
+#ifdef	CONFIG_KDB
+	(void)kdb(KDB_REASON_OOPS, err, regs);
+#endif	/* CONFIG_KDB */
   	do_exit(SIGSEGV);
 }
 
@@ -178,6 +184,14 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		if (break_num < 0x80000) {
 			sig = SIGILL; code = __ILL_BREAK;
 		} else {
+#ifdef	CONFIG_KDB
+			if (break_num == KDB_BREAK_ENTER &&
+			    kdb(KDB_REASON_ENTER, break_num, regs))
+				return;		/* kdb handled it */
+			if (break_num == KDB_BREAK_BREAK &&
+			    kdb(KDB_REASON_BREAK, break_num, regs))
+				return;		/* kdb handled it */
+#endif	/* CONFIG_KDB */
 			sig = SIGTRAP; code = TRAP_BRKPT;
 		}
 	}
@@ -522,6 +536,10 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		      case 35: siginfo.si_code = TRAP_BRANCH; ifa = 0; break;
 		      case 36: siginfo.si_code = TRAP_TRACE; ifa = 0; break;
 		}
+#ifdef	CONFIG_KDB
+		if (!user_mode(regs) && kdb(KDB_REASON_DEBUG, vector, regs))
+			return;	/* kdb handled this */
+#endif	/* CONFIG_KDB */
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_addr  = (void *) ifa;

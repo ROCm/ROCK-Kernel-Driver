@@ -14,6 +14,10 @@
 #include <linux/swap.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#include <linux/kdbprivate.h>
+#endif	/* CONFIG_KDB */
 #include <linux/namei.h>
 #include <linux/shm.h>
 #include <linux/blkdev.h>
@@ -1600,6 +1604,24 @@ void si_swapinfo(struct sysinfo *val)
 	val->totalswap = total_swap_pages + nr_to_be_unused;
 	swap_list_unlock();
 }
+
+#ifdef	CONFIG_KDB
+/* Like si_swapinfo() but without the locks */
+void kdb_si_swapinfo(struct sysinfo *val)
+{
+	unsigned int i;
+	unsigned long nr_to_be_unused = 0;
+
+	for (i = 0; i < nr_swapfiles; i++) {
+		if (!(swap_info[i].flags & SWP_USED) ||
+		     (swap_info[i].flags & SWP_WRITEOK))
+			continue;
+		nr_to_be_unused += swap_info[i].inuse_pages;
+	}
+	val->freeswap = nr_swap_pages + nr_to_be_unused;
+	val->totalswap = total_swap_pages + nr_to_be_unused;
+}
+#endif	/* CONFIG_KDB */
 
 /*
  * Verify that a swap entry is valid and increment its swap map count.

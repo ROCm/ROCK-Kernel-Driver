@@ -181,6 +181,18 @@ ENTRY(ret_from_fork)
 	popl %eax
 	jmp syscall_exit
 
+#if defined(CONFIG_KDB)
+ENTRY(kdb_call)
+	pushl %eax              # save orig EAX
+	SAVE_ALL
+	pushl %esp              # struct pt_regs
+	pushl $0                # error_code
+	pushl $7                # KDB_REASON_ENTRY
+	call  kdb
+	addl  $12,%esp          # remove args
+	RESTORE_ALL
+#endif
+
 /*
  * Return to user mode is not as complex as all this looks,
  * but we want the default path for a system call return to
@@ -583,6 +595,22 @@ ENTRY(general_protection)
 ENTRY(alignment_check)
 	pushl $do_alignment_check
 	jmp error_code
+
+#if defined(CONFIG_KDB)
+ENTRY(page_fault_mca)
+	pushl %ecx
+	pushl %edx
+	pushl %eax
+	movl  $473,%ecx
+	rdmsr
+	andl  $0xfffffffe,%eax		/* Disable last branch recording */
+	wrmsr
+	popl  %eax
+	popl  %edx
+	popl  %ecx
+	pushl $do_page_fault
+	jmp error_code
+#endif
 
 ENTRY(page_fault)
 	pushl $do_page_fault

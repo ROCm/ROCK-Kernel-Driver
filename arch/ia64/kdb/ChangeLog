@@ -1,0 +1,293 @@
+2004-08-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.8-ia64-1.
+
+2004-08-12 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.8-rc4-ia64-1.
+
+2004-08-04 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.8-rc3-ia64-1.
+
+2004-07-18 Keith Owens  <kaos@sgi.com>
+
+	* New config name for SN serial console.
+	* kdb-v4.4-2.6.8-rc2-ia64-1.
+
+2004-07-12 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.8-rc1-ia64-1.
+
+2004-06-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.7-ia64-040629-1.
+
+2004-06-16 Keith Owens  <kaos@sgi.com>
+
+	* Coexist with 2.6.7-ia64-040619.
+	* kdb-v4.4-2.6.7-ia64-040619-1.
+
+2004-06-16 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.7-ia64-1.
+
+2004-06-10 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.7-rc3-ia64-1.
+
+2004-06-09 Keith Owens  <kaos@sgi.com>
+
+	* Namespace clean up.  Mark code/variables as static when it is only
+	  used in one file, delete dead code/variables.
+	* Saved interrupt state requires long, not int.
+	* kdb v4.4-2.6.7-rc2-ia64-3.
+
+2004-06-08 Keith Owens  <kaos@sgi.com>
+
+	* Whitespace clean up, no code changes.
+	* kdb v4.4-2.6.7-rc2-2.
+
+2004-06-07 Keith Owens  <kaos@sgi.com>
+
+	* Force KALLSYMS and KALLSYMS_ALL for CONFIG_KDB.
+	* kdb v4.4-2.6.7-rc2-1.
+
+2004-06-06 Keith Owens  <kaos@sgi.com>
+
+	* Add standard archkdb commands.
+	* Move kdb_{get,put}userarea_size definitions to linux/kdb.h.
+	* kdb v4.4-2.6.6-ia64-040521-2.
+
+2004-05-25 Keith Owens  <kaos@sgi.com>
+
+	* Update Kconfig text.
+	* kdb v4.4-2.6.6-ia64-040521-1.
+
+2004-05-23 Keith Owens  <kaos@sgi.com>
+
+	* Move bfd.h and ansidecl.h from arch/$(ARCH)/kdb to include/asm-$(ARCH).
+	* ia64-opc.c needs kdbprivate.h after common reorganisation.
+	* Update copyright notices.
+	* kdb v4.4-2.6.6-ia64-1.
+
+2004-05-60 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.6-rc3-ia64-1.
+
+2004-05-60 Keith Owens  <kaos@sgi.com>
+
+	* Tweak WAR for backtrace through contended spinlocks.
+	* kdb v4.3-2.6.6-rc2-ia64-1.
+
+2004-04-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.6-rc1-ia64-1.
+
+2004-04-15 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.5-ia64-040413-1.
+
+2004-03-06 Keith Owens  <kaos@sgi.com>
+
+	* Use kdb_print for unwind debugging.
+	* kdb v4.3-2.6.4-rc2-ia64-1.
+
+2004-02-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.4-rc1-ia64-1.
+
+2004-02-18 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.6.3-ia64-1.
+
+2004-02-17 Keith Owens  <kaos@sgi.com>
+
+	* Reconcile 2.6-test versions from Xavier Bru (Bull), Greg Banks (SGI),
+	  Jim Houston (Concurrent Computer Corp).
+	* Reconcile with kdb v4.3-2.4.23-ia64-0312??-1.
+	* Reconcile with salinfo changes.
+	* Port WAR for backtrace from spinlock contention from 2.4 to 2.6.
+	* Merge PGS FIFO tweak with SERIAL_IO_MEM and concurrent support for
+	  multiple consoles (no USB consoles yet).
+	* Update pt_regs output to match the order of struct pt_regs.
+	* KDB wrappers for interrupts handlers now return the handler's return code.
+	* tpa and tpav commands from Anonymous.
+	* Reconcile with mca changes.
+	* Upgrade to 2.6.3-rc3.
+	* kdb v4.3-2.6.3-rc3-ia64-1.
+
+2003-10-22 Xavier Bru   <xavier.bru@bull.net>
+	* Merge to 2.6.0-test7
+2003-10-20 Philippe Garrigues <Philippe.Garrigues@bull.net>
+	* Enable FIFO in UART
+2003-09-08 Xavier Bru   <xavier.bru@bull.net>
+	* Merge to 2.6.0-test4
+2003-03-21 Xavier Bru <xavier.bru@bull.net>
+	* Merge kdb v4.0 on 2.5.64 ia64
+	* new kernel parameters support
+	* new kallsyms support
+
+2003-10-24 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.3-2.4.23-pre8-cset-1.1069.1.143-to-1.1108-ia64-1.
+
+2003-10-03 Keith Owens  <kaos@sgi.com>
+
+	* After MCA, copy the saved RSE registers from ia64_mca_bspstore to the
+	  stack of the failing process.
+	* Abort backtrace when we hit IVT, no unwind data which confuses
+	  unw_unwind().
+	* Workaround for backtrace through spinlock contention called from leaf
+	  functions.
+	* kdb v4.3-2.4.22-ia64-030909-1.
+
+2003-07-20 Keith Owens  <kaos@sgi.com>
+
+	* MCA rendezvous timeout affects kdb_wait_for_cpus_secs.
+	* Support SGI L1 console.
+	* kdb v4.3-2.4.21-ia64-030702-2.
+
+2003-07-08 Keith Owens  <kaos@sgi.com>
+
+	* print_symbol() in mca.c does something useful when kdb is installed.
+	* Unwind and SAL changes removed from kdb, they are in the base kernel.
+	* kdb v4.3-2.4.21-ia64-030702-1.
+
+2003-06-20 Keith Owens  <kaos@sgi.com>
+
+	* Add CONFIG_KDB_CONTINUE_CATASTROPHIC.
+	* Do not send IPI if the machine state does not require them.
+	* Correct definition of KDB_ENTER().
+	* Workaround for broken init monarch handler.
+	* Monarch cpu must get to kdb, even if it was interrupted in user space.
+	* Unwind fixes.
+	* Generalize ia64_spinlock_contention name.
+	* Add kdba_fru for SN machines.
+	* Correct test for cpu number.
+	* kdb v4.3-2.4.20-ia64-020821-1.
+
+2003-05-02 Keith Owens  <kaos@sgi.com>
+
+	* Add kdba_fp_value().
+	* Limit backtrace size to catch loops.
+	* Print spinlock name in ia64_spinlock_contention.
+	* Tweak INIT slave stack lock and handler.
+	* Add read/write access to user pages.  Vamsi Krishna S., IBM
+	* Rename cpu_is_online to cpu_online, as in 2.5.
+	* Clean up USB keyboard support.
+	* Clean up serial console support.
+	* kdb v4.2-2.4.20-ia64-020821-1.
+
+2003-04-04 Keith Owens  <kaos@sgi.com>
+
+	* Add support for INIT slave interrupts.
+	* Tell SAL to always rendezvous on MCA.
+	* No lock on SAL rendezvous call.
+	* Include unwind.c from 2.4.21-pre5.
+	* Rename cpu_online to cpu_is_online.
+	* Workarounds for scheduler bugs.
+	* kdb v4.1-2.4.20-ia64-020821-1.
+
+2003-03-16 Keith Owens  <kaos@sgi.com>
+
+	* Each cpu saves its state as it enters kdb or before it enters code
+	  which cannot call kdb, converting kdb from a pull to a push model.
+	* Clean up kdb interaction with CONFIG_SERIAL_CONSOLE.
+	* Removal of special cases for i386 backtrace from common code
+	  simplifies the architecture code.
+	* Add support for MCA events (both main and rendezvous) plus INIT
+	  monarch event.
+	* Correct decode of brl.
+	* Move kdba_print_nameval to common code.
+	* Generalize kdba unwind handlers.
+	* Fix decode of sal records (fix included in later ia64 kernels).
+	* Handle multiple pt_regs in stack (fix included in later ia64 kernels).
+	* Clean up debug code in unwind (fix included in later ia64 kernels).
+	* Move kdb break numbers to their own file so it can be used in asm.
+	* kdb v4.0-2.4.20-ia64-021210-1.
+
+2003-02-03 Keith Owens  <kaos@sgi.com>
+
+	* Register kdb commands early.
+	* Handle KDB_ENTER() when kdb=off.
+	* Optimize __kdba_getarea_size when width is a constant.
+	* Decode oops via kallsyms if it is available.
+	* Update copyright notices to 2003.
+	* Add commands to dump struct pt_regs and switch_stack.
+	* Handle padding from unw_init_running for switch_stack.
+	* Add dummy kdba_local_arch_setup/kdba_local_arch_cleanup.
+	* Warning for pod mode.
+	* Add command history and editing.  Sonic Zhang.
+	* kdb_toggleled is conditional on KDB_BLINK_LED.  Bernhard Fischer.
+	* Allow tab on serial line for symbol completion.
+	* Ignore KDB_ENTER() when kdb is already running.
+	* kdb v3.0-2.4.20-ia64-021210-1.
+
+2003-01-23 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.20-ia64-021210.
+	* kdb v2.5-2.4.20-ia64-021210-1.
+
+2002-11-14 Keith Owens  <kaos@sgi.com>
+
+	* General clean up of handling for breakpoints and single stepping over
+	  software breakpoints.
+	* kdb v2.5-2.4.19-ia64-020821-1.
+
+2002-10-31 Keith Owens  <kaos@sgi.com>
+
+	* Remove kdb_eframe_t.
+	* Sanity check if we have pt_regs.
+	* Remove kdba_getcurrentframe().
+	* Comments for coexistence with O(1) scheduler.
+	* kdb v2.4-2.4.19-ia64-020821-1.
+
+2002-10-15 Keith Owens  <kaos@sgi.com>
+
+	* Minimize differences between patches for 2.4 and 2.5 kernels.
+	* kdb v2.3-2.4.19-ia64-020821-2.
+
+2002-08-10 Keith Owens  <kaos@sgi.com>
+
+	* Verify rw address for instruction breakpoint.
+	* Replace kdb_port with kdb_serial to support memory mapped I/O.
+	  David Mosberger.
+	  Note: This needs kdb v2.3-2.4.18-common-2 or later.
+	* kdb v2.3-2.4.18-ia64-020722-2.
+
+2002-08-07 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.18-ia64-020722.
+	* Remove individual SGI copyrights, the general SGI copyright applies.
+	* Clean up disassembly layout.  Hugh Dickins, Keith Owens.
+	* Remove fixed KDB_MAX_COMMANDS size.
+	* Add set_fs() around __copy_to_user on kernel addresses.
+	  Randolph Chung.
+	* Position ia64 for CONFIG_NUMA_REPLICATE.
+	* Stacked registers modification support.  Sebastien Lelarge.
+	* USB keyboard support.  Sebastien Lelarge.
+	* kdb v2.3-2.4.18-ia64-020722-1.
+
+2002-03-20 Keith Owens  <kaos@sgi.com>
+
+	* Sync with 2.4.17-sn2.
+	* Add pod command.
+
+2002-02-20 Keith Owens  <kaos@sgi.com>
+
+	* Call kdb from mca handler.  Jenna S. Hall, Intel.
+	* kdb v2.1-2.4.17-ia64-011226-2.
+
+2002-01-18 Keith Owens  <kaos@sgi.com>
+
+	* Replace kdb_get/putword with kdb_get/putarea functions.
+	* Wrap kdb references in #ifdef CONFIG_KDB.
+	* Delete sample i386 code.
+	* Refuse to update kernel text on NUMA systems.
+	* Reject hardware breakpoints, not supported yet.
+	* kdb v2.1-2.4.17-ia64-011226-1.
+
+2002-01-07 Keith Owens  <kaos@sgi.com>
+
+	* Split kdb for ia64 as kdb v2.0-2.4.17-ia64-011226-1.

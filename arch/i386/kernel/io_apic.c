@@ -27,6 +27,9 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/config.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 #include <linux/smp_lock.h>
 #include <linux/mc146818rtc.h>
 #include <linux/compiler.h>
@@ -1134,6 +1137,10 @@ next:
 	current_vector += 8;
 	if (current_vector == SYSCALL_VECTOR)
 		goto next;
+#ifdef	CONFIG_KDB
+	if (current_vector == KDBENTER_VECTOR)
+		goto next;
+#endif	/* CONFIG_KDB */
 
 	if (current_vector >= FIRST_SYSTEM_VECTOR) {
 		offset++;

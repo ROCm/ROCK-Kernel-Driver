@@ -25,6 +25,9 @@
 #include <linux/module.h>
 #include <linux/nmi.h>
 #include <linux/sysdev.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>
@@ -487,6 +490,9 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 			printk("NMI Watchdog detected LOCKUP on CPU%d, eip %08lx, registers:\n", cpu, regs->eip);
 			show_registers(regs);
 			printk("console shuts up ...\n");
+#ifdef	CONFIG_KDB
+			kdb(KDB_REASON_NMI, 0, regs);
+#endif	/* CONFIG_KDB */
 			console_silent();
 			spin_unlock(&nmi_print_lock);
 			bust_spinlocks(0);

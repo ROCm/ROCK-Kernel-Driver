@@ -5,6 +5,9 @@
  */
 
 #include <linux/config.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
@@ -869,11 +872,18 @@ task_t fastcall *next_thread(const task_t *p)
 	const struct list_head *tmp, *head = &link->pidptr->task_list;
 
 #ifdef CONFIG_SMP
+#ifdef	CONFIG_KDB
+	/* kdb does not take locks */
+	if (!KDB_IS_RUNNING()) {
+#endif
 	if (!p->sighand)
 		BUG();
 	if (!spin_is_locked(&p->sighand->siglock) &&
 				!rwlock_is_locked(&tasklist_lock))
 		BUG();
+#ifdef	CONFIG_KDB
+	}
+#endif
 #endif
 	tmp = link->pid_chain.next;
 	if (tmp == head)

@@ -1815,3 +1815,15 @@ int in_gate_area(struct task_struct *task, unsigned long addr)
 }
 
 #endif
+
+#ifdef CONFIG_KDB
+struct page * kdb_follow_page(struct mm_struct *mm, unsigned long address, int write)
+{
+	struct page *page = follow_page(mm, address, write);
+
+	if (!page)
+		return get_page_map(page);
+
+	return page;
+}
+#endif

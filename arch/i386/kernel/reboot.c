@@ -3,6 +3,10 @@
  */
 
 #include <linux/mm.h>
+#include <linux/config.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -330,6 +334,14 @@ void machine_restart(char * __unused)
 	 * Stop all CPUs and turn off local APICs and the IO-APIC, so
 	 * other OSs see a clean IRQ state.
 	 */
+#ifdef	CONFIG_KDB
+	/*
+	 * If this restart is occuring while kdb is running (e.g. reboot
+	 * command), the other CPU's are already stopped.  Don't try to
+	 * stop them yet again.
+	 */
+	if (!KDB_IS_RUNNING())
+#endif	/* CONFIG_KDB */
 	smp_send_stop();
 #elif defined(CONFIG_X86_LOCAL_APIC)
 	if (cpu_has_apic) {

@@ -950,6 +950,8 @@ GLOBAL_ENTRY(ia64_spinlock_contention_pre3_4)
 (p14)	br.cond.sptk.few .wait
 (p15)	rsm psr.i		// disable interrupts if we reenabled them
 	br.cond.sptk.few b6	// lock is now free, try to acquire
+	.global ia64_spinlock_contention_pre3_4_end	// for kernprof
+ia64_spinlock_contention_pre3_4_end:
 END(ia64_spinlock_contention_pre3_4)
 
 #else

@@ -443,6 +443,10 @@ void __init init_IRQ(void)
 		int vector = FIRST_EXTERNAL_VECTOR + i;
 		if (i >= NR_IRQS)
 			break;
+#ifdef	CONFIG_KDB
+		if (vector == KDBENTER_VECTOR)
+			continue;
+#endif
 		if (vector != SYSCALL_VECTOR) 
 			set_intr_gate(vector, interrupt[i]);
 	}

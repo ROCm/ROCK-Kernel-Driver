@@ -83,6 +83,9 @@ SECTIONS
   __con_initcall_start = .;
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
+  __kdb_initcall_start = .;
+  .kdb_initcall.init : { *(.kdb_initcall.init) }
+  __kdb_initcall_end = .;
   SECURITY_INIT
   . = ALIGN(4);
   __alt_instructions = .;

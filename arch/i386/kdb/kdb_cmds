@@ -1,0 +1,17 @@
+# Standard architecture specific commands for kdb.
+# These commands are appended to those in kdb/kdb_cmds, see that file for
+# restrictions.
+
+# Standard debugging information for first level support, invoked from archkdb*
+# commands that are defined in kdb/kdb_cmds.
+
+defcmd archkdbcommon "" "Common arch debugging"
+  set LINES 2000000
+  set BTAPROMPT 0
+  -summary
+  -id %eip-24
+  -cpu
+  -ps
+  -dmesg 600
+  -bt
+endefcmd

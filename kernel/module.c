@@ -2202,6 +2202,10 @@ void struct_module(struct module *mod) { return; }
 EXPORT_SYMBOL(struct_module);
 #endif
 
+#ifdef	CONFIG_KDB
+struct list_head *kdb_modules = &modules;	/* kdb needs the list of modules */
+#endif	/* CONFIG_KDB */
+
 static int __init modules_init(void)
 {
 	return subsystem_register(&module_subsys);

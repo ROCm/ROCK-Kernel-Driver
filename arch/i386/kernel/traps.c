@@ -36,6 +36,10 @@
 #include <linux/mca.h>
 #endif
 
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
+
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -55,6 +59,9 @@
 #include "mach_traps.h"
 
 asmlinkage int system_call(void);
+#ifdef	CONFIG_KDB
+asmlinkage int kdb_call(void);
+#endif	/* CONFIG_KDB */
 asmlinkage void lcall7(void);
 asmlinkage void lcall27(void);
 
@@ -85,6 +92,9 @@ asmlinkage void segment_not_present(void);
 asmlinkage void stack_segment(void);
 asmlinkage void general_protection(void);
 asmlinkage void page_fault(void);
+#ifdef	CONFIG_KDB
+asmlinkage void page_fault_mca(void);
+#endif	/* CONFIG_KDB */
 asmlinkage void coprocessor_error(void);
 asmlinkage void simd_coprocessor_error(void);
 asmlinkage void alignment_check(void);
@@ -321,6 +331,10 @@ void die(const char * str, struct pt_regs * regs, long err)
 	show_registers(regs);
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
+#ifdef	CONFIG_KDB
+	kdb_diemsg = str;
+	kdb(KDB_REASON_OOPS, err, regs);
+#endif	/* CONFIG_KDB */
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
@@ -419,7 +433,9 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 }
 
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip)
+#ifndef	CONFIG_KDB
 DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
+#endif	/* !CONFIG_KDB */
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
 DO_VM86_ERROR( 5, SIGSEGV, "bounds", bounds)
 DO_ERROR_INFO( 6, SIGILL,  "invalid operand", invalid_op, ILL_ILLOPN, regs->eip)
@@ -490,16 +506,37 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 		return;
 	}
 #endif
+#ifdef	CONFIG_KDB
+	(void)kdb(KDB_REASON_NMI, reason, regs);
+#endif	/* CONFIG_KDB */
 	printk("Uhhuh. NMI received for unknown reason %02x on CPU %d.\n",
 		reason, smp_processor_id());
 	printk("Dazed and confused, but trying to continue\n");
 	printk("Do you have a strange power saving mode enabled?\n");
 }
 
+#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
+static void
+do_ack_apic_irq(void)
+{
+	ack_APIC_irq();
+}
+#endif	/* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
+
 static void default_do_nmi(struct pt_regs * regs)
 {
 	unsigned char reason = get_nmi_reason();
  
+#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
+	/*
+	 * Call the kernel debugger to see if this NMI is due
+	 * to an KDB requested IPI.  If so, kdb will handle it.
+	 */
+	if (kdb_ipi(regs, do_ack_apic_irq)) {
+		return;
+	}
+#endif	/* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
+
 	if (!(reason & 0xc0)) {
 #ifdef CONFIG_X86_LOCAL_APIC
 		/*
@@ -587,6 +624,11 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
+#ifdef	CONFIG_KDB
+	if (kdb(KDB_REASON_DEBUG, error_code, regs))
+		return;
+#endif	/* CONFIG_KDB */
+
 	/* It's safe to allow irq's after DR6 has been saved */
 	if (regs->eflags & X86_EFLAGS_IF)
 		local_irq_enable();
@@ -653,6 +695,16 @@ clear_TF:
 	regs->eflags &= ~TF_MASK;
 	return;
 }
+
+#ifdef	CONFIG_KDB
+asmlinkage void do_int3(struct pt_regs * regs, long error_code)
+{
+	if (kdb(KDB_REASON_BREAK, error_code, regs))
+		return;
+	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
+}
+#endif	/* CONFIG_KDB */
+
 
 /*
  * Note that we play around with the 'TS' bit in an attempt to get
@@ -922,7 +974,17 @@ void __init trap_init(void)
 	set_trap_gate(11,&segment_not_present);
 	set_trap_gate(12,&stack_segment);
 	set_trap_gate(13,&general_protection);
+#ifdef	CONFIG_KDB
+	if (test_bit(X86_FEATURE_MCE, boot_cpu_data.x86_capability) &&
+	    test_bit(X86_FEATURE_MCA, boot_cpu_data.x86_capability)) {
+		set_intr_gate(14,&page_fault_mca);
+	}
+	else {
+		set_intr_gate(14,&page_fault);
+	}
+#else	/* !CONFIG_KDB */
 	set_intr_gate(14,&page_fault);
+#endif	/* CONFIG_KDB */
 	set_trap_gate(15,&spurious_interrupt_bug);
 	set_trap_gate(16,&coprocessor_error);
 	set_trap_gate(17,&alignment_check);
@@ -932,6 +994,14 @@ void __init trap_init(void)
 	set_trap_gate(19,&simd_coprocessor_error);
 
 	set_system_gate(SYSCALL_VECTOR,&system_call);
+#ifdef	CONFIG_KDB
+	kdb_enablehwfault();
+	/*
+	 * A trap gate, used by the kernel to enter the 
+	 * debugger, preserving all registers.
+	 */
+	set_trap_gate(KDBENTER_VECTOR, &kdb_call);
+#endif	/* CONFIG_KDB */
 
 	/*
 	 * default LDT is a single-entry callgate to lcall7 for iBCS

@@ -14,6 +14,12 @@
 #include <linux/err.h>
 #include <linux/proc_fs.h>
 
+#ifdef CONFIG_KDB
+#define kdb 1
+#else
+#define kdb 0
+#endif
+
 /* These will be re-linked against their real values during the second link stage */
 extern unsigned long kallsyms_addresses[] __attribute__((weak));
 extern unsigned long kallsyms_num_syms __attribute__((weak));
@@ -21,6 +27,7 @@ extern char kallsyms_names[] __attribute__((weak));
 
 /* Defined by the linker script. */
 extern char _stext[], _etext[], _sinittext[], _einittext[];
+extern char _end[];	/* for CONFIG_KDB */
 
 static inline int is_kernel_inittext(unsigned long addr)
 {
@@ -35,6 +42,12 @@ static inline int is_kernel_text(unsigned long addr)
 	if (addr >= (unsigned long)_stext && addr <= (unsigned long)_etext)
 		return 1;
 	return 0;
+}
+
+/* kdb treats all kernel addresses as valid, including data */
+static inline int is_kernel(unsigned long addr)
+{
+	return (addr >= (unsigned long)_stext && addr <= (unsigned long)_end);
 }
 
 /* Lookup the address for this symbol. Returns 0 if not found. */
@@ -69,8 +82,8 @@ const char *kallsyms_lookup(unsigned long addr,
 
 	namebuf[KSYM_NAME_LEN] = 0;
 	namebuf[0] = 0;
-
-	if (is_kernel_text(addr) || is_kernel_inittext(addr)) {
+	if ((kdb && is_kernel(addr)) ||
+	    (!kdb && (is_kernel_text(addr) || is_kernel_inittext(addr)))) {
 		unsigned long symbol_end;
 		char *name = kallsyms_names;
 
@@ -92,7 +105,7 @@ const char *kallsyms_lookup(unsigned long addr,
 		if (is_kernel_inittext(addr))
 			symbol_end = (unsigned long)_einittext;
 		else
-			symbol_end = (unsigned long)_etext;
+			symbol_end = kdb ? (unsigned long)_end : (unsigned long)_etext;
 
 		/* Search for next non-aliased symbol */
 		for (i = best+1; i < kallsyms_num_syms; i++) {

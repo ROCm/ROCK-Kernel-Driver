@@ -46,6 +46,19 @@
 
 #include <linux/serial_core.h>
 #include "8250.h"
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+/*
+ * kdb_serial_line records the serial line number of the first serial console.
+ * NOTE: The kernel ignores characters on the serial line unless a user space
+ * program has opened the line first.  To enter kdb before user space has opened
+ * the serial line, you can use the 'kdb=early' flag to lilo and set the
+ * appropriate breakpoints.
+ */
+
+static int  kdb_serial_line = -1;
+static const char *kdb_serial_ptr = kdb_serial_str;
+#endif	/* CONFIG_KDB */
 
 /*
  * Configuration:
@@ -839,6 +852,18 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 				return; // if TTY_DONT_FLIP is set
 		}
 		ch = serial_inp(up, UART_RX);
+#ifdef	CONFIG_KDB
+		if ((up->port.line == kdb_serial_line) && kdb_on) {
+		    if (ch == *kdb_serial_ptr) {
+			if (!(*++kdb_serial_ptr)) {
+			    kdb(KDB_REASON_KEYBOARD, 0, regs);
+			    kdb_serial_ptr = kdb_serial_str;
+			    break;
+			}
+		    } else
+			kdb_serial_ptr = kdb_serial_str;
+		}
+#endif	/* CONFIG_KDB */
 		*tty->flip.char_buf_ptr = ch;
 		*tty->flip.flag_buf_ptr = TTY_NORMAL;
 		up->port.icount.rx++;
@@ -1997,6 +2022,29 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	if (!port->ops)
 		return -ENODEV;
 
+#ifdef	CONFIG_KDB
+	/*
+	 * Remember the line number of the first serial
+	 * console.  We'll make this the kdb serial console too.
+	 */
+	if (kdb_serial_line == -1) {
+		kdb_serial_line = co->index;
+		kdb_serial.io_type = port->iotype;
+		switch (port->iotype) {
+		case SERIAL_IO_MEM:
+#ifdef  SERIAL_IO_MEM32
+		case SERIAL_IO_MEM32:
+#endif
+			kdb_serial.iobase = (unsigned long)(port->membase);
+			kdb_serial.ioreg_shift = port->regshift;
+			break;
+		default:
+			kdb_serial.iobase = port->iobase;
+			kdb_serial.ioreg_shift = 0;
+			break;
+		}
+	}
+#endif	/* CONFIG_KDB */
 	/*
 	 * Temporary fix.
 	 */
