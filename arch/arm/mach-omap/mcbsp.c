@@ -18,6 +18,7 @@
 #include <linux/wait.h>
 #include <linux/completion.h>
 #include <linux/interrupt.h>
+#include <linux/err.h>
 
 #include <asm/delay.h>
 #include <asm/io.h>
@@ -29,7 +30,6 @@
 #include <asm/arch/mcbsp.h>
 
 #include <asm/hardware/clock.h>
-#include <linux/err.h>
 
 #ifdef CONFIG_MCBSP_DEBUG
 #define DBG(x...)	printk(x)
