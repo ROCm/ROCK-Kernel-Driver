@@ -16,7 +16,7 @@ define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 
 choice 'IA-64 processor type' \
 	"Itanium			CONFIG_ITANIUM \
-	 McKinley			CONFIG_MCKINLEY" Itanium
+	 Itanium-2			CONFIG_MCKINLEY" Itanium
 
 choice 'IA-64 system type'					\
 	"generic		CONFIG_IA64_GENERIC		\
@@ -26,11 +26,18 @@ choice 'IA-64 system type'					\
 	 SGI-SN1		CONFIG_IA64_SGI_SN1		\
 	 SGI-SN2		CONFIG_IA64_SGI_SN2" generic
 
-choice 'Kernel page size'						\
+if [ "$CONFIG_ITANIUM" = "y" ]; then
+  choice 'Kernel page size'						\
+	"4KB			CONFIG_IA64_PAGE_SIZE_4KB		\
+	 8KB			CONFIG_IA64_PAGE_SIZE_8KB		\
+	 16KB			CONFIG_IA64_PAGE_SIZE_16KB" 16KB
+else
+  choice 'Kernel page size'						\
 	"4KB			CONFIG_IA64_PAGE_SIZE_4KB		\
 	 8KB			CONFIG_IA64_PAGE_SIZE_8KB		\
 	 16KB			CONFIG_IA64_PAGE_SIZE_16KB		\
 	 64KB			CONFIG_IA64_PAGE_SIZE_64KB" 16KB
+endif
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
   define_bool CONFIG_ACPI y
