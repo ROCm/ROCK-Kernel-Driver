@@ -1,5 +1,5 @@
 /*
- * Workbit NinjaSCSI-32Bi/UDE PCI/Cardbus SCSI Host Bus Adapter driver
+ * Workbit NinjaSCSI-32Bi/UDE PCI/CardBus SCSI Host Bus Adapter driver
  * Debug routine
  *
  * This software may be used and distributed according to the terms of
@@ -88,7 +88,7 @@ static void print_commandk (unsigned char *command)
 	int i,s;
 //	printk(KERN_DEBUG);
 	print_opcodek(command[0]);
-	/*printk(KERN_DEBUG __func__ " ");*/
+	/*printk(KERN_DEBUG "%s ", __FUNCTION__);*/
 	if ((command[0] >> 5) == 6 ||
 	    (command[0] >> 5) == 7 ) {
 		s = 12; /* vender specific */
@@ -137,9 +137,9 @@ static void print_commandk (unsigned char *command)
 	printk("\n");
 }
 
-static void show_command(Scsi_Cmnd *ptr)
+static void show_command(Scsi_Cmnd *SCpnt)
 {
-	print_commandk(ptr->cmnd);
+	print_commandk(SCpnt->cmnd);
 }
 
 static void show_busphase(unsigned char stat)
@@ -260,3 +260,4 @@ static void nsp32_print_register(int base)
 	}
 }
 
+/* end */
