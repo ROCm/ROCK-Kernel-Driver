@@ -100,8 +100,9 @@ extern unsigned long nr_uninterruptible(void);
 #define TASK_RUNNING		0
 #define TASK_INTERRUPTIBLE	1
 #define TASK_UNINTERRUPTIBLE	2
-#define TASK_ZOMBIE		4
-#define TASK_STOPPED		8
+#define TASK_STOPPED		4
+#define TASK_ZOMBIE		8
+#define TASK_DEAD		16
 
 #define __set_task_state(tsk, state_value)		\
 	do { (tsk)->state = (state_value); } while (0)
