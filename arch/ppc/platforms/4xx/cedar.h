@@ -17,7 +17,7 @@
 #ifdef __KERNEL__
 #ifndef __ASM_CEDER_H__
 #define __ASM_CEDER_H__
-#include <platforms/ibmnp405l.h>
+#include <platforms/4xx/ibmnp405l.h>
 
 #ifndef __ASSEMBLY__
 /*

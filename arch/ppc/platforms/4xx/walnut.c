@@ -39,7 +39,7 @@
 #include <asm/page.h>
 #include <asm/time.h>
 #include <asm/io.h>
-#include <platforms/ibm_ocp.h>
+#include <platforms/4xx/ibm_ocp.h>
 
 #ifdef CONFIG_PPC_RTC
 #include <asm/todc.h>

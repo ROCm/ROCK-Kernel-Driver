@@ -31,7 +31,8 @@
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 
-#include "cpc700.h"
+#include <syslib/cpc700.h>
+
 #include "pal4.h"
 
 extern void pal4_find_bridges(void);

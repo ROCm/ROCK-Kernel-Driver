@@ -19,35 +19,35 @@
 #ifdef CONFIG_40x
 
 #if defined(CONFIG_ASH)
-#include <platforms/ash.h>
+#include <platforms/4xx/ash.h>
 #endif
 
 #if defined (CONFIG_CEDER)
-#include <platforms/ceder.h>
+#include <platforms/4xx/ceder.h>
 #endif
 
 #if defined(CONFIG_CPCI405)
-#include <platforms/cpci405.h>
+#include <platforms/4xx/cpci405.h>
 #endif
 
 #if defined(CONFIG_EP405)
-#include <platforms/ep405.h>
+#include <platforms/4xx/ep405.h>
 #endif
 
 #if defined(CONFIG_OAK)
-#include <platforms/oak.h>
+#include <platforms/4xx/oak.h>
 #endif
 
 #if defined(CONFIG_REDWOOD_4)
-#include <platforms/redwood.h>
+#include <platforms/4xx/redwood.h>
 #endif
 
 #if defined(CONFIG_REDWOOD_5)
-#include <platforms/redwood5.h>
+#include <platforms/4xx/redwood5.h>
 #endif
 
 #if defined(CONFIG_WALNUT)
-#include <platforms/walnut.h>
+#include <platforms/4xx/walnut.h>
 #endif
 
 #ifndef PPC4xx_MACHINE_NAME

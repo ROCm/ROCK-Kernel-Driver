@@ -14,7 +14,7 @@
 #define LSR_TEMT	0x40 /* Xmitter empty */
 #define LSR_ERR		0x80 /* Error */
 
-#include <platforms/ibm_ocp.h>
+#include <platforms/4xx/ibm_ocp.h>
 
 extern struct NS16550* COM_PORTS[];
 #ifndef NULL

@@ -17,8 +17,8 @@
 #ifdef __KERNEL__
 #ifndef __ASM_ASH_H__
 #define __ASM_ASH_H__
-#include <platforms/ibm_ocp.h>
-#include <platforms/ibmnp405h.h>
+#include <platforms/4xx/ibm_ocp.h>
+#include <platforms/4xx/ibmnp405h.h>
 
 #ifndef __ASSEMBLY__
 /*
