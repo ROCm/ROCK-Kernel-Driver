@@ -74,8 +74,6 @@ extern void *__bzero(void *, size_t);
 extern void *__memscan_zero(void *, size_t);
 extern void *__memscan_generic(void *, int, size_t);
 extern int __memcmp(const void *, const void *, __kernel_size_t);
-extern int __strncmp(const char *, const char *, __kernel_size_t);
-extern __kernel_size_t __strlen(const char *);
 extern __kernel_size_t strlen(const char *);
 extern void linux_sparc_syscall(void);
 extern void rtrap(void);
@@ -295,7 +293,6 @@ EXPORT_SYMBOL(__prom_getchild);
 EXPORT_SYMBOL(__prom_getsibling);
 
 /* sparc library symbols */
-EXPORT_SYMBOL(__strlen);
 EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strnlen);
 EXPORT_SYMBOL(__strlen_user);
@@ -341,7 +338,6 @@ EXPORT_SYMBOL(__bzero);
 EXPORT_SYMBOL(__memscan_zero);
 EXPORT_SYMBOL(__memscan_generic);
 EXPORT_SYMBOL(__memcmp);
-EXPORT_SYMBOL(__strncmp);
 EXPORT_SYMBOL(__memset);
 EXPORT_SYMBOL(memchr);
 
@@ -376,6 +372,7 @@ EXPORT_SYMBOL_NOVERS(memcmp);
 EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(memset);
 EXPORT_SYMBOL_NOVERS(memmove);
+EXPORT_SYMBOL_NOVERS(strncmp);
 
 void VISenter(void);
 /* RAID code needs this */
