@@ -45,7 +45,7 @@ spinlock_t vlan_group_lock = SPIN_LOCK_UNLOCKED;
 
 static char vlan_fullname[] = "802.1Q VLAN Support";
 static unsigned int vlan_version = 1;
-static unsigned int vlan_release = 7;
+static unsigned int vlan_release = 8;
 static char vlan_copyright[] = "Ben Greear <greearb@candelatech.com>";
 static char vlan_buggyright[] = "David S. Miller <davem@redhat.com>";
 
@@ -229,11 +229,12 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 			if (real_dev->features &
 			    (NETIF_F_HW_VLAN_RX | NETIF_F_HW_VLAN_FILTER)) {
 				real_dev->vlan_rx_kill_vid(real_dev, vlan_id);
-			} else {
-				br_write_lock(BR_NETPROTO_LOCK);
-				grp->vlan_devices[vlan_id] = NULL;
-				br_write_unlock(BR_NETPROTO_LOCK);
 			}
+
+			br_write_lock(BR_NETPROTO_LOCK);
+			grp->vlan_devices[vlan_id] = NULL;
+			br_write_unlock(BR_NETPROTO_LOCK);
+
 
 			/* Caller unregisters (and if necessary, puts)
 			 * VLAN device, but we get rid of the reference to
@@ -255,6 +256,12 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 				spin_lock_bh(&vlan_group_lock);
 				__grp_unhash(grp);
 				spin_unlock_bh(&vlan_group_lock);
+
+				/* Free the group, after we have removed it
+				 * from the hash.
+				 */
+				kfree(grp);
+				grp = NULL;
 
 				ret = 1;
 			}
@@ -626,6 +633,7 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 			ret = unregister_vlan_dev(dev,
 						  VLAN_DEV_INFO(vlandev)->vlan_id);
 
+			dev_put(vlandev);
 			unregister_netdevice(vlandev);
 
 			/* Group was destroyed? */

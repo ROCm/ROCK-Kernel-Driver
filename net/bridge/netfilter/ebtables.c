@@ -183,7 +183,7 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff **pskb,
 	point = (struct ebt_entry *)(private->hook_entry[hook]->data);
 	counter_base = cb_base + private->hook_entry[hook]->counter_offset;
 	// base for chain jumps
-	base = (char *)chaininfo;
+	base = private->entries;
 	i = 0;
 	while (i < nentries) {
 		if (ebt_basic_match(point, (**pskb).mac.ethernet, in, out))
