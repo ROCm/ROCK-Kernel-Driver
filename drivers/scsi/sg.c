@@ -2976,3 +2976,4 @@ sg_proc_version_info(char *buffer, int *len, off_t * begin,
 
 module_init(init_sg);
 module_exit(exit_sg);
+MODULE_ALIAS_CHARDEV_MAJOR(SCSI_GENERIC_MAJOR);
