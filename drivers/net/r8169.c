@@ -490,6 +490,13 @@ static int mdio_read(void __iomem *ioaddr, int RegAddr)
 	return value;
 }
 
+static void rtl8169_irq_mask_and_ack(void __iomem *ioaddr)
+{
+	RTL_W16(IntrMask, 0x0000);
+
+	RTL_W16(IntrStatus, 0xffff);
+}
+
 static unsigned int rtl8169_tbi_reset_pending(void __iomem *ioaddr)
 {
 	return RTL_R32(TBICSR) & TBIReset;
@@ -1234,6 +1241,9 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 		goto err_out_free_res;
 	}
 
+	// Unneeded ? Don't mess with Mrs. Murphy.
+	rtl8169_irq_mask_and_ack(ioaddr);
+
 	// Soft reset the chip. 
 	RTL_W8(ChipCmd, CmdReset);
 
@@ -1540,7 +1550,7 @@ err_free_irq:
 static void rtl8169_hw_reset(void __iomem *ioaddr)
 {
 	/* Disable interrupts */
-	RTL_W16(IntrMask, 0x0000);
+	rtl8169_irq_mask_and_ack(ioaddr);
 
 	/* Reset the chipset */
 	RTL_W8(ChipCmd, CmdReset);
@@ -1824,9 +1834,7 @@ static void rtl8169_wait_for_quiescence(struct net_device *dev)
 	/* Wait for any pending NAPI task to complete */
 	netif_poll_disable(dev);
 
-	RTL_W16(IntrMask, 0x0000);
-
-	RTL_W16(IntrStatus, 0xffff);
+	rtl8169_irq_mask_and_ack(ioaddr);
 
 	netif_poll_enable(dev);
 }
@@ -2244,11 +2252,8 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	struct rtl8169_private *tp = netdev_priv(dev);
 	int boguscnt = max_interrupt_work;
 	void __iomem *ioaddr = tp->mmio_addr;
-	int status = 0;
+	int status;
 	int handled = 0;
-
-	if (unlikely(!netif_running(dev)))
-		goto out;
 
 	do {
 		status = RTL_R16(IntrStatus);
@@ -2258,6 +2263,9 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			break;
 
 		handled = 1;
+
+		if (unlikely(!netif_running(dev)))
+			goto out_asic_stop;
 
 		status &= tp->intr_mask;
 		RTL_W16(IntrStatus,
@@ -2306,6 +2314,12 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	}
 out:
 	return IRQ_RETVAL(handled);
+
+out_asic_stop:
+	RTL_W8(ChipCmd, 0x00);
+	rtl8169_irq_mask_and_ack(ioaddr);
+	RTL_R16(CPlusCmd);
+	goto out;
 }
 
 #ifdef CONFIG_R8169_NAPI
@@ -2321,7 +2335,7 @@ static int rtl8169_poll(struct net_device *dev, int *budget)
 	*budget -= work_done;
 	dev->quota -= work_done;
 
-	if ((work_done < work_to_do) || !netif_running(dev)) {
+	if (work_done < work_to_do) {
 		netif_rx_complete(dev);
 		tp->intr_mask = 0xffff;
 		/*
