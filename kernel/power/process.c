@@ -23,14 +23,16 @@
  */
 #define TIMEOUT	(6 * HZ)
 
-#define INTERESTING(p) \
-			/* We don't want to touch kernel_threads..*/ \
-			if (p->flags & PF_IOTHREAD) \
-				continue; \
-			if (p == current) \
-				continue; \
-			if (p->state == TASK_ZOMBIE) \
-				continue;
+
+static inline int freezeable(struct task_struct * p)
+{
+	if ((p == current) || 
+	    (p->flags & PF_IOTHREAD) || 
+	    (p->state == TASK_ZOMBIE) ||
+	    (p->state == TASK_DEAD))
+		return 0;
+	return 1;
+}
 
 /* Refrigerator is place where frozen processes are stored :-). */
 void refrigerator(unsigned long flag)
@@ -71,8 +73,10 @@ int freeze_processes(void)
 		read_lock(&tasklist_lock);
 		do_each_thread(g, p) {
 			unsigned long flags;
-			INTERESTING(p);
-			if (p->flags & PF_FROZEN)
+			if (!freezeable(p))
+				continue;
+			if ((p->flags & PF_FROZEN) ||
+			    (p->state == TASK_STOPPED))
 				continue;
 
 			/* FIXME: smp problem here: we may not access other process' flags
@@ -104,15 +108,18 @@ void thaw_processes(void)
 	printk( "Restarting tasks..." );
 	read_lock(&tasklist_lock);
 	do_each_thread(g, p) {
-		INTERESTING(p);
-		
-		if (p->flags & PF_FROZEN) p->flags &= ~PF_FROZEN;
-		else
+		if (!freezeable(p))
+			continue;
+		if (p->flags & PF_FROZEN) {
+			p->flags &= ~PF_FROZEN;
+			wake_up_process(p);
+		} else
 			printk(KERN_INFO " Strange, %s not stopped\n", p->comm );
 		wake_up_process(p);
 	} while_each_thread(g, p);
 
 	read_unlock(&tasklist_lock);
+	schedule();
 	printk( " done\n" );
 	MDELAY(500);
 }
