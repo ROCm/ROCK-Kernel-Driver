@@ -41,7 +41,6 @@
 #include <linux/ipc.h>
 #include <linux/msg.h>
 #include <linux/shm.h>
-#include <asm/ipc.h>
 
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>

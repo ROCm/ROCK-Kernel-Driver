@@ -44,7 +44,6 @@
 
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
-#include <asm/ipc.h>
 
 #define AUDIT_VERSION		"0.2"
 #define AUDIT_MINOR		224
