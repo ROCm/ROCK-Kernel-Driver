@@ -191,6 +191,27 @@ scan_root_bus(int bus, struct pci_ops *ops, void *sysdata)
 	return b;
 }
 
+static int
+alloc_resource (char *name, struct resource *root, unsigned long start, unsigned long end, unsigned long flags)
+{
+	struct resource *res;
+
+	res = kmalloc(sizeof(*res), GFP_KERNEL);
+	if (!res)
+		return -ENOMEM;
+
+	memset(res, 0, sizeof(*res));
+	res->name = name;
+	res->start = start;
+	res->end = end;
+	res->flags = flags;
+
+	if (request_resource(root, res))
+		return -EBUSY;
+
+	return 0;
+}
+
 static u64
 add_io_space (struct acpi_resource_address64 *addr)
 {
@@ -251,14 +272,17 @@ add_window (struct acpi_resource *res, void *data)
 	struct acpi_resource_address64 addr;
 	acpi_status status;
 	unsigned long flags, offset = 0;
+	struct resource *root;
 
 	status = acpi_resource_to_address64(res, &addr);
 	if (ACPI_SUCCESS(status)) {
 		if (addr.resource_type == ACPI_MEMORY_RANGE) {
 			flags = IORESOURCE_MEM;
+			root = &iomem_resource;
 			offset = addr.address_translation_offset;
 		} else if (addr.resource_type == ACPI_IO_RANGE) {
 			flags = IORESOURCE_IO;
+			root = &ioport_resource;
 			offset = add_io_space(&addr);
 			if (offset == ~0)
 				return AE_OK;
@@ -270,6 +294,12 @@ add_window (struct acpi_resource *res, void *data)
 		window->resource.start  = addr.min_address_range;
 		window->resource.end    = addr.max_address_range;
 		window->offset		= offset;
+
+		if (alloc_resource(info->name, root, addr.min_address_range + offset,
+			addr.max_address_range + offset, flags))
+			printk(KERN_ERR "alloc 0x%lx-0x%lx from %s for %s failed\n",
+				addr.min_address_range + offset, addr.max_address_range + offset,
+				root->name, info->name);
 	}
 
 	return AE_OK;
