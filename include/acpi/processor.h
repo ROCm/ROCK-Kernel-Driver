@@ -135,7 +135,9 @@ struct acpi_processor {
 
 extern int acpi_processor_register_performance (
 	struct acpi_processor_performance * performance,
-	struct acpi_processor ** pr,
+	unsigned int cpu);
+extern void acpi_processor_unregister_performance (
+	struct acpi_processor_performance * performance,
 	unsigned int cpu);
 
 #endif
