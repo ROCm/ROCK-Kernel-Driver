@@ -1110,7 +1110,7 @@ static int __devinit mm_pci_probe(struct pci_dev *dev, const struct pci_device_i
 	release_mem_region(card->mem_base, card->mem_len);
  failed_req_mem:
 #endif
-	iounmap((void *) card->csr_base);
+	iounmap((void *) card->csr_remap);
  failed_remap_csr:
 	release_mem_region(card->csr_base, card->csr_len);
  failed_req_csr:

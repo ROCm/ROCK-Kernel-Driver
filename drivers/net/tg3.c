@@ -57,8 +57,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.8"
-#define DRV_MODULE_RELDATE	"August 1, 2003"
+#define DRV_MODULE_VERSION	"1.9"
+#define DRV_MODULE_RELDATE	"August 3, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -2199,7 +2199,6 @@ static irqreturn_t tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_RETVAL(handled);
 }
 
-static void tg3_init_rings(struct tg3 *);
 static int tg3_init_hw(struct tg3 *);
 static int tg3_halt(struct tg3 *);
 
@@ -2217,7 +2216,6 @@ static void tg3_reset_task(void *_data)
 	tp->tg3_flags2 &= ~TG3_FLG2_RESTART_TIMER;
 
 	tg3_halt(tp);
-	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 
 	spin_unlock(&tp->tx_lock);
@@ -2719,7 +2717,6 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 
 	tg3_set_mtu(dev, tp, new_mtu);
 
-	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 
 	spin_unlock(&tp->tx_lock);
@@ -2805,8 +2802,8 @@ static void tg3_free_rings(struct tg3 *tp)
  *
  * The chip has been shut down and the driver detached from
  * the networking, so no interrupts or new tx packets will
- * end up in the driver.  tp->{tx,}lock is not held and we are not
- * in an interrupt context and thus may sleep.
+ * end up in the driver.  tp->{tx,}lock are held and thus
+ * we may not sleep.
  */
 static void tg3_init_rings(struct tg3 *tp)
 {
@@ -3985,6 +3982,13 @@ static int tg3_reset_hw(struct tg3 *tp)
 		tw32(TG3PCI_PCISTATE, val);
 	}
 
+	/* Descriptor ring init may make accesses to the
+	 * NIC SRAM area to setup the TX descriptors, so we
+	 * can only do this after the hardware has been
+	 * successfully reset.
+	 */
+	tg3_init_rings(tp);
+
 	/* Clear statistics/status block in chip, and status block in ram. */
 	for (i = NIC_SRAM_STATS_BLK;
 	     i < NIC_SRAM_STATUS_BLK + TG3_HW_STATUS_SIZE;
@@ -4545,8 +4549,6 @@ static int tg3_open(struct net_device *dev)
 
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
-
-	tg3_init_rings(tp);
 
 	err = tg3_init_hw(tp);
 	if (err) {
@@ -5359,7 +5361,6 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		tp->tx_pending = ering.tx_pending;
 
 		tg3_halt(tp);
-		tg3_init_rings(tp);
 		tg3_init_hw(tp);
 		netif_wake_queue(tp->dev);
 		spin_unlock(&tp->tx_lock);
@@ -5403,7 +5404,6 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		else
 			tp->tg3_flags &= ~TG3_FLAG_PAUSE_TX;
 		tg3_halt(tp);
-		tg3_init_rings(tp);
 		tg3_init_hw(tp);
 		spin_unlock(&tp->tx_lock);
 		spin_unlock_irq(&tp->lock);
@@ -7017,7 +7017,6 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 		spin_lock_irq(&tp->lock);
 		spin_lock(&tp->tx_lock);
 
-		tg3_init_rings(tp);
 		tg3_init_hw(tp);
 
 		spin_unlock(&tp->tx_lock);
@@ -7048,7 +7047,6 @@ static int tg3_resume(struct pci_dev *pdev)
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
 
-	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 	tg3_enable_ints(tp);
 

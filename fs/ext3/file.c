@@ -60,7 +60,8 @@ ext3_file_write(struct kiocb *iocb, const char *buf, size_t count, loff_t pos)
 {
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_dentry->d_inode;
-	int ret, err;
+	ssize_t ret;
+	int err;
 
 	ret = generic_file_aio_write(iocb, buf, count, pos);
 
