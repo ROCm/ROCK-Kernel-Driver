@@ -472,6 +472,11 @@ static inline unsigned iminor(struct inode *inode)
 	return minor(inode->i_rdev);
 }
 
+static inline unsigned imajor(struct inode *inode)
+{
+	return major(inode->i_rdev);
+}
+
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
 	int pid;		/* pid or -pgrp where SIGIO should be sent */

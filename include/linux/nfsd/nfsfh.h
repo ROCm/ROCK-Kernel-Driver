@@ -294,7 +294,7 @@ fill_post_wcc(struct svc_fh *fhp)
 		/* how much do we care for accuracy with MinixFS? */
 		fhp->fh_post_blocks     = (inode->i_size+511) >> 9;
 	}
-	fhp->fh_post_rdev[0]    = htonl((u32)major(inode->i_rdev));
+	fhp->fh_post_rdev[0]    = htonl((u32)imajor(inode));
 	fhp->fh_post_rdev[1]    = htonl((u32)iminor(inode));
 	fhp->fh_post_atime      = inode->i_atime;
 	fhp->fh_post_mtime      = inode->i_mtime;

@@ -238,7 +238,7 @@ tapechar_open (struct inode *inode, struct file *filp)
 	struct tape_device *device;
 	int minor, rc;
 
-	if (major(filp->f_dentry->d_inode->i_rdev) != tapechar_major)
+	if (imajor(filp->f_dentry->d_inode) != tapechar_major)
 		return -ENODEV;
 	minor = iminor(filp->f_dentry->d_inode);
 	device = tape_get_device(minor / TAPE_MINORS_PER_DEV);

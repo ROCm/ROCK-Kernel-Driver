@@ -103,7 +103,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	   it out again with the appropriate data attached */
 	if (S_ISBLK(inode->i_mode) || S_ISCHR(inode->i_mode)) {
 		/* For these, we don't actually need to read the old node */
-		dev =  (major(dentry->d_inode->i_rdev) << 8) | 
+		dev =  (imajor(dentry->d_inode) << 8) | 
 			iminor(dentry->d_inode);
 		mdata = (char *)&dev;
 		mdatalen = sizeof(dev);

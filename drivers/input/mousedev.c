@@ -228,7 +228,7 @@ static int mousedev_open(struct inode * inode, struct file * file)
 	int i;
 
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
-	if (major(inode->i_rdev) == MISC_MAJOR)
+	if (imajor(inode) == MISC_MAJOR)
 		i = MOUSEDEV_MIX;
 	else
 #endif

@@ -73,7 +73,7 @@ static ssize_t snd_hwdep_write(struct file * file, const char *buf, size_t count
 
 static int snd_hwdep_open(struct inode *inode, struct file * file)
 {
-	int major = major(inode->i_rdev);
+	int major = imajor(inode);
 	int cardnum;
 	int device;
 	snd_hwdep_t *hw;

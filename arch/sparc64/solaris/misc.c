@@ -77,7 +77,7 @@ static u32 do_solaris_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u64 o
 			goto out;
 		else {
 			struct inode * inode = file->f_dentry->d_inode;
-			if(major(inode->i_rdev) == MEM_MAJOR &&
+			if(imajor(inode) == MEM_MAJOR &&
 			   iminor(inode) == 5) {
 				flags |= MAP_ANONYMOUS;
 				fput(file);

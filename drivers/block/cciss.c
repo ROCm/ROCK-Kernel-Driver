@@ -356,11 +356,11 @@ static void cmd_free(ctlr_info_t *h, CommandList_struct *c, int got_from_pool)
  */
 static int cciss_open(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
+	int ctlr = imajor(inode) - COMPAQ_CISS_MAJOR;
 	int dsk  = iminor(inode) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
-	printk(KERN_DEBUG "cciss_open %x (%x:%x)\n", inode->i_rdev, ctlr, dsk);
+	printk(KERN_DEBUG "cciss_open %s (%x:%x)\n", inode->i_bdev->bd_disk->disk_name, ctlr, dsk);
 #endif /* CCISS_DEBUG */ 
 
 	if (ctlr >= MAX_CTLR || hba[ctlr] == NULL)
@@ -386,11 +386,11 @@ static int cciss_open(struct inode *inode, struct file *filep)
  */
 static int cciss_release(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
+	int ctlr = imajor(inode) - COMPAQ_CISS_MAJOR;
 	int dsk  = iminor(inode) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
-	printk(KERN_DEBUG "cciss_release %x (%x:%x)\n", inode->i_rdev, ctlr, dsk);
+	printk(KERN_DEBUG "cciss_release %s (%x:%x)\n", inode->i_bdev->bd_disk->disk_name, ctlr, dsk);
 #endif /* CCISS_DEBUG */
 
 	/* fsync_dev(inode->i_rdev); */
@@ -406,7 +406,7 @@ static int cciss_release(struct inode *inode, struct file *filep)
 static int cciss_ioctl(struct inode *inode, struct file *filep, 
 		unsigned int cmd, unsigned long arg)
 {
-	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
+	int ctlr = imajor(inode) - COMPAQ_CISS_MAJOR;
 	int dsk  = iminor(inode) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG

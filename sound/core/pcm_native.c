@@ -1431,7 +1431,7 @@ static struct file *snd_pcm_file_fd(int fd)
 		return 0;
 	inode = file->f_dentry->d_inode;
 	if (!S_ISCHR(inode->i_mode) ||
-	    major(inode->i_rdev) != snd_major) {
+	    imajor(inode) != snd_major) {
 		fput(file);
 		return 0;
 	}
