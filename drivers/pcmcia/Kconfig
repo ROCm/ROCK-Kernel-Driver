@@ -39,18 +39,6 @@ config PCMCIA_DEBUG
 	  In all the above examples, N is the debugging verbosity
 	  level.
 
-config PCMCIA_OBSOLETE
-	bool "Enable obsolete PCCARD code"
-	depends on PCCARD != n
-	help
-	  Say Y here to enable some code found in the PCCARD subsystem
-	  which has no in-kernel usage, but might be needed for certain
-	  external PCMCIA drivers. If you do need to say Y here so that
-	  one such driver compiles and/or works correctly, please report
-	  this to linux-pcmcia <at> lists.infradead.org
-
-	  If unsure, say N
-
 config PCMCIA
 	tristate "16-bit PCMCIA support"
 	depends on PCCARD

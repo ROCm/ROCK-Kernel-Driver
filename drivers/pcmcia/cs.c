@@ -1147,37 +1147,6 @@ int pcmcia_modify_configuration(client_handle_t handle,
     return CS_SUCCESS;
 } /* modify_configuration */
 
-#ifdef CONFIG_PCMCIA_OBSOLETE
-
-/*======================================================================
-
-    Modify the attributes of a window returned by RequestWindow.
-
-======================================================================*/
-
-int pcmcia_modify_window(window_handle_t win, modwin_t *req)
-{
-    if ((win == NULL) || (win->magic != WINDOW_MAGIC))
-	return CS_BAD_HANDLE;
-
-    win->ctl.flags &= ~(MAP_ATTRIB|MAP_ACTIVE);
-    if (req->Attributes & WIN_MEMORY_TYPE)
-	win->ctl.flags |= MAP_ATTRIB;
-    if (req->Attributes & WIN_ENABLE)
-	win->ctl.flags |= MAP_ACTIVE;
-    if (req->Attributes & WIN_DATA_WIDTH_16)
-	win->ctl.flags |= MAP_16BIT;
-    if (req->Attributes & WIN_USE_WAIT)
-	win->ctl.flags |= MAP_USE_WAIT;
-    win->ctl.speed = req->AccessSpeed;
-    win->sock->ops->set_mem_map(win->sock, &win->ctl);
-    
-    return CS_SUCCESS;
-} /* modify_window */
-EXPORT_SYMBOL(pcmcia_modify_window);
-
-#endif /* CONFIG_PCMCIA_OBSOLETE */
-
 /* register pcmcia_callback */
 int pccard_register_pcmcia(struct pcmcia_socket *s, struct pcmcia_callback *c)
 {
@@ -1862,35 +1831,6 @@ int pcmcia_insert_card(struct pcmcia_socket *skt)
 
 	return ret;
 } /* insert_card */
-
-/*======================================================================
-
-    Maybe this should send a CS_EVENT_CARD_INSERTION event if we
-    haven't sent one to this client yet?
-    
-======================================================================*/
-
-#ifdef CONFIG_PCMCIA_OBSOLETE
-int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask)
-{
-    u_int events, bit;
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    if (handle->Attributes & CONF_EVENT_MASK_VALID)
-	return CS_BAD_SOCKET;
-    handle->EventMask = mask->EventMask;
-    events = handle->PendingEvents & handle->EventMask;
-    handle->PendingEvents -= events;
-    while (events != 0) {
-	bit = ((events ^ (events-1)) + 1) >> 1;
-	EVENT(handle, bit, CS_EVENT_PRI_LOW);
-	events -= bit;
-    }
-    return CS_SUCCESS;
-} /* set_event_mask */
-EXPORT_SYMBOL(pcmcia_set_event_mask);
-
-#endif /* CONFIG_PCMCIA_OBSOLETE */
 
 /*======================================================================
 
