@@ -347,7 +347,6 @@ static void __exit
 NCR_Q720_exit(void)
 {
 	mca_unregister_driver(&NCR_Q720_driver);
-	//scsi_sysfs_release_attributes(&NCR_Q720_driver_template);
 }
 
 module_init(NCR_Q720_init);

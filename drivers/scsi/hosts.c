@@ -151,12 +151,6 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 		dump_stack();
         }
 
-	/* if its not set in the template, use the default */
-	if (!sht->shost_attrs)
-		 sht->shost_attrs = scsi_sysfs_shost_attrs;
-	if (!sht->sdev_attrs)
-		 sht->sdev_attrs = scsi_sysfs_sdev_attrs;
-
 	shost = kmalloc(sizeof(struct Scsi_Host) + privsize, gfp_mask);
 	if (!shost)
 		return NULL;

@@ -329,12 +329,12 @@ struct scsi_host_template {
 #define SCSI_DEFAULT_HOST_BLOCKED	7
 
 	/*
-	 * Pointer to the sysfs class properties for this host
+	 * Pointer to the sysfs class properties for this host, NULL terminated.
 	 */
 	struct class_device_attribute **shost_attrs;
 
 	/*
-	 * Pointer to the SCSI device properties for this host
+	 * Pointer to the SCSI device properties for this host, NULL terminated.
 	 */
 	struct device_attribute **sdev_attrs;
 
@@ -499,8 +499,6 @@ static inline struct device *scsi_get_device(struct Scsi_Host *shost)
 {
         return shost->shost_gendev.parent;
 }
-
-extern void scsi_sysfs_release_attributes(struct scsi_host_template *);
 
 extern void scsi_unblock_requests(struct Scsi_Host *);
 extern void scsi_block_requests(struct Scsi_Host *);

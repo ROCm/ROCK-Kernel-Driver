@@ -165,7 +165,6 @@ static void __exit
 lasi700_exit(void)
 {
 	unregister_parisc_driver(&lasi700_driver);
-	scsi_sysfs_release_attributes(&lasi700_template);
 }
 
 module_init(lasi700_init);
