@@ -623,7 +623,7 @@ config BINFMT_ELF
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  will be called binfmt_elf. Saying M or N here is dangerous because
 	  some crucial programs on your system might be in ELF format.
 
 config BINFMT_MISC
@@ -648,7 +648,7 @@ config BINFMT_MISC
 	  use this part of the kernel.
 
 	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc.o. If you
+	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
 source "drivers/parport/Kconfig"
@@ -704,7 +704,7 @@ config IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.o.
+	  will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -731,7 +731,7 @@ config SCSI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.o.  If you want to compile it as
+	  The module will be called scsi_mod.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
@@ -855,7 +855,7 @@ config SERIAL
 
 	  If you want to compile this driver as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  serial.o.
+	  serial.
 	  [WARNING: Do not compile this driver as a module if you are using
 	  non-standard serial ports, since the configuration information will
 	  be lost when the driver is unloaded.  This limitation may be lifted
@@ -992,7 +992,7 @@ config PRINTER
 	  driver as a module however ( = code which can be inserted in and
 	  removed from the running kernel whenever you want), say M here and
 	  read <file:Documentation/modules.txt> and
-	  <file:Documentation/parport.txt>.  The module will be called lp.o.
+	  <file:Documentation/parport.txt>.  The module will be called lp.
 
 	  If you have several parallel ports, you can specify which ports to
 	  use with the "lp" kernel command line option.  (Try "man bootparam"
@@ -1036,7 +1036,7 @@ config PPDEV
 	  This support is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  ppdev.o.
+	  ppdev.
 
 	  If unsure, say N.
 
@@ -1108,7 +1108,7 @@ config SH_WDT
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called shwdt.o. If you want to compile it as a module,
+	  The module is called shwdt. If you want to compile it as a module,
 	  say M here and read Documentation/modules.txt.
 
 endmenu
@@ -1137,7 +1137,7 @@ config RTC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called rtc.o. If you want to compile it as a module,
+	  The module is called rtc. If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.
 
 source "drivers/char/pcmcia/Kconfig"
@@ -1175,7 +1175,7 @@ config SOUND
 	  and load that module after the PnP configuration is finished.  To do
 	  this, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/sound/README.modules>; the module will be
-	  called soundcore.o.
+	  called soundcore.
 
 	  I'm told that even without a sound card, you can make your computer
 	  say more than an occasional beep, by programming the PC speaker.

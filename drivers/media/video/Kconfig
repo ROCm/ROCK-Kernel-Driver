@@ -28,7 +28,7 @@ config VIDEO_BT848
 	  If you say Y or M here, you need to say Y or M to "I2C support" and
 	  "I2C bit-banging interfaces" in the character device section.
 
-	  This driver is available as a module called bttv.o ( = code
+	  This driver is available as a module called bttv ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -38,7 +38,7 @@ config VIDEO_PMS
 	depends on VIDEO_DEV
 	help
 	  Say Y if you have such a thing.  This driver is also available as a
-	  module called pms.o ( = code which can be inserted in and removed
+	  module called pms ( = code which can be inserted in and removed
 	  from the running kernel whenever you want).  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
@@ -52,7 +52,7 @@ config VIDEO_PLANB
 	  Otherwise, or if you don't understand a word, say N.
 	  See <http://www.cpu.lu/~mlan/planb.html> for more info.
 
-	  Saying M will compile this driver as a module (planb.o).
+	  Saying M will compile this driver as a module (planb).
 
 config VIDEO_BWQCAM
 	tristate "Quickcam BW Video For Linux"
@@ -61,7 +61,7 @@ config VIDEO_BWQCAM
 	  Say Y have if you the black and white version of the QuickCam
 	  camera. See the next option for the color version.
 
-	  This driver is also available as a module called bw-qcam.o ( = code
+	  This driver is also available as a module called bw-qcam ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -74,7 +74,7 @@ config VIDEO_CQCAM
 	  Connectix QuickCam.  If you have one of these cameras, say Y here,
 	  otherwise say N.  This driver does not work with the original
 	  monochrome QuickCam, QuickCam VC or QuickClip.  It is also available
-	  as a module (c-qcam.o).
+	  as a module (c-qcam).
 	  Read <file:Documentation/video4linux/CQcam.txt> for more information.
 
 config VIDEO_W9966
@@ -85,7 +85,7 @@ config VIDEO_W9966
 	  Currently tested with the LifeView FlyCam Supra.
 	  If you have one of these cameras, say Y here
 	  otherwise say N.
-	  This driver is also available as a module (w9966.o).
+	  This driver is also available as a module (w9966).
 
 	  Check out <file:Documentation/video4linux/w9966.txt> for more
 	  information.
@@ -103,7 +103,7 @@ config VIDEO_CPIA
 	  Please read <file:Documentation/video4linux/README.cpia> for more
 	  information.
 
-	  This driver is also available as a module (cpia.o).
+	  This driver is also available as a module (cpia).
 
 config VIDEO_CPIA_PP
 	tristate "CPiA Parallel Port Lowlevel Support"
@@ -113,7 +113,7 @@ config VIDEO_CPIA_PP
 	  Vision's CPiA (Colour Processor Interface ASIC), such as the
 	  Creative Webcam II. If you have the parallel port version of one
 	  of these cameras, say Y here, otherwise say N. It is also available
-	  as a module (cpia_pp.o).
+	  as a module (cpia_pp).
 
 config VIDEO_CPIA_USB
 	tristate "CPiA USB Lowlevel Support"
@@ -123,7 +123,7 @@ config VIDEO_CPIA_USB
 	  (Colour Processor Interface ASIC), such as the Creative Webcam II.
 	  If you have the USB version of one of these cameras, say Y here,
 	  otherwise say N. This will not work with the Creative Webcam III.
-	  It is also available as a module (cpia_usb.o).
+	  It is also available as a module (cpia_usb).
 
 config VIDEO_SAA5249
 	tristate "SAA5249 Teletext processor"
@@ -132,7 +132,7 @@ config VIDEO_SAA5249
 	  Support for I2C bus based teletext using the SAA5249 chip. At the
 	  moment this is only useful on some European WinTV cards.
 
-	  This driver is also available as a module called saa5249.o ( = code
+	  This driver is also available as a module called saa5249 ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -177,10 +177,16 @@ config VIDEO_ZORAN_BUZ
 config VIDEO_ZORAN_DC10
 	tristate "Miro DC10(+) support"
 	depends on VIDEO_ZORAN
+	help
+	  Say Y to support the Pinnacle Systems Studio DC10 plus TV/Video
+	  card.  Vendor page at <http://www.pinnaclesys.com/>.
 
 config VIDEO_ZORAN_LML33
 	tristate "Linux Media Labs LML33 support"
 	depends on VIDEO_ZORAN
+	help
+	  Say Y here to support the Linux Media Labs LML33 TV/Video card.
+	  Resources page is at <http://www.linuxmedialabs.com/lml33doc.html>.
 
 config VIDEO_ZR36120
 	tristate "Zoran ZR36120/36125 Video For Linux"
@@ -191,7 +197,7 @@ config VIDEO_ZR36120
 	  and Buster boards. Please read the material in
 	  <file:Documentation/video4linux/zr36120.txt> for more information.
 
-	  This driver is also available as a module called zr36120.o ( = code
+	  This driver is also available as a module called zr36120 ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -207,7 +213,7 @@ config VIDEO_MEYE
 	  If you say Y or M here, you need to say Y or M to "Sony Programmable
 	  I/O Control Device" in the character device section.
 
-	  This driver is available as a module called meye.o ( = code
+	  This driver is available as a module called meye ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -219,7 +225,7 @@ config VIDEO_SAA7134
 	  This is a video4linux driver for Philips SAA7130/7134 based
 	  TV cards.
 
-	  This driver is available as a module called saa7134.o ( = code
+	  This driver is available as a module called saa7134 ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.

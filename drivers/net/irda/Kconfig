@@ -9,7 +9,7 @@ config IRTTY_SIR
 	depends on IRDA
 	help
 	  Say Y here if you want to build support for the IrTTY line
-	  discipline.  If you want to compile it as a module (irtty-sir.o), say M
+	  discipline.  If you want to compile it as a module (irtty-sir), say M
 	  here and read <file:Documentation/modules.txt>.  IrTTY makes it
 	  possible to use Linux's own serial driver for all IrDA ports that
 	  are 16550 compatible.  Most IrDA chips are 16550 compatible so you
@@ -72,7 +72,7 @@ config IRTTY_OLD
 	depends on IRDA
 	help
 	  Say Y here if you want to build support for the IrTTY line
-	  discipline.  If you want to compile it as a module (irtty.o), say M
+	  discipline.  If you want to compile it as a module (irtty), say M
 	  here and read <file:Documentation/modules.txt>.  IrTTY makes it
 	  possible to use Linux's own serial driver for all IrDA ports that
 	  are 16550 compatible.  Most IrDA chips are 16550 compatible so you
@@ -86,7 +86,7 @@ config IRPORT_SIR
 	depends on IRDA
 	---help---
 	  Say Y here if you want to build support for the IrPORT IrDA device
-	  driver. If you want to compile it as a module (irport.o), say M here
+	  driver. If you want to compile it as a module (irport), say M here
 	  and read <file:Documentation/modules.txt>.  IrPORT can be used
 	  instead of IrTTY and sometimes this can be better.  One example is
 	  if your IrDA port does not have echo-canceling, which will work OK
@@ -188,7 +188,7 @@ config OLD_BELKIN_DONGLE
 	  Say Y here if you want to build support for the Adaptec Airport 1000
 	  and 2000 dongles.  If you want to compile it as a module, say M here
 	  and read <file:Documentation/modules.txt>.  The module will be
-	  called old_belkin.o.  Some information is contained in the comments
+	  called old_belkin.  Some information is contained in the comments
 	  at the top of <file:drivers/net/irda/old_belkin.c>.
 
 config EP7211_IR
@@ -230,7 +230,7 @@ config USB_IRDA
 	depends on IRDA && USB && EXPERIMENTAL
 	---help---
 	  Say Y here if you want to build support for the USB IrDA FIR Dongle
-	  device driver.  If you want to compile it as a module (irda-usb.o),
+	  device driver.  If you want to compile it as a module (irda-usb),
 	  say M here and read <file:Documentation/modules.txt>.  IrDA-USB
 	  support the various IrDA USB dongles available and most of their
 	  pecularities.  Those dongles plug in the USB port of your computer,
@@ -251,7 +251,7 @@ config NSC_FIR
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  nsc-ircc.o.
+	  nsc-ircc.
 
 config WINBOND_FIR
 	tristate "Winbond W83977AF (IR)"
@@ -264,7 +264,7 @@ config WINBOND_FIR
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  w83977af_ir.o.
+	  w83977af_ir.
 
 config TOSHIBA_OLD
 	tristate "Toshiba Type-O IR Port (old driver)"
@@ -276,7 +276,7 @@ config TOSHIBA_OLD
 	  maintained and will be removed in favor of the new driver.
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called toshoboe.o.
+	  The module will be called toshoboe.
 
 config TOSHIBA_FIR
 	tristate "Toshiba Type-O IR Port"
@@ -287,7 +287,7 @@ config TOSHIBA_FIR
 	  Libretto 100/110CT, Tecra 8100, Portege 7020 and many more laptops.
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called donauboe.o.
+	  The module will be called donauboe.
 
 config SMC_IRCC_FIR
 	tristate "SMC IrCC (EXPERIMENTAL)"
@@ -297,7 +297,7 @@ config SMC_IRCC_FIR
 	  Communications Controller.  It is used in the Fujitsu Lifebook 635t
 	  and Sony PCG-505TX.  If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.  The module will be
-	  called smc-ircc.o.
+	  called smc-ircc.
 
 config ALI_FIR
 	tristate "ALi M5123 FIR (EXPERIMENTAL)"
@@ -310,7 +310,7 @@ config ALI_FIR
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  ali-ircc.o.
+	  ali-ircc.
 
 config VLSI_FIR
 	tristate "VLSI 82C147 SIR/MIR/FIR (EXPERIMENTAL)"
@@ -322,7 +322,8 @@ config VLSI_FIR
 	  FIR (4Mbps) speeds.
 
 	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called vlsi_ir.o.
+	  <file:Documentation/modules.txt>. The module will be called
+	  vlsi_ir.
 
 config SA1100_FIR
 	tristate "SA1100 Internal IR"

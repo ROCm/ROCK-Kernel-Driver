@@ -208,6 +208,7 @@ EXPORT_SYMBOL(close_bdev_excl);
 EXPORT_SYMBOL(__brelse);
 EXPORT_SYMBOL(__bforget);
 EXPORT_SYMBOL(ll_rw_block);
+EXPORT_SYMBOL(sync_dirty_buffer);
 EXPORT_SYMBOL(submit_bh);
 EXPORT_SYMBOL(unlock_buffer);
 EXPORT_SYMBOL(__wait_on_buffer);
@@ -489,6 +490,9 @@ EXPORT_SYMBOL(xtime);
 EXPORT_SYMBOL(xtime_lock);
 EXPORT_SYMBOL(do_gettimeofday);
 EXPORT_SYMBOL(do_settimeofday);
+#if (BITS_PER_LONG < 64)
+EXPORT_SYMBOL(get_jiffies_64);
+#endif
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 EXPORT_SYMBOL(__might_sleep);
 #endif

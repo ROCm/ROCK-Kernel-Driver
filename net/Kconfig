@@ -31,7 +31,7 @@ config PACKET
 	  protocol implemented in the kernel, e.g. tcpdump.  If you want them
 	  to work, choose Y.
 
-	  This driver is also available as a module called af_packet.o ( =
+	  This driver is also available as a module called af_packet ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want).  If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>; if you use modprobe
@@ -149,7 +149,7 @@ config UNIX
 	  which can be inserted in and removed from the running kernel
 	  whenever you want).  If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>. The module will be
-	  called unix.o.  If you try building this as a module and you have
+	  called unix.  If you try building this as a module and you have
 	  said Y to "Kernel module loader support" above, be sure to add
 	  'alias net-pf-1 unix' to your /etc/modules.conf file. Note that
 	  several important services won't work correctly if you say M here
@@ -217,7 +217,7 @@ config IPV6
 
 	  This protocol support is also available as a module ( = code which
 	  can be inserted in and removed from the running kernel whenever you
-	  want). The module will be called ipv6.o. If you want to compile it
+	  want). The module will be called ipv6. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  It is safe to say N here for now.
@@ -329,7 +329,7 @@ config IPX
 	  The IPX driver would enlarge your kernel by about 16 KB. This driver
 	  is also available as a module ( = code which can be inserted in and
 	  removed from the running kernel whenever you want).  The module will
-	  be called ipx.o.  If you want to compile it as a module, say M here
+	  be called ipx.  If you want to compile it as a module, say M here
 	  and read <file:Documentation/modules.txt>.  Unless you want to
 	  integrate your Linux box with a local Novell network, say N.
 
@@ -358,7 +358,7 @@ config ATALK
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called appletalk.o.  If you want to compile it as a
+	  The module is called appletalk.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  You
 	  almost certainly want to compile it as a module so you can restart
 	  your AppleTalk stack without rebooting your machine.  I hear that
@@ -388,7 +388,7 @@ config DECNET
 
 	  The DECnet code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called decnet.o.
+	  The module is called decnet.
 
 source "net/decnet/Kconfig"
 
@@ -417,7 +417,7 @@ config BRIDGE
 	  If you want to compile this code as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called bridge.o.
+	  will be called bridge.
 
 	  If unsure, say N.
 
@@ -455,7 +455,7 @@ config X25
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called x25.o. If unsure, say N.
+	  will be called x25. If unsure, say N.
 
 config LAPB
 	tristate "LAPB Data Link Driver (EXPERIMENTAL)"
@@ -476,7 +476,7 @@ config LAPB
 	  If you want to compile this driver as a module though ( = code which
 	  can be inserted in and removed from the running kernel whenever you
 	  want), say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called lapb.o.  If unsure, say N.
+	  module will be called lapb.  If unsure, say N.
 
 config NET_DIVERT
 	bool "Frame Diverter (EXPERIMENTAL)"
@@ -521,7 +521,7 @@ config ECONET
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called econet.o. If you want to compile it as a
+	  The module will be called econet. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config ECONET_AUNUDP
@@ -561,7 +561,7 @@ config WAN_ROUTER
 	  information.
 
 	  The WAN routing support is also available as a module called
-	  wanrouter.o ( = code which can be inserted in and removed from the
+	  wanrouter ( = code which can be inserted in and removed from the
 	  running kernel whenever you want).  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
@@ -661,7 +661,7 @@ config NET_PKTGEN
 	  Documentation on how to use the packet generaor can be found
 	  at <file:Documentation/networking/pktgen.txt>.
 
-	  This code is also available as a module called pktgen.o ( = code
+	  This code is also available as a module called pktgen ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want).  If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.

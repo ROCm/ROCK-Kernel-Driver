@@ -116,6 +116,23 @@ struct user_struct * alloc_uid(uid_t uid)
 	return up;
 }
 
+void switch_uid(struct user_struct *new_user)
+{
+	struct user_struct *old_user;
+
+	/* What if a process setreuid()'s and this brings the
+	 * new uid over his NPROC rlimit?  We can check this now
+	 * cheaply with the new uid cache, so if it matters
+	 * we should be checking for it.  -DaveM
+	 */
+	old_user = current->user;
+	atomic_inc(&new_user->__count);
+	atomic_inc(&new_user->processes);
+	atomic_dec(&old_user->processes);
+	current->user = new_user;
+	free_uid(old_user);
+}
+
 
 static int __init uid_cache_init(void)
 {

@@ -70,7 +70,7 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 
 	/* gatt table should be empty. */
 	while (j < (pg_start + mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge.gatt_table[j]))
+		if (!PGE_EMPTY(agp_bridge->gatt_table[j]))
 			return -EBUSY;
 		j++;
 	}
@@ -81,7 +81,7 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
-		addr = agp_bridge.mask_memory(mem->memory[i], mem->type);
+		addr = agp_bridge->mask_memory(mem->memory[i], mem->type);
 
 		tmp = addr;
 		BUG_ON(tmp & 0xffffff0000000ffc);
@@ -89,9 +89,9 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 		pte |=(tmp & 0x00000000fffff000);
 		pte |= 1<<1|1<<0;
 
-		agp_bridge.gatt_table[j] = pte;
+		agp_bridge->gatt_table[j] = pte;
 	}
-	agp_bridge.tlb_flush(mem);
+	agp_bridge->tlb_flush(mem);
 	return 0;
 }
 
@@ -134,12 +134,12 @@ static int amd_x86_64_fetch_size(void)
 			temp = (temp & 0xe);
 			values = A_SIZE_32(x86_64_aperture_sizes);
 
-			for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
+			for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
 				if (temp == values[i].size_value) {
-					agp_bridge.previous_size =
-					    agp_bridge.current_size = (void *) (values + i);
+					agp_bridge->previous_size =
+					    agp_bridge->current_size = (void *) (values + i);
 
-					agp_bridge.aperture_size_idx = i;
+					agp_bridge->aperture_size_idx = i;
 					return values[i].size;
 				}
 			}
@@ -225,14 +225,14 @@ static int amd_8151_configure(void)
 	int current_size;
 	int tmp, tmp2, i;
 	u64 aperbar;
-	unsigned long gatt_bus = virt_to_phys(agp_bridge.gatt_table_real);
+	unsigned long gatt_bus = virt_to_phys(agp_bridge->gatt_table_real);
 
 	/* Configure AGP regs in each x86-64 host bridge. */
 	pci_for_each_dev(dev) {
 		if (dev->bus->number==0 &&
 			PCI_FUNC(dev->devfn)==3 &&
 			PCI_SLOT(dev->devfn)>=24 && PCI_SLOT(dev->devfn)<=31) {
-			agp_bridge.gart_bus_addr = amd_x86_64_configure(dev,gatt_bus);
+			agp_bridge->gart_bus_addr = amd_x86_64_configure(dev,gatt_bus);
 			hammer = dev;
 
 			/*
@@ -248,7 +248,7 @@ static int amd_8151_configure(void)
 
 	/* Shadow x86-64 registers into 8151 registers. */
 
-	dev = agp_bridge.dev;
+	dev = agp_bridge->dev;
 	if (!dev) 
 		return -ENODEV;
 
@@ -315,7 +315,7 @@ static void amd_8151_cleanup(void)
 
 static unsigned long amd_8151_mask_memory(unsigned long addr, int type)
 {
-	return addr | agp_bridge.masks[0].mask;
+	return addr | agp_bridge->masks[0].mask;
 }
 
 
@@ -368,12 +368,12 @@ static void agp_x86_64_agp_enable(u32 mode)
 	}
 
 
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &command);
+	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &command);
 
 	command = agp_collect_device_status(mode, command);
 	command |= 0x100;
 
-	pci_write_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_COMMAND, command);
+	pci_write_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_COMMAND, command);
 
 	agp_device_command(command, 1);
 }
@@ -381,30 +381,30 @@ static void agp_x86_64_agp_enable(u32 mode)
 
 static int __init amd_8151_setup (struct pci_dev *pdev)
 {
-	agp_bridge.masks = amd_8151_masks;
-	agp_bridge.aperture_sizes = (void *) amd_8151_sizes;
-	agp_bridge.size_type = U32_APER_SIZE;
-	agp_bridge.num_aperture_sizes = 7;
-	agp_bridge.dev_private_data = NULL;
-	agp_bridge.needs_scratch_page = FALSE;
-	agp_bridge.configure = amd_8151_configure;
-	agp_bridge.fetch_size = amd_x86_64_fetch_size;
-	agp_bridge.cleanup = amd_8151_cleanup;
-	agp_bridge.tlb_flush = amd_x86_64_tlbflush;
-	agp_bridge.mask_memory = amd_8151_mask_memory;
-	agp_bridge.agp_enable = agp_x86_64_agp_enable;
-	agp_bridge.cache_flush = global_cache_flush;
-	agp_bridge.create_gatt_table = agp_generic_create_gatt_table;
-	agp_bridge.free_gatt_table = agp_generic_free_gatt_table;
-	agp_bridge.insert_memory = x86_64_insert_memory;
-	agp_bridge.remove_memory = agp_generic_remove_memory;
-	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge.free_by_type = agp_generic_free_by_type;
-	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge.suspend = agp_generic_suspend;
-	agp_bridge.resume = agp_generic_resume;
-	agp_bridge.cant_use_aperture = 0;
+	agp_bridge->masks = amd_8151_masks;
+	agp_bridge->aperture_sizes = (void *) amd_8151_sizes;
+	agp_bridge->size_type = U32_APER_SIZE;
+	agp_bridge->num_aperture_sizes = 7;
+	agp_bridge->dev_private_data = NULL;
+	agp_bridge->needs_scratch_page = FALSE;
+	agp_bridge->configure = amd_8151_configure;
+	agp_bridge->fetch_size = amd_x86_64_fetch_size;
+	agp_bridge->cleanup = amd_8151_cleanup;
+	agp_bridge->tlb_flush = amd_x86_64_tlbflush;
+	agp_bridge->mask_memory = amd_8151_mask_memory;
+	agp_bridge->agp_enable = agp_x86_64_agp_enable;
+	agp_bridge->cache_flush = global_cache_flush;
+	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
+	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
+	agp_bridge->insert_memory = x86_64_insert_memory;
+	agp_bridge->remove_memory = agp_generic_remove_memory;
+	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
+	agp_bridge->free_by_type = agp_generic_free_by_type;
+	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge->suspend = agp_generic_suspend;
+	agp_bridge->resume = agp_generic_resume;
+	agp_bridge->cant_use_aperture = 0;
 	return 0;
 }
 
@@ -420,11 +420,11 @@ static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_
 	if (cap_ptr == 0)
 		return -ENODEV;
 
-	agp_bridge.dev = dev;
-	agp_bridge.capndx = cap_ptr;
+	agp_bridge->dev = dev;
+	agp_bridge->capndx = cap_ptr;
 
 	/* Fill in the mode register */
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
+	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode);
 	amd_8151_setup(dev);
 	amd_k8_agp_driver.dev = dev;
 	agp_register_driver(&amd_k8_agp_driver);
@@ -458,9 +458,9 @@ int __init agp_amdk8_init(void)
 
 	ret_val = pci_module_init(&agp_amdk8_pci_driver);
 	if (ret_val)
-		agp_bridge.type = NOT_SUPPORTED;
+		agp_bridge->type = NOT_SUPPORTED;
 
-	agp_bridge.type = AMD_8151;
+	agp_bridge->type = AMD_8151;
 
 	return ret_val;
 }

@@ -54,7 +54,7 @@ config COSA
 
 	  The driver will be compiled as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cosa.o. For general information about
+	  The module will be called cosa. For general information about
 	  modules read <file:Documentation/modules.txt>.
 
 #
@@ -76,7 +76,7 @@ config COMX
 	  use this driver.
 
 	  If you want to compile this as a module, say M and read
-	  <file:Documentation/modules.txt>.  The module will be called comx.o.
+	  <file:Documentation/modules.txt>.  The module will be called comx.
 
 config COMX_HW_COMX
 	tristate "Support for COMX/CMX/HiCOMX boards"
@@ -90,7 +90,7 @@ config COMX_HW_COMX
 
 	  If you want to compile this as a module, say M and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  comx-hw-comx.o.
+	  comx-hw-comx.
 
 config COMX_HW_LOCOMX
 	tristate "Support for LoCOMX board"
@@ -101,7 +101,7 @@ config COMX_HW_LOCOMX
 
 	  If you want to compile this as a module, say M and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  comx-hw-locomx.o.
+	  comx-hw-locomx.
 
 config COMX_HW_MIXCOM
 	tristate "Support for MixCOM board"
@@ -119,7 +119,7 @@ config COMX_HW_MIXCOM
 
 	  If you want to compile this as a module, say M and read
 	  <file:Documentation/modules.txt>. The module will be called
-	  comx-hw-mixcom.o.
+	  comx-hw-mixcom.
 
 config COMX_HW_MUNICH
 	tristate "Support for MUNICH based boards: SliceCOM, PCICOM (WelCOM)"
@@ -130,7 +130,7 @@ config COMX_HW_MUNICH
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called comx-hw-munich.o. If you want to compile it
+	  The module will be called comx-hw-munich. If you want to compile it
 	  as a module, say M here and read Documentation/modules.txt.
 
 	  Read linux/Documentation/networking/slicecom.txt for help on
@@ -147,7 +147,7 @@ config COMX_PROTO_PPP
 
 	  If you want to compile this as a module, say M and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  comx-proto-ppp.o.
+	  comx-proto-ppp.
 
 config COMX_PROTO_LAPB
 	tristate "Support for LAPB protocol on MultiGate boards"
@@ -158,7 +158,7 @@ config COMX_PROTO_LAPB
 
 	  If you want to compile this as a module, say M and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  comx-proto-lapb.o.
+	  comx-proto-lapb.
 
 config COMX_PROTO_FR
 	tristate "Support for Frame Relay on MultiGate boards"
@@ -169,7 +169,7 @@ config COMX_PROTO_FR
 
 	  If you want to compile this as a module, say M and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  comx-proto-fr.o.
+	  comx-proto-fr.
 
 #
 # The Etinc driver has not been tested as non-modular yet.
@@ -185,7 +185,7 @@ config DSCC4
 
 	  The driver will be compiled as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called dscc4.o. For general information about
+	  The module will be called dscc4. For general information about
 	  modules read <file:Documentation/modules.txt>.
 
 #
@@ -214,7 +214,7 @@ config LANMEDIA
 	  To change setting such as syncPPP vs cisco HDLC or clock source you
 	  will need lmcctl.  It is available at <ftp://ftp.lanmedia.com/>.
 
-	  This code is also available as a module called lmc.o ( = code
+	  This code is also available as a module called lmc ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -229,7 +229,7 @@ config SEALEVEL_4021
 	  This driver can only be compiled as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  If you want to do that, say M here. The module will be called
-	  sealevel.o.
+	  sealevel.
 
 config SYNCLINK_SYNCPPP
 	tristate "SyncLink HDLC/SYNCPPP support"
@@ -317,7 +317,7 @@ config PC300
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read Documentation/modules.txt. The module will be
-	  called pc300.o.
+	  called pc300.
 
 	  If you haven't heard about it, it's safe to say N.
 
@@ -369,7 +369,7 @@ config FARSYNC
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want)
 	  say M here and read <file:Documentation/modules.txt>.
-	  The module will be called farsync.o and if you want the module to be
+	  The module will be called farsync and if you want the module to be
 	  automatically loaded when the interface is referenced then you
 	  should add "alias hdlcX farsync" to /etc/modules.conf for each
 	  interface, where X is 0, 1, 2, ...
@@ -408,7 +408,7 @@ config DLCI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called dlci.o. If you want to compile it as a
+	  The module will be called dlci. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config DLCI_COUNT
@@ -441,7 +441,7 @@ config SDLA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sdla.o. If you want to compile it as a
+	  The module will be called sdla. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 # Wan router core.
@@ -491,7 +491,7 @@ config VENDOR_SANGOMA
 
 	  The driver will be compiled as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called wanpipe.o.  For general information about
+	  The module will be called wanpipe.  For general information about
 	  modules read <file:Documentation/modules.txt>.
 
 config WANPIPE_CHDLC
@@ -583,7 +583,7 @@ config CYCLADES_SYNC
 
 	  The driver will be compiled as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cyclomx.o. For general information about
+	  The module will be called cyclomx. For general information about
 	  modules read <file:Documentation/modules.txt>.
 
 config CYCLOMX_X25
@@ -610,7 +610,7 @@ config LAPBETHER
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called lapbether.o.  If unsure, say N.
+	  will be called lapbether.  If unsure, say N.
 
 config X25_ASY
 	tristate "X.25 async driver (EXPERIMENTAL)"
@@ -625,7 +625,7 @@ config X25_ASY
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called x25_asy.o.  If unsure, say N.
+	  will be called x25_asy.  If unsure, say N.
 
 config SBNI
 	tristate "Granch SBNI12 Leased Line adapter support"
@@ -634,7 +634,7 @@ config SBNI
 	  This is a driver for ISA SBNI12-xx cards which are low cost
 	  alternatives to leased line modems. Say Y if you want to insert
 	  the driver into the kernel or say M to compile it as a module (the
-	  module will be called sbni.o).
+	  module will be called sbni).
 
 	  You can find more information and last versions of drivers and
 	  utilities at <http://www.granch.ru/>. If you have any question you

@@ -17,7 +17,7 @@ config SOUND_BT878
 	  don't need this driver as most TV cards handle sound with a short
 	  cable from the TV card to your sound card's line-in.
 
-	  This driver is available as a module called btaudio.o ( = code
+	  This driver is available as a module called btaudio ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -528,7 +528,7 @@ config SOUND_OSS
 	help
 	  OSS is the Open Sound System suite of sound card drivers.  They make
 	  sound programming easier since they provide a common API.  Say Y or
-	  M here (the module will be called sound.o) if you haven't found a
+	  M here (the module will be called sound) if you haven't found a
 	  driver for your sound card above, then pick your driver from the
 	  list below.
 
@@ -552,7 +552,7 @@ config SOUND_DMAP
 	  until the shutdown. This option is only useful if you said Y to
 	  "OSS sound modules", above. If you said M to "OSS sound modules"
 	  then you can get the persistent DMA buffer functionality by passing
-	  the command-line argument "dmabuf=1" to the sound.o module.
+	  the command-line argument "dmabuf=1" to the sound module.
 
 	  Say Y unless you have 16MB or more RAM or a PCI sound card.
 
@@ -600,7 +600,7 @@ config SOUND_ACI_MIXER
 	  miropcm20 driver (say M or Y here and go back to "Multimedia
 	  devices" -> "Radio Adapters").
 
-	  This driver is also available as a module and will be called aci.o.
+	  This driver is also available as a module and will be called aci.
 
 config SOUND_CS4232
 	tristate "Crystal CS4232 based (PnP) cards"
@@ -861,7 +861,7 @@ config SOUND_SB
 	  command line.
 
 	  You can say M here to compile this driver as a module; the module is
-	  called sb.o.
+	  called sb.
 
 config SOUND_AWE32_SYNTH
 	tristate "AWE32 synth"

@@ -23,7 +23,7 @@ config PCMCIA_AHA152X
 	  Say Y here if you intend to attach this type of PCMCIA SCSI host
 	  adapter to your computer.
 
-	  This driver is also available as a module called aha152x_cs.o ( =
+	  This driver is also available as a module called aha152x_cs ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -35,7 +35,7 @@ config PCMCIA_FDOMAIN
 	  Say Y here if you intend to attach this type of PCMCIA SCSI host
 	  adapter to your computer.
 
-	  This driver is also available as a module called fdomain_cs.o ( =
+	  This driver is also available as a module called fdomain_cs ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want).  If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -48,7 +48,7 @@ config PCMCIA_NINJA_SCSI
 	  your computer, say Y here and read
 	  <file:Documentation/scsi/NinjaSCSI.txt>.
 
-	  This driver is also available as a module called nsp_cs.o ( =
+	  This driver is also available as a module called nsp_cs ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -60,7 +60,7 @@ config PCMCIA_QLOGIC
 	  Say Y here if you intend to attach this type of PCMCIA SCSI host
 	  adapter to your computer.
 
-	  This driver is also available as a module called qlogic_cs.o ( =
+	  This driver is also available as a module called qlogic_cs ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want).  If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.

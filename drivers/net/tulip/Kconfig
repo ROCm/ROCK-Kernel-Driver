@@ -27,7 +27,7 @@ config DE2104X
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tulip.o.  If you want to compile it as a
+	  The module will be called tulip.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -48,7 +48,7 @@ config TULIP
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tulip.o.  If you want to compile it as a
+	  The module will be called tulip.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -86,7 +86,7 @@ config DE4X5
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called de4x5.o.  If you want to compile it as a
+	  The module will be called de4x5.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -110,7 +110,7 @@ config DM9102
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called dmfe.o.  If you want to compile it as a
+	  The module will be called dmfe.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -125,7 +125,7 @@ config PCMCIA_XIRCOM
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xircom_cb.o.  If you want to compile
+	  The module will be called xircom_cb.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>. If unsure, say N.
 
@@ -140,7 +140,7 @@ config PCMCIA_XIRTULIP
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xircom_tulip_cb.o.  If you want to compile
+	  The module will be called xircom_tulip_cb.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>. If unsure, say N.
 

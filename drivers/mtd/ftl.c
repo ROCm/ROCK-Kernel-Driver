@@ -841,7 +841,7 @@ static int ftl_open(struct inode *inode, struct file *file)
 		return -EROFS;
 	}
     
-	DEBUG(0, "ftl_cs: ftl_open(%s)\n", inode->i_bdev->b_disk->disk_name);
+	DEBUG(0, "ftl_cs: ftl_open(%s)\n", inode->i_bdev->bd_disk->disk_name);
 
 	atomic_inc(&partition->open);
 
@@ -855,7 +855,7 @@ static release_t ftl_close(struct inode *inode, struct file *file)
 	partition_t *part = inode->i_bdev->bd_disk->private_data;
 	int i;
     
-	DEBUG(0, "ftl_cs: ftl_close(%s)\n", inode->i_bdev->b_disk->disk_name);
+	DEBUG(0, "ftl_cs: ftl_close(%s)\n", inode->i_bdev->bd_disk->disk_name);
 
 	/* Wait for any pending erase operations to complete */
 	if (part->mtd->sync)

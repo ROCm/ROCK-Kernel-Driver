@@ -11,7 +11,7 @@ config JOYSTICK_IFORCE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called iforce.o. If you want to compile it as a
+	  The module will be called iforce. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config JOYSTICK_IFORCE_USB

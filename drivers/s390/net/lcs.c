@@ -61,7 +61,7 @@
  */
 #define VERSION_LCS_C  "$Revision: 1.42 $"
 
-static const char *version="LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
+static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 
 /**
  * Some prototypes.
