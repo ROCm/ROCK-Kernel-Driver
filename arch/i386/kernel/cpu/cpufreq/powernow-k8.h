@@ -143,7 +143,7 @@ struct pst_s {
 #define dprintk(msg...) do { } while(0)
 #endif
 
-static inline int core_voltage_pre_transition(struct powernow_k8_data *data, u32 reqvid);
-static inline int core_voltage_post_transition(struct powernow_k8_data *data, u32 reqvid);
-static inline int core_frequency_transition(struct powernow_k8_data *data, u32 reqfid);
+static int core_voltage_pre_transition(struct powernow_k8_data *data, u32 reqvid);
+static int core_voltage_post_transition(struct powernow_k8_data *data, u32 reqvid);
+static int core_frequency_transition(struct powernow_k8_data *data, u32 reqfid);
 

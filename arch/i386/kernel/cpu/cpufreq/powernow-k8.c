@@ -83,7 +83,7 @@ static u32 convert_fid_to_vco_fid(u32 fid)
  * Return 1 if the pending bit is set. Unless we just instructed the processor
  * to transition to a new state, seeing this bit set is really bad news.
  */
-static inline int pending_bit_stuck(void)
+static int pending_bit_stuck(void)
 {
 	u32 lo, hi;
 
@@ -116,14 +116,14 @@ static int query_current_values_with_pending_wait(struct powernow_k8_data *data)
 }
 
 /* the isochronous relief time */
-static inline void count_off_irt(struct powernow_k8_data *data)
+static void count_off_irt(struct powernow_k8_data *data)
 {
 	udelay((1 << data->irt) * 10);
 	return;
 }
 
 /* the voltage stabalization time */
-static inline void count_off_vst(struct powernow_k8_data *data)
+static void count_off_vst(struct powernow_k8_data *data)
 {
 	udelay(data->vstable * VST_UNITS_20US);
 	return;
