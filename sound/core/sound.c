@@ -36,7 +36,7 @@
 
 static int major = CONFIG_SND_MAJOR;
 int snd_major;
-static int cards_limit = SNDRV_CARDS;
+static int cards_limit = 1;
 #ifdef CONFIG_DEVFS_FS
 static int device_mode = S_IFCHR | S_IRUGO | S_IWUGO;
 #endif
@@ -50,7 +50,7 @@ MODULE_PARM(major, "i");
 MODULE_PARM_DESC(major, "Major # for sound driver.");
 MODULE_PARM_SYNTAX(major, "default:116,skill:devel");
 MODULE_PARM(cards_limit, "i");
-MODULE_PARM_DESC(cards_limit, "Count of soundcards installed in the system.");
+MODULE_PARM_DESC(cards_limit, "Count of auto-loadable soundcards.");
 MODULE_PARM_SYNTAX(cards_limit, "default:8,skill:advanced");
 #ifdef CONFIG_DEVFS_FS
 MODULE_PARM(device_mode, "i");
@@ -58,6 +58,10 @@ MODULE_PARM_DESC(device_mode, "Device file permission mask for devfs.");
 MODULE_PARM_SYNTAX(device_mode, "default:0666,base:8");
 #endif
 
+/* this one holds the actual max. card number currently available.
+ * as default, it's identical with cards_limit option.  when more
+ * modules are loaded manually, this limit number increases, too.
+ */
 int snd_ecards_limit;
 
 static struct list_head snd_minors_hash[SNDRV_CARDS];
@@ -224,7 +228,7 @@ int snd_register_device(int type, snd_card_t * card, int dev, snd_minor_t * reg,
 	}
 	list_add_tail(&preg->list, &snd_minors_hash[SNDRV_MINOR_CARD(minor)]);
 #ifdef CONFIG_DEVFS_FS
-	if (strncmp(name, "controlC", 8))     /* created in sound.c */
+	if (strncmp(name, "controlC", 8) || card->number >= cards_limit)
 		devfs_mk_cdev(MKDEV(major, minor), S_IFCHR | device_mode, "snd/%s", name);
 #endif
 	up(&sound_mutex);
@@ -257,6 +261,8 @@ int snd_unregister_device(int type, snd_card_t * card, int dev)
 #ifdef CONFIG_DEVFS_FS
 	if (strncmp(mptr->name, "controlC", 8))	/* created in sound.c */
 		devfs_remove("snd/%s", mptr->name);
+	else if (card->number >= cards_limit)
+		devfs_remove("snd/%s", mptr->name); /* manualy created */
 #endif
 	list_del(&mptr->list);
 	up(&sound_mutex);

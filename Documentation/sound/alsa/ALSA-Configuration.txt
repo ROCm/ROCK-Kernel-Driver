@@ -55,9 +55,10 @@ Module parameters
     major	- major # for sound driver
 		- default is 116
     cards_limit
-		- specifies card limit # (1-8)
-		- good for kmod support if you do not want to search
-		  for soundcards which are not installed in your system
+		- specifies card limit # for auto-loading (1-8)
+		- default is 1
+		- for auto-loading more than 1 card, specify this option
+		  together with snd-card-X aliases.
     device_mode
 		- specifies permission mask for dynamic sound device filesystem
 		  (available only when DEVFS is enabled)
