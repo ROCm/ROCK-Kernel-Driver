@@ -2125,6 +2125,41 @@ static int __init serial8250_late_console_init(void)
 }
 late_initcall(serial8250_late_console_init);
 
+static int __init find_port(struct uart_port *p)
+{
+	int line;
+	struct uart_port *port;
+
+	for (line = 0; line < UART_NR; line++) {
+		port = &serial8250_ports[line].port;
+		if (p->iotype == port->iotype &&
+		    p->iobase == port->iobase &&
+		    p->membase == port->membase)
+			return line;
+	}
+	return -ENODEV;
+}
+
+int __init serial8250_start_console(struct uart_port *port, char *options)
+{
+	int line;
+
+	line = find_port(port);
+	if (line < 0)
+		return -ENODEV;
+
+	add_preferred_console("ttyS", line, options);
+	printk("Adding console on ttyS%d at %s 0x%lx (options '%s')\n",
+		line, port->iotype == UPIO_MEM ? "MMIO" : "I/O port",
+		port->iotype == UPIO_MEM ? (unsigned long) port->mapbase :
+		    (unsigned long) port->iobase, options);
+	if (!(serial8250_console.flags & CON_ENABLED)) {
+		serial8250_console.flags &= ~CON_PRINTBUFFER;
+		register_console(&serial8250_console);
+	}
+	return line;
+}
+
 #define SERIAL8250_CONSOLE	&serial8250_console
 #else
 #define SERIAL8250_CONSOLE	NULL

@@ -32,7 +32,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.79 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.83 $"
 
 #include "zfcp_ext.h"
 
@@ -3347,11 +3347,9 @@ zfcp_erp_action_cleanup(int action, struct zfcp_adapter *adapter,
 		if ((result == ZFCP_ERP_SUCCEEDED)
 		    && (!atomic_test_mask(ZFCP_STATUS_UNIT_TEMPORARY,
 					  &unit->status))
-		    && (!unit->device)) {
+		    && (!unit->device))
  			scsi_add_device(unit->port->adapter->scsi_host, 0,
  					unit->port->scsi_id, unit->scsi_lun);
-			zfcp_cb_unit_add(unit);
-		}
 		zfcp_unit_put(unit);
 		break;
 	case ZFCP_ERP_ACTION_REOPEN_PORT_FORCED:
@@ -3587,9 +3585,3 @@ zfcp_erp_unit_access_changed(struct zfcp_unit *unit)
 }
 
 #undef ZFCP_LOG_AREA
-
-EXPORT_SYMBOL(zfcp_erp_wait);
-EXPORT_SYMBOL(zfcp_erp_port_reopen);
-EXPORT_SYMBOL(zfcp_erp_unit_reopen);
-EXPORT_SYMBOL(zfcp_erp_unit_shutdown);
-EXPORT_SYMBOL(zfcp_fsf_request_timeout_handler);

@@ -894,7 +894,7 @@ int aac_read(struct scsi_cmnd * scsicmd, int cid)
 	aac_io_done(scsicmd);
 	fib_complete(cmd_fibcontext);
 	fib_free(cmd_fibcontext);
-	return -1;
+	return 0;
 }
 
 static int aac_write(struct scsi_cmnd * scsicmd, int cid)
@@ -928,7 +928,7 @@ static int aac_write(struct scsi_cmnd * scsicmd, int cid)
 	if (!(cmd_fibcontext = fib_alloc(dev))) {
 		scsicmd->result = DID_ERROR << 16;
 		aac_io_done(scsicmd);
-		return -1;
+		return 0;
 	}
 	fib_init(cmd_fibcontext);
 
@@ -1004,7 +1004,7 @@ static int aac_write(struct scsi_cmnd * scsicmd, int cid)
 
 	fib_complete(cmd_fibcontext);
 	fib_free(cmd_fibcontext);
-	return -1;
+	return 0;
 }
 
 

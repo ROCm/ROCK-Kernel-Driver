@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/initrd.h>
+#include <linux/root_dev.h>
 #include <linux/seq_file.h>
 #include <linux/irq.h>
 

@@ -12,17 +12,13 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 
 #include "isdn_divert.h"
 
 MODULE_DESCRIPTION("ISDN4Linux: Call diversion support");
 MODULE_AUTHOR("Werner Cornelius");
 MODULE_LICENSE("GPL");
-
-/********************/
-/* needed externals */
-/********************/
-extern int printk(const char *fmt,...);
 
 /****************************************/
 /* structure containing interface to hl */

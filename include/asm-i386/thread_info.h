@@ -10,6 +10,7 @@
 #ifdef __KERNEL__
 
 #include <linux/config.h>
+#include <linux/compiler.h>
 #include <asm/page.h>
 
 #ifndef __ASSEMBLY__
@@ -92,7 +93,7 @@ static inline struct thread_info *current_thread_info(void)
 }
 
 /* how to get the current stack pointer from C */
-register unsigned long current_stack_pointer asm("esp");
+register unsigned long current_stack_pointer asm("esp") __attribute_used__;
 
 /* thread information allocation */
 #ifdef CONFIG_DEBUG_STACK_USAGE

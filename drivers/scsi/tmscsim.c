@@ -526,21 +526,23 @@ dc390_StartSCSI( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_sr
     DC390_write8 (ScsiCmd, CLEAR_FIFO_CMD);		/* Flush FIFO */
     DEBUG1(printk (KERN_INFO "DC390: Start SCSI command: %02x (Sync:%02x)\n",\
             scmd->cmnd[0], pDCB->SyncMode));
-    disc_allowed = pDCB->DevMode & EN_DISCONNECT_;
-    try_sync_nego = 0;
+
     /* Don't disconnect on AUTO_REQSENSE, cause it might be an
      * Contingent Allegiance Condition (6.6), where no tags should be used.
      * All other have to be allowed to disconnect to prevent Incorrect 
      * Initiator Connection (6.8.2/6.5.2) */
     /* Changed KG, 99/06/06 */
-    if( /*(((pSRB->pcmd->cmnd[0] == INQUIRY) || (pSRB->pcmd->cmnd[0] == REQUEST_SENSE) ||
-	 * (pSRB->pcmd->cmnd[0] == TEST_UNIT_READY)) && pACB->scan_devices)
-		||*/ (pSRB->SRBFlag & AUTO_REQSENSE) ) 
-      disc_allowed = 0;
-    if ( (pDCB->SyncMode & SYNC_ENABLE) && (pDCB->TargetLUN == 0) && sdev->sdtr &&
-	( ( ( (scmd->cmnd[0] == REQUEST_SENSE) || (pSRB->SRBFlag & AUTO_REQSENSE) )
-	  && !(pDCB->SyncMode & SYNC_NEGO_DONE) ) || (scmd->cmnd[0] == INQUIRY) ) )
+    if (! (pSRB->SRBFlag & AUTO_REQSENSE))
+	disc_allowed = pDCB->DevMode & EN_DISCONNECT_;
+    else
+	disc_allowed = 0;
+
+    if ((pDCB->SyncMode & SYNC_ENABLE) && pDCB->TargetLUN == 0 && sdev->sdtr &&
+	(((scmd->cmnd[0] == REQUEST_SENSE || (pSRB->SRBFlag & AUTO_REQSENSE)) &&
+	  !(pDCB->SyncMode & SYNC_NEGO_DONE)) || scmd->cmnd[0] == INQUIRY))
       try_sync_nego = 1;
+    else
+      try_sync_nego = 0;
 
     pSRB->MsgCnt = 0;
     cmd = SEL_W_ATN;
@@ -548,7 +550,7 @@ dc390_StartSCSI( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_sr
     /* Change 99/05/31: Don't use tags when not disconnecting (BUSY) */
     if ((pDCB->SyncMode & EN_TAG_QUEUEING) && disc_allowed && scsi_populate_tag_msg(scmd, tag)) {
 	DC390_write8(ScsiFifo, tag[0]);
-	pDCB->TagMask |= (1 << tag[1]);
+	pDCB->TagMask |= 1 << tag[1];
 	pSRB->TagNumber = tag[1];
 	DC390_write8(ScsiFifo, tag[1]);
 	DEBUG1(printk(KERN_INFO "DC390: Select w/DisCn for Cmd %li (SRB %p), block tag %02x\n", scmd->pid, pSRB, tag[1]));
@@ -556,7 +558,7 @@ dc390_StartSCSI( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_sr
     } else {
 	/* No TagQ */
 //no_tag:
-	DEBUG1(printk(KERN_INFO "DC390: Select w%s/DisCn for Cmd %li (SRB %p), No TagQ\n", (disc_allowed ? "" : "o"), scmd->pid, pSRB));
+	DEBUG1(printk(KERN_INFO "DC390: Select w%s/DisCn for Cmd %li (SRB %p), No TagQ\n", disc_allowed ? "" : "o", scmd->pid, pSRB));
     }
 
     pSRB->SRBState = SRB_START_;
@@ -1461,14 +1463,13 @@ dc390_CommandPhase( struct dc390_acb* pACB, struct dc390_srb* pSRB, u8 *psstatus
     }
     else
     {
-	u8 bval = 0;
 	DC390_write8 (ScsiFifo, REQUEST_SENSE);
 	pDCB = pACB->pActiveDCB;
 	DC390_write8 (ScsiFifo, pDCB->TargetLUN << 5);
-	DC390_write8 (ScsiFifo, bval);
-	DC390_write8 (ScsiFifo, bval);
+	DC390_write8 (ScsiFifo, 0);
+	DC390_write8 (ScsiFifo, 0);
 	DC390_write8 (ScsiFifo, sizeof(pSRB->pcmd->sense_buffer));
-	DC390_write8 (ScsiFifo, bval);
+	DC390_write8 (ScsiFifo, 0);
 	DEBUG0(printk(KERN_DEBUG "DC390: AutoReqSense (CmndPhase)!\n"));
     }
     pSRB->SRBState = SRB_COMMAND;
@@ -1773,7 +1774,7 @@ dc390_RequestSense(struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_
 static void
 dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB )
 {
-    u8  bval, status;
+    u8 status;
     struct scsi_cmnd *pcmd;
 
     pcmd = pSRB->pcmd;
@@ -1824,9 +1825,7 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 	}
 	else if( status_byte(status) == QUEUE_FULL )
 	{
-	    bval = (u8) pDCB->GoingSRBCnt;
-	    bval--;
-	    pDCB->MaxCommand = bval;
+	    scsi_track_queue_full(pcmd->device, pDCB->GoingSRBCnt - 1);
 	    pcmd->use_sg = pSRB->SavedSGCount;
 	    DEBUG0 (printk ("DC390: RETRY pid %li (%02x), target %02i-%02i\n", pcmd->pid, pcmd->cmnd[0], pcmd->device->id, pcmd->device->lun));
 	    pSRB->TotalXferredLen = 0;
@@ -1974,7 +1973,7 @@ static int DC390_queuecommand(struct scsi_cmnd *cmd,
 	struct dc390_dcb *dcb = sdev->hostdata;
 	struct dc390_srb *srb;
 
-	if (dcb->MaxCommand <= dcb->GoingSRBCnt)
+	if (sdev->queue_depth <= dcb->GoingSRBCnt)
 		goto device_busy;
 	if (acb->pActiveDCB)
 		goto host_busy;
@@ -2177,7 +2176,6 @@ static int dc390_slave_alloc(struct scsi_device *scsi_device)
 	pDCB->pDCBACB = pACB;
 	pDCB->TargetID = id;
 	pDCB->TargetLUN = lun;
-	pDCB->MaxCommand = 1;
 
 	/*
 	 * Some values are for all LUNs: Copy them 
@@ -2270,8 +2268,7 @@ static int dc390_slave_configure(struct scsi_device *sdev)
 	acb->scan_devices = 0;
 	if (sdev->tagged_supported && (dcb->DevMode & TAG_QUEUEING_)) {
 		dcb->SyncMode |= EN_TAG_QUEUEING;
-		dcb->MaxCommand = dcb->pDCBACB->TagMaxNum;
-		scsi_activate_tcq(sdev, dcb->MaxCommand);
+		scsi_activate_tcq(sdev, acb->TagMaxNum);
 	}
 
 	return 0;
@@ -2287,10 +2284,10 @@ static struct scsi_host_template driver_template = {
 	.queuecommand		= DC390_queuecommand,
 	.eh_abort_handler	= DC390_abort,
 	.eh_bus_reset_handler	= DC390_bus_reset,
-	.can_queue		= 42,
+	.can_queue		= 1,
 	.this_id		= 7,
 	.sg_tablesize		= SG_ALL,
-	.cmd_per_lun		= 16,
+	.cmd_per_lun		= 1,
 	.use_clustering		= DISABLE_CLUSTERING,
 };
 
@@ -2300,198 +2297,157 @@ static struct scsi_host_template driver_template = {
  *
  **********************************************************************/
 
-
-static void __devinit dc390_EnDisableCE(u8 mode, struct pci_dev *pdev, u8 *regval)
+static void __devinit dc390_eeprom_prepare_read(struct pci_dev *pdev, u8 cmd)
 {
-    u8 bval;
+	u8 carryFlag = 1, j = 0x80, bval;
+	int i;
 
-    bval = 0;
-    if(mode == ENABLE_CE)
-	*regval = 0xc0;
-    else
-	*regval = 0x80;
-    pci_write_config_byte(pdev, *regval, bval);
-    if(mode == DISABLE_CE)
-        pci_write_config_byte(pdev, *regval, bval);
-    udelay(160);
-}
+	for (i = 0; i < 9; i++) {
+		if (carryFlag) {
+			pci_write_config_byte(pdev, 0x80, 0x40);
+			bval = 0xc0;
+		} else
+			bval = 0x80;
 
+		udelay(160);
+		pci_write_config_byte(pdev, 0x80, bval);
+		udelay(160);
+		pci_write_config_byte(pdev, 0x80, 0);
+		udelay(160);
 
-/* Override EEprom values with explicitly set values */
-static void __devinit dc390_EEprom_Override (u8 index)
-{
-    u8 *ptr = (u8 *) dc390_eepromBuf[index];
-    u8 id;
-    
-    /* Adapter Settings */
-    if (tmscsim[0] != -2)
-	ptr[EE_ADAPT_SCSI_ID] = (u8)tmscsim[0];	/* Adapter ID */
-    if (tmscsim[3] != -2)
-	ptr[EE_MODE2] = (u8)tmscsim[3];
-    if (tmscsim[5] != -2)
-	ptr[EE_DELAY] = tmscsim[5];			/* Reset delay */
-    if (tmscsim[4] != -2)
-	ptr[EE_TAG_CMD_NUM] = (u8)tmscsim[4];	/* Tagged Cmds */
-    
-    /* Device Settings */
-    for (id = 0; id < MAX_SCSI_ID; id++)
-    {
-	if (tmscsim[2] != -2)
-		ptr[id<<2] = (u8)tmscsim[2];		/* EE_MODE1 */
-	if (tmscsim[1] != -2)
-		ptr[(id<<2) + 1] = (u8)tmscsim[1];	/* EE_Speed */
-    }
-}
-
-/* Handle "-1" case */
-static void __devinit dc390_check_for_safe_settings (void)
-{
-	if (tmscsim[0] == -1 || tmscsim[0] > 15) /* modules-2.0.0 passes -1 as string */
-	{
-		tmscsim[0] = 7; tmscsim[1] = 4;
-		tmscsim[2] = 0x09; tmscsim[3] = 0x0f;
-		tmscsim[4] = 2; tmscsim[5] = 10;
-		printk (KERN_INFO "DC390: Using safe settings.\n");
+		carryFlag = (cmd & j) ? 1 : 0;
+		j >>= 1;
 	}
 }
 
+static u16 __devinit dc390_eeprom_get_data(struct pci_dev *pdev)
+{
+	int i;
+	u16 wval = 0;
+	u8 bval;
 
-static int __initdata tmscsim_def[] = {7, 0 /* 10MHz */,
-		PARITY_CHK_ | SEND_START_ | EN_DISCONNECT_
-		| SYNC_NEGO_ | TAG_QUEUEING_,
-		MORE2_DRV | GREATER_1G | RST_SCSI_BUS | ACTIVE_NEGATION
-		/* | NO_SEEK */
-# ifdef CONFIG_SCSI_MULTI_LUN
-		| LUN_CHECK
-# endif
-		, 3 /* 16 Tags per LUN */, 1 /* s delay after Reset */ };
+	for (i = 0; i < 16; i++) {
+		wval <<= 1;
+
+		pci_write_config_byte(pdev, 0x80, 0x80);
+		udelay(160);
+		pci_write_config_byte(pdev, 0x80, 0x40);
+		udelay(160);
+		pci_read_config_byte(pdev, 0x00, &bval);
+
+		if (bval == 0x22)
+			wval |= 1;
+	}
+
+	return wval;
+}
+
+static void __devinit dc390_read_eeprom(struct pci_dev *pdev, u16 *ptr)
+{
+	u8 cmd = EEPROM_READ, i;
+
+	for (i = 0; i < 0x40; i++) {
+		pci_write_config_byte(pdev, 0xc0, 0);
+		udelay(160);
+
+		dc390_eeprom_prepare_read(pdev, cmd++);
+		*ptr++ = dc390_eeprom_get_data(pdev);
+
+		pci_write_config_byte(pdev, 0x80, 0);
+		pci_write_config_byte(pdev, 0x80, 0);
+		udelay(160);
+	}
+}
+
+/* Override EEprom values with explicitly set values */
+static void __devinit dc390_eeprom_override(u8 index)
+{
+	u8 *ptr = (u8 *) dc390_eepromBuf[index], id;
+
+	/* Adapter Settings */
+	if (tmscsim[0] != -2)
+		ptr[EE_ADAPT_SCSI_ID] = (u8)tmscsim[0];	/* Adapter ID */
+	if (tmscsim[3] != -2)
+		ptr[EE_MODE2] = (u8)tmscsim[3];
+	if (tmscsim[5] != -2)
+		ptr[EE_DELAY] = tmscsim[5];		/* Reset delay */
+	if (tmscsim[4] != -2)
+		ptr[EE_TAG_CMD_NUM] = (u8)tmscsim[4];	/* Tagged Cmds */
+
+	/* Device Settings */
+	for (id = 0; id < MAX_SCSI_ID; id++) {
+		if (tmscsim[2] != -2)
+			ptr[id << 2] = (u8)tmscsim[2];		/* EE_MODE1 */
+		if (tmscsim[1] != -2)
+			ptr[(id << 2) + 1] = (u8)tmscsim[1];	/* EE_Speed */
+	}
+}
+
+static int __devinitdata tmscsim_def[] = {
+	7,
+	0 /* 10MHz */,
+	PARITY_CHK_ | SEND_START_ | EN_DISCONNECT_ | SYNC_NEGO_ | TAG_QUEUEING_,
+	MORE2_DRV | GREATER_1G | RST_SCSI_BUS | ACTIVE_NEGATION | LUN_CHECK,
+	3 /* 16 Tags per LUN */,
+	1 /* s delay after Reset */,
+};
 
 /* Copy defaults over set values where missing */
 static void __devinit dc390_fill_with_defaults (void)
 {
 	int i;
-	PARSEDEBUG(printk(KERN_INFO "DC390: setup %08x %08x %08x %08x %08x %08x\n", tmscsim[0],\
-			  tmscsim[1], tmscsim[2], tmscsim[3], tmscsim[4], tmscsim[5]));
-	for (i = 0; i < 6; i++)
-	{
+
+	for (i = 0; i < 6; i++) {
 		if (tmscsim[i] < 0 || tmscsim[i] > 255)
 			tmscsim[i] = tmscsim_def[i];
 	}
+
 	/* Sanity checks */
-	if (tmscsim[0] >   7) tmscsim[0] =   7;
-	if (tmscsim[1] >   7) tmscsim[1] =   4;
-	if (tmscsim[4] >   5) tmscsim[4] =   4;
-	if (tmscsim[5] > 180) tmscsim[5] = 180;
+	if (tmscsim[0] > 7)
+		tmscsim[0] = 7;
+	if (tmscsim[1] > 7)
+		tmscsim[1] = 4;
+	if (tmscsim[4] > 5)
+		tmscsim[4] = 4;
+	if (tmscsim[5] > 180)
+		tmscsim[5] = 180;
 }
 
-static void __devinit dc390_EEpromOutDI(struct pci_dev *pdev, u8 *regval, u8 Carry)
+static void __devinit dc390_check_eeprom(struct pci_dev *pdev, u8 index)
 {
-    u8 bval;
+	u8 interpd[] = {1, 3, 5, 10, 16, 30, 60, 120};
+	u8 EEbuf[128];
+	u16 *ptr = (u16 *)EEbuf, wval = 0;
+	int i;
 
-    bval = 0;
-    if(Carry)
-    {
-	bval = 0x40;
-	*regval = 0x80;
-	pci_write_config_byte(pdev, *regval, bval);
-    }
-    udelay(160);
-    bval |= 0x80;
-    pci_write_config_byte(pdev, *regval, bval);
-    udelay(160);
-    bval = 0;
-    pci_write_config_byte(pdev, *regval, bval);
-    udelay(160);
-}
+	dc390_read_eeprom(pdev, ptr);
+	memcpy(dc390_eepromBuf[index], EEbuf, EE_ADAPT_SCSI_ID);
+	memcpy(&dc390_eepromBuf[index][EE_ADAPT_SCSI_ID], 
+	       &EEbuf[REAL_EE_ADAPT_SCSI_ID], EE_LEN - EE_ADAPT_SCSI_ID);
 
+	dc390_eepromBuf[index][EE_DELAY] = interpd[dc390_eepromBuf[index][EE_DELAY]];
 
-static u8 __devinit dc390_EEpromInDO(struct pci_dev *pdev)
-{
-    u8 bval;
+	for (i = 0; i < 0x40; i++, ptr++)
+		wval += *ptr;
 
-    pci_write_config_byte(pdev, 0x80, 0x80);
-    udelay(160);
-    pci_write_config_byte(pdev, 0x80, 0x40);
-    udelay(160);
-    pci_read_config_byte(pdev, 0x00, &bval);
-    if(bval == 0x22)
-	return(1);
-    else
-	return(0);
-}
+	/* no Tekram EEprom found */
+	if (wval != 0x1234) {
+		int speed;
 
+		printk(KERN_INFO "DC390_init: No EEPROM found! Trying default settings ...\n");
 
-static u16 __devinit dc390_EEpromGetData1(struct pci_dev *pdev)
-{
-    u8 i;
-    u8 carryFlag;
-    u16 wval;
+		/*
+		 * XXX(hch): bogus, because we might have tekram and
+		 *           non-tekram hbas in a single machine.
+		 */
+		dc390_fill_with_defaults();
 
-    wval = 0;
-    for(i=0; i<16; i++)
-    {
-	wval <<= 1;
-	carryFlag = dc390_EEpromInDO(pdev);
-	wval |= carryFlag;
-    }
-    return(wval);
-}
-
-
-static void __devinit dc390_Prepare(struct pci_dev *pdev, u8 *regval, u8 EEpromCmd)
-{
-    u8 i,j;
-    u8 carryFlag;
-
-    carryFlag = 1;
-    j = 0x80;
-    for(i=0; i<9; i++)
-    {
-	dc390_EEpromOutDI(pdev, regval, carryFlag);
-	carryFlag = (EEpromCmd & j) ? 1 : 0;
-	j >>= 1;
-    }
-}
-
-
-static void __devinit dc390_ReadEEprom(struct pci_dev *pdev, u16 *ptr)
-{
-    u8   regval,cmd;
-    u8   i;
-
-    cmd = EEPROM_READ;
-    for(i=0; i<0x40; i++)
-    {
-	dc390_EnDisableCE(ENABLE_CE, pdev, &regval);
-	dc390_Prepare(pdev, &regval, cmd++);
-	*ptr++ = dc390_EEpromGetData1(pdev);
-	dc390_EnDisableCE(DISABLE_CE, pdev, &regval);
-    }
-}
-
-
-static void __devinit dc390_interpret_delay (u8 index)
-{
-    char interpd [] = {1,3,5,10,16,30,60,120};
-    dc390_eepromBuf[index][EE_DELAY] = interpd [dc390_eepromBuf[index][EE_DELAY]];
-}
-
-static u8 __devinit dc390_CheckEEpromCheckSum(struct pci_dev *pdev, u8 index)
-{
-    u8  i;
-    char  EEbuf[128];
-    u16 wval, *ptr = (u16 *)EEbuf;
-
-    dc390_ReadEEprom(pdev, ptr);
-    memcpy (dc390_eepromBuf[index], EEbuf, EE_ADAPT_SCSI_ID);
-    memcpy (&dc390_eepromBuf[index][EE_ADAPT_SCSI_ID], 
-	    &EEbuf[REAL_EE_ADAPT_SCSI_ID], EE_LEN - EE_ADAPT_SCSI_ID);
-    dc390_interpret_delay (index);
-    
-    wval = 0;
-    for(i=0; i<0x40; i++, ptr++)
-	wval += *ptr;
-    return (wval == 0x1234 ? 0 : 1);
+		speed = dc390_clock_speed[tmscsim[1]];
+		printk(KERN_INFO "DC390: Used defaults: AdaptID=%i, SpeedIdx=%i (%i.%i MHz), "
+		       "DevMode=0x%02x, AdaptMode=0x%02x, TaggedCmnds=%i (%i), DelayReset=%is\n", 
+		       tmscsim[0], tmscsim[1], speed / 10, speed % 10,
+		       (u8)tmscsim[2], (u8)tmscsim[3], tmscsim[4], 2 << (tmscsim[4]), tmscsim[5]);
+	}
 }
 
 static void __devinit dc390_init_hw(struct dc390_acb *pACB, u8 index)
@@ -2565,26 +2521,11 @@ static int __devinit dc390_probe_one(struct pci_dev *pdev,
 	pACB = (struct dc390_acb *)shost->hostdata;
 	memset(pACB, 0, sizeof(struct dc390_acb));
 
-	if (dc390_CheckEEpromCheckSum(pdev, dc390_adapterCnt)) {
-		int speed;
-		printk(KERN_INFO "DC390_init: No EEPROM found! Trying default settings ...\n");
-		dc390_check_for_safe_settings();
-		dc390_fill_with_defaults();
-		dc390_EEprom_Override(dc390_adapterCnt);
-		speed = dc390_clock_speed[tmscsim[1]];
-		printk(KERN_INFO "DC390: Used defaults: AdaptID=%i, SpeedIdx=%i (%i.%i MHz),"
-		       " DevMode=0x%02x, AdaptMode=0x%02x, TaggedCmnds=%i (%i), DelayReset=%is\n", 
-		       tmscsim[0], tmscsim[1], speed/10, speed%10,
-		       (u8)tmscsim[2], (u8)tmscsim[3], tmscsim[4], 2 << (tmscsim[4]), tmscsim[5]);
-	} else {
-		dc390_check_for_safe_settings();
-		dc390_EEprom_Override(dc390_adapterCnt);
-	}
+	dc390_check_eeprom(pdev, dc390_adapterCnt);
+	dc390_eeprom_override(dc390_adapterCnt);
 
 	io_port = pci_resource_start(pdev, 0);
 
-	shost->can_queue = MAX_CMD_QUEUE;
-	shost->cmd_per_lun = MAX_CMD_PER_LUN;
 	shost->this_id = dc390_eepromBuf[dc390_adapterCnt][EE_ADAPT_SCSI_ID];
 	shost->io_port = io_port;
 	shost->n_io_port = 0x80;
@@ -2708,6 +2649,16 @@ static struct pci_driver dc390_driver = {
 
 static int __init dc390_module_init(void)
 {
+	if (tmscsim[0] == -1 || tmscsim[0] > 15) {
+		tmscsim[0] = 7;
+		tmscsim[1] = 4;
+		tmscsim[2] = PARITY_CHK_ | TAG_QUEUEING_;
+		tmscsim[3] = MORE2_DRV | GREATER_1G | RST_SCSI_BUS | ACTIVE_NEGATION;
+		tmscsim[4] = 2;
+		tmscsim[5] = 10;
+		printk (KERN_INFO "DC390: Using safe settings.\n");
+	}
+
 	return pci_module_init(&dc390_driver);
 }
 

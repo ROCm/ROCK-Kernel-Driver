@@ -394,6 +394,7 @@ static int smsc47m1_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct i2c_client *new_client;
 	struct smsc47m1_data *data;
 	int err = 0;
+	int fan1, fan2, pwm1, pwm2;
 
 	if (!i2c_is_isa_adapter(adapter)) {
 		return 0;
@@ -423,6 +424,22 @@ static int smsc47m1_detect(struct i2c_adapter *adapter, int address, int kind)
 	new_client->id = smsc47m1_id++;
 	init_MUTEX(&data->update_lock);
 
+	/* If no function is properly configured, there's no point in
+	   actually registering the chip. */
+	fan1 = (smsc47m1_read_value(new_client, SMSC47M1_REG_TPIN(0)) & 0x05)
+	       == 0x05;
+	fan2 = (smsc47m1_read_value(new_client, SMSC47M1_REG_TPIN(1)) & 0x05)
+	       == 0x05;
+	pwm1 = (smsc47m1_read_value(new_client, SMSC47M1_REG_PPIN(0)) & 0x05)
+	       == 0x04;
+	pwm2 = (smsc47m1_read_value(new_client, SMSC47M1_REG_PPIN(1)) & 0x05)
+	       == 0x04;
+	if (!(fan1 || fan2 || pwm1 || pwm2)) {
+		dev_warn(&new_client->dev, "Device is not configured, will not use\n");
+		err = -ENODEV;
+		goto error_free;
+	}
+
 	if ((err = i2c_attach_client(new_client)))
 		goto error_free;
 
@@ -434,8 +451,7 @@ static int smsc47m1_detect(struct i2c_adapter *adapter, int address, int kind)
 	   function. */
 	smsc47m1_update_device(&new_client->dev, 1);
 
-	if ((smsc47m1_read_value(new_client, SMSC47M1_REG_TPIN(0)) & 0x05)
-	    == 0x05) {
+	if (fan1) {
 		device_create_file(&new_client->dev, &dev_attr_fan1_input);
 		device_create_file(&new_client->dev, &dev_attr_fan1_min);
 		device_create_file(&new_client->dev, &dev_attr_fan1_div);
@@ -443,8 +459,7 @@ static int smsc47m1_detect(struct i2c_adapter *adapter, int address, int kind)
 		dev_dbg(&new_client->dev, "Fan 1 not enabled by hardware, "
 			"skipping\n");
 
-	if ((smsc47m1_read_value(new_client, SMSC47M1_REG_TPIN(1)) & 0x05)
-	    == 0x05) {
+	if (fan2) {
 		device_create_file(&new_client->dev, &dev_attr_fan2_input);
 		device_create_file(&new_client->dev, &dev_attr_fan2_min);
 		device_create_file(&new_client->dev, &dev_attr_fan2_div);
@@ -452,15 +467,13 @@ static int smsc47m1_detect(struct i2c_adapter *adapter, int address, int kind)
 		dev_dbg(&new_client->dev, "Fan 2 not enabled by hardware, "
 			"skipping\n");
 
-	if ((smsc47m1_read_value(new_client, SMSC47M1_REG_PPIN(0)) & 0x05)
-	    == 0x04) {
+	if (pwm1) {
 		device_create_file(&new_client->dev, &dev_attr_pwm1);
 		device_create_file(&new_client->dev, &dev_attr_pwm1_enable);
 	} else
 		dev_dbg(&new_client->dev, "PWM 1 not enabled by hardware, "
 			"skipping\n");
-	if ((smsc47m1_read_value(new_client, SMSC47M1_REG_PPIN(1)) & 0x05)
-	    == 0x04) {
+	if (pwm2) {
 		device_create_file(&new_client->dev, &dev_attr_pwm2);
 		device_create_file(&new_client->dev, &dev_attr_pwm2_enable);
 	} else

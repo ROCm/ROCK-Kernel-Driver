@@ -3131,8 +3131,9 @@ static int st_ioctl(struct inode *inode, struct file *file,
 	 * access to the device is prohibited.
 	 */
 	retval = scsi_nonblockable_ioctl(STp->device, cmd_in, p, file);
-	if (!scsi_block_when_processing_errors(STp->device) || !retval)
+	if (!scsi_block_when_processing_errors(STp->device) || retval != -ENODEV)
 		goto out;
+	retval = 0;
 
 	cmd_type = _IOC_TYPE(cmd_in);
 	cmd_nr = _IOC_NR(cmd_in);

@@ -166,14 +166,12 @@ static void __init map_vsyscall(void)
 
 static int __init vsyscall_init(void)
 {
-	if ((unsigned long) &vgettimeofday != VSYSCALL_ADDR(__NR_vgettimeofday))
-		panic("vgettimeofday link addr broken");
-	if ((unsigned long) &vtime != VSYSCALL_ADDR(__NR_vtime))
-		panic("vtime link addr broken");
-	if (VSYSCALL_ADDR(0) != __fix_to_virt(VSYSCALL_FIRST_PAGE))
-		panic("fixmap first vsyscall %lx should be %lx", __fix_to_virt(VSYSCALL_FIRST_PAGE),
-		      VSYSCALL_ADDR(0));
+        BUG_ON(((unsigned long) &vgettimeofday != 
+		      VSYSCALL_ADDR(__NR_vgettimeofday)));
+	BUG_ON((unsigned long) &vtime != VSYSCALL_ADDR(__NR_vtime));
+	BUG_ON((VSYSCALL_ADDR(0) != __fix_to_virt(VSYSCALL_FIRST_PAGE)));
 	map_vsyscall();
+	sysctl_vsyscall = 1; 
 
 	return 0;
 }

@@ -1842,7 +1842,12 @@ static int __devinit meye_probe(struct pci_dev *pcidev,
 	memcpy(meye.video_dev, &meye_template, sizeof(meye_template));
 	meye.video_dev->dev = &meye.mchip_dev->dev;
 
-	sonypi_camera_command(SONYPI_COMMAND_SETCAMERA, 1);
+	if ((ret = sonypi_camera_command(SONYPI_COMMAND_SETCAMERA, 1))) {
+		printk(KERN_ERR "meye: unable to power on the camera\n");
+		printk(KERN_ERR "meye: did you enable the camera in "
+				"sonypi using the module options ?\n");
+		goto outsonypienable;
+	}
 
 	ret = -EIO;
 	if ((ret = pci_enable_device(meye.mchip_dev))) {
@@ -1943,6 +1948,7 @@ outregions:
 	pci_disable_device(meye.mchip_dev);
 outenabledev:
 	sonypi_camera_command(SONYPI_COMMAND_SETCAMERA, 0);
+outsonypienable:
 	kfifo_free(meye.doneq);
 outkfifoalloc2:
 	kfifo_free(meye.grabq);

@@ -31,7 +31,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.83 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.86 $"
 
 #include "zfcp_ext.h"
 
@@ -1020,8 +1020,6 @@ zfcp_fsf_status_read_handler(struct zfcp_fsf_req *fsf_req)
 		atomic_set_mask(ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED,
 				&adapter->status);
 		zfcp_erp_adapter_failed(adapter);
-
-		zfcp_cb_link_down(adapter);
 		break;
 
 	case FSF_STATUS_READ_LINK_UP:
@@ -1037,9 +1035,6 @@ zfcp_fsf_status_read_handler(struct zfcp_fsf_req *fsf_req)
 		zfcp_erp_adapter_reopen(adapter,
 					ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED
 					| ZFCP_STATUS_COMMON_ERP_FAILED);
-
-		zfcp_cb_link_up(adapter);
-
 		break;
 
 	case FSF_STATUS_READ_CFDC_UPDATED:
@@ -2255,8 +2250,6 @@ zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *fsf_req)
 		}
 		atomic_set_mask(ZFCP_STATUS_ADAPTER_XCONFIG_OK,
 				&adapter->status);
-		zfcp_cb_adapter_add(adapter);
-
 		break;
 	case FSF_EXCHANGE_CONFIG_DATA_INCOMPLETE:
 		debug_text_event(adapter->erp_dbf, 0, "xchg-inco");
@@ -5138,7 +5131,3 @@ zfcp_fsf_req_cleanup(struct zfcp_fsf_req *fsf_req)
 }
 
 #undef ZFCP_LOG_AREA
-
-EXPORT_SYMBOL(zfcp_fsf_exchange_port_data);
-EXPORT_SYMBOL(zfcp_fsf_send_ct);
-EXPORT_SYMBOL(zfcp_fsf_send_els);

@@ -178,7 +178,8 @@ void _insb(unsigned int port, void * addr, unsigned long count)
 	else {
 		unsigned char *buf = addr;
 		unsigned char *portp = PORT2ADDR(port);
-		while(count--) *buf++ = *(volatile unsigned char *)portp;
+		while (count--)
+			*buf++ = *(volatile unsigned char *)portp;
 	}
 }
 
@@ -192,7 +193,8 @@ void _insw(unsigned int port, void * addr, unsigned long count)
 			1);
 	else {
 		portp = PORT2ADDR(port);
-		while (count--) *buf++ = *(volatile unsigned short *)portp;
+		while (count--)
+			*buf++ = *(volatile unsigned short *)portp;
 	}
 }
 

@@ -3154,8 +3154,9 @@ static int __init parport_parse_dma(const char *dmastr, int *val)
 				     PARPORT_DMA_NONE, PARPORT_DMA_NOFIFO);
 }
 
-static int __init parport_init_mode_setup(const char *str) {
-
+#ifdef CONFIG_PCI
+static int __init parport_init_mode_setup(char *str)
+{
 	printk(KERN_DEBUG "parport_pc.c: Specified parameter parport_init_mode=%s\n", str);
 
 	if (!strcmp (str, "spp"))
@@ -3170,11 +3171,12 @@ static int __init parport_init_mode_setup(const char *str) {
 		parport_init_mode=5;
 	return 1;
 }
+#endif
 
 #ifdef MODULE
 static const char *irq[PARPORT_PC_MAX_PORTS];
 static const char *dma[PARPORT_PC_MAX_PORTS];
-static const char *init_mode;
+static char *init_mode;
 
 MODULE_PARM_DESC(io, "Base I/O address (SPP regs)");
 module_param_array(io, int, NULL, 0);
@@ -3189,16 +3191,20 @@ module_param_array(dma, charp, NULL, 0);
 MODULE_PARM_DESC(verbose_probing, "Log chit-chat during initialisation");
 module_param(verbose_probing, int, 0644);
 #endif
+#ifdef CONFIG_PCI
 MODULE_PARM_DESC(init_mode, "Initialise mode for VIA VT8231 port (spp, ps2, epp, ecp or ecpepp)");
 MODULE_PARM(init_mode, "s");
+#endif
 
 static int __init parse_parport_params(void)
 {
 	unsigned int i;
 	int val;
 
+#ifdef CONFIG_PCI
 	if (init_mode)
 		parport_init_mode_setup(init_mode);
+#endif
 
 	for (i = 0; i < PARPORT_PC_MAX_PORTS && io[i]; i++) {
 		if (parport_parse_irq(irq[i], &val))
@@ -3313,9 +3319,9 @@ __setup ("parport=", parport_setup);
  *
  * parport_init_mode=[spp|ps2|epp|ecp|ecpepp]
  */
-
+#ifdef CONFIG_PCI
 __setup("parport_init_mode=",parport_init_mode_setup);
-
+#endif
 #endif
 
 /* "Parser" ends here */
