@@ -982,7 +982,8 @@ static inline int ll_new_mergeable(request_queue_t *q,
 
 	if (req->nr_phys_segments + nr_phys_segs > q->max_phys_segments) {
 		req->flags |= REQ_NOMERGE;
-		q->last_merge = NULL;
+		if (req == q->last_merge)
+			q->last_merge = NULL;
 		return 0;
 	}
 
@@ -1004,7 +1005,8 @@ static inline int ll_new_hw_segment(request_queue_t *q,
 	if (req->nr_hw_segments + nr_hw_segs > q->max_hw_segments
 	    || req->nr_phys_segments + nr_phys_segs > q->max_phys_segments) {
 		req->flags |= REQ_NOMERGE;
-		q->last_merge = NULL;
+		if (req == q->last_merge)
+			q->last_merge = NULL;
 		return 0;
 	}
 
@@ -1024,7 +1026,8 @@ static int ll_back_merge_fn(request_queue_t *q, struct request *req,
 
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
 		req->flags |= REQ_NOMERGE;
-		q->last_merge = NULL;
+		if (req == q->last_merge)
+			q->last_merge = NULL;
 		return 0;
 	}
 	if (unlikely(!bio_flagged(req->biotail, BIO_SEG_VALID)))
@@ -1055,7 +1058,8 @@ static int ll_front_merge_fn(request_queue_t *q, struct request *req,
 
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
 		req->flags |= REQ_NOMERGE;
-		q->last_merge = NULL;
+		if (req == q->last_merge)
+			q->last_merge = NULL;
 		return 0;
 	}
 	len = bio->bi_hw_back_size + req->bio->bi_hw_front_size;
