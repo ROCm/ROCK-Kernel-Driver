@@ -8,8 +8,6 @@ obj-rpc		:= keyb_ps2.o
 obj-clps7500	:= keyb_ps2.o defkeymap-acorn.o
 
 obj-$(CONFIG_RPCMOUSE)		+= mouse_rpc.o
-obj-$(CONFIG_ATOMWIDE_SERIAL)	+= serial-atomwide.o
-obj-$(CONFIG_DUALSP_SERIAL)	+= serial-dualsp.o
 obj-$(CONFIG_ARCH_ACORN)	+= defkeymap-acorn.o i2c.o pcf8583.o
 obj-$(CONFIG_L7200_KEYB)	+= defkeymap-l7200.o keyb_l7200.o
 

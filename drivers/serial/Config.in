@@ -22,8 +22,7 @@ dep_bool '  Support RSA serial ports' CONFIG_SERIAL_8250_RSA $CONFIG_SERIAL_8250
 comment 'Non-8250 serial port support'
 
 if [ "$CONFIG_ARM" = "y" ]; then
-   dep_tristate 'Acorn Atomwide 16550 serial port support' CONFIG_ATOMWIDE_SERIAL $CONFIG_ARCH_ACORN $CONFIG_SERIAL_8250
-   dep_tristate 'Acorn Dual 16550 serial port support' CONFIG_DUALSP_SERIAL $CONFIG_ARCH_ACORN $CONFIG_SERIAL_8250
+   dep_tristate 'Acorn expansion card serial port support' CONFIG_SERIAL_8250_ACORN $CONFIG_ARCH_ACORN $CONFIG_SERIAL_8250
    dep_bool 'Anakin serial port support' CONFIG_SERIAL_ANAKIN $CONFIG_ARCH_ANAKIN
    dep_bool '  Console on Anakin serial port' CONFIG_SERIAL_ANAKIN_CONSOLE $CONFIG_SERIAL_ANAKIN
    if [ "$CONFIG_SERIAL_ANAKIN" = "y" ]; then
