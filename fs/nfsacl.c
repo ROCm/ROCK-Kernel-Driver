@@ -89,7 +89,7 @@ unsigned int
 nfsacl_encode(struct xdr_buf *buf, unsigned int base, struct inode *inode,
 	      struct posix_acl *acl, int encode_entries, int typeflag)
 {
-	int entries = (acl && acl->a_count) ? max(acl->a_count, 4) : 0;
+	int entries = (acl && acl->a_count) ? max_t(int, acl->a_count, 4) : 0;
 	struct nfsacl_encode_desc nfsacl_desc = {
 		.desc = {
 			.elem_size = 12,
