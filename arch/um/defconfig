@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.8.1-mm3
-# Fri Aug 20 13:03:03 2004
+# Linux kernel version: 2.6.9-rc2-mm1
+# Thu Sep 16 23:44:48 2004
 #
 CONFIG_USERMODE=y
 CONFIG_MMU=y
@@ -20,7 +20,6 @@ CONFIG_HOSTFS=y
 CONFIG_HPPFS=y
 CONFIG_MCONSOLE=y
 # CONFIG_HOST_2G_2G is not set
-# CONFIG_UML_SMP is not set
 # CONFIG_SMP is not set
 CONFIG_NEST_LEVEL=0
 CONFIG_KERNEL_HALF_GIGS=1
@@ -38,6 +37,7 @@ CONFIG_BROKEN_ON_SMP=y
 #
 # General setup
 #
+CONFIG_LOCALVERSION=""
 CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_POSIX_MQUEUE is not set
@@ -47,6 +47,7 @@ CONFIG_SYSCTL=y
 # CONFIG_AUDIT is not set
 CONFIG_LOG_BUF_SHIFT=14
 # CONFIG_HOTPLUG is not set
+CONFIG_KOBJECT_UEVENT=y
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
@@ -54,12 +55,13 @@ CONFIG_KALLSYMS=y
 # CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
-# CONFIG_CPUSETS is not set
 CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
 CONFIG_IOSCHED_CFQ=y
 # CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+CONFIG_SHMEM=y
+# CONFIG_TINY_SHMEM is not set
 
 #
 # Loadable module support
@@ -144,6 +146,7 @@ CONFIG_INET=y
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
 # CONFIG_INET_IPCOMP is not set
+# CONFIG_INET_TUNNEL is not set
 # CONFIG_IPV6 is not set
 # CONFIG_NETFILTER is not set
 
@@ -253,6 +256,11 @@ CONFIG_QUOTA=y
 CONFIG_QUOTACTL=y
 CONFIG_AUTOFS_FS=y
 CONFIG_AUTOFS4_FS=y
+
+#
+# Caches
+#
+# CONFIG_CACHEFS is not set
 
 #
 # CD-ROM/DVD Filesystems
