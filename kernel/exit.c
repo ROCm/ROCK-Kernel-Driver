@@ -89,12 +89,6 @@ repeat:
 		zap_leader = (leader->exit_signal == -1);
 	}
 
-	p->parent->cutime += p->utime + p->cutime;
-	p->parent->cstime += p->stime + p->cstime;
-	p->parent->cmin_flt += p->min_flt + p->cmin_flt;
-	p->parent->cmaj_flt += p->maj_flt + p->cmaj_flt;
-	p->parent->cnvcsw += p->nvcsw + p->cnvcsw;
-	p->parent->cnivcsw += p->nivcsw + p->cnivcsw;
 	sched_exit(p);
 	write_unlock_irq(&tasklist_lock);
 	spin_unlock(&p->proc_lock);
@@ -1031,6 +1025,38 @@ static int wait_task_zombie(task_t *p, int noreap,
 		 * dying on another processor.
 		 */
 		return 0;
+	}
+
+	if (likely(p->real_parent == p->parent) && likely(p->signal)) {
+		/*
+		 * The resource counters for the group leader are in its
+		 * own task_struct.  Those for dead threads in the group
+		 * are in its signal_struct, as are those for the child
+		 * processes it has previously reaped.  All these
+		 * accumulate in the parent's signal_struct c* fields.
+		 *
+		 * We don't bother to take a lock here to protect these
+		 * p->signal fields, because they are only touched by
+		 * __exit_signal, which runs with tasklist_lock
+		 * write-locked anyway, and so is excluded here.  We do
+		 * need to protect the access to p->parent->signal fields,
+		 * as other threads in the parent group can be right
+		 * here reaping other children at the same time.
+		 */
+		spin_lock_irq(&p->parent->sighand->siglock);
+		p->parent->signal->cutime +=
+			p->utime + p->signal->utime + p->signal->cutime;
+		p->parent->signal->cstime +=
+			p->stime + p->signal->stime + p->signal->cstime;
+		p->parent->signal->cmin_flt +=
+			p->min_flt + p->signal->min_flt + p->signal->cmin_flt;
+		p->parent->signal->cmaj_flt +=
+			p->maj_flt + p->signal->maj_flt + p->signal->cmaj_flt;
+		p->parent->signal->cnvcsw +=
+			p->nvcsw + p->signal->nvcsw + p->signal->cnvcsw;
+		p->parent->signal->cnivcsw +=
+			p->nivcsw + p->signal->nivcsw + p->signal->cnivcsw;
+		spin_unlock_irq(&p->parent->sighand->siglock);
 	}
 
 	/*

@@ -160,10 +160,39 @@ asmlinkage long compat_sys_times(struct compat_tms __user *tbuf)
 	 */
 	if (tbuf) {
 		struct compat_tms tmp;
-		tmp.tms_utime = compat_jiffies_to_clock_t(current->utime);
-		tmp.tms_stime = compat_jiffies_to_clock_t(current->stime);
-		tmp.tms_cutime = compat_jiffies_to_clock_t(current->cutime);
-		tmp.tms_cstime = compat_jiffies_to_clock_t(current->cstime);
+		struct task_struct *tsk = current;
+		struct task_struct *t;
+		unsigned long utime, stime, cutime, cstime;
+
+		read_lock(&tasklist_lock);
+		utime = tsk->signal->utime;
+		stime = tsk->signal->stime;
+		t = tsk;
+		do {
+			utime += t->utime;
+			stime += t->stime;
+			t = next_thread(t);
+		} while (t != tsk);
+
+		/*
+		 * While we have tasklist_lock read-locked, no dying thread
+		 * can be updating current->signal->[us]time.  Instead,
+		 * we got their counts included in the live thread loop.
+		 * However, another thread can come in right now and
+		 * do a wait call that updates current->signal->c[us]time.
+		 * To make sure we always see that pair updated atomically,
+		 * we take the siglock around fetching them.
+		 */
+		spin_lock_irq(&tsk->sighand->siglock);
+		cutime = tsk->signal->cutime;
+		cstime = tsk->signal->cstime;
+		spin_unlock_irq(&tsk->sighand->siglock);
+		read_unlock(&tasklist_lock);
+
+		tmp.tms_utime = compat_jiffies_to_clock_t(utime);
+		tmp.tms_stime = compat_jiffies_to_clock_t(stime);
+		tmp.tms_cutime = compat_jiffies_to_clock_t(cutime);
+		tmp.tms_cstime = compat_jiffies_to_clock_t(cstime);
 		if (copy_to_user(tbuf, &tmp, sizeof(tmp)))
 			return -EFAULT;
 	}

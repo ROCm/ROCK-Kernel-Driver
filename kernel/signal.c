@@ -369,6 +369,22 @@ void __exit_signal(struct task_struct *tsk)
 		if (tsk == sig->curr_target)
 			sig->curr_target = next_thread(tsk);
 		tsk->signal = NULL;
+		/*
+		 * Accumulate here the counters for all threads but the
+		 * group leader as they die, so they can be added into
+		 * the process-wide totals when those are taken.
+		 * The group leader stays around as a zombie as long
+		 * as there are other threads.  When it gets reaped,
+		 * the exit.c code will add its counts into these totals.
+		 * We won't ever get here for the group leader, since it
+		 * will have been the last reference on the signal_struct.
+		 */
+		sig->utime += tsk->utime;
+		sig->stime += tsk->stime;
+		sig->min_flt += tsk->min_flt;
+		sig->maj_flt += tsk->maj_flt;
+		sig->nvcsw += tsk->nvcsw;
+		sig->nivcsw += tsk->nivcsw;
 		spin_unlock(&sighand->siglock);
 		sig = NULL;	/* Marker for below.  */
 	}
@@ -663,12 +679,14 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 */
 			p->signal->group_stop_count = 0;
 			p->signal->stop_state = 1;
+			spin_unlock(&p->sighand->siglock);
 			if (p->ptrace & PT_PTRACED)
 				do_notify_parent_cldstop(p, p->parent);
 			else
 				do_notify_parent_cldstop(
 					p->group_leader,
 					p->group_leader->real_parent);
+			spin_lock(&p->sighand->siglock);
 		}
 		rm_from_queue(SIG_KERNEL_STOP_MASK, &p->signal->shared_pending);
 		t = p;
@@ -707,12 +725,14 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 */
 			p->signal->stop_state = -1;
 			p->signal->group_exit_code = 0;
+			spin_unlock(&p->sighand->siglock);
 			if (p->ptrace & PT_PTRACED)
 				do_notify_parent_cldstop(p, p->parent);
 			else
 				do_notify_parent_cldstop(
 					p->group_leader,
 					p->group_leader->real_parent);
+			spin_lock(&p->sighand->siglock);
 		}
 	}
 }
@@ -1473,8 +1493,8 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	if (sig == -1)
 		BUG();
 
-	BUG_ON(tsk->group_leader != tsk && tsk->group_leader->state != TASK_ZOMBIE && !tsk->ptrace);
-	BUG_ON(tsk->group_leader == tsk && !thread_group_empty(tsk) && !tsk->ptrace);
+	BUG_ON(!tsk->ptrace &&
+	       (tsk->group_leader != tsk || !thread_group_empty(tsk)));
 
 	info.si_signo = sig;
 	info.si_errno = 0;
@@ -1482,8 +1502,8 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	info.si_uid = tsk->uid;
 
 	/* FIXME: find out whether or not this is supposed to be c*time. */
-	info.si_utime = tsk->utime;
-	info.si_stime = tsk->stime;
+	info.si_utime = tsk->utime + tsk->signal->utime;
+	info.si_stime = tsk->stime + tsk->signal->stime;
 	k_getrusage(tsk, RUSAGE_BOTH, &info.si_rusage);
 
 	status = tsk->exit_code & 0x7f;
