@@ -153,12 +153,10 @@ static void queue_event_one_user(struct apm_user *as, apm_event_t event)
 
 static void queue_event(apm_event_t event, struct apm_user *sender)
 {
-	struct list_head *l;
+	struct apm_user *as;
 
 	spin_lock(&user_list_lock);
-	list_for_each(l, &apm_user_list) {
-		struct apm_user *as = list_entry(l, struct apm_user, list);
-
+	list_for_each_entry(as, &apm_user_list, list) {
 		if (as != sender && as->reader)
 			queue_event_one_user(as, event);
 	}
@@ -168,7 +166,7 @@ static void queue_event(apm_event_t event, struct apm_user *sender)
 
 static int apm_suspend(void)
 {
-	struct list_head *l;
+	struct apm_user *as;
 	int err = pm_suspend(PM_SUSPEND_MEM);
 
 	/*
@@ -181,9 +179,7 @@ static int apm_suspend(void)
 	 * Finally, wake up anyone who is sleeping on the suspend.
 	 */
 	spin_lock(&user_list_lock);
-	list_for_each(l, &apm_user_list) {
-		struct apm_user *as = list_entry(l, struct apm_user, list);
-
+	list_for_each_entry(as, &apm_user_list, list) {
 		as->suspend_result = err;
 		as->suspend_wait = 0;
 	}
