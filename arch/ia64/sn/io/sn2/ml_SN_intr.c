@@ -39,6 +39,7 @@
 #include <asm/sn/sn2/shubio.h>
 #include <asm/sal.h>
 #include <asm/sn/sn_sal.h>
+#include <asm/sn/sn2/shub_mmr.h>
 
 extern irqpda_t	*irqpdaindr;
 extern cnodeid_t master_node_get(vertex_hdl_t vhdl);
