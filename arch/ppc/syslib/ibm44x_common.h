@@ -1,7 +1,7 @@
 /*
- * arch/ppc/kernel/ibm440gp_common.h
+ * arch/ppc/kernel/ibm44x_common.h
  *
- * PPC440GP system library
+ * PPC44x system library
  *
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
  * Copyright (c) 2003 Zultys Technologies
@@ -13,23 +13,24 @@
  *
  */
 #ifdef __KERNEL__
-#ifndef __PPC_SYSLIB_IBM440GP_COMMON_H
-#define __PPC_SYSLIB_IBM440GP_COMMON_H
+#ifndef __PPC_SYSLIB_IBM44x_COMMON_H
+#define __PPC_SYSLIB_IBM44x_COMMON_H
 
 #ifndef __ASSEMBLY__
 
-#include <linux/config.h>
-#include <linux/init.h>
-#include <syslib/ibm44x_common.h>
-
 /*
- * Please, refer to the Figure 13.1 in 440GP user manual
- *
- * if internal UART clock is used, ser_clk is ignored
+ * All clocks are in Hz
  */
-void ibm440gp_get_clocks(struct ibm44x_clocks*, unsigned int sys_clk,
-	unsigned int ser_clk) __init;
+struct ibm44x_clocks {
+	unsigned int vco;	/* VCO, 0 if system PLL is bypassed */
+	unsigned int cpu;	/* CPUCoreClk */
+	unsigned int plb;	/* PLBClk */
+	unsigned int opb;	/* OPBClk */
+	unsigned int ebc;	/* PerClk */
+	unsigned int uart0;
+	unsigned int uart1;
+};
 
 #endif /* __ASSEMBLY__ */
-#endif /* __PPC_SYSLIB_IBM440GP_COMMON_H */
+#endif /* __PPC_SYSLIB_IBM44x_COMMON_H */
 #endif /* __KERNEL__ */
