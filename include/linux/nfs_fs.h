@@ -277,6 +277,7 @@ extern void nfs_begin_attr_update(struct inode *);
 extern void nfs_end_attr_update(struct inode *);
 extern void nfs_begin_data_update(struct inode *);
 extern void nfs_end_data_update(struct inode *);
+extern void nfs_end_data_update_defer(struct inode *);
 
 /* linux/net/ipv4/ipconfig.c: trims ip addr off front of name, too. */
 extern u32 root_nfs_parse_addr(char *name); /*__init*/

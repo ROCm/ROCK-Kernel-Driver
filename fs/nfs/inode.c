@@ -1012,6 +1012,8 @@ void nfs_begin_data_update(struct inode *inode)
  * nfs_end_data_update
  * @inode - pointer to inode
  * Declare end of the operations that will update file data
+ * This will mark the inode as immediately needing revalidation
+ * of its attribute cache.
  */
 void nfs_end_data_update(struct inode *inode)
 {
@@ -1024,6 +1026,27 @@ void nfs_end_data_update(struct inode *inode)
 		nfsi->flags |= NFS_INO_INVALID_DATA;
 	nfsi->cache_change_attribute ++;
 	atomic_dec(&nfsi->data_updates);
+}
+
+/**
+ * nfs_end_data_update_defer
+ * @inode - pointer to inode
+ * Declare end of the operations that will update file data
+ * This will defer marking the inode as needing revalidation
+ * unless there are no other pending updates.
+ */
+void nfs_end_data_update_defer(struct inode *inode)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+
+	if (atomic_dec_and_test(&nfsi->data_updates)) {
+		/* Mark the attribute cache for revalidation */
+		nfsi->flags |= NFS_INO_INVALID_ATTR;
+		/* Directories and symlinks: invalidate page cache too */
+		if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
+			nfsi->flags |= NFS_INO_INVALID_DATA;
+		nfsi->cache_change_attribute ++;
+	}
 }
 
 /**
