@@ -1351,7 +1351,7 @@ static int acpi_processor_throttling_open_fs(struct inode *inode, struct file *f
 						PDE(inode)->data);
 }
 
-static int
+static ssize_t
 acpi_processor_write_throttling (
         struct file		*file,
         const char		*buffer,
@@ -1414,7 +1414,7 @@ static int acpi_processor_limit_open_fs(struct inode *inode, struct file *file)
 						PDE(inode)->data);
 }
 
-static int
+static ssize_t
 acpi_processor_write_limit (
 	struct file		*file,
 	const char		*buffer,
