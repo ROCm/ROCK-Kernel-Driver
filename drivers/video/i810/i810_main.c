@@ -1416,62 +1416,50 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 
 	i810_enable_cursor(mmio, OFF);
 
-	if (cursor->set & FB_CUR_SETHOT)
-		info->cursor.hot = cursor->hot;
-	
 	if (cursor->set & FB_CUR_SETPOS) {
 		u32 tmp;
 
-		info->cursor.image.dx = cursor->image.dx;
-		info->cursor.image.dy = cursor->image.dy;
-		tmp = (info->cursor.image.dx - info->var.xoffset) & 0xffff;
-		tmp |= (info->cursor.image.dy - info->var.yoffset) << 16;
+		tmp = (cursor->image.dx - info->var.xoffset) & 0xffff;
+		tmp |= (cursor->image.dy - info->var.yoffset) << 16;
 		i810_writel(CURPOS, mmio, tmp);
 	}
 
-	if (cursor->set & FB_CUR_SETSIZE) {
+	if (cursor->set & FB_CUR_SETSIZE)
 		i810_reset_cursor_image(par);
-		info->cursor.image.height = cursor->image.height;
-		info->cursor.image.width = cursor->image.width;
-	}
 
-	if (cursor->set & FB_CUR_SETCMAP) {
+	if (cursor->set & FB_CUR_SETCMAP)
 		i810_load_cursor_colors(cursor->image.fg_color,
 					cursor->image.bg_color,
 					info);
-		info->cursor.image.fg_color = cursor->image.fg_color;
-		info->cursor.image.bg_color = cursor->image.bg_color;
 
-	}
-
-	if (cursor->set & (FB_CUR_SETSHAPE)) {
-		int size = ((info->cursor.image.width + 7) >> 3) * 
-			info->cursor.image.height;
+	if (cursor->set & (FB_CUR_SETSHAPE | FB_CUR_SETIMAGE)) {
+		int size = ((cursor->image.width + 7) >> 3) *
+			cursor->image.height;
 		int i;
 		u8 *data = kmalloc(64 * 8, GFP_KERNEL);
 
 		if (data == NULL)
 			return -ENOMEM;
-		info->cursor.image.data = cursor->image.data;
 
-		switch (info->cursor.rop) {
+		switch (cursor->rop) {
 		case ROP_XOR:
 			for (i = 0; i < size; i++)
-				data[i] = info->cursor.image.data[i] ^ info->cursor.mask[i];
+				data[i] = cursor->image.data[i] ^ cursor->mask[i];
 			break;
 		case ROP_COPY:
 		default:
 			for (i = 0; i < size; i++)
-				data[i] = info->cursor.image.data[i] & info->cursor.mask[i];
+				data[i] = cursor->image.data[i] & cursor->mask[i];
 			break;
 		}
-		i810_load_cursor_image(info->cursor.image.width, 
-				       info->cursor.image.height, data,
+
+		i810_load_cursor_image(cursor->image.width,
+				       cursor->image.height, data,
 				       par);
 		kfree(data);
 	}
 
-	if (info->cursor.enable)
+	if (cursor->enable)
 		i810_enable_cursor(mmio, ON);
 
 	return 0;
