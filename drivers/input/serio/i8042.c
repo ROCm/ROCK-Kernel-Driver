@@ -746,6 +746,29 @@ static int i8042_controller_init(void)
 
 
 /*
+ * Reset the controller.
+ */
+void i8042_controller_reset(void)
+{
+	if (i8042_reset) {
+		unsigned char param;
+
+		if (i8042_command(&param, I8042_CMD_CTL_TEST))
+			printk(KERN_ERR "i8042.c: i8042 controller reset timeout.\n");
+	}
+
+/*
+ * Restore the original control register setting.
+ */
+
+	i8042_ctr = i8042_initial_ctr;
+
+	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
+		printk(KERN_WARNING "i8042.c: Can't restore CTR.\n");
+}
+
+
+/*
  * Here we try to reset everything back to a state in which the BIOS will be
  * able to talk to the hardware when rebooting.
  */
@@ -770,26 +793,20 @@ void i8042_controller_cleanup(void)
 		if (i8042_mux_values[i].exists)
 			serio_cleanup(i8042_mux_port + i);
 
-/*
- * Reset the controller.
- */
+	i8042_controller_reset();
+}
 
-	if (i8042_reset) {
-		unsigned char param;
-
-		if (i8042_command(&param, I8042_CMD_CTL_TEST))
-			printk(KERN_ERR "i8042.c: i8042 controller reset timeout.\n");
-	}
 
 /*
- * Restore the original control register setting.
+ * Here we try to restore the original BIOS settings
  */
 
-	i8042_ctr = i8042_initial_ctr;
+static int i8042_controller_suspend(void)
+{
+	del_timer_sync(&i8042_timer);
+	i8042_controller_reset();
 
-	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
-		printk(KERN_WARNING "i8042.c: Can't restore CTR.\n");
-
+	return 0;
 }
 
 
@@ -809,7 +826,7 @@ static int i8042_controller_resume(void)
 	if (i8042_mux_present)
 		if (i8042_enable_mux_mode(&i8042_aux_values, NULL) ||
 		    i8042_enable_mux_ports(&i8042_aux_values)) {
-			printk(KERN_WARNING "i8042: failed to resume active multiplexor, mouse won't wotk.\n");
+			printk(KERN_WARNING "i8042: failed to resume active multiplexor, mouse won't work.\n");
 		}
 
 /*
@@ -825,6 +842,10 @@ static int i8042_controller_resume(void)
 	for (i = 0; i < 4; i++)
 		if (i8042_mux_values[i].exists && i8042_activate_port(i8042_mux_port + i) == 0)
 			serio_reconnect(i8042_mux_port + i);
+/*
+ * Restart timer (for polling "stuck" data)
+ */
+	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
 	return 0;
 }
@@ -851,16 +872,22 @@ static struct notifier_block i8042_notifier=
 };
 
 /*
- * Resume handler for the new PM scheme (driver model)
+ * Suspend/resume handlers for the new PM scheme (driver model)
  */
+static int i8042_suspend(struct sys_device *dev, u32 state)
+{
+	return i8042_controller_suspend();
+}
+
 static int i8042_resume(struct sys_device *dev)
 {
 	return i8042_controller_resume();
 }
 
 static struct sysdev_class kbc_sysclass = {
-       set_kset_name("i8042"),
-       .resume = i8042_resume,
+	set_kset_name("i8042"),
+	.suspend = i8042_suspend,
+	.resume = i8042_resume,
 };
 
 static struct sys_device device_i8042 = {
@@ -869,12 +896,17 @@ static struct sys_device device_i8042 = {
 };
 
 /*
- * Resume handler for the old PM scheme (APM)
+ * Suspend/resume handler for the old PM scheme (APM)
  */
 static int i8042_pm_callback(struct pm_dev *dev, pm_request_t request, void *dummy)
 {
-	if (request == PM_RESUME)
-		return i8042_controller_resume();
+	switch (request) {
+		case PM_SUSPEND:
+			return i8042_controller_suspend();
+
+		case PM_RESUME:
+			return i8042_controller_resume();
+	}
 
 	return 0;
 }
@@ -955,7 +987,7 @@ void __exit i8042_exit(void)
 		sysdev_class_unregister(&kbc_sysclass);
 	}
 
-	del_timer(&i8042_timer);
+	del_timer_sync(&i8042_timer);
 
 	i8042_controller_cleanup();
 	
