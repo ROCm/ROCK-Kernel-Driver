@@ -13,12 +13,6 @@
 
 /* Obsolete functions, these will be going away... */
 
-int
-pcibios_present(void)
-{
-	return !list_empty(&pci_devices);
-}
-
 #define PCI_OP(rw,size,type)							\
 int pcibios_##rw##_config_##size (unsigned char bus, unsigned char dev_fn,	\
 				  unsigned char where, unsigned type val)	\
@@ -35,8 +29,6 @@ PCI_OP(write, byte, char)
 PCI_OP(write, word, short)
 PCI_OP(write, dword, int)
 
-
-EXPORT_SYMBOL(pcibios_present);
 EXPORT_SYMBOL(pcibios_read_config_byte);
 EXPORT_SYMBOL(pcibios_read_config_word);
 EXPORT_SYMBOL(pcibios_read_config_dword);

@@ -322,15 +322,6 @@ enum pci_mmap_state {
 
 #define PCI_ANY_ID (~0)
 
-#define pci_present pcibios_present
-
-
-#define pci_for_each_dev_reverse(dev) \
-	for(dev = pci_dev_g(pci_devices.prev); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.prev))
-
-#define pci_for_each_bus(bus) \
-for(bus = pci_bus_b(pci_root_buses.next); bus != pci_bus_b(&pci_root_buses); bus = pci_bus_b(bus->node.next))
-
 /*
  * The pci_dev structure is used to describe both PCI and ISAPnP devices.
  */
@@ -503,8 +494,17 @@ struct pci_driver {
 /* these external functions are only available when PCI support is enabled */
 #ifdef CONFIG_PCI
 
+static inline int pci_present(void)
+{
+	return !list_empty(&pci_devices);
+}
+
 #define pci_for_each_dev(dev) \
 	for(dev = pci_dev_g(pci_devices.next); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.next))
+#define pci_for_each_dev_reverse(dev) \
+	for(dev = pci_dev_g(pci_devices.prev); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.prev))
+#define pci_for_each_bus(bus) \
+	for(bus = pci_bus_b(pci_root_buses.next); bus != pci_bus_b(&pci_root_buses); bus = pci_bus_b(bus->node.next))
 
 void pcibios_fixup_bus(struct pci_bus *);
 int pcibios_enable_device(struct pci_dev *, int mask);
@@ -520,7 +520,6 @@ void pcibios_fixup_pbus_ranges(struct pci_bus *, struct pbus_set_ranges_data *);
 
 /* Backward compatibility, don't use in new code! */
 
-int pcibios_present(void);
 int pcibios_read_config_byte (unsigned char bus, unsigned char dev_fn,
 			      unsigned char where, unsigned char *val);
 int pcibios_read_config_word (unsigned char bus, unsigned char dev_fn,
@@ -656,7 +655,7 @@ void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
  */
 
 #ifndef CONFIG_PCI
-static inline int pcibios_present(void) { return 0; }
+static inline int pci_present(void) { return 0; }
 
 #define _PCI_NOP(o,s,t) \
 	static inline int pcibios_##o##_config_##s (u8 bus, u8 dfn, u8 where, t val) \
