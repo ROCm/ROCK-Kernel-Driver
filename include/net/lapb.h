@@ -81,7 +81,6 @@ struct lapb_frame {
 struct lapb_cb {
 	struct list_head	node;
 	struct net_device	*dev;
-	void			*token;
 
 	/* Link status fields */
 	unsigned int		mode;

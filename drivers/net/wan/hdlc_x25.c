@@ -152,7 +152,7 @@ static int x25_open(hdlc_device *hdlc)
 	cb.data_indication = x25_data_indication;
 	cb.data_transmit = x25_data_transmit;
 
-	result = lapb_register(hdlc_to_dev(hdlc), hdlc, &cb);
+	result = lapb_register(hdlc_to_dev(hdlc), &cb);
 	if (result != LAPB_OK)
 		return result;
 	return 0;

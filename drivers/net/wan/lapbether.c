@@ -299,11 +299,9 @@ static struct lapb_register_struct lapbeth_callbacks = {
  */
 static int lapbeth_open(struct net_device *dev)
 {
-	struct lapbethdev *lapbeth;
 	int err;
 
-	lapbeth = (struct lapbethdev *)dev->priv;
-	if ((err = lapb_register(dev, lapbeth, &lapbeth_callbacks)) != LAPB_OK) {
+	if ((err = lapb_register(dev, &lapbeth_callbacks)) != LAPB_OK) {
 		printk(KERN_ERR "lapbeth: lapb_register error - %d\n", err);
 		return -ENODEV;
 	}
