@@ -1382,8 +1382,9 @@ static int irda_recvmsg_dgram(struct kiocb *iocb, struct socket *sock,
 /*
  * Function irda_recvmsg_stream (sock, msg, size, flags, scm)
  */
-static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
-			       int size, int flags, struct scm_cookie *scm)
+static int irda_recvmsg_stream(struct kiocb *iocb, struct socket *sock,
+			       struct msghdr *msg, int size, int flags,
+			       struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self = irda_sk(sk);
@@ -1509,8 +1510,8 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
  *    packet service...
  *
  */
-static int irda_sendmsg_dgram(struct socket *sock, struct msghdr *msg,
-			      int len, struct scm_cookie *scm)
+static int irda_sendmsg_dgram(struct kiocb *iocb, struct socket *sock,
+			      struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self;
@@ -1575,8 +1576,8 @@ static int irda_sendmsg_dgram(struct socket *sock, struct msghdr *msg,
  *    packet service...
  */
 #ifdef CONFIG_IRDA_ULTRA
-static int irda_sendmsg_ultra(struct socket *sock, struct msghdr *msg,
-			      int len, struct scm_cookie *scm)
+static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
+			      struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self;
