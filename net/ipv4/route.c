@@ -1265,6 +1265,8 @@ static int ip_route_input_mc(struct sk_buff *skb, u32 daddr, u32 saddr,
 
 	atomic_set(&rth->u.dst.__refcnt, 1);
 	rth->u.dst.flags= DST_HOST;
+	if (in_dev->cnf.no_policy)
+		rth->u.dst.flags |= DST_NOPOLICY;
 	rth->fl.fl4_dst	= daddr;
 	rth->rt_dst	= daddr;
 	rth->fl.fl4_tos	= tos;
@@ -1470,6 +1472,10 @@ int ip_route_input_slow(struct sk_buff *skb, u32 daddr, u32 saddr,
 
 	atomic_set(&rth->u.dst.__refcnt, 1);
 	rth->u.dst.flags= DST_HOST;
+	if (in_dev->cnf.no_policy)
+		rth->u.dst.flags |= DST_NOPOLICY;
+	if (in_dev->cnf.no_xfrm)
+		rth->u.dst.flags |= DST_NOXFRM;
 	rth->fl.fl4_dst	= daddr;
 	rth->rt_dst	= daddr;
 	rth->fl.fl4_tos	= tos;
@@ -1547,6 +1553,8 @@ local_input:
 
 	atomic_set(&rth->u.dst.__refcnt, 1);
 	rth->u.dst.flags= DST_HOST;
+	if (in_dev->cnf.no_policy)
+		rth->u.dst.flags |= DST_NOPOLICY;
 	rth->fl.fl4_dst	= daddr;
 	rth->rt_dst	= daddr;
 	rth->fl.fl4_tos	= tos;
@@ -1719,6 +1727,7 @@ int ip_route_output_slow(struct rtable **rp, const struct flowi *oldflp)
 	unsigned flags = 0;
 	struct rtable *rth;
 	struct net_device *dev_out = NULL;
+	struct in_device *in_dev = NULL;
 	unsigned hash;
 	int free_res = 0;
 	int err;
@@ -1895,6 +1904,10 @@ make_route:
 	if (dev_out->flags & IFF_LOOPBACK)
 		flags |= RTCF_LOCAL;
 
+	in_dev = in_dev_get(dev_out);
+	if (!in_dev)
+		goto e_inval;
+
 	if (res.type == RTN_BROADCAST) {
 		flags |= RTCF_BROADCAST | RTCF_LOCAL;
 		if (res.fi) {
@@ -1903,11 +1916,8 @@ make_route:
 		}
 	} else if (res.type == RTN_MULTICAST) {
 		flags |= RTCF_MULTICAST|RTCF_LOCAL;
-		read_lock(&inetdev_lock);
-		if (!__in_dev_get(dev_out) ||
-		    !ip_check_mc(__in_dev_get(dev_out), oldflp->fl4_dst))
+		if (!ip_check_mc(in_dev, oldflp->fl4_dst))
 			flags &= ~RTCF_LOCAL;
-		read_unlock(&inetdev_lock);
 		/* If multicast route do not exist use
 		   default one, but do not gateway in this case.
 		   Yes, it is hack.
@@ -1924,6 +1934,10 @@ make_route:
 
 	atomic_set(&rth->u.dst.__refcnt, 1);
 	rth->u.dst.flags= DST_HOST;
+	if (in_dev->cnf.no_xfrm)
+		rth->u.dst.flags |= DST_NOXFRM;
+	if (in_dev->cnf.no_policy)
+		rth->u.dst.flags |= DST_NOPOLICY;
 	rth->fl.fl4_dst	= oldflp->fl4_dst;
 	rth->fl.fl4_tos	= tos;
 	rth->fl.fl4_src	= oldflp->fl4_src;
@@ -1959,20 +1973,17 @@ make_route:
 		}
 #ifdef CONFIG_IP_MROUTE
 		if (res.type == RTN_MULTICAST) {
-			struct in_device *in_dev = in_dev_get(dev_out);
-			if (in_dev) {
-				if (IN_DEV_MFORWARD(in_dev) &&
-				    !LOCAL_MCAST(oldflp->fl4_dst)) {
-					rth->u.dst.input = ip_mr_input;
-					rth->u.dst.output = ip_mc_output;
-				}
-				in_dev_put(in_dev);
+			if (IN_DEV_MFORWARD(in_dev) &&
+			    !LOCAL_MCAST(oldflp->fl4_dst)) {
+				rth->u.dst.input = ip_mr_input;
+				rth->u.dst.output = ip_mc_output;
 			}
 		}
 #endif
 	}
 
 	rt_set_nexthop(rth, &res, 0);
+	
 
 	rth->rt_flags = flags;
 
@@ -1983,6 +1994,8 @@ done:
 		fib_res_put(&res);
 	if (dev_out)
 		dev_put(dev_out);
+	if (in_dev)
+		in_dev_put(in_dev);
 out:	return err;
 
 e_inval:

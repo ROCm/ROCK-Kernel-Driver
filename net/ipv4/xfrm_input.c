@@ -81,6 +81,9 @@ int xfrm4_rcv(struct sk_buff *skb)
 		if (x->props.replay_window)
 			xfrm_replay_advance(x, seq);
 
+		x->curlft.bytes += skb->len;
+		x->curlft.packets++;
+
 		spin_unlock(&x->lock);
 
 		xfrm_vec[xfrm_nr++] = x;

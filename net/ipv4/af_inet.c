@@ -110,6 +110,7 @@
 #include <net/icmp.h>
 #include <net/ipip.h>
 #include <net/inet_common.h>
+#include <net/xfrm.h>
 #ifdef CONFIG_IP_MROUTE
 #include <linux/mroute.h>
 #endif
@@ -195,6 +196,8 @@ void inet_sock_release(struct sock *sk)
 	 */
 
 	sock_orphan(sk);
+
+	xfrm_sk_free_policy(sk);
 
 #ifdef INET_REFCNT_DEBUG
 	if (atomic_read(&sk->refcnt) != 1)

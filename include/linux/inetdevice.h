@@ -19,6 +19,8 @@ struct ipv4_devconf
 	int	tag;
 	int     arp_filter;
 	int	medium_id;
+	int	no_xfrm;
+	int	no_policy;
 	void	*sysctl;
 };
 

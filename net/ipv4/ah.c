@@ -231,6 +231,7 @@ int ah_output(struct sk_buff *skb)
 	skb->nh.raw = skb->data;
 
 	x->curlft.bytes += skb->len;
+	x->curlft.packets++;
 	spin_unlock_bh(&x->lock);
 	if ((skb->dst = dst_pop(dst)) == NULL)
 		goto error;
