@@ -214,6 +214,8 @@ static int fop_open(struct inode * inode, struct file * file)
 		case WATCHDOG_MINOR:
 			/* Just in case we're already talking to someone... */
 			if(test_and_set_bit(0, &wdt_is_open)) {
+				/* Davej: Is this unlock bogus? */
+				spin_unlock(&wdt_spinlock);
 				return -EBUSY;
 			}
 			/* Good, fire up the show */
@@ -236,7 +238,7 @@ static int fop_close(struct inode * inode, struct file * file)
 			printk(OUR_NAME ": device file closed unexpectedly. Will not stop the WDT!\n");
 		}
 	}
-	wdt_is_open = 0;
+	clear_bit(0, &wdt_is_open);
 	return 0;
 }
 
