@@ -295,7 +295,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 		return -EIO;
 
 	dprintk(KERN_INFO "cpufreq: currently at %s speed setting - %i MHz\n", 
-		(speed == speedstep_low_freq) ? "low" : "high",
+		(speed == speedstep_freqs[SPEEDSTEP_LOW].frequency) ? "low" : "high",
 		(speed / 1000));
 
 	/* cpuinfo and default policy values */
