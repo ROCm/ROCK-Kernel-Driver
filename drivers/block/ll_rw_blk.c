@@ -151,9 +151,39 @@ struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 	return ret;
 }
 
+/**
+ * blk_queue_prep_rq - set a prepare_request function for queue
+ * @q:		queue
+ * @pfn:	prepare_request function
+ *
+ * It's possible for a queue to register a prepare_request callback which
+ * is invoked before the request is handed to the request_fn. The goal of
+ * the function is to prepare a request for I/O, it can be used to build a
+ * cdb from the request data for instance.
+ *
+ */
 void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn)
 {
 	q->prep_rq_fn = pfn;
+}
+
+/**
+ * blk_queue_merge_bvec - set a merge_bvec function for queue
+ * @q:		queue
+ * @mbfn:	merge_bvec_fn
+ *
+ * Usually queues have static limitations on the max sectors or segments that
+ * we can put in a request. Stacking drivers may have some settings that
+ * are dynamic, and thus we have to query the queue whether it is ok to
+ * add a new bio_vec to a bio at a given offset or not. If the block device
+ * has such limitations, it needs to register a merge_bvec_fn to control
+ * the size of bio's sent to it. Per default now merge_bvec_fn is defined for
+ * a queue, and only the fixed limits are honored.
+ *
+ */
+void blk_queue_merge_bvec(request_queue_t *q, merge_bvec_fn *mbfn)
+{
+	q->merge_bvec_fn = mbfn;
 }
 
 /**
@@ -2057,6 +2087,7 @@ EXPORT_SYMBOL(blk_put_request);
 EXPORT_SYMBOL(blk_insert_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
+EXPORT_SYMBOL(blk_queue_merge_bvec);
 
 EXPORT_SYMBOL(blk_queue_find_tag);
 EXPORT_SYMBOL(blk_queue_init_tags);
