@@ -398,6 +398,15 @@ config FETCHOP
 	  operations that can operate without interference from
 	  kernel speculation.
 
+config SGI_IOC4_SERIAL
+	tristate "SGI Altix ioc4 serial support"
+	depends on SERIAL_NONSTANDARD && IA64
+	help
+	  If you have an SGI Altix and you would like to use the ioc4
+	  serial ports, say M.  Otherwise, say N.
+
+	  This driver will be built as a module called ioc4_serial.
+
 config AU1000_SERIAL_CONSOLE
 	bool "Enable Au1000 serial console"
 	depends on AU1000_UART

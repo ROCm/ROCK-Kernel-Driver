@@ -700,3 +700,4 @@ EXPORT_SYMBOL(hwgraph_info_export_LBL);
 EXPORT_SYMBOL(hwgraph_info_unexport_LBL);
 EXPORT_SYMBOL(hwgraph_traverse);
 EXPORT_SYMBOL(hwgraph_vertex_name_get);
+EXPORT_SYMBOL(hwgraph_edge_get);
