@@ -407,8 +407,8 @@ int msdos_partition(struct parsed_partitions *state, struct block_device *bdev)
 	 * On the second pass look inside *BSD, Unixware and Solaris partitions.
 	 */
 
-	state->next = 5;
-	for (slot = 1 ; slot <= 4 ; slot++, p++) {
+	state->next = DOS_EXTENDED_PARTITION;
+	for (slot = 1 ; slot < DOS_EXTENDED_PARTITION ; slot++, p++) {
 		u32 start = START_SECT(p)*sector_size;
 		u32 size = NR_SECTS(p)*sector_size;
 		if (!size)
@@ -435,7 +435,7 @@ int msdos_partition(struct parsed_partitions *state, struct block_device *bdev)
 
 	/* second pass - output for each on a separate line */
 	p = (struct partition *) (0x1be + data);
-	for (slot = 1 ; slot <= 4 ; slot++, p++) {
+	for (slot = 1 ; slot < DOS_EXTENDED_PARTITION ; slot++, p++) {
 		unsigned char id = SYS_IND(p);
 		int n;
 
