@@ -401,35 +401,6 @@ static int intel_845_configure(void)
 }
 
 
-static int intel_860_configure(void)
-{
-	u32 temp;
-	u16 temp2;
-	struct aper_size_info_8 *current_size;
-
-	current_size = A_SIZE_8(agp_bridge->current_size);
-
-	/* aperture size */
-	pci_write_config_byte(agp_bridge->dev, INTEL_APSIZE, current_size->size_value);
-
-	/* address to map to */
-	pci_read_config_dword(agp_bridge->dev, AGP_APBASE, &temp);
-	agp_bridge->gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
-
-	/* attbase - aperture base */
-	pci_write_config_dword(agp_bridge->dev, INTEL_ATTBASE, agp_bridge->gatt_bus_addr);
-
-	/* agpctrl */
-	pci_write_config_dword(agp_bridge->dev, INTEL_AGPCTRL, 0x0000);
-
-	/* mcgcfg */
-	pci_read_config_word(agp_bridge->dev, INTEL_I860_MCHCFG, &temp2);
-	pci_write_config_word(agp_bridge->dev, INTEL_I860_MCHCFG, temp2 | (1 << 9));
-	/* clear any possible AGP-related error conditions */
-	pci_write_config_word(agp_bridge->dev, INTEL_I860_ERRSTS, 0xf700);
-	return 0;
-}
-
 /* Setup function */
 static struct gatt_mask intel_generic_masks[] =
 {
@@ -494,29 +465,6 @@ static struct agp_bridge_driver intel_845_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-
-static struct agp_bridge_driver intel_860_driver = {
-	.owner			= THIS_MODULE,
-	.aperture_sizes		= intel_8xx_sizes,
-	.size_type		= U8_APER_SIZE,
-	.num_aperture_sizes	= 7,
-	.configure		= intel_860_configure,
-	.fetch_size		= intel_8xx_fetch_size,
-	.cleanup		= intel_8xx_cleanup,
-	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= agp_generic_mask_memory,
-	.masks			= intel_generic_masks,
-	.agp_enable		= agp_generic_enable,
-	.cache_flush		= global_cache_flush,
-	.create_gatt_table	= agp_generic_create_gatt_table,
-	.free_gatt_table	= agp_generic_free_gatt_table,
-	.insert_memory		= agp_generic_insert_memory,
-	.remove_memory		= agp_generic_remove_memory,
-	.alloc_by_type		= agp_generic_alloc_by_type,
-	.free_by_type		= agp_generic_free_by_type,
-	.agp_alloc_page		= agp_generic_alloc_page,
-	.agp_destroy_page	= agp_generic_destroy_page,
-};
 
 static int find_i830(u16 device)
 {
