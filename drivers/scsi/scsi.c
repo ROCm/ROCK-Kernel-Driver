@@ -1673,7 +1673,7 @@ static void scsi_strcpy_devinfo(char *name, char *to, size_t to_length,
 
 	from_length = strlen(from);
 	strncpy(to, from, min(to_length, from_length));
-	if (from_length < to_length)
+	if (from_length < to_length) {
 		if (compatible) {
 			/*
 			 * NUL terminate the string if it is short.
@@ -1686,6 +1686,7 @@ static void scsi_strcpy_devinfo(char *name, char *to, size_t to_length,
 			strncpy(&to[from_length], spaces,
 				to_length - from_length);
 		}
+	}
 	if (from_length > to_length)
 		 printk(KERN_WARNING "%s: %s string '%s' is too long\n",
 			__FUNCTION__, name, from);
@@ -1911,12 +1912,6 @@ int scsi_attach_device(struct scsi_device *sdev)
 			(*sdt->attach) (sdev);
 	up_read(&scsi_devicelist_mutex);
 	return 0;
-
-fail:
-	printk(KERN_ERR "%s: Allocation failure during SCSI scanning, "
-			"some SCSI devices might not be configured\n",
-			__FUNCTION__);
-	return -ENOMEM;
 }
 
 void scsi_detach_device(struct scsi_device *sdev)
