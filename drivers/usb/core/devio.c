@@ -399,7 +399,6 @@ static int releaseintf(struct dev_state *ps, unsigned int intf)
 		return -EINVAL;
 	err = -EINVAL;
 	dev = ps->dev;
-	down(&dev->serialize);
 	/* lock against other changes to driver bindings */
 	down_write(&usb_bus_type.subsys.rwsem);
 	if (test_and_clear_bit(intf, &ps->ifclaimed)) {
@@ -408,7 +407,6 @@ static int releaseintf(struct dev_state *ps, unsigned int intf)
 		err = 0;
 	}
 	up_write(&usb_bus_type.subsys.rwsem);
-	up(&dev->serialize);
 	return err;
 }
 
