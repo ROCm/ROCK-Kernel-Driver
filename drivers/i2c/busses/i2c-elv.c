@@ -21,8 +21,6 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-elv.c,v 1.27 2003/01/21 08:08:16 kmalkki Exp $ */
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -36,7 +34,7 @@
 
 #define DEFAULT_BASE 0x378
 static int base=0;
-static unsigned char PortData = 0;
+static unsigned char port_data = 0;
 
 /* ----- global defines -----------------------------------------------	*/
 #define DEB(x)		/* should be reasonable open, close &c. 	*/
@@ -57,21 +55,21 @@ static unsigned char PortData = 0;
 static void bit_elv_setscl(void *data, int state)
 {
 	if (state) {
-		PortData &= 0xfe;
+		port_data &= 0xfe;
 	} else {
-		PortData |=1;
+		port_data |=1;
 	}
-	outb(PortData, DATA);
+	outb(port_data, DATA);
 }
 
 static void bit_elv_setsda(void *data, int state)
 {
 	if (state) {
-		PortData &=0xfd;
+		port_data &=0xfd;
 	} else {
-		PortData |=2;
+		port_data |=2;
 	}
-	outb(PortData, DATA);
+	outb(port_data, DATA);
 } 
 
 static int bit_elv_getscl(void *data)
@@ -103,7 +101,7 @@ static int bit_elv_init(void)
 		goto fail;
 	}
 
-	PortData = 0;
+	port_data = 0;
 	bit_elv_setsda((void*)base,1);
 	bit_elv_setscl((void*)base,1);
 	return 0;
@@ -129,14 +127,13 @@ static struct i2c_algo_bit_data bit_elv_data = {
 
 static struct i2c_adapter bit_elv_ops = {
 	.owner		= THIS_MODULE,
-	.id		= I2C_HW_B_ELV,
 	.algo_data	= &bit_elv_data,
 	.name		= "ELV Parallel port adaptor",
 };
 
 static int __init i2c_bitelv_init(void)
 {
-	printk(KERN_INFO "i2c-elv.o: i2c ELV parallel port adapter module version %s (%s)\n", I2C_VERSION, I2C_DATE);
+	printk(KERN_INFO "i2c ELV parallel port adapter driver\n");
 	if (base==0) {
 		/* probe some values */
 		base=DEFAULT_BASE;

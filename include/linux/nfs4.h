@@ -134,6 +134,15 @@ enum open_delegation_type4 {
 	NFS4_OPEN_DELEGATE_WRITE = 2
 };
 
+enum lock_type4 {
+	NFS4_UNLOCK_LT = 0,
+	NFS4_READ_LT = 1,
+	NFS4_WRITE_LT = 2,
+	NFS4_READW_LT = 3,
+	NFS4_WRITEW_LT = 4
+};
+
+
 /* Mandatory Attributes */
 #define FATTR4_WORD0_SUPPORTED_ATTRS    (1)
 #define FATTR4_WORD0_TYPE               (1 << 1)
