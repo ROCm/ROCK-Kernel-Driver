@@ -526,19 +526,15 @@ int property_release (struct inode *inode, struct file *filp)
 	} else if (op->flag & OPP_DIRTY) {
 		if (op->flag & OPP_STRING) {
 			op->value [op->len] = 0;
-			save_and_cli (flags);
 			error = prom_setprop (node, op->name,
 					      op->value, op->len + 1);
-			restore_flags (flags);
 			if (error <= 0)
 				printk (KERN_WARNING "openpromfs: "
 					"Couldn't write property %s\n",
 					op->name);
 		} else if ((op->flag & OPP_BINARY) || !op->len) {
-			save_and_cli (flags);
 			error = prom_setprop (node, op->name,
 					      op->value, op->len);
-			restore_flags (flags);
 			if (error <= 0)
 				printk (KERN_WARNING "openpromfs: "
 					"Couldn't write property %s\n",
