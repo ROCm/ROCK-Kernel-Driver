@@ -180,7 +180,7 @@ static ssize_t snd_info_entry_read(struct file *file, char *buffer,
 	snd_info_private_data_t *data;
 	struct snd_info_entry *entry;
 	snd_info_buffer_t *buf;
-	long size = 0;
+	size_t size = 0;
 
 	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
 	snd_assert(data != NULL, return -ENXIO);
@@ -192,7 +192,8 @@ static ssize_t snd_info_entry_read(struct file *file, char *buffer,
 			return -EIO;
 		if (file->f_pos >= (long)buf->size)
 			return 0;
-		size = min(count, buf->size - file->f_pos);
+		size = buf->size - file->f_pos;
+		size = min(count, size);
 		if (copy_to_user(buffer, buf->buffer + file->f_pos, size))
 			return -EFAULT;
 		file->f_pos += size;
@@ -213,7 +214,7 @@ static ssize_t snd_info_entry_write(struct file *file, const char *buffer,
 	snd_info_private_data_t *data;
 	struct snd_info_entry *entry;
 	snd_info_buffer_t *buf;
-	long size = 0;
+	size_t size = 0;
 
 	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
 	snd_assert(data != NULL, return -ENXIO);
@@ -227,7 +228,8 @@ static ssize_t snd_info_entry_write(struct file *file, const char *buffer,
 			return -EINVAL;
 		if (file->f_pos >= (long)buf->len)
 			return -ENOMEM;
-		size = min(count, buf->len - file->f_pos);
+		size = buf->len - file->f_pos;
+		size = min(count, size);
 		if (copy_from_user(buf->buffer + file->f_pos, buffer, size))
 			return -EFAULT;
 		if ((long)buf->size < file->f_pos + size)
