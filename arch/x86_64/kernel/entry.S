@@ -297,7 +297,7 @@ int_very_careful:
 	sti
 	SAVE_REST
 	/* Check for syscall exit trace */	
-	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),%edx
+	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP),%edx
 	jz int_signal
 	pushq %rdi
 	leaq 8(%rsp),%rdi	# &ptregs -> arg1	
@@ -305,6 +305,7 @@ int_very_careful:
 	popq %rdi
 	btr  $TIF_SYSCALL_TRACE,%edi
 	btr  $TIF_SYSCALL_AUDIT,%edi
+	btr  $TIF_SINGLESTEP,%edi
 	jmp int_restore_rest
 	
 int_signal:
