@@ -10,19 +10,12 @@ obj-$(CONFIG_PCMCIA)			+= pcmcia_core.o ds.o
 ifeq ($(CONFIG_CARDBUS),y)
   obj-$(CONFIG_PCMCIA) 			+= yenta_socket.o
 endif
-ifeq ($(CONFIG_I82365),y)
-  obj-$(CONFIG_PCMCIA)			+= i82365.o
-endif
-ifeq ($(CONFIG_I82092),y)
-  obj-$(CONFIG_PCMCIA)			+= i82092.o
-endif
-ifeq ($(CONFIG_TCIC),y)
-  obj-$(CONFIG_PCMCIA)			+= tcic.o
-endif
+
+obj-$(CONFIG_I82365)			+= i82365.o
+obj-$(CONFIG_I82092)			+= i82092.o
+obj-$(CONFIG_TCIC)			+= tcic.o
 obj-$(CONFIG_HD64465_PCMCIA)		+= hd64465_ss.o
-
 obj-$(CONFIG_PCMCIA_SA1100)		+= sa1100_cs.o
-
 
 yenta_socket-objs				:= pci_socket.o yenta.o
 
