@@ -204,6 +204,19 @@ static inline int is_page_cache_freeable(struct page *page)
 	return page_count(page) - !!PagePrivate(page) == 2;
 }
 
+static int may_write_to_queue(struct backing_dev_info *bdi)
+{
+	if (current_is_kswapd())
+		return 1;
+	if (current_is_pdflush())	/* This is unlikely, but why not... */
+		return 1;
+	if (!bdi_write_congested(bdi))
+		return 1;
+	if (bdi == current->backing_dev_info)
+		return 1;
+	return 0;
+}
+
 /*
  * shrink_list returns the number of reclaimed pages
  */
@@ -303,8 +316,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * See swapfile.c:page_queue_congested().
 		 */
 		if (PageDirty(page)) {
-			struct backing_dev_info *bdi;
-
 			if (!is_page_cache_freeable(page))
 				goto keep_locked;
 			if (!mapping)
@@ -313,9 +324,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				goto activate_locked;
 			if (!may_enter_fs)
 				goto keep_locked;
-			bdi = mapping->backing_dev_info;
-			if (bdi != current->backing_dev_info &&
-					bdi_write_congested(bdi))
+			if (!may_write_to_queue(mapping->backing_dev_info))
 				goto keep_locked;
 			write_lock(&mapping->page_lock);
 			if (test_clear_page_dirty(page)) {
@@ -424,7 +433,7 @@ keep:
 	if (pagevec_count(&freed_pvec))
 		__pagevec_release_nonlru(&freed_pvec);
 	mod_page_state(pgsteal, ret);
-	if (current->flags & PF_KSWAPD)
+	if (current_is_kswapd())
 		mod_page_state(kswapd_steal, ret);
 	mod_page_state(pgactivate, pgactivate);
 	return ret;
