@@ -360,6 +360,8 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		  }
 		  break;
 
+#ifdef CONFIG_PROC_MM
+	/* uml skas stuff */
 	case PTRACE_FAULTINFO: {
 		struct ptrace_faultinfo fault;
 
@@ -406,6 +408,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret=0;
 		break;
 	}
+#endif
 	case PTRACE_SYSCALL: /* continue and stop at next (return from) syscall */
 	case PTRACE_CONT: { /* restart after signal. */
 		long tmp;
