@@ -851,20 +851,20 @@ static int opl3sa2_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id *de
 	opl3sa2_activated[card] = 1;
 
 	/* Our own config: */
-	cfg[card].io_base = dev->io_resource[4].start;
-	cfg[card].irq     = dev->irq_resource[0].start;
-	cfg[card].dma     = dev->dma_resource[0].start;
-	cfg[card].dma2    = dev->dma_resource[1].start;
+	cfg[card].io_base = pnp_port_start(dev, 4);
+	cfg[card].irq     = pnp_irq(dev, 0);
+	cfg[card].dma     = pnp_dma(dev, 0);
+	cfg[card].dma2    = pnp_dma(dev, 1);
 
 	/* The MSS config: */
-	cfg_mss[card].io_base      = dev->io_resource[1].start;
-	cfg_mss[card].irq          = dev->irq_resource[0].start;
-	cfg_mss[card].dma          = dev->dma_resource[0].start;
-	cfg_mss[card].dma2         = dev->dma_resource[1].start;
+	cfg_mss[card].io_base      = pnp_port_start(dev, 1);
+	cfg_mss[card].irq          = pnp_irq(dev, 0);
+	cfg_mss[card].dma          = pnp_dma(dev, 0);
+	cfg_mss[card].dma2         = pnp_dma(dev, 1);
 	cfg_mss[card].card_subtype = 1; /* No IRQ or DMA setup */
 
-	cfg_mpu[card].io_base       = dev->io_resource[3].start;
-	cfg_mpu[card].irq           = dev->irq_resource[0].start;
+	cfg_mpu[card].io_base       = pnp_port_start(dev, 3);
+	cfg_mpu[card].irq           = pnp_irq(dev, 0);
 	cfg_mpu[card].dma           = -1;
 	cfg_mpu[card].dma2          = -1;
 	cfg_mpu[card].always_detect = 1; /* It's there, so use shared IRQs */
