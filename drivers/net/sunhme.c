@@ -1521,12 +1521,6 @@ static int happy_meal_init(struct happy_meal *hp)
 	hme_write32(hp, bregs + BMAC_IGAP1, DEFAULT_IPG1);
 	hme_write32(hp, bregs + BMAC_IGAP2, DEFAULT_IPG2);
 
-	/* Make sure we can handle VLAN frames.  */
-	hme_write32(hp, bregs + BMAC_TXMAX,
-		    ETH_DATA_LEN + ETH_HLEN + 8);
-	hme_write32(hp, bregs + BMAC_RXMAX,
-		    ETH_DATA_LEN + ETH_HLEN + 8);
-
 	/* Load up the MAC address and random seed. */
 	HMD(("rseed/macaddr, "));
 
@@ -2805,8 +2799,8 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	dev->watchdog_timeo = 5*HZ;
 	dev->do_ioctl = &happy_meal_ioctl;
 
-	/* Happy Meal can do it all... */
-	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM;
+	/* Happy Meal can do it all... except VLAN. */
+	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_VLAN_CHALLENGED;
 
 	dev->irq = sdev->irqs[0];
 
