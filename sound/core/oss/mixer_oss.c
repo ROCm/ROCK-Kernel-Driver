@@ -30,6 +30,8 @@
 #include <sound/mixer_oss.h>
 #include <linux/soundcard.h>
 
+#define OSS_ALSAEMULVER         _SIOR ('M', 249, int)
+
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Mixer OSS emulation for ALSA.");
 MODULE_LICENSE("GPL");
@@ -306,34 +308,36 @@ static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, 
 			tmp = snd_mixer_oss_set_recsrc(fmixer, tmp);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
+			return put_user(tmp, (int *)arg);
 		case OSS_GETVERSION:
 			return put_user(SNDRV_OSS_VERSION, (int *) arg);
+		case OSS_ALSAEMULVER:
+			return put_user(1, (int *) arg);
 		case SOUND_MIXER_READ_DEVMASK:
 			tmp = snd_mixer_oss_devmask(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
+			return put_user(tmp, (int *)arg);
 		case SOUND_MIXER_READ_STEREODEVS:
 			tmp = snd_mixer_oss_stereodevs(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
+			return put_user(tmp, (int *)arg);
 		case SOUND_MIXER_READ_RECMASK:
 			tmp = snd_mixer_oss_recmask(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
+			return put_user(tmp, (int *)arg);
 		case SOUND_MIXER_READ_CAPS:
 			tmp = snd_mixer_oss_caps(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
+			return put_user(tmp, (int *)arg);
 		case SOUND_MIXER_READ_RECSRC:
 			tmp = snd_mixer_oss_get_recsrc(fmixer);
 			if (tmp < 0)
 				return tmp;
-			return put_user(tmp, (int *)arg) ? -EFAULT : 0;
+			return put_user(tmp, (int *)arg);
 		}
 	}
 	if (cmd & SIOC_IN) {
@@ -342,12 +346,12 @@ static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, 
 		tmp = snd_mixer_oss_set_volume(fmixer, cmd & 0xff, tmp);
 		if (tmp < 0)
 			return tmp;
-		return put_user(tmp, (int *)arg) ? -EFAULT : 0;
+		return put_user(tmp, (int *)arg);
 	} else if (cmd & SIOC_OUT) {
 		tmp = snd_mixer_oss_get_volume(fmixer, cmd & 0xff);
 		if (tmp < 0)
 			return tmp;
-		return put_user(tmp, (int *)arg) ? -EFAULT : 0;
+		return put_user(tmp, (int *)arg);
 	}
 	return -ENXIO;
 }

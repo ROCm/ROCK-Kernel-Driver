@@ -40,6 +40,8 @@
 #include <linux/soundcard.h>
 #include <sound/initval.h>
 
+#define OSS_ALSAEMULVER		_SIOR ('M', 249, int)
+
 static int dsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};
 static int adsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
 static int nonblock_open;
@@ -1871,7 +1873,9 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 
 	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
 	if (cmd == OSS_GETVERSION)
-		return put_user(SNDRV_OSS_VERSION, (int *)arg) ? -EFAULT : 0;
+		return put_user(SNDRV_OSS_VERSION, (int *)arg);
+	if (cmd == OSS_ALSAEMULVER)
+		return put_user(1, (int *)arg);
 #if defined(CONFIG_SND_MIXER_OSS) || (defined(MODULE) && defined(CONFIG_SND_MIXER_OSS_MODULE))
 	if (((cmd >> 8) & 0xff) == 'M')	{	/* mixer ioctl - for OSS compatibility */
 		snd_pcm_substream_t *substream;
@@ -1900,48 +1904,48 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		if ((res = snd_pcm_oss_set_rate(pcm_oss_file, res))<0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SOUND_PCM_READ_RATE:
 		res = snd_pcm_oss_get_rate(pcm_oss_file);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SNDCTL_DSP_STEREO:
 		if (get_user(res, (int *)arg))
 			return -EFAULT;
 		res = res > 0 ? 2 : 1;
 		if ((res = snd_pcm_oss_set_channels(pcm_oss_file, res)) < 0)
 			return res;
-		return put_user(--res, (int *)arg) ? -EFAULT : 0;
+		return put_user(--res, (int *)arg);
 	case SNDCTL_DSP_GETBLKSIZE:
 		res = snd_pcm_oss_get_block_size(pcm_oss_file);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SNDCTL_DSP_SETFMT:
 		if (get_user(res, (int *)arg))
 			return -EFAULT;
 		res = snd_pcm_oss_set_format(pcm_oss_file, res);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SOUND_PCM_READ_BITS:
 		res = snd_pcm_oss_get_format(pcm_oss_file);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SNDCTL_DSP_CHANNELS:
 		if (get_user(res, (int *)arg))
 			return -EFAULT;
 		res = snd_pcm_oss_set_channels(pcm_oss_file, res);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SOUND_PCM_READ_CHANNELS:
 		res = snd_pcm_oss_get_channels(pcm_oss_file);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SOUND_PCM_WRITE_FILTER:
 	case SOUND_PCM_READ_FILTER:
 		return -EIO;
@@ -1953,7 +1957,7 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 		res = snd_pcm_oss_set_subdivide(pcm_oss_file, res);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SNDCTL_DSP_SETFRAGMENT:
 		if (get_user(res, (int *)arg))
 			return -EFAULT;
@@ -1962,7 +1966,7 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 		res = snd_pcm_oss_get_formats(pcm_oss_file);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SNDCTL_DSP_GETOSPACE:
 	case SNDCTL_DSP_GETISPACE:
 		return snd_pcm_oss_get_space(pcm_oss_file,
@@ -1975,12 +1979,12 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 		res = snd_pcm_oss_get_caps(pcm_oss_file);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SNDCTL_DSP_GETTRIGGER:
 		res = snd_pcm_oss_get_trigger(pcm_oss_file);
 		if (res < 0)
 			return res;
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SNDCTL_DSP_SETTRIGGER:
 		if (get_user(res, (int *)arg))
 			return -EFAULT;
@@ -2011,7 +2015,7 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 			put_user(0, (int *)arg);
 			return res;
 		}
-		return put_user(res, (int *)arg) ? -EFAULT : 0;
+		return put_user(res, (int *)arg);
 	case SNDCTL_DSP_PROFILE:
 		return 0;	/* silently ignore */
 	default:
