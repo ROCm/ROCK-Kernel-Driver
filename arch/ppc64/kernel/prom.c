@@ -123,7 +123,7 @@ struct pci_intr_map {
 
 
 typedef unsigned long interpret_func(struct device_node *, unsigned long,
-				     int, int);
+				     int, int, int);
 
 #ifndef FB_MAX			/* avoid pulling in all of the fb stuff */
 #define FB_MAX	8
@@ -2064,7 +2064,8 @@ map_interrupt(unsigned int **irq, struct device_node **ictrler,
 }
 
 static unsigned long __init
-finish_node_interrupts(struct device_node *np, unsigned long mem_start)
+finish_node_interrupts(struct device_node *np, unsigned long mem_start,
+		       int measure_only)
 {
 	unsigned int *ints;
 	int intlen, intrcells;
@@ -2080,6 +2081,9 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 	np->n_intrs = intlen;
 	np->intrs = (struct interrupt_info *) mem_start;
 	mem_start += intlen * sizeof(struct interrupt_info);
+
+	if (measure_only)
+		return mem_start;
 
 	for (i = 0; i < intlen; ++i) {
 		np->intrs[i].line = 0;
@@ -2117,7 +2121,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 
 static unsigned long __init
 interpret_pci_props(struct device_node *np, unsigned long mem_start,
-		    int naddrc, int nsizec)
+		    int naddrc, int nsizec, int measure_only)
 {
 	struct address_range *adr;
 	struct pci_reg_property *pci_addrs;
@@ -2129,9 +2133,11 @@ interpret_pci_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= sizeof(struct pci_reg_property)) >= 0) {
-			adr[i].space = pci_addrs[i].addr.a_hi;
-			adr[i].address = pci_addrs[i].addr.a_lo;
-			adr[i].size = pci_addrs[i].size_lo;
+ 			if (!measure_only) {
+				adr[i].space = pci_addrs[i].addr.a_hi;
+				adr[i].address = pci_addrs[i].addr.a_lo;
+				adr[i].size = pci_addrs[i].size_lo;
+			}
 			++i;
 		}
 		np->addrs = adr;
@@ -2143,7 +2149,7 @@ interpret_pci_props(struct device_node *np, unsigned long mem_start,
 
 static unsigned long __init
 interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
-		      int naddrc, int nsizec)
+		      int naddrc, int nsizec, int measure_only)
 {
 	struct reg_property32 *rp;
 	struct address_range *adr;
@@ -2164,9 +2170,11 @@ interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= sizeof(struct reg_property32)) >= 0) {
-			adr[i].space = 2;
-			adr[i].address = rp[i].address + base_address;
-			adr[i].size = rp[i].size;
+ 			if (!measure_only) {
+				adr[i].space = 2;
+				adr[i].address = rp[i].address + base_address;
+				adr[i].size = rp[i].size;
+			}
 			++i;
 		}
 		np->addrs = adr;
@@ -2179,7 +2187,7 @@ interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
 
 static unsigned long __init
 interpret_macio_props(struct device_node *np, unsigned long mem_start,
-		      int naddrc, int nsizec)
+		      int naddrc, int nsizec, int measure_only)
 {
 	struct reg_property32 *rp;
 	struct address_range *adr;
@@ -2200,9 +2208,11 @@ interpret_macio_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= sizeof(struct reg_property32)) >= 0) {
-			adr[i].space = 2;
-			adr[i].address = rp[i].address + base_address;
-			adr[i].size = rp[i].size;
+ 			if (!measure_only) {
+				adr[i].space = 2;
+				adr[i].address = rp[i].address + base_address;
+				adr[i].size = rp[i].size;
+			}
 			++i;
 		}
 		np->addrs = adr;
@@ -2215,7 +2225,7 @@ interpret_macio_props(struct device_node *np, unsigned long mem_start,
 
 static unsigned long __init
 interpret_isa_props(struct device_node *np, unsigned long mem_start,
-		    int naddrc, int nsizec)
+		    int naddrc, int nsizec, int measure_only)
 {
 	struct isa_reg_property *rp;
 	struct address_range *adr;
@@ -2226,9 +2236,11 @@ interpret_isa_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= sizeof(struct reg_property)) >= 0) {
-			adr[i].space = rp[i].space;
-			adr[i].address = rp[i].address;
-			adr[i].size = rp[i].size;
+ 			if (!measure_only) {
+				adr[i].space = rp[i].space;
+				adr[i].address = rp[i].address;
+				adr[i].size = rp[i].size;
+			}
 			++i;
 		}
 		np->addrs = adr;
@@ -2241,7 +2253,7 @@ interpret_isa_props(struct device_node *np, unsigned long mem_start,
 
 static unsigned long __init
 interpret_root_props(struct device_node *np, unsigned long mem_start,
-		     int naddrc, int nsizec)
+		     int naddrc, int nsizec, int measure_only)
 {
 	struct address_range *adr;
 	int i, l;
@@ -2253,9 +2265,11 @@ interpret_root_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= rpsize) >= 0) {
-			adr[i].space = 0;
-			adr[i].address = rp[naddrc - 1];
-			adr[i].size = rp[naddrc + nsizec - 1];
+ 			if (!measure_only) {
+				adr[i].space = 0;
+				adr[i].address = rp[naddrc - 1];
+				adr[i].size = rp[naddrc + nsizec - 1];
+			}
 			++i;
 			rp += naddrc + nsizec;
 		}
@@ -2269,7 +2283,7 @@ interpret_root_props(struct device_node *np, unsigned long mem_start,
 
 static unsigned long __init
 finish_node(struct device_node *np, unsigned long mem_start,
-	    interpret_func *ifunc, int naddrc, int nsizec)
+	    interpret_func *ifunc, int naddrc, int nsizec, int measure_only)
 {
 	struct device_node *child;
 	int *ip;
@@ -2284,9 +2298,9 @@ finish_node(struct device_node *np, unsigned long mem_start,
 
 	/* get the device addresses and interrupts */
 	if (ifunc != NULL)
-		mem_start = ifunc(np, mem_start, naddrc, nsizec);
+		mem_start = ifunc(np, mem_start, naddrc, nsizec, measure_only);
 
-	mem_start = finish_node_interrupts(np, mem_start);
+	mem_start = finish_node_interrupts(np, mem_start, measure_only);
 
 	/* Look for #address-cells and #size-cells properties. */
 	ip = (int *) get_property(np, "#address-cells", 0);
@@ -2324,7 +2338,7 @@ finish_node(struct device_node *np, unsigned long mem_start,
 
 	for (child = np->child; child != NULL; child = child->sibling)
 		mem_start = finish_node(child, mem_start, ifunc,
-					naddrc, nsizec);
+					naddrc, nsizec, measure_only);
 
 	return mem_start;
 }
@@ -2342,14 +2356,11 @@ finish_device_tree(void)
 
 	virt_irq_init();
 
-	mem = finish_node(allnodes, mem, NULL, 0, 0);
-	dev_tree_size = mem - (unsigned long) allnodes;
-
-	mem = _ALIGN(mem, PAGE_SIZE);
-	lmb_reserve(__pa(klimit), mem-klimit);
-
-	klimit = mem;
-
+	dev_tree_size = finish_node(allnodes, 0, NULL, 0, 0, 1);
+	mem = (long)abs_to_virt(lmb_alloc(dev_tree_size,
+					  __alignof__(struct device_node)));
+	if (finish_node(allnodes, mem, NULL, 0, 0, 0) != mem + dev_tree_size)
+		BUG();
 	rtas.dev = of_find_node_by_name(NULL, "rtas");
 }
 
