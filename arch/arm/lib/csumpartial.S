@@ -73,8 +73,7 @@ td3	.req	lr
 .done:		adc	r0, sum, #0		@ collect up the last carry
 		ldr	td0, [sp], #4
 		tst	td0, #1			@ check buffer alignment
-		movne	td0, r0, lsl #8		@ rotate checksum by 8 bits
-		orrne	r0, td0, r0, lsr #24
+		movne	r0, r0, ror #8		@ rotate checksum by 8 bits
 		ldr	pc, [sp], #4		@ return
 
 .not_aligned:	tst	buf, #1			@ odd address

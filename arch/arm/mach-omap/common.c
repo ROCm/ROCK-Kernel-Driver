@@ -17,6 +17,7 @@
 #include <linux/serial.h>
 #include <linux/tty.h>
 #include <linux/serial_core.h>
+#include <linux/serial_reg.h>
 
 #include <asm/hardware.h>
 #include <asm/system.h>
@@ -306,39 +307,66 @@ void omap_map_io(void)
 		_omap_map_io();
 }
 
+static inline unsigned int omap_serial_in(struct uart_port *up, int offset)
+{
+	offset <<= up->regshift;
+	return (unsigned int)__raw_readb(up->membase + offset);
+}
+
+static inline void omap_serial_outp(struct uart_port *up, int offset, int value)
+{
+	offset <<= up->regshift;
+	__raw_writeb(value, up->membase + offset);
+}
+
+/*
+ * Internal UARTs need to be initialized for the 8250 autoconfig to work
+ * properly.
+ */
+static void __init omap_serial_reset(struct uart_port *up)
+{
+	omap_serial_outp(up, UART_OMAP_MDR1, 0x07); /* disable UART */
+	omap_serial_outp(up, UART_OMAP_MDR1, 0x00); /* enable UART */
+
+	if (!cpu_is_omap1510()) {
+		omap_serial_outp(up, UART_OMAP_SYSC, 0x01);
+		while (!(omap_serial_in(up, UART_OMAP_SYSC) & 0x01));
+	}
+}
+
 static struct uart_port omap_serial_ports[] = {
 	{
 		.membase	= (char*)IO_ADDRESS(OMAP_UART1_BASE),
 		.mapbase	= (unsigned long)OMAP_UART1_BASE,
 		.irq		= INT_UART1,
-		.flags		= UPF_SKIP_TEST,
+		.flags		= UPF_BOOT_AUTOCONF,
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP16XX_BASE_BAUD * 16,
 		.line		= 0,
-		.type		= PORT_OMAP,
+		.type		= PORT_16654,
 		.fifosize	= 64
 	} , {
 		.membase	= (char*)IO_ADDRESS(OMAP_UART2_BASE),
 		.mapbase	= (unsigned long)OMAP_UART2_BASE,
 		.irq		= INT_UART2,
-		.flags		= UPF_SKIP_TEST,
+		.flags		= UPF_BOOT_AUTOCONF,
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP16XX_BASE_BAUD * 16,
 		.line		= 1,
-		.type		= PORT_OMAP,
+		.type		= PORT_16654,
 		.fifosize	= 64
 	} , {
 		.membase	= (char*)IO_ADDRESS(OMAP_UART3_BASE),
 		.mapbase	= (unsigned long)OMAP_UART3_BASE,
 		.irq		= INT_UART3,
-		.flags		= UPF_SKIP_TEST,
+		.flags		= UPF_BOOT_AUTOCONF,
 		.iotype		= UPIO_MEM,
 		.regshift	= 2,
 		.uartclk	= OMAP16XX_BASE_BAUD * 16,
 		.line		= 2,
-		.type		= PORT_OMAP,
+		.type		= PORT_16654,
 		.fifosize	= 64
 	}
 };
@@ -366,8 +394,6 @@ void __init omap_serial_init(int ports[OMAP_MAX_NR_PORTS])
 	}
 
 	for (i = 0; i < OMAP_MAX_NR_PORTS; i++) {
-		unsigned long port;
-		unsigned char regshift;
 		unsigned char reg;
 
 		if (ports[i] != 1)
@@ -382,7 +408,7 @@ void __init omap_serial_init(int ports[OMAP_MAX_NR_PORTS])
 					reg = fpga_read(OMAP1510_FPGA_POWER);
 					reg |= OMAP1510_FPGA_PCR_COM1_EN;
 					fpga_write(reg, OMAP1510_FPGA_POWER);
-					udelay(1);
+					udelay(10);
 				}
 			}
 			break;
@@ -394,7 +420,7 @@ void __init omap_serial_init(int ports[OMAP_MAX_NR_PORTS])
 					reg = fpga_read(OMAP1510_FPGA_POWER);
 					reg |= OMAP1510_FPGA_PCR_COM2_EN;
 					fpga_write(reg, OMAP1510_FPGA_POWER);
-					udelay(1);
+					udelay(10);
 				}
 			}
 			break;
@@ -405,16 +431,8 @@ void __init omap_serial_init(int ports[OMAP_MAX_NR_PORTS])
 			}
 			break;
 		}
-
-		/* Reset port */
-		if (!cpu_is_omap1510()) {
-			port = (unsigned long)omap_serial_ports[i].membase;
-			regshift = omap_serial_ports[i].regshift;
-			writeb(0x01, port + (UART_SYSC << regshift));
-			while (!(readb(port + (UART_SYSC << regshift)) & 0x01));
-		}
-
-		//early_serial_setup(&omap_serial_ports[i]);
+		omap_serial_reset(&omap_serial_ports[i]);
+		early_serial_setup(&omap_serial_ports[i]);
 	}
 }
 

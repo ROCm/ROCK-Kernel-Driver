@@ -23,6 +23,7 @@
  *
  * Parts based on arch/arm/mach-pxa/pm.c
  *
+ * Thanks to Dimitry Andric for debugging
 */
 
 #include <linux/config.h>
@@ -33,10 +34,12 @@
 #include <linux/interrupt.h>
 #include <linux/crc32.h>
 #include <linux/ioport.h>
+#include <linux/delay.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
 
+#include <asm/arch/regs-serial.h>
 #include <asm/arch/regs-clock.h>
 #include <asm/arch/regs-gpio.h>
 #include <asm/arch/regs-mem.h>
@@ -68,7 +71,21 @@ struct sleep_save {
 
 static struct sleep_save core_save[] = {
 	SAVE_ITEM(S3C2410_LOCKTIME),
-	SAVE_ITEM(S3C2410_CLKCON)
+	SAVE_ITEM(S3C2410_CLKCON),
+
+	/* we restore the timings here, with the proviso that the board
+	 * brings the system up in an slower, or equal frequency setting
+	 * to the original system.
+	 *
+	 * if we cannot guarantee this, then things are going to go very
+	 * wrong here, as we modify the refresh and both pll settings.
+	 */
+
+	SAVE_ITEM(S3C2410_REFRESH),
+	SAVE_ITEM(S3C2410_MPLLCON),
+	SAVE_ITEM(S3C2410_UPLLCON),
+	SAVE_ITEM(S3C2410_CLKDIVN),
+	SAVE_ITEM(S3C2410_CLKSLOW),
 };
 
 /* this lot should be really saved by the IRQ code */
@@ -115,6 +132,20 @@ static struct sleep_save gpio_save[] = {
 };
 
 #ifdef CONFIG_S3C2410_PM_DEBUG
+
+#define SAVE_UART(va) \
+	SAVE_ITEM((va) + S3C2410_ULCON), \
+	SAVE_ITEM((va) + S3C2410_UCON), \
+	SAVE_ITEM((va) + S3C2410_UFCON), \
+	SAVE_ITEM((va) + S3C2410_UMCON), \
+	SAVE_ITEM((va) + S3C2410_UBRDIV)
+
+static struct sleep_save uart_save[] = {
+	SAVE_UART(S3C2410_VA_UART0),
+	SAVE_UART(S3C2410_VA_UART1),
+	SAVE_UART(S3C2410_VA_UART2),
+};
+
 /* debug
  *
  * we send the debug to printascii() to allow it to be seen if the
@@ -135,10 +166,24 @@ static void pm_dbg(const char *fmt, ...)
 	printascii(buff);
 }
 
+static void s3c2410_pm_debug_init(void)
+{
+	unsigned long tmp = __raw_readl(S3C2410_CLKCON);
+
+	/* re-start uart clocks */
+	tmp |= S3C2410_CLKCON_UART0;
+	tmp |= S3C2410_CLKCON_UART1;
+	tmp |= S3C2410_CLKCON_UART2;
+
+	__raw_writel(tmp, S3C2410_CLKCON);
+	udelay(10);
+}
 
 #define DBG(fmt...) pm_dbg(fmt)
 #else
 #define DBG(fmt...) printk(KERN_DEBUG fmt)
+
+#define s3c2410_pm_debug_init() do { } while(0)
 #endif
 
 #if defined(CONFIG_S3C2410_PM_CHECK) && CONFIG_S3C2410_PM_CHECK_CHUNKSIZE != 0
@@ -329,6 +374,9 @@ static void s3c2410_pm_check_restore(void)
 }
 
 #else
+
+static struct sleep_save uart_save[] = {};
+
 #define s3c2410_pm_check_prepare() do { } while(0)
 #define s3c2410_pm_check_restore() do { } while(0)
 #define s3c2410_pm_check_store()   do { } while(0)
@@ -344,12 +392,20 @@ static void s3c2410_pm_do_save(struct sleep_save *ptr, int count)
 	}
 }
 
+/* s3c2410_pm_do_restore
+ *
+ * restore the system from the given list of saved registers
+ *
+ * Note, we do not use DBG() in here, as the system may not have
+ * restore the UARTs state yet
+*/
 
 static void s3c2410_pm_do_restore(struct sleep_save *ptr, int count)
 {
 	for (; count > 0; count--, ptr++) {
-		DBG("restore %08lx (restore %08lx, current %08x)\n",
-		    ptr->reg, ptr->val, __raw_readl(ptr->reg));
+		printk(KERN_DEBUG "restore %08lx (restore %08lx, was %08x)\n",
+		       ptr->reg, ptr->val, __raw_readl(ptr->reg));
+
 		__raw_writel(ptr->val, ptr->reg);
 	}
 }
@@ -434,10 +490,14 @@ static void s3c2410_pm_configure_extint(void)
  * central control for sleep/resume process
 */
 
-static int s3c2410_pm_enter(u32 state)
+static int s3c2410_pm_enter(suspend_state_t state)
 {
 	unsigned long regs_save[16];
 	unsigned long tmp;
+
+	/* ensure the debug is initialised (if enabled) */
+
+	s3c2410_pm_debug_init();
 
 	DBG("s3c2410_pm_enter(%d)\n", state);
 
@@ -480,6 +540,7 @@ static int s3c2410_pm_enter(u32 state)
 	s3c2410_pm_do_save(gpio_save, ARRAY_SIZE(gpio_save));
 	s3c2410_pm_do_save(irq_save, ARRAY_SIZE(irq_save));
 	s3c2410_pm_do_save(core_save, ARRAY_SIZE(core_save));
+	s3c2410_pm_do_save(uart_save, ARRAY_SIZE(uart_save));
 
 	/* set the irq configuration for wake */
 
@@ -493,7 +554,7 @@ static int s3c2410_pm_enter(u32 state)
 
 	/* ack any outstanding external interrupts before we go to sleep */
 
-	__raw_writel(S3C2410_EINTPEND, __raw_readl(S3C2410_EINTPEND));
+	__raw_writel(__raw_readl(S3C2410_EINTPEND), S3C2410_EINTPEND);
 
 	/* flush cache back to ram */
 
@@ -512,8 +573,17 @@ static int s3c2410_pm_enter(u32 state)
 	/* unset the return-from-sleep flag, to ensure reset */
 
 	tmp = __raw_readl(S3C2410_GSTATUS2);
-	tmp &= S3C2410_GSTATUs2_OFFRESET;
+	tmp &= S3C2410_GSTATUS2_OFFRESET;
 	__raw_writel(tmp, S3C2410_GSTATUS2);
+
+	/* restore the system state */
+
+	s3c2410_pm_do_restore(core_save, ARRAY_SIZE(core_save));
+	s3c2410_pm_do_restore(gpio_save, ARRAY_SIZE(gpio_save));
+	s3c2410_pm_do_restore(irq_save, ARRAY_SIZE(irq_save));
+	s3c2410_pm_do_restore(uart_save, ARRAY_SIZE(uart_save));
+
+	s3c2410_pm_debug_init();
 
 	/* check what irq (if any) restored the system */
 
@@ -526,12 +596,6 @@ static int s3c2410_pm_enter(u32 state)
 
 	s3c2410_pm_show_resume_irqs(IRQ_EINT4-4, __raw_readl(S3C2410_EINTPEND),
 				    s3c_irqwake_eintmask);
-
-	DBG("post sleep, restoring state...\n");
-
-	s3c2410_pm_do_restore(core_save, ARRAY_SIZE(core_save));
-	s3c2410_pm_do_restore(gpio_save, ARRAY_SIZE(gpio_save));
-	s3c2410_pm_do_restore(irq_save, ARRAY_SIZE(irq_save));
 
 	DBG("post sleep, preparing to return\n");
 
@@ -546,7 +610,7 @@ static int s3c2410_pm_enter(u32 state)
 /*
  * Called after processes are frozen, but before we shut down devices.
  */
-static int s3c2410_pm_prepare(u32 state)
+static int s3c2410_pm_prepare(suspend_state_t state)
 {
 	return 0;
 }
@@ -554,7 +618,7 @@ static int s3c2410_pm_prepare(u32 state)
 /*
  * Called after devices are re-setup, but before processes are thawed.
  */
-static int s3c2410_pm_finish(u32 state)
+static int s3c2410_pm_finish(suspend_state_t state)
 {
 	return 0;
 }

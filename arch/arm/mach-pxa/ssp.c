@@ -185,7 +185,7 @@ int ssp_init(struct ssp_dev *dev, u32 port, u32 mode, u32 flags, u32 psp_flags,
 {
 	int ret, irq;
 
-	if (!request_mem_region(__PREG(SSCR0_P(dev->port)), 0x2c, "SSP")) {
+	if (!request_mem_region(__PREG(SSCR0_P(port)), 0x2c, "SSP")) {
 		return -EBUSY;
 	}
 

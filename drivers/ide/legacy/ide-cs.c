@@ -206,7 +206,7 @@ static int idecs_register(unsigned long io, unsigned long ctl, unsigned long irq
     ide_init_hwif_ports(&hw, io, ctl, NULL);
     hw.irq = irq;
     hw.chipset = ide_pci;
-    return ide_register_hw(&hw, NULL);
+    return ide_register_hw_with_fixup(&hw, NULL, ide_undecoded_slave);
 }
 
 /*======================================================================

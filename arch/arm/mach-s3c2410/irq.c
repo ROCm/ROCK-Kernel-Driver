@@ -36,6 +36,9 @@
  *
  *   05-Oct-2004  Ben Dooks <ben@simtec.co.uk>
  *		  Add support for power management controls
+ *
+ *   04-Nov-2004  Ben Dooks
+ *		  Fix standard IRQ wake for EINT0..4 and RTC
 */
 
 #include <linux/init.h>
@@ -91,7 +94,7 @@ s3c_irq_wake(unsigned int irqno, unsigned int state)
 	if (!state)
 		s3c_irqwake_intmask |= irqbit;
 	else
-		s3c_irqwake_intmask &= irqbit;
+		s3c_irqwake_intmask &= ~irqbit;
 
 	return 0;
 }

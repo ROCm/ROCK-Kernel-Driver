@@ -35,7 +35,10 @@
 #include <asm/arch/regs-mem.h>
 #include <asm/arch/regs-serial.h>
 
-#define CONFIG_DEBUG_RESUME
+/* CONFIG_DEBUG_RESUME is dangerous if your bootloader does not
+ * reset the UART configuration, only enable if you really need this!
+*/
+//#define CONFIG_DEBUG_RESUME
 
 	.text
 
@@ -132,6 +135,15 @@ ENTRY(s3c2410_cpu_resume)
 
 	mov	r2, #S3C2410_PA_UART & 0xff000000
 	orr	r2, r2, #S3C2410_PA_UART & 0xff000
+
+#if 0
+	/* SMDK2440 LED set */
+	mov	r14, #S3C2410_PA_GPIO
+	ldr	r12, [ r14, #0x54 ]
+	bic	r12, r12, #3<<4
+	orr	r12, r12, #1<<7
+	str	r12, [ r14, #0x54 ]
+#endif
 
 #ifdef CONFIG_DEBUG_RESUME
 	mov	r3, #'L'

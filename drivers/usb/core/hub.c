@@ -2077,10 +2077,6 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 			hdev->bus->b_hnp_enable = 0;
 	}
 
-	retval = clear_port_feature(hdev, port + 1, USB_PORT_FEAT_SUSPEND);
-	if (retval < 0 && retval != -EPIPE)
-		dev_dbg(&udev->dev, "can't clear suspend; %d\n", retval);
-
 	/* Some low speed devices have problems with the quick delay, so */
 	/*  be a bit pessimistic with those devices. RHbug #23670 */
 	if (oldspeed == USB_SPEED_LOW)
@@ -2393,6 +2389,15 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
   			goto done;
 		return;
 	}
+
+#ifdef  CONFIG_USB_SUSPEND
+	/* If something is connected, but the port is suspended, wake it up.. */
+	if (portstatus & USB_PORT_STAT_SUSPEND) {
+		status = hub_port_resume(hdev, port);
+		if (status < 0)
+			dev_dbg(hub_dev, "can't clear suspend on port %d; %d\n", port+1, status);
+	}
+#endif
 
 	for (i = 0; i < SET_CONFIG_TRIES; i++) {
 		struct usb_device *udev;

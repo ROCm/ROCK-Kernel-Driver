@@ -47,7 +47,7 @@
 
 
 /* ------------------------------------------------------------------------
- *  Versatile PB Registers
+ *  Versatile Registers
  * ------------------------------------------------------------------------
  * 
  */
@@ -55,10 +55,16 @@
 #define VERSATILE_SYS_SW_OFFSET               0x04
 #define VERSATILE_SYS_LED_OFFSET              0x08
 #define VERSATILE_SYS_OSC0_OFFSET             0x0C
+
+#if defined(CONFIG_ARCH_VERSATILE_PB)
 #define VERSATILE_SYS_OSC1_OFFSET             0x10
 #define VERSATILE_SYS_OSC2_OFFSET             0x14
 #define VERSATILE_SYS_OSC3_OFFSET             0x18
 #define VERSATILE_SYS_OSC4_OFFSET             0x1C
+#elif defined(CONFIG_ARCH_VERSATILE_AB)
+#define VERSATILE_SYS_OSC1_OFFSET             0x1C
+#endif
+
 #define VERSATILE_SYS_LOCK_OFFSET             0x20
 #define VERSATILE_SYS_100HZ_OFFSET            0x24
 #define VERSATILE_SYS_CFGDATA1_OFFSET         0x28
@@ -90,9 +96,13 @@
 #define VERSATILE_SYS_LED                     (VERSATILE_SYS_BASE + VERSATILE_SYS_LED_OFFSET)
 #define VERSATILE_SYS_OSC0                    (VERSATILE_SYS_BASE + VERSATILE_SYS_OSC0_OFFSET)
 #define VERSATILE_SYS_OSC1                    (VERSATILE_SYS_BASE + VERSATILE_SYS_OSC1_OFFSET)
+
+#if defined(CONFIG_ARCH_VERSATILE_PB)
 #define VERSATILE_SYS_OSC2                    (VERSATILE_SYS_BASE + VERSATILE_SYS_OSC2_OFFSET)
 #define VERSATILE_SYS_OSC3                    (VERSATILE_SYS_BASE + VERSATILE_SYS_OSC3_OFFSET)
 #define VERSATILE_SYS_OSC4                    (VERSATILE_SYS_BASE + VERSATILE_SYS_OSC4_OFFSET)
+#endif
+
 #define VERSATILE_SYS_LOCK                    (VERSATILE_SYS_BASE + VERSATILE_SYS_LOCK_OFFSET)
 #define VERSATILE_SYS_100HZ                   (VERSATILE_SYS_BASE + VERSATILE_SYS_100HZ_OFFSET)
 #define VERSATILE_SYS_CFGDATA1                (VERSATILE_SYS_BASE + VERSATILE_SYS_CFGDATA1_OFFSET)
@@ -132,7 +142,7 @@
 
 
 /* ------------------------------------------------------------------------
- *  Versatile PB control registers
+ *  Versatile control registers
  * ------------------------------------------------------------------------
  */
 
@@ -213,6 +223,7 @@
 #define VERSATILE_SSP_BASE             0x101F4000	/* Synchronous Serial Port */
 
 #define VERSATILE_SSMC_BASE            0x20000000	/* SSMC */
+#define VERSATILE_IB2_BASE             0x24000000	/* IB2 module */
 #define VERSATILE_MBX_BASE             0x40000000	/* MBX */
 #define VERSATILE_PCI_BASE             0x41000000	/* PCI Interface */
 #define VERSATILE_SDRAM67_BASE         0x70000000	/* SDRAM banks 6 and 7 */
@@ -255,7 +266,7 @@
 
 
 /* ------------------------------------------------------------------------
- *  Versatile PB Interrupt Controller - control registers
+ *  Versatile Interrupt Controller - control registers
  * ------------------------------------------------------------------------
  * 
  *  Offsets from interrupt controller base 
@@ -482,6 +493,17 @@
 
 #define VERSATILE_CSR_BASE             0x10000000
 #define VERSATILE_CSR_SIZE             0x10000000
+
+#ifdef CONFIG_ARCH_VERSATILE_AB
+/*
+ * IB2 Versatile/AB expansion board definitions
+ */
+#define VERSATILE_IB2_CAMERA_BANK	0x24000000
+#define VERSATILE_IB2_KBD_DATAREG	0x25000000
+#define VERSATILE_IB2_IER		0x26000000	/* for VICINTSOURCE27 */
+#define VERSATILE_IB2_CTRL		0x27000000
+#define VERSATILE_IB2_STAT		0x27000004
+#endif
 
 #endif
 
