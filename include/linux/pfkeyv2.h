@@ -181,7 +181,7 @@ struct sadb_x_policy {
 	uint8_t		sadb_x_policy_dir;
 	uint8_t		sadb_x_policy_reserved;
 	uint32_t	sadb_x_policy_id;
-	uint32_t	sadb_x_policy_reserved2;
+	uint32_t	sadb_x_policy_priority;
 } __attribute__((packed));
 /* sizeof(struct sadb_x_policy) == 16 */
 
