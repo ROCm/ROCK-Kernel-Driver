@@ -1,0 +1,20 @@
+#
+# SCTP configuration
+#
+mainmenu_option next_comment
+comment '   SCTP Configuration (EXPERIMENTAL)'
+
+if [ "$CONFIG_IPV6" != "n" ]; then
+   define_bool CONFIG_IPV6_SCTP__ $CONFIG_IPV6
+else
+   define_bool CONFIG_IPV6_SCTP__ y
+fi
+
+dep_tristate '  The SCTP Protocol (EXPERIMENTAL)' CONFIG_IP_SCTP $CONFIG_IPV6_SCTP__
+if [ "$CONFIG_IP_SCTP" != "n" ]; then
+   bool '    SCTP: Use old checksum (Adler-32)' CONFIG_SCTP_ADLER32
+   bool '    SCTP: Debug messages' CONFIG_SCTP_DBG_MSG
+   bool '    SCTP: Debug object counts' CONFIG_SCTP_DBG_OBJCNT
+fi
+
+endmenu

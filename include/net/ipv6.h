@@ -4,7 +4,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>
  *
- *	$Id: ipv6.h,v 1.23 2000/12/13 18:31:48 davem Exp $
+ *	$Id: ipv6.h,v 1.1 2002/05/20 15:13:07 jgrimm Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -335,6 +335,14 @@ extern int 			ipv6_recv_error(struct sock *sk, struct msghdr *msg, int len);
 extern void			ipv6_icmp_error(struct sock *sk, struct sk_buff *skb, int err, u16 port,
 						u32 info, u8 *payload);
 extern void			ipv6_local_error(struct sock *sk, int err, struct flowi *fl, u32 info);
+
+extern int inet6_release(struct socket *sock);
+extern int inet6_bind(struct socket *sock, struct sockaddr *uaddr, 
+		      int addr_len);
+extern int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
+			 int *uaddr_len, int peer);
+extern int inet6_ioctl(struct socket *sock, unsigned int cmd, 
+		       unsigned long arg);
 
 #endif /* __KERNEL__ */
 #endif /* _NET_IPV6_H */
