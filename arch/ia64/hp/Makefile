@@ -14,9 +14,9 @@ O_TARGET := hp.a
 obj-y := hpsim_console.o hpsim_irq.o hpsim_setup.o
 obj-$(CONFIG_IA64_GENERIC) += hpsim_machvec.o
 
-obj-$(CONFIG_SIMETH)	+= simeth.o
-obj-$(CONFIG_SIM_SERIAL) += simserial.o
-obj-$(CONFIG_SCSI_SIM)	+= simscsi.o
+obj-$(CONFIG_HP_SIMETH)	+= simeth.o
+obj-$(CONFIG_HP_SIMSERIAL) += simserial.o
+obj-$(CONFIG_HP_SIMSCSI) += simscsi.o
 
 clean::
 

@@ -1,0 +1,9 @@
+mainmenu_option next_comment
+comment 'HP Simulator drivers'
+
+bool 'Simulated Ethernet ' CONFIG_HP_SIMETH
+bool 'Simulated serial driver support' CONFIG_HP_SIMSERIAL
+if [ "$CONFIG_SCSI" != "n" ]; then
+  bool 'Simulated SCSI disk' CONFIG_HP_SIMSCSI
+fi
+endmenu

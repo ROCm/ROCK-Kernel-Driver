@@ -43,7 +43,7 @@
  *
  *	When reading the code, it helps to keep the following picture in mind:
  *
- *	       bank 0 bank 1
+ *	       word 0 word 1
  *            +------+------+---
  *	      |	v[x] | 	t1  | ^
  *	      |	t2   |	t3  | |
