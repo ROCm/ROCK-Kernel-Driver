@@ -736,11 +736,9 @@ asmlinkage void math_state_restore(void)
 	struct task_struct *me = current;
 	clts();			/* Allow maths ops (or we recurse) */
 
-	if (me->used_math) {
-		restore_fpu_checking(&me->thread.i387.fxsave);
-	} else {
+	if (!me->used_math)
 		init_fpu();
-	}
+	restore_fpu_checking(&me->thread.i387.fxsave);
 	set_thread_flag(TIF_USEDFPU); 
 }
 

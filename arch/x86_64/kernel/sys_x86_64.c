@@ -114,19 +114,8 @@ asmlinkage long sys_pause(void)
 	return -ERESTARTNOHAND;
 }
 
-asmlinkage long wrap_sys_shmat(int shmid, char *shmaddr, int shmflg, 
-			       unsigned long *raddr_user)
+asmlinkage long wrap_sys_shmat(int shmid, char *shmaddr, int shmflg)
 {
 	unsigned long raddr;
-	return sys_shmat(shmid,shmaddr,shmflg,&raddr) ?: put_user(raddr,raddr_user);
-} 
-
-asmlinkage long wrap_sys_semctl(int semid, int semnum, int cmd, unsigned long *ptr)
-{	
-	unsigned long val; 
-	/* XXX: for cmd==SETVAL the manpage says ptr is the value directly. i386
-	   seems to always get it via a pointer. Follow i386 here. Check this. */
-	if (get_user(val, ptr))
-		return -EFAULT;
-	return sys_semctl(semid, semnum, cmd, (union semun)(void *)val);
+	return sys_shmat(shmid,shmaddr,shmflg,&raddr) ?: raddr;
 } 

@@ -15,6 +15,8 @@ define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 define_bool CONFIG_X86_CMPXCHG y
 
+define_bool CONFIG_EARLY_PRINTK y
+
 source init/Config.in
 
 mainmenu_option next_comment
@@ -210,12 +212,8 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
 #   bool '  Memory mapped I/O debugging' CONFIG_DEBUG_IOVIRT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
    bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
-   bool '  Early printk' CONFIG_EARLY_PRINTK
    bool '  Additional run-time checks' CONFIG_CHECKING
    bool '  Debug __init statements' CONFIG_INIT_DEBUG
-#if [ "$CONFIG_SERIAL_CONSOLE" = "y" ]; then
-#  bool 'Early serial console (ttyS0)' CONFIG_EARLY_SERIAL_CONSOLE
-#fi
 fi
 endmenu
 
