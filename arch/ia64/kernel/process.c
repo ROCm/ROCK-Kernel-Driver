@@ -33,15 +33,14 @@
 #include <asm/unwind.h>
 #include <asm/user.h>
 
-#ifdef CONFIG_IA64_SGI_SN
-#include <asm/sn/idle.h>
-#endif
-
 #ifdef CONFIG_PERFMON
 # include <asm/perfmon.h>
 #endif
 
 #include "sigframe.h"
+
+void (*ia64_mark_idle)(int);
+
 
 void
 ia64_do_show_stack (struct unw_frame_info *info, void *arg)
@@ -175,6 +174,8 @@ default_idle (void)
 void __attribute__((noreturn))
 cpu_idle (void *unused)
 {
+	void (*mark_idle)(int) = ia64_mark_idle;
+
 	/* endless idle loop with no priority at all */
 	while (1) {
 		void (*idle)(void) = pm_idle;
@@ -187,15 +188,13 @@ cpu_idle (void *unused)
 #endif
 
 		while (!need_resched()) {
-#ifdef CONFIG_IA64_SGI_SN
-			snidle();
-#endif
+			if (mark_idle)
+				(*mark_idle)(1);
 			(*idle)();
 		}
 
-#ifdef CONFIG_IA64_SGI_SN
-		snidleoff();
-#endif
+		if (mark_idle)
+			(*mark_idle)(0);
 
 #ifdef CONFIG_SMP
 		normal_xtp();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1999,2001-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1999,2001-2003 Silicon Graphics, Inc. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it 
  * under the terms of version 2 of the GNU General Public License 
@@ -79,6 +79,8 @@ DEFINE_PER_CPU(struct pda_s, pda_percpu);
 extern void bte_init_node (nodepda_t *, cnodeid_t);
 extern void bte_init_cpu (void);
 extern void sn_timer_init (void);
+extern void (*ia64_mark_idle)(int);
+extern void snidle(int);
 
 unsigned long sn_rtc_cycles_per_second;   
 
@@ -304,6 +306,8 @@ sn_setup(char **cmdline_p)
 	current->thread.flags |= IA64_THREAD_FPEMU_NOPRINT;
 
 	sn_timer_init();
+
+	ia64_mark_idle = &snidle;
 }
 
 /**
