@@ -57,7 +57,7 @@ static int v1_read_dqblk(struct dquot *dquot)
 	if (dquot->dq_dqb.dqb_bhardlimit == 0 && dquot->dq_dqb.dqb_bsoftlimit == 0 &&
 	    dquot->dq_dqb.dqb_ihardlimit == 0 && dquot->dq_dqb.dqb_isoftlimit == 0)
 		dquot->dq_flags |= DQ_FAKE;
-	++dqstats_array[DQSTATS_READS];
+	dqstats.reads++;
 
 	return 0;
 }
@@ -101,7 +101,7 @@ static int v1_commit_dqblk(struct dquot *dquot)
 
 out:
 	set_fs(fs);
-	++dqstats_array[DQSTATS_WRITES];
+	dqstats.writes++;
 
 	return ret;
 }
@@ -233,6 +233,8 @@ static void __exit exit_v1_quota_format(void)
 {
         unregister_quota_format(&v1_quota_format);
 }
+
+EXPORT_NO_SYMBOLS;
 
 module_init(init_v1_quota_format);
 module_exit(exit_v1_quota_format);
