@@ -74,9 +74,9 @@ static unsigned short ppp_type_trans(struct sk_buff *skb,
 
 
 
-int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
+int hdlc_ppp_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
-	struct net_device *dev = hdlc_to_dev(hdlc);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	int result;
 
 	switch (ifr->ifr_settings.type) {

@@ -44,12 +44,12 @@ static int eth_tx(struct sk_buff *skb, struct net_device *dev)
 }
 
 
-int hdlc_raw_eth_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
+int hdlc_raw_eth_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
 	raw_hdlc_proto *raw_s = ifr->ifr_settings.ifs_ifsu.raw_hdlc;
 	const size_t size = sizeof(raw_hdlc_proto);
 	raw_hdlc_proto new_settings;
-	struct net_device *dev = hdlc_to_dev(hdlc);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	int result;
 	void *old_ch_mtu;
 	int old_qlen;

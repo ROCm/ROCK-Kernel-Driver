@@ -171,10 +171,10 @@ typedef struct hdlc_device_struct {
 
 
 
-int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
-int hdlc_raw_eth_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
+int hdlc_raw_ioctl(struct net_device *dev, struct ifreq *ifr);
+int hdlc_raw_eth_ioctl(struct net_device *dev, struct ifreq *ifr);
 int hdlc_cisco_ioctl(struct net_device *dev, struct ifreq *ifr);
-int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
+int hdlc_ppp_ioctl(struct net_device *dev, struct ifreq *ifr);
 int hdlc_fr_ioctl(struct net_device *dev, struct ifreq *ifr);
 int hdlc_x25_ioctl(struct net_device *dev, struct ifreq *ifr);
 
@@ -204,12 +204,6 @@ static __inline__ hdlc_device* dev_to_hdlc(struct net_device *dev)
 static __inline__ pvc_device* dev_to_pvc(struct net_device *dev)
 {
 	return (pvc_device*)dev->priv;
-}
-
-
-static __inline__ const char *hdlc_to_name(hdlc_device *hdlc)
-{
-	return hdlc_to_dev(hdlc)->name;
 }
 
 
