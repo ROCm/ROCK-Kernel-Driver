@@ -31,4 +31,6 @@ typedef struct {
 
 #define BITS_PER_LONG 32
 
+typedef __vector128 vector128;
+
 #endif /* _PPC64_TYPES_H */

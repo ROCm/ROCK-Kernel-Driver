@@ -18,9 +18,8 @@
   */
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
-#ifndef _ISERIES_PROC_H
+#include <linux/init.h>
 #include <asm/iSeries/iSeries_proc.h>
-#endif
 
 static struct proc_dir_entry *iSeries_proc_root;
 static int iSeries_proc_initializationDone;
@@ -66,8 +65,8 @@ do { \
 MYQUEUE(iSeries_proc_registration);
 typedef MYQUEUETYPE(iSeries_proc_registration) aQueue;
 
-aQueue iSeries_free;
-aQueue iSeries_queued;
+static aQueue iSeries_free;
+static aQueue iSeries_queued;
 
 void iSeries_proc_early_init(void)
 {
@@ -85,10 +84,10 @@ void iSeries_proc_early_init(void)
 	spin_unlock_irqrestore(&iSeries_proc_lock, flags);
 }
 
-void iSeries_proc_create(void)
+static int iSeries_proc_create(void)
 {
 	unsigned long flags;
-	struct iSeries_proc_registration *reg = NULL;
+	struct iSeries_proc_registration *reg;
 
 	printk("iSeries_proc: Creating /proc/iSeries\n");
 
@@ -106,7 +105,10 @@ void iSeries_proc_create(void)
 	iSeries_proc_initializationDone = 1;
 out:
 	spin_unlock_irqrestore(&iSeries_proc_lock, flags);
+	return 0;
 }
+
+arch_initcall(iSeries_proc_create);
 
 void iSeries_proc_callback(iSeriesProcFunction initFunction)
 {

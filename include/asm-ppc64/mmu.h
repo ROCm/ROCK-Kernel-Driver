@@ -245,6 +245,8 @@ static inline void tlbiel(unsigned long va)
 	asm volatile("ptesync": : :"memory");
 }
 
+extern void htab_finish_init(void);
+
 #endif /* __ASSEMBLY__ */
 
 /*

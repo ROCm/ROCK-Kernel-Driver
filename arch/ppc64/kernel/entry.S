@@ -29,6 +29,7 @@
 #include <asm/thread_info.h>
 #include <asm/ppc_asm.h>
 #include <asm/offsets.h>
+#include <asm/cputable.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #define DO_SOFT_DISABLE
@@ -211,6 +212,15 @@ _GLOBAL(ret_from_syscall_2)
 	.align	2,0
 #endif
 
+	
+_GLOBAL(ppc32_swapcontext)
+	bl	.sys32_swapcontext
+	b	80f
+	
+_GLOBAL(ppc64_swapcontext)
+	bl	.sys_swapcontext
+	b	80f
+
 _GLOBAL(ppc32_sigreturn)
 	bl	.sys32_sigreturn
 	b	80f
@@ -261,10 +271,17 @@ _GLOBAL(_switch)
 	SAVE_10GPRS(22, r1)
 	mflr	r20		/* Return to switch caller */
 	mfmsr	r22
-	andi.	r21, r22, MSR_FP
+	li	r0, MSR_FP
+#ifdef CONFIG_ALTIVEC
+BEGIN_FTR_SECTION
+	oris	r0,r0,MSR_VEC@h	/* Disable altivec */
+	mfspr	r24,SPRN_VRSAVE	/* save vrsave register value */
+	std	r24,THREAD_VRSAVE(r3)
+END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
+#endif /* CONFIG_ALTIVEC */
+	and.	r0,r0,r22
 	beq+	1f
-	li	r6,MSR_FP	/* Disable floating-point */
-	andc	r22,r22,r6
+	andc	r22,r22,r0
 	mtmsrd	r22
 	isync
 1:	std	r20,_NIP(r1)
@@ -278,6 +295,14 @@ _GLOBAL(_switch)
 	ld	r1,KSP(r4)	/* Load new stack pointer */
 	ld	r6,_CCR(r1)
 	mtcrf	0xFF,r6
+
+#ifdef CONFIG_ALTIVEC
+BEGIN_FTR_SECTION
+	ld	r0,THREAD_VRSAVE(r4)
+	mtspr	SPRN_VRSAVE,r0		/* if G4, restore VRSAVE reg */
+END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
+#endif /* CONFIG_ALTIVEC */
+
 	/* r3-r13 are destroyed -- Cort */
 	REST_8GPRS(14, r1)
 	REST_10GPRS(22, r1)

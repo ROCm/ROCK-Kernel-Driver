@@ -50,19 +50,9 @@
 #include <asm/iSeries/HvLpConfig.h>
 #include <asm/iSeries/HvCall.h>
 
-/*
- * Check that the tty_driver_data actually points to our stuff
- */
-#define VIOTTY_PARANOIA_CHECK 1
 #define VIOTTY_MAGIC (0x0DCB)
-
-static DECLARE_WAIT_QUEUE_HEAD(viocons_wait_queue);
-
 #define VTTY_PORTS 10
 #define VIOTTY_SERIAL_START 65
-
-static u64 sndMsgSeq[VTTY_PORTS];
-static u64 sndMsgAck[VTTY_PORTS];
 
 static spinlock_t consolelock = SPIN_LOCK_UNLOCKED;
 static spinlock_t consoleloglock = SPIN_LOCK_UNLOCKED;
@@ -70,9 +60,6 @@ static spinlock_t consoleloglock = SPIN_LOCK_UNLOCKED;
 #ifdef CONFIG_MAGIC_SYSRQ
 static int vio_sysrq_pressed;
 extern int sysrq_enabled;
-/* The following is how it is implemented on redhat systems
- * extern struct sysrq_ctls_struct sysrq_ctls;
- */
 #endif
 
 /*
@@ -91,12 +78,12 @@ struct viocharlpevent {
 
 /*
  * This is a place where we handle the distribution of memory
- * for copy_from_user() calls.  We use VIO_MAX_SUBTYPES because it
- * seems as good a number as any.  The buffer_available array is to
+ * for copy_from_user() calls.  The buffer_available array is to
  * help us determine which buffer to use.
  */
-static struct viocharlpevent viocons_cfu_buffer[VIO_MAX_SUBTYPES];
-static atomic_t viocons_cfu_buffer_available[VIO_MAX_SUBTYPES];
+#define VIOCHAR_NUM_CFU_BUFFERS	7
+static struct viocharlpevent viocons_cfu_buffer[VIOCHAR_NUM_CFU_BUFFERS];
+static atomic_t viocons_cfu_buffer_available[VIOCHAR_NUM_CFU_BUFFERS];
 
 #define VIOCHAR_WINDOW		10
 #define VIOCHAR_HIGHWATERMARK	3
@@ -113,24 +100,32 @@ enum viochar_rc {
 	viochar_rc_ebusy = 1
 };
 
-/* When we get writes faster than we can send it to the partition,
- * buffer the data here.  There is one set of buffers for each virtual
- * port.
- * Note that used is a bit map of used buffers.
- * It had better have enough bits to hold NUM_BUF
- * the bitops assume it is a multiple of unsigned long
- */
-#define NUM_BUF (8)
-#define OVERFLOW_SIZE VIOCHAR_MAX_DATA
+#define VIOCHAR_NUM_BUF		8
 
-static struct overflow_buffer {
+/*
+ * Our port information.  We store a pointer to one entry in the
+ * tty_driver_data
+ */
+static struct port_info {
+	int magic;
+	struct tty_struct *tty;
+	HvLpIndex lp;
+	u8 vcons;
+	u64 seq;	/* sequence number of last HV send */
+	u64 ack;	/* last ack from HV */
+/*
+ * When we get writes faster than we can send it to the partition,
+ * buffer the data here. Note that used is a bit map of used buffers.
+ * It had better have enough bits to hold VIOCHAR_NUM_BUF the bitops assume
+ * it is a multiple of unsigned long
+ */
 	unsigned long used;
-	u8 *buffer[NUM_BUF];
-	int bufferBytes[NUM_BUF];
+	u8 *buffer[VIOCHAR_NUM_BUF];
+	int bufferBytes[VIOCHAR_NUM_BUF];
 	int curbuf;
 	int bufferOverflow;
 	int overflowMessage;
-} overflow[VTTY_PORTS];
+} port_info[VTTY_PORTS];
 
 static void initDataEvent(struct viocharlpevent *viochar, HvLpIndex lp);
 
@@ -181,39 +176,25 @@ void hvlogOutput(const char *buf, int count)
 }
 
 /*
- * Our port information.  We store a pointer to one entry in the
- * tty_driver_data
- */
-static struct port_info_tag {
-	int magic;
-	struct tty_struct *tty;
-	HvLpIndex lp;
-	u8 vcons;
-	u8 port;
-} port_info[VTTY_PORTS];
-
-/*
  * Make sure we're pointing to a valid port_info structure.  Shamelessly
  * plagerized from serial.c
  */
-static inline int viotty_paranoia_check(struct port_info_tag *pi,
+static inline int viotty_paranoia_check(struct port_info *pi,
 					char *name, const char *routine)
 {
-#ifdef VIOTTY_PARANOIA_CHECK
+	static const char *bad_pi_addr = KERN_WARNING_VIO
+		"Warning: bad address for port_info struct (%s) in %s\n";
 	static const char *badmagic = KERN_WARNING_VIO
 		"Warning: bad magic number for port_info struct (%s) in %s\n";
-	static const char *badinfo = KERN_WARNING_VIO
-		"Warning: null port_info for (%s) in %s\n";
 
-	if (!pi) {
-		printk(badinfo, name, routine);
+	if ((pi - &port_info[0]) > VTTY_PORTS) {
+		printk(bad_pi_addr, name, routine);
 		return 1;
 	}
 	if (pi->magic != VIOTTY_MAGIC) {
 		printk(badmagic, name, routine);
 		return 1;
 	}
-#endif
 	return 0;
 }
 
@@ -224,7 +205,7 @@ static void viocons_init_cfu_buffer(void)
 {
 	int i;
 
-	for (i = 1; i < VIO_MAX_SUBTYPES; i++)
+	for (i = 1; i < VIOCHAR_NUM_CFU_BUFFERS; i++)
 		atomic_set(&viocons_cfu_buffer_available[i], 1);
 }
 
@@ -237,7 +218,7 @@ static struct viocharlpevent *viocons_get_cfu_buffer(void)
 	 * are interrupted during this array traversal as long as we
 	 * get an available space.
 	 */
-	for (i = 0; i < VIO_MAX_SUBTYPES; i++)
+	for (i = 0; i < VIOCHAR_NUM_CFU_BUFFERS; i++)
 		if (atomic_dec_if_positive(&viocons_cfu_buffer_available[i])
 				== 0 )
 			return &viocons_cfu_buffer[i];
@@ -273,7 +254,7 @@ static int buffer_add(u8 port, const char *buf, size_t len)
 	size_t curlen;
 	const char *curbuf;
 	int nextbuf;
-	struct overflow_buffer *pov = &overflow[port];
+	struct port_info *pi = &port_info[port];
 
 	curbuf = buf;
 	bleft = len;
@@ -283,10 +264,10 @@ static int buffer_add(u8 port, const char *buf, size_t len)
 		 * filled everything up, so return.  If we filled the previous
 		 * buffer we would already have moved to the next one.
 		 */
-		if (pov->bufferBytes[pov->curbuf] == OVERFLOW_SIZE) {
+		if (pi->bufferBytes[pi->curbuf] == VIOCHAR_MAX_DATA) {
 			hvlog ("\n\rviocons: No overflow buffer available for memcpy().\n");
-			pov->bufferOverflow++;
-			pov->overflowMessage = 1;
+			pi->bufferOverflow++;
+			pi->overflowMessage = 1;
 			break;
 		}
 
@@ -294,33 +275,32 @@ static int buffer_add(u8 port, const char *buf, size_t len)
 		 * Turn on the "used" bit for this buffer.  If it's already on,
 		 * that's fine.
 		 */
-		set_bit(pov->curbuf, &pov->used);
+		set_bit(pi->curbuf, &pi->used);
 
 		/*
 		 * See if this buffer has been allocated.  If not, allocate it.
 		 */
-		if (pov->buffer[pov->curbuf] == NULL) {
-			pov->buffer[pov->curbuf] =
-			    kmalloc(OVERFLOW_SIZE, GFP_ATOMIC);
-			if (pov->buffer[pov->curbuf] == NULL) {
+		if (pi->buffer[pi->curbuf] == NULL) {
+			pi->buffer[pi->curbuf] =
+			    kmalloc(VIOCHAR_MAX_DATA, GFP_ATOMIC);
+			if (pi->buffer[pi->curbuf] == NULL) {
 				hvlog("\n\rviocons: kmalloc failed allocating spaces for buffer %d.",
-					pov->curbuf);
+					pi->curbuf);
 				break;
 			}
 		}
 
 		/* Figure out how much we can copy into this buffer. */
-		if (bleft < (OVERFLOW_SIZE - pov->bufferBytes[pov->curbuf]))
+		if (bleft < (VIOCHAR_MAX_DATA - pi->bufferBytes[pi->curbuf]))
 			curlen = bleft;
 		else
-			curlen = OVERFLOW_SIZE - pov->bufferBytes[pov->curbuf];
+			curlen = VIOCHAR_MAX_DATA - pi->bufferBytes[pi->curbuf];
 
 		/* Copy the data into the buffer. */
-		memcpy(pov->buffer[pov->curbuf] +
-			pov->bufferBytes[pov->curbuf], curbuf,
-			curlen);
+		memcpy(pi->buffer[pi->curbuf] + pi->bufferBytes[pi->curbuf],
+				curbuf, curlen);
 
-		pov->bufferBytes[pov->curbuf] += curlen;
+		pi->bufferBytes[pi->curbuf] += curlen;
 		curbuf += curlen;
 		bleft -= curlen;
 
@@ -330,13 +310,13 @@ static int buffer_add(u8 port, const char *buf, size_t len)
 		 * up then we'll advance the curbuf to the next in the
 		 * circular queue.
 		 */
-		if (pov->bufferBytes[pov->curbuf] == OVERFLOW_SIZE) {
-			nextbuf = (pov->curbuf + 1) % NUM_BUF;
+		if (pi->bufferBytes[pi->curbuf] == VIOCHAR_MAX_DATA) {
+			nextbuf = (pi->curbuf + 1) % VIOCHAR_NUM_BUF;
 			/*
 			 * Move to the next buffer if it hasn't been used yet
 			 */
-			if (test_bit(nextbuf, &pov->used) == 0)
-				pov->curbuf = nextbuf;
+			if (test_bit(nextbuf, &pi->used) == 0)
+				pi->curbuf = nextbuf;
 		}
 	}
 	return len - bleft;
@@ -354,7 +334,7 @@ static void send_buffers(u8 port, HvLpIndex lp)
 	int nextbuf;
 	struct viocharlpevent *viochar;
 	unsigned long flags;
-	struct overflow_buffer *pov = &overflow[port];
+	struct port_info *pi = &port_info[port];
 
 	spin_lock_irqsave(&consolelock, flags);
 
@@ -368,7 +348,7 @@ static void send_buffers(u8 port, HvLpIndex lp)
 		return;
 	}
 
-	if (pov->used == 0) {
+	if (pi->used == 0) {
 		hvlog("\n\rviocons: in sendbuffers(), but no buffers used.\n");
 		vio_free_event_buffer(viomajorsubtype_chario, viochar);
 		spin_unlock_irqrestore(&consolelock, flags);
@@ -379,13 +359,13 @@ static void send_buffers(u8 port, HvLpIndex lp)
 	 * curbuf points to the buffer we're filling.  We want to
 	 * start sending AFTER this one.  
 	 */
-	nextbuf = (pov->curbuf + 1) % NUM_BUF;
+	nextbuf = (pi->curbuf + 1) % VIOCHAR_NUM_BUF;
 
 	/*
 	 * Loop until we find a buffer with the used bit on
 	 */
-	while (test_bit(nextbuf, &pov->used) == 0)
-		nextbuf = (nextbuf + 1) % NUM_BUF;
+	while (test_bit(nextbuf, &pi->used) == 0)
+		nextbuf = (nextbuf + 1) % VIOCHAR_NUM_BUF;
 
 	initDataEvent(viochar, lp);
 
@@ -393,14 +373,14 @@ static void send_buffers(u8 port, HvLpIndex lp)
 	 * While we have buffers with data, and our send window
 	 * is open, send them
 	 */
-	while ((test_bit(nextbuf, &pov->used)) &&
-	       ((sndMsgSeq[port] - sndMsgAck[port]) < VIOCHAR_WINDOW)) {
-		viochar->len = pov->bufferBytes[nextbuf];
-		viochar->event.xCorrelationToken = sndMsgSeq[port]++;
+	while ((test_bit(nextbuf, &pi->used)) &&
+	       ((pi->seq - pi->ack) < VIOCHAR_WINDOW)) {
+		viochar->len = pi->bufferBytes[nextbuf];
+		viochar->event.xCorrelationToken = pi->seq++;
 		viochar->event.xSizeMinus1 =
 			offsetof(struct viocharlpevent, data) + viochar->len;
 
-		memcpy(viochar->data, pov->buffer[nextbuf], viochar->len);
+		memcpy(viochar->data, pi->buffer[nextbuf], viochar->len);
 
 		hvrc = HvCallEvent_signalLpEvent(&viochar->event);
 		if (hvrc) {
@@ -420,28 +400,26 @@ static void send_buffers(u8 port, HvLpIndex lp)
 		 * clear the used bit, zero the number of bytes in
 		 * this buffer, and move to the next buffer
 		 */
-		clear_bit(nextbuf, &pov->used);
-		pov->bufferBytes[nextbuf] = 0;
-		nextbuf = (nextbuf + 1) % NUM_BUF;
+		clear_bit(nextbuf, &pi->used);
+		pi->bufferBytes[nextbuf] = 0;
+		nextbuf = (nextbuf + 1) % VIOCHAR_NUM_BUF;
 	}
 
 	/*
 	 * If we have emptied all the buffers, start at 0 again.
 	 * this will re-use any allocated buffers
 	 */
-	if (pov->used == 0) {
-		pov->curbuf = 0;
+	if (pi->used == 0) {
+		pi->curbuf = 0;
 
-		if (pov->overflowMessage)
-			pov->overflowMessage = 0;
+		if (pi->overflowMessage)
+			pi->overflowMessage = 0;
 
-		if (port_info[port].tty) {
-			if ((port_info[port].tty->flags &
-						(1 << TTY_DO_WRITE_WAKEUP)) &&
-			    (port_info[port].tty->ldisc.write_wakeup))
-				(port_info[port].tty->ldisc.write_wakeup)(
-						port_info[port].tty);
-			wake_up_interruptible(&port_info[port].tty->write_wait);
+		if (pi->tty) {
+			if ((pi->tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
+			    (pi->tty->ldisc.write_wakeup))
+				(pi->tty->ldisc.write_wakeup)(pi->tty);
+			wake_up_interruptible(&pi->tty->write_wait);
 		}
 	}
 
@@ -466,19 +444,18 @@ static int internal_write(HvLpIndex lp, u8 port, const char *buf,
 	const char *curbuf;
 	unsigned long flags;
 	int copy_needed = (viochar == NULL);
+	struct port_info *pi = &port_info[port];
 
 	/*
 	 * Write to the hvlog of inbound data are now done prior to
 	 * calling internal_write() since internal_write() is only called in
 	 * the event that an lp event path is active, which isn't the case for
 	 * logging attempts prior to console initialization.
-	 */
-
-	/*
+	 *
 	 * If there is already data queued for this port, send it prior to
 	 * attempting to send any new data.
 	 */
-	if (overflow[port].used)
+	if (pi->used)
 		send_buffers(port, lp);
 
 	spin_lock_irqsave(&consolelock, flags);
@@ -506,14 +483,14 @@ static int internal_write(HvLpIndex lp, u8 port, const char *buf,
 	curbuf = buf;
 	bleft = len;
 
-	while ((bleft > 0) && (overflow[port].used == 0) &&
-	       ((sndMsgSeq[port] - sndMsgAck[port]) < VIOCHAR_WINDOW)) {
+	while ((bleft > 0) && (pi->used == 0) &&
+	       ((pi->seq - pi->ack) < VIOCHAR_WINDOW)) {
 		if (bleft > VIOCHAR_MAX_DATA)
 			curlen = VIOCHAR_MAX_DATA;
 		else
 			curlen = bleft;
 
-		viochar->event.xCorrelationToken = sndMsgSeq[port]++;
+		viochar->event.xCorrelationToken = pi->seq++;
 
 		if (copy_needed) {
 			memcpy(viochar->data, curbuf, curlen);
@@ -541,8 +518,8 @@ static int internal_write(HvLpIndex lp, u8 port, const char *buf,
 	if (bleft > 0)
 		bleft -= buffer_add(port, curbuf, bleft);
 	/*
-	 * Since we grabbed it from the viopath data structure, return it to the
-	 * data structure
+	 * Since we grabbed it from the viopath data structure, return
+	 * it to the data structure.
 	 */
 	if (copy_needed)
 		vio_free_event_buffer(viomajorsubtype_chario, viochar);
@@ -554,12 +531,11 @@ static int internal_write(HvLpIndex lp, u8 port, const char *buf,
 static int get_port_data(struct tty_struct *tty, HvLpIndex *lp, u8 *port)
 {
 	unsigned long flags;
-	struct port_info_tag *pi = NULL;
+	struct port_info *pi = NULL;
 
 	spin_lock_irqsave(&consolelock, flags);
 	if (tty) {
-		pi = (struct port_info_tag *)tty->driver_data;
-
+		pi = (struct port_info *)tty->driver_data;
 		if (!pi || viotty_paranoia_check(pi, tty->name,
 					     "get_port_data")) {
 			spin_unlock_irqrestore(&consolelock, flags);
@@ -567,7 +543,7 @@ static int get_port_data(struct tty_struct *tty, HvLpIndex *lp, u8 *port)
 		}
 
 		*lp = pi->lp;
-		*port = pi->port;
+		*port = pi - &port_info[0];
 	} else {
 		/*
 		 * If this is the console device, use the lp from
@@ -686,6 +662,7 @@ static int viotty_open(struct tty_struct *tty, struct file *filp)
 {
 	int port;
 	unsigned long flags;
+	struct port_info *pi;
 
 	port = tty->index;
 
@@ -697,15 +674,16 @@ static int viotty_open(struct tty_struct *tty, struct file *filp)
 
 	spin_lock_irqsave(&consolelock, flags);
 
+	pi = &port_info[port];
 	/* If some other TTY is already connected here, reject the open */
-	if ((port_info[port].tty) && (port_info[port].tty != tty)) {
+	if ((pi->tty) && (pi->tty != tty)) {
 		spin_unlock_irqrestore(&consolelock, flags);
 		printk(KERN_WARNING_VIO
 		       "console attempt to open device twice from different ttys\n");
 		return -EBUSY;
 	}
-	tty->driver_data = &port_info[port];
-	port_info[port].tty = tty;
+	tty->driver_data = pi;
+	pi->tty = tty;
 	spin_unlock_irqrestore(&consolelock, flags);
 
 	return 0;
@@ -717,10 +695,10 @@ static int viotty_open(struct tty_struct *tty, struct file *filp)
 static void viotty_close(struct tty_struct *tty, struct file *filp)
 {
 	unsigned long flags;
-	struct port_info_tag *pi = NULL;
+	struct port_info *pi;
 
 	spin_lock_irqsave(&consolelock, flags);
-	pi = (struct port_info_tag *)tty->driver_data;
+	pi = (struct port_info *)tty->driver_data;
 
 	if (!pi || viotty_paranoia_check(pi, tty->name, "viotty_close")) {
 		spin_unlock_irqrestore(&consolelock, flags);
@@ -843,20 +821,20 @@ static int viotty_write_room(struct tty_struct *tty)
 {
 	int i;
 	int room = 0;
-	struct port_info_tag *pi = NULL;
+	struct port_info *pi;
 	unsigned long flags;
 
 	spin_lock_irqsave(&consolelock, flags);
-	pi = (struct port_info_tag *) tty->driver_data;
+	pi = (struct port_info *)tty->driver_data;
 	if (!pi || viotty_paranoia_check(pi, tty->name, "viotty_write_room")) {
 		spin_unlock_irqrestore(&consolelock, flags);
 		return 0;
 	}
 
 	/* If no buffers are used, return the max size. */
-	if (overflow[pi->port].used == 0) {
+	if (pi->used == 0) {
 		spin_unlock_irqrestore(&consolelock, flags);
-		return VIOCHAR_MAX_DATA * NUM_BUF;
+		return VIOCHAR_MAX_DATA * VIOCHAR_NUM_BUF;
 	}
 
 	/*
@@ -864,8 +842,8 @@ static int viotty_write_room(struct tty_struct *tty)
 	 * count and it can change on us between each operation if we
 	 * don't hold the spinlock.
 	 */
-	for (i = 0; ((i < NUM_BUF) && (room < VIOCHAR_MAX_DATA)); i++)
-		room += (OVERFLOW_SIZE - overflow[pi->port].bufferBytes[i]);
+	for (i = 0; ((i < VIOCHAR_NUM_BUF) && (room < VIOCHAR_MAX_DATA)); i++)
+		room += (VIOCHAR_MAX_DATA - pi->bufferBytes[i]);
 	spin_unlock_irqrestore(&consolelock, flags);
 
 	if (room > VIOCHAR_MAX_DATA)
@@ -949,6 +927,7 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 	unsigned long flags;
 	struct viocharlpevent *cevent = (struct viocharlpevent *)event;
 	u8 port = cevent->virtual_device;
+	struct port_info *pi;
 	int reject = 0;
 
 	if (event->xFlags.xFunction == HvLpEvent_Function_Ack) {
@@ -958,9 +937,9 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 		spin_lock_irqsave(&consolelock, flags);
 		/* Got the lock, don't cause console output */
 
+		pi = &port_info[port];
 		if (event->xRc == HvLpEvent_Rc_Good) {
-			sndMsgSeq[port] = sndMsgAck[port] = 0;
-
+			pi->seq = pi->ack = 0;
 			/*
 			 * This line allows connections from the primary
 			 * partition but once one is connected from the
@@ -968,7 +947,7 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 			 * of linux will allow access from the hosting
 			 * partition again without a required iSeries fix.
 			 */
-			port_info[port].lp = event->xTargetLp;
+			pi->lp = event->xTargetLp;
 		}
 
 		spin_unlock_irqrestore(&consolelock, flags);
@@ -1005,21 +984,24 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 		 * a spinlock.
 		 */
 		reject = 1;
-	} else if ((port_info[port].lp != HvLpIndexInvalid) &&
-		   (port_info[port].lp != event->xSourceLp)) {
-		/*
-		 * If this is tty is already connected to a different
-		 * partition, fail.
-		 */
-		event->xRc = HvLpEvent_Rc_SubtypeError;
-		cevent->subtype_result_code = viorc_openRejected;
-		reject = 2;
 	} else {
-		port_info[port].lp = event->xSourceLp;
-		event->xRc = HvLpEvent_Rc_Good;
-		cevent->subtype_result_code = viorc_good;
-		sndMsgSeq[port] = sndMsgAck[port] = 0;
-		reject = 0;
+		pi = &port_info[port];
+		if ((pi->lp != HvLpIndexInvalid) &&
+				(pi->lp != event->xSourceLp)) {
+			/*
+			 * If this is tty is already connected to a different
+			 * partition, fail.
+			 */
+			event->xRc = HvLpEvent_Rc_SubtypeError;
+			cevent->subtype_result_code = viorc_openRejected;
+			reject = 2;
+		} else {
+			pi->lp = event->xSourceLp;
+			event->xRc = HvLpEvent_Rc_Good;
+			cevent->subtype_result_code = viorc_good;
+			pi->seq = pi->ack = 0;
+			reject = 0;
+		}
 	}
 
 	spin_unlock_irqrestore(&consolelock, flags);
@@ -1101,7 +1083,7 @@ static void vioHandleData(struct HvLpEvent *event)
 	struct tty_struct *tty;
 	unsigned long flags;
 	struct viocharlpevent *cevent = (struct viocharlpevent *)event;
-	struct port_info_tag *pi;
+	struct port_info *pi;
 	int index;
 	u8 port = cevent->virtual_device;
 
@@ -1110,6 +1092,15 @@ static void vioHandleData(struct HvLpEvent *event)
 		       "console data on invalid virtual device %d\n", port);
 		return;
 	}
+
+	/*
+	 * Hold the spinlock so that we don't take an interrupt that
+	 * changes tty between the time we fetch the port_info
+	 * pointer and the time we paranoia check.
+	 */
+	spin_lock_irqsave(&consolelock, flags);
+	pi = &port_info[port];
+
 	/*
 	 * Change 05/01/2003 - Ryan Arnold: If a partition other than
 	 * the current exclusive partition tries to send us data
@@ -1119,18 +1110,12 @@ static void vioHandleData(struct HvLpEvent *event)
 	 * therefore he shouldn't be allowed to send data either.
 	 * This will work without an iSeries fix.
 	 */
-	if (port_info[port].lp != event->xSourceLp)
+	if (pi->lp != event->xSourceLp) {
+		spin_unlock_irqrestore(&consolelock, flags);
 		return;
+	}
 
-	/*
-	 * Hold the spinlock so that we don't take an interrupt that
-	 * changes tty between the time we fetch the port_info_tag
-	 * pointer and the time we paranoia check.
-	 */
-	spin_lock_irqsave(&consolelock, flags);
-
-	tty = port_info[port].tty;
-
+	tty = pi->tty;
 	if (tty == NULL) {
 		spin_unlock_irqrestore(&consolelock, flags);
 		printk(KERN_WARNING_VIO "no tty for virtual device %d\n", port);
@@ -1146,7 +1131,7 @@ static void vioHandleData(struct HvLpEvent *event)
 	/*
 	 * Just to be paranoid, make sure the tty points back to this port
 	 */
-	pi = (struct port_info_tag *)tty->driver_data;
+	pi = (struct port_info *)tty->driver_data;
 	if (!pi || viotty_paranoia_check(pi, tty->name, "vioHandleData")) {
 		spin_unlock_irqrestore(&consolelock, flags);
 		return;
@@ -1162,11 +1147,6 @@ static void vioHandleData(struct HvLpEvent *event)
 	for (index = 0; index < cevent->len; index++) {
 #ifdef CONFIG_MAGIC_SYSRQ
 		if (sysrq_enabled) {
-			/*
-			 * The following is how this is implemented on
-			 * redhat systems
-			 * if( sysrq_ctls.enabled ) {
-			 */
 			/* 0x0f is the ascii character for ^O */
 			if (cevent->data[index] == '\x0f') {
 				vio_sysrq_pressed = 1;
@@ -1223,10 +1203,10 @@ static void vioHandleAck(struct HvLpEvent *event)
 	}
 
 	spin_lock_irqsave(&consolelock, flags);
-	sndMsgAck[port] = event->xCorrelationToken;
+	port_info[port].ack = event->xCorrelationToken;
 	spin_unlock_irqrestore(&consolelock, flags);
 
-	if (overflow[port].used)
+	if (port_info[port].used)
 		send_buffers(port, port_info[port].lp);
 }
 
@@ -1373,7 +1353,7 @@ int __init viocons_init2(void)
 
 static int viocons_init3(void)
 {
-#if 0
+#if 1
 	int ret = viocons_init2();
 
 	if (ret)
@@ -1412,35 +1392,7 @@ static int viocons_init3(void)
 
 	if (tty_register_driver(viottyS_driver))
 		printk(KERN_WARNING_VIO "Couldn't register console S driver\n");
-#if 0
-	/* Now create the vcs and vcsa devfs entries so mingetty works */
-	{
-		struct tty_driver temp_driver = *viotty_driver;
-		int i;
 
-		temp_driver.name = "vcs%d";
-		for (i = 0; i < VTTY_PORTS; i++)
-			tty_register_devfs(&temp_driver,
-					   0, i + temp_driver.minor_start);
-
-		temp_driver.name = "vcsa%d";
-		for (i = 0; i < VTTY_PORTS; i++)
-			tty_register_devfs(&temp_driver,
-					   0, i + temp_driver.minor_start);
-
-		/*
-		 * For compatibility with some earlier code only!
-		 * This will go away!!!
-		 */
-		temp_driver.name = "viocons/%d";
-		temp_driver.name_base = 0;
-		for (i = 0; i < VTTY_PORTS; i++)
-			tty_register_devfs(&temp_driver,
-					   0, i + temp_driver.minor_start);
-	}
-#endif
-
-	/* Fetch memory for the cfu buffer */
 	viocons_init_cfu_buffer();
 
 	return 0;
@@ -1452,7 +1404,6 @@ static int __init viocons_init(void)
 
 	printk(KERN_INFO_VIO "registering console\n");
 	for (i = 0; i < VTTY_PORTS; i++) {
-		port_info[i].port = i;
 		port_info[i].lp = HvLpIndexInvalid;
 		port_info[i].magic = VIOTTY_MAGIC;
 	}

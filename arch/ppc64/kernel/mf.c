@@ -36,7 +36,6 @@
 #include <asm/nvram.h>
 #include <asm/time.h>
 #include <asm/iSeries/ItSpCommArea.h>
-#include <asm/iSeries/mf_proc.h>
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/uaccess.h>
 #include <linux/pci.h>

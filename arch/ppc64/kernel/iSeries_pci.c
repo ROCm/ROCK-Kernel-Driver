@@ -654,10 +654,16 @@ static int CheckReturnCode(char *TextHdr, struct iSeries_Device_Node *DevNode,
 static inline struct iSeries_Device_Node *xlateIoMmAddress(void *IoAddress,
 		 u64 *dsaptr, u64 *BarOffsetPtr)
 {
-	unsigned long BaseIoAddr =
-		(unsigned long)IoAddress - iSeries_Base_Io_Memory;
-	long TableIndex = BaseIoAddr / iSeries_IoMmTable_Entry_Size;
-	struct iSeries_Device_Node *DevNode = iSeries_IoMmTable[TableIndex];
+	unsigned long BaseIoAddr;
+	unsigned long TableIndex;
+	struct iSeries_Device_Node *DevNode;
+
+	if (((unsigned long)IoAddress < iSeries_Base_Io_Memory) ||
+			((unsigned long)IoAddress >= iSeries_Max_Io_Memory))
+		return NULL;
+	BaseIoAddr = (unsigned long)IoAddress - iSeries_Base_Io_Memory;
+	TableIndex = BaseIoAddr / iSeries_IoMmTable_Entry_Size;
+	DevNode = iSeries_IoMmTable[TableIndex];
 
 	if (DevNode != NULL) {
 		int barnum = iSeries_IoBarTable[TableIndex];
@@ -685,6 +691,18 @@ u8 iSeries_Read_Byte(void *IoAddress)
 	struct iSeries_Device_Node *DevNode =
 		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
+	if (DevNode == NULL) {
+		static unsigned long last_jiffies;
+		static int num_printed;
+
+		if ((jiffies - last_jiffies) > 60 * HZ) {
+			last_jiffies = jiffies;
+			num_printed = 0;
+		}
+		if (num_printed++ < 10)
+			printk(KERN_ERR "iSeries_Read_Byte: invalid access at IO address %p\n", IoAddress);
+		return 0xff;
+	}
 	do {
 		++Pci_Io_Read_Count;
 		HvCall3Ret16(HvCallPciBarLoad8, &ret, dsa, BarOffset, 0);
@@ -701,6 +719,18 @@ u16 iSeries_Read_Word(void *IoAddress)
 	struct iSeries_Device_Node *DevNode =
 		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
+	if (DevNode == NULL) {
+		static unsigned long last_jiffies;
+		static int num_printed;
+
+		if ((jiffies - last_jiffies) > 60 * HZ) {
+			last_jiffies = jiffies;
+			num_printed = 0;
+		}
+		if (num_printed++ < 10)
+			printk(KERN_ERR "iSeries_Read_Word: invalid access at IO address %p\n", IoAddress);
+		return 0xffff;
+	}
 	do {
 		++Pci_Io_Read_Count;
 		HvCall3Ret16(HvCallPciBarLoad16, &ret, dsa,
@@ -718,6 +748,18 @@ u32 iSeries_Read_Long(void *IoAddress)
 	struct iSeries_Device_Node *DevNode =
 		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
+	if (DevNode == NULL) {
+		static unsigned long last_jiffies;
+		static int num_printed;
+
+		if ((jiffies - last_jiffies) > 60 * HZ) {
+			last_jiffies = jiffies;
+			num_printed = 0;
+		}
+		if (num_printed++ < 10)
+			printk(KERN_ERR "iSeries_Read_Long: invalid access at IO address %p\n", IoAddress);
+		return 0xffffffff;
+	}
 	do {
 		++Pci_Io_Read_Count;
 		HvCall3Ret16(HvCallPciBarLoad32, &ret, dsa,
@@ -742,6 +784,18 @@ void iSeries_Write_Byte(u8 data, void *IoAddress)
 	struct iSeries_Device_Node *DevNode =
 		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
+	if (DevNode == NULL) {
+		static unsigned long last_jiffies;
+		static int num_printed;
+
+		if ((jiffies - last_jiffies) > 60 * HZ) {
+			last_jiffies = jiffies;
+			num_printed = 0;
+		}
+		if (num_printed++ < 10)
+			printk(KERN_ERR "iSeries_Write_Byte: invalid access at IO address %p\n", IoAddress);
+		return;
+	}
 	do {
 		++Pci_Io_Write_Count;
 		rc = HvCall4(HvCallPciBarStore8, dsa, BarOffset, data, 0);
@@ -756,6 +810,18 @@ void iSeries_Write_Word(u16 data, void *IoAddress)
 	struct iSeries_Device_Node *DevNode =
 		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
+	if (DevNode == NULL) {
+		static unsigned long last_jiffies;
+		static int num_printed;
+
+		if ((jiffies - last_jiffies) > 60 * HZ) {
+			last_jiffies = jiffies;
+			num_printed = 0;
+		}
+		if (num_printed++ < 10)
+			printk(KERN_ERR "iSeries_Write_Word: invalid access at IO address %p\n", IoAddress);
+		return;
+	}
 	do {
 		++Pci_Io_Write_Count;
 		rc = HvCall4(HvCallPciBarStore16, dsa, BarOffset, swab16(data), 0);
@@ -770,6 +836,18 @@ void iSeries_Write_Long(u32 data, void *IoAddress)
 	struct iSeries_Device_Node *DevNode =
 		xlateIoMmAddress(IoAddress, &dsa, &BarOffset);
 
+	if (DevNode == NULL) {
+		static unsigned long last_jiffies;
+		static int num_printed;
+
+		if ((jiffies - last_jiffies) > 60 * HZ) {
+			last_jiffies = jiffies;
+			num_printed = 0;
+		}
+		if (num_printed++ < 10)
+			printk(KERN_ERR "iSeries_Write_Long: invalid access at IO address %p\n", IoAddress);
+		return;
+	}
 	do {
 		++Pci_Io_Write_Count;
 		rc = HvCall4(HvCallPciBarStore32, dsa, BarOffset, swab32(data), 0);

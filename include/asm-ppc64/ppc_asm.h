@@ -39,6 +39,19 @@
 #define REST_16FPRS(n, base)	REST_8FPRS(n, base); REST_8FPRS(n+8, base)
 #define REST_32FPRS(n, base)	REST_16FPRS(n, base); REST_16FPRS(n+16, base)
 
+#define SAVE_VR(n,b,base)	li b,THREAD_VR0+(16*(n));  stvx n,b,base
+#define SAVE_2VRS(n,b,base)	SAVE_VR(n,b,base); SAVE_VR(n+1,b,base)
+#define SAVE_4VRS(n,b,base)	SAVE_2VRS(n,b,base); SAVE_2VRS(n+2,b,base)
+#define SAVE_8VRS(n,b,base)	SAVE_4VRS(n,b,base); SAVE_4VRS(n+4,b,base)
+#define SAVE_16VRS(n,b,base)	SAVE_8VRS(n,b,base); SAVE_8VRS(n+8,b,base)
+#define SAVE_32VRS(n,b,base)	SAVE_16VRS(n,b,base); SAVE_16VRS(n+16,b,base)
+#define REST_VR(n,b,base)	li b,THREAD_VR0+(16*(n)); lvx n,b,base
+#define REST_2VRS(n,b,base)	REST_VR(n,b,base); REST_VR(n+1,b,base)
+#define REST_4VRS(n,b,base)	REST_2VRS(n,b,base); REST_2VRS(n+2,b,base)
+#define REST_8VRS(n,b,base)	REST_4VRS(n,b,base); REST_4VRS(n+4,b,base)
+#define REST_16VRS(n,b,base)	REST_8VRS(n,b,base); REST_8VRS(n+8,b,base)
+#define REST_32VRS(n,b,base)	REST_16VRS(n,b,base); REST_16VRS(n+16,b,base)
+
 #define CHECKANYINT(ra,rb)			\
 	mfspr	rb,SPRG3;		/* Get Paca address */\
 	ld	ra,PACALPPACA+LPPACAANYINT(rb); /* Get pending interrupt flags */\

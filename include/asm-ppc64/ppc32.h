@@ -121,12 +121,24 @@ struct sigcontext32 {
 	u32 regs;  /* 4 byte pointer to the pt_regs32 structure. */
 };
 
+struct mcontext32 {
+	elf_gregset_t32		mc_gregs;
+	elf_fpregset_t		mc_fregs;
+	unsigned int		mc_pad[2];
+	elf_vrregset_t32	mc_vregs __attribute__((__aligned__(16)));
+};
+
 struct ucontext32 { 
-	unsigned int	  uc_flags;
-	unsigned int 	  uc_link;
-	stack_32_t	  uc_stack;
-	struct sigcontext32 uc_mcontext;
-	sigset_t	  uc_sigmask;	/* mask last for extensibility */
+	unsigned int	  	uc_flags;
+	unsigned int 	  	uc_link;
+	stack_32_t	 	uc_stack;
+	int		 	uc_pad[7];
+	u32			uc_regs;	/* points to uc_mcontext field */
+	compat_sigset_t	 	uc_sigmask;	/* mask last for extensibility */
+	/* glibc has 1024-bit signal masks, ours are 64-bit */
+	int		 	uc_maskext[30];
+	int		 	uc_pad2[3];
+	struct mcontext32	uc_mcontext;
 };
 
 typedef struct compat_sigevent {

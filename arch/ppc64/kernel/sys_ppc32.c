@@ -2106,6 +2106,10 @@ long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 		goto out;
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
+#ifdef CONFIG_ALTIVEC
+	if (regs->msr & MSR_VEC)
+		giveup_altivec(current);
+#endif /* CONFIG_ALTIVEC */
 
 	error = do_execve32(filename, (u32*) a1, (u32*) a2, regs);
 
@@ -2126,9 +2130,25 @@ void start_thread32(struct pt_regs* regs, unsigned long nip, unsigned long sp)
 	regs->nip = nip;
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER32;
+#ifndef CONFIG_SMP
 	if (last_task_used_math == current)
 		last_task_used_math = 0;
+#endif /* CONFIG_SMP */
 	current->thread.fpscr = 0;
+	memset(current->thread.fpr, 0, sizeof(current->thread.fpr));
+#ifdef CONFIG_ALTIVEC
+#ifndef CONFIG_SMP
+	if (last_task_used_altivec == current)
+		last_task_used_altivec = 0;
+#endif /* CONFIG_SMP */
+	memset(current->thread.vr, 0, sizeof(current->thread.vr));
+	current->thread.vscr.u[0] = 0;
+	current->thread.vscr.u[1] = 0;
+	current->thread.vscr.u[2] = 0;
+	current->thread.vscr.u[3] = 0x00010000; /* Java mode disabled */
+	current->thread.vrsave = 0;
+	current->thread.used_vr = 0;
+#endif /* CONFIG_ALTIVEC */
 }
 
 extern asmlinkage int sys_prctl(int option, unsigned long arg2, unsigned long arg3,

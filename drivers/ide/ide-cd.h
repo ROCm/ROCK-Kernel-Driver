@@ -501,6 +501,7 @@ struct cdrom_info {
 #define ILLEGAL_REQUEST         0x05
 #define UNIT_ATTENTION          0x06
 #define DATA_PROTECT            0x07
+#define BLANK_CHECK             0x08
 #define ABORTED_COMMAND         0x0b
 #define MISCOMPARE              0x0e
 
@@ -578,7 +579,7 @@ const char * const sense_key_texts[16] = {
 	"Illegal request",
 	"Unit attention",
 	"Data protect",
-	"(reserved)",
+	"Blank check",
 	"(reserved)",
 	"(reserved)",
 	"Aborted command",

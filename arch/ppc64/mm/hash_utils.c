@@ -27,6 +27,7 @@
 #include <linux/sysctl.h>
 #include <linux/ctype.h>
 #include <linux/cache.h>
+#include <linux/init.h>
 
 #include <asm/ppcdebug.h>
 #include <asm/processor.h>
@@ -48,7 +49,6 @@
 #include <asm/tlb.h>
 #include <asm/cacheflush.h>
 #include <asm/cputable.h>
-
 /*
  * Note:  pte   --> Linux PTE
  *        HPTE  --> PowerPC Hashed Page Table Entry
@@ -68,8 +68,7 @@ extern unsigned long _SDR1;
 #define KB (1024)
 #define MB (1024*KB)
 
-static inline void
-loop_forever(void)
+static inline void loop_forever(void)
 {
 	volatile unsigned long x = 1;
 	for(;x;x|=1)
@@ -77,9 +76,8 @@ loop_forever(void)
 }
 
 #ifdef CONFIG_PPC_PSERIES
-static inline void
-create_pte_mapping(unsigned long start, unsigned long end,
-		   unsigned long mode, int large)
+static inline void create_pte_mapping(unsigned long start, unsigned long end,
+				      unsigned long mode, int large)
 {
 	unsigned long addr;
 	unsigned int step;
@@ -120,8 +118,7 @@ create_pte_mapping(unsigned long start, unsigned long end,
 	}
 }
 
-void
-htab_initialize(void)
+void __init htab_initialize(void)
 {
 	unsigned long table, htab_size_bytes;
 	unsigned long pteg_count;
@@ -186,190 +183,45 @@ htab_initialize(void)
 #endif
 
 /*
- * find_linux_pte returns the address of a linux pte for a given 
- * effective address and directory.  If not found, it returns zero.
+ * Called by asm hashtable.S for doing lazy icache flush
  */
-pte_t *find_linux_pte(pgd_t *pgdir, unsigned long ea)
+unsigned int hash_page_do_lazy_icache(unsigned int pp, pte_t pte, int trap)
 {
-	pgd_t *pg;
-	pmd_t *pm;
-	pte_t *pt = NULL;
-	pte_t pte;
+	struct page *page;
 
-	pg = pgdir + pgd_index(ea);
-	if (!pgd_none(*pg)) {
+#define PPC64_HWNOEXEC (1 << 2)
 
-		pm = pmd_offset(pg, ea);
-		if (pmd_present(*pm)) { 
-			pt = pte_offset_kernel(pm, ea);
-			pte = *pt;
-			if (!pte_present(pte))
-				pt = NULL;
-		}
+	if (!pfn_valid(pte_pfn(pte)))
+		return pp;
+
+	page = pte_page(pte);
+
+	/* page is dirty */
+	if (!test_bit(PG_arch_1, &page->flags) && !PageReserved(page)) {
+		if (trap == 0x400) {
+			__flush_dcache_icache(page_address(page));
+			set_bit(PG_arch_1, &page->flags);
+		} else
+			pp |= PPC64_HWNOEXEC;
 	}
-
-	return pt;
+	return pp;
 }
 
-static inline unsigned long computeHptePP(unsigned long pte)
+/*
+ * Called by asm hashtable.S in case of critical insert failure
+ */
+void htab_insert_failure(void)
 {
-	return (pte & _PAGE_USER) |
-		(((pte & _PAGE_USER) >> 1) &
-		 ((~((pte >> 2) &	/* _PAGE_RW */
-		     (pte >> 7))) &	/* _PAGE_DIRTY */
-		  1));
+	panic("hash_page: pte_insert failed\n");
 }
 
 /*
  * Handle a fault by adding an HPTE. If the address can't be determined
  * to be valid via Linux page tables, return 1. If handled return 0
  */
-int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
-		pte_t *ptep, unsigned long trap, int local)
-{
-	unsigned long va, vpn;
-	unsigned long newpp, prpn;
-	unsigned long hpteflags;
-	long slot;
-	pte_t old_pte, new_pte;
+extern int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
+		       pte_t *ptep, unsigned long trap, int local);
 
-	/* XXX fix for large ptes */
-	int large = 0;
-
-	/* Search the Linux page table for a match with va */
-	va = (vsid << 28) | (ea & 0x0fffffff);
-
-	if (large)
-		vpn = va >> LARGE_PAGE_SHIFT;
-	else
-		vpn = va >> PAGE_SHIFT;
-
-	/*
-	 * If no pte found or not present, send the problem up to
-	 * do_page_fault
-	 */
-	if (unlikely(!ptep || !pte_present(*ptep)))
-		return 1;
-
-	/* 
-	 * Check the user's access rights to the page.  If access should be
-	 * prevented then send the problem up to do_page_fault.
-	 */
-	access |= _PAGE_PRESENT;
-	if (unlikely(access & ~(pte_val(*ptep))))
-		return 1;
-
-	/*
-	 * At this point, we have a pte (old_pte) which can be used to build
-	 * or update an HPTE. There are 2 cases:
-	 *
-	 * 1. There is a valid (present) pte with no associated HPTE (this is 
-	 *	the most common case)
-	 * 2. There is a valid (present) pte with an associated HPTE. The
-	 *	current values of the pp bits in the HPTE prevent access
-	 *	because we are doing software DIRTY bit management and the
-	 *	page is currently not DIRTY. 
-	 */
-
-	old_pte = *ptep;
-	new_pte = old_pte;
-	/* If the attempted access was a store */
-	if (access & _PAGE_RW)
-		pte_val(new_pte) |= _PAGE_ACCESSED | _PAGE_DIRTY;
-	else
-		pte_val(new_pte) |= _PAGE_ACCESSED;
-
-	newpp = computeHptePP(pte_val(new_pte));
-
-#define PPC64_HWNOEXEC (1 << 2)
-
-	/* We do lazy icache flushing on cpus that support it */
-	if (unlikely((cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)
-		     && pfn_valid(pte_pfn(new_pte)))) {
-		struct page *page = pte_page(new_pte);
-
-		/* page is dirty */
-		if (!PageReserved(page) &&
-		    !test_bit(PG_arch_1, &page->flags)) {
-			if (trap == 0x400) {
-				__flush_dcache_icache(page_address(page));
-				set_bit(PG_arch_1, &page->flags);
-			} else {
-				newpp |= PPC64_HWNOEXEC;
-			}
-		}
-	}
-
-	/* Check if pte already has an hpte (case 2) */
-	if (unlikely(pte_val(old_pte) & _PAGE_HASHPTE)) {
-		/* There MIGHT be an HPTE for this pte */
-		unsigned long hash, slot, secondary;
-
-		hash = hpt_hash(vpn, large);
-		secondary = (pte_val(old_pte) & _PAGE_SECONDARY) >> 15;
-		if (secondary)
-			hash = ~hash;
-		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
-		slot += (pte_val(old_pte) & _PAGE_GROUP_IX) >> 12;
-
-		if (ppc_md.hpte_updatepp(slot, newpp, va, large, local) == -1)
-			pte_val(old_pte) &= ~_PAGE_HPTEFLAGS;
-		else
-			if (!pte_same(old_pte, new_pte))
-				*ptep = new_pte;
-	}
-
-	if (likely(!(pte_val(old_pte) & _PAGE_HASHPTE))) {
-		unsigned long hash = hpt_hash(vpn, large);
-		unsigned long hpte_group;
-		prpn = pte_val(old_pte) >> PTE_SHIFT;
-
-repeat:
-		hpte_group = ((hash & htab_data.htab_hash_mask) *
-			      HPTES_PER_GROUP) & ~0x7UL;
-
-		/* Update the linux pte with the HPTE slot */
-		pte_val(new_pte) &= ~_PAGE_HPTEFLAGS;
-		pte_val(new_pte) |= _PAGE_HASHPTE;
-
-		/* copy appropriate flags from linux pte */
-		hpteflags = (pte_val(new_pte) & 0x1f8) | newpp;
-
-		slot = ppc_md.hpte_insert(hpte_group, va, prpn, 0,
-					  hpteflags, 0, large);
-
-		/* Primary is full, try the secondary */
-		if (unlikely(slot == -1)) {
-			pte_val(new_pte) |= 1 << 15;
-			hpte_group = ((~hash & htab_data.htab_hash_mask) *
-				      HPTES_PER_GROUP) & ~0x7UL; 
-			slot = ppc_md.hpte_insert(hpte_group, va, prpn,
-						  1, hpteflags, 0, large);
-			if (slot == -1) {
-				if (mftb() & 0x1)
-					hpte_group = ((hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP) & ~0x7UL;
-
-				ppc_md.hpte_remove(hpte_group);
-				goto repeat;
-                        }
-		}
-
-		if (unlikely(slot == -2))
-			panic("hash_page: pte_insert failed\n");
-
-		pte_val(new_pte) |= (slot<<12) & _PAGE_GROUP_IX;
-
-		/* 
-		 * No need to use ldarx/stdcx here because all who
-		 * might be updating the pte will hold the
-		 * page_table_lock or the hash_table_lock
-		 * (we hold both)
-		 */
-		*ptep = new_pte;
-	}
-
-	return 0;
-}
 
 int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 {
@@ -429,23 +281,20 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 	if (pgdir == NULL)
 		return 1;
 
-	/*
-	 * Lock the Linux page table to prevent mmap and kswapd
-	 * from modifying entries while we search and update
-	 */
-	spin_lock(&mm->page_table_lock);
-
 	tmp = cpumask_of_cpu(smp_processor_id());
 	if (user_region && cpus_equal(mm->cpu_vm_mask, tmp))
 		local = 1;
 
-	ret = hash_huge_page(mm, access, ea, vsid, local);
-	if (ret < 0) {
+	/* Is this a huge page ? */
+	if (unlikely(in_hugepage_area(mm->context, ea)))
+		ret = hash_huge_page(mm, access, ea, vsid, local);
+	else {
 		ptep = find_linux_pte(pgdir, ea);
+		if (ptep == NULL)
+			return 1;
 		ret = __hash_page(ea, access, vsid, ptep, trap, local);
 	}
 
-	spin_unlock(&mm->page_table_lock);
 
 	return ret;
 }
@@ -491,4 +340,27 @@ void flush_hash_range(unsigned long context, unsigned long number, int local)
 			flush_hash_page(context, batch->addr[i], batch->pte[i],
 					local);
 	}
+}
+
+static inline void make_bl(unsigned int *insn_addr, void *func)
+{
+	unsigned long funcp = *((unsigned long *)func);
+	int offset = funcp - (unsigned long)insn_addr;
+
+	*insn_addr = (unsigned int)(0x48000001 | (offset & 0x03fffffc));
+	flush_icache_range((unsigned long)insn_addr, 4+
+			   (unsigned long)insn_addr);
+}
+
+void __init htab_finish_init(void)
+{
+	extern unsigned int *htab_call_hpte_insert1;
+	extern unsigned int *htab_call_hpte_insert2;
+	extern unsigned int *htab_call_hpte_remove;
+	extern unsigned int *htab_call_hpte_updatepp;
+
+	make_bl(htab_call_hpte_insert1, ppc_md.hpte_insert);
+	make_bl(htab_call_hpte_insert2, ppc_md.hpte_insert);
+	make_bl(htab_call_hpte_remove, ppc_md.hpte_remove);
+	make_bl(htab_call_hpte_updatepp, ppc_md.hpte_updatepp);
 }

@@ -214,6 +214,10 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 	}
 #endif
+	/* Finish initializing the hash table (do the dynamic
+	 * patching for the fast-path hashtable.S code)
+	 */
+	htab_finish_init();
 
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
@@ -312,6 +316,11 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		seq_printf(m, "%s", cur_cpu_spec->cpu_name);
 	else
 		seq_printf(m, "unknown (%08x)", pvr);
+
+#ifdef CONFIG_ALTIVEC
+	if (cur_cpu_spec->cpu_features & CPU_FTR_ALTIVEC)
+		seq_printf(m, ", altivec supported");
+#endif /* CONFIG_ALTIVEC */
 
 	seq_printf(m, "\n");
 

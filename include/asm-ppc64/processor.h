@@ -311,6 +311,7 @@
 #define	SPRN_USIA	0x3AB	/* User Sampled Instruction Address Register */
 #define	SPRN_XER	0x001	/* Fixed Point Exception Register */
 #define	SPRN_ZPR	0x3B0	/* Zone Protection Register */
+#define SPRN_VRSAVE     0x100   /* Vector save */
 
 /* Short-hand versions for a number of the above SPRNs */
 
@@ -464,11 +465,9 @@ void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp);
 void release_thread(struct task_struct *);
 
 /* Prepare to copy thread state - unlazy all lazy status */
-#define prepare_to_copy(tsk)	do { } while (0)
+extern void prepare_to_copy(struct task_struct *tsk);
 
-/*
- * Create a new kernel thread.
- */
+/* Create a new kernel thread. */
 extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 
 /*
@@ -479,6 +478,7 @@ extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 
 /* Lazy FPU handling on uni-processor */
 extern struct task_struct *last_task_used_math;
+extern struct task_struct *last_task_used_altivec;
 
 
 #ifdef __KERNEL__
@@ -518,6 +518,14 @@ struct thread_struct {
 	unsigned long	fpexc_mode;	/* Floating-point exception mode */
 	unsigned long	saved_msr;	/* Save MSR across signal handlers */
 	unsigned long	saved_softe;	/* Ditto for Soft Enable/Disable */
+#ifdef CONFIG_ALTIVEC
+	/* Complete AltiVec register set */
+	vector128	vr[32] __attribute((aligned(16)));
+	/* AltiVec status */
+	vector128	vscr __attribute((aligned(16)));
+	unsigned long	vrsave;
+	int		used_vr;	/* set if process has used altivec */
+#endif /* CONFIG_ALTIVEC */
 };
 
 #define INIT_SP		(sizeof(init_stack) + (unsigned long) &init_stack)

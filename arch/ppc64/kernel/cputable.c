@@ -21,6 +21,13 @@
 
 struct cpu_spec* cur_cpu_spec = NULL;
 
+/* NOTE:
+ * Unlike ppc32, ppc64 will only call this once for the boot CPU, it's
+ * the responsibility of the appropriate CPU save/restore functions to
+ * eventually copy these settings over. Those save/restore aren't yet
+ * part of the cputable though. That has to be fixed for both ppc32
+ * and ppc64
+ */
 extern void __setup_cpu_power3(unsigned long offset, struct cpu_spec* spec);
 extern void __setup_cpu_power4(unsigned long offset, struct cpu_spec* spec);
 

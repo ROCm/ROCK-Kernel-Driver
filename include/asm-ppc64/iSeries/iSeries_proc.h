@@ -16,22 +16,15 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-
-
-/* Change Activity: */
-/* End Change Activity */
-
 #ifndef _ISERIES_PROC_H
 #define _ISERIES_PROC_H
 
 #include <linux/proc_fs.h>
 
 extern void iSeries_proc_early_init(void);
-extern void iSeries_proc_create(void);
 
 typedef void (*iSeriesProcFunction)(struct proc_dir_entry *iSeries_proc);
 
 extern void iSeries_proc_callback(iSeriesProcFunction initFunction);
 
 #endif /* _iSeries_PROC_H */
-
