@@ -66,7 +66,12 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 	ret = -ENOSYS;
 	switch (call) {
 	case SEMOP:
-		ret = sys_semop (first, (struct sembuf *)ptr, second);
+		ret = sys_semtimedop (first, (struct sembuf *)ptr, second,
+				      NULL);
+		break;
+	case SEMTIMEDOP:
+		ret = sys_semtimedop (first, (struct sembuf *)ptr, second,
+				      (const struct timespec *) fifth);
 		break;
 	case SEMGET:
 		ret = sys_semget (first, second, third);

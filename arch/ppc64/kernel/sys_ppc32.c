@@ -1773,6 +1773,22 @@ do_sys32_shmctl(int first, int second, void *uptr)
 	return err;
 }
 
+static int sys32_semtimedop(int semid, struct sembuf *tsems, int nsems,
+			    const struct compat_timespec *timeout32)
+{
+	struct compat_timespec t32;
+	struct timespec *t64 = compat_alloc_user_space(sizeof(*t64));
+
+	if (copy_from_user(&t32, timeout32, sizeof(t32)))
+		return -EFAULT;
+
+	if (put_user(t32.tv_sec, &t64->tv_sec) ||
+	    put_user(t32.tv_nsec, &t64->tv_nsec))
+		return -EFAULT;
+
+	return sys_semtimedop(semid, tsems, nsems, t64);
+}
+
 /*
  * Note: it is necessary to treat first_parm, second_parm, and
  * third_parm as unsigned ints, with the corresponding cast to a
@@ -1795,8 +1811,12 @@ asmlinkage long sys32_ipc(u32 call, u32 first_parm, u32 second_parm, u32 third_p
 
 	case SEMOP:
 		/* struct sembuf is the same on 32 and 64bit :)) */
-		err = sys_semop(first, (struct sembuf *)AA(ptr),
-				second);
+		err = sys_semtimedop(first, (struct sembuf *)AA(ptr),
+				     second, NULL);
+		break;
+	case SEMTIMEDOP:
+		err = sys32_semtimedop(first, (struct sembuf *)AA(ptr), second,
+				       (const struct compat_timespec *)AA(fifth));
 		break;
 	case SEMGET:
 		err = sys_semget(first, second, third);
