@@ -389,11 +389,7 @@ static int devices_read_proc(char *page, char **start, off_t off,
 extern int show_interrupts(struct seq_file *p, void *v);
 static int interrupts_open(struct inode *inode, struct file *file)
 {
-	unsigned size = PAGE_SIZE;
-	/*
-	 * probably should depend on NR_CPUS, but that's only rough estimate;
-	 * if we'll need more it will be given,
-	 */
+	unsigned size = PAGE_SIZE * (1 + NR_CPUS / 8);
 	char *buf = kmalloc(size, GFP_KERNEL);
 	struct seq_file *m;
 	int res;
