@@ -30,34 +30,13 @@
  */
 
 #include <linux/config.h>
-#include <asm/uaccess.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <linux/types.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/socket.h>
-#include <linux/sockios.h>
-#include <linux/in.h>
-#include <linux/errno.h>
-#include <linux/interrupt.h>
-#include <linux/if_ether.h>
-#include <linux/inet.h>
-#include <linux/notifier.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
 #include <linux/if_arp.h>
-#include <linux/skbuff.h>
-#include <linux/spinlock.h>
 #include <net/sock.h>
 #include <net/datalink.h>
 #include <net/psnap.h>
 #include <linux/atalk.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
-#include <linux/module.h>
 
 int sysctl_aarp_expiry_time = AARP_EXPIRY_TIME;
 int sysctl_aarp_tick_time = AARP_TICK_TIME;
@@ -995,4 +974,3 @@ void aarp_unregister_proc_fs(void)
 	proc_net_remove("aarp");
 }
 #endif
-MODULE_LICENSE("GPL");

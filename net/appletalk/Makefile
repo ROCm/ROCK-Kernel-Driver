@@ -6,7 +6,7 @@ export-objs = ddp.o
 
 obj-$(CONFIG_ATALK) += appletalk.o
 
-appletalk-y			:= aarp.o ddp.o
+appletalk-y			:= aarp.o ddp.o atalk_proc.o
 appletalk-$(CONFIG_SYSCTL)	+= sysctl_net_atalk.o
 appletalk-objs			:= $(appletalk-y)
 
