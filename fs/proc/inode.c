@@ -23,7 +23,7 @@
 
 extern void free_proc_entry(struct proc_dir_entry *);
 
-struct proc_dir_entry * de_get(struct proc_dir_entry *de)
+static inline struct proc_dir_entry * de_get(struct proc_dir_entry *de)
 {
 	if (de)
 		atomic_inc(&de->count);
@@ -33,7 +33,7 @@ struct proc_dir_entry * de_get(struct proc_dir_entry *de)
 /*
  * Decrements the use count and checks for deferred deletion.
  */
-void de_put(struct proc_dir_entry *de)
+static void de_put(struct proc_dir_entry *de)
 {
 	if (de) {	
 		lock_kernel();		
