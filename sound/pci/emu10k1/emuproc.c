@@ -229,7 +229,7 @@ static void snd_emu10k1_proc_acode_read(snd_info_entry_t *entry,
 
 	snd_iprintf(buffer, "FX8010 Instruction List '%s'\n", emu->fx8010.name);
 	snd_iprintf(buffer, "  Code dump      :\n");
-	for (pc = 0; pc < 512; pc++) {
+	for (pc = 0; pc < (emu->audigy ? 1024 : 512); pc++) {
 		u32 low, high;
 			
 		low = snd_emu10k1_efx_read(emu, pc * 2);
@@ -256,9 +256,13 @@ static void snd_emu10k1_proc_acode_read(snd_info_entry_t *entry,
 }
 
 #define TOTAL_SIZE_GPR		(0x100*4)
+#define A_TOTAL_SIZE_GPR	(0x200*4)
 #define TOTAL_SIZE_TANKMEM_DATA	(0xa0*4)
 #define TOTAL_SIZE_TANKMEM_ADDR (0xa0*4)
+#define A_TOTAL_SIZE_TANKMEM_DATA (0x100*4)
+#define A_TOTAL_SIZE_TANKMEM_ADDR (0x100*4)
 #define TOTAL_SIZE_CODE		(0x200*8)
+#define A_TOTAL_SIZE_CODE	(0x400*8)
 
 static long snd_emu10k1_fx8010_read(snd_info_entry_t *entry, void *file_private_data,
 				    struct file *file, char __user *buf,
@@ -267,12 +271,12 @@ static long snd_emu10k1_fx8010_read(snd_info_entry_t *entry, void *file_private_
 	long size;
 	emu10k1_t *emu = entry->private_data;
 	unsigned int offset;
+	int tram_addr = 0;
 	
 	if (!strcmp(entry->name, "fx8010_tram_addr")) {
-		if (emu->audigy) return -EINVAL;
 		offset = TANKMEMADDRREGBASE;
+		tram_addr = 1;
 	} else if (!strcmp(entry->name, "fx8010_tram_data")) {
-		if (emu->audigy) return -EINVAL;
 		offset = TANKMEMDATAREGBASE;
 	} else if (!strcmp(entry->name, "fx8010_code")) {
 		offset = emu->audigy ? A_MICROCODEBASE : MICROCODEBASE;
@@ -289,7 +293,11 @@ static long snd_emu10k1_fx8010_read(snd_info_entry_t *entry, void *file_private_
 		if ((tmp = kmalloc(size + 8, GFP_KERNEL)) == NULL)
 			return -ENOMEM;
 		for (idx = 0; idx < ((pos & 3) + size + 3) >> 2; idx++)
-			tmp[idx] = snd_emu10k1_ptr_read(emu, offset + idx + (pos >> 2), 0);
+			if (tram_addr && emu->audigy) {
+				tmp[idx] = snd_emu10k1_ptr_read(emu, offset + idx + (pos >> 2), 0) >> 11;
+				tmp[idx] |= snd_emu10k1_ptr_read(emu, 0x100 + idx + (pos >> 2), 0) << 20;
+			} else 
+				tmp[idx] = snd_emu10k1_ptr_read(emu, offset + idx + (pos >> 2), 0);
 		if (copy_to_user(buf, ((char *)tmp) + (pos & 3), size))
 			res = -EFAULT;
 		else {
@@ -316,35 +324,35 @@ int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
 		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
-		entry->size = TOTAL_SIZE_GPR;
+		entry->size = emu->audigy ? A_TOTAL_SIZE_GPR : TOTAL_SIZE_GPR;
 		entry->c.ops = &snd_emu10k1_proc_ops_fx8010;
 	}
-	if (!emu->audigy && ! snd_card_proc_new(emu->card, "fx8010_tram_data", &entry)) {
+	if (! snd_card_proc_new(emu->card, "fx8010_tram_data", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
 		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
-		entry->size = TOTAL_SIZE_TANKMEM_DATA;
+		entry->size = emu->audigy ? A_TOTAL_SIZE_TANKMEM_DATA : TOTAL_SIZE_TANKMEM_DATA ;
 		entry->c.ops = &snd_emu10k1_proc_ops_fx8010;
 	}
-	if (!emu->audigy && ! snd_card_proc_new(emu->card, "fx8010_tram_addr", &entry)) {
+	if (! snd_card_proc_new(emu->card, "fx8010_tram_addr", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
 		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
-		entry->size = TOTAL_SIZE_TANKMEM_ADDR;
+		entry->size = emu->audigy ? A_TOTAL_SIZE_TANKMEM_ADDR : TOTAL_SIZE_TANKMEM_ADDR ;
 		entry->c.ops = &snd_emu10k1_proc_ops_fx8010;
 	}
 	if (! snd_card_proc_new(emu->card, "fx8010_code", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = emu;
 		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
-		entry->size = TOTAL_SIZE_CODE;
+		entry->size = emu->audigy ? A_TOTAL_SIZE_CODE : TOTAL_SIZE_CODE;
 		entry->c.ops = &snd_emu10k1_proc_ops_fx8010;
 	}
 	if (! snd_card_proc_new(emu->card, "fx8010_acode", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->private_data = emu;
 		entry->mode = S_IFREG | S_IRUGO /*| S_IWUSR*/;
-		entry->c.text.read_size = 64*1024;
+		entry->c.text.read_size = 128*1024;
 		entry->c.text.read = snd_emu10k1_proc_acode_read;
 	}
 	return 0;
