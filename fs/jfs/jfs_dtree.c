@@ -2908,7 +2908,7 @@ static void add_missing_indices(struct inode *inode, s64 bn)
 			d->index = cpu_to_le32(add_index(tid, inode, bn, i));
 			if (dtlck->index >= dtlck->maxcnt)
 				dtlck = (struct dt_lock *) txLinelock(dtlck);
-			lv = dtlck->lv;
+			lv = &dtlck->lv[dtlck->index];
 			lv->offset = stbl[i];
 			lv->length = 1;
 			dtlck->index++;
