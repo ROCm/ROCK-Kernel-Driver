@@ -266,6 +266,10 @@ static int serverworks_configure(void)
 	pci_read_config_dword(agp_bridge->dev, serverworks_private.mm_addr_ofs, &temp);
 	temp = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	serverworks_private.registers = (volatile u8 *) ioremap(temp, 4096);
+	if (!serverworks_private.registers) {
+		printk (KERN_ERR PFX "Unable to ioremap() memory.\n");
+		return -ENOMEM;
+	}
 
 	OUTREG8(serverworks_private.registers, SVWRKS_GART_CACHE, 0x0a);
 
