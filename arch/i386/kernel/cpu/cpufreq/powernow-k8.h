@@ -1,12 +1,12 @@
 /*
- *   (c) 2003 Advanced Micro Devices, Inc.
+ *  (c) 2003, 2004 Advanced Micro Devices, Inc.
  *  Your use of this code is subject to the terms and conditions of the
- *  GNU general public license version 2. See "../../../COPYING" or
+ *  GNU general public license version 2. See "COPYING" or
  *  http://www.gnu.org/licenses/gpl.html
  */
 
 struct powernow_k8_data {
-	unsigned int    cpu;
+	unsigned int cpu;
 
 	u32 numps;  /* number of p-states */
 	u32 batps;  /* number of p-states supported on battery */
@@ -18,7 +18,7 @@ struct powernow_k8_data {
 	u32 irt;     /* isochronous relief time */
 	u32 vidmvs;  /* usable value calculated from mvs */
 	u32 vstable; /* voltage stabilization time, units 20 us */
-	u32     plllock; /* pll lock time, units 1 us */
+	u32 plllock; /* pll lock time, units 1 us */
 
 	/* keep track of the current fid / vid */
 	u32 currvid;
@@ -32,15 +32,10 @@ struct powernow_k8_data {
 
 
 /* processor's cpuid instruction support */
-#define CPUID_PROCESSOR_SIGNATURE             1	/* function 1               */
-#define CPUID_F1_FAM                 0x00000f00	/* family mask              */
-#define CPUID_F1_XFAM                0x0ff00000	/* extended family mask     */
-#define CPUID_F1_MOD                 0x000000f0	/* model mask               */
-#define CPUID_F1_STEP                0x0000000f	/* stepping level mask      */
-#define CPUID_XFAM_MOD               0x0ff00ff0	/* xtended fam, fam + model */
-#define ATHLON64_XFAM_MOD            0x00000f40	/* xtended fam, fam + model */
-#define OPTERON_XFAM_MOD             0x00000f50	/* xtended fam, fam + model */
-#define ATHLON64_REV_C0                       8
+#define CPUID_PROCESSOR_SIGNATURE             1	/* function 1 */
+#define CPUID_XFAM_MOD               0x0ff00ff0	/* extended fam, fam + model */
+#define ATHLON64_XFAM_MOD            0x00000f40	/* extended fam, fam + model */
+#define OPTERON_XFAM_MOD             0x00000f50	/* extended fam, fam + model */
 #define CPUID_GET_MAX_CAPABILITIES   0x80000000
 #define CPUID_FREQ_VOLT_CAPABILITIES 0x80000007
 #define P_STATE_TRANSITION_CAPABLE            6
@@ -88,8 +83,8 @@ struct powernow_k8_data {
  */
 
 /* fids (frequency identifiers) are arranged in 2 tables - lo and hi */
-#define LO_FID_TABLE_TOP     6
-#define HI_FID_TABLE_BOTTOM  8
+#define LO_FID_TABLE_TOP     6	/* fid values marking the boundary    */
+#define HI_FID_TABLE_BOTTOM  8	/* between the low and high tables    */
 
 #define LO_VCOFREQ_TABLE_TOP    1400	/* corresponding vco frequency values */
 #define HI_VCOFREQ_TABLE_BOTTOM 1600
@@ -97,14 +92,12 @@ struct powernow_k8_data {
 #define MIN_FREQ_RESOLUTION  200 /* fids jump by 2 matching freq jumps by 200 */
 
 #define MAX_FID 0x2a	/* Spec only gives FID values as far as 5 GHz */
-
 #define LEAST_VID 0x1e	/* Lowest (numerically highest) useful vid value */
 
 #define MIN_FREQ 800	/* Min and max freqs, per spec */
 #define MAX_FREQ 5000
 
 #define INVALID_FID_MASK 0xffffffc1  /* not a valid fid if these bits are set */
-
 #define INVALID_VID_MASK 0xffffffe0  /* not a valid vid if these bits are set */
 
 #define STOP_GRANT_5NS 1 /* min poss memory access latency for voltage change */
@@ -112,18 +105,35 @@ struct powernow_k8_data {
 #define PLL_LOCK_CONVERSION (1000/5) /* ms to ns, then divide by clock period */
 
 #define MAXIMUM_VID_STEPS 1  /* Current cpus only allow a single step of 25mV */
-
 #define VST_UNITS_20US 20   /* Voltage Stabalization Time is in units of 20us */
 
 /*
-Version 1.4 of the PSB table. This table is constructed by BIOS and is
-to tell the OS's power management driver which VIDs and FIDs are
-supported by this particular processor. This information is obtained from
-the data sheets for each processor model by the system vendor and
-incorporated into the BIOS.
-If the data in the PSB / PST is wrong, then this driver will program the
-wrong values into hardware, which is very likely to lead to a crash.
-*/
+ * Most values of interest are enocoded in a single field of the _PSS
+ * entries: the "control" value.
+ */
+                                                                                                    
+#define IRT_SHIFT      30
+#define RVO_SHIFT      28
+#define PLL_L_SHIFT    20
+#define MVS_SHIFT      18
+#define VST_SHIFT      11
+#define VID_SHIFT       6
+#define IRT_MASK        3
+#define RVO_MASK        3
+#define PLL_L_MASK   0x7f
+#define MVS_MASK        3
+#define VST_MASK     0x7f
+#define VID_MASK     0x1f
+#define FID_MASK     0x3f
+
+
+/*
+ * Version 1.4 of the PSB table. This table is constructed by BIOS and is
+ * to tell the OS's power management driver which VIDs and FIDs are
+ * supported by this particular processor.
+ * If the data in the PSB / PST is wrong, then this driver will program the
+ * wrong values into hardware, which is very likely to lead to a crash.
+ */
 
 #define PSB_ID_STRING      "AMDK7PNOW!"
 #define PSB_ID_STRING_LEN  10
