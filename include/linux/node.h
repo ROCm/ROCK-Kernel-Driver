@@ -19,11 +19,11 @@
 #ifndef _LINUX_NODE_H_
 #define _LINUX_NODE_H_
 
-#include <linux/device.h>
+#include <linux/sysdev.h>
 
 struct node {
 	unsigned long cpumap;	/* Bitmap of CPUs on the Node */
-	struct sys_root sysroot;
+	struct sys_device	sysdev;
 };
 
 extern int register_node(struct node *, int, struct node *);

@@ -11,7 +11,6 @@
 #include <linux/config.h>
 #include <linux/pm.h>
 #include <linux/device.h>
-#include <linux/cpufreq.h>
 
 #include <asm/leds.h>
 #include <asm/system.h>
@@ -65,13 +64,6 @@ int suspend(void)
 	 * Tell devices that they now have power.
 	 */
 	device_resume(RESUME_POWER_ON);
-
-	/*
-	 * Restore the CPU frequency settings.
-	 */
-#ifdef CONFIG_CPU_FREQ
-	cpufreq_restore();
-#endif
 
 	/*
 	 * Resume LDM devices.
