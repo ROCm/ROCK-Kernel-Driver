@@ -40,19 +40,19 @@ EXPORT_SYMBOL(unblock_signals);
  */	
 static void handle_signal(struct pt_regs *regs, unsigned long signr,
 			  struct k_sigaction *ka, siginfo_t *info,
-			  sigset_t *oldset, int error)
+			  sigset_t *oldset)
 {
         __sighandler_t handler;
 	void (*restorer)(void);
 	unsigned long sp;
 	sigset_t save;
-	int err, ret;
+	int err, error, ret;
 
-	err = PT_REGS_SYSCALL_RET(&current->thread.regs);
+	error = PT_REGS_SYSCALL_RET(&current->thread.regs);
 	ret = 0;
 	/* Always make any pending restarted system calls return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
-	switch(err){
+	switch(error){
 	case -ERESTART_RESTARTBLOCK:
 	case -ERESTARTNOHAND:
 		ret = -EINTR;
@@ -115,7 +115,7 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 		force_sigsegv(signr, current);
 }
 
-static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
+static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 {
 	struct k_sigaction ka_copy;
 	siginfo_t info;
@@ -127,7 +127,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 	sig = get_signal_to_deliver(&info, &ka_copy, regs, NULL);
 	if(sig > 0){
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal(regs, sig, &ka_copy, &info, oldset, error);
+		handle_signal(regs, sig, &ka_copy, &info, oldset);
 		return(1);
 	}
 
@@ -161,8 +161,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 
 int do_signal(void)
 {
-	return(kern_do_signal(&current->thread.regs, NULL,
-			      PT_REGS_SYSCALL_RET(&current->thread.regs)));
+	return(kern_do_signal(&current->thread.regs, NULL));
 }
 
 /*
@@ -183,7 +182,7 @@ long sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if(kern_do_signal(&current->thread.regs, &saveset, -EINTR))
+		if(kern_do_signal(&current->thread.regs, &saveset))
 			return(-EINTR);
 	}
 }
@@ -210,7 +209,7 @@ long sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if (kern_do_signal(&current->thread.regs, &saveset, -EINTR))
+		if (kern_do_signal(&current->thread.regs, &saveset))
 			return(-EINTR);
 	}
 }
