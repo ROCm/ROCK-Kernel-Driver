@@ -309,7 +309,7 @@ static int pci_device_suspend(struct device * dev, u32 state)
 	if (drv && drv->suspend)
 		i = drv->suspend(pci_dev, dev_state);
 		
-	pci_save_state(pci_dev, pci_dev->saved_config_space);
+	pci_save_state(pci_dev);
 	return i;
 }
 
@@ -321,7 +321,7 @@ static int pci_device_suspend(struct device * dev, u32 state)
 static void pci_default_resume(struct pci_dev *pci_dev)
 {
 	/* restore the PCI config space */
-	pci_restore_state(pci_dev, pci_dev->saved_config_space);
+	pci_restore_state(pci_dev);
 	/* if the device was enabled before suspend, reenable */
 	if (pci_dev->is_enabled)
 		pci_enable_device(pci_dev);

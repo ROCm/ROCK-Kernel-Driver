@@ -1236,7 +1236,7 @@ static struct video_device meye_template = {
 #ifdef CONFIG_PM
 static int meye_suspend(struct pci_dev *pdev, u32 state)
 {
-	pci_save_state(pdev, meye.pm_state);
+	pci_save_state(pdev);
 	meye.pm_mchip_mode = meye.mchip_mode;
 	mchip_hic_stop();
 	mchip_set(MCHIP_MM_INTA, 0x0);
@@ -1245,7 +1245,7 @@ static int meye_suspend(struct pci_dev *pdev, u32 state)
 
 static int meye_resume(struct pci_dev *pdev)
 {
-	pci_restore_state(pdev, meye.pm_state);
+	pci_restore_state(pdev);
 	pci_write_config_word(meye.mchip_dev, MCHIP_PCI_SOFTRESET_SET, 1);
 
 	mchip_delay(MCHIP_HIC_CMD, 0);

@@ -308,14 +308,12 @@ pci_set_power_state(struct pci_dev *dev, int state)
  * (>= 64 bytes).
  */
 int
-pci_save_state(struct pci_dev *dev, u32 *buffer)
+pci_save_state(struct pci_dev *dev)
 {
 	int i;
-	if (buffer) {
-		/* XXX: 100% dword access ok here? */
-		for (i = 0; i < 16; i++)
-			pci_read_config_dword(dev, i * 4,&buffer[i]);
-	}
+	/* XXX: 100% dword access ok here? */
+	for (i = 0; i < 16; i++)
+		pci_read_config_dword(dev, i * 4,&dev->saved_config_space[i]);
 	return 0;
 }
 
@@ -326,27 +324,12 @@ pci_save_state(struct pci_dev *dev, u32 *buffer)
  *
  */
 int 
-pci_restore_state(struct pci_dev *dev, u32 *buffer)
+pci_restore_state(struct pci_dev *dev)
 {
 	int i;
 
-	if (buffer) {
-		for (i = 0; i < 16; i++)
-			pci_write_config_dword(dev,i * 4, buffer[i]);
-	}
-	/*
-	 * otherwise, write the context information we know from bootup.
-	 * This works around a problem where warm-booting from Windows
-	 * combined with a D3(hot)->D0 transition causes PCI config
-	 * header data to be forgotten.
-	 */	
-	else {
-		for (i = 0; i < 6; i ++)
-			pci_write_config_dword(dev,
-					       PCI_BASE_ADDRESS_0 + (i * 4),
-					       dev->resource[i].start);
-		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-	}
+	for (i = 0; i < 16; i++)
+		pci_write_config_dword(dev,i * 4, dev->saved_config_space[i]);
 	return 0;
 }
 

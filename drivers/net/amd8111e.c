@@ -1874,7 +1874,7 @@ static int amd8111e_suspend(struct pci_dev *pci_dev, u32 state)
 		pci_enable_wake(pci_dev, 4, 0); /* 4 == D3 cold */
 	}
 	
-	pci_save_state(pci_dev, lp->pm_state);
+	pci_save_state(pci_dev);
 	pci_set_power_state(pci_dev, 3);
 
 	return 0;
@@ -1888,7 +1888,7 @@ static int amd8111e_resume(struct pci_dev *pci_dev)
 		return 0;
 
 	pci_set_power_state(pci_dev, 0);
-	pci_restore_state(pci_dev, lp->pm_state);
+	pci_restore_state(pci_dev);
 
 	pci_enable_wake(pci_dev, 3, 0);
 	pci_enable_wake(pci_dev, 4, 0); /* D3 cold */

@@ -227,7 +227,7 @@ pdev_save_srm_config(struct pci_dev *dev)
 	tmp->next = srm_saved_configs;
 	tmp->dev = dev;
 
-	pci_save_state(dev, tmp->regs);
+	pci_save_state(dev);
 
 	srm_saved_configs = tmp;
 }
@@ -243,7 +243,7 @@ pci_restore_srm_config(void)
 
 	/* Restore SRM config. */
 	for (tmp = srm_saved_configs; tmp; tmp = tmp->next) {
-		pci_restore_state(tmp->dev, tmp->regs);
+		pci_restore_state(tmp->dev);
 	}
 }
 #endif

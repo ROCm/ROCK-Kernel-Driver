@@ -3221,7 +3221,7 @@ static int velocity_suspend(struct pci_dev *pdev, u32 state)
 	netif_device_detach(vptr->dev);
 
 	spin_lock_irqsave(&vptr->lock, flags);
-	pci_save_state(pdev, vptr->pci_state);
+	pci_save_state(pdev);
 #ifdef ETHTOOL_GWOL
 	if (vptr->flags & VELOCITY_FLAGS_WOL_ENABLED) {
 		velocity_get_ip(vptr);
@@ -3254,7 +3254,7 @@ static int velocity_resume(struct pci_dev *pdev)
 
 	pci_set_power_state(pdev, 0);
 	pci_enable_wake(pdev, 0, 0);
-	pci_restore_state(pdev, vptr->pci_state);
+	pci_restore_state(pdev);
 
 	mac_wol_reset(vptr->mac_regs);
 

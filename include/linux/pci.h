@@ -777,8 +777,8 @@ int pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask);
 int pci_assign_resource(struct pci_dev *dev, int i);
 
 /* Power management related routines */
-int pci_save_state(struct pci_dev *dev, u32 *buffer);
-int pci_restore_state(struct pci_dev *dev, u32 *buffer);
+int pci_save_state(struct pci_dev *dev);
+int pci_restore_state(struct pci_dev *dev);
 int pci_set_power_state(struct pci_dev *dev, int state);
 int pci_enable_wake(struct pci_dev *dev, u32 state, int enable);
 
@@ -909,8 +909,8 @@ static inline int pci_find_ext_capability (struct pci_dev *dev, int cap) {return
 static inline const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev) { return NULL; }
 
 /* Power management related routines */
-static inline int pci_save_state(struct pci_dev *dev, u32 *buffer) { return 0; }
-static inline int pci_restore_state(struct pci_dev *dev, u32 *buffer) { return 0; }
+static inline int pci_save_state(struct pci_dev *dev) { return 0; }
+static inline int pci_restore_state(struct pci_dev *dev) { return 0; }
 static inline int pci_set_power_state(struct pci_dev *dev, int state) { return 0; }
 static inline int pci_enable_wake(struct pci_dev *dev, u32 state, int enable) { return 0; }
 

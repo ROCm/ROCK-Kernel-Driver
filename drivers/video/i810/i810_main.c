@@ -1517,7 +1517,7 @@ static int i810fb_suspend(struct pci_dev *dev, u32 state)
 		par->drm_agp->unbind_memory(par->i810_gtt.i810_cursor_memory);
 		pci_disable_device(dev);
 	}
-	pci_save_state(dev, par->pci_state);
+	pci_save_state(dev);
 	pci_set_power_state(dev, state);
 
 	return 0;
@@ -1531,7 +1531,7 @@ static int i810fb_resume(struct pci_dev *dev)
 	if (par->cur_state == 0)
 		return 0;
 
-	pci_restore_state(dev, par->pci_state);
+	pci_restore_state(dev);
 	pci_set_power_state(dev, 0);
 	pci_enable_device(dev);
 	par->drm_agp->bind_memory(par->i810_gtt.i810_fb_memory, 

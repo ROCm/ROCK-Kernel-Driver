@@ -311,7 +311,6 @@ struct ali_card {
 	u16 pci_id;
 #ifdef CONFIG_PM
 	u16 pm_suspended;
-	u32 pm_save_state[64 / sizeof(u32)];
 	int pm_saved_mixer_settings[SOUND_MIXER_NRDEVICES][NR_AC97];
 #endif
 	/* soundcore stuff */
@@ -3576,7 +3575,7 @@ static int ali_pm_suspend(struct pci_dev *dev, u32 pm_state)
 			}
 		}
 	}
-	pci_save_state(dev, card->pm_save_state);	/* XXX do we need this? */
+	pci_save_state(dev);	/* XXX do we need this? */
 	pci_disable_device(dev);	/* disable busmastering */
 	pci_set_power_state(dev, 3);	/* Zzz. */
 	return 0;
@@ -3588,7 +3587,7 @@ static int ali_pm_resume(struct pci_dev *dev)
 	int num_ac97, i = 0;
 	struct ali_card *card = pci_get_drvdata(dev);
 	pci_enable_device(dev);
-	pci_restore_state(dev, card->pm_save_state);
+	pci_restore_state(dev);
 	/* observation of a toshiba portege 3440ct suggests that the 
 	   hardware has to be more or less completely reinitialized from
 	   scratch after an apm suspend.  Works For Me.   -dan */

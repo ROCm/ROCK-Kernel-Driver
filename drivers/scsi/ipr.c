@@ -4935,7 +4935,7 @@ static int ipr_reset_restore_cfg_space(struct ipr_cmnd *ipr_cmd)
 	int rc;
 
 	ENTER;
-	rc = pci_restore_state(ioa_cfg->pdev, ioa_cfg->pci_cfg_buf);
+	rc = pci_restore_state(ioa_cfg->pdev);
 
 	if (rc != PCIBIOS_SUCCESSFUL) {
 		ipr_cmd->ioasa.ioasc = cpu_to_be32(IPR_IOASC_PCI_ACCESS_ERROR);
@@ -5749,7 +5749,7 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 	}
 
 	/* Save away PCI config space for use following IOA reset */
-	rc = pci_save_state(pdev, ioa_cfg->pci_cfg_buf);
+	rc = pci_save_state(pdev);
 
 	if (rc != PCIBIOS_SUCCESSFUL) {
 		dev_err(&pdev->dev, "Failed to save PCI config space\n");

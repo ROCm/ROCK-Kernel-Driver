@@ -1827,7 +1827,7 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 
 	pci_set_drvdata(pdev, dev);
 
-	pci_save_state(bp->pdev, bp->pci_cfg_state);
+	pci_save_state(bp->pdev);
 
 	printk(KERN_INFO "%s: Broadcom 4400 10/100BaseT Ethernet ", dev->name);
 	for (i = 0; i < 6; i++)
@@ -1893,7 +1893,7 @@ static int b44_resume(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct b44 *bp = dev->priv;
 
-	pci_restore_state(pdev, bp->pci_cfg_state);
+	pci_restore_state(pdev);
 
 	if (!netif_running(dev))
 		return 0;
