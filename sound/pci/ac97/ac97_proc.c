@@ -296,7 +296,7 @@ static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buff
 {
 	ac97_t *ac97 = entry->private_data;
 	
-	down(&ac97->mutex);
+	down(&ac97->page_mutex);
 	if ((ac97->id & 0xffffff40) == AC97_ID_AD1881) {	// Analog Devices AD1881/85/86
 		int idx;
 		for (idx = 0; idx < 3; idx++)
@@ -322,7 +322,7 @@ static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buff
 	} else {
 		snd_ac97_proc_read_main(ac97, buffer, 0);
 	}
-	up(&ac97->mutex);
+	up(&ac97->page_mutex);
 }
 
 #ifdef CONFIG_SND_DEBUG
@@ -332,7 +332,7 @@ static void snd_ac97_proc_regs_write(snd_info_entry_t *entry, snd_info_buffer_t 
 	ac97_t *ac97 = entry->private_data;
 	char line[64];
 	unsigned int reg, val;
-	down(&ac97->mutex);
+	down(&ac97->page_mutex);
 	while (!snd_info_get_line(buffer, line, sizeof(line))) {
 		if (sscanf(line, "%x %x", &reg, &val) != 2)
 			continue;
@@ -340,7 +340,7 @@ static void snd_ac97_proc_regs_write(snd_info_entry_t *entry, snd_info_buffer_t 
 		if (reg < 0x80 && (reg & 1) == 0 && val <= 0xffff)
 			snd_ac97_write_cache(ac97, reg, val);
 	}
-	up(&ac97->mutex);
+	up(&ac97->page_mutex);
 }
 #endif
 
@@ -359,7 +359,7 @@ static void snd_ac97_proc_regs_read(snd_info_entry_t *entry,
 {
 	ac97_t *ac97 = entry->private_data;
 
-	down(&ac97->mutex);
+	down(&ac97->page_mutex);
 	if ((ac97->id & 0xffffff40) == AC97_ID_AD1881) {	// Analog Devices AD1881/85/86
 
 		int idx;
@@ -375,7 +375,7 @@ static void snd_ac97_proc_regs_read(snd_info_entry_t *entry,
 	} else {
 		snd_ac97_proc_regs_read_main(ac97, buffer, 0);
 	}	
-	up(&ac97->mutex);
+	up(&ac97->page_mutex);
 }
 
 void snd_ac97_proc_init(ac97_t * ac97)

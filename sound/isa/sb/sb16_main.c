@@ -509,7 +509,7 @@ static snd_pcm_hardware_t snd_sb16_capture =
  *  open/close
  */
 
-int snd_sb16_playback_open(snd_pcm_substream_t * substream)
+static int snd_sb16_playback_open(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
 	sb_t *chip = snd_pcm_substream_chip(substream);
@@ -566,7 +566,7 @@ int snd_sb16_playback_open(snd_pcm_substream_t * substream)
 	return 0;
 }
 
-int snd_sb16_playback_close(snd_pcm_substream_t * substream)
+static int snd_sb16_playback_close(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
 	sb_t *chip = snd_pcm_substream_chip(substream);
@@ -579,7 +579,7 @@ int snd_sb16_playback_close(snd_pcm_substream_t * substream)
 	return 0;
 }
 
-int snd_sb16_capture_open(snd_pcm_substream_t * substream)
+static int snd_sb16_capture_open(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
 	sb_t *chip = snd_pcm_substream_chip(substream);
@@ -636,7 +636,7 @@ int snd_sb16_capture_open(snd_pcm_substream_t * substream)
 	return 0;
 }
 
-int snd_sb16_capture_close(snd_pcm_substream_t * substream)
+static int snd_sb16_capture_close(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
 	sb_t *chip = snd_pcm_substream_chip(substream);
@@ -728,7 +728,7 @@ static int snd_sb16_dma_control_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 	return change;
 }
 
-snd_kcontrol_new_t snd_sb16_dma_control = {
+static snd_kcontrol_new_t snd_sb16_dma_control = {
 	.iface = SNDRV_CTL_ELEM_IFACE_PCM,
 	.name = "16-bit DMA Allocation",
 	.info = snd_sb16_dma_control_info,

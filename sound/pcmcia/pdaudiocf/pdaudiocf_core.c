@@ -28,7 +28,7 @@
 /*
  *
  */
-unsigned char pdacf_ak4117_read(void *private_data, unsigned char reg)
+static unsigned char pdacf_ak4117_read(void *private_data, unsigned char reg)
 {
 	pdacf_t *chip = private_data;
 	unsigned long timeout;
@@ -60,7 +60,7 @@ unsigned char pdacf_ak4117_read(void *private_data, unsigned char reg)
 	return res;
 }
 
-void pdacf_ak4117_write(void *private_data, unsigned char reg, unsigned char val)
+static void pdacf_ak4117_write(void *private_data, unsigned char reg, unsigned char val)
 {
 	pdacf_t *chip = private_data;
 	unsigned long timeout;
@@ -267,7 +267,6 @@ int snd_pdacf_suspend(snd_card_t *card, unsigned int state)
 	outw(val, chip->port + PDAUDIOCF_REG_IER);
 	chip->chip_status |= PDAUDIOCF_STAT_IS_SUSPENDED;	/* ignore interrupts from now */
 	snd_pdacf_powerdown(chip);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -287,7 +286,6 @@ int snd_pdacf_resume(snd_card_t *card, unsigned int state)
 	       (snd_ak4117_external_rate(chip->ak4117) <= 0 || !check_signal(chip)))
 		mdelay(1);
 	chip->chip_status &= ~PDAUDIOCF_STAT_IS_SUSPENDED;
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif

@@ -46,7 +46,7 @@
 
 static int dsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};
 static int adsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
-static int nonblock_open;
+static int nonblock_open = 1;
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Abramo Bagnara <abramo@alsa-project.org>");
 MODULE_DESCRIPTION("PCM OSS emulation for ALSA.");
@@ -77,7 +77,7 @@ static inline void snd_leave_user(mm_segment_t fs)
 	set_fs(fs);
 }
 
-int snd_pcm_oss_plugin_clear(snd_pcm_substream_t *substream)
+static int snd_pcm_oss_plugin_clear(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_plugin_t *plugin, *next;
@@ -92,7 +92,7 @@ int snd_pcm_oss_plugin_clear(snd_pcm_substream_t *substream)
 	return 0;
 }
 
-int snd_pcm_plugin_insert(snd_pcm_plugin_t *plugin)
+static int snd_pcm_plugin_insert(snd_pcm_plugin_t *plugin)
 {
 	snd_pcm_runtime_t *runtime = plugin->plug->runtime;
 	plugin->next = runtime->oss.plugin_first;
@@ -513,8 +513,7 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 
 	runtime->oss.params = 0;
 	runtime->oss.prepare = 1;
-	if (runtime->oss.buffer != NULL)
-		vfree(runtime->oss.buffer);
+	vfree(runtime->oss.buffer);
 	runtime->oss.buffer = vmalloc(runtime->oss.period_bytes);
 	runtime->oss.buffer_used = 0;
 	if (runtime->dma_area)
@@ -524,12 +523,9 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 
 	err = 0;
 failure:
-	if (sw_params)
-		kfree(sw_params);
-	if (params)
-		kfree(params);
-	if (sparams)
-		kfree(sparams);
+	kfree(sw_params);
+	kfree(params);
+	kfree(sparams);
 	return err;
 }
 
@@ -1671,8 +1667,7 @@ static void snd_pcm_oss_release_substream(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime;
 	runtime = substream->runtime;
-	if (runtime->oss.buffer)
-		vfree(runtime->oss.buffer);
+	vfree(runtime->oss.buffer);
 	snd_pcm_oss_plugin_clear(substream);
 	substream->oss.file = NULL;
 	substream->oss.oss = 0;

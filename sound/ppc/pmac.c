@@ -71,7 +71,7 @@ static int snd_pmac_dbdma_alloc(pmac_dbdma_t *rec, int size)
 
 static void snd_pmac_dbdma_free(pmac_dbdma_t *rec)
 {
-	if (rec && rec->space)
+	if (rec)
 		kfree(rec->space);
 }
 
@@ -318,7 +318,8 @@ static snd_pcm_uframes_t snd_pmac_pcm_pointer(pmac_t *chip, pmac_stream_t *rec,
 	stat = ld_le16(&cp->xfer_status);
 	if (stat & (ACTIVE|DEAD)) {
 		count = in_le16(&cp->res_count);
-		count = rec->period_size - count;
+		if (count)
+			count = rec->period_size - count;
 	}
 #endif
 	count += rec->cur_period * rec->period_size;
@@ -425,10 +426,10 @@ static snd_pcm_hardware_t snd_pmac_playback =
 	.rate_max =		44100,
 	.channels_min =		2,
 	.channels_max =		2,
-	.buffer_bytes_max =	32768,
+	.buffer_bytes_max =	131072,
 	.period_bytes_min =	256,
 	.period_bytes_max =	16384,
-	.periods_min =		1,
+	.periods_min =		3,
 	.periods_max =		PMAC_MAX_FRAGS,
 };
 
@@ -444,10 +445,10 @@ static snd_pcm_hardware_t snd_pmac_capture =
 	.rate_max =		44100,
 	.channels_min =		2,
 	.channels_max =		2,
-	.buffer_bytes_max =	32768,
+	.buffer_bytes_max =	131072,
 	.period_bytes_min =	256,
 	.period_bytes_max =	16384,
-	.periods_min =		1,
+	.periods_min =		3,
 	.periods_max =		PMAC_MAX_FRAGS,
 };
 
@@ -550,6 +551,8 @@ static int snd_pmac_pcm_open(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substream
 	if (chip->can_duplex)
 		snd_pcm_set_sync(subs);
 
+	/* constraints to fix choppy sound */
+	snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
 	return 0;
 }
 
@@ -1248,7 +1251,6 @@ static int snd_pmac_suspend(snd_card_t *card, unsigned int state)
 	if (chip->rx_irq >= 0)
 		disable_irq(chip->rx_irq);
 	snd_pmac_sound_feature(chip, 0);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1275,7 +1277,6 @@ static int snd_pmac_resume(snd_card_t *card, unsigned int state)
 	if (chip->rx_irq >= 0)
 		enable_irq(chip->rx_irq);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 

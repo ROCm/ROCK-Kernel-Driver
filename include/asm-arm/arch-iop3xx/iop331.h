@@ -4,7 +4,7 @@
  * Intel IOP331 Chip definitions
  *
  * Author: Dave Jiang (dave.jiang@intel.com)
- * Copyright (C) 2003 Intel Corp.
+ * Copyright (C) 2003, 2004 Intel Corp.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,7 +21,8 @@
  */
 #ifndef __ASSEMBLY__
 #ifdef	CONFIG_ARCH_IOP331
-#define	iop_is_331()	((processor_id & 0xffffffb0) == 0x69054090)
+/*#define	iop_is_331()	((processor_id & 0xffffffb0) == 0x69054090) */
+#define	iop_is_331()	((processor_id & 0xffffff30) == 0x69054010)
 #else
 #define	iop_is_331()	0
 #endif
@@ -30,20 +31,28 @@
 /*
  * IOP331 I/O and Mem space regions for PCI autoconfiguration
  */
-#define IOP331_PCI_LOWER_IO             0x90000000
-#define IOP331_PCI_UPPER_IO             0x900fffff
-#define IOP331_PCI_LOWER_MEM            0x80000000
-#define IOP331_PCI_UPPER_MEM            0x87ffffff
+#define IOP331_PCI_IO_WINDOW_SIZE   0x10000
+#define IOP331_PCI_LOWER_IO_PA      0x90000000
+#define IOP331_PCI_LOWER_IO_VA      0xfe000000
+#define IOP331_PCI_LOWER_IO_BA      (*IOP331_OIOWTVR)
+#define IOP331_PCI_UPPER_IO_PA      (IOP331_PCI_LOWER_IO_PA + IOP331_PCI_IO_WINDOW_SIZE - 1)
+#define IOP331_PCI_UPPER_IO_VA      (IOP331_PCI_LOWER_IO_VA + IOP331_PCI_IO_WINDOW_SIZE - 1)
+#define IOP331_PCI_UPPER_IO_BA      (IOP331_PCI_LOWER_IO_BA + IOP331_PCI_IO_WINDOW_SIZE - 1)
+#define IOP331_PCI_IO_OFFSET        (IOP331_PCI_LOWER_IO_VA - IOP331_PCI_LOWER_IO_BA)
 
-#define IOP331_PCI_WINDOW_SIZE          128 * 0x100000
-
+#define IOP331_PCI_MEM_WINDOW_SIZE  (~*IOP331_IALR1 + 1)
+#define IOP331_PCI_LOWER_MEM_PA     0x80000000
+#define IOP331_PCI_LOWER_MEM_VA     0x80000000
+#define IOP331_PCI_LOWER_MEM_BA     (*IOP331_OMWTVR0)
+#define IOP331_PCI_UPPER_MEM_PA     (IOP331_PCI_LOWER_MEM_PA + IOP331_PCI_MEM_WINDOW_SIZE - 1)
+#define IOP331_PCI_UPPER_MEM_VA     (IOP331_PCI_LOWER_MEM_VA + IOP331_PCI_MEM_WINDOW_SIZE - 1)
+#define IOP331_PCI_UPPER_MEM_BA     (IOP331_PCI_LOWER_MEM_BA + IOP331_PCI_MEM_WINDOW_SIZE - 1)
+#define IOP331_PCI_MEM_OFFSET       (IOP331_PCI_LOWER_MEM_VA - IOP331_PCI_LOWER_MEM_BA)
 
 /*
  * IOP331 chipset registers
  */
-#define IOP331_VIRT_MEM_BASE 0xfeffe000  /* chip virtual mem address*/
-// #define IOP331_VIRT_MEM_BASE 0xfff00000  /* chip virtual mem address*/
-
+#define IOP331_VIRT_MEM_BASE  0xfeffe000  /* chip virtual mem address*/
 #define IOP331_PHYS_MEM_BASE  0xffffe000  /* chip physical memory address */
 #define IOP331_REG_ADDR(reg) (IOP331_VIRT_MEM_BASE | (reg))
 
@@ -248,8 +257,14 @@
 #define IOP331_TU_TISR    (volatile u32 *)IOP331_REG_ADDR(0x000007E8)
 #define IOP331_TU_WDTCR   (volatile u32 *)IOP331_REG_ADDR(0x000007EC)
 
-#define	IOP331_TICK_RATE	266000000	/* 266 MHz clock */
+#if defined(CONFIG_ARCH_IOP331)
+#define	IOP331_TICK_RATE	266000000	/* 266 MHz IB clock */
+#endif
 
+#if defined(CONFIG_IOP331_STEPD) || defined(CONFIG_ARCH_IQ80333)
+#undef IOP331_TICK_RATE
+#define IOP331_TICK_RATE	333000000	/* 333 Mhz IB clock */
+#endif
 
 /* Application accelerator unit 0x00000800 - 0x000008FF */
 #define IOP331_AAU_ACR     (volatile u32 *)IOP331_REG_ADDR(0x00000800)
@@ -324,6 +339,11 @@
 
 /* 0x00001740 through 0x0000176C UART 1 */
 
+#define IOP331_UART0_PHYS  (IOP331_PHYS_MEM_BASE | 0x00001700)	/* UART #1 physical */
+#define IOP331_UART1_PHYS  (IOP331_PHYS_MEM_BASE | 0x00001740)	/* UART #2 physical */
+#define IOP331_UART0_VIRT  (IOP331_VIRT_MEM_BASE | 0x00001700) /* UART #1 virtual addr */
+#define IOP331_UART1_VIRT  (IOP331_VIRT_MEM_BASE | 0x00001740) /* UART #2 virtual addr */
+
 /* Reserved 0x00001770 through 0x0000177F */
 
 /* General Purpose I/O Registers */
@@ -332,6 +352,7 @@
 #define IOP331_GPOD       (volatile u32 *)IOP331_REG_ADDR(0x00001788)
 
 /* Reserved 0x0000178c through 0x000019ff */
+
 
 #ifndef __ASSEMBLY__
 extern void iop331_map_io(void);

@@ -267,6 +267,7 @@ static void snd_emu10k1_pcm_init_voice(emu10k1_t *emu,
 		send_routing[3] = 3;
 		memset(send_amount, 0, sizeof(send_amount));
 	} else {
+		/* mono, left, right (master voice = left) */
 		tmp = stereo ? (master ? 1 : 2) : 0;
 		memcpy(send_routing, &mix->send_routing[tmp][0], 8);
 		memcpy(send_amount, &mix->send_volume[tmp][0], 8);
@@ -292,15 +293,9 @@ static void snd_emu10k1_pcm_init_voice(emu10k1_t *emu,
 	// setup routing
 	if (emu->audigy) {
 		snd_emu10k1_ptr_write(emu, A_FXRT1, voice,
-				      ((unsigned int)send_routing[3] << 24) |
-				      ((unsigned int)send_routing[2] << 16) |
-				      ((unsigned int)send_routing[1] << 8) |
-				      (unsigned int)send_routing[0]);
+				      snd_emu10k1_compose_audigy_fxrt1(send_routing));
 		snd_emu10k1_ptr_write(emu, A_FXRT2, voice,
-				      ((unsigned int)send_routing[7] << 24) |
-				      ((unsigned int)send_routing[6] << 16) |
-				      ((unsigned int)send_routing[5] << 8) |
-				      (unsigned int)send_routing[4]);
+				      snd_emu10k1_compose_audigy_fxrt2(send_routing));
 		snd_emu10k1_ptr_write(emu, A_SENDAMOUNTS, voice,
 				      ((unsigned int)send_amount[4] << 24) |
 				      ((unsigned int)send_amount[5] << 16) |
@@ -777,8 +772,7 @@ static void snd_emu10k1_pcm_free_substream(snd_pcm_runtime_t *runtime)
 {
 	emu10k1_pcm_t *epcm = runtime->private_data;
 
-	if (epcm)
-		kfree(epcm);
+	kfree(epcm);
 }
 
 static int snd_emu10k1_playback_open(snd_pcm_substream_t * substream)

@@ -135,7 +135,7 @@ static struct packet_data *pkt_alloc_packet_data(void)
 		goto no_bio;
 
 	for (i = 0; i < PAGES_PER_PACKET; i++) {
-		pkt->pages[i] = alloc_page(GFP_KERNEL|| __GFP_ZERO);
+		pkt->pages[i] = alloc_page(GFP_KERNEL|__GFP_ZERO);
 		if (!pkt->pages[i])
 			goto no_page;
 	}

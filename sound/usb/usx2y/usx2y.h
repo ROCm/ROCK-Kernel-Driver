@@ -27,6 +27,7 @@
 
 /* hwdep id string */
 #define SND_USX2Y_LOADER_ID		"USX2Y Loader"
+#define SND_USX2Y_USBPCM_ID		"USX2Y USBPCM"
 
 /* hardware type */
 enum {
@@ -42,8 +43,9 @@ enum {
 
 /* chip status */
 enum {
-	USX2Y_STAT_CHIP_INIT	= (1 << 0),	/* all operational */
-	USX2Y_STAT_CHIP_HUP	= (1 << 31),	/* all operational */
+	USX2Y_STAT_CHIP_INIT	=	(1 << 0),	/* all operational */
+	USX2Y_STAT_CHIP_MMAP_PCM_URBS = (1 << 1),	/* pcm transport over mmaped urbs */
+	USX2Y_STAT_CHIP_HUP	=	(1 << 31),	/* all operational */
 };
 
 #endif /* __SOUND_USX2Y_COMMON_H */

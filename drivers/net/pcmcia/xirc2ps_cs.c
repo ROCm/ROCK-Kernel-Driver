@@ -365,7 +365,7 @@ typedef struct local_info_t {
     int dingo;	 /* a CEM56 type card */
     int new_mii; /* has full 10baseT/100baseT MII */
     int modem;	 /* is a multi function card (i.e with a modem) */
-    caddr_t dingo_ccr; /* only used for CEM56 cards */
+    void __iomem *dingo_ccr; /* only used for CEM56 cards */
     unsigned last_ptr_value; /* last packets transmitted value */
     const char *manf_str;
 } local_info_t;

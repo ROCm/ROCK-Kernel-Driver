@@ -51,10 +51,8 @@ int snd_free_sgbuf_pages(struct snd_dma_buffer *dmab)
 		vunmap(dmab->area);
 	dmab->area = NULL;
 
-	if (sgbuf->table)
-		kfree(sgbuf->table);
-	if (sgbuf->page_table)
-		kfree(sgbuf->page_table);
+	kfree(sgbuf->table);
+	kfree(sgbuf->page_table);
 	kfree(sgbuf);
 	dmab->private_data = NULL;
 	

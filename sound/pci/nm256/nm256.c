@@ -1130,7 +1130,7 @@ snd_nm256_ac97_read(ac97_t *ac97, unsigned short reg)
 		return 0;
 	res = snd_nm256_readw(chip, chip->mixer_base + reg);
 	/* Magic delay.  Bleah yucky.  */
-	udelay(1000);
+	msleep(1);
 	return res;
 }
 
@@ -1151,7 +1151,7 @@ snd_nm256_ac97_write(ac97_t *ac97,
 	/* Wait for the write to take, too. */
 	while (tries-- > 0) {
 		snd_nm256_writew(chip, base + reg, val);
-		udelay(1000);  /* a little delay here seems better.. */
+		msleep(1);  /* a little delay here seems better.. */
 		if (snd_nm256_ac97_ready(chip))
 			return;
 	}
@@ -1275,7 +1275,6 @@ static int nm256_suspend(snd_card_t *card, unsigned int state)
 	snd_ac97_suspend(chip->ac97);
 	chip->coeffs_current = 0;
 	pci_disable_device(chip->pci);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -1290,7 +1289,6 @@ static int nm256_resume(snd_card_t *card, unsigned int state)
 	/* restore ac97 */
 	snd_ac97_resume(chip->ac97);
 
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* CONFIG_PM */
@@ -1488,12 +1486,6 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 
 	snd_nm256_init_chip(chip);
 
-	if ((err = snd_nm256_pcm(chip, 0)) < 0)
-		goto __error;
-	
-	if ((err = snd_nm256_mixer(chip)) < 0)
-		goto __error;
-
 	// pci_set_master(pci); /* needed? */
 	
 	snd_card_set_pm_callback(card, nm256_suspend, nm256_resume, chip);
@@ -1612,6 +1604,12 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 	if (reset_workaround[dev]) {
 		snd_printdd(KERN_INFO "nm256: reset_workaround activated\n");
 		chip->reset_workaround = 1;
+	}
+
+	if ((err = snd_nm256_pcm(chip, 0)) < 0 ||
+	    (err = snd_nm256_mixer(chip)) < 0) {
+		snd_card_free(card);
+		return err;
 	}
 
 	sprintf(card->shortname, "NeoMagic %s", card->driver);

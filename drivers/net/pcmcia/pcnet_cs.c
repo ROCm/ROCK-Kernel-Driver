@@ -227,7 +227,7 @@ typedef struct pcnet_dev_t {
     dev_link_t		link;
     dev_node_t		node;
     u_int		flags;
-    caddr_t		base;
+    void		__iomem *base;
     struct timer_list	watchdog;
     int			stale, fast_poll;
     u_char		phy_id;
@@ -352,7 +352,7 @@ static hw_info_t *get_hwinfo(dev_link_t *link)
     struct net_device *dev = link->priv;
     win_req_t req;
     memreq_t mem;
-    u_char *base, *virt;
+    u_char __iomem *base, *virt;
     int i, j;
 
     /* Allocate a small memory window */
@@ -1491,9 +1491,10 @@ static int setup_dma_config(dev_link_t *link, int start_pg,
 
 /*====================================================================*/
 
-static void copyin(u_char *dest, u_char *src, int c)
+static void copyin(void *dest, void __iomem *src, int c)
 {
-    u_short *d = (u_short *)dest, *s = (u_short *)src;
+    u_short *d = dest;
+    u_short __iomem *s = src;
     int odd;
 
     if (c <= 0)
@@ -1508,9 +1509,10 @@ static void copyin(u_char *dest, u_char *src, int c)
 	*((u_char *)d) = readw(s) & 0xff;
 }
 
-static void copyout(u_char *dest, const u_char *src, int c)
+static void copyout(void __iomem *dest, const void *src, int c)
 {
-    u_short *d = (u_short *)dest, *s = (u_short *)src;
+    u_short __iomem *d = dest;
+    const u_short *s = src;
     int odd;
 
     if (c <= 0)
@@ -1531,10 +1533,11 @@ static void shmem_get_8390_hdr(struct net_device *dev,
 			       struct e8390_pkt_hdr *hdr,
 			       int ring_page)
 {
-    void *xfer_start = (void *)(ei_status.rmem_start + (ring_page << 8)
-				- (ei_status.rx_start_page << 8));
+    void __iomem *xfer_start = ei_status.mem + (TX_PAGES<<8)
+				+ (ring_page << 8)
+				- (ei_status.rx_start_page << 8);
     
-    copyin((void *)hdr, xfer_start, sizeof(struct e8390_pkt_hdr));
+    copyin(hdr, xfer_start, sizeof(struct e8390_pkt_hdr));
     /* Fix for big endian systems */
     hdr->count = le16_to_cpu(hdr->count);
 }
@@ -1544,17 +1547,17 @@ static void shmem_get_8390_hdr(struct net_device *dev,
 static void shmem_block_input(struct net_device *dev, int count,
 			      struct sk_buff *skb, int ring_offset)
 {
-    void *xfer_start = (void *)(ei_status.rmem_start + ring_offset
-				- (ei_status.rx_start_page << 8));
+    void __iomem *xfer_start = ei_status.mem + (TX_PAGES<<8)
+				+ ring_offset
+				- (ei_status.rx_start_page << 8);
     char *buf = skb->data;
     
-    if (xfer_start + count > (void *)ei_status.rmem_end) {
+    if (xfer_start + count > (void __iomem *)ei_status.rmem_end) {
 	/* We must wrap the input move. */
-	int semi_count = (void*)ei_status.rmem_end - xfer_start;
+	int semi_count = (void __iomem *)ei_status.rmem_end - xfer_start;
 	copyin(buf, xfer_start, semi_count);
 	buf += semi_count;
-	ring_offset = ei_status.rx_start_page << 8;
-	xfer_start = (void *)ei_status.rmem_start;
+	xfer_start = ei_status.mem + (TX_PAGES<<8);
 	count -= semi_count;
     }
     copyin(buf, xfer_start, count);
@@ -1565,7 +1568,7 @@ static void shmem_block_input(struct net_device *dev, int count,
 static void shmem_block_output(struct net_device *dev, int count,
 			       const u_char *buf, const int start_page)
 {
-    void *shmem = (void *)dev->mem_start + (start_page << 8);
+    void __iomem *shmem = ei_status.mem + (start_page << 8);
     shmem -= ei_status.tx_start_page << 8;
     copyout(shmem, buf, count);
 }
@@ -1617,8 +1620,8 @@ static int setup_shmem_window(dev_link_t *link, int start_pg,
 	goto failed;
     }
     
-    dev->mem_start = (u_long)info->base + offset;
-    ei_status.rmem_start = dev->mem_start + (TX_PAGES<<8);
+    ei_status.mem = info->base + offset;
+    dev->mem_start = (u_long)ei_status.mem;
     dev->mem_end = ei_status.rmem_end = (u_long)info->base + req.Size;
 
     ei_status.tx_start_page = start_pg;

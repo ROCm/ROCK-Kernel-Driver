@@ -2608,8 +2608,8 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 
 	if (request_irq(pci->irq, snd_cmipci_interrupt, SA_INTERRUPT|SA_SHIRQ, card->driver, (void *)cm)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
-		err = -EBUSY;
-		goto __error;
+		snd_cmipci_free(cm);
+		return -EBUSY;
 	}
 	cm->irq = pci->irq;
 
@@ -2660,6 +2660,11 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 		break;
 	default:
 		break;
+	}
+
+	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, cm, &ops)) < 0) {
+		snd_cmipci_free(cm);
+		return err;
 	}
 
 	/* set MPU address */
@@ -2717,22 +2722,22 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 	/* create pcm devices */
 	pcm_index = pcm_spdif_index = 0;
 	if ((err = snd_cmipci_pcm_new(cm, pcm_index)) < 0)
-		goto __error;
+		return err;
 	pcm_index++;
 	if (cm->has_dual_dac) {
 		if ((err = snd_cmipci_pcm2_new(cm, pcm_index)) < 0)
-			goto __error;
+			return err;
 		pcm_index++;
 	}
 	if (cm->can_ac3_hw || cm->can_ac3_sw) {
 		pcm_spdif_index = pcm_index;
 		if ((err = snd_cmipci_pcm_spdif_new(cm, pcm_index)) < 0)
-			goto __error;
+			return err;
 	}
 
 	/* create mixer interface & switches */
 	if ((err = snd_cmipci_mixer_new(cm, pcm_spdif_index)) < 0)
-		goto __error;
+		return err;
 
 	if (iomidi > 0) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_CMIPCI,
@@ -2742,10 +2747,6 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 		}
 	}
 
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, cm, &ops)) < 0) {
-		snd_cmipci_free(cm);
-		return err;
-	}
 #ifdef USE_VAR48KRATE
 	for (val = 0; val < ARRAY_SIZE(rates); val++)
 		snd_cmipci_set_pll(cm, rates[val], val);
@@ -2785,10 +2786,6 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 
 	*rcmipci = cm;
 	return 0;
-
- __error:
-	snd_cmipci_free(cm);
-	return err;
 }
 
 /*

@@ -357,8 +357,8 @@ static unsigned char snd_sonicvibes_in(sonicvibes_t * sonic, unsigned char reg)
 	return value;
 }
 
-#ifdef CONFIG_SND_DEBUG
-void snd_sonicvibes_debug(sonicvibes_t * sonic)
+#if 0
+static void snd_sonicvibes_debug(sonicvibes_t * sonic)
 {
 	printk("SV REGS:          INDEX = 0x%02x  ", inb(SV_REG(sonic, INDEX)));
 	printk("                 STATUS = 0x%02x\n", inb(SV_REG(sonic, STATUS)));
@@ -1333,12 +1333,13 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
 #endif
 	sonic->revision = snd_sonicvibes_in(sonic, SV_IREG_REVISION);
 	snd_ctl_add(card, snd_ctl_new1(&snd_sonicvibes_game_control, sonic));
-	snd_sonicvibes_proc_init(sonic);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, sonic, &ops)) < 0) {
 		snd_sonicvibes_free(sonic);
 		return err;
 	}
+
+	snd_sonicvibes_proc_init(sonic);
 
 	snd_card_set_dev(card, &pci->dev);
 

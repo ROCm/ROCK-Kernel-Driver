@@ -119,7 +119,7 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 		 * switched atomically.
 		 */
 		bsp = ia64_getreg(_IA64_REG_AR_BSP);
-		sp = ia64_getreg(_IA64_REG_AR_SP);
+		sp = ia64_getreg(_IA64_REG_SP);
 
 		if ((sp - bsp) < 1024) {
 			static unsigned char count;

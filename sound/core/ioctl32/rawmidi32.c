@@ -38,9 +38,11 @@ struct sndrv_rawmidi_params32 {
 #define CVT_sndrv_rawmidi_params()\
 {\
 	COPY(stream);\
-	COPY(buffer_size);\
-	COPY(avail_min);\
-	COPY(no_active_sensing);\
+	COPY_CVT(buffer_size);\
+	COPY_CVT(avail_min);\
+	if (copy_in_user(((size_t __user *)&dst->avail_min + 1),\
+			 ((size_t __user *)&src->avail_min + 1), 4)) \
+		return -EFAULT;\
 }
 
 struct sndrv_rawmidi_status32 {
@@ -54,10 +56,10 @@ struct sndrv_rawmidi_status32 {
 #define CVT_sndrv_rawmidi_status()\
 {\
 	COPY(stream);\
-	COPY(tstamp.tv_sec);\
-	COPY(tstamp.tv_nsec);\
-	COPY(avail);\
-	COPY(xruns);\
+	COPY_CVT(tstamp.tv_sec);\
+	COPY_CVT(tstamp.tv_nsec);\
+	COPY_CVT(avail);\
+	COPY_CVT(xruns);\
 }
 
 DEFINE_ALSA_IOCTL(rawmidi_params);

@@ -21,7 +21,7 @@
  *                              merged HAL layer (patches from Brian)
  */
 
-/* $Id: sa11xx-uda1341.c,v 1.18 2004/07/20 15:54:09 cladisch Exp $ */
+/* $Id: sa11xx-uda1341.c,v 1.19 2004/12/15 15:26:10 tiwai Exp $ */
 
 /***************************************************************************************************
 *
@@ -875,7 +875,6 @@ static int snd_sa11xx_uda1341_suspend(snd_card_t *card, unsigned int state)
 #endif
 	l3_command(chip->uda1341, CMD_SUSPEND, NULL);
 	sa11xx_uda1341_audio_shutdown(chip);
-	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
 
@@ -891,7 +890,6 @@ static int snd_sa11xx_uda1341_resume(snd_card_t *card, unsigned int state)
 #else
 	//FIXME
 #endif
-	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	return 0;
 }
 #endif /* COMFIG_PM */

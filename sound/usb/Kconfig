@@ -17,7 +17,7 @@ config SND_USB_AUDIO
 
 config SND_USB_USX2Y
 	tristate "Tascam US-122, US-224 and US-428 USB driver"
-	depends on SND && USB
+	depends on SND && USB && (X86 || PPC || ALPHA)
 	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM

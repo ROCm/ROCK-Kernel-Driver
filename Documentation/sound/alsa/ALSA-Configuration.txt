@@ -252,8 +252,17 @@ Module parameters
     Module for video cards based on Bt87x chips.
 
     digital_rate - Override the default digital rate (Hz)
+    load_all	- Load the driver even if the card model isn't known
 
     Module supports up to 8 cards.
+
+  Module snd-ca0106
+  -----------------
+
+    Module for Creative Audigy LS and SB Live 24bit
+
+    Module supports up to 8 cards.
+
 
   Module snd-cmi8330
   ------------------
@@ -426,6 +435,13 @@ Module parameters
 	* Creative Card 5.1 (c) 2003			[0x3fc3/0x7cff]
         * Creative Card all ins and outs		[0x3fff/0x7fff]
     
+  Module snd-emu10k1x
+  -------------------
+
+    Module for Creative Emu10k1X (SB Live Dell OEM version)
+
+    Module supports up to 8 cards.
+
   Module snd-ens1370
   ------------------
 
@@ -595,8 +611,11 @@ Module parameters
 
     Module supports up to 8 cards.
 
-    Note: you need to load the firmware via hdsploader utility included
-          in alsa-tools and alsa-firmware packages.
+    Note: The firmware data can be automatically loaded via hotplug
+          when CONFIG_FW_LOADER is set.  Otherwise, you need to load
+          the firmware via hdsploader utility included in alsa-tools
+          package.
+          The firmware data is found in alsa-firmware package.
 
     Note: snd-page-alloc module does the job which snd-hammerfall-mem
           module did formerly.  It will allocate the buffers in advance
@@ -773,6 +792,12 @@ Module parameters
     Module supports multiple cards.
     Note: One miXart8 board will be represented as 4 alsa cards.
           See MIXART.txt for details.
+
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via mixartloader utility in alsa-tools package.
 
   Module snd-mpu401
   -----------------
@@ -1182,6 +1207,15 @@ Module parameters
     Note: for the MPU401 on VIA823x, use snd-mpu401 driver
 	  additonally.  The mpu_port option is for VIA686 chips only.
 
+  Module snd-via82xx-modem
+  ------------------------
+
+    Module for VIA82xx AC97 modem
+
+    ac97_clock	- AC'97 codec clock base (default 48000Hz)
+
+    Module supports up to 8 cards.
+
   Module snd-virmidi
   ------------------
 
@@ -1203,9 +1237,12 @@ Module parameters
 
     Module supports up to 8 cards.
 
-    For loading the firmware, use vxloader utility in alsa-tools
-    and alsa-firmware packages.  You can load the firmware automatically
-    by adding the following to /etc/modprobe.conf
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via vxloader utility in alsa-tools package.  To invoke
+    vxloader automatically, add the following to /etc/modprobe.conf
 
 	install snd-vx222 /sbin/modprobe --first-time -i snd-vx222 && /usr/bin/vxloader
 
@@ -1234,8 +1271,11 @@ Module parameters
     To activate the driver via the card manager, you'll need to set
     up /etc/pcmcia/vxpocket.conf.  See the sound/pcmcia/vx/vxpocket.c.
 
-    For loading the firmware, use vxloader utility in alsa-tools
-    and alsa-firmware packages.
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via vxloader utility in alsa-tools package.
 
     The irq_mask and irq_list are provided to avoid allocation of
     specific IRQs.  Usually you don't need to specify them.
@@ -1260,8 +1300,11 @@ Module parameters
     To activate the driver via the card manager, you'll need to set
     up /etc/pcmcia/vxp440.conf.  See the sound/pcmcia/vx/vxp440.c.
 
-    For loading the firmware, use vxloader utility in alsa-tools
-    and alsa-firmware packages.
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via vxloader utility in alsa-tools package.
 
     The irq_mask and irq_list are provided to avoid allocation of
     specific IRQs.  Usually you don't need to specify them.

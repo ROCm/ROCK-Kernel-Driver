@@ -32,58 +32,58 @@
 #include <sound/snd_wavefront.h>
 #include <sound/initval.h>
 
-int wf_raw = 0; /* we normally check for "raw state" to firmware
-		   loading. if non-zero, then during driver loading, the
-		   state of the board is ignored, and we reset the
-		   board and load the firmware anyway.
-		*/
+static int wf_raw = 0; /* we normally check for "raw state" to firmware
+			  loading. if non-zero, then during driver loading, the
+			  state of the board is ignored, and we reset the
+			  board and load the firmware anyway.
+		       */
 		   
-int fx_raw = 1; /* if this is zero, we'll leave the FX processor in
-		   whatever state it is when the driver is loaded.
-		   The default is to download the microprogram and
-		   associated coefficients to set it up for "default"
-		   operation, whatever that means.
-		*/
+static int fx_raw = 1; /* if this is zero, we'll leave the FX processor in
+			  whatever state it is when the driver is loaded.
+			  The default is to download the microprogram and
+			  associated coefficients to set it up for "default"
+			  operation, whatever that means.
+		       */
 
-int debug_default = 0;  /* you can set this to control debugging
-			      during driver loading. it takes any combination
-			      of the WF_DEBUG_* flags defined in
-			      wavefront.h
-			   */
+static int debug_default = 0;  /* you can set this to control debugging
+				  during driver loading. it takes any combination
+				  of the WF_DEBUG_* flags defined in
+				  wavefront.h
+			       */
 
 /* XXX this needs to be made firmware and hardware version dependent */
 
-char *ospath = "/etc/sound/wavefront.os"; /* where to find a processed
-					     version of the WaveFront OS
-					  */
+static char *ospath = "/etc/sound/wavefront.os"; /* where to find a processed
+						    version of the WaveFront OS
+						 */
 
-int wait_usecs = 150; /* This magic number seems to give pretty optimal
-			 throughput based on my limited experimentation.
-			 If you want to play around with it and find a better
-			 value, be my guest. Remember, the idea is to
-			 get a number that causes us to just busy wait
-			 for as many WaveFront commands as possible, without
-			 coming up with a number so large that we hog the
-			 whole CPU.
+static int wait_usecs = 150; /* This magic number seems to give pretty optimal
+				throughput based on my limited experimentation.
+				If you want to play around with it and find a better
+				value, be my guest. Remember, the idea is to
+				get a number that causes us to just busy wait
+				for as many WaveFront commands as possible, without
+				coming up with a number so large that we hog the
+				whole CPU.
 
-			 Specifically, with this number, out of about 134,000
-			 status waits, only about 250 result in a sleep.
-		      */
+				Specifically, with this number, out of about 134,000
+				status waits, only about 250 result in a sleep.
+			    */
 
-int sleep_interval = 100;   /* HZ/sleep_interval seconds per sleep */
-int sleep_tries = 50;       /* number of times we'll try to sleep */
+static int sleep_interval = 100;   /* HZ/sleep_interval seconds per sleep */
+static int sleep_tries = 50;       /* number of times we'll try to sleep */
 
-int reset_time = 2;        /* hundreths of a second we wait after a HW
-			      reset for the expected interrupt.
-			   */
+static int reset_time = 2;        /* hundreths of a second we wait after a HW
+				     reset for the expected interrupt.
+				  */
 
-int ramcheck_time = 20;    /* time in seconds to wait while ROM code
-			      checks on-board RAM.
-			   */
+static int ramcheck_time = 20;    /* time in seconds to wait while ROM code
+				     checks on-board RAM.
+				  */
 
-int osrun_time = 10;       /* time in seconds we wait for the OS to
-			      start running.
-			   */
+static int osrun_time = 10;       /* time in seconds we wait for the OS to
+				     start running.
+				  */
 module_param(wf_raw, int, 0444);
 MODULE_PARM_DESC(wf_raw, "if non-zero, assume that we need to boot the OS");
 module_param(fx_raw, int, 0444);
@@ -1709,7 +1709,7 @@ snd_wavefront_internal_interrupt (snd_wavefront_card_t *card)
 7 Unused
 */
 
-int __init
+static int __init
 snd_wavefront_interrupt_bits (int irq)
 
 {
@@ -1922,7 +1922,7 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 
 {
 	unsigned char section[WF_SECTION_MAX];
-	char section_length; /* yes, just a char; max value is WF_SECTION_MAX */
+	signed char section_length; /* yes, just a char; max value is WF_SECTION_MAX */
 	int section_cnt_downloaded = 0;
 	int fd;
 	int c;

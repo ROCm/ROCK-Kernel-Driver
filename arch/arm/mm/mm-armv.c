@@ -526,7 +526,7 @@ void setup_mm_for_reboot(char mode)
 			pmdval |= PMD_BIT4;
 		pmd = pmd_offset(pgd + i, i << PGDIR_SHIFT);
 		set_pmd(pmd, __pmd(pmdval));
-		set_pmd(pmd + 1, __pmd(pmdval + 1 << (PGDIR_SHIFT - 1)));
+		set_pmd(pmd + 1, __pmd(pmdval + (1 << (PGDIR_SHIFT - 1))));
 	}
 }
 

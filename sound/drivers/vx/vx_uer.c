@@ -197,7 +197,7 @@ static int vx_calc_clock_from_freq(vx_core_t *chip, int freq)
  * vx_change_clock_source - change the clock source
  * @source: the new source
  */
-void vx_change_clock_source(vx_core_t *chip, int source)
+static void vx_change_clock_source(vx_core_t *chip, int source)
 {
 	unsigned long flags;
 
