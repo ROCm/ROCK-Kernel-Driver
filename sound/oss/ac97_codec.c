@@ -46,7 +46,6 @@
  *	Isolated from trident.c to support multiple ac97 codec
  */
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/string.h>

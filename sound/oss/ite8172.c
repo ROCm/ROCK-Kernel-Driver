@@ -54,7 +54,6 @@
  *    07.30.2003  Removed initialisation to zero for static variables
  *		   (spdif[NR_DEVICE], i2s_fmt[NR_DEVICE], and devindex)
  */
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
