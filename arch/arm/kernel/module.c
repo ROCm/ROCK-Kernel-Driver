@@ -7,27 +7,59 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
- *  This code is currently broken.  We need to allocate a jump table
- *  for out of range branches.  We'd really like to be able to allocate
- *  a jump table and share it between modules, thereby reducing the
- *  cache overhead associated with the jump tables.
+ * Module allocation method suggested by Andi Kleen.
  */
-#warning FIXME
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/elf.h>
 #include <linux/vmalloc.h>
+#include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/string.h>
 
+#include <asm/pgtable.h>
+
 void *module_alloc(unsigned long size)
 {
-	return NULL; /* disabled */
+	struct vm_struct *area;
+	struct page **pages;
+	unsigned int array_size, i;
 
-	if (size == 0)
-		return NULL;
-	return vmalloc(size);
+	size = PAGE_ALIGN(size);
+	if (!size)
+		goto out_null;
+
+	area = __get_vm_area(size, VM_ALLOC, MODULE_START, MODULE_END);
+	if (!area)
+		goto out_null;
+
+	area->nr_pages = size >> PAGE_SHIFT;
+	array_size = area->nr_pages * sizeof(struct page *);
+	area->pages = pages = kmalloc(array_size, GFP_KERNEL);
+	if (!area->pages) {
+		remove_vm_area(area->addr);
+		kfree(area);
+		goto out_null;
+	}
+
+	memset(pages, 0, array_size);
+
+	for (i = 0; i < area->nr_pages; i++) {
+		pages[i] = alloc_page(GFP_KERNEL);
+		if (unlikely(!pages[i])) {
+			area->nr_pages = i;
+			goto out_no_pages;
+		}
+	}
+
+	if (map_vm_area(area, PAGE_KERNEL, &pages))
+		goto out_no_pages;
+	return area->addr;
+
+ out_no_pages:
+	vfree(area->addr);
+ out_null:
+	return NULL;
 }
 
 void module_free(struct module *module, void *region)
@@ -59,8 +91,6 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 	Elf32_Rel *rel = (void *)relsec->sh_offset;
 	unsigned int i;
 
-	printk("Applying relocations for section %u\n", relsec->sh_info);
-
 	for (i = 0; i < relsec->sh_size / sizeof(Elf32_Rel); i++, rel++) {
 		unsigned long loc;
 		Elf32_Sym *sym;
@@ -81,17 +111,14 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 		}
 
 		if (rel->r_offset < 0 || rel->r_offset > dstsec->sh_size - sizeof(u32)) {
-			printk(KERN_ERR "%s: out of bounds relocation, section %d reloc %d "
-				"offset %d size %d\n",
-				module->name, relindex, i, rel->r_offset, dstsec->sh_size);
+			printk(KERN_ERR "%s: out of bounds relocation, "
+				"section %d reloc %d offset %d size %d\n",
+				module->name, relindex, i, rel->r_offset,
+				dstsec->sh_size);
 			return -ENOEXEC;
 		}
 
 		loc = dstsec->sh_offset + rel->r_offset;
-
-		printk("%s: rel%d: at 0x%08lx [0x%08lx], symbol '%s' value 0x%08lx =>",
-			module->name, i, loc, *(u32 *)loc, strtab + sym->st_name,
-			sym->st_value);
 
 		switch (ELF32_R_TYPE(rel->r_info)) {
 		case R_ARM_ABS32:
@@ -104,9 +131,12 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 				offset -= 0x04000000;
 
 			offset += sym->st_value - loc;
-			if (offset & 3 || offset <= 0xfc000000 || offset >= 0x04000000) {
-				printk(KERN_ERR "%s: unable to fixup relocation: out of range\n",
-					module->name);
+			if (offset & 3 ||
+			    offset <= (s32)0xfc000000 ||
+			    offset >= (s32)0x04000000) {
+				printk(KERN_ERR "%s: unable to fixup "
+				       "relocation: out of range\n",
+				       module->name);
 				return -ENOEXEC;
 			}
 
@@ -117,11 +147,10 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 			break;
 
 		default:
-			printk("\n" KERN_ERR "%s: unknown relocation: %u\n",
-				module->name, ELF32_R_TYPE(rel->r_info));
+			printk(KERN_ERR "%s: unknown relocation: %u\n",
+			       module->name, ELF32_R_TYPE(rel->r_info));
 			return -ENOEXEC;
 		}
-		printk("[0x%08lx]\n", *(u32 *)loc);
 	}
 	return 0;
 }

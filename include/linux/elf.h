@@ -200,6 +200,10 @@ typedef struct {
 #define ELF64_R_SYM(i)			((i) >> 32)
 #define ELF64_R_TYPE(i)			((i) & 0xffffffff)
 
+#define R_ARM_NONE	0
+#define R_ARM_PC24	1
+#define R_ARM_ABS32	2
+
 #define R_386_NONE	0
 #define R_386_32	1
 #define R_386_PC32	2
