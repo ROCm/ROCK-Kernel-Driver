@@ -1780,7 +1780,6 @@ __u32 irlmp_get_daddr(struct lsap_cb *self)
 #ifdef CONFIG_PROC_FS
 
 struct irlmp_iter_state {
-	unsigned long flags;
 	hashbin_t *hashbin;
 };
 
@@ -1791,7 +1790,7 @@ static void *irlmp_seq_hb_idx(struct irlmp_iter_state *iter, loff_t *off)
 {
 	void *element;
 
-	spin_lock_irqsave(&iter->hashbin->hb_spinlock, iter->flags);
+	spin_lock_irq(&iter->hashbin->hb_spinlock);
 	for (element = hashbin_get_first(iter->hashbin);
 	     element != NULL; 
 	     element = hashbin_get_next(iter->hashbin)) {
@@ -1800,7 +1799,7 @@ static void *irlmp_seq_hb_idx(struct irlmp_iter_state *iter, loff_t *off)
 			return element;
 		}
 	}
-	spin_unlock_irqrestore(&iter->hashbin->hb_spinlock, iter->flags);
+	spin_unlock_irq(&iter->hashbin->hb_spinlock);
 	iter->hashbin = NULL;
 	return NULL;
 }
@@ -1848,8 +1847,7 @@ static void *irlmp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	v = hashbin_get_next(iter->hashbin);
 
 	if (v == NULL) {			/* no more in this hash bin */
-		spin_unlock_irqrestore(&iter->hashbin->hb_spinlock, 
-				       iter->flags);
+		spin_unlock_irq(&iter->hashbin->hb_spinlock);
 
 		if (iter->hashbin == irlmp->unconnected_lsaps) 
 			v =  LINK_START_TOKEN;
@@ -1862,10 +1860,9 @@ static void *irlmp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 static void irlmp_seq_stop(struct seq_file *seq, void *v)
 {
 	struct irlmp_iter_state *iter = seq->private;
-	
+
 	if (iter->hashbin)
-		spin_unlock_irqrestore(&iter->hashbin->hb_spinlock, iter->flags);
-		
+		spin_unlock_irq(&iter->hashbin->hb_spinlock);
 }
 
 static int irlmp_seq_show(struct seq_file *seq, void *v)

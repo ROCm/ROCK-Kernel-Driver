@@ -1094,7 +1094,6 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 #ifdef CONFIG_PROC_FS
 struct irlap_iter_state {
 	int id;
-	unsigned long flags;
 };
 
 static void *irlap_seq_start(struct seq_file *seq, loff_t *pos)
@@ -1103,7 +1102,7 @@ static void *irlap_seq_start(struct seq_file *seq, loff_t *pos)
 	struct irlap_cb *self;
 
 	/* Protect our access to the tsap list */
-	spin_lock_irqsave(&irlap->hb_spinlock, iter->flags);
+	spin_lock_irq(&irlap->hb_spinlock);
 	iter->id = 0;
 
 	for (self = (struct irlap_cb *) hashbin_get_first(irlap); 
@@ -1127,8 +1126,7 @@ static void *irlap_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 static void irlap_seq_stop(struct seq_file *seq, void *v)
 {
-	struct irlap_iter_state *iter = seq->private;
-	spin_unlock_irqrestore(&irlap->hb_spinlock, iter->flags);
+	spin_unlock_irq(&irlap->hb_spinlock);
 }
 
 static int irlap_seq_show(struct seq_file *seq, void *v)
