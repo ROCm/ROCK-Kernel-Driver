@@ -228,10 +228,10 @@ sunos_sys_table:
 	.word sunos_nosys, sunos_nosys, sunos_nosys
 	.word sunos_nosys, sunos_nosys
 /*250*/	.word sunos_nosys, sunos_nosys, sunos_nosys
-	.word sunos_nosys, sunos_nosys, sys_ni_syscall
-	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
-	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
-	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
-	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
+	.word sunos_nosys, sunos_nosys, sunos_nosys
+	.word sunos_nosys, sunos_nosys, sunos_nosys
+	.word sunos_nosys, sunos_nosys, sunos_nosys
+	.word sunos_nosys, sunos_nosys, sunos_nosys
+	.word sunos_nosys, sunos_nosys, sunos_nosys
 
 #endif
