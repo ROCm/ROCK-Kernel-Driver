@@ -226,11 +226,10 @@ static int bnep_net_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-int bnep_net_init(struct net_device *dev)
+void bnep_net_setup(struct net_device *dev)
 {
-	struct bnep_session *s = dev->priv;
 
-	memcpy(dev->dev_addr, s->eh.h_dest, ETH_ALEN);
+	memset(dev->broadcast, 0xff, ETH_ALEN);
 	dev->addr_len = ETH_ALEN;
 
 	ether_setup(dev);
@@ -245,6 +244,4 @@ int bnep_net_init(struct net_device *dev)
 
 	dev->watchdog_timeo  = HZ * 2;
 	dev->tx_timeout      = bnep_net_timeout;
-
-	return 0;
 }

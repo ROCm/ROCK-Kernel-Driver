@@ -136,7 +136,6 @@ int coda_open(struct inode *coda_inode, struct file *coda_file)
 	cfi->cfi_magic = CODA_MAGIC;
 	cfi->cfi_mapcount = 0;
 	cfi->cfi_container = host_file;
-	coda_load_creds(&cfi->cfi_cred);
 
 	BUG_ON(coda_file->private_data != NULL);
 	coda_file->private_data = cfi;
@@ -176,7 +175,7 @@ int coda_flush(struct file *coda_file)
 	coda_inode = coda_file->f_dentry->d_inode;
 
 	err = venus_store(coda_inode->i_sb, coda_i2f(coda_inode), coda_flags,
-			  &cfi->cfi_cred);
+			  coda_file->f_uid);
 
 	if (err == -EOPNOTSUPP) {
 		use_coda_close = 1;
@@ -214,7 +213,7 @@ int coda_release(struct inode *coda_inode, struct file *coda_file)
 
 	if (use_coda_close)
 		err = venus_close(coda_inode->i_sb, coda_i2f(coda_inode),
-				  coda_flags, &cfi->cfi_cred);
+				  coda_flags, coda_file->f_uid);
 
 	host_inode = cfi->cfi_container->f_dentry->d_inode;
 	cii = ITOC(coda_inode);
