@@ -216,6 +216,13 @@ static void sch_atm_pop(struct atm_vcc *vcc,struct sk_buff *skb)
 	tasklet_schedule(&p->task);
 }
 
+static const u8 llc_oui_ip[] = {
+	0xaa,		/* DSAP: non-ISO */
+	0xaa,		/* SSAP: non-ISO */
+	0x03,		/* Ctrl: Unnumbered Information Command PDU */
+	0x00,		/* OUI: EtherType */
+	0x00, 0x00,
+	0x08, 0x00 };	/* Ethertype IP (0800) */
 
 static int atm_tc_change(struct Qdisc *sch, u32 classid, u32 parent,
     struct rtattr **tca, unsigned long *arg)
@@ -322,11 +329,10 @@ static int atm_tc_change(struct Qdisc *sch, u32 classid, u32 parent,
 	flow->next = p->link.next;
 	p->link.next = flow;
 	flow->hdr_len = hdr_len;
-	if (hdr) memcpy(flow->hdr,hdr,hdr_len);
-	else {
-		memcpy(flow->hdr,llc_oui,sizeof(llc_oui));
-		((u16 *) flow->hdr)[3] = htons(ETH_P_IP);
-	}
+	if (hdr)
+		memcpy(flow->hdr,hdr,hdr_len);
+	else
+		memcpy(flow->hdr,llc_oui_ip,sizeof(llc_oui_ip));
 	*arg = (unsigned long) flow;
 	return 0;
 err_out:
