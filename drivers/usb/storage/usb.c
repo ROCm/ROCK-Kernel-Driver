@@ -47,6 +47,8 @@
  */
 
 #include <linux/config.h>
+#include <linux/sched.h>
+#include <linux/errno.h>
 #include "usb.h"
 #include "scsiglue.h"
 #include "transport.h"
