@@ -171,7 +171,7 @@ static __inline__ void __tcp_inherit_port(struct sock *sk, struct sock *child)
 	spin_unlock(&head->lock);
 }
 
-__inline__ void tcp_inherit_port(struct sock *sk, struct sock *child)
+inline void tcp_inherit_port(struct sock *sk, struct sock *child)
 {
 	local_bh_disable();
 	__tcp_inherit_port(sk, child);
@@ -316,7 +316,7 @@ static void __tcp_put_port(struct sock *sk)
 	spin_unlock(&head->lock);
 }
 
-__inline__ void tcp_put_port(struct sock *sk)
+inline void tcp_put_port(struct sock *sk)
 {
 	local_bh_disable();
 	__tcp_put_port(sk);
@@ -458,8 +458,8 @@ static struct sock *__tcp_v4_lookup_listener(struct sock *sk, u32 daddr,
 }
 
 /* Optimize the common listener case. */
-__inline__ struct sock *tcp_v4_lookup_listener(u32 daddr, unsigned short hnum,
-					       int dif)
+inline struct sock *tcp_v4_lookup_listener(u32 daddr, unsigned short hnum,
+					   int dif)
 {
 	struct sock *sk;
 
@@ -529,8 +529,8 @@ static inline struct sock *__tcp_v4_lookup(u32 saddr, u16 sport,
 	return sk ? : tcp_v4_lookup_listener(daddr, hnum, dif);
 }
 
-__inline__ struct sock *tcp_v4_lookup(u32 saddr, u16 sport, u32 daddr,
-				      u16 dport, int dif)
+inline struct sock *tcp_v4_lookup(u32 saddr, u16 sport, u32 daddr,
+				  u16 dport, int dif)
 {
 	struct sock *sk;
 

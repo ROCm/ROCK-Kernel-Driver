@@ -2101,7 +2101,7 @@ out:
 
 /* These states need RST on ABORT according to RFC793 */
 
-extern __inline__ int tcp_need_reset(int state)
+static inline int tcp_need_reset(int state)
 {
 	return (1 << state) &
 	       (TCPF_ESTABLISHED | TCPF_CLOSE_WAIT | TCPF_FIN_WAIT1 |

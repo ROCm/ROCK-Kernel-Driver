@@ -603,7 +603,7 @@ err_inval:
 }
 
 
-extern __inline__ void tcpdiag_rcv_skb(struct sk_buff *skb)
+static inline void tcpdiag_rcv_skb(struct sk_buff *skb)
 {
 	int err;
 	struct nlmsghdr * nlh;

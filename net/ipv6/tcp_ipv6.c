@@ -370,9 +370,9 @@ static inline struct sock *__tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
 	return tcp_v6_lookup_listener(daddr, hnum, dif);
 }
 
-__inline__ struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
-				      struct in6_addr *daddr, u16 dport,
-				      int dif)
+inline struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
+				  struct in6_addr *daddr, u16 dport,
+				  int dif)
 {
 	struct sock *sk;
 
