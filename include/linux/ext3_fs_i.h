@@ -113,6 +113,9 @@ struct ext3_inode_info {
 	 */
 	loff_t	i_disksize;
 
+	/* on-disk additional length */
+	__u16 i_extra_isize;
+
 	/*
 	 * truncate_sem is for serialising ext3_truncate() against
 	 * ext3_getblock().  In the 2.4 ext2 design, great chunks of inode's
