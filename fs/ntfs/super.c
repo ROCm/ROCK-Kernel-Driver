@@ -1126,8 +1126,7 @@ void ntfs_put_super(struct super_block *vfs_sb)
 	down_write(&vol->mftbmp_lock);
 	/*
 	 * Clean up mft bitmap address space. Ignore the _inode_ bit in the
-	 * name of the function... FIXME: What does this do with dirty pages?
-	 * (ask Al Viro)
+	 * name of the function... FIXME: This destroys dirty pages!!! (AIA)
 	 */
 	truncate_inode_pages(&vol->mftbmp_mapping, 0);
 	vol->mftbmp_mapping.a_ops = NULL;
@@ -1493,22 +1492,6 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->sb = sb;
 	vol->upcase = NULL;
 	vol->mft_ino = NULL;
-	init_rwsem(&vol->mftbmp_lock);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.clean_pages);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.dirty_pages);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.locked_pages);
-	vol->mftbmp_mapping.a_ops = NULL;
-	vol->mftbmp_mapping.host = NULL;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,6)
-	vol->mftbmp_mapping.i_mmap = NULL;
-	vol->mftbmp_mapping.i_mmap_shared = NULL;
-#else
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap_shared);
-#endif
-	spin_lock_init(&vol->mftbmp_mapping.i_shared_lock);
-	init_run_list(&vol->mftbmp_rl);
 	vol->mftmirr_ino = NULL;
 	vol->lcnbmp_ino = NULL;
 	init_rwsem(&vol->lcnbmp_lock);
@@ -1519,6 +1502,26 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->on_errors = 0;
 	vol->mft_zone_multiplier = 0;
 	vol->nls_map = NULL;
+	init_rwsem(&vol->mftbmp_lock);
+	init_run_list(&vol->mftbmp_rl);
+
+	/* Initialize the mftbmp address space mapping.  */
+	INIT_RADIX_TREE(&vol->mftbmp_mapping.page_tree, GFP_ATOMIC);
+	rwlock_init(&vol->mftbmp_mapping.page_lock);
+	INIT_LIST_HEAD(&vol->mftbmp_mapping.clean_pages);
+	INIT_LIST_HEAD(&vol->mftbmp_mapping.dirty_pages);
+	INIT_LIST_HEAD(&vol->mftbmp_mapping.locked_pages);
+	INIT_LIST_HEAD(&vol->mftbmp_mapping.io_pages);
+	vol->mftbmp_mapping.nrpages = 0;
+	vol->mftbmp_mapping.a_ops = NULL;
+	vol->mftbmp_mapping.host = NULL;
+	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap);
+	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap_shared);
+	spin_lock_init(&vol->mftbmp_mapping.i_shared_lock);
+	vol->mftbmp_mapping.dirtied_when = 0;
+	vol->mftbmp_mapping.gfp_mask = GFP_HIGHUSER;
+	vol->mftbmp_mapping.ra_pages =
+			sb->s_bdev->bd_inode->i_mapping->ra_pages;
 
 	/*
 	 * Default is group and other don't have any access to files or

@@ -262,6 +262,13 @@ ChangeLog
 
 Note that a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.6:
+	- Major bugfix to make compatible with other kernel changes. This fixes
+	  the hangs/oopses on umount.
+	- Locking cleanup in directory operations (remove BKL usage).
+2.0.5:
+	- Major buffer overflow bug fix.
+	- Minor cleanups and updates for kernel 2.5.12.
 2.0.4:
 	- Cleanups and updates for kernel 2.5.11.
 2.0.3:
