@@ -1741,6 +1741,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	},
 	{
 		.vendor = 0x8086,
+		.device = 0x4856,
+		.name = "Intel D845WN (82801BA)",
+		.type = AC97_TUNE_SWAP_HP
+	},
+	{
+		.vendor = 0x8086,
 		.device = 0x4d44,
 		.name = "Intel D850EMV2",	/* AD1885 */
 		.type = AC97_TUNE_HP_ONLY
