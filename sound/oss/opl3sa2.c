@@ -832,7 +832,7 @@ static struct pnp_driver opl3sa2_driver = {
 /* End of component functions */
 
 #ifdef CONFIG_PM
-static spinlock_t opl3sa2_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(opl3sa2_lock);
 
 /* Power Management support functions */
 static int opl3sa2_suspend(struct pm_dev *pdev, unsigned int pm_mode)
