@@ -235,12 +235,12 @@ int diva_os_register_io_port (void *adapter, int register, unsigned long port,
 /*
 **  I/O port access abstraction
 */
-byte inpp (void*);
-word inppw (void*);
-void inppw_buffer (void*, void*, int);
-void outppw (void*, word);
-void outppw_buffer (void* , void*, int);
-void outpp (void*, word);
+byte inpp (void __iomem *);
+word inppw (void __iomem *);
+void inppw_buffer (void __iomem *, void*, int);
+void outppw (void __iomem *, word);
+void outppw_buffer (void __iomem * , void*, int);
+void outpp (void __iomem *, word);
 
 /*
 **  IRQ 

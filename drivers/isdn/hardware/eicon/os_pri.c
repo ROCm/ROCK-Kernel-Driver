@@ -332,7 +332,7 @@ static int diva_pri_cleanup_adapter(diva_os_xdi_adapter_t * a)
 static int diva_pri_reset_adapter(PISDN_ADAPTER IoAdapter)
 {
 	dword i;
-	struct mp_load *boot;
+	struct mp_load __iomem *boot;
 
 	if (!IoAdapter->Address || !IoAdapter->reset) {
 		return (-1);
@@ -343,7 +343,7 @@ static int diva_pri_reset_adapter(PISDN_ADAPTER IoAdapter)
 		return (-1);
 	}
 
-	boot = (struct mp_load *) DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
+	boot = (struct mp_load __iomem *) DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
 	WRITE_DWORD(&boot->err, 0);
 	DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, boot);
 
@@ -351,7 +351,7 @@ static int diva_pri_reset_adapter(PISDN_ADAPTER IoAdapter)
 
 	diva_os_wait(10);
 
-	boot = (struct mp_load *) DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
+	boot = (struct mp_load __iomem *) DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
 	i = READ_DWORD(&boot->live);
 
 	diva_os_wait(10);
@@ -408,8 +408,8 @@ diva_pri_write_sdram_block(PISDN_ADAPTER IoAdapter,
 			   dword address,
 			   const byte * data, dword length, dword limit)
 {
-	byte *p = DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
-	byte *mem = p;
+	byte __iomem *p = DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
+	byte __iomem *mem = p;
 
 	if (((address + length) >= limit) || !mem) {
 		DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, p);
@@ -433,8 +433,8 @@ diva_pri_start_adapter(PISDN_ADAPTER IoAdapter,
 {
 	dword i;
 	int started = 0;
-	byte *p;
-	struct mp_load *boot = (struct mp_load *) DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
+	byte __iomem *p;
+	struct mp_load __iomem *boot = (struct mp_load __iomem *) DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
 	ADAPTER *a = &IoAdapter->a;
 
 	if (IoAdapter->Initialized) {
@@ -468,7 +468,7 @@ diva_pri_start_adapter(PISDN_ADAPTER IoAdapter,
 	}
 
 	if (!started) {
-		byte *p = (byte *)boot;
+		byte __iomem *p = (byte __iomem *)boot;
 		dword TrapId;
 		dword debug;
 		TrapId = READ_DWORD(&p[0x80]);
@@ -492,7 +492,7 @@ diva_pri_start_adapter(PISDN_ADAPTER IoAdapter,
 	 */
 	IoAdapter->IrqCount = 0;
 	p = DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
-	WRITE_DWORD(((dword volatile *) p), (dword) ~ 0x03E00000);
+	WRITE_DWORD(p, (dword) ~ 0x03E00000);
 	DIVA_OS_MEM_DETACH_CFG(IoAdapter, p);
 	a->ReadyInt = 1;
 	a->ram_out(a, &PR_RAM->ReadyInt, 1);
@@ -729,8 +729,8 @@ diva_pri_cmd_card_proc(struct _diva_os_xdi_adapter *a,
 							   a->xdi_mbox.
 							   data_length);
 					if (a->xdi_mbox.data) {
-						byte *p = DIVA_OS_MEM_ATTACH_ADDRESS(&a->xdi_adapter);
-						byte *src = p;
+						byte __iomem *p = DIVA_OS_MEM_ATTACH_ADDRESS(&a->xdi_adapter);
+						byte __iomem *src = p;
 						byte *dst = a->xdi_mbox.data;
 						dword len = a->xdi_mbox.data_length;
 
@@ -764,8 +764,8 @@ static int pri_get_serial_number(diva_os_xdi_adapter_t * a)
 	byte data[64];
 	int i;
 	dword len = sizeof(data);
-	volatile byte *config;
-	volatile byte *flash;
+	volatile byte __iomem *config;
+	volatile byte __iomem *flash;
 
 /*
  *  First set some GT6401x config registers before accessing the BOOT-ROM
@@ -905,7 +905,7 @@ void diva_os_prepare_pri_functions(PISDN_ADAPTER IoAdapter)
 **  Checks presence of DSP on board
 */
 static int
-dsp_check_presence(volatile byte * addr, volatile byte * data, int dsp)
+dsp_check_presence(volatile byte __iomem * addr, volatile byte __iomem * data, int dsp)
 {
 	word pattern;
 
@@ -950,8 +950,8 @@ dsp_check_presence(volatile byte * addr, volatile byte * data, int dsp)
 */
 static dword diva_pri_detect_dsps(diva_os_xdi_adapter_t * a)
 {
-	byte *base;
-	byte *p;
+	byte __iomem *base;
+	byte __iomem *p;
 	dword ret = 0;
 	dword row_offset[7] = {
 		0x00000000,
@@ -962,7 +962,9 @@ static dword diva_pri_detect_dsps(diva_os_xdi_adapter_t * a)
 		0x00000000	/* 5 - ROW 0 */
 	};
 
-	byte *dsp_addr_port, *dsp_data_port, row_state;
+	byte __iomem *dsp_addr_port;
+	byte __iomem *dsp_data_port;
+	byte row_state;
 	int dsp_row = 0, dsp_index, dsp_num;
 
 	if (!a->xdi_adapter.Control || !a->xdi_adapter.reset) {

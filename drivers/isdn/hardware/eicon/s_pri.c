@@ -47,7 +47,7 @@ static dword pri_ram_offset (ADAPTER* a) {
   Recovery XLOG buffer from the card
   ------------------------------------------------------------------------- */
 static void pri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
- byte  *base ;
+ byte  __iomem *base ;
  word *Xlog ;
  dword   regs[4], TrapID, size ;
  Xdesc   xlogDesc ;
@@ -89,7 +89,7 @@ static void pri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
   Hardware reset of PRI card
   ------------------------------------------------------------------------- */
 static void reset_pri_hardware (PISDN_ADAPTER IoAdapter) {
- byte *p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+ byte __iomem *p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
  *p = _MP_RISC_RESET | _MP_LED1 | _MP_LED2 ;
  diva_os_wait (50) ;
  *p = 0x00 ;
@@ -101,8 +101,8 @@ static void reset_pri_hardware (PISDN_ADAPTER IoAdapter) {
   ------------------------------------------------------------------------- */
 static void stop_pri_hardware (PISDN_ADAPTER IoAdapter) {
  dword i;
- byte *p;
- dword volatile *cfgReg = (dword volatile *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
+ byte __iomem *p;
+ dword volatile __iomem *cfgReg = (void __iomem *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
  cfgReg[3] = 0x00000000 ;
  cfgReg[1] = 0x00000000 ;
  DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfgReg);
@@ -114,7 +114,7 @@ static void stop_pri_hardware (PISDN_ADAPTER IoAdapter) {
   i++ ;
  }
  DBG_TRC(("%s: PRI stopped (%d)", IoAdapter->Name, i))
- cfgReg = (dword volatile *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
+ cfgReg = (void __iomem *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
  WRITE_DWORD(&cfgReg[0],((dword)(~0x03E00000)));
  DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfgReg);
  diva_os_wait (1) ;
@@ -491,15 +491,15 @@ static int load_pri_hardware (PISDN_ADAPTER IoAdapter) {
   PRI Adapter interrupt Service Routine
    -------------------------------------------------------------------------- */
 static int pri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
- byte *cfg = DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
- if ( !((READ_DWORD((dword *)cfg)) & 0x80000000) ) {
+ byte __iomem *cfg = DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
+ if ( !(READ_DWORD(cfg) & 0x80000000) ) {
   DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfg);
   return (0) ;
  }
  /*
   clear interrupt line
   */
- WRITE_DWORD(((dword *)cfg), (dword)~0x03E00000) ;
+ WRITE_DWORD(cfg, (dword)~0x03E00000) ;
  DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfg);
  IoAdapter->IrqCount++ ;
  if ( IoAdapter->Initialized )
@@ -512,7 +512,7 @@ static int pri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
   Disable interrupt in the card hardware
   ------------------------------------------------------------------------- */
 static void disable_pri_interrupt (PISDN_ADAPTER IoAdapter) {
- dword volatile *cfgReg = (dword volatile *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter) ;
+ dword volatile __iomem *cfgReg = (dword volatile __iomem *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter) ;
  cfgReg[3] = 0x00000000 ;
  cfgReg[1] = 0x00000000 ;
  WRITE_DWORD(&cfgReg[0], (dword)(~0x03E00000)) ;
