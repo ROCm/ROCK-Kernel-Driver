@@ -496,7 +496,7 @@ void do_tty_hangup(void *data)
 	}
 	
 	read_lock(&tasklist_lock);
- 	for_each_task(p) {
+ 	for_each_process(p) {
 		if ((tty->session > 0) && (p->session == tty->session) &&
 		    p->leader) {
 			send_sig(SIGHUP,p,1);
@@ -598,7 +598,7 @@ void disassociate_ctty(int on_exit)
 	tty->pgrp = -1;
 
 	read_lock(&tasklist_lock);
-	for_each_task(p)
+	for_each_process(p)
 	  	if (p->session == current->session)
 			p->tty = NULL;
 	read_unlock(&tasklist_lock);
@@ -1223,7 +1223,7 @@ static void release_dev(struct file * filp)
 		struct task_struct *p;
 
 		read_lock(&tasklist_lock);
-		for_each_task(p) {
+		for_each_process(p) {
 			if (p->tty == tty || (o_tty && p->tty == o_tty))
 				p->tty = NULL;
 		}
@@ -1561,7 +1561,7 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 			struct task_struct *p;
 
 			read_lock(&tasklist_lock);
-			for_each_task(p)
+			for_each_process(p)
 				if (p->tty == tty)
 					p->tty = NULL;
 			read_unlock(&tasklist_lock);
@@ -1834,7 +1834,7 @@ static void __do_SAK(void *arg)
 	if (tty->driver.flush_buffer)
 		tty->driver.flush_buffer(tty);
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	for_each_process(p) {
 		if ((p->tty == tty) ||
 		    ((session > 0) && (p->session == session))) {
 			printk(KERN_NOTICE "SAK: killed process %d"

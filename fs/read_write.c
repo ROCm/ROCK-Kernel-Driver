@@ -286,9 +286,29 @@ asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char *buf,
 	return ret;
 }
 
+/*
+ * Reduce an iovec's length in-place.  Return the resulting number of segments
+ */
+unsigned long iov_shorten(struct iovec *iov, unsigned long nr_segs, size_t to)
+{
+	unsigned long seg = 0;
+	size_t len = 0;
+
+	while (seg < nr_segs) {
+		seg++;
+		if (len + iov->iov_len >= to) {
+			iov->iov_len = to - len;
+			break;
+		}
+		len += iov->iov_len;
+		iov++;
+	}
+	return seg;
+}
+
 static ssize_t do_readv_writev(int type, struct file *file,
 			       const struct iovec * vector,
-			       unsigned long count)
+			       unsigned long nr_segs)
 {
 	typedef ssize_t (*io_fn_t)(struct file *, char *, size_t, loff_t *);
 	typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, loff_t *);
@@ -296,73 +316,86 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	size_t tot_len;
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov=iovstack;
-	ssize_t ret, i;
+	ssize_t ret = -EINVAL;
+	int seg;
 	io_fn_t fn;
 	iov_fn_t fnv;
 	struct inode *inode;
 
 	/*
+	 * SuS says "The readv() function *may* fail if the iovcnt argument
+	 * was less than or equal to 0, or greater than {IOV_MAX}.  Linux has
+	 * traditionally returned -EINVAL for zero segments, so...
+	 */
+	if (nr_segs == 0)
+		goto out;
+
+	/*
 	 * First get the "struct iovec" from user memory and
 	 * verify all the pointers
 	 */
-	ret = 0;
-	if (!count)
-		goto out_nofree;
-	ret = -EINVAL;
-	if (count > UIO_MAXIOV)
-		goto out_nofree;
+	if ((nr_segs > UIO_MAXIOV) || (nr_segs <= 0))
+		goto out;
 	if (!file->f_op)
-		goto out_nofree;
-	if (count > UIO_FASTIOV) {
+		goto out;
+	if (nr_segs > UIO_FASTIOV) {
 		ret = -ENOMEM;
-		iov = kmalloc(count*sizeof(struct iovec), GFP_KERNEL);
+		iov = kmalloc(nr_segs*sizeof(struct iovec), GFP_KERNEL);
 		if (!iov)
-			goto out_nofree;
+			goto out;
 	}
 	ret = -EFAULT;
-	if (copy_from_user(iov, vector, count*sizeof(*vector)))
+	if (copy_from_user(iov, vector, nr_segs*sizeof(*vector)))
 		goto out;
 
 	/*
 	 * Single unix specification:
-	 * We should -EINVAL if an element length is not >= 0 and fitting an ssize_t
-	 * The total length is fitting an ssize_t
+	 * We should -EINVAL if an element length is not >= 0 and fitting an
+	 * ssize_t.  The total length is fitting an ssize_t
 	 *
 	 * Be careful here because iov_len is a size_t not an ssize_t
 	 */
-	 
 	tot_len = 0;
 	ret = -EINVAL;
-	for (i = 0 ; i < count ; i++) {
+	for (seg = 0 ; seg < nr_segs; seg++) {
 		ssize_t tmp = tot_len;
-		ssize_t len = (ssize_t)iov[i].iov_len;
+		ssize_t len = (ssize_t)iov[seg].iov_len;
 		if (len < 0)	/* size_t not fitting an ssize_t .. */
 			goto out;
 		tot_len += len;
 		if (tot_len < tmp) /* maths overflow on the ssize_t */
 			goto out;
 	}
-
-	inode = file->f_dentry->d_inode;
-	/* VERIFY_WRITE actually means a read, as we write to user space */
-	ret = locks_verify_area((type == VERIFY_WRITE
-				 ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
-				inode, file, file->f_pos, tot_len);
-	if (ret) goto out;
-
-	fnv = (type == VERIFY_WRITE ? file->f_op->readv : file->f_op->writev);
-	if (fnv) {
-		ret = fnv(file, iov, count, &file->f_pos);
+	if (tot_len == 0) {
+		ret = 0;
 		goto out;
 	}
 
+	inode = file->f_dentry->d_inode;
 	/* VERIFY_WRITE actually means a read, as we write to user space */
-	fn = (type == VERIFY_WRITE ? file->f_op->read :
-	      (io_fn_t) file->f_op->write);
+	ret = locks_verify_area((type == READ 
+				 ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
+				inode, file, file->f_pos, tot_len);
+	if (ret)
+		goto out;
 
+	fnv = NULL;
+	if (type == READ) {
+		fn = file->f_op->read;
+		fnv = file->f_op->readv;
+	} else {
+		fn = (io_fn_t)file->f_op->write;
+		fnv = file->f_op->writev;
+	}
+	if (fnv) {
+		ret = fnv(file, iov, nr_segs, &file->f_pos);
+		goto out;
+	}
+
+	/* Do it by hand, with file-ops */
 	ret = 0;
 	vector = iov;
-	while (count > 0) {
+	while (nr_segs > 0) {
 		void * base;
 		size_t len;
 		ssize_t nr;
@@ -370,7 +403,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 		base = vector->iov_base;
 		len = vector->iov_len;
 		vector++;
-		count--;
+		nr_segs--;
 
 		nr = fn(file, base, len, &file->f_pos);
 
@@ -382,20 +415,18 @@ static ssize_t do_readv_writev(int type, struct file *file,
 		if (nr != len)
 			break;
 	}
-
 out:
 	if (iov != iovstack)
 		kfree(iov);
-out_nofree:
-	/* VERIFY_WRITE actually means a read, as we write to user space */
-	if ((ret + (type == VERIFY_WRITE)) > 0)
+	if ((ret + (type == READ)) > 0)
 		dnotify_parent(file->f_dentry,
-			(type == VERIFY_WRITE) ? DN_MODIFY : DN_ACCESS);
+				(type == READ) ? DN_MODIFY : DN_ACCESS);
 	return ret;
 }
 
-asmlinkage ssize_t sys_readv(unsigned long fd, const struct iovec * vector,
-			     unsigned long count)
+
+asmlinkage ssize_t
+sys_readv(unsigned long fd, const struct iovec *vector, unsigned long nr_segs)
 {
 	struct file * file;
 	ssize_t ret;
@@ -409,7 +440,7 @@ asmlinkage ssize_t sys_readv(unsigned long fd, const struct iovec * vector,
 	    (file->f_op->readv || file->f_op->read)) {
 		ret = security_ops->file_permission (file, MAY_READ);
 		if (!ret)
-			ret = do_readv_writev(VERIFY_WRITE, file, vector, count);
+			ret = do_readv_writev(READ, file, vector, nr_segs);
 	}
 	fput(file);
 
@@ -417,8 +448,8 @@ bad_file:
 	return ret;
 }
 
-asmlinkage ssize_t sys_writev(unsigned long fd, const struct iovec * vector,
-			      unsigned long count)
+asmlinkage ssize_t
+sys_writev(unsigned long fd, const struct iovec * vector, unsigned long nr_segs)
 {
 	struct file * file;
 	ssize_t ret;
@@ -432,7 +463,7 @@ asmlinkage ssize_t sys_writev(unsigned long fd, const struct iovec * vector,
 	    (file->f_op->writev || file->f_op->write)) {
 		ret = security_ops->file_permission (file, MAY_WRITE);
 		if (!ret)
-			ret = do_readv_writev(VERIFY_READ, file, vector, count);
+			ret = do_readv_writev(WRITE, file, vector, nr_segs);
 	}
 	fput(file);
 

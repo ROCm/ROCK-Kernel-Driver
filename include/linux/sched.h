@@ -169,7 +169,8 @@ struct namespace;
 /* Maximum number of active map areas.. This is a random (large) number */
 #define MAX_MAP_COUNT	(65536)
 
-struct kioctx;
+#include <linux/aio.h>
+
 struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */
 	rb_root_t mm_rb;
@@ -202,6 +203,8 @@ struct mm_struct {
 	/* aio bits */
 	rwlock_t		ioctx_list_lock;
 	struct kioctx		*ioctx_list;
+
+	struct kioctx		default_kioctx;
 };
 
 extern int mmlist_nr;
@@ -219,8 +222,6 @@ struct signal_struct {
 	/* thread group exit support */
 	int			group_exit;
 	int			group_exit_code;
-
-	struct completion	group_exit_done;
 };
 
 /*
@@ -316,6 +317,7 @@ struct task_struct {
 	struct task_struct *parent;	/* parent process */
 	struct list_head children;	/* list of my children */
 	struct list_head sibling;	/* linkage in my parent's children list */
+	struct task_struct *group_leader;
 	struct list_head thread_group;
 
 	/* PID hash table linkage. */
@@ -758,14 +760,16 @@ static inline void remove_wait_queue_locked(wait_queue_head_t *q,
 #define remove_parent(p)	list_del_init(&(p)->sibling)
 #define add_parent(p, parent)	list_add_tail(&(p)->sibling,&(parent)->children)
 
-#define REMOVE_LINKS(p) do {				\
-	list_del_init(&(p)->tasks);			\
-	remove_parent(p);				\
+#define REMOVE_LINKS(p) do {					\
+	if (thread_group_leader(p))				\
+		list_del_init(&(p)->tasks);			\
+	remove_parent(p);					\
 	} while (0)
 
-#define SET_LINKS(p) do {				\
-	list_add_tail(&(p)->tasks,&init_task.tasks);	\
-	add_parent(p, (p)->parent);			\
+#define SET_LINKS(p) do {					\
+	if (thread_group_leader(p))				\
+		list_add_tail(&(p)->tasks,&init_task.tasks);	\
+	add_parent(p, (p)->parent);				\
 	} while (0)
 
 static inline struct task_struct *eldest_child(struct task_struct *p)
@@ -795,11 +799,18 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 #define next_task(p)	list_entry((p)->tasks.next, struct task_struct, tasks)
 #define prev_task(p)	list_entry((p)->tasks.prev, struct task_struct, tasks)
 
-#define for_each_task(p) \
+#define for_each_process(p) \
 	for (p = &init_task ; (p = next_task(p)) != &init_task ; )
 
-#define for_each_thread(task) \
-	for (task = next_thread(current) ; task != current ; task = next_thread(task))
+/*
+ * Careful: do_each_thread/while_each_thread is a double loop so
+ *          'break' will not work as expected - use goto instead.
+ */
+#define do_each_thread(g, t) \
+	for (g = t = &init_task ; (g = t = next_task(g)) != &init_task ; ) do
+
+#define while_each_thread(g, t) \
+	while ((t = next_thread(t)) != g)
 
 static inline task_t *next_thread(task_t *p)
 {
@@ -826,6 +837,9 @@ static inline task_t *prev_thread(task_t *p)
 }
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
+
+#define delay_group_leader(p) \
+	(p->tgid == p->pid && !list_empty(&p->thread_group))
 
 extern void unhash_process(struct task_struct *p);
 

@@ -188,22 +188,16 @@ static inline void copy_ttentry(struct tt_entry *src, struct tt_entry *dest)
 /* Initialize the kgdb_savettable so that debugging can commence */
 static void eh_init(void)
 {
-	int i, flags;
+	int i;
 
-	save_and_cli(flags);
 	for(i=0; i < 256; i++)
 		copy_ttentry(&sparc_ttable[i], &kgdb_savettable[i]);
-	restore_flags(flags);
 }
 
 /* Install an exception handler for kgdb */
 static void exceptionHandler(int tnum, trapfunc_t trap_entry)
 {
 	unsigned long te_addr = (unsigned long) trap_entry;
-	int flags;
-
-	/* We are dorking with a live trap table, all irqs off */
-	save_and_cli(flags);
 
 	/* Make new vector */
 	sparc_ttable[tnum].inst_one =
@@ -212,8 +206,6 @@ static void exceptionHandler(int tnum, trapfunc_t trap_entry)
 	sparc_ttable[tnum].inst_two = SPARC_RD_PSR_L0;
 	sparc_ttable[tnum].inst_three = SPARC_NOP;
 	sparc_ttable[tnum].inst_four = SPARC_NOP;
-
-	restore_flags(flags);
 }
 
 /* Convert ch from a hex digit to an int */
@@ -406,7 +398,7 @@ set_debug_traps(void)
 	struct hard_trap_info *ht;
 	unsigned long flags;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 #if 0	
 /* Have to sort this out. This cannot be done after initialization. */
 	BTFIXUPSET_CALL(flush_cache_all, flush_cache_all_nop, BTFIXUPCALL_NOP);
@@ -438,7 +430,7 @@ set_debug_traps(void)
 #endif
 
 	initialized = 1; /* connect! */
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /* Convert the SPARC hardware trap type code to a unix signal number. */

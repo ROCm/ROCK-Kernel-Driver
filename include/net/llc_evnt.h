@@ -43,29 +43,18 @@ struct llc_stat_ev_prim_if {
 
 struct llc_stat_ev_pdu_if {
 	u8 reason;
-	struct sk_buff *skb;
-};
-
-struct llc_stat_ev_tmr_if {
-	void *timer_specific;
-};
-
-struct llc_stat_ev_rpt_sts_if {
-	u8 status;
 };
 
 union llc_stat_ev_if {
 	struct llc_stat_ev_simple_if  a;	/* 'a' for simple, easy ... */
 	struct llc_stat_ev_prim_if    prim;
 	struct llc_stat_ev_pdu_if     pdu;
-	struct llc_stat_ev_tmr_if     tmr;
-	struct llc_stat_ev_rpt_sts_if rsts;	/* report status */
 };
 
 struct llc_station_state_ev {
-	u8			type;
+	u8		     type;
 	union llc_stat_ev_if data;
-	struct list_head	node; /* node in station->ev_q.list */
+	struct list_head     node; /* node in station->ev_q.list */
 };
 
 static __inline__ struct llc_station_state_ev *

@@ -42,6 +42,7 @@
 #include <linux/highuid.h>
 #include <linux/brlock.h>
 #include <linux/fs.h>
+#include <linux/uio.h>
 #include <linux/tty.h>
 #include <linux/in6.h>
 #include <linux/completion.h>
@@ -343,6 +344,9 @@ EXPORT_SYMBOL(register_disk);
 EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL_GPL(generic_file_direct_IO);
+EXPORT_SYMBOL(generic_file_readv);
+EXPORT_SYMBOL(generic_file_writev);
+EXPORT_SYMBOL(iov_shorten);
 
 /* tty routines */
 EXPORT_SYMBOL(tty_hangup);

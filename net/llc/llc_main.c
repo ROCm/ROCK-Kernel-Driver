@@ -52,6 +52,11 @@ static int llc_rtn_all_conns(struct llc_sap *sap);
 
 static struct llc_station llc_main_station;	/* only one of its kind */
 
+#undef LLC_REFCNT_DEBUG
+#ifdef LLC_REFCNT_DEBUG
+static atomic_t llc_sock_nr;
+#endif
+
 /**
  *	llc_sap_alloc - allocates and initializes sap.
  *
@@ -136,7 +141,7 @@ struct llc_sap *llc_sap_find(u8 sap_value)
  *
  *	This function processes frames that has received and timers that has
  *	expired during sending an I pdu (refer to data_req_handler).  frames
- *	queue by mac_indicate function (llc_mac.c) and timers queue by timer
+ *	queue by llc_rcv function (llc_mac.c) and timers queue by timer
  *	callback functions(llc_c_ac.c).
  */
 static int llc_backlog_rcv(struct sock *sk, struct sk_buff *skb)
@@ -146,13 +151,13 @@ static int llc_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 
 	if (llc_backlog_type(skb) == LLC_PACKET) {
 		if (llc->state > 1) /* not closed */
-			rc = llc_pdu_router(llc->sap, sk, skb, LLC_TYPE_2);
+			rc = llc_conn_rcv(sk, skb);
 		else
 			kfree_skb(skb);
 	} else if (llc_backlog_type(skb) == LLC_EVENT) {
 		/* timer expiration event */
 		if (llc->state > 1)  /* not closed */
-			rc = llc_conn_send_ev(sk, skb);
+			rc = llc_conn_state_process(sk, skb);
 		else
 			llc_conn_free_ev(skb);
 		kfree_skb(skb);
@@ -165,10 +170,12 @@ static int llc_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 }
 
 /**
- *     llc_sock_init - Initialize a socket with default llc values.
+ *     llc_sk_init - Initializes a socket with default llc values.
  *     @sk: socket to intiailize.
+ *
+ *     Initializes a socket with default llc values.
  */
-int llc_sock_init(struct sock* sk)
+int llc_sk_init(struct sock* sk)
 {
 	struct llc_opt *llc = kmalloc(sizeof(*llc), GFP_ATOMIC);
 	int rc = -ENOMEM;
@@ -198,61 +205,83 @@ out:
 }
 
 /**
- *	__llc_sock_alloc - Allocates LLC sock
+ *	llc_sk_alloc - Allocates LLC sock
+ *	@family: upper layer protocol family
+ *	@priority: for allocation (%GFP_KERNEL, %GFP_ATOMIC, etc)
  *
  *	Allocates a LLC sock and initializes it. Returns the new LLC sock
  *	or %NULL if there's no memory available for one
  */
-struct sock *__llc_sock_alloc(void)
+struct sock *llc_sk_alloc(int family, int priority)
 {
-	struct sock *sk = sk_alloc(PF_LLC, GFP_ATOMIC, 1, NULL);
+	struct sock *sk = sk_alloc(family, priority, 1, NULL);
 
+	MOD_INC_USE_COUNT;
 	if (!sk)
-		goto out;
-	if (llc_sock_init(sk))
+		goto decmod;
+	if (llc_sk_init(sk))
 		goto outsk;
 	sock_init_data(NULL, sk);
+#ifdef LLC_REFCNT_DEBUG
+	atomic_inc(&llc_sock_nr);
+	printk(KERN_DEBUG "LLC socket %p created in %s, now we have %d alive\n", sk,
+		__FUNCTION__, atomic_read(&llc_sock_nr));
+#endif
 out:
 	return sk;
 outsk:
 	sk_free(sk);
 	sk = NULL;
+decmod:
+	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
 /**
- *	__llc_sock_free - Frees a LLC socket
+ *	llc_sk_free - Frees a LLC socket
  *	@sk - socket to free
  *
  *	Frees a LLC socket
  */
-void __llc_sock_free(struct sock *sk, u8 free)
+void llc_sk_free(struct sock *sk)
 {
 	struct llc_opt *llc = llc_sk(sk);
 
 	llc->state = LLC_CONN_OUT_OF_SVC;
-	/* stop all (possibly) running timers */
+	/* Stop all (possibly) running timers */
 	llc_conn_ac_stop_all_timers(sk, NULL);
-	/* handle return of frames on lists */
-#if 0
+#ifdef DEBUG_LLC_CONN_ALLOC
 	printk(KERN_INFO "%s: unackq=%d, txq=%d\n", __FUNCTION__,
 		skb_queue_len(&llc->pdu_unack_q),
 		skb_queue_len(&sk->write_queue));
 #endif
+	skb_queue_purge(&sk->receive_queue);
 	skb_queue_purge(&sk->write_queue);
 	skb_queue_purge(&llc->pdu_unack_q);
-	if (free)
-		sock_put(sk);
+#ifdef LLC_REFCNT_DEBUG
+	if (atomic_read(&sk->refcnt) != 1) {
+		printk(KERN_DEBUG "Destruction of LLC sock %p delayed in %s, cnt=%d\n",
+			sk, __FUNCTION__, atomic_read(&sk->refcnt));
+		printk(KERN_DEBUG "%d LLC sockets are still alive\n",
+			atomic_read(&llc_sock_nr));
+	} else {
+		atomic_dec(&llc_sock_nr);
+		printk(KERN_DEBUG "LLC socket %p released in %s, %d are still alive\n", sk,
+			__FUNCTION__, atomic_read(&llc_sock_nr));
+	}
+#endif
+	sock_put(sk);
+	MOD_DEC_USE_COUNT;
 }
 
 /**
- *	llc_sock_reset - resets a connection
+ *	llc_sk_reset - resets a connection
  *	@sk: LLC socket to reset
  *
  *	Resets a connection to the out of service state. Stops its timers
  *	and frees any frames in the queues of the connection.
  */
-void llc_sock_reset(struct sock *sk)
+void llc_sk_reset(struct sock *sk)
 {
 	struct llc_opt *llc = llc_sk(sk);
 
@@ -286,8 +315,6 @@ void llc_sock_reset(struct sock *sk)
 static int llc_rtn_all_conns(struct llc_sap *sap)
 {
 	int rc = 0;
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
 	struct list_head *entry, *tmp;
 
 	spin_lock_bh(&sap->sk_list.lock);
@@ -296,12 +323,8 @@ static int llc_rtn_all_conns(struct llc_sap *sap)
 	list_for_each_safe(entry, tmp, &sap->sk_list.list) {
 		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
 
-		prim.sap = sap;
-		prim_data.disc.sk = llc->sk;
-		prim.prim = LLC_DISC_PRIM;
-		prim.data = &prim_data;
 		llc->state = LLC_CONN_STATE_TEMP;
-		if (sap->req(&prim))
+		if (llc_send_disc(llc->sk))
 			rc = 1;
 	}
 out:
@@ -320,14 +343,14 @@ struct llc_station *llc_station_get(void)
 }
 
 /**
- *	llc_station_send_ev: queue event and try to process queue.
+ *	llc_station_state_process: queue event and try to process queue.
  *	@station: Address of the station
  *	@skb: Address of the event
  *
  *	Queues an event (on the station event queue) for handling by the
  *	station state machine and attempts to process any queued-up events.
  */
-void llc_station_send_ev(struct llc_station *station, struct sk_buff *skb)
+void llc_station_state_process(struct llc_station *station, struct sk_buff *skb)
 {
 	spin_lock_bh(&station->ev_q.lock);
 	skb_queue_tail(&station->ev_q.list, skb);
@@ -557,13 +580,13 @@ unlock:
 
 static struct packet_type llc_packet_type = {
 	.type = __constant_htons(ETH_P_802_2),
-	.func = mac_indicate,
+	.func = llc_rcv,
 	.data = (void *)1,
 };
 
 static struct packet_type llc_tr_packet_type = {
 	.type = __constant_htons(ETH_P_TR_802_2),
-	.func = mac_indicate,
+	.func = llc_rcv,
 	.data = (void *)1,
 };
 
@@ -585,7 +608,7 @@ static int __init llc_init(void)
 	skb_queue_head_init(&llc_main_station.mac_pdu_q);
 	skb_queue_head_init(&llc_main_station.ev_q.list);
 	spin_lock_init(&llc_main_station.ev_q.lock);
-	skb = alloc_skb(1, GFP_ATOMIC);
+	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
 		goto err;
 	llc_build_offset_table();

@@ -883,11 +883,11 @@ out1:
 
 static void chroot_fs_refs(struct nameidata *old_nd, struct nameidata *new_nd)
 {
-	struct task_struct *p;
+	struct task_struct *g, *p;
 	struct fs_struct *fs;
 
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	do_each_thread(g, p) {
 		task_lock(p);
 		fs = p->fs;
 		if (fs) {
@@ -900,7 +900,7 @@ static void chroot_fs_refs(struct nameidata *old_nd, struct nameidata *new_nd)
 			put_fs_struct(fs);
 		} else
 			task_unlock(p);
-	}
+	} while_each_thread(g, p);
 	read_unlock(&tasklist_lock);
 }
 
@@ -1012,7 +1012,7 @@ static void __init init_mount_tree(void)
 {
 	struct vfsmount *mnt;
 	struct namespace *namespace;
-	struct task_struct *p;
+	struct task_struct *g, *p;
 
 	mnt = do_kern_mount("rootfs", 0, "rootfs", NULL);
 	if (IS_ERR(mnt))
@@ -1028,10 +1028,10 @@ static void __init init_mount_tree(void)
 
 	init_task.namespace = namespace;
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	do_each_thread(g, p) {
 		get_namespace(namespace);
 		p->namespace = namespace;
-	}
+	} while_each_thread(g, p);
 	read_unlock(&tasklist_lock);
 
 	set_fs_pwd(current->fs, namespace->root, namespace->root->mnt_root);

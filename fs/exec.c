@@ -515,7 +515,6 @@ static inline int make_private_signals(void)
 	atomic_set(&newsig->count, 1);
 	newsig->group_exit = 0;
 	newsig->group_exit_code = 0;
-	init_completion(&newsig->group_exit_done);
 	memcpy(newsig->action, current->sig->action, sizeof(newsig->action));
 	init_sigpending(&newsig->shared_pending);
 

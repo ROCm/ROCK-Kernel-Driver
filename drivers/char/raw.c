@@ -201,25 +201,29 @@ out:
 }
 
 static ssize_t
-rw_raw_dev(int rw, struct file *filp, char *buf, size_t size, loff_t *offp)
+rw_raw_dev(int rw, struct file *filp, const struct iovec *iov, unsigned long nr_segs, loff_t *offp)
 {
 	const int minor = minor(filp->f_dentry->d_inode->i_rdev);
 	struct block_device *bdev = raw_devices[minor].binding;
 	struct inode *inode = bdev->bd_inode;
+ 	size_t count = iov_length(iov, nr_segs); 
 	ssize_t ret = 0;
 
-	if (size == 0)
-		goto out;
-	ret = -EINVAL;
-	if (size < 0)
-		goto out;
-	ret = -ENXIO;
-	if (*offp >= inode->i_size)
-		goto out;
+	if (count == 0)
+		goto out;	
 
-	if (size + *offp > inode->i_size)
-		size = inode->i_size - *offp;
-	ret = generic_file_direct_IO(rw, inode, buf, *offp, size);
+	if ((ssize_t)count < 0)
+		return -EINVAL;	
+
+	if (*offp >= inode->i_size) 
+		return -ENXIO;
+
+	if (count + *offp > inode->i_size) {
+		count = inode->i_size - *offp;
+		nr_segs = iov_shorten((struct iovec *)iov, nr_segs, count);
+	}
+	ret = generic_file_direct_IO(rw, inode, iov, *offp, nr_segs);
+
 	if (ret > 0)
 		*offp += ret;
 out:
@@ -227,15 +231,31 @@ out:
 }
 
 static ssize_t
-raw_read(struct file *filp, char * buf, size_t size, loff_t *offp)
+raw_read(struct file *filp, char *buf, size_t size, loff_t *offp)
 {
-	return rw_raw_dev(READ, filp, buf, size, offp);
+	struct iovec local_iov = { .iov_base = buf, .iov_len = size};
+
+	return rw_raw_dev(READ, filp, &local_iov, 1, offp);
 }
 
 static ssize_t
 raw_write(struct file *filp, const char *buf, size_t size, loff_t *offp)
 {
-	return rw_raw_dev(WRITE, filp, (char *)buf, size, offp);
+	struct iovec local_iov = { .iov_base = buf, .iov_len = size};
+
+	return rw_raw_dev(WRITE, filp, &local_iov, 1, offp);
+}
+
+static ssize_t 
+raw_readv(struct file *filp, const struct iovec *iov, unsigned long nr_segs, loff_t *offp) 
+{
+	return rw_raw_dev(READ, filp, iov, nr_segs, offp);
+}
+
+static ssize_t 
+raw_writev(struct file *filp, const struct iovec *iov, unsigned long nr_segs, loff_t *offp) 
+{
+	return rw_raw_dev(WRITE, filp, iov, nr_segs, offp);
 }
 
 static struct file_operations raw_fops = {
@@ -244,6 +264,8 @@ static struct file_operations raw_fops = {
 	.open	=	raw_open,
 	.release=	raw_release,
 	.ioctl	=	raw_ioctl,
+	.readv	= 	raw_readv,
+	.writev	= 	raw_writev,
 	.owner	=	THIS_MODULE,
 };
 

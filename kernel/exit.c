@@ -115,7 +115,7 @@ int session_of_pgrp(int pgrp)
 
 	fallback = -1;
 	read_lock(&tasklist_lock);
-	for_each_task(p) {
+	for_each_process(p) {
  		if (p->session <= 0)
  			continue;
 		if (p->pgrp == pgrp) {
@@ -141,7 +141,7 @@ static int __will_become_orphaned_pgrp(int pgrp, struct task_struct * ignored_ta
 {
 	struct task_struct *p;
 
-	for_each_task(p) {
+	for_each_process(p) {
 		if ((p == ignored_task) || (p->pgrp != pgrp) ||
 		    (p->state == TASK_ZOMBIE) ||
 		    (p->parent->pid == 1))
@@ -175,7 +175,7 @@ static inline int __has_stopped_jobs(int pgrp)
 	int retval = 0;
 	struct task_struct * p;
 
-	for_each_task(p) {
+	for_each_process(p) {
 		if (p->pgrp != pgrp)
 			continue;
 		if (p->state != TASK_STOPPED)
@@ -465,7 +465,8 @@ static inline void forget_original_parent(struct task_struct * father)
 	 */
 	list_for_each(_p, &father->children) {
 		p = list_entry(_p,struct task_struct,sibling);
-		reparent_thread(p, reaper, child_reaper);
+		if (father == p->real_parent)
+			reparent_thread(p, reaper, child_reaper);
 	}
 	list_for_each(_p, &father->ptrace_children) {
 		p = list_entry(_p,struct task_struct,ptrace_list);
@@ -485,9 +486,16 @@ static inline void zap_thread(task_t *p, task_t *father, int traced)
 		p->ptrace = ptrace_flag;
 		__ptrace_link(p, trace_task);
 	} else {
-		/* Otherwise, if we were tracing this thread, untrace it.  */
+		/*
+		 * Otherwise, if we were tracing this thread, untrace it.
+		 * If we were only tracing the thread (i.e. not its real
+		 * parent), stop here.
+		 */
 		ptrace_unlink (p);
-
+		if (p->parent != father) {
+			BUG_ON(p->parent != p->real_parent);
+			return;
+		}
 		list_del_init(&p->sibling);
 		p->parent = p->real_parent;
 		list_add_tail(&p->sibling, &p->parent->children);
@@ -575,7 +583,6 @@ static void exit_notify(void)
 	 *	jobs, send them a SIGHUP and then a SIGCONT.  (POSIX 3.2.2.2)
 	 */
 
-	current->state = TASK_ZOMBIE;
 	if (current->exit_signal != -1)
 		do_notify_parent(current, current->exit_signal);
 
@@ -584,6 +591,8 @@ static void exit_notify(void)
 	while (!list_empty(&current->ptrace_children))
 		zap_thread(list_entry(current->ptrace_children.next,struct task_struct,ptrace_list), current, 1);
 	BUG_ON(!list_empty(&current->children));
+
+	current->state = TASK_ZOMBIE;
 	/*
 	 * No need to unlock IRQs, we'll schedule() immediately
 	 * anyway. In the preemption case this also makes it
@@ -689,9 +698,9 @@ asmlinkage long sys_exit_group(int error_code)
 	do_exit(sig->group_exit_code);
 }
 
-static inline int eligible_child(pid_t pid, int options, task_t *p)
+static int eligible_child(pid_t pid, int options, task_t *p)
 {
-	if (pid>0) {
+	if (pid > 0) {
 		if (p->pid != pid)
 			return 0;
 	} else if (!pid) {
@@ -716,6 +725,12 @@ static inline int eligible_child(pid_t pid, int options, task_t *p)
 	 * using a signal other than SIGCHLD.) */
 	if (((p->exit_signal != SIGCHLD) ^ ((options & __WCLONE) != 0))
 	    && !(options & __WALL))
+		return 0;
+	/*
+	 * Do not consider thread group leaders that are
+	 * in a non-empty thread group:
+	 */
+	if (current->tgid != p->tgid && delay_group_leader(p))
 		return 0;
 
 	if (security_ops->task_wait(p))
@@ -773,8 +788,12 @@ repeat:
 				current->cstime += p->stime + p->cstime;
 				read_unlock(&tasklist_lock);
 				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
-				if (!retval && stat_addr)
-					retval = put_user(p->exit_code, stat_addr);
+				if (!retval && stat_addr) {
+					if (p->sig->group_exit)
+						retval = put_user(p->sig->group_exit_code, stat_addr);
+					else
+						retval = put_user(p->exit_code, stat_addr);
+				}
 				if (retval)
 					goto end_wait4; 
 				retval = p->pid;

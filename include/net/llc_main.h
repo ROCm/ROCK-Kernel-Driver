@@ -30,7 +30,6 @@
  *
  * @state - state of station
  * @xid_r_count - XID response PDU counter
- * @ack_tmr_running - 1 or 0
  * @mac_sa - MAC source address
  * @sap_list - list of related SAPs
  * @ev_q - events entering state mach.
@@ -40,7 +39,6 @@ struct llc_station {
 	u8			    state;
 	u8			    xid_r_count;
 	struct timer_list	    ack_timer;
-	u8			    ack_tmr_running;
 	u8			    retry_count;
 	u8			    maximum_retry;
 	u8			    mac_sa[6];
@@ -61,8 +59,8 @@ extern void llc_sap_save(struct llc_sap *sap);
 extern void llc_free_sap(struct llc_sap *sap);
 extern struct llc_sap *llc_sap_find(u8 lsap);
 extern struct llc_station *llc_station_get(void);
-extern void llc_station_send_ev(struct llc_station *station,
-				struct sk_buff *skb);
+extern void llc_station_state_process(struct llc_station *station,
+				      struct sk_buff *skb);
 extern void llc_station_send_pdu(struct llc_station *station,
 				 struct sk_buff *skb);
 extern struct sk_buff *llc_alloc_frame(void);
