@@ -130,11 +130,16 @@ static struct ledptr {
  */
 int getkeycode(unsigned int scancode)
 {
-	struct input_handle *handle;
+	struct list_head * node;
 	struct input_dev *dev = NULL;
 
-	for (handle = kbd_handler.handle; handle; handle = handle->hnext) 
-		if (handle->dev->keycodesize) { dev = handle->dev; break; }
+	list_for_each(node,&kbd_handler.h_list) {
+		struct input_handle * handle = to_handle_h(node);
+		if (handle->dev->keycodesize) { 
+			dev = handle->dev; 
+			break;
+		}
+	}
 
 	if (!dev)
 		return -ENODEV;
@@ -147,12 +152,17 @@ int getkeycode(unsigned int scancode)
 
 int setkeycode(unsigned int scancode, unsigned int keycode)
 {
-	struct input_handle *handle;
+	struct list_head * node;
 	struct input_dev *dev = NULL;
 	int i, oldkey;
 
-	for (handle = kbd_handler.handle; handle; handle = handle->hnext) 
-		if (handle->dev->keycodesize) { dev = handle->dev; break; }
+	list_for_each(node,&kbd_handler.h_list) {
+		struct input_handle *handle = to_handle_h(node);
+		if (handle->dev->keycodesize) { 
+			dev = handle->dev; 
+			break; 
+		}
+	}
 
 	if (!dev)
 		return -ENODEV;
@@ -178,27 +188,30 @@ int setkeycode(unsigned int scancode, unsigned int keycode)
  */
 static void kd_nosound(unsigned long ignored)
 {
-	struct input_handle *handle;
+	struct list_head * node;
 
-	for (handle = kbd_handler.handle; handle; handle = handle->hnext)
+	list_for_each(node,&kbd_handler.h_list) {
+		struct input_handle *handle = to_handle_h(node);
 		if (test_bit(EV_SND, handle->dev->evbit)) {
 			if (test_bit(SND_TONE, handle->dev->sndbit))
 				input_event(handle->dev, EV_SND, SND_TONE, 0);
 			if (test_bit(SND_BELL, handle->dev->sndbit))
 				input_event(handle->dev, EV_SND, SND_BELL, 0);
 		}
+	}
 }
 
 static struct timer_list kd_mksound_timer = { function: kd_nosound };
 
 void kd_mksound(unsigned int hz, unsigned int ticks)
 {
-	struct input_handle *handle;
+	struct list_head * node;
 
 	del_timer(&kd_mksound_timer);
 
 	if (hz) {
-		for (handle = kbd_handler.handle; handle; handle = handle->hnext)
+		list_for_each(node,&kbd_handler.h_list) {
+			struct input_handle *handle = to_handle_h(node);
 			if (test_bit(EV_SND, handle->dev->evbit)) {
 				if (test_bit(SND_TONE, handle->dev->sndbit)) {
 					input_event(handle->dev, EV_SND, SND_TONE, hz);
@@ -209,6 +222,7 @@ void kd_mksound(unsigned int hz, unsigned int ticks)
 					break;
 				}
 			}
+		}
 		if (ticks)
 			mod_timer(&kd_mksound_timer, jiffies + ticks);
 	} else
@@ -220,12 +234,13 @@ void kd_mksound(unsigned int hz, unsigned int ticks)
  */
 int kbd_rate(struct kbd_repeat *rep)
 {
-	struct input_handle *handle;
+	struct list_head * node;
 
 	if (rep->rate < 0 || rep->delay < 0)
 		return -EINVAL;
 
-	for (handle = kbd_handler.handle; handle; handle = handle->hnext)
+	list_for_each(node,&kbd_handler.h_list) {
+		struct input_handle *handle = to_handle_h(node);
 		if (test_bit(EV_REP, handle->dev->evbit)) {
 			if (rep->rate > HZ) rep->rate = HZ;
 			handle->dev->rep[REP_PERIOD] = rep->rate ? (HZ / rep->rate) : 0;
@@ -233,7 +248,7 @@ int kbd_rate(struct kbd_repeat *rep)
 			if (handle->dev->rep[REP_DELAY] < handle->dev->rep[REP_PERIOD])
 				handle->dev->rep[REP_DELAY] = handle->dev->rep[REP_PERIOD];
 		}
-	
+	}
 	return 0;
 }
 
@@ -843,11 +858,12 @@ static inline unsigned char getleds(void)
 
 static void kbd_bh(unsigned long dummy)
 {
-	struct input_handle *handle;	
+	struct list_head * node;
 	unsigned char leds = getleds();
 
 	if (leds != ledstate) {
-		for (handle = kbd_handler.handle; handle; handle = handle->hnext) {
+		list_for_each(node,&kbd_handler.h_list) {
+			struct input_handle * handle = to_handle_h(node);
 			input_event(handle->dev, EV_LED, LED_SCROLLL, !!(leds & 0x01));
 			input_event(handle->dev, EV_LED, LED_NUML,    !!(leds & 0x02));
 			input_event(handle->dev, EV_LED, LED_CAPSL,   !!(leds & 0x04));
