@@ -345,6 +345,23 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		dev->weight = *((u32 *) RTA_DATA(ida[IFLA_WEIGHT - 1]));
 	}
 
+	if (ida[IFLA_IFNAME - 1]) {
+		char ifname[IFNAMSIZ];
+
+		if (ida[IFLA_IFNAME - 1]->rta_len > RTA_LENGTH(sizeof(ifname)))
+			goto out;
+
+		memset(ifname, 0, sizeof(ifname));
+		memcpy(ifname, RTA_DATA(ida[IFLA_IFNAME - 1]),
+			RTA_PAYLOAD(ida[IFLA_IFNAME - 1]));
+		ifname[IFNAMSIZ - 1] = '\0';
+
+		err = dev_change_name(dev, ifname);
+
+		if (err)
+			goto out;
+	}
+
 	err = 0;
 
 out:
