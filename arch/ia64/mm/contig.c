@@ -166,6 +166,46 @@ find_memory (void)
 	find_initrd();
 }
 
+#ifdef CONFIG_SMP
+/**
+ * per_cpu_init - setup per-cpu variables
+ *
+ * Allocate and setup per-cpu data areas.
+ */
+void *
+per_cpu_init (void)
+{
+	void *cpu_data;
+	int cpu;
+
+	/*
+	 * get_free_pages() cannot be used before cpu_init() done.  BSP
+	 * allocates "NR_CPUS" pages for all CPUs to avoid that AP calls
+	 * get_zeroed_page().
+	 */
+	if (smp_processor_id() == 0) {
+		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
+					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
+			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
+			cpu_data += PERCPU_PAGE_SIZE;
+			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
+		}
+	}
+	return __per_cpu_start + __per_cpu_offset[smp_processor_id()];
+}
+#endif /* CONFIG_SMP */
+
+static int
+count_pages (u64 start, u64 end, void *arg)
+{
+	unsigned long *count = arg;
+
+	*count += (end - start) >> PAGE_SHIFT;
+	return 0;
+}
+
 #ifdef CONFIG_VIRTUAL_MEM_MAP
 static int
 count_dma_pages (u64 start, u64 end, void *arg)

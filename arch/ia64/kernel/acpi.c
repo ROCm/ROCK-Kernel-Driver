@@ -380,7 +380,7 @@ acpi_numa_processor_affinity_init (struct acpi_table_processor_affinity *pa)
 void __init
 acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 {
-	unsigned long paddr, size, hole_size, min_hole_size;
+	unsigned long paddr, size;
 	u8 pxm;
 	struct node_memblk_s *p, *q, *pend;
 
@@ -401,34 +401,6 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 	/* Ignore disabled entries */
 	if (!ma->flags.enabled)
 		return;
-
-	/*
-	 * When the chunk is not the first one in the node, check distance
-	 * from the other chunks. When the hole is too huge ignore the chunk.
-	 * This restriction should be removed when multiple chunks per node
-	 * is supported.
-	 */
-	pend = &node_memblk[num_memblks];
-	min_hole_size = 0;
-	for (p = &node_memblk[0]; p < pend; p++) {
-		if (p->nid != pxm)
-			continue;
-		if (p->start_paddr < paddr)
-			hole_size = paddr - (p->start_paddr + p->size);
-		else
-			hole_size = p->start_paddr - (paddr + size);
-
-		if (!min_hole_size || hole_size < min_hole_size)
-			min_hole_size = hole_size;
-	}
-
-	if (min_hole_size) {
-		if (min_hole_size > size) {
-			printk(KERN_ERR "Too huge memory hole. Ignoring %ld MBytes at %lx\n",
-			       size/(1024*1024), paddr);
-			return;
-		}
-	}
 
 	/* record this node in proximity bitmap */
 	pxm_bit_set(pxm);

@@ -220,24 +220,8 @@ config NUMA
 	  Access).  This option is for configuring high-end multiprocessor
 	  server systems.  If in doubt, say N.
 
-choice
-	prompt "Maximum Memory per NUMA Node" if NUMA && IA64_DIG
-	depends on NUMA && IA64_DIG
-	default IA64_NODESIZE_16GB
-
-config IA64_NODESIZE_16GB
-	bool "16GB"
-
-config IA64_NODESIZE_64GB
-	bool "64GB"
-
-config IA64_NODESIZE_256GB
-	bool "256GB"
-
-endchoice
-
 config DISCONTIGMEM
-	bool "Discontiguous memory support" if (IA64_DIG || IA64_SGI_SN2 || IA64_GENERIC) && NUMA
+	bool "Discontiguous memory support" if (IA64_DIG || IA64_SGI_SN2 || IA64_GENERIC) && NUMA && VIRTUAL_MEM_MAP
 	default y if (IA64_SGI_SN2 || IA64_GENERIC) && NUMA
 	help
 	  Say Y to support efficient handling of discontiguous physical memory,
@@ -250,14 +234,10 @@ config VIRTUAL_MEM_MAP
 	default y if !IA64_HP_SIM
 	help
 	  Say Y to compile the kernel with support for a virtual mem map.
-	  This is an alternate method of supporting large holes in the
-	  physical address space on non NUMA machines. Since the DISCONTIGMEM
-	  option is not supported on machines with the ZX1 chipset, this is
-	  the only way of supporting more than 1 Gb of memory on those
-	  machines. This code also only takes effect if a memory hole of
-	  greater than 1 Gb is found during boot, so it is safe to enable
-	  unless you require the DISCONTIGMEM option for your machine. If you
-	  are unsure, say Y.
+	  This code also only takes effect if a memory hole of greater than
+	  1 Gb is found during boot.  You must turn this option on if you
+	  require the DISCONTIGMEM option for your machine. If you are
+	  unsure, say Y.
 
 config IA64_MCA
 	bool "Enable IA-64 Machine Check Abort"
