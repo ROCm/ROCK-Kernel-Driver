@@ -326,11 +326,12 @@ struct sock *sctp_err_lookup(int family, struct sk_buff *skb,
 	}
 
 	if (asoc) {
+		sk = asoc->base.sk;
+
 		if (ntohl(sctphdr->vtag) != asoc->c.peer_vtag) {
 			ICMP_INC_STATS_BH(ICMP_MIB_INERRORS);
 			goto out;
 		}
-		sk = asoc->base.sk;
 	} else
 		sk = ep->base.sk;
 
