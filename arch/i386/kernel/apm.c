@@ -1211,6 +1211,7 @@ static int suspend(int vetoable)
 	err = apm_set_power_state(APM_STATE_SUSPEND);
 	reinit_timer();
 	set_time();
+	ignore_normal_resume = 1;
 	sti();
 	if (err == APM_NO_ERROR)
 		err = APM_SUCCESS;
@@ -1219,7 +1220,6 @@ static int suspend(int vetoable)
 	err = (err == APM_SUCCESS) ? 0 : -EIO;
 	pm_send_all(PM_RESUME, (void *)0);
 	queue_event(APM_NORMAL_RESUME, NULL);
-	ignore_normal_resume = 1;
  out:
 	spin_lock(&user_list_lock);
 	for (as = user_list; as != NULL; as = as->next) {
