@@ -2743,9 +2743,8 @@ module_exit(usb_exit);
 
 /*
  * USB may be built into the kernel or be built as modules.
- * If the USB core [and maybe a host controller driver] is built
- * into the kernel, and other device drivers are built as modules,
- * then these symbols need to be exported for the modules to use.
+ * These symbols are exported for device (or host controller)
+ * driver modules to use.
  */
 EXPORT_SYMBOL(usb_ifnum_to_ifpos);
 EXPORT_SYMBOL(usb_ifnum_to_if);
@@ -2762,6 +2761,7 @@ EXPORT_SYMBOL(usb_deregister_dev);
 
 EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_free_dev);
+EXPORT_SYMBOL(usb_hub_tt_clear_buffer);
 
 EXPORT_SYMBOL(usb_find_interface_driver_for_ifnum);
 EXPORT_SYMBOL(usb_driver_claim_interface);
@@ -2799,6 +2799,5 @@ EXPORT_SYMBOL(usb_clear_halt);
 EXPORT_SYMBOL(usb_set_configuration);
 EXPORT_SYMBOL(usb_set_interface);
 
-EXPORT_SYMBOL(usb_make_path);
 EXPORT_SYMBOL(usb_devfs_handle);
 MODULE_LICENSE("GPL");

@@ -149,6 +149,98 @@ static void hub_irq(struct urb *urb)
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 }
 
+/* USB 2.0 spec Section 11.24.2.3 */
+static inline int
+hub_clear_tt_buffer (struct usb_device *hub, u16 devinfo, u16 tt)
+{
+	return usb_control_msg (hub, usb_rcvctrlpipe (hub, 0),
+		HUB_CLEAR_TT_BUFFER, USB_DIR_IN | USB_RECIP_OTHER,
+		devinfo, tt, 0, 0, HZ);
+}
+
+/*
+ * enumeration blocks khubd for a long time. we use keventd instead, since
+ * long blocking there is the exception, not the rule.  accordingly, HCDs
+ * talking to TTs must queue control transfers (not just bulk and iso), so
+ * both can talk to the same hub concurrently.
+ */
+static void hub_tt_kevent (void *arg)
+{
+	struct usb_hub		*hub = arg;
+	unsigned long		flags;
+
+	spin_lock_irqsave (&hub->tt.lock, flags);
+	while (!list_empty (&hub->tt.clear_list)) {
+		struct list_head	*temp;
+		struct usb_tt_clear	*clear;
+		int			status;
+
+		temp = hub->tt.clear_list.next;
+		clear = list_entry (temp, struct usb_tt_clear, clear_list);
+		list_del (&clear->clear_list);
+
+		/* drop lock so HCD can concurrently report other TT errors */
+		spin_unlock_irqrestore (&hub->tt.lock, flags);
+		status = hub_clear_tt_buffer (hub->dev,
+				clear->devinfo, clear->tt);
+		spin_lock_irqsave (&hub->tt.lock, flags);
+
+		if (status)
+			err ("usb-%s-%s clear tt %d (%04x) error %d",
+				hub->dev->bus->bus_name, hub->dev->devpath,
+				clear->tt, clear->devinfo, status);
+		kfree (clear);
+	}
+	spin_unlock_irqrestore (&hub->tt.lock, flags);
+}
+
+/**
+ * usb_hub_tt_clear_buffer - clear control/bulk TT state in high speed hub
+ * @dev: the device whose split transaction failed
+ * @pipe: identifies the endpoint of the failed transaction
+ *
+ * High speed HCDs use this to tell the hub driver that some split control or
+ * bulk transaction failed in a way that requires clearing internal state of
+ * a transaction translator.  This is normally detected (and reported) from
+ * interrupt context.
+ *
+ * It may not be possible for that hub to handle additional full (or low)
+ * speed transactions until that state is fully cleared out.
+ */
+void usb_hub_tt_clear_buffer (struct usb_device *dev, int pipe)
+{
+	struct usb_tt		*tt = dev->tt;
+	unsigned long		flags;
+	struct usb_tt_clear	*clear;
+
+	/* we've got to cope with an arbitrary number of pending TT clears,
+	 * since each TT has "at least two" buffers that can need it (and
+	 * there can be many TTs per hub).  even if they're uncommon.
+	 */
+	if ((clear = kmalloc (sizeof *clear, SLAB_ATOMIC)) == 0) {
+		err ("can't save CLEAR_TT_BUFFER state for hub at usb-%s-%s",
+			dev->bus->bus_name, tt->hub->devpath);
+		/* FIXME recover somehow ... RESET_TT? */
+		return;
+	}
+
+	/* info that CLEAR_TT_BUFFER needs */
+	clear->tt = tt->multi ? dev->ttport : 1;
+	clear->devinfo = usb_pipeendpoint (pipe);
+	clear->devinfo |= dev->devnum << 4;
+	clear->devinfo |= usb_pipecontrol (pipe)
+			? (USB_ENDPOINT_XFER_CONTROL << 11)
+			: (USB_ENDPOINT_XFER_BULK << 11);
+	if (usb_pipein (pipe))
+		clear->devinfo |= 1 << 15;
+	
+	/* tell keventd to clear state for this TT */
+	spin_lock_irqsave (&tt->lock, flags);
+	list_add_tail (&clear->clear_list, &tt->clear_list);
+	schedule_task (&tt->kevent);
+	spin_unlock_irqrestore (&tt->lock, flags);
+}
+
 static void usb_hub_power_on(struct usb_hub *hub)
 {
 	int i;
@@ -231,6 +323,9 @@ static int usb_hub_configure(struct usb_hub *hub,
                         break;
 	}
 
+	spin_lock_init (&hub->tt.lock);
+	INIT_LIST_HEAD (&hub->tt.clear_list);
+	INIT_TQUEUE (&hub->tt.kevent, hub_tt_kevent, hub);
 	switch (dev->descriptor.bDeviceProtocol) {
 		case 0:
 			break;
@@ -431,6 +526,10 @@ static void hub_disconnect(struct usb_device *dev, void *ptr)
 
 	down(&hub->khubd_sem); /* Wait for khubd to leave this hub alone. */
 	up(&hub->khubd_sem);
+
+	/* assuming we used keventd, it must quiesce too */
+	if (hub->tt.hub)
+		flush_scheduled_tasks ();
 
 	if (hub->urb) {
 		usb_unlink_urb(hub->urb);

@@ -363,22 +363,6 @@ struct usb_bus {
 extern int usb_root_hub_string(int id, int serial,
 		char *type, __u8 *data, int len);
 
-/*
- * As of USB 2.0, full/low speed devices are segregated into trees.
- * One type grows from USB 1.1 host controllers (OHCI, UHCI etc).
- * The other type grows from high speed hubs when they connect to
- * full/low speed devices using "Transaction Translators" (TTs).
- *
- * TTs should only be known to the hub driver, and high speed bus
- * drivers (only EHCI for now).  They affect periodic scheduling and
- * sometimes control/bulk error recovery.
- */
-struct usb_tt {
-	struct usb_device	*hub;	/* upstream highspeed hub */
-	int			multi;	/* true means one TT per port */
-};
-
-
 /* -------------------------------------------------------------------------- */
 
 /* This is arbitrary.
@@ -386,6 +370,8 @@ struct usb_tt {
  * have up to 255 ports. The most yet reported is 10.
  */
 #define USB_MAXCHILDREN		(16)
+
+struct usb_tt;
 
 struct usb_device {
 	int		devnum;		/* Address on USB bus */
@@ -1176,6 +1162,7 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
  * appropriately.
  */
 
+/* NOTE:  these are not the standard USB_ENDPOINT_XFER_* values!! */
 #define PIPE_ISOCHRONOUS		0
 #define PIPE_INTERRUPT			1
 #define PIPE_CONTROL			2
