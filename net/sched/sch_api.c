@@ -1172,21 +1172,6 @@ static struct file_operations psched_fops = {
 };	
 #endif
 
-#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
-int psched_tod_diff(int delta_sec, int bound)
-{
-	int delta;
-
-	if (bound <= 1000000 || delta_sec > (0x7FFFFFFF/1000000)-1)
-		return bound;
-	delta = delta_sec * 1000000;
-	if (delta > bound)
-		delta = bound;
-	return delta;
-}
-EXPORT_SYMBOL(psched_tod_diff);
-#endif
-
 #ifdef CONFIG_NET_SCH_CLK_CPU
 psched_tdiff_t psched_clock_per_hz;
 int psched_clock_scale;

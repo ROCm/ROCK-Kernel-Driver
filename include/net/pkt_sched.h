@@ -132,7 +132,18 @@ do {									\
 	   __delta; \
 })
 
-extern int psched_tod_diff(int delta_sec, int bound);
+static inline int
+psched_tod_diff(int delta_sec, int bound)
+{
+	int delta;
+
+	if (bound <= 1000000 || delta_sec > (0x7FFFFFFF/1000000)-1)
+		return bound;
+	delta = delta_sec * 1000000;
+	if (delta > bound)
+		delta = bound;
+	return delta;
+}
 
 #define PSCHED_TDIFF_SAFE(tv1, tv2, bound) \
 ({ \
