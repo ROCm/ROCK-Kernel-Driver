@@ -35,18 +35,12 @@
 #include <linux/ioctl.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
-
 #include "io_16654.h"
 #include "io_usbvend.h"
 #include "io_ti.h"
+
+static int debug;
 
 /*
  * Version Information
@@ -315,8 +309,8 @@ static int TIReadDownloadMemory(struct usb_device *dev, int start_address,
 		}
 
 		if (read_length > 1) {
-			usb_serial_debug_data (__FILE__, __FUNCTION__,
-					       read_length, buffer);
+			usb_serial_debug_data(debug, &dev->dev, __FUNCTION__,
+					      read_length, buffer);
 		}
 
 		/* Update pointers/length */
@@ -357,7 +351,7 @@ static int TIReadBootMemory (struct edgeport_serial *serial, int start_address, 
 	}
 
 	dbg ("%s - start_address = %x, length = %d", __FUNCTION__, start_address, length);
-	usb_serial_debug_data (__FILE__, __FUNCTION__, length, buffer);
+	usb_serial_debug_data(debug, &serial->serial->dev->dev, __FUNCTION__, length, buffer);
 
 	serial->TiReadI2C = 1;
 
@@ -390,7 +384,7 @@ static int TIWriteBootMemory (struct edgeport_serial *serial, int start_address,
 	}
 
   	dbg ("%s - start_sddr = %x, length = %d", __FUNCTION__, start_address, length);
-	usb_serial_debug_data (__FILE__, __FUNCTION__, length, buffer);
+	usb_serial_debug_data(debug, &serial->serial->dev->dev, __FUNCTION__, length, buffer);
 
 	return status;
 }
@@ -412,7 +406,7 @@ static int TIWriteDownloadI2C (struct edgeport_serial *serial, int start_address
 		write_length = length;
 
 	dbg ("%s - BytesInFirstPage Addr = %x, length = %d", __FUNCTION__, start_address, write_length);
-	usb_serial_debug_data (__FILE__, __FUNCTION__, write_length, buffer);
+	usb_serial_debug_data(debug, &serial->serial->dev->dev, __FUNCTION__, write_length, buffer);
 
 	/* Write first page */
 	be_start_address = cpu_to_be16 (start_address);
@@ -439,7 +433,7 @@ static int TIWriteDownloadI2C (struct edgeport_serial *serial, int start_address
 			write_length = length;
 
 		dbg ("%s - Page Write Addr = %x, length = %d", __FUNCTION__, start_address, write_length);
-		usb_serial_debug_data (__FILE__, __FUNCTION__, write_length, buffer);
+		usb_serial_debug_data(debug, &serial->serial->dev->dev, __FUNCTION__, write_length, buffer);
 
 		/* Write next page */
 		be_start_address = cpu_to_be16 (start_address);
@@ -1669,7 +1663,7 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 		
-	usb_serial_debug_data (__FILE__, __FUNCTION__, length, data);
+	usb_serial_debug_data(debug, &edge_serial->serial->dev->dev, __FUNCTION__, length, data);
 		
 	if (length != 2) {
 		dbg ("%s - expecting packet of size 2, got %d", __FUNCTION__, length);
@@ -1761,7 +1755,7 @@ static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
 
 	tty = edge_port->port->tty;
 	if (tty && urb->actual_length) {
-		usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+		usb_serial_debug_data(debug, &edge_port->port->dev, __FUNCTION__, urb->actual_length, data);
 
 		if (edge_port->close_pending) {
 			dbg ("%s - close is pending, dropping data on the floor.", __FUNCTION__);
@@ -2045,7 +2039,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 		memcpy (port->write_urb->transfer_buffer, data, count);
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, count, port->write_urb->transfer_buffer);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, port->write_urb->transfer_buffer);
 
 	/* set up our urb */
 	usb_fill_bulk_urb (port->write_urb, port->serial->dev,

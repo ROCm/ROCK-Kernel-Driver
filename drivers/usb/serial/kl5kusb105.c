@@ -56,16 +56,10 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
- 	static int debug = 1;
-#else
- 	static int debug;
-#endif
-
 #include "usb-serial.h"
 #include "kl5kusb105.h"
 
+static int debug;
 
 /*
  * Version Information
@@ -659,7 +653,8 @@ static void klsi_105_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	} else if (urb->actual_length <= 2) {
 		dbg("%s - size %d URB not understood", __FUNCTION__,
 		    urb->actual_length);
-		usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+		usb_serial_debug_data(debug, &port->dev, __FUNCTION__,
+				      urb->actual_length, data);
 	} else {
 		int i;
 		int bytes_sent = ((__u8 *) data)[0] +
@@ -671,8 +666,8 @@ static void klsi_105_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 		 * intermixed tty_flip_buffer_push()s
 		 * FIXME
 		 */ 
-		usb_serial_debug_data (__FILE__, __FUNCTION__,
-				       urb->actual_length, data);
+		usb_serial_debug_data(debug, &port->dev, __FUNCTION__,
+				      urb->actual_length, data);
 
 		if (bytes_sent + 2 > urb->actual_length) {
 			dbg("%s - trying to read more data than available"

@@ -80,16 +80,11 @@
 #include <linux/usb.h>
 #include <linux/serial_reg.h>
 #include <linux/serial.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
 #include "whiteheat_fw.h"		/* firmware for the ConnectTech WhiteHEAT device */
 #include "whiteheat.h"			/* WhiteHEAT specific commands */
+
+static int debug;
 
 #ifndef CMSPAR
 #define CMSPAR 0
@@ -747,7 +742,7 @@ static int whiteheat_write(struct usb_serial_port *port, int from_user, const un
 			memcpy (urb->transfer_buffer, buf + sent, bytes);
 		}
 
-		usb_serial_debug_data (__FILE__, __FUNCTION__, bytes, urb->transfer_buffer);
+		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, bytes, urb->transfer_buffer);
 
 		urb->dev = serial->dev;
 		urb->transfer_buffer_length = bytes;
@@ -975,10 +970,6 @@ static void command_port_write_callback (struct urb *urb, struct pt_regs *regs)
 		dbg ("nonzero urb status: %d", urb->status);
 		return;
 	}
-
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
-
-	return;
 }
 
 
@@ -997,7 +988,7 @@ static void command_port_read_callback (struct urb *urb, struct pt_regs *regs)
 		return;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &command_port->dev, __FUNCTION__, urb->actual_length, data);
 
 	command_info = usb_get_serial_port_data(command_port);
 	if (!command_info) {
@@ -1059,7 +1050,7 @@ static void whiteheat_read_callback(struct urb *urb, struct pt_regs *regs)
 		return;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 
 	spin_lock(&info->lock);
 	list_add_tail(&wrap->list, &info->rx_urb_q);

@@ -72,18 +72,14 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
+#include "usb-serial.h"
 
 
-#ifndef CONFIG_USB_SERIAL_DEBUG
-#define CONFIG_USB_SERIAL_DEBUG 0
-#endif
 #ifndef CONFIG_USB_SAFE_PADDED
 #define CONFIG_USB_SAFE_PADDED 0
 #endif
 
-static int debug = CONFIG_USB_SERIAL_DEBUG;
-#include "usb-serial.h"		// must follow the declaration of debug
-
+static int debug;
 static int safe = 1;
 static int padded = CONFIG_USB_SAFE_PADDED;
 
@@ -347,7 +343,7 @@ static int safe_write (struct usb_serial_port *port, int from_user, const unsign
 		port->write_urb->transfer_buffer_length = count;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, count, port->write_urb->transfer_buffer);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, port->write_urb->transfer_buffer);
 #ifdef ECHO_TX
 	{
 		int i;

@@ -75,15 +75,10 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
- 	static int debug = 1;
-#else
- 	static int debug;
-#endif
-
 #include "usb-serial.h"
 #include "belkin_sa.h"
+
+static int debug;
 
 /*
  * Version Information
@@ -276,7 +271,7 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 
 	/* Handle known interrupt data */
 	/* ignore data[0] and data[1] */

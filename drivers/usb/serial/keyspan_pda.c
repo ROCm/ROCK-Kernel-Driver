@@ -80,12 +80,7 @@
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
+static int debug;
 
 struct ezusb_hex_record {
 	__u16 address;

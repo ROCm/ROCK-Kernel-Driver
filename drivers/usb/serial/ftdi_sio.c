@@ -253,12 +253,6 @@
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 #include <linux/serial.h>
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
 #include "ftdi_sio.h"
 
@@ -268,6 +262,8 @@
 #define DRIVER_VERSION "v1.4.0"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>, Bill Ryder <bryder@sgi.com>, Kuba Ober <kuba@mareimbrium.org>"
 #define DRIVER_DESC "USB FTDI Serial Converters Driver"
+
+static int debug;
 
 static struct usb_device_id id_table_sio [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_SIO_PID) },
@@ -1492,7 +1488,7 @@ static int ftdi_write (struct usb_serial_port *port, int from_user,
 		}
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, transfer_size, buffer);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, transfer_size, buffer);
 
 	/* fill the buffer and send it */
 	usb_fill_bulk_urb(urb, port->serial->dev, 
@@ -1658,7 +1654,7 @@ static void ftdi_process_read (struct usb_serial_port *port)
 
         /* The first two bytes of every read packet are status */
 	if (urb->actual_length > 2) {
-		usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 	} else {
                 dbg("Status only: %03oo %03oo",data[0],data[1]);
         }

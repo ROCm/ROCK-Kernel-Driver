@@ -49,13 +49,6 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
 #include "pl2303.h"
 
@@ -65,7 +58,7 @@
 #define DRIVER_VERSION "v0.11"
 #define DRIVER_DESC "Prolific PL2303 USB to serial adaptor driver"
 
-
+static int debug;
 
 static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(PL2303_VENDOR_ID, PL2303_PRODUCT_ID) },
@@ -251,7 +244,7 @@ static int pl2303_write (struct usb_serial_port *port, int from_user,  const uns
 		memcpy (port->write_urb->transfer_buffer, buf, count);
 	}
 	
-	usb_serial_debug_data (__FILE__, __FUNCTION__, count, port->write_urb->transfer_buffer);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, port->write_urb->transfer_buffer);
 
 	port->write_urb->transfer_buffer_length = count;
 	port->write_urb->dev = port->serial->dev;
@@ -716,7 +709,7 @@ static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs)
 	}
 
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
 
 	if (urb->actual_length < UART_STATE)
 		goto exit;
@@ -770,7 +763,7 @@ static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 		return;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 
 	/* get tty_flag from status */
 	tty_flag = TTY_NORMAL;

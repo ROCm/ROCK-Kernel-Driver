@@ -107,19 +107,11 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-	#define DEBUG
-#else
-	static int debug;
-	#undef DEBUG
-#endif
-
 #include <linux/usb.h>
-
 #include "usb-serial.h"
 #include "keyspan.h"
+
+static int debug;
 
 /*
  * Version Information

@@ -56,13 +56,6 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug = 0;
-#endif
-
 #include "usb-serial.h"
 #include "ipaq.h"
 
@@ -77,6 +70,7 @@
 #define DRIVER_DESC "USB PocketPC PDA driver"
 
 static __u16 product, vendor;
+static int debug;
 
 /* Function prototypes for an ipaq */
 static int  ipaq_open (struct usb_serial_port *port, struct file *filp);
@@ -315,7 +309,7 @@ static void ipaq_read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 		return;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
 	if (tty && urb->actual_length) {
@@ -396,7 +390,7 @@ static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const un
 	} else {
 		memcpy(pkt->data, buf, count);
 	}
-	usb_serial_debug_data(__FILE__, __FUNCTION__, count, pkt->data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, pkt->data);
 
 	pkt->len = count;
 	pkt->written = 0;

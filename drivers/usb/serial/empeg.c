@@ -63,14 +63,9 @@
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
+
+static int debug;
 
 /*
  * Version Information
@@ -249,7 +244,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 			memcpy (urb->transfer_buffer, current_position, transfer_size);
 		}
 
-		usb_serial_debug_data (__FILE__, __FUNCTION__, transfer_size, urb->transfer_buffer);
+		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, transfer_size, urb->transfer_buffer);
 
 		/* build up our urb */
 		usb_fill_bulk_urb (
@@ -365,7 +360,7 @@ static void empeg_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 		return;
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
 

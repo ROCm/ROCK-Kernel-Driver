@@ -48,18 +48,10 @@
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 #include <linux/ioctl.h>
-
-
-#include "kobil_sct.h"
-//#include "../core/usb-debug.c"
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-
 #include "usb-serial.h"
+#include "kobil_sct.h"
+
+static int debug;
 
 /* Version Information */
 #define DRIVER_VERSION "21/05/2004"
@@ -456,7 +448,7 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 		memcpy (priv->buf + priv->filled, buf, count);
 	}
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, count, priv->buf + priv->filled);
+	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, priv->buf + priv->filled);
 
 	priv->filled = priv->filled + count;
 
