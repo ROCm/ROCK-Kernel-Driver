@@ -323,6 +323,15 @@ EXPORT_SYMBOL(xfrm_policy_flush);
 EXPORT_SYMBOL(xfrm_policy_byid);
 EXPORT_SYMBOL(xfrm_policy_list);
 
+EXPORT_SYMBOL_GPL(xfrm_probe_algs);
+EXPORT_SYMBOL_GPL(xfrm_count_auth_supported);
+EXPORT_SYMBOL_GPL(xfrm_count_enc_supported);
+EXPORT_SYMBOL_GPL(xfrm_aalg_get_byidx);
+EXPORT_SYMBOL_GPL(xfrm_ealg_get_byidx);
+EXPORT_SYMBOL_GPL(xfrm_aalg_get_byid);
+EXPORT_SYMBOL_GPL(xfrm_ealg_get_byid);
+EXPORT_SYMBOL_GPL(xfrm_aalg_get_byname);
+EXPORT_SYMBOL_GPL(xfrm_ealg_get_byname);
 
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
 /* inet functions common to v4 and v6 */

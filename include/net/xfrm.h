@@ -1,12 +1,18 @@
+#ifndef _NET_XFRM_H
+#define _NET_XFRM_H
+
 #include <linux/xfrm.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/crypto.h>
+#include <linux/pfkeyv2.h>
 
 #include <net/dst.h>
 #include <net/route.h>
+
+#define XFRM_ALIGN8(len)	(((len) + 7) & ~7)
 
 extern struct semaphore xfrm_cfg_sem;
 
@@ -347,6 +353,29 @@ static inline void xfrm_sk_free_policy(struct sock *sk)
 	}
 }
 
+/*
+ * xfrm algorithm information
+ */
+struct xfrm_algo_auth_info {
+	u16 icv_truncbits;
+	u16 icv_fullbits;
+};
+
+struct xfrm_algo_encr_info {
+	u16 blockbits;
+	u16 defkeybits;
+};
+
+struct xfrm_algo_desc {
+	char *name;
+	u8 available:1;
+	union {
+		struct xfrm_algo_auth_info auth;
+		struct xfrm_algo_encr_info encr;
+	} uinfo;
+	struct sadb_alg desc;
+};
+
 extern void xfrm_state_init(void);
 extern void xfrm_input_init(void);
 extern int xfrm_state_walk(u8 proto, int (*func)(struct xfrm_state *, int, void*), void *);
@@ -385,3 +414,15 @@ extern wait_queue_head_t km_waitq;
 extern void km_warn_expired(struct xfrm_state *x);
 extern void km_expired(struct xfrm_state *x);
 extern int km_query(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *pol);
+
+extern void xfrm_probe_algs(void);
+extern int xfrm_count_auth_supported(void);
+extern int xfrm_count_enc_supported(void);
+extern struct xfrm_algo_desc *xfrm_aalg_get_byidx(unsigned int idx);
+extern struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx);
+extern struct xfrm_algo_desc *xfrm_aalg_get_byid(int alg_id);
+extern struct xfrm_algo_desc *xfrm_ealg_get_byid(int alg_id);
+extern struct xfrm_algo_desc *xfrm_aalg_get_byname(char *name);
+extern struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name);
+
+#endif	/* _NET_XFRM_H */
