@@ -513,6 +513,7 @@ static int loop_transfer_bio(struct loop_device *lo,
 					from_bvec->bv_len, IV);
 		kunmap(from_bvec->bv_page);
 		kunmap(to_bvec->bv_page);
+		IV += from_bvec->bv_len >> 9;
 	}
 
 	return ret;
