@@ -377,7 +377,7 @@ static int list_devices(struct dm_ioctl *param, size_t param_size)
 	for (i = 0; i < NUM_BUCKETS; i++) {
 		list_for_each_entry (hc, _name_buckets + i, name_list) {
 			needed += sizeof(struct dm_name_list);
-			needed += strlen(hc->name);
+			needed += strlen(hc->name) + 1;
 			needed += ALIGN_MASK;
 		}
 	}
