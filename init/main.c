@@ -68,6 +68,7 @@ extern void sysctl_init(void);
 extern void signals_init(void);
 extern void buffer_init(void);
 extern void pidhash_init(void);
+extern void pidmap_init(void);
 extern void pte_chain_init(void);
 extern void radix_tree_init(void);
 extern void free_initmem(void);
@@ -394,6 +395,7 @@ asmlinkage void __init start_kernel(void)
 	extable_init();
 	rcu_init();
 	init_IRQ();
+	pidhash_init();
 	sched_init();
 	softirq_init();
 	time_init();
@@ -419,7 +421,7 @@ asmlinkage void __init start_kernel(void)
 	page_address_init();
 	mem_init();
 	kmem_cache_sizes_init();
-	pidhash_init();
+	pidmap_init();
 	pgtable_cache_init();
 	pte_chain_init();
 	fork_init(num_physpages);

@@ -23,10 +23,11 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/hash.h>
 
-#define PIDHASH_SIZE 4096
-#define pid_hashfn(nr) ((nr >> 8) ^ nr) & (PIDHASH_SIZE - 1)
-static struct list_head pid_hash[PIDTYPE_MAX][PIDHASH_SIZE];
+#define pid_hashfn(nr) hash_long((unsigned long)nr, pidhash_shift)
+static struct list_head *pid_hash[PIDTYPE_MAX];
+static int pidhash_shift;
 
 int pid_max = PID_MAX_DEFAULT;
 int last_pid;
@@ -258,20 +259,46 @@ void switch_exec_pids(task_t *leader, task_t *thread)
 	attach_pid(leader, PIDTYPE_SID, leader->session);
 }
 
+/*
+ * The pid hash table is scaled according to the amount of memory in the
+ * machine.  From a minimum of 16 slots up to 4096 slots at one gigabyte or
+ * more.
+ */
 void __init pidhash_init(void)
 {
-	int i, j;
+	int i, j, pidhash_size;
+	unsigned long megabytes = max_pfn >> (20 - PAGE_SHIFT);
 
-	/*
-	 * Allocate PID 0, and hash it via all PID types:
-	 */
+	pidhash_shift = max(4, fls(megabytes * 4));
+	pidhash_shift = min(12, pidhash_shift);
+	pidhash_size = 1 << pidhash_shift;
+
+	printk("PID hash table entries: %d (order %d: %d bytes)\n",
+		pidhash_size, pidhash_shift,
+		pidhash_size * sizeof(struct list_head));
+
+	for (i = 0; i < PIDTYPE_MAX; i++) {
+		pid_hash[i] = alloc_bootmem(pidhash_size *
+					sizeof(struct list_head));
+		if (!pid_hash[i])
+			panic("Could not alloc pidhash!\n");
+		for (j = 0; j < pidhash_size; j++)
+			INIT_LIST_HEAD(&pid_hash[i][j]);
+	}
+}
+
+void __init pidmap_init(void)
+{
+	int i;
+
 	pidmap_array->page = (void *)get_zeroed_page(GFP_KERNEL);
 	set_bit(0, pidmap_array->page);
 	atomic_dec(&pidmap_array->nr_free);
 
-	for (i = 0; i < PIDTYPE_MAX; i++) {
-		for (j = 0; j < PIDHASH_SIZE; j++)
-			INIT_LIST_HEAD(&pid_hash[i][j]);
+	/*
+	 * Allocate PID 0, and hash it via all PID types:
+	 */
+
+	for (i = 0; i < PIDTYPE_MAX; i++)
 		attach_pid(current, i, 0);
-	}
 }
