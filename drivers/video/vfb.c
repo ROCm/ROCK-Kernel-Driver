@@ -24,8 +24,6 @@
 #include <linux/fb.h>
 #include <linux/init.h>
 
-#include <video/fbcon.h>
-
     /*
      *  RAM we reserve for the frame buffer. This defines the maximum screen
      *  size
@@ -42,7 +40,6 @@ static const char *mode_option __initdata = NULL;
 
 static struct fb_info fb_info;
 static u32 vfb_pseudo_palette[17];
-static struct display disp;
 
 static struct fb_var_screeninfo vfb_default __initdata = {
 	.xres =		640,
@@ -90,23 +87,21 @@ static int vfb_check_var(struct fb_var_screeninfo *var,
 static int vfb_set_par(struct fb_info *info);
 static int vfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			 u_int transp, struct fb_info *info);
-static int vfb_pan_display(struct fb_var_screeninfo *var, int con,
+static int vfb_pan_display(struct fb_var_screeninfo *var,
 			   struct fb_info *info);
 static int vfb_mmap(struct fb_info *info, struct file *file,
 		    struct vm_area_struct *vma);
 
 static struct fb_ops vfb_ops = {
-	.fb_set_var	gen_set_var,
-	.fb_get_cmap	gen_set_cmap,
-	.fb_set_cmap	gen_set_cmap,
-	.fb_check_var	vfb_check_var,
-	.fb_set_par	vfb_set_par,
-	.fb_setcolreg	vfb_setcolreg,
-	.fb_pan_display	vfb_pan_display,
-	.fb_fillrect	cfb_fillrect,
-	.fb_copyarea	cfb_copyarea,
-	.fb_imageblit	cfb_imageblit,
-	.fb_mmap	vfb_mmap,
+	.fb_check_var	= vfb_check_var,
+	.fb_set_par	= vfb_set_par,
+	.fb_setcolreg	= vfb_setcolreg,
+	.fb_pan_display	= vfb_pan_display,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= soft_cursor,
+	.fb_mmap	= vfb_mmap,
 };
 
     /*
@@ -356,7 +351,7 @@ static int vfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
      *  This call looks only at xoffset, yoffset and the FB_VMODE_YWRAP flag
      */
 
-static int vfb_pan_display(struct fb_var_screeninfo *var, int con,
+static int vfb_pan_display(struct fb_var_screeninfo *var,
 			   struct fb_info *info)
 {
 	if (var->vmode & FB_VMODE_YWRAP) {
@@ -444,13 +439,6 @@ int __init vfb_init(void)
 	fb_info.pseudo_palette = &vfb_pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-	strcpy(fb_info.modename, vfb_fix.id);
-	fb_info.changevar = NULL;
-	fb_info.currcon = -1;
-	fb_info.disp = &disp;
-	fb_info.switch_con = gen_switch;
-	fb_info.updatevar = gen_update_var;
-
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 
 	if (register_framebuffer(&fb_info) < 0) {
@@ -460,7 +448,7 @@ int __init vfb_init(void)
 
 	printk(KERN_INFO
 	       "fb%d: Virtual frame buffer device, using %ldK of video memory\n",
-	       GET_FB_IDX(fb_info.node), videomemorysize >> 10);
+	       minor(fb_info.node), videomemorysize >> 10);
 	return 0;
 }
 
