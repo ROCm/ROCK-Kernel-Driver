@@ -1066,7 +1066,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	if (mp->m_logbufs == 0) {
 		xlog_debug = 0;
 		xlog_devt = log->l_dev;
-		log->l_iclog_bufs = XLOG_NUM_ICLOGS;
+		log->l_iclog_bufs = XLOG_MIN_ICLOGS;
 	} else
 #endif
 	{
@@ -1074,9 +1074,16 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 		 * This is the normal path.  If m_logbufs == -1, then the
 		 * admin has chosen to use the system defaults for logbuffers.
 		 */
-		if (mp->m_logbufs == -1)
-			log->l_iclog_bufs = XLOG_NUM_ICLOGS;
-		else
+		if (mp->m_logbufs == -1) { 
+			if (xfs_physmem <= btoc(128*1024*1024)) { 
+				log->l_iclog_bufs = XLOG_MIN_ICLOGS; 
+			} else if (xfs_physmem <= btoc(400*1024*1024)) { 
+				log->l_iclog_bufs = XLOG_MED_ICLOGS;; 
+			} else {
+				/* 256K with 32K bufs */
+				log->l_iclog_bufs = XLOG_MAX_ICLOGS;
+			}
+		} else
 			log->l_iclog_bufs = mp->m_logbufs;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
