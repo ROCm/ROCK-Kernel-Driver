@@ -573,7 +573,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				break;
 
 			default:
-				retval = -EINVAL;
+				retval = -ENOTTY;
 		}
 	else	/* old-style ioctl value */
 		switch (cmd) {
@@ -590,7 +590,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				break;
 
 			default:
-				retval = -EINVAL;
+				retval = -ENOTTY;
 		}
 
 done:
