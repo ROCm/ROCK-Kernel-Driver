@@ -1,3 +1,25 @@
+2002-01-28  Stefan Rompf  <srompf@isg.de>,
+            Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+        * 21142.c (t21142_timer):  Use return value of
+        tulip_check_duplex() to indicate to system whether or not
+        carrier is present.  Use carrier presence/absence to determine
+        when next the 21142 media timer should check for link beat.
+
+        * timer (tulip_timer):  Un-comment-out calls to
+        netif_carrier_{on,off}, as there is now value in
+        reporting link beta information to userspace.
+
+2002-01-28  Pavel Roskin  <proski@gnu.org>
+
+	* tulip_core.c (tulip_init_one): Use tp->eeprom instead of
+	allocating a buffer for EEPROM copy on the stack.
+
+	* tulip_core.c: Add support for Conexant RS7112 (a.k.a. CN7112)
+	chip.
+	* tulip.h: Likewise.  Increase EEPROM_SIZE to 512 bytes to
+	accomodate EEPROM on Conexant RS7112.
+
 2002-02-07  Uwe Bonnes  <bon@elektron.ikp.physik.tu-darmstadt.de>
 
         * tulip_core (tulip_pci_tbl[]):

@@ -39,8 +39,13 @@ void t21142_timer(unsigned long data)
 		printk(KERN_INFO"%s: 21143 negotiation status %8.8x, %s.\n",
 			   dev->name, csr12, medianame[dev->if_port]);
 	if (tulip_media_cap[dev->if_port] & MediaIsMII) {
-		tulip_check_duplex(dev);
-		next_tick = 60*HZ;
+		if (tulip_check_duplex(dev) < 0) {
+			netif_carrier_off(dev);
+			next_tick = 3*HZ;
+		} else {
+			netif_carrier_on(dev);
+			next_tick = 60*HZ;
+		}
 	} else if (tp->nwayset) {
 		/* Don't screw up a negotiated session! */
 		if (tulip_debug > 1)

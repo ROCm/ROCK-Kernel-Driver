@@ -1154,6 +1154,17 @@ CONFIG_NATSEMI
   More specific information and updates are available from
   <http://www.scyld.com/network/natsemi.html>.
 
+CONFIG_NATSEMI_CABLE_MAGIC
+  Some systems see lots of errors with NatSemi ethernet controllers
+  on certain cables.  If you are seeing lots of errors, try turning
+  this option on.  Some boards have incorrect values for supporting
+  resistors that can cause this change to break.  If you turn this
+  option on and your network suddenly stops working, turn this
+  option off.
+
+  Say N unless you are certain you need this option.
+  Vendors should not enable this option by default.
+
 CONFIG_SK_G16
   If you have a network (Ethernet) card of this type, say Y and read
   the Ethernet-HOWTO, available from

@@ -37,7 +37,6 @@ static int	nfsctl_addclient(struct nfsctl_client *data);
 static int	nfsctl_delclient(struct nfsctl_client *data);
 static int	nfsctl_export(struct nfsctl_export *data);
 static int	nfsctl_unexport(struct nfsctl_export *data);
-static int	nfsctl_getfh(struct nfsctl_fhparm *, __u8 *);
 static int	nfsctl_getfd(struct nfsctl_fdparm *, __u8 *);
 static int	nfsctl_getfs(struct nfsctl_fsparm *, struct knfsd_fh *);
 #ifdef notyet
@@ -125,7 +124,7 @@ nfsctl_getfs(struct nfsctl_fsparm *data, struct knfsd_fh *res)
 	if (!(clp = exp_getclient(sin)))
 		err = -EPERM;
 	else
-		err = exp_rootfh(clp, NODEV, 0, data->gd_path, res, data->gd_maxlen);
+		err = exp_rootfh(clp, data->gd_path, res, data->gd_maxlen);
 	exp_unlock();
 	return err;
 }
@@ -148,40 +147,7 @@ nfsctl_getfd(struct nfsctl_fdparm *data, __u8 *res)
 	if (!(clp = exp_getclient(sin)))
 		err = -EPERM;
 	else
-		err = exp_rootfh(clp, NODEV, 0, data->gd_path, &fh, NFS_FHSIZE);
-	exp_unlock();
-
-	if (err == 0) {
-		if (fh.fh_size > NFS_FHSIZE)
-			err = -EINVAL;
-		else {
-			memset(res,0, NFS_FHSIZE);
-			memcpy(res, &fh.fh_base, fh.fh_size);
-		}
-	}
-
-	return err;
-}
-
-static inline int
-nfsctl_getfh(struct nfsctl_fhparm *data, __u8 *res)
-{
-	struct sockaddr_in	*sin;
-	struct svc_client	*clp;
-	int			err = 0;
-	struct knfsd_fh		fh;
-
-	if (data->gf_addr.sa_family != AF_INET)
-		return -EPROTONOSUPPORT;
-	if (data->gf_version < 2 || data->gf_version > NFSSVC_MAXVERS)
-		return -EINVAL;
-	sin = (struct sockaddr_in *)&data->gf_addr;
-
-	exp_readlock();
-	if (!(clp = exp_getclient(sin)))
-		err = -EPERM;
-	else
-		err = exp_rootfh(clp, to_kdev_t(data->gf_dev), data->gf_ino, NULL, &fh, NFS_FHSIZE);
+		err = exp_rootfh(clp, data->gd_path, &fh, NFS_FHSIZE);
 	exp_unlock();
 
 	if (err == 0) {
@@ -277,9 +243,6 @@ asmlinkage handle_sys_nfsservctl(int cmd, void *opaque_argp, void *opaque_resp)
 		err = nfsctl_ugidupdate(&arg->ca_umap);
 		break;
 #endif
-	case NFSCTL_GETFH:
-		err = nfsctl_getfh(&arg->ca_getfh, res->cr_getfh);
-		break;
 	case NFSCTL_GETFD:
 		err = nfsctl_getfd(&arg->ca_getfd, res->cr_getfh);
 		break;
