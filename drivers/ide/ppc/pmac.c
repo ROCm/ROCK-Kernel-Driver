@@ -1240,6 +1240,7 @@ pmac_ide_dma_read (ide_drive_t *drive)
 //	ide_task_t *args = rq->special;
 	u8 unit = (drive->select.b.unit & 0x01);
 	u8 ata4;
+	u8 lba48 = (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command = WIN_NOP;
 
 	if (pmif == NULL)
@@ -1271,7 +1272,7 @@ pmac_ide_dma_read (ide_drive_t *drive)
 		command = args->tfRegister[IDE_COMMAND_OFFSET];
 	}
 #else
-	command = rq_lba48(rq) ? WIN_READDMA_EXT : WIN_READDMA;
+	command = (lba48) ? WIN_READDMA_EXT : WIN_READDMA;
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		command = args->tfRegister[IDE_COMMAND_OFFSET];
@@ -1292,6 +1293,7 @@ pmac_ide_dma_write (ide_drive_t *drive)
 //	ide_task_t *args = rq->special;
 	u8 unit = (drive->select.b.unit & 0x01);
 	u8 ata4;
+	u8 lba48 = (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command = WIN_NOP;
 
 	if (pmif == NULL)
@@ -1323,7 +1325,7 @@ pmac_ide_dma_write (ide_drive_t *drive)
 		command = args->tfRegister[IDE_COMMAND_OFFSET];
 	}
 #else
-	command = rq_lba48(rq) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
+	command = (lba48) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		command = args->tfRegister[IDE_COMMAND_OFFSET];

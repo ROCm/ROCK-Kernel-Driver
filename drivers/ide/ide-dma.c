@@ -653,7 +653,7 @@ int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= HWGROUP(drive)->rq;
 	unsigned int reading	= 1 << 3;
-	u8 lba48		= rq_lba48(rq);
+	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command	= WIN_NOP;
 
 	/* try pio */
@@ -685,7 +685,7 @@ int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= HWGROUP(drive)->rq;
 	unsigned int reading	= 0;
-	u8 lba48		= rq_lba48(rq);
+	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command	= WIN_NOP;
 
 	/* try PIO instead of DMA */

@@ -657,7 +657,7 @@ static int icside_dma_read(ide_drive_t *drive)
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	} else if (rq_lba48(rq)) {
+	} else if (drive->addressing == 1) {
 		cmd = WIN_READDMA_EXT;
 	} else {
 		cmd = WIN_READDMA;
@@ -698,7 +698,7 @@ int icside_dma_write(ide_drive_t *drive)
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		cmd = args->tfRegister[IDE_COMMAND_OFFSET];
-	} else if (rq_lba48(rq)) {
+	} else if (drive->addressing == 1) {
 		cmd = WIN_WRITEDMA_EXT;
 	} else {
 		cmd = WIN_WRITEDMA;

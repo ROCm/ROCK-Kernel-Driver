@@ -400,20 +400,9 @@ u8 ide_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 			if (err & MARK_ERR)	printk("AddrMarkNotFound ");
 			printk("}");
 			if ((err & (BBD_ERR | ABRT_ERR)) == BBD_ERR || (err & (ECC_ERR|ID_ERR|MARK_ERR))) {
-				struct request *rq = HWGROUP(drive)->rq;
-				int lba48 = drive->addressing;
-
-				if (rq) {
-					if (rq->flags & REQ_DRIVE_TASKFILE) {
-						ide_task_t *t = rq->special;
-						lba48 = t->addressing;
-					} else
-						lba48 = rq_lba48(rq);
-				}
-
 				if ((drive->id->command_set_2 & 0x0400) &&
 				    (drive->id->cfs_enable_2 & 0x0400) &&
-				    lba48) {
+				    (drive->addressing == 1)) {
 					u64 sectors = 0;
 					u32 high = 0;
 					u32 low = ide_read_24(drive);

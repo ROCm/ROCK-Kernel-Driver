@@ -138,7 +138,7 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 	ide_hwif_t *hwif	= HWIF(drive);
 	task_struct_t *taskfile	= (task_struct_t *) task->tfRegister;
 	hob_struct_t *hobfile	= (hob_struct_t *) task->hobRegister;
-	u8 HIHI			= (task->addressing == 1) ? 0xE0 : 0xEF;
+	u8 HIHI			= (drive->addressing == 1) ? 0xE0 : 0xEF;
 
 #ifdef CONFIG_IDE_TASK_IOCTL_DEBUG
 	void debug_taskfile(drive, task);
@@ -151,7 +151,7 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 	}
 	SELECT_MASK(drive, 0);
 
-	if (task->addressing == 1) {
+	if (drive->addressing == 1) {
 		hwif->OUTB(hobfile->feature, IDE_FEATURE_REG);
 		hwif->OUTB(hobfile->sector_count, IDE_NSECTOR_REG);
 		hwif->OUTB(hobfile->sector_number, IDE_SECTOR_REG);
@@ -241,7 +241,7 @@ void ide_end_taskfile (ide_drive_t *drive, u8 stat, u8 err)
 	args->tfRegister[IDE_STATUS_OFFSET]  = stat;
 	if ((drive->id->command_set_2 & 0x0400) &&
 	    (drive->id->cfs_enable_2 & 0x0400) &&
-	    (args->addressing == 1)) {
+	    (drive->addressing == 1)) {
 		hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG_HOB);
 		args->hobRegister[IDE_FEATURE_OFFSET_HOB] = hwif->INB(IDE_FEATURE_REG);
 		args->hobRegister[IDE_NSECTOR_OFFSET_HOB] = hwif->INB(IDE_NSECTOR_REG);
@@ -1272,13 +1272,6 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 	args.data_phase   = req_task->data_phase;
 	args.command_type = req_task->req_cmd;
 
-	/*
-	 * this forces 48-bit commands if the drive is configured to do so.
-	 * it would also be possible to lookup the command type based on the
-	 * opcode, but this is way simpler.
-	 */
-	args.addressing = drive->addressing;
-
 #ifdef CONFIG_IDE_TASK_IOCTL_DEBUG
 	DTF("%s: ide_ioctl_cmd %s:  ide_task_cmd %s\n",
 		drive->name,
@@ -1618,13 +1611,13 @@ ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task)
 	 */
 	if (task->tf_out_flags.all == 0) {
 		task->tf_out_flags.all = IDE_TASKFILE_STD_OUT_FLAGS;
-		if (task->addressing == 1)
+		if (drive->addressing == 1)
 			task->tf_out_flags.all |= (IDE_HOB_STD_OUT_FLAGS << 8);
         }
 
 	if (task->tf_in_flags.all == 0) {
 		task->tf_in_flags.all = IDE_TASKFILE_STD_IN_FLAGS;
-		if (task->addressing == 1)
+		if (drive->addressing == 1)
 			task->tf_in_flags.all |= (IDE_HOB_STD_IN_FLAGS  << 8);
         }
 

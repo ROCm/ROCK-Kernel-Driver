@@ -846,12 +846,6 @@ static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned l
 		bio_kunmap_irq(buffer, flags);
 }
 
-/*
- * must be addressed with 48-bit lba
- */
-#define rq_lba48(rq)	\
-	(((rq)->sector + (rq)->nr_sectors) > 0xfffffff || rq->nr_sectors > 256)
-
 #define IDE_CHIPSET_PCI_MASK	\
     ((1<<ide_pci)|(1<<ide_cmd646)|(1<<ide_ali14xx))
 #define IDE_CHIPSET_IS_PCI(c)	((IDE_CHIPSET_PCI_MASK >> (c)) & 1)
@@ -1393,7 +1387,6 @@ typedef struct ide_task_s {
 	ide_reg_valid_t		tf_in_flags;
 	int			data_phase;
 	int			command_type;
-	int			addressing;	/* 1 for 48-bit */
 	ide_pre_handler_t	*prehandler;
 	ide_handler_t		*handler;
 	ide_post_handler_t	*posthandler;

@@ -205,7 +205,7 @@ void ide_end_drive_cmd (ide_drive_t *drive, u8 stat, u8 err)
 			args->tfRegister[IDE_SELECT_OFFSET]  = hwif->INB(IDE_SELECT_REG);
 			args->tfRegister[IDE_STATUS_OFFSET]  = stat;
 
-			if (args->addressing == 1) {
+			if (drive->addressing == 1) {
 				hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG_HOB);
 				args->hobRegister[IDE_FEATURE_OFFSET_HOB] = hwif->INB(IDE_FEATURE_REG);
 				args->hobRegister[IDE_NSECTOR_OFFSET_HOB] = hwif->INB(IDE_NSECTOR_REG);

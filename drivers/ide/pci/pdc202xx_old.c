@@ -535,9 +535,8 @@ static int pdc202xx_quirkproc (ide_drive_t *drive)
 
 static int pdc202xx_old_ide_dma_begin(ide_drive_t *drive)
 {
-	struct request *rq = HWGROUP(drive)->rq;
-
-	if (rq_lba48(rq)) {
+	if (drive->addressing == 1) {
+		struct request *rq	= HWGROUP(drive)->rq;
 		ide_hwif_t *hwif	= HWIF(drive);
 //		struct pci_dev *dev	= hwif->pci_dev;
 //		unsgned long high_16	= pci_resource_start(dev, 4);
@@ -558,9 +557,7 @@ static int pdc202xx_old_ide_dma_begin(ide_drive_t *drive)
 
 static int pdc202xx_old_ide_dma_end(ide_drive_t *drive)
 {
-	struct request *rq = HWGROUP(drive)->rq;
-
-	if (rq_lba48(rq)) {
+	if (drive->addressing == 1) {
 		ide_hwif_t *hwif	= HWIF(drive);
 //		unsigned long high_16	= pci_resource_start(hwif->pci_dev, 4);
 		unsigned long high_16	= hwif->dma_master;
