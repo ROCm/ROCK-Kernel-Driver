@@ -434,7 +434,7 @@ typedef struct irnet_socket
 
   /* ------------------- IrLMP and IrIAS part ------------------- */
   /* Used for IrDA Discovery and socket name resolution */
-  __u32			ckey;		/* IrLMP client handle */
+  void *		ckey;		/* IrLMP client handle */
   __u16			mask;		/* Hint bits mask (filter discov.)*/
   int			nslots;		/* Number of slots for discovery */
 

@@ -53,7 +53,7 @@ typedef struct irnet_root
    * reentrant, beware... So, we blindly protect all with spinlock */
 
   /* Handle for the hint bit advertised in IrLMP */
-  __u32			skey;
+  void *		skey;
 
   /* Server socket part */
   struct ias_object *	ias_obj;	/* Our service name + lsap in IAS */

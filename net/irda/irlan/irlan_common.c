@@ -64,7 +64,8 @@
  *  Master structure
  */
 hashbin_t *irlan = NULL;
-static __u32 ckey, skey;
+static void *ckey;
+static void *skey;
 
 /* Module parameters */
 static int eth = 0; /* Use "eth" or "irlan" name for devices */
