@@ -21,6 +21,7 @@
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/topology.h>
+#include <linux/interrupt.h>
 #include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
@@ -30,6 +31,12 @@
 #include <asm/cacheflush.h>
 #include <asm/kdebug.h>
 #include <asm/proto.h>
+
+#ifdef CONFIG_PREEMPT
+#define preempt_atomic() in_atomic()
+#else
+#define preempt_atomic() 1
+#endif
 
 dma_addr_t bad_dma_address;
 
@@ -96,6 +103,8 @@ AGPEXTERN __u32 *agp_gatt_table;
 
 static unsigned long next_bit;  /* protected by iommu_bitmap_lock */
 static int need_flush; 		/* global flush state. set for each gart wrap */
+static dma_addr_t pci_map_area(struct pci_dev *dev, unsigned long phys_mem, 
+			       size_t size, int dir);
 
 static unsigned long alloc_iommu(int size) 
 { 	
@@ -169,43 +178,44 @@ static void flush_gart(struct pci_dev *dev)
 
 /* 
  * Allocate memory for a consistent mapping.
- * All mappings are consistent here, so this is just a wrapper around
- * pci_map_single.
  */
 void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 			   dma_addr_t *dma_handle)
 {
 	void *memory;
-	int gfp = GFP_ATOMIC;
-	unsigned long dma_mask;
+	int gfp = preempt_atomic() ? GFP_ATOMIC : GFP_KERNEL; 
+	unsigned long dma_mask = 0;
+	u64 bus;
 
-	if (hwdev == NULL) {
-		gfp |= GFP_DMA; 
-		dma_mask = 0xffffffff; 
-	} else {
+	if (hwdev) 
 		dma_mask = hwdev->dev.coherent_dma_mask;
-	}
-
 	if (dma_mask == 0) 
 		dma_mask = 0xffffffff; 
-	if (dma_mask < 0xffffffff || no_iommu)
-		gfp |= GFP_DMA;
 
 	/* Kludge to make it bug-to-bug compatible with i386. i386
 	   uses the normal dma_mask for alloc_consistent. */
 	dma_mask &= hwdev->dma_mask;
 
+ again:
 	memory = (void *)__get_free_pages(gfp, get_order(size));
-	if (memory == NULL) {
+	if (memory == NULL)
 		return NULL; 
-	} else {
+
+	{
 		int high, mmu;
-	        high = ((unsigned long)virt_to_bus(memory) + size) >= dma_mask;
+		bus = virt_to_bus(memory);
+	        high = (bus + size) >= dma_mask;
 		mmu = high;
 		if (force_iommu && !(gfp & GFP_DMA)) 
 			mmu = 1;
-		if (no_iommu) { 
-			if (high) goto error;
+		if (no_iommu || dma_mask < 0xffffffffUL) { 
+			if (high) {
+				if (!(gfp & GFP_DMA)) { 
+					gfp |= GFP_DMA; 
+					goto again;
+				}
+				goto free;
+			}
 			mmu = 0; 
 		} 	
 		memset(memory, 0, size); 
@@ -215,15 +225,16 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 		}
 	} 
 
-	*dma_handle = pci_map_single(hwdev, memory, size, 0);
+	*dma_handle = pci_map_area(hwdev, bus, size, PCI_DMA_BIDIRECTIONAL);
 	if (*dma_handle == bad_dma_address)
 		goto error; 
-
+	flush_gart(hwdev);	
 	return memory; 
 	
 error:
 	if (panic_on_overflow)
-		panic("pci_map_single: overflow %lu bytes\n", size); 
+		panic("pci_alloc_consistent: overflow %lu bytes\n", size); 
+free:
 	free_pages((unsigned long)memory, get_order(size)); 
 	return NULL; 
 }
@@ -608,6 +619,7 @@ EXPORT_SYMBOL(pci_unmap_single);
 EXPORT_SYMBOL(pci_dma_supported);
 EXPORT_SYMBOL(no_iommu);
 EXPORT_SYMBOL(force_iommu); 
+EXPORT_SYMBOL(bad_dma_address);
 
 static __init unsigned long check_iommu_size(unsigned long aper, u64 aper_size)
 { 
@@ -733,7 +745,7 @@ static int __init pci_iommu_init(void)
 
 	if (swiotlb) { 
 		no_iommu = 1;
-		printk(KERN_INFO "PCI-DMA: Using SWIOTLB :-(\n"); 
+		printk(KERN_INFO "PCI-DMA: Using software bounce buffering for  IO (SWIOTLB)\n"); 
 		return -1; 
 	} 
 	
@@ -837,6 +849,7 @@ fs_initcall(pci_iommu_init);
    forcesac For SAC mode for masks <40bits  (experimental)
    fullflush Flush IOMMU on each allocation (default) 
    nofullflush Don't use IOMMU fullflush
+   soft	 Use software bounce buffering (default for Intel machines)
 */
 __init int iommu_setup(char *opt) 
 { 
@@ -876,6 +889,8 @@ __init int iommu_setup(char *opt)
 		    iommu_fullflush = 1;
 	    if (!memcmp(p, "nofullflush", 11))
 		    iommu_fullflush = 0;
+	    if (!memcmp(p, "soft", 4))
+		    swiotlb = 1;
 #ifdef CONFIG_IOMMU_LEAK
 	    if (!memcmp(p,"leak", 4)) { 
 		    leak_trace = 1;

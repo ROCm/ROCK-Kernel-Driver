@@ -405,10 +405,10 @@ void __init mem_init(void)
 	int tmp;
 
 #ifdef CONFIG_SWIOTLB
-       if (!iommu_aperture && end_pfn >= 0xffffffff>>PAGE_SHIFT) { 
-	       swiotlb_init();
+	if (!iommu_aperture && end_pfn >= 0xffffffff>>PAGE_SHIFT)
 	       swiotlb = 1;
-       }
+	if (swiotlb)
+		swiotlb_init();	
 #endif
 
 	/* How many end-of-memory variables you have, grandma! */
