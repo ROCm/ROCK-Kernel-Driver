@@ -85,7 +85,7 @@ void br_stp_disable_bridge(struct net_bridge *br)
 		p = p->next;
 	}
 
-	del_timer(&br->tick);
+	del_timer_sync(&br->tick);
 }
 
 /* called under bridge lock */

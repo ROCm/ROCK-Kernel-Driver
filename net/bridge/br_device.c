@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/if_bridge.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
 
@@ -91,9 +92,9 @@ static int br_dev_open(struct net_device *dev)
 	netif_start_queue(dev);
 
 	br = dev->priv;
-	read_lock(&br->lock);
+	write_lock(&br->lock);
 	br_stp_enable_bridge(br);
-	read_unlock(&br->lock);
+	write_unlock(&br->lock);
 
 	return 0;
 }
@@ -107,9 +108,9 @@ static int br_dev_stop(struct net_device *dev)
 	struct net_bridge *br;
 
 	br = dev->priv;
-	read_lock(&br->lock);
+	write_lock(&br->lock);
 	br_stp_disable_bridge(br);
-	read_unlock(&br->lock);
+	write_unlock(&br->lock);
 
 	netif_stop_queue(dev);
 
@@ -121,6 +122,11 @@ static int br_dev_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
 	return -1;
 }
 
+static void br_dev_destruct(struct net_device *dev) 
+{
+	kfree(dev->priv);
+}
+
 void br_dev_setup(struct net_device *dev)
 {
 	memset(dev->dev_addr, 0, ETH_ALEN);
@@ -130,6 +136,8 @@ void br_dev_setup(struct net_device *dev)
 	dev->hard_start_xmit = br_dev_xmit;
 	dev->open = br_dev_open;
 	dev->set_multicast_list = br_dev_set_multicast_list;
+	dev->destructor = br_dev_destruct;
+	dev->owner = THIS_MODULE;
 	dev->stop = br_dev_stop;
 	dev->accept_fastpath = br_dev_accept_fastpath;
 	dev->tx_queue_len = 0;
