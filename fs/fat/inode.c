@@ -999,12 +999,11 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		error = first;
 		goto out_fail;
 	}
-
-	if ((FAT_FIRST_ENT(sb, media) | 0x03) == first) {
-		/* all is as it should be: -1 to -8 */
-	} else if (media == 0xf8 && (FAT_FIRST_ENT(sb, 0xfe) | 0x03) == first) {
+	if (FAT_FIRST_ENT(sb, media) == first) {
+		/* all is as it should be */
+	} else if (media == 0xf8 && FAT_FIRST_ENT(sb, 0xfe) == first) {
 		/* bad, reported on pc9800 */
-	} else if (media == 0xf0 && (FAT_FIRST_ENT(sb, 0xf8) | 0x03) == first) {
+	} else if (media == 0xf0 && FAT_FIRST_ENT(sb, 0xf8) == first) {
 		/* bad, reported with a MO disk on win95/me */
 	} else if (first == 0) {
 		/* bad, reported with a SmartMedia card */
