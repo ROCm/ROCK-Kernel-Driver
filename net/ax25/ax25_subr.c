@@ -257,18 +257,18 @@ void ax25_calculate_t1(ax25_cb *ax25)
 	int n, t = 2;
 
 	switch (ax25->backoff) {
-		case 0:
-			break;
+	case 0:
+		break;
 
-		case 1:
-			t += 2 * ax25->n2count;
-			break;
+	case 1:
+		t += 2 * ax25->n2count;
+		break;
 
-		case 2:
-			for (n = 0; n < ax25->n2count; n++)
-				t *= 2;
-			if (t > 8) t = 8;
-			break;
+	case 2:
+		for (n = 0; n < ax25->n2count; n++)
+			t *= 2;
+		if (t > 8) t = 8;
+		break;
 	}
 
 	ax25->t1 = t * ax25->rtt;

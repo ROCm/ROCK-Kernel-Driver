@@ -88,16 +88,16 @@ int ax25_encapsulate(struct sk_buff *skb, struct net_device *dev, unsigned short
 
   	/* Append a suitable AX.25 PID */
   	switch (type) {
-  		case ETH_P_IP:
-  			*buff++ = AX25_P_IP;
- 			break;
-  		case ETH_P_ARP:
-  			*buff++ = AX25_P_ARP;
-  			break;
-  		default:
-  			printk(KERN_ERR "AX.25: ax25_encapsulate - wrong protocol type 0x%2.2x\n", type);
-  			*buff++ = 0;
-  			break;
+  	case ETH_P_IP:
+  		*buff++ = AX25_P_IP;
+ 		break;
+  	case ETH_P_ARP:
+  		*buff++ = AX25_P_ARP;
+  		break;
+  	default:
+  		printk(KERN_ERR "AX.25: ax25_encapsulate - wrong protocol type 0x%2.2x\n", type);
+  		*buff++ = 0;
+  		break;
  	}
 
 	if (daddr != NULL)

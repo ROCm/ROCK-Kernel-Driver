@@ -199,18 +199,18 @@ static int ax25_process_rx_frame(ax25_cb *ax25, struct sk_buff *skb, int type, i
 		return 0;
 
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-		case AX25_PROTO_STD_SIMPLEX:
-		case AX25_PROTO_STD_DUPLEX:
-			queued = ax25_std_frame_in(ax25, skb, type);
-			break;
+	case AX25_PROTO_STD_SIMPLEX:
+	case AX25_PROTO_STD_DUPLEX:
+		queued = ax25_std_frame_in(ax25, skb, type);
+		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-		case AX25_PROTO_DAMA_SLAVE:
-			if (dama || ax25->ax25_dev->dama.slave)
-				queued = ax25_ds_frame_in(ax25, skb, type);
-			else
-				queued = ax25_std_frame_in(ax25, skb, type);
-			break;
+	case AX25_PROTO_DAMA_SLAVE:
+		if (dama || ax25->ax25_dev->dama.slave)
+			queued = ax25_ds_frame_in(ax25, skb, type);
+		else
+			queued = ax25_std_frame_in(ax25, skb, type);
+		break;
 #endif
 	}
 
@@ -285,47 +285,47 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev, ax25_address *d
 		/* Now we are pointing at the pid byte */
 		switch (skb->data[1]) {
 #ifdef CONFIG_INET
-			case AX25_P_IP:
-				skb_pull(skb,2);		/* drop PID/CTRL */
-				skb->h.raw    = skb->data;
-				skb->nh.raw   = skb->data;
-				skb->dev      = dev;
-				skb->pkt_type = PACKET_HOST;
-				skb->protocol = htons(ETH_P_IP);
-				ip_rcv(skb, dev, ptype);	/* Note ptype here is the wrong one, fix me later */
-				break;
+		case AX25_P_IP:
+			skb_pull(skb,2);		/* drop PID/CTRL */
+			skb->h.raw    = skb->data;
+			skb->nh.raw   = skb->data;
+			skb->dev      = dev;
+			skb->pkt_type = PACKET_HOST;
+			skb->protocol = htons(ETH_P_IP);
+			ip_rcv(skb, dev, ptype);	/* Note ptype here is the wrong one, fix me later */
+			break;
 
-			case AX25_P_ARP:
-				skb_pull(skb,2);
-				skb->h.raw    = skb->data;
-				skb->nh.raw   = skb->data;
-				skb->dev      = dev;
-				skb->pkt_type = PACKET_HOST;
-				skb->protocol = htons(ETH_P_ARP);
-				arp_rcv(skb, dev, ptype);	/* Note ptype here is wrong... */
-				break;
+		case AX25_P_ARP:
+			skb_pull(skb,2);
+			skb->h.raw    = skb->data;
+			skb->nh.raw   = skb->data;
+			skb->dev      = dev;
+			skb->pkt_type = PACKET_HOST;
+			skb->protocol = htons(ETH_P_ARP);
+			arp_rcv(skb, dev, ptype);	/* Note ptype here is wrong... */
+			break;
 #endif
-			case AX25_P_TEXT:
-				/* Now find a suitable dgram socket */
-				if ((sk = ax25_find_socket(&dest, &src, SOCK_DGRAM)) != NULL) {
-					if (atomic_read(&sk->rmem_alloc) >= sk->rcvbuf) {
-						kfree_skb(skb);
-					} else {
-						/*
-						 *	Remove the control and PID.
-						 */
-						skb_pull(skb, 2);
-						if (sock_queue_rcv_skb(sk, skb) != 0)
-							kfree_skb(skb);
-					}
-				} else {
+		case AX25_P_TEXT:
+			/* Now find a suitable dgram socket */
+			if ((sk = ax25_find_socket(&dest, &src, SOCK_DGRAM)) != NULL) {
+				if (atomic_read(&sk->rmem_alloc) >= sk->rcvbuf) {
 					kfree_skb(skb);
+				} else {
+					/*
+					 *	Remove the control and PID.
+					 */
+					skb_pull(skb, 2);
+					if (sock_queue_rcv_skb(sk, skb) != 0)
+						kfree_skb(skb);
 				}
-				break;
+			} else {
+				kfree_skb(skb);
+			}
+			break;
 
-			default:
-				kfree_skb(skb);	/* Will scan SOCK_AX25 RAW sockets */
-				break;
+		default:
+			kfree_skb(skb);	/* Will scan SOCK_AX25 RAW sockets */
+			break;
 		}
 
 		return 0;
