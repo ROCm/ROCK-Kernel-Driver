@@ -436,7 +436,10 @@ static void CDCEther_set_multicast( struct net_device *net )
 
 	// Tell the kernel to stop sending us frames while we get this
 	// all set up.
-	netif_stop_queue(net);
+//	netif_stop_queue(net);
+
+// FIXME: We hold xmit_lock. If you want to do the queue stuff you need
+//	  to enable it from a completion handler
 
       /* Note: do not reorder, GCC is clever about common statements. */
         if (net->flags & IFF_PROMISC) {
@@ -469,7 +472,7 @@ static void CDCEther_set_multicast( struct net_device *net )
 			MODE_FLAG_DIRECTED |
 			MODE_FLAG_BROADCAST |
 			MODE_FLAG_MULTICAST;
-		buff = kmalloc(6 * net->mc_count, in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+		buff = kmalloc(6 * net->mc_count, GFP_ATOMIC);
                 for (i = 0, mclist = net->mc_list;
 		     mclist && i < net->mc_count;
                      i++, mclist = mclist->next) {
@@ -477,6 +480,7 @@ static void CDCEther_set_multicast( struct net_device *net )
 		}
 #if 0
 		usb_control_msg(ether_dev->usb,
+// FIXME: We hold a spinlock. You must not use a synchronous API
 				usb_sndctrlpipe(ether_dev->usb, 0),
 				SET_ETHERNET_MULTICAST_FILTER, /* request */
 				USB_TYPE_CLASS | USB_DIR_OUT | USB_RECIP_INTERFACE, /* request type */
@@ -493,7 +497,7 @@ static void CDCEther_set_multicast( struct net_device *net )
 	CDC_SetEthernetPacketFilter(ether_dev);
 #endif	
         // Tell the kernel to start giving frames to us again.
-	netif_wake_queue(net);
+//	netif_wake_queue(net);
 }
 
 //////////////////////////////////////////////////////////////////////////////

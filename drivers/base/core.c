@@ -25,6 +25,8 @@ int (*platform_notify_remove)(struct device * dev) = NULL;
 
 spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
+#define to_dev(node) container_of(node,struct device,driver_list)
+
 
 /**
  * found_match - do actual binding of device to driver
@@ -53,9 +55,9 @@ static int found_match(struct device * dev, struct device_driver * drv)
 	pr_debug("bound device '%s' to driver '%s'\n",
 		 dev->bus_id,drv->name);
 
-	write_lock(&drv->lock);
+	spin_lock(&device_lock);
 	list_add_tail(&dev->driver_list,&drv->devices);
-	write_unlock(&drv->lock);
+	spin_unlock(&device_lock);
 	
 	goto Done;
 
@@ -101,19 +103,14 @@ static void device_detach(struct device * dev)
 	struct device_driver * drv; 
 
 	if (dev->driver) {
-		lock_device(dev);
+		spin_lock(&device_lock);
 		drv = dev->driver;
 		dev->driver = NULL;
-		unlock_device(dev);
-
-		write_lock(&drv->lock);
-		list_del_init(&dev->driver_list);
-		write_unlock(&drv->lock);
+		spin_unlock(&device_lock);
 
 		/* detach from driver */
-		if (drv->remove)
+		if (drv && drv->remove)
 			drv->remove(dev);
-		put_driver(drv);
 	}
 }
 
@@ -134,47 +131,26 @@ int driver_attach(struct device_driver * drv)
 	return bus_for_each_dev(drv->bus,drv,do_driver_attach);
 }
 
-static int do_driver_detach(struct device * dev, struct device_driver * drv)
-{
-	lock_device(dev);
-	if (dev->driver == drv) {
-		dev->driver = NULL;
-		unlock_device(dev);
-		if (drv->remove)
-			drv->remove(dev);
-	} else
-		unlock_device(dev);
-	return 0;
-}
-
 void driver_detach(struct device_driver * drv)
 {
-	struct device * next;
-	struct device * dev = NULL;
 	struct list_head * node;
-	int error = 0;
+	struct device * prev = NULL;
 
-	write_lock(&drv->lock);
-	node = drv->devices.next;
-	while (node != &drv->devices) {
-		next = list_entry(node,struct device,driver_list);
-		get_device(next);
-		list_del_init(&next->driver_list);
-		write_unlock(&drv->lock);
-
-		if (dev)
-			put_device(dev);
-		dev = next;
-		if ((error = do_driver_detach(dev,drv))) {
-			put_device(dev);
-			break;
+	spin_lock(&device_lock);
+	list_for_each(node,&drv->devices) {
+		struct device * dev = get_device_locked(to_dev(node));
+		if (dev) {
+			if (prev)
+				list_del_init(&prev->driver_list);
+			spin_unlock(&device_lock);
+			device_detach(dev);
+			if (prev)
+				put_device(prev);
+			prev = dev;
+			spin_lock(&device_lock);
 		}
-		write_lock(&drv->lock);
-		node = drv->devices.next;
 	}
-	write_unlock(&drv->lock);
-	if (dev)
-		put_device(dev);
+	spin_unlock(&device_lock);
 }
 
 /**
@@ -191,7 +167,6 @@ void driver_detach(struct device_driver * drv)
 int device_register(struct device *dev)
 {
 	int error;
-	struct device *prev_dev;
 
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
@@ -199,24 +174,21 @@ int device_register(struct device *dev)
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
 	INIT_LIST_HEAD(&dev->g_list);
+	INIT_LIST_HEAD(&dev->driver_list);
+	INIT_LIST_HEAD(&dev->bus_list);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 
-	spin_lock(&device_lock);
 	if (dev != &device_root) {
 		if (!dev->parent)
 			dev->parent = &device_root;
 		get_device(dev->parent);
 
-		if (list_empty(&dev->parent->children))
-			prev_dev = dev->parent;
-		else
-			prev_dev = list_entry(dev->parent->children.prev, struct device, node);
-		list_add(&dev->g_list, &prev_dev->g_list);
-
+		spin_lock(&device_lock);
+		list_add_tail(&dev->g_list,&dev->parent->g_list);
 		list_add_tail(&dev->node,&dev->parent->children);
+		spin_unlock(&device_lock);
 	}
-	spin_unlock(&device_lock);
 
 	pr_debug("DEV: registering device: ID = '%s', name = %s\n",
 		 dev->bus_id, dev->name);
@@ -234,10 +206,35 @@ int device_register(struct device *dev)
 		platform_notify(dev);
 
  register_done:
+	if (error) {
+		spin_lock(&device_lock);
+		list_del_init(&dev->g_list);
+		list_del_init(&dev->node);
+		spin_unlock(&device_lock);
+		if (dev->parent)
+			put_device(dev->parent);
+	}
 	put_device(dev);
-	if (error && dev->parent)
-		put_device(dev->parent);
 	return error;
+}
+
+struct device * get_device_locked(struct device * dev)
+{
+	struct device * ret = dev;
+	if (dev && atomic_read(&dev->refcount) > 0)
+		atomic_inc(&dev->refcount);
+	else
+		ret = NULL;
+	return ret;
+}
+
+struct device * get_device(struct device * dev)
+{
+	struct device * ret;
+	spin_lock(&device_lock);
+	ret = get_device_locked(dev);
+	spin_unlock(&device_lock);
+	return ret;
 }
 
 /**
@@ -250,6 +247,8 @@ void put_device(struct device * dev)
 		return;
 	list_del_init(&dev->node);
 	list_del_init(&dev->g_list);
+	list_del_init(&dev->bus_list);
+	list_del_init(&dev->driver_list);
 	spin_unlock(&device_lock);
 
 	pr_debug("DEV: Unregistering device. ID = '%s', name = '%s'\n",
@@ -296,4 +295,5 @@ static int __init device_init(void)
 core_initcall(device_init);
 
 EXPORT_SYMBOL(device_register);
+EXPORT_SYMBOL(get_device);
 EXPORT_SYMBOL(put_device);

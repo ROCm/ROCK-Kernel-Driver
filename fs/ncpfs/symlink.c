@@ -100,7 +100,7 @@ fail:
  * symlinks can't do much...
  */
 struct address_space_operations ncp_symlink_aops = {
-	readpage:	ncp_symlink_readpage,
+	.readpage	= ncp_symlink_readpage,
 };
 	
 /* ----- create a new symbolic link -------------------------------------- */

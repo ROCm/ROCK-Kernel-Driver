@@ -131,9 +131,10 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	struct thread_info *ti;
 
 	ti = alloc_thread_info();
-	if (!ti) return NULL;
+	if (!ti)
+		return NULL;
 
-	tsk = kmem_cache_alloc(task_struct_cachep,GFP_ATOMIC);
+	tsk = kmem_cache_alloc(task_struct_cachep, GFP_KERNEL);
 	if (!tsk) {
 		free_thread_info(ti);
 		return NULL;

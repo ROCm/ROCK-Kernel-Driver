@@ -1401,14 +1401,14 @@ static ssize_t sg_device_kdev_read(struct device *driverfs_dev, char *page,
 	Sg_device * sdp=list_entry(driverfs_dev, Sg_device, sg_driverfs_dev);
 	return off ? 0 : sprintf(page, "%x\n",sdp->i_rdev.value);
 }
-static DEVICE_ATTR(kdev,"kdev",S_IRUGO,sg_device_kdev_read,NULL);
+static DEVICE_ATTR(kdev,S_IRUGO,sg_device_kdev_read,NULL);
 
 static ssize_t sg_device_type_read(struct device *driverfs_dev, char *page, 
 		size_t count, loff_t off) 
 {
 	return off ? 0 : sprintf (page, "CHR\n");
 }
-static DEVICE_ATTR(type,"type",S_IRUGO,sg_device_type_read,NULL);
+static DEVICE_ATTR(type,S_IRUGO,sg_device_type_read,NULL);
 
 static int sg_attach(Scsi_Device * scsidp)
 {

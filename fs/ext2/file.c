@@ -38,17 +38,17 @@ static int ext2_release_file (struct inode * inode, struct file * filp)
  * the ext2 filesystem.
  */
 struct file_operations ext2_file_operations = {
-	llseek:		generic_file_llseek,
-	read:		generic_file_read,
-	write:		generic_file_write,
-	ioctl:		ext2_ioctl,
-	mmap:		generic_file_mmap,
-	open:		generic_file_open,
-	release:	ext2_release_file,
-	fsync:		ext2_sync_file,
-	sendfile:	generic_file_sendfile,
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.write		= generic_file_write,
+	.ioctl		= ext2_ioctl,
+	.mmap		= generic_file_mmap,
+	.open		= generic_file_open,
+	.release	= ext2_release_file,
+	.fsync		= ext2_sync_file,
+	.sendfile	= generic_file_sendfile,
 };
 
 struct inode_operations ext2_file_inode_operations = {
-	truncate:	ext2_truncate,
+	.truncate	= ext2_truncate,
 };

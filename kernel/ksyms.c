@@ -344,7 +344,7 @@ EXPORT_SYMBOL(register_disk);
 EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL(wipe_partitions);
-EXPORT_SYMBOL(generic_file_direct_IO);
+EXPORT_SYMBOL_GPL(generic_file_direct_IO);
 
 /* tty routines */
 EXPORT_SYMBOL(tty_hangup);
@@ -505,6 +505,7 @@ EXPORT_SYMBOL(vsscanf);
 EXPORT_SYMBOL(kdevname);
 EXPORT_SYMBOL(__bdevname);
 EXPORT_SYMBOL(cdevname);
+EXPORT_SYMBOL(simple_strtoull);
 EXPORT_SYMBOL(simple_strtoul);
 EXPORT_SYMBOL(simple_strtol);
 EXPORT_SYMBOL(system_utsname);	/* UTS data */
