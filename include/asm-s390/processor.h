@@ -72,6 +72,7 @@ extern struct task_struct *last_task_used_math;
 # define TASK31_SIZE		(0x80000000UL)
 # define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
 					(TASK31_SIZE / 2) : (TASK_SIZE / 2))
+# define __TASK_UNMAPPED_BASE	(TASK31_SIZE / 2)
 
 #endif /* __s390x__ */
 
