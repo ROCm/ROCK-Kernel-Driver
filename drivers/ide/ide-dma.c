@@ -553,7 +553,7 @@ static ide_startstop_t ide_dma_timeout_revovery (ide_drive_t *drive)
 
 static void ide_toggle_bounce(ide_drive_t *drive, int on)
 {
-	dma64_addr_t addr = BLK_BOUNCE_HIGH;
+	u64 addr = BLK_BOUNCE_HIGH;
 
 	if (on && drive->media == ide_disk && HWIF(drive)->highmem) {
 		if (!PCI_DMA_BUS_IS_PHYS)

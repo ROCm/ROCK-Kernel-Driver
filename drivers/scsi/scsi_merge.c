@@ -123,7 +123,7 @@ void scsi_initialize_merge_fn(Scsi_Device * SDpnt)
 {
 	struct Scsi_Host *SHpnt = SDpnt->host;
 	request_queue_t *q = &SDpnt->request_queue;
-	dma64_addr_t bounce_limit;
+	u64 bounce_limit;
 
 	/*
 	 * The generic merging functions work just fine for us.
