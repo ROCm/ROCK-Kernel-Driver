@@ -60,10 +60,10 @@ extern initcall_t __initcall_start, __initcall_end;
 #define __define_initcall(level,fn) \
 	static initcall_t __initcall_##fn __attribute__ ((unused,__section__ (".initcall" level ".init"))) = fn
 
-#define early_arch_initcall(fn)		__define_initcall("1",fn)
-#define mem_initcall(fn)		__define_initcall("2",fn)
-#define subsys_initcall(fn)		__define_initcall("3",fn)
-#define arch_initcall(fn)		__define_initcall("4",fn)
+#define core_initcall(fn)		__define_initcall("1",fn)
+#define unused_initcall(fn)		__define_initcall("2",fn)
+#define arch_initcall(fn)		__define_initcall("3",fn)
+#define subsys_initcall(fn)		__define_initcall("4",fn)
 #define fs_initcall(fn)			__define_initcall("5",fn)
 #define device_initcall(fn)		__define_initcall("6",fn)
 #define late_initcall(fn)		__define_initcall("7",fn)
@@ -159,10 +159,10 @@ typedef void (*__cleanup_module_func_t)(void);
 
 #define __setup(str,func) /* nothing */
 
-#define early_arch_initcall(fn)		module_init(fn)
-#define mem_initcall(fn)		module_init(fn)
-#define subsys_initcall(fn)		module_init(fn)
+#define core_initcall(fn)		module_init(fn)
+#define unused_initcall(fn)		module_init(fn)
 #define arch_initcall(fn)		module_init(fn)
+#define subsys_initcall(fn)		module_init(fn)
 #define fs_initcall(fn)			module_init(fn)
 #define device_initcall(fn)		module_init(fn)
 #define late_initcall(fn)		module_init(fn)
