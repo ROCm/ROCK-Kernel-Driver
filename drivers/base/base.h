@@ -1,13 +1,5 @@
 #undef DEBUG
 
-#ifdef DEBUG
-# define DBG(x...) printk(x)
-#else
-# define DBG(x...)
-#endif
-
-extern struct list_head global_device_list;
-extern spinlock_t device_lock;
 extern struct semaphore device_sem;
 
 extern int bus_add_device(struct device * dev);

@@ -18,14 +18,10 @@
 
 #include "base.h"
 
-LIST_HEAD(global_device_list);
-
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
 
 DECLARE_MUTEX(device_sem);
-
-spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
 #define to_dev(obj) container_of(obj,struct device,kobj)
 
@@ -146,11 +142,9 @@ void device_initialize(struct device *dev)
 	kobject_init(&dev->kobj);
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
-	INIT_LIST_HEAD(&dev->g_list);
 	INIT_LIST_HEAD(&dev->driver_list);
 	INIT_LIST_HEAD(&dev->bus_list);
 	INIT_LIST_HEAD(&dev->intf_list);
-//	spin_lock_init(&dev->lock);
 }
 
 /**
@@ -188,13 +182,11 @@ int device_add(struct device *dev)
 		goto register_done;
 
 	/* now take care of our own registration */
-	down(&device_sem);
 	if (parent) {
-		list_add_tail(&dev->g_list,&dev->parent->g_list);
+		down(&device_sem);
 		list_add_tail(&dev->node,&parent->children);
-	} else
-		list_add_tail(&dev->g_list,&global_device_list);
-	up(&device_sem);
+		up(&device_sem);
+	}
 
 	bus_add_device(dev);
 
@@ -276,10 +268,11 @@ void device_del(struct device * dev)
 {
 	struct device * parent = dev->parent;
 
-	down(&device_sem);
-	list_del_init(&dev->node);
-	list_del_init(&dev->g_list);
-	up(&device_sem);
+	if (parent) {
+		down(&device_sem);
+		list_del_init(&dev->node);
+		up(&device_sem);
+	}
 
 	/* Notify the platform of the removal, in case they
 	 * need to do anything...

@@ -250,7 +250,6 @@ extern int interface_add_data(struct intf_data *);
 
 
 struct device {
-	struct list_head g_list;        /* node in depth-first order list */
 	struct list_head node;		/* node in sibling list */
 	struct list_head bus_list;	/* node in bus's list */
 	struct list_head driver_list;
@@ -288,12 +287,6 @@ static inline struct device *
 list_to_dev(struct list_head *node)
 {
 	return list_entry(node, struct device, node);
-}
-
-static inline struct device *
-g_list_to_dev(struct list_head *g_list)
-{
-	return list_entry(g_list, struct device, g_list);
 }
 
 static inline void *
