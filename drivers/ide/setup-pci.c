@@ -515,12 +515,8 @@ static void ide_hwif_setup_dma(struct pci_dev *dev, ide_pci_device_t *d, ide_hwi
  
 static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, int noisy, int *config)
 {
-	int ret = 0;
 	u32 class_rev;
 	u16 pcicmd;
-
-	if (!noautodma)
-		ret = 1;
 
 	if (noisy)
 		ide_setup_pci_noise(dev, d);
@@ -535,8 +531,6 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
 	if (!(pcicmd & PCI_COMMAND_IO)) {	/* is device disabled? */
 		if (ide_pci_configure(dev, d))
 			return -ENODEV;
-		/* default DMA off if we had to configure it here */
-		ret = 0;
 		*config = 1;
 		printk(KERN_INFO "%s: device enabled (Linux)\n", d->name);
 	}
@@ -545,14 +539,13 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
 	class_rev &= 0xff;
 	if (noisy)
 		printk(KERN_INFO "%s: chipset revision %d\n", d->name, class_rev);
-	return ret;
+	return 0;
 }
 
 /**
  *	ide_pci_setup_ports	-	configure ports/devices on PCI IDE
  *	@dev: PCI device
  *	@d: IDE pci device info
- *	@autodma: Should we enable DMA
  *	@pciirq: IRQ line
  *	@index: ata index to update
  *
@@ -565,7 +558,7 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
  *	where the chipset setup is not the default PCI IDE one.
  */
  
-void ide_pci_setup_ports(struct pci_dev *dev, ide_pci_device_t *d, int autodma, int pciirq, ata_index_t *index)
+void ide_pci_setup_ports(struct pci_dev *dev, ide_pci_device_t *d, int pciirq, ata_index_t *index)
 {
 	int port;
 	int at_least_one_hwif_enabled = 0;
@@ -619,11 +612,7 @@ controller_ok:
 
 		if (d->autodma == NODMA)
 			goto bypass_legacy_dma;
-		if (d->autodma == NOAUTODMA)
-			autodma = 0;
-		if (autodma)
-			hwif->autodma = 1;
-			
+
 		if(d->init_setup_dma)
 			d->init_setup_dma(dev, d, hwif);
 		else
@@ -656,12 +645,11 @@ EXPORT_SYMBOL_GPL(ide_pci_setup_ports);
  */
 static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d, u8 noisy)
 {
-	int autodma = 0;
 	int pciirq = 0;
 	int tried_config = 0;
 	ata_index_t index = { .b = { .low = 0xff, .high = 0xff } };
 
-	if((autodma = ide_setup_pci_controller(dev, d, noisy, &tried_config)) < 0)
+	if (ide_setup_pci_controller(dev, d, noisy, &tried_config) < 0)
 		return index;
 
 	/*
@@ -709,7 +697,7 @@ static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_
 	if(pciirq < 0)		/* Error not an IRQ */
 		return index;
 
-	ide_pci_setup_ports(dev, d, autodma, pciirq, &index);
+	ide_pci_setup_ports(dev, d, pciirq, &index);
 
 	return index;
 }
