@@ -706,32 +706,18 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 	}
 
 	if (istab &0x10) {	// XPR
-		if (bcs->tx_skb) {
-			if (bcs->tx_skb->len) {
-				ipacx_fill_fifo(bcs);
-				goto afterXPR;
-			}
-			xmit_complete_b(bcs);
-			bcs->count = 0; 
-		}
-		xmit_ready_b(bcs);
+		xmit_xpr(bcs);
 	}
-  afterXPR:
 
 	if (istab &0x04) {	// XDU
-    if (bcs->mode == L1_MODE_TRANS) {
-      ipacx_fill_fifo(bcs);
-    }  
-    else {
-      if (bcs->tx_skb) {  // restart transmitting the whole frame
-        skb_push(bcs->tx_skb, bcs->count);
-        bcs->tx_cnt += bcs->count;
-        bcs->count = 0;
-      }
-	    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x01);  // XRES
-      if (cs->debug &L1_DEB_WARN)
-        debugl1(cs, "bch_int() B-%d XDU error", hscx);
-    }
+		if (cs->debug &L1_DEB_WARN)
+			debugl1(cs, "bch_int() B-%d XDU error", hscx);
+		if (bcs->mode == L1_MODE_TRANS) {
+			ipacx_fill_fifo(bcs);
+		}  else {
+			xmit_restart_b(bcs);
+			cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x01);  // XRES
+		}
 	}
 }
 

@@ -292,17 +292,10 @@ write_modem(struct BCState *bcs) {
 	return(ret);
 }
 
-inline void
+static void
 modem_fill(struct BCState *bcs)
 {
-	if (bcs->tx_skb) {
-		if (bcs->tx_skb->len) {
-			write_modem(bcs);
-			return;
-		}
-		xmit_complete_b(bcs);
-	}
-	xmit_ready_b(bcs);
+	xmit_xpr_b(bcs);
 }
 
 static inline void receive_chars(struct IsdnCardState *cs,

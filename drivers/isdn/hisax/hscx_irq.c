@@ -190,16 +190,8 @@ hscx_interrupt(struct IsdnCardState *cs, u_char val, u_char hscx)
 			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 	}
-	if (val & 0x10) {	/* XPR */
-		if (bcs->tx_skb) {
-			if (bcs->tx_skb->len) {
-				hscx_fill_fifo(bcs);
-				return;
-			}
-			xmit_complete_b(bcs);
-			bcs->count = 0;
-		}
-		xmit_ready_b(bcs);
+	if (val & 0x10) {
+		xmit_xpr_b(bcs);
 	}
 }
 
@@ -215,23 +207,13 @@ hscx_int_main(struct IsdnCardState *cs, u_char val)
 		bcs = cs->bcs + 1;
 		exval = READHSCX(cs, 1, HSCX_EXIR);
 		if (exval & 0x40) {
-			if (bcs->mode == 1)
+			if (cs->debug & L1_DEB_WARN)
+				debugl1(cs, "HSCX B EXIR %x", exval);
+			if (bcs->mode == L1_MODE_TRANS)
 				hscx_fill_fifo(bcs);
 			else {
-#ifdef ERROR_STATISTIC
-				bcs->err_tx++;
-#endif
-				/* Here we lost an TX interrupt, so
-				   * restart transmitting the whole frame.
-				 */
-				if (bcs->tx_skb) {
-					skb_push(bcs->tx_skb, bcs->count);
-					bcs->tx_cnt += bcs->count;
-					bcs->count = 0;
-				}
+				xmit_restart_b(bcs);
 				WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX B EXIR %x Lost TX", exval);
 			}
 		} else if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX B EXIR %x", exval);
@@ -245,23 +227,13 @@ hscx_int_main(struct IsdnCardState *cs, u_char val)
 		bcs = cs->bcs;
 		exval = READHSCX(cs, 0, HSCX_EXIR);
 		if (exval & 0x40) {
+			if (cs->debug & L1_DEB_WARN)
+				debugl1(cs, "HSCX A EXIR %x", exval);
 			if (bcs->mode == L1_MODE_TRANS)
 				hscx_fill_fifo(bcs);
 			else {
-				/* Here we lost an TX interrupt, so
-				   * restart transmitting the whole frame.
-				 */
-#ifdef ERROR_STATISTIC
-				bcs->err_tx++;
-#endif
-				if (bcs->tx_skb) {
-					skb_push(bcs->tx_skb, bcs->count);
-					bcs->tx_cnt += bcs->count;
-					bcs->count = 0;
-				}
+				xmit_restart_b(bcs);
 				WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX A EXIR %x Lost TX", exval);
 			}
 		} else if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX A EXIR %x", exval);

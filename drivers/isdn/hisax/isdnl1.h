@@ -121,3 +121,41 @@ xmit_pull_req_b(struct PStack *st, struct sk_buff *skb)
 	if (!busy)
 		L1L2(st, PH_PULL | CONFIRM, NULL);
 }
+
+/* called with the card lock held */
+static inline void
+xmit_restart_b(struct BCState *bcs)
+{
+#ifdef ERROR_STATISTIC
+	bcs->err_tx++;
+#endif
+	if (!bcs->tx_skb) {
+		WARN_ON(1);
+		return;
+	}
+	skb_push(bcs->tx_skb, bcs->count);
+	bcs->tx_cnt += bcs->count;
+	bcs->count = 0;
+}
+
+/* Useful for HSCX work-alike's */
+/* ---------------------------------------------------------------------- */
+
+/* XPR - transmit pool ready */
+/* called with the card lock held */
+static inline void
+xmit_xpr_b(struct BCState *bcs)
+{
+	/* current frame? */
+	if (bcs->tx_skb) {
+		/* last frame not done yet? */
+		if (bcs->tx_skb->len) {
+			bcs->cs->BC_Send_Data(bcs);
+			return;
+		}
+		xmit_complete_b(bcs);
+		bcs->count = 0;
+	}
+	xmit_ready_b(bcs);
+}
+

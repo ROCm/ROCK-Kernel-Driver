@@ -424,16 +424,10 @@ HDLC_irq(struct BCState *bcs, u_int stat)
 	}
 	if (stat & HDLC_INT_XDU) {
 		/* Here we lost an TX interrupt, so
-		 * restart transmitting the whole frame.
-		 */
-		if (bcs->tx_skb) {
-			skb_push(bcs->tx_skb, bcs->count);
-			bcs->tx_cnt += bcs->count;
-			bcs->count = 0;
-			if (bcs->cs->debug & L1_DEB_WARN)
-				debugl1(bcs->cs, "ch%d XDU", bcs->channel);
-		} else if (bcs->cs->debug & L1_DEB_WARN)
-			debugl1(bcs->cs, "ch%d XDU without skb", bcs->channel);
+		 * restart transmitting the whole frame. */
+		if (bcs->cs->debug & L1_DEB_WARN)
+			debugl1(bcs->cs, "ch%d XDU", bcs->channel);
+		xmit_restart_b(bcs);
 		bcs->hw.hdlc.ctrl.sr.xml = 0;
 		bcs->hw.hdlc.ctrl.sr.cmd |= HDLC_CMD_XRS;
 		write_ctrl(bcs, 1);
@@ -441,15 +435,7 @@ HDLC_irq(struct BCState *bcs, u_int stat)
 		write_ctrl(bcs, 1);
 		hdlc_fill_fifo(bcs);
 	} else if (stat & HDLC_INT_XPR) {
-		if (bcs->tx_skb) {
-			if (bcs->tx_skb->len) {
-				hdlc_fill_fifo(bcs);
-				return;
-			}
-			xmit_complete_b(bcs);
-			bcs->count = 0;
-		}
-		xmit_ready_b(bcs);
+		xmit_xpr_b(bcs);
 	}
 }
 
