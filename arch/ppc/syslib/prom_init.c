@@ -366,14 +366,14 @@ try_again:
 						   default_colors[i*3+2]) != 0)
 					break;
 
-#ifdef CONFIG_FB
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 			for (i = 0; i < LINUX_LOGO_COLORS; i++)
 				if (prom_set_color(ih, i + 32,
 						   linux_logo_red[i],
 						   linux_logo_green[i],
 						   linux_logo_blue[i]) != 0)
 					break;
-#endif /* CONFIG_FB */
+#endif /* CONFIG_FRAMEBUFFER_CONSOLE */
 		}
 	}
 
