@@ -645,7 +645,8 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 				      collection of bitflags defining what
 				      mount options were selected. */
 				   unsigned long * blocks, /* strtol-ed from NNN of resize=NNN */
-				   char ** jdev_name)
+				   char ** jdev_name,
+				   unsigned int * commit_max_age)
 {
     int c;
     char * arg = NULL;
@@ -662,6 +663,7 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	{"resize", 'r', 0, 0, 0},
 	{"jdev", 'j', 0, 0, 0},
 	{"nolargeio", 'w', 0, 0, 0},
+	{"commit", 'c', 0, 0, 0},
 	{NULL, 0, 0, 0, 0}
     };
 	
@@ -688,6 +690,19 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 		printk ("reiserfs_parse_options: bad value %s\n", arg);
 		return 0;
 	    }
+	}
+
+	if ( c == 'c' ) {
+		char *p = 0;
+		int val = simple_strtoul (arg, &p, 0);
+		/* commit=NNN (time in seconds) */
+		if ( *p != '\0' || val == 0) {
+			printk ("reiserfs_parse_options: bad value %s\n", arg);
+			return 0;
+		}
+		if ( val > 0 ) {
+			*commit_max_age = val;
+		}
 	}
 
 	if ( c == 'w' ) {
@@ -743,10 +758,11 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   unsigned long blocks;
   unsigned long mount_options = REISERFS_SB(s)->s_mount_opt;
   unsigned long safe_mask = 0;
+  unsigned int commit_max_age = 0;
 
   rs = SB_DISK_SUPER_BLOCK (s);
 
-  if (!reiserfs_parse_options(s, arg, &mount_options, &blocks, NULL))
+  if (!reiserfs_parse_options(s, arg, &mount_options, &blocks, NULL, &commit_max_age))
     return -EINVAL;
   
   handle_attrs(s);
@@ -763,6 +779,10 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   /* Update the bitmask, taking care to keep
    * the bits we're not allowed to change here */
   REISERFS_SB(s)->s_mount_opt = (REISERFS_SB(s)->s_mount_opt & ~safe_mask) |  (mount_options & safe_mask);
+
+  if(commit_max_age != 0) {
+	  SB_JOURNAL_MAX_COMMIT_AGE(s) = commit_max_age;
+  }
 
   if(blocks) {
     int rc = reiserfs_resize(s, blocks);
@@ -1217,6 +1237,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     struct reiserfs_transaction_handle th ;
     int old_format = 0;
     unsigned long blocks;
+	unsigned int commit_max_age = 0;
     int jinit_done = 0 ;
     struct reiserfs_iget_args args ;
     struct reiserfs_super_block * rs;
@@ -1241,7 +1262,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     REISERFS_SB(s)->s_alloc_options.preallocsize = 9;
 
     jdev_name = NULL;
-    if (reiserfs_parse_options (s, (char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name) == 0) {
+    if (reiserfs_parse_options (s, (char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name, &commit_max_age) == 0) {
 	goto error;
     }
 
@@ -1283,7 +1304,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 #endif
 
     // set_device_ro(s->s_dev, 1) ;
-    if(journal_init(s, jdev_name, old_format)) {
+    if( journal_init(s, jdev_name, old_format, commit_max_age) ) {
 	SPRINTK(silent, "sh-2022: reiserfs_fill_super: unable to initialize journal space\n") ;
 	goto error ;
     } else {
