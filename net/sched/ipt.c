@@ -218,9 +218,8 @@ override:
 	*/
 	p->tm.install = jiffies;
 #ifdef CONFIG_NET_ESTIMATOR
-	if (est) {
-		qdisc_new_estimator(&p->stats, p->stats_lock, est);
-	}
+	if (est)
+		gen_new_estimator(&p->bstats, &p->rate_est, p->stats_lock, est);
 #endif
 	h = tcf_hash(p->index);
 	write_lock_bh(&ipt_lock);
@@ -258,8 +257,8 @@ tcf_ipt(struct sk_buff **pskb, struct tc_action *a)
 	spin_lock(&p->lock);
 
 	p->tm.lastuse = jiffies;
-	p->stats.bytes += skb->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb->len;
+	p->bstats.packets++;
 
 	if (skb_cloned(skb) ) {
 		if (pskb_expand_head(skb, 0, 0, GFP_ATOMIC)) {
@@ -278,7 +277,7 @@ tcf_ipt(struct sk_buff **pskb, struct tc_action *a)
 		break;
 	case NF_DROP:
 		result = TC_ACT_SHOT;
-		p->stats.drops++;
+		p->qstats.drops++;
 		break;
 	case IPT_CONTINUE:
 		result = TC_ACT_PIPE;
@@ -346,17 +345,6 @@ tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	return -1;
 }
 
-int
-tcf_ipt_stats(struct sk_buff *skb, struct tc_action *a)
-{
-	struct tcf_ipt *p;
-	p = PRIV(a,ipt);
-	if (NULL != p)
-		return qdisc_copy_stats(skb, &p->stats, p->stats_lock);
-
-	return 1;
-}
-
 struct tc_action_ops act_ipt_ops = {
 	.next		=	NULL,
 	.kind		=	"ipt",
@@ -364,7 +352,6 @@ struct tc_action_ops act_ipt_ops = {
 	.capab		=	TCA_CAP_NONE,
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_ipt,
-	.get_stats	=	tcf_ipt_stats,
 	.dump		=	tcf_ipt_dump,
 	.cleanup	=	tcf_ipt_cleanup,
 	.lookup		=	tcf_hash_search,

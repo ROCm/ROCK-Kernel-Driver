@@ -109,6 +109,8 @@ struct divert_cf
 #include <linux/skbuff.h>
 
 #ifdef CONFIG_NET_DIVERT
+#include <linux/netdevice.h>
+
 int alloc_divert_blk(struct net_device *);
 void free_divert_blk(struct net_device *);
 int divert_ioctl(unsigned int cmd, struct divert_cf __user *arg);
