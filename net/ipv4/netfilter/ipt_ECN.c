@@ -67,7 +67,7 @@ set_ect_tcp(struct sk_buff **pskb, const struct ipt_ECN_info *einfo, int inward)
 
 	if (einfo->operation & IPT_ECN_OP_SET_CWR)
 		th->cwr = einfo->proto.tcp.cwr;
-	diffs[1] = ((u_int16_t *)&th)[6];
+	diffs[1] = ((u_int16_t *)th)[6];
 
 	/* Only mangle if it's changed. */
 	if (diffs[0] != diffs[1]) {
