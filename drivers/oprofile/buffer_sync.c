@@ -199,8 +199,16 @@ static void add_cpu_switch(int i)
 	last_cookie = ~0UL;
 }
 
+static void add_kernel_ctx_switch(unsigned int in_kernel)
+{
+	add_event_entry(ESCAPE_CODE);
+	if (in_kernel)
+		add_event_entry(KERNEL_ENTER_SWITCH_CODE); 
+	else
+		add_event_entry(KERNEL_EXIT_SWITCH_CODE); 
+}
  
-static void add_ctx_switch(pid_t pid, unsigned long cookie)
+static void add_user_ctx_switch(pid_t pid, unsigned long cookie)
 {
 	add_event_entry(ESCAPE_CODE);
 	add_event_entry(CTX_SWITCH_CODE); 
@@ -243,19 +251,13 @@ static void add_us_sample(struct mm_struct * mm, struct op_sample * s)
 }
 
  
-static inline int is_kernel(unsigned long val)
-{
-	return val > PAGE_OFFSET;
-}
-
-
 /* Add a sample to the global event buffer. If possible the
  * sample is converted into a persistent dentry/offset pair
  * for later lookup from userspace.
  */
-static void add_sample(struct mm_struct * mm, struct op_sample * s)
+static void add_sample(struct mm_struct * mm, struct op_sample * s, int in_kernel)
 {
-	if (is_kernel(s->eip)) {
+	if (in_kernel) {
 		add_sample_entry(s->eip, s->event);
 	} else if (mm) {
 		add_us_sample(mm, s);
@@ -319,26 +321,34 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 	struct mm_struct * mm = 0;
 	struct task_struct * new;
 	unsigned long cookie;
+	int in_kernel = 1;
 	int i;
  
 	for (i=0; i < cpu_buf->pos; ++i) {
 		struct op_sample * s = &cpu_buf->buffer[i];
  
 		if (is_ctx_switch(s->eip)) {
-			new = (struct task_struct *)s->event;
- 
-			release_mm(mm);
-			mm = take_task_mm(new);
- 
-			cookie = get_exec_dcookie(mm);
-			add_ctx_switch(new->pid, cookie);
+			if (s->event <= 1) {
+				/* kernel/userspace switch */
+				in_kernel = s->event;
+				add_kernel_ctx_switch(s->event);
+			} else {
+				/* userspace context switch */
+				new = (struct task_struct *)s->event;
+
+				release_mm(mm);
+				mm = take_task_mm(new);
+
+				cookie = get_exec_dcookie(mm);
+				add_user_ctx_switch(new->pid, cookie);
+			}
 		} else {
-			add_sample(mm, s);
+			add_sample(mm, s, in_kernel);
 		}
 	}
 	release_mm(mm);
 
-	cpu_buf->pos = 0;
+	cpu_buffer_reset(cpu_buf);
 }
  
  
@@ -364,10 +374,12 @@ static void sync_cpu_buffers(void)
 		 * lockers only, and this region is already
 		 * protected by buffer_sem. It's raw to prevent
 		 * the preempt bogometer firing. Fruity, huh ? */
-		_raw_spin_lock(&cpu_buf->int_lock);
-		add_cpu_switch(i);
-		sync_buffer(cpu_buf);
-		_raw_spin_unlock(&cpu_buf->int_lock);
+		if (cpu_buf->pos > 0) {
+			_raw_spin_lock(&cpu_buf->int_lock);
+			add_cpu_switch(i);
+			sync_buffer(cpu_buf);
+			_raw_spin_unlock(&cpu_buf->int_lock);
+		}
 	}
 
 	up(&buffer_sem);
@@ -393,3 +405,4 @@ static void timer_ping(unsigned long data)
 	schedule_work(&sync_wq);
 	/* timer is re-added by the scheduled task */
 }
+

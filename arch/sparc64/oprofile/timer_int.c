@@ -19,8 +19,10 @@ static int timer_notify(struct notifier_block * self, unsigned long val, void * 
 {
 	struct pt_regs * regs = (struct pt_regs *)data;
 	int cpu = smp_processor_id();
+	unsigned long pc = instruction_pointer(regs);
+	int is_kernel = !user_mode(regs);
  
-	oprofile_add_sample(instruction_pointer(regs), 0, cpu);
+	oprofile_add_sample(pc, is_kernel, 0, cpu);
 	return 0;
 }
  

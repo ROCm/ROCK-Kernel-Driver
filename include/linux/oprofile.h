@@ -49,7 +49,8 @@ int oprofile_arch_init(struct oprofile_operations ** ops);
  * Add a sample. This may be called from any context. Pass
  * smp_processor_id() as cpu.
  */
-extern void oprofile_add_sample(unsigned long eip, unsigned long event, int cpu);
+extern void oprofile_add_sample(unsigned long eip, unsigned int is_kernel, 
+	unsigned long event, int cpu);
 
 /**
  * Create a file of the given name as a child of the given root, with

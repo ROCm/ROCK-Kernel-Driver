@@ -20,7 +20,7 @@ struct task_struct;
 int alloc_cpu_buffers(void);
 
 void free_cpu_buffers(void);
- 
+
 /* CPU buffer is composed of such entries (which are
  * also used for context switch notes)
  */
@@ -34,6 +34,7 @@ struct oprofile_cpu_buffer {
 	/* protected by int_lock */
 	unsigned long pos;
 	struct task_struct * last_task;
+	int last_is_kernel;
 	struct op_sample * buffer;
 	unsigned long sample_received;
 	unsigned long sample_lost_locked;
@@ -42,5 +43,7 @@ struct oprofile_cpu_buffer {
 } ____cacheline_aligned;
 
 extern struct oprofile_cpu_buffer cpu_buffer[];
+
+void cpu_buffer_reset(struct oprofile_cpu_buffer *cpu_buf);
 
 #endif /* OPROFILE_CPU_BUFFER_H */

@@ -569,6 +569,8 @@ static int p4_check_ctrs(unsigned int const cpu,
 {
 	unsigned long ctr, low, high, stag, real;
 	int i;
+	unsigned long eip = instruction_pointer(regs);
+	int is_kernel = !user_mode(regs);
 
 	stag = get_stagger();
 
@@ -599,7 +601,7 @@ static int p4_check_ctrs(unsigned int const cpu,
 		CCCR_READ(low, high, real);
  		CTR_READ(ctr, high, real);
 		if (CCCR_OVF_P(low) || CTR_OVERFLOW_P(ctr)) {
-			oprofile_add_sample(regs->eip, i, cpu);
+			oprofile_add_sample(eip, is_kernel, i, cpu);
  			CTR_WRITE(reset_value[i], real);
 			CCCR_CLEAR_OVF(low);
 			CCCR_WRITE(low, high, real);
@@ -624,7 +626,8 @@ static void p4_start(struct op_msrs const * const msrs)
 	stag = get_stagger();
 
 	for (i = 0; i < num_counters; ++i) {
-		if (!reset_value[i]) continue;
+		if (!reset_value[i])
+			continue;
 		CCCR_READ(low, high, VIRT_CTR(stag, i));
 		CCCR_SET_ENABLE(low);
 		CCCR_WRITE(low, high, VIRT_CTR(stag, i));

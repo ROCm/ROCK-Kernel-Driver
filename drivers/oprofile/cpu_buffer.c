@@ -62,6 +62,7 @@ int alloc_cpu_buffers(void)
 		spin_lock_init(&b->int_lock);
 		b->pos = 0;
 		b->last_task = 0;
+		b->last_is_kernel = -1;
 		b->sample_received = 0;
 		b->sample_lost_locked = 0;
 		b->sample_lost_overflow = 0;
@@ -84,11 +85,19 @@ void free_cpu_buffers(void)
  * be safe from any context. Instead we trylock the CPU's int_lock.
  * int_lock is taken by the processing code in sync_cpu_buffers()
  * so we avoid disturbing that.
+ *
+ * is_kernel is needed because on some architectures you cannot
+ * tell if you are in kernel or user space simply by looking at
+ * eip. We tag this in the buffer by generating kernel enter/exit
+ * events whenever is_kernel changes
  */
-void oprofile_add_sample(unsigned long eip, unsigned long event, int cpu)
+void oprofile_add_sample(unsigned long eip, unsigned int is_kernel, 
+	unsigned long event, int cpu)
 {
 	struct oprofile_cpu_buffer * cpu_buf = &cpu_buffer[cpu];
 	struct task_struct * task;
+
+	is_kernel = !!is_kernel;
 
 	cpu_buf->sample_received++;
  
@@ -101,8 +110,16 @@ void oprofile_add_sample(unsigned long eip, unsigned long event, int cpu)
 		cpu_buf->sample_lost_overflow++;
 		goto out;
 	}
- 
+
 	task = current;
+
+	/* notice a switch from user->kernel or vice versa */
+	if (cpu_buf->last_is_kernel != is_kernel) {
+		cpu_buf->last_is_kernel = is_kernel;
+		cpu_buf->buffer[cpu_buf->pos].eip = ~0UL;
+		cpu_buf->buffer[cpu_buf->pos].event = is_kernel;
+		cpu_buf->pos++;
+	}
 
 	/* notice a task switch */
 	if (cpu_buf->last_task != task) {
@@ -130,3 +147,19 @@ void oprofile_add_sample(unsigned long eip, unsigned long event, int cpu)
 out:
 	spin_unlock(&cpu_buf->int_lock);
 }
+
+/* resets the cpu buffer to a sane state - should be called with 
+ * cpu_buf->int_lock held
+ */
+void cpu_buffer_reset(struct oprofile_cpu_buffer *cpu_buf)
+{
+	cpu_buf->pos = 0;
+
+	/* reset these to invalid values; the next sample
+	 * collected will populate the buffer with proper
+	 * values to initialize the buffer
+	 */
+	cpu_buf->last_is_kernel = -1;
+	cpu_buf->last_task = 0;
+}
+
