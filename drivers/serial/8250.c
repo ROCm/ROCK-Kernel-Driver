@@ -1943,6 +1943,22 @@ static void __init serial8250_isa_init_ports(void)
 		return;
 	first = 0;
 
+	for (i = 0; i < UART_NR; i++) {
+		struct uart_8250_port *up = &serial8250_ports[i];
+
+		up->port.line = i;
+		spin_lock_init(&up->port.lock);
+
+		init_timer(&up->timer);
+		up->timer.function = serial8250_timeout;
+
+		/*
+		 * ALPHA_KLUDGE_MCR needs to be killed.
+		 */
+		up->mcr_mask = ~ALPHA_KLUDGE_MCR;
+		up->mcr_force = ALPHA_KLUDGE_MCR;
+	}
+
 	for (i = 0, up = serial8250_ports; i < ARRAY_SIZE(old_serial_port);
 	     i++, up++) {
 		up->port.iobase   = old_serial_port[i].port;
@@ -1969,18 +1985,8 @@ serial8250_register_ports(struct uart_driver *drv, struct device *dev)
 	for (i = 0; i < UART_NR; i++) {
 		struct uart_8250_port *up = &serial8250_ports[i];
 
-		up->port.line = i;
 		up->port.ops = &serial8250_pops;
 		up->port.dev = dev;
-		init_timer(&up->timer);
-		up->timer.function = serial8250_timeout;
-
-		/*
-		 * ALPHA_KLUDGE_MCR needs to be killed.
-		 */
-		up->mcr_mask = ~ALPHA_KLUDGE_MCR;
-		up->mcr_force = ALPHA_KLUDGE_MCR;
-
 		uart_add_one_port(drv, &up->port);
 	}
 }
@@ -2083,11 +2089,6 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	port = &serial8250_ports[co->index].port;
 	if (!port->ops)
 		return -ENODEV;
-
-	/*
-	 * Temporary fix.
-	 */
-	spin_lock_init(&port->lock);
 
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
