@@ -26,8 +26,6 @@
 #include <asm/io.h>
 #include <asm/mtrr.h>
 
-#include <video/fbcon.h>
-
 #define INCLUDE_TIMING_TABLE_DATA
 #define DBE_REG_BASE regs
 #include <video/sgivw.h>
@@ -85,9 +83,6 @@ static struct fb_var_screeninfo sgivwfb_var __initdata = {
         .vmode		= FB_VMODE_NONINTERLACED
 };
 
-/* console related variables */
-static struct display disp;
-
 /*
  *  Interface used by the world
  */
@@ -105,8 +100,6 @@ static int sgivwfb_mmap(struct fb_info *info, struct file *file,
 static struct fb_ops sgivwfb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_check_var	= sgivwfb_check_var,
 	.fb_set_par	= sgivwfb_set_par,
 	.fb_setcolreg	= sgivwfb_setcolreg,
@@ -240,8 +233,8 @@ static int sgivwfb_check_var(struct fb_var_screeninfo *var,
 
 	if (var->vmode & FB_VMODE_CONUPDATE) {
 		var->vmode |= FB_VMODE_YWRAP;
-		var->xoffset = display->var.xoffset;
-		var->yoffset = display->var.yoffset;
+		var->xoffset = info->var.xoffset;
+		var->yoffset = info->var.yoffset;
 	}
 
 	/* XXX FIXME - forcing var's */
@@ -720,18 +713,12 @@ int __init sgivwfb_init(void)
 	sgivwfb_fix.ywrapstep = ywrap;
 	sgivwfb_fix.ypanstep = ypan;
 
-	strcpy(fb_info.modename, sgivwfb_fix.id);
-	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fix = sgivwfb_fix;
 	fb_info.var = sgivwfb_var;
 	fb_info.fbops = &sgivwfb_ops;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.par = &default_par;
-	fb_info.disp = &disp;
-	fb_info.currcon = -1;
-	fb_info.switch_con = gen_switch;
-	fb_info.updatevar = gen_update_var;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fb_info.screen_base =

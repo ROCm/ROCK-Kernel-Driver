@@ -125,9 +125,6 @@ static struct fb_info info;
      */
 static struct xxx_par __initdata current_par;
 
-    /* To go away in the near future */ 
-static struct display disp;
-
 int xxxfb_init(void);
 int xxxfb_setup(char*);
 
@@ -421,15 +418,6 @@ int __init xxxfb_init(void)
     info.flags = FBINFO_FLAG_DEFAULT;
     info.par = current_par;
 
-    /* The following has to be set but in th efuture will go away */
-    strcpy(info.modename, xxxfb_fix.id);
-    info.changevar = NULL;
-    info.currcon = -1;
-    info.disp = &disp; 			
-    info.switch_con = gen_switch;
-    info.updatevar = gen_update_var;
-    
-
     /*
      * This should give a reasonable default video mode. The following is
      * done when we can set a video mode. 
@@ -450,7 +438,6 @@ int __init xxxfb_init(void)
      * mode. If we are setting the mode ourselves we don't call this. 
      */	
     info.var = xxxfb_var;
-    gen_set_disp(-1, &fb_info);
 	
     if (register_framebuffer(&info) < 0)
 	return -EINVAL;
@@ -512,8 +499,6 @@ static struct fb_ops xxxfb_ops = {
 	.fb_release	= xxxfb_release, /* only if you need it to do something */
 	/* Stuff to go away. Use generic functions for now */
 	.fb_set_var	= gen_set_var,	
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 
 	.fb_check_var	= xxxfb_check_var,
 	.fb_set_par	= xxxfb_set_par,	/* optional */	

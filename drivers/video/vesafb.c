@@ -17,15 +17,11 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
-#include <linux/console.h>
-#include <linux/selection.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 
 #include <asm/io.h>
 #include <asm/mtrr.h>
-
-#include <video/fbcon.h>
 
 #define dac_reg	(0x3c8)
 #define dac_val	(0x3c9)
@@ -49,7 +45,6 @@ static struct fb_fix_screeninfo vesafb_fix __initdata = {
 	.accel	= FB_ACCEL_NONE,
 };
 
-static struct display disp;
 static struct fb_info fb_info;
 static u32 pseudo_palette[17];
 
@@ -176,8 +171,6 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 static struct fb_ops vesafb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= vesafb_setcolreg,
 	.fb_pan_display	= vesafb_pan_display,
 	.fb_fillrect	= cfb_fillrect,
@@ -351,21 +344,15 @@ int __init vesafb_init(void)
 		}
 	}
 	
-	strcpy(fb_info.modename, vesafb_fix.id);
-	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &vesafb_ops;
 	fb_info.var = vesafb_defined;
 	fb_info.fix = vesafb_fix;
-	fb_info.currcon = -1;
-	fb_info.disp = &disp;
-	fb_info.switch_con = gen_switch;
 	fb_info.updatevar = gen_update_var;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&fb_info.cmap, video_cmap_len, 0);
-	gen_set_disp(-1, &fb_info);
 
 	if (register_framebuffer(&fb_info)<0)
 		return -EINVAL;

@@ -20,7 +20,6 @@
 #include <linux/string.h>
 #include <linux/fb.h>
 #include <asm/types.h>
-#include <video/fbcon.h>
 
 #if BITS_PER_LONG == 32
 #define FB_READ		fb_readl
