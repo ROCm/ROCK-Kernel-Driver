@@ -120,17 +120,20 @@ extern unsigned long empty_zero_page[1024];
 #define PAGE_COPY	__pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_CACHABLE | _PAGE_ACCESSED | _PAGE_FLAGS_HARD)
 #define PAGE_READONLY	__pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_CACHABLE | _PAGE_ACCESSED | _PAGE_FLAGS_HARD)
 #define PAGE_KERNEL	__pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_CACHABLE | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_HW_SHARED | _PAGE_FLAGS_HARD)
+#define PAGE_KERNEL_NOCACHE \
+			__pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_HW_SHARED | _PAGE_FLAGS_HARD)
 #define PAGE_KERNEL_RO	__pgprot(_PAGE_PRESENT | _PAGE_CACHABLE | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_HW_SHARED | _PAGE_FLAGS_HARD)
 #define PAGE_KERNEL_PCC(slot, type) \
 			__pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_FLAGS_HARD | (slot ? _PAGE_PCC_AREA5 : _PAGE_PCC_AREA6) | (type))
 #else /* no mmu */
-#define PAGE_NONE	__pgprot(0)
-#define PAGE_SHARED	__pgprot(0)
-#define PAGE_COPY	__pgprot(0)
-#define PAGE_READONLY	__pgprot(0)
-#define PAGE_KERNEL	__pgprot(0)
-#define PAGE_KERNEL_RO	__pgprot(0)
-#define PAGE_KERNEL_PCC	__pgprot(0)
+#define PAGE_NONE		__pgprot(0)
+#define PAGE_SHARED		__pgprot(0)
+#define PAGE_COPY		__pgprot(0)
+#define PAGE_READONLY		__pgprot(0)
+#define PAGE_KERNEL		__pgprot(0)
+#define PAGE_KERNEL_NOCACHE	__pgprot(0)
+#define PAGE_KERNEL_RO		__pgprot(0)
+#define PAGE_KERNEL_PCC		__pgprot(0)
 #endif
 
 /*
@@ -255,25 +258,17 @@ extern void update_mmu_cache(struct vm_area_struct * vma,
 #define __swp_type(x)		((x).val & 0xff)
 #define __swp_offset(x)		((x).val >> 10)
 #define __swp_entry(type, offset) ((swp_entry_t) { (type) | ((offset) << 10) })
-#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
-#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) >> 1 })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val << 1 })
 
 /*
  * Encode and decode a nonlinear file mapping entry
  */
 #define PTE_FILE_MAX_BITS	29
-#define pte_to_pgoff(pte)	(pte_val(pte))
-#define pgoff_to_pte(off)	((pte_t) { (off) | _PAGE_FILE })
+#define pte_to_pgoff(pte)	(pte_val(pte) >> 1)
+#define pgoff_to_pte(off)	((pte_t) { ((off) << 1) | _PAGE_FILE })
 
-/*
- * Routines for update of PTE 
- *
- * We just can use generic implementation, as SuperH has no SMP feature.
- * (We needed atomic implementation for SMP)
- *
- */
-
-#define pte_same(A,B)	(pte_val(A) == pte_val(B))
+typedef pte_t *pte_addr_t;
 
 #endif /* !__ASSEMBLY__ */
 
@@ -290,12 +285,11 @@ extern void update_mmu_cache(struct vm_area_struct * vma,
 extern unsigned int kobjsize(const void *objp);
 #endif /* !CONFIG_MMU */
 
-#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
-#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
+#ifdef CONFIG_CPU_SH4
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
-#define __HAVE_ARCH_PTEP_SET_WRPROTECT
-#define __HAVE_ARCH_PTEP_MKDIRTY
-#define __HAVE_ARCH_PTE_SAME
+extern inline pte_t ptep_get_and_clear(pte_t *ptep);
+#endif
+
 #include <asm-generic/pgtable.h>
 
 #endif /* __ASM_SH_PAGE_H */
