@@ -901,7 +901,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 
 	adapter = netdev->priv;
 	memset(adapter, 0, sizeof(adapter));
-	dev->driver_data = netdev;
+	dev->dev.driver_data = netdev;
 
 	adapter->vdev = dev;
 	adapter->netdev = netdev;
@@ -971,7 +971,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 
 static int __devexit ibmveth_remove(struct vio_dev *dev)
 {
-	struct net_device *netdev = dev->driver_data;
+	struct net_device *netdev = dev->dev.driver_data;
 	struct ibmveth_adapter *adapter = netdev->priv;
 
 	unregister_netdev(netdev);
