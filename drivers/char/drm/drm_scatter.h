@@ -73,7 +73,7 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 
 	DRM_DEBUG( "%s\n", __FUNCTION__ );
 
-	if (drm_core_check_feature(dev, DRIVER_SG))
+	if (!drm_core_check_feature(dev, DRIVER_SG))
 		return -EINVAL;
 
 	if ( dev->sg )
