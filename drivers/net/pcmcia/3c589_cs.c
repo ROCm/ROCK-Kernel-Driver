@@ -308,7 +308,7 @@ static void tc589_config(dev_link_t *link)
     tuple_t tuple;
     cisparse_t parse;
     u16 buf[32], *phys_addr;
-    int last_fn, last_ret, i, j, multi = 0;
+    int last_fn, last_ret, i, j, multi = 0, fifo;
     ioaddr_t ioaddr;
     char *ram_split[] = {"5:3", "3:1", "1:1", "3:5"};
     
@@ -357,11 +357,6 @@ static void tc589_config(dev_link_t *link)
 	
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
-    if (register_netdev(dev) != 0) {
-	printk(KERN_ERR "3c589_cs: register_netdev() failed\n");
-	goto failed;
-    }
-    
     ioaddr = dev->base_addr;
     EL3WINDOW(0);
 
@@ -382,13 +377,10 @@ static void tc589_config(dev_link_t *link)
 	}
     }
 
-    strcpy(lp->node.dev_name, dev->name);
-    link->dev = &lp->node;
-    link->state &= ~DEV_CONFIG_PENDING;
-    
     /* The address and resource configuration register aren't loaded from
        the EEPROM and *must* be set to 0 and IRQ3 for the PCMCIA version. */
     outw(0x3f00, ioaddr + 8);
+    fifo = inl(ioaddr);
 
     /* The if_port symbol can be set when the module is loaded */
     if ((if_port >= 0) && (if_port <= 3))
@@ -396,14 +388,24 @@ static void tc589_config(dev_link_t *link)
     else
 	printk(KERN_ERR "3c589_cs: invalid if_port requested\n");
     
+    link->dev = &lp->node;
+    link->state &= ~DEV_CONFIG_PENDING;
+
+    if (register_netdev(dev) != 0) {
+	printk(KERN_ERR "3c589_cs: register_netdev() failed\n");
+	link->dev = NULL;
+	goto failed;
+    }
+
+    strcpy(lp->node.dev_name, dev->name);
+
     printk(KERN_INFO "%s: 3Com 3c%s, io %#3lx, irq %d, hw_addr ",
 	   dev->name, (multi ? "562" : "589"), dev->base_addr,
 	   dev->irq);
     for (i = 0; i < 6; i++)
 	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
-    i = inl(ioaddr);
     printk(KERN_INFO "  %dK FIFO split %s Rx:Tx, %s xcvr\n",
-	   (i & 7) ? 32 : 8, ram_split[(i >> 16) & 3],
+	   (fifo & 7) ? 32 : 8, ram_split[(fifo >> 16) & 3],
 	   if_names[dev->if_port]);
     return;
 

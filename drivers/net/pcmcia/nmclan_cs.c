@@ -734,11 +734,6 @@ static void nmclan_config(dev_link_t *link)
   CS_CHECK(RequestConfiguration, pcmcia_request_configuration(handle, &link->conf));
   dev->irq = link->irq.AssignedIRQ;
   dev->base_addr = link->io.BasePort1;
-  i = register_netdev(dev);
-  if (i != 0) {
-    printk(KERN_NOTICE "nmclan_cs: register_netdev() failed\n");
-    goto failed;
-  }
 
   ioaddr = dev->base_addr;
 
@@ -777,9 +772,17 @@ static void nmclan_config(dev_link_t *link)
   else
     printk(KERN_NOTICE "nmclan_cs: invalid if_port requested\n");
 
-  strcpy(lp->node.dev_name, dev->name);
   link->dev = &lp->node;
   link->state &= ~DEV_CONFIG_PENDING;
+
+  i = register_netdev(dev);
+  if (i != 0) {
+    printk(KERN_NOTICE "nmclan_cs: register_netdev() failed\n");
+    link->dev = NULL;
+    goto failed;
+  }
+
+  strcpy(lp->node.dev_name, dev->name);
 
   printk(KERN_INFO "%s: nmclan: port %#3lx, irq %d, %s port, hw_addr ",
 	 dev->name, dev->base_addr, dev->irq, if_names[dev->if_port]);

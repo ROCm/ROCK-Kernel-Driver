@@ -384,6 +384,8 @@ static void tc574_detach(dev_link_t *link)
 #define CS_CHECK(fn, ret) \
   do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
+static char *ram_split[] = {"5:3", "3:1", "1:1", "3:5"};
+
 static void tc574_config(dev_link_t *link)
 {
 	client_handle_t handle = link->handle;
@@ -396,6 +398,7 @@ static void tc574_config(dev_link_t *link)
 	ioaddr_t ioaddr;
 	u16 *phys_addr;
 	char *cardname;
+	union wn3_config config;
 
 	phys_addr = (u16 *)dev->dev_addr;
 
@@ -431,15 +434,7 @@ static void tc574_config(dev_link_t *link)
 	dev->irq = link->irq.AssignedIRQ;
 	dev->base_addr = link->io.BasePort1;
 
-	if (register_netdev(dev) != 0) {
-		printk(KERN_NOTICE "3c574_cs: register_netdev() failed\n");
-		goto failed;
-	}
-
 	ioaddr = dev->base_addr;
-	strcpy(lp->node.dev_name, dev->name);
-	link->dev = &lp->node;
-	link->state &= ~DEV_CONFIG_PENDING;
 
 	/* The 3c574 normally uses an EEPROM for configuration info, including
 	   the hardware address.  The future products may include a modem chip
@@ -467,24 +462,14 @@ static void tc574_config(dev_link_t *link)
 	} else
 		cardname = "3Com 3c574";
 
-	printk(KERN_INFO "%s: %s at io %#3lx, irq %d, hw_addr ",
-		   dev->name, cardname, dev->base_addr, dev->irq);
-
-	for (i = 0; i < 6; i++)
-		printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : ".\n"));
-
 	{
-		u_char mcr, *ram_split[] = {"5:3", "3:1", "1:1", "3:5"};
-		union wn3_config config;
+		u_char mcr;
 		outw(2<<11, ioaddr + RunnerRdCtrl);
 		mcr = inb(ioaddr + 2);
 		outw(0<<11, ioaddr + RunnerRdCtrl);
 		printk(KERN_INFO "  ASIC rev %d,", mcr>>3);
 		EL3WINDOW(3);
 		config.i = inl(ioaddr + Wn3_Config);
-		printk(" %dK FIFO split %s Rx:Tx, %sMII interface.\n",
-			   8 << config.u.ram_size, ram_split[config.u.ram_split],
-			   config.u.autoselect ? "autoselect " : "");
 		lp->default_media = config.u.xcvr;
 		lp->autoselect = config.u.autoselect;
 	}
@@ -530,6 +515,25 @@ static void tc574_config(dev_link_t *link)
 			mdio_write(ioaddr, lp->phys, 4, lp->advertising);
 		}
 	}
+
+	link->state &= ~DEV_CONFIG_PENDING;
+	link->dev = &lp->node;
+
+	if (register_netdev(dev) != 0) {
+		printk(KERN_NOTICE "3c574_cs: register_netdev() failed\n");
+		link->dev = NULL;
+		goto failed;
+	}
+
+	strcpy(lp->node.dev_name, dev->name);
+
+	printk(KERN_INFO "%s: %s at io %#3lx, irq %d, hw_addr ",
+		   dev->name, cardname, dev->base_addr, dev->irq);
+	for (i = 0; i < 6; i++)
+		printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : ".\n"));
+	printk(" %dK FIFO split %s Rx:Tx, %sMII interface.\n",
+		   8 << config.u.ram_size, ram_split[config.u.ram_split],
+		   config.u.autoselect ? "autoselect " : "");
 
 	return;
 

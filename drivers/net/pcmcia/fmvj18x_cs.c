@@ -510,10 +510,6 @@ static void fmvj18x_config(dev_link_t *link)
     CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
-    if (register_netdev(dev) != 0) {
-	printk(KERN_NOTICE "fmvj18x_cs: register_netdev() failed\n");
-	goto failed;
-    }
 
     if (link->io.BasePort2 != 0)
 	fmvj18x_setup_mfc(link);
@@ -575,7 +571,6 @@ static void fmvj18x_config(dev_link_t *link)
 	/* Read MACID from Buggy CIS */
 	if (fmvj18x_get_hwinfo(link, tuple.TupleData) == -1) {
 	    printk(KERN_NOTICE "fmvj18x_cs: unable to read hardware net address.\n");
-	    unregister_netdev(dev);
 	    goto failed;
 	}
 	for (i = 0 ; i < 6; i++) {
@@ -592,10 +587,18 @@ static void fmvj18x_config(dev_link_t *link)
 	break;
     }
 
-    strcpy(lp->node.dev_name, dev->name);
-    link->dev = &lp->node;
-
     lp->cardtype = cardtype;
+    link->dev = &lp->node;
+    link->state &= ~DEV_CONFIG_PENDING;
+
+    if (register_netdev(dev) != 0) {
+	printk(KERN_NOTICE "fmvj18x_cs: register_netdev() failed\n");
+	link->dev = NULL;
+	goto failed;
+    }
+
+    strcpy(lp->node.dev_name, dev->name);
+
     /* print current configuration */
     printk(KERN_INFO "%s: %s, sram %s, port %#3lx, irq %d, hw_addr ", 
 	   dev->name, card_name, sram_config == 0 ? "4K TX*2" : "8K TX*2", 
@@ -603,7 +606,6 @@ static void fmvj18x_config(dev_link_t *link)
     for (i = 0; i < 6; i++)
 	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
 
-    link->state &= ~DEV_CONFIG_PENDING;
     return;
     
 cs_failed:

@@ -430,18 +430,10 @@ static void axnet_config(dev_link_t *link)
     ei_status.block_input = &block_input;
     ei_status.block_output = &block_output;
 
-    strcpy(info->node.dev_name, dev->name);
-
     if (inb(dev->base_addr + AXNET_TEST) != 0)
 	info->flags |= IS_AX88790;
     else
 	info->flags |= IS_AX88190;
-
-    printk(KERN_INFO "%s: Asix AX88%d90: io %#3lx, irq %d, hw_addr ",
-	   dev->name, ((info->flags & IS_AX88790) ? 7 : 1),
-	   dev->base_addr, dev->irq);
-    for (i = 0; i < 6; i++)
-	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
 
     if (info->flags & IS_AX88790)
 	outb(0x10, dev->base_addr + AXNET_GPIO);  /* select Internal PHY */
@@ -463,19 +455,27 @@ static void axnet_config(dev_link_t *link)
     }
 
     info->phy_id = (i < 32) ? i : -1;
-    if (i < 32) {
-	DEBUG(0, "  MII transceiver at index %d, status %x.\n", i, j);
-    } else {
-	printk(KERN_NOTICE "  No MII transceivers found!\n");
-    }
+    link->dev = &info->node;
+    link->state &= ~DEV_CONFIG_PENDING;
 
     if (register_netdev(dev) != 0) {
 	printk(KERN_NOTICE "axnet_cs: register_netdev() failed\n");
+	link->dev = NULL;
 	goto failed;
     }
 
-    link->dev = &info->node;
-    link->state &= ~DEV_CONFIG_PENDING;
+    strcpy(info->node.dev_name, dev->name);
+
+    printk(KERN_INFO "%s: Asix AX88%d90: io %#3lx, irq %d, hw_addr ",
+	   dev->name, ((info->flags & IS_AX88790) ? 7 : 1),
+	   dev->base_addr, dev->irq);
+    for (i = 0; i < 6; i++)
+	printk("%02X%s", dev->dev_addr[i], ((i<5) ? ":" : "\n"));
+    if (info->phy_id != -1) {
+	DEBUG(0, "  MII transceiver at index %d, status %x.\n", info->phy_id, j);
+    } else {
+	printk(KERN_NOTICE "  No MII transceivers found!\n");
+    }
     return;
 
 cs_failed:
