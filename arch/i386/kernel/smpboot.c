@@ -503,6 +503,39 @@ static struct task_struct * __init fork_by_hand(void)
 	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
+#ifdef CONFIG_NUMA
+
+/* which logical CPUs are on which nodes */
+volatile unsigned long node_2_cpu_mask[MAX_NR_NODES] = 
+						{ [0 ... MAX_NR_NODES-1] = 0 };
+/* which node each logical CPU is on */
+volatile int cpu_2_node[NR_CPUS] = { [0 ... NR_CPUS-1] = 0 };
+
+/* set up a mapping between cpu and node. */
+static inline void map_cpu_to_node(int cpu, int node)
+{
+	printk("Mapping cpu %d to node %d\n", cpu, node);
+	node_2_cpu_mask[node] |= (1 << cpu);
+	cpu_2_node[cpu] = node;
+}
+
+/* undo a mapping between cpu and node. */
+static inline void unmap_cpu_to_node(int cpu)
+{
+	int node;
+
+	printk("Unmapping cpu %d from all nodes\n", cpu);
+	for (node = 0; node < MAX_NR_NODES; node ++)
+		node_2_cpu_mask[node] &= ~(1 << cpu);
+	cpu_2_node[cpu] = -1;
+}
+#else /* !CONFIG_NUMA */
+
+#define map_cpu_to_node(cpu, node)	({})
+#define unmap_cpu_to_node(cpu)	({})
+
+#endif /* CONFIG_NUMA */
+
 /* which physical APIC ID maps to which logical CPU number */
 volatile int physical_apicid_2_cpu[MAX_APICID];
 /* which logical CPU number maps to which physical APIC ID */
@@ -537,6 +570,7 @@ static inline void map_cpu_to_boot_apicid(int cpu, int apicid)
 	if (clustered_apic_mode) {
 		logical_apicid_2_cpu[apicid] = cpu;	
 		cpu_2_logical_apicid[cpu] = apicid;
+		map_cpu_to_node(cpu, apicid_to_node(apicid));
 	} else {
 		physical_apicid_2_cpu[apicid] = cpu;	
 		cpu_2_physical_apicid[cpu] = apicid;
@@ -552,6 +586,7 @@ static inline void unmap_cpu_to_boot_apicid(int cpu, int apicid)
 	if (clustered_apic_mode) {
 		logical_apicid_2_cpu[apicid] = -1;	
 		cpu_2_logical_apicid[cpu] = -1;
+		unmap_cpu_to_node(cpu);
 	} else {
 		physical_apicid_2_cpu[apicid] = -1;	
 		cpu_2_physical_apicid[cpu] = -1;
