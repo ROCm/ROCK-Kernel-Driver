@@ -507,7 +507,7 @@ const long channel_frequency[] = {
 	2412, 2417, 2422, 2427, 2432, 2437, 2442,
 	2447, 2452, 2457, 2462, 2467, 2472, 2484
 };
-#define NUM_CHANNELS ( sizeof(channel_frequency) / sizeof(channel_frequency[0]) )
+#define NUM_CHANNELS ARRAY_SIZE(channel_frequency)
 
 /* This tables gives the actual meanings of the bitrate IDs returned by the firmware. */
 struct {
@@ -525,7 +525,7 @@ struct {
 	{55,  1,  7,  7},
 	{110, 0,  5,  8},
 };
-#define BITRATE_TABLE_SIZE (sizeof(bitrate_table) / sizeof(bitrate_table[0]))
+#define BITRATE_TABLE_SIZE ARRAY_SIZE(bitrate_table)
 
 /********************************************************************/
 /* Data types                                                       */
