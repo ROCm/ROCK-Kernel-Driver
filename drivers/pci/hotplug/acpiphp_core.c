@@ -324,31 +324,22 @@ static int __init init_slots(void)
 	for (i = 0; i < num_slots; ++i) {
 		slot = kmalloc(sizeof(struct slot), GFP_KERNEL);
 		if (!slot)
-			return -ENOMEM;
+			goto error;
 		memset(slot, 0, sizeof(struct slot));
 
 		slot->hotplug_slot = kmalloc(sizeof(struct hotplug_slot), GFP_KERNEL);
-		if (!slot->hotplug_slot) {
-			kfree(slot);
-			return -ENOMEM;
-		}
+		if (!slot->hotplug_slot)
+			goto error_slot;
 		memset(slot->hotplug_slot, 0, sizeof(struct hotplug_slot));
 
 		slot->hotplug_slot->info = kmalloc(sizeof(struct hotplug_slot_info), GFP_KERNEL);
-		if (!slot->hotplug_slot->info) {
-			kfree(slot->hotplug_slot);
-			kfree(slot);
-			return -ENOMEM;
-		}
+		if (!slot->hotplug_slot->info)
+			goto error_hpslot;
 		memset(slot->hotplug_slot->info, 0, sizeof(struct hotplug_slot_info));
 
 		slot->hotplug_slot->name = kmalloc(SLOT_NAME_SIZE, GFP_KERNEL);
-		if (!slot->hotplug_slot->name) {
-			kfree(slot->hotplug_slot->info);
-			kfree(slot->hotplug_slot);
-			kfree(slot);
-			return -ENOMEM;
-		}
+		if (!slot->hotplug_slot->name)
+			goto error_info;
 
 		slot->magic = SLOT_MAGIC;
 		slot->number = i;
@@ -378,6 +369,14 @@ static int __init init_slots(void)
 	}
 
 	return retval;
+error_info:
+	kfree(slot->hotplug_slot->info);
+error_hpslot:
+	kfree(slot->hotplug_slot);
+error_slot:
+	kfree(slot);
+error:
+	return -ENOMEM;
 }
 
 
