@@ -377,7 +377,8 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 
 	set_bit(usage->type, input->evbit);
 	if ((usage->type == EV_REL)
-			&& (device->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK)
+			&& (device->quirks & (HID_QUIRK_2WHEEL_MOUSE_HACK_BACK
+				| HID_QUIRK_2WHEEL_MOUSE_HACK_EXTRA))
 			&& (usage->code == REL_WHEEL)) {
 		set_bit(REL_HWHEEL, bit);
 	}
@@ -431,8 +432,8 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 
 	input_regs(input, regs);
 
-	if ((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK)
-			&& (usage->code == BTN_BACK || usage->code == BTN_EXTRA)) {
+	if (((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_EXTRA) && (usage->code == BTN_EXTRA))
+		|| ((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_BACK) && (usage->code == BTN_BACK))) {
 		if (value)
 			hid->quirks |= HID_QUIRK_2WHEEL_MOUSE_HACK_ON;
 		else
