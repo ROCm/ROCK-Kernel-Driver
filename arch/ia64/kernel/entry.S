@@ -663,25 +663,31 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	PT_REGS_UNWIND_INFO(0)
 	/*
 	 * work.need_resched etc. mustn't get changed by this CPU before it returns to
-	 * user- or fsys-mode, hence we disable interrupts early on:
+	 * user- or fsys-mode, hence we disable interrupts early on.
+	 *
+	 * p6 controls whether current_thread_info()->flags needs to be check for
+	 * extra work.  We always check for extra work when returning to user-level.
+	 * With CONFIG_PREEMPT, we also check for extra work when the preempt_count
+	 * is 0.  After extra work processing has been completed, execution
+	 * resumes at .work_processed_syscall with p6 set to 1 if the extra-work-check
+	 * needs to be redone.
 	 */
 #ifdef CONFIG_PREEMPT
 	rsm psr.i				// disable interrupts
-#else
-(pUStk)	rsm psr.i
-#endif
 	cmp.eq pLvSys,p0=r0,r0			// pLvSys=1: leave from syscall
-(pUStk)	cmp.eq.unc p6,p0=r0,r0			// p6 <- pUStk
-.work_processed_syscall:
-#ifdef CONFIG_PREEMPT
 (pKStk) adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
 	;;
 	.pred.rel.mutex pUStk,pKStk
 (pKStk) ld4 r21=[r20]			// r21 <- preempt_count
 (pUStk)	mov r21=0			// r21 <- 0
 	;;
-(p6)	cmp.eq.unc p6,p0=r21,r0		// p6 <- p6 && (r21 == 0)
-#endif /* CONFIG_PREEMPT */
+	cmp.eq p6,p0=r21,r0		// p6 <- pUStk || (preempt_count == 0)
+#else /* !CONFIG_PREEMPT */
+(pUStk)	rsm psr.i
+	cmp.eq pLvSys,p0=r0,r0		// pLvSys=1: leave from syscall
+(pUStk)	cmp.eq.unc p6,p0=r0,r0		// p6 <- pUStk
+#endif
+.work_processed_syscall:
 	adds r16=PT(LOADRS)+16,r12
 	adds r17=PT(AR_BSPSTORE)+16,r12
 	adds r18=TI_FLAGS+IA64_TASK_SIZE,r13
@@ -776,26 +782,31 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	PT_REGS_UNWIND_INFO(0)
 	/*
 	 * work.need_resched etc. mustn't get changed by this CPU before it returns to
-	 * user- or fsys-mode, hence we disable interrupts early on:
+	 * user- or fsys-mode, hence we disable interrupts early on.
+	 *
+	 * p6 controls whether current_thread_info()->flags needs to be check for
+	 * extra work.  We always check for extra work when returning to user-level.
+	 * With CONFIG_PREEMPT, we also check for extra work when the preempt_count
+	 * is 0.  After extra work processing has been completed, execution
+	 * resumes at .work_processed_syscall with p6 set to 1 if the extra-work-check
+	 * needs to be redone.
 	 */
 #ifdef CONFIG_PREEMPT
 	rsm psr.i				// disable interrupts
-#else
-(pUStk)	rsm psr.i
-#endif
 	cmp.eq p0,pLvSys=r0,r0			// pLvSys=0: leave from kernel
-(pUStk)	cmp.eq.unc p6,p0=r0,r0			// p6 <- pUStk
-	;;
-.work_processed_kernel:
-#ifdef CONFIG_PREEMPT
-	adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
+(pKStk)	adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
 	;;
 	.pred.rel.mutex pUStk,pKStk
 (pKStk)	ld4 r21=[r20]			// r21 <- preempt_count
 (pUStk)	mov r21=0			// r21 <- 0
 	;;
-(p6)	cmp.eq.unc p6,p0=r21,r0		// p6 <- p6 && (r21 == 0)
-#endif /* CONFIG_PREEMPT */
+	cmp.eq p6,p0=r21,r0		// p6 <- pUStk || (preempt_count == 0)
+#else
+(pUStk)	rsm psr.i
+	cmp.eq p0,pLvSys=r0,r0		// pLvSys=0: leave from kernel
+(pUStk)	cmp.eq.unc p6,p0=r0,r0		// p6 <- pUStk
+#endif
+.work_processed_kernel:
 	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
 (p6)	ld4 r31=[r17]				// load current_thread_info()->flags
@@ -1065,7 +1076,7 @@ skip_rbs_switch:
 	br.cond.sptk.many .work_processed_kernel	// re-check
 
 .notify:
-	br.call.spnt.many rp=notify_resume_user
+(pUStk)	br.call.spnt.many rp=notify_resume_user
 .ret10:	cmp.ne p6,p0=r0,r0				// p6 <- 0
 (pLvSys)br.cond.sptk.many .work_processed_syscall	// don't re-check
 	br.cond.sptk.many .work_processed_kernel	// don't re-check
