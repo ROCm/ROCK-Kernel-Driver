@@ -352,6 +352,7 @@ struct fb_pixmap {
 struct fb_info;
 struct vm_area_struct;
 struct file;
+struct device;
 
     /*
      *  Frame buffer operations
@@ -412,6 +413,7 @@ struct fb_info {
    struct vc_data *display_fg;		/* Console visible on this display */
    int currcon;				/* Current VC. */	
    void *pseudo_palette;                /* Fake palette of 16 colors */ 
+   struct device *dev;                  /* pointer to the device for this fb */
 #ifdef CONFIG_BOOTSPLASH
    struct splash_data *splash_data;
    unsigned char *splash_pic;

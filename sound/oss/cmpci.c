@@ -3024,16 +3024,16 @@ void initialize_chip(struct pci_dev *pcidev)
 		printk(KERN_INFO "cmpci: found %s adapter at io %#06x irq %u\n",
 		       devicename, s->iobase, s->irq);
 		/* register devices */
-		if ((s->dev_audio = register_sound_dsp(&cm_audio_fops, -1)) < 0)
+		if ((s->dev_audio = register_sound_dsp(&cm_audio_fops, -1, &pcidev->dev)) < 0)
 			goto err_dev1;
-		if ((s->dev_mixer = register_sound_mixer(&cm_mixer_fops, -1)) < 0)
+		if ((s->dev_mixer = register_sound_mixer(&cm_mixer_fops, -1, &pcidev->dev)) < 0)
 			goto err_dev2;
 #ifdef CONFIG_SOUND_CMPCI_MIDI
-		if ((s->dev_midi = register_sound_midi(&cm_midi_fops, -1)) < 0)
+		if ((s->dev_midi = register_sound_midi(&cm_midi_fops, -1, &pcidev->dev)) < 0)
 			goto err_dev3;
 #endif
 #ifdef CONFIG_SOUND_CMPCI_FM
-		if ((s->dev_dmfm = register_sound_special(&cm_dmfm_fops, 15 /* ?? */)) < 0)
+		if ((s->dev_dmfm = register_sound_special(&cm_dmfm_fops, 15, &pcidev->dev /* ?? */)) < 0)
 			goto err_dev4;
 #endif
 		pci_set_master(pcidev);	/* enable bus mastering */

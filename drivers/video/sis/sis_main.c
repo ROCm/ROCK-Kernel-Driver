@@ -4507,6 +4507,7 @@ int __init sisfb_init(void)
 		sis_fb_info.par = &ivideo;
 		sis_fb_info.screen_base = ivideo.video_vbase;
 		sis_fb_info.fbops = &sisfb_ops;
+		sis_fb_info.dev = &pdev->dev;
 		sisfb_get_fix(&sis_fb_info.fix, -1, &sis_fb_info);
 		sis_fb_info.pseudo_palette = pseudo_palette;
 		

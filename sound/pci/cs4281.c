@@ -1036,6 +1036,7 @@ static int __devinit snd_cs4281_pcm(cs4281_t * chip, int device, snd_pcm_t ** rp
 	pcm->private_free = snd_cs4281_pcm_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "CS4281");
+	pcm->dev = &chip->pci->dev;
 	chip->pcm = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 512*1024);
@@ -1865,6 +1866,7 @@ static int __devinit snd_cs4281_midi(cs4281_t * chip, int device, snd_rawmidi_t 
 	rmidi->info_flags |= SNDRV_RAWMIDI_INFO_OUTPUT | SNDRV_RAWMIDI_INFO_INPUT | SNDRV_RAWMIDI_INFO_DUPLEX;
 	rmidi->private_data = chip;
 	chip->rmidi = rmidi;
+	chip->rmidi->dev_ptr = &chip->pci->dev;
 	if (rrawmidi)
 		*rrawmidi = rmidi;
 	return 0;
@@ -1989,6 +1991,7 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+	opl3->dev = &pci->dev;
 	if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 		snd_card_free(card);
 		return err;

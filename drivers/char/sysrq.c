@@ -266,7 +266,7 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 /* v */	NULL, /* May be assigned at init time by SMP VOYAGER */
 /* w */	NULL,
 /* x */	NULL,
-/* y */	NULL,
+/* y */	&sysrq_mountro_op,	/* stupid fujitsu laptop, can't hit the U key */
 /* z */	NULL
 };
 

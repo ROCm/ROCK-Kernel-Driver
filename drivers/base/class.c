@@ -10,7 +10,11 @@
  *
  */
 
+#ifdef DEBUG_KOBJECT
+#define DEBUG 1
+#else
 #undef DEBUG
+#endif
 
 #include <linux/device.h>
 #include <linux/module.h>

@@ -1895,6 +1895,7 @@ snd_es1968_pcm(es1968_t *chip, int device)
 
 	strcpy(pcm->name, "ESS Maestro");
 
+	pcm->dev = &chip->pci->dev;
 	chip->pcm = pcm;
 
 	return 0;
@@ -2755,6 +2756,7 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 			printk(KERN_WARNING "es1968: skipping MPU-401 MIDI support..\n");
 		}
 	}
+	chip->rmidi->dev_ptr = &pci->dev;
 
 	/* card switches */
 	for (i = 0; i < num_controls(snd_es1968_control_switches); i++) {

@@ -991,6 +991,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	int err = -EINVAL;
 	int i;
 	int j;
+	int config;
 
 	/*
 	 * Set the driver for the usb device to point to the "generic" driver.
@@ -1108,18 +1109,31 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	/* choose and set the configuration. that registers the interfaces
 	 * with the driver core, and lets usb device drivers bind to them.
+	 * NOTE:  should interact with hub power budgeting.
 	 */
+	config = dev->config[0].desc.bConfigurationValue;
 	if (dev->descriptor.bNumConfigurations != 1) {
+		for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
+			/* heuristic:  Linux is more likely to have class
+			 * drivers, so avoid vendor-specific interfaces.
+			 */
+			if (dev->config[i].interface[0]->altsetting
+						->desc.bInterfaceClass
+					== USB_CLASS_VENDOR_SPEC)
+				continue;
+			config = dev->config[i].desc.bConfigurationValue;
+			break;
+		}
 		dev_info(&dev->dev,
 			"configuration #%d chosen from %d choices\n",
-			dev->config[0].desc.bConfigurationValue,
+			config,
 			dev->descriptor.bNumConfigurations);
 	}
-	err = usb_set_configuration(dev,
-			dev->config[0].desc.bConfigurationValue);
+	err = usb_set_configuration(dev, config);
 	if (err) {
 		dev_err(&dev->dev, "can't set config #%d, error %d\n",
-			dev->config[0].desc.bConfigurationValue, err);
+			config, err);
+		device_del(&dev->dev);
 		goto fail;
 	}
 

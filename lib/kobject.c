@@ -10,7 +10,11 @@
  * about using the kobject interface.
  */
 
+#ifdef DEBUG_KOBJECT
+#define DEBUG 1
+#else
 #undef DEBUG
+#endif
 
 #include <linux/kobject.h>
 #include <linux/string.h>
@@ -188,8 +192,8 @@ static void kset_hotplug(const char *action, struct kset *kset,
 		}
 	}
 
-	pr_debug ("%s: %s %s %s %s %s %s\n", __FUNCTION__, argv[0], argv[1],
-		  envp[0], envp[1], envp[2], envp[3]);
+	pr_debug ("%s: %s %s %s %s %s %s %s\n", __FUNCTION__, argv[0], argv[1],
+		  envp[0], envp[1], envp[2], envp[3], envp[4]);
 	retval = call_usermodehelper (argv[0], argv, envp, 0);
 	if (retval)
 		pr_debug ("%s - call_usermodehelper returned %d\n",
@@ -216,6 +220,7 @@ static void kset_hotplug(const char *action, struct kset *kset,
 
 void kobject_init(struct kobject * kobj)
 {
+	WARN_ON(atomic_read(&kobj->refcount));
 	atomic_set(&kobj->refcount,1);
 	INIT_LIST_HEAD(&kobj->entry);
 	kobj->kset = kset_get(kobj->kset);
@@ -239,8 +244,6 @@ static void unlink(struct kobject * kobj)
 		list_del_init(&kobj->entry);
 		up_write(&kobj->kset->subsys->rwsem);
 	}
-	if (kobj->parent) 
-		kobject_put(kobj->parent);
 	kobject_put(kobj);
 }
 
@@ -277,9 +280,11 @@ int kobject_add(struct kobject * kobj)
 	kobj->parent = parent;
 
 	error = create_dir(kobj);
-	if (error)
+	if (error) {
 		unlink(kobj);
-	else {
+		if (parent)
+			kobject_put(parent);
+	} else {
 		/* If this kobj does not belong to a kset,
 		   try to find a parent that does. */
 		top_kobj = kobj;
@@ -443,6 +448,7 @@ struct kobject * kobject_get(struct kobject * kobj)
 		atomic_inc(&kobj->refcount);
 	} else
 		ret = NULL;
+	WARN_ON((kobj != NULL) && (ret==NULL));
 	return ret;
 }
 
@@ -455,6 +461,7 @@ void kobject_cleanup(struct kobject * kobj)
 {
 	struct kobj_type * t = get_ktype(kobj);
 	struct kset * s = kobj->kset;
+	struct kobject * parent = kobj->parent;
 
 	pr_debug("kobject %s: cleaning up\n",kobject_name(kobj));
 	if (kobj->k_name != kobj->name)
@@ -462,8 +469,17 @@ void kobject_cleanup(struct kobject * kobj)
 	kobj->k_name = NULL;
 	if (t && t->release)
 		t->release(kobj);
+	else {
+		printk(KERN_ERR "kobject '%s' does not have a release() function, "
+			"it is broken and must be fixed.\n",
+			kobj->name);
+		WARN_ON(1);
+	}
+
 	if (s)
 		kset_put(s);
+	if (parent) 
+		kobject_put(parent);
 }
 
 /**

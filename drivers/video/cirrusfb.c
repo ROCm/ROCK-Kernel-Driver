@@ -2787,6 +2787,7 @@ int __init clgenfb_init(void)
 	fb_info->gen.info.switch_con = &fbgen_switch;
 	fb_info->gen.info.updatevar = &fbgen_update_var;
 	fb_info->gen.info.flags = FBINFO_FLAG_DEFAULT;
+	fb_info->gen.info.dev = fb_info->pdev;
 
 	for (j = 0; j < 256; j++) {
 		if (j < 16) {

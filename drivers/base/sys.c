@@ -12,7 +12,11 @@
  * add themselves as children of the system bus.
  */
 
+#ifdef DEBUG_KOBJECT
+#define DEBUG 1
+#else
 #undef DEBUG
+#endif
 
 #include <linux/sysdev.h>
 #include <linux/err.h>

@@ -310,6 +310,7 @@ struct snd_opl3 {
 	spinlock_t sys_timer_lock;	/* Lock for system timer access */
 #endif
 	struct semaphore access_mutex;	/* locking */
+	struct device *dev;
 };
 
 /* opl3.c */

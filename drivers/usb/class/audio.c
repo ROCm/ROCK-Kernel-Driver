@@ -3045,7 +3045,7 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 		kfree(as);
 		return;
 	}
-	if ((as->dev_audio = register_sound_dsp(&usb_audio_fops, -1)) < 0) {
+	if ((as->dev_audio = register_sound_dsp(&usb_audio_fops, -1, &dev->dev)) < 0) {
 		printk(KERN_ERR "usbaudio: cannot register dsp\n");
 		usb_free_urb(as->usbin.durb[0].urb);
 		usb_free_urb(as->usbin.durb[1].urb);
@@ -3640,7 +3640,7 @@ static void usb_audio_constructmixer(struct usb_audio_state *s, unsigned char *b
 	ms->state = s;
 	ms->iface = ctrlif;
 	ms->numch = state.nrmixch;
-	if ((ms->dev_mixer = register_sound_mixer(&usb_mixer_fops, -1)) < 0) {
+	if ((ms->dev_mixer = register_sound_mixer(&usb_mixer_fops, -1, &s->usbdev->dev)) < 0) {
 		printk(KERN_ERR "usbaudio: cannot register mixer\n");
 		kfree(ms);
 		return;

@@ -857,7 +857,7 @@ static int ad1889_ac97_init(ad1889_dev_t *dev, int id)
 
 	dev->ac97_features = eid;
 
-	if ((ac97->dev_mixer = register_sound_mixer(&ad1889_mixer_fops, -1)) < 0) {
+	if ((ac97->dev_mixer = register_sound_mixer(&ad1889_mixer_fops, -1, &dev->pci->dev)) < 0) {
 		printk(KERN_ERR DEVNAME ": cannot register mixer\n");
 		goto out_free;
 	}
@@ -1008,7 +1008,7 @@ static int __devinit ad1889_probe(struct pci_dev *pcidev, const struct pci_devic
 		goto err_free_mem;
 
 	/* register /dev/dsp */
-	if ((dev->dev_audio = register_sound_dsp(&ad1889_fops, -1)) < 0) {
+	if ((dev->dev_audio = register_sound_dsp(&ad1889_fops, -1, &pcidev->dev)) < 0) {
 		printk(KERN_ERR DEVNAME ": cannot register /dev/dsp\n");
 		goto err_free_irq;
 	}

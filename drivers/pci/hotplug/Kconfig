@@ -88,6 +88,10 @@ config HOTPLUG_PCI_ACPI
 
 	  When in doubt, say N.
 
+config HOTPLUG_PCI_AMD
+	tristate "AMD Standard Hot Plug Controller (SHPC) driver"
+	depends on HOTPLUG_PCI
+
 config HOTPLUG_PCI_CPCI
 	bool "CompactPCI Hotplug driver"
 	depends on HOTPLUG_PCI

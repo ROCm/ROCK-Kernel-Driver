@@ -1,0 +1,7 @@
+config SECURITY_RSA
+	tristate "RSA crap"
+	help
+	  bah bah bah...
+
+	  If you are unsure how to answer this question, answer N.
+

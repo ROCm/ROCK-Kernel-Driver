@@ -2063,6 +2063,7 @@ static int __devinit snd_cmipci_pcm_new(cmipci_t *cm, int device)
 	pcm->private_free = snd_cmipci_pcm_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "C-Media PCI DAC/ADC");
+	pcm->dev = &cm->pci->dev;
 	cm->pcm = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(cm->pci, pcm, 64*1024, 128*1024);
@@ -2085,6 +2086,7 @@ static int __devinit snd_cmipci_pcm2_new(cmipci_t *cm, int device)
 	pcm->private_free = snd_cmipci_pcm_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "C-Media PCI 2nd DAC");
+	pcm->dev = &cm->pci->dev;
 	cm->pcm2 = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(cm->pci, pcm, 64*1024, 128*1024);
@@ -2115,6 +2117,7 @@ static int __devinit snd_cmipci_pcm_spdif_new(cmipci_t *cm, int device)
 	pcm->private_free = snd_cmipci_pcm_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "C-Media PCI IEC958");
+	pcm->dev = &cm->pci->dev;
 	cm->pcm_spdif = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(cm->pci, pcm, 64*1024, 128*1024);
@@ -3051,6 +3054,7 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 			printk(KERN_ERR "cmipci: no OPL device at 0x%lx, skipping...\n", iosynth);
 			iosynth = 0;
 		} else {
+			cm->opl3->dev = &pci->dev;
 			if ((err = snd_opl3_hwdep_new(cm->opl3, 0, 1, &cm->opl3hwdep)) < 0) {
 				printk(KERN_ERR "cmipci: cannot create OPL3 hwdep\n");
 				return err;
@@ -3093,6 +3097,8 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 					       iomidi, 0,
 					       cm->irq, 0, &cm->rmidi)) < 0) {
 			printk(KERN_ERR "cmipci: no UART401 device at 0x%lx\n", iomidi);
+		} else {
+			cm->rmidi->dev_ptr = &pci->dev;
 		}
 	}
 

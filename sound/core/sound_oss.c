@@ -121,11 +121,11 @@ int snd_register_oss_device(int type, snd_card_t * card, int dev, snd_minor_t * 
 		track2 = SNDRV_MINOR_OSS(cidx, SNDRV_MINOR_OSS_DMMIDI1);
 		break;
 	}
-	register1 = register_sound_special(reg->f_ops, minor);
+	register1 = register_sound_special(reg->f_ops, minor, NULL);
 	if (register1 != minor)
 		goto __end;
 	if (track2 >= 0) {
-		register2 = register_sound_special(reg->f_ops, track2);
+		register2 = register_sound_special(reg->f_ops, track2, NULL);
 		if (register2 != track2)
 			goto __end;
 	}

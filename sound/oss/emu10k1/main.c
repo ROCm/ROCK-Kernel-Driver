@@ -231,25 +231,25 @@ static void emu10k1_audio_cleanup(struct emu10k1_card *card)
 
 static int __devinit emu10k1_register_devices(struct emu10k1_card *card)
 {
-	card->audio_dev = register_sound_dsp(&emu10k1_audio_fops, -1);
+	card->audio_dev = register_sound_dsp(&emu10k1_audio_fops, -1, &card->pci_dev->dev);
 	if (card->audio_dev < 0) {
 		printk(KERN_ERR "emu10k1: cannot register first audio device!\n");
 		goto err_dev;
 	}
 
-	card->audio_dev1 = register_sound_dsp(&emu10k1_audio_fops, -1);
+	card->audio_dev1 = register_sound_dsp(&emu10k1_audio_fops, -1, &card->pci_dev->dev);
 	if (card->audio_dev1 < 0) {
 		printk(KERN_ERR "emu10k1: cannot register second audio device!\n");
 		goto err_dev1;
 	}
 
-	card->ac97->dev_mixer = register_sound_mixer(&emu10k1_mixer_fops, -1);
+	card->ac97->dev_mixer = register_sound_mixer(&emu10k1_mixer_fops, -1, &card->pci_dev->dev);
 	if (card->ac97->dev_mixer < 0) {
 		printk(KERN_ERR "emu10k1: cannot register mixer device\n");
 		goto err_mixer;
         }
 
-	card->midi_dev = register_sound_midi(&emu10k1_midi_fops, -1);
+	card->midi_dev = register_sound_midi(&emu10k1_midi_fops, -1, &card->pci_dev->dev);
 	if (card->midi_dev < 0) {
                 printk(KERN_ERR "emu10k1: cannot register midi device!\n");
 		goto err_midi;

@@ -1380,6 +1380,7 @@ static int __devinit snd_intel8x0_pcm1(intel8x0_t *chip, int device, struct ich_
 
 	pcm->private_data = chip;
 	pcm->info_flags = 0;
+	pcm->dev = &chip->pci->dev;
 	if (rec->suffix)
 		sprintf(pcm->name, "%s - %s", chip->card->shortname, rec->suffix);
 	else
@@ -2612,6 +2613,8 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 					       -1, 0, &chip->rmidi)) < 0) {
 			printk(KERN_ERR "intel8x0: no UART401 device at 0x%x, skipping.\n", mpu_port[dev]);
 			mpu_port[dev] = 0;
+		} else {
+			chip->rmidi->dev_ptr = &pci->dev;
 		}
 	} else
 		mpu_port[dev] = 0;

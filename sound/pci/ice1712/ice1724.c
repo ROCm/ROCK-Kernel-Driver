@@ -719,6 +719,7 @@ static int __devinit snd_vt1724_pcm_profi(ice1712_t * ice, int device)
 	pcm->private_data = ice;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ICE1724");
+	pcm->dev = &ice->pci->dev;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 256*1024, 256*1024);
 
@@ -890,6 +891,7 @@ static int __devinit snd_vt1724_pcm_spdif(ice1712_t * ice, int device)
 	pcm->private_data = ice;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ICE1724 IEC958");
+	pcm->dev = &ice->pci->dev;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 64*1024, 64*1024);
 
@@ -1955,6 +1957,8 @@ static int __devinit snd_vt1724_probe(struct pci_dev *pci,
 						       &ice->rmidi[0])) < 0) {
 				snd_card_free(card);
 				return err;
+			} else {
+				ice->rmidi[0]->dev_ptr = &pci->dev;
 			}
 		}
 	}

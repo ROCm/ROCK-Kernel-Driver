@@ -119,12 +119,16 @@ static void pcf_isa_waitforpin(void) {
 	int timeout = 2;
 
 	if (irq > 0) {
-		cli();
+		/* This cli() stuff has to get cleaned up */
+		#if defined(CONFIG_SMP)
+		WARN_ON(1);
+		#endif
+		/* cli(); */
 		if (pcf_pending == 0) {
 			interruptible_sleep_on_timeout(&pcf_wait, timeout*HZ );
 		} else
 			pcf_pending = 0;
-		sti();
+		/* sti(); */
 	} else {
 		udelay(100);
 	}

@@ -130,6 +130,8 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 				       trident->irq, 0, &trident->rmidi)) < 0) {
 		snd_card_free(card);
 		return err;
+	} else {
+		trident->rmidi->dev_ptr = &pci->dev;
 	}
 
 #if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))

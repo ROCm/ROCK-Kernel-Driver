@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/time.h>
+#include <linux/sound.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/minors.h>
@@ -387,6 +388,24 @@ static int snd_hwdep_dev_free(snd_device_t *device)
 	return snd_hwdep_free(hwdep);
 }
 
+static void snd_hwdep_dev_release(snd_hwdep_t *hwdep)
+{
+	return;
+}
+
+#define to_hwdep_dev(hwdep) container_of(hwdep, snd_hwdep_t, class_dev)
+
+static ssize_t show_dev(struct class_device *class_dev, char *buf)
+{
+	int minor = -1;
+	snd_hwdep_t *hwdep = to_hwdep_dev(class_dev);
+	minor = SNDRV_MINOR(hwdep->card->number, SNDRV_DEVICE_TYPE_HWDEP + hwdep->device);
+
+	return sprintf(buf, "%d:%d\n", CONFIG_SND_MAJOR, minor);
+}
+
+static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
+
 static int snd_hwdep_dev_register(snd_device_t *device)
 {
 	snd_hwdep_t *hwdep = snd_magic_cast(snd_hwdep_t, device->device_data, return -ENXIO);
@@ -399,6 +418,7 @@ static int snd_hwdep_dev_register(snd_device_t *device)
 		up(&register_mutex);
 		return -EBUSY;
 	}
+	hwdep->release = snd_hwdep_dev_release;
 	snd_hwdep_devices[idx] = hwdep;
 	sprintf(name, "hwC%iD%i", hwdep->card->number, hwdep->device);
 	if ((err = snd_register_device(SNDRV_DEVICE_TYPE_HWDEP,
@@ -410,6 +430,8 @@ static int snd_hwdep_dev_register(snd_device_t *device)
 		up(&register_mutex);
 		return err;
 	}
+	sound_add_class_device(name, &hwdep->class_dev, hwdep->dev);
+	class_device_create_file(&hwdep->class_dev, &class_device_attr_dev);
 #ifdef CONFIG_SND_OSSEMUL
 	hwdep->ossreg = 0;
 	if (hwdep->oss_type >= 0) {
@@ -446,6 +468,7 @@ static int snd_hwdep_dev_unregister(snd_device_t *device)
 	if (hwdep->ossreg)
 		snd_unregister_oss_device(hwdep->oss_type, hwdep->card, hwdep->device);
 #endif
+	sound_remove_class_device(&hwdep->class_dev);
 	snd_unregister_device(SNDRV_DEVICE_TYPE_HWDEP, hwdep->card, hwdep->device);
 	snd_hwdep_devices[idx] = NULL;
 	up(&register_mutex);

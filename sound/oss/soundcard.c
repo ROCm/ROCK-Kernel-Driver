@@ -503,10 +503,10 @@ struct file_operations oss_sound_fops = {
 static int create_special_devices(void)
 {
 	int seq1,seq2;
-	seq1=register_sound_special(&oss_sound_fops, 1);
+	seq1=register_sound_special(&oss_sound_fops, 1, NULL);
 	if(seq1==-1)
 		goto bad;
-	seq2=register_sound_special(&oss_sound_fops, 8);
+	seq2=register_sound_special(&oss_sound_fops, 8, NULL);
 	if(seq2!=-1)
 		return 0;
 	unregister_sound_special(1);

@@ -758,6 +758,7 @@ int snd_emu10k1_fx8010_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
 
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "EMU10K1 FX8010");
+	pcm->dev = &emu->pci->dev;
 	emu->pcm_fx8010 = pcm;
 	
 	snd_pcm_lib_preallocate_pci_pages_for_all(emu->pci, pcm, 64*1024, 0);
@@ -2424,6 +2425,7 @@ int __devinit snd_emu10k1_fx8010_new(emu10k1_t *emu, int device, snd_hwdep_t ** 
 	hw->ops.ioctl = snd_emu10k1_fx8010_ioctl;
 	hw->ops.release = snd_emu10k1_fx8010_release;
 	hw->private_data = emu;
+	hw->dev = &emu->pci->dev;
 	if (rhwdep)
 		*rhwdep = hw;
 	return 0;

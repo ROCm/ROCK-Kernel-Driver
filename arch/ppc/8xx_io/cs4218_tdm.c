@@ -1731,7 +1731,7 @@ static struct file_operations mixer_fops =
 
 static void __init mixer_init(void)
 {
-	mixer_unit = register_sound_mixer(&mixer_fops, -1);
+	mixer_unit = register_sound_mixer(&mixer_fops, -1, NULL);
 	if (mixer_unit < 0)
 		return;
 
@@ -2320,7 +2320,7 @@ static struct file_operations sq_fops =
 
 static void __init sq_init(void)
 {
-	sq_unit = register_sound_dsp(&sq_fops, -1);
+	sq_unit = register_sound_dsp(&sq_fops, -1, NULL);
 	if (sq_unit < 0)
 		return;
 
@@ -2453,7 +2453,7 @@ static struct file_operations state_fops =
 
 static void __init state_init(void)
 {
-	state_unit = register_sound_special(&state_fops, SND_DEV_STATUS);
+	state_unit = register_sound_special(&state_fops, SND_DEV_STATUS, NULL);
 	if (state_unit < 0)
 		return;
 	state.busy = 0;

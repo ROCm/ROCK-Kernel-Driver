@@ -1257,6 +1257,7 @@ static int __devinit snd_via8233_pcm_new(via82xx_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_via8233_capture_ops);
 	pcm->private_data = chip;
 	strcpy(pcm->name, chip->card->shortname);
+	pcm->dev = &chip->pci->dev;
 	/* set up playbacks */
 	for (i = 0; i < 4; i++)
 		init_viadev(chip, i, 0x10 * i, 0);
@@ -1274,6 +1275,7 @@ static int __devinit snd_via8233_pcm_new(via82xx_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_via8233_capture_ops);
 	pcm->private_data = chip;
 	strcpy(pcm->name, chip->card->shortname);
+	pcm->dev = &chip->pci->dev;
 	/* set up playback */
 	init_viadev(chip, chip->multi_devno, VIA_REG_MULTPLAY_STATUS, 0);
 	/* set up capture */
@@ -1307,6 +1309,7 @@ static int __devinit snd_via8233a_pcm_new(via82xx_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_via8233_capture_ops);
 	pcm->private_data = chip;
 	strcpy(pcm->name, chip->card->shortname);
+	pcm->dev = &chip->pci->dev;
 	/* set up playback */
 	init_viadev(chip, chip->multi_devno, VIA_REG_MULTPLAY_STATUS, 0);
 	/* capture */
@@ -1322,6 +1325,7 @@ static int __devinit snd_via8233a_pcm_new(via82xx_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_via8233_playback_ops);
 	pcm->private_data = chip;
 	strcpy(pcm->name, chip->card->shortname);
+	pcm->dev = &chip->pci->dev;
 	/* set up playback */
 	init_viadev(chip, chip->playback_devno, 0x30, 0);
 
@@ -1351,6 +1355,7 @@ static int __devinit snd_via686_pcm_new(via82xx_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_via686_capture_ops);
 	pcm->private_data = chip;
 	strcpy(pcm->name, chip->card->shortname);
+	pcm->dev = &chip->pci->dev;
 	init_viadev(chip, 0, VIA_REG_PLAYBACK_STATUS, 0);
 	init_viadev(chip, 1, VIA_REG_CAPTURE_STATUS, 1);
 

@@ -36,6 +36,7 @@
 #include <linux/kbd_kern.h>
 #include <linux/console.h>
 #include <linux/smp_lock.h>
+#include <linux/device.h>
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
@@ -469,6 +470,85 @@ static struct file_operations vcs_fops = {
 	.open		= vcs_open,
 };
 
+/* vc class implementation */
+
+struct vc_dev {
+	struct list_head node;
+	dev_t dev;
+	struct class_device class_dev;
+};
+#define to_vc_dev(d) container_of(d, struct vc_dev, class_dev)
+
+static LIST_HEAD(vc_dev_list);
+static spinlock_t vc_dev_list_lock = SPIN_LOCK_UNLOCKED;
+
+static void release_vc_dev(struct class_device *class_dev)
+{
+	struct vc_dev *vc_dev = to_vc_dev(class_dev);
+	kfree(vc_dev);
+}
+
+static struct class vc_class = {
+	.name		= "vc",
+	.release	= &release_vc_dev,
+};
+
+static ssize_t show_dev(struct class_device *class_dev, char *buf)
+{
+	struct vc_dev *vc_dev = to_vc_dev(class_dev);
+	return print_dev_t(buf, vc_dev->dev);
+}
+static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
+
+static int vc_add_class_device(dev_t dev, char *name, int minor)
+{
+	struct vc_dev *vc_dev = NULL;
+	int retval;
+
+	vc_dev = kmalloc(sizeof(*vc_dev), GFP_KERNEL);
+	if (!vc_dev)
+		return -ENOMEM;
+	memset(vc_dev, 0x00, sizeof(*vc_dev));
+
+	vc_dev->dev = dev;
+	vc_dev->class_dev.class = &vc_class;
+	snprintf(vc_dev->class_dev.class_id, BUS_ID_SIZE, name, minor);
+	retval = class_device_register(&vc_dev->class_dev);
+	if (retval)
+		goto error;
+	class_device_create_file(&vc_dev->class_dev, &class_device_attr_dev);
+	spin_lock(&vc_dev_list_lock);
+	list_add(&vc_dev->node, &vc_dev_list);
+	spin_unlock(&vc_dev_list_lock);
+	return 0;
+error:
+	kfree(vc_dev);
+	return retval;
+}
+
+static void vc_remove_class_device(int minor)
+{
+	struct vc_dev *vc_dev = NULL;
+	struct list_head *tmp;
+	int found = 0;
+
+	spin_lock(&vc_dev_list_lock);
+	list_for_each(tmp, &vc_dev_list) {
+		vc_dev = list_entry(tmp, struct vc_dev, node);
+		if (MINOR(vc_dev->dev) == minor) {
+			found = 1;
+			break;
+		}
+	}
+	if (found) {
+		list_del(&vc_dev->node);
+		spin_unlock(&vc_dev_list_lock);
+		class_device_unregister(&vc_dev->class_dev);
+	} else {
+		spin_unlock(&vc_dev_list_lock);
+	}
+}
+
 void vcs_make_devfs(struct tty_struct *tty)
 {
 	devfs_mk_cdev(MKDEV(VCS_MAJOR, tty->index + 1),
@@ -477,19 +557,26 @@ void vcs_make_devfs(struct tty_struct *tty)
 	devfs_mk_cdev(MKDEV(VCS_MAJOR, tty->index + 129),
 			S_IFCHR|S_IRUSR|S_IWUSR,
 			"vcc/a%u", tty->index + 1);
+	vc_add_class_device(MKDEV(VCS_MAJOR, tty->index + 1), "vcs%u", tty->index + 1);
+	vc_add_class_device(MKDEV(VCS_MAJOR, tty->index + 129), "vcsa%u", tty->index + 1);
 }
 void vcs_remove_devfs(struct tty_struct *tty)
 {
 	devfs_remove("vcc/%u", tty->index + 1);
 	devfs_remove("vcc/a%u", tty->index + 1);
+	vc_remove_class_device(tty->index + 1);
+	vc_remove_class_device(tty->index + 129);
 }
 
 int __init vcs_init(void)
 {
 	if (register_chrdev(VCS_MAJOR, "vcs", &vcs_fops))
 		panic("unable to get major %d for vcs device", VCS_MAJOR);
+	class_register(&vc_class);
 
 	devfs_mk_cdev(MKDEV(VCS_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vcc/0");
 	devfs_mk_cdev(MKDEV(VCS_MAJOR, 128), S_IFCHR|S_IRUSR|S_IWUSR, "vcc/a0");
+	vc_add_class_device(MKDEV(VCS_MAJOR, 0), "vcs", 0);
+	vc_add_class_device(MKDEV(VCS_MAJOR, 128), "vcsa", 128);
 	return 0;
 }

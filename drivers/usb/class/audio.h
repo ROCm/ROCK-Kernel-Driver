@@ -1,9 +1,3 @@
-#define USB_DT_CS_DEVICE                0x21
-#define USB_DT_CS_CONFIG                0x22
-#define USB_DT_CS_STRING                0x23
-#define USB_DT_CS_INTERFACE             0x24
-#define USB_DT_CS_ENDPOINT              0x25
-
 #define CS_AUDIO_UNDEFINED		0x20
 #define CS_AUDIO_DEVICE			0x21
 #define CS_AUDIO_CONFIGURATION		0x22

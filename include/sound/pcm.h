@@ -445,6 +445,9 @@ struct _snd_pcm {
 #if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	snd_pcm_oss_t oss;
 #endif
+	void (*release)(snd_pcm_t *pcm);
+	struct class_device class_dev[2];
+	struct device *dev;
 };
 
 typedef struct _snd_pcm_notify {

@@ -24,5 +24,13 @@ config ZLIB_INFLATE
 config ZLIB_DEFLATE
 	tristate
 
+
+config DEBUG_KOBJECT
+	bool "print lots of sysfs related debug infos"
+	default n
+	help
+	  This option enables DEBUG in drivers/base/*.c and lib/kobject.c
+	  If unsure, say N.
+
 endmenu
 

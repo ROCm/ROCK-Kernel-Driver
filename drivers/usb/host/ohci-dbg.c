@@ -269,18 +269,19 @@ static void ohci_dump (struct ohci_hcd *controller, int verbose)
 	ohci_dump_status (controller, NULL, 0);
 	if (controller->hcca)
 		ohci_dbg (controller,
-			"hcca frame #%04x\n", controller->hcca->frame_no);
+			"hcca frame #%04x\n", OHCI_FRAME_NO(controller->hcca));
 	ohci_dump_roothub (controller, 1, NULL, 0);
 }
 
 static const char data0 [] = "DATA0";
 static const char data1 [] = "DATA1";
 
-static void ohci_dump_td (struct ohci_hcd *ohci, char *label, struct td *td)
+static void ohci_dump_td (const struct ohci_hcd *ohci, const char *label,
+		const struct td *td)
 {
 	u32	tmp = le32_to_cpup (&td->hwINFO);
 
-	ohci_dbg (ohci, "%s td %p%s; urb %p index %d; hw next td %08x",
+	ohci_dbg (ohci, "%s td %p%s; urb %p index %d; hw next td %08x\n",
 		label, td,
 		(tmp & TD_DONE) ? " (DONE)" : "",
 		td->urb, td->index,
@@ -301,28 +302,28 @@ static void ohci_dump_td (struct ohci_hcd *ohci, char *label, struct td *td)
 		case TD_DP_OUT: pid = "OUT"; break;
 		default: pid = "(bad pid)"; break;
 		}
-		ohci_dbg (ohci, "     info %08x CC=%x %s DI=%d %s %s", tmp,
+		ohci_dbg (ohci, "     info %08x CC=%x %s DI=%d %s %s\n", tmp,
 			TD_CC_GET(tmp), /* EC, */ toggle,
 			(tmp & TD_DI) >> 21, pid,
 			(tmp & TD_R) ? "R" : "");
 		cbp = le32_to_cpup (&td->hwCBP);
 		be = le32_to_cpup (&td->hwBE);
-		ohci_dbg (ohci, "     cbp %08x be %08x (len %d)", cbp, be,
+		ohci_dbg (ohci, "     cbp %08x be %08x (len %d)\n", cbp, be,
 			cbp ? (be + 1 - cbp) : 0);
 	} else {
 		unsigned	i;
-		ohci_dbg (ohci, "     info %08x CC=%x FC=%d DI=%d SF=%04x", tmp,
+		ohci_dbg (ohci, "  info %08x CC=%x FC=%d DI=%d SF=%04x\n", tmp,
 			TD_CC_GET(tmp),
 			(tmp >> 24) & 0x07,
 			(tmp & TD_DI) >> 21,
 			tmp & 0x0000ffff);
-		ohci_dbg (ohci, "     bp0 %08x be %08x",
+		ohci_dbg (ohci, "  bp0 %08x be %08x\n",
 			le32_to_cpup (&td->hwCBP) & ~0x0fff,
 			le32_to_cpup (&td->hwBE));
 		for (i = 0; i < MAXPSW; i++) {
 			u16	psw = le16_to_cpup (&td->hwPSW [i]);
 			int	cc = (psw >> 12) & 0x0f;
-			ohci_dbg (ohci, "       psw [%d] = %2x, CC=%x %s=%d", i,
+			ohci_dbg (ohci, "    psw [%d] = %2x, CC=%x %s=%d\n", i,
 				psw, cc,
 				(cc >= 0x0e) ? "OFFSET" : "SIZE",
 				psw & 0x0fff);
@@ -332,12 +333,13 @@ static void ohci_dump_td (struct ohci_hcd *ohci, char *label, struct td *td)
 
 /* caller MUST own hcd spinlock if verbose is set! */
 static void __attribute__((unused))
-ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
+ohci_dump_ed (const struct ohci_hcd *ohci, const char *label,
+		const struct ed *ed, int verbose)
 {
 	u32	tmp = ed->hwINFO;
 	char	*type = "";
 
-	ohci_dbg (ohci, "%s, ed %p state 0x%x type %s; next ed %08x",
+	ohci_dbg (ohci, "%s, ed %p state 0x%x type %s; next ed %08x\n",
 		label,
 		ed, ed->state, edstring (ed->type),
 		le32_to_cpup (&ed->hwNextED));
@@ -347,7 +349,7 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 	/* else from TDs ... control */
 	}
 	ohci_dbg (ohci,
-		"  info %08x MAX=%d%s%s%s%s EP=%d%s DEV=%d", le32_to_cpu (tmp),
+		"  info %08x MAX=%d%s%s%s%s EP=%d%s DEV=%d\n", le32_to_cpu (tmp),
 		0x03ff & (le32_to_cpu (tmp) >> 16),
 		(tmp & ED_DEQUEUE) ? " DQ" : "",
 		(tmp & ED_ISO) ? " ISO" : "",
@@ -356,7 +358,7 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 		0x000f & (le32_to_cpu (tmp) >> 7),
 		type,
 		0x007f & le32_to_cpu (tmp));
-	ohci_dbg (ohci, "  tds: head %08x %s%s tail %08x%s",
+	ohci_dbg (ohci, "  tds: head %08x %s%s tail %08x%s\n",
 		tmp = le32_to_cpup (&ed->hwHeadP),
 		(ed->hwHeadP & ED_C) ? data1 : data0,
 		(ed->hwHeadP & ED_H) ? " HALT" : "",
@@ -541,23 +543,28 @@ show_periodic (struct class_device *class_dev, char *buf)
 			if (temp == seen_count) {
 				u32	info = ed->hwINFO;
 				u32	scratch = cpu_to_le32p (&ed->hwINFO);
+				struct list_head	*entry;
+				unsigned		qlen = 0;
+
+				/* qlen measured here in TDs, not urbs */
+				list_for_each (entry, &ed->td_list)
+					qlen++;
 
 				temp = snprintf (next, size,
-					" (%cs dev%d%s ep%d%s"
+					" (%cs dev%d ep%d%s-%s qlen %u"
 					" max %d %08x%s%s)",
 					(info & ED_LOWSPEED) ? 'l' : 'f',
 					scratch & 0x7f,
-					(info & ED_ISO) ? " iso" : "",
 					(scratch >> 7) & 0xf,
 					(info & ED_IN) ? "in" : "out",
+					(info & ED_ISO) ? "iso" : "int",
+					qlen,
 					0x03ff & (scratch >> 16),
 					scratch,
-					(info & ED_SKIP) ? " s" : "",
+					(info & ED_SKIP) ? " K" : "",
 					(ed->hwHeadP & ED_H) ? " H" : "");
 				size -= temp;
 				next += temp;
-
-				// FIXME some TD info too
 
 				if (seen_count < DBG_SCHED_LIMIT)
 					seen [seen_count++] = ed;
@@ -617,7 +624,7 @@ show_registers (struct class_device *class_dev, char *buf)
 	/* hcca */
 	if (ohci->hcca)
 		ohci_dbg_sw (ohci, &next, &size,
-			"hcca frame 0x%04x\n", ohci->hcca->frame_no);
+			"hcca frame 0x%04x\n", OHCI_FRAME_NO(ohci->hcca));
 
 	/* other registers mostly affect frame timings */
 	rdata = readl (&regs->fminterval);

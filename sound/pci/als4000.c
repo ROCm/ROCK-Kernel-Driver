@@ -510,6 +510,7 @@ static int __devinit snd_als4000_pcm(sb_t *chip, int device)
 		return err;
 	pcm->private_free = snd_als4000_pcm_free;
 	pcm->private_data = chip;
+	pcm->dev = &chip->pci->dev;
 	pcm->info_flags = SNDRV_PCM_INFO_JOINT_DUPLEX;
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_als4000_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_als4000_capture_ops);
@@ -658,6 +659,8 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		printk(KERN_ERR "als4000: no MPU-401device at 0x%lx ?\n", gcr+0x30);
 		return err;
+	} else {
+		chip->rmidi->dev_ptr = &pci->dev; 
 	}
 
 	if ((err = snd_als4000_pcm(chip, 0)) < 0) {
@@ -674,6 +677,7 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 		printk(KERN_ERR "als4000: no OPL device at 0x%lx-0x%lx ?\n",
 			   gcr+0x10, gcr+0x12 );
 	} else {
+		opl3->dev = &pci->dev;
 		if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 			snd_card_free(card);
 			return err;

@@ -292,13 +292,13 @@ static int __init hostaudio_init_module(void)
         printk(KERN_INFO "UML Audio Relay (host dsp = %s, host mixer = %s)\n",
 	       dsp, mixer);
 
-	module_data.dev_audio = register_sound_dsp(&hostaudio_fops, -1);
+	module_data.dev_audio = register_sound_dsp(&hostaudio_fops, -1, NULL);
         if(module_data.dev_audio < 0){
                 printk(KERN_ERR "hostaudio: couldn't register DSP device!\n");
                 return -ENODEV;
         }
 
-	module_data.dev_mixer = register_sound_mixer(&hostmixer_fops, -1);
+	module_data.dev_mixer = register_sound_mixer(&hostmixer_fops, -1, NULL);
         if(module_data.dev_mixer < 0){
                 printk(KERN_ERR "hostmixer: couldn't register mixer "
 		       "device!\n");

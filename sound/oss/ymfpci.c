@@ -2487,7 +2487,7 @@ static int ymf_ac97_init(ymfpci_t *unit, int num_ac97)
 
 	unit->ac97_features = eid;
 
-	if ((codec->dev_mixer = register_sound_mixer(&ymf_mixer_fops, -1)) < 0) {
+	if ((codec->dev_mixer = register_sound_mixer(&ymf_mixer_fops, -1, &unit->pci->dev)) < 0) {
 		printk(KERN_ERR "ymfpci: couldn't register mixer!\n");
 		goto out_kfree;
 	}
@@ -2584,7 +2584,7 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
 	}
 
 	/* register /dev/dsp */
-	if ((codec->dev_audio = register_sound_dsp(&ymf_fops, -1)) < 0) {
+	if ((codec->dev_audio = register_sound_dsp(&ymf_fops, -1, &pcidev->dev)) < 0) {
 		printk(KERN_ERR "ymfpci: unable to register dsp\n");
 		goto out_free_irq;
 	}

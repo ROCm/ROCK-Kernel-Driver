@@ -26,6 +26,7 @@
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 #include <asm/semaphore.h>
+#include <linux/device.h>
 
 #if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
 #include "seq_device.h"
@@ -143,6 +144,9 @@ struct _snd_rawmidi {
 #if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
 	snd_seq_device_t *seq_dev;
 #endif
+	void (*release)(snd_rawmidi_t *rmidi);
+	struct class_device class_dev;
+	struct device *dev_ptr;
 };
 
 /* main rawmidi functions */

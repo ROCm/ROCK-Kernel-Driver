@@ -2165,16 +2165,27 @@ Your cooperation is appreciated.
 		  0 = /dev/usb/lp0	First USB printer
 		    ...
 		 15 = /dev/usb/lp15	16th USB printer
-		 16 = /dev/usb/mouse0	First USB mouse
-		    ...
-		 31 = /dev/usb/mouse15	16th USB mouse
-		 32 = /dev/usb/ez0	First USB firmware loader
-		    ...
-		 47 = /dev/usb/ez15	16th USB firmware loader
+		 32 = /dev/usb/mdc800	MDC800 USB camera
 		 48 = /dev/usb/scanner0	First USB scanner
 		    ...
 		 63 = /dev/usb/scanner15 16th USB scanner
 		 64 = /dev/usb/rio500	Diamond Rio 500
+		 96 = /dev/usb/hiddev0	1st USB HID device
+		    ...
+		111 = /dev/usb/hiddev15	16th USB HID device
+		112 = /dev/usb/auer0	1st auerswald ISDN device
+		    ...
+		127 = /dev/usb/auer15	16th auerswald ISDN device
+		128 = /dev/usb/brlvgr0	First Braille Voyager device
+		    ...
+		131 = /dev/usb/brlvgr3	Fourth Braille Voyager device
+		144 = /dev/usb/lcd	USB LCD device
+		160 = /dev/usb/legousbtower0	1st USB Legotower device
+		    ...
+		175 = /dev/usb/legousbtower15	16th USB Legotower device
+		240 = /dev/usb/dabusb0	First daubusb device
+		    ...
+		243 = /dev/usb/dabusb3	Fourth dabusb device
 
 181 char	Conrad Electronic parallel port radio clocks
 		  0 = /dev/pcfclock0	First Conrad radio clock

@@ -36,6 +36,7 @@
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
+#include "module-sig.h"
 
 #if 0
 #define DEBUGP printk
@@ -615,6 +616,7 @@ unsigned int module_refcount(struct module *mod)
 
 	for (i = 0; i < NR_CPUS; i++)
 		total += local_read(&mod->ref[i].count);
+	total += atomic_read(&mod->kobj.refcount);
 	return total;
 }
 EXPORT_SYMBOL(module_refcount);
@@ -657,6 +659,8 @@ static void wait_for_zero_refcount(struct module *mod)
 	current->state = TASK_RUNNING;
 	down(&module_mutex);
 }
+
+static void mod_kobject_remove(struct module *mod);
 
 asmlinkage long
 sys_delete_module(const char __user *name_user, unsigned int flags)
@@ -706,6 +710,10 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 			goto out;
 		}
 	}
+
+	/* unregister the kobject in this module */
+	mod_kobject_remove(mod);
+
 	/* Stop the machine so refcounts can't move: irqs disabled. */
 	DEBUGP("Stopping refcounts...\n");
 	ret = stop_refcounts();
@@ -745,7 +753,7 @@ static void print_unload_info(struct seq_file *m, struct module *mod)
 	struct module_use *use;
 	int printed_something = 0;
 
-	seq_printf(m, " %u ", module_refcount(mod));
+	seq_printf(m, " %u ", module_refcount(mod) - atomic_read(&mod->kobj.refcount));
 
 	/* Always include a trailing , so userspace can differentiate
            between this and the old multi-field proc format. */
@@ -1494,6 +1502,11 @@ static struct module *load_module(void __user *umod,
 		goto free_hdr;
 	}
 
+	if (module_check_sig(hdr, sechdrs, secstrings)) {
+		err = -EPERM;
+		goto free_hdr;
+	}
+
 	/* Now copy in args */
 	arglen = strlen_user(uargs);
 	if (!arglen) {
@@ -1684,6 +1697,85 @@ static struct module *load_module(void __user *umod,
 	else return ptr;
 }
 
+/* sysfs stuff */
+struct module_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct module *mod, char *);
+	ssize_t (*store)(struct module *mod, const char *, size_t);
+};
+#define to_module_attr(n) container_of(n, struct module_attribute, attr);
+#define to_module(n) container_of(n, struct module, kobj)
+
+static ssize_t module_attr_show(struct kobject *kobj, struct attribute *attr, char *buf)
+{
+	struct module *slot = to_module(kobj);
+	struct module_attribute *attribute = to_module_attr(attr);
+	return attribute->show ? attribute->show(slot, buf) : 0;
+}
+
+static ssize_t module_attr_store(struct kobject *kobj, struct attribute *attr, const char *buf, size_t len)
+{
+	struct module *slot = to_module(kobj);
+	struct module_attribute *attribute = to_module_attr(attr);
+	return attribute->store ? attribute->store(slot, buf, len) : 0;
+}
+
+static struct sysfs_ops module_sysfs_ops = {
+	.show = module_attr_show,
+	.store = module_attr_store,
+};
+
+/* Huh?  A release() function that doesn't do anything?
+ * This is here only because a module has another reference count that
+ * it uses to determine if it should be cleaned up or not.  If the
+ * module wants to switch over to use the kobject reference instead of
+ * its own, then this release function needs to do some work.
+ */
+static void module_release(struct kobject *kobj)
+{
+}
+
+static struct kobj_type module_ktype = {
+	.sysfs_ops =	&module_sysfs_ops,
+	.release =	&module_release,
+};
+static decl_subsys(module, &module_ktype, NULL);
+
+static int __init module_subsys_init(void)
+{
+	return subsystem_register(&module_subsys);
+}
+core_initcall(module_subsys_init);
+
+static ssize_t show_mod_refcount(struct module *mod, char *buf)
+{
+	return sprintf(buf, "%d\n", module_refcount(mod) - atomic_read(&mod->kobj.refcount));
+}
+
+static struct module_attribute mod_refcount = {
+	.attr = {.name = "refcount", .mode = S_IRUGO},
+	.show = show_mod_refcount,
+};
+
+static int mod_kobject_init(struct module *mod)
+{
+	int retval;
+
+	memset(&mod->kobj, 0x00, sizeof(struct kobject));
+	kobject_set_name(&mod->kobj, mod->name);
+	kobj_set_kset_s(mod, module_subsys);
+	retval = kobject_register(&mod->kobj);
+	if (!retval)
+		retval = sysfs_create_file(&mod->kobj, &mod_refcount.attr);
+	return retval;
+}
+
+static void mod_kobject_remove(struct module *mod)
+{
+	sysfs_remove_file(&mod->kobj, &mod_refcount.attr);
+	kobject_unregister(&mod->kobj);
+}
+
 /* This is where the real work happens */
 asmlinkage long
 sys_init_module(void __user *umod,
@@ -1747,6 +1839,8 @@ sys_init_module(void __user *umod,
 		}
 		return ret;
 	}
+
+	mod_kobject_init(mod);
 
 	/* Now it's a first class citizen! */
 	down(&module_mutex);

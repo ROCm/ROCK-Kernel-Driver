@@ -1536,6 +1536,7 @@ aty128_init(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* fill in info */
 	info->fbops = &aty128fb_ops;
 	info->flags = FBINFO_FLAG_DEFAULT;
+	info->dev = &pdev->dev;
 
 #ifdef CONFIG_PMAC_PBOOK
 	par->lcd_on = default_lcd_on;

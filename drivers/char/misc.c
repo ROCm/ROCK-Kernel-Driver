@@ -47,7 +47,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/stat.h>
 #include <linux/init.h>
-
+#include <linux/device.h>
 #include <linux/tty.h>
 #include <linux/kmod.h>
 
@@ -180,6 +180,91 @@ fail:
 	return err;
 }
 
+/* Misc class implementation */
+
+/* 
+ * TODO for 2.7:
+ *  - add a struct class_device to struct miscdevice and make all usages of
+ *    them dynamic.  This will let us get rid of struct misc_dev below.
+ */
+struct misc_dev {
+	struct list_head node;
+	dev_t dev;
+	struct class_device class_dev;
+};
+#define to_misc_dev(d) container_of(d, struct misc_dev, class_dev)
+
+static LIST_HEAD(misc_dev_list);
+static spinlock_t misc_dev_list_lock = SPIN_LOCK_UNLOCKED;
+
+static void release_misc_dev(struct class_device *class_dev)
+{
+	struct misc_dev *misc_dev = to_misc_dev(class_dev);
+	kfree(misc_dev);
+}
+
+static struct class misc_class = {
+	.name		= "misc",
+	.release	= &release_misc_dev,
+};
+
+static ssize_t show_dev(struct class_device *class_dev, char *buf)
+{
+	struct misc_dev *misc_dev = to_misc_dev(class_dev);
+	return print_dev_t(buf, misc_dev->dev);
+}
+static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
+
+static void misc_add_class_device(struct miscdevice *misc)
+{
+	struct misc_dev *misc_dev = NULL;
+	int retval;
+
+	misc_dev = kmalloc(sizeof(*misc_dev), GFP_KERNEL);
+	if (!misc_dev)
+		return;
+	memset(misc_dev, 0x00, sizeof(*misc_dev));
+
+	misc_dev->dev = MKDEV(MISC_MAJOR, misc->minor);
+	misc_dev->class_dev.dev = misc->dev;
+	misc_dev->class_dev.class = &misc_class;
+	snprintf(misc_dev->class_dev.class_id, BUS_ID_SIZE, "%s", misc->name);
+	retval = class_device_register(&misc_dev->class_dev);
+	if (retval)
+		goto error;
+	class_device_create_file(&misc_dev->class_dev, &class_device_attr_dev);
+	spin_lock(&misc_dev_list_lock);
+	list_add(&misc_dev->node, &misc_dev_list);
+	spin_unlock(&misc_dev_list_lock);
+	return;
+error:
+	kfree(misc_dev);
+}
+
+static void misc_remove_class_device(struct miscdevice *misc)
+{
+	struct misc_dev *misc_dev = NULL;
+	struct list_head *tmp;
+	int found = 0;
+
+	spin_lock(&misc_dev_list_lock);
+	list_for_each(tmp, &misc_dev_list) {
+		misc_dev = list_entry(tmp, struct misc_dev, node);
+		if ((MINOR(misc_dev->dev) == misc->minor)) {
+			found = 1;
+			break;
+		}
+	}
+	if (found) {
+		list_del(&misc_dev->node);
+		spin_unlock(&misc_dev_list_lock);
+		class_device_unregister(&misc_dev->class_dev);
+	} else {
+		spin_unlock(&misc_dev_list_lock);
+	}
+}
+
+
 static struct file_operations misc_fops = {
 	.owner		= THIS_MODULE,
 	.open		= misc_open,
@@ -236,6 +321,7 @@ int misc_register(struct miscdevice * misc)
 
 	devfs_mk_cdev(MKDEV(MISC_MAJOR, misc->minor),
 			S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP, misc->devfs_name);
+	misc_add_class_device(misc);
 
 	/*
 	 * Add it to the front, so that later devices can "override"
@@ -265,6 +351,7 @@ int misc_deregister(struct miscdevice * misc)
 
 	down(&misc_sem);
 	list_del(&misc->list);
+	misc_remove_class_device(misc);
 	devfs_remove(misc->devfs_name);
 	if (i < DYNAMIC_MINORS && i>0) {
 		misc_minors[i>>3] &= ~(1 << (misc->minor & 7));
@@ -285,6 +372,7 @@ static int __init misc_init(void)
 	if (ent)
 		ent->proc_fops = &misc_proc_fops;
 #endif
+	class_register(&misc_class);
 #ifdef CONFIG_MVME16x
 	rtc_MK48T08_init();
 #endif

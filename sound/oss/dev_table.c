@@ -123,7 +123,7 @@ void sound_unload_audiodev(int dev)
 
 int sound_alloc_audiodev(void)
 { 
-	int i = register_sound_dsp(&oss_sound_fops, -1);
+	int i = register_sound_dsp(&oss_sound_fops, -1, NULL);
 	if(i==-1)
 		return i;
 	i>>=4;
@@ -134,7 +134,7 @@ int sound_alloc_audiodev(void)
 
 int sound_alloc_mididev(void)
 {
-	int i = register_sound_midi(&oss_sound_fops, -1);
+	int i = register_sound_midi(&oss_sound_fops, -1, NULL);
 	if(i==-1)
 		return i;
 	i>>=4;
@@ -159,7 +159,7 @@ int sound_alloc_synthdev(void)
 
 int sound_alloc_mixerdev(void)
 {
-	int i = register_sound_mixer(&oss_sound_fops, -1);
+	int i = register_sound_mixer(&oss_sound_fops, -1, NULL);
 	if(i==-1)
 		return -1;
 	i>>=4;

@@ -234,15 +234,9 @@ struct usb_driver usb_storage_driver = {
  */
 
 void fill_inquiry_response(struct us_data *us, unsigned char *data,
-		unsigned int data_len) {
-
-	int i;
-	struct scatterlist *sg;
-	int len =
-		us->srb->request_bufflen > data_len ? data_len :
-		us->srb->request_bufflen;
-	int transferred;
-	int amt;
+		unsigned int data_len)
+{
+	unsigned int index, offset;
 
 	if (data_len<36) // You lose.
 		return;
@@ -270,22 +264,11 @@ void fill_inquiry_response(struct us_data *us, unsigned char *data,
 		data[35] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice) & 0x0F);
 	}
 
-	if (us->srb->use_sg) {
-		sg = (struct scatterlist *)us->srb->request_buffer;
-		for (i=0; i<us->srb->use_sg; i++)
-			memset(sg_address(sg[i]), 0, sg[i].length);
-		for (i=0, transferred=0; 
-				i<us->srb->use_sg && transferred < len;
-				i++) {
-			amt = sg[i].length > len-transferred ? 
-					len-transferred : sg[i].length;
-			memcpy(sg_address(sg[i]), data+transferred, amt);
-			transferred -= amt;
-		}
-	} else {
-		memset(us->srb->request_buffer, 0, us->srb->request_bufflen);
-		memcpy(us->srb->request_buffer, data, len);
-	}
+	index = offset = 0;
+	usb_stor_access_xfer_buf(data, data_len, us->srb,
+			&index, &offset, TO_XFER_BUF);
+	if (data_len < us->srb->request_bufflen)
+		us->srb->resid = us->srb->request_bufflen - data_len;
 }
 
 static int usb_stor_control_thread(void * __us)

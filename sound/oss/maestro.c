@@ -3486,7 +3486,7 @@ maestro_probe(struct pci_dev *pcidev,const struct pci_device_id *pdid)
 		if(s->dma_adc.ready || s->dma_dac.ready || s->dma_adc.rawbuf)
 			printk("maestro: BOTCH!\n");
 		/* register devices */
-		if ((s->dev_audio = register_sound_dsp(&ess_audio_fops, -1)) < 0)
+		if ((s->dev_audio = register_sound_dsp(&ess_audio_fops, -1, NULL)) < 0)
 			break;
 	}
 	
@@ -3543,7 +3543,7 @@ maestro_probe(struct pci_dev *pcidev,const struct pci_device_id *pdid)
 		maestro_ac97_init(card);
 	}
 
-	if ((card->dev_mixer = register_sound_mixer(&ess_mixer_fops, -1)) < 0) {
+	if ((card->dev_mixer = register_sound_mixer(&ess_mixer_fops, -1, NULL)) < 0) {
 		printk("maestro: couldn't register mixer!\n");
 	} else {
 		memcpy(card->mix.mixer_state,mixer_defaults,sizeof(card->mix.mixer_state));

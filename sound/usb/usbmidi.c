@@ -1019,6 +1019,7 @@ static int snd_usbmidi_create_rawmidi(snd_usb_midi_t* umidi,
 	snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_OUTPUT, &snd_usbmidi_output_ops);
 	snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_INPUT, &snd_usbmidi_input_ops);
 
+	rmidi->dev_ptr = &umidi->iface->dev;
 	umidi->rmidi = rmidi;
 	return 0;
 }

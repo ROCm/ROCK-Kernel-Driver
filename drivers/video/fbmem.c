@@ -31,6 +31,7 @@
 #include <linux/kmod.h>
 #endif
 #include <linux/devfs_fs_kernel.h>
+#include <linux/device.h>
 
 #if defined(__mc68000__) || defined(CONFIG_APUS)
 #include <asm/setup.h>
@@ -1199,6 +1200,83 @@ static struct file_operations fb_fops = {
 #endif
 };
 
+struct fb_dev {
+	struct list_head node;
+	dev_t dev;
+	struct class_device class_dev;
+};
+#define to_fb_dev(d) container_of(d, struct fb_dev, class_dev)
+
+static void release_fb_dev(struct class_device *class_dev)
+{
+	struct fb_dev *fb_dev = to_fb_dev(class_dev);
+	kfree(fb_dev);
+}
+
+static struct class fb_class = {
+	.name		= "video",
+	.release	= &release_fb_dev,
+};
+
+static LIST_HEAD(fb_dev_list);
+static spinlock_t fb_dev_list_lock = SPIN_LOCK_UNLOCKED;
+
+static ssize_t show_dev(struct class_device *class_dev, char *buf)
+{
+	struct fb_dev *fb_dev = to_fb_dev(class_dev);
+	return print_dev_t(buf, fb_dev->dev);
+}
+static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
+
+static void fb_add_class_device(int minor, struct device *device)
+{
+	struct fb_dev *fb_dev = NULL;
+	int retval;
+
+	fb_dev = kmalloc(sizeof(*fb_dev), GFP_KERNEL);
+	if (!fb_dev)
+		return;
+	memset(fb_dev, 0x00, sizeof(*fb_dev));
+
+	fb_dev->dev = MKDEV(FB_MAJOR, minor);
+	fb_dev->class_dev.dev = device;
+	fb_dev->class_dev.class = &fb_class;
+	snprintf(fb_dev->class_dev.class_id, BUS_ID_SIZE, "fb%d", minor);
+	retval = class_device_register(&fb_dev->class_dev);
+	if (retval)
+		goto error;
+	class_device_create_file(&fb_dev->class_dev, &class_device_attr_dev);
+	spin_lock(&fb_dev_list_lock);
+	list_add(&fb_dev->node, &fb_dev_list);
+	spin_unlock(&fb_dev_list_lock);
+	return;
+error:
+	kfree(fb_dev);
+}
+
+void fb_remove_class_device(int minor)
+{
+	struct fb_dev *fb_dev = NULL;
+	struct list_head *tmp;
+	int found = 0;
+
+	spin_lock(&fb_dev_list_lock);
+	list_for_each(tmp, &fb_dev_list) {
+		fb_dev = list_entry(tmp, struct fb_dev, node);
+		if ((MINOR(fb_dev->dev) == minor)) {
+			found = 1;
+			break;
+		}
+	}
+	if (found) {
+		list_del(&fb_dev->node);
+		spin_unlock(&fb_dev_list_lock);
+		class_device_unregister(&fb_dev->class_dev);
+	} else {
+		spin_unlock(&fb_dev_list_lock);
+	}
+}
+
 /**
  *	register_framebuffer - registers a frame buffer device
  *	@fb_info: frame buffer info structure
@@ -1242,6 +1320,8 @@ register_framebuffer(struct fb_info *fb_info)
 
 	devfs_mk_cdev(MKDEV(FB_MAJOR, i),
 			S_IFCHR | S_IRUGO | S_IWUGO, "fb/%d", i);
+
+	fb_add_class_device(i, fb_info->dev);
 	return 0;
 }
 
@@ -1270,6 +1350,7 @@ unregister_framebuffer(struct fb_info *fb_info)
 		kfree(fb_info->pixmap.addr);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
+	fb_remove_class_device(i);
 	return 0;
 }
 
@@ -1293,6 +1374,8 @@ fbmem_init(void)
 	devfs_mk_dir("fb");
 	if (register_chrdev(FB_MAJOR,"fb",&fb_fops))
 		printk("unable to get major %d for fb devs\n", FB_MAJOR);
+
+	class_register(&fb_class);
 
 #ifdef CONFIG_FB_OF
 	if (ofonly) {

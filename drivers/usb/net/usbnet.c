@@ -909,8 +909,7 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 	memset (info, 0, sizeof *info);
 	info->control = intf;
 	while (len > 3) {
-		/* ignore bDescriptorType != CS_INTERFACE */
-		if (buf [1] != 0x24)
+		if (buf [1] != USB_DT_CS_INTERFACE)
 			goto next_desc;
 
 		/* bDescriptorSubType identifies three "must have" descriptors;

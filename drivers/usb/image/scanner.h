@@ -43,7 +43,7 @@
 
 // #define DEBUG
 
-#define DRIVER_VERSION "0.4.15"
+#define DRIVER_VERSION "0.4.16"
 #define DRIVER_DESC "USB Scanner Driver"
 
 #include <linux/usb.h>
@@ -146,7 +146,12 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0458, 0x2015) }, /* ColorPage HR7LE */
 	{ USB_DEVICE(0x0458, 0x2016) }, /* ColorPage HR6X */
 	{ USB_DEVICE(0x0458, 0x2018) },	/* ColorPage HR7X */
+	{ USB_DEVICE(0x0458, 0x201b) },	/* Colorpage Vivid 4x */
 	/* Hewlett Packard */
+	/* IMPORTANT: Hewlett-Packard multi-function peripherals (OfficeJet, 
+	   Printer/Scanner/Copier (PSC), LaserJet, or PhotoSmart printer)
+	   should not be added to this table because they are accessed by a
+	   userspace driver (hpoj) */
 	{ USB_DEVICE(0x03f0, 0x0101) },	/* ScanJet 4100C */
 	{ USB_DEVICE(0x03f0, 0x0102) },	/* PhotoSmart S20 */
 	{ USB_DEVICE(0x03f0, 0x0105) },	/* ScanJet 4200C */
@@ -168,10 +173,10 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x03F0, 0x1105) },	/* ScanJet 5470C */
 	{ USB_DEVICE(0x03f0, 0x1205) }, /* ScanJet 5550C */
 	{ USB_DEVICE(0x03f0, 0x1305) },	/* Scanjet 4570c */
-	{ USB_DEVICE(0x03f0, 0x1411) }, /* PSC 750 */
+	//	{ USB_DEVICE(0x03f0, 0x1411) }, /* PSC 750 - NOT SUPPORTED - use hpoj userspace driver */
 	{ USB_DEVICE(0x03f0, 0x2005) },	/* ScanJet 3570c */
 	{ USB_DEVICE(0x03f0, 0x2205) },	/* ScanJet 3500c */
-	{ USB_DEVICE(0x03f0, 0x2f11) }, /* PSC 1210 */
+	//	{ USB_DEVICE(0x03f0, 0x2f11) }, /* PSC 1210 - NOT SUPPORTED - use hpoj userspace driver */
 	/* Lexmark */
 	{ USB_DEVICE(0x043d, 0x002d) }, /* X70/X73 */
 	{ USB_DEVICE(0x043d, 0x003d) }, /* X83 */
@@ -187,6 +192,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x05da, 0x30ce) },	/* ScanMaker 3800 */
 	{ USB_DEVICE(0x05da, 0x30cf) },	/* ScanMaker 4800 */
 	{ USB_DEVICE(0x05da, 0x30d4) },	/* ScanMaker 3830 + 3840 */
+	{ USB_DEVICE(0x05da, 0x30d8) },	/* ScanMaker 5900 */
 	{ USB_DEVICE(0x04a7, 0x0224) },	/* Scanport 3000 (actually Visioneer?)*/
 	/* The following SCSI-over-USB Microtek devices are supported by the
 	   microtek driver: Enable SCSI and USB Microtek in kernel config */
@@ -245,6 +251,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x07b3, 0x0400) }, /* OpticPro 1248U */
 	{ USB_DEVICE(0x07b3, 0x0401) }, /* OpticPro 1248U (another one) */
 	{ USB_DEVICE(0x07b3, 0x0403) },	/* U16B */
+	{ USB_DEVICE(0x07b3, 0x0413) },	/* OpticSlim 1200 */
 	/* Primax/Colorado */
 	{ USB_DEVICE(0x0461, 0x0300) },	/* G2-300 #1 */
 	{ USB_DEVICE(0x0461, 0x0301) },	/* G2E-300 #1 */
@@ -261,6 +268,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0461, 0x0383) },	/* G2E-600 */
 	/* Prolink */
 	{ USB_DEVICE(0x06dc, 0x0014) }, /* Winscan Pro 2448U */
+	/* Reflecta  */
+	{ USB_DEVICE(0x05e3, 0x0120) },	/* iScan 1800 */
 	/* Relisis */
 	// { USB_DEVICE(0x0475, 0x0103) },	/* Episode - undetected endpoint */
 	{ USB_DEVICE(0x0475, 0x0210) }, /* Scorpio Ultra 3 */
@@ -285,6 +294,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04b8, 0x011c) }, /* Perfection 3200 */
 	{ USB_DEVICE(0x04b8, 0x011d) }, /* Perfection 1260 */
 	{ USB_DEVICE(0x04b8, 0x011e) }, /* Perfection 1660 Photo */
+	{ USB_DEVICE(0x04b8, 0x011f) },	/* Perfection 1670 */
 	{ USB_DEVICE(0x04b8, 0x0801) }, /* Stylus CX5200 */
 	{ USB_DEVICE(0x04b8, 0x0802) }, /* Stylus CX3200 */
 	/* Siemens */
@@ -309,6 +319,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04a7, 0x0221) },	/* OneTouch 5300 USB */
 	{ USB_DEVICE(0x04a7, 0x0224) },	/* OneTouch 4800 USB */
 	{ USB_DEVICE(0x04a7, 0x0226) },	/* OneTouch 5800 USB */
+	{ USB_DEVICE(0x04a7, 0x0229) }, /* OneTouch 7100 USB */
 	{ USB_DEVICE(0x04a7, 0x022c) },	/* OneTouch 9020 USB */
 	{ USB_DEVICE(0x04a7, 0x0231) },	/* 6100 USB */
 	{ USB_DEVICE(0x04a7, 0x0311) },	/* 6200 EPP/USB */

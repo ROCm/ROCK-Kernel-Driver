@@ -963,6 +963,13 @@ config SCx200_GPIO
 
 	  If compiled as a module, it will be called scx200_gpio.
 
+config FJKEYINFO
+	tristate "Fujitsu Lifebook Application Key Support"
+	help
+	  Provide support for Fujitsu Lifebook application keys.
+
+	  If compiled as a module, it will be called fjkeyinf.
+
 config RAW_DRIVER
 	tristate "RAW driver (/dev/raw/rawN)"
 	help

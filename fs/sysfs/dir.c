@@ -83,7 +83,8 @@ static void remove_dir(struct dentry * d)
 	struct dentry * parent = dget(d->d_parent);
 	down(&parent->d_inode->i_sem);
 	d_delete(d);
-	simple_rmdir(parent->d_inode,d);
+	if (d->d_inode)
+		simple_rmdir(parent->d_inode,d);
 
 	pr_debug(" o %s removing done (%d)\n",d->d_name.name,
 		 atomic_read(&d->d_count));

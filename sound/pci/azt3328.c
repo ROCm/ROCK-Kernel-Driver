@@ -1239,6 +1239,7 @@ static int __devinit snd_azf3328_pcm(azf3328_t *chip, int device)
 	pcm->private_free = snd_azf3328_pcm_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, chip->card->shortname);
+	pcm->dev = &chip->pci->dev;
 	chip->pcm = pcm;
 
 	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 64*1024);
@@ -1502,6 +1503,8 @@ static int __devinit snd_azf3328_probe(struct pci_dev *pci,
 		snd_printk("azf3328: no MPU-401 device at 0x%lx?\n", chip->mpu_port);
 		snd_card_free(card);
 		return err;
+	} else {
+		chip->rmidi->dev_ptr = &pci->dev;
 	}
 
 	if ((err = snd_azf3328_pcm(chip, 0)) < 0) {
@@ -1514,6 +1517,7 @@ static int __devinit snd_azf3328_probe(struct pci_dev *pci,
 		snd_printk("azf3328: no OPL3 device at 0x%lx-0x%lx?\n",
 			   chip->synth_port, chip->synth_port+2 );
 	} else {
+		opl3->dev = &pci->dev;
 		if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 			snd_card_free(card);
 			return err;

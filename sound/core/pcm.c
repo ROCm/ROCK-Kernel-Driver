@@ -22,6 +22,7 @@
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/sound.h>
 #include <linux/time.h>
 #include <sound/core.h>
 #include <sound/minors.h>
@@ -825,6 +826,32 @@ void snd_pcm_release_substream(snd_pcm_substream_t *substream)
 	substream->pstr->substream_opened--;
 }
 
+static void snd_pcm_dev_release(snd_pcm_t *pcm)
+{
+	return;
+}
+
+#define to_pcm_dev0(pcm) container_of(pcm, snd_pcm_t, class_dev[0])
+#define to_pcm_dev1(pcm) container_of(pcm, snd_pcm_t, class_dev[1])
+
+static ssize_t show_dev(struct class_device *class_dev, char *buf)
+{
+	int minor = -1;
+	snd_pcm_t *pcm;
+	if (!strcmp((class_dev->class_id + strlen(class_dev->class_id) - 1), "p")) {
+		pcm = to_pcm_dev0(class_dev);
+		minor = SNDRV_MINOR(pcm->card->number, SNDRV_DEVICE_TYPE_PCM_PLAYBACK + pcm->device);
+	}
+	else
+	{
+		pcm = to_pcm_dev1(class_dev);
+		minor = SNDRV_MINOR(pcm->card->number, SNDRV_DEVICE_TYPE_PCM_CAPTURE + pcm->device);
+	}
+	return sprintf(buf, "%d:%d\n", CONFIG_SND_MAJOR, minor);
+}
+
+static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
+
 static int snd_pcm_dev_register(snd_device_t *device)
 {
 	int idx, cidx, err;
@@ -844,6 +871,7 @@ static int snd_pcm_dev_register(snd_device_t *device)
 	snd_pcm_devices[idx] = pcm;
 	for (cidx = 0; cidx < 2; cidx++) {
 		int devtype = -1;
+		pcm->release = snd_pcm_dev_release;
 		if (pcm->streams[cidx].substream == NULL)
 			continue;
 		switch (cidx) {
@@ -863,6 +891,8 @@ static int snd_pcm_dev_register(snd_device_t *device)
 			snd_pcm_lock(1);
 			return err;
 		}
+		sound_add_class_device(str, &pcm->class_dev[cidx], pcm->dev);
+		class_device_create_file(&pcm->class_dev[cidx], &class_device_attr_dev);
 		for (substream = pcm->streams[cidx].substream; substream; substream = substream->next)
 			snd_pcm_timer_init(substream);
 	}
@@ -912,8 +942,10 @@ static int snd_pcm_dev_unregister(snd_device_t *device)
 			break;
 		case SNDRV_PCM_STREAM_CAPTURE:
 			devtype = SNDRV_DEVICE_TYPE_PCM_CAPTURE;
+			pcm->class_dev[0] = pcm->class_dev[cidx];
 			break;
 		}
+		sound_remove_class_device(&pcm->class_dev[0]);
 		snd_unregister_device(devtype, pcm->card, pcm->device);
 		for (substream = pcm->streams[cidx].substream; substream; substream = substream->next)
 			snd_pcm_timer_done(substream);

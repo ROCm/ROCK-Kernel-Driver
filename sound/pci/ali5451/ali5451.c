@@ -1746,6 +1746,7 @@ static int __devinit snd_ali_pcm(ali_t * codec, int device, snd_pcm_t ** rpcm)
 	pcm->info_flags = 0;
 	pcm->dev_subclass = SNDRV_PCM_SUBCLASS_GENERIC_MIX;
 	strcpy(pcm->name, "ALI 5451");
+	pcm->dev = &codec->pci->dev;
 	codec->pcm = pcm;
 	if (rpcm) *rpcm = pcm;
 	return 0;

@@ -45,7 +45,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-algo-ite.h>
 #include <linux/i2c-adap-ite.h>
-#include "../i2c-ite.h"
 
 #define DEFAULT_BASE  0x14014030
 #define ITE_IIC_IO_SIZE	0x40

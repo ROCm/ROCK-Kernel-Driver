@@ -2528,6 +2528,7 @@ static int __devinit snd_rme9652_create_pcm(snd_card_t *card,
 
 	rme9652->pcm = pcm;
 	pcm->private_data = rme9652;
+	pcm->dev = &rme9652->pci->dev;
 	strcpy(pcm->name, rme9652->card_name);
 
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_rme9652_playback_ops);

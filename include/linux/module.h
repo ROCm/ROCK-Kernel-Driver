@@ -16,6 +16,7 @@
 #include <linux/kmod.h>
 #include <linux/elf.h>
 #include <linux/stringify.h>
+#include <linux/kobject.h>
 #include <asm/local.h>
 
 #include <asm/module.h>
@@ -187,6 +188,8 @@ enum module_state
 
 struct module
 {
+	struct kobject	kobj;
+
 	enum module_state state;
 
 	/* Member of list of modules */
