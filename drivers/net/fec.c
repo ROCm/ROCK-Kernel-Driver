@@ -1638,9 +1638,12 @@ fec_set_mac_address(struct net_device *dev)
 
 /* Initialize the FEC Ethernet on 860T (or ColdFire 5272).
  */
+ /*
+  * XXX:  We need to clean up on failure exits here.
+  */
 int __init fec_enet_init(struct net_device *dev)
 {
-	struct fec_enet_private *fep;
+	struct fec_enet_private *fep = dev->priv;
 	unsigned long	mem_addr;
 	volatile cbd_t	*bdp;
 	cbd_t		*cbd_base;
@@ -1650,13 +1653,6 @@ int __init fec_enet_init(struct net_device *dev)
 	/* Only allow us to be probed once. */
 	if (found)
 		return(-ENXIO);
-
-	/* Allocate some private information.
-	*/
-	fep = (struct fec_enet_private *)kmalloc(sizeof(*fep), GFP_KERNEL);
-	if (!fep)
-		return -ENOMEM;
-	memset(fep, 0, sizeof(*fep));
 
 	/* Create an Ethernet device instance.
 	*/
@@ -1694,6 +1690,7 @@ int __init fec_enet_init(struct net_device *dev)
 	}
 	mem_addr = __get_free_page(GFP_KERNEL);
 	cbd_base = (cbd_t *)mem_addr;
+	/* XXX: missing check for allocation failure */
 
 	fec_uncache(mem_addr);
 
@@ -1715,6 +1712,7 @@ int __init fec_enet_init(struct net_device *dev)
 		/* Allocate a page.
 		*/
 		mem_addr = __get_free_page(GFP_KERNEL);
+		/* XXX: missing check for allocation failure */
 
 		fec_uncache(mem_addr);
 
@@ -1761,9 +1759,6 @@ int __init fec_enet_init(struct net_device *dev)
 	fec_request_intrs(dev, fecp);
 
 	dev->base_addr = (unsigned long)fecp;
-	dev->priv = fep;
-
-	ether_setup(dev);
 
 	/* The FEC Ethernet specific entries in the device structure. */
 	dev->open = fec_enet_open;
@@ -1949,14 +1944,28 @@ fec_stop(struct net_device *dev)
 	fecp->fec_mii_speed = fep->phy_speed;
 }
 
-static struct net_device fec_dev = {
-	.init = fec_enet_init,
-};
+static struct net_device *fec_dev;
 
 static int __init fec_enet_module_init(void)
 {
-	if (register_netdev(&fec_dev) != 0)
+	struct net_device *dev;
+	int err;
+
+	dev = alloc_etherdev(sizeof(struct fec_enet_private));
+	if (!dev)
+		return -ENOMEM;
+	err = fec_enet_init(dev);
+	if (err) {
+		free_netdev(dev);
+		return err;
+	}
+
+	if (register_netdev(dev) != 0) {
+		/* XXX: missing cleanup here */
+		free_netdev(dev);
 		return -EIO;
+	}
+	fec_dev = dev;
 	return(0);
 }
 
