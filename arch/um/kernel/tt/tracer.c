@@ -319,7 +319,13 @@ int tracer(int (*init_proc)(void *), void *sp)
 				case OP_HALT:
 					unmap_physmem();
 					kmalloc_ok = 0;
-					ptrace(PTRACE_KILL, pid, 0, 0);
+					os_kill_ptraced_process(pid, 0);
+					/* Now let's reap remaining zombies */
+					errno = 0;
+					do {
+						waitpid(-1, &status,
+							WUNTRACED);
+					} while (errno != ECHILD);
 					return(op == OP_REBOOT);
 				case OP_NONE:
 					printf("Detaching pid %d\n", pid);
