@@ -715,15 +715,13 @@ int dm_suspend(struct mapped_device *md)
 	}
 
 	set_bit(DMF_BLOCK_IO, &md->flags);
+	add_wait_queue(&md->wait, &wait);
 	up_write(&md->lock);
 
 	/*
 	 * Then we wait for the already mapped ios to
 	 * complete.
 	 */
-	down_read(&md->lock);
-
-	add_wait_queue(&md->wait, &wait);
 	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
 
@@ -734,11 +732,11 @@ int dm_suspend(struct mapped_device *md)
 	}
 
 	current->state = TASK_RUNNING;
-	remove_wait_queue(&md->wait, &wait);
-	up_read(&md->lock);
 
-	/* set_bit is atomic */
+	down_write(&md->lock);
+	remove_wait_queue(&md->wait, &wait);
 	set_bit(DMF_SUSPENDED, &md->flags);
+	up_write(&md->lock);
 
 	return 0;
 }
