@@ -89,6 +89,12 @@ struct ipv6_esp_hdr {
 	__u8  enc_data[0];      /* Length variable but >=8. Mind the 64 bit alignment! */
 };
 
+struct ipv6_comp_hdr {
+	__u8 nexthdr;
+	__u8 flags;
+	__u16 cpi;
+};
+
 /*
  *	IPv6 fixed header
  *

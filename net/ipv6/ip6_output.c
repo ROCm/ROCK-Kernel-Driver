@@ -887,7 +887,7 @@ static void ip6_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 #endif
 }
 
-static int ip6_found_nexthdr(struct sk_buff *skb, u8 **nexthdr)
+int ip6_found_nexthdr(struct sk_buff *skb, u8 **nexthdr)
 {
 	u16 offset = sizeof(struct ipv6hdr);
 	struct ipv6_opt_hdr *exthdr = (struct ipv6_opt_hdr*)(skb->nh.ipv6h + 1);

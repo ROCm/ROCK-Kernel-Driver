@@ -34,7 +34,7 @@ int xfrm_parse_spi(struct sk_buff *skb, u8 nexthdr, u32 *spi, u32 *seq)
 		offset_seq = offsetof(struct ip_esp_hdr, seq_no);
 		break;
 	case IPPROTO_COMP:
-		if (!pskb_may_pull(skb, 4))
+		if (!pskb_may_pull(skb, sizeof(struct ip_comp_hdr)))
 			return -EINVAL;
 		*spi = ntohl(ntohs(*(u16*)(skb->h.raw + 2)));
 		*seq = 0;
