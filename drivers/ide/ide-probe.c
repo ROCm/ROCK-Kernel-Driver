@@ -947,15 +947,10 @@ static int ide_init_queue(ide_drive_t *drive)
 	if (drive->disk)
 		drive->disk->queue = drive->queue;
 
-	return 0;
-}
-
-/*
- * Setup the drive for request handling.
- */
-static void ide_init_drive(ide_drive_t *drive)
-{
+	/* needs drive->queue to be set */
 	ide_toggle_bounce(drive, 1);
+
+	return 0;
 }
 
 /*
@@ -1070,10 +1065,9 @@ static int init_irq (ide_hwif_t *hwif)
 	}
 
 	/*
-	 * Link any new drives into the hwgroup, allocate
-	 * the block device queue and initialize the drive.
-	 * Note that ide_init_drive sends commands to the new
-	 * drive.
+	 * For any present drive:
+	 * - allocate the block device queue
+	 * - link drive into the hwgroup
 	 */
 	for (index = 0; index < MAX_DRIVES; ++index) {
 		ide_drive_t *drive = &hwif->drives[index];
@@ -1094,7 +1088,6 @@ static int init_irq (ide_hwif_t *hwif)
 			hwgroup->drive->next = drive;
 		}
 		spin_unlock_irq(&ide_lock);
-		ide_init_drive(drive);
 	}
 
 #if !defined(__mc68000__) && !defined(CONFIG_APUS) && !defined(__sparc__)
@@ -1310,7 +1303,6 @@ int export_ide_init_queue (ide_drive_t *drive)
 	if (ide_init_queue(drive))
 		return 1;
 
-	ide_init_drive(drive);
 	return 0;
 }
 
