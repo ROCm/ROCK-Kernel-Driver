@@ -479,20 +479,21 @@ static char *t1isa_procinfo(struct capi_ctr *ctrl)
 /* ------------------------------------------------------------- */
 
 static struct capi_driver t1isa_driver = {
-    name: "t1isa",
-    revision: "0.0",
-    load_firmware: t1isa_load_firmware,
-    reset_ctr: t1isa_reset_ctr,
-    remove_ctr: t1isa_remove_ctr,
-    register_appl: b1_register_appl,
-    release_appl: b1_release_appl,
-    send_message: t1isa_send_message,
-
-    procinfo: t1isa_procinfo,
-    ctr_read_proc: b1ctl_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: t1isa_add_card,
+	owner: THIS_MODULE,
+	name: "t1isa",
+	revision: "0.0",
+	load_firmware: t1isa_load_firmware,
+	reset_ctr: t1isa_reset_ctr,
+	remove_ctr: t1isa_remove_ctr,
+	register_appl: b1_register_appl,
+	release_appl: b1_release_appl,
+	send_message: t1isa_send_message,
+	
+	procinfo: t1isa_procinfo,
+	ctr_read_proc: b1ctl_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: t1isa_add_card,
 };
 
 static int __init t1isa_init(void)

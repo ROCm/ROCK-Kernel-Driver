@@ -252,7 +252,6 @@ hycapi_register_appl(struct capi_ctr *ctrl, __u16 appl,
 	       rp, sizeof(capi_register_params));
 	
 /*        MOD_INC_USE_COUNT; */
-	ctrl->appl_registered(ctrl, appl);
 }
 
 /*********************************************************************
@@ -313,7 +312,6 @@ hycapi_release_appl(struct capi_ctr *ctrl, __u16 appl)
 	{
 		hycapi_release_internal(ctrl, appl);
 	}
-	ctrl->appl_released(ctrl, appl);
 /*        MOD_DEC_USE_COUNT;  */
 }
 
@@ -666,18 +664,21 @@ hycapi_tx_capiget(hysdn_card *card)
 
 
 static struct capi_driver hycapi_driver = {
-	"hysdn",
-	"0.0",
-	hycapi_load_firmware, 
-	hycapi_reset_ctr,
-	hycapi_remove_ctr,
-	hycapi_register_appl,
-	hycapi_release_appl,
-	hycapi_send_message,
-	hycapi_procinfo,
-	hycapi_read_proc,
-	0,	/* use standard driver_read_proc */
-	0, /* no add_card function */
+	owner: THIS_MODULE,
+	name: "hysdn",
+	revision: "0.0",
+	load_firmware: hycapi_load_firmware, 
+	reset_ctr: hycapi_reset_ctr,
+	remove_ctr: hycapi_remove_ctr,
+	register_appl: hycapi_register_appl,
+	release_appl: hycapi_release_appl,
+	send_message: hycapi_send_message,
+
+	procinfo: hycapi_procinfo,
+	ctr_read_proc: hycapi_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+
+	add_card: 0, /* no add_card function */
 };
 
 

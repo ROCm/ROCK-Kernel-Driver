@@ -152,20 +152,21 @@ static char *b1pcmcia_procinfo(struct capi_ctr *ctrl)
 /* ------------------------------------------------------------- */
 
 static struct capi_driver b1pcmcia_driver = {
-    name: "b1pcmcia",
-    revision: "0.0",
-    load_firmware: b1_load_firmware,
-    reset_ctr: b1_reset_ctr,
-    remove_ctr: b1pcmcia_remove_ctr,
-    register_appl: b1_register_appl,
-    release_appl: b1_release_appl,
-    send_message: b1_send_message,
+	owner: THIS_MODULE,
+	name: "b1pcmcia",
+	revision: "0.0",
+	load_firmware: b1_load_firmware,
+	reset_ctr: b1_reset_ctr,
+	remove_ctr: b1pcmcia_remove_ctr,
+	register_appl: b1_register_appl,
+	release_appl: b1_release_appl,
+	send_message: b1_send_message,
+	
+	procinfo: b1pcmcia_procinfo,
+	ctr_read_proc: b1ctl_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
 
-    procinfo: b1pcmcia_procinfo,
-    ctr_read_proc: b1ctl_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0,
+	add_card: 0,
 };
 
 /* ------------------------------------------------------------- */

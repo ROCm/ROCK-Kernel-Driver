@@ -165,20 +165,21 @@ static void b1pci_remove_ctr(struct capi_ctr *ctrl)
 /* ------------------------------------------------------------- */
 
 static struct capi_driver b1pci_driver = {
-    name: "b1pci",
-    revision: "0.0",
-    load_firmware: b1_load_firmware,
-    reset_ctr: b1_reset_ctr,
-    remove_ctr: b1pci_remove_ctr,
-    register_appl: b1_register_appl,
-    release_appl: b1_release_appl,
-    send_message: b1_send_message,
-
-    procinfo: b1pci_procinfo,
-    ctr_read_proc: b1ctl_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0, /* no add_card function */
+	owner: THIS_MODULE,
+	name: "b1pci",
+	revision: "0.0",
+	load_firmware: b1_load_firmware,
+	reset_ctr: b1_reset_ctr,
+	remove_ctr: b1pci_remove_ctr,
+	register_appl: b1_register_appl,
+	release_appl: b1_release_appl,
+	send_message: b1_send_message,
+	
+	procinfo: b1pci_procinfo,
+	ctr_read_proc: b1ctl_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: 0, /* no add_card function */
 };
 
 #ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
@@ -327,20 +328,21 @@ static void b1pciv4_remove_ctr(struct capi_ctr *ctrl)
 
 
 static struct capi_driver b1pciv4_driver = {
-    name: "b1pciv4",
-    revision: "0.0",
-    load_firmware: b1dma_load_firmware,
-    reset_ctr: b1dma_reset_ctr,
-    remove_ctr: b1pciv4_remove_ctr,
-    register_appl: b1dma_register_appl,
-    release_appl: b1dma_release_appl,
-    send_message: b1dma_send_message,
-
-    procinfo: b1pciv4_procinfo,
-    ctr_read_proc: b1dmactl_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0, /* no add_card function */
+	owner: THIS_MODULE,
+	name: "b1pciv4",
+	revision: "0.0",
+	load_firmware: b1dma_load_firmware,
+	reset_ctr: b1dma_reset_ctr,
+	remove_ctr: b1pciv4_remove_ctr,
+	register_appl: b1dma_register_appl,
+	release_appl: b1dma_release_appl,
+	send_message: b1dma_send_message,
+	
+	procinfo: b1pciv4_procinfo,
+	ctr_read_proc: b1dmactl_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: 0, /* no add_card function */
 };
 
 #endif /* CONFIG_ISDN_DRV_AVMB1_B1PCIV4 */

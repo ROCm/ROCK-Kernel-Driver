@@ -122,6 +122,27 @@ static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
 static struct tq_struct tq_state_notify;
 static struct tq_struct tq_recv_notify;
 
+/* -------- ref counting -------------------------------------- */
+
+static inline struct capi_ctr *
+capi_ctr_get(struct capi_ctr *card)
+{
+	if (card->driver->owner) {
+		if (try_inc_mod_count(card->driver->owner))
+			return card;
+		else
+			return NULL;
+	}
+	return card;
+}
+
+static inline void
+capi_ctr_put(struct capi_ctr *card)
+{
+	if (card->driver->owner)
+		__MOD_DEC_USE_COUNT(card->driver->owner);
+}
+
 /* -------- util functions ------------------------------------ */
 
 static char *cardstate2str(unsigned short cardstate)
@@ -473,6 +494,8 @@ static void proc_capi_exit(void)
 
 static void register_appl(struct capi_ctr *card, u16 applid, capi_register_params *rparam)
 {
+	card = capi_ctr_get(card);
+
 	card->driver->register_appl(card, applid, rparam);
 }
 
@@ -495,6 +518,8 @@ static void release_appl(struct capi_ctr *card, u16 applid)
 	}
 
 	card->driver->release_appl(card, applid);
+
+	capi_ctr_put(card);
 }
 
 
@@ -909,6 +934,7 @@ static void controllercb_reseted(struct capi_ctr * card)
 				nextpp = &(*pp)->next;
 			}
 		}
+		capi_ctr_put(card);
 	}
 
 	printk(KERN_NOTICE "kcapi: card %d down.\n", CARDNR(card));

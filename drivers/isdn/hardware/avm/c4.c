@@ -1200,37 +1200,39 @@ static int c4_add_card(struct capi_driver *driver,
 /* ------------------------------------------------------------- */
 
 static struct capi_driver c2_driver = {
-    name: "c2",
-    revision: "0.0",
-    load_firmware: c4_load_firmware,
-    reset_ctr: c4_reset_ctr,
-    remove_ctr: c4_remove_ctr,
-    register_appl: c4_register_appl,
-    release_appl: c4_release_appl,
-    send_message: c4_send_message,
+	owner: THIS_MODULE,
+	name: "c2",
+	revision: "0.0",
+	load_firmware: c4_load_firmware,
+	reset_ctr: c4_reset_ctr,
+	remove_ctr: c4_remove_ctr,
+	register_appl: c4_register_appl,
+	release_appl: c4_release_appl,
+	send_message: c4_send_message,
 
-    procinfo: c4_procinfo,
-    ctr_read_proc: c4_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0, /* no add_card function */
+	procinfo: c4_procinfo,
+	ctr_read_proc: c4_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: 0, /* no add_card function */
 };
 
 static struct capi_driver c4_driver = {
-    name: "c4",
-    revision: "0.0",
-    load_firmware: c4_load_firmware,
-    reset_ctr: c4_reset_ctr,
-    remove_ctr: c4_remove_ctr,
-    register_appl: c4_register_appl,
-    release_appl: c4_release_appl,
-    send_message: c4_send_message,
-
-    procinfo: c4_procinfo,
-    ctr_read_proc: c4_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0, /* no add_card function */
+	owner: THIS_MODULE,
+	name: "c4",
+	revision: "0.0",
+	load_firmware: c4_load_firmware,
+	reset_ctr: c4_reset_ctr,
+	remove_ctr: c4_remove_ctr,
+	register_appl: c4_register_appl,
+	release_appl: c4_release_appl,
+	send_message: c4_send_message,
+	
+	procinfo: c4_procinfo,
+	ctr_read_proc: c4_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: 0, /* no add_card function */
 };
 
 static int c4_attach_driver (struct capi_driver * driver)

@@ -79,30 +79,31 @@ struct capi_driver_interface {
 };
 
 struct capi_driver {
-     char name[32];				/* driver name */
-     char revision[32];
-     int (*load_firmware)(struct capi_ctr *, capiloaddata *);
-     void (*reset_ctr)(struct capi_ctr *);
-     void (*remove_ctr)(struct capi_ctr *);
-     void (*register_appl)(struct capi_ctr *, __u16 appl,
-						capi_register_params *);
-     void (*release_appl)(struct capi_ctr *, __u16 appl);
-     void (*send_message)(struct capi_ctr *, struct sk_buff *skb);
-
-     char *(*procinfo)(struct capi_ctr *);
-     int (*ctr_read_proc)(char *page, char **start, off_t off,
-			       int count, int *eof, struct capi_ctr *card);
-     int (*driver_read_proc)(char *page, char **start, off_t off,
-		               int count, int *eof, struct capi_driver *driver);
-
-     int (*add_card)(struct capi_driver *driver, capicardparams *data);
-
-     /* intitialized by kcapi */
-     struct capi_ctr	*controller;		/* list of controllers */
-     struct capi_driver *next;
-     int ncontroller;
-     struct proc_dir_entry *procent;
-     char procfn[128];
+	struct module *owner;
+	char name[32];				/* driver name */
+	char revision[32];
+	int (*load_firmware)(struct capi_ctr *, capiloaddata *);
+	void (*reset_ctr)(struct capi_ctr *);
+	void (*remove_ctr)(struct capi_ctr *);
+	void (*register_appl)(struct capi_ctr *, __u16 appl,
+			      capi_register_params *);
+	void (*release_appl)(struct capi_ctr *, __u16 appl);
+	void (*send_message)(struct capi_ctr *, struct sk_buff *skb);
+	
+	char *(*procinfo)(struct capi_ctr *);
+	int (*ctr_read_proc)(char *page, char **start, off_t off,
+			     int count, int *eof, struct capi_ctr *card);
+	int (*driver_read_proc)(char *page, char **start, off_t off,
+				int count, int *eof, struct capi_driver *driver);
+	
+	int (*add_card)(struct capi_driver *driver, capicardparams *data);
+	
+	/* intitialized by kcapi */
+	struct capi_ctr	*controller;		/* list of controllers */
+	struct capi_driver *next;
+	int ncontroller;
+	struct proc_dir_entry *procent;
+	char procfn[128];
 };
 
 struct capi_driver_interface *attach_capi_driver(struct capi_driver *driver);
