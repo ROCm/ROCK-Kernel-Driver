@@ -170,7 +170,7 @@ static inline int pci_dac_dma_supported(struct pci_dev *hwdev,u64 mask)
 }
 
 #define PCI_DMA_ERROR_CODE      (~(dma_addr_t)0x0)
-static inline int pci_dma_error(dma_addr_t dma_addr)
+static inline int pci_dma_mapping_error(dma_addr_t dma_addr)
 {
 	return (dma_addr == PCI_DMA_ERROR_CODE);
 }

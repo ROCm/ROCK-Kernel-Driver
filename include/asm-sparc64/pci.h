@@ -215,7 +215,7 @@ pci_dac_dma_sync_single_for_device(struct pci_dev *pdev, dma64_addr_t dma_addr, 
 
 #define PCI_DMA_ERROR_CODE	(~(dma_addr_t)0x0)
 
-static inline int pci_dma_error(dma_addr_t dma_addr)
+static inline int pci_dma_mapping_error(dma_addr_t dma_addr)
 {
 	return (dma_addr == PCI_DMA_ERROR_CODE);
 }
