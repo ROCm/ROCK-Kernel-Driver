@@ -542,8 +542,7 @@ cmds(struct pt_regs *excp)
 			symbol_lookup();
 			break;
 		case 'r':
-			if (excp != NULL)
-				prregs(excp);	/* print regs */
+			prregs(excp);	/* print regs */
 			break;
 		case 'e':
 			if (excp == NULL)
@@ -966,8 +965,7 @@ static void backtrace(struct pt_regs *excp)
 
 spinlock_t exception_print_lock = SPIN_LOCK_UNLOCKED;
 
-void
-excprint(struct pt_regs *fp)
+void excprint(struct pt_regs *fp)
 {
 	unsigned long flags;
 
@@ -1002,21 +1000,31 @@ excprint(struct pt_regs *fp)
 	spin_unlock_irqrestore(&exception_print_lock, flags);
 }
 
-void
-prregs(struct pt_regs *fp)
+void prregs(struct pt_regs *fp)
 {
 	int n;
 	unsigned long base;
 
 	if (scanhex((void *)&base))
 		fp = (struct pt_regs *) base;
-	for (n = 0; n < 16; ++n)
-		printf("R%.2ld = %.16lx   R%.2ld = %.16lx\n", n, fp->gpr[n],
-		       n+16, fp->gpr[n+16]);
-	printf("pc  = %.16lx   msr = %.16lx\nlr  = %.16lx   cr  = %.16lx\n",
-	       fp->nip, fp->msr, fp->link, fp->ccr);
-	printf("ctr = %.16lx   xer = %.16lx   trap = %8lx\n",
-	       fp->ctr, fp->xer, fp->trap);
+
+	if (setjmp(bus_error_jmp) == 0) {
+		__debugger_fault_handler = handle_fault;
+		sync();
+		for (n = 0; n < 16; ++n)
+			printf("R%.2ld = %.16lx   R%.2ld = %.16lx\n", n,
+			       fp->gpr[n], n+16, fp->gpr[n+16]);
+		printf("pc  = %.16lx   msr = %.16lx\nlr  = %.16lx   "
+		       "cr  = %.16lx\n", fp->nip, fp->msr, fp->link, fp->ccr);
+		printf("ctr = %.16lx   xer = %.16lx   trap = %8lx\n",
+		       fp->ctr, fp->xer, fp->trap);
+
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
+	} else {
+		printf("*** Error reading regs\n");
+	}
 }
 
 void

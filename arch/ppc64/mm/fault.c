@@ -37,8 +37,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-void bad_page_fault(struct pt_regs *, unsigned long, int);
-
 /*
  * The error_code parameter is
  *  - DSISR for a non-SLB data access fault,
@@ -177,10 +175,8 @@ do_sigbus:
  * It is called from do_page_fault above and from some of the procedures
  * in traps.c.
  */
-void
-bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
+void bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 {
-	extern void die(const char *, struct pt_regs *, long);
 	const struct exception_table_entry *entry;
 
 	/* Are we prepared to handle this fault?  */
@@ -190,7 +186,5 @@ bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 	}
 
 	/* kernel has accessed a bad area */
-	if (debugger(regs))
-		return;
 	die("Kernel access of bad area", regs, sig);
 }
