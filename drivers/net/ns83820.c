@@ -93,6 +93,7 @@
 #define dprintk(x...)		do { } while (0)
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
@@ -115,7 +116,7 @@
 
 #define DRV_NAME "ns83820"
 
-/* Global parameters.  See MODULE_PARM near the bottom. */
+/* Global parameters.  See module_param near the bottom. */
 static int ihr = 2;
 static int reset_phy = 0;
 static int lnksts = 0;		/* CFG_LNKSTS bit polarity */
@@ -2142,13 +2143,13 @@ MODULE_LICENSE("GPL");
 
 MODULE_DEVICE_TABLE(pci, ns83820_pci_tbl);
 
-MODULE_PARM(lnksts, "i");
+module_param(lnksts, int, 0);
 MODULE_PARM_DESC(lnksts, "Polarity of LNKSTS bit");
 
-MODULE_PARM(ihr, "i");
+module_param(ihr, int, 0);
 MODULE_PARM_DESC(ihr, "Time in 100 us increments to delay interrupts (range 0-127)");
 
-MODULE_PARM(reset_phy, "i");
+module_param(reset_phy, int, 0);
 MODULE_PARM_DESC(reset_phy, "Set to 1 to reset the PHY on startup");
 
 module_init(ns83820_init);
