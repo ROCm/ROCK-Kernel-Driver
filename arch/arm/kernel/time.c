@@ -343,6 +343,9 @@ void timer_tick(struct pt_regs *regs)
 	do_leds();
 	do_set_rtc();
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
 }
 
 void (*init_arch_time)(void);

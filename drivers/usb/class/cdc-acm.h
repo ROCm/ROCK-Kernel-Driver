@@ -117,6 +117,7 @@ struct union_desc {
 } __attribute__ ((packed));
 
 /* class specific descriptor types */
+#define CDC_HEADER_TYPE			0x00
 #define CDC_CALL_MANAGEMENT_TYPE	0x01
 #define CDC_AC_MANAGEMENT_TYPE		0x02
 #define CDC_UNION_TYPE			0x06

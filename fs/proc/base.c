@@ -473,7 +473,7 @@ out:
 
 static int proc_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
-	if (vfs_permission(inode, mask) != 0)
+	if (generic_permission(inode, mask, NULL) != 0)
 		return -EACCES;
 	return proc_check_root(inode);
 }

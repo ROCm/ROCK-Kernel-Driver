@@ -938,11 +938,6 @@ int i2o_seq_show_drivers_stored(struct seq_file *seq, void *v)
 			seq_printf(seq, "                ");
 		}
 
-#if 0
-		if (c->i2oversion == 0x02)
-			seq_printf(seq, "%-d", dst->module_state);
-#endif
-
 		seq_printf(seq, "%-#7x", dst->i2o_vendor_id);
 		seq_printf(seq, "%-#8x", dst->module_id);
 		seq_printf(seq, "%-29s", chtostr(dst->module_name_version, 28));
@@ -950,10 +945,6 @@ int i2o_seq_show_drivers_stored(struct seq_file *seq, void *v)
 		seq_printf(seq, "%8d ", dst->module_size);
 		seq_printf(seq, "%8d ", dst->mpb_size);
 		seq_printf(seq, "0x%04x", dst->module_flags);
-#if 0
-		if (c->i2oversion == 0x02)
-			seq_printf(seq, "%d", dst->notification_level);
-#endif
 		seq_printf(seq, "\n");
 	}
 

@@ -196,7 +196,7 @@ static void usb_kbd_close(struct input_dev *dev)
 	struct usb_kbd *kbd = dev->private;
 
 	if (!--kbd->open)
-		usb_unlink_urb(kbd->irq);
+		usb_kill_urb(kbd->irq);
 }
 
 static int usb_kbd_alloc_mem(struct usb_device *dev, struct usb_kbd *kbd)
@@ -343,7 +343,7 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 	
 	usb_set_intfdata(intf, NULL);
 	if (kbd) {
-		usb_unlink_urb(kbd->irq);
+		usb_kill_urb(kbd->irq);
 		input_unregister_device(&kbd->dev);
 		usb_kbd_free_mem(interface_to_usbdev(intf), kbd);
 		kfree(kbd);

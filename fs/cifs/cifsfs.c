@@ -200,7 +200,7 @@ static int cifs_permission(struct inode * inode, int mask, struct nameidata *nd)
 		on the client (above and beyond ACL on servers) for  
 		servers which do not support setting and viewing mode bits,
 		so allowing client to check permissions is useful */ 
-		return vfs_permission(inode, mask);
+		return generic_permission(inode, mask, NULL);
 }
 
 static kmem_cache_t *cifs_inode_cachep;

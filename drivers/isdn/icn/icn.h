@@ -70,8 +70,7 @@ typedef struct icn_cdef {
 #define ICN_FLAGS_RUNNING  4    /* Cards driver activated                  */
 #define ICN_FLAGS_RBTIMER  8    /* cyclic scheduling of B-Channel-poll     */
 
-#define ICN_BOOT_TIMEOUT1  (HZ) /* Delay for Boot-download (jiffies)       */
-#define ICN_CHANLOCK_DELAY (HZ/10)	/* Delay for Channel-mapping (jiffies)     */
+#define ICN_BOOT_TIMEOUT1  1000 /* Delay for Boot-download (msecs)         */
 
 #define ICN_TIMER_BCREAD (HZ/100)	/* B-Channel poll-cycle                    */
 #define ICN_TIMER_DCREAD (HZ/2) /* D-Channel poll-cycle                    */

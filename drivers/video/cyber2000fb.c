@@ -1399,6 +1399,8 @@ static int __devinit cyberpro_common_probe(struct cfb_info *cfb)
 		cfb->fb.var.xres, cfb->fb.var.yres,
 		h_sync / 1000, h_sync % 1000, v_sync);
 
+	if (cfb->dev)
+		cfb->fb.device = &cfb->dev->dev;
 	err = register_framebuffer(&cfb->fb);
 
 failed:
@@ -1722,7 +1724,7 @@ int __init cyber2000fb_init(void)
 #ifndef MODULE
 	char *option = NULL;
 
-	if (fb_get_options("cyber2000fb", NULL))
+	if (fb_get_options("cyber2000fb", &option))
 		return -ENODEV;
 	cyber2000fb_setup(option);
 #endif

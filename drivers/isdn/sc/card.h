@@ -24,24 +24,25 @@
  * We need these if they're not already included
  */
 #include <linux/timer.h>
+#include <linux/time.h>
 #include <linux/isdnif.h>
 #include "message.h"
 
 /*
  * Amount of time to wait for a reset to complete
  */
-#define CHECKRESET_TIME		milliseconds(4000)
+#define CHECKRESET_TIME		msecs_to_jiffies(4000)
 
 /*
  * Amount of time between line status checks
  */
-#define CHECKSTAT_TIME		milliseconds(8000)
+#define CHECKSTAT_TIME		msecs_to_jiffies(8000)
 
 /*
  * The maximum amount of time to wait for a message response
  * to arrive. Use exclusively by send_and_receive
  */
-#define SAR_TIMEOUT		milliseconds(10000)
+#define SAR_TIMEOUT		msecs_to_jiffies(10000)
 
 /*
  * Macro to determine is a card id is valid

@@ -1524,6 +1524,7 @@ imsttfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	par->cmap_regs = (__u8 *)ioremap(addr + 0x840000, 0x1000);
 	info->par = par;
 	info->pseudo_palette = (void *) (par + 1);
+	info->device = &pdev->dev;
 	init_imstt(info);
 
 	pci_set_drvdata(pdev, info);

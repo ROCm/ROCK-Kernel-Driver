@@ -808,7 +808,7 @@ int hostfs_permission(struct inode *ino, int desired, struct nameidata *nd)
 	if(name == NULL) return(-ENOMEM);
 	err = access_file(name, r, w, x);
 	kfree(name);
-	if(!err) err = vfs_permission(ino, desired);
+	if(!err) err = generic_permission(ino, desired, NULL);
 	return(err);
 }
 

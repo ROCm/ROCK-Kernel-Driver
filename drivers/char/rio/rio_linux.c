@@ -330,8 +330,7 @@ int RIODelay (struct Port *PortP, int njiffies)
   func_enter ();
 
   rio_dprintk (RIO_DEBUG_DELAY, "delaying %d jiffies\n", njiffies);  
-  current->state = TASK_INTERRUPTIBLE;
-  schedule_timeout(njiffies);
+  msleep_interruptible(jiffies_to_msecs(njiffies));
   func_exit();
 
   if (signal_pending(current))
@@ -347,8 +346,7 @@ int RIODelay_ni (struct Port *PortP, int njiffies)
   func_enter ();
 
   rio_dprintk (RIO_DEBUG_DELAY, "delaying %d jiffies (ni)\n", njiffies);  
-  current->state = TASK_UNINTERRUPTIBLE;
-  schedule_timeout(njiffies);
+  msleep(jiffies_to_msecs(njiffies));
   func_exit();
   return !RIO_FAIL;
 }

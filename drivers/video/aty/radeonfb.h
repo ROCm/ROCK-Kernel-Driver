@@ -425,8 +425,6 @@ static inline u32 _INPLL(struct radeonfb_info *rinfo, u32 addr)
 		spin_unlock_irqrestore(&rinfo->reg_lock, flags); 	\
 	} while (0)
 
-#define MS_TO_HZ(ms)       ((ms * HZ + 999) / 1000)
-
 #define BIOS_IN8(v)  	(readb(rinfo->bios_seg + (v)))
 #define BIOS_IN16(v) 	(readb(rinfo->bios_seg + (v)) | \
 			  (readb(rinfo->bios_seg + (v) + 1) << 8))

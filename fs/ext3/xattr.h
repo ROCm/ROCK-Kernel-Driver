@@ -56,23 +56,13 @@ struct ext3_xattr_entry {
 
 # ifdef CONFIG_EXT3_FS_XATTR
 
-struct ext3_xattr_handler {
-	char *prefix;
-	size_t (*list)(char *list, struct inode *inode, const char *name,
-		       int name_len);
-	int (*get)(struct inode *inode, const char *name, void *buffer,
-		   size_t size);
-	int (*set)(struct inode *inode, const char *name, const void *buffer,
-		   size_t size, int flags);
-};
+extern struct xattr_handler ext3_xattr_user_handler;
+extern struct xattr_handler ext3_xattr_trusted_handler;
+extern struct xattr_handler ext3_xattr_acl_access_handler;
+extern struct xattr_handler ext3_xattr_acl_default_handler;
+extern struct xattr_handler ext3_xattr_security_handler;
 
-extern int ext3_xattr_register(int, struct ext3_xattr_handler *);
-extern void ext3_xattr_unregister(int, struct ext3_xattr_handler *);
-
-extern int ext3_setxattr(struct dentry *, const char *, const void *, size_t, int);
-extern ssize_t ext3_getxattr(struct dentry *, const char *, void *, size_t);
 extern ssize_t ext3_listxattr(struct dentry *, char *, size_t);
-extern int ext3_removexattr(struct dentry *, const char *);
 
 extern int ext3_xattr_get(struct inode *, int, const char *, void *, size_t);
 extern int ext3_xattr_list(struct inode *, char *, size_t);
@@ -85,11 +75,9 @@ extern void ext3_xattr_put_super(struct super_block *);
 extern int init_ext3_xattr(void);
 extern void exit_ext3_xattr(void);
 
+extern struct xattr_handler *ext3_xattr_handlers[];
+
 # else  /* CONFIG_EXT3_FS_XATTR */
-#  define ext3_setxattr		NULL
-#  define ext3_getxattr		NULL
-#  define ext3_listxattr	NULL
-#  define ext3_removexattr	NULL
 
 static inline int
 ext3_xattr_get(struct inode *inode, int name_index, const char *name,
@@ -139,8 +127,6 @@ exit_ext3_xattr(void)
 {
 }
 
-# endif  /* CONFIG_EXT3_FS_XATTR */
+#define ext3_xattr_handlers	NULL
 
-extern struct ext3_xattr_handler ext3_xattr_user_handler;
-extern struct ext3_xattr_handler ext3_xattr_trusted_handler;
-extern struct ext3_xattr_handler ext3_xattr_security_handler;
+# endif  /* CONFIG_EXT3_FS_XATTR */

@@ -46,6 +46,9 @@ static void timer_interrupt(int irq, void *dummy, struct pt_regs * regs)
 	platform_timer_eoi();
 
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
 	profile_tick(CPU_PROFILING, regs);
 }
 

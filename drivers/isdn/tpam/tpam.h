@@ -14,6 +14,8 @@
 #ifndef _TPAM_PRIV_H_
 #define _TPAM_PRIV_H_
 
+//#define DEBUG /* uncomment if you want debugging output */
+#include <linux/kernel.h>
 #include <linux/isdnif.h>
 #include <linux/init.h>
 #include <linux/workqueue.h>
@@ -223,14 +225,5 @@ extern void init_CRC(void);
 extern void hdlc_encode_modem(u8 *, u32, u8 *, u32 *);
 extern void hdlc_no_accm_encode(u8 *, u32, u8 *, u32 *);
 extern u32 hdlc_no_accm_decode(u8 *, u32);
-
-/* Define this to enable debug tracing prints */
-#undef DEBUG
-
-#ifdef DEBUG
-#define dprintk printk
-#else
-#define dprintk while(0) printk
-#endif
 
 #endif /* _TPAM_H_ */

@@ -770,7 +770,8 @@ usb_gadget_unregister_driver (struct usb_gadget_driver *driver)
 
 	spin_lock_irqsave (&dum->lock, flags);
 	stop_activity (dum, driver);
-	dum->port_status &= ~USB_PORT_STAT_CONNECTION;
+	dum->port_status &= ~(USB_PORT_STAT_CONNECTION | USB_PORT_STAT_ENABLE |
+			USB_PORT_STAT_LOW_SPEED | USB_PORT_STAT_HIGH_SPEED);
 	dum->port_status |= (1 << USB_PORT_FEAT_C_CONNECTION);
 	spin_unlock_irqrestore (&dum->lock, flags);
 
@@ -815,8 +816,8 @@ static int dummy_urb_enqueue (
 	struct dummy	*dum;
 	unsigned long	flags;
 
-	/* patch to usb_sg_init() is in 2.5.60 */
-	BUG_ON (!urb->transfer_buffer && urb->transfer_buffer_length);
+	if (!urb->transfer_buffer && urb->transfer_buffer_length)
+		return -EINVAL;
 
 	dum = container_of (hcd, struct dummy, hcd);
 	spin_lock_irqsave (&dum->lock, flags);
@@ -1102,10 +1103,10 @@ restart:
 		ep = find_endpoint(dum, address);
 		if (!ep) {
 			/* set_configuration() disagreement */
-			dev_err (hardware,
+			dev_dbg (hardware,
 				"no ep configured for urb %p\n",
 				urb);
-			maybe_set_status (urb, -ETIMEDOUT);
+			maybe_set_status (urb, -EPROTO);
 			goto return_urb;
 		}
 
@@ -1409,9 +1410,12 @@ static int dummy_hub_control (
 	case ClearPortFeature:
 		switch (wValue) {
 		case USB_PORT_FEAT_SUSPEND:
-			/* 20msec resume signaling */
-			dum->resuming = 1;
-			dum->re_timeout = jiffies + ((HZ * 20)/1000);
+			if (dum->port_status & (1 << USB_PORT_FEAT_SUSPEND)) {
+				/* 20msec resume signaling */
+				dum->resuming = 1;
+				dum->re_timeout = jiffies +
+							msecs_to_jiffies(20);
+			}
 			break;
 		case USB_PORT_FEAT_POWER:
 			dum->port_status = 0;
@@ -1440,7 +1444,7 @@ static int dummy_hub_control (
 			dum->port_status &= ~(1 << USB_PORT_FEAT_SUSPEND);
 			dum->resuming = 0;
 			dum->re_timeout = 0;
-			if (dum->driver->resume) {
+			if (dum->driver && dum->driver->resume) {
 				spin_unlock (&dum->lock);
 				dum->driver->resume (&dum->gadget);
 				spin_lock (&dum->lock);
@@ -1481,11 +1485,15 @@ static int dummy_hub_control (
 	case SetPortFeature:
 		switch (wValue) {
 		case USB_PORT_FEAT_SUSPEND:
-			dum->port_status |= (1 << USB_PORT_FEAT_SUSPEND);
-			if (dum->driver->suspend) {
-				spin_unlock (&dum->lock);
-				dum->driver->suspend (&dum->gadget);
-				spin_lock (&dum->lock);
+			if ((dum->port_status & (1 << USB_PORT_FEAT_SUSPEND))
+					== 0) {
+				dum->port_status |=
+						(1 << USB_PORT_FEAT_SUSPEND);
+				if (dum->driver && dum->driver->suspend) {
+					spin_unlock (&dum->lock);
+					dum->driver->suspend (&dum->gadget);
+					spin_lock (&dum->lock);
+				}
 			}
 			break;
 		case USB_PORT_FEAT_RESET:
@@ -1502,7 +1510,7 @@ static int dummy_hub_control (
 				/* FIXME test that code path! */
 			}
 			/* 50msec reset signaling */
-			dum->re_timeout = jiffies + ((HZ * 50)/1000);
+			dum->re_timeout = jiffies + msecs_to_jiffies(50);
 			/* FALLTHROUGH */
 		default:
 			dum->port_status |= (1 << wValue);
@@ -1790,4 +1798,3 @@ static void __exit cleanup (void)
 	the_controller = 0;
 }
 module_exit (cleanup);
-

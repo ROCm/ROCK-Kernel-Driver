@@ -222,7 +222,7 @@ struct mode_registers {
 
 struct heap_data {
         unsigned long physical;
-	__u8 *virtual;
+	__u8 __iomem *virtual;
 	u32 offset;
 	u32 size;
 };	
@@ -256,7 +256,7 @@ struct i810fb_par {
 	u32 pseudo_palette[17];
 	u32 pci_state[16];
 	unsigned long mmio_start_phys;
-	u8 *mmio_start_virtual;
+	u8 __iomem *mmio_start_virtual;
 	u32 pitch;
 	u32 pixconf;
 	u32 watermark;

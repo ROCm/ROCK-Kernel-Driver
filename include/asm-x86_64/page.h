@@ -130,18 +130,10 @@ extern __inline__ int get_order(unsigned long size)
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
 
-#define __VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
-				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
-#define __VM_STACK_FLAGS 	(VM_GROWSDOWN | VM_READ | VM_WRITE | VM_EXEC | \
-                                VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
-
 #define VM_DATA_DEFAULT_FLAGS \
-	(test_thread_flag(TIF_IA32) ? vm_data_default_flags32 : \
-	  vm_data_default_flags) 
+	(((current->personality & READ_IMPLIES_EXEC) ? VM_EXEC : 0 ) | \
+	 VM_READ | VM_WRITE | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
 
-#define VM_STACK_DEFAULT_FLAGS \
-	(test_thread_flag(TIF_IA32) ? vm_stack_flags32 : vm_stack_flags) 
-	
 #define CONFIG_ARCH_GATE_AREA 1	
 
 #ifndef __ASSEMBLY__

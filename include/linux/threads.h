@@ -30,6 +30,6 @@
 /*
  * A maximum of 4 million PIDs should be enough for a while:
  */
-#define PID_MAX_LIMIT (4*1024*1024)
+#define PID_MAX_LIMIT (sizeof(long) > 4 ? 4*1024*1024 : PID_MAX_DEFAULT)
 
 #endif

@@ -29,7 +29,6 @@ EXPORT_SYMBOL(posix_acl_equiv_mode);
 EXPORT_SYMBOL(posix_acl_from_mode);
 EXPORT_SYMBOL(posix_acl_create_masq);
 EXPORT_SYMBOL(posix_acl_chmod_masq);
-EXPORT_SYMBOL(posix_acl_masq_nfs_mode);
 EXPORT_SYMBOL(posix_acl_permission);
 
 /*
@@ -377,47 +376,6 @@ posix_acl_chmod_masq(struct posix_acl *acl, mode_t mode)
 			return -EIO;
 		group_obj->e_perm = (mode & S_IRWXG) >> 3;
 	}
-
-	return 0;
-}
-
-/*
- * Adjust the mode parameter so that NFSv2 grants nobody permissions
- * that may not be granted by the ACL. This is necessary because NFSv2
- * may compute access permissions on the client side, and may serve cached
- * data whenever it assumes access would be granted.  Since ACLs may also
- * be used to deny access to specific users, the minimal permissions
- * for secure operation over NFSv2 are very restrictive. Permissions
- * granted to users via Access Control Lists will not be effective over
- * NFSv2.
- *
- * Privilege escalation can only happen for read operations, as writes are
- * always carried out on the NFS server, where the proper access checks are
- * implemented.
- */
-int
-posix_acl_masq_nfs_mode(struct posix_acl *acl, mode_t *mode_p)
-{
-	struct posix_acl_entry *pa, *pe; int min_perm = S_IRWXO;
-
-	FOREACH_ACL_ENTRY(pa, acl, pe) {
-                switch(pa->e_tag) {
-			case ACL_USER_OBJ:
-				break;
-
-			case ACL_USER:
-			case ACL_GROUP_OBJ:
-			case ACL_GROUP:
-			case ACL_MASK:
-			case ACL_OTHER:
-				min_perm &= pa->e_perm;
-				break;
-
-			default:
-				return -EIO;
-		}
-	}
-	*mode_p = (*mode_p & ~(S_IRWXG|S_IRWXO)) | (min_perm << 3) | min_perm;
 
 	return 0;
 }

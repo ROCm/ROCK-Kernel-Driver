@@ -1600,7 +1600,7 @@ int nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 	return res;
 out_notsup:
 	nfs_revalidate_inode(NFS_SERVER(inode), inode);
-	res = vfs_permission(inode, mask);
+	res = generic_permission(inode, mask, NULL);
 	unlock_kernel();
 	return res;
 }

@@ -256,41 +256,10 @@ int pm_send_all(pm_request_t rqst, void *data)
 	return 0;
 }
 
-/**
- *	pm_find  - find a device
- *	@type: type of device
- *	@from: where to start looking
- *
- *	Scan the power management list for devices of a specific type. The
- *	return value for a matching device may be passed to further calls
- *	to this function to find further matches. A %NULL indicates the end
- *	of the list. 
- *
- *	To search from the beginning pass %NULL as the @from value.
- *
- *	The caller MUST hold the pm_devs_lock lock when calling this 
- *	function. The instant that the lock is dropped all pointers returned
- *	may become invalid.
- */
- 
-struct pm_dev *pm_find(pm_dev_t type, struct pm_dev *from)
-{
-	struct list_head *entry = from ? from->entry.next:pm_devs.next;
-	while (entry != &pm_devs) {
-		struct pm_dev *dev = list_entry(entry, struct pm_dev, entry);
-		if (type == PM_UNKNOWN_DEV || dev->type == type)
-			return dev;
-		entry = entry->next;
-	}
-	return NULL;
-}
-
 EXPORT_SYMBOL(pm_register);
 EXPORT_SYMBOL(pm_unregister);
 EXPORT_SYMBOL(pm_unregister_all);
-EXPORT_SYMBOL(pm_send);
 EXPORT_SYMBOL(pm_send_all);
-EXPORT_SYMBOL(pm_find);
 EXPORT_SYMBOL(pm_active);
 
 

@@ -233,8 +233,10 @@ void account_ticks(struct pt_regs *regs)
 	while (ticks--)
 		update_process_times(user_mode(regs));
 #else
-	while (ticks--)
+	while (ticks--) {
 		do_timer(regs);
+		update_process_times(user_mode(regs));
+	}
 #endif
 	s390_do_profile(regs);
 }

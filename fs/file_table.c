@@ -24,10 +24,8 @@ struct files_stat_struct files_stat = {
 
 EXPORT_SYMBOL(files_stat); /* Needed by unix.o */
 
-/* public *and* exported. Not pretty! */
+/* public. Not pretty! */
 spinlock_t __cacheline_aligned_in_smp files_lock = SPIN_LOCK_UNLOCKED;
-
-EXPORT_SYMBOL(files_lock);
 
 static spinlock_t filp_count_lock = SPIN_LOCK_UNLOCKED;
 
@@ -198,8 +196,6 @@ void put_filp(struct file *file)
 		file_free(file);
 	}
 }
-
-EXPORT_SYMBOL(put_filp);
 
 void file_move(struct file *file, struct list_head *list)
 {

@@ -166,16 +166,6 @@ struct dev_state {
 	unsigned long ifclaimed;
 };
 
-/* internal methods & data */
-extern struct usb_driver usbdevfs_driver;
-extern struct file_operations usbdevfs_drivers_fops;
-extern struct file_operations usbdevfs_devices_fops;
-extern struct file_operations usbdevfs_device_file_operations;
-extern struct inode_operations usbdevfs_device_inode_operations;
-extern struct inode_operations usbdevfs_bus_inode_operations;
-extern struct file_operations usbdevfs_bus_file_operations;
-extern void usbdevfs_conn_disc_event(void);
-
 #endif /* __KERNEL__ */
 
 /* --------------------------------------------------------------------- */

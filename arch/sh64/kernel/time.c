@@ -309,6 +309,9 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	ctc_last_interrupt = (unsigned long) current_ctc;
 
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
 	profile_tick(CPU_PROFILING, regs);
 
 #ifdef CONFIG_HEARTBEAT

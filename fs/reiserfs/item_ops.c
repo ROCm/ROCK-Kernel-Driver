@@ -26,7 +26,7 @@ static void sd_decrement_key (struct cpu_key * key)
     set_cpu_key_k_offset(key, (loff_t)(-1));
 }
 
-static int sd_is_left_mergeable (struct key * key, unsigned long bsize)
+static int sd_is_left_mergeable (struct reiserfs_key * key, unsigned long bsize)
 {
     return 0;
 }
@@ -145,7 +145,7 @@ static void direct_decrement_key (struct cpu_key * key)
 }
 
 
-static int direct_is_left_mergeable (struct key * key, unsigned long bsize)
+static int direct_is_left_mergeable (struct reiserfs_key * key, unsigned long bsize)
 {
     int version = le_key_version (key);
     return ((le_key_k_offset (version, key) & (bsize - 1)) != 1);
@@ -250,7 +250,7 @@ static void indirect_decrement_key (struct cpu_key * key)
 
 
 // if it is not first item of the body, then it is mergeable
-static int indirect_is_left_mergeable (struct key * key, unsigned long bsize)
+static int indirect_is_left_mergeable (struct reiserfs_key * key, unsigned long bsize)
 {
     int version = le_key_version (key);
     return (le_key_k_offset (version, key) != 1);
@@ -403,7 +403,7 @@ static void direntry_decrement_key (struct cpu_key * key)
 }
 
 
-static int direntry_is_left_mergeable (struct key * key, unsigned long bsize)
+static int direntry_is_left_mergeable (struct reiserfs_key * key, unsigned long bsize)
 {
     if (le32_to_cpu (key->u.k_offset_v1.k_offset) == DOT_OFFSET)
 	return 0;
@@ -691,7 +691,7 @@ static void errcatch_decrement_key (struct cpu_key * key)
 }
 
 
-static int errcatch_is_left_mergeable (struct key * key, unsigned long bsize)
+static int errcatch_is_left_mergeable (struct reiserfs_key * key, unsigned long bsize)
 {
     reiserfs_warning (NULL, "green-16003: Invalid item type observed, run fsck ASAP");
     return 0;

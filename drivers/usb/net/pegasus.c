@@ -854,10 +854,10 @@ static void free_all_urbs(pegasus_t * pegasus)
 
 static void unlink_all_urbs(pegasus_t * pegasus)
 {
-	usb_unlink_urb(pegasus->intr_urb);
-	usb_unlink_urb(pegasus->tx_urb);
-	usb_unlink_urb(pegasus->rx_urb);
-	usb_unlink_urb(pegasus->ctrl_urb);
+	usb_kill_urb(pegasus->intr_urb);
+	usb_kill_urb(pegasus->tx_urb);
+	usb_kill_urb(pegasus->rx_urb);
+	usb_kill_urb(pegasus->ctrl_urb);
 }
 
 static int alloc_urbs(pegasus_t * pegasus)
@@ -920,8 +920,8 @@ static int pegasus_open(struct net_device *net)
 	if ((res = enable_net_traffic(net, pegasus->usb))) {
 		err("can't enable_net_traffic() - %d", res);
 		res = -EIO;
-		usb_unlink_urb(pegasus->rx_urb);
-		usb_unlink_urb(pegasus->intr_urb);
+		usb_kill_urb(pegasus->rx_urb);
+		usb_kill_urb(pegasus->intr_urb);
 		free_skb_pool(pegasus);
 		goto exit;
 	}

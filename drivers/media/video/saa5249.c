@@ -273,8 +273,7 @@ static void jdelay(unsigned long delay)
 	sigfillset(&current->blocked);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(delay);
+	msleep_interruptible(jiffies_to_msecs(delay));
 
 	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = oldblocked;

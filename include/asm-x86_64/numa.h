@@ -1,6 +1,8 @@
 #ifndef _ASM_X8664_NUMA_H 
 #define _ASM_X8664_NUMA_H 1
 
+#include <linux/nodemask.h>
+
 #define MAXNODE 8 
 #define NODEMASK 0xff
 

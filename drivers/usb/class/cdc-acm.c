@@ -301,9 +301,9 @@ done:
 	return 0;
 
 full_bailout:
-	usb_unlink_urb(acm->readurb);
+	usb_kill_urb(acm->readurb);
 bail_out_and_unlink:
-	usb_unlink_urb(acm->ctrlurb);
+	usb_kill_urb(acm->ctrlurb);
 bail_out:
 	up(&open_sem);
 	return -EIO;
@@ -320,9 +320,9 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 	if (!--acm->used) {
 		if (acm->dev) {
 			acm_set_control(acm, acm->ctrlout = 0);
-			usb_unlink_urb(acm->ctrlurb);
-			usb_unlink_urb(acm->writeurb);
-			usb_unlink_urb(acm->readurb);
+			usb_kill_urb(acm->ctrlurb);
+			usb_kill_urb(acm->writeurb);
+			usb_kill_urb(acm->readurb);
 		} else {
 			tty_unregister_device(acm_tty_driver, acm->minor);
 			acm_table[acm->minor] = NULL;
@@ -542,6 +542,17 @@ static int acm_probe (struct usb_interface *intf,
 		return -EINVAL;
 	}
 
+	if (!buflen) {
+		if (intf->cur_altsetting->endpoint->extralen && intf->cur_altsetting->endpoint->extra) {
+			dev_dbg(&intf->dev,"Seeking extra descriptors on endpoint");
+			buflen = intf->cur_altsetting->endpoint->extralen;
+			buffer = intf->cur_altsetting->endpoint->extra;
+		} else {
+			err("Zero length descriptor references");
+			return -EINVAL;
+		}
+	}
+
 	while (buflen > 0) {
 		if (buffer [1] != USB_DT_CS_INTERFACE) {
 			err("skipping garbage");
@@ -558,6 +569,8 @@ static int acm_probe (struct usb_interface *intf,
 				break;
 			case CDC_COUNTRY_TYPE: /* maybe somehow export */
 				break; /* for now we ignore it */
+			case CDC_HEADER_TYPE: /* maybe check version */ 
+				break; /* for now we ignore it */ 
 			case CDC_AC_MANAGEMENT_TYPE:
 				ac_management_function = buffer[3];
 				break;
@@ -569,7 +582,7 @@ static int acm_probe (struct usb_interface *intf,
 				break;
 				
 			default:
-				err("Ignoring extra header");
+				err("Ignoring extra header, type %d, length %d", buffer[2], buffer[0]);
 				break;
 			}
 next_desc:
@@ -637,7 +650,7 @@ next_desc:
 	dbg("interfaces are valid");
 	for (minor = 0; minor < ACM_TTY_MINORS && acm_table[minor]; minor++);
 
-	if (acm_table[minor]) {
+	if (minor == ACM_TTY_MINORS) {
 		err("no more free acm devices");
 		return -ENODEV;
 	}
@@ -762,9 +775,9 @@ static void acm_disconnect(struct usb_interface *intf)
 	acm->dev = NULL;
 	usb_set_intfdata (intf, NULL);
 
-	usb_unlink_urb(acm->ctrlurb);
-	usb_unlink_urb(acm->readurb);
-	usb_unlink_urb(acm->writeurb);
+	usb_kill_urb(acm->ctrlurb);
+	usb_kill_urb(acm->readurb);
+	usb_kill_urb(acm->writeurb);
 
 	flush_scheduled_work(); /* wait for acm_softint */
 

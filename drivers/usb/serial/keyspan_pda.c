@@ -285,7 +285,7 @@ static void keyspan_pda_rx_throttle (struct usb_serial_port *port)
 	   upon the device too. */
 
 	dbg("keyspan_pda_rx_throttle port %d", port->number);
-	usb_unlink_urb(port->interrupt_in_urb);
+	usb_kill_urb(port->interrupt_in_urb);
 }
 
 
@@ -706,8 +706,8 @@ static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 			keyspan_pda_set_modem_info(serial, 0);
 
 		/* shutdown our bulk reads and writes */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->interrupt_in_urb);
+		usb_kill_urb(port->write_urb);
+		usb_kill_urb(port->interrupt_in_urb);
 	}
 }
 

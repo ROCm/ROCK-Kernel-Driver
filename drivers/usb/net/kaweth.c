@@ -668,13 +668,13 @@ static int kaweth_open(struct net_device *net)
 		INTBUFFERSIZE,
 		int_callback,
 		kaweth,
-		8);
+		250); /* overriding the descriptor */
 	kaweth->irq_urb->transfer_dma = kaweth->intbufferhandle;
 	kaweth->irq_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	res = usb_submit_urb(kaweth->irq_urb, GFP_KERNEL);
 	if (res) {
-		usb_unlink_urb(kaweth->rx_urb);
+		usb_kill_urb(kaweth->rx_urb);
 		return -EIO;
 	}
 
@@ -695,15 +695,15 @@ static int kaweth_close(struct net_device *net)
 
 	kaweth->status |= KAWETH_STATUS_CLOSING;
 
-	usb_unlink_urb(kaweth->irq_urb);
-	usb_unlink_urb(kaweth->rx_urb);
+	usb_kill_urb(kaweth->irq_urb);
+	usb_kill_urb(kaweth->rx_urb);
 
 	flush_scheduled_work();
 
 	/* a scheduled work may have resubmitted,
 	   we hit them again */
-	usb_unlink_urb(kaweth->irq_urb);
-	usb_unlink_urb(kaweth->rx_urb);
+	usb_kill_urb(kaweth->irq_urb);
+	usb_kill_urb(kaweth->rx_urb);
 
 	kaweth->status &= ~KAWETH_STATUS_CLOSING;
 
@@ -1173,8 +1173,8 @@ static void kaweth_disconnect(struct usb_interface *intf)
 	}
 
 	kaweth->removed = 1;
-	usb_unlink_urb(kaweth->irq_urb);
-	usb_unlink_urb(kaweth->rx_urb);
+	usb_kill_urb(kaweth->irq_urb);
+	usb_kill_urb(kaweth->rx_urb);
 
 	/* we need to wait for the urb to be cancelled, if it is active */
 	spin_lock(&kaweth->device_lock);
@@ -1250,19 +1250,17 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
                 return status;
         }
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
 	while (timeout && !awd.done) {
-		timeout = schedule_timeout(timeout);
 		set_current_state(TASK_UNINTERRUPTIBLE);
+		timeout = schedule_timeout(timeout);
 	}
 
-        set_current_state(TASK_RUNNING);
         remove_wait_queue(&awd.wqh, &wait);
 
         if (!timeout) {
                 // timeout
                 kaweth_warn("usb_control/bulk_msg: timeout");
-                usb_unlink_urb(urb);  // remove urb safely
+                usb_kill_urb(urb);  // remove urb safely
                 status = -ETIMEDOUT;
         }
 	else {

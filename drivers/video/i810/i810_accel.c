@@ -32,7 +32,7 @@ extern void flush_cache(void);
 /************************************************************/
 
 /* BLT Engine Routines */
-static inline void i810_report_error(u8 *mmio)
+static inline void i810_report_error(u8 __iomem *mmio)
 {
 	printk("IIR     : 0x%04x\n"
 	       "EIR     : 0x%04x\n"
@@ -59,7 +59,7 @@ static inline int wait_for_space(struct fb_info *info, u32 space)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	u32 head, count = WAIT_COUNT, tail;
-	u8 *mmio = par->mmio_start_virtual;
+	u8 __iomem *mmio = par->mmio_start_virtual;
 
 	tail = par->cur_tail;
 	while (count--) {
@@ -89,7 +89,7 @@ static inline int wait_for_space(struct fb_info *info, u32 space)
 static inline int wait_for_engine_idle(struct fb_info *info)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
-	u8 *mmio = par->mmio_start_virtual;
+	u8 __iomem *mmio = par->mmio_start_virtual;
 	int count = WAIT_COUNT;
 
 	if (wait_for_space(info, par->iring.size)) /* flush */
@@ -133,7 +133,7 @@ static inline u32 begin_iring(struct fb_info *info, u32 space)
  */
 static inline void end_iring(struct i810fb_par *par)
 {
-	u8 *mmio = par->mmio_start_virtual;
+	u8 __iomem *mmio = par->mmio_start_virtual;
 
 	i810_writel(IRING, mmio, par->cur_tail);
 }
@@ -326,7 +326,7 @@ static inline void load_front(int offset, struct fb_info *info)
 static inline void i810fb_iring_enable(struct i810fb_par *par, u32 mode)
 {
 	u32 tmp;
-	u8 *mmio = par->mmio_start_virtual;
+	u8 __iomem *mmio = par->mmio_start_virtual;
 
 	tmp = i810_readl(IRING + 12, mmio);
 	if (mode == OFF) 
@@ -451,7 +451,7 @@ int i810fb_sync(struct fb_info *info)
 void i810fb_load_front(u32 offset, struct fb_info *info)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
-	u8 *mmio = par->mmio_start_virtual;
+	u8 __iomem *mmio = par->mmio_start_virtual;
 
 	if (!info->var.accel_flags || par->dev_flags & LOCKUP)
 		i810_writel(DPLYBASE, mmio, par->fb.physical + offset);
@@ -472,7 +472,7 @@ void i810fb_init_ringbuffer(struct fb_info *info)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	u32 tmp1, tmp2;
-	u8 *mmio = par->mmio_start_virtual;
+	u8 __iomem *mmio = par->mmio_start_virtual;
 	
 	wait_for_engine_idle(info);
 	i810fb_iring_enable(par, OFF);

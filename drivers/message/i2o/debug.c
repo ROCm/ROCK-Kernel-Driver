@@ -54,7 +54,7 @@ void i2o_report_status(const char *severity, const char *str,
 	if (cmd == I2O_CMD_UTIL_EVT_REGISTER)
 		return;		// No status in this reply
 
-	printk("%s%s: ", severity, str);
+	printk(KERN_DEBUG "%s%s: ", severity, str);
 
 	if (cmd < 0x1F)		// Utility cmd
 		i2o_report_util_cmd(cmd);
@@ -62,7 +62,7 @@ void i2o_report_status(const char *severity, const char *str,
 	else if (cmd >= 0xA0 && cmd <= 0xEF)	// Executive cmd
 		i2o_report_exec_cmd(cmd);
 	else
-		printk("Cmd = %0#2x, ", cmd);	// Other cmds
+		printk(KERN_DEBUG "Cmd = %0#2x, ", cmd);	// Other cmds
 
 	if (msg[0] & MSG_FAIL) {
 		i2o_report_fail_status(req_status, msg);
@@ -74,7 +74,8 @@ void i2o_report_status(const char *severity, const char *str,
 	if (cmd < 0x1F || (cmd >= 0xA0 && cmd <= 0xEF))
 		i2o_report_common_dsc(detailed_status);
 	else
-		printk(" / DetailedStatus = %0#4x.\n", detailed_status);
+		printk(KERN_DEBUG " / DetailedStatus = %0#4x.\n",
+		       detailed_status);
 }
 
 /* Used to dump a message to syslog during debugging */
@@ -129,20 +130,20 @@ void i2o_report_controller_unit(struct i2o_controller *c, struct i2o_device *d)
 
 	printk(KERN_INFO "    Class: ");
 	//sprintf(str, "%-21s", i2o_get_class_name(d->lct_data.class_id));
-	printk("%s\n", str);
+	printk(KERN_DEBUG "%s\n", str);
 
 	printk(KERN_INFO "  Subclass: 0x%04X\n", d->lct_data.sub_class);
 	printk(KERN_INFO "     Flags: ");
 
 	if (d->lct_data.device_flags & (1 << 0))
-		printk("C");	// ConfigDialog requested
+		printk(KERN_DEBUG "C");	// ConfigDialog requested
 	if (d->lct_data.device_flags & (1 << 1))
-		printk("U");	// Multi-user capable
+		printk(KERN_DEBUG "U");	// Multi-user capable
 	if (!(d->lct_data.device_flags & (1 << 4)))
-		printk("P");	// Peer service enabled!
+		printk(KERN_DEBUG "P");	// Peer service enabled!
 	if (!(d->lct_data.device_flags & (1 << 5)))
-		printk("M");	// Mgmt service enabled!
-	printk("\n");
+		printk(KERN_DEBUG "M");	// Mgmt service enabled!
+	printk(KERN_DEBUG "\n");
 }
 
 /*
@@ -177,9 +178,11 @@ void i2o_report_fail_status(u8 req_status, u32 * msg)
 	};
 
 	if (req_status == I2O_FSC_TRANSPORT_UNKNOWN_FAILURE)
-		printk("TRANSPORT_UNKNOWN_FAILURE (%0#2x)\n.", req_status);
+		printk(KERN_DEBUG "TRANSPORT_UNKNOWN_FAILURE (%0#2x)\n.",
+		       req_status);
 	else
-		printk("TRANSPORT_%s.\n", FAIL_STATUS[req_status & 0x0F]);
+		printk(KERN_DEBUG "TRANSPORT_%s.\n",
+		       FAIL_STATUS[req_status & 0x0F]);
 
 	/* Dump some details */
 
@@ -192,16 +195,17 @@ void i2o_report_fail_status(u8 req_status, u32 * msg)
 
 	printk(KERN_ERR "  Severity:  0x%02X ", (msg[4] >> 16) & 0xFF);
 	if (msg[4] & (1 << 16))
-		printk("(FormatError), "
+		printk(KERN_DEBUG "(FormatError), "
 		       "this msg can never be delivered/processed.\n");
 	if (msg[4] & (1 << 17))
-		printk("(PathError), "
+		printk(KERN_DEBUG "(PathError), "
 		       "this msg can no longer be delivered/processed.\n");
 	if (msg[4] & (1 << 18))
-		printk("(PathState), "
+		printk(KERN_DEBUG "(PathState), "
 		       "the system state does not allow delivery.\n");
 	if (msg[4] & (1 << 19))
-		printk("(Congestion), resources temporarily not available;"
+		printk(KERN_DEBUG
+		       "(Congestion), resources temporarily not available;"
 		       "do not retry immediately.\n");
 }
 
@@ -227,9 +231,9 @@ void i2o_report_common_status(u8 req_status)
 	};
 
 	if (req_status >= ARRAY_SIZE(REPLY_STATUS))
-		printk("RequestStatus = %0#2x", req_status);
+		printk(KERN_DEBUG "RequestStatus = %0#2x", req_status);
 	else
-		printk("%s", REPLY_STATUS[req_status]);
+		printk(KERN_DEBUG "%s", REPLY_STATUS[req_status]);
 }
 
 /*
@@ -272,9 +276,10 @@ static void i2o_report_common_dsc(u16 detailed_status)
 	};
 
 	if (detailed_status > I2O_DSC_DEVICE_NOT_AVAILABLE)
-		printk(" / DetailedStatus = %0#4x.\n", detailed_status);
+		printk(KERN_DEBUG " / DetailedStatus = %0#4x.\n",
+		       detailed_status);
 	else
-		printk(" / %s.\n", COMMON_DSC[detailed_status]);
+		printk(KERN_DEBUG " / %s.\n", COMMON_DSC[detailed_status]);
 }
 
 /*
@@ -284,49 +289,49 @@ static void i2o_report_util_cmd(u8 cmd)
 {
 	switch (cmd) {
 	case I2O_CMD_UTIL_NOP:
-		printk("UTIL_NOP, ");
+		printk(KERN_DEBUG "UTIL_NOP, ");
 		break;
 	case I2O_CMD_UTIL_ABORT:
-		printk("UTIL_ABORT, ");
+		printk(KERN_DEBUG "UTIL_ABORT, ");
 		break;
 	case I2O_CMD_UTIL_CLAIM:
-		printk("UTIL_CLAIM, ");
+		printk(KERN_DEBUG "UTIL_CLAIM, ");
 		break;
 	case I2O_CMD_UTIL_RELEASE:
-		printk("UTIL_CLAIM_RELEASE, ");
+		printk(KERN_DEBUG "UTIL_CLAIM_RELEASE, ");
 		break;
 	case I2O_CMD_UTIL_CONFIG_DIALOG:
-		printk("UTIL_CONFIG_DIALOG, ");
+		printk(KERN_DEBUG "UTIL_CONFIG_DIALOG, ");
 		break;
 	case I2O_CMD_UTIL_DEVICE_RESERVE:
-		printk("UTIL_DEVICE_RESERVE, ");
+		printk(KERN_DEBUG "UTIL_DEVICE_RESERVE, ");
 		break;
 	case I2O_CMD_UTIL_DEVICE_RELEASE:
-		printk("UTIL_DEVICE_RELEASE, ");
+		printk(KERN_DEBUG "UTIL_DEVICE_RELEASE, ");
 		break;
 	case I2O_CMD_UTIL_EVT_ACK:
-		printk("UTIL_EVENT_ACKNOWLEDGE, ");
+		printk(KERN_DEBUG "UTIL_EVENT_ACKNOWLEDGE, ");
 		break;
 	case I2O_CMD_UTIL_EVT_REGISTER:
-		printk("UTIL_EVENT_REGISTER, ");
+		printk(KERN_DEBUG "UTIL_EVENT_REGISTER, ");
 		break;
 	case I2O_CMD_UTIL_LOCK:
-		printk("UTIL_LOCK, ");
+		printk(KERN_DEBUG "UTIL_LOCK, ");
 		break;
 	case I2O_CMD_UTIL_LOCK_RELEASE:
-		printk("UTIL_LOCK_RELEASE, ");
+		printk(KERN_DEBUG "UTIL_LOCK_RELEASE, ");
 		break;
 	case I2O_CMD_UTIL_PARAMS_GET:
-		printk("UTIL_PARAMS_GET, ");
+		printk(KERN_DEBUG "UTIL_PARAMS_GET, ");
 		break;
 	case I2O_CMD_UTIL_PARAMS_SET:
-		printk("UTIL_PARAMS_SET, ");
+		printk(KERN_DEBUG "UTIL_PARAMS_SET, ");
 		break;
 	case I2O_CMD_UTIL_REPLY_FAULT_NOTIFY:
-		printk("UTIL_REPLY_FAULT_NOTIFY, ");
+		printk(KERN_DEBUG "UTIL_REPLY_FAULT_NOTIFY, ");
 		break;
 	default:
-		printk("Cmd = %0#2x, ", cmd);
+		printk(KERN_DEBUG "Cmd = %0#2x, ", cmd);
 	}
 }
 
@@ -337,106 +342,106 @@ static void i2o_report_exec_cmd(u8 cmd)
 {
 	switch (cmd) {
 	case I2O_CMD_ADAPTER_ASSIGN:
-		printk("EXEC_ADAPTER_ASSIGN, ");
+		printk(KERN_DEBUG "EXEC_ADAPTER_ASSIGN, ");
 		break;
 	case I2O_CMD_ADAPTER_READ:
-		printk("EXEC_ADAPTER_READ, ");
+		printk(KERN_DEBUG "EXEC_ADAPTER_READ, ");
 		break;
 	case I2O_CMD_ADAPTER_RELEASE:
-		printk("EXEC_ADAPTER_RELEASE, ");
+		printk(KERN_DEBUG "EXEC_ADAPTER_RELEASE, ");
 		break;
 	case I2O_CMD_BIOS_INFO_SET:
-		printk("EXEC_BIOS_INFO_SET, ");
+		printk(KERN_DEBUG "EXEC_BIOS_INFO_SET, ");
 		break;
 	case I2O_CMD_BOOT_DEVICE_SET:
-		printk("EXEC_BOOT_DEVICE_SET, ");
+		printk(KERN_DEBUG "EXEC_BOOT_DEVICE_SET, ");
 		break;
 	case I2O_CMD_CONFIG_VALIDATE:
-		printk("EXEC_CONFIG_VALIDATE, ");
+		printk(KERN_DEBUG "EXEC_CONFIG_VALIDATE, ");
 		break;
 	case I2O_CMD_CONN_SETUP:
-		printk("EXEC_CONN_SETUP, ");
+		printk(KERN_DEBUG "EXEC_CONN_SETUP, ");
 		break;
 	case I2O_CMD_DDM_DESTROY:
-		printk("EXEC_DDM_DESTROY, ");
+		printk(KERN_DEBUG "EXEC_DDM_DESTROY, ");
 		break;
 	case I2O_CMD_DDM_ENABLE:
-		printk("EXEC_DDM_ENABLE, ");
+		printk(KERN_DEBUG "EXEC_DDM_ENABLE, ");
 		break;
 	case I2O_CMD_DDM_QUIESCE:
-		printk("EXEC_DDM_QUIESCE, ");
+		printk(KERN_DEBUG "EXEC_DDM_QUIESCE, ");
 		break;
 	case I2O_CMD_DDM_RESET:
-		printk("EXEC_DDM_RESET, ");
+		printk(KERN_DEBUG "EXEC_DDM_RESET, ");
 		break;
 	case I2O_CMD_DDM_SUSPEND:
-		printk("EXEC_DDM_SUSPEND, ");
+		printk(KERN_DEBUG "EXEC_DDM_SUSPEND, ");
 		break;
 	case I2O_CMD_DEVICE_ASSIGN:
-		printk("EXEC_DEVICE_ASSIGN, ");
+		printk(KERN_DEBUG "EXEC_DEVICE_ASSIGN, ");
 		break;
 	case I2O_CMD_DEVICE_RELEASE:
-		printk("EXEC_DEVICE_RELEASE, ");
+		printk(KERN_DEBUG "EXEC_DEVICE_RELEASE, ");
 		break;
 	case I2O_CMD_HRT_GET:
-		printk("EXEC_HRT_GET, ");
+		printk(KERN_DEBUG "EXEC_HRT_GET, ");
 		break;
 	case I2O_CMD_ADAPTER_CLEAR:
-		printk("EXEC_IOP_CLEAR, ");
+		printk(KERN_DEBUG "EXEC_IOP_CLEAR, ");
 		break;
 	case I2O_CMD_ADAPTER_CONNECT:
-		printk("EXEC_IOP_CONNECT, ");
+		printk(KERN_DEBUG "EXEC_IOP_CONNECT, ");
 		break;
 	case I2O_CMD_ADAPTER_RESET:
-		printk("EXEC_IOP_RESET, ");
+		printk(KERN_DEBUG "EXEC_IOP_RESET, ");
 		break;
 	case I2O_CMD_LCT_NOTIFY:
-		printk("EXEC_LCT_NOTIFY, ");
+		printk(KERN_DEBUG "EXEC_LCT_NOTIFY, ");
 		break;
 	case I2O_CMD_OUTBOUND_INIT:
-		printk("EXEC_OUTBOUND_INIT, ");
+		printk(KERN_DEBUG "EXEC_OUTBOUND_INIT, ");
 		break;
 	case I2O_CMD_PATH_ENABLE:
-		printk("EXEC_PATH_ENABLE, ");
+		printk(KERN_DEBUG "EXEC_PATH_ENABLE, ");
 		break;
 	case I2O_CMD_PATH_QUIESCE:
-		printk("EXEC_PATH_QUIESCE, ");
+		printk(KERN_DEBUG "EXEC_PATH_QUIESCE, ");
 		break;
 	case I2O_CMD_PATH_RESET:
-		printk("EXEC_PATH_RESET, ");
+		printk(KERN_DEBUG "EXEC_PATH_RESET, ");
 		break;
 	case I2O_CMD_STATIC_MF_CREATE:
-		printk("EXEC_STATIC_MF_CREATE, ");
+		printk(KERN_DEBUG "EXEC_STATIC_MF_CREATE, ");
 		break;
 	case I2O_CMD_STATIC_MF_RELEASE:
-		printk("EXEC_STATIC_MF_RELEASE, ");
+		printk(KERN_DEBUG "EXEC_STATIC_MF_RELEASE, ");
 		break;
 	case I2O_CMD_STATUS_GET:
-		printk("EXEC_STATUS_GET, ");
+		printk(KERN_DEBUG "EXEC_STATUS_GET, ");
 		break;
 	case I2O_CMD_SW_DOWNLOAD:
-		printk("EXEC_SW_DOWNLOAD, ");
+		printk(KERN_DEBUG "EXEC_SW_DOWNLOAD, ");
 		break;
 	case I2O_CMD_SW_UPLOAD:
-		printk("EXEC_SW_UPLOAD, ");
+		printk(KERN_DEBUG "EXEC_SW_UPLOAD, ");
 		break;
 	case I2O_CMD_SW_REMOVE:
-		printk("EXEC_SW_REMOVE, ");
+		printk(KERN_DEBUG "EXEC_SW_REMOVE, ");
 		break;
 	case I2O_CMD_SYS_ENABLE:
-		printk("EXEC_SYS_ENABLE, ");
+		printk(KERN_DEBUG "EXEC_SYS_ENABLE, ");
 		break;
 	case I2O_CMD_SYS_MODIFY:
-		printk("EXEC_SYS_MODIFY, ");
+		printk(KERN_DEBUG "EXEC_SYS_MODIFY, ");
 		break;
 	case I2O_CMD_SYS_QUIESCE:
-		printk("EXEC_SYS_QUIESCE, ");
+		printk(KERN_DEBUG "EXEC_SYS_QUIESCE, ");
 		break;
 	case I2O_CMD_SYS_TAB_SET:
-		printk("EXEC_SYS_TAB_SET, ");
+		printk(KERN_DEBUG "EXEC_SYS_TAB_SET, ");
 		break;
 	default:
-		printk("Cmd = %#02x, ", cmd);
+		printk(KERN_DEBUG "Cmd = %#02x, ", cmd);
 	}
 }
 
@@ -445,28 +450,28 @@ void i2o_debug_state(struct i2o_controller *c)
 	printk(KERN_INFO "%s: State = ", c->name);
 	switch (((i2o_status_block *) c->status_block.virt)->iop_state) {
 	case 0x01:
-		printk("INIT\n");
+		printk(KERN_DEBUG "INIT\n");
 		break;
 	case 0x02:
-		printk("RESET\n");
+		printk(KERN_DEBUG "RESET\n");
 		break;
 	case 0x04:
-		printk("HOLD\n");
+		printk(KERN_DEBUG "HOLD\n");
 		break;
 	case 0x05:
-		printk("READY\n");
+		printk(KERN_DEBUG "READY\n");
 		break;
 	case 0x08:
-		printk("OPERATIONAL\n");
+		printk(KERN_DEBUG "OPERATIONAL\n");
 		break;
 	case 0x10:
-		printk("FAILED\n");
+		printk(KERN_DEBUG "FAILED\n");
 		break;
 	case 0x11:
-		printk("FAULTED\n");
+		printk(KERN_DEBUG "FAULTED\n");
 		break;
 	default:
-		printk("%x (unknown !!)\n",
+		printk(KERN_DEBUG "%x (unknown !!)\n",
 		       ((i2o_status_block *) c->status_block.virt)->iop_state);
 	}
 };
@@ -516,53 +521,58 @@ void i2o_dump_hrt(struct i2o_controller *c)
 		d = (u8 *) (rows + 2);
 		state = p[1] << 8 | p[0];
 
-		printk("TID %04X:[", state & 0xFFF);
+		printk(KERN_DEBUG "TID %04X:[", state & 0xFFF);
 		state >>= 12;
 		if (state & (1 << 0))
-			printk("H");	/* Hidden */
+			printk(KERN_DEBUG "H");	/* Hidden */
 		if (state & (1 << 2)) {
-			printk("P");	/* Present */
+			printk(KERN_DEBUG "P");	/* Present */
 			if (state & (1 << 1))
-				printk("C");	/* Controlled */
+				printk(KERN_DEBUG "C");	/* Controlled */
 		}
 		if (state > 9)
-			printk("*");	/* Hard */
+			printk(KERN_DEBUG "*");	/* Hard */
 
-		printk("]:");
+		printk(KERN_DEBUG "]:");
 
 		switch (p[3] & 0xFFFF) {
 		case 0:
 			/* Adapter private bus - easy */
-			printk("Local bus %d: I/O at 0x%04X Mem 0x%08X",
-			       p[2], d[1] << 8 | d[0], *(u32 *) (d + 4));
+			printk(KERN_DEBUG
+			       "Local bus %d: I/O at 0x%04X Mem 0x%08X", p[2],
+			       d[1] << 8 | d[0], *(u32 *) (d + 4));
 			break;
 		case 1:
 			/* ISA bus */
-			printk("ISA %d: CSN %d I/O at 0x%04X Mem 0x%08X",
-			       p[2], d[2], d[1] << 8 | d[0], *(u32 *) (d + 4));
+			printk(KERN_DEBUG
+			       "ISA %d: CSN %d I/O at 0x%04X Mem 0x%08X", p[2],
+			       d[2], d[1] << 8 | d[0], *(u32 *) (d + 4));
 			break;
 
 		case 2:	/* EISA bus */
-			printk("EISA %d: Slot %d I/O at 0x%04X Mem 0x%08X",
+			printk(KERN_DEBUG
+			       "EISA %d: Slot %d I/O at 0x%04X Mem 0x%08X",
 			       p[2], d[3], d[1] << 8 | d[0], *(u32 *) (d + 4));
 			break;
 
 		case 3:	/* MCA bus */
-			printk("MCA %d: Slot %d I/O at 0x%04X Mem 0x%08X",
-			       p[2], d[3], d[1] << 8 | d[0], *(u32 *) (d + 4));
+			printk(KERN_DEBUG
+			       "MCA %d: Slot %d I/O at 0x%04X Mem 0x%08X", p[2],
+			       d[3], d[1] << 8 | d[0], *(u32 *) (d + 4));
 			break;
 
 		case 4:	/* PCI bus */
-			printk("PCI %d: Bus %d Device %d Function %d",
-			       p[2], d[2], d[1], d[0]);
+			printk(KERN_DEBUG
+			       "PCI %d: Bus %d Device %d Function %d", p[2],
+			       d[2], d[1], d[0]);
 			break;
 
 		case 0x80:	/* Other */
 		default:
-			printk("Unsupported bus type.");
+			printk(KERN_DEBUG "Unsupported bus type.");
 			break;
 		}
-		printk("\n");
+		printk(KERN_DEBUG "\n");
 		rows += length;
 	}
 }
