@@ -65,18 +65,22 @@ static int route_mirror(struct sk_buff *skb)
 	return 0;
 }
 
-static void
-ip_rewrite(struct sk_buff *skb)
+static int ip_rewrite(struct sk_buff **pskb)
 {
-	struct iphdr *iph = skb->nh.iph;
-	u32 odaddr = iph->saddr;
-	u32 osaddr = iph->daddr;
+	u32 odaddr, osaddr;
 
-	skb->nfcache |= NFC_ALTERED;
+	if (!skb_ip_make_writable(pskb, sizeof(struct iphdr)))
+		return 0;
+
+	odaddr = (*pskb)->nh.iph->saddr;
+	osaddr = (*pskb)->nh.iph->daddr;
+
+	(*pskb)->nfcache |= NFC_ALTERED;
 
 	/* Rewrite IP header */
-	iph->daddr = odaddr;
-	iph->saddr = osaddr;
+	(*pskb)->nh.iph->daddr = odaddr;
+	(*pskb)->nh.iph->saddr = osaddr;
+	return 1;
 }
 
 /* Stolen from ip_finish_output2 */
@@ -100,29 +104,28 @@ static void ip_direct_send(struct sk_buff *skb)
 }
 
 static unsigned int ipt_mirror_target(struct sk_buff **pskb,
-				      unsigned int hooknum,
 				      const struct net_device *in,
 				      const struct net_device *out,
+				      unsigned int hooknum,
 				      const void *targinfo,
 				      void *userinfo)
 {
-	if (((*pskb)->dst != NULL) &&
-	    route_mirror(*pskb)) {
-
-		ip_rewrite(*pskb);
+	if (((*pskb)->dst != NULL) && route_mirror(*pskb)) {
+		if (!ip_rewrite(pskb))
+			return NF_DROP;
 
 		/* If we are not at FORWARD hook (INPUT/PREROUTING),
 		 * the TTL isn't decreased by the IP stack */
 		if (hooknum != NF_IP_FORWARD) {
-			struct iphdr *iph = (*pskb)->nh.iph;
-			if (iph->ttl <= 1) {
+			if ((*pskb)->nh.iph->ttl <= 1) {
 				/* this will traverse normal stack, and 
 				 * thus call conntrack on the icmp packet */
 				icmp_send(*pskb, ICMP_TIME_EXCEEDED, 
 					  ICMP_EXC_TTL, 0);
 				return NF_DROP;
 			}
-			ip_decrease_ttl(iph);
+			/* Made writable by ip_rewrite */
+			ip_decrease_ttl((*pskb)->nh.iph);
 		}
 
 		/* Don't let conntrack code see this packet:
