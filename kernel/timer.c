@@ -53,7 +53,6 @@ typedef struct tvec_root_s {
 	struct list_head vec[TVR_SIZE];
 } tvec_root_t;
 
-
 struct tvec_t_base_s {
 	spinlock_t lock;
 	unsigned long timer_jiffies;
@@ -66,6 +65,14 @@ struct tvec_t_base_s {
 } ____cacheline_aligned_in_smp;
 
 typedef struct tvec_t_base_s tvec_base_t;
+
+static inline void set_running_timer(tvec_base_t *base,
+					struct timer_list *timer)
+{
+#ifdef CONFIG_SMP
+	base->running_timer = timer;
+#endif
+}
 
 /* Fake initialization */
 static DEFINE_PER_CPU(tvec_base_t, tvec_bases) = { SPIN_LOCK_UNLOCKED };
@@ -94,7 +101,7 @@ static inline void check_timer(struct timer_list *timer)
 		check_timer_failed(timer);
 }
 
-static inline void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
+static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 {
 	unsigned long expires = timer->expires;
 	unsigned long idx = expires - base->timer_jiffies;
@@ -354,7 +361,7 @@ del_again:
 static int cascade(tvec_base_t *base, tvec_t *tv)
 {
 	/* cascade all the timers from tv up one level */
-	struct list_head *head, *curr, *next;
+	struct list_head *head, *curr;
 
 	head = tv->vec + tv->index;
 	curr = head->next;
@@ -366,11 +373,9 @@ static int cascade(tvec_base_t *base, tvec_t *tv)
 		struct timer_list *tmp;
 
 		tmp = list_entry(curr, struct timer_list, entry);
-		if (tmp->base != base)
-			BUG();
-		next = curr->next;
+		BUG_ON(tmp->base != base);
+		curr = curr->next;
 		internal_add_timer(base, tmp);
-		curr = next;
 	}
 	INIT_LIST_HEAD(head);
 
@@ -387,8 +392,8 @@ static int cascade(tvec_base_t *base, tvec_t *tv)
 static inline void __run_timers(tvec_base_t *base)
 {
 	spin_lock_irq(&base->lock);
-	while ((long)(jiffies - base->timer_jiffies) >= 0) {
-		struct list_head *head, *curr;
+	while (time_after_eq(jiffies, base->timer_jiffies)) {
+		struct list_head *head;
 
 		/*
 		 * Cascade timers:
@@ -400,35 +405,27 @@ static inline void __run_timers(tvec_base_t *base)
 			cascade(base, &base->tv5);
 repeat:
 		head = base->tv1.vec + base->tv1.index;
-		curr = head->next;
-		if (curr != head) {
+		if (!list_empty(head)) {
 			void (*fn)(unsigned long);
 			unsigned long data;
 			struct timer_list *timer;
 
-			timer = list_entry(curr, struct timer_list, entry);
+			timer = list_entry(head->next,struct timer_list,entry);
  			fn = timer->function;
  			data = timer->data;
 
 			list_del(&timer->entry);
 			timer->base = NULL;
-#if CONFIG_SMP
-			base->running_timer = timer;
-#endif
+			set_running_timer(base, timer);
 			spin_unlock_irq(&base->lock);
-			if (!fn)
-				printk("Bad: timer %p has NULL fn. (data: %08lx)\n", timer, data);
-			else
-				fn(data);
+			fn(data);
 			spin_lock_irq(&base->lock);
 			goto repeat;
 		}
 		++base->timer_jiffies; 
 		base->tv1.index = (base->tv1.index + 1) & TVR_MASK;
 	}
-#if CONFIG_SMP
-	base->running_timer = NULL;
-#endif
+	set_running_timer(base, NULL);
 	spin_unlock_irq(&base->lock);
 }
 
@@ -775,7 +772,7 @@ static void run_timer_softirq(struct softirq_action *h)
 {
 	tvec_base_t *base = &per_cpu(tvec_bases, smp_processor_id());
 
-	if ((long)(jiffies - base->timer_jiffies) >= 0)
+	if (time_after_eq(jiffies, base->timer_jiffies))
 		__run_timers(base);
 }
 
