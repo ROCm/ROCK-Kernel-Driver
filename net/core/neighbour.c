@@ -1479,7 +1479,7 @@ static void neigh_app_notify(struct neighbour *n)
 
 #ifdef CONFIG_SYSCTL
 
-struct neigh_sysctl_table {
+static struct neigh_sysctl_table {
 	struct ctl_table_header *sysctl_header;
 	ctl_table		neigh_vars[17];
 	ctl_table		neigh_dev[2];

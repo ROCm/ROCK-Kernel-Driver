@@ -809,7 +809,7 @@ out:
 	return err ? : copied;
 }
 
-void netlink_data_ready(struct sock *sk, int len)
+static void netlink_data_ready(struct sock *sk, int len)
 {
 	struct netlink_opt *nlk = nlk_sk(sk);
 
@@ -1126,7 +1126,7 @@ static int netlink_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-struct seq_operations netlink_seq_ops = {
+static struct seq_operations netlink_seq_ops = {
 	.start  = netlink_seq_start,
 	.next   = netlink_seq_next,
 	.stop   = netlink_seq_stop,
@@ -1159,7 +1159,7 @@ int netlink_unregister_notifier(struct notifier_block *nb)
 	return notifier_chain_unregister(&netlink_chain, nb);
 }
                 
-struct proto_ops netlink_ops = {
+static struct proto_ops netlink_ops = {
 	.family =	PF_NETLINK,
 	.owner =	THIS_MODULE,
 	.release =	netlink_release,
@@ -1180,7 +1180,7 @@ struct proto_ops netlink_ops = {
 	.sendpage =	sock_no_sendpage,
 };
 
-struct net_proto_family netlink_family_ops = {
+static struct net_proto_family netlink_family_ops = {
 	.family = PF_NETLINK,
 	.create = netlink_create,
 	.owner	= THIS_MODULE,	/* for consistency 8) */

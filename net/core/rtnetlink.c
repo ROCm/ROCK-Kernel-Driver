@@ -280,7 +280,7 @@ out:
 	return err;
 }
 
-int rtnetlink_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
+static int rtnetlink_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	int idx;
 	int s_idx = cb->family;
@@ -553,7 +553,7 @@ static int rtnetlink_event(struct notifier_block *this, unsigned long event, voi
 	return NOTIFY_DONE;
 }
 
-struct notifier_block rtnetlink_dev_notifier = {
+static struct notifier_block rtnetlink_dev_notifier = {
 	.notifier_call	= rtnetlink_event,
 };
 
