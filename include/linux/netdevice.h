@@ -206,7 +206,8 @@ enum netdev_state_t
 	__LINK_STATE_START,
 	__LINK_STATE_PRESENT,
 	__LINK_STATE_SCHED,
-	__LINK_STATE_NOCARRIER
+	__LINK_STATE_NOCARRIER,
+	__LINK_STATE_RX_SCHED
 };
 
 
@@ -330,6 +331,10 @@ struct net_device
 	void                    *ip6_ptr;       /* IPv6 specific data */
 	void			*ec_ptr;	/* Econet specific data	*/
 
+	struct list_head	poll_list;	/* Link to poll list	*/
+	int			quota;
+	int			weight;
+
 	struct Qdisc		*qdisc;
 	struct Qdisc		*qdisc_sleeping;
 	struct Qdisc		*qdisc_list;
@@ -373,6 +378,7 @@ struct net_device
 	int			(*stop)(struct net_device *dev);
 	int			(*hard_start_xmit) (struct sk_buff *skb,
 						    struct net_device *dev);
+	int			(*poll) (struct net_device *dev, int *quota);
 	int			(*hard_header) (struct sk_buff *skb,
 						struct net_device *dev,
 						unsigned short type,
@@ -492,8 +498,11 @@ struct softnet_data
 	int			cng_level;
 	int			avg_blog;
 	struct sk_buff_head	input_pkt_queue;
+	struct list_head	poll_list;
 	struct net_device	*output_queue;
 	struct sk_buff		*completion_queue;
+
+	struct net_device	backlog_dev;	/* Sorry. 8) */
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
 
 
@@ -547,6 +556,7 @@ static inline int netif_running(struct net_device *dev)
 	return test_bit(__LINK_STATE_START, &dev->state);
 }
 
+
 /* Use this variant when it is known for sure that it
  * is executing from interrupt context.
  */
@@ -578,6 +588,8 @@ static inline void dev_kfree_skb_any(struct sk_buff *skb)
 extern void		net_call_rx_atomic(void (*fn)(void));
 #define HAVE_NETIF_RX 1
 extern int		netif_rx(struct sk_buff *skb);
+#define HAVE_NETIF_RECEIVE_SKB 1
+extern int		netif_receive_skb(struct sk_buff *skb);
 extern int		dev_ioctl(unsigned int cmd, void *);
 extern int		dev_change_flags(struct net_device *, unsigned);
 extern void		dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev);
@@ -695,6 +707,78 @@ enum {
 #define netif_msg_rx_status(p)	((p)->msg_enable & NETIF_MSG_RX_STATUS)
 #define netif_msg_pktdata(p)	((p)->msg_enable & NETIF_MSG_PKTDATA)
 
+/* Schedule rx intr now? */
+
+static inline int netif_rx_schedule_prep(struct net_device *dev)
+{
+	return netif_running(dev) &&
+		!test_and_set_bit(__LINK_STATE_RX_SCHED, &dev->state);
+}
+
+/* Add interface to tail of rx poll list. This assumes that _prep has
+ * already been called and returned 1.
+ */
+
+static inline void __netif_rx_schedule(struct net_device *dev)
+{
+	unsigned long flags;
+	int cpu = smp_processor_id();
+
+	local_irq_save(flags);
+	dev_hold(dev);
+	list_add_tail(&dev->poll_list, &softnet_data[cpu].poll_list);
+	if (dev->quota < 0)
+		dev->quota += dev->weight;
+	else
+		dev->quota = dev->weight;
+	__cpu_raise_softirq(cpu, NET_RX_SOFTIRQ);
+	local_irq_restore(flags);
+}
+
+/* Try to reschedule poll. Called by irq handler. */
+
+static inline void netif_rx_schedule(struct net_device *dev)
+{
+	if (netif_rx_schedule_prep(dev))
+		__netif_rx_schedule(dev);
+}
+
+/* Try to reschedule poll. Called by dev->poll() after netif_rx_complete().
+ * Do not inline this?
+ */
+static inline int netif_rx_reschedule(struct net_device *dev, int undo)
+{
+	if (netif_rx_schedule_prep(dev)) {
+		unsigned long flags;
+		int cpu = smp_processor_id();
+
+		dev->quota += undo;
+
+		local_irq_save(flags);
+		list_add_tail(&dev->poll_list, &softnet_data[cpu].poll_list);
+		__cpu_raise_softirq(cpu, NET_RX_SOFTIRQ);
+		local_irq_restore(flags);
+		return 1;
+	}
+	return 0;
+}
+
+/* Remove interface from poll list: it must be in the poll list
+ * on current cpu. This primitive is called by dev->poll(), when
+ * it completes the work. The device cannot be out of poll list at this
+ * moment, it is BUG().
+ */
+static inline void netif_rx_complete(struct net_device *dev)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	if (!test_bit(__LINK_STATE_RX_SCHED, &dev->state)) BUG();
+	list_del(&dev->poll_list);
+	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
+	local_irq_restore(flags);
+}
+
 /* These functions live elsewhere (drivers/net/net_init.c, but related) */
 
 extern void		ether_setup(struct net_device *dev);
@@ -719,6 +803,7 @@ extern void		dev_mcast_init(void);
 extern int		netdev_register_fc(struct net_device *dev, void (*stimul)(struct net_device *dev));
 extern void		netdev_unregister_fc(int bit);
 extern int		netdev_max_backlog;
+extern int		weight_p;
 extern unsigned long	netdev_fc_xoff;
 extern atomic_t netdev_dropping;
 extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
