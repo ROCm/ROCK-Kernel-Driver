@@ -3,26 +3,9 @@
 # System.map is used by module-init tools and some debugging
 # tools to retreive the actual addresses of symbols in the kernel.
 #
-# Before creating the System.map file as a sideeffect check for
-# undefined symbols.
-# At least one version of the ARM bin-utils did not error out on
-# undefined symbols, so catch them here instead.
-
 # Usage
 # mksysmap vmlinux System.map
 
-
-#####
-# Check for undefined symbols.
-# Undefined symbols with three leading underscores are ignored since
-# they are used by the sparc BTFIXUP logic - and is assumed to be undefined.
-
-
-if [ "`$NM -u $1 | grep -v ' ___'`" != "" ]; then
-	echo "$1: error: undefined symbol(s) found:"
-	$NM -u $1 | grep -v ' ___'
-	exit 1
-fi
 
 #####
 # Generate System.map (actual filename passed as second argument)
