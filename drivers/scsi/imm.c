@@ -27,8 +27,10 @@ static int device_check(int host_no);
 #include <linux/blk.h>
 #include <asm/io.h>
 #include <linux/parport.h>
+#include <linux/workqueue.h>
 #include "sd.h"
 #include "hosts.h"
+
 typedef struct {
     struct pardevice *dev;	/* Parport device entry         */
     int base;			/* Actual port address          */
