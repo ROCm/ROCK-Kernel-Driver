@@ -462,6 +462,7 @@ call_encode(struct rpc_task *task)
 	struct rpc_clnt	*clnt = task->tk_client;
 	struct rpc_rqst	*req = task->tk_rqstp;
 	struct xdr_buf *sndbuf = &req->rq_snd_buf;
+	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
 	unsigned int	bufsiz;
 	kxdrproc_t	encode;
 	int		status;
@@ -479,10 +480,11 @@ call_encode(struct rpc_task *task)
 	sndbuf->tail[0].iov_len  = 0;
 	sndbuf->page_len	 = 0;
 	sndbuf->len		 = 0;
-	req->rq_rvec[0].iov_base = (void *)((char *)task->tk_buffer + bufsiz);
-	req->rq_rvec[0].iov_len  = bufsiz;
-	req->rq_rlen		 = bufsiz;
-	req->rq_rnr		 = 1;
+	rcvbuf->head[0].iov_base = (void *)((char *)task->tk_buffer + bufsiz);
+	rcvbuf->head[0].iov_len  = bufsiz;
+	rcvbuf->tail[0].iov_len  = 0;
+	rcvbuf->page_len	 = 0;
+	rcvbuf->len		 = bufsiz;
 
 	/* Zero buffer so we have automatic zero-padding of opaque & string */
 	memset(task->tk_buffer, 0, bufsiz);

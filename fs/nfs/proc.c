@@ -117,22 +117,17 @@ nfs_proc_lookup(struct inode *dir, struct qstr *name,
 }
 
 static int
-nfs_proc_readlink(struct inode *inode, void *buffer, unsigned int bufsiz)
+nfs_proc_readlink(struct inode *inode, struct page *page)
 {
 	struct nfs_readlinkargs	args = {
 		fh:		NFS_FH(inode),
-		buffer:		buffer,
-		bufsiz:		bufsiz
-	};
-	struct nfs_readlinkres	res = {
-		buffer:		buffer,
-		bufsiz:		bufsiz
+		count:		PAGE_CACHE_SIZE,
+		pages:		&page
 	};
 	int			status;
 
 	dprintk("NFS call  readlink\n");
-	status = rpc_call(NFS_CLIENT(inode), NFSPROC_READLINK,
-					&args, &res, 0);
+	status = rpc_call(NFS_CLIENT(inode), NFSPROC_READLINK, &args, NULL, 0);
 	dprintk("NFS reply readlink: %d\n", status);
 	return status;
 }
@@ -140,14 +135,16 @@ nfs_proc_readlink(struct inode *inode, void *buffer, unsigned int bufsiz)
 static int
 nfs_proc_read(struct inode *inode, struct rpc_cred *cred,
 	      struct nfs_fattr *fattr, int flags,
-	      loff_t offset, unsigned int count, void *buffer, int *eofp)
+	      unsigned int base, unsigned int count, struct page *page,
+	      int *eofp)
 {
+	u64			offset = page_offset(page) + base;
 	struct nfs_readargs	arg = {
 		fh:		NFS_FH(inode),
 		offset:		offset,
 		count:		count,
-		nriov:		1,
-		iov:		{{ buffer, count }, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}}
+		pgbase:		base,
+		pages:		&page
 	};
 	struct nfs_readres	res = {
 		fattr:		fattr,
@@ -429,27 +426,23 @@ nfs_proc_rmdir(struct inode *dir, struct qstr *name)
  */
 static int
 nfs_proc_readdir(struct inode *dir, struct rpc_cred *cred,
-		 __u64 cookie, void *entry, 
-		 unsigned int size, int plus)
+		 u64 cookie, struct page *page, unsigned int count, int plus)
 {
-	struct nfs_readdirargs	arg;
-	struct nfs_readdirres	res;
+	struct nfs_readdirargs	arg = {
+		fh:		NFS_FH(dir),
+		cookie:		cookie,
+		count:		count,
+		pages:		&page
+	};
 	struct rpc_message	msg = {
 		rpc_proc:	NFSPROC_READDIR,
 		rpc_argp:	&arg,
-		rpc_resp:	&res,
+		rpc_resp:	NULL,
 		rpc_cred:	cred
 	};
 	int			status;
 
 	lock_kernel();
-
-	arg.fh = NFS_FH(dir);
-	arg.cookie = cookie;
-	arg.buffer = entry;
-	arg.bufsiz = size;
-	res.buffer = entry;
-	res.bufsiz = size;
 
 	dprintk("NFS call  readdir %d\n", (unsigned int)cookie);
 	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);

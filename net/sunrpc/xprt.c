@@ -557,58 +557,60 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 	return;
 }
 
+static size_t
+skb_read_bits(skb_reader_t *desc, void *to, size_t len)
+{
+	if (len > desc->count)
+		len = desc->count;
+	skb_copy_bits(desc->skb, desc->offset, to, len);
+	desc->count -= len;
+	desc->offset += len;
+	return len;
+}
+
+static size_t
+skb_read_and_csum_bits(skb_reader_t *desc, void *to, size_t len)
+{
+	unsigned int csum2, pos;
+
+	if (len > desc->count)
+		len = desc->count;
+	pos = desc->offset;
+	csum2 = skb_copy_and_csum_bits(desc->skb, pos, to, len, 0);
+	desc->csum = csum_block_add(desc->csum, csum2, pos);
+	desc->count -= len;
+	desc->offset += len;
+	return len;
+}
+
 /*
  * We have set things up such that we perform the checksum of the UDP
  * packet in parallel with the copies into the RPC client iovec.  -DaveM
  */
-static int csum_partial_copy_to_page_cache(struct iovec *iov,
-					   struct sk_buff *skb,
-					   int copied)
+static int
+csum_partial_copy_to_xdr(struct xdr_buf *xdr, struct sk_buff *skb)
 {
-	int offset = sizeof(struct udphdr);
-	__u8 *cur_ptr = iov->iov_base;
-	__kernel_size_t cur_len = iov->iov_len;
-	unsigned int csum = skb->csum;
-	int need_csum = (skb->ip_summed != CHECKSUM_UNNECESSARY);
-	int slack = skb->len - copied - sizeof(struct udphdr);
+	skb_reader_t desc;
 
-	if (need_csum)
-		csum = csum_partial(skb->data, sizeof(struct udphdr), csum);
-	while (copied > 0) {
-		if (cur_len) {
-			int to_move = cur_len;
-			if (to_move > copied)
-				to_move = copied;
-			if (need_csum) {
-				unsigned int csum2;
+	desc.skb = skb;
+	desc.offset = sizeof(struct udphdr);
+	desc.count = skb->len - desc.offset;
 
-				csum2 = skb_copy_and_csum_bits(skb, offset,
-							       cur_ptr,
-							       to_move, 0);
-				csum = csum_block_add(csum, csum2, offset);
-			} else
-				skb_copy_bits(skb, offset, cur_ptr, to_move);
-			offset += to_move;
-			copied -= to_move;
-			cur_ptr += to_move;
-			cur_len -= to_move;
-		}
-		if (cur_len <= 0) {
-			iov++;
-			cur_len = iov->iov_len;
-			cur_ptr = iov->iov_base;
-		}
+	if (skb->ip_summed == CHECKSUM_UNNECESSARY)
+		goto no_checksum;
+
+	desc.csum = csum_partial(skb->data, desc.offset, skb->csum);
+	xdr_partial_copy_from_skb(xdr, 0, &desc, skb_read_and_csum_bits);
+	if (desc.offset != skb->len) {
+		unsigned int csum2;
+		csum2 = skb_checksum(skb, desc.offset, skb->len - desc.offset, 0);
+		desc.csum = csum_block_add(desc.csum, csum2, desc.offset);
 	}
-	if (need_csum) {
-		if (slack > 0) {
-			unsigned int csum2;
-
-			csum2 = skb_checksum(skb, offset, slack, 0);
-			csum = csum_block_add(csum, csum2, offset);
-		}
-		if ((unsigned short)csum_fold(csum))
-			return -1;
-	}
+	if ((unsigned short)csum_fold(desc.csum))
+		return -1;
+	return 0;
+no_checksum:
+	xdr_partial_copy_from_skb(xdr, 0, &desc, skb_read_bits);
 	return 0;
 }
 
@@ -659,7 +661,7 @@ udp_data_ready(struct sock *sk, int len)
 		copied = repsize;
 
 	/* Suck it into the iovec, verify checksum if not done by hw. */
-	if (csum_partial_copy_to_page_cache(rovr->rq_rvec, skb, copied))
+	if (csum_partial_copy_to_xdr(&rovr->rq_rcv_buf, skb))
 		goto out_unlock;
 
 	/* Something worked... */
@@ -676,12 +678,6 @@ udp_data_ready(struct sock *sk, int len)
 	if (sk->sleep && waitqueue_active(sk->sleep))
 		wake_up_interruptible(sk->sleep);
 }
-
-typedef struct {
-	struct sk_buff *skb;
-	unsigned offset;
-	size_t count;
-} skb_reader_t;
 
 /*
  * Copy from an skb into memory and shrink the skb.
@@ -773,11 +769,8 @@ static inline void
 tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 {
 	struct rpc_rqst *req;
-	struct iovec *iov;
-	char *p;
-	unsigned long skip;
-	size_t len, used;
-	int n;
+	struct xdr_buf *rcvbuf;
+	size_t len;
 
 	/* Find and lock the request corresponding to this xid */
 	req = xprt_lookup_rqst(xprt, xprt->tcp_xid);
@@ -787,36 +780,30 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 				xprt->tcp_xid);
 		return;
 	}
-	skip = xprt->tcp_copied;
-	iov = req->rq_rvec;
-	for (n = req->rq_rnr; n != 0; n--, iov++) {
-		if (skip >= iov->iov_len) {
-			skip -= iov->iov_len;
-			continue;
-		}
-		p = iov->iov_base;
-		len = iov->iov_len;
-		if (skip) {
-			p += skip;
-			len -= skip;
-			skip = 0;
-		}
-		if (xprt->tcp_offset + len > xprt->tcp_reclen)
-			len = xprt->tcp_reclen - xprt->tcp_offset;
-		used = tcp_copy_data(desc, p, len);
-		xprt->tcp_copied += used;
-		xprt->tcp_offset += used;
-		if (used != len)
-			break;
-		if (xprt->tcp_copied == req->rq_rlen) {
+
+	rcvbuf = &req->rq_rcv_buf;
+	len = desc->count;
+	if (len > xprt->tcp_reclen - xprt->tcp_offset) {
+		skb_reader_t my_desc;
+
+		len = xprt->tcp_reclen - xprt->tcp_offset;
+		memcpy(&my_desc, desc, sizeof(my_desc));
+		my_desc.count = len;
+		xdr_partial_copy_from_skb(rcvbuf, xprt->tcp_copied,
+					  &my_desc, tcp_copy_data);
+		desc->count -= len;
+		desc->offset += len;
+	} else
+		xdr_partial_copy_from_skb(rcvbuf, xprt->tcp_copied,
+					  desc, tcp_copy_data);
+	xprt->tcp_copied += len;
+	xprt->tcp_offset += len;
+
+	if (xprt->tcp_copied == req->rq_rlen)
+		xprt->tcp_flags &= ~XPRT_COPY_DATA;
+	else if (xprt->tcp_offset == xprt->tcp_reclen) {
+		if (xprt->tcp_flags & XPRT_LAST_FRAG)
 			xprt->tcp_flags &= ~XPRT_COPY_DATA;
-			break;
-		}
-		if (xprt->tcp_offset == xprt->tcp_reclen) {
-			if (xprt->tcp_flags & XPRT_LAST_FRAG)
-				xprt->tcp_flags &= ~XPRT_COPY_DATA;
-			break;
-		}
 	}
 
 	if (!(xprt->tcp_flags & XPRT_COPY_DATA)) {

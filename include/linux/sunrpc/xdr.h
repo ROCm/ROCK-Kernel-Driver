@@ -95,6 +95,8 @@ u32 *	xdr_decode_netobj_fixed(u32 *p, void *obj, unsigned int len);
 
 void	xdr_encode_pages(struct xdr_buf *, struct page **, unsigned int,
 			 unsigned int);
+void	xdr_inline_pages(struct xdr_buf *, unsigned int,
+			 struct page **, unsigned int, unsigned int);
 
 /*
  * Decode 64bit quantities (NFSv3 support)
@@ -128,10 +130,38 @@ void xdr_shift_iovec(struct iovec *, int, size_t);
 void xdr_zero_iovec(struct iovec *, int, size_t);
 
 /*
+ * Maximum number of iov's we use.
+ */
+#define MAX_IOVEC	(12)
+
+/*
  * XDR buffer helper functions
  */
 extern int xdr_kmap(struct iovec *, struct xdr_buf *, unsigned int);
 extern void xdr_kunmap(struct xdr_buf *, unsigned int);
+extern void xdr_shift_buf(struct xdr_buf *, unsigned int);
+extern void xdr_zero_buf(struct xdr_buf *, unsigned int);
+
+/*
+ * Helper structure for copying from an sk_buff.
+ */
+typedef struct {
+	struct sk_buff	*skb;
+	unsigned int	offset;
+	size_t		count;
+	unsigned int	csum;
+} skb_reader_t;
+
+typedef size_t (*skb_read_actor_t)(skb_reader_t *desc, void *to, size_t len);
+
+extern void xdr_partial_copy_from_skb(struct xdr_buf *, unsigned int,
+		skb_reader_t *, skb_read_actor_t);
+
+extern int xdr_copy_skb(struct xdr_buf *xdr, unsigned int base,
+		struct sk_buff *skb, unsigned int offset);
+
+extern int xdr_copy_and_csum_skb(struct xdr_buf *xdr, unsigned int base,
+		struct sk_buff *skb, unsigned int offset, unsigned int csum);
 
 #endif /* __KERNEL__ */
 

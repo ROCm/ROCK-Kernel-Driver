@@ -220,35 +220,20 @@ static int
 nfs_xdr_readargs(struct rpc_rqst *req, u32 *p, struct nfs_readargs *args)
 {
 	struct rpc_auth	*auth = req->rq_task->tk_auth;
-	int		buflen, replen;
-	unsigned int	nr;
+	unsigned int replen;
+	u32 offset = (u32)args->offset;
+	u32 count = args->count;
 
 	p = xdr_encode_fhandle(p, args->fh);
-	*p++ = htonl(args->offset);
-	*p++ = htonl(args->count);
-	*p++ = htonl(args->count);
+	*p++ = htonl(offset);
+	*p++ = htonl(count);
+	*p++ = htonl(count);
 	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
 
-	/* Get the number of buffers in the receive iovec */
-        nr = args->nriov;
-
-        if (nr+2 > MAX_IOVEC) {
-                printk(KERN_ERR "NFS: Bad number of iov's in xdr_readargs\n");
-                return -EINVAL;
-        }
-
-	/* set up reply iovec */
+	/* Inline the page array */
 	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS_readres_sz) << 2;
-	buflen = req->rq_rvec[0].iov_len;
-	req->rq_rvec[0].iov_len  = replen;
-        /* Copy the iovec */
-        memcpy(req->rq_rvec + 1, args->iov, nr * sizeof(struct iovec));
-
-	req->rq_rvec[nr+1].iov_base = (u8 *) req->rq_rvec[0].iov_base + replen;
-	req->rq_rvec[nr+1].iov_len  = buflen - replen;
-	req->rq_rlen = args->count + buflen;
-	req->rq_rnr += nr+1;
-
+	xdr_inline_pages(&req->rq_rcv_buf, replen,
+			 args->pages, args->pgbase, count);
 	return 0;
 }
 
@@ -269,7 +254,7 @@ nfs_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
 	if (iov->iov_len > hdrlen) {
 		dprintk("NFS: READ header is short. iovec will be shifted.\n");
-		xdr_shift_iovec(iov, req->rq_rnr, iov->iov_len - hdrlen);
+		xdr_shift_buf(&req->rq_rcv_buf, iov->iov_len - hdrlen);
 	}
 
 	recvd = req->rq_rlen - hdrlen;
@@ -281,7 +266,6 @@ nfs_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 
 	dprintk("RPC:      readres OK count %d\n", count);
 	if (count < res->count) {
-		xdr_zero_iovec(iov+1, req->rq_rnr-2, res->count - count);
 		res->count = count;
 		res->eof = 1;  /* Silly NFSv3ism which can't be helped */
 	} else
@@ -376,32 +360,24 @@ nfs_xdr_readdirargs(struct rpc_rqst *req, u32 *p, struct nfs_readdirargs *args)
 {
 	struct rpc_task	*task = req->rq_task;
 	struct rpc_auth	*auth = task->tk_auth;
-	u32		bufsiz = args->bufsiz;
-	int		buflen, replen;
+	unsigned int replen;
+	u32 count = args->count;
 
 	/*
 	 * Some servers (e.g. HP OS 9.5) seem to expect the buffer size
 	 * to be in longwords ... check whether to convert the size.
 	 */
 	if (task->tk_client->cl_flags & NFS_CLNTF_BUFSIZE)
-		bufsiz = bufsiz >> 2;
+		count = count >> 2;
 
 	p = xdr_encode_fhandle(p, args->fh);
 	*p++ = htonl(args->cookie);
-	*p++ = htonl(bufsiz); /* see above */
+	*p++ = htonl(count); /* see above */
 	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
 
-	/* set up reply iovec */
+	/* Inline the page array */
 	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS_readdirres_sz) << 2;
-	buflen = req->rq_rvec[0].iov_len;
-	req->rq_rvec[0].iov_len  = replen;
-	req->rq_rvec[1].iov_base = args->buffer;
-	req->rq_rvec[1].iov_len  = args->bufsiz;
-	req->rq_rvec[2].iov_base = (u8 *) req->rq_rvec[0].iov_base + replen;
-	req->rq_rvec[2].iov_len  = buflen - replen;
-	req->rq_rlen = buflen + args->bufsiz;
-	req->rq_rnr += 2;
-
+	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages, 0, count);
 	return 0;
 }
 
@@ -413,12 +389,15 @@ nfs_xdr_readdirargs(struct rpc_rqst *req, u32 *p, struct nfs_readdirargs *args)
  * from nfs_readdir for each entry.
  */
 static int
-nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs_readdirres *res)
+nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, void *dummy)
 {
-	struct iovec		*iov = req->rq_rvec;
-	int			 hdrlen;
-	int			 status, nr;
-	u32			*end, *entry, len;
+	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
+	struct iovec *iov = rcvbuf->head;
+	struct page **page;
+	int hdrlen;
+	int status, nr;
+	unsigned int len, pglen;
+	u32 *end, *entry;
 
 	if ((status = ntohl(*p++)))
 		return -nfs_stat_to_errno(status);
@@ -426,13 +405,13 @@ nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs_readdirres *res)
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
 	if (iov->iov_len > hdrlen) {
 		dprintk("NFS: READDIR header is short. iovec will be shifted.\n");
-		xdr_shift_iovec(iov, req->rq_rnr, iov->iov_len - hdrlen);
+		xdr_shift_buf(rcvbuf, iov->iov_len - hdrlen);
 	}
 
-
-	/* Get start and end address of XDR data */
-	p   = (u32 *) iov[1].iov_base;
-	end = (u32 *) ((u8 *) p + iov[1].iov_len);
+	pglen = rcvbuf->page_len;
+	page = rcvbuf->pages;
+	p = kmap(*page);
+	end = (u32 *)((char *)p + pglen);
 	for (nr = 0; *p++; nr++) {
 		entry = p - 1;
 		if (p + 2 > end)
@@ -443,16 +422,21 @@ nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs_readdirres *res)
 		if (len > NFS2_MAXNAMLEN) {
 			printk(KERN_WARNING "NFS: giant filename in readdir (len 0x%x)!\n",
 						len);
-			return -errno_NFSERR_IO;
+			goto err_unmap;
 		}
 		if (p + 2 > end)
 			goto short_pkt;
 	}
+	kunmap(*page);
 	return nr;
  short_pkt:
+	kunmap(*page);
 	printk(KERN_NOTICE "NFS: short packet in readdir reply!\n");
 	entry[0] = entry[1] = 0;
 	return nr;
+err_unmap:
+	kunmap(*page);
+	return -errno_NFSERR_IO;
 }
 
 u32 *
@@ -538,21 +522,16 @@ nfs_xdr_diropres(struct rpc_rqst *req, u32 *p, struct nfs_diropok *res)
 static int
 nfs_xdr_readlinkargs(struct rpc_rqst *req, u32 *p, struct nfs_readlinkargs *args)
 {
-	struct rpc_task *task = req->rq_task;
-	struct rpc_auth *auth = task->tk_auth;
-	int		buflen, replen;
+	struct rpc_auth *auth = req->rq_task->tk_auth;
+	unsigned int replen;
+	u32 count = args->count - 4;
 
 	p = xdr_encode_fhandle(p, args->fh);
 	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
+
+	/* Inline the page array */
 	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS_readlinkres_sz) << 2;
-	buflen = req->rq_rvec[0].iov_len;
-	req->rq_rvec[0].iov_len  = replen;
-	req->rq_rvec[1].iov_base = args->buffer;
-	req->rq_rvec[1].iov_len  = args->bufsiz;
-	req->rq_rvec[2].iov_base = (u8 *) req->rq_rvec[0].iov_base + replen;
-	req->rq_rvec[2].iov_len  = buflen - replen;
-	req->rq_rlen = buflen + args->bufsiz;
-	req->rq_rnr += 2;
+	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages, 0, count);
 	return 0;
 }
 
@@ -560,32 +539,33 @@ nfs_xdr_readlinkargs(struct rpc_rqst *req, u32 *p, struct nfs_readlinkargs *args
  * Decode READLINK reply
  */
 static int
-nfs_xdr_readlinkres(struct rpc_rqst *req, u32 *p, struct nfs_readlinkres *res)
+nfs_xdr_readlinkres(struct rpc_rqst *req, u32 *p, void *dummy)
 {
-	struct iovec *iov = req->rq_rvec;
-	u32	*strlen;
+	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
+	struct iovec *iov = rcvbuf->head;
+	unsigned int hdrlen;
+	u32	*strlen, len;
 	char	*string;
-	int	hdrlen;
 	int	status;
-	unsigned int len;
 
 	if ((status = ntohl(*p++)))
 		return -nfs_stat_to_errno(status);
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
 	if (iov->iov_len > hdrlen) {
 		dprintk("NFS: READLINK header is short. iovec will be shifted.\n");
-		xdr_shift_iovec(iov, req->rq_rnr, iov->iov_len - hdrlen);
+		xdr_shift_buf(rcvbuf, iov->iov_len - hdrlen);
 	}
 
-	strlen = (u32*)res->buffer;
+	strlen = (u32*)kmap(rcvbuf->pages[0]);
 	/* Convert length of symlink */
 	len = ntohl(*strlen);
-	if (len > res->bufsiz - 5)
-		len = res->bufsiz - 5;
+	if (len > rcvbuf->page_len)
+		len = rcvbuf->page_len;
 	*strlen = len;
 	/* NULL terminate the string we got */
 	string = (char *)(strlen + 1);
 	string[len] = 0;
+	kunmap(rcvbuf->pages[0]);
 	return 0;
 }
 

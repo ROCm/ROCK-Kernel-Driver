@@ -16,11 +16,6 @@
 #include <linux/sunrpc/xdr.h>
 
 /*
- * Maximum number of iov's we use.
- */
-#define MAX_IOVEC	10
-
-/*
  * The transport code maintains an estimate on the maximum number of out-
  * standing RPC requests, using a smoothed version of the congestion
  * avoidance implemented in 44BSD. This is basically the Van Jacobson
@@ -89,7 +84,7 @@ struct rpc_rqst {
 	struct rpc_xprt *	rq_xprt;		/* RPC client */
 	struct rpc_timeout	rq_timeout;		/* timeout parms */
 	struct xdr_buf		rq_snd_buf;		/* send buffer */
-	struct rpc_iov		rq_rcv_buf;		/* recv buffer */
+	struct xdr_buf		rq_rcv_buf;		/* recv buffer */
 
 	/*
 	 * This is the private part
@@ -116,9 +111,8 @@ struct rpc_rqst {
 };
 #define rq_svec			rq_snd_buf.head
 #define rq_slen			rq_snd_buf.len
-#define rq_rvec			rq_rcv_buf.io_vec
-#define rq_rnr			rq_rcv_buf.io_nr
-#define rq_rlen			rq_rcv_buf.io_len
+#define rq_rvec			rq_rcv_buf.head
+#define rq_rlen			rq_rcv_buf.len
 
 #define XPRT_LAST_FRAG		(1 << 0)
 #define XPRT_COPY_RECM		(1 << 1)

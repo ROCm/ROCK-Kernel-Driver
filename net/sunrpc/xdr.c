@@ -120,6 +120,27 @@ xdr_encode_pages(struct xdr_buf *xdr, struct page **pages, unsigned int base,
 	xdr->len += len;
 }
 
+void
+xdr_inline_pages(struct xdr_buf *xdr, unsigned int offset,
+		 struct page **pages, unsigned int base, unsigned int len)
+{
+	struct iovec *head = xdr->head;
+	struct iovec *tail = xdr->tail;
+	char *buf = (char *)head->iov_base;
+	unsigned int buflen = head->iov_len;
+
+	head->iov_len  = offset;
+
+	xdr->pages = pages;
+	xdr->page_base = base;
+	xdr->page_len = len;
+
+	tail->iov_base = buf + offset;
+	tail->iov_len = buflen - offset;
+
+	xdr->len += len;
+}
+
 
 /*
  * Realign the iovec if the server missed out some reply elements
@@ -250,4 +271,73 @@ void xdr_kunmap(struct xdr_buf *xdr, unsigned int base)
 		pglen -= PAGE_CACHE_SIZE;
 		ppage++;
 	}
+}
+
+void
+xdr_partial_copy_from_skb(struct xdr_buf *xdr, unsigned int base,
+			  skb_reader_t *desc,
+			  skb_read_actor_t copy_actor)
+{
+	struct page	**ppage = xdr->pages;
+	unsigned int	len, pglen = xdr->page_len;
+	int		ret;
+
+	len = xdr->head[0].iov_len;
+	if (base < len) {
+		len -= base;
+		ret = copy_actor(desc, (char *)xdr->head[0].iov_base + base, len);
+		if (ret != len || !desc->count)
+			return;
+		base = 0;
+	} else
+		base -= len;
+
+	if (pglen == 0)
+		goto copy_tail;
+	if (base >= pglen) {
+		base -= pglen;
+		goto copy_tail;
+	}
+	if (base || xdr->page_base) {
+		pglen -= base;
+		base  += xdr->page_base;
+		ppage += base >> PAGE_CACHE_SHIFT;
+		base &= ~PAGE_CACHE_MASK;
+	}
+	do {
+		char *kaddr;
+
+		len = PAGE_CACHE_SIZE;
+		kaddr = kmap_atomic(*ppage, KM_USER0);
+		if (base) {
+			len -= base;
+			if (pglen < len)
+				len = pglen;
+			ret = copy_actor(desc, kaddr + base, len);
+			base = 0;
+		} else {
+			if (pglen < len)
+				len = pglen;
+			ret = copy_actor(desc, kaddr, len);
+		}
+		kunmap_atomic(kaddr, KM_USER0);
+		if (ret != len || !desc->count)
+			return;
+		ppage++;
+	} while ((pglen -= len) != 0);
+copy_tail:
+	len = xdr->tail[0].iov_len;
+	if (len)
+		copy_actor(desc, (char *)xdr->tail[0].iov_base + base, len);
+}
+
+void
+xdr_shift_buf(struct xdr_buf *xdr, size_t len)
+{
+	struct iovec iov[MAX_IOVEC];
+	unsigned int nr;
+
+	nr = xdr_kmap(iov, xdr, 0);
+	xdr_shift_iovec(iov, nr, len);
+	xdr_kunmap(xdr, 0);
 }

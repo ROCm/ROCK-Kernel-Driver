@@ -97,8 +97,8 @@ EXPORT_SYMBOL(xdr_decode_string_inplace);
 EXPORT_SYMBOL(xdr_decode_netobj);
 EXPORT_SYMBOL(xdr_encode_netobj);
 EXPORT_SYMBOL(xdr_encode_pages);
-EXPORT_SYMBOL(xdr_shift_iovec);
-EXPORT_SYMBOL(xdr_zero_iovec);
+EXPORT_SYMBOL(xdr_inline_pages);
+EXPORT_SYMBOL(xdr_shift_buf);
 
 /* Debugging symbols */
 #ifdef RPC_DEBUG

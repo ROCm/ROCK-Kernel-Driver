@@ -68,8 +68,8 @@ struct nfs_readargs {
 	struct nfs_fh *		fh;
 	__u64			offset;
 	__u32			count;
-	unsigned int            nriov;
-	struct iovec            iov[NFS_READ_MAXIOV];
+	unsigned int		pgbase;
+	struct page **		pages;
 };
 
 struct nfs_readres {
@@ -165,8 +165,8 @@ struct nfs_symlinkargs {
 struct nfs_readdirargs {
 	struct nfs_fh *		fh;
 	__u32			cookie;
-	void *			buffer;
-	unsigned int		bufsiz;
+	unsigned int		count;
+	struct page **		pages;
 };
 
 struct nfs_diropok {
@@ -176,18 +176,8 @@ struct nfs_diropok {
 
 struct nfs_readlinkargs {
 	struct nfs_fh *		fh;
-	void *			buffer;
-	unsigned int		bufsiz;
-};
-
-struct nfs_readlinkres {
-	void *			buffer;
-	unsigned int		bufsiz;
-};
-
-struct nfs_readdirres {
-	void *			buffer;
-	unsigned int		bufsiz;
+	unsigned int		count;
+	struct page **		pages;
 };
 
 struct nfs3_sattrargs {
@@ -262,9 +252,9 @@ struct nfs3_readdirargs {
 	struct nfs_fh *		fh;
 	__u64			cookie;
 	__u32			verf[2];
-	void *			buffer;
-	unsigned int		bufsiz;
 	int			plus;
+	unsigned int            count;
+	struct page **		pages;
 };
 
 struct nfs3_diropres {
@@ -280,14 +270,8 @@ struct nfs3_accessres {
 
 struct nfs3_readlinkargs {
 	struct nfs_fh *		fh;
-	void *			buffer;
-	unsigned int		bufsiz;
-};
-
-struct nfs3_readlinkres {
-	struct nfs_fattr *	fattr;
-	void *			buffer;
-	unsigned int		bufsiz;
+	unsigned int		count;
+	struct page **		pages;
 };
 
 struct nfs3_renameres {
@@ -303,8 +287,6 @@ struct nfs3_linkres {
 struct nfs3_readdirres {
 	struct nfs_fattr *	dir_attr;
 	__u32 *			verf;
-	void *			buffer;
-	unsigned int		bufsiz;
 	int			plus;
 };
 
@@ -322,11 +304,11 @@ struct nfs_rpc_ops {
 	int	(*lookup)  (struct inode *, struct qstr *,
 			    struct nfs_fh *, struct nfs_fattr *);
 	int	(*access)  (struct inode *, int , int);
-	int	(*readlink)(struct inode *, void *, unsigned int);
+	int	(*readlink)(struct inode *, struct page *);
 	int	(*read)    (struct inode *, struct rpc_cred *,
 			    struct nfs_fattr *,
-			    int, loff_t, unsigned int,
-			    void *buffer, int *eofp);
+			    int, unsigned int, unsigned int,
+			    struct page *, int *eofp);
 	int	(*write)   (struct inode *, struct rpc_cred *,
 			    struct nfs_fattr *,
 			    int, unsigned int, unsigned int,
@@ -349,7 +331,7 @@ struct nfs_rpc_ops {
 			    struct nfs_fh *, struct nfs_fattr *);
 	int	(*rmdir)   (struct inode *, struct qstr *);
 	int	(*readdir) (struct inode *, struct rpc_cred *,
-			    u64, void *, unsigned int, int);
+			    u64, struct page *, unsigned int, int);
 	int	(*mknod)   (struct inode *, struct qstr *, struct iattr *,
 			    dev_t, struct nfs_fh *, struct nfs_fattr *);
 	int	(*statfs)  (struct nfs_server *, struct nfs_fh *,
