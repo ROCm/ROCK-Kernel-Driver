@@ -415,10 +415,10 @@ int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6,
 int sys_pipe(int __user *fildes);
 int sys_ptrace(long request, long pid, long addr, long data);
 struct sigaction;
-asmlinkage long sys_rt_sigaction(int sig,
-				const struct sigaction __user *act,
-				struct sigaction __user *oact,
-				size_t sigsetsize);
+long sys_rt_sigaction(int sig,
+		      const struct sigaction __user *act,
+		      struct sigaction __user *oact,
+		      size_t sigsetsize);
 
 #endif /* __KERNEL_SYSCALLS__ */
 
