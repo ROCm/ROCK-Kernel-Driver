@@ -115,7 +115,7 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
         freecom_udata_t extra = (freecom_udata_t) us->extra;
         struct freecom_xfer_wrap *fxfr =
                 (struct freecom_xfer_wrap *) extra->buffer;
-        int result, partial;
+        int result;
 
         fxfr->Type = FCM_PACKET_INPUT | 0x00;
         fxfr->Timeout = 0;    /* Short timeout for debugging. */
@@ -125,14 +125,12 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
         US_DEBUGP("Read data Freecom! (c=%d)\n", count);
 
         /* Issue the transfer command. */
-        result = usb_stor_bulk_msg (us, fxfr, opipe,
-                        FCM_PACKET_LENGTH, &partial);
+        result = usb_stor_bulk_transfer_buf (us, opipe, fxfr,
+                        FCM_PACKET_LENGTH, NULL);
         if (result != USB_STOR_XFER_GOOD) {
-                US_DEBUGP ("Freecom readdata xport failure: r=%d, p=%d\n",
-                                result, partial);
+                US_DEBUGP ("Freecom readdata transport error\n");
                 return USB_STOR_TRANSPORT_ERROR;
         }
-        US_DEBUGP("Done issuing read request: %d %d\n", result, partial);
 
         /* Now transfer all of our blocks. */
 	US_DEBUGP("Start of read\n");
@@ -151,7 +149,7 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
         freecom_udata_t extra = (freecom_udata_t) us->extra;
         struct freecom_xfer_wrap *fxfr =
                 (struct freecom_xfer_wrap *) extra->buffer;
-        int result, partial;
+        int result;
 
         fxfr->Type = FCM_PACKET_OUTPUT | 0x00;
         fxfr->Timeout = 0;    /* Short timeout for debugging. */
@@ -161,15 +159,12 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
         US_DEBUGP("Write data Freecom! (c=%d)\n", count);
 
         /* Issue the transfer command. */
-        result = usb_stor_bulk_msg (us, fxfr, opipe,
-                        FCM_PACKET_LENGTH, &partial);
+        result = usb_stor_bulk_transfer_buf (us, opipe, fxfr,
+                        FCM_PACKET_LENGTH, NULL);
         if (result != USB_STOR_XFER_GOOD) {
-                US_DEBUGP ("Freecom writedata xport failure: r=%d, p=%d\n",
-                                result, partial);
+                US_DEBUGP ("Freecom writedata transport error\n");
                 return USB_STOR_TRANSPORT_ERROR;
         }
-        US_DEBUGP("Done issuing write request: %d %d\n",
-                        result, partial);
 
         /* Now transfer all of our blocks. */
 	US_DEBUGP("Start of write\n");
@@ -191,7 +186,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
         struct freecom_status  *fst;
         unsigned int ipipe, opipe;             /* We need both pipes. */
         int result;
-        int partial;
+	unsigned int partial;
         int length;
         freecom_udata_t extra;
 
@@ -215,23 +210,22 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
         US_DEBUG(pdump (srb->cmnd, 12));
 
         /* Send it out. */
-        result = usb_stor_bulk_msg (us, fcb, opipe,
-                        FCM_PACKET_LENGTH, &partial);
+        result = usb_stor_bulk_transfer_buf (us, opipe, fcb,
+                        FCM_PACKET_LENGTH, NULL);
 
         /* The Freecom device will only fail if there is something wrong in
          * USB land.  It returns the status in its own registers, which
          * come back in the bulk pipe. */
         if (result != USB_STOR_XFER_GOOD) {
-                US_DEBUGP ("freecom xport failure: r=%d, p=%d\n",
-                                result, partial);
+                US_DEBUGP ("freecom transport error\n");
                 return USB_STOR_TRANSPORT_ERROR;
         }
 
         /* There are times we can optimize out this status read, but it
          * doesn't hurt us to always do it now. */
-        result = usb_stor_bulk_msg (us, fst, ipipe,
+        result = usb_stor_bulk_transfer_buf (us, ipipe, fst,
                         FCM_PACKET_LENGTH, &partial);
-        US_DEBUGP("foo Status result %d %d\n", result, partial);
+        US_DEBUGP("foo Status result %d %u\n", result, partial);
 	if (result != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;
 
@@ -256,24 +250,23 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		memset (fcb->Filler, 0, sizeof (fcb->Filler));
 
         	/* Send it out. */
-		result = usb_stor_bulk_msg (us, fcb, opipe,
-				FCM_PACKET_LENGTH, &partial);
+		result = usb_stor_bulk_transfer_buf (us, opipe, fcb,
+				FCM_PACKET_LENGTH, NULL);
 
 		/* The Freecom device will only fail if there is something
 		 * wrong in USB land.  It returns the status in its own
 		 * registers, which come back in the bulk pipe.
 		 */
 		if (result != USB_STOR_XFER_GOOD) {
-			US_DEBUGP ("freecom xport failure: r=%d, p=%d\n",
-					result, partial);
+			US_DEBUGP ("freecom transport error\n");
 			return USB_STOR_TRANSPORT_ERROR;
 		}
 
 		/* get the data */
-        	result = usb_stor_bulk_msg (us, fst, ipipe,
+        	result = usb_stor_bulk_transfer_buf (us, ipipe, fst,
 				FCM_PACKET_LENGTH, &partial);
 
-		US_DEBUGP("bar Status result %d %d\n", result, partial);
+		US_DEBUGP("bar Status result %d %u\n", result, partial);
 		if (result > USB_STOR_XFER_SHORT)
 	                return USB_STOR_TRANSPORT_ERROR;
 
@@ -328,7 +321,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
                         return result;
 
                 US_DEBUGP("FCM: Waiting for status\n");
-                result = usb_stor_bulk_msg (us, fst, ipipe,
+                result = usb_stor_bulk_transfer_buf (us, ipipe, fst,
                                 FCM_PACKET_LENGTH, &partial);
 		US_DEBUG(pdump ((void *) fst, partial));
 
@@ -354,7 +347,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
                         return result;
 
                 US_DEBUGP("FCM: Waiting for status\n");
-                result = usb_stor_bulk_msg (us, fst, ipipe,
+                result = usb_stor_bulk_transfer_buf (us, ipipe, fst,
                                 FCM_PACKET_LENGTH, &partial);
 
                 if (partial != 4 || result > USB_STOR_XFER_SHORT)
@@ -385,13 +378,6 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
         }
 
         return USB_STOR_TRANSPORT_GOOD;
-
-        US_DEBUGP("Freecom: transfer_length = %d\n",
-			usb_stor_transfer_length (srb));
-
-        US_DEBUGP("Freecom: direction = %d\n", srb->sc_data_direction);
-
-        return USB_STOR_TRANSPORT_ERROR;
 }
 
 int
