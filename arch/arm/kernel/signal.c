@@ -362,8 +362,8 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 		 * Ensure that the instruction cache sees
 		 * the return code written onto the stack.
 		 */
-		cpu_icache_invalidate_range((unsigned long)rc,
-					    (unsigned long)(rc + 1));
+		flush_icache_range((unsigned long)rc,
+				   (unsigned long)(rc + 1));
 
 		retcode = ((unsigned long)rc) + thumb;
 	}
@@ -569,6 +569,9 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 				put_user(0xef000000 | __NR_restart_syscall, &usp[1]);
 				/* ldr	pc, [sp], #12 */
 				put_user(0xe49df00c, &usp[2]);
+
+				flush_icache_range((unsigned long)usp,
+						   (unsigned long)(usp + 3));
 
 				regs->ARM_pc = regs->ARM_sp + 4;
 			}
