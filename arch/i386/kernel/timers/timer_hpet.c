@@ -131,63 +131,6 @@ void delay_hpet(unsigned long loops)
 	} while ((hpet_end - hpet_start) < (loops));
 }
 
-/* ------ Calibrate the TSC -------
- * Return 2^32 * (1 / (TSC clocks per usec)) for getting the CPU freq.
- * Set 2^32 * (1 / (tsc per HPET clk)) for delay_hpet().
- * calibrate_tsc() calibrates the processor TSC by comparing
- * it to the HPET timer of known frequency.
- * Too much 64-bit arithmetic here to do this cleanly in C
- */
-#define CALIBRATE_CNT_HPET 	(5 * hpet_tick)
-#define CALIBRATE_TIME_HPET 	(5 * KERNEL_TICK_USEC)
-
-static unsigned long __init calibrate_tsc(void)
-{
-	unsigned long tsc_startlow, tsc_starthigh;
-	unsigned long tsc_endlow, tsc_endhigh;
-	unsigned long hpet_start, hpet_end;
-	unsigned long result, remain;
-
-	hpet_start = hpet_readl(HPET_COUNTER);
-	rdtsc(tsc_startlow, tsc_starthigh);
-	do {
-		hpet_end = hpet_readl(HPET_COUNTER);
-	} while ((hpet_end - hpet_start) < CALIBRATE_CNT_HPET);
-	rdtsc(tsc_endlow, tsc_endhigh);
-
-	/* 64-bit subtract - gcc just messes up with long longs */
-	__asm__("subl %2,%0\n\t"
-		"sbbl %3,%1"
-		:"=a" (tsc_endlow), "=d" (tsc_endhigh)
-		:"g" (tsc_startlow), "g" (tsc_starthigh),
-		 "0" (tsc_endlow), "1" (tsc_endhigh));
-
-	/* Error: ECPUTOOFAST */
-	if (tsc_endhigh)
-		goto bad_calibration;
-
-	/* Error: ECPUTOOSLOW */
-	if (tsc_endlow <= CALIBRATE_TIME_HPET)
-		goto bad_calibration;
-
-	ASM_DIV64_REG(result, remain, tsc_endlow, 0, CALIBRATE_TIME_HPET);
-	if (remain > (tsc_endlow >> 1))
-		result++; /* rounding the result */
-
-	ASM_DIV64_REG(tsc_hpet_quotient, remain, tsc_endlow, 0,
-			CALIBRATE_CNT_HPET);
-	if (remain > (tsc_endlow >> 1))
-		tsc_hpet_quotient++; /* rounding the result */
-
-	return result;
-bad_calibration:
-	/*
-	 * the CPU was so fast/slow that the quotient wouldn't fit in
-	 * 32 bits..
-	 */
-	return 0;
-}
-
 static int __init init_hpet(char* override)
 {
 	unsigned long result, remain;
@@ -201,7 +144,7 @@ static int __init init_hpet(char* override)
 
 	printk("Using HPET for gettimeofday\n");
 	if (cpu_has_tsc) {
-		unsigned long tsc_quotient = calibrate_tsc();
+		unsigned long tsc_quotient = calibrate_tsc_hpet(&tsc_hpet_quotient);
 		if (tsc_quotient) {
 			/* report CPU clock rate in Hz.
 			 * The formula is (10^6 * 2^32) / (2^32 * 1 / (clocks/us)) =

@@ -19,7 +19,6 @@
 #include <asm/fixmap.h>
 
 extern spinlock_t i8253_lock;
-extern unsigned long calibrate_tsc(void);
 
 /* Number of usecs that the last interrupt was delayed */
 static int delay_at_last_interrupt;
