@@ -1012,6 +1012,7 @@ void ext2_read_inode (struct inode * inode)
 		ei->i_dir_acl = le32_to_cpu(raw_inode->i_dir_acl);
 	ei->i_dtime = 0;
 	inode->i_generation = le32_to_cpu(raw_inode->i_generation);
+	ei->i_state = 0;
 	ei->i_next_alloc_block = 0;
 	ei->i_next_alloc_goal = 0;
 	ei->i_prealloc_count = 0;
@@ -1075,6 +1076,11 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 
 	if (IS_ERR(raw_inode))
  		return -EIO;
+
+	/* For fields not not tracking in the in-memory inode,
+	 * initialise them to zero for new inodes. */
+	if (ei->i_state & EXT2_STATE_NEW)
+		memset(raw_inode, 0, EXT2_SB(sb)->s_inode_size);
 
 	if (ino == EXT2_ACL_IDX_INO || ino == EXT2_ACL_DATA_INO) {
 		ext2_error (sb, "ext2_write_inode", "bad inode number: %lu",
@@ -1152,6 +1158,7 @@ static int ext2_update_inode(struct inode * inode, int do_sync)
 			err = -EIO;
 		}
 	}
+	ei->i_state &= ~EXT2_STATE_NEW;
 	brelse (bh);
 	return err;
 }

@@ -2325,6 +2325,11 @@ static int ext3_do_update_inode(handle_t *handle,
 		if (err)
 			goto out_brelse;
 	}
+	/* For fields not not tracking in the in-memory inode,
+	 * initialise them to zero for new inodes. */
+	if (ei->i_state & EXT3_STATE_NEW)
+		memset(raw_inode, 0, EXT3_SB(inode->i_sb)->s_inode_size);
+
 	raw_inode->i_mode = cpu_to_le16(inode->i_mode);
 	if(!(test_opt(inode->i_sb, NO_UID32))) {
 		raw_inode->i_uid_low = cpu_to_le16(low_16_bits(inode->i_uid));
@@ -2362,15 +2367,6 @@ static int ext3_do_update_inode(handle_t *handle,
 	raw_inode->i_faddr = cpu_to_le32(ei->i_faddr);
 	raw_inode->i_frag = ei->i_frag_no;
 	raw_inode->i_fsize = ei->i_frag_size;
-#else
-	/* If we are not tracking these fields in the in-memory inode,
-	 * then preserve them on disk, but still initialise them to zero
-	 * for new inodes. */
-	if (ei->i_state & EXT3_STATE_NEW) {
-		raw_inode->i_faddr = 0;
-		raw_inode->i_frag = 0;
-		raw_inode->i_fsize = 0;
-	}
 #endif
 	raw_inode->i_file_acl = cpu_to_le32(ei->i_file_acl);
 	if (!S_ISREG(inode->i_mode)) {

@@ -386,6 +386,7 @@ repeat:
 	ei->i_prealloc_block = 0;
 	ei->i_prealloc_count = 0;
 	ei->i_dir_start_lookup = 0;
+	ei->i_state = EXT2_STATE_NEW;
 	if (ei->i_flags & EXT2_SYNC_FL)
 		inode->i_flags |= S_SYNC;
 	if (ei->i_flags & EXT2_DIRSYNC_FL)

@@ -10,6 +10,7 @@ struct ext2_inode_info {
 	__u32	i_faddr;
 	__u8	i_frag_no;
 	__u8	i_frag_size;
+	__u16	i_state;
 	__u32	i_file_acl;
 	__u32	i_dir_acl;
 	__u32	i_dtime;
@@ -22,6 +23,12 @@ struct ext2_inode_info {
 	rwlock_t i_meta_lock;
 	struct inode	vfs_inode;
 };
+
+/*
+ * Inode dynamic state flags
+ */
+#define EXT2_STATE_NEW			0x00000001 /* inode is newly created */
+
 
 /*
  * Function prototypes
