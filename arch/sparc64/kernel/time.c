@@ -284,7 +284,8 @@ static unsigned long __hbird_read_stick(void)
 			     "ldxa	[%1] %5, %4\n\t"
 			     "cmp	%4, %2\n\t"
 			     "bl,a,pn	%%xcc, 1f\n\t"
-			     " add	%3, 1, %3\n\t"
+			     " add	%3, 1, %3\n"
+			     "1:\n\t"
 			     "sllx	%3, 32, %3\n\t"
 			     "or	%3, %4, %0\n\t"
 			     : "=&r" (ret), "=&r" (addr),
