@@ -863,7 +863,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_rt_sigaction
 	.llong .sys32_rt_sigprocmask
 	.llong .sys32_rt_sigpending     /* 175 */
-	.llong .sys32_rt_sigtimedwait
+	.llong .compat_rt_sigtimedwait
 	.llong .sys32_rt_sigqueueinfo
 	.llong .ppc32_rt_sigsuspend
 	.llong .sys32_pread64

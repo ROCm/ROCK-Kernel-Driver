@@ -628,53 +628,14 @@ sys32_rt_sigpending(compat_sigset_t __user *set, compat_size_t sigsetsize)
 	return ret;
 }
 
-
 asmlinkage long
-sys32_rt_sigtimedwait(compat_sigset_t __user *uthese, siginfo_t32 __user *uinfo,
-		      struct compat_timespec __user *uts, compat_size_t sigsetsize)
-{
-	sigset_t s;
-	compat_sigset_t s32;
-	struct timespec t;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-	siginfo_t info;
-		
-	if (copy_from_user (&s32, uthese, sizeof(compat_sigset_t)))
-		return -EFAULT;
-	switch (_NSIG_WORDS) {
-	case 4: s.sig[3] = s32.sig[6] | (((long)s32.sig[7]) << 32);
-	case 3: s.sig[2] = s32.sig[4] | (((long)s32.sig[5]) << 32);
-	case 2: s.sig[1] = s32.sig[2] | (((long)s32.sig[3]) << 32);
-	case 1: s.sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
-	}
-	if (uts && get_compat_timespec(&t, uts))
-		return -EFAULT;
-	if (uinfo) {
-		/* stop data leak to user space in case of structure fill mismatch
-		 * between sys_rt_sigtimedwait & ia32_copy_siginfo_to_user.
-		 */
-		memset(&info, 0, sizeof(info));
-	}
-	set_fs (KERNEL_DS);
-	ret = sys_rt_sigtimedwait(&s, uinfo ? &info : NULL, uts ? &t : NULL,
-			sigsetsize);
-	set_fs (old_fs);
-	if (ret >= 0 && uinfo) {
-		if (ia32_copy_siginfo_to_user(uinfo, &info))
-			return -EFAULT;
-	}
-	return ret;
-}
-
-asmlinkage long
-sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 __user *uinfo)
+sys32_rt_sigqueueinfo(int pid, int sig, compat_siginfo_t __user *uinfo)
 {
 	siginfo_t info;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
-	if (ia32_copy_siginfo_from_user(&info, uinfo))
+	if (copy_siginfo_from_user32(&info, uinfo))
 		return -EFAULT;
 	set_fs (KERNEL_DS);
 	ret = sys_rt_sigqueueinfo(pid, sig, &info);
@@ -1000,7 +961,7 @@ asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp,
 }
 
 asmlinkage long sys32_waitid(int which, compat_pid_t pid,
-			     siginfo_t32 __user *uinfo, int options,
+			     compat_siginfo_t __user *uinfo, int options,
 			     struct compat_rusage __user *uru)
 {
 	siginfo_t info;
@@ -1022,7 +983,7 @@ asmlinkage long sys32_waitid(int which, compat_pid_t pid,
 
 	BUG_ON(info.si_code & __SI_MASK);
 	info.si_code |= __SI_CHLD;
-	return ia32_copy_siginfo_to_user(uinfo, &info);
+	return copy_siginfo_to_user32(uinfo, &info);
 }
 
 /*

@@ -840,13 +840,13 @@ sys32_rt_sigpending_wrapper:
 	llgfr	%r3,%r3			# size_t
 	jg	sys32_rt_sigpending	# branch to system call
 
-	.globl  sys32_rt_sigtimedwait_wrapper 
-sys32_rt_sigtimedwait_wrapper:
+	.globl  compat_rt_sigtimedwait_wrapper
+compat_rt_sigtimedwait_wrapper:
 	llgtr	%r2,%r2			# const sigset_emu31_t *
 	llgtr	%r3,%r3			# siginfo_emu31_t *
 	llgtr	%r4,%r4			# const struct compat_timespec *
 	llgfr	%r5,%r5			# size_t
-	jg	sys32_rt_sigtimedwait	# branch to system call
+	jg	compat_rt_sigtimedwait	# branch to system call
 
 	.globl  sys32_rt_sigqueueinfo_wrapper 
 sys32_rt_sigqueueinfo_wrapper:

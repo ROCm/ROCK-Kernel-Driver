@@ -2641,7 +2641,7 @@ long sys32_fadvise64_64(int fd, __u32 offset_low, __u32 offset_high,
 } 
 
 asmlinkage long sys32_waitid(int which, compat_pid_t pid,
-			     siginfo_t32 __user *uinfo, int options,
+			     compat_siginfo_t __user *uinfo, int options,
 			     struct compat_rusage __user *uru)
 {
 	siginfo_t info;

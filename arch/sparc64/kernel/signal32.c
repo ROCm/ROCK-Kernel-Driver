@@ -86,7 +86,7 @@ struct new_signal_frame32 {
 	__siginfo_fpu_t		fpu_state;
 };
 
-struct siginfo32 {
+typedef struct compat_siginfo{
 	int si_signo;
 	int si_errno;
 	int si_code;
@@ -136,11 +136,11 @@ struct siginfo32 {
 			int _fd;
 		} _sigpoll;
 	} _sifields;
-};
+}compat_siginfo_t;
 
 struct rt_signal_frame32 {
 	struct sparc_stackf32	ss;
-	struct siginfo32	info;
+	compat_siginfo_t	info;
 	struct pt_regs32	regs;
 	compat_sigset_t		mask;
 	/* __siginfo_fpu32_t * */ u32 fpu_save;
@@ -157,11 +157,11 @@ struct rt_signal_frame32 {
 #define NF_ALIGNEDSZ  (((sizeof(struct new_signal_frame32) + 7) & (~7)))
 #define RT_ALIGNEDSZ  (((sizeof(struct rt_signal_frame32) + 7) & (~7)))
 
-int copy_siginfo_to_user32(struct siginfo32 __user *to, siginfo_t *from)
+int copy_siginfo_to_user32(compat_siginfo_t __user *to, siginfo_t *from)
 {
 	int err;
 
-	if (!access_ok(VERIFY_WRITE, to, sizeof(struct siginfo32)))
+	if (!access_ok(VERIFY_WRITE, to, sizeof(compat_siginfo_t)))
 		return -EFAULT;
 
 	/* If you change siginfo_t structure, please be sure
@@ -210,9 +210,9 @@ int copy_siginfo_to_user32(struct siginfo32 __user *to, siginfo_t *from)
 /* CAUTION: This is just a very minimalist implementation for the
  *          sake of compat_sys_rt_sigqueueinfo()
  */
-int copy_siginfo_to_kernel32(siginfo_t *to, struct siginfo32 __user *from)
+int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
 {
-	if (!access_ok(VERIFY_WRITE, from, sizeof(struct siginfo32)))
+	if (!access_ok(VERIFY_WRITE, from, sizeof(compat_siginfo_t)))
 		return -EFAULT;
 
 	if (copy_from_user(to, from, 3*sizeof(int)) ||
