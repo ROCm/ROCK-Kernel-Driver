@@ -761,8 +761,9 @@ static int stir_transmit_thread(void *arg)
 	       && netif_device_present(dev)
 	       && !signal_pending(current))
 	{
+#ifdef CONFIG_PM
 		/* if suspending, then power off and wait */
-		if (current->flags & PF_FREEZE) {
+		if (unlikely(current->flags & PF_FREEZE)) {
 			if (stir->receiving)
 				receive_stop(stir);
 			else
@@ -775,6 +776,7 @@ static int stir_transmit_thread(void *arg)
 			if (change_speed(stir, stir->speed))
 				break;
 		}
+#endif
 
 		/* if something to send? */
 		skb = xchg(&stir->tx_pending, NULL);
@@ -1125,7 +1127,7 @@ static void stir_disconnect(struct usb_interface *intf)
 	usb_set_intfdata(intf, NULL);
 }
 
-
+#ifdef CONFIG_PM
 /* Power management suspend, so power off the transmitter/receiver */
 static int stir_suspend(struct usb_interface *intf, u32 state)
 {
@@ -1145,6 +1147,7 @@ static int stir_resume(struct usb_interface *intf)
 	/* receiver restarted when send thread wakes up */
 	return 0;
 }
+#endif
 
 /*
  * USB device callbacks
@@ -1155,8 +1158,10 @@ static struct usb_driver irda_driver = {
 	.probe		= stir_probe,
 	.disconnect	= stir_disconnect,
 	.id_table	= dongles,
+#ifdef CONFIG_PM
 	.suspend	= stir_suspend,
 	.resume		= stir_resume,
+#endif
 };
 
 /*
