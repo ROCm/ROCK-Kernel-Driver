@@ -436,7 +436,7 @@ static long pSeries_lpar_hpte_find(unsigned long vpn)
 	hash = hpt_hash(vpn, 0);
 
 	for (j = 0; j < 2; j++) {
-		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
+		slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
 		for (i = 0; i < HPTES_PER_GROUP; i++) {
 			hpte_dw0.dword0 = pSeries_lpar_hpte_getword0(slot);
 			dw0 = hpte_dw0.dw0;

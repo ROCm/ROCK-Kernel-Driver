@@ -168,7 +168,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 
 		hash = hpt_hash(vpn, 0);
 
-		hpteg = ((hash & htab_data.htab_hash_mask)*HPTES_PER_GROUP);
+		hpteg = ((hash & htab_hash_mask) * HPTES_PER_GROUP);
 
 		/* Panic if a pte grpup is full */
 		if (ppc_md.hpte_insert(hpteg, va, pa >> PAGE_SHIFT, 0,

@@ -55,6 +55,7 @@
 #include <asm/serial.h>
 #include <asm/cache.h>
 #include <asm/page.h>
+#include <asm/mmu.h>
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -90,7 +91,6 @@ extern void udbg_init_maple_realmode(void);
 #endif
 
 /* extern void *stab; */
-extern HTAB htab_data;
 extern unsigned long klimit;
 
 extern void mm_init_ppc64(void);
@@ -672,8 +672,8 @@ void __init setup_system(void)
 			ppc64_caches.dline_size);
 	printk("ppc64_caches.icache_line_size = 0x%x\n",
 			ppc64_caches.iline_size);
-	printk("htab_data.htab                = 0x%p\n", htab_data.htab);
-	printk("htab_data.num_ptegs           = 0x%lx\n", htab_data.htab_num_ptegs);
+	printk("htab_address                  = 0x%p\n", htab_address);
+	printk("htab_hash_mask                = 0x%lx\n", htab_hash_mask);
 	printk("-----------------------------------------------------\n");
 
 	mm_init_ppc64();

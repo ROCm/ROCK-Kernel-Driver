@@ -472,18 +472,16 @@ static void __init build_iSeries_Memory_Map(void)
 	printk("HPT absolute addr = %016lx, size = %dK\n",
 			chunk_to_addr(hptFirstChunk), hptSizeChunks * 256);
 
-	/* Fill in the htab_data structure */
-	/* Fill in size of hashed page table */
+	/* Fill in the hashed page table hash mask */
 	num_ptegs = hptSizePages *
 		(PAGE_SIZE / (sizeof(HPTE) * HPTES_PER_GROUP));
-	htab_data.htab_num_ptegs = num_ptegs;
-	htab_data.htab_hash_mask = num_ptegs - 1;
+	htab_hash_mask = num_ptegs - 1;
 	
 	/*
 	 * The actual hashed page table is in the hypervisor,
 	 * we have no direct access
 	 */
-	htab_data.htab = NULL;
+	htab_address = NULL;
 
 	/*
 	 * Determine if absolute memory has any
