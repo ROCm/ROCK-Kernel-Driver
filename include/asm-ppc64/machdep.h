@@ -94,6 +94,9 @@ struct machdep_calls {
 
 	ssize_t		(*nvram_write)(char *buf, size_t count, loff_t *index);
 	ssize_t		(*nvram_read)(char *buf, size_t count, loff_t *index);	
+	ssize_t		(*nvram_size)(void);		
+	int		(*nvram_sync)(void);
+
 
 #ifdef CONFIG_SMP
 	/* functions for dealing with other cpus */

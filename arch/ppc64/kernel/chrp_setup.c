@@ -178,6 +178,10 @@ chrp_setup_arch(void)
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
 #endif
+
+#ifdef CONFIG_PPC_PSERIES
+	pSeries_nvram_init();
+#endif
 }
 
 void __init
@@ -271,9 +275,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.calibrate_decr = pSeries_calibrate_decr;
 
 	ppc_md.progress       = chrp_progress;
-
-	ppc_md.nvram_read     = pSeries_nvram_read;
-	ppc_md.nvram_write    = pSeries_nvram_write;
 
         /* Build up the firmware_features bitmask field
          * using contents of device-tree/ibm,hypertas-functions.

@@ -40,6 +40,7 @@
 #include <asm/time.h>
 #include <asm/cputable.h>
 #include <asm/sections.h>
+#include <asm/nvram.h>
 
 extern unsigned long klimit;
 /* extern void *stab; */
@@ -261,6 +262,8 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 
 void machine_restart(char *cmd)
 {
+	if (ppc_md.nvram_sync)
+		ppc_md.nvram_sync();
 	ppc_md.restart(cmd);
 }
 
@@ -268,6 +271,8 @@ EXPORT_SYMBOL(machine_restart);
   
 void machine_power_off(void)
 {
+	if (ppc_md.nvram_sync)
+		ppc_md.nvram_sync();
 	ppc_md.power_off();
 }
 
@@ -275,6 +280,8 @@ EXPORT_SYMBOL(machine_power_off);
   
 void machine_halt(void)
 {
+	if (ppc_md.nvram_sync)
+		ppc_md.nvram_sync();
 	ppc_md.halt();
 }
 
