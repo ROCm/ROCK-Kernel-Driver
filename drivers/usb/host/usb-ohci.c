@@ -83,7 +83,8 @@
 
 
 #ifdef CONFIG_PMAC_PBOOK
-#include <asm/feature.h>
+#include <asm/machdep.h>
+#include <asm/pmac_feature.h>
 #include <asm/pci-bridge.h>
 #ifndef CONFIG_PM
 #define CONFIG_PM
@@ -2727,12 +2728,12 @@ ohci_pci_suspend (struct pci_dev *dev, u32 state)
 	pci_write_config_word (dev, PCI_COMMAND, cmd);
 #ifdef CONFIG_PMAC_PBOOK
 	{
-   	struct device_node	*of_node;
+		struct device_node	*of_node;
 
-	/* Disable USB PAD & cell clock */
-	of_node = pci_device_to_OF_node (ohci->ohci_dev);
-	if (of_node && _machine == _MACH_Pmac)
-		feature_set_usb_power (of_node, 0);
+		/* Disable USB PAD & cell clock */
+		of_node = pci_device_to_OF_node (ohci->ohci_dev);
+		if (of_node)
+			pmac_call_feature(PMAC_FTR_USB_ENABLE, of_node, 0, 0);
 	}
 #endif
 	return 0;
@@ -2757,12 +2758,12 @@ ohci_pci_resume (struct pci_dev *dev)
 
 #ifdef CONFIG_PMAC_PBOOK
 	{
-	struct device_node *of_node;
+		struct device_node *of_node;
 
-	/* Re-enable USB PAD & cell clock */
-	of_node = pci_device_to_OF_node (ohci->ohci_dev);
-	if (of_node && _machine == _MACH_Pmac)
-		feature_set_usb_power (of_node, 1);
+		/* Re-enable USB PAD & cell clock */
+		of_node = pci_device_to_OF_node (ohci->ohci_dev);
+		if (of_node)
+			pmac_call_feature(PMAC_FTR_USB_ENABLE, of_node, 0, 1);
 	}
 #endif
 
