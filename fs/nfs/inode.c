@@ -47,11 +47,8 @@
  *        their needs. People that do NFS over a slow network, might for
  *        instance want to reduce it to something closer to 1 for improved
  *        interactive response.
- *
- *        For the moment, though, we instead set it to RPC_MAXREQS, which
- *        is the maximum number of simultaneous RPC requests on the wire.
  */
-#define NFS_MAX_READAHEAD	RPC_MAXREQS
+#define NFS_MAX_READAHEAD	(RPC_DEF_SLOT_TABLE - 1)
 
 static void nfs_invalidate_inode(struct inode *);
 static int nfs_update_inode(struct inode *, struct nfs_fattr *, unsigned long);

@@ -338,8 +338,8 @@ xprt_adjust_cwnd(struct rpc_xprt *xprt, int result)
 		/* The (cwnd >> 1) term makes sure
 		 * the result gets rounded properly. */
 		cwnd += (RPC_CWNDSCALE * RPC_CWNDSCALE + (cwnd >> 1)) / cwnd;
-		if (cwnd > RPC_MAXCWND)
-			cwnd = RPC_MAXCWND;
+		if (cwnd > RPC_MAXCWND(xprt))
+			cwnd = RPC_MAXCWND(xprt);
 		__xprt_lock_write_next(xprt);
 	} else if (result == -ETIMEDOUT) {
 		cwnd >>= 1;
@@ -1304,10 +1304,9 @@ do_xprt_reserve(struct rpc_task *task)
 	task->tk_status = 0;
 	if (task->tk_rqstp)
 		return;
-	if (xprt->free) {
-		struct rpc_rqst	*req = xprt->free;
-		xprt->free = req->rq_next;
-		req->rq_next = NULL;
+	if (!list_empty(&xprt->free)) {
+		struct rpc_rqst	*req = list_entry(xprt->free.next, struct rpc_rqst, rq_list);
+		list_del_init(&req->rq_list);
 		task->tk_rqstp = req;
 		xprt_request_init(task, xprt);
 		return;
@@ -1343,7 +1342,6 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 	req->rq_task	= task;
 	req->rq_xprt    = xprt;
 	req->rq_xid     = xprt_alloc_xid(xprt);
-	INIT_LIST_HEAD(&req->rq_list);
 	dprintk("RPC: %4d reserved req %p xid %08x\n", task->tk_pid,
 			req, req->rq_xid);
 }
@@ -1374,9 +1372,7 @@ xprt_release(struct rpc_task *task)
 	dprintk("RPC: %4d release request %p\n", task->tk_pid, req);
 
 	spin_lock(&xprt->xprt_lock);
-	req->rq_next = xprt->free;
-	xprt->free   = req;
-
+	list_add(&req->rq_list, &xprt->free);
 	xprt_clear_backlog(xprt);
 	spin_unlock(&xprt->xprt_lock);
 }
@@ -1407,6 +1403,9 @@ xprt_set_timeout(struct rpc_timeout *to, unsigned int retr, unsigned long incr)
 	to->to_exponential = 0;
 }
 
+unsigned int xprt_udp_slot_table_entries = RPC_DEF_SLOT_TABLE;
+unsigned int xprt_tcp_slot_table_entries = RPC_DEF_SLOT_TABLE;
+
 /*
  * Initialize an RPC client
  */
@@ -1414,21 +1413,33 @@ static struct rpc_xprt *
 xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 {
 	struct rpc_xprt	*xprt;
+	unsigned int entries;
+	size_t slot_table_size;
 	struct rpc_rqst	*req;
-	int		i;
 
 	dprintk("RPC:      setting up %s transport...\n",
 				proto == IPPROTO_UDP? "UDP" : "TCP");
 
+	entries = (proto == IPPROTO_TCP)?
+		xprt_tcp_slot_table_entries : xprt_udp_slot_table_entries;
+
 	if ((xprt = kmalloc(sizeof(struct rpc_xprt), GFP_KERNEL)) == NULL)
 		return ERR_PTR(-ENOMEM);
 	memset(xprt, 0, sizeof(*xprt)); /* Nnnngh! */
+	xprt->max_reqs = entries;
+	slot_table_size = entries * sizeof(xprt->slot[0]);
+	xprt->slot = kmalloc(slot_table_size, GFP_KERNEL);
+	if (xprt->slot == NULL) {
+		kfree(xprt);
+		return ERR_PTR(-ENOMEM);
+	}
+	memset(xprt->slot, 0, slot_table_size);
 
 	xprt->addr = *ap;
 	xprt->prot = proto;
 	xprt->stream = (proto == IPPROTO_TCP)? 1 : 0;
 	if (xprt->stream) {
-		xprt->cwnd = RPC_MAXCWND;
+		xprt->cwnd = RPC_MAXCWND(xprt);
 		xprt->nocong = 1;
 	} else
 		xprt->cwnd = RPC_INITCWND;
@@ -1436,6 +1447,7 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 	spin_lock_init(&xprt->xprt_lock);
 	init_waitqueue_head(&xprt->cong_wait);
 
+	INIT_LIST_HEAD(&xprt->free);
 	INIT_LIST_HEAD(&xprt->recv);
 	INIT_WORK(&xprt->sock_connect, xprt_socket_connect, xprt);
 	INIT_WORK(&xprt->task_cleanup, xprt_socket_autoclose, xprt);
@@ -1458,17 +1470,16 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 	INIT_RPC_WAITQ(&xprt->backlog, "xprt_backlog");
 
 	/* initialize free list */
-	for (i = 0, req = xprt->slot; i < RPC_MAXREQS-1; i++, req++)
-		req->rq_next = req + 1;
-	req->rq_next = NULL;
-	xprt->free = xprt->slot;
+	for (req = &xprt->slot[entries-1]; req >= &xprt->slot[0]; req--)
+		list_add(&req->rq_list, &xprt->free);
 
 	xprt_init_xid(xprt);
 
 	/* Check whether we want to use a reserved port */
 	xprt->resvport = capable(CAP_NET_BIND_SERVICE) ? 1 : 0;
 
-	dprintk("RPC:      created transport %p\n", xprt);
+	dprintk("RPC:      created transport %p with %u slots\n", xprt,
+			xprt->max_reqs);
 	
 	return xprt;
 }
@@ -1547,11 +1558,11 @@ xprt_sock_setbufsize(struct rpc_xprt *xprt)
 		return;
 	if (xprt->rcvsize) {
 		sk->sk_userlocks |= SOCK_RCVBUF_LOCK;
-		sk->sk_rcvbuf = xprt->rcvsize * RPC_MAXCONG * 2;
+		sk->sk_rcvbuf = xprt->rcvsize * xprt->max_reqs *  2;
 	}
 	if (xprt->sndsize) {
 		sk->sk_userlocks |= SOCK_SNDBUF_LOCK;
-		sk->sk_sndbuf = xprt->sndsize * RPC_MAXCONG * 2;
+		sk->sk_sndbuf = xprt->sndsize * xprt->max_reqs * 2;
 		sk->sk_write_space(sk);
 	}
 }
@@ -1640,6 +1651,7 @@ xprt_destroy(struct rpc_xprt *xprt)
 	dprintk("RPC:      destroying transport %p\n", xprt);
 	xprt_shutdown(xprt);
 	xprt_close(xprt);
+	kfree(xprt->slot);
 	kfree(xprt);
 
 	return 0;
