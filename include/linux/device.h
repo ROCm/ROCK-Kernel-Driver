@@ -163,6 +163,8 @@ extern void driver_remove_file(struct device_driver *, struct driver_attribute *
  */
 struct device_class {
 	char			* name;
+	struct rw_semaphore	rwsem;
+
 	atomic_t		refcount;
 	u32			present;
 
