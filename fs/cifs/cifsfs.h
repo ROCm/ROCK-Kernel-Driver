@@ -60,8 +60,6 @@ extern int cifs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int cifs_setattr(struct dentry *, struct iattr *);
 
 extern struct inode_operations cifs_file_inode_ops;
-extern void cifs_truncate_file(struct inode *);
-
 extern struct inode_operations cifs_symlink_inode_ops;
 
 /* Functions related to files and directories */

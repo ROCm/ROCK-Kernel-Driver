@@ -410,18 +410,20 @@ cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
 	else if(file->f_dentry->d_inode == NULL)
 		return -EIO;
 
+	cFYI(1,("In read_wrapper size %d at %d",read_size,*poffset));
 	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead) {
 		return generic_file_read(file,read_data,read_size,poffset);
 	} else {
 		/* BB do we need to lock inode from here until after invalidate? */
-		if(file->f_dentry->d_inode->i_mapping) {
+/*		if(file->f_dentry->d_inode->i_mapping) {
 			filemap_fdatawrite(file->f_dentry->d_inode->i_mapping);
 			filemap_fdatawait(file->f_dentry->d_inode->i_mapping);
-		}
-		/* force read from the server since we do not have oplock */
-		/* BB we should relax this and do it on a timer and call cifs_revalidate */
-		/* BB we should make timer configurable */
-		invalidate_remote_inode(file->f_dentry->d_inode);
+		}*/
+/*		cifs_revalidate(file->f_dentry);*/ /* BB fixme */
+
+		/* BB we should make timer configurable - perhaps 
+		   by simply calling cifs_revalidate here */
+		/* invalidate_remote_inode(file->f_dentry->d_inode);*/
 		return generic_file_read(file,read_data,read_size,poffset);
 	}
 }
@@ -438,6 +440,8 @@ cifs_write_wrapper(struct file * file, const char *write_data,
 		return -EIO;
 	else if(file->f_dentry->d_inode == NULL)
 		return -EIO;
+
+	cFYI(1,("In write_wrapper size %d at %d",write_size,*poffset));
 
 	/* check whether we can cache writes locally */
 	written = generic_file_write(file,write_data,write_size,poffset);
@@ -632,12 +636,14 @@ static int cifs_oplock_thread(void * dummyarg)
 				netfid = oplock_item->netfid;
 				spin_unlock(&GlobalMid_Lock);
 				DeleteOplockQEntry(oplock_item);
+				down(&inode->i_sem);
 				if (S_ISREG(inode->i_mode)) {
 					rc = filemap_fdatawrite(inode->i_mapping);
 					if(CIFS_I(inode)->clientCanCacheRead == 0)
 						invalidate_remote_inode(inode);
 				} else
 					rc = 0;
+				up(&inode->i_sem);
 				if (rc)
 					CIFS_I(inode)->write_behind_rc = rc;
 				cFYI(1,("Oplock flush inode %p rc %d",inode,rc));

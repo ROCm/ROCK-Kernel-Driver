@@ -1103,10 +1103,10 @@ typedef struct smb_com_transaction2_spi_rsp {
 } TRANSACTION2_SPI_RSP;
 
 struct set_file_rename {
-        __u32 overwrite;   /* 1 = overwrite dest */
-        __u32 root_fid;   /* zero */
+	__u32 overwrite;   /* 1 = overwrite dest */
+	__u32 root_fid;   /* zero */
 	__u32 target_name_len;
-        char  target_name[0];  /* Must be unicode */
+	char  target_name[0];  /* Must be unicode */
 };
 
 struct smb_com_transaction2_sfi_req {

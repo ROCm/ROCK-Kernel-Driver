@@ -711,10 +711,10 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 	struct cifs_sb_info *cifs_sb;
 
 	xid = GetXid();
-
+	cFYI(1,("commit write for page %p up to position %ld or 0x%lx for %d or 0x%x bytes",page,position,position,to,to));
 	if (position > inode->i_size){
 		i_size_write(inode, position);
-		if (file->private_data == NULL) {
+		/*if (file->private_data == NULL) {
 			rc = -EBADF;
 		} else {
 			open_file = (struct cifsFileInfo *)file->private_data;
@@ -727,21 +727,17 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 					if(rc != 0)
 						break;
 				}
-                if(!open_file->closePend) {
-			rc = CIFSSMBSetFileSize(xid, cifs_sb->tcon, 
-					position, open_file->netfid,
-					open_file->pid,FALSE);
-			/* need to zero out the rest of the page */
-			if(to < PAGE_CACHE_SIZE)
-				memset(page+to,0,PAGE_CACHE_SIZE-to);
-		
-		} else {
-                    rc = -EBADF;
-                    break;
-                }
+				if(!open_file->closePend) {
+					rc = CIFSSMBSetFileSize(xid, cifs_sb->tcon, 
+						position, open_file->netfid,
+						open_file->pid,FALSE);
+				} else {
+					rc = -EBADF;
+					break;
+				}
 			}
 			cFYI(1,(" SetEOF (commit write) rc = %d",rc));
-		}
+		}*/
 	}
 	set_page_dirty(page);
 
@@ -768,7 +764,7 @@ cifs_fsync(struct file *file, struct dentry *dentry, int datasync)
 	return rc;
 }
 
-static int
+/* static int
 cifs_sync_page(struct page *page)
 {
 	struct address_space *mapping;
@@ -783,17 +779,17 @@ cifs_sync_page(struct page *page)
 		return 0;
 	inode = mapping->host;
 	if (!inode)
-		return 0;
+		return 0;*/
 
 /*	fill in rpages then 
     result = cifs_pagein_inode(inode, index, rpages); *//* BB finish */
 
-	cFYI(1, ("rpages is %d for sync page of Index %ld ", rpages, index));
+/*   cFYI(1, ("rpages is %d for sync page of Index %ld ", rpages, index));
 
 	if (rc < 0)
 		return rc;
 	return 0;
-}
+} */
 
 /*
  * As file closes, flush all cached write data for this inode checking
@@ -908,11 +904,9 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 		if(list_empty(pages))
 			break;
 
-		spin_lock(&mapping->page_lock);
 		page = list_entry(pages->prev, struct page, list);
-
+/*cERROR(1,("copy_cache_pages page %p index %ld data %p",page,page->index,data));*/ /* BB removeme */
 		list_del(&page->list);
-		spin_unlock(&mapping->page_lock);
 
 		if (add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
 			page_cache_release(page);
@@ -925,19 +919,21 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 
 		if(PAGE_CACHE_SIZE > bytes_read) {
 			memcpy(target,data,bytes_read);
+			/* zero the tail end of this partial page */
+			memset(target+bytes_read,0,PAGE_CACHE_SIZE-bytes_read);
 			bytes_read = 0;
 		} else {
 			memcpy(target,data,PAGE_CACHE_SIZE);
 			bytes_read -= PAGE_CACHE_SIZE;
 		}
+		kunmap_atomic(target,KM_USER0);
 
 		if (!pagevec_add(plru_pvec, page))
 			__pagevec_lru_add(plru_pvec);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
-		kunmap_atomic(target,KM_USER0);
-		unlock_page(page);
-		page_cache_release(page);
+		unlock_page(page);   /* BB verify we need to unlock here */
+	   /* page_cache_release(page);*/
 		data += PAGE_CACHE_SIZE;
 	}
 	return;
@@ -973,21 +969,40 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	pagevec_init(&lru_pvec, 0);
 
 	for(i = 0;i<num_pages;) {
-		spin_lock(&mapping->page_lock);
+		int contig_pages;
+		struct page * tmp_page;
+		unsigned long expected_index;
+
 		if(list_empty(page_list)) {
-			spin_unlock(&mapping->page_lock);
 			break;
 		}
 		page = list_entry(page_list->prev, struct page, list);
 		offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
-	        spin_unlock(&mapping->page_lock);
+
+		/* count adjacent pages that we will read into */
+		contig_pages = 0;
+		expected_index = list_entry(page_list->prev,struct page,list)->index;
+		list_for_each_entry_reverse(tmp_page,page_list,list) {
+			if(tmp_page->index == expected_index) {
+				contig_pages++;
+				expected_index++;
+			} else {
+				break; 
+			}
+		}
+/*		cERROR(1,("ended with contig_pages %d since expected_index %d not matched",contig_pages,expected_index)); */
+		if(contig_pages >  num_pages - i) {
+/*			cERROR(1,("reducing contig_pages from %d with i: %d",contig_pages,i));*/
+			contig_pages = num_pages - i;
+		}
 
 		/* for reads over a certain size could initiate async read ahead */
 
-		cFYI(0,("Read %d pages into cache at offset %ld ",
-			num_pages-i, (unsigned long) offset)); 
-		
-		read_size = (num_pages - i) * PAGE_CACHE_SIZE;
+/*		cERROR(1,("Read %d pages out of %d into cache at offset %ld ",
+			contig_pages, num_pages-i, (unsigned long) offset));*/  /* BB removeme BB */
+	
+			
+		read_size = contig_pages * PAGE_CACHE_SIZE;
 		/* Read size needs to be in multiples of one page */
 		read_size = min_t(const unsigned int,read_size,cifs_sb->rsize & PAGE_CACHE_MASK);
 
@@ -1003,35 +1018,50 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 				open_file->netfid,
 				read_size, offset,
 				&bytes_read, &smb_read_data);
+			/* BB need to check return code here */
+/*			cERROR(1,("read size: %d bytes read: %d rc: %d",read_size,bytes_read,rc)); */ /* BB removeme BB */
 		}
 		if ((rc < 0) || (smb_read_data == NULL)) {
-			cFYI(1,("Read error in readpages: %d",rc));
+			cERROR(1,("Read error in readpages: %d",rc)); 
 			/* clean up remaing pages off list */            
-			spin_lock(&mapping->page_lock);
 			while (!list_empty(page_list) && (i < num_pages)) {
 				page = list_entry(page_list->prev, struct page, list);
 				list_del(&page->list);
+				page_cache_release(page);
 			}
-			spin_unlock(&mapping->page_lock);
 			break;
 		} else if (bytes_read > 0) {
 			pSMBr = (struct smb_com_read_rsp *)smb_read_data;
 			cifs_copy_cache_pages(mapping, page_list, bytes_read,
 				smb_read_data + 4 /* RFC1000 hdr */ +
 				le16_to_cpu(pSMBr->DataOffset), &lru_pvec);
+
 			i +=  bytes_read >> PAGE_CACHE_SHIFT;
+
 			if((bytes_read & PAGE_CACHE_MASK) != bytes_read) {
 				cFYI(1,("Partial page %d of %d read to cache",i++,num_pages));
-				break;
+
+				i++; /* account for partial page */
+
+				/* server copy of file can have smaller size than client */
+				/* BB do we need to verify this common case ? this case is ok - 
+				if we are at server EOF we will hit it on next read */
+
+			/* while(!list_empty(page_list) && (i < num_pages)) {
+					page = list_entry(page_list->prev,struct page, list);
+					list_del(&page->list);
+					page_cache_release(page);
+				}
+				break; */
 			}
 		} else {
-			cFYI(1,("No bytes read cleaning remaining pages off readahead list"));
+			cFYI(1,("No bytes read (%d) at offset %d . Cleaning remaining pages from readahead list",bytes_read,offset)); 
 			/* BB turn off caching and do new lookup on file size at server? */
 			while (!list_empty(page_list) && (i < num_pages)) {
 				page = list_entry(page_list->prev, struct page, list);
 				list_del(&page->list);
+				page_cache_release(page); /* BB removeme - replace with zero of page? */
 			}
-
 			break;
 		}
 		if(smb_read_data) {
@@ -1042,6 +1072,12 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	}
 
 	pagevec_lru_add(&lru_pvec);
+
+/* need to free smb_read_data buf before exit */
+if(smb_read_data) {
+	cifs_buf_release(smb_read_data);
+	smb_read_data = 0;
+} 
 
 	FreeXid(xid);
 	return rc;
@@ -1811,13 +1847,31 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 
 	return rc;
 }
+int cifs_prepare_write(struct file *file, struct page *page,
+			unsigned from, unsigned to)
+{
+	cFYI(1,("prepare write for page %p from %d to %d",page,from,to));
+	if (!PageUptodate(page)) {
+		if (to - from != PAGE_CACHE_SIZE) {
+			void *kaddr = kmap_atomic(page, KM_USER0);
+			memset(kaddr, 0, from);
+			memset(kaddr + to, 0, PAGE_CACHE_SIZE - to);
+			flush_dcache_page(page);
+			kunmap_atomic(kaddr, KM_USER0);
+		}
+		SetPageUptodate(page);
+	}
+	return 0;
+}
+
 
 struct address_space_operations cifs_addr_ops = {
 	.readpage = cifs_readpage,
 	.readpages = cifs_readpages,
 	.writepage = cifs_writepage,
-	.prepare_write = simple_prepare_write,
+	.prepare_write = simple_prepare_write, /* BB fixme BB */
+/*	.prepare_write = cifs_prepare_write, */  /* BB removeme BB */
 	.commit_write = cifs_commit_write,
-	.sync_page = cifs_sync_page,
+   /* .sync_page = cifs_sync_page, */
 	/*.direct_IO = */
 };
