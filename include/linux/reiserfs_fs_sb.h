@@ -160,7 +160,10 @@ struct reiserfs_transaction_handle {
   int t_blocks_allocated ;      /* number of blocks this writer allocated */
   unsigned long t_trans_id ;    /* sanity check, equals the current trans id */
   struct super_block *t_super ; /* super for this FS when journal_begin was 
-                                   called. */
+                                   called. saves calls to reiserfs_get_super */
+  int displace_new_blocks:1;	/* if new block allocation occurres, that block
+				   should be displaced from others */
+
 } ;
 
 /*
@@ -254,6 +257,14 @@ struct reiserfs_journal {
 
 typedef __u32 (*hashf_t) (const signed char *, int);
 
+struct reiserfs_bitmap_info
+{
+    // FIXME: Won't work with block sizes > 8K
+    __u16  first_zero_hint;
+    __u16  free_count;
+    struct buffer_head *bh; /* the actual bitmap */
+};
+
 struct proc_dir_entry;
 
 #if defined( CONFIG_PROC_FS ) && defined( CONFIG_REISERFS_PROC_INFO )
@@ -269,6 +280,12 @@ typedef struct reiserfs_proc_info_data
   stat_cnt_t search_by_key;
   stat_cnt_t search_by_key_fs_changed;
   stat_cnt_t search_by_key_restarted;
+
+  stat_cnt_t insert_item_restarted;
+  stat_cnt_t paste_into_item_restarted;
+  stat_cnt_t cut_from_item_restarted;
+  stat_cnt_t delete_solid_item_restarted;
+  stat_cnt_t delete_item_restarted;
 
   stat_cnt_t leaked_oid;
   stat_cnt_t leaves_removable;
@@ -292,14 +309,15 @@ typedef struct reiserfs_proc_info_data
   stat_cnt_t need_r_neighbor[ 5 ];
 
   stat_cnt_t free_block;
-  struct __find_forward_stats {
+  struct __scan_bitmap_stats {
 	stat_cnt_t call;
 	stat_cnt_t wait;
 	stat_cnt_t bmap;
 	stat_cnt_t retry;
 	stat_cnt_t in_journal_hint;
-	stat_cnt_t in_journal_out;
-  } find_forward;
+	stat_cnt_t in_journal_nohint;
+	stat_cnt_t stolen;
+  } scan_bitmap;
   struct __journal_stats {
 	stat_cnt_t in_journal;
 	stat_cnt_t in_journal_bitmap;
@@ -329,7 +347,7 @@ struct reiserfs_sb_info
 				/* both the comment and the choice of
                                    name are unclear for s_rs -Hans */
     struct reiserfs_super_block * s_rs;           /* Pointer to the super block in the buffer */
-    struct buffer_head ** s_ap_bitmap;       /* array of buffers, holding block bitmap */
+    struct reiserfs_bitmap_info * s_ap_bitmap;
     struct reiserfs_journal *s_journal ;		/* pointer to journal information */
     unsigned short s_mount_state;                 /* reiserfs state (valid, invalid) */
   
@@ -341,6 +359,16 @@ struct reiserfs_sb_info
     unsigned long s_mount_opt;	/* reiserfs's mount options are set
                                    here (currently - NOTAIL, NOLOG,
                                    REPLAYONLY) */
+
+    struct {			/* This is a structure that describes block allocator options */
+	unsigned long bits;	/* Bitfield for enable/disable kind of options */
+	unsigned long large_file_size; /* size started from which we consider file to be a large one(in blocks) */
+	int border;		/* percentage of disk, border takes */
+	int preallocmin;	/* Minimal file size (in blocks) starting from which we do preallocations */
+	int preallocsize;	/* Number of blocks we try to prealloc when file
+				   reaches preallocmin size (in blocks) or
+				   prealloc_list is empty. */
+    } s_alloc_options;
 
 				/* Comment? -Hans */
     wait_queue_head_t s_wait;
@@ -368,6 +396,7 @@ struct reiserfs_sb_info
     int s_is_unlinked_ok;
     reiserfs_proc_info_data_t s_proc_info_data;
     struct proc_dir_entry *procdir;
+    int reserved_blocks; /* amount of blocks reserved for further allocations */
 };
 
 /* Definitions of reiserfs on-disk properties: */
@@ -375,7 +404,8 @@ struct reiserfs_sb_info
 #define REISERFS_3_6 1
 
 /* Mount options */
-#define NOTAIL 0  /* -o notail: no tails will be created in a session */
+#define REISERFS_LARGETAIL 0  /* large tails will be created in a session */
+#define REISERFS_SMALLTAIL 17  /* small (for files less than block size) tails will be created in a session */
 #define REPLAYONLY 3 /* replay journal and return 0. Use by fsck */
 #define REISERFS_NOLOG 4      /* -o nolog: turn journalling off */
 #define REISERFS_CONVERT 5    /* -o conv: causes conversion of old
@@ -423,7 +453,8 @@ struct reiserfs_sb_info
 #define reiserfs_hashed_relocation(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_HASHED_RELOCATION))
 #define reiserfs_test4(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_TEST4))
 
-#define dont_have_tails(s) (REISERFS_SB(s)->s_mount_opt & (1 << NOTAIL))
+#define have_large_tails(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_LARGETAIL))
+#define have_small_tails(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_SMALLTAIL))
 #define replay_only(s) (REISERFS_SB(s)->s_mount_opt & (1 << REPLAYONLY))
 #define reiserfs_dont_log(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_NOLOG))
 #define old_format_only(s) (REISERFS_SB(s)->s_properties & (1 << REISERFS_3_5))

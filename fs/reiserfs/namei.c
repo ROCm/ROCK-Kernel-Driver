@@ -661,6 +661,10 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
 
+#ifdef DISPLACE_NEW_PACKING_LOCALITIES
+    /* set flag that new packing locality created and new blocks for the content     * of that directory are not displaced yet */
+    REISERFS_I(dir)->new_packing_locality = 1;
+#endif
     mode = S_IFDIR | mode;
     if (!(inode = new_inode(dir->i_sb))) {
 	return -ENOMEM ;
