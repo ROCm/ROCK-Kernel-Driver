@@ -1998,11 +1998,16 @@ xfs_qm_init_quotainos(
 	int		error;
 	__int64_t	sbflags;
 	uint		flags;
+	int		readonly;
+	vfs_t		*vfsp;
 
 	ASSERT(mp->m_quotainfo);
 	uip = gip = NULL;
+	error = 0;
 	sbflags = 0;
 	flags = 0;
+	vfsp = XFS_MTOVFS(mp);
+	readonly = vfsp->vfs_flag & VFS_RDONLY;
 
 	/*
 	 * Get the uquota and gquota inodes
@@ -2034,38 +2039,44 @@ xfs_qm_init_quotainos(
 	/*
 	 * Create the two inodes, if they don't exist already. The changes
 	 * made above will get added to a transaction and logged in one of
-	 * the qino_alloc calls below.
+	 * the qino_alloc calls below.  If the device is readonly,
+	 * temporarily switch to read-write to do this.
 	 */
+
+	if (readonly &&
+	    ((XFS_IS_UQUOTA_ON(mp) && uip == NULL) || 
+	     (XFS_IS_GQUOTA_ON(mp) && gip == NULL))) {
+		if ((error = xfs_quotaino_create_read_only(mp)))
+			goto error;
+	}
+
 	if (XFS_IS_UQUOTA_ON(mp) && uip == NULL) {
-		if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY)
-			return XFS_ERROR(EROFS);
 		if ((error = xfs_qm_qino_alloc(mp, &uip,
 					      sbflags | XFS_SB_UQUOTINO,
 					      flags | XFS_QMOPT_UQUOTA)))
-			return XFS_ERROR(error);
+			goto error;
 
 		flags &= ~XFS_QMOPT_SBVERSION;
 	}
 	if (XFS_IS_GQUOTA_ON(mp) && gip == NULL) {
-		if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY) {
-			if (uip)
-				VN_RELE(XFS_ITOV(uip));
-			return XFS_ERROR(EROFS);
-		}
 		if ((error = xfs_qm_qino_alloc(mp, &gip,
 					      sbflags | XFS_SB_GQUOTINO,
 					      flags | XFS_QMOPT_GQUOTA))) {
 			if (uip)
 				VN_RELE(XFS_ITOV(uip));
 
-			return XFS_ERROR(error);
+			goto error;
 		}
 	}
 
 	XFS_QI_UQIP(mp) = uip;
 	XFS_QI_GQIP(mp) = gip;
 
-	return (0);
+error:
+	if (readonly)
+		vfsp->vfs_flag |= VFS_RDONLY;
+
+	return XFS_ERROR(error);
 }
 
 

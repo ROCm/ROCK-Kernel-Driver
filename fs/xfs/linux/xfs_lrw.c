@@ -1863,3 +1863,12 @@ xfs_quotacheck_read_only(xfs_mount_t *mp)
 		"quotacheck required on readonly filesystem.");
 	return xfs_is_read_only(mp);
 }
+
+int
+xfs_quotaino_create_read_only(xfs_mount_t *mp)
+{
+        cmn_err(CE_NOTE, "XFS: WARNING: "
+                "Quota inode creation required on readonly filesystem.");
+        return xfs_is_read_only(mp);
+}
+
