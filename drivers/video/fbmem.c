@@ -860,17 +860,19 @@ fb_blank(struct fb_info *info, int blank)
 	
 	if (info->fbops->fb_blank && !info->fbops->fb_blank(blank, info))
 		return 0;
+
+	cmap = info->cmap;
+
 	if (blank) { 
 		black = kmalloc(sizeof(u16) * info->cmap.len, GFP_KERNEL);
-		if (!black) {
+		if (black) {
 			memset(black, 0, info->cmap.len * sizeof(u16));
 			cmap.red = cmap.green = cmap.blue = black;
 			cmap.transp = info->cmap.transp ? black : NULL;
 			cmap.start = info->cmap.start;
 			cmap.len = info->cmap.len;
 		}
-	} else
-		cmap = info->cmap;
+	}
 
 	err = fb_set_cmap(&cmap, info);
 	kfree(black);
