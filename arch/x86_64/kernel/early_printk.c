@@ -10,7 +10,7 @@
 #ifdef __i386__
 #define VGABASE		(__ISA_IO_base + 0xb8000)
 #else
-#define VGABASE		((void *)0xffffffff800b8000UL)
+#define VGABASE		((void __iomem *)0xffffffff800b8000UL)
 #endif
 
 #define MAX_YPOS	25

@@ -4,9 +4,5 @@
 
 # Object file lists.
 
-obj-y			:= dma.o irq.o oldlatches.o \
-			   small_page.o
+obj-y			:= dma.o irq.o latches.o
 
-extra-y 		:= head.o
-
-AFLAGS_head.o		:= -DTEXTADDR=$(TEXTADDR)

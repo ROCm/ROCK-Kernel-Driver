@@ -90,6 +90,7 @@ do {                                                            \
 #define IOEB_PSCLR		(IOEB_BASE + 0x58)
 #define IOEB_MONTYPE		(IOEB_BASE + 0x70)
 
+//FIXME - These adresses are weird - ISTR some weirdo address shifting stuff was going on here...
 #define IO_EC_IOC_BASE		0x80090000
 #define IO_EC_MEMC_BASE		0x80000000
 

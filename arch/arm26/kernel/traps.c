@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/traps.c
+ *  linux/arch/arm26/kernel/traps.c
  *
  *  Copyright (C) 1995-2002 Russell King
  *  Fragments that appear the same as linux/arch/i386/kernel/traps.c (C) Linus Torvalds
@@ -10,9 +10,11 @@
  * published by the Free Software Foundation.
  *
  *  'traps.c' handles hardware exceptions after we have saved some state in
- *  'linux/arch/arm/lib/traps.S'.  Mostly a debugging aid, but will probably
+ *  'linux/arch/arm26/lib/traps.S'.  Mostly a debugging aid, but will probably
  *  kill the offending process.
  */
+
+#include <linux/module.h>
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -28,7 +30,6 @@
 
 #include <asm/atomic.h>
 #include <asm/io.h>
-#include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -134,14 +135,14 @@ static void dump_instr(struct pt_regs *regs)
 	dump_mem("Stack: ", sp, 8192+(unsigned long)tsk->thread_info);
 }
 
-EXPORT_SYMBOL(dump_stack);
-
 void dump_stack(void)
 {
 #ifdef CONFIG_DEBUG_ERRORS
         __backtrace();
 #endif
 }
+
+EXPORT_SYMBOL(dump_stack);
 
 //FIXME - was a static fn
 void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
@@ -425,7 +426,6 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		return 0;
 
 	case NR(usr26):
-	case NR(usr32):
 		break;
 
 	default:

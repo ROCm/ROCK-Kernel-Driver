@@ -1119,7 +1119,7 @@ static inline int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 		return 0;
 
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
-		if (skb_shinfo(skb)->frags[i].page >= highmem_start_page)
+		if (PageHighMem(skb_shinfo(skb)->frags[i].page))
 			return 1;
 
 	return 0;

@@ -274,6 +274,8 @@ extern int diag210(struct diag210 *addr);
 
 extern void wait_cons_dev(void);
 
+extern void clear_all_subchannels(void);
+
 #endif
 
 #endif

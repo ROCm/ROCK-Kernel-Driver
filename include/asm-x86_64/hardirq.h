@@ -21,7 +21,6 @@
  */
 static inline void ack_bad_irq(unsigned int irq)
 {
-#ifdef CONFIG_X86
 	printk("unexpected IRQ trap at vector %02x\n", irq);
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
@@ -33,7 +32,6 @@ static inline void ack_bad_irq(unsigned int irq)
 	 * completely.
 	 */
 	ack_APIC_irq();
-#endif
 #endif
 }
 #endif /* __ASM_HARDIRQ_H */

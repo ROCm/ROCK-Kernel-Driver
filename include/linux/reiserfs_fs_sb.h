@@ -410,6 +410,10 @@ struct reiserfs_sb_info
     struct rw_semaphore xattr_dir_sem;
 
     int j_errno;
+#ifdef CONFIG_QUOTA
+    char *s_qf_names[MAXQUOTAS];
+    int s_jquota_fmt;
+#endif
 };
 
 /* Definitions of reiserfs on-disk properties: */

@@ -25,5 +25,6 @@
 
 void global_flush_tlb(void); 
 int change_page_attr(struct page *page, int numpages, pgprot_t prot);
+int change_page_attr_addr(unsigned long addr, int numpages, pgprot_t prot);
 
 #endif /* _X8664_CACHEFLUSH_H */

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/io-acorn.S
+ *  linux/arch/arm26/lib/io-acorn.S
  *
  *  Copyright (C) 1995, 1996 Russell King
  *

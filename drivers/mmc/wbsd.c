@@ -205,8 +205,6 @@ static void wbsd_request_end(struct wbsd_host* host, struct mmc_request* mrq)
 
 static inline void wbsd_init_sg(struct wbsd_host* host, struct mmc_data* data)
 {
-	struct request* req = data->req;
-	
 	/*
 	 * Get info. about SG list from data structure.
 	 */

@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.40 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.48 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -20,7 +20,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_SYS_C = "$Revision: 1.40 $";
+const char *VERSION_QETH_SYS_C = "$Revision: 1.48 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -75,8 +75,7 @@ qeth_dev_if_name_show(struct device *dev, char *buf)
 	struct qeth_card *card = dev->driver_data;
 	if (!card)
 		return -EINVAL;
-
-	return sprintf(buf, "%s\n", card->info.if_name);
+	return sprintf(buf, "%s\n", QETH_CARD_IFNAME(card));
 }
 
 static DEVICE_ATTR(if_name, 0444, qeth_dev_if_name_show, NULL);
@@ -440,7 +439,7 @@ qeth_dev_route6_store(struct device *dev, const char *buf, size_t count)
 	if (!qeth_is_supported(card, IPA_IPV6)){
 		PRINT_WARN("IPv6 not supported for interface %s.\n"
 			   "Routing status no changed.\n",
-			   card->info.if_name);
+			   QETH_CARD_IFNAME(card));
 		return -ENOTSUPP;
 	}
 
@@ -515,8 +514,15 @@ qeth_dev_fake_ll_store(struct device *dev, const char *buf, size_t count)
 		return -EPERM;
 
 	i = simple_strtoul(buf, &tmp, 16);
-	if ((i == 0) || (i == 1))
+	if ((i == 0) || (i == 1)) {
 		card->options.fake_ll = i;
+		if (card->dev) {
+			if (i)
+  				card->dev->hard_header = qeth_fake_header;
+			else
+				card->dev->hard_header = NULL;
+		}
+	}
 	else {
 		PRINT_WARN("fake_ll: write 0 or 1 to this file!\n");
 		return -EINVAL;
@@ -715,8 +721,9 @@ qeth_dev_layer2_store(struct device *dev, const char *buf, size_t count)
 	if (!card)
 		return -EINVAL;
 
-	if ((card->state != CARD_STATE_DOWN) &&
-	    (card->state != CARD_STATE_RECOVER))
+	if (((card->state != CARD_STATE_DOWN) &&
+	     (card->state != CARD_STATE_RECOVER)) ||
+	    (card->info.type != QETH_CARD_TYPE_OSAE))
 		return -EPERM;
 
 	i = simple_strtoul(buf, &tmp, 16);

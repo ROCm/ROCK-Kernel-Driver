@@ -545,7 +545,8 @@ out_unlock:
 /*
  * save segment content permanently
  */
-void segment_save(char *name)
+void
+segment_save(char *name)
 {
 	struct dcss_segment *seg;
 	int startpfn = 0;

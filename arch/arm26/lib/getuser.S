@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/getuser.S
+ *  linux/arch/arm26/lib/getuser.S
  *
  *  Copyright (C) 2001 Russell King
  *
@@ -28,6 +28,7 @@
  */
 #include <asm/asm_offsets.h>
 #include <asm/thread_info.h>
+#include <asm/errno.h>
 
         .global __get_user_1
 __get_user_1:
@@ -98,7 +99,7 @@ __get_user_bad_8:
         mov     r2, #0
 __get_user_bad:
         mov     r1, #0
-        mov     r0, #-14
+        mov     r0, #-EFAULT
         ldmfd   sp!, {pc}^
 
 .section __ex_table, "a"

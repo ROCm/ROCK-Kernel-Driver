@@ -54,6 +54,8 @@
 #include "mem.h"
 #include "mem_kern.h"
 
+#define DRIVER_NAME "uml-blkdev"
+
 static spinlock_t ubd_io_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t ubd_lock = SPIN_LOCK_UNLOCKED;
 
@@ -117,6 +119,7 @@ struct ubd {
 	struct openflags openflags;
 	int no_cow;
 	struct cow cow;
+	struct platform_device pdev;
 
 	int map_writes;
 	int map_reads;
@@ -585,6 +588,14 @@ static int ubd_new_disk(int major, u64 size, int unit,
 		sprintf(disk->devfs_name, "ubd_fake/disc%d", unit);
 	}
 
+	/* sysfs register (not for ide fake devices) */
+	if (major == MAJOR_NR) {
+		ubd_dev[unit].pdev.id   = unit;
+		ubd_dev[unit].pdev.name = DRIVER_NAME;
+		platform_device_register(&ubd_dev[unit].pdev);
+		disk->driverfs_dev = &ubd_dev[unit].pdev.dev;
+	}
+
 	disk->private_data = &ubd_dev[unit];
 	disk->queue = ubd_queue;
 	add_disk(disk);
@@ -718,6 +729,7 @@ static int ubd_remove(char *str)
 		fake_gendisk[n] = NULL;
 	}
 
+	platform_device_unregister(&dev->pdev);
 	*dev = ((struct ubd) DEFAULT_UBD);
 	err = 0;
  out:
@@ -739,6 +751,11 @@ static int ubd_mc_init(void)
 }
 
 __initcall(ubd_mc_init);
+
+static struct device_driver ubd_driver = {
+	.name  = DRIVER_NAME,
+	.bus   = &platform_bus_type,
+};
 
 int ubd_init(void)
 {
@@ -762,6 +779,7 @@ int ubd_init(void)
 		if (register_blkdev(fake_major, "ubd"))
 			return -1;
 	}
+	driver_register(&ubd_driver);
 	for (i = 0; i < MAX_DEV; i++) 
 		ubd_add(i);
 	return 0;

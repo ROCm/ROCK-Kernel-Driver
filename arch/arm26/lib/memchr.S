@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/memchr.S
+ *  linux/arch/arm26/lib/memchr.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *

@@ -56,7 +56,7 @@ extern void kunmap_high(struct page *page);
 static inline void *kmap(struct page *page)
 {
 	might_sleep();
-	if (page < highmem_start_page)
+	if (!PageHighMem(page))
 		return page_address(page);
 	return kmap_high(page);
 }
@@ -64,7 +64,7 @@ static inline void *kmap(struct page *page)
 static inline void kunmap(struct page *page)
 {
 	BUG_ON(in_interrupt());
-	if (page < highmem_start_page)
+	if (!PageHighMem(page))
 		return;
 	kunmap_high(page);
 }
@@ -82,7 +82,7 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 
 	/* even !CONFIG_PREEMPT needs this, for in_atomic in do_page_fault */
 	inc_preempt_count();
-	if (page < highmem_start_page)
+	if (!PageHighMem(page))
 		return page_address(page);
 
 	idx = type + KM_TYPE_NR*smp_processor_id();

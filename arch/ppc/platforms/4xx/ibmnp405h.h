@@ -132,8 +132,7 @@
 #define DCRN_UIC1_BASE	0x0D0
 #define DCRN_CPC0_EPRCSR 0x0F3
 
-#define UIC0_UIC1NC      30	/* UIC1 non-critical interrupt */
-#define UIC0_UIC1CR      31	/* UIC1 critical interrupt */
+#define UIC0_UIC1NC	0x00000002
 
 #define CHR1_CETE	0x00000004	/* CPU external timer enable */
 #define UIC0	DCRN_UIC0_BASE
@@ -141,7 +140,6 @@
 
 #undef NR_UICS
 #define NR_UICS	2
-#define UIC_CASCADE_MASK 0x0003	/* bits 30 & 31 */
 
 /* EMAC DCRN's FIXME: armin */
 #define DCRN_MALRXCTP2R(base)	((base) + 0x42)	/* Channel Rx 2 Channel Table Pointer */

@@ -61,5 +61,6 @@ obj-$(CONFIG_PPC_MAPLE)		+= smp-tbsync.o
 endif
 
 obj-$(CONFIG_ALTIVEC)		+= vecemu.o vector.o
+obj-$(CONFIG_KPROBES)		+= kprobes.o
 
 CFLAGS_ioctl32.o += -Ifs/

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/delay.S
+ *  linux/arch/arm26/lib/delay.S
  *
  *  Copyright (C) 1995, 1996 Russell King
  *

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/io-writesb.S
+ *  linux/arch/arm26/lib/io-writesb.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *

@@ -7,6 +7,7 @@
  * for more details.
  *
  * Copyright (C) 2001  by Hiroyuki Kondo, Hirokazu Takata, and Hitoshi Yamamoto
+ * Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
  */
 
 #include <linux/config.h>
@@ -73,7 +74,7 @@
 #define local_irq_disable() \
 	__asm__ __volatile__ ("clrpsw #0x40 -> nop": : :"memory")
 #else	/* CONFIG_CHIP_M32102 */
-static __inline__ void local_irq_enable(void)
+static inline void local_irq_enable(void)
 {
 	unsigned long tmpreg;
 	__asm__ __volatile__(
@@ -83,7 +84,7 @@ static __inline__ void local_irq_enable(void)
 	: "=&r" (tmpreg) : : "cbit", "memory");
 }
 
-static __inline__ void local_irq_disable(void)
+static inline void local_irq_disable(void)
 {
 	unsigned long tmpreg0, tmpreg1;
 	__asm__ __volatile__(
@@ -219,11 +220,7 @@ static __inline__ unsigned long __xchg(unsigned long x, volatile void * ptr,
  * rmb() prevents loads being reordered across this point.
  * wmb() prevents stores being reordered across this point.
  */
-#if 0
-#define mb()   __asm__ __volatile__ ("push r0; \n\t pop r0;" : : : "memory")
-#else
-#define mb()   __asm__ __volatile__ ("" : : : "memory")
-#endif
+#define mb()   barrier()
 #define rmb()  mb()
 #define wmb()  mb()
 
@@ -298,4 +295,3 @@ static __inline__ unsigned long __xchg(unsigned long x, volatile void * ptr,
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
 #endif  /* _ASM_M32R_SYSTEM_H */
-

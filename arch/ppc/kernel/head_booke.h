@@ -303,4 +303,37 @@ label:
 	addi	r3,r1,STACK_FRAME_OVERHEAD;				      \
 	EXC_XFER_TEMPLATE(DebugException, 0x2002, (MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), NOCOPY, crit_transfer_to_handler, ret_from_crit_exc)
 
+#define INSTRUCTION_STORAGE_EXCEPTION					      \
+	START_EXCEPTION(InstructionStorage)				      \
+	NORMAL_EXCEPTION_PROLOG;					      \
+	mfspr	r5,SPRN_ESR;		/* Grab the ESR and save it */	      \
+	stw	r5,_ESR(r11);						      \
+	mr      r4,r12;                 /* Pass SRR0 as arg2 */		      \
+	li      r5,0;                   /* Pass zero as arg3 */		      \
+	EXC_XFER_EE_LITE(0x0400, handle_page_fault)
+
+#define ALIGNMENT_EXCEPTION						      \
+	START_EXCEPTION(Alignment)					      \
+	NORMAL_EXCEPTION_PROLOG;					      \
+	mfspr   r4,SPRN_DEAR;           /* Grab the DEAR and save it */	      \
+	stw     r4,_DEAR(r11);						      \
+	addi    r3,r1,STACK_FRAME_OVERHEAD;				      \
+	EXC_XFER_EE(0x0600, AlignmentException)
+
+#define PROGRAM_EXCEPTION						      \
+	START_EXCEPTION(Program)					      \
+	NORMAL_EXCEPTION_PROLOG;					      \
+	mfspr	r4,SPRN_ESR;		/* Grab the ESR and save it */	      \
+	stw	r4,_ESR(r11);						      \
+	addi	r3,r1,STACK_FRAME_OVERHEAD;				      \
+	EXC_XFER_STD(0x0700, ProgramCheckException)
+
+#define DECREMENTER_EXCEPTION						      \
+	START_EXCEPTION(Decrementer)					      \
+	NORMAL_EXCEPTION_PROLOG;					      \
+	lis     r0,TSR_DIS@h;           /* Setup the DEC interrupt mask */    \
+	mtspr   SPRN_TSR,r0;		/* Clear the DEC interrupt */	      \
+	addi    r3,r1,STACK_FRAME_OVERHEAD;				      \
+	EXC_XFER_LITE(0x0900, timer_interrupt)
+
 #endif /* __HEAD_BOOKE_H__ */
