@@ -364,11 +364,13 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 	/* Initialize the ACPI boot-time table parser */
 	acpi_table_init(*cmdline_p);
-
-#ifdef CONFIG_ACPI_NUMA
+# ifdef CONFIG_ACPI_NUMA
 	acpi_numa_init();
-#endif
-
+# endif
+#else
+# ifdef CONFIG_SMP
+	smp_build_cpu_map();	/* happens, e.g., with the Ski simulator */
+# endif
 #endif /* CONFIG_APCI_BOOT */
 
 	find_memory();
@@ -501,6 +503,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 			sep = ',';
 			*cp++ = ' ';
 			strcpy(cp, feature_bits[i].feature_name);
+			cp += strlen(feature_bits[i].feature_name);
 			mask &= ~feature_bits[i].mask;
 		}
 	}

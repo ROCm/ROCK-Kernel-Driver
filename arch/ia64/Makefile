@@ -24,12 +24,13 @@ CFLAGS_KERNEL	:= -mconstant-gp
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 
 ifneq ($(GCC_VERSION),2)
-	CFLAGS += -frename-registers --param max-inline-insns=5000
+	cflags-y += -frename-registers --param max-inline-insns=5000
 endif
 
 cflags-$(CONFIG_ITANIUM_BSTEP_SPECIFIC)	+= -mb-step
 cflags-$(CONFIG_IA64_SGI_SN)		+= -DBRINGUP
 
+CFLAGS += $(cflags-y)
 HEAD := arch/ia64/kernel/head.o arch/ia64/kernel/init_task.o
 
 libs-y				+= arch/ia64/lib/

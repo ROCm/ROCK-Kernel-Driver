@@ -527,7 +527,6 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 		if (restart) {
 			switch (errno) {
 			      case ERESTART_RESTARTBLOCK:
-printk("ERESTART_RESTARTBLOCK: ignoring\n");
 				current_thread_info()->restart_block.fn = do_no_restart_syscall;
 			      case ERESTARTNOHAND:
 				scr->pt.r8 = ERR_CODE(EINTR);
@@ -577,10 +576,8 @@ printk("ERESTART_RESTARTBLOCK: ignoring\n");
 				 * the "break" instruction gets re-executed.
 				 */
 				ia64_decrement_ip(&scr->pt);
-				if (errno == ERESTART_RESTARTBLOCK) {
-printk("ERESTART_RESTARTBLOCK: restarting at %lx\n", scr->pt.cr_iip);
+				if (errno == ERESTART_RESTARTBLOCK)
 					scr->pt.r15 = __NR_restart_syscall;
-				}
 			}
 		}
 	}
