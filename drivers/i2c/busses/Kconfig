@@ -7,6 +7,7 @@ menu "I2C Hardware Sensors Mainboard support"
 
 config I2C_AMD756
 	tristate "  AMD 756/766"
+	depends on I2C && I2C_PROC
 	help
 	  If you say yes to this option, support will be included for the AMD
 	  756/766/768 mainboard I2C interfaces.
@@ -23,6 +24,7 @@ config I2C_AMD756
 
 config I2C_AMD8111
 	tristate "  AMD 8111"
+	depends on I2C && I2C_PROC
 	help
 	  If you say yes to this option, support will be included for the AMD
 	  8111 mainboard I2C interfaces.
