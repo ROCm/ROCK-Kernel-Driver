@@ -32,135 +32,156 @@
 #include <asm/bitops.h>
 
 
-static inline u8 ide_inb (u32 port)
+static u8 ide_inb (u32 port)
 {
-	return (u8) IN_BYTE(port);
+	return (u8) inb(port);
 }
 
-static inline u8 ide_inb_p (u32 port)
+static u16 ide_inw (u32 port)
 {
-	return (u8) IN_BYTE_P(port);
+	return (u16) inw(port);
 }
 
-static inline u16 ide_inw (u32 port)
+static void ide_insw (u32 port, void *addr, u32 count)
 {
-	return (u16) IN_WORD(port);
+	return insw(port, addr, count);
 }
 
-static inline u16 ide_inw_p (u32 port)
+static u32 ide_inl (u32 port)
 {
-	return (u16) IN_WORD_P(port);
+	return (u32) inl(port);
 }
 
-static inline void ide_insw (u32 port, void *addr, u32 count)
+static void ide_insl (u32 port, void *addr, u32 count)
 {
-	while (count--) { *(u16 *)addr = IN_WORD(port); addr += 2; }
+	insl(port, addr, count);
 }
 
-static inline void ide_insw_p (u32 port, void *addr, u32 count)
+static void ide_outb (u8 addr, u32 port)
 {
-	while (count--) { *(u16 *)addr = IN_WORD_P(port); addr += 2; }
+	outb(addr, port);
 }
 
-static inline u32 ide_inl (u32 port)
+static void ide_outw (u16 addr, u32 port)
 {
-	return (u32) IN_LONG(port);
+	outw(addr, port);
 }
 
-static inline u32 ide_inl_p (u32 port)
+static void ide_outsw (u32 port, void *addr, u32 count)
 {
-        return (u32) IN_LONG_P(port);
+	outsw(port, addr, count);
 }
 
-static inline void ide_insl (u32 port, void *addr, u32 count)
+static void ide_outl (u32 addr, u32 port)
 {
-	ide_insw(port, addr, (count)<<1);
-//	while (count--) { *(u32 *)addr = IN_LONG(port); addr += 4; }
+	outl(addr, port);
 }
 
-static inline void ide_insl_p (u32 port, void *addr, u32 count)
+static void ide_outsl (u32 port, void *addr, u32 count)
 {
-	ide_insw_p(port, addr, (count)<<1);
-//	while (count--) { *(u32 *)addr = IN_LONG(port); addr += 4; }
-}
-
-static inline void ide_outb (u8 addr, u32 port)
-{
-	OUT_BYTE(addr, port);
-}
-
-static inline void ide_outb_p (u8 addr, u32 port)
-{
-	OUT_BYTE_P(addr, port);
-}
-
-static inline void ide_outw (u16 addr, u32 port)
-{
-	OUT_WORD(addr, port);
-}
-
-static inline void ide_outw_p (u16 addr, u32 port)
-{
-	OUT_WORD_P(addr, port);
-}
-
-static inline void ide_outsw (u32 port, void *addr, u32 count)
-{
-	while (count--) { OUT_WORD(*(u16 *)addr, port); addr += 2; }
-}
-
-static inline void ide_outsw_p (u32 port, void *addr, u32 count)
-{
-	while (count--) { OUT_WORD_P(*(u16 *)addr, port); addr += 2; }
-}
-
-static inline void ide_outl (u32 addr, u32 port)
-{
-	OUT_LONG(addr, port);
-}
-
-static inline void ide_outl_p (u32 addr, u32 port)
-{
-	OUT_LONG_P(addr, port);
-}
-
-static inline void ide_outsl (u32 port, void *addr, u32 count)
-{
-	ide_outsw(port, addr, (count)<<1);
-//	while (count--) { OUT_LONG(*(u32 *)addr, port); addr += 4; }
-}
-
-static inline void ide_outsl_p (u32 port, void *addr, u32 count)
-{
-	ide_outsw_p(port, addr, (count)<<1);
-//	while (count--) { OUT_LONG_P(*(u32 *)addr, port); addr += 4; }
+	return outsl(port, addr, count);
 }
 
 void default_hwif_iops (ide_hwif_t *hwif)
 {
 	hwif->OUTB	= ide_outb;
-	hwif->OUTBP	= ide_outb_p;
 	hwif->OUTW	= ide_outw;
-	hwif->OUTWP	= ide_outw_p;
 	hwif->OUTL	= ide_outl;
-	hwif->OUTLP	= ide_outl_p;
 	hwif->OUTSW	= ide_outsw;
-	hwif->OUTSWP	= ide_outsw_p;
 	hwif->OUTSL	= ide_outsl;
-	hwif->OUTSLP	= ide_outsl_p;
 	hwif->INB	= ide_inb;
-	hwif->INBP	= ide_inb_p;
 	hwif->INW	= ide_inw;
-	hwif->INWP	= ide_inw_p;
 	hwif->INL	= ide_inl;
-	hwif->INLP	= ide_inl_p;
 	hwif->INSW	= ide_insw;
-	hwif->INSWP	= ide_insw_p;
 	hwif->INSL	= ide_insl;
-	hwif->INSLP	= ide_insl_p;
 }
 
 EXPORT_SYMBOL(default_hwif_iops);
+
+static u8 ide_mm_inb (u32 port)
+{
+	return (u8) readb(port);
+}
+
+static u16 ide_mm_inw (u32 port)
+{
+	return (u16) readw(port);
+}
+
+static void ide_mm_insw (u32 port, void *addr, u32 count)
+{
+#ifdef CONFIG_PPC
+	/* Can we move the barrier out of the loop ? */
+	while (count--) { *(u16 *)addr = __raw_readw(port); iobarrier_r(); addr += 2; }
+#else /* everything else is sane benh */
+	while (count--) { *(u16 *)addr = readw(port); addr += 2; }
+#endif
+}
+
+static u32 ide_mm_inl (u32 port)
+{
+	return (u32) readl(port);
+}
+
+static void ide_mm_insl (u32 port, void *addr, u32 count)
+{
+#ifdef CONFIG_PPC
+	/* Can we move the barrier out of the loop ? */
+	while (count--) { *(u32 *)addr = __raw_readl(port); iobarrier_r(); addr += 4; }
+#else /* everything else is sane benh */
+	while (count--) { *(u32 *)addr = readl(port); addr += 4; }
+#endif
+}
+
+static void ide_mm_outb (u8 value, u32 port)
+{
+	writeb(value, port);
+}
+
+static void ide_mm_outw (u16 value, u32 port)
+{
+	writew(value, port);
+}
+
+static void ide_mm_outsw (u32 port, void *addr, u32 count)
+{
+#ifdef CONFIG_PPC
+	/* Can we move the barrier out of the loop ? */
+	while (count--) { __raw_writew(*(u16 *)addr, port); iobarrier_w(); addr += 2; }
+#else /* everything else is sane benh */
+	while (count--) { writew(*(u16 *)addr, port); addr += 2; }
+#endif
+}
+
+static void ide_mm_outl (u32 value, u32 port)
+{
+	writel(value, port);
+}
+
+static void ide_mm_outsl (u32 port, void *addr, u32 count)
+{
+#ifdef CONFIG_PPC
+	while (count--) { __raw_writel(*(u32 *)addr, port); iobarrier_w(); addr += 4; }
+#else /* everything else is sane benh */
+	while (count--) { writel(*(u32 *)addr, port); addr += 4; }
+#endif
+}
+
+void default_hwif_mmiops (ide_hwif_t *hwif)
+{
+	hwif->OUTB	= ide_mm_outb;
+	hwif->OUTW	= ide_mm_outw;
+	hwif->OUTL	= ide_mm_outl;
+	hwif->OUTSW	= ide_mm_outsw;
+	hwif->OUTSL	= ide_mm_outsl;
+	hwif->INB	= ide_mm_inb;
+	hwif->INW	= ide_mm_inw;
+	hwif->INL	= ide_mm_inl;
+	hwif->INSW	= ide_mm_insw;
+	hwif->INSL	= ide_mm_insl;
+}
+
+EXPORT_SYMBOL(default_hwif_mmiops);
 
 void default_hwif_transport (ide_hwif_t *hwif)
 {
@@ -217,7 +238,6 @@ void QUIRK_LIST (ide_drive_t *drive)
 
 EXPORT_SYMBOL(QUIRK_LIST);
 
-#if SUPPORT_VLB_SYNC
 /*
  * Some localbus EIDE interfaces require a special access sequence
  * when using 32-bit I/O instructions to transfer data.  We call this
@@ -233,7 +253,6 @@ void ata_vlb_sync (ide_drive_t *drive, ide_ioreg_t port)
 }
 
 EXPORT_SYMBOL(ata_vlb_sync);
-#endif /* SUPPORT_VLB_SYNC */
 
 /*
  * This is used for most PIO data transfers *from* the IDE interface
@@ -244,7 +263,6 @@ void ata_input_data (ide_drive_t *drive, void *buffer, u32 wcount)
 	u8 io_32bit		= drive->io_32bit;
 
 	if (io_32bit) {
-#if SUPPORT_VLB_SYNC
 		if (io_32bit & 2) {
 			unsigned long flags;
 			local_irq_save(flags);
@@ -252,19 +270,9 @@ void ata_input_data (ide_drive_t *drive, void *buffer, u32 wcount)
 			hwif->INSL(IDE_DATA_REG, buffer, wcount);
 			local_irq_restore(flags);
 		} else
-#endif /* SUPPORT_VLB_SYNC */
 			hwif->INSL(IDE_DATA_REG, buffer, wcount);
 	} else {
-#if SUPPORT_SLOW_DATA_PORTS
-		if (drive->slow) {
-			u16 *ptr = (u16 *) buffer;
-			while (wcount--) {
-				*ptr++ = hwif->INWP(IDE_DATA_REG);
-				*ptr++ = hwif->INWP(IDE_DATA_REG);
-			}
-		} else
-#endif /* SUPPORT_SLOW_DATA_PORTS */
-			hwif->INSW(IDE_DATA_REG, buffer, wcount<<1);
+		hwif->INSW(IDE_DATA_REG, buffer, wcount<<1);
 	}
 }
 
@@ -279,7 +287,6 @@ void ata_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
 	u8 io_32bit		= drive->io_32bit;
 
 	if (io_32bit) {
-#if SUPPORT_VLB_SYNC
 		if (io_32bit & 2) {
 			unsigned long flags;
 			local_irq_save(flags);
@@ -287,19 +294,9 @@ void ata_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
 			hwif->OUTSL(IDE_DATA_REG, buffer, wcount);
 			local_irq_restore(flags);
 		} else
-#endif /* SUPPORT_VLB_SYNC */
 			hwif->OUTSL(IDE_DATA_REG, buffer, wcount);
 	} else {
-#if SUPPORT_SLOW_DATA_PORTS
-		if (drive->slow) {
-			u16 *ptr = (u16 *) buffer;
-			while (wcount--) {
-				hwif->OUTWP(*ptr++, IDE_DATA_REG);
-				hwif->OUTWP(*ptr++, IDE_DATA_REG);
-			}
-		} else
-#endif /* SUPPORT_SLOW_DATA_PORTS */
-			hwif->OUTSW(IDE_DATA_REG, buffer, wcount<<1);
+		hwif->OUTSW(IDE_DATA_REG, buffer, wcount<<1);
 	}
 }
 
@@ -312,6 +309,7 @@ EXPORT_SYMBOL(ata_output_data);
  * so if an odd bytecount is specified, be sure that there's at least one
  * extra byte allocated for the buffer.
  */
+
 void atapi_input_bytes (ide_drive_t *drive, void *buffer, u32 bytecount)
 {
 	ide_hwif_t *hwif = HWIF(drive);
