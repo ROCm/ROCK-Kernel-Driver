@@ -13,15 +13,8 @@
 
 static inline void arch_idle(void)
 {
-#if 0
-	while (!current->need_resched && !hlt_counter) {
-		cpu_do_idle(IDLE_CLOCK_SLOW);
-		cpu_do_idle(IDLE_WAIT_FAST);
-		cpu_do_idle(IDLE_CLOCK_FAST);
-	}
-#endif
+	cpu_do_idle();
 }
-
 
 static inline void arch_reset(char mode)
 {
@@ -39,7 +32,4 @@ static inline void arch_reset(char mode)
 	if (*IXP2000_STRAP_OPTIONS & CFG_PCI_BOOT_HOST) {
 		*(IXP2000_RESET0) |= (RSTALL);
 	}
-
-
-	
 }
