@@ -603,6 +603,12 @@ static int __init balanced_irq_init(void)
         c = &boot_cpu_data;
 	if (irqbalance_disabled)
 		return 0;
+	
+	 /* disable irqbalance completely if there is only one processor online */
+	if (num_online_cpus() < 2) {
+		irqbalance_disabled = 1;
+		return 0;
+	}
 	/*
 	 * Enable physical balance only if more than 1 physical processor
 	 * is present
