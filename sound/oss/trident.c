@@ -768,9 +768,8 @@ static int cyber_init_ritual(struct trident_card *card)
  	 *	Keep interrupts off for the configure - we don't want to
  	 *	clash with another cyberpro config event
  	 */
- 
-	save_flags(flags);
-	cli();
+ 	
+	spin_lock_irqsave(&card->lock, flags); 
 	portDat = cyber_inidx(CYBER_PORT_AUDIO, CYBER_IDX_AUDIO_ENABLE);
 	/* enable, if it was disabled */
 	if( (portDat & CYBER_BMSK_AUENZ) != CYBER_BMSK_AUENZ_ENABLE ) {
@@ -795,7 +794,7 @@ static int cyber_init_ritual(struct trident_card *card)
 		cyber_outidx( CYBER_PORT_AUDIO, 0xb3, 0x06 );
 		cyber_outidx( CYBER_PORT_AUDIO, 0xbf, 0x00 );
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->lock, flags); 
 	return ret;
 }
 
@@ -3502,9 +3501,8 @@ static void ali_save_regs(struct trident_card *card)
 	unsigned long flags;
 	int i, j;
 
-	save_flags(flags); 
-	cli();
-	
+	spin_lock_irqsave(&card->lock, flags); 
+
 	ali_registers.global_regs[0x2c] = inl(TRID_REG(card,T4D_MISCINT));
 	//ali_registers.global_regs[0x20] = inl(TRID_REG(card,T4D_START_A));	
 	ali_registers.global_regs[0x21] = inl(TRID_REG(card,T4D_STOP_A));
@@ -3532,7 +3530,7 @@ static void ali_save_regs(struct trident_card *card)
 	//Stop all HW channel
 	outl(ALI_STOP_ALL_CHANNELS, TRID_REG(card, T4D_STOP_A));
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->lock, flags); 
 }
 
 static void ali_restore_regs(struct trident_card *card)
@@ -3540,8 +3538,7 @@ static void ali_restore_regs(struct trident_card *card)
 	unsigned long flags;
 	int i, j;
 
-	save_flags(flags); 
-	cli();
+	spin_lock_irqsave(&card->lock, flags); 
 	
 	for (i = 1; i < ALI_MIXER_REGS; i++)
 		ali_ac97_write(card->ac97_codec[0], i*2, ali_registers.mixer_regs[i]);
@@ -3564,6 +3561,8 @@ static void ali_restore_regs(struct trident_card *card)
 	outl(ali_registers.global_regs[0x20], TRID_REG(card,T4D_START_A));
 	//restore IRQ enable bits
 	outl(ali_registers.global_regs[0x2c], TRID_REG(card,T4D_MISCINT));
+
+	spin_unlock_irqrestore(&card->lock, flags); 
 	
 	restore_flags(flags);
 }
