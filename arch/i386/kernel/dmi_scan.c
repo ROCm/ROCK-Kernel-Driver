@@ -329,6 +329,17 @@ static int __init local_apic_kills_bios(struct dmi_blacklist *d)
 	return 0;
 }
 
+static int __init need_local_apic(struct dmi_blacklist *d)
+{ 
+#ifdef CONFIG_X86_LOCAL_APIC
+	extern int enable_local_apic;
+	enable_local_apic = 0;
+	printk(KERN_WARNING "%s machine detected. Enablig LAPIC\n",
+		       d->ident);
+#endif
+	return 0;
+} 
+
 /* 
  * Don't access SMBus on IBM systems which get corrupted eeproms 
  */
@@ -1031,6 +1042,15 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH }},
 
 #endif
+
+	{ need_local_apic, "Intel C440GX+", {
+			MATCH(DMI_BOARD_VENDOR, "Intel"),
+			MATCH(DMI_BOARD_NAME, "C440GX+"),
+			NO_MATCH}},
+	{ need_local_apic, "HP Proliant DL380", {
+			MATCH(DMI_BOARD_VENDOR, "HP"),
+			MATCH(DMI_BOARD_NAME, "ProLiant DL380"),
+			NO_MATCH}},
 
 	{ NULL, }
 };
