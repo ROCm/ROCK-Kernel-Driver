@@ -11,8 +11,7 @@
 
 /* bitmap.c contains the code that handles the inode and block bitmaps */
 
-#include <linux/fs.h>
-#include <linux/minix_fs.h>
+#include "minix.h"
 #include <linux/locks.h>
 
 #include <asm/bitops.h>

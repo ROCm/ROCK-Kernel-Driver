@@ -11,8 +11,7 @@
 
 #include <linux/module.h>
 
-#include <linux/fs.h>
-#include <linux/minix_fs.h>
+#include "minix.h"
 #include <linux/slab.h>
 #include <linux/locks.h>
 #include <linux/init.h>
