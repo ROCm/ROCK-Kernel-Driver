@@ -65,7 +65,7 @@ void tty_wait_until_sent(struct tty_struct * tty, long timeout)
 	if (tty->driver.wait_until_sent)
 		tty->driver.wait_until_sent(tty, timeout);
 stop_waiting:
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&tty->write_wait, &wait);
 }
 

@@ -48,7 +48,6 @@
 #include <linux/init.h>
 
 #include <linux/tty.h>
-#include <linux/selection.h>
 #include <linux/kmod.h>
 
 #include "busmouse.h"
