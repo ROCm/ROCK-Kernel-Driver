@@ -772,6 +772,7 @@ alloc_init_open_stateowner(unsigned int strhashval, struct nfs4_client *clp, str
 	INIT_LIST_HEAD(&sop->so_strhash);
 	INIT_LIST_HEAD(&sop->so_perclient);
 	INIT_LIST_HEAD(&sop->so_perfilestate);
+	INIT_LIST_HEAD(&sop->so_perlockowner);  /* not used */
 	list_add(&sop->so_idhash, &ownerid_hashtbl[idhashval]);
 	list_add(&sop->so_strhash, &ownerstr_hashtbl[strhashval]);
 	list_add(&sop->so_perclient, &clp->cl_perclient);
@@ -790,13 +791,28 @@ alloc_init_open_stateowner(unsigned int strhashval, struct nfs4_client *clp, str
 }
 
 static void
+release_stateid_lockowner(struct nfs4_stateid *open_stp)
+{
+	struct nfs4_stateowner *lock_sop;
+
+	while (!list_empty(&open_stp->st_perlockowner)) {
+		lock_sop = list_entry(open_stp->st_perlockowner.next,
+				struct nfs4_stateowner, so_perlockowner);
+		/* list_del(&open_stp->st_perlockowner);  */
+		BUG_ON(lock_sop->so_is_open_owner);
+		release_stateowner(lock_sop);
+	}
+}
+
+static void
 release_stateowner(struct nfs4_stateowner *sop)
 {
 	struct nfs4_stateid *stp;
 
-	list_del_init(&sop->so_idhash);
-	list_del_init(&sop->so_strhash);
-	list_del_init(&sop->so_perclient);
+	list_del(&sop->so_idhash);
+	list_del(&sop->so_strhash);
+	list_del(&sop->so_perclient);
+	list_del(&sop->so_perlockowner);
 	del_perclient++;
 	while (!list_empty(&sop->so_perfilestate)) {
 		stp = list_entry(sop->so_perfilestate.next, 
@@ -815,6 +831,7 @@ init_stateid(struct nfs4_stateid *stp, struct nfs4_file *fp, struct nfs4_stateow
 
 	INIT_LIST_HEAD(&stp->st_hash);
 	INIT_LIST_HEAD(&stp->st_perfilestate);
+	INIT_LIST_HEAD(&stp->st_perlockowner);
 	INIT_LIST_HEAD(&stp->st_perfile);
 	list_add(&stp->st_hash, &stateid_hashtbl[hashval]);
 	list_add(&stp->st_perfilestate, &sop->so_perfilestate);
@@ -833,17 +850,21 @@ init_stateid(struct nfs4_stateid *stp, struct nfs4_file *fp, struct nfs4_stateow
 static void
 release_stateid(struct nfs4_stateid *stp, int flags) {
 
-	list_del_init(&stp->st_hash);
+	list_del(&stp->st_hash);
 	list_del_perfile++;
-	list_del_init(&stp->st_perfile);
-	list_del_init(&stp->st_perfilestate);
+	list_del(&stp->st_perfile);
+	list_del(&stp->st_perfilestate);
 	if((stp->st_vfs_set) && (flags & OPEN_STATE)) {
+		release_stateid_lockowner(stp);
 		nfsd_close(&stp->st_vfs_file);
 		vfsclose++;
 		dput(stp->st_vfs_file.f_dentry);
 		mntput(stp->st_vfs_file.f_vfsmnt);
+	} else if ((stp->st_vfs_set) && (flags & LOCK_STATE)) {
+		struct file *filp = &stp->st_vfs_file;
+
+		locks_remove_posix(filp, (fl_owner_t) stp->st_stateowner);
 	}
-	/* should use a slab cache */
 	kfree(stp);
 	stp = NULL;
 }
@@ -852,7 +873,7 @@ static void
 release_file(struct nfs4_file *fp)
 {
 	free_file++;
-	list_del_init(&fp->fi_hash);
+	list_del(&fp->fi_hash);
 	iput(fp->fi_inode);
 	kfree(fp);
 }	
@@ -1723,7 +1744,7 @@ find_lockstateowner_str(unsigned int hashval, struct xdr_netobj *owner, clientid
  */
 
 static struct nfs4_stateowner *
-alloc_init_lock_stateowner(unsigned int strhashval, struct nfs4_client *clp, struct nfsd4_lock *lock) {
+alloc_init_lock_stateowner(unsigned int strhashval, struct nfs4_client *clp, struct nfs4_stateid *open_stp, struct nfsd4_lock *lock) {
 	struct nfs4_stateowner *sop;
 	struct nfs4_replay *rp;
 	unsigned int idhashval;
@@ -1735,9 +1756,11 @@ alloc_init_lock_stateowner(unsigned int strhashval, struct nfs4_client *clp, str
 	INIT_LIST_HEAD(&sop->so_strhash);
 	INIT_LIST_HEAD(&sop->so_perclient);
 	INIT_LIST_HEAD(&sop->so_perfilestate);
+	INIT_LIST_HEAD(&sop->so_perlockowner);
 	list_add(&sop->so_idhash, &lock_ownerid_hashtbl[idhashval]);
 	list_add(&sop->so_strhash, &lock_ownerstr_hashtbl[strhashval]);
 	list_add(&sop->so_perclient, &clp->cl_perclient);
+	list_add(&sop->so_perlockowner, &open_stp->st_perlockowner);
 	add_perclient++;
 	sop->so_is_open_owner = 0;
 	sop->so_id = current_ownerid++;
@@ -1761,10 +1784,10 @@ alloc_init_lock_stateid(struct nfs4_stateowner *sop, struct nfs4_file *fp, struc
 	if ((stp = kmalloc(sizeof(struct nfs4_stateid), 
 					GFP_KERNEL)) == NULL)
 		goto out;
-
 	INIT_LIST_HEAD(&stp->st_hash);
 	INIT_LIST_HEAD(&stp->st_perfile);
 	INIT_LIST_HEAD(&stp->st_perfilestate);
+	INIT_LIST_HEAD(&stp->st_perlockowner); /* not used */
 	list_add(&stp->st_hash, &lockstateid_hashtbl[hashval]);
 	list_add(&stp->st_perfile, &fp->fi_perfile);
 	list_add_perfile++;
@@ -1853,8 +1876,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 					&lock->v.new.clientid, &lock_sop))
 			goto out;
 		status = nfserr_resource;
-		if (!(lock->lk_stateowner = alloc_init_lock_stateowner(strhashval, 
-						open_sop->so_client, lock)))
+		if (!(lock->lk_stateowner = alloc_init_lock_stateowner(strhashval, open_sop->so_client, open_stp, lock)))
 			goto out;
 		if ((lock_stp = alloc_init_lock_stateid(lock->lk_stateowner, 
 						fp, open_stp)) == NULL)
