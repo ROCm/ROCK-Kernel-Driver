@@ -116,12 +116,12 @@ static int _hpfs_bmap(struct address_space *mapping, long block)
 	return generic_block_bmap(mapping,block,hpfs_get_block);
 }
 struct address_space_operations hpfs_aops = {
-	readpage: hpfs_readpage,
-	writepage: hpfs_writepage,
-	sync_page: block_sync_page,
-	prepare_write: hpfs_prepare_write,
-	commit_write: generic_commit_write,
-	bmap: _hpfs_bmap
+	.readpage = hpfs_readpage,
+	.writepage = hpfs_writepage,
+	.sync_page = block_sync_page,
+	.prepare_write = hpfs_prepare_write,
+	.commit_write = generic_commit_write,
+	.bmap = _hpfs_bmap
 };
 
 ssize_t hpfs_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)

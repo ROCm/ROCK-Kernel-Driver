@@ -50,8 +50,8 @@ int hpfs_compare_dentry(struct dentry *dentry, struct qstr *a, struct qstr *b)
 }
 
 struct dentry_operations hpfs_dentry_operations = {
-	d_hash:		hpfs_hash_dentry,
-	d_compare:	hpfs_compare_dentry,
+	.d_hash		= hpfs_hash_dentry,
+	.d_compare	= hpfs_compare_dentry,
 };
 
 void hpfs_set_dentry_operations(struct dentry *dentry)

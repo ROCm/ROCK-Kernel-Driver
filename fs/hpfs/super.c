@@ -206,13 +206,13 @@ static void destroy_inodecache(void)
 
 static struct super_operations hpfs_sops =
 {
-	alloc_inode:	hpfs_alloc_inode,
-	destroy_inode:	hpfs_destroy_inode,
-        read_inode:	hpfs_read_inode,
-	delete_inode:	hpfs_delete_inode,
-	put_super:	hpfs_put_super,
-	statfs:		hpfs_statfs,
-	remount_fs:	hpfs_remount_fs,
+	.alloc_inode	= hpfs_alloc_inode,
+	.destroy_inode	= hpfs_destroy_inode,
+        .read_inode	= hpfs_read_inode,
+	.delete_inode	= hpfs_delete_inode,
+	.put_super	= hpfs_put_super,
+	.statfs		= hpfs_statfs,
+	.remount_fs	= hpfs_remount_fs,
 };
 
 /*
@@ -638,11 +638,11 @@ static struct super_block *hpfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type hpfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"hpfs",
-	get_sb:		hpfs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "hpfs",
+	.get_sb		= hpfs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_hpfs_fs(void)
