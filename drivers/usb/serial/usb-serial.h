@@ -62,8 +62,6 @@
 
 #define MAX_NUM_PORTS		8	/* The maximum number of ports one device can grab at once */
 
-#define USB_SERIAL_MAGIC	0x6702	/* magic number for usb_serial struct */
-
 /* parity check flag */
 #define RELEVANT_IFLAG(iflag)	(iflag & (IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK))
 
@@ -130,7 +128,6 @@ static inline void usb_set_serial_port_data (struct usb_serial_port *port, void 
 
 /**
  * usb_serial - structure used by the usb-serial core for a device
- * @magic: magic number for internal validity of this pointer.
  * @dev: pointer to the struct usb_device for this device
  * @type: pointer to the struct usb_serial_device_type for this device
  * @interface: pointer to the struct usb_interface for this device
@@ -148,7 +145,6 @@ static inline void usb_set_serial_port_data (struct usb_serial_port *port, void 
  *	usb_set_serial_data() to access this.
  */
 struct usb_serial {
-	int				magic;
 	struct usb_device *		dev;
 	struct usb_serial_device_type *	type;
 	struct usb_interface *		interface;
@@ -303,10 +299,6 @@ static inline int serial_paranoia_check (struct usb_serial *serial, const char *
 {
 	if (!serial) {
 		dbg("%s - serial == NULL", function);
-		return -1;
-	}
-	if (serial->magic != USB_SERIAL_MAGIC) {
-		dbg("%s - bad magic number for serial", function);
 		return -1;
 	}
 	if (!serial->type) {

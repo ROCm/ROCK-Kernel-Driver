@@ -416,8 +416,7 @@ static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_po
 			}
 		if (good_spot == 0)
 			continue;
-			
-		serial->magic = USB_SERIAL_MAGIC;
+
 		*minor = i;
 		dbg("%s - minor base = %d", __FUNCTION__, *minor);
 		for (i = *minor; (i < (*minor + num_ports)) && (i < SERIAL_TTY_MINORS); ++i)
