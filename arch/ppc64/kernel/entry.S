@@ -309,9 +309,7 @@ _GLOBAL(_switch)
 	blr
 
 _GLOBAL(ret_from_fork)
-#if CONFIG_SMP || CONFIG_PREEMPT
 	bl	.schedule_tail
-#endif
 	clrrdi	r4,r1,THREAD_SHIFT
 	ld	r4,TI_FLAGS(r4)
 	andi.	r4,r4,_TIF_SYSCALL_TRACE

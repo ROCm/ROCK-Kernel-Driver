@@ -104,13 +104,17 @@ __switch_to(struct task_struct *prev, struct task_struct *new)
 }
 
 static void show_tsk_stack(struct task_struct *p, unsigned long sp);
+static char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen);
 
 void show_regs(struct pt_regs * regs)
 {
 	int i;
+	char name_buf[256];
 
-	printk("NIP: %016lX XER: %016lX LR: %016lX REGS: %p TRAP: %04lx    %s\n",
-	       regs->nip, regs->xer, regs->link, regs,regs->trap, print_tainted());
+	printk("NIP: %016lX XER: %016lX LR: %016lX\n",
+	       regs->nip, regs->xer, regs->link);
+	printk("REGS: %p TRAP: %04lx    %s\n",
+	       regs, regs->trap, print_tainted());
 	printk("MSR: %016lx EE: %01x PR: %01x FP: %01x ME: %01x IR/DR: %01x%01x\n",
 	       regs->msr, regs->msr&MSR_EE ? 1 : 0, regs->msr&MSR_PR ? 1 : 0,
 	       regs->msr & MSR_FP ? 1 : 0,regs->msr&MSR_ME ? 1 : 0,
@@ -135,6 +139,13 @@ void show_regs(struct pt_regs * regs)
 		printk("%016lX ", r);
 	}
 	printk("\n");
+	/*
+	 * Lookup NIP late so we have the best change of getting the
+	 * above info out without failing
+	 */
+	printk("NIP [%016lx] ", regs->nip);
+	printk("%s\n", ppc_find_proc_name((unsigned *)regs->nip,
+	       name_buf, 256));
 	show_tsk_stack(current, regs->gpr[1]);
 }
 
@@ -166,7 +177,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	extern void ret_from_fork(void);
 	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 
-	p->user_tid = NULL;
+	p->set_child_tid = p->clear_child_tid = NULL;
 
 	/* Copy registers */
 	sp -= sizeof(struct pt_regs);
@@ -259,19 +270,24 @@ int sys_clone(unsigned long clone_flags, u32 p2, u32 p3, u32 p4, u32 p5,
 	      u32 p6, struct pt_regs *regs)
 {
 	struct task_struct *p;
-	unsigned long tid_ptr = 0;
+	unsigned long parent_tidptr = 0;
+	unsigned long child_tidptr = 0;
 
-	if (clone_flags & (CLONE_SETTID | CLONE_CLEARTID)) {
-		tid_ptr = p3;
-		if (test_thread_flag(TIF_32BIT))
-			tid_ptr &= 0xffffffff;
+	if (clone_flags & (CLONE_PARENT_SETTID | CLONE_CHILD_SETTID |
+			   CLONE_CHILD_CLEARTID)) {
+		parent_tidptr = p3;
+		child_tidptr = p4;
+		if (test_thread_flag(TIF_32BIT)) {
+			parent_tidptr &= 0xffffffff;
+			child_tidptr &= 0xffffffff;
+		}
 	}
 
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
 	p = do_fork(clone_flags & ~CLONE_IDLETASK, regs->gpr[1], regs, 0,
-		    (int *)tid_ptr);
+		    (int *)parent_tidptr, (int *)child_tidptr);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -283,7 +299,7 @@ int sys_fork(u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6,
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
-	p = do_fork(SIGCHLD, regs->gpr[1], regs, 0, NULL);
+	p = do_fork(SIGCHLD, regs->gpr[1], regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -296,7 +312,7 @@ int sys_vfork(u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6,
 		giveup_fpu(current);
 
 	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0,
-	            NULL);
+	            NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -366,7 +382,7 @@ void initialize_paca_hardware_interrupt_stack(void)
 
 extern char _stext[], _etext[];
 
-char * ppc_find_proc_name( unsigned * p, char * buf, unsigned buflen )
+static char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen)
 {
 	unsigned long tb_flags;
 	unsigned short name_len;
@@ -453,20 +469,18 @@ static void show_tsk_stack(struct task_struct *p, unsigned long sp)
 	if (!p)
 		return;
 
-	printk("Call Trace: ");
+	printk("Call Trace:\n");
 	do {
 		if (__get_user(sp, (unsigned long *)sp))
 			break;
 		if (sp < (stack_page + sizeof(struct thread_struct)) ||
 		    sp >= (stack_page + THREAD_SIZE))
 			break;
-		if (count > 0) {
-			if (__get_user(ip, (unsigned long *)(sp + 16)))
-				break;
-			printk("[%016lx] ", ip);
-			printk("%s\n", ppc_find_proc_name((unsigned *)ip,
-			       name_buf, 256 ));
-		}
+		if (__get_user(ip, (unsigned long *)(sp + 16)))
+			break;
+		printk("[%016lx] ", ip);
+		printk("%s\n", ppc_find_proc_name((unsigned *)ip,
+		       name_buf, 256));
 	} while (count++ < 32);
 }
 
