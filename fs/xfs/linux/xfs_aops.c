@@ -351,7 +351,24 @@ cluster_write(
  * Calling this without startio set means we are being asked to make a dirty
  * page ready for freeing it's buffers.  When called with startio set then
  * we are coming from writepage.
+ *
+ * When called with startio e.g. from write page it is important that we write WHOLE page if 
+ * possible. The bh->b_state's can not know of any of the blocks or which block for that matter
+ * are dirty due to map writes, and therefore bh uptodate is only vaild if the page 
+ * itself isn't completely uptodate. Some layers may clear the page dirty flag prior to
+ * calling write page under the assumption the entire page will be written out, by not writing
+ * out the whole page the page can be reused before all vaild dirty data is written out.
+ * Note: in the case of a page that has been dirty'd by mapwrite and but partially setup by
+ * block_prepare_write the bh->b_states's will not agree and only ones setup by BPW/BCW will have
+ * valid state, thus the whole page must be written out thing.
  */
+
+ 
+
+
+
+
+
 STATIC int
 delalloc_convert(
 	struct page		*page,
@@ -414,7 +431,9 @@ delalloc_convert(
 					unlock_buffer(bh);
 				}
 			}
-		} else if (!buffer_mapped(bh) && allocate_space) {
+		} else if (!buffer_mapped(bh) && 
+			   (buffer_uptodate(bh) || PageUptodate(page))
+			   && (allocate_space || startio)) {
 			int	size;
 
 			/* Getting here implies an unmapped buffer was found,
@@ -442,7 +461,7 @@ delalloc_convert(
 				}
 			}
 		} else if (startio && buffer_mapped(bh)) {
-			if (buffer_dirty(bh) || allocate_space) {
+			if(buffer_uptodate(bh) && allocate_space) {
 				lock_buffer(bh);
 				bh_arr[cnt++] = bh;
 			}
