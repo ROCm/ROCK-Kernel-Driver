@@ -1,6 +1,7 @@
 #include <linux/list.h>
 #include <linux/pci.h>
 #include <linux/agp_backend.h>
+#include <linux/module.h>
 
 #include "agp.h"
 
@@ -548,4 +549,6 @@ int agp_generic_agp_3_0_enable(u32 mode)
 	}
 	return FALSE;
 }
+
+EXPORT_SYMBOL(agp_generic_agp_3_0_enable);
 

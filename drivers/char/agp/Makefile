@@ -6,9 +6,9 @@
 export-objs := backend.o
 
 agpgart-y := backend.o frontend.o generic.o
+agpgart-$(CONFIG_AGP3) += generic-3.0.o
 agpgart-objs := $(agpgart-y)
 obj-$(CONFIG_AGP) += agpgart.o
-obj-$(CONFIG_AGP3) += generic-3.0.o
 
 obj-$(CONFIG_AGP_INTEL)		+= intel-agp.o
 obj-$(CONFIG_AGP_VIA)		+= via-agp.o
