@@ -533,12 +533,12 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 			/* We need the timeouts for at least some IT87-like chips. But only
 			   if we read 'undefined' registers. */
 			i = inb_p(address + 1);
-			if (inb_p(address + 2) != i)
+			if (inb_p(address + 2) != i
+			 || inb_p(address + 3) != i
+			 || inb_p(address + 7) != i) {
+		 		err = -ENODEV;
 				goto ERROR1;
-			if (inb_p(address + 3) != i)
-				goto ERROR1;
-			if (inb_p(address + 7) != i)
-				goto ERROR1;
+			}
 #undef REALLY_SLOW_IO
 
 			/* Let's just hope nothing breaks here */
@@ -546,7 +546,8 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 			outb_p(~i & 0x7f, address + 5);
 			if ((inb_p(address + 5) & 0x7f) != (~i & 0x7f)) {
 				outb_p(i, address + 5);
-				return 0;
+				err = -ENODEV;
+				goto ERROR1;
 			}
 		}
 	}
@@ -573,11 +574,12 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Now, we do the remaining detection. */
 
 	if (kind < 0) {
-		if (it87_read_value(new_client, IT87_REG_CONFIG) & 0x80)
-			goto ERROR1;
-		if (!is_isa
-			&& (it87_read_value(new_client, IT87_REG_I2C_ADDR) !=
-			address)) goto ERROR1;
+		if ((it87_read_value(new_client, IT87_REG_CONFIG) & 0x80)
+		  || (!is_isa
+		   && it87_read_value(new_client, IT87_REG_I2C_ADDR) != address)) {
+		   	err = -ENODEV;
+			goto ERROR2;
+		}
 	}
 
 	/* Determine the chip type. */
@@ -592,7 +594,8 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 					"Ignoring 'force' parameter for unknown chip at "
 					"adapter %d, address 0x%02x\n",
 					i2c_adapter_id(adapter), address);
-			goto ERROR1;
+			err = -ENODEV;
+			goto ERROR2;
 		}
 	}
 
@@ -611,7 +614,7 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Tell the I2C layer a new client has arrived */
 	if ((err = i2c_attach_client(new_client)))
-		goto ERROR1;
+		goto ERROR2;
 
 	/* Initialize the IT87 chip */
 	it87_init_client(new_client, data);
@@ -667,9 +670,9 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	return 0;
 
-ERROR1:
+ERROR2:
 	kfree(data);
-
+ERROR1:
 	if (is_isa)
 		release_region(address, IT87_EXTENT);
 ERROR0:

@@ -748,9 +748,9 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
       ERROR3:
-	release_region(address, VIA686A_EXTENT);
 	kfree(data);
       ERROR0:
+	release_region(address, VIA686A_EXTENT);
 	return err;
 }
 
