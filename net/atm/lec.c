@@ -706,7 +706,7 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
                         lec_arp_check_empties(priv, vcc, skb);
                 }
                 skb->dev = dev;
-                skb_pull(skb->data, 2); /* skip lec_id */
+                skb_pull(skb, 2); /* skip lec_id */
 #ifdef CONFIG_TR
                 if (priv->is_trdev) skb->protocol = tr_type_trans(skb, dev);
                 else
