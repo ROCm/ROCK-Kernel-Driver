@@ -22,7 +22,7 @@
 #include <linux/highmem.h>
 
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
+#include <linux/hardirq.h>
 
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
