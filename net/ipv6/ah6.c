@@ -19,7 +19,7 @@
  *
  *	Mitsuru KANDA @USAGI       : IPv6 Support 
  * 	Kazunori MIYAZAWA @USAGI   :
- * 	Kunihiro Ishiguro          :
+ * 	Kunihiro Ishiguro <kunihiro@ipinfusion.com>
  * 	
  * 	This file is derived from net/ipv4/ah.c.
  */
