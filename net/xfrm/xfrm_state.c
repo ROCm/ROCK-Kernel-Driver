@@ -331,14 +331,8 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 		}
 	}
 
-	if (best) {
-		xfrm_state_hold(best);
-		spin_unlock_bh(&xfrm_state_lock);
-		return best;
-	}
-
-	x = NULL;
-	if (!error && !acquire_in_progress &&
+	x = best;
+	if (!x && !error && !acquire_in_progress &&
 	    ((x = xfrm_state_alloc()) != NULL)) {
 		/* Initialize temporary selector matching only
 		 * to current session. */
@@ -363,10 +357,12 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 			error = 1;
 		}
 	}
-	spin_unlock_bh(&xfrm_state_lock);
-	if (!x)
+	if (x)
+		xfrm_state_hold(x);
+	else
 		*err = acquire_in_progress ? -EAGAIN :
 			(error ? -ESRCH : -ENOMEM);
+	spin_unlock_bh(&xfrm_state_lock);
 	return x;
 }
 
