@@ -170,7 +170,7 @@ int __init fastlane_esp_detect(Scsi_Host_Template *tpnt)
 
 		/* Map the physical address space into virtual kernel space */
 		address = (unsigned long)
-			ioremap_nocache(board, z->resource.end-board+1);
+			z_ioremap(board, z->resource.end-board+1);
 
 		if(!address){
 			printk("Could not remap Fastlane controller memory!");
@@ -219,7 +219,7 @@ int __init fastlane_esp_detect(Scsi_Host_Template *tpnt)
 	return 0;
 
  err_unmap:
-	iounmap((void *)address);
+	z_iounmap((void *)address);
  err_unregister:
 	scsi_unregister (esp->ehost);
  err_release:
