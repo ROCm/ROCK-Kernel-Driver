@@ -331,6 +331,7 @@ static void neigh_hash_grow(struct neigh_table *tbl, unsigned long new_entries)
 	old_hash = tbl->hash_buckets;
 
 	write_lock_bh(&tbl->lock);
+	get_random_bytes(&tbl->hash_rnd, sizeof(tbl->hash_rnd));
 	for (i = 0; i < old_entries; i++) {
 		struct neighbour *n, *next;
 
@@ -1306,7 +1307,7 @@ void neigh_table_init(struct neigh_table *tbl)
 	if (!tbl->kmem_cachep)
 		panic("cannot create neighbour cache");
 
-	tbl->hash_mask = 0x1f;
+	tbl->hash_mask = 1;
 	tbl->hash_buckets = neigh_hash_alloc(tbl->hash_mask + 1);
 
 	phsize = (PNEIGH_HASHMASK + 1) * sizeof(struct pneigh_entry *);
