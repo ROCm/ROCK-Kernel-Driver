@@ -226,7 +226,7 @@ config FB_FM2
 
 config FB_ATARI
 	bool "Atari native chipset support"
-	depends on FB && ATARI
+	depends on FB && ATARI && BROKEN
 	help
 	  This is the frame buffer device driver for the builtin graphics
 	  chipset found in Ataris.
