@@ -326,7 +326,6 @@ EXPORT_SYMBOL(set_anon_super);
 EXPORT_SYMBOL(default_llseek);
 EXPORT_SYMBOL(dentry_open);
 EXPORT_SYMBOL(filemap_nopage);
-EXPORT_SYMBOL(filemap_sync);
 EXPORT_SYMBOL(filemap_fdatawrite);
 EXPORT_SYMBOL(filemap_fdatawait);
 EXPORT_SYMBOL(lock_page);
