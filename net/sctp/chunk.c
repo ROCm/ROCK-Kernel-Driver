@@ -53,7 +53,8 @@
 void sctp_datamsg_init(struct sctp_datamsg *msg)
 {
 	atomic_set(&msg->refcnt, 1);
-	msg->notify_done = 0;
+	msg->send_failed = 0;
+	msg->send_error = 0;
 	INIT_LIST_HEAD(&msg->chunks);
 	INIT_LIST_HEAD(&msg->track);
 }
@@ -74,11 +75,45 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 {
 	struct list_head *pos, *temp;
 	struct sctp_chunk *chunk;
+	struct sctp_opt *sp;
+	struct sctp_ulpevent *ev;
+	struct sctp_association *asoc;
+	int error, notify;
 
-	/* Release all references, if there are any left. */
+	/* If we failed, we may need to notify. */
+	notify = msg->send_failed ? -1 : 0;
+
+	/* Release all references. */
 	list_for_each_safe(pos, temp, &msg->track) {
 		list_del(pos);
 		chunk = list_entry(pos, struct sctp_chunk, frag_list);
+		/* Check whether we _really_ need to notify. */
+		if (notify < 0) {
+			asoc = chunk->asoc;
+			if (msg->send_error)
+				error = msg->send_error;
+			else
+				error = asoc->outqueue.error;
+				
+			sp = sctp_sk(asoc->base.sk);
+			notify = sctp_ulpevent_type_enabled(SCTP_SEND_FAILED,
+							    &sp->subscribe);
+		}
+
+		/* Generate a SEND FAILED event only if enabled. */
+		if (notify > 0) {
+			int sent;
+			if (chunk->has_tsn)
+				sent = SCTP_DATA_SENT;
+			else
+				sent = SCTP_DATA_UNSENT;
+		       
+			ev = sctp_ulpevent_make_send_failed(asoc, chunk, sent, 
+							    error, GFP_ATOMIC);
+			if (ev)
+				sctp_ulpq_tail_event(&asoc->ulpq, ev);
+		}
+
 		sctp_chunk_put(chunk);
 	}
 

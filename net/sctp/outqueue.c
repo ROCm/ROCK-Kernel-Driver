@@ -243,7 +243,6 @@ void sctp_outq_teardown(struct sctp_outq *q)
 	struct sctp_transport *transport;
 	struct list_head *lchunk, *pos, *temp;
 	struct sctp_chunk *chunk;
-	struct sctp_ulpevent *ev;
 
 	/* Throw away unacknowledged chunks. */
 	list_for_each(pos, &q->asoc->peer.transport_addr_list) {
@@ -251,14 +250,9 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		while ((lchunk = sctp_list_dequeue(&transport->transmitted))) {
 			chunk = list_entry(lchunk, struct sctp_chunk,
 					   transmitted_list);
-
+			/* Mark as part of a failed message. */
+			chunk->msg->send_failed = 1;
 			/* Generate a SEND FAILED event. */
-			ev = sctp_ulpevent_make_send_failed(q->asoc,
-					chunk, SCTP_DATA_SENT,
-					q->error, GFP_ATOMIC);
-			if (ev)
-				sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
-
 			sctp_chunk_free(chunk);
 		}
 	}
@@ -282,13 +276,8 @@ void sctp_outq_teardown(struct sctp_outq *q)
 	/* Throw away any leftover data chunks. */
 	while ((chunk = sctp_outq_dequeue_data(q))) {
 
-		/* Generate a SEND FAILED event. */
-		ev = sctp_ulpevent_make_send_failed(q->asoc,
-				chunk, SCTP_DATA_UNSENT,
-				q->error, GFP_ATOMIC);
-		if (ev)
-			sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
-
+		/* Mark as send failure. */
+		chunk->msg->send_failed = 1;
 		sctp_chunk_free(chunk);
 	}
 
@@ -609,215 +598,6 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
 	return error;
 }
 
-/* This routine either transmits the fragment or puts it on the output
- * queue.  'pos' points to the next chunk in the output queue after the
- * chunk that is currently in the process of fragmentation.
- */
-void sctp_xmit_frag(struct sctp_outq *q, struct sctp_chunk *pos,
-		struct sctp_packet *packet, struct sctp_chunk *frag, __u32 tsn)
-{
-	struct sctp_transport *transport = packet->transport;
-	struct sk_buff_head *queue = &q->out;
-	sctp_xmit_t status;
-	int error;
-
-	frag->subh.data_hdr->tsn = htonl(tsn);
-	frag->has_tsn = 1;
-
-	/* An inner fragment may be smaller than the earlier one and may get
-	 * in if we call q->build_output.  This ensures that all the fragments
-	 * are sent in order.
-	 */
-	if (!skb_queue_empty(queue)) {
-		SCTP_DEBUG_PRINTK("sctp_xmit_frag: q not empty. "
-				  "adding 0x%x to outqueue\n",
-				  ntohl(frag->subh.data_hdr->tsn));
-		if (pos)
-			sctp_outq_insert_data(q, frag, pos);
-		else
-			sctp_outq_tail_data(q, frag);
-		return;
-	}
-
-	/* Add the chunk fragment to the packet.  */
-	status = (*q->build_output)(packet, frag);
-	switch (status) {
-	case SCTP_XMIT_RWND_FULL:
-		/* RWND is full, so put the chunk in the output queue. */
-		SCTP_DEBUG_PRINTK("sctp_xmit_frag: rwnd full. "
-				  "adding 0x%x to outqueue\n",
-				  ntohl(frag->subh.data_hdr->tsn));
-		if (pos)
-			sctp_outq_insert_data(q, frag, pos);
-		else
-			sctp_outq_tail_data(q, frag);
-		break;
-
-	case SCTP_XMIT_OK:
-		error = (*q->force_output)(packet);
-		if (error < 0) {
-			/* Packet could not be transmitted, put the chunk in
-			 * the output queue
-			 */
-			SCTP_DEBUG_PRINTK("sctp_xmit_frag: force output "
-					  "failed. adding 0x%x to outqueue\n",
-					  ntohl(frag->subh.data_hdr->tsn));
-			if (pos)
-				sctp_outq_insert_data(q, frag, pos);
-			else
-				sctp_outq_tail_data(q, frag);
-		} else {
-			SCTP_DEBUG_PRINTK("sctp_xmit_frag: force output "
-					  "success. 0x%x sent\n",
-					  ntohl(frag->subh.data_hdr->tsn));
-			list_add_tail(&frag->transmitted_list,
-				      &transport->transmitted);
-
-			sctp_transport_reset_timers(transport);
-		}
-		break;
-
-	default:
-		BUG();
-	};
-}
-
-/* This routine calls sctp_xmit_frag() for all the fragments of a message.
- * The argument 'frag' point to the first fragment and it holds the list
- * of all the other fragments in the 'frag_list' field.
- */
-void sctp_xmit_fragmented_chunks(struct sctp_outq *q, struct sctp_packet *pkt,
-				 struct sctp_chunk *frag)
-{
-	struct sctp_association *asoc = frag->asoc;
-	struct list_head *lfrag, *frag_list;
-	__u32 tsn;
-	int nfrags = 1;
-	struct sctp_chunk *pos;
-
-	/* Count the number of fragments. */
-	frag_list = &frag->frag_list;
-	list_for_each(lfrag, frag_list) {
-		nfrags++;
-	}
-
-	/* Get a TSN block of nfrags TSNs. */
-	tsn = sctp_association_get_tsn_block(asoc, nfrags);
-
-	pos = (struct sctp_chunk *)skb_peek(&q->out);
-	/* Transmit the first fragment. */
-	sctp_xmit_frag(q, pos, pkt, frag, tsn++);
-
-	/* Transmit the rest of fragments. */
-	frag_list = &frag->frag_list;
-	list_for_each(lfrag, frag_list) {
-		frag = list_entry(lfrag, struct sctp_chunk, frag_list);
-		sctp_xmit_frag(q, pos, pkt, frag, tsn++);
-	}
-}
-
-/* This routine breaks the given chunk into 'max_frag_data_len' size
- * fragments.  It returns the first fragment with the frag_list field holding
- * the remaining fragments.
- */
-struct sctp_chunk *sctp_fragment_chunk(struct sctp_chunk *chunk,
-				  size_t max_frag_data_len)
-{
-	struct sctp_association *asoc = chunk->asoc;
-	void *data_ptr = chunk->subh.data_hdr;
-	struct sctp_sndrcvinfo *sinfo = &chunk->sinfo;
-	__u16 chunk_data_len = sctp_data_size(chunk);
-	__u16 ssn = ntohs(chunk->subh.data_hdr->ssn);
-	struct sctp_chunk *first_frag, *frag;
-	struct list_head *frag_list;
-	int nfrags;
-	__u8 old_flags, flags;
-
-	/* nfrags = no. of max size fragments + any smaller last fragment. */
-	nfrags = ((chunk_data_len / max_frag_data_len) +
-		  ((chunk_data_len % max_frag_data_len) ? 1 : 0));
-
-	/* Start of the data in the chunk. */
-	data_ptr += sizeof(sctp_datahdr_t);
-
-	/* Are we fragmenting an already fragmented large message? */
- 	old_flags = chunk->chunk_hdr->flags;
-	if (old_flags & SCTP_DATA_FIRST_FRAG)
-		flags = SCTP_DATA_FIRST_FRAG;
-	else
-		flags = SCTP_DATA_MIDDLE_FRAG;
-
-	/* Make the first fragment. */
-	first_frag = sctp_make_datafrag(asoc, sinfo, max_frag_data_len,
-					data_ptr, flags, ssn);
-
-	if (!first_frag)
-		goto err;
-	sctp_datamsg_assign(chunk->msg, first_frag);
-	first_frag->has_ssn = 1;
-	/* All the fragments are added to the frag_list of the first chunk. */
-	frag_list = &first_frag->frag_list;
-
-	chunk_data_len -= max_frag_data_len;
-	data_ptr += max_frag_data_len;
-
-	/* Make the middle fragments. */
-	while (chunk_data_len > max_frag_data_len) {
-		frag = sctp_make_datafrag(asoc, sinfo, max_frag_data_len,
-					  data_ptr, SCTP_DATA_MIDDLE_FRAG,
-					  ssn);
-		if (!frag)
-			goto err;
-		sctp_datamsg_assign(chunk->msg, frag);
-		frag->has_ssn = 1;
-		/* Add the middle fragment to the first fragment's
-		 * frag_list.
-		 */
-		list_add_tail(&frag->frag_list, frag_list);
-
-		chunk_data_len -= max_frag_data_len;
-		data_ptr += max_frag_data_len;
-	}
-
-	if (old_flags & SCTP_DATA_LAST_FRAG)
-		flags = SCTP_DATA_LAST_FRAG;
-	else
-		flags = SCTP_DATA_MIDDLE_FRAG;
-
-	/* Make the last fragment. */
-	frag = sctp_make_datafrag(asoc, sinfo, chunk_data_len, data_ptr,
-				  flags, ssn);
-	if (!frag)
-		goto err;
-	sctp_datamsg_assign(chunk->msg, frag);
-	frag->has_ssn = 1;
-
-	/* Add the last fragment to the first fragment's frag_list. */
-	list_add_tail(&frag->frag_list, frag_list);
-
-	/* Free the original chunk. */
-	sctp_chunk_free(chunk);
-
-	return first_frag;
-
-err:
-	/* Free any fragments that are created before the failure.  */
-	if (first_frag) {
-		struct list_head *flist, *lfrag;
-
-		/* Free all the fragments off the first one. */
-		flist = &first_frag->frag_list;
-		while (NULL != (lfrag = sctp_list_dequeue(flist))) {
-			frag = list_entry(lfrag, struct sctp_chunk, frag_list);
-			sctp_chunk_free(frag);
-		}
-		/* Free the first fragment. */
-		sctp_chunk_free(first_frag);
-	}
-
-	return NULL;
-}
-
 /* Cork the outqueue so queued chunks are really queued. */
 int sctp_outq_uncork(struct sctp_outq *q)
 {
@@ -1020,14 +800,9 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 			 */
 			if (chunk->sinfo.sinfo_stream >=
 			    asoc->c.sinit_num_ostreams) {
-				struct sctp_ulpevent *ev;
-
-				/* Generate a SEND FAILED event. */
-				ev = sctp_ulpevent_make_send_failed(asoc,
-					    chunk, SCTP_DATA_UNSENT,
-					    SCTP_ERROR_INV_STRM, GFP_ATOMIC);
-				if (ev)
-					sctp_ulpq_tail_event(&asoc->ulpq, ev);
+				/* Mark as failed send. */
+				chunk->msg->send_failed = 1;
+				chunk->msg->send_error = SCTP_ERROR_INV_STRM;
 
 				/* Free the chunk. */
 				sctp_chunk_free(chunk);
@@ -1096,26 +871,6 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 				sctp_outq_head_data(q, chunk);
 				goto sctp_flush_out;
 				break;
-
-			case SCTP_XMIT_MUST_FRAG: {
-				struct sctp_chunk *frag;
-
-				frag = sctp_fragment_chunk(chunk,
-					packet->transport->asoc->frag_point);
-				if (!frag) {
-					/* We could not fragment due to out of
-					 * memory condition. Free the original
-					 * chunk and return ENOMEM.
-					 */
-					sctp_chunk_free(chunk);
-					error = -ENOMEM;
-					return error;
-				}
-
-				sctp_xmit_fragmented_chunks(q, packet, frag);
-				goto sctp_flush_out;
-				break;
-			}
 
 			case SCTP_XMIT_OK:
 				break;

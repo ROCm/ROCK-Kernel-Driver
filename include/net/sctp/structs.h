@@ -459,8 +459,9 @@ struct sctp_datamsg {
 	struct list_head track;
 	/* Reference counting. */
 	atomic_t refcnt;
-	/* Have the SEND_FAILED notifications been done. */
-	__u8 notify_done;
+	/* Did the messenge fail to send? */
+	int send_error;
+	char send_failed;
 };
 
 struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *,
