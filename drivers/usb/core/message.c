@@ -572,13 +572,16 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
 	memset(buf,0,size);	// Make sure we parse really received data
 
 	while (i--) {
-		/* retries if the returned length was 0; flakey device */
+		/* retry on length 0 or stall; some devices are flakey */
 		if ((result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 				    USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 				    (type << 8) + index, 0, buf, size,
 				    HZ * USB_CTRL_GET_TIMEOUT)) > 0
-				|| result == -EPIPE)
+				|| result != -EPIPE)
 			break;
+
+		dev_dbg (&dev->dev, "RETRY descriptor, result %d\n", result);
+		result = -ENOMSG;
 	}
 	return result;
 }
@@ -1244,7 +1247,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 
 	/* get langid for strings if it's not yet known */
 	if (!dev->have_langid) {
-		err = usb_get_string(dev, 0, 0, tbuf, 4);
+		err = usb_get_descriptor(dev, USB_DT_STRING, 0, tbuf, 4);
 		if (err < 0) {
 			dev_err (&dev->dev,
 				"string descriptor 0 read error: %d\n",
@@ -1268,11 +1271,19 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	 */
 
 	err = usb_get_string(dev, dev->string_langid, index, tbuf, 2);
+	if (err == -EPIPE) {
+		dev_dbg(&dev->dev, "RETRY string %d read/%d\n", index, 2);
+		err = usb_get_string(dev, dev->string_langid, index, tbuf, 2);
+	}
 	if(err<2)
 		goto errout;
 	len=tbuf[0];	
 	
 	err = usb_get_string(dev, dev->string_langid, index, tbuf, len);
+	if (err == -EPIPE) {
+		dev_dbg(&dev->dev, "RETRY string %d read/%d\n", index, len);
+		err = usb_get_string(dev, dev->string_langid, index, tbuf, len);
+	}
 	if (err < 0)
 		goto errout;
 
