@@ -62,6 +62,8 @@
 #define Priority_MessagePendingInterruptsFlag            0x40
 #define Nonpriority_MessageCompletionInterruptsFlag      0x20
 #define Priority_MessageCompletionInterruptsFlag         0x10
+#define IUCVControlInterruptsFlag                        0x08
+#define AllInterrupts                                    0xf8
 /*
  * Mapping of external interrupt buffers should be used with the corresponding
  * interrupt types.                  
@@ -738,6 +740,7 @@ int iucv_send2way_prmmsg_array (u16 pathid,
  *           0x40 - Priority_MessagePendingInterruptsFlag            
  *           0x20 - Nonpriority_MessageCompletionInterruptsFlag      
  *           0x10 - Priority_MessageCompletionInterruptsFlag         
+ *           0x08 - IUCVControlInterruptsFlag
  * Output: NA                                                        
  * Return: Return code from CP IUCV call.                         
 */

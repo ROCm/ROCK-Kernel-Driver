@@ -44,9 +44,6 @@
 #include <linux/kmod.h>
 #endif
 
-#define __KERNEL_SYSCALLS__
-#include <linux/unistd.h>
-
 #include <asm/unaligned.h>
 
 #define MAJOR_NR MD_MAJOR

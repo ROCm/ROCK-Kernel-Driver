@@ -1,630 +1,30 @@
 /*
- * linux/fs/hfs/extent.c
+ *  linux/fs/hfs/extent.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains the functions related to the extents B-tree.
- *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
  */
 
-#include "hfs.h"
+#include <linux/pagemap.h>
 
-/*================ File-local data type ================*/
-
-/* An extent record on disk*/
-struct hfs_raw_extent {
-	hfs_word_t	block1;
-	hfs_word_t	length1;
-	hfs_word_t	block2;
-	hfs_word_t	length2;
-	hfs_word_t	block3;
-	hfs_word_t	length3;
-};
+#include "hfs_fs.h"
+#include "btree.h"
 
 /*================ File-local functions ================*/
 
 /*
  * build_key
  */
-static inline void build_key(struct hfs_ext_key *key,
-			     const struct hfs_fork *fork, hfs_u16 block)
+static void hfs_ext_build_key(hfs_btree_key *key, u32 cnid, u16 block, u8 type)
 {
-	key->KeyLen = 7;
-	key->FkType = fork->fork;
-	hfs_put_nl(fork->entry->cnid, key->FNum);
-	hfs_put_hs(block,             key->FABN);
+	key->key_len = 7;
+	key->ext.FkType = type;
+	key->ext.FNum = cpu_to_be32(cnid);
+	key->ext.FABN = cpu_to_be16(block);
 }
-
-
-/*
- * lock_bitmap()
- *
- * Get an exclusive lock on the B-tree bitmap.
- */
-static inline void lock_bitmap(struct hfs_mdb *mdb) {
-	down(&mdb->bitmap_sem);
-}
-
-/*
- * unlock_bitmap()
- *
- * Relinquish an exclusive lock on the B-tree bitmap.
- */
-static inline void unlock_bitmap(struct hfs_mdb *mdb) {
-	up(&mdb->bitmap_sem);
-}
-
-/*
- * dump_ext()
- *
- * prints the content of a extent for debugging purposes.
- */
-#if defined(DEBUG_EXTENTS) || defined(DEBUG_ALL)
-static void dump_ext(const char *msg, const struct hfs_extent *e) {
-	if (e) {
-		hfs_warn("%s (%d-%d) (%d-%d) (%d-%d)\n", msg,
-			 e->start,
-			 e->start + e->length[0] - 1,
-			 e->start + e->length[0],
-			 e->start + e->length[0] + e->length[1] - 1,
-			 e->start + e->length[0] + e->length[1],
-			 e->end);
-	} else {
-		hfs_warn("%s NULL\n", msg);
-	}
-}
-#else
-#define dump_ext(A,B) {}
-#endif
-
-/*
- * read_extent()
- * 
- * Initializes a (struct hfs_extent) from a (struct hfs_raw_extent) and
- * the number of the starting block for the extent.
- *
- * Note that the callers must check that to,from != NULL
- */
-static void read_extent(struct hfs_extent *to,
-			const struct hfs_raw_extent *from,
-			hfs_u16 start)
-{
-	to->start = start;
-	to->block[0]  = hfs_get_hs(from->block1);
-	to->length[0] = hfs_get_hs(from->length1);
-	to->block[1]  = hfs_get_hs(from->block2);
-	to->length[1] = hfs_get_hs(from->length2);
-	to->block[2]  = hfs_get_hs(from->block3);
-	to->length[2] = hfs_get_hs(from->length3);
-	to->end = start + to->length[0] + to->length[1] + to->length[2] - 1;
-	to->next = to->prev = NULL;
-	to->count = 0;
-}
-
-/*
- * write_extent()
- * 
- * Initializes a (struct hfs_raw_extent) from a (struct hfs_extent).
- *
- * Note that the callers must check that to,from != NULL
- */
-static void write_extent(struct hfs_raw_extent *to,
-			 const struct hfs_extent *from)
-{
-	hfs_put_hs(from->block[0], to->block1);
-	hfs_put_hs(from->length[0], to->length1);
-	hfs_put_hs(from->block[1], to->block2);
-	hfs_put_hs(from->length[1], to->length2);
-	hfs_put_hs(from->block[2], to->block3);
-	hfs_put_hs(from->length[2], to->length3);
-}
-
-/*
- * decode_extent()
- *
- * Given an extent record and allocation block offset into the file,
- * return the number of the corresponding allocation block on disk,
- * or -1 if the desired block is not mapped by the given extent.
- *
- * Note that callers must check that extent != NULL
- */
-static int decode_extent(const struct hfs_extent * extent, int block)
-{
-	if (!extent || (block < extent->start) || (block > extent->end) ||
-	    (extent->end == (hfs_u16)(extent->start - 1))) {
-		return -1;
-	}
-	block -= extent->start;
-	if (block < extent->length[0]) {
-		return block + extent->block[0];
-	}
-	block -= extent->length[0];
-	if (block < extent->length[1]) {
-		return block + extent->block[1];
-	}
-	return block + extent->block[2] - extent->length[1];
-}
-
-/*
- * relse_ext()
- *
- * Reduce the reference count of an in-core extent record by one,
- * removing it from memory if the count falls to zero.
- */
-static void relse_ext(struct hfs_extent *ext)
-{
-	if (--ext->count || !ext->start) {
-		return;
-	}
-	ext->prev->next = ext->next;
-	if (ext->next) {
-		ext->next->prev = ext->prev;
-	}
-	HFS_DELETE(ext);
-}
-
-/*
- * set_cache()
- * 
- * Changes the 'cache' field of the fork.
- */
-static inline void set_cache(struct hfs_fork *fork, struct hfs_extent *ext)
-{
-	struct hfs_extent *tmp = fork->cache;
-
-	++ext->count;
-	fork->cache = ext;
-	relse_ext(tmp);
-}
-
-/*
- * find_ext()
- *
- * Given a pointer to a (struct hfs_file) and an allocation block
- * number in the file, find the extent record containing that block.
- * Returns a pointer to the extent record on success or NULL on failure.
- * The 'cache' field of 'fil' also points to the extent so it has a
- * reference count of at least 2.
- *
- * Callers must check that fil != NULL
- */
-static struct hfs_extent * find_ext(struct hfs_fork *fork, int alloc_block)
-{
-        struct hfs_cat_entry *entry = fork->entry;
-	struct hfs_btree *tr= entry->mdb->ext_tree;
-	struct hfs_ext_key target, *key;
-	struct hfs_brec brec;
-	struct hfs_extent *ext, *ptr;
-	int tmp;
-
-	if (alloc_block < 0) {
-		ext = &fork->first;
-		goto found;
-	}
-
-	ext = fork->cache;
-	if (!ext || (alloc_block < ext->start)) {
-		ext = &fork->first;
-	}
-	while (ext->next && (alloc_block > ext->end)) {
-		ext = ext->next;
-	}
-	if ((alloc_block <= ext->end) && (alloc_block >= ext->start)) {
-		goto found;
-	}
-
-	/* time to read more extents */
-	if (!HFS_NEW(ext)) {
-		goto bail3;
-	}
-
-	build_key(&target, fork, alloc_block);
-
-	tmp = hfs_bfind(&brec, tr, HFS_BKEY(&target), HFS_BFIND_READ_LE);
-	if (tmp < 0) {
-		goto bail2;
-	}
-
-	key = (struct hfs_ext_key *)brec.key;
-	if ((hfs_get_nl(key->FNum) != hfs_get_nl(target.FNum)) ||
-	    (key->FkType != fork->fork)) {
-		goto bail1;
-	}
-		
-	read_extent(ext, brec.data, hfs_get_hs(key->FABN));
-	hfs_brec_relse(&brec, NULL);
-
-	if ((alloc_block > ext->end) && (alloc_block < ext->start)) {
-		/* something strange happened */
-		goto bail2;
-	}
-
-	ptr = fork->cache;
-	if (!ptr || (alloc_block < ptr->start)) {
-		ptr = &fork->first;
-	}
-	while (ptr->next && (alloc_block > ptr->end)) {
-		ptr = ptr->next;
-	}
-	if (ext->start == ptr->start) {
-		/* somebody beat us to it. */
-		HFS_DELETE(ext);
-		ext = ptr;
-	} else if (ext->start < ptr->start) {
-		/* insert just before ptr */
-		ptr->prev->next = ext;
-		ext->prev = ptr->prev;
-		ext->next = ptr;
-		ptr->prev = ext;
-	} else {
-		/* insert at end */
-		ptr->next = ext;
-		ext->prev = ptr;
-	}
- found:
-	++ext->count; /* for return value */
-	set_cache(fork, ext);
-	return ext;
-
- bail1:
-	hfs_brec_relse(&brec, NULL);
- bail2:
-	HFS_DELETE(ext);
- bail3:
-	return NULL;
-}
-
-/*
- * delete_extent()
- *
- * Description:
- *   Deletes an extent record from a fork, reducing its physical length.
- * Input Variable(s):
- *   struct hfs_fork *fork: the fork
- *   struct hfs_extent *ext: the current last extent for 'fork'
- * Output Variable(s):
- *   NONE
- * Returns:
- *   void
- * Preconditions:
- *   'fork' points to a valid (struct hfs_fork)
- *   'ext' point to a valid (struct hfs_extent) which is the last in 'fork'
- *    and which is not also the first extent in 'fork'.
- * Postconditions:
- *   The extent record has been removed if possible, and a warning has been
- *   printed otherwise.
- */
-static void delete_extent(struct hfs_fork *fork, struct hfs_extent *ext)
-{
-	struct hfs_mdb *mdb = fork->entry->mdb;
-	struct hfs_ext_key key;
-	int error;
-
-	if (fork->cache == ext) {
-		set_cache(fork, ext->prev);
-	}
-	ext->prev->next = NULL;
-	if (ext->count != 1) {
-		hfs_warn("hfs_truncate: extent has count %d.\n", ext->count);
-	}
-
-	lock_bitmap(mdb);
-	error = hfs_clear_vbm_bits(mdb, ext->block[2], ext->length[2]);
-	if (error) {
-		hfs_warn("hfs_truncate: error %d freeing blocks.\n", error);
-	}
-	error = hfs_clear_vbm_bits(mdb, ext->block[1], ext->length[1]);
-	if (error) {
-		hfs_warn("hfs_truncate: error %d freeing blocks.\n", error);
-	}
-	error = hfs_clear_vbm_bits(mdb, ext->block[0], ext->length[0]);
-	if (error) {
-		hfs_warn("hfs_truncate: error %d freeing blocks.\n", error);
-	}
-	unlock_bitmap(mdb);
-
-	build_key(&key, fork, ext->start);
-
-	error = hfs_bdelete(mdb->ext_tree, HFS_BKEY(&key));
-	if (error) {
-		hfs_warn("hfs_truncate: error %d deleting an extent.\n", error);
-	}
-
-	HFS_DELETE(ext);
-}
-
-/*
- * new_extent()
- *
- * Description:
- *   Adds a new extent record to a fork, extending its physical length.
- * Input Variable(s):
- *   struct hfs_fork *fork: the fork to extend
- *   struct hfs_extent *ext: the current last extent for 'fork'
- *   hfs_u16 ablock: the number of allocation blocks in 'fork'.
- *   hfs_u16 start: first allocation block to add to 'fork'.
- *   hfs_u16 len: the number of allocation blocks to add to 'fork'.
- *   hfs_u32 ablksz: number of sectors in an allocation block.
- * Output Variable(s):
- *   NONE
- * Returns:
- *   (struct hfs_extent *) the new extent or NULL
- * Preconditions:
- *   'fork' points to a valid (struct hfs_fork)
- *   'ext' point to a valid (struct hfs_extent) which is the last in 'fork'
- *   'ablock', 'start', 'len' and 'ablksz' are what they claim to be.
- * Postconditions:
- *   If NULL is returned then no changes have been made to 'fork'.
- *   If the return value is non-NULL that it is the extent that has been
- *   added to 'fork' both in memory and on disk.  The 'psize' field of
- *   'fork' has been updated to reflect the new physical size.
- */
-static struct hfs_extent *new_extent(struct hfs_fork *fork,
-				     struct hfs_extent *ext,
-				     hfs_u16 ablock, hfs_u16 start,
-				     hfs_u16 len, hfs_u16 ablksz)
-{
-	struct hfs_raw_extent raw;
-	struct hfs_ext_key key;
-	int error;
-
-	if (fork->entry->cnid == htonl(HFS_EXT_CNID)) {
-		/* Limit extents tree to the record in the MDB */
-		return NULL;
-	}
-
-	if (!HFS_NEW(ext->next)) {
-		return NULL;
-	}
-	ext->next->prev = ext;
-	ext->next->next = NULL;
-	ext = ext->next;
-	relse_ext(ext->prev);
-
-	ext->start = ablock;
-	ext->block[0] = start;
-	ext->length[0] = len;
-	ext->block[1] = 0;
-	ext->length[1] = 0;
-	ext->block[2] = 0;
-	ext->length[2] = 0;
-	ext->end = ablock + len - 1;
-	ext->count = 1;
-
-	write_extent(&raw, ext);
-	
-	build_key(&key, fork, ablock);
-
-	error = hfs_binsert(fork->entry->mdb->ext_tree, 
-			    HFS_BKEY(&key), &raw, sizeof(raw));
-	if (error) {
-		ext->prev->next = NULL;
-		HFS_DELETE(ext);
-		return NULL;
-	}
-	set_cache(fork, ext);
-	return ext;
-}
-
-/*
- * update_ext()
- *
- * Given a (struct hfs_fork) write an extent record back to disk.
- */
-static void update_ext(struct hfs_fork *fork, struct hfs_extent *ext)
-{
-	struct hfs_ext_key target;
-	struct hfs_brec brec;
-
-	if (ext->start) {
-		build_key(&target, fork, ext->start);
-
-		if (!hfs_bfind(&brec, fork->entry->mdb->ext_tree,
-			       HFS_BKEY(&target), HFS_BFIND_WRITE)) {
-			write_extent(brec.data, ext);
-			hfs_brec_relse(&brec, NULL);
-		}
-	}
-}
-
-/*
- * zero_blocks()
- * 
- * Zeros-out 'num' allocation blocks beginning with 'start'.
- */
-static int zero_blocks(struct hfs_mdb *mdb, int start, int num) {
-	hfs_buffer buf;
-	int end;
-	int j;
-
-	start = mdb->fs_start + start * mdb->alloc_blksz;
-	end = start + num * mdb->alloc_blksz;
-
-	for (j=start; j<end; ++j) {
-		if (hfs_buffer_ok(buf = hfs_buffer_get(mdb->sys_mdb, j, 0))) {
-			memset(hfs_buffer_data(buf), 0, HFS_SECTOR_SIZE);
-			hfs_buffer_dirty(buf);
-			hfs_buffer_put(buf);
-		}
-	}
-	return 0;
-}
-
-/*
- * shrink_fork()
- *
- * Try to remove enough allocation blocks from 'fork'
- * so that it is 'ablocks' allocation blocks long. 
- */
-static void shrink_fork(struct hfs_fork *fork, int ablocks)
-{
-	struct hfs_mdb *mdb = fork->entry->mdb;
-	struct hfs_extent *ext;
-	int i, error, next, count;
-	hfs_u32 ablksz = mdb->alloc_blksz;
-
-	next =  (fork->psize / ablksz) - 1;
-	ext = find_ext(fork, next);
-	while (ext && ext->start && (ext->start >= ablocks)) {
-		next = ext->start - 1;
-		delete_extent(fork, ext);
-		ext = find_ext(fork, next);
-	}
-	if (!ext) {
-		fork->psize = (next + 1) * ablksz;
-		return;
-	}
-
-	if ((count = next + 1 - ablocks) > 0) {
-		for (i=2; (i>=0) && !ext->length[i]; --i) {};
-		lock_bitmap(mdb);
-		while (count && (ext->length[i] <= count)) {
-			ext->end -= ext->length[i];
-			count -= ext->length[i];
-			error = hfs_clear_vbm_bits(mdb, ext->block[i],
-						   ext->length[i]);
-			if (error) {
-				hfs_warn("hfs_truncate: error %d freeing "
-				       "blocks.\n", error);
-			}
-			ext->block[i] = ext->length[i] = 0;
-			--i;
-		}
-		if (count) {
-			ext->end -= count;
-			ext->length[i] -= count;
-			error = hfs_clear_vbm_bits(mdb, ext->block[i] +
-						       ext->length[i], count);
-			if (error) {
-				hfs_warn("hfs_truncate: error %d freeing "
-				       "blocks.\n", error);
-			}
-		}
-		unlock_bitmap(mdb);
-		update_ext(fork, ext);
-	}
-
-	fork->psize = ablocks * ablksz;
-}
-
-/*
- * grow_fork()
- *
- * Try to add enough allocation blocks to 'fork'
- * so that it is 'ablock' allocation blocks long. 
- */
-static int grow_fork(struct hfs_fork *fork, int ablocks)
-{
-	struct hfs_cat_entry *entry = fork->entry;
-	struct hfs_mdb *mdb = entry->mdb;
-	struct hfs_extent *ext;
-	int i, start, err;
-	hfs_u16 need, len=0;
-	hfs_u32 ablksz = mdb->alloc_blksz;
-	hfs_u32 blocks, clumpablks;
-
-	blocks = fork->psize;
-	need = ablocks - blocks/ablksz;
-	if (need < 1) { /* no need to grow the fork */
-		return 0;
-	}
-
-	/* round up to clumpsize */
-	if (entry->u.file.clumpablks) {
-		clumpablks = entry->u.file.clumpablks;
-	} else {
-		clumpablks = mdb->clumpablks;
-	}
-	need = ((need + clumpablks - 1) / clumpablks) * clumpablks;
-
-	/* find last extent record and try to extend it */
-	if (!(ext = find_ext(fork, blocks/ablksz - 1))) {
-		/* somehow we couldn't find the end of the file! */
-		return -1;
-	}
-
-	/* determine which is the last used extent in the record */
-	/* then try to allocate the blocks immediately following it */
-	for (i=2; (i>=0) && !ext->length[i]; --i) {};
-	if (i>=0) {
-		/* try to extend the last extent */
-		start = ext->block[i] + ext->length[i];
-
-		err = 0;
-		lock_bitmap(mdb);
-		len = hfs_vbm_count_free(mdb, start);
-		if (!len) {
-			unlock_bitmap(mdb);
-			goto more_extents;
-		}
-		if (need < len) {
-			len = need;
-		}
-		err = hfs_set_vbm_bits(mdb, start, len);
-		unlock_bitmap(mdb);
-		if (err) {
-			relse_ext(ext);
-			return -1;
-		}
-	
-		zero_blocks(mdb, start, len);
-	
-		ext->length[i] += len;
-		ext->end += len;
-		blocks = (fork->psize += len * ablksz);
-		need -= len;
-		update_ext(fork, ext);
-	}
-
-more_extents:
-	/* add some more extents */
-	while (need) {
-		len = need;
-		err = 0;
-		lock_bitmap(mdb);
-		start = hfs_vbm_search_free(mdb, &len);
-		if (need < len) {
-			len = need;
-		}
-		err = hfs_set_vbm_bits(mdb, start, len);
-		unlock_bitmap(mdb);
-		if (!len || err) {
-			relse_ext(ext);
-			return -1;
-		}
-		zero_blocks(mdb, start, len);
-
-		/* determine which is the first free extent in the record */
-		for (i=0; (i<3) && ext->length[i]; ++i) {};
-		if (i < 3) {
-			ext->block[i] = start;
-			ext->length[i] = len;
-			ext->end += len;
-			update_ext(fork, ext);
-		} else {
-			if (!(ext = new_extent(fork, ext, blocks/ablksz,
-					       start, len, ablksz))) {
-				lock_bitmap(mdb);
-				hfs_clear_vbm_bits(mdb, start, len);
-				unlock_bitmap(mdb);
-				return -1;
-			}
-		}
-		blocks = (fork->psize += len * ablksz);
-		need -= len;
-	}
-	set_cache(fork, ext);
-	relse_ext(ext);
-	return 0;
-}
-
-/*================ Global functions ================*/
 
 /*
  * hfs_ext_compare()
@@ -647,159 +47,480 @@ more_extents:
  *   key1 and key2 point to "valid" (struct hfs_ext_key)s.
  * Postconditions:
  *   This function has no side-effects */
-int hfs_ext_compare(const struct hfs_ext_key *key1,
-		    const struct hfs_ext_key *key2)
+int hfs_ext_keycmp(const btree_key *key1, const btree_key *key2)
 {
 	unsigned int tmp;
 	int retval;
 
-	tmp = hfs_get_hl(key1->FNum) - hfs_get_hl(key2->FNum);
+	tmp = be32_to_cpu(key1->ext.FNum) - be32_to_cpu(key2->ext.FNum);
 	if (tmp != 0) {
 		retval = (int)tmp;
 	} else {
-		tmp = (unsigned char)key1->FkType - (unsigned char)key2->FkType;
+		tmp = (unsigned char)key1->ext.FkType - (unsigned char)key2->ext.FkType;
 		if (tmp != 0) {
 			retval = (int)tmp;
 		} else {
-			retval = (int)(hfs_get_hs(key1->FABN)
-				       - hfs_get_hs(key2->FABN));
+			retval = (int)(be16_to_cpu(key1->ext.FABN)
+				       - be16_to_cpu(key2->ext.FABN));
 		}
 	}
 	return retval;
 }
 
 /*
- * hfs_extent_adj()
+ * hfs_ext_find_block
  *
- * Given an hfs_fork shrink or grow the fork to hold the
- * forks logical size.
+ * Find a block within an extent record
  */
-void hfs_extent_adj(struct hfs_fork *fork)
+static u16 hfs_ext_find_block(struct hfs_extent *ext, u16 off)
 {
-	if (fork) {
-		hfs_u32 blks, ablocks, ablksz;
+	int i;
+	u16 count;
 
-		if (fork->lsize > HFS_FORK_MAX) {
-			fork->lsize = HFS_FORK_MAX;
-		}
-
-		blks = (fork->lsize+HFS_SECTOR_SIZE-1) >> HFS_SECTOR_SIZE_BITS;
-		ablksz = fork->entry->mdb->alloc_blksz;
-		ablocks = (blks + ablksz - 1) / ablksz;
-
-		if (blks > fork->psize) {
-			grow_fork(fork, ablocks);
-			if (blks > fork->psize) {
-				fork->lsize =
-					fork->psize >> HFS_SECTOR_SIZE_BITS;
-			}
-		} else if (blks < fork->psize) {
-			shrink_fork(fork, ablocks);
-		}
+	for (i = 0; i < 3; ext++, i++) {
+		count = be16_to_cpu(ext->count);
+		if (off < count)
+			return be16_to_cpu(ext->block) + off;
+		off -= count;
 	}
-}
-
-/*
- * hfs_extent_map()
- *
- * Given an hfs_fork and a block number within the fork, return the
- * number of the corresponding physical block on disk, or zero on
- * error.
- */
-int hfs_extent_map(struct hfs_fork *fork, int block, int create) 
-{
-	int ablksz, ablock, offset, tmp;
-	struct hfs_extent *ext;
-
-	if (!fork || !fork->entry || !fork->entry->mdb) {
-		return 0;
-	}
-
-#if defined(DEBUG_EXTENTS) || defined(DEBUG_ALL)
-	hfs_warn("hfs_extent_map: ablock %d of file %d, fork %d\n",
-		 block, fork->entry->cnid, fork->fork);
-#endif
-
-	if (block < 0) {
-		hfs_warn("hfs_extent_map: block < 0\n");
-		return 0;
-	}
-	if (block > (HFS_FORK_MAX >> HFS_SECTOR_SIZE_BITS)) {
-		hfs_warn("hfs_extent_map: block(0x%08x) > big; cnid=%d "
-			 "fork=%d\n", block, fork->entry->cnid, fork->fork);
-		return 0;
-	}
-	ablksz = fork->entry->mdb->alloc_blksz;
-	offset = fork->entry->mdb->fs_start + (block % ablksz);
-	ablock = block / ablksz;
-	
-	if (block >= fork->psize) {
-		if (!create || (grow_fork(fork, ablock + 1) < 0))
-			return 0;
-	}
-
-#if defined(DEBUG_EXTENTS) || defined(DEBUG_ALL)
-	hfs_warn("(lblock %d offset %d)\n", ablock, offset);
-#endif
-
-	if ((ext = find_ext(fork, ablock))) {
-		dump_ext("trying new: ", ext);
-		tmp = decode_extent(ext, ablock);
-		relse_ext(ext);
-		if (tmp >= 0) {
-			return tmp*ablksz + offset;
-		}
-	} 
-
+	/* panic? */
 	return 0;
 }
 
-/*
- * hfs_extent_out()
- *
- * Copy the first extent record from a (struct hfs_fork) to a (struct
- * raw_extent), record (normally the one in the catalog entry).
- */
-void hfs_extent_out(const struct hfs_fork *fork, hfs_byte_t dummy[12])
+static int hfs_ext_block_count(struct hfs_extent *ext)
 {
-	struct hfs_raw_extent *ext = (struct hfs_raw_extent *)dummy;
+	int i;
+	u16 count = 0;
 
-	if (fork && ext) {
-		write_extent(ext, &fork->first);
-		dump_ext("extent out: ", &fork->first);
+	for (i = 0; i < 3; ext++, i++)
+		count += be16_to_cpu(ext->count);
+	return count;
+}
+
+static u16 hfs_ext_lastblock(struct hfs_extent *ext)
+{
+	int i;
+
+	ext += 2;
+	for (i = 0; i < 2; ext--, i++)
+		if (ext->count)
+			break;
+	return be16_to_cpu(ext->block) + be16_to_cpu(ext->count);
+}
+
+static void __hfs_ext_write_extent(struct inode *inode, struct hfs_find_data *fd)
+{
+	int res;
+
+	hfs_ext_build_key(fd->search_key, inode->i_ino, HFS_I(inode)->cached_start,
+			  HFS_IS_RSRC(inode) ?  HFS_FK_RSRC : HFS_FK_DATA);
+	res = hfs_brec_find(fd);
+	if (HFS_I(inode)->flags & HFS_FLG_EXT_NEW) {
+		if (res != -ENOENT)
+			return;
+		hfs_brec_insert(fd, HFS_I(inode)->cached_extents, sizeof(hfs_extent_rec));
+		HFS_I(inode)->flags &= ~(HFS_FLG_EXT_DIRTY|HFS_FLG_EXT_NEW);
+	} else {
+		if (res)
+			return;
+		hfs_bnode_write(fd->bnode, HFS_I(inode)->cached_extents, fd->entryoffset, fd->entrylength);
+		HFS_I(inode)->flags &= ~HFS_FLG_EXT_DIRTY;
 	}
 }
 
-/*
- * hfs_extent_in()
- *
- * Copy an raw_extent to the 'first' and 'cache' fields of an hfs_fork.
- */
-void hfs_extent_in(struct hfs_fork *fork, const hfs_byte_t dummy[12])
+void hfs_ext_write_extent(struct inode *inode)
 {
-	const struct hfs_raw_extent *ext =
-		(const struct hfs_raw_extent *)dummy;
+	struct hfs_find_data fd;
 
-	if (fork && ext) {
-		read_extent(&fork->first, ext, 0);
-		fork->cache = &fork->first;
-		fork->first.count = 2;
-		dump_ext("extent in: ", &fork->first);
+	if (HFS_I(inode)->flags & HFS_FLG_EXT_DIRTY) {
+		hfs_find_init(HFS_SB(inode->i_sb)->ext_tree, &fd);
+		__hfs_ext_write_extent(inode, &fd);
+		hfs_find_exit(&fd);
 	}
 }
 
-/* 
- * hfs_extent_free()
- *
- * Removes from memory all extents associated with 'fil'.
- */
-void hfs_extent_free(struct hfs_fork *fork)
+static inline int __hfs_ext_read_extent(struct hfs_find_data *fd, struct hfs_extent *extent,
+					u32 cnid, u32 block, u8 type)
 {
-	if (fork) {
-		set_cache(fork, &fork->first);
+	int res;
 
-	        if (fork->first.next) {
-		        hfs_warn("hfs_extent_free: extents in use!\n");
+	hfs_ext_build_key(fd->search_key, cnid, block, type);
+	fd->key->ext.FNum = 0;
+	res = hfs_brec_find(fd);
+	if (res && res != -ENOENT)
+		return res;
+	if (fd->key->ext.FNum != fd->search_key->ext.FNum ||
+	    fd->key->ext.FkType != fd->search_key->ext.FkType)
+		return -ENOENT;
+	if (fd->entrylength != sizeof(hfs_extent_rec))
+		return -EIO;
+	hfs_bnode_read(fd->bnode, extent, fd->entryoffset, sizeof(hfs_extent_rec));
+	return 0;
+}
+
+static inline int __hfs_ext_cache_extent(struct hfs_find_data *fd, struct inode *inode, u32 block)
+{
+	int res;
+
+	if (HFS_I(inode)->flags & HFS_FLG_EXT_DIRTY)
+		__hfs_ext_write_extent(inode, fd);
+
+	res = __hfs_ext_read_extent(fd, HFS_I(inode)->cached_extents, inode->i_ino,
+				    block, HFS_IS_RSRC(inode) ? HFS_FK_RSRC : HFS_FK_DATA);
+	if (!res) {
+		HFS_I(inode)->cached_start = be16_to_cpu(fd->key->ext.FABN);
+		HFS_I(inode)->cached_blocks = hfs_ext_block_count(HFS_I(inode)->cached_extents);
+	} else {
+		HFS_I(inode)->cached_start = HFS_I(inode)->cached_blocks = 0;
+		HFS_I(inode)->flags &= ~(HFS_FLG_EXT_DIRTY|HFS_FLG_EXT_NEW);
+	}
+	return res;
+}
+
+static int hfs_ext_read_extent(struct inode *inode, u16 block)
+{
+	struct hfs_find_data fd;
+	int res;
+
+	if (block >= HFS_I(inode)->cached_start &&
+	    block < HFS_I(inode)->cached_start + HFS_I(inode)->cached_blocks)
+		return 0;
+
+	hfs_find_init(HFS_SB(inode->i_sb)->ext_tree, &fd);
+	res = __hfs_ext_cache_extent(&fd, inode, block);
+	hfs_find_exit(&fd);
+	return res;
+}
+
+static void hfs_dump_extent(struct hfs_extent *extent)
+{
+	int i;
+
+	dprint(DBG_EXTENT, "   ");
+	for (i = 0; i < 3; i++)
+		dprint(DBG_EXTENT, " %u:%u", be16_to_cpu(extent[i].block),
+				 be16_to_cpu(extent[i].count));
+	dprint(DBG_EXTENT, "\n");
+}
+
+static int hfs_add_extent(struct hfs_extent *extent, u16 offset,
+			  u16 alloc_block, u16 block_count)
+{
+	u16 count, start;
+	int i;
+
+	hfs_dump_extent(extent);
+	for (i = 0; i < 3; extent++, i++) {
+		count = be16_to_cpu(extent->count);
+		if (offset == count) {
+			start = be16_to_cpu(extent->block);
+			if (alloc_block != start + count) {
+				if (++i >= 3)
+					return -ENOSPC;
+				extent++;
+				extent->block = cpu_to_be16(alloc_block);
+			} else
+				block_count += count;
+			extent->count = cpu_to_be16(block_count);
+			return 0;
+		} else if (offset < count)
+			break;
+		offset -= count;
+	}
+	/* panic? */
+	return -EIO;
+}
+
+int hfs_free_extents(struct super_block *sb, struct hfs_extent *extent,
+		     u16 offset, u16 block_nr)
+{
+	u16 count, start;
+	int i;
+
+	hfs_dump_extent(extent);
+	for (i = 0; i < 3; extent++, i++) {
+		count = be16_to_cpu(extent->count);
+		if (offset == count)
+			goto found;
+		else if (offset < count)
+			break;
+		offset -= count;
+	}
+	/* panic? */
+	return -EIO;
+found:
+	for (;;) {
+		start = be16_to_cpu(extent->block);
+		if (count <= block_nr) {
+			hfs_clear_vbm_bits(sb, start, count);
+			extent->block = 0;
+			extent->count = 0;
+			block_nr -= count;
+		} else {
+			count -= block_nr;
+			hfs_clear_vbm_bits(sb, start + count, block_nr);
+			extent->count = cpu_to_be16(count);
+			block_nr = 0;
 		}
+		if (!block_nr || !i)
+			return 0;
+		i--;
+		extent--;
+		count = be16_to_cpu(extent->count);
 	}
+}
+
+int hfs_free_fork(struct super_block *sb, struct hfs_cat_file *file, int type)
+{
+	struct hfs_find_data fd;
+	u32 total_blocks, blocks, start;
+	u32 cnid = be32_to_cpu(file->FlNum);
+	struct hfs_extent *extent;
+	int res, i;
+
+	if (type == HFS_FK_DATA) {
+		total_blocks = file->PyLen;
+		extent = file->ExtRec;
+	} else {
+		total_blocks = file->RPyLen;
+		extent = file->RExtRec;
+	}
+	total_blocks = be32_to_cpu(total_blocks) / HFS_SB(sb)->alloc_blksz;
+	if (!total_blocks)
+		return 0;
+
+	blocks = 0;
+	for (i = 0; i < 3; extent++, i++)
+		blocks += be16_to_cpu(extent[i].count);
+
+	res = hfs_free_extents(sb, extent, blocks, blocks);
+	if (res)
+		return res;
+	if (total_blocks == blocks)
+		return 0;
+
+	hfs_find_init(HFS_SB(sb)->ext_tree, &fd);
+	do {
+		res = __hfs_ext_read_extent(&fd, extent, cnid, total_blocks, type);
+		if (res)
+			break;
+		start = be16_to_cpu(fd.key->ext.FABN);
+		hfs_free_extents(sb, extent, total_blocks - start, total_blocks);
+		hfs_brec_remove(&fd);
+		total_blocks = start;
+	} while (total_blocks > blocks);
+	hfs_find_exit(&fd);
+
+	return res;
+}
+
+/*
+ * hfs_get_block
+ */
+int hfs_get_block(struct inode *inode, sector_t block,
+		  struct buffer_head *bh_result, int create)
+{
+	struct super_block *sb;
+	u16 dblock, ablock;
+	int res;
+
+	sb = inode->i_sb;
+	/* Convert inode block to disk allocation block */
+	ablock = (u32)block / HFS_SB(sb)->fs_div;
+
+	if (block >= inode->i_blocks) {
+		if (block > inode->i_blocks || !create)
+			return -EIO;
+		if (ablock >= HFS_I(inode)->alloc_blocks) {
+			res = hfs_extend_file(inode);
+			if (res)
+				return res;
+		}
+	} else
+		create = 0;
+
+	if (ablock < HFS_I(inode)->first_blocks) {
+		dblock = hfs_ext_find_block(HFS_I(inode)->first_extents, ablock);
+		goto done;
+	}
+
+	down(&HFS_I(inode)->extents_lock);
+	res = hfs_ext_read_extent(inode, ablock);
+	if (!res)
+		dblock = hfs_ext_find_block(HFS_I(inode)->cached_extents,
+					    ablock - HFS_I(inode)->cached_start);
+	else {
+		up(&HFS_I(inode)->extents_lock);
+		return -EIO;
+	}
+	up(&HFS_I(inode)->extents_lock);
+
+done:
+	map_bh(bh_result, sb, HFS_SB(sb)->fs_start +
+	       dblock * HFS_SB(sb)->fs_div +
+	       (u32)block % HFS_SB(sb)->fs_div);
+
+	if (create) {
+		set_buffer_new(bh_result);
+		HFS_I(inode)->phys_size += sb->s_blocksize;
+		inode->i_blocks++;
+		mark_inode_dirty(inode);
+	}
+	return 0;
+}
+
+int hfs_extend_file(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	u32 start, len, goal;
+	int res;
+
+	down(&HFS_I(inode)->extents_lock);
+	if (HFS_I(inode)->alloc_blocks == HFS_I(inode)->first_blocks)
+		goal = hfs_ext_lastblock(HFS_I(inode)->first_extents);
+	else {
+		res = hfs_ext_read_extent(inode, HFS_I(inode)->alloc_blocks);
+		if (res)
+			goto out;
+		goal = hfs_ext_lastblock(HFS_I(inode)->cached_extents);
+	}
+
+	len = HFS_I(inode)->clump_blocks;
+	start = hfs_vbm_search_free(sb, goal, &len);
+	if (!len) {
+		res = -ENOSPC;
+		goto out;
+	}
+
+	dprint(DBG_EXTENT, "extend %lu: %u,%u\n", inode->i_ino, start, len);
+	if (HFS_I(inode)->alloc_blocks == HFS_I(inode)->first_blocks) {
+		if (!HFS_I(inode)->first_blocks) {
+			dprint(DBG_EXTENT, "first extents\n");
+			/* no extents yet */
+			HFS_I(inode)->first_extents[0].block = cpu_to_be16(start);
+			HFS_I(inode)->first_extents[0].count = cpu_to_be16(len);
+			res = 0;
+		} else {
+			/* try to append to extents in inode */
+			res = hfs_add_extent(HFS_I(inode)->first_extents,
+					     HFS_I(inode)->alloc_blocks,
+					     start, len);
+			if (res == -ENOSPC)
+				goto insert_extent;
+		}
+		if (!res) {
+			hfs_dump_extent(HFS_I(inode)->first_extents);
+			HFS_I(inode)->first_blocks += len;
+		}
+	} else {
+		res = hfs_add_extent(HFS_I(inode)->cached_extents,
+				     HFS_I(inode)->alloc_blocks -
+				     HFS_I(inode)->cached_start,
+				     start, len);
+		if (!res) {
+			hfs_dump_extent(HFS_I(inode)->cached_extents);
+			HFS_I(inode)->flags |= HFS_FLG_EXT_DIRTY;
+			HFS_I(inode)->cached_blocks += len;
+		} else if (res == -ENOSPC)
+			goto insert_extent;
+	}
+out:
+	up(&HFS_I(inode)->extents_lock);
+	if (!res) {
+		HFS_I(inode)->alloc_blocks += len;
+		mark_inode_dirty(inode);
+		if (inode->i_ino < HFS_FIRSTUSER_CNID)
+			set_bit(HFS_FLG_ALT_MDB_DIRTY, &HFS_SB(sb)->flags);
+		set_bit(HFS_FLG_MDB_DIRTY, &HFS_SB(sb)->flags);
+		sb->s_dirt = 1;
+	}
+	return res;
+
+insert_extent:
+	dprint(DBG_EXTENT, "insert new extent\n");
+	hfs_ext_write_extent(inode);
+
+	memset(HFS_I(inode)->cached_extents, 0, sizeof(hfs_extent_rec));
+	HFS_I(inode)->cached_extents[0].block = cpu_to_be16(start);
+	HFS_I(inode)->cached_extents[0].count = cpu_to_be16(len);
+	hfs_dump_extent(HFS_I(inode)->cached_extents);
+	HFS_I(inode)->flags |= HFS_FLG_EXT_DIRTY|HFS_FLG_EXT_NEW;
+	HFS_I(inode)->cached_start = HFS_I(inode)->alloc_blocks;
+	HFS_I(inode)->cached_blocks = len;
+
+	res = 0;
+	goto out;
+}
+
+void hfs_file_truncate(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	struct hfs_find_data fd;
+	u16 blk_cnt, alloc_cnt, start;
+	u32 size;
+	int res;
+
+	dprint(DBG_INODE, "truncate: %lu, %Lu -> %Lu\n", inode->i_ino,
+	       (long long)HFS_I(inode)->phys_size, inode->i_size);
+	if (inode->i_size > HFS_I(inode)->phys_size) {
+		struct address_space *mapping = inode->i_mapping;
+		struct page *page;
+		int res;
+
+		size = inode->i_size - 1;
+		page = grab_cache_page(mapping, size >> PAGE_CACHE_SHIFT);
+		if (!page)
+			return;
+		size &= PAGE_CACHE_SIZE - 1;
+		size++;
+		res = mapping->a_ops->prepare_write(NULL, page, size, size);
+		if (!res)
+			res = mapping->a_ops->commit_write(NULL, page, size, size);
+		if (res)
+			inode->i_size = HFS_I(inode)->phys_size;
+		unlock_page(page);
+		page_cache_release(page);
+		mark_inode_dirty(inode);
+		return;
+	}
+	size = inode->i_size + HFS_SB(sb)->alloc_blksz - 1;
+	blk_cnt = size / HFS_SB(sb)->alloc_blksz;
+	alloc_cnt = HFS_I(inode)->alloc_blocks;
+	if (blk_cnt == alloc_cnt)
+		goto out;
+
+	down(&HFS_I(inode)->extents_lock);
+	hfs_find_init(HFS_SB(sb)->ext_tree, &fd);
+	while (1) {
+		if (alloc_cnt == HFS_I(inode)->first_blocks) {
+			hfs_free_extents(sb, HFS_I(inode)->first_extents,
+					 alloc_cnt, alloc_cnt - blk_cnt);
+			hfs_dump_extent(HFS_I(inode)->first_extents);
+			HFS_I(inode)->first_blocks = blk_cnt;
+			break;
+		}
+		res = __hfs_ext_cache_extent(&fd, inode, alloc_cnt);
+		if (res)
+			break;
+		start = HFS_I(inode)->cached_start;
+		hfs_free_extents(sb, HFS_I(inode)->cached_extents,
+				 alloc_cnt - start, alloc_cnt - blk_cnt);
+		hfs_dump_extent(HFS_I(inode)->cached_extents);
+		if (blk_cnt > start) {
+			HFS_I(inode)->flags |= HFS_FLG_EXT_DIRTY;
+			break;
+		}
+		alloc_cnt = start;
+		HFS_I(inode)->cached_start = HFS_I(inode)->cached_blocks = 0;
+		HFS_I(inode)->flags &= ~(HFS_FLG_EXT_DIRTY|HFS_FLG_EXT_NEW);
+		hfs_brec_remove(&fd);
+	}
+	hfs_find_exit(&fd);
+	up(&HFS_I(inode)->extents_lock);
+
+	HFS_I(inode)->alloc_blocks = blk_cnt;
+out:
+	HFS_I(inode)->phys_size = inode->i_size;
+	mark_inode_dirty(inode);
+	inode->i_blocks = (inode->i_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
 }

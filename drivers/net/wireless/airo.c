@@ -1036,8 +1036,8 @@ typedef struct {
 } WifiCtlHdr;
 
 WifiCtlHdr wifictlhdr8023 = {
-ctlhdr: {
-        ctl: HOST_DONT_RLSE,
+	.ctlhdr = {
+		.ctl	= HOST_DONT_RLSE,
 	}
 };
 

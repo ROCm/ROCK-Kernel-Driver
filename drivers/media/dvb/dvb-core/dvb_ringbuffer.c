@@ -24,8 +24,6 @@
  */
 
 
-
-#define __KERNEL_SYSCALLS__
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -123,7 +121,7 @@ ssize_t dvb_ringbuffer_read(struct dvb_ringbuffer *rbuf, u8 *buf, size_t len, in
                 if (copy_to_user(buf, rbuf->data+rbuf->pread, todo))
                         return -EFAULT;
 
-        rbuf->pread = (rbuf->pread + len) % rbuf->size;
+        rbuf->pread = (rbuf->pread + todo) % rbuf->size;
 
         return len;
 }
@@ -155,7 +153,7 @@ ssize_t dvb_ringbuffer_write(struct dvb_ringbuffer *rbuf, const u8 *buf,
                 if (copy_from_user(rbuf->data+rbuf->pwrite, buf, todo)) 
                         return -EFAULT;
 
-        rbuf->pwrite = (rbuf->pwrite + len) % rbuf->size;
+        rbuf->pwrite = (rbuf->pwrite + todo) % rbuf->size;
 
 	return len;
 }

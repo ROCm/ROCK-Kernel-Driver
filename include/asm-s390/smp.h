@@ -29,6 +29,9 @@ typedef struct
 	__u16      cpu;
 } sigp_info;
 
+extern int smp_call_function_on(void (*func) (void *info), void *info,
+				int nonatomic, int wait, int cpu);
+
 extern cpumask_t cpu_online_map;
 extern cpumask_t cpu_possible_map;
 
@@ -61,4 +64,9 @@ extern __inline__ __u16 hard_smp_processor_id(void)
 #define cpu_logical_map(cpu) (cpu)
 
 #endif
+
+#ifndef CONFIG_SMP
+#define smp_call_function_on(func,info,nonatomic,wait,cpu)      ({ 0; })
+#endif
+
 #endif

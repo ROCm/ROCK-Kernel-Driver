@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/blacklist.c
  *   S/390 common I/O routines -- blacklisting of specific devices
- *   $Revision: 1.27 $
+ *   $Revision: 1.29 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -18,9 +18,11 @@
 #include <linux/ctype.h>
 #include <linux/device.h>
 
+#include <asm/cio.h>
 #include <asm/uaccess.h>
 
 #include "blacklist.h"
+#include "cio.h"
 #include "cio_debug.h"
 #include "css.h"
 
@@ -199,8 +201,6 @@ is_blacklisted (int devno)
 }
 
 #ifdef CONFIG_PROC_FS
-
-extern void css_reiterate_subchannels(void);
 /*
  * Function: s390_redo_validation
  * Look for no longer blacklisted devices
@@ -208,9 +208,29 @@ extern void css_reiterate_subchannels(void);
 static inline void
 s390_redo_validation (void)
 {
-	CIO_TRACE_EVENT (0, "redoval");
+	unsigned int irq;
 
-	css_reiterate_subchannels();
+	CIO_TRACE_EVENT (0, "redoval");
+	for (irq = 0; irq <= __MAX_SUBCHANNELS; irq++) {
+		int ret;
+		struct subchannel *sch;
+
+		sch = get_subchannel_by_schid(irq);
+		if (sch) {
+			/* Already known. */
+			put_device(&sch->dev);
+			continue;
+		}
+		ret = css_probe_device(irq);
+		if (ret == -ENXIO)
+			break; /* We're through. */
+		if (ret == -ENOMEM)
+			/*
+			 * Stop validation for now. Bad, but no need for a
+			 * panic.
+			 */
+			break;
+	}
 }
 
 /*

@@ -616,7 +616,9 @@ asmlinkage void do_magic_resume_2(void)
 	PRINTK( "ok\n" );
 
 #ifdef SUSPEND_CONSOLE
+	acquire_console_sem();
 	update_screen(fg_console);	/* Hmm, is this the problem? */
+	release_console_sem();
 #endif
 }
 
