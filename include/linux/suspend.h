@@ -23,16 +23,6 @@ typedef struct pbe {
 
 #define SWAP_FILENAME_MAXLENGTH	32
 
-struct suspend_header {
-	u32 version_code;
-	unsigned long num_physpages;
-	char machine[8];
-	char version[20];
-	int num_cpus;
-	int page_size;
-	suspend_pagedir_t *suspend_pagedir;
-	unsigned int num_pbes;
-};
 
 #define SUSPEND_PD_PAGES(x)     (((x)*sizeof(struct pbe))/PAGE_SIZE+1)
    

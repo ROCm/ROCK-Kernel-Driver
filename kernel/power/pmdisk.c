@@ -28,7 +28,6 @@
 #include <linux/device.h>
 #include <linux/swapops.h>
 #include <linux/bootmem.h>
-#include <linux/utsname.h>
 
 #include <asm/mmu_context.h>
 
@@ -61,17 +60,7 @@ extern suspend_pagedir_t *pagedir_nosave;
 extern suspend_pagedir_t *pagedir_save;
 extern int pagedir_order;
 
-
-struct pmdisk_info {
-	struct new_utsname	uts;
-	u32			version_code;
-	unsigned long		num_physpages;
-	int			cpus;
-	unsigned long		image_pages;
-	unsigned long		pagedir_pages;
-	swp_entry_t		pagedir[768];
-} __attribute__((aligned(PAGE_SIZE))) pmdisk_info;
-
+extern struct swsusp_info swsusp_info;
 
 
 #define PMDISK_SIG	"pmdisk-swap1"
@@ -139,11 +128,11 @@ extern void swsusp_data_free(void);
 
 static void free_pagedir_entries(void)
 {
-	int num = pmdisk_info.pagedir_pages;
+	int num = swsusp_info.pagedir_pages;
 	int i;
 
 	for (i = 0; i < num; i++)
-		swap_free(pmdisk_info.pagedir[i]);
+		swap_free(swsusp_info.pagedir[i]);
 }
 
 
@@ -159,64 +148,15 @@ static int write_pagedir(void)
 	int n = SUSPEND_PD_PAGES(nr_copy_pages);
 	int i;
 
-	pmdisk_info.pagedir_pages = n;
+	swsusp_info.pagedir_pages = n;
 	printk( "Writing pagedir (%d pages)\n", n);
 	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE)
-		error = swsusp_write_page(addr,&pmdisk_info.pagedir[i]);
+		error = swsusp_write_page(addr,&swsusp_info.pagedir[i]);
 	return error;
 }
 
-
-#ifdef DEBUG
-static void dump_pmdisk_info(void)
-{
-	printk(" pmdisk: Version: %u\n",pmdisk_info.version_code);
-	printk(" pmdisk: Num Pages: %ld\n",pmdisk_info.num_physpages);
-	printk(" pmdisk: UTS Sys: %s\n",pmdisk_info.uts.sysname);
-	printk(" pmdisk: UTS Node: %s\n",pmdisk_info.uts.nodename);
-	printk(" pmdisk: UTS Release: %s\n",pmdisk_info.uts.release);
-	printk(" pmdisk: UTS Version: %s\n",pmdisk_info.uts.version);
-	printk(" pmdisk: UTS Machine: %s\n",pmdisk_info.uts.machine);
-	printk(" pmdisk: UTS Domain: %s\n",pmdisk_info.uts.domainname);
-	printk(" pmdisk: CPUs: %d\n",pmdisk_info.cpus);
-	printk(" pmdisk: Image: %ld Pages\n",pmdisk_info.image_pages);
-	printk(" pmdisk: Pagedir: %ld Pages\n",pmdisk_info.pagedir_pages);
-}
-#else
-static void dump_pmdisk_info(void)
-{
-
-}
-#endif
-
-static void init_header(void)
-{
-	memset(&pmdisk_info,0,sizeof(pmdisk_info));
-	pmdisk_info.version_code = LINUX_VERSION_CODE;
-	pmdisk_info.num_physpages = num_physpages;
-	memcpy(&pmdisk_info.uts,&system_utsname,sizeof(system_utsname));
-
-	pmdisk_info.cpus = num_online_cpus();
-	pmdisk_info.image_pages = nr_copy_pages;
-	dump_pmdisk_info();
-}
-
-/**
- *	write_header - Fill and write the suspend header.
- *	@entry:	Location of the last swap entry used.
- *
- *	Allocate a page, fill header, write header. 
- *
- *	@entry is the location of the last pagedir entry written on 
- *	entrance. On exit, it contains the location of the header. 
- */
-
-static int write_header(swp_entry_t * entry)
-{
-	return swsusp_write_page((unsigned long)&pmdisk_info,entry);
-}
-
-
+extern void swsusp_init_header(void);
+extern int swsusp_write_header(swp_entry_t*);
 
 /**
  *	write_suspend_image - Write entire image and metadata.
@@ -228,13 +168,14 @@ static int write_suspend_image(void)
 	int error;
 	swp_entry_t prev = { 0 };
 
+	swsusp_init_header();
 	if ((error = swsusp_data_write()))
 		goto FreeData;
 
 	if ((error = write_pagedir()))
 		goto FreePagedir;
 
-	if ((error = write_header(&prev)))
+	if ((error = swsusp_write_header(&prev)))
 		goto FreePagedir;
 
 	error = mark_swapfiles(prev);
@@ -310,57 +251,10 @@ static int __init check_sig(void)
 }
 
 
-/*
- * Sanity check if this image makes sense with this kernel/swap context
- * I really don't think that it's foolproof but more than nothing..
- */
-
-static const char * __init sanity_check(void)
-{
-	dump_pmdisk_info();
-	if(pmdisk_info.version_code != LINUX_VERSION_CODE)
-		return "kernel version";
-	if(pmdisk_info.num_physpages != num_physpages)
-		return "memory size";
-	if (strcmp(pmdisk_info.uts.sysname,system_utsname.sysname))
-		return "system type";
-	if (strcmp(pmdisk_info.uts.release,system_utsname.release))
-		return "kernel release";
-	if (strcmp(pmdisk_info.uts.version,system_utsname.version))
-		return "version";
-	if (strcmp(pmdisk_info.uts.machine,system_utsname.machine))
-		return "machine";
-	if(pmdisk_info.cpus != num_online_cpus())
-		return "number of cpus";
-	return NULL;
-}
-
-
-static int __init check_header(void)
-{
-	const char * reason = NULL;
-	int error;
-
-	init_header();
-
-	if ((error = bio_read_page(swp_offset(pmdisk_header.pmdisk_info), 
-			       &pmdisk_info)))
-		return error;
-
- 	/* Is this same machine? */
-	if ((reason = sanity_check())) {
-		printk(KERN_ERR "pmdisk: Resume mismatch: %s\n",reason);
-		return -EPERM;
-	}
-	nr_copy_pages = pmdisk_info.image_pages;
-	return error;
-}
-
-
 static int __init read_pagedir(void)
 {
 	unsigned long addr;
-	int i, n = pmdisk_info.pagedir_pages;
+	int i, n = swsusp_info.pagedir_pages;
 	int error = 0;
 
 	pagedir_order = get_bitmask_order(n);
@@ -373,7 +267,7 @@ static int __init read_pagedir(void)
 	pr_debug("pmdisk: Reading pagedir (%d Pages)\n",n);
 
 	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE) {
-		unsigned long offset = swp_offset(pmdisk_info.pagedir[i]);
+		unsigned long offset = swp_offset(swsusp_info.pagedir[i]);
 		if (offset)
 			error = bio_read_page(offset, (void *)addr);
 		else
@@ -388,12 +282,13 @@ static int __init read_pagedir(void)
 static int __init read_suspend_image(void)
 {
 	extern int swsusp_data_read(void);
+	extern int swsusp_check_header(swp_entry_t);
 
 	int error = 0;
 
 	if ((error = check_sig()))
 		return error;
-	if ((error = check_header()))
+	if ((error = swsusp_check_header(pmdisk_header.pmdisk_info)))
 		return error;
 	if ((error = read_pagedir()))
 		return error;

@@ -111,6 +111,8 @@ suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
 suspend_pagedir_t *pagedir_save;
 int pagedir_order __nosavedata = 0;
 
+struct swsusp_info swsusp_info;
+
 struct link {
 	char dummy[PAGE_SIZE - sizeof(swp_entry_t)];
 	swp_entry_t next;
@@ -119,7 +121,6 @@ struct link {
 union diskpage {
 	union swap_header swh;
 	struct link link;
-	struct suspend_header sh;
 };
 
 /*
@@ -154,27 +155,6 @@ static const char name_resume[] = "Resume Machine: ";
 /*
  * Saving part...
  */
-
-static __inline__ int fill_suspend_header(struct suspend_header *sh)
-{
-	memset((char *)sh, 0, sizeof(*sh));
-
-	sh->version_code = LINUX_VERSION_CODE;
-	sh->num_physpages = num_physpages;
-	strncpy(sh->machine, system_utsname.machine, 8);
-	strncpy(sh->version, system_utsname.version, 20);
-	/* FIXME: Is this bogus? --RR */
-	sh->num_cpus = num_online_cpus();
-	sh->page_size = PAGE_SIZE;
-	sh->suspend_pagedir = pagedir_nosave;
-	BUG_ON (pagedir_save != pagedir_nosave);
-	sh->num_pbes = nr_copy_pages;
-	/* TODO: needed? mounted fs' last mounted date comparison
-	 * [so they haven't been mounted since last suspend.
-	 * Maybe it isn't.] [we'd need to do this for _all_ fs-es]
-	 */
-	return 0;
-}
 
 /* We memorize in swapfile_used what swap devices are used for suspension */
 #define SWAPFILE_UNUSED    0
@@ -375,7 +355,55 @@ int swsusp_data_write(void)
 	return error;
 }
 
+#ifdef DEBUG
+static void dump_info(void)
+{
+	printk(" swsusp: Version: %u\n",swsusp_info.version_code);
+	printk(" swsusp: Num Pages: %ld\n",swsusp_info.num_physpages);
+	printk(" swsusp: UTS Sys: %s\n",swsusp_info.uts.sysname);
+	printk(" swsusp: UTS Node: %s\n",swsusp_info.uts.nodename);
+	printk(" swsusp: UTS Release: %s\n",swsusp_info.uts.release);
+	printk(" swsusp: UTS Version: %s\n",swsusp_info.uts.version);
+	printk(" swsusp: UTS Machine: %s\n",swsusp_info.uts.machine);
+	printk(" swsusp: UTS Domain: %s\n",swsusp_info.uts.domainname);
+	printk(" swsusp: CPUs: %d\n",swsusp_info.cpus);
+	printk(" swsusp: Image: %ld Pages\n",swsusp_info.image_pages);
+	printk(" swsusp: Pagedir: %ld Pages\n",swsusp_info.pagedir_pages);
+}
+#else
+static void dump_info(void)
+{
 
+}
+#endif
+
+void swsusp_init_header(void)
+{
+	memset(&swsusp_info,0,sizeof(swsusp_info));
+	swsusp_info.version_code = LINUX_VERSION_CODE;
+	swsusp_info.num_physpages = num_physpages;
+	memcpy(&swsusp_info.uts,&system_utsname,sizeof(system_utsname));
+
+	swsusp_info.suspend_pagedir = pagedir_nosave;
+	swsusp_info.cpus = num_online_cpus();
+	swsusp_info.image_pages = nr_copy_pages;
+	dump_info();
+}
+
+/**
+ *	write_header - Fill and write the suspend header.
+ *	@entry:	Location of the last swap entry used.
+ *
+ *	Allocate a page, fill header, write header. 
+ *
+ *	@entry is the location of the last pagedir entry written on 
+ *	entrance. On exit, it contains the location of the header. 
+ */
+
+int swsusp_write_header(swp_entry_t * entry)
+{
+	return swsusp_write_page((unsigned long)&swsusp_info,entry);
+}
 
 /**
  *    write_suspend_image - Write entire image to disk.
@@ -411,17 +439,12 @@ static int write_suspend_image(void)
 		error = swsusp_write_page(addr,&entry);
 	}
 	printk("H");
-	BUG_ON (sizeof(struct suspend_header) > PAGE_SIZE-sizeof(swp_entry_t));
 	BUG_ON (sizeof(union diskpage) != PAGE_SIZE);
 	BUG_ON (sizeof(struct link) != PAGE_SIZE);
 
-	cur = (void *) buffer;
-	if (fill_suspend_header(&cur->sh))
-		BUG();		/* Not a BUG_ON(): we want fill_suspend_header to be called, always */
-		
-	cur->link.next = entry;
-	if ((error = swsusp_write_page((unsigned long)cur,&entry)))
-		return error;
+	swsusp_init_header();
+	swsusp_info.pagedir[0] = entry;
+	error = swsusp_write_header(&entry);
 	printk( "S" );
 	mark_swapfiles(entry, MARK_SWAP_SUSPEND);
 	printk( "|\n" );
@@ -734,7 +757,7 @@ static int alloc_image_pages(void)
 static int enough_free_mem(void)
 {
 	if(nr_free_pages() < (nr_copy_pages + PAGES_FOR_IO)) {
-		pr_debug("pmdisk: Not enough free pages: Have %d\n",
+		pr_debug("swsusp: Not enough free pages: Have %d\n",
 			 nr_free_pages());
 		return 0;
 	}
@@ -758,7 +781,7 @@ static int enough_swap(void)
 
 	si_swapinfo(&i);
 	if (i.freeswap < (nr_copy_pages + PAGES_FOR_IO))  {
-		pr_debug("pmdisk: Not enough swap. Need %ld\n",i.freeswap);
+		pr_debug("swsusp: Not enough swap. Need %ld\n",i.freeswap);
 		return 0;
 	}
 	return 1;
@@ -1087,35 +1110,6 @@ static int __init swsusp_pagedir_relocate(void)
 	return check_pagedir();
 }
 
-/*
- * Sanity check if this image makes sense with this kernel/swap context
- * I really don't think that it's foolproof but more than nothing..
- */
-
-static int sanity_check_failed(char *reason)
-{
-	printk(KERN_ERR "%s%s\n", name_resume, reason);
-	return -EPERM;
-}
-
-static int sanity_check(struct suspend_header *sh)
-{
-	if (sh->version_code != LINUX_VERSION_CODE)
-		return sanity_check_failed("Incorrect kernel version");
-	if (sh->num_physpages != num_physpages)
-		return sanity_check_failed("Incorrect memory size");
-	if (strncmp(sh->machine, system_utsname.machine, 8))
-		return sanity_check_failed("Incorrect machine type");
-	if (strncmp(sh->version, system_utsname.version, 20))
-		return sanity_check_failed("Incorrect version");
-	if (sh->num_cpus != num_online_cpus())
-		return sanity_check_failed("Incorrect number of cpus");
-	if (sh->page_size != PAGE_SIZE)
-		return sanity_check_failed("Incorrect PAGE_SIZE");
-	return 0;
-}
-
-
 /**
  *	Using bio to read from swap.
  *	This code requires a bit more work than just using buffer heads
@@ -1172,7 +1166,7 @@ static int submit(int rw, pgoff_t page_off, void * page)
 	bio->bi_end_io = end_io;
 
 	if (bio_add_page(bio, virt_to_page(page), PAGE_SIZE, 0) < PAGE_SIZE) {
-		printk("pmdisk: ERROR: adding page to bio at %ld\n",page_off);
+		printk("swsusp: ERROR: adding page to bio at %ld\n",page_off);
 		error = -EFAULT;
 		goto Done;
 	}
@@ -1196,6 +1190,50 @@ int bio_write_page(pgoff_t page_off, void * page)
 {
 	return submit(WRITE,page_off,page);
 }
+
+/*
+ * Sanity check if this image makes sense with this kernel/swap context
+ * I really don't think that it's foolproof but more than nothing..
+ */
+
+static const char * __init sanity_check(void)
+{
+	dump_info();
+	if(swsusp_info.version_code != LINUX_VERSION_CODE)
+		return "kernel version";
+	if(swsusp_info.num_physpages != num_physpages)
+		return "memory size";
+	if (strcmp(swsusp_info.uts.sysname,system_utsname.sysname))
+		return "system type";
+	if (strcmp(swsusp_info.uts.release,system_utsname.release))
+		return "kernel release";
+	if (strcmp(swsusp_info.uts.version,system_utsname.version))
+		return "version";
+	if (strcmp(swsusp_info.uts.machine,system_utsname.machine))
+		return "machine";
+	if(swsusp_info.cpus != num_online_cpus())
+		return "number of cpus";
+	return NULL;
+}
+
+
+int __init swsusp_check_header(swp_entry_t loc)
+{
+	const char * reason = NULL;
+	int error;
+
+	if ((error = bio_read_page(swp_offset(loc), &swsusp_info)))
+		return error;
+
+ 	/* Is this same machine? */
+	if ((reason = sanity_check())) {
+		printk(KERN_ERR "swsusp: Resume mismatch: %s\n",reason);
+		return -EPERM;
+	}
+	nr_copy_pages = swsusp_info.image_pages;
+	return error;
+}
+
 
 
 /**
@@ -1276,13 +1314,14 @@ static int __init __read_suspend_image(int noresume)
 	printk( "%sSignature found, resuming\n", name_resume );
 	MDELAY(1000);
 
-	if (bio_read_page(next.val, cur)) return -EIO;
-	if (sanity_check(&cur->sh)) 	/* Is this same machine? */	
-		return -EPERM;
-	PREPARENEXT;
+	if ((error = swsusp_check_header(next)))
+		return error;
 
-	pagedir_save = cur->sh.suspend_pagedir;
-	nr_copy_pages = cur->sh.num_pbes;
+	next = swsusp_info.pagedir[0];
+	next.val = swp_offset(next);
+
+	pagedir_save = swsusp_info.suspend_pagedir;
+	nr_copy_pages = swsusp_info.image_pages;
 	nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
 	pagedir_order = get_bitmask_order(nr_pgdir_pages);
 

@@ -1,4 +1,5 @@
-
+#include <linux/suspend.h>
+#include <linux/utsname.h>
 
 /* With SUSPEND_CONSOLE defined, it suspend looks *really* cool, but
    we probably do not take enough locks for switching consoles, etc,
@@ -7,6 +8,19 @@
 #if defined(CONFIG_VT) && defined(CONFIG_VT_CONSOLE)
 #define SUSPEND_CONSOLE	(MAX_NR_CONSOLES-1)
 #endif
+
+
+struct swsusp_info {
+	struct new_utsname	uts;
+	u32			version_code;
+	unsigned long		num_physpages;
+	int			cpus;
+	unsigned long		image_pages;
+	unsigned long		pagedir_pages;
+	suspend_pagedir_t	* suspend_pagedir;
+	swp_entry_t		pagedir[768];
+} __attribute__((aligned(PAGE_SIZE)));
+
 
 
 #ifdef CONFIG_PM_DISK
