@@ -425,7 +425,6 @@ static int hugetlbfs_mknod(struct inode *dir,
 	}
 	inode = hugetlbfs_get_inode(dir->i_sb, current->fsuid, gid, mode, dev);
 	if (inode) {
-		dir->i_size += PSEUDO_DIRENT_SIZE;
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 		d_instantiate(dentry, inode);
 		dget(dentry);	/* Extra count - pin the dentry in core */
@@ -470,7 +469,6 @@ static int hugetlbfs_symlink(struct inode *dir,
 		} else
 			iput(inode);
 	}
-	dir->i_size += PSEUDO_DIRENT_SIZE;
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 
 	return error;
@@ -502,65 +500,6 @@ static int hugetlbfs_statfs(struct super_block *sb, struct kstatfs *buf)
 	return 0;
 }
 
-static int hugetlbfs_link(struct dentry *old_dentry,
-			struct inode *dir, struct dentry *dentry)
-{
-	struct inode *inode = old_dentry->d_inode;
-
-	dir->i_size += PSEUDO_DIRENT_SIZE;
-	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-	inode->i_nlink++;
-	atomic_inc(&inode->i_count);
-	dget(dentry);
-	d_instantiate(dentry, inode);
-	return 0;
-}
-
-static int hugetlbfs_unlink(struct inode *dir, struct dentry *dentry)
-{
-	struct inode *inode = dentry->d_inode;
-
-	dir->i_size -= PSEUDO_DIRENT_SIZE;
-	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-	inode->i_nlink--;
-	dput(dentry);
-	return 0;
-}
-
-static int hugetlbfs_rmdir(struct inode *dir, struct dentry *dentry)
-{
-	if (!simple_empty(dentry))
-		return -ENOTEMPTY;
-
-	dir->i_nlink--;
-	return hugetlbfs_unlink(dir, dentry);
-}
-
-static int hugetlbfs_rename(struct inode *old_dir, struct dentry *old_dentry,
-			struct inode *new_dir, struct dentry *new_dentry)
-{
-	struct inode *inode = old_dentry->d_inode;
-	int they_are_dirs = S_ISDIR(inode->i_mode);
-
-	if (!simple_empty(new_dentry))
-		return -ENOTEMPTY;
-
-	if (new_dentry->d_inode) {
-		hugetlbfs_unlink(new_dir, new_dentry);
-		if (they_are_dirs)
-			old_dir->i_nlink--;
-	} else if (they_are_dirs) {
-		old_dir->i_nlink--;
-		new_dir->i_nlink++;
-	}
-
-	old_dir->i_size -= PSEUDO_DIRENT_SIZE;
-	new_dir->i_size += PSEUDO_DIRENT_SIZE;
-	old_dir->i_ctime = old_dir->i_mtime = new_dir->i_ctime =
-		new_dir->i_mtime = inode->i_ctime = CURRENT_TIME;
-	return 0;
-}
-
 static void hugetlbfs_put_super(struct super_block *sb)
 {
 	struct hugetlbfs_sb_info *sbi = HUGETLBFS_SB(sb);
@@ -587,13 +526,13 @@ struct file_operations hugetlbfs_file_operations = {
 static struct inode_operations hugetlbfs_dir_inode_operations = {
 	.create		= hugetlbfs_create,
 	.lookup		= simple_lookup,
-	.link		= hugetlbfs_link,
-	.unlink		= hugetlbfs_unlink,
+	.link		= simple_link,
+	.unlink		= simple_unlink,
 	.symlink	= hugetlbfs_symlink,
 	.mkdir		= hugetlbfs_mkdir,
-	.rmdir		= hugetlbfs_rmdir,
+	.rmdir		= simple_rmdir,
 	.mknod		= hugetlbfs_mknod,
-	.rename		= hugetlbfs_rename,
+	.rename		= simple_rename,
 	.setattr	= hugetlbfs_setattr,
 };
 

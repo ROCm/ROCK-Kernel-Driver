@@ -652,8 +652,8 @@ acpi_pci_link_add (
 
 	link->device = device;
 	link->handle = device->handle;
-	sprintf(acpi_device_name(device), "%s", ACPI_PCI_LINK_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_PCI_LINK_CLASS);
+	strcpy(acpi_device_name(device), ACPI_PCI_LINK_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_PCI_LINK_CLASS);
 	acpi_driver_data(device) = link;
 
 	result = acpi_pci_link_get_possible(link);

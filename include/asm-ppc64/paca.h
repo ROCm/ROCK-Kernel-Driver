@@ -64,14 +64,13 @@ struct paca_struct {
         u16 xHwProcNum;                 /* Physical processor number            0x1A */
 	u32 default_decr;		/* Default decrementer value		0x1c */	
 	u64 xKsave;			/* Saved Kernel stack addr or zero	0x20 */
-	u64 pvr;			/* Processor version register		0x28 */
 	struct ItLpQueue *lpQueuePtr;	/* LpQueue handled by this processor    0x30 */
 	u64  xTOC;			/* Kernel TOC address			0x38 */
 	STAB xStab_data;		/* Segment table information		0x40,0x48,0x50 */
 	u8 *exception_sp;		/*                                      0x58 */
 	u8 xProcEnabled;		/*                                      0x59 */
 	u8 prof_enabled;		/* 1=iSeries profiling enabled          0x60 */
-	u8 resv1[30];			/*					0x61-0x7F */
+	u8 resv1[38];			/*					0x61-0x7F */
 
 /*=====================================================================================
  * CACHE_LINE_2 0x0080 - 0x00FF

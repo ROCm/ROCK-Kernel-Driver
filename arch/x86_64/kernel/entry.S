@@ -436,7 +436,7 @@ ret_from_intr:
 	popq  %rdi
 	cli	
 	subl $1,%gs:pda_irqcount
-#ifdef CONFIG_KGDB
+#ifdef CONFIG_DEBUG_INFO
 	movq RBP(%rdi),%rbp
 #endif
 	leaq ARGOFFSET(%rdi),%rsp

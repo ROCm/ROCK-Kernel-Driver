@@ -917,7 +917,7 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 	if ((attr->ia_valid & ATTR_ATIME) != 0) {
 		__u16 dummy;
 		info_mask |= (DM_LAST_ACCESS_DATE);
-		ncp_date_unix2dos(attr->ia_ctime.tv_sec,
+		ncp_date_unix2dos(attr->ia_atime.tv_sec,
 				  &(dummy), &(info.lastAccessDate));
 		info.lastAccessDate = le16_to_cpu(info.lastAccessDate);
 	}

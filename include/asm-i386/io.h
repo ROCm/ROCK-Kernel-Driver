@@ -153,6 +153,9 @@ extern void bt_iounmap(void *addr, unsigned long size);
 #define readb(addr) (*(volatile unsigned char *) __io_virt(addr))
 #define readw(addr) (*(volatile unsigned short *) __io_virt(addr))
 #define readl(addr) (*(volatile unsigned int *) __io_virt(addr))
+#define readb_relaxed(addr) readb(addr)
+#define readw_relaxed(addr) readw(addr)
+#define readl_relaxed(addr) readl(addr)
 #define __raw_readb readb
 #define __raw_readw readw
 #define __raw_readl readl

@@ -1754,7 +1754,7 @@ static int open_tx(struct atm_vcc *vcc)
                          (iadev->tx_buf_sz - sizeof(struct cpcs_trailer))){
            printk("IA:  SDU size over (%d) the configured SDU size %d\n",
 		  vcc->qos.txtp.max_sdu,iadev->tx_buf_sz);
-	   INPH_IA_VCC(vcc) = NULL;  
+	   vcc->dev_data = NULL;
            kfree(ia_vcc);
            return -EINVAL; 
         }
@@ -2671,7 +2671,7 @@ static void ia_close(struct atm_vcc *vcc)
         }
 	kfree(INPH_IA_VCC(vcc));  
         ia_vcc = NULL;
-        INPH_IA_VCC(vcc) = NULL;  
+        vcc->dev_data = NULL;
         clear_bit(ATM_VF_ADDR,&vcc->flags);
         return;        
 }  
@@ -2684,7 +2684,7 @@ static int ia_open(struct atm_vcc *vcc)
 	if (!test_bit(ATM_VF_PARTIAL,&vcc->flags))  
 	{  
 		IF_EVENT(printk("ia: not partially allocated resources\n");)  
-		INPH_IA_VCC(vcc) = NULL;  
+		vcc->dev_data = NULL;
 	}  
 	iadev = INPH_IA_DEV(vcc->dev);  
 	if (vcc->vci != ATM_VPI_UNSPEC && vcc->vpi != ATM_VCI_UNSPEC)  
@@ -2700,7 +2700,7 @@ static int ia_open(struct atm_vcc *vcc)
 	/* Device dependent initialization */  
 	ia_vcc = kmalloc(sizeof(*ia_vcc), GFP_KERNEL);  
 	if (!ia_vcc) return -ENOMEM;  
-	INPH_IA_VCC(vcc) = ia_vcc;  
+	vcc->dev_data = ia_vcc;
   
 	if ((error = open_rx(vcc)))  
 	{  
@@ -3196,7 +3196,7 @@ static int __devinit ia_init_one(struct pci_dev *pdev,
 		ret = -ENOMEM;
 		goto err_out_disable_dev;
 	}
-	INPH_IA_DEV(dev) = iadev; 
+	dev->dev_data = iadev;
 	IF_INIT(printk(DEV_LABEL "registered at (itf :%d)\n", dev->number);)
 	IF_INIT(printk("dev_id = 0x%x iadev->LineRate = %d \n", (u32)dev,
 		iadev->LineRate);)

@@ -78,7 +78,7 @@ static int irq_list[4] = { -1 };
 static int host_id = 7;
 static int reconnect = 1;
 static int parity = 1;
-static int synchronous = 0;
+static int synchronous = 1;
 static int reset_delay = 100;
 static int ext_trans = 0;
 
@@ -244,9 +244,6 @@ static void aha152x_config_cs(dev_link_t *link)
     CS_CHECK(RequestIRQ, pcmcia_request_irq(handle, &link->irq));
     CS_CHECK(RequestConfiguration, pcmcia_request_configuration(handle, &link->conf));
     
-    /* A bad hack... */
-    release_region(link->io.BasePort1, link->io.NumPorts1);
-
     /* Set configuration options for the aha152x driver */
     memset(&s, 0, sizeof(s));
     s.conf        = "PCMCIA setup";
@@ -266,9 +263,6 @@ static void aha152x_config_cs(dev_link_t *link)
 	goto cs_failed;
     }
 
-    scsi_add_host(host, NULL); /* XXX handle failure */
-    scsi_scan_host(host);
-
     sprintf(info->node.dev_name, "scsi%d", host->host_no);
     link->dev = &info->node;
     info->host = host;
@@ -286,7 +280,7 @@ static void aha152x_release_cs(dev_link_t *link)
 {
 	scsi_info_t *info = link->priv;
 
-	scsi_remove_host(info->host);
+	aha152x_release(info->host);
 	link->dev = NULL;
     
 	pcmcia_release_configuration(link->handle);
@@ -294,7 +288,6 @@ static void aha152x_release_cs(dev_link_t *link)
 	pcmcia_release_irq(link->handle, &link->irq);
     
 	link->state &= ~DEV_CONFIG;
-	scsi_unregister(info->host);
 }
 
 static int aha152x_event(event_t event, int priority,

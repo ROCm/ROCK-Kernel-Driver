@@ -2,8 +2,6 @@
  *
  * Name:	skqueue.h
  * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
- * Version:	$Revision: 1.16 $
- * Date:	$Date: 2003/09/16 12:50:32 $
  * Purpose:	Defines for the Event queue
  *
  ******************************************************************************/
@@ -21,68 +19,6 @@
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
-
-/******************************************************************************
- *
- * History:
- *
- *	$Log: skqueue.h,v $
- *	Revision 1.16  2003/09/16 12:50:32  rschmidt
- *	Editorial changes
- *	
- *	Revision 1.15  2003/05/13 17:54:57  mkarl
- *	Editorial changes.
- *	
- *	Revision 1.14  2002/03/15 10:52:13  mkunz
- *	Added event classes for link aggregation
- *	
- *	Revision 1.13  1999/11/22 13:59:05  cgoos
- *	Changed license header to GPL.
- *	
- *	Revision 1.12  1998/09/08 08:48:01  gklug
- *	add: init level handling
- *	
- *	Revision 1.11  1998/09/03 14:15:11  gklug
- *	add: CSUM and HWAC Eventclass and function.
- *	fix: pParaPtr according to CCC
- *	
- *	Revision 1.10  1998/08/20 12:43:03  gklug
- *	add: typedef SK_QUEUE
- *	
- *	Revision 1.9  1998/08/19 09:50:59  gklug
- *	fix: remove struct keyword from C-code (see CCC) add typedefs
- *	
- *	Revision 1.8  1998/08/18 07:00:01  gklug
- *	fix: SK_PTR not defined use void * instead.
- *	
- *	Revision 1.7  1998/08/17 13:43:19  gklug
- *	chg: Parameter will be union of 64bit para, 2 times SK_U32 or SK_PTR
- *	
- *	Revision 1.6  1998/08/14 07:09:30  gklug
- *	fix: chg pAc -> pAC
- *	
- *	Revision 1.5  1998/08/11 14:26:44  gklug
- *	chg: Event Dispatcher returns now int.
- *	
- *	Revision 1.4  1998/08/11 12:15:21  gklug
- *	add: Error numbers of skqueue module
- *	
- *	Revision 1.3  1998/08/07 12:54:23  gklug
- *	fix: first compiled version
- *	
- *	Revision 1.2  1998/08/07 09:34:00  gklug
- *	adapt structure defs to CCC
- *	add: prototypes for functions
- *	
- *	Revision 1.1  1998/07/30 14:52:12  gklug
- *	Initial version.
- *	Defines Event Classes, Event structs and queue management variables.
- *
- ******************************************************************************/
-
-/*
- * SKQUEUE.H	contains all defines and types for the event queue
- */
 
 #ifndef _SKQUEUE_H_
 #define _SKQUEUE_H_

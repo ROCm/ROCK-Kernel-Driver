@@ -102,6 +102,8 @@ long plpar_hcall(unsigned long opcode,
 		 unsigned long *out2,
 		 unsigned long *out3);
 
+#define HVSC			".long 0x44000022\n"
+
 /* Same as plpar_hcall but for those opcodes that return no values
  * other than status.  Slightly more efficient.
  */

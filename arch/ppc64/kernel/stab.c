@@ -141,8 +141,7 @@ int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	return (global_entry | (castout_entry & 0x7));
 }
 
-static inline void __ste_allocate(unsigned long esid, unsigned long vsid,
-				  mm_context_t context)
+static inline void __ste_allocate(unsigned long esid, unsigned long vsid)
 {
 	unsigned char stab_entry;
 	unsigned long *offset;
@@ -185,7 +184,7 @@ int ste_allocate(unsigned long ea)
 	}
 
 	esid = GET_ESID(ea);
-	__ste_allocate(esid, vsid, context);
+	__ste_allocate(esid, vsid);
 	/* Order update */
 	asm volatile("sync":::"memory");
 
@@ -215,7 +214,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 	if (!IS_VALID_EA(pc) || (REGION_ID(pc) >= KERNEL_REGION_ID))
 		return;
 	vsid = get_vsid(mm->context, pc);
-	__ste_allocate(pc_esid, vsid, mm->context);
+	__ste_allocate(pc_esid, vsid);
 
 	if (pc_esid == stack_esid)
 		return;
@@ -223,7 +222,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 	if (!IS_VALID_EA(stack) || (REGION_ID(stack) >= KERNEL_REGION_ID))
 		return;
 	vsid = get_vsid(mm->context, stack);
-	__ste_allocate(stack_esid, vsid, mm->context);
+	__ste_allocate(stack_esid, vsid);
 
 	if (pc_esid == unmapped_base_esid || stack_esid == unmapped_base_esid)
 		return;
@@ -232,7 +231,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 	    (REGION_ID(unmapped_base) >= KERNEL_REGION_ID))
 		return;
 	vsid = get_vsid(mm->context, unmapped_base);
-	__ste_allocate(unmapped_base_esid, vsid, mm->context);
+	__ste_allocate(unmapped_base_esid, vsid);
 
 	/* Order update */
 	asm volatile("sync" : : : "memory");

@@ -203,12 +203,12 @@
 
 #define AUDIO_DEBUG 1
 
-#define SND_DEV_DSP16   5 
+#define SND_DEV_DSP16   5
 
 #define dprintk(x)
 
 #undef abs
-extern int abs(int __x) __attribute__ ((__const__)); /* Shut up warning */
+extern int abs(int __x) __attribute_const__; /* Shut up warning */
 
 /* --------------------------------------------------------------------- */
 

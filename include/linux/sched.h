@@ -204,7 +204,6 @@ struct mm_struct {
 	unsigned long arg_start, arg_end, env_start, env_end;
 	unsigned long rss, total_vm, locked_vm;
 	unsigned long def_flags;
-	cpumask_t cpu_vm_mask;
 
 	unsigned long saved_auxv[40]; /* for /proc/PID/auxv */
 
@@ -212,6 +211,8 @@ struct mm_struct {
 #ifdef CONFIG_HUGETLB_PAGE
 	int used_hugetlb;
 #endif
+	cpumask_t cpu_vm_mask;
+
 	/* Architecture-specific MM context */
 	mm_context_t context;
 
@@ -670,7 +671,7 @@ static inline int capable(int cap)
 extern struct mm_struct * mm_alloc(void);
 
 /* mmdrop drops the mm and the page tables */
-extern inline void FASTCALL(__mmdrop(struct mm_struct *));
+extern void FASTCALL(__mmdrop(struct mm_struct *));
 static inline void mmdrop(struct mm_struct * mm)
 {
 	if (atomic_dec_and_test(&mm->mm_count))

@@ -197,18 +197,6 @@ ide_hwif_t ide_hwifs[MAX_HWIFS];	/* master data repository */
 
 EXPORT_SYMBOL(ide_hwifs);
 
-ide_devices_t *idedisk;
-ide_devices_t *idecd;
-ide_devices_t *idefloppy;
-ide_devices_t *idetape;
-ide_devices_t *idescsi;
-
-EXPORT_SYMBOL(idedisk);
-EXPORT_SYMBOL(idecd);
-EXPORT_SYMBOL(idefloppy);
-EXPORT_SYMBOL(idetape);
-EXPORT_SYMBOL(idescsi);
-
 extern ide_driver_t idedefault_driver;
 static void setup_driver_defaults(ide_driver_t *driver);
 
@@ -858,16 +846,8 @@ void ide_unregister (unsigned int index)
 	hwif->ide_dma_good_drive	= old_hwif.ide_dma_good_drive;
 	hwif->ide_dma_count		= old_hwif.ide_dma_count;
 	hwif->ide_dma_verbose		= old_hwif.ide_dma_verbose;
-	hwif->ide_dma_retune		= old_hwif.ide_dma_retune;
 	hwif->ide_dma_lostirq		= old_hwif.ide_dma_lostirq;
 	hwif->ide_dma_timeout		= old_hwif.ide_dma_timeout;
-	hwif->ide_dma_queued_on		= old_hwif.ide_dma_queued_on;
-	hwif->ide_dma_queued_off	= old_hwif.ide_dma_queued_off;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-	hwif->ide_dma_queued_read	= old_hwif.ide_dma_queued_read;
-	hwif->ide_dma_queued_write	= old_hwif.ide_dma_queued_write;
-	hwif->ide_dma_queued_start	= old_hwif.ide_dma_queued_start;
-#endif
 #endif
 
 #if 0
@@ -1689,7 +1669,7 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 
 		case CDROMEJECT:
 		case CDROMCLOSETRAY:
-			return scsi_cmd_ioctl(bdev, cmd, arg);
+			return scsi_cmd_ioctl(bdev->bd_disk, cmd, arg);
 
 		case HDIO_GET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))

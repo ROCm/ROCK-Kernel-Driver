@@ -38,6 +38,9 @@ u32 __readl(void *addr);
 #define readb(b)		__readb(b)
 #define readw(b)		__readw(b)
 #define readl(b)		__readl(b)
+#define readb_relaxed(addr)	readb(addr)
+#define readw_relaxed(addr)	readw(addr)
+#define readl_relaxed(addr)	readl(addr)
 
 void __writeb(u8  val, void *addr);
 void __writew(u16 val, void *addr);

@@ -48,23 +48,31 @@ static int verbose;
  */
 
 #define SET_PWM(data,pwm) do { 		\
-	(long) data &= ~0xff; 		\
-	(long) data |= pwm; 		\
+	long d = (long)data;		\
+	d &= ~0xff; 			\
+	d |= pwm; 			\
+	data = (void *)d;		\
 } while (0)
 
 #define SET_REG0(data,reg0) do {	\
-	(long) data &= ~(0xff << 8); 	\
-	(long) data |= reg0 << 8; 	\
+	long d = (long)data;		\
+	d &= ~(0xff << 8); 		\
+	d |= reg0 << 8; 		\
+	data = (void *)d;		\
 } while (0)
 
 #define SET_TUNER(data,type) do {	\
-	(long) data &= ~(0xff << 16); 	\
-	(long) data |= type << 16;	\
+	long d = (long)data;		\
+	d &= ~(0xff << 16); 		\
+	d |= type << 16;		\
+	data = (void *)d;		\
 } while (0)
 
 #define SET_DEMOD_ADDR(data,type) do {	\
-	(long) data &= ~(0xff << 24); 	\
-	(long) data |= type << 24;	\
+	long d = (long)data;		\
+	d &= ~(0xff << 24); 		\
+	d |= type << 24;		\
+	data = (void *)d;		\
 } while (0)
 
 #define GET_PWM(data) ((u8) ((long) data & 0xff))

@@ -232,7 +232,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			if (t < 0 || t > dev->keycodemax || !dev->keycodesize) return -EINVAL;
 			if (get_user(v, ((int *) arg) + 1)) return -EFAULT;
 			u = INPUT_KEYCODE(dev, t);
-			INPUT_KEYCODE(dev, t) = v;
+			SET_INPUT_KEYCODE(dev, t, v);
 			for (i = 0; i < dev->keycodemax; i++) if (v == u) break;
 			if (i == dev->keycodemax) clear_bit(u, dev->keybit);
 			set_bit(v, dev->keybit);

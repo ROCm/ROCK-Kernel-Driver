@@ -420,7 +420,7 @@ static int sc1200_suspend (struct pci_dev *dev, u32 state)
 				ss = kmalloc(sizeof(sc1200_saved_state_t), GFP_KERNEL);
 				if (ss == NULL)
 					return -ENOMEM;
-				(sc1200_saved_state_t *)hwif->config_data = ss;
+				hwif->config_data = (unsigned long)ss;
 			}
 			ss = (sc1200_saved_state_t *)hwif->config_data;
 			//

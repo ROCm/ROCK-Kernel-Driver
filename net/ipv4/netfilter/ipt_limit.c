@@ -1,12 +1,18 @@
 /* Kernel module to control the rate
  *
- * Jérôme de Vivie   <devivie@info.enserb.u-bordeaux.fr>
- * Hervé Eychenne   <eychenne@info.enserb.u-bordeaux.fr>
- *
  * 2 September 1999: Changed from the target RATE to the match
  *                   `limit', removed logging.  Did I mention that
  *                   Alexey is a fucking genius?
  *                   Rusty Russell (rusty@rustcorp.com.au).  */
+
+/* (C) 1999 Jérôme de Vivie <devivie@info.enserb.u-bordeaux.fr>
+ * (C) 1999 Hervé Eychenne <eychenne@info.enserb.u-bordeaux.fr>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>

@@ -52,7 +52,7 @@
 /*
  * hcall interface to pSeries LPAR
  */
-#define HSC .long 0x44000022
+#define HVSC .long 0x44000022
 #define H_SET_ASR		0x30
 
 /*
@@ -1743,7 +1743,7 @@ _GLOBAL(__secondary_start)
 	cmpwi	r3,0x34         /* Pulsar */
 	bne	98f
 97:	li	r3,H_SET_ASR    /* hcall = H_SET_ASR */
-	HSC     		/* Invoking hcall */
+	HVSC     		/* Invoking hcall */
 	b	99f
 98:                             /* !(rpa hypervisor) || !(star)  */
 	mtasr	r4	        /* set the stab location         */
@@ -1912,7 +1912,7 @@ _STATIC(start_here_pSeries)
 	cmpwi	r3,0x34         /* Pulsar */
 	bne	98f
 97:	li	r3,H_SET_ASR    /* hcall = H_SET_ASR */
-	HSC     	        /* Invoking hcall */
+	HVSC     	        /* Invoking hcall */
 	b     	99f
 98:                             /* !(rpa hypervisor) || !(star) */
 	mtasr	r4	        /* set the stab location         */

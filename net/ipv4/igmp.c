@@ -126,10 +126,14 @@
  * contradict to specs provided this delay is small enough.
  */
 
-#define IGMP_V1_SEEN(in_dev) ((in_dev)->mr_v1_seen && \
-		time_before(jiffies, (in_dev)->mr_v1_seen))
-#define IGMP_V2_SEEN(in_dev) ((in_dev)->mr_v2_seen && \
-		time_before(jiffies, (in_dev)->mr_v2_seen))
+#define IGMP_V1_SEEN(in_dev) (ipv4_devconf.force_igmp_version == 1 || \
+		(in_dev)->cnf.force_igmp_version == 1 || \
+		((in_dev)->mr_v1_seen && \
+		time_before(jiffies, (in_dev)->mr_v1_seen)))
+#define IGMP_V2_SEEN(in_dev) (ipv4_devconf.force_igmp_version == 2 || \
+		(in_dev)->cnf.force_igmp_version == 2 || \
+		((in_dev)->mr_v2_seen && \
+		time_before(jiffies, (in_dev)->mr_v2_seen)))
 
 static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im);
 static void igmpv3_del_delrec(struct in_device *in_dev, __u32 multiaddr);
@@ -1063,7 +1067,7 @@ static void igmp_group_dropped(struct ip_mc_list *im)
 	reporter = im->reporter;
 	igmp_stop_timer(im);
 
-	if (in_dev->dev->flags & IFF_UP) {
+	if (!in_dev->dead) {
 		if (IGMP_V1_SEEN(in_dev))
 			goto done;
 		if (IGMP_V2_SEEN(in_dev)) {
@@ -1094,6 +1098,8 @@ static void igmp_group_added(struct ip_mc_list *im)
 	if (im->multiaddr == IGMP_ALL_HOSTS)
 		return;
 
+	if (in_dev->dead)
+		return;
 	if (IGMP_V1_SEEN(in_dev) || IGMP_V2_SEEN(in_dev)) {
 		spin_lock_bh(&im->lock);
 		igmp_start_timer(im, IGMP_Initial_Report_Delay);
@@ -1167,7 +1173,7 @@ void ip_mc_inc_group(struct in_device *in_dev, u32 addr)
 	igmpv3_del_delrec(in_dev, im->multiaddr);
 #endif
 	igmp_group_added(im);
-	if (in_dev->dev->flags & IFF_UP)
+	if (!in_dev->dead)
 		ip_rt_multicast_event(in_dev);
 out:
 	return;
@@ -1191,7 +1197,7 @@ void ip_mc_dec_group(struct in_device *in_dev, u32 addr)
 				write_unlock_bh(&in_dev->lock);
 				igmp_group_dropped(i);
 
-				if (in_dev->dev->flags & IFF_UP)
+				if (!in_dev->dead)
 					ip_rt_multicast_event(in_dev);
 
 				ip_ma_put(i);
@@ -1266,6 +1272,9 @@ void ip_mc_destroy_dev(struct in_device *in_dev)
 	struct ip_mc_list *i;
 
 	ASSERT_RTNL();
+
+	/* Deactivate timers */
+	ip_mc_down(in_dev);
 
 	write_lock_bh(&in_dev->lock);
 	while ((i = in_dev->mc_list) != NULL) {

@@ -49,7 +49,7 @@
  * in.  We use a table to route these, and this defines
  * the maximum number of distinct subtypes
  */
-#define VIO_MAX_SUBTYPES 7
+#define VIO_MAX_SUBTYPES 8
 
 /* Each subtype can register a handler to process their events.
  * The handler must have this interface.
@@ -103,7 +103,8 @@ enum viosubtypes {
 	viomajorsubtype_chario = 0x0300,
 	viomajorsubtype_config = 0x0400,
 	viomajorsubtype_cdio = 0x0500,
-	viomajorsubtype_tape = 0x0600
+	viomajorsubtype_tape = 0x0600,
+	viomajorsubtype_scsi = 0x0700
 };
 
 

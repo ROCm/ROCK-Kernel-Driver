@@ -1282,13 +1282,13 @@ static void plip_attach (struct parport *port)
 		}
 
 		sprintf(name, "plip%d", unit);
-		dev = alloc_netdev(sizeof(struct net_local), name, 
-				   ether_setup);
+		dev = alloc_etherdev(sizeof(struct net_local));
 		if (!dev) {
 			printk(KERN_ERR "plip: memory squeeze\n");
 			return;
 		}
 		
+		strcpy(dev->name, name);
 		dev->init = plip_init_netdev;
 
 		SET_MODULE_OWNER(dev);
@@ -1306,17 +1306,23 @@ static void plip_attach (struct parport *port)
 
 		if (!nl->pardev) {
 			printk(KERN_ERR "%s: parport_register failed\n", name);
-			kfree(dev);
+			goto err_free_dev;
 			return;
 		}
 
 		if (register_netdev(dev)) {
 			printk(KERN_ERR "%s: network register failed\n", name);
-			kfree(dev);
-		} else {
-			dev_plip[unit++] = dev;
+			goto err_parport_unregister;
 		}
+		dev_plip[unit++] = dev;
 	}
+	return;
+
+err_parport_unregister:
+	parport_unregister_device(nl->pardev);
+err_free_dev:
+	free_netdev(dev);
+	return;
 }
 
 /* plip_detach() is called (by the parport code) when a port is

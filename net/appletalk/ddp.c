@@ -1051,7 +1051,7 @@ static int atalk_create(struct socket *sock, int protocol)
 	sk = sk_alloc(PF_APPLETALK, GFP_KERNEL, 1, NULL);
 	if (!sk)
 		goto out;
-	at = at_sk(sk) = kmalloc(sizeof(*at), GFP_KERNEL);
+	at = sk->sk_protinfo = kmalloc(sizeof(*at), GFP_KERNEL);
 	if (!at)
 		goto outsk;
 	memset(at, 0, sizeof(*at));

@@ -77,7 +77,7 @@ void putDebugString(char* str)
  * to use.
  */
 void
-kgdb_map_scc(void)
+gen550_kgdb_map_scc(void)
 {
 	printk(KERN_DEBUG "kgdb init\n");
 	kgdb_debugport = serial_init(KGDB_PORT, NULL);

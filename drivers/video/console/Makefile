@@ -28,11 +28,11 @@ obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o font.o
 
 obj-$(CONFIG_FB_STI)              += sticore.o
 
-# Files generated that shall be removed upon make clean
+# Targets that kbuild needs to know about
 targets := promcon_tbl.c
 
 quiet_cmd_conmakehash = CNMKHSH $@
-      cmd_conmakehash = $(objtree)/scripts/conmakehash $< | \
+      cmd_conmakehash = scripts/conmakehash $< | \
 		sed -e '/\#include <[^>]*>/p' -e 's/types/init/' \
 		-e 's/dfont\(_uni.*\]\)/promfont\1 __initdata/' > $@
 

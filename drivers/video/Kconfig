@@ -673,26 +673,27 @@ config FB_ATY_XL_INIT
 	  Say Y here to support booting a Rage XL without BIOS support.
 
 config FB_SIS
-	tristate "SIS acceleration"
+	tristate "SiS acceleration"
 	depends on FB && PCI
 	help
-	  This is the frame buffer device driver for the SiS 630 and 640 Super
-	  Socket 7 UMA cards.  Specs available at <http://www.sis.com.tw/>.
+	  This is the frame buffer device driver for the SiS 300, 315 and
+	  330 series VGA chipsets. Specs available at http://www.sis.com
+
+	  To compile this driver as a module, choose M here; the module
+	  will be called sisfb.
 
 config FB_SIS_300
-	bool "SIS 630/540/730 support"
+	bool "SiS 300 series support"
 	depends on FB_SIS
 	help
-	  This is the frame buffer device driver for the SiS 630 and related
-	  Super Socket 7 UMA cards.  Specs available at
-	  <http://www.sis.com.tw/>.
+	  Say Y here to support use of the SiS 300/305, 540, 630 and 730.
 
 config FB_SIS_315
-	bool "SIS 315H/315 support"
+	bool "SiS 315/330 series support"
 	depends on FB_SIS
 	help
-	  This is the frame buffer device driver for the SiS 315 graphics
-	  card.  Specs available at <http://www.sis.com.tw/>.
+	  Say Y here to support use of the SiS 315 and 330 series
+	  (315/H/PRO, 55x, 650, 651, 740, 330, 661, 741, 760).
 
 config FB_NEOMAGIC
 	tristate "NeoMagic display support"

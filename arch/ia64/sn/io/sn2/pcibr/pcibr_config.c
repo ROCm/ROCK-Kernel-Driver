@@ -34,22 +34,21 @@ void       	  do_pcibr_config_set(cfg_p, unsigned, unsigned, uint64_t);
  * the 32bit word that contains the "offset" byte.
  */
 cfg_p
-pcibr_func_config_addr(bridge_t *bridge, pciio_bus_t bus, pciio_slot_t slot, 
+pcibr_func_config_addr(pcibr_soft_t soft, pciio_bus_t bus, pciio_slot_t slot, 
 					pciio_function_t func, int offset)
 {
 	/*
 	 * Type 1 config space
 	 */
 	if (bus > 0) {
-		bridge->b_pci_cfg = ((bus << 16) | (slot << 11));
-		return &bridge->b_type1_cfg.f[func].l[(offset)];
+		pcireg_type1_cntr_set(soft, ((bus << 16) | (slot << 11)));
+		return (pcireg_type1_cfg_addr(soft, func, offset));
 	}
 
 	/*
 	 * Type 0 config space
 	 */
-	slot++;
-	return &bridge->b_type0_cfg_dev[slot].f[func].l[offset];
+	return (pcireg_type0_cfg_addr(soft, slot, func, offset));
 }
 
 /*
@@ -58,59 +57,21 @@ pcibr_func_config_addr(bridge_t *bridge, pciio_bus_t bus, pciio_slot_t slot,
  * 32bit word that contains the "offset" byte.
  */
 cfg_p
-pcibr_slot_config_addr(bridge_t *bridge, pciio_slot_t slot, int offset)
+pcibr_slot_config_addr(pcibr_soft_t soft, pciio_slot_t slot, int offset)
 {
-	return pcibr_func_config_addr(bridge, 0, slot, 0, offset);
-}
-
-/*
- * Return config space data for given slot / offset
- */
-unsigned
-pcibr_slot_config_get(bridge_t *bridge, pciio_slot_t slot, int offset)
-{
-	cfg_p  cfg_base;
-	
-	cfg_base = pcibr_slot_config_addr(bridge, slot, 0);
-	return (do_pcibr_config_get(cfg_base, offset, sizeof(unsigned)));
-}
-
-/*
- * Return config space data for given slot / func / offset
- */
-unsigned
-pcibr_func_config_get(bridge_t *bridge, pciio_slot_t slot, 
-					pciio_function_t func, int offset)
-{
-	cfg_p  cfg_base;
-
-	cfg_base = pcibr_func_config_addr(bridge, 0, slot, func, 0);
-	return (do_pcibr_config_get(cfg_base, offset, sizeof(unsigned)));
-}
-
-/*
- * Set config space data for given slot / offset
- */
-void
-pcibr_slot_config_set(bridge_t *bridge, pciio_slot_t slot, 
-					int offset, unsigned val)
-{
-	cfg_p  cfg_base;
-
-	cfg_base = pcibr_slot_config_addr(bridge, slot, 0);
-	do_pcibr_config_set(cfg_base, offset, sizeof(unsigned), val);
+	return pcibr_func_config_addr(soft, 0, slot, 0, offset);
 }
 
 /*
  * Set config space data for given slot / func / offset
  */
 void
-pcibr_func_config_set(bridge_t *bridge, pciio_slot_t slot, 
+pcibr_func_config_set(pcibr_soft_t soft, pciio_slot_t slot, 
 			pciio_function_t func, int offset, unsigned val)
 {
 	cfg_p  cfg_base;
 
-	cfg_base = pcibr_func_config_addr(bridge, 0, slot, func, 0);
+	cfg_base = pcibr_func_config_addr(soft, 0, slot, func, 0);
 	do_pcibr_config_set(cfg_base, offset, sizeof(unsigned), val);
 }
 
@@ -124,8 +85,6 @@ pcibr_config_addr(vertex_hdl_t conn,
     pciio_bus_t		    pciio_bus;
     pciio_slot_t            pciio_slot;
     pciio_function_t        pciio_func;
-    pcibr_soft_t            pcibr_soft;
-    bridge_t               *bridge;
     cfg_p                   cfgbase = (cfg_p)0;
     pciio_info_t	    pciio_info;
 
@@ -164,11 +123,7 @@ pcibr_config_addr(vertex_hdl_t conn,
 	pciio_func = PCI_TYPE1_FUNC(reg);
     }
 
-    pcibr_soft = (pcibr_soft_t) pcibr_info->f_mfast;
-
-    bridge = pcibr_soft->bs_base;
-
-    cfgbase = pcibr_func_config_addr(bridge,
+    cfgbase = pcibr_func_config_addr((pcibr_soft_t) pcibr_info->f_mfast,
 			pciio_bus, pciio_slot, pciio_func, 0);
 
     return cfgbase;

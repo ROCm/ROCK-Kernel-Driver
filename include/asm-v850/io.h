@@ -23,6 +23,10 @@
 #define readl(addr) \
   ({ unsigned long __v = (*(volatile unsigned long *) (addr)); __v; })
 
+#define readb_relaxed(a) readb(a)
+#define readw_relaxed(a) readw(a)
+#define readl_relaxed(a) readl(a)
+
 #define writeb(b, addr) \
   (void)((*(volatile unsigned char *) (addr)) = (b))
 #define writew(b, addr) \

@@ -8,9 +8,7 @@
 #ifndef _ASM_IA64_SN_PIO_H
 #define _ASM_IA64_SN_PIO_H
 
-#include <linux/types.h>
-#include <asm/sn/sgi.h>
-#include <asm/sn/driver.h>
+#include <asm/sn/types.h>
 
 /*
  * pioaddr_t	- The kernel virtual address that a PIO can be done upon.
@@ -18,7 +16,7 @@
  *		  to long mostly, just cast for other sizes.
  */
 
-typedef volatile ulong*	pioaddr_t;
+typedef volatile unsigned long*	pioaddr_t;
 
 /*
  * iopaddr_t	- the physical io space relative address (e.g. VME A16S 0x0800).

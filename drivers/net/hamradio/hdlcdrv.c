@@ -832,7 +832,7 @@ struct net_device *hdlcdrv_register(const struct hdlcdrv_ops *ops,
 	if (err < 0) {
 		printk(KERN_WARNING "hdlcdrv: cannot register net "
 		       "device %s\n", dev->name);
-		kfree(dev);
+		free_netdev(dev);
 		dev = ERR_PTR(err);
 	}
 	return dev;

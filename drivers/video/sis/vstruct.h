@@ -1,3 +1,57 @@
+/* $XFree86$ */
+/*
+ * General structure definitions for universal mode switching modules
+ *
+ * Copyright (C) 2001-2004 by Thomas Winischhofer, Vienna, Austria
+ *
+ * If distributed as part of the Linux kernel, the following license terms
+ * apply:
+ *
+ * * This program is free software; you can redistribute it and/or modify
+ * * it under the terms of the GNU General Public License as published by
+ * * the Free Software Foundation; either version 2 of the named License,
+ * * or any later version.
+ * *
+ * * This program is distributed in the hope that it will be useful,
+ * * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * * GNU General Public License for more details.
+ * *
+ * * You should have received a copy of the GNU General Public License
+ * * along with this program; if not, write to the Free Software
+ * * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA
+ *
+ * Otherwise, the following license terms apply:
+ *
+ * * Redistribution and use in source and binary forms, with or without
+ * * modification, are permitted provided that the following conditions
+ * * are met:
+ * * 1) Redistributions of source code must retain the above copyright
+ * *    notice, this list of conditions and the following disclaimer.
+ * * 2) Redistributions in binary form must reproduce the above copyright
+ * *    notice, this list of conditions and the following disclaimer in the
+ * *    documentation and/or other materials provided with the distribution.
+ * * 3) All advertising materials mentioning features or use of this software
+ * *    must display the following acknowledgement: "This product includes
+ * *    software developed by Thomas Winischhofer, Vienna, Austria."
+ * * 4) The name of the author may not be used to endorse or promote products
+ * *    derived from this software without specific prior written permission.
+ * *
+ * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Author: 	Thomas Winischhofer <thomas@winischhofer.net>
+ *
+ */
+
 #ifdef _INIT_
 #define EXTERN
 #else
@@ -58,7 +112,6 @@ typedef struct _SiS_LVDSCRT1DataStruct
 	UCHAR  CR[15];
 } SiS_LVDSCRT1DataStruct;
 
-/*add for LCDA*/
 typedef struct _SiS_LCDACRT1DataStruct
 {
 	UCHAR  CR[17];
@@ -79,6 +132,7 @@ typedef struct _SiS_StStruct
 	UCHAR  VB_StTVFlickerIndex;
 	UCHAR  VB_StTVEdgeIndex;
 	UCHAR  VB_StTVYFilterIndex;
+	UCHAR  St_PDC;
 } SiS_StStruct;
 
 typedef struct _SiS_VBModeStruct
@@ -110,14 +164,13 @@ typedef struct _SiS_ExtStruct
 {
 	UCHAR  Ext_ModeID;
 	USHORT Ext_ModeFlag;
-	USHORT Ext_ModeInfo;
-	USHORT Ext_Point;
+	UCHAR  Ext_ModeOffset;
 	USHORT Ext_VESAID;
-	UCHAR  Ext_VESAMEMSize;
 	UCHAR  Ext_RESINFO;
 	UCHAR  VB_ExtTVFlickerIndex;
 	UCHAR  VB_ExtTVEdgeIndex;
 	UCHAR  VB_ExtTVYFilterIndex;
+	UCHAR  VB_ExtTVYFilterIndexROM661;
 	UCHAR  REFindex;
 } SiS_ExtStruct;
 
@@ -130,7 +183,7 @@ typedef struct _SiS_Ext2Struct
 	UCHAR  ModeID;
 	USHORT XRes;
 	USHORT YRes;
-	USHORT ROM_OFFSET;
+	UCHAR  Ext_PDC;
 } SiS_Ext2Struct;
 
 typedef struct _SiS_Part2PortTblStruct
@@ -148,12 +201,6 @@ typedef struct _SiS_MCLKDataStruct
 	UCHAR  SR28,SR29,SR2A;
 	USHORT CLOCK;
 } SiS_MCLKDataStruct;
-
-typedef struct _SiS_ECLKDataStruct
-{
-	UCHAR  SR2E,SR2F,SR30;
-	USHORT CLOCK;
-} SiS_ECLKDataStruct;
 
 typedef struct _SiS_VCLKDataStruct
 {
@@ -183,41 +230,78 @@ typedef struct _SiS_ModeResInfoStruct
 
 typedef UCHAR DRAM4Type[4];
 
+/* Defines for SiS_CustomT */
+/* Never change these for sisfb compatibility */
+#define CUT_NONE          0
+#define CUT_FORCENONE     1
+#define CUT_BARCO1366     2
+#define CUT_BARCO1024     3
+#define CUT_COMPAQ1280    4
+#define CUT_COMPAQ12802   5
+#define CUT_PANEL848      6
+#define CUT_CLEVO1024     7
+#define CUT_CLEVO10242    8
+#define CUT_CLEVO1400     9
+#define CUT_CLEVO14002    10
+#define CUT_UNIWILL1024   11
+#define CUT_ASUSL3000D    12
+#define CUT_UNIWILL10242  13
+#define CUT_ACER1280      14
+#define CUT_COMPAL1400_1  15
+#define CUT_COMPAL1400_2  16
+#define CUT_ASUSA2H_1     17
+#define CUT_ASUSA2H_2     18
+
 typedef struct _SiS_Private
 {
 #ifdef LINUX_KERNEL
-        USHORT RelIO;
+        SISIOADDRESS RelIO;
 #endif
-	USHORT SiS_P3c4;
-	USHORT SiS_P3d4;
-	USHORT SiS_P3c0;
-	USHORT SiS_P3ce;
-	USHORT SiS_P3c2;
-	USHORT SiS_P3ca;
-	USHORT SiS_P3c6;
-	USHORT SiS_P3c7;
-	USHORT SiS_P3c8;
-	USHORT SiS_P3c9;
-	USHORT SiS_P3da;
-	USHORT SiS_Part1Port;
-	USHORT SiS_Part2Port;
-	USHORT SiS_Part3Port;
-	USHORT SiS_Part4Port;
-	USHORT SiS_Part5Port;
+	SISIOADDRESS SiS_P3c4;
+	SISIOADDRESS SiS_P3d4;
+	SISIOADDRESS SiS_P3c0;
+	SISIOADDRESS SiS_P3ce;
+	SISIOADDRESS SiS_P3c2;
+	SISIOADDRESS SiS_P3ca;
+	SISIOADDRESS SiS_P3c6;
+	SISIOADDRESS SiS_P3c7;
+	SISIOADDRESS SiS_P3c8;
+	SISIOADDRESS SiS_P3c9;
+	SISIOADDRESS SiS_P3cb;
+	SISIOADDRESS SiS_P3cd;
+	SISIOADDRESS SiS_P3da;
+	SISIOADDRESS SiS_Part1Port;
+	SISIOADDRESS SiS_Part2Port;
+	SISIOADDRESS SiS_Part3Port;
+	SISIOADDRESS SiS_Part4Port;
+	SISIOADDRESS SiS_Part5Port;
+	SISIOADDRESS SiS_VidCapt;
+	SISIOADDRESS SiS_VidPlay;
 	USHORT SiS_IF_DEF_LVDS;
+	USHORT SiS_IF_DEF_CH70xx;
+	USHORT SiS_IF_DEF_CONEX;
 	USHORT SiS_IF_DEF_TRUMPION;
 	USHORT SiS_IF_DEF_DSTN;
 	USHORT SiS_IF_DEF_FSTN;
-	USHORT SiS_IF_DEF_CH70xx;
-	USHORT SiS_IF_DEF_HiVision;
+	USHORT SiS_SysFlags;
 	UCHAR  SiS_VGAINFO;
+#ifndef LINUX_KERNEL
+        USHORT SiS_CP1, SiS_CP2, SiS_CP3, SiS_CP4;
+#endif
 	BOOLEAN SiS_UseROM;
 	int    SiS_CHOverScan;
 	BOOLEAN SiS_CHSOverScan;
 	BOOLEAN SiS_ChSW;
 	BOOLEAN SiS_UseLCDA;
 	int    SiS_UseOEM;
+	ULONG  SiS_CustomT;
 	USHORT SiS_Backup70xx;
+	BOOLEAN HaveEMI;
+	BOOLEAN HaveEMILCD;
+	BOOLEAN OverruleEMI;
+	UCHAR  EMI_30,EMI_31,EMI_32,EMI_33;
+	UCHAR  PDC;
+	UCHAR  SiS_MyCR63;
 	USHORT SiS_CRT1Mode;
 	USHORT SiS_flag_clearbuffer;
 	int    SiS_RAMType;
@@ -225,12 +309,14 @@ typedef struct _SiS_Private
 	UCHAR  SiS_DataBusWidth;
 	USHORT SiS_ModeType;
 	USHORT SiS_VBInfo;
+	USHORT SiS_TVMode;
 	USHORT SiS_LCDResInfo;
 	USHORT SiS_LCDTypeInfo;
 	USHORT SiS_LCDInfo;
+	USHORT SiS_LCDInfo661;
 	USHORT SiS_VBType;
 	USHORT SiS_VBExtInfo;
-	USHORT SiS_HiVision;
+	USHORT SiS_YPbPr;
 	USHORT SiS_SelectCRT2Rate;
 	USHORT SiS_SetFlag;
 	USHORT SiS_RVBHCFACT;
@@ -254,11 +340,13 @@ typedef struct _SiS_Private
 	USHORT SiS_DDC_Port;
 	USHORT SiS_DDC_Index;
 	USHORT SiS_DDC_Data;
+	USHORT SiS_DDC_NData;
 	USHORT SiS_DDC_Clk;
-	USHORT SiS_DDC_DataShift;
+	USHORT SiS_DDC_NClk;
 	USHORT SiS_DDC_DeviceAddr;
 	USHORT SiS_DDC_ReadAddr;
 	USHORT SiS_DDC_SecAddr;
+	BOOLEAN SiS_SensibleSR11;
 	USHORT SiS_Panel800x600;
 	USHORT SiS_Panel1024x768;
 	USHORT SiS_Panel1280x1024;
@@ -270,22 +358,24 @@ typedef struct _SiS_Private
 	USHORT SiS_Panel1280x768;
 	USHORT SiS_Panel1024x600;
 	USHORT SiS_Panel640x480;
+	USHORT SiS_Panel640x480_2;
+	USHORT SiS_Panel640x480_3;
 	USHORT SiS_Panel1152x864;
+	USHORT SiS_PanelCustom;
+	USHORT SiS_PanelBarco1366;
 	USHORT SiS_PanelMax;
 	USHORT SiS_PanelMinLVDS;
 	USHORT SiS_PanelMin301;
 	USHORT SiS_ChrontelInit;
 	
-	/* Pointers: */
 	const SiS_StStruct          *SiS_SModeIDTable;
-	const SiS_StandTableStruct  *SiS_StandTable;
+	SiS_StandTableStruct        *SiS_StandTable;
 	const SiS_ExtStruct         *SiS_EModeIDTable;
 	const SiS_Ext2Struct        *SiS_RefIndex;
 	const SiS_VBModeStruct      *SiS_VBModeIDTable;
 	const SiS_CRT1TableStruct   *SiS_CRT1Table;
 	const SiS_MCLKDataStruct    *SiS_MCLKData_0;
 	const SiS_MCLKDataStruct    *SiS_MCLKData_1;
-	const SiS_ECLKDataStruct    *SiS_ECLKData;
 	const SiS_VCLKDataStruct    *SiS_VCLKData;
 	const SiS_VBVCLKDataStruct  *SiS_VBVCLKData;
 	const SiS_StResInfoStruct   *SiS_StResInfo;
@@ -316,7 +406,7 @@ typedef struct _SiS_Private
 	const USHORT *pSiS_RGBSenseData;
 	const USHORT *pSiS_VideoSenseData;
 	const USHORT *pSiS_YCSenseData;
-	const USHORT *pSiS_RGBSenseData2; /*301b*/
+	const USHORT *pSiS_RGBSenseData2;
 	const USHORT *pSiS_VideoSenseData2;
 	const USHORT *pSiS_YCSenseData2;
 #endif
@@ -329,6 +419,8 @@ typedef struct _SiS_Private
 	const UCHAR *SiS_PALMPhase2;
 	const UCHAR *SiS_PALNPhase2;
 	const UCHAR *SiS_SpecialPhase;
+	const UCHAR *SiS_SpecialPhaseM;
+	const UCHAR *SiS_SpecialPhaseJ;
 	const SiS_LCDDataStruct  *SiS_StLCD1024x768Data;
 	const SiS_LCDDataStruct  *SiS_ExtLCD1024x768Data;
 	const SiS_LCDDataStruct  *SiS_St2LCD1024x768Data;
@@ -340,26 +432,38 @@ typedef struct _SiS_Private
 	const SiS_LCDDataStruct  *SiS_LCD1280x960Data;
 	const SiS_LCDDataStruct  *SiS_NoScaleData1400x1050;
 	const SiS_LCDDataStruct  *SiS_NoScaleData1600x1200;
+	const SiS_LCDDataStruct  *SiS_NoScaleData1280x768;
 	const SiS_LCDDataStruct  *SiS_StLCD1400x1050Data;
 	const SiS_LCDDataStruct  *SiS_StLCD1600x1200Data;
+	const SiS_LCDDataStruct  *SiS_StLCD1280x768Data;
 	const SiS_LCDDataStruct  *SiS_ExtLCD1400x1050Data;
 	const SiS_LCDDataStruct  *SiS_ExtLCD1600x1200Data;
+	const SiS_LCDDataStruct  *SiS_ExtLCD1280x768Data;
+	const SiS_LCDDataStruct  *SiS_NoScaleData;
 	const SiS_TVDataStruct   *SiS_StPALData;
 	const SiS_TVDataStruct   *SiS_ExtPALData;
 	const SiS_TVDataStruct   *SiS_StNTSCData;
 	const SiS_TVDataStruct   *SiS_ExtNTSCData;
-/*	const SiS_TVDataStruct   *SiS_St1HiTVData;  */
+	const SiS_TVDataStruct   *SiS_St1HiTVData;
 	const SiS_TVDataStruct   *SiS_St2HiTVData;
 	const SiS_TVDataStruct   *SiS_ExtHiTVData;
+	const SiS_TVDataStruct   *SiS_St525iData;
+	const SiS_TVDataStruct   *SiS_St525pData;
+	const SiS_TVDataStruct   *SiS_St750pData;
+	const SiS_TVDataStruct   *SiS_Ext525iData;
+	const SiS_TVDataStruct   *SiS_Ext525pData;
+	const SiS_TVDataStruct   *SiS_Ext750pData;
 	const UCHAR *SiS_NTSCTiming;
 	const UCHAR *SiS_PALTiming;
 	const UCHAR *SiS_HiTVExtTiming;
 	const UCHAR *SiS_HiTVSt1Timing;
 	const UCHAR *SiS_HiTVSt2Timing;
-	const UCHAR *SiS_HiTVTextTiming;
 	const UCHAR *SiS_HiTVGroup3Data;
 	const UCHAR *SiS_HiTVGroup3Simu;
+#if 0
+	const UCHAR *SiS_HiTVTextTiming;
 	const UCHAR *SiS_HiTVGroup3Text;
+#endif
 	const SiS_PanelDelayTblStruct *SiS_PanelDelayTbl;
 	const SiS_PanelDelayTblStruct *SiS_PanelDelayTblLVDS;
 	const SiS_LVDSDataStruct  *SiS_LVDS800x600Data_1;
@@ -381,12 +485,23 @@ typedef struct _SiS_Private
 	const SiS_LVDSDataStruct  *SiS_LVDS1152x768Data_1;
 	const SiS_LVDSDataStruct  *SiS_LVDS1152x768Data_2;
 	const SiS_LVDSDataStruct  *SiS_LVDS640x480Data_1;
+	const SiS_LVDSDataStruct  *SiS_LVDS640x480Data_2;
 	const SiS_LVDSDataStruct  *SiS_LVDS320x480Data_1;
+	const SiS_LVDSDataStruct  *SiS_LCDA1024x768Data_1;
+	const SiS_LVDSDataStruct  *SiS_LCDA1024x768Data_2;
+	const SiS_LVDSDataStruct  *SiS_LCDA1280x1024Data_1;
+	const SiS_LVDSDataStruct  *SiS_LCDA1280x1024Data_2;
 	const SiS_LVDSDataStruct  *SiS_LCDA1400x1050Data_1;
 	const SiS_LVDSDataStruct  *SiS_LCDA1400x1050Data_2;
 	const SiS_LVDSDataStruct  *SiS_LCDA1600x1200Data_1;
 	const SiS_LVDSDataStruct  *SiS_LCDA1600x1200Data_2;
 	const SiS_LVDSDataStruct  *SiS_LVDSXXXxXXXData_1;
+	const SiS_LVDSDataStruct  *SiS_LVDSBARCO1366Data_1;
+	const SiS_LVDSDataStruct  *SiS_LVDSBARCO1366Data_2;
+	const SiS_LVDSDataStruct  *SiS_LVDSBARCO1024Data_1;
+	const SiS_LVDSDataStruct  *SiS_LVDSBARCO1024Data_2;
+	const SiS_LVDSDataStruct  *SiS_LVDS848x480Data_1;
+	const SiS_LVDSDataStruct  *SiS_LVDS848x480Data_2;
 	const SiS_LVDSDataStruct  *SiS_CHTVUNTSCData;
 	const SiS_LVDSDataStruct  *SiS_CHTVONTSCData;
 	const SiS_LVDSDataStruct  *SiS_CHTVUPALData;
@@ -478,6 +593,12 @@ typedef struct _SiS_Private
 	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT11600x1200_2_H;
 	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT1XXXxXXX_1;
 	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT1XXXxXXX_1_H;
+	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT1640x480_1;
+	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT1640x480_1_H;
+	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT1640x480_2;
+	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT1640x480_2_H;
+	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT1640x480_3;
+	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT1640x480_3_H;
 	const SiS_LVDSCRT1DataStruct  *SiS_CHTVCRT1UNTSC;
 	const SiS_LVDSCRT1DataStruct  *SiS_CHTVCRT1ONTSC;
 	const SiS_LVDSCRT1DataStruct  *SiS_CHTVCRT1UPAL;
@@ -486,28 +607,23 @@ typedef struct _SiS_Private
 
 	const SiS_LVDSCRT1DataStruct  *SiS_LVDSCRT1320x480_1;
 
-	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT1800x600_1;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11024x768_1;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11280x1024_1;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11400x1050_1;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11600x1200_1;
-	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT1800x600_1_H;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11024x768_1_H;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11280x1024_1_H;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11400x1050_1_H;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11600x1200_1_H;
-	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT1800x600_2;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11024x768_2;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11280x1024_2;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11400x1050_2;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11600x1200_2;
-	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT1800x600_2_H;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11024x768_2_H;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11280x1024_2_H;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11400x1050_2_H;
 	const SiS_LCDACRT1DataStruct  *SiS_LCDACRT11600x1200_2_H;
 
-	/* TW: New for 650/301LV */
 	const SiS_Part2PortTblStruct *SiS_CRT2Part2_1024x768_1;
 	const SiS_Part2PortTblStruct *SiS_CRT2Part2_1280x1024_1;
 	const SiS_Part2PortTblStruct *SiS_CRT2Part2_1400x1050_1;
@@ -539,6 +655,9 @@ typedef struct _SiS_Private
 	const UCHAR *SiS_CHTVVCLKUPALN;
 	const UCHAR *SiS_CHTVVCLKOPALN;
 	const UCHAR *SiS_CHTVVCLKSOPAL;
+
+	USHORT  PanelXRes;
+	USHORT  PanelYRes;
 	
 	BOOLEAN UseCustomMode;
 	BOOLEAN CRT1UsesCustomMode;
@@ -560,10 +679,12 @@ typedef struct _SiS_Private
 	UCHAR   CSR2B;
 	UCHAR   CSR2C;
 	USHORT  CSRClock;
+	USHORT  CSRClock_CRT1;
 	USHORT  CModeFlag;
+	USHORT  CModeFlag_CRT1;
 	USHORT  CInfoFlag;
-	BOOLEAN SiS_CHPALM;
-	BOOLEAN SiS_CHPALN;
+
+	int	LVDSHL;
 	
 	BOOLEAN Backup;
 	UCHAR Backup_Mode;
@@ -578,7 +699,22 @@ typedef struct _SiS_Private
 	UCHAR Backup_1c;
 	UCHAR Backup_1d;
 	
-	int    UsePanelScaler;
+	int     UsePanelScaler;
+
+	USHORT  CP_Vendor, CP_Product;
+	BOOLEAN CP_HaveCustomData;
+	int     CP_PreferredX, CP_PreferredY;
+	int	CP_MaxX, CP_MaxY, CP_MaxClock;
+	BOOLEAN CP_Supports64048075;
+	int     CP_HDisplay[7], CP_VDisplay[7];	/* For Custom LCD panel dimensions */
+    	int     CP_HTotal[7], CP_VTotal[7];
+    	int     CP_HSyncStart[7], CP_VSyncStart[7];
+    	int     CP_HSyncEnd[7], CP_VSyncEnd[7];
+	int     CP_HBlankStart[7], CP_VBlankStart[7];
+	int     CP_HBlankEnd[7], CP_VBlankEnd[7];
+    	int     CP_Clock[7];
+	BOOLEAN CP_DataValid[7];
+	BOOLEAN CP_HSync_P[7], CP_VSync_P[7], CP_SyncValid[7];
 } SiS_Private;
 
 #endif

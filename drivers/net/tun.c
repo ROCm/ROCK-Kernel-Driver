@@ -377,6 +377,7 @@ static struct tun_struct *tun_get_by_name(const char *name)
 static int tun_set_iff(struct file *file, struct ifreq *ifr)
 {
 	struct tun_struct *tun;
+	struct net_device *dev;
 	int err;
 
 	tun = tun_get_by_name(ifr->ifr_name);
@@ -394,7 +395,6 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 	else {
 		char *name;
 		unsigned long flags = 0;
-		struct net_device *dev;
 
 		err = -EINVAL;
 
@@ -424,16 +424,13 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 
 		if (strchr(dev->name, '%')) {
 			err = dev_alloc_name(dev, dev->name);
-			if (err < 0) {
-				kfree(dev);
-				goto failed;
-			}
+			if (err < 0)
+				goto err_free_dev;
 		}
 
-		if ((err = register_netdevice(tun->dev))) {
-			kfree(dev);
-			goto failed;
-		}
+		err = register_netdevice(tun->dev);
+		if (err < 0)
+			goto err_free_dev;
 	
 		list_add(&tun->list, &tun_dev_list);
 	}
@@ -451,6 +448,9 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 
 	strcpy(ifr->ifr_name, tun->dev->name);
 	return 0;
+
+ err_free_dev:
+	free_netdev(dev);
  failed:
 	return err;
 }

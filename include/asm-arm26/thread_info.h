@@ -71,7 +71,7 @@ struct thread_info {
 /*
  * how to get the thread information struct from C
  */
-static inline struct thread_info *current_thread_info(void) __attribute__ (( __const__ ));
+static inline struct thread_info *current_thread_info(void) __attribute_const__;
 
 static inline struct thread_info *current_thread_info(void)
 {

@@ -1246,9 +1246,9 @@ acpi_thermal_add (
 	memset(tz, 0, sizeof(struct acpi_thermal));
 
 	tz->handle = device->handle;
-	sprintf(tz->name, "%s", device->pnp.bus_id);
-	sprintf(acpi_device_name(device), "%s", ACPI_THERMAL_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_THERMAL_CLASS);
+	strcpy(tz->name, device->pnp.bus_id);
+	strcpy(acpi_device_name(device), ACPI_THERMAL_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_THERMAL_CLASS);
 	acpi_driver_data(device) = tz;
 
 	result = acpi_thermal_get_info(tz);

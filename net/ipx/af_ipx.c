@@ -1351,7 +1351,7 @@ static int ipx_create(struct socket *sock, int protocol)
         	rc = -ENOMEM;
 		if (!sk)
 			goto out;
-		ipx = ipx_sk(sk) = kmalloc(sizeof(*ipx), GFP_KERNEL);
+		ipx = sk->sk_protinfo = kmalloc(sizeof(*ipx), GFP_KERNEL);
 		if (!ipx)
 			goto outsk;
 		memset(ipx, 0, sizeof(*ipx));

@@ -1428,9 +1428,8 @@ EXPORT_SYMBOL_GPL(ac97_register_driver);
  *	ac97_unregister_driver	-	unregister a codec helper
  *	@driver: Driver handler
  *
- *	Register a handler for codecs matching the codec id. The handler
- *	attach function is called for all present codecs and will be 
- *	called when new codecs are discovered.
+ *	Unregister a handler for codecs matching the codec id. The handler
+ *	remove function is called for all matching codecs.
  */
  
 void ac97_unregister_driver(struct ac97_driver *driver)
@@ -1440,13 +1439,14 @@ void ac97_unregister_driver(struct ac97_driver *driver)
 	
 	down(&codec_sem);
 	list_del_init(&driver->list);
-	
+
 	list_for_each(l, &codecs)
 	{
 		c = list_entry(l, struct ac97_codec, list);
-		if(c->driver == driver)
+		if (c->driver == driver) {
 			driver->remove(c, driver);
-		c->driver = NULL;
+			c->driver = NULL;
+		}
 	}
 	
 	up(&codec_sem);

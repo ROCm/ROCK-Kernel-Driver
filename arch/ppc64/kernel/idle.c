@@ -161,7 +161,7 @@ int dedicated_idle(void)
 	struct paca_struct *lpaca = get_paca(), *ppaca;
 	unsigned long start_snooze;
 
-	ppaca = &paca[(lpaca->xPacaIndex) ^ 1];
+	ppaca = &paca[smp_processor_id() ^ 1];
 
 	while (1) {
 		/* Indicate to the HV that we are idle.  Now would be

@@ -116,6 +116,7 @@ extern int acpi_noirq;
 
 #ifdef CONFIG_X86_IO_APIC
 extern int skip_ioapic_setup;
+extern int acpi_irq_to_vector(u32 irq);
 
 static inline void disable_ioapic_setup(void)
 {

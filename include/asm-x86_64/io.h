@@ -188,6 +188,10 @@ extern void iounmap(void *addr);
 #define readw(addr) (*(volatile unsigned short *) __io_virt(addr))
 #define readl(addr) (*(volatile unsigned int *) __io_virt(addr))
 #define readq(addr) (*(volatile unsigned long *) __io_virt(addr))
+#define readb_relaxed(a) readb(a)
+#define readw_relaxed(a) readw(a)
+#define readl_relaxed(a) readl(a)
+#define readq_relaxed(a) readq(a)
 #define __raw_readb readb
 #define __raw_readw readw
 #define __raw_readl readl

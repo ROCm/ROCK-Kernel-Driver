@@ -72,7 +72,7 @@ static int reset_one_mii_phy(struct mii_phy* phy, int phy_id)
 	int limit = 10000;
 	
 	val = __phy_read(phy, phy_id, MII_BMCR);
-	val &= ~BMCR_ISOLATE;
+	val &= ~(BMCR_ISOLATE | BMCR_PDOWN);
 	val |= BMCR_RESET;
 	__phy_write(phy, phy_id, MII_BMCR, val);
 
@@ -157,7 +157,7 @@ static int bcm5400_init(struct mii_phy* phy)
 	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
 	phy_write(phy, MII_BCM5400_GB_CONTROL, data);
 	
-	mdelay(10);
+	udelay(100);
 
 	/* Reset and configure cascaded 10/100 PHY */
 	(void)reset_one_mii_phy(phy, 0x1f);
@@ -217,7 +217,7 @@ static int bcm5401_init(struct mii_phy* phy)
 	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
 	phy_write(phy, MII_BCM5400_GB_CONTROL, data);
 
-	mdelay(10);
+	udelay(10);
 
 	/* Reset and configure cascaded 10/100 PHY */
 	(void)reset_one_mii_phy(phy, 0x1f);
@@ -258,7 +258,7 @@ static int bcm5411_init(struct mii_phy* phy)
 	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
 	phy_write(phy, MII_BCM5400_GB_CONTROL, data);
 
-	mdelay(10);
+	udelay(10);
 
 	/* Reset and configure cascaded 10/100 PHY */
 	(void)reset_one_mii_phy(phy, 0x1f);
@@ -299,6 +299,15 @@ static int bcm5421_init(struct mii_phy* phy)
 	phy_write(phy, 0x1c, 0xa821);
 	phy_write(phy, 0x1c, 0x941d);
 #endif
+	return 0;
+}
+
+static int bcm5421k2_init(struct mii_phy* phy)
+{
+	/* Init code borrowed from OF */
+	phy_write(phy, 4, 0x01e1);
+	phy_write(phy, 9, 0x0300);
+
 	return 0;
 }
 
@@ -647,7 +656,7 @@ static struct mii_phy_def bcm5201_phy_def = {
 	.phy_id_mask	= 0xfffffff0,
 	.name		= "BCM5201",
 	.features	= MII_BASIC_FEATURES,
-	.magic_aneg	= 0,
+	.magic_aneg	= 1,
 	.ops		= &bcm5201_phy_ops
 };
 
@@ -666,7 +675,7 @@ static struct mii_phy_def bcm5221_phy_def = {
 	.phy_id_mask	= 0xfffffff0,
 	.name		= "BCM5221",
 	.features	= MII_BASIC_FEATURES,
-	.magic_aneg	= 0,
+	.magic_aneg	= 1,
 	.ops		= &bcm5221_phy_ops
 };
 
@@ -746,6 +755,25 @@ static struct mii_phy_def bcm5421_phy_def = {
 	.ops		= &bcm5421_phy_ops
 };
 
+/* Broadcom BCM 5421 built-in K2 */
+static struct mii_phy_ops bcm5421k2_phy_ops = {
+	.init		= bcm5421k2_init,
+	.suspend	= bcm5411_suspend,
+	.setup_aneg	= bcm54xx_setup_aneg,
+	.setup_forced	= bcm54xx_setup_forced,
+	.poll_link	= genmii_poll_link,
+	.read_link	= bcm54xx_read_link,
+};
+
+static struct mii_phy_def bcm5421k2_phy_def = {
+	.phy_id		= 0x002062e0,
+	.phy_id_mask	= 0xfffffff0,
+	.name		= "BCM5421-K2",
+	.features	= MII_GBIT_FEATURES,
+	.magic_aneg	= 1,
+	.ops		= &bcm5421k2_phy_ops
+};
+
 /* Marvell 88E1101 (Apple seem to deal with 2 different revs,
  * I masked out the 8 last bits to get both, but some specs
  * would be useful here) --BenH.
@@ -790,6 +818,7 @@ static struct mii_phy_def* mii_phy_table[] = {
 	&bcm5401_phy_def,
 	&bcm5411_phy_def,
 	&bcm5421_phy_def,
+	&bcm5421k2_phy_def,
 	&marvell_phy_def,
 	&genmii_phy_def,
 	NULL
@@ -813,8 +842,8 @@ int mii_phy_probe(struct mii_phy *phy, int mii_id)
 		goto fail;
 
 	/* Read ID and find matching entry */	
-	id = (phy_read(phy, MII_PHYSID1) << 16 | phy_read(phy, MII_PHYSID2))
-			 	& 0xfffffff0;
+	id = (phy_read(phy, MII_PHYSID1) << 16 | phy_read(phy, MII_PHYSID2));
+	printk(KERN_DEBUG "PHY ID: %x, addr: %x\n", id, mii_id);
 	for (i=0; (def = mii_phy_table[i]) != NULL; i++)
 		if ((id & def->phy_id_mask) == def->phy_id)
 			break;

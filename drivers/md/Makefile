@@ -24,26 +24,43 @@ obj-$(CONFIG_MD_MULTIPATH)	+= multipath.o
 obj-$(CONFIG_BLK_DEV_MD)	+= md.o
 obj-$(CONFIG_BLK_DEV_DM)	+= dm-mod.o
 
-# Files generated that shall be removed upon make clean
-clean-files := raid6int*.c raid6tables.c mktables
+quiet_cmd_unroll = UNROLL  $@
+      cmd_unroll = $(PERL) $(srctree)/$(src)/unroll.pl $(UNROLL) \
+                   < $< > $@ || ( rm -f $@ && exit 1 )
 
-$(obj)/raid6int1.c:   $(src)/raid6int.uc $(src)/unroll.pl
-	$(PERL) $(src)/unroll.pl 1 < $< > $@ || ( rm -f $@ && exit 1 )
+targets += raid6int1.c
+$(obj)/raid6int1.c:   UNROLL := 1
+$(obj)/raid6int1.c:   $(src)/raid6int.uc $(src)/unroll.pl FORCE
+	$(call if_changed,unroll)
 
-$(obj)/raid6int2.c:   $(src)/raid6int.uc $(src)/unroll.pl
-	$(PERL) $(src)/unroll.pl 2 < $< > $@ || ( rm -f $@ && exit 1 )
+targets += raid6int2.c
+$(obj)/raid6int2.c:   UNROLL := 2
+$(obj)/raid6int2.c:   $(src)/raid6int.uc $(src)/unroll.pl FORCE
+	$(call if_changed,unroll)
 
-$(obj)/raid6int4.c:   $(src)/raid6int.uc $(src)/unroll.pl
-	$(PERL) $(src)/unroll.pl 4 < $< > $@ || ( rm -f $@ && exit 1 )
+targets += raid6int4.c
+$(obj)/raid6int4.c:   UNROLL := 4
+$(obj)/raid6int4.c:   $(src)/raid6int.uc $(src)/unroll.pl FORCE
+	$(call if_changed,unroll)
 
-$(obj)/raid6int8.c:   $(src)/raid6int.uc $(src)/unroll.pl
-	$(PERL) $(src)/unroll.pl 8 < $< > $@ || ( rm -f $@ && exit 1 )
+targets += raid6int8.c
+$(obj)/raid6int8.c:   UNROLL := 8
+$(obj)/raid6int8.c:   $(src)/raid6int.uc $(src)/unroll.pl FORCE
+	$(call if_changed,unroll)
 
-$(obj)/raid6int16.c:  $(src)/raid6int.uc $(src)/unroll.pl
-	$(PERL) $(src)/unroll.pl 16 < $< > $@ || ( rm -f $@ && exit 1 )
+targets += raid6int16.c
+$(obj)/raid6int16.c:  UNROLL := 16
+$(obj)/raid6int16.c:  $(src)/raid6int.uc $(src)/unroll.pl FORCE
+	$(call if_changed,unroll)
 
-$(obj)/raid6int32.c:  $(src)/raid6int.uc $(src)/unroll.pl
-	$(PERL) $(src)/unroll.pl 32 < $< > $@ || ( rm -f $@ && exit 1 )
+targets += raid6int32.c
+$(obj)/raid6int32.c:  UNROLL := 32
+$(obj)/raid6int32.c:  $(src)/raid6int.uc $(src)/unroll.pl FORCE
+	$(call if_changed,unroll)
 
-$(obj)/raid6tables.c: $(obj)/mktables
-	$(obj)/mktables > $@ || ( rm -f $@ && exit 1 )
+quiet_cmd_mktable = TABLE   $@
+      cmd_mktable = $(obj)/mktables > $@ || ( rm -f $@ && exit 1 )
+
+targets += raid6tables.c
+$(obj)/raid6tables.c: $(obj)/mktables FORCE
+	$(call if_changed,mktable)

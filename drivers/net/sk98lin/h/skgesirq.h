@@ -2,8 +2,6 @@
  *
  * Name:	skgesirq.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 1.30 $
- * Date:	$Date: 2003/07/04 12:34:13 $
  * Purpose:	SK specific Gigabit Ethernet special IRQ functions
  *
  ******************************************************************************/
@@ -19,111 +17,6 @@
  *	(at your option) any later version.
  *
  *	The information in this file is provided "AS IS" without warranty.
- *
- ******************************************************************************/
-
-/******************************************************************************
- *
- * History:
- *	$Log: skgesirq.h,v $
- *	Revision 1.30  2003/07/04 12:34:13  rschmidt
- *	Added SKERR_SIRQ_E025 for Downshift detected (Yukon-Copper)
- *	
- *	Revision 1.29  2003/05/28 15:14:49  rschmidt
- *	Moved defines for return codes of SkGePortCheckUp() to header file.
- *	Minor changes to avoid LINT warnings.
- *	
- *	Revision 1.28  2003/05/13 17:22:43  mkarl
- *	Editorial changes.
- *	
- *	Revision 1.27  2003/03/31 07:32:34  mkarl
- *	Corrected Copyright.
- *	Editorial changes.
- *	
- *	Revision 1.26  2002/10/14 09:52:36  rschmidt
- *	Added SKERR_SIRQ_E023 and SKERR_SIRQ_E024 for GPHY (Yukon)
- *	Editorial changes
- *	
- *	Revision 1.25  2002/07/15 18:15:52  rwahl
- *	Editorial changes.
- *	
- *	Revision 1.24  2002/07/15 15:39:21  rschmidt
- *	Corrected define for SKERR_SIRQ_E022
- *	Editorial changes
- *	
- *	Revision 1.23  2002/04/25 11:09:45  rschmidt
- *	Removed declarations for SkXmInitPhy(), SkXmRxTxEnable()
- *	Editorial changes
- *	
- *	Revision 1.22  2000/11/09 11:30:10  rassmann
- *	WA: Waiting after releasing reset until BCom chip is accessible.
- *	
- *	Revision 1.21  2000/10/18 12:22:40  cgoos
- *	Added workaround for half duplex hangup.
- *	
- *	Revision 1.20  1999/12/06 10:00:44  cgoos
- *	Added SET event for role.
- *	
- *	Revision 1.19  1999/11/22 13:58:26  cgoos
- *	Changed license header to GPL.
- *	
- *	Revision 1.18  1999/05/19 07:32:59  cgoos
- *	Changes for 1000Base-T.
- *	
- *	Revision 1.17  1999/03/12 13:29:31  malthoff
- *	Move Autonegotiation Error Codes to skgeinit.h.
- *	
- *	Revision 1.16  1999/03/08 10:11:28  gklug
- *	add: AutoNegDone return codes
- *	
- *	Revision 1.15  1998/11/18 13:20:53  gklug
- *	add: different timeouts for active and non-active links
- *	
- *	Revision 1.14  1998/11/04 07:18:14  cgoos
- *	Added prototype for SkXmRxTxEnable.
- *	
- *	Revision 1.13  1998/10/21 05:52:23  gklug
- *	add: parameter DoLoop to InitPhy function
- *	
- *	Revision 1.12  1998/10/19 06:45:03  cgoos
- *	Added prototype for SkXmInitPhy.
- *	
- *	Revision 1.11  1998/10/15 14:34:10  gklug
- *	add: WA_TIME is 500 msec
- *	
- *	Revision 1.10  1998/10/14 14:49:41  malthoff
- *	Remove err log defines E021 and E022. They are
- *	defined in skgeinit.h now.
- *
- *	Revision 1.9  1998/10/14 14:00:39  gklug
- *	add: error logs for init phys
- *	
- *	Revision 1.8  1998/10/14 05:44:05  gklug
- *	add: E020
- *	
- *	Revision 1.7  1998/10/02 06:24:58  gklug
- *	add: error messages
- *	
- *	Revision 1.6  1998/10/01 07:54:45  gklug
- *	add: PNMI debug module
- *	
- *	Revision 1.5  1998/09/28 13:36:31  malthoff
- *	Move the bit definitions for Autonegotiation
- *	and Flow Control to skgeinit.h.
- *	
- *	Revision 1.4  1998/09/15 12:29:34  gklug
- *	add: error logs
- *	
- *	Revision 1.3  1998/09/03 13:54:02  gklug
- *	add: function prototypes
- *	
- *	Revision 1.2  1998/09/03 10:24:36  gklug
- *	add: Events send by PNMI
- *	add: parameter definition for Flow Control etc.
- *	
- *	Revision 1.1  1998/08/27 11:50:27  gklug
- *	initial revision
- *	
  *
  ******************************************************************************/
 

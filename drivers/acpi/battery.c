@@ -735,8 +735,8 @@ acpi_battery_add (
 	memset(battery, 0, sizeof(struct acpi_battery));
 
 	battery->handle = device->handle;
-	sprintf(acpi_device_name(device), "%s", ACPI_BATTERY_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_BATTERY_CLASS);
+	strcpy(acpi_device_name(device), ACPI_BATTERY_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_BATTERY_CLASS);
 	acpi_driver_data(device) = battery;
 
 	result = acpi_battery_check(battery);

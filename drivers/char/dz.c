@@ -986,11 +986,7 @@ static int dz_ioctl(struct tty_struct *tty, struct file *file,
 		return 0;
 
 	case TIOCGSOFTCAR:
-		error = verify_area (VERIFY_WRITE, (void *)arg, sizeof(long));
-		if (error)
-			return error;
-		put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned long *)arg);
-		return 0;
+		return put_user(C_CLOCAL(tty) ? 1 : 0, (unsigned long *)arg);
 
 	case TIOCSSOFTCAR:
 		if (get_user (arg, (unsigned long *)arg))
@@ -1001,10 +997,6 @@ static int dz_ioctl(struct tty_struct *tty, struct file *file,
 		return 0;
 
 	case TIOCGSERIAL:
-		error = verify_area(VERIFY_WRITE, (void *)arg,
-		                    sizeof(struct serial_struct));
-		if (error)
-			return error;
 		return get_serial_info(info, (struct serial_struct *)arg);
 
 	case TIOCSSERIAL:

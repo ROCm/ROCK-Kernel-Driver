@@ -27,6 +27,7 @@
 #include <linux/config.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
+#include <linux/irq.h>
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
 #include <asm/apic.h>
@@ -312,7 +313,14 @@ __setup("acpi_pic_sci=", acpi_pic_sci_setup);
 
 #endif /* CONFIG_ACPI_BUS */
 
-
+#ifdef CONFIG_X86_IO_APIC
+int acpi_irq_to_vector(u32 irq)
+{
+	if (use_pci_vector() && !platform_legacy_irq(irq))
+ 		irq = IO_APIC_VECTOR(irq);
+	return irq;
+}
+#endif
 
 static unsigned long __init
 acpi_scan_rsdp (

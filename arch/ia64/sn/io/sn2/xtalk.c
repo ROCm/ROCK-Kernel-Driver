@@ -30,9 +30,6 @@
  * completely disappear.
  */
 
-#define	NEW(ptr)	(ptr = kmalloc(sizeof (*(ptr)), GFP_KERNEL))
-#define	DEL(ptr)	(kfree(ptr))
-
 char                    widget_info_fingerprint[] = "widget_info";
 
 /* =====================================================================
@@ -855,7 +852,9 @@ xwidget_register(xwidget_hwid_t hwid,		/* widget's hardware ID */
     char		    *s,devnm[MAXDEVNAME];
 
     /* Allocate widget_info and associate it with widget vertex */
-    NEW(widget_info);
+    widget_info = kmalloc(sizeof(*widget_info), GFP_KERNEL);
+     if (!widget_info)
+ 	return - ENOMEM;
 
     /* Initialize widget_info */
     widget_info->w_vertex = widget;
@@ -898,16 +897,13 @@ xwidget_unregister(vertex_hdl_t widget)
 
     /* Make sure that we have valid widget information initialized */
     if (!(widget_info = xwidget_info_get(widget)))
-	return(1);
+	return 1;
 
     hwid = &(widget_info->w_hwid);
 
-    /* Clean out the xwidget information */
-    (void)kfree(widget_info->w_name);
-    memset((void *)widget_info, 0, sizeof(widget_info));
-    DEL(widget_info);
-    
-    return(0);
+    kfree(widget_info->w_name);
+    kfree(widget_info);
+    return 0;
 }
 
 void

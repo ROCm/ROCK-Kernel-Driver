@@ -252,13 +252,15 @@ void show_regs(struct pt_regs * regs)
  * the "args".
  */
 extern void kernel_thread_helper(void);
-__asm__(".align 4\n"
+__asm__(".section .text\n"
+	".align 4\n"
 	"kernel_thread_helper:\n\t"
 	"movl %edx,%eax\n\t"
 	"pushl %edx\n\t"
 	"call *%ebx\n\t"
 	"pushl %eax\n\t"
-	"call do_exit");
+	"call do_exit\n"
+	".previous");
 
 /*
  * Create a kernel thread

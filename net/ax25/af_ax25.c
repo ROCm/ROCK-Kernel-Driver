@@ -816,7 +816,7 @@ int ax25_create(struct socket *sock, int protocol)
 	if ((sk = sk_alloc(PF_AX25, GFP_ATOMIC, 1, NULL)) == NULL)
 		return -ENOMEM;
 
-	ax25 = ax25_sk(sk) = ax25_create_cb();
+	ax25 = sk->sk_protinfo = ax25_create_cb();
 	if (!ax25) {
 		sk_free(sk);
 		return -ENOMEM;
@@ -901,7 +901,7 @@ struct sock *ax25_make_new(struct sock *osk, struct ax25_dev *ax25_dev)
 		memcpy(ax25->digipeat, oax25->digipeat, sizeof(ax25_digi));
 	}
 
-	ax25_sk(sk) = ax25;
+	sk->sk_protinfo = ax25;
 	ax25->sk    = sk;
 
 	return sk;

@@ -19,6 +19,14 @@
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		0x10000000
 
+extern int pcibios_scan_all_fns(struct pci_bus *bus, int devfn);
+
+#ifdef CONFIG_PPC_ISERIES
+#define pcibios_scan_all_fns(a, b)	0
+#else
+extern int pcibios_scan_all_fns(struct pci_bus *bus, int devfn);
+#endif
+
 static inline void pcibios_set_master(struct pci_dev *dev)
 {
 	/* No special bus mastering setup handling */

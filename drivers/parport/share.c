@@ -44,8 +44,13 @@ int parport_default_spintime =  DEFAULT_SPIN_TIME;
 static struct parport *portlist = NULL, *portlist_tail = NULL;
 static spinlock_t parportlist_lock = SPIN_LOCK_UNLOCKED;
 
+/* list of all allocated ports, sorted by ->number */
+static LIST_HEAD(all_ports);
+static spinlock_t full_list_lock = SPIN_LOCK_UNLOCKED;
+
 static struct parport_driver *driver_chain = NULL;
-static spinlock_t driverlist_lock = SPIN_LOCK_UNLOCKED;
+
+static DECLARE_MUTEX(registration_lock);
 
 /* What you can do to a port that's gone away.. */
 static void dead_write_lines (struct parport *p, unsigned char b){}
@@ -98,55 +103,19 @@ static struct parport_operations dead_ops = {
 /* Call attach(port) for each registered driver. */
 static void attach_driver_chain(struct parport *port)
 {
+	/* caller has exclusive registration_lock */
 	struct parport_driver *drv;
-	void (**attach) (struct parport *);
-	int count = 0, i;
-
-	/* This is complicated because attach() must be able to block,
-	 * but we can't let it do that while we're holding a
-	 * spinlock. */
-
-	spin_lock (&driverlist_lock);
 	for (drv = driver_chain; drv; drv = drv->next)
-		count++;
-	spin_unlock (&driverlist_lock);
-
-	/* Drivers can unregister here; that's okay.  If they register
-	 * they'll be given an attach during parport_register_driver,
-	 * so that's okay too.  The only worry is that someone might
-	 * get given an attach twice if they registered just before
-	 * this function gets called. */
-
-	/* Hmm, this could be fixed with a generation number..
-	 * FIXME */
-
-	attach = kmalloc (sizeof (void(*)(struct parport *)) * count,
-			  GFP_KERNEL);
-	if (!attach) {
-		printk (KERN_WARNING "parport: not enough memory to attach\n");
-		return;
-	}
-
-	spin_lock (&driverlist_lock);
-	for (i = 0, drv = driver_chain; drv && i < count; drv = drv->next)
-		attach[i++] = drv->attach;
-	spin_unlock (&driverlist_lock);
-
-	for (count = 0; count < i; count++)
-		(*attach[count]) (port);
-
-	kfree (attach);
+		drv->attach(port);
 }
 
 /* Call detach(port) for each registered driver. */
 static void detach_driver_chain(struct parport *port)
 {
+	/* caller has exclusive registration_lock */
 	struct parport_driver *drv;
-
-	spin_lock (&driverlist_lock);
 	for (drv = driver_chain; drv; drv = drv->next)
 		drv->detach (port);
-	spin_unlock (&driverlist_lock);
 }
 
 /* Ask kmod for some lowlevel drivers. */
@@ -174,7 +143,7 @@ static void get_lowlevel_driver (void)
  *	pointer it must call parport_get_port() to do so.  Calling
  *	parport_register_device() on that port will do this for you.
  *
- *	The driver's detach() function may not block.  The port that
+ *	The driver's detach() function may block.  The port that
  *	detach() is given will be valid for the duration of the
  *	callback, but if the driver wants to take a copy of the
  *	pointer it must call parport_get_port() to do so.
@@ -185,8 +154,6 @@ static void get_lowlevel_driver (void)
 int parport_register_driver (struct parport_driver *drv)
 {
 	struct parport *port;
-	struct parport **ports;
-	int count = 0, i;
 
 	if (!portlist)
 		get_lowlevel_driver ();
@@ -199,31 +166,12 @@ int parport_register_driver (struct parport_driver *drv)
 	 * it.  But we need to hold a spinlock to iterate over the
 	 * list of ports.. */
 
-	spin_lock (&parportlist_lock);
+	down(&registration_lock);
 	for (port = portlist; port; port = port->next)
-		count++;
-	spin_unlock (&parportlist_lock);
-
-	ports = kmalloc (sizeof (struct parport *) * count, GFP_KERNEL);
-	if (!ports)
-		printk (KERN_WARNING "parport: not enough memory to attach\n");
-	else {
-		spin_lock (&parportlist_lock);
-		for (i = 0, port = portlist; port && i < count;
-		     port = port->next)
-			ports[i++] = port;
-		spin_unlock (&parportlist_lock);
-
-		for (count = 0; count < i; count++)
-			drv->attach (ports[count]);
-
-		kfree (ports);
-	}
-
-	spin_lock (&driverlist_lock);
+		drv->attach(port);
 	drv->next = driver_chain;
 	driver_chain = drv;
-	spin_unlock (&driverlist_lock);
+	up(&registration_lock);
 
 	return 0;
 }
@@ -241,49 +189,46 @@ int parport_register_driver (struct parport_driver *drv)
  *	be called, and for each port that attach() was called for, the
  *	detach() routine will have been called.
  *
- *	If the caller's attach() function can block, it is their
- *	responsibility to make sure to wait for it to exit before
- *	unloading.
- *
- *	All the driver's detach() calls are guaranteed to have
+ *	All the driver's attach() and detach() calls are guaranteed to have
  *	finished by the time this function returns.
- *
- *	The driver's detach() call is not allowed to block.
  **/
 
 void parport_unregister_driver (struct parport_driver *arg)
 {
-	struct parport_driver *drv = driver_chain, *olddrv = NULL;
+	struct parport_driver *drv, *olddrv = NULL;
 
+	down(&registration_lock);
+	drv = driver_chain;
 	while (drv) {
 		if (drv == arg) {
 			struct parport *port;
 
-			spin_lock (&driverlist_lock);
 			if (olddrv)
 				olddrv->next = drv->next;
 			else
 				driver_chain = drv->next;
-			spin_unlock (&driverlist_lock);
 
 			/* Call the driver's detach routine for each
 			 * port to clean up any resources that the
 			 * attach routine acquired. */
-			spin_lock (&parportlist_lock);
 			for (port = portlist; port; port = port->next)
 				drv->detach (port);
-			spin_unlock (&parportlist_lock);
+			up(&registration_lock);
 
 			return;
 		}
 		olddrv = drv;
 		drv = drv->next;
 	}
+	up(&registration_lock);
 }
 
 static void free_port (struct parport *port)
 {
 	int d;
+	spin_lock(&full_list_lock);
+	list_del(&port->full_list);
+	spin_unlock(&full_list_lock);
 	for (d = 0; d < 5; d++) {
 		if (port->probe_info[d].class_name)
 			kfree (port->probe_info[d].class_name);
@@ -386,8 +331,9 @@ struct parport *parport_enumerate(void)
 struct parport *parport_register_port(unsigned long base, int irq, int dma,
 				      struct parport_operations *ops)
 {
+	struct list_head *l;
 	struct parport *tmp;
-	int portnum;
+	int num;
 	int device;
 	char *name;
 
@@ -418,6 +364,7 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 	init_MUTEX_LOCKED (&tmp->ieee1284.irq); /* actually a semaphore at 0 */
 	tmp->spintime = parport_default_spintime;
 	atomic_set (&tmp->ref_count, 1);
+	INIT_LIST_HEAD(&tmp->full_list);
 
 	name = kmalloc(15, GFP_KERNEL);
 	if (!name) {
@@ -427,52 +374,21 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 	}
 	/* Search for the lowest free parport number. */
 
-	spin_lock_irq (&parportlist_lock);
-	for (portnum = 0; ; portnum++) {
-		struct parport *itr = portlist;
-		while (itr) {
-			if (itr->number == portnum)
-				/* No good, already used. */
-				break;
-			else
-				itr = itr->next;
-		}
-
-		if (itr == NULL)
-			/* Got to the end of the list. */
+	spin_lock(&full_list_lock);
+	for (l = all_ports.next, num = 0; l != &all_ports; l = l->next, num++) {
+		struct parport *p = list_entry(l, struct parport, full_list);
+		if (p->number != num)
 			break;
 	}
+	tmp->portnum = tmp->number = num;
+	list_add_tail(&tmp->full_list, l);
+	spin_unlock(&full_list_lock);
 
 	/*
 	 * Now that the portnum is known finish doing the Init.
 	 */
-	tmp->portnum = tmp->number = portnum;
-	sprintf(name, "parport%d", portnum);
+	sprintf(name, "parport%d", tmp->portnum = tmp->number);
 	tmp->name = name;
-
-	
-	/*
-	 * Chain the entry to our list.
-	 *
-	 * This function must not run from an irq handler so we don' t need
-	 * to clear irq on the local CPU. -arca
-	 */
-
-	/* We are locked against anyone else performing alterations, but
-	 * because of parport_enumerate people can still _read_ the list
-	 * while we are changing it; so be careful..
-	 *
-	 * It's okay to have portlist_tail a little bit out of sync
-	 * since it's only used for changing the list, not for reading
-	 * from it.
-	 */
-
-	if (portlist_tail)
-		portlist_tail->next = tmp;
-	portlist_tail = tmp;
-	if (!portlist)
-		portlist = tmp;
-	spin_unlock_irq(&parportlist_lock);
 
 	for (device = 0; device < 5; device++)
 		/* assume the worst */
@@ -497,6 +413,7 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 
 void parport_announce_port (struct parport *port)
 {
+
 #ifdef CONFIG_PARPORT_1284
 	/* Analyse the IEEE1284.3 topology of the port. */
 	if (parport_daisy_init (port) == 0) {
@@ -514,8 +431,27 @@ void parport_announce_port (struct parport *port)
 	}
 #endif
 
+	down(&registration_lock);
+	/* We are locked against anyone else performing alterations, but
+	 * because of parport_enumerate people can still _read_ the list
+	 * while we are changing it; so be careful..
+	 *
+	 * It's okay to have portlist_tail a little bit out of sync
+	 * since it's only used for changing the list, not for reading
+	 * from it.
+	 */
+
+	spin_lock_irq(&parportlist_lock);
+	if (portlist_tail)
+		portlist_tail->next = port;
+	portlist_tail = port;
+	if (!portlist)
+		portlist = port;
+	spin_unlock_irq(&parportlist_lock);
+
 	/* Let drivers know that a new port has arrived. */
 	attach_driver_chain (port);
+	up(&registration_lock);
 }
 
 /**
@@ -541,6 +477,7 @@ void parport_unregister_port(struct parport *port)
 {
 	struct parport *p;
 
+	down(&registration_lock);
 	port->ops = &dead_ops;
 
 	/* Spread the word. */
@@ -570,6 +507,7 @@ void parport_unregister_port(struct parport *port)
 			     "%s not found in port list!\n", port->name);
 	}
 	spin_unlock(&parportlist_lock);
+	up(&registration_lock);
 
 	/* Yes, parport_enumerate _is_ unsafe.  Don't use it. */
 	parport_put_port (port);

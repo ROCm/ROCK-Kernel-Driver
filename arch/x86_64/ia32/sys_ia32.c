@@ -274,13 +274,16 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act,
 		return -EINVAL;
 
 	if (act) {
+		compat_uptr_t handler, restorer;
+
 		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
-		    __get_user((long)new_ka.sa.sa_handler, &act->sa_handler) ||
+		    __get_user(handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &act->sa_flags) ||
-		    __get_user((long)new_ka.sa.sa_restorer, &act->sa_restorer)||
+		    __get_user(restorer, &act->sa_restorer)||
 		    __copy_from_user(&set32, &act->sa_mask, sizeof(compat_sigset_t)))
 			return -EFAULT;
-
+		new_ka.sa.sa_handler = compat_ptr(handler);
+		new_ka.sa.sa_restorer = compat_ptr(restorer);
 		/* FIXME: here we rely on _COMPAT_NSIG_WORS to be >= than _NSIG_WORDS << 1 */
 		switch (_NSIG_WORDS) {
 		case 4: new_ka.sa.sa_mask.sig[3] = set32.sig[6]
@@ -331,13 +334,18 @@ sys32_sigaction (int sig, struct old_sigaction32 *act, struct old_sigaction32 *o
 
         if (act) {
 		compat_old_sigset_t mask;
+		compat_uptr_t handler, restorer;
 
 		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
-		    __get_user((long)new_ka.sa.sa_handler, &act->sa_handler) ||
+		    __get_user(handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &act->sa_flags) ||
-		    __get_user((long)new_ka.sa.sa_restorer, &act->sa_restorer) ||
+		    __get_user(restorer, &act->sa_restorer) ||
 		    __get_user(mask, &act->sa_mask))
 			return -EFAULT;
+
+		new_ka.sa.sa_handler = compat_ptr(handler);
+		new_ka.sa.sa_restorer = compat_ptr(restorer);
+
 		siginitset(&new_ka.sa.sa_mask, mask);
         }
 
@@ -525,7 +533,7 @@ filldir32 (void *__buf, const char *name, int namlen, loff_t offset, ino_t ino,
 	put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
-	((char *) dirent) += reclen;
+	dirent = ((void *)dirent) + reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;

@@ -598,7 +598,6 @@ static ctl_table kern_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
-		.strategy	= &sysctl_jiffies,
 	},
 	{ .ctl_name = 0 }
 };

@@ -142,6 +142,10 @@ static int bad_address(void *p)
 void dump_pagetable(unsigned long address)
 {
 	pml4_t *pml4;
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t *pte;
+
 	asm("movq %%cr3,%0" : "=r" (pml4));
 
 	pml4 = __va((unsigned long)pml4 & PHYSICAL_PAGE_MASK); 
@@ -150,17 +154,17 @@ void dump_pagetable(unsigned long address)
 	if (bad_address(pml4)) goto bad;
 	if (!pml4_present(*pml4)) goto ret; 
 
-	pgd_t *pgd = __pgd_offset_k((pgd_t *)pml4_page(*pml4), address); 
+	pgd = __pgd_offset_k((pgd_t *)pml4_page(*pml4), address);
 	if (bad_address(pgd)) goto bad;
 	printk("PGD %lx ", pgd_val(*pgd)); 
 	if (!pgd_present(*pgd))	goto ret;
 
-	pmd_t *pmd = pmd_offset(pgd, address); 
+	pmd = pmd_offset(pgd, address);
 	if (bad_address(pmd)) goto bad;
 	printk("PMD %lx ", pmd_val(*pmd));
 	if (!pmd_present(*pmd))	goto ret;	 
 
-	pte_t *pte = pte_offset_kernel(pmd, address);
+	pte = pte_offset_kernel(pmd, address);
 	if (bad_address(pte)) goto bad;
 	printk("PTE %lx", pte_val(*pte)); 
 ret:

@@ -79,6 +79,10 @@ extern unsigned long pci_io_base;
 #define outsl(port, buf, nl)	_outsl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
 #endif
 
+#define readb_relaxed(addr) readb(addr)
+#define readw_relaxed(addr) readw(addr)
+#define readl_relaxed(addr) readl(addr)
+
 extern void _insb(volatile u8 *port, void *buf, int ns);
 extern void _outsb(volatile u8 *port, const void *buf, int ns);
 extern void _insw(volatile u16 *port, void *buf, int ns);

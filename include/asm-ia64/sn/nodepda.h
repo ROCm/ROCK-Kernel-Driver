@@ -9,14 +9,14 @@
 #define _ASM_IA64_SN_NODEPDA_H
 
 
-#include <linux/config.h>
-#include <asm/sn/sgi.h>
+#include <asm/semaphore.h>
 #include <asm/irq.h>
 #include <asm/sn/intr.h>
 #include <asm/sn/router.h>
 #include <asm/sn/pda.h>
 #include <asm/sn/module.h>
 #include <asm/sn/bte.h>
+#include <asm/sn/sn2/arch.h>
 
 /*
  * NUMA Node-Specific Data structures are defined in this file.

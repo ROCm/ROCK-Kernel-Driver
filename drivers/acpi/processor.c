@@ -2286,8 +2286,8 @@ acpi_processor_add (
 	memset(pr, 0, sizeof(struct acpi_processor));
 
 	pr->handle = device->handle;
-	sprintf(acpi_device_name(device), "%s", ACPI_PROCESSOR_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_PROCESSOR_CLASS);
+	strcpy(acpi_device_name(device), ACPI_PROCESSOR_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_PROCESSOR_CLASS);
 	acpi_driver_data(device) = pr;
 
 	result = acpi_processor_get_info(pr);

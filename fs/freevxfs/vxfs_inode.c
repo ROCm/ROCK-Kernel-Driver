@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_inode.c,v 1.42 2002/01/02 23:51:36 hch Exp hch $"
-
 /*
  * Veritas filesystem driver - inode routines.
  */

@@ -9,11 +9,15 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
+#include <linux/mm.h>
+#include <linux/delay.h>
+#include <asm/sn/sgi.h>
 #include <asm/sn/sn2/sn_private.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/simulator.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
+#include <asm/sn/pci/pcibr_private.h>
 
 /* #define DEBUG		1 */
 /* #define XBOW_DEBUG	1 */

@@ -1021,6 +1021,9 @@ static int __init atm_clip_init(void)
 	clip_tbl.kmem_cachep = kmem_cache_create(clip_tbl.id,
 	    clip_tbl.entry_size, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 
+	if (!clip_tbl.kmem_cachep)
+		return -ENOMEM;
+
 	/* so neigh_ifdown() doesn't complain */
 	clip_tbl.proxy_timer.data = 0;
 	clip_tbl.proxy_timer.function = 0;

@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -63,7 +63,7 @@ MODULE_PARM_DESC(X, S);
 /* Transmit Descriptor Count
  *
  * Valid Range: 80-256 for 82542 and 82543 gigabit ethernet controllers
- * Valid Range: 80-4096 for 82544
+ * Valid Range: 80-4096 for 82544 and newer
  *
  * Default Value: 256
  */
@@ -73,7 +73,7 @@ E1000_PARAM(TxDescriptors, "Number of transmit descriptors");
 /* Receive Descriptor Count
  *
  * Valid Range: 80-256 for 82542 and 82543 gigabit ethernet controllers
- * Valid Range: 80-4096 for 82544
+ * Valid Range: 80-4096 for 82544 and newer
  *
  * Default Value: 256
  */
@@ -196,16 +196,6 @@ E1000_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
 #define AUTONEG_ADV_MASK     0x2F
 #define FLOW_CONTROL_DEFAULT FLOW_CONTROL_FULL
 
-#define DEFAULT_TXD                  256
-#define MAX_TXD                      256
-#define MIN_TXD                       80
-#define MAX_82544_TXD               4096
-
-#define DEFAULT_RXD                  256
-#define MAX_RXD                      256
-#define MIN_RXD                       80
-#define MAX_82544_RXD               4096
-
 #define DEFAULT_RDTR                   0
 #define MAX_RXDELAY               0xFFFF
 #define MIN_RXDELAY                    0
@@ -299,7 +289,7 @@ static void e1000_check_copper_options(struct e1000_adapter *adapter);
  * e1000_check_options - Range Checking for Command Line Parameters
  * @adapter: board private structure
  *
- * This routine checks all command line paramters for valid user
+ * This routine checks all command line parameters for valid user
  * input.  If an invalid value is given, or if no user specified
  * value exists, a default value is used.  The final value is stored
  * in a variable in the adapter structure.
@@ -320,14 +310,15 @@ e1000_check_options(struct e1000_adapter *adapter)
 		struct e1000_option opt = {
 			.type = range_option,
 			.name = "Transmit Descriptors",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_TXD),
-			.def  = DEFAULT_TXD,
-			.arg  = { .r = { .min = MIN_TXD }}
+			.err  = "using default of "
+				__MODULE_STRING(E1000_DEFAULT_TXD),
+			.def  = E1000_DEFAULT_TXD,
+			.arg  = { .r = { .min = E1000_MIN_TXD }}
 		};
 		struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 		e1000_mac_type mac_type = adapter->hw.mac_type;
 		opt.arg.r.max = mac_type < e1000_82544 ?
-			MAX_TXD : MAX_82544_TXD;
+			E1000_MAX_TXD : E1000_MAX_82544_TXD;
 
 		tx_ring->count = TxDescriptors[bd];
 		e1000_validate_option(&tx_ring->count, &opt);
@@ -337,13 +328,15 @@ e1000_check_options(struct e1000_adapter *adapter)
 		struct e1000_option opt = {
 			.type = range_option,
 			.name = "Receive Descriptors",
-			.err  = "using default of " __MODULE_STRING(DEFAULT_RXD),
-			.def  = DEFAULT_RXD,
-			.arg  = { .r = { .min = MIN_RXD }}
+			.err  = "using default of "
+				__MODULE_STRING(E1000_DEFAULT_RXD),
+			.def  = E1000_DEFAULT_RXD,
+			.arg  = { .r = { .min = E1000_MIN_RXD }}
 		};
 		struct e1000_desc_ring *rx_ring = &adapter->rx_ring;
 		e1000_mac_type mac_type = adapter->hw.mac_type;
-		opt.arg.r.max = mac_type < e1000_82544 ? MAX_RXD : MAX_82544_RXD;
+		opt.arg.r.max = mac_type < e1000_82544 ? E1000_MAX_RXD :
+			E1000_MAX_82544_RXD;
 
 		rx_ring->count = RxDescriptors[bd];
 		e1000_validate_option(&rx_ring->count, &opt);
@@ -446,13 +439,19 @@ e1000_check_options(struct e1000_adapter *adapter)
 		};
 
 		adapter->itr = InterruptThrottleRate[bd];
-		if(adapter->itr == 0) {
-			printk(KERN_INFO "%s turned off\n", opt.name);
-		} else if(adapter->itr == 1 || adapter->itr == -1) {
-			/* Dynamic mode */
+		switch(adapter->itr) {
+		case -1:
 			adapter->itr = 1;
-		} else {
+			break;
+		case 0:
+			printk(KERN_INFO "%s turned off\n", opt.name);
+			break;
+		case 1:
+			printk(KERN_INFO "%s set to dynamic mode\n", opt.name);
+			break;
+		default:
 			e1000_validate_option(&adapter->itr, &opt);
+			break;
 		}
 	}
 
@@ -490,9 +489,9 @@ e1000_check_fiber_options(struct e1000_adapter *adapter)
 		printk(KERN_INFO "Duplex not valid for fiber adapters, "
 		       "parameter ignored\n");
 	}
-	if((AutoNeg[bd] != OPTION_UNSET)) {
-		printk(KERN_INFO "AutoNeg not valid for fiber adapters, "
-		       "parameter ignored\n");
+	if((AutoNeg[bd] != OPTION_UNSET) && (AutoNeg[bd] != 0x20)) {
+		printk(KERN_INFO "AutoNeg other than Full/1000 is "
+		       "not valid for fiber adapters, parameter ignored\n");
 	}
 }
 

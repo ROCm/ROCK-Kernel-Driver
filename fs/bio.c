@@ -281,23 +281,9 @@ int bio_get_nr_vecs(struct block_device *bdev)
 	return nr_pages;
 }
 
-/**
- *	bio_add_page	-	attempt to add page to bio
- *	@bio: destination bio
- *	@page: page to add
- *	@len: vec entry length
- *	@offset: vec entry offset
- *
- *	Attempt to add a page to the bio_vec maplist. This can fail for a
- *	number of reasons, such as the bio being full or target block
- *	device limitations. The target block device must allow bio's
- *      smaller than PAGE_SIZE, so it is always possible to add a single
- *      page to an empty bio.
- */
-int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
-		 unsigned int offset)
+static int __bio_add_page(request_queue_t *q, struct bio *bio, struct page
+			  *page, unsigned int len, unsigned int offset)
 {
-	request_queue_t *q = bdev_get_queue(bio->bi_bdev);
 	int retried_segments = 0;
 	struct bio_vec *bvec;
 
@@ -362,14 +348,33 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
 	return len;
 }
 
-static struct bio *__bio_map_user(struct block_device *bdev,
+/**
+ *	bio_add_page	-	attempt to add page to bio
+ *	@bio: destination bio
+ *	@page: page to add
+ *	@len: vec entry length
+ *	@offset: vec entry offset
+ *
+ *	Attempt to add a page to the bio_vec maplist. This can fail for a
+ *	number of reasons, such as the bio being full or target block
+ *	device limitations. The target block device must allow bio's
+ *      smaller than PAGE_SIZE, so it is always possible to add a single
+ *      page to an empty bio.
+ */
+int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
+		 unsigned int offset)
+{
+	return __bio_add_page(bdev_get_queue(bio->bi_bdev), bio, page,
+			      len, offset);
+}
+
+static struct bio *__bio_map_user(request_queue_t *q, struct block_device *bdev,
 				  unsigned long uaddr, unsigned int len,
 				  int write_to_vm)
 {
 	unsigned long end = (uaddr + len + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	unsigned long start = uaddr >> PAGE_SHIFT;
 	const int nr_pages = end - start;
-	request_queue_t *q = bdev_get_queue(bdev);
 	int ret, offset, i;
 	struct page **pages;
 	struct bio *bio;
@@ -412,7 +417,7 @@ static struct bio *__bio_map_user(struct block_device *bdev,
 		/*
 		 * sorry...
 		 */
-		if (bio_add_page(bio, pages[i], bytes, offset) < bytes)
+		if (__bio_add_page(q, bio, pages[i], bytes, offset) < bytes)
 			break;
 
 		len -= bytes;
@@ -451,12 +456,12 @@ out:
  *	Map the user space address into a bio suitable for io to a block
  *	device.
  */
-struct bio *bio_map_user(struct block_device *bdev, unsigned long uaddr,
-			 unsigned int len, int write_to_vm)
+struct bio *bio_map_user(request_queue_t *q, struct block_device *bdev,
+			 unsigned long uaddr, unsigned int len, int write_to_vm)
 {
 	struct bio *bio;
 
-	bio = __bio_map_user(bdev, uaddr, len, write_to_vm);
+	bio = __bio_map_user(q, bdev, uaddr, len, write_to_vm);
 
 	if (bio) {
 		/*

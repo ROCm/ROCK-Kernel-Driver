@@ -41,6 +41,10 @@ void bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
 void bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
 			const unsigned long *bitmap2, int bits);
 int bitmap_weight(const unsigned long *bitmap, int bits);
+int bitmap_snprintf(char *buf, unsigned int buflen,
+			const unsigned long *maskp, int bits);
+int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
+			unsigned long *maskp, int bits);
 
 #endif /* __ASSEMBLY__ */
 

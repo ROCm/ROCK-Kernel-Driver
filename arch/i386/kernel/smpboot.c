@@ -33,6 +33,7 @@
  *		Dave Jones	:	Report invalid combinations of Athlon CPUs.
 *		Rusty Russell	:	Hacked into shape for new "hotplug" boot process. */
 
+#include <linux/module.h>
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -503,6 +504,7 @@ cpumask_t node_2_cpu_mask[MAX_NUMNODES] =
 				{ [0 ... MAX_NUMNODES-1] = CPU_MASK_NONE };
 /* which node each logical CPU is on */
 int cpu_2_node[NR_CPUS] = { [0 ... NR_CPUS-1] = 0 };
+EXPORT_SYMBOL(cpu_2_node);
 
 /* set up a mapping between cpu and node. */
 static inline void map_cpu_to_node(int cpu, int node)

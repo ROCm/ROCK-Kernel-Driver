@@ -380,7 +380,7 @@ he_init_one(struct pci_dev *pci_dev, const struct pci_device_id *pci_ent)
 	he_dev->pci_dev = pci_dev;
 	he_dev->atm_dev = atm_dev;
 	he_dev->atm_dev->dev_data = he_dev;
-	HE_DEV(atm_dev) = he_dev;
+	atm_dev->dev_data = he_dev;
 	he_dev->number = atm_dev->number;
 	if (he_start(atm_dev)) {
 		he_stop(he_dev);
@@ -2361,7 +2361,7 @@ he_open(struct atm_vcc *vcc)
 	init_waitqueue_head(&he_vcc->rx_waitq);
 	init_waitqueue_head(&he_vcc->tx_waitq);
 
-	HE_VCC(vcc) = he_vcc;
+	vcc->dev_data = he_vcc;
 
 	if (vcc->qos.txtp.traffic_class != ATM_NONE) {
 		int pcr_goal;

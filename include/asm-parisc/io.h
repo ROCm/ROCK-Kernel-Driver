@@ -171,6 +171,11 @@ extern __inline__ void ___raw_writeq(unsigned long long val, unsigned long addr)
 #define writeq(b,addr) __raw_writeq(cpu_to_le64(b),addr)
 #endif /* !USE_HPPA_IOREMAP */
 
+#define readb_relaxed(addr) readb(addr)
+#define readw_relaxed(addr) readw(addr)
+#define readl_relaxed(addr) readl(addr)
+#define readq_relaxed(addr) readq(addr)
+
 extern void __memcpy_fromio(unsigned long dest, unsigned long src, int count);
 extern void __memcpy_toio(unsigned long dest, unsigned long src, int count);
 extern void __memset_io(unsigned long dest, char fill, int count);

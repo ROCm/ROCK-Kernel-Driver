@@ -46,8 +46,9 @@ xswitch_vertex_init(vertex_hdl_t xswitch)
 	int rc;
 
 	xvolinfo = kmalloc(sizeof(struct xswitch_vol_s), GFP_KERNEL);
-	if (xvolinfo <= 0 ) {
-		printk("xswitch_vertex_init: out of memory\n");
+	if (!xvolinfo) {
+		printk(KERN_WARNING "xswitch_vertex_init(): Unable to "
+			"allocate memory\n");
 		return;
 	}
        	memset(xvolinfo, 0, sizeof(struct xswitch_vol_s));
@@ -239,30 +240,29 @@ do_assignment:
 static void
 early_probe_for_widget(vertex_hdl_t hubv, xwidget_hwid_t hwid)
 {
-	hubreg_t llp_csr_reg;
 	nasid_t nasid;
 	hubinfo_t hubinfo;
+	hubreg_t llp_csr_reg;
+	widgetreg_t widget_id;
+	int result = 0;
+
+	hwid->part_num = XWIDGET_PART_NUM_NONE;
+	hwid->rev_num = XWIDGET_REV_NUM_NONE;
+	hwid->mfg_num = XWIDGET_MFG_NUM_NONE;
 
 	hubinfo_get(hubv, &hubinfo);
 	nasid = hubinfo->h_nasid;
 
 	llp_csr_reg = REMOTE_HUB_L(nasid, IIO_LLP_CSR);
-	/* 
-	 * If link is up, read the widget's part number.
-	 * A direct connect widget must respond to widgetnum=0.
-	 */
-	if (llp_csr_reg & IIO_LLP_CSR_IS_UP) {
-		/* TBD: Put hub into "indirect" mode */
-		/*
-		 * We're able to read from a widget because our hub's 
-		 * WIDGET_ID was set up earlier.
-		 */
-		widgetreg_t widget_id = *(volatile widgetreg_t *)
-			(RAW_NODE_SWIN_BASE(nasid, 0x0) + WIDGET_ID);
+	if (!(llp_csr_reg & IIO_LLP_CSR_IS_UP))
+		return;
 
-		DBG("early_probe_for_widget: Hub Vertex 0x%p is UP widget_id = 0x%x Register 0x%p\n", hubv, widget_id,
-		(volatile widgetreg_t *)(RAW_NODE_SWIN_BASE(nasid, 0x0) + WIDGET_ID) );
+	/* Read the Cross-Talk Widget Id on the other end */
+	result = snia_badaddr_val((volatile void *)
+			(RAW_NODE_SWIN_BASE(nasid, 0x0) + WIDGET_ID), 
+			4, (void *) &widget_id);
 
+	if (result == 0) { /* Found something connected */
 		hwid->part_num = XWIDGET_PART_NUM(widget_id);
 		hwid->rev_num = XWIDGET_REV_NUM(widget_id);
 		hwid->mfg_num = XWIDGET_MFG_NUM(widget_id);
@@ -344,13 +344,12 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 			return;
 		}
 
-		board = find_lboard_class(
-				(lboard_t *)KL_CONFIG_INFO(nasid),
-				KLCLASS_IOBRICK);
+		board = find_lboard_class_nasid( (lboard_t *)KL_CONFIG_INFO(nasid),
+				nasid, KLCLASS_IOBRICK);
 		if (!board && NODEPDA(cnode)->xbow_peer != INVALID_NASID) {
-		    	board = find_lboard_class(
-					(lboard_t *)KL_CONFIG_INFO( NODEPDA(cnode)->xbow_peer),
-						KLCLASS_IOBRICK);
+		    	board = find_lboard_class_nasid(
+				(lboard_t *)KL_CONFIG_INFO( NODEPDA(cnode)->xbow_peer),
+					NODEPDA(cnode)->xbow_peer, KLCLASS_IOBRICK);
 		}
 
 		if (board) {
@@ -365,7 +364,7 @@ io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 		{
 			lboard_t *brd;
 
-			brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
+			brd = find_lboard_any((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 			if ( brd != (lboard_t *)0 ) {
 				board->brd_geoid = brd->brd_geoid;
 			}
@@ -584,10 +583,9 @@ io_init_node(cnodeid_t cnodeid)
 
 	} else {
 		void	*bridge;
-		extern uint64_t pcireg_control_get(void *);
 
 		bridge = (void *)NODE_SWIN_BASE(COMPACT_TO_NASID_NODEID(cnodeid), 0);
-		npdap->basew_id = pcireg_control_get(bridge) & WIDGET_WIDGET_ID;
+		npdap->basew_id = pcireg_bridge_control_get(bridge) & WIDGET_WIDGET_ID;
 
 		printk(" ****io_init_node: Unknown Widget Part Number 0x%x Widget ID 0x%x attached to Hubv 0x%p ****\n", widget_partnum, npdap->basew_id, (void *)hubv);
 		return;
@@ -764,7 +762,7 @@ io_brick_map_widget(int brick_type, int widget_num)
         /* Look for brick prefix in table */
         for (i = 0; i < num_bricks; i++) {
                if (brick_type == io_brick_tab[i].ibm_type)
-                       return(io_brick_tab[i].ibm_map_wid[widget_num]);
+                       return io_brick_tab[i].ibm_map_wid[widget_num];
         }
 
         return 0;

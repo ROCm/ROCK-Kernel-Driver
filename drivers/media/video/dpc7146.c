@@ -131,7 +131,7 @@ static int dpc_probe(struct saa7146_dev* dev)
 	DEB_D(("dpc_v4l2.o: dpc_probe succeeded for this device.\n"));	
 
 	/* we store the pointer in our private data field */
-	(struct dpc*)dev->ext_priv = dpc;
+	dev->ext_priv = dpc;
 
 	return 0;
 }

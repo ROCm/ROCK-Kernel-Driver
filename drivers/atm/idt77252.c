@@ -664,8 +664,8 @@ alloc_scq(struct idt77252_dev *card, int class)
 	skb_queue_head_init(&scq->transmit);
 	skb_queue_head_init(&scq->pending);
 
-	TXPRINTK("idt77252: SCQ: base 0x%p, next 0x%p, last 0x%p, paddr %08x\n",
-		 scq->base, scq->next, scq->last, scq->paddr);
+	TXPRINTK("idt77252: SCQ: base 0x%p, next 0x%p, last 0x%p, paddr %08llx\n",
+		 scq->base, scq->next, scq->last, (unsigned long long)scq->paddr);
 
 	return scq;
 }
