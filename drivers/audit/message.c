@@ -393,8 +393,8 @@ audit_msg_syscall(struct aud_process *pinfo,
 	msgh->body.msg_arch = syscall->arch;
 	switch (syscall->major) {
 	case AUDIT_access:
-		msgh->body.msg_fsuid = syscall->args[syscall->entry->sy_narg].at_intval;
-		msgh->body.msg_fsgid = syscall->args[syscall->entry->sy_narg + 1].at_intval;
+		msgh->body.msg_fsuid = syscall->raw_args[syscall->entry->sy_narg];
+		msgh->body.msg_fsgid = syscall->raw_args[syscall->entry->sy_narg + 1];
 		break;
 	}
 	syscall_msg = (struct aud_msg_syscall *) msgh->body.msg_data;

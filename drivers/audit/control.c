@@ -856,7 +856,6 @@ __audit_detach(task_t *task, int permanent)
 			task->audit = NULL;
 		else {
 			pinfo->flags &= ~AUD_F_ATTACHED;
-			pinfo->audit_uid = (uid_t) -1;
 			pinfo->suspended = 1;
 		}
 		task_unlock(task);
