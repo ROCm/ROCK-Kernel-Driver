@@ -396,13 +396,13 @@ pci_populate_driver_dir(struct pci_driver *drv)
  * @drv: the driver structure to register
  * 
  * Adds the driver structure to the list of registered drivers.
- * Returns a negative value on error. The driver remains registered
- * even if no device was claimed during registration.
+ * Returns a negative value on error, otherwise 0. 
+ * If no error occured, the driver remains registered even if 
+ * no device was claimed during registration.
  */
-int
-pci_register_driver(struct pci_driver *drv)
+int pci_register_driver(struct pci_driver *drv)
 {
-	int count = 0;
+	int error;
 
 	/* initialize common driver fields */
 	drv->driver.name = drv->name;
@@ -413,13 +413,12 @@ pci_register_driver(struct pci_driver *drv)
 	pci_init_dynids(&drv->dynids);
 
 	/* register with core */
-	count = driver_register(&drv->driver);
+	error = driver_register(&drv->driver);
 
-	if (count >= 0) {
+	if (!error)
 		pci_populate_driver_dir(drv);
-	}
 
-	return count ? count : 1;
+	return error;
 }
 
 /**
