@@ -23,7 +23,7 @@ obj-y    := entry.o traps.o process.o osf_sys.o irq.o irq_alpha.o \
 # FIXME!
 # These should be made conditional on the stuff that needs them!
 #
-obj-y	 += irq_i8259.o irq_srm.o irq_pyxis.o \
+obj-y	 += irq_i8259.o irq_srm.o \
 	    es1888.o smc37c669.o smc37c93x.o ns87312.o
 
 ifdef CONFIG_VGA_HOSE
@@ -43,7 +43,7 @@ obj-y 	 += core_apecs.o core_cia.o core_irongate.o core_lca.o core_mcpcia.o \
 	    sys_jensen.o sys_miata.o sys_mikasa.o sys_nautilus.o sys_titan.o \
 	    sys_noritake.o sys_rawhide.o sys_ruffian.o sys_rx164.o \
 	    sys_sable.o sys_sio.o sys_sx164.o sys_takara.o sys_rx164.o \
-	    sys_wildfire.o core_wildfire.o
+	    sys_wildfire.o core_wildfire.o irq_pyxis.o
 
 else
 
@@ -93,6 +93,10 @@ endif
 obj-$(CONFIG_ALPHA_SX164) += sys_sx164.o
 obj-$(CONFIG_ALPHA_TAKARA) += sys_takara.o
 obj-$(CONFIG_ALPHA_WILDFIRE) += sys_wildfire.o
+
+ifneq ($(CONFIG_ALPHA_MIATA)$(CONFIG_ALPHA_RUFFIAN)$(CONFIG_ALPHA_SX164),)
+obj-y    += irq_pyxis.o
+endif
 
 endif # GENERIC
 

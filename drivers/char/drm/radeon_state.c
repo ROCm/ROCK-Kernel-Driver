@@ -778,7 +778,7 @@ static void radeon_cp_dispatch_vertex( drm_device_t *dev,
 
 	radeon_update_ring_snapshot( dev_priv );
 
-	if ( 1 )
+	if ( 0 )
 		radeon_print_dirty( "dispatch_vertex", sarea_priv->dirty );
 
 	if ( buf->used ) {

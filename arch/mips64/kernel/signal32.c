@@ -30,8 +30,6 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-extern asmlinkage int sys_wait4(pid_t pid, unsigned long *stat_addr,
-                         int options, unsigned long *ru);
 extern asmlinkage int do_signal32(sigset_t *oldset, struct pt_regs *regs);
 extern asmlinkage int save_fp_context(struct sigcontext *sc);
 extern asmlinkage int restore_fp_context(struct sigcontext *sc);

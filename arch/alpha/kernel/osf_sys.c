@@ -904,7 +904,6 @@ extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 extern int do_getitimer(int which, struct itimerval *value);
 extern int do_setitimer(int which, struct itimerval *, struct itimerval *);
 asmlinkage int sys_utimes(char *, struct timeval *);
-extern int sys_wait4(pid_t, int *, int, struct rusage *);
 extern int do_adjtimex(struct timex *);
 
 struct timeval32

@@ -53,8 +53,6 @@
 #define MSR_USERCHANGE	(MSR_FE0 | MSR_FE1)
 
 int do_signal(sigset_t *oldset, struct pt_regs *regs);
-extern int sys_wait4(pid_t pid, unsigned long *stat_addr,
-		     int options, unsigned long *ru);
 
 int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
 {

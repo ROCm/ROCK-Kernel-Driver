@@ -12,6 +12,8 @@
 #ifndef _PPC_KERNEL_OPEN_PIC_H
 #define _PPC_KERNEL_OPEN_PIC_H
 
+#include <linux/config.h>
+
 #define OPENPIC_SIZE	0x40000
 
 /* OpenPIC IRQ controller structure */

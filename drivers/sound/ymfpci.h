@@ -21,6 +21,7 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
+#include <linux/config.h>
 
 /*
  *  Direct registers
@@ -131,7 +132,12 @@
 #define YDSXG_AC97READCMD		0x8000
 #define YDSXG_AC97WRITECMD		0x0000
 
+#define PCIR_LEGCTRL			0x40
+#define PCIR_ELEGCTRL			0x42
 #define PCIR_DSXGCTRL			0x48
+#define PCIR_OPLADR			0x60
+#define PCIR_SBADR			0x62
+#define PCIR_MPUADR			0x64
 
 #define YDSXG_DSPLENGTH			0x0080
 #define YDSXG_CTRLLENGTH		0x3000
@@ -185,8 +191,8 @@ typedef struct stru_ymfpci_playback_bank {
 } ymfpci_playback_bank_t;
 
 typedef struct stru_ymfpci_capture_bank {
-	u32 base;			/* 32-bit address */
-	u32 loop_end;			/* 32-bit offset */
+	u32 base;			/* 32-bit address (aligned at 4) */
+	u32 loop_end;			/* size in BYTES (aligned at 4) */
 	u32 start;			/* 32-bit offset */
 	u32 num_of_loops;		/* counter */
 } ymfpci_capture_bank_t;
@@ -198,8 +204,7 @@ typedef struct stru_ymfpci_effect_bank {
 	u32 temp;
 } ymfpci_effect_bank_t;
 
-typedef struct stru_ymfpci_voice ymfpci_voice_t;
-typedef struct ymf_pcm ymfpci_pcm_t;
+typedef struct ymf_voice ymfpci_voice_t;
 /*
  * Throughout the code Yaroslav names YMF unit pointer "codec"
  * even though it does not correspond to any codec. Must be historic.
@@ -214,52 +219,35 @@ typedef enum {
 	YMFPCI_MIDI
 } ymfpci_voice_type_t;
 
-struct stru_ymfpci_voice {
-	ymfpci_t *codec;
+struct ymf_voice {
+	// ymfpci_t *codec;
 	int number;
-	int use: 1,
-	    pcm: 1,
-	    synth: 1,
-	    midi: 1;
+	char use, pcm, synth, midi;	// bool
 	ymfpci_playback_bank_t *bank;
-	void (*interrupt)(ymfpci_t *codec, ymfpci_voice_t *voice);
-	ymfpci_pcm_t *ypcm;
+	struct ymf_pcm *ypcm;
 };
 
-typedef enum {
-	PLAYBACK_VOICE,
-	CAPTURE_REC,
-	CAPTURE_AC97,
-	EFFECT_DRY_LEFT,
-	EFFECT_DRY_RIGHT,
-	EFFECT_EFF1,
-	EFFECT_EFF2,
-	EFFECT_EFF3
-} ymfpci_pcm_type_t;
-
-struct ymf_pcm {
-	ymfpci_t *codec;
-	ymfpci_pcm_type_t type;
-	struct ymf_state *state;
-	ymfpci_voice_t *voices[2];	/* playback only */
-	int running;			// +
-	int spdif;
+struct ymf_capture {
+	// struct ymf_unit *unit;
+	int use;
+	ymfpci_capture_bank_t *bank;
+	struct ymf_pcm *ypcm;
 };
 
 struct ymf_unit {
 	u8 rev;				/* PCI revision */
 	void *reg_area_virt;
-	void *work_ptr;				// +
+	void *work_ptr;
 
 	unsigned int bank_size_playback;
 	unsigned int bank_size_capture;
 	unsigned int bank_size_effect;
 	unsigned int work_size;
 
-	void *bank_base_playback;		// +
-	void *bank_base_capture;		// +
-	void *bank_base_effect;			// +
-	void *work_base;			// +
+	void *bank_base_playback;
+	void *bank_base_capture;
+	void *bank_base_effect;
+	void *work_base;
 
 	u32 *ctrl_playback;
 	ymfpci_playback_bank_t *bank_playback[YDSXG_PLAYBACK_VOICES][2];
@@ -269,12 +257,19 @@ struct ymf_unit {
 	int start_count;
 
 	u32 active_bank;
-	ymfpci_voice_t voices[64];
+	struct ymf_voice voices[64];
+	struct ymf_capture capture[5];
 
 	struct ac97_codec *ac97_codec[NR_AC97];
 	u16 ac97_features;
 
 	struct pci_dev *pci;
+
+#ifdef CONFIG_SOUND_YMFPCI_LEGACY
+	/* legacy hardware resources */
+	unsigned int iosynth, iomidi;
+	struct address_info opl3_data, mpu_data;
+#endif
 
 	spinlock_t reg_lock;
 	spinlock_t voice_lock;
@@ -284,13 +279,10 @@ struct ymf_unit {
 	struct semaphore open_sem;
 
 	struct list_head ymf_devs;
-	struct ymf_state *states[1];			// *
-	/* ypcm may be the same thing as state, but not for record, effects. */
+	struct list_head states;	/* List of states for this unit */
+	/* For the moment we do not traverse list of states so it is
+	 * entirely useless. Will be used (PM) or killed. XXX */
 };
-
-/*
- * "Software" or virtual channel, an instance of opened /dev/dsp.
- */
 
 struct ymf_dmabuf {
 
@@ -312,7 +304,6 @@ struct ymf_dmabuf {
 	/* redundant, but makes calculations easier */
 	unsigned fragsize;
 	unsigned dmasize;	/* Total rawbuf[] size */
-	unsigned fragsamples;
 
 	/* OSS stuff */
 	unsigned mapped:1;
@@ -329,15 +320,40 @@ struct ymf_pcm_format {
 	int shift;			/* redundant, computed from the above */
 };
 
+typedef enum {
+	PLAYBACK_VOICE,
+	CAPTURE_REC,
+	CAPTURE_AC97,
+	EFFECT_DRY_LEFT,
+	EFFECT_DRY_RIGHT,
+	EFFECT_EFF1,
+	EFFECT_EFF2,
+	EFFECT_EFF3
+} ymfpci_pcm_type_t;
+
+/* This is variant record, but we hate unions. Little waste on pointers []. */
+struct ymf_pcm {
+	ymfpci_pcm_type_t type;
+	struct ymf_state *state;
+
+	ymfpci_voice_t *voices[2];
+	int capture_bank_number;
+
+	struct ymf_dmabuf dmabuf;
+	int running;
+	int spdif;
+};
+
+/*
+ * "Software" or virtual channel, an instance of opened /dev/dsp.
+ * It may have two physical channels (pcms) for duplex operations.
+ */
+
 struct ymf_state {
+	struct list_head chain;
 	struct ymf_unit *unit;			/* backpointer */
-
-	/* virtual channel number */
-	int virt;				// * unused a.t.m.
-
-	struct ymf_pcm ypcm;			// *
-	struct ymf_dmabuf dmabuf;		// *
-	struct ymf_pcm_format format;		// *
+	struct ymf_pcm rpcm, wpcm;
+	struct ymf_pcm_format format;
 };
 
 #endif				/* __YMFPCI_H */

@@ -1,4 +1,4 @@
-/* $Id: sys_sunos.c,v 1.130 2000/08/12 13:25:41 davem Exp $
+/* $Id: sys_sunos.c,v 1.131 2001/01/24 21:05:12 davem Exp $
  * sys_sunos.c: SunOS specific syscall compatibility support.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -834,7 +834,6 @@ asmlinkage int sunos_setpgrp(pid_t pid, pid_t pgid)
 }
 
 /* So stupid... */
-extern asmlinkage int sys_wait4(pid_t, unsigned int *, int, struct rusage *);
 asmlinkage int sunos_wait4(pid_t pid, unsigned int *stat_addr, int options, struct rusage *ru)
 {
 	int ret;

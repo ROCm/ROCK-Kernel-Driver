@@ -217,8 +217,11 @@ static int shmem_writepage(struct page * page)
 
 	info = &page->mapping->host->u.shmem_i;
 	swap = __get_swap_page(2);
-	if (!swap.val)
-		return 1;
+	if (!swap.val) {
+		set_page_dirty(page);
+		UnlockPage(page);
+		return -ENOMEM;
+	}
 
 	spin_lock(&info->lock);
 	shmem_recalc_inode(page->mapping->host);

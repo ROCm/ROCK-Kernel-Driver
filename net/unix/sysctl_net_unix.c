@@ -11,7 +11,6 @@
 
 #include <linux/mm.h>
 #include <linux/sysctl.h>
-#include <linux/config.h>
 
 extern int sysctl_unix_max_dgram_qlen;
 

@@ -32,8 +32,6 @@
 #define SWI_SYS_SIGRETURN (0xef000000|(__NR_sigreturn))
 #define SWI_SYS_RT_SIGRETURN (0xef000000|(__NR_rt_sigreturn))
 
-asmlinkage int sys_wait4(pid_t pid, unsigned long * stat_addr,
-			 int options, unsigned long *ru);
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs, int syscall);
 
 int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)

@@ -15,7 +15,7 @@
  */
 
 
-#define VIA_VERSION	"1.1.14"
+#define VIA_VERSION	"1.1.14a"
 
 
 #include <linux/config.h>
@@ -76,8 +76,16 @@
 #define VIA_COUNTER_LIMIT	100000
 
 /* size of DMA buffers */
-#define VIA_DMA_BUFFERS		16
-#define VIA_DMA_BUF_SIZE	PAGE_SIZE
+#define VIA_MAX_BUFFER_DMA_PAGES	32
+
+/* buffering default values in ms */
+#define VIA_DEFAULT_FRAG_TIME		20
+#define VIA_DEFAULT_BUFFER_TIME		500
+
+#define VIA_MAX_FRAG_SIZE		PAGE_SIZE
+#define VIA_MIN_FRAG_SIZE		64
+
+#define VIA_MIN_FRAG_NUMBER		2	
 
 #ifndef AC97_PCM_LR_ADC_RATE
 #  define AC97_PCM_LR_ADC_RATE AC97_PCM_LR_DAC_RATE
@@ -102,7 +110,6 @@
 #define VIA_BASE0_PCM_OUT_CHAN_STATUS 0x00
 #define VIA_BASE0_PCM_OUT_CHAN_CTRL	0x01
 #define VIA_BASE0_PCM_OUT_CHAN_TYPE	0x02
-#define VIA_BASE0_PCM_OUT_BLOCK_COUNT	0x0C
 
 #define VIA_BASE0_PCM_IN_CHAN		0x10 /* input PCM from user */
 #define VIA_BASE0_PCM_IN_CHAN_STATUS	0x10
@@ -114,6 +121,7 @@
 #define VIA_PCM_CONTROL			0x01
 #define VIA_PCM_TYPE			0x02
 #define VIA_PCM_TABLE_ADDR		0x04
+#define VIA_PCM_BLOCK_COUNT		0x0C
 
 /* XXX unused DMA channel for FM PCM data */
 #define VIA_BASE0_FM_OUT_CHAN		0x20
@@ -223,14 +231,14 @@ enum via_channel_states {
 };
 
 
-struct via_sgd_data {
+struct via_buffer_pgtbl {
 	dma_addr_t handle;
 	void *cpuaddr;
 };
 
 
 struct via_channel {
-	atomic_t n_bufs;
+	atomic_t n_frags;
 	atomic_t hw_ptr;
 	wait_queue_head_t wait;
 
@@ -246,11 +254,14 @@ struct via_channel {
 	u8 pcm_fmt;		/* VIA_PCM_FMT_xxx */
 
 	unsigned rate;		/* sample rate */
+	unsigned int frag_size;
+	unsigned int frag_number;
 
 	volatile struct via_sgd_table *sgtable;
 	dma_addr_t sgt_handle;
 
-	struct via_sgd_data sgbuf [VIA_DMA_BUFFERS];
+	unsigned int page_number;
+	struct via_buffer_pgtbl pgtbl[VIA_MAX_BUFFER_DMA_PAGES];
 
 	long iobase;
 
@@ -301,17 +312,16 @@ static unsigned int via_dsp_poll(struct file *file, struct poll_table_struct *wa
 static int via_dsp_ioctl (struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 static int via_dsp_open (struct inode *inode, struct file *file);
 static int via_dsp_release(struct inode *inode, struct file *file);
-#ifdef VIA_SUPPORT_MMAP
 static int via_dsp_mmap(struct file *file, struct vm_area_struct *vma);
-#endif
 
 static u16 via_ac97_read_reg (struct ac97_codec *codec, u8 reg);
 static void via_ac97_write_reg (struct ac97_codec *codec, u8 reg, u16 value);
 static u8 via_ac97_wait_idle (struct via_info *card);
 
 static void via_chan_free (struct via_info *card, struct via_channel *chan);
-static void via_chan_clear (struct via_channel *chan);
+static void via_chan_clear (struct via_info *card, struct via_channel *chan);
 static void via_chan_pcm_fmt (struct via_channel *chan, int reset);
+static void via_chan_buffer_free (struct via_info *card, struct via_channel *chan);
 
 #ifdef VIA_PROC_FS
 static int via_init_proc (void);
@@ -569,25 +579,53 @@ static void via_chan_init_defaults (struct via_info *card, struct via_channel *c
 	chan->pcm_fmt = VIA_PCM_FMT_MASK;
 	chan->is_enabled = 1;
 
-	if (chan->is_record)
-		atomic_set (&chan->n_bufs, 0);
-	else
-		atomic_set (&chan->n_bufs, VIA_DMA_BUFFERS);
+	chan->frag_number = 0;
+        chan->frag_size = 0;
+	atomic_set(&chan->n_frags, 0);
 	atomic_set (&chan->hw_ptr, 0);
 }
 
+/**
+ *      via_chan_init - Initialize PCM channel
+ *      @card: Private audio chip info
+ *      @chan: Channel to be initialized
+ *
+ *      Performs some of the preparations necessary to begin
+ *      using a PCM channel.
+ *
+ *      Currently the preparations consist in 
+ *      setting the
+ *      PCM channel to a known state.
+ */
+
+
+static void via_chan_init (struct via_info *card, struct via_channel *chan)
+{
+
+        DPRINTK ("ENTER\n");
+
+	/* bzero channel structure, and init members to defaults */
+        via_chan_init_defaults (card, chan);
+
+        /* stop any existing channel output */
+        via_chan_clear (card, chan);
+        via_chan_status_clear (chan->iobase);
+        via_chan_pcm_fmt (chan, 1);
+
+	DPRINTK ("EXIT\n");
+}
 
 /**
- *	via_chan_init - Initialize PCM channel
+ *	via_chan_buffer_init - Initialize PCM channel buffer
  *	@card: Private audio chip info
  *	@chan: Channel to be initialized
  *
- *	Performs all the preparations necessary to begin
+ *	Performs some of the preparations necessary to begin
  *	using a PCM channel.
  *
  *	Currently the preparations include allocating the
- *	scatter-gather DMA table and buffers, setting the
- *	PCM channel to a known state, and passing the
+ *	scatter-gather DMA table and buffers,
+ *	and passing the
  *	address of the DMA table to the hardware.
  *
  *	Note that special care is taken when passing the
@@ -596,18 +634,21 @@ static void via_chan_init_defaults (struct via_info *card, struct via_channel *c
  *	always "take" the address.
  */
 
-static int via_chan_init (struct via_info *card, struct via_channel *chan)
+static int via_chan_buffer_init (struct via_info *card, struct via_channel *chan)
 {
+	int page, offset;
 	int i;
 
 	DPRINTK ("ENTER\n");
 
-	/* bzero channel structure, and init members to defaults */
-	via_chan_init_defaults (card, chan);
+	if (chan->sgtable != NULL) {
+		DPRINTK ("EXIT\n");
+		return 0;
+	}
 
 	/* alloc DMA-able memory for scatter-gather table */
 	chan->sgtable = pci_alloc_consistent (card->pdev,
-		(sizeof (struct via_sgd_table) * VIA_DMA_BUFFERS),
+		(sizeof (struct via_sgd_table) * chan->frag_number),
 		&chan->sgt_handle);
 	if (!chan->sgtable) {
 		printk (KERN_ERR PFX "DMA table alloc fail, aborting\n");
@@ -616,45 +657,54 @@ static int via_chan_init (struct via_info *card, struct via_channel *chan)
 	}
 
 	memset ((void*)chan->sgtable, 0,
-		(sizeof (struct via_sgd_table) * VIA_DMA_BUFFERS));
+		(sizeof (struct via_sgd_table) * chan->frag_number));
 
 	/* alloc DMA-able memory for scatter-gather buffers */
-	for (i = 0; i < VIA_DMA_BUFFERS; i++) {
-		chan->sgbuf[i].cpuaddr =
-			pci_alloc_consistent (card->pdev, VIA_DMA_BUF_SIZE,
-					      &chan->sgbuf[i].handle);
 
-		if (!chan->sgbuf[i].cpuaddr)
+	chan->page_number = (chan->frag_number * chan->frag_size) / PAGE_SIZE + 
+			    (((chan->frag_number * chan->frag_size) % PAGE_SIZE) ? 1 : 0);
+
+	for (i = 0; i < chan->page_number; i++) {
+		chan->pgtbl[i].cpuaddr = pci_alloc_consistent (card->pdev, PAGE_SIZE,
+					      &chan->pgtbl[i].handle);
+
+		if (!chan->pgtbl[i].cpuaddr) {
+			chan->page_number = i;
 			goto err_out_nomem;
-
-		if (i < (VIA_DMA_BUFFERS - 1))
-			chan->sgtable[i].count = cpu_to_le32 (VIA_DMA_BUF_SIZE | VIA_FLAG);
-		else
-			chan->sgtable[i].count = cpu_to_le32 (VIA_DMA_BUF_SIZE | VIA_EOL);
-		chan->sgtable[i].addr = cpu_to_le32 (chan->sgbuf[i].handle);
+		}
 
 #ifndef VIA_NDEBUG
-		memset (chan->sgbuf[i].cpuaddr, 0xBC, VIA_DMA_BUF_SIZE);
+                memset (chan->pgtbl[i].cpuaddr, 0xBC, chan->frag_size);
 #endif
 
 #if 1
-		DPRINTK ("dmabuf #%d (h=%lx, 32(h)=%lx, v2p=%lx, a=%p)\n",
-			 i, (long)chan->sgbuf[i].handle,
-			 (long)chan->sgtable[i].addr,
-			 virt_to_phys(chan->sgbuf[i].cpuaddr),
-			 chan->sgbuf[i].cpuaddr);
+                DPRINTK ("dmabuf_pg #%d (h=%lx, v2p=%lx, a=%p)\n",
+			i, (long)chan->pgtbl[i].handle,
+			virt_to_phys(chan->pgtbl[i].cpuaddr),
+			chan->pgtbl[i].cpuaddr);
 #endif
-
-		assert ((VIA_DMA_BUF_SIZE % PAGE_SIZE) == 0);
 	}
 
-	/* stop any existing channel output */
-	via_chan_clear (chan);
-	via_chan_status_clear (chan->iobase);
-	via_chan_pcm_fmt (chan, 1);
+	for (i = 0; i < chan->frag_number; i++) {
+
+		page = i / (PAGE_SIZE / chan->frag_size);
+		offset = (i % (PAGE_SIZE / chan->frag_size)) * chan->frag_size;
+
+		chan->sgtable[i].count = cpu_to_le32 (chan->frag_size | VIA_FLAG);
+		chan->sgtable[i].addr = cpu_to_le32 (chan->pgtbl[page].handle + offset);
+
+#if 1
+		DPRINTK ("dmabuf #%d (32(h)=%lx)\n",
+			 i,
+			 (long)chan->sgtable[i].addr);
+#endif
+	}	
+
+	/* overwrite the last buffer information */
+	chan->sgtable[chan->frag_number - 1].count = cpu_to_le32 (chan->frag_size | VIA_EOL);
 
 	/* set location of DMA-able scatter-gather info table */
-	DPRINTK("outl (0x%X, 0x%04lX)\n",
+	DPRINTK ("outl (0x%X, 0x%04lX)\n",
 		cpu_to_le32 (chan->sgt_handle),
 		chan->iobase + VIA_PCM_TABLE_ADDR);
 
@@ -664,7 +714,7 @@ static int via_chan_init (struct via_info *card, struct via_channel *chan)
 	udelay (20);
 	via_ac97_wait_idle (card);
 
-	DPRINTK("inl (0x%lX) = %x\n",
+	DPRINTK ("inl (0x%lX) = %x\n",
 		chan->iobase + VIA_PCM_TABLE_ADDR,
 		inl(chan->iobase + VIA_PCM_TABLE_ADDR));
 
@@ -673,7 +723,7 @@ static int via_chan_init (struct via_info *card, struct via_channel *chan)
 
 err_out_nomem:
 	printk (KERN_ERR PFX "DMA buffer alloc fail, aborting\n");
-	via_chan_free (card, chan);
+	via_chan_buffer_free (card, chan);
 	DPRINTK ("EXIT\n");
 	return -ENOMEM;
 }
@@ -695,8 +745,6 @@ err_out_nomem:
 
 static void via_chan_free (struct via_info *card, struct via_channel *chan)
 {
-	int i;
-
 	DPRINTK ("ENTER\n");
 
 	synchronize_irq();
@@ -710,23 +758,33 @@ static void via_chan_free (struct via_info *card, struct via_channel *chan)
 
 	spin_unlock_irq (&card->lock);
 
+	DPRINTK ("EXIT\n");
+}
+
+static void via_chan_buffer_free (struct via_info *card, struct via_channel *chan)
+{
+	int i;
+
+        DPRINTK ("ENTER\n");
+
 	/* zero location of DMA-able scatter-gather info table */
 	via_ac97_wait_idle(card);
 	outl (0, chan->iobase + VIA_PCM_TABLE_ADDR);
 
-	for (i = 0; i < VIA_DMA_BUFFERS; i++)
-		if (chan->sgbuf[i].cpuaddr) {
-			assert ((VIA_DMA_BUF_SIZE % PAGE_SIZE) == 0);
-			pci_free_consistent (card->pdev, VIA_DMA_BUF_SIZE,
-					     chan->sgbuf[i].cpuaddr,
-					     chan->sgbuf[i].handle);
-			chan->sgbuf[i].cpuaddr = NULL;
-			chan->sgbuf[i].handle = 0;
+	for (i = 0; i < chan->page_number; i++)
+		if (chan->pgtbl[i].cpuaddr) {
+			pci_free_consistent (card->pdev, PAGE_SIZE,
+					     chan->pgtbl[i].cpuaddr,
+					     chan->pgtbl[i].handle);
+			chan->pgtbl[i].cpuaddr = NULL;
+			chan->pgtbl[i].handle = 0;
 		}
+
+	chan->page_number = 0;
 
 	if (chan->sgtable) {
 		pci_free_consistent (card->pdev,
-			(sizeof (struct via_sgd_table) * VIA_DMA_BUFFERS),
+			(sizeof (struct via_sgd_table) * chan->frag_number),
 			(void*)chan->sgtable, chan->sgt_handle);
 		chan->sgtable = NULL;
 	}
@@ -771,11 +829,11 @@ static void via_chan_pcm_fmt (struct via_channel *chan, int reset)
 	if (!chan->is_record)
 		chan->pcm_fmt |= VIA_CHAN_TYPE_INT_SELECT;
 
-	outb (chan->pcm_fmt, chan->iobase + 2);
+	outb (chan->pcm_fmt, chan->iobase + VIA_PCM_TYPE);
 
 	DPRINTK ("EXIT, pcm_fmt = 0x%02X, reg = 0x%02X\n",
 		 chan->pcm_fmt,
-		 inb (chan->iobase + 2));
+		 inb (chan->iobase + VIA_PCM_TYPE));
 }
 
 
@@ -787,10 +845,11 @@ static void via_chan_pcm_fmt (struct via_channel *chan, int reset)
  *	all software pointers which track DMA operation.
  */
 
-static void via_chan_clear (struct via_channel *chan)
+static void via_chan_clear (struct via_info *card, struct via_channel *chan)
 {
 	DPRINTK ("ENTER\n");
 	via_chan_stop (chan->iobase);
+	via_chan_buffer_free(card, chan);
 	chan->is_active = 0;
 	chan->is_mapped = 0;
 	chan->is_enabled = 1;
@@ -798,10 +857,6 @@ static void via_chan_clear (struct via_channel *chan)
 	chan->sw_ptr = 0;
 	chan->n_irqs = 0;
 	atomic_set (&chan->hw_ptr, 0);
-	if (chan->is_record)
-		atomic_set (&chan->n_bufs, 0);
-	else
-		atomic_set (&chan->n_bufs, VIA_DMA_BUFFERS);
 	DPRINTK ("EXIT\n");
 }
 
@@ -826,7 +881,7 @@ static int via_chan_set_speed (struct via_info *card,
 {
 	DPRINTK ("ENTER, requested rate = %d\n", val);
 
-	via_chan_clear (chan);
+	via_chan_clear (card, chan);
 
 	val = via_set_rate (&card->ac97, chan, val);
 
@@ -858,7 +913,7 @@ static int via_chan_set_fmt (struct via_info *card,
 	 	 val == AFMT_S16_LE ? "AFMT_S16_LE" :
 		 "unknown");
 
-	via_chan_clear (chan);
+	via_chan_clear (card, chan);
 
 	assert (val != AFMT_QUERY); /* this case is handled elsewhere */
 
@@ -907,7 +962,7 @@ static int via_chan_set_stereo (struct via_info *card,
 {
 	DPRINTK ("ENTER, channels = %d\n", val);
 
-	via_chan_clear (chan);
+	via_chan_clear (card, chan);
 
 	switch (val) {
 
@@ -934,6 +989,78 @@ static int via_chan_set_stereo (struct via_info *card,
 	return val;
 }
 
+static int via_chan_set_buffering (struct via_info *card,
+                                struct via_channel *chan, int val)
+{
+	int shift;
+
+        DPRINTK ("ENTER\n");
+
+	/* in both cases the buffer cannot be changed */
+	if (chan->is_active || chan->is_mapped) { 
+		DPRINTK ("EXIT\n");
+		return -EINVAL;
+	}
+
+	/* called outside SETFRAGMENT */
+	/* set defaults or do nothing */
+	if (val < 0) {
+
+		if (chan->frag_size && chan->frag_number)
+			goto out;
+
+		DPRINTK ("\n");
+
+		chan->frag_size = (VIA_DEFAULT_FRAG_TIME * chan->rate *
+				   ((chan->pcm_fmt & VIA_PCM_FMT_STEREO) ? 2 : 1) *
+				   ((chan->pcm_fmt & VIA_PCM_FMT_16BIT) ? 2 : 1)) / 1000 - 1;
+
+		shift = 0;
+		while (chan->frag_size) {
+			chan->frag_size >>= 1;
+			shift++;
+		}
+		chan->frag_size = 1 << shift;
+
+		chan->frag_number = (VIA_DEFAULT_BUFFER_TIME / VIA_DEFAULT_FRAG_TIME);
+
+		DPRINTK ("setting default values %d %d\n", chan->frag_size, chan->frag_number);
+	} else {
+		chan->frag_size = 1 << (val & 0xFFFF);
+		chan->frag_number = (val >> 16) & 0xFFFF;
+
+		DPRINTK ("using user values %d %d\n", chan->frag_size, chan->frag_number);
+	}
+
+	/* quake3 wants frag_number to be a power of two */
+	shift = 0;
+	while (chan->frag_number) {
+		chan->frag_number >>= 1;
+		shift++;
+	}
+	chan->frag_number = 1 << shift;
+
+	if (chan->frag_size > VIA_MAX_FRAG_SIZE)
+		chan->frag_size = VIA_MAX_FRAG_SIZE;
+	else if (chan->frag_size < VIA_MIN_FRAG_SIZE)
+		chan->frag_size = VIA_MIN_FRAG_SIZE;
+
+	if (chan->frag_number < VIA_MIN_FRAG_NUMBER)
+                chan->frag_number = VIA_MIN_FRAG_NUMBER;
+
+	if ((chan->frag_number * chan->frag_size) / PAGE_SIZE > VIA_MAX_BUFFER_DMA_PAGES)
+		chan->frag_number = (VIA_MAX_BUFFER_DMA_PAGES * PAGE_SIZE) / chan->frag_size;
+
+out:
+	if (chan->is_record)
+		atomic_set (&chan->n_frags, 0);
+	else
+		atomic_set (&chan->n_frags, chan->frag_number);
+
+	DPRINTK ("EXIT\n");
+
+	return 0;
+}
 
 #ifdef VIA_CHAN_DUMP_BUFS
 /**
@@ -948,7 +1075,7 @@ static void via_chan_dump_bufs (struct via_channel *chan)
 {
 	int i;
 
-	for (i = 0; i < VIA_DMA_BUFFERS; i++) {
+	for (i = 0; i < chan->frag_number; i++) {
 		DPRINTK ("#%02d: addr=%x, count=%u, flag=%d, eol=%d\n",
 			 i, chan->sgtable[i].addr,
 			 chan->sgtable[i].count & 0x00FFFFFF,
@@ -975,15 +1102,15 @@ static void via_chan_flush_frag (struct via_channel *chan)
 
 	assert (chan->slop_len > 0);
 
-	if (chan->sw_ptr == (VIA_DMA_BUFFERS - 1))
+	if (chan->sw_ptr == (chan->frag_number - 1))
 		chan->sw_ptr = 0;
 	else
 		chan->sw_ptr++;
 
 	chan->slop_len = 0;
 
-	assert (atomic_read (&chan->n_bufs) > 0);
-	atomic_dec (&chan->n_bufs);
+	assert (atomic_read (&chan->n_frags) > 0);
+	atomic_dec (&chan->n_frags);
 
 	DPRINTK ("EXIT\n");
 }
@@ -1003,7 +1130,7 @@ static inline void via_chan_maybe_start (struct via_channel *chan)
 	if (!chan->is_active && chan->is_enabled) {
 		chan->is_active = 1;
 		sg_begin (chan);
-		DPRINTK("starting channel %s\n", chan->name);
+		DPRINTK ("starting channel %s\n", chan->name);
 	}
 }
 
@@ -1213,7 +1340,7 @@ static loff_t via_llseek(struct file *file, loff_t offset, int origin)
 {
 	DPRINTK ("ENTER\n");
 
-	DPRINTK("EXIT, returning -ESPIPE\n");
+	DPRINTK ("EXIT, returning -ESPIPE\n");
 	return -ESPIPE;
 }
 
@@ -1245,7 +1372,7 @@ static int __init via_ac97_reset (struct via_info *card)
 		pci_read_config_byte (card->pdev, 0x43, &r43);
 		pci_read_config_byte (card->pdev, 0x44, &r44);
 		pci_read_config_byte (card->pdev, 0x48, &r48);
-		DPRINTK("PCI config: %02X %02X %02X %02X %02X %02X\n",
+		DPRINTK ("PCI config: %02X %02X %02X %02X %02X %02X\n",
 			r40,r41,r42,r43,r44,r48);
 
 		spin_lock_irq (&card->lock);
@@ -1334,7 +1461,7 @@ static int __init via_ac97_init (struct via_info *card)
 	card->ac97.dev_mixer = register_sound_mixer (&via_mixer_fops, -1);
 	if (card->ac97.dev_mixer < 0) {
 		printk (KERN_ERR PFX "unable to register AC97 mixer, aborting\n");
-		DPRINTK("EXIT, returning -EIO\n");
+		DPRINTK ("EXIT, returning -EIO\n");
 		return -EIO;
 	}
 
@@ -1359,21 +1486,21 @@ static int __init via_ac97_init (struct via_info *card)
 
 err_out:
 	unregister_sound_mixer (card->ac97.dev_mixer);
-	DPRINTK("EXIT, returning %d\n", rc);
+	DPRINTK ("EXIT, returning %d\n", rc);
 	return rc;
 }
 
 
 static void via_ac97_cleanup (struct via_info *card)
 {
-	DPRINTK("ENTER\n");
+	DPRINTK ("ENTER\n");
 
 	assert (card != NULL);
 	assert (card->ac97.dev_mixer >= 0);
 
 	unregister_sound_mixer (card->ac97.dev_mixer);
 
-	DPRINTK("EXIT\n");
+	DPRINTK ("EXIT\n");
 }
 
 
@@ -1414,24 +1541,24 @@ static void via_intr_channel (struct via_channel *chan)
 
 	/* sanity check: make sure our h/w ptr doesn't have a weird value */
 	assert (n >= 0);
-	assert (n < VIA_DMA_BUFFERS);
+	assert (n < chan->frag_number);
 
 	/* reset SGD data structure in memory to reflect a full buffer,
 	 * and advance the h/w ptr, wrapping around to zero if needed
 	 */
-	if (n == (VIA_DMA_BUFFERS - 1)) {
-		chan->sgtable[n].count = (VIA_DMA_BUF_SIZE | VIA_EOL);
+	if (n == (chan->frag_number - 1)) {
+		chan->sgtable[n].count = (chan->frag_size | VIA_EOL);
 		atomic_set (&chan->hw_ptr, 0);
 	} else {
-		chan->sgtable[n].count = (VIA_DMA_BUF_SIZE | VIA_FLAG);
+		chan->sgtable[n].count = (chan->frag_size | VIA_FLAG);
 		atomic_inc (&chan->hw_ptr);
 	}
 
 	/* accounting crap for SNDCTL_DSP_GETxPTR */
 	chan->n_irqs++;
-	chan->bytes += VIA_DMA_BUF_SIZE;
+	chan->bytes += chan->frag_size;
 	if (chan->bytes < 0) /* handle overflow of 31-bit value */
-		chan->bytes = VIA_DMA_BUF_SIZE;
+		chan->bytes = chan->frag_size;
 
 	/* wake up anyone listening to see when interrupts occur */
 	if (waitqueue_active (&chan->wait))
@@ -1445,25 +1572,25 @@ static void via_intr_channel (struct via_channel *chan)
 	if (chan->is_mapped)
 		return;
 
-	/* If we are recording, then n_bufs represents the number
-	 * of buffers waiting to be handled by userspace.
-	 * If we are playback, then n_bufs represents the number
-	 * of buffers remaining to be filled by userspace.
-	 * We increment here.  If we reach max buffers (VIA_DMA_BUFFERS),
+	/* If we are recording, then n_frags represents the number
+	 * of fragments waiting to be handled by userspace.
+	 * If we are playback, then n_frags represents the number
+	 * of fragments remaining to be filled by userspace.
+	 * We increment here.  If we reach max number of fragments,
 	 * this indicates an underrun/overrun.  For this case under OSS,
 	 * we stop the record/playback process.
 	 */
-	if (atomic_read (&chan->n_bufs) < VIA_DMA_BUFFERS)
-		atomic_inc (&chan->n_bufs);
-	assert (atomic_read (&chan->n_bufs) <= VIA_DMA_BUFFERS);
+	if (atomic_read (&chan->n_frags) < chan->frag_number)
+		atomic_inc (&chan->n_frags);
+	assert (atomic_read (&chan->n_frags) <= chan->frag_number);
 
-	if (atomic_read (&chan->n_bufs) == VIA_DMA_BUFFERS) {
+	if (atomic_read (&chan->n_frags) == chan->frag_number) {
 		chan->is_active = 0;
 		via_chan_stop (chan->iobase);
 	}
 
-	DPRINTK ("%s intr, channel n_bufs == %d\n", chan->name,
-		 atomic_read (&chan->n_bufs));
+	DPRINTK ("%s intr, channel n_frags == %d\n", chan->name,
+		 atomic_read (&chan->n_frags));
 }
 
 
@@ -1618,9 +1745,7 @@ static struct file_operations via_dsp_fops = {
 	poll:		via_dsp_poll,
 	llseek: 	via_llseek,
 	ioctl:		via_dsp_ioctl,
-#ifdef VIA_SUPPORT_MMAP
 	mmap:		via_dsp_mmap,
-#endif
 };
 
 
@@ -1668,7 +1793,6 @@ static void via_dsp_cleanup (struct via_info *card)
 }
 
 
-#ifdef VIA_SUPPORT_MMAP
 static struct page * via_mm_nopage (struct vm_area_struct * vma,
 				    unsigned long address, int write_access)
 {
@@ -1685,8 +1809,6 @@ static struct page * via_mm_nopage (struct vm_area_struct * vma,
 		 address,
 		 write_access);
 
-	assert (VIA_DMA_BUF_SIZE == PAGE_SIZE);
-
         if (address > vma->vm_end) {
 		DPRINTK ("EXIT, returning NOPAGE_SIGBUS\n");
 		return NOPAGE_SIGBUS; /* Disallow mremap */
@@ -1702,7 +1824,7 @@ static struct page * via_mm_nopage (struct vm_area_struct * vma,
 
 #ifndef VIA_NDEBUG
 	{
-	unsigned long max_bufs = VIA_DMA_BUFFERS;
+	unsigned long max_bufs = chan->frag_number;
 	if (rd && wr) max_bufs *= 2;
 	/* via_dsp_mmap() should ensure this */
 	assert (pgoff < max_bufs);
@@ -1711,17 +1833,17 @@ static struct page * via_mm_nopage (struct vm_area_struct * vma,
 
 	/* if full-duplex (read+write) and we have two sets of bufs,
 	 * then the playback buffers come first, sez soundcard.c */
-	if (pgoff >= VIA_DMA_BUFFERS) {
-		pgoff -= VIA_DMA_BUFFERS;
+	if (pgoff >= chan->page_number) {
+		pgoff -= chan->page_number;
 		chan = &card->ch_in;
 	} else if (!wr)
 		chan = &card->ch_in;
 
-	assert ((((unsigned long)chan->sgbuf[pgoff].cpuaddr) % PAGE_SIZE) == 0);
+	assert ((((unsigned long)chan->pgtbl[pgoff].cpuaddr) % PAGE_SIZE) == 0);
 
-	dmapage = virt_to_page (chan->sgbuf[pgoff].cpuaddr);
+	dmapage = virt_to_page (chan->pgtbl[pgoff].cpuaddr);
 	DPRINTK ("EXIT, returning page %p for cpuaddr %lXh\n",
-		 dmapage, (unsigned long) chan->sgbuf[pgoff].cpuaddr);
+		 dmapage, (unsigned long) chan->pgtbl[pgoff].cpuaddr);
 	get_page (dmapage);
 	return dmapage;
 }
@@ -1761,16 +1883,18 @@ static int via_dsp_mmap(struct file *file, struct vm_area_struct *vma)
 		 vma->vm_end - vma->vm_start,
 		 vma->vm_pgoff);
 
-	assert (VIA_DMA_BUF_SIZE == PAGE_SIZE);
-
 	max_size = 0;
-	if (file->f_mode & FMODE_READ) {
+	if (vma->vm_flags & VM_READ) {
 		rd = 1;
-		max_size += (VIA_DMA_BUFFERS * VIA_DMA_BUF_SIZE);
+		via_chan_set_buffering(card, &card->ch_in, -1);
+		via_chan_buffer_init (card, &card->ch_in);
+		max_size += card->ch_in.page_number << PAGE_SHIFT;
 	}
-	if (file->f_mode & FMODE_WRITE) {
+	if (vma->vm_flags & VM_WRITE) {
 		wr = 1;
-		max_size += (VIA_DMA_BUFFERS * VIA_DMA_BUF_SIZE);
+		via_chan_set_buffering(card, &card->ch_out, -1);
+		via_chan_buffer_init (card, &card->ch_out);
+		max_size += card->ch_out.page_number << PAGE_SHIFT;
 	}
 
 	start = vma->vm_start;
@@ -1802,10 +1926,9 @@ static int via_dsp_mmap(struct file *file, struct vm_area_struct *vma)
 	rc = 0;
 
 out:
-	DPRINTK("EXIT, returning %d\n", rc);
+	DPRINTK ("EXIT, returning %d\n", rc);
 	return rc;
 }
-#endif /* VIA_SUPPORT_MMAP */
 
 
 static ssize_t via_dsp_do_read (struct via_info *card,
@@ -1831,13 +1954,13 @@ handle_one_block:
 	 */
 	n = chan->sw_ptr;
 
-	/* n_bufs represents the number of buffers waiting
+	/* n_frags represents the number of fragments waiting
 	 * to be copied to userland.  sleep until at least
 	 * one buffer has been read from the audio hardware.
 	 */
-	tmp = atomic_read (&chan->n_bufs);
+	tmp = atomic_read (&chan->n_frags);
 	assert (tmp >= 0);
-	assert (tmp <= VIA_DMA_BUFFERS);
+	assert (tmp <= chan->frag_number);
 	while (tmp == 0) {
 		if (nonblock || !chan->is_active)
 			return -EAGAIN;
@@ -1848,18 +1971,18 @@ handle_one_block:
 		if (signal_pending (current))
 			return -ERESTARTSYS;
 
-		tmp = atomic_read (&chan->n_bufs);
+		tmp = atomic_read (&chan->n_frags);
 	}
 
 	/* Now that we have a buffer we can read from, send
 	 * as much as sample data possible to userspace.
 	 */
-	while ((count > 0) && (chan->slop_len < VIA_DMA_BUF_SIZE)) {
-		size_t slop_left = VIA_DMA_BUF_SIZE - chan->slop_len;
+	while ((count > 0) && (chan->slop_len < chan->frag_size)) {
+		size_t slop_left = chan->frag_size - chan->slop_len;
 
 		size = (count < slop_left) ? count : slop_left;
 		if (copy_to_user (userbuf,
-				  chan->sgbuf[n].cpuaddr + chan->slop_len,
+				  chan->pgtbl[n / (PAGE_SIZE / chan->frag_size)].cpuaddr + n % (PAGE_SIZE / chan->frag_size) + chan->slop_len,
 				  size))
 			return -EFAULT;
 
@@ -1871,7 +1994,7 @@ handle_one_block:
 	/* If we didn't copy the buffer completely to userspace,
 	 * stop now.
 	 */
-	if (chan->slop_len < VIA_DMA_BUF_SIZE)
+	if (chan->slop_len < chan->frag_size)
 		goto out;
 
 	/*
@@ -1882,20 +2005,20 @@ handle_one_block:
 	/* advance channel software pointer to point to
 	 * the next buffer from which we will copy
 	 */
-	if (chan->sw_ptr == (VIA_DMA_BUFFERS - 1))
+	if (chan->sw_ptr == (chan->frag_number - 1))
 		chan->sw_ptr = 0;
 	else
 		chan->sw_ptr++;
 
 	/* mark one less buffer waiting to be processed */
-	assert (atomic_read (&chan->n_bufs) > 0);
-	atomic_dec (&chan->n_bufs);
+	assert (atomic_read (&chan->n_frags) > 0);
+	atomic_dec (&chan->n_frags);
 
 	/* we are at a block boundary, there is no fragment data */
 	chan->slop_len = 0;
 
-	DPRINTK("Flushed block %u, sw_ptr now %u, n_bufs now %d\n",
-		n, chan->sw_ptr, atomic_read (&chan->n_bufs));
+	DPRINTK ("Flushed block %u, sw_ptr now %u, n_frags now %d\n",
+		n, chan->sw_ptr, atomic_read (&chan->n_frags));
 
 	DPRINTK ("regs==%02X %02X %02X %08X %08X %08X %08X\n",
 		 inb (card->baseaddr + 0x00),
@@ -1941,12 +2064,18 @@ static ssize_t via_dsp_read(struct file *file, char *buffer, size_t count, loff_
 		goto out_up;
 	}
 
+	via_chan_set_buffering(card, &card->ch_in, -1);
+        rc = via_chan_buffer_init (card, &card->ch_in);
+
+	if (rc)
+		goto out_up;
+
 	rc = via_dsp_do_read (card, buffer, count, nonblock);
 
 out_up:
 	up (&card->syscall_sem);
 out:
-	DPRINTK("EXIT, returning %ld\n",(long) rc);
+	DPRINTK ("EXIT, returning %ld\n",(long) rc);
 	return rc;
 }
 
@@ -1966,40 +2095,40 @@ handle_one_block:
 	if (current->need_resched)
 		schedule ();
 
-	/* grab current channel software pointer.  In the case of
-	 * playback, this is pointing to the next buffer that
+	/* grab current channel fragment pointer.  In the case of
+	 * playback, this is pointing to the next fragment that
 	 * should receive data from userland.
 	 */
 	n = chan->sw_ptr;
 
-	/* n_bufs represents the number of buffers remaining
+	/* n_frags represents the number of fragments remaining
 	 * to be filled by userspace.  Sleep until
-	 * at least one buffer is available for our use.
+	 * at least one fragment is available for our use.
 	 */
-	tmp = atomic_read (&chan->n_bufs);
+	tmp = atomic_read (&chan->n_frags);
 	assert (tmp >= 0);
-	assert (tmp <= VIA_DMA_BUFFERS);
+	assert (tmp <= chan->frag_number);
 	while (tmp == 0) {
 		if (nonblock || !chan->is_enabled)
 			return -EAGAIN;
 
-		DPRINTK ("Sleeping on block %d, tmp==%d, ir==%d\n", n, tmp, chan->is_record);
+		DPRINTK ("Sleeping on page %d, tmp==%d, ir==%d\n", n, tmp, chan->is_record);
 		interruptible_sleep_on (&chan->wait);
 
 		if (signal_pending (current))
 			return -ERESTARTSYS;
 
-		tmp = atomic_read (&chan->n_bufs);
+		tmp = atomic_read (&chan->n_frags);
 	}
 
-	/* Now that we have a buffer we can write to, fill it up
+	/* Now that we have at least one fragment we can write to, fill the buffer
 	 * as much as possible with data from userspace.
 	 */
-	while ((count > 0) && (chan->slop_len < VIA_DMA_BUF_SIZE)) {
-		size_t slop_left = VIA_DMA_BUF_SIZE - chan->slop_len;
+	while ((count > 0) && (chan->slop_len < chan->frag_size)) {
+		size_t slop_left = chan->frag_size - chan->slop_len;
 
 		size = (count < slop_left) ? count : slop_left;
-		if (copy_from_user (chan->sgbuf[n].cpuaddr + chan->slop_len,
+		if (copy_from_user (chan->pgtbl[n / (PAGE_SIZE / chan->frag_size)].cpuaddr + (n % (PAGE_SIZE / chan->frag_size)) * chan->frag_size + chan->slop_len,
 				    userbuf, size))
 			return -EFAULT;
 
@@ -2009,36 +2138,36 @@ handle_one_block:
 	}
 
 	/* If we didn't fill up the buffer with data, stop now.
-	 * Put a 'stop' marker in the DMA table too, to tell the
-	 * audio hardware to stop if it gets here.
-	 */
-	if (chan->slop_len < VIA_DMA_BUF_SIZE) {
+         * Put a 'stop' marker in the DMA table too, to tell the
+         * audio hardware to stop if it gets here.
+         */
+	if (chan->slop_len < chan->frag_size) {
 		sgtable[n].count = cpu_to_le32 (chan->slop_len | VIA_EOL | VIA_STOP);
 		goto out;
 	}
 
 	/*
-	 * If we get to this point, we have filled a buffer with
-	 * audio data, flush the buffer to audio hardware.
-	 */
+         * If we get to this point, we have filled a buffer with
+         * audio data, flush the buffer to audio hardware.
+         */
 
 	/* Record the true size for the audio hardware to notice */
-	if (n == (VIA_DMA_BUFFERS - 1))
-		sgtable[n].count = cpu_to_le32 (VIA_DMA_BUF_SIZE | VIA_EOL);
-	else
-		sgtable[n].count = cpu_to_le32 (VIA_DMA_BUF_SIZE | VIA_FLAG);
+        if (n == (chan->frag_number - 1))
+                sgtable[n].count = cpu_to_le32 (chan->frag_size | VIA_EOL);
+        else
+                sgtable[n].count = cpu_to_le32 (chan->frag_size | VIA_FLAG);
 
 	/* advance channel software pointer to point to
 	 * the next buffer we will fill with data
 	 */
-	if (chan->sw_ptr == (VIA_DMA_BUFFERS - 1))
+	if (chan->sw_ptr == (chan->frag_number - 1))
 		chan->sw_ptr = 0;
 	else
 		chan->sw_ptr++;
 
 	/* mark one less buffer as being available for userspace consumption */
-	assert (atomic_read (&chan->n_bufs) > 0);
-	atomic_dec (&chan->n_bufs);
+	assert (atomic_read (&chan->n_frags) > 0);
+	atomic_dec (&chan->n_frags);
 
 	/* we are at a block boundary, there is no fragment data */
 	chan->slop_len = 0;
@@ -2046,8 +2175,8 @@ handle_one_block:
 	/* if SGD has not yet been started, start it */
 	via_chan_maybe_start (chan);
 
-	DPRINTK("Flushed block %u, sw_ptr now %u, n_bufs now %d\n",
-		n, chan->sw_ptr, atomic_read (&chan->n_bufs));
+	DPRINTK ("Flushed block %u, sw_ptr now %u, n_frags now %d\n",
+		n, chan->sw_ptr, atomic_read (&chan->n_frags));
 
 	DPRINTK ("regs==%02X %02X %02X %08X %08X %08X %08X\n",
 		 inb (card->baseaddr + 0x00),
@@ -2093,12 +2222,18 @@ static ssize_t via_dsp_write(struct file *file, const char *buffer, size_t count
 		goto out_up;
 	}
 
+	via_chan_set_buffering(card, &card->ch_out, -1);
+	rc = via_chan_buffer_init (card, &card->ch_out);
+
+	if (rc)
+		goto out_up;
+
 	rc = via_dsp_do_write (card, buffer, count, nonblock);
 
 out_up:
 	up (&card->syscall_sem);
 out:
-	DPRINTK("EXIT, returning %ld\n",(long) rc);
+	DPRINTK ("EXIT, returning %ld\n",(long) rc);
 	return rc;
 }
 
@@ -2117,23 +2252,27 @@ static unsigned int via_dsp_poll(struct file *file, struct poll_table_struct *wa
 	rd = (file->f_mode & FMODE_READ);
 	wr = (file->f_mode & FMODE_WRITE);
 
-	if (wr && (atomic_read (&card->ch_out.n_bufs) == 0)) {
+	if (wr && (atomic_read (&card->ch_out.n_frags) == 0)) {
 		assert (card->ch_out.is_active);
                 poll_wait(file, &card->ch_out.wait, wait);
 	}
         if (rd) {
 		/* XXX is it ok, spec-wise, to start DMA here? */
+		if (!card->ch_in.is_active) {
+			via_chan_set_buffering(card, &card->ch_in, -1);
+			via_chan_buffer_init(card, &card->ch_in);
+		}
 		via_chan_maybe_start (&card->ch_in);
-		if (atomic_read (&card->ch_in.n_bufs) == 0)
+		if (atomic_read (&card->ch_in.n_frags) == 0)
 	                poll_wait(file, &card->ch_in.wait, wait);
 	}
 
-	if (wr && (atomic_read (&card->ch_out.n_bufs) > 0))
+	if (wr && ((atomic_read (&card->ch_out.n_frags) > 0) || !card->ch_out.is_active))
 		mask |= POLLOUT | POLLWRNORM;
-	if (rd && (atomic_read (&card->ch_in.n_bufs) > 0))
+	if (rd && (atomic_read (&card->ch_in.n_frags) > 0))
 		mask |= POLLIN | POLLRDNORM;
 
-	DPRINTK("EXIT, returning %u\n", mask);
+	DPRINTK ("EXIT, returning %u\n", mask);
 	return mask;
 }
 
@@ -2158,12 +2297,12 @@ static int via_dsp_drain_playback (struct via_info *card,
 	if (chan->slop_len > 0)
 		via_chan_flush_frag (chan);
 
-	if (atomic_read (&chan->n_bufs) == VIA_DMA_BUFFERS)
+	if (atomic_read (&chan->n_frags) == chan->frag_number)
 		goto out;
 
 	via_chan_maybe_start (chan);
 
-	while (atomic_read (&chan->n_bufs) < VIA_DMA_BUFFERS) {
+	while (atomic_read (&chan->n_frags) < chan->frag_number) {
 		if (nonblock) {
 			DPRINTK ("EXIT, returning -EAGAIN\n");
 			return -EAGAIN;
@@ -2178,7 +2317,7 @@ static int via_dsp_drain_playback (struct via_info *card,
 		pci_read_config_byte (card->pdev, 0x43, &r43);
 		pci_read_config_byte (card->pdev, 0x44, &r44);
 		pci_read_config_byte (card->pdev, 0x48, &r48);
-		DPRINTK("PCI config: %02X %02X %02X %02X %02X %02X\n",
+		DPRINTK ("PCI config: %02X %02X %02X %02X %02X %02X\n",
 			r40,r41,r42,r43,r44,r48);
 
 		DPRINTK ("regs==%02X %02X %02X %08X %08X %08X %08X\n",
@@ -2195,7 +2334,7 @@ static int via_dsp_drain_playback (struct via_info *card,
 			printk (KERN_ERR "sleeping but not active\n");
 #endif
 
-		DPRINTK ("sleeping, nbufs=%d\n", atomic_read (&chan->n_bufs));
+		DPRINTK ("sleeping, nbufs=%d\n", atomic_read (&chan->n_frags));
 		interruptible_sleep_on (&chan->wait);
 
 		if (signal_pending (current)) {
@@ -2213,7 +2352,7 @@ static int via_dsp_drain_playback (struct via_info *card,
 		pci_read_config_byte (card->pdev, 0x43, &r43);
 		pci_read_config_byte (card->pdev, 0x44, &r44);
 		pci_read_config_byte (card->pdev, 0x48, &r48);
-		DPRINTK("PCI config: %02X %02X %02X %02X %02X %02X\n",
+		DPRINTK ("PCI config: %02X %02X %02X %02X %02X %02X\n",
 			r40,r41,r42,r43,r44,r48);
 
 		DPRINTK ("regs==%02X %02X %02X %08X %08X %08X %08X\n",
@@ -2225,7 +2364,7 @@ static int via_dsp_drain_playback (struct via_info *card,
 			 inl (card->baseaddr + 0x80),
 			 inl (card->baseaddr + 0x84));
 
-		DPRINTK ("final nbufs=%d\n", atomic_read (&chan->n_bufs));
+		DPRINTK ("final nbufs=%d\n", atomic_read (&chan->n_frags));
 	}
 #endif
 
@@ -2252,21 +2391,23 @@ static int via_dsp_ioctl_space (struct via_info *card,
 {
 	audio_buf_info info;
 
-	info.fragstotal = VIA_DMA_BUFFERS;
-	info.fragsize = VIA_DMA_BUF_SIZE;
+	via_chan_set_buffering(card, chan, -1);
+
+	info.fragstotal = chan->frag_number;
+	info.fragsize = chan->frag_size;
 
 	/* number of full fragments we can read/write without blocking */
-	info.fragments = atomic_read (&chan->n_bufs);
+	info.fragments = atomic_read (&chan->n_frags);
 
-	if ((chan->slop_len > 0) && (info.fragments > 0))
+	if ((chan->slop_len % chan->frag_size > 0) && (info.fragments > 0))
 		info.fragments--;
 
 	/* number of bytes that can be read or written immediately
 	 * without blocking.
 	 */
-	info.bytes = (info.fragments * VIA_DMA_BUF_SIZE);
-	if (chan->slop_len > 0)
-		info.bytes += VIA_DMA_BUF_SIZE - chan->slop_len;
+	info.bytes = (info.fragments * chan->frag_size);
+	if (chan->slop_len % chan->frag_size > 0)
+		info.bytes += chan->frag_size - (chan->slop_len % chan->frag_size);
 
 	DPRINTK ("EXIT, returning fragstotal=%d, fragsize=%d, fragments=%d, bytes=%d\n",
 		info.fragstotal,
@@ -2305,8 +2446,8 @@ static int via_dsp_ioctl_ptr (struct via_info *card,
 
 	if (chan->is_active) {
 		unsigned long extra;
-		info.ptr = atomic_read (&chan->hw_ptr) * VIA_DMA_BUF_SIZE;
-		extra = VIA_DMA_BUF_SIZE - inl (chan->iobase + VIA_BASE0_PCM_OUT_BLOCK_COUNT);
+		info.ptr = atomic_read (&chan->hw_ptr) * chan->frag_size;
+		extra = chan->frag_size - inl (chan->iobase + VIA_PCM_BLOCK_COUNT);
 		info.ptr += extra;
 		info.bytes += extra;
 	} else {
@@ -2386,13 +2527,13 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 
 	/* OSS API version.  XXX unverified */
 	case OSS_GETVERSION:
-		DPRINTK("ioctl OSS_GETVERSION, EXIT, returning SOUND_VERSION\n");
+		DPRINTK ("ioctl OSS_GETVERSION, EXIT, returning SOUND_VERSION\n");
 		rc = put_user (SOUND_VERSION, (int *)arg);
 		break;
 
 	/* list of supported PCM data formats */
 	case SNDCTL_DSP_GETFMTS:
-		DPRINTK("DSP_GETFMTS, EXIT, returning AFMT U8|S16_LE\n");
+		DPRINTK ("DSP_GETFMTS, EXIT, returning AFMT U8|S16_LE\n");
                 rc = put_user (AFMT_U8 | AFMT_S16_LE, (int *)arg);
 		break;
 
@@ -2402,20 +2543,19 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			rc = -EFAULT;
 			break;
 		}
-		DPRINTK("DSP_SETFMT, val==%d\n", val);
+		DPRINTK ("DSP_SETFMT, val==%d\n", val);
 		if (val != AFMT_QUERY) {
 			rc = 0;
 
-			if (rc == 0 && rd)
+			if (rd)
 				rc = via_chan_set_fmt (card, &card->ch_in, val);
-			if (rc == 0 && wr)
+
+			if (rc >= 0 && wr)
 				rc = via_chan_set_fmt (card, &card->ch_out, val);
 
-			if (rc <= 0) {
-				if (rc == 0)
-					rc = -EINVAL;
+			if (rc < 0)
 				break;
-			}
+
 			val = rc;
 		} else {
 			if ((rd && (card->ch_in.pcm_fmt & VIA_PCM_FMT_16BIT)) ||
@@ -2424,7 +2564,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			else
 				val = AFMT_U8;
 		}
-		DPRINTK("SETFMT EXIT, returning %d\n", val);
+		DPRINTK ("SETFMT EXIT, returning %d\n", val);
                 rc = put_user (val, (int *)arg);
 		break;
 
@@ -2434,18 +2574,19 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			rc = -EFAULT;
 			break;
 		}
-		DPRINTK("DSP_CHANNELS, val==%d\n", val);
+		DPRINTK ("DSP_CHANNELS, val==%d\n", val);
 		if (val != 0) {
 			rc = 0;
-			if (rc == 0 && rd)
+
+			if (rd)
 				rc = via_chan_set_stereo (card, &card->ch_in, val);
-			if (rc == 0 && wr)
+
+			if (rc >= 0 && wr)
 				rc = via_chan_set_stereo (card, &card->ch_out, val);
-			if (rc <= 0) {
-				if (rc == 0)
-					rc = -EINVAL;
+
+			if (rc < 0)
 				break;
-			}
+
 			val = rc;
 		} else {
 			if ((rd && (card->ch_in.pcm_fmt & VIA_PCM_FMT_STEREO)) ||
@@ -2454,7 +2595,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			else
 				val = 1;
 		}
-		DPRINTK("CHANNELS EXIT, returning %d\n", val);
+		DPRINTK ("CHANNELS EXIT, returning %d\n", val);
                 rc = put_user (val, (int *)arg);
 		break;
 
@@ -2464,21 +2605,21 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			rc = -EFAULT;
 			break;
 		}
-		DPRINTK("DSP_STEREO, val==%d\n", val);
+		DPRINTK ("DSP_STEREO, val==%d\n", val);
 		rc = 0;
 
-		if (rc == 0 && rd)
+		if (rd)
 			rc = via_chan_set_stereo (card, &card->ch_in, val ? 2 : 1);
-		if (rc == 0 && wr)
+		if (rc >= 0 && wr)
 			rc = via_chan_set_stereo (card, &card->ch_out, val ? 2 : 1);
 
-		if (rc <= 0) {
-			if (rc == 0)
-				rc = -EINVAL;
+		if (rc < 0)
 			break;
-		}
-		DPRINTK("STEREO EXIT, returning %d\n", val);
-                rc = 0;
+
+		val = rc - 1;
+
+		DPRINTK ("STEREO EXIT, returning %d\n", val);
+		rc = put_user(val, (int *) arg);
 		break;
 
 	/* query or set sampling rate */
@@ -2487,7 +2628,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			rc = -EFAULT;
 			break;
 		}
-		DPRINTK("DSP_SPEED, val==%d\n", val);
+		DPRINTK ("DSP_SPEED, val==%d\n", val);
 		if (val < 0) {
 			rc = -EINVAL;
 			break;
@@ -2495,16 +2636,14 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 		if (val > 0) {
 			rc = 0;
 
-			if (rc == 0 && rd)
+			if (rd)
 				rc = via_chan_set_speed (card, &card->ch_in, val);
-			if (rc == 0 && wr)
+			if (rc >= 0 && wr)
 				rc = via_chan_set_speed (card, &card->ch_out, val);
 
-			if (rc <= 0) {
-				if (rc == 0)
-					rc = -EINVAL;
+			if (rc < 0)
 				break;
-			}
+
 			val = rc;
 		} else {
 			if (rd)
@@ -2514,7 +2653,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			else
 				val = 0;
 		}
-		DPRINTK("SPEED EXIT, returning %d\n", val);
+		DPRINTK ("SPEED EXIT, returning %d\n", val);
                 rc = put_user (val, (int *)arg);
 		break;
 
@@ -2522,7 +2661,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	case SNDCTL_DSP_SYNC:
 		DPRINTK ("DSP_SYNC\n");
 		if (wr) {
-			DPRINTK("SYNC EXIT (after calling via_dsp_drain_playback)\n");
+			DPRINTK ("SYNC EXIT (after calling via_dsp_drain_playback)\n");
 			rc = via_dsp_drain_playback (card, &card->ch_out, nonblock);
 		}
 		break;
@@ -2531,12 +2670,19 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
         case SNDCTL_DSP_RESET:
 		DPRINTK ("DSP_RESET\n");
 		if (rd) {
-			via_chan_clear (&card->ch_in);
+			via_chan_clear (card, &card->ch_in);
 			via_chan_pcm_fmt (&card->ch_in, 1);
+			card->ch_in.frag_number = 0;
+			card->ch_in.frag_size = 0;
+			atomic_set(&card->ch_in.n_frags, 0);
 		}
+
 		if (wr) {
-			via_chan_clear (&card->ch_out);
+			via_chan_clear (card, &card->ch_out);
 			via_chan_pcm_fmt (&card->ch_out, 1);
+			card->ch_out.frag_number = 0;
+			card->ch_out.frag_size = 0;
+			atomic_set(&card->ch_out.n_frags, 0);
 		}
 
 		rc = 0;
@@ -2544,40 +2690,47 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 
 	/* obtain bitmask of device capabilities, such as mmap, full duplex, etc. */
 	case SNDCTL_DSP_GETCAPS:
-		DPRINTK("DSP_GETCAPS\n");
+		DPRINTK ("DSP_GETCAPS\n");
 		rc = put_user(VIA_DSP_CAP, (int *)arg);
 		break;
 
-	/* obtain bitmask of device capabilities, such as mmap, full duplex, etc. */
+	/* obtain buffer fragment size */
 	case SNDCTL_DSP_GETBLKSIZE:
-		DPRINTK("DSP_GETBLKSIZE\n");
-		rc = put_user(VIA_DMA_BUF_SIZE, (int *)arg);
+		DPRINTK ("DSP_GETBLKSIZE\n");
+
+		if (rd) {
+			via_chan_set_buffering(card, &card->ch_in, -1);
+			rc = put_user(card->ch_in.frag_size, (int *)arg);
+		} else if (wr) {
+			via_chan_set_buffering(card, &card->ch_out, -1);
+			rc = put_user(card->ch_out.frag_size, (int *)arg);
+		}
 		break;
 
 	/* obtain information about input buffering */
 	case SNDCTL_DSP_GETISPACE:
-		DPRINTK("DSP_GETISPACE\n");
+		DPRINTK ("DSP_GETISPACE\n");
 		if (rd)
 			rc = via_dsp_ioctl_space (card, &card->ch_in, (void*) arg);
 		break;
 
 	/* obtain information about output buffering */
 	case SNDCTL_DSP_GETOSPACE:
-		DPRINTK("DSP_GETOSPACE\n");
+		DPRINTK ("DSP_GETOSPACE\n");
 		if (wr)
 			rc = via_dsp_ioctl_space (card, &card->ch_out, (void*) arg);
 		break;
 
 	/* obtain information about input hardware pointer */
 	case SNDCTL_DSP_GETIPTR:
-		DPRINTK("DSP_GETIPTR\n");
+		DPRINTK ("DSP_GETIPTR\n");
 		if (rd)
 			rc = via_dsp_ioctl_ptr (card, &card->ch_in, (void*) arg);
 		break;
 
 	/* obtain information about output hardware pointer */
 	case SNDCTL_DSP_GETOPTR:
-		DPRINTK("DSP_GETOPTR\n");
+		DPRINTK ("DSP_GETOPTR\n");
 		if (wr)
 			rc = via_dsp_ioctl_ptr (card, &card->ch_out, (void*) arg);
 		break;
@@ -2585,25 +2738,29 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	/* return number of bytes remaining to be played by DMA engine */
 	case SNDCTL_DSP_GETODELAY:
 		{
-		DPRINTK("DSP_GETODELAY\n");
+		DPRINTK ("DSP_GETODELAY\n");
 
 		chan = &card->ch_out;
 
 		if (!wr)
 			break;
 
-		val = VIA_DMA_BUFFERS - atomic_read (&chan->n_bufs);
+		if (chan->is_active) {
 
-		if (val > 0) {
-			val *= VIA_DMA_BUF_SIZE;
-			val -= VIA_DMA_BUF_SIZE -
-			       inl (chan->iobase + VIA_BASE0_PCM_OUT_BLOCK_COUNT);
-		}
-		val += chan->slop_len;
+			val = chan->frag_number - atomic_read (&chan->n_frags);
 
-		assert (val <= (VIA_DMA_BUF_SIZE * VIA_DMA_BUFFERS));
+			if (val > 0) {
+				val *= chan->frag_size;
+				val -= chan->frag_size -
+				       inl (chan->iobase + VIA_PCM_BLOCK_COUNT);
+			}
+			val += chan->slop_len % chan->frag_size;
+		} else
+			val = 0;
 
-		DPRINTK("GETODELAY EXIT, val = %d bytes\n", val);
+		assert (val <= (chan->frag_size * chan->frag_number));
+
+		DPRINTK ("GETODELAY EXIT, val = %d bytes\n", val);
                 rc = put_user (val, (int *)arg);
 		break;
 		}
@@ -2617,7 +2774,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			rc = -EFAULT;
 			break;
 		}
-		DPRINTK("DSP_SETTRIGGER, rd=%d, wr=%d, act=%d/%d, en=%d/%d\n",
+		DPRINTK ("DSP_SETTRIGGER, rd=%d, wr=%d, act=%d/%d, en=%d/%d\n",
 			rd, wr, card->ch_in.is_active, card->ch_out.is_active,
 			card->ch_in.is_enabled, card->ch_out.is_enabled);
 
@@ -2625,6 +2782,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 
 		if (rd)
 			rc = via_dsp_ioctl_trigger (&card->ch_in, val);
+
 		if (!rc && wr)
 			rc = via_dsp_ioctl_trigger (&card->ch_out, val);
 
@@ -2634,7 +2792,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	 * with O_RDWR, this is mainly a no-op that always returns success.
 	 */
 	case SNDCTL_DSP_SETDUPLEX:
-		DPRINTK("DSP_SETDUPLEX\n");
+		DPRINTK ("DSP_SETDUPLEX\n");
 		if (!rd || !wr)
 			break;
 		rc = 0;
@@ -2646,7 +2804,13 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			rc = -EFAULT;
 			break;
 		}
-		DPRINTK("DSP_SETFRAGMENT, val==%d\n", val);
+		DPRINTK ("DSP_SETFRAGMENT, val==%d\n", val);
+
+		if (rd)
+			rc = via_chan_set_buffering(card, &card->ch_in, val);
+
+		if (wr)
+			rc = via_chan_set_buffering(card, &card->ch_out, val);	
 
 		DPRINTK ("SNDCTL_DSP_SETFRAGMENT (fragshift==0x%04X (%d), maxfrags==0x%04X (%d))\n",
 			 val & 0xFFFF,
@@ -2654,13 +2818,12 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			 (val >> 16) & 0xFFFF,
 			 (val >> 16) & 0xFFFF);
 
-		/* just to shut up some programs */
 		rc = 0;
 		break;
 
 	/* inform device of an upcoming pause in input (or output). */
 	case SNDCTL_DSP_POST:
-		DPRINTK("DSP_POST\n");
+		DPRINTK ("DSP_POST\n");
 		if (wr) {
 			if (card->ch_out.slop_len > 0)
 				via_chan_flush_frag (&card->ch_out);
@@ -2678,15 +2841,14 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	}
 
 	up (&card->syscall_sem);
-	DPRINTK("EXIT, returning %d\n", rc);
+	DPRINTK ("EXIT, returning %d\n", rc);
 	return rc;
 }
 
 
 static int via_dsp_open (struct inode *inode, struct file *file)
 {
-	int rc, minor = MINOR(inode->i_rdev);
-	int got_read_chan = 0;
+	int minor = MINOR(inode->i_rdev);
 	struct via_info *card;
 	struct pci_dev *pdev;
 	struct via_channel *chan;
@@ -2733,17 +2895,13 @@ match:
 	}
 
 	file->private_data = card;
-	DPRINTK("file->f_mode == 0x%x\n", file->f_mode);
+	DPRINTK ("file->f_mode == 0x%x\n", file->f_mode);
 
 	/* handle input from analog source */
 	if (file->f_mode & FMODE_READ) {
 		chan = &card->ch_in;
 
-		rc = via_chan_init (card, chan);
-		if (rc)
-			goto err_out;
-
-		got_read_chan = 1;
+		via_chan_init (card, chan);
 
 		/* why is this forced to 16-bit stereo in all drivers? */
 		chan->pcm_fmt = VIA_PCM_FMT_16BIT | VIA_PCM_FMT_STEREO;
@@ -2756,30 +2914,28 @@ match:
 	if (file->f_mode & FMODE_WRITE) {
 		chan = &card->ch_out;
 
-		rc = via_chan_init (card, chan);
-		if (rc)
-			goto err_out_read_chan;
+		via_chan_init (card, chan);
 
-		if ((minor & 0xf) == SND_DEV_DSP16) {
-			chan->pcm_fmt |= VIA_PCM_FMT_16BIT;
-			via_set_rate (&card->ac97, chan, 44100);
+		if (file->f_mode & FMODE_READ) {
+			/* if in duplex mode make the recording and playback channels
+			   have the same settings */
+			chan->pcm_fmt = VIA_PCM_FMT_16BIT | VIA_PCM_FMT_STEREO;
+			via_chan_pcm_fmt (chan, 0);
+                        via_set_rate (&card->ac97, chan, 44100);
 		} else {
-			via_set_rate (&card->ac97, chan, 8000);
+			 if ((minor & 0xf) == SND_DEV_DSP16) {
+				chan->pcm_fmt = VIA_PCM_FMT_16BIT;
+				via_chan_pcm_fmt (chan, 0);
+				via_set_rate (&card->ac97, chan, 44100);
+			} else {
+				via_chan_pcm_fmt (chan, 0);
+				via_set_rate (&card->ac97, chan, 8000);
+			}
 		}
-
-		via_chan_pcm_fmt (chan, 0);
 	}
 
 	DPRINTK ("EXIT, returning 0\n");
 	return 0;
-
-err_out_read_chan:
-	if (got_read_chan)
-		via_chan_free (card, &card->ch_in);
-err_out:
-	up (&card->open_sem);
-	DPRINTK("ERROR EXIT, returning %d\n", rc);
-	return rc;
 }
 
 
@@ -2807,15 +2963,18 @@ static int via_dsp_release(struct inode *inode, struct file *file)
 			printk (KERN_DEBUG "via_audio: ignoring drain playback error %d\n", rc);
 
 		via_chan_free (card, &card->ch_out);
+		via_chan_buffer_free(card, &card->ch_out);
 	}
 
-	if (file->f_mode & FMODE_READ)
+	if (file->f_mode & FMODE_READ) {
 		via_chan_free (card, &card->ch_in);
+		via_chan_buffer_free (card, &card->ch_in);
+	}
 
 	up (&card->syscall_sem);
 	up (&card->open_sem);
 
-	DPRINTK("EXIT, returning 0\n");
+	DPRINTK ("EXIT, returning 0\n");
 	return 0;
 }
 
@@ -2934,9 +3093,9 @@ static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id
 		tmp &= 0xF0;
 		tmp |= pdev->irq;
 		pci_write_config_byte (pdev, 0x3C, tmp);
-		DPRINTK("new 0x3c==0x%02x\n", tmp);
+		DPRINTK ("new 0x3c==0x%02x\n", tmp);
 	} else {
-		DPRINTK("IRQ reg 0x3c==0x%02x, irq==%d\n",
+		DPRINTK ("IRQ reg 0x3c==0x%02x, irq==%d\n",
 			tmp, tmp & 0x0F);
 	}
 
@@ -3036,12 +3195,12 @@ static int __init init_via82cxxx_audio(void)
 
 static void __exit cleanup_via82cxxx_audio(void)
 {
-	DPRINTK("ENTER\n");
+	DPRINTK ("ENTER\n");
 
 	pci_unregister_driver (&via_driver);
 	via_cleanup_proc ();
 
-	DPRINTK("EXIT\n");
+	DPRINTK ("EXIT\n");
 }
 
 
@@ -3133,7 +3292,7 @@ static int via_info_read_proc (char *page, char **start, off_t off,
 
 		);
 
-	DPRINTK("EXIT, returning %d\n", len);
+	DPRINTK ("EXIT, returning %d\n", len);
 	return len;
 
 #undef YN

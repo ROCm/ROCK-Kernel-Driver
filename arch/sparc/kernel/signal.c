@@ -1,4 +1,4 @@
-/*  $Id: signal.c,v 1.107 2000/09/05 21:44:54 davem Exp $
+/*  $Id: signal.c,v 1.108 2001/01/24 21:05:12 davem Exp $
  *  linux/arch/sparc/kernel/signal.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -27,9 +27,6 @@
 #include <asm/pgtable.h>
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
-
-asmlinkage int sys_wait4(pid_t pid, unsigned long *stat_addr,
-			 int options, unsigned long *ru);
 
 extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 		   void *fpqueue, unsigned long *fpqdepth);

@@ -1,4 +1,4 @@
-/*  $Id: signal.c,v 1.54 2000/09/05 21:44:54 davem Exp $
+/*  $Id: signal.c,v 1.55 2001/01/24 21:05:13 davem Exp $
  *  arch/sparc64/kernel/signal.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -30,9 +30,6 @@
 #include <asm/visasm.h>
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
-
-asmlinkage int sys_wait4(pid_t pid, unsigned long *stat_addr,
-			 int options, unsigned long *ru);
 
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 			 unsigned long orig_o0, int ret_from_syscall);

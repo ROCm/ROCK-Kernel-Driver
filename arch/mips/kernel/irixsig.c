@@ -16,8 +16,6 @@
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
 
-asmlinkage int sys_wait4(pid_t pid, unsigned long *stat_addr,
-                         int options, unsigned long *ru);
 extern asmlinkage void syscall_trace(void);
 
 #undef DEBUG_SIG

@@ -42,7 +42,7 @@ static inline void
 cabriolet_update_irq_hw(unsigned int irq, unsigned long mask)
 {
 	int ofs = (irq - 16) / 8;
-	outb(mask >> (16 + ofs*3), 0x804 + ofs);
+	outb(mask >> (16 + ofs * 8), 0x804 + ofs);
 }
 
 static inline void

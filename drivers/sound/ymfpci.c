@@ -24,19 +24,28 @@
  *
  * TODO:
  *  - Use P44Slot for 44.1 playback.
- *  - Capture and duplex
  *  - 96KHz playback for DVD - use pitch of 2.0.
  *  - uLaw for Sun apps.
+ *     : Alan says firmly "no software format conversion in kernel".
  *  - Retain DMA buffer on close, do not wait the end of frame.
  *  - Cleanup
- *      ? merge ymf_pcm and state
- *      ? pcm interrupt no pointer
  *      ? underused structure members
  *      - Remove remaining P3 tags (debug messages).
  *  - Resolve XXX tagged questions.
  *  - Cannot play 5133Hz.
+ *  - 2001/01/07 Consider if we can remove voice_lock, like so:
+ *     : Allocate/deallocate voices in open/close under semafore.
+ *     : We access voices in interrupt, that only for pcms that open.
+ *    voice_lock around playback_prepare closes interrupts for insane duration.
+ *  - Revisit the way voice_alloc is done - too confusing, overcomplicated.
+ *    Should support various channel types, however.
+ *  - Remove prog_dmabuf from read/write, leave it in open.
+ *  - 2001/01/07 Replace the OPL3 part of CONFIG_SOUND_YMFPCI_LEGACY code with
+ *    native synthesizer through a playback slot.
+ *  - Use new 2.3.x cache coherent PCI DMA routines instead of virt_to_bus.
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -50,19 +59,19 @@
 #include <asm/dma.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_SOUND_YMFPCI_LEGACY
+# include "sound_config.h"
+# include "mpu401.h"
+#endif
 #include "ymfpci.h"
 
-#define snd_magic_cast(t, p, err)	((t *)(p))
-
-/* Channels, such as play and record. I do only play a.t.m. XXX */
-#define NR_HW_CH	1
-
-static int ymf_playback_trigger(ymfpci_t *codec, ymfpci_pcm_t *ypcm, int cmd);
-static int ymfpci_voice_alloc(ymfpci_t *codec, ymfpci_voice_type_t type,
-    int pair, ymfpci_voice_t **rvoice);
-static int ymfpci_voice_free(ymfpci_t *codec, ymfpci_voice_t *pvoice);
-static int ymf_playback_prepare(ymfpci_t *codec, struct ymf_state *state);
-static int ymf_state_alloc(ymfpci_t *unit, int nvirt);
+static int ymf_playback_trigger(ymfpci_t *codec, struct ymf_pcm *ypcm, int cmd);
+static void ymf_capture_trigger(ymfpci_t *unit, struct ymf_pcm *ypcm, int cmd);
+static void ymfpci_voice_free(ymfpci_t *codec, ymfpci_voice_t *pvoice);
+static int ymf_capture_alloc(struct ymf_unit *unit, int *pbank);
+static int ymf_playback_prepare(struct ymf_state *state);
+static int ymf_capture_prepare(struct ymf_state *state);
+static struct ymf_state *ymf_state_alloc(ymfpci_t *unit);
 
 static LIST_HEAD(ymf_devs);
 
@@ -87,7 +96,7 @@ MODULE_DEVICE_TABLE(pci, ymf_id_tbl);
 /*
  * Mindlessly copied from cs46xx XXX
  */
-extern __inline__ unsigned ld2(unsigned int x)
+static inline unsigned ld2(unsigned int x)
 {
 	unsigned r = 0;
 	
@@ -281,18 +290,13 @@ static void ymf_pcm_update_shift(struct ymf_pcm_format *f)
 		f->shift++;
 }
 
-/*
- * Whole OSS-style DMA machinery is taken from cs46xx.
- */
-
 /* Are you sure 32K is not too much? See if mpg123 skips on loaded systems. */
 #define DMABUF_DEFAULTORDER (15-PAGE_SHIFT)
 #define DMABUF_MINORDER 1
 
 /* allocate DMA buffer, playback and recording buffer should be allocated seperately */
-static int alloc_dmabuf(struct ymf_state *state)
+static int alloc_dmabuf(struct ymf_dmabuf *dmabuf)
 {
-	struct ymf_dmabuf *dmabuf = &state->dmabuf;
 	void *rawbuf = NULL;
 	int order;
 	struct page * map,  * mapend;
@@ -323,9 +327,8 @@ static int alloc_dmabuf(struct ymf_state *state)
 }
 
 /* free DMA buffer */
-static void dealloc_dmabuf(struct ymf_state *state)
+static void dealloc_dmabuf(struct ymf_dmabuf *dmabuf)
 {
-	struct ymf_dmabuf *dmabuf = &state->dmabuf;
 	struct page *map, *mapend;
 
 	if (dmabuf->rawbuf) {
@@ -339,9 +342,9 @@ static void dealloc_dmabuf(struct ymf_state *state)
 	dmabuf->mapped = dmabuf->ready = 0;
 }
 
-static int prog_dmabuf(struct ymf_state *state, unsigned rec)
+static int prog_dmabuf(struct ymf_state *state, int rec)
 {
-	struct ymf_dmabuf *dmabuf = &state->dmabuf;
+	struct ymf_dmabuf *dmabuf;
 	int w_16;
 	unsigned bytepersec;
 	unsigned bufsize;
@@ -350,6 +353,7 @@ static int prog_dmabuf(struct ymf_state *state, unsigned rec)
 	int ret;
 
 	w_16 = ymf_pcm_format_width(state->format.format) == 16;
+	dmabuf = rec ? &state->rpcm.dmabuf : &state->wpcm.dmabuf;
 
 	spin_lock_irqsave(&state->unit->reg_lock, flags);
 	dmabuf->hwptr = dmabuf->swptr = 0;
@@ -359,7 +363,7 @@ static int prog_dmabuf(struct ymf_state *state, unsigned rec)
 
 	/* allocate DMA buffer if not allocated yet */
 	if (!dmabuf->rawbuf)
-		if ((ret = alloc_dmabuf(state)))
+		if ((ret = alloc_dmabuf(dmabuf)))
 			return ret;
 
 	bytepersec = state->format.rate << state->format.shift;
@@ -383,7 +387,6 @@ static int prog_dmabuf(struct ymf_state *state, unsigned rec)
 		dmabuf->numfrag = bufsize >> dmabuf->fragshift;
 	}
 	dmabuf->fragsize = 1 << dmabuf->fragshift;
-	dmabuf->fragsamples = dmabuf->fragsize >> state->format.shift;
 	dmabuf->dmasize = dmabuf->numfrag << dmabuf->fragshift;
 
 	/*
@@ -414,15 +417,20 @@ static int prog_dmabuf(struct ymf_state *state, unsigned rec)
 	 *	Now set up the ring 
 	 */
 
-	spin_lock_irqsave(&state->unit->reg_lock, flags);
+	/* XXX   ret = rec? cap_pre(): pbk_pre();  */
+	spin_lock_irqsave(&state->unit->voice_lock, flags);
 	if (rec) {
-		/* ymf_rec_setup(state); */
+		if ((ret = ymf_capture_prepare(state)) != 0) {
+			spin_unlock_irqrestore(&state->unit->voice_lock, flags);
+			return ret;
+		}
 	} else {
-		if ((ret = ymf_playback_prepare(state->unit, state)) != 0) {
+		if ((ret = ymf_playback_prepare(state)) != 0) {
+			spin_unlock_irqrestore(&state->unit->voice_lock, flags);
 			return ret;
 		}
 	}
-	spin_unlock_irqrestore(&state->unit->reg_lock, flags);
+	spin_unlock_irqrestore(&state->unit->voice_lock, flags);
 
 	/* set the ready flag for the dma buffer (this comment is not stupid) */
 	dmabuf->ready = 1;
@@ -439,8 +447,13 @@ static int prog_dmabuf(struct ymf_state *state, unsigned rec)
 
 static void ymf_start_dac(struct ymf_state *state)
 {
-	ymf_playback_trigger(state->unit, &state->ypcm, 1);
+	ymf_playback_trigger(state->unit, &state->wpcm, 1);
 }
+
+// static void ymf_start_adc(struct ymf_state *state)
+// {
+// 	ymf_capture_trigger(state->unit, &state->rpcm, 1);
+// }
 
 /*
  * Wait until output is drained.
@@ -449,14 +462,14 @@ static void ymf_start_dac(struct ymf_state *state)
 static void ymf_wait_dac(struct ymf_state *state)
 {
 	struct ymf_unit *unit = state->unit;
-	ymfpci_pcm_t *ypcm = &state->ypcm;
+	struct ymf_pcm *ypcm = &state->wpcm;
 	DECLARE_WAITQUEUE(waita, current);
 	unsigned long flags;
 
-	add_wait_queue(&state->dmabuf.wait, &waita);
+	add_wait_queue(&ypcm->dmabuf.wait, &waita);
 
 	spin_lock_irqsave(&unit->reg_lock, flags);
-	if (state->dmabuf.count != 0 && !state->ypcm.running) {
+	if (ypcm->dmabuf.count != 0 && !ypcm->running) {
 		ymf_playback_trigger(unit, ypcm, 1);
 	}
 
@@ -479,12 +492,23 @@ static void ymf_wait_dac(struct ymf_state *state)
 	spin_unlock_irqrestore(&unit->reg_lock, flags);
 
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&state->dmabuf.wait, &waita);
+	remove_wait_queue(&ypcm->dmabuf.wait, &waita);
 
 	/*
 	 * This function may take up to 4 seconds to reach this point
 	 * (32K circular buffer, 8000 Hz). User notices.
 	 */
+}
+
+/* Can just stop, without wait. Or can we? */
+static void ymf_stop_adc(struct ymf_state *state)
+{
+	struct ymf_unit *unit = state->unit;
+	unsigned long flags;
+
+	spin_lock_irqsave(&unit->reg_lock, flags);
+	ymf_capture_trigger(unit, &state->rpcm, 0);
+	spin_unlock_irqrestore(&unit->reg_lock, flags);
 }
 
 /*
@@ -523,12 +547,11 @@ static void ymfpci_hw_stop(ymfpci_t *codec)
  *  Playback voice management
  */
 
-static int voice_alloc(ymfpci_t *codec, ymfpci_voice_type_t type, int pair, ymfpci_voice_t **rvoice)
+static int voice_alloc(ymfpci_t *codec, ymfpci_voice_type_t type, int pair, ymfpci_voice_t *rvoice[])
 {
 	ymfpci_voice_t *voice, *voice2;
 	int idx;
-	
-	*rvoice = NULL;
+
 	for (idx = 0; idx < 64; idx += pair ? 2 : 1) {
 		voice = &codec->voices[idx];
 		voice2 = pair ? &codec->voices[idx+1] : NULL;
@@ -551,52 +574,29 @@ static int voice_alloc(ymfpci_t *codec, ymfpci_voice_type_t type, int pair, ymfp
 			break;
 		}
 		ymfpci_hw_start(codec);
-		if (voice2)
+		rvoice[0] = voice;
+		if (voice2) {
 			ymfpci_hw_start(codec);
-		*rvoice = voice;
+			rvoice[1] = voice2;
+		}
 		return 0;
 	}
-	return -ENOMEM;
+	return -EBUSY;	/* Your audio channel is open by someone else. */
 }
 
-static int ymfpci_voice_alloc(ymfpci_t *codec, ymfpci_voice_type_t type,
-    int pair, ymfpci_voice_t **rvoice)
+static void ymfpci_voice_free(ymfpci_t *unit, ymfpci_voice_t *pvoice)
 {
-	unsigned long flags;
-	int result;
-
-	spin_lock_irqsave(&codec->voice_lock, flags);
-	for (;;) {
-		result = voice_alloc(codec, type, pair, rvoice);
-		if (result == 0 || type != YMFPCI_PCM)
-			break;
-		/* TODO: synth/midi voice deallocation */
-		break;
-	}
-	spin_unlock_irqrestore(&codec->voice_lock, flags);	
-	return result;		
-}
-
-static int ymfpci_voice_free(ymfpci_t *codec, ymfpci_voice_t *pvoice)
-{
-	unsigned long flags;
-	
-	ymfpci_hw_stop(codec);
-	spin_lock_irqsave(&codec->voice_lock, flags);
+	ymfpci_hw_stop(unit);
 	pvoice->use = pvoice->pcm = pvoice->synth = pvoice->midi = 0;
 	pvoice->ypcm = NULL;
-	pvoice->interrupt = NULL;
-	spin_unlock_irqrestore(&codec->voice_lock, flags);
-	return 0;
 }
 
 /*
- *  PCM part
  */
 
 static void ymf_pcm_interrupt(ymfpci_t *codec, ymfpci_voice_t *voice)
 {
-	ymfpci_pcm_t *ypcm;
+	struct ymf_pcm *ypcm;
 	int redzone;
 	int pos, delta, swptr;
 	int played, distance;
@@ -611,7 +611,7 @@ static void ymf_pcm_interrupt(ymfpci_t *codec, ymfpci_voice_t *voice)
 		ypcm->running = 0;	// lock it
 		return;
 	}
-	dmabuf = &state->dmabuf;
+	dmabuf = &ypcm->dmabuf;
 	spin_lock(&codec->reg_lock);
 	if (ypcm->running) {
 /* P3 */ /** printk("ymfpci: %d, intr bank %d count %d start 0x%x:%x\n",
@@ -627,10 +627,9 @@ static void ymf_pcm_interrupt(ymfpci_t *codec, ymfpci_voice_t *voice)
 		pos = voice->bank[codec->active_bank].start;
 		pos <<= state->format.shift;
 		if (pos < 0 || pos >= dmabuf->dmasize) {	/* ucode bug */
-			printk(KERN_ERR
-			    "ymfpci%d: %d: runaway: hwptr %d dmasize %d\n",
+			printk(KERN_ERR "ymfpci%d: runaway voice %d: hwptr %d=>%d dmasize %d\n",
 			    codec->dev_audio, voice->number,
-			    dmabuf->hwptr, dmabuf->dmasize);
+			    dmabuf->hwptr, pos, dmabuf->dmasize);
 			pos = 0;
 		}
 		if (pos < dmabuf->hwptr) {
@@ -706,36 +705,66 @@ static void ymf_pcm_interrupt(ymfpci_t *codec, ymfpci_voice_t *voice)
 	spin_unlock(&codec->reg_lock);
 }
 
-#if HAVE_RECORD
-static void ymfpci_pcm_capture_interrupt(snd_pcm_subchn_t *substream)
+static void ymf_cap_interrupt(ymfpci_t *unit, struct ymf_capture *cap)
 {
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, );
-	ymfpci_t *codec = ypcm->codec;
-	u32 pos, delta;
-	
-	spin_lock(&codec->reg_lock);
+	struct ymf_pcm *ypcm;
+	int redzone;
+	struct ymf_state *state;
+	struct ymf_dmabuf *dmabuf;
+	int pos, delta;
+	int cnt;
+
+	if ((ypcm = cap->ypcm) == NULL) {
+		return;
+	}
+	if ((state = ypcm->state) == NULL) {
+		ypcm->running = 0;	// lock it
+		return;
+	}
+	dmabuf = &ypcm->dmabuf;
+	spin_lock(&unit->reg_lock);
 	if (ypcm->running) {
-		pos = codec->bank_capture[ypcm->capture_bank_number][codec->active_bank]->start << ypcm->shift_offset;
-		if (pos < ypcm->last_pos)  // <--  dmabuf->hwptr
-			delta = pos + (ypcm->buffer_size - ypcm->last_pos);
-		else
-			delta = pos - ypcm->last_pos;
-		ypcm->frag_pos += delta;
-		ypcm->last_pos = pos;
-		while (ypcm->frag_pos >= ypcm->frag_size) {
-			ypcm->frag_pos -= ypcm->frag_size;
-			// printk("done - active_bank = 0x%x, start = 0x%x\n", codec->active_bank, voice->bank[codec->active_bank].start);
-			spin_unlock(&codec->reg_lock);
-			snd_pcm_transfer_done(substream);
-			spin_lock(&codec->reg_lock);
+		redzone = ymf_calc_lend(state->format.rate);
+		redzone <<= (state->format.shift + 1);
+
+		pos = cap->bank[unit->active_bank].start;
+		// pos <<= state->format.shift;
+		if (pos < 0 || pos >= dmabuf->dmasize) {	/* ucode bug */
+			printk(KERN_ERR "ymfpci%d: runaway capture %d: hwptr %d=>%d dmasize %d\n",
+			    unit->dev_audio, ypcm->capture_bank_number,
+			    dmabuf->hwptr, pos, dmabuf->dmasize);
+			pos = 0;
+		}
+		if (pos < dmabuf->hwptr) {
+			delta = dmabuf->dmasize - dmabuf->hwptr;
+			delta += pos;
+		} else {
+			delta = pos - dmabuf->hwptr;
+		}
+		dmabuf->hwptr = pos;
+
+		cnt = dmabuf->count;
+		cnt += delta;
+		if (cnt + redzone > dmabuf->dmasize) {
+			/* Overflow - bump swptr */
+			dmabuf->count = dmabuf->dmasize - redzone;
+			dmabuf->swptr = dmabuf->hwptr + redzone;
+			if (dmabuf->swptr >= dmabuf->dmasize) {
+				dmabuf->swptr -= dmabuf->dmasize;
+			}
+		} else {
+			dmabuf->count = cnt;
+		}
+
+		dmabuf->total_bytes += delta;
+		if (dmabuf->count) {		/* && is_sleeping  XXX */
+			wake_up(&dmabuf->wait);
 		}
 	}
-	spin_unlock(&codec->reg_lock);
+	spin_unlock(&unit->reg_lock);
 }
-#endif
 
-static int ymf_playback_trigger(ymfpci_t *codec, ymfpci_pcm_t *ypcm, int cmd)
+static int ymf_playback_trigger(ymfpci_t *codec, struct ymf_pcm *ypcm, int cmd)
 {
 
 	if (ypcm->voices[0] == NULL) {
@@ -755,40 +784,29 @@ static int ymf_playback_trigger(ymfpci_t *codec, ymfpci_pcm_t *ypcm, int cmd)
 	return 0;
 }
 
-#if HAVE_RECORD
-static int ymfpci_capture_trigger(void *private_data,	
-				      snd_pcm_subchn_t * substream,
-				      int cmd)
+static void ymf_capture_trigger(ymfpci_t *codec, struct ymf_pcm *ypcm, int cmd)
 {
-	unsigned long flags;
-	ymfpci_t *codec = snd_magic_cast(ymfpci_t, private_data, -ENXIO);
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, substream->runtime->private_data, -ENXIO);
-	int result = 0;
 	u32 tmp;
 
-	spin_lock_irqsave(&codec->reg_lock, flags);
-	if (cmd == SND_PCM_TRIGGER_GO) {
+	if (cmd != 0) {
 		tmp = ymfpci_readl(codec, YDSXGR_MAPOFREC) | (1 << ypcm->capture_bank_number);
 		ymfpci_writel(codec, YDSXGR_MAPOFREC, tmp);
 		ypcm->running = 1;
-	} else if (cmd == SND_PCM_TRIGGER_STOP) {
+	} else {
 		tmp = ymfpci_readl(codec, YDSXGR_MAPOFREC) & ~(1 << ypcm->capture_bank_number);
 		ymfpci_writel(codec, YDSXGR_MAPOFREC, tmp);
 		ypcm->running = 0;
-	} else {
-		result = -EINVAL;
 	}
-	spin_unlock_irqrestore(&codec->reg_lock, flags);
-	return result;
 }
-#endif
 
-static int ymfpci_pcm_voice_alloc(ymfpci_pcm_t *ypcm, int voices)
+static int ymfpci_pcm_voice_alloc(struct ymf_pcm *ypcm, int voices)
 {
+	struct ymf_unit *unit;
 	int err;
 
+	unit = ypcm->state->unit;
 	if (ypcm->voices[1] != NULL && voices < 2) {
-		ymfpci_voice_free(ypcm->codec, ypcm->voices[1]);
+		ymfpci_voice_free(unit, ypcm->voices[1]);
 		ypcm->voices[1] = NULL;
 	}
 	if (voices == 1 && ypcm->voices[0] != NULL)
@@ -797,18 +815,17 @@ static int ymfpci_pcm_voice_alloc(ymfpci_pcm_t *ypcm, int voices)
 		return 0;		/* already allocated */
 	if (voices > 1) {
 		if (ypcm->voices[0] != NULL && ypcm->voices[1] == NULL) {
-			ymfpci_voice_free(ypcm->codec, ypcm->voices[0]);
+			ymfpci_voice_free(unit, ypcm->voices[0]);
 			ypcm->voices[0] = NULL;
 		}		
-	}
-	err = ymfpci_voice_alloc(ypcm->codec, YMFPCI_PCM, voices > 1, &ypcm->voices[0]);
-	if (err < 0)
-		return err;
-	ypcm->voices[0]->ypcm = ypcm;
-	ypcm->voices[0]->interrupt = ymf_pcm_interrupt;
-	if (voices > 1) {
-		ypcm->voices[1] = &ypcm->codec->voices[ypcm->voices[0]->number + 1];
+		if ((err = voice_alloc(unit, YMFPCI_PCM, 1, ypcm->voices)) < 0)
+			return err;
+		ypcm->voices[0]->ypcm = ypcm;
 		ypcm->voices[1]->ypcm = ypcm;
+	} else {
+		if ((err = voice_alloc(unit, YMFPCI_PCM, 0, ypcm->voices)) < 0)
+			return err;
+		ypcm->voices[0]->ypcm = ypcm;
 	}
 	return 0;
 }
@@ -901,17 +918,32 @@ static void ymf_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 }
 
 /*
- * XXX Use new cache coherent PCI DMA routines instead of virt_to_bus.
+ * XXX Capture channel allocation is entirely fake at the moment.
+ * We use only one channel and mark it busy as required.
  */
-static int ymf_playback_prepare(ymfpci_t *codec, struct ymf_state *state)
+static int ymf_capture_alloc(struct ymf_unit *unit, int *pbank)
 {
-	ymfpci_pcm_t *ypcm = &state->ypcm;
+	struct ymf_capture *cap;
+	int cbank;
+
+	cbank = 1;		/* Only ADC slot is used for now. */
+	cap = &unit->capture[cbank];
+	if (cap->use)
+		return -EBUSY;
+	cap->use = 1;
+	*pbank = cbank;
+	return 0;
+}
+
+static int ymf_playback_prepare(struct ymf_state *state)
+{
+	struct ymf_pcm *ypcm = &state->wpcm;
 	int err, nvoice;
 
 	if ((err = ymfpci_pcm_voice_alloc(ypcm, state->format.voices)) < 0) {
-		/* Cannot be unless we leak voices in ymf_release! */
-		printk(KERN_ERR "ymfpci%d: cannot allocate voice!\n",
-		    codec->dev_audio);
+		/* Somebody started 32 mpg123's in parallel? */
+		/* P3 */ printk("ymfpci%d: cannot allocate voice\n",
+		    state->unit->dev_audio);
 		return err;
 	}
 
@@ -919,101 +951,76 @@ static int ymf_playback_prepare(ymfpci_t *codec, struct ymf_state *state)
 		ymf_pcm_init_voice(ypcm->voices[nvoice],
 		    state->format.voices == 2, state->format.rate,
 		    ymf_pcm_format_width(state->format.format) == 16,
-		    virt_to_bus(state->dmabuf.rawbuf), state->dmabuf.dmasize,
+		    virt_to_bus(ypcm->dmabuf.rawbuf), ypcm->dmabuf.dmasize,
 		    ypcm->spdif);
 	}
 	return 0;
 }
 
-#if 0  /* old */
-static int ymfpci_capture_prepare(void *private_data,
-				      snd_pcm_subchn_t * substream)
+static int ymf_capture_prepare(struct ymf_state *state)
 {
-	ymfpci_t *codec = snd_magic_cast(ymfpci_t, private_data, -ENXIO);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, -ENXIO);
+	ymfpci_t *unit = state->unit;
+	struct ymf_pcm *ypcm = &state->rpcm;
 	ymfpci_capture_bank_t * bank;
-	int nbank;
+	/* XXX This is confusing, gotta rename one of them banks... */
+	int nbank;		/* flip-flop bank */
+	int cbank;		/* input [super-]bank */
+	struct ymf_capture *cap;
 	u32 rate, format;
 
-	ypcm->frag_size = snd_pcm_lib_transfer_fragment(substream);
-	ypcm->buffer_size = snd_pcm_lib_transfer_size(substream);
-	ypcm->frag_pos = 0;
-	ypcm->last_pos = 0;
-	ypcm->shift_offset = 0;
-	rate = ((48000 * 4096) / runtime->format.rate) - 1;
+	if (ypcm->capture_bank_number == -1) {
+		if (ymf_capture_alloc(unit, &cbank) != 0)
+			return -EBUSY;
+
+		ypcm->capture_bank_number = cbank;
+
+		cap = &unit->capture[cbank];
+		cap->bank = unit->bank_capture[cbank][0];
+		cap->ypcm = ypcm;
+		ymfpci_hw_start(unit);
+	}
+
+	// ypcm->frag_size = snd_pcm_lib_transfer_fragment(substream);
+	// frag_size is replaced with nonfragged byte-aligned rolling buffer
+	rate = ((48000 * 4096) / state->format.rate) - 1;
 	format = 0;
-	if (runtime->format.voices == 2)
+	if (state->format.voices == 2)
 		format |= 2;
-	if (snd_pcm_format_width(runtime->format.format) == 8)
+	if (ymf_pcm_format_width(state->format.format) == 8)
 		format |= 1;
 	switch (ypcm->capture_bank_number) {
 	case 0:
-		ymfpci_writel(codec, YDSXGR_RECFORMAT, format);
-		ymfpci_writel(codec, YDSXGR_RECSLOTSR, rate);
+		ymfpci_writel(unit, YDSXGR_RECFORMAT, format);
+		ymfpci_writel(unit, YDSXGR_RECSLOTSR, rate);
 		break;
 	case 1:
-		ymfpci_writel(codec, YDSXGR_ADCFORMAT, format);
-		ymfpci_writel(codec, YDSXGR_ADCSLOTSR, rate);
+		ymfpci_writel(unit, YDSXGR_ADCFORMAT, format);
+		ymfpci_writel(unit, YDSXGR_ADCSLOTSR, rate);
 		break;
 	}
 	for (nbank = 0; nbank < 2; nbank++) {
-		bank = codec->bank_capture[ypcm->capture_bank_number][nbank];
-		bank->base = virt_to_bus(runtime->dma_area->buf);
-		bank->loop_end = ypcm->buffer_size;
+		bank = unit->bank_capture[ypcm->capture_bank_number][nbank];
+		bank->base = virt_to_bus(ypcm->dmabuf.rawbuf);
+		// bank->loop_end = ypcm->dmabuf.dmasize >> state->format.shift;
+		bank->loop_end = ypcm->dmabuf.dmasize;
 		bank->start = 0;
 		bank->num_of_loops = 0;
 	}
-	if (runtime->digital.dig_valid)
-		/*runtime->digital.type == SND_PCM_DIG_AES_IEC958*/
-		ymfpci_writew(codec, YDSXGR_SPDIFOUTSTATUS, runtime->digital.dig_status[0] |
-								(runtime->digital.dig_status[1] << 8));
+#if 0 /* s/pdif */
+	if (state->digital.dig_valid)
+		/*state->digital.type == SND_PCM_DIG_AES_IEC958*/
+		ymfpci_writew(codec, YDSXGR_SPDIFOUTSTATUS,
+		    state->digital.dig_status[0] | (state->digital.dig_status[1] << 8));
+#endif
 	return 0;
 }
-
-static unsigned int ymfpci_playback_pointer(void *private_data,
-						snd_pcm_subchn_t * substream)
-{
-	ymfpci_t *codec = snd_magic_cast(ymfpci_t, private_data, -ENXIO);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, -ENXIO);
-	ymfpci_voice_t *voice = ypcm->voices[0];
-	unsigned long flags;
-	unsigned int result;
-
-	spin_lock_irqsave(&codec->reg_lock, flags);
-	if (ypcm->running && voice)
-		result = voice->bank[codec->active_bank].start << ypcm->shift_offset;
-	else
-		result = 0;
-	spin_unlock_irqrestore(&codec->reg_lock, flags);
-	return result;
-}
-
-static unsigned int ymfpci_capture_pointer(void *private_data,
-					       snd_pcm_subchn_t * substream)
-{
-	ymfpci_t *codec = snd_magic_cast(ymfpci_t, private_data, -ENXIO);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, -ENXIO);
-	unsigned long flags;
-	unsigned int result;
-
-	spin_lock_irqsave(&codec->reg_lock, flags);
-	if (ypcm->running)
-		result = codec->bank_capture[ypcm->capture_bank_number][codec->active_bank]->start << ypcm->shift_offset;
-	else
-		result = 0;
-	spin_unlock_irqrestore(&codec->reg_lock, flags);
-	return result;
-}
-#endif /* old */
 
 void ymf_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ymfpci_t *codec = dev_id;
 	u32 status, nvoice, mode;
-	ymfpci_voice_t *voice;
+	struct ymf_voice *voice;
+	struct ymf_capture *cap;
 
 	status = ymfpci_readl(codec, YDSXGR_STATUS);
 	if (status & 0x80000000) {
@@ -1026,8 +1033,13 @@ void ymf_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		spin_lock(&codec->voice_lock);
 		for (nvoice = 0; nvoice < 64; nvoice++) {
 			voice = &codec->voices[nvoice];
-			if (voice->interrupt)
-				voice->interrupt(codec, voice);
+			if (voice->use)
+				ymf_pcm_interrupt(codec, voice);
+		}
+		for (nvoice = 0; nvoice < 5; nvoice++) {
+			cap = &codec->capture[nvoice];
+			if (cap->use)
+				ymf_cap_interrupt(codec, cap);
 		}
 		spin_unlock(&codec->voice_lock);
 	}
@@ -1039,22 +1051,32 @@ void ymf_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 }
 
-static void ymf_pcm_free_substream(ymfpci_pcm_t *ypcm)
+static void ymf_pcm_free_substream(struct ymf_pcm *ypcm)
 {
-	ymfpci_t *codec;
+	unsigned long flags;
+	struct ymf_unit *unit;
 
-	if (ypcm) {
-		codec = ypcm->codec;
+	unit = ypcm->state->unit;
+
+	if (ypcm->type == PLAYBACK_VOICE) {
+		spin_lock_irqsave(&unit->voice_lock, flags);
 		if (ypcm->voices[1])
-			ymfpci_voice_free(codec, ypcm->voices[1]);
+			ymfpci_voice_free(unit, ypcm->voices[1]);
 		if (ypcm->voices[0])
-			ymfpci_voice_free(codec, ypcm->voices[0]);
+			ymfpci_voice_free(unit, ypcm->voices[0]);
+		spin_unlock_irqrestore(&unit->voice_lock, flags);
+	} else {
+		if (ypcm->capture_bank_number != -1) {
+			unit->capture[ypcm->capture_bank_number].use = 0;
+			ypcm->capture_bank_number = -1;
+			ymfpci_hw_stop(unit);
+		}
 	}
 }
 
-static int ymf_state_alloc(ymfpci_t *unit, int nvirt)
+static struct ymf_state *ymf_state_alloc(ymfpci_t *unit)
 {
-	ymfpci_pcm_t *ypcm;
+	struct ymf_pcm *ypcm;
 	struct ymf_state *state;
 
 	if ((state = kmalloc(sizeof(struct ymf_state), GFP_KERNEL)) == NULL) {
@@ -1062,60 +1084,30 @@ static int ymf_state_alloc(ymfpci_t *unit, int nvirt)
 	}
 	memset(state, 0, sizeof(struct ymf_state));
 
-	init_waitqueue_head(&state->dmabuf.wait);
-
-	ypcm = &state->ypcm;
+	ypcm = &state->wpcm;
 	ypcm->state = state;
-	ypcm->codec = unit;
 	ypcm->type = PLAYBACK_VOICE;
+	ypcm->capture_bank_number = -1;
+	init_waitqueue_head(&ypcm->dmabuf.wait);
+
+	ypcm = &state->rpcm;
+	ypcm->state = state;
+	ypcm->type = CAPTURE_AC97;
+	ypcm->capture_bank_number = -1;
+	init_waitqueue_head(&ypcm->dmabuf.wait);
 
 	state->unit = unit;
-	state->virt = nvirt;
 
 	state->format.format = AFMT_U8;
 	state->format.rate = 8000;
 	state->format.voices = 1;
 	ymf_pcm_update_shift(&state->format);
 
-	unit->states[nvirt] = state;
-	return 0;
+	return state;
 
 out0:
-	return -ENOMEM;
+	return NULL;
 }
-
-#if HAVE_RECORD
-
-static int ymfpci_capture_open(void *private_data,
-				   snd_pcm_subchn_t * substream,
-				   u32 capture_bank_number)
-{
-	ymfpci_t *codec = snd_magic_cast(ymfpci_t, private_data, -ENXIO);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm;
-	int err;
-
-	if ((err = snd_pcm_dma_alloc(substream, !capture_bank_number ? codec->dma2ptr : codec->dma3ptr, "YMFPCI - ADC")) < 0)
-		return err;
-	ypcm = snd_magic_kcalloc(ymfpci_pcm_t, 0, GFP_KERNEL);
-	if (ypcm == NULL) {
-		snd_pcm_dma_free(substream);
-		return -ENOMEM;
-	}
-	ypcm->codec = codec;
-	ypcm->type = capture_bank_number + CAPTURE_REC;
-	ypcm->substream = substream;	
-	ypcm->capture_bank_number = capture_bank_number;
-	codec->capture_substream[capture_bank_number] = substream;
-	runtime->hw = &ymfpci_capture;
-	snd_pcm_set_mixer(substream, codec->mixer->device, codec->ac97->me_capture);
-	runtime->private_data = ypcm;
-	runtime->private_free = ymfpci_pcm_free_substream;
-	ymfpci_hw_start(codec);
-	return 0;
-}
-
-#endif  /* old */
 
 /* AES/IEC958 channel status bits */
 #define SND_PCM_AES0_PROFESSIONAL	(1<<0)	/* 0 = consumer, 1 = professional */
@@ -1202,24 +1194,6 @@ static int ymfpci_capture_open(void *private_data,
 #define SND_PCM_AES3_CON_CLOCK_50PPM	(1<<4)	/* 50 ppm */
 #define SND_PCM_AES3_CON_CLOCK_VARIABLE	(2<<4)	/* variable pitch */
 
-#if HAVE_RECORD  /* old */
-
-static int ymfpci_capture_close(void *private_data,
-				    snd_pcm_subchn_t * substream)
-{
-	ymfpci_t *codec = snd_magic_cast(ymfpci_t, private_data, -ENXIO);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, -ENXIO);
-
-	if (ypcm != NULL) {
-		codec->capture_substream[ypcm->capture_bank_number] = NULL;
-		ymfpci_hw_stop(codec);
-	}
-	snd_pcm_dma_free(substream);
-	return 0;
-}
-#endif
-
 /*
  * User interface
  */
@@ -1229,21 +1203,21 @@ static loff_t ymf_llseek(struct file *file, loff_t offset, int origin)
 	return -ESPIPE;
 }
 
-/* in this loop, dmabuf.count signifies the amount of data that is waiting to be copied to
-   the user's buffer.  it is filled by the dma machine and drained by this loop. */
-static ssize_t ymf_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+/*
+ * in this loop, dmabuf.count signifies the amount of data that is
+ * waiting to be copied to the user's buffer.  it is filled by the dma
+ * machine and drained by this loop.
+ */
+static ssize_t
+ymf_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
 {
-#if HAVE_RECORD
-	struct cs_state *state = (struct cs_state *)file->private_data;
-	struct dmabuf *dmabuf = &state->dmabuf;
+	struct ymf_state *state = (struct ymf_state *)file->private_data;
+	struct ymf_dmabuf *dmabuf = &state->rpcm.dmabuf;
+	DECLARE_WAITQUEUE(waita, current);
 	ssize_t ret;
 	unsigned long flags;
-	unsigned swptr;
-	int cnt;
-
-#ifdef DEBUG
-	printk("cs461x: cs_read called, count = %d\n", count);
-#endif
+	unsigned int swptr;
+	int cnt;			/* This many to go in this revolution */
 
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
@@ -1255,19 +1229,14 @@ static ssize_t ymf_read(struct file *file, char *buffer, size_t count, loff_t *p
 		return -EFAULT;
 	ret = 0;
 
+	add_wait_queue(&dmabuf->wait, &waita);
 	while (count > 0) {
-		spin_lock_irqsave(&state->card->lock, flags);
-		if (dmabuf->count > (signed) dmabuf->dmasize) {
-			/* buffer overrun, we are recovering from sleep_on_timeout,
-			   resync hwptr and swptr, make process flush the buffer */
-			dmabuf->count = dmabuf->dmasize;
-			dmabuf->swptr = dmabuf->hwptr;
-		}
+		spin_lock_irqsave(&state->unit->reg_lock, flags);
 		swptr = dmabuf->swptr;
 		cnt = dmabuf->dmasize - swptr;
 		if (dmabuf->count < cnt)
 			cnt = dmabuf->count;
-		spin_unlock_irqrestore(&state->card->lock, flags);
+		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 
 		if (cnt > count)
 			cnt = count;
@@ -1275,14 +1244,18 @@ static ssize_t ymf_read(struct file *file, char *buffer, size_t count, loff_t *p
 			unsigned long tmo;
 			/* buffer is empty, start the dma machine and wait for data to be
 			   recorded */
-			start_adc(state);
+			spin_lock_irqsave(&state->unit->reg_lock, flags);
+			if (!state->rpcm.running) {
+				ymf_capture_trigger(state->unit, &state->rpcm, 1);
+			}
+			spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret) ret = -EAGAIN;
-				return ret;
+				break;
 			}
 			/* This isnt strictly right for the 810  but it'll do */
-			tmo = (dmabuf->dmasize * HZ) / (dmabuf->rate * 2);
-			tmo >>= sample_shift[dmabuf->fmt];
+			tmo = (dmabuf->dmasize * HZ) / (state->format.rate * 2);
+			tmo >>= state->format.shift;
 			/* There are two situations when sleep_on_timeout returns, one is when
 			   the interrupt is serviced correctly and the process is waked up by
 			   ISR ON TIME. Another is when timeout is expired, which means that
@@ -1290,50 +1263,56 @@ static ssize_t ymf_read(struct file *file, char *buffer, size_t count, loff_t *p
 			   is TOO LATE for the process to be scheduled to run (scheduler latency)
 			   which results in a (potential) buffer overrun. And worse, there is
 			   NOTHING we can do to prevent it. */
-			if (!interruptible_sleep_on_timeout(&dmabuf->wait, tmo)) {
-#ifdef DEBUG
-				printk(KERN_ERR "cs461x: recording schedule timeout, "
-				       "dmasz %u fragsz %u count %i hwptr %u swptr %u\n",
-				       dmabuf->dmasize, dmabuf->fragsize, dmabuf->count,
-				       dmabuf->hwptr, dmabuf->swptr);
-#endif
-				/* a buffer overrun, we delay the recovery untill next time the
-				   while loop begin and we REALLY have space to record */
+			set_current_state(TASK_INTERRUPTIBLE);
+			tmo = schedule_timeout(tmo);
+			spin_lock_irqsave(&state->unit->reg_lock, flags);
+			if (tmo == 0 && dmabuf->count == 0) {
+				printk(KERN_ERR "ymfpci%d: recording schedule timeout, "
+				    "dmasz %u fragsz %u count %i hwptr %u swptr %u\n",
+				    state->unit->dev_audio,
+				    dmabuf->dmasize, dmabuf->fragsize, dmabuf->count,
+				    dmabuf->hwptr, dmabuf->swptr);
 			}
+			spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 			if (signal_pending(current)) {
 				ret = ret ? ret : -ERESTARTSYS;
-				return ret;
+				break;
 			}
 			continue;
 		}
 
 		if (copy_to_user(buffer, dmabuf->rawbuf + swptr, cnt)) {
 			if (!ret) ret = -EFAULT;
-			return ret;
+			break;
 		}
 
 		swptr = (swptr + cnt) % dmabuf->dmasize;
 
-		spin_lock_irqsave(&state->card->lock, flags);
+		spin_lock_irqsave(&state->unit->reg_lock, flags);
 		dmabuf->swptr = swptr;
 		dmabuf->count -= cnt;
-		spin_unlock_irqrestore(&state->card->lock, flags);
+		// spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 
 		count -= cnt;
 		buffer += cnt;
 		ret += cnt;
-		start_adc(state);
+		// spin_lock_irqsave(&state->unit->reg_lock, flags);
+		if (!state->rpcm.running) {
+			ymf_capture_trigger(state->unit, &state->rpcm, 1);
+		}
+		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 	}
+	set_current_state(TASK_RUNNING);
+	remove_wait_queue(&dmabuf->wait, &waita);
+
 	return ret;
-#else
-	return -EINVAL;
-#endif
 }
 
-static ssize_t ymf_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t
+ymf_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
 {
 	struct ymf_state *state = (struct ymf_state *)file->private_data;
-	struct ymf_dmabuf *dmabuf = &state->dmabuf;
+	struct ymf_dmabuf *dmabuf = &state->wpcm.dmabuf;
 	DECLARE_WAITQUEUE(waita, current);
 	ssize_t ret;
 	unsigned long flags;
@@ -1375,7 +1354,7 @@ static ssize_t ymf_write(struct file *file, const char *buffer, size_t count, lo
 		}
 		if (dmabuf->count == 0) {
 			swptr = dmabuf->hwptr;
-			if (state->ypcm.running) {
+			if (state->wpcm.running) {
 				/*
 				 * Add uncertainty reserve.
 				 */
@@ -1410,8 +1389,8 @@ static ssize_t ymf_write(struct file *file, const char *buffer, size_t count, lo
 			 * wait for data to be played
 			 */
 			spin_lock_irqsave(&state->unit->reg_lock, flags);
-			if (!state->ypcm.running) {
-				ymf_playback_trigger(state->unit, &state->ypcm, 1);
+			if (!state->wpcm.running) {
+				ymf_playback_trigger(state->unit, &state->wpcm, 1);
 			}
 			spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 			if (file->f_flags & O_NONBLOCK) {
@@ -1448,8 +1427,8 @@ static ssize_t ymf_write(struct file *file, const char *buffer, size_t count, lo
 		 */
 		delay = state->format.rate / 20;	/* 50ms */
 		delay <<= state->format.shift;
-		if (dmabuf->count >= delay && !state->ypcm.running) {
-			ymf_playback_trigger(state->unit, &state->ypcm, 1);
+		if (dmabuf->count >= delay && !state->wpcm.running) {
+			ymf_playback_trigger(state->unit, &state->wpcm, 1);
 		}
 
 		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
@@ -1469,19 +1448,23 @@ static ssize_t ymf_write(struct file *file, const char *buffer, size_t count, lo
 static unsigned int ymf_poll(struct file *file, struct poll_table_struct *wait)
 {
 	struct ymf_state *state = (struct ymf_state *)file->private_data;
-	struct ymf_dmabuf *dmabuf = &state->dmabuf;
+	struct ymf_dmabuf *dmabuf;
 	unsigned long flags;
 	unsigned int mask = 0;
 
-	if (file->f_mode & (FMODE_WRITE | FMODE_READ))
-		poll_wait(file, &dmabuf->wait, wait);
+	if (file->f_mode & FMODE_WRITE)
+		poll_wait(file, &state->wpcm.dmabuf.wait, wait);
+	// if (file->f_mode & FMODE_READ)
+	// 	poll_wait(file, &dmabuf->wait, wait);
 
 	spin_lock_irqsave(&state->unit->reg_lock, flags);
 	if (file->f_mode & FMODE_READ) {
+		dmabuf = &state->rpcm.dmabuf;
 		if (dmabuf->count >= (signed)dmabuf->fragsize)
 			mask |= POLLIN | POLLRDNORM;
 	}
 	if (file->f_mode & FMODE_WRITE) {
+		dmabuf = &state->wpcm.dmabuf;
 		if (dmabuf->mapped) {
 			if (dmabuf->count >= (signed)dmabuf->fragsize)
 				mask |= POLLOUT | POLLWRNORM;
@@ -1498,10 +1481,9 @@ static unsigned int ymf_poll(struct file *file, struct poll_table_struct *wait)
 static int ymf_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct ymf_state *state = (struct ymf_state *)file->private_data;
-	struct ymf_dmabuf *dmabuf = &state->dmabuf;
+	struct ymf_dmabuf *dmabuf = &state->wpcm.dmabuf;
 	int ret;
 	unsigned long size;
-	
 
 	if (vma->vm_flags & VM_WRITE) {
 		if ((ret = prog_dmabuf(state, 0)) != 0)
@@ -1529,7 +1511,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
     unsigned int cmd, unsigned long arg)
 {
 	struct ymf_state *state = (struct ymf_state *)file->private_data;
-	struct ymf_dmabuf *dmabuf = &state->dmabuf;
+	struct ymf_dmabuf *dmabuf;
 	unsigned long flags;
 	audio_buf_info abinfo;
 	count_info cinfo;
@@ -1542,28 +1524,30 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
 			ymf_wait_dac(state);
+			dmabuf = &state->wpcm.dmabuf;
 			spin_lock_irqsave(&state->unit->reg_lock, flags);
 			dmabuf->ready = 0;
-			dmabuf->swptr = dmabuf->hwptr = 0;
+			dmabuf->swptr = dmabuf->hwptr;
 			dmabuf->count = dmabuf->total_bytes = 0;
 			spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		}
-#if HAVE_RECORD
 		if (file->f_mode & FMODE_READ) {
-			stop_adc(state);
-			synchronize_irq();
+			ymf_stop_adc(state);
+			dmabuf = &state->rpcm.dmabuf;
+			spin_lock_irqsave(&state->unit->reg_lock, flags);
 			dmabuf->ready = 0;
-			dmabuf->swptr = dmabuf->hwptr = 0;
+			dmabuf->swptr = dmabuf->hwptr;
 			dmabuf->count = dmabuf->total_bytes = 0;
+			spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		}
-#endif
 		return 0;
 
 	case SNDCTL_DSP_SYNC:
 		if (file->f_mode & FMODE_WRITE) {
+			dmabuf = &state->wpcm.dmabuf;
 			if (file->f_flags & O_NONBLOCK) {
 				spin_lock_irqsave(&state->unit->reg_lock, flags);
-				if (dmabuf->count != 0 && !state->ypcm.running) {
+				if (dmabuf->count != 0 && !state->wpcm.running) {
 					ymf_start_dac(state);
 				}
 				spin_unlock_irqrestore(&state->unit->reg_lock, flags);
@@ -1571,6 +1555,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 				ymf_wait_dac(state);
 			}
 		}
+		/* XXX What does this do for reading? dmabuf->count=0; ? */
 		return 0;
 
 	case SNDCTL_DSP_SPEED: /* set smaple rate */
@@ -1579,17 +1564,22 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		if (val >= 8000 && val <= 48000) {
 			if (file->f_mode & FMODE_WRITE) {
 				ymf_wait_dac(state);
+				dmabuf = &state->wpcm.dmabuf;
+				spin_lock_irqsave(&state->unit->reg_lock, flags);
+				dmabuf->ready = 0;
+				state->format.rate = val;
+				ymf_pcm_update_shift(&state->format);
+				spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 			}
-#if HAVE_RECORD
 			if (file->f_mode & FMODE_READ) {
-				stop_adc(state);
+				ymf_stop_adc(state);
+				dmabuf = &state->rpcm.dmabuf;
+				spin_lock_irqsave(&state->unit->reg_lock, flags);
+				dmabuf->ready = 0;
+				state->format.rate = val;
+				ymf_pcm_update_shift(&state->format);
+				spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 			}
-#endif
-			spin_lock_irqsave(&state->unit->reg_lock, flags);
-			dmabuf->ready = 0;
-			state->format.rate = val;
-			ymf_pcm_update_shift(&state->format);
-			spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		}
 		return put_user(state->format.rate, (int *)arg);
 
@@ -1597,41 +1587,41 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	 * OSS manual does not mention SNDCTL_DSP_STEREO at all.
 	 * All channels are mono and if you want stereo, you
 	 * play into two channels with SNDCTL_DSP_CHANNELS.
-	 * However, mpg123 uses it. I wonder, why Michael Hipp uses it.
+	 * However, mpg123 calls it. I wonder, why Michael Hipp used it.
 	 */
 	case SNDCTL_DSP_STEREO: /* set stereo or mono channel */
 		if (get_user(val, (int *)arg))
 			return -EFAULT;
 		if (file->f_mode & FMODE_WRITE) {
 			ymf_wait_dac(state); 
+			dmabuf = &state->wpcm.dmabuf;
 			spin_lock_irqsave(&state->unit->reg_lock, flags);
 			dmabuf->ready = 0;
 			state->format.voices = val ? 2 : 1;
 			ymf_pcm_update_shift(&state->format);
 			spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		}
-#if HAVE_RECORD
 		if (file->f_mode & FMODE_READ) {
-			/* stop_adc(state); */
+			ymf_stop_adc(state);
+			dmabuf = &state->rpcm.dmabuf;
+			spin_lock_irqsave(&state->unit->reg_lock, flags);
 			dmabuf->ready = 0;
-			if(val)
-				dmabuf->fmt |= CS_FMT_STEREO;
-			else
-				dmabuf->fmt &= ~CS_FMT_STEREO;
+			state->format.voices = val ? 2 : 1;
+			ymf_pcm_update_shift(&state->format);
+			spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		}
-#endif
 		return 0;
 
 	case SNDCTL_DSP_GETBLKSIZE:
 		if (file->f_mode & FMODE_WRITE) {
 			if ((val = prog_dmabuf(state, 0)))
 				return val;
-			return put_user(dmabuf->fragsize, (int *)arg);
+			return put_user(state->wpcm.dmabuf.fragsize, (int *)arg);
 		}
 		if (file->f_mode & FMODE_READ) {
 			if ((val = prog_dmabuf(state, 1)))
 				return val;
-			return put_user(dmabuf->fragsize, (int *)arg);
+			return put_user(state->rpcm.dmabuf.fragsize, (int *)arg);
 		}
 		return -EINVAL;
 
@@ -1644,17 +1634,22 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		if (val == AFMT_S16_LE || val == AFMT_U8) {
 			if (file->f_mode & FMODE_WRITE) {
 				ymf_wait_dac(state);
+				dmabuf = &state->wpcm.dmabuf;
+				spin_lock_irqsave(&state->unit->reg_lock, flags);
+				dmabuf->ready = 0;
+				state->format.format = val;
+				ymf_pcm_update_shift(&state->format);
+				spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 			}
-#if HAVE_RECORD
 			if (file->f_mode & FMODE_READ) {
-				stop_adc(state);
+				ymf_stop_adc(state);
+				dmabuf = &state->rpcm.dmabuf;
+				spin_lock_irqsave(&state->unit->reg_lock, flags);
+				dmabuf->ready = 0;
+				state->format.format = val;
+				ymf_pcm_update_shift(&state->format);
+				spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 			}
-#endif
-			spin_lock_irqsave(&state->unit->reg_lock, flags);
-			dmabuf->ready = 0;
-			state->format.format = val;
-			ymf_pcm_update_shift(&state->format);
-			spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		}
 		return put_user(state->format.format, (int *)arg);
 
@@ -1667,20 +1662,24 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 				ymf_wait_dac(state);
 				if (val == 1 || val == 2) {
 					spin_lock_irqsave(&state->unit->reg_lock, flags);
+					dmabuf = &state->wpcm.dmabuf;
 					dmabuf->ready = 0;
 					state->format.voices = val;
 					ymf_pcm_update_shift(&state->format);
 					spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 				}
 			}
-#if HAVE_RECORD
 			if (file->f_mode & FMODE_READ) {
-				spin_lock_irqsave(&state->unit->reg_lock, flags);
-				stop_adc(state);
-				dmabuf->ready = 0;
-				spin_unlock_irqrestore(&state->unit->reg_lock, flags);
+				ymf_stop_adc(state);
+				if (val == 1 || val == 2) {
+					spin_lock_irqsave(&state->unit->reg_lock, flags);
+					dmabuf = &state->rpcm.dmabuf;
+					dmabuf->ready = 0;
+					state->format.voices = val;
+					ymf_pcm_update_shift(&state->format);
+					spin_unlock_irqrestore(&state->unit->reg_lock, flags);
+				}
 			}
-#endif
 		}
 		return put_user(state->format.voices, (int *)arg);
 
@@ -1696,15 +1695,16 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		 * The paragraph above is a clumsy way to say "flush ioctl".
 		 * This ioctl is used by mpg123.
 		 */
-	/* P3 */ /* printk("ymfpci: ioctl SNDCTL_DSP_POST\n"); */
 		spin_lock_irqsave(&state->unit->reg_lock, flags);
-		if (dmabuf->count != 0 && !state->ypcm.running) {
+		if (state->wpcm.dmabuf.count != 0 && !state->wpcm.running) {
 			ymf_start_dac(state);
 		}
 		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		return 0;
 
+#if 0 /* XXX Was dummy implementation anyways. Make sense of this. */
 	case SNDCTL_DSP_SUBDIVIDE:
+		dmabuf = &state->wpcm.dmabuf;
 		if (dmabuf->subdivision)
 			return -EINVAL;
 		if (get_user(val, (int *)arg))
@@ -1713,6 +1713,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 			return -EINVAL;
 		dmabuf->subdivision = val;
 		return 0;
+#endif
 
 	case SNDCTL_DSP_SETFRAGMENT:
 		if (get_user(val, (int *)arg))
@@ -1720,6 +1721,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	/* P3: these frags are for Doom. Amasingly, it sets [2,2**11]. */
 	/* P3 */ // printk("ymfpci: ioctl SNDCTL_DSP_SETFRAGMENT 0x%x\n", val);
 
+		dmabuf = &state->wpcm.dmabuf;
 		dmabuf->ossfragshift = val & 0xffff;
 		dmabuf->ossmaxfrags = (val >> 16) & 0xffff;
 		switch (dmabuf->ossmaxfrags) {
@@ -1736,10 +1738,10 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	case SNDCTL_DSP_GETOSPACE:
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;
+		dmabuf = &state->wpcm.dmabuf;
 		if (!dmabuf->ready && (val = prog_dmabuf(state, 0)) != 0)
 			return val;
 		spin_lock_irqsave(&state->unit->reg_lock, flags);
-		/* cs_update_ptr(state); */  /* XXX Always up to date? */
 		abinfo.fragsize = dmabuf->fragsize;
 		abinfo.bytes = dmabuf->dmasize - dmabuf->count;
 		abinfo.fragstotal = dmabuf->numfrag;
@@ -1747,21 +1749,19 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
-#if HAVE_RECORD
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
 			return -EINVAL;
+		dmabuf = &state->rpcm.dmabuf;
 		if (!dmabuf->ready && (val = prog_dmabuf(state, 1)) != 0)
 			return val;
-		spin_lock_irqsave(&state->card->lock, flags);
-		cs_update_ptr(state);
+		spin_lock_irqsave(&state->unit->reg_lock, flags);
 		abinfo.fragsize = dmabuf->fragsize;
 		abinfo.bytes = dmabuf->count;
 		abinfo.fragstotal = dmabuf->numfrag;
 		abinfo.fragments = abinfo.bytes >> dmabuf->fragshift;
-		spin_unlock_irqrestore(&state->card->lock, flags);
+		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
-#endif
 
 	case SNDCTL_DSP_NONBLOCK:
 		file->f_flags |= O_NONBLOCK;
@@ -1772,9 +1772,10 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 			    (int *)arg); */
 		return put_user(0, (int *)arg);
 
-#if 0 /* old */
+#if 0 /* not implememnted, yet? */
 	case SNDCTL_DSP_GETTRIGGER:
 		val = 0;
+		dmabuf = &state->wpcm.dmabuf;
 		if (file->f_mode & FMODE_READ && dmabuf->enable)
 			val |= PCM_ENABLE_INPUT;
 		if (file->f_mode & FMODE_WRITE && dmabuf->enable)
@@ -1785,6 +1786,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		if (get_user(val, (int *)arg))
 			return -EFAULT;
 		if (file->f_mode & FMODE_READ) {
+			dmabuf = &state->rpcm.dmabuf;
 			if (val & PCM_ENABLE_INPUT) {
 				if (!dmabuf->ready && (ret = prog_dmabuf(state, 1)))
 					return ret;
@@ -1793,6 +1795,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 				stop_adc(state);
 		}
 		if (file->f_mode & FMODE_WRITE) {
+			dmabuf = &state->wpcm.dmabuf;
 			if (val & PCM_ENABLE_OUTPUT) {
 				if (!dmabuf->ready && (ret = prog_dmabuf(state, 0)))
 					return ret;
@@ -1801,48 +1804,48 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 				stop_dac(state);
 		}
 		return 0;
-
 #endif
 
-#if HAVE_RECORD
 	case SNDCTL_DSP_GETIPTR:
 		if (!(file->f_mode & FMODE_READ))
 			return -EINVAL;
+		dmabuf = &state->rpcm.dmabuf;
 		spin_lock_irqsave(&state->unit->reg_lock, flags);
-		cs_update_ptr(state);
 		cinfo.bytes = dmabuf->total_bytes;
 		cinfo.blocks = dmabuf->count >> dmabuf->fragshift;
 		cinfo.ptr = dmabuf->hwptr;
+		/* XXX fishy - breaks invariant  count=hwptr-swptr */
 		if (dmabuf->mapped)
 			dmabuf->count &= dmabuf->fragsize-1;
 		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
-#endif
+		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETOPTR:
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;
+		dmabuf = &state->wpcm.dmabuf;
 		spin_lock_irqsave(&state->unit->reg_lock, flags);
-		/* cs_update_ptr(state); */  /* Always up to date */
 		cinfo.bytes = dmabuf->total_bytes;
 		cinfo.blocks = dmabuf->count >> dmabuf->fragshift;
 		cinfo.ptr = dmabuf->hwptr;
+		/* XXX fishy - breaks invariant  count=swptr-hwptr */
 		if (dmabuf->mapped)
 			dmabuf->count &= dmabuf->fragsize-1;
 		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_SETDUPLEX:	/* XXX TODO */
 		return -EINVAL;
 
-#if 0 /* old */
+#if 0 /* XXX implement when an app found that uses it. */
 	case SNDCTL_DSP_GETODELAY:
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;
 		spin_lock_irqsave(&state->unit->reg_lock, flags);
 		cs_update_ptr(state);
+		dmabuf = &state->wpcm.dmabuf;
 		val = dmabuf->count;
-		spin_unlock_irqrestore(&state->card->lock, flags);
+		spin_unlock_irqrestore(&state->unit->reg_lock, flags);
 		return put_user(val, (int *)arg);
 #endif
 
@@ -1850,7 +1853,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		return put_user(state->format.rate, (int *)arg);
 
 	case SOUND_PCM_READ_CHANNELS:
-		return put_user(state->format.voices,	(int *)arg);
+		return put_user(state->format.voices, (int *)arg);
 
 	case SOUND_PCM_READ_BITS:
 		return put_user(AFMT_S16_LE, (int *)arg);
@@ -1873,28 +1876,25 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	return -ENOTTY;
 }
 
+/*
+ * open(2)
+ * We use upper part of the minor to distinguish between soundcards.
+ * Channels are opened with a clone open.
+ */
 static int ymf_open(struct inode *inode, struct file *file)
 {
 	struct list_head *list;
 	ymfpci_t *unit;
 	int minor;
 	struct ymf_state *state;
-	int nvirt;
 	int err;
 
-	/*
-	 * This is how we do it currently: only one channel is used
-	 * in every board, so that we could use several boards in one machine.
-	 * We waste 63 out of 64 playback slots, but so what.
-	 * OSS model is constructed for devices with single playback channel.
-	 */
 	minor = MINOR(inode->i_rdev);
 	if ((minor & 0x0F) == 3) {	/* /dev/dspN */
 		;
 	} else {
 		return -ENXIO;
 	}
-	nvirt = 0;			/* Such is the partitioning of minor */
 
 	for (list = ymf_devs.next; list != &ymf_devs; list = list->next) {
 		unit = list_entry(list, ymfpci_t, ymf_devs);
@@ -1905,34 +1905,36 @@ static int ymf_open(struct inode *inode, struct file *file)
 		return -ENODEV;
 
 	down(&unit->open_sem);
-	if (unit->states[nvirt] != NULL) {
-		up(&unit->open_sem);
-		return -EBUSY;
-	}
 
-	if ((err = ymf_state_alloc(unit, nvirt)) != 0) {
+	if ((state = ymf_state_alloc(unit)) == NULL) {
 		up(&unit->open_sem);
-		return err;
+		return -ENOMEM;
 	}
-	state = unit->states[nvirt];
+	list_add_tail(&state->chain, &unit->states);
 
 	file->private_data = state;
 
 	/*
-	 * XXX This ymf_playback_prepare is totally unneeded here.
-	 * The question is if we want to allow write to fail if
-	 * prog_dmabuf fails... Say, no memory in DMA zone?
+	 * ymf_read and ymf_write that we borrowed from cs46xx
+	 * allocate buffers with prog_dmabuf(). We call prog_dmabuf
+	 * here so that in case of DMA memory exhaustion open
+	 * fails rather than write.
+	 *
+	 * XXX prog_dmabuf allocates voice. Should allocate explicitly, above.
 	 */
-	if ((err = ymf_playback_prepare(unit, state)) != 0) {
-		/* XXX This recovery is ugly as hell. */
-
-		ymf_pcm_free_substream(&state->ypcm);
-
-		unit->states[state->virt] = NULL;
-		kfree(state);
-
-		up(&unit->open_sem);
-		return err;
+	if (file->f_mode & FMODE_WRITE) {
+		if (!state->wpcm.dmabuf.ready) {
+			if ((err = prog_dmabuf(state, 0)) != 0) {
+				goto out_nodma;
+			}
+		}
+	}
+	if (file->f_mode & FMODE_READ) {
+		if (!state->rpcm.dmabuf.ready) {
+			if ((err = prog_dmabuf(state, 1)) != 0) {
+				goto out_nodma;
+			}
+		}
 	}
 
 #if 0 /* test if interrupts work */
@@ -1941,10 +1943,26 @@ static int ymf_open(struct inode *inode, struct file *file)
 	    (YDSXGR_TIMERCTRL_TEN|YDSXGR_TIMERCTRL_TIEN));
 #endif
 	up(&unit->open_sem);
-	/* XXX Is it correct to have MOD_INC_USE_COUNT outside of sem.? */
 
 	MOD_INC_USE_COUNT;
 	return 0;
+
+out_nodma:
+	/*
+	 * XXX Broken custom: "goto out_xxx" in other place is
+	 * a nestable exception, but here it is not nestable due to semaphore.
+	 * XXX Doubtful technique of self-describing objects....
+	 */
+	dealloc_dmabuf(&state->wpcm.dmabuf);
+	dealloc_dmabuf(&state->rpcm.dmabuf);
+	ymf_pcm_free_substream(&state->wpcm);
+	ymf_pcm_free_substream(&state->rpcm);
+
+	list_del(&state->chain);
+	kfree(state);
+
+	up(&unit->open_sem);
+	return err;
 }
 
 static int ymf_release(struct inode *inode, struct file *file)
@@ -1956,12 +1974,6 @@ static int ymf_release(struct inode *inode, struct file *file)
 	ymfpci_writeb(codec, YDSXGR_TIMERCTRL, 0);
 #endif
 
-	if (state != codec->states[state->virt]) {
-		printk(KERN_ERR "ymfpci%d.%d: state mismatch\n",
-		    state->unit->dev_audio, state->virt);
-		return -EIO;
-	}
-
 	down(&codec->open_sem);
 
 	/*
@@ -1969,10 +1981,14 @@ static int ymf_release(struct inode *inode, struct file *file)
 	 * Deallocate when unloading the driver and we can wait.
 	 */
 	ymf_wait_dac(state);
-	dealloc_dmabuf(state);
-	ymf_pcm_free_substream(&state->ypcm);
+	ymf_stop_adc(state);		/* fortunately, it's immediate */
+	dealloc_dmabuf(&state->wpcm.dmabuf);
+	dealloc_dmabuf(&state->rpcm.dmabuf);
+	ymf_pcm_free_substream(&state->wpcm);
+	ymf_pcm_free_substream(&state->rpcm);
 
-	codec->states[state->virt] = NULL;
+	list_del(&state->chain);
+	file->private_data = NULL;	/* Can you tell I programmed Solaris */
 	kfree(state);
 
 	up(&codec->open_sem);
@@ -2044,6 +2060,83 @@ static /*const*/ struct file_operations ymf_mixer_fops = {
 /*
  *  initialization routines
  */
+
+#ifdef CONFIG_SOUND_YMFPCI_LEGACY
+
+static int ymfpci_setup_legacy(ymfpci_t *unit, struct pci_dev *pcidev)
+{
+	int v;
+	int mpuio = -1, oplio = -1;
+
+	switch (unit->iomidi) {
+	case 0x330:
+		mpuio = 0;
+		break;
+	case 0x300:
+		mpuio = 1;
+		break;
+	case 0x332:
+		mpuio = 2;
+		break;
+	case 0x334:
+		mpuio = 3;
+		break;
+	default: ;
+	}
+
+	switch (unit->iosynth) {
+	case 0x388:
+		oplio = 0;
+		break;
+	case 0x398:
+		oplio = 1;
+		break;
+	case 0x3a0:
+		oplio = 2;
+		break;
+	case 0x3a8:
+		oplio = 3;
+		break;
+	default: ;
+	}
+
+	if (mpuio >= 0 || oplio >= 0) {
+		v = 0x003e;
+		pci_write_config_word(pcidev, PCIR_LEGCTRL, v);
+	
+		switch (pcidev->device) {
+		case PCI_DEVICE_ID_YAMAHA_724:
+		case PCI_DEVICE_ID_YAMAHA_740:
+		case PCI_DEVICE_ID_YAMAHA_724F:
+		case PCI_DEVICE_ID_YAMAHA_740C:
+			v = 0x8800;
+			if (mpuio >= 0) { v |= mpuio<<4; }
+			if (oplio >= 0) { v |= oplio; }
+			pci_write_config_word(pcidev, PCIR_ELEGCTRL, v);
+			break;
+
+		case PCI_DEVICE_ID_YAMAHA_744:
+		case PCI_DEVICE_ID_YAMAHA_754:
+			v = 0x8800;
+			pci_write_config_word(pcidev, PCIR_ELEGCTRL, v);
+			if (oplio >= 0) {
+				pci_write_config_word(pcidev, PCIR_OPLADR, unit->iosynth);
+			}
+			if (mpuio >= 0) {
+				pci_write_config_word(pcidev, PCIR_MPUADR, unit->iomidi);
+			}
+			break;
+
+		default:
+			printk(KERN_ERR "ymfpci: Unknown device ID: 0x%x\n",
+			    pcidev->device);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+#endif /* CONFIG_SOUND_YMFPCI_LEGACY */
 
 static void ymfpci_aclink_reset(struct pci_dev * pci)
 {
@@ -2149,6 +2242,12 @@ static int ymfpci_memalloc(ymfpci_t *codec)
 	ptr += 0x00ff;
 	(long)ptr &= ~0x00ff;
 
+	/*
+	 * Hardware requires only ptr[playback_ctrl_size] zeroed,
+	 * but in our judgement it is a wrong kind of savings, so clear it all.
+	 */
+	memset(ptr, 0, size);
+
 	codec->bank_base_playback = ptr;
 	codec->ctrl_playback = (u32 *)ptr;
 	codec->ctrl_playback[0] = YDSXG_PLAYBACK_VOICES;
@@ -2213,7 +2312,7 @@ static void ymfpci_memfree(ymfpci_t *codec)
 	kfree(codec->work_ptr);
 }
 
-static int ymf_ac97_init(ymfpci_t *card, int num_ac97)
+static int ymf_ac97_init(ymfpci_t *unit, int num_ac97)
 {
 	struct ac97_codec *codec;
 	u16 eid;
@@ -2224,7 +2323,7 @@ static int ymf_ac97_init(ymfpci_t *card, int num_ac97)
 
 	/* initialize some basic codec information, other fields will be filled
 	   in ac97_probe_codec */
-	codec->private_data = card;
+	codec->private_data = unit;
 	codec->id = num_ac97;
 
 	codec->codec_read = ymfpci_codec_read;
@@ -2241,20 +2340,33 @@ static int ymf_ac97_init(ymfpci_t *card, int num_ac97)
 		goto out_kfree;
 	}
 
-	card->ac97_features = eid;
+	unit->ac97_features = eid;
 
 	if ((codec->dev_mixer = register_sound_mixer(&ymf_mixer_fops, -1)) < 0) {
 		printk(KERN_ERR "ymfpci: couldn't register mixer!\n");
 		goto out_kfree;
 	}
 
-	card->ac97_codec[num_ac97] = codec;
+	unit->ac97_codec[num_ac97] = codec;
 
 	return 0;
  out_kfree:
 	kfree(codec);
 	return -ENODEV;
 }
+
+#ifdef CONFIG_SOUND_YMFPCI_LEGACY
+# ifdef MODULE
+static int mpu_io     = 0;
+static int synth_io   = 0;
+MODULE_PARM(mpu_io, "i");
+MODULE_PARM(synth_io, "i");
+# else
+static int mpu_io     = 0x330;
+static int synth_io   = 0x388;
+# endif
+static int assigned;
+#endif /* CONFIG_SOUND_YMFPCI_LEGACY */
 
 static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_device_id *ent)
 {
@@ -2277,10 +2389,15 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
 	spin_lock_init(&codec->reg_lock);
 	spin_lock_init(&codec->voice_lock);
 	init_MUTEX(&codec->open_sem);
+	INIT_LIST_HEAD(&codec->states);
 	codec->pci = pcidev;
 
 	pci_read_config_byte(pcidev, PCI_REVISION_ID, &codec->rev);
 	codec->reg_area_virt = ioremap(pci_resource_start(pcidev, 0), 0x8000);
+	if (codec->reg_area_virt == NULL) {
+		printk(KERN_ERR "ymfpci: unable to map registers\n");
+		goto out_free;
+	}
 
 	printk(KERN_INFO "ymfpci: %s at 0x%lx IRQ %d\n",
 	    (char *)ent->driver_data, pci_resource_start(pcidev, 0), pcidev->irq);
@@ -2289,6 +2406,16 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
 	if (ymfpci_codec_ready(codec, 0, 1) < 0)
 		goto out_unmap;
 
+#ifdef CONFIG_SOUND_YMFPCI_LEGACY
+	if (assigned == 0) {
+		codec->iomidi = mpu_io;
+		codec->iosynth = synth_io;
+		if (ymfpci_setup_legacy(codec, pcidev) < 0)
+			goto out_unmap;
+		assigned = 1;
+	}
+#endif
+
 	ymfpci_download_image(codec);
 
 	udelay(100); /* seems we need some delay after downloading image.. */
@@ -2296,11 +2423,11 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
 	if (ymfpci_memalloc(codec) < 0)
 		goto out_disable_dsp;
 
-	/* ymfpci_proc_init(card, codec); */
+	/* ymfpci_proc_init(unit, codec); */
 
 	if (request_irq(pcidev->irq, ymf_interrupt, SA_SHIRQ, "ymfpci", codec) != 0) {
-		printk(KERN_ERR "ymfpci%d: unable to request IRQ %d\n",
-		       codec->dev_audio, pcidev->irq);
+		printk(KERN_ERR "ymfpci: unable to request IRQ %d\n",
+		    pcidev->irq);
 		goto out_memfree;
 	}
 
@@ -2316,6 +2443,23 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
 	 */
 	if ((err = ymf_ac97_init(codec, 0)) != 0)
 		goto out_unregister_sound_dsp;
+
+#ifdef CONFIG_SOUND_YMFPCI_LEGACY
+	codec->opl3_data.name = "ymfpci";
+	codec->mpu_data.name  = "ymfpci";
+
+	codec->opl3_data.io_base = codec->iosynth;
+	codec->opl3_data.irq     = -1;
+
+	codec->mpu_data.io_base  = codec->iomidi;
+	codec->mpu_data.irq      = -1;	/* XXX Make it ours. */
+
+	if (codec->iomidi) {
+		if (!probe_uart401(&codec->mpu_data, THIS_MODULE)) {
+			codec->iomidi = 0;	/* XXX kludge */
+		}
+	}
+#endif /* CONFIG_SOUND_YMFPCI_LEGACY */
 
 	/* put it into driver list */
 	list_add_tail(&codec->ymf_devs, &ymf_devs);
@@ -2336,6 +2480,7 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
 	ymfpci_writel(codec, YDSXGR_STATUS, ~0);
  out_unmap:
 	iounmap(codec->reg_area_virt);
+ out_free:
 	kfree(codec);
 	return -ENODEV;
 }
@@ -2358,6 +2503,11 @@ static void __devexit ymf_remove_one(struct pci_dev *pcidev)
 	ctrl = ymfpci_readw(codec, YDSXGR_GLOBALCTRL);
 	ymfpci_writew(codec, YDSXGR_GLOBALCTRL, ctrl & ~0x0007);
 	iounmap(codec->reg_area_virt);
+#ifdef CONFIG_SOUND_YMFPCI_LEGACY
+	if (codec->iomidi) {
+		unload_uart401(&codec->mpu_data);
+	}
+#endif /* CONFIG_SOUND_YMFPCI_LEGACY */
 	kfree(codec);
 }
 

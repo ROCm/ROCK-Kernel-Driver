@@ -21,7 +21,6 @@
  *					needed cleaned seq-number fields.
  */
 
-#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>

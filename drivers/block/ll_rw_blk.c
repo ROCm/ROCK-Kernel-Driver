@@ -630,15 +630,8 @@ void inline blkdev_release_request(struct request *req)
 		    && atomic_read(&queued_sectors) < low_queued_sectors)
 			wake_up(&blk_buffers_wait);
 
-		if (!list_empty(&q->request_freelist[rw])) {
-			blk_refill_freelist(q, rw);
-			list_add(&req->table, &q->request_freelist[rw]);
-			return;
-		}
-
 		/*
-		 * free list is empty, add to pending free list and
-		 * batch wakeups
+		 * Add to pending free list and batch wakeups
 		 */
 		list_add(&req->table, &q->pending_freelist[rw]);
 

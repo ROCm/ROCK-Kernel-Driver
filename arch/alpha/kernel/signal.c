@@ -30,7 +30,6 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-asmlinkage int sys_wait4(int, int *, int, struct rusage *);
 asmlinkage void ret_from_sys_call(void);
 asmlinkage int do_signal(sigset_t *, struct pt_regs *,
 			 struct switch_stack *, unsigned long, unsigned long);

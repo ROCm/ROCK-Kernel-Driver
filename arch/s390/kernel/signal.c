@@ -52,8 +52,6 @@ typedef struct
 	struct ucontext uc;
 } rt_sigframe;
 
-asmlinkage int sys_wait4(pid_t pid, unsigned long *stat_addr,
-			 int options, unsigned long *ru);
 asmlinkage int FASTCALL(do_signal(struct pt_regs *regs, sigset_t *oldset));
 
 /*

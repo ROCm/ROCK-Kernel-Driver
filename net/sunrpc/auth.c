@@ -267,22 +267,26 @@ rpcauth_holdcred(struct rpc_task *task)
 	dprintk("RPC: %4d holding %s cred %p\n",
 		task->tk_pid, task->tk_auth->au_ops->au_name, task->tk_msg.rpc_cred);
 	if (task->tk_msg.rpc_cred) {
+		spin_lock(&rpc_credcache_lock);
 		task->tk_msg.rpc_cred->cr_count++;
 		task->tk_msg.rpc_cred->cr_expire = jiffies + task->tk_auth->au_expire;
+		spin_unlock(&rpc_credcache_lock);
 	}
 }
 
 void
 rpcauth_releasecred(struct rpc_auth *auth, struct rpc_cred *cred)
 {
+	spin_lock(&rpc_credcache_lock);
 	if (cred != NULL && cred->cr_count > 0) {
-		cred->cr_count--;
-		if (cred->cr_flags & RPCAUTH_CRED_DEAD) {
+		if (!--cred->cr_count && (cred->cr_flags & RPCAUTH_CRED_DEAD)) {
+			spin_unlock(&rpc_credcache_lock);
 			rpcauth_remove_credcache(auth, cred);
-			if (!cred->cr_count)
-				rpcauth_crdestroy(auth, cred);
+			rpcauth_crdestroy(auth, cred);
+			return;
 		}
 	}
+	spin_unlock(&rpc_credcache_lock);
 }
 
 void
@@ -335,13 +339,19 @@ rpcauth_invalcred(struct rpc_task *task)
 {
 	dprintk("RPC: %4d invalidating %s cred %p\n",
 		task->tk_pid, task->tk_auth->au_ops->au_name, task->tk_msg.rpc_cred);
+	spin_lock(&rpc_credcache_lock);
 	if (task->tk_msg.rpc_cred)
 		task->tk_msg.rpc_cred->cr_flags &= ~RPCAUTH_CRED_UPTODATE;
+	spin_unlock(&rpc_credcache_lock);
 }
 
 int
 rpcauth_uptodatecred(struct rpc_task *task)
 {
-	return !(task->tk_msg.rpc_cred) ||
+	int retval;
+	spin_lock(&rpc_credcache_lock);
+	retval = !(task->tk_msg.rpc_cred) ||
 		(task->tk_msg.rpc_cred->cr_flags & RPCAUTH_CRED_UPTODATE);
+	spin_unlock(&rpc_credcache_lock);
+	return retval;
 }

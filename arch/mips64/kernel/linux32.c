@@ -585,9 +585,6 @@ put_rusage (struct rusage32 *ru, struct rusage *r)
 	return err;
 }
 
-extern asmlinkage int sys_wait4(pid_t pid, unsigned int * stat_addr,
-				int options, struct rusage * ru);
-
 asmlinkage int
 sys32_wait4(__kernel_pid_t32 pid, unsigned int * stat_addr, int options,
 	    struct rusage32 * ru)

@@ -602,7 +602,9 @@ void __init ide_init_via82cxxx(ide_hwif_t *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->dmaproc = &via82cxxx_dmaproc;
+#ifdef CONFIG_IDEDMA_AUTO
 		hwif->autodma = 1;
+#endif
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 }
