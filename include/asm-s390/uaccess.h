@@ -367,8 +367,8 @@ copy_in_user(void __user *to, const void __user *from, unsigned long n)
 /*
  * Copy a null terminated string from userspace.
  */
-extern long __strncpy_from_user_asm(char *dst, const char __user *src,
-								long count);
+extern long __strncpy_from_user_asm(long count, char *dst,
+					const char __user *src);
 
 static inline long
 strncpy_from_user(char *dst, const char __user *src, long count)
@@ -376,18 +376,18 @@ strncpy_from_user(char *dst, const char __user *src, long count)
         long res = -EFAULT;
         might_sleep();
         if (access_ok(VERIFY_READ, src, 1))
-                res = __strncpy_from_user_asm(dst, src, count);
+                res = __strncpy_from_user_asm(count, dst, src);
         return res;
 }
 
 
-extern long __strnlen_user_asm(const char __user *src, long count);
+extern long __strnlen_user_asm(long count, const char __user *src);
 
 static inline unsigned long
 strnlen_user(const char __user * src, unsigned long n)
 {
 	might_sleep();
-	return __strnlen_user_asm(src, n);
+	return __strnlen_user_asm(n, src);
 }
 
 /**
