@@ -155,10 +155,8 @@ zImage Image bootpImage: vmlinux
 zinstall install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
-MRPROPER_FILES	+= \
-	include/asm-arm/arch include/asm-arm/.arch \
-	include/asm-arm/constants.h* \
-	include/asm-arm/mach-types.h
+CLEAN_FILES += include/asm-arm/constants.h* include/asm-arm/mach-types.h
+MRPROPER_FILES += include/asm-arm/arch include/asm-arm/.arch
 
 # We use MRPROPER_FILES and CLEAN_FILES now
 archclean:
