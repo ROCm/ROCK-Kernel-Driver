@@ -832,6 +832,8 @@ static int moxa_ioctl(struct tty_struct *tty, struct file *file,
 	case TIOCSSERIAL:
 		return moxa_set_serial_info(ch, argp);
 	default:
+		if(!capable(CAP_SYS_RAWIO))
+			return -EPERM;
 		retval = MoxaDriverIoctl(cmd, arg, port);
 	}
 	return (retval);
