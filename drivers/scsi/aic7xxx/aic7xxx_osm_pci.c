@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm_pci.c#41 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm_pci.c#42 $
  */
 
 #include "aic7xxx_osm.h"
@@ -229,8 +229,7 @@ ahc_linux_pci_reserve_io_region(struct ahc_softc *ahc, u_long *base)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 	if (check_region(*base, 256) != 0)
 		return (ENOMEM);
-	else
-		request_region(*base, 256, "aic7xxx");
+	request_region(*base, 256, "aic7xxx");
 #else
 	if (request_region(*base, 256, "aic7xxx") == 0)
 		return (ENOMEM);
