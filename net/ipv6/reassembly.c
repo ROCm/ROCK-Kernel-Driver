@@ -387,7 +387,7 @@ ip6_frag_create(unsigned int hash, u32 id, struct in6_addr *src, struct in6_addr
 	init_timer(&fq->timer);
 	fq->timer.function = ip6_frag_expire;
 	fq->timer.data = (long) fq;
-	fq->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&fq->lock);
 	atomic_set(&fq->refcnt, 1);
 
 	return ip6_frag_intern(hash, fq);

@@ -267,8 +267,8 @@ static struct mpoa_client *alloc_mpc(void)
 	if (mpc == NULL)
 		return NULL;
 	memset(mpc, 0, sizeof(struct mpoa_client));
-	mpc->ingress_lock = RW_LOCK_UNLOCKED;
-	mpc->egress_lock  = RW_LOCK_UNLOCKED;
+	rwlock_init(&mpc->ingress_lock);
+	rwlock_init(&mpc->egress_lock);
 	mpc->next = mpcs;
 	atm_mpoa_init_cache(mpc);
 

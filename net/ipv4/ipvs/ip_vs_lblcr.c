@@ -362,7 +362,7 @@ static inline struct ip_vs_lblcr_entry *ip_vs_lblcr_new(__u32 daddr)
 	/* initilize its dest set */
 	atomic_set(&(en->set.size), 0);
 	en->set.list = NULL;
-	en->set.lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&en->set.lock);
 
 	return en;
 }
@@ -659,7 +659,7 @@ static int ip_vs_lblcr_init_svc(struct ip_vs_service *svc)
 	for (i=0; i<IP_VS_LBLCR_TAB_SIZE; i++) {
 		INIT_LIST_HEAD(&tbl->bucket[i]);
 	}
-	tbl->lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&tbl->lock);
 	tbl->max_size = IP_VS_LBLCR_TAB_SIZE*16;
 	tbl->rover = 0;
 	tbl->counter = 1;

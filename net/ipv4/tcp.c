@@ -467,7 +467,7 @@ int tcp_listen_start(struct sock *sk)
 	sk->sk_max_ack_backlog = 0;
 	sk->sk_ack_backlog = 0;
 	tp->accept_queue = tp->accept_queue_tail = NULL;
-	tp->syn_wait_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&tp->syn_wait_lock);
 	tcp_delack_init(tp);
 
 	lopt = kmalloc(sizeof(struct tcp_listen_opt), GFP_KERNEL);
@@ -2309,7 +2309,7 @@ void __init tcp_init(void)
 	if (!tcp_ehash)
 		panic("Failed to allocate TCP established hash table\n");
 	for (i = 0; i < (tcp_ehash_size << 1); i++) {
-		tcp_ehash[i].lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&tcp_ehash[i].lock);
 		INIT_HLIST_HEAD(&tcp_ehash[i].chain);
 	}
 
@@ -2325,7 +2325,7 @@ void __init tcp_init(void)
 	if (!tcp_bhash)
 		panic("Failed to allocate TCP bind hash table\n");
 	for (i = 0; i < tcp_bhash_size; i++) {
-		tcp_bhash[i].lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&tcp_bhash[i].lock);
 		INIT_HLIST_HEAD(&tcp_bhash[i].chain);
 	}
 

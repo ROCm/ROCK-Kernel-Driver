@@ -580,7 +580,7 @@ ip_vs_conn_new(int proto, __u32 caddr, __u16 cport, __u32 vaddr, __u16 vport,
 	cp->daddr          = daddr;
 	cp->dport          = dport;
 	cp->flags	   = flags;
-	cp->lock           = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&cp->lock);
 
 	/*
 	 * Set the entry is referenced by the current thread before hashing
@@ -894,7 +894,7 @@ int ip_vs_conn_init(void)
 	}
 
 	for (idx = 0; idx < CT_LOCKARRAY_SIZE; idx++)  {
-		__ip_vs_conntbl_lock_array[idx].l = RW_LOCK_UNLOCKED;
+		rwlock_init(&__ip_vs_conntbl_lock_array[idx].l);
 	}
 
 	proc_net_fops_create("ip_vs_conn", 0, &ip_vs_conn_fops);

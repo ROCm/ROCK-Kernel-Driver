@@ -113,7 +113,7 @@ struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 
 	/* Initialize the bind addr area */
 	sctp_bind_addr_init(&ep->base.bind_addr, 0);
-	ep->base.addr_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&ep->base.addr_lock);
 
 	/* Remember who we are attached to.  */
 	ep->base.sk = sk;

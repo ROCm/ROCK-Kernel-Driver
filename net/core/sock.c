@@ -1175,8 +1175,8 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	} else
 		sk->sk_sleep	=	NULL;
 
-	sk->sk_dst_lock		=	RW_LOCK_UNLOCKED;
-	sk->sk_callback_lock	=	RW_LOCK_UNLOCKED;
+	rwlock_init(&sk->sk_dst_lock);
+	rwlock_init(&sk->sk_callback_lock);
 
 	sk->sk_state_change	=	sock_def_wakeup;
 	sk->sk_data_ready	=	sock_def_readable;
