@@ -86,7 +86,7 @@ static int ebt_ip_check(const char *tablename, unsigned int hookmask,
 	if (info->bitmask & ~EBT_IP_MASK || info->invflags & ~EBT_IP_MASK)
 		return -EINVAL;
 	if (info->bitmask & (EBT_IP_DPORT | EBT_IP_SPORT)) {
-		if (!(info->bitmask & EBT_IPROTO))
+		if (info->bitmask & EBT_IPROTO)
 			return -EINVAL;
 		if (info->protocol != IPPROTO_TCP &&
 		    info->protocol != IPPROTO_UDP)
