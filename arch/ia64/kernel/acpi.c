@@ -56,16 +56,19 @@ asm (".weak iosapic_version");
 void (*pm_idle) (void);
 void (*pm_power_off) (void);
 
+unsigned char acpi_kbd_controller_present = 1;
+
 const char *
 acpi_get_sysname (void)
 {
 #ifdef CONFIG_IA64_GENERIC
-	unsigned long rsdp_phys = 0;
+	unsigned long rsdp_phys;
 	struct acpi20_table_rsdp *rsdp;
 	struct acpi_table_xsdt *xsdt;
 	struct acpi_table_header *hdr;
 
-	if ((0 != acpi_find_rsdp(&rsdp_phys)) || !rsdp_phys) {
+	rsdp_phys = acpi_find_rsdp();
+	if (!rsdp_phys) {
 		printk("ACPI 2.0 RSDP not found, default to \"dig\"\n");
 		return "dig";
 	}
@@ -99,6 +102,8 @@ acpi_get_sysname (void)
 	return "sn2";
 # elif defined (CONFIG_IA64_DIG)
 	return "dig";
+# elif defined (CONFIG_IA64_HP_ZX1)
+	return "hpzx1";
 # else
 #	error Unknown platform.  Fix acpi.c.
 # endif
@@ -130,9 +135,7 @@ acpi_get_crs (acpi_handle obj, acpi_buffer *buf)
 	if (!buf->pointer)
 		return -ENOMEM;
 
-	result = acpi_get_current_resources(obj, buf);
-
-	return result;
+	return acpi_get_current_resources(obj, buf);
 }
 
 acpi_resource *
@@ -175,6 +178,8 @@ acpi_dispose_crs (acpi_buffer *buf)
 /* Array to record platform interrupt vectors for generic interrupt routing. */
 int platform_irq_list[ACPI_MAX_PLATFORM_IRQS] = { [0 ... ACPI_MAX_PLATFORM_IRQS - 1] = -1 };
 
+enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_IOSAPIC;
+
 /*
  * Interrupt routing API for device drivers.  Provides interrupt vector for
  * a generic platform event.  Currently only CPEI is implemented.
@@ -189,10 +194,14 @@ acpi_request_vector (u32 int_type)
 		vector = platform_irq_list[int_type];
 	} else
 		printk("acpi_request_vector(): invalid interrupt type\n");
-
 	return vector;
 }
 
+char *
+__acpi_map_table (unsigned long phys_addr, unsigned long size)
+{
+	return __va(phys_addr);
+}
 
 /* --------------------------------------------------------------------------
                             Boot-time Table Parsing
@@ -206,7 +215,7 @@ struct acpi_table_madt *	acpi_madt __initdata;
 static int __init
 acpi_parse_lapic_addr_ovr (acpi_table_entry_header *header)
 {
-	struct acpi_table_lapic_addr_ovr *lapic = NULL;
+	struct acpi_table_lapic_addr_ovr *lapic;
 
 	lapic = (struct acpi_table_lapic_addr_ovr *) header;
 	if (!lapic)
@@ -218,7 +227,6 @@ acpi_parse_lapic_addr_ovr (acpi_table_entry_header *header)
 		iounmap((void *) ipi_base_addr);
 		ipi_base_addr = (unsigned long) ioremap(lapic->address, 0);
 	}
-
 	return 0;
 }
 
@@ -226,7 +234,7 @@ acpi_parse_lapic_addr_ovr (acpi_table_entry_header *header)
 static int __init
 acpi_parse_lsapic (acpi_table_entry_header *header)
 {
-	struct acpi_table_lsapic *lsapic = NULL;
+	struct acpi_table_lsapic *lsapic;
 
 	lsapic = (struct acpi_table_lsapic *) header;
 	if (!lsapic)
@@ -262,7 +270,7 @@ acpi_parse_lsapic (acpi_table_entry_header *header)
 static int __init
 acpi_parse_lapic_nmi (acpi_table_entry_header *header)
 {
-	struct acpi_table_lapic_nmi *lacpi_nmi = NULL;
+	struct acpi_table_lapic_nmi *lacpi_nmi;
 
 	lacpi_nmi = (struct acpi_table_lapic_nmi*) header;
 	if (!lacpi_nmi)
@@ -271,7 +279,6 @@ acpi_parse_lapic_nmi (acpi_table_entry_header *header)
 	acpi_table_print_madt_entry(header);
 
 	/* TBD: Support lapic_nmi entries */
-
 	return 0;
 }
 
@@ -279,11 +286,11 @@ acpi_parse_lapic_nmi (acpi_table_entry_header *header)
 static int __init
 acpi_find_iosapic (int global_vector, u32 *irq_base, char **iosapic_address)
 {
-	struct acpi_table_iosapic *iosapic = NULL;
-	int ver = 0;
-	int max_pin = 0;
-	char *p = 0;
-	char *end = 0;
+	struct acpi_table_iosapic *iosapic;
+	int ver;
+	int max_pin;
+	char *p;
+	char *end;
 
 	if (!irq_base || !iosapic_address)
 		return -ENODEV;
@@ -338,10 +345,10 @@ acpi_parse_iosapic (acpi_table_entry_header *header)
 static int __init
 acpi_parse_plat_int_src (acpi_table_entry_header *header)
 {
-	struct acpi_table_plat_int_src *plintsrc = NULL;
-	int vector = 0;
-	u32 irq_base = 0;
-	char *iosapic_address = NULL;
+	struct acpi_table_plat_int_src *plintsrc;
+	int vector;
+	u32 irq_base;
+	char *iosapic_address;
 
 	plintsrc = (struct acpi_table_plat_int_src *) header;
 	if (!plintsrc)
@@ -354,7 +361,7 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 		return -ENODEV;
 	}
 
-	if (0 != acpi_find_iosapic(plintsrc->global_irq, &irq_base, &iosapic_address)) {
+	if (acpi_find_iosapic(plintsrc->global_irq, &irq_base, &iosapic_address)) {
 		printk(KERN_WARNING PREFIX "IOSAPIC not found\n");
 		return -ENODEV;
 	}
@@ -363,15 +370,15 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 	 * Get vector assignment for this IRQ, set attributes, and program the
 	 * IOSAPIC routing table.
 	 */
-	vector = iosapic_register_platform_irq (plintsrc->type,
-						plintsrc->global_irq,
-						plintsrc->iosapic_vector,
-						plintsrc->eid,
-						plintsrc->id,
-						(plintsrc->flags.polarity == 1) ? 1 : 0,
-						(plintsrc->flags.trigger == 1) ? 1 : 0,
-						irq_base,
-						iosapic_address);
+	vector = iosapic_register_platform_irq(plintsrc->type,
+					       plintsrc->global_irq,
+					       plintsrc->iosapic_vector,
+					       plintsrc->eid,
+					       plintsrc->id,
+					       (plintsrc->flags.polarity == 1) ? 1 : 0,
+					       (plintsrc->flags.trigger == 1) ? 1 : 0,
+					       irq_base,
+					       iosapic_address);
 
 	platform_irq_list[plintsrc->type] = vector;
 	return 0;
@@ -381,7 +388,7 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 static int __init
 acpi_parse_int_src_ovr (acpi_table_entry_header *header)
 {
-	struct acpi_table_int_src_ovr *p = NULL;
+	struct acpi_table_int_src_ovr *p;
 
 	p = (struct acpi_table_int_src_ovr *) header;
 	if (!p)
@@ -394,9 +401,8 @@ acpi_parse_int_src_ovr (acpi_table_entry_header *header)
 		return 0;
 
 	iosapic_register_legacy_irq(p->bus_irq, p->global_irq,
-		(p->flags.polarity == 1) ? 1 : 0,
-		(p->flags.trigger == 1) ? 1 : 0);
-
+				    (p->flags.polarity == 1) ? 1 : 0,
+				    (p->flags.trigger == 1) ? 1 : 0);
 	return 0;
 }
 
@@ -404,7 +410,7 @@ acpi_parse_int_src_ovr (acpi_table_entry_header *header)
 static int __init
 acpi_parse_nmi_src (acpi_table_entry_header *header)
 {
-	struct acpi_table_nmi_src *nmi_src = NULL;
+	struct acpi_table_nmi_src *nmi_src;
 
 	nmi_src = (struct acpi_table_nmi_src*) header;
 	if (!nmi_src)
@@ -413,7 +419,6 @@ acpi_parse_nmi_src (acpi_table_entry_header *header)
 	acpi_table_print_madt_entry(header);
 
 	/* TBD: Support nimsrc entries */
-
 	return 0;
 }
 
@@ -425,50 +430,59 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 		return -EINVAL;
 
 	acpi_madt = (struct acpi_table_madt *) __va(phys_addr);
-	if (!acpi_madt) {
-		printk(KERN_WARNING PREFIX "Unable to map MADT\n");
-		return -ENODEV;
-	}
 
 	/* Get base address of IPI Message Block */
 
 	if (acpi_madt->lapic_address)
-		ipi_base_addr = (unsigned long)
-			ioremap(acpi_madt->lapic_address, 0);
+		ipi_base_addr = (unsigned long) ioremap(acpi_madt->lapic_address, 0);
 
 	printk(KERN_INFO PREFIX "Local APIC address 0x%lx\n", ipi_base_addr);
+	return 0;
+}
+
+static int __init
+acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
+{
+	struct acpi_table_header *fadt_header;
+	fadt_descriptor_rev2 *fadt;
+
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	fadt_header = (struct acpi_table_header *) __va(phys_addr);
+	if (fadt_header->revision != 3)
+		return -ENODEV;		/* Only deal with ACPI 2.0 FADT */
+
+	fadt = (fadt_descriptor_rev2 *) fadt_header;
+
+	if (!(fadt->iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER))
+		acpi_kbd_controller_present = 0;
 
 	return 0;
 }
 
-
-int __init
-acpi_find_rsdp (unsigned long *rsdp_phys)
+unsigned long __init
+acpi_find_rsdp (void)
 {
-	if (!rsdp_phys)
-		return -EINVAL;
+	unsigned long rsdp_phys = 0;
 
-	if (efi.acpi20) {
-		(*rsdp_phys) = __pa(efi.acpi20);
-		return 0;
-	}
-	else if (efi.acpi) {
+	if (efi.acpi20)
+		rsdp_phys = __pa(efi.acpi20);
+	else if (efi.acpi)
 		printk(KERN_WARNING PREFIX "v1.0/r0.71 tables no longer supported\n");
-	}
-
-	return -ENODEV;
+	return rsdp_phys;
 }
 
 
-#ifdef CONFIG_SERIAL_ACPI
+#ifdef CONFIG_SERIAL_8250_ACPI
 
 #include <linux/acpi_serial.h>
 
 static int __init
 acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 {
-	acpi_ser_t *spcr = NULL;
-	unsigned long global_int = 0;
+	acpi_ser_t *spcr;
+	unsigned long global_int;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
@@ -486,11 +500,6 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 	 */
 
 	spcr = (acpi_ser_t *) __va(phys_addr);
-	if (!spcr) {
-		printk(KERN_WARNING PREFIX "Unable to map SPCR\n");
-		return -ENODEV;
-	}
-
 	setup_serial_acpi(spcr);
 
 	if (spcr->length < sizeof(acpi_ser_t))
@@ -500,38 +509,37 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 	if ((spcr->base_addr.space_id != ACPI_SERIAL_PCICONF_SPACE) &&
 	    (spcr->int_type == ACPI_SERIAL_INT_SAPIC))
 	{
-		u32 irq_base = 0;
-		char *iosapic_address = NULL;
-		int vector = 0;
+		u32 irq_base;
+		char *iosapic_address;
+		int vector;
 
 		/* We have a UART in memory space with an SAPIC interrupt */
 
-		global_int = (  (spcr->global_int[3] << 24) |
-				(spcr->global_int[2] << 16) |
-				(spcr->global_int[1] << 8)  |
-				(spcr->global_int[0])  );
+		global_int = ((spcr->global_int[3] << 24) |
+			      (spcr->global_int[2] << 16) |
+			      (spcr->global_int[1] << 8)  |
+			      (spcr->global_int[0])  );
 
 		/* Which iosapic does this IRQ belong to? */
 
-		if (0 == acpi_find_iosapic(global_int, &irq_base, &iosapic_address)) {
-			vector = iosapic_register_irq (global_int, 1, 1,
-						       irq_base, iosapic_address);
-		}
+		if (!acpi_find_iosapic(global_int, &irq_base, &iosapic_address))
+			vector = iosapic_register_irq(global_int, 1, 1,
+						      irq_base, iosapic_address);
 	}
 	return 0;
 }
 
-#endif /*CONFIG_SERIAL_ACPI*/
+#endif /* CONFIG_SERIAL_8250_ACPI */
 
 
 int __init
 acpi_boot_init (char *cmdline)
 {
-	int result = 0;
+	int result;
 
 	/* Initialize the ACPI boot-time table parser */
 	result = acpi_table_init(cmdline);
-	if (0 != result)
+	if (result)
 		return result;
 
 	/*
@@ -542,59 +550,44 @@ acpi_boot_init (char *cmdline)
 	 * information -- the successor to MPS tables.
 	 */
 
-	result = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
-	if (1 > result)
-		return result;
+	if (acpi_table_parse(ACPI_APIC, acpi_parse_madt) < 1) {
+		printk(KERN_ERR PREFIX "Can't find MADT\n");
+		goto skip_madt;
+	}
 
 	/* Local APIC */
 
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr);
-	if (0 > result) {
+	if (acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr) < 0)
 		printk(KERN_ERR PREFIX "Error parsing LAPIC address override entry\n");
-		return result;
-	}
 
-	result = acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_parse_lsapic);
-	if (1 > result) {
-		printk(KERN_ERR PREFIX "Error parsing MADT - no LAPIC entries!\n");
-		return -ENODEV;
-	}
+	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_parse_lsapic) < 1)
+		printk(KERN_ERR PREFIX "Error parsing MADT - no LAPIC entries\n");
 
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi);
-	if (0 > result) {
+	if (acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi) < 0)
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
-		return result;
-	}
 
 	/* I/O APIC */
 
-	result = acpi_table_parse_madt(ACPI_MADT_IOSAPIC, acpi_parse_iosapic);
-	if (1 > result) {
-		printk(KERN_ERR PREFIX "Error parsing MADT - no IOAPIC entries!\n");
-		return ((result == 0) ? -ENODEV : result);
-	}
+	if (acpi_table_parse_madt(ACPI_MADT_IOSAPIC, acpi_parse_iosapic) < 1)
+		printk(KERN_ERR PREFIX "Error parsing MADT - no IOSAPIC entries\n");
 
 	/* System-Level Interrupt Routing */
 
-	result = acpi_table_parse_madt(ACPI_MADT_PLAT_INT_SRC, acpi_parse_plat_int_src);
-	if (0 > result) {
+	if (acpi_table_parse_madt(ACPI_MADT_PLAT_INT_SRC, acpi_parse_plat_int_src) < 0)
 		printk(KERN_ERR PREFIX "Error parsing platform interrupt source entry\n");
-		return result;
-	}
 
-	result = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr);
-	if (0 > result) {
+	if (acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr) < 0)
 		printk(KERN_ERR PREFIX "Error parsing interrupt source overrides entry\n");
-		return result;
-	}
 
-	result = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src);
-	if (0 > result) {
+	if (acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src) < 0)
 		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
-		return result;
-	}
+  skip_madt:
 
-#ifdef CONFIG_SERIAL_ACPI
+	/* FADT says whether a legacy keyboard controller is present. */
+	if (acpi_table_parse(ACPI_FACP, acpi_parse_fadt) < 1)
+		printk(KERN_ERR PREFIX "Can't find FADT\n");
+
+#ifdef CONFIG_SERIAL_8250_ACPI
 	/*
 	 * TBD: Need phased approach to table parsing (only do those absolutely
 	 *      required during boot-up).  Recommend expanding concept of fix-
@@ -602,7 +595,7 @@ acpi_boot_init (char *cmdline)
 	 *      serial ports, EC, SMBus, etc.
 	 */
 	acpi_table_parse(ACPI_SPCR, acpi_parse_spcr);
-#endif /*CONFIG_SERIAL_ACPI*/
+#endif
 
 #ifdef CONFIG_SMP
 	if (available_cpus == 0) {
@@ -610,10 +603,11 @@ acpi_boot_init (char *cmdline)
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
 	smp_boot_data.cpu_count = total_cpus;
+
+	smp_build_cpu_map();
 #endif
 	/* Make boot-up look pretty */
 	printk("%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
-
 	return 0;
 }
 
@@ -625,9 +619,9 @@ acpi_boot_init (char *cmdline)
 int __init
 acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 {
-	struct pci_vector_struct *vector = NULL;
-	struct list_head *node = NULL;
-	struct acpi_prt_entry *entry = NULL;
+	struct pci_vector_struct *vector;
+	struct list_head *node;
+	struct acpi_prt_entry *entry;
 	int i = 0;
 
 	if (!vectors || !count)
@@ -636,14 +630,14 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 	*vectors = NULL;
 	*count = 0;
 
-	if (acpi_prts.count <= 0) {
+	if (acpi_prt.count < 0) {
 		printk(KERN_ERR PREFIX "No PCI IRQ routing entries\n");
 		return -ENODEV;
 	}
 
 	/* Allocate vectors */
 
-	*vectors = kmalloc(sizeof(struct pci_vector_struct) * acpi_prts.count, GFP_KERNEL);
+	*vectors = kmalloc(sizeof(struct pci_vector_struct) * acpi_prt.count, GFP_KERNEL);
 	if (!(*vectors))
 		return -ENOMEM;
 
@@ -651,15 +645,15 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 
 	vector = *vectors;
 
-	list_for_each(node, &acpi_prts.entries) {
+	list_for_each(node, &acpi_prt.entries) {
 		entry = (struct acpi_prt_entry *)node;
 		vector[i].bus    = entry->id.bus;
-		vector[i].pci_id = ((u32) entry->id.dev << 16) | 0xffff;
-		vector[i].pin    = entry->id.pin;
-		vector[i].irq    = entry->source.index;
+		vector[i].pci_id = ((u32) entry->id.device << 16) | 0xffff;
+		vector[i].pin    = entry->pin;
+		vector[i].irq    = entry->link.index;
 		i++;
 	}
-	*count = acpi_prts.count;
+	*count = acpi_prt.count;
 	return 0;
 }
 
@@ -671,8 +665,7 @@ acpi_get_interrupt_model (int *type)
         if (!type)
                 return -EINVAL;
 
-	*type = ACPI_INT_MODEL_IOSAPIC;
-
+	*type = ACPI_IRQ_MODEL_IOSAPIC;
         return 0;
 }
 

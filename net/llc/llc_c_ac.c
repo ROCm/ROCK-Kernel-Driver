@@ -61,15 +61,18 @@ int llc_conn_ac_clear_remote_busy(struct sock *sk, struct llc_conn_state_ev *ev)
 int llc_conn_ac_conn_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 {
 	int rc = 1;
+	u8 dsap;
 	struct sk_buff *skb = ev->data.pdu.skb;
-	union llc_u_prim_data *prim_data = llc_ind_prim.data;
-	struct llc_prim_if_block *prim = &llc_ind_prim;
 	struct llc_sap *sap;
-	struct llc_opt *llc = llc_sk(sk);
 
-	llc_pdu_decode_dsap(skb, &prim_data->conn.daddr.lsap);
-	sap = llc_sap_find(prim_data->conn.daddr.lsap);
+	llc_pdu_decode_dsap(skb, &dsap);
+	sap = llc_sap_find(dsap);
 	if (sap) {
+		struct llc_prim_if_block *prim = &sap->llc_ind_prim;
+		union llc_u_prim_data *prim_data = prim->data;
+		struct llc_opt *llc = llc_sk(sk);
+
+		prim_data->conn.daddr.lsap = dsap;
 		llc_pdu_decode_sa(skb, llc->daddr.mac);
 		llc_pdu_decode_da(skb, llc->laddr.mac);
 		llc->dev = skb->dev;
@@ -90,14 +93,11 @@ int llc_conn_ac_conn_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 
 int llc_conn_ac_conn_confirm(struct sock *sk, struct llc_conn_state_ev *ev)
 {
-	union llc_u_prim_data *prim_data = llc_cfm_prim.data;
 	struct sk_buff *skb = ev->data.pdu.skb;
-	/* FIXME: wtf, this is global, so the whole thing is really
-	 *	  non reentrant...
-	 */
-	struct llc_prim_if_block *prim = &llc_cfm_prim;
 	struct llc_opt *llc = llc_sk(sk);
 	struct llc_sap *sap = llc->sap;
+	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
+	union llc_u_prim_data *prim_data = prim->data;
 
 	prim_data->conn.sk     = sk;
 	prim_data->conn.pri    = 0;
@@ -106,7 +106,7 @@ int llc_conn_ac_conn_confirm(struct sock *sk, struct llc_conn_state_ev *ev)
 	if (skb)
 		prim_data->conn.dev    = skb->dev;
 	else
-		printk(KERN_ERR __FUNCTION__ "ev->data.pdu.skb == NULL\n");
+		printk(KERN_ERR "%s: ev->data.pdu.skb == NULL\n", __FUNCTION__);
 	prim->data   = prim_data;
 	prim->prim   = LLC_CONN_PRIM;
 	prim->sap    = sap;
@@ -118,17 +118,19 @@ int llc_conn_ac_conn_confirm(struct sock *sk, struct llc_conn_state_ev *ev)
 static int llc_conn_ac_data_confirm(struct sock *sk,
 				    struct llc_conn_state_ev *ev)
 {
-	struct llc_prim_if_block *prim = &llc_cfm_prim;
-	union llc_u_prim_data *prim_data = llc_cfm_prim.data;
+	struct llc_opt *llc = llc_sk(sk);
+	struct llc_sap *sap = llc->sap;
+	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
+	union llc_u_prim_data *prim_data = prim->data;
 
 	prim_data->data.sk     = sk;
 	prim_data->data.pri    = 0;
-	prim_data->data.link   = llc_sk(sk)->link;
+	prim_data->data.link   = llc->link;
 	prim_data->data.status = LLC_STATUS_RECEIVED;
 	prim_data->data.skb    = NULL;
 	prim->data	       = prim_data;
 	prim->prim	       = LLC_DATA_PRIM;
-	prim->sap	       = llc_sk(sk)->sap;
+	prim->sap	       = sap;
 	ev->flag	       = 1;
 	ev->cfm_prim	       = prim;
 	return 0;
@@ -144,12 +146,9 @@ int llc_conn_ac_disc_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 {
 	u8 reason = 0;
 	int rc = 1;
-	union llc_u_prim_data *prim_data = llc_ind_prim.data;
-	struct llc_prim_if_block *prim = &llc_ind_prim;
 
 	if (ev->type == LLC_CONN_EV_TYPE_PDU) {
-		struct llc_pdu_un *pdu =
-				(struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
+		struct llc_pdu_un *pdu = llc_pdu_un_hdr(ev->data.pdu.skb);
 
 		if (!LLC_PDU_IS_RSP(pdu) &&
 		    !LLC_PDU_TYPE_IS_U(pdu) &&
@@ -170,12 +169,17 @@ int llc_conn_ac_disc_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 		rc = 1;
 	}
 	if (!rc) {
+		struct llc_opt *llc = llc_sk(sk);
+		struct llc_sap *sap = llc->sap;
+		struct llc_prim_if_block *prim = &sap->llc_ind_prim;
+		union llc_u_prim_data *prim_data = prim->data;
+
 		prim_data->disc.sk     = sk;
 		prim_data->disc.reason = reason;
-		prim_data->disc.link   = llc_sk(sk)->link;
+		prim_data->disc.link   = llc->link;
 		prim->data	       = prim_data;
 		prim->prim	       = LLC_DISC_PRIM;
-		prim->sap	       = llc_sk(sk)->sap;
+		prim->sap	       = llc->sap;
 		ev->flag	       = 1;
 		ev->ind_prim	       = prim;
 	}
@@ -184,15 +188,17 @@ int llc_conn_ac_disc_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 
 int llc_conn_ac_disc_confirm(struct sock *sk, struct llc_conn_state_ev *ev)
 {
-	union llc_u_prim_data *prim_data = llc_cfm_prim.data;
-	struct llc_prim_if_block *prim = &llc_cfm_prim;
+	struct llc_opt *llc = llc_sk(sk);
+	struct llc_sap *sap = llc->sap;
+	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
+	union llc_u_prim_data *prim_data = prim->data;
 
 	prim_data->disc.sk     = sk;
 	prim_data->disc.reason = ev->status;
-	prim_data->disc.link   = llc_sk(sk)->link;
+	prim_data->disc.link   = llc->link;
 	prim->data	       = prim_data;
 	prim->prim	       = LLC_DISC_PRIM;
-	prim->sap	       = llc_sk(sk)->sap;
+	prim->sap	       = sap;
 	ev->flag	       = 1;
 	ev->cfm_prim	       = prim;
 	return 0;
@@ -202,9 +208,7 @@ int llc_conn_ac_rst_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 {
 	u8 reason = 0;
 	int rc = 1;
-	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
-	union llc_u_prim_data *prim_data = llc_ind_prim.data;
-	struct llc_prim_if_block *prim = &llc_ind_prim;
+	struct llc_pdu_un *pdu = llc_pdu_un_hdr(ev->data.pdu.skb);
 	struct llc_opt *llc = llc_sk(sk);
 
 	switch (ev->type) {
@@ -237,12 +241,16 @@ int llc_conn_ac_rst_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 			break;
 	}
 	if (!rc) {
+		struct llc_sap *sap = llc->sap;
+		struct llc_prim_if_block *prim = &sap->llc_ind_prim;
+		union llc_u_prim_data *prim_data = prim->data;
+
 		prim_data->res.sk     = sk;
 		prim_data->res.reason = reason;
 		prim_data->res.link   = llc->link;
 		prim->data	      = prim_data;
 		prim->prim	      = LLC_RESET_PRIM;
-		prim->sap	      = llc->sap;
+		prim->sap	      = sap;
 		ev->flag	      = 1;
 		ev->ind_prim	      = prim;
 	}
@@ -251,14 +259,16 @@ int llc_conn_ac_rst_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 
 int llc_conn_ac_rst_confirm(struct sock *sk, struct llc_conn_state_ev *ev)
 {
-	union llc_u_prim_data *prim_data = llc_cfm_prim.data;
-	struct llc_prim_if_block *prim = &llc_cfm_prim;
+	struct llc_opt *llc = llc_sk(sk);
+	struct llc_sap *sap = llc->sap;
+	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
+	union llc_u_prim_data *prim_data = prim->data;
 
 	prim_data->res.sk   = sk;
-	prim_data->res.link = llc_sk(sk)->link;
+	prim_data->res.link = llc->link;
 	prim->data	    = prim_data;
 	prim->prim	    = LLC_RESET_PRIM;
-	prim->sap	    = llc_sk(sk)->sap;
+	prim->sap	    = sap;
 	ev->flag	    = 1;
 	ev->cfm_prim	    = prim;
 	return 0;

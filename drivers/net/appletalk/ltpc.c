@@ -262,7 +262,7 @@ static unsigned char *ltdmacbuf;
 struct ltpc_private
 {
 	struct net_device_stats stats;
-	struct at_addr my_addr;
+	struct atalk_addr my_addr;
 };
 
 /* transmit queue element struct */
@@ -826,7 +826,7 @@ static int ltpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct sockaddr_at *sa = (struct sockaddr_at *) &ifr->ifr_addr;
 	/* we'll keep the localtalk node address in dev->pa_addr */
-	struct at_addr *aa = &((struct ltpc_private *)dev->priv)->my_addr;
+	struct atalk_addr *aa = &((struct ltpc_private *)dev->priv)->my_addr;
 	struct lt_init c;
 	int ltflags;
 

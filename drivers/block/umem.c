@@ -818,7 +818,7 @@ static void del_battery_timer(void)
 static int mm_revalidate(kdev_t i_rdev)
 {
 	int card_number = DEVICE_NR(i_rdev);
-	mm_partitions[minor(i_rdev)] = cards[card_number].mm_size << 1;
+	mm_partitions[minor(i_rdev)].nr_sects = cards[card_number].mm_size << 1;
 	return 0;
 }
 /*
@@ -828,7 +828,7 @@ static int mm_revalidate(kdev_t i_rdev)
 */
 static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned long arg)
 {
-	if (cmd == case HDIO_GETGEO) {
+	if (cmd == HDIO_GETGEO) {
 		unsigned int minor = minor(i->i_rdev);
 		int err, size, card_number = (minor >> MM_SHIFT);
 		struct hd_geometry geo;

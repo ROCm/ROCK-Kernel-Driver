@@ -1121,12 +1121,6 @@ out:
 	return ERR_PTR(-ENOENT);
 }
 
-void proc_pid_delete_inode(struct inode *inode)
-{
-	if (proc_task(inode))
-		put_task_struct(proc_task(inode));
-}
-
 #define PROC_NUMBUF 10
 #define PROC_MAXPIDS 20
 

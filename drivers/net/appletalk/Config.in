@@ -3,7 +3,6 @@
 #
 
 mainmenu_option next_comment
-comment 'Appletalk devices'
 dep_mbool 'Appletalk interfaces support' CONFIG_DEV_APPLETALK $CONFIG_ATALK
 if [ "$CONFIG_DEV_APPLETALK" = "y" ]; then
    tristate '  Apple/Farallon LocalTalk PC support' CONFIG_LTPC
@@ -18,4 +17,3 @@ if [ "$CONFIG_DEV_APPLETALK" = "y" ]; then
       bool '    Appletalk-IP to IP Decapsulation support' CONFIG_IPDDP_DECAP
    fi
 fi
-endmenu

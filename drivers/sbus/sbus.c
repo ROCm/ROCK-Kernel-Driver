@@ -16,13 +16,14 @@
 #include <asm/oplib.h>
 #include <asm/bpp.h>
 #include <asm/irq.h>
-#ifdef CONFIG_SPARC32
-#include <asm/pcic.h>		/* pcic_present */
-#endif
 
 struct sbus_bus *sbus_root = NULL;
 
 static struct linux_prom_irqs irqs[PROMINTR_MAX] __initdata = { { 0 } };
+
+#ifdef CONFIG_PCI
+extern int pcic_present(void);
+#endif
 
 /* Perhaps when I figure out more about the iommu we'll put a
  * device registration routine here that probe_sbus() calls to
@@ -336,17 +337,10 @@ static int __init sbus_init(void)
 		   (nd = prom_getchild(iommund)) == 0 ||
 		   (nd = prom_searchsiblings(nd, "sbus")) == 0) {
 #ifdef CONFIG_PCI
-#ifdef CONFIG_SPARC32
                         if (!pcic_present()) {
                                 prom_printf("Neither SBUS nor PCI found.\n");
                                 prom_halt();
                         }
-#else
-                        if (!pcibios_present()) {
-                                prom_printf("Neither SBUS nor PCI found.\n");
-                                prom_halt();
-                        }
-#endif
                         return 0;
 #else
 			/* No reason to run further - the data access trap will occur. */

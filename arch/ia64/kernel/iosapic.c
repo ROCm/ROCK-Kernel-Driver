@@ -88,7 +88,7 @@ static struct {
 
 static struct iosapic_irq {
 	char *addr;			/* base address of IOSAPIC */
-	unsigned char base_irq;		/* first irq assigned to this IOSAPIC */
+	unsigned int base_irq;		/* first irq assigned to this IOSAPIC */
 	char pin;			/* IOSAPIC pin (-1 => not an IOSAPIC irq) */
 	unsigned char dmode	: 3;	/* delivery mode (see iosapic.h) */
 	unsigned char polarity	: 1;	/* interrupt polarity (see iosapic.h) */
@@ -97,9 +97,9 @@ static struct iosapic_irq {
 
 static struct iosapic {
 	char *addr;			/* base address of IOSAPIC */
-	unsigned char	pcat_compat;	/* 8259 compatibility flag */
-	unsigned char 	base_irq;	/* first irq assigned to this IOSAPIC */
+	unsigned int 	base_irq;	/* first irq assigned to this IOSAPIC */
 	unsigned short 	max_pin;	/* max input pin supported in this IOSAPIC */
+	unsigned char	pcat_compat;	/* 8259 compatibility flag */
 } iosapic_lists[256] __initdata;
 
 static int num_iosapic = 0;
@@ -159,6 +159,10 @@ set_rte (unsigned int vector, unsigned long dest)
 	char *addr;
 	int pin;
 	char redir;
+
+#ifdef DEBUG_IRQ_ROUTING
+	printk(KERN_DEBUG "set_rte: routing vector 0x%02x to 0x%lx\n", vector, dest);
+#endif
 
 	pin = iosapic_irq[vector].pin;
 	if (pin < 0)
@@ -322,14 +326,14 @@ iosapic_end_level_irq (unsigned int irq)
 #define iosapic_ack_level_irq		nop
 
 struct hw_interrupt_type irq_type_iosapic_level = {
-	typename:	"IO-SAPIC-level",
-	startup:	iosapic_startup_level_irq,
-	shutdown:	iosapic_shutdown_level_irq,
-	enable:		iosapic_enable_level_irq,
-	disable:	iosapic_disable_level_irq,
-	ack:		iosapic_ack_level_irq,
-	end:		iosapic_end_level_irq,
-	set_affinity:	iosapic_set_affinity
+	.typename =	"IO-SAPIC-level",
+	.startup =	iosapic_startup_level_irq,
+	.shutdown =	iosapic_shutdown_level_irq,
+	.enable =	iosapic_enable_level_irq,
+	.disable =	iosapic_disable_level_irq,
+	.ack =		iosapic_ack_level_irq,
+	.end =		iosapic_end_level_irq,
+	.set_affinity =	iosapic_set_affinity
 };
 
 /*
@@ -366,14 +370,14 @@ iosapic_ack_edge_irq (unsigned int irq)
 #define iosapic_end_edge_irq		nop
 
 struct hw_interrupt_type irq_type_iosapic_edge = {
-	typename:	"IO-SAPIC-edge",
-	startup:	iosapic_startup_edge_irq,
-	shutdown:	iosapic_disable_edge_irq,
-	enable:		iosapic_enable_edge_irq,
-	disable:	iosapic_disable_edge_irq,
-	ack:		iosapic_ack_edge_irq,
-	end:		iosapic_end_edge_irq,
-	set_affinity:	iosapic_set_affinity
+	.typename =	"IO-SAPIC-edge",
+	.startup =	iosapic_startup_edge_irq,
+	.shutdown =	iosapic_disable_edge_irq,
+	.enable =	iosapic_enable_edge_irq,
+	.disable =	iosapic_disable_edge_irq,
+	.ack =		iosapic_ack_edge_irq,
+	.end =		iosapic_end_edge_irq,
+	.set_affinity =	iosapic_set_affinity
 };
 
 unsigned int
@@ -406,7 +410,7 @@ iosapic_reassign_vector (int vector)
 	    || iosapic_irq[vector].polarity || iosapic_irq[vector].trigger)
 	{
 		new_vector = ia64_alloc_irq();
-		printk("Reassigning Vector 0x%x to 0x%x\n", vector, new_vector);
+		printk("Reassigning vector 0x%x to 0x%x\n", vector, new_vector);
 		memcpy (&iosapic_irq[new_vector], &iosapic_irq[vector],
 			sizeof(struct iosapic_irq));
 		memset (&iosapic_irq[vector], 0, sizeof(struct iosapic_irq));
@@ -422,6 +426,7 @@ register_irq (u32 global_vector, int vector, int pin, unsigned char delivery,
 	irq_desc_t *idesc;
 	struct hw_interrupt_type *irq_type;
 
+	gsi_to_vector(global_vector) = vector;
 	iosapic_irq[vector].pin	= pin;
 	iosapic_irq[vector].polarity = polarity ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW;
 	iosapic_irq[vector].dmode    = delivery;
@@ -640,7 +645,7 @@ iosapic_init_pci_irq (void)
 	unsigned int irq;
 	char *addr;
 
-	if (0 != acpi_get_prt(&pci_irq.route, &pci_irq.num_routes))
+	if (acpi_get_prt(&pci_irq.route, &pci_irq.num_routes))
 		return;
 
 	for (i = 0; i < pci_irq.num_routes; i++) {
@@ -679,11 +684,10 @@ iosapic_init_pci_irq (void)
 		       pci_irq.route[i].bus, pci_irq.route[i].pci_id>>16, pci_irq.route[i].pin,
 		       iosapic_irq[vector].base_irq + iosapic_irq[vector].pin, vector);
 #endif
-
 		/*
-		 * Forget not to program the IOSAPIC RTE per ACPI _PRT
+		 * NOTE: The IOSAPIC RTE will be programmed in iosapic_pci_fixup().  It
+		 * needs to be done there to ensure PCI hotplug works right.
 		 */
-		set_rte(vector, (ia64_get_lid() >> 16) & 0xffff);
 	}
 }
 
@@ -757,10 +761,11 @@ iosapic_pci_fixup (int phase)
 				if (!(smp_int_redirect & SMP_IRQ_REDIRECTION)) {
 					static int cpu_index = 0;
 
-					set_rte(vector, cpu_physical_id(cpu_index) & 0xffff);
+					while (!cpu_online(cpu_index))
+						if (++cpu_index >= NR_CPUS)
+							cpu_index = 0;
 
-					for (cpu_index++; !cpu_online(cpu_index % NR_CPUS); cpu_index++);
-                                        cpu_index %= NR_CPUS;
+					set_rte(vector, cpu_physical_id(cpu_index) & 0xffff);
 				} else {
 					/*
 					 * Direct the interrupt vector to the current cpu,

@@ -849,7 +849,7 @@ static void __init hd_geninit(void)
 	}
 
 	for(drive=0; drive < NR_HD; drive++) {
-		hd_gendisk[i].nr_real = 1;
+		hd_gendisk[drive].nr_real = 1;
 		add_gendisk(hd_gendisk + drive);
 		register_disk(hd_gendisk + drive,
 			mk_kdev(MAJOR_NR,drive<<6), 1<<6,

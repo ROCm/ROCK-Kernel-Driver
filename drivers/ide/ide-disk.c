@@ -71,7 +71,8 @@ static int lba_capacity_is_ok(struct hd_driveid *id)
 	unsigned long lba_sects, chs_sects, head, tail;
 
 	if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400)) {
-		printk("48-bit Drive: %llu \n", id->lba_capacity_2);
+		printk("48-bit Drive: %llu \n",
+		       (unsigned long long) id->lba_capacity_2);
 		return 1;
 	}
 

@@ -4,7 +4,9 @@ TARGET	= $(TOPDIR)/include/asm-ia64/offsets.h
 
 all:
 
-mrproper:
+fastdep:
+
+mrproper: clean
 
 clean:
 	rm -f print_offsets.s print_offsets offsets.h

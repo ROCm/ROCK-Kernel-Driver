@@ -423,6 +423,7 @@ void __init cpu_init (void)
 {
 	int cpu = smp_processor_id();
 	struct tss_struct * t = init_tss + cpu;
+	struct thread_struct *thread = &current->thread;
 
 	if (test_and_set_bit(cpu, &cpu_initialized)) {
 		printk(KERN_WARNING "CPU#%d already initialized!\n", cpu);
@@ -447,9 +448,13 @@ void __init cpu_init (void)
 	 */
 	if (cpu) {
 		memcpy(cpu_gdt_table[cpu], cpu_gdt_table[0], GDT_SIZE);
-		cpu_gdt_descr[cpu].size = GDT_SIZE;
+		cpu_gdt_descr[cpu].size = GDT_SIZE - 1;
 		cpu_gdt_descr[cpu].address = (unsigned long)cpu_gdt_table[cpu];
 	}
+	/*
+	 * Set up the per-thread TLS descriptor cache:
+	 */
+	memcpy(thread->tls_array, cpu_gdt_table[cpu], GDT_ENTRY_TLS_MAX * 8);
 
 	__asm__ __volatile__("lgdt %0": "=m" (cpu_gdt_descr[cpu]));
 	__asm__ __volatile__("lidt %0": "=m" (idt_descr));
@@ -468,9 +473,9 @@ void __init cpu_init (void)
 		BUG();
 	enter_lazy_tlb(&init_mm, current, cpu);
 
-	t->esp0 = current->thread.esp0;
+	t->esp0 = thread->esp0;
 	set_tss_desc(cpu,t);
-	cpu_gdt_table[cpu][TSS_ENTRY].b &= 0xfffffdff;
+	cpu_gdt_table[cpu][GDT_ENTRY_TSS].b &= 0xfffffdff;
 	load_TR_desc();
 	load_LDT(&init_mm.context);
 

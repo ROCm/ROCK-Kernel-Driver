@@ -1695,7 +1695,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	u_short param[6];
 #endif
 	u_short isp_cfg1, hwrev;
-	unsigned long flags;
 	struct isp1020_hostdata *hostdata =
 		(struct isp1020_hostdata *) host->hostdata;
 

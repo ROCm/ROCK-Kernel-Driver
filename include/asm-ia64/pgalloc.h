@@ -15,9 +15,10 @@
 
 #include <linux/config.h>
 
-#include <linux/mm.h>
-#include <linux/threads.h>
 #include <linux/compiler.h>
+#include <linux/mm.h>
+#include <linux/page-flags.h>
+#include <linux/threads.h>
 
 #include <asm/mmu_context.h>
 #include <asm/processor.h>

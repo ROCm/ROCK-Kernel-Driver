@@ -681,11 +681,8 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
 	/*
 	 * Load the per-thread Thread-Local Storage descriptor.
-	 *
-	 * NOTE: it's faster to do the two stores unconditionally
-	 * than to branch away.
 	 */
-	load_TLS_desc(next, cpu);
+	load_TLS(next, cpu);
 
 	/*
 	 * Save away %fs and %gs. No need to save %es and %ds, as
@@ -834,35 +831,114 @@ unsigned long get_wchan(struct task_struct *p)
 #undef first_sched
 
 /*
- * Set the Thread-Local Storage area:
+ * sys_alloc_thread_area: get a yet unused TLS descriptor index.
  */
-asmlinkage int sys_set_thread_area(unsigned long base, unsigned long flags)
+static int get_free_idx(void)
 {
 	struct thread_struct *t = &current->thread;
-	int writable = 0;
-	int cpu;
+	int idx;
 
-	/* do not allow unused flags */
-	if (flags & ~TLS_FLAGS_MASK)
+	for (idx = 0; idx < GDT_ENTRY_TLS_ENTRIES; idx++)
+		if (desc_empty(t->tls_array + idx))
+			return idx + GDT_ENTRY_TLS_MIN;
+	return -ESRCH;
+}
+
+/*
+ * Set a given TLS descriptor:
+ */
+asmlinkage int sys_set_thread_area(struct user_desc *u_info)
+{
+	struct thread_struct *t = &current->thread;
+	struct user_desc info;
+	struct desc_struct *desc;
+	int cpu, idx;
+
+	if (copy_from_user(&info, u_info, sizeof(info)))
+		return -EFAULT;
+	idx = info.entry_number;
+
+	/*
+	 * index -1 means the kernel should try to find and
+	 * allocate an empty descriptor:
+	 */
+	if (idx == -1) {
+		idx = get_free_idx();
+		if (idx < 0)
+			return idx;
+		if (put_user(idx, &u_info->entry_number))
+			return -EFAULT;
+	}
+
+	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
 		return -EINVAL;
 
-	if (flags & TLS_FLAG_WRITABLE)
-		writable = 1;
+	desc = t->tls_array + idx - GDT_ENTRY_TLS_MIN;
 
 	/*
 	 * We must not get preempted while modifying the TLS.
 	 */
 	cpu = get_cpu();
 
-        t->tls_desc.a = ((base & 0x0000ffff) << 16) | 0xffff;
+	if (LDT_empty(&info)) {
+		desc->a = 0;
+		desc->b = 0;
+	} else {
+		desc->a = LDT_entry_a(&info);
+		desc->b = LDT_entry_b(&info);
+	}
+	load_TLS(t, cpu);
 
-        t->tls_desc.b = (base & 0xff000000) | ((base & 0x00ff0000) >> 16) |
-				0xf0000 | (writable << 9) | (1 << 15) |
-					(1 << 22) | (1 << 23) | 0x7000;
-
-	load_TLS_desc(t, cpu);
 	put_cpu();
 
-	return TLS_ENTRY*8 + 3;
+	return 0;
+}
+
+/*
+ * Get the current Thread-Local Storage area:
+ */
+
+#define GET_BASE(desc) ( \
+	(((desc)->a >> 16) & 0x0000ffff) | \
+	(((desc)->b << 16) & 0x00ff0000) | \
+	( (desc)->b        & 0xff000000)   )
+
+#define GET_LIMIT(desc) ( \
+	((desc)->a & 0x0ffff) | \
+	 ((desc)->b & 0xf0000) )
+	
+#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
+#define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
+#define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
+#define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)
+#define GET_PRESENT(desc)	(((desc)->b >> 15) & 1)
+#define GET_USEABLE(desc)	(((desc)->b >> 20) & 1)
+
+asmlinkage int sys_get_thread_area(struct user_desc *u_info)
+{
+	struct user_desc info;
+	struct desc_struct *desc;
+	int idx;
+
+	if (get_user(idx, &u_info->entry_number))
+		return -EFAULT;
+	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+		return -EINVAL;
+
+	desc = current->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
+
+	info.entry_number = idx;
+	info.base_addr = GET_BASE(desc);
+	info.limit = GET_LIMIT(desc);
+	info.seg_32bit = GET_32BIT(desc);
+	info.contents = GET_CONTENTS(desc);
+	info.read_exec_only = !GET_WRITABLE(desc);
+	info.limit_in_pages = GET_LIMIT_PAGES(desc);
+	info.seg_not_present = !GET_PRESENT(desc);
+	info.useable = GET_USEABLE(desc);
+
+	if (copy_to_user(u_info, &info, sizeof(info)))
+		return -EFAULT;
+	return 0;
 }
 

@@ -2,8 +2,8 @@
 #define _ASM_IA64_DMA_H
 
 /*
- * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/config.h>
@@ -17,5 +17,7 @@ extern unsigned long MAX_DMA_ADDRESS;
 #else
 # define isa_dma_bridge_buggy 	(0)
 #endif
+
+#define free_dma(x)
 
 #endif /* _ASM_IA64_DMA_H */

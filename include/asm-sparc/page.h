@@ -24,7 +24,7 @@
 
 #ifdef __KERNEL__
 
-#include <asm/head.h>       /* for KERNBASE */
+/* #include <asm/head.h> XXX */      /* for KERNBASE */
 #include <asm/btfixup.h>
 
 #ifndef __ASSEMBLY__
@@ -89,7 +89,7 @@ extern struct cache_palias *sparc_aliases;
  */
 typedef struct { unsigned long pte; } pte_t;
 typedef struct { unsigned long iopte; } iopte_t;
-typedef struct { unsigned long pmd; } pmd_t;
+typedef struct { unsigned long pmdv[16]; } pmd_t;
 typedef struct { unsigned long pgd; } pgd_t;
 typedef struct { unsigned long ctxd; } ctxd_t;
 typedef struct { unsigned long pgprot; } pgprot_t;
@@ -97,7 +97,7 @@ typedef struct { unsigned long iopgprot; } iopgprot_t;
 
 #define pte_val(x)	((x).pte)
 #define iopte_val(x)	((x).iopte)
-#define pmd_val(x)      ((x).pmd)
+#define pmd_val(x)      ((x).pmdv[0])
 #define pgd_val(x)	((x).pgd)
 #define ctxd_val(x)	((x).ctxd)
 #define pgprot_val(x)	((x).pgprot)
@@ -105,7 +105,7 @@ typedef struct { unsigned long iopgprot; } iopgprot_t;
 
 #define __pte(x)	((pte_t) { (x) } )
 #define __iopte(x)	((iopte_t) { (x) } )
-#define __pmd(x)        ((pmd_t) { (x) } )
+/* #define __pmd(x)        ((pmd_t) { (x) } ) */ /* XXX procedure with loop */
 #define __pgd(x)	((pgd_t) { (x) } )
 #define __ctxd(x)	((ctxd_t) { (x) } )
 #define __pgprot(x)	((pgprot_t) { (x) } )
@@ -117,7 +117,7 @@ typedef struct { unsigned long iopgprot; } iopgprot_t;
  */
 typedef unsigned long pte_t;
 typedef unsigned long iopte_t;
-typedef unsigned long pmd_t;
+typedef struct { unsigned long pmdv[16]; } pmd_t;
 typedef unsigned long pgd_t;
 typedef unsigned long ctxd_t;
 typedef unsigned long pgprot_t;
@@ -125,7 +125,7 @@ typedef unsigned long iopgprot_t;
 
 #define pte_val(x)	(x)
 #define iopte_val(x)	(x)
-#define pmd_val(x)      (x)
+#define pmd_val(x)      ((x).pmdv[0])
 #define pgd_val(x)	(x)
 #define ctxd_val(x)	(x)
 #define pgprot_val(x)	(x)
@@ -133,7 +133,7 @@ typedef unsigned long iopgprot_t;
 
 #define __pte(x)	(x)
 #define __iopte(x)	(x)
-#define __pmd(x)        (x)
+/* #define __pmd(x)        (x) */ /* XXX later */
 #define __pgd(x)	(x)
 #define __ctxd(x)	(x)
 #define __pgprot(x)	(x)

@@ -24,9 +24,6 @@
 
 struct linux_ebus *ebus_chain = 0;
 
-#ifdef CONFIG_SUN_AUXIO
-extern void auxio_probe(void);
-#endif
 extern void rs_init(void);
 
 /* We are together with pcic.c under CONFIG_PCI. */
@@ -366,7 +363,4 @@ void __init ebus_init(void)
 	}
 
 	rs_init();
-#ifdef CONFIG_SUN_AUXIO
-	auxio_probe();
-#endif
 }

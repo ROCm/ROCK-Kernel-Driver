@@ -74,8 +74,6 @@ struct proc_dir_entry {
 	kdev_t	rdev;
 };
 
-#define PROC_INODE_PROPER(inode) ((inode)->i_ino & ~0xffff)
-
 #ifdef CONFIG_PROC_FS
 
 extern struct proc_dir_entry proc_root;
@@ -89,7 +87,6 @@ extern void proc_root_init(void);
 extern void proc_misc_init(void);
 
 struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry);
-void proc_pid_delete_inode(struct inode *inode);
 int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir);
 
 extern struct proc_dir_entry *create_proc_entry(const char *name, mode_t mode,

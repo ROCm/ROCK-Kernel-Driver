@@ -10,6 +10,7 @@
 
 #include <linux/bootmem.h>
 #include <linux/mm.h>
+#include <linux/personality.h>
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
@@ -68,10 +69,9 @@ ia64_init_addr_space (void)
 	struct vm_area_struct *vma;
 
 	/*
-	 * If we're out of memory and kmem_cache_alloc() returns NULL,
-	 * we simply ignore the problem.  When the process attempts to
-	 * write to the register backing store for the first time, it
-	 * will get a SEGFAULT in this case.
+	 * If we're out of memory and kmem_cache_alloc() returns NULL, we simply ignore
+	 * the problem.  When the process attempts to write to the register backing store
+	 * for the first time, it will get a SEGFAULT in this case.
 	 */
 	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 	if (vma) {
@@ -86,6 +86,19 @@ ia64_init_addr_space (void)
 		vma->vm_private_data = NULL;
 		insert_vm_struct(current->mm, vma);
 	}
+
+	/* map NaT-page at address zero to speed up speculative dereferencing of NULL: */
+	if (!(current->personality & MMAP_PAGE_ZERO)) {
+		vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
+		if (vma) {
+			memset(vma, 0, sizeof(*vma));
+			vma->vm_mm = current->mm;
+			vma->vm_end = PAGE_SIZE;
+			vma->vm_page_prot = __pgprot(pgprot_val(PAGE_READONLY) | _PAGE_MA_NAT);
+			vma->vm_flags = VM_READ | VM_MAYREAD | VM_IO | VM_RESERVED;
+			insert_vm_struct(current->mm, vma);
+		}
+	}
 }
 
 void
@@ -95,7 +108,7 @@ free_initmem (void)
 
 	addr = (unsigned long) &__init_begin;
 	for (; addr < (unsigned long) &__init_end; addr += PAGE_SIZE) {
-		clear_bit(PG_reserved, &virt_to_page(addr)->flags);
+		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
 		free_page(addr);
 		++totalram_pages;
@@ -149,9 +162,9 @@ free_initrd_mem (unsigned long start, unsigned long end)
 		if (!virt_addr_valid(start))
 			continue;
 		page = virt_to_page(start);
-		clear_bit(PG_reserved, &page->flags);
+		ClearPageReserved(page);
 		set_page_count(page, 1);
-		__free_page(page);
+		free_page(start);
 		++totalram_pages;
 	}
 }

@@ -64,12 +64,13 @@ if [ "$CONFIG_MCKINLEY" = "y" ]; then
 	fi
 fi
 
-if [ "$CONFIG_IA64_GENERIC" = "y" -o  "$CONFIG_IA64_DIG" = "y" -o "$CONFIG_IA64_HP_ZX1" = "y" ]; then
+if [ "$CONFIG_IA64_GENERIC" = "y" -o "$CONFIG_IA64_DIG" = "y" -o "$CONFIG_IA64_HP_ZX1" = "y" ];
+then
 	bool '  Enable IA-64 Machine Check Abort' CONFIG_IA64_MCA
 	define_bool CONFIG_PM y
 fi
 
-if [ "$CONFIG_IA64_SGI_SN1" = "y" -o  "$CONFIG_IA64_SGI_SN2" = "y" ]; then
+if [ "$CONFIG_IA64_SGI_SN1" = "y" -o "$CONFIG_IA64_SGI_SN2" = "y" ]; then
 	define_bool CONFIG_IA64_SGI_SN y
 	bool '  Enable extra debugging code' CONFIG_IA64_SGI_SN_DEBUG
 	bool '  Enable SGI Medusa Simulator Support' CONFIG_IA64_SGI_SN_SIM
@@ -99,21 +100,20 @@ tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+  source drivers/acpi/Config.in
 
-source drivers/acpi/Config.in
+  bool 'PCI support' CONFIG_PCI
+  source drivers/pci/Config.in
 
-bool 'PCI support' CONFIG_PCI
-source drivers/pci/Config.in
+  bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
+  if [ "$CONFIG_HOTPLUG" = "y" ]; then
+     source drivers/hotplug/Config.in
+     source drivers/pcmcia/Config.in
+  else
+     define_bool CONFIG_PCMCIA n
+  fi
 
-bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
-if [ "$CONFIG_HOTPLUG" = "y" ]; then
-   source drivers/pcmcia/Config.in
-else
-   define_bool CONFIG_PCMCIA n
-fi
-
-source drivers/parport/Config.in
-
+  source drivers/parport/Config.in
 fi # !HP_SIM
 
 endmenu
@@ -123,39 +123,26 @@ if [ "$CONFIG_NET" = "y" ]; then
 fi
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+  source drivers/mtd/Config.in
+  source drivers/pnp/Config.in
+  source drivers/block/Config.in
+  source drivers/ieee1394/Config.in
+  source drivers/message/i2o/Config.in
+  source drivers/md/Config.in
+  source drivers/message/fusion/Config.in
 
-source drivers/mtd/Config.in
-source drivers/pnp/Config.in
-source drivers/block/Config.in
-source drivers/ieee1394/Config.in
-source drivers/message/i2o/Config.in
-source drivers/md/Config.in
-source drivers/message/fusion/Config.in
+  mainmenu_option next_comment
+  comment 'ATA/ATAPI/MFM/RLL support'
 
-mainmenu_option next_comment
-comment 'ATA/ATAPI/MFM/RLL support'
+  tristate 'ATA/ATAPI/MFM/RLL support' CONFIG_IDE
 
-tristate 'ATA/ATAPI/MFM/RLL support' CONFIG_IDE
-
-if [ "$CONFIG_IDE" != "n" ]; then
-  source drivers/ide/Config.in
-else
-  define_bool CONFIG_BLK_DEV_HD n
+  if [ "$CONFIG_IDE" != "n" ]; then
+    source drivers/ide/Config.in
+  else
+    define_bool CONFIG_BLK_DEV_HD n
+  fi
+  endmenu
 fi
-endmenu
-
-else # ! HP_SIM
-mainmenu_option next_comment
-comment 'Block devices'
-tristate 'Loopback device support' CONFIG_BLK_DEV_LOOP
-dep_tristate 'Network block device support' CONFIG_BLK_DEV_NBD $CONFIG_NET
-
-tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
-if [ "$CONFIG_BLK_DEV_RAM" = "y" -o "$CONFIG_BLK_DEV_RAM" = "m" ]; then
-   int '  Default RAM disk size' CONFIG_BLK_DEV_RAM_SIZE 4096
-fi
-endmenu
-fi # !HP_SIM
 
 mainmenu_option next_comment
 comment 'SCSI support'
@@ -168,79 +155,82 @@ fi
 endmenu
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+  if [ "$CONFIG_NET" = "y" ]; then
+    mainmenu_option next_comment
+    comment 'Network device support'
 
-if [ "$CONFIG_NET" = "y" ]; then
+    bool 'Network device support' CONFIG_NETDEVICES
+    if [ "$CONFIG_NETDEVICES" = "y" ]; then
+      source drivers/net/Config.in
+    fi
+    endmenu
+  fi
+  source net/ax25/Config.in
+  source drivers/isdn/Config.in
+
   mainmenu_option next_comment
-  comment 'Network device support'
+  comment 'CD-ROM drivers (not for SCSI or IDE/ATAPI drives)'
 
-  bool 'Network device support' CONFIG_NETDEVICES
-  if [ "$CONFIG_NETDEVICES" = "y" ]; then
-    source drivers/net/Config.in
+  bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
+  if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+    source drivers/cdrom/Config.in
   fi
   endmenu
-fi
 
-source net/ax25/Config.in
+  #
+  # input before char - char/joystick depends on it. As does USB.
+  #
+  source drivers/input/Config.in
+  source drivers/char/Config.in
 
-source drivers/isdn/Config.in
+  #source drivers/misc/Config.in
 
-mainmenu_option next_comment
-comment 'CD-ROM drivers (not for SCSI or IDE/ATAPI drives)'
+  source drivers/media/Config.in
+else # HP_SIM
 
-bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
-if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
-  source drivers/cdrom/Config.in
-fi
-endmenu
+  mainmenu_option next_comment
+  comment 'Block devices'
+  tristate 'Loopback device support' CONFIG_BLK_DEV_LOOP
+  dep_tristate 'Network block device support' CONFIG_BLK_DEV_NBD $CONFIG_NET
 
-fi # !HP_SIM
-
-#
-# input before char - char/joystick depends on it. As does USB.
-#
-source drivers/input/Config.in
-source drivers/char/Config.in
-
-#source drivers/misc/Config.in
-
-source drivers/media/Config.in
+  tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
+  if [ "$CONFIG_BLK_DEV_RAM" = "y" -o "$CONFIG_BLK_DEV_RAM" = "m" ]; then
+    int '  Default RAM disk size' CONFIG_BLK_DEV_RAM_SIZE 4096
+  fi
+  endmenu
+fi # HP_SIM
 
 source fs/Config.in
 
-if [ "$CONFIG_VT" = "y" ]; then
+if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+  if [ "$CONFIG_VT" = "y" ]; then
+    mainmenu_option next_comment
+    comment 'Console drivers'
+    bool 'VGA text console' CONFIG_VGA_CONSOLE
+    source drivers/video/Config.in
+    if [ "$CONFIG_FB" = "y" ]; then
+      define_bool CONFIG_PCI_CONSOLE y
+    fi
+    endmenu
+  fi
+
   mainmenu_option next_comment
-  comment 'Console drivers'
-  bool 'VGA text console' CONFIG_VGA_CONSOLE
-  source drivers/video/Config.in
-  if [ "$CONFIG_FB" = "y" ]; then
-    define_bool CONFIG_PCI_CONSOLE y
+  comment 'Sound'
+
+  tristate 'Sound card support' CONFIG_SOUND
+  if [ "$CONFIG_SOUND" != "n" ]; then
+    source sound/Config.in
   fi
   endmenu
-fi
 
-if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
-
-mainmenu_option next_comment
-comment 'Sound'
-
-tristate 'Sound card support' CONFIG_SOUND
-if [ "$CONFIG_SOUND" != "n" ]; then
-  source sound/Config.in
-fi
-endmenu
-
-source drivers/usb/Config.in
-
-source lib/Config.in
-
-source net/bluetooth/Config.in
-
+  source drivers/usb/Config.in
+  source lib/Config.in
+  source net/bluetooth/Config.in
 fi # !HP_SIM
 
 if [ "$CONFIG_IA64_HP_SIM" != "n" -o "$CONFIG_IA64_GENERIC" != "n" ]; then
-  source arch/ia64/hp/Config.in
+  source arch/ia64/hp/sim/Config.in
 fi
-
 
 mainmenu_option next_comment
 comment 'Kernel hacking'
@@ -255,7 +245,14 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    bool '  Disable VHPT' CONFIG_DISABLE_VHPT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
 
-   bool '  Early printk support (requires VGA!)' CONFIG_IA64_EARLY_PRINTK
+   bool '  Early printk support' CONFIG_IA64_EARLY_PRINTK
+   if [ "$CONFIG_IA64_EARLY_PRINTK" != "n" ]; then
+      bool '    Early printk on MMIO serial port' CONFIG_IA64_EARLY_PRINTK_UART
+      if [ "$CONFIG_IA64_EARLY_PRINTK_UART" != "n" ]; then
+         hex '      UART MMIO base address' CONFIG_IA64_EARLY_PRINTK_UART_BASE ff5e0000
+      fi
+      bool '    Early printk on VGA' CONFIG_IA64_EARLY_PRINTK_VGA
+   fi
    bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
    bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
    bool '  Turn on compare-and-exchange bug checking (slow!)' CONFIG_IA64_DEBUG_CMPXCHG

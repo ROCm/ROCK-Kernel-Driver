@@ -22,14 +22,14 @@ hpsim_irq_noop (unsigned int irq)
 }
 
 static struct hw_interrupt_type irq_type_hp_sim = {
-	typename:	"hpsim",
-	startup:	hpsim_irq_startup,
-	shutdown:	hpsim_irq_noop,
-	enable:		hpsim_irq_noop,
-	disable:	hpsim_irq_noop,
-	ack:		hpsim_irq_noop,
-	end:		hpsim_irq_noop,
-	set_affinity:	(void (*)(unsigned int, unsigned long)) hpsim_irq_noop,
+	.typename =	"hpsim",
+	.startup =	hpsim_irq_startup,
+	.shutdown =	hpsim_irq_noop,
+	.enable =	hpsim_irq_noop,
+	.disable =	hpsim_irq_noop,
+	.ack =		hpsim_irq_noop,
+	.end =		hpsim_irq_noop,
+	.set_affinity =	(void (*)(unsigned int, unsigned long)) hpsim_irq_noop,
 };
 
 void __init

@@ -2064,7 +2064,7 @@ __init int migration_init(void)
 {
 	/* Start one for boot CPU. */
 	migration_call(&migration_notifier, CPU_ONLINE,
-		       (void *)smp_processor_id());
+		       (void *)(long)smp_processor_id());
 	register_cpu_notifier(&migration_notifier);
 	return 0;
 }
