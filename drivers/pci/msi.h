@@ -30,6 +30,9 @@ extern void (*interrupt[NR_IRQS])(void);
 #define set_msi_irq_affinity	set_msi_affinity
 #else
 #define set_msi_irq_affinity	NULL
+#endif
+
+#ifndef CONFIG_IRQBALANCE
 static inline void move_msi(int vector) {}
 #endif
 
