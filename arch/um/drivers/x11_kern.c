@@ -537,7 +537,12 @@ static int x11_setup(char *str)
 {
 	if (3 == sscanf(str,"%dx%d@%d",&x11_width,&x11_height,&x11_fps) ||
 	    2 == sscanf(str,"%dx%d",&x11_width,&x11_height)) {
+#if defined(CONFIG_DUMMY_CONSOLE)
+		printk("%s: console_use_vt=1\n",__FUNCTION__);
+		console_use_vt = 1;
 		x11_enable = 1;
+		conswitchp = &dummy_con;
+#endif  
 		return 0;
 	}
 	return -1;
