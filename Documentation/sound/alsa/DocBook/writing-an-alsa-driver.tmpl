@@ -395,7 +395,6 @@
   #include <linux/pci.h>
   #include <linux/slab.h>
   #include <sound/core.h>
-  #define SNDRV_GET_ID
   #include <sound/initval.h>
 
   // module parameters (see "Module Parameters")
@@ -739,7 +738,6 @@
   #include <linux/pci.h>
   #include <linux/slab.h>
   #include <sound/core.h>
-  #define SNDRV_GET_ID
   #include <sound/initval.h>
 ]]>
           </programlisting>
@@ -1086,8 +1084,6 @@
           struct pci_dev *pci;
 
           unsigned long port;
-          struct resource *res_port;
-
           int irq;
   };
 
@@ -1096,14 +1092,11 @@
           // disable hardware here if any
           // (not implemented in this document)
 
-          // release the i/o port
-          if (chip->res_port) {
-                  release_resource(chip->res_port);
-                  kfree_nocheck(chip->res_port);
-          }
           // release the irq
           if (chip->irq >= 0)
                   free_irq(chip->irq, (void *)chip);
+          // release the i/o ports
+          pci_release_regions(chip->pci);
           // release the data
           kfree(chip);
           return 0;
@@ -1141,18 +1134,16 @@
           chip->irq = -1;
 
           // (1) PCI resource allocation
-          chip->port = pci_resource_start(pci, 0);
-          if ((chip->res_port = request_region(chip->port, 8,
-                                                 "My Chip")) == NULL) { 
-                  snd_mychip_free(chip);
-                  printk(KERN_ERR "cannot allocate the port\n");
-                  return -EBUSY;
+          if ((err = pci_request_regions(pci, "My Chip")) < 0) {
+                  kfree(chip);
+                  return err;
           }
+          chip->port = pci_resource_start(pci, 0);
           if (request_irq(pci->irq, snd_mychip_interrupt,
                           SA_INTERRUPT|SA_SHIRQ, "My Chip",
                           (void *)chip)) {
+                  printk(KERN_ERR "cannot grab irq %d\n", pci->irq);
                   snd_mychip_free(chip);
-                  printk(KERN_ERR "cannot grab irq\n");
                   return -EBUSY;
           }
           chip->irq = pci->irq;
@@ -1268,8 +1259,6 @@
           snd_card_t *card;
 
           unsigned long port;
-          struct resource *res_port;
-
           int irq;
   };
 ]]>
@@ -1294,14 +1283,11 @@
         <informalexample>
           <programlisting>
 <![CDATA[
-  chip->port = pci_resource_start(pci, 0);
-  if ((chip->res_port = request_region(chip->port, 8,
-                                       "My Chip")) == NULL) { 
-          printk(KERN_ERR "cannot allocate the port 0x%lx\n",
-                 chip->port);
-          snd_mychip_free(chip);
-          return -EBUSY;
+  if ((err = pci_request_regions(pci, "My Chip")) < 0) { 
+          kfree(chip);
+          return err;
   }
+  chip->port = pci_resource_start(pci, 0);
 ]]>
           </programlisting>
         </informalexample>
@@ -1325,8 +1311,8 @@
   if (request_irq(pci->irq, snd_mychip_interrupt,
                   SA_INTERRUPT|SA_SHIRQ, "My Chip",
                   (void *)chip)) {
-          snd_mychip_free(chip);
           printk(KERN_ERR "cannot grab irq %d\n", pci->irq);
+          snd_mychip_free(chip);
           return -EBUSY;
   }
   chip->irq = pci->irq;
@@ -1383,7 +1369,45 @@
 
       <para>
         For releasing the resources, <quote>check-and-release</quote>
-        method is a safer way. For the i/o port, do like this: 
+        method is a safer way. For the interrupt, do like this: 
+
+        <informalexample>
+          <programlisting>
+<![CDATA[
+  if (chip->irq >= 0)
+          free_irq(chip->irq, (void *)chip);
+]]>
+          </programlisting>
+        </informalexample>
+
+        Since the irq number can start from 0, you should initialize
+        chip-&gt;irq with a negative value (e.g. -1), so that you can
+        check the validity of the irq number as above.
+      </para>
+
+      <para>
+        When you requested I/O ports or memory regions via
+	<function>pci_request_region()</function> or
+	<function>pci_request_regions()</function> like this example,
+	release the resource(s) using the corresponding function,
+	<function>pci_release_region()</function> or
+	<function>pci_release_regions()</function>.
+
+        <informalexample>
+          <programlisting>
+<![CDATA[
+  pci_release_regions(chip->pci);
+]]>
+          </programlisting>
+        </informalexample>
+      </para>
+
+      <para>
+	When you requested manually via <function>request_region()</function>
+	or <function>request_mem_region</function>, you can release it via
+	<function>release_resource()</function>.  Suppose that you keep
+	the resource pointer returned from <function>request_region()</function>
+	in chip-&gt;res_port, the release procedure looks like below:
 
         <informalexample>
           <programlisting>
@@ -1395,10 +1419,8 @@
 ]]>
           </programlisting>
         </informalexample>
-      </para>
 
-      <para>
-        As you can see, the i/o resource pointer is also to be freed
+      As you can see, the resource pointer is also to be freed
       via <function>kfree_nocheck()</function> after
       <function>release_resource()</function> is called. You
       cannot use <function>kfree()</function> here, because on ALSA,
@@ -1412,17 +1434,6 @@
       </para>
 
       <para>
-        For releasing the interrupt, do like this:
-
-        <informalexample>
-          <programlisting>
-<![CDATA[
-  if (chip->irq >= 0)
-          free_irq(chip->irq, (void *)chip);
-]]>
-          </programlisting>
-        </informalexample>
-
         And finally, release the chip-specific record.
 
         <informalexample>
@@ -1469,7 +1480,6 @@
           ....
           unsigned long iobase_phys;
           unsigned long iobase_virt;
-          struct resource *res_iobase;
   };
 ]]>
           </programlisting>
@@ -1480,15 +1490,14 @@
         <informalexample>
           <programlisting>
 <![CDATA[
+  if ((err = pci_request_regions(pci, "My Chip")) < 0) {
+          kfree(chip);
+          return err;
+  }
   chip->iobase_phys = pci_resource_start(pci, 0);
   chip->iobase_virt = (unsigned long)
-                      ioremap_nocache(chip->iobase_phys, 512);
-  if ((chip->res_port = request_mem_region(chip->iobase_phys, 512,
-                                           "My Chip")) == NULL) {
-          printk(KERN_ERR "cannot allocate the memory region\n");
-          snd_mychip_free(chip);
-          return -EBUSY;
-  }
+                      ioremap_nocache(chip->iobase_phys,
+                                      pci_resource_len(pci, 0));
 ]]>
           </programlisting>
         </informalexample>
@@ -1503,10 +1512,8 @@
           ....
           if (chip->iobase_virt)
                   iounmap((void *)chip->iobase_virt);
-          if (chip->res_iobase) {
-                  release_resource(chip->res_iobase);
-                  kfree_nocheck(chip->res_iobase);
-          }
+          ....
+          pci_release_regions(chip->pci);
           ....
   }
 ]]>
