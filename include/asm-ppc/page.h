@@ -14,19 +14,8 @@
 #define KERNELBASE	PAGE_OFFSET
 
 #ifndef __ASSEMBLY__
-#include <asm/system.h> /* for xmon definition */
+#include <asm/processor.h>	/* for BUG definition */
 
-#ifdef CONFIG_XMON
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	xmon(0); \
-} while (0)
-#else
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	__asm__ __volatile__(".long 0x0"); \
-} while (0)
-#endif
 #define PAGE_BUG(page) do { BUG(); } while (0)
 
 #define STRICT_MM_TYPECHECKS

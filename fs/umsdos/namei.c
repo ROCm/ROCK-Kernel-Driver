@@ -237,7 +237,7 @@ static int umsdos_nevercreat (struct inode *dir, struct dentry *dentry,
  * The same is true for directory creation.
  */
 static int umsdos_create_any (struct inode *dir, struct dentry *dentry,
-				int mode, int rdev, char flags)
+				int mode, dev_t rdev, char flags)
 {
 	struct dentry *fake;
 	struct inode *inode;
@@ -861,7 +861,7 @@ out_remove:
  * in particular and other parts of the kernel I guess.
  */
 int UMSDOS_mknod (struct inode *dir, struct dentry *dentry,
-		 int mode, int rdev)
+		 int mode, dev_t rdev)
 {
 	return umsdos_create_any (dir, dentry, mode, rdev, 0);
 }

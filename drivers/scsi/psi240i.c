@@ -26,25 +26,25 @@
 
 #include <linux/module.h>
 
+#include <linux/blk.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
+#include <linux/stat.h>
+
 #include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
 
 #include "psi240i.h"
 #include "psi_chip.h"
-
-#include<linux/stat.h>
 
 //#define DEBUG 1
 

@@ -3103,7 +3103,7 @@ static int devfs_rmdir (struct inode *dir, struct dentry *dentry)
 }   /*  End Function devfs_rmdir  */
 
 static int devfs_mknod (struct inode *dir, struct dentry *dentry, int mode,
-			int rdev)
+			dev_t rdev)
 {
     int err;
     struct fs_info *fs_info = dir->i_sb->s_fs_info;

@@ -202,7 +202,7 @@ static struct file_operations bad_sock_fops = {
 	.open		= sock_no_open
 };
 
-void init_special_inode(struct inode *inode, umode_t mode, int rdev)
+void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 {
 	inode->i_mode = mode;
 	if (S_ISCHR(mode)) {
@@ -217,5 +217,6 @@ void init_special_inode(struct inode *inode, umode_t mode, int rdev)
 	else if (S_ISSOCK(mode))
 		inode->i_fop = &bad_sock_fops;
 	else
-		printk(KERN_DEBUG "init_special_inode: bogus imode (%o)\n", mode);
+		printk(KERN_DEBUG "init_special_inode: bogus imode (%o)\n",
+		       mode);
 }

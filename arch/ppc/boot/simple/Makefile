@@ -132,23 +132,9 @@ EXTRA_AFLAGS			:= -Wa,-m405
 EXTRA				:= rw4/rw4_init.o rw4/rw4_init_brd.o
 endif
 
-# Default linker args.  Link at 0x00800000 or 0x00400000 by default, but
-# allow it to be overridden.
-ifeq ($(CONFIG_BOOT_LOAD_BOOL),y)
-LD_ARGS				:= -T $(boot)/ld.script \
-					-Ttext $(CONFIG_BOOT_LOAD) -Bstatic
-else
+# Linker args.  This specifies where the image will be run at.
 LD_ARGS				= -T $(boot)/ld.script \
-					-Ttext 0x00800000 -Bstatic
-ifeq ($(CONFIG_8260)$(CONFIG_40x)$(CONFIG_8xx),y)
-LD_ARGS				:= -T $(boot)/ld.script -Ttext 0x00400000 \
-					-Bstatic
-endif
-ifeq ($(CONFIG_440),y)
-LD_ARGS				:= -T $(boot)/ld.script -Ttext 0x01000000 \
-					-Bstatic
-endif
-endif
+					-Ttext $(CONFIG_BOOT_LOAD) -Bstatic
 OBJCOPY_ARGS			:= -O elf32-powerpc
 
 # head.o and relocate.o must be at the start.
@@ -167,8 +153,7 @@ boot-$(CONFIG_8260)		+= m8260_tty.o
 boot-$(CONFIG_GT64260_CONSOLE)	+= gt64260_tty.o
 endif
 
-EXTRA_TARGETS			:= $(boot-y)
-LIBS				:=  $(common)/lib.a $(bootlib)/lib.a
+LIBS				:= $(common)/lib.a $(bootlib)/lib.a
 
 OBJS				:= $(addprefix $(obj)/,$(boot-y))
 
@@ -181,7 +166,7 @@ $(obj)/dummy.o: $(common)/dummy.c
 	$(CC) -c -o $@ $(common)/dummy.c
 
 $(obj)/zvmlinux: $(OBJS) $(LIBS) $(boot)/ld.script $(images)/vmlinux.gz \
-	$(obj)/dummy.o
+		$(obj)/dummy.o
 	$(OBJCOPY) $(OBJCOPY_ARGS) \
 		--add-section=.image=$(images)/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data \

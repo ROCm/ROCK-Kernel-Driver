@@ -669,7 +669,7 @@ static int udf_create(struct inode *dir, struct dentry *dentry, int mode)
 	return 0;
 }
 
-static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, int rdev)
+static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, dev_t rdev)
 {
 	struct inode * inode;
 	struct udf_fileident_bh fibh;

@@ -88,22 +88,24 @@
  */
 
 #include <linux/module.h>
-
-#include <asm/io.h>
-#include <asm/system.h>
+#include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/signal.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/blk.h>
+#include <linux/stat.h>
+
+#include <asm/io.h>
+#include <asm/system.h>
+#include <asm/uaccess.h>
+
 #include "scsi.h"
 #include "hosts.h"
 #include "seagate.h"
-#include <linux/stat.h>
-#include <asm/uaccess.h>
+
 #include <scsi/scsi_ioctl.h>
 
 #ifdef DEBUG

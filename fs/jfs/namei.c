@@ -1316,7 +1316,7 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
  *
  * FUNCTION:    Create a special file (device)
  */
-int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
+int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	struct btstack btstack;
 	struct component_name dname;

@@ -30,23 +30,23 @@
  * are deemed to be part of the source code.
  */
 
+#include <linux/blk.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/proc_fs.h>
-#include <linux/sched.h>
-#include <asm/dma.h>
+#include <linux/stat.h>
 
+#include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <linux/blk.h>
+
 #include "scsi.h"
 #include "hosts.h"
-
 #include "aha1740.h"
-#include<linux/stat.h>
 
 /* IF YOU ARE HAVING PROBLEMS WITH THIS DRIVER, AND WANT TO WATCH
    IT WORK, THEN:

@@ -1314,6 +1314,17 @@ config BOOT_LOAD
 	depends on BOOT_LOAD_BOOL
 	default "0x00400000"
 
+# If we don't have a custom load, we define one here depending.
+config BOOT_LOAD
+	hex
+	depends on !BOOT_LOAD_BOOL && (40x || 8xx || 8260)
+	default "0x00400000"
+
+config BOOT_LOAD
+	hex
+	depends on !BOOT_LOAD_BOOL
+	default "0x00800000"
+
 endmenu
 
 source "drivers/mtd/Kconfig"
