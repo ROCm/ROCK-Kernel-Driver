@@ -3,6 +3,7 @@
 #
 
 menu "I2C Hardware Sensors Chip support"
+	depends on I2C
 
 config I2C_SENSOR
 	tristate

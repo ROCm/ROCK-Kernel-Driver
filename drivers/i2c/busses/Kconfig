@@ -3,6 +3,7 @@
 #
 
 menu "I2C Hardware Bus support"
+	depends on I2C
 
 config I2C_ALI1535
 	tristate "ALI 1535"
