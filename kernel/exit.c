@@ -199,6 +199,17 @@ static inline int has_stopped_jobs(int pgrp)
 	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
 		if (p->state != TASK_STOPPED)
 			continue;
+
+		/* If p is stopped by a debugger on a signal that won't
+		   stop it, then don't count p as stopped.  This isn't
+		   perfect but it's a good approximation.  */
+		if (unlikely (p->ptrace)
+		    && p->exit_code != SIGSTOP
+		    && p->exit_code != SIGTSTP
+		    && p->exit_code != SIGTTOU
+		    && p->exit_code != SIGTTIN)
+			continue;
+
 		retval = 1;
 		break;
 	}
@@ -594,7 +605,7 @@ static void exit_notify(struct task_struct *tsk)
 	 * is about to become orphaned.
 	 */
 	 
-	t = tsk->parent;
+	t = tsk->real_parent;
 	
 	if ((t->pgrp != tsk->pgrp) &&
 	    (t->session == tsk->session) &&
@@ -627,8 +638,16 @@ static void exit_notify(struct task_struct *tsk)
 		tsk->exit_signal = SIGCHLD;
 
 
-	if (tsk->exit_signal != -1)
-		do_notify_parent(tsk, tsk->exit_signal);
+	/* If something other than our normal parent is ptracing us, then
+	 * send it a SIGCHLD instead of honoring exit_signal.  exit_signal
+	 * only has special meaning to our real parent.
+	 */
+	if (tsk->exit_signal != -1) {
+		if (tsk->parent == tsk->real_parent)
+			do_notify_parent(tsk, tsk->exit_signal);
+		else
+			do_notify_parent(tsk, SIGCHLD);
+	}
 
 	tsk->state = TASK_ZOMBIE;
 	/*
@@ -661,6 +680,9 @@ NORET_TYPE void do_exit(long code)
 
 	profile_exit_task(tsk);
  
+	if (unlikely(current->ptrace & PT_TRACE_EXIT))
+		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
+
 	acct_process(code);
 	__exit_mm(tsk);
 
