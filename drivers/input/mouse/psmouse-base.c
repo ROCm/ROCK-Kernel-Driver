@@ -163,14 +163,14 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		       psmouse->name, psmouse->phys, psmouse->pktcnt);
 		psmouse->pktcnt = 0;
 	}
-	
+
 	psmouse->last = jiffies;
 	psmouse->packet[psmouse->pktcnt++] = data;
 
 	if (psmouse->packet[0] == PSMOUSE_RET_BAT) {
 		if (psmouse->pktcnt == 1)
 			goto out;
-		
+
 		if (psmouse->pktcnt == 2) {
 			if (psmouse->packet[1] == PSMOUSE_RET_ID) {
 				psmouse->state = PSMOUSE_IGNORE;
@@ -258,7 +258,7 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 			return (psmouse->cmdcnt = 0) - 1;
 
 	while (psmouse->cmdcnt && timeout--) {
-	
+
 		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_RESET_BAT &&
 				timeout > 100000) /* do not run in a endless loop */
 			timeout = 100000; /* 1 sec */
@@ -497,7 +497,7 @@ static void psmouse_set_rate(struct psmouse *psmouse)
 static void psmouse_initialize(struct psmouse *psmouse)
 {
 	unsigned char param[2];
-	
+
 /*
  * We set the mouse report rate, resolution and scaling.
  */
@@ -571,7 +571,7 @@ static void psmouse_disconnect(struct serio *serio)
 static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 {
 	struct psmouse *psmouse;
-	
+
 	if ((serio->type & SERIO_TYPE) != SERIO_8042 &&
 	    (serio->type & SERIO_TYPE) != SERIO_PS_PSTHRU)
 		return;
@@ -603,7 +603,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 		serio->private = NULL;
 		return;
 	}
-	
+
 	sprintf(psmouse->devname, "%s %s %s",
 		psmouse_protocols[psmouse->type], psmouse->vendor, psmouse->name);
 	sprintf(psmouse->phys, "%s/input0",
@@ -617,7 +617,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.id.version = psmouse->model;
 
 	input_register_device(&psmouse->dev);
-	
+
 	printk(KERN_INFO "input: %s on %s\n", psmouse->devname, serio->phys);
 
 	psmouse_initialize(psmouse);
