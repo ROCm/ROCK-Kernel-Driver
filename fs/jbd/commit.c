@@ -82,11 +82,16 @@ void journal_commit_transaction(journal_t *journal)
 		   commit_transaction->t_tid);
 
 	commit_transaction->t_state = T_LOCKED;
+
+	spin_lock(&commit_transaction->t_handle_lock);
 	while (commit_transaction->t_updates != 0) {
+		spin_unlock(&commit_transaction->t_handle_lock);
 		unlock_journal(journal);
 		sleep_on(&journal->j_wait_updates);
 		lock_journal(journal);
+		spin_lock(&commit_transaction->t_handle_lock);
 	}
+	spin_unlock(&commit_transaction->t_handle_lock);
 
 	J_ASSERT (commit_transaction->t_outstanding_credits <=
 			journal->j_max_transaction_buffers);

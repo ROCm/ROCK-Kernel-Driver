@@ -196,9 +196,11 @@ repeat_locked:
 	 * use and add the handle to the running transaction. */
 
 	handle->h_transaction = transaction;
+	spin_lock(&transaction->t_handle_lock);
 	transaction->t_outstanding_credits += nblocks;
 	transaction->t_updates++;
 	transaction->t_handle_count++;
+	spin_unlock(&transaction->t_handle_lock);
 	jbd_debug(4, "Handle %p given %d credits (total %d, free %d)\n",
 		  handle, nblocks, transaction->t_outstanding_credits,
 		  log_space_left(journal));
@@ -363,18 +365,21 @@ int journal_restart(handle_t *handle, int nblocks)
 	if (is_handle_aborted(handle))
 		return 0;
 	
-	/* First unlink the handle from its current transaction, and
-	 * start the commit on that. */
-	
-	J_ASSERT (transaction->t_updates > 0);
-	J_ASSERT (journal_current_handle() == handle);
+	/*
+	 * First unlink the handle from its current transaction, and start the
+	 * commit on that.
+	 */
+	J_ASSERT(transaction->t_updates > 0);
+	J_ASSERT(journal_current_handle() == handle);
 
 	lock_kernel();
+	spin_lock(&transaction->t_handle_lock);
 	transaction->t_outstanding_credits -= handle->h_buffer_credits;
 	transaction->t_updates--;
 
 	if (!transaction->t_updates)
 		wake_up(&journal->j_wait_updates);
+	spin_unlock(&transaction->t_handle_lock);
 
 	jbd_debug(2, "restarting handle %p\n", handle);
 	log_start_commit(journal, transaction);
@@ -396,7 +401,7 @@ int journal_restart(handle_t *handle, int nblocks)
  *
  * The journal lock should not be held on entry.
  */
-void journal_lock_updates (journal_t *journal)
+void journal_lock_updates(journal_t *journal)
 {
 	lock_journal(journal);
 
@@ -409,9 +414,13 @@ void journal_lock_updates (journal_t *journal)
 		transaction_t *transaction = journal->j_running_transaction;
 		if (!transaction)
 			break;
-		if (!transaction->t_updates)
+		spin_lock(&transaction->t_handle_lock);
+		if (!transaction->t_updates) {
+			spin_unlock(&transaction->t_handle_lock);
 			break;
+		}
 		
+		spin_unlock(&transaction->t_handle_lock);
 		unlock_journal(journal);
 		sleep_on(&journal->j_wait_updates);
 		lock_journal(journal);
@@ -1299,8 +1308,8 @@ int journal_stop(handle_t *handle)
 	if (!handle)
 		return 0;
 
-	J_ASSERT (transaction->t_updates > 0);
-	J_ASSERT (journal_current_handle() == handle);
+	J_ASSERT(transaction->t_updates > 0);
+	J_ASSERT(journal_current_handle() == handle);
 	
 	if (is_handle_aborted(handle))
 		err = -EIO;
@@ -1334,6 +1343,7 @@ int journal_stop(handle_t *handle)
 
 	current->journal_info = NULL;
 	lock_kernel();
+	spin_lock(&transaction->t_handle_lock);
 	transaction->t_outstanding_credits -= handle->h_buffer_credits;
 	transaction->t_updates--;
 	if (!transaction->t_updates) {
@@ -1341,6 +1351,7 @@ int journal_stop(handle_t *handle)
 		if (journal->j_barrier_count)
 			wake_up(&journal->j_wait_transaction_locked);
 	}
+	spin_unlock(&transaction->t_handle_lock);
 
 	/* Move callbacks from the handle to the transaction. */
 	list_splice(&handle->h_jcb, &transaction->t_jcb);
