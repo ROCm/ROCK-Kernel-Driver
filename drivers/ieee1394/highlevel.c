@@ -372,6 +372,7 @@ u64 hpsb_allocate_and_register_addrspace(struct hpsb_highlevel *hl,
 	INIT_LIST_HEAD(&as->host_list);
 	INIT_LIST_HEAD(&as->hl_list);
 	as->op = ops;
+	as->host = host;
 
 	write_lock_irqsave(&addr_space_lock, flags);
 
