@@ -475,11 +475,13 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	struct rb_node ** rb_link, * rb_parent;
 	unsigned long charged = 0;
 
-	if (file && (!file->f_op || !file->f_op->mmap))
-		return -ENODEV;
+	if (file) {
+		if (!file->f_op || !file->f_op->mmap)
+			return -ENODEV;
 
-	if ((prot & PROT_EXEC) && (file->f_vfsmnt->mnt_flags & MNT_NOEXEC))
-		return -EPERM;
+		if ((prot & PROT_EXEC) && (file->f_vfsmnt->mnt_flags & MNT_NOEXEC))
+			return -EPERM;
+	}
 
 	if (!len)
 		return addr;
