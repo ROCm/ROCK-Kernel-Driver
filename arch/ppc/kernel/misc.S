@@ -1297,6 +1297,8 @@ _GLOBAL(sys_call_table)
 	.long sys_sched_setaffinity
 	.long sys_sched_getaffinity
 	.long sys_security
+	.long sys_ni_syscall	/* 225 - reserved for Tux */
+
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall
 	.endr

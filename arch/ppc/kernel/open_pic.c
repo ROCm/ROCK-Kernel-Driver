@@ -149,16 +149,15 @@ struct hw_interrupt_type open_pic_ipi = {
  * data has probably been corrupted and we're going to panic or deadlock later
  * anyway --Troy
  */
-extern unsigned long* _get_SP(void);
 #define check_arg_irq(irq) \
     if (irq < open_pic_irq_offset || irq >= NumSources+open_pic_irq_offset \
 	|| ISR[irq - open_pic_irq_offset] == 0) { \
       printk("open_pic.c:%d: illegal irq %d\n", __LINE__, irq); \
-      print_backtrace(_get_SP()); }
+      show_stack(NULL); }
 #define check_arg_cpu(cpu) \
     if (cpu < 0 || cpu >= NumProcessors){ \
 	printk("open_pic.c:%d: illegal cpu %d\n", __LINE__, cpu); \
-	print_backtrace(_get_SP()); }
+	show_stack(NULL); }
 #else
 #define check_arg_ipi(ipi)	do {} while (0)
 #define check_arg_timer(timer)	do {} while (0)
