@@ -224,7 +224,6 @@ static inline u8 FAN_TO_REG(long rpm, int div)
    allocated. */
 struct it87_data {
 	struct semaphore lock;
-	int sysctl_id;
 	enum chips type;
 
 	struct semaphore update_lock;
@@ -533,22 +532,21 @@ static int it87_attach_adapter(struct i2c_adapter *adapter)
 int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 {
 	int i;
-	struct i2c_client *new_client;
+	struct i2c_client *new_client = NULL;
 	struct it87_data *data;
 	int err = 0;
 	const char *name = "";
 	const char *client_name = "";
 	int is_isa = i2c_is_isa_adapter(adapter);
 
-	if (!is_isa
-	    && !i2c_check_functionality(adapter,
-					I2C_FUNC_SMBUS_BYTE_DATA)) goto
-		    ERROR0;
+	if (!is_isa && 
+	    !i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
+		goto ERROR0;
 
-	if (is_isa) {
-		if (check_region(address, IT87_EXTENT))
+	/* Reserve the ISA region */
+	if (is_isa)
+		if (!request_region(address, IT87_EXTENT, name))
 			goto ERROR0;
-	}
 
 	/* Probe whether there is anything available on this address. Already
 	   done for SMBus clients */
@@ -560,11 +558,11 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 			   if we read 'undefined' registers. */
 			i = inb_p(address + 1);
 			if (inb_p(address + 2) != i)
-				goto ERROR0;
+				goto ERROR1;
 			if (inb_p(address + 3) != i)
-				goto ERROR0;
+				goto ERROR1;
 			if (inb_p(address + 7) != i)
-				goto ERROR0;
+				goto ERROR1;
 #undef REALLY_SLOW_IO
 
 			/* Let's just hope nothing breaks here */
@@ -585,7 +583,7 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 					sizeof(struct it87_data),
 					GFP_KERNEL))) {
 		err = -ENOMEM;
-		goto ERROR0;
+		goto ERROR1;
 	}
 
 	data = (struct it87_data *) (new_client + 1);
@@ -635,10 +633,6 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 		goto ERROR1;
 	}
 
-	/* Reserve the ISA region */
-	if (is_isa)
-		request_region(address, IT87_EXTENT, name);
-
 	/* Fill in the remaining client fields and put it into the global list */
 	strncpy(new_client->dev.name, name, DEVICE_NAME_SIZE);
 
@@ -650,7 +644,7 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Tell the I2C layer a new client has arrived */
 	if ((err = i2c_attach_client(new_client)))
-		goto ERROR2;
+		goto ERROR1;
 
 	/* register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_in_input0);
@@ -689,12 +683,12 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	it87_init_client(new_client);
 	return 0;
 
-      ERROR2:
+ERROR1:
+	kfree(new_client);
+
 	if (is_isa)
 		release_region(address, IT87_EXTENT);
-      ERROR1:
-	kfree(new_client);
-      ERROR0:
+ERROR0:
 	return err;
 }
 
