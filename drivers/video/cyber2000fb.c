@@ -1114,8 +1114,6 @@ static struct fb_ops cyber2000fb_ops = {
 	.fb_setcolreg	= cyber2000fb_setcolreg,
 	.fb_pan_display	= cyber2000fb_pan_display,
 	.fb_blank	= cyber2000fb_blank,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 };
 
 /*

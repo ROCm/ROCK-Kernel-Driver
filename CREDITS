@@ -2773,6 +2773,19 @@ S: Klosterweg 28 / i309
 S: 76131 Karlsruhe
 S: Germany
 
+N: James Simmons 
+E: jsimmons@users.sf.net 
+D: Frame buffer device maintainer
+D: input layer developement 
+D: tty/console layer
+D: various mipsel devices 
+S: 115 Carmel Avenue 
+S: El Cerrito CA 94530
+S: USA 
+
+N: Chris Vance
+E: cvance@tislabs.com
+
 N: Jaspreet Singh
 E: jaspreet@sangoma.com
 W: www.sangoma.com
