@@ -376,3 +376,5 @@ static void dma_advance_sg (Scsi_Cmnd *sp)
 static Scsi_Host_Template driver_template = SCSI_SUN3X_ESP;
 
 #include "scsi_module.c"
+
+MODULE_LICENSE("GPL");
