@@ -36,16 +36,16 @@ static int secondary;
 static int vendor_id = 0x0557;
 static int product_id = 0x2008;
 
-MODULE_PARM(vendor_id, "h");
+module_param(vendor_id, uint, 0400);
 MODULE_PARM_DESC(vendor_id, "USB Vendor ID of device to look for");
 
-MODULE_PARM(product_id, "h");
+module_param(product_id, uint, 0400);
 MODULE_PARM_DESC(product_id, "USB Product ID of device to look for");
 
 /* should we print out debug messages */
 static int debug = 0;
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, 0600);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
 #if defined(CONFIG_SECURITY_ROOTPLUG_MODULE)

@@ -125,11 +125,11 @@ raw_ioctl(struct inode *inode, struct file *filp,
 	return ioctl_by_bdev(bdev, command, arg);
 }
 
-static void bind_device(struct raw_config_request rq)
+static void bind_device(struct raw_config_request *rq)
 {
-	class_simple_device_remove(MKDEV(RAW_MAJOR, rq.raw_minor));
-	class_simple_device_add(raw_class, MKDEV(RAW_MAJOR, rq.raw_minor),
-				      NULL, "raw%d", rq.raw_minor);
+	class_simple_device_remove(MKDEV(RAW_MAJOR, rq->raw_minor));
+	class_simple_device_add(raw_class, MKDEV(RAW_MAJOR, rq->raw_minor),
+				      NULL, "raw%d", rq->raw_minor);
 }
 
 /*
@@ -200,15 +200,16 @@ static int raw_ctl_ioctl(struct inode *inode, struct file *filp,
 			if (rq.block_major == 0 && rq.block_minor == 0) {
 				/* unbind */
 				rawdev->binding = NULL;
-				class_simple_device_remove(MKDEV(RAW_MAJOR, rq.raw_minor));
+				class_simple_device_remove(MKDEV(RAW_MAJOR,
+								rq.raw_minor));
 			} else {
 				rawdev->binding = bdget(dev);
 				if (rawdev->binding == NULL)
 					err = -ENOMEM;
 				else {
 					__module_get(THIS_MODULE);
-					bind_device(rq);
-					}
+					bind_device(&rq);
+				}
 			}
 			up(&raw_mutex);
 		} else {

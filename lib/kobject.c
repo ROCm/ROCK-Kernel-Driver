@@ -537,7 +537,8 @@ void kset_unregister(struct kset * k)
  *	@name:	object's name.
  *
  *	Lock kset via @kset->subsys, and iterate over @kset->list,
- *	looking for a matching kobject. Return object if found.
+ *	looking for a matching kobject. If matching object is found
+ *	take a reference and return the object.
  */
 
 struct kobject * kset_find_obj(struct kset * kset, const char * name)
@@ -548,8 +549,8 @@ struct kobject * kset_find_obj(struct kset * kset, const char * name)
 	down_read(&kset->subsys->rwsem);
 	list_for_each(entry,&kset->list) {
 		struct kobject * k = to_kobj(entry);
-		if (kobject_name(k) && (!strcmp(kobject_name(k),name))) {
-			ret = k;
+		if (kobject_name(k) && !strcmp(kobject_name(k),name)) {
+			ret = kobject_get(k);
 			break;
 		}
 	}

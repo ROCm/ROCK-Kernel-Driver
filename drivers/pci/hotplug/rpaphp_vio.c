@@ -86,7 +86,14 @@ int register_vio_slot(struct device_node *dn)
 	}
 	slot->dev_type = VIO_DEV;
 	slot->dev.vio_dev = vio_find_node(dn);
-	if (!slot->dev.vio_dev)
+	if (slot->dev.vio_dev) {
+		/*
+		 * rpaphp is the only owner of vio devices and
+		 * does not need extra reference taken by
+		 * vio_find_node
+		 */
+		put_device(&slot->dev.vio_dev->dev);
+	} else
 		slot->dev.vio_dev = vio_register_device_node(dn);
 	if (slot->dev.vio_dev)
 		slot->state = CONFIGURED;
