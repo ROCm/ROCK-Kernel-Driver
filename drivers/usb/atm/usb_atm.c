@@ -94,7 +94,7 @@ static int udsl_print_packet(const unsigned char *data, int len);
 
 #define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@free.fr>"
 #define DRIVER_VERSION	"1.8"
-#define DRIVER_DESC	"Alcatel SpeedTouch USB driver version " DRIVER_VERSION
+#define DRIVER_DESC	"Generic USB ATM/DSL I/O, version " DRIVER_VERSION
 
 static unsigned int num_rcv_urbs = UDSL_DEFAULT_RCV_URBS;
 static unsigned int num_snd_urbs = UDSL_DEFAULT_SND_URBS;
@@ -369,10 +369,6 @@ static unsigned int udsl_write_cells(struct udsl_instance_data *instance,
 	if (!(ctrl->num_cells -= ne) || !(howmany -= ne))
 		goto out;
 
-	if (instance->snd_padding) {
-		memset(target, 0, instance->snd_padding);
-		target += instance->snd_padding;
-	}
 	udsl_fill_cell_header(target, ctrl->atm_data.vcc);
 	target += ATM_CELL_HEADER;
 	memcpy(target, skb->data, skb->len);
@@ -387,6 +383,10 @@ static unsigned int udsl_write_cells(struct udsl_instance_data *instance,
 			goto out;
 		}
 
+		if (instance->snd_padding) {
+			memset(target, 0, instance->snd_padding);
+			target += instance->snd_padding;
+		}
 		udsl_fill_cell_header(target, ctrl->atm_data.vcc);
 		target += ATM_CELL_HEADER;
 		memset(target, 0, ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER);

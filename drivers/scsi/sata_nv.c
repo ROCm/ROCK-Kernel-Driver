@@ -218,10 +218,18 @@ static struct ata_port_operations nv_ops = {
 	.host_stop		= nv_host_stop,
 };
 
+/* FIXME: The hardware provides the necessary SATA PHY controls
+ * to support ATA_FLAG_SATA_RESET.  However, it is currently
+ * necessary to disable that flag, to solve misdetection problems.
+ * See http://bugme.osdl.org/show_bug.cgi?id=3352 for more info.
+ *
+ * This problem really needs to be investigated further.  But in the
+ * meantime, we avoid ATA_FLAG_SATA_RESET to get people working.
+ */
 static struct ata_port_info nv_port_info = {
 	.sht		= &nv_sht,
 	.host_flags	= ATA_FLAG_SATA |
-			  ATA_FLAG_SATA_RESET |
+			  /* ATA_FLAG_SATA_RESET | */
 			  ATA_FLAG_SRST |
 			  ATA_FLAG_NO_LEGACY,
 	.pio_mask	= NV_PIO_MASK,
