@@ -82,6 +82,7 @@
 **	    Etc...
 **
 **	Supported NCR/SYMBIOS chips:
+**		53C720		(Wide,   Fast SCSI-2, HP Zalon)
 **		53C810		(8 bits, Fast SCSI-2, no rom BIOS) 
 **		53C815		(8 bits, Fast SCSI-2, on board rom BIOS)
 **		53C820		(Wide,   Fast SCSI-2, no rom BIOS)
@@ -178,6 +179,23 @@
 typedef u32 u_int32;
 typedef u64 u_int64;
 typedef	u_long		vm_offset_t;
+
+#ifdef __hppa__
+/*
+ * Yuck.  Current plan is to use ncr58c8xx.c for non-pci big endian
+ * chips, and sym53c8xx.c for pci little endian chips.  Define this
+ * here so it gets seen by sym53c8xx_defs.h, pulled in via ncr53c8xx.h.
+ */
+#define SCSI_NCR_BIG_ENDIAN
+/* INTFLY interrupts don't always seem to get serviced atm..... */
+#define SIMULATED_INTFLY
+#endif
+
+#if defined(CONFIG_SCSI_ZALON) || defined(CONFIG_SCSI_ZALON_MODULE)
+#define ENABLE_SCSI_ZALON
+#include "zalon.h"
+#endif
+
 #include "ncr53c8xx.h"
 
 /*
@@ -379,6 +397,8 @@ static Scsi_Host_Template	*the_template	= NULL;
 
 static void ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ncr53c8xx_timeout(unsigned long np);
+static int ncr53c8xx_proc_info(char *buffer, char **start, off_t offset,
+			int length, int hostno, int func);
 
 #define initverbose (driver_setup.verbose)
 #define bootverbose (np->verbose)
@@ -450,7 +470,8 @@ static u_char Tekram_sync[16] __initdata =
 #define	SIR_RESEL_BAD_I_T_L	(15)
 #define	SIR_RESEL_BAD_I_T_L_Q	(16)
 #define	SIR_DONE_OVERFLOW	(17)
-#define	SIR_MAX			(17)
+#define	SIR_INTFLY		(18)
+#define	SIR_MAX			(18)
 
 /*==========================================================
 **
@@ -622,6 +643,15 @@ struct tcb {
 	**	negotiation of wide and synch transfer and device quirks.
 	**----------------------------------------------------------------
 	*/
+#ifdef SCSI_NCR_BIG_ENDIAN
+/*0*/	u_short	period;
+/*2*/	u_char	sval;
+/*3*/	u_char	minsync;
+/*0*/	u_char	wval;
+/*1*/	u_char	widedone;
+/*2*/	u_char	quirks;
+/*3*/	u_char	maxoffs;
+#else
 /*0*/	u_char	minsync;
 /*1*/	u_char	sval;
 /*2*/	u_short	period;
@@ -629,6 +659,7 @@ struct tcb {
 /*1*/	u_char	quirks;
 /*2*/	u_char	widedone;
 /*3*/	u_char	wval;
+#endif
 
 #ifdef SCSI_NCR_INTEGRITY_CHECKING
 	u_char 	ic_min_sync;
@@ -839,10 +870,17 @@ struct head {
 /*
 **	Last four bytes (host)
 */
+#ifdef SCSI_NCR_BIG_ENDIAN
+#define  actualquirks  phys.header.status[3]
+#define  host_status   phys.header.status[2]
+#define  scsi_status   phys.header.status[1]
+#define  parity_status phys.header.status[0]
+#else
 #define  actualquirks  phys.header.status[0]
 #define  host_status   phys.header.status[1]
 #define  scsi_status   phys.header.status[2]
 #define  parity_status phys.header.status[3]
+#endif
 
 /*
 **	First four bytes (script)
@@ -1026,8 +1064,8 @@ struct ncb {
 	**	be used for probing adapter implementation differences.
 	**----------------------------------------------------------------
 	*/
-	u_char	sv_scntl0, sv_scntl3, sv_dmode, sv_dcntl, sv_ctest3, sv_ctest4,
-		sv_ctest5, sv_gpcntl, sv_stest2, sv_stest4;
+	u_char	sv_scntl0, sv_scntl3, sv_dmode, sv_dcntl, sv_ctest0, sv_ctest3,
+		sv_ctest4, sv_ctest5, sv_gpcntl, sv_stest2, sv_stest4;
 
 	/*----------------------------------------------------------------
 	**	Actual initial value of IO register bits used by the 
@@ -1035,8 +1073,8 @@ struct ncb {
 	**	features that are to be enabled.
 	**----------------------------------------------------------------
 	*/
-	u_char	rv_scntl0, rv_scntl3, rv_dmode, rv_dcntl, rv_ctest3, rv_ctest4, 
-		rv_ctest5, rv_stest2;
+	u_char	rv_scntl0, rv_scntl3, rv_dmode, rv_dcntl, rv_ctest0, rv_ctest3,
+		rv_ctest4, rv_ctest5, rv_stest2;
 
 	/*----------------------------------------------------------------
 	**	Targets management.
@@ -1158,7 +1196,7 @@ struct ncb {
 	*/
 	struct ccb	*ccb;		/* Global CCB			*/
 	struct usrcmd	user;		/* Command from user		*/
-	u_char		release_stage;	/* Synchronisation stage on release  */
+	volatile u_char	release_stage;	/* Synchronisation stage on release  */
 
 #ifdef SCSI_NCR_INTEGRITY_CHECKING
 	/*----------------------------------------------------------------
@@ -1197,6 +1235,23 @@ struct ncb {
 */
 
 /*
+**	For HP Zalon/53c720 systems, the Zalon interface
+**	between CPU and 53c720 does prefetches, which causes
+**	problems with self modifying scripts.  The problem
+**	is overcome by calling a dummy subroutine after each
+**	modification, to force a refetch of the script on
+**	return from the subroutine.
+*/
+
+#ifdef ENABLE_SCSI_ZALON
+#define PREFETCH_FLUSH_CNT	2
+#define PREFETCH_FLUSH		SCR_CALL, PADDRH (wait_dma),
+#else
+#define PREFETCH_FLUSH_CNT	0
+#define PREFETCH_FLUSH
+#endif
+
+/*
 **	Script fragments which are loaded into the on-chip RAM 
 **	of 825A, 875 and 895 chips.
 */
@@ -1204,7 +1259,7 @@ struct script {
 	ncrcmd	start		[  5];
 	ncrcmd  startpos	[  1];
 	ncrcmd	select		[  6];
-	ncrcmd	select2		[  9];
+	ncrcmd	select2		[  9 + PREFETCH_FLUSH_CNT];
 	ncrcmd	loadpos		[  4];
 	ncrcmd	send_ident	[  9];
 	ncrcmd	prepare		[  6];
@@ -1220,7 +1275,7 @@ struct script {
 	ncrcmd	setmsg		[  7];
 	ncrcmd	cleanup		[  6];
 	ncrcmd  complete	[  9];
-	ncrcmd	cleanup_ok	[  8];
+	ncrcmd	cleanup_ok	[  8 + PREFETCH_FLUSH_CNT];
 	ncrcmd	cleanup0	[  1];
 #ifndef SCSI_NCR_CCB_DONE_SUPPORT
 	ncrcmd	signal		[ 12];
@@ -1238,11 +1293,11 @@ struct script {
 	ncrcmd  idle		[  2];
 	ncrcmd	reselect	[  8];
 	ncrcmd	reselected	[  8];
-	ncrcmd	resel_dsa	[  6];
+	ncrcmd	resel_dsa	[  6 + PREFETCH_FLUSH_CNT];
 	ncrcmd	loadpos1	[  4];
 	ncrcmd  resel_lun	[  6];
 	ncrcmd	resel_tag	[  6];
-	ncrcmd	jump_to_nexus	[  4];
+	ncrcmd	jump_to_nexus	[  4 + PREFETCH_FLUSH_CNT];
 	ncrcmd	nexus_indirect	[  4];
 	ncrcmd	resel_notag	[  4];
 	ncrcmd  data_in		[MAX_SCATTERL * 4];
@@ -1263,7 +1318,7 @@ struct scripth {
 #endif
 	ncrcmd	select_no_atn	[  8];
 	ncrcmd	cancel		[  4];
-	ncrcmd	skip		[  9];
+	ncrcmd	skip		[  9 + PREFETCH_FLUSH_CNT];
 	ncrcmd	skip2		[ 19];
 	ncrcmd	par_err_data_in	[  6];
 	ncrcmd	par_err_other	[  4];
@@ -1296,9 +1351,10 @@ struct scripth {
 	ncrcmd	bad_i_t_l_q	[  4];
 	ncrcmd	bad_target	[  8];
 	ncrcmd	bad_status	[  8];
-	ncrcmd	start_ram	[  4];
+	ncrcmd	start_ram	[  4 + PREFETCH_FLUSH_CNT];
 	ncrcmd	start_ram0	[  4];
 	ncrcmd	sto_restart	[  5];
+	ncrcmd	wait_dma	[  2];
 	ncrcmd	snooptest	[  9];
 	ncrcmd	snoopend	[  2];
 };
@@ -1324,6 +1380,7 @@ static	lcb_p	ncr_setup_lcb	(ncb_p np, u_char tn, u_char ln,
 static	void	ncr_getclock	(ncb_p np, int mult);
 static	void	ncr_selectclock	(ncb_p np, u_char scntl3);
 static	ccb_p	ncr_get_ccb	(ncb_p np, u_char tn, u_char ln);
+static	void	ncr_chip_reset	(ncb_p np, int delay);
 static	void	ncr_init	(ncb_p np, int reset, char * msg, u_long code);
 static	int	ncr_int_sbmc	(ncb_p np);
 static	int	ncr_int_par	(ncb_p np);
@@ -1522,6 +1579,10 @@ static	struct script script0 __initdata = {
 	SCR_COPY_F (4),
 		RADDR (dsa),
 		PADDR (loadpos),
+	/*
+	**	Flush script prefetch if required
+	*/
+	PREFETCH_FLUSH
 	/*
 	**	then we do the actual copy.
 	*/
@@ -1823,6 +1884,10 @@ static	struct script script0 __initdata = {
 	SCR_COPY_F (4),
 		RADDR (dsa),
 		PADDR (cleanup0),
+	/*
+	**	Flush script prefetch if required
+	*/
+	PREFETCH_FLUSH
 	SCR_COPY (sizeof (struct head)),
 		NADDR (header),
 }/*-------------------------< CLEANUP0 >--------------------*/,{
@@ -1852,8 +1917,13 @@ static	struct script script0 __initdata = {
 	/*
 	**	... signal completion to the host
 	*/
+#ifdef SIMULATED_INTFLY
+	SCR_INT,
+		SIR_INTFLY,
+#else
 	SCR_INT_FLY,
 		0,
+#endif
 	/*
 	**	Auf zu neuen Schandtaten!
 	*/
@@ -1872,8 +1942,13 @@ static	struct script script0 __initdata = {
 	SCR_INT,
 		SIR_DONE_OVERFLOW,
 }/*------------------------< DONE_END >---------------------*/,{
+#ifdef SIMULATED_INTFLY
+	SCR_INT,
+		SIR_INTFLY,
+#else
 	SCR_INT_FLY,
 		0,
+#endif
 	SCR_COPY (4),
 		RADDR (temp),
 		PADDR (done_pos),
@@ -2051,6 +2126,10 @@ static	struct script script0 __initdata = {
 		RADDR (dsa),
 		PADDR (loadpos1),
 	/*
+	**	Flush script prefetch if required
+	*/
+	PREFETCH_FLUSH
+	/*
 	**	then we do the actual copy.
 	*/
 	SCR_COPY (sizeof (struct head)),
@@ -2112,6 +2191,10 @@ static	struct script script0 __initdata = {
 	SCR_COPY_F (4),
 		RADDR (temp),
 		PADDR (nexus_indirect),
+	/*
+	**	Flush script prefetch if required
+	*/
+	PREFETCH_FLUSH
 	SCR_COPY (4),
 }/*-------------------------< NEXUS_INDIRECT >-------------------*/,{
 		0,
@@ -2267,6 +2350,10 @@ static	struct scripth scripth0 __initdata = {
 	SCR_COPY_F (4),
 		RADDR (dsa),
 		PADDRH (skip2),
+	/*
+	**	Flush script prefetch if required
+	*/
+	PREFETCH_FLUSH
 	/*
 	**	then we do the actual copy.
 	*/
@@ -2778,6 +2865,10 @@ static	struct scripth scripth0 __initdata = {
 	SCR_COPY_F (4),
 		RADDR (scratcha),
 		PADDRH (start_ram0),
+	/*
+	**	Flush script prefetch if required
+	*/
+	PREFETCH_FLUSH
 	SCR_COPY (sizeof (struct script)),
 }/*-------------------------< START_RAM0 >--------------------*/,{
 		0,
@@ -2795,6 +2886,17 @@ static	struct scripth scripth0 __initdata = {
 		PADDR (startpos),
 	SCR_JUMP,
 		PADDR (start),
+}/*-------------------------< WAIT_DMA >-------------------*/,{
+	/*
+	**	For HP Zalon/53c720 systems, the Zalon interface
+	**	between CPU and 53c720 does prefetches, which causes
+	**	problems with self modifying scripts.  The problem
+	**	is overcome by calling a dummy subroutine after each
+	**	modification, to force a refetch of the script on
+	**	return from the subroutine.
+	*/
+	SCR_RETURN,
+		0,
 }/*-------------------------< SNOOPTEST >-------------------*/,{
 	/*
 	**	Read the variable.
@@ -3128,9 +3230,12 @@ static u_long div_10M[] =
 #define burst_length(bc) (!(bc))? 0 : 1 << (bc)
 
 /*
- *	Burst code from io register bits.
+ *	Burst code from io register bits.  Burst enable is ctest0 for c720,
+ *	ctest4 for others.
  */
-#define burst_code(dmode, ctest4, ctest5) \
+#define burst_code(dmode, ctest0, ctest4, ctest5) \
+	(np->device_id == PSEUDO_ZALON_720_ID) ? \
+	(ctest0) & 0x80? 0 : (((dmode) & 0xc0) >> 6) + 1 : \
 	(ctest4) & 0x80? 0 : (((dmode) & 0xc0) >> 6) + ((ctest5) & 0x04) + 1
 
 /*
@@ -3138,12 +3243,14 @@ static u_long div_10M[] =
  */
 static inline void ncr_init_burst(ncb_p np, u_char bc)
 {
-	np->rv_ctest4	&= ~0x80;
+	u_char *be = (np->device_id == PSEUDO_ZALON_720_ID) ?
+		&np->rv_ctest0 : &np->rv_ctest4;
+	*be		&= ~0x80;
 	np->rv_dmode	&= ~(0x3 << 6);
 	np->rv_ctest5	&= ~0x4;
 
 	if (!bc) {
-		np->rv_ctest4	|= 0x80;
+		*be		|= 0x80;
 	}
 	else {
 		--bc;
@@ -3220,6 +3327,7 @@ static int __init ncr_prepare_setting(ncb_p np, ncr_nvram *nvram)
 	np->sv_scntl3	= INB(nc_scntl3) & 0x07;
 	np->sv_dmode	= INB(nc_dmode)  & 0xce;
 	np->sv_dcntl	= INB(nc_dcntl)  & 0xa8;
+	np->sv_ctest0	= INB(nc_ctest0) & 0x84;
 	np->sv_ctest3	= INB(nc_ctest3) & 0x01;
 	np->sv_ctest4	= INB(nc_ctest4) & 0x80;
 	np->sv_ctest5	= INB(nc_ctest5) & 0x24;
@@ -3306,10 +3414,11 @@ static int __init ncr_prepare_setting(ncb_p np, ncr_nvram *nvram)
 	np->rv_scntl0	= np->sv_scntl0;
 	np->rv_dmode	= np->sv_dmode;
 	np->rv_dcntl	= np->sv_dcntl;
+	np->rv_ctest0	= np->sv_ctest0;
 	np->rv_ctest3	= np->sv_ctest3;
 	np->rv_ctest4	= np->sv_ctest4;
 	np->rv_ctest5	= np->sv_ctest5;
-	burst_max	= burst_code(np->sv_dmode, np->sv_ctest4, np->sv_ctest5);
+	burst_max	= burst_code(np->sv_dmode, np->sv_ctest0, np->sv_ctest4, np->sv_ctest5);
 #else
 
 	/*
@@ -3317,7 +3426,7 @@ static int __init ncr_prepare_setting(ncb_p np, ncr_nvram *nvram)
 	*/
 	burst_max	= driver_setup.burst_max;
 	if (burst_max == 255)
-		burst_max = burst_code(np->sv_dmode, np->sv_ctest4, np->sv_ctest5);
+		burst_max = burst_code(np->sv_dmode, np->sv_ctest0, np->sv_ctest4, np->sv_ctest5);
 	if (burst_max > 7)
 		burst_max = 7;
 	if (burst_max > np->maxburst)
@@ -3340,6 +3449,12 @@ static int __init ncr_prepare_setting(ncb_p np, ncr_nvram *nvram)
 		np->rv_ctest3	|= WRIE;	/* Write and Invalidate */
 	if (np->features & FE_DFS)
 		np->rv_ctest5	|= DFS;		/* Dma Fifo Size */
+	if (np->features & FE_MUX)
+		np->rv_ctest4	|= MUX;		/* Host bus multiplex mode */
+	if (np->features & FE_EA)
+		np->rv_dcntl	|= EA;		/* Enable ACK */
+	if (np->features & FE_EHP)
+		np->rv_ctest0	|= EHP;		/* Even host parity */
 
 	/*
 	**	Select some other
@@ -3539,6 +3654,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	ncr_nvram *nvram = device->nvram;
 	int i;
 
+#ifndef ENABLE_SCSI_ZALON
 	printk(KERN_INFO "ncr53c%s-%d: rev 0x%x on pci bus %d device %d function %d "
 #ifdef __sparc__
 		"irq %s\n",
@@ -3552,6 +3668,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 		__irq_itoa(device->slot.irq));
 #else
 		device->slot.irq);
+#endif
 #endif
 
 	/*
@@ -3650,7 +3767,9 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	**	Try to map the controller chip into iospace.
 	*/
 
+#ifndef ENABLE_SCSI_ZALON
 	request_region(device->slot.io_port, 128, "ncr53c8xx");
+#endif
 	np->base_io = device->slot.io_port;
 
 #ifdef SCSI_NCR_NVRAM_SUPPORT
@@ -3707,7 +3826,9 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	instance->dma_channel	= 0;
 	instance->cmd_per_lun	= MAX_TAGS;
 	instance->can_queue	= (MAX_START-4);
+#ifndef ENABLE_SCSI_ZALON
 	scsi_set_pci_device(instance, device->pdev);
+#endif
 
 #ifdef SCSI_NCR_INTEGRITY_CHECKING
 	np->check_integrity	  = 0;
@@ -3762,10 +3883,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	/*
 	**	Reset chip.
 	*/
-
-	OUTB (nc_istat,  SRST);
-	UDELAY (100);
-	OUTB (nc_istat,  0   );
+	ncr_chip_reset(np, 100);
 
 	/*
 	**	Now check the cache handling of the pci chipset.
@@ -3882,7 +4000,9 @@ attach_error:
 #ifdef DEBUG_NCR53C8XX
 		printk(KERN_DEBUG "%s: releasing IO region %x[%d]\n", ncr_name(np), np->base_io, 128);
 #endif
+#ifndef ENABLE_SCSI_ZALON
 		release_region(np->base_io, 128);
+#endif
 	}
 	if (np->irq) {
 #ifdef DEBUG_NCR53C8XX
@@ -3907,7 +4027,7 @@ unregister:
 	scsi_unregister(instance);
 
         return -1;
- }
+}
 
 
 /*==========================================================
@@ -4694,9 +4814,7 @@ static int ncr_reset_scsi_bus(ncb_p np, int enab_int, int settle_delay)
 			"command processing suspended for %d seconds\n",
 			ncr_name(np), settle_delay);
 
-	OUTB (nc_istat, SRST);
-	UDELAY (100);
-	OUTB (nc_istat, 0);
+	ncr_chip_reset(np, 100);
 	UDELAY (2000);	/* The 895 needs time for the bus mode to settle */
 	if (enab_int)
 		OUTW (nc_sien, RST);
@@ -4705,7 +4823,8 @@ static int ncr_reset_scsi_bus(ncb_p np, int enab_int, int settle_delay)
 	**	properly set IRQ mode, prior to resetting the bus.
 	*/
 	OUTB (nc_stest3, TE);
-	OUTB (nc_dcntl, (np->rv_dcntl & IRQM));
+	if (np->device_id != PSEUDO_ZALON_720_ID)
+		OUTB (nc_dcntl, (np->rv_dcntl & IRQM));
 	OUTB (nc_scntl1, CRST);
 	UDELAY (200);
 
@@ -4912,6 +5031,10 @@ static int ncr_detach(ncb_p np)
 	lcb_p lp;
 	int target, lun;
 	int i;
+	char inst_name[16];
+
+	/* Local copy so we don't access np after freeing it! */
+	strncpy(inst_name, ncr_name(np), 16);
 
 	printk("%s: releasing host resources\n", ncr_name(np));
 
@@ -4958,12 +5081,11 @@ static int ncr_detach(ncb_p np)
 	*/
 
 	printk("%s: resetting chip\n", ncr_name(np));
-	OUTB (nc_istat,  SRST);
-	UDELAY (100);
-	OUTB (nc_istat,  0   );
+	ncr_chip_reset(np, 100);
 
 	OUTB(nc_dmode,	np->sv_dmode);
 	OUTB(nc_dcntl,	np->sv_dcntl);
+	OUTB(nc_ctest0,	np->sv_ctest0);
 	OUTB(nc_ctest3,	np->sv_ctest3);
 	OUTB(nc_ctest4,	np->sv_ctest4);
 	OUTB(nc_ctest5,	np->sv_ctest5);
@@ -4986,7 +5108,9 @@ static int ncr_detach(ncb_p np)
 #ifdef DEBUG_NCR53C8XX
 	printk("%s: releasing IO region %x[%d]\n", ncr_name(np), np->base_io, 128);
 #endif
+#ifndef ENABLE_SCSI_ZALON
 	release_region(np->base_io, 128);
+#endif
 
 	/*
 	**	Free allocated ccb(s)
@@ -5031,7 +5155,7 @@ static int ncr_detach(ncb_p np)
 		m_free_dma(np->ccb, sizeof(struct ccb), "CCB");
 	m_free_dma(np, sizeof(struct ncb), "NCB");
 
-	printk("%s: host resources successfully released\n", ncr_name(np));
+	printk("%s: host resources successfully released\n", inst_name);
 
 	return 1;
 }
@@ -5423,6 +5547,27 @@ void ncr_wakeup (ncb_p np, u_long code)
 	}
 }
 
+/*
+** Reset ncr chip.
+*/
+
+/* Some initialisation must be done immediately following reset, for 53c720,
+ * at least.  EA (dcntl bit 5) isn't set here as it is set once only in
+ * the _detect function.
+ */
+static void ncr_chip_reset(ncb_p np, int delay)
+{
+	OUTB (nc_istat,  SRST);
+	UDELAY (delay);
+	OUTB (nc_istat,  0   );
+
+	if (np->features & FE_EHP)
+		OUTB (nc_ctest0, EHP);
+	if (np->features & FE_MUX)
+		OUTB (nc_ctest4, MUX);
+}
+
+
 /*==========================================================
 **
 **
@@ -5469,6 +5614,7 @@ void ncr_init (ncb_p np, int reset, char * msg, u_long code)
 	np->squeueput = 0;
 	np->script0->startpos[0] = cpu_to_scr(NCB_SCRIPTH_PHYS (np, tryloop));
 
+#ifdef SCSI_NCR_CCB_DONE_SUPPORT
 	/*
 	**	Clear Done Queue
 	*/
@@ -5477,6 +5623,7 @@ void ncr_init (ncb_p np, int reset, char * msg, u_long code)
 		np->scripth0->done_queue[5*i + 4] =
 			cpu_to_scr(NCB_SCRIPT_PHYS (np, done_end));
 	}
+#endif
 
 	/*
 	**	Start at first entry.
@@ -5495,8 +5642,11 @@ void ncr_init (ncb_p np, int reset, char * msg, u_long code)
 	**	Init chip.
 	*/
 
-	OUTB (nc_istat,  0x00   );	/*  Remove Reset, abort */
-	UDELAY (2000);	/* The 895 needs time for the bus mode to settle */
+	/*
+	** Remove reset; big delay because the 895 needs time for the
+	** bus mode to settle
+	*/
+	ncr_chip_reset(np, 2000);
 
 	OUTB (nc_scntl0, np->rv_scntl0 | 0xc0);
 					/*  full arb., ena parity, par->ATN  */
@@ -5511,6 +5661,7 @@ void ncr_init (ncb_p np, int reset, char * msg, u_long code)
 	OUTB (nc_ctest5, np->rv_ctest5);	/* Large fifo + large burst */
 
 	OUTB (nc_dcntl , NOCOM|np->rv_dcntl);	/* Protect SFBR */
+	OUTB (nc_ctest0, np->rv_ctest0);	/* 720: CDIS and EHP */
 	OUTB (nc_ctest3, np->rv_ctest3);	/* Write and invalidate */
 	OUTB (nc_ctest4, np->rv_ctest4);	/* Master parity checking */
 
@@ -7095,6 +7246,18 @@ void ncr_int_sir (ncb_p np)
 	if (DEBUG_FLAGS & DEBUG_TINY) printk ("I#%d", num);
 
 	switch (num) {
+	case SIR_INTFLY:
+		/*
+		**	This is used for HP Zalon/53c720 where INTFLY
+		**	operation is currently broken.
+		*/
+		ncr_wakeup_done(np);
+#ifdef SCSI_NCR_CCB_DONE_SUPPORT
+		OUTL(nc_dsp, NCB_SCRIPT_PHYS (np, done_end) + 8);
+#else
+		OUTL(nc_dsp, NCB_SCRIPT_PHYS (np, start));
+#endif
+		return;
 	case SIR_RESEL_NO_MSG_IN:
 	case SIR_RESEL_NO_IDENTIFY:
 		/*
@@ -7841,15 +8004,23 @@ static void ncr_init_tcb (ncb_p np, u_char tn)
 	*/
 	tp->getscr[0] =	cpu_to_scr(copy_1);
 	tp->getscr[1] = cpu_to_scr(vtobus (&tp->sval));
+#ifdef SCSI_NCR_BIG_ENDIAN
+	tp->getscr[2] = cpu_to_scr(ncr_reg_bus_addr(nc_sxfer) ^ 3);
+#else
 	tp->getscr[2] = cpu_to_scr(ncr_reg_bus_addr(nc_sxfer));
-  
+#endif
+
 	/*
 	**	Load the timing register.
 	**	COPY @(tp->wval), @(scntl3)
 	*/
 	tp->getscr[3] =	cpu_to_scr(copy_1);
 	tp->getscr[4] = cpu_to_scr(vtobus (&tp->wval));
+#ifdef SCSI_NCR_BIG_ENDIAN
+	tp->getscr[5] = cpu_to_scr(ncr_reg_bus_addr(nc_scntl3) ^ 3);
+#else
 	tp->getscr[5] = cpu_to_scr(ncr_reg_bus_addr(nc_scntl3));
+#endif
 
 	/*
 	**	Get the IDENTIFY message and the lun.
@@ -7878,10 +8049,17 @@ static void ncr_init_tcb (ncb_p np, u_char tn)
 	/*
 	**	These assert's should be moved at driver initialisations.
 	*/
+#ifdef SCSI_NCR_BIG_ENDIAN
+	assert (( (offsetof(struct ncr_reg, nc_sxfer) ^
+		offsetof(struct tcb    , sval    )) &3) == 3);
+	assert (( (offsetof(struct ncr_reg, nc_scntl3) ^
+		offsetof(struct tcb    , wval    )) &3) == 3);
+#else
 	assert (( (offsetof(struct ncr_reg, nc_sxfer) ^
 		offsetof(struct tcb    , sval    )) &3) == 0);
 	assert (( (offsetof(struct ncr_reg, nc_scntl3) ^
 		offsetof(struct tcb    , wval    )) &3) == 0);
+#endif
 }
 
 
@@ -8122,14 +8300,10 @@ static	int	ncr_scatter(ncb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 			segment = 1;
 		}
 	}
-	else {
+	else if (use_sg <= MAX_SCATTER) {
 		struct scatterlist *scatter = (struct scatterlist *)cmd->buffer;
 
 		use_sg = map_scsi_sg_data(np, cmd);
-		if (use_sg > MAX_SCATTER) {
-			unmap_scsi_data(np, cmd);
-			return -1;
-		}
 		data = &data[MAX_SCATTER - use_sg];
 
 		while (segment < use_sg) {
@@ -8141,6 +8315,9 @@ static	int	ncr_scatter(ncb_p np, ccb_p cp, Scsi_Cmnd *cmd)
 			cp->data_len	  += len;
 			++segment;
 		}
+	}
+	else {
+		return -1;
 	}
 
 	return segment;
@@ -8226,9 +8403,7 @@ static int __init ncr_snooptest (struct ncb* np)
 	/*
 	**	Reset ncr chip
 	*/
-	OUTB (nc_istat,  SRST);
-	UDELAY (100);
-	OUTB (nc_istat,  0   );
+	ncr_chip_reset(np, 100);
 	/*
 	**	check for timeout
 	*/
@@ -8455,7 +8630,7 @@ static void __init ncr_getclock (ncb_p np, int mult)
 	if (np->multiplier != mult || (scntl3 & 7) < 3 || !(scntl3 & 1)) {
 		unsigned f2;
 
-		OUTB(nc_istat, SRST); UDELAY (5); OUTB(nc_istat, 0);
+		ncr_chip_reset(np, 5);
 
 		(void) ncrgetfreq (np, 11);	/* throw away first result */
 		f1 = ncrgetfreq (np, 11);
@@ -9202,6 +9377,7 @@ __setup("ncr53c8xx=", ncr53c8xx_setup);
 */
 
 static u_short	ncr_chip_ids[]   __initdata = {
+	PSEUDO_ZALON_720_ID,
 	PCI_DEVICE_ID_NCR_53C810,
 	PCI_DEVICE_ID_NCR_53C815,
 	PCI_DEVICE_ID_NCR_53C820,
@@ -9215,6 +9391,74 @@ static u_short	ncr_chip_ids[]   __initdata = {
 	PCI_DEVICE_ID_NCR_53C895A,
 	PCI_DEVICE_ID_NCR_53C1510D
 };
+
+#ifdef ENABLE_SCSI_ZALON
+/* Attach a 53c720 interfaced via Zalon chip on HP boxes.  */
+int zalon_attach(Scsi_Host_Template *tpnt, unsigned long io_port,
+		struct parisc_device *dev, int irq, int unit)
+{
+	u_short device_id;
+	u_char revision;
+	int i;
+	ncr_chip *chip;
+	ncr_device device;
+
+	tpnt->proc_name = NAME53C8XX;
+	tpnt->proc_info = ncr53c8xx_proc_info;
+
+#if	defined(SCSI_NCR_BOOT_COMMAND_LINE_SUPPORT) && defined(MODULE)
+	if (ncr53c8xx)
+		ncr53c8xx_setup(ncr53c8xx);
+#endif
+
+#ifdef SCSI_NCR_DEBUG_INFO_SUPPORT
+	ncr_debug = driver_setup.debug;
+#endif
+	if (initverbose >= 2)
+		ncr_print_driver_setup();
+
+	memset(&device, 0, sizeof(ncr_device));
+	chip = 0;
+	device_id = PSEUDO_ZALON_720_ID;
+	revision = 0;
+	for (i = 0; i < sizeof(ncr_chip_table)/sizeof(ncr_chip_table[0]); i++) {		if (device_id != ncr_chip_table[i].device_id)
+			continue;
+		chip = &device.chip;
+		memcpy(chip, &ncr_chip_table[i], sizeof(*chip));
+		chip->revision_id = revision;
+		break;
+	}
+
+	if (!chip) {
+		printk(NAME53C8XX ": not initializing, device not supported\n");		return -1;
+	}
+
+	/* Fix some features according to driver setup. */
+	driver_setup.diff_support = 2;
+
+	/* The following three are needed before any other access. */
+	writeb(0x20, io_port + 0x38); /* DCNTL_REG,  EA  */
+	writeb(0x04, io_port + 0x1b); /* CTEST0_REG, EHP */
+	writeb(0x80, io_port + 0x22); /* CTEST4_REG, MUX */
+
+	/* Initialise ncr_device structure with items required by ncr_attach. */
+	device.host_id		= driver_setup.host_id;
+	device.pdev		= ccio_get_fake(dev);
+	device.slot.bus		= 0;
+	device.slot.device_fn	= 0;
+	device.slot.base	= (u_long)io_port;
+	device.slot.base_c	= (u_long)io_port;
+	device.slot.base_2	= 0;
+	device.slot.base_2_c	= 0;
+	device.slot.io_port	= io_port;
+	device.slot.irq		= irq;
+	device.attach_done	= 0;
+
+	printk(KERN_INFO NAME53C8XX ": 53c%s detected\n", device.chip.name);
+
+	return ncr_attach(tpnt, unit, &device);
+}
+#endif
 
 /*==========================================================
 **
@@ -9265,6 +9509,10 @@ MODULE_LICENSE("GPL");
 static
 #endif
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0) || defined(MODULE)
+#ifdef ENABLE_SCSI_ZALON
+Scsi_Host_Template driver_template = SCSI_ZALON;
+#else
 Scsi_Host_Template driver_template = NCR53C8XX;
+#endif
 #include "scsi_module.c"
 #endif
