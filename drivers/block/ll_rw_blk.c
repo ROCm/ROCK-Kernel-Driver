@@ -1202,6 +1202,26 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
 	return rq;
 }
 
+/*
+ * Non-locking blk_get_request variant, for special requests from drivers.
+ */
+struct request *__blk_get_request(request_queue_t *q, int rw)
+{
+	struct request *rq;
+
+	BUG_ON(rw != READ && rw != WRITE);
+
+	rq = get_request(q, rw);
+
+	if (rq) {
+		rq->flags = 0;
+		rq->buffer = NULL;
+		rq->bio = rq->biotail = NULL;
+		rq->waiting = NULL;
+	}
+	return rq;
+}
+
 void blk_put_request(struct request *rq)
 {
 	blkdev_release_request(rq);
@@ -1379,6 +1399,14 @@ void blk_attempt_remerge(request_queue_t *q, struct request *rq)
 	spin_lock_irqsave(q->queue_lock, flags);
 	attempt_back_merge(q, rq);
 	spin_unlock_irqrestore(q->queue_lock, flags);
+}
+
+/*
+ * Non-locking blk_attempt_remerge variant.
+ */
+void __blk_attempt_remerge(request_queue_t *q, struct request *rq)
+{
+	attempt_back_merge(q, rq);
 }
 
 static int __make_request(request_queue_t *q, struct bio *bio)
@@ -2039,6 +2067,7 @@ EXPORT_SYMBOL(generic_unplug_device);
 EXPORT_SYMBOL(blk_plug_device);
 EXPORT_SYMBOL(blk_remove_plug);
 EXPORT_SYMBOL(blk_attempt_remerge);
+EXPORT_SYMBOL(__blk_attempt_remerge);
 EXPORT_SYMBOL(blk_max_low_pfn);
 EXPORT_SYMBOL(blk_max_pfn);
 EXPORT_SYMBOL(blk_queue_max_sectors);
@@ -2055,6 +2084,7 @@ EXPORT_SYMBOL(blk_queue_assign_lock);
 EXPORT_SYMBOL(blk_phys_contig_segment);
 EXPORT_SYMBOL(blk_hw_contig_segment);
 EXPORT_SYMBOL(blk_get_request);
+EXPORT_SYMBOL(__blk_get_request);
 EXPORT_SYMBOL(blk_put_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);

@@ -405,7 +405,7 @@ static void icside_dma_enable(struct ata_device *drive, int on, int verbose)
 #endif
 }
 
-static int icside_dma_check(struct ata_device *drive)
+static int icside_dma_check(struct ata_device *drive, int map)
 {
 	struct hd_driveid *id = drive->id;
 	struct ata_channel *ch = drive->channel;
@@ -466,7 +466,7 @@ static ide_startstop_t icside_dmaintr(struct ata_device *drive, struct request *
 	if (ata_status(drive, DRIVE_READY, drive->bad_wstat | DRQ_STAT)) {
 		if (!dma_stat) {
 			__ide_end_request(drive, rq, 1, rq->nr_sectors);
-			return ide_stopped;
+			return ATA_OP_FINISHED;
 		}
 		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n",
 		       drive->name, dma_stat);
@@ -516,10 +516,10 @@ static int icside_dma_init(struct ata_device *drive, struct request *rq)
 	u8 int cmd;
 
 	if (icside_dma_common(drive, rq, DMA_MODE_WRITE))
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 
 	if (drive->type != ATA_DISK)
-		return ide_started;
+		return ATA_OP_CONTINUES;
 
 	ata_set_handler(drive, icside_dmaintr, WAIT_CMD, NULL);
 
@@ -535,7 +535,7 @@ static int icside_dma_init(struct ata_device *drive, struct request *rq)
 
 	enable_dma(ch->hw.dma);
 
-	return ide_started;
+	return ATA_OP_CONTINUES;
 }
 
 static int icside_irq_status(struct ata_device *drive)

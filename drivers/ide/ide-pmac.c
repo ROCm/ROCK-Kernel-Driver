@@ -256,11 +256,11 @@ struct {
 static void pmac_ide_setup_dma(struct device_node *np, int ix);
 
 static void pmac_udma_enable(struct ata_device *drive, int on, int verbose);
-static int pmac_udma_start(struct ata_device *drive, struct request *rq);
+static void pmac_udma_start(struct ata_device *drive, struct request *rq);
 static int pmac_udma_stop(struct ata_device *drive);
 static int pmac_udma_init(struct ata_device *drive, struct request *rq);
 static int pmac_udma_irq_status(struct ata_device *drive);
-static int pmac_udma_setup(struct ata_device *drive);
+static int pmac_udma_setup(struct ata_device *drive, int map);
 static int pmac_ide_build_dmatable(struct ata_device *drive, struct request *rq, int ix, int wr);
 static int pmac_ide_tune_chipset(struct ata_device *drive, byte speed);
 static void pmac_ide_tuneproc(struct ata_device *drive, byte pio);
@@ -1340,7 +1340,7 @@ static void pmac_udma_enable(struct ata_device *drive, int on, int verbose)
 	ide_toggle_bounce(drive, 0);
 }
 
-static int pmac_udma_start(struct ata_device *drive, struct request *rq)
+static void pmac_udma_start(struct ata_device *drive, struct request *rq)
 {
 	int ix, ata4;
 	volatile struct dbdma_regs *dma;
@@ -1350,7 +1350,7 @@ static int pmac_udma_start(struct ata_device *drive, struct request *rq)
 	 */
 	ix = pmac_ide_find(drive);
 	if (ix < 0)
-		return ide_stopped;
+		return;
 
 	dma = pmac_ide[ix].dma_regs;
 	ata4 = (pmac_ide[ix].kind == controller_kl_ata4 ||
@@ -1360,7 +1360,7 @@ static int pmac_udma_start(struct ata_device *drive, struct request *rq)
 	/* Make sure it gets to the controller right now */
 	(void)in_le32(&dma->control);
 
-	return ide_started;
+	return;
 }
 
 static int pmac_udma_stop(struct ata_device *drive)
@@ -1397,7 +1397,7 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 	 */
 	ix = pmac_ide_find(drive);
 	if (ix < 0)
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 
 	if (rq_data_dir(rq) == READ)
 		reading = 1;
@@ -1409,7 +1409,7 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 		pmac_ide[ix].kind == controller_kl_ata4_80);
 
 	if (!pmac_ide_build_dmatable(drive, rq, ix, !reading))
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 	/* Apple adds 60ns to wrDataSetup on reads */
 	if (ata4 && (pmac_ide[ix].timings[unit] & TR_66_UDMA_EN)) {
 		out_le32((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG + _IO_BASE),
@@ -1419,7 +1419,7 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 	}
 
 	if (drive->type != ATA_DISK)
-		return ide_started;
+		return ATA_OP_CONTINUES;
 
 	ata_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
 	if ((rq->flags & REQ_SPECIAL) &&
@@ -1435,7 +1435,7 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 
 	udma_start(drive, rq);
 
-	return ide_started;
+	return ATA_OP_CONTINUES;
 }
 
 /*
@@ -1491,14 +1491,14 @@ static int pmac_udma_irq_status(struct ata_device *drive)
 	set_bit(IDE_DMA, drive->channel->active);
 //	if (drive->waiting_for_dma >= DMA_WAIT_TIMEOUT) {
 //		printk(KERN_WARNING "ide%d, timeout waiting \
-				for dbdma command stop\n", ix);
-		return 1;
-	}
+//				for dbdma command stop\n", ix);
+//		return 1;
+//	}
 	udelay(1);
 	return 0;
 }
 
-static int pmac_udma_setup(struct ata_device *drive)
+static int pmac_udma_setup(struct ata_device *drive, int map)
 {
 	/* Change this to better match ide-dma.c */
 	pmac_ide_check_dma(drive);

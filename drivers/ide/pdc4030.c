@@ -230,7 +230,7 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	struct ata_channel *hwif2;
 	struct dc_ident ident;
 	int i;
-	ide_startstop_t startstop;
+	ide_startstop_t ret;
 
 	if (!hwif)
 		return 0;
@@ -250,8 +250,8 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 
 	/* FIXME: Make this go away. */
 	spin_lock_irq(hwif->lock);
-	if (ata_status_poll(drive, DATA_READY, BAD_W_STAT,
-				WAIT_DRQ, NULL, &startstop)) {
+	ret = ata_status_poll(drive, DATA_READY, BAD_W_STAT, WAIT_DRQ, NULL);
+	if (ret != ATA_OP_READY) {
 		printk(KERN_INFO
 			"%s: Failed Promise read config!\n",hwif->name);
 		spin_unlock_irq(hwif->lock);
@@ -414,10 +414,8 @@ read_next:
 	rq->errors = 0;
 	rq->nr_sectors -= nsect;
 	total_remaining = rq->nr_sectors;
-	if ((rq->current_nr_sectors -= nsect) <= 0) {
-		/* FIXME: no queue locking above! */
-		ata_end_request(drive, rq, 1);
-	}
+	if ((rq->current_nr_sectors -= nsect) <= 0)
+		__ata_end_request(drive, rq, 1, 0);
 
 	/*
 	 * Now the data has been read in, do the following:
@@ -437,27 +435,18 @@ read_next:
 		if (drive->status & DRQ_STAT)
 			goto read_again;
 		if (drive->status & BUSY_STAT) {
-			unsigned long flags;
-			struct ata_channel *ch = drive->channel;
-
-			/* FIXME: this locking should encompass the above register
-			 * file access too.
-			 */
-
-			spin_lock_irqsave(ch->lock, flags);
 			ata_set_handler(drive, promise_read_intr, WAIT_CMD, NULL);
-			spin_unlock_irqrestore(ch->lock, flags);
 #ifdef DEBUG_READ
 			printk(KERN_DEBUG "%s: promise_read: waiting for"
 			       "interrupt\n", drive->name);
 #endif
-			return ide_started;
+			return ATA_OP_CONTINUES;
 		}
 		printk(KERN_ERR "%s: Eeek! promise_read_intr: sectors left "
 		       "!DRQ !BUSY\n", drive->name);
 		return ata_error(drive, rq, "promise read intr");
 	}
-	return ide_stopped;
+	return ATA_OP_FINISHED;
 }
 
 /*
@@ -470,20 +459,13 @@ read_next:
  */
 static ide_startstop_t promise_complete_pollfunc(struct ata_device *drive, struct request *rq)
 {
-	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
 
 	if (!ata_status(drive, 0, BUSY_STAT)) {
 		if (time_before(jiffies, ch->poll_timeout)) {
-			/* FIXME: this locking should encompass the above
-			 * register file access too.
-			 */
-
-			spin_lock_irqsave(ch->lock, flags);
 			ata_set_handler(drive, promise_complete_pollfunc, HZ/100, NULL);
-			spin_unlock_irqrestore(ch->lock, flags);
 
-			return ide_started; /* continue polling... */
+			return ATA_OP_CONTINUES; /* continue polling... */
 		}
 		ch->poll_timeout = 0;
 		printk(KERN_ERR "%s: completion timeout - still busy!\n",
@@ -495,15 +477,9 @@ static ide_startstop_t promise_complete_pollfunc(struct ata_device *drive, struc
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: Write complete - end_request\n", drive->name);
 #endif
-	/* FIXME: this locking should encompass the above
-	 * register file access too.
-	 */
-
-	spin_lock_irqsave(ch->lock, flags);
 	__ata_end_request(drive, rq, 1, rq->nr_sectors);
-	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_stopped;
+	return ATA_OP_FINISHED;
 }
 
 /*
@@ -563,21 +539,17 @@ int promise_multwrite(struct ata_device *drive, struct request *rq, unsigned int
  */
 static ide_startstop_t promise_write_pollfunc(struct ata_device *drive, struct request *rq)
 {
-	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
 
-	spin_lock_irqsave(ch->lock, flags);
 	if (inb(IDE_NSECTOR_REG) != 0) {
 		if (time_before(jiffies, ch->poll_timeout)) {
 			ata_set_handler(drive, promise_write_pollfunc, HZ/100, NULL);
-			spin_unlock_irqrestore(ch->lock, flags);
 
-			return ide_started; /* continue polling... */
+			return ATA_OP_CONTINUES; /* continue polling... */
 		}
 		ch->poll_timeout = 0;
 		printk(KERN_ERR "%s: write timed out!\n", drive->name);
 		ata_status(drive, 0, 0);
-		spin_unlock_irqrestore(ch->lock, flags);
 
 		return ata_error(drive, rq, "write timeout");
 	}
@@ -592,8 +564,8 @@ static ide_startstop_t promise_write_pollfunc(struct ata_device *drive, struct r
 	printk(KERN_DEBUG "%s: Done last 4 sectors - status = %02x\n",
 		drive->name, drive->status);
 #endif
-	spin_unlock_irqrestore(ch->lock, flags);
-	return ide_started;
+
+	return ATA_OP_CONTINUES;
 }
 
 /*
@@ -605,7 +577,6 @@ static ide_startstop_t promise_write_pollfunc(struct ata_device *drive, struct r
  */
 static ide_startstop_t promise_do_write(struct ata_device *drive, struct request *rq)
 {
-	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
 
 #ifdef DEBUG_WRITE
@@ -613,43 +584,35 @@ static ide_startstop_t promise_do_write(struct ata_device *drive, struct request
 	       "buffer=%p\n", drive->name, rq->sector,
 	       rq->sector + rq->nr_sectors - 1, rq->buffer);
 #endif
-	/* FIXME: this locking should encompass the above register
-	 * file access too.
-	 */
-
-	spin_lock_irqsave(ch->lock, flags);
 	/*
 	 * If there are more than 4 sectors to transfer, do n-4 then go into
 	 * the polling strategy as defined above.
 	 */
 	if (rq->nr_sectors > 4) {
 		if (promise_multwrite(drive, rq, rq->nr_sectors - 4)) {
-			spin_unlock_irqrestore(ch->lock, flags);
-			return ide_stopped;
+
+			return ATA_OP_FINISHED;
 		}
 		ch->poll_timeout = jiffies + WAIT_WORSTCASE;
 		ata_set_handler(drive, promise_write_pollfunc, HZ/100, NULL);
-		spin_unlock_irqrestore(ch->lock, flags);
 
-		return ide_started;
+		return ATA_OP_CONTINUES;
 	} else {
 	/*
 	 * There are 4 or fewer sectors to transfer, do them all in one go
 	 * and wait for NOT BUSY.
 	 */
-		if (promise_multwrite(drive, rq, rq->nr_sectors)) {
-			spin_unlock_irqrestore(ch->lock, flags);
-			return ide_stopped;
-		}
+		if (promise_multwrite(drive, rq, rq->nr_sectors))
+			return ATA_OP_FINISHED;
+
 		ch->poll_timeout = jiffies + WAIT_WORSTCASE;
 		ata_set_handler(drive, promise_complete_pollfunc, HZ/100, NULL);
-		spin_unlock_irqrestore(ch->lock, flags);
 
 #ifdef DEBUG_WRITE
 		printk(KERN_DEBUG "%s: promise_write: <= 4 sectors, "
 			"status = %02x\n", drive->name, drive->status);
 #endif
-		return ide_started;
+		return ATA_OP_CONTINUES;
 	}
 }
 
@@ -666,9 +629,9 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 	/* Check that it's a regular command. If not, bomb out early. */
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "pdc4030 bad flags");
-		ata_end_request(drive, rq, 0);
+		__ata_end_request(drive, rq, 0, 0);
 
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 	}
 
 	ata_irq_enable(drive, 1);
@@ -701,34 +664,23 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 				return promise_read_intr(drive, rq);
 			}
 			if (inb(IDE_SELECT_REG) & 0x01) {
-				unsigned long flags;
-				struct ata_channel *ch = drive->channel;
-
-				/* FIXME: this locking should encompass the above register
-				 * file access too.
-				 */
-
-				spin_lock_irqsave(ch->lock, flags);
 #ifdef DEBUG_READ
 				printk(KERN_DEBUG "%s: read: waiting for "
 				                  "interrupt\n", drive->name);
 #endif
 				ata_set_handler(drive, promise_read_intr, WAIT_CMD, NULL);
-				spin_unlock_irqrestore(ch->lock, flags);
 
-				return ide_started;
+				return ATA_OP_CONTINUES;
 			}
 			udelay(1);
 		} while (time_before(jiffies, timeout));
 
 		printk(KERN_ERR "%s: reading: No DRQ and not waiting - Odd!\n",
 			drive->name);
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 
 	case WRITE: {
-		ide_startstop_t startstop;
-		unsigned long flags;
-		struct ata_channel *ch = drive->channel;
+		ide_startstop_t ret;
 
 		/*
 		 * Strategy on write is: look for the DRQ that should have been
@@ -740,29 +692,25 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 		 * completion must be polled
 		 */
 
-		/* FIXME: Move this lock upwards.
-		 */
-		spin_lock_irqsave(ch->lock, flags);
-		if (ata_status_poll(drive, DATA_READY, drive->bad_wstat,
-					WAIT_DRQ, rq, &startstop )) {
+		ret = ata_status_poll(drive, DATA_READY, drive->bad_wstat,
+					WAIT_DRQ, rq);
+		if (ret != ATA_OP_READY) {
 			printk(KERN_ERR "%s: no DRQ after issuing "
 			       "PROMISE_WRITE\n", drive->name);
-			spin_unlock_irqrestore(ch->lock, flags);
 
-			return startstop;
+			return ret;
 		}
 		if (!drive->channel->unmask)
 			__cli();	/* local CPU only */
-		spin_unlock_irqrestore(ch->lock, flags);
 
 		return promise_do_write(drive, rq);
 	}
 
 	default:
 		printk(KERN_ERR "pdc4030: command not READ or WRITE! Huh?\n");
-		/* FIXME: This should already run under the lock. */
-		ata_end_request(drive, rq, 0);
-		return ide_stopped;
+
+		__ata_end_request(drive, rq, 0, 0);
+		return ATA_OP_FINISHED;
 	}
 }
 

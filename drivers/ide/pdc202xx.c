@@ -129,29 +129,30 @@ int check_in_drive_lists(struct ata_device *drive)
 	return 0;
 }
 
-static int pdc202xx_ratemask(struct ata_device *drive)
+static int __init pdc202xx_modes_map(struct ata_channel *ch)
 {
-	struct pci_dev *dev = drive->channel->pci_dev;
-	int map = 0;
+	int map = XFER_EPIO | XFER_SWDMA | XFER_MWDMA | XFER_UDMA;
 
-	if (!eighty_ninty_three(drive))
-		return XFER_UDMA;
-
-	switch(dev->device) {
+	switch(ch->pci_dev->device) {
 		case PCI_DEVICE_ID_PROMISE_20276:
 		case PCI_DEVICE_ID_PROMISE_20275:
 		case PCI_DEVICE_ID_PROMISE_20269:
 			map |= XFER_UDMA_133;
 		case PCI_DEVICE_ID_PROMISE_20268R:
 		case PCI_DEVICE_ID_PROMISE_20268:
+			map &= ~XFER_SWDMA;
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
 			map |= XFER_UDMA_100;
 		case PCI_DEVICE_ID_PROMISE_20262:
 			map |= XFER_UDMA_66;
-		case PCI_DEVICE_ID_PROMISE_20246:
-			map |= XFER_UDMA;
+
+			if (!ch->udma_four) {
+				printk(KERN_WARNING "%s: 40-pin cable, speed reduced to UDMA(33) mode.\n", ch->name);
+				map &= ~XFER_UDMA_80W;
+			}
 	}
+
 	return map;
 }
 
@@ -163,9 +164,6 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 #if PDC202XX_DECODE_REGISTER_INFO
 	u8 DP;
 #endif
-
-	if (drive->dn > 3) /* FIXME: remove this --bkz */
-		return -1;
 
 	drive_pci = 0x60 + (drive->dn << 2);
 
@@ -372,48 +370,34 @@ static void pdc202xx_tune_drive(struct ata_device *drive, u8 pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-/* FIXME: split this for old & new chipsets (jumpbit) --bkz */
-static int config_chipset_for_dma(struct ata_device *drive, byte udma)
+static int pdc202xx_tx_udma_setup(struct ata_device *drive, int map)
 {
-	struct hd_driveid *id	= drive->id;
+	struct hd_driveid *id = drive->id;
+	struct ata_channel *ch = drive->channel;
+	u32 indexreg = ch->dma_base + 1;
+	u32 datareg = indexreg + 2;
+	u8 adj = (drive->dn % 2) ? 0x08 : 0x00;
+
+	if (drive->type != ATA_DISK)
+		return 0;
+
+	/* IORDY_EN & PREFETCH_EN */
+	if (id->capability & 4)
+		set_2regs(0x13, (IN_BYTE(datareg)|0x03));
+
+	return udma_generic_setup(drive, map);
+}
+
+static int pdc202xx_udma_setup(struct ata_device *drive, int map)
+{
+	struct hd_driveid *id = drive->id;
 	struct ata_channel *hwif = drive->channel;
 	struct hd_driveid *mate_id = hwif->drives[!(drive->dn%2)].id;
-	struct pci_dev *dev	= hwif->pci_dev;
+	struct pci_dev *dev = hwif->pci_dev;
 	u32 high_16 = pci_resource_start(dev, 4);
-	u32 dma_base = hwif->dma_base;
-	u32 indexreg = dma_base + 1;
-	u32 datareg = dma_base + 3;
-	byte adj		= (drive->dn%2) ? 0x08 : 0x00;
-	u8 jumpbit;
 	u32 drive_conf;
 	u8 drive_pci = 0, AP, tmp, mode = -1;
 	u8 CLKSPD, mask = hwif->unit ? 0x08 : 0x02;
-	int map;
-
-	/* UDMA 3, 4, 5 and 6 */
-	u8 needs_80w = (id->dma_ultra & 0x0078);
-
-	switch(dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20267:
-		case PCI_DEVICE_ID_PROMISE_20265:
-		case PCI_DEVICE_ID_PROMISE_20262:
-		case PCI_DEVICE_ID_PROMISE_20246:
-			jumpbit = 0;
-			break;
-		default: /* chipsets newer then 20267 */
-			jumpbit = 1;
-			break;
-	}
-
-	/* FIXME: this check is wrong for 20246  --bkz */
-	/* */
-	if (needs_80w && !hwif->udma_four) {
-		printk(KERN_WARNING "%s: channel requires an 80-pin cable.\n", hwif->name);
-		printk(KERN_INFO "%s: reduced to UDMA(33) mode.\n", drive->name);
-	}
-
-	if (jumpbit)
-		goto chipset_is_set;
 
 	/*
 	 * Set the control register to use the 66Mhz system
@@ -427,7 +411,7 @@ static int config_chipset_for_dma(struct ata_device *drive, byte udma)
 	 * FIXME: move this to pdc202xx_tuneproc()
 	 *        right now you can't downgrade from U66 to U33  --bkz
 	 */
-	if (needs_80w) {
+	if (id->dma_ultra & 0x0078) {	/* UDMA 3, 4, 5 and 6 */
 		CLKSPD = IN_BYTE(high_16 + PDC_CLK);
 		/* check cable and mate (must be at least udma3 capable) */
 		if (!hwif->udma_four ||
@@ -449,12 +433,11 @@ static int config_chipset_for_dma(struct ata_device *drive, byte udma)
 	/* FIXME: what if SYNC_ERRDY is enabled for slave
 		  and disabled for master? --bkz */
 	pci_read_config_byte(dev, drive_pci, &AP);
+	/* enable SYNC_ERRDY for master and slave (if enabled for master) */
 	if (!(AP & SYNC_ERRDY_EN)) {
-		if (drive->dn == 0 || drive->dn == 2) {
-			/* enable SYNC_ERRDY for master */
+		if (!(drive->dn % 2)) {
 			pci_write_config_byte(dev, drive_pci, AP|SYNC_ERRDY_EN);
 		} else {
-			/* enable SYNC_ERRDY for slave if enabled for master */
 			pci_read_config_byte(dev, drive_pci - 4, &tmp);
 			if (tmp & SYNC_ERRDY_EN)
 				pci_write_config_byte(dev, drive_pci, AP|SYNC_ERRDY_EN);
@@ -466,85 +449,26 @@ chipset_is_set:
 	if (drive->type != ATA_DISK)
 		return 0;
 
-	if (jumpbit) {
-		if (id->capability & 4) {	/* IORDY_EN & PREFETCH_EN */
-			set_2regs(0x13, (IN_BYTE(datareg)|0x03));
-		}
-	} else {
-		pci_read_config_byte(dev, drive_pci, &AP);
-		if (id->capability & 4)		/* IORDY_EN */
-			pci_write_config_byte(dev, drive_pci, AP|IORDY_EN);
-		pci_read_config_byte(dev, drive_pci, &AP);
-		if (drive->type == ATA_DISK)	/* PREFETCH_EN */
-			pci_write_config_byte(dev, drive_pci, AP|PREFETCH_EN);
-	}
+	pci_read_config_byte(dev, drive_pci, &AP);
+	if (id->capability & 4)		/* IORDY_EN */
+		pci_write_config_byte(dev, drive_pci, AP|IORDY_EN);
+	pci_read_config_byte(dev, drive_pci, &AP);
+	if (drive->type == ATA_DISK)	/* PREFETCH_EN */
+		pci_write_config_byte(dev, drive_pci, AP|PREFETCH_EN);
 
-	if (udma) {
-		map = pdc202xx_ratemask(drive);
-	} else {
-		if (!jumpbit)
-			map = XFER_SWDMA | XFER_MWDMA;
-		else
-			map = XFER_MWDMA;
-	}
+	map = hwif->modes_map;
+
+	if (!eighty_ninty_three(drive))
+		map &= ~XFER_UDMA_80W;
 
 	mode = ata_timing_mode(drive, map);
 	if (mode < XFER_SW_DMA_0) {
 		/* restore original pci-config space */
-		if (!jumpbit)
-			pci_write_config_dword(dev, drive_pci, drive_conf);
+		pci_write_config_dword(dev, drive_pci, drive_conf);
 		return 0;
 	}
 
-	return !hwif->speedproc(drive, mode);
-}
-
-static int pdc202xx_udma_setup(struct ata_device *drive)
-{
-	struct hd_driveid *id = drive->id;
-	struct ata_channel *hwif = drive->channel;
-	int on = 0;
-	int verbose = 1;
-
-	if (id && (id->capability & 1) && hwif->autodma) {
-		/* Consult the list of known "bad" drives */
-		verbose = 0;
-		if (udma_black_list(drive))
-			goto no_dma_set;
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & 0x007F) {
-				/* Force if Capable UltraDMA */
-				on = config_chipset_for_dma(drive, 1);
-				if ((id->field_valid & 2) &&
-				    (!on))
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & 0x0007) ||
-			    (id->dma_1word & 0x0007)) {
-				/* Force if Capable regular DMA modes */
-				on = config_chipset_for_dma(drive, 0);
-				if (!on)
-					goto no_dma_set;
-			}
-		} else if (udma_white_list(drive)) {
-			if (id->eide_dma_time > 150) {
-				goto no_dma_set;
-			}
-			/* Consult the list of known "good" drives */
-			on = config_chipset_for_dma(drive, 0);
-			if (!on)
-				goto no_dma_set;
-		} else goto no_dma_set;
-	} else if ((id->capability & 8) || (id->field_valid & 2)) {
-no_dma_set:
-		pdc202xx_tune_drive(drive, 255);
-	}
-
-	udma_enable(drive, on, verbose);
-
-	return 0;
+	return udma_generic_setup(drive, map);
 }
 
 static void pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
@@ -725,12 +649,20 @@ static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 		case PCI_DEVICE_ID_PROMISE_20269:
 		case PCI_DEVICE_ID_PROMISE_20268:
 		case PCI_DEVICE_ID_PROMISE_20268R:
+			hwif->udma_four = pdc202xx_tx_ata66_check(hwif);
+
 			hwif->speedproc = &pdc202xx_new_tune_chipset;
 			hwif->resetproc = &pdc202xx_new_reset;
+#ifdef CONFIG_BLK_DEV_IDEDMA
+			if (hwif->dma_base)
+				hwif->udma_setup = pdc202xx_tx_udma_setup;
+#endif
 			break;
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
 		case PCI_DEVICE_ID_PROMISE_20262:
+			hwif->udma_four = pdc202xx_ata66_check(hwif);
+
 			hwif->resetproc	= &pdc202xx_reset;
 #ifdef CONFIG_BLK_DEV_IDEDMA
 			/* we need special functions for lba48 */
@@ -741,6 +673,10 @@ static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 #endif
 		/* FIXME: check whether 20246 works with lba48 --bkz */
 		case PCI_DEVICE_ID_PROMISE_20246:
+#ifdef CONFIG_BLK_DEV_IDEDMA
+			if (hwif->dma_base)
+				hwif->udma_setup = pdc202xx_udma_setup;
+#endif
 			hwif->speedproc = &pdc202xx_tune_chipset;
 		default:
 			break;
@@ -748,18 +684,15 @@ static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
+		hwif->modes_map = pdc202xx_modes_map(hwif);
 		hwif->udma_irq_lost = pdc202xx_bug;
 		hwif->udma_timeout = pdc202xx_bug;
-		hwif->udma_setup = pdc202xx_udma_setup;
 		hwif->highmem = 1;
-		if (!noautodma)
-			hwif->autodma = 1;
 	} else
 #endif
 	{
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;
-		hwif->autodma = 0;
 	}
 }
 
@@ -770,7 +703,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20246,
 		init_chipset: pdc202xx_init_chipset,
-		ata66_check: NULL,
 		init_channel: ide_init_pdc202xx,
 #ifndef CONFIG_PDC202XX_FORCE
 		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
@@ -783,7 +715,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20262,
 		init_chipset: pdc202xx_init_chipset,
-		ata66_check: pdc202xx_ata66_check,
 		init_channel: ide_init_pdc202xx,
 #ifndef CONFIG_PDC202XX_FORCE
 		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
@@ -796,7 +727,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20265,
 		init_chipset: pdc202xx_init_chipset,
-		ata66_check: pdc202xx_ata66_check,
 		init_channel: ide_init_pdc202xx,
 #ifndef CONFIG_PDC202XX_FORCE
 		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
@@ -811,7 +741,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20267,
 		init_chipset: pdc202xx_init_chipset,
-		ata66_check: pdc202xx_ata66_check,
 		init_channel: ide_init_pdc202xx,
 #ifndef CONFIG_PDC202XX_FORCE
 		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
@@ -824,7 +753,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20268,
 		init_chipset: pdc202xx_tx_init_chipset,
-		ata66_check: pdc202xx_tx_ata66_check,
 		init_channel: ide_init_pdc202xx,
 		bootable: OFF_BOARD,
 		flags: ATA_F_IRQ | ATA_F_DMA
@@ -837,7 +765,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20268R,
 		init_chipset: pdc202xx_tx_init_chipset,
-		ata66_check: pdc202xx_tx_ata66_check,
 		init_channel: ide_init_pdc202xx,
 		bootable: OFF_BOARD,
 		flags: ATA_F_IRQ  | ATA_F_DMA
@@ -846,7 +773,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20269,
 		init_chipset: pdc202xx_tx_init_chipset,
-		ata66_check: pdc202xx_tx_ata66_check,
 		init_channel: ide_init_pdc202xx,
 		bootable: OFF_BOARD,
 		flags: ATA_F_IRQ | ATA_F_DMA
@@ -855,7 +781,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20275,
 		init_chipset: pdc202xx_tx_init_chipset,
-		ata66_check: pdc202xx_tx_ata66_check,
 		init_channel: ide_init_pdc202xx,
 		bootable: OFF_BOARD,
 		flags: ATA_F_IRQ | ATA_F_DMA
@@ -864,7 +789,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_PROMISE,
 		device: PCI_DEVICE_ID_PROMISE_20276,
 		init_chipset: pdc202xx_tx_init_chipset,
-		ata66_check: pdc202xx_tx_ata66_check,
 		init_channel: ide_init_pdc202xx,
 		bootable: OFF_BOARD,
 		flags: ATA_F_IRQ | ATA_F_DMA

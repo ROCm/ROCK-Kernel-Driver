@@ -191,7 +191,7 @@ static int cs5530_config_dma(struct ata_device *drive)
 	return 0;
 }
 
-static int cs5530_udma_setup(struct ata_device *drive)
+static int cs5530_udma_setup(struct ata_device *drive, int map)
 {
 	return cs5530_config_dma(drive);
 }
@@ -285,17 +285,15 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
  */
 static void __init ide_init_cs5530(struct ata_channel *hwif)
 {
+	u32 basereg, d0_timings;
+
 	hwif->serialized = 1;
-	if (!hwif->dma_base) {
-		hwif->autodma = 0;
-	} else {
-		unsigned int basereg, d0_timings;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	hwif->udma_setup = cs5530_udma_setup;
-	hwif->highmem = 1;
-#else
-	hwif->autodma = 0;
+	if (hwif->dma_base) {
+		hwif->highmem = 1;
+		hwif->udma_setup = cs5530_udma_setup;
+	}
 #endif
 
 		hwif->tuneproc = &cs5530_tuneproc;
@@ -311,7 +309,6 @@ static void __init ide_init_cs5530(struct ata_channel *hwif)
 			if (!hwif->drives[1].autotune)
 				hwif->drives[1].autotune = 1;	/* needs autotuning later */
 		}
-	}
 }
 
 

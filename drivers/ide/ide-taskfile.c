@@ -197,13 +197,14 @@ int drive_is_ready(struct ata_device *drive)
 int ide_do_drive_cmd(struct ata_device *drive, struct request *rq, ide_action_t action)
 {
 	unsigned long flags;
-	unsigned int major = drive->channel->major;
+	struct ata_channel *ch = drive->channel;
+	unsigned int major = ch->major;
 	request_queue_t *q = &drive->queue;
 	struct list_head *queue_head = &q->queue_head;
 	DECLARE_COMPLETION(wait);
 
 #ifdef CONFIG_BLK_DEV_PDC4030
-	if (drive->channel->chipset == ide_pdc4030 && rq->buffer != NULL)
+	if (ch->chipset == ide_pdc4030 && rq->buffer)
 		return -ENOSYS;  /* special drive cmds not supported */
 #endif
 	rq->errors = 0;
@@ -212,22 +213,18 @@ int ide_do_drive_cmd(struct ata_device *drive, struct request *rq, ide_action_t 
 	if (action == ide_wait)
 		rq->waiting = &wait;
 
-	spin_lock_irqsave(drive->channel->lock, flags);
+	spin_lock_irqsave(ch->lock, flags);
 
-	if (blk_queue_empty(&drive->queue) || action == ide_preempt) {
-		if (action == ide_preempt)
-			drive->rq = NULL;
-	} else {
-		if (action == ide_wait)
-			queue_head = queue_head->prev;
-		else
-			queue_head = queue_head->next;
-	}
-	q->elevator.elevator_add_req_fn(q, rq, queue_head);
+	if (action == ide_preempt)
+		drive->rq = NULL;
+	else if (!blk_queue_empty(&drive->queue))
+		queue_head = queue_head->prev;	/* ide_end and ide_wait */
+
+	__elv_add_request(q, rq, queue_head);
 
 	do_ide_request(q);
 
-	spin_unlock_irqrestore(drive->channel->lock, flags);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	if (action == ide_wait) {
 		wait_for_completion(&wait);	/* wait for it to be serviced */
@@ -235,23 +232,20 @@ int ide_do_drive_cmd(struct ata_device *drive, struct request *rq, ide_action_t 
 	}
 
 	return 0;
-
 }
 
 
 /*
  * Invoked on completion of a special REQ_SPECIAL command.
  */
-ide_startstop_t ata_special_intr(struct ata_device *drive, struct
+static ide_startstop_t special_intr(struct ata_device *drive, struct
 		request *rq) {
-
-	struct ata_taskfile *ar = rq->special;
-	ide_startstop_t ret = ide_stopped;
 	unsigned long flags;
+	struct ata_channel *ch =drive->channel;
+	struct ata_taskfile *ar = rq->special;
+	ide_startstop_t ret = ATA_OP_FINISHED;
 
-	ide__sti();	/* local CPU only */
-
-	spin_lock_irqsave(drive->channel->lock, flags);
+	ide__sti();
 
 	if (rq->buffer && ar->taskfile.sector_number) {
 		if (!ata_status(drive, 0, DRQ_STAT) && ar->taskfile.sector_number) {
@@ -283,24 +277,27 @@ ide_startstop_t ata_special_intr(struct ata_device *drive, struct
 		ata_in_regfile(drive, &ar->hobfile);
 	}
 
+	spin_lock_irqsave(ch->lock, flags);
+
 	blkdev_dequeue_request(rq);
 	drive->rq = NULL;
 	end_that_request_last(rq);
 
-	spin_unlock_irqrestore(drive->channel->lock, flags);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ret;
 }
 
-int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *ar)
+int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *ar, char *buf)
 {
 	struct request req;
 
 	ar->command_type = IDE_DRIVE_TASK_NO_DATA;
-	ar->XXX_handler = ata_special_intr;
+	ar->XXX_handler = special_intr;
 
 	memset(&req, 0, sizeof(req));
 	req.flags = REQ_SPECIAL;
+	req.buffer = buf;
 	req.special = ar;
 
 	return ide_do_drive_cmd(drive, &req, ide_wait);
@@ -310,5 +307,4 @@ EXPORT_SYMBOL(drive_is_ready);
 EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
-EXPORT_SYMBOL(ata_special_intr);
 EXPORT_SYMBOL(ide_raw_taskfile);

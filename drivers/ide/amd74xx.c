@@ -175,21 +175,15 @@ static void amd74xx_tune_drive(struct ata_device *drive, u8 pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int amd74xx_udma_setup(struct ata_device *drive)
+static int __init amd_modes_map(struct ata_channel *ch)
 {
-	short w80 = drive->channel->udma_four;
+	short w80 = ch->udma_four;
+	int map = XFER_EPIO | XFER_MWDMA | XFER_UDMA |
+		  ((amd_config->flags & AMD_BAD_SWDMA) ? 0 : XFER_SWDMA) |
+		  (w80 && (amd_config->flags & AMD_UDMA) >= AMD_UDMA_66 ? XFER_UDMA_66 : 0) |
+		  (w80 && (amd_config->flags & AMD_UDMA) >= AMD_UDMA_100 ? XFER_UDMA_100 : 0);
 
-	short speed = ata_timing_mode(drive,
-			XFER_PIO | XFER_EPIO | XFER_MWDMA | XFER_UDMA |
-			((amd_config->flags & AMD_BAD_SWDMA) ? 0 : XFER_SWDMA) |
-			(w80 && (amd_config->flags & AMD_UDMA) >= AMD_UDMA_66 ? XFER_UDMA_66 : 0) |
-			(w80 && (amd_config->flags & AMD_UDMA) >= AMD_UDMA_100 ? XFER_UDMA_100 : 0));
-
-	amd_set_drive(drive, speed);
-
-	udma_enable(drive, drive->channel->autodma && (speed & XFER_MODE) != XFER_PIO, 0);
-
-	return 0;
+	return map;
 }
 #endif
 
@@ -274,9 +268,10 @@ static void __init amd74xx_init_channel(struct ata_channel *hwif)
 {
 	int i;
 
+	hwif->udma_four = amd74xx_ata66_check(hwif);
+
 	hwif->tuneproc = &amd74xx_tune_drive;
 	hwif->speedproc = &amd_set_drive;
-	hwif->autodma = 0;
 
 	hwif->io_32bit = 1;
 	hwif->unmask = 1;
@@ -289,11 +284,8 @@ static void __init amd74xx_init_channel(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->udma_setup = amd74xx_udma_setup;
-# ifdef CONFIG_IDEDMA_AUTO
-		if (!noautodma)
-			hwif->autodma = 1;
-# endif
+		hwif->modes_map = amd_modes_map(hwif);
+		hwif->udma_setup = udma_generic_setup;
 	}
 #endif
 }
@@ -314,7 +306,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_AMD,
 		device: PCI_DEVICE_ID_AMD_COBRA_7401,
 		init_chipset: amd74xx_init_chipset,
-		ata66_check: amd74xx_ata66_check,
 		init_channel: amd74xx_init_channel,
 		init_dma: amd74xx_init_dma,
 		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
@@ -324,7 +315,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor:	PCI_VENDOR_ID_AMD,
 		device:	PCI_DEVICE_ID_AMD_VIPER_7409,
 		init_chipset: amd74xx_init_chipset,
-		ata66_check: amd74xx_ata66_check,
 		init_channel: amd74xx_init_channel,
 		init_dma: amd74xx_init_dma,
 		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
@@ -335,7 +325,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor:	PCI_VENDOR_ID_AMD,
 		device:	PCI_DEVICE_ID_AMD_VIPER_7411,
 		init_chipset: amd74xx_init_chipset,
-		ata66_check: amd74xx_ata66_check,
 		init_channel: amd74xx_init_channel,
 		init_dma: amd74xx_init_dma,
 		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
@@ -345,7 +334,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor:	PCI_VENDOR_ID_AMD,
 		device:	PCI_DEVICE_ID_AMD_OPUS_7441,
 		init_chipset: amd74xx_init_chipset,
-		ata66_check: amd74xx_ata66_check,
 		init_channel: amd74xx_init_channel,
 		init_dma: amd74xx_init_dma,
 		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
@@ -355,7 +343,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor:	PCI_VENDOR_ID_AMD,
 		device:	PCI_DEVICE_ID_AMD_8111_IDE,
 		init_chipset: amd74xx_init_chipset,
-		ata66_check: amd74xx_ata66_check,
 		init_channel: amd74xx_init_channel,
 		init_dma: amd74xx_init_dma,
 		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
@@ -365,7 +352,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor:	PCI_VENDOR_ID_NVIDIA,
 		device:	PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
 		init_chipset: amd74xx_init_chipset,
-		ata66_check: amd74xx_ata66_check,
 		init_channel: amd74xx_init_channel,
 		init_dma: amd74xx_init_dma,
 		enablebits: {{0x50,0x01,0x01}, {0x50,0x02,0x02}},

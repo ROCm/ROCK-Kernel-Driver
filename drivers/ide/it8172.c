@@ -179,14 +179,6 @@ static int it8172_tune_chipset(struct ata_device *drive, u8 speed)
 
 	return ide_config_drive_speed(drive, speed);
 }
-
-static int it8172_udma_setup(struct ata_device *drive)
-{
-	u8 speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO |
-				   XFER_SWDMA | XFER_MWDMA | XFER_UDMA);
-
-	return !it8172_tune_chipset(drive, speed);
-}
 #endif /* defined(CONFIG_BLK_DEV_IDEDMA) && (CONFIG_IT8172_TUNING) */
 
 
@@ -216,15 +208,11 @@ static void __init ide_init_it8172(struct ata_channel *hwif)
     if (!hwif->dma_base)
 	return;
 
-#ifndef CONFIG_BLK_DEV_IDEDMA
-    hwif->autodma = 0;
-#else /* CONFIG_BLK_DEV_IDEDMA */
 # ifdef CONFIG_IT8172_TUNING
-    hwif->autodma = 1;
-    hwif->dmaproc = &it8172_dmaproc;
+	hwif->modes_map = XFER_EPIO | XFER_SWDMA | XFER_MWDMA | XFER_UDMA;
+	hwif->udma_setup = udma_generic_setup;
     hwif->speedproc = &it8172_tune_chipset;
 # endif
-#endif
 
     cmdBase = dev->resource[0].start;
     ctrlBase = dev->resource[1].start;

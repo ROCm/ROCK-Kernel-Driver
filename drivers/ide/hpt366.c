@@ -493,37 +493,23 @@ static unsigned int hpt_revision(struct pci_dev *dev)
 	return class_rev;
 }
 
-static int hpt3xx_ratemask(struct ata_device *drive)
+static int __init hpt3xx_modes_map(struct ata_channel *ch)
 {
-	u32 rev = hpt_revision(drive->channel->pci_dev);
-	int map = XFER_UDMA;
+	u32 rev = hpt_revision(ch->pci_dev);
+	int map = XFER_EPIO | XFER_MWDMA | XFER_UDMA | XFER_UDMA_66;
 
 	if (rev >= 8) {					/* HPT374 */
 		if (HPT374_ALLOW_ATA133_6)
 			map |= XFER_UDMA_133;
-		map |= (XFER_UDMA_100 | XFER_UDMA_66);
+		map |= XFER_UDMA_100;
 	} else if (rev >= 5) {				/* HPT372 */
 		if (HPT372_ALLOW_ATA133_6)
 			map |= XFER_UDMA_133;
-		map |= (XFER_UDMA_100 | XFER_UDMA_66);
-	} else if (rev >= 4) {				/* HPT370A */
+		map |= XFER_UDMA_100;
+	} else if (rev >= 3) {				/* HPT370A / HPT370 */
 		if (HPT370_ALLOW_ATA100_5)
 			map |= XFER_UDMA_100;
-		map |= XFER_UDMA_66;
-	} else if (rev >= 3) {				/* HPT370 */
-		if (HPT370_ALLOW_ATA100_5)
-			map |= XFER_UDMA_100;
-		map |= XFER_UDMA_66;
-		if (check_in_drive_lists(drive, bad_ata33))
-			return 0;
-	} else {					/* HPT366 and HPT368 */
-		map |= XFER_UDMA_66;
-		if (check_in_drive_lists(drive, bad_ata33))
-			return 0;
-	}
-
-	if (!eighty_ninty_three(drive))
-		return XFER_UDMA;
+	}						/* HPT366 / HPT368 */
 
 	return map;
 }
@@ -662,62 +648,42 @@ static int hpt3xx_tune_chipset(struct ata_device *drive, u8 speed)
 	return ide_config_drive_speed(drive, speed);
 }
 
+/* FIXME: pio == 255 -> ata_best_pio_mode(drive)  --bkz */
 static void hpt3xx_tune_drive(struct ata_device *drive, u8 pio)
 {
 	(void) hpt3xx_tune_chipset(drive, XFER_PIO_0 + min_t(u8, pio, 4));
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_chipset_for_dma(struct ata_device *drive)
+static int hpt3xx_udma_setup(struct ata_device *drive, int map)
 {
-	int map;
 	u32 rev;
-	u8 mode;
 
 	if (drive->type != ATA_DISK)
 		return 0;
 
 	rev = hpt_revision(drive->channel->pci_dev);
 
-	/* FIXME: check SWDMA modes --bkz */
-	map = hpt3xx_ratemask(drive) | XFER_MWDMA;
-	mode = ata_timing_mode(drive, map);
+	/* FIXME: badlists need futher investigation  --bkz */
 
-	/* FIXME: badlists need futher investigation --bkz
-		  bad_ata100_5 is for HPT370/370A,
-		  bad_ata66_4, bad_ata66_3 and bad_ata33 are for HPT366/368
-	 */
-	if (mode == XFER_UDMA_5 && rev < 5) {
-		if (check_in_drive_lists(drive, bad_ata100_5)) {
-			/* FIXME: make XFER_UDMA_66/100/133
-				  independent of XFER_UDMA --bkz */
-			map &= ~XFER_UDMA_100;
-			map |= XFER_UDMA;
-			mode = ata_timing_mode(drive, map);
-		}
-	}
-	if (mode == XFER_UDMA_4 && rev < 3) {
-		if (check_in_drive_lists(drive, bad_ata66_4)) {
-			if (drive->id->dma_ultra & 0x0008) {
-				mode = XFER_UDMA_3;
-			} else {
-				map &= ~XFER_UDMA_66;
-				map |= XFER_UDMA;
-				mode = ata_timing_mode(drive, map);
-			}
-		}
-	}
-	if (mode == XFER_UDMA_3 && rev < 3) {
-		if (check_in_drive_lists(drive, bad_ata66_3)) {
-			map &= ~XFER_UDMA_66;
-			map |= XFER_UDMA;
-			mode = ata_timing_mode(drive, map);
-		}
-	}
-	if (check_in_drive_lists(drive, bad_ata33) && rev < 3)
-		mode = ata_timing_mode(drive, XFER_MWDMA);
+	/* bad_ata100_5 is for HPT370/370A,
+	   bad_ata66_4, bad_ata66_3 and bad_ata33 are for HPT366/368 */
 
-	return !hpt3xx_tune_chipset(drive, mode);
+	if (rev < 5 && check_in_drive_lists(drive, bad_ata100_5))
+		map &= ~XFER_UDMA_100;
+
+	if (rev < 3) {
+		if (check_in_drive_lists(drive, bad_ata66_4))
+			map &= ~XFER_UDMA_66_4;
+
+		if (check_in_drive_lists(drive, bad_ata66_3))
+			map &= ~XFER_UDMA_66_3;
+
+		if (check_in_drive_lists(drive, bad_ata33))
+			map &= ~XFER_UDMA_ALL;
+	}
+
+	return udma_generic_setup(drive, map);
 }
 
 static int hpt3xx_quirkproc(struct ata_device *drive)
@@ -752,59 +718,6 @@ static void hpt3xx_maskproc(struct ata_device *drive)
 		if (ch->io_ports[IDE_CONTROL_OFFSET])
 			OUT_BYTE(0x00, ch->io_ports[IDE_CONTROL_OFFSET]);
 	}
-}
-
-static int hpt3xx_udma_setup(struct ata_device *drive)
-{
-	struct hd_driveid *id = drive->id;
-	int on = 1;
-	int verbose = 1;
-
-	if (id && (id->capability & 1) && drive->channel->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (udma_black_list(drive)) {
-			on = 0;
-			goto fast_ata_pio;
-		}
-		on = 0;
-		verbose = 0;
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & 0x007F) {
-				/* Force if Capable UltraDMA */
-				on = config_chipset_for_dma(drive);
-				if ((id->field_valid & 2) &&
-				    (!on))
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if (id->dma_mword & 0x0007) {
-				/* Force if Capable regular DMA modes */
-				on = config_chipset_for_dma(drive);
-				if (!on)
-					goto no_dma_set;
-			}
-		} else if (udma_white_list(drive)) {
-			if (id->eide_dma_time > 150) {
-				goto no_dma_set;
-			}
-			/* Consult the list of known "good" drives */
-			on = config_chipset_for_dma(drive);
-			if (!on)
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
-		}
-	} else if ((id->capability & 8) || (id->field_valid & 2)) {
-fast_ata_pio:
-		on = 0;
-		verbose = 0;
-no_dma_set:
-		hpt3xx_tune_chipset(drive, ata_best_pio_mode(drive));
-	}
-	udma_enable(drive, on, verbose);
-
-	return 0;
 }
 
 static void hpt366_udma_irq_lost(struct ata_device *drive)
@@ -1232,6 +1145,8 @@ static void __init hpt366_init_channel(struct ata_channel *ch)
 	struct pci_dev *dev = ch->pci_dev;
 	u32 rev = hpt_revision(dev);
 
+	ch->udma_four = hpt366_ata66_check(ch);
+
 	ch->tuneproc = hpt3xx_tune_drive;
 	ch->speedproc = hpt3xx_tune_chipset;
 	ch->quirkproc = hpt3xx_quirkproc;
@@ -1272,17 +1187,12 @@ static void __init hpt366_init_channel(struct ata_channel *ch)
 //			ch->resetproc = hpt3xx_reset;
 //			ch->busproc = hpt3xx_tristate;
 		}
+		ch->modes_map = hpt3xx_modes_map(ch);
 		ch->udma_setup = hpt3xx_udma_setup;
-
-		if (!noautodma)
-			ch->autodma = 1;
-		else
-			ch->autodma = 0;
 		ch->highmem = 1;
 	} else
 #endif
 	{
-		ch->autodma = 0;
 		ch->drives[0].autotune = 1;
 		ch->drives[1].autotune = 1;
 	}
@@ -1315,7 +1225,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_TTI,
 		device: PCI_DEVICE_ID_TTI_HPT366,
 		init_chipset: hpt366_init_chipset,
-		ata66_check: hpt366_ata66_check,
 		init_channel: hpt366_init_channel,
 		init_dma: hpt366_init_dma,
 		bootable: OFF_BOARD,
@@ -1326,7 +1235,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_TTI,
 		device: PCI_DEVICE_ID_TTI_HPT372,
 		init_chipset: hpt366_init_chipset,
-		ata66_check: hpt366_ata66_check,
 		init_channel: hpt366_init_channel,
 		init_dma: hpt366_init_dma,
 		bootable: OFF_BOARD,
@@ -1337,7 +1245,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_TTI,
 		device: PCI_DEVICE_ID_TTI_HPT374,
 		init_chipset: hpt366_init_chipset,
-		ata66_check: hpt366_ata66_check,
 		init_channel: hpt366_init_channel,
 		init_dma: hpt366_init_dma,
 		bootable: OFF_BOARD,

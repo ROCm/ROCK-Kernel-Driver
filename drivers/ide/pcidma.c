@@ -27,6 +27,8 @@
 #include <linux/ide.h>
 #include <linux/delay.h>
 
+#include "ata-timing.h"
+
 #include <asm/io.h>
 #include <asm/irq.h>
 
@@ -44,18 +46,9 @@ ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
 
 	if (ata_status(drive, DRIVE_READY, drive->bad_wstat | DRQ_STAT)) {
 		if (!dma_stat) {
-			unsigned long flags;
-			struct ata_channel *ch = drive->channel;
-
-			/* FIXME: this locking should encompass the above register
-			 * file access too.
-			 */
-
-			spin_lock_irqsave(ch->lock, flags);
 			__ata_end_request(drive, rq, 1, rq->nr_sectors);
-			spin_unlock_irqrestore(ch->lock, flags);
 
-			return ide_stopped;
+			return ATA_OP_FINISHED;
 		}
 		printk(KERN_ERR "%s: dma_intr: bad DMA status (dma_stat=%x)\n",
 		       drive->name, dma_stat);
@@ -128,7 +121,7 @@ static int build_sglist(struct ata_device *drive, struct request *rq)
 /*
  * 1 dma-ing, 2 error, 4 intr
  */
-static int dma_timer_expiry(struct ata_device *drive, struct request *rq)
+static ide_startstop_t dma_timer_expiry(struct ata_device *drive, struct request *rq, unsigned long *wait)
 {
 	/* FIXME: What's that? */
 	u8 dma_stat = inb(drive->channel->dma_base + 2);
@@ -140,15 +133,17 @@ static int dma_timer_expiry(struct ata_device *drive, struct request *rq)
 #if 0
 	drive->expiry = NULL;	/* one free ride for now */
 #endif
-
+	*wait = 0;
 	if (dma_stat & 2) {	/* ERROR */
 		ata_status(drive, 0, 0);
 		return ata_error(drive, rq, __FUNCTION__);
 	}
-	if (dma_stat & 1)	/* DMAing */
-		return WAIT_CMD;
+	if (dma_stat & 1) {	/* DMAing */
+		*wait = WAIT_CMD;
+		return ATA_OP_CONTINUES;
+	}
 
-	return 0;
+	return ATA_OP_FINISHED;
 }
 
 int ata_start_dma(struct ata_device *drive, struct request *rq)
@@ -171,10 +166,73 @@ int ata_start_dma(struct ata_device *drive, struct request *rq)
 	return 0;
 }
 
+/* generic udma_setup() function for drivers having ->speedproc/tuneproc */
+int udma_generic_setup(struct ata_device *drive, int map)
+{
+	struct hd_driveid *id = drive->id;
+	struct ata_channel *ch = drive->channel;
+	int on = 0;
+	u8 mode;
+
+	if (!id || (drive->type != ATA_DISK && ch->no_atapi_autodma))
+		return 0;
+
+	if ((map & XFER_UDMA_80W) && !eighty_ninty_three(drive))
+		map &= ~XFER_UDMA_80W;
+
+	if ((id->capability & 1) && ch->autodma && ch->speedproc) {
+
+		/* Consult the list of known "bad" devices. */
+		if (udma_black_list(drive))
+			goto set_dma;
+
+		mode = ata_timing_mode(drive, map);
+
+		/* Device is UltraDMA capable. */
+		if (mode & XFER_UDMA) {
+			if((on = !ch->speedproc(drive, mode)))
+				goto set_dma;
+
+			printk(KERN_WARNING "%s: UDMA auto-tune failed.\n", drive->name);
+
+			map &= ~XFER_UDMA_ALL;
+			mode = ata_timing_mode(drive, map);
+		}
+
+		/* Device is regular DMA capable. */
+		if (mode & (XFER_SWDMA | XFER_MWDMA)) {
+			if((on = !ch->speedproc(drive, mode)))
+				goto set_dma;
+
+			printk(KERN_WARNING "%s: DMA auto-tune failed.\n", drive->name);
+		}
+
+		/* FIXME: this seems non-functional  --bkz */
+		/* Consult the list of known "good" devices. */
+		if (udma_white_list(drive)) {
+
+			if (id->eide_dma_time > 150)
+				goto set_dma;
+
+			printk(KERN_INFO "%s: device is on DMA whitelist.\n", drive->name);
+//			on = 1;
+		}
+
+		/* Revert to PIO. */
+		if (!on && ch->tuneproc)
+			ch->tuneproc(drive, 255);
+	}
+
+set_dma:
+	udma_enable(drive, on, !on);
+
+	return 0;
+}
+
 /*
  * Configure a device for DMA operation.
  */
-int udma_pci_setup(struct ata_device *drive)
+int udma_pci_setup(struct ata_device *drive, int map)
 {
 	int config_allows_dma = 1;
 	struct hd_driveid *id = drive->id;
@@ -399,8 +457,6 @@ int udma_new_table(struct ata_device *drive, struct request *rq)
 
 /*
  * Teardown mappings after DMA has completed.
- *
- * Channel lock should be held.
  */
 void udma_destroy_table(struct ata_channel *ch)
 {
@@ -411,8 +467,6 @@ void udma_destroy_table(struct ata_channel *ch)
  * Prepare the channel for a DMA startfer. Please note that only the broken
  * Pacific Digital host chip needs the reques to be passed there to decide
  * about addressing modes.
- *
- * Channel lock should be held.
  */
 void udma_pci_start(struct ata_device *drive, struct request *rq)
 {
@@ -426,9 +480,6 @@ void udma_pci_start(struct ata_device *drive, struct request *rq)
 	outb(inb(dma_base) | 1, dma_base);	/* start DMA */
 }
 
-/*
- * Channel lock should be held.
- */
 int udma_pci_stop(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
@@ -445,8 +496,6 @@ int udma_pci_stop(struct ata_device *drive)
 
 /*
  * FIXME: This should be attached to a channel as we can see now!
- *
- * Channel lock should be held.
  */
 int udma_pci_irq_status(struct ata_device *drive)
 {
@@ -533,19 +582,17 @@ dma_alloc_failure:
  *
  * It's exported only for host chips which use it for fallback or (too) late
  * capability checking.
- *
- * Channel lock should be held.
  */
 int udma_pci_init(struct ata_device *drive, struct request *rq)
 {
 	u8 cmd;
 
 	if (ata_start_dma(drive, rq))
-		return ide_stopped;
+		return ATA_OP_FINISHED;
 
 	/* No DMA transfers on ATAPI devices. */
 	if (drive->type != ATA_DISK)
-		return ide_started;
+		return ATA_OP_CONTINUES;
 
 	if (rq_data_dir(rq) == READ)
 		cmd = 0x08;
@@ -560,7 +607,7 @@ int udma_pci_init(struct ata_device *drive, struct request *rq)
 
 	udma_start(drive, rq);
 
-	return ide_started;
+	return ATA_OP_CONTINUES;
 }
 
 EXPORT_SYMBOL(ide_dma_intr);
