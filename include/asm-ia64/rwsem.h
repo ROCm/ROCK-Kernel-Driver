@@ -17,10 +17,9 @@
  * waiting (in which case it goes to sleep).
  */
 
-#ifndef _IA64_RWSEM_H
-#define _IA64_RWSEM_H
+#ifndef _ASM_IA64_RWSEM_H
+#define _ASM_IA64_RWSEM_H
 
-#ifdef __KERNEL__
 #include <linux/list.h>
 #include <linux/spinlock.h>
 
@@ -65,7 +64,8 @@ extern struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem);
 extern struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem);
 extern struct rw_semaphore *rwsem_downgrade_wake(struct rw_semaphore *sem);
 
-static inline void init_rwsem(struct rw_semaphore *sem)
+static inline void
+init_rwsem (struct rw_semaphore *sem)
 {
 	sem->count = RWSEM_UNLOCKED_VALUE;
 	spin_lock_init(&sem->wait_lock);
@@ -78,7 +78,8 @@ static inline void init_rwsem(struct rw_semaphore *sem)
 /*
  * lock for reading
  */
-static inline void __down_read(struct rw_semaphore *sem)
+static inline void
+__down_read (struct rw_semaphore *sem)
 {
 	int result;
 	__asm__ __volatile__ ("fetchadd4.acq %0=[%1],1" :
@@ -90,7 +91,8 @@ static inline void __down_read(struct rw_semaphore *sem)
 /*
  * lock for writing
  */
-static inline void __down_write(struct rw_semaphore *sem)
+static inline void
+__down_write (struct rw_semaphore *sem)
 {
 	int old, new;
 
@@ -106,7 +108,8 @@ static inline void __down_write(struct rw_semaphore *sem)
 /*
  * unlock after reading
  */
-static inline void __up_read(struct rw_semaphore *sem)
+static inline void
+__up_read (struct rw_semaphore *sem)
 {
 	int result;
 	__asm__ __volatile__ ("fetchadd4.rel %0=[%1],-1" :
@@ -118,7 +121,8 @@ static inline void __up_read(struct rw_semaphore *sem)
 /*
  * unlock after writing
  */
-static inline void __up_write(struct rw_semaphore *sem)
+static inline void
+__up_write (struct rw_semaphore *sem)
 {
 	int old, new;
 
@@ -134,7 +138,8 @@ static inline void __up_write(struct rw_semaphore *sem)
 /*
  * trylock for reading -- returns 1 if successful, 0 if contention
  */
-static inline int __down_read_trylock(struct rw_semaphore *sem)
+static inline int
+__down_read_trylock (struct rw_semaphore *sem)
 {
 	int tmp;
 	while ((tmp = sem->count) >= 0) {
@@ -148,17 +153,19 @@ static inline int __down_read_trylock(struct rw_semaphore *sem)
 /*
  * trylock for writing -- returns 1 if successful, 0 if contention
  */
-static inline int __down_write_trylock(struct rw_semaphore *sem)
+static inline int
+__down_write_trylock (struct rw_semaphore *sem)
 {
 	int tmp = cmpxchg_acq(&sem->count, RWSEM_UNLOCKED_VALUE,
-			  RWSEM_ACTIVE_WRITE_BIAS);
+			      RWSEM_ACTIVE_WRITE_BIAS);
 	return tmp == RWSEM_UNLOCKED_VALUE;
 }
 
 /*
  * downgrade write lock to read lock
  */
-static inline void __downgrade_write(struct rw_semaphore *sem)
+static inline void
+__downgrade_write (struct rw_semaphore *sem)
 {
 	int old, new;
 
@@ -172,17 +179,10 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 }
 
 /*
- * implement atomic add functionality
+ * Implement atomic add functionality.  These used to be "inline" functions, but GCC v3.1
+ * doesn't quite optimize this stuff right and ends up with bad calls to fetchandadd.
  */
-static inline void rwsem_atomic_add(int delta, struct rw_semaphore *sem)
-{
-	atomic_add(delta, (atomic_t *)(&sem->count));
-}
+#define rwsem_atomic_add(delta, sem)	atomic_add(delta, (atomic_t *)(&(sem)->count))
+#define rwsem_atomic_update(delta, sem)	atomic_add_return(delta, (atomic_t *)(&(sem)->count))
 
-static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
-{
-	return atomic_add_return(delta, (atomic_t *)(&sem->count));
-}
-
-#endif /* __KERNEL__ */
-#endif /* _IA64_RWSEM_H */
+#endif /* _ASM_IA64_RWSEM_H */

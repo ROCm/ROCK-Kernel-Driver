@@ -35,24 +35,34 @@ extern unsigned long __bad_increment_for_ia64_fetch_and_add (void);
 	}									\
 })
 
-#define ia64_fetch_and_add(i,v)							\
-({										\
-	__u64 _tmp;								\
-	volatile __typeof__(*(v)) *_v = (v);					\
-	switch (i) {								\
-	      case -16:	IA64_FETCHADD(_tmp, _v, -16, sizeof(*(v))); break;	\
-	      case  -8:	IA64_FETCHADD(_tmp, _v,  -8, sizeof(*(v))); break;	\
-	      case  -4:	IA64_FETCHADD(_tmp, _v,  -4, sizeof(*(v))); break;	\
-	      case  -1:	IA64_FETCHADD(_tmp, _v,  -1, sizeof(*(v))); break;	\
-	      case   1:	IA64_FETCHADD(_tmp, _v,   1, sizeof(*(v))); break;	\
-	      case   4:	IA64_FETCHADD(_tmp, _v,   4, sizeof(*(v))); break;	\
-	      case   8:	IA64_FETCHADD(_tmp, _v,   8, sizeof(*(v))); break;	\
-	      case  16:	IA64_FETCHADD(_tmp, _v,  16, sizeof(*(v))); break;	\
-	      default:								\
-		_tmp = __bad_increment_for_ia64_fetch_and_add();		\
-		break;								\
-	}									\
-	(__typeof__(*(v))) (_tmp + (i));	/* return new value */		\
+#define ia64_fetch_and_add(i,v)								\
+({											\
+	__u64 _tmp;									\
+	volatile __typeof__(*(v)) *_v = (v);						\
+	/* Can't use a switch () here: gcc isn't always smart enough for that... */	\
+	if ((i) == -16)									\
+		IA64_FETCHADD(_tmp, _v, -16, sizeof(*(v)));				\
+	else if ((i) == -8)								\
+		IA64_FETCHADD(_tmp, _v, -8, sizeof(*(v)));				\
+	else if ((i) == -4)								\
+		IA64_FETCHADD(_tmp, _v, -4, sizeof(*(v)));				\
+	else if ((i) == -2)								\
+		IA64_FETCHADD(_tmp, _v, -2, sizeof(*(v)));				\
+	else if ((i) == -1)								\
+		IA64_FETCHADD(_tmp, _v, -1, sizeof(*(v)));				\
+	else if ((i) == 1)								\
+		IA64_FETCHADD(_tmp, _v, 1, sizeof(*(v)));				\
+	else if ((i) == 2)								\
+		IA64_FETCHADD(_tmp, _v, 2, sizeof(*(v)));				\
+	else if ((i) == 4)								\
+		IA64_FETCHADD(_tmp, _v, 4, sizeof(*(v)));				\
+	else if ((i) == 8)								\
+		IA64_FETCHADD(_tmp, _v, 8, sizeof(*(v)));				\
+	else if ((i) == 16)								\
+		IA64_FETCHADD(_tmp, _v, 16, sizeof(*(v)));				\
+	else										\
+		_tmp = __bad_increment_for_ia64_fetch_and_add();			\
+	(__typeof__(*(v))) (_tmp + (i));	/* return new value */			\
 })
 
 /*
