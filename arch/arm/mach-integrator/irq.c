@@ -46,20 +46,16 @@ static void sc_unmask_irq(unsigned int irq)
 {
         __raw_writel(1 << irq, VA_IC_BASE + IRQ_ENABLE_SET);
 }
+
+static struct irqchip sc_chip = {
+	ack:	sc_mask_irq,
+	mask:	sc_mask_irq,
+	unmask:	sc_unmask_irq,
+};
  
 void __init integrator_init_irq(void)
 {
 	unsigned int i;
-
-	for (i = 0; i < NR_IRQS; i++) {
-	        if (((1 << i) && INTEGRATOR_SC_VALID_INT) != 0) {
-		        irq_desc[i].valid	= 1;
-			irq_desc[i].probe_ok	= 1;
-			irq_desc[i].mask_ack	= sc_mask_irq;
-			irq_desc[i].mask	= sc_mask_irq;
-			irq_desc[i].unmask	= sc_unmask_irq;
-		}
-	}
 
 	/* Disable all interrupts initially. */
 	/* Do the core module ones */
@@ -68,4 +64,12 @@ void __init integrator_init_irq(void)
 	/* do the header card stuff next */
 	__raw_writel(-1, VA_IC_BASE + IRQ_ENABLE_CLEAR);
 	__raw_writel(-1, VA_IC_BASE + FIQ_ENABLE_CLEAR);
+
+	for (i = 0; i < NR_IRQS; i++) {
+	        if (((1 << i) && INTEGRATOR_SC_VALID_INT) != 0) {
+	        	set_irq_chip(i, &sc_chip);
+	        	set_irq_handler(i, do_level_IRQ);
+	        	set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+		}
+	}
 }

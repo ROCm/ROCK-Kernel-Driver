@@ -18,11 +18,3 @@
 #define NR_IRQS			NR_XS80200_IRQS
 
 #define	IRQ_XSCALE_PMU		IRQ_XS80200_PMU
-
-#ifdef CONFIG_XSCALE_ADI_EVB
-
-/* Interrupts available on the ADI Eval Board */
-
-#endif
-
-

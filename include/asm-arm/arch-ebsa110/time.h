@@ -39,7 +39,7 @@ void __init time_init(void)
 
 	timer_irq.handler = timer_interrupt;
 
-	setup_arm_irq(IRQ_EBSA110_TIMER0, &timer_irq);
+	setup_irq(IRQ_EBSA110_TIMER0, &timer_irq);
 }
 
 

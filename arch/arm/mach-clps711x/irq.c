@@ -26,7 +26,7 @@
 
 #include <asm/hardware/clps7111.h>
 
-static void mask_irq_int1(unsigned int irq)
+static void int1_mask(unsigned int irq)
 {
 	u32 intmr1;
 
@@ -35,7 +35,7 @@ static void mask_irq_int1(unsigned int irq)
 	clps_writel(intmr1, INTMR1);
 }
 
-static void mask_ack_irq_int1(unsigned int irq)
+static void int1_ack(unsigned int irq)
 {
 	u32 intmr1;
 
@@ -53,7 +53,7 @@ static void mask_ack_irq_int1(unsigned int irq)
 	}
 }
 
-static void unmask_irq_int1(unsigned int irq)
+static void int1_unmask(unsigned int irq)
 {
 	u32 intmr1;
 
@@ -62,7 +62,13 @@ static void unmask_irq_int1(unsigned int irq)
 	clps_writel(intmr1, INTMR1);
 }
 
-static void mask_irq_int2(unsigned int irq)
+static struct irqchip int1_chip = {
+	ack:	int1_ack,
+	mask:	int1_mask,
+	unmask:	int1_unmask,
+};
+
+static void int2_mask(unsigned int irq)
 {
 	u32 intmr2;
 
@@ -71,7 +77,7 @@ static void mask_irq_int2(unsigned int irq)
 	clps_writel(intmr2, INTMR2);
 }
 
-static void mask_ack_irq_int2(unsigned int irq)
+static void int2_ack(unsigned int irq)
 {
 	u32 intmr2;
 
@@ -84,7 +90,7 @@ static void mask_ack_irq_int2(unsigned int irq)
 	}
 }
 
-static void unmask_irq_int2(unsigned int irq)
+static void int2_unmask(unsigned int irq)
 {
 	u32 intmr2;
 
@@ -93,28 +99,26 @@ static void unmask_irq_int2(unsigned int irq)
 	clps_writel(intmr2, INTMR2);
 }
 
+static struct irqchip int2_chip = {
+	ack:	int2_ack,
+	mask:	int2_mask,
+	unmask:	int2_unmask,
+};
+
 void __init clps711x_init_irq(void)
 {
 	unsigned int i;
 
 	for (i = 0; i < NR_IRQS; i++) {
 	        if (INT1_IRQS & (1 << i)) {
-		        irq_desc[i].valid	= 1;
-			irq_desc[i].probe_ok	= 1;
-			irq_desc[i].mask_ack	= (INT1_ACK_IRQS & (1 << i)) ?
-						   mask_ack_irq_int1 :
-						   mask_irq_int1;
-			irq_desc[i].mask	= mask_irq_int1;
-			irq_desc[i].unmask	= unmask_irq_int1;
+	        	set_irq_handler(i, do_level_IRQ);
+	        	set_irq_chip(i, &int1_chip);
+	        	set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
 		}
 		if (INT2_IRQS & (1 << i)) {
-		        irq_desc[i].valid	= 1;
-			irq_desc[i].probe_ok	= 1;
-			irq_desc[i].mask_ack	= (INT2_ACK_IRQS & (1 << i)) ?
-						   mask_ack_irq_int2 :
-						   mask_irq_int2;
-			irq_desc[i].mask	= mask_irq_int2;
-			irq_desc[i].unmask	= unmask_irq_int2;
+			set_irq_handler(i, do_level_IRQ);
+			set_irq_chip(i, &int2_chip);
+			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
 		}			
 	}
 

@@ -7,6 +7,12 @@
  * include/asm-arm/arch-ebsa110/irq.h
  * Copyright (C) 1996-1998 Russell King
  */
+
+#include <linux/init.h>
+#include <linux/fs.h>
+#include <linux/ptrace.h>
+#include <linux/interrupt.h>
+
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/mach/irq.h>
@@ -31,12 +37,12 @@ static void shark_disable_8259A_irq(unsigned int irq)
 	if (irq<8) {
 	  mask = 1 << irq;
 	  cached_irq_mask[0] |= mask;
+	  outb(cached_irq_mask[1],0xA1);
 	} else {
 	  mask = 1 << (irq-8);
 	  cached_irq_mask[1] |= mask;
+	  outb(cached_irq_mask[0],0x21);
 	}
-	outb(cached_irq_mask[1],0xA1);
-	outb(cached_irq_mask[0],0x21);
 }
 
 static void shark_enable_8259A_irq(unsigned int irq)
@@ -45,31 +51,15 @@ static void shark_enable_8259A_irq(unsigned int irq)
 	if (irq<8) {
 	  mask = ~(1 << irq);
 	  cached_irq_mask[0] &= mask;
+	  outb(cached_irq_mask[0],0x21);
 	} else {
 	  mask = ~(1 << (irq-8));
 	  cached_irq_mask[1] &= mask;
+	  outb(cached_irq_mask[1],0xA1);
 	}
-	outb(cached_irq_mask[1],0xA1);
-	outb(cached_irq_mask[0],0x21);
 }
 
-/*
- * Careful! The 8259A is a fragile beast, it pretty
- * much _has_ to be done exactly like this (mask it
- * first, _then_ send the EOI, and the order of EOI
- * to the two 8259s is important!
- */
-static void shark_mask_and_ack_8259A_irq(unsigned int irq)
-{
-        if (irq & 8) {
-                cached_irq_mask[1] |= 1 << (irq-8);
-		inb(0xA1);              /* DUMMY */
-                outb(cached_irq_mask[1],0xA1);
-        } else {
-                cached_irq_mask[0] |= 1 << irq;
-                outb(cached_irq_mask[0],0x21);
-	}
-}
+static void shark_ack_8259A_irq(unsigned int irq){}
 
 static void bogus_int(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -78,32 +68,30 @@ static void bogus_int(int irq, void *dev_id, struct pt_regs *regs)
 
 static struct irqaction cascade;
 
+static struct irqchip fb_chip = {
+	ack:	shark_ack_8259A_irq,
+	mask:	shark_disable_8259A_irq,
+	unmask:	shark_enable_8259A_irq,
+};
+
 void __init shark_init_irq(void)
 {
 	int irq;
 
 	for (irq = 0; irq < NR_IRQS; irq++) {
-		irq_desc[irq].valid	= 1;
-		irq_desc[irq].probe_ok	= 1;
-		irq_desc[irq].mask_ack	= shark_mask_and_ack_8259A_irq;
-		irq_desc[irq].mask	= shark_disable_8259A_irq;
-		irq_desc[irq].unmask	= shark_enable_8259A_irq;
+		set_irq_chip(irq, &fb_chip);
+		set_irq_handler(irq, do_edge_IRQ);
+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 
-	/* The PICs are initialized to level triggered and auto eoi!
-	 * If they are set to edge triggered they lose some IRQs,
-	 * if they are set to manual eoi they get locked up after
-	 * a short time
-	 */
-
 	/* init master interrupt controller */
-	outb(0x19, 0x20); /* Start init sequence, level triggered */
+	outb(0x11, 0x20); /* Start init sequence, edge triggered (level: 0x19)*/
 	outb(0x00, 0x21); /* Vector base */
 	outb(0x04, 0x21); /* Cascade (slave) on IRQ2 */
 	outb(0x03, 0x21); /* Select 8086 mode , auto eoi*/
 	outb(0x0A, 0x20);
 	/* init slave interrupt controller */
-	outb(0x19, 0xA0); /* Start init sequence, level triggered */
+	outb(0x11, 0xA0); /* Start init sequence, edge triggered */
 	outb(0x08, 0xA1); /* Vector base */
 	outb(0x02, 0xA1); /* Cascade (slave) on IRQ2 */
 	outb(0x03, 0xA1); /* Select 8086 mode, auto eoi */
@@ -119,6 +107,6 @@ void __init shark_init_irq(void)
 	cascade.name = "cascade";
 	cascade.next = NULL;
 	cascade.dev_id = NULL;
-	setup_arm_irq(2,&cascade);
+	setup_irq(2,&cascade);
 }
 

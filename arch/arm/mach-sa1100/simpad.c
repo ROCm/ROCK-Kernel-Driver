@@ -93,7 +93,7 @@ static void __init simpad_map_io(void)
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);
 
-	set_GPIO_IRQ_edge(GPIO_UCB1300_IRQ);
+	set_irq_type(IRQ_GPIO_UCB1300_IRQ, IRQT_RISING);
 }
 
 #ifdef CONFIG_PROC_FS

@@ -24,5 +24,19 @@
 extern void disable_irq(unsigned int);
 extern void enable_irq(unsigned int);
 
+#define __IRQT_FALEDGE	(1 << 0)
+#define __IRQT_RISEDGE	(1 << 1)
+#define __IRQT_LOWLVL	(1 << 2)
+#define __IRQT_HIGHLVL	(1 << 3)
+
+#define IRQT_NOEDGE	(0)
+#define IRQT_RISING	(__IRQT_RISEDGE)
+#define IRQT_FALLING	(__IRQT_FALEDGE)
+#define IRQT_BOTHEDGE	(__IRQT_RISEDGE|__IRQT_FALEDGE)
+#define IRQT_LOW	(__IRQT_LOWLVL)
+#define IRQT_HIGH	(__IRQT_HIGHLVL)
+
+int set_irq_type(unsigned int irq, unsigned int type);
+
 #endif
 

@@ -113,7 +113,7 @@ ide_init_default_hwifs(void)
 
         /* Enable GPIO as interrupt line */
         GPDR &= ~LART_GPIO_IDE;
-        set_GPIO_IRQ_edge(LART_GPIO_IDE, GPIO_RISING_EDGE);
+	set_irq_type(LART_IRQ_IDE, IRQT_RISING);
         
         /* set PCMCIA interface timing */
         MECR = 0x00060006;

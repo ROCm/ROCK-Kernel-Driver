@@ -39,5 +39,5 @@ void __init time_init(void)
 {
 	clps711x_setup_timer();
 	timer_irq.handler = p720t_timer_interrupt;
-	setup_arm_irq(IRQ_TC2OI, &timer_irq);
+	setup_irq(IRQ_TC2OI, &timer_irq);
 }
