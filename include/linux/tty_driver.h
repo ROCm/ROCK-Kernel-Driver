@@ -116,6 +116,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/list.h>
 
 struct tty_driver {
 	int	magic;		/* magic number for this structure */
@@ -170,13 +171,10 @@ struct tty_driver {
 			  int count, int *eof, void *data);
 	int (*write_proc)(struct file *file, const char *buffer,
 			  unsigned long count, void *data);
-
-	/*
-	 * linked list pointers
-	 */
-	struct tty_driver *next;
-	struct tty_driver *prev;
+	struct list_head tty_drivers;
 };
+
+extern struct list_head tty_drivers;
 
 /* tty driver magic number */
 #define TTY_DRIVER_MAGIC		0x5402
