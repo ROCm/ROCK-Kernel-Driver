@@ -374,7 +374,7 @@ bad_area_nosemaphore:
 		    (address >> 32))
 			return;
 
-		if (exception_trace && !unhandled_signal(tsk, SIGSEGV)) { 
+		if (exception_trace && unhandled_signal(tsk, SIGSEGV)) { 
 		printk(KERN_INFO 
 		       "%s[%d]: segfault at %016lx rip %016lx rsp %016lx error %lx\n",
 					tsk->comm, tsk->pid, address, regs->rip,
