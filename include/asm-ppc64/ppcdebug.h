@@ -108,4 +108,8 @@ extern char *trace_names[64];
 #define PPCDBG_ENTER_DEBUGGER() do {;} while(0)
 #endif
 
+#ifndef PPCDBG_ENTER_DEBUGGER_REGS
+#define PPCDBG_ENTER_DEBUGGER_REGS(A) do {;} while(0)
+#endif
+
 #endif /*__PPCDEBUG_H */
