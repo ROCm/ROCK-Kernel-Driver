@@ -5,7 +5,7 @@
 menu "Input device support"
 
 config INPUT
-	tristate
+	tristate "Input devices (needed for keyboard, mouse, ...)"
 	default y
 	---help---
 	  Say Y here if you have any input device (mouse, keyboard, tablet,

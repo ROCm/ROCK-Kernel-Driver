@@ -2,7 +2,7 @@
 # Input core configuration
 #
 config SERIO
-	tristate "Serial i/o support"
+	tristate "Serial i/o support (needed for keyboard and mouse)"
 	default y
 	---help---
 	  Say Yes here if you have any input device that uses serial I/O to
