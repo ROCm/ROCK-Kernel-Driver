@@ -1040,6 +1040,7 @@ acpi_processor_apply_limit (
 	if (!pr->flags.limit)
 		return_VALUE(-ENODEV);
 
+#ifdef CONFIG_CPU_FREQ
 	if (pr->flags.performance) {
 		px = pr->performance_platform_limit;
 		if (pr->limit.user.px > px)
@@ -1058,6 +1059,7 @@ acpi_processor_apply_limit (
 	} else if (pr->performance_platform_limit) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Platform limit event detected. Consider using ACPI P-States CPUfreq driver\n"));
 	}
+#endif
 
 	if (pr->flags.throttling) {
 		if (pr->limit.user.tx > tx)
