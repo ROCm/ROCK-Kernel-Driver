@@ -347,7 +347,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge)
 	INIT_LIST_HEAD(head);
 
 	/* Find all AGP devices, and add them to dev_list. */
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		mcapndx = pci_find_capability(dev, PCI_CAP_ID_AGP);
 		if (mcapndx == 0)
 			continue;
