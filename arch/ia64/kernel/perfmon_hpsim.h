@@ -14,12 +14,6 @@
  * they do not count anything. But you can read/write them.
  */
 
-#define RDEP(x)	(1UL<<(x))
-
-#ifndef CONFIG_IA64_HP_SIM
-#error "This file should only be included for the HP Simulator"
-#endif
-
 static pfm_reg_desc_t pfm_hpsim_pmc_desc[PMU_MAX_PMCS]={
 /* pmc0  */ { PFM_REG_CONTROL , 0, 0x1UL, -1UL, NULL, NULL, {0UL, 0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc1  */ { PFM_REG_CONTROL , 0, 0x0UL, -1UL, NULL, NULL, {0UL, 0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
@@ -60,16 +54,22 @@ static pfm_reg_desc_t pfm_hpsim_pmd_desc[PMU_MAX_PMDS]={
 	    { PFM_REG_END     , 0, 0x0UL, -1UL, NULL, NULL, {0,}, {0,}}, /* end marker */
 };
 
+static int
+pfm_hpsim_probe(void)
+{
+	return local_cpu_data->family == 0x7 && ia64_platform_is("hpsim") ? 0 : -1;
+}
+
 /*
  * impl_pmcs, impl_pmds are computed at runtime to minimize errors!
  */
-static pmu_config_t pmu_conf={
+static pmu_config_t pmu_conf_hpsim={
 	.pmu_name   = "hpsim",
 	.pmu_family = 0x7, /* ski emulator reports as Itanium */
-	.enabled    = 0,
 	.ovfl_val   = (1UL << 32) - 1,
 	.num_ibrs   = 0, /* does not use */
 	.num_dbrs   = 0, /* does not use */
 	.pmd_desc   = pfm_hpsim_pmd_desc,
-	.pmc_desc   = pfm_hpsim_pmc_desc
+	.pmc_desc   = pfm_hpsim_pmc_desc,
+	.probe      = pfm_hpsim_probe
 };
