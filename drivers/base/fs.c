@@ -42,11 +42,11 @@ int device_create_file(struct device * dev, struct device_attribute * entry)
  * @name:	name of the file
  *
  */
-void device_remove_file(struct device * dev, const char * name)
+void device_remove_file(struct device * dev, struct device_attribute * attr)
 {
 	if (dev) {
 		get_device(dev);
-		driverfs_remove_file(&dev->dir,name);
+		driverfs_remove_file(&dev->dir,attr->name);
 		put_device(dev);
 	}
 }
@@ -60,7 +60,6 @@ void device_remove_dir(struct device * dev)
 	if (dev)
 		driverfs_remove_dir(&dev->dir);
 }
-
 
 static int get_devpath_length(struct device * dev)
 {

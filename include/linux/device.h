@@ -180,7 +180,7 @@ g_list_to_dev(struct list_head *g_list)
 extern int device_register(struct device * dev);
 
 extern int device_create_file(struct device *device, struct device_attribute * entry);
-extern void device_remove_file(struct device * dev, const char * name);
+extern void device_remove_file(struct device * dev, struct device_attribute * attr);
 
 /*
  * Platform "fixup" functions - allow the platform to have their say
