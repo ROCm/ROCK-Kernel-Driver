@@ -490,8 +490,11 @@ static void *hub_probe(struct usb_device *dev, unsigned int i,
 	list_add(&hub->hub_list, &hub_list);
 	spin_unlock_irqrestore(&hub_event_lock, flags);
 
-	if (usb_hub_configure(hub, endpoint) >= 0)
+	if (usb_hub_configure(hub, endpoint) >= 0) {
+		strcpy (dev->actconfig->interface[i].dev.name,
+			"Hub/Port Status Changes");
 		return hub;
+	}
 
 	err("hub configuration failed for device at %s", dev->devpath);
 
@@ -637,7 +640,8 @@ static int usb_hub_port_status(struct usb_device *hub, int port,
 	if (portsts) {
 		ret = usb_get_port_status(hub, port + 1, portsts);
 		if (ret < 0)
-			err("%s(%s) failed (err = %d)", __FUNCTION__, hub->devpath, ret);
+			err("%s(%s-%s) failed (err = %d)", __FUNCTION__,
+				hub->bus->bus_name, hub->devpath, ret);
 		else {
 			*status = le16_to_cpu(portsts->wPortStatus);
 			*change = le16_to_cpu(portsts->wPortChange); 
@@ -884,19 +888,11 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 		info("new USB device %s-%s, assigned address %d",
 			dev->bus->bus_name, dev->devpath, dev->devnum);
 
-		/* put the device in the global device tree */
+		/* put the device in the global device tree. the hub port
+		 * is the "bus_id"; hubs show in hierarchy like bridges
+		 */
 		dev->dev.parent = &dev->parent->dev;
-		sprintf (&dev->dev.name[0], "USB device %04x:%04x",
-			 dev->descriptor.idVendor,
-			 dev->descriptor.idProduct);
-		/* find the number of the port this device is connected to */
-		sprintf (&dev->dev.bus_id[0], "unknown_port_%03d", dev->devnum);
-		for (i = 0; i < USB_MAXCHILDREN; ++i) {
-			if (dev->parent->children[i] == dev) {
-				sprintf (&dev->dev.bus_id[0], "%02d", i);
-				break;
-			}
-		}
+		sprintf (&dev->dev.bus_id[0], "%d", port + 1);
 
 		/* Run it through the hoops (find a driver, etc) */
 		if (!usb_new_device(dev))

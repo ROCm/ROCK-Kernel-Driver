@@ -13,6 +13,7 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
+#include <asm/arch/shannon.h>
 
 #include "generic.h"
 
@@ -23,13 +24,16 @@ static void __init shannon_map_io(void)
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);
+
 	Ser1SDCR0 |= SDCR0_SUS;
 	GAFR |= (GPIO_UART_TXD | GPIO_UART_RXD);
-	GPDR |= GPIO_UART_TXD;
+	GPDR |= GPIO_UART_TXD | SHANNON_GPIO_CODEC_RESET;
 	GPDR &= ~GPIO_UART_RXD;
 	PPAR |= PPAR_UPR;
 
-	set_GPIO_IRQ_edge(SHANNON_GPIO_IRQ_CODEC);
+	/* reset the codec */
+	GPCR = SHANNON_GPIO_CODEC_RESET;
+	GPSR = SHANNON_GPIO_CODEC_RESET;
 }
 
 MACHINE_START(SHANNON, "Shannon (AKA: Tuxscreen)")

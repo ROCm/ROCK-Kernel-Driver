@@ -34,12 +34,10 @@
 #define READ_FAULT(m)		(!((m) & FAULT_CODE_WRITE))
 #else
 /*
- * On 32-bit processors, we define "mode" to be zero when reading,
- * non-zero when writing.  This now ties up nicely with the polarity
- * of the 26-bit machines, and also means that we avoid the horrible
- * gcc code for "int val = !other_val;".
+ * "code" is actually the FSR register.  Bit 11 set means the
+ * isntruction was performing a write.
  */
-#define DO_COW(code)		((code) & (1 << 8))
+#define DO_COW(code)		((code) & (1 << 11))
 #define READ_FAULT(code)	(!DO_COW(code))
 #endif
 
@@ -56,7 +54,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 
 	printk(KERN_ALERT "pgd = %p\n", mm->pgd);
 	pgd = pgd_offset(mm, addr);
-	printk(KERN_ALERT "*pgd = %08lx", pgd_val(*pgd));
+	printk(KERN_ALERT "*pgd=%08lx", pgd_val(*pgd));
 
 	do {
 		pmd_t *pmd;
@@ -71,7 +69,9 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 		}
 
 		pmd = pmd_offset(pgd, addr);
-		printk(", *pmd = %08lx", pmd_val(*pmd));
+#if PTRS_PER_PMD != 1
+		printk(", *pmd=%08lx", pmd_val(*pmd));
+#endif
 
 		if (pmd_none(*pmd))
 			break;
@@ -84,9 +84,9 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 #ifndef CONFIG_HIGHMEM
 		/* We must not map this if we have highmem enabled */
 		pte = pte_offset_map(pmd, addr);
-		printk(", *pte = %08lx", pte_val(*pte));
+		printk(", *pte=%08lx", pte_val(*pte));
 #ifdef CONFIG_CPU_32
-		printk(", *ppte = %08lx", pte_val(pte[-PTRS_PER_PTE]));
+		printk(", *ppte=%08lx", pte_val(pte[-PTRS_PER_PTE]));
 #endif
 		pte_unmap(pte);
 #endif

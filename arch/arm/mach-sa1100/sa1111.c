@@ -117,10 +117,11 @@ static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
 {
 	unsigned int mask = SA1111_IRQMASK_LO(irq);
 
+	if (flags == IRQT_PROBE)
+		return 0;
+
 	if ((!(flags & __IRQT_RISEDGE) ^ !(flags & __IRQT_FALEDGE)) == 0)
 		return -EINVAL;
-
-	printk("IRQ%d: %s edge\n", irq, flags & __IRQT_RISEDGE ? "rising" : "falling");
 
 	if (flags & __IRQT_RISEDGE)
 		INTPOL0 &= ~mask;
@@ -181,10 +182,11 @@ static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
 {
 	unsigned int mask = SA1111_IRQMASK_HI(irq);
 
+	if (flags == IRQT_PROBE)
+		return 0;
+
 	if ((!(flags & __IRQT_RISEDGE) ^ !(flags & __IRQT_FALEDGE)) == 0)
 		return -EINVAL;
-
-	printk("IRQ%d: %s edge\n", irq, flags & __IRQT_RISEDGE ? "rising" : "falling");
 
 	if (flags & __IRQT_RISEDGE)
 		INTPOL1 &= ~mask;
@@ -302,7 +304,7 @@ sa1111_probe(struct device *parent, unsigned long phys_addr)
 	/*
 	 * Probe for the chip.  Only touch the SBI registers.
 	 */
-	id = readl(sa->base + SA1111_SKID);
+	id = sa1111_readl(sa->base + SA1111_SKID);
 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
 		printk(KERN_DEBUG "SA1111 not detected: ID = %08lx\n", id);
 		ret = -ENODEV;
@@ -370,11 +372,11 @@ void sa1111_wake(void)
 	/*
 	 * Turn VCO on, and disable PLL Bypass.
 	 */
-	r = readl(sa->base + SA1111_SKCR);
+	r = sa1111_readl(sa->base + SA1111_SKCR);
 	r &= ~SKCR_VCO_OFF;
-	writel(r, sa->base + SA1111_SKCR);
+	sa1111_writel(r, sa->base + SA1111_SKCR);
 	r |= SKCR_PLL_BYPASS | SKCR_OE_EN;
-	writel(r, sa->base + SA1111_SKCR);
+	sa1111_writel(r, sa->base + SA1111_SKCR);
 
 	/*
 	 * Wait lock time.  SA1111 manual _doesn't_
@@ -386,7 +388,7 @@ void sa1111_wake(void)
 	 * Enable RCLK.  We also ensure that RDYEN is set.
 	 */
 	r |= SKCR_RCLKEN | SKCR_RDYEN;
-	writel(r, sa->base + SA1111_SKCR);
+	sa1111_writel(r, sa->base + SA1111_SKCR);
 
 	/*
 	 * Wait 14 RCLK cycles for the chip to finish coming out
@@ -397,7 +399,7 @@ void sa1111_wake(void)
 	/*
 	 * Ensure all clocks are initially off.
 	 */
-	writel(0, sa->base + SA1111_SKPCR);
+	sa1111_writel(0, sa->base + SA1111_SKPCR);
 
 	local_irq_restore(flags);
 }
@@ -406,16 +408,18 @@ void sa1111_doze(void)
 {
 	struct sa1111_device *sa = sa1111;
 	unsigned long flags;
+	unsigned int val;
 
 	local_irq_save(flags);
 
-	if (readl(sa->base + SA1111_SKPCR) & SKPCR_UCLKEN) {
+	if (sa1111_readl(sa->base + SA1111_SKPCR) & SKPCR_UCLKEN) {
 		local_irq_restore(flags);
 		printk("SA1111 doze mode refused\n");
 		return;
 	}
 
-	writel(readl(sa->base + SA1111_SKCR) & ~SKCR_RCLKEN, sa->base + SA1111_SKCR);
+	val = sa1111_readl(sa->base + SA1111_SKCR);
+	sa1111_writel(val & ~SKCR_RCLKEN, sa->base + SA1111_SKCR);
 	local_irq_restore(flags);
 }
 
@@ -430,8 +434,36 @@ void sa1111_configure_smc(int sdram, unsigned int drac, unsigned int cas_latency
 	if (cas_latency == 3)
 		smcr |= SMCR_CLAT;
 
-	writel(smcr, sa->base + SA1111_SMCR);
+	sa1111_writel(smcr, sa->base + SA1111_SMCR);
 }
+
+EXPORT_SYMBOL(sa1111_wake);
+EXPORT_SYMBOL(sa1111_doze);
+
+void sa1111_enable_device(unsigned int mask)
+{
+	struct sa1111_device *sa = sa1111;
+	unsigned int val;
+
+	preempt_disable();
+	val = sa1111_readl(sa->base + SA1111_SKPCR);
+	sa1111_writel(val | mask, sa->base + SA1111_SKPCR);
+	preempt_enable();
+}
+
+void sa1111_disable_device(unsigned int mask)
+{
+	struct sa1111_device *sa = sa1111;
+	unsigned int val;
+
+	preempt_disable();
+	val = sa1111_readl(sa->base + SA1111_SKPCR);
+	sa1111_writel(val & ~mask, sa->base + SA1111_SKPCR);
+	preempt_enable();
+}
+
+EXPORT_SYMBOL(sa1111_enable_device);
+EXPORT_SYMBOL(sa1111_disable_device);
 
 /* According to the "Intel StrongARM SA-1111 Microprocessor Companion
  * Chip Specification Update" (June 2000), erratum #7, there is a
@@ -527,7 +559,7 @@ int sa1111_init(struct device *parent, unsigned long phys, unsigned int irq)
 	 * We only need to turn on DCLK whenever we want to use the
 	 * DMA.  It can otherwise be held firmly in the off position.
 	 */
-	SKPCR |= SKPCR_DCLKEN;
+	sa1111_enable_device(SKPCR_DCLKEN);
 
 	/*
 	 * Enable the SA1110 memory bus request and grant signals.

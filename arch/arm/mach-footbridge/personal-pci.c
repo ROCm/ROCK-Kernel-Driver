@@ -53,4 +53,4 @@ static int __init personal_pci_init(void)
 	return 0;
 }
 
-subsys_initcall(&personal_pci_init);
+subsys_initcall(personal_pci_init);

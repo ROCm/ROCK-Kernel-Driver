@@ -41,6 +41,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/proc_fs.h>
 #include <linux/smp_lock.h>
+#include <linux/notifier.h>
 #include <net/sock.h>
 #include <net/scm.h>
 
@@ -80,6 +81,8 @@ atomic_t netlink_sock_nr;
 
 static rwlock_t nl_table_lock = RW_LOCK_UNLOCKED;
 static atomic_t nl_table_users = ATOMIC_INIT(0);
+
+static struct notifier_block *netlink_chain;
 
 static void netlink_sock_destruct(struct sock *sk)
 {
@@ -276,6 +279,12 @@ static int netlink_release(struct socket *sock)
 
 	skb_queue_purge(&sk->write_queue);
 
+	if (nlk->pid && !nlk->groups) {
+		struct netlink_notify n = { protocol:sk->protocol,
+		                            pid:nlk->pid };
+		notifier_call_chain(&netlink_chain, NETLINK_URELEASE, &n);
+	}	
+	
 	sock_put(sk);
 	return 0;
 }
@@ -967,6 +976,16 @@ done:
 }
 #endif
 
+int netlink_register_notifier(struct notifier_block *nb)
+{
+	return notifier_chain_register(&netlink_chain, nb);
+}
+
+int netlink_unregister_notifier(struct notifier_block *nb)
+{
+	return notifier_chain_unregister(&netlink_chain, nb);
+}
+                
 struct proto_ops netlink_ops = {
 	family:		PF_NETLINK,
 

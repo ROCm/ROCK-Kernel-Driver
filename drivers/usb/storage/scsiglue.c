@@ -114,11 +114,11 @@ static int release(struct Scsi_Host *psh)
 	/* Kill the control threads
 	 *
 	 * Enqueue the command, wake up the thread, and wait for 
-	 * notification that it's exited.
+	 * notification that it has exited.
 	 */
-	US_DEBUGP("-- sending US_ACT_EXIT command to thread\n");
-	us->action = US_ACT_EXIT;
-	
+	US_DEBUGP("-- sending exit command to thread\n");
+	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
+	us->srb = NULL;
 	up(&(us->sema));
 	wait_for_completion(&(us->notify));
 
@@ -137,25 +137,19 @@ static int command( Scsi_Cmnd *srb )
 	return DID_BAD_TARGET << 16;
 }
 
-/* run command */
+/* queue a command */
+/* This is always called with scsi_lock(srb->host) held */
 static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 {
 	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
-	unsigned long flags;
 
 	US_DEBUGP("queuecommand() called\n");
 	srb->host_scribble = (unsigned char *)us;
 
-	/* get exclusive access to the structures we want */
-	spin_lock_irqsave(&us->queue_exclusion, flags);
-
 	/* enqueue the command */
-	us->queue_srb = srb;
+	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE || us->srb != NULL);
 	srb->scsi_done = done;
-	us->action = US_ACT_COMMAND;
-
-	/* release the lock on the structure */
-	spin_unlock_irqrestore(&us->queue_exclusion, flags);
+	us->srb = srb;
 
 	/* wake up the process task */
 	up(&(us->sema));
@@ -168,74 +162,82 @@ static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
  ***********************************************************************/
 
 /* Command abort */
+/* This is always called with scsi_lock(srb->host) held */
 static int command_abort( Scsi_Cmnd *srb )
 {
 	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
 
 	US_DEBUGP("command_abort() called\n");
 
-	if (atomic_read(&us->sm_state) == US_STATE_RUNNING) {
- 		scsi_unlock(srb->host);
-		usb_stor_abort_transport(us);
-
-		/* wait for us to be done */
-		wait_for_completion(&(us->notify));
- 		scsi_lock(srb->host);
-		return SUCCESS;
+	/* Is this command still active? */
+	if (us->srb != srb) {
+		US_DEBUGP ("-- nothing to abort\n");
+		return FAILED;
 	}
 
-	US_DEBUGP ("-- nothing to abort\n");
-	return FAILED;
+	usb_stor_abort_transport(us);
+	return SUCCESS;
 }
 
 /* This invokes the transport reset mechanism to reset the state of the
  * device */
+/* This is always called with scsi_lock(srb->host) held */
 static int device_reset( Scsi_Cmnd *srb )
 {
 	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
 	int result;
 
 	US_DEBUGP("device_reset() called\n" );
+	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
 
-	/* if the device was removed, then we're already reset */
-	if (!test_bit(DEV_ATTACHED, &us->bitflags))
-		return SUCCESS;
-
+	/* set the state and release the lock */
+	atomic_set(&us->sm_state, US_STATE_RESETTING);
 	scsi_unlock(srb->host);
+
 	/* lock the device pointers */
 	down(&(us->dev_semaphore));
-	us->srb = srb;
-	atomic_set(&us->sm_state, US_STATE_RESETTING);
-	result = us->transport_reset(us);
-	atomic_set(&us->sm_state, US_STATE_IDLE);
 
-	/* unlock the device pointers */
+	/* if the device was removed, then we're already reset */
+	if (!(us->flags & US_FL_DEV_ATTACHED))
+		result = SUCCESS;
+	else
+		result = us->transport_reset(us);
 	up(&(us->dev_semaphore));
+
+	/* lock access to the state and clear it */
 	scsi_lock(srb->host);
+	atomic_set(&us->sm_state, US_STATE_IDLE);
 	return result;
 }
 
 /* This resets the device port, and simulates the device
  * disconnect/reconnect for all drivers which have claimed
  * interfaces, including ourself. */
+/* This is always called with scsi_lock(srb->host) held */
 static int bus_reset( Scsi_Cmnd *srb )
 {
 	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
 	int i;
 	int result;
-	struct usb_device *pusb_dev_save = us->pusb_dev;
+	struct usb_device *pusb_dev_save;
 
 	/* we use the usb_reset_device() function to handle this for us */
 	US_DEBUGP("bus_reset() called\n");
 
+	scsi_unlock(srb->host);
+
 	/* if the device has been removed, this worked */
-	if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
+	down(&us->dev_semaphore);
+	if (!(us->flags & US_FL_DEV_ATTACHED)) {
 		US_DEBUGP("-- device removed already\n");
+		up(&us->dev_semaphore);
+		scsi_lock(srb->host);
 		return SUCCESS;
 	}
+	pusb_dev_save = us->pusb_dev;
+	up(&us->dev_semaphore);
 
 	/* attempt to reset the port */
-	scsi_unlock(srb->host);
 	result = usb_reset_device(pusb_dev_save);
 	US_DEBUGP("usb_reset_device returns %d\n", result);
 	if (result < 0) {
@@ -245,7 +247,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 
 	/* FIXME: This needs to lock out driver probing while it's working
 	 * or we can have race conditions */
-	/* Is that still true?  I don't see how...  AS */
+	/* This functionality really should be provided by the khubd thread */
 	for (i = 0; i < pusb_dev_save->actconfig->bNumInterfaces; i++) {
  		struct usb_interface *intf =
 			&pusb_dev_save->actconfig->interface[i];
@@ -331,8 +333,8 @@ static int proc_info (char *buffer, char **start, off_t offset, int length,
 
 	/* show the GUID of the device */
 	SPRINTF("         GUID: " GUID_FORMAT "\n", GUID_ARGS(us->guid));
-	SPRINTF("     Attached: %s\n", (test_bit(DEV_ATTACHED, &us->bitflags)
-			? "Yes" : "No"));
+	SPRINTF("     Attached: %s\n", (us->flags & US_FL_DEV_ATTACHED ?
+			"Yes" : "No"));
 
 	/*
 	 * Calculate start of next buffer, and return value.

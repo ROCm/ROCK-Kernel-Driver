@@ -537,7 +537,6 @@ static int bluetooth_write (struct tty_struct * tty, int from_user, const unsign
 				/* build up our urb */
 				FILL_BULK_URB (urb, bluetooth->dev, usb_sndbulkpipe(bluetooth->dev, bluetooth->bulk_out_endpointAddress),
 						urb->transfer_buffer, buffer_size, bluetooth_write_bulk_callback, bluetooth);
-				urb->transfer_flags |= USB_QUEUE_BULK;
 
 				/* send it down the pipe */
 				retval = usb_submit_urb(urb, GFP_KERNEL);

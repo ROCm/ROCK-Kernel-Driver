@@ -1317,9 +1317,6 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 		usb_rcvbulkpipe (dev->udev, dev->driver_info->in),
 		skb->data, size, rx_complete, skb);
 	urb->transfer_flags |= USB_ASYNC_UNLINK;
-#ifdef	REALLY_QUEUE
-	urb->transfer_flags |= USB_QUEUE_BULK;
-#endif
 #if 0
 	// Idle-but-posted reads with UHCI really chew up
 	// PCI bandwidth unless FSBR is disabled
@@ -1802,9 +1799,6 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 			usb_sndbulkpipe (dev->udev, info->out),
 			skb->data, skb->len, tx_complete, skb);
 	urb->transfer_flags |= USB_ASYNC_UNLINK;
-#ifdef	REALLY_QUEUE
-	urb->transfer_flags |= USB_QUEUE_BULK;
-#endif
 	// FIXME urb->timeout = ... jiffies ... ;
 
 	spin_lock_irqsave (&dev->txq.lock, flags);

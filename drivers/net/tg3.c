@@ -52,8 +52,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"0.99"
-#define DRV_MODULE_RELDATE	"Jun 11, 2002"
+#define DRV_MODULE_VERSION	"0.99-NAPI"
+#define DRV_MODULE_RELDATE	"Jun 20, 2002"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -404,7 +404,8 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 		break;
 
 	default:
-		printk(KERN_WARNING "%s: Invalid power state (%d) requested.\n",
+		printk(KERN_WARNING PFX "%s: Invalid power state (%d) "
+		       "requested.\n",
 		       tp->dev->name, state);
 		return -EINVAL;
 	};
@@ -490,9 +491,9 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 static void tg3_link_report(struct tg3 *tp)
 {
 	if (!netif_carrier_ok(tp->dev)) {
-		printk("%s: Link is down.\n", tp->dev->name);
+		printk(KERN_INFO PFX "%s: Link is down.\n", tp->dev->name);
 	} else {
-		printk("%s: Link is up at %d Mbps, %s duplex.\n",
+		printk(KERN_INFO PFX "%s: Link is up at %d Mbps, %s duplex.\n",
 		       tp->dev->name,
 		       (tp->link_config.active_speed == SPEED_1000 ?
 			1000 :
@@ -501,7 +502,8 @@ static void tg3_link_report(struct tg3 *tp)
 		       (tp->link_config.active_duplex == DUPLEX_FULL ?
 			"full" : "half"));
 
-		printk("%s: Flow control is %s for TX and %s for RX.\n",
+		printk(KERN_INFO PFX "%s: Flow control is %s for TX and "
+		       "%s for RX.\n",
 		       tp->dev->name,
 		       (tp->tg3_flags & TG3_FLAG_TX_PAUSE) ? "on" : "off",
 		       (tp->tg3_flags & TG3_FLAG_RX_PAUSE) ? "on" : "off");
@@ -1725,7 +1727,7 @@ static void tg3_recycle_rx(struct tg3 *tp, u32 opaque_key,
 #if TG3_VLAN_TAG_USED
 static int tg3_vlan_rx(struct tg3 *tp, struct sk_buff *skb, u16 vlan_tag)
 {
-	return vlan_hwaccel_rx(skb, tp->vlgrp, vlan_tag);
+	return vlan_hwaccel_receive_skb(skb, tp->vlgrp, vlan_tag);
 }
 #endif
 
@@ -1753,16 +1755,18 @@ static int tg3_vlan_rx(struct tg3 *tp, struct sk_buff *skb, u16 vlan_tag)
  * If both the host and chip were to write into the same ring, cache line
  * eviction could occur since both entities want it in an exclusive state.
  */
-static void tg3_rx(struct tg3 *tp)
+static int tg3_rx(struct tg3 *tp, int budget)
 {
 	u32 work_mask;
 	u32 rx_rcb_ptr = tp->rx_rcb_ptr;
 	u16 hw_idx, sw_idx;
+	int received;
 
 	hw_idx = tp->hw_status->idx[0].rx_producer;
 	sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE;
 	work_mask = 0;
-	while (sw_idx != hw_idx) {
+	received = 0;
+	while (sw_idx != hw_idx && budget > 0) {
 		struct tg3_rx_buffer_desc *desc = &tp->rx_rcb[sw_idx];
 		unsigned int len;
 		struct sk_buff *skb;
@@ -1860,9 +1864,11 @@ static void tg3_rx(struct tg3 *tp)
 				    desc->err_vlan & RXD_VLAN_MASK);
 		} else
 #endif
-			netif_rx(skb);
+			netif_receive_skb(skb);
 
 		tp->dev->last_rx = jiffies;
+		received++;
+		budget--;
 
 next_pkt:
 		(*post_ptr)++;
@@ -1894,110 +1900,17 @@ next_pkt_nopost:
 			     sw_idx);
 	}
 #endif
+
+	return received;
 }
 
-#define PKT_RATE_LOW		22000
-#define PKT_RATE_HIGH		61000
-
-static void tg3_rate_sample(struct tg3 *tp, unsigned long ticks)
+static int tg3_poll(struct net_device *netdev, int *budget)
 {
-	u32 delta, rx_now, tx_now;
-	int new_vals, do_tx, do_rx;
-
-	rx_now = tp->hw_stats->rx_ucast_packets.low;
-	tx_now = tp->hw_stats->COS_out_packets[0].low;
-
-	delta  = (rx_now - tp->last_rx_count);
-	delta += (tx_now - tp->last_tx_count);
-	delta /= (ticks / tp->coalesce_config.rate_sample_jiffies);
-
-	tp->last_rx_count = rx_now;
-	tp->last_tx_count = tx_now;
-
-	new_vals = 0;
-	do_tx = (tp->tg3_flags & TG3_FLAG_ADAPTIVE_TX) != 0;
-	do_rx = (tp->tg3_flags & TG3_FLAG_ADAPTIVE_RX) != 0;
-	if (delta < tp->coalesce_config.pkt_rate_low) {
-		if (do_rx &&
-		    tp->coalesce_config.rx_max_coalesced_frames !=
-		    tp->coalesce_config.rx_max_coalesced_frames_low) {
-			tp->coalesce_config.rx_max_coalesced_frames =
-				LOW_RXMAX_FRAMES;
-			tp->coalesce_config.rx_coalesce_ticks =
-				LOW_RXCOL_TICKS;
-			new_vals = 1;
-		}
-		if (do_tx &&
-		    tp->coalesce_config.tx_max_coalesced_frames !=
-		    tp->coalesce_config.tx_max_coalesced_frames_low) {
-			tp->coalesce_config.tx_max_coalesced_frames =
-				tp->coalesce_config.tx_max_coalesced_frames_low;
-			tp->coalesce_config.tx_coalesce_ticks =
-				tp->coalesce_config.tx_coalesce_ticks_low;
-			new_vals = 1;
-		}
-	} else if (delta < tp->coalesce_config.pkt_rate_high) {
-		if (do_rx &&
-		    tp->coalesce_config.rx_max_coalesced_frames !=
-		    tp->coalesce_config.rx_max_coalesced_frames_def) {
-			tp->coalesce_config.rx_max_coalesced_frames =
-				tp->coalesce_config.rx_max_coalesced_frames_def;
-			tp->coalesce_config.rx_coalesce_ticks =
-				tp->coalesce_config.rx_coalesce_ticks_def;
-			new_vals = 1;
-		}
-		if (do_tx &&
-		    tp->coalesce_config.tx_max_coalesced_frames !=
-		    tp->coalesce_config.tx_max_coalesced_frames_def) {
-			tp->coalesce_config.tx_max_coalesced_frames =
-				tp->coalesce_config.tx_max_coalesced_frames_def;
-			tp->coalesce_config.tx_coalesce_ticks =
-				tp->coalesce_config.tx_coalesce_ticks_def;
-			new_vals = 1;
-		}
-	} else {
-		if (do_rx &&
-		    tp->coalesce_config.rx_max_coalesced_frames !=
-		    tp->coalesce_config.rx_max_coalesced_frames_high) {
-			tp->coalesce_config.rx_max_coalesced_frames =
-				tp->coalesce_config.rx_max_coalesced_frames_high;
-			tp->coalesce_config.rx_coalesce_ticks =
-				tp->coalesce_config.rx_coalesce_ticks_high;
-			new_vals = 1;
-		}
-		if (do_tx &&
-		    tp->coalesce_config.tx_max_coalesced_frames !=
-		    tp->coalesce_config.tx_max_coalesced_frames_high) {
-			tp->coalesce_config.tx_max_coalesced_frames =
-				tp->coalesce_config.tx_max_coalesced_frames_high;
-			tp->coalesce_config.tx_coalesce_ticks =
-				tp->coalesce_config.tx_coalesce_ticks_high;
-			new_vals = 1;
-		}
-	}
-
-	if (new_vals) {
-		if (do_rx) {
-			tw32(HOSTCC_RXCOL_TICKS,
-			     tp->coalesce_config.rx_coalesce_ticks);
-			tw32(HOSTCC_RXMAX_FRAMES,
-			     tp->coalesce_config.rx_max_coalesced_frames);
-		}
-		if (do_tx) {
-			tw32(HOSTCC_TXCOL_TICKS,
-			     tp->coalesce_config.tx_coalesce_ticks);
-			tw32(HOSTCC_TXMAX_FRAMES,
-			     tp->coalesce_config.tx_max_coalesced_frames);
-		}
-	}
-
-	tp->last_rate_sample = jiffies;
-}
-
-static void tg3_interrupt_main_work(struct tg3 *tp)
-{
+	struct tg3 *tp = netdev->priv;
 	struct tg3_hw_status *sblk = tp->hw_status;
-	int did_pkts;
+	int done;
+
+	spin_lock_irq(&tp->lock);
 
 	if (!(tp->tg3_flags &
 	      (TG3_FLAG_USE_LINKCHG_REG |
@@ -2009,23 +1922,61 @@ static void tg3_interrupt_main_work(struct tg3 *tp)
 		}
 	}
 
-	did_pkts = 0;
-	if (sblk->idx[0].rx_producer != tp->rx_rcb_ptr) {
-		tg3_rx(tp);
-		did_pkts = 1;
-	}
-
-	if (sblk->idx[0].tx_consumer != tp->tx_cons) {
+	if (sblk->idx[0].tx_consumer != tp->tx_cons)
 		tg3_tx(tp);
-		did_pkts = 1;
+
+	done = 1;
+	if (sblk->idx[0].rx_producer != tp->rx_rcb_ptr) {
+		int orig_budget = *budget;
+		int work_done;
+
+		if (orig_budget > netdev->quota)
+			orig_budget = netdev->quota;
+
+		work_done = tg3_rx(tp, orig_budget);
+
+		*budget -= work_done;
+		netdev->quota -= work_done;
+
+		if (work_done >= orig_budget)
+			done = 0;
 	}
 
-	if (did_pkts &&
-	    (tp->tg3_flags & (TG3_FLAG_ADAPTIVE_RX | TG3_FLAG_ADAPTIVE_TX))) {
-		unsigned long ticks = jiffies - tp->last_rate_sample;
+	if (done) {
+		netif_rx_complete(netdev);
+		tg3_enable_ints(tp);
+	}
 
-		if (ticks >= tp->coalesce_config.rate_sample_jiffies)
-			tg3_rate_sample(tp, ticks);
+	spin_unlock_irq(&tp->lock);
+
+	return (done ? 0 : 1);
+}
+
+static __inline__ void tg3_interrupt_main_work(struct net_device *dev, struct tg3 *tp)
+{
+	struct tg3_hw_status *sblk = tp->hw_status;
+	int work_exists = 0;
+
+	if (!(tp->tg3_flags &
+	      (TG3_FLAG_USE_LINKCHG_REG |
+	       TG3_FLAG_POLL_SERDES))) {
+		if (sblk->status & SD_STATUS_LINK_CHG)
+			work_exists = 1;
+	}
+	if (sblk->idx[0].tx_consumer != tp->tx_cons ||
+	    sblk->idx[0].rx_producer != tp->rx_rcb_ptr)
+		work_exists = 1;
+
+	if (!work_exists)
+		return;
+
+	if (netif_rx_schedule_prep(dev)) {
+		tw32(TG3PCI_MISC_HOST_CTRL,
+		     (tp->misc_host_ctrl | MISC_HOST_CTRL_MASK_PCI_INT));
+		__netif_rx_schedule(dev);
+	} else {
+		printk(KERN_ERR PFX "%s: Error, poll already scheduled\n",
+		       dev->name);
 	}
 }
 
@@ -2037,53 +1988,16 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	spin_lock(&tp->lock);
 
-	while (sblk->status & SD_STATUS_UPDATED) {
+	if (sblk->status & SD_STATUS_UPDATED) {
 		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
 			     0x00000001);
 		sblk->status &= ~SD_STATUS_UPDATED;
 
-		tg3_interrupt_main_work(tp);
+		tg3_interrupt_main_work(dev, tp);
 
 		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
 			     0x00000000);
 		tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
-	}
-
-	spin_unlock(&tp->lock);
-}
-
-static void tg3_interrupt_tagged(int irq, void *dev_id, struct pt_regs *regs)
-{
-	struct net_device *dev = dev_id;
-	struct tg3 *tp = dev->priv;
-	struct tg3_hw_status *sblk = tp->hw_status;
-
-	spin_lock(&tp->lock);
-
-	if (sblk->status & SD_STATUS_UPDATED) {
-		u32 oldtag;
-
-		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
-			     0x00000001);
-		oldtag = sblk->status_tag;
-
-		while (1) {
-			u32 newtag;
-
-			sblk->status &= ~SD_STATUS_UPDATED;
-			barrier();
-
-			tg3_interrupt_main_work(tp);
-
-			newtag = sblk->status_tag;
-			if (newtag == oldtag) {
-				tw32_mailbox(MAILBOX_INTERRUPT_0 +
-					     TG3_64BIT_REG_LOW,
-					     newtag << 24);
-				break;
-			}
-			oldtag = newtag;
-		}
 	}
 
 	spin_unlock(&tp->lock);
@@ -2096,7 +2010,7 @@ static void tg3_tx_timeout(struct net_device *dev)
 {
 	struct tg3 *tp = dev->priv;
 
-	printk(KERN_ERR "%s: transmit timed out, resetting\n",
+	printk(KERN_ERR PFX "%s: transmit timed out, resetting\n",
 	       dev->name);
 
 	spin_lock_irq(&tp->lock);
@@ -3638,24 +3552,16 @@ static int tg3_reset_hw(struct tg3 *tp)
 		udelay(10);
 	}
 
-	tw32(HOSTCC_RXCOL_TICKS,
-	     tp->coalesce_config.rx_coalesce_ticks);
-	tw32(HOSTCC_RXMAX_FRAMES,
-	     tp->coalesce_config.rx_max_coalesced_frames);
-	tw32(HOSTCC_RXCOAL_TICK_INT,
-	     tp->coalesce_config.rx_coalesce_ticks_during_int);
-	tw32(HOSTCC_RXCOAL_MAXF_INT,
-	     tp->coalesce_config.rx_max_coalesced_frames_during_int);
-	tw32(HOSTCC_TXCOL_TICKS,
-	     tp->coalesce_config.tx_coalesce_ticks);
-	tw32(HOSTCC_TXMAX_FRAMES,
-	     tp->coalesce_config.tx_max_coalesced_frames);
-	tw32(HOSTCC_TXCOAL_TICK_INT,
-	     tp->coalesce_config.tx_coalesce_ticks_during_int);
-	tw32(HOSTCC_TXCOAL_MAXF_INT,
-	     tp->coalesce_config.tx_max_coalesced_frames_during_int);
+	tw32(HOSTCC_RXCOL_TICKS, 0);
+	tw32(HOSTCC_RXMAX_FRAMES, 1);
+	tw32(HOSTCC_RXCOAL_TICK_INT, 0);
+	tw32(HOSTCC_RXCOAL_MAXF_INT, 1);
+	tw32(HOSTCC_TXCOL_TICKS, LOW_TXCOL_TICKS);
+	tw32(HOSTCC_TXMAX_FRAMES, LOW_RXMAX_FRAMES);
+	tw32(HOSTCC_TXCOAL_TICK_INT, 0);
+	tw32(HOSTCC_TXCOAL_MAXF_INT, 0);
 	tw32(HOSTCC_STAT_COAL_TICKS,
-	     tp->coalesce_config.stats_coalesce_ticks);
+	     DEFAULT_STAT_COAL_TICKS);
 
 	/* Status/statistics block address. */
 	tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
@@ -3806,24 +3712,22 @@ static void tg3_timer(unsigned long __opaque)
 
 	spin_lock_irq(&tp->lock);
 
-	if (!(tp->tg3_flags & TG3_FLAG_TAGGED_IRQ_STATUS)) {
-		/* All of this garbage is because on the 5700 the
-		 * mailbox/status_block protocol the chip uses with
-		 * the cpu is race prone.
-		 */
-		if (tp->hw_status->status & SD_STATUS_UPDATED) {
-			tw32(GRC_LOCAL_CTRL,
-			     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
-		} else {
-			tw32(HOSTCC_MODE,
-			     (HOSTCC_MODE_ENABLE | HOSTCC_MODE_NOW));
-		}
+	/* All of this garbage is because when using non-tagged
+	 * IRQ status the mailbox/status_block protocol the chip
+	 * uses with the cpu is race prone.
+	 */
+	if (tp->hw_status->status & SD_STATUS_UPDATED) {
+		tw32(GRC_LOCAL_CTRL,
+		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
+	} else {
+		tw32(HOSTCC_MODE,
+		     (HOSTCC_MODE_ENABLE | HOSTCC_MODE_NOW));
+	}
 
-		if (!(tr32(WDMAC_MODE) & WDMAC_MODE_ENABLE)) {
-			tg3_halt(tp);
-			tg3_init_rings(tp);
-			tg3_init_hw(tp);
-		}
+	if (!(tr32(WDMAC_MODE) & WDMAC_MODE_ENABLE)) {
+		tg3_halt(tp);
+		tg3_init_rings(tp);
+		tg3_init_hw(tp);
 	}
 
 	/* This part only runs once per second. */
@@ -3893,12 +3797,8 @@ static int tg3_open(struct net_device *dev)
 	if (err)
 		return err;
 
-	if (tp->tg3_flags & TG3_FLAG_TAGGED_IRQ_STATUS)
-		err = request_irq(dev->irq, tg3_interrupt_tagged,
-				  SA_SHIRQ, dev->name, dev);
-	else
-		err = request_irq(dev->irq, tg3_interrupt,
-				  SA_SHIRQ, dev->name, dev);
+	err = request_irq(dev->irq, tg3_interrupt,
+			  SA_SHIRQ, dev->name, dev);
 
 	if (err) {
 		tg3_free_consistent(tp);
@@ -3914,13 +3814,8 @@ static int tg3_open(struct net_device *dev)
 		tg3_halt(tp);
 		tg3_free_rings(tp);
 	} else {
-		if (tp->tg3_flags & TG3_FLAG_TAGGED_IRQ_STATUS) {
-			tp->timer_offset = HZ;
-			tp->timer_counter = tp->timer_multiplier = 1;
-		} else {
-			tp->timer_offset = HZ / 10;
-			tp->timer_counter = tp->timer_multiplier = 10;
-		}
+		tp->timer_offset = HZ / 10;
+		tp->timer_counter = tp->timer_multiplier = 10;
 
 		init_timer(&tp->timer);
 		tp->timer.expires = jiffies + tp->timer_offset;
@@ -4240,10 +4135,7 @@ static inline unsigned long get_stat64(tg3_stat64_t *val)
 	unsigned long ret;
 
 #if (BITS_PER_LONG == 32)
-	if (val->high != 0)
-		ret = ~0UL;
-	else
-		ret = val->low;
+	ret = val->low;
 #else
 	ret = ((u64)val->high << 32) | ((u64)val->low);
 #endif
@@ -4486,177 +4378,6 @@ do {	p = orig_p + (reg);	\
 	return orig_p;
 }
 
-static void tg3_to_ethtool_coal(struct tg3 *tp,
-				struct ethtool_coalesce *ecoal)
-{
-	ecoal->rx_coalesce_usecs =
-		tp->coalesce_config.rx_coalesce_ticks_def;
-	ecoal->rx_max_coalesced_frames =
-		tp->coalesce_config.rx_max_coalesced_frames_def;
-	ecoal->rx_coalesce_usecs_irq =
-		tp->coalesce_config.rx_coalesce_ticks_during_int_def;
-	ecoal->rx_max_coalesced_frames_irq =
-		tp->coalesce_config.rx_max_coalesced_frames_during_int_def;
-
-	ecoal->tx_coalesce_usecs =
-		tp->coalesce_config.tx_coalesce_ticks_def;
-	ecoal->tx_max_coalesced_frames =
-		tp->coalesce_config.tx_max_coalesced_frames_def;
-	ecoal->tx_coalesce_usecs_irq =
-		tp->coalesce_config.tx_coalesce_ticks_during_int_def;
-	ecoal->tx_max_coalesced_frames_irq =
-		tp->coalesce_config.tx_max_coalesced_frames_during_int_def;
-
-	ecoal->stats_block_coalesce_usecs =
-		tp->coalesce_config.stats_coalesce_ticks_def;
-
-	ecoal->use_adaptive_rx_coalesce =
-		(tp->tg3_flags & TG3_FLAG_ADAPTIVE_RX) != 0;
-	ecoal->use_adaptive_tx_coalesce =
-		(tp->tg3_flags & TG3_FLAG_ADAPTIVE_TX) != 0;
-
-	ecoal->pkt_rate_low =
-		tp->coalesce_config.pkt_rate_low;
-	ecoal->rx_coalesce_usecs_low =
-		tp->coalesce_config.rx_coalesce_ticks_low;
-	ecoal->rx_max_coalesced_frames_low =
-		tp->coalesce_config.rx_max_coalesced_frames_low;
-	ecoal->tx_coalesce_usecs_low =
-		tp->coalesce_config.tx_coalesce_ticks_low;
-	ecoal->tx_max_coalesced_frames_low =
-		tp->coalesce_config.tx_max_coalesced_frames_low;
-
-	ecoal->pkt_rate_high =
-		tp->coalesce_config.pkt_rate_high;
-	ecoal->rx_coalesce_usecs_high =
-		tp->coalesce_config.rx_coalesce_ticks_high;
-	ecoal->rx_max_coalesced_frames_high =
-		tp->coalesce_config.rx_max_coalesced_frames_high;
-	ecoal->tx_coalesce_usecs_high =
-		tp->coalesce_config.tx_coalesce_ticks_high;
-	ecoal->tx_max_coalesced_frames_high =
-		tp->coalesce_config.tx_max_coalesced_frames_high;
-
-	ecoal->rate_sample_interval =
-		tp->coalesce_config.rate_sample_jiffies / HZ;
-}
-
-static int tg3_from_ethtool_coal(struct tg3 *tp,
-				 struct ethtool_coalesce *ecoal)
-{
-	/* Make sure we are not getting garbage. */
-	if ((ecoal->rx_coalesce_usecs == 0 &&
-	     ecoal->rx_max_coalesced_frames == 0) ||
-	    (ecoal->tx_coalesce_usecs == 0 &&
-	     ecoal->tx_max_coalesced_frames == 0) ||
-	    ecoal->stats_block_coalesce_usecs == 0)
-		return -EINVAL;
-	if (ecoal->use_adaptive_rx_coalesce ||
-	    ecoal->use_adaptive_tx_coalesce) {
-		if (ecoal->pkt_rate_low > ecoal->pkt_rate_high)
-			return -EINVAL;
-		if (ecoal->rate_sample_interval == 0)
-			return -EINVAL;
-		if (ecoal->use_adaptive_rx_coalesce &&
-		    ((ecoal->rx_coalesce_usecs_low == 0 &&
-		      ecoal->rx_max_coalesced_frames_low == 0) ||
-		     (ecoal->rx_coalesce_usecs_high == 0 &&
-		      ecoal->rx_max_coalesced_frames_high == 0)))
-			return -EINVAL;
-		if (ecoal->use_adaptive_tx_coalesce &&
-		    ((ecoal->tx_coalesce_usecs_low == 0 &&
-		      ecoal->tx_max_coalesced_frames_low == 0) ||
-		     (ecoal->tx_coalesce_usecs_high == 0 &&
-		      ecoal->tx_max_coalesced_frames_high == 0)))
-			return -EINVAL;
-	}
-
-	/* Looks good, let it rip. */
-	spin_lock_irq(&tp->lock);
-	tp->coalesce_config.rx_coalesce_ticks =
-		tp->coalesce_config.rx_coalesce_ticks_def =
-		ecoal->rx_coalesce_usecs;
-	tp->coalesce_config.rx_max_coalesced_frames =
-		tp->coalesce_config.rx_max_coalesced_frames_def =
-		ecoal->rx_max_coalesced_frames;
-	tp->coalesce_config.rx_coalesce_ticks_during_int =
-		tp->coalesce_config.rx_coalesce_ticks_during_int_def =
-		ecoal->rx_coalesce_usecs_irq;
-	tp->coalesce_config.rx_max_coalesced_frames_during_int =
-		tp->coalesce_config.rx_max_coalesced_frames_during_int_def =
-		ecoal->rx_max_coalesced_frames_irq;
-	tp->coalesce_config.tx_coalesce_ticks =
-		tp->coalesce_config.tx_coalesce_ticks_def =
-		ecoal->tx_coalesce_usecs;
-	tp->coalesce_config.tx_max_coalesced_frames =
-		tp->coalesce_config.tx_max_coalesced_frames_def =
-		ecoal->tx_max_coalesced_frames;
-	tp->coalesce_config.tx_coalesce_ticks_during_int =
-		tp->coalesce_config.tx_coalesce_ticks_during_int_def =
-		ecoal->tx_coalesce_usecs_irq;
-	tp->coalesce_config.tx_max_coalesced_frames_during_int =
-		tp->coalesce_config.tx_max_coalesced_frames_during_int_def =
-		ecoal->tx_max_coalesced_frames_irq;
-	tp->coalesce_config.stats_coalesce_ticks =
-		tp->coalesce_config.stats_coalesce_ticks_def =
-		ecoal->stats_block_coalesce_usecs;
-
-	if (ecoal->use_adaptive_rx_coalesce)
-		tp->tg3_flags |= TG3_FLAG_ADAPTIVE_RX;
-	else
-		tp->tg3_flags &= ~TG3_FLAG_ADAPTIVE_RX;
-	if (ecoal->use_adaptive_tx_coalesce)
-		tp->tg3_flags |= TG3_FLAG_ADAPTIVE_TX;
-	else
-		tp->tg3_flags &= ~TG3_FLAG_ADAPTIVE_TX;
-
-	tp->coalesce_config.pkt_rate_low = ecoal->pkt_rate_low;
-	tp->coalesce_config.pkt_rate_high = ecoal->pkt_rate_high;
-	tp->coalesce_config.rate_sample_jiffies =
-		ecoal->rate_sample_interval * HZ;
-
-	tp->coalesce_config.rx_coalesce_ticks_low =
-		ecoal->rx_coalesce_usecs_low;
-	tp->coalesce_config.rx_max_coalesced_frames_low =
-		ecoal->rx_max_coalesced_frames_low;
-	tp->coalesce_config.tx_coalesce_ticks_low =
-		ecoal->tx_coalesce_usecs_low;
-	tp->coalesce_config.tx_max_coalesced_frames_low =
-		ecoal->tx_max_coalesced_frames_low;
-
-	tp->coalesce_config.rx_coalesce_ticks_high =
-		ecoal->rx_coalesce_usecs_high;
-	tp->coalesce_config.rx_max_coalesced_frames_high =
-		ecoal->rx_max_coalesced_frames_high;
-	tp->coalesce_config.tx_coalesce_ticks_high =
-		ecoal->tx_coalesce_usecs_high;
-	tp->coalesce_config.tx_max_coalesced_frames_high =
-		ecoal->tx_max_coalesced_frames_high;
-
-	tw32(HOSTCC_RXCOL_TICKS,
-	     tp->coalesce_config.rx_coalesce_ticks_def);
-	tw32(HOSTCC_RXMAX_FRAMES,
-	     tp->coalesce_config.rx_max_coalesced_frames_def);
-	tw32(HOSTCC_RXCOAL_TICK_INT,
-	     tp->coalesce_config.rx_coalesce_ticks_during_int_def);
-	tw32(HOSTCC_RXCOAL_MAXF_INT,
-	     tp->coalesce_config.rx_max_coalesced_frames_during_int_def);
-	tw32(HOSTCC_TXCOL_TICKS,
-	     tp->coalesce_config.tx_coalesce_ticks_def);
-	tw32(HOSTCC_TXMAX_FRAMES,
-	     tp->coalesce_config.tx_max_coalesced_frames_def);
-	tw32(HOSTCC_TXCOAL_TICK_INT,
-	     tp->coalesce_config.tx_coalesce_ticks_during_int_def);
-	tw32(HOSTCC_TXCOAL_MAXF_INT,
-	     tp->coalesce_config.tx_max_coalesced_frames_during_int_def);
-	tw32(HOSTCC_STAT_COAL_TICKS,
-	     tp->coalesce_config.stats_coalesce_ticks_def);
-
-	spin_unlock_irq(&tp->lock);
-
-	return 0;
-}
-
 static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 {
 	struct tg3 *tp = dev->priv;
@@ -4708,8 +4429,8 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		cmd.phy_address = PHY_ADDR;
 		cmd.transceiver = 0;
 		cmd.autoneg = tp->link_config.autoneg;
-		cmd.maxtxpkt = tp->coalesce_config.tx_max_coalesced_frames_def;
-		cmd.maxrxpkt = tp->coalesce_config.rx_max_coalesced_frames_def;
+		cmd.maxtxpkt = 0;
+		cmd.maxrxpkt = 0;
 		if (copy_to_user(useraddr, &cmd, sizeof(cmd)))
 			return -EFAULT;
 		return 0;
@@ -4761,22 +4482,6 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 			tp->link_config.duplex = cmd.duplex;
 		}
 
-		if (cmd.maxtxpkt || cmd.maxrxpkt) {
-			tp->coalesce_config.tx_max_coalesced_frames_def =
-				tp->coalesce_config.tx_max_coalesced_frames =
-				cmd.maxtxpkt;
-			tp->coalesce_config.rx_max_coalesced_frames_def =
-				tp->coalesce_config.rx_max_coalesced_frames =
-				cmd.maxrxpkt;
-
-			/* Coalescing config bits can be updated without
-			 * a full chip reset.
-			 */
-			tw32(HOSTCC_TXMAX_FRAMES,
-			     tp->coalesce_config.tx_max_coalesced_frames);
-			tw32(HOSTCC_RXMAX_FRAMES,
-			     tp->coalesce_config.rx_max_coalesced_frames);
-		}
 		tg3_setup_phy(tp);
 		spin_unlock_irq(&tp->lock);
 
@@ -4872,22 +4577,6 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		if (copy_to_user(useraddr, &edata, sizeof(edata)))
 			return -EFAULT;
 		return 0;
-	}
-	case ETHTOOL_GCOALESCE: {
-		struct ethtool_coalesce ecoal = { ETHTOOL_GCOALESCE };
-
-		tg3_to_ethtool_coal(tp, &ecoal);
-		if (copy_to_user(useraddr, &ecoal, sizeof(ecoal)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SCOALESCE: {
-		struct ethtool_coalesce ecoal;
-
-		if (copy_from_user(&ecoal, useraddr, sizeof(ecoal)))
-			return -EINVAL;
-
-		return tg3_from_ethtool_coal(tp, &ecoal);
 	}
 	case ETHTOOL_GRINGPARAM: {
 		struct ethtool_ringparam ering = { ETHTOOL_GRINGPARAM };
@@ -5641,42 +5330,13 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->tg3_flags |= TG3_FLAG_WOL_SPEED_100MB;
 	}
 
-	/* Only 5701 and later support tagged irq status mode. */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700) {
-		tp->tg3_flags |= TG3_FLAG_TAGGED_IRQ_STATUS;
-		tp->misc_host_ctrl |= MISC_HOST_CTRL_TAGGED_STATUS;
-
-		/* ??? Due to a glitch Broadcom's driver ALWAYS sets
-		 * ??? these bits in coalesce_mode.  Because MM_GetConfig
-		 * ??? always sets pDevice->UseTaggedStatus correctly
-		 * ??? the following test at tigon3.c:LM_GetAdapterInfo()
-		 * ???
-		 * ???   pDevice->UseTaggedStatus &&
-		 * ???   (pDevice->ChipRevId == T3_CHIP_ID_5700_C0 ||
-		 * ???    T3_CHIP_REV(pDevice->ChipRevId) == T3_CHIP_REV_5700_AX ||
-		 * ???    T3_CHIP_REV(pDevice->ChipRevId) == T3_CHIP_REV_5700_BX)
-		 * ???
-		 * ??? will never pass and thus pDevice->CoalesceMode will never
-		 * ??? get set to zero.  For now I'll mirror what I believe is
-		 * ??? the intention of their driver.
-		 * ???
-		 * ??? Update: This is fixed in Broadcom's 2.2.3 and later
-		 * ???         drivers.  All the current 2.0.x drivers still
-		 * ???         have the bug.
-		 */
-		tp->coalesce_mode = (HOSTCC_MODE_CLRTICK_RXBD |
-				     HOSTCC_MODE_CLRTICK_TXBD);
-	} else {
-		tp->coalesce_mode = 0;
-
-		/* If not using tagged status, set the *_during_int
-		 * coalesce default config values to zero.
-		 */
-		tp->coalesce_config.rx_coalesce_ticks_during_int_def = 0;
-		tp->coalesce_config.rx_max_coalesced_frames_during_int_def = 0;
-		tp->coalesce_config.tx_coalesce_ticks_during_int_def = 0;
-		tp->coalesce_config.tx_max_coalesced_frames_during_int_def = 0;
-	}
+	/* Only 5701 and later support tagged irq status mode.
+	 *
+	 * However, since we are using NAPI avoid tagged irq status
+	 * because the interrupt condition is more difficult to
+	 * fully clear in that mode.
+	 */
+	tp->coalesce_mode = 0;
 
 	if (GET_CHIP_REV(tp->pci_chip_rev_id) != CHIPREV_5700_AX &&
 	    GET_CHIP_REV(tp->pci_chip_rev_id) != CHIPREV_5700_BX)
@@ -6121,61 +5781,6 @@ static void __devinit tg3_init_link_config(struct tg3 *tp)
 	tp->link_config.orig_autoneg = AUTONEG_INVALID;
 }
 
-static void __devinit tg3_init_coalesce_config(struct tg3 *tp)
-{
-	tp->coalesce_config.rx_coalesce_ticks_def = DEFAULT_RXCOL_TICKS;
-	tp->coalesce_config.rx_max_coalesced_frames_def = DEFAULT_RXMAX_FRAMES;
-	tp->coalesce_config.rx_coalesce_ticks_during_int_def =
-		DEFAULT_RXCOAL_TICK_INT;
-	tp->coalesce_config.rx_max_coalesced_frames_during_int_def =
-		DEFAULT_RXCOAL_MAXF_INT;
-	tp->coalesce_config.tx_coalesce_ticks_def = DEFAULT_TXCOL_TICKS;
-	tp->coalesce_config.tx_max_coalesced_frames_def = DEFAULT_TXMAX_FRAMES;
-	tp->coalesce_config.tx_coalesce_ticks_during_int_def =
-		DEFAULT_TXCOAL_TICK_INT;
-	tp->coalesce_config.tx_max_coalesced_frames_during_int_def =
-		DEFAULT_TXCOAL_MAXF_INT;
-	tp->coalesce_config.stats_coalesce_ticks_def =
-		DEFAULT_STAT_COAL_TICKS;
-
-	tp->coalesce_config.rx_coalesce_ticks_low =
-		LOW_RXCOL_TICKS;
-	tp->coalesce_config.rx_max_coalesced_frames_low =
-		LOW_RXMAX_FRAMES;
-	tp->coalesce_config.tx_coalesce_ticks_low =
-		LOW_TXCOL_TICKS;
-	tp->coalesce_config.tx_max_coalesced_frames_low =
-		LOW_TXMAX_FRAMES;
-
-	tp->coalesce_config.rx_coalesce_ticks_high =
-		HIGH_RXCOL_TICKS;
-	tp->coalesce_config.rx_max_coalesced_frames_high =
-		HIGH_RXMAX_FRAMES;
-	tp->coalesce_config.tx_coalesce_ticks_high =
-		HIGH_TXCOL_TICKS;
-	tp->coalesce_config.tx_max_coalesced_frames_high =
-		HIGH_TXMAX_FRAMES;
-
-	/* Active == default */
-	tp->coalesce_config.rx_coalesce_ticks =
-		tp->coalesce_config.rx_coalesce_ticks_def;
-	tp->coalesce_config.rx_max_coalesced_frames =
-		tp->coalesce_config.rx_max_coalesced_frames_def;
-	tp->coalesce_config.tx_coalesce_ticks =
-		tp->coalesce_config.tx_coalesce_ticks_def;
-	tp->coalesce_config.tx_max_coalesced_frames =
-		tp->coalesce_config.tx_max_coalesced_frames_def;
-	tp->coalesce_config.stats_coalesce_ticks =
-		tp->coalesce_config.stats_coalesce_ticks_def;
-
-	tp->coalesce_config.rate_sample_jiffies = (1 * HZ);
-	tp->coalesce_config.pkt_rate_low = 22000;
-	tp->coalesce_config.pkt_rate_high = 61000;
-
-	tp->tg3_flags |= TG3_FLAG_ADAPTIVE_RX;
-	tp->tg3_flags &= ~(TG3_FLAG_ADAPTIVE_TX);
-}
-
 static void __devinit tg3_init_bufmgr_config(struct tg3 *tp)
 {
 	tp->bufmgr_config.mbuf_read_dma_low_water =
@@ -6333,8 +5938,6 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 
 	tg3_init_link_config(tp);
 
-	tg3_init_coalesce_config(tp);
-
 	tg3_init_bufmgr_config(tp);
 
 	tp->rx_pending = TG3_DEF_RX_RING_PENDING;
@@ -6351,6 +5954,8 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	dev->set_mac_address = tg3_set_mac_addr;
 	dev->do_ioctl = tg3_ioctl;
 	dev->tx_timeout = tg3_tx_timeout;
+	dev->poll = tg3_poll;
+	dev->weight = 64;
 	dev->watchdog_timeo = TG3_TX_TIMEOUT;
 	dev->change_mtu = tg3_change_mtu;
 	dev->irq = pdev->irq;

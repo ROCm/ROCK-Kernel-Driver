@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/kernel/traps.c
  *
- *  Copyright (C) 1995, 1996 Russell King
+ *  Copyright (C) 1995-2002 Russell King
  *  Fragments that appear the same as linux/arch/i386/kernel/traps.c (C) Linus Torvalds
  *
  * This program is free software; you can redistribute it and/or modify
@@ -66,7 +66,16 @@ static int verify_stack(unsigned long sp)
 static void dump_mem(const char *str, unsigned long bottom, unsigned long top)
 {
 	unsigned long p = bottom & ~31;
+	mm_segment_t fs;
 	int i;
+
+	/*
+	 * We need to switch to kernel mode so that we can use __get_user
+	 * to safely read from kernel space.  Note that we now dump the
+	 * code first, just in case the backtrace kills us.
+	 */
+	fs = get_fs();
+	set_fs(KERNEL_DS);
 
 	printk("%s", str);
 	printk("(0x%08lx to 0x%08lx)\n", bottom, top);
@@ -86,6 +95,8 @@ static void dump_mem(const char *str, unsigned long bottom, unsigned long top)
 		}
 		printk ("\n");
 	}
+
+	set_fs(fs);
 }
 
 static void dump_instr(struct pt_regs *regs)
@@ -93,7 +104,16 @@ static void dump_instr(struct pt_regs *regs)
 	unsigned long addr = instruction_pointer(regs);
 	const int thumb = thumb_mode(regs);
 	const int width = thumb ? 4 : 8;
+	mm_segment_t fs;
 	int i;
+
+	/*
+	 * We need to switch to kernel mode so that we can use __get_user
+	 * to safely read from kernel space.  Note that we now dump the
+	 * code first, just in case the backtrace kills us.
+	 */
+	fs = get_fs();
+	set_fs(KERNEL_DS);
 
 	printk("Code: ");
 	for (i = -4; i < 1; i++) {
@@ -112,6 +132,8 @@ static void dump_instr(struct pt_regs *regs)
 		}
 	}
 	printk("\n");
+
+	set_fs(fs);
 }
 
 static void dump_stack(struct task_struct *tsk, unsigned long sp)
@@ -171,22 +193,9 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 		current->comm, current->pid, tsk->thread_info + 1);
 
 	if (!user_mode(regs) || in_interrupt()) {
-		mm_segment_t fs;
-
-		/*
-		 * We need to switch to kernel mode so that we can
-		 * use __get_user to safely read from kernel space.
-		 * Note that we now dump the code first, just in case
-		 * the backtrace kills us.
-		 */
-		fs = get_fs();
-		set_fs(KERNEL_DS);
-
 		dump_stack(tsk, (unsigned long)(regs + 1));
 		dump_backtrace(regs, tsk);
 		dump_instr(regs);
-
-		set_fs(fs);
 	}
 
 	spin_unlock_irq(&die_lock);
@@ -233,7 +242,7 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 }
 
 #ifdef CONFIG_CPU_26
-asmlinkage void do_excpt(int address, struct pt_regs *regs, int mode)
+asmlinkage void do_excpt(unsigned long address, struct pt_regs *regs, int mode)
 {
 	siginfo_t info;
 
@@ -274,20 +283,11 @@ asmlinkage void do_unexp_fiq (struct pt_regs *regs)
 asmlinkage void bad_mode(struct pt_regs *regs, int reason, int proc_mode)
 {
 	unsigned int vectors = vectors_base();
-	mm_segment_t fs;
 
 	console_verbose();
 
 	printk(KERN_CRIT "Bad mode in %s handler detected: mode %s\n",
 		handler[reason], processor_modes[proc_mode]);
-
-	/*
-	 * We need to switch to kernel mode so that we can use __get_user
-	 * to safely read from kernel space.  Note that we now dump the
-	 * code first, just in case the backtrace kills us.
-	 */
-	fs = get_fs();
-	set_fs(KERNEL_DS);
 
 	/*
 	 * Dump out the vectors and stub routines.  Maybe a better solution
@@ -296,10 +296,8 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, int proc_mode)
 	dump_mem(KERN_CRIT "Vectors: ", vectors, vectors + 0x40);
 	dump_mem(KERN_CRIT "Stubs: ", vectors + 0x200, vectors + 0x4b8);
 
-	set_fs(fs);
-
 	die("Oops", regs, 0);
-	cli();
+	local_irq_disable();
 	panic("bad mode");
 }
 
@@ -308,13 +306,7 @@ static int bad_syscall(int n, struct pt_regs *regs)
 	struct thread_info *thread = current_thread_info();
 	siginfo_t info;
 
-	/* You might think just testing `handler' would be enough, but PER_LINUX
-	 * points it to no_lcall7 to catch undercover SVr4 binaries.  Gutted.
-	 */
 	if (current->personality != PER_LINUX && thread->exec_domain->handler) {
-		/* Hand it off to iBCS.  The extra parameter and consequent type 
-		 * forcing is necessary because of the weird ARM calling convention.
-		 */
 		thread->exec_domain->handler(n, regs);
 		return regs->ARM_r0;
 	}
@@ -380,20 +372,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		return 0;
 
 	case NR(breakpoint): /* SWI BREAK_POINT */
-		/*
-		 * The PC is always left pointing at the next
-		 * instruction.  Fix this.
-		 */
-		regs->ARM_pc -= 4;
-		__ptrace_cancel_bpt(current);
-
-		info.si_signo = SIGTRAP;
-		info.si_errno = 0;
-		info.si_code  = TRAP_BRKPT;
-		info.si_addr  = (void *)instruction_pointer(regs) -
-				 (thumb_mode(regs) ? 2 : 4);
-
-		force_sig_info(SIGTRAP, &info, current);
+		ptrace_break(current, regs);
 		return regs->ARM_r0;
 
 #ifdef CONFIG_CPU_32
@@ -418,13 +397,13 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 	case NR(usr26):
 		if (!(elf_hwcap & HWCAP_26BIT))
 			break;
-		regs->ARM_cpsr &= ~0x10;
+		regs->ARM_cpsr &= ~MODE32_BIT;
 		return regs->ARM_r0;
 
 	case NR(usr32):
 		if (!(elf_hwcap & HWCAP_26BIT))
 			break;
-		regs->ARM_cpsr |= 0x10;
+		regs->ARM_cpsr |= MODE32_BIT;
 		return regs->ARM_r0;
 #else
 	case NR(cacheflush):
