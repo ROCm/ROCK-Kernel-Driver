@@ -76,8 +76,6 @@ extern struct page_state {
 	unsigned long nr_dirty;
 	unsigned long nr_writeback;
 	unsigned long nr_pagecache;
-	unsigned long nr_active;	/* on active_list LRU */
-	unsigned long nr_inactive;	/* on inactive_list LRU */
 	unsigned long nr_page_table_pages;
 	unsigned long nr_reverse_maps;
 } ____cacheline_aligned_in_smp page_states[NR_CPUS];

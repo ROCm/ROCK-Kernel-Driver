@@ -27,6 +27,7 @@
 #include <linux/ioport.h>
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/mmzone.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/slab.h>
@@ -136,6 +137,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	int len, committed;
 	struct page_state ps;
 	int cpu;
+	unsigned long inactive;
+	unsigned long active;
 	unsigned long flushes = 0;
 	unsigned long non_flushes = 0;
 
@@ -145,6 +148,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	}
 
 	get_page_state(&ps);
+	get_zone_counts(&active, &inactive);
+
 /*
  * display in kilobytes.
  */
@@ -182,8 +187,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.sharedram),
 		K(ps.nr_pagecache-swapper_space.nrpages),
 		K(swapper_space.nrpages),
-		K(ps.nr_active),
-		K(ps.nr_inactive),
+		K(active),
+		K(inactive),
 		K(i.totalhigh),
 		K(i.freehigh),
 		K(i.totalram-i.totalhigh),

@@ -213,51 +213,6 @@ extern spinlock_t _pagemap_lru_lock;
 
 extern void FASTCALL(mark_page_accessed(struct page *));
 
-/*
- * List add/del helper macros. These must be called
- * with the pagemap_lru_lock held!
- */
-#define DEBUG_LRU_PAGE(page)			\
-do {						\
-	if (!PageLRU(page))			\
-		BUG();				\
-	if (PageActive(page))			\
-		BUG();				\
-} while (0)
-
-#define __add_page_to_active_list(page)		\
-do {						\
-	list_add(&(page)->lru, &active_list);	\
-	inc_page_state(nr_active);		\
-} while (0)
-
-#define add_page_to_active_list(page)		\
-do {						\
-	DEBUG_LRU_PAGE(page);			\
-	SetPageActive(page);			\
-	__add_page_to_active_list(page);	\
-} while (0)
-
-#define add_page_to_inactive_list(page)		\
-do {						\
-	DEBUG_LRU_PAGE(page);			\
-	list_add(&(page)->lru, &inactive_list);	\
-	inc_page_state(nr_inactive);		\
-} while (0)
-
-#define del_page_from_active_list(page)		\
-do {						\
-	list_del(&(page)->lru);			\
-	ClearPageActive(page);			\
-	dec_page_state(nr_active);		\
-} while (0)
-
-#define del_page_from_inactive_list(page)	\
-do {						\
-	list_del(&(page)->lru);			\
-	dec_page_state(nr_inactive);		\
-} while (0)
-
 extern spinlock_t swaplock;
 
 #define swap_list_lock()	spin_lock(&swaplock)

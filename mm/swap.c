@@ -19,6 +19,7 @@
 #include <linux/pagemap.h>
 #include <linux/pagevec.h>
 #include <linux/init.h>
+#include <linux/mm_inline.h>
 #include <linux/prefetch.h>
 
 /* How many pages do we try to swap or page in/out together? */
@@ -31,6 +32,7 @@ static inline void activate_page_nolock(struct page * page)
 {
 	if (PageLRU(page) && !PageActive(page)) {
 		del_page_from_inactive_list(page);
+		SetPageActive(page);
 		add_page_to_active_list(page);
 		KERNEL_STAT_INC(pgactivate);
 	}
@@ -79,12 +81,8 @@ void __page_cache_release(struct page *page)
 	unsigned long flags;
 
 	spin_lock_irqsave(&_pagemap_lru_lock, flags);
-	if (TestClearPageLRU(page)) {
-		if (PageActive(page))
-			del_page_from_active_list(page);
-		else
-			del_page_from_inactive_list(page);
-	}
+	if (TestClearPageLRU(page))
+		del_page_from_lru(page);
 	if (page_count(page) != 0)
 		page = NULL;
 	spin_unlock_irqrestore(&_pagemap_lru_lock, flags);
@@ -124,12 +122,8 @@ void __pagevec_release(struct pagevec *pvec)
 			lock_held = 1;
 		}
 
-		if (TestClearPageLRU(page)) {
-			if (PageActive(page))
-				del_page_from_active_list(page);
-			else
-				del_page_from_inactive_list(page);
-		}
+		if (TestClearPageLRU(page))
+			del_page_from_lru(page);
 		if (page_count(page) == 0)
 			pagevec_add(&pages_to_free, page);
 	}
@@ -182,8 +176,10 @@ void pagevec_deactivate_inactive(struct pagevec *pvec)
 			spin_lock_irq(&_pagemap_lru_lock);
 			lock_held = 1;
 		}
-		if (!PageActive(page) && PageLRU(page))
-			list_move(&page->lru, &inactive_list);
+		if (!PageActive(page) && PageLRU(page)) {
+			struct zone *zone = page_zone(page);
+			list_move(&page->lru, &zone->inactive_list);
+		}
 	}
 	if (lock_held)
 		spin_unlock_irq(&_pagemap_lru_lock);
@@ -224,10 +220,7 @@ void __pagevec_lru_del(struct pagevec *pvec)
 
 		if (!TestClearPageLRU(page))
 			BUG();
-		if (PageActive(page))
-			del_page_from_active_list(page);
-		else
-			del_page_from_inactive_list(page);
+		del_page_from_lru(page);
 	}
 	spin_unlock_irq(&_pagemap_lru_lock);
 	pagevec_release(pvec);

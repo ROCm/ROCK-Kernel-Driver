@@ -1151,14 +1151,15 @@ do_readahead(struct file *file, unsigned long index, unsigned long nr)
 {
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	unsigned long max;
-	struct page_state ps;
+	unsigned long active;
+	unsigned long inactive;
 
 	if (!mapping || !mapping->a_ops || !mapping->a_ops->readpage)
 		return -EINVAL;
 
 	/* Limit it to a sane percentage of the inactive list.. */
-	get_page_state(&ps);
-	max = ps.nr_inactive / 2;
+	get_zone_counts(&active, &inactive);
+	max = inactive / 2;
 	if (nr > max)
 		nr = max;
 

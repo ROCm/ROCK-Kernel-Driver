@@ -8,6 +8,7 @@
 #include <linux/spinlock.h>
 #include <linux/list.h>
 #include <linux/wait.h>
+#include <asm/atomic.h>
 
 /*
  * Free memory management - zoned buddy allocator.
@@ -42,6 +43,12 @@ struct zone {
 	unsigned long		free_pages;
 	unsigned long		pages_min, pages_low, pages_high;
 	int			need_balance;
+
+	struct list_head	active_list;
+	struct list_head	inactive_list;
+	atomic_t		refill_counter;
+	unsigned long		nr_active;
+	unsigned long		nr_inactive;
 
 	/*
 	 * free areas of different sizes
@@ -157,10 +164,10 @@ memclass(struct zone *pgzone, struct zone *classzone)
  * prototypes for the discontig memory code.
  */
 struct page;
-extern void show_free_areas_core(pg_data_t *pgdat);
-extern void free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
+void free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
   unsigned long *zones_size, unsigned long paddr, unsigned long *zholes_size,
   struct page *pmap);
+void get_zone_counts(unsigned long *active, unsigned long *inactive);
 
 extern pg_data_t contig_page_data;
 

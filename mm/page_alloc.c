@@ -27,8 +27,6 @@
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 int nr_swap_pages;
-LIST_HEAD(active_list);
-LIST_HEAD(inactive_list);
 pg_data_t *pgdat_list;
 
 /*
@@ -266,7 +264,7 @@ struct page *_alloc_pages(unsigned int gfp_mask, unsigned int order)
 #endif
 
 static /* inline */ struct page *
-balance_classzone(struct zone *classzone, unsigned int gfp_mask,
+balance_classzone(struct zone* classzone, unsigned int gfp_mask,
 			unsigned int order, int * freed)
 {
 	struct page * page = NULL;
@@ -344,7 +342,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 
 		/* the incremental min is allegedly to discourage fallback */
 		min += z->pages_low;
-		if (z->free_pages > min) {
+		if (z->free_pages > min || z->free_pages >= z->pages_high) {
 			page = rmqueue(z, order);
 			if (page)
 				return page;
@@ -367,7 +365,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		if (gfp_mask & __GFP_HIGH)
 			local_min >>= 2;
 		min += local_min;
-		if (z->free_pages > min) {
+		if (z->free_pages > min || z->free_pages >= z->pages_high) {
 			page = rmqueue(z, order);
 			if (page)
 				return page;
@@ -410,7 +408,7 @@ nopage:
 		struct zone *z = zones[i];
 
 		min += z->pages_min;
-		if (z->free_pages > min) {
+		if (z->free_pages > min || z->free_pages >= z->pages_high) {
 			page = rmqueue(z, order);
 			if (page)
 				return page;
@@ -561,10 +559,20 @@ void get_page_state(struct page_state *ret)
 		ret->nr_dirty += ps->nr_dirty;
 		ret->nr_writeback += ps->nr_writeback;
 		ret->nr_pagecache += ps->nr_pagecache;
-		ret->nr_active += ps->nr_active;
-		ret->nr_inactive += ps->nr_inactive;
 		ret->nr_page_table_pages += ps->nr_page_table_pages;
 		ret->nr_reverse_maps += ps->nr_reverse_maps;
+	}
+}
+
+void get_zone_counts(unsigned long *active, unsigned long *inactive)
+{
+	struct zone *zone;
+
+	*active = 0;
+	*inactive = 0;
+	for_each_zone(zone) {
+		*active += zone->nr_active;
+		*inactive += zone->nr_inactive;
 	}
 }
 
@@ -604,8 +612,11 @@ void show_free_areas(void)
 	pg_data_t *pgdat;
 	struct page_state ps;
 	int type;
+	unsigned long active;
+	unsigned long inactive;
 
 	get_page_state(&ps);
+	get_zone_counts(&active, &inactive);
 
 	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
 		K(nr_free_pages()),
@@ -614,21 +625,27 @@ void show_free_areas(void)
 	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
 		for (type = 0; type < MAX_NR_ZONES; ++type) {
 			struct zone *zone = &pgdat->node_zones[type];
-			printk("Zone:%s "
-				"freepages:%6lukB "
-				"min:%6lukB "
-				"low:%6lukB " 
-				"high:%6lukB\n", 
+			printk("Zone:%s"
+				" freepages:%6lukB"
+				" min:%6lukB"
+				" low:%6lukB"
+				" high:%6lukB"
+				" active:%6lukB"
+				" inactive:%6lukB"
+				"\n",
 				zone->name,
 				K(zone->free_pages),
 				K(zone->pages_min),
 				K(zone->pages_low),
-				K(zone->pages_high));
+				K(zone->pages_high),
+				K(zone->nr_active),
+				K(zone->nr_inactive)
+				);
 		}
 
 	printk("( Active:%lu inactive:%lu dirty:%lu writeback:%lu free:%u )\n",
-		ps.nr_active,
-		ps.nr_inactive,
+		active,
+		inactive,
 		ps.nr_dirty,
 		ps.nr_writeback,
 		nr_free_pages());
@@ -815,6 +832,11 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 		zone->zone_pgdat = pgdat;
 		zone->free_pages = 0;
 		zone->need_balance = 0;
+		INIT_LIST_HEAD(&zone->active_list);
+		INIT_LIST_HEAD(&zone->inactive_list);
+		atomic_set(&zone->refill_counter, 0);
+		zone->nr_active = 0;
+		zone->nr_inactive = 0;
 		if (!size)
 			continue;
 
