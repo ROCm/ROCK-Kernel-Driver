@@ -27,17 +27,15 @@ static ide_pci_host_proc_t slc90e66_procs[] __initdata = {
 };
 #endif	/* defined(DISPLAY_SLC90E66_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-static void init_setup_slc90e66(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_slc90e66(struct pci_dev *, const char *);
 static void init_hwif_slc90e66(ide_hwif_t *);
 static void init_dma_slc90e66(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t slc90e66_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_EFAR,
 		device:		PCI_DEVICE_ID_EFAR_SLC90E66_1,
 		name:		"SLC90E66",
-		init_setup:	init_setup_slc90e66,
 		init_chipset:	init_chipset_slc90e66,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_slc90e66,

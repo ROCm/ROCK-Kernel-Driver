@@ -254,9 +254,9 @@ struct uvd {
  * that default to usbvideo-provided methods.
  */
 struct usbvideo_cb {
-	void *(*probe)(struct usb_device *, unsigned int,const struct usb_device_id *);
+	int (*probe)(struct usb_interface *, const struct usb_device_id *);
 	void (*userFree)(struct uvd *);
-	void (*disconnect)(struct usb_device *, void *);
+	void (*disconnect)(struct usb_interface *);
 	int (*setupOnOpen)(struct uvd *);
 	void (*videoStart)(struct uvd *);
 	void (*videoStop)(struct uvd *);

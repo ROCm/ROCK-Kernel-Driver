@@ -41,6 +41,7 @@
 #include <linux/module.h>
 #include <linux/namei.h>
 #include <linux/proc_fs.h>
+#include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -577,11 +578,17 @@ static inline int de_thread(struct signal_struct *oldsig)
 	 * and to assume its PID:
 	 */
 	if (current->pid != current->tgid) {
-		struct task_struct *leader = current->group_leader;
+		struct task_struct *leader = current->group_leader, *parent;
 		struct dentry *proc_dentry1, *proc_dentry2;
-		unsigned long state;
+		unsigned long state, ptrace;
 
-		wait_task_inactive(leader);
+		/*
+		 * Wait for the thread group leader to be a zombie.
+		 * It should already be zombie at this point, most
+		 * of the time.
+		 */
+		while (leader->state != TASK_ZOMBIE)
+			yield();
 
 		write_lock_irq(&tasklist_lock);
 		proc_dentry1 = clean_proc_dentry(current);
@@ -597,10 +604,33 @@ static inline int de_thread(struct signal_struct *oldsig)
 		 * two threads with a switched PID, and release
 		 * the former thread group leader:
 		 */
+		ptrace = leader->ptrace;
+		parent = leader->parent;
+
+		ptrace_unlink(leader);
+		ptrace_unlink(current);
 		unhash_pid(current);
 		unhash_pid(leader);
+		remove_parent(current);
+		remove_parent(leader);
+		/*
+		 * Split up the last two remaining members of the
+		 * thread group:
+		 */
+		list_del_init(&leader->thread_group);
+
 		leader->pid = leader->tgid = current->pid;
 		current->pid = current->tgid;
+		current->parent = current->real_parent = leader->real_parent;
+		leader->parent = leader->real_parent = child_reaper;
+		current->exit_signal = SIGCHLD;
+
+		add_parent(current, current->parent);
+		add_parent(leader, leader->parent);
+		if (ptrace) {
+			current->ptrace = ptrace;
+			__ptrace_link(current, parent);
+		}
 		hash_pid(current);
 		hash_pid(leader);
 		
@@ -608,8 +638,9 @@ static inline int de_thread(struct signal_struct *oldsig)
 		state = leader->state;
 		write_unlock_irq(&tasklist_lock);
 
-		if (state == TASK_ZOMBIE)
-			release_task(leader);
+		if (state != TASK_ZOMBIE)
+			BUG();
+		release_task(leader);
 
 		put_proc_dentry(proc_dentry1);
 		put_proc_dentry(proc_dentry2);

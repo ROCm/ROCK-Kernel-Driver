@@ -38,7 +38,7 @@ static void init_hwif_svwks(ide_hwif_t *);
 static void init_dma_svwks(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t serverworks_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_SERVERWORKS,
 		device:		PCI_DEVICE_ID_SERVERWORKS_OSB4IDE,
 		name:		"SvrWks OSB4",
@@ -52,7 +52,7 @@ static ide_pci_device_t serverworks_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	ON_BOARD,
 		extra:		0,
-	},{
+	},{	/* 1 */
 		vendor:		PCI_VENDOR_ID_SERVERWORKS,
 		device:		PCI_DEVICE_ID_SERVERWORKS_CSB5IDE,
 		name:		"SvrWks CSB5",
@@ -66,7 +66,7 @@ static ide_pci_device_t serverworks_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	ON_BOARD,
 		extra:		0,
-	},{
+	},{	/* 2 */
 		vendor:		PCI_VENDOR_ID_SERVERWORKS,
 		device:		PCI_DEVICE_ID_SERVERWORKS_CSB6IDE,
 		name:		"SvrWks CSB6",
@@ -80,7 +80,7 @@ static ide_pci_device_t serverworks_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	ON_BOARD,
 		extra:		0,
-	},{
+	},{	/* 3 */
 		vendor:		PCI_VENDOR_ID_SERVERWORKS,
 		device:		PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2,
 		name:		"SvrWks CSB6",

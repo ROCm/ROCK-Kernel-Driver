@@ -457,6 +457,12 @@ static void edge_shutdown		(struct usb_serial *serial);
 
 #include "io_tables.h"	/* all of the devices that this driver supports */
 
+static struct usb_driver io_driver = {
+	.name =		"io_edgeport",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table_combined,
+};
 
 /* function prototypes for all of our local functions */
 static int  process_rcvd_data		(struct edgeport_serial *edge_serial, unsigned char *buffer, __u16 bufferLength);
@@ -3050,6 +3056,7 @@ int __init edgeport_init(void)
 	usb_serial_register (&edgeport_2port_device);
 	usb_serial_register (&edgeport_4port_device);
 	usb_serial_register (&edgeport_8port_device);
+	usb_register (&io_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
@@ -3062,6 +3069,7 @@ int __init edgeport_init(void)
  ****************************************************************************/
 void __exit edgeport_exit (void)
 {
+	usb_deregister (&io_driver);
 	usb_serial_deregister (&edgeport_1port_device);
 	usb_serial_deregister (&edgeport_2port_device);
 	usb_serial_deregister (&edgeport_4port_device);

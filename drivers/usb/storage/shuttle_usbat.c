@@ -348,10 +348,13 @@ int usbat_rw_block_test(struct us_data *us,
 			 * the bulk output pipe only the first time.
 			 */
 
-			if (direction==SCSI_DATA_READ && i==0)
-				usb_stor_clear_halt(us,
+			if (direction==SCSI_DATA_READ && i==0) {
+				if (usb_stor_clear_halt(us,
 					usb_sndbulkpipe(us->pusb_dev,
-					  us->ep_out));
+					  us->ep_out)) < 0)
+					return USB_STOR_TRANSPORT_ERROR;
+			}
+
 			/*
 			 * Read status: is the device angry, or just busy?
 			 */

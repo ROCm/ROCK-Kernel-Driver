@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/pdc202xx.c	Version 0.35	Mar. 30, 2002
+ *  linux/drivers/ide/pdc202xx.c	Version 0.36	Sept 11, 2002
  *
  *  Copyright (C) 1998-2002		Andre Hedrick <andre@linux-ide.org>
  *
@@ -30,6 +30,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
@@ -918,21 +919,69 @@ static void __init init_setup_pdc202xx (struct pci_dev *dev, ide_pci_device_t *d
 	ide_setup_pci_device(dev, d);
 }
 
-int __init pdc202xx_scan_pcidev (struct pci_dev *dev)
+/**
+ *	pdc202xx_init_one	-	called when a PDC202xx is found
+ *	@dev: the pdc202xx device
+ *	@id: the matching pci id
+ *
+ *	Called when the PCI registration layer (or the IDE initialization)
+ *	finds a device matching our IDE device tables.
+ */
+ 
+static int __devinit pdc202xx_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d;
+	ide_pci_device_t *d = &pdc202xx_chipsets[id->driver_data];
 
-	if (dev->vendor != PCI_VENDOR_ID_PROMISE)
-		return 0;
-
-	for (d = pdc202xx_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
+	if (dev->device != d->device)
+		BUG();
+	d->init_setup(dev, d);
 	return 0;
 }
 
+/**
+ *	pdc202xx_remove_one	-	called with the IDE to be unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an IDE device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void pdc202xx_remove_one(struct pci_dev *dev)
+{
+	panic("Promise IDE removal not yet supported");
+}
+
+static struct pci_device_id pdc202xx_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20246, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20262, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20263, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2},
+	{ PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20265, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
+	{ PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20267, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"Promise Old IDE",
+	id_table:	pdc202xx_pci_tbl,
+	probe:		pdc202xx_init_one,
+	remove:		__devexit_p(pdc202xx_remove_one),
+};
+
+static int pdc202xx_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void pdc202xx_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(pdc202xx_ide_init);
+module_exit(pdc202xx_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick, Frank Tiernan");
+MODULE_DESCRIPTION("PCI driver module for older Promise IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

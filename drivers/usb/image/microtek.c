@@ -154,9 +154,9 @@
 
 /* USB layer driver interface */
 
-static void *mts_usb_probe(struct usb_device *dev, unsigned int interface,
+static int mts_usb_probe(struct usb_interface *intf,
 			 const struct usb_device_id *id);
-static void mts_usb_disconnect(struct usb_device *dev, void *ptr);
+static void mts_usb_disconnect(struct usb_interface *intf);
 
 static struct usb_device_id mts_usb_ids [];
 
@@ -773,18 +773,21 @@ static Scsi_Host_Template mts_scsi_host_template = {
 
 /* USB layer driver interface implementation */
 
-static void mts_usb_disconnect (struct usb_device *dev, void *ptr)
+static void mts_usb_disconnect (struct usb_interface *intf)
 {
-	struct mts_desc* to_remove = (struct mts_desc*)ptr;
+	struct mts_desc* to_remove = dev_get_drvdata(&intf->dev);
 
 	MTS_DEBUG_GOT_HERE();
 
-	/* leave the list - lock it */
-	down(&mts_list_semaphore);
+	dev_set_drvdata(&intf->dev, NULL);
+	if (to_remove) {
+		/* leave the list - lock it */
+		down(&mts_list_semaphore);
 
-	mts_remove_nolock(to_remove);
+		mts_remove_nolock(to_remove);
 
-	up(&mts_list_semaphore);
+		up(&mts_list_semaphore);
+	}
 }
 
 struct vendor_product
@@ -834,8 +837,8 @@ static struct usb_device_id mts_usb_ids [] =
 MODULE_DEVICE_TABLE (usb, mts_usb_ids);
 
 
-static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
-			     const struct usb_device_id *id)
+static int mts_usb_probe (struct usb_interface *intf,
+			  const struct usb_device_id *id)
 {
 	int i;
 	int result;
@@ -846,6 +849,7 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 
 	struct mts_desc * new_desc;
 	struct vendor_product const* p;
+	struct usb_device *dev = interface_to_usbdev (intf);
 
 	/* the altsettting 0 on the interface we're probing */
 	struct usb_interface_descriptor *altsetting;
@@ -869,8 +873,7 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 			     p->name );
 
 	/* the altsettting 0 on the interface we're probing */
-	altsetting =
-		&(dev->actconfig->interface[interface].altsetting[0]);
+	altsetting = &(intf->altsetting[0]);
 
 
 	/* Check if the config is sane */
@@ -878,7 +881,7 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 	if ( altsetting->bNumEndpoints != MTS_EP_TOTAL ) {
 		MTS_WARNING( "expecting %d got %d endpoints! Bailing out.\n",
 			     (int)MTS_EP_TOTAL, (int)altsetting->bNumEndpoints );
-		return NULL;
+		return -ENODEV;
 	}
 
 	for( i = 0; i < altsetting->bNumEndpoints; i++ ) {
@@ -896,7 +899,7 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 			else {
 				if ( ep_out != -1 ) {
 					MTS_WARNING( "can only deal with one output endpoints. Bailing out." );
-					return NULL;
+					return -ENODEV;
 				}
 
 				ep_out = altsetting->endpoint[i].bEndpointAddress &
@@ -909,7 +912,7 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 
 	if ( ep_out == -1 ) {
 		MTS_WARNING( "couldn't find an output bulk endpoint. Bailing out.\n" );
-		return NULL;
+		return -ENODEV;
 	}
 
 
@@ -932,7 +935,7 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 	default:
 		MTS_DEBUG( "unknown error %d from usb_set_interface\n",
 			(int)result );
- 		return NULL;
+ 		return -ENODEV;
 	}
 	
 	
@@ -941,19 +944,18 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 	if (new_desc == NULL)
 	{
 		MTS_ERROR("couldn't allocate scanner desc, bailing out!\n");
-		return NULL;
+		return -ENOMEM;
 	}
 
 	memset( new_desc, 0, sizeof(*new_desc) );
 	new_desc->urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!new_desc->urb) {
 		kfree(new_desc);
-		return NULL;
+		return -ENOMEM;
 	}
 		
 	/* initialising that descriptor */
 	new_desc->usb_dev = dev;
-	new_desc->interface = interface;
 
 	init_MUTEX(&new_desc->lock);
 
@@ -1000,7 +1002,7 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 
 		/* FIXME: need more cleanup? */
 		kfree( new_desc );
-		return NULL;
+		return -ENOMEM;
 	}
 	MTS_DEBUG_GOT_HERE();
 
@@ -1015,7 +1017,8 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 
 	MTS_DEBUG("completed probe and exiting happily\n");
 
-	return (void *)new_desc;
+	dev_set_drvdata(&intf->dev, new_desc);
+	return 0;
 }
 
 

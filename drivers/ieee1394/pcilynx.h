@@ -94,7 +94,7 @@ struct ti_lynx {
 
         struct lynx_send_data {
                 pcl_t pcl_start, pcl;
-                struct hpsb_packet *queue, *queue_last;
+                struct list_head queue;
                 spinlock_t queue_lock;
                 dma_addr_t header_dma, data_dma;
                 int channel;

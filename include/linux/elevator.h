@@ -4,8 +4,6 @@
 typedef int (elevator_merge_fn) (request_queue_t *, struct request **,
 				 struct bio *);
 
-typedef void (elevator_merge_cleanup_fn) (request_queue_t *, struct request *, int);
-
 typedef void (elevator_merge_req_fn) (request_queue_t *, struct request *, struct request *);
 
 typedef struct request *(elevator_next_req_fn) (request_queue_t *);
@@ -21,7 +19,6 @@ typedef void (elevator_exit_fn) (request_queue_t *, elevator_t *);
 struct elevator_s
 {
 	elevator_merge_fn *elevator_merge_fn;
-	elevator_merge_cleanup_fn *elevator_merge_cleanup_fn;
 	elevator_merge_req_fn *elevator_merge_req_fn;
 
 	elevator_next_req_fn *elevator_next_req_fn;
@@ -42,7 +39,6 @@ struct elevator_s
  */
 extern void __elv_add_request(request_queue_t *, struct request *,
 			      struct list_head *);
-extern void elv_merge_cleanup(request_queue_t *, struct request *, int);
 extern int elv_merge(request_queue_t *, struct request **, struct bio *);
 extern void elv_merge_requests(request_queue_t *, struct request *,
 			       struct request *);
@@ -61,6 +57,7 @@ extern elevator_t elevator_noop;
  */
 extern elevator_t elevator_linus;
 #define elv_linus_sequence(rq)	((long)(rq)->elevator_private)
+#define ELV_LINUS_SEEK_COST	16
 
 /*
  * use the /proc/iosched interface, all the below is history ->

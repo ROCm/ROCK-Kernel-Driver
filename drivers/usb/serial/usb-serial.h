@@ -233,6 +233,9 @@ struct usb_serial_device_type {
 extern int  usb_serial_register(struct usb_serial_device_type *new_device);
 extern void usb_serial_deregister(struct usb_serial_device_type *device);
 
+extern int usb_serial_probe(struct usb_interface *iface, const struct usb_device_id *id);
+extern void usb_serial_disconnect(struct usb_interface *iface);
+
 /* determine if we should include the EzUSB loader functions */
 #undef USES_EZUSB_FUNCTIONS
 #if defined(CONFIG_USB_SERIAL_KEYSPAN_PDA) || defined(CONFIG_USB_SERIAL_KEYSPAN_PDA_MODULE)

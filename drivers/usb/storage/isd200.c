@@ -425,7 +425,8 @@ static int isd200_transfer_partial( struct us_data *us,
         /* if we stall, we need to clear it before we go on */
         if (result == -EPIPE) {
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                usb_stor_clear_halt(us, pipe);
+                if (usb_stor_clear_halt(us, pipe) < 0)
+			return ISD200_TRANSPORT_FAILED;
         }
     
         /* did we send all the data? */
@@ -501,13 +502,13 @@ static void isd200_transfer( struct us_data *us, Scsi_Cmnd *srb )
                             sg[i].length) {
                                 result = isd200_transfer_partial(us, 
                                                                  srb->sc_data_direction,
-                                                                 page_address(sg[i].page) + sg[i].offset, 
+                                                                 sg_address(sg[i]), 
                                                                  sg[i].length);
                                 total_transferred += sg[i].length;
                         } else
                                 result = isd200_transfer_partial(us, 
                                                                  srb->sc_data_direction,                            
-                                                                 page_address(sg[i].page) + sg[i].offset, 
+                                                                 sg_address(sg[i]), 
                                                                  transfer_amount - total_transferred);
 
                         /* if we get an error, end the loop here */
@@ -589,7 +590,8 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 	else if (result == -EPIPE) {
 		/* if we stall, we need to clear it before we go on */
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                usb_stor_clear_halt(us, pipe);
+                if (usb_stor_clear_halt(us, pipe) < 0)
+			return ISD200_TRANSPORT_ERROR;
 	} else if (result)  
                 return ISD200_TRANSPORT_ERROR;
     
@@ -621,7 +623,8 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         /* did the attempt to read the CSW fail? */
         if (result == -EPIPE) {
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                usb_stor_clear_halt(us, pipe);
+                if (usb_stor_clear_halt(us, pipe) < 0)
+			return ISD200_TRANSPORT_ERROR;
            
                 /* get the status again */
                 US_DEBUGP("Attempting to get CSW (2nd try)...\n");
@@ -824,7 +827,7 @@ void isd200_invoke_transport( struct us_data *us,
 
 	case ISD200_TRANSPORT_GOOD:
 		/* Indicate a good result */
-		srb->result = GOOD;
+		srb->result = GOOD << 1;
 		break;
 
 	case ISD200_TRANSPORT_ABORTED:
@@ -946,15 +949,6 @@ int isd200_write_config( struct us_data *us )
 		US_DEBUGP("   ISD200 Config Data was written successfully\n");
         } else {
 		US_DEBUGP("   Request to write ISD200 Config Data failed!\n");
-
-		/* STALL must be cleared when they are detected */
-		if (result == -EPIPE) {
-			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_stor_clear_halt(us,
-					usb_sndctrlpipe(us->pusb_dev, 0));
-			US_DEBUGP("-- usb_stor_clear_halt() returns %d\n", result);
-
-		}
 		retStatus = ISD200_ERROR;
         }
 
@@ -1000,15 +994,6 @@ int isd200_read_config( struct us_data *us )
 #endif
         } else {
 		US_DEBUGP("   Request to get ISD200 Config Data failed!\n");
-
-		/* STALL must be cleared when they are detected */
-		if (result == -EPIPE) {
-			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_stor_clear_halt(us,   
-					usb_sndctrlpipe(us->pusb_dev, 0));
-			US_DEBUGP("-- usb_stor_clear_halt() returns %d\n", result);
-
-		}
 		retStatus = ISD200_ERROR;
         }
 
@@ -1271,7 +1256,7 @@ int isd200_get_inquiry_data( struct us_data *us )
 				/* ATA Command Identify successful */
 				int i;
 				__u16 *src, *dest;
-				ata_fix_driveid(&info->drive);
+				ide_fix_driveid(&info->drive);
 
 				US_DEBUGP("   Identify Data Structure:\n");
 				US_DEBUGP("      config = 0x%x\n", info->drive.config);
@@ -1409,10 +1394,10 @@ void isd200_data_copy(Scsi_Cmnd *srb, char * src, int length)
 				/* transfer the lesser of the next buffer or the
 				 * remaining data */
 				if (len - total >= sg[i].length) {
-					memcpy(page_address(sg[i].page) + sg[i].offset, src + total, sg[i].length);
+					memcpy(sg_address(sg[i]), src + total, sg[i].length);
 					total += sg[i].length;
 				} else {
-					memcpy(page_address(sg[i].page) + sg[i].offset, src + total, len - total);
+					memcpy(sg_address(sg[i]), src + total, len - total);
 					total = len;
 				}
 			} 
@@ -1462,7 +1447,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 
 		/* copy InquiryData */
 		isd200_data_copy(srb, (char *) &info->InquiryData, srb->request_bufflen);
-		srb->result = GOOD;
+		srb->result = GOOD << 1;
 		sendToTransport = FALSE;
 		break;
 
@@ -1482,7 +1467,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = 0;
 		} else {
 			US_DEBUGP("   Media Status not supported, just report okay\n");
-			srb->result = GOOD;
+			srb->result = GOOD << 1;
 			sendToTransport = FALSE;
 		}
 		break;
@@ -1503,7 +1488,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = 0;
 		} else {
 			US_DEBUGP("   Media Status not supported, just report okay\n");
-			srb->result = GOOD;
+			srb->result = GOOD << 1;
 			sendToTransport = FALSE;
 		}
 		break;
@@ -1529,7 +1514,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = sizeof(struct read_capacity_data);
 
 		isd200_data_copy(srb, (char *) &readCapacityData, srb->request_bufflen);
-		srb->result = GOOD;
+		srb->result = GOOD << 1;
 		sendToTransport = FALSE;
 	}
 	break;
@@ -1613,7 +1598,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = 0;
 		} else {
 			US_DEBUGP("   Not removeable media, just report okay\n");
-			srb->result = GOOD;
+			srb->result = GOOD << 1;
 			sendToTransport = FALSE;
 		}
 		break;
@@ -1642,7 +1627,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 			srb->request_bufflen = 0;
 		} else {
 			US_DEBUGP("   Nothing to do, just report okay\n");
-			srb->result = GOOD;
+			srb->result = GOOD << 1;
 			sendToTransport = FALSE;
 		}
 		break;

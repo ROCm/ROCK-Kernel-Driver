@@ -545,9 +545,10 @@ static struct parport_operations parport_uss720_ops =
 
 /* --------------------------------------------------------------------- */
 
-static void * uss720_probe(struct usb_device *usbdev, unsigned int ifnum,
-			   const struct usb_device_id *id)
+static int uss720_probe(struct usb_interface *intf,
+			const struct usb_device_id *id)
 {
+	struct usb_device *usbdev = interface_to_usbdev(intf);
 	struct usb_interface_descriptor *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct parport_uss720_private *priv;
@@ -558,13 +559,13 @@ static void * uss720_probe(struct usb_device *usbdev, unsigned int ifnum,
 	       usbdev->descriptor.idVendor, usbdev->descriptor.idProduct);
 
 	/* our known interfaces have 3 alternate settings */
-	if (usbdev->actconfig->interface[ifnum].num_altsetting != 3)
-		return NULL;
+	if (intf->num_altsetting != 3)
+		return -ENODEV;
 
-	i = usb_set_interface(usbdev, ifnum, 2);
+	i = usb_set_interface(usbdev, intf->altsetting->bInterfaceNumber, 2);
 	printk(KERN_DEBUG "uss720: set inteface result %d\n", i);
 
-	interface = &usbdev->actconfig->interface[ifnum].altsetting[2];
+	interface = &intf->altsetting[2];
 
 	/*
 	 * Allocate parport interface 
@@ -572,7 +573,7 @@ static void * uss720_probe(struct usb_device *usbdev, unsigned int ifnum,
 	printk(KERN_INFO "uss720: (C) 1999 by Thomas Sailer, <sailer@ife.ee.ethz.ch>\n");
 
 	if (!(priv = kmalloc(sizeof(struct parport_uss720_private), GFP_KERNEL)))
-		return NULL;
+		return -ENOMEM;
 	if (!(pp = parport_register_port(0, PARPORT_IRQ_NONE, PARPORT_DMA_NONE, &parport_uss720_ops))) {
 		printk(KERN_WARNING "usb-uss720: could not register parport\n");
 		goto probe_abort;
@@ -607,7 +608,8 @@ static void * uss720_probe(struct usb_device *usbdev, unsigned int ifnum,
 	parport_announce_port(pp);
 
 	MOD_INC_USE_COUNT;
-	return pp;
+	dev_set_drvdata (&intf->dev, pp);
+	return 0;
 
 #if 0
 probe_abort_port:
@@ -615,22 +617,26 @@ probe_abort_port:
 #endif
 probe_abort:
 	kfree(priv);
-	return NULL;
+	return -ENODEV;
 }
 
-static void uss720_disconnect(struct usb_device *usbdev, void *ptr)
+static void uss720_disconnect(struct usb_interface *intf)
 {
-	struct parport *pp = (struct parport *)ptr;
-	struct parport_uss720_private *priv = pp->private_data;
+	struct parport *pp = dev_get_drvdata (&intf->dev);
+	struct parport_uss720_private *priv;
 
+	dev_set_drvdata (&intf->dev, NULL);
+	if (pp) {
+		priv = pp->private_data;
 #if 0
-	usb_release_irq(usbdev, priv->irqhandle, priv->irqpipe);
+		usb_release_irq(usbdev, priv->irqhandle, priv->irqpipe);
 #endif
-	priv->usbdev = NULL;
-	parport_proc_unregister(pp);
-	parport_unregister_port(pp);
-	kfree(priv);
-	MOD_DEC_USE_COUNT;
+		priv->usbdev = NULL;
+		parport_proc_unregister(pp);
+		parport_unregister_port(pp);
+		kfree(priv);
+		MOD_DEC_USE_COUNT;
+	}
 }
 
 /* table of cables that work through this driver */

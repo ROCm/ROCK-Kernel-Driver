@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/slc90e66.c	Version 0.10	October 4, 2000
+ *  linux/drivers/ide/slc90e66.c	Version 0.11	September 11, 2002
  *
  *  Copyright (C) 2000-2002 Andre Hedrick <andre@linux-ide.org>
  *
@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
@@ -364,26 +365,56 @@ static void __init init_dma_slc90e66 (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_slc90e66 (struct pci_dev *dev, ide_pci_device_t *d)
+
+static int __devinit slc90e66_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &slc90e66_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init slc90e66_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_EFAR)
-		return 0;
-
-	for (d = slc90e66_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	slc90e66_remove_one	-	called with an slc90e66 is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an slc90e66 device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void slc90e66_remove_one(struct pci_dev *dev)
+{
+	panic("slc90e66 removal not yet supported");
+}
+
+static struct pci_device_id slc90e66_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_EFAR, PCI_DEVICE_ID_EFAR_SLC90E66_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"SLC90e66 IDE",
+	id_table:	slc90e66_pci_tbl,
+	probe:		slc90e66_init_one,
+	remove:		__devexit_p(slc90e66_remove_one),
+};
+
+static int slc90e66_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void slc90e66_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(slc90e66_ide_init);
+module_exit(slc90e66_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for SLC90E66 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

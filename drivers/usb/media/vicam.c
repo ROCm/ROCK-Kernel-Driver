@@ -787,9 +787,10 @@ error:
 	return 1;
 }
 
-static void *vicam_probe(struct usb_device *udev, unsigned int ifnum,
+static int vicam_probe(struct usb_interface *intf, 
 	const struct usb_device_id *id)
 {
+	struct usb_device *udev = interface_to_usbdev(intf);
 	struct usb_vicam *vicam;
 	char *camera_name=NULL;
 
@@ -798,7 +799,7 @@ static void *vicam_probe(struct usb_device *udev, unsigned int ifnum,
 	/* See if the device offered us matches what we can accept */
 	if ((udev->descriptor.idVendor != USB_VICAM_VENDOR_ID) ||
 	    (udev->descriptor.idProduct != USB_VICAM_PRODUCT_ID)) {
-		return NULL;
+		return -ENODEV;
 	}
 	
 	camera_name="3Com HomeConnect USB";
@@ -807,14 +808,14 @@ static void *vicam_probe(struct usb_device *udev, unsigned int ifnum,
 	vicam = kmalloc (sizeof(struct usb_vicam), GFP_KERNEL);
 	if (vicam == NULL) {
 		err ("couldn't kmalloc vicam struct");
-		return NULL;
+		return -ENOMEM;
 	}
 	memset(vicam, 0, sizeof(*vicam));
 
 	vicam->readurb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!vicam->readurb) {
 		kfree(vicam);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	vicam->udev = udev;
@@ -826,7 +827,7 @@ static void *vicam_probe(struct usb_device *udev, unsigned int ifnum,
 	if (vicam_init(vicam)) {
 		usb_free_urb(vicam->readurb);
 		kfree(vicam);
-		return NULL;
+		return -ENOMEM;
 	}
 	memcpy(&vicam->vdev, &vicam_template, sizeof(vicam_template));
 	memcpy(vicam->vdev.name, vicam->camera_name, strlen(vicam->camera_name));
@@ -835,7 +836,7 @@ static void *vicam_probe(struct usb_device *udev, unsigned int ifnum,
 		err("video_register_device");
 		usb_free_urb(vicam->readurb);
 		kfree(vicam);
-		return NULL;
+		return -EIO;
 	}
 
 	info("registered new video device: video%d", vicam->vdev.minor);
@@ -843,34 +844,38 @@ static void *vicam_probe(struct usb_device *udev, unsigned int ifnum,
 	init_MUTEX (&vicam->sem);
 	init_waitqueue_head(&vicam->wait);
 	
-	return vicam;
+	dev_set_drvdata (&intf->dev, vicam);
+	return 0;
 }
 
 
 /* FIXME - vicam_disconnect - important */
-static void vicam_disconnect(struct usb_device *udev, void *ptr)
+static void vicam_disconnect(struct usb_interface *intf)
 {
 	struct usb_vicam *vicam;
 
-	vicam = (struct usb_vicam *) ptr;
+	vicam = dev_get_drvdata (&intf->dev);
 
-	video_unregister_device(&vicam->vdev);
-	vicam->udev = NULL;
+	dev_set_drvdata (&intf->dev, NULL);
+
+	if (vicam) {
+		video_unregister_device(&vicam->vdev);
+		vicam->udev = NULL;
 /*
-	vicam->frame[0].grabstate = FRAME_ERROR;
-	vicam->frame[1].grabstate = FRAME_ERROR;
+		vicam->frame[0].grabstate = FRAME_ERROR;
+		vicam->frame[1].grabstate = FRAME_ERROR;
 */
 
-	/* Free buffers and shit */
+		/* Free buffers and shit */
+		info("%s disconnected", vicam->camera_name);
+		synchronize(vicam);
 
-	info("%s disconnected", vicam->camera_name);
-	synchronize(vicam);
-
-	if (!vicam->open_count) {
-		/* Other random junk */
-		usb_free_urb(vicam->readurb);
-		kfree(vicam);
-		vicam = NULL;
+		if (!vicam->open_count) {
+			/* Other random junk */
+			usb_free_urb(vicam->readurb);
+			kfree(vicam);
+			vicam = NULL;
+		}
 	}
 }
 

@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/cy82c693.c		Version 0.34	Dec. 13, 1999
+ * linux/drivers/ide/cy82c693.c		Version 0.40	Sep. 10, 2002
  *
  *  Copyright (C) 1998-2000 Andreas S. Krebs (akrebs@altavista.net), Maintainer
  *  Copyright (C) 1998-2002 Andre Hedrick <andre@linux-ide.org>, Integrater
@@ -29,8 +29,7 @@
  * - first tests with DMA look okay, they seem to work, but there is a
  *   problem with sound - the BusMaster IDE TimeOut should fixed this
  *
- *
- * History:
+ * Ancient History:
  * AMH@1999-08-24: v0.34 init_cy82c693_chip moved to pci_init_cy82c693
  * ASK@1999-01-23: v0.33 made a few minor code clean ups
  *                       removed DMA clock speed setting by default
@@ -46,6 +45,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
@@ -418,29 +418,56 @@ void __init init_dma_cy82c693 (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-void __init init_setup_cy82c693 (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit cy82c693_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &cy82c693_chipsets[id->driver_data];
         if ((!(PCI_FUNC(dev->devfn) & 1) ||
 	    (!((dev->class >> 8) == PCI_CLASS_STORAGE_IDE))))
-		return;	/* CY82C693 is more than only a IDE controller */
+		return 0;	/* CY82C693 is more than only a IDE controller */
 	ide_setup_pci_device(dev, d);
-}
-
-int __init cy82c693_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_CONTAQ)
-		return 0;
-
-	for (d = cy82c693_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	cy82c693_remove_one	-	called with an Cypress is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an Cypress device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void cy82c693_remove_one(struct pci_dev *dev)
+{
+	panic("Cypress removal not yet supported");
+}
+
+static struct pci_device_id cy82c693_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"Cypress IDE",
+	id_table:	cy82c693_pci_tbl,
+	probe:		cy82c693_init_one,
+	remove:		__devexit_p(cy82c693_remove_one),
+};
+
+static int cy82c693_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void cy82c693_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(cy82c693_ide_init);
+module_exit(cy82c693_ide_exit);
+
+MODULE_AUTHOR("Andreas Krebs, Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for the Cypress CY82C693 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

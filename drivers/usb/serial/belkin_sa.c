@@ -115,6 +115,13 @@ static struct usb_device_id id_table_combined [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
 
+static struct usb_driver belkin_driver = {
+	.name =		"belkin",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table_combined,
+};
+
 /* All of the device info needed for the serial converters */
 static struct usb_serial_device_type belkin_device = {
 	.owner =		THIS_MODULE,
@@ -527,6 +534,7 @@ static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, un
 static int __init belkin_sa_init (void)
 {
 	usb_serial_register (&belkin_device);
+	usb_register (&belkin_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
@@ -534,6 +542,7 @@ static int __init belkin_sa_init (void)
 
 static void __exit belkin_sa_exit (void)
 {
+	usb_deregister (&belkin_driver);
 	usb_serial_deregister (&belkin_device);
 }
 

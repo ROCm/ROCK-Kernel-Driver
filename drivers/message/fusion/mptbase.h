@@ -13,7 +13,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptbase.h,v 1.123 2002/06/20 13:28:16 pdelaney Exp $
+ *  $Id: mptbase.h,v 1.133 2002/09/05 22:30:09 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -80,8 +80,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2002 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"2.01.06"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.01.06"
+#define MPT_LINUX_VERSION_COMMON	"2.02.01.01"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.02.01.01"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -379,7 +379,11 @@ typedef struct _VirtDevice {
 	u8			 maxWidth;	/* 0 if narrow, 1 if wide*/
 	u8			 negoFlags;	/* bit field, 0 if WDTR/SDTR/QAS allowed */
 	u8			 raidVolume;	/* set, if RAID Volume */
+#ifdef ABORT_FIX
+	u8			 numAborts;
+#else
 	u8			 rsvd;
+#endif
 	u16			 rsvd1raid;
 	int			 npaths;
 	u16			 fc_phys_lun;
@@ -422,6 +426,7 @@ typedef struct _VirtDevice {
 #define MPT_TARGET_FLAGS_VALID_INQUIRY	0x02
 #define MPT_TARGET_FLAGS_VALID_SENSE	0x04
 #define MPT_TARGET_FLAGS_Q_YES		0x08
+#define MPT_TARGET_FLAGS_VALID_56	0x10
 
 #define MPT_TARGET_NO_NEGO_WIDE		0x01
 #define MPT_TARGET_NO_NEGO_SYNC		0x02
@@ -511,7 +516,7 @@ typedef struct _mpt_ioctl_events {
 #define MPT_SCSICFG_NEGOTIATE		0x01	/* Negotiate on next IO */
 #define MPT_SCSICFG_NEED_DV		0x02	/* Schedule DV */
 #define MPT_SCSICFG_DV_PENDING		0x04	/* DV on this physical id pending */
-#define MPT_SCSICFG_DV_DONE		0x08	/* DV on this physical id complete */
+#define MPT_SCSICFG_DV_NOT_DONE		0x08	/* DV has not been performed */
 #define MPT_SCSICFG_BLK_NEGO		0x10	/* WriteSDP1 with WDTR and SDTR disabled */
 
 						/* Args passed to writeSDP1: */
@@ -622,7 +627,8 @@ typedef struct _MPT_ADAPTER
 	LANPage1_t		 lan_cnfg_page1;
 	u8			 FirstWhoInit;
 	u8			 upload_fw;	/* If set, do a fw upload */
-	u8			 pad1[6];
+	u8			 reload_fw;	/* Force a FW Reload on next reset */
+	u8			 pad1[5];
 } MPT_ADAPTER;
 
 
@@ -706,6 +712,13 @@ typedef struct _mpt_sge {
 #else
 #define dsgprintk(x)
 #endif
+
+#if defined(MPT_DEBUG_DL) || defined(MPT_DEBUG)
+#define ddlprintk(x)  printk x
+#else
+#define ddlprintk(x)
+#endif
+
 
 #ifdef MPT_DEBUG_DV
 #define ddvprintk(x)  printk x

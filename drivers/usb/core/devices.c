@@ -111,7 +111,6 @@ static char *format_endpt =
 
 /*
  * Need access to the driver and USB bus lists.
- * extern struct list_head usb_driver_list;
  * extern struct list_head usb_bus_list;
  * However, these will come from functions that return ptrs to each of them.
  */

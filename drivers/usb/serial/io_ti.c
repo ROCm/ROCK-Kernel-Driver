@@ -142,7 +142,7 @@ static struct usb_device_id edgeport_2port_id_table [] = {
 };
 
 /* Devices that this driver supports */
-static __devinitdata struct usb_device_id id_table_combined [] = {
+static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_1) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_2) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_2I) },
@@ -160,6 +160,13 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 };
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
+
+static struct usb_driver io_driver = {
+	.name =		"io_ti",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table_combined,
+};
 
 
 static struct EDGE_FIRMWARE_VERSION_INFO OperationalCodeImageVersion;
@@ -2658,12 +2665,14 @@ static int __init edgeport_init(void)
 {
 	usb_serial_register (&edgeport_1port_device);
 	usb_serial_register (&edgeport_2port_device);
+	usb_register (&io_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
 
 static void __exit edgeport_exit (void)
 {
+	usb_deregister (&io_driver);
 	usb_serial_deregister (&edgeport_1port_device);
 	usb_serial_deregister (&edgeport_2port_device);
 }

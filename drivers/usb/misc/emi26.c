@@ -41,8 +41,8 @@ typedef struct _INTEL_HEX_RECORD
 static int emi26_writememory( struct usb_device *dev, int address, unsigned char *data, int length, __u8 bRequest);
 static int emi26_set_reset(struct usb_device *dev, unsigned char reset_bit);
 static int emi26_load_firmware (struct usb_device *dev);
-static void *emi26_probe(struct usb_device *dev, unsigned int if_num, const struct usb_device_id *id);
-static void emi26_disconnect(struct usb_device *dev, void *drv_context);
+static int emi26_probe(struct usb_interface *intf, const struct usb_device_id *id);
+static void emi26_disconnect(struct usb_interface *intf);
 static int __init emi26_init (void);
 static void __exit emi26_exit (void);
 
@@ -195,8 +195,10 @@ static __devinitdata struct usb_device_id id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
-static void * emi26_probe(struct usb_device *dev, unsigned int if_num, const struct usb_device_id *id)
+static int emi26_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
+
 	info("%s start", __FUNCTION__); 
 	
 	if((dev->descriptor.idVendor == EMI26_VENDOR_ID) && (dev->descriptor.idProduct == EMI26_PRODUCT_ID)) {
@@ -204,10 +206,10 @@ static void * emi26_probe(struct usb_device *dev, unsigned int if_num, const str
 	}
 	
 	/* do not return the driver context, let real audio driver do that */
-	return 0;
+	return -EIO;
 }
 
-static void emi26_disconnect(struct usb_device *dev, void *drv_context)
+static void emi26_disconnect(struct usb_interface *intf)
 {
 }
 

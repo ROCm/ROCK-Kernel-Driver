@@ -408,7 +408,7 @@ static const struct keyspan_device_details *keyspan_devices[] = {
 	NULL,
 };
 
-static __devinitdata struct usb_device_id keyspan_ids_combined[] = {
+static struct usb_device_id keyspan_ids_combined[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa18x_pre_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19_pre_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19w_pre_product_id) },
@@ -433,6 +433,13 @@ static __devinitdata struct usb_device_id keyspan_ids_combined[] = {
 };
 
 MODULE_DEVICE_TABLE(usb, keyspan_ids_combined);
+
+static struct usb_driver keyspan_driver = {
+	.name =		"keyspan",                
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	keyspan_ids_combined,
+};
 
 /* usb_device_id table for the pre-firmware download keyspan devices */
 static struct usb_device_id keyspan_pre_ids[] = {
