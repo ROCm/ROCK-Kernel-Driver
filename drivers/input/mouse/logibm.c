@@ -75,6 +75,8 @@ static int logibm_irq = LOGIBM_IRQ;
 module_param_named(irq, logibm_irq, uint, 0);
 MODULE_PARM_DESC(irq, "IRQ number (5=default)");
 
+__obsolete_setup("logibm_irq=");
+
 static int logibm_used = 0;
 
 static irqreturn_t logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs);
