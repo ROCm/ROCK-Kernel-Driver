@@ -60,7 +60,7 @@ unsigned int sign_CIFS_PDUs = 1;
 struct task_struct * oplockThread = NULL;
 unsigned int CIFSMaxBufSize = CIFS_MAX_MSGSIZE;
 module_param(CIFSMaxBufSize, int, CIFS_MAX_MSGSIZE);
-MODULE_PARM_DESC(CIFSMaxBufSize,"Network buffer size (not including header). Default: 16384 Range: 4096 to 130048");
+MODULE_PARM_DESC(CIFSMaxBufSize,"Network buffer size (not including header). Default: 16384 Range: 8192 to 130048");
 unsigned int cifs_min_rcv = CIFS_MIN_RCV_POOL;
 module_param(cifs_min_rcv, int, CIFS_MIN_RCV_POOL);
 MODULE_PARM_DESC(cifs_min_rcv,"Network buffers in pool. Default: 4 Range: 1 to 64");
@@ -632,8 +632,10 @@ cifs_destroy_inodecache(void)
 static int
 cifs_init_request_bufs(void)
 {
-	if(CIFSMaxBufSize < 4096) {
-		CIFSMaxBufSize = 4096;
+	if(CIFSMaxBufSize < 8192) {
+	/* Buffer size can not be smaller than 2 * PATH_MAX since maximum
+	Unicode path name has to fit in any SMB/CIFS path based frames */
+		CIFSMaxBufSize = 8192;
 	} else if (CIFSMaxBufSize > 1024*127) {
 		CIFSMaxBufSize = 1024 * 127;
 	} else {

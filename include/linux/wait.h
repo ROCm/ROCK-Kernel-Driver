@@ -326,8 +326,8 @@ int wake_bit_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 	wait_queue_t name = {						\
 		.task		= current,				\
 		.func		= autoremove_wake_function,		\
-		.task_list	= {	.next = &name.task_list,	\
-					.prev = &name.task_list,	\
+		.task_list	= {	.next = &(name).task_list,	\
+					.prev = &(name).task_list,	\
 				},					\
 	}
 
@@ -338,15 +338,15 @@ int wake_bit_function(wait_queue_t *wait, unsigned mode, int sync, void *key);
 			.task		= current,			\
 			.func		= wake_bit_function,		\
 			.task_list	=				\
-				LIST_HEAD_INIT(name.wait.task_list),	\
+				LIST_HEAD_INIT((name).wait.task_list),	\
 		},							\
 	}
 
 #define init_wait(wait)							\
 	do {								\
-		wait->task = current;					\
-		wait->func = autoremove_wake_function;			\
-		INIT_LIST_HEAD(&wait->task_list);			\
+		(wait)->task = current;					\
+		(wait)->func = autoremove_wake_function;		\
+		INIT_LIST_HEAD(&(wait)->task_list);			\
 	} while (0)
 
 /**

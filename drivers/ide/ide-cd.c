@@ -2359,24 +2359,30 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 	/* Read the multisession information. */
 	if (toc->hdr.first_track != CDROM_LEADOUT) {
 		/* Read the multisession information. */
-		stat = cdrom_read_tocentry(drive, 0, 1, 1, (char *)&ms_tmp,
+		stat = cdrom_read_tocentry(drive, 0, 0, 1, (char *)&ms_tmp,
 					   sizeof(ms_tmp), sense);
 		if (stat) return stat;
+
+		toc->last_session_lba = be32_to_cpu(ms_tmp.ent.addr.lba);
 	} else {
-		ms_tmp.ent.addr.msf.minute = 0;
-		ms_tmp.ent.addr.msf.second = 2;
-		ms_tmp.ent.addr.msf.frame  = 0;
 		ms_tmp.hdr.first_track = ms_tmp.hdr.last_track = CDROM_LEADOUT;
+		toc->last_session_lba = msf_to_lba(0, 2, 0); /* 0m 2s 0f */
 	}
 
 #if ! STANDARD_ATAPI
-	if (CDROM_CONFIG_FLAGS(drive)->tocaddr_as_bcd)
-		msf_from_bcd (&ms_tmp.ent.addr.msf);
-#endif  /* not STANDARD_ATAPI */
+	if (CDROM_CONFIG_FLAGS(drive)->tocaddr_as_bcd) {
+		/* Re-read multisession information using MSF format */
+		stat = cdrom_read_tocentry(drive, 0, 1, 1, (char *)&ms_tmp,
+					   sizeof(ms_tmp), sense);
+		if (stat)
+			return stat;
 
-	toc->last_session_lba = msf_to_lba (ms_tmp.ent.addr.msf.minute,
-					    ms_tmp.ent.addr.msf.second,
-					    ms_tmp.ent.addr.msf.frame);
+		msf_from_bcd (&ms_tmp.ent.addr.msf);
+		toc->last_session_lba = msf_to_lba(ms_tmp.ent.addr.msf.minute,
+					  	   ms_tmp.ent.addr.msf.second,
+						   ms_tmp.ent.addr.msf.frame);
+	}
+#endif  /* not STANDARD_ATAPI */
 
 	toc->xa_flag = (ms_tmp.hdr.first_track != ms_tmp.hdr.last_track);
 

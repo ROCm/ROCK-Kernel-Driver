@@ -162,7 +162,7 @@ syscall_error_cont:
 
 	/* check for syscall tracing or audit */
 	ld	r9,TI_FLAGS(r12)
-	andi.	r0,r9,_TIF_SYSCALL_T_OR_A
+	andi.	r0,r9,(_TIF_SYSCALL_T_OR_A|_TIF_SINGLESTEP)
 	bne-	syscall_exit_trace
 syscall_exit_trace_cont:
 
@@ -265,16 +265,21 @@ _GLOBAL(save_nvgprs)
 _GLOBAL(ppc32_sigsuspend)
 	bl	.save_nvgprs
 	bl	.sys32_sigsuspend
-	b	syscall_exit
+	b	70f
 
 _GLOBAL(ppc64_rt_sigsuspend)
 	bl	.save_nvgprs
 	bl	.sys_rt_sigsuspend
-	b	syscall_exit
+	b	70f
 
 _GLOBAL(ppc32_rt_sigsuspend)
 	bl	.save_nvgprs
 	bl	.sys32_rt_sigsuspend
+	/* If sigsuspend() returns zero, we are going into a signal handler */
+70:	cmpdi	0,r3,0
+	beq	.ret_from_except
+	/* If it returned -EINTR, we need to return via syscall_exit to set
+	   the SO bit in cr0 and potentially stop for ptrace. */
 	b	syscall_exit
 
 _GLOBAL(ppc_fork)
@@ -317,7 +322,7 @@ _GLOBAL(ppc64_rt_sigreturn)
 	blt	syscall_exit
 	clrrdi	r4,r1,THREAD_SHIFT
 	ld	r4,TI_FLAGS(r4)
-	andi.	r4,r4,_TIF_SYSCALL_T_OR_A
+	andi.	r4,r4,(_TIF_SYSCALL_T_OR_A|_TIF_SINGLESTEP)
 	beq+	81f
 	bl	.do_syscall_trace_leave
 81:	b	.ret_from_except

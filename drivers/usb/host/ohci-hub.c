@@ -305,7 +305,7 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 {
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 	int		ports, i, changed = 0, length = 1;
-	int		can_suspend = 1;
+	int		can_suspend = hcd->can_wakeup;
 	unsigned long	flags;
 
 	spin_lock_irqsave (&ohci->lock, flags);

@@ -1731,6 +1731,12 @@ M:	tsbogend@alpha.franken.de
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+PHRAM MTD DRIVER
+P:	Jörn Engel
+M:	joern@wh.fh-wedel.de
+L:	linux-mtd@lists.infradead.org
+S:	Maintained
+
 POSIX CLOCKS and TIMERS
 P:	George Anzinger
 M:	george@mvista.com

@@ -980,6 +980,16 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 			 via Handle (SetFileInfo) instead of by path */
 		rc = CIFSSMBSetTimes(xid, pTcon, full_path, &time_buf,
 				cifs_sb->local_nls);
+		if(rc == -EOPNOTSUPP) {
+			cFYI(1,("OS2 level of SetPathInfo not implemented"));
+			/* Need to convert time_buf into old format, 
+			but probably better to do that inside the function
+			below rather than here */
+			/* Better to return EOPNOTSUPP until function
+			below is ready */
+			/* CIFSSMBSetTimesLegacy(xid, pTcon, full_path,
+        	        FILE_INFO_STANDARD * data, cifs_sb->local_nls); */
+		}
 	}
 
 	/* do not  need local check to inode_check_ok since the server does that */

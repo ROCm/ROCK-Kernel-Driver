@@ -1319,6 +1319,10 @@ static long do_wait(pid_t pid, int options, struct siginfo __user *infop,
 
 	add_wait_queue(&current->wait_chldexit,&wait);
 repeat:
+	/*
+	 * We will set this flag if we see any child that might later
+	 * match our criteria, even if we are not able to reap it yet.
+	 */
 	flag = 0;
 	current->state = TASK_INTERRUPTIBLE;
 	read_lock(&tasklist_lock);
@@ -1337,11 +1341,14 @@ repeat:
 
 			switch (p->state) {
 			case TASK_TRACED:
-				flag = 1;
 				if (!my_ptrace_child(p))
 					continue;
 				/*FALLTHROUGH*/
 			case TASK_STOPPED:
+				/*
+				 * It's stopped now, so it might later
+				 * continue, exit, or stop again.
+				 */
 				flag = 1;
 				if (!(options & WUNTRACED) &&
 				    !my_ptrace_child(p))
@@ -1377,8 +1384,12 @@ repeat:
 						goto end;
 					break;
 				}
-				flag = 1;
 check_continued:
+				/*
+				 * It's running now, so it might later
+				 * exit, stop, or stop and then continue.
+				 */
+				flag = 1;
 				if (!unlikely(options & WCONTINUED))
 					continue;
 				retval = wait_task_continued(

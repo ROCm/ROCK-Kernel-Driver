@@ -217,7 +217,13 @@ static int pxa2xx_drv_pcmcia_resume(struct device *dev, u32 level)
 {
 	int ret = 0;
 	if (level == RESUME_RESTORE_STATE)
+	{
+		struct pcmcia_low_level *ops = dev->platform_data;
+		int nr = ops ? ops->nr : 0;
+
+		MECR = nr > 1 ? MECR_CIT | MECR_NOS : (nr > 0 ? MECR_CIT : 0);
 		ret = pcmcia_socket_dev_resume(dev);
+	}
 	return ret;
 }
 

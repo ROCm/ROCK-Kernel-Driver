@@ -254,7 +254,8 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			cFYI(1,("call to reconnect done"));
 			csocket = server->ssocket;
 			continue;
-		} else if ((length == -ERESTARTSYS) || (length == -EAGAIN)) {
+		} else if ((length == -ERESTARTSYS) || (length == -EAGAIN)
+				|| ((length > 0) && (length <= 3)) ) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1); /* minimum sleep to prevent looping
 				allowing socket to clear and app threads to set
@@ -280,7 +281,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		}
 
 		pdu_length = 4 + ntohl(smb_buffer->smb_buf_length);
-		/* Ony read pdu_length after below checks for too short (due
+		/* Only read pdu_length after below checks for too short (due
 		   to e.g. int overflow) and too long ie beyond end of buf */
 		cFYI(1, ("Peek length rcvd: 0x%x beginning 0x%x)", length, pdu_length));
 
@@ -330,13 +331,19 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				csocket = server->ssocket;
 				continue;
 			} else {
-				if (/*(length != sizeof (struct smb_hdr) - 1)
-				    ||*/ (pdu_length >
+				if (length < 16) {
+					/* We can not validate the SMB unless 
+					at least this much of SMB available
+					so give the socket time to copy
+					a few more bytes and retry */ 
+					set_current_state(TASK_INTERRUPTIBLE);
+					schedule_timeout(10);
+					continue;
+				} else if( (pdu_length >
 					CIFSMaxBufSize + MAX_CIFS_HDR_SIZE)
 				    || (pdu_length <
 					sizeof (struct smb_hdr) - 1)
-				    ||
-				    (checkSMBhdr
+				    || (checkSMBhdr
 				     (smb_buffer, smb_buffer->Mid))) {
 					cERROR(1,
 					    ("Invalid size or format for SMB found with length %d and pdu_length %d",

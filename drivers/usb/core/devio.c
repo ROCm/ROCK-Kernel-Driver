@@ -523,13 +523,12 @@ static int usbdev_release(struct inode *inode, struct file *file)
 
 	usb_lock_device(dev);
 	list_del_init(&ps->list);
-
-	if (connected(dev)) {
-		for (ifnum = 0; ps->ifclaimed && ifnum < 8*sizeof(ps->ifclaimed); ifnum++)
-			if (test_bit(ifnum, &ps->ifclaimed))
-				releaseintf(ps, ifnum);
-		destroy_all_async(ps);
+	for (ifnum = 0; ps->ifclaimed && ifnum < 8*sizeof(ps->ifclaimed);
+			ifnum++) {
+		if (test_bit(ifnum, &ps->ifclaimed))
+			releaseintf(ps, ifnum);
 	}
+	destroy_all_async(ps);
 	usb_unlock_device(dev);
 	usb_put_dev(dev);
 	ps->dev = NULL;
@@ -1023,7 +1022,7 @@ static int proc_reapurb(struct dev_state *ps, void __user *arg)
 	int ret;
 
 	add_wait_queue(&ps->wait, &wait);
-	while (connected(dev)) {
+	for (;;) {
 		__set_current_state(TASK_INTERRUPTIBLE);
 		if ((as = async_getcompleted(ps)))
 			break;

@@ -64,6 +64,13 @@ trivially built from Samba 3.0 or later source e.g. by executing:
 
 	gcc samba/source/client/mount.cifs.c -o mount.cifs
 
+If cifs is built as a module, then the size and number of network buffers
+and maximum number of simultaneous requests to one server can be configured.
+Changing these from their defaults is not recommended. By executing modinfo
+	modinfo kernel/fs/cifs/cifs.ko
+on kernel/fs/cifs/cifs.ko the list of configuration changes that can be made
+at module initialization time (by running insmod cifs.ko) can be seen.
+
 Allowing User Mounts
 ====================
 To permit users to mount and unmount over directories they own is possible

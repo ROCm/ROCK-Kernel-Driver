@@ -289,6 +289,15 @@ early_console_setup (char *cmdline)
 	return -1;
 }
 
+static inline void
+mark_bsp_online (void)
+{
+#ifdef CONFIG_SMP
+	/* If we register an early console, allow CPU 0 to printk */
+	cpu_set(smp_processor_id(), cpu_online_map);
+#endif
+}
+
 void __init
 setup_arch (char **cmdline_p)
 {
@@ -306,11 +315,8 @@ setup_arch (char **cmdline_p)
 	machvec_init(acpi_get_sysname());
 #endif
 
-#ifdef CONFIG_SMP
-	/* If we register an early console, allow CPU 0 to printk */
-	if (!early_console_setup(*cmdline_p))
-		cpu_set(smp_processor_id(), cpu_online_map);
-#endif
+	if (early_console_setup(*cmdline_p) == 0)
+		mark_bsp_online();
 
 #ifdef CONFIG_ACPI_BOOT
 	/* Initialize the ACPI boot-time table parser */
