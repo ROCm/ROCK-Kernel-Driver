@@ -68,7 +68,6 @@ const char *getvecname(unsigned long vec)
 	return ret;
 }
 
-
 extern unsigned long kdba_getword(unsigned long addr, size_t width);
 
 /* Copy a block of memory using kdba_getword().
@@ -82,7 +81,6 @@ static void kdba_getmem(unsigned long addr, void *p, int size)
 		size--;
 	}
 }
-
 
 /*
  * kdba_bt_stack_ppc
@@ -101,17 +99,14 @@ kdba_bt_stack_ppc(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 		   struct task_struct *p, int regs_esp)
 {
 
-	kdb_machreg_t	esp,eip,ebp,old_esp;
-/*	kdb_symtab_t	symtab, *sym; */
-	kdbtbtable_t	tbtab;
-	/* declare these as raw ptrs so we don't get func descriptors */
-	extern void *ret_from_except, *ret_from_syscall_1;
-/*	int do_bottom_half_ret=0; */
+	kdb_machreg_t esp, eip, ebp;
 
 	const char *name;
-	char namebuf[128];
-	unsigned long symsize,symoffset;
+	unsigned long symsize, symoffset;
 	char *symmodname;
+	int flag = 0;
+	kdb_machreg_t lr;
+	char namebuf[128];
 
 	/*
 	 * The caller may have supplied an address at which the
@@ -155,7 +150,8 @@ kdba_bt_stack_ppc(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 
 	kdb_printf("          SP(esp)            PC(eip)      Function(args)\n");
 
-	/* (Ref: 64-bit PowerPC ELF ABI Spplement; Ian Lance Taylor, Zembu Labs).
+	/* (Ref: 64-bit PowerPC ELF ABI Supplement: 
+				Ian Lance Taylor, Zembu Labs).
 	 A PPC stack frame looks like this:
 
 	 High Address
@@ -180,17 +176,15 @@ kdba_bt_stack_ppc(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 	 */
 	while (1) {
 		kdb_printf("0x%016lx  0x%016lx  ", esp, eip);
-		/*		kdbnearsym(eip, &symtab); */
-		kdba_find_tb_table(eip, &tbtab); 
-
-		/*		sym = symtab.sym_name ? &symtab : &tbtab.symtab; *//* use fake symtab if necessary */
 		name = NULL;
 		if (esp >= PAGE_OFFSET) { 
-			/*if ((sym) )*/ 
-			/* if this fails, eip is outside of kernel space, dont trust it. */
+			/* 
+			 * if this fails, eip is outside of kernel space, 
+			 * dont trust it. 
+			 */
 			if (eip > PAGE_OFFSET) {
-				name = kallsyms_lookup(eip, &symsize, &symoffset, &symmodname,
-						       namebuf);
+				name = kallsyms_lookup(eip, &symsize, 
+					&symoffset, &symmodname, namebuf);
 			}
 			if (name) { 
 				kdb_printf("%s", name);
@@ -199,45 +193,68 @@ kdba_bt_stack_ppc(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 			}
 		}
 
-		/* if this fails, eip is outside of kernel space, dont trust data. */
+		/* 
+		 * if this fails, eip is outside of kernel space, 
+		 * dont trust data. 
+		 */
 		if (eip > PAGE_OFFSET) { 
 			if (eip - symoffset > 0) {
 				kdb_printf(" +0x%lx", /*eip -*/ symoffset);
 			}
 		}
 		kdb_printf("\n");
+		if (!flag && (task_curr(p))) {
+			unsigned long start = 0, end = 0;
 
-		/* ret_from_except=0xa5e0 ret_from_syscall_1=a378 do_bottom_half_ret=a5e0 */
+			flag++;
+			if ((!regs) || (regs->link < PAGE_OFFSET) || 
+					(regs->link == eip))
+				goto next_frame;
+
+			lr = regs->link;
+			start = eip - symoffset;
+			end = eip - symoffset + symsize;
+			if (lr >= start && lr < end)
+				goto next_frame;
+
+			name = NULL;
+			name = kallsyms_lookup(lr, &symsize, 
+				&symoffset, &symmodname, namebuf);
+			if (name)
+				kdb_printf("0x%016lx  0x%016lx (lr) %s +0x%lx\n", 
+					esp, lr, name, symoffset);
+		}
+
+next_frame:
 		if (esp < PAGE_OFFSET) { /* below kernelspace..   */
 			kdb_printf("<Stack contents outside of kernel space.  %.16lx>\n", esp );
 			break;
 		} else {
-			if (eip == (kdb_machreg_t)ret_from_except ||
-			    eip == (kdb_machreg_t)ret_from_syscall_1 /* ||
-								      eip == (kdb_machreg_t)do_bottom_half_ret */) {
-				/* pull exception regs from the stack */
+			unsigned long *sp = (unsigned long *)esp;
+			if (esp <= (unsigned long) p->thread_info + THREAD_SIZE
+					 + sizeof(struct pt_regs) + 400
+					 && sp[12] == 0x7265677368657265) {
 				struct pt_regs eregs;
-				kdba_getmem(esp+STACK_FRAME_OVERHEAD, &eregs, sizeof(eregs));
-				kdb_printf("  [exception: %lx:%s regs 0x%lx] "
-				           "nip:[0x%lx] gpr[1]:[0x%lx]\n", 
-				           eregs.trap,getvecname(eregs.trap), 
-				           esp+STACK_FRAME_OVERHEAD,
-				           (unsigned long int)eregs.nip,
-				           (unsigned long int)eregs.gpr[1]);
-				old_esp = esp;
-				esp = kdba_getword(esp, 8);
-				if (!esp)
-					break;
-				eip = kdba_getword(esp+16, 8);	/* saved lr */
-				if (esp < PAGE_OFFSET) {  /* userspace... */
-					if (old_esp > PAGE_OFFSET) {
-						kdb_printf("<Stack drops into userspace here %.16lx>\n",esp);
-						break;
-					}
+				kdba_getmem(esp + STACK_FRAME_OVERHEAD, 
+						&eregs, sizeof(eregs));
+				kdb_printf("--- Exception: %lx: %s ", 
+					eregs.trap, getvecname(eregs.trap));
+				name = kallsyms_lookup(eregs.nip, &symsize, 
+					&symoffset, &symmodname, namebuf);
+				if (name) { 
+					kdb_printf("at %s +0x%lx\n", 
+							name, symoffset);
+				} else {
+					kdb_printf("NO_SYMBOL or Userspace\n");
 				}
-				/* we want to follow exception registers, not into user stack.  ...   */
+				flag = 0;
+				/* 
+				 * we want to follow exception registers, 
+				 * not into user stack.  ...   
+				 */
 				esp = eregs.gpr[1];
 				eip = eregs.nip;
+				regs = &eregs;
 			} else {
 				esp = kdba_getword(esp, 8);
 				if (!esp)
