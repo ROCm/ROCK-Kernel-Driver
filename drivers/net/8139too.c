@@ -92,7 +92,7 @@
 */
 
 #define DRV_NAME	"8139too"
-#define DRV_VERSION	"0.9.25"
+#define DRV_VERSION	"0.9.26"
 
 
 #include <linux/config.h>
