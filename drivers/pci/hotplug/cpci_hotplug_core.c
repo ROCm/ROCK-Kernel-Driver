@@ -323,7 +323,7 @@ cpci_hp_unregister_bus(struct pci_bus *bus)
 }
 
 /* This is the interrupt mode interrupt handler */
-irqreturn_t
+static irqreturn_t
 cpci_hp_intr(int irq, void *data, struct pt_regs *regs)
 {
 	dbg("entered cpci_hp_intr");

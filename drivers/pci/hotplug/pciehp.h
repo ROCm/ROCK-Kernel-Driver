@@ -196,7 +196,6 @@ struct resource_lists {
 extern void pciehp_create_ctrl_files	(struct controller *ctrl);
 
 /* controller functions */
-extern void	pciehp_pushbutton_thread		(unsigned long event_pointer);
 extern int	pciehprm_find_available_resources	(struct controller *ctrl);
 extern int	pciehp_event_start_thread	(void);
 extern void	pciehp_event_stop_thread	(void);

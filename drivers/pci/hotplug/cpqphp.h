@@ -431,7 +431,6 @@ extern int	cpqhp_return_board_resources	(struct pci_func * func, struct resource
 extern void	cpqhp_destroy_resource_list	(struct resource_lists * resources);
 extern int	cpqhp_configure_device		(struct controller* ctrl, struct pci_func* func);
 extern int	cpqhp_unconfigure_device	(struct pci_func* func);
-extern struct slot *cpqhp_find_slot		(struct controller *ctrl, u8 device);
 
 /* Global variables */
 extern int cpqhp_debug;

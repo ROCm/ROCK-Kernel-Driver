@@ -1395,6 +1395,81 @@ static void pushbutton_helper_thread(unsigned long data)
 }
 
 
+/**
+ * pciehp_pushbutton_thread
+ *
+ * Scheduled procedure to handle blocking stuff for the pushbuttons
+ * Handles all pending events and exits.
+ *
+ */
+static void pciehp_pushbutton_thread(unsigned long slot)
+{
+	struct slot *p_slot = (struct slot *) slot;
+	u8 getstatus;
+	int rc;
+	
+	pushbutton_pending = 0;
+
+	if (!p_slot) {
+		dbg("%s: Error! slot NULL\n", __FUNCTION__);
+		return;
+	}
+
+	p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
+	if (getstatus) {
+		p_slot->state = POWEROFF_STATE;
+		dbg("In power_down_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
+
+		if (pciehp_disable_slot(p_slot)) {
+			/* Wait for exclusive access to hardware */
+			down(&p_slot->ctrl->crit_sect);
+
+			/* Turn on the Attention LED */
+			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
+			if (rc) {
+				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
+				return;
+			}
+	
+			/* Wait for the command to complete */
+			wait_for_ctrl_irq (p_slot->ctrl);
+
+			/* Done with exclusive hardware access */
+			up(&p_slot->ctrl->crit_sect);
+		}
+		p_slot->state = STATIC_STATE;
+	} else {
+		p_slot->state = POWERON_STATE;
+		dbg("In add_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
+
+		if (pciehp_enable_slot(p_slot)) {
+			/* Wait for exclusive access to hardware */
+			down(&p_slot->ctrl->crit_sect);
+
+			/* Turn off the green LED */
+			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
+			if (rc) {
+				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
+				return;
+			}
+			/* Wait for the command to complete */
+			wait_for_ctrl_irq (p_slot->ctrl);
+			
+			p_slot->hpc_ops->green_led_off(p_slot);
+
+			/* Wait for the command to complete */
+			wait_for_ctrl_irq (p_slot->ctrl);
+
+			/* Done with exclusive hardware access */
+			up(&p_slot->ctrl->crit_sect);
+		}
+		p_slot->state = STATIC_STATE;
+	}
+
+	return;
+}
+
+
 /* this is the main worker thread */
 static int event_thread(void* data)
 {
@@ -1605,81 +1680,6 @@ static void interrupt_event_handler(struct controller *ctrl)
 			}
 		}		/* End of FOR loop */
 	}
-}
-
-
-/**
- * pciehp_pushbutton_thread
- *
- * Scheduled procedure to handle blocking stuff for the pushbuttons
- * Handles all pending events and exits.
- *
- */
-void pciehp_pushbutton_thread(unsigned long slot)
-{
-	struct slot *p_slot = (struct slot *) slot;
-	u8 getstatus;
-	int rc;
-	
-	pushbutton_pending = 0;
-
-	if (!p_slot) {
-		dbg("%s: Error! slot NULL\n", __FUNCTION__);
-		return;
-	}
-
-	p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
-	if (getstatus) {
-		p_slot->state = POWEROFF_STATE;
-		dbg("In power_down_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
-
-		if (pciehp_disable_slot(p_slot)) {
-			/* Wait for exclusive access to hardware */
-			down(&p_slot->ctrl->crit_sect);
-
-			/* Turn on the Attention LED */
-			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
-			if (rc) {
-				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
-				return;
-			}
-	
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-
-			/* Done with exclusive hardware access */
-			up(&p_slot->ctrl->crit_sect);
-		}
-		p_slot->state = STATIC_STATE;
-	} else {
-		p_slot->state = POWERON_STATE;
-		dbg("In add_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
-
-		if (pciehp_enable_slot(p_slot)) {
-			/* Wait for exclusive access to hardware */
-			down(&p_slot->ctrl->crit_sect);
-
-			/* Turn off the green LED */
-			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
-			if (rc) {
-				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
-				return;
-			}
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-			
-			p_slot->hpc_ops->green_led_off(p_slot);
-
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-
-			/* Done with exclusive hardware access */
-			up(&p_slot->ctrl->crit_sect);
-		}
-		p_slot->state = STATIC_STATE;
-	}
-
-	return;
 }
 
 

@@ -172,7 +172,7 @@ static int zt5550_hc_enable_irq(void)
 	return 0;
 }
 
-int zt5550_hc_disable_irq(void)
+static int zt5550_hc_disable_irq(void)
 {
 	u8 reg;
 

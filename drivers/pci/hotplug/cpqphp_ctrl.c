@@ -142,7 +142,7 @@ static u8 handle_switch_change(u8 change, struct controller * ctrl)
  * @ctrl: scan lots of this controller
  * @device: the device id to find
  */
-struct slot *cpqhp_find_slot(struct controller *ctrl, u8 device)
+static struct slot *cpqhp_find_slot(struct controller *ctrl, u8 device)
 {
 	struct slot *slot = ctrl->slot;
 
@@ -2226,7 +2226,7 @@ int cpqhp_process_SS(struct controller *ctrl, struct pci_func *func)
  * @num_of_slots: number of slots to use
  * @direction: 1 to start from the left side, 0 to start right.
  */
-void switch_leds(struct controller *ctrl, const int num_of_slots,
+static void switch_leds(struct controller *ctrl, const int num_of_slots,
 			u32 *work_LED, const int direction)
 {
 	int loop;
