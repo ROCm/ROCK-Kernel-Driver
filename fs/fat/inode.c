@@ -1226,10 +1226,10 @@ retry:
 	}
 	lock_kernel();
 	if (!(bh = sb_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
-		fat_fs_panic(sb, "unable to read i-node block (i_pos %lld)",
-			     i_pos);
+		printk(KERN_ERR "FAT: unable to read inode block "
+		       "for updating (i_pos %lld)", i_pos);
 		unlock_kernel();
-		return;
+		return /* -EIO */;
 	}
 	spin_lock(&fat_inode_lock);
 	if (i_pos != MSDOS_I(inode)->i_pos) {
