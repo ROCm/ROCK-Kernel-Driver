@@ -1275,12 +1275,15 @@ static void w83627hf_init_client(struct i2c_client *client)
 	}
 
 	/* Read VRM & OVT Config only once */
-	if (w83627thf == data->type || w83637hf == data->type)
+	if (w83627thf == data->type || w83637hf == data->type) {
 		data->vrm_ovt = 
 			w83627hf_read_value(client, W83627THF_REG_VRM_OVT_CFG);
+		data->vrm = (data->vrm_ovt & 0x01) ? 90 : 82;
+	} else {
+		/* Convert VID to voltage based on default VRM */
+		data->vrm = DEFAULT_VRM;
+	}
 
-	/* Convert VID to voltage based on default VRM */
-	data->vrm = DEFAULT_VRM;
 	if (type != w83697hf)
 		vid = vid_from_reg(vid, data->vrm);
 
