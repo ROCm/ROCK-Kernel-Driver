@@ -227,7 +227,6 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 #if DMA_INT
     UCHAR  dstatus;
 #endif
-    DC390_IFLAGS;
 
     pACB = (PACB)dev_id;
     for (pACB2 = dc390_pACB_start; (pACB2 && pACB2 != pACB); pACB2 = pACB2->pNextACB);
@@ -244,9 +243,9 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
     DEBUG1(printk (KERN_DEBUG "sstatus=%02x,", sstatus));
 
 #if DMA_INT
-    DC390_LOCK_IO(pACB->pScsiHost);
+    spin_lock_irq(pACB->pScsiHost->host_lock);
     dstatus = dc390_dma_intr (pACB);
-    DC390_UNLOCK_IO(pACB->pScsiHost);
+    spin_unlock_irq(pACB->pScsiHost->host_lock);
 
     DEBUG1(printk (KERN_DEBUG "dstatus=%02x,", dstatus));
     if (! (dstatus & SCSI_INTERRUPT))
@@ -260,7 +259,7 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
     //DC390_write32 (DMA_ScsiBusCtrl, EN_INT_ON_PCI_ABORT);
 #endif
 
-    DC390_LOCK_IO(pACB->pScsiHost);
+    spin_lock_irq(pACB->pScsiHost->host_lock);
 
     istate = DC390_read8 (Intern_State);
     istatus = DC390_read8 (INT_Status); /* This clears Scsi_Status, Intern_State and INT_Status ! */
@@ -328,11 +327,10 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 	DEBUG1(printk (KERN_INFO "DC390: [%i]%s(1) (%02x)\n", phase, dc390_p1_str[phase], sstatus));
 	stateV = (void *) dc390_phase1[phase];
 	( *stateV )( pACB, pSRB, &sstatus );
-	goto unlock;
     }
 
  unlock:
-    DC390_UNLOCK_IO(pACB->pScsiHost);
+    spin_unlock_irq(pACB->pScsiHost->host_lock);
     return IRQ_HANDLED;
 }
 
@@ -363,10 +361,20 @@ dc390_DataOut_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 
 	if( sstatus & COUNT_2_ZERO )
 	{
-	    int ctr = 6000000; /* only try for about a second */
-	    while( --ctr && !((dstate = DC390_read8 (DMA_Status)) & DMA_XFER_DONE) && pSRB->SGToBeXferLen );
-	    if (!ctr) printk (KERN_CRIT "DC390: Deadlock in DataOut_0: DMA aborted unfinished: %06x bytes remain!!\n", DC390_read32 (DMA_Wk_ByteCntr));
-	    dc390_laststatus &= ~0xff000000; dc390_laststatus |= dstate << 24;
+	    unsigned long timeout = jiffies + HZ;
+
+	    /* Function called from the ISR with the host_lock held and interrupts disabled */
+	    if (pSRB->SGToBeXferLen)
+		while (time_before(jiffies, timeout) && !((dstate = DC390_read8 (DMA_Status)) & DMA_XFER_DONE)) {
+		    spin_unlock_irq(pACB->pScsiHost->host_lock);
+		    udelay(50);
+		    spin_lock_irq(pACB->pScsiHost->host_lock);
+		}
+	    if (!time_before(jiffies, timeout))
+		printk (KERN_CRIT "DC390: Deadlock in DataOut_0: DMA aborted unfinished: %06x bytes remain!!\n",
+			DC390_read32 (DMA_Wk_ByteCntr));
+	    dc390_laststatus &= ~0xff000000;
+	    dc390_laststatus |= dstate << 24;
 	    pSRB->TotalXferredLen += pSRB->SGToBeXferLen;
 	    pSRB->SGIndex++;
 	    if( pSRB->SGIndex < pSRB->SGcount )
@@ -418,12 +426,23 @@ dc390_DataIn_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 
 	if( sstatus & COUNT_2_ZERO )
 	{
-	    int ctr = 6000000; /* only try for about a second */
 	    int dstate = 0;
-	    while( --ctr && !((dstate = DC390_read8 (DMA_Status)) & DMA_XFER_DONE) && pSRB->SGToBeXferLen );
-	    if (!ctr) printk (KERN_CRIT "DC390: Deadlock in DataIn_0: DMA aborted unfinished: %06x bytes remain!!\n", DC390_read32 (DMA_Wk_ByteCntr));
-	    if (!ctr) printk (KERN_CRIT "DC390: DataIn_0: DMA State: %i\n", dstate);
-	    dc390_laststatus &= ~0xff000000; dc390_laststatus |= dstate << 24;
+	    unsigned long timeout = jiffies + HZ;
+
+	    /* Function called from the ISR with the host_lock held and interrupts disabled */
+	    if (pSRB->SGToBeXferLen)
+		while (time_before(jiffies, timeout) && !((dstate = DC390_read8 (DMA_Status)) & DMA_XFER_DONE)) {
+		    spin_unlock_irq(pACB->pScsiHost->host_lock);
+		    udelay(50);
+		    spin_lock_irq(pACB->pScsiHost->host_lock);
+		}
+	    if (!time_before(jiffies, timeout)) {
+		printk (KERN_CRIT "DC390: Deadlock in DataIn_0: DMA aborted unfinished: %06x bytes remain!!\n",
+			DC390_read32 (DMA_Wk_ByteCntr));
+		printk (KERN_CRIT "DC390: DataIn_0: DMA State: %i\n", dstate);
+	    }
+	    dc390_laststatus &= ~0xff000000;
+	    dc390_laststatus |= dstate << 24;
 	    DEBUG1(ResidCnt = ((ULONG) DC390_read8 (CtcReg_High) << 16)	\
 		+ ((ULONG) DC390_read8 (CtcReg_Mid) << 8)		\
 		+ ((ULONG) DC390_read8 (CtcReg_Low)));
@@ -1111,10 +1130,9 @@ dc390_Disconnect( PACB pACB )
     pDCB = pACB->pActiveDCB;
     if (!pDCB)
      {
-	int j = 400;
 	DEBUG0(printk(KERN_ERR "ACB:%p->ActiveDCB:%p IOPort:%04x IRQ:%02x !\n",\
 	       pACB, pDCB, pACB->IOPortBase, pACB->IRQLevel));
-	while (--j) udelay (1000);
+	mdelay(400);
 	DC390_read8 (INT_Status);	/* Reset Pending INT */
 	DC390_write8 (ScsiCmd, EN_SEL_RESEL);
 	return;

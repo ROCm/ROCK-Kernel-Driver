@@ -283,12 +283,6 @@ static struct pci_device_id tmscsim_pci_tbl[] = {
 };
 MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 
-#define USE_SPINLOCKS 1
-
-#define DC390_IFLAGS unsigned long iflags
-#define DC390_LOCK_IO(dev) spin_lock_irqsave (((struct Scsi_Host *)dev)->host_lock, iflags)
-#define DC390_UNLOCK_IO(dev) spin_unlock_irqrestore (((struct Scsi_Host *)dev)->host_lock, iflags)
-
 /* These macros are used for uniform access to 2.0.x and 2.1.x PCI config space*/
 
 #define PDEV pdev
@@ -863,11 +857,11 @@ static void dc390_Waiting_process ( PACB pACB )
 static void DC390_waiting_timed_out (unsigned long ptr)
 {
 	PACB pACB = (PACB)ptr;
-	DC390_IFLAGS;
+	unsigned long iflags;
 	DEBUG0(printk ("DC390: Debug: Waiting queue woken up by timer!\n"));
-	DC390_LOCK_IO(pACB->pScsiHost);
+	spin_lock_irqsave(pACB->pScsiHost->host_lock, iflags);
 	dc390_Waiting_process (pACB);
-	DC390_UNLOCK_IO(pACB->pScsiHost);
+	spin_unlock_irqrestore(pACB->pScsiHost->host_lock, iflags);
 }
 
 /***********************************************************************
@@ -2026,12 +2020,12 @@ static int __devexit dc390_shutdown (struct Scsi_Host *host)
 static void __devexit dc390_remove_one(struct pci_dev *dev)
 {
 	struct Scsi_Host *scsi_host = pci_get_drvdata(dev);
-	DC390_IFLAGS;
+	unsigned long iflags;
 	PACB pACB = (PACB) scsi_host->hostdata;
 
 	scsi_remove_host(scsi_host);
 
-	DC390_LOCK_IO(scsi_host);
+	spin_lock_irqsave(scsi_host->host_lock, iflags);
 
 	/* TO DO: We should check for outstanding commands first. */
 	dc390_shutdown(scsi_host);
@@ -2043,7 +2037,7 @@ static void __devexit dc390_remove_one(struct pci_dev *dev)
 
 	release_region(scsi_host->io_port, scsi_host->n_io_port);
 	dc390_freeDCBs(scsi_host);
-	DC390_UNLOCK_IO(scsi_host);
+	spin_unlock_irqrestore(scsi_host->host_lock, iflags);
 
 	pci_disable_device(dev);
 	scsi_host_put(scsi_host);
