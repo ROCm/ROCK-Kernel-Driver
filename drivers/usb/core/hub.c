@@ -597,10 +597,8 @@ descriptor_error:
 
 	usb_set_intfdata (intf, hub);
 
-	if (hub_configure(hub, endpoint) >= 0) {
-		strcpy (intf->dev.name, "Hub");
+	if (hub_configure(hub, endpoint) >= 0)
 		return 0;
-	}
 
 	hub_disconnect (intf);
 	return -ENODEV;
