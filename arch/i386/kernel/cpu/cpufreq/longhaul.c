@@ -1,6 +1,4 @@
 /*
- *  $Id: longhaul.c,v 1.87 2003/02/22 10:23:46 db Exp $
- *
  *  (C) 2001-2003  Dave Jones. <davej@suse.de>
  *  (C) 2002  Padraig Brady. <padraig@antefacto.com>
  *

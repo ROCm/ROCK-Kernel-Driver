@@ -1,6 +1,4 @@
 /*
- *  $Id: longrun.c,v 1.25 2003/02/28 16:03:50 db Exp $
- *
  * (C) 2002 - 2003  Dominik Brodowski <linux@brodo.de>
  *
  *  Licensed under the terms of the GNU GPL License version 2.

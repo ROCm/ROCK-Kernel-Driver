@@ -1,6 +1,5 @@
 /*
- *  $Id: powernow-k7.c,v 1.34 2003/02/22 10:23:46 db Exp $
- *
+ *  AMD K7 Powernow driver.
  *  (C) 2003 Dave Jones <davej@suse.de>
  *
  *  Licensed under the terms of the GNU GPL License version 2.
