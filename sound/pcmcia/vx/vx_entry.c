@@ -266,15 +266,6 @@ void snd_vxpocket_detach(struct snd_vxp_entry *hw, dev_link_t *link)
 }
 
 /*
- * snd_vxpocket_detach_all - detach all instances linked to the hw
- */
-void snd_vxpocket_detach_all(struct snd_vxp_entry *hw)
-{
-	while (hw->dev_list != NULL)
-		snd_vxpocket_detach(hw, hw->dev_list);
-}
-
-/*
  * configuration callback
  */
 
@@ -397,4 +388,3 @@ static int vxpocket_event(event_t event, int priority, event_callback_args_t *ar
 EXPORT_SYMBOL(snd_vxpocket_ops);
 EXPORT_SYMBOL(snd_vxpocket_attach);
 EXPORT_SYMBOL(snd_vxpocket_detach);
-EXPORT_SYMBOL(snd_vxpocket_detach_all);

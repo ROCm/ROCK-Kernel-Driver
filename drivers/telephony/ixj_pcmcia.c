@@ -313,10 +313,7 @@ static int __init ixj_pcmcia_init(void)
 static void ixj_pcmcia_exit(void)
 {
 	pcmcia_unregister_driver(&ixj_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		ixj_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(ixj_pcmcia_init);

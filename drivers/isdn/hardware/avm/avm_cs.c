@@ -521,13 +521,7 @@ static int __init avmcs_init(void)
 static void __exit avmcs_exit(void)
 {
 	pcmcia_unregister_driver(&avmcs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			avmcs_release(dev_list);
-		avmcs_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(avmcs_init);

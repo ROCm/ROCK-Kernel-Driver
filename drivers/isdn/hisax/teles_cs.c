@@ -522,10 +522,7 @@ static int __init init_teles_cs(void)
 static void __exit exit_teles_cs(void)
 {
 	pcmcia_unregister_driver(&teles_cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		teles_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_teles_cs);

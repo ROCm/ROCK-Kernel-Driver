@@ -1308,8 +1308,7 @@ static int __init init_tc574(void)
 static void __exit exit_tc574(void)
 {
 	pcmcia_unregister_driver(&tc574_driver);
-	while (dev_list != NULL)
-		tc574_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_tc574);

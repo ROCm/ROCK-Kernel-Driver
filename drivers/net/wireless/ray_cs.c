@@ -2952,8 +2952,7 @@ static void __exit exit_ray_cs(void)
 #endif
 
     pcmcia_unregister_driver(&ray_driver);
-    while (dev_list != NULL)
-        ray_detach(dev_list);
+    BUG_ON(dev_list != NULL);
 } /* exit_ray_cs */
 
 module_init(init_ray_cs);

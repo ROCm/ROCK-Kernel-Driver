@@ -749,10 +749,7 @@ static int __init init_serial_cs(void)
 static void __exit exit_serial_cs(void)
 {
 	pcmcia_unregister_driver(&serial_cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		serial_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_serial_cs);

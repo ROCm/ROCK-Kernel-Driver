@@ -2263,8 +2263,7 @@ static int __init init_smc91c92_cs(void)
 static void __exit exit_smc91c92_cs(void)
 {
 	pcmcia_unregister_driver(&smc91c92_cs_driver);
-	while (dev_list != NULL)
-		smc91c92_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_smc91c92_cs);

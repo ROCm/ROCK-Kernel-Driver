@@ -839,10 +839,7 @@ static int __init init_dtl1_cs(void)
 static void __exit exit_dtl1_cs(void)
 {
 	pcmcia_unregister_driver(&dtl1_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		dtl1_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_dtl1_cs);

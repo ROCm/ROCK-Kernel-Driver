@@ -1083,8 +1083,7 @@ static int __init init_tc589(void)
 static void __exit exit_tc589(void)
 {
 	pcmcia_unregister_driver(&tc589_driver);
-	while (dev_list != NULL)
-		tc589_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_tc589);

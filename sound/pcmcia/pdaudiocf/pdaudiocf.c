@@ -274,15 +274,6 @@ static void snd_pdacf_detach(dev_link_t *link)
 }
 
 /*
- * snd_pdacf_detach_all - detach all instances linked to the hw
- */
-static void snd_pdacf_detach_all(void)
-{
-	while (dev_list != NULL)
-		snd_pdacf_detach(dev_list);
-}
-
-/*
  * configuration callback
  */
 
@@ -413,7 +404,7 @@ static int __init init_pdacf(void)
 static void __exit exit_pdacf(void)
 {
 	pcmcia_unregister_driver(&pdacf_cs_driver);
-	snd_pdacf_detach_all();
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_pdacf);

@@ -877,8 +877,7 @@ static int __init init_axnet_cs(void)
 static void __exit exit_axnet_cs(void)
 {
 	pcmcia_unregister_driver(&axnet_cs_driver);
-	while (dev_list != NULL)
-		axnet_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_axnet_cs);

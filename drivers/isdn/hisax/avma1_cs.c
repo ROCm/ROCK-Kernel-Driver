@@ -531,13 +531,7 @@ static int __init init_avma1_cs(void)
 static void __exit exit_avma1_cs(void)
 {
 	pcmcia_unregister_driver(&avma1cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			avma1cs_release(dev_list);
-		avma1cs_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_avma1_cs);

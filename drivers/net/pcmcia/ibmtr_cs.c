@@ -538,8 +538,7 @@ static int __init init_ibmtr_cs(void)
 static void __exit exit_ibmtr_cs(void)
 {
 	pcmcia_unregister_driver(&ibmtr_cs_driver);
-	while (dev_list != NULL)
-		ibmtr_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_ibmtr_cs);

@@ -2267,13 +2267,7 @@ static void __exit wl3501_exit_module(void)
 {
 	dprintk(0, ": unloading");
 	pcmcia_unregister_driver(&wl3501_driver);
-	while (wl3501_dev_list) {
-		/* Mark the device as non-existing to minimize calls to card */
-		wl3501_dev_list->state &= ~DEV_PRESENT;
-		if (wl3501_dev_list->state & DEV_CONFIG)
-			wl3501_release(wl3501_dev_list);
-		wl3501_detach(wl3501_dev_list);
-	}
+	BUG_ON(wl3501_dev_list != NULL);
 }
 
 module_init(wl3501_init_module);

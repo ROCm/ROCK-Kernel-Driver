@@ -967,10 +967,7 @@ static int __init init_bt3c_cs(void)
 static void __exit exit_bt3c_cs(void)
 {
 	pcmcia_unregister_driver(&bt3c_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		bt3c_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_bt3c_cs);

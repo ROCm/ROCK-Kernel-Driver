@@ -485,8 +485,7 @@ static int __init init_ide_cs(void)
 static void __exit exit_ide_cs(void)
 {
 	pcmcia_unregister_driver(&ide_cs_driver);
-	while (dev_list != NULL)
-		ide_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_ide_cs);

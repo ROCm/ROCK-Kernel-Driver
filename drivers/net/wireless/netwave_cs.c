@@ -1696,9 +1696,7 @@ static int __init init_netwave_cs(void)
 static void __exit exit_netwave_cs(void)
 {
 	pcmcia_unregister_driver(&netwave_driver);
-
-	if (dev_list != NULL)	/* Critical situation */
-		printk("netwave_cs: devices remaining when removing module\n");
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_netwave_cs);

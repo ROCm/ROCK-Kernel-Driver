@@ -2194,10 +2194,9 @@ static void __exit nsp_cs_exit(void)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,68))
 	pcmcia_unregister_driver(&nsp_driver);
+	BUG_ON(dev_list != NULL);
 #else
 	unregister_pcmcia_driver(&dev_info);
-#endif
-
 	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG) {
@@ -2205,6 +2204,7 @@ static void __exit nsp_cs_exit(void)
 		}
 		nsp_cs_detach(dev_list);
 	}
+#endif
 }
 
 

@@ -887,10 +887,7 @@ static int __init init_btuart_cs(void)
 static void __exit exit_btuart_cs(void)
 {
 	pcmcia_unregister_driver(&btuart_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		btuart_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_btuart_cs);

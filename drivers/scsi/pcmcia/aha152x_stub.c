@@ -347,10 +347,7 @@ static int __init init_aha152x_cs(void)
 static void __exit exit_aha152x_cs(void)
 {
 	pcmcia_unregister_driver(&aha152x_cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		aha152x_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_aha152x_cs);

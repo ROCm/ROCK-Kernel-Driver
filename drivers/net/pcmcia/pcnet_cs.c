@@ -1662,8 +1662,7 @@ static void __exit exit_pcnet_cs(void)
 {
     DEBUG(0, "pcnet_cs: unloading\n");
     pcmcia_unregister_driver(&pcnet_driver);
-    while (dev_list != NULL)
-	pcnet_detach(dev_list);
+    BUG_ON(dev_list != NULL);
 }
 
 module_init(init_pcnet_cs);

@@ -592,13 +592,7 @@ static int airo_cs_init(void)
 static void airo_cs_cleanup(void)
 {
 	pcmcia_unregister_driver(&airo_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			airo_release(dev_list);
-		airo_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 /*

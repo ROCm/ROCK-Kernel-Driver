@@ -3147,13 +3147,7 @@ static void synclink_cs_cleanup(void)
 	}
 
 	pcmcia_unregister_driver(&mgslpc_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			mgslpc_release((u_long)dev_list);
-		mgslpc_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 static int __init synclink_cs_init(void)

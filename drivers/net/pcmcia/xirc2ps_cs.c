@@ -2016,9 +2016,7 @@ static void __exit
 exit_xirc2ps_cs(void)
 {
 	pcmcia_unregister_driver(&xirc2ps_cs_driver);
-
-	while (dev_list)
-		xirc2ps_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_xirc2ps_cs);

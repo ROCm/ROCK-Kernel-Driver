@@ -693,13 +693,7 @@ static int atmel_cs_init(void)
 static void atmel_cs_cleanup(void)
 {
         pcmcia_unregister_driver(&atmel_driver);
-
-        /* XXX: this really needs to move into generic code.. */
-        while (dev_list != NULL) {
-                if (dev_list->state & DEV_CONFIG)
-                        atmel_release(dev_list);
-                atmel_detach(dev_list);
-        }
+	BUG_ON(dev_list != NULL);
 }
 
 /*

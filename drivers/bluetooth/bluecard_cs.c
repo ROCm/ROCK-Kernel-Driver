@@ -1117,10 +1117,7 @@ static int __init init_bluecard_cs(void)
 static void __exit exit_bluecard_cs(void)
 {
 	pcmcia_unregister_driver(&bluecard_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		bluecard_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_bluecard_cs);

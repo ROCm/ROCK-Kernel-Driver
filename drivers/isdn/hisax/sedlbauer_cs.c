@@ -648,13 +648,7 @@ static int __init init_sedlbauer_cs(void)
 static void __exit exit_sedlbauer_cs(void)
 {
 	pcmcia_unregister_driver(&sedlbauer_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			sedlbauer_release(dev_list);
-		sedlbauer_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_sedlbauer_cs);

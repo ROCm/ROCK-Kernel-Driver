@@ -792,8 +792,7 @@ static int __init init_fmvj18x_cs(void)
 static void __exit exit_fmvj18x_cs(void)
 {
 	pcmcia_unregister_driver(&fmvj18x_cs_driver);
-	while (dev_list != NULL)
-		fmvj18x_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_fmvj18x_cs);
