@@ -476,7 +476,7 @@ static void catc_ctrl_done(struct urb *urb)
 {
 	struct catc *catc = urb->context;
 	struct ctrl_queue *q;
-	long flags;
+	unsigned long flags;
 
 	if (urb->status)
 		dbg("ctrl_done, status %d, len %d.", urb->status, urb->actual_length);
@@ -510,7 +510,7 @@ static int catc_ctrl_async(struct catc *catc, u8 dir, u8 request, u16 value,
 {
 	struct ctrl_queue *q;
 	int retval = 0;
-	long flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&catc->ctrl_lock, flags);
 	
