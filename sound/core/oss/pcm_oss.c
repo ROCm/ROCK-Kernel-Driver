@@ -27,7 +27,6 @@
 #endif
 
 #include <sound/driver.h>
-#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/time.h>
@@ -938,46 +937,68 @@ static int snd_pcm_oss_post(snd_pcm_oss_file_t *pcm_oss_file)
 	return 0;
 }
 
+static int snd_pcm_oss_sync1(snd_pcm_substream_t *substream, size_t size)
+{
+	snd_pcm_runtime_t *runtime;
+	ssize_t result = 0;
+	wait_queue_t wait;
+
+	runtime = substream->runtime;
+	init_waitqueue_entry(&wait, current);
+	add_wait_queue(&runtime->sleep, &wait);
+	while (1) {
+		result = snd_pcm_oss_write2(substream, runtime->oss.buffer, size, 1);
+		if (result > 0) {
+			runtime->oss.buffer_used = 0;
+			result = 0;
+			break;
+		}
+		if (result != 0 && result != -EAGAIN)
+			break;
+		result = 0;
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule();
+		if (signal_pending(current)) {
+			result = -ERESTARTSYS;
+			break;
+		}
+		set_current_state(TASK_RUNNING);
+	}
+	remove_wait_queue(&runtime->sleep, &wait);
+	return result;
+}
+
 static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
 {
 	int err = 0;
 	unsigned int saved_f_flags;
 	snd_pcm_substream_t *substream;
 	snd_pcm_runtime_t *runtime;
-	ssize_t result;
-	wait_queue_t wait;
+	size_t size;
 
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	if (substream != NULL) {
 		if ((err = snd_pcm_oss_make_ready(substream)) < 0)
 			return err;
-		
 		runtime = substream->runtime;
 		if (runtime->oss.buffer_used > 0) {
 			snd_pcm_format_set_silence(runtime->format,
 						   runtime->oss.buffer + runtime->oss.buffer_used,
 						   bytes_to_samples(runtime, runtime->oss.period_bytes - runtime->oss.buffer_used));
-			init_waitqueue_entry(&wait, current);
-			add_wait_queue(&runtime->sleep, &wait);
-			while (1) {
-				result = snd_pcm_oss_write2(substream, runtime->oss.buffer, runtime->oss.period_bytes, 1);
-				if (result > 0) {
-					runtime->oss.buffer_used = 0;
-					break;
-				}
-				if (result != 0 && result != -EAGAIN)
-					break;
-				set_current_state(TASK_INTERRUPTIBLE);
-				schedule();
-				if (signal_pending(current)) {
-					result = -ERESTARTSYS;
-					break;
-				}
-			}
-			set_current_state(TASK_RUNNING);
-			remove_wait_queue(&runtime->sleep, &wait);
-			if (result < 0)
-				return result;
+			err = snd_pcm_oss_sync1(substream, runtime->oss.period_bytes);
+			if (err < 0)
+				return err;
+		}
+		size = runtime->control->appl_ptr % runtime->period_size;
+		if (size > 0) {
+			size = runtime->period_size - size;
+                        size *= runtime->channels;
+			snd_pcm_format_set_silence(runtime->format,
+						   runtime->oss.buffer,
+						   size);
+			err = snd_pcm_oss_sync1(substream, samples_to_bytes(runtime, size));
+			if (err < 0)
+				return err;
 		}
 		saved_f_flags = substream->ffile->f_flags;
 		substream->ffile->f_flags &= ~O_NONBLOCK;
@@ -1395,6 +1416,10 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 	}
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DELAY, &delay);
+		if (err == -EPIPE || err == -ESTRPIPE) {
+			err = 0;
+			delay = 0;
+		}
 	} else {
 		err = snd_pcm_oss_capture_position_fixup(substream, &delay);
 	}
@@ -1455,7 +1480,12 @@ static int snd_pcm_oss_get_space(snd_pcm_oss_file_t *pcm_oss_file, int stream, s
 	} else {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DELAY, &avail);
-			avail = runtime->buffer_size - avail;
+			if (err == -EPIPE || err == -ESTRPIPE) {
+				avail = runtime->buffer_size;
+				err = 0;
+			} else {
+				avail = runtime->buffer_size - avail;
+			}
 		} else {
 			err = snd_pcm_oss_capture_position_fixup(substream, &avail);
 		}

@@ -2111,9 +2111,9 @@ static int snd_cs46xx_spdif_default_put(snd_kcontrol_t * kcontrol,
 	int change;
 
 	down (&chip->spos_mutex);
-	val = _wrap_all_bits(((u32)ucontrol->value.iec958.status[0] << 24)) |
-	      _wrap_all_bits(((u32)ucontrol->value.iec958.status[2] << 16)) |
-	      _wrap_all_bits( (u32)ucontrol->value.iec958.status[3])  |
+	val = ((unsigned int)_wrap_all_bits(ucontrol->value.iec958.status[0]) << 24) |
+		((unsigned int)_wrap_all_bits(ucontrol->value.iec958.status[2]) << 16) |
+		((unsigned int)_wrap_all_bits(ucontrol->value.iec958.status[3]))  |
 		/* left and right validity bit */
 		(1 << 13) | (1 << 12);
 
@@ -2164,9 +2164,9 @@ static int snd_cs46xx_spdif_stream_put(snd_kcontrol_t * kcontrol,
 	int change;
 
 	down (&chip->spos_mutex);
-	val = _wrap_all_bits(((u32)ucontrol->value.iec958.status[0] << 24)) |
-	      _wrap_all_bits(((u32)ucontrol->value.iec958.status[1] << 16)) |
-	      _wrap_all_bits( (u32)ucontrol->value.iec958.status[3]) |
+	val = ((unsigned int)_wrap_all_bits(ucontrol->value.iec958.status[0]) << 24) |
+		((unsigned int)_wrap_all_bits(ucontrol->value.iec958.status[1]) << 16) |
+		((unsigned int)_wrap_all_bits(ucontrol->value.iec958.status[3])) |
 		/* left and right validity bit */
 		(1 << 13) | (1 << 12);
 

@@ -116,13 +116,14 @@ static inline int gamma_dma_is_ready(drm_device_t *dev)
 	return (!GAMMA_READ(GAMMA_DMACOUNT));
 }
 
-irqreturn_t gamma_dma_service(int irq, void *device, struct pt_regs *regs)
+irqreturn_t gamma_dma_service( DRM_IRQ_ARGS )
 {
-	drm_device_t	 *dev = (drm_device_t *)device;
+	drm_device_t	 *dev = (drm_device_t *)arg;
 	drm_device_dma_t *dma = dev->dma;
 	drm_gamma_private_t *dev_priv =
 				(drm_gamma_private_t *)dev->dev_private;
 
+	/* FIXME: should check whether we're actually interested in the interrupt? */
 	atomic_inc(&dev->counts[6]); /* _DRM_STAT_IRQ */
 
 	while (GAMMA_READ(GAMMA_INFIFOSPACE) < 3)
@@ -141,7 +142,7 @@ irqreturn_t gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 		}
 		clear_bit(0, &dev->dma_flag);
 
-				/* Dispatch new buffer */
+		/* Dispatch new buffer */
 		schedule_work(&dev->work);
 	}
 	return IRQ_HANDLED;

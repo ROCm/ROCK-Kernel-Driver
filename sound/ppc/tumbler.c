@@ -42,7 +42,7 @@
 #define TAS_I2C_ADDR	0x34
 
 /* registers */
-#define TAS_REG_MCS	0x01
+#define TAS_REG_MCS	0x01	/* main control */
 #define TAS_REG_DRC	0x02
 #define TAS_REG_VOL	0x04
 #define TAS_REG_TREBLE	0x05
@@ -56,6 +56,8 @@
 /* tas3004 */
 #define TAS_REG_LMIX	TAS_REG_INPUT1
 #define TAS_REG_RMIX	TAS_REG_INPUT2
+#define TAS_REG_MCS2	0x43		/* main control 2 */
+#define TAS_REG_ACS	0x40		/* analog control */
 
 /* mono volumes for tas3001c/tas3004 */
 enum {
@@ -98,21 +100,48 @@ typedef struct pmac_tumbler_t {
 /*
  */
 
-static int tumbler_init_client(pmac_keywest_t *i2c)
+static int send_init_client(pmac_keywest_t *i2c, unsigned int *regs)
 {
-	int err, count = 10;
-	do {
-		/* normal operation, SCLK=64fps, i2s output, i2s input, 16bit width */
-		err =  snd_pmac_keywest_write_byte(i2c, TAS_REG_MCS,
-						   (1<<6)+(2<<4)+(2<<2)+0);
-		if (err >= 0)
-			return err;
-		mdelay(10);
-	} while (count--);
-	return -ENXIO;
+	while (*regs > 0) {
+		int err, count = 10;
+		do {
+			err =  snd_pmac_keywest_write_byte(i2c, regs[0], regs[1]);
+			if (err >= 0)
+				break;
+			mdelay(10);
+		} while (count--);
+		if (err < 0)
+			return -ENXIO;
+		regs += 2;
+	}
+	return 0;
 }
 
 
+static int tumbler_init_client(pmac_keywest_t *i2c)
+{
+	static unsigned int regs[] = {
+		/* normal operation, SCLK=64fps, i2s output, i2s input, 16bit width */
+		TAS_REG_MCS, (1<<6)|(2<<4)|(2<<2)|0,
+		0, /* terminator */
+	};
+	return send_init_client(i2c, regs);
+}
+
+static int snapper_init_client(pmac_keywest_t *i2c)
+{
+	static unsigned int regs[] = {
+		/* normal operation, SCLK=64fps, i2s output, 16bit width */
+		TAS_REG_MCS, (1<<6)|(2<<4)|0,
+		/* normal operation, all-pass mode */
+		TAS_REG_MCS2, (1<<1),
+		/* normal output, no deemphasis, A input, power-up */
+		TAS_REG_ACS, 0,
+		0, /* terminator */
+	};
+	return send_init_client(i2c, regs);
+}
+	
 /*
  * gpio access
  */
@@ -882,8 +911,8 @@ static void tumbler_resume(pmac_t *chip)
 	snd_assert(mix, return);
 
 	tumbler_reset_audio(chip);
-	if (mix->i2c.client) {
-		if (tumbler_init_client(&mix->i2c) < 0)
+	if (mix->i2c.client && mix->i2c.init_client) {
+		if (mix->i2c.init_client(&mix->i2c) < 0)
 			printk(KERN_ERR "tumbler_init_client error\n");
 	} else
 		printk(KERN_ERR "tumbler: i2c is not initialized\n");
@@ -976,6 +1005,9 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 	chip->mixer_data = mix;
 	chip->mixer_free = tumbler_cleanup;
 
+	if ((err = tumbler_init(chip)) < 0)
+		return err;
+
 	/* set up TAS */
 	tas_node = find_devices("deq");
 	if (tas_node == NULL)
@@ -987,11 +1019,12 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 	else
 		mix->i2c.addr = TAS_I2C_ADDR;
 
-	mix->i2c.init_client = tumbler_init_client;
 	if (chip->model == PMAC_TUMBLER) {
+		mix->i2c.init_client = tumbler_init_client;
 		mix->i2c.name = "TAS3001c";
 		chipname = "Tumbler";
 	} else {
+		mix->i2c.init_client = snapper_init_client;
 		mix->i2c.name = "TAS3004";
 		chipname = "Snapper";
 	}
@@ -1020,9 +1053,6 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 		return err;
 	chip->speaker_sw_ctl = snd_ctl_new1(&tumbler_speaker_sw, chip);
 	if ((err = snd_ctl_add(chip->card, chip->speaker_sw_ctl)) < 0)
-		return err;
-
-	if ((err = tumbler_init(chip)) < 0)
 		return err;
 
 #ifdef CONFIG_PMAC_PBOOK

@@ -130,6 +130,7 @@ static int pcm_substreams_p[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4 };
 static int pcm_substreams_c[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1 };
 static int clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int use_pm[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
+static int enable_mpu[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
@@ -155,6 +156,9 @@ MODULE_PARM_SYNTAX(clock, SNDRV_ENABLED);
 MODULE_PARM(use_pm, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(use_pm, "Toggle power-management.  (0 = off, 1 = on, 2 = auto)");
 MODULE_PARM_SYNTAX(use_pm, SNDRV_ENABLED ",allows:{{0,1,2}},skill:advanced");
+MODULE_PARM(enable_mpu, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable_mpu, "Enable MPU401.  (0 = off, 1 = on, 2 = auto)");
+MODULE_PARM_SYNTAX(enable_mpu, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 
 
 /* PCI Dev ID's */
@@ -2377,7 +2381,9 @@ static void snd_es1968_chip_init(es1968_t *chip)
 static void snd_es1968_start_irq(es1968_t *chip)
 {
 	unsigned short w;
-	w = ESM_HIRQ_DSIE | ESM_HIRQ_MPU401 | ESM_HIRQ_HW_VOLUME;
+	w = ESM_HIRQ_DSIE | ESM_HIRQ_HW_VOLUME;
+	if (chip->rmidi)
+		w |= ESM_HIRQ_MPU401;
 	outw(w, chip->io_port + ESM_PORT_HOST_IRQ);
 }
 
@@ -2491,16 +2497,20 @@ static int snd_es1968_dev_free(snd_device_t *device)
 	return snd_es1968_free(chip);
 }
 
-struct pm_whitelist {
+struct ess_device_list {
 	unsigned short type;	/* chip type */
 	unsigned short vendor;	/* subsystem vendor id */
 };
 
-static struct pm_whitelist whitelist[] __devinitdata = {
+static struct ess_device_list pm_whitelist[] __devinitdata = {
 	{ TYPE_MAESTRO2E, 0x1028 },
 	{ TYPE_MAESTRO2E, 0x103c },
 	{ TYPE_MAESTRO2E, 0x1179 },
 	{ TYPE_MAESTRO2E, 0x14c0 },	/* HP omnibook 4150 */
+};
+
+static struct ess_device_list mpu_blacklist[] __devinitdata = {
+	{ TYPE_MAESTRO2, 0x125d },
 };
 
 static int __devinit snd_es1968_create(snd_card_t * card,
@@ -2578,9 +2588,9 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 		/* disable power-management if not on the whitelist */
 		unsigned short vend;
 		pci_read_config_word(chip->pci, PCI_SUBSYSTEM_VENDOR_ID, &vend);
-		for (i = 0; i < (int)ARRAY_SIZE(whitelist); i++) {
-			if (chip->type == whitelist[i].type &&
-			    vend == whitelist[i].vendor) {
+		for (i = 0; i < (int)ARRAY_SIZE(pm_whitelist); i++) {
+			if (chip->type == pm_whitelist[i].type &&
+			    vend == pm_whitelist[i].vendor) {
 				do_pm = 1;
 				break;
 			}
@@ -2726,10 +2736,24 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 		return err;
 	}
 
-	if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
-				       chip->io_port + ESM_MPU401_PORT, 1,
-				       chip->irq, 0, &chip->rmidi)) < 0) {
-		printk(KERN_WARNING "es1968: skipping MPU-401 MIDI support..\n");
+	if (enable_mpu[dev] == 2) {
+		/* check the black list */
+		unsigned short vend;
+		pci_read_config_word(chip->pci, PCI_SUBSYSTEM_VENDOR_ID, &vend);
+		for (i = 0; i < ARRAY_SIZE(mpu_blacklist); i++) {
+			if (chip->type == mpu_blacklist[i].type &&
+			    vend == mpu_blacklist[i].vendor) {
+				enable_mpu[dev] = 0;
+				break;
+			}
+		}
+	}
+	if (enable_mpu[dev]) {
+		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
+					       chip->io_port + ESM_MPU401_PORT, 1,
+					       chip->irq, 0, &chip->rmidi)) < 0) {
+			printk(KERN_WARNING "es1968: skipping MPU-401 MIDI support..\n");
+		}
 	}
 
 	/* card switches */
@@ -2778,16 +2802,6 @@ static struct pci_driver driver = {
 #endif
 };
 
-#if 0 // do we really need this?
-static int snd_es1968_notifier(struct notifier_block *nb, unsigned long event, void *buf)
-{
-	pci_unregister_driver(&driver);
-	return NOTIFY_OK;
-}
-
-static struct notifier_block snd_es1968_nb = {snd_es1968_notifier, NULL, 0};
-#endif
-
 static int __init alsa_card_es1968_init(void)
 {
 	int err;
@@ -2798,14 +2812,6 @@ static int __init alsa_card_es1968_init(void)
 #endif
 		return err;
 	}
-#if 0 // do we really need this?
-	/* If this driver is not shutdown cleanly at reboot, it can
-	   leave the speaking emitting an annoying noise, so we catch
-	   shutdown events. */ 
-	if (register_reboot_notifier(&snd_es1968_nb)) {
-		printk(KERN_ERR "reboot notifier registration failed; may make noise at shutdown.\n");
-	}
-#endif
 	return 0;
 }
 
@@ -2827,7 +2833,8 @@ module_exit(alsa_card_es1968_exit)
 			 pcm_substreams_p,
 			 pcm_substreams_c,
 			 clock,
-			 use_pm
+			 use_pm,
+			 enable_mpu
 */
 
 static int __init alsa_card_es1968_setup(char *str)
@@ -2843,7 +2850,8 @@ static int __init alsa_card_es1968_setup(char *str)
 	       get_option(&str,&pcm_substreams_p[nr_dev]) == 2 &&
 	       get_option(&str,&pcm_substreams_c[nr_dev]) == 2 &&
 	       get_option(&str,&clock[nr_dev]) == 2 &&
-	       get_option(&str,&use_pm[nr_dev]) == 2);
+	       get_option(&str,&use_pm[nr_dev]) == 2 &&
+	       get_option(&str,&enable_mpu[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

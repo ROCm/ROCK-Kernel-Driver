@@ -152,6 +152,9 @@ available:
 	direct		don't use plugins
 	block		force block open mode
 	non-block	force non-block open mode
+	whole-frag	write only whole fragments (optimization affecting
+			playback only)
+	no-silence	do not fill silence ahead to avoid clicks
 
 The disable option is useful when one stream direction (playback or
 capture) is not handled correctly by the application although the
@@ -184,6 +187,12 @@ module option of snd-pcm-oss.  For using the non-block mode as default
 for OSS devices, define like the following:
 
 	options snd-pcm-oss nonblock_open=1
+
+The whole-frag and no-silence commands have been added recently.
+Both commands are for optimization use only.  The former command
+specifies to invoke the write transfer only when the whole fragment is
+filled.  The latter stops writing the silence data ahead
+automatically.  Both are disabled as default.
 
 You can check the currently defined configuration by reading the proc
 file.  The read image can be sent to the proc file again, hence you

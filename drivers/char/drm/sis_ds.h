@@ -28,27 +28,25 @@
  * 
  */
 
-#ifndef _sis_ds_h_
-#define _sis_ds_h_
+#ifndef __SIS_DS_H__
+#define __SIS_DS_H__
 
 /* Set Data Structure */
 
 #define SET_SIZE 5000
-#define MALLOC(s) kmalloc(s, GFP_KERNEL)
-#define FREE(s) kfree(s)
 
 typedef unsigned int ITEM_TYPE;
 
 typedef struct {
-  ITEM_TYPE val;
-  int alloc_next, free_next;
+	ITEM_TYPE val;
+	int alloc_next, free_next;
 } list_item_t;
 
 typedef struct {
-  int alloc;
-  int free;
-  int trace;
-  list_item_t list[SET_SIZE];
+	int alloc;
+	int free;
+	int trace;
+	list_item_t list[SET_SIZE];
 } set_t;
 
 set_t *setInit(void);
@@ -57,8 +55,6 @@ int setDel(set_t *set, ITEM_TYPE item);
 int setFirst(set_t *set, ITEM_TYPE *item);
 int setNext(set_t *set, ITEM_TYPE *item);
 int setDestroy(set_t *set);
-
-#endif
 
 /*
  * GLX Hardware Device Driver common code
@@ -84,16 +80,13 @@ int setDestroy(set_t *set);
  *
  */
 
-#ifndef MM_INC
-#define MM_INC
-
 struct mem_block_t {
-  struct mem_block_t *next;
-  struct mem_block_t *heap;
-  int ofs,size;
-  int align;
-  int free:1;
-  int reserved:1;
+	struct mem_block_t *next;
+	struct mem_block_t *heap;
+	int ofs,size;
+	int align;
+	int free:1;
+	int reserved:1;
 };
 typedef struct mem_block_t TMemBlock;
 typedef struct mem_block_t *PMemBlock;
@@ -102,13 +95,19 @@ typedef struct mem_block_t *PMemBlock;
 typedef struct mem_block_t memHeap_t;
 
 static __inline__ int mmBlockSize(PMemBlock b)
-{ return b->size; }
+{
+	return b->size;
+}
 
 static __inline__ int mmOffset(PMemBlock b)
-{ return b->ofs; }
+{
+	return b->ofs;
+}
 
 static __inline__ void mmMarkReserved(PMemBlock b)
-{ b->reserved = 1; }
+{
+	b->reserved = 1;
+}
 
 /* 
  * input: total size in bytes
@@ -116,12 +115,9 @@ static __inline__ void mmMarkReserved(PMemBlock b)
  */
 memHeap_t *mmInit( int ofs, int size );
 
-
-
 memHeap_t *mmAddRange( memHeap_t *heap,
 		       int ofs,
 		       int size );
-
 
 /*
  * Allocate 'size' bytes with 2^align2 bytes alignment,
@@ -133,14 +129,19 @@ memHeap_t *mmAddRange( memHeap_t *heap,
  *		startSearch = linear offset from start of heap to begin search
  * return: pointer to the allocated block, 0 if error
  */
-PMemBlock  mmAllocMem( memHeap_t *heap, int size, int align2, int startSearch );
+PMemBlock mmAllocMem( memHeap_t *heap, int size, int align2, int startSearch );
+
+/*
+ * Returns 1 if the block 'b' is part of the heap 'heap'
+ */
+int mmBlockInHeap( PMemBlock heap, PMemBlock b );
 
 /*
  * Free block starts at offset
  * input: pointer to a block
  * return: 0 if OK, -1 if error
  */
-int  mmFreeMem( PMemBlock b );
+int mmFreeMem( PMemBlock b );
 
 /*
  * Reserve 'size' bytes block start at offset
@@ -160,4 +161,4 @@ void mmDestroy( memHeap_t *mmInit );
 /* For debuging purpose. */
 void mmDumpMemInfo( memHeap_t *mmInit );
 
-#endif
+#endif /* __SIS_DS_H__ */
