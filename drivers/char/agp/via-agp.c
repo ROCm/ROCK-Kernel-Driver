@@ -39,7 +39,7 @@ static int via_configure(void)
 	pci_write_config_byte(agp_bridge->dev, VIA_APSIZE,
 			      current_size->size_value);
 	/* address to map too */
-	pci_read_config_dword(agp_bridge->dev, VIA_APBASE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AGP_APBASE, &temp);
 	agp_bridge->gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 
 	/* GART control register */
@@ -114,7 +114,7 @@ static int via_configure_agp3(void)
 	current_size = A_SIZE_16(agp_bridge->current_size);
 
 	/* address to map too */
-	pci_read_config_dword(agp_bridge->dev, VIA_APBASE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AGP_APBASE, &temp);
 	agp_bridge->gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 
 	/* attbase - aperture GATT base */
