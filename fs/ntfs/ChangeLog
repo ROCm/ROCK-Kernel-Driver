@@ -51,6 +51,8 @@ ToDo/Notes:
 	  ntfs_read_locked_index_inode().  Note, we do not overload
 	  ntfs_attr_iget() as indices consist of multiple attributes so using
 	  ntfs_attr_iget() to obtain an index inode would be confusing.
+	- Ensure that there is no overflow when doing page->index <<
+	  PAGE_CACHE_SHIFT by casting page->index to s64 in fs/ntfs/aops.c.
 
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 
