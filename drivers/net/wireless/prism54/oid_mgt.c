@@ -1,5 +1,5 @@
 /*   
- *  Copyright (C) 2003 Aurelien Alleaume <slts@free.fr>
+ *  Copyright (C) 2003,2004 Aurelien Alleaume <slts@free.fr>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,182 +31,210 @@ const int frequency_list_a[] = { 5170, 5180, 5190, 5200, 5210, 5220, 5230,
 	5240, 5260, 5280, 5300, 5320
 };
 
-#define OID_U32(x) {x, 0, sizeof(u32), OID_FLAG_U32}
-#define OID_U32_C(x) {x, 0, sizeof(u32), OID_FLAG_U32 | OID_FLAG_CACHED}
-#define OID_STRUCT(x,s) {x, 0, sizeof(s), 0}
-#define OID_STRUCT_C(x,s) {x, 0, sizeof(s), OID_FLAG_CACHED}
-#define OID_STRUCT_MLME(x){x, 0, sizeof(struct obj_mlme), 0}
-#define OID_STRUCT_MLMEEX(x){x, 0, sizeof(struct obj_mlmeex), OID_FLAG_MLMEEX}
+int
+channel_of_freq(int f)
+{
+	int c = 0;
 
-#define OID_UNKNOWN(x) {x, 0, 0, 0}
+	if ((f >= 2412) && (f <= 2484)) {
+		while ((c < 14) && (f != frequency_list_bg[c]))
+			c++;
+		if (c >= 14)
+			return 0;
+	} else if ((f >= (int) 5170) && (f <= (int) 5320)) {
+		while ((c < 12) && (f != frequency_list_a[c]))
+			c++;
+		if (c >= 12)
+			return 0;
+	} else
+		return 0;
+
+	return ++c;
+}
+
+#define OID_STRUCT(name,oid,s,t) [name] = {oid, 0, sizeof(s), t}
+#define OID_STRUCT_C(name,oid,s,t) OID_STRUCT(name,oid,s,t | OID_FLAG_CACHED)
+#define OID_U32(name,oid) OID_STRUCT(name,oid,u32,OID_TYPE_U32)
+#define OID_U32_C(name,oid) OID_STRUCT_C(name,oid,u32,OID_TYPE_U32)
+#define OID_STRUCT_MLME(name,oid) OID_STRUCT(name,oid,struct obj_mlme,OID_TYPE_MLME)
+#define OID_STRUCT_MLMEEX(name,oid) OID_STRUCT(name,oid,struct obj_mlmeex,OID_TYPE_MLMEEX)
+
+#define OID_UNKNOWN(name,oid) OID_STRUCT(name,oid,0,0)
 
 struct oid_t isl_oid[] = {
-	[GEN_OID_MACADDRESS] = OID_STRUCT(0x00000000, u8[6]),
-	[GEN_OID_LINKSTATE] = OID_U32(0x00000001),
-	[GEN_OID_WATCHDOG] = OID_UNKNOWN(0x00000002),
-	[GEN_OID_MIBOP] = OID_UNKNOWN(0x00000003),
-	[GEN_OID_OPTIONS] = OID_UNKNOWN(0x00000004),
-	[GEN_OID_LEDCONFIG] = OID_UNKNOWN(0x00000005),
+	OID_STRUCT(GEN_OID_MACADDRESS, 0x00000000, u8[6], OID_TYPE_ADDR),
+	OID_U32(GEN_OID_LINKSTATE, 0x00000001),
+	OID_UNKNOWN(GEN_OID_WATCHDOG, 0x00000002),
+	OID_UNKNOWN(GEN_OID_MIBOP, 0x00000003),
+	OID_UNKNOWN(GEN_OID_OPTIONS, 0x00000004),
+	OID_UNKNOWN(GEN_OID_LEDCONFIG, 0x00000005),
 
 	/* 802.11 */
-	[DOT11_OID_BSSTYPE] = OID_U32_C(0x10000000),
-	[DOT11_OID_BSSID] = OID_STRUCT_C(0x10000001, u8[6]),
-	[DOT11_OID_SSID] = OID_STRUCT_C(0x10000002, struct obj_ssid),
-	[DOT11_OID_STATE] = OID_U32(0x10000003),
-	[DOT11_OID_AID] = OID_U32(0x10000004),
-	[DOT11_OID_COUNTRYSTRING] = OID_STRUCT(0x10000005, u8[4]),
-	[DOT11_OID_SSIDOVERRIDE] = OID_STRUCT_C(0x10000006, struct obj_ssid),
+	OID_U32_C(DOT11_OID_BSSTYPE, 0x10000000),
+	OID_STRUCT_C(DOT11_OID_BSSID, 0x10000001, u8[6], OID_TYPE_SSID),
+	OID_STRUCT_C(DOT11_OID_SSID, 0x10000002, struct obj_ssid,
+		     OID_TYPE_SSID),
+	OID_U32(DOT11_OID_STATE, 0x10000003),
+	OID_U32(DOT11_OID_AID, 0x10000004),
+	OID_STRUCT(DOT11_OID_COUNTRYSTRING, 0x10000005, u8[4], OID_TYPE_RAW),
+	OID_STRUCT_C(DOT11_OID_SSIDOVERRIDE, 0x10000006, struct obj_ssid,
+		     OID_TYPE_SSID),
 
-	[DOT11_OID_MEDIUMLIMIT] = OID_U32(0x11000000),
-	[DOT11_OID_BEACONPERIOD] = OID_U32_C(0x11000001),
-	[DOT11_OID_DTIMPERIOD] = OID_U32(0x11000002),
-	[DOT11_OID_ATIMWINDOW] = OID_U32(0x11000003),
-	[DOT11_OID_LISTENINTERVAL] = OID_U32(0x11000004),
-	[DOT11_OID_CFPPERIOD] = OID_U32(0x11000005),
-	[DOT11_OID_CFPDURATION] = OID_U32(0x11000006),
+	OID_U32(DOT11_OID_MEDIUMLIMIT, 0x11000000),
+	OID_U32_C(DOT11_OID_BEACONPERIOD, 0x11000001),
+	OID_U32(DOT11_OID_DTIMPERIOD, 0x11000002),
+	OID_U32(DOT11_OID_ATIMWINDOW, 0x11000003),
+	OID_U32(DOT11_OID_LISTENINTERVAL, 0x11000004),
+	OID_U32(DOT11_OID_CFPPERIOD, 0x11000005),
+	OID_U32(DOT11_OID_CFPDURATION, 0x11000006),
 
-	[DOT11_OID_AUTHENABLE] = OID_U32_C(0x12000000),
-	[DOT11_OID_PRIVACYINVOKED] = OID_U32_C(0x12000001),
-	[DOT11_OID_EXUNENCRYPTED] = OID_U32_C(0x12000002),
-	[DOT11_OID_DEFKEYID] = OID_U32_C(0x12000003),
-	[DOT11_OID_DEFKEYX] = {0x12000004, 3, sizeof (struct obj_key), OID_FLAG_CACHED},	/* DOT11_OID_DEFKEY1,...DOT11_OID_DEFKEY4 */
-	[DOT11_OID_STAKEY] = OID_UNKNOWN(0x12000008),
-	[DOT11_OID_REKEYTHRESHOLD] = OID_U32(0x12000009),
-	[DOT11_OID_STASC] = OID_UNKNOWN(0x1200000a),
+	OID_U32_C(DOT11_OID_AUTHENABLE, 0x12000000),
+	OID_U32_C(DOT11_OID_PRIVACYINVOKED, 0x12000001),
+	OID_U32_C(DOT11_OID_EXUNENCRYPTED, 0x12000002),
+	OID_U32_C(DOT11_OID_DEFKEYID, 0x12000003),
+	[DOT11_OID_DEFKEYX] = {0x12000004, 3, sizeof (struct obj_key),
+			       OID_FLAG_CACHED | OID_TYPE_KEY},	/* DOT11_OID_DEFKEY1,...DOT11_OID_DEFKEY4 */
+	OID_UNKNOWN(DOT11_OID_STAKEY, 0x12000008),
+	OID_U32(DOT11_OID_REKEYTHRESHOLD, 0x12000009),
+	OID_UNKNOWN(DOT11_OID_STASC, 0x1200000a),
 
-	[DOT11_OID_PRIVTXREJECTED] = OID_U32(0x1a000000),
-	[DOT11_OID_PRIVRXPLAIN] = OID_U32(0x1a000001),
-	[DOT11_OID_PRIVRXFAILED] = OID_U32(0x1a000002),
-	[DOT11_OID_PRIVRXNOKEY] = OID_U32(0x1a000003),
+	OID_U32(DOT11_OID_PRIVTXREJECTED, 0x1a000000),
+	OID_U32(DOT11_OID_PRIVRXPLAIN, 0x1a000001),
+	OID_U32(DOT11_OID_PRIVRXFAILED, 0x1a000002),
+	OID_U32(DOT11_OID_PRIVRXNOKEY, 0x1a000003),
 
-	[DOT11_OID_RTSTHRESH] = OID_U32_C(0x13000000),
-	[DOT11_OID_FRAGTHRESH] = OID_U32_C(0x13000001),
-	[DOT11_OID_SHORTRETRIES] = OID_U32_C(0x13000002),
-	[DOT11_OID_LONGRETRIES] = OID_U32_C(0x13000003),
-	[DOT11_OID_MAXTXLIFETIME] = OID_U32_C(0x13000004),
-	[DOT11_OID_MAXRXLIFETIME] = OID_U32(0x13000005),
-	[DOT11_OID_AUTHRESPTIMEOUT] = OID_U32(0x13000006),
-	[DOT11_OID_ASSOCRESPTIMEOUT] = OID_U32(0x13000007),
+	OID_U32_C(DOT11_OID_RTSTHRESH, 0x13000000),
+	OID_U32_C(DOT11_OID_FRAGTHRESH, 0x13000001),
+	OID_U32_C(DOT11_OID_SHORTRETRIES, 0x13000002),
+	OID_U32_C(DOT11_OID_LONGRETRIES, 0x13000003),
+	OID_U32_C(DOT11_OID_MAXTXLIFETIME, 0x13000004),
+	OID_U32(DOT11_OID_MAXRXLIFETIME, 0x13000005),
+	OID_U32(DOT11_OID_AUTHRESPTIMEOUT, 0x13000006),
+	OID_U32(DOT11_OID_ASSOCRESPTIMEOUT, 0x13000007),
 
-	[DOT11_OID_ALOFT_TABLE] = OID_UNKNOWN(0x1d000000),
-	[DOT11_OID_ALOFT_CTRL_TABLE] = OID_UNKNOWN(0x1d000001),
-	[DOT11_OID_ALOFT_RETREAT] = OID_UNKNOWN(0x1d000002),
-	[DOT11_OID_ALOFT_PROGRESS] = OID_UNKNOWN(0x1d000003),
-	[DOT11_OID_ALOFT_FIXEDRATE] = OID_U32(0x1d000004),
-	[DOT11_OID_ALOFT_RSSIGRAPH] = OID_UNKNOWN(0x1d000005),
-	[DOT11_OID_ALOFT_CONFIG] = OID_UNKNOWN(0x1d000006),
+	OID_UNKNOWN(DOT11_OID_ALOFT_TABLE, 0x1d000000),
+	OID_UNKNOWN(DOT11_OID_ALOFT_CTRL_TABLE, 0x1d000001),
+	OID_UNKNOWN(DOT11_OID_ALOFT_RETREAT, 0x1d000002),
+	OID_UNKNOWN(DOT11_OID_ALOFT_PROGRESS, 0x1d000003),
+	OID_U32(DOT11_OID_ALOFT_FIXEDRATE, 0x1d000004),
+	OID_UNKNOWN(DOT11_OID_ALOFT_RSSIGRAPH, 0x1d000005),
+	OID_UNKNOWN(DOT11_OID_ALOFT_CONFIG, 0x1d000006),
 
 	[DOT11_OID_VDCFX] = {0x1b000000, 7, 0, 0},
-	[DOT11_OID_MAXFRAMEBURST] = OID_U32(0x1b000008), /* in microseconds */
+	OID_U32(DOT11_OID_MAXFRAMEBURST, 0x1b000008),
 
-	[DOT11_OID_PSM] = OID_U32(0x14000000),
-	[DOT11_OID_CAMTIMEOUT] = OID_U32(0x14000001),
-	[DOT11_OID_RECEIVEDTIMS] = OID_U32(0x14000002),
-	[DOT11_OID_ROAMPREFERENCE] = OID_U32(0x14000003),
+	OID_U32(DOT11_OID_PSM, 0x14000000),
+	OID_U32(DOT11_OID_CAMTIMEOUT, 0x14000001),
+	OID_U32(DOT11_OID_RECEIVEDTIMS, 0x14000002),
+	OID_U32(DOT11_OID_ROAMPREFERENCE, 0x14000003),
 
-	[DOT11_OID_BRIDGELOCAL] = OID_U32(0x15000000),
-	[DOT11_OID_CLIENTS] = OID_U32(0x15000001),
-	[DOT11_OID_CLIENTSASSOCIATED] = OID_U32(0x15000002),
+	OID_U32(DOT11_OID_BRIDGELOCAL, 0x15000000),
+	OID_U32(DOT11_OID_CLIENTS, 0x15000001),
+	OID_U32(DOT11_OID_CLIENTSASSOCIATED, 0x15000002),
 	[DOT11_OID_CLIENTX] = {0x15000003, 2006, 0, 0},	/* DOT11_OID_CLIENTX,...DOT11_OID_CLIENT2007 */
 
-	[DOT11_OID_CLIENTFIND] = OID_STRUCT(0x150007DB, u8[6]),
-	[DOT11_OID_WDSLINKADD] = OID_STRUCT(0x150007DC, u8[6]),
-	[DOT11_OID_WDSLINKREMOVE] = OID_STRUCT(0x150007DD, u8[6]),
-	[DOT11_OID_EAPAUTHSTA] = OID_STRUCT(0x150007DE, u8[6]),
-	[DOT11_OID_EAPUNAUTHSTA] = OID_STRUCT(0x150007DF, u8[6]),
-	[DOT11_OID_DOT1XENABLE] = OID_U32_C(0x150007E0),
-	[DOT11_OID_MICFAILURE] = OID_UNKNOWN(0x150007E1),
-	[DOT11_OID_REKEYINDICATE] = OID_UNKNOWN(0x150007E2),
+	OID_STRUCT(DOT11_OID_CLIENTFIND, 0x150007DB, u8[6], OID_TYPE_ADDR),
+	OID_STRUCT(DOT11_OID_WDSLINKADD, 0x150007DC, u8[6], OID_TYPE_ADDR),
+	OID_STRUCT(DOT11_OID_WDSLINKREMOVE, 0x150007DD, u8[6], OID_TYPE_ADDR),
+	OID_STRUCT(DOT11_OID_EAPAUTHSTA, 0x150007DE, u8[6], OID_TYPE_ADDR),
+	OID_STRUCT(DOT11_OID_EAPUNAUTHSTA, 0x150007DF, u8[6], OID_TYPE_ADDR),
+	OID_U32_C(DOT11_OID_DOT1XENABLE, 0x150007E0),
+	OID_UNKNOWN(DOT11_OID_MICFAILURE, 0x150007E1),
+	OID_UNKNOWN(DOT11_OID_REKEYINDICATE, 0x150007E2),
 
-	[DOT11_OID_MPDUTXSUCCESSFUL] = OID_U32(0x16000000),
-	[DOT11_OID_MPDUTXONERETRY] = OID_U32(0x16000001),
-	[DOT11_OID_MPDUTXMULTIPLERETRIES] = OID_U32(0x16000002),
-	[DOT11_OID_MPDUTXFAILED] = OID_U32(0x16000003),
-	[DOT11_OID_MPDURXSUCCESSFUL] = OID_U32(0x16000004),
-	[DOT11_OID_MPDURXDUPS] = OID_U32(0x16000005),
-	[DOT11_OID_RTSSUCCESSFUL] = OID_U32(0x16000006),
-	[DOT11_OID_RTSFAILED] = OID_U32(0x16000007),
-	[DOT11_OID_ACKFAILED] = OID_U32(0x16000008),
-	[DOT11_OID_FRAMERECEIVES] = OID_U32(0x16000009),
-	[DOT11_OID_FRAMEERRORS] = OID_U32(0x1600000A),
-	[DOT11_OID_FRAMEABORTS] = OID_U32(0x1600000B),
-	[DOT11_OID_FRAMEABORTSPHY] = OID_U32(0x1600000C),
+	OID_U32(DOT11_OID_MPDUTXSUCCESSFUL, 0x16000000),
+	OID_U32(DOT11_OID_MPDUTXONERETRY, 0x16000001),
+	OID_U32(DOT11_OID_MPDUTXMULTIPLERETRIES, 0x16000002),
+	OID_U32(DOT11_OID_MPDUTXFAILED, 0x16000003),
+	OID_U32(DOT11_OID_MPDURXSUCCESSFUL, 0x16000004),
+	OID_U32(DOT11_OID_MPDURXDUPS, 0x16000005),
+	OID_U32(DOT11_OID_RTSSUCCESSFUL, 0x16000006),
+	OID_U32(DOT11_OID_RTSFAILED, 0x16000007),
+	OID_U32(DOT11_OID_ACKFAILED, 0x16000008),
+	OID_U32(DOT11_OID_FRAMERECEIVES, 0x16000009),
+	OID_U32(DOT11_OID_FRAMEERRORS, 0x1600000A),
+	OID_U32(DOT11_OID_FRAMEABORTS, 0x1600000B),
+	OID_U32(DOT11_OID_FRAMEABORTSPHY, 0x1600000C),
 
-	[DOT11_OID_SLOTTIME] = OID_U32(0x17000000),
-	[DOT11_OID_CWMIN] = OID_U32(0x17000001),
-	[DOT11_OID_CWMAX] = OID_U32(0x17000002),
-	[DOT11_OID_ACKWINDOW] = OID_U32(0x17000003),
-	[DOT11_OID_ANTENNARX] = OID_U32(0x17000004),
-	[DOT11_OID_ANTENNATX] = OID_U32(0x17000005),
-	[DOT11_OID_ANTENNADIVERSITY] = OID_U32(0x17000006),
-	[DOT11_OID_CHANNEL] = OID_U32_C(0x17000007),
-	[DOT11_OID_EDTHRESHOLD] = OID_U32_C(0x17000008),
-	[DOT11_OID_PREAMBLESETTINGS] = OID_U32(0x17000009),
-	[DOT11_OID_RATES] = OID_STRUCT(0x1700000A, u8[IWMAX_BITRATES + 1]),
-	[DOT11_OID_CCAMODESUPPORTED] = OID_U32(0x1700000B),
-	[DOT11_OID_CCAMODE] = OID_U32(0x1700000C),
-	[DOT11_OID_RSSIVECTOR] = OID_U32(0x1700000D),
-	[DOT11_OID_OUTPUTPOWERTABLE] = OID_U32(0x1700000E),
-	[DOT11_OID_OUTPUTPOWER] = OID_U32_C(0x1700000F),
-	[DOT11_OID_SUPPORTEDRATES] =
-	    OID_STRUCT(0x17000010, u8[IWMAX_BITRATES + 1]),
-	[DOT11_OID_FREQUENCY] = OID_U32_C(0x17000011),
-	[DOT11_OID_SUPPORTEDFREQUENCIES] = {0x17000012, 0, sizeof (struct
-								   obj_frequencies)
-					    + sizeof (u16) * IWMAX_FREQ, 0},
+	OID_U32(DOT11_OID_SLOTTIME, 0x17000000),
+	OID_U32(DOT11_OID_CWMIN, 0x17000001),
+	OID_U32(DOT11_OID_CWMAX, 0x17000002),
+	OID_U32(DOT11_OID_ACKWINDOW, 0x17000003),
+	OID_U32(DOT11_OID_ANTENNARX, 0x17000004),
+	OID_U32(DOT11_OID_ANTENNATX, 0x17000005),
+	OID_U32(DOT11_OID_ANTENNADIVERSITY, 0x17000006),
+	OID_U32_C(DOT11_OID_CHANNEL, 0x17000007),
+	OID_U32_C(DOT11_OID_EDTHRESHOLD, 0x17000008),
+	OID_U32(DOT11_OID_PREAMBLESETTINGS, 0x17000009),
+	OID_STRUCT(DOT11_OID_RATES, 0x1700000A, u8[IWMAX_BITRATES + 1],
+		   OID_TYPE_RAW),
+	OID_U32(DOT11_OID_CCAMODESUPPORTED, 0x1700000B),
+	OID_U32(DOT11_OID_CCAMODE, 0x1700000C),
+	OID_UNKNOWN(DOT11_OID_RSSIVECTOR, 0x1700000D),
+	OID_UNKNOWN(DOT11_OID_OUTPUTPOWERTABLE, 0x1700000E),
+	OID_U32(DOT11_OID_OUTPUTPOWER, 0x1700000F),
+	OID_STRUCT(DOT11_OID_SUPPORTEDRATES, 0x17000010,
+		   u8[IWMAX_BITRATES + 1], OID_TYPE_RAW),
+	OID_U32_C(DOT11_OID_FREQUENCY, 0x17000011),
+	[DOT11_OID_SUPPORTEDFREQUENCIES] =
+	    {0x17000012, 0, sizeof (struct obj_frequencies)
+	     + sizeof (u16) * IWMAX_FREQ, OID_TYPE_FREQUENCIES},
 
-	[DOT11_OID_NOISEFLOOR] = OID_U32(0x17000013),
-	[DOT11_OID_FREQUENCYACTIVITY] =
-	    OID_STRUCT(0x17000014, u8[IWMAX_FREQ + 1]),
-	[DOT11_OID_IQCALIBRATIONTABLE] = OID_UNKNOWN(0x17000015),
-	[DOT11_OID_NONERPPROTECTION] = OID_U32(0x17000016),
-	[DOT11_OID_SLOTSETTINGS] = OID_U32(0x17000017),
-	[DOT11_OID_NONERPTIMEOUT] = OID_U32(0x17000018),
-	[DOT11_OID_PROFILES] = OID_U32(0x17000019),
-	[DOT11_OID_EXTENDEDRATES] =
-	    OID_STRUCT(0x17000020, u8[IWMAX_BITRATES + 1]),
+	OID_U32(DOT11_OID_NOISEFLOOR, 0x17000013),
+	OID_STRUCT(DOT11_OID_FREQUENCYACTIVITY, 0x17000014, u8[IWMAX_FREQ + 1],
+		   OID_TYPE_RAW),
+	OID_UNKNOWN(DOT11_OID_IQCALIBRATIONTABLE, 0x17000015),
+	OID_U32(DOT11_OID_NONERPPROTECTION, 0x17000016),
+	OID_U32(DOT11_OID_SLOTSETTINGS, 0x17000017),
+	OID_U32(DOT11_OID_NONERPTIMEOUT, 0x17000018),
+	OID_U32(DOT11_OID_PROFILES, 0x17000019),
+	OID_STRUCT(DOT11_OID_EXTENDEDRATES, 0x17000020,
+		   u8[IWMAX_BITRATES + 1], OID_TYPE_RAW),
 
-	[DOT11_OID_DEAUTHENTICATE] = OID_STRUCT_MLME(0x18000000),
-	[DOT11_OID_AUTHENTICATE] = OID_STRUCT_MLME(0x18000001),
-	[DOT11_OID_DISASSOCIATE] = OID_STRUCT_MLME(0x18000002),
-	[DOT11_OID_ASSOCIATE] = OID_STRUCT_MLME(0x18000003),
-	[DOT11_OID_SCAN] = OID_UNKNOWN(0x18000004),
-	[DOT11_OID_BEACON] = OID_STRUCT_MLMEEX(0x18000005),
-	[DOT11_OID_PROBE] = OID_STRUCT_MLMEEX(0x18000006),
-	[DOT11_OID_DEAUTHENTICATEEX] = OID_STRUCT_MLMEEX(0x18000007),
-	[DOT11_OID_AUTHENTICATEEX] = OID_STRUCT_MLMEEX(0x18000008),
-	[DOT11_OID_DISASSOCIATEEX] = OID_STRUCT_MLMEEX(0x18000009),
-	[DOT11_OID_ASSOCIATEEX] = OID_STRUCT_MLMEEX(0x1800000A),
-	[DOT11_OID_REASSOCIATE] = OID_STRUCT_MLMEEX(0x1800000B),
-	[DOT11_OID_REASSOCIATEEX] = OID_STRUCT_MLMEEX(0x1800000C),
+	OID_STRUCT_MLME(DOT11_OID_DEAUTHENTICATE, 0x18000000),
+	OID_STRUCT_MLME(DOT11_OID_AUTHENTICATE, 0x18000001),
+	OID_STRUCT_MLME(DOT11_OID_DISASSOCIATE, 0x18000002),
+	OID_STRUCT_MLME(DOT11_OID_ASSOCIATE, 0x18000003),
+	OID_UNKNOWN(DOT11_OID_SCAN, 0x18000004),
+	OID_STRUCT_MLMEEX(DOT11_OID_BEACON, 0x18000005),
+	OID_STRUCT_MLMEEX(DOT11_OID_PROBE, 0x18000006),
+	OID_STRUCT_MLMEEX(DOT11_OID_DEAUTHENTICATEEX, 0x18000007),
+	OID_STRUCT_MLMEEX(DOT11_OID_AUTHENTICATEEX, 0x18000008),
+	OID_STRUCT_MLMEEX(DOT11_OID_DISASSOCIATEEX, 0x18000009),
+	OID_STRUCT_MLMEEX(DOT11_OID_ASSOCIATEEX, 0x1800000A),
+	OID_STRUCT_MLMEEX(DOT11_OID_REASSOCIATE, 0x1800000B),
+	OID_STRUCT_MLMEEX(DOT11_OID_REASSOCIATEEX, 0x1800000C),
 
-	[DOT11_OID_NONERPSTATUS] = OID_U32(0x1E000000),
+	OID_U32(DOT11_OID_NONERPSTATUS, 0x1E000000),
 
-	[DOT11_OID_STATIMEOUT] = OID_U32(0x19000000),
-	[DOT11_OID_MLMEAUTOLEVEL] = OID_U32_C(0x19000001),
-	[DOT11_OID_BSSTIMEOUT] = OID_U32(0x19000002),
-	[DOT11_OID_ATTACHMENT] = OID_UNKNOWN(0x19000003),
-	[DOT11_OID_PSMBUFFER] = OID_STRUCT_C(0x19000004, struct obj_buffer),
+	OID_U32(DOT11_OID_STATIMEOUT, 0x19000000),
+	OID_U32_C(DOT11_OID_MLMEAUTOLEVEL, 0x19000001),
+	OID_U32(DOT11_OID_BSSTIMEOUT, 0x19000002),
+	OID_UNKNOWN(DOT11_OID_ATTACHMENT, 0x19000003),
+	OID_STRUCT_C(DOT11_OID_PSMBUFFER, 0x19000004, struct obj_buffer,
+		     OID_TYPE_BUFFER),
 
-	[DOT11_OID_BSSS] = OID_U32(0x1C000000),
-	[DOT11_OID_BSSX] = {0x1C000001, 63, sizeof (struct obj_bss), 0},	/*DOT11_OID_BSS1,...,DOT11_OID_BSS64 */
-	[DOT11_OID_BSSFIND] = OID_STRUCT(0x1C000042, struct obj_bss),
+	OID_U32(DOT11_OID_BSSS, 0x1C000000),
+	[DOT11_OID_BSSX] = {0x1C000001, 63, sizeof (struct obj_bss),
+			    OID_TYPE_BSS},	/*DOT11_OID_BSS1,...,DOT11_OID_BSS64 */
+	OID_STRUCT(DOT11_OID_BSSFIND, 0x1C000042, struct obj_bss, OID_TYPE_BSS),
 	[DOT11_OID_BSSLIST] = {0x1C000043, 0, sizeof (struct
 						      obj_bsslist) +
-			       sizeof (struct obj_bss[IWMAX_BSS]), 0},
+			       sizeof (struct obj_bss[IWMAX_BSS]),
+			       OID_TYPE_BSSLIST},
 
-	[OID_INL_TUNNEL] = OID_UNKNOWN(0xFF020000),
-	[OID_INL_MEMADDR] = OID_UNKNOWN(0xFF020001),
-	[OID_INL_MEMORY] = OID_UNKNOWN(0xFF020002),
-	[OID_INL_MODE] = OID_U32_C(0xFF020003),
-	[OID_INL_COMPONENT_NR] = OID_UNKNOWN(0xFF020004),
-	[OID_INL_VERSION] = OID_UNKNOWN(0xFF020005),
-	[OID_INL_INTERFACE_ID] = OID_UNKNOWN(0xFF020006),
-	[OID_INL_COMPONENT_ID] = OID_UNKNOWN(0xFF020007),
-	[OID_INL_CONFIG] = OID_U32_C(0xFF020008),
-	[OID_INL_DOT11D_CONFORMANCE] = OID_U32_C(0xFF02000C),
-	[OID_INL_PHYCAPABILITIES] = OID_U32(0xFF02000D),
-	[OID_INL_OUTPUTPOWER] = OID_U32_C(0xFF02000F),
+	OID_UNKNOWN(OID_INL_TUNNEL, 0xFF020000),
+	OID_UNKNOWN(OID_INL_MEMADDR, 0xFF020001),
+	OID_UNKNOWN(OID_INL_MEMORY, 0xFF020002),
+	OID_U32_C(OID_INL_MODE, 0xFF020003),
+	OID_UNKNOWN(OID_INL_COMPONENT_NR, 0xFF020004),
+	OID_UNKNOWN(OID_INL_VERSION, 0xFF020005),
+	OID_UNKNOWN(OID_INL_INTERFACE_ID, 0xFF020006),
+	OID_UNKNOWN(OID_INL_COMPONENT_ID, 0xFF020007),
+	OID_U32_C(OID_INL_CONFIG, 0xFF020008),
+	OID_U32_C(OID_INL_DOT11D_CONFORMANCE, 0xFF02000C),
+	OID_U32(OID_INL_PHYCAPABILITIES, 0xFF02000D),
+	OID_U32_C(OID_INL_OUTPUTPOWER, 0xFF02000F),
 
 };
 
@@ -257,6 +285,134 @@ mgt_clean(islpci_private *priv)
 	priv->mib = NULL;
 }
 
+void
+mgt_le_to_cpu(int type, void *data)
+{
+	switch (type) {
+	case OID_TYPE_U32:
+		*(u32 *) data = le32_to_cpu(*(u32 *) data);
+		break;
+	case OID_TYPE_BUFFER:{
+			struct obj_buffer *buff = data;
+			buff->size = le32_to_cpu(buff->size);
+			buff->addr = le32_to_cpu(buff->addr);
+			break;
+		}
+	case OID_TYPE_BSS:{
+			struct obj_bss *bss = data;
+			bss->age = le16_to_cpu(bss->age);
+			bss->channel = le16_to_cpu(bss->channel);
+			bss->capinfo = le16_to_cpu(bss->capinfo);
+			bss->rates = le16_to_cpu(bss->rates);
+			bss->basic_rates = le16_to_cpu(bss->basic_rates);
+			break;
+		}
+	case OID_TYPE_BSSLIST:{
+			struct obj_bsslist *list = data;
+			int i;
+			list->nr = le32_to_cpu(list->nr);
+			for (i = 0; i < list->nr; i++)
+				mgt_le_to_cpu(OID_TYPE_BSS, &list->bsslist[i]);
+			break;
+		}
+	case OID_TYPE_FREQUENCIES:{
+			struct obj_frequencies *freq = data;
+			int i;
+			freq->nr = le16_to_cpu(freq->nr);
+			for (i = 0; i < freq->nr; i++)
+				freq->mhz[i] = le16_to_cpu(freq->mhz[i]);
+			break;
+		}
+	case OID_TYPE_MLME:{
+			struct obj_mlme *mlme = data;
+			mlme->id = le16_to_cpu(mlme->id);
+			mlme->state = le16_to_cpu(mlme->state);
+			mlme->code = le16_to_cpu(mlme->code);
+			break;
+		}
+	case OID_TYPE_MLMEEX:{
+			struct obj_mlmeex *mlme = data;
+			mlme->id = le16_to_cpu(mlme->id);
+			mlme->state = le16_to_cpu(mlme->state);
+			mlme->code = le16_to_cpu(mlme->code);
+			mlme->size = le16_to_cpu(mlme->size);
+			break;
+		}
+	case OID_TYPE_SSID:
+	case OID_TYPE_KEY:
+	case OID_TYPE_ADDR:
+	case OID_TYPE_RAW:
+		break;
+	default:
+		BUG();
+	}
+}
+
+static void
+mgt_cpu_to_le(int type, void *data)
+{
+	switch (type) {
+	case OID_TYPE_U32:
+		*(u32 *) data = cpu_to_le32(*(u32 *) data);
+		break;
+	case OID_TYPE_BUFFER:{
+			struct obj_buffer *buff = data;
+			buff->size = cpu_to_le32(buff->size);
+			buff->addr = cpu_to_le32(buff->addr);
+			break;
+		}
+	case OID_TYPE_BSS:{
+			struct obj_bss *bss = data;
+			bss->age = cpu_to_le16(bss->age);
+			bss->channel = cpu_to_le16(bss->channel);
+			bss->capinfo = cpu_to_le16(bss->capinfo);
+			bss->rates = cpu_to_le16(bss->rates);
+			bss->basic_rates = cpu_to_le16(bss->basic_rates);
+			break;
+		}
+	case OID_TYPE_BSSLIST:{
+			struct obj_bsslist *list = data;
+			int i;
+			list->nr = cpu_to_le32(list->nr);
+			for (i = 0; i < list->nr; i++)
+				mgt_cpu_to_le(OID_TYPE_BSS, &list->bsslist[i]);
+			break;
+		}
+	case OID_TYPE_FREQUENCIES:{
+			struct obj_frequencies *freq = data;
+			int i;
+			freq->nr = cpu_to_le16(freq->nr);
+			for (i = 0; i < freq->nr; i++)
+				freq->mhz[i] = cpu_to_le16(freq->mhz[i]);
+			break;
+		}
+	case OID_TYPE_MLME:{
+			struct obj_mlme *mlme = data;
+			mlme->id = cpu_to_le16(mlme->id);
+			mlme->state = cpu_to_le16(mlme->state);
+			mlme->code = cpu_to_le16(mlme->code);
+			break;
+		}
+	case OID_TYPE_MLMEEX:{
+			struct obj_mlmeex *mlme = data;
+			mlme->id = cpu_to_le16(mlme->id);
+			mlme->state = cpu_to_le16(mlme->state);
+			mlme->code = cpu_to_le16(mlme->code);
+			mlme->size = cpu_to_le16(mlme->size);
+			break;
+		}
+	case OID_TYPE_SSID:
+	case OID_TYPE_KEY:
+	case OID_TYPE_ADDR:
+	case OID_TYPE_RAW:
+		break;
+	default:
+		BUG();
+	}
+}
+
+/* Note : data is modified during this function */
+
 int
 mgt_set_request(islpci_private *priv, enum oid_num_t n, int extra, void *data)
 {
@@ -265,7 +421,7 @@ mgt_set_request(islpci_private *priv, enum oid_num_t n, int extra, void *data)
 	int response_op = PIMFOR_OP_ERROR;
 	int dlen;
 	void *cache, *_data = data;
-	u32 oid, u;
+	u32 oid;
 
 	BUG_ON(OID_NUM_LAST <= n);
 	BUG_ON(extra > isl_oid[n].range);
@@ -279,13 +435,11 @@ mgt_set_request(islpci_private *priv, enum oid_num_t n, int extra, void *data)
 	cache += (cache ? extra * dlen : 0);
 	oid = isl_oid[n].oid + extra;
 
-	if (data == NULL)
+	if (_data == NULL)
 		/* we are requested to re-set a cached value */
 		_data = cache;
-	if ((isl_oid[n].flags & OID_FLAG_U32) && data) {
-		u = cpu_to_le32(*(u32 *) data);
-		_data = &u;
-	}
+	else
+		mgt_cpu_to_le(isl_oid[n].flags & OID_FLAG_TYPE, _data);
 	/* If we are going to write to the cache, we don't want anyone to read
 	 * it -> acquire write lock.
 	 * Else we could acquire a read lock to be sure we don't bother the
@@ -313,6 +467,10 @@ mgt_set_request(islpci_private *priv, enum oid_num_t n, int extra, void *data)
 		up_write(&priv->mib_sem);
 	}
 
+	/* re-set given data to what it was */
+	if (data)
+		mgt_le_to_cpu(isl_oid[n].flags & OID_FLAG_TYPE, data);
+
 	return ret;
 }
 
@@ -326,7 +484,7 @@ mgt_get_request(islpci_private *priv, enum oid_num_t n, int extra, void *data,
 	struct islpci_mgmtframe *response = NULL;
 	
 	int dlen;
-	void *cache, *_res=NULL;
+	void *cache, *_res = NULL;
 	u32 oid;
 
 	BUG_ON(OID_NUM_LAST <= n);
@@ -362,20 +520,19 @@ mgt_get_request(islpci_private *priv, enum oid_num_t n, int extra, void *data,
 		_res = cache;
 		ret = 0;
 	}
-	if (isl_oid[n].flags & OID_FLAG_U32) {
-		if (ret)
-			res->u = 0;
-		else
-			res->u = le32_to_cpu(*(u32 *) _res);
-	} else {
+	if ((isl_oid[n].flags & OID_FLAG_TYPE) == OID_TYPE_U32)
+		res->u = ret ? 0 : le32_to_cpu(*(u32 *) _res);
+	else {
 		res->ptr = kmalloc(reslen, GFP_KERNEL);
 		BUG_ON(res->ptr == NULL);
 		if (ret)
 			memset(res->ptr, 0, reslen);
-		else
+		else {
 			memcpy(res->ptr, _res, reslen);
+			mgt_le_to_cpu(isl_oid[n].flags & OID_FLAG_TYPE,
+				      res->ptr);
+		}
 	}
-
 	if (cache)
 		up_read(&priv->mib_sem);
 
@@ -404,7 +561,7 @@ mgt_commit_list(islpci_private *priv, enum oid_num_t *l, int n)
 		int j = 0;
 		u32 oid = t->oid;
 		BUG_ON(data == NULL);
-		while (j <= t->range){
+		while (j <= t->range) {
 			response = NULL;
 			ret |= islpci_mgt_transaction(priv->ndev, PIMFOR_OP_SET,
 			                              oid, data, t->size,
@@ -431,13 +588,21 @@ mgt_set(islpci_private *priv, enum oid_num_t n, void *data)
 	BUG_ON(priv->mib[n] == NULL);
 
 	memcpy(priv->mib[n], data, isl_oid[n].size);
-	if (isl_oid[n].flags & OID_FLAG_U32)
-		*(u32 *) priv->mib[n] = cpu_to_le32(*(u32 *) priv->mib[n]);
+	mgt_cpu_to_le(isl_oid[n].flags & OID_FLAG_TYPE, priv->mib[n]);
 }
 
-/* Commits the cache. If something goes wrong, it restarts the device. Lock
- * outside
- */
+void
+mgt_get(islpci_private *priv, enum oid_num_t n, void *res)
+{
+	BUG_ON(OID_NUM_LAST <= n);
+	BUG_ON(priv->mib[n] == NULL);
+	BUG_ON(res == NULL);
+
+	memcpy(res, priv->mib[n], isl_oid[n].size);
+	mgt_le_to_cpu(isl_oid[n].flags & OID_FLAG_TYPE, res);
+}
+
+/* Commits the cache. Lock outside. */
 
 static enum oid_num_t commit_part1[] = {
 	OID_INL_CONFIG,
@@ -528,5 +693,104 @@ mgt_oidtonum(u32 oid)
 
 	printk(KERN_DEBUG "looking for an unknown oid 0x%x", oid);
 
+	return 0;
+}
+
+int
+mgt_response_to_str(enum oid_num_t n, union oid_res_t *r, char *str)
+{
+	switch (isl_oid[n].flags & OID_FLAG_TYPE) {
+	case OID_TYPE_U32:
+		return snprintf(str, PRIV_STR_SIZE, "%u\n", r->u);
+		break;
+	case OID_TYPE_BUFFER:{
+			struct obj_buffer *buff = r->ptr;
+			return snprintf(str, PRIV_STR_SIZE,
+					"size=%u\naddr=0x%X\n", buff->size,
+					buff->addr);
+		}
+		break;
+	case OID_TYPE_BSS:{
+			struct obj_bss *bss = r->ptr;
+			return snprintf(str, PRIV_STR_SIZE,
+					"age=%u\nchannel=%u\n\
+				        capinfo=0x%X\nrates=0x%X\nbasic_rates=0x%X\n", bss->age, bss->channel, bss->capinfo, bss->rates, bss->basic_rates);
+		}
+		break;
+	case OID_TYPE_BSSLIST:{
+			struct obj_bsslist *list = r->ptr;
+			int i, k;
+			k = snprintf(str, PRIV_STR_SIZE, "nr=%u\n", list->nr);
+			for (i = 0; i < list->nr; i++)
+				k += snprintf(str + k, PRIV_STR_SIZE - k,
+					      "bss[%u] : \nage=%u\nchannel=%u\ncapinfo=0x%X\nrates=0x%X\nbasic_rates=0x%X\n",
+					      i, list->bsslist[i].age,
+					      list->bsslist[i].channel,
+					      list->bsslist[i].capinfo,
+					      list->bsslist[i].rates,
+					      list->bsslist[i].basic_rates);
+			return k;
+		}
+		break;
+	case OID_TYPE_FREQUENCIES:{
+			struct obj_frequencies *freq = r->ptr;
+			int i, t;
+			printk("nr : %u\n", freq->nr);
+			t = snprintf(str, PRIV_STR_SIZE, "nr=%u\n", freq->nr);
+			for (i = 0; i < freq->nr; i++)
+				t += snprintf(str + t, PRIV_STR_SIZE - t,
+					      "mhz[%u]=%u\n", i, freq->mhz[i]);
+			return t;
+		}
+		break;
+	case OID_TYPE_MLME:{
+			struct obj_mlme *mlme = r->ptr;
+			return snprintf(str, PRIV_STR_SIZE, "id=0x%X\nstate=0x%X\n\
+			         code=0x%X\n", mlme->id, mlme->state,
+					mlme->code);
+		}
+		break;
+	case OID_TYPE_MLMEEX:{
+			struct obj_mlmeex *mlme = r->ptr;
+			return snprintf(str, PRIV_STR_SIZE, "id=0x%X\nstate=0x%X\n\
+			         code=0x%X\nsize=0x%X\n", mlme->id, mlme->state,
+					mlme->code, mlme->size);
+		}
+		break;
+	case OID_TYPE_SSID:{
+			struct obj_ssid *ssid = r->ptr;
+			return snprintf(str, PRIV_STR_SIZE,
+					"length=%u\noctets=%s\n",
+					ssid->length, ssid->octets);
+		}
+		break;
+	case OID_TYPE_KEY:{
+			struct obj_key *key = r->ptr;
+			int t, i;
+			t = snprintf(str, PRIV_STR_SIZE,
+				     "type=0x%X\nlength=0x%X\nkey=0x",
+				     key->type, key->length);
+			for (i = 0; i < key->length; i++)
+				t += snprintf(str + t, PRIV_STR_SIZE - t,
+					      "%02X:", key->key[i]);
+			t += snprintf(str + t, PRIV_STR_SIZE - t, "\n");
+			return t;
+		}
+		break;
+	case OID_TYPE_RAW:
+	case OID_TYPE_ADDR:{
+			unsigned char *buff = r->ptr;
+			int t, i;
+			t = snprintf(str, PRIV_STR_SIZE, "hex data=");
+			for (i = 0; i < isl_oid[n].size; i++)
+				t += snprintf(str + t, PRIV_STR_SIZE - t,
+					      "%02X:", buff[i]);
+			t += snprintf(str + t, PRIV_STR_SIZE - t, "\n");
+			return t;
+		}
+		break;
+	default:
+		BUG();
+	}
 	return 0;
 }
