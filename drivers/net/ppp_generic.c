@@ -917,19 +917,14 @@ ppp_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return err;
 }
 
-static int
-ppp_net_init(struct net_device *dev)
+static void ppp_setup(struct net_device *dev)
 {
 	dev->hard_header_len = PPP_HDRLEN;
 	dev->mtu = PPP_MTU;
-	dev->hard_start_xmit = ppp_start_xmit;
-	dev->get_stats = ppp_net_stats;
-	dev->do_ioctl = ppp_net_ioctl;
 	dev->addr_len = 0;
 	dev->tx_queue_len = 3;
 	dev->type = ARPHRD_PPP;
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
-	return 0;
 }
 
 /*
@@ -2272,23 +2267,13 @@ ppp_create_interface(int unit, int *retp)
 	int i;
 
 	ppp = kmalloc(sizeof(struct ppp), GFP_KERNEL);
-	if (ppp == 0)
-		goto err;
-	dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
-	if (dev == 0)
-		goto err;
+	if (!ppp)
+		goto out;
+	dev = alloc_netdev(0, "", ppp_setup);
+	if (!dev)
+		goto out1;
 	memset(ppp, 0, sizeof(struct ppp));
-	memset(dev, 0, sizeof(struct net_device));
 
-	ret = -EEXIST;
-	down(&all_ppp_sem);
-	if (unit < 0)
-		unit = cardmap_find_first_free(all_ppp_units);
-	else if (cardmap_get(all_ppp_units, unit) != NULL)
-		goto err_unlock;	/* unit already exists */
-
-	/* Initialize the new ppp unit */
-	ppp->file.index = unit;
 	ppp->mru = PPP_MRU;
 	init_ppp_file(&ppp->file, INTERFACE);
 	ppp->file.hdrlen = PPP_HDRLEN - 2;	/* don't count proto bytes */
@@ -2301,20 +2286,29 @@ ppp_create_interface(int unit, int *retp)
 	ppp->minseq = -1;
 	skb_queue_head_init(&ppp->mrq);
 #endif /* CONFIG_PPP_MULTILINK */
-
 	ppp->dev = dev;
-	dev->init = ppp_net_init;
-	sprintf(dev->name, "ppp%d", unit);
 	dev->priv = ppp;
-	dev->destructor = free_netdev;
 
-	rtnl_lock();
-	ret = register_netdevice(dev);
-	rtnl_unlock();
+	dev->hard_start_xmit = ppp_start_xmit;
+	dev->get_stats = ppp_net_stats;
+	dev->do_ioctl = ppp_net_ioctl;
+
+	ret = -EEXIST;
+	down(&all_ppp_sem);
+	if (unit < 0)
+		unit = cardmap_find_first_free(all_ppp_units);
+	else if (cardmap_get(all_ppp_units, unit) != NULL)
+		goto out2;	/* unit already exists */
+
+	/* Initialize the new ppp unit */
+	ppp->file.index = unit;
+	sprintf(dev->name, "ppp%d", unit);
+
+	ret = register_netdev(dev);
 	if (ret != 0) {
 		printk(KERN_ERR "PPP: couldn't register device %s (%d)\n",
 		       dev->name, ret);
-		goto err_unlock;
+		goto out2;
 	}
 
 	atomic_inc(&ppp_unit_count);
@@ -2323,14 +2317,13 @@ ppp_create_interface(int unit, int *retp)
 	*retp = 0;
 	return ppp;
 
- err_unlock:
+out2:
 	up(&all_ppp_sem);
- err:
+	free_netdev(dev);
+out1:
+	kfree(ppp);
+out:
 	*retp = ret;
-	if (ppp)
-		kfree(ppp);
-	if (dev)
-		kfree(dev);
 	return NULL;
 }
 
@@ -2361,8 +2354,10 @@ static void ppp_shutdown_interface(struct ppp *ppp)
 	ppp->dev = 0;
 	ppp_unlock(ppp);
 	/* This will call dev_close() for us. */
-	if (dev)
+	if (dev) {
 		unregister_netdev(dev);
+		free_netdev(dev);
+	}
 	cardmap_set(&all_ppp_units, ppp->file.index, NULL);
 	ppp->file.dead = 1;
 	ppp->owner = NULL;
