@@ -583,7 +583,7 @@ static void yenta_open_bh(void * data)
 	pci_socket_t * socket = (pci_socket_t *) data;
 
 	/* It's OK to overwrite this now */
-	INIT_WORK(&socket->tq_task, yenta_bh, NULL);
+	INIT_WORK(&socket->tq_task, yenta_bh, socket);
 
 	if (!socket->cb_irq || request_irq(socket->cb_irq, yenta_interrupt, SA_SHIRQ, socket->dev->name, socket)) {
 		/* No IRQ or request_irq failed. Poll */
