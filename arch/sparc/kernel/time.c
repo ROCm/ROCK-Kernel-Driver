@@ -27,6 +27,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
+#include <linux/profile.h>
 
 #include <asm/oplib.h>
 #include <asm/segment.h>
