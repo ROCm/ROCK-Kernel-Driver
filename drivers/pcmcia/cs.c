@@ -1020,7 +1020,7 @@ int pcmcia_bind_device(bind_req_t *req)
     init_waitqueue_head(&client->mtd_req);
     client->next = s->clients;
     s->clients = client;
-    DEBUG(1, "cs: bind_device(): client 0x%p, sock %d, dev %s\n",
+    DEBUG(1, "cs: bind_device(): client 0x%p, sock %p, dev %s\n",
 	  client, client->Socket, client->dev_info);
     return CS_SUCCESS;
 } /* bind_device */
@@ -1551,7 +1551,7 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 	memset(s->config, 0, sizeof(config_t) * s->functions);
     }
     
-    DEBUG(1, "cs: register_client(): client 0x%p, sock %d, dev %s\n",
+    DEBUG(1, "cs: register_client(): client 0x%p, sock %p, dev %s\n",
 	  client, client->Socket, client->dev_info);
     if (client->EventMask & CS_EVENT_REGISTRATION_COMPLETE)
 	EVENT(client, CS_EVENT_REGISTRATION_COMPLETE, CS_EVENT_PRI_LOW);
@@ -2081,7 +2081,7 @@ int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: resetting socket %d\n", handle->Socket);
+	DEBUG(1, "cs: resetting socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);
@@ -2130,7 +2130,7 @@ int pcmcia_suspend_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: suspending socket %d\n", handle->Socket);
+	DEBUG(1, "cs: suspending socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);
@@ -2157,7 +2157,7 @@ int pcmcia_resume_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: waking up socket %d\n", handle->Socket);
+	DEBUG(1, "cs: waking up socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);
@@ -2190,7 +2190,7 @@ int pcmcia_eject_card(client_handle_t handle, client_req_t *req)
     
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: user eject request on socket %d\n", handle->Socket);
+	DEBUG(1, "cs: user eject request on socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);
@@ -2219,7 +2219,7 @@ int pcmcia_insert_card(client_handle_t handle, client_req_t *req)
 
 	if (CHECK_HANDLE(handle))
 		return CS_BAD_HANDLE;
-	DEBUG(1, "cs: user insert request on socket %d\n", handle->Socket);
+	DEBUG(1, "cs: user insert request on socket %p\n", handle->Socket);
 	skt = SOCKET(handle);
 
 	down(&skt->skt_sem);
