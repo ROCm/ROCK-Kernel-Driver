@@ -2,6 +2,7 @@
 #define __LINUX_USB_H
 
 #include <linux/device.h>
+#include <linux/errno.h>
 
 /* USB constants */
 
@@ -775,6 +776,14 @@ struct usb_driver {
  */
 extern int usb_register(struct usb_driver *);
 extern void usb_deregister(struct usb_driver *);
+
+#ifndef CONFIG_USB_DYNAMIC_MINORS
+static inline int usb_register_dev(struct usb_driver *new_driver, int num_minors, int *start_minor) { return -ENODEV; }
+static inline void usb_deregister_dev(struct usb_driver *driver, int num_minors, int start_minor) {}
+#else
+extern int usb_register_dev(struct usb_driver *new_driver, int num_minors, int *start_minor);
+extern void usb_deregister_dev(struct usb_driver *driver, int num_minors, int start_minor);
+#endif
 
 /* -------------------------------------------------------------------------- */
 
