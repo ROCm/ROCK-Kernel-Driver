@@ -609,11 +609,7 @@ static struct dc390_dcb __inline__ *dc390_findDCB ( struct dc390_acb* pACB, u8 i
      {
 	pDCB = pDCB->pNextDCB;
 	if (pDCB == pACB->pLinkDCB)
-	  {
-	     DCBDEBUG(printk (KERN_WARNING "DC390: DCB not found (DCB=%p, DCBmap[%2x]=%2x)\n",
-			      pDCB, id, pACB->DCBmap[id]));
 	     return 0;
-	  }
      }
    DCBDEBUG1( printk (KERN_DEBUG "DCB %p (%02x,%02x) found.\n",	\
 		      pDCB, pDCB->TargetID, pDCB->TargetLUN));
@@ -981,28 +977,6 @@ static int DC390_queue_command(struct scsi_cmnd *cmd,
     struct dc390_srb*   pSRB;
     struct dc390_acb*   pACB = (struct dc390_acb*) cmd->device->host->hostdata;
 
-    DEBUG0(/*  if(pACB->scan_devices) */	\
-	printk(KERN_INFO "DC390: Queue Cmd=%02x,Tgt=%d,LUN=%d (pid=%li), buffer=%p\n",\
-	       cmd->cmnd[0],cmd->device->id,cmd->device->lun,cmd->pid, cmd->buffer));
-
-    /* TODO: Change the policy: Always accept TEST_UNIT_READY or INQUIRY 
-     * commands and alloc a DCB for the device if not yet there. DCB will
-     * be removed in dc390_SRBdone if SEL_TIMEOUT */
-    if (!(pACB->scan_devices) && !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun))) {
-	printk(KERN_INFO "DC390: Ignore target %02x lun %02x\n",
-		cmd->device->id, cmd->device->lun); 
-	goto fail;
-    }
-
-    /* Should it be: BUG_ON(!pDCB); ? */
-
-    if (!pDCB)
-    {  /* should never happen */
-	printk (KERN_ERR "DC390: no DCB found, target %02x lun %02x\n", 
-		cmd->device->id, cmd->device->lun);
-	goto fail;
-    }
-
     pACB->Cmds++;
     cmd->scsi_done = done;
     cmd->result = 0;
@@ -1023,10 +997,6 @@ static int DC390_queue_command(struct scsi_cmnd *cmd,
 
  requeue:
     return 1;
- fail:
-    cmd->result = DID_BAD_TARGET << 16;
-    done(cmd);
-    return 0;
 }
 
 /* We ignore mapping problems, as we expect everybody to respect 
@@ -1391,7 +1361,6 @@ static void dc390_linkSRB( struct dc390_acb* pACB )
 static void __devinit dc390_initACB (struct Scsi_Host *psh, unsigned long io_port, u8 Irq, u8 index)
 {
     struct dc390_acb*    pACB;
-    u8   i;
 
     psh->can_queue = MAX_CMD_QUEUE;
     psh->cmd_per_lun = MAX_CMD_PER_LUN;
@@ -1438,8 +1407,6 @@ static void __devinit dc390_initACB (struct Scsi_Host *psh, unsigned long io_por
     dc390_linkSRB( pACB );
     pACB->pTmpSRB = &pACB->TmpSRB;
     dc390_initSRB( pACB->pTmpSRB );
-    for(i=0; i<MAX_SCSI_ID; i++)
-	pACB->DCBmap[i] = 0;
     pACB->sel_timeout = SEL_TIMEOUT;
     pACB->glitch_cfg = EATER_25NS;
     pACB->Cmds = pACB->CmdInQ = pACB->CmdOutOfSRB = 0;
@@ -1600,7 +1567,6 @@ static int dc390_slave_alloc(struct scsi_device *scsi_device)
 			pDCB->CtrlR4 |= NEGATE_REQACKDATA | NEGATE_REQACK;
 	}
 
-	pACB->DCBmap[id] |= (1 << lun);
 	dc390_updateDCB(pACB, pDCB);
 
 	pACB->scan_devices = 1;
@@ -1624,8 +1590,6 @@ static void dc390_slave_destroy(struct scsi_device *scsi_device)
 
 	BUG_ON(pDCB->GoingSRBCnt > 1);
 	
-	pACB->DCBmap[pDCB->TargetID] &= ~(1 << pDCB->TargetLUN);
-   
 	if (pDCB == pACB->pLinkDCB) {
 		if (pACB->pLastDCB == pDCB) {
 			pDCB->pNextDCB = NULL;

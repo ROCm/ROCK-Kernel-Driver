@@ -1398,26 +1398,7 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 	pSRB->SRBFlag &= ~AUTO_REQSENSE;
 	pSRB->AdaptStatus = 0;
 	pSRB->TargetStatus = CHECK_CONDITION << 1;
-#ifdef DC390_REMOVABLEDEBUG
-	switch (pcmd->sense_buffer[2] & 0x0f)
-	{	    
-	 case NOT_READY: printk (KERN_INFO "DC390: ReqSense: NOT_READY (Cmnd = 0x%02x, Dev = %i-%i, Stat = %i, Scan = %i)\n",
-				 pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN,
-				 status, pACB->scan_devices); break;
-	 case UNIT_ATTENTION: printk (KERN_INFO "DC390: ReqSense: UNIT_ATTENTION (Cmnd = 0x%02x, Dev = %i-%i, Stat = %i, Scan = %i)\n",
-				      pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN,
-				      status, pACB->scan_devices); break;
-	 case ILLEGAL_REQUEST: printk (KERN_INFO "DC390: ReqSense: ILLEGAL_REQUEST (Cmnd = 0x%02x, Dev = %i-%i, Stat = %i, Scan = %i)\n",
-				       pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN,
-				       status, pACB->scan_devices); break;
-	 case MEDIUM_ERROR: printk (KERN_INFO "DC390: ReqSense: MEDIUM_ERROR (Cmnd = 0x%02x, Dev = %i-%i, Stat = %i, Scan = %i)\n",
-				    pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN,
-				    status, pACB->scan_devices); break;
-	 case HARDWARE_ERROR: printk (KERN_INFO "DC390: ReqSense: HARDWARE_ERROR (Cmnd = 0x%02x, Dev = %i-%i, Stat = %i, Scan = %i)\n",
-				      pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN,
-				      status, pACB->scan_devices); break;
-	}
-#endif
+
 	//pcmd->result = MK_RES(DRIVER_SENSE,DID_OK,0,status);
 	if (status == (CHECK_CONDITION << 1))
 	{
@@ -1571,23 +1552,6 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 	    pDCB->Inquiry7 = ptr->Flags;
 
 ckc_e:
-    if( pACB->scan_devices )
-    {
-	if( pcmd->cmnd[0] == TEST_UNIT_READY ||
-	    pcmd->cmnd[0] == INQUIRY)
-	{
-#ifdef DC390_DEBUG0
-	    printk (KERN_INFO "DC390: %s: result: %08x", 
-		    (pcmd->cmnd[0] == INQUIRY? "INQUIRY": "TEST_UNIT_READY"),
-		    pcmd->result);
-	    if (pcmd->result & (DRIVER_SENSE << 24)) printk (" (sense: %02x %02x %02x %02x)\n",
-				   pcmd->sense_buffer[0], pcmd->sense_buffer[1],
-				   pcmd->sense_buffer[2], pcmd->sense_buffer[3]);
-	    else printk ("\n");
-#endif
-	}
-    }
-
     if( pcmd->cmnd[0] == INQUIRY && 
 	(pcmd->result == (DID_OK << 16) || status_byte(pcmd->result) & CHECK_CONDITION) )
      {
