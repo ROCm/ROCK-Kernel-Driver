@@ -540,7 +540,7 @@ int check_disk_change(struct block_device *bdev)
 	disk = get_gendisk(bdev->bd_dev, &part);
 	if (bdops->revalidate)
 		bdops->revalidate(dev);
-	if (disk && disk->minor_shift)
+	if (disk && disk->minors > 1)
 		bdev->bd_invalidated = 1;
 	return 1;
 }
@@ -799,7 +799,7 @@ static int blkdev_reread_part(struct block_device *bdev)
 	struct gendisk *disk = get_gendisk(bdev->bd_dev, &part);
 	int res = 0;
 
-	if (!disk || !disk->minor_shift || bdev != bdev->bd_contains)
+	if (!disk || disk->minors == 1 || bdev != bdev->bd_contains)
 		return -EINVAL;
 	if (part)
 		BUG();

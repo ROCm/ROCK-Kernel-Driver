@@ -61,7 +61,7 @@ void add_disk(struct gendisk *disk)
 {
 	write_lock(&gendisk_lock);
 	list_add(&disk->list, &gendisks[disk->major].list);
-	if (disk->minor_shift)
+	if (disk->minors > 1)
 		list_add_tail(&disk->full_list, &gendisk_list);
 	else
 		INIT_LIST_HEAD(&disk->full_list);
@@ -107,7 +107,7 @@ get_gendisk(dev_t dev, int *part)
 		disk = list_entry(p, struct gendisk, list);
 		if (disk->first_minor > minor)
 			continue;
-		if (disk->first_minor + (1<<disk->minor_shift) <= minor)
+		if (disk->first_minor + disk->minors <= minor)
 			continue;
 		read_unlock(&gendisk_lock);
 		*part = minor - disk->first_minor;
@@ -163,7 +163,7 @@ static int show_partition(struct seq_file *part, void *v)
 		sgp->major, sgp->first_minor,
 		(unsigned long long)get_capacity(sgp) >> 1,
 		disk_name(sgp, 0, buf));
-	for (n = 0; n < (1<<sgp->minor_shift) - 1; n++) {
+	for (n = 0; n < sgp->minors - 1; n++) {
 		if (sgp->part[n].nr_sects == 0)
 			continue;
 		seq_printf(part, "%4d  %4d %10llu %s\n",

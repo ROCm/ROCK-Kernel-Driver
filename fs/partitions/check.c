@@ -130,7 +130,7 @@ static DEVICE_ATTR(type,S_IRUGO,partition_device_type_read,NULL);
 
 static void driverfs_create_partitions(struct gendisk *hd)
 {
-	int max_p = 1<<hd->minor_shift;
+	int max_p = hd->minors;
 	struct hd_struct *p = hd->part;
 	char name[DEVICE_NAME_SIZE];
 	char bus_id[BUS_ID_SIZE];
@@ -187,7 +187,7 @@ static void driverfs_create_partitions(struct gendisk *hd)
 
 static void driverfs_remove_partitions(struct gendisk *hd)
 {
-	int max_p = 1<<hd->minor_shift;
+	int max_p = hd->minors;
 	struct device *dev;
 	struct hd_struct *p;
 	int part;
@@ -233,7 +233,7 @@ static void check_partition(struct gendisk *hd, struct block_device *bdev)
 		if (isdigit(state->name[strlen(state->name)-1]))
 			sprintf(state->name, "p");
 	}
-	state->limit = 1<<hd->minor_shift;
+	state->limit = hd->minors;
 	for (i = 0; check_part[i]; i++) {
 		int res, j;
 		struct hd_struct *p;
@@ -298,7 +298,7 @@ static void devfs_create_partitions(struct gendisk *dev)
 	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
 	char dirname[64], symlink[16];
 	static devfs_handle_t devfs_handle;
-	int part, max_p = 1<<dev->minor_shift;
+	int part, max_p = dev->minors;
 	struct hd_struct *p = dev->part;
 
 	if (dev->flags & GENHD_FL_REMOVABLE)
@@ -380,7 +380,7 @@ static void devfs_remove_partitions(struct gendisk *dev)
 {
 #ifdef CONFIG_DEVFS_FS
 	int part;
-	for (part = (1<<dev->minor_shift)-1; part--; ) {
+	for (part = dev->minors-1; part--; ) {
 		devfs_unregister(dev->part[part].de);
 		dev->part[part].de = NULL;
 	}
@@ -401,7 +401,7 @@ void register_disk(struct gendisk *disk)
 		devfs_create_cdrom(disk);
 
 	/* No minors to use for partitions */
-	if (!disk->minor_shift)
+	if (disk->minors == 1)
 		return;
 
 	/* No such device (e.g., media were just removed) */
@@ -458,7 +458,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	if (res)
 		return res;
 	bdev->bd_invalidated = 0;
-	for (p = 0; p < (1<<disk->minor_shift) - 1; p++) {
+	for (p = 0; p < disk->minors - 1; p++) {
 		disk->part[p].start_sect = 0;
 		disk->part[p].nr_sects = 0;
 	}
@@ -466,7 +466,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 		bdev->bd_op->revalidate(dev);
 	if (get_capacity(disk))
 		check_partition(disk, bdev);
-	for (p = 1; p < (1<<disk->minor_shift); p++)
+	for (p = 1; p < disk->minors; p++)
 		update_partition(disk, p);
 	return res;
 }
@@ -495,7 +495,7 @@ fail:
 
 static int wipe_partitions(struct gendisk *disk)
 {
-	int max_p = 1 << disk->minor_shift;
+	int max_p = disk->minors;
 	kdev_t devp;
 	int res;
 	int p;

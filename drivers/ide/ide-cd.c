@@ -3193,6 +3193,7 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	memset(info, 0, sizeof (struct cdrom_info));
 	drive->driver_data = info;
 	DRIVER(drive)->busy++;
+	g->minors = 1;
 	g->minor_shift = 0;
 	g->de = drive->de;
 	g->flags = GENHD_FL_CD;

@@ -97,7 +97,7 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 		return -EINVAL;
 	if (part)
 		BUG();
-	if (p->pno <= 0 || p->pno >= (1 << g->minor_shift))
+	if (p->pno <= 0 || p->pno >= g->minors)
 		return -EINVAL;
 
 	/* partition number in use? */
@@ -105,7 +105,7 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 		return -EBUSY;
 
 	/* overlap? */
-	for (i = 0; i < (1<<g->minor_shift) - 1; i++)
+	for (i = 0; i < g->minors - 1; i++)
 		if (!(ppstart+pplength <= g->part[i].start_sect ||
 		      ppstart >= g->part[i].start_sect + g->part[i].nr_sects))
 			return -EBUSY;
@@ -142,7 +142,7 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 		return -EINVAL;
 	if (part)
 		BUG();
-	if (p->pno <= 0 || p->pno >= (1 << g->minor_shift))
+	if (p->pno <= 0 || p->pno >= g->minors)
   		return -EINVAL;
 
 	/* existing drive and partition? */

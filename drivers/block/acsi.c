@@ -1739,7 +1739,10 @@ int acsi_init( void )
 		sprintf(disk->disk_name, "ad%c", 'a'+i);
 		disk->major = MAJOR_NR;
 		disk->first_minor = i << 4;
-		disk->minor_shift = (acsi_info[i].type==HARDDISK)?4:0;
+		if (acsi_info[i].type != HARDDISK) {
+			disk->minor_shift = 0;
+			disk->minors = 1;
+		}
 		disk->fops = &acsi_fops;
 		set_capacity(disk, acsi_info[i].size);
 		add_disk(disk);
