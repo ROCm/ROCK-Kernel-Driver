@@ -34,9 +34,9 @@ static void iomd_unmask_irq_a(unsigned int irq)
 }
 
 static struct irqchip iomd_a_chip = {
-	ack:	iomd_ack_irq_a,
-	mask:	iomd_mask_irq_a,
-	unmask:	iomd_unmask_irq_a,
+	.ack	= iomd_ack_irq_a,
+	.mask	= iomd_mask_irq_a,
+	.unmask = iomd_unmask_irq_a,
 };
 
 static void iomd_mask_irq_b(unsigned int irq)
@@ -58,9 +58,9 @@ static void iomd_unmask_irq_b(unsigned int irq)
 }
 
 static struct irqchip iomd_b_chip = {
-	ack:	iomd_mask_irq_b,
-	mask:	iomd_mask_irq_b,
-	unmask:	iomd_unmask_irq_b,
+	.ack	= iomd_mask_irq_b,
+	.mask	= iomd_mask_irq_b,
+	.unmask = iomd_unmask_irq_b,
 };
 
 static void iomd_mask_irq_dma(unsigned int irq)
@@ -82,9 +82,9 @@ static void iomd_unmask_irq_dma(unsigned int irq)
 }
 
 static struct irqchip iomd_dma_chip = {
-	ack:	iomd_mask_irq_dma,
-	mask:	iomd_mask_irq_dma,
-	unmask:	iomd_unmask_irq_dma,
+	.ack	= iomd_mask_irq_dma,
+	.mask	= iomd_mask_irq_dma,
+	.unmask = iomd_unmask_irq_dma,
 };
 
 static void iomd_mask_irq_fiq(unsigned int irq)
@@ -106,9 +106,9 @@ static void iomd_unmask_irq_fiq(unsigned int irq)
 }
 
 static struct irqchip iomd_fiq_chip = {
-	ack:	iomd_mask_irq_fiq,
-	mask:	iomd_mask_irq_fiq,
-	unmask:	iomd_unmask_irq_fiq,
+	.ack	= iomd_mask_irq_fiq,
+	.mask	= iomd_mask_irq_fiq,
+	.unmask = iomd_unmask_irq_fiq,
 };
 
 void __init rpc_init_irq(void)

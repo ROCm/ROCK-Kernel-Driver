@@ -24,12 +24,12 @@ static int __init shark_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 extern void __init via82c505_preinit(void *sysdata);
 
 static struct hw_pci shark_pci __initdata = {
-	setup:		via82c505_setup,
-	swizzle:       	pci_std_swizzle,
-	map_irq:	shark_map_irq,
-	nr_controllers:	1,
-	scan:		via82c505_scan_bus,
-	preinit:	via82c505_preinit
+	.setup		= via82c505_setup,
+	.swizzle     	= pci_std_swizzle,
+	.map_irq	= shark_map_irq,
+	.nr_controllers = 1,
+	.scan		= via82c505_scan_bus,
+	.preinit	= via82c505_preinit
 };
 
 static int __init shark_pci_init(void)

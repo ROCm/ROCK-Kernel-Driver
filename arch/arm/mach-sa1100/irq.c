@@ -95,11 +95,11 @@ static void sa1100_low_gpio_unmask(unsigned int irq)
 }
 
 static struct irqchip sa1100_low_gpio_chip = {
-	ack:		sa1100_low_gpio_ack,
-	mask:		sa1100_low_gpio_mask,
-	unmask:		sa1100_low_gpio_unmask,
-	rerun:		sa1100_manual_rerun,
-	type:		sa1100_gpio_type,
+	.ack		= sa1100_low_gpio_ack,
+	.mask		= sa1100_low_gpio_mask,
+	.unmask		= sa1100_low_gpio_unmask,
+	.rerun		= sa1100_manual_rerun,
+	.type		= sa1100_gpio_type,
 };
 
 /*
@@ -169,11 +169,11 @@ static void sa1100_high_gpio_unmask(unsigned int irq)
 }
 
 static struct irqchip sa1100_high_gpio_chip = {
-	ack:		sa1100_high_gpio_ack,
-	mask:		sa1100_high_gpio_mask,
-	unmask:		sa1100_high_gpio_unmask,
-	rerun:		sa1100_manual_rerun,
-	type:		sa1100_gpio_type,
+	.ack		= sa1100_high_gpio_ack,
+	.mask		= sa1100_high_gpio_mask,
+	.unmask		= sa1100_high_gpio_unmask,
+	.rerun		= sa1100_manual_rerun,
+	.type		= sa1100_gpio_type,
 };
 
 /*
@@ -191,16 +191,16 @@ static void sa1100_unmask_irq(unsigned int irq)
 }
 
 static struct irqchip sa1100_normal_chip = {
-	ack:		sa1100_mask_irq,
-	mask:		sa1100_mask_irq,
-	unmask:		sa1100_unmask_irq,
+	.ack		= sa1100_mask_irq,
+	.mask		= sa1100_mask_irq,
+	.unmask		= sa1100_unmask_irq,
 	/* rerun should never be called */
 };
 
 static struct resource irq_resource = {
-	name:	"irqs",
-	start:	0x90050000,
-	end:	0x9005ffff,
+	.name	= "irqs",
+	.start	= 0x90050000,
+	.end	= 0x9005ffff,
 };
 
 void __init sa1100_init_irq(void)

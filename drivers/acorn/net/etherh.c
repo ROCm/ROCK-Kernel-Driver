@@ -141,8 +141,8 @@ static void etherh_irq_disable(ecard_t *ec, int irqnr)
 }
 
 static expansioncard_ops_t etherh_ops = {
-	irqenable:	etherh_irq_enable,
-	irqdisable:	etherh_irq_disable,
+	.irqenable	= etherh_irq_enable,
+	.irqdisable	= etherh_irq_disable,
 };
 
 

@@ -247,12 +247,12 @@ static void destroy_inodecache(void)
 }
 
 static struct super_operations adfs_sops = {
-	alloc_inode:	adfs_alloc_inode,
-	destroy_inode:	adfs_destroy_inode,
-	write_inode:	adfs_write_inode,
-	put_super:	adfs_put_super,
-	statfs:		adfs_statfs,
-	remount_fs:	adfs_remount,
+	.alloc_inode	= adfs_alloc_inode,
+	.destroy_inode	= adfs_destroy_inode,
+	.write_inode	= adfs_write_inode,
+	.put_super	= adfs_put_super,
+	.statfs		= adfs_statfs,
+	.remount_fs	= adfs_remount,
 };
 
 static struct adfs_discmap *adfs_read_map(struct super_block *sb, struct adfs_discrecord *dr)
@@ -464,11 +464,11 @@ static struct super_block *adfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type adfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"adfs",
-	get_sb:		adfs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "adfs",
+	.get_sb		= adfs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_adfs_fs(void)

@@ -100,13 +100,13 @@ static struct map_desc system3_io_desc[] __initdata = {
 };
 
 static struct sa1100_port_fns system3_port_fns __initdata = {
-	set_mctrl:	system3_set_mctrl,
-	get_mctrl:	system3_get_mctrl,
-	pm:		system3_uart_pm,
+	.set_mctrl	= system3_set_mctrl,
+	.get_mctrl	= system3_get_mctrl,
+	.pm		= system3_uart_pm,
 };
 
 static struct notifier_block system3_clkchg_block = {
-	notifier_call:	sdram_notifier,
+	.notifier_call	= sdram_notifier,
 };
 
 /**********************************************************************

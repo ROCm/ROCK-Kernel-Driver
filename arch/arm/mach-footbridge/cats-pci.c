@@ -36,13 +36,13 @@ static int __init cats_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
  * cards being used (ie, pci-pci bridge based cards)?
  */
 static struct hw_pci cats_pci __initdata = {
-	swizzle:		NULL,
-	map_irq:		cats_map_irq,
-	nr_controllers:		1,
-	setup:			dc21285_setup,
-	scan:			dc21285_scan_bus,
-	preinit:		dc21285_preinit,
-	postinit:		dc21285_postinit,
+	.swizzle		= NULL,
+	.map_irq		= cats_map_irq,
+	.nr_controllers		= 1,
+	.setup			= dc21285_setup,
+	.scan			= dc21285_scan_bus,
+	.preinit		= dc21285_preinit,
+	.postinit		= dc21285_postinit,
 };
 
 static int cats_pci_init(void)

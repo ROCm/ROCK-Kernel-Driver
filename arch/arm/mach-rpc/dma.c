@@ -216,16 +216,16 @@ static int iomd_set_dma_speed(dmach_t channel, dma_t *dma, int cycle)
 }
 
 static struct dma_ops iomd_dma_ops = {
-	type:		"IOMD",
-	request:	iomd_request_dma,
-	free:		iomd_free_dma,
-	enable:		iomd_enable_dma,
-	disable:	iomd_disable_dma,
-	setspeed:	iomd_set_dma_speed,
+	.type		= "IOMD",
+	.request	= iomd_request_dma,
+	.free		= iomd_free_dma,
+	.enable		= iomd_enable_dma,
+	.disable	= iomd_disable_dma,
+	.setspeed	= iomd_set_dma_speed,
 };
 
 static struct fiq_handler fh = {
-	name: "floppydma"
+	.name	= "floppydma"
 };
 
 static void floppy_enable_dma(dmach_t channel, dma_t *dma)
@@ -275,10 +275,10 @@ static int floppy_get_residue(dmach_t channel, dma_t *dma)
 }
 
 static struct dma_ops floppy_dma_ops = {
-	type:		"FIQDMA",
-	enable:		floppy_enable_dma,
-	disable:	floppy_disable_dma,
-	residue:	floppy_get_residue,
+	.type		= "FIQDMA",
+	.enable		= floppy_enable_dma,
+	.disable	= floppy_disable_dma,
+	.residue	= floppy_get_residue,
 };
 
 /*
@@ -289,9 +289,9 @@ static void sound_enable_disable_dma(dmach_t channel, dma_t *dma)
 }
 
 static struct dma_ops sound_dma_ops = {
-	type:		"VIRTUAL",
-	enable:		sound_enable_disable_dma,
-	disable:	sound_enable_disable_dma,
+	.type		= "VIRTUAL",
+	.enable		= sound_enable_disable_dma,
+	.disable	= sound_enable_disable_dma,
 };
 
 void __init arch_dma_init(dma_t *dma)

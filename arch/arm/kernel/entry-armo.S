@@ -244,7 +244,7 @@ vector_prefetch:
 		tst	lr, #3
 		bne	__pabt_invalid
 		save_user_regs
-		teqp	pc, #0x00000003		@ NOT a problem - doesnt change mode
+		teqp	pc, #0x00000003		@ NOT a problem - doesn't change mode
 		mask_pc	r0, lr			@ Address of abort
 		mov	r1, sp			@ Tasks registers
 		bl	do_PrefetchAbort
@@ -295,7 +295,7 @@ Laddrexcptn_not_user:
 		and	r2, lr, #3
 		teq	r2, #3
 		bne	Laddrexcptn_illegal_mode
-		teqp	pc, #0x00000003		@ NOT a problem - doesnt change mode
+		teqp	pc, #0x00000003		@ NOT a problem - doesn't change mode
 		mask_pc	r0, lr
 		mov	r1, sp
 		orr	r2, r2, #0x400
@@ -399,7 +399,7 @@ vector_data:	sub	lr, lr, #8		@ Correct lr
 		tst	lr, #3
 		bne	Ldata_not_user
 		save_user_regs
-		teqp	pc, #0x00000003		@ NOT a problem - doesnt change mode
+		teqp	pc, #0x00000003		@ NOT a problem - doesn't change mode
 		mask_pc	r0, lr
 		bl	Ldata_do
 		b	ret_from_exception
@@ -410,7 +410,7 @@ Ldata_not_user:
 		teq	r2, #3
 		bne	Ldata_illegal_mode
 		tst	lr, #0x08000000
-		teqeqp	pc, #0x00000003		@ NOT a problem - doesnt change mode
+		teqeqp	pc, #0x00000003		@ NOT a problem - doesn't change mode
 		mask_pc	r0, lr
 		bl	Ldata_do
 		SVC_RESTORE_ALL

@@ -35,10 +35,10 @@ static void fb_dma_disable(dmach_t channel, dma_t *dma)
 }
 
 static struct dma_ops fb_dma_ops = {
-	type:		"fb",
-	request:	fb_dma_request,
-	enable:		fb_dma_enable,
-	disable:	fb_dma_disable,
+	.type		= "fb",
+	.request	= fb_dma_request,
+	.enable		= fb_dma_enable,
+	.disable	= fb_dma_disable,
 };
 #endif
 

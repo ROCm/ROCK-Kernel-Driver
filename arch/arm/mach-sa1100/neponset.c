@@ -26,8 +26,8 @@
 #include "sa1111.h"
 
 static struct device neponset_device = {
-	name:	"Neponset",
-	bus_id:	"nep_bus",
+	.name	= "Neponset",
+	.bus_id	= "nep_bus",
 };
 
 /*
@@ -159,8 +159,8 @@ static u_int neponset_get_mctrl(struct uart_port *port)
 }
 
 static struct sa1100_port_fns neponset_port_fns __initdata = {
-	set_mctrl:	neponset_set_mctrl,
-	get_mctrl:	neponset_get_mctrl,
+	.set_mctrl	= neponset_set_mctrl,
+	.get_mctrl	= neponset_get_mctrl,
 };
 
 static int __init neponset_init(void)

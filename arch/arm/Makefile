@@ -123,6 +123,10 @@ endif
 MACHINE		 = sa1100
 endif
 
+ifeq ($(CONFIG_ARCH_PXA),y)
+MACHINE		 = pxa
+endif
+
 ifeq ($(CONFIG_ARCH_L7200),y)
 MACHINE		 = l7200
 endif

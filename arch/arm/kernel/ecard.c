@@ -407,7 +407,7 @@ static int ecard_reboot(struct notifier_block *me, unsigned long val, void *v)
 }
 
 static struct notifier_block ecard_reboot_notifier = {
-	notifier_call:	ecard_reboot,
+	.notifier_call	= ecard_reboot,
 };
 
 
@@ -571,9 +571,9 @@ static void ecard_irq_mask(unsigned int irqnr)
 }
 
 static struct irqchip ecard_chip = {
-	ack:	ecard_irq_mask,
-	mask:	ecard_irq_mask,
-	unmask:	ecard_irq_unmask,
+	.ack	= ecard_irq_mask,
+	.mask	= ecard_irq_mask,
+	.unmask = ecard_irq_unmask,
 };
 
 void ecard_enablefiq(unsigned int fiqnr)

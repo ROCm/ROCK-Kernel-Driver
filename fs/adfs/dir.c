@@ -198,9 +198,9 @@ out:
 }
 
 struct file_operations adfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	adfs_readdir,
-	fsync:		file_fsync,
+	.read		= generic_read_dir,
+	.readdir	= adfs_readdir,
+	.fsync		= file_fsync,
 };
 
 static int
@@ -265,8 +265,8 @@ adfs_compare(struct dentry *parent, struct qstr *entry, struct qstr *name)
 }
 
 struct dentry_operations adfs_dentry_operations = {
-	d_hash:		adfs_hash,
-	d_compare:	adfs_compare,
+	.d_hash		= adfs_hash,
+	.d_compare	= adfs_compare,
 };
 
 struct dentry *adfs_lookup(struct inode *dir, struct dentry *dentry)
@@ -297,6 +297,6 @@ struct dentry *adfs_lookup(struct inode *dir, struct dentry *dentry)
  * directories can handle most operations...
  */
 struct inode_operations adfs_dir_inode_operations = {
-	lookup:		adfs_lookup,
-	setattr:	adfs_notify_change,
+	.lookup		= adfs_lookup,
+	.setattr	= adfs_notify_change,
 };

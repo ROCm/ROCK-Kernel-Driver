@@ -54,9 +54,9 @@ static void lubbock_unmask_irq(unsigned int irq)
 }
 
 static struct irqchip lubbock_irq_chip = {
-	ack:		lubbock_ack_irq,
-	mask:		lubbock_mask_irq,
-	unmask:		lubbock_unmask_irq,
+	.ack		= lubbock_ack_irq,
+	.mask		= lubbock_mask_irq,
+	.unmask		= lubbock_unmask_irq,
 };
 
 void lubbock_irq_handler(unsigned int irq, struct irqdesc *desc,
@@ -142,11 +142,20 @@ static void __init lubbock_map_io(void)
 
 	/* This is for the SMC chip select */
 	pxa_gpio_mode(GPIO79_nCS_3_MD);
+
+	/* setup sleep mode values */
+	PWER  = 0x00000002;
+	PFER  = 0x00000000;
+	PRER  = 0x00000002;
+	PGSR0 = 0x00008000;
+	PGSR1 = 0x003F0202;
+	PGSR2 = 0x0001C000;
+	PCFR |= PCFR_OPDE;
 }
 
 MACHINE_START(LUBBOCK, "Intel DBPXA250 Development Platform")
 	MAINTAINER("MontaVista Software Inc.")
-	BOOT_MEM(0xa0000000, 0x40000000, 0xfc000000)
+	BOOT_MEM(0xa0000000, 0x40000000, io_p2v(0x40000000))
 	MAPIO(lubbock_map_io)
 	INITIRQ(lubbock_init_irq)
 MACHINE_END

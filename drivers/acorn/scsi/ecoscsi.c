@@ -262,19 +262,19 @@ int NCR5380_proc_info(char *buffer, char **start, off_t offset,
 #include "../../scsi/NCR5380.c"
 
 static Scsi_Host_Template ecoscsi_template =  {
-	module:		THIS_MODULE,
-	name:		"Serial Port EcoSCSI NCR5380",
-	detect:		ecoscsi_detect,
-	release:	ecoscsi_release,
-	info:		ecoscsi_info,
-	queuecommand:	ecoscsi_queue_command,
-	abort:		ecoscsi_abort,
-	reset:		ecoscsi_reset,
-	can_queue:	16,
-	this_id:	7,
-	sg_tablesize:	SG_ALL,
-	cmd_per_lun:	2,
-	use_clustering:	DISABLE_CLUSTERING
+	.module		= THIS_MODULE,
+	.name		= "Serial Port EcoSCSI NCR5380",
+	.detect		= ecoscsi_detect,
+	.release	= ecoscsi_release,
+	.info		= ecoscsi_info,
+	.queuecommand	= ecoscsi_queue_command,
+	.abort		= ecoscsi_abort,
+	.reset		= ecoscsi_reset,
+	.can_queue	= 16,
+	.this_id	= 7,
+	.sg_tablesize	= SG_ALL,
+	.cmd_per_lun	= 2,
+	.use_clustering	= DISABLE_CLUSTERING
 };
 
 static int __init ecoscsi_init(void)

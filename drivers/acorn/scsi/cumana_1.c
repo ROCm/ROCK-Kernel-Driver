@@ -389,21 +389,21 @@ static void cumanascsi_write(struct Scsi_Host *instance, int reg, int value)
 #include "../../scsi/NCR5380.c"
 
 static Scsi_Host_Template cumanascsi_template = {
-	module:			THIS_MODULE,
-	name:			"Cumana 16-bit SCSI",
-	detect:			cumanascsi_detect,
-	release:		cumanascsi_release,
-	info:			cumanascsi_info,
-	queuecommand:		cumanascsi_queue_command,
-	abort:			cumanascsi_abort,
-	reset:			cumanascsi_reset,
-	bios_param:		scsicam_bios_param,
-	can_queue:		16,
-	this_id:		7,
-	sg_tablesize:		SG_ALL,
-	cmd_per_lun:		2,
-	unchecked_isa_dma:	0,
-	use_clustering:		DISABLE_CLUSTERING
+	.module			= THIS_MODULE,
+	.name			= "Cumana 16-bit SCSI",
+	.detect			= cumanascsi_detect,
+	.release		= cumanascsi_release,
+	.info			= cumanascsi_info,
+	.queuecommand		= cumanascsi_queue_command,
+	.abort			= cumanascsi_abort,
+	.reset			= cumanascsi_reset,
+	.bios_param		= scsicam_bios_param,
+	.can_queue		= 16,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 2,
+	.unchecked_isa_dma	= 0,
+	.use_clustering		= DISABLE_CLUSTERING
 };
 
 static int __init cumanascsi_init(void)

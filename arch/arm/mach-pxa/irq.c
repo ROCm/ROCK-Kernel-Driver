@@ -40,9 +40,9 @@ static void pxa_unmask_irq(unsigned int irq)
 }
 
 static struct irqchip pxa_internal_chip = {
-	ack:		pxa_mask_irq,
-	mask:		pxa_mask_irq,
-	unmask:		pxa_unmask_irq,
+	.ack		= pxa_mask_irq,
+	.mask		= pxa_mask_irq,
+	.unmask		= pxa_unmask_irq,
 };
 
 /*
@@ -109,11 +109,11 @@ static void pxa_ack_low_gpio(unsigned int irq)
 }
 
 static struct irqchip pxa_low_gpio_chip = {
-	ack:		pxa_ack_low_gpio,
-	mask:           pxa_mask_irq,
-	unmask:         pxa_unmask_irq,
-	rerun:          pxa_manual_rerun,
-	type:           pxa_gpio_irq_type,
+	.ack		= pxa_ack_low_gpio,
+	.mask		= pxa_mask_irq,
+	.unmask		= pxa_unmask_irq,
+	.rerun		= pxa_manual_rerun,
+	.type		= pxa_gpio_irq_type,
 };
 
 /*
@@ -201,11 +201,11 @@ static void pxa_unmask_muxed_gpio(unsigned int irq)
 }
 
 static struct irqchip pxa_muxed_gpio_chip = {
-	ack:		pxa_ack_muxed_gpio,
-	mask:		pxa_mask_muxed_gpio,
-	unmask:		pxa_unmask_muxed_gpio,
-	rerun:		pxa_manual_rerun,
-	type:		pxa_gpio_irq_type,
+	.ack		= pxa_ack_muxed_gpio,
+	.mask		= pxa_mask_muxed_gpio,
+	.unmask		= pxa_unmask_muxed_gpio,
+	.rerun		= pxa_manual_rerun,
+	.type		= pxa_gpio_irq_type,
 };
 
 

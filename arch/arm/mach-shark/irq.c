@@ -69,9 +69,9 @@ static void bogus_int(int irq, void *dev_id, struct pt_regs *regs)
 static struct irqaction cascade;
 
 static struct irqchip fb_chip = {
-	ack:	shark_ack_8259A_irq,
-	mask:	shark_disable_8259A_irq,
-	unmask:	shark_enable_8259A_irq,
+	.ack	= shark_ack_8259A_irq,
+	.mask	= shark_disable_8259A_irq,
+	.unmask = shark_enable_8259A_irq,
 };
 
 void __init shark_init_irq(void)

@@ -216,7 +216,7 @@ static int sa1100_dram_notifier(struct notifier_block *nb,
 
 
 static struct notifier_block sa1100_dram_block = {
-	notifier_call: sa1100_dram_notifier,
+	.notifier_call	= sa1100_dram_notifier,
 };
 
 

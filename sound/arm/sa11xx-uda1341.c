@@ -101,9 +101,9 @@ static unsigned int rates[] = {
 #define RATES sizeof(rates) / sizeof(rates[0])
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	count: RATES,
-	list: rates,
-	mask: 0,
+	.count	= RATES,
+	.list	= rates,
+	.mask	= 0,
 };
 
 /* }}} */
@@ -545,46 +545,46 @@ static int snd_card_sa11xx_uda1341_pcm_trigger(stream_id_t stream_id,
 
 static snd_pcm_hardware_t snd_sa11xx_uda1341_capture =
 {
-	info:			(SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
-				 SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			(SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
-				 SNDRV_PCM_RATE_22050 | SNDRV_PCM_RATE_32000 |\
-				 SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |\
-				 SNDRV_PCM_RATE_KNOT),
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	16380,
-	period_bytes_min:	64,
-	period_bytes_max:	8190, /* <= MAX_DMA_SIZE from ams/arch-sa1100/dma.h */
-	periods_min:		2,
-	periods_max:		255,
-	fifo_size:		0,
+	.info			= (SNDRV_PCM_INFO_INTERLEAVED |
+				   SNDRV_PCM_INFO_BLOCK_TRANSFER |
+				   SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID),
+	.formats		= SNDRV_PCM_FMTBIT_S16_LE,
+	.rates			= (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
+				   SNDRV_PCM_RATE_22050 | SNDRV_PCM_RATE_32000 |\
+				   SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |\
+				   SNDRV_PCM_RATE_KNOT),
+	.rate_min		= 8000,
+	.rate_max		= 48000,
+	.channels_min:		= 2,
+	.channels_max:		= 2,
+	.buffer_bytes_max:	= 16380,
+	.period_bytes_min:	= 64,
+	.period_bytes_max:	= 8190, /* <= MAX_DMA_SIZE from ams/arch-sa1100/dma.h */
+	.periods_min		= 2,
+	.periods_max		= 255,
+	.fifo_size		= 0,
 };
 
 static snd_pcm_hardware_t snd_sa11xx_uda1341_playback =
 {
-	info:			(SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
-				 SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID),
-	formats:		SNDRV_PCM_FMTBIT_S16_LE,
-	rates:			(SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
-                                 SNDRV_PCM_RATE_22050 | SNDRV_PCM_RATE_32000 |\
-				 SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |\
-				 SNDRV_PCM_RATE_KNOT),
-	rate_min:		8000,
-	rate_max:		48000,
-	channels_min:		2,
-	channels_max:		2,
-	buffer_bytes_max:	16380,
-	period_bytes_min:	64,
-	period_bytes_max:	8190, /* <= MAX_DMA_SIZE from ams/arch-sa1100/dma.h */
-	periods_min:		2,
-	periods_max:		255,
-	fifo_size:		0,
+	.info			= (SNDRV_PCM_INFO_INTERLEAVED |
+				   SNDRV_PCM_INFO_BLOCK_TRANSFER |
+				   SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID),
+	.formats		= SNDRV_PCM_FMTBIT_S16_LE,
+	.rates			= (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
+                                   SNDRV_PCM_RATE_22050 | SNDRV_PCM_RATE_32000 |\
+				   SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |\
+				   SNDRV_PCM_RATE_KNOT),
+	.rate_min		= 8000,
+	.rate_max		= 48000,
+	.channels_min		= 2,
+	.channels_max		= 2,
+	.buffer_bytes_max	= 16380,
+	.period_bytes_min	= 64,
+	.period_bytes_max	= 8190, /* <= MAX_DMA_SIZE from ams/arch-sa1100/dma.h */
+	.periods_min		= 2,
+	.periods_max		= 255,
+	.fifo_size		= 0,
 };
 
 /* {{{ snd_card_sa11xx_uda1341_playback functions */
@@ -752,25 +752,25 @@ static int snd_sa11xx_uda1341_hw_free(snd_pcm_substream_t * substream)
 /* }}} */
 
 static snd_pcm_ops_t snd_card_sa11xx_uda1341_playback_ops = {
-	open:			snd_card_sa11xx_uda1341_playback_open,
-	close:			snd_card_sa11xx_uda1341_playback_close,
-	ioctl:			snd_card_sa11xx_uda1341_playback_ioctl,
-	hw_params:	        snd_sa11xx_uda1341_hw_params,
-	hw_free:	        snd_sa11xx_uda1341_hw_free,
-	prepare:		snd_card_sa11xx_uda1341_playback_prepare,
-	trigger:		snd_card_sa11xx_uda1341_playback_trigger,
-	pointer:		snd_card_sa11xx_uda1341_playback_pointer,
+	.open			= snd_card_sa11xx_uda1341_playback_open,
+	.close			= snd_card_sa11xx_uda1341_playback_close,
+	.ioctl			= snd_card_sa11xx_uda1341_playback_ioctl,
+	.hw_params	        = snd_sa11xx_uda1341_hw_params,
+	.hw_free	        = snd_sa11xx_uda1341_hw_free,
+	.prepare		= snd_card_sa11xx_uda1341_playback_prepare,
+	.trigger		= snd_card_sa11xx_uda1341_playback_trigger,
+	.pointer		= snd_card_sa11xx_uda1341_playback_pointer,
 };
 
 static snd_pcm_ops_t snd_card_sa11xx_uda1341_capture_ops = {
-	open:			snd_card_sa11xx_uda1341_capture_open,
-	close:			snd_card_sa11xx_uda1341_capture_close,
-	ioctl:			snd_card_sa11xx_uda1341_capture_ioctl,
-	hw_params:	        snd_sa11xx_uda1341_hw_params,
-	hw_free:	        snd_sa11xx_uda1341_hw_free,
-	prepare:		snd_card_sa11xx_uda1341_capture_prepare,
-	trigger:		snd_card_sa11xx_uda1341_capture_trigger,
-	pointer:		snd_card_sa11xx_uda1341_capture_pointer,
+	.open			= snd_card_sa11xx_uda1341_capture_open,
+	.close			= snd_card_sa11xx_uda1341_capture_close,
+	.ioctl			= snd_card_sa11xx_uda1341_capture_ioctl,
+	.hw_params	        = snd_sa11xx_uda1341_hw_params,
+	.hw_free	        = snd_sa11xx_uda1341_hw_free,
+	.prepare		= snd_card_sa11xx_uda1341_capture_prepare,
+	.trigger		= snd_card_sa11xx_uda1341_capture_trigger,
+	.pointer		= snd_card_sa11xx_uda1341_capture_pointer,
 };
 
 static int __init snd_card_sa11xx_uda1341_pcm(sa11xx_uda1341_t *sa11xx_uda1341, int device, int substreams)

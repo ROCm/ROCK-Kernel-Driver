@@ -100,9 +100,9 @@ static void gm_unmask_irq1(unsigned int irq)
 }
 
 static struct irqchip gm_irq1_chip = {
-	ack:	gm_mask_irq1,
-	mask:	gm_mask_irq1,
-	unmask:	gm_unmask_irq1,
+	.ack	= gm_mask_irq1,
+	.mask	= gm_mask_irq1,
+	.unmask = gm_unmask_irq1,
 };
 
 static void gm_mask_irq2(unsigned int irq)
@@ -118,9 +118,9 @@ static void gm_unmask_irq2(unsigned int irq)
 }
 
 static struct irqchip gm_irq2_chip = {
-	ack:	gm_mask_irq2,
-	mask:	gm_mask_irq2,
-	unmask:	gm_unmask_irq2,
+	.ack	= gm_mask_irq2,
+	.mask	= gm_mask_irq2,
+	.unmask = gm_unmask_irq2,
 };
 
 static void __init graphicsmaster_init_irq(void)
@@ -236,9 +236,9 @@ graphicsmaster_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
 }
 
 static struct sa1100_port_fns graphicsmaster_port_fns __initdata = {
-	get_mctrl:	graphicsmaster_get_mctrl,
-	set_mctrl:	graphicsmaster_set_mctrl,
-	pm:		graphicsmaster_uart_pm,
+	.get_mctrl	= graphicsmaster_get_mctrl,
+	.set_mctrl	= graphicsmaster_set_mctrl,
+	.pm		= graphicsmaster_uart_pm,
 };
 
 static void __init graphicsmaster_map_io(void)

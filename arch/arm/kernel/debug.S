@@ -215,8 +215,8 @@
 		.macro	addruart,rx
 		mrc	p15, 0, \rx, c1, c0
 		tst	\rx, #1			@ MMU enabled?
-		moveq	\rx, #0x40000000	@ physical
-		movne	\rx, #0xfc000000	@ virtual
+		moveq	\rx, #0x40000000		@ physical
+		movne	\rx, #io_p2v(0x40000000)	@ virtual
 		orr	\rx, \rx, #0x00100000
 		.endm
 

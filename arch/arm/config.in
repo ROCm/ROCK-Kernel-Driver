@@ -26,6 +26,7 @@ choice 'ARM system type' \
 	 Cirrus-CL-PS7500FE     CONFIG_ARCH_CLPS7500 \
  	 CLPS711x/EP721x-based	CONFIG_ARCH_CLPS711X \
 	 Co-EBSA285		CONFIG_ARCH_CO285 \
+	 PXA250/210-based	CONFIG_ARCH_PXA \
 	 EBSA-110		CONFIG_ARCH_EBSA110 \
  	 Epxa10db               CONFIG_ARCH_CAMELOT \
 	 FootBridge		CONFIG_ARCH_FOOTBRIDGE \
@@ -123,6 +124,16 @@ dep_tristate '  Support for SA11x0 USB network link function' CONFIG_SA1100_USB_
 dep_tristate '  Support for SA11x0 USB character device emulation' CONFIG_SA1100_USB_CHAR $CONFIG_SA1100_USB
 
 dep_tristate 'Compaq iPAQ Handheld sleeve support' CONFIG_H3600_SLEEVE $CONFIG_SA1100_H3600
+endmenu
+
+mainmenu_option next_comment
+comment 'Intel PXA250/210 Implementations'
+dep_bool '  Intel DBPXA250 Development Platform' CONFIG_ARCH_LUBBOCK $CONFIG_ARCH_PXA
+dep_bool '  Accelent Xscale IDP' CONFIG_ARCH_PXA_IDP $CONFIG_ARCH_PXA
+
+if [ "$CONFIG_ARCH_LUBBOCK" = "y" ]; then
+   define_bool CONFIG_SA1111 y
+fi
 endmenu
 
 mainmenu_option next_comment
@@ -227,7 +238,9 @@ if [ "$CONFIG_ARCH_EBSA110"    = "y" -o "$CONFIG_FOOTBRIDGE"    = "y" -o \
 else
    define_bool CONFIG_CPU_32v4 n
 fi
-if [ "$CONFIG_ARCH_IOP310" = "y" -o "$CONFIG_ARCH_ADIFCC" = "y" ]; then
+if [ "$CONFIG_ARCH_IOP310" = "y" -o \
+     "$CONFIG_ARCH_ADIFCC" = "y" -o \
+     "$CONFIG_ARCH_PXA" = "y" ]; then
    define_bool CONFIG_CPU_32v5 y
 else
    define_bool CONFIG_CPU_32v5 n
@@ -317,7 +330,9 @@ else
 fi
 
 # XScale
-if [ "$CONFIG_ARCH_IOP310" = "y" -o "$CONFIG_ARCH_ADIFCC" = "y" ]; then
+if [ "$CONFIG_ARCH_IOP310" = "y" -o \
+     "$CONFIG_ARCH_ADIFCC" = "y" -o \
+     "$CONFIG_ARCH_PXA" = "y" ]; then
    define_bool CONFIG_CPU_XSCALE y
 else
    define_bool CONFIG_CPU_XSCALE n
@@ -467,6 +482,8 @@ if [ "$CONFIG_ARCH_NETWINDER" = "y" -o  \
      "$CONFIG_ARCH_SHARK" = "y" -o      \
      "$CONFIG_ARCH_CO285" = "y" -o      \
      "$CONFIG_ARCH_SA1100" = "y" -o     \
+     "$CONFIG_ARCH_LUBBOCK" = "y" -o    \
+     "$CONFIG_ARCH_PXA_IDP" = "y" -o \
      "$CONFIG_ARCH_INTEGRATOR" = "y" -o \
      "$CONFIG_ARCH_CDB89712" = "y" -o   \
      "$CONFIG_ARCH_P720T" = "y" ]; then
@@ -477,6 +494,8 @@ if [ "$CONFIG_ARCH_NETWINDER" = "y" -o  \
 	   "$CONFIG_ARCH_SHARK" = "y" -o      \
 	   "$CONFIG_ARCH_CO285" = "y" -o      \
 	   "$CONFIG_ARCH_SA1100" = "y" -o     \
+          "$CONFIG_ARCH_LUBBOCK" = "y" -o    \
+	   "$CONFIG_ARCH_PXA_IDP" = "y" -o    \
            "$CONFIG_ARCH_INTEGRATOR" = "y" -o \
 	   "$CONFIG_ARCH_P720T" = "y" ]; then
          bool '  Timer LED' CONFIG_LEDS_TIMER

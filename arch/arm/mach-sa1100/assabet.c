@@ -254,9 +254,9 @@ static u_int assabet_get_mctrl(struct uart_port *port)
 }
 
 static struct sa1100_port_fns assabet_port_fns __initdata = {
-	set_mctrl:	assabet_set_mctrl,
-	get_mctrl:	assabet_get_mctrl,
-	pm:		assabet_uart_pm,
+	.set_mctrl	= assabet_set_mctrl,
+	.get_mctrl	= assabet_get_mctrl,
+	.pm		= assabet_uart_pm,
 };
 
 static struct map_desc assabet_io_desc[] __initdata = {

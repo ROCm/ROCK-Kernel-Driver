@@ -64,15 +64,15 @@ void do_bad_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 }
 
 static struct irqchip bad_chip = {
-	ack:	dummy_mask_unmask_irq,
-	mask:	dummy_mask_unmask_irq,
-	unmask:	dummy_mask_unmask_irq,
+	.ack	= dummy_mask_unmask_irq,
+	.mask	= dummy_mask_unmask_irq,
+	.unmask = dummy_mask_unmask_irq,
 };
 
 static struct irqdesc bad_irq_desc = {
-	chip:	&bad_chip,
-	handle:	do_bad_IRQ,
-	depth:	1,
+	.chip	= &bad_chip,
+	.handle = do_bad_IRQ,
+	.depth	= 1,
 };
 
 /**

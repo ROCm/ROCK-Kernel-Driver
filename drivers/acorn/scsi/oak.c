@@ -252,20 +252,20 @@ printk("reading %p len %d\n", addr, len);
 #include "../../scsi/NCR5380.c"
 
 static Scsi_Host_Template oakscsi_template = {
-	module:		THIS_MODULE,
-	proc_info:	oakscsi_proc_info,
-	name:		"Oak 16-bit SCSI",
-	detect:		oakscsi_detect,
-	release:	oakscsi_release,
-	info:		oakscsi_info,
-	queuecommand:	oakscsi_queue_command,
-	abort:		oakscsi_abort,
-	reset:		oakscsi_reset,
-	can_queue:	16,
-	this_id:	7,
-	sg_tablesize:	SG_ALL,
-	cmd_per_lun:	2,
-	use_clustering:	DISABLE_CLUSTERING
+	.module		= THIS_MODULE,
+	.proc_info	= oakscsi_proc_info,
+	.name		= "Oak 16-bit SCSI",
+	.detect		= oakscsi_detect,
+	.release	= oakscsi_release,
+	.info		= oakscsi_info,
+	.queuecommand	= oakscsi_queue_command,
+	.abort		= oakscsi_abort,
+	.reset		= oakscsi_reset,
+	.can_queue	= 16,
+	.this_id	= 7,
+	.sg_tablesize	= SG_ALL,
+	.cmd_per_lun	= 2,
+	.use_clustering	= DISABLE_CLUSTERING
 };
 
 static int __init oakscsi_init(void)

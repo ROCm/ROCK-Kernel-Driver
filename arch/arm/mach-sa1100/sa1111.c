@@ -133,11 +133,11 @@ static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
 }
 
 static struct irqchip sa1111_low_chip = {
-	ack:		sa1111_ack_lowirq,
-	mask:		sa1111_mask_lowirq,
-	unmask:		sa1111_unmask_lowirq,
-	rerun:		sa1111_rerun_lowirq,
-	type:		sa1111_type_lowirq,
+	.ack		= sa1111_ack_lowirq,
+	.mask		= sa1111_mask_lowirq,
+	.unmask		= sa1111_unmask_lowirq,
+	.rerun		= sa1111_rerun_lowirq,
+	.type		= sa1111_type_lowirq,
 };
 
 static void sa1111_ack_highirq(unsigned int irq)
@@ -198,11 +198,11 @@ static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
 }
 
 static struct irqchip sa1111_high_chip = {
-	ack:		sa1111_ack_highirq,
-	mask:		sa1111_mask_highirq,
-	unmask:		sa1111_unmask_highirq,
-	rerun:		sa1111_rerun_highirq,
-	type:		sa1111_type_highirq,
+	.ack		= sa1111_ack_highirq,
+	.mask		= sa1111_mask_highirq,
+	.unmask		= sa1111_unmask_highirq,
+	.rerun		= sa1111_rerun_highirq,
+	.type		= sa1111_type_highirq,
 };
 
 static void __init sa1111_init_irq(int irq_nr)
@@ -257,8 +257,8 @@ static int sa1111_resume(struct device *dev, u32 level)
 }
 
 static struct device_driver sa1111_device_driver = {
-	suspend:	sa1111_suspend,
-	resume:		sa1111_resume,
+	.suspend	= sa1111_suspend,
+	.resume		= sa1111_resume,
 };
 
 /**

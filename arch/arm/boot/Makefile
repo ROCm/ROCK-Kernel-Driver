@@ -87,6 +87,10 @@ ifeq ($(CONFIG_SA1111),y)
 endif
 endif
 
+ifeq ($(CONFIG_ARCH_PXA),y)
+ZRELADDR	 = 0xa0008000
+endif
+
 ifeq ($(CONFIG_ARCH_ANAKIN),y)
 ZRELADDR	 = 0x20008000
 endif

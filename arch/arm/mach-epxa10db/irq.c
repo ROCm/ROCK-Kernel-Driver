@@ -39,15 +39,15 @@ static void epxa_unmask_irq(unsigned int irq)
  
 
 static struct irqchip epxa_irq_chip = {
-	ack:		epxa_mask_irq,
-	mask:		epxa_mask_irq,
-	unmask:		epxa_unmask_irq,
+	.ack		= epxa_mask_irq,
+	.mask		= epxa_mask_irq,
+	.unmask		= epxa_unmask_irq,
 };
 
 static struct resource irq_resource = {
-	name:	"irq_handler",
-	start:	IO_ADDRESS(EXC_INT_CTRL00_BASE),
-	end:	IO_ADDRESS(INT_PRIORITY_FC(EXC_INT_CTRL00_BASE))+4,
+	.name	= "irq_handler",
+	.start	= IO_ADDRESS(EXC_INT_CTRL00_BASE),
+	.end	= IO_ADDRESS(INT_PRIORITY_FC(EXC_INT_CTRL00_BASE))+4,
 };
 
 void __init epxa10db_init_irq(void)

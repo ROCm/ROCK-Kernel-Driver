@@ -67,9 +67,9 @@ static void fb_unmask_irq(unsigned int irq)
 }
 
 static struct irqchip fb_chip = {
-	ack:	fb_mask_irq,
-	mask:	fb_mask_irq,
-	unmask:	fb_unmask_irq,
+	.ack	= fb_mask_irq,
+	.mask	= fb_mask_irq,
+	.unmask = fb_unmask_irq,
 };
 
 static void __init __fb_init_irq(void)
