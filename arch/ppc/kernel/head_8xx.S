@@ -1,7 +1,7 @@
 /*
  *  arch/ppc/kernel/except_8xx.S
  *
- *  PowerPC version 
+ *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *  Rewritten by Cort Dougan (cort@cs.nmt.edu) for PReP
  *    Copyright (C) 1996 Cort Dougan <cort@cs.nmt.edu>
@@ -18,7 +18,7 @@
  *  modify it under the terms of the GNU General Public License
  *  as published by the Free Software Foundation; either version
  *  2 of the License, or (at your option) any later version.
- *	
+ *
  */
 
 #include <linux/config.h>
@@ -77,7 +77,7 @@ _start:
  * and the CCR at memory location 0.....Someday I'll fix this.....
  *	-- Dan
  */
-	
+
 	.globl	__start
 __start:
 	mr	r31,r3			/* save parameters */
@@ -166,7 +166,7 @@ label:						\
 	STD_EXCEPTION(0x100, Reset, __secondary_start_psurge)
 #else
 	STD_EXCEPTION(0x100, Reset, UnknownException)
-#endif	
+#endif
 
 /* Machine check */
 	STD_EXCEPTION(0x200, MachineCheck, MachineCheckException)
@@ -218,7 +218,7 @@ HardwareInterrupt:
 do_IRQ_intercept:
 	.long	do_IRQ;
 	.long	ret_from_intercept
-	
+
 
 /* Alignment exception */
 	. = 0x600
@@ -516,20 +516,20 @@ DataTLBError:
 	andis.	r21, r20, 0x0200	/* If set, indicates store op */
 	beq	2f
 
-	/* The EA of a data TLB miss is automatically stored in the MD_EPN 
-	 * register.  The EA of a data TLB error is automatically stored in 
-	 * the DAR, but not the MD_EPN register.  We must copy the 20 most 
-	 * significant bits of the EA from the DAR to MD_EPN before we 
-	 * start walking the page tables.  We also need to copy the CASID 
+	/* The EA of a data TLB miss is automatically stored in the MD_EPN
+	 * register.  The EA of a data TLB error is automatically stored in
+	 * the DAR, but not the MD_EPN register.  We must copy the 20 most
+	 * significant bits of the EA from the DAR to MD_EPN before we
+	 * start walking the page tables.  We also need to copy the CASID
 	 * value from the M_CASID register.
-	 * Addendum:  The EA of a data TLB error is _supposed_ to be stored 
-	 * in DAR, but it seems that this doesn't happen in some cases, such 
-	 * as when the error is due to a dcbi instruction to a page with a 
-	 * TLB that doesn't have the changed bit set.  In such cases, there 
-	 * does not appear to be any way  to recover the EA of the error 
-	 * since it is neither in DAR nor MD_EPN.  As a workaround, the 
-	 * _PAGE_HWWRITE bit is set for all kernel data pages when the PTEs 
-	 * are initialized in mapin_ram().  This will avoid the problem, 
+	 * Addendum:  The EA of a data TLB error is _supposed_ to be stored
+	 * in DAR, but it seems that this doesn't happen in some cases, such
+	 * as when the error is due to a dcbi instruction to a page with a
+	 * TLB that doesn't have the changed bit set.  In such cases, there
+	 * does not appear to be any way  to recover the EA of the error
+	 * since it is neither in DAR nor MD_EPN.  As a workaround, the
+	 * _PAGE_HWWRITE bit is set for all kernel data pages when the PTEs
+	 * are initialized in mapin_ram().  This will avoid the problem,
 	 * assuming we only use the dcbi instruction on kernel addresses.
 	 */
 	mfspr	r20, DAR
@@ -901,7 +901,7 @@ set_dec_cpu6:
 	SYNC
 	blr
 #endif
-	
+
 /*
  * We put a few things here that have to be page-aligned.
  * This stuff goes at the beginning of the data segment,
@@ -916,12 +916,12 @@ empty_zero_page:
 
 	.globl	swapper_pg_dir
 swapper_pg_dir:
-	.space	4096	
+	.space	4096
 
 /*
  * This space gets a copy of optional info passed to us by the bootstrap
  * Used to pass parameters into the kernel like root=/dev/sda1, etc.
- */	
+ */
 	.globl	cmd_line
 cmd_line:
 	.space	512

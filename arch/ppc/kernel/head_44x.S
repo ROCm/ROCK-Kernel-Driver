@@ -33,7 +33,7 @@
 		li	r26,vector_label@l; 		\
 		mtspr	SPRN_IVOR##vector_number,r26;	\
 		sync
-					
+				
 /* As with the other PowerPC ports, it is expected that when code
  * execution begins here, the following registers contain valid, yet
  * optional, information:
@@ -44,7 +44,7 @@
  *   r6 - Start of kernel command line string (e.g. "mem=128")
  *   r7 - End of kernel command line string
  *
- */ 
+ */
 	.text
 _GLOBAL(_stext)
 _GLOBAL(_start)
@@ -102,7 +102,7 @@ _GLOBAL(_start)
 	oris	r3,r3,PPC44x_MMUCR_STS@h	/* Set STS=1 */
 wmmucr:	mtspr	SPRN_MMUCR,r3			/* Put MMUCR */
 	sync
-	
+
 	bl	invstr				/* Find our address */
 invstr:	mflr	r5				/* Make it accessible */
 	tlbsx	r23,0,r5			/* Find entry we are in */
@@ -190,7 +190,7 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	 * are used for polled operation.
 	 */
  	/* pageid fields */
-	lis	r3,0xe000		
+	lis	r3,0xe000	
 	ori	r3,r3,(PPC44x_TLB_VALID | PPC44x_TLB_PAGESZ(PPC44x_PAGESZ_256M))
 
 	/* xlat fields */
@@ -243,7 +243,7 @@ skpinv:	addi	r4,r4,1				/* Increment */
 
 	/*
 	 * This is where the main kernel code starts.
-	 */ 
+	 */
 
 	/* ptr to current */
 	lis	r2,init_task@h
@@ -299,7 +299,7 @@ skpinv:	addi	r4,r4,1				/* Increment */
  * this case we handle interrupts in the kernel virtual address
  * space.
  *
- * Interrupt vectors are dynamically placed relative to the 
+ * Interrupt vectors are dynamically placed relative to the
  * interrupt prefix as determined by the address of interrupt_base.
  * The interrupt vectors offsets are programmed using the labels
  * for each interrupt vector entry.
@@ -525,7 +525,7 @@ interrupt_base:
 
 	rlwimi  r12, r10, 23, 20, 28    /* Compute pte address */
 	lwz     r11, 4(r12)             /* Get pte entry */
-	
+
 	andi.	r13, r11, _PAGE_RW	/* Is it writeable? */
 	beq	2f			/* Bail if not */
 
@@ -888,7 +888,7 @@ finish_tlb_load:
 	ori	r13, r13, tlb_44x_hwater@l
 	lwz	r11, 0(r13)
 
-	
+
 	/* Increment, rollover, and store TLB index */
 	addi	r14, r14, 1
 	cmpw	0, r14, r11		/* reserve entries 62-63 for kernel */
@@ -971,7 +971,7 @@ _GLOBAL(giveup_fpu)
  * extern void abort(void)
  *
  * At present, this routine just applies a system reset.
- */ 
+ */
 _GLOBAL(abort)
         mfspr   r13,SPRN_DBCR0
         oris    r13,r13,DBCR_RST(DBCR_RST_SYSTEM)@h

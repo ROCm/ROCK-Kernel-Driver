@@ -93,7 +93,7 @@
 /* Tokens for indicators */
 #define TONE_FREQUENCY		0x0001 /* 0 - 1000 (HZ)*/
 #define TONE_VOLUME		0x0002 /* 0 - 100 (%) */
-#define SYSTEM_POWER_STATE	0x0003 
+#define SYSTEM_POWER_STATE	0x0003
 #define WARNING_LIGHT		0x0004
 #define DISK_ACTIVITY_LIGHT	0x0005
 #define HEX_DISPLAY_UNIT	0x0006
@@ -107,7 +107,7 @@
 /* 9006 - 9999: Vendor specific */
 
 /* other */
-#define MAX_SENSORS		 17  /* I only know of 17 sensors */    
+#define MAX_SENSORS		 17  /* I only know of 17 sensors */
 #define MAX_LINELENGTH          256
 #define SENSOR_PREFIX		"ibm,sensor-"
 #define cel_to_fahr(x)		((x*9/5)+32)
@@ -138,9 +138,9 @@ struct rtas_sensors {
 /* Declarations */
 static int ppc_rtas_sensor_read(char * buf, char ** start, off_t off,
 		int count, int *eof, void *data);
-static ssize_t ppc_rtas_clock_read(struct file * file, char * buf, 
+static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos);
-static ssize_t ppc_rtas_clock_write(struct file * file, const char * buf, 
+static ssize_t ppc_rtas_clock_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos);
 static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos);
@@ -184,7 +184,7 @@ struct file_operations ppc_rtas_tone_volume_operations = {
 };
 
 int ppc_rtas_find_all_sensors (void);
-int ppc_rtas_process_sensor(struct individual_sensor s, int state, 
+int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 		int error, char * buf);
 char * ppc_rtas_process_error(int error);
 int get_location_code(struct individual_sensor s, char * buf);
@@ -202,7 +202,7 @@ void proc_rtas_init(void)
 	if ((rtas == 0) || (_machine != _MACH_chrp)) {
 		return;
 	}
-	
+
 	proc_rtas = proc_mkdir("rtas", 0);
 	if (proc_rtas == 0)
 		return;
@@ -212,19 +212,19 @@ void proc_rtas_init(void)
 	entry = create_proc_entry("progress", S_IRUGO|S_IWUSR, proc_rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_progress_operations;
 
-	entry = create_proc_entry("clock", S_IRUGO|S_IWUSR, proc_rtas); 
+	entry = create_proc_entry("clock", S_IRUGO|S_IWUSR, proc_rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_clock_operations;
 
-	entry = create_proc_entry("poweron", S_IWUSR|S_IRUGO, proc_rtas); 
+	entry = create_proc_entry("poweron", S_IWUSR|S_IRUGO, proc_rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_poweron_operations;
 
-	create_proc_read_entry("sensors", S_IRUGO, proc_rtas, 
+	create_proc_read_entry("sensors", S_IRUGO, proc_rtas,
 			ppc_rtas_sensor_read, NULL);
-	
-	entry = create_proc_entry("frequency", S_IWUSR|S_IRUGO, proc_rtas); 
+
+	entry = create_proc_entry("frequency", S_IWUSR|S_IRUGO, proc_rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_tone_freq_operations;
 
-	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_rtas); 
+	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_tone_volume_operations;
 }
 
@@ -248,11 +248,11 @@ static ssize_t ppc_rtas_poweron_write(struct file * file, const char * buf,
 
 	to_tm(nowtime, &tm);
 
-	error = call_rtas("set-time-for-power-on", 7, 1, NULL, 
-			tm.tm_year, tm.tm_mon, tm.tm_mday, 
+	error = call_rtas("set-time-for-power-on", 7, 1, NULL,
+			tm.tm_year, tm.tm_mon, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec, 0 /* nano */);
 	if (error != 0)
-		printk(KERN_WARNING "error: setting poweron time returned: %s\n", 
+		printk(KERN_WARNING "error: setting poweron time returned: %s\n",
 				ppc_rtas_process_error(error));
 	return count;
 }
@@ -287,7 +287,7 @@ static ssize_t ppc_rtas_progress_write(struct file * file, const char * buf,
 	strcpy(progress_led, buf); /* save the string */
 	/* Lets see if the user passed hexdigits */
 	hex = simple_strtoul(buf, NULL, 10);
-	
+
 	ppc_md.progress ((char *)buf, hex);
 	return count;
 
@@ -313,7 +313,7 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 /* ****************************************************************** */
 /* CLOCK                                                              */
 /* ****************************************************************** */
-static ssize_t ppc_rtas_clock_write(struct file * file, const char * buf, 
+static ssize_t ppc_rtas_clock_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos)
 {
 	struct rtc_time tm;
@@ -328,16 +328,16 @@ static ssize_t ppc_rtas_clock_write(struct file * file, const char * buf,
 	}
 
 	to_tm(nowtime, &tm);
-	error = call_rtas("set-time-of-day", 7, 1, NULL, 
-			tm.tm_year, tm.tm_mon, tm.tm_mday, 
+	error = call_rtas("set-time-of-day", 7, 1, NULL,
+			tm.tm_year, tm.tm_mon, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec, 0);
 	if (error != 0)
-		printk(KERN_WARNING "error: setting the clock returned: %s\n", 
+		printk(KERN_WARNING "error: setting the clock returned: %s\n",
 				ppc_rtas_process_error(error));
 	return count;
 }
 /* ****************************************************************** */
-static ssize_t ppc_rtas_clock_read(struct file * file, char * buf, 
+static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	unsigned int year, mon, day, hour, min, sec;
@@ -345,15 +345,15 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 	int n, error;
 
 	error = call_rtas("get-time-of-day", 0, 8, ret);
-	
+
 	year = ret[0]; mon  = ret[1]; day  = ret[2];
 	hour = ret[3]; min  = ret[4]; sec  = ret[5];
 
 	if (error != 0){
-		printk(KERN_WARNING "error: reading the clock returned: %s\n", 
+		printk(KERN_WARNING "error: reading the clock returned: %s\n",
 				ppc_rtas_process_error(error));
 		n = sprintf (buf, "0");
-	} else { 
+	} else {
 		n = sprintf (buf, "%lu\n", mktime(year, mon, day, hour, min, sec));
 	}
 	kfree(ret);
@@ -395,7 +395,7 @@ static int ppc_rtas_sensor_read(char * buf, char ** start, off_t off,
 		j = sensors.sensor[i].quant;
 		/* A sensor may have multiple instances */
 		while (j >= 0) {
-			error =	call_rtas("get-sensor-state", 2, 2, &ret, 
+			error =	call_rtas("get-sensor-state", 2, 2, &ret,
 				  sensors.sensor[i].token, sensors.sensor[i].quant-j);
 			state = (int) ret;
 			n += ppc_rtas_process_sensor(sensors.sensor[i], state, error, buffer+n );
@@ -479,8 +479,8 @@ char * ppc_rtas_process_error(int error)
  * Builds a string out of what the sensor said
  */
 
-int ppc_rtas_process_sensor(struct individual_sensor s, int state, 
-		int error, char * buf) 
+int ppc_rtas_process_sensor(struct individual_sensor s, int state,
+		int error, char * buf)
 {
 	/* Defined return vales */
 	const char * key_switch[]        = { "Off\t", "Normal\t", "Secure\t", "Mainenance" };
@@ -488,7 +488,7 @@ int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 	const char * lid_status[]        = { " ", "Open", "Closed" };
 	const char * power_source[]      = { "AC\t", "Battery", "AC & Battery" };
 	const char * battery_remaining[] = { "Very Low", "Low", "Mid", "High" };
-	const char * epow_sensor[]       = { 
+	const char * epow_sensor[]       = {
 		"EPOW Reset", "Cooling warning", "Power warning",
 		"System shutdown", "System halt", "EPOW main enclosure",
 		"EPOW power off" };
@@ -632,8 +632,8 @@ int check_location (char *c, int idx, char * buf)
 
 
 /* ****************************************************************** */
-/* 
- * Format: 
+/*
+ * Format:
  * ${LETTER}${NUMBER}[[-/]${LETTER}${NUMBER} [ ... ] ]
  * the '.' may be an abbrevation
  */
@@ -670,7 +670,7 @@ int get_location_code(struct individual_sensor s, char * buffer)
 	len = strlen(tmp);
 	while (strlen(tmp) < 4)
 		n += sprintf (tmp+n, "0");
-	
+
 	/* invert the string */
 	while (tmp[i]) {
 		if (i<len)
@@ -721,7 +721,7 @@ static ssize_t ppc_rtas_tone_freq_write(struct file * file, const char * buf,
 	error = call_rtas("set-indicator", 3, 1, NULL,
 			TONE_FREQUENCY, 0, freq);
 	if (error != 0)
-		printk(KERN_WARNING "error: setting tone frequency returned: %s\n", 
+		printk(KERN_WARNING "error: setting tone frequency returned: %s\n",
 				ppc_rtas_process_error(error));
 	return count;
 }
@@ -757,12 +757,12 @@ static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
 	}
 	if (volume < 0) volume = 0;
 	if (volume > 100) volume = 100;
-	
+
         rtas_tone_volume = volume; /* save it for later */
 	error = call_rtas("set-indicator", 3, 1, NULL,
 			TONE_VOLUME, 0, volume);
 	if (error != 0)
-		printk(KERN_WARNING "error: setting tone volume returned: %s\n", 
+		printk(KERN_WARNING "error: setting tone volume returned: %s\n",
 				ppc_rtas_process_error(error));
 	return count;
 }

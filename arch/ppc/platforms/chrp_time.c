@@ -133,10 +133,10 @@ unsigned long __chrp chrp_get_rtc_time(void)
 
 	/* Since the UIP flag is set for about 2.2 ms and the clock
 	 * is typically written with a precision of 1 jiffy, trying
-	 * to obtain a precision better than a few milliseconds is 
+	 * to obtain a precision better than a few milliseconds is
 	 * an illusion. Only consistency is interesting, this also
 	 * allows to use the routine for /dev/rtc without a potential
-	 * 1 second kernel busy loop triggered by any reader of /dev/rtc. 
+	 * 1 second kernel busy loop triggered by any reader of /dev/rtc.
 	 */
 
 	for ( i = 0; i<1000000; i++) {

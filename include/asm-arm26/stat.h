@@ -42,8 +42,7 @@ struct stat {
  * insane amounts of padding around dev_t's.
  */
 struct stat64 {
-	unsigned short  st_dev;
-	unsigned char   __pad0b[6];
+	unsigned long long  st_dev;
 	unsigned char   __pad0[4];
 
 #define STAT64_HAS_BROKEN_ST_INO	1
@@ -54,8 +53,7 @@ struct stat64 {
 	unsigned long	st_uid;
 	unsigned long	st_gid;
 
-	unsigned short  st_rdev;
-	unsigned char   __pad3b[6];
+	unsigned long long  st_rdev;
 	unsigned char   __pad3[4];
 
 	long long	st_size;

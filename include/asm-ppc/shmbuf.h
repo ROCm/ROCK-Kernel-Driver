@@ -1,7 +1,7 @@
 #ifndef _PPC_SHMBUF_H
 #define _PPC_SHMBUF_H
 
-/* 
+/*
  * The shmid64_ds structure for PPC architecture.
  */
 

@@ -560,7 +560,7 @@ fcc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		 * down.  We now issue a restart transmit.  Since the
 		 * errors close the BD and update the pointers, the restart
 		 * _should_ pick up without having to reset any of our
-		 * pointers either.  Also, To workaround 8260 device erratum 
+		 * pointers either.  Also, To workaround 8260 device erratum
 		 * CPM37, we must disable and then re-enable the transmitter
 		 * following a Late Collision, Underrun, or Retry Limit error.
 		 */
@@ -609,7 +609,7 @@ fcc_enet_rx(struct net_device *dev)
 for (;;) {
 	if (bdp->cbd_sc & BD_ENET_RX_EMPTY)
 		break;
-		
+
 #ifndef final_version
 	/* Since we have allocated space to hold a complete frame, both
 	 * the first and last indicators should be set.
@@ -1242,7 +1242,7 @@ return;
 	ep = (fcc_enet_t *)dev->base_addr;
 
 	if (dev->flags&IFF_PROMISC) {
-	  
+	
 		/* Log any net taps. */
 		printk("%s: Promiscuous mode enabled.\n", dev->name);
 		cep->fccp->fcc_fpsmr |= FCC_PSMR_PRO;
@@ -1266,7 +1266,7 @@ return;
 			dmi = dev->mc_list;
 
 			for (i=0; i<dev->mc_count; i++) {
-				
+		
 				/* Only support group multicast for now.
 				*/
 				if (!(dmi->dmi_addr[0] & 1))
@@ -1307,12 +1307,12 @@ int fcc_enet_set_mac_address(struct net_device *dev, void *p)
 
 	cep = (struct fcc_enet_private *)(dev->priv);
 	ep = cep->ep;
-	
+
         if (netif_running(dev))
                 return -EBUSY;
 
         memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
-	
+
 	eap = (unsigned char *) &(ep->fen_paddrh);
 	for (i=5; i>=0; i--)
 		*eap++ = addr->sa_data[i];
@@ -1547,7 +1547,7 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 	ep->fen_genfcc.fcc_tiptr = mem_addr+32;
 	ep->fen_padptr = mem_addr+64;
 	memset((char *)(&(immap->im_dprambase[(mem_addr+64)])), 0x88, 32);
-	
+
 	ep->fen_genfcc.fcc_rbptr = 0;
 	ep->fen_genfcc.fcc_tbptr = 0;
 	ep->fen_genfcc.fcc_rcrc = 0;
@@ -1859,7 +1859,7 @@ fcc_stop(struct net_device *dev)
 	fccp->fcc_gfmr &= ~(FCC_GFMR_ENR | FCC_GFMR_ENT);
 }
 #endif	/* CONFIG_USE_MDIO */
-	
+
 static void
 fcc_restart(struct net_device *dev, int duplex)
 {

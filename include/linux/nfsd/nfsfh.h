@@ -117,26 +117,6 @@ struct knfsd_fh {
 
 #ifdef __KERNEL__
 
-/*
- * Conversion macros for the filehandle fields.
- *
- * Keep the device numbers in "backwards compatible
- * format", ie the low 16 bits contain the low 8 bits
- * of the 20-bit minor and the 12-bit major number.
- *
- * The high 16 bits contain the rest (4 bits major
- * and 12 bits minor),
- */
-
-static inline dev_t u32_to_dev_t(__u32 udev)
-{
-	unsigned int minor, major;
-
-	minor = (udev & 0xff) | ((udev >> 8) & 0xfff00);
-	major = ((udev >> 8) & 0xff) | ((udev >> 20) & 0xf00);
-	return MKDEV(major, minor);
-}
-
 static inline __u32 ino_t_to_u32(ino_t ino)
 {
 	return (__u32) ino;
@@ -196,6 +176,12 @@ static inline void mk_fsid_v1(u32 *fsidv, u32 fsid)
 	fsidv[0] = fsid;
 }
 
+static inline void mk_fsid_v2(u32 *fsidv, dev_t dev, ino_t ino)
+{
+	fsidv[0] = htonl(MAJOR(dev));
+	fsidv[1] = htonl(MINOR(dev));
+	fsidv[2] = ino_t_to_u32(ino);
+}
 
 /*
  * Shorthand for dprintk()'s

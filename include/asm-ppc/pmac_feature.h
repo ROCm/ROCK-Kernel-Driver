@@ -1,27 +1,27 @@
 /*
  * Definition of platform feature hooks for PowerMacs
- * 
+ *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1998 Paul Mackerras &
  *                    Ben. Herrenschmidt.
- *                    
- *                    
+ *
+ *
  * Note: I removed media-bay details from the feature stuff, I beleive it's
  *       not worth it, the media-bay driver can directly use the mac-io
  *       ASIC registers.
- *       
+ *
  * Implementation note: Currently, none of these functions will block.
  * However, they may internally protect themselves with a spinlock
  * for way too long. Be prepared for at least some of these to block
  * in the future.
- * 
+ *
  * Unless specifically defined, the result code is assumed to be an
  * error when negative, 0 is the default success result. Some functions
  * may return additional positive result values.
- * 
+ *
  * To keep implementation simple, all feature calls are assumed to have
  * the prototype parameters (struct device_node* node, int value).
  * When either is not used, pass 0.
@@ -35,9 +35,9 @@
 
 /*
  * Known Mac motherboard models
- * 
+ *
  * Please, report any error here to benh@kernel.crashing.org, thanks !
- * 
+ *
  * Note that I don't fully maintain this list for Core99 & MacRISC2
  * and I'm considering removing all NewWorld entries from it and
  * entirely rely on the model string.
@@ -76,7 +76,7 @@
 #define PMAC_TYPE_UNKNOWN_PADDINGTON	0x4f	/* Unknown but paddington based */
 
 /* Core99 machines based on UniNorth 1.0 and 1.5
- * 
+ *
  * Note: A single entry here may cover several actual models according
  * to the device-tree. (Sawtooth is most tower G4s, FW_IMAC is most
  * FireWire based iMacs, etc...). Those machines are too similar to be
@@ -99,7 +99,7 @@
 
 /* MacRisc2 with UniNorth 2.0 */
 #define PMAC_TYPE_RACKMAC		0x80	/* XServe */
-#define PMAC_TYPE_WINDTUNNEL		0x81	
+#define PMAC_TYPE_WINDTUNNEL		0x81
 
 /* MacRISC2 machines based on the Pangea chipset
  */
@@ -123,7 +123,7 @@
 
 /*
  * Feature calls supported on pmac
- * 	
+ *
  */
 
 /*
@@ -203,7 +203,7 @@ static inline int pmac_call_feature(int selector, struct device_node* node,
 #define PMAC_FTR_SOUND_CHIP_ENABLE	PMAC_FTR_DEF(9)
 
 /* -- add various tweaks related to sound routing -- */
- 
+
 /* PMAC_FTR_AIRPORT_ENABLE	(struct device_node* node, 0, int value)
  * enable/disable the airport card
  */
@@ -238,7 +238,7 @@ static inline int pmac_call_feature(int selector, struct device_node* node,
 #define PMAC_FTR_SLEEP_STATE		PMAC_FTR_DEF(15)
 
 /* PMAC_FTR_GET_MB_INFO		(NULL, selector, 0)
- * 
+ *
  * returns some motherboard infos.
  * selector: 0  - model id
  *           1  - model flags (capabilities)
@@ -275,7 +275,7 @@ extern void pmac_feature_init(void);
  * on the data structures or constants below in a normal driver
  *
  */
- 
+
 #define MAX_MACIO_CHIPS		2
 
 enum {

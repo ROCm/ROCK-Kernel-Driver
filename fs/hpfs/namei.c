@@ -194,7 +194,7 @@ int hpfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	int err;
 	if ((err = hpfs_chk_name((char *)name, &len))) return err==-ENOENT ? -EINVAL : err;
 	if (hpfs_sb(dir->i_sb)->sb_eas < 2) return -EPERM;
-	if (!old_valid_dev(rdev))
+	if (!new_valid_dev(rdev))
 		return -EINVAL;
 	lock_kernel();
 	if (!(fnode = hpfs_alloc_fnode(dir->i_sb, hpfs_i(dir)->i_dno, &fno, &bh))) goto bail;

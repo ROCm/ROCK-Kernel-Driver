@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/platforms/spruce.h
- * 
+ *
  * Definitions for IBM Spruce reference board support
  *
  * Authors: Matt Porter and Johnnie Peters

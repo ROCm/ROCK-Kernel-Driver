@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/platforms/prpmc750_serial.h
- * 
+ *
  * Motorola PrPMC750 serial support
  *
  * Author: Matt Porter <mporter@mvista.com>

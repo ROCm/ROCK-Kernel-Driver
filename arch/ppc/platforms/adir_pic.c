@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/adir_pic.c
- * 
+ *
  * Interrupt controller support for SBS Adirondack
  *
  * By Michael Sokolov <msokolov@ivan.Harhan.ORG>
@@ -61,7 +61,7 @@ adir_onboard_pic_enable(unsigned int irq)
 	/* Change irq to Adirondack onboard native value */
 	irq -= 16;
 
-	/* Enable requested irq number */ 
+	/* Enable requested irq number */
 	out_be16(maskreg, in_be16(maskreg) & ~(1 << irq));
 }
 
@@ -73,7 +73,7 @@ adir_onboard_pic_disable(unsigned int irq)
 	/* Change irq to Adirondack onboard native value */
 	irq -= 16;
 
-	/* Disable requested irq number */ 
+	/* Disable requested irq number */
 	out_be16(maskreg, in_be16(maskreg) | (1 << irq));
 }
 

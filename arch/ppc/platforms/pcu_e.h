@@ -1,6 +1,6 @@
 /*
  * Siemens PCU E board specific definitions
- * 
+ *
  * Copyright (c) 2001 Wolfgang Denk (wd@denx.de)
  */
 
@@ -8,7 +8,7 @@
 #define __MACH_PCU_E_H
 
 #include <linux/config.h>
- 
+
 #include <asm/ppcboot.h>
 
 #define	PCU_E_IMMR_BASE    0xFE000000	/* phys. addr of IMMR			*/

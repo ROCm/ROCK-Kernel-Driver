@@ -93,7 +93,7 @@ extern void prep_tiger1_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi
 /* for the mac fs */
 dev_t boot_dev;
 
-#ifdef CONFIG_SOUND_CS4232 
+#ifdef CONFIG_SOUND_CS4232
 long ppc_cs4232_dma, ppc_cs4232_dma2;
 #endif
 
@@ -102,7 +102,7 @@ extern unsigned long Hash_size, Hash_mask;
 extern int probingmem;
 extern unsigned long loops_per_jiffy;
 
-#ifdef CONFIG_SOUND_CS4232 
+#ifdef CONFIG_SOUND_CS4232
 EXPORT_SYMBOL(ppc_cs4232_dma);
 EXPORT_SYMBOL(ppc_cs4232_dma2);
 #endif
@@ -188,7 +188,7 @@ prep_ibm_cpuinfo(struct seq_file *m)
 
 	/* print info about the SCSI fuse */
 	seq_printf(m, "scsi fuse\t: ");
-	if (equip_reg & PREP_IBM_EQUIPMENT_SCSIFUSE) 
+	if (equip_reg & PREP_IBM_EQUIPMENT_SCSIFUSE)
 		seq_printf(m, "ok");
 	else
 		seq_printf(m, "bad");
@@ -202,8 +202,8 @@ prep_ibm_cpuinfo(struct seq_file *m)
 		for (i = 0; (res->ActualNumMemories) && (i < MAX_MEMS); i++) {
 			if (res->Memories[i].SIMMSize != 0)
 				seq_printf(m, "%d:%ldMiB ", i,
-					(res->Memories[i].SIMMSize > 1024) ? 
-					res->Memories[i].SIMMSize>>20 : 
+					(res->Memories[i].SIMMSize > 1024) ?
+					res->Memories[i].SIMMSize>>20 :
 					res->Memories[i].SIMMSize);
 		}
 		seq_printf(m, "\n");
@@ -361,12 +361,12 @@ prep_tiger1_cpuinfo(struct seq_file *m)
 			seq_printf(m, "async, ");
 		else
 			seq_printf(m, "sync burst, ");
-		
+	
 		if (l2_reg & 0x4)
 			seq_printf(m, "parity, ");
 		else
 			seq_printf(m, "no parity, ");
-		
+	
 		switch (l2_reg & 0x3) {
 			case 0x0:
 				seq_printf(m, "256KiB\n");
@@ -440,8 +440,8 @@ no_l2:
 		for (i = 0; (res->ActualNumMemories) && (i < MAX_MEMS); i++) {
 			if (res->Memories[i].SIMMSize != 0)
 				seq_printf(m, "%d:%ldM ", i,
-					(res->Memories[i].SIMMSize > 1024) ? 
-					res->Memories[i].SIMMSize>>20 : 
+					(res->Memories[i].SIMMSize > 1024) ?
+					res->Memories[i].SIMMSize>>20 :
 					res->Memories[i].SIMMSize);
 		}
 		seq_printf(m, "\n");
@@ -562,7 +562,7 @@ prep_show_percpuinfo(struct seq_file *m, int i)
 {
 	/* PREP's without residual data will give incorrect values here */
 	seq_printf(m, "clock\t\t: ");
-#ifdef CONFIG_PREP_RESIDUAL	
+#ifdef CONFIG_PREP_RESIDUAL
 	if (res->ResidualLength)
 		seq_printf(m, "%ldMHz\n",
 			   (res->VitalProductData.ProcessorHz > 1024) ?
@@ -575,7 +575,7 @@ prep_show_percpuinfo(struct seq_file *m, int i)
 	return 0;
 }
 
-#ifdef CONFIG_SOUND_CS4232 
+#ifdef CONFIG_SOUND_CS4232
 static long __init masktoint(unsigned int i)
 {
 	int t = -1;
@@ -586,7 +586,7 @@ static long __init masktoint(unsigned int i)
 
 /*
  * ppc_cs4232_dma and ppc_cs4232_dma2 are used in include/asm/dma.h
- * to distinguish sound dma-channels from others. This is because 
+ * to distinguish sound dma-channels from others. This is because
  * blocksize on 16 bit dma-channels 5,6,7 is 128k, but
  * the cs4232.c uses 64k like on 8 bit dma-channels 0,1,2,3
  */
@@ -597,7 +597,7 @@ static void __init prep_init_sound(void)
 
 	/*
 	 * Get the needed resource informations from residual data.
-	 * 
+	 *
 	 */
 #ifdef CONFIG_PREP_RESIDUAL
 	audiodevice = residual_find_device(~0, NULL, MultimediaController,
@@ -619,7 +619,7 @@ static void __init prep_init_sound(void)
 	/*
 	 * These are the PReP specs' defaults for the cs4231.  We use these
 	 * as fallback incase we don't have residual data.
-	 * At least the IBM Thinkpad 850 with IDE DMA Channels at 6 and 7 
+	 * At least the IBM Thinkpad 850 with IDE DMA Channels at 6 and 7
 	 * will use the other values.
 	 */
 	if (audiodevice == NULL) {
@@ -628,7 +628,7 @@ static void __init prep_init_sound(void)
 			ppc_cs4232_dma = 1;
 			ppc_cs4232_dma2 = -1;
 			break;
-		default: 
+		default:
 			ppc_cs4232_dma = 6;
 			ppc_cs4232_dma2 = 7;
 		}
@@ -692,10 +692,10 @@ prep_setup_arch(void)
 
 	/* init to some ~sane value until calibrate_delay() runs */
 	loops_per_jiffy = 50000000;
-	
+
 	/* Lookup PCI host bridges */
 	prep_find_bridges();
-	
+
 	/* Set up floppy in PS/2 mode */
 	outb(0x09, SIO_CONFIG_RA);
 	reg = inb(SIO_CONFIG_RD);
@@ -775,7 +775,7 @@ prep_setup_arch(void)
 		break;
 	}
 
-	/* Read in NVRAM data */ 
+	/* Read in NVRAM data */
 	init_prep_nvram();
 
 	/* if no bootargs, look in NVRAM */
@@ -789,7 +789,7 @@ prep_setup_arch(void)
 		}
 	}
 
-#ifdef CONFIG_SOUND_CS4232 
+#ifdef CONFIG_SOUND_CS4232
 	prep_init_sound();
 #endif /* CONFIG_SOUND_CS4232 */
 
@@ -833,7 +833,7 @@ prep_res_calibrate_decr(void)
 		tb_ticks_per_jiffy = freq / HZ / divisor;
 		return 0;
 	} else
-#endif	
+#endif
 		return 1;
 }
 
@@ -905,12 +905,12 @@ mk48t59_init(void) {
 	tmp = ppc_md.nvram_read_val(MK48T59_RTC_CONTROLB);
 	if (tmp & MK48T59_RTC_CB_STOP) {
 		printk("Warning: RTC was stopped, date will be wrong.\n");
-		ppc_md.nvram_write_val(MK48T59_RTC_CONTROLB, 
+		ppc_md.nvram_write_val(MK48T59_RTC_CONTROLB,
 					 tmp & ~MK48T59_RTC_CB_STOP);
 		/* Low frequency crystal oscillators may take a very long
 		 * time to startup and stabilize. For now just ignore the
 		 * the issue, but attempting to calibrate the decrementer
-		 * from the RTC just after this wakeup is likely to be very 
+		 * from the RTC just after this wakeup is likely to be very
 		 * inaccurate. Firmware should not allow to load
 		 * the OS with the clock stopped anyway...
 		 */
@@ -934,11 +934,11 @@ mk48t59_calibrate_decr(void)
 	unsigned char save_control;
 	long i;
 	unsigned char sec;
- 
-		
+
+	
 	/* Make sure the time is not stopped. */
 	save_control = ppc_md.nvram_read_val(MK48T59_RTC_CONTROLB);
-	
+
 	ppc_md.nvram_write_val(MK48T59_RTC_CONTROLA,
 			(save_control & (~MK48T59_RTC_CB_STOP)));
 
@@ -1120,7 +1120,7 @@ void __init
 prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		unsigned long r6, unsigned long r7)
 {
-#ifdef CONFIG_PREP_RESIDUAL	
+#ifdef CONFIG_PREP_RESIDUAL
 	/* make a copy of residual data */
 	if ( r3 ) {
 		memcpy((void *)res,(void *)(r3+KERNELBASE),
@@ -1136,7 +1136,7 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	DMA_MODE_WRITE = 0x48;
 
 	/* figure out what kind of prep workstation we are */
-#ifdef CONFIG_PREP_RESIDUAL	
+#ifdef CONFIG_PREP_RESIDUAL
 	if ( res->ResidualLength != 0 ) {
 		if ( !strncmp(res->VitalProductData.PrintableModel,"IBM",3) )
 			_prep_type = _PREP_IBM;

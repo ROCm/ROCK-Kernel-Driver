@@ -1,6 +1,6 @@
 /*
  * arch/ppc/syslib/cpc710.h
- * 
+ *
  * Definitions for the IBM CPC710 PCI Host Bridge
  *
  * Author: Matt Porter <mporter@mvista.com>

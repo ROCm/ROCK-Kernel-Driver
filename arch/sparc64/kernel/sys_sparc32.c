@@ -1304,16 +1304,17 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
 	int err;
 
-	if (stat->size > MAX_NON_LFS)
+	if (stat->size > MAX_NON_LFS || !old_valid_dev(stat->dev) ||
+	    !old_valid_dev(stat->rdev))
 		return -EOVERFLOW;
 
-	err  = put_user(stat->dev, &statbuf->st_dev);
+	err  = put_user(old_encode_dev(stat->dev), &statbuf->st_dev);
 	err |= put_user(stat->ino, &statbuf->st_ino);
 	err |= put_user(stat->mode, &statbuf->st_mode);
 	err |= put_user(stat->nlink, &statbuf->st_nlink);
 	err |= put_user(high2lowuid(stat->uid), &statbuf->st_uid);
 	err |= put_user(high2lowgid(stat->gid), &statbuf->st_gid);
-	err |= put_user(stat->rdev, &statbuf->st_rdev);
+	err |= put_user(old_encode_dev(stat->rdev), &statbuf->st_rdev);
 	err |= put_user(stat->size, &statbuf->st_size);
 	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
 	err |= put_user(0, &statbuf->__unused1);

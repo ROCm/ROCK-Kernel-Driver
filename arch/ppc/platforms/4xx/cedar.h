@@ -48,14 +48,12 @@ extern  void *cedar_rtc_base;
 #define CEDAR_RTC_VADDR		CEDAR_RTC_PADDR
 #define CEDAR_RTC_SIZE		((uint)8*1024)
 
-
 /* Early initialization address mapping for block_io.
  * Standard 405GP map.
  */
 #define PPC4xx_ONB_IO_PADDR	((uint)0xef600000)
 #define PPC4xx_ONB_IO_VADDR	PPC4xx_ONB_IO_PADDR
 #define PPC4xx_ONB_IO_SIZE	((uint)4*1024)
-
 
 #ifdef CONFIG_PPC405GP_INTERNAL_CLOCK
 #define BASE_BAUD		201600
@@ -64,9 +62,6 @@ extern  void *cedar_rtc_base;
 #endif
 
 #define PPC4xx_MACHINE_NAME "IBM NP405L Cedar"
-
- 
-
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __ASM_CEDAR_H__ */

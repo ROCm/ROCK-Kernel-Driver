@@ -168,15 +168,15 @@ struct ucontext_ia32 {
 };
 
 struct stat64 {
-	unsigned short	st_dev;
-	unsigned char	__pad0[10];
+	unsigned long long	st_dev;
+	unsigned char	__pad0[4];
 	unsigned int	__st_ino;
 	unsigned int	st_mode;
 	unsigned int	st_nlink;
 	unsigned int	st_uid;
 	unsigned int	st_gid;
-	unsigned short	st_rdev;
-	unsigned char	__pad3[10];
+	unsigned long long	st_rdev;
+	unsigned char	__pad3[4];
 	unsigned int	st_size_lo;
 	unsigned int	st_size_hi;
 	unsigned int	st_blksize;

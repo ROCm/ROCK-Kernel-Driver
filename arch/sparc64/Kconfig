@@ -85,16 +85,6 @@ config HW_CONSOLE
 	bool
 	default y
 
-config HUGETLB_PAGE
-	bool "SPARC64 Huge TLB Page Support"
-	help
-	  This enables support for huge pages.  User space applications
-	  can make use of this support with the sys_alloc_hugepages and
-	  sys_free_hugepages system calls.  If your applications are
-	  huge page aware, then say Y here.
-
-	  Otherwise, say N.
-
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---

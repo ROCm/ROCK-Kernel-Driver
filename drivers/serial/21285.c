@@ -481,18 +481,6 @@ static int __init serial21285_console_setup(struct console *co, char *options)
 }
 
 extern struct uart_driver serial21285_reg;
-#ifdef CONFIG_SERIAL_21285_OLD
-static struct console serial21285_old_cons =
-{
-	.name		= SERIAL_21285_OLD_NAME,
-	.write		= serial21285_console_write,
-	.device		= uart_console_device,
-	.setup		= serial21285_console_setup,
-	.flags		= CON_PRINTBUFFER,
-	.index		= -1,
-	.data		= &serial21285_reg,
-};
-#endif
 
 static struct console serial21285_console =
 {

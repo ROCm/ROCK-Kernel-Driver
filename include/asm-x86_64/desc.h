@@ -149,6 +149,8 @@ static inline void set_seg_base(unsigned cpu, int entry, void *base)
 
 #define LDT_entry_a(info) \
 	((((info)->base_addr & 0x0000ffff) << 16) | ((info)->limit & 0x0ffff))
+/* Don't allow setting of the lm bit. It is useless anyways because 
+   64bit system calls require __USER_CS. */ 
 #define LDT_entry_b(info) \
 	(((info)->base_addr & 0xff000000) | \
 	(((info)->base_addr & 0x00ff0000) >> 16) | \
@@ -159,7 +161,7 @@ static inline void set_seg_base(unsigned cpu, int entry, void *base)
 	((info)->seg_32bit << 22) | \
 	((info)->limit_in_pages << 23) | \
 	((info)->useable << 20) | \
-	((info)->lm << 21) | \
+	/* ((info)->lm << 21) | */ \
 	0x7000)
 
 #define LDT_empty(info) (\

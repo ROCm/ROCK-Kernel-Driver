@@ -1,6 +1,6 @@
 /*
  * arch/ppc/boot/simple/gt64260_tty.c
- * 
+ *
  * Bootloader version of the embedded MPSC/UART driver for the GT64260[A].
  * Note: Due to 64260A errata, DMA will be used for UART input (via SDMA).
  *

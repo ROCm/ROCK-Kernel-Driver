@@ -33,9 +33,9 @@ typedef struct { volatile int counter; } atomic_t;
  *	 31                          8 7      0
  */
 
-#define ATOMIC_INIT(i)	{ (i << 8) }
+#define ATOMIC_INIT(i)	{ ((i) << 8) }
 
-static __inline__ int atomic_read(atomic_t *v)
+static __inline__ int atomic_read(const atomic_t *v)
 {
 	int ret = v->counter;
 

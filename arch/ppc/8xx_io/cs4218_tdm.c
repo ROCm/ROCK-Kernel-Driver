@@ -597,7 +597,7 @@ static ssize_t cs4218_ctx_law(const u_char *userPtr, size_t userCount,
 	int hSpeed = sound.hard.speed, sSpeed = sound.soft.speed;
 	int utotal, ftotal;
 	int stereo = sound.soft.stereo;
- 
+
 	frameLeft >>= 2;
 	if (stereo)
 		userCount >>= 1;
@@ -2087,7 +2087,7 @@ static int sq_open(struct inode *inode, struct file *file)
 
 		read_sq_setup(numReadBufs,readbufSize<<10, sound_read_buffers);
 		read_sq.open_mode = file->f_mode;
-	}                                                                      
+	}
 
 	/* Start up the 4218 by:
 	 * Reset.

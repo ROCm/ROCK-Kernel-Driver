@@ -14,7 +14,8 @@
 
 #ifdef __KERNEL__
 
-#define DASD_PER_MAJOR ( 1U<<(MINORBITS-DASD_PARTN_BITS))
+/* we keep old device allocation scheme; IOW, minors are still in 0..255 */
+#define DASD_PER_MAJOR ( 1U<<(8-DASD_PARTN_BITS))
 #define DASD_PARTN_MASK ((1 << DASD_PARTN_BITS) - 1)
 
 /*

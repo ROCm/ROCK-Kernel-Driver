@@ -64,11 +64,7 @@ static inline int level_to_pers (int level)
 typedef struct mddev_s mddev_t;
 typedef struct mdk_rdev_s mdk_rdev_t;
 
-#if (MINORBITS != 8)
-#error MD does not handle bigger kdev yet
-#endif
-
-#define MAX_MD_DEVS  (1<<MINORBITS)	/* Max number of md dev */
+#define MAX_MD_DEVS  256	/* Max number of md dev */
 
 /*
  * options passed in raidrun:

@@ -190,8 +190,8 @@
 #define   DBCR0_IA34T       0x00004000  /* Instr Addr 3-4 range Toggle     */
 #define   DBCR0_FT          0x00000001  /* Freeze Timers on debug event    */
 #ifndef CONFIG_BOOKE
-#define	SPRN_DBCR1	0x3BD	/* Debug Control Register 1 */		  
-#define	SPRN_DBSR	0x3F0	/* Debug Status Register */		  
+#define	SPRN_DBCR1	0x3BD	/* Debug Control Register 1 */		
+#define	SPRN_DBSR	0x3F0	/* Debug Status Register */		
 #define   DBSR_IC	    0x80000000	/* Instruction Completion          */
 #define   DBSR_BT	    0x40000000	/* Branch taken */
 #define   DBSR_TIE	    0x10000000	/* Trap Instruction debug Event    */

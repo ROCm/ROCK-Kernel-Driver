@@ -272,7 +272,7 @@ int hpux_utssys(char *ubuf, int n, int type)
 		break ;
 	case 2:
 		/*  ustat():  */
-		return( hpux_ustat((dev_t)n, (struct hpux_ustat *)ubuf) );
+		return( hpux_ustat(new_decode_dev(n), (struct hpux_ustat *)ubuf) );
 		break ;
 	case 3:
 		/*  setuname():

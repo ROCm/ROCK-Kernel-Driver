@@ -43,7 +43,7 @@ void boot(int a1, int a2, void *prom)
     void *dst;
     unsigned char *im;
     unsigned initrd_start, initrd_size;
-    
+
     printf("chrpboot starting: loaded at 0x%p\n", &_start);
 
     initrd_size = (char *)(&__ramdisk_end) - (char *)(&__ramdisk_begin);

@@ -44,7 +44,7 @@
 
    At the end of the DCR defines several synonyms are defined for backwards
    compatibility, but all new code specific to the 405LP uses the consistent
-   names. 
+   names.
 
    Version 07/24/02 1.1 - Armin
         added default pm define
@@ -147,7 +147,7 @@
 /*****************************************************************************
  * Indirectly accessed DCRs. Note that unlike direct-access DCRs whose numbers
  * must be hard-coded into the instruction, indirect-access DCR numbers can be
- * computed. 
+ * computed.
  *****************************************************************************/
 
 /* Offsets for SDRAM Controler Registers */
@@ -311,7 +311,7 @@
 #define TDES0_IO_BASE  0xef600b00
 
 /*****************************************************************************
- * CPM bits for the 405LP.  
+ * CPM bits for the 405LP.
  *****************************************************************************/
 
 #define CPM_BITMASK(i) (((unsigned)0x80000000) >> i)
@@ -460,7 +460,7 @@ typedef union {
 /* APM0_IER -- APM Interrupt Enable Register
    APM0_IPR -- APM Interrupt Polarity Register
    APM0_ISR -- APM Interrupt Status Register
-   APM0_ITR -- APM Interrupt Trigger Register 
+   APM0_ITR -- APM Interrupt Trigger Register
 
    The interrupts are also accessed via standard interrupt numbers:
 
@@ -860,7 +860,7 @@ typedef union {
    The mask is a mask with 1s in every reserved bit position.
 
    NB: This routine always writes the register with the valid bit set,
-       regardless of the valid bit setting in the 'new' parameter.  
+       regardless of the valid bit setting in the 'new' parameter.
 
    Unfortunately this must be a macro to work (due to mtdcr()).
 

@@ -54,6 +54,7 @@ extern void kgdb_map_scc(void);
 #endif
 
 extern void ppc6xx_idle(void);
+extern void power4_idle(void);
 
 extern boot_infos_t *boot_infos;
 char saved_command_line[256];
@@ -63,7 +64,7 @@ char *sysmap;
 unsigned long sysmap_size;
 
 /* Used with the BI_MEMSIZE bootinfo parameter to store the memory
-   size value reported by the boot loader. */ 
+   size value reported by the boot loader. */
 unsigned long boot_mem_size;
 
 unsigned long ISA_DMA_THRESHOLD;
@@ -117,12 +118,12 @@ void machine_restart(char *cmd)
 {
 	ppc_md.restart(cmd);
 }
-  
+
 void machine_power_off(void)
 {
 	ppc_md.power_off();
 }
-  
+
 void machine_halt(void)
 {
 	ppc_md.halt();
@@ -219,7 +220,7 @@ int show_cpuinfo(struct seq_file *m, void *v)
 		break;
 	}
 
-	seq_printf(m, "revision\t: %hd.%hd (pvr %04x %04x)\n", 
+	seq_printf(m, "revision\t: %hd.%hd (pvr %04x %04x)\n",
 		   maj, min, PVR_VER(pvr), PVR_REV(pvr));
 
 	seq_printf(m, "bogomips\t: %lu.%02lu\n",
@@ -318,7 +319,7 @@ of_show_percpuinfo(struct seq_file *m, int i)
 {
 	struct device_node *cpu_node;
 	int *fp, s;
-			
+	
 	cpu_node = find_type_devices("cpu");
 	if (!cpu_node)
 		return 0;
@@ -335,7 +336,7 @@ intuit_machine_type(void)
 {
 	char *model;
 	struct device_node *root;
-			
+	
 	/* ask the OF info if we're a chrp or pmac */
 	root = find_path_device("/");
 	if (root != 0) {
@@ -366,7 +367,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		btext_clearscreen();
 		btext_welcome();
 	}
-#endif	
+#endif
 
 	parse_bootinfo(find_bootinfo());
 
@@ -403,7 +404,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	 * bootargs property of the /chosen node.
 	 * If an initial ramdisk is present, r3 and r4
 	 * are used for initrd_start and initrd_size,
-	 * otherwise they contain 0xdeadbeef.  
+	 * otherwise they contain 0xdeadbeef.
 	 */
 	cmd_line[0] = 0;
 	if (r3 >= 0x4000 && r3 < 0x800000 && r4 == 0) {
@@ -426,7 +427,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	} else {
 		struct device_node *chosen;
 		char *p;
-			
+	
 #ifdef CONFIG_BLK_DEV_INITRD
 		if (r3 && r4 && r4 != 0xdeadbeef) {
 			if (r3 < KERNELBASE)
@@ -450,7 +451,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		extern int __adb_probe_sync;
 		__adb_probe_sync = 1;
 	}
-#endif /* CONFIG_ADB */	
+#endif /* CONFIG_ADB */
 
 	switch (_machine) {
 	case _MACH_Pmac:
@@ -529,8 +530,11 @@ machine_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	strcpy(cmd_line, CONFIG_CMDLINE);
 #endif /* CONFIG_CMDLINE */
 
-#if defined(CONFIG_6xx)
+#ifdef CONFIG_6xx
 	ppc_md.power_save = ppc6xx_idle;
+#endif
+#ifdef CONFIG_POWER4
+	ppc_md.power_save = power4_idle;
 #endif
 
 	platform_init(r3, r4, r5, r6, r7);
@@ -578,7 +582,7 @@ static struct cpu cpu_devices[NR_CPUS];
 int __init ppc_init(void)
 {
 	int i;
-	
+
 	/* clear the progress line */
 	if ( ppc_md.progress ) ppc_md.progress("             ", 0xffff);
 
@@ -652,7 +656,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_code = (unsigned long) _etext;
 	init_mm.end_data = (unsigned long) _edata;
 	init_mm.brk = (unsigned long) klimit;
-	
+
 	/* Save unparsed command line copy for /proc/cmdline */
 	strcpy(saved_command_line, cmd_line);
 	*cmdline_p = cmd_line;

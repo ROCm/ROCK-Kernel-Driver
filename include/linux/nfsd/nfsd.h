@@ -15,6 +15,7 @@
 #include <linux/unistd.h>
 #include <linux/dirent.h>
 #include <linux/fs.h>
+#include <linux/mount.h>
 
 #include <linux/nfsd/debug.h>
 #include <linux/nfsd/nfsfh.h>
@@ -208,6 +209,17 @@ void		nfsd_lockd_shutdown(void);
  * Time of server startup
  */
 extern struct timeval	nfssvc_boot;
+
+static inline int is_fsid(struct svc_fh *fh, struct knfsd_fh *reffh)
+{
+	if (fh->fh_export->ex_flags & NFSEXP_FSID) {
+		struct vfsmount *mnt = fh->fh_export->ex_mnt;
+		if (!old_valid_dev(mnt->mnt_sb->s_dev) ||
+		    (reffh->fh_version == 1 && reffh->fh_fsid_type == 1))
+			return 1;
+	}
+	return 0;
+}
 
 
 #ifdef CONFIG_NFSD_V4

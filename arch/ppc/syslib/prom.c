@@ -803,7 +803,7 @@ prom_get_irq_senses(unsigned char *senses, int off, int max)
 					senses[i-off] = (IRQ_SENSE_LEVEL
 						| IRQ_POLARITY_NEGATIVE);
 				else
-					senses[i-off] = (IRQ_SENSE_EDGE 
+					senses[i-off] = (IRQ_SENSE_EDGE
 						| IRQ_POLARITY_POSITIVE);
 			}
 		}
@@ -962,7 +962,7 @@ find_path_device(const char *path)
  *
  *	Returns a node pointer with refcount incremented, use
  *	of_node_put() on it when done.
- */ 
+ */
 struct device_node *of_find_node_by_name(struct device_node *from,
 	const char *name)
 {
@@ -1116,7 +1116,7 @@ struct device_node *of_node_get(struct device_node *node)
  *	allocation on ppc32
  */
 void  of_node_put(struct device_node *node)
-{    
+{
 }
 
 /*
@@ -1188,8 +1188,8 @@ find_parent_pci_resource(struct pci_dev* pdev, struct address_range *range)
 {
 	unsigned long mask;
 	int i;
-	
-	/* Check this one */ 
+
+	/* Check this one */
 	mask = bus_space_to_resource_flags(range->space);
 	for (i=0; i<DEVICE_COUNT_RESOURCE; i++) {
 		if ((pdev->resource[i].flags & mask) == mask &&
@@ -1237,7 +1237,7 @@ request_OF_resource(struct device_node* node, int index, const char* name_postfi
 		parent = &ioport_resource;
 	else
 		goto fail;
-		
+
 	/* Find a PCI parent if any */
 	nd = node;
 	pcidev = NULL;
@@ -1292,7 +1292,7 @@ release_OF_resource(struct device_node* node, int index)
 		parent = &ioport_resource;
 	else
 		return -EINVAL;
-		
+
 	/* Find a PCI parent if any */
 	nd = node;
 	pcidev = NULL;

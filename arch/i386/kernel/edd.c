@@ -1,6 +1,6 @@
 /*
  * linux/arch/i386/kernel/edd.c
- *  Copyright (C) 2002, 2003 Dell Computer Corporation
+ *  Copyright (C) 2002, 2003 Dell Inc.
  *  by Matt Domsch <Matt_Domsch@dell.com>
  *
  * BIOS Enhanced Disk Drive Services (EDD)

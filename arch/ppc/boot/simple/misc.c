@@ -230,7 +230,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 		 	puts("\n");
 		}
 	}
- 
+
 	rec->tag = BI_FIRST;
 	rec->size = sizeof(struct bi_record);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);

@@ -1,5 +1,5 @@
 /*
- *  PowerPC version 
+ *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *  Rewritten by Cort Dougan (cort@fsmlabs.com) for PReP
  *    Copyright (C) 1996 Cort Dougan <cort@fsmlabs.com>
@@ -16,7 +16,7 @@
  *  modify it under the terms of the GNU General Public License
  *  as published by the Free Software Foundation; either version
  *  2 of the License, or (at your option) any later version.
- *	
+ *
  */
 
 #include <linux/config.h>
@@ -433,7 +433,7 @@ ppc_clone:
  *
  * The code which creates the new task context is in 'copy_thread'
  * in arch/ppc/kernel/process.c
- */	
+ */
 _GLOBAL(_switch)
 	stwu	r1,-INT_FRAME_SIZE(r1)
 	mflr	r0
@@ -818,7 +818,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_601)
 	.comm	ee_restarts,4
 
 /*
- * PROM code for specific machines follows.  Put it 
+ * PROM code for specific machines follows.  Put it
  * here so it's easy to add arch-specific sections later.
  * -- Cort
  */

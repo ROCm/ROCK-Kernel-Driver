@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/prpmc750_pci.c
- * 
+ *
  * PCI support for Motorola PrPMC750
  *
  * Author: Matt Porter <mporter@mvista.com>
@@ -35,7 +35,7 @@ prpmc_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	/*
 	 *      PCI IDSEL/INTPIN->INTLINE
 	 *      A       B       C       D
-	 */ 
+	 */
 	{
 		{12,	0,	0,	0},  /* IDSEL 14 - Ethernet, base */
 		{0,	0,	0,	0},  /* IDSEL 15 - unused */
@@ -114,7 +114,7 @@ prpmc750_find_bridges(void)
 	hose->mem_space.end = PRPMC750_PCI_UPPER_MEM_AUTO;
 
 	hose->io_base_virt = (void *)PRPMC750_ISA_IO_BASE;
-	
+
 	setup_indirect_pci(hose,
 			PRPMC750_PCI_CONFIG_ADDR,
 			PRPMC750_PCI_CONFIG_DATA);

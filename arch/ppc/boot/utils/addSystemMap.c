@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 
     round = actualKernelLen % 4096;
     roundedKernelLen = actualKernelLen;
-    if ( round ) 
+    if ( round )
 	roundedKernelLen += (4096 - round);
 
     printf("actual kernel length rounded up to a 4k multiple = %ld\n", roundedKernelLen);

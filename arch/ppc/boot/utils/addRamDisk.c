@@ -23,7 +23,7 @@ void put4k(FILE *file, char *buf )
     fwrite(buf, 1, 4096, file);
 }
 
-void death(const char *msg, FILE *fdesc, const char *fname) 
+void death(const char *msg, FILE *fdesc, const char *fname)
 {
     printf(msg);
     fclose(fdesc);
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
 
     round = actualKernelLen % 4096;
     roundedKernelLen = actualKernelLen;
-    if ( round ) 
+    if ( round )
 	roundedKernelLen += (4096 - round);
 
     printf("actual kernel length rounded up to a 4k multiple = %d\n", roundedKernelLen);
@@ -147,7 +147,7 @@ int main(int argc, char **argv)
     fclose(inputVmlinux);
     /* And flush the written output file */
     fflush(outputVmlinux);
-    
+
     /* fseek to the hvReleaseData pointer */
     fseek(outputVmlinux, ElfHeaderSize + 0x24, SEEK_SET);
     if (fread(&hvReleaseData, 4, 1, outputVmlinux) != 1) {
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
     }
     hvReleaseData = ntohl(hvReleaseData); /* Convert to native int */
     printf("hvReleaseData is at %08x\n", hvReleaseData);
-    
+
     /* fseek to the hvReleaseData */
     fseek(outputVmlinux, ElfHeaderSize + hvReleaseData, SEEK_SET);
     if (fread(inbuf, 0x40, 1, outputVmlinux) != 1) {
@@ -164,11 +164,11 @@ int main(int argc, char **argv)
     /* Check hvReleaseData sanity */
     if (memcmp(inbuf, &eyeCatcher, 4) != 0) {
         death("hvReleaseData is invalid\n", outputVmlinux, argv[3]);
-    }    
+    }
     /* Get the naca pointer */
     naca = ntohl(*((u_int32_t *) &inbuf[0x0c])) - KERNELBASE;
     printf("naca is at %08x\n", naca);
-    
+
     /* fseek to the naca */
     fseek(outputVmlinux, ElfHeaderSize + naca, SEEK_SET);
     if (fread(inbuf, 0x18, 1, outputVmlinux) != 1) {
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
     /* Fill in the values */
     *((u_int32_t *) &inbuf[0x0c]) = htonl(ramStartOffs);
     *((u_int32_t *) &inbuf[0x14]) = htonl(ramPages);
-    
+
     /* Write out the new naca */
     fflush(outputVmlinux);
     fseek(outputVmlinux, ElfHeaderSize + naca, SEEK_SET);
@@ -192,12 +192,12 @@ int main(int argc, char **argv)
     }
     printf("RAM Disk of 0x%x pages size is attached to the kernel at offset 0x%08x\n",
             ramPages, ramStartOffs);
-    
+
     /* Done */
     fclose(outputVmlinux);
     /* Set permission to executable */
     chmod(argv[3], S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);
-    
+
     return 0;
 }
 

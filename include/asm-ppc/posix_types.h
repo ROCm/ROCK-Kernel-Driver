@@ -7,7 +7,6 @@
  * assume GCC is being used.
  */
 
-typedef unsigned int	__kernel_dev_t;
 typedef unsigned long	__kernel_ino_t;
 typedef unsigned int	__kernel_mode_t;
 typedef unsigned short	__kernel_nlink_t;
@@ -75,7 +74,7 @@ static __inline__ void __FD_CLR(unsigned long fd, __kernel_fd_set *fdsetp)
 
 #undef __FD_ISSET
 static __inline__ int __FD_ISSET(unsigned long fd, __kernel_fd_set *p)
-{ 
+{
 	unsigned long _tmp = fd / __NFDBITS;
 	unsigned long _rem = fd % __NFDBITS;
 	return (p->fds_bits[_tmp] & (1UL<<_rem)) != 0;

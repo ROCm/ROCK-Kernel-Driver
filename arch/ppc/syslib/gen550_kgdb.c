@@ -7,7 +7,7 @@
  * port(s) to be used can be accomplished by setting
  * ppc_md.early_serial_map to a platform-specific mapping function.
  *
- * Adapted from ppc4xx_kgdb.c. 
+ * Adapted from ppc4xx_kgdb.c.
  *
  * Author: Matt Porter <mporter@mvista.com>
  *
