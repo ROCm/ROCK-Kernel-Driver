@@ -296,13 +296,13 @@ static int usblp_check_status(struct usblp *usblp, int err)
 	}
 
 	status = *usblp->statusbuf;
-	if (~status & LP_PERRORP) {
+
+	if (~status & LP_PERRORP)
 		newerr = 3;
-		if (status & LP_POUTPA)
-			newerr = 1;
-		if (~status & LP_PSELECD)
-			newerr = 2;
-	}
+	if (status & LP_POUTPA)
+		newerr = 1;
+	if (~status & LP_PSELECD)
+		newerr = 2;
 
 	if (newerr != err)
 		info("usblp%d: %s", usblp->minor, usblp_messages[newerr]);
