@@ -108,7 +108,7 @@ arch_initcall(integrator_init);
 
 #define CM_CTRL	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_CTRL_OFFSET
 
-static spinlock_t cm_lock;
+static spinlock_t cm_lock = SPIN_LOCK_UNLOCKED;
 
 /**
  * cm_control - update the CM_CTRL register.
