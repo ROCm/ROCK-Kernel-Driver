@@ -54,16 +54,10 @@ ENTRY(swsusp_arch_resume)
 	movq	%rax, %cr4;  # turn PGE back on
 
 	movq	pagedir_nosave(%rip), %rdx
-	/* compute the limit */
-	movl	nr_copy_pages(%rip), %eax
-	testl	%eax, %eax
-	jz	done
-	movq	%rdx,%r8
-	movl	$SIZEOF_PBE,%r9d
-	mul		%r9  # with rax, clobbers rdx
-	movq 	%r8, %rdx
-	addq	%r8, %rax
 loop:
+	testq	%rdx, %rdx
+	jz	done
+
 	/* get addresses from the pbe and copy the page */
 	movq	pbe_address(%rdx), %rsi
 	movq	pbe_orig_address(%rdx), %rdi
@@ -72,9 +66,8 @@ loop:
 	movsq
 
 	/* progress to the next pbe */
-	addq	$SIZEOF_PBE, %rdx
-	cmpq	%rax, %rdx
-	jb	loop
+	movq	pbe_next(%rdx), %rdx
+	jmp	loop
 done:
 	movl	$24, %eax
 	movl	%eax, %ds
