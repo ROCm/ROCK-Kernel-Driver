@@ -20,7 +20,8 @@
 #include "ext2.h"
 #include "xattr.h"
 
-static int ext2_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int
+ext2_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 {
 	struct ext2_inode_info *ei = EXT2_I(dentry->d_inode);
 	return vfs_readlink(dentry, buffer, buflen, (char *)ei->i_data);
