@@ -1266,6 +1266,12 @@ static inline u32 file_to_av(struct file *file)
 int inode_security_set_sid(struct inode *inode, u32 sid)
 {
 	struct inode_security_struct *isec = inode->i_security;
+	struct superblock_security_struct *sbsec = inode->i_sb->s_security;
+
+	if (!sbsec->initialized) {
+		/* Defer initialization to selinux_complete_init. */
+		return 0;
+	}
 
 	down(&isec->sem);
 	isec->sclass = inode_mode_to_security_class(inode->i_mode);
