@@ -21,14 +21,14 @@
 /*
  * Pick up VMALLOC_END
  */
-#define ___io(p)		((unsigned long)((p)+IXP2000_PCI_IO_VIRT_BASE))
+#define ___io(p)		((void __iomem *)((p)+IXP2000_PCI_IO_VIRT_BASE))
 
 /*
  * IXP2000 does not do proper byte-lane conversion for PCI addresses,
  * so we need to override standard functions.
  */
-#define alignb(addr)		((addr & ~3) + (3 - (addr & 3)))
-#define alignw(addr)		((addr & ~2) + (2 - (addr & 2)))
+#define alignb(addr)		(((unsigned long)addr & ~3) + (3 - ((unsigned long)addr & 3)))
+#define alignw(addr)		(((unsigned long)addr & ~2) + (2 - ((unsigned long)addr & 2)))
 
 #define outb(v,p)		__raw_writeb(v,alignb(___io(p)))
 #define outw(v,p)		__raw_writew((v),alignw(___io(p)))
