@@ -78,13 +78,21 @@ static force_inline void do_vgettimeofday(struct timeval * tv)
 	do {
 		sequence = read_seqbegin(&__xtime_lock);
 		
-		sync_core();
-		rdtscll(t);
 		sec = __xtime.tv_sec;
 		usec = (__xtime.tv_nsec / 1000) +
-			(__jiffies - __wall_jiffies) * (1000000 / HZ) +
-			(t  - __hpet.last_tsc) * (1000000 / HZ) / __hpet.ticks + __hpet.offset;
+			(__jiffies - __wall_jiffies) * (1000000 / HZ);
 
+		if (__vxtime.mode == VXTIME_TSC) {
+			sync_core();
+			rdtscll(t);
+			usec += ((t - __vxtime.last_tsc) *
+				 __vxtime.tsc_quot) >> 32;
+		} else {
+#if 0
+			usec += ((readl(fix_to_virt(VSYSCALL_HPET) + 0xf0) -
+				  __vxtime.last) * __vxtime.quot) >> 32;
+#endif
+		}
 	} while (read_seqretry(&__xtime_lock, sequence));
 
 	tv->tv_sec = sec + usec / 1000000;

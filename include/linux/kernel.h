@@ -199,7 +199,7 @@ extern void dump_stack(void);
 
 /*
  * Check at compile time that something is of a particular type.
- * Always evaluates to 1 so you may use it easily in conparisons.
+ * Always evaluates to 1 so you may use it easily in comparisons.
  */
 #define typecheck(type,x) \
 ({	type __dummy; \

@@ -12,11 +12,7 @@ config SUPERH
 	  The SuperH is a RISC processor targeted for use in embedded systems
 	  and consumer electronics; it was also used in the Sega Dreamcast
 	  gaming console.  The SuperH port has a home page at
-	  <http://www.sh-linux.org/>.
-
-config MMU
-	bool
-	default y
+	  <http://www.linux-sh.org/>.
 
 config UID16
 	bool
@@ -33,60 +29,18 @@ config GENERIC_ISA_DMA
 	bool
 	default y
 
+config VARIABLE_CLOCK_TICK_RATE
+	bool
+	default y
+
 source "init/Kconfig"
 
 
-menu "Processor type and features"
+menu "System type"
 
 choice
 	prompt "SuperH system type"
-	default SH_GENERIC
-
-config SH_GENERIC
-	bool "Generic"
-	---help---
-	  Select Generic if configuring for a generic SuperH system.
-	  The "generic" option compiles in *all* the possible hardware
-	  support and relies on the sh_mv= kernel commandline option to choose
-	  at runtime which routines to use.  "MV" stands for "machine vector";
-	  each of the machines below is described by a machine vector.
-
-	  Select SolutionEngine if configuring for a Hitachi SH7709
-	  or SH7750/7750S evalutation board.
-
-	  Select Overdrive if configuring for a ST407750 Overdrive board.
-	  More information at
-	  <http://linuxsh.sourceforge.net/docs/7750overdrive.php3>.
-
-	  Select HP620 if configuring for a HP Jornada HP620.
-	  More information (hardware only) at
-	  <http://www.hp.com/jornada/>.
-
-	  Select HP680 if configuring for a HP Jornada HP680.
-	  More information (hardware only) at
-	  <http://www.hp.com/jornada/products/680/>.
-
-	  Select HP690 if configuring for a HP Jornada HP690.
-	  More information (hardware only) at
-	  <http://www.hp.com/jornada/products/680/>.
-
-	  Select CqREEK if configuring for a CqREEK SH7708 or SH7750.
-	  More information at
-	  <http://sources.redhat.com/ecos/hardware.html#SuperH>.
-
-	  Select DMIDA if configuring for a DataMyte 4000 Industrial
-	  Digital Assistant. More information at <http://www.dmida.com/>.
-
-	  Select EC3104 if configuring for a system with an Eclipse
-	  International EC3104 chip, e.g. the Harris AD2000 or Compaq Aero 8000.
-
-	  Select Dreamcast if configuring for a SEGA Dreamcast.
-	  More information at
-	  <http://www.m17n.org/linux-sh/dreamcast/>.  There is a
-	  Dreamcast project is at <http://linuxdc.sourceforge.net/>.
-
-	  Select BareCPU if you know what this means, and it applies
-	  to your system.
+	default SH_UNKNOWN
 
 config SH_SOLUTION_ENGINE
 	bool "SolutionEngine"
@@ -146,6 +100,9 @@ config SH_EC3104
 	  Select EC3104 if configuring for a system with an Eclipse
 	  International EC3104 chip, e.g. the Harris AD2000.
 
+config SH_SATURN
+	bool "Saturn"
+
 config SH_DREAMCAST
 	bool "Dreamcast"
 	help
@@ -162,9 +119,18 @@ config SH_BIGSUR
 
 config SH_SH2000
 	bool "SH2000"
+	help
+	  SH-2000 is a single-board computer based around SH7709A chip
+	  intended for embedded applications.
+	  It has an Ethernet interface (CS8900A), direct connected
+	  Compact Flash socket, three serial ports and PC-104 bus.
+	  More information at <http://sh2000.sh-linux.org>.
 
 config SH_ADX
 	bool "ADX"
+
+config SH_MPC1211
+	bool "MPC1211"
 
 config SH_UNKNOWN
 	bool "BareCPU"
@@ -180,91 +146,31 @@ config SH_UNKNOWN
 
 endchoice
 
-# The SH7750 RTC module is disabled in the Dreamcast
-config SH_RTC
-	bool
-	depends on !SH_DREAMCAST
+config MMU
+        bool "Support for memory management hardware"
+	depends on !CPU_SH2
 	default y
 	help
-	  Selecting this option will allow the Linux kernel to emulate
-	  PC's RTC.
+	  Early SH processors (such as the SH7604) lack an MMU. In order to
+	  boot on these systems, this option must not be set.
 
-	  If unsure, say N.
+	  On other systems (such as the SH-3 and 4) where an MMU exists,
+	  turning this off will boot the kernel on these machines with the
+	  MMU implicitly switched off.
 
-config SH_HP600
-	bool
-	depends on SH_HP620 || SH_HP680 || SH_HP690
-	default y
+config CMDLINE_BOOL
+	bool "Default bootloader kernel arguments"
 
-choice
-	prompt "Processor type"
-	default CPU_SUBTYPE_SH7708
-
-config CPU_SUBTYPE_SH7707
-	bool "SH7707"
-	---help---
-	  Select the type of SuperH processor you have. This information is
-	  used for optimizing and configuration purposes.
-
-	  Select SH7707 if you have a  60 Mhz SH-3 HD6417707 CPU.
-
-	  Select SH7708 if you have a  60 Mhz SH-3 HD6417708S or
-	  if you have a 100 Mhz SH-3 HD6417708R CPU.
-
-	  Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
-
-	  Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
-
-	  Select SH7751 if you have a SH7751
-
-	  Select ST40STB1 if you have a ST40STB1
-
-config CPU_SUBTYPE_SH7708
-	bool "SH7708"
-	help
-	  Select SH7708 if you have a  60 Mhz SH-3 HD6417708S or
-	  if you have a 100 Mhz SH-3 HD6417708R CPU.
-
-config CPU_SUBTYPE_SH7709
-	bool "SH7709"
-	help
-	  Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
-
-config CPU_SUBTYPE_SH7750
-	bool "SH7750"
-	help
-	  Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
-
-config CPU_SUBTYPE_SH7751
-	bool "SH7751"
-
-config CPU_SUBTYPE_ST40STB1
-	bool "ST40STB1"
-
-endchoice
-
-config CPU_SH3
-	bool
-	depends on CPU_SUBTYPE_SH7709 || CPU_SUBTYPE_SH7708 || CPU_SUBTYPE_SH7707
-	default y
-
-config CPU_SH4
-	bool
-	depends on CPU_SUBTYPE_ST40STB1 || CPU_SUBTYPE_SH7751 || CPU_SUBTYPE_SH7750
-	default y
-
-config CPU_LITTLE_ENDIAN
-	bool "Little Endian"
-	help
-	  Some MIPS machines can be configured for either little or big endian
-	  byte order. These modes require different kernels. Say Y if your
-	  machine is little endian, N if it's a big endian machine.
+config CMDLINE
+	string "Initial kernel command string"
+	depends on CMDLINE_BOOL
+	default "console=ttySC1,115200"
 
 # Platform-specific memory start and size definitions
 config MEMORY_START
-	hex "Physical memory start address" if !MEMORY_SET
-	default "08000000" if !MEMORY_SET || SH_ADX || CPU_SUBTYPE_ST40STB1 && ST40_LMI_MEMORY
-	default "0c000000" if SH_HP600 || SH_BIGSUR || SH_DREAMCAST || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE
+	hex "Physical memory start address" if !MEMORY_SET || MEMORY_OVERRIDE
+	default "08000000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || SH_MPC1211
+	default "0c000000" if !MEMORY_OVERRIDE && (SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE)
 	---help---
 	  Computers built with Hitachi SuperH processors always
 	  map the ROM starting at address zero.  But the processor
@@ -280,10 +186,12 @@ config MEMORY_START
 	  value on any of the known systems will only lead to disaster.
 
 config MEMORY_SIZE
-	hex "Physical memory size" if !MEMORY_SET
-	default "00400000" if !MEMORY_SET || SH_ADX || CPU_SUBTYPE_ST40STB1 && ST40_LMI_MEMORY || SH_HP600 || SH_BIGSUR || SH_DREAMCAST || SH_SH2000
-	default "04000000" if SH_7751_SOLUTION_ENGINE
-	default "02000000" if SH_SOLUTION_ENGINE
+	hex "Physical memory size" if !MEMORY_SET || MEMORY_OVERRIDE
+	default "00400000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || !MEMORY_OVERRIDE && (SH_HP600 || SH_BIGSUR || SH_SH2000)
+	default "01000000" if !MEMORY_OVERRIDE && SH_DREAMCAST
+	default "04000000" if !MEMORY_OVERRIDE && SH_7751_SOLUTION_ENGINE
+	default "02000000" if !MEMORY_OVERRIDE && SH_SOLUTION_ENGINE
+	default "08000000" if SH_MPC1211
 	help
 	  This sets the default memory size assumed by your SH kernel. It can
 	  be overridden as normal by the 'mem=' argument on the kernel command
@@ -293,7 +201,7 @@ config MEMORY_SIZE
 
 config MEMORY_SET
 	bool
-	depends on SH_ADX || CPU_SUBTYPE_ST40STB1 && ST40_LMI_MEMORY || SH_HP600 || SH_BIGSUR || SH_DREAMCAST || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE
+	depends on !MEMORY_OVERRIDE && (SH_MPC1211 || SH_ADX || SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE)
 	default y
 	help
 	  This is an option about which you will never be asked a question.
@@ -301,68 +209,14 @@ config MEMORY_SET
 
 	  There is a grue here.
 
-config ST40_LMI_MEMORY
-	bool "Memory on LMI"
-	depends on CPU_SUBTYPE_ST40STB1
-
 # If none of the above have set memory start/size, ask the user.
-endmenu
-
-config DISCONTIGMEM
-	bool
-	depends on SH_HP690
-	default y
-	help
-	  Say Y to upport efficient handling of discontiguous physical memory,
-	  for architectures which are either NUMA (Non-Uniform Memory Access)
-	  or have huge holes in the physical address space for other reasons.
-	  See <file:Documentation/vm/numa> for more.
-
-
-menu "General setup"
-
-# Even on SuperH devices which don't have an ISA bus,
-# this variable helps the PCMCIA modules handle
-# IRQ requesting properly -- Greg Banks.
-config ISA
-	bool
-	default y
-	help
-	  Find out whether you have ISA slots on your motherboard.  ISA is the
-	  name of a bus system, i.e. the way the CPU talks to the other stuff
-	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
-	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
-	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
-
-config EISA
-	bool
-	---help---
-	  The Extended Industry Standard Architecture (EISA) bus was
-	  developed as an open alternative to the IBM MicroChannel bus.
-
-	  The EISA bus provided some of the features of the IBM MicroChannel
-	  bus while maintaining backward compatibility with cards made for
-	  the older ISA bus.  The EISA bus saw limited use between 1988 and
-	  1995 when it was made obsolete by the PCI bus.
-
-	  Say Y here if you are building a kernel for an EISA-based machine.
-
-	  Otherwise, say N.
-
-config MCA
-	bool
-	help
-	  MicroChannel Architecture is found in some IBM PS/2 machines and
-	  laptops.  It is a bus system similar to PCI or ISA. See
-	  <file:Documentation/mca.txt> (and especially the web page given
-	  there) before attempting to build an MCA bus kernel.
-
-config SBUS
-	bool
-
+config MEMORY_OVERRIDE
+	bool "Override default load address and memory size"
+	
+# XXX: break these out into the board-specific configs below
 config CF_ENABLER
 	bool "Compact Flash Enabler support"
-	depends on SH_GENERIC || SH_SOLUTION_ENGINE || SH_UNKNOWN || SH_CAT68701 || SH_ADX
+	depends on SH_ADX || SH_SOLUTION_ENGINE || SH_UNKNOWN || SH_CAT68701
 	---help---
 	  Compact Flash is a small, removable mass storage device introduced
 	  in 1994 originally as a PCMCIA device.  If you say `Y' here, you
@@ -403,8 +257,276 @@ config CF_BASE_ADDR
 	default "b8000000" if CF_AREA6
 	default "b4000000" if CF_AREA5
 
+endmenu
+
+# The SH7750 RTC module is disabled in the Dreamcast
+config SH_RTC
+	bool
+	depends on !SH_DREAMCAST
+	default y
+	help
+	  Selecting this option will allow the Linux kernel to emulate
+	  PC's RTC.
+
+	  If unsure, say N.
+
+# This is also board-specific
+config PCI_AUTO
+	bool
+
+config SH_HP600
+	bool
+	depends on SH_HP620 || SH_HP680 || SH_HP690
+	default y
+
+config DISCONTIGMEM
+	bool
+	depends on SH_HP690
+	default y
+	help
+	  Say Y to upport efficient handling of discontiguous physical memory,
+	  for architectures which are either NUMA (Non-Uniform Memory Access)
+	  or have huge holes in the physical address space for other reasons.
+	  See <file:Documentation/vm/numa> for more.
+
+
+menu "Processor type and features"
+
+#
+# Ick, get rid of all this CPU_SUBTYPE nonsense. Just probe it, fill in
+# cpu_data, and leave it alone. (Feasible for SH-4 at least, and some
+# SH-3). ++paulm
+#
+choice
+	prompt "Processor type"
+	default CPU_SUBTYPE_SH7708
+
+config CPU_SUBTYPE_SH7604
+	bool "SH7604"
+	help
+	  Select SH7604 if you have SH7604
+
+config CPU_SUBTYPE_SH7707
+	bool "SH7707"
+	---help---
+	  Select the type of SuperH processor you have. This information is
+	  used for optimizing and configuration purposes.
+
+          Select SH7604 if you have a SH-2 CPU.
+
+	  Select SH7707 if you have a  60 Mhz SH-3 HD6417707 CPU.
+
+	  Select SH7708 if you have a  60 Mhz SH-3 HD6417708S or
+	  if you have a 100 Mhz SH-3 HD6417708R CPU.
+
+	  Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
+
+	  Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
+
+	  Select SH7751 if you have a SH7751
+
+	  Select ST40STB1 if you have a ST40STB1
+
+config CPU_SUBTYPE_SH7708
+	bool "SH7708"
+	help
+	  Select SH7708 if you have a  60 Mhz SH-3 HD6417708S or
+	  if you have a 100 Mhz SH-3 HD6417708R CPU.
+
+config CPU_SUBTYPE_SH7709
+	bool "SH7709"
+	help
+	  Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
+
+config CPU_SUBTYPE_SH7750
+	bool "SH7750"
+	help
+	  Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
+
+config CPU_SUBTYPE_SH7751
+	bool "SH7751"
+	help
+	  Select SH7750 if you have a 166 Mhz SH-4 HD6417751 CPU.
+
+config CPU_SUBTYPE_ST40STB1
+	bool "ST40STB1"
+	help
+	  Select ST40STB1 if you have a ST40STB1 CPU.
+
+endchoice
+
+config CPU_SH2
+	bool
+	depends on CPU_SUBTYPE_SH7604
+	default y
+
+config CPU_SH3
+	bool
+	depends on !CPU_SH2 && (CPU_SUBTYPE_SH7707 || CPU_SUBTYPE_SH7708 || CPU_SUBTYPE_SH7709)
+	default y
+
+config CPU_SH4
+	bool
+	depends on !CPU_SH3 && !CPU_SH2 && (CPU_SUBTYPE_SH7750 || CPU_SUBTYPE_SH7751 || CPU_SUBTYPE_ST40STB1)
+	default y
+
+config ZERO_PAGE_OFFSET
+	hex "Zero page offset"
+	default "00001000" if !SH_MPC1211
+	default "00004000" if SH_MPC1211
+	help
+	  This sets the default offset of zero page.
+
+# XXX: needs to lose subtype for system type
+config ST40_LMI_MEMORY
+	bool "Memory on LMI"
+	depends on CPU_SUBTYPE_ST40STB1
+
+config MEMORY_START
+	hex
+	depends on CPU_SUBTYPE_ST40STB1 && ST40_LMI_MEMORY
+	default "08000000"
+
+config MEMORY_SIZE
+	hex
+	depends on CPU_SUBTYPE_ST40STB1 && ST40_LMI_MEMORY
+	default "00400000"
+
+config MEMORY_SET
+	bool
+	depends on CPU_SUBTYPE_ST40STB1 && ST40_LMI_MEMORY
+	default y
+
+config CPU_LITTLE_ENDIAN
+	bool "Little Endian"
+	help
+	  Some SuperH machines can be configured for either little or big
+	  endian byte order. These modes require different kernels. Say Y if
+	  your machine is little endian, N if it's a big endian machine.
+
+config PREEMPT
+	bool "Preemptible Kernel (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+
+config UBC_WAKEUP
+	bool "Wakeup UBC on startup"
+	help
+	  Selecting this option will wakeup the User Break Controller (UBC) on
+	  startup. Although the UBC is left in an awake state when the processor
+	  comes up, some boot loaders misbehave by putting the UBC to sleep in a
+	  power saving state, which causes issues with things like ptrace().
+
+	  If unsure, say N.
+
+config SH_WRITETHROUGH
+	bool "Use write-through caching"
+	default y if CPU_SH2
+	help
+	  Selecting this option will configure the caches in write-through
+	  mode, as opposed to the default write-back configuration.
+
+	  Since there's sill some aliasing issues on SH-4, this option will
+	  unfortunately still require the majority of flushing functions to
+	  be implemented to deal with aliasing.
+
+	  If unsure, say N.
+
+config SH_OCRAM
+	bool "Operand Cache RAM (OCRAM) support"
+	help
+	  Selecting this option will automatically tear down the number of
+	  sets in the dcache by half, which in turn exposes a memory range.
+
+	  The addresses for the OC RAM base will vary according to the
+	  processor version. Consult vendor documentation for specifics.
+
+	  If unsure, say N.
+
+config SMP
+	bool "Symmetric multi-processing support"
+	---help---
+	  This enables support for systems with more than one CPU. If you have
+	  a system with only one CPU, like most personal computers, say N. If
+	  you have a system with more than one CPU, say Y.
+
+	  If you say N here, the kernel will run on single and multiprocessor
+	  machines, but will use only one CPU of a multiprocessor machine. If
+	  you say Y here, the kernel will run on many, but not all,
+	  singleprocessor machines. On a singleprocessor machine, the kernel
+	  will run faster if you say N here.
+
+	  People using multiprocessor machines who say Y here should also say
+	  Y to "Enhanced Real Time Clock Support", below.
+
+	  See also the <file:Documentation/smp.tex>,
+	  <file:Documentation/smp.txt>, <file:Documentation/nmi_watchdog.txt>
+	  and the SMP-HOWTO available at
+	  <http://www.tldp.org/docs.html#howto>.
+
+	  If you don't know what to do here, say N.
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-32)"
+	depends on SMP
+	default "2"
+	help
+	  This allows you to specify the maximum number of CPUs which this
+	  kernel will support.  The maximum supported value is 32 and the
+	  minimum value which makes sense is 2.
+
+	  This is purely to save memory - each supported CPU adds
+	  approximately eight kilobytes to the kernel image.
+
+config SH_DMA
+	bool "DMA controller (DMAC) support"
+	help
+	  Selecting this option will provide same API as PC's Direct Memory
+	  Access Controller(8237A) for SuperH DMAC.
+
+	  If unsure, say N.
+
+config CPU_FREQ
+	bool "CPU Frequency scaling"
+	help
+	  CPU clock scaling allows you to change the clock speed of the
+	  running CPU on the fly.
+
+	  For details, take a look at <file:Documentation/cpufreq>.
+
+	  If unsure, say N.
+
+config CPU_FREQ_TABLE
+	tristate "CPU frequency table helpers"
+	depends on CPU_FREQ
+	default y
+	help
+	  Many cpufreq drivers use these helpers, so only say N here if
+	  the cpufreq driver of your choice doesn't need these helpers.
+
+	  If unsure, say Y.
+
+config SH_CPU_FREQ
+	tristate "SuperH CPU Frequency driver"
+	depends on CPU_FREQ
+	help
+	  This adds the cpufreq driver for SuperH. At present, only
+	  the SH-4 is supported.
+
+	  For details, take a look at <file:Documentation/cpufreq>.
+
+	  If unsure, say N.
+
+source "drivers/cpufreq/Kconfig"
+
+# A board must have defined HD6446X_SERIES in order to see these
+choice
+	prompt "HD6446x options"
+	depends HD6446X_SERIES
+	default HD64461
+
 config HD64461
 	bool "Hitachi HD64461 companion chip support"
+	depends on CPU_SUBTYPE_SH7709
 	---help---
 	  The Hitachi HD64461 provides an interface for
 	  the SH7709 CPU, supporting a LCD controller,
@@ -417,6 +539,24 @@ config HD64461
 	  Say Y if you want support for the HD64461.
 	  Otherwise, say N.
 
+config HD64465
+	bool "Hitachi HD64465 companion chip support"
+	depends on CPU_SUBTYPE_SH7750
+	---help---
+	  The Hitachi HD64465 provides an interface for
+	  the SH7750 CPU, supporting a LCD controller,
+	  CRT color controller, IrDA, USB, PCMCIA,
+	  keyboard controller, and a printer interface.
+
+	  More information is available at
+	  <http://global.hitachi.com/New/cnews/E/1998/981019B.html>.
+
+	  Say Y if you want support for the HD64465.
+	  Otherwise, say N.
+
+endchoice
+
+# These will also be split into the Kconfig's below
 config HD64461_IRQ
 	int "HD64461 IRQ"
 	depends on HD64461
@@ -434,19 +574,6 @@ config HD64461_ENABLER
 	  via the HD64461 companion chip.
 	  Otherwise, say N.
 
-config HD64465
-	bool "Hitachi HD64465 companion chip support"
-	---help---
-	  The Hitachi HD64465 provides an interface for
-	  the SH7750 CPU, supporting a LCD controller,
-	  CRT color controller, IrDA, USB, PCMCIA,
-	  keyboard controller, and a printer interface.
-
-	  More information is available at
-	  <http://global.hitachi.com/New/cnews/E/1998/981019B.html>.
-
-	  Say Y if you want support for the HD64465.
-	  Otherwise, say N.
 
 config HD64465_IOBASE
 	hex "HD64465 start address"
@@ -466,13 +593,49 @@ config HD64465_IRQ
 
 	  Do not change this unless you know what you are doing.
 
-config SH_DMA
-	bool "DMA controller (DMAC) support"
-	help
-	  Selecting this option will provide same API as PC's Direct Memory
-	  Access Controller(8237A) for SuperH DMAC.
+endmenu
 
-	  If unsure, say N.
+
+menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
+
+# Even on SuperH devices which don't have an ISA bus,
+# this variable helps the PCMCIA modules handle
+# IRQ requesting properly -- Greg Banks.
+config ISA
+	bool
+	default y
+	help
+	  Find out whether you have ISA slots on your motherboard.  ISA is the
+	  name of a bus system, i.e. the way the CPU talks to the other stuff
+	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+config EISA
+	bool
+	---help---
+	  The Extended Industry Standard Architecture (EISA) bus was
+	  developed as an open alternative to the IBM MicroChannel bus.
+
+	  The EISA bus provided some of the features of the IBM MicroChannel
+	  bus while maintaining backward compatibility with cards made for
+	  the older ISA bus.  The EISA bus saw limited use between 1988 and
+	  1995 when it was made obsolete by the PCI bus.
+
+	  Say Y here if you are building a kernel for an EISA-based machine.
+
+	  Otherwise, say N.
+
+config MCA
+	bool
+	help
+	  MicroChannel Architecture is found in some IBM PS/2 machines and
+	  laptops.  It is a bus system similar to PCI or ISA. See
+	  <file:Documentation/mca.txt> (and especially the web page given
+	  there) before attempting to build an MCA bus kernel.
+
+config SBUS
+	bool
 
 config PCI
 	bool "PCI support"
@@ -559,6 +722,13 @@ config HOTPLUG
 
 source "drivers/pcmcia/Kconfig"
 
+source "drivers/hotplug/Kconfig"
+
+endmenu
+
+
+menu "Executable file formats"
+
 choice
 	prompt "Kernel core (/proc/kcore) format"
 	depends on PROC_FS
@@ -622,6 +792,9 @@ config BINFMT_ELF
 	  will be called binfmt_elf. Saying M or N here is dangerous because
 	  some crucial programs on your system might be in ELF format.
 
+config BINFMT_FLAT
+	tristate "Kernel support for FLAT binaries"
+
 config BINFMT_MISC
 	tristate "Kernel support for MISC binaries"
 	---help---
@@ -647,15 +820,13 @@ config BINFMT_MISC
 	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
-source "drivers/parport/Kconfig"
-
 endmenu
 
 source "drivers/mtd/Kconfig"
 
-source "drivers/block/Kconfig"
+source "drivers/parport/Kconfig"
 
-source "drivers/md/Kconfig"
+source "drivers/block/Kconfig"
 
 
 menu "ATA/ATAPI/MFM/RLL support"
@@ -711,10 +882,10 @@ source "drivers/ide/Kconfig"
 endmenu
 
 
-menu "SCSI support"
+menu "SCSI device support"
 
 config SCSI
-	tristate "SCSI support"
+	tristate "SCSI device support"
 	---help---
 	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
 	  any other SCSI device under Linux, say Y and make sure that you know
@@ -737,9 +908,6 @@ source "drivers/scsi/Kconfig"
 
 endmenu
 
-source "drivers/ieee1394/Kconfig"
-
-source "net/Kconfig"
 
 menu "Old CD-ROM drivers (not SCSI, not IDE)"
 
@@ -776,8 +944,22 @@ source "drivers/cdrom/Kconfig"
 
 endmenu
 
+source "drivers/md/Kconfig"
+
+source "drivers/ieee1394/Kconfig"
+
+source "net/Kconfig"
+
+source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+source "drivers/telephony/Kconfig"
+
 #
-# input before char - char/joystick depends on it. As does USB.
+# input - input/joystick depends on it. As does USB.
 #
 source "drivers/input/Kconfig"
 
@@ -836,6 +1018,11 @@ config VT_CONSOLE
 	  loadlin) about how to pass options to the kernel at boot time.)
 
 	  If unsure, say Y.
+
+config HW_CONSOLE
+	bool
+	depends on VT && !S390 && !UM
+	default y
 
 config SERIAL
 	tristate "Serial (8250, 16450, 16550 or compatible) support"
@@ -948,7 +1135,7 @@ config UNIX98_PTY_COUNT
 
 config HEARTBEAT
 	bool "Heartbeat LED"
-	depends on SH_GENERIC || SH_CAT68701 || SH_STB1_HARP || SH_STB1_OVERDRIVE || SH_BIGSUR || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE
+	depends on SH_MPC1211 || SH_CAT68701 || SH_STB1_HARP || SH_STB1_OVERDRIVE || SH_BIGSUR || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE
 	help
 	  Use the power-on LED on your machine as a load meter.  The exact
 	  behavior is platform-dependent, but normally the flash frequency is
@@ -971,7 +1158,6 @@ comment "Input core support is required for Maple input peripherals"
 
 endmenu
 
-#source drivers/char/joystick/Config.in
 config PRINTER
 	tristate "Parallel printer support"
 	depends on PARPORT
@@ -1095,12 +1281,18 @@ config WATCHDOG_NOWAYOUT
 	  it has been started.
 
 config SH_WDT
-	tristate "SH 3/4 Watchdog"
+	tristate "SuperH Watchdog"
 	depends on WATCHDOG
 	help
 	  This driver adds watchdog support for the integrated watchdog in the
-	  SuperH 3 and 4 processors. If you have one of these processors, say Y,
-	  otherwise say N.
+	  SuperH processors. If you have one of these processors and wish
+	  to have watchdog support enabled, say Y, otherwise say N.
+
+	  As a side note, saying Y here will automatically boost HZ to 1000
+	  so that the timer has a chance to clear the overflow counter. On
+	  slower systems (such as the SH-2 and SH-3) this will likely yield
+	  some performance issues. As such, the WDT should be avoided here
+	  unless it is absolutely necessary.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -1138,6 +1330,10 @@ config RTC
 
 source "drivers/char/pcmcia/Kconfig"
 
+source "drivers/serial/Kconfig"
+
+source "drivers/i2c/Kconfig"
+ 
 endmenu
 
 source "fs/Kconfig"
@@ -1182,6 +1378,10 @@ source "sound/Kconfig"
 
 endmenu
 
+source "drivers/usb/Kconfig"
+
+source "net/bluetooth/Kconfig"
+
 
 menu "Kernel hacking"
 
@@ -1197,6 +1397,14 @@ config MAGIC_SYSRQ
 	  send a BREAK and then within 5 seconds a command keypress. The
 	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
 	  unless you really know what this hack does.
+
+config DEBUG_SPINLOCK
+	bool "Spinlock debugging"
+	help
+	  Say Y here and build SMP to catch missing spinlock initialization
+	  and certain other kinds of spinlock errors commonly made.  This is
+	  best used in conjunction with the NMI watchdog so that spinlock
+	  deadlocks are also debuggable.
 
 config SH_STANDARD_BIOS
 	bool "Use LinuxSH standard BIOS"

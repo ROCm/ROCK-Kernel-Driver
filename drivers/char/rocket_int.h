@@ -2,26 +2,7 @@
  * rocket_int.h --- internal header file for rocket.c
  *
  * Written by Theodore Ts'o, Copyright 1997.
- *
- * Copyright 1994, 1997, 2003 Comtrol Corporation.    All Rights Reserved.
- * 
- * The following source code is subject to Comtrol Corporation's
- * Developer's License Agreement.
- * 
- * This source code is protected by United States copyright law and 
- * international copyright treaties.
- * 
- * This source code may only be used to develop software products that
- * will operate with Comtrol brand hardware.
- * 
- * You may not reproduce nor distribute this source code in its original
- * form but must produce a derivative work which includes portions of
- * this source code only.
- * 
- * The portions of this source code which you use in your derivative
- * work must bear Comtrol's copyright notice:
- * 
- * 		Copyright 1994 Comtrol Corporation.
+ * Copyright 1997 Comtrol Corporation.  
  * 
  */
 
@@ -98,17 +79,9 @@ static inline unsigned short sInW(unsigned short port)
 #define sInW(a) (inw_p(a))
 #endif				/* ROCKET_DEBUG_IO */
 
-/* This is used to move arrays of bytes so byte swapping isn't
- * appropriate.  On Linux 2.3 and above outsw is the same as
- * outsw_ns, but we use the old form for compatibility with
- * old kernels. */
-#if  defined(__BIG_ENDIAN) && (LINUX_VERSION_CODE < VERSION_CODE(2,3,0))
-#define sOutStrW(port, addr, count) if (count) outsw_ns(port, addr, count)
-#define sInStrW(port, addr, count) if (count) insw_ns(port, addr, count)
-#else
+/* This is used to move arrays of bytes so byte swapping isn't appropriate. */
 #define sOutStrW(port, addr, count) if (count) outsw(port, addr, count)
 #define sInStrW(port, addr, count) if (count) insw(port, addr, count)
-#endif
 
 #define CTL_SIZE 8
 #define AIOP_CTL_SIZE 4
@@ -1318,11 +1291,7 @@ struct r_port {
 /* Compact PCI device */ 
 #define PCI_DEVICE_ID_CRP16INTF		0x0903	/* Rocketport Compact PCI 16 port w/external I/F */
 
-/*  Taking care of some kernel incompatibilities... */
-#if LINUX_VERSION_CODE > VERSION_CODE(2,5,68)
-
 #define TTY_GET_LINE(t) t->index
-
 #define TTY_DRIVER_MINOR_START(t) t->driver->minor_start
 #define TTY_DRIVER_SUBTYPE(t) t->driver->subtype
 #define TTY_DRIVER_NAME(t) t->driver->name
@@ -1330,15 +1299,4 @@ struct r_port {
 #define TTY_DRIVER_FLUSH_BUFFER_EXISTS(t) t->driver->flush_buffer
 #define TTY_DRIVER_FLUSH_BUFFER(t) t->driver->flush_buffer(t)
 
-#else
 
-#define TTY_GET_LINE(t) minor(t->device) - TTY_DRIVER_MINOR_START(t)
-
-#define TTY_DRIVER_MINOR_START(t) t->driver.minor_start
-#define TTY_DRIVER_SUBTYPE(t) t->driver.subtype
-#define TTY_DRIVER_NAME(t) t->driver.name
-#define TTY_DRIVER_NAME_BASE(t) t->driver.name_base
-#define TTY_DRIVER_FLUSH_BUFFER_EXISTS(t) t->driver.flush_buffer
-#define TTY_DRIVER_FLUSH_BUFFER(t) t->driver.flush_buffer(t)
-
-#endif

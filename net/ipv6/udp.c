@@ -584,7 +584,7 @@ static struct sock *udp_v6_mcast_next(struct sock *sk,
 	for (; s; s = s->sk_next) {
 		struct inet_opt *inet = inet_sk(s);
 
-		if (inet->num == num && sk->sk_family == PF_INET6) {
+		if (inet->num == num && s->sk_family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(s);
 			if (inet->dport) {
 				if (inet->dport != rmt_port)

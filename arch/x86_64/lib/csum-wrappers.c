@@ -1,4 +1,4 @@
-/* Copyright 2002 Andi Kleen, SuSE Labs.
+/* Copyright 2002,2003 Andi Kleen, SuSE Labs.
  * Subject to the GNU Public License v.2
  * 
  * Wrappers of assembly checksum functions for x86-64.
@@ -6,18 +6,6 @@
 
 #include <asm/checksum.h>
 #include <linux/module.h>
-
-/* Better way for this sought */
-static inline unsigned from64to32(unsigned long x)
-{
-	/* add up 32-bit words for 33 bits */
-        x = (x & 0xffffffff) + (x >> 32);
-        /* add up 16-bit and 17-bit words for 17+c bits */
-        x = (x & 0xffff) + (x >> 16);
-        /* add up 16-bit and 2-bit for 16+c bit */
-        x = (x & 0xffff) + (x >> 16);
-        return x;
-}
 
 /** 
  * csum_partial_copy_from_user - Copy and checksum from user space. 
@@ -36,14 +24,32 @@ csum_partial_copy_from_user(const char *src, char *dst,
 { 
 	*errp = 0;
 	if (likely(access_ok(VERIFY_READ,src, len))) { 
-		unsigned long sum; 
-		sum = csum_partial_copy_generic(src,dst,len,isum,errp,NULL);
+		/* Why 6, not 7? To handle odd addresses aligned we
+		   would need to do considerable complications to fix the
+		   checksum which is defined as an 16bit accumulator. The
+		   fix alignment code is primarily for performance
+		   compatibility with 32bit and that will handle odd
+		   addresses slowly too. */
+		if (unlikely((unsigned long)src & 6)) {			
+			while (((unsigned long)src & 6) && len >= 2) { 
+				__u16 val16;			
+				*errp = __get_user(val16, (__u16 *)src); 
+				if (*errp)
+					return isum;
+				*(__u16 *)dst = val16;
+				isum = add32_with_carry(isum, val16); 
+				src += 2; 
+				dst += 2; 
+				len -= 2;
+			}
+		}
+		isum = csum_partial_copy_generic(src,dst,len,isum,errp,NULL);
 		if (likely(*errp == 0)) 
-			return from64to32(sum); 
+			return isum;
 	} 
 	*errp = -EFAULT;
 	memset(dst,0,len); 
-	return 0;		
+	return isum;		
 } 
 
 EXPORT_SYMBOL(csum_partial_copy_from_user);
@@ -67,8 +73,22 @@ csum_partial_copy_to_user(const char *src, char *dst,
 		*errp = -EFAULT;
 		return 0; 
 	}
+
+	if (unlikely((unsigned long)dst & 6)) {
+		while (((unsigned long)dst & 6) && len >= 2) { 
+			__u16 val16 = *(__u16 *)src;
+			isum = add32_with_carry(isum, val16);
+			*errp = __put_user(val16, (__u16 *)dst);
+			if (*errp)
+				return isum;
+			src += 2; 
+			dst += 2; 
+			len -= 2;
+		}
+	}
+
 	*errp = 0;
-	return from64to32(csum_partial_copy_generic(src,dst,len,isum,NULL,errp)); 
+	return csum_partial_copy_generic(src,dst,len,isum,NULL,errp); 
 } 
 
 EXPORT_SYMBOL(csum_partial_copy_to_user);
@@ -85,10 +105,8 @@ EXPORT_SYMBOL(csum_partial_copy_to_user);
 unsigned int 
 csum_partial_copy_nocheck(const char *src, char *dst, int len, unsigned int sum)
 { 
-	return from64to32(csum_partial_copy_generic(src,dst,len,sum,NULL,NULL));
+	return csum_partial_copy_generic(src,dst,len,sum,NULL,NULL);
 } 
-
-//EXPORT_SYMBOL(csum_partial_copy_nocheck);
 
 unsigned short csum_ipv6_magic(struct in6_addr *saddr, struct in6_addr *daddr,
 			       __u32 len, unsigned short proto, unsigned int sum) 
@@ -103,7 +121,7 @@ unsigned short csum_ipv6_magic(struct in6_addr *saddr, struct in6_addr *daddr,
 	    "  adcq $0,%[sum]\n"
 	    : [sum] "=r" (sum64) 
 	    : "[sum]" (rest),[saddr] "r" (saddr), [daddr] "r" (daddr));
-	return csum_fold(from64to32(sum64)); 
+	return csum_fold(add32_with_carry(sum64 & 0xffffffff, sum64>>32));
 }
 
 EXPORT_SYMBOL(csum_ipv6_magic);

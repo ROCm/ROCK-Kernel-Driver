@@ -263,7 +263,7 @@ void show_registers(struct pt_regs *regs)
 		rsp = regs->rsp;
 
 	printk("CPU %d ", cpu);
-	show_regs(regs);
+	__show_regs(regs);
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 		cur->comm, cur->pid, 4096+(unsigned long)cur);
 

@@ -689,15 +689,16 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 
 		vma = find_extend_vma(mm, start);
 
-#ifdef FIXADDR_START
-		if (!vma && start >= FIXADDR_START && start < FIXADDR_TOP) {
+#ifdef FIXADDR_USER_START
+		if (!vma &&
+		    start >= FIXADDR_USER_START && start < FIXADDR_USER_END) {
 			static struct vm_area_struct fixmap_vma = {
 				/* Catch users - if there are any valid
 				   ones, we can make this be "&init_mm" or
 				   something.  */
 				.vm_mm = NULL,
-				.vm_start = FIXADDR_START,
-				.vm_end = FIXADDR_TOP,
+				.vm_start = FIXADDR_USER_START,
+				.vm_end = FIXADDR_USER_END,
 				.vm_page_prot = PAGE_READONLY,
 				.vm_flags = VM_READ | VM_EXEC,
 			};
@@ -705,6 +706,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			pgd_t *pgd;
 			pmd_t *pmd;
 			pte_t *pte;
+			if (write) /* user fixmap pages are read-only */
+				return i ? : -EFAULT;
 			pgd = pgd_offset_k(pg);
 			if (!pgd)
 				return i ? : -EFAULT;
@@ -712,8 +715,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			if (!pmd)
 				return i ? : -EFAULT;
 			pte = pte_offset_kernel(pmd, pg);
-			if (!pte || !pte_present(*pte) || !pte_user(*pte) ||
-			    !(write ? pte_write(*pte) : pte_read(*pte)))
+			if (!pte || !pte_present(*pte))
 				return i ? : -EFAULT;
 			if (pages) {
 				pages[i] = pte_page(*pte);

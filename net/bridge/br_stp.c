@@ -26,7 +26,7 @@ static const char *br_port_state_names[] = {
 void br_log_state(const struct net_bridge_port *p)
 {
 	pr_info("%s: port %d(%s) entering %s state\n",
-		p->br->dev.name, p->port_no, p->dev->name, 
+		p->br->dev->name, p->port_no, p->dev->name, 
 		br_port_state_names[p->state]);
 
 }
@@ -130,7 +130,7 @@ void br_become_root_bridge(struct net_bridge *br)
 	br_topology_change_detection(br);
 	del_timer(&br->tcn_timer);
 
-	if (br->dev.flags & IFF_UP) {
+	if (br->dev->flags & IFF_UP) {
 		br_config_bpdu_generation(br);
 		mod_timer(&br->hello_timer, jiffies + br->hello_time);
 	}
@@ -289,10 +289,10 @@ static inline void br_topology_change_acknowledged(struct net_bridge *br)
 /* called under bridge lock */
 void br_topology_change_detection(struct net_bridge *br)
 {
-	if (!(br->dev.flags & IFF_UP))
+	if (!(br->dev->flags & IFF_UP))
 		return;
 
-	pr_info("%s: topology change detected", br->dev.name);
+	pr_info("%s: topology change detected", br->dev->name);
 	if (br_is_root_bridge(br)) {
 		printk(", propagating");
 		br->topology_change = 1;
@@ -446,7 +446,7 @@ void br_received_tcn_bpdu(struct net_bridge_port *p)
 {
 	if (br_is_designated_port(p)) {
 		pr_info("%s: received tcn bpdu on port %i(%s)\n",
-		       p->br->dev.name, p->port_no, p->dev->name);
+		       p->br->dev->name, p->port_no, p->dev->name);
 
 		br_topology_change_detection(p->br);
 		br_topology_change_acknowledge(p);

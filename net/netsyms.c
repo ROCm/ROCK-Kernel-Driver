@@ -190,6 +190,7 @@ EXPORT_SYMBOL(neigh_app_ns);
 #endif
 #ifdef CONFIG_SYSCTL
 EXPORT_SYMBOL(neigh_sysctl_register);
+EXPORT_SYMBOL(neigh_sysctl_unregister);
 #endif
 EXPORT_SYMBOL(pneigh_lookup);
 EXPORT_SYMBOL(pneigh_enqueue);

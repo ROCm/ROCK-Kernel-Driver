@@ -47,6 +47,7 @@
 #include "open_pic.h"
 #include <asm/machdep.h>
 #include <asm/xics.h>
+#include <asm/cputable.h>
 
 int smp_threads_ready;
 unsigned long cache_decay_ticks;
@@ -583,7 +584,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	paca[cpu].prof_multiplier = 1;
 	paca[cpu].default_decr = tb_ticks_per_jiffy / decr_overclock;
 
-	if (!cpu_has_slb()) {
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_SLB)) {
 		void *tmp;
 
 		/* maximum of 48 CPUs on machines with a segment table */

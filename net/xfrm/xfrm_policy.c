@@ -224,7 +224,7 @@ static void xfrm_policy_gc_kill(struct xfrm_policy *policy)
 		atomic_dec(&policy->refcnt);
 
 	if (atomic_read(&policy->refcnt) > 1)
-		flow_cache_flush(policy);
+		flow_cache_flush();
 
 	xfrm_pol_put(policy);
 }

@@ -10,7 +10,6 @@
  *
  * Errata 5: Processor may fail to execute a FID/VID change in presence of interrupt.
  * - We cli/sti on stepping A0 CPUs around the FID/VID transition.
- * (ADDENDUM: This seems to be needed on more systems, so we do it unconditionally now).
  * Errata 15: Processors with half frequency multipliers may hang upon wakeup from disconnect.
  * - We disable half multipliers if ACPI is used on A0 stepping CPUs.
  */
@@ -260,7 +259,8 @@ static void change_speed (unsigned int index)
 
 	/* Now do the magic poking into the MSRs.  */
 
-	__asm__("\tcli\n");
+	if (have_a0 == 1)	/* A0 errata 5 */
+		__asm__("\tcli\n");
 
 	if (freqs.old > freqs.new) {
 		/* Going down, so change FID first */
@@ -272,7 +272,9 @@ static void change_speed (unsigned int index)
 		change_FID(vid);
 	}
 	
-	__asm__("\tsti\n");
+
+	if (have_a0 == 1)
+		__asm__("\tsti\n");
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 }

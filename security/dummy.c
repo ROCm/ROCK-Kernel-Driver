@@ -308,11 +308,6 @@ static int dummy_inode_permission (struct inode *inode, int mask)
 	return 0;
 }
 
-static int dummy_inode_permission_lite (struct inode *inode, int mask)
-{
-	return 0;
-}
-
 static int dummy_inode_setattr (struct dentry *dentry, struct iattr *iattr)
 {
 	return 0;
@@ -515,11 +510,6 @@ static int dummy_task_prctl (int option, unsigned long arg2, unsigned long arg3,
 			     unsigned long arg4, unsigned long arg5)
 {
 	return 0;
-}
-
-static void dummy_task_kmod_set_label (void)
-{
-	return;
 }
 
 static void dummy_task_reparent_to_init (struct task_struct *p)
@@ -831,7 +821,6 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, inode_readlink);
 	set_to_dummy_if_null(ops, inode_follow_link);
 	set_to_dummy_if_null(ops, inode_permission);
-	set_to_dummy_if_null(ops, inode_permission_lite);
 	set_to_dummy_if_null(ops, inode_setattr);
 	set_to_dummy_if_null(ops, inode_getattr);
 	set_to_dummy_if_null(ops, inode_delete);
@@ -871,7 +860,6 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, task_wait);
 	set_to_dummy_if_null(ops, task_kill);
 	set_to_dummy_if_null(ops, task_prctl);
-	set_to_dummy_if_null(ops, task_kmod_set_label);
 	set_to_dummy_if_null(ops, task_reparent_to_init);
  	set_to_dummy_if_null(ops, task_to_inode);
 	set_to_dummy_if_null(ops, ipc_permission);

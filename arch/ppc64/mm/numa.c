@@ -154,8 +154,28 @@ new_range:
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
-		node_data[numa_domain].node_start_pfn = start / PAGE_SIZE;
-		node_data[numa_domain].node_size = size / PAGE_SIZE;
+		/* 
+		 * For backwards compatibility, OF splits the first node
+		 * into two regions (the first being 0-4GB). Check for
+		 * this simple case and complain if there is a gap in
+		 * memory
+		 */
+		if (node_data[numa_domain].node_size) {
+			unsigned long shouldstart =
+				node_data[numa_domain].node_start_pfn + 
+				node_data[numa_domain].node_size;
+			if (shouldstart != (start / PAGE_SIZE)) {
+				printk(KERN_ERR "Hole in node, disabling "
+						"region start %lx length %lx\n",
+						start, size);
+				continue;
+			}
+			node_data[numa_domain].node_size += size / PAGE_SIZE;
+		} else {
+			node_data[numa_domain].node_start_pfn =
+				start / PAGE_SIZE;
+			node_data[numa_domain].node_size = size / PAGE_SIZE;
+		}
 
 		for (i = start ; i < (start+size); i += MEMORY_INCREMENT)
 			numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] =
@@ -174,6 +194,20 @@ new_range:
 	return 0;
 }
 
+void setup_nonnuma(void)
+{
+	unsigned long i;
+
+	for (i = 0; i < NR_CPUS; i++)
+		map_cpu_to_node(i, 0);
+
+	node_data[0].node_start_pfn = 0;
+	node_data[0].node_size = lmb_end_of_DRAM() / PAGE_SIZE;
+
+	for (i = 0 ; i < lmb_end_of_DRAM(); i += MEMORY_INCREMENT)
+		numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] = 0;
+}
+
 void __init do_init_bootmem(void)
 {
 	int nid;
@@ -181,9 +215,8 @@ void __init do_init_bootmem(void)
 	min_low_pfn = 0;
 	max_low_pfn = lmb_end_of_DRAM() >> PAGE_SHIFT;
 
-	/* XXX FIXME: support machines without associativity information */
 	if (parse_numa_properties())
-		BUG();
+		setup_nonnuma();
 
 	for (nid = 0; nid < numnodes; nid++) {
 		unsigned long start_paddr, end_paddr;
@@ -204,7 +237,7 @@ void __init do_init_bootmem(void)
 
 		NODE_DATA(nid)->bdata = &plat_node_bdata[nid];
 
-		bootmap_pages = bootmem_bootmap_pages(end_paddr - start_paddr);
+		bootmap_pages = bootmem_bootmap_pages((end_paddr - start_paddr) >> PAGE_SHIFT);
 		dbg("bootmap_pages = %lx\n", bootmap_pages);
 
 		bootmem_paddr = lmb_alloc_base(bootmap_pages << PAGE_SHIFT,

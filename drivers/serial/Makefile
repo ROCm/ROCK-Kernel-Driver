@@ -8,6 +8,9 @@ serial-8250-y :=
 serial-8250-$(CONFIG_GSC) += 8250_gsc.o
 serial-8250-$(CONFIG_PCI) += 8250_pci.o
 serial-8250-$(CONFIG_PNP) += 8250_pnp.o
+serial-8250-$(CONFIG_ACPI) += acpi.o
+serial-8250-$(CONFIG_SERIAL_HCDP) += 8250_hcdp.o
+
 obj-$(CONFIG_SERIAL_CORE) += core.o
 obj-$(CONFIG_SERIAL_21285) += 21285.o
 obj-$(CONFIG_SERIAL_8250) += 8250.o $(serial-8250-y)
