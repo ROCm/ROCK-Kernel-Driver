@@ -44,12 +44,6 @@ static inline int is_kernel_text(unsigned long addr)
 	return 0;
 }
 
-/* kdb treats all kernel addresses as valid, including data */
-static inline int is_kernel(unsigned long addr)
-{
-	return (addr >= (unsigned long)_stext && addr <= (unsigned long)_end);
-}
-
 /* Lookup the address for this symbol. Returns 0 if not found. */
 unsigned long kallsyms_lookup_name(const char *name)
 {
