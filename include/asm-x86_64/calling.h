@@ -56,7 +56,7 @@
 	movq  %r10,1*8(%rsp) 
 	CFI_REL_OFFSET	r10,1*8
 	movq  %r11,(%rsp) 
-	CFI_OFFSET	r11
+	CFI_REL_OFFSET	r11,0*8
 	.endif
 	.endm
 
