@@ -220,6 +220,7 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 
 		dma_addr = vio_map_single(adapter->vdev, skb->data, pool->buff_size, DMA_FROM_DEVICE);
 
+               pool->free_map[free_index] = 0xffff;
 		pool->dma_addr[index] = dma_addr;
 		pool->skbuff[index] = skb;
 
@@ -234,6 +235,7 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 		lpar_rc = h_add_logical_lan_buffer(adapter->vdev->unit_address, desc.desc);
 		    
 		if(lpar_rc != H_Success) {
+                       pool->free_map[free_index] = index;
 			pool->skbuff[index] = NULL;
 			pool->consumer_index--;
 			vio_unmap_single(adapter->vdev, pool->dma_addr[index], pool->buff_size, DMA_FROM_DEVICE);
@@ -241,7 +243,6 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 			adapter->replenish_add_buff_failure++;
 			break;
 		} else {
-			pool->free_map[free_index] = 0xffff;
 			buffers_added++;
 			adapter->replenish_add_buff_success++;
 		}
@@ -271,7 +272,6 @@ static void ibmveth_replenish_task(struct ibmveth_adapter *adapter)
 	adapter->rx_no_buffer = *(u64*)(((char*)adapter->buffer_list_addr) + 4096 - 8);
 
 	atomic_inc(&adapter->not_replenishing);
-	ibmveth_assert(atomic_read(&adapter->not_replenishing) == 1);
 }
 
 /* kick the replenish tasklet if we need replenishing and it isn't already running */
