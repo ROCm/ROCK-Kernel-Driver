@@ -1618,7 +1618,6 @@ RME9652_SYNC_PREF("Preferred Sync Source", 0),
 RME9652_SPDIF_RATE("IEC958 Sample Rate", 0),
 RME9652_ADAT_SYNC("ADAT1 Sync Check", 0, 0),
 RME9652_ADAT_SYNC("ADAT2 Sync Check", 0, 1),
-RME9652_ADAT_SYNC("ADAT3 Sync Check", 0, 2),
 RME9652_TC_VALID("Timecode Valid", 0),
 RME9652_PASSTHRU("Passthru", 0)
 };
