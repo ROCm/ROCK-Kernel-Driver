@@ -8,7 +8,7 @@ host/		- This is for all of the USB host drivers.  This
 		  includes UHCI, OHCI, EHCI, and any others that might
 		  be created in the future.
 
-device/		- This is for all of the USB device controller drivers. 
+gadget/		- This is for all of the USB device controller drivers. 
 
 
 Individual USB driver directories.  A new driver should be added to the
@@ -16,7 +16,7 @@ first subdirectory in the list below that it fits into.
 
 image/		- This is for still image drivers, like scanners or
 		  digital cameras.
-input/		- This if for any driver that uses the input subsystem,
+input/		- This is for any driver that uses the input subsystem,
 		  like keyboard, mice, touchscreens, tablets, etc.
 media/		- This is for multimedia drivers, like video cameras,
 		  radios, and any other drivers that talk to the v4l
@@ -29,5 +29,3 @@ class/		- This is for all USB device drivers that do not fit
 		  of USB Class specified devices. 
 misc/		- This is for all USB device drivers that do not fit
 		  into any of the above categories.
-	  
-

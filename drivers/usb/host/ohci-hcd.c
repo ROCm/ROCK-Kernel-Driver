@@ -125,7 +125,7 @@
 
 /*-------------------------------------------------------------------------*/
 
-static const char	hcd_name [] = "ohci-hcd";
+static const char	hcd_name [] = "ohci_hcd";
 
 #include "ohci.h"
 

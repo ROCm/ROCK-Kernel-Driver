@@ -1653,7 +1653,7 @@ static void sppp_init(SLMP_INFO *info)
 	d->tx_timeout = sppp_cb_tx_timeout;
 	d->watchdog_timeo = 10*HZ;
 
-	if (register_netdev(d) == -1) {
+	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(info->netdev);
 		return;

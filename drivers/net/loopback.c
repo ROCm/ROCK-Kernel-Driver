@@ -125,19 +125,7 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct net_device_stats *stats = (struct net_device_stats *)dev->priv;
 
-	/*
-	 *	Optimise so buffers with skb->free=1 are not copied but
-	 *	instead are lobbed from tx queue to rx queue 
-	 */
-
-	if (skb_shared(skb)) {
-	  	struct sk_buff *skb2=skb;
-	  	skb=skb_clone(skb, GFP_ATOMIC);		/* Clone the buffer */
-		kfree_skb(skb2);
-	  	if (unlikely(skb==NULL))
-			return 0;
-	} else
-		skb_orphan(skb);
+	skb_orphan(skb);
 
 	skb->protocol=eth_type_trans(skb,dev);
 	skb->dev=dev;

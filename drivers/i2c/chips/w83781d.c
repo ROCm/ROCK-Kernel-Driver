@@ -1346,6 +1346,10 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		data->lm75[1] = NULL;
 	}
 
+	/* Initialize the chip */
+	w83781d_init_client(new_client);
+
+	/* Register sysfs hooks */
 	device_create_file_in(new_client, 0);
 	if (kind != w83783s && kind != w83697hf)
 		device_create_file_in(new_client, 1);
@@ -1408,8 +1412,6 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 #endif
 
-	/* Initialize the chip */
-	w83781d_init_client(new_client);
 	return 0;
 
 ERROR3:

@@ -701,7 +701,10 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	if ((err = i2c_attach_client(new_client)))
 		goto ERROR1;
 
-	/* register sysfs hooks */
+	/* Initialize the IT87 chip */
+	it87_init_client(new_client, data);
+
+	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_in_input0);
 	device_create_file(&new_client->dev, &dev_attr_in_input1);
 	device_create_file(&new_client->dev, &dev_attr_in_input2);
@@ -750,8 +753,6 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_fan_div3);
 	device_create_file(&new_client->dev, &dev_attr_alarm);
 
-	/* Initialize the IT87 chip */
-	it87_init_client(new_client, data);
 	return 0;
 
 ERROR1:

@@ -76,7 +76,7 @@ static inline struct sk_buff *vlan_check_reorder_header(struct sk_buff *skb)
 	if (VLAN_DEV_INFO(skb->dev)->flags & 1) {
 		if (skb_shared(skb) || skb_cloned(skb)) {
 			struct sk_buff *nskb = skb_copy(skb, GFP_ATOMIC);
-			kfree(skb);
+			kfree_skb(skb);
 			skb = nskb;
 		}
 		if (skb) {
