@@ -78,7 +78,7 @@
 
 static char dev_info[] = "orinoco_tmd";
 
-#define COR_VALUE	(COR_LEVEL_REQ | COR_FUNC_ENA | COR_FUNC_ENA) /* Enable PC card with interrupt in level trigger */
+#define COR_VALUE	(COR_LEVEL_REQ | COR_FUNC_ENA) /* Enable PC card with interrupt in level trigger */
 
 static int orinoco_tmd_init_one(struct pci_dev *pdev,
 				const struct pci_device_id *ent)

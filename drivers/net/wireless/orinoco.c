@@ -813,7 +813,7 @@ static int orinoco_xmit(struct sk_buff *skb, struct net_device *dev)
 			   HERMES_802_3_OFFSET - HERMES_802_11_OFFSET);
 
 	/* Encapsulate Ethernet-II frames */
-	if (ntohs(eh->h_proto) > 1500) { /* Ethernet-II frame */
+	if (ntohs(eh->h_proto) > ETH_DATA_LEN) { /* Ethernet-II frame */
 		struct header_struct hdr;
 		data_len = len;
 		data_off = HERMES_802_3_OFFSET + sizeof(hdr);
