@@ -26,6 +26,9 @@
 static __inline__ int ide_default_irq(unsigned long base)
 {
 	switch (base) {
+#ifdef CONFIG_X86_PC9800
+		case 0x640: return 9;
+#endif
 		case 0x1f0: return 14;
 		case 0x170: return 15;
 		case 0x1e8: return 11;
@@ -40,12 +43,17 @@ static __inline__ int ide_default_irq(unsigned long base)
 static __inline__ unsigned long ide_default_io_base(int index)
 {
 	switch (index) {
+#ifdef CONFIG_X86_PC9800
+		case 0:
+		case 1:	return 0x640;
+#else
 		case 0:	return 0x1f0;
 		case 1:	return 0x170;
 		case 2: return 0x1e8;
 		case 3: return 0x168;
 		case 4: return 0x1e0;
 		case 5: return 0x160;
+#endif
 		default:
 			return 0;
 	}
@@ -56,13 +64,24 @@ static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_por
 {
 	unsigned long reg = data_port;
 	int i;
+#ifdef CONFIG_X86_PC9800
+	unsigned long increment = data_port == 0x640 ? 2 : 1;
+#endif
 
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
 		hw->io_ports[i] = reg;
+#ifdef CONFIG_X86_PC9800
+		reg += increment;
+#else
 		reg += 1;
+#endif
 	}
 	if (ctrl_port) {
 		hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
+#ifdef CONFIG_X86_PC9800
+	} else if (data_port == 0x640) {
+		hw->io_ports[IDE_CONTROL_OFFSET] = 0x74c;
+#endif
 	} else {
 		hw->io_ports[IDE_CONTROL_OFFSET] = hw->io_ports[IDE_DATA_OFFSET] + 0x206;
 	}

@@ -654,7 +654,8 @@ call_transmit(struct rpc_task *task)
 	if (task->tk_status < 0)
 		return;
 	/* Encode here so that rpcsec_gss can use correct sequence number. */
-	call_encode(task);
+	if (!task->tk_rqstp->rq_bytes_sent)
+		call_encode(task);
 	if (task->tk_status < 0)
 		return;
 	xprt_transmit(task);

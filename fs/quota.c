@@ -221,12 +221,17 @@ asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, ca
 	uint cmds, type;
 	struct super_block *sb = NULL;
 	struct block_device *bdev;
+	char *tmp;
 	int ret = -ENODEV;
 
 	cmds = cmd >> SUBCMDSHIFT;
 	type = cmd & SUBCMDMASK;
 
-	bdev = lookup_bdev(special);
+	tmp = getname(special);
+	if (IS_ERR(tmp))
+		return PTR_ERR(tmp);
+	bdev = lookup_bdev(tmp);
+	putname(tmp);
 	if (IS_ERR(bdev))
 		return PTR_ERR(bdev);
 	sb = get_super(bdev);
