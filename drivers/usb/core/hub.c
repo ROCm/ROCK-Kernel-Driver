@@ -2395,7 +2395,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 	if (portstatus & USB_PORT_STAT_SUSPEND) {
 		status = hub_port_resume(hdev, port);
 		if (status < 0)
-			dev_dbg(hub_dev, "can't clear suspend on port %d; %d\n", port+1, retval);
+			dev_dbg(hub_dev, "can't clear suspend on port %d; %d\n", port+1, status);
 	}
 #endif
 
