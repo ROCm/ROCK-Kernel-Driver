@@ -358,8 +358,7 @@ static void
 elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u8 ista,val;
-	int icnt=5;
+	u8 val;
 
 	if (!cs) {
 		printk(KERN_WARNING "Elsa: Spurious interrupt!\n");
@@ -376,44 +375,13 @@ elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 		val = serial_inp(cs, UART_IIR);
 		if (!(val & UART_IIR_NO_INT)) {
 			debugl1(cs,"IIR %02x", val);
+			spin_lock(&cs->lock);
 			rs_interrupt_elsa(intno, cs);
+			spin_unlock(&cs->lock);
 		}
 	}
 #endif
-	ista = ipac_read(cs, IPAC_ISTA);
-Start_IPAC:
-	if (cs->debug & L1_DEB_IPAC)
-		debugl1(cs, "IPAC ISTA %02X", ista);
-	if (ista & 0x0f) {
-		val = hscx_read(cs, 1, HSCX_ISTA);
-		if (ista & 0x01)
-			val |= 0x01;
-		if (ista & 0x04)
-			val |= 0x02;
-		if (ista & 0x08)
-			val |= 0x04;
-		if (val)
-			hscx_int_main(cs, val);
-	}
-	if (ista & 0x20) {
-		val = ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
-		if (val) {
-			isac_interrupt(cs, val);
-		}
-	}
-	if (ista & 0x10) {
-		val = 0x01;
-		isac_interrupt(cs, val);
-	}
-	ista  = ipac_read(cs, IPAC_ISTA);
-	if ((ista & 0x3f) && icnt) {
-		icnt--;
-		goto Start_IPAC;
-	}
-	if (!icnt)
-		printk(KERN_WARNING "ELSA IRQ LOOP\n");
-	ipac_write(cs, IPAC_MASK, 0xFF);
-	ipac_write(cs, IPAC_MASK, 0xC0);
+	ipac_irq(intno, dev_id, regs);
 }
 
 static void
@@ -708,7 +676,6 @@ elsa_aux_ind(struct IsdnCardState *cs, void *arg)
 static void
 elsa_init(struct IsdnCardState *cs)
 {
-	cs->debug |= L1_DEB_IPAC;
 	if (cs->subtyp == ELSA_QS1000 || cs->subtyp == ELSA_QS3000)
 		byteout(cs->hw.elsa.timer, 0);
 
@@ -716,6 +683,15 @@ elsa_init(struct IsdnCardState *cs)
 		byteout(cs->hw.elsa.trig, 0xff);
 
 	inithscxisac(cs);
+}
+
+static void
+elsa_ipac_init(struct IsdnCardState *cs)
+{
+	if (cs->hw.elsa.trig)
+		byteout(cs->hw.elsa.trig, 0xff);
+
+	ipac_init(cs);
 }
 
 static void
@@ -766,7 +742,7 @@ static struct card_ops elsa_ops = {
 };
 
 static struct card_ops elsa_ipac_ops = {
-	.init     = elsa_init,
+	.init     = elsa_ipac_init,
 	.test     = elsa_test,
 	.reset    = elsa_reset,
 	.release  = elsa_release,
@@ -1002,7 +978,6 @@ setup_elsa(struct IsdnCard *card)
 			cs->subtyp = ELSA_PCMCIA_IPAC;
 			cs->hw.elsa.isac = cs->hw.elsa.base + 2;
 			cs->hw.elsa.hscx = cs->hw.elsa.base + 2;
-			test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		} else {
 			cs->subtyp = ELSA_PCMCIA;
 			cs->hw.elsa.ale = cs->hw.elsa.base + ELSA_ALE_PCM;
@@ -1062,7 +1037,6 @@ setup_elsa(struct IsdnCard *card)
 		cs->hw.elsa.ale  = cs->hw.elsa.base;
 		cs->hw.elsa.isac = cs->hw.elsa.base +1;
 		cs->hw.elsa.hscx = cs->hw.elsa.base +1; 
-		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		cs->hw.elsa.timer = 0;
 		cs->hw.elsa.trig  = 0;
 		cs->irq_flags |= SA_SHIRQ;

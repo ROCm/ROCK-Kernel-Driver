@@ -98,57 +98,6 @@ set_ipac_active(struct IsdnCardState *cs, u_int active)
 	ipac_write(cs, IPAC_MASK, active ? 0xc0 : 0xff);
 }
 
-static void
-bkm_a8_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 ista, val, icnt = 5;
-
-	spin_lock(&cs->lock);
-	ista = ipac_read(cs, IPAC_ISTA);
-	if (!(ista & 0x3f)) /* not this IPAC */
-		goto unlock;
-      Start_IPAC:
-	if (cs->debug & L1_DEB_IPAC)
-		debugl1(cs, "IPAC ISTA %02X", ista);
-	if (ista & 0x0f) {
-		val = ipac_bc_read(cs, 1, HSCX_ISTA);
-		if (ista & 0x01)
-			val |= 0x01;
-		if (ista & 0x04)
-			val |= 0x02;
-		if (ista & 0x08)
-			val |= 0x04;
-		if (val) {
-			hscx_int_main(cs, val);
-		}
-	}
-	if (ista & 0x20) {
-		val = ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
-		if (val) {
-			isac_interrupt(cs, val);
-		}
-	}
-	if (ista & 0x10) {
-		val = 0x01;
-		isac_interrupt(cs, val);
-	}
-	ista = ipac_read(cs, IPAC_ISTA);
-	if ((ista & 0x3f) && icnt) {
-		icnt--;
-		goto Start_IPAC;
-	}
-	if (!icnt)
-		printk(KERN_WARNING "HiSax: %s (%s) IRQ LOOP\n",
-		       CardType[cs->typ],
-		       sct_quadro_subtypes[cs->subtyp]);
-	ipac_write(cs, IPAC_MASK, 0xFF);
-	ipac_write(cs, IPAC_MASK, 0xC0);
- unlock:
-	spin_unlock(&cs->lock);
-}
-
-
 void
 release_io_sct_quadro(struct IsdnCardState *cs)
 {
@@ -193,7 +142,7 @@ bkm_a8_init(struct IsdnCardState *cs)
 {
 	cs->debug |= L1_DEB_IPAC;
 	set_ipac_active(cs, 1);
-	inithscxisac(cs);
+	ipac_init(cs);
 	/* Enable ints */
 	enable_bkm_int(cs, 1);
 }
@@ -220,7 +169,7 @@ static struct card_ops bkm_a8_ops = {
 	.init     = bkm_a8_init,
 	.reset    = bkm_a8_reset,
 	.release  = bkm_a8_release,
-	.irq_func = bkm_a8_interrupt,
+	.irq_func = ipac_irq,
 };
 
 int __init
@@ -379,8 +328,6 @@ setup_sct_quadro(struct IsdnCard *card)
 	       cs->hw.ax.base,
 	       cs->hw.ax.data_adr,
 	       cs->irq);
-
-	test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 
 	cs->dc_hw_ops = &ipac_dc_ops;
 	cs->bc_hw_ops = &ipac_bc_ops;

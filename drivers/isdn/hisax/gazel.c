@@ -227,52 +227,6 @@ ipac_writefifo(struct IsdnCardState *cs, u8 off, u8 * data, int size)
 
 BUILD_IPAC_OPS(ipac);
 
-#define MAXCOUNT 5
-  
-static void
-gazel_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 ista, val;
-	int count = 0;
-
-	if (!cs) {
-		printk(KERN_WARNING "Gazel: Spurious interrupt!\n");
-		return;
-	}
-	ista = ipac_read(cs, IPAC_ISTA);
-	do {
-		if (ista & 0x0f) {
-			val = hscx_read(cs, 1, HSCX_ISTA);
-			if (ista & 0x01)
-				val |= 0x01;
-			if (ista & 0x04)
-				val |= 0x02;
-			if (ista & 0x08)
-				val |= 0x04;
-			if (val) {
-				hscx_int_main(cs, val);
-			}
-		}
-		if (ista & 0x20) {
-			val = isac_read(cs, ISAC_ISTA) & 0xfe;
-			if (val) {
-				isac_interrupt(cs, val);
-			}
-		}
-		if (ista & 0x10) {
-			val = 0x01;
-			isac_interrupt(cs, val);
-		}
-		ista = ipac_read(cs, IPAC_ISTA);
-		count++;
-	}
-	while ((ista & 0x3f) && (count < MAXCOUNT));
-
-	ipac_write(cs, IPAC_MASK, 0xFF);
-	ipac_write(cs, IPAC_MASK, 0xC0);
-}
-
 static void
 gazel_release(struct IsdnCardState *cs)
 {
@@ -397,10 +351,10 @@ static struct card_ops gazel_ops = {
 };
 
 static struct card_ops gazel_ipac_ops = {
-	.init     = inithscxisac,
+	.init     = ipac_init,
 	.reset    = gazel_ipac_reset,
 	.release  = gazel_ipac_release,
-	.irq_func = gazel_ipac_interrupt,
+	.irq_func = ipac_irq,
 };
 
 static int
@@ -499,7 +453,6 @@ setup_gazelisa(struct IsdnCard *card, struct IsdnCardState *cs)
 			break;
 		case R742:
 			printk(KERN_INFO "Gazel: Card ISA R742 found\n");
-			test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 			printk(KERN_INFO
 			       "Gazel: config irq:%d ipac:0x%X\n",
 			       cs->irq, cs->hw.gazel.ipac);
@@ -588,7 +541,6 @@ setup_gazelpci(struct IsdnCardState *cs)
 		case PCI_DEVICE_ID_PLX_DJINN_ITOO:
 			printk(KERN_INFO "Gazel: Card PCI R753 found\n");
 			cs->subtyp = R753;
-			test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 			printk(KERN_INFO
 			    "Gazel: config irq:%d ipac:0x%X  cfg:0x%X\n",
 			cs->irq, cs->hw.gazel.ipac, cs->hw.gazel.cfg_reg);

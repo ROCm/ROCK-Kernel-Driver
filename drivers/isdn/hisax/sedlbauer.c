@@ -299,51 +299,6 @@ sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static void
-sedlbauer_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 ista, val, icnt = 5;
-
-	spin_lock(&cs->lock);
-	ista = ipac_read(cs, IPAC_ISTA);
-Start_IPAC:
-	if (cs->debug & L1_DEB_IPAC)
-		debugl1(cs, "IPAC ISTA %02X", ista);
-	if (ista & 0x0f) {
-		val = hscx_read(cs, 1, HSCX_ISTA);
-		if (ista & 0x01)
-			val |= 0x01;
-		if (ista & 0x04)
-			val |= 0x02;
-		if (ista & 0x08)
-			val |= 0x04;
-		if (val)
-			hscx_int_main(cs, val);
-	}
-	if (ista & 0x20) {
-		val = ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
-		if (val) {
-			isac_interrupt(cs, val);
-		}
-	}
-	if (ista & 0x10) {
-		val = 0x01;
-		isac_interrupt(cs, val);
-	}
-	ista  = ipac_read(cs, IPAC_ISTA);
-	if ((ista & 0x3f) && icnt) {
-		icnt--;
-		goto Start_IPAC;
-	}
-	if (!icnt)
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "Sedlbauer IRQ LOOP");
-	ipac_write(cs, IPAC_MASK, 0xFF);
-	ipac_write(cs, IPAC_MASK, 0xC0);
-	spin_unlock(&cs->lock);
-}
-
-static void
 sedlbauer_isar_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -502,10 +457,10 @@ static struct card_ops sedlbauer_ops = {
 };
 
 static struct card_ops sedlbauer_ipac_ops = {
-	.init     = inithscxisac,
+	.init     = ipac_init,
 	.reset    = sedlbauer_reset,
 	.release  = sedlbauer_release,
-	.irq_func = sedlbauer_ipac_interrupt,
+	.irq_func = ipac_irq,
 };
 
 static struct card_ops sedlbauer_isar_ops = {
@@ -744,7 +699,6 @@ ready:
 			cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
 			cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
 		}
-		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		cs->dc_hw_ops = &ipac_dc_ops;
 		cs->bc_hw_ops = &ipac_bc_ops;
 		cs->card_ops = &sedlbauer_ipac_ops;

@@ -189,51 +189,6 @@ ipac_writefifo(struct IsdnCardState *cs, u8 off, u8 * data, int size)
 BUILD_IPAC_OPS(ipac);
 
 static void
-asuscom_ipac_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 ista, val, icnt = 5;
-
-	spin_lock(&cs->lock);
-	ista = ipac_read(cs, IPAC_ISTA);
-Start_IPAC:
-	if (cs->debug & L1_DEB_IPAC)
-		debugl1(cs, "IPAC ISTA %02X", ista);
-	if (ista & 0x0f) {
-		val = hscx_read(cs, 1, HSCX_ISTA);
-		if (ista & 0x01)
-			val |= 0x01;
-		if (ista & 0x04)
-			val |= 0x02;
-		if (ista & 0x08)
-			val |= 0x04;
-		if (val)
-			hscx_int_main(cs, val);
-	}
-	if (ista & 0x20) {
-		val = ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
-		if (val) {
-			isac_interrupt(cs, val);
-		}
-	}
-	if (ista & 0x10) {
-		val = 0x01;
-		isac_interrupt(cs, val);
-	}
-	ista  = ipac_read(cs, IPAC_ISTA);
-	if ((ista & 0x3f) && icnt) {
-		icnt--;
-		goto Start_IPAC;
-	}
-	if (!icnt)
-		printk(KERN_WARNING "ASUS IRQ LOOP\n");
-
-	ipac_write(cs, IPAC_MASK, 0xFF);
-	ipac_write(cs, IPAC_MASK, 0xC0);
-	spin_unlock(&cs->lock);
-}
-
-static void
 asuscom_release(struct IsdnCardState *cs)
 {
 	if (cs->hw.asus.cfg_reg)
@@ -275,25 +230,18 @@ Asus_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	return(0);
 }
 
-static void
-asuscom_init(struct IsdnCardState *cs)
-{
-	cs->debug |= L1_DEB_IPAC;
-	inithscxisac(cs);
-}
-
 static struct card_ops asuscom_ops = {
-	.init     = asuscom_init,
+	.init     = inithscxisac,
 	.reset    = asuscom_reset,
 	.release  = asuscom_release,
 	.irq_func = hscxisac_irq,
 };
 
 static struct card_ops asuscom_ipac_ops = {
-	.init     = asuscom_init,
+	.init     = ipac_init,
 	.reset    = asuscom_ipac_reset,
 	.release  = asuscom_release,
-	.irq_func = asuscom_ipac_interrupt,
+	.irq_func = ipac_irq,
 };
 
 #ifdef __ISAPNP__
@@ -390,7 +338,6 @@ setup_asuscom(struct IsdnCard *card)
 		cs->card_ops = &asuscom_ipac_ops;
 		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
 		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
-		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		cs->dc_hw_ops = &ipac_dc_ops;
 		cs->bc_hw_ops = &ipac_bc_ops;
 		printk(KERN_INFO "Asus: IPAC version %x\n", val);

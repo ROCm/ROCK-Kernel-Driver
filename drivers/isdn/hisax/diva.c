@@ -334,98 +334,17 @@ diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static void
-diva_ipac_isa_irq(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 ista,val;
-	int icnt=5;
-
-	if (!cs) {
-		printk(KERN_WARNING "Diva: Spurious interrupt!\n");
-		return;
-	}
-	ista = ipac_read(cs, IPAC_ISTA);
-Start_IPACISA:
-	if (cs->debug & L1_DEB_IPAC)
-		debugl1(cs, "IPAC ISTA %02X", ista);
-	if (ista & 0x0f) {
-		val = hscx_read(cs, 1, HSCX_ISTA);
-		if (ista & 0x01)
-			val |= 0x01;
-		if (ista & 0x04)
-			val |= 0x02;
-		if (ista & 0x08)
-			val |= 0x04;
-		if (val)
-			hscx_int_main(cs, val);
-	}
-	if (ista & 0x20) {
-		val = ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
-		if (val) {
-			isac_interrupt(cs, val);
-		}
-	}
-	if (ista & 0x10) {
-		val = 0x01;
-		isac_interrupt(cs, val);
-	}
-	ista  = ipac_read(cs, IPAC_ISTA);
-	if ((ista & 0x3f) && icnt) {
-		icnt--;
-		goto Start_IPACISA;
-	}
-	if (!icnt)
-		printk(KERN_WARNING "DIVA IPAC IRQ LOOP\n");
-	
-	ipac_write(cs, IPAC_MASK, 0xFF);
-	ipac_write(cs, IPAC_MASK, 0xC0);
-}
-
-static void
 diva_ipac_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u8 ista,val;
-	int icnt=5;
+	u8 val;
 
 	val = readb(cs->hw.diva.pci_cfg);
 	if (!(val & PITA_INT0_STATUS))
 		return; /* other shared IRQ */
 	writeb(PITA_INT0_STATUS, cs->hw.diva.pci_cfg); /* Reset pending INT0 */
-	ista = mem_ipac_read(cs, IPAC_ISTA);
-Start_IPACPCI:
-	if (cs->debug & L1_DEB_IPAC)
-		debugl1(cs, "IPAC ISTA %02X", ista);
-	if (ista & 0x0f) {
-		val = mem_ipac_bc_read(cs, 1, HSCX_ISTA);
-		if (ista & 0x01)
-			val |= 0x01;
-		if (ista & 0x04)
-			val |= 0x02;
-		if (ista & 0x08)
-			val |= 0x04;
-		if (val)
-			hscx_int_main(cs, val);
-	}
-	if (ista & 0x20) {
-		val = mem_ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
-		if (val) {
-			isac_interrupt(cs, val);
-		}
-	}
-	if (ista & 0x10) {
-		val = 0x01;
-		isac_interrupt(cs, val);
-	}
-	ista  = mem_ipac_read(cs, IPAC_ISTA);
-	if ((ista & 0x3f) && icnt) {
-		icnt--;
-		goto Start_IPACPCI;
-	}
-	if (!icnt)
-		printk(KERN_WARNING "DIVA IPAC PCI IRQ LOOP\n");
-	mem_ipac_write(cs, IPAC_MASK, 0xFF);
-	mem_ipac_write(cs, IPAC_MASK, 0xC0);
+
+	ipac_irq(intno, dev_id, regs);
 }
 
 static void
@@ -629,7 +548,7 @@ static void
 diva_ipac_pci_init(struct IsdnCardState *cs)
 {
 	writel(PITA_INT0_ENABLE, cs->hw.diva.pci_cfg);
-	inithscxisac(cs);
+	ipac_init(cs);
 }
 
 static struct card_ops diva_ops = {
@@ -640,10 +559,10 @@ static struct card_ops diva_ops = {
 };
 
 static struct card_ops diva_ipac_isa_ops = {
-	.init     = inithscxisac,
+	.init     = ipac_init,
 	.reset    = diva_ipac_isa_reset,
 	.release  = diva_ipac_isa_release,
-	.irq_func = diva_ipac_isa_irq,
+	.irq_func = ipac_irq,
 };
 
 static struct card_ops diva_ipac_pci_ops = {
@@ -717,7 +636,6 @@ setup_diva(struct IsdnCard *card)
 			cs->hw.diva.hscx = card->para[1] + DIVA_IPAC_DATA;
 			cs->hw.diva.isac_adr = card->para[1] + DIVA_IPAC_ADR;
 			cs->hw.diva.hscx_adr = card->para[1] + DIVA_IPAC_ADR;
-			test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		} else {
 			cs->subtyp = DIVA_ISA;
 			cs->hw.diva.ctrl = card->para[1] + DIVA_ISA_CTRL;
@@ -768,7 +686,6 @@ setup_diva(struct IsdnCard *card)
 								card->para[1] + DIVA_IPAC_ADR;
 							cs->hw.diva.hscx_adr =
 								card->para[1] + DIVA_IPAC_ADR;
-							test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 						} else {
 							cs->subtyp = DIVA_ISA;
 							cs->hw.diva.ctrl =
@@ -854,7 +771,6 @@ setup_diva(struct IsdnCard *card)
 			cs->hw.diva.hscx = 0;
 			cs->hw.diva.isac_adr = 0;
 			cs->hw.diva.hscx_adr = 0;
-			test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 			bytecnt = 0;
 		} else {
 			cs->hw.diva.ctrl = cs->hw.diva.cfg_reg + DIVA_PCI_CTRL;

@@ -28,6 +28,9 @@
 #define IPAC_SCFG	0xCB
 #define IPAC_TIMR2	0xCC
 
+void ipac_init(struct IsdnCardState *cs);
+void ipac_irq(int intno, void *dev_id, struct pt_regs *regs);
+
 /* Macro to build the needed D- and B-Channel access routines given
  * access functions for the IPAC */
 
