@@ -1041,24 +1041,24 @@ void inet_unregister_protosw(struct inet_protosw *p)
 }
 
 #ifdef CONFIG_IP_MULTICAST
-static struct inet_protocol igmp_protocol = {
+static struct net_protocol igmp_protocol = {
 	.handler =	igmp_rcv,
 };
 #endif
 
-static struct inet_protocol tcp_protocol = {
+static struct net_protocol tcp_protocol = {
 	.handler =	tcp_v4_rcv,
 	.err_handler =	tcp_v4_err,
 	.no_policy =	1,
 };
 
-static struct inet_protocol udp_protocol = {
+static struct net_protocol udp_protocol = {
 	.handler =	udp_rcv,
 	.err_handler =	udp_err,
 	.no_policy =	1,
 };
 
-static struct inet_protocol icmp_protocol = {
+static struct net_protocol icmp_protocol = {
 	.handler =	icmp_rcv,
 };
 
