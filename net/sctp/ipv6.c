@@ -144,17 +144,19 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct flowi fl;
 
+	memset(&fl, 0, sizeof(fl));
+
 	fl.proto = sk->protocol;
 
 	/* Fill in the dest address from the route entry passed with the skb
 	 * and the source address from the transport.
 	 */
-	fl.fl6_dst = &transport->ipaddr.v6.sin6_addr;
-	fl.fl6_src = &transport->saddr.v6.sin6_addr;
+	ipv6_addr_copy(&fl.fl6_dst, &transport->ipaddr.v6.sin6_addr);
+	ipv6_addr_copy(&fl.fl6_src, &transport->saddr.v6.sin6_addr);
 
 	fl.fl6_flowlabel = np->flow_label;
 	IP6_ECN_flow_xmit(sk, fl.fl6_flowlabel);
-	if (ipv6_addr_type(fl.fl6_src) & IPV6_ADDR_LINKLOCAL)
+	if (ipv6_addr_type(&fl.fl6_src) & IPV6_ADDR_LINKLOCAL)
 		fl.oif = transport->saddr.v6.sin6_scope_id;
 	else
 		fl.oif = sk->bound_dev_if;
@@ -163,14 +165,14 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 
 	if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) np->opt->srcrt;
-		fl.nl_u.ip6_u.daddr = rt0->addr;
+		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
 	SCTP_DEBUG_PRINTK("%s: skb:%p, len:%d, "
 			  "src:%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x "
 			  "dst:%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
 			  __FUNCTION__, skb, skb->len, 
-			  NIP6(*fl.fl6_src), NIP6(*fl.fl6_dst));
+			  NIP6(fl.fl6_src), NIP6(fl.fl6_dst));
 
 	SCTP_INC_STATS(SctpOutSCTPPacks);
 
@@ -185,17 +187,19 @@ struct dst_entry *sctp_v6_get_dst(struct sctp_association *asoc,
 				  union sctp_addr *saddr)
 {
 	struct dst_entry *dst;
-	struct flowi fl = {
-		.nl_u = { .ip6_u = { .daddr = &daddr->v6.sin6_addr, } } };
+	struct flowi fl;
+
+	memset(&fl, 0, sizeof(fl));
+	ipv6_addr_copy(&fl.fl6_dst, &daddr->v6.sin6_addr);
 
 	SCTP_DEBUG_PRINTK("%s: DST=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ",
-			  __FUNCTION__, NIP6(*fl.fl6_dst));
+			  __FUNCTION__, NIP6(fl.fl6_dst));
 
 	if (saddr) {
-		fl.fl6_src = &saddr->v6.sin6_addr;
+		ipv6_addr_copy(&fl.fl6_src, &saddr->v6.sin6_addr);
 		SCTP_DEBUG_PRINTK(
 			"SRC=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x - ",
-			NIP6(*fl.fl6_src));
+			NIP6(fl.fl6_src));
 	}
 
 	dst = ip6_route_output(NULL, &fl);

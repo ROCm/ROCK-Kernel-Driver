@@ -152,15 +152,14 @@ int ip6_route_me_harder(struct sk_buff *skb)
 {
 	struct ipv6hdr *iph = skb->nh.ipv6h;
 	struct dst_entry *dst;
-	struct flowi fl;
-
-	fl.proto = iph->nexthdr;
-	fl.fl6_dst = &iph->daddr;
-	fl.fl6_src = &iph->saddr;
-	fl.oif = skb->sk ? skb->sk->bound_dev_if : 0;
-	fl.fl6_flowlabel = 0;
-	fl.fl_ip_dport = 0;
-	fl.fl_ip_sport = 0;
+	struct flowi fl = {
+		.oif = skb->sk ? skb->sk->bound_dev_if : 0,
+		.nl_u =
+		{ .ip6_u =
+		  { .daddr = iph->daddr,
+		    .saddr = iph->saddr, } },
+		.proto = iph->nexthdr,
+	};
 
 	dst = ip6_route_output(skb->sk, &fl);
 
@@ -200,7 +199,7 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	     struct ipv6_txoptions *opt)
 {
 	struct ipv6_pinfo *np = sk ? inet6_sk(sk) : NULL;
-	struct in6_addr *first_hop = fl->fl6_dst;
+	struct in6_addr *first_hop = &fl->fl6_dst;
 	struct dst_entry *dst = skb->dst;
 	struct ipv6hdr *hdr;
 	u8  proto = fl->proto;
@@ -255,7 +254,7 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 	hdr->nexthdr = proto;
 	hdr->hop_limit = hlimit;
 
-	ipv6_addr_copy(&hdr->saddr, fl->fl6_src);
+	ipv6_addr_copy(&hdr->saddr, &fl->fl6_src);
 	ipv6_addr_copy(&hdr->daddr, first_hop);
 
 	mtu = dst_pmtu(dst);
@@ -320,8 +319,8 @@ static struct ipv6hdr * ip6_bld_1(struct sock *sk, struct sk_buff *skb, struct f
 	hdr->hop_limit = hlimit;
 	hdr->nexthdr = fl->proto;
 
-	ipv6_addr_copy(&hdr->saddr, fl->fl6_src);
-	ipv6_addr_copy(&hdr->daddr, fl->fl6_dst);
+	ipv6_addr_copy(&hdr->saddr, &fl->fl6_src);
+	ipv6_addr_copy(&hdr->daddr, &fl->fl6_dst);
 	return hdr;
 }
 
@@ -526,19 +525,19 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct in6_addr *final_dst = NULL;
+	struct in6_addr final_dst_buf, *final_dst = NULL;
 	struct dst_entry *dst;
 	int err = 0;
 	unsigned int pktlength, jumbolen, mtu;
-	struct in6_addr saddr;
 
 	if (opt && opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
-		final_dst = fl->fl6_dst;
-		fl->fl6_dst = rt0->addr;
+		ipv6_addr_copy(&final_dst_buf, &fl->fl6_dst);
+		final_dst = &final_dst_buf;
+		ipv6_addr_copy(&fl->fl6_dst, rt0->addr);
 	}
 
-	if (!fl->oif && ipv6_addr_is_multicast(fl->fl6_dst))
+	if (!fl->oif && ipv6_addr_is_multicast(&fl->fl6_dst))
 		fl->oif = np->mcast_oif;
 
 	dst = __sk_dst_check(sk, np->dst_cookie);
@@ -564,9 +563,9 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 			 */
 
 		if (((rt->rt6i_dst.plen != 128 ||
-		      ipv6_addr_cmp(fl->fl6_dst, &rt->rt6i_dst.addr))
+		      ipv6_addr_cmp(&fl->fl6_dst, &rt->rt6i_dst.addr))
 		     && (np->daddr_cache == NULL ||
-			 ipv6_addr_cmp(fl->fl6_dst, np->daddr_cache)))
+			 ipv6_addr_cmp(&fl->fl6_dst, np->daddr_cache)))
 		    || (fl->oif && fl->oif != dst->dev->ifindex)) {
 			dst = NULL;
 		} else
@@ -582,8 +581,8 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		return -ENETUNREACH;
 	}
 
-	if (fl->fl6_src == NULL) {
-		err = ipv6_get_saddr(dst, fl->fl6_dst, &saddr);
+	if (ipv6_addr_any(&fl->fl6_src)) {
+		err = ipv6_get_saddr(dst, &fl->fl6_dst, &fl->fl6_src);
 
 		if (err) {
 #if IP6_DEBUG >= 2
@@ -592,7 +591,6 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 #endif
 			goto out;
 		}
-		fl->fl6_src = &saddr;
 	}
 	pktlength = length;
 
@@ -604,7 +602,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
         }
 
 	if (hlimit < 0) {
-		if (ipv6_addr_is_multicast(fl->fl6_dst))
+		if (ipv6_addr_is_multicast(&fl->fl6_dst))
 			hlimit = np->mcast_hops;
 		else
 			hlimit = np->hop_limit;
@@ -715,7 +713,9 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 	 *	cleanup
 	 */
 out:
-	ip6_dst_store(sk, dst, fl->fl6_dst == &np->daddr ? &np->daddr : NULL);
+	ip6_dst_store(sk, dst,
+		      !ipv6_addr_cmp(&fl->fl6_dst, &np->daddr) ?
+		      &np->daddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
 	return err;
@@ -1135,7 +1135,7 @@ fail:
 	return err;
 }
 
-int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl, struct in6_addr **saddr)
+int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	int err = 0;
@@ -1163,9 +1163,9 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl, st
 			 */
 
 		if (((rt->rt6i_dst.plen != 128 ||
-		      ipv6_addr_cmp(fl->fl6_dst, &rt->rt6i_dst.addr))
+		      ipv6_addr_cmp(&fl->fl6_dst, &rt->rt6i_dst.addr))
 		     && (np->daddr_cache == NULL ||
-			 ipv6_addr_cmp(fl->fl6_dst, np->daddr_cache)))
+			 ipv6_addr_cmp(&fl->fl6_dst, np->daddr_cache)))
 		    || (fl->oif && fl->oif != (*dst)->dev->ifindex)) {
 			*dst = NULL;
 		} else
@@ -1181,9 +1181,8 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl, st
 		return -ENETUNREACH;
 	}
 
-	if (fl->fl6_src == NULL) {
-		*saddr = kmalloc(sizeof(struct in6_addr), GFP_ATOMIC);
-		err = ipv6_get_saddr(*dst, fl->fl6_dst, *saddr);
+	if (ipv6_addr_any(&fl->fl6_src)) {
+		err = ipv6_get_saddr(*dst, &fl->fl6_dst, &fl->fl6_src);
 
 		if (err) {
 #if IP6_DEBUG >= 2
@@ -1192,7 +1191,6 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl, st
 #endif
 			return err;
 		}
-		fl->fl6_src = *saddr;
 	}
 
         if (*dst) {
@@ -1415,7 +1413,7 @@ int ip6_push_pending_frames(struct sock *sk)
 {
 	struct sk_buff *skb, *tmp_skb;
 	struct sk_buff **tail_skb;
-	struct in6_addr *final_dst = NULL;
+	struct in6_addr final_dst_buf, *final_dst = &final_dst_buf;
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6hdr *hdr;
@@ -1446,7 +1444,7 @@ int ip6_push_pending_frames(struct sock *sk)
 #endif
 	}
 
-	final_dst = fl->fl6_dst;
+	ipv6_addr_copy(final_dst, &fl->fl6_dst);
 	__skb_pull(skb, skb->h.raw - skb->nh.raw);
 	if (opt && opt->opt_flen)
 		ipv6_push_frag_opts(skb, opt, &proto);
@@ -1463,7 +1461,7 @@ int ip6_push_pending_frames(struct sock *sk)
 		hdr->payload_len = 0;
 	hdr->hop_limit = np->hop_limit;
 	hdr->nexthdr = proto;
-	ipv6_addr_copy(&hdr->saddr, fl->fl6_src);
+	ipv6_addr_copy(&hdr->saddr, &fl->fl6_src);
 	ipv6_addr_copy(&hdr->daddr, final_dst);
 
 	skb->dst = dst_clone(&rt->u.dst);

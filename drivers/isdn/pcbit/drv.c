@@ -171,7 +171,7 @@ int pcbit_init_dev(int board, int mem_base, int irq)
 
 	dev->dev_if = dev_if;
 
-	SET_MODULE_OWNER(dev_if);
+	dev_if->owner = THIS_MODULE;
 
 	dev_if->channels = 2;
 	
