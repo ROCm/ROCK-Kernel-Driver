@@ -1800,7 +1800,7 @@ int isp2x00_reset(Scsi_Cmnd * Cmnd, unsigned int reset_flags)
 }
 
 
-int isp2x00_biosparam(Disk * disk, kdev_t n, int ip[])
+int isp2x00_biosparam(Disk * disk, struct block_device *n, int ip[])
 {
 	int size = disk->capacity;
 

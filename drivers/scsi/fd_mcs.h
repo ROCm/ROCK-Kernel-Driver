@@ -28,7 +28,7 @@ extern int fd_mcs_command( Scsi_Cmnd * );
 extern int fd_mcs_abort( Scsi_Cmnd * );
 extern int fd_mcs_reset( Scsi_Cmnd *, unsigned int );
 extern int fd_mcs_queue( Scsi_Cmnd *, void (*done)(Scsi_Cmnd *) );
-extern int fd_mcs_biosparam( Disk *, kdev_t, int * );
+extern int fd_mcs_biosparam( Disk *, struct block_device *, int * );
 extern int fd_mcs_proc_info( char *, char **, off_t, int, int, int );
 extern const char *fd_mcs_info(struct Scsi_Host *);
 

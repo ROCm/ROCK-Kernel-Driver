@@ -201,7 +201,7 @@ extern	int		 x_scsi_host_reset(Scsi_Cmnd *);
 extern	int		 x_scsi_old_abort(Scsi_Cmnd *);
 extern	int		 x_scsi_old_reset(Scsi_Cmnd *, unsigned int);
 #endif
-extern	int		 x_scsi_bios_param(Disk *, kdev_t, int *);
+extern	int		 x_scsi_bios_param(Disk *, struct block_device *, int *);
 extern	void		 x_scsi_select_queue_depths(struct Scsi_Host *, Scsi_Device *);
 extern	void		 x_scsi_taskmgmt_bh(void *);
 

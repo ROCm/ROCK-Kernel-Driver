@@ -830,7 +830,7 @@ int Pci2000_Release (struct Scsi_Host *pshost)
  *	Returns:		zero.
  *
  ****************************************************************/
-int Pci2000_BiosParam (Scsi_Disk *disk, kdev_t dev, int geom[])
+int Pci2000_BiosParam (Scsi_Disk *disk, struct block_device *dev, int geom[])
 	{
 	PADAPTER2000	    padapter;
 

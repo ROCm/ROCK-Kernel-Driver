@@ -37,14 +37,6 @@ static unsigned long max_block(struct block_device *bdev)
 	return retval;
 }
 
-static loff_t blkdev_size(kdev_t dev)
-{
-	loff_t sz = blkdev_size_in_bytes(dev);
-	if (sz)
-		return sz;
-	return ~0ULL;
-}
-
 /* Kill _all_ buffers, dirty or not.. */
 static void kill_bdev(struct block_device *bdev)
 {
@@ -301,6 +293,8 @@ struct block_device *bdget(dev_t dev)
 			new_bdev->bd_queue = NULL;
 			new_bdev->bd_contains = NULL;
 			new_bdev->bd_inode = inode;
+			new_bdev->bd_part_count = 0;
+			sema_init(&new_bdev->bd_part_sem, 1);
 			inode->i_mode = S_IFBLK;
 			inode->i_rdev = kdev;
 			inode->i_bdev = new_bdev;
@@ -423,9 +417,9 @@ int get_blkdev_list(char * p)
 	Return the function table of a device.
 	Load the driver if needed.
 */
-const struct block_device_operations * get_blkfops(unsigned int major)
+struct block_device_operations * get_blkfops(unsigned int major)
 {
-	const struct block_device_operations *ret = NULL;
+	struct block_device_operations *ret = NULL;
 
 	/* major 0 is used for non-device mounts */
 	if (major && major < MAX_BLKDEV) {
@@ -487,7 +481,7 @@ int unregister_blkdev(unsigned int major, const char * name)
 int check_disk_change(kdev_t dev)
 {
 	int i;
-	const struct block_device_operations * bdops = NULL;
+	struct block_device_operations * bdops = NULL;
 
 	i = major(dev);
 	if (i < MAX_BLKDEV)
@@ -520,35 +514,28 @@ int check_disk_change(kdev_t dev)
 	return 1;
 }
 
-int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
-{
-	int res;
-	mm_segment_t old_fs = get_fs();
-
-	if (!bdev->bd_op->ioctl)
-		return -EINVAL;
-	set_fs(KERNEL_DS);
-	res = bdev->bd_op->ioctl(bdev->bd_inode, NULL, cmd, arg);
-	set_fs(old_fs);
-	return res;
-}
-
 static int do_open(struct block_device *bdev, struct inode *inode, struct file *file)
 {
 	int ret = -ENXIO;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct module *owner = NULL;
+	struct block_device_operations *ops, *current_ops;
 
-	down(&bdev->bd_sem);
 	lock_kernel();
-	if (!bdev->bd_op) {
-		bdev->bd_op = get_blkfops(major(dev));
-		if (!bdev->bd_op)
-			goto out;
-		owner = bdev->bd_op->owner;
+	ops = get_blkfops(major(dev));
+	if (ops) {
+		owner = ops->owner;
 		if (owner)
 			__MOD_INC_USE_COUNT(owner);
 	}
+
+	down(&bdev->bd_sem);
+	if (!bdev->bd_op)
+		current_ops = ops;
+	else
+		current_ops = bdev->bd_op;
+	if (!current_ops)
+		goto out;
 	if (!bdev->bd_contains) {
 		unsigned minor = minor(dev);
 		struct gendisk *g = get_gendisk(dev);
@@ -569,15 +556,36 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			}
 		}
 	}
-	if (bdev->bd_op->open) {
-		ret = bdev->bd_op->open(inode, file);
-		if (ret)
-			goto out2;
+	if (bdev->bd_contains == bdev) {
+		if (current_ops->open) {
+			ret = current_ops->open(inode, file);
+			if (ret)
+				goto out2;
+		}
+	} else {
+		down(&bdev->bd_contains->bd_part_sem);
+		bdev->bd_contains->bd_part_count++;
+		up(&bdev->bd_contains->bd_part_sem);
 	}
-	bdev->bd_inode->i_size = blkdev_size(dev);
+	if (!bdev->bd_op)
+		bdev->bd_op = ops;
+	else if (owner)
+		__MOD_DEC_USE_COUNT(owner);
 	if (!bdev->bd_openers) {
 		struct blk_dev_struct *p = blk_dev + major(dev);
+		struct gendisk *g = get_gendisk(dev);
 		unsigned bsize = bdev_hardsect_size(bdev);
+
+		bdev->bd_offset = 0;
+		if (g) {
+			bdev->bd_inode->i_size =
+				(loff_t) g->part[minor(dev)].nr_sects << 9;
+			bdev->bd_offset = g->part[minor(dev)].start_sect;
+		} else if (blk_size[major(dev)])
+			bdev->bd_inode->i_size =
+				(loff_t) blk_size[major(dev)][minor(dev)] << 10;
+		else
+			bdev->bd_inode->i_size = 0;
 		while (bsize < PAGE_CACHE_SIZE) {
 			if (bdev->bd_inode->i_size & bsize)
 				break;
@@ -601,14 +609,12 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		}
 	}
 	bdev->bd_openers++;
-	unlock_kernel();
 	up(&bdev->bd_sem);
+	unlock_kernel();
 	return 0;
 
 out2:
 	if (!bdev->bd_openers) {
-		bdev->bd_op = NULL;
-		bdev->bd_queue = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
@@ -619,8 +625,8 @@ out1:
 	if (owner)
 		__MOD_DEC_USE_COUNT(owner);
 out:
-	unlock_kernel();
 	up(&bdev->bd_sem);
+	unlock_kernel();
 	if (ret)
 		bdput(bdev);
 	return ret;
@@ -677,11 +683,17 @@ int blkdev_put(struct block_device *bdev, int kind)
 	}
 	if (!--bdev->bd_openers)
 		kill_bdev(bdev);
-	if (bdev->bd_op->release)
-		ret = bdev->bd_op->release(bd_inode, NULL);
-	if (bdev->bd_op->owner)
-		__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
+	if (bdev->bd_contains == bdev) {
+		if (bdev->bd_op->release)
+			ret = bdev->bd_op->release(bd_inode, NULL);
+	} else {
+		down(&bdev->bd_contains->bd_part_sem);
+		bdev->bd_contains->bd_part_count--;
+		up(&bdev->bd_contains->bd_part_sem);
+	}
 	if (!bdev->bd_openers) {
+		if (bdev->bd_op->owner)
+			__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
 		bdev->bd_op = NULL;
 		bdev->bd_queue = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
@@ -706,15 +718,37 @@ static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 {
 	int ret = -EINVAL;
 	switch (cmd) {
+	/*
+	 * deprecated, use the /proc/iosched interface instead
+	 */
+	case BLKELVGET:
+	case BLKELVSET:
+		ret = -ENOTTY;
+		break;
 	case BLKRAGET:
+	case BLKROGET:
+	case BLKBSZGET:
+	case BLKSSZGET:
 	case BLKFRAGET:
+	case BLKSECTGET:
 	case BLKRASET:
 	case BLKFRASET:
+	case BLKBSZSET:
+	case BLKPG:
 		ret = blk_ioctl(inode->i_bdev, cmd, arg);
 		break;
 	default:
 		if (inode->i_bdev->bd_op->ioctl)
 			ret =inode->i_bdev->bd_op->ioctl(inode, file, cmd, arg);
+		if (ret == -EINVAL) {
+			switch (cmd) {
+				case BLKGETSIZE:
+				case BLKGETSIZE64:
+				case BLKFLSBUF:
+				case BLKROSET:
+					ret = blk_ioctl(inode->i_bdev,cmd,arg);
+			}
+		}
 		break;
 	}
 	return ret;
@@ -741,6 +775,16 @@ struct file_operations def_blk_fops = {
 	fsync:		block_fsync,
 	ioctl:		blkdev_ioctl,
 };
+
+int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
+{
+	int res;
+	mm_segment_t old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	res = blkdev_ioctl(bdev->bd_inode, NULL, cmd, arg);
+	set_fs(old_fs);
+	return res;
+}
 
 const char *__bdevname(kdev_t dev)
 {

@@ -15,6 +15,7 @@
 #define	ON20_VERSION	"1.01"
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -131,35 +132,33 @@ static void on20_release_proto( PIA *pi)
 {       MOD_DEC_USE_COUNT;
 }
 
-struct pi_protocol on20 = {"on20",0,2,2,1,1,
-                           on20_write_regr,
-                           on20_read_regr,
-                           on20_write_block,
-                           on20_read_block,
-                           on20_connect,
-                           on20_disconnect,
-                           0,
-                           0,
-                           0,
-                           on20_log_adapter,
-                           on20_init_proto,
-                           on20_release_proto
-                          };
+static struct pi_protocol on20 = {
+	.name		= "on20",
+	.max_mode	= 2,
+	.epp_first	= 2,
+	.default_delay	= 1,
+	.max_units	= 1,
+	.write_regr	= on20_write_regr,
+	.read_regr	= on20_read_regr,
+	.write_block	= on20_write_block,
+	.read_block	= on20_read_block,
+	.connect	= on20_connect,
+	.disconnect	= on20_disconnect,
+	.log_adapter	= on20_log_adapter,
+	.init_proto	= on20_init_proto,
+	.release_proto	= on20_release_proto,
+};
 
-
-#ifdef MODULE
-
-int     init_module(void)
-
-{       return pi_register( &on20 ) - 1;
+static int __init on20_init(void)
+{
+	return pi_register(&on20)-1;
 }
 
-void    cleanup_module(void)
-
-{       pi_unregister( &on20 );
+static void __exit on20_exit(void)
+{
+	pi_unregister(&on20);
 }
 
-#endif
-
-/* end of on20.c */
 MODULE_LICENSE("GPL");
+module_init(on20_init)
+module_exit(on20_exit)

@@ -7,17 +7,7 @@
  *  Re-organised Feb 1998 Russell King
  */
 
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/blk.h>
 #include <linux/ctype.h>
-
-#include <asm/byteorder.h>
-#include <asm/system.h>
-
 #include "check.h"
 #include "atari.h"
 
@@ -40,15 +30,14 @@ static inline int OK_id(char *s)
 		memcmp (s, "RAW", 3) == 0 ;
 }
 
-int atari_partition (struct gendisk *hd, struct block_device *bdev,
-		     unsigned long first_sector, int minor)
+int atari_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
-	int m_lim = minor + (1 << hd->minor_shift);
 	Sector sect;
 	struct rootsector *rs;
 	struct partition_info *pi;
 	u32 extensect;
 	u32 hd_size;
+	int slot;
 #ifdef ICD_PARTS
 	int part_fmt = 0; /* 0:unknown, 1:AHDI, 2:ICD/Supra */
 #endif
@@ -58,7 +47,7 @@ int atari_partition (struct gendisk *hd, struct block_device *bdev,
 		return -1;
 
 	/* Verify this is an Atari rootsector: */
-	hd_size = hd->part[minor - 1].nr_sects;
+	hd_size = bdev->bd_inode->i_size >> 9;
 	if (!VALID_PARTITION(&rs->part[0], hd_size) &&
 	    !VALID_PARTITION(&rs->part[1], hd_size) &&
 	    !VALID_PARTITION(&rs->part[2], hd_size) &&
@@ -74,7 +63,7 @@ int atari_partition (struct gendisk *hd, struct block_device *bdev,
 
 	pi = &rs->part[0];
 	printk (" AHDI");
-	for (; pi < &rs->part[4] && minor < m_lim; minor++, pi++) {
+	for (slot = 1; pi < &rs->part[4] && slot < state->limit; slot++, pi++) {
 		struct rootsector *xrs;
 		Sector sect2;
 		ulong partsect;
@@ -84,7 +73,7 @@ int atari_partition (struct gendisk *hd, struct block_device *bdev,
 		/* active partition */
 		if (memcmp (pi->id, "XGM", 3) != 0) {
 			/* we don't care about other id's */
-			add_gd_partition (hd, minor, be32_to_cpu(pi->st),
+			put_partition (state, slot, be32_to_cpu(pi->st),
 					be32_to_cpu(pi->siz));
 			continue;
 		}
@@ -109,7 +98,7 @@ int atari_partition (struct gendisk *hd, struct block_device *bdev,
 				break;
 			}
 
-			add_gd_partition(hd, minor,
+			put_partition(state, slot,
 				   partsect + be32_to_cpu(xrs->part[0].st),
 				   be32_to_cpu(xrs->part[0].siz));
 
@@ -126,8 +115,7 @@ int atari_partition (struct gendisk *hd, struct block_device *bdev,
 
 			partsect = be32_to_cpu(xrs->part[1].st) + extensect;
 			put_dev_sector(sect2);
-			minor++;
-			if (minor >= m_lim) {
+			if (++slot == state->limit) {
 				printk( "\nMaximum number of partitions reached!\n" );
 				break;
 			}
@@ -140,12 +128,12 @@ int atari_partition (struct gendisk *hd, struct block_device *bdev,
 		/* sanity check: no ICD format if first partition invalid */
 		if (OK_id(pi->id)) {
 			printk(" ICD<");
-			for (; pi < &rs->icdpart[8] && minor < m_lim; minor++, pi++) {
+			for (; pi < &rs->icdpart[8] && slot < state->limit; slot++, pi++) {
 				/* accept only GEM,BGM,RAW,LNX,SWP partitions */
 				if (!((pi->flg & 1) && OK_id(pi->id)))
 					continue;
 				part_fmt = 2;
-				add_gd_partition (hd, minor,
+				put_partition (state, slot,
 						be32_to_cpu(pi->st),
 						be32_to_cpu(pi->siz));
 			}
@@ -159,4 +147,3 @@ int atari_partition (struct gendisk *hd, struct block_device *bdev,
 
 	return 1;
 }
-

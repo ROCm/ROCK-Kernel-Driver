@@ -2241,28 +2241,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			autostart_arrays();
 			goto done;
 #endif
-
-		case BLKGETSIZE:	/* Return device size */
-			if (!arg) {
-				err = -EINVAL;
-				MD_BUG();
-				goto abort;
-			}
-			err = put_user(md_hd_struct[minor].nr_sects,
-						(unsigned long *) arg);
-			goto done;
-
-		case BLKGETSIZE64:	/* Return device size */
-			err = put_user((u64)md_hd_struct[minor].nr_sects << 9,
-						(u64 *) arg);
-			goto done;
-
-		case BLKFLSBUF:
-		case BLKBSZGET:
-		case BLKBSZSET:
-			err = blk_ioctl(inode->i_bdev, cmd, arg);
-			goto abort;
-
 		default:;
 	}
 
@@ -2386,7 +2364,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 						(short *) &loc->cylinders);
 			if (err)
 				goto abort_unlock;
-			err = put_user (get_start_sect(dev),
+			err = put_user (get_start_sect(inode->i_bdev),
 						(long *) &loc->start);
 			goto done_unlock;
 	}

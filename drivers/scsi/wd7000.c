@@ -1706,9 +1706,9 @@ int wd7000_reset (Scsi_Cmnd *SCpnt, unsigned int unused)
 /*
  *  This was borrowed directly from aha1542.c. (Zaga)
  */
-int wd7000_biosparam (Disk *disk, kdev_t dev, int *ip)
+int wd7000_biosparam (Disk *disk, struct block_device *bdev, int *ip)
 {
-    dprintk("wd7000_biosparam: dev=%s, size=%d, ", kdevname(dev),
+    dprintk("wd7000_biosparam: dev=%s, size=%d, ", bdevname(bdev),
 	    disk->capacity);
 
     /*
@@ -1727,7 +1727,7 @@ int wd7000_biosparam (Disk *disk, kdev_t dev, int *ip)
 	/*
 	 * try to figure out the geometry from the partition table
 	 */
-	if ((scsicam_bios_param (disk, dev, info) < 0) ||
+	if ((scsicam_bios_param (disk, bdev, info) < 0) ||
 	    !(((info[0] == 64) && (info[1] == 32)) ||
 	      ((info[0] == 255) && (info[1] == 63)))) {
 	    printk ("wd7000_biosparam: unable to verify geometry for disk with >1GB.\n"

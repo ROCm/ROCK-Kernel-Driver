@@ -1020,7 +1020,7 @@ int ultrastor_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 
 }
 
-int ultrastor_biosparam(Disk * disk, kdev_t dev, int * dkinfo)
+int ultrastor_biosparam(Disk * disk, struct block_device *dev, int * dkinfo)
 {
     int size = disk->capacity;
     unsigned int s = config.heads * config.sectors;

@@ -22,7 +22,6 @@
 #define _PCI2000_H
 
 #include <linux/types.h>
-#include <linux/kdev_t.h>
 
 #ifndef	PSI_EIDE_SCSIOP
 #define	PSI_EIDE_SCSIOP	1
@@ -194,7 +193,7 @@ int Pci2000_QueueCommand	(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
 int Pci2000_Abort			(Scsi_Cmnd *SCpnt);
 int Pci2000_Reset			(Scsi_Cmnd *SCpnt, unsigned int flags);
 int Pci2000_Release			(struct Scsi_Host *pshost);
-int Pci2000_BiosParam		(Disk *disk, kdev_t dev, int geom[]);
+int Pci2000_BiosParam		(Disk *disk, struct block_device *dev, int geom[]);
 
 #ifndef NULL
 	#define NULL 0

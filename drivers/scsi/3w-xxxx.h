@@ -56,7 +56,6 @@
 
 #include <linux/version.h>
 #include <linux/types.h>
-#include <linux/kdev_t.h>
 
 /* AEN strings */
 static char *tw_aen_string[] = {
@@ -445,7 +444,7 @@ int tw_poll_status(TW_Device_Extension *tw_dev, u32 flag, int seconds);
 int tw_post_command_packet(TW_Device_Extension *tw_dev, int request_id);
 int tw_reset_device_extension(TW_Device_Extension *tw_dev);
 int tw_reset_sequence(TW_Device_Extension *tw_dev);
-int tw_scsi_biosparam(Disk *disk, kdev_t dev, int geom[]);
+int tw_scsi_biosparam(Disk *disk, struct block_device *dev, int geom[]);
 int tw_scsi_detect(Scsi_Host_Template *tw_host);
 int tw_scsi_eh_abort(Scsi_Cmnd *SCpnt);
 int tw_scsi_eh_reset(Scsi_Cmnd *SCpnt);

@@ -194,8 +194,7 @@ struct hfs_btree {
 	struct hfs_bnode		       /* The bnode cache */
 				*cache[HFS_CACHELEN];
 	struct hfs_cat_entry	entry;	       /* Fake catalog entry */
-	int			lock;
-	hfs_wait_queue		wait;
+	struct semaphore	sem;
 	int			dirt;
 	int                     keySize;   
 	/* Fields from the BTHdrRec in native byte-order: */

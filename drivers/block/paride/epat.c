@@ -19,6 +19,7 @@
 #define EPAT_VERSION      "1.02"
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -311,35 +312,34 @@ static void epat_release_proto( PIA *pi)
 {	MOD_DEC_USE_COUNT;
 }
 
-struct pi_protocol epat = {"epat",0,6,3,1,1,
-			   epat_write_regr,
-			   epat_read_regr,
-			   epat_write_block,
-			   epat_read_block,
-			   epat_connect,
-			   epat_disconnect,
-			   0,
-			   0,
-			   epat_test_proto,
-			   epat_log_adapter,
-			   epat_init_proto,
-			   epat_release_proto
-			  };
+static struct pi_protocol epat = {
+	.name		= "epat",
+	.max_mode	= 6,
+	.epp_first	= 3,
+	.default_delay	= 1,
+	.max_units	= 1,
+	.write_regr	= epat_write_regr,
+	.read_regr	= epat_read_regr,
+	.write_block	= epat_write_block,
+	.read_block	= epat_read_block,
+	.connect	= epat_connect,
+	.disconnect	= epat_disconnect,
+	.test_proto	= epat_test_proto,
+	.log_adapter	= epat_log_adapter,
+	.init_proto	= epat_init_proto,
+	.release_proto	= epat_release_proto,
+};
 
-
-#ifdef MODULE
-
-int	init_module(void)
-
-{	return pi_register( &epat) - 1;
+static int __init epat_init(void)
+{
+	return pi_register(&epat)-1;
 }
 
-void	cleanup_module(void)
-
-{	pi_unregister( &epat);
+static void __exit epat_exit(void)
+{
+	pi_unregister(&epat);
 }
 
-#endif
-
-/* end of epat.c */
 MODULE_LICENSE("GPL");
+module_init(epat_init)
+module_exit(epat_exit)

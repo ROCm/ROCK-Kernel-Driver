@@ -310,10 +310,7 @@ struct hfs_dir {
 	hfs_u16		flags;
 	hfs_u16		dirs;		/* Number of directories in this one */
 	hfs_u16		files;		/* Number of files in this directory */
-	int		readers;
-	hfs_wait_queue	read_wait;
-	int		writers;
-	hfs_wait_queue	write_wait;
+	struct rw_semaphore	sem;
 };
 
 /*

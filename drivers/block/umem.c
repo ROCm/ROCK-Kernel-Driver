@@ -65,7 +65,7 @@
 #define MM_BLKSIZE 1024  /* 1k blocks */
 #define MM_HARDSECT 512  /* 512-byte hardware sectors */
 #define MM_SHIFT 6       /* max 64 partitions on 4 cards  */
-#define DEVICE_NR(device) (MINOR(device)>>MM_SHIFT)
+#define DEVICE_NR(device) (minor(device)>>MM_SHIFT)
 
 /*
  * Version Information
@@ -150,7 +150,6 @@ struct cardinfo {
 		unsigned long	last_change;
 	} battery[2];
 
-	atomic_t	 usage;
 	spinlock_t 	lock;
 	int		check_batteries;
 
@@ -813,31 +812,21 @@ static void del_battery_timer(void)
  * Note no locks taken out here.  In a worst case scenario, we could drop
  * a chunk of system memory.  But that should never happen, since validation
  * happens at open or mount time, when locks are held.
+ *
+ *	That's crap, since doing that while some partitions are opened
+ * or mounted will give you really nasty results.
  */
 static int mm_revalidate(kdev_t i_rdev)
 {
-	int i;
-
-	int card_number = DEVICE_NR(kdev_val(i_rdev));
-	/* first partition, # of partitions */
-	int part1 = (card_number << MM_SHIFT) + 1;
-	int npart = (1 << MM_SHIFT) -1;
-
-	/* first clear old partition information */
-	for (i=0; i<npart ;i++) {
-		mm_gendisk.sizes[part1+i]=0;
-		mm_gendisk.part[part1+i].start_sect = 0;
-		mm_gendisk.part[part1+i].nr_sects = 0;
-	}
-
-	mm_gendisk.part[card_number << MM_SHIFT].nr_sects =
-		cards[card_number].mm_size << 1;
-
-
-	/* then fill new info */
+	int card_number = DEVICE_NR(i_rdev);
+	kdev_t device = mk_mdev(MAJOR_NR, card_number << MM_SHIFT);
+	int res = dev_lock_part(device);
+	if (res < 0)
+		return res;
+	wipe_partitions(device);
 	printk(KERN_INFO "mm partition check: (%d)\n", card_number);
-	grok_partitions(mk_kdev(major_nr,part1-1),
-			mm_gendisk.sizes[card_number<<MM_SHIFT]);
+	grok_partitions(device, cards[card_number].mm_size << 1);
+	dev_unlock_part(device);
 	return 0;
 }
 /*
@@ -859,16 +848,6 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 
 
 	switch(cmd) {
-
-	case BLKGETSIZE:
-		/* Return the device size, expressed in sectors */
-		err = ! access_ok (VERIFY_WRITE, arg, sizeof(long));
-		if (err) return -EFAULT;
-		size = mm_gendisk.part[minor].nr_sects;
-		if (copy_to_user((long *) arg, &size, sizeof (long)))
-			return -EFAULT;
-		return 0;
-
 	case BLKRRPART:
 		return (mm_revalidate(i->i_rdev));
 
@@ -883,16 +862,15 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 		size = cards[card_number].mm_size * (1024 / MM_HARDSECT);
 		geo.heads     = 64;
 		geo.sectors   = 32;
-		geo.start     = mm_gendisk.part[minor].start_sect;
+		geo.start     = get_start_sect(inode->i_bdev);
 		geo.cylinders = size / (geo.heads * geo.sectors);
 
 		if (copy_to_user((void *) arg, &geo, sizeof(geo)))
 			return -EFAULT;
 		return 0;
 
-
 	default:
-		return blk_ioctl(i->i_bdev, cmd, arg);
+		return -EINVAL;
 	}
 
 	return -ENOTTY; /* unknown command */
@@ -905,7 +883,7 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 */
 static int mm_check_change(kdev_t i_rdev)
 {
-	int card_number = DEVICE_NR(kdev_val(i_rdev));
+	int card_number = DEVICE_NR(i_rdev);
 /*  struct cardinfo *dev = cards + card_number; */
 	if (card_number >= num_cards) /* paranoid */
 		return 0;
@@ -920,38 +898,8 @@ static int mm_check_change(kdev_t i_rdev)
 */
 static int mm_open(struct inode *i, struct file *filp)
 {
-	int num;
-	struct cardinfo *card;
-
-	num = DEVICE_NR(kdev_val(i->i_rdev));
-	if (num >= num_cards)
+	if (DEVICE_NR(i->i_rdev) >= num_cards)
 		return -ENXIO;
-
-	card = cards + num;
-
-	atomic_inc(&card->usage);
-	MOD_INC_USE_COUNT;
-
-	return 0;
-}
-/*
------------------------------------------------------------------------------------
---                              mm_do_release
------------------------------------------------------------------------------------
-*/
-static int mm_do_release(struct inode *i, struct file *filp)
-{
-	int num;
-	struct cardinfo *card;
-
-	num = DEVICE_NR(kdev_val(i->i_rdev));
-
-	card = cards + num;
-
-	if (atomic_dec_and_test(&card->usage))
-		invalidate_device(i->i_rdev, 1);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 /*
@@ -962,7 +910,6 @@ static int mm_do_release(struct inode *i, struct file *filp)
 static struct block_device_operations mm_fops = {
 	owner:		THIS_MODULE,
 	open:		mm_open,
-	release:	mm_do_release,
 	ioctl:		mm_ioctl,
 	revalidate:	mm_revalidate,
 	check_media_change: mm_check_change,
@@ -1243,7 +1190,7 @@ static struct pci_driver mm_pci_driver = {
 
 static request_queue_t * mm_queue_proc(kdev_t dev)
 {
-	int c = DEVICE_NR(kdev_val(dev));
+	int c = DEVICE_NR(dev);
 
 	if (c < MM_MAXCARDS)
 		return &cards[c].queue;
@@ -1293,7 +1240,6 @@ int __init mm_init(void)
 	blk_dev[MAJOR_NR].queue = mm_queue_proc;
 	add_gendisk(&mm_gendisk);
 
-        blk_size[MAJOR_NR]      = mm_gendisk.sizes;
         for (i = 0; i < num_cards; i++) {
 		register_disk(&mm_gendisk, mk_kdev(MAJOR_NR, i<<MM_SHIFT), MM_SHIFT,
 			      &mm_fops, cards[i].mm_size << 1);
@@ -1324,9 +1270,6 @@ void __exit mm_cleanup(void)
 	pci_unregister_driver(&mm_pci_driver);
 
 	unregister_blkdev(MAJOR_NR, "umem");
-
-        for (i = 0; i < (num_cards << MM_SHIFT); i++)
-		invalidate_device (mk_kdev(MAJOR_NR,i), 1);
 
 	blk_size     [MAJOR_NR] = NULL;
 
