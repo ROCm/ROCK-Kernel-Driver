@@ -1012,28 +1012,13 @@ ia64_log_prt_oem_data (int header_len, int sect_len, u8 *p_data, prfunc_t prfunc
 void
 ia64_log_rec_header_print (sal_log_record_header_t *lh, prfunc_t prfunc)
 {
-	char str_buf[32];
-
-	sprintf(str_buf, "%2d.%02d",
-		(lh->revision.major >> 4) * 10 + (lh->revision.major & 0xf),
-		(lh->revision.minor >> 4) * 10 + (lh->revision.minor & 0xf));
-	prfunc("+Err Record ID: %d    SAL Rev: %s\n", lh->id, str_buf);
-	sprintf(str_buf, "%02d/%02d/%04d/ %02d:%02d:%02d",
-		(lh->timestamp.slh_month >> 4) * 10 +
-		(lh->timestamp.slh_month & 0xf),
-		(lh->timestamp.slh_day >> 4) * 10 +
-		(lh->timestamp.slh_day & 0xf),
-		(lh->timestamp.slh_century >> 4) * 1000 +
-		(lh->timestamp.slh_century & 0xf) * 100 +
-		(lh->timestamp.slh_year >> 4) * 10 +
-		(lh->timestamp.slh_year & 0xf),
-		(lh->timestamp.slh_hour >> 4) * 10 +
-		(lh->timestamp.slh_hour & 0xf),
-		(lh->timestamp.slh_minute >> 4) * 10 +
-		(lh->timestamp.slh_minute & 0xf),
-		(lh->timestamp.slh_second >> 4) * 10 +
-		(lh->timestamp.slh_second & 0xf));
-	prfunc("+Time: %s    Severity %d\n", str_buf, lh->severity);
+	prfunc("+Err Record ID: %d    SAL Rev: %2x.%02x\n", lh->id,
+			lh->revision.major, lh->revision.minor);
+	prfunc("+Time: %02x/%02x/%02x%02x %02x:%02x:%02x    Severity %d\n",
+			lh->timestamp.slh_month, lh->timestamp.slh_day,
+			lh->timestamp.slh_century, lh->timestamp.slh_year,
+			lh->timestamp.slh_hour, lh->timestamp.slh_minute,
+			lh->timestamp.slh_second, lh->severity);
 }
 
 /*

@@ -8,6 +8,9 @@
  *  Copyright (C) 2000 Intel Corp.
  *  Copyright (C) 2000,2001 J.I. Lee <jung-ik.lee@intel.com>
  *  Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+ *  Copyright (C) 2001 Jenna Hall <jenna.s.hall@intel.com>
+ *  Copyright (C) 2001 Takayoshi Kochi <t-kouchi@cq.jp.nec.com>
+ *  Copyright (C) 2002 Erich Focht <efocht@ess.nec.de>
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
@@ -43,6 +46,7 @@
 #include <asm/machvec.h>
 #include <asm/page.h>
 #include <asm/system.h>
+#include <asm/numa.h>
 
 
 #define PREFIX			"ACPI: "
@@ -447,6 +451,158 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 }
 
 
+#ifdef CONFIG_ACPI_NUMA
+
+#define SLIT_DEBUG
+
+#define PXM_FLAG_LEN ((MAX_PXM_DOMAINS + 1)/32)
+
+static int __initdata srat_num_cpus;			/* number of cpus */
+static u32 __initdata pxm_flag[PXM_FLAG_LEN];
+#define pxm_bit_set(bit)	(set_bit(bit,(void *)pxm_flag))
+#define pxm_bit_test(bit)	(test_bit(bit,(void *)pxm_flag))
+/* maps to convert between proximity domain and logical node ID */
+int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
+int __initdata nid_to_pxm_map[NR_NODES];
+static struct acpi_table_slit __initdata *slit_table;
+
+/*
+ * ACPI 2.0 SLIT (System Locality Information Table)
+ * http://devresource.hp.com/devresource/Docs/TechPapers/IA64/slit.pdf
+ */
+void __init
+acpi_numa_slit_init (struct acpi_table_slit *slit)
+{
+	int i, j, node_from, node_to;
+	u32 len;
+
+	len = sizeof(struct acpi_table_header) + 8
+		+ slit->localities * slit->localities;
+	if (slit->header.length != len) {
+		printk("ACPI 2.0 SLIT: size mismatch: %d expected, %d actual\n",
+		      len, slit->header.length);
+		memset(numa_slit, 10, sizeof(numa_slit));
+		return;
+	}
+	slit_table = slit;
+}
+
+void __init
+acpi_numa_processor_affinity_init (struct acpi_table_processor_affinity *pa)
+{
+	/* record this node in proximity bitmap */
+	pxm_bit_set(pa->proximity_domain);
+
+	node_cpuid[srat_num_cpus].phys_id = (pa->apic_id << 8) | (pa->lsapic_eid);
+	/* nid should be overridden as logical node id later */
+	node_cpuid[srat_num_cpus].nid = pa->proximity_domain;
+	srat_num_cpus++;
+}
+
+void __init
+acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
+{
+	unsigned long paddr, size;
+	u8 pxm;
+	struct node_memblk_s *p, *q, *pend;
+
+	pxm = ma->proximity_domain;
+
+	/* record this node in proximity bitmap */
+	pxm_bit_set(pxm);
+
+	/* fill node memory chunk structure */
+	paddr = ma->base_addr_hi;
+	paddr = (paddr << 32) | ma->base_addr_lo;
+	size = ma->length_hi;
+	size = (size << 32) | ma->length_lo;
+
+	if (num_memblks >= NR_MEMBLKS) {
+		printk("Too many mem chunks in SRAT. Ignoring %ld MBytes at %lx\n",
+			size/(1024*1024), paddr);
+		return;
+	}
+
+	/* Insertion sort based on base address */
+	pend = &node_memblk[num_memblks];
+	for (p = &node_memblk[0]; p < pend; p++) {
+		if (paddr < p->start_paddr)
+			break;
+	}
+	if (p < pend) {
+		for (q = pend; q >= p; q--)
+			*(q + 1) = *q;
+	}
+	p->start_paddr = paddr;
+	p->size = size;
+	p->nid = pxm;
+	num_memblks++;
+}
+
+void __init
+acpi_numa_arch_fixup(void)
+{
+	int i, j;
+
+	/* calculate total number of nodes in system from PXM bitmap */
+	numnodes = 0;		/* init total nodes in system */
+
+	memset(pxm_to_nid_map, -1, sizeof(pxm_to_nid_map));
+	memset(nid_to_pxm_map, -1, sizeof(nid_to_pxm_map));
+	for (i = 0; i < MAX_PXM_DOMAINS; i++) {
+		if (pxm_bit_test(i)) {
+			pxm_to_nid_map[i] = numnodes;
+			nid_to_pxm_map[numnodes++] = i;
+		}
+	}
+
+	/* set logical node id in memory chunk structure */
+	for (i = 0; i < num_memblks; i++)
+		node_memblk[i].nid = pxm_to_nid_map[node_memblk[i].nid];
+
+	/* assign memory bank numbers for each chunk on each node */
+	for (i = 0; i < numnodes; i++) {
+		int bank;
+
+		bank = 0;
+		for (j = 0; j < num_memblks; j++)
+			if (node_memblk[j].nid == i)
+				node_memblk[j].bank = bank++;
+	}
+
+	/* set logical node id in cpu structure */
+	for (i = 0; i < srat_num_cpus; i++)
+		node_cpuid[i].nid = pxm_to_nid_map[node_cpuid[i].nid];
+
+	printk("Number of logical nodes in system = %d\n", numnodes);
+	printk("Number of memory chunks in system = %d\n", num_memblks);
+
+	if (!slit_table) return;
+	memset(numa_slit, -1, sizeof(numa_slit));
+	for (i=0; i<slit_table->localities; i++) {
+		if (!pxm_bit_test(i))
+			continue;
+		node_from = pxm_to_nid_map[i];
+		for (j=0; j<slit_table->localities; j++) {
+			if (!pxm_bit_test(j))
+				continue;
+			node_to = pxm_to_nid_map[j];
+			node_distance(node_from, node_to) = 
+				slit_table->entry[i*slit_table->localities + j];
+		}
+	}
+
+#ifdef SLIT_DEBUG
+	printk("ACPI 2.0 SLIT locality table:\n");
+	for (i = 0; i < numnodes; i++) {
+		for (j = 0; j < numnodes; j++)
+			printk("%03d ", node_distance(i,j));
+		printk("\n");
+	}
+#endif
+}
+#endif /* CONFIG_ACPI_NUMA */
+
 static int __init
 acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
@@ -556,12 +712,6 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 int __init
 acpi_boot_init (char *cmdline)
 {
-	int result;
-
-	/* Initialize the ACPI boot-time table parser */
-	result = acpi_table_init(cmdline);
-	if (result)
-		return result;
 
 	/*
 	 * MADT

@@ -160,6 +160,14 @@ SECTIONS
   .bss : AT(ADDR(.bss) - PAGE_OFFSET)
 	{ *(.bss) *(COMMON) }
 
+  /* XXX Must this come last to avoid shifting other symbols?  --davidm */
+  __kallsyms : AT(ADDR(__kallsyms) - PAGE_OFFSET)
+	{
+	  __start___kallsyms = .;	/* All kernel symbols */
+	  *(__kallsyms)
+	  __stop___kallsyms = .;
+	}
+
   _end = .;
 
   /* Stabs debugging sections.  */

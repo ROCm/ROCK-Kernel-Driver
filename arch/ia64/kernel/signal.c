@@ -41,6 +41,16 @@
 # define GET_SIGSET(k,u)	__get_user((k)->sig[0], &(u)->sig[0])
 #endif
 
+register double f16 asm ("f16"); register double f17 asm ("f17");
+register double f18 asm ("f18"); register double f19 asm ("f19");
+register double f20 asm ("f20"); register double f21 asm ("f21");
+register double f22 asm ("f22"); register double f23 asm ("f23");
+
+register double f24 asm ("f24"); register double f25 asm ("f25");
+register double f26 asm ("f26"); register double f27 asm ("f27");
+register double f28 asm ("f28"); register double f29 asm ("f29");
+register double f30 asm ("f30"); register double f31 asm ("f31");
+
 long
 ia64_rt_sigsuspend (sigset_t *uset, size_t sigsetsize, struct sigscratch *scr)
 {
