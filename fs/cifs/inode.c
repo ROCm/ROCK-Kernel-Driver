@@ -204,10 +204,10 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 				    strnlen(search_path, MAX_PATHCONF) + 1,
 				    GFP_KERNEL);
 			if (tmp_path == NULL) {
-			    if(buf)
-				kfree(buf);
-			    FreeXid(xid);
-			    return -ENOMEM;
+				if(buf)
+					kfree(buf);
+				FreeXid(xid);
+				return -ENOMEM;
 			}
 
 			strncpy(tmp_path, pTcon->treeName, MAX_TREE_SIZE);
@@ -218,10 +218,10 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 			kfree(tmp_path);
 			/* BB fix up inode etc. */
 		} else if (rc) {
-		    if(buf)
-			kfree(buf);
-		    FreeXid(xid);
-		    return rc;
+			if(buf)
+				kfree(buf);
+			FreeXid(xid);
+			return rc;
 		}
 	} else {
 		struct cifsInodeInfo *cifsInfo;
@@ -275,7 +275,7 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		i_size_write(inode,le64_to_cpu(pfindData->EndOfFile));
 		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
 		inode->i_blocks =
-	                (inode->i_blksize - 1 + pfindData->AllocationSize) >> inode->i_blkbits;
+			(inode->i_blksize - 1 + pfindData->AllocationSize) >> inode->i_blkbits;
 
 		inode->i_nlink = le32_to_cpu(pfindData->NumberOfLinks);
 
@@ -380,8 +380,8 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 				__u16 netfid;
 
 				rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OPEN, DELETE,
-                                	CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
-	                                &netfid, &oplock, NULL, cifs_sb->local_nls);
+						CREATE_NOT_DIR | CREATE_DELETE_ON_CLOSE,
+						&netfid, &oplock, NULL, cifs_sb->local_nls);
 				if(rc==0) {
 					CIFSSMBRenameOpenFile(xid,pTcon,netfid,NULL,cifs_sb->local_nls);
 					CIFSSMBClose(xid, pTcon, netfid);

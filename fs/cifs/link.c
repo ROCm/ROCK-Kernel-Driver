@@ -96,6 +96,8 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	pTcon = cifs_sb->tcon;
 	target_path = kmalloc(PATH_MAX, GFP_KERNEL);
 	if(target_path == NULL) {
+		if (full_path)
+			kfree(full_path);
 		FreeXid(xid);
 		return -ENOMEM;
 	}
@@ -212,6 +214,8 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 		len = buflen;
 	tmpbuffer = kmalloc(len,GFP_KERNEL);   
 	if(tmpbuffer == NULL) {
+		if (full_path)
+			kfree(full_path);
 		FreeXid(xid);
 		return -ENOMEM;
 	}
@@ -251,10 +255,11 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 						cFYI(1,("num referral: %d",num_referrals));
 						if(referrals) {
 							cFYI(1,("referral string: %s ",referrals));
-							strncpy(tmpbuffer, referrals, len-1);
+							strncpy(tmpbuffer, referrals, len-1);                            
 						}
 					}
-
+					if(referrals)
+						kfree(referrals);
 					kfree(tmp_path);
 					if(referrals) {
 						kfree(referrals);

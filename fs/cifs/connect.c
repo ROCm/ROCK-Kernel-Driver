@@ -44,7 +44,7 @@ extern void SMBencrypt(unsigned char *passwd, unsigned char *c8,
 		       unsigned char *p24);
 extern void SMBNTencrypt(unsigned char *passwd, unsigned char *c8,
 			 unsigned char *p24);
-extern int cifs_inet_addr(char *);
+extern int cifs_inet_pton(int, const char *, void *dst);
 
 struct smb_vol {
 	char *username;
@@ -378,7 +378,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				ses->server = NULL;
 			}
 		}
-		kfree(server);
+		read_unlock(&GlobalSMBSeslock);
 	} else {
 		spin_lock(&GlobalMid_Lock);
 		list_for_each(tmp, &server->pending_mid_q) {
@@ -393,8 +393,22 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			}
 		}
 		spin_unlock(&GlobalMid_Lock);
+		read_unlock(&GlobalSMBSeslock);
+		set_current_state(TASK_INTERRUPTIBLE);
+		/* 1/8th of sec should be more than enough time for them to exit */
+		schedule_timeout(HZ/8); 
 	}
-	read_unlock(&GlobalSMBSeslock);
+
+	if (list_empty(&server->pending_mid_q)) {
+		/* mpx threads have not exited yet give them 
+		at least the smb send timeout time for long ops */
+		cFYI(1, ("Wait for exit from demultiplex thread"));
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(46 * HZ);	
+		/* if threads still have not exited they are probably never
+		coming home not much else we can do but free the memory */
+	}
+	kfree(server);
 
 	cFYI(1, ("About to exit from demultiplex thread"));
 	return 0;
@@ -765,7 +779,8 @@ connect_to_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 		the helper that resolves tcp names, mount to it, try to 
 		tcon to it unmount it if fail */
 
-	/* BB free memory for referrals string BB */
+	if(referrals)
+		kfree(referrals);
 
 	return rc;
 }
@@ -955,6 +970,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	if (cifs_parse_mount_options(mount_data, devname, &volume_info)) {
 		if(volume_info.UNC)
 			kfree(volume_info.UNC);
+		if(volume_info.password)
+			kfree(volume_info.password);
 		FreeXid(xid);
 		return -EINVAL;
 	}
@@ -966,19 +983,45 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		cifserror("No username specified ");
         /* In userspace mount helper we can get user name from alternate
            locations such as env variables and files on disk */
+		if(volume_info.UNC)
+			kfree(volume_info.UNC);
+		if(volume_info.password)
+			kfree(volume_info.password);
 		FreeXid(xid);
 		return -EINVAL;
 	}
 
 	if (volume_info.UNCip && volume_info.UNC) {
-		sin_server.sin_addr.s_addr = cifs_inet_addr(volume_info.UNCip);
-		cFYI(1, ("UNC: %s ip: %s  ", volume_info.UNC, volume_info.UNCip));
+		rc = cifs_inet_pton(AF_INET, volume_info.UNCip,&sin_server.sin_addr.s_addr);
+
+		if(rc == 0) {
+			/* not ipv4 address, try ipv6 */
+			rc = cifs_inet_pton(AF_INET6,volume_info.UNCip,&sin_server6.sin6_addr.in6_u); 
+		} 
+       
+		if(rc != 1) {
+			/* we failed translating address */
+			if(volume_info.UNC)
+				kfree(volume_info.UNC);
+			if(volume_info.password)
+				kfree(volume_info.password);
+			FreeXid(xid);
+			return -EINVAL;
+		}
+
+		cFYI(1, ("UNC: %s ip: %s", volume_info.UNC, volume_info.UNCip));
+		/* success */
+		rc = 0;
 	} else if (volume_info.UNCip){
 		/* BB using ip addr as server name connect to the DFS root below */
 		cERROR(1,("Connecting to DFS root not implemented yet"));
 	} else /* which servers DFS root would we conect to */ {
 		cERROR(1,
 		       ("CIFS mount error: No UNC path (e.g. -o unc=//192.168.1.100/public) specified  "));
+		if(volume_info.UNC)
+			kfree(volume_info.UNC);
+		if(volume_info.password)
+			kfree(volume_info.password);
 		FreeXid(xid);
 		return -EINVAL;
 	}
@@ -991,6 +1034,10 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		cifs_sb->local_nls = load_nls(volume_info.iocharset);
 		if(cifs_sb->local_nls == NULL) {
 			cERROR(1,("CIFS mount error: iocharset %s not found",volume_info.iocharset));
+			if(volume_info.UNC)
+				kfree(volume_info.UNC);
+			if(volume_info.password)
+				kfree(volume_info.password);
 			FreeXid(xid);
 			return -ELIBACC;
 		}
@@ -1014,6 +1061,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 				sock_release(csocket);
 			if(volume_info.UNC)
 				kfree(volume_info.UNC);
+			if(volume_info.password)
+				kfree(volume_info.password);
 			FreeXid(xid);
 			return rc;
 		}
@@ -1024,6 +1073,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			sock_release(csocket);
 			if(volume_info.UNC)
 				kfree(volume_info.UNC);
+			if(volume_info.password)
+				kfree(volume_info.password);
 			FreeXid(xid);
 			return rc;
 		} else {
@@ -1044,6 +1095,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	if (existingCifsSes) {
 		pSesInfo = existingCifsSes;
 		cFYI(1, ("Existing smb sess found "));
+		if(volume_info.password)
+			kfree(volume_info.password);
 	} else if (!rc) {
 		cFYI(1, ("Existing smb sess not found "));
 		pSesInfo = sesInfoAlloc();
@@ -1070,7 +1123,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			up(&pSesInfo->sesSem);
 			if(!rc)
 				atomic_inc(&srvTcp->socketUseCount);
-		}
+		} else
+			if(volume_info.password)
+				kfree(volume_info.password);
 	}
     
 	/* search for existing tcon to this server share */
@@ -2494,6 +2549,8 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 			if (((long) bcc_ptr + (2 * length)) -
 			    (long) pByteArea(smb_buffer_response) <=
 			    BCC(smb_buffer_response)) {
+				if(tcon->nativeFileSystem)
+					kfree(tcon->nativeFileSystem);
 				tcon->nativeFileSystem =
 				    cifs_kcalloc(length + 2, GFP_KERNEL);
 				cifs_strfromUCS_le(tcon->nativeFileSystem,
@@ -2510,6 +2567,8 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 			if (((long) bcc_ptr + length) -
 			    (long) pByteArea(smb_buffer_response) <=
 			    BCC(smb_buffer_response)) {
+				if(tcon->nativeFileSystem)
+					kfree(tcon->nativeFileSystem);
 				tcon->nativeFileSystem =
 				    cifs_kcalloc(length + 1, GFP_KERNEL);
 				strncpy(tcon->nativeFileSystem, bcc_ptr,

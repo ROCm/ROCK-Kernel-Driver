@@ -150,11 +150,12 @@ cifs_open(struct inode *inode, struct file *file)
 		cFYI(1, ("cifs_open returned 0x%x ", rc));
 		cFYI(1, ("oplock: %d ", oplock));	
 	} else {
+		if(file->private_data)
+			kfree(file->private_data);
 		file->private_data =
-		    kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
+			kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
 		if (file->private_data) {
-			memset(file->private_data, 0,
-			       sizeof (struct cifsFileInfo));
+			memset(file->private_data, 0, sizeof(struct cifsFileInfo));
 			pCifsFile = (struct cifsFileInfo *) file->private_data;
 			pCifsFile->netfid = netfid;
 			pCifsFile->pid = current->pid;
@@ -183,7 +184,7 @@ cifs_open(struct inode *inode, struct file *file)
 						struct timespec temp;
 						temp = cifs_NTtimeToUnix(le64_to_cpu(buf->LastWriteTime));
 						if(timespec_equal(&file->f_dentry->d_inode->i_mtime,&temp) && 
-							(file->f_dentry->d_inode->i_size == le64_to_cpu(buf->EndOfFile))) {
+							(file->f_dentry->d_inode->i_size == (loff_t)le64_to_cpu(buf->EndOfFile))) {
 							cFYI(1,("inode unchanged on server"));
 						} else {
 							cFYI(1,("invalidating remote inode since open detected it changed"));
@@ -297,11 +298,11 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 	else
 		oplock = FALSE;
 
-        /* BB pass O_SYNC flag through on file attributes .. BB */
+		/* BB pass O_SYNC flag through on file attributes .. BB */
 
-        /* Also refresh inode by passing in file_info buf returned by SMBOpen
-           and calling get_inode_info with returned buf (at least
-           helps non-Unix server case */
+		/* Also refresh inode by passing in file_info buf returned by SMBOpen
+		   and calling get_inode_info with returned buf (at least
+		   helps non-Unix server case */
 	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	if(buf==0) {
 		up(&pCifsFile->fh_sem);
@@ -932,7 +933,6 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 			continue;
 		}
 
-		page_cache_get(page);
 		target = kmap_atomic(page,KM_USER0);
 
 		if(PAGE_CACHE_SIZE > bytes_read) {
@@ -946,12 +946,11 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 		}
 		kunmap_atomic(target,KM_USER0);
 
-		if (!pagevec_add(plru_pvec, page))
-			__pagevec_lru_add(plru_pvec);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
-		unlock_page(page);   /* BB verify we need to unlock here */
-	   /* page_cache_release(page);*/
+		unlock_page(page);
+		if (!pagevec_add(plru_pvec, page))
+			__pagevec_lru_add(plru_pvec);
 		data += PAGE_CACHE_SIZE;
 	}
 	return;
@@ -1031,10 +1030,16 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 				read_size, offset,
 				&bytes_read, &smb_read_data);
 			/* BB need to check return code here */
+			if(rc== -EAGAIN) {
+				if(smb_read_data) {
+					cifs_buf_release(smb_read_data);
+					smb_read_data = 0;
+				}
+			}
 		}
 		if ((rc < 0) || (smb_read_data == NULL)) {
-			cERROR(1,("Read error in readpages: %d",rc)); 
-			/* clean up remaing pages off list */            
+			cFYI(1,("Read error in readpages: %d",rc));
+			/* clean up remaing pages off list */
 			while (!list_empty(page_list) && (i < num_pages)) {
 				page = list_entry(page_list->prev, struct page, lru);
 				list_del(&page->lru);
@@ -1085,10 +1090,10 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	pagevec_lru_add(&lru_pvec);
 
 /* need to free smb_read_data buf before exit */
-if(smb_read_data) {
-	cifs_buf_release(smb_read_data);
-	smb_read_data = 0;
-} 
+	if(smb_read_data) {
+		cifs_buf_release(smb_read_data);
+		smb_read_data = 0;
+	} 
 
 	FreeXid(xid);
 	return rc;
@@ -1497,8 +1502,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			searchHandle = findParms.SearchHandle;
 			if(file->private_data == NULL)
 				file->private_data =
-				    kmalloc(sizeof(struct cifsFileInfo),
-					  GFP_KERNEL);
+					kmalloc(sizeof(struct cifsFileInfo),GFP_KERNEL);
 			if (file->private_data) {
 				memset(file->private_data, 0,
 				       sizeof (struct cifsFileInfo));

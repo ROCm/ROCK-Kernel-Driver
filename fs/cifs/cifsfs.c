@@ -127,10 +127,11 @@ out_no_root:
 		iput(inode);
 
 out_mount_failed:
-	if(cifs_sb->local_nls)
-		unload_nls(cifs_sb->local_nls);	
-	if(cifs_sb)
+	if(cifs_sb) {
+		if(cifs_sb->local_nls)
+			unload_nls(cifs_sb->local_nls);	
 		kfree(cifs_sb);
+	}
 	return rc;
 }
 
@@ -190,8 +191,21 @@ cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 
 static int cifs_permission(struct inode * inode, int mask, struct nameidata *nd)
 {
-	/* the server does permission checks, we do not need to do it here */
-	return 0;
+        struct cifs_sb_info *cifs_sb;
+
+        cifs_sb = CIFS_SB(inode->i_sb);
+
+        if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
+		/* the server supports the Unix-like mode bits and does its
+		own permission checks, and therefore we do not allow the file
+		mode to be overriden on these mounts - so do not do perm
+		check on client side */
+		return 0;
+	} else /* file mode might have been restricted at mount time 
+		on the client (above and beyond ACL on servers) for  
+		servers which do not support setting and viewing mode bits,
+		so allowing client to check permissions is useful */ 
+		return vfs_permission(inode, mask);
 }
 
 static kmem_cache_t *cifs_inode_cachep;
@@ -410,7 +424,7 @@ cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
 	else if(file->f_dentry->d_inode == NULL)
 		return -EIO;
 
-	cFYI(1,("In read_wrapper size %d at %lld",read_size,*poffset));
+	cFYI(1,("In read_wrapper size %zd at %lld",read_size,*poffset));
 	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead) {
 		return generic_file_read(file,read_data,read_size,poffset);
 	} else {
@@ -441,7 +455,7 @@ cifs_write_wrapper(struct file * file, const char *write_data,
 	else if(file->f_dentry->d_inode == NULL)
 		return -EIO;
 
-	cFYI(1,("In write_wrapper size %d at %lld",write_size,*poffset));
+	cFYI(1,("In write_wrapper size %zd at %lld",write_size,*poffset));
 
 	/* check whether we can cache writes locally */
 	written = generic_file_write(file,write_data,write_size,poffset);
