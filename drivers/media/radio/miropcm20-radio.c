@@ -121,8 +121,8 @@ static int pcm20_getflags(struct pcm20_device *dev, __u32 *flags, __u16 *signal)
 	return 0;
 }
 
-static int pcm20_ioctl(struct inode *inode, struct file *file,
-		       unsigned int cmd, void *arg)
+static int pcm20_do_ioctl(struct inode *inode, struct file *file,
+			  unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct pcm20_device *pcm20 = dev->priv;
@@ -210,6 +210,12 @@ static int pcm20_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int pcm20_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, pcm20_do_ioctl);
+}
+
 static struct pcm20_device pcm20_unit = {
 	freq:   87*16000,
 	muted:  1,
@@ -220,7 +226,7 @@ static struct file_operations pcm20_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		pcm20_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -230,7 +236,6 @@ static struct video_device pcm20_radio = {
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_RTRACK,
 	fops:           &pcm20_fops,
-	kernel_ioctl:	pcm20_ioctl,
 	priv:		&pcm20_unit
 };
 

@@ -157,8 +157,8 @@ static int az_setfreq(struct az_device *dev, unsigned long frequency)
 	return 0;
 }
 
-static int az_ioctl(struct inode *inode, struct file *file,
-		    unsigned int cmd, void *arg)
+static int az_do_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct az_device *az = dev->priv;
@@ -243,13 +243,19 @@ static int az_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int az_ioctl(struct inode *inode, struct file *file,
+		    unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, az_do_ioctl);
+}
+
 static struct az_device aztech_unit;
 
 static struct file_operations aztech_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		az_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -260,7 +266,6 @@ static struct video_device aztech_radio=
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_AZTECH,
 	fops:           &aztech_fops,
-	kernel_ioctl:   az_ioctl,
 };
 
 static int __init aztech_init(void)

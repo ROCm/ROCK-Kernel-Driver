@@ -215,8 +215,8 @@ int zol_is_stereo (struct zol_device *dev)
 	return 0;
 }
 
-static int zol_ioctl(struct inode *inode, struct file *file,
-		     unsigned int cmd, void *arg)
+static int zol_do_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct zol_device *zol = dev->priv;
@@ -309,6 +309,12 @@ static int zol_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int zol_ioctl(struct inode *inode, struct file *file,
+		     unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, zol_do_ioctl);
+}
+
 static struct zol_device zoltrix_unit;
 
 static struct file_operations zoltrix_fops =
@@ -316,7 +322,7 @@ static struct file_operations zoltrix_fops =
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		zol_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -327,7 +333,6 @@ static struct video_device zoltrix_radio =
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_ZOLTRIX,
 	fops:           &zoltrix_fops,
-	kernel_ioctl:  	zol_ioctl,
 };
 
 static int __init zoltrix_init(void)

@@ -106,8 +106,8 @@ static int rt_getsigstr(struct rt_device *dev)
 	return 1;		/* signal present		*/
 }
 
-static int rt_ioctl(struct inode *inode, struct file *file,
-		    unsigned int cmd, void *arg)
+static int rt_do_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct rt_device *rt=dev->priv;
@@ -186,13 +186,19 @@ static int rt_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static int rt_ioctl(struct inode *inode, struct file *file,
+		    unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, rt_do_ioctl);
+}
+
 static struct rt_device rtrack2_unit;
 
 static struct file_operations rtrack2_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:		video_generic_ioctl,
+	ioctl:		rt_ioctl,
 	llseek:         no_llseek,
 };
 
@@ -203,7 +209,6 @@ static struct video_device rtrack2_radio=
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_RTRACK2,
 	fops:           &rtrack2_fops,
-	kernel_ioctl:   rt_ioctl,
 };
 
 static int __init rtrack2_init(void)
