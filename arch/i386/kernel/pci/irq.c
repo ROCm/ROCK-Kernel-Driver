@@ -17,7 +17,7 @@
 #include <asm/smp.h>
 #include <asm/io_apic.h>
 
-#include "pci-i386.h"
+#include "pci.h"
 
 #define PIRQ_SIGNATURE	(('$' << 0) + ('P' << 8) + ('I' << 16) + ('R' << 24))
 #define PIRQ_VERSION 0x0100

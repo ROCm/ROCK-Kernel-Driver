@@ -92,7 +92,7 @@
 #include <linux/ioport.h>
 #include <linux/errno.h>
 
-#include "pci-i386.h"
+#include "pci.h"
 
 void
 pcibios_update_resource(struct pci_dev *dev, struct resource *root,

@@ -16,7 +16,7 @@
 #include <asm/io.h>
 #include <asm/smp.h>
 
-#include "pci-i386.h"
+#include "pci.h"
 
 unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2;
 
