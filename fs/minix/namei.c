@@ -78,7 +78,12 @@ static struct dentry *minix_lookup(struct inode * dir, struct dentry *dentry, st
 static int minix_mknod(struct inode * dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	int error;
-	struct inode * inode = minix_new_inode(dir, &error);
+	struct inode *inode;
+
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
+	inode = minix_new_inode(dir, &error);
 
 	if (inode) {
 		inode->i_mode = mode;

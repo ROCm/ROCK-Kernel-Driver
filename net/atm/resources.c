@@ -110,20 +110,16 @@ struct atm_dev *atm_dev_register(const char *type, const struct atmdev_ops *ops,
 	list_add_tail(&dev->dev_list, &atm_devs);
 	spin_unlock(&atm_dev_lock);
 
-#ifdef CONFIG_PROC_FS
-	if (ops->proc_read) {
-		if (atm_proc_dev_register(dev) < 0) {
-			printk(KERN_ERR "atm_dev_register: "
-			       "atm_proc_dev_register failed for dev %s\n",
-			       type);
-			spin_lock(&atm_dev_lock);
-			list_del(&dev->dev_list);
-			spin_unlock(&atm_dev_lock);
-			__free_atm_dev(dev);
-			return NULL;
-		}
+	if (atm_proc_dev_register(dev) < 0) {
+		printk(KERN_ERR "atm_dev_register: "
+		       "atm_proc_dev_register failed for dev %s\n",
+		       type);
+		spin_lock(&atm_dev_lock);
+		list_del(&dev->dev_list);
+		spin_unlock(&atm_dev_lock);
+		__free_atm_dev(dev);
+		return NULL;
 	}
-#endif
 
 	return dev;
 }
@@ -133,10 +129,8 @@ void atm_dev_deregister(struct atm_dev *dev)
 {
 	unsigned long warning_time;
 
-#ifdef CONFIG_PROC_FS
-	if (dev->ops->proc_read)
-		atm_proc_dev_deregister(dev);
-#endif
+	atm_proc_dev_deregister(dev);
+
 	spin_lock(&atm_dev_lock);
 	list_del(&dev->dev_list);
 	spin_unlock(&atm_dev_lock);

@@ -577,7 +577,7 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	}
 
 	if (param->flags & DM_PERSISTENT_DEV_FLAG)
-		r = dm_create_with_minor(minor(to_kdev_t(param->dev)), &md);
+		r = dm_create_with_minor(MINOR(param->dev), &md);
 	else
 		r = dm_create(&md);
 

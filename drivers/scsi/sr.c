@@ -59,7 +59,7 @@
 MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
 
 
-#define SR_DISKS	(1 << KDEV_MINOR_BITS)
+#define SR_DISKS	256
 
 #define MAX_RETRIES	3
 #define SR_TIMEOUT	(30 * HZ)

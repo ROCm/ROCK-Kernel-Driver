@@ -158,7 +158,6 @@ enum tubwhat {          /* echo what= proc actions */
 
 
 #define TUBMAXMINS      256
-#define TUB_DEV MKDEV(IBM_FS3270_MAJ, 0)        /* Generic /dev/3270/tub */
 #define _GEOM_ROWS 24
 #define _GEOM_COLS 80
 #define GEOM_ROWS (tubp->geom_rows)
@@ -293,23 +292,6 @@ typedef struct tub_s {
 #define	TUB_OPEN_STET	0x0400		/* No screen clear on open */
 #define	TUB_UE_BUSY	0x0800
 #define	TUB_INPUT_HACK	0x1000		/* Early init of command line */
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-#define	S390_CONSOLE_DEV MKDEV(TTY_MAJOR, 64)
-#define tub_major(x) MAJOR(x)
-#define tub_minor(x) MINOR(x)
-#define tub_mkdev(x, y) MKDEV(x, y)
-#elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-#define	S390_CONSOLE_DEV MKDEV(TTYAUX_MAJOR, 1)
-#define tub_major(x) MAJOR(x)
-#define tub_minor(x) MINOR(x)
-#define tub_mkdev(x, y) MKDEV(x, y)
-#else
-#define S390_CONSOLE_DEV mk_kdev(TTYAUX_MAJOR, 1)
-#define tub_major(x) major(x)
-#define tub_minor(x) minor(x)
-#define tub_mkdev(x, y) mk_kdev(x, y)
-#endif
 
 /*
  * Extra stuff for 3270 console support

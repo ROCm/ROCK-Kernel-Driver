@@ -158,10 +158,6 @@
 /** \name Backward compatibility section */
 /*@{*/
 
-#ifndef minor
-#define minor(x) MINOR((x))
-#endif
-
 #ifndef MODULE_LICENSE
 #define MODULE_LICENSE(x) 
 #endif

@@ -242,7 +242,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 				case S_IFCHR:
 				case S_IFBLK:
 					/* reserve rdev for later checking */
-					attr->ia_size = kdev_t_to_nr(inode->i_rdev);
+					attr->ia_size = inode->i_rdev;
 					attr->ia_valid |= ATTR_SIZE;
 
 					/* FALLTHROUGH */
@@ -279,7 +279,8 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 		int	is_borc = 0;
 		u32	size = attr->ia_size;
 
-		rdev = (dev_t) size;
+		/* may need to change when we widen dev_t */
+		rdev = old_decode_dev(size);
 		if (type != S_IFBLK && type != S_IFCHR) {
 			rdev = 0;
 		} else if (type == S_IFCHR && !(attr->ia_valid & ATTR_SIZE)) {
@@ -300,7 +301,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 		/* Make sure the type and device matches */
 		nfserr = nfserr_exist;
 		if (inode && (type != (inode->i_mode & S_IFMT) || 
-		    (is_borc && kdev_t_to_nr(inode->i_rdev) != rdev)))
+		    (is_borc && inode->i_rdev != rdev)))
 			goto out_unlock;
 	}
 	

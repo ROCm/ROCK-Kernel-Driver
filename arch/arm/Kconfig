@@ -542,39 +542,15 @@ config CPU_FREQ_SA1100
 	bool
 	depends on CPU_FREQ && SA1100_LART
 	default y
+	select CPU_FREQ_DEFAULT_GOV_USERSPACE
+	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_SA1110
 	bool
 	depends on CPU_FREQ && (SA1100_ASSABET || SA1100_CERF || SA1100_PT_SYSTEM3)
 	default y
-
-if (CPU_FREQ_SA1100 || CPU_FREQ_SA1110)
-
-config CPU_FREQ_GOV_USERSPACE
-	tristate
-	depends on CPU_FREQ
-	default y
-
-config CPU_FREQ_24_API
-	bool
-	depends on CPU_FREQ_GOV_USERSPACE && SYSCTL
-	default y
-
-config CPU_FREQ_PROC_INTF
-	tristate "/proc/cpufreq interface (deprecated)"
-	depends on CPU_FREQ && PROC_FS
-	help
-	  This enables the /proc/cpufreq interface for controlling
-	  CPUFreq. Please note that it is recommended to use the sysfs
-	  interface instead (which is built automatically).
-
-	  For details, take a look at linux/Documentation/cpufreq.
-
-	  If in doubt, say N.
-
-endif
-
-# CPUfreq on Integrator can use the generic cpufreq core
+	select CPU_FREQ_DEFAULT_GOV_USERSPACE
+	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_INTEGRATOR
 	tristate "CPUfreq driver for ARM Integrator CPUs"
@@ -587,7 +563,7 @@ config CPU_FREQ_INTEGRATOR
 
 	  If in doubt, say Y.
 
-if (CPU_FREQ_INTEGRATOR)
+if (CPU_FREQ_INTEGRATOR) || (CPU_FREQ_SA1110) || (CPU_FREQ_SA1100)
 
 source "drivers/cpufreq/Kconfig"
 

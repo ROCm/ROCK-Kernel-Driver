@@ -1906,7 +1906,7 @@ static int journal_init_dev( struct super_block *super,
 	journal -> j_dev_bd = NULL;
 	journal -> j_dev_file = NULL;
 	jdev = SB_ONDISK_JOURNAL_DEVICE( super ) ?
-		SB_ONDISK_JOURNAL_DEVICE( super ) : super->s_dev;	
+		old_decode_dev(SB_ONDISK_JOURNAL_DEVICE(super)) : super->s_dev;	
 
 	if (bdev_read_only(super->s_bdev))
 	    blkdev_mode = FMODE_READ;
@@ -1939,7 +1939,6 @@ static int journal_init_dev( struct super_block *super,
 			result = -ENOMEM;
 		} else  {
 			/* ok */
-			jdev = jdev_inode -> i_bdev -> bd_dev;
 			set_blocksize(journal->j_dev_bd, super->s_blocksize);
 		}
 	} else {

@@ -32,8 +32,6 @@ int (*br_should_route_hook) (struct sk_buff **pskb) = NULL;
 
 static int __init br_init(void)
 {
-	printk(KERN_INFO "NET4: Ethernet Bridge 008 for NET4.0\n");
-
 #if defined(CONFIG_INET) && defined(CONFIG_NETFILTER)
 	if (br_netfilter_init())
 		return 1;

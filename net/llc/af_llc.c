@@ -1042,15 +1042,10 @@ static struct proto_ops llc_ui_ops = {
 	.sendpage    = sock_no_sendpage,
 };
 
-static char llc_ui_banner[] __initdata =
-	KERN_INFO "NET4.0 IEEE 802.2 BSD sockets, Jay Schulist, 2001, "
-		  "Arnaldo C. Melo, 2002-2003\n";
-
 int __init llc_ui_init(void)
 {
 	llc_ui_sap_last_autoport = LLC_SAP_DYN_START;
 	sock_register(&llc_ui_family_ops);
-	printk(llc_ui_banner);
 	return 0;
 }
 

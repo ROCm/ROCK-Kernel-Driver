@@ -33,8 +33,21 @@ int atmpvc_init(void);
 void atmpvc_exit(void);
 int atmsvc_init(void);
 void atmsvc_exit(void);
+
+#ifdef CONFIG_PROC_FS
 int atm_proc_init(void);
 void atm_proc_exit(void);
+#else
+static inline int atm_proc_init(void)
+{
+	return 0;
+}
+
+static inline void atm_proc_exit(void)
+{
+	/* nothing */
+}
+#endif /* CONFIG_PROC_FS */
 
 /* SVC */
 

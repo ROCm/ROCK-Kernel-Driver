@@ -270,7 +270,7 @@ struct request_queue
 	 * Together with queue_head for cacheline sharing
 	 */
 	struct list_head	queue_head;
-	struct list_head	*last_merge;
+	struct request		*last_merge;
 	elevator_t		elevator;
 
 	/*

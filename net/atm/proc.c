@@ -593,6 +593,10 @@ int atm_proc_dev_register(struct atm_dev *dev)
 	int digits,num;
 	int error;
 
+	/* No proc info */
+	if (!dev->ops->proc_read)
+		return 0;
+
 	error = -ENOMEM;
 	digits = 0;
 	for (num = dev->number; num; num /= 10) digits++;
@@ -619,6 +623,9 @@ fail1:
 
 void atm_proc_dev_deregister(struct atm_dev *dev)
 {
+	if (!dev->ops->proc_read)
+		return;
+
 	remove_proc_entry(dev->proc_name, atm_proc_root);
 	kfree(dev->proc_name);
 }

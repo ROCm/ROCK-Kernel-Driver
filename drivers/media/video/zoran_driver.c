@@ -1265,7 +1265,7 @@ static int
 zoran_open (struct inode *inode,
 	    struct file  *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	struct zoran *zr = NULL;
 	struct zoran_fh *fh;
 	int i, res, first_open = 0, have_module_locks = 0;

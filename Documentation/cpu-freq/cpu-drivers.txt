@@ -64,6 +64,12 @@ And optionally
 
 cpufreq_driver.exit -		A pointer to a per-CPU cleanup function.
 
+cpufreq_driver.resume -		A pointer to a per-CPU resume function
+				which is called with interrupts disabled
+				and _before_ the pre-suspend frequency
+				and/or policy is restored by a call to
+				->target or ->setpolicy.
+
 cpufreq_driver.attr -		A pointer to a NULL-terminated list of
 				"struct freq_attr" which allow to
 				export values to sysfs.
@@ -119,7 +125,7 @@ section 2 for details on frequency table helpers.
 
 You need to make sure that at least one valid frequency (or operating
 range) is within policy->min and policy->max. If necessary, increase
-policy->max fist, and only if this is no solution, decreas policy->min.
+policy->max first, and only if this is no solution, decrease policy->min.
 
 
 1.4 target or setpolicy?

@@ -160,7 +160,7 @@ static int sh_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	sh_freqs[SH_FREQ_MIN].frequency = min_freq;
 
 	/* cpuinfo and default policy values */
-	policy->policy                     = CPUFREQ_POLICY_PERFORMANCE;
+	policy->governor                   = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	policy->cur                        = max_freq;
 

@@ -341,16 +341,13 @@ static int pppoatm_ioctl(struct atm_vcc *atmvcc, unsigned int cmd,
 	return -ENOIOCTLCMD;
 }
 
-/* the following avoids some spurious warnings from the compiler */
-#define UNUSED __attribute__((unused))
-
-static int __init UNUSED pppoatm_init(void)
+static int __init pppoatm_init(void)
 {
 	pppoatm_ioctl_set(pppoatm_ioctl);
 	return 0;
 }
 
-static void __exit UNUSED pppoatm_exit(void)
+static void __exit pppoatm_exit(void)
 {
 	pppoatm_ioctl_set(NULL);
 }

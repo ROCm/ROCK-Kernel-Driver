@@ -224,7 +224,7 @@ fail:
 asmlinkage long
 sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 {
-	unsigned long nstart, end, tmp;
+	unsigned long vm_flags, nstart, end, tmp;
 	struct vm_area_struct * vma, * next, * prev;
 	int error = -EINVAL;
 
@@ -238,6 +238,8 @@ sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 		return -EINVAL;
 	if (end == start)
 		return 0;
+
+	vm_flags = calc_vm_prot_bits(prot);
 
 	down_write(&current->mm->mmap_sem);
 
@@ -257,7 +259,8 @@ sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 			goto out;
 		}
 
-		newflags = prot | (vma->vm_flags & ~(PROT_READ | PROT_WRITE | PROT_EXEC));
+		newflags = vm_flags | (vma->vm_flags & ~(VM_READ | VM_WRITE | VM_EXEC));
+
 		if ((newflags & ~(newflags >> 4)) & 0xf) {
 			error = -EACCES;
 			goto out;

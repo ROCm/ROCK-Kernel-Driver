@@ -28,11 +28,6 @@ struct kobj_map {
 	struct rw_semaphore *sem;
 };
 
-static inline int dev_to_index(dev_t dev)
-{
-	return MAJOR(dev) % 255;
-}
-
 int kobj_map(struct kobj_map *domain, dev_t dev, unsigned long range,
 	     struct module *module, kobj_probe_t *probe,
 	     int (*lock)(dev_t, void *), void *data)

@@ -40,7 +40,6 @@ const char sysctl_divert_version[32]="0.46";	/* Current version */
 
 static int __init dv_init(void)
 {
-	printk(KERN_INFO "NET4: Frame Diverter %s\n", sysctl_divert_version);
 	return 0;
 }
 module_init(dv_init);

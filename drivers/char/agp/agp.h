@@ -302,7 +302,7 @@ struct agp_bridge_data {
 #define AMD64_GARTAPERTUREBASE	0x94
 #define AMD64_GARTTABLEBASE	0x98
 #define AMD64_GARTCACHECTL		0x9c
-#define AMD64_GARTEN		1<<0
+#define AMD64_GARTEN		(1<<0)
 
 /* ALi registers */
 #define ALI_AGPCTRL			0xb8

@@ -113,6 +113,9 @@ linvfs_mknod(
 	xattr_exists_t	test_default_acl = _ACL_DEFAULT_EXISTS;
 	int		error;
 
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
 	if (test_default_acl && test_default_acl(dvp)) {
 		if (!_ACL_ALLOC(default_acl))
 			return -ENOMEM;
@@ -178,7 +181,7 @@ linvfs_mknod(
 		ip = LINVFS_GET_IP(vp);
 
 		if (S_ISCHR(mode) || S_ISBLK(mode))
-			ip->i_rdev = to_kdev_t(rdev);
+			ip->i_rdev = rdev;
 		else if (S_ISDIR(mode))
 			validate_fields(ip);
 		d_instantiate(dentry, ip);

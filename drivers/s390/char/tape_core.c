@@ -178,7 +178,7 @@ tape_assign_minor(struct tape_device *device)
 			break;
 		minor += TAPE_MINORS_PER_DEV;
 	}
-	if (minor >= (1 << KDEV_MINOR_BITS)) {
+	if (minor >= 256) {
 		write_unlock(&tape_device_lock);
 		return -ENODEV;
 	}

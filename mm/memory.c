@@ -43,7 +43,6 @@
 #include <linux/swap.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
-#include <linux/vcache.h>
 #include <linux/rmap-locking.h>
 #include <linux/module.h>
 
@@ -962,7 +961,6 @@ static inline void establish_pte(struct vm_area_struct * vma, unsigned long addr
 static inline void break_cow(struct vm_area_struct * vma, struct page * new_page, unsigned long address, 
 		pte_t *page_table)
 {
-	invalidate_vcache(address, vma->vm_mm, new_page);
 	flush_cache_page(vma, address);
 	establish_pte(vma, address, page_table, pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot))));
 }

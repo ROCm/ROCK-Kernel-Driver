@@ -10,9 +10,54 @@ config CPU_FREQ_PROC_INTF
 	  
 	  If in doubt, say N.
 
+choice
+	prompt "Default CPUFreq governor"
+	depends on CPU_FREQ
+	default CPU_FREQ_DEFAULT_GOV_PERFORMANCE
+	help
+	  This option sets which CPUFreq governor shall be loaded at
+	  startup. If in doubt, select 'performance'.
+
+config CPU_FREQ_DEFAULT_GOV_PERFORMANCE
+	bool "performance"
+	select CPU_FREQ_GOV_PERFORMANCE
+	help
+	  Use the CPUFreq governor 'performance' as default. This sets
+	  the frequency statically to the highest frequency supported by
+	  the CPU.
+
+config CPU_FREQ_DEFAULT_GOV_USERSPACE
+	bool "userspace"
+	select CPU_FREQ_GOV_USERSPACE
+	help
+	  Use the CPUFreq governor 'userspace' as default. This allows
+	  you to set the CPU frequency manually or when an userspace 
+	  programm shall be able to set the CPU dynamically without having
+	  to enable the userspace governor manually.
+
+endchoice
+
+config CPU_FREQ_GOV_PERFORMANCE
+       tristate "'performance' governor"
+       depends on CPU_FREQ
+       help
+	  This cpufreq governors set the frequency statically to the
+	  highest available CPU frequency.
+
+	  If in doubt, say Y.
+
+config CPU_FREQ_GOV_POWERSAVE
+       tristate "'powersave' governor"
+       depends on CPU_FREQ
+       help
+	  Theis cpufreq governors set the frequency statically to the
+	  lowest available CPU frequency.
+
+	  If in doubt, say Y.
+
 config CPU_FREQ_GOV_USERSPACE
        tristate "'userspace' governor for userspace frequency scaling"
-       depends on CPU_FREQ
+       depends on CPU_FREQ 
        help
 	  Enable this cpufreq governor when you either want to set the
 	  CPU frequency manually or when an userspace programm shall

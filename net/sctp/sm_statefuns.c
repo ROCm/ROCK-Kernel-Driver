@@ -929,6 +929,7 @@ static int sctp_sf_send_restart_abort(union sctp_addr *ssa,
 	struct sctp_errhdr *errhdr;
 	struct sctp_endpoint *ep;
 	char buffer[sizeof(struct sctp_errhdr)+sizeof(union sctp_addr_param)];
+	struct sctp_af *af = sctp_get_af_specific(ssa->v4.sin_family);
 
 	/* Build the error on the stack.   We are way to malloc crazy
 	 * throughout the code today.
@@ -937,7 +938,7 @@ static int sctp_sf_send_restart_abort(union sctp_addr *ssa,
 	addrparm = (union sctp_addr_param *)errhdr->variable;
 
 	/* Copy into a parm format. */
-	len = sockaddr2sctp_addr(ssa, addrparm);
+	len = af->to_addr_param(ssa, addrparm);
 	len += sizeof(sctp_errhdr_t);
 
 	errhdr->cause = SCTP_ERROR_RESTART;
