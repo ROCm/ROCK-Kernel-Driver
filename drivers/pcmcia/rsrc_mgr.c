@@ -550,7 +550,7 @@ pcmcia_align(void *align_data, struct resource *res,
 
 	for (m = data->map->next; m != data->map; m = m->next) {
 		unsigned long start = m->base;
-		unsigned long end = m->base + m->num;
+		unsigned long end = m->base + m->num - 1;
 
 		/*
 		 * If the lower resources are not available, try aligning
@@ -569,7 +569,7 @@ pcmcia_align(void *align_data, struct resource *res,
 		if (res->start >= res->end)
 			break;
 
-		if ((res->start + size) <= end)
+		if ((res->start + size - 1) <= end)
 			break;
 	}
 
@@ -608,18 +608,16 @@ int find_io_region(ioaddr_t *base, ioaddr_t num, unsigned long align,
 	data.offset = *base & data.mask;
 	data.map = &io_db;
 
+	down(&rsrc_sem);
 #ifdef CONFIG_PCI
 	if (s->cb_dev) {
 		ret = pci_bus_alloc_resource(s->cb_dev->bus, res, num, 1,
 					     min, 0, pcmcia_align, &data);
 	} else
 #endif
-	{
-		down(&rsrc_sem);
 		ret = allocate_resource(&ioport_resource, res, num, min, ~0UL, 0,
 					pcmcia_align, &data);
-		up(&rsrc_sem);
-	}
+	up(&rsrc_sem);
 
 	if (ret != 0) {
 		kfree(res);
@@ -652,6 +650,7 @@ int find_mem_region(u_long *base, u_long num, u_long align,
 			min = 0x100000UL + *base;
 		}
 
+		down(&rsrc_sem);
 #ifdef CONFIG_PCI
 		if (s->cb_dev) {
 			ret = pci_bus_alloc_resource(s->cb_dev->bus, res, num,
@@ -659,12 +658,9 @@ int find_mem_region(u_long *base, u_long num, u_long align,
 						     pcmcia_align, &data);
 		} else
 #endif
-		{
-			down(&rsrc_sem);
 			ret = allocate_resource(&iomem_resource, res, num, min,
 						max, 0, pcmcia_align, &data);
-			up(&rsrc_sem);
-		}
+		up(&rsrc_sem);
 		if (ret == 0 || low)
 			break;
 		low = 1;
