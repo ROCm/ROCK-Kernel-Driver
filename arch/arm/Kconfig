@@ -645,8 +645,6 @@ source "drivers/misc/Kconfig"
 
 source "drivers/usb/Kconfig"
 
-source "net/bluetooth/Kconfig"
-
 
 menu "Kernel hacking"
 
