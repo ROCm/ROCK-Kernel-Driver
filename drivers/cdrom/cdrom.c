@@ -2052,7 +2052,7 @@ int cdrom_ioctl(struct cdrom_device_info *cdi, struct inode *ip,
 	int ret;
 
 	/* Try the generic SCSI command ioctl's first.. */
-	ret = scsi_cmd_ioctl(ip->i_bdev->bd_disk, cmd, arg);
+	ret = scsi_cmd_ioctl(ip->i_bdev->bd_disk, cmd, (void __user *)arg);
 	if (ret != -ENOTTY)
 		return ret;
 

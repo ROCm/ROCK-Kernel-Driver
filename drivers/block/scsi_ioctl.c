@@ -44,18 +44,18 @@ EXPORT_SYMBOL(scsi_command_size);
 
 #include <scsi/sg.h>
 
-static int sg_get_version(int *p)
+static int sg_get_version(int __user *p)
 {
 	static int sg_version_num = 30527;
 	return put_user(sg_version_num, p);
 }
 
-static int scsi_get_idlun(request_queue_t *q, int *p)
+static int scsi_get_idlun(request_queue_t *q, int __user *p)
 {
 	return put_user(0, p);
 }
 
-static int scsi_get_bus(request_queue_t *q, int *p)
+static int scsi_get_bus(request_queue_t *q, int __user *p)
 {
 	return put_user(0, p);
 }
@@ -65,7 +65,7 @@ static int sg_get_timeout(request_queue_t *q)
 	return q->sg_timeout / (HZ / USER_HZ);
 }
 
-static int sg_set_timeout(request_queue_t *q, int *p)
+static int sg_set_timeout(request_queue_t *q, int __user *p)
 {
 	int timeout, err = get_user(timeout, p);
 
@@ -75,12 +75,12 @@ static int sg_set_timeout(request_queue_t *q, int *p)
 	return err;
 }
 
-static int sg_get_reserved_size(request_queue_t *q, int *p)
+static int sg_get_reserved_size(request_queue_t *q, int __user *p)
 {
 	return put_user(q->sg_reserved_size, p);
 }
 
-static int sg_set_reserved_size(request_queue_t *q, int *p)
+static int sg_set_reserved_size(request_queue_t *q, int __user *p)
 {
 	int size, err = get_user(size, p);
 
@@ -100,7 +100,7 @@ static int sg_set_reserved_size(request_queue_t *q, int *p)
  * will always return that we are ATAPI even for a real SCSI drive, I'm not
  * so sure this is worth doing anything about (why would you care??)
  */
-static int sg_emulated_host(request_queue_t *q, int *p)
+static int sg_emulated_host(request_queue_t *q, int __user *p)
 {
 	return put_user(1, p);
 }
@@ -220,7 +220,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 #define OMAX_SB_LEN 16          /* For backward compatibility */
 
 static int sg_scsi_ioctl(request_queue_t *q, struct gendisk *bd_disk,
-			 Scsi_Ioctl_Command *sic)
+			 Scsi_Ioctl_Command __user *sic)
 {
 	struct request *rq;
 	int err, in_len, out_len, bytes, opcode, cmdlen;
@@ -312,7 +312,7 @@ error:
 	return err;
 }
 
-int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
+int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, void __user *arg)
 {
 	request_queue_t *q;
 	struct request *rq;
@@ -330,40 +330,40 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 		 * new sgv3 interface
 		 */
 		case SG_GET_VERSION_NUM:
-			err = sg_get_version((int *) arg);
+			err = sg_get_version(arg);
 			break;
 		case SCSI_IOCTL_GET_IDLUN:
-			err = scsi_get_idlun(q, (int *) arg);
+			err = scsi_get_idlun(q, arg);
 			break;
 		case SCSI_IOCTL_GET_BUS_NUMBER:
-			err = scsi_get_bus(q, (int *) arg);
+			err = scsi_get_bus(q, arg);
 			break;
 		case SG_SET_TIMEOUT:
-			err = sg_set_timeout(q, (int *) arg);
+			err = sg_set_timeout(q, arg);
 			break;
 		case SG_GET_TIMEOUT:
 			err = sg_get_timeout(q);
 			break;
 		case SG_GET_RESERVED_SIZE:
-			err = sg_get_reserved_size(q, (int *) arg);
+			err = sg_get_reserved_size(q, arg);
 			break;
 		case SG_SET_RESERVED_SIZE:
-			err = sg_set_reserved_size(q, (int *) arg);
+			err = sg_set_reserved_size(q, arg);
 			break;
 		case SG_EMULATED_HOST:
-			err = sg_emulated_host(q, (int *) arg);
+			err = sg_emulated_host(q, arg);
 			break;
 		case SG_IO: {
 			struct sg_io_hdr hdr;
 
 			err = -EFAULT;
-			if (copy_from_user(&hdr, (struct sg_io_hdr __user *) arg, sizeof(hdr)))
+			if (copy_from_user(&hdr, arg, sizeof(hdr)))
 				break;
 			err = sg_io(q, bd_disk, &hdr);
 			if (err == -EFAULT)
 				break;
 
-			if (copy_to_user((struct sg_io_hdr __user *) arg, &hdr, sizeof(hdr)))
+			if (copy_to_user(arg, &hdr, sizeof(hdr)))
 				err = -EFAULT;
 			break;
 		}
@@ -372,7 +372,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			struct sg_io_hdr hdr;
 
 			err = -EFAULT;
-			if (copy_from_user(&cgc, (struct cdrom_generic_command __user *) arg, sizeof(cgc)))
+			if (copy_from_user(&cgc, arg, sizeof(cgc)))
 				break;
 			cgc.timeout = clock_t_to_jiffies(cgc.timeout);
 			memset(&hdr, 0, sizeof(hdr));
@@ -416,7 +416,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 
 			cgc.stat = err;
 			cgc.buflen = hdr.resid;
-			if (copy_to_user((struct cdrom_generic_command __user *) arg, &cgc, sizeof(cgc)))
+			if (copy_to_user(arg, &cgc, sizeof(cgc)))
 				err = -EFAULT;
 
 			break;
@@ -430,8 +430,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			if (!arg)
 				break;
 
-			err = sg_scsi_ioctl(q, bd_disk,
-					    (Scsi_Ioctl_Command *)arg);
+			err = sg_scsi_ioctl(q, bd_disk, arg);
 			break;
 		case CDROMCLOSETRAY:
 			close = 1;
