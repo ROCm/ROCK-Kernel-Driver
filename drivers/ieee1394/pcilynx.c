@@ -1677,7 +1677,7 @@ static int __devinit add_card(struct pci_dev *dev,
 
 
 
-static size_t get_lynx_rom(struct hpsb_host *host, const quadlet_t **ptr)
+static size_t get_lynx_rom(struct hpsb_host *host, quadlet_t **ptr)
 {
         struct ti_lynx *lynx = host->hostdata;
         *ptr = lynx->config_rom;

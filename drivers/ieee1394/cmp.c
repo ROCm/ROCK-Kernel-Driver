@@ -199,7 +199,7 @@ static void cmp_remove_host(struct hpsb_host *host)
 }
 
 static int pcr_read(struct hpsb_host *host, int nodeid, quadlet_t *buf,
-		    u64 addr, unsigned int length)
+		    u64 addr, unsigned int length, u16 flags)
 {
 	int csraddr = addr - CSR_REGISTER_BASE;
 	int plug;
@@ -235,7 +235,7 @@ static int pcr_read(struct hpsb_host *host, int nodeid, quadlet_t *buf,
 }
 
 static int pcr_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
-		    u64 addr, quadlet_t data, quadlet_t arg, int extcode)
+		    u64 addr, quadlet_t data, quadlet_t arg, int extcode, u16 flags)
 {
 	int csraddr = addr - CSR_REGISTER_BASE;
 	int plug;

@@ -97,7 +97,6 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <linux/proc_fs.h>
-#include <linux/tqueue.h>
 #include <linux/delay.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
@@ -2587,6 +2586,7 @@ found:
 	return p;
 }
 
+#ifdef CONFIG_DEVFS_FS
 static int dv1394_devfs_add_entry(struct video_card *video)
 {
 	char buf[32];
@@ -2694,6 +2694,7 @@ void dv1394_devfs_del( char *name)
 		kfree(p);
 	}
 }
+#endif /* CONFIG_DEVFS_FS */
 
 /*** IEEE1394 HPSB CALLBACKS ***********************************************/
 
@@ -2852,7 +2853,6 @@ static void dv1394_add_host (struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
 	char buf[16];
-	struct dv1394_devfs_entry *devfs_entry;
 
 	/* We only work with the OHCI-1394 driver */
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
@@ -2874,13 +2874,15 @@ static void dv1394_add_host (struct hpsb_host *host)
 #endif
 
 #ifdef CONFIG_DEVFS_FS
-	devfs_entry = dv1394_devfs_find("dv");
+{
+	struct dv1394_devfs_entry = devfs_entry = dv1394_devfs_find("dv");
 	if (devfs_entry != NULL) {
 		snprintf(buf, sizeof(buf), "host%d", ohci->id);
 		dv1394_devfs_add_dir(buf, devfs_entry, &devfs_entry);
 		dv1394_devfs_add_dir("NTSC", devfs_entry, NULL);
 		dv1394_devfs_add_dir("PAL", devfs_entry, NULL);
 	}
+}
 #endif
 	
 	dv1394_init(ohci, DV1394_NTSC, MODE_RECEIVE);

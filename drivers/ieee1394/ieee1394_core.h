@@ -2,7 +2,6 @@
 #ifndef _IEEE1394_CORE_H
 #define _IEEE1394_CORE_H
 
-#include <linux/tqueue.h>
 #include <linux/slab.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/proc_fs.h>
@@ -78,7 +77,7 @@ struct hpsb_packet {
 };
 
 /* add a new task for when a packet completes */
-void hpsb_add_packet_complete_task(struct hpsb_packet *packet, struct tq_struct *tq);
+void hpsb_add_packet_complete_task(struct hpsb_packet *packet, struct hpsb_queue_struct *tq);
 
 static inline struct hpsb_packet *driver_packet(struct list_head *l)
 {

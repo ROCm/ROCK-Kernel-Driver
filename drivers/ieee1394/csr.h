@@ -41,8 +41,10 @@ struct csr_control {
         quadlet_t bandwidth_available;
         quadlet_t channels_available_hi, channels_available_lo;
 
-        const quadlet_t *rom;
+        quadlet_t *rom;
         size_t rom_size;
+        unsigned char rom_version;
+
 
         quadlet_t topology_map[256];
         quadlet_t speed_map[1024];

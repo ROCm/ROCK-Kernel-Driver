@@ -35,7 +35,6 @@
 #include <linux/poll.h>
 #include <linux/smp_lock.h>
 #include <linux/proc_fs.h>
-#include <linux/tqueue.h>
 #include <linux/delay.h>
 #include <linux/devfs_fs_kernel.h>
 
@@ -1455,12 +1454,7 @@ static int __init video1394_init_module (void)
  		return -EIO;
  	}
 	
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-	devfs_handle = devfs_mk_dir(NULL, VIDEO1394_DRIVER_NAME,
-			strlen(VIDEO1394_DRIVER_NAME), NULL);
-#else
 	devfs_handle = devfs_mk_dir(NULL, VIDEO1394_DRIVER_NAME, NULL);
-#endif
 
 	hl_handle = hpsb_register_highlevel (VIDEO1394_DRIVER_NAME, &hl_ops);
 	if (hl_handle == NULL) {
