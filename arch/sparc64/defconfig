@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.11-rc3
-# Mon Feb  7 15:29:00 2005
+# Linux kernel version: 2.6.11-rc4
+# Thu Feb 17 15:32:19 2005
 #
 CONFIG_64BIT=y
 CONFIG_MMU=y
@@ -53,6 +53,7 @@ CONFIG_MODVERSIONS=y
 CONFIG_MODULE_SRCVERSION_ALL=y
 CONFIG_KMOD=y
 CONFIG_STOP_MACHINE=y
+CONFIG_SYSVIPC_COMPAT=y
 
 #
 # General machine setup

@@ -405,9 +405,10 @@ static __inline__ unsigned long ffz(unsigned long word)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_zero_bit(void *addr, int size, int offset)
+static __inline__ int find_next_zero_bit(const unsigned long *addr,
+					 int size, int offset)
 {
-	unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
+	const unsigned long *p = addr + (offset >> 5);
 	unsigned long result = offset & ~31UL;
 	unsigned long tmp;
 

@@ -17,7 +17,7 @@
 #include <asm/auxio.h>
 
 /* This cannot be static, as it is referenced in entry.S */
-void __iomem *auxio_register = 0UL;
+void __iomem *auxio_register = NULL;
 
 enum auxio_type {
 	AUXIO_TYPE_NODEV,

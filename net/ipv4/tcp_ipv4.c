@@ -591,8 +591,8 @@ static int __tcp_v4_check_established(struct sock *sk, __u16 lport,
 				if ((tp->write_seq =
 						tw->tw_snd_nxt + 65535 + 2) == 0)
 					tp->write_seq = 1;
-				tp->ts_recent	    = tw->tw_ts_recent;
-				tp->ts_recent_stamp = tw->tw_ts_recent_stamp;
+				tp->rx_opt.ts_recent	   = tw->tw_ts_recent;
+				tp->rx_opt.ts_recent_stamp = tw->tw_ts_recent_stamp;
 				sock_hold(sk2);
 				goto unique;
 			} else
@@ -783,25 +783,25 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		inet->saddr = rt->rt_src;
 	inet->rcv_saddr = inet->saddr;
 
-	if (tp->ts_recent_stamp && inet->daddr != daddr) {
+	if (tp->rx_opt.ts_recent_stamp && inet->daddr != daddr) {
 		/* Reset inherited state */
-		tp->ts_recent	    = 0;
-		tp->ts_recent_stamp = 0;
-		tp->write_seq	    = 0;
+		tp->rx_opt.ts_recent	   = 0;
+		tp->rx_opt.ts_recent_stamp = 0;
+		tp->write_seq		   = 0;
 	}
 
 	if (sysctl_tcp_tw_recycle &&
-	    !tp->ts_recent_stamp && rt->rt_dst == daddr) {
+	    !tp->rx_opt.ts_recent_stamp && rt->rt_dst == daddr) {
 		struct inet_peer *peer = rt_get_peer(rt);
 
 		/* VJ's idea. We save last timestamp seen from
 		 * the destination in peer table, when entering state TIME-WAIT
-		 * and initialize ts_recent from it, when trying new connection.
+		 * and initialize rx_opt.ts_recent from it, when trying new connection.
 		 */
 
 		if (peer && peer->tcp_ts_stamp + TCP_PAWS_MSL >= xtime.tv_sec) {
-			tp->ts_recent_stamp = peer->tcp_ts_stamp;
-			tp->ts_recent = peer->tcp_ts;
+			tp->rx_opt.ts_recent_stamp = peer->tcp_ts_stamp;
+			tp->rx_opt.ts_recent = peer->tcp_ts;
 		}
 	}
 
@@ -812,7 +812,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (inet->opt)
 		tp->ext_header_len = inet->opt->optlen;
 
-	tp->mss_clamp = 536;
+	tp->rx_opt.mss_clamp = 536;
 
 	/* Socket identity is still unknown (sport may be zero).
 	 * However we set state to SYN-SENT and not releasing socket
@@ -1393,7 +1393,7 @@ struct or_calltable or_ipv4 = {
 
 int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 {
-	struct tcp_sock tp;
+	struct tcp_options_received tmp_opt;
 	struct open_request *req;
 	__u32 saddr = skb->nh.iph->saddr;
 	__u32 daddr = skb->nh.iph->daddr;
@@ -1435,29 +1435,29 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 	if (!req)
 		goto drop;
 
-	tcp_clear_options(&tp);
-	tp.mss_clamp = 536;
-	tp.user_mss  = tcp_sk(sk)->user_mss;
+	tcp_clear_options(&tmp_opt);
+	tmp_opt.mss_clamp = 536;
+	tmp_opt.user_mss  = tcp_sk(sk)->rx_opt.user_mss;
 
-	tcp_parse_options(skb, &tp, 0);
+	tcp_parse_options(skb, &tmp_opt, 0);
 
 	if (want_cookie) {
-		tcp_clear_options(&tp);
-		tp.saw_tstamp = 0;
+		tcp_clear_options(&tmp_opt);
+		tmp_opt.saw_tstamp = 0;
 	}
 
-	if (tp.saw_tstamp && !tp.rcv_tsval) {
+	if (tmp_opt.saw_tstamp && !tmp_opt.rcv_tsval) {
 		/* Some OSes (unknown ones, but I see them on web server, which
 		 * contains information interesting only for windows'
 		 * users) do not send their stamp in SYN. It is easy case.
 		 * We simply do not advertise TS support.
 		 */
-		tp.saw_tstamp = 0;
-		tp.tstamp_ok  = 0;
+		tmp_opt.saw_tstamp = 0;
+		tmp_opt.tstamp_ok  = 0;
 	}
-	tp.tstamp_ok = tp.saw_tstamp;
+	tmp_opt.tstamp_ok = tmp_opt.saw_tstamp;
 
-	tcp_openreq_init(req, &tp, skb);
+	tcp_openreq_init(req, &tmp_opt, skb);
 
 	req->af.v4_req.loc_addr = daddr;
 	req->af.v4_req.rmt_addr = saddr;
@@ -1483,7 +1483,7 @@ int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 		 * timewait bucket, so that all the necessary checks
 		 * are made in the function processing timewait state.
 		 */
-		if (tp.saw_tstamp &&
+		if (tmp_opt.saw_tstamp &&
 		    sysctl_tcp_tw_recycle &&
 		    (dst = tcp_v4_route_req(sk, req)) != NULL &&
 		    (peer = rt_get_peer((struct rtable *)dst)) != NULL &&
@@ -1987,11 +1987,11 @@ int tcp_v4_remember_stamp(struct sock *sk)
 	}
 
 	if (peer) {
-		if ((s32)(peer->tcp_ts - tp->ts_recent) <= 0 ||
+		if ((s32)(peer->tcp_ts - tp->rx_opt.ts_recent) <= 0 ||
 		    (peer->tcp_ts_stamp + TCP_PAWS_MSL < xtime.tv_sec &&
-		     peer->tcp_ts_stamp <= tp->ts_recent_stamp)) {
-			peer->tcp_ts_stamp = tp->ts_recent_stamp;
-			peer->tcp_ts = tp->ts_recent;
+		     peer->tcp_ts_stamp <= tp->rx_opt.ts_recent_stamp)) {
+			peer->tcp_ts_stamp = tp->rx_opt.ts_recent_stamp;
+			peer->tcp_ts = tp->rx_opt.ts_recent;
 		}
 		if (release_it)
 			inet_putpeer(peer);

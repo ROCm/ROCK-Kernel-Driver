@@ -49,10 +49,10 @@ do {										\
 	__asm__ __volatile__ ("wr %%g0, %0, %%asi" : : "r" ((val).seg));	\
 } while(0)
 
-#define __user_ok(addr,size) 1
+#define __user_ok(addr,size) ((void)(addr), (void)(size), 1)
 #define __kernel_ok (segment_eq(get_fs(), KERNEL_DS))
-#define __access_ok(addr,size) 1
-#define access_ok(type,addr,size) 1
+#define __access_ok(addr,size) ((void)(addr), (void)(size), 1)
+#define access_ok(type,addr,size) ((void)(type), (void)(addr), (void)(size), 1)
 
 static inline int verify_area(int type, const void __user * addr, unsigned long size)
 {

@@ -24,6 +24,7 @@ typedef u16		compat_ipc_pid_t;
 typedef s32		compat_daddr_t;
 typedef u32		compat_caddr_t;
 typedef __kernel_fsid_t	compat_fsid_t;
+typedef s32		compat_key_t;
 
 typedef s32		compat_int_t;
 typedef s32		compat_long_t;
@@ -138,5 +139,63 @@ static __inline__ void __user *compat_alloc_user_space(long len)
 
 	return (void __user *) (usp - len);
 }
+
+struct compat_ipc64_perm {
+	compat_key_t key;
+	__kernel_uid_t uid;
+	__kernel_gid_t gid;
+	__kernel_uid_t cuid;
+	__kernel_gid_t cgid;
+	unsigned short __pad1;
+	compat_mode_t mode;
+	unsigned short __pad2;
+	unsigned short seq;
+	unsigned long __unused1;	/* yes they really are 64bit pads */
+	unsigned long __unused2;
+};
+
+struct compat_semid64_ds {
+	struct compat_ipc64_perm sem_perm;
+	unsigned int	__pad1;
+	compat_time_t	sem_otime;
+	unsigned int	__pad2;
+	compat_time_t	sem_ctime;
+	u32		sem_nsems;
+	u32		__unused1;
+	u32		__unused2;
+};
+
+struct compat_msqid64_ds {
+	struct compat_ipc64_perm msg_perm;
+	unsigned int	__pad1;
+	compat_time_t	msg_stime;
+	unsigned int	__pad2;
+	compat_time_t	msg_rtime;
+	unsigned int	__pad3;
+	compat_time_t	msg_ctime;
+	unsigned int	msg_cbytes;
+	unsigned int	msg_qnum;
+	unsigned int	msg_qbytes;
+	compat_pid_t	msg_lspid;
+	compat_pid_t	msg_lrpid;
+	unsigned int	__unused1;
+	unsigned int	__unused2;
+};
+
+struct compat_shmid64_ds {
+	struct compat_ipc64_perm shm_perm;
+	unsigned int	__pad1;
+	compat_time_t	shm_atime;
+	unsigned int	__pad2;
+	compat_time_t	shm_dtime;
+	unsigned int	__pad3;
+	compat_time_t	shm_ctime;
+	compat_size_t	shm_segsz;
+	compat_pid_t	shm_cpid;
+	compat_pid_t	shm_lpid;
+	unsigned int	shm_nattch;
+	unsigned int	__unused1;
+	unsigned int	__unused2;
+};
 
 #endif /* _ASM_SPARC64_COMPAT_H */
