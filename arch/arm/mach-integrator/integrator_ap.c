@@ -92,7 +92,7 @@ static void __init ap_map_io(void)
 	iotable_init(ap_io_desc, ARRAY_SIZE(ap_io_desc));
 }
 
-#define ALLPCI ( (1 << IRQ_PCIINT0) | (1 << IRQ_PCIINT1) | (1 << IRQ_PCIINT2) | (1 << IRQ_PCIINT3) )
+#define INTEGRATOR_SC_VALID_INT	0x003fffff
 
 static void sc_mask_irq(unsigned int irq)
 {
@@ -152,7 +152,7 @@ static int __init ap_init(void)
 		lmdev->resource.start = 0xc0000000 + 0x10000000 * i;
 		lmdev->resource.end = lmdev->resource.start + 0x0fffffff;
 		lmdev->resource.flags = IORESOURCE_MEM;
-		lmdev->irq = IRQ_EXPINT0 + i;
+		lmdev->irq = IRQ_AP_EXPINT0 + i;
 		lmdev->id = i;
 
 		lm_device_register(lmdev);
