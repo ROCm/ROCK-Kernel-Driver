@@ -756,6 +756,9 @@ static __inline__ int rtattr_strcmp(const struct rtattr *rta, const char *str)
 
 extern int rtattr_parse(struct rtattr *tb[], int maxattr, struct rtattr *rta, int len);
 
+#define rtattr_parse_nested(tb, max, rta) \
+	rtattr_parse((tb), (max), RTA_DATA((rta)), RTA_PAYLOAD((rta)))
+
 extern struct sock *rtnl;
 
 struct rtnetlink_link
