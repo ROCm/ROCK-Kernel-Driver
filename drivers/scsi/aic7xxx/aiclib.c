@@ -1230,3 +1230,106 @@ aic_calc_syncsrate(u_int period_factor)
 	 */
 	return (10000000 / (period_factor * 4 * 10));
 }
+
+/*
+ * Return speed in KB/s.
+ */
+u_int
+aic_calc_speed(u_int width, u_int period, u_int offset, u_int min_rate)
+{
+	u_int freq;
+
+	if (offset != 0 && period < min_rate)
+		freq  = aic_calc_syncsrate(period);
+	else
+		/* Roughly 3.3MB/s for async */
+		freq  = 3300;
+	freq <<= width;
+	return (freq);
+}
+
+uint32_t
+aic_error_action(struct scsi_cmnd *cmd, struct scsi_inquiry_data *inq_data,
+		 cam_status status, u_int scsi_status)
+{
+	aic_sense_action  err_action;
+	int		  sense;
+
+	sense  = (cmd->result >> 24) == DRIVER_SENSE;
+
+	switch (status) {
+	case CAM_REQ_CMP:
+		err_action = SS_NOP;
+		break;
+	case CAM_AUTOSENSE_FAIL:
+	case CAM_SCSI_STATUS_ERROR:
+
+		switch (scsi_status) {
+		case SCSI_STATUS_OK:
+		case SCSI_STATUS_COND_MET:
+		case SCSI_STATUS_INTERMED:
+		case SCSI_STATUS_INTERMED_COND_MET:
+			err_action = SS_NOP;
+			break;
+		case SCSI_STATUS_CMD_TERMINATED:
+		case SCSI_STATUS_CHECK_COND:
+			if (sense != 0) {
+				struct scsi_sense_data *sense;
+
+				sense = (struct scsi_sense_data *)
+				    &cmd->sense_buffer;
+				err_action =
+				    aic_sense_error_action(sense, inq_data, 0);
+
+			} else {
+				err_action = SS_RETRY|SSQ_FALLBACK
+					   | SSQ_DECREMENT_COUNT|EIO;
+			}
+			break;
+		case SCSI_STATUS_QUEUE_FULL:
+		case SCSI_STATUS_BUSY:
+			err_action = SS_RETRY|SSQ_DELAY|SSQ_MANY
+				   | SSQ_DECREMENT_COUNT|EBUSY;
+			break;
+		case SCSI_STATUS_RESERV_CONFLICT:
+		default:
+			err_action = SS_FAIL|EBUSY;
+			break;
+		}
+		break;
+	case CAM_CMD_TIMEOUT:
+	case CAM_REQ_CMP_ERR:
+	case CAM_UNEXP_BUSFREE:
+	case CAM_UNCOR_PARITY:
+	case CAM_DATA_RUN_ERR:
+		err_action = SS_RETRY|SSQ_FALLBACK|EIO;
+		break;
+	case CAM_UA_ABORT:
+	case CAM_UA_TERMIO:
+	case CAM_MSG_REJECT_REC:
+	case CAM_SEL_TIMEOUT:
+		err_action = SS_FAIL|EIO;
+		break;
+	case CAM_REQ_INVALID:
+	case CAM_PATH_INVALID:
+	case CAM_DEV_NOT_THERE:
+	case CAM_NO_HBA:
+	case CAM_PROVIDE_FAIL:
+	case CAM_REQ_TOO_BIG:		
+	case CAM_RESRC_UNAVAIL:
+	case CAM_BUSY:
+	default:
+		/* panic??  These should never occur in our application. */
+		err_action = SS_FAIL|EIO;
+		break;
+	case CAM_SCSI_BUS_RESET:
+	case CAM_BDR_SENT:		
+	case CAM_REQUEUE_REQ:
+		/* Unconditional requeue */
+		err_action = SS_RETRY;
+		break;
+	}
+
+	return (err_action);
+}
+

@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#118 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#121 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -90,7 +90,6 @@
 #define AIC_LIB_PREFIX ahc
 #include "scsi.h"
 #include "hosts.h"
-#include "aiclib.h"
 
 /* Name space conflict with BSD queue macros */
 #ifdef LIST_HEAD
@@ -100,6 +99,7 @@
 #include "cam.h"
 #include "queue.h"
 #include "scsi_message.h"
+#include "aiclib.h"
 
 /*********************************** Debugging ********************************/
 #ifdef CONFIG_AIC7XXX_DEBUG_ENABLE
@@ -497,7 +497,7 @@ struct ahc_linux_target {
  * Per-SCB OSM storage.
  */
 typedef enum {
-	AHC_UP_EH_SEMAPHORE
+	AHC_UP_EH_SEMAPHORE = 0x1
 } ahc_linux_scb_flags;
 
 struct scb_platform_data {
@@ -550,6 +550,7 @@ struct ahc_platform_data {
 	struct semaphore	 dv_cmd_sem;	/* XXX This needs to be in
 						 * the target struct
 						 */
+	struct scsi_device	*dv_scsi_dev;
 	struct Scsi_Host        *host;		/* pointer to scsi host */
 #define AHC_LINUX_NOIRQ	((uint32_t)~0)
 	uint32_t		 irq;		/* IRQ for this adapter */

@@ -2,7 +2,7 @@
  * Core routines and tables shareable across OS platforms.
  *
  * Copyright (c) 1994-2002 Justin T. Gibbs.
- * Copyright (c) 2000-2002 Adaptec Inc.
+ * Copyright (c) 2000-2003 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#151 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#153 $
  *
  * $FreeBSD$
  */
@@ -171,8 +171,8 @@ static void		ahd_handle_ign_wide_residue(struct ahd_softc *ahd,
 static void		ahd_reinitialize_dataptrs(struct ahd_softc *ahd);
 static void		ahd_handle_devreset(struct ahd_softc *ahd,
 					    struct ahd_devinfo *devinfo,
-					    cam_status status, char *message,
-					    int verbose_level);
+					    u_int lun, cam_status status,
+					    char *message, int verbose_level);
 #if AHD_TARGET_MODE
 static void		ahd_setup_target_msgin(struct ahd_softc *ahd,
 					       struct ahd_devinfo *devinfo,
@@ -688,8 +688,7 @@ ahd_handle_seqint(struct ahd_softc *ahd, u_int intstat)
 							&tstate);
 			tinfo = &targ_info->curr;
 			ahd_set_width(ahd, &devinfo, MSG_EXT_WDTR_BUS_8_BIT,
-				      AHD_TRANS_ACTIVE|AHD_TRANS_GOAL,
-				      /*paused*/TRUE);
+				      AHD_TRANS_ACTIVE, /*paused*/TRUE);
 			ahd_set_syncrate(ahd, &devinfo, /*period*/0,
 					 /*offset*/0, /*ppr_options*/0,
 					 AHD_TRANS_ACTIVE, /*paused*/TRUE);
@@ -1016,6 +1015,9 @@ ahd_handle_seqint(struct ahd_softc *ahd, u_int intstat)
 			u_int	   tag;
 			cam_status error;
 
+			ahd_print_path(ahd, scb);
+			printf("Task Management Func 0x%x Complete\n",
+			       scb->hscb->task_management);
 			lun = CAM_LUN_WILDCARD;
 			tag = SCB_LIST_NULL;
 
@@ -1026,18 +1028,30 @@ ahd_handle_seqint(struct ahd_softc *ahd, u_int intstat)
 			case SIU_TASKMGMT_CLEAR_TASK_SET:
 				lun = scb->hscb->lun;
 				error = CAM_REQ_ABORTED;
+				ahd_abort_scbs(ahd, SCB_GET_TARGET(ahd, scb),
+					       'A', lun, tag, ROLE_INITIATOR,
+					       error);
 				break;
 			case SIU_TASKMGMT_LUN_RESET:
 				lun = scb->hscb->lun;
 			case SIU_TASKMGMT_TARGET_RESET:
+			{
+				struct ahd_devinfo devinfo;
+
+				ahd_scb_devinfo(ahd, &devinfo, scb);
 				error = CAM_BDR_SENT;
+				ahd_handle_devreset(ahd, &devinfo, lun,
+						    CAM_BDR_SENT,
+						    lun != CAM_LUN_WILDCARD
+						    ? "Lun Reset"
+						    : "Target Reset",
+						    /*verbose_level*/0);
 				break;
+			}
 			default:
 				panic("Unexpected TaskMgmt Func\n");
 				break;
 			}
-			ahd_abort_scbs(ahd, SCB_GET_TARGET(ahd, scb),
-				       'A', lun, tag, ROLE_INITIATOR, error);
 		}
 		break;
 	}
@@ -1046,13 +1060,31 @@ ahd_handle_seqint(struct ahd_softc *ahd, u_int intstat)
 		u_int	scbid;
 		struct	scb *scb;
 
+		/*
+		 * An ABORT TASK TMF failed to be delivered before
+		 * the targeted command completed normally.
+		 */
 		scbid = ahd_get_scbptr(ahd);
 		scb = ahd_lookup_scb(ahd, scbid);
 		if (scb != NULL) {
 			/*
-                         * Remove the second instance of this SCB from
+			 * Remove the second instance of this SCB from
 			 * the QINFIFO if it is still there.
                          */
+			ahd_print_path(ahd, scb);
+			printf("SCB completes before TMF\n");
+			/*
+			 * Handle losing the race.  Wait until any
+			 * current selection completes.  We will then
+			 * set the TMF back to zero in this SCB so that
+			 * the sequencer doesn't bother to issue another
+			 * sequencer interrupt for its completion.
+			 */
+			while ((ahd_inb(ahd, SCSISEQ0) & ENSELO) != 0
+			    && (ahd_inb(ahd, SSTAT0) & SELDO) == 0
+			    && (ahd_inb(ahd, SSTAT1) & SELTO) == 0)
+				;
+			ahd_outb(ahd, SCB_TASK_MANAGEMENT, 0);
 			ahd_search_qinfifo(ahd, SCB_GET_TARGET(ahd, scb),
 					   SCB_GET_CHANNEL(ahd, scb),  
 					   SCB_GET_LUN(scb), scb->hscb->tag, 
@@ -1784,8 +1816,8 @@ ahd_handle_nonpkt_busfree(struct ahd_softc *ahd)
 					  ROLE_INITIATOR))
 				ahd_set_transaction_status(scb, CAM_REQ_CMP);
 #endif
-			ahd_handle_devreset(ahd, &devinfo, CAM_BDR_SENT,
-					    "Bus Device Reset",
+			ahd_handle_devreset(ahd, &devinfo, CAM_LUN_WILDCARD,
+					    CAM_BDR_SENT, "Bus Device Reset",
 					    /*verbose_level*/0);
 			printerror = 0;
 		} else if (ahd_sent_msg(ahd, AHDMSG_EXT, MSG_EXT_PPR, FALSE)
@@ -3692,8 +3724,8 @@ ahd_sent_msg(struct ahd_softc *ahd, ahd_msgtype type, u_int msgval, int full)
 			if (type == AHDMSG_1B
 			 && ahd->msgout_index > index
 			 && (ahd->msgout_buf[index] == msgval
-			  || ((ahd->msgout_buf[index] & MSG_IDENTIFYFLAG) != 0))
-			   && msgval == MSG_IDENTIFYFLAG)
+			  || ((ahd->msgout_buf[index] & MSG_IDENTIFYFLAG) != 0
+			   && msgval == MSG_IDENTIFYFLAG)))
 				found = TRUE;
 			index++;
 		}
@@ -4039,7 +4071,7 @@ ahd_parse_msg(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 	}
 #ifdef AHD_TARGET_MODE
 	case MSG_BUS_DEV_RESET:
-		ahd_handle_devreset(ahd, devinfo,
+		ahd_handle_devreset(ahd, devinfo, CAM_LUN_WILDCARD,
 				    CAM_BDR_SENT,
 				    "Bus Device Reset Received",
 				    /*verbose_level*/0);
@@ -4538,16 +4570,16 @@ ahd_reinitialize_dataptrs(struct ahd_softc *ahd)
  */
 static void
 ahd_handle_devreset(struct ahd_softc *ahd, struct ahd_devinfo *devinfo,
-		    cam_status status, char *message, int verbose_level)
+		    u_int lun, cam_status status, char *message,
+		    int verbose_level)
 {
 #ifdef AHD_TARGET_MODE
 	struct ahd_tmode_tstate* tstate;
-	u_int lun;
 #endif
 	int found;
 
 	found = ahd_abort_scbs(ahd, devinfo->target, devinfo->channel,
-			       CAM_LUN_WILDCARD, SCB_LIST_NULL, devinfo->role,
+			       lun, SCB_LIST_NULL, devinfo->role,
 			       status);
 
 #ifdef AHD_TARGET_MODE
@@ -4557,10 +4589,20 @@ ahd_handle_devreset(struct ahd_softc *ahd, struct ahd_devinfo *devinfo,
 	 */
 	tstate = ahd->enabled_targets[devinfo->our_scsiid];
 	if (tstate != NULL) {
-		for (lun = 0; lun < AHD_NUM_LUNS; lun++) {
+		u_int cur_lun;
+		u_int max_lun;
+
+		if (lun != CAM_LUN_WILDCARD) {
+			cur_lun = 0;
+			max_lun = AHD_NUM_LUNS - 1;
+		} else {
+			cur_lun = lun;
+			max_lun = lun;
+		}
+		for (cur_lun <= max_lun; cur_lun++) {
 			struct ahd_tmode_lstate* lstate;
 
-			lstate = tstate->enabled_luns[lun];
+			lstate = tstate->enabled_luns[cur_lun];
 			if (lstate == NULL)
 				continue;
 
@@ -4580,7 +4622,7 @@ ahd_handle_devreset(struct ahd_softc *ahd, struct ahd_devinfo *devinfo,
 			 /*ppr_options*/0, AHD_TRANS_CUR, /*paused*/TRUE);
 	
 	ahd_send_async(ahd, devinfo->channel, devinfo->target,
-		       CAM_LUN_WILDCARD, AC_SENT_BDR, NULL);
+		       lun, AC_SENT_BDR, NULL);
 
 	if (message != NULL
 	 && (verbose_level <= bootverbose))

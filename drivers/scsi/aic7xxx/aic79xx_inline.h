@@ -2,7 +2,7 @@
  * Inline routines shareable across OS platforms.
  *
  * Copyright (c) 1994-2001 Justin T. Gibbs.
- * Copyright (c) 2000-2002 Adaptec Inc.
+ * Copyright (c) 2000-2003 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_inline.h#40 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_inline.h#41 $
  *
  * $FreeBSD$
  */
@@ -272,7 +272,6 @@ ahd_setup_scb_common(struct ahd_softc *ahd, struct scb *scb)
 	if ((scb->flags & SCB_PACKETIZED) != 0) {
 		/* XXX what about ACA??  It is type 4, but TAG_TYPE == 0x3. */
 		scb->hscb->task_attribute= scb->hscb->control & SCB_TAG_TYPE;
-		scb->hscb->task_management = 0;
 		/*
 		 * For Rev A short lun workaround.
 		 */

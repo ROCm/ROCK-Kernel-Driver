@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#108 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#110 $
  *
  * $FreeBSD$
  */
@@ -1844,8 +1844,9 @@ ahc_update_neg_request(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		 * occurs the need to renegotiate is
 		 * recorded persistently.
 		 */
+		if ((ahc->features & AHC_WIDE) != 0)
+			tinfo->curr.width = AHC_WIDTH_UNKNOWN;
 		tinfo->curr.period = AHC_PERIOD_UNKNOWN;
-		tinfo->curr.width = AHC_WIDTH_UNKNOWN;
 		tinfo->curr.offset = AHC_OFFSET_UNKNOWN;
 	}
 	if (tinfo->curr.period != tinfo->goal.period
@@ -4045,6 +4046,14 @@ ahc_reset(struct ahc_softc *ahc)
 	 * to disturb the integrity of the bus.
 	 */
 	ahc_pause(ahc);
+	if ((ahc_inb(ahc, HCNTRL) & CHIPRST) != 0) {
+		/*
+		 * The chip has not been initialized since
+		 * PCI/EISA/VLB bus reset.  Don't trust
+		 * "left over BIOS data".
+		 */
+		ahc->flags |= AHC_NO_BIOS_INIT;
+	}
 	sxfrctl1_b = 0;
 	if ((ahc->chip & AHC_CHIPID_MASK) == AHC_AIC7770) {
 		u_int sblkctl;
@@ -6725,13 +6734,14 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	       ahc_inb(ahc, SCBPTR));
 	cur_col = 0;
 	if ((ahc->features & AHC_DT) != 0)
-		ahc_scsisigi_print(ahc_inb(ahc, SCSISIGI), &cur_col, 50);
+		ahc_scsiphase_print(ahc_inb(ahc, SCSIPHASE), &cur_col, 50);
+	ahc_scsisigi_print(ahc_inb(ahc, SCSISIGI), &cur_col, 50);
 	ahc_error_print(ahc_inb(ahc, ERROR), &cur_col, 50);
-	ahc_scsiphase_print(ahc_inb(ahc, SCSIPHASE), &cur_col, 50);
 	ahc_scsibusl_print(ahc_inb(ahc, SCSIBUSL), &cur_col, 50);
 	ahc_lastphase_print(ahc_inb(ahc, LASTPHASE), &cur_col, 50);
 	ahc_scsiseq_print(ahc_inb(ahc, SCSISEQ), &cur_col, 50);
 	ahc_sblkctl_print(ahc_inb(ahc, SBLKCTL), &cur_col, 50);
+	ahc_scsirate_print(ahc_inb(ahc, SCSIRATE), &cur_col, 50);
 	ahc_seqctl_print(ahc_inb(ahc, SEQCTL), &cur_col, 50);
 	ahc_seq_flags_print(ahc_inb(ahc, SEQ_FLAGS), &cur_col, 50);
 	ahc_sstat0_print(ahc_inb(ahc, SSTAT0), &cur_col, 50);
