@@ -454,12 +454,6 @@ struct ip_vs_stats
 struct ip_vs_conn;
 struct ip_vs_app;
 
-#define	CONFIG_IP_VS_PROTO_UDP
-#define	CONFIG_IP_VS_PROTO_TCP
-#define	CONFIG_IP_VS_PROTO_ICMP
-#define	CONFIG_IP_VS_PROTO_ESP
-#define	CONFIG_IP_VS_PROTO_AH
-
 struct ip_vs_protocol {
 	struct ip_vs_protocol	*next;
 	char			*name;
