@@ -209,6 +209,10 @@ extern int soc_probe(void);
 extern int atmdev_init(void);
 extern int cpqarray_init(void);
 
+struct device_class disk_devclass = {
+	.name		= "disk",
+};
+
 int __init device_init(void)
 {
 	int i;
@@ -226,7 +230,11 @@ int __init device_init(void)
 #ifdef CONFIG_ATM
 	(void) atmdev_init();
 #endif
+
+	devclass_register(&disk_devclass);
 	return 0;
 }
 
 __initcall(device_init);
+
+EXPORT_SYMBOL(disk_devclass);
