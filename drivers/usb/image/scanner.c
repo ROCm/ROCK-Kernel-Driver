@@ -369,6 +369,11 @@
  *    - Added vendor/product ids for Avision, Canon, HP, Microtek and Relisys scanners.
  *    - Clean up irq urb when not enough memory is available.
  *
+ * 0.4.15  2003-09-12
+ *    - Use static declarations for usb_scanner_init/usb_scanner_exit 
+ *      (Daniele Bellucci).
+ *
+ *
  * TODO
  *    - Performance
  *    - Select/poll methods
@@ -1169,13 +1174,13 @@ usb_driver scanner_driver = {
 	.id_table =	ids,
 };
 
-void __exit
+static void __exit
 usb_scanner_exit(void)
 {
 	usb_deregister(&scanner_driver);
 }
 
-int __init
+static int __init
 usb_scanner_init (void)
 {
         if (usb_register(&scanner_driver) < 0)
