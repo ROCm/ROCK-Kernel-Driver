@@ -387,14 +387,13 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 
 		if (i8042_aux_values.exists && (str & I8042_STR_AUXDATA)) {
-			if (i8042_aux_port.dev)
-				i8042_aux_port.dev->interrupt(&i8042_aux_port, data, 0);
+			serio_interrupt(&i8042_aux_port, data, 0);
 		} else {
-			if (i8042_kbd_values.exists && i8042_kbd_port.dev) {
+			if (i8042_kbd_values.exists) {
 				if (!i8042_direct) {
 					if (data > 0x7f) {
 						if (test_and_clear_bit(data & 0x7f, i8042_unxlate_seen)) {
-							i8042_kbd_port.dev->interrupt(&i8042_kbd_port, 0xf0, 0);	
+							serio_interrupt(&i8042_kbd_port, 0xf0, 0);	
 							data = i8042_unxlate_table[data & 0x7f];
 						}
 					} else {
@@ -402,7 +401,7 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 						data = i8042_unxlate_table[data];
 					}
 				}
-				i8042_kbd_port.dev->interrupt(&i8042_kbd_port, data, 0);
+				serio_interrupt(&i8042_kbd_port, data, 0);
 			}
 		}
 	}
