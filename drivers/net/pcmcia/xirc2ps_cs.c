@@ -689,7 +689,7 @@ xirc2ps_detach(dev_link_t * link)
      * the release() function is called, that will trigger a proper
      * detach().
      */
-    del_timer(&link->release);
+    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
 	xirc2ps_release((unsigned long)link);
 	if (link->state & DEV_STALE_CONFIG) {
