@@ -908,15 +908,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 					} else
 						debugl1(cs,"fill_data %d blocked", bcs->channel);
 				} else {
-					if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-						if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-							hfc_fill_fifo(bcs);
-							test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-						} else
-							debugl1(cs,"fill_data %d blocked", bcs->channel);
-					} else {
-						sched_b_event(bcs, B_XMTBUFREADY);
-					}
+					xmit_ready_b(bcs);
 				}
 			}
 		}
@@ -932,15 +924,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 					} else
 						debugl1(cs,"fill_data %d blocked", bcs->channel);
 				} else {
-					if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-						if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-							hfc_fill_fifo(bcs);
-							test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-						} else
-							debugl1(cs,"fill_data %d blocked", bcs->channel);
-					} else {
-						sched_b_event(bcs, B_XMTBUFREADY);
-					}
+					xmit_ready_b(bcs);
 				}
 			}
 		}

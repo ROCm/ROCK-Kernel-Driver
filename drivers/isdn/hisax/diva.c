@@ -482,7 +482,7 @@ Memhscx_fill_fifo(struct BCState *bcs)
 	p = ptr = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, count);
 	bcs->tx_cnt -= count;
-	bcs->hw.hscx.count += count;
+	bcs->count += count;
 	while(cnt--)
 		memwritereg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0,
 			*p++);
@@ -565,10 +565,10 @@ Memhscx_interrupt(struct IsdnCardState *cs, u_char val, u_char hscx)
 				return;
 			}
 			xmit_complete_b(bcs);
-			bcs->hw.hscx.count = 0; 
+			bcs->count = 0; 
 		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-			bcs->hw.hscx.count = 0;
+			bcs->count = 0;
 			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
 			Memhscx_fill_fifo(bcs);
 		} else {
@@ -596,9 +596,9 @@ Memhscx_int_main(struct IsdnCardState *cs, u_char val)
 				   * restart transmitting the whole frame.
 				 */
 				if (bcs->tx_skb) {
-					skb_push(bcs->tx_skb, bcs->hw.hscx.count);
-					bcs->tx_cnt += bcs->hw.hscx.count;
-					bcs->hw.hscx.count = 0;
+					skb_push(bcs->tx_skb, bcs->count);
+					bcs->tx_cnt += bcs->count;
+					bcs->count = 0;
 				}
 				MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
 				if (cs->debug & L1_DEB_WARN)
@@ -623,9 +623,9 @@ Memhscx_int_main(struct IsdnCardState *cs, u_char val)
 				   * restart transmitting the whole frame.
 				 */
 				if (bcs->tx_skb) {
-					skb_push(bcs->tx_skb, bcs->hw.hscx.count);
-					bcs->tx_cnt += bcs->hw.hscx.count;
-					bcs->hw.hscx.count = 0;
+					skb_push(bcs->tx_skb, bcs->count);
+					bcs->tx_cnt += bcs->count;
+					bcs->count = 0;
 				}
 				MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
 				if (cs->debug & L1_DEB_WARN)
@@ -709,7 +709,7 @@ diva_irq_ipacx_pci(int intno, void *dev_id, struct pt_regs *regs)
 	cfg = (u_char *) cs->hw.diva.pci_cfg;
 	val = *cfg;
 	if (!(val &PITA_INT0_STATUS)) return; // other shared IRQ
-  interrupt_ipacx(cs);      // handler for chip
+	interrupt_ipacx(cs);      // handler for chip
 	*cfg = PITA_INT0_STATUS;  // Reset PLX interrupt
 }
 
@@ -1158,7 +1158,7 @@ ready:
 		cs->writeisacfifo = &MemWriteISACfifo_IPACX;
 		cs->BC_Read_Reg  = &MemReadHSCX_IPACX;
 		cs->BC_Write_Reg = &MemWriteHSCX_IPACX;
-		cs->BC_Send_Data = 0; // function located in ipacx module
+		cs->BC_Send_Data = &ipacx_fill_fifo;
 		cs->irq_func = &diva_irq_ipacx_pci;
 		printk(KERN_INFO "Diva: IPACX Design Id: %x\n", 
             MemReadISAC_IPACX(cs, IPACX_ID) &0x3F);

@@ -341,7 +341,7 @@ hdlc_fill_fifo(struct BCState *bcs)
 	ptr = (u_int *) p = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, count);
 	bcs->tx_cnt -= count;
-	bcs->hw.hdlc.count += count;
+	bcs->count += count;
 	bcs->hw.hdlc.ctrl.sr.xml = ((count == fifo_size) ? 0 : count);
 	write_ctrl(bcs, 3);  /* sets the correct index too */
 	if (cs->subtyp == AVM_FRITZ_PCI) {
@@ -434,9 +434,9 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 		 * restart transmitting the whole frame.
 		 */
 		if (bcs->tx_skb) {
-			skb_push(bcs->tx_skb, bcs->hw.hdlc.count);
-			bcs->tx_cnt += bcs->hw.hdlc.count;
-			bcs->hw.hdlc.count = 0;
+			skb_push(bcs->tx_skb, bcs->count);
+			bcs->tx_cnt += bcs->count;
+			bcs->count = 0;
 			if (bcs->cs->debug & L1_DEB_WARN)
 				debugl1(bcs->cs, "ch%d XDU", bcs->channel);
 		} else if (bcs->cs->debug & L1_DEB_WARN)
@@ -454,16 +454,9 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 				return;
 			}
 			xmit_complete_b(bcs);
-			bcs->hw.hdlc.count = 0;
+			bcs->count = 0;
 		}
-		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-			bcs->hw.hdlc.count = 0;
-			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
-			hdlc_fill_fifo(bcs);
-		} else {
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			sched_b_event(bcs, B_XMTBUFREADY);
-		}
+		xmit_ready_b(bcs);
 	}
 }
 
@@ -521,7 +514,7 @@ hdlc_l2l1(struct PStack *st, int pr, void *arg)
 			} else {
 				st->l1.bcs->tx_skb = skb;
 				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-				st->l1.bcs->hw.hdlc.count = 0;
+				st->l1.bcs->count = 0;
 				spin_unlock_irqrestore(&avm_pci_lock, flags);
 				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			}
@@ -533,7 +526,7 @@ hdlc_l2l1(struct PStack *st, int pr, void *arg)
 			}
 			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 			st->l1.bcs->tx_skb = skb;
-			st->l1.bcs->hw.hdlc.count = 0;
+			st->l1.bcs->count = 0;
 			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			break;
 		case (PH_PULL | REQUEST):

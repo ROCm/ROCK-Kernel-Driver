@@ -279,7 +279,7 @@ W6692B_fill_fifo(struct BCState *bcs)
 	ptr = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, count);
 	bcs->tx_cnt -= count;
-	bcs->hw.w6692.count += count;
+	bcs->count += count;
 	WRITEW6692BFIFO(cs, bcs->channel, ptr, count);
 	cs->BC_Write_Reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACT | W_B_CMDR_XMS | (more ? 0 : W_B_CMDR_XME));
 	spin_unlock_irqrestore(&w6692_lock , flags);
@@ -361,16 +361,9 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 				return;
 			}
 			xmit_complete_b(bcs);
-			bcs->hw.w6692.count = 0;
+			bcs->count = 0;
 		}
-		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-			bcs->hw.w6692.count = 0;
-			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
-			W6692B_fill_fifo(bcs);
-		} else {
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			sched_b_event(bcs, B_XMTBUFREADY);
-		}
+		xmit_ready_b(bcs);
 	}
 	if (val & W_B_EXI_XDUN) {	/* XDUN */
 		if (bcs->mode == 1)
@@ -380,9 +373,9 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 			   * restart transmitting the whole frame.
 			 */
 			if (bcs->tx_skb) {
-				skb_push(bcs->tx_skb, bcs->hw.w6692.count);
-				bcs->tx_cnt += bcs->hw.w6692.count;
-				bcs->hw.w6692.count = 0;
+				skb_push(bcs->tx_skb, bcs->count);
+				bcs->tx_cnt += bcs->count;
+				bcs->count = 0;
 			}
 			cs->BC_Write_Reg(cs, bchan, W_B_CMDR, W_B_CMDR_XRST | W_B_CMDR_RACT);
 			if (cs->debug & L1_DEB_WARN)
@@ -742,7 +735,7 @@ W6692_l2l1(struct PStack *st, int pr, void *arg)
 			} else {
 				st->l1.bcs->tx_skb = skb;
 				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-				st->l1.bcs->hw.w6692.count = 0;
+				st->l1.bcs->count = 0;
 				spin_unlock_irqrestore(&w6692_lock , flags);
 				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			}
@@ -754,7 +747,7 @@ W6692_l2l1(struct PStack *st, int pr, void *arg)
 			}
 			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 			st->l1.bcs->tx_skb = skb;
-			st->l1.bcs->hw.w6692.count = 0;
+			st->l1.bcs->count = 0;
 			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			break;
 		case (PH_PULL | REQUEST):

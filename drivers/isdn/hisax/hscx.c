@@ -106,7 +106,7 @@ hscx_l2l1(struct PStack *st, int pr, void *arg)
 			} else {
 				st->l1.bcs->tx_skb = skb;
 				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-				st->l1.bcs->hw.hscx.count = 0;
+				st->l1.bcs->count = 0;
 				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			}
 			spin_unlock_irqrestore(&cs->lock, flags);
@@ -118,7 +118,7 @@ hscx_l2l1(struct PStack *st, int pr, void *arg)
 			} else {
 				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 				st->l1.bcs->tx_skb = skb;
-				st->l1.bcs->hw.hscx.count = 0;
+				st->l1.bcs->count = 0;
 				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			}
 			spin_unlock_irqrestore(&cs->lock, flags);

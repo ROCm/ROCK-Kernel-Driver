@@ -351,7 +351,6 @@ struct l3_process {
 struct hscx_hw {
 	int hscx;
 	int rcvidx;
-	int count;              /* Current skb sent count */
 	u_char *rcvbuf;         /* B-Channel receive Buffer */
 	u_char tsaxr0;
 	u_char tsaxr1;
@@ -360,7 +359,6 @@ struct hscx_hw {
 struct w6692B_hw {
 	int bchan;
 	int rcvidx;
-	int count;              /* Current skb sent count */
 	u_char *rcvbuf;         /* B-Channel receive Buffer */
 };
 
@@ -411,7 +409,6 @@ struct hdlc_hw {
 	} ctrl;
 	u_int stat;
 	int rcvidx;
-	int count;              /* Current skb sent count */
 	u_char *rcvbuf;         /* B-Channel receive Buffer */
 };
 
@@ -504,6 +501,7 @@ struct BCState {
 	int err_rdo;
 	int err_inv;
 #endif
+	int count;
 	union {
 		struct hscx_hw hscx;
 		struct hdlc_hw hdlc;
@@ -1405,19 +1403,4 @@ static inline void
 L4L3(struct PStack *st, int pr, void *arg)
 {
 	st->l3.l4l3(st, pr, arg);
-}
-
-static inline void
-sched_b_event(struct BCState *bcs, int event)
-{
-	set_bit(event, &bcs->event);
-	schedule_work(&bcs->work);
-}
-
-static inline void
-xmit_complete_b(struct BCState *bcs)
-{
-	skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-	sched_b_event(bcs, B_CMPLREADY);
-	bcs->tx_skb = NULL;
 }

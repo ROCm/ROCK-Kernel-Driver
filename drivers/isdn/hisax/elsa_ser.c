@@ -293,8 +293,8 @@ write_modem(struct BCState *bcs) {
 }
 
 inline void
-modem_fill(struct BCState *bcs) {
-		
+modem_fill(struct BCState *bcs)
+{
 	if (bcs->tx_skb) {
 		if (bcs->tx_skb->len) {
 			write_modem(bcs);
@@ -302,14 +302,7 @@ modem_fill(struct BCState *bcs) {
 		}
 		xmit_complete_b(bcs);
 	}
-	if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-		bcs->hw.hscx.count = 0;
-		test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
-		write_modem(bcs);
-	} else {
-		test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-		sched_b_event(bcs, B_XMTBUFREADY);
-	}
+	xmit_ready_b(bcs);
 }
 
 static inline void receive_chars(struct IsdnCardState *cs,
@@ -574,7 +567,7 @@ modem_l2l1(struct PStack *st, int pr, void *arg)
 		} else {
 			st->l1.bcs->tx_skb = skb;
 			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-			st->l1.bcs->hw.hscx.count = 0;
+			st->l1.bcs->count = 0;
 			spin_unlock_irqrestore(&elsa_ser_lock, flags);
 			write_modem(st->l1.bcs);
 		}
@@ -607,6 +600,7 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 			if (open_hscxstate(st->l1.hardware, bcs))
 				return (-1);
 			st->l1.l2l1 = hscx_l2l1;
+			// bcs->cs->BC_Send_Data = hscx_fill_fifo;
 			break;
 		case L1_MODE_MODEM:
 			bcs->mode = L1_MODE_MODEM;
@@ -622,6 +616,7 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 			bcs->tx_cnt = 0;
 			bcs->cs->hw.elsa.bcs = bcs;
 			st->l1.l2l1 = modem_l2l1;
+			bcs->cs->BC_Send_Data = modem_fill;
 			break;
 	}
 	st->l1.bcs = bcs;

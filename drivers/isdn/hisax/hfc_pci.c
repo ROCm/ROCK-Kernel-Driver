@@ -1036,15 +1036,7 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 					} else
 						debugl1(cs, "fill_data %d blocked", bcs->channel);
 				} else {
-					if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-						if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-							hfcpci_fill_fifo(bcs);
-							test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-						} else
-							debugl1(cs, "fill_data %d blocked", bcs->channel);
-					} else {
-						sched_b_event(bcs, B_XMTBUFREADY);
-					}
+					xmit_buf_ready(bcs);
 				}
 			}
 		}
@@ -1060,15 +1052,7 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 					} else
 						debugl1(cs, "fill_data %d blocked", bcs->channel);
 				} else {
-					if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-						if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-							hfcpci_fill_fifo(bcs);
-							test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-						} else
-							debugl1(cs, "fill_data %d blocked", bcs->channel);
-					} else {
-						sched_b_event(bcs, B_XMTBUFREADY);
-					}
+					xmit_buf_ready(bcs);
 				}
 			}
 		}

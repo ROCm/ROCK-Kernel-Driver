@@ -106,7 +106,7 @@ jade_fill_fifo(struct BCState *bcs)
 	ptr = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, count);
 	bcs->tx_cnt -= count;
-	bcs->hw.hscx.count += count;
+	bcs->count += count;
 	WRITEJADEFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
 	WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, more ? jadeXCMD_XF : (jadeXCMD_XF|jadeXCMD_XME));
 	spin_unlock_irqrestore(&jade_irq_lock, flags);
@@ -187,16 +187,9 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 				return;
 			}
 			xmit_complete_b(bcs);
-			bcs->hw.hscx.count = 0;
+			bcs->count = 0;
 		}
-		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-			bcs->hw.hscx.count = 0;
-			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
-			jade_fill_fifo(bcs);
-		} else {
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			sched_b_event(bcs, B_XMTBUFREADY);
-		}
+		xmit_ready_b(bcs);
 	}
 }
 
@@ -220,9 +213,9 @@ jade_int_main(struct IsdnCardState *cs, u_char val, int jade)
 			   * restart transmitting the whole frame.
 			 */
 			if (bcs->tx_skb) {
-			   	skb_push(bcs->tx_skb, bcs->hw.hscx.count);
-				bcs->tx_cnt += bcs->hw.hscx.count;
-				bcs->hw.hscx.count = 0;
+			   	skb_push(bcs->tx_skb, bcs->count);
+				bcs->tx_cnt += bcs->count;
+				bcs->count = 0;
 			}
 			WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, jadeXCMD_XRES);
 			if (cs->debug & L1_DEB_WARN)

@@ -34,3 +34,33 @@ extern void l1_msg_b(struct PStack *st, int pr, void *arg);
 #ifdef L2FRAME_DEBUG
 extern void Logl2Frame(struct IsdnCardState *cs, struct sk_buff *skb, char *buf, int dir);
 #endif
+
+static inline void
+sched_b_event(struct BCState *bcs, int event)
+{
+	set_bit(event, &bcs->event);
+	schedule_work(&bcs->work);
+}
+
+static inline void
+xmit_complete_b(struct BCState *bcs)
+{
+	skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
+	sched_b_event(bcs, B_CMPLREADY);
+	bcs->tx_skb = NULL;
+}
+
+static inline void
+xmit_ready_b(struct BCState *bcs)
+{
+	bcs->tx_skb = skb_dequeue(&bcs->squeue);
+	if (bcs->tx_skb) {
+		bcs->count = 0;
+		set_bit(BC_FLG_BUSY, &bcs->Flag);
+		bcs->cs->BC_Send_Data(bcs);
+	} else {
+		clear_bit(BC_FLG_BUSY, &bcs->Flag);
+		sched_b_event(bcs, B_XMTBUFREADY);
+	}
+}
+	
