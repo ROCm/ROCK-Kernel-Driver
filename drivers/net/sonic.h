@@ -87,6 +87,7 @@
 #define SONIC_FAET              0x2d
 #define SONIC_MPT               0x2e
 
+#define SONIC_DCR2              0x3f
 
 /*
  * SONIC command bits
