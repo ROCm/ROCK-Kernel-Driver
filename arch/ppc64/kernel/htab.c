@@ -847,28 +847,22 @@ int hash_page(unsigned long ea, unsigned long access)
 
 	ptep = find_linux_pte(pgdir, ea);
 
-	/* If no pte found, send the problem up to do_page_fault */
-	if ( ! ptep ) {
-	  spin_unlock( &mm->page_table_lock );
-	  return 1;
+	/*
+	 * If no pte found or not present, send the problem up to
+	 * do_page_fault
+	 */
+	if (!ptep || !pte_present(*ptep)) {
+		spin_unlock(&mm->page_table_lock);
+		return 1;
 	}
 
 	/*
 	 * Acquire the hash table lock to guarantee that the linux
 	 * pte we fetch will not change
 	 */
-	spin_lock( &hash_table_lock );
+	spin_lock(&hash_table_lock);
 	
 	old_pte = *ptep;
-	
-	/* If the pte is not "present" (valid), send the problem
-	 * up to do_page_fault.
-	 */
-	if ( ! pte_present( old_pte ) ) {
-	  spin_unlock( &hash_table_lock );
-	  spin_unlock( &mm->page_table_lock );
-	  return 1;
-	}
 	
 	/* At this point we have found a pte (which was present).
 	 * The spinlocks prevent this status from changing
@@ -958,8 +952,7 @@ int hash_page(unsigned long ea, unsigned long access)
 				ppc_md.hpte_updatepp( slot, newpp, va );
 				if ( !pte_same( old_pte, new_pte ) )
 					*ptep = new_pte;
-			}
-			else {
+			} else {
 				/* HPTE is not for this pte */
 				pte_val(old_pte) &= ~_PAGE_HPTEFLAGS;
 			}
@@ -972,10 +965,10 @@ int hash_page(unsigned long ea, unsigned long access)
 			 *
 			 * Find an available HPTE slot
  			 */
-			slot = ppc_md.hpte_selectslot( vpn );
+			slot = ppc_md.hpte_selectslot(vpn);
 
 			hash_ind = 0;
-			if ( slot < 0 ) {
+			if (slot < 0) {
 				slot = -slot;
 				hash_ind = 1;
 			}
@@ -983,35 +976,31 @@ int hash_page(unsigned long ea, unsigned long access)
 			/* Set the physical address */
 			prpn = pte_val(old_pte) >> PTE_SHIFT;
 			
-			if ( ptep ) {
-				/* Update the linux pte with the HPTE slot */
-				pte_val(new_pte) &= ~_PAGE_HPTEFLAGS;
-				pte_val(new_pte) |= hash_ind << 15;
-				pte_val(new_pte) |= (slot<<12) & _PAGE_GROUP_IX;
-				pte_val(new_pte) |= _PAGE_HASHPTE;
-				/* No need to use ldarx/stdcx here because all
-				 * who might be updating the pte will hold the page_table_lock
-				 * or the hash_table_lock (we hold both)
-				 */
-				*ptep = new_pte;
-			}
-
+			/* Update the linux pte with the HPTE slot */
+			pte_val(new_pte) &= ~_PAGE_HPTEFLAGS;
+			pte_val(new_pte) |= hash_ind << 15;
+			pte_val(new_pte) |= (slot<<12) & _PAGE_GROUP_IX;
+			pte_val(new_pte) |= _PAGE_HASHPTE;
+			/* No need to use ldarx/stdcx here because all
+			 * who might be updating the pte will hold the page_table_lock
+			 * or the hash_table_lock (we hold both)
+			 */
+			*ptep = new_pte;
+			
 			/* copy appropriate flags from linux pte */
 			hpteflags = (pte_val(new_pte) & 0x1f8) | newpp;
 
 			/* Create the HPTE */
-			ppc_md.hpte_create_valid( slot, vpn, prpn, hash_ind, ptep, hpteflags, 0 ); 
+			ppc_md.hpte_create_valid(slot, vpn, prpn, hash_ind, ptep, hpteflags, 0);
 
 		}
 
 		/* Indicate success */
 		rc = 0;
 	}		
-	
-	spin_unlock( &hash_table_lock );
-	if (ptep)
-		spin_unlock( &mm->page_table_lock );
 
+	spin_unlock(&hash_table_lock);
+	spin_unlock(&mm->page_table_lock);
 	return rc;
 }
 
