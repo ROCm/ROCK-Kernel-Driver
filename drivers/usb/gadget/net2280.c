@@ -73,7 +73,7 @@
 #include <asm/unaligned.h>
 
 
-#define DRIVER_DESC		"NetChip 2280 USB Peripheral Controller"
+#define	DRIVER_DESC		"NetChip 2280 USB Peripheral Controller"
 #define	DRIVER_VERSION		"May Day 2003"
 
 #define	DMA_ADDR_INVALID	(~(dma_addr_t)0)
@@ -97,6 +97,15 @@ static int use_dma = 1;
 
 /* "modprobe net2280 use_dma=n" etc */
 module_param (use_dma, bool, S_IRUGO|S_IWUSR);
+
+/* mode 0 == ep-{a,b,c,d} 1K fifo each
+ * mode 1 == ep-{a,b} 2K fifo each, ep-{c,d} unavailable
+ * mode 2 == ep-a 2K fifo, ep-{b,c} 1K each, ep-d unavailable
+ */
+static ushort fifo_mode = 0;
+
+/* "modprobe net2280 fifo_mode=1" etc */
+module_param (fifo_mode, ushort, 0644);
 
 #define	DIR_STRING(bAddress) (((bAddress) & USB_DIR_IN) ? "in" : "out")
 
@@ -384,7 +393,7 @@ net2280_free_request (struct usb_ep *_ep, struct usb_request *_req)
 	struct net2280_request	*req;
 
 	ep = container_of (_ep, struct net2280_ep, ep);
-	if (!ep || !_req || (!ep->desc && ep->num != 0))
+	if (!ep || !_req)
 		return;
 
 	req = container_of (_req, struct net2280_request, req);
@@ -1193,11 +1202,13 @@ net2280_fifo_status (struct usb_ep *_ep)
 
 	ep = container_of (_ep, struct net2280_ep, ep);
 	if (!_ep || (!ep->desc && ep->num != 0))
-		return -EINVAL;
+		return -ENODEV;
 	if (!ep->dev->driver || ep->dev->gadget.speed == USB_SPEED_UNKNOWN)
 		return -ESHUTDOWN;
 
-	avail = readl (&ep->regs->ep_avail);
+	avail = readl (&ep->regs->ep_avail) & ((1 << 12) - 1);
+	if (avail > ep->fifo_size)
+		return -EOVERFLOW;
 	if (ep->is_in)
 		avail = ep->fifo_size - avail;
 	return avail;
@@ -1649,7 +1660,7 @@ static void usb_reset (struct net2280 *dev)
 	writel (tmp, &dev->regs->devinit);
 
 	/* standard fifo and endpoint allocations */
-	set_fifo_mode (dev, 0);
+	set_fifo_mode (dev, (fifo_mode <= 2) ? fifo_mode : 0);
 }
 
 static void usb_reinit (struct net2280 *dev)
