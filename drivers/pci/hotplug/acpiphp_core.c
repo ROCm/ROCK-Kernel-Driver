@@ -441,7 +441,7 @@ static int init_slots (void)
 		slot->number = i;
 
 		slot->hotplug_slot->private = slot;
-		slot->hotplug_slot->release = &release_slots;
+		slot->hotplug_slot->release = &release_slot;
 		slot->hotplug_slot->ops = &acpi_hotplug_slot_ops;
 
 		slot->acpi_slot = get_slot_from_id(i);
@@ -455,7 +455,7 @@ static int init_slots (void)
 		retval = pci_hp_register(slot->hotplug_slot);
 		if (retval) {
 			err("pci_hp_register failed with error %d\n", retval);
-			release_slot();
+			release_slot(slot->hotplug_slot);
 			return retval;
 		}
 
