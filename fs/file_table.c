@@ -85,6 +85,7 @@ static int old_max;
 			rwlock_init(&f->f_owner.lock);
 			/* f->f_version: 0 */
 			INIT_LIST_HEAD(&f->f_list);
+			f->f_maxcount = INT_MAX;
 			return f;
 		}
 	}

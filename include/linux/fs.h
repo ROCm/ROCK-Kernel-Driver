@@ -586,6 +586,7 @@ struct file {
 	unsigned int		f_uid, f_gid;
 	struct file_ra_state	f_ra;
 
+	size_t			f_maxcount;
 	unsigned long		f_version;
 	void			*f_security;
 

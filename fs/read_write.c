@@ -185,8 +185,12 @@ bad:
 
 int rw_verify_area(int read_write, struct file *file, loff_t *ppos, size_t count)
 {
-	struct inode *inode = file->f_dentry->d_inode;
+	struct inode *inode;
 
+	if (count > file->f_maxcount)
+		return -EINVAL;
+
+	inode = file->f_dentry->d_inode;
 	if (inode->i_flock && MANDATORY_LOCK(inode))
 		return locks_mandatory_area(read_write == READ ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE, inode, file, *ppos, count);
 	return 0;
