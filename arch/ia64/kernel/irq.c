@@ -84,11 +84,13 @@ irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned = {
 	}
 };
 
+#ifdef CONFIG_SMP
 /*
  * This is updated when the user sets irq affinity via /proc
  */
 cpumask_t __cacheline_aligned pending_irq_cpumask[NR_IRQS];
 static unsigned long pending_irq_redir[BITS_TO_LONGS(NR_IRQS)];
+#endif
 
 #ifdef CONFIG_IA64_GENERIC
 irq_desc_t * __ia64_irq_desc (unsigned int irq)
