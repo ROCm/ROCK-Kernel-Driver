@@ -1,11 +1,6 @@
 ToDo/Notes:
 	- Find and fix bugs.
 	- Checkpoint or disable the user space journal ($UsnJrnl).
-	- Implement sops->dirty_inode() to implement {a,m,c}time updates and
-	  such things.  This should probably just flag the ntfs inode such that
-	  sops->write_inode(), i.e. ntfs_write_inode(), will copy the times
-	  when it is invoked rather than having to update the mft record
-	  every time.
 	- In between ntfs_prepare/commit_write, need exclusion between
 	  simultaneous file extensions. Need perhaps an NInoResizeUnderway()
 	  flag which we can set in ntfs_prepare_write() and clear again in
@@ -25,6 +20,11 @@ ToDo/Notes:
 	  the problem.
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
+
+2.1.17 - WIP.
+
+	- Implement bitmap modification code (fs/ntfs/bitmap.[hc]).  This
+	  includes functions to set/clear a single bit or a run of bits.
 
 2.1.16 - Implement access time updates, file sync, async io, and read/writev.
 

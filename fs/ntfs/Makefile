@@ -6,7 +6,7 @@ ntfs-objs := aops.o attrib.o collate.o compress.o debug.o dir.o file.o \
 	     index.o inode.o mft.o mst.o namei.o super.o sysctl.o unistr.o \
 	     upcase.o
 
-EXTRA_CFLAGS = -DNTFS_VERSION=\"2.1.16\"
+EXTRA_CFLAGS = -DNTFS_VERSION=\"2.1.17-WIP\"
 
 ifeq ($(CONFIG_NTFS_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG
@@ -15,5 +15,5 @@ endif
 ifeq ($(CONFIG_NTFS_RW),y)
 EXTRA_CFLAGS += -DNTFS_RW
 
-ntfs-objs += logfile.o quota.o
+ntfs-objs += bitmap.o logfile.o quota.o
 endif
