@@ -140,7 +140,5 @@ static char *IMM_MODE_STRING[] =
 #endif
 
 static int imm_engine(imm_struct *, Scsi_Cmnd *);
-static int imm_init(imm_struct *);
-static void imm_interrupt(void *);
 
 #endif				/* _IMM_H */

@@ -44,14 +44,13 @@ typedef struct {
 	unsigned wanted:1;	/* Parport sharing busy flag    */
 	wait_queue_head_t *waiting;
 	struct Scsi_Host *host;
+	struct list_head list;
 } imm_struct;
 
 static void imm_reset_pulse(unsigned int base);
 static int device_check(imm_struct *dev);
 
 #include "imm.h"
-#define NO_HOSTS 4
-static imm_struct imm_hosts[NO_HOSTS];
 
 static inline imm_struct *imm_dev(struct Scsi_Host *host)
 {
@@ -112,117 +111,6 @@ static void imm_pb_dismiss(imm_struct *dev)
 static inline void imm_pb_release(imm_struct *dev)
 {
 	parport_release(dev->dev);
-}
-
-/***************************************************************************
- *                   Parallel port probing routines                        *
- ***************************************************************************/
-
-static Scsi_Host_Template imm_template;
-
-static int imm_probe(imm_struct *dev, struct parport *pb)
-{
-	struct Scsi_Host *host;
-	DECLARE_WAIT_QUEUE_HEAD(waiting);
-	DEFINE_WAIT(wait);
-	int ports;
-	int modes, ppb;
-	int err;
-
-	init_waitqueue_head(&waiting);
-
-	memset(dev, 0, sizeof(dev));
-
-	dev->base = -1;
-	dev->mode = IMM_AUTODETECT;
-
-	dev->dev = parport_register_device(pb, "imm", NULL, imm_wakeup,
-						NULL, 0, dev);
-
-	if (!dev->dev)
-		return -ENOMEM;
-
-	/* Claim the bus so it remembers what we do to the control
-	 * registers. [ CTR and ECP ]
-	 */
-	err = -EBUSY;
-	dev->waiting = &waiting;
-	prepare_to_wait(&waiting, &wait, TASK_UNINTERRUPTIBLE);
-	if (imm_pb_claim(dev))
-		schedule_timeout(3 * HZ);
-	if (dev->wanted) {
-		printk(KERN_ERR "imm%d: failed to claim parport because "
-			"a pardevice is owning the port for too long "
-			"time!\n", dev - imm_hosts);
-		imm_pb_dismiss(dev);
-		dev->waiting = NULL;
-		finish_wait(&waiting, &wait);
-		goto out;
-	}
-	dev->waiting = NULL;
-	finish_wait(&waiting, &wait);
-	ppb = dev->base = dev->dev->port->base;
-	dev->base_hi = dev->dev->port->base_hi;
-	w_ctr(ppb, 0x0c);
-	modes = dev->dev->port->modes;
-
-	/* Mode detection works up the chain of speed
-	 * This avoids a nasty if-then-else-if-... tree
-	 */
-	dev->mode = IMM_NIBBLE;
-
-	if (modes & PARPORT_MODE_TRISTATE)
-		dev->mode = IMM_PS2;
-
-	/* Done configuration */
-
-	err = imm_init(dev);
-
-	imm_pb_release(dev);
-
-	if (err)
-		goto out;
-
-	/* now the glue ... */
-	switch (dev->mode) {
-	case IMM_NIBBLE:
-	case IMM_PS2:
-		ports = 3;
-		break;
-	case IMM_EPP_8:
-	case IMM_EPP_16:
-	case IMM_EPP_32:
-		ports = 8;
-		break;
-	default:	/* Never gets here */
-		BUG();
-	}
-
-	INIT_WORK(&dev->imm_tq, imm_interrupt, dev);
-
-	err = -ENOMEM;
-	host = scsi_host_alloc(&imm_template, sizeof(imm_struct *));
-	if (!host)
-		goto out;
-	list_add_tail(&host->sht_legacy_list, &imm_template.legacy_hosts);
-	host->io_port = pb->base;
-	host->n_io_port = ports;
-	host->dma_channel = -1;
-	host->unique_id = dev - imm_hosts;
-	*(imm_struct **)&host->hostdata = dev;
-	dev->host = host;
-	err = scsi_add_host(host, NULL);
-	if (err)
-		goto out1;
-	scsi_scan_host(host);
-	return 0;
-
-out1:
-	list_del(&host->sht_legacy_list);
-	scsi_host_put(host);
-out:
-	parport_unregister_device(dev->dev);
-	return err;
 }
 
 /* This is to give the imm driver a way to modify the timings (and other
@@ -1243,36 +1131,161 @@ static Scsi_Host_Template imm_template = {
 	.can_queue		= 1,
 };
 
+/***************************************************************************
+ *                   Parallel port probing routines                        *
+ ***************************************************************************/
+
+static LIST_HEAD(imm_hosts);
+
+static int __imm_attach(struct parport *pb)
+{
+	struct Scsi_Host *host;
+	imm_struct *dev;
+	DECLARE_WAIT_QUEUE_HEAD(waiting);
+	DEFINE_WAIT(wait);
+	int ports;
+	int modes, ppb;
+	int err = -ENOMEM;
+
+	init_waitqueue_head(&waiting);
+
+	dev = kmalloc(sizeof(imm_struct), GFP_KERNEL);
+	if (!dev)
+		return -ENOMEM;
+
+	memset(dev, 0, sizeof(dev));
+
+	dev->base = -1;
+	dev->mode = IMM_AUTODETECT;
+	INIT_LIST_HEAD(&dev->list);
+
+	dev->dev = parport_register_device(pb, "imm", NULL, imm_wakeup,
+						NULL, 0, dev);
+
+	if (!dev->dev)
+		goto out;
+
+
+	/* Claim the bus so it remembers what we do to the control
+	 * registers. [ CTR and ECP ]
+	 */
+	err = -EBUSY;
+	dev->waiting = &waiting;
+	prepare_to_wait(&waiting, &wait, TASK_UNINTERRUPTIBLE);
+	if (imm_pb_claim(dev))
+		schedule_timeout(3 * HZ);
+	if (dev->wanted) {
+		printk(KERN_ERR "imm%d: failed to claim parport because "
+			"a pardevice is owning the port for too long "
+			"time!\n", pb->number);
+		imm_pb_dismiss(dev);
+		dev->waiting = NULL;
+		finish_wait(&waiting, &wait);
+		goto out1;
+	}
+	dev->waiting = NULL;
+	finish_wait(&waiting, &wait);
+	ppb = dev->base = dev->dev->port->base;
+	dev->base_hi = dev->dev->port->base_hi;
+	w_ctr(ppb, 0x0c);
+	modes = dev->dev->port->modes;
+
+	/* Mode detection works up the chain of speed
+	 * This avoids a nasty if-then-else-if-... tree
+	 */
+	dev->mode = IMM_NIBBLE;
+
+	if (modes & PARPORT_MODE_TRISTATE)
+		dev->mode = IMM_PS2;
+
+	/* Done configuration */
+
+	err = imm_init(dev);
+
+	imm_pb_release(dev);
+
+	if (err)
+		goto out1;
+
+	/* now the glue ... */
+	switch (dev->mode) {
+	case IMM_NIBBLE:
+	case IMM_PS2:
+		ports = 3;
+		break;
+	case IMM_EPP_8:
+	case IMM_EPP_16:
+	case IMM_EPP_32:
+		ports = 8;
+		break;
+	default:	/* Never gets here */
+		BUG();
+	}
+
+	INIT_WORK(&dev->imm_tq, imm_interrupt, dev);
+
+	err = -ENOMEM;
+	host = scsi_host_alloc(&imm_template, sizeof(imm_struct *));
+	if (!host)
+		goto out1;
+	host->io_port = pb->base;
+	host->n_io_port = ports;
+	host->dma_channel = -1;
+	host->unique_id = pb->number;
+	*(imm_struct **)&host->hostdata = dev;
+	dev->host = host;
+	list_add_tail(&dev->list, &imm_hosts);
+	err = scsi_add_host(host, NULL);
+	if (err)
+		goto out2;
+	scsi_scan_host(host);
+	return 0;
+
+out2:
+	list_del_init(&dev->list);
+	scsi_host_put(host);
+out1:
+	parport_unregister_device(dev->dev);
+out:
+	kfree(dev);
+	return err;
+}
+
+static void imm_attach(struct parport *pb)
+{
+	__imm_attach(pb);
+}
+
+static void imm_detach(struct parport *pb)
+{
+	imm_struct *dev;
+	list_for_each_entry(dev, &imm_hosts, list) {
+		if (dev->dev->port == pb) {
+			list_del_init(&dev->list);
+			scsi_remove_host(dev->host);
+			scsi_host_put(dev->host);
+			parport_unregister_device(dev->dev);
+			kfree(dev);
+			break;
+		}
+	}
+}
+
+static struct parport_driver imm_driver = {
+	.name	= "imm",
+	.attach	= imm_attach,
+	.detach	= imm_detach,
+};
+
 static int __init imm_driver_init(void)
 {
-	struct parport *pb = parport_enumerate();
-	int i, nhosts;
-
-	INIT_LIST_HEAD(&imm_template.legacy_hosts);
-
 	printk("imm: Version %s\n", IMM_VERSION);
-
-	for (i = 0, nhosts = 0; pb; i++, pb = pb->next) {
-		imm_struct *dev = &imm_hosts[i];
-		if (imm_probe(dev, pb) == 0)
-			nhosts++;
-	}
-	return nhosts ? 0 : -ENODEV;
+	return parport_register_driver(&imm_driver);
 }
 
 static void __exit imm_driver_exit(void)
 {
-	struct scsi_host_template *sht = &imm_template;
-	struct Scsi_Host *host, *s;
-
-	list_for_each_entry(host, &sht->legacy_hosts, sht_legacy_list)
-		scsi_remove_host(host);
-	list_for_each_entry_safe(host, s, &sht->legacy_hosts, sht_legacy_list) {
-		imm_struct *dev = imm_dev(host);
-		list_del(&host->sht_legacy_list);
-		scsi_host_put(host);
-		parport_unregister_device(dev->dev);
-	}
+	parport_unregister_driver(&imm_driver);
 }
 
 module_init(imm_driver_init);
