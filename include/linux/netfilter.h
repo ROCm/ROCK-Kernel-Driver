@@ -10,6 +10,7 @@
 #include <linux/wait.h>
 #include <linux/list.h>
 #endif
+#include <linux/compiler.h>
 
 /* Responses from hook functions. */
 #define NF_DROP 0

@@ -22,6 +22,7 @@
 #include <linux/ipv6.h>
 #include <linux/skbuff.h>
 #endif
+#include <linux/compiler.h>
 #include <linux/netfilter_ipv6.h>
 
 #define IP6T_FUNCTION_MAXNAMELEN 30
@@ -106,7 +107,9 @@ struct ip6t_counters
 	u_int64_t pcnt, bcnt;			/* Packet and byte counters */
 };
 
+#ifdef __KERNEL__
 static DECLARE_MUTEX(ip6t_mutex);
+#endif
 
 /* Values for "flag" field in struct ip6t_ip6 (general ip6 structure). */
 #define IP6T_F_PROTO		0x01	/* Set if rule cares about upper 

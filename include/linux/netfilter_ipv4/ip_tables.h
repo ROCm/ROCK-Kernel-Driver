@@ -22,6 +22,7 @@
 #include <linux/ip.h>
 #include <linux/skbuff.h>
 #endif
+#include <linux/compiler.h>
 #include <linux/netfilter_ipv4.h>
 
 #define IPT_FUNCTION_MAXNAMELEN 30
@@ -336,8 +337,8 @@ ipt_get_target(struct ipt_entry *e)
 /*
  *	Main firewall chains definitions and global var's definitions.
  */
-static DECLARE_MUTEX(ipt_mutex);
 #ifdef __KERNEL__
+static DECLARE_MUTEX(ipt_mutex);
 
 #include <linux/init.h>
 extern void ipt_init(void) __init;
