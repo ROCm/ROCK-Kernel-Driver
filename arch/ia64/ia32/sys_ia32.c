@@ -2661,6 +2661,32 @@ long sys32_fadvise64_64(int fd, __u32 offset_low, __u32 offset_high,
 			       advice); 
 } 
 
+asmlinkage long sys32_waitid(int which, compat_pid_t pid,
+			     siginfo_t32 __user *uinfo, int options,
+			     struct compat_rusage __user *uru)
+{
+	siginfo_t info;
+	struct rusage ru;
+	long ret;
+	mm_segment_t old_fs = get_fs();
+
+	info.si_signo = 0;
+	set_fs (KERNEL_DS);
+	ret = sys_waitid(which, pid, (siginfo_t __user *) &info, options,
+			 uru ? &ru : NULL);
+	set_fs (old_fs);
+
+	if (ret < 0 || info.si_signo == 0)
+		return ret;
+
+	if (uru && (ret = put_compat_rusage(&ru, uru)))
+		return ret;
+
+	BUG_ON(info.si_code & __SI_MASK);
+	info.si_code |= __SI_CHLD;
+	return copy_siginfo_to_user32(uinfo, &info);
+}
+
 #ifdef	NOTYET  /* UNTESTED FOR IA64 FROM HERE DOWN */
 
 asmlinkage long sys32_setreuid(compat_uid_t ruid, compat_uid_t euid)
