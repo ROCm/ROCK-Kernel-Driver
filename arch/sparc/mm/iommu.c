@@ -119,6 +119,13 @@ iommu_init(int iommund, struct sbus_bus *sbus)
 		prom_halt();
 	}
 	bit_map_init(&iommu->usemap, bitmap, IOMMU_NPTES);
+	/* To be coherent on HyperSparc, the page color of DVMA
+	 * and physical addresses must match.
+	 */
+	if (srmmu_modtype == HyperSparc)
+		iommu->usemap.num_colors = vac_cache_size >> PAGE_SHIFT;
+	else
+		iommu->usemap.num_colors = 1;
 
 	printk("IOMMU: impl %d vers %d table 0x%p[%d B] map [%d b]\n",
 	    impl, vers, iommu->page_table,
@@ -128,7 +135,9 @@ iommu_init(int iommund, struct sbus_bus *sbus)
 }
 
 /* This begs to be btfixup-ed by srmmu. */
-static void iommu_viking_flush_iotlb(iopte_t *iopte, unsigned int niopte)
+/* Flush the iotlb entries to ram. */
+/* This could be better if we didn't have to flush whole pages. */
+static void iommu_flush_iotlb(iopte_t *iopte, unsigned int niopte)
 {
 	unsigned long start;
 	unsigned long end;
@@ -145,6 +154,11 @@ static void iommu_viking_flush_iotlb(iopte_t *iopte, unsigned int niopte)
 			viking_flush_page(start);
 			start += PAGE_SIZE;
 		}
+	} else {
+		while(start < end) {
+			__flush_page_to_ram(start);
+			start += PAGE_SIZE;
+		}
 	}
 }
 
@@ -156,7 +170,8 @@ static u32 iommu_get_one(struct page *page, int npages, struct sbus_bus *sbus)
 	unsigned int busa, busa0;
 	int i;
 
-	ioptex = bit_map_string_get(&iommu->usemap, npages, 1);
+	/* page color = pfn of page */
+	ioptex = bit_map_string_get(&iommu->usemap, npages, page_to_pfn(page));
 	if (ioptex < 0)
 		panic("iommu out");
 	busa0 = iommu->start + (ioptex << PAGE_SHIFT);
@@ -172,8 +187,7 @@ static u32 iommu_get_one(struct page *page, int npages, struct sbus_bus *sbus)
 		page++;
 	}
 
-	iommu_viking_flush_iotlb(iopte0, npages);
-	flush_cache_all(); // hack to fix dma errors with hypersparc
+	iommu_flush_iotlb(iopte0, npages);
 
 	return busa0;
 }
@@ -328,7 +342,9 @@ static int iommu_map_dma_area(dma_addr_t *pba, unsigned long va,
 	if ((addr & ~PAGE_MASK) != 0) BUG();
 	if ((len & ~PAGE_MASK) != 0) BUG();
 
-	ioptex = bit_map_string_get(&iommu->usemap, len >> PAGE_SHIFT, 1);
+	/* page color = physical address */
+	ioptex = bit_map_string_get(&iommu->usemap, len >> PAGE_SHIFT,
+		addr >> PAGE_SHIFT);
 	if (ioptex < 0)
 		panic("iommu out");
 
@@ -372,7 +388,7 @@ static int iommu_map_dma_area(dma_addr_t *pba, unsigned long va,
 	 *        to handle the latter case as well.
 	 */
 	flush_cache_all();
-	iommu_viking_flush_iotlb(first, len >> PAGE_SHIFT);
+	iommu_flush_iotlb(first, len >> PAGE_SHIFT);
 	flush_tlb_all();
 	iommu_invalidate(iommu->regs);
 

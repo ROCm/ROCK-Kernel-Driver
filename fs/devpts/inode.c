@@ -103,6 +103,7 @@ devpts_fill_super(struct super_block *s, void *data, int silent)
 	s->s_magic = DEVPTS_SUPER_MAGIC;
 	s->s_op = &devpts_sops;
 	s->s_xattr = devpts_xattr_handlers;
+	s->s_time_gran = 1;
 
 	inode = new_inode(s);
 	if (!inode)

@@ -315,7 +315,7 @@ ia32_sys_call_table:
 	.quad sys_unlink		/* 10 */
 	.quad stub32_execve
 	.quad sys_chdir
-	.quad sys32_time
+	.quad compat_sys_time
 	.quad sys_mknod
 	.quad sys_chmod		/* 15 */
 	.quad sys_lchown16
@@ -327,7 +327,7 @@ ia32_sys_call_table:
 	.quad sys_oldumount	/* old_umount  */
 	.quad sys_setuid16
 	.quad sys_getuid16
-	.quad sys_stime		/* stime */		/* 25 */
+	.quad compat_sys_stime	/* stime */		/* 25 */
 	.quad sys32_ptrace	/* ptrace */
 	.quad sys_alarm
 	.quad sys_fstat	/* (old)fstat */
@@ -479,7 +479,7 @@ ia32_sys_call_table:
 	.quad sys32_rt_sigaction
 	.quad sys32_rt_sigprocmask	/* 175 */
 	.quad sys32_rt_sigpending
-	.quad sys32_rt_sigtimedwait
+	.quad compat_rt_sigtimedwait
 	.quad sys32_rt_sigqueueinfo
 	.quad stub32_rt_sigsuspend
 	.quad sys32_pread		/* 180 */

@@ -139,8 +139,8 @@ END_FTR_SECTION_IFCLR(CPU_FTR_COHERENT_ICACHE)
 	std	r3,STK_PARM(r4)(r1)
 
 	/* Get htab_hash_mask */
-	ld	r4,htab_data@got(2)
-	ld	r27,16(r4)	/* htab_data.htab_hash_mask -> r27 */
+	ld	r4,htab_hash_mask@got(2)
+	ld	r27,0(r4)	/* htab_hash_mask -> r27 */
 
 	/* Check if we may already be in the hashtable, in this case, we
 	 * go to out-of-line code to try to modify the HPTE

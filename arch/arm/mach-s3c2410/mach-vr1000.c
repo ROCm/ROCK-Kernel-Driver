@@ -18,6 +18,7 @@
  *     05-Apr-2004 BJD  Copied to make mach-vr1000.c
  *     18-Oct-2004 BJD  Updated board struct
  *     04-Nov-2004 BJD  Clock and serial configuration update
+ *     04-Jan-2004 BJD  Updated uart init call
 */
 
 #include <linux/kernel.h>
@@ -204,7 +205,7 @@ void __init vr1000_map_io(void)
 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
 
 	s3c24xx_init_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
-	s3c2410_init_uarts(vr1000_uartcfgs, ARRAY_SIZE(vr1000_uartcfgs));
+	s3c24xx_init_uarts(vr1000_uartcfgs, ARRAY_SIZE(vr1000_uartcfgs));
 	s3c24xx_set_board(&vr1000_board);
 	usb_simtec_init();
 }

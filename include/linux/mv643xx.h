@@ -13,8 +13,11 @@
 #ifndef __ASM_MV64340_H
 #define __ASM_MV64340_H
 
+#ifdef __MIPS__
 #include <asm/addrspace.h>
 #include <asm/marvell.h>
+#endif
+#include <asm/types.h>
 
 /****************************************/
 /* Processor Address Space              */
@@ -1035,5 +1038,51 @@
 #define MV64340_SERIAL_INIT_STATUS                                  0xf32c
 
 extern void mv64340_irq_init(unsigned int base);
+
+/* MPSC Platform Device, Driver Data (Shared register regions) */
+#define	MPSC_SHARED_NAME		"mpsc_shared"
+
+#define	MPSC_ROUTING_BASE_ORDER		0
+#define	MPSC_SDMA_INTR_BASE_ORDER	1
+
+#define MPSC_ROUTING_REG_BLOCK_SIZE	0x000c
+#define MPSC_SDMA_INTR_REG_BLOCK_SIZE	0x0084
+
+struct mpsc_shared_pd_dd {
+	u32	mrr_val;
+	u32	rcrr_val;
+	u32	tcrr_val;
+	u32	intr_cause_val;
+	u32	intr_mask_val;
+};
+
+/* MPSC Platform Device, Driver Data */
+#define	MPSC_CTLR_NAME			"mpsc"
+
+#define	MPSC_BASE_ORDER			0
+#define	MPSC_SDMA_BASE_ORDER		1
+#define	MPSC_BRG_BASE_ORDER		2
+
+#define MPSC_REG_BLOCK_SIZE		0x0038
+#define MPSC_SDMA_REG_BLOCK_SIZE	0x0c18
+#define MPSC_BRG_REG_BLOCK_SIZE		0x0008
+
+struct mpsc_pd_dd {
+	u8	mirror_regs;
+	u8	cache_mgmt;
+	u8	max_idle;
+	int	default_baud;
+	int	default_bits;
+	int	default_parity;
+	int	default_flow;
+	u32	chr_1_val;
+	u32	chr_2_val;
+	u32	chr_10_val;
+	u32	mpcr_val;
+	u32	bcr_val;
+	u8	brg_can_tune;
+	u8	brg_clk_src;
+	u32	brg_clk_freq;
+};
 
 #endif /* __ASM_MV64340_H */

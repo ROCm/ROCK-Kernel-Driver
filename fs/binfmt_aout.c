@@ -424,7 +424,7 @@ beyond_if:
 		return retval;
 	}
 
-	retval = setup_arg_pages(bprm, EXSTACK_DEFAULT);
+	retval = setup_arg_pages(bprm, STACK_TOP, EXSTACK_DEFAULT);
 	if (retval < 0) { 
 		/* Someone check-me: is this error path enough? */ 
 		send_sig(SIGKILL, current, 0); 

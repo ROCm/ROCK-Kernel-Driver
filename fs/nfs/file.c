@@ -295,10 +295,19 @@ out_swapfile:
 static int do_getlk(struct file *filp, int cmd, struct file_lock *fl)
 {
 	struct inode *inode = filp->f_mapping->host;
-	int status;
+	int status = 0;
 
 	lock_kernel();
-	status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+	/* Use local locking if mounted with "-onolock" */
+	if (!(NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM))
+		status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+	else {
+		struct file_lock *cfl = posix_test_lock(filp, fl);
+		if (cfl != NULL) {
+			memcpy(fl, cfl, sizeof(*fl));
+			fl->fl_type = F_UNLCK;
+		}
+	}
 	unlock_kernel();
 	return status;
 }
@@ -325,7 +334,11 @@ static int do_unlk(struct file *filp, int cmd, struct file_lock *fl)
 	 * 	still need to complete the unlock.
 	 */
 	lock_kernel();
-	status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+	/* Use local locking if mounted with "-onolock" */
+	if (!(NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM))
+		status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+	else
+		status = posix_lock_file_wait(filp, fl);
 	rpc_clnt_sigunmask(NFS_CLIENT(inode), &oldset);
 	return status;
 }
@@ -351,15 +364,19 @@ static int do_setlk(struct file *filp, int cmd, struct file_lock *fl)
 		return status;
 
 	lock_kernel();
-	status = NFS_PROTO(inode)->lock(filp, cmd, fl);
-	/* If we were signalled we still need to ensure that
-	 * we clean up any state on the server. We therefore
-	 * record the lock call as having succeeded in order to
-	 * ensure that locks_remove_posix() cleans it out when
-	 * the process exits.
-	 */
-	if (status == -EINTR || status == -ERESTARTSYS)
-		posix_lock_file(filp, fl);
+	/* Use local locking if mounted with "-onolock" */
+	if (!(NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM)) {
+		status = NFS_PROTO(inode)->lock(filp, cmd, fl);
+		/* If we were signalled we still need to ensure that
+		 * we clean up any state on the server. We therefore
+		 * record the lock call as having succeeded in order to
+		 * ensure that locks_remove_posix() cleans it out when
+		 * the process exits.
+		 */
+		if (status == -EINTR || status == -ERESTARTSYS)
+			posix_lock_file(filp, fl);
+	} else
+		status = posix_lock_file_wait(filp, fl);
 	unlock_kernel();
 	if (status < 0)
 		return status;
@@ -395,15 +412,6 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	/* No mandatory locks over NFS */
 	if ((inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID)
 		return -ENOLCK;
-
-	if (NFS_PROTO(inode)->version != 4) {
-		/* Fake OK code if mounted without NLM support */
-		if (NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM) {
-			if (IS_GETLK(cmd))
-				return LOCK_USE_CLNT;
-			return 0;
-		}
-	}
 
 	/*
 	 * No BSD flocks over NFS allowed.

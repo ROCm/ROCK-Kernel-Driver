@@ -149,14 +149,13 @@ space      := $(nullstring) # end of line
 # careful not to include files twice if building in the source
 # directory. LOCALVERSION from the command line override all of this
 
-ifeq ($(objtree),$(srctree))
-localversion-files := $(wildcard $(srctree)/localversion*)
-else
-localversion-files := $(wildcard $(objtree)/localversion* $(srctree)/localversion*)
-endif
+localver := $(objtree)/localversion* $(srctree)/localversion*
+localver := $(sort $(wildcard $(localver)))
+# skip backup files (containing '~')
+localver := $(foreach f, $(localver), $(if $(findstring ~, $(f)),,$(f)))
 
 LOCALVERSION = $(subst $(space),, \
-	       $(shell cat /dev/null $(localversion-files:%~=)) \
+	       $(shell cat /dev/null $(localver)) \
 	       $(patsubst "%",%,$(CONFIG_LOCALVERSION)))
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(LOCALVERSION)
@@ -291,7 +290,7 @@ check_gcc = $(warning check_gcc is deprecated - use cc-option) \
             $(call cc-option, $(1),$(2))
 
 # cc-option-yn
-# Usage: flag := $(call gcc-option-yn, -march=winchip-c6)
+# Usage: flag := $(call cc-option-yn, -march=winchip-c6)
 cc-option-yn = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null \
                 > /dev/null 2>&1; then echo "y"; else echo "n"; fi;)
 
@@ -331,7 +330,10 @@ DEPMOD		= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
 PERL		= perl
 CHECK		= sparse
+
+NOSTDINC_FLAGS := -nostdinc -isystem $(shell $(CC) -print-file-name=include)
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__
+CHECKFLAGS     += $(NOSTDINC_FLAGS)
 MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
@@ -339,7 +341,6 @@ LDFLAGS_MODULE  = -r
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
 
-NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option
@@ -349,7 +350,8 @@ LINUXINCLUDE    := -Iinclude \
 CPPFLAGS        := -D__KERNEL__ $(LINUXINCLUDE)
 
 CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs \
-	  	   -fno-strict-aliasing -fno-common
+	  	   -fno-strict-aliasing -fno-common \
+		   -ffreestanding
 AFLAGS		:= -D__ASSEMBLY__
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION LOCALVERSION KERNELRELEASE \
@@ -389,7 +391,7 @@ scripts_basic:
 # using a seperate output directory. This allows convinient use
 # of make in output directory
 outputmakefile:
-	$(Q)if /usr/bin/env test ! $(srctree) -ef $(objtree); then \
+	$(Q)if test ! $(srctree) -ef $(objtree); then \
 	$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile              \
 	    $(srctree) $(objtree) $(VERSION) $(PATCHLEVEL)         \
 	    > $(objtree)/Makefile;                                 \
@@ -1209,6 +1211,9 @@ endif #ifeq ($(mixed-targets),1)
 checkstack:
 	$(OBJDUMP) -d vmlinux $$(find . -name '*.ko') | \
 	$(PERL) $(src)/scripts/checkstack.pl $(ARCH)
+
+kernelrelease:
+	@echo $(KERNELRELEASE)
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================

@@ -295,7 +295,7 @@ int umsdos_writeentry (struct dentry *parent, struct umsdos_info *info,
 	unlock_page(page);
 	page_cache_release(page);
 		
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(dir);
 
 out_dput:

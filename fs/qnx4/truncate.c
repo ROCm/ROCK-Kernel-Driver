@@ -31,7 +31,7 @@ void qnx4_truncate(struct inode *inode)
 		/* TODO */
 	}
 	QNX4DEBUG(("qnx4: qnx4_truncate called\n"));
-	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	unlock_kernel();
 }

@@ -289,6 +289,17 @@ static inline struct raw6_opt * raw6_sk(const struct sock *__sk)
 #else
 #define __ipv6_only_sock(sk)	0
 #define ipv6_only_sock(sk)	0
+
+static inline struct ipv6_pinfo * inet6_sk(const struct sock *__sk)
+{
+	return NULL;
+}
+
+static inline struct raw6_opt * raw6_sk(const struct sock *__sk)
+{
+	return NULL;
+}
+
 #endif
 
 #endif

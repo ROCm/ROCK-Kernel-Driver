@@ -6,7 +6,7 @@
  *      (C) Copyright 2000-2001, Greg Ungerer (gerg@snapgear.com)
  *      (C) Copyright 2001-2002, SnapGear (www.snapgear.com)
  *
- *	$Id: nettel.c,v 1.8 2004/11/04 13:24:15 gleixner Exp $
+ *	$Id: nettel.c,v 1.10 2005/01/05 17:11:29 dwmw2 Exp $
  */
 
 /****************************************************************************/
@@ -332,8 +332,8 @@ int __init nettel_init(void)
 
 		/* Destroy useless AMD MTD mapping */
 		amd_mtd = NULL;
-		iounmap((void *) nettel_amd_map.virt);
-		nettel_amd_map.virt = (unsigned long) NULL;
+		iounmap(nettel_amd_map.virt);
+		nettel_amd_map.virt = NULL;
 #else
 		/* Only AMD flash supported */
 		return(-ENXIO);
@@ -357,8 +357,7 @@ int __init nettel_init(void)
 	/* Probe for the the size of the first Intel flash */
 	nettel_intel_map.size = maxsize;
 	nettel_intel_map.phys = intel0addr;
-	nettel_intel_map.virt = (unsigned long)
-		ioremap_nocache(intel0addr, maxsize);
+	nettel_intel_map.virt = ioremap_nocache(intel0addr, maxsize);
 	if (!nettel_intel_map.virt) {
 		printk("SNAPGEAR: failed to ioremap() ROMCS1\n");
 		return(-EIO);
@@ -366,8 +365,8 @@ int __init nettel_init(void)
 	simple_map_init(&nettel_intel_map);
 
 	intel_mtd = do_map_probe("cfi_probe", &nettel_intel_map);
-	if (! intel_mtd) {
-		iounmap((void *) nettel_intel_map.virt);
+	if (!intel_mtd) {
+		iounmap(nettel_intel_map.virt);
 		return(-ENXIO);
 	}
 
@@ -388,11 +387,10 @@ int __init nettel_init(void)
 	/* Delete the old map and probe again to do both chips */
 	map_destroy(intel_mtd);
 	intel_mtd = NULL;
-	iounmap((void *) nettel_intel_map.virt);
+	iounmap(nettel_intel_map.virt);
 
 	nettel_intel_map.size = maxsize;
-	nettel_intel_map.virt = (unsigned long)
-		ioremap_nocache(intel0addr, maxsize);
+	nettel_intel_map.virt = ioremap_nocache(intel0addr, maxsize);
 	if (!nettel_intel_map.virt) {
 		printk("SNAPGEAR: failed to ioremap() ROMCS1/2\n");
 		return(-EIO);
@@ -480,7 +478,7 @@ void __exit nettel_cleanup(void)
 		map_destroy(intel_mtd);
 	}
 	if (nettel_intel_map.virt) {
-		iounmap((void *)nettel_intel_map.virt);
+		iounmap(nettel_intel_map.virt);
 		nettel_intel_map.virt = 0;
 	}
 #endif

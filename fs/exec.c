@@ -47,6 +47,7 @@
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/rmap.h>
+#include <linux/acct.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -341,7 +342,11 @@ out_sig:
 	force_sig(SIGKILL, current);
 }
 
-int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
+#define EXTRA_STACK_VM_PAGES	20	/* random */
+
+int setup_arg_pages(struct linux_binprm *bprm,
+		    unsigned long stack_top,
+		    int executable_stack)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
@@ -378,14 +383,14 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 	memmove(to, to + offset, PAGE_SIZE - offset);
 	kunmap(bprm->page[j - 1]);
 
-	/* Adjust bprm->p to point to the end of the strings. */
-	bprm->p = PAGE_SIZE * i - offset;
-
 	/* Limit stack size to 1GB */
 	stack_base = current->signal->rlim[RLIMIT_STACK].rlim_max;
 	if (stack_base > (1 << 30))
 		stack_base = 1 << 30;
-	stack_base = PAGE_ALIGN(STACK_TOP - stack_base);
+	stack_base = PAGE_ALIGN(stack_top - stack_base);
+
+	/* Adjust bprm->p to point to the end of the strings. */
+	bprm->p = stack_base + PAGE_SIZE * i - offset;
 
 	mm->arg_start = stack_base;
 	arg_size = i << PAGE_SHIFT;
@@ -394,12 +399,14 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 	while (i < MAX_ARG_PAGES)
 		bprm->page[i++] = NULL;
 #else
-	stack_base = STACK_TOP - MAX_ARG_PAGES * PAGE_SIZE;
-	mm->arg_start = bprm->p + stack_base;
-	arg_size = STACK_TOP - (PAGE_MASK & (unsigned long) mm->arg_start);
+	stack_base = stack_top - MAX_ARG_PAGES * PAGE_SIZE;
+	bprm->p += stack_base;
+	mm->arg_start = bprm->p;
+	arg_size = stack_top - (PAGE_MASK & (unsigned long) mm->arg_start);
 #endif
 
-	bprm->p += stack_base;
+	arg_size += EXTRA_STACK_VM_PAGES * PAGE_SIZE;
+
 	if (bprm->loader)
 		bprm->loader += stack_base;
 	bprm->exec += stack_base;
@@ -420,11 +427,10 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		mpnt->vm_mm = mm;
 #ifdef CONFIG_STACK_GROWSUP
 		mpnt->vm_start = stack_base;
-		mpnt->vm_end = PAGE_MASK &
-			(PAGE_SIZE - 1 + (unsigned long) bprm->p);
+		mpnt->vm_end = stack_base + arg_size;
 #else
-		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
-		mpnt->vm_end = STACK_TOP;
+		mpnt->vm_end = stack_top;
+		mpnt->vm_start = mpnt->vm_end - arg_size;
 #endif
 		/* Adjust stack execute permissions; explicitly enable
 		 * for EXSTACK_ENABLE_X, disable for EXSTACK_DISABLE_X
@@ -595,7 +601,7 @@ static inline int de_thread(struct task_struct *tsk)
 	 */
 	read_lock(&tasklist_lock);
 	spin_lock_irq(lock);
-	if (sig->group_exit) {
+	if (sig->flags & SIGNAL_GROUP_EXIT) {
 		/*
 		 * Another group action in progress, just
 		 * return so that the signal is processed.
@@ -605,7 +611,6 @@ static inline int de_thread(struct task_struct *tsk)
 		kmem_cache_free(sighand_cachep, newsighand);
 		return -EAGAIN;
 	}
-	sig->group_exit = 1;
 	zap_other_threads(current);
 	read_unlock(&tasklist_lock);
 
@@ -703,7 +708,7 @@ static inline int de_thread(struct task_struct *tsk)
 	 * Now there are really no other threads at all,
 	 * so it's safe to stop telling them to kill themselves.
 	 */
-	sig->group_exit = 0;
+	sig->flags = 0;
 
 no_thread_group:
 	BUG_ON(atomic_read(&sig->count) != 1);
@@ -1160,6 +1165,8 @@ int do_execve(char * filename,
 
 		/* execve success */
 		security_bprm_free(bprm);
+		acct_update_integrals();
+		update_mem_hiwater();
 		kfree(bprm);
 		return retval;
 	}
@@ -1388,7 +1395,7 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 	}
 	mm->dumpable = 0;
 	init_completion(&mm->core_done);
-	current->signal->group_exit = 1;
+	current->signal->flags = SIGNAL_GROUP_EXIT;
 	current->signal->group_exit_code = exit_code;
 	coredump_wait(mm);
 

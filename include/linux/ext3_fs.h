@@ -293,6 +293,8 @@ struct ext3_inode {
 			__u32	m_i_reserved2[2];
 		} masix2;
 	} osd2;				/* OS dependent 2 */
+	__u16	i_extra_isize;
+	__u16	i_pad1;
 };
 
 #define i_size_high	i_dir_acl
@@ -755,10 +757,10 @@ extern int ext3_forget(handle_t *, int, struct inode *, struct buffer_head *, in
 extern struct buffer_head * ext3_getblk (handle_t *, struct inode *, long, int, int *);
 extern struct buffer_head * ext3_bread (handle_t *, struct inode *, int, int, int *);
 
+extern int ext3_get_inode_loc(struct inode *, struct ext3_iloc *, int);
 extern void ext3_read_inode (struct inode *);
 extern int  ext3_write_inode (struct inode *, int);
 extern int  ext3_setattr (struct dentry *, struct iattr *);
-extern void ext3_put_inode (struct inode *);
 extern void ext3_delete_inode (struct inode *);
 extern int  ext3_sync_inode (handle_t *, struct inode *);
 extern void ext3_discard_reservation (struct inode *);

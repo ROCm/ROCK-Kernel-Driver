@@ -29,6 +29,7 @@ restrictions referred to are that the relevant option is valid if:
 	CD	Appropriate CD support is enabled.
 	DEVFS	devfs support is enabled. 
 	DRM	Direct Rendering Management support is enabled. 
+	EDD	BIOS Enhanced Disk Drive Services (EDD) is enabled
 	EFI	EFI Partitioning (GPT) is enabled
 	EIDE	EIDE/ATAPI support is enabled.
 	FB	The frame buffer device is enabled.
@@ -50,6 +51,7 @@ restrictions referred to are that the relevant option is valid if:
 	MOUSE	Appropriate mouse support is enabled.
 	MTD	MTD support is enabled.
 	NET	Appropriate network support is enabled.
+	NUMA	NUMA support is enabled.
 	NFS	Appropriate NFS support is enabled.
 	OSS	OSS sound support is enabled.
 	PARIDE	The ParIDE subsystem is enabled.
@@ -410,6 +412,10 @@ running once the system is up.
 
 	edb=		[HW,PS2]
 
+	edd=		[EDD]
+			Format: {"of[f]" | "sk[ipmbr]"}
+			See comment in arch/i386/boot/edd.S
+
 	eicon=		[HW,ISDN] 
 			Format: <id>,<membase>,<irq>
 
@@ -475,6 +481,10 @@ running once the system is up.
 			Format: <io>,<irq>,<dma>,<dma16>
  
 	gvp11=		[HW,SCSI]
+
+	hashdist=	[KNL,NUMA] Large hashes allocated during boot
+			are distributed across NUMA nodes.  Defaults on
+			for IA-64, off otherwise.
 
 	hcl=		[IA-64] SGI's Hardware Graph compatibility layer
 
@@ -577,11 +587,13 @@ running once the system is up.
 			Format: <RDP>, <reset>, <pci_scan>, <verbosity>
 
 	isolcpus=	[KNL,SMP] Isolate CPUs from the general scheduler.
-			Format: <cpu number>, ..., <cpu number>
+			Format: <cpu number>,...,<cpu number>
 			This option can be used to specify one or more CPUs
 			to isolate from the general SMP balancing and scheduling
 			algorithms. The only way to move a process onto or off
 			an "isolated" CPU is via the CPU affinity syscalls.
+			<cpu number> begins at 0 and the maximum value is
+			"number of CPUs in system - 1".
 
 			This option is the preferred way to isolate CPUs. The
 			alternative - manually setting the CPU mask of all tasks

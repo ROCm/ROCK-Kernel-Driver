@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: write.c,v 1.86 2004/11/13 10:44:26 dedekind Exp $
+ * $Id: write.c,v 1.87 2004/11/16 20:36:12 dwmw2 Exp $
  *
  */
 

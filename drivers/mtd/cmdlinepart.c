@@ -1,5 +1,5 @@
 /*
- * $Id: cmdlinepart.c,v 1.16 2004/11/16 18:28:59 dwmw2 Exp $
+ * $Id: cmdlinepart.c,v 1.17 2004/11/26 11:18:47 lavinen Exp $
  *
  * Read flash partition table from command line
  *
@@ -338,8 +338,10 @@ static int parse_cmdline_partitions(struct mtd_info *master,
  * This is the handler for our kernel parameter, called from 
  * main.c::checksetup(). Note that we can not yet kmalloc() anything,
  * so we only save the commandline for later processing.
+ *
+ * This function needs to be visible for bootloaders.
  */
-static int mtdpart_setup(char *s)
+int mtdpart_setup(char *s)
 {
 	cmdline = s;
 	return 1;

@@ -893,7 +893,8 @@ tcp_read_xid(struct rpc_xprt *xprt, skb_reader_t *desc)
 	xprt->tcp_flags &= ~XPRT_COPY_XID;
 	xprt->tcp_flags |= XPRT_COPY_DATA;
 	xprt->tcp_copied = 4;
-	dprintk("RPC:      reading reply for XID %08x\n", xprt->tcp_xid);
+	dprintk("RPC:      reading reply for XID %08x\n",
+						ntohl(xprt->tcp_xid));
 	tcp_check_recm(xprt);
 }
 
@@ -913,7 +914,7 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 	if (!req) {
 		xprt->tcp_flags &= ~XPRT_COPY_DATA;
 		dprintk("RPC:      XID %08x request not found!\n",
-				xprt->tcp_xid);
+				ntohl(xprt->tcp_xid));
 		spin_unlock(&xprt->sock_lock);
 		return;
 	}
@@ -1103,7 +1104,7 @@ xprt_write_space(struct sock *sk)
 		goto out;
 
 	spin_lock_bh(&xprt->sock_lock);
-	if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->pending)
+	if (xprt->snd_task)
 		rpc_wake_up_task(xprt->snd_task);
 	spin_unlock_bh(&xprt->sock_lock);
 out:
@@ -1362,7 +1363,7 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 	req->rq_xprt    = xprt;
 	req->rq_xid     = xprt_alloc_xid(xprt);
 	dprintk("RPC: %4d reserved req %p xid %08x\n", task->tk_pid,
-			req, req->rq_xid);
+			req, ntohl(req->rq_xid));
 }
 
 /*

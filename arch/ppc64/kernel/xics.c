@@ -24,7 +24,6 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/smp.h>
-#include <asm/naca.h>
 #include <asm/rtas.h>
 #include <asm/xics.h>
 #include <asm/hvcall.h>
@@ -575,7 +574,7 @@ nextnode:
  */
 static int __init xics_setup_i8259(void)
 {
-	if (naca->interrupt_controller == IC_PPC_XIC &&
+	if (ppc64_interrupt_controller == IC_PPC_XIC &&
 	    xics_irq_8259_cascade != -1) {
 		if (request_irq(irq_offset_up(xics_irq_8259_cascade),
 				no_action, 0, "8259 cascade", NULL))

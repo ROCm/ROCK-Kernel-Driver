@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.65 2004/10/27 09:12:48 mschwide Exp $
+ * $Id: ctcmain.c,v 1.68 2004/12/27 09:25:27 heicarst Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.65 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.68 $
  *
  */
 
@@ -320,7 +320,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.65 $";
+	char vbuf[] = "$Revision: 1.68 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -1939,6 +1939,7 @@ add_channel(struct ccw_device *cdev, enum channel_types type)
 			   ch_fsm, CH_FSM_LEN, GFP_KERNEL);
 	if (ch->fsm == NULL) {
 		ctc_pr_warn("ctc: Could not create FSM in add_channel\n");
+		kfree(ch->ccw);
 		kfree(ch);
 		return -1;
 	}
@@ -1947,6 +1948,7 @@ add_channel(struct ccw_device *cdev, enum channel_types type)
 					      GFP_KERNEL)) == NULL) {
 		ctc_pr_warn("ctc: Out of memory in add_channel\n");
 		kfree_fsm(ch->fsm);
+		kfree(ch->ccw);
 		kfree(ch);
 		return -1;
 	}
@@ -1959,6 +1961,7 @@ add_channel(struct ccw_device *cdev, enum channel_types type)
 			"using old entry\n", (*c)->id);
 		kfree(ch->irb);
 		kfree_fsm(ch->fsm);
+		kfree(ch->ccw);
 		kfree(ch);
 		return 0;
 	}
@@ -2710,7 +2713,7 @@ buffer_write(struct device *dev, const char *buf, size_t count)
 	struct net_device *ndev;
 	int bs1;
 
-	DBF_TEXT(trace, 5, __FUNCTION__);
+	DBF_TEXT(trace, 3, __FUNCTION__);
 	priv = dev->driver_data;
 	if (!priv)
 		return -ENODEV;
@@ -2835,7 +2838,7 @@ static DEVICE_ATTR(stats, 0644, stats_show, stats_write);
 static int
 ctc_add_attributes(struct device *dev)
 {
-	device_create_file(dev, &dev_attr_buffer);
+//	device_create_file(dev, &dev_attr_buffer);
 	device_create_file(dev, &dev_attr_loglevel);
 	device_create_file(dev, &dev_attr_stats);
 	return 0;
@@ -2846,7 +2849,7 @@ ctc_remove_attributes(struct device *dev)
 {
 	device_remove_file(dev, &dev_attr_stats);
 	device_remove_file(dev, &dev_attr_loglevel);
-	device_remove_file(dev, &dev_attr_buffer);
+//	device_remove_file(dev, &dev_attr_buffer);
 }
 
 
@@ -2988,6 +2991,7 @@ static DEVICE_ATTR(type, 0444, ctc_type_show, NULL);
 static struct attribute *ctc_attr[] = {
 	&dev_attr_protocol.attr,
 	&dev_attr_type.attr,
+	&dev_attr_buffer.attr,
 	NULL,
 };
 

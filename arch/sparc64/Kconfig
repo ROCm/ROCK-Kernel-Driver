@@ -186,6 +186,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 choice
 	prompt "SPARC64 Huge TLB Page Size"
 	depends on HUGETLB_PAGE
@@ -556,7 +560,7 @@ config DRM
 
 config DRM_FFB
 	tristate "Creator/Creator3D"
-	depends on DRM
+	depends on DRM && BROKEN
 	help
 	  Choose this option if you have one of Sun's Creator3D-based graphics
 	  and frame buffer cards.  Product page at

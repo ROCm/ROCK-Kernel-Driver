@@ -58,7 +58,6 @@
 #define Dprintk(x...)
 #endif
 
-extern int cpu_idle(void);
 extern cpumask_t cpu_initialized;
 
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
@@ -443,7 +442,8 @@ int __init start_secondary(void *unused)
 	 */
 	local_flush_tlb_all();
 
-	return cpu_idle();
+	cpu_idle();
+	return 0;
 }
 
 /*==========================================================================*

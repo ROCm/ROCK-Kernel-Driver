@@ -263,30 +263,17 @@ static struct backlight_controller radeon_backlight_controller = {
 
 static void __devexit radeon_unmap_ROM(struct radeonfb_info *rinfo, struct pci_dev *dev)
 {
-	// leave it disabled and unassigned
-	struct resource *r = &dev->resource[PCI_ROM_RESOURCE];
-	
 	if (!rinfo->bios_seg)
 		return;
-	iounmap(rinfo->bios_seg);
-	
-	/* Release the ROM resource if we used it in the first place */
-	if (r->parent && r->flags & PCI_ROM_ADDRESS_ENABLE) {
-		release_resource(r);
-		r->flags &= ~PCI_ROM_ADDRESS_ENABLE;
-		r->end -= r->start;
-		r->start = 0;
-	}
-	/* This will disable and set address to unassigned */
-	pci_write_config_dword(dev, dev->rom_base_reg, 0);
+	pci_unmap_rom(dev, rinfo->bios_seg);
 }
 
 static int __devinit radeon_map_ROM(struct radeonfb_info *rinfo, struct pci_dev *dev)
 {
 	void __iomem *rom;
-	struct resource *r;
 	u16 dptr;
 	u8 rom_type;
+	size_t rom_size;
 
 	/* If this is a primary card, there is a shadow copy of the
 	 * ROM somewhere in the first meg. We will just ignore the copy
@@ -301,21 +288,7 @@ static int __devinit radeon_map_ROM(struct radeonfb_info *rinfo, struct pci_dev 
 	OUTREG(MPP_TB_CONFIG, temp);
 	temp = INREG(MPP_TB_CONFIG);
                                                                                                           
-	/* no need to search for the ROM, just ask the card where it is. */
-	r = &dev->resource[PCI_ROM_RESOURCE];
-	
-	/* assign the ROM an address if it doesn't have one */
-	if (r->parent == NULL)
-		pci_assign_resource(dev, PCI_ROM_RESOURCE);
-	
-	/* enable if needed */
-	if (!(r->flags & PCI_ROM_ADDRESS_ENABLE)) {
-		pci_write_config_dword(dev, dev->rom_base_reg,
-				       r->start | PCI_ROM_ADDRESS_ENABLE);
-		r->flags |= PCI_ROM_ADDRESS_ENABLE;
-	}
-	
-	rom = ioremap(r->start, r->end - r->start + 1);
+	rom = pci_map_rom(dev, &rom_size);
 	if (!rom) {
 		printk(KERN_ERR "radeonfb: ROM failed to map\n");
 		return -ENOMEM;

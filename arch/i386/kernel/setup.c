@@ -97,6 +97,9 @@ unsigned int mca_pentium_flag;
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
 
+/* Boot loader ID as an integer, for the benefit of proc_dointvec */
+int bootloader_type;
+
 /* user-defined highmem size */
 static unsigned int highmem_pages = -1;
 
@@ -737,6 +740,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			}
 		}
 
+		else if (!memcmp(from, "noexec=", 7))
+			noexec_setup(from + 7);
+
+
 #ifdef  CONFIG_X86_SMP
 		/*
 		 * If the BIOS enumerates physical processors before logical,
@@ -1338,6 +1345,7 @@ void __init setup_arch(char **cmdline_p)
 		BIOS_revision = SYS_DESC_TABLE.table[2];
 	}
 	aux_device_present = AUX_DEVICE_INFO;
+	bootloader_type = LOADER_TYPE;
 
 #ifdef CONFIG_BLK_DEV_RAM
 	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
@@ -1413,6 +1421,7 @@ void __init setup_arch(char **cmdline_p)
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
+	acpi_boot_table_init();
 	acpi_boot_init();
 
 #ifdef CONFIG_X86_LOCAL_APIC

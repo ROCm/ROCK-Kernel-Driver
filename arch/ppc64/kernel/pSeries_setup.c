@@ -56,9 +56,9 @@
 #include <asm/dma.h>
 #include <asm/machdep.h>
 #include <asm/irq.h>
-#include <asm/naca.h>
 #include <asm/time.h>
 #include <asm/nvram.h>
+#include <asm/plpar_wrappers.h>
 
 #include "i8259.h"
 #include <asm/xics.h>
@@ -81,7 +81,8 @@ extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
 extern void find_udbg_vterm(void);
 extern void SystemReset_FWNMI(void), MachineCheck_FWNMI(void);	/* from head.S */
-extern void generic_find_legacy_serial_ports(unsigned int *default_speed);
+extern void generic_find_legacy_serial_ports(u64 *physport,
+		unsigned int *default_speed);
 
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 
@@ -196,7 +197,7 @@ static void __init pSeries_setup_mpic(void)
 static void __init pSeries_setup_arch(void)
 {
 	/* Fixup ppc_md depending on the type of interrupt controller */
-	if (naca->interrupt_controller == IC_OPEN_PIC) {
+	if (ppc64_interrupt_controller == IC_OPEN_PIC) {
 		ppc_md.init_IRQ       = pSeries_init_mpic; 
 		ppc_md.get_irq        = mpic_get_irq;
 		/* Allocate the mpic now, so that find_and_init_phbs() can
@@ -308,15 +309,15 @@ static  void __init pSeries_discover_pic(void)
 	 * to properly parse the OF interrupt tree & do the virtual irq mapping
 	 */
 	__irq_offset_value = NUM_ISA_INTERRUPTS;
-	naca->interrupt_controller = IC_INVALID;
+	ppc64_interrupt_controller = IC_INVALID;
 	for (np = NULL; (np = of_find_node_by_name(np, "interrupt-controller"));) {
 		typep = (char *)get_property(np, "compatible", NULL);
 		if (strstr(typep, "open-pic"))
-			naca->interrupt_controller = IC_OPEN_PIC;
+			ppc64_interrupt_controller = IC_OPEN_PIC;
 		else if (strstr(typep, "ppc-xicp"))
-			naca->interrupt_controller = IC_PPC_XIC;
+			ppc64_interrupt_controller = IC_PPC_XIC;
 		else
-			printk("initialize_naca: failed to recognize"
+			printk("pSeries_discover_pic: failed to recognize"
 			       " interrupt-controller\n");
 		break;
 	}
@@ -344,6 +345,7 @@ static void __init pSeries_init_early(void)
 	void *comport;
 	int iommu_off = 0;
 	unsigned int default_speed;
+	u64 physport;
 
 	DBG(" -> pSeries_init_early()\n");
 
@@ -357,13 +359,13 @@ static void __init pSeries_init_early(void)
 			     get_property(of_chosen, "linux,iommu-off", NULL));
 	}
 
-	generic_find_legacy_serial_ports(&default_speed);
+	generic_find_legacy_serial_ports(&physport, &default_speed);
 
 	if (systemcfg->platform & PLATFORM_LPAR)
 		find_udbg_vterm();
-	else if (naca->serialPortAddr) {
+	else if (physport) {
 		/* Map the uart for udbg. */
-		comport = (void *)__ioremap(naca->serialPortAddr, 16, _PAGE_NO_CACHE);
+		comport = (void *)__ioremap(physport, 16, _PAGE_NO_CACHE);
 		udbg_init_uart(comport, default_speed);
 
 		ppc_md.udbg_putc = udbg_putc;

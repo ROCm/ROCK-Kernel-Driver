@@ -18,4 +18,12 @@ struct ipt_multiport
 	u_int8_t count;				/* Number of ports */
 	u_int16_t ports[IPT_MULTI_PORTS];	/* Ports */
 };
+
+struct ipt_multiport_v1
+{
+	u_int8_t flags;				/* Type of comparison */
+	u_int8_t count;				/* Number of ports */
+	u_int16_t ports[IPT_MULTI_PORTS];	/* Ports */
+	u_int8_t pflags[IPT_MULTI_PORTS];	/* Port flags */
+};
 #endif /*_IPT_MULTIPORT_H*/

@@ -239,7 +239,8 @@ free:
 
 /*
  * Create a SECTION PGD between VIRT and PHYS in domain
- * DOMAIN with protection PROT
+ * DOMAIN with protection PROT.  This operates on half-
+ * pgdir entry increments.
  */
 static inline void
 alloc_init_section(unsigned long virt, unsigned long phys, int prot)
@@ -481,6 +482,9 @@ static void __init create_mapping(struct map_desc *md)
 		length -= PAGE_SIZE;
 	}
 
+	/*
+	 * A section mapping covers half a "pgdir" entry.
+	 */
 	while (length >= (PGDIR_SIZE / 2)) {
 		alloc_init_section(virt, virt + off, prot_sect);
 
@@ -522,6 +526,7 @@ void setup_mm_for_reboot(char mode)
 			pmdval |= PMD_BIT4;
 		pmd = pmd_offset(pgd + i, i << PGDIR_SHIFT);
 		set_pmd(pmd, __pmd(pmdval));
+		set_pmd(pmd + 1, __pmd(pmdval + 1 << (PGDIR_SHIFT - 1)));
 	}
 }
 

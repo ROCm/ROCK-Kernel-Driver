@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/io-readsb.S
+ *  linux/arch/arm26/lib/io-readsb.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *

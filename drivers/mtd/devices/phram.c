@@ -1,13 +1,8 @@
 /**
+ * $Id: phram.c,v 1.11 2005/01/05 18:05:13 dwmw2 Exp $
  *
- * $Id: phram.c,v 1.3 2004/11/16 18:29:01 dwmw2 Exp $
- *
- * Copyright (c) Jochen Schaeuble <psionic@psionic.de>
- * 07/2003	rewritten by Joern Engel <joern@wh.fh-wedel.de>
- *
- * DISCLAIMER:  This driver makes use of Rusty's excellent module code,
- * so it will not work for 2.4 without changes and it wont work for 2.4
- * as a module without major changes.  Oh well!
+ * Copyright (c) ????		Jochen Schäuble <psionic@psionic.de>
+ * Copyright (c) 2003-2004	Jörn Engel <joern@wh.fh-wedel.de>
  *
  * Usage:
  *
@@ -15,8 +10,11 @@
  *   phram=<name>,<start>,<len>
  * <name> may be up to 63 characters.
  * <start> and <len> can be octal, decimal or hexadecimal.  If followed
- * by "k", "M" or "G", the numbers will be interpreted as kilo, mega or
+ * by "ki", "Mi" or "Gi", the numbers will be interpreted as kilo, mega or
  * gigabytes.
+ *
+ * Example:
+ *	phram=swap,64Mi,128Mi phram=test,900Mi,1Mi
  *
  */
 
@@ -31,8 +29,8 @@
 #define ERROR(fmt, args...) printk(KERN_ERR "phram: " fmt , ## args)
 
 struct phram_mtd_list {
+	struct mtd_info mtd;
 	struct list_head list;
-	struct mtd_info *mtdinfo;
 };
 
 static LIST_HEAD(phram_list);
@@ -41,7 +39,7 @@ static LIST_HEAD(phram_list);
 
 static int phram_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
-	u_char *start = (u_char *)mtd->priv;
+	u_char *start = mtd->priv;
 
 	if (instr->addr + instr->len > mtd->size)
 		return -EINVAL;
@@ -63,7 +61,7 @@ static int phram_erase(struct mtd_info *mtd, struct erase_info *instr)
 static int phram_point(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char **mtdbuf)
 {
-	u_char *start = (u_char *)mtd->priv;
+	u_char *start = mtd->priv;
 
 	if (from + len > mtd->size)
 		return -EINVAL;
@@ -80,7 +78,7 @@ static void phram_unpoint(struct mtd_info *mtd, u_char *addr, loff_t from, size_
 static int phram_read(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char *buf)
 {
-	u_char *start = (u_char *)mtd->priv;
+	u_char *start = mtd->priv;
 
 	if (from + len > mtd->size)
 		return -EINVAL;
@@ -94,7 +92,7 @@ static int phram_read(struct mtd_info *mtd, loff_t from, size_t len,
 static int phram_write(struct mtd_info *mtd, loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
-	u_char *start = (u_char *)mtd->priv;
+	u_char *start = mtd->priv;
 
 	if (to + len > mtd->size)
 		return -EINVAL;
@@ -112,9 +110,8 @@ static void unregister_devices(void)
 	struct phram_mtd_list *this;
 
 	list_for_each_entry(this, &phram_list, list) {
-		del_mtd_device(this->mtdinfo);
-		iounmap(this->mtdinfo->priv);
-		kfree(this->mtdinfo);
+		del_mtd_device(&this->mtd);
+		iounmap(this->mtd.priv);
 		kfree(this);
 	}
 }
@@ -128,45 +125,39 @@ static int register_device(char *name, unsigned long start, unsigned long len)
 	if (!new)
 		goto out0;
 
-	new->mtdinfo = kmalloc(sizeof(struct mtd_info), GFP_KERNEL);
-	if (!new->mtdinfo)
-		goto out1;
-	
-	memset(new->mtdinfo, 0, sizeof(struct mtd_info));
+	memset(new, 0, sizeof(*new));
 
 	ret = -EIO;
-	new->mtdinfo->priv = ioremap(start, len);
-	if (!new->mtdinfo->priv) {
+	new->mtd.priv = ioremap(start, len);
+	if (!new->mtd.priv) {
 		ERROR("ioremap failed\n");
-		goto out2;
+		goto out1;
 	}
 
 
-	new->mtdinfo->name = name;
-	new->mtdinfo->size = len;
-	new->mtdinfo->flags = MTD_CAP_RAM | MTD_ERASEABLE | MTD_VOLATILE;
-        new->mtdinfo->erase = phram_erase;
-	new->mtdinfo->point = phram_point;
-	new->mtdinfo->unpoint = phram_unpoint;
-	new->mtdinfo->read = phram_read;
-	new->mtdinfo->write = phram_write;
-	new->mtdinfo->owner = THIS_MODULE;
-	new->mtdinfo->type = MTD_RAM;
-	new->mtdinfo->erasesize = 0x0;
+	new->mtd.name = name;
+	new->mtd.size = len;
+	new->mtd.flags = MTD_CAP_RAM | MTD_ERASEABLE | MTD_VOLATILE;
+        new->mtd.erase = phram_erase;
+	new->mtd.point = phram_point;
+	new->mtd.unpoint = phram_unpoint;
+	new->mtd.read = phram_read;
+	new->mtd.write = phram_write;
+	new->mtd.owner = THIS_MODULE;
+	new->mtd.type = MTD_RAM;
+	new->mtd.erasesize = 0;
 
 	ret = -EAGAIN;
-	if (add_mtd_device(new->mtdinfo)) {
+	if (add_mtd_device(&new->mtd)) {
 		ERROR("Failed to register new device\n");
-		goto out3;
+		goto out2;
 	}
 
 	list_add_tail(&new->list, &phram_list);
 	return 0;	
 
-out3:
-	iounmap(new->mtdinfo->priv);
 out2:
-	kfree(new->mtdinfo);
+	iounmap(new->mtd.priv);
 out1:
 	kfree(new);
 out0:
@@ -184,7 +175,9 @@ static int ustrtoul(const char *cp, char **endp, unsigned int base)
 		result *= 1024;
 	case 'k':
 		result *= 1024;
-		endp++;
+	/* By dwmw2 editorial decree, "ki", "Mi" or "Gi" are to be used. */
+		if ((*endp)[1] == 'i')
+			(*endp) += 2;
 	}
 	return result;
 }
@@ -235,7 +228,7 @@ static int phram_setup(const char *val, struct kernel_param *kp)
 	uint32_t len;
 	int i, ret;
 
-	if (strnlen(val, sizeof(str)) >= sizeof(str))
+	if (strnlen(val, sizeof(buf)) >= sizeof(buf))
 		parse_err("parameter too long\n");
 
 	strcpy(str, val);
@@ -271,78 +264,11 @@ static int phram_setup(const char *val, struct kernel_param *kp)
 }
 
 module_param_call(phram, phram_setup, NULL, NULL, 000);
-MODULE_PARM_DESC(phram, "Memory region to map. \"map=<name>,<start><length>\"");
-
-/*
- * Just for compatibility with slram, this is horrible and should go someday.
- */
-static int __init slram_setup(const char *val, struct kernel_param *kp)
-{
-	char buf[256], *str = buf;
-
-	if (!val || !val[0])
-		parse_err("no arguments to \"slram=\"\n");
-
-	if (strnlen(val, sizeof(str)) >= sizeof(str))
-		parse_err("parameter too long\n");
-
-	strcpy(str, val);
-
-	while (str) {
-		char *token[3];
-		char *name;
-		uint32_t start;
-		uint32_t len;
-		int i, ret;
-
-		for (i=0; i<3; i++) {
-			token[i] = strsep(&str, ",");
-			if (token[i])
-				continue;
-			parse_err("wrong number of arguments to \"slram=\"\n");
-		}
-
-		/* name */
-		ret = parse_name(&name, token[0]);
-		if (ret == -ENOMEM)
-			parse_err("of memory\n");
-		if (ret == -ENOSPC)
-			parse_err("too long\n");
-		if (ret)
-			return 1;
-
-		/* start */
-		ret = parse_num32(&start, token[1]);
-		if (ret)
-			parse_err("illegal start address\n");
-
-		/* len */
-		if (token[2][0] == '+')
-			ret = parse_num32(&len, token[2] + 1);
-		else
-			ret = parse_num32(&len, token[2]);
-
-		if (ret)
-			parse_err("illegal device length\n");
-
-		if (token[2][0] != '+') {
-			if (len < start)
-				parse_err("end < start\n");
-			len -= start;
-		}
-
-		register_device(name, start, len);
-	}
-	return 1;
-}
-
-module_param_call(slram, slram_setup, NULL, NULL, 000);
-MODULE_PARM_DESC(slram, "List of memory regions to map. \"map=<name>,<start><length/end>\"");
+MODULE_PARM_DESC(phram,"Memory region to map. \"map=<name>,<start>,<length>\"");
 
 
 static int __init init_phram(void)
 {
-	printk(KERN_ERR "phram loaded\n");
 	return 0;
 }
 

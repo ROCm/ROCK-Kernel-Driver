@@ -393,6 +393,11 @@ int hostfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 static struct file_operations hostfs_file_fops = {
 	.llseek		= generic_file_llseek,
 	.read		= generic_file_read,
+	.sendfile	= generic_file_sendfile,
+	.aio_read	= generic_file_aio_read,
+	.aio_write	= generic_file_aio_write,
+	.readv		= generic_file_readv,
+	.writev		= generic_file_writev,
 	.write		= generic_file_write,
 	.mmap		= generic_file_mmap,
 	.open		= hostfs_file_open,
@@ -401,6 +406,7 @@ static struct file_operations hostfs_file_fops = {
 };
 
 static struct file_operations hostfs_dir_fops = {
+	.llseek		= generic_file_llseek,
 	.readdir	= hostfs_readdir,
 	.read		= generic_read_dir,
 };

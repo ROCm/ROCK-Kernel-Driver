@@ -379,6 +379,7 @@ typedef int (*acpi_madt_entry_handler) (acpi_table_entry_header *header, const u
 char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
 unsigned long acpi_find_rsdp (void);
 int acpi_boot_init (void);
+int acpi_boot_table_init (void);
 int acpi_numa_init (void);
 
 int acpi_table_init (void);
@@ -417,10 +418,24 @@ static inline int acpi_boot_init(void)
 	return 0;
 }
 
+static inline int acpi_boot_table_init(void)
+{
+	return 0;
+}
+
 #endif 	/*!CONFIG_ACPI_BOOT*/
 
 unsigned int acpi_register_gsi (u32 gsi, int edge_level, int active_high_low);
 int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
+
+/*
+ * This function undoes the effect of one call to acpi_register_gsi().
+ * If this matches the last registration, any IRQ resources for gsi
+ * are freed.
+ */
+#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
+void acpi_unregister_gsi (u32 gsi);
+#endif
 
 #ifdef CONFIG_ACPI_PCI
 
@@ -446,6 +461,10 @@ struct pci_dev;
 
 int acpi_pci_irq_enable (struct pci_dev *dev);
 void acpi_penalize_isa_irq(int irq);
+
+#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
+void acpi_pci_irq_disable (struct pci_dev *dev);
+#endif
 
 struct acpi_pci_driver {
 	struct acpi_pci_driver *next;

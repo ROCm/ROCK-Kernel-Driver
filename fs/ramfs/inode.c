@@ -186,6 +186,7 @@ static int ramfs_fill_super(struct super_block * sb, void * data, int silent)
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = RAMFS_MAGIC;
 	sb->s_op = &ramfs_ops;
+	sb->s_time_gran = 1;
 	inode = ramfs_get_inode(sb, S_IFDIR | 0755, 0);
 	if (!inode)
 		return -ENOMEM;

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/boot/compressed/head.S
+ *  linux/arch/arm26/boot/compressed/head.S
  *
  *  Copyright (C) 1996-2002 Russell King
  *

@@ -93,6 +93,7 @@ capifs_fill_super(struct super_block *s, void *data, int silent)
 	s->s_blocksize_bits = 10;
 	s->s_magic = CAPIFS_SUPER_MAGIC;
 	s->s_op = &capifs_sops;
+	s->s_time_gran = 1;
 
 	inode = new_inode(s);
 	if (!inode)

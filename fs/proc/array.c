@@ -78,6 +78,7 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 #include <asm/processor.h>
+#include "internal.h"
 
 /* Gcc optimizes away "strlen(x)" for constant x */
 #define ADDBUF(buffer, string) \

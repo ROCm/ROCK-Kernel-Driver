@@ -460,15 +460,15 @@ char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
 	return message;
 }
 
-extern char __initramfs_start, __initramfs_end;
+extern char __initramfs_start[], __initramfs_end[];
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/initrd.h>
 #endif
 
 void __init populate_rootfs(void)
 {
-	char *err = unpack_to_rootfs(&__initramfs_start,
-			 &__initramfs_end - &__initramfs_start, 0);
+	char *err = unpack_to_rootfs(__initramfs_start,
+			 __initramfs_end - __initramfs_start, 0);
 	if (err)
 		panic(err);
 #ifdef CONFIG_BLK_DEV_INITRD

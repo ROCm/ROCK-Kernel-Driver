@@ -93,7 +93,7 @@
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
-#include <asm/naca.h>
+#include <asm/cache.h>
 
 #undef STRICT_MM_TYPECHECKS
 
@@ -106,8 +106,8 @@ static __inline__ void clear_page(void *addr)
 {
 	unsigned long lines, line_size;
 
-	line_size = systemcfg->dCacheL1LineSize; 
-	lines = naca->dCacheL1LinesPerPage;
+	line_size = ppc64_caches.dline_size;
+	lines = ppc64_caches.dlines_per_page;
 
 	__asm__ __volatile__(
 	"mtctr  	%1	# clear_page\n\
@@ -182,6 +182,8 @@ static inline int get_order(unsigned long size)
 #define __pa(x) ((unsigned long)(x)-PAGE_OFFSET)
 
 extern int page_is_ram(unsigned long pfn);
+
+extern u64 ppc64_pft_size;		/* Log 2 of page table size */
 
 #endif /* __ASSEMBLY__ */
 

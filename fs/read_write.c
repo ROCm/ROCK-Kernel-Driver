@@ -216,8 +216,11 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 				ret = file->f_op->read(file, buf, count, pos);
 			else
 				ret = do_sync_read(file, buf, count, pos);
-			if (ret > 0)
+			if (ret > 0) {
 				dnotify_parent(file->f_dentry, DN_ACCESS);
+				current->rchar += ret;
+			}
+			current->syscr++;
 		}
 	}
 
@@ -260,8 +263,11 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 				ret = file->f_op->write(file, buf, count, pos);
 			else
 				ret = do_sync_write(file, buf, count, pos);
-			if (ret > 0)
+			if (ret > 0) {
 				dnotify_parent(file->f_dentry, DN_MODIFY);
+				current->wchar += ret;
+			}
+			current->syscw++;
 		}
 	}
 
@@ -540,6 +546,9 @@ sys_readv(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 		fput_light(file, fput_needed);
 	}
 
+	if (ret > 0)
+		current->rchar += ret;
+	current->syscr++;
 	return ret;
 }
 
@@ -558,6 +567,9 @@ sys_writev(unsigned long fd, const struct iovec __user *vec, unsigned long vlen)
 		fput_light(file, fput_needed);
 	}
 
+	if (ret > 0)
+		current->wchar += ret;
+	current->syscw++;
 	return ret;
 }
 
@@ -635,6 +647,13 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	}
 
 	retval = in_file->f_op->sendfile(in_file, ppos, count, file_send_actor, out_file);
+
+	if (retval > 0) {
+		current->rchar += retval;
+		current->wchar += retval;
+	}
+	current->syscr++;
+	current->syscw++;
 
 	if (*ppos > max)
 		retval = -EOVERFLOW;

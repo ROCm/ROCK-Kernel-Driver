@@ -21,13 +21,4 @@ typedef struct {
 
 #define HARDIRQ_BITS    8
 
-#define irq_enter()             (preempt_count() += HARDIRQ_OFFSET)
-#define irq_exit()                                                      \
-do {                                                                    \
-                preempt_count() -= IRQ_EXIT_OFFSET;                     \
-                if (!in_interrupt() && softirq_pending(smp_processor_id())) \
-                        do_softirq();                                   \
-                preempt_enable_no_resched();                            \
-} while (0)
-
 #endif /* __SPARC_HARDIRQ_H */

@@ -1016,6 +1016,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 
 sigsegv_and_return:
 	force_sig(SIGSEGV, current);
+	return -EFAULT;
 }
 
 static inline void

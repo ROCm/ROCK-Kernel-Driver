@@ -39,6 +39,7 @@
 #include <linux/audit.h>
 #include <linux/profile.h>
 #include <linux/rmap.h>
+#include <linux/acct.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -47,13 +48,13 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-/* The idle threads do not count..
- * Protected by write_lock_irq(&tasklist_lock)
+/*
+ * Protected counters by write_lock_irq(&tasklist_lock)
  */
-int nr_threads;
-
-int max_threads;
 unsigned long total_forks;	/* Handle normal Linux uptimes. */
+int nr_threads; 		/* The idle threads do not count.. */
+
+int max_threads;		/* tunable limit on nr_threads */
 
 DEFINE_PER_CPU(unsigned long, process_counts) = 0;
 
@@ -469,6 +470,9 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	if (retval)
 		goto free_pt;
 
+	mm->hiwater_rss = mm->rss;
+	mm->hiwater_vm = mm->total_vm;
+
 good_mm:
 	tsk->mm = mm;
 	tsk->active_mm = mm;
@@ -729,11 +733,11 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 		return -ENOMEM;
 	atomic_set(&sig->count, 1);
 	atomic_set(&sig->live, 1);
-	sig->group_exit = 0;
+	init_waitqueue_head(&sig->wait_chldexit);
+	sig->flags = 0;
 	sig->group_exit_code = 0;
 	sig->group_exit_task = NULL;
 	sig->group_stop_count = 0;
-	sig->stop_state = 0;
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
 	INIT_LIST_HEAD(&sig->posix_timers);
@@ -857,7 +861,6 @@ static task_t *copy_process(unsigned long clone_flags,
 
 	INIT_LIST_HEAD(&p->children);
 	INIT_LIST_HEAD(&p->sibling);
-	init_waitqueue_head(&p->wait_chldexit);
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);
 	spin_lock_init(&p->proc_lock);
@@ -865,12 +868,23 @@ static task_t *copy_process(unsigned long clone_flags,
 	clear_tsk_thread_flag(p, TIF_SIGPENDING);
 	init_sigpending(&p->pending);
 
-	p->it_real_value = p->it_virt_value = p->it_prof_value = 0;
-	p->it_real_incr = p->it_virt_incr = p->it_prof_incr = 0;
+	p->it_real_value = 0;
+	p->it_real_incr = 0;
+	p->it_virt_value = 0;
+	p->it_virt_incr = 0;
+	p->it_prof_value = 0;
+	p->it_prof_incr = 0;
 	init_timer(&p->real_timer);
 	p->real_timer.data = (unsigned long) p;
 
-	p->utime = p->stime = 0;
+	p->utime = 0;
+	p->stime = 0;
+	p->rchar = 0;		/* I/O counter: bytes read */
+	p->wchar = 0;		/* I/O counter: bytes written */
+	p->syscr = 0;		/* I/O counter: read syscalls */
+	p->syscw = 0;		/* I/O counter: write syscalls */
+	acct_clear_integrals(p);
+
 	p->lock_depth = -1;		/* -1 = no lock */
 	do_posix_clock_monotonic_gettime(&p->start_time);
 	p->security = NULL;
@@ -985,7 +999,7 @@ static task_t *copy_process(unsigned long clone_flags,
 		 * do not create this new thread - the whole thread
 		 * group is supposed to exit anyway.
 		 */
-		if (current->signal->group_exit) {
+		if (current->signal->flags & SIGNAL_GROUP_EXIT) {
 			spin_unlock(&current->sighand->siglock);
 			write_unlock_irq(&tasklist_lock);
 			retval = -EAGAIN;
@@ -1020,6 +1034,7 @@ static task_t *copy_process(unsigned long clone_flags,
 	}
 
 	nr_threads++;
+	total_forks++;
 	write_unlock_irq(&tasklist_lock);
 	retval = 0;
 
@@ -1152,7 +1167,6 @@ long do_fork(unsigned long clone_flags,
 			wake_up_new_task(p, clone_flags);
 		else
 			p->state = TASK_STOPPED;
-		++total_forks;
 
 		if (unlikely (trace)) {
 			current->ptrace_message = pid;

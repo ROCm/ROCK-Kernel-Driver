@@ -376,7 +376,12 @@ int journal_revoke(handle_t *handle, unsigned long blocknr,
            first having the revoke cancelled: it's illegal to free a
            block twice without allocating it in between! */
 	if (bh) {
-		J_ASSERT_BH(bh, !buffer_revoked(bh));
+		if (!J_EXPECT_BH(bh, !buffer_revoked(bh),
+				 "inconsistent data on disk")) {
+			if (!bh_in)
+				brelse(bh);
+			return -EIO;
+		}
 		set_buffer_revoked(bh);
 		set_buffer_revokevalid(bh);
 		if (bh_in) {

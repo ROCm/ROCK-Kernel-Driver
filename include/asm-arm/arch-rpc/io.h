@@ -124,12 +124,14 @@ static inline unsigned sz __in##fnsuffix (unsigned int port)		\
 	return (unsigned sz)value;						\
 }
 
-static inline unsigned int __ioaddr (unsigned int port)			\
-{										\
-	if (__PORT_PCIO(port))							\
-		return (unsigned int)(PCIO_BASE + (port << 2));			\
-	else									\
-		return (unsigned int)(IO_BASE + (port << 2));			\
+static inline void __iomem *__ioaddr(unsigned int port)
+{
+	void __iomem *ret;
+	if (__PORT_PCIO(port))
+		ret = (void __iomem *)PCIO_BASE;
+	else
+		ret = (void __iomem *)IO_BASE;
+	return ret + (port << 2);
 }
 
 #define DECLARE_IO(sz,fnsuffix,instr)	\
@@ -211,7 +213,7 @@ DECLARE_IO(int,l,"")
 	else									\
 		__asm__ __volatile__(						\
 		"str	%0, [%1, %2]	@ outlc"				\
-		: : "r" (__v), "r" (IO_BASE), "r" ((port) << 2));			\
+		: : "r" (__v), "r" (IO_BASE), "r" ((port) << 2));		\
 })
 
 #define __inlc(port)								\
@@ -229,7 +231,7 @@ DECLARE_IO(int,l,"")
 })
 
 #define __ioaddrc(port)								\
-	(__PORT_PCIO((port)) ? PCIO_BASE + ((port) << 2) : IO_BASE + ((port) << 2))
+	((void __iomem *)(__PORT_PCIO((port)) ? PCIO_BASE : IO_BASE) + ((port) << 2))
 
 #define inb(p)	 	(__builtin_constant_p((p)) ? __inbc(p)    : __inb(p))
 #define inw(p)	 	(__builtin_constant_p((p)) ? __inwc(p)    : __inw(p))
@@ -239,7 +241,7 @@ DECLARE_IO(int,l,"")
 #define outl(v,p)	(__builtin_constant_p((p)) ? __outlc(v,p) : __outl(v,p))
 #define __ioaddr(p)	(__builtin_constant_p((p)) ? __ioaddr(p)  : __ioaddrc(p))
 /* the following macro is deprecated */
-#define ioaddr(port)			__ioaddr((port))
+#define ioaddr(port)	((unsigned long)__ioaddr((port)))
 
 #define insb(p,d,l)	__raw_readsb(__ioaddr(p),d,l)
 #define insw(p,d,l)	__raw_readsw(__ioaddr(p),d,l)

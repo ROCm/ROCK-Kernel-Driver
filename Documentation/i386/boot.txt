@@ -173,6 +173,9 @@ filled out, however:
 	2  bootsect-loader
 	3  SYSLINUX
 	4  EtherBoot
+	5  ELILO
+	7  GRuB
+	8  U-BOOT
 
 	Please contact <hpa@zytor.com> if you need a bootloader ID
 	value assigned.

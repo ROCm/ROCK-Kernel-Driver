@@ -784,6 +784,54 @@ void d_instantiate(struct dentry *entry, struct inode * inode)
 }
 
 /**
+ * d_instantiate_unique - instantiate a non-aliased dentry
+ * @entry: dentry to instantiate
+ * @inode: inode to attach to this dentry
+ *
+ * Fill in inode information in the entry. On success, it returns NULL.
+ * If an unhashed alias of "entry" already exists, then we return the
+ * aliased dentry instead.
+ *
+ * Note that in order to avoid conflicts with rename() etc, the caller
+ * had better be holding the parent directory semaphore.
+ */
+struct dentry *d_instantiate_unique(struct dentry *entry, struct inode *inode)
+{
+	struct dentry *alias;
+	int len = entry->d_name.len;
+	const char *name = entry->d_name.name;
+	unsigned int hash = entry->d_name.hash;
+
+	BUG_ON(!list_empty(&entry->d_alias));
+	spin_lock(&dcache_lock);
+	if (!inode)
+		goto do_negative;
+	list_for_each_entry(alias, &inode->i_dentry, d_alias) {
+		struct qstr *qstr = &alias->d_name;
+
+		if (qstr->hash != hash)
+			continue;
+		if (alias->d_parent != entry->d_parent)
+			continue;
+		if (qstr->len != len)
+			continue;
+		if (memcmp(qstr->name, name, len))
+			continue;
+		dget_locked(alias);
+		spin_unlock(&dcache_lock);
+		BUG_ON(!d_unhashed(alias));
+		return alias;
+	}
+	list_add(&entry->d_alias, &inode->i_dentry);
+do_negative:
+	entry->d_inode = inode;
+	spin_unlock(&dcache_lock);
+	security_d_instantiate(entry, inode);
+	return NULL;
+}
+EXPORT_SYMBOL(d_instantiate_unique);
+
+/**
  * d_alloc_root - allocate root dentry
  * @root_inode: inode to allocate the root for
  *
@@ -1574,14 +1622,21 @@ static void __init dcache_init_early(void)
 {
 	int loop;
 
+	/* If hashes are distributed across NUMA nodes, defer
+	 * hash allocation until vmalloc space is available.
+	 */
+	if (hashdist)
+		return;
+
 	dentry_hashtable =
 		alloc_large_system_hash("Dentry cache",
 					sizeof(struct hlist_head),
 					dhash_entries,
 					13,
-					0,
+					HASH_EARLY,
 					&d_hash_shift,
-					&d_hash_mask);
+					&d_hash_mask,
+					0);
 
 	for (loop = 0; loop < (1 << d_hash_shift); loop++)
 		INIT_HLIST_HEAD(&dentry_hashtable[loop]);
@@ -1589,6 +1644,8 @@ static void __init dcache_init_early(void)
 
 static void __init dcache_init(unsigned long mempages)
 {
+	int loop;
+
 	/* 
 	 * A constructor could be added for stable state like the lists,
 	 * but it is probably not worth it because of the cache nature
@@ -1601,6 +1658,23 @@ static void __init dcache_init(unsigned long mempages)
 					 NULL, NULL);
 	
 	set_shrinker(DEFAULT_SEEKS, shrink_dcache_memory);
+
+	/* Hash may have been set up in dcache_init_early */
+	if (!hashdist)
+		return;
+
+	dentry_hashtable =
+		alloc_large_system_hash("Dentry cache",
+					sizeof(struct hlist_head),
+					dhash_entries,
+					13,
+					0,
+					&d_hash_shift,
+					&d_hash_mask,
+					0);
+
+	for (loop = 0; loop < (1 << d_hash_shift); loop++)
+		INIT_HLIST_HEAD(&dentry_hashtable[loop]);
 }
 
 /* SLAB cache for __getname() consumers */

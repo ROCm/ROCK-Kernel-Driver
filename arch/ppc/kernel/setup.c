@@ -7,6 +7,7 @@
 #include <linux/string.h>
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/reboot.h>
 #include <linux/delay.h>
 #include <linux/initrd.h>
@@ -681,7 +682,6 @@ arch_initcall(ppc_init);
 /* Warning, IO base is not yet inited */
 void __init setup_arch(char **cmdline_p)
 {
-	extern int panic_timeout;
 	extern char *klimit;
 	extern void do_init_bootmem(void);
 

@@ -316,8 +316,9 @@ config CC_OPTIMIZE_FOR_SIZE
 	  If unsure, say N.
 
 config SHMEM
+	bool "Use full shmem filesystem" if EMBEDDED
 	default y
-	bool "Use full shmem filesystem" if EMBEDDED && MMU
+	depends on MMU
 	help
 	  The shmem is an internal filesystem used to manage shared memory.
 	  It is backed by swap and manages resource limits. It is also exported

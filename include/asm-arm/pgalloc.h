@@ -50,9 +50,8 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 {
 	pte_t *pte;
 
-	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 	if (pte) {
-		clear_page(pte);
 		clean_dcache_area(pte, sizeof(pte_t) * PTRS_PER_PTE);
 		pte += PTRS_PER_PTE;
 	}
@@ -65,10 +64,9 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
 	struct page *pte;
 
-	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
+	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
 	if (pte) {
 		void *page = page_address(pte);
-		clear_page(page);
 		clean_dcache_area(page, sizeof(pte_t) * PTRS_PER_PTE);
 	}
 

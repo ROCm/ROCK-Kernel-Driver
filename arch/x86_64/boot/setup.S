@@ -158,7 +158,9 @@ cmd_line_ptr:	.long 0			# (Header version 0x0202 or later)
 ramdisk_max:	.long 0xffffffff
 	
 trampoline:	call	start_of_setup
-		.space	1024
+		.align 16
+					# The offset at this point is 0x240
+		.space  (0x7ff-0x240+1)	# E820 & EDD space (ending at 0x7ff)
 # End of setup header #####################################################
 
 start_of_setup:

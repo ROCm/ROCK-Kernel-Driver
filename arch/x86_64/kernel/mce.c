@@ -43,7 +43,7 @@ struct mce_log mcelog = {
 	MCE_LOG_LEN,
 }; 
 
-static void mce_log(struct mce *mce)
+void mce_log(struct mce *mce)
 {
 	unsigned next, entry;
 	mce->finished = 0;
@@ -305,6 +305,17 @@ static void __init mce_cpu_quirks(struct cpuinfo_x86 *c)
 	}
 }			
 
+static void __init mce_cpu_features(struct cpuinfo_x86 *c)
+{
+	switch (c->x86_vendor) {
+	case X86_VENDOR_INTEL:
+		mce_intel_feature_init(c);
+		break;
+	default:
+		break;
+	}
+}
+
 /* 
  * Called for each booted CPU to set up machine checks.
  * Must be called with preempt off. 
@@ -321,6 +332,7 @@ void __init mcheck_init(struct cpuinfo_x86 *c)
 		return;
 
 	mce_init(NULL);
+	mce_cpu_features(c);
 }
 
 /*

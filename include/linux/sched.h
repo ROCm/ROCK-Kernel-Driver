@@ -13,6 +13,7 @@
 #include <linux/rbtree.h>
 #include <linux/thread_info.h>
 #include <linux/cpumask.h>
+#include <linux/errno.h>
 
 #include <asm/system.h>
 #include <asm/semaphore.h>
@@ -88,6 +89,7 @@ extern unsigned long avenrun[];		/* Load averages */
 #define CT_TO_SECS(x)	((x) / HZ)
 #define CT_TO_USECS(x)	(((x) % HZ) * 1000000/HZ)
 
+extern unsigned long total_forks;
 extern int nr_threads;
 extern int last_pid;
 DECLARE_PER_CPU(unsigned long, process_counts);
@@ -250,6 +252,9 @@ struct mm_struct {
 	struct kioctx		*ioctx_list;
 
 	struct kioctx		default_kioctx;
+
+	unsigned long hiwater_rss;	/* High-water RSS usage */
+	unsigned long hiwater_vm;	/* High-water virtual memory usage */
 };
 
 struct sighand_struct {
@@ -269,6 +274,8 @@ struct signal_struct {
 	atomic_t		count;
 	atomic_t		live;
 
+	wait_queue_head_t	wait_chldexit;	/* for wait4() */
+
 	/* current thread group signal load-balancing target: */
 	task_t			*curr_target;
 
@@ -276,7 +283,6 @@ struct signal_struct {
 	struct sigpending	shared_pending;
 
 	/* thread group exit support */
-	int			group_exit;
 	int			group_exit_code;
 	/* overloaded:
 	 * - notify group_exit_task when ->count is equal to notify_count
@@ -288,8 +294,7 @@ struct signal_struct {
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
-	/* 1 if group stopped since last SIGCONT, -1 if SIGCONT since report */
-  	int			stop_state;
+	unsigned int		flags; /* see SIGNAL_* flags below */
 
 	/* POSIX.1b Interval Timers */
 	struct list_head posix_timers;
@@ -324,6 +329,15 @@ struct signal_struct {
 	 */
 	struct rlimit rlim[RLIM_NLIMITS];
 };
+
+/*
+ * Bits in flags field of signal_struct.
+ */
+#define SIGNAL_STOP_STOPPED	0x00000001 /* job control stop in effect */
+#define SIGNAL_STOP_DEQUEUED	0x00000002 /* stop signal dequeued */
+#define SIGNAL_STOP_CONTINUED	0x00000004 /* SIGCONT since WCONTINUED reap */
+#define SIGNAL_GROUP_EXIT	0x00000008 /* group exit in progress */
+
 
 /*
  * Priority of a process goes from 0..MAX_PRIO-1, valid RT
@@ -574,7 +588,6 @@ struct task_struct {
 	/* PID/PID hash table linkage. */
 	struct pid pids[PIDTYPE_MAX];
 
-	wait_queue_head_t wait_chldexit;	/* for wait4() */
 	struct completion *vfork_done;		/* for vfork() */
 	int __user *set_child_tid;		/* CLONE_CHILD_SETTID */
 	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
@@ -660,6 +673,13 @@ struct task_struct {
  * to a stack based synchronous wait) if its doing sync IO.
  */
 	wait_queue_t *io_wait;
+/* i/o counters(bytes read/written, #syscalls */
+	u64 rchar, wchar, syscr, syscw;
+#if defined(CONFIG_BSD_PROCESS_ACCT)
+	u64 acct_rss_mem1;	/* accumulated rss usage */
+	u64 acct_vm_mem1;	/* accumulated virtual memory usage */
+	clock_t acct_stimexpd;	/* clock_t-converted stime since last update */
+#endif
 #ifdef CONFIG_NUMA
   	struct mempolicy *mempolicy;
   	short il_next;		/* could be shared with used_math */
@@ -721,6 +741,8 @@ extern int set_cpus_allowed(task_t *p, cpumask_t new_mask);
 #else
 static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 {
+	if (!cpus_intersects(new_mask, cpu_online_map))
+		return -EINVAL;
 	return 0;
 }
 #endif
@@ -1124,6 +1146,34 @@ extern void normalize_rt_tasks(void);
 
 #endif
 
+/* try_to_freeze
+ *
+ * Checks whether we need to enter the refrigerator
+ * and returns 1 if we did so.
+ */
+#ifdef CONFIG_PM
+extern void refrigerator(unsigned long);
+extern int freeze_processes(void);
+extern void thaw_processes(void);
+
+static inline int try_to_freeze(unsigned long refrigerator_flags)
+{
+	if (unlikely(current->flags & PF_FREEZE)) {
+		refrigerator(refrigerator_flags);
+		return 1;
+	} else
+		return 0;
+}
+#else
+static inline void refrigerator(unsigned long flag) {}
+static inline int freeze_processes(void) { BUG(); return 0; }
+static inline void thaw_processes(void) {}
+
+static inline int try_to_freeze(unsigned long refrigerator_flags)
+{
+	return 0;
+}
+#endif /* CONFIG_PM */
 #endif /* __KERNEL__ */
 
 #endif

@@ -688,7 +688,11 @@ void do_generic_mapping_read(struct address_space *mapping,
 			     read_actor_t actor)
 {
 	struct inode *inode = mapping->host;
-	unsigned long index, end_index, offset;
+	unsigned long index;
+	unsigned long end_index;
+	unsigned long offset;
+	unsigned long req_size;
+	unsigned long next_index;
 	loff_t isize;
 	struct page *cached_page;
 	int error;
@@ -696,6 +700,8 @@ void do_generic_mapping_read(struct address_space *mapping,
 
 	cached_page = NULL;
 	index = *ppos >> PAGE_CACHE_SHIFT;
+	next_index = index;
+	req_size = (desc->count + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	offset = *ppos & ~PAGE_CACHE_MASK;
 
 	isize = i_size_read(inode);
@@ -705,7 +711,7 @@ void do_generic_mapping_read(struct address_space *mapping,
 	end_index = (isize - 1) >> PAGE_CACHE_SHIFT;
 	for (;;) {
 		struct page *page;
-		unsigned long nr, ret;
+		unsigned long ret_size, nr, ret;
 
 		/* nr is the maximum number of bytes to copy from this page */
 		nr = PAGE_CACHE_SIZE;
@@ -720,7 +726,12 @@ void do_generic_mapping_read(struct address_space *mapping,
 		nr = nr - offset;
 
 		cond_resched();
-		page_cache_readahead(mapping, &ra, filp, index);
+		if (index == next_index && req_size) {
+			ret_size = page_cache_readahead(mapping, &ra,
+					filp, index, req_size);
+			next_index += ret_size;
+			req_size -= ret_size;
+		}
 
 find_page:
 		page = find_get_page(mapping, index);
@@ -740,9 +751,10 @@ page_ok:
 			flush_dcache_page(page);
 
 		/*
-		 * Mark the page accessed if we read the beginning.
+		 * When (part of) the same page is read multiple times
+		 * in succession, only mark it as accessed the first time.
 		 */
-		if (!offset)
+		if (ra.prev_page != index)
 			mark_page_accessed(page);
 
 		/*
@@ -1166,7 +1178,7 @@ retry_all:
 	 * For sequential accesses, we use the generic readahead logic.
 	 */
 	if (VM_SequentialReadHint(area))
-		page_cache_readahead(mapping, ra, file, pgoff);
+		page_cache_readahead(mapping, ra, file, pgoff, 1);
 
 	/*
 	 * Do we have something in the page cache already?
@@ -2149,7 +2161,7 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char __user *buf,
 	BUG_ON(iocb->ki_pos != pos);
 
 	down(&inode->i_sem);
-	ret = generic_file_aio_write_nolock(iocb, &local_iov, 1,
+	ret = __generic_file_aio_write_nolock(iocb, &local_iov, 1,
 						&iocb->ki_pos);
 	up(&inode->i_sem);
 

@@ -878,7 +878,7 @@ static struct miscdevice rtc_dev=
 	&rtc_fops
 };
 
-#ifdef RTC_IRQ
+#if defined(RTC_IRQ) && !defined(__sparc__)
 static irqreturn_t (*rtc_int_handler_ptr)(int irq, void *dev_id, struct pt_regs *regs);
 #endif
 

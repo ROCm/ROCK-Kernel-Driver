@@ -54,6 +54,9 @@
 #define R_M32R_GOTPC_HI_ULO	59
 #define R_M32R_GOTPC_HI_SLO	60
 #define R_M32R_GOTPC_LO		61
+#define R_M32R_GOTOFF_HI_ULO	62
+#define R_M32R_GOTOFF_HI_SLO	63
+#define R_M32R_GOTOFF_LO	64
 
 #define R_M32R_NUM		256
 

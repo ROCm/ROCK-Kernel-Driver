@@ -30,6 +30,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 config TIME_INTERPOLATION
 	bool
 	default y
@@ -301,6 +305,11 @@ config IA64_PALINFO
 
 	  To use this option, you have to ensure that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
+
+config ACPI_DEALLOCATE_IRQ
+	bool
+	depends on IOSAPIC && EXPERIMENTAL
+	default y
 
 source "drivers/firmware/Kconfig"
 

@@ -157,7 +157,7 @@ struct inode * udf_new_inode (struct inode *dir, int mode, int * err)
 	else
 		UDF_I_ALLOCTYPE(inode) = ICBTAG_FLAG_AD_LONG;
 	inode->i_mtime = inode->i_atime = inode->i_ctime =
-		UDF_I_CRTIME(inode) = CURRENT_TIME;
+		UDF_I_CRTIME(inode) = current_fs_time(inode->i_sb);
 	insert_inode_hash(inode);
 	mark_inode_dirty(inode);
 

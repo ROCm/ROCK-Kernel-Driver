@@ -20,6 +20,7 @@ extern unsigned long __supported_pte_mask;
 
 #define swapper_pg_dir init_level4_pgt
 
+extern void nonx_setup(const char *str);
 extern void paging_init(void);
 extern void clear_kernel_mapping(unsigned long addr, unsigned long size);
 

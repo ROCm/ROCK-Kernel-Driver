@@ -988,7 +988,7 @@ int acpi_processor_power_exit(struct acpi_processor *pr, struct acpi_device *dev
 		 * (pm_idle), Wait for all processors to update cached/local
 		 * copies of pm_idle before proceeding.
 		 */
-		synchronize_kernel();
+		cpu_idle_wait();
 	}
 
 	return_VALUE(0);

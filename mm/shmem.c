@@ -369,9 +369,8 @@ static swp_entry_t *shmem_swp_alloc(struct shmem_inode_info *info, unsigned long
 		}
 
 		spin_unlock(&info->lock);
-		page = shmem_dir_alloc(mapping_gfp_mask(inode->i_mapping));
+		page = shmem_dir_alloc(mapping_gfp_mask(inode->i_mapping) | __GFP_ZERO);
 		if (page) {
-			clear_highpage(page);
 			page->nr_swapped = 0;
 		}
 		spin_lock(&info->lock);
@@ -910,7 +909,7 @@ shmem_alloc_page(unsigned long gfp, struct shmem_inode_info *info,
 	pvma.vm_policy = mpol_shared_policy_lookup(&info->policy, idx);
 	pvma.vm_pgoff = idx;
 	pvma.vm_end = PAGE_SIZE;
-	page = alloc_page_vma(gfp, &pvma, 0);
+	page = alloc_page_vma(gfp | __GFP_ZERO, &pvma, 0);
 	mpol_free(pvma.vm_policy);
 	return page;
 }
@@ -926,7 +925,7 @@ static inline struct page *
 shmem_alloc_page(unsigned long gfp,struct shmem_inode_info *info,
 				 unsigned long idx)
 {
-	return alloc_page(gfp);
+	return alloc_page(gfp | __GFP_ZERO);
 }
 #endif
 
@@ -1135,7 +1134,6 @@ repeat:
 
 		info->alloced++;
 		spin_unlock(&info->lock);
-		clear_highpage(filepage);
 		flush_dcache_page(filepage);
 		SetPageUptodate(filepage);
 	}

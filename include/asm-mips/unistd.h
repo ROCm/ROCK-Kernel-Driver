@@ -1106,7 +1106,6 @@ type name (atype a,btype b,ctype c,dtype d,etype e,ftype f) \
 #define __ARCH_WANT_SYS_GETHOSTNAME
 #define __ARCH_WANT_SYS_PAUSE
 #define __ARCH_WANT_SYS_SGETMASK
-#define __ARCH_WANT_SYS_TIME
 #define __ARCH_WANT_SYS_UTIME
 #define __ARCH_WANT_SYS_WAITPID
 #define __ARCH_WANT_SYS_SOCKETCALL
@@ -1121,6 +1120,12 @@ type name (atype a,btype b,ctype c,dtype d,etype e,ftype f) \
 #define __ARCH_WANT_SYS_RT_SIGACTION
 # ifndef __mips64
 #  define __ARCH_WANT_STAT64
+# endif
+# ifdef CONFIG_MIPS32
+#  define __ARCH_WANT_SYS_TIME
+# endif
+# ifdef CONFIG_MIPS32_O32
+#  define __ARCH_WANT_COMPAT_SYS_TIME
 # endif
 #endif
 

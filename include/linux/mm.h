@@ -85,7 +85,7 @@ struct vm_area_struct {
 			struct vm_area_struct *head;
 		} vm_set;
 
-		struct prio_tree_node prio_tree_node;
+		struct raw_prio_tree_node prio_tree_node;
 	} shared;
 
 	/*
@@ -106,10 +106,30 @@ struct vm_area_struct {
 	struct file * vm_file;		/* File we map to (can be NULL). */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 
+#ifndef CONFIG_MMU
+	atomic_t vm_usage;		/* refcount (VMAs shared if !MMU) */
+#endif
 #ifdef CONFIG_NUMA
 	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 #endif
 };
+
+/*
+ * This struct defines the per-mm list of VMAs for uClinux. If CONFIG_MMU is
+ * disabled, then there's a single shared list of VMAs maintained by the
+ * system, and mm's subscribe to these individually
+ */
+struct vm_list_struct {
+	struct vm_list_struct	*next;
+	struct vm_area_struct	*vma;
+};
+
+#ifndef CONFIG_MMU
+extern struct rb_root nommu_vma_tree;
+extern struct rw_semaphore nommu_vma_sem;
+
+extern unsigned int kobjsize(const void *objp);
+#endif
 
 /*
  * vm_flags..
@@ -603,6 +623,10 @@ int FASTCALL(set_page_dirty(struct page *page));
 int set_page_dirty_lock(struct page *page);
 int clear_page_dirty_for_io(struct page *page);
 
+extern unsigned long do_mremap(unsigned long addr,
+			       unsigned long old_len, unsigned long new_len,
+			       unsigned long flags, unsigned long new_addr);
+
 /*
  * Prototype to add a shrinker callback for ageable caches.
  * 
@@ -635,6 +659,7 @@ extern void remove_shrinker(struct shrinker *shrinker);
  * The following ifdef needed to get the 4level-fixup.h header to work.
  * Remove it when 4level-fixup.h has been removed.
  */
+#ifdef CONFIG_MMU
 #ifndef __ARCH_HAS_4LEVEL_HACK 
 static inline pud_t *pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 {
@@ -650,6 +675,7 @@ static inline pmd_t *pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long a
 	return pmd_offset(pud, address);
 }
 #endif
+#endif /* CONFIG_MMU */
 
 extern void free_area_init(unsigned long * zones_size);
 extern void free_area_init_node(int nid, pg_data_t *pgdat,
@@ -732,15 +758,18 @@ int write_one_page(struct page *page, int wait);
 /* readahead.c */
 #define VM_MAX_READAHEAD	128	/* kbytes */
 #define VM_MIN_READAHEAD	16	/* kbytes (includes current page) */
+#define VM_MAX_CACHE_HIT    	256	/* max pages in a row in cache before
+					 * turning readahead off */
 
 int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			unsigned long offset, unsigned long nr_to_read);
 int force_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			unsigned long offset, unsigned long nr_to_read);
-void page_cache_readahead(struct address_space *mapping, 
+unsigned long  page_cache_readahead(struct address_space *mapping,
 			  struct file_ra_state *ra,
 			  struct file *filp,
-			  unsigned long offset);
+			  unsigned long offset,
+			  unsigned long size);
 void handle_ra_miss(struct address_space *mapping, 
 		    struct file_ra_state *ra, pgoff_t offset);
 unsigned long max_sane_readahead(unsigned long nr);
@@ -775,6 +804,7 @@ extern struct page * vmalloc_to_page(void *addr);
 extern unsigned long vmalloc_to_pfn(void *addr);
 extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
+extern int check_user_page_readable(struct mm_struct *mm, unsigned long address);
 int remap_pfn_range(struct vm_area_struct *, unsigned long,
 		unsigned long, unsigned long, pgprot_t);
 
@@ -806,6 +836,9 @@ static inline void vm_stat_unaccount(struct vm_area_struct *vma)
 							-vma_pages(vma));
 }
 
+/* update per process rss and vm hiwater data */
+extern void update_mem_hiwater(void);
+
 #ifndef CONFIG_DEBUG_PAGEALLOC
 static inline void
 kernel_map_pages(struct page *page, int numpages, int enable)
@@ -813,10 +846,14 @@ kernel_map_pages(struct page *page, int numpages, int enable)
 }
 #endif
 
-#ifndef CONFIG_ARCH_GATE_AREA
 extern struct vm_area_struct *get_gate_vma(struct task_struct *tsk);
+#ifdef	__HAVE_ARCH_GATE_AREA
+int in_gate_area_no_task(unsigned long addr);
 int in_gate_area(struct task_struct *task, unsigned long addr);
-#endif
+#else
+int in_gate_area_no_task(unsigned long addr);
+#define in_gate_area(task, addr) ({(void)task; in_gate_area_no_task(addr);})
+#endif	/* __HAVE_ARCH_GATE_AREA */
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

@@ -82,7 +82,7 @@
  * PMD_SHIFT determines the size of the area a second-level page table can map
  * PGDIR_SHIFT determines what a third-level page table entry can map
  */
-#define PMD_SHIFT		20
+#define PMD_SHIFT		21
 #define PGDIR_SHIFT		21
 
 #define LIBRARY_TEXT_START	0x0c000000

@@ -224,9 +224,8 @@ struct ip_conntrack
 /* get master conntrack via master expectation */
 #define master_ct(conntr) (conntr->master ? conntr->master->expectant : NULL)
 
-/* Alter reply tuple (maybe alter helper).  If it's already taken,
-   return 0 and don't do alteration. */
-extern int
+/* Alter reply tuple (maybe alter helper). */
+extern void
 ip_conntrack_alter_reply(struct ip_conntrack *conntrack,
 			 const struct ip_conntrack_tuple *newreply);
 
@@ -283,10 +282,10 @@ extern int ip_ct_no_defrag;
 struct sk_buff *
 ip_ct_gather_frags(struct sk_buff *skb);
 
-/* Delete all conntracks which match. */
+/* Iterate over all conntracks: if iter returns true, it's deleted. */
 extern void
-ip_ct_selective_cleanup(int (*kill)(const struct ip_conntrack *i, void *data),
-			void *data);
+ip_ct_iterate_cleanup(int (*iter)(struct ip_conntrack *i, void *data),
+		      void *data);
 
 /* It's confirmed if it is, or has been in the hash table. */
 static inline int is_confirmed(struct ip_conntrack *ct)

@@ -196,7 +196,7 @@ static int iounit_map_dma_area(dma_addr_t *pba, unsigned long va, __u32 addr, in
 			pte_t *ptep;
 			long i;
 
-			pgdp = pgd_offset(init_task.mm, addr);
+			pgdp = pgd_offset(&init_mm, addr);
 			pmdp = pmd_offset(pgdp, addr);
 			ptep = pte_offset_map(pmdp, addr);
 

@@ -7,7 +7,6 @@
 #include <linux/init.h>
 #include <linux/module.h>
 
-#include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
 MODULE_AUTHOR("Jan Kara");
@@ -41,23 +40,14 @@ static void v1_mem2disk_dqblk(struct v1_disk_dqblk *d, struct mem_dqblk *m)
 static int v1_read_dqblk(struct dquot *dquot)
 {
 	int type = dquot->dq_type;
-	struct file *filp;
-	mm_segment_t fs;
-	loff_t offset;
 	struct v1_disk_dqblk dqblk;
 
-	filp = sb_dqopt(dquot->dq_sb)->files[type];
-	if (filp == (struct file *)NULL)
+	if (!sb_dqopt(dquot->dq_sb)->files[type])
 		return -EINVAL;
 
-	/* Now we are sure filp is valid */
-	offset = v1_dqoff(dquot->dq_id);
 	/* Set structure to 0s in case read fails/is after end of file */
 	memset(&dqblk, 0, sizeof(struct v1_disk_dqblk));
-	fs = get_fs();
-	set_fs(KERNEL_DS);
-	filp->f_op->read(filp, (char *)&dqblk, sizeof(struct v1_disk_dqblk), &offset);
-	set_fs(fs);
+	dquot->dq_sb->s_op->quota_read(dquot->dq_sb, type, (char *)&dqblk, sizeof(struct v1_disk_dqblk), v1_dqoff(dquot->dq_id));
 
 	v1_disk2mem_dqblk(&dquot->dq_dqb, &dqblk);
 	if (dquot->dq_dqb.dqb_bhardlimit == 0 && dquot->dq_dqb.dqb_bsoftlimit == 0 &&
@@ -71,16 +61,8 @@ static int v1_read_dqblk(struct dquot *dquot)
 static int v1_commit_dqblk(struct dquot *dquot)
 {
 	short type = dquot->dq_type;
-	struct file *filp;
-	mm_segment_t fs;
-	loff_t offset;
 	ssize_t ret;
 	struct v1_disk_dqblk dqblk;
-
-	filp = sb_dqopt(dquot->dq_sb)->files[type];
-	offset = v1_dqoff(dquot->dq_id);
-	fs = get_fs();
-	set_fs(KERNEL_DS);
 
 	v1_mem2disk_dqblk(&dqblk, &dquot->dq_dqb);
 	if (dquot->dq_id == 0) {
@@ -88,9 +70,9 @@ static int v1_commit_dqblk(struct dquot *dquot)
 		dqblk.dqb_itime = sb_dqopt(dquot->dq_sb)->info[type].dqi_igrace;
 	}
 	ret = 0;
-	if (filp)
-		ret = filp->f_op->write(filp, (char *)&dqblk,
-					sizeof(struct v1_disk_dqblk), &offset);
+	if (sb_dqopt(dquot->dq_sb)->files[type])
+		ret = dquot->dq_sb->s_op->quota_write(dquot->dq_sb, type, (char *)&dqblk,
+					sizeof(struct v1_disk_dqblk), v1_dqoff(dquot->dq_id));
 	if (ret != sizeof(struct v1_disk_dqblk)) {
 		printk(KERN_WARNING "VFS: dquota write failed on dev %s\n",
 			dquot->dq_sb->s_id);
@@ -101,7 +83,6 @@ static int v1_commit_dqblk(struct dquot *dquot)
 	ret = 0;
 
 out:
-	set_fs(fs);
 	dqstats.writes++;
 
 	return ret;
@@ -121,14 +102,11 @@ struct v2_disk_dqheader {
 
 static int v1_check_quota_file(struct super_block *sb, int type)
 {
-	struct file *f = sb_dqopt(sb)->files[type];
-	struct inode *inode = f->f_dentry->d_inode;
+	struct inode *inode = sb_dqopt(sb)->files[type];
 	ulong blocks;
 	size_t off; 
 	struct v2_disk_dqheader dqhead;
-	mm_segment_t fs;
 	ssize_t size;
-	loff_t offset = 0;
 	loff_t isize;
 	static const uint quota_magics[] = V2_INITQMAGICS;
 
@@ -140,10 +118,7 @@ static int v1_check_quota_file(struct super_block *sb, int type)
 	if ((blocks % sizeof(struct v1_disk_dqblk) * BLOCK_SIZE + off) % sizeof(struct v1_disk_dqblk))
 		return 0;
 	/* Doublecheck whether we didn't get file with new format - with old quotactl() this could happen */
-	fs = get_fs();
-	set_fs(KERNEL_DS);
-	size = f->f_op->read(f, (char *)&dqhead, sizeof(struct v2_disk_dqheader), &offset);
-	set_fs(fs);
+	size = sb->s_op->quota_read(sb, type, (char *)&dqhead, sizeof(struct v2_disk_dqheader), 0);
 	if (size != sizeof(struct v2_disk_dqheader))
 		return 1;	/* Probably not new format */
 	if (le32_to_cpu(dqhead.dqh_magic) != quota_magics[type])
@@ -155,16 +130,10 @@ static int v1_check_quota_file(struct super_block *sb, int type)
 static int v1_read_file_info(struct super_block *sb, int type)
 {
 	struct quota_info *dqopt = sb_dqopt(sb);
-	mm_segment_t fs;
-	loff_t offset;
-	struct file *filp = dqopt->files[type];
 	struct v1_disk_dqblk dqblk;
 	int ret;
 
-	offset = v1_dqoff(0);
-	fs = get_fs();
-	set_fs(KERNEL_DS);
-	if ((ret = filp->f_op->read(filp, (char *)&dqblk, sizeof(struct v1_disk_dqblk), &offset)) != sizeof(struct v1_disk_dqblk)) {
+	if ((ret = sb->s_op->quota_read(sb, type, (char *)&dqblk, sizeof(struct v1_disk_dqblk), v1_dqoff(0))) != sizeof(struct v1_disk_dqblk)) {
 		if (ret >= 0)
 			ret = -EIO;
 		goto out;
@@ -173,38 +142,31 @@ static int v1_read_file_info(struct super_block *sb, int type)
 	dqopt->info[type].dqi_igrace = dqblk.dqb_itime ? dqblk.dqb_itime : MAX_IQ_TIME;
 	dqopt->info[type].dqi_bgrace = dqblk.dqb_btime ? dqblk.dqb_btime : MAX_DQ_TIME;
 out:
-	set_fs(fs);
 	return ret;
 }
 
 static int v1_write_file_info(struct super_block *sb, int type)
 {
 	struct quota_info *dqopt = sb_dqopt(sb);
-	mm_segment_t fs;
-	struct file *filp = dqopt->files[type];
 	struct v1_disk_dqblk dqblk;
-	loff_t offset;
 	int ret;
 
 	dqopt->info[type].dqi_flags &= ~DQF_INFO_DIRTY;
-	offset = v1_dqoff(0);
-	fs = get_fs();
-	set_fs(KERNEL_DS);
-	if ((ret = filp->f_op->read(filp, (char *)&dqblk, sizeof(struct v1_disk_dqblk), &offset)) != sizeof(struct v1_disk_dqblk)) {
+	if ((ret = sb->s_op->quota_read(sb, type, (char *)&dqblk,
+	    sizeof(struct v1_disk_dqblk), v1_dqoff(0))) != sizeof(struct v1_disk_dqblk)) {
 		if (ret >= 0)
 			ret = -EIO;
 		goto out;
 	}
 	dqblk.dqb_itime = dqopt->info[type].dqi_igrace;
 	dqblk.dqb_btime = dqopt->info[type].dqi_bgrace;
-	offset = v1_dqoff(0);
-	ret = filp->f_op->write(filp, (char *)&dqblk, sizeof(struct v1_disk_dqblk), &offset);
+	ret = sb->s_op->quota_write(sb, type, (char *)&dqblk,
+	      sizeof(struct v1_disk_dqblk), v1_dqoff(0));
 	if (ret == sizeof(struct v1_disk_dqblk))
 		ret = 0;
 	else if (ret > 0)
 		ret = -EIO;
 out:
-	set_fs(fs);
 	return ret;
 }
 

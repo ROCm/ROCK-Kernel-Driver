@@ -138,8 +138,7 @@ op_add_pm(unsigned long pc, int kern, unsigned long counter,
 	if (counter == 1)
 		fake_counter += PM_NUM_COUNTERS;
 	if (ctr[fake_counter].enabled)
-		oprofile_add_sample(pc, kern, fake_counter,
-				    smp_processor_id());
+		oprofile_add_pc(pc, kern, fake_counter);
 }
 
 static void
@@ -197,8 +196,7 @@ ev67_handle_interrupt(unsigned long which, struct pt_regs *regs,
 			   to PALcode. Recognize ITB miss by PALcode
 			   offset address, and get actual PC from
 			   EXC_ADDR.  */
-			oprofile_add_sample(regs->pc, kern, which,
-					    smp_processor_id());
+			oprofile_add_pc(regs->pc, kern, which);
 			if ((pmpc & ((1 << 15) - 1)) ==  581)
 				op_add_pm(regs->pc, kern, which,
 					  ctr, PM_ITB_MISS);
@@ -241,7 +239,7 @@ ev67_handle_interrupt(unsigned long which, struct pt_regs *regs,
 		}
 	}
 
-	oprofile_add_sample(pmpc, kern, which, smp_processor_id());
+	oprofile_add_pc(pmpc, kern, which);
 
 	pctr_ctl = wrperfmon(5, 0);
 	if (pctr_ctl & (1UL << 27))

@@ -1,7 +1,7 @@
 /*
  * Common code to handle map devices which are simple ROM
  * (C) 2000 Red Hat. GPL'd.
- * $Id: map_rom.c,v 1.22 2004/11/16 18:29:00 dwmw2 Exp $
+ * $Id: map_rom.c,v 1.23 2005/01/05 18:05:12 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -57,7 +57,7 @@ static struct mtd_info *map_rom_probe(struct map_info *map)
 
 static int maprom_read (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf)
 {
-	struct map_info *map = (struct map_info *)mtd->priv;
+	struct map_info *map = mtd->priv;
 
 	map_copy_from(map, buf, from, len);
 	*retlen = len;

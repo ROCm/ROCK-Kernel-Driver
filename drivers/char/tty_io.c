@@ -1011,7 +1011,7 @@ static ssize_t tty_read(struct file * file, char __user * buf, size_t count,
 	tty_ldisc_deref(ld);
 	unlock_kernel();
 	if (i > 0)
-		inode->i_atime = CURRENT_TIME;
+		inode->i_atime = current_fs_time(inode->i_sb);
 	return i;
 }
 
@@ -1088,7 +1088,8 @@ static inline ssize_t do_tty_write(
 		cond_resched();
 	}
 	if (written) {
-		file->f_dentry->d_inode->i_mtime = CURRENT_TIME;
+		struct inode *inode = file->f_dentry->d_inode;
+		inode->i_mtime = current_fs_time(inode->i_sb);
 		ret = written;
 	}
 	up(&tty->atomic_write);
@@ -2903,8 +2904,8 @@ void __init console_init(void)
 	   So I haven't moved it. dwmw2 */
         rs_360_init();
 #endif
-	call = &__con_initcall_start;
-	while (call < &__con_initcall_end) {
+	call = __con_initcall_start;
+	while (call < __con_initcall_end) {
 		(*call)();
 		call++;
 	}

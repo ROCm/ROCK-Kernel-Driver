@@ -347,18 +347,22 @@ asmlinkage long sys_fsync(unsigned int fd)
 		goto out_putf;
 	}
 
-	/* We need to protect against concurrent writers.. */
-	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(mapping);
+
+	/*
+	 * We need to protect against concurrent writers,
+	 * which could cause livelocks in fsync_buffers_list
+	 */
+	down(&mapping->host->i_sem);
 	err = file->f_op->fsync(file, file->f_dentry, 0);
 	if (!ret)
 		ret = err;
+	up(&mapping->host->i_sem);
 	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);
@@ -383,17 +387,17 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 
 	mapping = file->f_mapping;
 
-	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(mapping);
+	down(&mapping->host->i_sem);
 	err = file->f_op->fsync(file, file->f_dentry, 1);
 	if (!ret)
 		ret = err;
+	up(&mapping->host->i_sem);
 	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);
@@ -422,6 +426,7 @@ __find_get_block_slow(struct block_device *bdev, sector_t block, int unused)
 	struct buffer_head *bh;
 	struct buffer_head *head;
 	struct page *page;
+	int all_mapped = 1;
 
 	index = block >> (PAGE_CACHE_SHIFT - bd_inode->i_blkbits);
 	page = find_get_page(bd_mapping, index);
@@ -439,14 +444,23 @@ __find_get_block_slow(struct block_device *bdev, sector_t block, int unused)
 			get_bh(bh);
 			goto out_unlock;
 		}
+		if (!buffer_mapped(bh))
+			all_mapped = 0;
 		bh = bh->b_this_page;
 	} while (bh != head);
 
-	printk("__find_get_block_slow() failed. "
-		"block=%llu, b_blocknr=%llu\n",
-		(unsigned long long)block, (unsigned long long)bh->b_blocknr);
-	printk("b_state=0x%08lx, b_size=%u\n", bh->b_state, bh->b_size);
-	printk("device blocksize: %d\n", 1 << bd_inode->i_blkbits);
+	/* we might be here because some of the buffers on this page are
+	 * not mapped.  This is due to various races between
+	 * file io on the block device and getblk.  It gets dealt with
+	 * elsewhere, don't buffer_error if we had some unmapped buffers
+	 */
+	if (all_mapped) {
+		printk("__find_get_block_slow() failed. "
+			"block=%llu, b_blocknr=%llu\n",
+			(unsigned long long)block, (unsigned long long)bh->b_blocknr);
+		printk("b_state=0x%08lx, b_size=%u\n", bh->b_state, bh->b_size);
+		printk("device blocksize: %d\n", 1 << bd_inode->i_blkbits);
+	}
 out_unlock:
 	spin_unlock(&bd_mapping->private_lock);
 	page_cache_release(page);
@@ -1089,18 +1103,16 @@ init_page_buffers(struct page *page, struct block_device *bdev,
 {
 	struct buffer_head *head = page_buffers(page);
 	struct buffer_head *bh = head;
-	unsigned int b_state;
-
-	b_state = 1 << BH_Mapped;
-	if (PageUptodate(page))
-		b_state |= 1 << BH_Uptodate;
+	int uptodate = PageUptodate(page);
 
 	do {
-		if (!(bh->b_state & (1 << BH_Mapped))) {
+		if (!buffer_mapped(bh)) {
 			init_buffer(bh, NULL, NULL);
 			bh->b_bdev = bdev;
 			bh->b_blocknr = block;
-			bh->b_state = b_state;
+			if (uptodate)
+				set_buffer_uptodate(bh);
+			set_buffer_mapped(bh);
 		}
 		block++;
 		bh = bh->b_this_page;
@@ -1129,8 +1141,10 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 
 	if (page_has_buffers(page)) {
 		bh = page_buffers(page);
-		if (bh->b_size == size)
+		if (bh->b_size == size) {
+			init_page_buffers(page, bdev, block, size);
 			return page;
+		}
 		if (!try_to_free_buffers(page))
 			goto failed;
 	}

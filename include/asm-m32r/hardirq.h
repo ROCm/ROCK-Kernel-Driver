@@ -1,3 +1,4 @@
+#ifdef __KERNEL__
 #ifndef __ASM_HARDIRQ_H
 #define __ASM_HARDIRQ_H
 
@@ -7,8 +8,6 @@
 
 typedef struct {
 	unsigned int __softirq_pending;
-	unsigned int __syscall_count;
-	struct task_struct * __ksoftirqd_task; /* waitqueue is too large */
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
@@ -40,4 +39,11 @@ do {									\
 		preempt_enable_no_resched();				\
 } while (0)
 
+static inline void ack_bad_irq(int irq)
+{
+	printk(KERN_CRIT "unexpected IRQ trap at vector %02x\n", irq);
+	BUG();
+}
+
 #endif /* __ASM_HARDIRQ_H */
+#endif /* __KERNEL__ */

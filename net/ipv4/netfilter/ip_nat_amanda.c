@@ -39,7 +39,7 @@ amanda_nat_expected(struct sk_buff **pskb,
 {
 	struct ip_conntrack *master = master_ct(ct);
 	struct ip_ct_amanda_expect *exp_amanda_info;
-	struct ip_nat_multi_range mr;
+	struct ip_nat_range range;
 	u_int32_t newip;
 
 	IP_NF_ASSERT(info);
@@ -51,20 +51,19 @@ amanda_nat_expected(struct sk_buff **pskb,
 	else
 		newip = master->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip;
 
-	mr.rangesize = 1;
 	/* We don't want to manip the per-protocol, just the IPs. */
-	mr.range[0].flags = IP_NAT_RANGE_MAP_IPS;
-	mr.range[0].min_ip = mr.range[0].max_ip = newip;
+	range.flags = IP_NAT_RANGE_MAP_IPS;
+	range.min_ip = range.max_ip = newip;
 
 	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_DST) {
 		exp_amanda_info = &ct->master->help.exp_amanda_info;
-		mr.range[0].flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
-		mr.range[0].min = mr.range[0].max
+		range.flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
+		range.min = range.max
 			= ((union ip_conntrack_manip_proto)
 				{ .udp = { htons(exp_amanda_info->port) } });
 	}
 
-	return ip_nat_setup_info(ct, &mr, hooknum);
+	return ip_nat_setup_info(ct, &range, hooknum);
 }
 
 static int amanda_data_fixup(struct ip_conntrack *ct,

@@ -315,7 +315,7 @@ void __init pmac_init_early(void)
 	}
 
 	/* Setup interrupt mapping options */
-	naca->interrupt_controller = IC_OPEN_PIC;
+	ppc64_interrupt_controller = IC_OPEN_PIC;
 
 	DBG(" <- pmac_init_early\n");
 }

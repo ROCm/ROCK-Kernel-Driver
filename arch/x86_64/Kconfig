@@ -41,6 +41,10 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 config X86_CMPXCHG
 	bool
 	default y
@@ -98,10 +102,11 @@ config MK8
 	  Optimize for AMD Opteron/Athlon64/Hammer/K8 CPUs.
 
 config MPSC
-       bool "Intel x86-64"
+       bool "Intel EM64T"
        help
-	  Optimize for Intel IA32 with 64bit extension CPUs
-	  (Prescott/Nocona/Potomac)
+	  Optimize for Intel Pentium 4 and Xeon CPUs with Intel
+	  Extended Memory 64 Technology(EM64T). For details see
+	  <http://www.intel.com/technology/64bitextensions/>.
 
 config GENERIC_CPU
 	bool "Generic-x86-64"
@@ -289,17 +294,15 @@ config HAVE_DEC_LOCK
 	depends on SMP
 	default y
 
-# actually 64 maximum, but you need to fix the APIC code first
-# to use clustered mode or whatever your big iron needs
 config NR_CPUS
-	int "Maximum number of CPUs (2-8)"
-	range 2 8
+	int "Maximum number of CPUs (2-256)"
+	range 2 256
 	depends on SMP
 	default "8"
 	help
 	  This allows you to specify the maximum number of CPUs which this
-	  kernel will support.  The maximum supported value is 32 and the
-	  minimum value which makes sense is 2.
+	  kernel will support. Current maximum is 256 CPUs due to
+	  APIC addressing limits. Less depending on the hardware.
 
 	  This is purely to save memory - each supported CPU requires
 	  memory in the static kernel configuration.
@@ -338,6 +341,13 @@ config X86_MCE
 	   machine check error logs. See
 	   ftp://ftp.x86-64.org/pub/linux/tools/mcelog
 
+config X86_MCE_INTEL
+	bool "Intel MCE features"
+	depends on X86_MCE && X86_LOCAL_APIC
+	default y
+	help
+	   Additional support for intel specific MCE features such as
+	   the thermal monitor.
 endmenu
 
 #

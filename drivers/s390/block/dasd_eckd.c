@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.65 $
+ * $Revision: 1.66 $
  */
 
 #include <linux/config.h>
@@ -1192,10 +1192,10 @@ dasd_eckd_release(struct block_device *bdev, int no, long args)
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1, 32, device);
-	if (cqr == NULL) {
+	if (IS_ERR(cqr)) {
 		MESSAGE(KERN_WARNING, "%s",
-			"No memory to allocate initialization request");
-		return -ENOMEM;
+			"Could not allocate initialization request");
+		return PTR_ERR(cqr);
 	}
 	cqr->cpaddr->cmd_code = DASD_ECKD_CCW_RELEASE;
         cqr->cpaddr->flags |= CCW_FLAG_SLI;
@@ -1236,10 +1236,10 @@ dasd_eckd_reserve(struct block_device *bdev, int no, long args)
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1, 32, device);
-	if (cqr == NULL) {
+	if (IS_ERR(cqr)) {
 		MESSAGE(KERN_WARNING, "%s",
-			"No memory to allocate initialization request");
-		return -ENOMEM;
+			"Could not allocate initialization request");
+		return PTR_ERR(cqr);
 	}
 	cqr->cpaddr->cmd_code = DASD_ECKD_CCW_RESERVE;
         cqr->cpaddr->flags |= CCW_FLAG_SLI;
@@ -1279,10 +1279,10 @@ dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
 				   1, 32, device);
-	if (cqr == NULL) {
+	if (IS_ERR(cqr)) {
 		MESSAGE(KERN_WARNING, "%s",
-			"No memory to allocate initialization request");
-		return -ENOMEM;
+			"Could not allocate initialization request");
+		return PTR_ERR(cqr);
 	}
 	cqr->cpaddr->cmd_code = DASD_ECKD_CCW_SLCK;
         cqr->cpaddr->flags |= CCW_FLAG_SLI;
@@ -1323,10 +1323,10 @@ dasd_eckd_performance(struct block_device *bdev, int no, long args)
 				   (sizeof (struct dasd_psf_prssd_data) +
 				    sizeof (struct dasd_rssd_perf_stats_t)),
 				   device);
-	if (cqr == NULL) {
+	if (IS_ERR(cqr)) {
 		MESSAGE(KERN_WARNING, "%s",
-			"No memory to allocate initialization request");
-		return -ENOMEM;
+			"Could not allocate initialization request");
+		return PTR_ERR(cqr);
 	}
 	cqr->device = device;
 	cqr->retries = 0;

@@ -27,7 +27,7 @@
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
 #include <asm/iSeries/HvLpConfig.h>
-#include <asm/iSeries/ItLpPaca.h>
+#include <asm/lppaca.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/hvcall.h>
 #include <asm/cputable.h>
@@ -72,7 +72,7 @@ static struct proc_dir_entry *proc_ppc64_lparcfg;
 
 /*
  * For iSeries legacy systems, the PPA purr function is available from the
- * xEmulatedTimeBase field in the paca.
+ * emulated_time_base field in the paca.
  */
 static unsigned long get_purr(void)
 {
@@ -82,11 +82,11 @@ static unsigned long get_purr(void)
 
 	for_each_cpu(cpu) {
 		lpaca = paca + cpu;
-		sum_purr += lpaca->lppaca.xEmulatedTimeBase;
+		sum_purr += lpaca->lppaca.emulated_time_base;
 
 #ifdef PURR_DEBUG
 		printk(KERN_INFO "get_purr for cpu (%d) has value (%ld) \n",
-			cpu, lpaca->lppaca.xEmulatedTimeBase);
+			cpu, lpaca->lppaca.emulated_time_base);
 #endif
 	}
 	return sum_purr;
@@ -107,7 +107,7 @@ static int lparcfg_data(struct seq_file *m, void *v)
 
 	seq_printf(m, "%s %s \n", MODULE_NAME, MODULE_VERS);
 
-	shared = (int)(lpaca->lppaca_ptr->xSharedProc);
+	shared = (int)(lpaca->lppaca_ptr->shared_proc);
 	seq_printf(m, "serial_number=%c%c%c%c%c%c%c\n",
 		   e2a(xItExtVpdPanel.mfgID[2]),
 		   e2a(xItExtVpdPanel.mfgID[3]),
@@ -395,7 +395,7 @@ static int lparcfg_data(struct seq_file *m, void *v)
 			   (h_resource >> 0 * 8) & 0xffff);
 
 		/* pool related entries are apropriate for shared configs */
-		if (paca[0].lppaca.xSharedProc) {
+		if (paca[0].lppaca.shared_proc) {
 
 			h_pic(&pool_idle_time, &pool_procs);
 
@@ -444,7 +444,7 @@ static int lparcfg_data(struct seq_file *m, void *v)
 	seq_printf(m, "partition_potential_processors=%d\n",
 		   partition_potential_processors);
 
-	seq_printf(m, "shared_processor_mode=%d\n", paca[0].lppaca.xSharedProc);
+	seq_printf(m, "shared_processor_mode=%d\n", paca[0].lppaca.shared_proc);
 
 	return 0;
 }

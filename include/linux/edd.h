@@ -49,6 +49,10 @@
 #define EDD_MBR_SIG_MAX 16        /* max number of signatures to store */
 #define EDD_MBR_SIG_NR_BUF 0x1ea  /* addr of number of MBR signtaures at EDD_MBR_SIG_BUF
 				     in boot_params - treat this as 1 byte  */
+#define EDD_CL_EQUALS   0x3d646465     /* "edd=" */
+#define EDD_CL_OFF      0x666f         /* "of" for off  */
+#define EDD_CL_SKIP     0x6b73         /* "sk" for skipmbr */
+
 #ifndef __ASSEMBLY__
 
 #define EDD_EXT_FIXED_DISK_ACCESS           (1 << 0)

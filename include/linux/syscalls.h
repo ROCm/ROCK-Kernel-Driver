@@ -63,7 +63,7 @@ struct mq_attr;
 #include <linux/quota.h>
 #include <linux/key.h>
 
-asmlinkage long sys_time(int __user *tloc);
+asmlinkage long sys_time(time_t __user *tloc);
 asmlinkage long sys_stime(time_t __user *tptr);
 asmlinkage long sys_gettimeofday(struct timeval __user *tv,
 				struct timezone __user *tz);

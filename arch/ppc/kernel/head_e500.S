@@ -119,7 +119,7 @@ invstr:	mflr	r6				/* Make it accessible */
 	tlbsx	0,r6				/* Fall through, we had to match */
 match_TLB:
 	mfspr	r7,SPRN_MAS0
-	rlwinm	r3,r7,16,28,31			/* Extract MAS0(Entry) */
+	rlwinm	r3,r7,16,20,31			/* Extract MAS0(Entry) */
 
 	mfspr	r7,SPRN_MAS1			/* Insure IPROT set */
 	oris	r7,r7,MAS1_IPROT@h
@@ -131,7 +131,7 @@ match_TLB:
 	andi.	r9,r9,0xfff
 	li	r6,0				/* Set Entry counter to 0 */
 1:	lis	r7,0x1000			/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r6,16,12,15			/* Setup MAS0 = TLBSEL | ESEL(r6) */
+	rlwimi	r7,r6,16,4,15			/* Setup MAS0 = TLBSEL | ESEL(r6) */
 	mtspr	SPRN_MAS0,r7
 	tlbre
 	mfspr	r7,SPRN_MAS1
@@ -163,13 +163,13 @@ skpinv:	addi	r6,r6,1				/* Increment */
 	andi.	r5, r3, 0x1	/* Find an entry not used and is non-zero */
 	addi	r5, r5, 0x1
 	lis	r7,0x1000	/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r3,16,12,15	/* Setup MAS0 = TLBSEL | ESEL(r3) */
+	rlwimi	r7,r3,16,4,15	/* Setup MAS0 = TLBSEL | ESEL(r3) */
 	mtspr	SPRN_MAS0,r7
 	tlbre
 
 	/* Just modify the entry ID and EPN for the temp mapping */
 	lis	r7,0x1000	/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r5,16,12,15	/* Setup MAS0 = TLBSEL | ESEL(r5) */
+	rlwimi	r7,r5,16,4,15	/* Setup MAS0 = TLBSEL | ESEL(r5) */
 	mtspr	SPRN_MAS0,r7
 	xori	r6,r4,1		/* Setup TMP mapping in the other Address space */
 	slwi	r6,r6,12
@@ -201,7 +201,7 @@ skpinv:	addi	r6,r6,1				/* Increment */
 
 /* 5. Invalidate mapping we started in */
 	lis	r7,0x1000	/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r3,16,12,15	/* Setup MAS0 = TLBSEL | ESEL(r3) */
+	rlwimi	r7,r3,16,4,15	/* Setup MAS0 = TLBSEL | ESEL(r3) */
 	mtspr	SPRN_MAS0,r7
 	tlbre
 	li	r6,0
@@ -242,7 +242,7 @@ skpinv:	addi	r6,r6,1				/* Increment */
 
 /* 8. Clear out the temp mapping */
 	lis	r7,0x1000	/* Set MAS0(TLBSEL) = 1 */
-	rlwimi	r7,r5,16,12,15	/* Setup MAS0 = TLBSEL | ESEL(r5) */
+	rlwimi	r7,r5,16,4,15	/* Setup MAS0 = TLBSEL | ESEL(r5) */
 	mtspr	SPRN_MAS0,r7
 	tlbre
 	mtspr	SPRN_MAS1,r8
@@ -282,7 +282,7 @@ skpinv:	addi	r6,r6,1				/* Increment */
 	mtspr	SPRN_IVPR,r4
 
 	/* Setup the defaults for TLB entries */
-	li	r2,MAS4_TSIZED(BOOKE_PAGESZ_4K)
+	li	r2,(MAS4_TSIZED(BOOKE_PAGESZ_4K))@l
    	mtspr	SPRN_MAS4, r2
 
 #if 0
@@ -464,32 +464,16 @@ interrupt_base:
 	b	data_access
 
 	/* Instruction Storage Interrupt */
-	START_EXCEPTION(InstructionStorage)
-	NORMAL_EXCEPTION_PROLOG
-	mfspr	r5,SPRN_ESR		/* Grab the ESR and save it */
-	stw	r5,_ESR(r11)
-	mr      r4,r12                  /* Pass SRR0 as arg2 */
-	li      r5,0                    /* Pass zero as arg3 */
-	EXC_XFER_EE_LITE(0x0400, handle_page_fault)
+	INSTRUCTION_STORAGE_EXCEPTION
 
 	/* External Input Interrupt */
 	EXCEPTION(0x0500, ExternalInput, do_IRQ, EXC_XFER_LITE)
 
 	/* Alignment Interrupt */
-	START_EXCEPTION(Alignment)
-	NORMAL_EXCEPTION_PROLOG
-	mfspr   r4,SPRN_DEAR            /* Grab the DEAR and save it */
-	stw     r4,_DEAR(r11)
-	addi    r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_EE(0x0600, AlignmentException)
+	ALIGNMENT_EXCEPTION
 
 	/* Program Interrupt */
-	START_EXCEPTION(Program)
-	NORMAL_EXCEPTION_PROLOG
-	mfspr	r4,SPRN_ESR		/* Grab the ESR and save it */
-	stw	r4,_ESR(r11)
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_STD(0x0700, ProgramCheckException)
+	PROGRAM_EXCEPTION
 
 	/* Floating Point Unavailable Interrupt */
 	EXCEPTION(0x0800, FloatingPointUnavailable, UnknownException, EXC_XFER_EE)
@@ -503,12 +487,7 @@ interrupt_base:
 	EXCEPTION(0x2900, AuxillaryProcessorUnavailable, UnknownException, EXC_XFER_EE)
 
 	/* Decrementer Interrupt */
-	START_EXCEPTION(Decrementer)
-	NORMAL_EXCEPTION_PROLOG
-	lis     r0,TSR_DIS@h            /* Setup the DEC interrupt mask */
-	mtspr   SPRN_TSR,r0		/* Clear the DEC interrupt */
-	addi    r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_LITE(0x0900, timer_interrupt)
+	DECREMENTER_EXCEPTION
 
 	/* Fixed Internal Timer Interrupt */
 	/* TODO: Add FIT support */
@@ -539,8 +518,7 @@ interrupt_base:
 	ori	r11, r11, swapper_pg_dir@l
 
 	mfspr	r12,SPRN_MAS1		/* Set TID to 0 */
-	li	r13,MAS1_TID@l
-	andc	r12,r12,r13
+	rlwinm	r12,r12,0,16,1
 	mtspr	SPRN_MAS1,r12
 
 	b	4f
@@ -604,8 +582,7 @@ interrupt_base:
 	ori	r11, r11, swapper_pg_dir@l
 
 	mfspr	r12,SPRN_MAS1		/* Set TID to 0 */
-	li	r13,MAS1_TID@l
-	andc	r12,r12,r13
+	rlwinm	r12,r12,0,16,1
 	mtspr	SPRN_MAS1,r12
 
 	b	4f
@@ -666,7 +643,8 @@ interrupt_base:
 	EXCEPTION(0x2050, SPEFloatingPointRound, UnknownException, EXC_XFER_EE)
 
 	/* Performance Monitor */
-	EXCEPTION(0x2060, PerformanceMonitor, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2060, PerformanceMonitor, PerformanceMonitorException, EXC_XFER_STD)
+
 
 	/* Debug Interrupt */
 	DEBUG_EXCEPTION

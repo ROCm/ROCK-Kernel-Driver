@@ -1,5 +1,5 @@
 /*
- * $Id: redboot.c,v 1.15 2004/08/10 07:55:16 dwmw2 Exp $
+ * $Id: redboot.c,v 1.17 2004/11/22 11:33:56 ijc Exp $
  *
  * Parse RedBoot-style Flash Image System (FIS) tables and
  * produce a Linux partition array to match.
@@ -30,6 +30,9 @@ struct fis_list {
 	struct fis_list *next;
 };
 
+static int directory = CONFIG_MTD_REDBOOT_DIRECTORY_BLOCK;
+module_param(directory, int, 0);
+
 static inline int redboot_checksum(struct fis_image_desc *img)
 {
 	/* RedBoot doesn't actually write the desc_cksum field yet AFAICT */
@@ -50,6 +53,8 @@ static int parse_redboot_partitions(struct mtd_info *master,
 	char *nullname;
 	int namelen = 0;
 	int nulllen = 0;
+	int numslots;
+	unsigned long offset;
 #ifdef CONFIG_MTD_REDBOOT_PARTS_UNALLOCATED
 	static char nullstring[] = "unallocated";
 #endif
@@ -59,8 +64,15 @@ static int parse_redboot_partitions(struct mtd_info *master,
 	if (!buf)
 		return -ENOMEM;
 
-	/* Read the start of the last erase block */
-	ret = master->read(master, master->size - master->erasesize,
+	if ( directory < 0 )
+		offset = master->size + directory*master->erasesize;
+	else
+		offset = directory*master->erasesize;
+
+	printk(KERN_NOTICE "Searching for RedBoot partition table in %s at offset 0x%lx\n",
+	       master->name, offset);
+
+	ret = master->read(master, offset,
 			   master->erasesize, &retlen, (void *)buf);
 
 	if (ret)
@@ -71,12 +83,16 @@ static int parse_redboot_partitions(struct mtd_info *master,
 		goto out;
 	}
 
-	/* RedBoot image could appear in any of the first three slots */
-	for (i = 0; i < 3; i++) {
-		if (!memcmp(buf[i].name, "RedBoot", 8))
+	numslots = (master->erasesize / sizeof(struct fis_image_desc));
+	for (i = 0; i < numslots; i++) {
+		if (buf[i].name[0] == 0xff) {
+			i = numslots;
+			break;
+		}
+		if (!memcmp(buf[i].name, "FIS directory", 14))
 			break;
 	}
-	if (i == 3) {
+	if (i == numslots) {
 		/* Didn't find it */
 		printk(KERN_NOTICE "No RedBoot partition table detected in %s\n",
 		       master->name);
@@ -84,7 +100,7 @@ static int parse_redboot_partitions(struct mtd_info *master,
 		goto out;
 	}
 
-	for (i = 0; i < master->erasesize / sizeof(struct fis_image_desc); i++) {
+	for (i = 0; i < numslots; i++) {
 		struct fis_list *new_fl, **prev;
 
 		if (buf[i].name[0] == 0xff)

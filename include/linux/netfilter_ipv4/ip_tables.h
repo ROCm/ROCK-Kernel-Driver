@@ -53,7 +53,9 @@ struct ipt_entry_match
 			u_int16_t match_size;
 
 			/* Used by userspace */
-			char name[IPT_FUNCTION_MAXNAMELEN];
+			char name[IPT_FUNCTION_MAXNAMELEN-1];
+
+			u_int8_t revision;
 		} user;
 		struct {
 			u_int16_t match_size;
@@ -76,7 +78,9 @@ struct ipt_entry_target
 			u_int16_t target_size;
 
 			/* Used by userspace */
-			char name[IPT_FUNCTION_MAXNAMELEN];
+			char name[IPT_FUNCTION_MAXNAMELEN-1];
+
+			u_int8_t revision;
 		} user;
 		struct {
 			u_int16_t target_size;
@@ -152,9 +156,11 @@ struct ipt_entry
 #define IPT_SO_SET_ADD_COUNTERS	(IPT_BASE_CTL + 1)
 #define IPT_SO_SET_MAX		IPT_SO_SET_ADD_COUNTERS
 
-#define IPT_SO_GET_INFO		(IPT_BASE_CTL)
-#define IPT_SO_GET_ENTRIES	(IPT_BASE_CTL + 1)
-#define IPT_SO_GET_MAX		IPT_SO_GET_ENTRIES
+#define IPT_SO_GET_INFO			(IPT_BASE_CTL)
+#define IPT_SO_GET_ENTRIES		(IPT_BASE_CTL + 1)
+#define IPT_SO_GET_REVISION_MATCH	(IPT_BASE_CTL + 2)
+#define IPT_SO_GET_REVISION_TARGET	(IPT_BASE_CTL + 3)
+#define IPT_SO_GET_MAX			IPT_SO_GET_REVISION_TARGET
 
 /* CONTINUE verdict for targets */
 #define IPT_CONTINUE 0xFFFFFFFF
@@ -284,6 +290,15 @@ struct ipt_get_entries
 	struct ipt_entry entrytable[0];
 };
 
+/* The argument to IPT_SO_GET_REVISION_*.  Returns highest revision
+ * kernel supports, if >= revision. */
+struct ipt_get_revision
+{
+	char name[IPT_FUNCTION_MAXNAMELEN-1];
+
+	u_int8_t revision;
+};
+
 /* Standard return verdict, or do jump. */
 #define IPT_STANDARD_TARGET ""
 /* Error verdict. */
@@ -344,7 +359,9 @@ struct ipt_match
 {
 	struct list_head list;
 
-	const char name[IPT_FUNCTION_MAXNAMELEN];
+	const char name[IPT_FUNCTION_MAXNAMELEN-1];
+
+	u_int8_t revision;
 
 	/* Return true or false: return FALSE and set *hotdrop = 1 to
            force immediate packet drop. */
@@ -378,7 +395,9 @@ struct ipt_target
 {
 	struct list_head list;
 
-	const char name[IPT_FUNCTION_MAXNAMELEN];
+	const char name[IPT_FUNCTION_MAXNAMELEN-1];
+
+	u_int8_t revision;
 
 	/* Called when user tries to insert an entry of this type:
            hook_mask is a bitmask of hooks from which it can be
@@ -412,10 +431,6 @@ extern void ipt_unregister_target(struct ipt_target *target);
 
 extern int ipt_register_match(struct ipt_match *match);
 extern void ipt_unregister_match(struct ipt_match *match);
-
-extern struct ipt_target *
-__ipt_find_target_lock(const char *name, int *error);
-extern void __ipt_mutex_up(void);
 
 /* Furniture shopping... */
 struct ipt_table

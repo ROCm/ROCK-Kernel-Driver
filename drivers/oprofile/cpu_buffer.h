@@ -37,9 +37,11 @@ struct oprofile_cpu_buffer {
 	unsigned long buffer_size;
 	struct task_struct * last_task;
 	int last_is_kernel;
+	int tracing;
 	struct op_sample * buffer;
 	unsigned long sample_received;
 	unsigned long sample_lost_overflow;
+	unsigned long backtrace_aborted;
 	int cpu;
 	struct work_struct work;
 } ____cacheline_aligned;
@@ -47,5 +49,9 @@ struct oprofile_cpu_buffer {
 extern struct oprofile_cpu_buffer cpu_buffer[];
 
 void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf);
+
+/* transient events for the CPU buffer -> event buffer */
+#define CPU_IS_KERNEL 1
+#define CPU_TRACE_BEGIN 2
 
 #endif /* OPROFILE_CPU_BUFFER_H */

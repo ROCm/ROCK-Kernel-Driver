@@ -225,6 +225,7 @@ static void hugetlbfs_delete_inode(struct inode *inode)
 
 	hlist_del_init(&inode->i_hash);
 	list_del_init(&inode->i_list);
+	list_del_init(&inode->i_sb_list);
 	inode->i_state |= I_FREEING;
 	inodes_stat.nr_inodes--;
 	spin_unlock(&inode_lock);
@@ -267,6 +268,7 @@ static void hugetlbfs_forget_inode(struct inode *inode)
 	hlist_del_init(&inode->i_hash);
 out_truncate:
 	list_del_init(&inode->i_list);
+	list_del_init(&inode->i_sb_list);
 	inode->i_state |= I_FREEING;
 	inodes_stat.nr_inodes--;
 	spin_unlock(&inode_lock);
@@ -670,6 +672,7 @@ hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_blocksize_bits = HPAGE_SHIFT;
 	sb->s_magic = HUGETLBFS_MAGIC;
 	sb->s_op = &hugetlbfs_ops;
+	sb->s_time_gran = 1;
 	inode = hugetlbfs_get_inode(sb, config.uid, config.gid,
 					S_IFDIR | config.mode, 0);
 	if (!inode)

@@ -343,8 +343,6 @@ smp_callin (void)
 int __devinit
 start_secondary (void *unused)
 {
-	extern int cpu_idle (void);
-
 	/* Early console may use I/O ports */
 	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
 
@@ -353,7 +351,8 @@ start_secondary (void *unused)
 	cpu_init();
 	smp_callin();
 
-	return cpu_idle();
+	cpu_idle();
+	return 0;
 }
 
 struct pt_regs * __devinit idle_regs(struct pt_regs *regs)

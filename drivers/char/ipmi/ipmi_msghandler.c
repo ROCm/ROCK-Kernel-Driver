@@ -49,7 +49,7 @@
 #define PFX "IPMI message handler: "
 #define IPMI_MSGHANDLER_VERSION "v33"
 
-struct ipmi_recv_msg *ipmi_alloc_recv_msg(void);
+static struct ipmi_recv_msg *ipmi_alloc_recv_msg(void);
 static int ipmi_init_msghandler(void);
 
 static int initialized = 0;
@@ -294,44 +294,6 @@ struct ipmi_smi
 	unsigned int events;
 };
 
-int
-ipmi_register_all_cmd_rcvr(ipmi_user_t user)
-{
-	unsigned long flags;
-	int           rv = -EBUSY;
-
-	write_lock_irqsave(&(user->intf->users_lock), flags);
-	write_lock(&(user->intf->cmd_rcvr_lock));
-	if ((user->intf->all_cmd_rcvr == NULL)
-	    && (list_empty(&(user->intf->cmd_rcvrs))))
-	{
-		user->intf->all_cmd_rcvr = user;
-		rv = 0;
-	}
-	write_unlock(&(user->intf->cmd_rcvr_lock));
-	write_unlock_irqrestore(&(user->intf->users_lock), flags);
-	return rv;
-}
-
-int
-ipmi_unregister_all_cmd_rcvr(ipmi_user_t user)
-{
-	unsigned long flags;
-	int           rv = -EINVAL;
-
-	write_lock_irqsave(&(user->intf->users_lock), flags);
-	write_lock(&(user->intf->cmd_rcvr_lock));
-	if (user->intf->all_cmd_rcvr == user)
-	{
-		user->intf->all_cmd_rcvr = NULL;
-		rv = 0;
-	}
-	write_unlock(&(user->intf->cmd_rcvr_lock));
-	write_unlock_irqrestore(&(user->intf->users_lock), flags);
-	return rv;
-}
-
-
 #define MAX_IPMI_INTERFACES 4
 static ipmi_smi_t ipmi_interfaces[MAX_IPMI_INTERFACES];
 
@@ -389,7 +351,7 @@ call_smi_watchers(int i)
 	up_read(&smi_watchers_sem);
 }
 
-int
+static int
 ipmi_addr_equal(struct ipmi_addr *addr1, struct ipmi_addr *addr2)
 {
 	if (addr1->addr_type != addr2->addr_type)
@@ -1360,26 +1322,6 @@ static inline int i_ipmi_request(ipmi_user_t          user,
 	return rv;
 }
 
-int ipmi_request(ipmi_user_t      user,
-		 struct ipmi_addr *addr,
-		 long             msgid,
-		 struct kernel_ipmi_msg  *msg,
-		 void             *user_msg_data,
-		 int              priority)
-{
-	return i_ipmi_request(user,
-			      user->intf,
-			      addr,
-			      msgid,
-			      msg,
-			      user_msg_data,
-			      NULL, NULL,
-			      priority,
-			      user->intf->my_address,
-			      user->intf->my_lun,
-			      -1, 0);
-}
-
 int ipmi_request_settime(ipmi_user_t      user,
 			 struct ipmi_addr *addr,
 			 long             msgid,
@@ -1423,28 +1365,6 @@ int ipmi_request_supply_msgs(ipmi_user_t          user,
 			      priority,
 			      user->intf->my_address,
 			      user->intf->my_lun,
-			      -1, 0);
-}
-
-int ipmi_request_with_source(ipmi_user_t      user,
-			     struct ipmi_addr *addr,
-			     long             msgid,
-			     struct kernel_ipmi_msg  *msg,
-			     void             *user_msg_data,
-			     int              priority,
-			     unsigned char    source_address,
-			     unsigned char    source_lun)
-{
-	return i_ipmi_request(user,
-			      user->intf,
-			      addr,
-			      msgid,
-			      msg,
-			      user_msg_data,
-			      NULL, NULL,
-			      priority,
-			      source_address,
-			      source_lun,
 			      -1, 0);
 }
 
@@ -1700,14 +1620,6 @@ channel_handler(ipmi_smi_t intf, struct ipmi_smi_msg *msg)
 	}
  out:
 	return;
-}
-
-void ipmi_poll_interface(ipmi_user_t user)
-{
-	ipmi_smi_t intf = user->intf;
-
-	if (intf->handlers->poll)
-		intf->handlers->poll(intf->send_info);
 }
 
 int ipmi_register_smi(struct ipmi_smi_handlers *handlers,
@@ -3211,15 +3123,11 @@ module_exit(cleanup_ipmi);
 module_init(ipmi_init_msghandler_mod);
 MODULE_LICENSE("GPL");
 
-EXPORT_SYMBOL(ipmi_alloc_recv_msg);
 EXPORT_SYMBOL(ipmi_create_user);
 EXPORT_SYMBOL(ipmi_destroy_user);
 EXPORT_SYMBOL(ipmi_get_version);
-EXPORT_SYMBOL(ipmi_request);
 EXPORT_SYMBOL(ipmi_request_settime);
 EXPORT_SYMBOL(ipmi_request_supply_msgs);
-EXPORT_SYMBOL(ipmi_request_with_source);
-EXPORT_SYMBOL(ipmi_poll_interface);
 EXPORT_SYMBOL(ipmi_register_smi);
 EXPORT_SYMBOL(ipmi_unregister_smi);
 EXPORT_SYMBOL(ipmi_register_for_cmd);
@@ -3227,12 +3135,9 @@ EXPORT_SYMBOL(ipmi_unregister_for_cmd);
 EXPORT_SYMBOL(ipmi_smi_msg_received);
 EXPORT_SYMBOL(ipmi_smi_watchdog_pretimeout);
 EXPORT_SYMBOL(ipmi_alloc_smi_msg);
-EXPORT_SYMBOL(ipmi_register_all_cmd_rcvr);
-EXPORT_SYMBOL(ipmi_unregister_all_cmd_rcvr);
 EXPORT_SYMBOL(ipmi_addr_length);
 EXPORT_SYMBOL(ipmi_validate_addr);
 EXPORT_SYMBOL(ipmi_set_gets_events);
-EXPORT_SYMBOL(ipmi_addr_equal);
 EXPORT_SYMBOL(ipmi_smi_watcher_register);
 EXPORT_SYMBOL(ipmi_smi_watcher_unregister);
 EXPORT_SYMBOL(ipmi_set_my_address);

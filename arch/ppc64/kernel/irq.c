@@ -65,6 +65,7 @@ extern irq_desc_t irq_desc[NR_IRQS];
 int __irq_offset_value;
 int ppc_spurious_interrupts;
 unsigned long lpevent_count;
+u64 ppc64_interrupt_controller;
 
 int show_interrupts(struct seq_file *p, void *v)
 {
@@ -258,8 +259,8 @@ void do_IRQ(struct pt_regs *regs)
 
 	lpaca = get_paca();
 #ifdef CONFIG_SMP
-	if (lpaca->lppaca.xIntDword.xFields.xIpiCnt) {
-		lpaca->lppaca.xIntDword.xFields.xIpiCnt = 0;
+	if (lpaca->lppaca.int_dword.fields.ipi_cnt) {
+		lpaca->lppaca.int_dword.fields.ipi_cnt = 0;
 		iSeries_smp_message_recv(regs);
 	}
 #endif /* CONFIG_SMP */
@@ -269,8 +270,8 @@ void do_IRQ(struct pt_regs *regs)
 
 	irq_exit();
 
-	if (lpaca->lppaca.xIntDword.xFields.xDecrInt) {
-		lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;
+	if (lpaca->lppaca.int_dword.fields.decr_int) {
+		lpaca->lppaca.int_dword.fields.decr_int = 0;
 		/* Signal a fake decrementer interrupt */
 		timer_interrupt(regs);
 	}
@@ -360,7 +361,7 @@ int virt_irq_create_mapping(unsigned int real_irq)
 	unsigned int virq, first_virq;
 	static int warned;
 
-	if (naca->interrupt_controller == IC_OPEN_PIC)
+	if (ppc64_interrupt_controller == IC_OPEN_PIC)
 		return real_irq;	/* no mapping for openpic (for now) */
 
 	/* don't map interrupts < MIN_VIRT_IRQ */

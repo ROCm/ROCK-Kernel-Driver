@@ -57,14 +57,13 @@ void default_idle(void)
 /*
  * The body of the idle task.
  */
-int cpu_idle(void)
+void cpu_idle(void)
 {
 	for (;;)
 		if (ppc_md.idle != NULL)
 			ppc_md.idle();
 		else
 			default_idle();
-	return 0;
 }
 
 #if defined(CONFIG_SYSCTL) && defined(CONFIG_6xx)

@@ -14,9 +14,6 @@ extern int tracing_pid;
 
 extern int tracer(int (*init_proc)(void *), void *sp);
 extern void user_time_init_tt(void);
-extern int copy_sc_from_user_tt(void *to_ptr, void *from_ptr, void *data);
-extern int copy_sc_to_user_tt(void *to_ptr, void *fp, void *from_ptr,
-			      void *data);
 extern void sig_handler_common_tt(int sig, void *sc);
 extern void syscall_handler_tt(int sig, union uml_pt_regs *regs);
 extern void reboot_tt(void);

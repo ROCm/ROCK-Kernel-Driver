@@ -32,6 +32,7 @@
 #include <asm/iSeries/HvCall.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/plpar_wrappers.h>
+#include <asm/systemcfg.h>
 
 extern void power4_idle(void);
 
@@ -66,7 +67,7 @@ static void yield_shared_processor(void)
 	 * The decrementer stops during the yield.  Force a fake decrementer
 	 * here and let the timer_interrupt code sort out the actual time.
 	 */
-	get_paca()->lppaca.xIntDword.xFields.xDecrInt = 1;
+	get_paca()->lppaca.int_dword.fields.decr_int = 1;
 	process_iSeries_events();
 }
 
@@ -85,7 +86,7 @@ static int iSeries_idle(void)
 	lpaca = get_paca();
 
 	while (1) {
-		if (lpaca->lppaca.xSharedProc) {
+		if (lpaca->lppaca.shared_proc) {
 			if (ItLpQueue_isLpIntPending(lpaca->lpqueue_ptr))
 				process_iSeries_events();
 			if (!need_resched())
@@ -172,7 +173,7 @@ int dedicated_idle(void)
 		 * Indicate to the HV that we are idle. Now would be
 		 * a good time to find other work to dispatch.
 		 */
-		lpaca->lppaca.xIdle = 1;
+		lpaca->lppaca.idle = 1;
 
 		oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
 		if (!oldval) {
@@ -193,7 +194,7 @@ int dedicated_idle(void)
 
 				HMT_medium();
 
-				if (!(ppaca->lppaca.xIdle)) {
+				if (!(ppaca->lppaca.idle)) {
 					local_irq_disable();
 
 					/*
@@ -232,7 +233,7 @@ int dedicated_idle(void)
 		}
 
 		HMT_medium();
-		lpaca->lppaca.xIdle = 0;
+		lpaca->lppaca.idle = 0;
 		schedule();
 		if (cpu_is_offline(cpu) && system_state == SYSTEM_RUNNING)
 			cpu_die();
@@ -250,7 +251,7 @@ static int shared_idle(void)
 		 * Indicate to the HV that we are idle. Now would be
 		 * a good time to find other work to dispatch.
 		 */
-		lpaca->lppaca.xIdle = 1;
+		lpaca->lppaca.idle = 1;
 
 		while (!need_resched() && !cpu_is_offline(cpu)) {
 			local_irq_disable();
@@ -272,7 +273,7 @@ static int shared_idle(void)
 		}
 
 		HMT_medium();
-		lpaca->lppaca.xIdle = 0;
+		lpaca->lppaca.idle = 0;
 		schedule();
 		if (cpu_is_offline(smp_processor_id()) &&
 		    system_state == SYSTEM_RUNNING)
@@ -298,10 +299,9 @@ static int native_idle(void)
 
 #endif /* CONFIG_PPC_ISERIES */
 
-int cpu_idle(void)
+void cpu_idle(void)
 {
 	idle_loop();
-	return 0;
 }
 
 int powersave_nap;
@@ -351,7 +351,7 @@ int idle_setup(void)
 #ifdef CONFIG_PPC_PSERIES
 	if (systemcfg->platform & PLATFORM_PSERIES) {
 		if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-			if (get_paca()->lppaca.xSharedProc) {
+			if (get_paca()->lppaca.shared_proc) {
 				printk(KERN_INFO "Using shared processor idle loop\n");
 				idle_loop = shared_idle;
 			} else {

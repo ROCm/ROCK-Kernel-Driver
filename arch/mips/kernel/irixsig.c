@@ -583,7 +583,7 @@ asmlinkage int irix_waitsys(int type, int pid, struct irix5_siginfo *info,
 		retval = -EINVAL;
 		goto out;
 	}
-	add_wait_queue(&current->wait_chldexit, &wait);
+	add_wait_queue(&current->signal->wait_chldexit, &wait);
 repeat:
 	flag = 0;
 	current->state = TASK_INTERRUPTIBLE;
@@ -672,7 +672,7 @@ repeat:
 	retval = -ECHILD;
 end_waitsys:
 	current->state = TASK_RUNNING;
-	remove_wait_queue(&current->wait_chldexit, &wait);
+	remove_wait_queue(&current->signal->wait_chldexit, &wait);
 
 out:
 	return retval;

@@ -67,11 +67,7 @@ EXPORT_SYMBOL(strncmp);
 
 EXPORT_SYMBOL(__down_interruptible);
 EXPORT_SYMBOL(__up);
-EXPORT_SYMBOL(naca);
 EXPORT_SYMBOL(__down);
-#ifdef CONFIG_PPC_ISERIES
-EXPORT_SYMBOL(itLpNaca);
-#endif
 
 EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(csum_partial_copy_generic);
@@ -162,4 +158,3 @@ EXPORT_SYMBOL(console_drivers);
 EXPORT_SYMBOL(tb_ticks_per_usec);
 EXPORT_SYMBOL(paca);
 EXPORT_SYMBOL(cur_cpu_spec);
-EXPORT_SYMBOL(systemcfg);

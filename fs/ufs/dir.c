@@ -462,7 +462,7 @@ int ufs_add_link(struct dentry *dentry, struct inode *inode)
 	if (IS_DIRSYNC(dir))
 		sync_dirty_buffer(bh);
 	brelse (bh);
-	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
 	dir->i_version++;
 	mark_inode_dirty(dir);
 
@@ -505,7 +505,7 @@ int ufs_delete_entry (struct inode * inode, struct ufs_dir_entry * dir,
 					fs16_to_cpu(sb, dir->d_reclen));
 			dir->d_ino = 0;
 			inode->i_version++;
-			inode->i_ctime = inode->i_mtime = CURRENT_TIME;
+			inode->i_ctime = inode->i_mtime = CURRENT_TIME_SEC;
 			mark_inode_dirty(inode);
 			mark_buffer_dirty(bh);
 			if (IS_DIRSYNC(inode))

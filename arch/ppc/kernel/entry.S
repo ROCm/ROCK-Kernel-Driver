@@ -111,8 +111,10 @@ transfer_to_handler:
 	addi	r11,r1,STACK_FRAME_OVERHEAD
 	stw	r11,PT_REGS(r12)
 #if defined(CONFIG_40x) || defined(CONFIG_BOOKE)
-	lwz	r12,PTRACE-THREAD(r12)
-	andi.	r12,r12,PT_PTRACED
+	/* Check to see if the dbcr0 register is set up to debug.  Use the
+	   single-step bit to do this. */
+	lwz	r12,THREAD_DBCR0(r12)
+	andis.	r12,r12,DBCR0_IC@h
 	beq+	3f
 	/* From user and task is ptraced - load up global dbcr0 */
 	li	r12,-1			/* clear all pending debug events */
@@ -242,9 +244,10 @@ ret_from_syscall:
 	bne-	syscall_exit_work
 syscall_exit_cont:
 #if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
-	/* If the process has its own DBCR0 value, load it up */
-	lwz	r0,PTRACE(r2)
-	andi.	r0,r0,PT_PTRACED
+	/* If the process has its own DBCR0 value, load it up.  The single
+	   step bit tells us that dbcr0 should be loaded. */
+	lwz	r0,THREAD+THREAD_DBCR0(r2)
+	andis.	r10,r0,DBCR0_IC@h
 	bnel-	load_dbcr0
 #endif
 	stwcx.	r0,0,r1			/* to clear the reservation */
@@ -599,9 +602,10 @@ user_exc_return:		/* r10 contains MSR_KERNEL here */
 
 restore_user:
 #if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
-	/* Check whether this process has its own DBCR0 value */
-	lwz	r0,PTRACE(r2)
-	andi.	r0,r0,PT_PTRACED
+	/* Check whether this process has its own DBCR0 value.  The single
+	   step bit tells us that dbcr0 should be loaded. */
+	lwz	r0,THREAD+THREAD_DBCR0(r2)
+	andis.	r10,r0,DBCR0_IC@h
 	bnel-	load_dbcr0
 #endif
 
@@ -876,17 +880,17 @@ ret_from_mcheck_exc:
 
 /*
  * Load the DBCR0 value for a task that is being ptraced,
- * having first saved away the global DBCR0.
+ * having first saved away the global DBCR0.  Note that r0
+ * has the dbcr0 value to set upon entry to this.
  */
 load_dbcr0:
-	mfmsr	r0		/* first disable debug exceptions */
-	rlwinm	r0,r0,0,~MSR_DE
-	mtmsr	r0
+	mfmsr	r10		/* first disable debug exceptions */
+	rlwinm	r10,r10,0,~MSR_DE
+	mtmsr	r10
 	isync
 	mfspr	r10,SPRN_DBCR0
 	lis	r11,global_dbcr0@ha
 	addi	r11,r11,global_dbcr0@l
-	lwz	r0,THREAD+THREAD_DBCR0(r2)
 	stw	r10,0(r11)
 	mtspr	SPRN_DBCR0,r0
 	lwz	r10,4(r11)

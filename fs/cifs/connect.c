@@ -1489,6 +1489,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			sb->s_maxbytes = (u64) 1 << 31;	/* 2 GB */
 	}
 
+	sb->s_time_gran = 100;
+
 /* on error free sesinfo and tcon struct if needed */
 	if (rc) {
 		/* if session setup failed, use count is zero but

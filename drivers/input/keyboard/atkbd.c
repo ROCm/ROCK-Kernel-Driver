@@ -756,6 +756,10 @@ static void atkbd_set_device_attrs(struct atkbd *atkbd)
 		set_bit(BTN_MIDDLE, atkbd->dev.keybit);
 	}
 
+	atkbd->dev.keycode = atkbd->keycode;
+	atkbd->dev.keycodesize = sizeof(unsigned char);
+	atkbd->dev.keycodemax = ARRAY_SIZE(atkbd_set2_keycode);
+
 	for (i = 0; i < 512; i++)
 		if (atkbd->keycode[i] && atkbd->keycode[i] < ATKBD_SPECIAL)
 			set_bit(atkbd->keycode[i], atkbd->dev.keybit);
@@ -803,10 +807,6 @@ static void atkbd_connect(struct serio *serio, struct serio_driver *drv)
 
 	if (atkbd->softrepeat)
 		atkbd->softraw = 1;
-
-	atkbd->dev.keycode = atkbd->keycode;
-	atkbd->dev.keycodesize = sizeof(unsigned char);
-	atkbd->dev.keycodemax = ARRAY_SIZE(atkbd_set2_keycode);
 
 	serio->private = atkbd;
 

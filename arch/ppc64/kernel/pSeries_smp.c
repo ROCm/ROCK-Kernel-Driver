@@ -38,7 +38,6 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/time.h>
 #include <asm/ppcdebug.h>
@@ -348,7 +347,7 @@ void __init smp_init_pSeries(void)
 
 	DBG(" -> smp_init_pSeries()\n");
 
-	if (naca->interrupt_controller == IC_OPEN_PIC)
+	if (ppc64_interrupt_controller == IC_OPEN_PIC)
 		smp_ops = &pSeries_mpic_smp_ops;
 	else
 		smp_ops = &pSeries_xics_smp_ops;

@@ -469,7 +469,7 @@ void ufs_truncate (struct inode * inode)
 			brelse (bh);
 		}
 	}
-	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
 	ufsi->i_lastfrag = DIRECT_FRAGMENT;
 	unlock_kernel();
 	mark_inode_dirty(inode);

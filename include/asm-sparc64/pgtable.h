@@ -315,7 +315,7 @@ static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 /* Find an entry in the second-level page table.. */
 #define pmd_offset(dir, address)	\
 	((pmd_t *) pgd_page(*(dir)) + \
-	 ((address >> PMD_SHIFT) & (REAL_PTRS_PER_PMD-1)))
+	 (((address) >> PMD_SHIFT) & (REAL_PTRS_PER_PMD-1)))
 
 /* Find an entry in the third-level page table.. */
 #define pte_index(dir, address)	\

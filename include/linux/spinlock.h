@@ -468,6 +468,20 @@ do { \
 
 #define spin_trylock_bh(lock)			__cond_lock(_spin_trylock_bh(lock))
 
+#define spin_trylock_irq(lock) \
+({ \
+	local_irq_disable(); \
+	_spin_trylock(lock) ? \
+	1 : ({local_irq_enable(); 0; }); \
+})
+
+#define spin_trylock_irqsave(lock, flags) \
+({ \
+	local_irq_save(flags); \
+	_spin_trylock(lock) ? \
+	1 : ({local_irq_restore(flags); 0;}); \
+})
+
 #ifdef CONFIG_LOCKMETER
 extern void _metered_spin_lock   (spinlock_t *lock);
 extern void _metered_spin_unlock (spinlock_t *lock);

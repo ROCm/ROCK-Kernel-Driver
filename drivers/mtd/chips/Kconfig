@@ -1,5 +1,5 @@
 # drivers/mtd/chips/Kconfig
-# $Id: Kconfig,v 1.9 2004/07/16 15:32:14 dwmw2 Exp $
+# $Id: Kconfig,v 1.13 2004/12/01 15:49:10 nico Exp $
 
 menu "RAM/ROM/Flash chip drivers"
 	depends on MTD!=n
@@ -7,6 +7,7 @@ menu "RAM/ROM/Flash chip drivers"
 config MTD_CFI
 	tristate "Detect flash chips by Common Flash Interface (CFI) probe"
 	depends on MTD
+	select MTD_GEN_PROBE
 	help
 	  The Common Flash Interface specification was developed by Intel,
 	  AMD and other flash manufactures that provides a universal method
@@ -18,6 +19,7 @@ config MTD_CFI
 config MTD_JEDECPROBE
 	tristate "Detect non-CFI AMD/JEDEC-compatible flash chips"
 	depends on MTD
+	select MTD_GEN_PROBE
 	help
 	  This option enables JEDEC-style probing of flash chips which are not
 	  compatible with the Common Flash Interface, but will use the common
@@ -29,8 +31,6 @@ config MTD_JEDECPROBE
 
 config MTD_GEN_PROBE
 	tristate
-	default m if MTD_CFI!=y && !MTD_INTELPROBE && MTD_JEDECPROBE!=y && (MTD_CFI=m || MTD_JEDECPROBE=m)
-	default y if MTD_CFI=y || MTD_INTELPROBE || MTD_JEDECPROBE=y
 
 config MTD_CFI_ADV_OPTIONS
 	bool "Flash chip driver advanced configuration options"
@@ -158,6 +158,7 @@ config MTD_CFI_I8
 config MTD_CFI_INTELEXT
 	tristate "Support for Intel/Sharp flash chips"
 	depends on MTD_GEN_PROBE
+	select MTD_CFI_UTIL
 	help
 	  The Common Flash Interface defines a number of different command
 	  sets which a CFI-compliant chip may claim to implement. This code
@@ -167,6 +168,7 @@ config MTD_CFI_INTELEXT
 config MTD_CFI_AMDSTD
 	tristate "Support for AMD/Fujitsu flash chips"
 	depends on MTD_GEN_PROBE
+	select MTD_CFI_UTIL
 	help
 	  The Common Flash Interface defines a number of different command
 	  sets which a CFI-compliant chip may claim to implement. This code
@@ -197,6 +199,7 @@ config MTD_CFI_AMDSTD_RETRY_MAX
 config MTD_CFI_STAA
 	tristate "Support for ST (Advanced Architecture) flash chips"
 	depends on MTD_GEN_PROBE
+	select MTD_CFI_UTIL
 	help
 	  The Common Flash Interface defines a number of different command
 	  sets which a CFI-compliant chip may claim to implement. This code
@@ -204,8 +207,6 @@ config MTD_CFI_STAA
 
 config MTD_CFI_UTIL
 	tristate
-	default y if MTD_CFI_INTELEXT=y || MTD_CFI_AMDSTD=y || MTD_CFI_STAA=y
-	default m if MTD_CFI_INTELEXT=m || MTD_CFI_AMDSTD=m || MTD_CFI_STAA=m
 
 config MTD_RAM
 	tristate "Support for RAM chips in bus mapping"
@@ -271,6 +272,15 @@ config MTD_JEDEC
 	  only called JEDEC because the JEDEC association
 	  <http://www.jedec.org/> distributes the identification codes for the
 	  chips.
+
+config MTD_XIP
+	bool "XIP aware MTD support"
+	depends on !SMP && MTD_CFI_INTELEXT && EXPERIMENTAL
+	default y if XIP_KERNEL
+	help
+	  This allows MTD support to work with flash memory which is also
+	  used for XIP purposes.  If you're not sure what this is all about
+	  then say N.
 
 endmenu
 

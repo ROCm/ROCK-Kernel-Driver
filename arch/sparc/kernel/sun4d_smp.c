@@ -122,8 +122,7 @@ void __init smp4d_callin(void)
 		
 	/* Fix idle thread fields. */
 	__asm__ __volatile__("ld [%0], %%g6\n\t"
-			     "sta %%g6, [%%g0] %1\n\t"
-			     : : "r" (&current_set[cpuid]), "i" (ASI_M_VIKING_TMP2)
+			     : : "r" (&current_set[cpuid])
 			     : "memory" /* paranoid */);
 
 	cpu_leds[cpuid] = 0x9;
@@ -146,7 +145,6 @@ void __init smp4d_callin(void)
 	spin_unlock_irqrestore(&sun4d_imsk_lock, flags);
 }
 
-extern int cpu_idle(void *unused);
 extern void init_IRQ(void);
 extern void cpu_panic(void);
 
@@ -460,25 +458,18 @@ void __init smp4d_blackbox_id(unsigned *addr)
 
 void __init smp4d_blackbox_current(unsigned *addr)
 {
-	/* We have a nice Linux current register :) */
-	int rd = addr[1] & 0x3e000000;
+	int rd = *addr & 0x3e000000;
 	
-	addr[0] = 0x10800006;			/* b .+24 */
-	addr[1] = 0xc0800820 | rd;		/* lda [%g0] ASI_M_VIKING_TMP2, reg */
+	addr[0] = 0xc0800800 | rd;		/* lda [%g0] ASI_M_VIKING_TMP1, reg */
+	addr[2] = 0x81282002 | rd | (rd >> 11);	/* sll reg, 2, reg */
+	addr[4] = 0x01000000;			/* nop */
 }
 
 void __init sun4d_init_smp(void)
 {
 	int i;
-	extern unsigned int patchme_store_new_current[];
 	extern unsigned int t_nmi[], linux_trap_ipi15_sun4d[], linux_trap_ipi15_sun4m[];
 
-	/* Store current into Linux current register :) */
-	__asm__ __volatile__("sta %%g6, [%%g0] %0" : : "i"(ASI_M_VIKING_TMP2));
-	
-	/* Patch switch_to */
-	patchme_store_new_current[0] = (patchme_store_new_current[0] & 0x3e000000) | 0xc0a00820;
-	
 	/* Patch ipi15 trap table */
 	t_nmi[1] = t_nmi[1] + (linux_trap_ipi15_sun4d - linux_trap_ipi15_sun4m);
 	

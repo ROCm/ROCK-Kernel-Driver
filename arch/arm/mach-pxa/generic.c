@@ -92,7 +92,7 @@ EXPORT_SYMBOL(pxa_set_cken);
  */
 static struct map_desc standard_io_desc[] __initdata = {
  /* virtual     physical    length      type */
-  { 0xf2000000, 0x40000000, 0x01800000, MT_DEVICE }, /* Devs */
+  { 0xf2000000, 0x40000000, 0x02000000, MT_DEVICE }, /* Devs */
   { 0xf4000000, 0x44000000, 0x00100000, MT_DEVICE }, /* LCD */
   { 0xf6000000, 0x48000000, 0x00100000, MT_DEVICE }, /* Mem Ctl */
   { 0xf8000000, 0x4c000000, 0x00100000, MT_DEVICE }, /* USB host */

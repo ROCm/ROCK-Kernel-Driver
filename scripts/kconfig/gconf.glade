@@ -310,13 +310,13 @@
 	      <property name="tooltips">True</property>
 
 	      <child>
-		<widget class="button" id="button1">
+		<widget class="GtkToolButton" id="button1">
 		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">Goes up of one level (single view)</property>
 		  <property name="label" translatable="yes">Back</property>
 		  <property name="use_underline">True</property>
-		  <property name="stock_pixmap">gtk-undo</property>
-		  <signal name="pressed" handler="on_back_pressed"/>
+		  <property name="stock-id">gtk-undo</property>
+		  <signal name="clicked" handler="on_back_pressed"/>
 		</widget>
 	      </child>
 
@@ -327,24 +327,24 @@
 	      </child>
 
 	      <child>
-		<widget class="button" id="button2">
+		<widget class="GtkToolButton" id="button2">
 		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">Load a config file</property>
 		  <property name="label" translatable="yes">Load</property>
 		  <property name="use_underline">True</property>
-		  <property name="stock_pixmap">gtk-open</property>
-		  <signal name="pressed" handler="on_load_pressed"/>
+		  <property name="stock-id">gtk-open</property>
+		  <signal name="clicked" handler="on_load_pressed"/>
 		</widget>
 	      </child>
 
 	      <child>
-		<widget class="button" id="button3">
+		<widget class="GtkToolButton" id="button3">
 		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">Save a config file</property>
 		  <property name="label" translatable="yes">Save</property>
 		  <property name="use_underline">True</property>
-		  <property name="stock_pixmap">gtk-save</property>
-		  <signal name="pressed" handler="on_save_pressed"/>
+		  <property name="stock-id">gtk-save</property>
+		  <signal name="clicked" handler="on_save_pressed"/>
 		</widget>
 	      </child>
 
@@ -355,34 +355,34 @@
 	      </child>
 
 	      <child>
-		<widget class="button" id="button4">
+		<widget class="GtkToolButton" id="button4">
 		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">Single view</property>
 		  <property name="label" translatable="yes">Single</property>
 		  <property name="use_underline">True</property>
-		  <property name="stock_pixmap">gtk-missing-image</property>
+		  <property name="stock-id">gtk-indent</property>
 		  <signal name="clicked" handler="on_single_clicked" last_modification_time="Sun, 12 Jan 2003 14:28:39 GMT"/>
 		</widget>
 	      </child>
 
 	      <child>
-		<widget class="button" id="button5">
+		<widget class="GtkToolButton" id="button5">
 		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">Split view</property>
 		  <property name="label" translatable="yes">Split</property>
 		  <property name="use_underline">True</property>
-		  <property name="stock_pixmap">gtk-missing-image</property>
+		  <property name="stock-id">gtk-copy</property>
 		  <signal name="clicked" handler="on_split_clicked" last_modification_time="Sun, 12 Jan 2003 14:28:45 GMT"/>
 		</widget>
 	      </child>
 
 	      <child>
-		<widget class="button" id="button6">
+		<widget class="GtkToolButton" id="button6">
 		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">Full view</property>
 		  <property name="label" translatable="yes">Full</property>
 		  <property name="use_underline">True</property>
-		  <property name="stock_pixmap">gtk-missing-image</property>
+		  <property name="stock-id">gtk-justify-left</property>
 		  <signal name="clicked" handler="on_full_clicked" last_modification_time="Sun, 12 Jan 2003 14:28:50 GMT"/>
 		</widget>
 	      </child>
@@ -394,22 +394,24 @@
 	      </child>
 
 	      <child>
-		<widget class="button" id="button7">
+		<widget class="GtkToolButton" id="button7">
 		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">Collapse the whole tree in the right frame</property>
 		  <property name="label" translatable="yes">Collapse</property>
 		  <property name="use_underline">True</property>
-		  <signal name="pressed" handler="on_collapse_pressed"/>
+		  <property name="stock-id">gtk-zoom-out</property>
+		  <signal name="clicked" handler="on_collapse_pressed"/>
 		</widget>
 	      </child>
 
 	      <child>
-		<widget class="button" id="button8">
+		<widget class="GtkToolButton" id="button8">
 		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">Expand the whole tree in the right frame</property>
 		  <property name="label" translatable="yes">Expand</property>
 		  <property name="use_underline">True</property>
-		  <signal name="pressed" handler="on_expand_pressed"/>
+		  <property name="stock-id">gtk-zoom-in</property>
+		  <signal name="clicked" handler="on_expand_pressed"/>
 		</widget>
 	      </child>
 	    </widget>

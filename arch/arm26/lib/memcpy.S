@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/memcpy.S
+ *  linux/arch/arm26/lib/memcpy.S
  *
  *  Copyright (C) 1995-1999 Russell King
  *

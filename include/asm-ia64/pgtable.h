@@ -91,7 +91,7 @@
 #define PGDIR_SHIFT		(PAGE_SHIFT + 2*(PAGE_SHIFT-3))
 #define PGDIR_SIZE		(__IA64_UL(1) << PGDIR_SHIFT)
 #define PGDIR_MASK		(~(PGDIR_SIZE-1))
-#define PTRS_PER_PGD		(__IA64_UL(1) << (PAGE_SHIFT-3))
+#define PTRS_PER_PGD		(1UL << (PAGE_SHIFT-3))
 #define USER_PTRS_PER_PGD	(5*PTRS_PER_PGD/8)	/* regions 0-4 are user regions */
 #define FIRST_USER_PGD_NR	0
 
@@ -104,7 +104,7 @@
 #define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT-3))
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
-#define PTRS_PER_PMD	(__IA64_UL(1) << (PAGE_SHIFT-3))
+#define PTRS_PER_PMD	(1UL << (PAGE_SHIFT-3))
 
 /*
  * Definitions for third level:

@@ -4,7 +4,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2000.c,v 1.64 2004/11/16 18:29:01 dwmw2 Exp $
+ * $Id: doc2000.c,v 1.66 2005/01/05 18:05:12 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -527,26 +527,26 @@ static const char im_name[] = "DoC2k_init";
  */
 static void DoC2k_init(struct mtd_info *mtd)
 {
-	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	struct DiskOnChip *old = NULL;
 	int maxchips;
 
 	/* We must avoid being called twice for the same device. */
 
 	if (doc2klist)
-		old = (struct DiskOnChip *) doc2klist->priv;
+		old = doc2klist->priv;
 
 	while (old) {
 		if (DoC2k_is_alias(old, this)) {
 			printk(KERN_NOTICE
 			       "Ignoring DiskOnChip 2000 at 0x%lX - already configured\n",
 			       this->physadr);
-			iounmap((void *) this->virtadr);
+			iounmap(this->virtadr);
 			kfree(mtd);
 			return;
 		}
 		if (old->nextdoc)
-			old = (struct DiskOnChip *) old->nextdoc->priv;
+			old = old->nextdoc->priv;
 		else
 			old = NULL;
 	}
@@ -573,7 +573,7 @@ static void DoC2k_init(struct mtd_info *mtd)
 	default:
 		printk("Unknown ChipID 0x%02x\n", this->ChipID);
 		kfree(mtd);
-		iounmap((void *) this->virtadr);
+		iounmap(this->virtadr);
 		return;
 	}
 
@@ -612,7 +612,7 @@ static void DoC2k_init(struct mtd_info *mtd)
 
 	if (!this->totlen) {
 		kfree(mtd);
-		iounmap((void *) this->virtadr);
+		iounmap(this->virtadr);
 	} else {
 		this->nextdoc = doc2klist;
 		doc2klist = mtd;
@@ -633,7 +633,7 @@ static int doc_read(struct mtd_info *mtd, loff_t from, size_t len,
 static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
 			size_t * retlen, u_char * buf, u_char * eccbuf, struct nand_oobinfo *oobsel)
 {
-	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip;
 	unsigned char syndrome[6];
@@ -790,7 +790,7 @@ static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 			 size_t * retlen, const u_char * buf,
 			 u_char * eccbuf, struct nand_oobinfo *oobsel)
 {
-	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	int di; /* Yes, DI is a hangover from when I was disassembling the binary driver */
 	void __iomem *docptr = this->virtadr;
 	volatile char dummy;
@@ -1033,7 +1033,7 @@ static int doc_writev_ecc(struct mtd_info *mtd, const struct kvec *vecs,
 static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 			size_t * retlen, u_char * buf)
 {
-	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	int len256 = 0, ret;
 	struct Nand *mychip;
 
@@ -1091,7 +1091,7 @@ static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 static int doc_write_oob_nolock(struct mtd_info *mtd, loff_t ofs, size_t len,
 				size_t * retlen, const u_char * buf)
 {
-	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	int len256 = 0;
 	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[ofs >> this->chipshift];
@@ -1194,7 +1194,7 @@ static int doc_write_oob_nolock(struct mtd_info *mtd, loff_t ofs, size_t len,
 static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
  			 size_t * retlen, const u_char * buf)
 {
- 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
+ 	struct DiskOnChip *this = mtd->priv;
  	int ret;
 
  	down(&this->lock);
@@ -1206,7 +1206,7 @@ static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 
 static int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
-	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	__u32 ofs = instr->addr;
 	__u32 len = instr->len;
 	volatile int dummy;
@@ -1288,12 +1288,12 @@ static void __exit cleanup_doc2000(void)
 	struct DiskOnChip *this;
 
 	while ((mtd = doc2klist)) {
-		this = (struct DiskOnChip *) mtd->priv;
+		this = mtd->priv;
 		doc2klist = this->nextdoc;
 
 		del_mtd_device(mtd);
 
-		iounmap((void *) this->virtadr);
+		iounmap(this->virtadr);
 		kfree(this->chips);
 		kfree(mtd);
 	}

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/changebit.S
+ *  linux/arch/arm26/lib/changebit.S
  *
  *  Copyright (C) 1995-1996 Russell King
  *

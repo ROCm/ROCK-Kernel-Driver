@@ -36,7 +36,8 @@
 #undef WARN_OLD
 #undef CORE_DUMP /* probably broken */
 
-extern int ia32_setup_arg_pages(struct linux_binprm *bprm, int exec_stack);
+extern int ia32_setup_arg_pages(struct linux_binprm *bprm,
+				unsigned long stack_top, int exec_stack);
 
 static int load_aout_binary(struct linux_binprm *, struct pt_regs * regs);
 static int load_aout_library(struct file*);
@@ -397,7 +398,7 @@ beyond_if:
 
 	set_brk(current->mm->start_brk, current->mm->brk);
 
-	retval = ia32_setup_arg_pages(bprm, EXSTACK_DEFAULT);
+	retval = ia32_setup_arg_pages(bprm, IA32_STACK_TOP, EXSTACK_DEFAULT);
 	if (retval < 0) { 
 		/* Someone check-me: is this error path enough? */ 
 		send_sig(SIGKILL, current, 0); 

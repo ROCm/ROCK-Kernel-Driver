@@ -44,10 +44,10 @@
 asmlinkage int do_signal(struct pt_regs *regs, sigset_t *oldset);
 void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 
-int ia32_copy_siginfo_to_user(siginfo_t32 __user *to, siginfo_t *from)
+int copy_siginfo_to_user32(compat_siginfo_t __user *to, siginfo_t *from)
 {
 	int err;
-	if (!access_ok (VERIFY_WRITE, to, sizeof(siginfo_t32)))
+	if (!access_ok (VERIFY_WRITE, to, sizeof(compat_siginfo_t)))
 		return -EFAULT;
 
 	/* If you change siginfo_t structure, please make sure that
@@ -95,11 +95,11 @@ int ia32_copy_siginfo_to_user(siginfo_t32 __user *to, siginfo_t *from)
 	return err;
 }
 
-int ia32_copy_siginfo_from_user(siginfo_t *to, siginfo_t32 __user *from)
+int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
 {
 	int err;
 	u32 ptr32;
-	if (!access_ok (VERIFY_READ, from, sizeof(siginfo_t32)))
+	if (!access_ok (VERIFY_READ, from, sizeof(compat_siginfo_t)))
 		return -EFAULT;
 
 	err = __get_user(to->si_signo, &from->si_signo);
@@ -188,7 +188,7 @@ struct rt_sigframe
 	int sig;
 	u32 pinfo;
 	u32 puc;
-	struct siginfo32 info;
+	compat_siginfo_t info;
 	struct ucontext_ia32 uc;
 	struct _fpstate_ia32 fpstate;
 	char retcode[8];
@@ -536,7 +536,7 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	}
 	err |= __put_user((u32)(u64)&frame->info, &frame->pinfo);
 	err |= __put_user((u32)(u64)&frame->uc, &frame->puc);
-	err |= ia32_copy_siginfo_to_user(&frame->info, info);
+	err |= copy_siginfo_to_user32(&frame->info, info);
 	if (err)
 		goto give_sigsegv;
 

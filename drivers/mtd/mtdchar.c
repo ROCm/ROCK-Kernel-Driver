@@ -1,5 +1,5 @@
 /*
- * $Id: mtdchar.c,v 1.65 2004/09/23 23:45:47 gleixner Exp $
+ * $Id: mtdchar.c,v 1.66 2005/01/05 18:05:11 dwmw2 Exp $
  *
  * Character-device access to raw MTD devices.
  *
@@ -61,7 +61,7 @@ static inline void mtdchar_devfs_exit(void)
 
 static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 {
-	struct mtd_info *mtd=(struct mtd_info *)file->private_data;
+	struct mtd_info *mtd = file->private_data;
 
 	switch (orig) {
 	case 0:
@@ -134,7 +134,7 @@ static int mtd_close(struct inode *inode, struct file *file)
 
 	DEBUG(MTD_DEBUG_LEVEL0, "MTD_close\n");
 
-	mtd = (struct mtd_info *)file->private_data;
+	mtd = file->private_data;
 	
 	if (mtd->sync)
 		mtd->sync(mtd);
@@ -151,7 +151,7 @@ static int mtd_close(struct inode *inode, struct file *file)
 
 static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t *ppos)
 {
-	struct mtd_info *mtd = (struct mtd_info *)file->private_data;
+	struct mtd_info *mtd = file->private_data;
 	size_t retlen=0;
 	size_t total_retlen=0;
 	int ret=0;
@@ -210,7 +210,7 @@ static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t
 
 static ssize_t mtd_write(struct file *file, const char __user *buf, size_t count,loff_t *ppos)
 {
-	struct mtd_info *mtd = (struct mtd_info *)file->private_data;
+	struct mtd_info *mtd = file->private_data;
 	char *kbuf;
 	size_t retlen;
 	size_t total_retlen=0;
@@ -276,7 +276,7 @@ static void mtdchar_erase_callback (struct erase_info *instr)
 static int mtd_ioctl(struct inode *inode, struct file *file,
 		     u_int cmd, u_long arg)
 {
-	struct mtd_info *mtd = (struct mtd_info *)file->private_data;
+	struct mtd_info *mtd = file->private_data;
 	void __user *argp = (void __user *)arg;
 	int ret = 0;
 	u_long size;

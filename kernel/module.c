@@ -681,13 +681,6 @@ static inline int use_module(struct module *a, struct module *b)
 static inline void module_unload_init(struct module *mod)
 {
 }
-
-asmlinkage long
-sys_delete_module(const char __user *name_user, unsigned int flags)
-{
-	return -ENOSYS;
-}
-
 #endif /* CONFIG_MODULE_UNLOAD */
 
 #ifdef CONFIG_OBSOLETE_MODPARM

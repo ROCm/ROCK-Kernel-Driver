@@ -66,8 +66,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/prom.h>
 #include <asm/sections.h>
-
-void smp_local_timer_interrupt(struct pt_regs *);
+#include <asm/systemcfg.h>
 
 u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
 
@@ -229,7 +228,7 @@ static void iSeries_tb_recal(void)
 /*
  * For iSeries shared processors, we have to let the hypervisor
  * set the hardware decrementer.  We set a virtual decrementer
- * in the ItLpPaca and call the hypervisor if the virtual
+ * in the lppaca and call the hypervisor if the virtual
  * decrementer is less than the current value in the hardware
  * decrementer. (almost always the new decrementer value will
  * be greater than the current hardware decementer so the hypervisor
@@ -255,11 +254,9 @@ int timer_interrupt(struct pt_regs * regs)
 	profile_tick(CPU_PROFILING, regs);
 #endif
 
-	lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;
+	lpaca->lppaca.int_dword.fields.decr_int = 0;
 
 	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
-
-#ifdef CONFIG_SMP
 		/*
 		 * We cannot disable the decrementer, so in the period
 		 * between this cpu's being marked offline in cpu_online_map
@@ -268,8 +265,7 @@ int timer_interrupt(struct pt_regs * regs)
 		 * is the case.
 		 */
 		if (!cpu_is_offline(cpu))
-			smp_local_timer_interrupt(regs);
-#endif
+			update_process_times(user_mode(regs));
 		/*
 		 * No need to check whether cpu is offline here; boot_cpuid
 		 * should have been fixed up by now.
@@ -278,9 +274,6 @@ int timer_interrupt(struct pt_regs * regs)
 			write_seqlock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;
 			do_timer(regs);
-#ifndef CONFIG_SMP
-			update_process_times(user_mode(regs));
-#endif
 			timer_sync_xtime( cur_tb );
 			timer_check_rtc();
 			write_sequnlock(&xtime_lock);
@@ -424,60 +417,6 @@ int do_settimeofday(struct timespec *tv)
 }
 
 EXPORT_SYMBOL(do_settimeofday);
-
-/*
- * This function is a copy of the architecture independent function
- * but which calls do_settimeofday rather than setting the xtime
- * fields itself.  This way, the fields which are used for 
- * do_settimeofday get updated too.
- */
-long ppc64_sys32_stime(int __user * tptr)
-{
-	int value;
-	struct timespec myTimeval;
-	int err;
-
-	if (get_user(value, tptr))
-		return -EFAULT;
-
-	myTimeval.tv_sec = value;
-	myTimeval.tv_nsec = 0;
-
-	err = security_settime(&myTimeval, NULL);
-	if (err)
-		return err;
-
-	do_settimeofday(&myTimeval);
-
-	return 0;
-}
-
-/*
- * This function is a copy of the architecture independent function
- * but which calls do_settimeofday rather than setting the xtime
- * fields itself.  This way, the fields which are used for 
- * do_settimeofday get updated too.
- */
-long ppc64_sys_stime(long __user * tptr)
-{
-	long value;
-	struct timespec myTimeval;
-	int err;
-
-	if (get_user(value, tptr))
-		return -EFAULT;
-
-	myTimeval.tv_sec = value;
-	myTimeval.tv_nsec = 0;
-
-	err = security_settime(&myTimeval, NULL);
-	if (err)
-		return err;
-
-	do_settimeofday(&myTimeval);
-
-	return 0;
-}
 
 void __init time_init(void)
 {

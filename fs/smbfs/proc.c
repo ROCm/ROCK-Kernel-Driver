@@ -1852,12 +1852,13 @@ smb_finish_dirent(struct smb_sb_info *server, struct smb_fattr *fattr)
 }
 
 void
-smb_init_root_dirent(struct smb_sb_info *server, struct smb_fattr *fattr)
+smb_init_root_dirent(struct smb_sb_info *server, struct smb_fattr *fattr,
+		     struct super_block *sb)
 {
 	smb_init_dirent(server, fattr);
 	fattr->attr = aDIR;
 	fattr->f_ino = 2; /* traditional root inode number */
-	fattr->f_mtime = CURRENT_TIME;
+	fattr->f_mtime = current_fs_time(sb);
 	smb_finish_dirent(server, fattr);
 }
 

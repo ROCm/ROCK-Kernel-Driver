@@ -52,7 +52,6 @@
 #if defined(CONFIG_SYSCTL)
 
 /* External variables not in a header file. */
-extern int panic_timeout;
 extern int C_A_D;
 extern int sysctl_overcommit_memory;
 extern int sysctl_overcommit_ratio;
@@ -624,6 +623,16 @@ static ctl_table kern_table[] = {
 		.proc_handler   = &proc_unknown_nmi_panic,
 	},
 #endif
+#if defined(CONFIG_X86)
+	{
+		.ctl_name	= KERN_BOOTLOADER_TYPE,
+		.procname	= "bootloader_type",
+		.data		= &bootloader_type,
+		.maxlen		= sizeof (int),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
 	{ .ctl_name = 0 }
 };
 
@@ -755,6 +764,7 @@ static ctl_table vm_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &zero,
 	},
+#ifdef CONFIG_MMU
 	{
 		.ctl_name	= VM_MAX_MAP_COUNT,
 		.procname	= "max_map_count",
@@ -763,6 +773,7 @@ static ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},
+#endif
 	{
 		.ctl_name	= VM_LAPTOP_MODE,
 		.procname	= "laptop_mode",
@@ -904,6 +915,7 @@ static ctl_table fs_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
+#ifdef CONFIG_MMU
 	{
 		.ctl_name	= FS_LEASE_TIME,
 		.procname	= "lease-break-time",
@@ -928,6 +940,7 @@ static ctl_table fs_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#endif
 	{ .ctl_name = 0 }
 };
 

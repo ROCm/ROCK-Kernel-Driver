@@ -215,7 +215,6 @@ nfs_complete_unlink(struct dentry *dentry)
 	spin_lock(&dentry->d_lock);
 	dentry->d_flags &= ~DCACHE_NFSFS_RENAMED;
 	spin_unlock(&dentry->d_lock);
-	if (data->task.tk_rpcwait == &nfs_delete_queue)
-		rpc_wake_up_task(&data->task);
+	rpc_wake_up_task(&data->task);
 	nfs_put_unlinkdata(data);
 }

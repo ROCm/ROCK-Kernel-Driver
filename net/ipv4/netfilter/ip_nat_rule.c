@@ -126,6 +126,7 @@ static unsigned int ipt_snat_target(struct sk_buff **pskb,
 {
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
+	const struct ip_nat_multi_range_compat *mr = targinfo;
 
 	IP_NF_ASSERT(hooknum == NF_IP_POST_ROUTING);
 
@@ -136,7 +137,7 @@ static unsigned int ipt_snat_target(struct sk_buff **pskb,
 	                    || ctinfo == IP_CT_RELATED + IP_CT_IS_REPLY));
 	IP_NF_ASSERT(out);
 
-	return ip_nat_setup_info(ct, targinfo, hooknum);
+	return ip_nat_setup_info(ct, &mr->range[0], hooknum);
 }
 
 static unsigned int ipt_dnat_target(struct sk_buff **pskb,
@@ -148,6 +149,7 @@ static unsigned int ipt_dnat_target(struct sk_buff **pskb,
 {
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
+	const struct ip_nat_multi_range_compat *mr = targinfo;
 
 	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING
 		     || hooknum == NF_IP_LOCAL_OUT);
@@ -157,7 +159,7 @@ static unsigned int ipt_dnat_target(struct sk_buff **pskb,
 	/* Connection must be valid and new. */
 	IP_NF_ASSERT(ct && (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED));
 
-	return ip_nat_setup_info(ct, targinfo, hooknum);
+	return ip_nat_setup_info(ct, &mr->range[0], hooknum);
 }
 
 static int ipt_snat_checkentry(const char *tablename,
@@ -166,17 +168,15 @@ static int ipt_snat_checkentry(const char *tablename,
 			       unsigned int targinfosize,
 			       unsigned int hook_mask)
 {
-	struct ip_nat_multi_range *mr = targinfo;
+	struct ip_nat_multi_range_compat *mr = targinfo;
 
 	/* Must be a valid range */
-	if (targinfosize < sizeof(struct ip_nat_multi_range)) {
-		DEBUGP("SNAT: Target size %u too small\n", targinfosize);
+	if (mr->rangesize != 1) {
+		printk("SNAT: multiple ranges no longer supported\n");
 		return 0;
 	}
 
-	if (targinfosize != IPT_ALIGN((sizeof(struct ip_nat_multi_range)
-				       + (sizeof(struct ip_nat_range)
-					  * (mr->rangesize - 1))))) {
+	if (targinfosize != sizeof(struct ip_nat_multi_range_compat)) {
 		DEBUGP("SNAT: Target size %u wrong for %u ranges\n",
 		       targinfosize, mr->rangesize);
 		return 0;
@@ -201,17 +201,15 @@ static int ipt_dnat_checkentry(const char *tablename,
 			       unsigned int targinfosize,
 			       unsigned int hook_mask)
 {
-	struct ip_nat_multi_range *mr = targinfo;
+	struct ip_nat_multi_range_compat *mr = targinfo;
 
 	/* Must be a valid range */
-	if (targinfosize < sizeof(struct ip_nat_multi_range)) {
-		DEBUGP("DNAT: Target size %u too small\n", targinfosize);
+	if (mr->rangesize != 1) {
+		printk("DNAT: multiple ranges no longer supported\n");
 		return 0;
 	}
 
-	if (targinfosize != IPT_ALIGN((sizeof(struct ip_nat_multi_range)
-				       + (sizeof(struct ip_nat_range)
-					  * (mr->rangesize - 1))))) {
+	if (targinfosize != sizeof(struct ip_nat_multi_range_compat)) {
 		DEBUGP("DNAT: Target size %u wrong for %u ranges\n",
 		       targinfosize, mr->rangesize);
 		return 0;
@@ -244,12 +242,12 @@ alloc_null_binding(struct ip_conntrack *conntrack,
 		= (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC
 		   ? conntrack->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip
 		   : conntrack->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip);
-	struct ip_nat_multi_range mr
-		= { 1, { { IP_NAT_RANGE_MAP_IPS, ip, ip, { 0 }, { 0 } } } };
+	struct ip_nat_range range
+		= { IP_NAT_RANGE_MAP_IPS, ip, ip, { 0 }, { 0 } };
 
 	DEBUGP("Allocating NULL binding for %p (%u.%u.%u.%u)\n", conntrack,
 	       NIPQUAD(ip));
-	return ip_nat_setup_info(conntrack, &mr, hooknum);
+	return ip_nat_setup_info(conntrack, &range, hooknum);
 }
 
 int ip_nat_rule_find(struct sk_buff **pskb,

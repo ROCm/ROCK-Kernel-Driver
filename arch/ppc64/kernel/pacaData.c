@@ -10,24 +10,25 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/threads.h>
+#include <linux/module.h>
+
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 
-#include <asm/iSeries/ItLpPaca.h>
+#include <asm/lppaca.h>
 #include <asm/iSeries/ItLpQueue.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 
-struct naca_struct *naca;
 struct systemcfg *systemcfg;
+EXPORT_SYMBOL(systemcfg);
 
 /* This symbol is provided by the linker - let it fill in the paca
  * field correctly */
 extern unsigned long __toc_start;
 
 /* The Paca is an array with one entry per processor.  Each contains an 
- * ItLpPaca, which contains the information shared between the 
+ * lppaca, which contains the information shared between the
  * hypervisor and Linux.  Each also contains an ItLpRegSave area which
  * is used by the hypervisor to save registers.
  * On systems with hardware multi-threading, there are two threads
@@ -60,13 +61,13 @@ extern unsigned long __toc_start;
 	.cpu_start = (start),		/* Processor start */		    \
 	.hw_cpu_id = 0xffff,						    \
 	.lppaca = {							    \
-		.xDesc = 0xd397d781,	/* "LpPa" */			    \
-		.xSize = sizeof(struct ItLpPaca),			    \
-		.xFPRegsInUse = 1,					    \
-		.xDynProcStatus = 2,					    \
-		.xDecrVal = 0x00ff0000,					    \
-		.xEndOfQuantum = 0xfffffffffffffffful,			    \
-		.xSLBCount = 64,					    \
+		.desc = 0xd397d781,	/* "LpPa" */			    \
+		.size = sizeof(struct lppaca),				    \
+		.dyn_proc_status = 2,					    \
+		.decr_val = 0x00ff0000,					    \
+		.fpregs_in_use = 1,					    \
+		.end_of_quantum = 0xfffffffffffffffful,			    \
+		.slb_count = 64,					    \
 	},								    \
 	EXTRA_INITS((number), (lpq))					    \
 }

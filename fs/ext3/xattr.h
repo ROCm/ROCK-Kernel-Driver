@@ -67,7 +67,8 @@ extern ssize_t ext3_listxattr(struct dentry *, char *, size_t);
 extern int ext3_xattr_get(struct inode *, int, const char *, void *, size_t);
 extern int ext3_xattr_list(struct inode *, char *, size_t);
 extern int ext3_xattr_set(struct inode *, int, const char *, const void *, size_t, int);
-extern int ext3_xattr_set_handle(handle_t *, struct inode *, int, const char *, const void *, size_t, int);
+extern int ext3_xattr_set_handle(handle_t *, struct inode *, int, const char *,const void *,size_t,int);
+extern int ext3_xattr_block_set(handle_t *, struct inode *, int, const char *,const void *,size_t,int);
 
 extern void ext3_xattr_delete_inode(handle_t *, struct inode *);
 extern void ext3_xattr_put_super(struct super_block *);

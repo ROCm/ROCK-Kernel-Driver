@@ -68,7 +68,7 @@ void default_idle(void)
 	}
 }
 
-void cpu_idle(void *unused)
+void cpu_idle(void)
 {
 	default_idle();
 }

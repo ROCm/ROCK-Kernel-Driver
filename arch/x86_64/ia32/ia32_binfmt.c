@@ -273,8 +273,9 @@ do {							\
 #define load_elf_binary load_elf32_binary
 
 #define ELF_PLAT_INIT(r, load_addr)	elf32_init(r)
-#define setup_arg_pages(bprm, exec_stack)	ia32_setup_arg_pages(bprm, exec_stack)
-int ia32_setup_arg_pages(struct linux_binprm *bprm, int executable_stack);
+#define setup_arg_pages(bprm, stack_top, exec_stack) \
+	ia32_setup_arg_pages(bprm, stack_top, exec_stack)
+int ia32_setup_arg_pages(struct linux_binprm *bprm, unsigned long stack_top, int executable_stack);
 
 #undef start_thread
 #define start_thread(regs,new_rip,new_rsp) do { \
@@ -329,7 +330,7 @@ static void elf32_init(struct pt_regs *regs)
 	me->thread.es = __USER_DS;
 }
 
-int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
+int setup_arg_pages(struct linux_binprm *bprm, unsigned long stack_top, int executable_stack)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;

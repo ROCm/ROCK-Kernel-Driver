@@ -50,7 +50,7 @@ Control non executable mappings for 64bit processes.
 on	Enable(default)
 off	Disable
 */ 
-static int __init nonx_setup(char *str)
+void __init nonx_setup(const char *str)
 {
 	if (!strcmp(str, "on")) {
                 __supported_pte_mask |= _PAGE_NX; 
@@ -59,10 +59,7 @@ static int __init nonx_setup(char *str)
 		do_not_nx = 1;
 		__supported_pte_mask &= ~_PAGE_NX;
         } 
-        return 1;
 } 
-
-__setup("noexec=", nonx_setup); 
 
 /*
  * Great future plan:
@@ -83,13 +80,12 @@ void __init setup_per_cpu_areas(void)
 
 	for (i = 0; i < NR_CPUS; i++) { 
 		unsigned char *ptr;
-		/* If possible allocate on the node of the CPU.
-		   In case it doesn't exist round-robin nodes. */
-		if (!NODE_DATA(i % numnodes)) { 
+
+		if (!NODE_DATA(cpu_to_node(i))) {
 			printk("cpu with no node %d, numnodes %d\n", i, numnodes);
 			ptr = alloc_bootmem(size);
 		} else { 
-			ptr = alloc_bootmem_node(NODE_DATA(i % numnodes), size);
+			ptr = alloc_bootmem_node(NODE_DATA(cpu_to_node(i)), size);
 		}
 		if (!ptr)
 			panic("Cannot allocate cpu data for CPU %d\n", i);
@@ -274,8 +270,4 @@ void __init cpu_init (void)
 	set_debug(0UL, 7);
 
 	fpu_init(); 
-
-#ifdef CONFIG_NUMA
-	numa_add_cpu(cpu);
-#endif
 }

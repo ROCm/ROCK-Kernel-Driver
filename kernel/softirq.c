@@ -152,6 +152,23 @@ void local_bh_enable(void)
 }
 EXPORT_SYMBOL(local_bh_enable);
 
+#ifdef __ARCH_IRQ_EXIT_IRQS_DISABLED
+# define invoke_softirq()	__do_softirq()
+#else
+# define invoke_softirq()	do_softirq()
+#endif
+
+/*
+ * Exit an interrupt context. Process softirqs if needed and possible:
+ */
+void irq_exit(void)
+{
+	preempt_count() -= IRQ_EXIT_OFFSET;
+	if (!in_interrupt() && local_softirq_pending())
+		invoke_softirq();
+	preempt_enable_no_resched();
+}
+
 /*
  * This function must run with irqs disabled!
  */

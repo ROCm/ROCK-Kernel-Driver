@@ -681,7 +681,7 @@ static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 #define pgd_page_kernel(pgd) (pgd_val(pgd) & PAGE_MASK)
 
 /* to find an entry in a page-table-directory */
-#define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+#define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
 #define pgd_offset(mm, address) ((mm)->pgd+pgd_index(address))
 
 /* to find an entry in a kernel page-table-directory */

@@ -366,20 +366,6 @@ static void panic_halt_ipmi_set_timeout(void)
 	}
 }
 
-/* Do a delayed shutdown, with the delay in milliseconds.  If power_off is
-   false, do a reset.  If power_off is true, do a power down.  This is
-   primarily for the IMB code's shutdown. */
-void ipmi_delayed_shutdown(long delay, int power_off)
-{
-	ipmi_ignore_heartbeat = 1;
-	if (power_off) 
-		ipmi_watchdog_state = WDOG_TIMEOUT_POWER_DOWN;
-	else
-		ipmi_watchdog_state = WDOG_TIMEOUT_RESET;
-	timeout = delay;
-	ipmi_set_timeout(IPMI_SET_TIMEOUT_HB_IF_NECESSARY);
-}
-
 /* We use a semaphore to make sure that only one thing can send a
    heartbeat at one time, because we only have one copy of the data.
    The semaphore is claimed when the set_timeout is sent and freed
@@ -890,8 +876,6 @@ static struct notifier_block wdog_reboot_notifier = {
 	0
 };
 
-extern int panic_timeout; /* Why isn't this defined anywhere? */
-
 static int wdog_panic_handler(struct notifier_block *this,
 			      unsigned long         event,
 			      void                  *unused)
@@ -1054,10 +1038,6 @@ static __exit void ipmi_unregister_watchdog(void)
 	/* Make sure no one can call us any more. */
 	misc_deregister(&ipmi_wdog_miscdev);
 
-	/*  Disable the timer. */
-	ipmi_watchdog_state = WDOG_TIMEOUT_NONE;
-	ipmi_set_timeout(IPMI_SET_TIMEOUT_NO_HB);
-
 	/* Wait to make sure the message makes it out.  The lower layer has
 	   pointers to our buffers, we want to make sure they are done before
 	   we release our memory. */
@@ -1084,8 +1064,5 @@ static void __exit ipmi_wdog_exit(void)
 	ipmi_unregister_watchdog();
 }
 module_exit(ipmi_wdog_exit);
-
-EXPORT_SYMBOL(ipmi_delayed_shutdown);
-
 module_init(ipmi_wdog_init);
 MODULE_LICENSE("GPL");

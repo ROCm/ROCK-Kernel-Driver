@@ -18,6 +18,9 @@ extern int		__set_personality(unsigned long);
  * These occupy the top three bytes.
  */
 enum {
+	FDPIC_FUNCPTRS =	0x0080000,	/* userspace function ptrs point to descriptors
+						 * (signal handling)
+						 */
 	MMAP_PAGE_ZERO =	0x0100000,
 	ADDR_COMPAT_LAYOUT =	0x0200000,
 	READ_IMPLIES_EXEC =	0x0400000,
@@ -43,6 +46,7 @@ enum {
 enum {
 	PER_LINUX =		0x0000,
 	PER_LINUX_32BIT =	0x0000 | ADDR_LIMIT_32BIT,
+	PER_LINUX_FDPIC =	0x0000 | FDPIC_FUNCPTRS,
 	PER_SVR4 =		0x0001 | STICKY_TIMEOUTS | MMAP_PAGE_ZERO,
 	PER_SVR3 =		0x0002 | STICKY_TIMEOUTS | SHORT_INODE,
 	PER_SCOSVR3 =		0x0003 | STICKY_TIMEOUTS |

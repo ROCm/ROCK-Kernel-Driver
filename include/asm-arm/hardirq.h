@@ -27,16 +27,6 @@ typedef struct {
 # error HARDIRQ_BITS is too low!
 #endif
 
-#define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
-
-extern asmlinkage void __do_softirq(void);
-
-#define irq_exit()							\
-	do {								\
-		preempt_count() -= IRQ_EXIT_OFFSET;			\
-		if (!in_interrupt() && local_softirq_pending())		\
-			__do_softirq();					\
-		preempt_enable_no_resched();				\
-	} while (0)
+#define __ARCH_IRQ_EXIT_IRQS_DISABLED	1
 
 #endif /* __ASM_HARDIRQ_H */

@@ -137,7 +137,7 @@ static int sysv_link(struct dentry * old_dentry, struct inode * dir,
 	if (inode->i_nlink >= SYSV_SB(inode->i_sb)->s_link_max)
 		return -EMLINK;
 
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	inc_count(inode);
 	atomic_inc(&inode->i_count);
 
@@ -260,7 +260,7 @@ static int sysv_rename(struct inode * old_dir, struct dentry * old_dentry,
 			goto out_dir;
 		inc_count(old_inode);
 		sysv_set_link(new_de, new_page, old_inode);
-		new_inode->i_ctime = CURRENT_TIME;
+		new_inode->i_ctime = CURRENT_TIME_SEC;
 		if (dir_de)
 			new_inode->i_nlink--;
 		dec_count(new_inode);

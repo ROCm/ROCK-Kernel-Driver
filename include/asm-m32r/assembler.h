@@ -1,20 +1,33 @@
 #ifndef _ASM_M32R_ASSEMBLER_H
 #define _ASM_M32R_ASSEMBLER_H
 
-/* $Id$ */
-
 /*
  * linux/asm-m32r/assembler.h
  *
- * This file contains M32R architecture specific defines.
+ * Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
  *
- * Do not include any C declarations in this file - it is included by
- * assembler source.
+ * This file contains M32R architecture specific macro definitions.
  */
 
 #include <linux/config.h>
 
+#ifndef __STR
+#ifdef __ASSEMBLY__
+#define __STR(x) x
+#else
+#define __STR(x) #x
+#endif
+#endif /* __STR */
 
+#ifdef CONFIG_SMP
+#define M32R_LOCK	__STR(lock)
+#define M32R_UNLOCK	__STR(unlock)
+#else
+#define M32R_LOCK	__STR(ld)
+#define M32R_UNLOCK	__STR(st)
+#endif
+
+#ifdef __ASSEMBLY__
 #undef ENTRY
 #define ENTRY(name) ENTRY_M name
 	.macro  ENTRY_M name
@@ -22,12 +35,13 @@
 	ALIGN
 \name:
 	.endm
+#endif
 
-/*
- * LDIMM: load immediate value
- *
- * STI: enable interruption
- * CLI: disable interruption
+
+/**
+ * LDIMM - load immediate value
+ * STI - enable interruption
+ * CLI - disable interruption
  */
 
 #ifdef __ASSEMBLY__
@@ -209,4 +223,3 @@
 #endif	/* __ASSEMBLY__ */
 
 #endif	/* _ASM_M32R_ASSEMBLER_H */
-

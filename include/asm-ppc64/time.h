@@ -78,8 +78,8 @@ static __inline__ void set_dec(int val)
 	struct paca_struct *lpaca = get_paca();
 	int cur_dec;
 
-	if (lpaca->lppaca.xSharedProc) {
-		lpaca->lppaca.xVirtualDecr = val;
+	if (lpaca->lppaca.shared_proc) {
+		lpaca->lppaca.virtual_decr = val;
 		cur_dec = get_dec();
 		if (cur_dec > val)
 			HvCall_setVirtualDecr();

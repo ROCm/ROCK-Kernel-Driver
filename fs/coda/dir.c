@@ -183,7 +183,7 @@ static inline void coda_dir_changed(struct inode *dir, int link)
 	/* optimistically we can also act as if our nose bleeds. The
          * granularity of the mtime is coarse anyways so we might actually be
          * right most of the time. Note: we only do this for directories. */
-	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
 #endif
 	if (link)
 		dir->i_nlink += link;

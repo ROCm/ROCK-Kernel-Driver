@@ -210,7 +210,7 @@ adfs_adfs2unix_time(struct timespec *tv, struct inode *inode)
 	return;
 
  cur_time:
-	*tv = CURRENT_TIME;
+	*tv = CURRENT_TIME_SEC;
 	return;
 
  too_early:

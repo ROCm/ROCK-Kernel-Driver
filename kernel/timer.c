@@ -806,7 +806,7 @@ static inline void do_process_times(struct task_struct *p,
 
 	psecs = (p->utime += user);
 	psecs += (p->stime += system);
-	if (p->signal && !unlikely(p->state & (EXIT_DEAD|EXIT_ZOMBIE)) &&
+	if (p->signal && !unlikely(p->exit_state) &&
 	    psecs / HZ >= p->signal->rlim[RLIMIT_CPU].rlim_cur) {
 		/* Send SIGXCPU every second.. */
 		if (!(psecs % HZ))

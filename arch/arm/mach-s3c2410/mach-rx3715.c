@@ -95,7 +95,7 @@ void __init rx3715_map_io(void)
 	s3c24xx_xtal = 16934000;
 
 	s3c24xx_init_io(rx3715_iodesc, ARRAY_SIZE(rx3715_iodesc));
-	s3c2440_init_uarts(rx3715_uartcfgs, ARRAY_SIZE(rx3715_uartcfgs));
+	s3c24xx_init_uarts(rx3715_uartcfgs, ARRAY_SIZE(rx3715_uartcfgs));
 	s3c24xx_set_board(&rx3715_board);
 }
 

@@ -373,6 +373,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	depends on !M386
 	default y
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 config X86_PPRO_FENCE
 	bool
 	depends on M686 || M586MMX || M586TSC || M586 || M486 || M386

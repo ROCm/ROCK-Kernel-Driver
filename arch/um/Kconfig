@@ -31,6 +31,10 @@ config RWSEM_GENERIC_SPINLOCK
 	bool
 	default y
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 menu "UML-specific options"
 
 config MODE_TT

@@ -298,7 +298,7 @@ jffs_setattr(struct dentry *dentry, struct iattr *iattr)
 		if (len) {
 			invalidate_inode_pages(inode->i_mapping);
 		}
-		inode->i_ctime = CURRENT_TIME;
+		inode->i_ctime = CURRENT_TIME_SEC;
 		inode->i_mtime = inode->i_ctime;
 	}
 	if (update_all || iattr->ia_valid & ATTR_ATIME) {
@@ -548,7 +548,7 @@ jffs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	/* This is a kind of update of the inode we're about to make
 	   here.  This is what they do in ext2fs.  Kind of.  */
 	if ((inode = iget(new_dir->i_sb, f->ino))) {
-		inode->i_ctime = CURRENT_TIME;
+		inode->i_ctime = CURRENT_TIME_SEC;
 		mark_inode_dirty(inode);
 		iput(inode);
 	}
@@ -1051,7 +1051,7 @@ jffs_remove(struct inode *dir, struct dentry *dentry, int type)
 	   from the in-memory file system structures.  */
 	jffs_insert_node(c, del_f, &raw_inode, NULL, del_node);
 
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(dir);
 	inode->i_nlink--;
 	inode->i_ctime = dir->i_ctime;
@@ -1518,7 +1518,7 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 		inode->i_size = pos;
 		inode->i_blocks = (inode->i_size + 511) >> 9;
 	}
-	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
+	inode->i_ctime = inode->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	invalidate_inode_pages(inode->i_mapping);
 

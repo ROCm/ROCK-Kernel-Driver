@@ -38,6 +38,7 @@ static inline int major_to_index(int major)
 	return major % MAX_PROBE_HASH;
 }
 
+#ifdef CONFIG_PROC_FS
 /* get block device names in somewhat random order */
 int get_blkdev_list(char *p)
 {
@@ -56,6 +57,7 @@ int get_blkdev_list(char *p)
 
 	return len;
 }
+#endif
 
 int register_blkdev(unsigned int major, const char *name)
 {

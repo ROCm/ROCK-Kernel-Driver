@@ -19,7 +19,6 @@
 #include <asm/mmu.h>
 #include <asm/mmu_context.h>
 #include <asm/paca.h>
-#include <asm/naca.h>
 #include <asm/cputable.h>
 
 extern void slb_allocate(unsigned long ea);

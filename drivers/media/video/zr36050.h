@@ -27,6 +27,8 @@
 #ifndef ZR36050_H
 #define ZR36050_H
 
+#include "videocodec.h"
+
 /* data stored for each zoran jpeg codec chip */
 struct zr36050 {
 	char name[32];
@@ -51,6 +53,10 @@ struct zr36050 {
 	__u8 v_samp_ratio[8];
 	__u16 scalefact;
 	__u16 dri;
+
+	/* com/app marker */
+	struct jpeg_com_marker com;
+	struct jpeg_app_marker app;
 };
 
 /* zr36050 register addresses */

@@ -236,7 +236,7 @@ sys_call_table:
 	PTR	sys_unlink			/* 4010 */
 	PTR	sys32_execve
 	PTR	sys_chdir
-	PTR	sys_time
+	PTR	compat_sys_time
 	PTR	sys_mknod
 	PTR	sys_chmod			/* 4015 */
 	PTR	sys_lchown
@@ -248,7 +248,7 @@ sys_call_table:
 	PTR	sys_oldumount
 	PTR	sys_setuid
 	PTR	sys_getuid
-	PTR	sys_stime			/* 4025 */
+	PTR	compat_sys_stime		/* 4025 */
 	PTR	sys32_ptrace
 	PTR	sys_alarm
 	PTR	sys_ni_syscall			/* was sys_fstat */
@@ -420,7 +420,7 @@ sys_call_table:
 	PTR	sys32_rt_sigaction
 	PTR	sys32_rt_sigprocmask 		/* 4195 */
 	PTR	sys32_rt_sigpending
-	PTR	sys32_rt_sigtimedwait
+	PTR	compat_rt_sigtimedwait
 	PTR	sys32_rt_sigqueueinfo
 	PTR	sys32_rt_sigsuspend
 	PTR	sys32_pread			/* 4200 */

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/strchr.S
+ *  linux/arch/arm26/lib/strchr.S
  *
  *  Copyright (C) 1995-2000 Russell King
  *

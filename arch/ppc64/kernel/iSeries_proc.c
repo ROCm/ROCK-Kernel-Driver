@@ -24,8 +24,7 @@
 #include <asm/paca.h>
 #include <asm/processor.h>
 #include <asm/time.h>
-#include <asm/naca.h>
-#include <asm/iSeries/ItLpPaca.h>
+#include <asm/lppaca.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/HvCallXm.h>
 #include <asm/iSeries/IoHriMainStore.h>

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# arch/arm/boot/install.sh
+# arch/arm26/boot/install.sh
 #
 # This file is subject to the terms and conditions of the GNU General Public
 # License.  See the file "COPYING" in the main directory of this archive
@@ -10,7 +10,7 @@
 #
 # Adapted from code in arch/i386/boot/Makefile by H. Peter Anvin
 # Adapted from code in arch/i386/boot/install.sh by Russell King
-# Stolen from arch/arm/boot/install.sh by Ian Molton
+# Stolen from arm32 by Ian Molton
 #
 # "make install" script for arm architecture
 #

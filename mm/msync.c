@@ -190,9 +190,12 @@ static int msync_interval(struct vm_area_struct * vma,
 			struct address_space *mapping = file->f_mapping;
 			int err;
 
-			down(&mapping->host->i_sem);
 			ret = filemap_fdatawrite(mapping);
 			if (file->f_op && file->f_op->fsync) {
+				/*
+				 * We don't take i_sem here because mmap_sem
+				 * is already held.
+				 */
 				err = file->f_op->fsync(file,file->f_dentry,1);
 				if (err && !ret)
 					ret = err;
@@ -200,7 +203,6 @@ static int msync_interval(struct vm_area_struct * vma,
 			err = filemap_fdatawait(mapping);
 			if (!ret)
 				ret = err;
-			up(&mapping->host->i_sem);
 		}
 	}
 	return ret;
@@ -211,6 +213,9 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 	unsigned long end;
 	struct vm_area_struct * vma;
 	int unmapped_error, error = -EINVAL;
+
+	if (flags & MS_SYNC)
+		current->flags |= PF_SYNCWRITE;
 
 	down_read(&current->mm->mmap_sem);
 	if (flags & ~(MS_ASYNC | MS_INVALIDATE | MS_SYNC))
@@ -262,5 +267,6 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 	}
 out:
 	up_read(&current->mm->mmap_sem);
+	current->flags &= ~PF_SYNCWRITE;
 	return error;
 }

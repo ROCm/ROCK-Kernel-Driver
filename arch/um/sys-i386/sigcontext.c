@@ -9,22 +9,14 @@
 #include <asm/sigcontext.h>
 #include "sysdep/ptrace.h"
 #include "kern_util.h"
-#include "frame_user.h"
-
-int sc_size(void *data)
-{
-	struct arch_frame_data *arch = data;
-
-	return(sizeof(struct sigcontext) + arch->fpstate_size);
-}
 
 void sc_to_sc(void *to_ptr, void *from_ptr)
 {
 	struct sigcontext *to = to_ptr, *from = from_ptr;
-	int size = sizeof(*to) + signal_frame_sc.common.arch.fpstate_size;
 
-	memcpy(to, from, size);
-	if(from->fpstate != NULL) to->fpstate = (struct _fpstate *) (to + 1);
+	memcpy(to, from, sizeof(*to) + sizeof(struct _fpstate));
+	if(from->fpstate != NULL)
+		to->fpstate = (struct _fpstate *) (to + 1);
 }
 
 unsigned long *sc_sigmask(void *sc_ptr)

@@ -21,8 +21,6 @@ static int
 perfmon_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg,
                 struct pt_regs *regs, unsigned long stamp)
 {
-	int cpu = smp_processor_id();
-	unsigned long eip = instruction_pointer(regs);
 	int event = arg->pmd_eventid;
  
 	arg->ovfl_ctrl.bits.reset_ovfl_pmds = 1;
@@ -31,7 +29,7 @@ perfmon_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg,
 	 * without perfmon being shutdown (e.g. SIGSEGV)
 	 */
 	if (allow_ints)
-		oprofile_add_sample(eip, !user_mode(regs), event, cpu);
+		oprofile_add_sample(regs, event);
 	return 0;
 }
 
@@ -75,21 +73,18 @@ static char * get_cpu_type(void)
 
 
 /* all the ops are handled via userspace for IA64 perfmon */
-static struct oprofile_operations perfmon_ops = {
-	.start = perfmon_start,
-	.stop = perfmon_stop,
-};
 
 static int using_perfmon;
 
-int perfmon_init(struct oprofile_operations ** ops)
+int perfmon_init(struct oprofile_operations * ops)
 {
 	int ret = pfm_register_buffer_fmt(&oprofile_fmt);
 	if (ret)
 		return -ENODEV;
 
-	perfmon_ops.cpu_type = get_cpu_type();
-	*ops = &perfmon_ops;
+	ops->cpu_type = get_cpu_type();
+	ops->start = perfmon_start;
+	ops->stop = perfmon_stop;
 	using_perfmon = 1;
 	printk(KERN_INFO "oprofile: using perfmon.\n");
 	return 0;

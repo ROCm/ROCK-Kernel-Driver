@@ -266,6 +266,18 @@ config JFS_POSIX_ACL
 
 	  If you don't know what Access Control Lists are, say N
 
+config JFS_SECURITY
+	bool "JFS Security Labels"
+	depends on JFS_FS
+	help
+	  Security labels support alternative access control models
+	  implemented by security modules like SELinux.  This option
+	  enables an extended attribute handler for file security
+	  labels in the jfs filesystem.
+
+	  If you are not using a security module that requires using
+	  extended attributes for file security labels, say N.
+
 config JFS_DEBUG
 	bool "JFS debugging"
 	depends on JFS_FS
@@ -1178,6 +1190,15 @@ config JFFS2_FS_NAND
 	  interesting for the file system to use.
 
 	  Say 'N' unless you have NAND flash.
+
+config JFFS2_FS_NOR_ECC
+        bool "JFFS2 support for ECC'd NOR flash (EXPERIMENTAL)"
+        depends on JFFS2_FS && EXPERIMENTAL
+        default n
+        help
+          This enables the experimental support for NOR flash with transparent
+          ECC for JFFS2. This type of flash chip is not common, however it is
+          available from ST Microelectronics.
 
 config JFFS2_COMPRESSION_OPTIONS
 	bool "Advanced compression options for JFFS2"

@@ -24,7 +24,7 @@ typedef union sigval32 {
 	u32 sival_ptr;
 } sigval_t32;
 
-struct siginfo32;
+struct compat_siginfo;
 
 #endif /* CONFIG_COMPAT */
 
@@ -55,9 +55,6 @@ typedef struct sigevent32 {
 		} _sigev_thread;
 	} _sigev_un;
 } sigevent_t32;
-
-extern int copy_siginfo_to_user32(struct siginfo32 __user *to, siginfo_t *from);
-extern int copy_siginfo_to_kernel32(siginfo_t *to, struct siginfo32 __user *from);
 
 #endif /* CONFIG_COMPAT */
 

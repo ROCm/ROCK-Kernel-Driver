@@ -28,13 +28,13 @@
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 
-#include <asm/naca.h>
 #include <asm/paca.h>
-#include <asm/iSeries/ItLpPaca.h>
+#include <asm/lppaca.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/rtas.h>
 #include <asm/cputable.h>
+#include <asm/cache.h>
 
 #define DEFINE(sym, val) \
 	asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -67,14 +67,12 @@ int main(void)
 #endif /* CONFIG_ALTIVEC */
 	DEFINE(MM, offsetof(struct task_struct, mm));
 
-	/* naca */
-        DEFINE(PACA, offsetof(struct naca_struct, paca));
-	DEFINE(DCACHEL1LINESIZE, offsetof(struct systemcfg, dCacheL1LineSize));
-        DEFINE(DCACHEL1LOGLINESIZE, offsetof(struct naca_struct, dCacheL1LogLineSize));
-        DEFINE(DCACHEL1LINESPERPAGE, offsetof(struct naca_struct, dCacheL1LinesPerPage));
-        DEFINE(ICACHEL1LINESIZE, offsetof(struct systemcfg, iCacheL1LineSize));
-        DEFINE(ICACHEL1LOGLINESIZE, offsetof(struct naca_struct, iCacheL1LogLineSize));
-        DEFINE(ICACHEL1LINESPERPAGE, offsetof(struct naca_struct, iCacheL1LinesPerPage));
+	DEFINE(DCACHEL1LINESIZE, offsetof(struct ppc64_caches, dline_size));
+	DEFINE(DCACHEL1LOGLINESIZE, offsetof(struct ppc64_caches, log_dline_size));
+	DEFINE(DCACHEL1LINESPERPAGE, offsetof(struct ppc64_caches, dlines_per_page));
+	DEFINE(ICACHEL1LINESIZE, offsetof(struct ppc64_caches, iline_size));
+	DEFINE(ICACHEL1LOGLINESIZE, offsetof(struct ppc64_caches, log_iline_size));
+	DEFINE(ICACHEL1LINESPERPAGE, offsetof(struct ppc64_caches, ilines_per_page));
 	DEFINE(PLATFORM, offsetof(struct systemcfg, platform));
 
 	/* paca */
@@ -104,10 +102,10 @@ int main(void)
         DEFINE(PACAEMERGSP, offsetof(struct paca_struct, emergency_sp));
 	DEFINE(PACALPPACA, offsetof(struct paca_struct, lppaca));
 	DEFINE(PACAHWCPUID, offsetof(struct paca_struct, hw_cpu_id));
-        DEFINE(LPPACASRR0, offsetof(struct ItLpPaca, xSavedSrr0));
-        DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
-	DEFINE(LPPACAANYINT, offsetof(struct ItLpPaca, xIntDword.xAnyInt));
-	DEFINE(LPPACADECRINT, offsetof(struct ItLpPaca, xIntDword.xFields.xDecrInt));
+	DEFINE(LPPACASRR0, offsetof(struct lppaca, saved_srr0));
+	DEFINE(LPPACASRR1, offsetof(struct lppaca, saved_srr1));
+	DEFINE(LPPACAANYINT, offsetof(struct lppaca, int_dword.any_int));
+	DEFINE(LPPACADECRINT, offsetof(struct lppaca, int_dword.fields.decr_int));
 
 	/* RTAS */
 	DEFINE(RTASBASE, offsetof(struct rtas_t, base));

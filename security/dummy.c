@@ -74,11 +74,8 @@ static int dummy_acct (struct file *file)
 
 static int dummy_capable (struct task_struct *tsk, int cap)
 {
-	if (cap_is_fs_cap (cap) ? tsk->fsuid == 0 : tsk->euid == 0)
-		/* capability granted */
+	if (cap_raised (tsk->cap_effective, cap))
 		return 0;
-
-	/* capability denied */
 	return -EPERM;
 }
 
@@ -92,7 +89,7 @@ static int dummy_quotactl (int cmds, int type, int id, struct super_block *sb)
 	return 0;
 }
 
-static int dummy_quota_on (struct file *f)
+static int dummy_quota_on (struct dentry *dentry)
 {
 	return 0;
 }
@@ -160,6 +157,14 @@ static int dummy_vm_enough_memory(long pages)
 		* sysctl_overcommit_ratio / 100;
 	allowed += total_swap_pages;
 
+	/* Leave the last 3% for root */
+	if (current->euid)
+		allowed -= allowed / 32;
+
+	/* Don't let a single process grow too big:
+	   leave 3% of the size of this process for other processes */
+	allowed -= current->mm->total_vm / 32;
+
 	if (atomic_read(&vm_committed_space) < allowed)
 		return 0;
 
@@ -191,6 +196,8 @@ static void dummy_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 
 	current->suid = current->euid = current->fsuid = bprm->e_uid;
 	current->sgid = current->egid = current->fsgid = bprm->e_gid;
+
+	dummy_capget(current, &current->cap_effective, &current->cap_inheritable, &current->cap_permitted);
 }
 
 static int dummy_bprm_set_security (struct linux_binprm *bprm)
@@ -550,6 +557,7 @@ static int dummy_task_setuid (uid_t id0, uid_t id1, uid_t id2, int flags)
 
 static int dummy_task_post_setuid (uid_t id0, uid_t id1, uid_t id2, int flags)
 {
+	dummy_capget(current, &current->cap_effective, &current->cap_inheritable, &current->cap_permitted);
 	return 0;
 }
 

@@ -19,44 +19,20 @@
 #include <linux/delay.h>
 #include <asm/machdep.h>
 
-
 /*
- * Define all of the IRQ senses and polarities.
+ * Define external IRQ senses and polarities.
  */
-
-static u_char redwood6_IRQ_initsenses[] __initdata = {
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 0: RTC/FPC */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 1: Transport */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 2: Audio Dec */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 3: Video Dec */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 4: DMA Chan 0 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 5: DMA Chan 1 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 6: DMA Chan 2 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 7: DMA Chan 3 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 8: SmartCard 0 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 9: IIC0 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 10: IRR */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 11: Cap Timers */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 12: Cmp Timers */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 13: Serial Port */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 14: Soft Modem */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 15: Down Ctrs */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 16: SmartCard 1 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 17: Ext Int 7 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 18: Ext Int 8 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 19: Ext Int 9 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 20: Serial 0 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 21: Serial 1 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 22: Serial 2 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 23: XPT_DMA */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 24: DCR timeout */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 25: Ext Int 0 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 26: Ext Int 1 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 27: Ext Int 2 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 28: Ext Int 3 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 29: Ext Int 4 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 30: Ext Int 5 */
-	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* 31: Ext Int 6 */
+unsigned char ppc4xx_uic_ext_irq_cfg[] __initdata = {
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 7 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 8 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 9 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 0 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 1 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 2 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 3 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 4 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 5 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),	/* Ext Int 6 */
 };
 
 static struct resource smc91x_resources[] = {
@@ -144,8 +120,6 @@ redwood6_setup_arch(void)
 
 	printk("\n");
 #endif
-	ibm4xxPIC_InitSenses = redwood6_IRQ_initsenses;
-	ibm4xxPIC_NumInitSenses = sizeof(redwood6_IRQ_initsenses);
 
 	/* Identify the system */
 	printk(KERN_INFO "IBM Redwood6 (STBx25XX) Platform\n");

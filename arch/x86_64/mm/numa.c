@@ -16,21 +16,23 @@
 #include <asm/proto.h>
 #include <asm/dma.h>
 #include <asm/numa.h>
+#include <asm/acpi.h>
 
 #ifndef Dprintk
 #define Dprintk(x...)
 #endif
 
-struct pglist_data *node_data[MAXNODE];
+struct pglist_data *node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 
 int memnode_shift;
 u8  memnodemap[NODEMAPSIZE];
 
-unsigned char cpu_to_node[NR_CPUS];  
-cpumask_t     node_to_cpumask[MAXNODE]; 
+#define NUMA_NO_NODE 0xff
+unsigned char cpu_to_node[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
+cpumask_t     node_to_cpumask[MAX_NUMNODES];
 
-static int numa_off __initdata; 
+int numa_off __initdata;
 
 unsigned long nodes_present; 
 
@@ -150,13 +152,12 @@ void __init numa_init_array(void)
 	   CPUs, as the number of CPUs is not known yet. 
 	   We round robin the existing nodes. */
 	rr = 0;
-	for (i = 0; i < MAXNODE; i++) {
-		if (node_online(i))
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_to_node[i] != NUMA_NO_NODE)
 			continue;
 		rr = next_node(rr, node_online_map);
 		if (rr == MAX_NUMNODES)
 			rr = first_node(node_online_map);
-		node_data[i] = node_data[rr];
 		cpu_to_node[i] = rr;
 		rr++; 
 	}
@@ -171,7 +172,7 @@ int numa_fake __initdata = 0;
 static int numa_emulation(unsigned long start_pfn, unsigned long end_pfn)
 {
  	int i;
- 	struct node nodes[MAXNODE];
+ 	struct node nodes[MAX_NUMNODES];
  	unsigned long sz = ((end_pfn - start_pfn)<<PAGE_SHIFT) / numa_fake;
 
  	/* Kludge needed for the hash function */
@@ -220,6 +221,12 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
  		return;
 #endif
 
+#ifdef CONFIG_ACPI_NUMA
+	if (!numa_off && !acpi_scan_nodes(start_pfn << PAGE_SHIFT,
+					  end_pfn << PAGE_SHIFT))
+ 		return;
+#endif
+
 #ifdef CONFIG_K8_NUMA
 	if (!numa_off && !k8_scan_nodes(start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT))
 		return;
@@ -237,7 +244,7 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 	for (i = 0; i < NR_CPUS; i++)
 		cpu_to_node[i] = 0;
 	node_to_cpumask[0] = cpumask_of_cpu(0);
-	setup_node_bootmem(0, start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT);
+	setup_node_bootmem(0, start_pfn << PAGE_SHIFT, end_pfn << PAGE_SHIFT);
 }
 
 __init void numa_add_cpu(int cpu)
@@ -276,6 +283,10 @@ __init int numa_setup(char *opt)
 		if (numa_fake >= MAX_NUMNODES)
 			numa_fake = MAX_NUMNODES;
 	}
+#endif
+#ifdef CONFIG_ACPI_NUMA
+ 	if (!strncmp(opt,"noacpi",6))
+ 		acpi_numa = -1;
 #endif
 	return 1;
 } 

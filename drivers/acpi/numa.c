@@ -184,17 +184,10 @@ acpi_numa_init()
 		result = acpi_table_parse_srat(ACPI_SRAT_MEMORY_AFFINITY,
 					       acpi_parse_memory_affinity,
 					       NR_NODE_MEMBLKS);	// IA64 specific
-	} else {
-		/* FIXME */
-		printk("Warning: acpi_table_parse(ACPI_SRAT) returned %d!\n",result);
 	}
 
 	/* SLIT: System Locality Information Table */
 	result = acpi_table_parse(ACPI_SLIT, acpi_parse_slit);
-	if (result < 1) {
-		/* FIXME */
-		printk("Warning: acpi_table_parse(ACPI_SLIT) returned %d!\n",result);
-	}
 
 	acpi_numa_arch_fixup();
 	return 0;

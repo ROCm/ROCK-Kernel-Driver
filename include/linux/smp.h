@@ -8,6 +8,8 @@
 
 #include <linux/config.h>
 
+extern void cpu_idle(void);
+
 #ifdef CONFIG_SMP
 
 #include <linux/preempt.h>

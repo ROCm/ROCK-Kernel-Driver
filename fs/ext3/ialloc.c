@@ -558,7 +558,7 @@ got:
 	/* This is the optimal IO size (for stat), not the fs block size */
 	inode->i_blksize = PAGE_SIZE;
 	inode->i_blocks = 0;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;
 
 	memset(ei->i_data, 0, sizeof(ei->i_data));
 	ei->i_next_alloc_block = 0;
@@ -596,6 +596,11 @@ got:
 	spin_unlock(&sbi->s_next_gen_lock);
 
 	ei->i_state = EXT3_STATE_NEW;
+	if (EXT3_INODE_SIZE(inode->i_sb) > EXT3_GOOD_OLD_INODE_SIZE) {
+		ei->i_extra_isize = sizeof(__u16)	/* i_extra_isize */
+				+ sizeof(__u16);	/* i_pad1 */
+	} else
+		ei->i_extra_isize = 0;
 
 	ret = inode;
 	if(DQUOT_ALLOC_INODE(inode)) {

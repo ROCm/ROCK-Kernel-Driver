@@ -928,7 +928,7 @@ call_refreshresult(struct rpc_task *task)
 	task->tk_action = call_reserve;
 	if (status >= 0 && rpcauth_uptodatecred(task))
 		return;
-	if (rpcauth_deadcred(task)) {
+	if (status == -EACCES) {
 		rpc_exit(task, -EACCES);
 		return;
 	}
@@ -970,23 +970,31 @@ call_verify(struct rpc_task *task)
 	struct kvec *iov = &task->tk_rqstp->rq_rcv_buf.head[0];
 	int len = task->tk_rqstp->rq_rcv_buf.len >> 2;
 	u32	*p = iov->iov_base, n;
+	int error = -EACCES;
 
 	if ((len -= 3) < 0)
-		goto garbage;
+		goto out_overflow;
 	p += 1;	/* skip XID */
 
 	if ((n = ntohl(*p++)) != RPC_REPLY) {
 		printk(KERN_WARNING "call_verify: not an RPC reply: %x\n", n);
-		goto garbage;
+		goto out_retry;
 	}
 	if ((n = ntohl(*p++)) != RPC_MSG_ACCEPTED) {
-		int	error = -EACCES;
-
 		if (--len < 0)
-			goto garbage;
-		if ((n = ntohl(*p++)) != RPC_AUTH_ERROR) {
-			printk(KERN_WARNING "call_verify: RPC call rejected: %x\n", n);
-		} else if (--len < 0)
+			goto out_overflow;
+		switch ((n = ntohl(*p++))) {
+			case RPC_AUTH_ERROR:
+				break;
+			case RPC_MISMATCH:
+				printk(KERN_WARNING "%s: RPC call version mismatch!\n", __FUNCTION__);
+				goto out_eio;
+			default:
+				printk(KERN_WARNING "%s: RPC call rejected, unknown error: %x\n", __FUNCTION__, n);
+				goto out_eio;
+		}
+		if (--len < 0)
+			goto out_overflow;
 		switch ((n = ntohl(*p++))) {
 		case RPC_AUTH_REJECTEDCRED:
 		case RPC_AUTH_REJECTEDVERF:
@@ -1017,20 +1025,18 @@ call_verify(struct rpc_task *task)
 		default:
 			printk(KERN_WARNING "call_verify: unknown auth error: %x\n", n);
 			error = -EIO;
-		} else
-			goto garbage;
+		}
 		dprintk("RPC: %4d call_verify: call rejected %d\n",
 						task->tk_pid, n);
-		rpc_exit(task, error);
-		return NULL;
+		goto out_err;
 	}
 	if (!(p = rpcauth_checkverf(task, p))) {
 		printk(KERN_WARNING "call_verify: auth check failed\n");
-		goto garbage;		/* bad verifier, retry */
+		goto out_retry;		/* bad verifier, retry */
 	}
 	len = p - (u32 *)iov->iov_base - 1;
 	if (len < 0)
-		goto garbage;
+		goto out_overflow;
 	switch ((n = ntohl(*p++))) {
 	case RPC_SUCCESS:
 		return p;
@@ -1053,23 +1059,28 @@ call_verify(struct rpc_task *task)
 				task->tk_client->cl_server);
 		goto out_eio;
 	case RPC_GARBAGE_ARGS:
+		dprintk("RPC: %4d %s: server saw garbage\n", task->tk_pid, __FUNCTION__);
 		break;			/* retry */
 	default:
 		printk(KERN_WARNING "call_verify: server accept status: %x\n", n);
 		/* Also retry */
 	}
 
-garbage:
-	dprintk("RPC: %4d call_verify: server saw garbage\n", task->tk_pid);
+out_retry:
 	task->tk_client->cl_stats->rpcgarbage++;
 	if (task->tk_garb_retry) {
 		task->tk_garb_retry--;
-		dprintk(KERN_WARNING "RPC: garbage, retrying %4d\n", task->tk_pid);
+		dprintk(KERN_WARNING "RPC %s: retrying %4d\n", __FUNCTION__, task->tk_pid);
 		task->tk_action = call_bind;
 		return NULL;
 	}
-	printk(KERN_WARNING "RPC: garbage, exit EIO\n");
+	printk(KERN_WARNING "RPC %s: retry failed, exit EIO\n", __FUNCTION__);
 out_eio:
-	rpc_exit(task, -EIO);
+	error = -EIO;
+out_err:
+	rpc_exit(task, error);
 	return NULL;
+out_overflow:
+	printk(KERN_WARNING "RPC %s: server reply was truncated.\n", __FUNCTION__);
+	goto out_retry;
 }

@@ -1096,15 +1096,13 @@ static void time_out_leases(struct inode *inode)
 */
 void remove_lease(struct file_lock *fl)
 {
-	if (!IS_LEASE(fl))
-		return;
-
 	lock_kernel();
-
+	if (!fl || !IS_LEASE(fl))
+		goto out;
 	fl->fl_type = F_UNLCK | F_INPROGRESS;
 	fl->fl_break_time = jiffies - 10;
 	time_out_leases(fl->fl_file->f_dentry->d_inode);
-
+out:
 	unlock_kernel();
 }
 
@@ -1228,7 +1226,7 @@ void lease_get_mtime(struct inode *inode, struct timespec *time)
 {
 	struct file_lock *flock = inode->i_flock;
 	if (flock && IS_LEASE(flock) && (flock->fl_type & F_WRLCK))
-		*time = CURRENT_TIME;
+		*time = current_fs_time(inode->i_sb);
 	else
 		*time = inode->i_mtime;
 }
@@ -1563,9 +1561,6 @@ int fcntl_getlk(struct file *filp, struct flock __user *l)
 		error = filp->f_op->lock(filp, F_GETLK, &file_lock);
 		if (error < 0)
 			goto out;
-		else if (error == LOCK_USE_CLNT)
-		  /* Bypass for NFS with no locking - 2.0.36 compat */
-		  fl = posix_test_lock(filp, &file_lock);
 		else
 		  fl = (file_lock.fl_type == F_UNLCK ? NULL : &file_lock);
 	} else {
@@ -1708,9 +1703,6 @@ int fcntl_getlk64(struct file *filp, struct flock64 __user *l)
 		error = filp->f_op->lock(filp, F_GETLK, &file_lock);
 		if (error < 0)
 			goto out;
-		else if (error == LOCK_USE_CLNT)
-		  /* Bypass for NFS with no locking - 2.0.36 compat */
-		  fl = posix_test_lock(filp, &file_lock);
 		else
 		  fl = (file_lock.fl_type == F_UNLCK ? NULL : &file_lock);
 	} else {

@@ -41,7 +41,6 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/time.h>
 #include <asm/ppcdebug.h>
@@ -74,7 +73,6 @@ static volatile unsigned int cpu_callin_map[NR_CPUS];
 
 extern unsigned char stab_array[];
 
-extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 
 int smt_enabled_at_boot = 1;
@@ -155,11 +153,6 @@ static void __init smp_space_timers(unsigned int max_cpus)
 			previous_tb = paca[i].next_jiffy_update_tb;
 		}
 	}
-}
-
-void smp_local_timer_interrupt(struct pt_regs * regs)
-{
-	update_process_times(user_mode(regs));
 }
 
 void smp_message_recv(int msg, struct pt_regs *regs)
@@ -523,7 +516,8 @@ int __devinit start_secondary(void *unused)
 
 	local_irq_enable();
 
-	return cpu_idle(NULL);
+	cpu_idle();
+	return 0;
 }
 
 int setup_profiling_timer(unsigned int multiplier)

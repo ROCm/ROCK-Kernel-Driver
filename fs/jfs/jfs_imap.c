@@ -2604,6 +2604,12 @@ diNewIAG(struct inomap * imap, int *iagnop, int agno, struct metapage ** mpp)
 		for (i = 0; i < SMAPSZ; i++)
 			iagp->inosmap[i] = cpu_to_le32(ONES);
 
+		/*
+		 * Invalidate the page after writing and syncing it.
+		 * After it's initialized, we access it in a different
+		 * address space
+		 */
+		set_bit(META_discard, &mp->flag);
 		flush_metapage(mp);
 
 		/*

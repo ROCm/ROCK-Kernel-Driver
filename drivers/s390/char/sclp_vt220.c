@@ -42,7 +42,6 @@ struct sclp_vt220_request {
 	struct list_head list;
 	struct sclp_req sclp_req;
 	int retry_count;
-	struct timer_list retry_timer;
 };
 
 /* VT220 SCCB */
@@ -96,7 +95,7 @@ static int sclp_vt220_initialized = 0;
 static int sclp_vt220_flush_later;
 
 static void sclp_vt220_receiver_fn(struct evbuf_header *evbuf);
-static void __sclp_vt220_emit(struct sclp_vt220_request *request);
+static int __sclp_vt220_emit(struct sclp_vt220_request *request);
 static void sclp_vt220_emit_current(void);
 
 /* Registration structure for our interest in SCLP event buffers */
@@ -116,25 +115,24 @@ static void
 sclp_vt220_process_queue(struct sclp_vt220_request *request)
 {
 	unsigned long flags;
-	struct sclp_vt220_request *next;
 	void *page;
 
-	/* Put buffer back to list of empty buffers */
-	page = request->sclp_req.sccb;
-	spin_lock_irqsave(&sclp_vt220_lock, flags);
-	/* Move request from outqueue to empty queue */
-	list_del(&request->list);
-	sclp_vt220_outqueue_count--;
-	list_add_tail((struct list_head *) page, &sclp_vt220_empty);
-	/* Check if there is a pending buffer on the out queue. */
-	next = NULL;
-	if (!list_empty(&sclp_vt220_outqueue))
-		next = list_entry(sclp_vt220_outqueue.next,
-				  struct sclp_vt220_request, list);
-	spin_unlock_irqrestore(&sclp_vt220_lock, flags);
-	if (next != NULL)
-		__sclp_vt220_emit(next);
-	else if (sclp_vt220_flush_later)
+	do {
+		/* Put buffer back to list of empty buffers */
+		page = request->sclp_req.sccb;
+		spin_lock_irqsave(&sclp_vt220_lock, flags);
+		/* Move request from outqueue to empty queue */
+		list_del(&request->list);
+		sclp_vt220_outqueue_count--;
+		list_add_tail((struct list_head *) page, &sclp_vt220_empty);
+		/* Check if there is a pending buffer on the out queue. */
+		request = NULL;
+		if (!list_empty(&sclp_vt220_outqueue))
+			request = list_entry(sclp_vt220_outqueue.next,
+					     struct sclp_vt220_request, list);
+		spin_unlock_irqrestore(&sclp_vt220_lock, flags);
+	} while (request && __sclp_vt220_emit(request));
+	if (request == NULL && sclp_vt220_flush_later)
 		sclp_vt220_emit_current();
 	wake_up(&sclp_vt220_waitq);
 	/* Check if the tty needs a wake up call */
@@ -143,25 +141,7 @@ sclp_vt220_process_queue(struct sclp_vt220_request *request)
 	}
 }
 
-/*
- * Retry sclp write request after waiting some time for an sclp equipment
- * check to pass.
- */
-static void
-sclp_vt220_retry(unsigned long data)
-{
-	struct sclp_vt220_request *request;
-	struct sclp_vt220_sccb *sccb;
-
-	request = (struct sclp_vt220_request *) data;
-	request->sclp_req.status = SCLP_REQ_FILLED;
-	sccb = (struct sclp_vt220_sccb *) request->sclp_req.sccb;
-	sccb->header.response_code = 0x0000;
-	sclp_add_request(&request->sclp_req);
-}
-
-#define SCLP_BUFFER_MAX_RETRY		5
-#define	SCLP_BUFFER_RETRY_INTERVAL	2
+#define SCLP_BUFFER_MAX_RETRY		1
 
 /*
  * Callback through which the result of a write request is reported by the
@@ -189,29 +169,26 @@ sclp_vt220_callback(struct sclp_req *request, void *data)
 		break;
 
 	case 0x0340: /* Contained SCLP equipment check */
-		if (vt220_request->retry_count++ > SCLP_BUFFER_MAX_RETRY)
+		if (++vt220_request->retry_count > SCLP_BUFFER_MAX_RETRY)
 			break;
 		/* Remove processed buffers and requeue rest */
 		if (sclp_remove_processed((struct sccb_header *) sccb) > 0) {
 			/* Not all buffers were processed */
 			sccb->header.response_code = 0x0000;
 			vt220_request->sclp_req.status = SCLP_REQ_FILLED;
-			sclp_add_request(request);
-			return;
+			if (sclp_add_request(request) == 0)
+				return;
 		}
 		break;
 
 	case 0x0040: /* SCLP equipment check */
-		if (vt220_request->retry_count++ > SCLP_BUFFER_MAX_RETRY)
+		if (++vt220_request->retry_count > SCLP_BUFFER_MAX_RETRY)
 			break;
-		/* Wait some time, then retry request */
-		vt220_request->retry_timer.function = sclp_vt220_retry;
-		vt220_request->retry_timer.data =
-			(unsigned long) vt220_request;
-		vt220_request->retry_timer.expires =
-			jiffies + SCLP_BUFFER_RETRY_INTERVAL*HZ;
-		add_timer(&vt220_request->retry_timer);
-		return;
+		sccb->header.response_code = 0x0000;
+		vt220_request->sclp_req.status = SCLP_REQ_FILLED;
+		if (sclp_add_request(request) == 0)
+			return;
+		break;
 
 	default:
 		break;
@@ -220,22 +197,22 @@ sclp_vt220_callback(struct sclp_req *request, void *data)
 }
 
 /*
- * Emit vt220 request buffer to SCLP.
+ * Emit vt220 request buffer to SCLP. Return zero on success, non-zero
+ * otherwise.
  */
-static void
+static int
 __sclp_vt220_emit(struct sclp_vt220_request *request)
 {
 	if (!(sclp_vt220_register.sclp_send_mask & EvTyp_VT220Msg_Mask)) {
 		request->sclp_req.status = SCLP_REQ_FAILED;
-		sclp_vt220_callback(&request->sclp_req, (void *) request);
-		return;
+		return -EIO;
 	}
 	request->sclp_req.command = SCLP_CMDW_WRITEDATA;
 	request->sclp_req.status = SCLP_REQ_FILLED;
 	request->sclp_req.callback = sclp_vt220_callback;
 	request->sclp_req.callback_data = (void *) request;
 
-	sclp_add_request(&request->sclp_req);
+	return sclp_add_request(&request->sclp_req);
 }
 
 /*
@@ -253,12 +230,12 @@ sclp_vt220_emit(struct sclp_vt220_request *request)
 	spin_unlock_irqrestore(&sclp_vt220_lock, flags);
 	/* Emit only the first buffer immediately - callback takes care of
 	 * the rest */
-	if (count == 0)
-		__sclp_vt220_emit(request);
+	if (count == 0 && __sclp_vt220_emit(request))
+		sclp_vt220_process_queue(request);
 }
 
 /*
- * Queue and emit current request.
+ * Queue and emit current request. Return zero on success, non-zero otherwise.
  */
 static void
 sclp_vt220_emit_current(void)
@@ -300,7 +277,6 @@ sclp_vt220_initialize_page(void *page)
 	/* Place request structure at end of page */
 	request = ((struct sclp_vt220_request *)
 			((addr_t) page + PAGE_SIZE)) - 1;
-	init_timer(&request->retry_timer);
 	request->retry_count = 0;
 	request->sclp_req.sccb = page;
 	/* SCCB goes at start of page */

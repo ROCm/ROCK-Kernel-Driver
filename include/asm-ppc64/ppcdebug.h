@@ -16,13 +16,14 @@
  ********************************************************************/
 
 #include <linux/config.h>
+#include <linux/types.h>
 #include <asm/udbg.h>
 #include <stdarg.h>
 
 #define PPCDBG_BITVAL(X)     ((1UL)<<((unsigned long)(X)))
 
 /* Defined below are the bit positions of various debug flags in the
- * debug_switch variable (defined in naca.h).
+ * ppc64_debug_switch variable.
  * -- When adding new values, please enter them into trace names below -- 
  *
  * Values 62 & 63 can be used to stress the hardware page table management
@@ -63,6 +64,8 @@
 /* #define PPC_DEBUG_DEFAULT    PPCDBG_ALL        */
 
 #define PPCDBG_NUM_FLAGS     64
+
+extern u64 ppc64_debug_switch;
 
 #ifdef WANT_PPCDBG_TAB
 /* A table of debug switch names to allow name lookup in xmon 

@@ -67,6 +67,15 @@ config SECURITY_SELINUX_DEVELOP
 	  can interactively toggle the kernel between enforcing mode and
 	  permissive mode (if permitted by the policy) via /selinux/enforce.
 
+config SECURITY_SELINUX_AVC_STATS
+	bool "NSA SELinux AVC Statistics"
+	depends on SECURITY_SELINUX
+	default y
+	help
+	  This option collects access vector cache statistics to
+	  /selinux/avc/cache_stats, which may be monitored via
+	  tools such as avcstat.
+
 config SECURITY_SELINUX_MLS
 	bool "NSA SELinux MLS policy (EXPERIMENTAL)"
 	depends on SECURITY_SELINUX && EXPERIMENTAL

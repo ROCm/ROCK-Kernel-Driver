@@ -2021,6 +2021,15 @@ N: H.J. Lu
 E: hjl@gnu.ai.mit.edu
 D: GCC + libraries hacker
 
+N: Michal Ludvig
+E: michal@logix.cz
+W: http://www.logix.cz/michal
+P: 1024D/C45B2218 1162 6471 D391 76E0 9F99  29DA 0C3A 2509 C45B 2218
+D: VIA PadLock driver
+D: Netfilter pkttype module
+S: Prague 4
+S: Czech Republic
+
 N: Tuomas J. Lukka
 E: Tuomas.Lukka@Helsinki.FI
 D: Original dual-monitor patches
@@ -3569,7 +3578,6 @@ S: The Netherlands
 
 N: David Woodhouse
 E: dwmw2@infradead.org
-E: dwmw2@redhat.com
 D: ARCnet stuff, Applicom board driver, SO_BINDTODEVICE,
 D: some Alpha platform porting from 2.0, Memory Technology Devices,
 D: Acquire watchdog timer, PC speaker driver maintenance,

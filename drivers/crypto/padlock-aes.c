@@ -58,8 +58,6 @@
 #define AES_EXTENDED_KEY_SIZE	64	/* in uint32_t units */
 #define AES_EXTENDED_KEY_SIZE_B	(AES_EXTENDED_KEY_SIZE * sizeof(uint32_t))
 
-static inline int aes_hw_extkey_available (uint8_t key_len);
-
 struct aes_ctx {
 	uint32_t e_data[AES_EXTENDED_KEY_SIZE+4];
 	uint32_t d_data[AES_EXTENDED_KEY_SIZE+4];
@@ -269,6 +267,19 @@ gen_tabs (void)
     t ^= E_KEY[8 * i + 7]; E_KEY[8 * i + 15] = t;   \
 }
 
+/* Tells whether the ACE is capable to generate
+   the extended key for a given key_len. */
+static inline int
+aes_hw_extkey_available(uint8_t key_len)
+{
+	/* TODO: We should check the actual CPU model/stepping
+	         as it's possible that the capability will be
+	         added in the next CPU revisions. */
+	if (key_len == 16)
+		return 1;
+	return 0;
+}
+
 static int
 aes_set_key(void *ctx_arg, const uint8_t *in_key, unsigned int key_len, uint32_t *flags)
 {
@@ -356,19 +367,6 @@ aes_set_key(void *ctx_arg, const uint8_t *in_key, unsigned int key_len, uint32_t
 	return 0;
 }
 
-/* Tells whether the ACE is capable to generate
-   the extended key for a given key_len. */
-static inline int
-aes_hw_extkey_available(uint8_t key_len)
-{
-	/* TODO: We should check the actual CPU model/stepping
-	         as it's possible that the capability will be
-	         added in the next CPU revisions. */
-	if (key_len == 16)
-		return 1;
-	return 0;
-}
-
 /* ====== Encryption/decryption routines ====== */
 
 /* This is the real call to PadLock. */
@@ -378,7 +376,7 @@ padlock_xcrypt_ecb(uint8_t *input, uint8_t *output, uint8_t *key,
 {
 	asm volatile ("pushfl; popfl");		/* enforce key reload. */
 	asm volatile (".byte 0xf3,0x0f,0xa7,0xc8"	/* rep xcryptecb */
-		      : "=m"(*output), "+S"(input), "+D"(output)
+		      : "+S"(input), "+D"(output)
 		      : "d"(control_word), "b"(key), "c"(count));
 }
 

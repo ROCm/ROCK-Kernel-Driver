@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/highmem.h>
 #include <linux/security.h>
+#include <linux/acct.h>
 #include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
@@ -250,6 +251,9 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 					   new_addr + new_len);
 	}
 
+	acct_update_integrals();
+	update_mem_hiwater();
+
 	return new_addr;
 }
 
@@ -386,6 +390,8 @@ unsigned long do_mremap(unsigned long addr,
 				make_pages_present(addr + old_len,
 						   addr + new_len);
 			}
+			acct_update_integrals();
+			update_mem_hiwater();
 			ret = addr;
 			goto out;
 		}

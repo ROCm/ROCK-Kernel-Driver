@@ -534,7 +534,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     }
 
     dir->i_size += paste_size;
-    dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+    dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
     if (!S_ISDIR (inode->i_mode) && visible)
 	// reiserfs_mkdir or reiserfs_rename will do that by itself
 	reiserfs_update_sd (th, dir);
@@ -545,7 +545,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
 
 /* quota utility function, call if you've had to abort after calling
 ** new_inode_init, and have not called reiserfs_new_inode yet.
-** This should only be called on inodes that do not hav stat data
+** This should only be called on inodes that do not have stat data
 ** inserted into the tree yet.
 */
 static int drop_new_inode(struct inode *inode) {
@@ -557,10 +557,9 @@ static int drop_new_inode(struct inode *inode) {
 }
 
 /* utility function that does setup for reiserfs_new_inode.  
-** DQUOT_ALLOC_INODE cannot be called inside a transaction, so we had
-** to pull some bits of reiserfs_new_inode out into this func.
-** Yes, the actual quota calls are missing, they are part of the quota
-** patch.
+** DQUOT_INIT needs lots of credits so it's better to have it
+** outside of a transaction, so we had to pull some bits of
+** reiserfs_new_inode out into this func.
 */
 static int new_inode_init(struct inode *inode, struct inode *dir, int mode) {
 
@@ -578,10 +577,6 @@ static int new_inode_init(struct inode *inode, struct inode *dir, int mode) {
         inode->i_gid = current->fsgid;
     }
     DQUOT_INIT(inode);
-    if (DQUOT_ALLOC_INODE(inode)) {
-        drop_new_inode(inode);
-	return -EDQUOT;
-    }
     return 0 ;
 }
 
@@ -590,16 +585,15 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
 {
     int retval;
     struct inode * inode;
-    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 ;
+    /* We need blocks for transaction + (user+group)*(quotas for new inode + update of quota for directory owner) */
+    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 + 2 * (REISERFS_QUOTA_INIT_BLOCKS+REISERFS_QUOTA_TRANS_BLOCKS);
     struct reiserfs_transaction_handle th ;
     int locked;
 
     if (!(inode = new_inode(dir->i_sb))) {
 	return -ENOMEM ;
     }
-    retval = new_inode_init(inode, dir, mode);
-    if (retval)
-        return retval;
+    new_inode_init(inode, dir, mode);
 
     locked = reiserfs_cache_default_acl (dir);
 
@@ -658,7 +652,8 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     int retval;
     struct inode * inode;
     struct reiserfs_transaction_handle th ;
-    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
+    /* We need blocks for transaction + (user+group)*(quotas for new inode + update of quota for directory owner) */
+    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 2 * (REISERFS_QUOTA_INIT_BLOCKS+REISERFS_QUOTA_TRANS_BLOCKS);
     int locked;
 
     if (!new_valid_dev(rdev))
@@ -667,9 +662,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     if (!(inode = new_inode(dir->i_sb))) {
 	return -ENOMEM ;
     }
-    retval = new_inode_init(inode, dir, mode);
-    if (retval)
-        return retval;
+    new_inode_init(inode, dir, mode);
 
     locked = reiserfs_cache_default_acl (dir);
 
@@ -733,7 +726,8 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     int retval;
     struct inode * inode;
     struct reiserfs_transaction_handle th ;
-    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
+    /* We need blocks for transaction + (user+group)*(quotas for new inode + update of quota for directory owner) */
+    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 2 * (REISERFS_QUOTA_INIT_BLOCKS+REISERFS_QUOTA_TRANS_BLOCKS);
     int locked;
 
 #ifdef DISPLACE_NEW_PACKING_LOCALITIES
@@ -744,9 +738,7 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     if (!(inode = new_inode(dir->i_sb))) {
 	return -ENOMEM ;
     }
-    retval = new_inode_init(inode, dir, mode);
-    if (retval)
-        return retval;
+    new_inode_init(inode, dir, mode);
 
     locked = reiserfs_cache_default_acl (dir);
 
@@ -836,8 +828,9 @@ static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
     struct reiserfs_dir_entry de;
 
 
-    /* we will be doing 2 balancings and update 2 stat data */
-    jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 + 2;
+    /* we will be doing 2 balancings and update 2 stat data, we change quotas
+     * of the owner of the directory and of the owner of the parent directory */
+    jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 + 2 + 2 * (REISERFS_QUOTA_INIT_BLOCKS+REISERFS_QUOTA_TRANS_BLOCKS);
 
     reiserfs_write_lock(dir->i_sb);
     retval = journal_begin(&th, dir->i_sb, jbegin_count) ;
@@ -881,7 +874,7 @@ static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
 			  "!= 2 (%d)", __FUNCTION__, inode->i_nlink);
 
     inode->i_nlink = 0;
-    inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+    inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
     reiserfs_update_sd (&th, inode);
 
     DEC_DIR_INODE_NLINK(dir)
@@ -920,8 +913,9 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
     inode = dentry->d_inode;
 
     /* in this transaction we can be doing at max two balancings and update
-       two stat datas */
-    jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 + 2;
+       two stat datas, we change quotas of the owner of the directory and of
+       the owner of the parent directory */
+    jbegin_count = JOURNAL_PER_BALANCE_CNT * 2 + 2 + 2 * (REISERFS_QUOTA_INIT_BLOCKS+REISERFS_QUOTA_TRANS_BLOCKS);
 
     reiserfs_write_lock(dir->i_sb);
     retval = journal_begin(&th, dir->i_sb, jbegin_count) ;
@@ -969,11 +963,11 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
 	inode->i_nlink++;
 	goto end_unlink;
     }
-    inode->i_ctime = CURRENT_TIME;
+    inode->i_ctime = CURRENT_TIME_SEC;
     reiserfs_update_sd (&th, inode);
 
     dir->i_size -= (de.de_entrylen + DEH_SIZE);
-    dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+    dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
     reiserfs_update_sd (&th, dir);
 
     if (!savelink)
@@ -1005,15 +999,13 @@ static int reiserfs_symlink (struct inode * parent_dir,
     int item_len;
     struct reiserfs_transaction_handle th ;
     int mode = S_IFLNK | S_IRWXUGO;
-    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
+    /* We need blocks for transaction + (user+group)*(quotas for new inode + update of quota for directory owner) */
+    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 2 * (REISERFS_QUOTA_INIT_BLOCKS+REISERFS_QUOTA_TRANS_BLOCKS);
 
     if (!(inode = new_inode(parent_dir->i_sb))) {
 	return -ENOMEM ;
     }
-    retval = new_inode_init(inode, parent_dir, mode);
-    if (retval) {
-        return retval;
-    }
+    new_inode_init(inode, parent_dir, mode);
 
     reiserfs_write_lock(parent_dir->i_sb);
     item_len = ROUND_UP (strlen (symname));
@@ -1083,7 +1075,8 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
     int retval;
     struct inode *inode = old_dentry->d_inode;
     struct reiserfs_transaction_handle th ;
-    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
+    /* We need blocks for transaction + update of quotas for the owners of the directory */
+    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 2 * REISERFS_QUOTA_TRANS_BLOCKS;
 
     reiserfs_write_lock(dir->i_sb);
     if (inode->i_nlink >= REISERFS_LINK_MAX) {
@@ -1121,7 +1114,7 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
 	return err ? err : retval;
     }
 
-    inode->i_ctime = CURRENT_TIME;
+    inode->i_ctime = CURRENT_TIME_SEC;
     reiserfs_update_sd (&th, inode);
 
     atomic_inc(&inode->i_count) ;
@@ -1201,8 +1194,9 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
        (2) new directory and (3) maybe old object stat data (when it is
        directory) and (4) maybe stat data of object to which new entry
        pointed initially and (5) maybe block containing ".." of
-       renamed directory */
-    jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 5;
+       renamed directory
+       quota updates: two parent directories */
+    jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 5 + 4 * REISERFS_QUOTA_TRANS_BLOCKS;
 
     old_inode = old_dentry->d_inode;
     new_dentry_inode = new_dentry->d_inode;
@@ -1368,7 +1362,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 
     mark_de_hidden (old_de.de_deh + old_de.de_entry_num);
     journal_mark_dirty (&th, old_dir->i_sb, old_de.de_bh);
-    ctime = CURRENT_TIME;
+    ctime = CURRENT_TIME_SEC;
     old_dir->i_ctime = old_dir->i_mtime = ctime;
     new_dir->i_ctime = new_dir->i_mtime = ctime;
     /* thanks to Alex Adriaanse <alex_a@caltech.edu> for patch which adds ctime update of

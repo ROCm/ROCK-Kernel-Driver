@@ -36,6 +36,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/smp.h>
+#include <linux/threads.h>
 #include <linux/timer.h>
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
@@ -2540,7 +2541,7 @@ asmlinkage void __sched schedule(void)
 	 * schedule() atomically, we ignore that path for now.
 	 * Otherwise, whine if we are scheduling when we should not be.
 	 */
-	if (likely(!(current->exit_state & (EXIT_DEAD | EXIT_ZOMBIE)))) {
+	if (likely(!current->exit_state)) {
 		if (unlikely(in_atomic())) {
 			printk(KERN_ERR "scheduling while atomic: "
 				"%s/0x%08x/%d\n",
@@ -4169,7 +4170,8 @@ static int __init isolated_cpu_setup(char *str)
 	str = get_options(str, ARRAY_SIZE(ints), ints);
 	cpus_clear(cpu_isolated_map);
 	for (i = 1; i <= ints[0]; i++)
-		cpu_set(ints[i], cpu_isolated_map);
+		if (ints[i] < NR_CPUS)
+			cpu_set(ints[i], cpu_isolated_map);
 	return 1;
 }
 
@@ -4631,7 +4633,7 @@ void __might_sleep(char *file, int line)
 	static unsigned long prev_jiffy;	/* ratelimiting */
 
 	if ((in_atomic() || irqs_disabled()) &&
-	    system_state == SYSTEM_RUNNING) {
+	    system_state == SYSTEM_RUNNING && !oops_in_progress) {
 		if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
 			return;
 		prev_jiffy = jiffies;

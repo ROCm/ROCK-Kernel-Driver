@@ -187,8 +187,6 @@ void init_main_window(const gchar * glade_file)
 	GtkWidget *widget;
 	GtkTextBuffer *txtbuf;
 	char title[256];
-	GdkPixmap *pixmap;
-	GdkBitmap *mask;
 	GtkStyle *style;
 
 	xml = glade_xml_new(glade_file, "window1", NULL);
@@ -220,36 +218,6 @@ void init_main_window(const gchar * glade_file)
 
 	style = gtk_widget_get_style(main_wnd);
 	widget = glade_xml_get_widget(xml, "toolbar1");
-
-	pixmap = gdk_pixmap_create_from_xpm_d(main_wnd->window, &mask,
-					      &style->bg[GTK_STATE_NORMAL],
-					      (gchar **) xpm_single_view);
-	gtk_image_set_from_pixmap(GTK_IMAGE
-				  (((GtkToolbarChild
-				     *) (g_list_nth(GTK_TOOLBAR(widget)->
-						    children,
-						    5)->data))->icon),
-				  pixmap, mask);
-	pixmap =
-	    gdk_pixmap_create_from_xpm_d(main_wnd->window, &mask,
-					 &style->bg[GTK_STATE_NORMAL],
-					 (gchar **) xpm_split_view);
-	gtk_image_set_from_pixmap(GTK_IMAGE
-				  (((GtkToolbarChild
-				     *) (g_list_nth(GTK_TOOLBAR(widget)->
-						    children,
-						    6)->data))->icon),
-				  pixmap, mask);
-	pixmap =
-	    gdk_pixmap_create_from_xpm_d(main_wnd->window, &mask,
-					 &style->bg[GTK_STATE_NORMAL],
-					 (gchar **) xpm_tree_view);
-	gtk_image_set_from_pixmap(GTK_IMAGE
-				  (((GtkToolbarChild
-				     *) (g_list_nth(GTK_TOOLBAR(widget)->
-						    children,
-						    7)->data))->icon),
-				  pixmap, mask);
 
 	switch (view_mode) {
 	case SINGLE_VIEW:

@@ -212,6 +212,7 @@ get_sb_pseudo(struct file_system_type *fs_type, char *name,
 	s->s_blocksize_bits = 10;
 	s->s_magic = magic;
 	s->s_op = ops ? ops : &default_ops;
+	s->s_time_gran = 1;
 	root = new_inode(s);
 	if (!root)
 		goto Enomem;
@@ -374,6 +375,7 @@ int simple_fill_super(struct super_block *s, int magic, struct tree_descr *files
 	s->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	s->s_magic = magic;
 	s->s_op = &s_ops;
+	s->s_time_gran = 1;
 
 	inode = new_inode(s);
 	if (!inode)

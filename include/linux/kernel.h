@@ -16,6 +16,8 @@
 #include <asm/byteorder.h>
 #include <asm/bug.h>
 
+extern const char linux_banner[];
+
 #define INT_MAX		((int)(~0U>>1))
 #define INT_MIN		(-INT_MAX - 1)
 #define UINT_MAX	(~0U)
@@ -134,6 +136,7 @@ static inline void console_verbose(void)
 
 extern void bust_spinlocks(int yes);
 extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in progress */
+extern int panic_timeout;
 extern int panic_on_oops;
 extern int tainted;
 extern const char *print_tainted(void);

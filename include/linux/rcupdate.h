@@ -65,7 +65,6 @@ struct rcu_ctrlblk {
 	long	cur;		/* Current batch number.                      */
 	long	completed;	/* Number of the last completed batch         */
 	int	next_pending;	/* Is the next batch already waiting?         */
-	seqcount_t lock;	/* For atomic reads of cur and next_pending.  */
 } ____cacheline_maxaligned_in_smp;
 
 /* Is batch a before batch b ? */
@@ -88,9 +87,7 @@ static inline int rcu_batch_after(long a, long b)
 struct rcu_data {
 	/* 1) quiescent state handling : */
 	long		quiescbatch;     /* Batch # for grace period */
-	long		qsctr;		 /* User-mode/idle loop etc. */
-	long            last_qsctr;	 /* value of qsctr at beginning */
-					 /* of rcu grace period */
+	int		passed_quiesc;	 /* User-mode/idle loop etc. */
 	int		qs_pending;	 /* core waits for quiesc state */
 
 	/* 2) batch handling */
@@ -110,17 +107,20 @@ extern struct rcu_ctrlblk rcu_ctrlblk;
 extern struct rcu_ctrlblk rcu_bh_ctrlblk;
 
 /*
- * Increment the quiscent state counter.
+ * Increment the quiescent state counter.
+ * The counter is a bit degenerated: We do not need to know
+ * how many quiescent states passed, just if there was at least
+ * one since the start of the grace period. Thus just a flag.
  */
 static inline void rcu_qsctr_inc(int cpu)
 {
 	struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
-	rdp->qsctr++;
+	rdp->passed_quiesc = 1;
 }
 static inline void rcu_bh_qsctr_inc(int cpu)
 {
 	struct rcu_data *rdp = &per_cpu(rcu_bh_data, cpu);
-	rdp->qsctr++;
+	rdp->passed_quiesc = 1;
 }
 
 static inline int __rcu_pending(struct rcu_ctrlblk *rcp,
