@@ -31,12 +31,15 @@ struct svc_sock {
 #define	SK_QUED		5			/* on serv->sk_sockets */
 #define	SK_DEAD		6			/* socket closed */
 
+	int			sk_reserved;	/* space on outq that is reserved */
+
 	int			(*sk_recvfrom)(struct svc_rqst *rqstp);
 	int			(*sk_sendto)(struct svc_rqst *rqstp);
 
 	/* We keep the old state_change and data_ready CB's here */
 	void			(*sk_ostate)(struct sock *);
 	void			(*sk_odata)(struct sock *, int bytes);
+	void			(*sk_owspace)(struct sock *);
 
 	/* private TCP part */
 	int			sk_reclen;	/* length of record */
@@ -52,5 +55,6 @@ void		svc_delete_socket(struct svc_sock *);
 int		svc_recv(struct svc_serv *, struct svc_rqst *, long);
 int		svc_send(struct svc_rqst *);
 void		svc_drop(struct svc_rqst *);
+void		svc_sock_update_bufs(struct svc_serv *serv);
 
 #endif /* SUNRPC_SVCSOCK_H */

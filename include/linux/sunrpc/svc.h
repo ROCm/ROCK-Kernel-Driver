@@ -115,6 +115,10 @@ struct svc_rqst {
 	void *			rq_argp;	/* decoded arguments */
 	void *			rq_resp;	/* xdr'd results */
 
+	int			rq_reserved;	/* space on socket outq
+						 * reserved for this request
+						 */
+
 	/* Catering to nfsd */
 	struct svc_client *	rq_client;	/* RPC peer info */
 	struct svc_cacherep *	rq_cacherep;	/* cache info */
@@ -163,6 +167,7 @@ struct svc_procedure {
 	unsigned int		pc_ressize;	/* result struct size */
 	unsigned int		pc_count;	/* call count */
 	unsigned int		pc_cachetype;	/* cache info (NFS) */
+	unsigned int		pc_xdrressize;	/* maximum size of XDR reply */
 };
 
 /*
@@ -180,5 +185,6 @@ void		   svc_destroy(struct svc_serv *);
 int		   svc_process(struct svc_serv *, struct svc_rqst *);
 int		   svc_register(struct svc_serv *, int, unsigned short);
 void		   svc_wake_up(struct svc_serv *);
+void		   svc_reserve(struct svc_rqst *rqstp, int space);
 
 #endif /* SUNRPC_SVC_H */
