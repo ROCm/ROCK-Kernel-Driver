@@ -121,12 +121,6 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 	if (!file)
 		goto bad;
 
-	retval = security_ops->file_llseek(file);
-	if (retval) {
-		fput(file);
-		goto bad;
-	}
-
 	retval = -EINVAL;
 	if (origin <= 2) {
 		loff_t res = llseek(file, offset, origin);
@@ -152,10 +146,6 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 	file = fget(fd);
 	if (!file)
 		goto bad;
-
-	retval = security_ops->file_llseek(file);
-	if (retval)
-		goto out_putf;
 
 	retval = -EINVAL;
 	if (origin > 2)

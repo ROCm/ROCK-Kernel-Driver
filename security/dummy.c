@@ -344,11 +344,6 @@ static void dummy_file_free_security (struct file *file)
 	return;
 }
 
-static int dummy_file_llseek (struct file *file)
-{
-	return 0;
-}
-
 static int dummy_file_ioctl (struct file *file, unsigned int command,
 			     unsigned long arg)
 {
@@ -602,7 +597,6 @@ struct security_operations dummy_security_ops = {
 	.file_permission =		dummy_file_permission,
 	.file_alloc_security =		dummy_file_alloc_security,
 	.file_free_security =		dummy_file_free_security,
-	.file_llseek =			dummy_file_llseek,
 	.file_ioctl =			dummy_file_ioctl,
 	.file_mmap =			dummy_file_mmap,
 	.file_mprotect =		dummy_file_mprotect,
