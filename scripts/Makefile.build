@@ -163,12 +163,12 @@ endif
 # Single-part modules are special since we need to mark them in $(MODVERDIR)
 
 $(single-used-m): %.o: %.c FORCE
-	$(touch-module)
 ifdef CONFIG_MODVERSIONS
 	$(call if_changed_rule,vcc_o_c)
 else
 	$(call if_changed_dep,cc_o_c)
 endif
+	$(touch-module)
 
 quiet_cmd_cc_lst_c = MKLST   $@
       cmd_cc_lst_c = $(CC) $(c_flags) -g -c -o $*.o $< && \
@@ -262,8 +262,8 @@ $(multi-used-y) : %.o: $(multi-objs-y) FORCE
 	$(call if_changed,link_multi-y)
 
 $(multi-used-m) : %.o: $(multi-objs-m) FORCE
-	$(touch-module)
 	$(call if_changed,link_multi-m)
+	$(touch-module)
 
 targets += $(multi-used-y) $(multi-used-m)
 
