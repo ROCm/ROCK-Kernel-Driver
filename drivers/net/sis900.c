@@ -2199,6 +2199,7 @@ static int sis900_suspend(struct pci_dev *pci_dev, u32 state)
 		return 0;
 
 	netif_stop_queue(net_dev);
+	netif_device_detach(net_dev);
 
 	/* Stop the chip's Tx and Rx Status Machine */
 	outl(RxDIS | TxDIS | inl(ioaddr + cr), ioaddr + cr);
