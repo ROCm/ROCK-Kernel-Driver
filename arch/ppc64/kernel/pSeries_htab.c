@@ -86,7 +86,7 @@ static inline void pSeries_unlock_hpte(HPTE *hptep)
 
 static spinlock_t pSeries_tlbie_lock = SPIN_LOCK_UNLOCKED;
 
-static long pSeries_insert_hpte(unsigned long hpte_group, unsigned long vpn,
+static long pSeries_hpte_insert(unsigned long hpte_group, unsigned long vpn,
 				unsigned long prpn, int secondary,
 				unsigned long hpteflags, int bolted, int large)
 {
@@ -144,7 +144,7 @@ static long pSeries_insert_hpte(unsigned long hpte_group, unsigned long vpn,
 	return i;
 }
 
-static long pSeries_remove_hpte(unsigned long hpte_group)
+static long pSeries_hpte_remove(unsigned long hpte_group)
 {
 	HPTE *hptep;
 	Hpte_dword0 dw0;
@@ -455,8 +455,8 @@ void hpte_init_pSeries(void)
 	ppc_md.hpte_invalidate	= pSeries_hpte_invalidate;
 	ppc_md.hpte_updatepp	= pSeries_hpte_updatepp;
 	ppc_md.hpte_updateboltedpp = pSeries_hpte_updateboltedpp;
-	ppc_md.insert_hpte	= pSeries_insert_hpte;
-	ppc_md.remove_hpte	= pSeries_remove_hpte;
+	ppc_md.hpte_insert	= pSeries_hpte_insert;
+	ppc_md.hpte_remove     	= pSeries_hpte_remove;
 	ppc_md.make_pte		= pSeries_make_pte;
 
 	/* Disable TLB batching on nighthawk */

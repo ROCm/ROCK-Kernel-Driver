@@ -40,14 +40,14 @@ struct machdep_calls {
 					 int large);
 	void            (*hpte_updateboltedpp)(unsigned long newpp, 
 					       unsigned long ea);
-	long		(*insert_hpte)(unsigned long hpte_group,
+	long		(*hpte_insert)(unsigned long hpte_group,
 				       unsigned long vpn,
 				       unsigned long prpn,
 				       int secondary, 
 				       unsigned long hpteflags, 
 				       int bolted,
 				       int large);
-	long		(*remove_hpte)(unsigned long hpte_group);
+	long		(*hpte_remove)(unsigned long hpte_group);
 	void		(*flush_hash_range)(unsigned long context,
 					    unsigned long number,
 					    int local);

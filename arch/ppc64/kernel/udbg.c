@@ -116,8 +116,6 @@ udbg_puts(const char *s)
 		if (s && *s != '\0') {
 			while ((c = *s++) != '\0')
 				ppc_md.udbg_putc(c);
-		} else {
-			udbg_puts("NULL");
 		}
 	} else {
 		printk("%s", s);
@@ -135,8 +133,7 @@ udbg_write(const char *s, int n)
 		while ( (( c = *s++ ) != '\0') && (remain-- > 0)) {
 			ppc_md.udbg_putc(c);
 		}
-	} else
-		udbg_puts("NULL");
+	}
 	return n - remain;
 }
 

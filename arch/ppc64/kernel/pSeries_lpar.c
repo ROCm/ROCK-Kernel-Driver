@@ -457,7 +457,7 @@ void pSeries_lpar_make_pte(HPTE *htab, unsigned long va, unsigned long pa,
 	 */
 }
 
-static long pSeries_lpar_insert_hpte(unsigned long hpte_group,
+static long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 				     unsigned long vpn, unsigned long prpn,
 				     int secondary, unsigned long hpteflags,
 				     int bolted, int large)
@@ -522,7 +522,7 @@ static long pSeries_lpar_insert_hpte(unsigned long hpte_group,
 
 static spinlock_t pSeries_lpar_tlbie_lock = SPIN_LOCK_UNLOCKED;
 
-static long pSeries_lpar_remove_hpte(unsigned long hpte_group)
+static long pSeries_lpar_hpte_remove(unsigned long hpte_group)
 {
 	unsigned long slot_offset;
 	unsigned long lpar_rc;
@@ -695,11 +695,11 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 
 void pSeries_lpar_mm_init(void)
 {
-	ppc_md.hpte_invalidate  = pSeries_lpar_hpte_invalidate;
-	ppc_md.hpte_updatepp    = pSeries_lpar_hpte_updatepp;
+	ppc_md.hpte_invalidate	= pSeries_lpar_hpte_invalidate;
+	ppc_md.hpte_updatepp	= pSeries_lpar_hpte_updatepp;
 	ppc_md.hpte_updateboltedpp = pSeries_lpar_hpte_updateboltedpp;
-	ppc_md.insert_hpte      = pSeries_lpar_insert_hpte;
-	ppc_md.remove_hpte      = pSeries_lpar_remove_hpte;
-	ppc_md.make_pte         = pSeries_lpar_make_pte;
+	ppc_md.hpte_insert	= pSeries_lpar_hpte_insert;
+	ppc_md.hpte_remove	= pSeries_lpar_hpte_remove;
+	ppc_md.make_pte		= pSeries_lpar_make_pte;
 	ppc_md.flush_hash_range	= pSeries_lpar_flush_hash_range;
 }
