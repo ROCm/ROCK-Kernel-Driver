@@ -191,26 +191,18 @@ void tcf_action_destroy(struct tc_action *act, int bind)
 {
 	struct tc_action *a;
 
-	for (a = act; act; a = act) {
-		if (a && a->ops && a->ops->cleanup) {
+	for (a = act; a; a = act) {
+		if (a->ops && a->ops->cleanup) {
 			DPRINTK("tcf_action_destroy destroying %p next %p\n",
-			        a, a->next ? a->next : NULL);
-			act = act->next;
+			        a, a->next);
 			if (a->ops->cleanup(a, bind) == ACT_P_DELETED)
 				module_put(a->ops->owner);
-			
-			a->ops = NULL;
+			act = act->next;
 			kfree(a);
 		} else { /*FIXME: Remove later - catch insertion bugs*/
 			printk("tcf_action_destroy: BUG? destroying NULL ops\n");
-			if (a) {
-				act = act->next;
-				kfree(a);
-			} else {
-				printk("tcf_action_destroy: BUG? destroying "
-				       "NULL action!\n");
-				break;
-			}
+			act = act->next;
+			kfree(a);
 		}
 	}
 }
@@ -220,7 +212,7 @@ tcf_action_dump_old(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 {
 	int err = -EINVAL;
 
-	if ((a == NULL) || (a->ops == NULL) || (a->ops->dump == NULL))
+	if (a->ops == NULL || a->ops->dump == NULL)
 		return err;
 	return a->ops->dump(skb, a, bind, ref);
 }
@@ -232,8 +224,7 @@ tcf_action_dump_1(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	unsigned char *b = skb->tail;
 	struct rtattr *r;
 
-	if ((a == NULL) || (a->ops == NULL) || (a->ops->dump == NULL) ||
-	    (a->ops->kind == NULL))
+	if (a->ops == NULL || a->ops->dump == NULL)
 		return err;
 
 	RTA_PUT(skb, TCA_KIND, IFNAMSIZ, a->ops->kind);
@@ -563,14 +554,9 @@ static void cleanup_a(struct tc_action *act)
 {
 	struct tc_action *a;
 
-	for (a = act; act; a = act) {
-		if (a) {
-			act = act->next;
-			a->ops = NULL;
-			a->priv = NULL;
-			kfree(a);
-		} else
-			printk("cleanup_a: BUG? empty action\n");
+	for (a = act; a; a = act) {
+		act = a->next;
+		kfree(a);
 	}
 }
 
@@ -715,7 +701,7 @@ tca_action_gd(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int event)
 		if (tb[i] == NULL)
 			break;
 		act = create_a(i+1);
-		if (a != NULL && a != act) {
+		if (a != NULL) {
 			a->next = act;
 			a = act;
 		} else
@@ -826,14 +812,9 @@ tcf_action_add(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int ovr)
 	 * stays intact
 	 * */
 	ret = tcf_add_notify(act, pid, seq, RTM_NEWACTION, n->nlmsg_flags);
-	for (a = act; act; a = act) {
-		if (a) {
-			act = act->next;
-			a->ops = NULL;
-			a->priv = NULL;
-			kfree(a);
-		} else
-			printk("tcf_action_add: BUG? empty action\n");
+	for (a = act; a; a = act) {
+		act = a->next;
+		kfree(a);
 	}
 done:
 	return ret;
