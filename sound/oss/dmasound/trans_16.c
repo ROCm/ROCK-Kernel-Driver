@@ -8,6 +8,9 @@
  *
  *  08/02/2001 Iain Sandoe
  *		split from dmasound_awacs.c
+ *  11/29/2003 Renzo Davoli (King Enzo)
+ *  	- input resampling (for soft rate < hard rate)
+ *  	- software line in gain control
  */
 
 #include <linux/soundcard.h>
@@ -58,7 +61,6 @@ static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
 
 /*** Translations ************************************************************/
 
-extern int expand_bal;	/* Balance factor for expanding (not volume!) */
 static int expand_data;	/* Data for expanding */
 
 static ssize_t pmac_ct_law(const u_char *userPtr, size_t userCount,
@@ -461,11 +463,13 @@ static ssize_t pmac_ct_s8_read(const u_char *userPtr, size_t userCount,
 		u_char data;
 
 		val = *p++;
+		val = (val * software_input_volume) >> 7;
 		data = val >> 8;
 		if (put_user(data, (u_char *)userPtr++))
 			return -EFAULT;
 		if (stereo) {
 			val = *p;
+			val = (val * software_input_volume) >> 7;
 			data = val >> 8;
 			if (put_user(data, (u_char *)userPtr++))
 				return -EFAULT;
@@ -494,11 +498,13 @@ static ssize_t pmac_ct_u8_read(const u_char *userPtr, size_t userCount,
 		u_char data;
 
 		val = *p++;
+		val = (val * software_input_volume) >> 7;
 		data = (val >> 8) ^ 0x80;
 		if (put_user(data, (u_char *)userPtr++))
 			return -EFAULT;
 		if (stereo) {
 			val = *p;
+			val = (val * software_input_volume) >> 7;
 			data = (val >> 8) ^ 0x80;
 			if (put_user(data, (u_char *)userPtr++))
 				return -EFAULT;
@@ -517,24 +523,27 @@ static ssize_t pmac_ct_s16_read(const u_char *userPtr, size_t userCount,
 	ssize_t count, used;
 	int stereo = dmasound.soft.stereo;
 	short *fp = (short *) &frame[*frameUsed];
+	short *up = (short *) userPtr;
 
 	frameLeft >>= 2;
 	userCount >>= (stereo? 2: 1);
 	used = count = min_t(unsigned long, userCount, frameLeft);
-	if (!stereo) {
-		short *up = (short *) userPtr;
-		while (count > 0) {
-			short data;
+	while (count > 0) {
+		short data;
+
+		data = *fp++;
+		data = (data * software_input_volume) >> 7;
+		if (put_user(data, up++))
+			return -EFAULT;
+		if (stereo) {
 			data = *fp;
+			data = (data * software_input_volume) >> 7;
 			if (put_user(data, up++))
 				return -EFAULT;
-			fp+=2;
-			count--;
 		}
-	} else {
-		if (copy_to_user((u_char *)userPtr, fp, count * 4))
-			return -EFAULT;
-	}
+		fp++;
+		count--;
+ 	}
 	*frameUsed += used * 4;
 	return stereo? used * 4: used * 2;
 }
@@ -556,11 +565,13 @@ static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
 		int data;
 
 		data = *fp++;
+		data = (data * software_input_volume) >> 7;
 		data ^= mask;
 		if (put_user(data, up++))
 			return -EFAULT;
 		if (stereo) {
 			data = *fp;
+			data = (data * software_input_volume) >> 7;
 			data ^= mask;
 			if (put_user(data, up++))
 				return -EFAULT;
@@ -571,6 +582,204 @@ static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
 	*frameUsed += used * 4;
 	return stereo? used * 4: used * 2;
 }
+
+/* data in routines (reducing speed)... */
+
+static ssize_t pmac_ctx_s8_read(const u_char *userPtr, size_t userCount,
+			  u_char frame[], ssize_t *frameUsed,
+			  ssize_t frameLeft)
+{
+	short *p = (short *) &frame[*frameUsed];
+	int bal = expand_read_bal;
+	int vall,valr, stereo = dmasound.soft.stereo;
+	int hSpeed = dmasound.hard.speed, sSpeed = dmasound.soft.speed;
+	int utotal, ftotal;
+
+	frameLeft >>= 2;
+	if (stereo)
+		userCount >>= 1;
+	ftotal = frameLeft;
+	utotal = userCount;
+	while (frameLeft) {
+		u_char data;
+
+		if (bal<0 && userCount == 0)
+			break;
+		vall = *p++;
+		vall = (vall * software_input_volume) >> 7;
+		if (stereo) {
+			valr = *p;
+			valr = (valr * software_input_volume) >> 7;
+		}
+		p++;
+		if (bal < 0) {
+			data = vall >> 8;
+			if (put_user(data, (u_char *)userPtr++))
+				return -EFAULT;
+			if (stereo) {
+				data = valr >> 8;
+				if (put_user(data, (u_char *)userPtr++))
+					return -EFAULT;
+			}
+			userCount--;
+			bal += hSpeed;
+		}
+		frameLeft--;
+		bal -= sSpeed;
+	}
+	expand_read_bal=bal;
+	*frameUsed += (ftotal - frameLeft) * 4;
+	utotal -= userCount;
+	return stereo? utotal * 2: utotal;
+}
+
+
+static ssize_t pmac_ctx_u8_read(const u_char *userPtr, size_t userCount,
+			  u_char frame[], ssize_t *frameUsed,
+			  ssize_t frameLeft)
+{
+	short *p = (short *) &frame[*frameUsed];
+	int bal = expand_read_bal;
+	int vall,valr, stereo = dmasound.soft.stereo;
+	int hSpeed = dmasound.hard.speed, sSpeed = dmasound.soft.speed;
+	int utotal, ftotal;
+
+	frameLeft >>= 2;
+	if (stereo)
+		userCount >>= 1;
+	ftotal = frameLeft;
+	utotal = userCount;
+	while (frameLeft) {
+		u_char data;
+
+		if (bal<0 && userCount == 0)
+			break;
+
+		vall = *p++;
+		vall = (vall * software_input_volume) >> 7;
+		if (stereo) {
+			valr = *p;
+			valr = (valr * software_input_volume) >> 7;
+		}
+		p++;
+		if (bal < 0) {
+			data = (vall >> 8) ^ 0x80;
+			if (put_user(data, (u_char *)userPtr++))
+				return -EFAULT;
+			if (stereo) {
+				data = (valr >> 8) ^ 0x80;
+				if (put_user(data, (u_char *)userPtr++))
+					return -EFAULT;
+			}
+			userCount--;
+			bal += hSpeed;
+		}
+		frameLeft--;
+		bal -= sSpeed;
+	}
+	expand_read_bal=bal;
+	*frameUsed += (ftotal - frameLeft) * 4;
+	utotal -= userCount;
+	return stereo? utotal * 2: utotal;
+}
+
+static ssize_t pmac_ctx_s16_read(const u_char *userPtr, size_t userCount,
+			   u_char frame[], ssize_t *frameUsed,
+			   ssize_t frameLeft)
+{
+	int bal = expand_read_bal;
+	short *fp = (short *) &frame[*frameUsed];
+	short *up = (short *) userPtr;
+	int stereo = dmasound.soft.stereo;
+	int hSpeed = dmasound.hard.speed, sSpeed = dmasound.soft.speed;
+	int utotal, ftotal;
+
+	frameLeft >>= 2;
+	userCount >>= (stereo? 2: 1);
+	ftotal = frameLeft;
+	utotal = userCount;
+	while (frameLeft) {
+		int datal,datar;
+
+		if (bal<0 && userCount == 0)
+			break;
+
+		datal = *fp++;
+		datal = (datal * software_input_volume) >> 7;
+		if (stereo) {
+			datar = *fp;
+			datar = (datar * software_input_volume) >> 7;
+		}
+		fp++;
+		if (bal < 0) {
+			if (put_user(datal, up++))
+				return -EFAULT;
+			if (stereo) {
+				if (put_user(datar, up++))
+					return -EFAULT;
+			}
+			userCount--;
+			bal += hSpeed;
+		}
+		frameLeft--;
+		bal -= sSpeed;
+	}
+	expand_read_bal=bal;
+	*frameUsed += (ftotal - frameLeft) * 4;
+	utotal -= userCount;
+	return stereo? utotal * 4: utotal * 2;
+}
+
+static ssize_t pmac_ctx_u16_read(const u_char *userPtr, size_t userCount,
+			   u_char frame[], ssize_t *frameUsed,
+			   ssize_t frameLeft)
+{
+	int bal = expand_read_bal;
+	int mask = (dmasound.soft.format == AFMT_U16_LE? 0x0080: 0x8000);
+	short *fp = (short *) &frame[*frameUsed];
+	short *up = (short *) userPtr;
+	int stereo = dmasound.soft.stereo;
+	int hSpeed = dmasound.hard.speed, sSpeed = dmasound.soft.speed;
+	int utotal, ftotal;
+
+	frameLeft >>= 2;
+	userCount >>= (stereo? 2: 1);
+	ftotal = frameLeft;
+	utotal = userCount;
+	while (frameLeft) {
+		int datal,datar;
+
+		if (bal<0 && userCount == 0)
+			break;
+
+		datal = *fp++;
+		datal = (datal * software_input_volume) >> 7;
+		datal ^= mask;
+		if (stereo) {
+			datar = *fp;
+			datar = (datar * software_input_volume) >> 7;
+			datar ^= mask;
+		}
+		fp++;
+		if (bal < 0) {
+			if (put_user(datal, up++))
+				return -EFAULT;
+			if (stereo) {
+				if (put_user(datar, up++))
+					return -EFAULT;
+			}
+			userCount--;
+			bal += hSpeed;
+		}
+		frameLeft--;
+		bal -= sSpeed;
+	}
+	expand_read_bal=bal;
+	*frameUsed += (ftotal - frameLeft) * 4;
+	utotal -= userCount;
+	return stereo? utotal * 4: utotal * 2;
+}
+
 
 TRANS transAwacsNormal = {
 	.ct_ulaw=	pmac_ct_law,
@@ -601,6 +810,15 @@ TRANS transAwacsNormalRead = {
 	.ct_u16be=	pmac_ct_u16_read,
 	.ct_s16le=	pmac_ct_s16_read,
 	.ct_u16le=	pmac_ct_u16_read,
+};
+
+TRANS transAwacsExpandRead = {
+	.ct_s8=		pmac_ctx_s8_read,
+	.ct_u8=		pmac_ctx_u8_read,
+	.ct_s16be=	pmac_ctx_s16_read,
+	.ct_u16be=	pmac_ctx_u16_read,
+	.ct_s16le=	pmac_ctx_s16_read,
+	.ct_u16le=	pmac_ctx_u16_read,
 };
 
 /* translation tables */

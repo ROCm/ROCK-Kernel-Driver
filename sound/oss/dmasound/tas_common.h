@@ -87,7 +87,7 @@ struct tas_gain_t
   unsigned int *mixer;
 };
 
-typedef char tas_shadow_t[16];
+typedef char tas_shadow_t[0x45];
 
 struct tas_data_t
 {

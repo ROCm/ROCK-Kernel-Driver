@@ -195,6 +195,9 @@ tas_init(int driver_id, const char *driver_name)
 
 	printk(KERN_INFO "tas driver [%s])\n", driver_name);
 
+#ifndef CONFIG_I2C_KEYWEST
+	request_module("i2c-keywest");
+#endif
 	tas_node = find_devices("deq");
 	if (tas_node == NULL)
 		return -ENODEV;
