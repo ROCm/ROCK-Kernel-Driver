@@ -80,14 +80,13 @@ do {	if (AUXREG) \
 } while(0)
 
 #ifndef __ASSEMBLY__
-extern __inline__ void set_auxio(unsigned char bits_on, unsigned char bits_off)
+static __inline__ void set_auxio(unsigned char bits_on, unsigned char bits_off)
 {
 	unsigned char regval;
 	unsigned long flags;
 
-	save_flags(flags); cli();
-
-	if(AUXREG) {
+	local_irq_save(flags);
+	if (AUXREG) {
 		unsigned char newval;
 
 		regval = sbus_readb(AUXREG);
@@ -96,7 +95,7 @@ extern __inline__ void set_auxio(unsigned char bits_on, unsigned char bits_off)
 		newval |= AUXIO_ORMEIN4M;
 		sbus_writeb(newval, AUXREG);
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 #endif /* !(__ASSEMBLY__) */
 
