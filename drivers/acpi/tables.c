@@ -58,6 +58,7 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_SSDT]		= "SSDT",
 	[ACPI_SPMI]		= "SPMI",
 	[ACPI_HPET]		= "HPET",
+	[ACPI_MCFG]		= "MCFG",
 };
 
 static char *mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };

@@ -317,6 +317,15 @@ struct acpi_table_ecdt {
 	char				ec_id[0];
 } __attribute__ ((packed));
 
+/* PCI MMCONFIG */
+
+struct acpi_table_mcfg {
+	struct acpi_table_header	header;
+	u8				reserved[8];
+	u32				base_address;
+	u32				base_reserved;
+} __attribute__ ((packed));
+
 /* Table Handlers */
 
 enum acpi_table_id {
@@ -338,6 +347,7 @@ enum acpi_table_id {
 	ACPI_SSDT,
 	ACPI_SPMI,
 	ACPI_HPET,
+	ACPI_MCFG,
 	ACPI_TABLE_COUNT
 };
 
@@ -368,6 +378,8 @@ void acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma);
 void acpi_numa_arch_fixup(void);
 
 extern int acpi_mp_config;
+
+extern u32 pci_mmcfg_base_addr;
 
 #else	/*!CONFIG_ACPI_BOOT*/
 
