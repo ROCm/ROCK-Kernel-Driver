@@ -26,12 +26,6 @@
 #define DRIVER_MINOR		0
 #define DRIVER_PATCHLEVEL	1
 
-#define DRIVER_COUNT_CARDS()	ffb_count_card_instances()
-
-/* For mmap customization */
-#define DRIVER_GET_MAP_OFS()	(map->offset & 0xffffffff)
-#define DRIVER_GET_REG_OFS()	ffb_get_reg_offset(dev)
-
 typedef struct _ffb_position_t {
 	int node;
 	int root;
@@ -173,36 +167,6 @@ static int __init ffb_scan_siblings(int root, int instance)
 	return instance;
 }
 
-static int ffb_presetup(drm_device_t *);
-
-static int __init ffb_count_card_instances(void)
-{
-	int root, total, instance;
-
-	total = ffb_count_siblings(prom_root_node);
-	root = prom_getchild(prom_root_node);
-	for (root = prom_searchsiblings(root, "upa"); root;
-	     root = prom_searchsiblings(prom_getsibling(root), "upa"))
-		total += ffb_count_siblings(root);
-
-	ffb_position = kmalloc(sizeof(ffb_position_t) * total, GFP_KERNEL);
-
-	/* Actual failure will be caught during ffb_presetup b/c we can't catch
-	 * it easily here.
-	 */
-	if (!ffb_position)
-		return -ENOMEM;
-
-	instance = ffb_scan_siblings(prom_root_node, 0);
-
-	root = prom_getchild(prom_root_node);
-	for (root = prom_searchsiblings(root, "upa"); root;
-	     root = prom_searchsiblings(prom_getsibling(root), "upa"))
-		instance = ffb_scan_siblings(root, instance);
-
-	return total;
-}
-
 static drm_map_t *ffb_find_map(struct file *filp, unsigned long off)
 {
 	drm_file_t	*priv	= filp->private_data;
@@ -273,18 +237,9 @@ unsigned long ffb_get_unmapped_area(struct file *filp,
 	return addr;
 }
 
-static unsigned long ffb_get_reg_offset(drm_device_t *dev)
-{
-	ffb_dev_priv_t *ffb_priv = (ffb_dev_priv_t *)dev->dev_private;
-
-	if (ffb_priv)
-		return ffb_priv->card_phys_base;
-
-	return 0;
-}
-
 #include "drm_auth.h"
 #include "drm_bufs.h"
+#include "drm_context.h"
 #include "drm_dma.h"
 #include "drm_drawable.h"
 #include "drm_drv.h"
@@ -292,7 +247,7 @@ static unsigned long ffb_get_reg_offset(drm_device_t *dev)
 /* This functions must be here since it references DRM(numdevs)
  * which drm_drv.h declares.
  */
-static int ffb_presetup(drm_device_t *dev)
+int ffb_presetup(drm_device_t *dev)
 {
 	ffb_dev_priv_t	*ffb_priv;
 	drm_device_t *temp_dev;

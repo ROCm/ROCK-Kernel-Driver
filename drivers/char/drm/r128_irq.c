@@ -36,7 +36,7 @@
 #include "r128_drm.h"
 #include "r128_drv.h"
 
-irqreturn_t r128_irq_handler( DRM_IRQ_ARGS )
+irqreturn_t r128_driver_irq_handler( DRM_IRQ_ARGS )
 {
 	drm_device_t *dev = (drm_device_t *) arg;
 	drm_r128_private_t *dev_priv = 
@@ -56,7 +56,7 @@ irqreturn_t r128_irq_handler( DRM_IRQ_ARGS )
 	return IRQ_NONE;
 }
 
-int DRM(vblank_wait)(drm_device_t *dev, unsigned int *sequence)
+int r128_driver_vblank_wait(drm_device_t *dev, unsigned int *sequence)
 {
 	unsigned int cur_vblank;
 	int ret = 0;

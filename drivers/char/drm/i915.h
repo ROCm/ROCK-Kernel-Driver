@@ -54,10 +54,6 @@
 /* We use our own dma mechanisms, not the drm template code.  However,
  * the shared IRQ code is useful to us:
  */
-#define __HAVE_DMA		0
-#define __HAVE_IRQ		1
-#define __HAVE_SHARED_IRQ	1
-
 #define __HAVE_PM		1
 
 #endif

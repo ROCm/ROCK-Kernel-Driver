@@ -587,6 +587,21 @@ static int ffb_driver_kernel_context_switch_unlock(struct drm_device *dev)
 	wake_up_interruptible(&dev->lock.lock_queue);
 }
 
+static unsigned long ffb_driver_get_map_ofs(drm_map_t *map)
+{
+	return (map->offset & 0xffffffff);
+}
+
+static unsigned long ffb_driver_get_reg_ofs(drm_device_t *dev)
+{
+       ffb_dev_priv_t *ffb_priv = (ffb_dev_priv_t *)dev->dev_private;
+       
+       if (ffb_priv)
+               return ffb_priv->card_phys_base;
+       
+       return 0;
+}
+
 static void ffb_driver_register_fns(drm_device_t *dev)
 {
 	DRM(fops).get_unmapped_area = ffb_get_unmapped_area;
@@ -596,4 +611,6 @@ static void ffb_driver_register_fns(drm_device_t *dev)
 	dev->fn_tbl.postcleanup = ffb_driver_postcleanup;
 	dev->fn_tbl.kernel_context_switch = ffb_context_switch;
 	dev->fn_tbl.kernel_context_switch_unlock = ffb_driver_kernel_context_switch_unlock;
+	dev->fn_tbl.get_map_ofs = ffb_driver_get_map_ofs;
+	dev->fn_tbl.get_reg_ofs = ffb_driver_get_reg_ofs;
 }

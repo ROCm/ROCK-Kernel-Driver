@@ -79,24 +79,11 @@
 #define __HAVE_COUNTER8         _DRM_STAT_SECONDARY
 #define __HAVE_COUNTER9         _DRM_STAT_DMA
 
-/* DMA customization:
- */
-#define __HAVE_DMA		1
-#define __HAVE_DMA_QUEUE	1
-#define __HAVE_DMA_RECLAIM	1
-
 /* Driver will work either way: IRQ's save cpu time when waiting for
  * the card, but are subject to subtle interactions between bios,
  * hardware and the driver.
  */
 /* XXX: Add vblank support? */
 #define USE_IRQS 0
-
-#if USE_IRQS
-#define __HAVE_IRQ		1
-#define __HAVE_SHARED_IRQ	1
-#else
-#define __HAVE_IRQ          0
-#endif
 
 #endif

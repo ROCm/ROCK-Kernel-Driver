@@ -286,8 +286,6 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 	return 0;
 }
 
-#if __HAVE_DMA
-
 /**
  * Cleanup after an error on one of the addbufs() functions.
  *
@@ -926,6 +924,11 @@ int DRM(addbufs)( struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg )
 {
 	drm_buf_desc_t request;
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
 
 	if ( copy_from_user( &request, (drm_buf_desc_t __user *)arg,
 			     sizeof(request) ) )
@@ -970,6 +973,9 @@ int DRM(infobufs)( struct inode *inode, struct file *filp,
 	drm_buf_info_t __user *argp = (void __user *)arg;
 	int i;
 	int count;
+
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
 
 	if ( !dma ) return -EINVAL;
 
@@ -1052,6 +1058,9 @@ int DRM(markbufs)( struct inode *inode, struct file *filp,
 	int order;
 	drm_buf_entry_t *entry;
 
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
+
 	if ( !dma ) return -EINVAL;
 
 	if ( copy_from_user( &request,
@@ -1098,6 +1107,9 @@ int DRM(freebufs)( struct inode *inode, struct file *filp,
 	int i;
 	int idx;
 	drm_buf_t *buf;
+
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
 
 	if ( !dma ) return -EINVAL;
 
@@ -1155,6 +1167,9 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 	unsigned long address;
 	drm_buf_map_t request;
 	int i;
+
+	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		return -EINVAL;
 
 	if ( !dma ) return -EINVAL;
 
@@ -1253,4 +1268,3 @@ int DRM(mapbufs)( struct inode *inode, struct file *filp,
 	return retcode;
 }
 
-#endif /* __HAVE_DMA */

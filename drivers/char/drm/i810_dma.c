@@ -232,13 +232,12 @@ int i810_dma_cleanup(drm_device_t *dev)
 {
 	drm_device_dma_t *dma = dev->dma;
 
-#if __HAVE_IRQ
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
-	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
-#endif
+	if (drm_core_check_feature(dev, DRIVER_HAVE_IRQ) && dev->irq_enabled)
+		DRM(irq_uninstall)(dev);
 
 	if (dev->dev_private) {
 		int i;
@@ -1407,10 +1406,11 @@ static int i810_driver_dma_quiescent(drm_device_t *dev)
 
 void i810_driver_register_fns(drm_device_t *dev)
 {
-	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR;
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_DMA_QUEUE;
 	dev->dev_priv_size = sizeof(drm_i810_buf_priv_t);
 	dev->fn_tbl.pretakedown = i810_driver_pretakedown;
 	dev->fn_tbl.release = i810_driver_release;
 	dev->fn_tbl.dma_quiescent = i810_driver_dma_quiescent;
+	dev->fn_tbl.reclaim_buffers = i810_reclaim_buffers;
 }
 
