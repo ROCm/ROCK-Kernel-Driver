@@ -35,15 +35,27 @@
 #include <linux/parport.h>
 #include <linux/input.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("TurboGraFX parallel port interface driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(tgfx, "2-8i");
-MODULE_PARM(tgfx_2, "2-8i");
-MODULE_PARM(tgfx_3, "2-8i");
+static int tgfx[] __initdata = { -1, 0, 0, 0, 0, 0, 0, 0 };
+static int tgfx_nargs __initdata = 0;
+module_param_array_named(map, tgfx, int, tgfx_nargs, 0);
+MODULE_PARM_DESC(map, "Describes first set of devices (<parport#>,<js1>,<js2>,..<js7>");
+
+static int tgfx_2[] __initdata = { -1, 0, 0, 0, 0, 0, 0, 0 };
+static int tgfx_nargs_2 __initdata = 0;
+module_param_array_named(map2, tgfx_2, int, tgfx_nargs_2, 0);
+MODULE_PARM_DESC(map2, "Describes second set of devices");
+
+static int tgfx_3[] __initdata = { -1, 0, 0, 0, 0, 0, 0, 0 };
+static int tgfx_nargs_3 __initdata = 0;
+module_param_array_named(map3, tgfx_3, int, tgfx_nargs_3, 0);
+MODULE_PARM_DESC(map3, "Describes third set of devices");
 
 #define TGFX_REFRESH_TIME	HZ/100	/* 10 ms */
 
@@ -57,10 +69,6 @@ MODULE_PARM(tgfx_3, "2-8i");
 #define TGFX_THUMB2		0x04
 #define TGFX_TOP		0x01
 #define TGFX_TOP2		0x08
-
-static int tgfx[] __initdata = { -1, 0, 0, 0, 0, 0, 0, 0 };
-static int tgfx_2[] __initdata = { -1, 0, 0, 0, 0, 0, 0, 0 };
-static int tgfx_3[] __initdata = { -1, 0, 0, 0, 0, 0, 0, 0 };
 
 static int tgfx_buttons[] = { BTN_TRIGGER, BTN_THUMB, BTN_THUMB2, BTN_TOP, BTN_TOP2 };
 static char *tgfx_name = "TurboGraFX Multisystem joystick";
@@ -133,7 +141,7 @@ static void tgfx_close(struct input_dev *dev)
  * tgfx_probe() probes for tg gamepads.
  */
 
-static struct tgfx __init *tgfx_probe(int *config)
+static struct tgfx __init *tgfx_probe(int *config, int nargs)
 {
 	struct tgfx *tgfx;
 	struct parport *pp;
@@ -141,6 +149,11 @@ static struct tgfx __init *tgfx_probe(int *config)
 
 	if (config[0] < 0)
 		return NULL;
+
+	if (nargs < 2) {
+		printk(KERN_ERR "turbografx.c: at least one joystick must be specified\n");
+		return NULL;
+	}
 
 	pp = parport_find_number(config[0]);
 
@@ -171,7 +184,7 @@ static struct tgfx __init *tgfx_probe(int *config)
 
 	tgfx->sticks = 0;
 
-	for (i = 0; i < 7; i++)
+	for (i = 0; i < nargs - 1; i++)
 		if (config[i+1] > 0 && config[i+1] < 6) {
 
 			tgfx->sticks |= (1 << i);
@@ -212,38 +225,11 @@ static struct tgfx __init *tgfx_probe(int *config)
 	return tgfx;
 }
 
-#ifndef MODULE
-static int __init tgfx_setup(char *str)
-{
-	int i, ints[9];
-	get_options(str, ARRAY_SIZE(ints), ints);
-	for (i = 0; i <= ints[0] && i < 8; i++) tgfx[i] = ints[i + 1];
-	return 1;
-}
-static int __init tgfx_setup_2(char *str)
-{
-	int i, ints[9];
-	get_options(str, ARRAY_SIZE(ints), ints);
-	for (i = 0; i <= ints[0] && i < 8; i++) tgfx_2[i] = ints[i + 1];
-	return 1;
-}
-static int __init tgfx_setup_3(char *str)
-{
-	int i, ints[9];
-	get_options(str, ARRAY_SIZE(ints), ints);
-	for (i = 0; i <= ints[0] && i < 8; i++) tgfx_3[i] = ints[i + 1];
-	return 1;
-}
-__setup("tgfx=", tgfx_setup);
-__setup("tgfx_2=", tgfx_setup_2);
-__setup("tgfx_3=", tgfx_setup_3);
-#endif
-
 int __init tgfx_init(void)
 {
-	tgfx_base[0] = tgfx_probe(tgfx);
-	tgfx_base[1] = tgfx_probe(tgfx_2);
-	tgfx_base[2] = tgfx_probe(tgfx_3);
+	tgfx_base[0] = tgfx_probe(tgfx, tgfx_nargs);
+	tgfx_base[1] = tgfx_probe(tgfx_2, tgfx_nargs_2);
+	tgfx_base[2] = tgfx_probe(tgfx_3, tgfx_nargs_3);
 
 	if (tgfx_base[0] || tgfx_base[1] || tgfx_base[2])
 		return 0;

@@ -32,6 +32,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
@@ -42,10 +43,13 @@
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Driver for Amiga joysticks");
-MODULE_PARM(amijoy, "1-2i");
 MODULE_LICENSE("GPL");
 
 static int amijoy[2] = { 0, 1 };
+static int amijoy_nargs;  
+module_param_array_named(map, amijoy, uint, amijoy_nargs, 0);
+MODULE_PARM_DESC(map, "Map of attached joysticks in form of <a>,<b> (default is 0,1)");
+
 static int amijoy_used[2] = { 0, 0 };
 static struct input_dev amijoy_dev[2];
 static char *amijoy_phys[2] = { "amijoy/input0", "amijoy/input1" };
@@ -100,17 +104,6 @@ static void amijoy_close(struct input_dev *dev)
 	if (!--(*used))
 		free_irq(IRQ_AMIGA_VERTB, amijoy_interrupt);
 }
-
-static int __init amijoy_setup(char *str)
-{
-	int i;
-	int ints[4];
-
-	str = get_options(str, ARRAY_SIZE(ints), ints);
-	for (i = 0; i <= ints[0] && i < 2; i++) amijoy[i] = ints[i+1];
-	return 1;
-}
-__setup("amijoy=", amijoy_setup);
 
 static int __init amijoy_init(void)
 {

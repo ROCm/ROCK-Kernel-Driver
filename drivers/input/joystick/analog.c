@@ -32,6 +32,7 @@
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/bitops.h>
 #include <linux/init.h>
@@ -50,9 +51,10 @@ MODULE_LICENSE("GPL");
 #define ANALOG_PORTS		16
 
 static char *js[ANALOG_PORTS];
+static int js_nargs;
 static int analog_options[ANALOG_PORTS];
-MODULE_PARM(js, "1-" __MODULE_STRING(ANALOG_PORTS) "s");
-MODULE_PARM_DESC(js, "Analog joystick options");
+module_param_array_named(map, js, charp, js_nargs, 0);
+MODULE_PARM_DESC(map, "Describes analog joysticks type/capabilities");
 
 /*
  * Times, feature definitions.
@@ -711,7 +713,7 @@ static void analog_parse_options(void)
 	int i, j;
 	char *end;
 
-	for (i = 0; i < ANALOG_PORTS && js[i]; i++) {
+	for (i = 0; i < js_nargs; i++) {
 
 		for (j = 0; analog_types[j].name; j++)
 			if (!strcmp(analog_types[j].name, js[i])) {
@@ -741,24 +743,6 @@ static struct gameport_dev analog_dev = {
 	.connect =	analog_connect,
 	.disconnect =	analog_disconnect,
 };
-
-#ifndef MODULE
-static int __init analog_setup(char *str)
-{
-	char *s = str;
-	int i = 0;
-
-	if (!str || !*str) return 0;
-
-	while ((str = s) && (i < ANALOG_PORTS)) {
-		if ((s = strchr(str,','))) *s++ = 0;
-		js[i++] = str;
-	}
-
-	return 1;
-}
-__setup("js=", analog_setup);
-#endif
 
 int __init analog_init(void)
 {

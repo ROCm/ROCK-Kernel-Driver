@@ -33,6 +33,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/parport.h>
@@ -42,9 +43,20 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Atari, Amstrad, Commodore, Amiga, Sega, etc. joystick driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(db9, "2i");
-MODULE_PARM(db9_2, "2i");
-MODULE_PARM(db9_3, "2i");
+static int db9[] __initdata = { -1, 0 };
+static int db9_nargs __initdata = 0;
+module_param_array_named(dev, db9, int, db9_nargs, 0);
+MODULE_PARM_DESC(dev, "Describes first attached device (<parport#>,<type>)");
+
+static int db9_2[] __initdata = { -1, 0 };
+static int db9_nargs_2 __initdata = 0;
+module_param_array_named(dev2, db9_2, int, db9_nargs_2, 0);
+MODULE_PARM_DESC(dev2, "Describes second attached device (<parport#>,<type>)");
+
+static int db9_3[] __initdata = { -1, 0 };
+static int db9_nargs_3 __initdata = 0;
+module_param_array_named(dev3, db9_3, int, db9_nargs_3, 0);
+MODULE_PARM_DESC(dev3, "Describes third attached device (<parport#>,<type>)");
 
 #define DB9_MULTI_STICK		0x01
 #define DB9_MULTI2_STICK	0x02
@@ -75,10 +87,6 @@ MODULE_PARM(db9_3, "2i");
 
 #define DB9_GENESIS6_DELAY	14
 #define DB9_REFRESH_TIME	HZ/100
-
-static int db9[] __initdata = { -1, 0 };
-static int db9_2[] __initdata = { -1, 0 };
-static int db9_3[] __initdata = { -1, 0 };
 
 struct db9 {
 	struct input_dev dev[DB9_MAX_DEVICES];
@@ -518,7 +526,7 @@ static void db9_close(struct input_dev *dev)
 	}
 }
 
-static struct db9 __init *db9_probe(int *config)
+static struct db9 __init *db9_probe(int *config, int nargs)
 {
 	struct db9 *db9;
 	struct parport *pp;
@@ -526,6 +534,12 @@ static struct db9 __init *db9_probe(int *config)
 
 	if (config[0] < 0)
 		return NULL;
+
+	if (nargs < 2) {
+		printk(KERN_ERR "db9.c: Device type must be specified.\n");
+		return NULL;
+	}
+
 	if (config[1] < 1 || config[1] >= DB9_MAX_PAD || !db9_buttons[config[1]]) {
 		printk(KERN_ERR "db9.c: bad config\n");
 		return NULL;
@@ -601,38 +615,11 @@ static struct db9 __init *db9_probe(int *config)
 	return db9;
 }
 
-#ifndef MODULE
-static int __init db9_setup(char *str)
-{
-	int i, ints[3];
-	get_options(str, ARRAY_SIZE(ints), ints);
-	for (i = 0; i <= ints[0] && i < 2; i++) db9[i] = ints[i + 1];
-	return 1;
-}
-static int __init db9_setup_2(char *str)
-{
-	int i, ints[3];
-	get_options(str, ARRAY_SIZE(ints), ints);
-	for (i = 0; i <= ints[0] && i < 2; i++) db9_2[i] = ints[i + 1];
-	return 1;
-}
-static int __init db9_setup_3(char *str)
-{
-	int i, ints[3];
-	get_options(str, ARRAY_SIZE(ints), ints);
-	for (i = 0; i <= ints[0] && i < 2; i++) db9_3[i] = ints[i + 1];
-	return 1;
-}
-__setup("db9=", db9_setup);
-__setup("db9_2=", db9_setup_2);
-__setup("db9_3=", db9_setup_3);
-#endif
-
 int __init db9_init(void)
 {
-	db9_base[0] = db9_probe(db9);
-	db9_base[1] = db9_probe(db9_2);
-	db9_base[2] = db9_probe(db9_3);
+	db9_base[0] = db9_probe(db9, db9_nargs);
+	db9_base[1] = db9_probe(db9_2, db9_nargs_2);
+	db9_base[2] = db9_probe(db9_3, db9_nargs_3);
 
 	if (db9_base[0] || db9_base[1] || db9_base[2])
 		return 0;
