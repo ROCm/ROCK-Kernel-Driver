@@ -163,7 +163,7 @@ unsigned short eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	
 	skb->mac.raw=skb->data;
 	skb_pull(skb,ETH_HLEN);
-	eth= skb->mac.ethernet;
+	eth = eth_hdr(skb);
 	skb->input_dev = dev;
 	
 	if(*eth->h_dest&1)
@@ -210,7 +210,7 @@ unsigned short eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 
 int eth_header_parse(struct sk_buff *skb, unsigned char *haddr)
 {
-	struct ethhdr *eth = skb->mac.ethernet;
+	struct ethhdr *eth = eth_hdr(skb);
 	memcpy(haddr, eth->h_source, ETH_ALEN);
 	return ETH_ALEN;
 }

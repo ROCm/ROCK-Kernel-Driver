@@ -123,7 +123,7 @@ typedef union ia64_va {
 #define REGION_KERNEL		7
 
 #ifdef CONFIG_HUGETLB_PAGE
-# define htlbpage_to_page(x)	((REGION_NUMBER(x) << 61)				\
+# define htlbpage_to_page(x)	(((unsigned long) REGION_NUMBER(x) << 61)			\
 				 | (REGION_OFFSET(x) >> (HPAGE_SHIFT-PAGE_SHIFT)))
 # define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
 # define is_hugepage_only_range(addr, len)		\
@@ -186,7 +186,7 @@ get_order (unsigned long size)
 # define __pgprot(x)	(x)
 #endif /* !STRICT_MM_TYPECHECKS */
 
-#define PAGE_OFFSET			0xe000000000000000
+#define PAGE_OFFSET			__IA64_UL_CONST(0xe000000000000000)
 
 #define VM_DATA_DEFAULT_FLAGS		(VM_READ | VM_WRITE |					\
 					 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC |		\

@@ -103,11 +103,15 @@ static inline int
 elf_core_copy_task_fpregs(struct task_struct *tsk, struct pt_regs *regs, elf_fpregset_t *fpu)
 {
 	struct ia32_user_i387_struct *fpstate = (void*)fpu;
+	mm_segment_t old_fs;
 
 	if (!tsk->used_math)
 		return 0;
-
-	save_ia32_fpstate(tsk, fpstate);
+	
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	save_ia32_fpstate(tsk, (struct ia32_user_i387_struct __user *) fpstate);
+	set_fs(old_fs);
 
 	return 1;
 }
@@ -117,11 +121,15 @@ static inline int
 elf_core_copy_task_xfpregs(struct task_struct *tsk, elf_fpxregset_t *xfpu)
 {
 	struct ia32_user_fxsr_struct *fpxstate = (void*) xfpu;
+	mm_segment_t old_fs;
 
 	if (!tsk->used_math)
 		return 0;
 
-	save_ia32_fpxstate(tsk, fpxstate);
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	save_ia32_fpxstate(tsk, (struct ia32_user_fxsr_struct __user *) fpxstate);
+	set_fs(old_fs);
 
 	return 1;
 }
