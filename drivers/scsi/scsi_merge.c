@@ -100,6 +100,8 @@ int scsi_init_io(Scsi_Cmnd *SCpnt)
 
 	SCpnt->request_buffer = (char *) sgpnt;
 	SCpnt->request_bufflen = req->nr_sectors << 9;
+	if (blk_pc_request(req))
+		SCpnt->request_bufflen = req->data_len;
 	req->buffer = NULL;
 
 	/* 
