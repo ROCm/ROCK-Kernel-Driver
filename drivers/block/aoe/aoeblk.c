@@ -12,14 +12,7 @@
 #include <linux/netdevice.h>
 #include "aoe.h"
 
-/* add attributes for our block devices in sysfs
- * (see drivers/block/genhd.c:disk_attr_show, etc.)
- */
-struct disk_attribute {
-	struct attribute attr;
-	ssize_t (*show)(struct gendisk *, char *);
-};
-
+/* add attributes for our block devices in sysfs */
 static ssize_t aoedisk_show_state(struct gendisk * disk, char *page)
 {
 	struct aoedev *d = disk->private_data;

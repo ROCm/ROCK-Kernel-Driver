@@ -315,12 +315,6 @@ subsys_initcall(device_init);
 /*
  * kobject & sysfs bindings for block devices
  */
-
-struct disk_attribute {
-	struct attribute attr;
-	ssize_t (*show)(struct gendisk *, char *);
-};
-
 static ssize_t disk_attr_show(struct kobject *kobj, struct attribute *attr,
 			      char *page)
 {
