@@ -131,7 +131,6 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 	/* Do this BEFORE marking the inode not in use or returning an error */
 	clear_inode (inode);
 
-	lock_super (sb);
 	es = EXT3_SB(sb)->s_es;
 	if (ino < EXT3_FIRST_INO(sb) || ino > le32_to_cpu(es->s_inodes_count)) {
 		ext3_error (sb, "ext3_free_inode",
@@ -150,7 +149,8 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 		goto error_return;
 
 	/* Ok, now we can actually update the inode bitmaps.. */
-	if (!ext3_clear_bit(bit, bitmap_bh->b_data))
+	if (!ext3_clear_bit_atomic(sb_bgl_lock(sbi, block_group),
+					bit, bitmap_bh->b_data))
 		ext3_error (sb, "ext3_free_inode",
 			      "bit already cleared for inode %lu", ino);
 	else {
@@ -160,27 +160,17 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 		fatal = ext3_journal_get_write_access(handle, bh2);
 		if (fatal) goto error_return;
 
-		BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "get write access");
-		fatal = ext3_journal_get_write_access(handle, EXT3_SB(sb)->s_sbh);
-		if (fatal) goto error_return;
-
 		if (gdp) {
+			spin_lock(&EXT3_SB(sb)->s_bgi[block_group].bg_ialloc_lock);
 			gdp->bg_free_inodes_count = cpu_to_le16(
 				le16_to_cpu(gdp->bg_free_inodes_count) + 1);
-			if (is_directory) {
+			if (is_directory)
 				gdp->bg_used_dirs_count = cpu_to_le16(
 				  le16_to_cpu(gdp->bg_used_dirs_count) - 1);
-				EXT3_SB(sb)->s_dir_count--;
-			}
+			spin_unlock(&EXT3_SB(sb)->s_bgi[block_group].bg_ialloc_lock);
 		}
 		BUFFER_TRACE(bh2, "call ext3_journal_dirty_metadata");
 		err = ext3_journal_dirty_metadata(handle, bh2);
-		if (!fatal) fatal = err;
-		es->s_free_inodes_count =
-			cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) + 1);
-		BUFFER_TRACE(EXT3_SB(sb)->s_sbh,
-					"call ext3_journal_dirty_metadata");
-		err = ext3_journal_dirty_metadata(handle, EXT3_SB(sb)->s_sbh);
 		if (!fatal) fatal = err;
 	}
 	BUFFER_TRACE(bitmap_bh, "call ext3_journal_dirty_metadata");
@@ -191,7 +181,6 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 error_return:
 	brelse(bitmap_bh);
 	ext3_std_error(sb, fatal);
-	unlock_super(sb);
 }
 
 /*
@@ -206,9 +195,8 @@ error_return:
  */
 static int find_group_dir(struct super_block *sb, struct inode *parent)
 {
-	struct ext3_super_block * es = EXT3_SB(sb)->s_es;
 	int ngroups = EXT3_SB(sb)->s_groups_count;
-	int avefreei = le32_to_cpu(es->s_free_inodes_count) / ngroups;
+	int avefreei = ext3_count_free_inodes(sb) / ngroups;
 	struct ext3_group_desc *desc, *best_desc = NULL;
 	struct buffer_head *bh;
 	int group, best_group = -1;
@@ -264,10 +252,12 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent)
 	struct ext3_super_block *es = sbi->s_es;
 	int ngroups = sbi->s_groups_count;
 	int inodes_per_group = EXT3_INODES_PER_GROUP(sb);
-	int avefreei = le32_to_cpu(es->s_free_inodes_count) / ngroups;
-	int avefreeb = le32_to_cpu(es->s_free_blocks_count) / ngroups;
+	int freei = ext3_count_free_inodes(sb);
+	int avefreei = freei / ngroups;
+	int freeb = ext3_count_free_blocks(sb);
+	int avefreeb = freeb / ngroups;
 	int blocks_per_dir;
-	int ndirs = sbi->s_dir_count;
+	int ndirs = ext3_count_dirs(sb);
 	int max_debt, max_dirs, min_blocks, min_inodes;
 	int group = -1, i;
 	struct ext3_group_desc *desc;
@@ -319,7 +309,7 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent)
 		desc = ext3_get_group_desc (sb, group, &bh);
 		if (!desc || !desc->bg_free_inodes_count)
 			continue;
-		if (sbi->s_debts[group] >= max_debt)
+		if (sbi->s_bgi[group].bg_debts >= max_debt)
 			continue;
 		if (le16_to_cpu(desc->bg_used_dirs_count) >= max_dirs)
 			continue;
@@ -338,6 +328,15 @@ fallback:
 			continue;
 		if (le16_to_cpu(desc->bg_free_inodes_count) >= avefreei)
 			return group;
+	}
+
+	if (avefreei) {
+		/*
+		 * The free-inodes counter is approximate, and for really small
+		 * filesystems the above test can fail to find any blockgroups
+		 */
+		avefreei = 0;
+		goto fallback;
 	}
 
 	return -1;
@@ -435,7 +434,6 @@ struct inode *ext3_new_inode(handle_t *handle, struct inode * dir, int mode)
 		return ERR_PTR(-ENOMEM);
 	ei = EXT3_I(inode);
 
-	lock_super (sb);
 	es = EXT3_SB(sb)->s_es;
 repeat:
 	if (S_ISDIR(mode)) {
@@ -464,11 +462,9 @@ repeat:
 		err = ext3_journal_get_write_access(handle, bitmap_bh);
 		if (err) goto fail;
 
-		if (ext3_set_bit(ino, bitmap_bh->b_data)) {
-			ext3_error (sb, "ext3_new_inode",
-				      "bit already set for inode %lu", ino);
+		if (ext3_set_bit_atomic(sb_bgl_lock(sbi, group),
+						ino, bitmap_bh->b_data)) 
 			goto repeat;
-		}
 		BUFFER_TRACE(bitmap_bh, "call ext3_journal_dirty_metadata");
 		err = ext3_journal_dirty_metadata(handle, bitmap_bh);
 		if (err) goto fail;
@@ -504,26 +500,19 @@ repeat:
 	BUFFER_TRACE(bh2, "get_write_access");
 	err = ext3_journal_get_write_access(handle, bh2);
 	if (err) goto fail;
+	spin_lock(&EXT3_SB(sb)->s_bgi[group].bg_ialloc_lock);
 	gdp->bg_free_inodes_count =
 		cpu_to_le16(le16_to_cpu(gdp->bg_free_inodes_count) - 1);
 	if (S_ISDIR(mode)) {
 		gdp->bg_used_dirs_count =
 			cpu_to_le16(le16_to_cpu(gdp->bg_used_dirs_count) + 1);
-		EXT3_SB(sb)->s_dir_count++;
 	}
+	spin_unlock(&EXT3_SB(sb)->s_bgi[group].bg_ialloc_lock);
 	BUFFER_TRACE(bh2, "call ext3_journal_dirty_metadata");
 	err = ext3_journal_dirty_metadata(handle, bh2);
 	if (err) goto fail;
 	
-	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "get_write_access");
-	err = ext3_journal_get_write_access(handle, EXT3_SB(sb)->s_sbh);
-	if (err) goto fail;
-	es->s_free_inodes_count =
-		cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) - 1);
-	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "call ext3_journal_dirty_metadata");
-	err = ext3_journal_dirty_metadata(handle, EXT3_SB(sb)->s_sbh);
 	sb->s_dirt = 1;
-	if (err) goto fail;
 
 	inode->i_uid = current->fsuid;
 	if (test_opt (sb, GRPID))
@@ -576,7 +565,6 @@ repeat:
 
 	ei->i_state = EXT3_STATE_NEW;
 
-	unlock_super(sb);
 	ret = inode;
 	if(DQUOT_ALLOC_INODE(inode)) {
 		DQUOT_DROP(inode);
@@ -600,7 +588,6 @@ repeat:
 fail:
 	ext3_std_error(sb, err);
 out:
-	unlock_super(sb);
 	iput(inode);
 	ret = ERR_PTR(err);
 really_out:
@@ -673,12 +660,13 @@ out:
 
 unsigned long ext3_count_free_inodes (struct super_block * sb)
 {
+	unsigned long desc_count;
+	struct ext3_group_desc *gdp;
+	int i;
 #ifdef EXT3FS_DEBUG
 	struct ext3_super_block *es;
-	unsigned long desc_count, bitmap_count, x;
-	struct ext3_group_desc *gdp;
+	unsigned long bitmap_count, x;
 	struct buffer_head *bitmap_bh = NULL;
-	int i;
 
 	lock_super (sb);
 	es = EXT3_SB(sb)->s_es;
@@ -706,7 +694,14 @@ unsigned long ext3_count_free_inodes (struct super_block * sb)
 	unlock_super(sb);
 	return desc_count;
 #else
-	return le32_to_cpu(EXT3_SB(sb)->s_es->s_free_inodes_count);
+	desc_count = 0;
+	for (i = 0; i < EXT3_SB(sb)->s_groups_count; i++) {
+		gdp = ext3_get_group_desc (sb, i, NULL);
+		if (!gdp)
+			continue;
+		desc_count += le16_to_cpu(gdp->bg_free_inodes_count);
+	}
+	return desc_count;
 #endif
 }
 

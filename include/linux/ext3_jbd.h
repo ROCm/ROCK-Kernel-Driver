@@ -117,6 +117,12 @@ __ext3_journal_get_write_access(const char *where,
 }
 
 static inline void
+ext3_journal_release_buffer(handle_t *handle, struct buffer_head *bh)
+{
+	journal_release_buffer(handle, bh);
+}
+
+static inline void
 ext3_journal_forget(handle_t *handle, struct buffer_head *bh)
 {
 	journal_forget(handle, bh);

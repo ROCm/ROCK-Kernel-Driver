@@ -48,9 +48,7 @@ EXPORT_SYMBOL(journal_get_create_access);
 EXPORT_SYMBOL(journal_get_undo_access);
 EXPORT_SYMBOL(journal_dirty_data);
 EXPORT_SYMBOL(journal_dirty_metadata);
-#if 0
 EXPORT_SYMBOL(journal_release_buffer);
-#endif
 EXPORT_SYMBOL(journal_forget);
 #if 0
 EXPORT_SYMBOL(journal_sync_buffer);

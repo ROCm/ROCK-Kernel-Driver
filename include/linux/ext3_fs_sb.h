@@ -21,6 +21,13 @@
 #include <linux/wait.h>
 #endif
 
+struct ext3_bg_info {
+	u8 bg_debts;
+	spinlock_t bg_balloc_lock;
+	spinlock_t bg_ialloc_lock;
+	unsigned long bg_reserved;
+} ____cacheline_aligned_in_smp;
+
 /*
  * third extended-fs super-block data in memory
  */
@@ -50,8 +57,7 @@ struct ext3_sb_info {
 	u32 s_next_generation;
 	u32 s_hash_seed[4];
 	int s_def_hash_version;
-	unsigned long s_dir_count;
-	u8 *s_debts;
+	struct ext3_bg_info *s_bgi;
 
 	/* Journaling */
 	struct inode * s_journal_inode;

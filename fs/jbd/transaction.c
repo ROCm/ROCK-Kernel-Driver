@@ -1106,7 +1106,6 @@ out_unlock:
 	return 0;
 }
 
-#if 0
 /* 
  * journal_release_buffer: undo a get_write_access without any buffer
  * updates, if the update decided in the end that it didn't need access.
@@ -1140,7 +1139,6 @@ void journal_release_buffer (handle_t *handle, struct buffer_head *bh)
 	JBUFFER_TRACE(jh, "exit");
 	unlock_journal(journal);
 }
-#endif
 
 /** 
  * void journal_forget() - bforget() for potentially-journaled buffers.

@@ -460,7 +460,7 @@ void ext3_put_super (struct super_block * sb)
 	for (i = 0; i < sbi->s_gdb_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
-	kfree(sbi->s_debts);
+	kfree(sbi->s_bgi);
 	brelse(sbi->s_sbh);
 
 	/* Debugging code just in case the in-memory inode orphan list
@@ -901,6 +901,8 @@ static int ext3_check_descriptors (struct super_block * sb)
 	struct ext3_sb_info *sbi = EXT3_SB(sb);
 	unsigned long block = le32_to_cpu(sbi->s_es->s_first_data_block);
 	struct ext3_group_desc * gdp = NULL;
+	unsigned long total_free;
+	unsigned int reserved = le32_to_cpu(sbi->s_es->s_r_blocks_count);
 	int desc_block = 0;
 	int i;
 
@@ -947,6 +949,43 @@ static int ext3_check_descriptors (struct super_block * sb)
 		block += EXT3_BLOCKS_PER_GROUP(sb);
 		gdp++;
 	}
+
+	total_free = ext3_count_free_blocks(sb);
+	if (total_free != le32_to_cpu(EXT3_SB(sb)->s_es->s_free_blocks_count)) {
+		printk("EXT3-fs: invalid s_free_blocks_count %u (real %lu)\n",
+				le32_to_cpu(EXT3_SB(sb)->s_es->s_free_blocks_count),
+				total_free);
+		EXT3_SB(sb)->s_es->s_free_blocks_count = cpu_to_le32(total_free);
+	}
+
+	/* distribute reserved blocks over groups -bzzz */
+	for(i = sbi->s_groups_count - 1; reserved && total_free && i >= 0; i--) {
+		int free;
+
+		gdp = ext3_get_group_desc (sb, i, NULL);
+		if (!gdp) {
+			ext3_error (sb, "ext3_check_descriptors",
+					"cant get descriptor for group %d", i);
+			return 0;
+		}
+
+		free = le16_to_cpu(gdp->bg_free_blocks_count);
+		if (free > reserved)
+			free = reserved;
+		sbi->s_bgi[i].bg_reserved = free;
+		reserved -= free;
+		total_free -= free;
+	}
+
+	total_free = ext3_count_free_inodes(sb);
+	if (total_free != le32_to_cpu(EXT3_SB(sb)->s_es->s_free_inodes_count)) {
+		printk("EXT3-fs: invalid s_free_inodes_count %u (real %lu)\n",
+			le32_to_cpu(EXT3_SB(sb)->s_es->s_free_inodes_count),
+			total_free);
+		EXT3_SB(sb)->s_es->s_free_inodes_count = cpu_to_le32(total_free);
+	}
+
+
 	return 1;
 }
 
@@ -1307,13 +1346,17 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		printk (KERN_ERR "EXT3-fs: not enough memory\n");
 		goto failed_mount;
 	}
-	sbi->s_debts = kmalloc(sbi->s_groups_count * sizeof(*sbi->s_debts),
+	sbi->s_bgi = kmalloc(sbi->s_groups_count * sizeof(struct ext3_bg_info),
 			GFP_KERNEL);
-	if (!sbi->s_debts) {
-		printk ("EXT3-fs: not enough memory\n");
+	if (!sbi->s_bgi) {
+		printk("EXT3-fs: not enough memory to allocate s_bgi\n");
 		goto failed_mount2;
 	}
-	memset(sbi->s_debts, 0, sbi->s_groups_count * sizeof(*sbi->s_debts));
+	memset(sbi->s_bgi, 0,  sbi->s_groups_count * sizeof(struct ext3_bg_info));
+	for (i = 0; i < sbi->s_groups_count; i++) {
+		spin_lock_init(&sbi->s_bgi[i].bg_balloc_lock);
+		spin_lock_init(&sbi->s_bgi[i].bg_ialloc_lock);
+	}
 	for (i = 0; i < db_count; i++) {
 		block = descriptor_loc(sb, logic_sb_block, i);
 		sbi->s_group_desc[i] = sb_bread(sb, block);
@@ -1329,7 +1372,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		goto failed_mount2;
 	}
 	sbi->s_gdb_count = db_count;
-	sbi->s_dir_count = ext3_count_dirs(sb);
 	/*
 	 * set up enough so that it can read an inode
 	 */
@@ -1432,8 +1474,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 failed_mount3:
 	journal_destroy(sbi->s_journal);
 failed_mount2:
-	if (sbi->s_debts)
-		kfree(sbi->s_debts);
+	kfree(sbi->s_bgi);
 	for (i = 0; i < db_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
@@ -1702,6 +1743,8 @@ static void ext3_commit_super (struct super_block * sb,
 	if (!sbh)
 		return;
 	es->s_wtime = cpu_to_le32(get_seconds());
+	es->s_free_blocks_count = cpu_to_le32(ext3_count_free_blocks(sb));
+	es->s_free_inodes_count = cpu_to_le32(ext3_count_free_inodes(sb));
 	BUFFER_TRACE(sbh, "marking dirty");
 	mark_buffer_dirty(sbh);
 	if (sync)

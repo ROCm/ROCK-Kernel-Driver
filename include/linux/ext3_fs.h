@@ -344,7 +344,9 @@ struct ext3_inode {
 #endif
 
 #define ext3_set_bit			ext2_set_bit
+#define ext3_set_bit_atomic		ext2_set_bit_atomic
 #define ext3_clear_bit			ext2_clear_bit
+#define ext3_clear_bit_atomic		ext2_clear_bit_atomic
 #define ext3_test_bit			ext2_test_bit
 #define ext3_find_first_zero_bit	ext2_find_first_zero_bit
 #define ext3_find_next_zero_bit		ext2_find_next_zero_bit
