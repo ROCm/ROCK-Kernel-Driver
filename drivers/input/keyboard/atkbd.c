@@ -33,12 +33,11 @@ MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
 MODULE_PARM(atkbd_set, "1i");
 MODULE_PARM(atkbd_reset, "1i");
 MODULE_PARM(atkbd_softrepeat, "1i");
-MODULE_PARM(atkbd_scroll, "1i");
 MODULE_LICENSE("GPL");
 
 static int atkbd_set = 2;
 module_param_named(set, atkbd_set, int, 0);
-MODULE_PARM_DESC(set, "Select keyboard code set (2 = default, 3, 4)");
+MODULE_PARM_DESC(set, "Select keyboard code set (2 = default, 3 = PS/2 native)");
 
 #if defined(__i386__) || defined(__x86_64__) || defined(__hppa__)
 static int atkbd_reset;
@@ -53,8 +52,12 @@ module_param_named(softrepeat, atkbd_softrepeat, bool, 0);
 MODULE_PARM_DESC(softrepeat, "Use software keyboard repeat");
 
 static int atkbd_scroll;
-module_parm_named(scroll, atkbd_scroll, bool, 0);
-MODULE_PARM_DESC_(scroll, "Enable scroll-wheel on office keyboards");
+module_param_named(scroll, atkbd_scroll, bool, 0);
+MODULE_PARM_DESC(scroll, "Enable scroll-wheel on MS Office and similar keyboards");
+
+static int atkbd_extra;
+module_param_named(extra, atkbd_extra, bool, 0);
+MODULE_PARM_DESC(extra, "Enable extra LEDs and keys on IBM RapidAcces, EzKey and similar keyboards");
 
 /*
  * Scancode to keycode tables. These are just the default setting, and
@@ -175,6 +178,7 @@ struct atkbd {
 	unsigned char cmdbuf[4];
 	unsigned char cmdcnt;
 	unsigned char set;
+	unsigned char extra;
 	unsigned char release;
 	int lastkey;
 	volatile signed char ack;
@@ -463,7 +467,7 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 			         | (test_bit(LED_CAPSL,   dev->led) ? 4 : 0);
 		        atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS);
 
-			if (atkbd->set == 4) {
+			if (atkbd->extra) {
 				param[0] = 0;
 				param[1] = (test_bit(LED_COMPOSE, dev->led) ? 0x01 : 0)
 					 | (test_bit(LED_SLEEP,   dev->led) ? 0x02 : 0)
@@ -572,20 +576,21 @@ static int atkbd_set_3(struct atkbd *atkbd)
 		return 3;
 	}
 
-	if (atkbd_set != 2) 
-		if (!atkbd_command(atkbd, param, ATKBD_CMD_OK_GETID)) {
-			atkbd->id = param[0] << 8 | param[1];
+	if (atkbd_extra) {
+		param[0] = 0x71;
+		if (!atkbd_command(atkbd, param, ATKBD_CMD_EX_ENABLE)) {
+			atkbd->extra = 1;
 			return 2;
 		}
-
-	if (atkbd_set == 4) {
-		param[0] = 0x71;
-		if (!atkbd_command(atkbd, param, ATKBD_CMD_EX_ENABLE))
-			return 4;
 	}
 
 	if (atkbd_set != 3) 
 		return 2;
+
+	if (!atkbd_command(atkbd, param, ATKBD_CMD_OK_GETID)) {
+		atkbd->id = param[0] << 8 | param[1];
+		return 2;
+	}
 
 	param[0] = 3;
 	if (atkbd_command(atkbd, param, ATKBD_CMD_SSCANSET))
@@ -739,9 +744,9 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 		atkbd->id = 0xab00;
 	}
 
-	if (atkbd->set == 4) {
+	if (atkbd->extra) {
 		atkbd->dev.ledbit[0] |= BIT(LED_COMPOSE) | BIT(LED_SUSPEND) | BIT(LED_SLEEP) | BIT(LED_MUTE) | BIT(LED_MISC);
-		sprintf(atkbd->name, "AT Set 2 Extended keyboard");
+		sprintf(atkbd->name, "AT Set 2 Extra keyboard");
 	} else
 		sprintf(atkbd->name, "AT %s Set %d keyboard",
 			atkbd->translated ? "Translated" : "Raw", atkbd->set);
