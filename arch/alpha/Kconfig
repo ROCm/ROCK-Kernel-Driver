@@ -297,7 +297,7 @@ config PCI
 
 config PCI_DOMAINS
 	bool
-	default PCI
+	default y
 
 config ALPHA_CORE_AGP
 	bool
