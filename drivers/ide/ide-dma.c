@@ -461,7 +461,14 @@ int __ide_dma_off_quietly (ide_drive_t *drive)
 {
 	drive->using_dma = 0;
 	ide_toggle_bounce(drive, 0);
-	return HWIF(drive)->ide_dma_host_off(drive);
+
+	if (HWIF(drive)->ide_dma_host_off(drive))
+		return 1;
+
+	if (drive->queue_setup)
+		HWIF(drive)->ide_dma_queued_off(drive);
+
+	return 0;
 }
 
 EXPORT_SYMBOL(__ide_dma_off_quietly);
@@ -493,7 +500,14 @@ int __ide_dma_on (ide_drive_t *drive)
 {
 	drive->using_dma = 1;
 	ide_toggle_bounce(drive, 1);
-	return HWIF(drive)->ide_dma_host_on(drive);
+
+	if (HWIF(drive)->ide_dma_host_on(drive))
+		return 1;
+
+	if (drive->queue_setup)
+		HWIF(drive)->ide_dma_queued_on(drive);
+
+	return 0;
 }
 
 EXPORT_SYMBOL(__ide_dma_on);
@@ -505,50 +519,58 @@ int __ide_dma_check (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_check);
 
+int ide_start_dma(ide_hwif_t *hwif, ide_drive_t *drive, int reading)
+{
+	struct request *rq = HWGROUP(drive)->rq;
+	u8 dma_stat;
+
+	/* fall back to pio! */
+	if (!ide_build_dmatable(drive, rq))
+		return 1;
+
+	/* PRD table */
+	hwif->OUTL(hwif->dmatable_dma, hwif->dma_prdtable);
+
+	/* specify r/w */
+	hwif->OUTB(reading, hwif->dma_command);
+
+	/* read dma_status for INTR & ERROR flags */
+	dma_stat = hwif->INB(hwif->dma_status);
+
+	/* clear INTR & ERROR flags */
+	hwif->OUTB(dma_stat|6, hwif->dma_status);
+	drive->waiting_for_dma = 1;
+	return 0;
+}
+
+EXPORT_SYMBOL(ide_start_dma);
+
 int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= HWGROUP(drive)->rq;
-//	ide_task_t *args	= rq->special;
 	unsigned int reading	= 1 << 3;
-	unsigned int count	= 0;
-	u8 dma_stat = 0, lba48	= (drive->addressing == 1) ? 1 : 0;
+	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command	= WIN_NOP;
 
-	if (!(count = ide_build_dmatable(drive, rq)))
-		/* try PIO instead of DMA */
+	/* try pio */
+	if (ide_start_dma(hwif, drive, reading))
 		return 1;
-	/* PRD table */
-	hwif->OUTL(hwif->dmatable_dma, hwif->dma_prdtable);
-	/* specify r/w */
-	hwif->OUTB(reading, hwif->dma_command);
-	/* read dma_status for INTR & ERROR flags */
-	dma_stat = hwif->INB(hwif->dma_status);
-	/* clear INTR & ERROR flags */
-	hwif->OUTB(dma_stat|6, hwif->dma_status);
-	drive->waiting_for_dma = 1;
+
 	if (drive->media != ide_disk)
 		return 0;
+
 	/* paranoia check */
 	if (HWGROUP(drive)->handler != NULL)
 		BUG();
 	ide_set_handler(drive, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
 
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
 	command = (lba48) ? WIN_READDMA_EXT : WIN_READDMA;
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		command = args->tfRegister[IDE_COMMAND_OFFSET];
 	}
-#endif
+
 	/* issue cmd to drive */
 	hwif->OUTB(command, IDE_COMMAND_REG);
 
@@ -561,47 +583,31 @@ int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= HWGROUP(drive)->rq;
-//	ide_task_t *args	= rq->special;
 	unsigned int reading	= 0;
-	unsigned int count	= 0;
-	u8 dma_stat = 0, lba48	= (drive->addressing == 1) ? 1 : 0;
+	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command	= WIN_NOP;
 
-	if (!(count = ide_build_dmatable(drive, rq)))
-		/* try PIO instead of DMA */
+	/* try PIO instead of DMA */
+	if (ide_start_dma(hwif, drive, reading))
 		return 1;
-	/* PRD table */
-	hwif->OUTL(hwif->dmatable_dma, hwif->dma_prdtable);
-	/* specify r/w */
-	hwif->OUTB(reading, hwif->dma_command);
-	/* read dma_status for INTR & ERROR flags */
-	dma_stat = hwif->INB(hwif->dma_status);
-	/* clear INTR & ERROR flags */
-	hwif->OUTB(dma_stat|6, hwif->dma_status);
-	drive->waiting_for_dma = 1;
+
 	if (drive->media != ide_disk)
 		return 0;
+
 	/* paranoia check */
 	if (HWGROUP(drive)->handler != NULL)
 		BUG();
 	ide_set_handler(drive, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
+
 	command = (lba48) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		command = args->tfRegister[IDE_COMMAND_OFFSET];
 	}
-#endif
+
 	/* issue cmd to drive */
 	hwif->OUTB(command, IDE_COMMAND_REG);
+
 	return HWIF(drive)->ide_dma_count(drive);
 }
 
@@ -619,6 +625,8 @@ int __ide_dma_begin (ide_drive_t *drive)
 	 */
 	/* start DMA */
 	hwif->OUTB(dma_cmd|1, hwif->dma_command);
+	hwif->dma = 1;
+	wmb();
 	return 0;
 }
 
@@ -642,6 +650,8 @@ int __ide_dma_end (ide_drive_t *drive)
 	/* purge DMA mappings */
 	ide_destroy_dmatable(drive);
 	/* verify good DMA status */
+	hwif->dma = 0;
+	wmb();
 	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;
 }
 
@@ -998,6 +1008,23 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_retune = &__ide_dma_retune;
 	if (!hwif->ide_dma_lostirq)
 		hwif->ide_dma_lostirq = &__ide_dma_lostirq;
+
+	/*
+	 * dma queued ops. if tcq isn't set, queued on and off are just
+	 * dummy functions. cuts down on ifdef hell
+	 */
+	if (!hwif->ide_dma_queued_on)
+		hwif->ide_dma_queued_on = __ide_dma_queued_on;
+	if (!hwif->ide_dma_queued_off)
+		hwif->ide_dma_queued_off = __ide_dma_queued_off;
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+	if (!hwif->ide_dma_queued_read)
+		hwif->ide_dma_queued_read = __ide_dma_queued_read;
+	if (!hwif->ide_dma_queued_write)
+		hwif->ide_dma_queued_write = __ide_dma_queued_write;
+	if (!hwif->ide_dma_queued_start)
+		hwif->ide_dma_queued_start = __ide_dma_queued_start;
+#endif
 
 	if (hwif->chipset != ide_trm290) {
 		u8 dma_stat = hwif->INB(hwif->dma_status);

@@ -213,14 +213,6 @@ typedef unsigned char	byte;	/* used everywhere */
 #define PRD_ENTRIES     (PAGE_SIZE / (2 * PRD_BYTES))
 
 /*
- * sector count bits
- */
-#define NSEC_CD			0x01
-#define NSEC_IO			0x02
-#define NSEC_REL		0x04
-
-
-/*
  * Our Physical Region Descriptor (PRD) table should be large enough
  * to handle the biggest I/O request we are likely to see.  Since requests
  * can have no more than 256 sectors, and since the typical blocksize is
@@ -689,6 +681,15 @@ typedef union {
 	} b;
 } atapi_select_t;
 
+/*
+ * Status returned from various ide_ functions
+ */
+typedef enum {
+	ide_stopped,	/* no drive operation was started */
+	ide_started,	/* a drive operation was started, handler was set */
+	ide_released,	/* as ide_started, but bus also released */
+} ide_startstop_t;
+
 struct ide_driver_s;
 struct ide_settings_s;
 
@@ -746,6 +747,7 @@ typedef struct ide_drive_s {
 	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
+	unsigned queue_setup	: 1;
 	unsigned addressing;		/*      : 3;
 					 *  0=28-bit
 					 *  1=48-bit
@@ -775,6 +777,7 @@ typedef struct ide_drive_s {
 	u8	sect;		/* "real" sectors per track */
 	u8	bios_head;	/* BIOS/fdisk/LILO number of heads */
 	u8	bios_sect;	/* BIOS/fdisk/LILO sectors per track */
+	u8	queue_depth;	/* max queue depth */
 
 	unsigned int	bios_cyl;	/* BIOS/fdisk/LILO number of cyls */
 	unsigned int	cyl;		/* "real" number of cyls */
@@ -822,6 +825,12 @@ typedef struct ide_dma_ops_s {
 	int (*ide_dma_retune)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
+	/* dma queued operations */
+	int (*ide_dma_queued_on)(ide_drive_t *drive);
+	int (*ide_dma_queued_off)(ide_drive_t *drive);
+	ide_startstop_t (*ide_dma_queued_read)(ide_drive_t *drive);
+	ide_startstop_t (*ide_dma_queued_write)(ide_drive_t *drive);
+	ide_startstop_t (*ide_dma_queued_start)(ide_drive_t *drive);
 } ide_dma_ops_t;
 
 /*
@@ -958,6 +967,13 @@ typedef struct hwif_s {
 	int (*ide_dma_retune)(ide_drive_t *drive);
 	int (*ide_dma_lostirq)(ide_drive_t *drive);
 	int (*ide_dma_timeout)(ide_drive_t *drive);
+
+	/* dma queued operations */
+	int (*ide_dma_queued_on)(ide_drive_t *drive);
+	int (*ide_dma_queued_off)(ide_drive_t *drive);
+	ide_startstop_t (*ide_dma_queued_read)(ide_drive_t *drive);
+	ide_startstop_t (*ide_dma_queued_write)(ide_drive_t *drive);
+	ide_startstop_t (*ide_dma_queued_start)(ide_drive_t *drive);
 #endif
 
 #if 0
@@ -1016,21 +1032,15 @@ typedef struct hwif_s {
 	unsigned	reset      : 1;	/* reset after probe */
 	unsigned	autodma    : 1;	/* auto-attempt using DMA at boot */
 	unsigned	udma_four  : 1;	/* 1=ATA-66 capable, 0=default */
-	unsigned	highmem    : 1;	/* can do full 32-bit dma */
 	unsigned	no_dsc     : 1;	/* 0 default, 1 dsc_overlap disabled */
+	unsigned	auto_poll  : 1; /* supports nop auto-poll */
 
 	struct device	gendev;
 
 	void		*hwif_data;	/* extra hwif data */
-} ide_hwif_t;
 
-/*
- * Status returned from various ide_ functions
- */
-typedef enum {
-	ide_stopped,	/* no drive operation was started */
-	ide_started	/* a drive operation was started, handler was set */
-} ide_startstop_t;
+	unsigned dma;
+} ide_hwif_t;
 
 /*
  *  internal ide interrupt handler type
@@ -1071,6 +1081,8 @@ typedef struct hwgroup_s {
 	int (*expiry)(ide_drive_t *);
 		/* ide_system_bus_speed */
 	int pio_clock;
+
+	unsigned char cmd_buf[4];
 } ide_hwgroup_t;
 
 /* structure attached to the request for IDE_TASK_CMDS */
@@ -1661,6 +1673,7 @@ extern void ide_destroy_dmatable(ide_drive_t *);
 extern ide_startstop_t ide_dma_intr(ide_drive_t *);
 extern int ide_release_dma(ide_hwif_t *);
 extern void ide_setup_dma(ide_hwif_t *, unsigned long, unsigned int);
+extern int ide_start_dma(ide_hwif_t *, ide_drive_t *, int);
 
 extern int __ide_dma_host_off(ide_drive_t *);
 extern int __ide_dma_off_quietly(ide_drive_t *);
@@ -1680,6 +1693,24 @@ extern int __ide_dma_verbose(ide_drive_t *);
 extern int __ide_dma_retune(ide_drive_t *);
 extern int __ide_dma_lostirq(ide_drive_t *);
 extern int __ide_dma_timeout(ide_drive_t *);
+
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+extern int __ide_dma_queued_on(ide_drive_t *drive);
+extern int __ide_dma_queued_off(ide_drive_t *drive);
+extern ide_startstop_t __ide_dma_queued_read(ide_drive_t *drive);
+extern ide_startstop_t __ide_dma_queued_write(ide_drive_t *drive);
+extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
+#else
+static inline int __ide_dma_queued_on(ide_drive_t *drive)
+{
+	return 1;
+}
+
+static inline int __ide_dma_queued_off(ide_drive_t *drive)
+{
+	return 1;
+}
+#endif
 
 extern void hwif_unregister(ide_hwif_t *);
 
@@ -1707,6 +1738,28 @@ extern void ide_toggle_bounce(ide_drive_t *drive, int on);
 extern spinlock_t ide_lock;
 
 #define local_irq_set(flags)	do { local_save_flags((flags)); local_irq_enable(); } while (0)
+
+#define IDE_MAX_TAG	32
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+static inline int ata_pending_commands(ide_drive_t *drive)
+{
+	if (drive->using_tcq)
+		return blk_queue_tag_depth(&drive->queue);
+
+	return 0;
+}
+
+static inline int ata_can_queue(ide_drive_t *drive)
+{
+	if (drive->using_tcq)
+		return blk_queue_tag_queue(&drive->queue);
+
+	return 1;
+}
+#else
+#define ata_pending_commands(drive)	(0)
+#define ata_can_queue(drive)		(1)
+#endif
 
 extern struct bus_type ide_bus_type;
 

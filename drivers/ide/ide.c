@@ -407,7 +407,10 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 
 	if (!end_that_request_first(rq, uptodate, nr_sectors)) {
 		add_blkdev_randomness(major(rq->rq_dev));
-		blkdev_dequeue_request(rq);
+		if (!blk_rq_tagged(rq))
+			blkdev_dequeue_request(rq);
+		else
+			blk_queue_end_tag(&drive->queue, rq);
 		HWGROUP(drive)->rq = NULL;
 		end_that_request_last(rq);
 		ret = 0;
@@ -1117,9 +1120,30 @@ void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 		drive->sleep = 0;
 		drive->service_start = jiffies;
 
-		BUG_ON(blk_queue_plugged(&drive->queue));
+queue_next:
+		if (!ata_can_queue(drive)) {
+			if (!ata_pending_commands(drive))
+				hwgroup->busy = 0;
 
-		rq = hwgroup->rq = elv_next_request(&drive->queue);
+			break;
+		}
+
+		if (blk_queue_plugged(&drive->queue)) {
+			if (drive->using_tcq)
+				break;
+
+			printk("ide: huh? queue was plugged!\n");
+			break;
+		}
+
+		rq = elv_next_request(&drive->queue);
+		if (!rq)
+			break;
+
+		if (!rq->bio && ata_pending_commands(drive))
+			break;
+
+		hwgroup->rq = rq;
 
 		/*
 		 * Some systems have trouble with IDE IRQs arriving while
@@ -1138,6 +1162,8 @@ void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 		spin_lock_irq(&ide_lock);
 		if (masked_irq && hwif->irq != masked_irq)
 			enable_irq(hwif->irq);
+		if (startstop == ide_released)
+			goto queue_next;
 		if (startstop == ide_stopped)
 			hwgroup->busy = 0;
 	}

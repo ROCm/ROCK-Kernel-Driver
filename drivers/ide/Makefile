@@ -22,6 +22,7 @@ obj-$(CONFIG_BLK_DEV_IDEFLOPPY)		+= ide-floppy.o
 
 obj-$(CONFIG_BLK_DEV_IDEPCI)		+= setup-pci.o
 obj-$(CONFIG_BLK_DEV_IDEDMA_PCI)	+= ide-dma.o
+obj-$(CONFIG_BLK_DEV_IDE_TCQ)		+= ide-tcq.o
 obj-$(CONFIG_BLK_DEV_ISAPNP)		+= ide-pnp.o
 
 ifeq ($(CONFIG_BLK_DEV_IDE),y)
