@@ -440,7 +440,7 @@ if [ "$CONFIG_ARCH_SA1100" = "y" -o \
 fi
 
 source drivers/pci/Config.in
-bool 'Support hot-pluggable devices' CONFIG_HOTPLUG
+bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
 if [ "$CONFIG_HOTPLUG" = "y" ]; then
    source drivers/pcmcia/Config.in
 else
