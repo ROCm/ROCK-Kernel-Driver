@@ -27,7 +27,6 @@ struct address_space swapper_space = {
 	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
 	.tree_lock	= SPIN_LOCK_UNLOCKED,
 	.clean_pages	= LIST_HEAD_INIT(swapper_space.clean_pages),
-	.locked_pages	= LIST_HEAD_INIT(swapper_space.locked_pages),
 	.a_ops		= &swap_aops,
 	.backing_dev_info = &swap_backing_dev_info,
 	.i_mmap		= LIST_HEAD_INIT(swapper_space.i_mmap),

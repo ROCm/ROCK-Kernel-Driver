@@ -154,7 +154,6 @@ int filemap_fdatawrite(struct address_space *mapping)
 {
 	return __filemap_fdatawrite(mapping, WB_SYNC_ALL);
 }
-
 EXPORT_SYMBOL(filemap_fdatawrite);
 
 /*
@@ -165,51 +164,40 @@ int filemap_flush(struct address_space *mapping)
 {
 	return __filemap_fdatawrite(mapping, WB_SYNC_NONE);
 }
-
 EXPORT_SYMBOL(filemap_flush);
 
-/**
- * filemap_fdatawait - walk the list of locked pages of the given address
- *                     space and wait for all of them.
- * @mapping: address space structure to wait for
+/*
+ * Wait for writeback to complete against pages indexed by start->end
+ * inclusive
  */
-int filemap_fdatawait(struct address_space * mapping)
+static int wait_on_page_writeback_range(struct address_space *mapping,
+				pgoff_t start, pgoff_t end)
 {
+	struct pagevec pvec;
+	int nr_pages;
 	int ret = 0;
-	int progress;
+	pgoff_t index;
 
-restart:
-	progress = 0;
-	spin_lock_irq(&mapping->tree_lock);
-        while (!list_empty(&mapping->locked_pages)) {
-		struct page *page;
+	if (end < start)
+		return 0;
 
-		page = list_entry(mapping->locked_pages.next,struct page,list);
-		list_del_init(&page->list);
+	pagevec_init(&pvec, 0);
+	index = start;
+	while ((nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
+			PAGECACHE_TAG_WRITEBACK,
+			min(end - index, (pgoff_t)PAGEVEC_SIZE-1) + 1))) {
+		unsigned i;
 
-		if (!PageWriteback(page)) {
-			if (++progress > 32) {
-				if (need_resched()) {
-					spin_unlock_irq(&mapping->tree_lock);
-					__cond_resched();
-					goto restart;
-				}
-			}
-			continue;
+		for (i = 0; i < nr_pages; i++) {
+			struct page *page = pvec.pages[i];
+
+			wait_on_page_writeback(page);
+			if (PageError(page))
+				ret = -EIO;
 		}
-
-		progress = 0;
-		page_cache_get(page);
-		spin_unlock_irq(&mapping->tree_lock);
-
-		wait_on_page_writeback(page);
-		if (PageError(page))
-			ret = -EIO;
-
-		page_cache_release(page);
-		spin_lock_irq(&mapping->tree_lock);
+		pagevec_release(&pvec);
+		cond_resched();
 	}
-	spin_unlock_irq(&mapping->tree_lock);
 
 	/* Check for outstanding write errors */
 	if (test_and_clear_bit(AS_ENOSPC, &mapping->flags))
@@ -219,6 +207,18 @@ restart:
 
 	return ret;
 }
+
+/**
+ * filemap_fdatawait - walk the list of under-writeback pages of the given
+ *     address space and wait for all of them.
+ *
+ * @mapping: address space structure to wait for
+ */
+int filemap_fdatawait(struct address_space *mapping)
+{
+	return wait_on_page_writeback_range(mapping, 0, -1);
+}
+
 EXPORT_SYMBOL(filemap_fdatawait);
 
 int filemap_write_and_wait(struct address_space *mapping)

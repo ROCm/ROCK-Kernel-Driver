@@ -324,7 +324,6 @@ struct address_space {
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
 	spinlock_t		tree_lock;	/* and spinlock protecting it */
 	struct list_head	clean_pages;	/* list of clean pages */
-	struct list_head	locked_pages;	/* list of locked pages */
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
 	struct list_head	i_mmap;		/* list of private mappings */
