@@ -829,6 +829,7 @@ struct _snd_emu10k1_pcm {
 };
 
 typedef struct {
+	/* mono, left, right x 8 sends (4 on emu10k1) */
 	unsigned char send_routing[3][8];
 	unsigned char send_volume[3][8];
 	unsigned short attn[3];
