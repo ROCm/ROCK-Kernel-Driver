@@ -287,7 +287,7 @@ static void netem_watchdog(unsigned long arg)
 		else
 			sch->q.qlen++;
 	}
-	qdisc_restart(dev);
+	qdisc_run(dev);
 	spin_unlock_bh(&dev->queue_lock);
 }
 
