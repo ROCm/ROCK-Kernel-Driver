@@ -1,6 +1,8 @@
 #ifndef _M68K_CACHEFLUSH_H
 #define _M68K_CACHEFLUSH_H
 
+#include <linux/mm.h>
+
 /*
  * Cache handling functions
  */
@@ -104,15 +106,15 @@ extern inline void flush_cache_page(struct vm_area_struct *vma,
 
 /* Push the page at kernel virtual address and clear the icache */
 /* RZ: use cpush %bc instead of cpush %dc, cinv %ic */
-#define flush_page_to_ram(page) __flush_page_to_ram((unsigned long) page_address(page))
-extern inline void __flush_page_to_ram(unsigned long address)
+#define flush_page_to_ram(page) __flush_page_to_ram(page_address(page))
+extern inline void __flush_page_to_ram(void *vaddr)
 {
 	if (CPU_IS_040_OR_060) {
 		__asm__ __volatile__("nop\n\t"
 				     ".chip 68040\n\t"
 				     "cpushp %%bc,(%0)\n\t"
 				     ".chip 68k"
-				     : : "a" (__pa((void *)address)));
+				     : : "a" (__pa(vaddr)));
 	} else {
 		unsigned long _tmp;
 		__asm__ __volatile__("movec %%cacr,%0\n\t"
