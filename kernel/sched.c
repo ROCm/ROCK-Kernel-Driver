@@ -4449,14 +4449,12 @@ static void sched_domain_debug(void)
 #define sched_domain_debug() {}
 #endif
 
-#ifdef CONFIG_SMP
 /*
  * Initial dummy domain for early boot and for hotplug cpu. Being static,
  * it is initialized to zero, so all balancing flags are cleared which is
  * what we want.
  */
 static struct sched_domain sched_domain_dummy;
-#endif
 
 #ifdef CONFIG_HOTPLUG_CPU
 /*
