@@ -4600,17 +4600,6 @@ static int tg3_reset_hw(struct tg3 *tp)
 	 */
 	tg3_init_rings(tp);
 
-	/* Clear statistics/status block in chip, and status block in ram. */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
-		for (i = NIC_SRAM_STATS_BLK;
-	     	     i < NIC_SRAM_STATUS_BLK + TG3_HW_STATUS_SIZE;
-	     	     i += sizeof(u32)) {
-			tg3_write_mem(tp, i, 0);
-			udelay(40);
-		}
-	}
-	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
-
 	/* This value is determined during the probe time DMA
 	 * engine test, tg3_test_dma.
 	 */
@@ -4708,6 +4697,17 @@ static int tg3_reset_hw(struct tg3 *tp)
 		       tp->dev->name);
 		return -ENODEV;
 	}
+
+	/* Clear statistics/status block in chip, and status block in ram. */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		for (i = NIC_SRAM_STATS_BLK;
+	     	     i < NIC_SRAM_STATUS_BLK + TG3_HW_STATUS_SIZE;
+	     	     i += sizeof(u32)) {
+			tg3_write_mem(tp, i, 0);
+			udelay(40);
+		}
+	}
+	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
 
 	/* Setup replenish threshold. */
 	tw32(RCVBDI_STD_THRESH, tp->rx_pending / 8);
