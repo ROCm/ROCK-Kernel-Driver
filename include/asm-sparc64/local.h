@@ -11,12 +11,12 @@ typedef atomic64_t local_t;
 #define local_set(v,i)	atomic64_set(v,i)
 
 #define local_inc(v)	atomic64_inc(v)
-#define local_dec(v)	atomic64_inc(v)
+#define local_dec(v)	atomic64_dec(v)
 #define local_add(i, v)	atomic64_add(i, v)
 #define local_sub(i, v)	atomic64_sub(i, v)
 
 #define __local_inc(v)		((v)->counter++)
-#define __local_dec(v)		((v)->counter++)
+#define __local_dec(v)		((v)->counter--)
 #define __local_add(i,v)	((v)->counter+=(i))
 #define __local_sub(i,v)	((v)->counter-=(i))
 
