@@ -17,8 +17,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <linux/kernel.h>
-
 #define AMBA_UART_DR	(*(volatile unsigned char *)0x101F1000)
 #define AMBA_UART_LCRH	(*(volatile unsigned char *)0x101F102C)
 #define AMBA_UART_CR	(*(volatile unsigned char *)0x101F1030)
