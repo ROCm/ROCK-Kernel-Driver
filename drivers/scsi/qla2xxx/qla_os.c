@@ -2270,10 +2270,10 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
     char **start, off_t offset, int length, int inout)
 {
 	struct info_str	info;
-	int             i;
+	int		i;
 	int             retval = -EINVAL;
 	os_lun_t	*up;
-	os_tgt_t	*tq;
+	fc_port_t	*fcport;
 	unsigned int	t, l;
 	uint32_t        tmp_sn;
 	unsigned long   *flags;
@@ -2459,20 +2459,23 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 	    ha->init_cb->port_name[7]);
 
 	/* Print out device port names */
-	for (i = 0; i < MAX_TARGETS; i++) {
-		if ((tq = TGT_Q(ha, i)) == NULL)
+	i = 0;
+ 	list_for_each_entry(fcport, &ha->fcports, list) {
+		if (fcport->port_type != FCT_TARGET)
 			continue;
 
 		copy_info(&info,
 		    "scsi-qla%d-target-%d="
-		    "%02x%02x%02x%02x%02x%02x%02x%02x;\n",
+		    "%02x%02x%02x%02x%02x%02x%02x%02x:%02x%02x%02x;\n",
 		    (int)ha->instance, i,
-		    tq->port_name[0], tq->port_name[1],
-		    tq->port_name[2], tq->port_name[3],
-		    tq->port_name[4], tq->port_name[5],
-		    tq->port_name[6], tq->port_name[7]);
-
-	} /* 2.25 node/port display to proc */
+		    fcport->port_name[0], fcport->port_name[1],
+		    fcport->port_name[2], fcport->port_name[3],
+		    fcport->port_name[4], fcport->port_name[5],
+		    fcport->port_name[6], fcport->port_name[7],
+		    fcport->d_id.b.domain, fcport->d_id.b.area,
+		    fcport->d_id.b.al_pa);
+		i++;
+	}
 
 	copy_info(&info, "\nSCSI LUN Information:\n");
 	copy_info(&info,
@@ -2776,11 +2779,11 @@ void qla2x00_mark_device_lost(scsi_qla_host_t *ha, fc_port_t *fcport,
 void
 qla2x00_mark_all_devices_lost(scsi_qla_host_t *ha) 
 {
-	struct list_head	*fcpl;
-	fc_port_t		*fcport;
+	fc_port_t *fcport;
 
-	list_for_each(fcpl, &ha->fcports) {
-		fcport = list_entry(fcpl, fc_port_t, list);
+	list_for_each_entry(fcport, &ha->fcports, list) {
+		if (fcport->port_type != FCT_TARGET)
+			continue;
 
 		/*
 		 * No point in marking the device as lost, if the device is
@@ -3140,7 +3143,6 @@ qla2x00_do_dpc(void *data)
 {
 	DECLARE_MUTEX_LOCKED(sem);
 	scsi_qla_host_t *ha;
-	struct list_head *fcpl;
 	fc_port_t	*fcport;
 	os_lun_t        *q;
 	srb_t           *sp;
@@ -3339,9 +3341,10 @@ qla2x00_do_dpc(void *data)
 			    ha->host_no));
 
 			next_loopid = 0;
-			list_for_each(fcpl, &ha->fcports) {
-				fcport = list_entry(fcpl, fc_port_t, list);
-				
+			list_for_each_entry(fcport, &ha->fcports, list) {
+				if (fcport->port_type != FCT_TARGET)
+					continue;
+
 				/*
 				 * If the port is not ONLINE then try to login
 				 * to it if we haven't run out of retries.
@@ -3643,7 +3646,6 @@ qla2x00_timer(scsi_qla_host_t *ha)
 {
 	int		t,l;
 	unsigned long	cpu_flags = 0;
-	struct list_head	*fcpl;
 	fc_port_t	*fcport;
 	os_lun_t *lq;
 	os_tgt_t *tq;
@@ -3678,8 +3680,9 @@ qla2x00_timer(scsi_qla_host_t *ha)
 	 * the port it marked DEAD. 
 	 */
 	t = 0;
-	list_for_each(fcpl, &ha->fcports) {
-		fcport = list_entry(fcpl, fc_port_t, list);
+	list_for_each_entry(fcport, &ha->fcports, list) {
+		if (fcport->port_type != FCT_TARGET)
+			continue;
 
 		if (atomic_read(&fcport->state) == FCS_DEVICE_LOST) {
 
