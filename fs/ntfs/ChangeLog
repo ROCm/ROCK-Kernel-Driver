@@ -19,6 +19,10 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
+2.1.11 - WIP
+
+	- Only build logfile.o if building the driver with read-write support.
+
 2.1.10 - Force read-only (re)mounting of volumes with unsupported volume flags.
 
 	- Finish off the white space cleanups (remove trailing spaces, etc).
