@@ -107,10 +107,10 @@ extern int dump_task_fpu (struct task_struct *, elf_fpregset_t *);
 #define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)
 
 #ifdef CONFIG_FSYS
-#define ARCH_DLINFO					\
-do {							\
-	extern int syscall_via_epc;			\
-	NEW_AUX_ENT(AT_SYSINFO, syscall_via_epc);	\
+#define ARCH_DLINFO									\
+do {											\
+	extern char syscall_via_epc[], __start_gate_section[];				\
+	NEW_AUX_ENT(AT_SYSINFO, GATE_ADDR + (syscall_via_epc - __start_gate_section));	\
 } while (0)
 #endif
 
