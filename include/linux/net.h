@@ -19,7 +19,6 @@
 #define _LINUX_NET_H
 
 #include <linux/config.h>
-#include <linux/socket.h>
 #include <linux/wait.h>
 
 struct poll_table_struct;
@@ -88,6 +87,8 @@ struct socket {
 struct vm_area_struct;
 struct page;
 struct kiocb;
+struct sockaddr;
+struct msghdr;
 
 struct proto_ops {
 	int		family;
@@ -135,6 +136,8 @@ struct net_proto_family {
 	short	encryption;
 	short	encrypt_net;
 };
+
+struct iovec;
 
 extern int	     sock_wake_async(struct socket *sk, int how, int band);
 extern int	     sock_register(struct net_proto_family *fam);

@@ -1,6 +1,8 @@
 #ifndef __LINUX_NETLINK_H
 #define __LINUX_NETLINK_H
 
+#include <linux/socket.h> /* for sa_family_t */
+
 #define NETLINK_ROUTE		0	/* Routing/device hook				*/
 #define NETLINK_SKIP		1	/* Reserved for ENskip  			*/
 #define NETLINK_USERSOCK	2	/* Reserved for user mode socket protocols 	*/
