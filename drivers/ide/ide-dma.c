@@ -200,8 +200,8 @@ EXPORT_SYMBOL_GPL(ide_dma_intr);
  *	kernel provide the necessary cache management so that we can
  *	operate in a portable fashion
  */
- 
-static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
+
+int ide_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct scatterlist *sg = hwif->sg_table;
@@ -220,6 +220,8 @@ static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
 
+EXPORT_SYMBOL_GPL(ide_build_sglist);
+
 /**
  *	ide_raw_build_sglist	-	map IDE scatter gather for DMA
  *	@drive: the drive to build the DMA table for
@@ -230,8 +232,8 @@ static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
  *	of the  kernel provide the necessary cache management so that we can
  *	operate in a portable fashion
  */
- 
-static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
+
+int ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct scatterlist *sg = hwif->sg_table;
@@ -269,6 +271,8 @@ static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
 
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
+
+EXPORT_SYMBOL_GPL(ide_raw_build_sglist);
 
 /**
  *	ide_build_dmatable	-	build IDE DMA table
