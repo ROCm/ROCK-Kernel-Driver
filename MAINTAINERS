@@ -973,7 +973,7 @@ M:	scott.feldman@intel.com
 S:	Supported
 
 INTERMEZZO FILE SYSTEM
-P:	Chen Yang
+P:	Cluster File Systems	
 M:	intermezzo-devel@lists.sf.net
 W:	http://www.inter-mezzo.org/
 L:	intermezzo-discuss@lists.sourceforge.net
