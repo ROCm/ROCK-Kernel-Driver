@@ -247,6 +247,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 void
 flush_tlb_mm(struct mm_struct *mm)
 {
+	spin_lock(&mm->page_table_lock);
 	if (mm->map_count) {
 		struct vm_area_struct *mp;
 		for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
@@ -261,6 +262,7 @@ flush_tlb_mm(struct mm_struct *mm)
 
 	/* XXX are there races with checking cpu_vm_mask? - Anton */
 	mm->cpu_vm_mask = 0;
+	spin_unlock(&mm->page_table_lock);
 }
 
 /*
@@ -666,6 +668,8 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
  * fault has been handled by updating a PTE in the linux page tables.
  * We use it to preload an HPTE into the hash table corresponding to
  * the updated linux PTE.
+ * 
+ * This must always be called with the mm->page_table_lock held
  */
 void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 		      pte_t pte)
