@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 113 $
+ *              $Revision: 115 $
  *
  *****************************************************************************/
 
@@ -747,7 +747,7 @@ u32
 acpi_ns_opens_scope (
 	acpi_object_type        type)
 {
-	ACPI_FUNCTION_TRACE_U32 ("Ns_opens_scope", type);
+	ACPI_FUNCTION_TRACE_STR ("Ns_opens_scope", acpi_ut_get_type_name (type));
 
 
 	if (!acpi_ut_valid_object_type (type)) {
@@ -883,43 +883,6 @@ acpi_ns_find_parent_name (
 
 	return_VALUE (ACPI_UNKNOWN_NAME);
 }
-
-
-#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ns_exist_downstream_sibling
- *
- * PARAMETERS:  *Node          - pointer to first Node to examine
- *
- * RETURN:      TRUE if sibling is found, FALSE otherwise
- *
- * DESCRIPTION: Searches remainder of scope being processed to determine
- *              whether there is a downstream sibling to the current
- *              object.  This function is used to determine what type of
- *              line drawing character to use when displaying namespace
- *              trees.
- *
- ******************************************************************************/
-
-u8
-acpi_ns_exist_downstream_sibling (
-	acpi_namespace_node     *node)
-{
-
-	if (!node) {
-		return (FALSE);
-	}
-
-	if (node->name.integer) {
-		return (TRUE);
-	}
-
-	return (FALSE);
-}
-
-#endif /* ACPI_DEBUG_OUTPUT */
 
 
 /*******************************************************************************

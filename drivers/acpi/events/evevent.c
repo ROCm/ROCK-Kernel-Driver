@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed and General Purpose Even handling and dispatch
- *              $Revision: 92 $
+ *              $Revision: 94 $
  *
  *****************************************************************************/
 
@@ -358,19 +358,24 @@ acpi_ev_gpe_initialize (void)
 		/* Check for GPE0/GPE1 overlap */
 
 		if (acpi_gbl_gpe_number_max >= acpi_gbl_FADT->gpe1_base) {
-			ACPI_REPORT_ERROR (("GPE0 block overlaps the GPE1 block\n"));
+			ACPI_REPORT_ERROR ((
+				"GPE0 block (GPE  0 to %d) overlaps the GPE1 block (GPE %d to %d)\n",
+				acpi_gbl_gpe_number_max, acpi_gbl_FADT->gpe1_base,
+				acpi_gbl_FADT->gpe1_base + (ACPI_MUL_8 (acpi_gbl_gpe_block_info[1].register_count) - 1)));
 			return_ACPI_STATUS (AE_BAD_VALUE);
 		}
 
 		/* GPE0 and GPE1 do not have to be contiguous in the GPE number space */
 
-		acpi_gbl_gpe_number_max = acpi_gbl_FADT->gpe1_base + (ACPI_MUL_8 (acpi_gbl_gpe_block_info[1].register_count) - 1);
+		acpi_gbl_gpe_number_max = acpi_gbl_FADT->gpe1_base +
+				 (ACPI_MUL_8 (acpi_gbl_gpe_block_info[1].register_count) - 1);
 	}
 
 	/* Check for Max GPE number out-of-range */
 
 	if (acpi_gbl_gpe_number_max > ACPI_GPE_MAX) {
-		ACPI_REPORT_ERROR (("Maximum GPE number from FADT is too large: 0x%X\n", acpi_gbl_gpe_number_max));
+		ACPI_REPORT_ERROR (("Maximum GPE number from FADT is too large: 0x%X\n",
+			acpi_gbl_gpe_number_max));
 		return_ACPI_STATUS (AE_BAD_VALUE);
 	}
 
@@ -794,7 +799,7 @@ acpi_ev_asynch_execute_gpe_method (
 		 */
 		status = acpi_ns_evaluate_by_handle (gpe_info.method_handle, NULL, NULL);
 		if (ACPI_FAILURE (status)) {
-			ACPI_REPORT_ERROR (("%s while evaluated GPE%X method\n",
+			ACPI_REPORT_ERROR (("%s while evaluating GPE%X method\n",
 				acpi_format_exception (status), gpe_number));
 		}
 	}
@@ -846,7 +851,7 @@ acpi_ev_gpe_dispatch (
 
 	gpe_number_index = acpi_ev_get_gpe_number_index (gpe_number);
 	if (gpe_number_index == ACPI_GPE_INVALID) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid event, GPE[%X].\n", gpe_number));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "GPE[%X] is not a valid event\n", gpe_number));
 		return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 	}
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbrsdt - ACPI RSDT table utilities
- *              $Revision: 3 $
+ *              $Revision: 4 $
  *
  *****************************************************************************/
 
@@ -108,7 +108,6 @@ acpi_tb_verify_rsdp (
 	table_info.pointer     = ACPI_CAST_PTR (acpi_table_header, rsdp);
 	table_info.length      = sizeof (RSDP_DESCRIPTOR);
 	table_info.allocation  = ACPI_MEM_MAPPED;
-	table_info.base_pointer = rsdp;
 
 	/* Save the table pointers and allocation info */
 
