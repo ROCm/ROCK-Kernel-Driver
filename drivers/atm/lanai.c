@@ -71,12 +71,6 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 
-#ifndef PCI_VENDOR_ID_EF_ATM_LANAI2
-/* These need to eventually go into <linux/pci.h> - they're here for now */
-#define PCI_VENDOR_ID_EF_ATM_LANAI2	0x0003
-#define PCI_VENDOR_ID_EF_ATM_LANAIHB	0x0005
-#endif
-
 /* -------------------- TUNABLE PARAMATERS: */
 
 /*
@@ -205,12 +199,6 @@
 typedef int vci_t;
 typedef unsigned long bus_addr_t;
 
-/* A bitfield large enough for NUM_VCI */
-#define VCI_BITFIELD_NELEM  ((NUM_VCI + BITS_PER_LONG - 1) / BITS_PER_LONG)
-typedef struct {
-	unsigned long ul[VCI_BITFIELD_NELEM];
-} vci_bitfield;
-
 /* DMA buffer in host memory for TX, RX, or service list. */
 struct lanai_buffer {
 	u32 *start;	/* From get_free_pages */
@@ -302,8 +290,8 @@ struct lanai_dev {
 	u8 eeprom[LANAI_EEPROM_SIZE];
 	u32 serialno, magicno;
 	struct pci_dev *pci;
-	vci_bitfield backlog_vccs;	/* VCCs that are backlogged */
-	vci_bitfield transmit_ready;	/* VCCs that have transmit space */
+	DECLARE_BITMAP(backlog_vccs, NUM_VCI);   /* VCCs with tx backlog */
+	DECLARE_BITMAP(transmit_ready, NUM_VCI); /* VCCs with transmit space */
 	struct timer_list timer;
 	int naal0;
 	struct lanai_buffer aal0buf;	/* AAL0 RX buffers */
@@ -320,54 +308,20 @@ struct lanai_dev {
 /* TODO - organize above in some rational fashion (see <asm/cache.h>) */
 };
 
-/* -------------------- VCI_BITFIELD UTILITIES: */
-
 /*
- * These functions assume that BITS_PER_LONG is a power of two, which
- * should be safe
+ * Each device has two bitmaps for each VCC (baclog_vccs and transmit_ready)
+ * This function iterates one of these, calling a given function for each
+ * vci with their bit set
  */
-#if (BITS_PER_LONG & (BITS_PER_LONG - 1))
-#error lanai driver requires type long to have a power of two number of bits
-#endif
-
-/*
- * In vci_bitfield_{set,clear} we do the operation in three
- * parts to ensure that gcc doesn't cast anything down to
- * 32 bits (and then sign extend them later) on 64-bit
- * platforms like the alpha
- */
-static inline void vci_bitfield_set(vci_bitfield *bf, vci_t vci)
-{
-	unsigned long bit = 1;
-	bit <<= (unsigned long) (vci & (BITS_PER_LONG - 1));
-	bf->ul[vci / BITS_PER_LONG] |= bit;
-}
-
-static inline void vci_bitfield_clear(vci_bitfield *bf, vci_t vci)
-{
-	unsigned long bit = 1;
-	bit <<= (unsigned long) (vci & (BITS_PER_LONG - 1));
-	bf->ul[vci / BITS_PER_LONG] &= ~bit;
-}
-
-static inline void vci_bitfield_init(vci_bitfield *bf)
-{
-	memset(bf, 0, sizeof(*bf));
-}
-
 static void vci_bitfield_iterate(struct lanai_dev *lanai,
-	const vci_bitfield *bf, void (*func)(struct lanai_dev *,vci_t vci))
+	/*const*/ unsigned long *lp,
+	void (*func)(struct lanai_dev *,vci_t vci))
 {
-	vci_t vci;
-	unsigned long mask;
-	const unsigned long *lp = &(bf->ul[0]);
-	for (vci = 0; vci < NUM_VCI; lp++)
-		if (*lp == 0)
-			vci += BITS_PER_LONG;
-		else
-			for (mask = 1; mask != 0; mask <<= 1, vci++)
-				if (*lp & mask)
-					func(lanai, vci);
+	vci_t vci = find_first_bit(lp, NUM_VCI);
+	while (vci < NUM_VCI) {
+		func(lanai, vci);
+		vci = find_next_bit(lp, NUM_VCI, vci + 1);
+	}
 }
 
 /* -------------------- BUFFER  UTILITIES: */
@@ -444,33 +398,6 @@ static int lanai_buf_size_cardorder(const struct lanai_buffer *buf)
 	if (order > 7)
 		order = 7;
 	return order;
-}
-
-/* -------------------- HANDLE BACKLOG_VCCS BITFIELD: */
-
-static inline void vcc_mark_backlogged(struct lanai_dev *lanai,
-	const struct lanai_vcc *lvcc)
-{
-	APRINTK(lvcc->vbase != 0, "vcc_mark_backlogged: zero vbase!\n");
-	vci_bitfield_set(&lanai->backlog_vccs, lvcc->vci);
-}
-
-static inline void vcc_unmark_backlogged(struct lanai_dev *lanai,
-	const struct lanai_vcc *lvcc)
-{
-	APRINTK(lvcc->vbase != 0, "vcc_unmark_backlogged: zero vbase!\n");
-	vci_bitfield_clear(&lanai->backlog_vccs, lvcc->vci);
-}
-
-static inline void vcc_backlog_init(struct lanai_dev *lanai)
-{
-	vci_bitfield_init(&lanai->backlog_vccs);
-}
-
-static inline int vcc_is_backlogged(/*const*/ struct lanai_vcc *lvcc)
-{
-	return lvcc->tx.inprogress != NULL ||
-	    !skb_queue_empty(&lvcc->tx.backlog);
 }
 
 /* -------------------- PORT I/O UTILITIES: */
@@ -557,7 +484,6 @@ static inline bus_addr_t reg_addr(const struct lanai_dev *lanai,
 {
 	return lanai->base + (bus_addr_t) reg;
 }
-
 
 static inline u32 reg_read(const struct lanai_dev *lanai,
 	enum lanai_register reg)
@@ -921,7 +847,7 @@ static void lanai_shutdown_tx_vci(struct lanai_dev *lanai,
 	}
 	while ((skb = skb_dequeue(&lvcc->tx.backlog)) != NULL)
 		lanai_free_skb(lvcc->tx.atmvcc, skb);
-	vcc_unmark_backlogged(lanai, lvcc);
+	__clear_bit(lvcc->vci, lanai->backlog_vccs);
 	spin_unlock_irqrestore(&lanai->txlock, flags);
 	timeout = jiffies + ((lanai_buf_size(&lvcc->tx.buf) * HZ) >> 17);
 	write = TXWRITEPTR_GET_PTR(cardvcc_read(lvcc, vcc_txwriteptr));
@@ -1283,6 +1209,13 @@ static inline int vcc_tx_space(const struct lanai_vcc *lvcc, int endptr)
 	return r;
 }
 
+/* test if VCC is currently backlogged */
+static inline int vcc_is_backlogged(/*const*/ struct lanai_vcc *lvcc)
+{
+	return lvcc->tx.inprogress != NULL ||
+	    !skb_queue_empty(&lvcc->tx.backlog);
+}
+
 /* Bit fields in the segmentation buffer descriptor */
 #define DESCRIPTOR_MAGIC	(0xD0000000)
 #define DESCRIPTOR_AAL5		(0x00008000)
@@ -1467,7 +1400,7 @@ static void vcc_tx_unqueue_aal5(struct lanai_dev *lanai,
 		atomic_inc(&lvcc->tx.atmvcc->stats->tx);
 	}
 	if (skb_queue_empty(&lvcc->tx.backlog))
-		vcc_unmark_backlogged(lanai, lvcc);
+		__clear_bit(lvcc->vci, lanai->backlog_vccs);
     end:
 	lanai_endtx(lanai, lvcc);
 }
@@ -1481,8 +1414,8 @@ static void vcc_tx_aal5(struct lanai_dev *lanai, struct lanai_vcc *lvcc,
 		goto queue_it;
 	space = vcc_tx_space(lvcc, TXREADPTR_GET_PTR(cardvcc_read(lvcc,
 	    vcc_txreadptr)));
-	if (space < 64) {
-		vcc_mark_backlogged(lanai, lvcc);	/* No space */
+	if (space < 64) {			/* No space at all */
+		__set_bit(lvcc->vci, lanai->backlog_vccs);
 		goto queue_it;
 	}
 	if (space >= 16 + (n = aal5_size(skb->len))) {
@@ -1506,7 +1439,7 @@ static void vcc_tx_aal5(struct lanai_dev *lanai, struct lanai_vcc *lvcc,
 		lvcc->tx.inprogress = skb;
 		lvcc->tx.inprogleft = n - bytes;
 		lvcc->tx.pptr = skb->data + bytes;
-		vcc_mark_backlogged(lanai, lvcc);
+		__set_bit(lvcc->vci, lanai->backlog_vccs);
 	}
 	lanai_endtx(lanai, lvcc);
 	return;
@@ -1535,7 +1468,7 @@ static void iter_dequeue(struct lanai_dev *lanai, vci_t vci)
 	struct lanai_vcc *lvcc = lanai->vccs[vci];
 	int endptr;
 	if (lvcc == NULL || !vcc_is_backlogged(lvcc)) {
-		vci_bitfield_clear(&lanai->backlog_vccs, vci);
+		__clear_bit(vci, lanai->backlog_vccs);
 		return;
 	}
 	endptr = TXREADPTR_GET_PTR(cardvcc_read(lvcc, vcc_txreadptr));
@@ -1547,7 +1480,7 @@ static inline void vcc_tx_dequeue_all(struct lanai_dev *lanai)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&lanai->txlock, flags);
-	vci_bitfield_iterate(lanai, &lanai->backlog_vccs, iter_dequeue);
+	vci_bitfield_iterate(lanai, lanai->backlog_vccs, iter_dequeue);
 	spin_unlock_irqrestore(&lanai->txlock, flags);
 }
 
@@ -1831,7 +1764,7 @@ static int handle_service(struct lanai_dev *lanai, u32 s)
 			lanai->stats.service_notx++;
 			return 0;
 		}
-		vci_bitfield_set(&lanai->transmit_ready, vci);
+		__set_bit(vci, lanai->transmit_ready);
 		lvcc->tx.endptr = SERVICE_GET_END(s);
 		vcclist_read_unlock();
 		return 1;
@@ -1916,9 +1849,9 @@ static void run_service(struct lanai_dev *lanai)
 	if (ntx != 0) {
 		spin_lock(&lanai->txlock);
 		vcclist_read_lock();
-		vci_bitfield_iterate(lanai, &lanai->transmit_ready,
+		vci_bitfield_iterate(lanai, lanai->transmit_ready,
 		    iter_transmit);
-		vci_bitfield_init(&lanai->transmit_ready);
+		CLEAR_BITMAP(&lanai->transmit_ready, NUM_VCI);
 		vcclist_read_unlock();
 		spin_unlock(&lanai->txlock);
 	}
@@ -2300,8 +2233,8 @@ static int __init lanai_dev_open(struct atm_dev *atmdev)
 	/* Basic device fields */
 	lanai->number = atmdev->number;
 	lanai->num_vci = NUM_VCI;
-	vci_bitfield_init(&lanai->backlog_vccs);
-	vci_bitfield_init(&lanai->transmit_ready);
+	CLEAR_BITMAP(&lanai->backlog_vccs, NUM_VCI);
+	CLEAR_BITMAP(&lanai->transmit_ready, NUM_VCI);
 	lanai->naal0 = 0;
 #ifdef USE_POWERDOWN
 	lanai->nbound = 0;
@@ -2380,7 +2313,7 @@ static int __init lanai_dev_open(struct atm_dev *atmdev)
 	reg_write(lanai, TX_FIFO_DEPTH, TxDepth_Reg);
 	reg_write(lanai, 0, CBR_ICG_Reg);	/* CBR defaults to no limit */
 	if ((result = request_irq(lanai->pci->irq, lanai_int, SA_SHIRQ,
-	    "lanai", lanai)) != 0) {
+	    DEV_LABEL, lanai)) != 0) {
 		printk(KERN_ERR DEV_LABEL ": can't allocate interrupt\n");
 		goto error_vcctable;
 	}
@@ -2573,6 +2506,7 @@ static int lanai_open(struct atm_vcc *atmvcc, short vpi, int vci)
 /* NOTE: these are all DEBUGGING ONLY currently */
 static int lanai_ioctl(struct atm_dev *atmdev, unsigned int cmd, void *arg)
 {
+#if 0
 	int result = 0;
 	struct lanai_dev *lanai = (struct lanai_dev *) atmdev->dev_data;
 	switch(cmd) {
@@ -2649,9 +2583,13 @@ static int lanai_ioctl(struct atm_dev *atmdev, unsigned int cmd, void *arg)
 			return 0;
 #endif
 		default:
-			result = -EINVAL;
+			result = -ENOIOCTLCMD;
 	}
 	return result;
+#else /* !0 */
+	(void) atmdev; (void) cmd; (void) arg;	/* no compiler warnings */
+	return -ENOIOCTLCMD;
+#endif /* 0 */
 }
 
 static int lanai_send(struct atm_vcc *atmvcc, struct sk_buff *skb)
@@ -2862,7 +2800,7 @@ static int __devinit lanai_init_one(struct pci_dev *pci,
 	return result;
 }
 
-static struct pci_device_id lanai_pci_tbl[] __devinitdata = {
+static struct pci_device_id lanai_pci_tbl[] = {
 	{
 		PCI_VENDOR_ID_EF, PCI_VENDOR_ID_EF_ATM_LANAI2,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0
