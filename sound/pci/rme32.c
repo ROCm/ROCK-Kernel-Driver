@@ -1210,20 +1210,16 @@ static snd_pcm_uframes_t
 snd_rme32_playback_fd_pointer(snd_pcm_substream_t * substream)
 {
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
-	size_t ptr;
-
-	ptr = readl(rme32->iobase + RME32_IO_GET_POS) & RME32_RCR_AUDIO_ADDR_MASK;
-	return snd_pcm_indirect_playback_pointer(substream, &rme32->playback_pcm, ptr);
+	return snd_pcm_indirect_playback_pointer(substream, &rme32->playback_pcm,
+						 snd_rme32_pcm_byteptr(rme32));
 }
 
 static snd_pcm_uframes_t
 snd_rme32_capture_fd_pointer(snd_pcm_substream_t * substream)
 {
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
-	size_t ptr;
-
-	ptr = readl(rme32->iobase + RME32_IO_GET_POS) & RME32_RCR_AUDIO_ADDR_MASK;
-	return snd_pcm_indirect_capture_pointer(substream, &rme32->capture_pcm, ptr);
+	return snd_pcm_indirect_capture_pointer(substream, &rme32->capture_pcm,
+						snd_rme32_pcm_byteptr(rme32));
 }
 
 /* for halfduplex mode */
@@ -1990,6 +1986,8 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 	rme32->card = card;
 	rme32->pci = pci;
 	snd_card_set_dev(card, &pci->dev);
+        if (fullduplex[dev])
+		rme32->fullduplex_mode = 1;
 	if ((err = snd_rme32_create(rme32)) < 0) {
 		snd_card_free(card);
 		return err;

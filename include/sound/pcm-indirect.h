@@ -34,7 +34,7 @@ typedef struct sndrv_pcm_indirect {
 	unsigned int sw_data;	/* Offset to next dst (or src) in sw ring buffer */
 	unsigned int sw_io;	/* Current software pointer in bytes */
 	int sw_ready;		/* Bytes ready to be transferred to/from hw */
-	size_t appl_ptr;	/* Last seen appl_ptr */
+	snd_pcm_uframes_t appl_ptr;	/* Last seen appl_ptr */
 } snd_pcm_indirect_t;
 
 typedef void (*snd_pcm_indirect_copy_t)(snd_pcm_substream_t *substream,
@@ -51,19 +51,19 @@ snd_pcm_indirect_playback_transfer(snd_pcm_substream_t *substream,
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
 	snd_pcm_sframes_t diff = appl_ptr - rec->appl_ptr;
-	snd_pcm_uframes_t qsize;
+	int qsize;
 
 	if (diff) {
 		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
 			diff += runtime->boundary;
-		rec->sw_ready += frames_to_bytes(runtime, diff);
+		rec->sw_ready += (int)frames_to_bytes(runtime, diff);
 		rec->appl_ptr = appl_ptr;
 	}
 	qsize = rec->hw_queue_size ? rec->hw_queue_size : rec->hw_buffer_size;
 	while (rec->hw_ready < qsize && rec->sw_ready > 0) {
-		size_t hw_to_end = rec->hw_buffer_size - rec->hw_data;
-		size_t sw_to_end = rec->sw_buffer_size - rec->sw_data;
-		size_t bytes = rec->hw_buffer_size - rec->hw_ready;
+		unsigned int hw_to_end = rec->hw_buffer_size - rec->hw_data;
+		unsigned int sw_to_end = rec->sw_buffer_size - rec->sw_data;
+		unsigned int bytes = qsize - rec->hw_ready;
 		if (rec->sw_ready < (int)bytes)
 			bytes = rec->sw_ready;
 		if (hw_to_end < bytes)
@@ -74,7 +74,7 @@ snd_pcm_indirect_playback_transfer(snd_pcm_substream_t *substream,
 			break;
 		copy(substream, rec, bytes);
 		rec->hw_data += bytes;
-		if ((int)rec->hw_data == rec->hw_buffer_size)
+		if (rec->hw_data == rec->hw_buffer_size)
 			rec->hw_data = 0;
 		rec->sw_data += bytes;
 		if (rec->sw_data == rec->sw_buffer_size)
@@ -90,9 +90,9 @@ snd_pcm_indirect_playback_transfer(snd_pcm_substream_t *substream,
  */
 static inline snd_pcm_uframes_t
 snd_pcm_indirect_playback_pointer(snd_pcm_substream_t *substream,
-				  snd_pcm_indirect_t *rec, size_t ptr)
+				  snd_pcm_indirect_t *rec, unsigned int ptr)
 {
-	ssize_t bytes = ptr - rec->hw_io;
+	int bytes = ptr - rec->hw_io;
 	if (bytes < 0)
 		bytes += rec->hw_buffer_size;
 	rec->hw_io = ptr;
@@ -155,9 +155,9 @@ snd_pcm_indirect_capture_transfer(snd_pcm_substream_t *substream,
  */
 static inline snd_pcm_uframes_t
 snd_pcm_indirect_capture_pointer(snd_pcm_substream_t *substream,
-				 snd_pcm_indirect_t *rec, size_t ptr)
+				 snd_pcm_indirect_t *rec, unsigned int ptr)
 {
-	ssize_t bytes = ptr - rec->hw_io;
+	int bytes = ptr - rec->hw_io;
 	if (bytes < 0)
 		bytes += rec->hw_buffer_size;
 	rec->hw_io = ptr;
