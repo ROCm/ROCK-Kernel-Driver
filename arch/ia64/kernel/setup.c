@@ -333,7 +333,7 @@ setup_arch (char **cmdline_p)
 #endif
 	{
 		extern unsigned char acpi_legacy_devices;
-		if (!efi.hcdp)
+		if (!efi.hcdp && !ia64_platform_is("sn2"))
 			setup_serial_legacy();
 	}
 #endif
