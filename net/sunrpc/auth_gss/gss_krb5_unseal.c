@@ -96,7 +96,7 @@ krb5_read_token(struct krb5_ctx *ctx,
 
 	dprintk("RPC:      krb5_read_token\n");
 
-	if (g_verify_token_header(&ctx->mech_used, &bodysize, &ptr, toktype,
+	if (g_verify_token_header(&ctx->mech_used, &bodysize, &ptr,
 					read_token->len))
 		goto out;
 

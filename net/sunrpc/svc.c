@@ -263,6 +263,7 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	u32			*statp;
 	u32			dir, prog, vers, proc,
 				auth_stat, rpc_stat;
+	int			auth_res;
 
 	rpc_stat = rpc_success;
 
@@ -304,12 +305,17 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	rqstp->rq_vers = vers = ntohl(svc_getu32(argv));	/* version number */
 	rqstp->rq_proc = proc = ntohl(svc_getu32(argv));	/* procedure number */
 
+	progp = serv->sv_program;
 	/*
 	 * Decode auth data, and add verifier to reply buffer.
 	 * We do this before anything else in order to get a decent
 	 * auth verifier.
 	 */
-	switch (svc_authenticate(rqstp, &auth_stat)) {
+	if (progp->pg_authenticate != NULL)
+		auth_res = progp->pg_authenticate(rqstp, &auth_stat);
+	else
+		auth_res = svc_authenticate(rqstp, &auth_stat);
+	switch (auth_res) {
 	case SVC_OK:
 		break;
 	case SVC_GARBAGE:
@@ -326,7 +332,6 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 		goto sendit;
 	}
 		
-	progp = serv->sv_program;
 	if (prog != progp->pg_prog)
 		goto err_bad_prog;
 

@@ -87,6 +87,14 @@ static inline u32 svc_getu32(struct kvec *iov)
 	iov->iov_len -= sizeof(u32);
 	return val;
 }
+
+static inline void svc_ungetu32(struct kvec *iov)
+{
+	u32 *vp = (u32 *)iov->iov_base;
+	iov->iov_base = (void *)(vp - 1);
+	iov->iov_len += sizeof(*vp);
+}
+
 static inline void svc_putu32(struct kvec *iov, u32 val)
 {
 	u32 *vp = iov->iov_base + iov->iov_len;
@@ -243,6 +251,8 @@ struct svc_program {
 	char *			pg_name;	/* service name */
 	char *			pg_class;	/* class name: services sharing authentication */
 	struct svc_stat *	pg_stats;	/* rpc statistics */
+	/* Override authentication. NULL means use default */
+	int			(*pg_authenticate)(struct svc_rqst *, u32 *);
 };
 
 /*

@@ -31,6 +31,8 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
+#include "delegation.h"
+
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
 static int nfs_file_open(struct inode *, struct file *);
@@ -113,6 +115,7 @@ nfs_file_release(struct inode *inode, struct file *filp)
 static int
 nfs_file_flush(struct file *file)
 {
+	struct nfs_open_context *ctx = (struct nfs_open_context *)file->private_data;
 	struct inode	*inode = file->f_dentry->d_inode;
 	int		status;
 
@@ -124,9 +127,9 @@ nfs_file_flush(struct file *file)
 	/* Ensure that data+attribute caches are up to date after close() */
 	status = nfs_wb_all(inode);
 	if (!status) {
-		status = file->f_error;
-		file->f_error = 0;
-		if (!status)
+		status = ctx->error;
+		ctx->error = 0;
+		if (!status && !nfs_have_delegation(inode, FMODE_READ))
 			__nfs_revalidate_inode(NFS_SERVER(inode), inode);
 	}
 	unlock_kernel();
@@ -197,6 +200,7 @@ nfs_file_mmap(struct file * file, struct vm_area_struct * vma)
 static int
 nfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 {
+	struct nfs_open_context *ctx = (struct nfs_open_context *)file->private_data;
 	struct inode *inode = dentry->d_inode;
 	int status;
 
@@ -205,8 +209,8 @@ nfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 	lock_kernel();
 	status = nfs_wb_all(inode);
 	if (!status) {
-		status = file->f_error;
-		file->f_error = 0;
+		status = ctx->error;
+		ctx->error = 0;
 	}
 	unlock_kernel();
 	return status;

@@ -18,6 +18,7 @@ struct nfs_server {
 	unsigned int		rpages;		/* read size (in pages) */
 	unsigned int		wsize;		/* write size */
 	unsigned int		wpages;		/* write size (in pages) */
+	unsigned int		wtmult;		/* server disk block size */
 	unsigned int		dtsize;		/* readdir size */
 	unsigned int		bsize;		/* server block size */
 	unsigned int		acregmin;	/* attr cache timeouts */

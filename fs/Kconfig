@@ -1415,8 +1415,8 @@ config NFS_V3
 	bool "Provide NFSv3 client support"
 	depends on NFS_FS
 	help
-	  Say Y here if you want your NFS client to be able to speak the newer
-	  version 3 of the NFS protocol.
+	  Say Y here if you want your NFS client to be able to speak version
+	  3 of the NFS protocol.
 
 	  If unsure, say Y.
 
@@ -1557,6 +1557,22 @@ config RPCSEC_GSS_KRB5
 
 	  Note: Requires an auxiliary userspace daemon which may be found on
 		http://www.citi.umich.edu/projects/nfsv4/
+
+	  If unsure, say N.
+
+config RPCSEC_GSS_SPKM3
+	tristate "Secure RPC: SPKM3 mechanism (EXPERIMENTAL)"
+	depends on SUNRPC && EXPERIMENTAL
+	select SUNRPC_GSS
+	select CRYPTO
+	select CRYPTO_MD5
+	select CRYPTO_DES
+	help
+	  Provides for secure RPC calls by means of a gss-api
+	  mechanism based on the SPKM3 public-key mechanism.
+
+	  Note: Requires an auxiliary userspace daemon which may be found on
+	  	http://www.citi.umich.edu/projects/nfsv4/
 
 	  If unsure, say N.
 

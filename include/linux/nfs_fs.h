@@ -28,6 +28,7 @@
 #include <linux/nfs3.h>
 #include <linux/nfs4.h>
 #include <linux/nfs_xdr.h>
+#include <linux/rwsem.h>
 #include <linux/workqueue.h>
 
 /*
@@ -75,14 +76,32 @@
 #ifdef __KERNEL__
 
 /*
- * NFSv3 Access mode cache
+ * NFSv3/v4 Access mode cache entry
  */
-struct nfs_access_cache {
+struct nfs_access_entry {
 	unsigned long		jiffies;
 	struct rpc_cred *	cred;
 	int			mask;
-	int			err;
 };
+
+struct nfs4_state;
+struct nfs_open_context {
+	atomic_t count;
+	struct dentry *dentry;
+	struct rpc_cred *cred;
+	struct nfs4_state *state;
+	fl_owner_t lockowner;
+	int mode;
+	int error;
+
+	struct list_head list;
+	wait_queue_head_t waitq;
+};
+
+/*
+ * NFSv4 delegation
+ */
+struct nfs_delegation;
 
 /*
  * nfs fs inode data in memory
@@ -137,7 +156,7 @@ struct nfs_inode {
 	 */
 	atomic_t		data_updates;
 
-	struct nfs_access_cache	cache_access;
+	struct nfs_access_entry	cache_access;
 
 	/*
 	 * This is the cookie verifier used for NFSv3 readdir
@@ -148,6 +167,7 @@ struct nfs_inode {
 	/*
 	 * This is the list of dirty unwritten pages.
 	 */
+	spinlock_t		req_lock;
 	struct list_head	dirty;
 	struct list_head	commit;
 	struct radix_tree_root	nfs_page_tree;
@@ -156,14 +176,17 @@ struct nfs_inode {
 				ncommit,
 				npages;
 
-	/* Credentials for shared mmap */
-	struct rpc_cred		*mm_cred;
+	/* Open contexts for shared mmap writes */
+	struct list_head	open_files;
 
 	wait_queue_head_t	nfs_i_wait;
 
 #ifdef CONFIG_NFS_V4
         /* NFSv4 state */
 	struct list_head	open_states;
+	struct nfs_delegation	*delegation;
+	int			 delegation_state;
+	struct rw_semaphore	rwsem;
 #endif /* CONFIG_NFS_V4*/
 
 	struct inode		vfs_inode;
@@ -268,9 +291,12 @@ extern struct inode *nfs_fhget(struct super_block *, struct nfs_fh *,
 extern int nfs_refresh_inode(struct inode *, struct nfs_fattr *);
 extern int nfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int nfs_permission(struct inode *, int, struct nameidata *);
-extern void nfs_set_mmcred(struct inode *, struct rpc_cred *);
+extern int nfs_access_get_cached(struct inode *, struct rpc_cred *, struct nfs_access_entry *);
+extern void nfs_access_add_cache(struct inode *, struct nfs_access_entry *);
 extern int nfs_open(struct inode *, struct file *);
 extern int nfs_release(struct inode *, struct file *);
+extern int nfs_attribute_timeout(struct inode *inode);
+extern int nfs_revalidate_inode(struct nfs_server *server, struct inode *inode);
 extern int __nfs_revalidate_inode(struct nfs_server *, struct inode *);
 extern int nfs_setattr(struct dentry *, struct iattr *);
 extern void nfs_begin_attr_update(struct inode *);
@@ -278,6 +304,12 @@ extern void nfs_end_attr_update(struct inode *);
 extern void nfs_begin_data_update(struct inode *);
 extern void nfs_end_data_update(struct inode *);
 extern void nfs_end_data_update_defer(struct inode *);
+extern struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry, struct rpc_cred *cred);
+extern struct nfs_open_context *get_nfs_open_context(struct nfs_open_context *ctx);
+extern void put_nfs_open_context(struct nfs_open_context *ctx);
+extern void nfs_file_set_open_context(struct file *filp, struct nfs_open_context *ctx);
+extern struct nfs_open_context *nfs_find_open_context(struct inode *inode, int mode);
+extern void nfs_file_clear_open_context(struct file *filp);
 
 /* linux/net/ipv4/ipconfig.c: trims ip addr off front of name, too. */
 extern u32 root_nfs_parse_addr(char *name); /*__init*/
@@ -289,16 +321,15 @@ extern struct inode_operations nfs_file_inode_operations;
 extern struct file_operations nfs_file_operations;
 extern struct address_space_operations nfs_file_aops;
 
-static __inline__ struct rpc_cred *
-nfs_file_cred(struct file *file)
+static inline struct rpc_cred *nfs_file_cred(struct file *file)
 {
-	struct rpc_cred *cred = NULL;
-	if (file)
-		cred = (struct rpc_cred *)file->private_data;
-#ifdef RPC_DEBUG
-	BUG_ON(cred && cred->cr_magic != RPCAUTH_CRED_MAGIC);
-#endif
-	return cred;
+	if (file != NULL) {
+		struct nfs_open_context *ctx;
+
+		ctx = (struct nfs_open_context*)file->private_data;
+		return ctx->cred;
+	}
+	return NULL;
 }
 
 /*
@@ -418,28 +449,6 @@ extern int  nfsroot_mount(struct sockaddr_in *, char *, struct nfs_fh *,
  * inline functions
  */
 
-static inline int nfs_attribute_timeout(struct inode *inode)
-{
-	struct nfs_inode *nfsi = NFS_I(inode);
-
-	return time_after(jiffies, nfsi->read_cache_jiffies+nfsi->attrtimeo);
-}
-
-/**
- * nfs_revalidate_inode - Revalidate the inode attributes
- * @server - pointer to nfs_server struct
- * @inode - pointer to inode struct
- *
- * Updates inode attribute information by retrieving the data from the server.
- */
-static inline int nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
-{
-	if (!(NFS_FLAGS(inode) & (NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA))
-			&& !nfs_attribute_timeout(inode))
-		return NFS_STALE(inode) ? -ESTALE : 0;
-	return __nfs_revalidate_inode(server, inode);
-}
-
 static inline loff_t
 nfs_size_to_loff_t(__u64 size)
 {
@@ -507,8 +516,6 @@ struct idmap;
 
 enum nfs4_client_state {
 	NFS4CLNT_OK  = 0,
-	NFS4CLNT_NEW,
-	NFS4CLNT_SETUP_STATE,
 };
 
 /*
@@ -520,7 +527,6 @@ struct nfs4_client {
 	u64			cl_clientid;	/* constant */
 	nfs4_verifier		cl_confirm;
 	unsigned long		cl_state;
-	long			cl_generation;
 
 	u32			cl_lockowner_id;
 
@@ -530,6 +536,7 @@ struct nfs4_client {
 	 */
 	struct rw_semaphore	cl_sem;
 
+	struct list_head	cl_delegations;
 	struct list_head	cl_state_owners;
 	struct list_head	cl_unused;
 	int			cl_nunused;
@@ -573,12 +580,11 @@ struct nfs4_state_owner {
 	u32                  so_id;      /* 32-bit identifier, unique */
 	struct semaphore     so_sema;
 	u32                  so_seqid;   /* protected by so_sema */
-	unsigned int         so_flags;   /* protected by so_sema */
 	atomic_t	     so_count;
-	long		     so_generation;
 
 	struct rpc_cred	     *so_cred;	 /* Associated cred */
 	struct list_head     so_states;
+	struct list_head     so_delegations;
 };
 
 /*
@@ -596,7 +602,8 @@ struct nfs4_state_owner {
 struct nfs4_lock_state {
 	struct list_head	ls_locks;	/* Other lock stateids */
 	fl_owner_t		ls_owner;	/* POSIX lock owner */
-	struct nfs4_state *	ls_parent;	/* Parent nfs4_state */
+#define NFS_LOCK_INITIALIZED 1
+	int			ls_flags;
 	u32			ls_seqid;
 	u32			ls_id;
 	nfs4_stateid		ls_stateid;
@@ -606,6 +613,7 @@ struct nfs4_lock_state {
 /* bits for nfs4_state->flags */
 enum {
 	LK_STATE_IN_USE,
+	NFS_DELEGATED_STATE,
 };
 
 struct nfs4_state {
@@ -629,6 +637,11 @@ struct nfs4_state {
 };
 
 
+struct nfs4_exception {
+	long timeout;
+	int retry;
+};
+
 extern struct dentry_operations nfs4_dentry_operations;
 extern struct inode_operations nfs4_dir_inode_operations;
 
@@ -639,10 +652,12 @@ extern int nfs4_open_reclaim(struct nfs4_state_owner *, struct nfs4_state *);
 extern int nfs4_proc_async_renew(struct nfs4_client *);
 extern int nfs4_proc_renew(struct nfs4_client *);
 extern int nfs4_do_close(struct inode *, struct nfs4_state *);
-int nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode);
+extern int nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode);
 extern int nfs4_wait_clnt_recover(struct rpc_clnt *, struct nfs4_client *);
 extern struct inode *nfs4_atomic_open(struct inode *, struct dentry *, struct nameidata *);
 extern int nfs4_open_revalidate(struct inode *, struct dentry *, int);
+extern int nfs4_handle_exception(struct nfs_server *, int, struct nfs4_exception *);
+extern int nfs4_lock_reclaim(struct nfs4_state *state, struct file_lock *request);
 
 /* nfs4renewd.c */
 extern void nfs4_schedule_state_renewal(struct nfs4_client *);
@@ -654,6 +669,8 @@ extern void init_nfsv4_state(struct nfs_server *);
 extern void destroy_nfsv4_state(struct nfs_server *);
 extern struct nfs4_client *nfs4_get_client(struct in_addr *);
 extern void nfs4_put_client(struct nfs4_client *clp);
+extern int nfs4_init_client(struct nfs4_client *clp);
+extern struct nfs4_client *nfs4_find_client(struct in_addr *);
 extern u32 nfs4_alloc_lockowner_id(struct nfs4_client *);
 
 extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struct rpc_cred *);
@@ -663,14 +680,13 @@ extern void nfs4_put_open_state(struct nfs4_state *);
 extern void nfs4_close_state(struct nfs4_state *, mode_t);
 extern struct nfs4_state *nfs4_find_state(struct inode *, struct rpc_cred *, mode_t mode);
 extern void nfs4_increment_seqid(int status, struct nfs4_state_owner *sp);
-extern int nfs4_handle_error(struct nfs_server *, int);
 extern void nfs4_schedule_state_recovery(struct nfs4_client *);
 extern struct nfs4_lock_state *nfs4_find_lock_state(struct nfs4_state *state, fl_owner_t);
-extern struct nfs4_lock_state *nfs4_alloc_lock_state(struct nfs4_state *state, fl_owner_t);
+extern struct nfs4_lock_state *nfs4_get_lock_state(struct nfs4_state *state, fl_owner_t);
 extern void nfs4_put_lock_state(struct nfs4_lock_state *state);
 extern void nfs4_increment_lock_seqid(int status, struct nfs4_lock_state *ls);
-extern void nfs4_notify_setlk(struct inode *, struct file_lock *, struct nfs4_lock_state *);
-extern void nfs4_notify_unlck(struct inode *, struct file_lock *, struct nfs4_lock_state *);
+extern void nfs4_notify_setlk(struct nfs4_state *, struct file_lock *, struct nfs4_lock_state *);
+extern void nfs4_notify_unlck(struct nfs4_state *, struct file_lock *, struct nfs4_lock_state *);
 extern void nfs4_copy_stateid(nfs4_stateid *, struct nfs4_state *, fl_owner_t);
 
 
@@ -681,6 +697,7 @@ struct nfs4_mount_data;
 #define destroy_nfsv4_state(server)       do { } while (0)
 #define nfs4_put_state_owner(inode, owner) do { } while (0)
 #define nfs4_put_open_state(state) do { } while (0)
+#define nfs4_close_state(a, b) do { } while (0)
 #define nfs4_renewd_prepare_shutdown(server) do { } while (0)
 #endif
 
@@ -697,6 +714,7 @@ struct nfs4_mount_data;
 #define NFSDBG_XDR		0x0020
 #define NFSDBG_FILE		0x0040
 #define NFSDBG_ROOT		0x0080
+#define NFSDBG_CALLBACK		0x0100
 #define NFSDBG_ALL		0xFFFF
 
 #ifdef __KERNEL__
