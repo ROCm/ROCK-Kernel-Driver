@@ -224,7 +224,7 @@ static int ida_proc_get_info(char *buffer, char **start, off_t offset, int lengt
 		(unsigned long)h->board_id,
 		h->firm_rev[0], h->firm_rev[1], h->firm_rev[2], h->firm_rev[3],
 		(unsigned long)h->ctlr_sig, (unsigned long)h->vaddr,
-		(unsigned int) h->ioaddr, (unsigned int)h->intr,
+		(unsigned int) h->io_mem_addr, (unsigned int)h->intr,
 		h->log_drives, h->phys_drives,
 		h->Qdepth, h->maxQsinceinit);
 
@@ -570,7 +570,7 @@ DBGINFO(
 );
 
 	c->intr = irq;
-	c->ioaddr = addr[0];
+	c->io_mem_addr = addr[0];
 
 	c->paddr = 0;
 	for(i=0; i<6; i++)
@@ -678,7 +678,7 @@ static int cpqarray_eisa_detect(void)
 			continue;
 		}
 		memset(hba[nr_ctlr], 0, sizeof(ctlr_info_t));
-		hba[nr_ctlr]->ioaddr = eisa[i];
+		hba[nr_ctlr]->io_mem_addr = eisa[i];
 
 		/*
 		 * Read the config register to find our interrupt
