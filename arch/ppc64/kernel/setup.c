@@ -399,7 +399,6 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 		}
 		__max_memory = maxmem;
 	}
-	ppc_md.progress("id mach: done", 0x200);
 }
 
 
@@ -498,13 +497,13 @@ void __init setup_arch(char **cmdline_p)
 
 	calibrate_delay = ppc64_calibrate_delay;
 
+	ppc64_boot_msg(0x12, "Setup Arch");
 #ifdef CONFIG_XMON
 	xmon_map_scc();
 	if (strstr(cmd_line, "xmon"))
 		xmon(0);
 #endif /* CONFIG_XMON */
 
-	ppc_md.progress("setup_arch:enter", 0x3eab);
 
 	/*
 	 * Set cache line size based on type of cpu as a default.
@@ -528,13 +527,59 @@ void __init setup_arch(char **cmdline_p)
 
 	/* set up the bootmem stuff with available memory */
 	do_init_bootmem();
-	ppc_md.progress("setup_arch:bootmem", 0x3eab);
 
 	ppc_md.setup_arch();
 
 	paging_init();
 	sort_exception_table();
-	ppc_md.progress("setup_arch: exit", 0x3eab);
+	ppc64_boot_msg(0x15, "Setup Done");
+}
+
+/* ToDo: do something useful if ppc_md is not yet setup. */
+#define PPC64_LINUX_FUNCTION 0x0f000000
+#define PPC64_IPL_MESSAGE 0xc0000000
+#define PPC64_TERM_MESSAGE 0xb0000000
+#define PPC64_ATTN_MESSAGE 0xa0000000
+#define PPC64_DUMP_MESSAGE 0xd0000000
+
+static void ppc64_do_msg(unsigned int src, const char *msg)
+{
+	if (ppc_md.progress) {
+		char buf[32];
+
+		sprintf(buf, "%08x        \n", src);
+		ppc_md.progress(buf, 0);
+		sprintf(buf, "%-16s", msg);
+		ppc_md.progress(buf, 0);
+	}
+}
+
+/* Print a boot progress message. */
+void ppc64_boot_msg(unsigned int src, const char *msg)
+{
+	ppc64_do_msg(PPC64_LINUX_FUNCTION|PPC64_IPL_MESSAGE|src, msg);
+	printk("[boot]%04x %s\n", src, msg);
+}
+
+/* Print a termination message (print only -- does not stop the kernel) */
+void ppc64_terminate_msg(unsigned int src, const char *msg)
+{
+	ppc64_do_msg(PPC64_LINUX_FUNCTION|PPC64_TERM_MESSAGE|src, msg);
+	printk("[terminate]%04x %s\n", src, msg);
+}
+
+/* Print something that needs attention (device error, etc) */
+void ppc64_attention_msg(unsigned int src, const char *msg)
+{
+	ppc64_do_msg(PPC64_LINUX_FUNCTION|PPC64_ATTN_MESSAGE|src, msg);
+	printk("[attention]%04x %s\n", src, msg);
+}
+
+/* Print a dump progress message. */
+void ppc64_dump_msg(unsigned int src, const char *msg)
+{
+	ppc64_do_msg(PPC64_LINUX_FUNCTION|PPC64_DUMP_MESSAGE|src, msg);
+	printk("[dump]%04x %s\n", src, msg);
 }
 
 int set_spread_lpevents( char * str )

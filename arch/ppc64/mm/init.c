@@ -411,7 +411,7 @@ void __init mm_init_ppc64(void)
 	struct paca_struct *lpaca;
 	unsigned long guard_page, index;
 
-	ppc_md.progress("MM:init", 0);
+	ppc64_boot_msg(0x100, "MM Init");
 
 	/* Reserve all contexts < FIRST_USER_CONTEXT for kernel use.
 	 * The range of contexts [FIRST_USER_CONTEXT, NUM_USER_CONTEXT)
@@ -432,7 +432,7 @@ void __init mm_init_ppc64(void)
 		ppc_md.hpte_updateboltedpp(PP_RXRX, guard_page);
 	}
 
-	ppc_md.progress("MM:exit", 0x211);
+	ppc64_boot_msg(0x100, "MM Init Done");
 }
 
 /*
