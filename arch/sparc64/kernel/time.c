@@ -283,7 +283,7 @@ static unsigned long __hbird_read_stick(void)
 			     "sub	%1, 0x8, %1\n\t"
 			     "ldxa	[%1] %5, %4\n\t"
 			     "cmp	%4, %2\n\t"
-			     "bl,a,pn	%%xcc, 1f\n\t"
+			     "blu,a,pn	%%xcc, 1f\n\t"
 			     " add	%3, 1, %3\n"
 			     "1:\n\t"
 			     "sllx	%3, 32, %3\n\t"
@@ -382,7 +382,7 @@ static struct sparc64_tick_ops hbtick_operations = {
 	.get_compare	=	hbtick_get_compare,
 	.add_tick	=	hbtick_add_tick,
 	.add_compare	=	hbtick_add_compare,
-	.softint_mask	=	1UL << 16,
+	.softint_mask	=	1UL << 0,
 };
 
 /* timer_interrupt() needs to keep up the real-time clock,
