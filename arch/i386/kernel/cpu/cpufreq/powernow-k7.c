@@ -565,6 +565,9 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 		result = powernow_decode_bios(fidvidstatus.bits.MFID, fidvidstatus.bits.SVID);
 		if (result) {
 			printk (KERN_INFO PFX "Trying ACPI perflib\n");
+			maximum_speed = 0;
+			minimum_speed = -1;
+			latency = 0;
 			result = powernow_acpi_init();
 			if (result) {
 				printk (KERN_INFO PFX "ACPI and legacy methods failed\n");
