@@ -133,7 +133,7 @@ CONFIG_PCMCIA_XIRCOM
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
-  The module will be called xircom_tulip_cb.o.  If you want to compile
+  The module will be called xircom_cb.o.  If you want to compile
   it as a module, say M here and read
   <file:Documentation/modules.txt>. If unsure, say N.
 
