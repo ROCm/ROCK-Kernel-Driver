@@ -152,11 +152,20 @@ void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu, int *d_clu)
 	struct fat_cache *walk;
 	int first;
 
+	BUG_ON(cluster == 0);
+	
 	first = MSDOS_I(inode)->i_start;
 	if (!first)
 		return;
 
 	spin_lock(&sbi->cache_lock);
+
+	if (MSDOS_I(inode)->disk_cluster &&
+	    MSDOS_I(inode)->file_cluster <= cluster) {
+		*d_clu = MSDOS_I(inode)->disk_cluster;
+		*f_clu = MSDOS_I(inode)->file_cluster;
+	}
+
 	for (walk = sbi->cache; walk; walk = walk->next) {
 		if (walk->start_cluster == first
 		    && walk->file_cluster <= cluster
@@ -203,6 +212,7 @@ static void __fat_cache_inval_inode(struct inode *inode)
 {
 	struct fat_cache *walk;
 	int first = MSDOS_I(inode)->i_start;
+	MSDOS_I(inode)->file_cluster = MSDOS_I(inode)->disk_cluster = 0;
 	for (walk = MSDOS_SB(inode->i_sb)->cache; walk; walk = walk->next)
 		if (walk->start_cluster == first)
 			walk->start_cluster = 0;
@@ -220,7 +230,7 @@ void fat_cache_add(struct inode *inode, int f_clu, int d_clu)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
 	struct fat_cache *walk, *last;
-	int first;
+	int first, prev_f_clu, prev_d_clu;
 
 	first = MSDOS_I(inode)->i_start;
 	if (!first)
@@ -228,6 +238,20 @@ void fat_cache_add(struct inode *inode, int f_clu, int d_clu)
 
 	last = NULL;
 	spin_lock(&sbi->cache_lock);
+
+	if (MSDOS_I(inode)->file_cluster == f_clu)
+		goto out;
+	else {
+		prev_f_clu = MSDOS_I(inode)->file_cluster;
+		prev_d_clu = MSDOS_I(inode)->disk_cluster;
+		MSDOS_I(inode)->file_cluster = f_clu;
+		MSDOS_I(inode)->disk_cluster = d_clu;
+		if (prev_f_clu == 0)
+			goto out;
+		f_clu = prev_f_clu;
+		d_clu = prev_d_clu;
+	}
+	
 	for (walk = sbi->cache; walk->next; walk = (last = walk)->next) {
 		if (walk->start_cluster == first &&
 		    walk->file_cluster == f_clu) {
