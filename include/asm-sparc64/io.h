@@ -444,9 +444,16 @@ out:
 /* On sparc64 we have the whole physical IO address space accessible
  * using physically addressed loads and stores, so this does nothing.
  */
-#define ioremap(__offset, __size)	((void __iomem *)(__offset))
+static inline void __iomem *ioremap(unsigned long offset, unsigned long size)
+{
+	return (void __iomem *)offset;
+}
+
 #define ioremap_nocache(X,Y)		ioremap((X),(Y))
-#define iounmap(__addr)			do { (void)(__addr); } while(0)
+
+static inline void iounmap(void __iomem *addr)
+{
+}
 
 #define ioread8(X)			readb(X)
 #define ioread16(X)			readw(X)
