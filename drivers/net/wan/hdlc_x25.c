@@ -184,10 +184,9 @@ int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	int result;
 
-	switch (ifr->ifr_settings.type) {
+	switch (ifr->ifr_settings->type) {
 	case IF_GET_PROTO:
-		ifr->ifr_settings.type = IF_PROTO_X25;
-		ifr->ifr_settings.data_length = 0;
+		ifr->ifr_settings->type = IF_PROTO_X25;
 		return 0; /* return protocol only, no settable parameters */
 
 	case IF_PROTO_X25:
@@ -196,9 +195,6 @@ int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 
 		if(dev->flags & IFF_UP)
 			return -EBUSY;
-
-		if (ifr->ifr_settings.data_length != 0)
-			return -EINVAL;	/* no settable parameters */
 
 		hdlc_detach(hdlc);
 

@@ -776,22 +776,17 @@ static void fr_destroy(hdlc_device *hdlc)
 
 int hdlc_fr_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 {
+	fr_proto *fr_s = &ifr->ifr_settings->ifs_hdlc.fr;
 	const size_t size = sizeof(fr_proto);
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	fr_proto_pvc pvc;
 	int result;
 
-	switch (ifr->ifr_settings.type) {
+	switch (ifr->ifr_settings->type) {
 	case IF_GET_PROTO:
-		ifr->ifr_settings.type = IF_PROTO_FR;
-		if (ifr->ifr_settings.data_length == 0)
-			return 0; /* return protocol only */
-		if (ifr->ifr_settings.data_length < size)
-			return -ENOMEM;	/* buffer too small */
-		if (copy_to_user(ifr->ifr_settings.data,
-				 &hdlc->state.fr.settings, size))
+		ifr->ifr_settings->type = IF_PROTO_FR;
+		if (copy_to_user(fr_s, &hdlc->state.fr.settings, size))
 			return -EFAULT;
-		ifr->ifr_settings.data_length = size;
 		return 0;
 
 	case IF_PROTO_FR:
@@ -801,11 +796,7 @@ int hdlc_fr_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if(dev->flags & IFF_UP)
 			return -EBUSY;
 
-		if (ifr->ifr_settings.data_length != size)
-			return -ENOMEM;	/* incorrect data length */
-
-		if (copy_from_user(&hdlc->state.fr.settings,
-				   ifr->ifr_settings.data, size))
+		if (copy_from_user(&hdlc->state.fr.settings, fr_s, size))
 			return -EFAULT;
 
 		/* FIXME - put sanity checks here */
@@ -839,12 +830,12 @@ int hdlc_fr_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (copy_from_user(&pvc, ifr->ifr_settings.data,
+		if (copy_from_user(&pvc, &ifr->ifr_settings->ifs_hdlc.fr_pvc,
 				   sizeof(fr_proto_pvc)))
 			return -EFAULT;
 
 		return fr_pvc(hdlc, pvc.dlci,
-			      ifr->ifr_settings.type == IF_PROTO_FR_ADD_PVC);
+			      ifr->ifr_settings->type == IF_PROTO_FR_ADD_PVC);
 	}
 
 	return -EINVAL;

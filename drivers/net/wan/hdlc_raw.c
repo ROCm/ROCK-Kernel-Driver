@@ -37,21 +37,15 @@ static void raw_rx(struct sk_buff *skb)
 
 int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 {
-	const size_t size = sizeof(hdlc_proto);
+	raw_hdlc_proto *raw_s = &ifr->ifr_settings->ifs_hdlc.raw_hdlc;
+	const size_t size = sizeof(raw_hdlc_proto);
 	struct net_device *dev = hdlc_to_dev(hdlc);
 	int result;
 
-	switch (ifr->ifr_settings.type) {
+	switch (ifr->ifr_settings->type) {
 	case IF_GET_PROTO:
-		ifr->ifr_settings.type = IF_PROTO_HDLC;
-		if (ifr->ifr_settings.data_length == 0)
-			return 0; /* return protocol only */
-		if (ifr->ifr_settings.data_length < size)
-			return -ENOMEM;	/* buffer too small */
-		if (copy_to_user(ifr->ifr_settings.data,
-				 &hdlc->state.raw_hdlc.settings, size))
+		if (copy_to_user(raw_s, &hdlc->state.raw_hdlc.settings, size))
 			return -EFAULT;
-		ifr->ifr_settings.data_length = size;
 		return 0;
 
 	case IF_PROTO_HDLC:
@@ -61,12 +55,9 @@ int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if(dev->flags & IFF_UP)
 			return -EBUSY;
 
-		if (ifr->ifr_settings.data_length != size)
-			return -ENOMEM;	/* incorrect data length */
-
-		if (copy_from_user(&hdlc->state.raw_hdlc.settings,
-				   ifr->ifr_settings.data, size))
+		if (copy_from_user(&hdlc->state.raw_hdlc.settings, raw_s, size))
 			return -EFAULT;
+
 
 		/* FIXME - put sanity checks here */
 		hdlc_detach(hdlc);

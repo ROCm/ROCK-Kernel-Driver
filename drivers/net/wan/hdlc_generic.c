@@ -75,13 +75,13 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (cmd != SIOCWANDEV)
 		return -EINVAL;
 
-	switch(ifr->ifr_settings.type) {
+	switch(ifr->ifr_settings->type) {
 	case IF_PROTO_HDLC:
 	case IF_PROTO_PPP:
 	case IF_PROTO_CISCO:
 	case IF_PROTO_FR:
 	case IF_PROTO_X25:
-		proto = ifr->ifr_settings.type;
+		proto = ifr->ifr_settings->type;
 		break;
 
 	default:
