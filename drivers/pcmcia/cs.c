@@ -621,8 +621,10 @@ static void unreset_socket(socket_info_t *s)
 		send_event(s, CS_EVENT_PM_RESUME, CS_EVENT_PRI_LOW);
 	} else if (s->state & SOCKET_SETUP_PENDING) {
 #ifdef CONFIG_CARDBUS
-	    if (s->state & SOCKET_CARDBUS)
+	    if (s->state & SOCKET_CARDBUS) {
 		cb_alloc(s);
+		s->state |= SOCKET_CARDBUS_CONFIG;
+	    }
 #endif
 	    send_event(s, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
 	    s->state &= ~SOCKET_SETUP_PENDING;
@@ -1072,7 +1074,7 @@ int pcmcia_get_configuration_info(client_handle_t handle,
 	config->Vcc = s->socket.Vcc;
 	config->Vpp1 = config->Vpp2 = s->socket.Vpp;
 	config->Option = s->cap.cb_dev->subordinate->number;
-	if (s->cb_config) {
+	if (s->state & SOCKET_CARDBUS_CONFIG) {
 	    config->Attributes = CONF_VALID_CLIENT;
 	    config->IntType = INT_CARDBUS;
 	    config->AssignedIRQ = s->irq.AssignedIRQ;

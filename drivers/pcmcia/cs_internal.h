@@ -176,6 +176,7 @@ typedef struct socket_info_t {
 #define SOCKET_IO_REQ(i)	(0x1000<<(i))
 #define SOCKET_REGION_INFO	0x4000
 #define SOCKET_CARDBUS		0x8000
+#define SOCKET_CARDBUS_CONFIG	0x10000
 
 #define CHECK_HANDLE(h) \
     (((h) == NULL) || ((h)->client_magic != CLIENT_MAGIC))
