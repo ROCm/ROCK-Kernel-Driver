@@ -1,5 +1,5 @@
 # drivers/mtd/nand/Kconfig
-# $Id: Kconfig,v 1.24 2004/11/26 12:28:22 dedekind Exp $
+# $Id: Kconfig,v 1.25 2004/11/29 22:40:45 dwmw2 Exp $
 
 menu "NAND Flash Device Drivers"
 	depends on MTD!=n
@@ -7,6 +7,7 @@ menu "NAND Flash Device Drivers"
 config MTD_NAND
 	tristate "NAND Device Support"
 	depends on MTD
+	select MTD_NAND_IDS
 	help
 	  This enables support for accessing all type of NAND flash
 	  devices. For further information see
@@ -56,8 +57,6 @@ config MTD_NAND_TOTO
 
 config MTD_NAND_IDS
 	tristate
-	default y if MTD_NAND = y || MTD_DOC2000 = y || MTD_DOC2001 = y || MTD_DOC2001PLUS = y
-	default m if MTD_NAND = m || MTD_DOC2000 = m || MTD_DOC2001 = m || MTD_DOC2001PLUS = m
 
 config MTD_NAND_TX4925NDFMC
 	tristate "SmartMedia Card on Toshiba RBTX4925 reference board"
