@@ -296,7 +296,7 @@ static int get_ctl_value(usb_mixer_elem_info_t *cval, int request, int validx, i
 			return 0;
 		}
 	}
-	snd_printdd(KERN_ERR "cannot get ctl value: req = 0x%x, idx = 0x%x, val = 0x%x, type = %d\n", request, validx, cval->ctrlif | (cval->id << 8), cval->val_type);
+	snd_printdd(KERN_ERR "cannot get ctl value: req = 0x%x, wValue = 0x%x, wIndex = 0x%x, type = %d\n", request, validx, cval->ctrlif | (cval->id << 8), cval->val_type);
 	return -EINVAL;
 }
 
@@ -331,6 +331,7 @@ static int set_ctl_value(usb_mixer_elem_info_t *cval, int request, int validx, i
 				    validx, cval->ctrlif | (cval->id << 8),
 				    buf, val_len, HZ / 10) >= 0)
 			return 0;
+	snd_printdd(KERN_ERR "cannot set ctl value: req = 0x%x, wValue = 0x%x, wIndex = 0x%x, type = %d, data = 0x%x/0x%x\n", request, validx, cval->ctrlif | (cval->id << 8), cval->val_type, buf[0], buf[1]);
 	return -EINVAL;
 }
 
@@ -571,11 +572,11 @@ static void usb_mixer_elem_free(snd_kcontrol_t *kctl)
 /*
  * retrieve the minimum and maximum values for the specified control
  */
-static int get_min_max(usb_mixer_elem_info_t *cval)
+static int get_min_max(usb_mixer_elem_info_t *cval, int default_min)
 {
 	/* for failsafe */
-	cval->min = 0;
-	cval->max = 1;
+	cval->min = default_min;
+	cval->max = cval->min + 1;
 	cval->res = 1;
 
 	if (cval->val_type == USB_MIXER_BOOLEAN ||
@@ -634,7 +635,7 @@ static int mixer_ctl_feature_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 		uinfo->value.integer.max = 1;
 	} else {
 		if (! cval->initialized)
-			get_min_max(cval);
+			get_min_max(cval,  0);
 		uinfo->value.integer.min = 0;
 		uinfo->value.integer.max = (cval->max - cval->min) / cval->res;
 	}
@@ -784,7 +785,7 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 	}
 
 	/* get min/max values */
-	get_min_max(cval);
+	get_min_max(cval, 0);
 
 	kctl = snd_ctl_new1(&usb_feature_unit_ctl, cval);
 	if (! kctl) {
@@ -952,7 +953,7 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 	}
 
 	/* get min/max values */
-	get_min_max(cval);
+	get_min_max(cval, 0);
 
 	kctl = snd_ctl_new1(&usb_feature_unit_ctl, cval);
 	if (! kctl) {
@@ -1060,6 +1061,7 @@ struct procunit_value_info {
 	int control;
 	char *suffix;
 	int val_type;
+	int min_value;
 };
 
 struct procunit_info {
@@ -1070,12 +1072,12 @@ struct procunit_info {
 
 static struct procunit_value_info updown_proc_info[] = {
 	{ USB_PROC_UPDOWN_SWITCH, "Switch", USB_MIXER_BOOLEAN },
-	{ USB_PROC_UPDOWN_MODE_SEL, "Mode Select", USB_MIXER_U8 },
+	{ USB_PROC_UPDOWN_MODE_SEL, "Mode Select", USB_MIXER_U8, 1 },
 	{ 0 }
 };
 static struct procunit_value_info prologic_proc_info[] = {
 	{ USB_PROC_PROLOGIC_SWITCH, "Switch", USB_MIXER_BOOLEAN },
-	{ USB_PROC_PROLOGIC_MODE_SEL, "Mode Select", USB_MIXER_U8 },
+	{ USB_PROC_PROLOGIC_MODE_SEL, "Mode Select", USB_MIXER_U8, 1 },
 	{ 0 }
 };
 static struct procunit_value_info threed_enh_proc_info[] = {
@@ -1173,7 +1175,7 @@ static int build_audio_procunit(mixer_build_t *state, int unitid, unsigned char 
 		cval->channels = 1;
 
 		/* get min/max values */
-		get_min_max(cval);
+		get_min_max(cval, valinfo->min_value);
 
 		kctl = snd_ctl_new1(&mixer_procunit_ctl, cval);
 		if (! kctl) {
