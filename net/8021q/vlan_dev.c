@@ -502,6 +502,10 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	stats->tx_packets++; /* for statics only */
 	stats->tx_bytes += skb->len;
 
+	skb->protocol = __constant_htons(ETH_P_8021Q);
+	skb->mac.raw -= VLAN_HLEN;
+	skb->nh.raw -= VLAN_HLEN;
+
 	dev_queue_xmit(skb);
 
 	return 0;
