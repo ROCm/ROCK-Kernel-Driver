@@ -66,7 +66,7 @@ extern int isdn_msncmp( const char *,  const char *);
 #if defined(ISDN_DEBUG_NET_DUMP) || defined(ISDN_DEBUG_MODEM_DUMP)
 extern void isdn_dumppkt(char *, u_char *, int, int);
 #else
-static inline void isdn_dumppkt(char *s, char *ss, u_char *d, int l, int m) { }
+static inline void isdn_dumppkt(char *s, u_char *d, int l, int m) { }
 #endif
 
 struct dial_info {

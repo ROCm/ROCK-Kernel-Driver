@@ -226,7 +226,6 @@ static int
 slot_bconn(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
-	int sl = slot - slots;
 	isdn_ctrl *ctrl = arg;
 
 	fsm_change_state(fi, ST_SLOT_ACTIVE);
@@ -242,7 +241,6 @@ static int
 slot_bhup(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
-	int sl = slot - slots;
 	isdn_ctrl *ctrl = arg;
 
 	fsm_change_state(fi, ST_SLOT_WAIT_DHUP);
@@ -255,7 +253,6 @@ static int
 slot_dhup(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
-	int sl = slot - slots;
 	isdn_ctrl *ctrl = arg;
 
 	fsm_change_state(fi, ST_SLOT_BOUND);
@@ -314,7 +311,6 @@ static int
 slot_bsent(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
-	int sl = slot - slots;
 	isdn_ctrl *ctrl = arg;
 
 	do_stat_cb(slot, ctrl);
@@ -489,10 +485,10 @@ struct isdn_driver {
 	isdn_if            *interface;        /* Interface to driver         */
 	int                *rcverr;           /* Error-counters for B rx     */
 	int                *rcvcount;         /* Byte-counters for B rx      */
+	struct sk_buff_head *rpqueue;
 #ifdef CONFIG_ISDN_AUDIO
 	unsigned long      DLEflag;           /* Insert DLE at next read     */
 #endif
-	struct sk_buff_head *rpqueue;         /* Pointers to rx queue        */
 	char               msn2eaz[10][ISDN_MSNLEN];  /*  MSN->EAZ           */
 	struct fsm_inst    fi;
 } driver;
@@ -1255,15 +1251,6 @@ isdn_status_callback(isdn_ctrl * c)
 			break;
 #endif
 #if 0 // FIXME
-		case ISDN_STAT_NODCH:
-			if (i < 0)
-				return -1;
-			dbg_statcallb("NODCH: %ld\n", c->arg);
-			if (isdn_net_stat_callback(i, c))
-				break;
-			if (isdn_tty_stat_callback(i, c))
-				break;
-			break;
 		case ISDN_STAT_DISCH:
 			save_flags(flags);
 			cli();

@@ -2349,22 +2349,6 @@ isdn_tty_stat_callback(int i, isdn_ctrl *c)
 					return 1;
 				}
 				break;
-			case ISDN_STAT_NODCH:
-#ifdef ISDN_TTY_STAT_DEBUG
-				printk(KERN_DEBUG "tty_STAT_NODCH ttyI%d\n", info->line);
-#endif
-				if (TTY_IS_ACTIVE(info)) {
-					if (info->dialing) {
-						info->dialing = 0;
-						info->last_l2 = -1;
-						info->last_si = 0;
-						sprintf(info->last_cause, "0000");
-						isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
-					}
-					isdn_tty_modem_hup(info, 0);
-					return 1;
-				}
-				break;
 			case ISDN_STAT_UNLOAD:
 #ifdef ISDN_TTY_STAT_DEBUG
 				printk(KERN_DEBUG "tty_STAT_UNLOAD ttyI%d\n", info->line);

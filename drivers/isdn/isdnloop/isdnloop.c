@@ -166,7 +166,6 @@ static isdnloop_stat isdnloop_stat_table[] =
 	{"AOC",            ISDN_STAT_CINF,  6}, /* Charge-info, DSS1-type     */
 	{"CAU",            ISDN_STAT_CAUSE, 7}, /* Cause code                 */
 	{"TEI OK",         ISDN_STAT_RUN,   0}, /* Card connected to wallplug */
-	{"NO D-CHAN",      ISDN_STAT_NODCH, 0}, /* No D-channel available     */
 	{"E_L1: ACT FAIL", ISDN_STAT_BHUP,  8}, /* Layer-1 activation failed  */
 	{"E_L2: DATA LIN", ISDN_STAT_BHUP,  8}, /* Layer-2 data link lost     */
 	{"E_L1: ACTIVATION FAILED",

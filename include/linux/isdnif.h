@@ -202,7 +202,6 @@ typedef struct
 #define ISDN_STAT_LOAD    265    /* Signal new lowlevel-driver is loaded  */
 #define ISDN_STAT_UNLOAD  266    /* Signal unload of lowlevel-driver      */
 #define ISDN_STAT_BSENT   267    /* Signal packet sent                    */
-#define ISDN_STAT_NODCH   268    /* Signal no D-Channel                   */
 #define ISDN_STAT_ADDCH   269    /* Add more Channels                     */
 #define ISDN_STAT_CAUSE   270    /* Cause-Message                         */
 #define ISDN_STAT_ICALLW  271    /* Incoming call without B-chan waiting  */
