@@ -1343,14 +1343,14 @@ static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
 	struct request *rq;
 	int ret;
 
-	if (!drive->wcache || !(drive->id->cfs_enable_2 & 0x3000))
+	if (!drive->wcache)
 		return 0;
 
 	rq = blk_get_request(q, WRITE, __GFP_WAIT);
 
 	memset(rq->cmd, 0, sizeof(rq->cmd));
 
-	if (drive->id->cfs_enable_2 & 0x2400)
+	if ((drive->id->cfs_enable_2 & 0x2400) == 0x2400)
 		rq->cmd[0] = WIN_FLUSH_CACHE_EXT;
 	else
 		rq->cmd[0] = WIN_FLUSH_CACHE;
@@ -1427,7 +1427,7 @@ static int do_idedisk_flushcache (ide_drive_t *drive)
 	ide_task_t args;
 
 	memset(&args, 0, sizeof(ide_task_t));
-	if (drive->id->cfs_enable_2 & 0x2400)
+	if ((drive->id->cfs_enable_2 & 0x2400) == 0x2400)
 		args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_FLUSH_CACHE_EXT;
 	else
 		args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_FLUSH_CACHE;
