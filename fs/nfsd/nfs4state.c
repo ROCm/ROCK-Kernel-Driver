@@ -335,8 +335,29 @@ static void
 expire_client(struct nfs4_client *clp)
 {
 	struct nfs4_stateowner *sop;
+	struct nfs4_delegation *dp;
+	struct nfs4_callback *cb = &clp->cl_callback;
+	struct rpc_clnt *clnt = clp->cl_callback.cb_client;
 
-	dprintk("NFSD: expire_client cl_count %d\n",atomic_read(&clp->cl_count));
+	dprintk("NFSD: expire_client cl_count %d\n",
+	                    atomic_read(&clp->cl_count));
+
+	/* shutdown rpc client, ending any outstanding recall rpcs */
+	if (atomic_read(&cb->cb_set) == 1 && clnt) {
+		rpc_shutdown_client(clnt);
+		clnt = clp->cl_callback.cb_client = NULL;
+	}
+	spin_lock(&recall_lock);
+	while (!list_empty(&clp->cl_del_perclnt)) {
+		dp = list_entry(clp->cl_del_perclnt.next, struct nfs4_delegation, dl_del_perclnt);
+		dprintk("NFSD: expire client. dp %p, dl_state %d, fp %p\n",
+				dp, atomic_read(&dp->dl_state), dp->dl_flock);
+
+		/* force release of delegation. */
+		atomic_set(&dp->dl_state, NFS4_RECALL_COMPLETE);
+		release_delegation(dp);
+	}
+	spin_unlock(&recall_lock);
 	list_del(&clp->cl_idhash);
 	list_del(&clp->cl_strhash);
 	list_del(&clp->cl_lru);
