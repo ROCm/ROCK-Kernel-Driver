@@ -61,7 +61,6 @@ struct inodes_stat_t {
 };
 extern struct inodes_stat_t inodes_stat;
 
-extern int max_super_blocks, nr_super_blocks;
 extern int leases_enable, dir_notify_enable, lease_break_time;
 
 #define NR_FILE  8192	/* this can well be larger on a larger system */
@@ -663,6 +662,7 @@ struct quota_mount_options
 #include <linux/cramfs_fs_sb.h>
 
 extern struct list_head super_blocks;
+extern spinlock_t sb_lock;
 
 #define sb_entry(list)	list_entry((list), struct super_block, s_list)
 struct super_block {
@@ -680,13 +680,14 @@ struct super_block {
 	struct dentry		*s_root;
 	struct rw_semaphore	s_umount;
 	struct semaphore	s_lock;
+	int			s_count;
+	atomic_t		s_active;
 
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_locked_inodes;/* inodes being synced */
 	struct list_head	s_files;
 
 	struct block_device	*s_bdev;
-	struct list_head	s_mounts;	/* vfsmount(s) of this one */
 	struct quota_mount_options s_dquot;	/* Diskquota specific options */
 
 	union {
@@ -1161,6 +1162,7 @@ extern void write_inode_now(struct inode *, int);
 extern void sync_dev(kdev_t);
 extern int fsync_dev(kdev_t);
 extern int fsync_super(struct super_block *);
+extern int fsync_no_super(kdev_t);
 extern void sync_inodes_sb(struct super_block *);
 extern int fsync_inode_buffers(struct inode *);
 extern int osync_inode_buffers(struct inode *);
@@ -1358,11 +1360,12 @@ extern int dcache_readdir(struct file *, void *, filldir_t);
 
 extern struct file_system_type *get_fs_type(const char *name);
 extern struct super_block *get_super(kdev_t);
+extern void drop_super(struct super_block *sb);
 static inline int is_mounted(kdev_t dev)
 {
 	struct super_block *sb = get_super(dev);
 	if (sb) {
-		/* drop_super(sb); will go here */
+		drop_super(sb);
 		return 1;
 	}
 	return 0;

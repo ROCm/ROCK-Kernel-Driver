@@ -26,6 +26,19 @@
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
+static inline void age_page_up(struct page *page)
+{
+	unsigned age = page->age + PAGE_AGE_ADV;
+	if (age > PAGE_AGE_MAX)
+		age = PAGE_AGE_MAX;
+	page->age = age;
+}
+
+static inline void age_page_down(struct page * page)
+{
+	page->age /= 2;
+}
+
 /*
  * The swap-out function returns 1 if it successfully
  * scanned all the pages it was asked to (`count').
@@ -54,16 +67,19 @@ static unsigned int zone_inactive_plenty(zone_t *zone)
 
 static unsigned int zone_inactive_shortage(zone_t *zone) 
 {
-	unsigned int inactive;
+	unsigned int sum;
 
 	if (!zone->size)
 		return 0;
 
-	inactive = zone->inactive_dirty_pages;
-	inactive += zone->inactive_clean_pages;
-	inactive += zone->free_pages;
-
-	return inactive < zone->pages_high;
+	sum = zone->pages_high;
+	sum -= zone->inactive_dirty_pages;
+	sum -= zone->inactive_clean_pages;
+	sum -= zone->free_pages;
+	
+	if (sum > 0)
+		return sum;
+	return 0;
 }
 
 static unsigned int zone_free_plenty(zone_t *zone)
@@ -103,9 +119,7 @@ static void try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, u
 
 	/* Don't look at this pte if it's been accessed recently. */
 	if (ptep_test_and_clear_young(page_table)) {
-		page->age += PAGE_AGE_ADV;
-		if (page->age > PAGE_AGE_MAX)
-			page->age = PAGE_AGE_MAX;
+		age_page_up(page);
 		return;
 	}
 
@@ -700,15 +714,6 @@ page_active:
 	return cleaned_pages;
 }
 
-static inline void age_page_up(struct page *page)
-{
-	unsigned age = page->age + PAGE_AGE_ADV;
-	if (age > PAGE_AGE_MAX)
-		age = PAGE_AGE_MAX;
-	page->age = age;
-}
-
-
 /**
  * refill_inactive_scan - scan the active list and find pages to deactivate
  * @priority: the priority at which to scan
@@ -760,7 +765,7 @@ int refill_inactive_scan(zone_t *zone, unsigned int priority, int target)
 			age_page_up(page);
 			page_active = 1;
 		} else {
-			age_page_down_ageonly(page);
+			age_page_down(page);
 			/*
 			 * Since we don't hold a reference on the page
 			 * ourselves, we have to do our test a bit more

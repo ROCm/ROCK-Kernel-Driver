@@ -59,9 +59,8 @@ static int do_remount_sb(struct super_block *sb, int flags, char * data);
 /* this is initialized in init/main.c */
 kdev_t ROOT_DEV;
 
-int nr_super_blocks;
-int max_super_blocks = NR_SUPER;
 LIST_HEAD(super_blocks);
+spinlock_t sb_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Handling of filesystem drivers list.
@@ -386,7 +385,6 @@ static struct vfsmount *add_vfsmnt(struct dentry *root, const char *dev_name)
 	mnt->mnt_parent = mnt;
 
 	spin_lock(&dcache_lock);
-	list_add(&mnt->mnt_instances, &sb->s_mounts);
 	list_add(&mnt->mnt_list, vfsmntlist.prev);
 	spin_unlock(&dcache_lock);
 	if (sb->s_type->fs_flags & FS_SINGLE)
@@ -395,10 +393,11 @@ out:
 	return mnt;
 }
 
-static struct vfsmount *clone_mnt(struct vfsmount *old_mnt, struct dentry *root)
+static struct vfsmount *clone_mnt(struct vfsmount *old, struct dentry *root)
 {
-	char *name = old_mnt->mnt_devname;
+	char *name = old->mnt_devname;
 	struct vfsmount *mnt = alloc_vfsmnt();
+	struct super_block *sb = old->mnt_sb;
 
 	if (!mnt)
 		goto out;
@@ -408,14 +407,12 @@ static struct vfsmount *clone_mnt(struct vfsmount *old_mnt, struct dentry *root)
 		if (mnt->mnt_devname)
 			strcpy(mnt->mnt_devname, name);
 	}
-	mnt->mnt_sb = old_mnt->mnt_sb;
+	mnt->mnt_sb = sb;
 	mnt->mnt_root = dget(root);
 	mnt->mnt_mountpoint = mnt->mnt_root;
 	mnt->mnt_parent = mnt;
 
-	spin_lock(&dcache_lock);
-	list_add(&mnt->mnt_instances, &old_mnt->mnt_instances);
-	spin_unlock(&dcache_lock);
+	atomic_inc(&sb->s_active);
 out:
 	return mnt;
 }
@@ -487,15 +484,11 @@ void __mntput(struct vfsmount *mnt)
 	struct super_block *sb = mnt->mnt_sb;
 
 	dput(mnt->mnt_root);
-	spin_lock(&dcache_lock);
-	list_del(&mnt->mnt_instances);
-	spin_unlock(&dcache_lock);
 	if (mnt->mnt_devname)
 		kfree(mnt->mnt_devname);
 	kmem_cache_free(mnt_cache, mnt);
 	kill_super(sb);
 }
-
 
 /* Use octal escapes, like mount does, for embedded spaces etc. */
 static unsigned char need_escaping[] = { ' ', '\t', '\n', '\\' };
@@ -645,6 +638,49 @@ int get_filesystem_info( char *buf )
 #undef MANGLE
 #undef FREEROOM
 }
+
+static inline void __put_super(struct super_block *sb)
+{
+	spin_lock(&sb_lock);
+	if (!--sb->s_count)
+		kfree(sb);
+	spin_unlock(&sb_lock);
+}
+
+static inline struct super_block * find_super(kdev_t dev)
+{
+	struct list_head *p;
+
+	list_for_each(p, &super_blocks) {
+		struct super_block * s = sb_entry(p);
+		if (s->s_dev == dev) {
+			s->s_count++;
+			return s;
+		}
+	}
+	return NULL;
+}
+
+void drop_super(struct super_block *sb)
+{
+	up_read(&sb->s_umount);
+	__put_super(sb);
+}
+
+static void put_super(struct super_block *sb)
+{
+	up_write(&sb->s_umount);
+	__put_super(sb);
+}
+
+static inline void write_super(struct super_block *sb)
+{
+	lock_super(sb);
+	if (sb->s_root && sb->s_dirt)
+		if (sb->s_op && sb->s_op->write_super)
+			sb->s_op->write_super(sb);
+	unlock_super(sb);
+}
  
 /*
  * Note: check the dirty flag before waiting, so we don't
@@ -655,21 +691,29 @@ void sync_supers(kdev_t dev)
 {
 	struct super_block * sb;
 
-	for (sb = sb_entry(super_blocks.next);
-	     sb != sb_entry(&super_blocks); 
-	     sb = sb_entry(sb->s_list.next)) {
-		if (!sb->s_dev)
-			continue;
-		if (dev && sb->s_dev != dev)
-			continue;
-		if (!sb->s_dirt)
-			continue;
-		lock_super(sb);
-		if (sb->s_dev && sb->s_dirt && (!dev || dev == sb->s_dev))
-			if (sb->s_op && sb->s_op->write_super)
-				sb->s_op->write_super(sb);
-		unlock_super(sb);
+	if (dev) {
+		sb = get_super(dev);
+		if (sb) {
+			if (sb->s_dirt)
+				write_super(sb);
+			drop_super(sb);
+		}
+		return;
 	}
+restart:
+	spin_lock(&sb_lock);
+	sb = sb_entry(super_blocks.next);
+	while (sb != sb_entry(&super_blocks))
+		if (sb->s_dirt) {
+			sb->s_count++;
+			spin_unlock(&sb_lock);
+			down_read(&sb->s_umount);
+			write_super(sb);
+			drop_super(sb);
+			goto restart;
+		} else
+			sb = sb_entry(sb->s_list.next);
+	spin_unlock(&sb_lock);
 }
 
 /**
@@ -687,17 +731,21 @@ struct super_block * get_super(kdev_t dev)
 	if (!dev)
 		return NULL;
 restart:
-	s = sb_entry(super_blocks.next);
-	while (s != sb_entry(&super_blocks))
-		if (s->s_dev == dev) {
-			/* Yes, it sucks. As soon as we get refcounting... */
-			lock_super(s);
-			unlock_super(s);
-			if (s->s_dev == dev)
-				return s;
-			goto restart;
-		} else
-			s = sb_entry(s->s_list.next);
+	spin_lock(&sb_lock);
+	s = find_super(dev);
+	if (s) {
+		spin_unlock(&sb_lock);
+		/* Yes, it sucks. As soon as we get refcounting... */
+		/* Almost there - next two lines will go away RSN */
+		lock_super(s);
+		unlock_super(s);
+		down_read(&s->s_umount);
+		if (s->s_root)
+			return s;
+		drop_super(s);
+		goto restart;
+	}
+	spin_unlock(&sb_lock);
 	return NULL;
 }
 
@@ -714,6 +762,7 @@ asmlinkage long sys_ustat(dev_t dev, struct ustat * ubuf)
         if (s == NULL)
                 goto out;
 	err = vfs_statfs(s, &sbuf);
+	drop_super(s);
 	if (err)
 		goto out;
 
@@ -735,35 +784,23 @@ out:
  *	the request.
  */
  
-static struct super_block *get_empty_super(void)
+static struct super_block *alloc_super(void)
 {
-	struct super_block *s;
-
-	for (s  = sb_entry(super_blocks.next);
-	     s != sb_entry(&super_blocks); 
-	     s  = sb_entry(s->s_list.next)) {
-		if (s->s_dev)
-			continue;
-		return s;
-	}
-	/* Need a new one... */
-	if (nr_super_blocks >= max_super_blocks)
-		return NULL;
-	s = kmalloc(sizeof(struct super_block),  GFP_USER);
+	struct super_block *s = kmalloc(sizeof(struct super_block),  GFP_USER);
 	if (s) {
-		nr_super_blocks++;
 		memset(s, 0, sizeof(struct super_block));
 		INIT_LIST_HEAD(&s->s_dirty);
 		INIT_LIST_HEAD(&s->s_locked_inodes);
-		list_add (&s->s_list, super_blocks.prev);
 		INIT_LIST_HEAD(&s->s_files);
-		INIT_LIST_HEAD(&s->s_mounts);
 		init_rwsem(&s->s_umount);
 		sema_init(&s->s_lock, 1);
+		s->s_count = 1;
+		atomic_set(&s->s_active, 1);
 		sema_init(&s->s_vfs_rename_sem,1);
 		sema_init(&s->s_nfsd_free_path_sem,1);
 		sema_init(&s->s_dquot.dqio_sem, 1);
 		sema_init(&s->s_dquot.dqoff_sem, 1);
+		s->s_maxbytes = MAX_NON_LFS;
 	}
 	return s;
 }
@@ -773,16 +810,16 @@ static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
 				       void *data, int silent)
 {
 	struct super_block * s;
-	s = get_empty_super();
+	s = alloc_super();
 	if (!s)
 		goto out;
 	s->s_dev = dev;
 	s->s_bdev = bdev;
 	s->s_flags = flags;
-	s->s_dirt = 0;
 	s->s_type = type;
-	s->s_dquot.flags = 0;
-	s->s_maxbytes = MAX_NON_LFS;
+	spin_lock(&sb_lock);
+	list_add (&s->s_list, super_blocks.prev);
+	spin_unlock(&sb_lock);
 	lock_super(s);
 	if (!type->read_super(s, data, silent))
 		goto out_fail;
@@ -798,6 +835,11 @@ out_fail:
 	s->s_bdev = 0;
 	s->s_type = NULL;
 	unlock_super(s);
+	atomic_dec(&s->s_active);
+	spin_lock(&sb_lock);
+	list_del(&s->s_list);
+	spin_unlock(&sb_lock);
+	__put_super(s);
 	return NULL;
 }
 
@@ -863,9 +905,25 @@ static struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	if (sb) {
 		if (fs_type == sb->s_type &&
 		    ((flags ^ sb->s_flags) & MS_RDONLY) == 0) {
+/*
+ * We are heavily relying on mount_sem here. We _will_ get rid of that
+ * ugliness RSN (and then atomicity of ->s_active will play), but first
+ * we need to get rid of "reuse" branch of get_empty_super() and that
+ * requires reference counters. Chicken and egg problem, but fortunately
+ * we can use the fact that right now all accesses to ->s_active are
+ * under mount_sem.
+ */
+			if (atomic_read(&sb->s_active)) {
+				spin_lock(&sb_lock);
+				sb->s_count--;
+				spin_unlock(&sb_lock);
+			}
+			atomic_inc(&sb->s_active);
+			up_read(&sb->s_umount);
 			path_release(&nd);
 			return sb;
 		}
+		drop_super(sb);
 	} else {
 		mode_t mode = FMODE_READ; /* we always need it ;-) */
 		if (!(flags & MS_RDONLY))
@@ -926,6 +984,7 @@ static struct super_block *get_sb_single(struct file_system_type *fs_type,
 	sb = fs_type->kern_mnt->mnt_sb;
 	if (!sb)
 		BUG();
+	atomic_inc(&sb->s_active);
 	do_remount_sb(sb, flags, data);
 	return sb;
 }
@@ -938,12 +997,8 @@ static void kill_super(struct super_block *sb)
 	struct file_system_type *fs = sb->s_type;
 	struct super_operations *sop = sb->s_op;
 
-	spin_lock(&dcache_lock);
-	if (!list_empty(&sb->s_mounts)) {
-		spin_unlock(&dcache_lock);
+	if (!atomic_dec_and_test(&sb->s_active))
 		return;
-	}
-	spin_unlock(&dcache_lock);
 	down_write(&sb->s_umount);
 	lock_kernel();
 	sb->s_root = NULL;
@@ -975,12 +1030,15 @@ static void kill_super(struct super_block *sb)
 	sb->s_type = NULL;
 	unlock_super(sb);
 	unlock_kernel();
-	up_write(&sb->s_umount);
 	if (bdev) {
 		blkdev_put(bdev, BDEV_FS);
 		bdput(bdev);
 	} else
 		put_unnamed_dev(dev);
+	spin_lock(&sb_lock);
+	list_del(&sb->s_list);
+	spin_unlock(&sb_lock);
+	put_super(sb);
 }
 
 /*
@@ -1045,9 +1103,6 @@ struct vfsmount *kern_mount(struct file_system_type *type)
 	mnt->mnt_root = dget(sb->s_root);
 	mnt->mnt_mountpoint = mnt->mnt_root;
 	mnt->mnt_parent = mnt;
-	spin_lock(&dcache_lock);
-	list_add(&mnt->mnt_instances, &sb->s_mounts);
-	spin_unlock(&dcache_lock);
 	type->kern_mnt = mnt;
 	return mnt;
 }
@@ -1092,7 +1147,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 
 	spin_lock(&dcache_lock);
 
-	if (mnt->mnt_instances.next != mnt->mnt_instances.prev) {
+	if (atomic_read(&sb->s_active) > 1) {
 		if (atomic_read(&mnt->mnt_count) > 2) {
 			spin_unlock(&dcache_lock);
 			return -EBUSY;
@@ -1324,9 +1379,6 @@ static int do_add_mount(struct nameidata *nd, char *type, int flags,
 	mnt->mnt_root = dget(sb->s_root);
 	mnt->mnt_mountpoint = mnt->mnt_root;
 	mnt->mnt_parent = mnt;
-	spin_lock(&dcache_lock);
-	list_add(&mnt->mnt_instances, &sb->s_mounts);
-	spin_unlock(&dcache_lock);
 
 	/* Something was mounted here while we slept */
 	while(d_mountpoint(nd->dentry) && follow_down(&nd->mnt, &nd->dentry))
@@ -1583,7 +1635,10 @@ skip_nfs:
 	check_disk_change(ROOT_DEV);
 	sb = get_super(ROOT_DEV);
 	if (sb) {
+		/* FIXME */
 		fs_type = sb->s_type;
+		atomic_inc(&sb->s_active);
+		up_read(&sb->s_umount);
 		goto mount_it;
 	}
 

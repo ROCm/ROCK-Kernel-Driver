@@ -1597,6 +1597,8 @@ asmlinkage long sys_quotactl(int cmd, const char *special, int id, caddr_t addr)
 	if (sb && sb_has_quota_enabled(sb, type))
 		ret = set_dqblk(sb, id, type, flags, (struct dqblk *) addr);
 out:
+	if (sb)
+		drop_super(sb);
 	unlock_kernel();
 	return ret;
 }

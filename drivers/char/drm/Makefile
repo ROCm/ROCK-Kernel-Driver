@@ -3,9 +3,7 @@
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 
 O_TARGET	:= drm.o
-export-objs	:= gamma_drv.o tdfx_drv.o r128_drv.o mga_drv.o i810_drv.o \
-		   ffb_drv.o
-list-multi	:= gamma.o tdfx.o r128.o mga.o i810.o ffb.o
+list-multi	:= gamma.o tdfx.o r128.o mga.o i810.o radeon.o ffb.o
 
 gamma-objs  := gamma_drv.o gamma_dma.o
 tdfx-objs   := tdfx_drv.o

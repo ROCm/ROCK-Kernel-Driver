@@ -402,7 +402,7 @@ static int shmem_getpage(struct inode * inode, unsigned long idx, struct page **
 	int error;
 
 	down (&inode->i_sem);
-	if (inode->i_size < (loff_t) idx * PAGE_CACHE_SIZE)
+	if (inode->i_size <= (loff_t) idx * PAGE_CACHE_SIZE)
 		goto sigbus;
 	*ptr = shmem_getpage_locked(inode, idx);
 	if (IS_ERR (*ptr))

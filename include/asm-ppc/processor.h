@@ -631,7 +631,7 @@ struct thread_struct {
 #define INIT_THREAD  { \
 	INIT_SP, /* ksp */ \
 	0, /* wchan */ \
-	(struct pt_regs *)INIT_SP - 1, /* regs */ \
+	0, /* regs */ \
 	KERNEL_DS, /*fs*/ \
 	swapper_pg_dir, /* pgdir */ \
 	0, /* last_syscall */ \
@@ -659,8 +659,8 @@ static inline unsigned long thread_saved_pc(struct thread_struct *t)
 
 unsigned long get_wchan(struct task_struct *p);
 
-#define KSTK_EIP(tsk)  ((tsk)->thread.regs->nip)
-#define KSTK_ESP(tsk)  ((tsk)->thread.regs->gpr[1])
+#define KSTK_EIP(tsk)  ((tsk)->thread.regs? (tsk)->thread.regs->nip: 0)
+#define KSTK_ESP(tsk)  ((tsk)->thread.regs? (tsk)->thread.regs->gpr[1]: 0)
 
 /*
  * NOTE! The task struct and the stack go together

@@ -258,23 +258,6 @@ static inline void sync_list(struct list_head *head)
 		__sync_one(list_entry(tmp, struct inode, i_list), 0);
 }
 
-static inline int wait_on_dirty(struct list_head *head)
-{
-	struct list_head * tmp;
-	list_for_each(tmp, head) {
-		struct inode *inode = list_entry(tmp, struct inode, i_list);
-		if (!inode->i_state & I_DIRTY)
-			continue;
-		__iget(inode);
-		spin_unlock(&inode_lock);
-		__wait_on_inode(inode);
-		iput(inode);
-		spin_lock(&inode_lock);
-		return 1;
-	}
-	return 0;
-}
-
 static inline void wait_on_locked(struct list_head *head)
 {
 	struct list_head * tmp;
@@ -319,6 +302,71 @@ static inline int try_to_sync_unused_list(struct list_head *head)
 	return 1;
 }
 
+void sync_inodes_sb(struct super_block *sb)
+{
+	spin_lock(&inode_lock);
+	while (!list_empty(&sb->s_dirty)||!list_empty(&sb->s_locked_inodes)) {
+		sync_list(&sb->s_dirty);
+		wait_on_locked(&sb->s_locked_inodes);
+	}
+	spin_unlock(&inode_lock);
+}
+
+/*
+ * Note:
+ * We don't need to grab a reference to superblock here. If it has non-empty
+ * ->s_dirty it's hadn't been killed yet and kill_super() won't proceed
+ * past sync_inodes_sb() until both ->s_dirty and ->s_locked_inodes are
+ * empty. Since __sync_one() regains inode_lock before it finally moves
+ * inode from superblock lists we are OK.
+ */
+
+void sync_unlocked_inodes(void)
+{
+	struct super_block * sb;
+	spin_lock(&inode_lock);
+	spin_lock(&sb_lock);
+	sb = sb_entry(super_blocks.next);
+	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
+		if (!list_empty(&sb->s_dirty)) {
+			spin_unlock(&sb_lock);
+			sync_list(&sb->s_dirty);
+			spin_lock(&sb_lock);
+		}
+	}
+	spin_unlock(&sb_lock);
+	spin_unlock(&inode_lock);
+}
+
+/*
+ * Find a superblock with inodes that need to be synced
+ */
+
+static struct super_block *get_super_to_sync(void)
+{
+	struct list_head *p;
+restart:
+	spin_lock(&inode_lock);
+	spin_lock(&sb_lock);
+	list_for_each(p, &super_blocks) {
+		struct super_block *s = list_entry(p,struct super_block,s_list);
+		if (list_empty(&s->s_dirty) && list_empty(&s->s_locked_inodes))
+			continue;
+		s->s_count++;
+		spin_unlock(&sb_lock);
+		spin_unlock(&inode_lock);
+		down_read(&s->s_umount);
+		if (!s->s_root) {
+			drop_super(s);
+			goto restart;
+		}
+		return s;
+	}
+	spin_unlock(&sb_lock);
+	spin_unlock(&inode_lock);
+	return NULL;
+}
+
 /**
  *	sync_inodes
  *	@dev: device to sync the inodes from.
@@ -327,53 +375,23 @@ static inline int try_to_sync_unused_list(struct list_head *head)
  *	writes them out, and puts them back on the normal list.
  */
 
-/*
- * caller holds exclusive lock on sb->s_umount
- */
- 
-void sync_inodes_sb(struct super_block *sb)
-{
-	spin_lock(&inode_lock);
-	sync_list(&sb->s_dirty);
-	wait_on_locked(&sb->s_locked_inodes);
-	spin_unlock(&inode_lock);
-}
-
-void sync_unlocked_inodes(void)
-{
-	struct super_block * sb = sb_entry(super_blocks.next);
-	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
-		if (!list_empty(&sb->s_dirty)) {
-			spin_lock(&inode_lock);
-			sync_list(&sb->s_dirty);
-			spin_unlock(&inode_lock);
-		}
-	}
-}
-
 void sync_inodes(kdev_t dev)
 {
-	struct super_block * sb = sb_entry(super_blocks.next);
+	struct super_block * s;
 
 	/*
 	 * Search the super_blocks array for the device(s) to sync.
 	 */
-	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
-		if (!sb->s_dev)
-			continue;
-		if (dev && sb->s_dev != dev)
-			continue;
-		down_read(&sb->s_umount);
-		if (sb->s_dev && (sb->s_dev == dev || !dev)) {
-			spin_lock(&inode_lock);
-			do {
-				sync_list(&sb->s_dirty);
-			} while (wait_on_dirty(&sb->s_locked_inodes));
-			spin_unlock(&inode_lock);
+	if (dev) {
+		if ((s = get_super(dev)) != NULL) {
+			sync_inodes_sb(s);
+			drop_super(s);
 		}
-		up_read(&sb->s_umount);
-		if (dev)
-			break;
+	} else {
+		while ((s = get_super_to_sync()) != NULL) {
+			sync_inodes_sb(s);
+			drop_super(s);
+		}
 	}
 }
 
@@ -382,13 +400,19 @@ void sync_inodes(kdev_t dev)
  */
 static void try_to_sync_unused_inodes(void)
 {
-	struct super_block * sb = sb_entry(super_blocks.next);
+	struct super_block * sb;
+
+	spin_lock(&sb_lock);
+	sb = sb_entry(super_blocks.next);
 	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
 		if (!sb->s_dev)
 			continue;
+		spin_unlock(&sb_lock);
 		if (!try_to_sync_unused_list(&sb->s_dirty))
-			break;
+			return;
+		spin_lock(&sb_lock);
 	}
+	spin_unlock(&sb_lock);
 }
 
 /**
@@ -598,15 +622,18 @@ int invalidate_inodes(struct super_block * sb)
  
 int invalidate_device(kdev_t dev, int do_sync)
 {
-	struct super_block *sb = get_super(dev);
+	struct super_block *sb;
 	int res;
 
 	if (do_sync)
 		fsync_dev(dev);
 
 	res = 0;
-	if (sb)
+	sb = get_super(dev);
+	if (sb) {
 		res = invalidate_inodes(sb);
+		drop_super(sb);
+	}
 	invalidate_buffers(dev);
 	return res;
 }

@@ -109,9 +109,11 @@ static int hpux_ustat(dev_t dev, struct hpux_ustat *ubuf)
 
 	lock_kernel();
 	s = get_super(to_kdev_t(dev));
+	unlock_kernel();
 	if (s == NULL)
 		goto out;
 	err = vfs_statfs(s, &sbuf);
+	drop_super(s);
 	if (err)
 		goto out;
 
@@ -124,7 +126,6 @@ static int hpux_ustat(dev_t dev, struct hpux_ustat *ubuf)
 	/* Changed to hpux_ustat:  */
 	err = copy_to_user(ubuf,&tmp,sizeof(struct hpux_ustat)) ? -EFAULT : 0;
 out:
-	unlock_kernel();
 	return err;
 }
 

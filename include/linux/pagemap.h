@@ -72,7 +72,9 @@ static inline unsigned long _page_hashfn(struct address_space * mapping, unsigne
 #define page_hash(mapping,index) (page_hash_table+_page_hashfn(mapping,index))
 
 extern struct page * __find_get_page(struct address_space *mapping,
-				     unsigned long offset, struct page **hash);
+				unsigned long index, struct page **hash);
+#define find_get_page(mapping, index) \
+	__find_get_page(mapping, index, page_hash(mapping, index))
 extern struct page * __find_lock_page (struct address_space * mapping,
 				unsigned long index, struct page **hash);
 extern void lock_page(struct page *page);

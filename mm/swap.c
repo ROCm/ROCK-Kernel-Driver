@@ -74,42 +74,6 @@ pager_daemon_t pager_daemon = {
 	8,	/* do swap I/O in clusters of this size */
 };
 
-/*
- * We use this (minimal) function in the case where we
- * know we can't deactivate the page (yet).
- */
-void age_page_down_ageonly(struct page * page)
-{
-	page->age /= 2;
-}
-
-void age_page_down_nolock(struct page * page)
-{
-	/* The actual page aging bit */
-	page->age /= 2;
-
-	/*
-	 * The page is now an old page. Move to the inactive
-	 * list (if possible ... see below).
-	 */
-	if (!page->age)
-	       deactivate_page_nolock(page);
-}
-
-void age_page_down(struct page * page)
-{
-	/* The actual page aging bit */
-	page->age /= 2;
-
-	/*
-	 * The page is now an old page. Move to the inactive
-	 * list (if possible ... see below).
-	 */
-	if (!page->age)
-	       deactivate_page(page);
-}
-
-
 /**
  * (de)activate_page - move pages from/to active and inactive lists
  * @page: the page we want to move

@@ -771,6 +771,7 @@ struct parport_driver {
    <funcprototype>
     <funcdef>struct pardevice *<function>parport_open</function></funcdef>
     <paramdef>int <parameter>devnum</parameter></paramdef>
+    <paramdef>const char *<parameter>name</parameter></paramdef>
     <paramdef>int <parameter>(*pf)</parameter>
      <funcparams>void *</funcparams></paramdef>
     <paramdef>int <parameter>(*kf)</parameter>

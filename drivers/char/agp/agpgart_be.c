@@ -2375,6 +2375,7 @@ static int serverworks_free_gatt_table(void)
 
 	serverworks_free_gatt_pages();
 	serverworks_free_page_map(&page_dir);
+	serverworks_free_page_map(&serverworks_private.scratch_dir);
 	return 0;
 }
 

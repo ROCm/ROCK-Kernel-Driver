@@ -346,6 +346,12 @@ int fsync_super(struct super_block *sb)
 	return sync_buffers(dev, 1);
 }
 
+int fsync_no_super(kdev_t dev)
+{
+	sync_buffers(dev, 0);
+	return sync_buffers(dev, 1);
+}
+
 int fsync_dev(kdev_t dev)
 {
 	sync_buffers(dev, 0);
