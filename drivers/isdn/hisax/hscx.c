@@ -102,32 +102,33 @@ void
 hscx_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	long flags;
+	struct IsdnCardState *cs = st->l1.bcs->cs;
+	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&cs->lock, flags);
 			if (st->l1.bcs->tx_skb) {
 				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				restore_flags(flags);
 			} else {
 				st->l1.bcs->tx_skb = skb;
 				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 				st->l1.bcs->hw.hscx.count = 0;
-				restore_flags(flags);
 				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			}
+			spin_unlock_irqrestore(&cs->lock, flags);
 			break;
 		case (PH_PULL | INDICATION):
+			spin_lock_irqsave(&cs->lock, flags);
 			if (st->l1.bcs->tx_skb) {
 				printk(KERN_WARNING "hscx_l2l1: this shouldn't happen\n");
-				break;
+			} else {
+				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
+				st->l1.bcs->tx_skb = skb;
+				st->l1.bcs->hw.hscx.count = 0;
+				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			}
-			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-			st->l1.bcs->tx_skb = skb;
-			st->l1.bcs->hw.hscx.count = 0;
-			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
+			spin_unlock_irqrestore(&cs->lock, flags);
 			break;
 		case (PH_PULL | REQUEST):
 			if (!st->l1.bcs->tx_skb) {

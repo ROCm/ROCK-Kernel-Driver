@@ -942,6 +942,7 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 	cs->status_write = cs->status_buf;
 	cs->status_end = cs->status_buf + HISAX_STATUS_BUFSIZE - 1;
 	cs->typ = card->typ;
+	spin_lock_init(&cs->lock);
 	SET_MODULE_OWNER(&cs->iif);
 	strcpy(cs->iif.id, id);
 	cs->iif.channels = 2;

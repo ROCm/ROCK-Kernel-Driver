@@ -881,6 +881,7 @@ struct icc_chip {
 struct IsdnCardState {
 	unsigned char typ;
 	unsigned char subtyp;
+	spinlock_t lock;
 	int protocol;
 	unsigned int irq;
 	unsigned long irq_flags;
