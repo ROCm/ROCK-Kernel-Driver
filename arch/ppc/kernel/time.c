@@ -83,6 +83,7 @@ time_t last_rtc_update;
 unsigned tb_ticks_per_jiffy;
 unsigned tb_to_us;
 unsigned tb_last_stamp;
+unsigned long tb_to_ns_scale;
 
 extern unsigned long wall_jiffies;
 
@@ -309,6 +310,7 @@ void __init time_init(void)
 		tb_to_us = 0x418937;
         } else {
                 ppc_md.calibrate_decr();
+		tb_to_ns_scale = mulhwu(tb_to_us, 1000 << 10);
 	}
 
 	/* Now that the decrementer is calibrated, it can be used in case the 
@@ -432,3 +434,26 @@ unsigned mulhwu_scale_factor(unsigned inscale, unsigned outscale) {
 	return mlt;
 }
 
+unsigned long long sched_clock(void)
+{
+	unsigned long lo, hi, hi2;
+	unsigned long long tb;
+
+	if (!__USE_RTC()) {
+		do {
+			hi = get_tbu();
+			lo = get_tbl();
+			hi2 = get_tbu();
+		} while (hi2 != hi);
+		tb = ((unsigned long long) hi << 32) | lo;
+		tb = (tb * tb_to_ns_scale) >> 10;
+	} else {
+		do {
+			hi = get_rtcu();
+			lo = get_rtcl();
+			hi2 = get_rtcu();
+		} while (hi2 != hi);
+		tb = ((unsigned long long) hi) * 1000000000 + lo;
+	}
+	return tb;
+}
