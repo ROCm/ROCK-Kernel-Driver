@@ -725,7 +725,7 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		msr	cpsr_c, r9
 		mov	r2, sp
 		bl	do_DataAbort
-		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
+		disable_irq r0
 		ldr	r0, [sp, #S_PSR]
 		msr	spsr, r0
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
@@ -776,9 +776,9 @@ svc_preempt:	teq	r9, #0				@ was preempt count = 0
 		movne	pc, lr
 		mov	r7, #PREEMPT_ACTIVE
 		str	r7, [r8, #TI_PREEMPT]		@ set PREEMPT_ACTIVE
-1:		set_cpsr_c r2, #MODE_SVC		@ enable IRQs
+1:		enable_irq r2				@ enable IRQs
 		bl	schedule
-		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC	@ disable IRQs
+		disable_irq r0				@ disable IRQs
 		ldr	r0, [r8, #TI_FLAGS]		@ get new tasks TI_FLAGS
 		tst	r0, #_TIF_NEED_RESCHED
 		beq	preempt_return			@ go again
@@ -801,7 +801,7 @@ __und_svc:	sub	sp, sp, #S_FRAME_SIZE
 		mov	r0, sp				@ struct pt_regs *regs
 		bl	do_undefinstr
 
-1:		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
+1:		disable_irq r0
 		ldr	lr, [sp, #S_PSR]		@ Get SVC cpsr
 		msr	spsr, lr
 		ldmia	sp, {r0 - pc}^			@ Restore SVC registers
@@ -822,7 +822,7 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		mov	r0, r2				@ address (pc)
 		mov	r1, sp				@ regs
 		bl	do_PrefetchAbort		@ call abort handler
-		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
+		disable_irq r0
 		ldr	r0, [sp, #S_PSR]
 		msr	spsr, r0
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
@@ -861,7 +861,7 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 #else
 		bl	CPU_ABORT_HANDLER
 #endif
-		set_cpsr_c r2, #MODE_SVC		@ Enable interrupts
+		enable_irq r2				@ Enable interrupts
 		mov	r2, sp
 		adrsvc	al, lr, ret_from_exception
 		b	do_DataAbort
@@ -916,7 +916,7 @@ __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
 		adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
 
-call_fpe:	set_cpsr_c r0, #MODE_SVC		@ Enable interrupts
+call_fpe:	enable_irq r0				@ Enable interrupts
 		get_thread_info r10			@ get current thread
 		ldr	r4, [r10, #TI_TASK]		@ get current task
 		mov	r8, #1
@@ -939,7 +939,7 @@ __pabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		stmdb	r8, {sp, lr}^			@ Save sp_usr lr_usr
 		alignment_trap r4, r7, __temp_abt
 		zero_fp
-		set_cpsr_c r0, #MODE_SVC		@ Enable interrupts
+		enable_irq r0				@ Enable interrupts
 		mov	r0, r5				@ address (pc)
 		mov	r1, sp				@ regs
 		bl	do_PrefetchAbort		@ call abort handler

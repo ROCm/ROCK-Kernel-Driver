@@ -11,13 +11,13 @@
 #define MODE_SVC 0x13
 #endif
 
-		.macro	zero_fp
+	.macro	zero_fp
 #ifndef CONFIG_NO_FRAME_POINTER
-		mov	fp, #0
+	mov	fp, #0
 #endif
-		.endm
+	.endm
 
-		.text
+	.text
 
 @ Bad Abort numbers
 @ -----------------
@@ -69,119 +69,146 @@
 #define S_OFF		8
 
 #ifdef CONFIG_CPU_32
-		.macro	save_user_regs
-		sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ Calling r0 - r12
-		add	r8, sp, #S_PC
-		stmdb	r8, {sp, lr}^			@ Calling sp, lr
-		mrs	r8, spsr			@ called from non-FIQ mode, so ok.
-		str	lr, [sp, #S_PC]			@ Save calling PC
-		str	r8, [sp, #S_PSR]		@ Save CPSR
-		str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
-		.endm
 
-		.macro	restore_user_regs
-		ldr	r0, [sp, #S_PSR]		@ Get calling cpsr
-		mov	ip, #PSR_I_BIT | MODE_SVC
-		msr	cpsr_c, ip			@ disable IRQs
-		msr	spsr, r0			@ save in spsr_svc
-		ldr	lr, [sp, #S_PC]			@ Get PC
-		ldmia	sp, {r0 - lr}^			@ Get calling r0 - lr
-		mov	r0, r0
-		add	sp, sp, #S_FRAME_SIZE
-		movs	pc, lr				@ return & move spsr_svc into cpsr
-		.endm
+	.macro	set_cpsr_c, reg, mode
+#if 1
+	/* broken binutils */
+	mov	\reg, \mode
+	msr	cpsr_c, \reg
+#else
+	msr	cpsr_c, \mode
+#endif
+	.endm
 
-		.macro	fast_restore_user_regs
-		mov	ip, #PSR_I_BIT | MODE_SVC
-		msr	cpsr_c, ip			@ disable IRQs
-		ldr	r1, [sp, #S_OFF + S_PSR]	@ get calling cpsr
-		ldr	lr, [sp, #S_OFF + S_PC]!	@ get pc
- 		msr	spsr, r1			@ save in spsr_svc
-		ldmdb	sp, {r1 - lr}^			@ get calling r1 - lr
-		mov	r0, r0
-		add	sp, sp, #S_FRAME_SIZE - S_PC
-		movs	pc, lr				@ return & move spsr_svc into cpsr
-		.endm
+	.macro	disable_irq, temp
+	set_cpsr_c \temp, #PSR_I_BIT | MODE_SVC
+	.endm
 
-		.macro	mask_pc, rd, rm
-		.endm
+	.macro	enable_irq, temp
+	set_cpsr_c \temp, #MODE_SVC
+	.endm
 
-		.macro	enable_irqs, temp
-		mov	\temp, #MODE_SVC
-		msr	cpsr_c, \temp
-		.endm
+	.macro	save_user_regs
+	sub	sp, sp, #S_FRAME_SIZE
+	stmia	sp, {r0 - r12}			@ Calling r0 - r12
+	add	r8, sp, #S_PC
+	stmdb	r8, {sp, lr}^			@ Calling sp, lr
+	mrs	r8, spsr			@ called from non-FIQ mode, so ok.
+	str	lr, [sp, #S_PC]			@ Save calling PC
+	str	r8, [sp, #S_PSR]		@ Save CPSR
+	str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
+	.endm
 
-		.macro	get_thread_info, rd
-		mov	\rd, sp, lsr #13
-		mov	\rd, \rd, lsl #13
-		.endm
+	.macro	restore_user_regs
+	ldr	r1, [sp, #S_PSR]		@ Get calling cpsr
+	disable_irq ip				@ disable IRQs
+	ldr	lr, [sp, #S_PC]!		@ Get PC
+	msr	spsr, r1			@ save in spsr_svc
+	ldmdb	sp, {r0 - lr}^			@ Get calling r0 - lr
+	mov	r0, r0
+	add	sp, sp, #S_FRAME_SIZE - S_PC
+	movs	pc, lr				@ return & move spsr_svc into cpsr
+	.endm
 
-		/*
-		 * Like adr, but force SVC mode (if required)
-		 */
-		.macro	adrsvc, cond, reg, label
-		adr\cond	\reg, \label
-		.endm
+/*
+ * Must be called with IRQs already disabled.
+ */
+	.macro	fast_restore_user_regs
+	ldr	r1, [sp, #S_OFF + S_PSR]	@ get calling cpsr
+	ldr	lr, [sp, #S_OFF + S_PC]!	@ get pc
+	msr	spsr, r1			@ save in spsr_svc
+	ldmdb	sp, {r1 - lr}^			@ get calling r1 - lr
+	mov	r0, r0
+	add	sp, sp, #S_FRAME_SIZE - S_PC
+	movs	pc, lr				@ return & move spsr_svc into cpsr
+	.endm
 
-		.macro	alignment_trap, rbase, rtemp, sym
+/*
+ * Must be called with IRQs already disabled.
+ */
+	.macro	slow_restore_user_regs
+	ldr	r1, [sp, #S_PSR]		@ get calling cpsr
+	ldr	lr, [sp, #S_PC]!		@ get pc
+	msr	spsr, r1			@ save in spsr_svc
+	ldmdb	sp, {r0 - lr}^			@ get calling r1 - lr
+	mov	r0, r0
+	add	sp, sp, #S_FRAME_SIZE - S_PC
+	movs	pc, lr				@ return & move spsr_svc into cpsr
+	.endm
+
+	.macro	mask_pc, rd, rm
+	.endm
+
+	.macro	get_thread_info, rd
+	mov	\rd, sp, lsr #13
+	mov	\rd, \rd, lsl #13
+	.endm
+
+/*
+ * Like adr, but force SVC mode (if required)
+ */
+	.macro	adrsvc, cond, reg, label
+	adr\cond	\reg, \label
+	.endm
+
+	.macro	alignment_trap, rbase, rtemp, sym
 #ifdef CONFIG_ALIGNMENT_TRAP
 #define OFF_CR_ALIGNMENT(x)	cr_alignment - x
 
-		ldr	\rtemp, [\rbase, #OFF_CR_ALIGNMENT(\sym)]
-		mcr	p15, 0, \rtemp, c1, c0
+	ldr	\rtemp, [\rbase, #OFF_CR_ALIGNMENT(\sym)]
+	mcr	p15, 0, \rtemp, c1, c0
 #endif
-		.endm
+	.endm
 
 #else
-		.macro	save_user_regs
-		str	r0, [sp, #-4]!
-		str	lr, [sp, #-4]!
-		sub	sp, sp, #15*4
-		stmia	sp, {r0 - lr}^
-		mov	r0, r0
-		.endm
+	.macro	save_user_regs
+	str	r0, [sp, #-4]!
+	str	lr, [sp, #-4]!
+	sub	sp, sp, #15*4
+	stmia	sp, {r0 - lr}^
+	mov	r0, r0
+	.endm
 
-		.macro	restore_user_regs
-		ldmia	sp, {r0 - lr}^
-		mov	r0, r0
-		ldr	lr, [sp, #15*4]
-		add	sp, sp, #15*4+8
-		movs	pc, lr
-		.endm
+	.macro	restore_user_regs
+	ldmia	sp, {r0 - lr}^
+	mov	r0, r0
+	ldr	lr, [sp, #15*4]
+	add	sp, sp, #15*4+8
+	movs	pc, lr
+	.endm
 
-		.macro	fast_restore_user_regs
-		add	sp, sp, #S_OFF
-		ldmib	sp, {r1 - lr}^
-		mov	r0, r0
-		ldr	lr, [sp, #15*4]
-		add	sp, sp, #15*4+8
-		movs	pc, lr
-		.endm
+	.macro	fast_restore_user_regs
+	add	sp, sp, #S_OFF
+	ldmib	sp, {r1 - lr}^
+	mov	r0, r0
+	ldr	lr, [sp, #15*4]
+	add	sp, sp, #15*4+8
+	movs	pc, lr
+	.endm
 
-		.macro	mask_pc, rd, rm
-		bic	\rd, \rm, #PCMASK
-		.endm
+	.macro	mask_pc, rd, rm
+	bic	\rd, \rm, #PCMASK
+	.endm
 
-		.macro	enable_irqs, temp
-		teqp	pc, #0x00000003
-		.endm
+	.macro	enable_irqs, temp
+	teqp	pc, #0x00000003
+	.endm
 
-		.macro	initialise_traps_extra
-		.endm
+	.macro	initialise_traps_extra
+	.endm
 
-		.macro	get_thread_info, rd
-		mov	\rd, sp, lsr #13
-		mov	\rd, \rd, lsl #13
-		.endm
+	.macro	get_thread_info, rd
+	mov	\rd, sp, lsr #13
+	mov	\rd, \rd, lsl #13
+	.endm
 
-		/*
-		 * Like adr, but force SVC mode (if required)
-		 */
-		.macro	adrsvc, cond, reg, label
-		adr\cond	\reg, \label
-		orr\cond	\reg, \reg, #0x08000003
-		.endm
+	/*
+	 * Like adr, but force SVC mode (if required)
+	 */
+	.macro	adrsvc, cond, reg, label
+	adr\cond	\reg, \label
+	orr\cond	\reg, \reg, #0x08000003
+	.endm
 
 #endif
 
@@ -215,13 +242,3 @@ tsk	.req	r9		@ current thread_info
 	ldr	scno, [lr, #-4]		@ get SWI instruction
 #endif
 	.endm
-
-	.macro	set_cpsr_c, reg, mode
-#if 1
-	mov	\reg, \mode
-	msr	cpsr_c, \reg
-#else
-	msr	cpsr_c, \mode
-#endif
-	.endm
-
