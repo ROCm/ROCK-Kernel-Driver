@@ -37,6 +37,13 @@
 
 #include <asm/uaccess.h>
 
+/* Command group 3 is reserved and should never be used.  */
+const unsigned char scsi_command_size[8] =
+{
+	6, 10, 10, 12,
+	16, 12, 10, 10
+};
+
 #define BLK_DEFAULT_TIMEOUT	(60 * HZ)
 
 int blk_do_rq(request_queue_t *q, struct block_device *bdev, struct request *rq)
