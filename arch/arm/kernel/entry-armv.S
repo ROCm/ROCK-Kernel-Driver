@@ -621,7 +621,7 @@ ENTRY(anakin_active_irqs)
 		rsb	\irqstat, \irqnr, #0
 		and	\irqstat, \irqstat, \irqnr
 		clz	\irqnr, \irqstat
-		rsb	\irqnr, \irqnr, #23
+		rsb	\irqnr, \irqnr, #(31 - PXA_IRQ_SKIP)
 1001:
 		.endm
 
