@@ -195,7 +195,7 @@ static int get_ranges (unsigned char *pst)
 #endif
 		}
 
-		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])\t", fid,
+		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])  ", fid,
 			fid_codes[fid] / 10, fid_codes[fid] % 10, speed/1000);
 
 		if (speed < minimum_speed)
@@ -376,7 +376,7 @@ static int powernow_acpi_init(void)
 				powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 		}
 
-		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])\t", fid,
+		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])  ", fid,
 			fid_codes[fid] / 10, fid_codes[fid] % 10, speed/1000);
 		dprintk ("VID: 0x%x (%d.%03dV)\n", vid,	mobile_vid_table[vid]/1000,
 			mobile_vid_table[vid]%1000);
@@ -466,9 +466,9 @@ static int powernow_decode_bios (int maxfid, int startvid)
 				    (maxfid==pst->maxfid) && (startvid==pst->startvid))
 				{
 					dprintk (KERN_INFO PFX "PST:%d (@%p)\n", i, pst);
-					dprintk (KERN_INFO PFX " cpuid: 0x%x\t", pst->cpuid);
-					dprintk ("fsb: %d\t", pst->fsbspeed);
-					dprintk ("maxFID: 0x%x\t", pst->maxfid);
+					dprintk (KERN_INFO PFX " cpuid: 0x%x  ", pst->cpuid);
+					dprintk ("fsb: %d  ", pst->fsbspeed);
+					dprintk ("maxFID: 0x%x  ", pst->maxfid);
 					dprintk ("startvid: 0x%x\n", pst->startvid);
 
 					ret = get_ranges ((char *) pst + sizeof (struct pst_s));
