@@ -81,7 +81,7 @@ pal4_show_cpuinfo(struct seq_file *m)
 static void
 pal4_restart(char *cmd)
 {
-        __cli();
+        local_irq_disable();
         __asm__ __volatile__("lis  3,0xfff0\n \
                               ori  3,3,0x100\n \
                               mtspr 26,3\n \
@@ -95,7 +95,7 @@ pal4_restart(char *cmd)
 static void
 pal4_power_off(void)
 {
-	__cli();
+	local_irq_disable();
 	for(;;);
 }
 
