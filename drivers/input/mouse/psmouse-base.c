@@ -533,9 +533,10 @@ static int psmouse_pm_callback(struct pm_dev *dev, pm_request_t request, void *d
 {
 	struct psmouse *psmouse = dev->data;
 
-	psmouse->state = PSMOUSE_IGNORE;
-	serio_reconnect(psmouse->serio);
-
+	if (request == PM_RESUME) {
+		psmouse->state = PSMOUSE_IGNORE;
+		serio_reconnect(psmouse->serio);
+	}
 	return 0;
 }
 
