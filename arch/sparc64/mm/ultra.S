@@ -209,6 +209,7 @@ __flush_tlb_kernel_range:	/* %o0=start, %o1=end */
 	 sethi		%hi(PAGE_SIZE), %o4
 	sub		%o1, %o0, %o3
 	sub		%o3, %o4, %o3
+	or		%o0, 0x20, %o0		! Nucleus
 1:	stxa		%g0, [%o0 + %o3] ASI_DMMU_DEMAP
 	stxa		%g0, [%o0 + %o3] ASI_IMMU_DEMAP
 	membar		#Sync
@@ -510,6 +511,7 @@ xcall_flush_tlb_kernel_range:
 	sub		%g7, %g1, %g3
 	add		%g2, 1, %g2
 	sub		%g3, %g2, %g3
+	or		%g1, 0x20, %g1		! Nucleus
 1:	stxa		%g0, [%g1 + %g3] ASI_DMMU_DEMAP
 	stxa		%g0, [%g1 + %g3] ASI_IMMU_DEMAP
 	membar		#Sync
