@@ -45,7 +45,6 @@
 #include "xdi_vers.h"
 #include "diva_dma.h"
 
-EXPORT_NO_SYMBOLS;
 static char *main_revision = "$Revision: 1.1.2.8 $";
 
 int errno = 0;

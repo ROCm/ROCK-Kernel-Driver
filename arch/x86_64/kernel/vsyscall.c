@@ -51,13 +51,14 @@
 #include <asm/errno.h>
 
 #define __vsyscall(nr) __attribute__ ((unused,__section__(".vsyscall_" #nr)))
+#define force_inline __attribute__((always_inline)) inline
 
 int __sysctl_vsyscall __section_sysctl_vsyscall = 1;
 seqlock_t __xtime_lock __section_xtime_lock = SEQLOCK_UNLOCKED;
 
 #include <asm/unistd.h>
 
-static inline void timeval_normalize(struct timeval * tv)
+static force_inline void timeval_normalize(struct timeval * tv)
 {
 	time_t __sec;
 
@@ -69,7 +70,7 @@ static inline void timeval_normalize(struct timeval * tv)
 	}
 }
 
-static inline void do_vgettimeofday(struct timeval * tv)
+static force_inline void do_vgettimeofday(struct timeval * tv)
 {
 	long sequence, t;
 	unsigned long sec, usec;
@@ -80,7 +81,7 @@ static inline void do_vgettimeofday(struct timeval * tv)
 		sync_core();
 		rdtscll(t);
 		sec = __xtime.tv_sec;
-		usec = (__xtime.tv_nsec * 1000) +
+		usec = (__xtime.tv_nsec / 1000) +
 			(__jiffies - __wall_jiffies) * (1000000 / HZ) +
 			(t  - __hpet.last_tsc) * (1000000 / HZ) / __hpet.ticks + __hpet.offset;
 
@@ -91,12 +92,12 @@ static inline void do_vgettimeofday(struct timeval * tv)
 }
 
 /* RED-PEN may want to readd seq locking, but then the variable should be write-once. */
-static inline void do_get_tz(struct timezone * tz)
+static force_inline void do_get_tz(struct timezone * tz)
 {
 		*tz = __sys_tz;
 }
 
-static inline int gettimeofday(struct timeval *tv, struct timezone *tz)
+static force_inline int gettimeofday(struct timeval *tv, struct timezone *tz)
 {
 	int ret;
 	asm volatile("syscall" 

@@ -122,6 +122,7 @@
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
+#include <linux/completion.h>
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
 #include <asm/dma.h>
@@ -325,6 +326,7 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	host->max_lun = NCR_700_MAX_LUNS;
 	host->unique_id = hostdata->base;
 	host->base = hostdata->base;
+	hostdata->eh_complete = NULL;
 	host->hostdata[0] = (unsigned long)hostdata;
 	/* kick the chip */
 	NCR_700_writeb(0xff, host, CTEST9_REG);
@@ -1525,6 +1527,9 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 			hostdata->state = NCR_700_HOST_FREE;
 			hostdata->cmd = NULL;
+			/* signal back if this was an eh induced reset */
+			if(hostdata->eh_complete != NULL)
+				complete(hostdata->eh_complete);
 			goto out_unlock;
 		} else if(sstat0 & SELECTION_TIMEOUT) {
 			DEBUG(("scsi%d: (%d:%d) selection timeout\n",
@@ -1949,10 +1954,27 @@ NCR_700_abort(Scsi_Cmnd * SCp)
 STATIC int
 NCR_700_bus_reset(Scsi_Cmnd * SCp)
 {
+	DECLARE_COMPLETION(complete);
+	struct NCR_700_Host_Parameters *hostdata = 
+		(struct NCR_700_Host_Parameters *)SCp->device->host->hostdata[0];
+
 	printk(KERN_INFO "scsi%d (%d:%d) New error handler wants BUS reset, cmd %p\n\t",
 	       SCp->device->host->host_no, SCp->device->id, SCp->device->lun, SCp);
 	print_command(SCp->cmnd);
+	/* In theory, eh_complete should always be null because the
+	 * eh is single threaded, but just in case we're handling a
+	 * reset via sg or something */
+	while(hostdata->eh_complete != NULL) {
+		spin_unlock_irq(SCp->device->host->host_lock);
+		schedule_timeout(HZ/10);
+		spin_lock_irq(SCp->device->host->host_lock);
+	}
+	hostdata->eh_complete = &complete;
 	NCR_700_internal_bus_reset(SCp->device->host);
+	spin_unlock_irq(SCp->device->host->host_lock);
+	wait_for_completion(&complete);
+	spin_lock_irq(SCp->device->host->host_lock);
+	hostdata->eh_complete = NULL;
 	return SUCCESS;
 }
 

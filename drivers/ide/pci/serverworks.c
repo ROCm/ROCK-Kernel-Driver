@@ -831,5 +831,3 @@ module_exit(svwks_ide_exit);
 MODULE_AUTHOR("Michael Aubry. Andrzej Krzysztofowicz, Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for Serverworks OSB4/CSB5/CSB6 IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

@@ -77,7 +77,6 @@ static unsigned long first_settimeofday = 1;
 #endif
 
 #define XSEC_PER_SEC (1024*1024)
-#define USEC_PER_SEC (1000000)
 
 unsigned long tb_ticks_per_jiffy;
 unsigned long tb_ticks_per_usec;

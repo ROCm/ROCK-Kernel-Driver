@@ -344,7 +344,7 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 		}
 	}
 
-	return skb->dst->input(skb);
+	return dst_input(skb);
 
 inhdr_error:
 	IP_INC_STATS_BH(IpInHdrErrors);

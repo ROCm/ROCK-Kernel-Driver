@@ -6,7 +6,8 @@ EXTRA_TARGETS := head.o init_task.o
 
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o vm86.o \
 		ptrace.o i8259.o ioport.o ldt.o setup.o time.o sys_i386.o \
-		pci-dma.o i386_ksyms.o i387.o dmi_scan.o bootflag.o
+		pci-dma.o i386_ksyms.o i387.o dmi_scan.o bootflag.o \
+		doublefault.o
 
 obj-y				+= cpu/
 obj-y				+= timers/

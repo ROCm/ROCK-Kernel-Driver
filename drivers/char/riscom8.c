@@ -140,11 +140,11 @@ static inline int rc_paranoia_check(struct riscom_port const * port,
 		"rc: Warning: null riscom port for device %s in %s\n";
 
 	if (!port) {
-		printk(badinfo, kdevname(device), routine);
+		printk(badinfo, cdevname(device), routine);
 		return 1;
 	}
 	if (port->magic != RISCOM8_MAGIC) {
-		printk(badmagic, kdevname(device), routine);
+		printk(badmagic, cdevname(device), routine);
 		return 1;
 	}
 #endif

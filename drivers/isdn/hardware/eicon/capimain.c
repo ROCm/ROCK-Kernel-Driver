@@ -29,8 +29,6 @@
 #include "cp_vers.h"
 #include "capifunc.h"
 
-EXPORT_NO_SYMBOLS;
-
 static char *main_revision = "$Revision: 1.1.2.11 $";
 static char *DRIVERNAME =
     "Eicon DIVA - CAPI Interface driver (http://www.melware.net)";

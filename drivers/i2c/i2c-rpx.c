@@ -17,12 +17,11 @@
 #include <linux/init.h>
 #include <linux/stddef.h>
 #include <linux/parport.h>
-
+#include <linux/i2c.h>
+#include <linux/i2c-algo-8xx.h>
 #include <asm/mpc8xx.h>
 #include <asm/commproc.h>
 
-#include <linux/i2c.h>
-#include <linux/i2c-algo-8xx.h>
 
 static void
 rpx_iic_init(struct i2c_algo_8xx_data *data)

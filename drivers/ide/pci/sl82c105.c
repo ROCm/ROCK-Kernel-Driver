@@ -537,5 +537,3 @@ module_exit(sl82c105_ide_exit);
 
 MODULE_DESCRIPTION("PCI driver module for W82C105 IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

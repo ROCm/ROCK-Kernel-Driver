@@ -399,5 +399,3 @@ module_exit(opti621_ide_exit);
 MODULE_AUTHOR("Jaromir Koutek, Jan Harkes, Mark Lord");
 MODULE_DESCRIPTION("PCI driver module for Opti621 IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

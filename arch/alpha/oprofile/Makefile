@@ -1,3 +1,5 @@
+EXTRA_CFLAGS := -Werror -Wno-sign-compare
+
 obj-$(CONFIG_OPROFILE) += oprofile.o
 
 DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \

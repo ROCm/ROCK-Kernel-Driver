@@ -126,6 +126,7 @@ typedef struct cb_bridge_map {
  * Socket operations.
  */
 struct pccard_operations {
+	struct module *owner;
 	int (*init)(unsigned int sock);
 	int (*suspend)(unsigned int sock);
 	int (*register_callback)(unsigned int sock, void (*handler)(void *, unsigned int), void * info);
@@ -144,12 +145,12 @@ struct pccard_operations {
  *  Calls to set up low-level "Socket Services" drivers
  */
 
-#define MAX_SOCKETS_PER_DEV 8
-
 struct pcmcia_socket_class_data {
 	unsigned int nsock;			/* number of sockets */
+	unsigned int sock_offset;		/* socket # (which is
+	 * returned to driver) = sock_offset + (0, 1, .. , (nsock-1) */
 	struct pccard_operations *ops;		/* see above */
-	void *s_info[MAX_SOCKETS_PER_DEV];	/* socket_info_t */
+	void *s_info;				/* socket_info_t */
 	unsigned int use_bus_pm;
 };
 

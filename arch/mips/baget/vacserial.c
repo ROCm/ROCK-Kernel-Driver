@@ -29,7 +29,7 @@
   
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
 #define DBG_CNT(s) baget_printk("(%s):[%x] refc=%d, serc=%d, ttyc=%d-> %s\n", \
-  kdevname(tty->device),(info->flags),serial_refcount,info->count,tty->count,s)
+  cdevname(tty->device),(info->flags),serial_refcount,info->count,tty->count,s)
 #else
 #define DBG_CNT(s)
 #endif
@@ -173,11 +173,11 @@ static inline int serial_paranoia_check(struct async_struct *info,
 		"Warning: null async_struct for (%s) in %s\n";
 
 	if (!info) {
-		printk(badinfo, kdevname(device), routine);
+		printk(badinfo, cdevname(device), routine);
 		return 1;
 	}
 	if (info->magic != SERIAL_MAGIC) {
-		printk(badmagic, kdevname(device), routine);
+		printk(badmagic, cdevname(device), routine);
 		return 1;
 	}
 #endif

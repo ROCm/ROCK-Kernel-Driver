@@ -793,6 +793,3 @@ module_exit(cmd64x_ide_exit);
 MODULE_AUTHOR("Eddie Dost, David Miller, Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for CMD64x IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;
-

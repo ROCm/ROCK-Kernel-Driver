@@ -34,7 +34,7 @@ struct alpha_machine_vector
 
 	int nr_irqs;
 	int rtc_port;
-	int max_asn;
+	unsigned int max_asn;
 	unsigned long max_isa_dma_address;
 	unsigned long irq_probe_mask;
 	unsigned long iack_sc;

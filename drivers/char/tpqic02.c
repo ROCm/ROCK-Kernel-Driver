@@ -2076,7 +2076,7 @@ static int qic02_tape_open_no_use_count(struct inode *inode,
 
 
 	if (TP_DIAGS(dev)) {
-		printk("qic02_tape_open: dev=%s, flags=%x     ", kdevname(dev), flags);
+		printk("qic02_tape_open: dev=%s, flags=%x     ", cdevname(dev), flags);
 	}
 
 	if (minor(dev) == 255) {	/* special case for resetting */
@@ -2266,7 +2266,7 @@ static int qic02_tape_release(struct inode *inode, struct file *filp)
 	kdev_t dev = inode->i_rdev;
 
 	if (TP_DIAGS(dev)) {
-		printk("qic02_tape_release: dev=%s\n", kdevname(dev));
+		printk("qic02_tape_release: dev=%s\n", cdevname(dev));
 	}
 
 	if (status_zombie == NO) {	/* don't rewind in zombie mode */

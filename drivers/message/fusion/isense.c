@@ -89,9 +89,9 @@
 #define my_VERSION	MPT_LINUX_VERSION_COMMON
 #define MYNAM		"isense"
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR(MODULEAUTHOR);
 MODULE_DESCRIPTION(my_NAME);
+MODULE_LICENSE("GPL");
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 int __init isense_init(void)

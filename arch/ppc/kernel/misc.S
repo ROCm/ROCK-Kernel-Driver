@@ -837,7 +837,7 @@ _GLOBAL(_outsl)
 	bdnz	00b
 	blr	
 
-_GLOBAL(ide_insw)
+_GLOBAL(__ide_mm_insw)
 _GLOBAL(_insw_ns)
 	cmpwi	0,r5,0
 	mtctr	r5
@@ -849,7 +849,7 @@ _GLOBAL(_insw_ns)
 	bdnz	00b
 	blr
 
-_GLOBAL(ide_outsw)
+_GLOBAL(__ide_mm_outsw)
 _GLOBAL(_outsw_ns)
 	cmpwi	0,r5,0
 	mtctr	r5
@@ -861,6 +861,7 @@ _GLOBAL(_outsw_ns)
 	bdnz	00b
 	blr	
 
+_GLOBAL(__ide_mm_insl)
 _GLOBAL(_insl_ns)
 	cmpwi	0,r5,0
 	mtctr	r5
@@ -872,6 +873,7 @@ _GLOBAL(_insl_ns)
 	bdnz	00b
 	blr
 
+_GLOBAL(__ide_mm_outsl)
 _GLOBAL(_outsl_ns)
 	cmpwi	0,r5,0
 	mtctr	r5
@@ -1281,7 +1283,12 @@ _GLOBAL(sys_call_table)
 	.long sys_epoll_ctl
 	.long sys_epoll_wait
  	.long sys_remap_file_pages
-
-	.rept NR_syscalls-(.-sys_call_table)/4
-		.long sys_ni_syscall
-	.endr
+ 	.long sys_timer_create	/* 240 */
+ 	.long sys_timer_settime
+ 	.long sys_timer_gettime
+ 	.long sys_timer_getoverrun
+ 	.long sys_timer_delete
+ 	.long sys_clock_settime	/* 245 */
+ 	.long sys_clock_gettime
+ 	.long sys_clock_getres
+ 	.long sys_clock_nanosleep

@@ -378,17 +378,26 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 		iclog->ic_callback_tail = &(cb->cb_next);
 	}
 	LOG_UNLOCK(log, spl);
-	if (!abortflg) {
-		if (xlog_state_release_iclog(log, iclog)) {
-			xfs_force_shutdown(mp, XFS_LOG_IO_ERROR);
-			return EIO;
-		}
-	} else {
+	if (abortflg) {
 		cb->cb_func(cb->cb_arg, abortflg);
 	}
 	return 0;
 }	/* xfs_log_notify */
 
+int
+xfs_log_release_iclog(xfs_mount_t *mp,
+		      void	  *iclog_hndl)
+{
+	xlog_t *log = mp->m_log;
+	xlog_in_core_t	  *iclog = (xlog_in_core_t *)iclog_hndl;
+
+	if (xlog_state_release_iclog(log, iclog)) {
+		xfs_force_shutdown(mp, XFS_LOG_IO_ERROR);
+		return(EIO);
+	}
+
+	return 0;
+}
 
 /*
  * Initialize log manager data.	 This routine is intended to be called when

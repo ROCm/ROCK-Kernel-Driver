@@ -485,13 +485,14 @@ int ipmi_create_user(unsigned int          if_num,
 	new_user->intf = ipmi_interfaces[if_num];
 	new_user->gets_events = 0;
 
-	rv = new_user->intf->handlers->new_user(new_user->intf->send_info);
-	if (rv)
+	if (!try_module_get(new_user->intf->handlers->owner)) {
+		rv = -ENODEV;
 		goto out_unlock;
+	}
 
-	write_lock_irqsave(&(new_user->intf->users_lock), flags);
-	list_add_tail(&(new_user->link), &(new_user->intf->users));
-	write_unlock_irqrestore(&(new_user->intf->users_lock), flags);
+	write_lock_irqsave(&new_user->intf->users_lock, flags);
+	list_add_tail(&new_user->link, &new_user->intf->users);
+	write_unlock_irqrestore(&new_user->intf->users_lock, flags);
 
  out_unlock:	
 	if (rv) {
@@ -563,12 +564,12 @@ int ipmi_destroy_user(ipmi_user_t user)
 	unsigned long flags;
 
 	down_read(&interfaces_sem);
-	write_lock_irqsave(&(intf->users_lock), flags);
+	write_lock_irqsave(&intf->users_lock, flags);
 	rv = ipmi_destroy_user_nolock(user);
 	if (!rv)
-		intf->handlers->user_left(intf->send_info);
+		module_put(intf->handlers->owner);
 		
-	write_unlock_irqrestore(&(intf->users_lock), flags);
+	write_unlock_irqrestore(&intf->users_lock, flags);
 	up_read(&interfaces_sem);
 	return rv;
 }

@@ -860,11 +860,11 @@ static inline int mgslpc_paranoia_check(MGSLPC_INFO *info,
 		"Warning: null mgslpc_info for (%s) in %s\n";
 
 	if (!info) {
-		printk(badinfo, kdevname(device), routine);
+		printk(badinfo, cdevname(device), routine);
 		return 1;
 	}
 	if (info->magic != MGSLPC_MAGIC) {
-		printk(badmagic, kdevname(device), routine);
+		printk(badmagic, cdevname(device), routine);
 		return 1;
 	}
 #endif

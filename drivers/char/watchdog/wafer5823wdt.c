@@ -256,6 +256,5 @@ module_exit(wafwdt_exit);
 
 MODULE_AUTHOR("Justin Cormack");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 /* end of wafer5823wdt.c */

@@ -5,7 +5,6 @@
 #include <linux/netfilter_ipv4/ipt_esp.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 
-EXPORT_NO_SYMBOLS;
 MODULE_LICENSE("GPL");
 
 #ifdef DEBUG_CONNTRACK

@@ -753,8 +753,6 @@ static void __exit ambauart_exit(void)
 module_init(ambauart_init);
 module_exit(ambauart_exit);
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("ARM Ltd/Deep Blue Solutions Ltd");
 MODULE_DESCRIPTION("ARM AMBA serial port driver $Revision: 1.41 $");
 MODULE_LICENSE("GPL");

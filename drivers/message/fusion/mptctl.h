@@ -90,6 +90,7 @@
 #endif	/*}*/
 
 #define MPTIOCINFO		_IOWR(MPT_MAGIC_NUMBER,17,struct mpt_ioctl_iocinfo)
+#define MPTIOCINFO1		_IOWR(MPT_MAGIC_NUMBER,17,struct mpt_ioctl_iocinfo_rev0)
 #define MPTTARGETINFO		_IOWR(MPT_MAGIC_NUMBER,18,struct mpt_ioctl_targetinfo)
 #define MPTTEST			_IOWR(MPT_MAGIC_NUMBER,19,struct mpt_ioctl_test)
 #define MPTEVENTQUERY		_IOWR(MPT_MAGIC_NUMBER,21,struct mpt_ioctl_eventquery)
@@ -99,7 +100,7 @@
 #define MPTFWREPLACE		_IOWR(MPT_MAGIC_NUMBER,25,struct mpt_ioctl_replace_fw)
 
 /*
- * SPARC PLATFORM REMARK:
+ * SPARC PLATFORM REMARKS:
  * IOCTL data structures that contain pointers
  * will have different sizes in the driver and applications
  * (as the app. will not use 8-byte pointers).
@@ -107,6 +108,8 @@
  * The driver will convert data from
  * mpt_fw_xfer32 (mpt_ioctl_command32) to mpt_fw_xfer (mpt_ioctl_command)
  * internally.
+ *
+ * If data structures change size, must handle as in IOCGETINFO.
  */
 struct mpt_fw_xfer {
 	unsigned int	 iocnum;	/* IOC unit number */
@@ -154,11 +157,11 @@ struct mpt_ioctl_diag_reset {
 struct mpt_ioctl_pci_info {
 	union {
 		struct {
-			unsigned long  deviceNumber   :  5;
-			unsigned long  functionNumber :  3;
-			unsigned long  busNumber      : 24;
+			unsigned int  deviceNumber   :  5;
+			unsigned int  functionNumber :  3;
+			unsigned int  busNumber      : 24;
 		} bits;
-		unsigned long  asUlong;
+		unsigned int  asUlong;
 	} u;
 };
 
@@ -187,6 +190,27 @@ struct mpt_ioctl_iocinfo {
 	char		 hostId;
 	char		 rsvd[2];
 	struct mpt_ioctl_pci_info  pciInfo; /* Added Rev 1 */
+};
+
+/* Original structure, must always accept these
+ * IOCTLs. 4 byte pads can occur based on arch with
+ * above structure. Wish to re-align, but cannot.
+ */
+struct mpt_ioctl_iocinfo_rev0 {
+	mpt_ioctl_header hdr;
+	int		 adapterType;	/* SCSI or FCP */
+	int		 port;		/* port number */
+	int		 pciId;		/* PCI Id. */
+	int		 hwRev;		/* hardware revision */
+	int		 subSystemDevice;	/* PCI subsystem Device ID */
+	int		 subSystemVendor;	/* PCI subsystem Vendor ID */
+	int		 numDevices;		/* number of devices */
+	int		 FWVersion;		/* FW Version (integer) */
+	int		 BIOSVersion;		/* BIOS Version (integer) */
+	char		 driverVersion[MPT_IOCTL_VERSION_LENGTH];	/* Driver Version (string) */
+	char		 busChangeEvent;
+	char		 hostId;
+	char		 rsvd[2];
 };
 
 /*
@@ -330,7 +354,7 @@ typedef struct _hp_header {
 	unsigned int lun;
 } hp_header_t;
 
-/*  
+/*
  *  Header:
  *  iocnum 	required (input)
  *  host 	ignored	
@@ -353,12 +377,12 @@ typedef struct _hp_host_info {
 	u32		 bus_phys_width;
 	u32		 base_io_addr;
 	u32		 rsvd;
-	unsigned long	 hard_resets;		/* driver initiated resets */
-	unsigned long	 soft_resets;		/* ioc, external resets */
-	unsigned long	 timeouts;		/* num timeouts */
+	unsigned int	 hard_resets;		/* driver initiated resets */
+	unsigned int	 soft_resets;		/* ioc, external resets */
+	unsigned int	 timeouts;		/* num timeouts */
 } hp_host_info_t;
 
-/*  
+/*
  *  Header:
  *  iocnum 	required (input)
  *  host 	required	

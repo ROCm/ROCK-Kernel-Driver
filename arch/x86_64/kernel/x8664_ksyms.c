@@ -29,6 +29,7 @@
 #include <asm/nmi.h>
 #include <asm/kdebug.h>
 #include <asm/unistd.h>
+#include <asm/delay.h>
 
 extern spinlock_t rtc_lock;
 
@@ -71,6 +72,7 @@ EXPORT_SYMBOL_NOVERS(__up_wakeup);
 EXPORT_SYMBOL(csum_partial_copy_nocheck);
 /* Delay loops */
 EXPORT_SYMBOL(__udelay);
+EXPORT_SYMBOL(__ndelay);
 EXPORT_SYMBOL(__delay);
 EXPORT_SYMBOL(__const_udelay);
 

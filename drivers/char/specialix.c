@@ -219,11 +219,11 @@ static inline int sx_paranoia_check(struct specialix_port const * port,
 		KERN_ERR "sx: Warning: null specialix port for device %s in %s\n";
  
 	if (!port) {
-		printk(badinfo, kdevname(device), routine);
+		printk(badinfo, cdevname(device), routine);
 		return 1;
 	}
 	if (port->magic != SPECIALIX_MAGIC) {
-		printk(badmagic, kdevname(device), routine);
+		printk(badmagic, cdevname(device), routine);
 		return 1;
 	}
 #endif

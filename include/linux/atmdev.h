@@ -297,7 +297,6 @@ struct atm_vcc {
 	int (*send)(struct atm_vcc *vcc,struct sk_buff *skb);
 	void		*dev_data;	/* per-device data */
 	void		*proto_data;	/* per-protocol data */
-	struct timeval	timestamp;	/* AAL timestamps */
 	struct sk_buff_head recvq;	/* receive queue */
 	struct k_atm_aal_stats *stats;	/* pointer to AAL stats group */
 	wait_queue_head_t sleep;	/* if socket is busy */

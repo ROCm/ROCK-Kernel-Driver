@@ -43,16 +43,27 @@ static struct {
 };
 
 int
-smb_init(int smb_command, int wct, const struct cifsTconInfo *tcon,
+smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 	 void **request_buf /* returned */ ,
 	 void **response_buf /* returned */ )
 {
 	int rc = 0;
 
-	if(tcon)
-		if(tcon->ses)
+	if(tcon && (tcon->tidStatus == CifsNeedReconnect)) {
+		rc = -EIO;
+		if(tcon->ses) {
+			struct nls_table *nls_codepage = load_nls_default();
 			if(tcon->ses->status == CifsNeedReconnect)
-				setup_session(0, tcon->ses, load_nls_default());
+				rc = setup_session(0, tcon->ses, nls_codepage);
+			if(!rc) {
+				rc = CIFSTCon(0, tcon->ses, tcon->treeName, tcon,
+					nls_codepage);
+				cFYI(1, ("reconnect tcon rc = %d", rc));
+			}
+		}
+	}
+	if(rc)
+		return rc;
 
 	*request_buf = buf_get();
 	if (request_buf == 0) {
@@ -143,7 +154,7 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 						pSMBr->u.extended_response.
 						GUID, 16) != 0) {
 						cFYI(1,
-							("UID of server does not match that of previous connection to same ip address"));
+							("UID of server does not match previous connection to same ip address"));
 						memcpy(server->
 							server_GUID,
 							pSMBr->u.
@@ -166,7 +177,8 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 			server->capabilities &= ~CAP_EXTENDED_SECURITY;
 		if(sign_CIFS_PDUs == FALSE) {        
 			if(server->secMode & SECMODE_SIGN_REQUIRED)
-				cERROR(1,("Server required CIFS packet signing - enable /proc/fs/cifs/PacketSigningEnabled"));
+				cERROR(1,
+				 ("Server requires /proc/fs/cifs/PacketSigningEnabled"));
 			server->secMode &= ~(SECMODE_SIGN_ENABLED | SECMODE_SIGN_REQUIRED);
 		}
 	}
@@ -188,8 +200,8 @@ CIFSSMBTDis(const int xid, struct cifsTconInfo *tcon)
 	 *  If last user of the connection and
 	 *  connection alive - disconnect it
 	 *  If this is the last connection on the server session disconnect it
-	 *  (and inside session disconnect we should check if tcp socket needs to 
-	 *  be freed and kernel thread woken up).
+	 *  (and inside session disconnect we should check if tcp socket needs 
+	 *  to be freed and kernel thread woken up).
 	 */
 	if (tcon)
 		down(&tcon->tconSem);
@@ -237,7 +249,7 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 	cFYI(1, ("In SMBLogoff for session disconnect"));
 
 	if (ses)
-		down(&ses->sesSem);	/* need to add more places where this sem is checked */
+		down(&ses->sesSem); /* check this sem more places */
 	else
 		return -EIO;
 
@@ -246,10 +258,10 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 		up(&ses->sesSem);
 		return -EBUSY;
 	}
-    if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
-	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, 0 /* no tcon anymore */ ,
-		      (void **) &pSMB, (void **) &smb_buffer_response);
+	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, 0 /* no tcon anymore */,
+		 (void **) &pSMB, (void **) &smb_buffer_response);
 	if (rc) {
 		up(&ses->sesSem);
 		return rc;
@@ -272,7 +284,7 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 }
 
 int
-CIFSSMBDelFile(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBDelFile(const int xid, struct cifsTconInfo *tcon,
 	       const char *fileName, const struct nls_table *nls_codepage)
 {
 	DELETE_FILE_REQ *pSMB = NULL;
@@ -315,7 +327,7 @@ CIFSSMBDelFile(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSSMBRmDir(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBRmDir(const int xid, struct cifsTconInfo *tcon,
 	     const char *dirName, const struct nls_table *nls_codepage)
 {
 	DELETE_DIRECTORY_REQ *pSMB = NULL;
@@ -358,7 +370,7 @@ CIFSSMBRmDir(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSSMBMkDir(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBMkDir(const int xid, struct cifsTconInfo *tcon,
 	     const char *name, const struct nls_table *nls_codepage)
 {
 	int rc = 0;
@@ -402,7 +414,7 @@ CIFSSMBMkDir(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSSMBOpen(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBOpen(const int xid, struct cifsTconInfo *tcon,
 	    const char *fileName, const int openDisposition,
 	    const int access_flags, const int create_options, __u16 * netfid,
 	    int *pOplock, const struct nls_table *nls_codepage)
@@ -446,14 +458,15 @@ CIFSSMBOpen(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->AllocationSize = 0;
 	pSMB->FileAttributes = ATTR_NORMAL;	/* XP does not handle ATTR_POSIX_SEMANTICS */
 	/*if ((omode & S_IWUGO) == 0)
-		pSMB->FileAttributes |= ATTR_READONLY;*/	
-    /*  Above line causes problems due to problem with vfs splitting create into
-        two pieces - need to set mode after file created not while it is being created */
+		pSMB->FileAttributes |= ATTR_READONLY;*/
+	/*  Above line causes problems due to vfs splitting create into two
+		pieces - need to set mode after file created not while it is
+		being created */
 	pSMB->FileAttributes = cpu_to_le32(pSMB->FileAttributes);
 	pSMB->ShareAccess = cpu_to_le32(FILE_SHARE_ALL);
 	pSMB->CreateDisposition = cpu_to_le32(openDisposition);
 	pSMB->CreateOptions = cpu_to_le32(create_options);
-	pSMB->ImpersonationLevel = cpu_to_le32(SECURITY_IMPERSONATION);	/* BB ?? BB */
+	pSMB->ImpersonationLevel = cpu_to_le32(SECURITY_IMPERSONATION);	/* BB ??*/
 	pSMB->SecurityFlags =
 	    cpu_to_le32(SECURITY_CONTEXT_TRACKING | SECURITY_EFFECTIVE_ONLY);
 
@@ -470,7 +483,7 @@ CIFSSMBOpen(const int xid, const struct cifsTconInfo *tcon,
 		*netfid = pSMBr->Fid;	/* cifs fid stays in le */
 		/* Do we care about the CreateAction in any cases? */
 
-		/* BB add code to update inode with file sizes from create response */
+		/* BB add code to update inode file sizes from create response */
 	}
 	if (pSMB)
 		buf_release(pSMB);
@@ -483,7 +496,7 @@ CIFSSMBOpen(const int xid, const struct cifsTconInfo *tcon,
 	freed by the caller */
 
 int
-CIFSSMBRead(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 	    const int netfid, const unsigned int count,
 	    const __u64 lseek, unsigned int *nbytes, char **buf)
 {
@@ -504,9 +517,8 @@ CIFSSMBRead(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->OffsetLow = cpu_to_le32(lseek & 0xFFFFFFFF);
 	pSMB->OffsetHigh = cpu_to_le32(lseek >> 32);
 	pSMB->Remaining = 0;
-	pSMB->MaxCount = cpu_to_le16(min(count,
-					 (tcon->ses->server->maxBuf -
-					  MAX_CIFS_HDR_SIZE) & 0xFFFFFF00));
+	pSMB->MaxCount = cpu_to_le16(min_t(const unsigned int, count,
+		(tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFF00));
 	pSMB->MaxCountHigh = 0;
 	pSMB->ByteCount = 0;  /* no need to do le conversion since it is 0 */
 
@@ -545,7 +557,7 @@ CIFSSMBRead(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSSMBWrite(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 	     const int netfid, const unsigned int count,
 	     const __u64 offset, unsigned int *nbytes, const char *buf,
 	     const int long_op)
@@ -596,7 +608,7 @@ CIFSSMBWrite(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSSMBLock(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	    const __u16 smb_file_id, const __u64 len,
 	    const __u64 offset, const __u32 numUnlock,
 	    const __u32 numLock, const __u8 lockType, const int waitFlag)
@@ -639,7 +651,7 @@ CIFSSMBLock(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSSMBClose(const int xid, const struct cifsTconInfo *tcon, int smb_file_id)
+CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 {
 	int rc = 0;
 	CLOSE_REQ *pSMB = NULL;
@@ -667,7 +679,7 @@ CIFSSMBClose(const int xid, const struct cifsTconInfo *tcon, int smb_file_id)
 }
 
 int
-CIFSSMBRename(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 	      const char *fromName, const char *toName,
 	      const struct nls_table *nls_codepage)
 {
@@ -697,7 +709,8 @@ CIFSSMBRename(const int xid, const struct cifsTconInfo *tcon,
 		name_len++;	/* trailing null */
 		name_len *= 2;
 		pSMB->OldFileName[name_len] = 0;	/* pad */
-		pSMB->OldFileName[name_len + 1] = 0x04;	/* strange that protocol requires an ASCII signature byte on Unicode string */
+	/* protocol requires ASCII signature byte on Unicode string */
+		pSMB->OldFileName[name_len + 1] = 0x04;
 		name_len2 =
 		    cifs_strtoUCS((wchar_t *) & pSMB->
 				  OldFileName[name_len + 2], toName, 530,
@@ -710,13 +723,13 @@ CIFSSMBRename(const int xid, const struct cifsTconInfo *tcon,
 		strncpy(pSMB->OldFileName, fromName, name_len);
 		name_len2 = strnlen(toName, 530);
 		name_len2++;	/* trailing null */
-		pSMB->OldFileName[name_len] = 0x04;	/* 2nd buffer format */
+		pSMB->OldFileName[name_len] = 0x04;  /* 2nd buffer format */
 		strncpy(&pSMB->OldFileName[name_len + 1], toName, name_len2);
 		name_len2++;	/* trailing null */
 		name_len2++;	/* signature byte */
 	}
 
-	pSMB->ByteCount = 1 /* 1st signature byte */  + name_len + name_len2;	
+	pSMB->ByteCount = 1 /* 1st signature byte */  + name_len + name_len2;
     /* we could also set search attributes but not needed */
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
@@ -733,7 +746,7 @@ CIFSSMBRename(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSUnixCreateSymLink(const int xid, const struct cifsTconInfo *tcon,
+CIFSUnixCreateSymLink(const int xid, struct cifsTconInfo *tcon,
 		      const char *fromName, const char *toName,
 		      const struct nls_table *nls_codepage)
 {
@@ -791,7 +804,8 @@ CIFSUnixCreateSymLink(const int xid, const struct cifsTconInfo *tcon,
 
 	pSMB->DataCount = name_len_target;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	pSMB->MaxDataCount = cpu_to_le16(1000);	/*BB find exact max SMB from sess */
+	/* BB find exact max on data count below from sess */
+	pSMB->MaxDataCount = cpu_to_le16(1000);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
@@ -820,7 +834,7 @@ CIFSUnixCreateSymLink(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSUnixCreateHardLink(const int xid, const struct cifsTconInfo *tcon,
+CIFSUnixCreateHardLink(const int xid, struct cifsTconInfo *tcon,
 		       const char *fromName, const char *toName,
 		       const struct nls_table *nls_codepage)
 {
@@ -877,7 +891,8 @@ CIFSUnixCreateHardLink(const int xid, const struct cifsTconInfo *tcon,
 
 	pSMB->DataCount = name_len_target;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB from sess*/
+	/* BB find exact max on data count below from sess*/
+	pSMB->MaxDataCount = cpu_to_le16(1000);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
@@ -904,7 +919,7 @@ CIFSUnixCreateHardLink(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSCreateHardLink(const int xid, const struct cifsTconInfo *tcon,
+CIFSCreateHardLink(const int xid, struct cifsTconInfo *tcon,
 		   const char *fromName, const char *toName,
 		   const struct nls_table *nls_codepage)
 {
@@ -937,7 +952,7 @@ CIFSCreateHardLink(const int xid, const struct cifsTconInfo *tcon,
 		name_len++;	/* trailing null */
 		name_len *= 2;
 		pSMB->OldFileName[name_len] = 0;	/* pad */
-		pSMB->OldFileName[name_len + 1] = 0x04;	/* strange that protocol requires an ASCII signature byte on Unicode string */
+		pSMB->OldFileName[name_len + 1] = 0x04; 
 		name_len2 =
 		    cifs_strtoUCS((wchar_t *) & pSMB->
 				  OldFileName[name_len + 2], toName, 530,
@@ -972,7 +987,7 @@ CIFSCreateHardLink(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSSMBUnixQuerySymLink(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBUnixQuerySymLink(const int xid, struct cifsTconInfo *tcon,
 			const unsigned char *searchName,
 			char *symlinkinfo, const int buflen,
 			const struct nls_table *nls_codepage)
@@ -1007,7 +1022,8 @@ CIFSSMBUnixQuerySymLink(const int xid, const struct cifsTconInfo *tcon,
 	    2 /* level */  + 4 /* rsrvd */  + name_len /* incl null */ ;
 	pSMB->TotalDataCount = 0;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	pSMB->MaxDataCount = cpu_to_le16(4000);	/* BB find exact max SMB PDU from sess structure BB */
+	/* BB find exact max data count below from sess structure BB */
+	pSMB->MaxDataCount = cpu_to_le16(4000);
 	pSMB->MaxSetupCount = 0;
 	pSMB->Reserved = 0;
 	pSMB->Flags = 0;
@@ -1041,27 +1057,17 @@ CIFSSMBUnixQuerySymLink(const int xid, const struct cifsTconInfo *tcon,
 		else {
 			if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
 				name_len = UniStrnlen((wchar_t *) ((char *)
-								   &pSMBr->hdr.
-								   Protocol +
-								   pSMBr->
-								   DataOffset),
-						      min(buflen,
-							  (int) pSMBr->
-							  DataCount) / 2);
+					&pSMBr->hdr.Protocol +pSMBr->DataOffset),
+					min_t(const int, buflen,pSMBr->DataCount) / 2);
 				cifs_strfromUCS_le(symlinkinfo,
-						   (wchar_t *) ((char *)
-								&pSMBr->
-								hdr.
-								Protocol +
-								pSMBr->
-								DataOffset),
-						   name_len, nls_codepage);
+					(wchar_t *) ((char *)&pSMBr->hdr.Protocol +
+						pSMBr->DataOffset),
+					name_len, nls_codepage);
 			} else {
 				strncpy(symlinkinfo,
-					(char *) &pSMBr->hdr.Protocol +
-					pSMBr->DataOffset, min(buflen, (int)
-							       pSMBr->
-							       DataCount));
+					(char *) &pSMBr->hdr.Protocol + 
+						pSMBr->DataOffset,
+					min_t(const int, buflen, pSMBr->DataCount));
 			}
 			symlinkinfo[buflen] = 0;
 	/* just in case so calling code does not go off the end of buffer */
@@ -1075,7 +1081,7 @@ CIFSSMBUnixQuerySymLink(const int xid, const struct cifsTconInfo *tcon,
 
 
 int
-CIFSSMBQueryReparseLinkInfo(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBQueryReparseLinkInfo(const int xid, struct cifsTconInfo *tcon,
 			const unsigned char *searchName,
 			char *symlinkinfo, const int buflen,__u16 fid,
 			const struct nls_table *nls_codepage)
@@ -1086,7 +1092,7 @@ CIFSSMBQueryReparseLinkInfo(const int xid, const struct cifsTconInfo *tcon,
 	struct smb_com_transaction_ioctl_req * pSMB;
 	struct smb_com_transaction_ioctl_rsp * pSMBr;
 
-	cFYI(1, ("In Windows reparse style QueryLink info for path %s", searchName));
+	cFYI(1, ("In Windows reparse style QueryLink for path %s", searchName));
 	rc = smb_init(SMB_COM_NT_TRANSACT, 23, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1095,7 +1101,8 @@ CIFSSMBQueryReparseLinkInfo(const int xid, const struct cifsTconInfo *tcon,
 	pSMB->TotalParameterCount = 0 ;
 	pSMB->TotalDataCount = 0;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	pSMB->MaxDataCount = cpu_to_le16(4000);	/* BB find exact max SMB PDU from sess structure BB */
+	/* BB find exact data count max from sess structure BB */
+	pSMB->MaxDataCount = cpu_to_le16(4000);
 	pSMB->MaxSetupCount = 4;
 	pSMB->Reserved = 0;
 	pSMB->ParameterOffset = 0;
@@ -1122,7 +1129,7 @@ CIFSSMBQueryReparseLinkInfo(const int xid, const struct cifsTconInfo *tcon,
 			rc = -EIO;	/* bad smb */
 		else {
 			if(pSMBr->DataCount && (pSMBr->DataCount < 2048)) {
-		/* could also validata reparse tag && better check name length */
+		/* could also validate reparse tag && better check name length */
 				struct reparse_data * reparse_buf = (struct reparse_data *)
 					((char *)&pSMBr->hdr.Protocol + pSMBr->DataOffset);
 				if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
@@ -1137,7 +1144,7 @@ CIFSSMBQueryReparseLinkInfo(const int xid, const struct cifsTconInfo *tcon,
 				} else { /* ASCII names */
 					strncpy(symlinkinfo,reparse_buf->LinkNamesBuf + 
 						reparse_buf->TargetNameOffset, 
-						min(buflen, (int)reparse_buf->TargetNameLen));
+						min_t(const int, buflen, reparse_buf->TargetNameLen));
 				}
 			} else {
 				rc = -EIO;
@@ -1154,7 +1161,7 @@ CIFSSMBQueryReparseLinkInfo(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSSMBQPathInfo(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBQPathInfo(const int xid, struct cifsTconInfo *tcon,
 		 const unsigned char *searchName,
 		 FILE_ALL_INFO * pFindData,
 		 const struct nls_table *nls_codepage)
@@ -1216,7 +1223,8 @@ CIFSSMBQPathInfo(const int xid, const struct cifsTconInfo *tcon,
 		cFYI(1, ("Send error in QPathInfo = %d", rc));
 	} else {		/* decode response */
 		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
-		if ((pSMBr->ByteCount < 40) || (pSMBr->DataOffset > 512))	/* BB also check enough total bytes returned */
+		/* BB also check enough total bytes returned */
+		if ((pSMBr->ByteCount < 40) || (pSMBr->DataOffset > 512)) 
 			rc = -EIO;	/* bad smb */
 		else {
 			memcpy((char *) pFindData,
@@ -1230,7 +1238,7 @@ CIFSSMBQPathInfo(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSSMBUnixQPathInfo(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBUnixQPathInfo(const int xid, struct cifsTconInfo *tcon,
 		     const unsigned char *searchName,
 		     FILE_UNIX_BASIC_INFO * pFindData,
 		     const struct nls_table *nls_codepage)
@@ -1265,7 +1273,8 @@ CIFSSMBUnixQPathInfo(const int xid, const struct cifsTconInfo *tcon,
 	    name_len /* includes null */ ;
 	pSMB->TotalDataCount = 0;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
-	pSMB->MaxDataCount = cpu_to_le16(4000);	/* BB find exact max SMB PDU from sess structure BB */
+	/* BB find exact max SMB PDU from sess structure BB */
+	pSMB->MaxDataCount = cpu_to_le16(4000); 
 	pSMB->MaxSetupCount = 0;
 	pSMB->Reserved = 0;
 	pSMB->Flags = 0;
@@ -1292,7 +1301,8 @@ CIFSSMBUnixQPathInfo(const int xid, const struct cifsTconInfo *tcon,
 		cFYI(1, ("Send error in QPathInfo = %d", rc));
 	} else {		/* decode response */
 		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
-		if ((pSMBr->ByteCount < 40) || (pSMBr->DataOffset > 512))	/* BB also check enough total bytes returned */
+		/* BB also check if enough total bytes returned */
+		if ((pSMBr->ByteCount < 40) || (pSMBr->DataOffset > 512))
 			rc = -EIO;	/* bad smb */
 		else {
 			memcpy((char *) pFindData,
@@ -1307,7 +1317,7 @@ CIFSSMBUnixQPathInfo(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSFindSingle(const int xid, const struct cifsTconInfo *tcon,
+CIFSFindSingle(const int xid, struct cifsTconInfo *tcon,
 	       const char *searchName, FILE_ALL_INFO * findData,
 	       const struct nls_table *nls_codepage)
 {
@@ -1381,7 +1391,7 @@ CIFSFindSingle(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSFindFirst(const int xid, const struct cifsTconInfo *tcon,
+CIFSFindFirst(const int xid, struct cifsTconInfo *tcon,
 	      const char *searchName, FILE_DIRECTORY_INFO * findData,
 	      T2_FFIRST_RSP_PARMS * findParms,
 	      const struct nls_table *nls_codepage, int *pUnicodeFlag,
@@ -1484,7 +1494,7 @@ CIFSFindFirst(const int xid, const struct cifsTconInfo *tcon,
 }
 
 int
-CIFSFindNext(const int xid, const struct cifsTconInfo *tcon,
+CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	     FILE_DIRECTORY_INFO * findData,
 	     T2_FNEXT_RSP_PARMS * findParms, const __u16 searchHandle,
 	     __u32 resumeKey, int *pUnicodeFlag, int *pUnixFlag)
@@ -1661,7 +1671,7 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 }
 
 int
-CIFSSMBQFSInfo(const int xid, const struct cifsTconInfo *tcon,
+CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
 	       struct statfs *FSData, const struct nls_table *nls_codepage)
 {
 /* level 0x103 SMB_QUERY_FILE_SYSTEM_INFO */

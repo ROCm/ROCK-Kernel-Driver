@@ -268,7 +268,7 @@ sable_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 		{ 32+3,  32+3,  32+3,  32+3,  32+3},  /* IdSel 7,  slot 1 */
 		{ 32+4,  32+4,  32+4,  32+4,  32+4},  /* IdSel 8,  slot 2 */
         };
-	const long min_idsel = 0, max_idsel = 8, irqs_per_slot = 5;
+	long min_idsel = 0, max_idsel = 8, irqs_per_slot = 5;
 	return COMMON_TABLE_LOOKUP;
 }
 

@@ -264,13 +264,11 @@ static inline unsigned long ffz(unsigned long word)
 {
 #if defined(__alpha_cix__) && defined(__alpha_fix__)
 	/* Whee.  EV67 can calculate it directly.  */
-	unsigned long result;
-	__asm__("cttz %1,%0" : "=r"(result) : "r"(~word));
-	return result;
+	return __kernel_cttz(~word);
 #else
 	unsigned long bits, qofs, bofs;
 
-	__asm__("cmpbge %1,%2,%0" : "=r"(bits) : "r"(word), "r"(~0UL));
+	bits = __kernel_cmpbge(word, ~0UL);
 	qofs = ffz_b(bits);
 	bits = __kernel_extbl(word, qofs);
 	bofs = ffz_b(bits);
@@ -286,13 +284,11 @@ static inline unsigned long __ffs(unsigned long word)
 {
 #if defined(__alpha_cix__) && defined(__alpha_fix__)
 	/* Whee.  EV67 can calculate it directly.  */
-	unsigned long result;
-	__asm__("cttz %1,%0" : "=r"(result) : "r"(word));
-	return result;
+	return __kernel_cttz(word);
 #else
 	unsigned long bits, qofs, bofs;
 
-	__asm__("cmpbge $31,%1,%0" : "=r"(bits) : "r"(word));
+	bits = __kernel_cmpbge(word, 0);
 	qofs = ffz_b(bits);
 	bits = __kernel_extbl(word, qofs);
 	bofs = ffz_b(~bits);
@@ -311,8 +307,8 @@ static inline unsigned long __ffs(unsigned long word)
 
 static inline int ffs(int word)
 {
-	int result = __ffs(word);
-	return word ? result+1 : 0;
+	int result = __ffs(word) + 1;
+	return word ? result : 0;
 }
 
 /*
@@ -321,9 +317,7 @@ static inline int ffs(int word)
 #if defined(__alpha_cix__) && defined(__alpha_fix__)
 static inline int fls(int word)
 {
-	long result;
-	__asm__("ctlz %1,%0" : "=r"(result) : "r"(word & 0xffffffff));
-	return 64 - result;
+	return 64 - __kernel_ctlz(word & 0xffffffff);
 }
 #else
 #define fls	generic_fls
@@ -332,11 +326,10 @@ static inline int fls(int word)
 /* Compute powers of two for the given integer.  */
 static inline int floor_log2(unsigned long word)
 {
-	long bit;
 #if defined(__alpha_cix__) && defined(__alpha_fix__)
-	__asm__("ctlz %1,%0" : "=r"(bit) : "r"(word));
-	return 63 - bit;
+	return 63 - __kernel_ctlz(word);
 #else
+	long bit;
 	for (bit = -1; word ; bit++)
 		word >>= 1;
 	return bit;
@@ -358,9 +351,7 @@ static inline int ceil_log2(unsigned int word)
 /* Whee.  EV67 can calculate it directly.  */
 static inline unsigned long hweight64(unsigned long w)
 {
-	unsigned long result;
-	__asm__("ctpop %1,%0" : "=r"(result) : "r"(w));
-	return result;
+	return __kernel_ctpop(w);
 }
 
 #define hweight32(x) hweight64((x) & 0xfffffffful)
@@ -415,11 +406,11 @@ find_next_zero_bit(void * addr, unsigned long size, unsigned long offset)
 	if (!size)
 		return result;
 	tmp = *p;
-found_first:
+ found_first:
 	tmp |= ~0UL << size;
 	if (tmp == ~0UL)        /* Are any bits zero? */
 		return result + size; /* Nope. */
-found_middle:
+ found_middle:
 	return result + ffz(tmp);
 }
 
@@ -456,11 +447,11 @@ find_next_bit(void * addr, unsigned long size, unsigned long offset)
 	if (!size)
 		return result;
 	tmp = *p;
-found_first:
+ found_first:
 	tmp &= ~0UL >> (64 - size);
 	if (!tmp)
 		return result + size;
-found_middle:
+ found_middle:
 	return result + __ffs(tmp);
 }
 

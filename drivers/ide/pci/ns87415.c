@@ -263,5 +263,3 @@ module_exit(ns87415_ide_exit);
 MODULE_AUTHOR("Mark Lord, Eddie Dost, Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for NS87415 IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

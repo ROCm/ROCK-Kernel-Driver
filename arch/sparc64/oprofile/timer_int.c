@@ -13,6 +13,7 @@
 #include <linux/smp.h>
 #include <linux/irq.h>
 #include <linux/oprofile.h>
+#include <linux/profile.h>
 #include <asm/ptrace.h>
  
 static int timer_notify(struct notifier_block * self, unsigned long val, void * data)

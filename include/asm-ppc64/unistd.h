@@ -250,6 +250,22 @@
 #define __NR_sys_epoll_ctl	237
 #define __NR_sys_epoll_wait	238
 #define __NR_remap_file_pages	239
+#define __NR_timer_create	240
+#define __NR_timer_settime	241
+#define __NR_timer_gettime	242
+#define __NR_timer_getoverrun	243
+#define __NR_timer_delete	244
+#define __NR_clock_settime	245
+#define __NR_clock_gettime	246
+#define __NR_clock_getres	247
+#define __NR_clock_nanosleep	248
+
+#define __NR_syscalls		249
+#ifdef __KERNEL__
+#define NR_syscalls	__NR_syscalls
+#endif
+
+#ifndef __ASSEMBLY__
 
 #ifdef __KERNEL_SYSCALLS__
 
@@ -283,5 +299,7 @@ extern pid_t waitpid(pid_t pid, int *wait_stat, int options);
  * but it doesn't work on all toolchains, so we just do it by hand
  */
 #define cond_syscall(x) asm(".weak\t." #x "\n\t.set\t." #x ",.sys_ni_syscall");
+
+#endif		/* __ASSEMBLY__ */
 
 #endif /* _ASM_PPC_UNISTD_H_ */

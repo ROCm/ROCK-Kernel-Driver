@@ -335,7 +335,9 @@ static int __init bt_init(void)
 	BT_INFO("Core ver %s", VERSION);
 
 	proc_bt = proc_mkdir("bluetooth", NULL);
-
+	if (proc_bt)
+		proc_bt->owner = THIS_MODULE;
+	
 	/* Init socket cache */
 	bt_sock_cache = kmem_cache_create("bt_sock",
 			sizeof(struct bt_sock), 0,

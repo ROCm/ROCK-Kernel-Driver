@@ -58,6 +58,9 @@ struct cpuinfo_x86 {
 	char	x86_model_id[64];
 	int 	x86_cache_size;  /* in KB */
 	int	x86_clflush_size;
+	int	x86_tlbsize;	/* number of 4K pages in DTLB/ITLB combined(in pages)*/
+        __u8    x86_virt_bits, x86_phys_bits;
+        __u32   x86_power; 	
 	unsigned long loops_per_jiffy;
 } ____cacheline_aligned;
 

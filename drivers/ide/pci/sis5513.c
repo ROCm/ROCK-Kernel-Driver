@@ -1087,8 +1087,6 @@ MODULE_AUTHOR("Lionel Bouton, L C Chang, Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for SIS IDE");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
 /*
  * TODO:
  *	- Get ridden of SisHostChipInfo[] completness dependancy.

@@ -19,12 +19,12 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include <linux/version.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/i2c-proc.h>
-#include <linux/init.h>
+
 
 /* Registers */
 #define ADM1021_SYSCTL_TEMP		1200
@@ -123,8 +123,6 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address,
 			  unsigned short flags, int kind);
 static void adm1021_init_client(struct i2c_client *client);
 static int adm1021_detach_client(struct i2c_client *client);
-static int adm1021_command(struct i2c_client *client, unsigned int cmd,
-			   void *arg);
 static int adm1021_read_value(struct i2c_client *client, u8 reg);
 static int adm1021_write_value(struct i2c_client *client, u8 reg,
 			       u16 value);
@@ -151,7 +149,6 @@ static struct i2c_driver adm1021_driver = {
 	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= adm1021_attach_adapter,
 	.detach_client	= adm1021_detach_client,
-	.command	= adm1021_command,
 };
 
 /* These files are created for each detected adm1021. This is just a template;
@@ -186,7 +183,7 @@ static ctl_table adm1021_max_dir_table_template[] = {
    take more memory than the datastructure takes now. */
 static int adm1021_id = 0;
 
-int adm1021_attach_adapter(struct i2c_adapter *adapter)
+static int adm1021_attach_adapter(struct i2c_adapter *adapter)
 {
 	return i2c_detect(adapter, &addr_data, adm1021_detect);
 }
@@ -339,7 +336,7 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address,
 	return err;
 }
 
-void adm1021_init_client(struct i2c_client *client)
+static void adm1021_init_client(struct i2c_client *client)
 {
 	/* Initialize the adm1021 chip */
 	adm1021_write_value(client, ADM1021_REG_TOS_W,
@@ -356,7 +353,7 @@ void adm1021_init_client(struct i2c_client *client)
 	adm1021_write_value(client, ADM1021_REG_CONV_RATE_W, 0x04);
 }
 
-int adm1021_detach_client(struct i2c_client *client)
+static int adm1021_detach_client(struct i2c_client *client)
 {
 
 	int err;
@@ -376,28 +373,20 @@ int adm1021_detach_client(struct i2c_client *client)
 
 }
 
-
-/* No commands defined yet */
-int adm1021_command(struct i2c_client *client, unsigned int cmd, void *arg)
-{
-	return 0;
-}
-
 /* All registers are byte-sized */
-int adm1021_read_value(struct i2c_client *client, u8 reg)
+static int adm1021_read_value(struct i2c_client *client, u8 reg)
 {
 	return i2c_smbus_read_byte_data(client, reg);
 }
 
-int adm1021_write_value(struct i2c_client *client, u8 reg, u16 value)
+static int adm1021_write_value(struct i2c_client *client, u8 reg, u16 value)
 {
-	if (read_only > 0)
-		return 0;
-
-	return i2c_smbus_write_byte_data(client, reg, value);
+	if (!read_only)
+		return i2c_smbus_write_byte_data(client, reg, value);
+	return 0;
 }
 
-void adm1021_update_client(struct i2c_client *client)
+static void adm1021_update_client(struct i2c_client *client)
 {
 	struct adm1021_data *data = client->data;
 
@@ -447,10 +436,11 @@ void adm1021_update_client(struct i2c_client *client)
 }
 
 
-void adm1021_temp(struct i2c_client *client, int operation, int ctl_name,
-		  int *nrels_mag, long *results)
+static void adm1021_temp(struct i2c_client *client, int operation,
+			 int ctl_name, int *nrels_mag, long *results)
 {
 	struct adm1021_data *data = client->data;
+
 	if (operation == SENSORS_PROC_REAL_INFO)
 		*nrels_mag = 0;
 	else if (operation == SENSORS_PROC_REAL_READ) {
@@ -473,8 +463,8 @@ void adm1021_temp(struct i2c_client *client, int operation, int ctl_name,
 	}
 }
 
-void adm1021_remote_temp(struct i2c_client *client, int operation,
-			 int ctl_name, int *nrels_mag, long *results)
+static void adm1021_remote_temp(struct i2c_client *client, int operation,
+				int ctl_name, int *nrels_mag, long *results)
 {
 	struct adm1021_data *data = client->data;
 	int prec = 0;
@@ -546,10 +536,11 @@ void adm1021_remote_temp(struct i2c_client *client, int operation,
 	}
 }
 
-void adm1021_die_code(struct i2c_client *client, int operation,
-		      int ctl_name, int *nrels_mag, long *results)
+static void adm1021_die_code(struct i2c_client *client, int operation,
+			     int ctl_name, int *nrels_mag, long *results)
 {
 	struct adm1021_data *data = client->data;
+
 	if (operation == SENSORS_PROC_REAL_INFO)
 		*nrels_mag = 0;
 	else if (operation == SENSORS_PROC_REAL_READ) {
@@ -561,8 +552,8 @@ void adm1021_die_code(struct i2c_client *client, int operation,
 	}
 }
 
-void adm1021_alarms(struct i2c_client *client, int operation, int ctl_name,
-		    int *nrels_mag, long *results)
+static void adm1021_alarms(struct i2c_client *client, int operation,
+			   int ctl_name, int *nrels_mag, long *results)
 {
 	struct adm1021_data *data = client->data;
 	if (operation == SENSORS_PROC_REAL_INFO)
@@ -578,7 +569,6 @@ void adm1021_alarms(struct i2c_client *client, int operation, int ctl_name,
 
 static int __init sensors_adm1021_init(void)
 {
-
 	return i2c_add_driver(&adm1021_driver);
 }
 

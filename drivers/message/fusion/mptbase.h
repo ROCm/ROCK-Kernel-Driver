@@ -13,7 +13,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptbase.h,v 1.141 2002/12/03 21:26:32 pdelaney Exp $
+ *  $Id: mptbase.h,v 1.144 2003/01/28 21:31:56 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -80,8 +80,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2002 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"2.03.01.01"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.03.01.01"
+#define MPT_LINUX_VERSION_COMMON	"2.05.00.03"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.05.00.03"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -383,12 +383,9 @@ typedef struct _VirtDevice {
 	u8			 maxWidth;	/* 0 if narrow, 1 if wide*/
 	u8			 negoFlags;	/* bit field, 0 if WDTR/SDTR/QAS allowed */
 	u8			 raidVolume;	/* set, if RAID Volume */
-#ifdef ABORT_FIX
-	u8			 numAborts;
-#else
-	u8			 rsvd;
-#endif
-	u16			 rsvd1raid;
+	u8			 type;		/* byte 0 of Inquiry data */
+	u8			 cflags;	/* controller flags */
+	u8			 rsvd1raid;
 	int			 npaths;
 	u16			 fc_phys_lun;
 	u16			 fc_xlat_lun;
@@ -400,11 +397,8 @@ typedef struct _VirtDevice {
 	ScsiCmndTracker		 WaitQ;
 	ScsiCmndTracker		 SentQ;
 	ScsiCmndTracker		 DoneQ;
+	u32			 num_luns;
 //--- LUN split here?
-#ifdef MPT_SAVE_AUTOSENSE
-	u8			 sense[SCSI_STD_SENSE_BYTES];		/* 18 */
-	u8			 rsvd2[2];	/* alignment */
-#endif
 	u32			 luns;		/* Max LUNs is 32 */
 	u8			 inq_data[SCSI_STD_INQUIRY_BYTES];	/* 36 */
 	u8			 pad0[4];
@@ -428,13 +422,15 @@ typedef struct _VirtDevice {
  *  Fibre Channel (SCSI) target device and associated defines...
  */
 #define MPT_TARGET_DEFAULT_DV_STATUS	0
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,55)
+#define MPT_TARGET_FLAGS_CONFIGURED	0x02
+#define MPT_TARGET_FLAGS_Q_YES		0x08
+#else
 #define MPT_TARGET_FLAGS_VALID_NEGO	0x01
 #define MPT_TARGET_FLAGS_VALID_INQUIRY	0x02
-#ifdef MPT_SAVE_AUTOSENSE
-#define MPT_TARGET_FLAGS_VALID_SENSE	0x04
-#endif
 #define MPT_TARGET_FLAGS_Q_YES		0x08
 #define MPT_TARGET_FLAGS_VALID_56	0x10
+#endif
 
 #define MPT_TARGET_NO_NEGO_WIDE		0x01
 #define MPT_TARGET_NO_NEGO_SYNC		0x02
@@ -603,7 +599,7 @@ typedef struct _MPT_ADAPTER
 	dma_addr_t		 sense_buf_pool_dma;
 	u32			 sense_buf_low_dma;
 	int			 mtrr_reg;
-	struct pci_dev		*pcidev;
+	struct pci_dev		*pcidev;	/* struct pci_dev pointer */
 	u8			*memmap;	/* mmap address */
 	struct Scsi_Host	*sh;		/* Scsi Host pointer */
 	ScsiCfgData		spi_data;	/* Scsi config. data */
@@ -763,6 +759,13 @@ typedef struct _mpt_sge {
 #else
 #define dcprintk(x)
 #endif
+
+#if defined(MPT_DEBUG_SCSI) || defined(MPT_DEBUG) || defined(MPT_DEBUG_MSG_FRAME)
+#define dsprintk(x) printk x
+#else
+#define dsprintk(x)
+#endif
+
 
 #define MPT_INDEX_2_MFPTR(ioc,idx) \
 	(MPT_FRAME_HDR*)( (u8*)(ioc)->req_frames + (ioc)->req_sz * (idx) )
@@ -1050,7 +1053,7 @@ extern int		  mpt_ASCQ_TableSz;
 #define offsetof(t, m)	((size_t) (&((t *)0)->m))
 #endif
 
-#if defined(__alpha__) || defined(__sparc_v9__) || defined(__ia64__)
+#if defined(__alpha__) || defined(__sparc_v9__) || defined(__ia64__) || defined(__x86_64__)
 #define CAST_U32_TO_PTR(x)	((void *)(u64)x)
 #define CAST_PTR_TO_U32(x)	((u32)(u64)x)
 #else

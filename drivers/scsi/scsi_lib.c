@@ -117,7 +117,7 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	 */
 	if (reason == SCSI_MLQUEUE_HOST_BUSY)
 		host->host_blocked = host->max_host_blocked;
-	else
+	else if (reason == SCSI_MLQUEUE_DEVICE_BUSY)
 		device->device_blocked = device->max_device_blocked;
 
 	/*
@@ -1340,23 +1340,6 @@ void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
 	}
 }
 
-/*
- * FIXME(eric) - these are empty stubs for the moment.  I need to re-implement
- * host blocking from scratch. The theory is that hosts that wish to block
- * will register/deregister using these functions instead of the old way
- * of setting the wish_block flag.
- *
- * The details of the implementation remain to be settled, however the
- * stubs are here now so that the actual drivers will properly compile.
- */
-void scsi_register_blocked_host(struct Scsi_Host * shost)
-{
-}
-
-void scsi_deregister_blocked_host(struct Scsi_Host * shost)
-{
-}
-
 int __init scsi_init_queue(void)
 {
 	int i;
@@ -1384,7 +1367,7 @@ int __init scsi_init_queue(void)
 	return 0;
 }
 
-void __exit scsi_exit_queue(void)
+void scsi_exit_queue(void)
 {
 	int i;
 

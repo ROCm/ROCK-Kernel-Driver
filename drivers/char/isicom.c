@@ -347,11 +347,11 @@ static inline int isicom_paranoia_check(struct isi_port const * port, kdev_t dev
 	static const char * badport = 
 			KERN_WARNING "ISICOM: Warning: NULL isicom port for dev %s in %s.\n";		
 	if (!port) {
-		printk(badport, kdevname(dev), routine);
+		printk(badport, cdevname(dev), routine);
 		return 1;
 	}
 	if (port->magic != ISICOM_MAGIC) {
-		printk(badmagic, kdevname(dev), routine);
+		printk(badmagic, cdevname(dev), routine);
 		return 1;
 	}	
 #endif	

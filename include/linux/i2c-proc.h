@@ -19,14 +19,9 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#ifndef SENSORS_SENSORS_H
-#define SENSORS_SENSORS_H
+#ifndef _LINUX_I2C_PROC_H
+#define _LINUX_I2C_PROC_H
 
-#ifdef __KERNEL__
-
-/* Next two must be included before sysctl.h can be included, in 2.0 kernels */
-#include <linux/types.h>
-#include <linux/fs.h>
 #include <linux/sysctl.h>
 
 /* The type of callback functions used in sensors_{proc,sysctl}_real */
@@ -388,7 +383,7 @@ extern int i2c_detect(struct i2c_adapter *adapter,
 
 /* This macro is used to scale user-input to sensible values in almost all
    chip drivers. */
-extern inline int SENSORS_LIMIT(long value, long low, long high)
+static inline int SENSORS_LIMIT(long value, long low, long high)
 {
 	if (value < low)
 		return low;
@@ -397,8 +392,6 @@ extern inline int SENSORS_LIMIT(long value, long low, long high)
 	else
 		return value;
 }
-
-#endif				/* def __KERNEL__ */
 
 
 /* The maximum length of the prefix */
@@ -418,5 +411,5 @@ struct i2c_chips_data {
 	char name[SENSORS_PREFIX_MAX + 13];
 };
 
-#endif				/* def SENSORS_SENSORS_H */
+#endif				/* def _LINUX_I2C_PROC_H */
 

@@ -328,6 +328,9 @@ EXPORT_SYMBOL(xfrm_policy_list);
 EXPORT_SYMBOL(xfrm6_state_lookup);
 EXPORT_SYMBOL(xfrm6_find_acq);
 EXPORT_SYMBOL(xfrm6_alloc_spi);
+EXPORT_SYMBOL(xfrm6_register_type);
+EXPORT_SYMBOL(xfrm6_unregister_type);
+EXPORT_SYMBOL(xfrm6_get_type);
 #endif
 
 EXPORT_SYMBOL_GPL(xfrm_probe_algs);

@@ -705,9 +705,15 @@ int icmpv6_err_convert(int type, int code, int *err)
 
 #ifdef CONFIG_SYSCTL
 ctl_table ipv6_icmp_table[] = {
-	{NET_IPV6_ICMP_RATELIMIT, "ratelimit",
-	&sysctl_icmpv6_time, sizeof(int), 0644, NULL, &proc_dointvec},
-	{0},
+	{
+		.ctl_name	= NET_IPV6_ICMP_RATELIMIT,
+		.procname	= "ratelimit",
+		.data		= &sysctl_icmpv6_time,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{ .ctl_name = 0 },
 };
 #endif
 

@@ -204,7 +204,7 @@ config PREEMPT
 # someone write a better help text please.
 config K8_NUMA
        bool "K8 NUMA support"
-       depends on SMP
+       depends on SMP && NOT_WORKING
        help
 	  Enable NUMA (Non Unified Memory Architecture) support for
 	  AMD Opteron Multiprocessor systems. The kernel will try to allocate

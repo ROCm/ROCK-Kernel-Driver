@@ -61,7 +61,7 @@ SMBus Write Byte
 This is the reverse of Read Byte: it sends a single byte to a device.
 See Read Byte for more information.
 
-S Addr Wr [A] Data NA P
+S Addr Wr [A] Data [A] P
 
 
 SMBus Read Byte Data

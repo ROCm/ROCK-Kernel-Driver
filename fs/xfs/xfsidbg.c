@@ -44,7 +44,6 @@
 MODULE_AUTHOR("SGI <sgi.com>");
 MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 /*
  * Command table functions.
