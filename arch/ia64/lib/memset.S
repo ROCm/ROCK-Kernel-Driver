@@ -9,8 +9,8 @@
  * 	in1:	byte value to use for storing
  *	in2:	length of the buffer
  *
- * Copyright (C) 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1999, 2001, 2002 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
  */
 
 #include <asm/asmmacro.h>
@@ -30,7 +30,19 @@
 #define saved_lc	r20
 #define tmp		r21
 
-GLOBAL_ENTRY(memset)
+GLOBAL_ENTRY(__bzero)
+	.prologue
+	.save ar.pfs, saved_pfs
+	alloc saved_pfs=ar.pfs,0,0,3,0
+	mov out2=out1
+	mov out1=0
+	/* FALL THROUGH (explicit NOPs so that next alloc is preceded by stop bit!) */
+	nop.m 0
+	nop.f 0
+	nop.i 0
+	;;
+END(__bzero)
+GLOBAL_ENTRY(__memset_generic)
 	.prologue
 	.save ar.pfs, saved_pfs
  	alloc saved_pfs=ar.pfs,3,0,0,0	// cnt is sink here
@@ -105,4 +117,7 @@ GLOBAL_ENTRY(memset)
 	;;
 (p6)	st1 [buf]=val		// only 1 byte left
 	br.ret.sptk.many rp
-END(memset)
+END(__memset_generic)
+
+	.global memset
+memset = __memset_generic		// alias needed for gcc

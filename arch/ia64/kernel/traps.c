@@ -214,7 +214,8 @@ ia64_ni_syscall (unsigned long arg0, unsigned long arg1, unsigned long arg2, uns
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 
-	printk("<sc%ld(%lx,%lx,%lx,%lx)>\n", regs->r15, arg0, arg1, arg2, arg3);
+	printk("%s(%d): <sc%ld(%lx,%lx,%lx,%lx)>\n", current->comm, current->pid,
+	       regs->r15, arg0, arg1, arg2, arg3);
 	return -ENOSYS;
 }
 

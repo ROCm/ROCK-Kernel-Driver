@@ -28,11 +28,6 @@ SECTIONS
   .text : AT(ADDR(.text) - PAGE_OFFSET)
     {
 	*(.text.ivt)
-	/* these are not really text pages, but they need to be page aligned: */
-	*(__special_page_section)
-	__start_gate_section = .;
-	*(.text.gate)
-	__stop_gate_section = .;
 	*(.text)
     }
   .text2 : AT(ADDR(.text2) - PAGE_OFFSET)
@@ -119,6 +114,13 @@ SECTIONS
   /* The initial task and kernel stack */
   .data.init_task : AT(ADDR(.data.init_task) - PAGE_OFFSET)
 	{ *(.data.init_task) }
+
+  .data.page_aligned : AT(ADDR(.data.page_aligned) - PAGE_OFFSET)
+        { *(__special_page_section)
+	  __start_gate_section = .;
+	  *(.text.gate)
+	  __stop_gate_section = .;
+	}
 
   . = ALIGN(SMP_CACHE_BYTES);
   .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - PAGE_OFFSET)

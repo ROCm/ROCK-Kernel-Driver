@@ -47,6 +47,8 @@ static void elf32_set_personality (void);
 #define ELF_PLAT_INIT(_r)		ia64_elf32_init(_r)
 #define setup_arg_pages(bprm)		ia32_setup_arg_pages(bprm)
 #define elf_map				elf32_map
+
+#undef SET_PERSONALITY
 #define SET_PERSONALITY(ex, ibcs2)	elf32_set_personality()
 
 /* Ugly but avoids duplication */

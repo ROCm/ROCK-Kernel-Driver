@@ -68,6 +68,8 @@ extern void machvec_noop (void);
 #  include <asm/machvec_hpsim.h>
 # elif defined (CONFIG_IA64_DIG)
 #  include <asm/machvec_dig.h>
+# elif defined (CONFIG_IA64_HP_ZX1)
+#  include <asm/machvec_hpzx1.h>
 # elif defined (CONFIG_IA64_SGI_SN1)
 #  include <asm/machvec_sn1.h>
 # elif defined (CONFIG_IA64_SGI_SN2)
@@ -123,6 +125,7 @@ struct ia64_machine_vector {
 	ia64_mv_cmci_handler_t *cmci_handler;
 	ia64_mv_log_print_t *log_print;
 	ia64_mv_send_ipi_t *send_ipi;
+	ia64_mv_global_tlb_purge_t *global_tlb_purge;
 	ia64_mv_pci_dma_init *dma_init;
 	ia64_mv_pci_alloc_consistent *alloc_consistent;
 	ia64_mv_pci_free_consistent *free_consistent;
@@ -149,6 +152,7 @@ struct ia64_machine_vector {
 {						\
 	#name,					\
 	platform_setup,				\
+	platform_cpu_init,			\
 	platform_irq_init,			\
 	platform_pci_fixup,			\
 	platform_map_nr,			\
