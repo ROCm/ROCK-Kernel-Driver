@@ -53,11 +53,11 @@ unsigned long blk_max_low_pfn, blk_max_pfn;
 
 static inline int batch_requests(struct request_queue *q)
 {
-	return min(q->nr_requests / 8, 8UL);
+	return q->nr_requests - min(q->nr_requests / 8, 8UL);
 }
 
 /*
- * Return the threshold (number of free requests) at which the queue is
+ * Return the threshold (number of used requests) at which the queue is
  * considered to be congested.  It include a little hysteresis to keep the
  * context switch rate down.
  */
@@ -65,9 +65,11 @@ static inline int queue_congestion_on_threshold(struct request_queue *q)
 {
 	int ret;
 
-	ret = q->nr_requests / 8 - 1;
-	if (ret < 0)
-		ret = 1;
+	ret = q->nr_requests - (q->nr_requests / 8) + 1;
+
+	if (ret > q->nr_requests)
+		ret = q->nr_requests;
+
 	return ret;
 }
 
@@ -78,9 +80,11 @@ static inline int queue_congestion_off_threshold(struct request_queue *q)
 {
 	int ret;
 
-	ret = q->nr_requests / 8 + 1;
-	if (ret > q->nr_requests)
-		ret = q->nr_requests;
+	ret = q->nr_requests - (q->nr_requests / 8) - 1;
+
+	if (ret < 1)
+		ret = 1;
+
 	return ret;
 }
 
@@ -1316,7 +1320,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		goto out;
 	}
 	rl->count[rw]++;
-	if ((q->nr_requests - rl->count[rw]) < queue_congestion_on_threshold(q))
+	if (rl->count[rw] >= queue_congestion_on_threshold(q))
 		set_queue_congested(q, rw);
 	spin_unlock_irq(q->queue_lock);
 
@@ -1324,7 +1328,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	if (!rq) {
 		spin_lock_irq(q->queue_lock);
 		rl->count[rw]--;
-		if ((q->nr_requests - rl->count[rw]) >= queue_congestion_off_threshold(q))
+		if (rl->count[rw] < queue_congestion_off_threshold(q))
                         clear_queue_congested(q, rw);
 		spin_unlock_irq(q->queue_lock);
 		goto out;
@@ -1545,10 +1549,9 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 		blk_free_request(q, req);
 
 		rl->count[rw]--;
-		if ((q->nr_requests - rl->count[rw]) >=
-				queue_congestion_off_threshold(q))
+		if (rl->count[rw] < queue_congestion_off_threshold(q))
 			clear_queue_congested(q, rw);
-		if ((q->nr_requests - rl->count[rw]) >= batch_requests(q) &&
+		if (rl->count[rw] < batch_requests(q) &&
 				waitqueue_active(&rl->wait[rw]))
 			wake_up(&rl->wait[rw]);
 	}
@@ -2402,19 +2405,15 @@ queue_requests_store(struct request_queue *q, const char *page, size_t count)
 	if (q->nr_requests < BLKDEV_MIN_RQ)
 		q->nr_requests = BLKDEV_MIN_RQ;
 
-	if ((q->nr_requests - rl->count[READ]) <
-				queue_congestion_on_threshold(q))
+	if (rl->count[READ] >= queue_congestion_on_threshold(q))
 		set_queue_congested(q, READ);
-	else if ((q->nr_requests - rl->count[READ]) >=
-				queue_congestion_off_threshold(q))
+	else if (rl->count[READ] < queue_congestion_off_threshold(q))
 		clear_queue_congested(q, READ);
 
-	if ((q->nr_requests - rl->count[READ]) <
-				queue_congestion_on_threshold(q))
-		set_queue_congested(q, READ);
-	else if ((q->nr_requests - rl->count[READ]) >=
-				queue_congestion_off_threshold(q))
-		clear_queue_congested(q, READ);
+	if (rl->count[WRITE] >= queue_congestion_on_threshold(q))
+		set_queue_congested(q, WRITE);
+	else if (rl->count[WRITE] < queue_congestion_off_threshold(q))
+		clear_queue_congested(q, WRITE);
 
 	return ret;
 }
