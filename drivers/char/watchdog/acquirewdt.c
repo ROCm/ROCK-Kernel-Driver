@@ -218,7 +218,7 @@ static struct miscdevice acq_miscdev=
  
 static struct notifier_block acq_notifier =
 {
-	.notifier_call = acq_notify_sys,
+	.self = acq_notify_sys,
 	.next = NULL,
 	.priority = 0
 };
