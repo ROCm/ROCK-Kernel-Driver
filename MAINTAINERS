@@ -876,6 +876,11 @@ M:	hch@infradead.org
 W:	ftp://ftp.openlinux.org/pub/people/hch/vxfs
 S:	Maintained
 
+FUJITSU FR-V PORT
+P:	David Howells
+M:	dhowells@redhat.com
+S:	Maintained
+
 FTAPE/QIC-117
 L:	linux-tape@vger.kernel.org
 W:	http://sourceforge.net/projects/ftape
