@@ -60,7 +60,6 @@
 
 #ifdef CONFIG_INET
 /* Entire module is for IP only */
-#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/socket.h>
 #include <linux/sockios.h>

@@ -26,7 +26,6 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/ctype.h>
 #include <linux/fcntl.h>
@@ -38,6 +37,12 @@
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/nubus.h>
+#include <linux/errno.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+#include <linux/module.h>
+
 #include <asm/bootinfo.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -49,13 +54,6 @@
 #include <asm/macints.h>
 #include <asm/mac_via.h>
 #include <asm/pgalloc.h>
-
-#include <linux/errno.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/module.h>
 
 #define SREGS_PAD(n)    u16 n;
 

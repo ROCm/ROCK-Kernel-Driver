@@ -39,18 +39,19 @@
 
 #define VERSION "0.65"
 
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/types.h>
-#include <linux/sched.h>
 #include <linux/netdevice.h>
 #include <linux/proc_fs.h>
-#include <asm/types.h>
-#include <asm/uaccess.h>
-#include <asm/io.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+
+#include <asm/types.h>
+#include <asm/uaccess.h>
+#include <asm/io.h>
 
 #include "comx.h"
 #include "mixcom.h"

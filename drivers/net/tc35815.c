@@ -32,9 +32,7 @@ static const char *version =
 	"tc35815.c:v0.00 26/07/2000 by Toshiba Corporation\n";
 
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -42,21 +40,20 @@ static const char *version =
 #include <linux/in.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
-#include <asm/byteorder.h>
 
+#include <asm/system.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <asm/dma.h>
+#include <asm/byteorder.h>
 
 /*
  * The name of the card. Is used for messages and in the requests for

@@ -41,7 +41,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
@@ -50,10 +49,12 @@
 #include <linux/inetdevice.h>
 #include <linux/random.h>
 #include <linux/pkt_sched.h>
+#include <linux/spinlock.h>
+
+#include <net/syncppp.h>
+
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
-#include <linux/spinlock.h>
-#include <net/syncppp.h>
 
 #define MAXALIVECNT     6               /* max. alive packets */
 

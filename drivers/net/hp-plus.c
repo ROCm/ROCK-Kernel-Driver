@@ -25,7 +25,6 @@ static const char version[] =
 
 #include <linux/string.h>		/* Important -- this inlines word moves. */
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
 #include <linux/netdevice.h>
@@ -35,7 +34,6 @@ static const char version[] =
 
 #include <asm/system.h>
 #include <asm/io.h>
-
 
 #include "8390.h"
 
