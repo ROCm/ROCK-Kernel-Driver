@@ -603,7 +603,7 @@ struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 #endif
 
 	if (newsk->sk_prot->init(newsk)) {
-		inet_sock_release(newsk);
+		sk_common_release(newsk);
 		newsk = NULL;
 	}
 
@@ -846,10 +846,10 @@ struct proto_ops inet_seqpacket_ops = {
 	.ioctl       = inet_ioctl,
 	.listen      = sctp_inet_listen,
 	.shutdown    = inet_shutdown,     /* Looks harmless.  */
-	.setsockopt  = inet_setsockopt,   /* IP_SOL IP_OPTION is a problem. */
-	.getsockopt  = inet_getsockopt,
+	.setsockopt  = sock_common_setsockopt,   /* IP_SOL IP_OPTION is a problem. */
+	.getsockopt  = sock_common_getsockopt,
 	.sendmsg     = inet_sendmsg,
-	.recvmsg     = inet_recvmsg,
+	.recvmsg     = sock_common_recvmsg,
 	.mmap        = sock_no_mmap,
 	.sendpage    = sock_no_sendpage,
 };
