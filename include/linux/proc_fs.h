@@ -133,7 +133,6 @@ extern void proc_tty_unregister_driver(struct tty_driver *driver);
  */
 struct device_node;
 extern void proc_device_tree_init(void);
-struct device_node;
 extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
 
 /*

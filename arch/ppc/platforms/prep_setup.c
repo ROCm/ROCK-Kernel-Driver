@@ -762,6 +762,16 @@ prep_setup_arch(void)
 		ppc_md.power_off = prep_halt;
 		ppc_md.show_cpuinfo = prep_mot_cpuinfo;
 
+#ifdef CONFIG_BLK_DEV_INITRD
+		if (initrd_start)
+			ROOT_DEV = Root_RAM0;
+		else
+#endif
+#ifdef CONFIG_ROOT_NFS
+			ROOT_DEV = Root_NFS;
+#else
+			ROOT_DEV = Root_SDA2;
+#endif
 		ROOT_DEV = Root_SDA3;
 		break;
 	}
