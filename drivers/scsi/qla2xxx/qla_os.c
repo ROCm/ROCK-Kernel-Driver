@@ -566,6 +566,7 @@ static ssize_t qla2x00_sysfs_write_nvram(struct kobject *kobj, char *buf,
 	/* Write NVRAM. */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	qla2x00_lock_nvram_access(ha);
+	qla2x00_release_nvram_protection(ha);
  	witer = (uint16_t *)buf;
 	for (cnt = 0; cnt < count / 2; cnt++) {
 		qla2x00_write_nvram_word(ha, cnt+ha->nvram_base,

@@ -346,6 +346,8 @@ typedef volatile struct {
 	volatile uint16_t nvram;	/* NVRAM register. */
 #define NVR_DESELECT		0
 #define NVR_BUSY		BIT_15
+#define NVR_WRT_ENABLE		BIT_14	/* Write enable */
+#define NVR_PR_ENABLE		BIT_13	/* Protection register enable */
 #define NVR_DATA_IN		BIT_3
 #define NVR_DATA_OUT		BIT_2
 #define NVR_SELECT		BIT_1
