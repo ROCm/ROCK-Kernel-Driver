@@ -57,8 +57,7 @@ void do_syscall(void *task, int pid, int local_using_sysemu)
 
 	UPT_SYSCALL_NR(TASK_REGS(task)) = PT_SYSCALL_NR(proc_regs);
 
-	if((syscall != __NR_sigreturn) &&
-	   ((unsigned long *) PT_IP(proc_regs) >= &_stext) && 
+	if(((unsigned long *) PT_IP(proc_regs) >= &_stext) &&
 	   ((unsigned long *) PT_IP(proc_regs) <= &_etext))
 		tracer_panic("I'm tracing myself and I can't get out");
 
