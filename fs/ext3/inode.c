@@ -2697,7 +2697,7 @@ void ext3_dirty_inode(struct inode *inode)
 	handle_t *handle;
 
 	lock_kernel();
-	handle = ext3_journal_start(inode, 1);
+	handle = ext3_journal_start(inode, 2);
 	if (IS_ERR(handle))
 		goto out;
 	if (current_handle &&
