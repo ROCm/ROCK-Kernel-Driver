@@ -115,8 +115,7 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 	unsigned long mmcr0 = 0, pmc1 = 0, pmc2 = 0;
 	int n = 0;
 #ifdef CONFIG_PPC_STD_MMU
-	int valid;
-	unsigned int kptes = 0, uptes = 0, zombie_ptes = 0;
+	unsigned int kptes = 0, uptes = 0;
 	PTE *ptr;
 	struct task_struct *p;
 #endif /* CONFIG_PPC_STD_MMU */
@@ -167,16 +166,6 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 		}
 		/* now undo the context skew; 801921 * 897 == 1 mod 2^20 */
 		ctx = (mctx * 801921) & 0xfffff;
-		valid = 0;
-		for_each_task(p) {
-			if (p->mm != NULL && ctx == p->mm->context) {
-				valid = 1;
-				uptes++;
-				break;
-			}
-		}
-		if (!valid)
-			zombie_ptes++;
 	}
 	
 	n += sprintf( buffer + n,
@@ -187,7 +176,6 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 		      "Entries\t\t: %lu\n"
 		      "User ptes\t: %u\n"
 		      "Kernel ptes\t: %u\n"
-		      "Zombies\t\t: %u\n"
 		      "Percent full\t: %lu%%\n",
                       (unsigned long)(Hash_size>>10),
 		      (Hash_size/(sizeof(PTE)*8)),
@@ -195,7 +183,6 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 		      Hash_size/sizeof(PTE),
                       uptes,
 		      kptes,
-		      zombie_ptes,
 		      ((kptes+uptes)*100) / (Hash_size/sizeof(PTE))
 		);
 
