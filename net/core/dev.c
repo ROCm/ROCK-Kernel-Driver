@@ -3049,7 +3049,7 @@ out:
 	return rc;
 }
 
-subsys_initcall(net_dev_init);
+fs_initcall(net_dev_init);
 
 EXPORT_SYMBOL(__dev_get);
 EXPORT_SYMBOL(__dev_get_by_flags);

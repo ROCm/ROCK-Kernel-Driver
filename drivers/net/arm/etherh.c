@@ -665,12 +665,6 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 		break;
 	}
 
-	printk(KERN_INFO "%s: %s in slot %d, ",
-		dev->name, dev_type, ec->slot_no);
-
-	for (i = 0; i < 6; i++)
-		printk("%2.2x%c", dev->dev_addr[i], i == 5 ? '\n' : ':');
-
 	ei_local = (struct ei_device *) dev->priv;
 	if (ec->cid.product == PROD_ANT_ETHERM) {
 		ei_local->tx_start_page = ETHERM_TX_START_PAGE;
@@ -697,6 +691,12 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 	ret = register_netdev(dev);
 	if (ret)
 		goto release;
+
+	printk(KERN_INFO "%s: %s in slot %d, ",
+		dev->name, dev_type, ec->slot_no);
+
+	for (i = 0; i < 6; i++)
+		printk("%2.2x%c", dev->dev_addr[i], i == 5 ? '\n' : ':');
 
 	ecard_set_drvdata(ec, dev);
 

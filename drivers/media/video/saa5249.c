@@ -214,7 +214,6 @@ static int saa5249_attach(struct i2c_adapter *adap, int addr, int kind)
 	}
 	t->client = client;
 	i2c_attach_client(client);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -237,7 +236,6 @@ static int saa5249_detach(struct i2c_client *client)
 	kfree(vd->priv);
 	kfree(vd);
 	kfree(client);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

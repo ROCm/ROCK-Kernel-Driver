@@ -511,9 +511,6 @@ void __invalidate_metapages(struct inode *ip, s64 addr, int len)
 		if (mp) {
 			set_bit(META_discard, &mp->flag);
 			spin_unlock(&meta_lock);
-			lock_page(mp->page);
-			block_invalidatepage(mp->page, 0);
-			unlock_page(mp->page);
 		} else {
 			spin_unlock(&meta_lock);
 			page = find_lock_page(mapping, lblock>>l2BlocksPerPage);

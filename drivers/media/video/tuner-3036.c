@@ -134,7 +134,6 @@ tuner_attach(struct i2c_adapter *adap, int addr, int kind)
 	printk("tuner: SAB3036 found, status %02x\n", tuner_getstatus(client));
 
         i2c_attach_client(client);
-	MOD_INC_USE_COUNT;
 
 	if (i2c_master_send(client, buffer, 2) != 2)
 		printk("tuner: i2c i/o error 1\n");
@@ -148,7 +147,6 @@ tuner_attach(struct i2c_adapter *adap, int addr, int kind)
 static int 
 tuner_detach(struct i2c_client *c)
 {
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

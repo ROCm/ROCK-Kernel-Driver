@@ -444,7 +444,7 @@ struct digi_port {
 /* Local Function Declarations */
 
 static void digi_wakeup_write( struct usb_serial_port *port );
-static void digi_wakeup_write_lock( struct usb_serial_port *port );
+static void digi_wakeup_write_lock(void *);
 static int digi_write_oob_command( struct usb_serial_port *port,
 	unsigned char *buf, int count, int interruptible );
 static int digi_write_inb_command( struct usb_serial_port *port,
@@ -608,9 +608,9 @@ static inline long cond_wait_interruptible_timeout_irqrestore(
 *  on writes.
 */
 
-static void digi_wakeup_write_lock( struct usb_serial_port *port )
+static void digi_wakeup_write_lock(void *arg)
 {
-
+	struct usb_serial_port *port = arg;
 	unsigned long flags;
 	struct digi_port *priv = usb_get_serial_port_data(port);
 

@@ -49,7 +49,6 @@ struct serial_struct {
 	unsigned short	iomem_reg_shift;
 	unsigned int	port_high;
 	unsigned long	iomap_base;	/* cookie passed into ioremap */
-	int	reserved[1];
 };
 
 /*

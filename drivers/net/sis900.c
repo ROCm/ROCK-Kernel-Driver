@@ -1438,7 +1438,7 @@ static void sis900_tx_timeout(struct net_device *net_dev)
 			pci_unmap_single(sis_priv->pci_dev, 
 				sis_priv->tx_ring[i].bufptr, skb->len,
 				PCI_DMA_TODEVICE);
-			dev_kfree_skb(skb);
+			dev_kfree_skb_irq(skb);
 			sis_priv->tx_skbuff[i] = 0;
 			sis_priv->tx_ring[i].cmdsts = 0;
 			sis_priv->tx_ring[i].bufptr = 0;
