@@ -220,11 +220,11 @@ static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 			agp_free_memory(new);
 			return NULL;
 		}
-		new->memory[0] = virt_to_phys((void *) new->memory[0]);
+		new->memory[0] = virt_to_phys(addr);
 		new->page_count = 1;
 		new->num_scratch_pages = 1;
 		new->type = AGP_PHYS_MEMORY;
-		new->physical = virt_to_phys((void *) new->memory[0]);
+		new->physical = new->memory[0];
 		return new;
 	}
 	return NULL;
@@ -515,11 +515,11 @@ static agp_memory *intel_i830_alloc_by_type(size_t pg_count,int type)
 			return(NULL);
 		}
 
-		nw->memory[0] = virt_to_phys((void *) nw->memory[0]);
+		nw->memory[0] = virt_to_phys(addr);
 		nw->page_count = 1;
 		nw->num_scratch_pages = 1;
 		nw->type = AGP_PHYS_MEMORY;
-		nw->physical = virt_to_phys(addr);
+		nw->physical = nw->memory[0];
 		return(nw);
 	}
 
