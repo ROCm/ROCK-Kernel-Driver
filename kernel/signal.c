@@ -661,6 +661,12 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 {
 	struct task_struct *t;
 
+	if (p->flags & SIGNAL_GROUP_EXIT)
+		/*
+		 * The process is in the middle of dying already.
+		 */
+		return;
+
 	if (sig_kernel_stop(sig)) {
 		/*
 		 * This is a stop signal.  Remove SIGCONT from all queues.
@@ -976,7 +982,7 @@ __group_complete_signal(int sig, struct task_struct *p)
 	 * Found a killable thread.  If the signal will be fatal,
 	 * then start taking the whole group down immediately.
 	 */
-	if (sig_fatal(p, sig) && !p->signal->group_exit &&
+	if (sig_fatal(p, sig) && !(p->signal->flags & SIGNAL_GROUP_EXIT) &&
 	    !sigismember(&t->real_blocked, sig) &&
 	    (sig == SIGKILL || !(t->ptrace & PT_PTRACED))) {
 		/*
@@ -989,10 +995,9 @@ __group_complete_signal(int sig, struct task_struct *p)
 			 * running and doing things after a slower
 			 * thread has the fatal signal pending.
 			 */
-			p->signal->group_exit = 1;
+			p->signal->flags = SIGNAL_GROUP_EXIT;
 			p->signal->group_exit_code = sig;
 			p->signal->group_stop_count = 0;
-			p->signal->flags = 0;
 			t = p;
 			do {
 				sigaddset(&t->pending.signal, SIGKILL);
@@ -1079,8 +1084,8 @@ void zap_other_threads(struct task_struct *p)
 {
 	struct task_struct *t;
 
+	p->signal->flags = SIGNAL_GROUP_EXIT;
 	p->signal->group_stop_count = 0;
-	p->signal->flags = 0;
 
 	if (thread_group_empty(p))
 		return;
@@ -1785,7 +1790,7 @@ static inline int handle_group_stop(void)
 		return 0;
 	}
 
-	if (current->signal->group_exit)
+	if (current->signal->flags & SIGNAL_GROUP_EXIT)
 		/*
 		 * Group stop is so another thread can do a core dump,
 		 * or else we are racing against a death signal.

@@ -601,7 +601,7 @@ static inline int de_thread(struct task_struct *tsk)
 	 */
 	read_lock(&tasklist_lock);
 	spin_lock_irq(lock);
-	if (sig->group_exit) {
+	if (sig->flags & SIGNAL_GROUP_EXIT) {
 		/*
 		 * Another group action in progress, just
 		 * return so that the signal is processed.
@@ -611,7 +611,6 @@ static inline int de_thread(struct task_struct *tsk)
 		kmem_cache_free(sighand_cachep, newsighand);
 		return -EAGAIN;
 	}
-	sig->group_exit = 1;
 	zap_other_threads(current);
 	read_unlock(&tasklist_lock);
 
@@ -709,7 +708,7 @@ static inline int de_thread(struct task_struct *tsk)
 	 * Now there are really no other threads at all,
 	 * so it's safe to stop telling them to kill themselves.
 	 */
-	sig->group_exit = 0;
+	sig->flags = 0;
 
 no_thread_group:
 	BUG_ON(atomic_read(&sig->count) != 1);
@@ -1396,7 +1395,7 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 	}
 	mm->dumpable = 0;
 	init_completion(&mm->core_done);
-	current->signal->group_exit = 1;
+	current->signal->flags = SIGNAL_GROUP_EXIT;
 	current->signal->group_exit_code = exit_code;
 	coredump_wait(mm);
 

@@ -734,7 +734,6 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	atomic_set(&sig->count, 1);
 	atomic_set(&sig->live, 1);
 	sig->flags = 0;
-	sig->group_exit = 0;
 	sig->group_exit_code = 0;
 	sig->group_exit_task = NULL;
 	sig->group_stop_count = 0;
@@ -1000,7 +999,7 @@ static task_t *copy_process(unsigned long clone_flags,
 		 * do not create this new thread - the whole thread
 		 * group is supposed to exit anyway.
 		 */
-		if (current->signal->group_exit) {
+		if (current->signal->flags & SIGNAL_GROUP_EXIT) {
 			spin_unlock(&current->sighand->siglock);
 			write_unlock_irq(&tasklist_lock);
 			retval = -EAGAIN;

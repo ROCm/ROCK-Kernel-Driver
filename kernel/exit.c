@@ -656,7 +656,7 @@ static void exit_notify(struct task_struct *tsk)
 	struct task_struct *t;
 	struct list_head ptrace_dead, *_p, *_n;
 
-	if (signal_pending(tsk) && !tsk->signal->group_exit
+	if (signal_pending(tsk) && !(tsk->signal->flags & SIGNAL_GROUP_EXIT)
 	    && !thread_group_empty(tsk)) {
 		/*
 		 * This occurs when there was a race between our exit
@@ -879,18 +879,18 @@ do_group_exit(int exit_code)
 {
 	BUG_ON(exit_code & 0x80); /* core dumps don't get here */
 
-	if (current->signal->group_exit)
+	if (current->signal->flags & SIGNAL_GROUP_EXIT)
 		exit_code = current->signal->group_exit_code;
 	else if (!thread_group_empty(current)) {
 		struct signal_struct *const sig = current->signal;
 		struct sighand_struct *const sighand = current->sighand;
 		read_lock(&tasklist_lock);
 		spin_lock_irq(&sighand->siglock);
-		if (sig->group_exit)
+		if (sig->flags & SIGNAL_GROUP_EXIT)
 			/* Another thread got here before we took the lock.  */
 			exit_code = sig->group_exit_code;
 		else {
-			sig->group_exit = 1;
+			sig->flags = SIGNAL_GROUP_EXIT;
 			sig->group_exit_code = exit_code;
 			zap_other_threads(current);
 		}
@@ -1070,7 +1070,7 @@ static int wait_task_zombie(task_t *p, int noreap,
 	read_unlock(&tasklist_lock);
 
 	retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
-	status = p->signal->group_exit
+	status = (p->signal->flags & SIGNAL_GROUP_EXIT)
 		? p->signal->group_exit_code : p->exit_code;
 	if (!retval && stat_addr)
 		retval = put_user(status, stat_addr);
