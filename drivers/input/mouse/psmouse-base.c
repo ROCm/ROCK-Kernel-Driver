@@ -150,36 +150,47 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		goto out;
 	}
 
-	if (test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags))
+	if (test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags)) {
 		switch (data) {
 			case PSMOUSE_RET_ACK:
 				psmouse->nak = 0;
-				clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
-				goto out;
 				break;
+
 			case PSMOUSE_RET_NAK:
 				psmouse->nak = 1;
-				clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
-				goto out;
-			default:
-				psmouse->nak = 0;	/* Workaround for mice which don't ACK the Get ID command */
-				clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
-				if (!test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags))
-					goto out;
+				break;
 
+			/*
+			 * Workaround for mice which don't ACK the Get ID command.
+			 * These are valid mouse IDs that we recognize.
+			 */
+			case 0x00:
+			case 0x03:
+			case 0x04:
+				if (test_bit(PSMOUSE_FLAG_WAITID, &psmouse->flags)) {
+					psmouse->nak = 0;
+					break;
+				}
+				/* Fall through */
+			default:
+				goto out;
 		}
+
+		if (!psmouse->nak && psmouse->cmdcnt) {
+			set_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+			set_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
+		}
+		clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+
+		if (data == PSMOUSE_RET_ACK || data == PSMOUSE_RET_NAK)
+			goto out;
+	}
 
 	if (test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags)) {
+		if (psmouse->cmdcnt)
+			psmouse->cmdbuf[--psmouse->cmdcnt] = data;
 
-		psmouse->cmdcnt--;
-		psmouse->cmdbuf[psmouse->cmdcnt] = data;
-
-		if (psmouse->cmdcnt == 1) {
-			if (data != 0xab && data != 0xac)
-				clear_bit(PSMOUSE_FLAG_ID, &psmouse->flags);
-			clear_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
-		}
-
+		clear_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
 		if (!psmouse->cmdcnt)
 			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
 
@@ -284,6 +295,7 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	int timeout = 500000; /* 500 msec */
 	int send = (command >> 12) & 0xf;
 	int receive = (command >> 8) & 0xf;
+	int rc = -1;
 	int i;
 
 	psmouse->cmdcnt = receive;
@@ -291,27 +303,20 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	if (command == PSMOUSE_CMD_RESET_BAT)
 		timeout = 4000000; /* 4 sec */
 
+	if (command == PSMOUSE_CMD_GETID)
+		set_bit(PSMOUSE_FLAG_WAITID, &psmouse->flags);
+
 	if (receive && param)
 		for (i = 0; i < receive; i++)
 			psmouse->cmdbuf[(receive - 1) - i] = param[i];
 
-	if (receive) {
-		set_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
-		set_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
-		set_bit(PSMOUSE_FLAG_ID, &psmouse->flags);
-	}
-
 	if (command & 0xff)
-		if (psmouse_sendbyte(psmouse, command & 0xff)) {
-			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
-			return -1;
-		}
+		if (psmouse_sendbyte(psmouse, command & 0xff))
+			goto out;
 
 	for (i = 0; i < send; i++)
-		if (psmouse_sendbyte(psmouse, param[i])) {
-			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
-			return -1;
-		}
+		if (psmouse_sendbyte(psmouse, param[i]))
+			goto out;
 
 	while (test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags) && timeout--) {
 
@@ -320,7 +325,13 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 			if (command == PSMOUSE_CMD_RESET_BAT && timeout > 100000)
 				timeout = 100000;
 
-			if (command == PSMOUSE_CMD_GETID && !test_bit(PSMOUSE_FLAG_ID, &psmouse->flags)) {
+			if (command == PSMOUSE_CMD_GETID &&
+			    psmouse->cmdbuf[receive - 1] != 0xab && psmouse->cmdbuf[receive - 1] != 0xac) {
+				/*
+				 * Device behind the port is not a keyboard
+				 * so we don't need to wait for the 2nd byte
+				 * of ID response.
+				 */
 				clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
 				psmouse->cmdcnt = 0;
 				break;
@@ -330,19 +341,20 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 		udelay(1);
 	}
 
-	clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
-
 	if (param)
 		for (i = 0; i < receive; i++)
 			param[i] = psmouse->cmdbuf[(receive - 1) - i];
 
-	if (command == PSMOUSE_CMD_RESET_BAT && psmouse->cmdcnt == 1)
-		return 0;
+	if (psmouse->cmdcnt && (command != PSMOUSE_CMD_RESET_BAT || psmouse->cmdcnt != 1))
+		goto out;
 
-	if (psmouse->cmdcnt)
-		return -1;
+	rc = 0;
 
-	return 0;
+out:
+	clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+	clear_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
+	clear_bit(PSMOUSE_FLAG_WAITID, &psmouse->flags);
+	return rc;
 }
 
 /*

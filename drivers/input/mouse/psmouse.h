@@ -20,8 +20,8 @@
 
 #define PSMOUSE_FLAG_ACK	0	/* Waiting for ACK/NAK */
 #define PSMOUSE_FLAG_CMD	1	/* Waiting for command to finish */
-#define PSMOUSE_FLAG_CMD1	2	/* First byte of command response */
-#define PSMOUSE_FLAG_ID		3	/* First byte is not keyboard ID */
+#define PSMOUSE_FLAG_CMD1	2	/* Waiting for the first byte of command response */
+#define PSMOUSE_FLAG_WAITID	3	/* Command execiting is GET ID */
 
 enum psmouse_state {
 	PSMOUSE_IGNORE,
