@@ -220,6 +220,7 @@ if [ "$CONFIG_FB" = "y" ]; then
       tristate '    16 bpp packed pixels support' CONFIG_FBCON_CFB16
       tristate '    24 bpp packed pixels support' CONFIG_FBCON_CFB24
       tristate '    32 bpp packed pixels support' CONFIG_FBCON_CFB32
+      tristate '    Hardware acceleration support' CONFIG_FBCON_ACCEL
       tristate '    Amiga bitplanes support' CONFIG_FBCON_AFB
       tristate '    Amiga interleaved bitplanes support' CONFIG_FBCON_ILBM
       tristate '    Atari interleaved bitplanes (2 planes) support' CONFIG_FBCON_IPLAN2P2
@@ -306,7 +307,7 @@ if [ "$CONFIG_FB" = "y" ]; then
       if [ "$CONFIG_FB_ATARI" = "y" -o "$CONFIG_FB_ATY" = "y" -o \
 	   "$CONFIG_FB_MAC" = "y" -o "$CONFIG_FB_NEOMAGIC" = "y" -o \
 	   "$CONFIG_FB_VIRTUAL" = "y" -o "$CONFIG_FB_TBOX" = "y" -o \
-	   "$CONFIG_FB_Q40" = "y" -o "$CONFIG_FB_RADEON" = "y" -o \
+	   "$CONFIG_FB_VOODOO1" = "y" -o "$CONFIG_FB_RADEON" = "y" -o \
 	   "$CONFIG_FB_CONTROL" = "y" -o "$CONFIG_FB_CLGEN" = "y" -o \
 	   "$CONFIG_FB_VIRGE" = "y" -o "$CONFIG_FB_CYBER" = "y" -o \
 	   "$CONFIG_FB_VALKYRIE" = "y" -o "$CONFIG_FB_PLATINUM" = "y" -o \
@@ -315,13 +316,13 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_RIVA" = "y" -o "$CONFIG_FB_ATY128" = "y" -o \
 	   "$CONFIG_FB_CYBER2000" = "y" -o "$CONFIG_FB_3DFX" = "y"  -o \
 	   "$CONFIG_FB_SIS" = "y" -o "$CONFIG_FB_SA1100" = "y" -o \
-	   "$CONFIG_FB_PVR2" = "y" -o "$CONFIG_FB_VOODOO1" = "y" ]; then 
+	   "$CONFIG_FB_PVR2" = "y" ]; then 
 	 define_tristate CONFIG_FBCON_CFB16 y
       else
 	 if [ "$CONFIG_FB_ATARI" = "m" -o "$CONFIG_FB_ATY" = "m" -o \
 	      "$CONFIG_FB_MAC" = "m" -o "$CONFIG_FB_NEOMAGIC" = "m" -o \
 	      "$CONFIG_FB_VIRTUAL" = "m" -o "$CONFIG_FB_TBOX" = "m" -o \
-	      "$CONFIG_FB_Q40" = "m" -o "$CONFIG_FB_3DFX" = "m" -o \
+	      "$CONFIG_FB_VOODOO1" = "m" -o "$CONFIG_FB_3DFX" = "m" -o \
 	      "$CONFIG_FB_CONTROL" = "m" -o "$CONFIG_FB_CLGEN" = "m" -o \
 	      "$CONFIG_FB_VIRGE" = "m" -o "$CONFIG_FB_CYBER" = "m" -o \
 	      "$CONFIG_FB_VALKYRIE" = "m" -o "$CONFIG_FB_PLATINUM" = "m" -o \
@@ -330,7 +331,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	      "$CONFIG_FB_RIVA" = "m" -o "$CONFIG_FB_ATY128" = "m" -o \
 	      "$CONFIG_FB_CYBER2000" = "m" -o "$CONFIG_FB_SIS" = "m" -o \
 	      "$CONFIG_FB_SA1100" = "m" -o "$CONFIG_FB_RADEON" = "m" -o \
-	      "$CONFIG_FB_PVR2" = "m" -o "$CONFIG_FB_VOODOO1" = "m" ]; then 
+	      "$CONFIG_FB_PVR2" = "m" ]; then 
 	    define_tristate CONFIG_FBCON_CFB16 m
 	 fi
       fi
@@ -357,9 +358,9 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_TGA" = "y" -o "$CONFIG_FB_PLATINUM" = "y" -o \
 	   "$CONFIG_FB_MATROX" = "y" -o "$CONFIG_FB_PM2" = "y" -o \
 	   "$CONFIG_FB_RIVA" = "y" -o "$CONFIG_FB_ATY128" = "y" -o \
-	   "$CONFIG_FB_FM2" = "y" -o "$CONFIG_FB_SGIVW" = "y" -o \
+	   "$CONFIG_FB_SIS" = "y" -o "$CONFIG_FB_SGIVW" = "y" -o \
 	   "$CONFIG_FB_RADEON" = "y" -o "$CONFIG_FB_PVR2" = "y" -o \
-	   "$CONFIG_FB_3DFX" = "y" -o "$CONFIG_FB_SIS" = "y" ]; then 
+	   "$CONFIG_FB_3DFX" = "y" ]; then 
 	 define_tristate CONFIG_FBCON_CFB32 y
       else
 	 if [ "$CONFIG_FB_ATARI" = "m" -o "$CONFIG_FB_ATY" = "m" -o \
@@ -374,8 +375,13 @@ if [ "$CONFIG_FB" = "y" ]; then
 	    define_tristate CONFIG_FBCON_CFB32 m
 	 fi
       fi
-      if [ "$CONFIG_FB_VESA" = "y" ]; then
+      if [ "$CONFIG_FB_VESA" = "y" -o "$CONFIG_FB_Q40" = "y" -o \
+	   "$CONFIG_FB_FM2" = "y" -o "$CONFIG_FB_HIT" = "y" ]; then
 	 define_tristate CONFIG_FBCON_ACCEL y
+      else
+	 if [ "$CONFIG_FB_HIT" = "m" ]; then
+	    define_tristate CONFIG_FBCON_ACCEL m
+         fi       
       fi
       if [ "$CONFIG_FB_AMIGA" = "y" ]; then
 	 define_tristate CONFIG_FBCON_AFB y
