@@ -212,7 +212,7 @@ struct __old_kernel_stat32
 	unsigned int   st_ctime;
 };
 
-struct sigcontext32_struct {
+struct sigcontext32 {
 	unsigned int	_unused[4];
 	int		signal;
 	unsigned int	handler;
@@ -224,7 +224,7 @@ struct ucontext32 {
 	unsigned int	  uc_flags;
 	unsigned int 	  uc_link;
 	stack_32_t	  uc_stack;
-	struct sigcontext32_struct uc_mcontext;
+	struct sigcontext32 uc_mcontext;
 	sigset_t	  uc_sigmask;	/* mask last for extensibility */
 };
 
