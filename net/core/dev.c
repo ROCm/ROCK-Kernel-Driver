@@ -107,10 +107,10 @@
 #include <linux/kmod.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
-#if defined(CONFIG_NET_RADIO) || defined(CONFIG_NET_PCMCIA_RADIO)
+#ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #include <net/iw_handler.h>
-#endif	/* CONFIG_NET_RADIO || CONFIG_NET_PCMCIA_RADIO */
+#endif	/* CONFIG_NET_RADIO */
 #ifdef CONFIG_PLIP
 extern int plip_init(void);
 #endif

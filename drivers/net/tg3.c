@@ -25,6 +25,7 @@
 #include <linux/if_vlan.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
+#include <linux/workqueue.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -54,8 +55,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.4"
-#define DRV_MODULE_RELDATE	"Feb 1, 2003"
+#define DRV_MODULE_VERSION	"1.4c"
+#define DRV_MODULE_RELDATE	"Feb 18, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -216,6 +217,12 @@ static void tg3_disable_ints(struct tg3 *tp)
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 }
 
+static inline void tg3_cond_int(struct tg3 *tp)
+{
+	if (tp->hw_status->status & SD_STATUS_UPDATED)
+		tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
+}
+
 static void tg3_enable_ints(struct tg3 *tp)
 {
 	tw32(TG3PCI_MISC_HOST_CTRL,
@@ -223,9 +230,55 @@ static void tg3_enable_ints(struct tg3 *tp)
 	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0x00000000);
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 
-	if (tp->hw_status->status & SD_STATUS_UPDATED)
-		tw32(GRC_LOCAL_CTRL,
-		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
+	tg3_cond_int(tp);
+}
+
+/* these netif_xxx funcs should be moved into generic net layer */
+static void netif_poll_disable(struct net_device *dev)
+{
+	while (test_and_set_bit(__LINK_STATE_RX_SCHED, &dev->state)) {
+		current->state = TASK_INTERRUPTIBLE;
+		schedule_timeout(1);
+	}
+}
+
+static inline void netif_poll_enable(struct net_device *dev)
+{
+	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
+}
+
+/* same as netif_rx_complete, except that local_irq_save(flags)
+ * has already been issued
+ */
+static inline void __netif_rx_complete(struct net_device *dev)
+{
+	if (!test_bit(__LINK_STATE_RX_SCHED, &dev->state)) BUG();
+	list_del(&dev->poll_list);
+	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
+}
+
+static inline void netif_tx_disable(struct net_device *dev)
+{
+	spin_lock_bh(&dev->xmit_lock);
+	netif_stop_queue(dev);
+	spin_unlock_bh(&dev->xmit_lock);
+}
+
+static inline void tg3_netif_stop(struct tg3 *tp)
+{
+	netif_poll_disable(tp->dev);
+	netif_tx_disable(tp->dev);
+}
+
+static inline void tg3_netif_start(struct tg3 *tp)
+{
+	netif_wake_queue(tp->dev);
+	/* NOTE: unconditional netif_wake_queue is only appropriate
+	 * so long as all callers are assured to have free tx slots
+	 * (such as after tg3_init_hw)
+	 */
+	netif_poll_enable(tp->dev);
+	tg3_cond_int(tp);
 }
 
 static void tg3_switch_clocks(struct tg3 *tp)
@@ -387,7 +440,6 @@ static int tg3_phy_reset(struct tg3 *tp, int force)
 }
 
 static int tg3_setup_phy(struct tg3 *);
-static int tg3_halt(struct tg3 *);
 
 static int tg3_set_power_state(struct tg3 *tp, int state)
 {
@@ -457,8 +509,6 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 		tp->link_config.autoneg = AUTONEG_ENABLE;
 		tg3_setup_phy(tp);
 	}
-
-	tg3_halt(tp);
 
 	pci_read_config_word(tp->pdev, pm + PCI_PM_PMC, &power_caps);
 
@@ -2044,7 +2094,12 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 		spin_unlock(&tp->tx_lock);
 	}
 
-	/* run RX thread, within the bounds set by NAPI */
+	spin_unlock_irqrestore(&tp->lock, flags);
+
+	/* run RX thread, within the bounds set by NAPI.
+	 * All RX "locking" is done by ensuring outside
+	 * code synchronizes with dev->poll()
+	 */
 	done = 1;
 	if (sblk->idx[0].rx_producer != tp->rx_rcb_ptr) {
 		int orig_budget = *budget;
@@ -2064,11 +2119,11 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 
 	/* if no more work, tell net stack and NIC we're done */
 	if (done) {
-		netif_rx_complete(netdev);
+		spin_lock_irqsave(&tp->lock, flags);
+		__netif_rx_complete(netdev);
 		tg3_enable_ints(tp);
+		spin_unlock_irqrestore(&tp->lock, flags);
 	}
-
-	spin_unlock_irqrestore(&tp->lock, flags);
 
 	return (done ? 0 : 1);
 }
@@ -2136,16 +2191,20 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static void tg3_init_rings(struct tg3 *);
 static int tg3_init_hw(struct tg3 *);
+static int tg3_halt(struct tg3 *);
 
-static void tg3_tx_timeout(struct net_device *dev)
+static void tg3_reset_task(void *_data)
 {
-	struct tg3 *tp = dev->priv;
+	struct tg3 *tp = _data;
+	unsigned int restart_timer;
 
-	printk(KERN_ERR PFX "%s: transmit timed out, resetting\n",
-	       dev->name);
+	tg3_netif_stop(tp);
 
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
+
+	restart_timer = tp->tg3_flags2 & TG3_FLG2_RESTART_TIMER;
+	tp->tg3_flags2 &= ~TG3_FLG2_RESTART_TIMER;
 
 	tg3_halt(tp);
 	tg3_init_rings(tp);
@@ -2154,7 +2213,20 @@ static void tg3_tx_timeout(struct net_device *dev)
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
-	netif_wake_queue(dev);
+	tg3_netif_start(tp);
+
+	if (restart_timer)
+		mod_timer(&tp->timer, jiffies + 1);
+}
+
+static void tg3_tx_timeout(struct net_device *dev)
+{
+	struct tg3 *tp = dev->priv;
+
+	printk(KERN_ERR PFX "%s: transmit timed out, resetting\n",
+	       dev->name);
+
+	schedule_work(&tp->reset_task);
 }
 
 #if !PCI_DMA_BUS_IS_PHYS
@@ -2686,6 +2758,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 		return 0;
 	}
 
+	tg3_netif_stop(tp);
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
 
@@ -2698,6 +2771,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
+	tg3_netif_start(tp);
 
 	return 0;
 }
@@ -3073,6 +3147,7 @@ out:
 static void tg3_chip_reset(struct tg3 *tp)
 {
 	u32 val;
+	u32 flags_save;
 
 	/* Force NVRAM to settle.
 	 * This deals with a chip bug which can result in EEPROM
@@ -3089,7 +3164,20 @@ static void tg3_chip_reset(struct tg3 *tp)
 		}
 	}
 
+	/*
+	 * We must avoid the readl() that normally takes place.
+	 * It locks machines, causes machine checks, and other
+	 * fun things.  So, temporarily disable the 5701
+	 * hardware workaround, while we do the reset.
+	 */
+	flags_save = tp->tg3_flags;
+	tp->tg3_flags &= ~TG3_FLAG_5701_REG_WRITE_BUG;
+
+	/* do the reset */
 	tw32(GRC_MISC_CFG, GRC_MISC_CFG_CORECLK_RESET);
+
+	/* restore 5701 hardware bug workaround flag */
+	tp->tg3_flags = flags_save;
 
 	/* Flush PCI posted writes.  The normal MMIO registers
 	 * are inaccessible at this time so this is the only
@@ -4394,9 +4482,11 @@ static void tg3_timer(unsigned long __opaque)
 	}
 
 	if (!(tr32(WDMAC_MODE) & WDMAC_MODE_ENABLE)) {
-		tg3_halt(tp);
-		tg3_init_rings(tp);
-		tg3_init_hw(tp);
+		tp->tg3_flags2 |= TG3_FLG2_RESTART_TIMER;
+		spin_unlock(&tp->tx_lock);
+		spin_unlock_irqrestore(&tp->lock, flags);
+		schedule_work(&tp->reset_task);
+		return;
 	}
 
 	/* This part only runs once per second. */
@@ -4527,8 +4617,6 @@ static int tg3_open(struct net_device *dev)
 		return err;
 	}
 
-	netif_start_queue(dev);
-
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
 
@@ -4536,6 +4624,8 @@ static int tg3_open(struct net_device *dev)
 
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
+
+	netif_start_queue(dev);
 
 	return 0;
 }
@@ -5302,6 +5392,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		    (ering.tx_pending > TG3_TX_RING_SIZE - 1))
 			return -EINVAL;
 
+		tg3_netif_stop(tp);
 		spin_lock_irq(&tp->lock);
 		spin_lock(&tp->tx_lock);
 
@@ -5315,6 +5406,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		netif_wake_queue(tp->dev);
 		spin_unlock(&tp->tx_lock);
 		spin_unlock_irq(&tp->lock);
+		tg3_netif_start(tp);
 
 		return 0;
 	}
@@ -5337,6 +5429,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		if (copy_from_user(&epause, useraddr, sizeof(epause)))
 			return -EFAULT;
 
+		tg3_netif_stop(tp);
 		spin_lock_irq(&tp->lock);
 		spin_lock(&tp->tx_lock);
 		if (epause.autoneg)
@@ -5356,6 +5449,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		tg3_init_hw(tp);
 		spin_unlock(&tp->tx_lock);
 		spin_unlock_irq(&tp->lock);
+		tg3_netif_start(tp);
 
 		return 0;
 	}
@@ -6710,6 +6804,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	spin_lock_init(&tp->lock);
 	spin_lock_init(&tp->tx_lock);
 	spin_lock_init(&tp->indirect_lock);
+	PREPARE_WORK(&tp->reset_task, tg3_reset_task, tp);
 
 	tp->regs = (unsigned long) ioremap(tg3reg_base, tg3reg_len);
 	if (tp->regs == 0UL) {
@@ -6851,6 +6946,8 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 	if (!netif_running(dev))
 		return 0;
 
+	tg3_netif_stop(tp);
+
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
 	tg3_disable_ints(tp);
@@ -6877,6 +6974,7 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 		spin_unlock_irq(&tp->lock);
 
 		netif_device_attach(dev);
+		tg3_netif_start(tp);
 	}
 
 	return err;
@@ -6906,6 +7004,8 @@ static int tg3_resume(struct pci_dev *pdev)
 
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
+
+	tg3_netif_start(tp);
 
 	return 0;
 }
