@@ -18,7 +18,7 @@
 
 #include <linux/fs.h>
 #include <linux/slab.h>
-#include "jfs_types.h"
+#include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_unicode.h"
 #include "jfs_debug.h"
@@ -82,9 +82,9 @@ int jfs_strtoUCS(wchar_t * to,
  * FUNCTION:	Allocate and translate to unicode string
  *
  */
-int get_UCSname(struct component_name * uniName, struct dentry *dentry,
-		struct nls_table *nls_tab)
+int get_UCSname(struct component_name * uniName, struct dentry *dentry)
 {
+	struct nls_table *nls_tab = JFS_SBI(dentry->d_sb)->nls_tab;
 	int length = dentry->d_name.len;
 
 	if (length > JFS_NAME_MAX)
