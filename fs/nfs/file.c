@@ -31,6 +31,8 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
+#include "delegation.h"
+
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
 static int nfs_file_open(struct inode *, struct file *);
@@ -127,7 +129,7 @@ nfs_file_flush(struct file *file)
 	if (!status) {
 		status = ctx->error;
 		ctx->error = 0;
-		if (!status)
+		if (!status && !nfs_have_delegation(inode, FMODE_READ))
 			__nfs_revalidate_inode(NFS_SERVER(inode), inode);
 	}
 	unlock_kernel();

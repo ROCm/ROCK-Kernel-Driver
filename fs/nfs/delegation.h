@@ -8,6 +8,7 @@
 #ifndef FS_NFS_DELEGATION_H
 #define FS_NFS_DELEGATION_H
 
+#if defined(CONFIG_NFS_V4)
 /*
  * NFSv4 delegation
  */
@@ -36,5 +37,20 @@ void nfs_delegation_reap_unclaimed(struct nfs4_client *clp);
 /* NFSv4 delegation-related procedures */
 int nfs4_proc_delegreturn(struct inode *inode, struct rpc_cred *cred, const nfs4_stateid *stateid);
 int nfs4_open_delegation_recall(struct dentry *dentry, struct nfs4_state *state);
+
+static inline int nfs_have_delegation(struct inode *inode, int flags)
+{
+	flags &= FMODE_READ|FMODE_WRITE;
+	smp_rmb();
+	if ((NFS_I(inode)->delegation_state & flags) == flags)
+		return 1;
+	return 0;
+}
+#else
+static inline int nfs_have_delegation(struct inode *inode, int flags)
+{
+	return 0;
+}
+#endif
 
 #endif

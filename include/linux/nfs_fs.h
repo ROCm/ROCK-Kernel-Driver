@@ -185,6 +185,7 @@ struct nfs_inode {
         /* NFSv4 state */
 	struct list_head	open_states;
 	struct nfs_delegation	*delegation;
+	int			 delegation_state;
 	struct rw_semaphore	rwsem;
 #endif /* CONFIG_NFS_V4*/
 
@@ -294,6 +295,8 @@ extern int nfs_access_get_cached(struct inode *, struct rpc_cred *, struct nfs_a
 extern void nfs_access_add_cache(struct inode *, struct nfs_access_entry *);
 extern int nfs_open(struct inode *, struct file *);
 extern int nfs_release(struct inode *, struct file *);
+extern int nfs_attribute_timeout(struct inode *inode);
+extern int nfs_revalidate_inode(struct nfs_server *server, struct inode *inode);
 extern int __nfs_revalidate_inode(struct nfs_server *, struct inode *);
 extern int nfs_setattr(struct dentry *, struct iattr *);
 extern void nfs_begin_attr_update(struct inode *);
@@ -445,28 +448,6 @@ extern int  nfsroot_mount(struct sockaddr_in *, char *, struct nfs_fh *,
 /*
  * inline functions
  */
-
-static inline int nfs_attribute_timeout(struct inode *inode)
-{
-	struct nfs_inode *nfsi = NFS_I(inode);
-
-	return time_after(jiffies, nfsi->read_cache_jiffies+nfsi->attrtimeo);
-}
-
-/**
- * nfs_revalidate_inode - Revalidate the inode attributes
- * @server - pointer to nfs_server struct
- * @inode - pointer to inode struct
- *
- * Updates inode attribute information by retrieving the data from the server.
- */
-static inline int nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
-{
-	if (!(NFS_FLAGS(inode) & (NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA))
-			&& !nfs_attribute_timeout(inode))
-		return NFS_STALE(inode) ? -ESTALE : 0;
-	return __nfs_revalidate_inode(server, inode);
-}
 
 static inline loff_t
 nfs_size_to_loff_t(__u64 size)

@@ -32,6 +32,8 @@
 #include <linux/smp_lock.h>
 #include <linux/namei.h>
 
+#include "delegation.h"
+
 #define NFS_PARANOIA 1
 /* #define NFS_DEBUG_VERBOSE 1 */
 
@@ -887,6 +889,8 @@ out:
 	return ret;
 no_open:
 	dput(parent);
+	if (inode != NULL && nfs_have_delegation(inode, FMODE_READ))
+		return 1;
 	return nfs_lookup_revalidate(dentry, nd);
 }
 #endif /* CONFIG_NFSV4 */

@@ -70,6 +70,8 @@ void nfs_inode_reclaim_delegation(struct inode *inode, struct rpc_cred *cred, st
 	put_rpccred(cred);
 	delegation->cred = get_rpccred(cred);
 	delegation->flags &= ~NFS_DELEGATION_NEED_RECLAIM;
+	NFS_I(inode)->delegation_state = delegation->type;
+	smp_wmb();
 }
 
 /*
@@ -96,6 +98,7 @@ int nfs_inode_set_delegation(struct inode *inode, struct rpc_cred *cred, struct 
 	if (nfsi->delegation == NULL) {
 		list_add(&delegation->super_list, &clp->cl_delegations);
 		nfsi->delegation = delegation;
+		nfsi->delegation_state = delegation->type;
 		delegation = NULL;
 	} else {
 		if (memcmp(&delegation->stateid, &nfsi->delegation->stateid,
@@ -150,6 +153,7 @@ int nfs_inode_return_delegation(struct inode *inode)
 	if (delegation != NULL) {
 		list_del_init(&delegation->super_list);
 		nfsi->delegation = NULL;
+		nfsi->delegation_state = 0;
 	}
 	spin_unlock(&clp->cl_lock);
 	nfs_delegation_claim_opens(inode);
@@ -218,6 +222,7 @@ static int recall_thread(void *data)
 				sizeof(delegation->stateid.data)) == 0) {
 		list_del_init(&delegation->super_list);
 		nfsi->delegation = NULL;
+		nfsi->delegation_state = 0;
 		args->result = 0;
 	} else {
 		delegation = NULL;
@@ -302,6 +307,7 @@ void nfs_delegation_reap_unclaimed(struct nfs4_client *clp)
 			continue;
 		list_move(&delegation->super_list, &head);
 		NFS_I(delegation->inode)->delegation = NULL;
+		NFS_I(delegation->inode)->delegation_state = 0;
 	}
 	spin_unlock(&clp->cl_lock);
 	while(!list_empty(&head)) {

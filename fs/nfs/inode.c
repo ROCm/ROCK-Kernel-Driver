@@ -39,6 +39,8 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
+#include "delegation.h"
+
 #define NFSDBG_FACILITY		NFSDBG_VFS
 #define NFS_PARANOIA 1
 
@@ -1017,6 +1019,30 @@ out:
 	return status;
 }
 
+int nfs_attribute_timeout(struct inode *inode)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+
+	if (nfs_have_delegation(inode, FMODE_READ))
+		return 0;
+	return time_after(jiffies, nfsi->read_cache_jiffies+nfsi->attrtimeo);
+}
+
+/**
+ * nfs_revalidate_inode - Revalidate the inode attributes
+ * @server - pointer to nfs_server struct
+ * @inode - pointer to inode struct
+ *
+ * Updates inode attribute information by retrieving the data from the server.
+ */
+int nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
+{
+	if (!(NFS_FLAGS(inode) & (NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA))
+			&& !nfs_attribute_timeout(inode))
+		return NFS_STALE(inode) ? -ESTALE : 0;
+	return __nfs_revalidate_inode(server, inode);
+}
+
 /**
  * nfs_begin_data_update
  * @inode - pointer to inode
@@ -1038,11 +1064,13 @@ void nfs_end_data_update(struct inode *inode)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 
-	/* Mark the attribute cache for revalidation */
-	nfsi->flags |= NFS_INO_INVALID_ATTR;
-	/* Directories and symlinks: invalidate page cache too */
-	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
-		nfsi->flags |= NFS_INO_INVALID_DATA;
+	if (!nfs_have_delegation(inode, FMODE_READ)) {
+		/* Mark the attribute cache for revalidation */
+		nfsi->flags |= NFS_INO_INVALID_ATTR;
+		/* Directories and symlinks: invalidate page cache too */
+		if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
+			nfsi->flags |= NFS_INO_INVALID_DATA;
+	}
 	nfsi->cache_change_attribute ++;
 	atomic_dec(&nfsi->data_updates);
 }
@@ -1082,6 +1110,10 @@ int nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	struct nfs_inode *nfsi = NFS_I(inode);
 	loff_t cur_size, new_isize;
 	int data_unstable;
+
+	/* Do we hold a delegation? */
+	if (nfs_have_delegation(inode, FMODE_READ))
+		return 0;
 
 	/* Are we in the process of updating data on the server? */
 	data_unstable = nfs_caches_unstable(inode);
@@ -1280,7 +1312,8 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)
 				|| S_ISLNK(inode->i_mode)))
 		invalid &= ~NFS_INO_INVALID_DATA;
-	nfsi->flags |= invalid;
+	if (!nfs_have_delegation(inode, FMODE_READ))
+		nfsi->flags |= invalid;
 
 	return 0;
  out_changed:
@@ -1436,8 +1469,6 @@ static struct file_system_type nfs_fs_type = {
 };
 
 #ifdef CONFIG_NFS_V4
-
-#include "delegation.h"
 
 static void nfs4_clear_inode(struct inode *);
 
@@ -1767,6 +1798,7 @@ static struct file_system_type nfs4_fs_type = {
 	do { \
 		INIT_LIST_HEAD(&(nfsi)->open_states); \
 		nfsi->delegation = NULL; \
+		nfsi->delegation_state = 0; \
 		init_rwsem(&nfsi->rwsem); \
 	} while(0)
 #define register_nfs4fs() register_filesystem(&nfs4_fs_type)

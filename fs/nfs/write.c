@@ -63,6 +63,8 @@
 #include <linux/smp_lock.h>
 #include <linux/mempool.h>
 
+#include "delegation.h"
+
 #define NFSDBG_FACILITY		NFSDBG_PAGECACHE
 
 #define MIN_POOL_WRITE		(32)
@@ -382,8 +384,7 @@ out:
 /*
  * Insert a write request into an inode
  */
-static inline int
-nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
+static int nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	int error;
@@ -395,6 +396,8 @@ nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 	if (!nfsi->npages) {
 		igrab(inode);
 		nfs_begin_data_update(inode);
+		if (nfs_have_delegation(inode, FMODE_WRITE))
+			nfsi->change_attr++;
 	}
 	nfsi->npages++;
 	atomic_inc(&req->wb_count);
