@@ -1352,3 +1352,47 @@ compat_sys_fstatfs64_wrapper:
 	llgfr	%r3,%r3			# compat_size_t
 	llgtr	%r4,%r4			# struct compat_statfs64 *
 	jg	compat_fstatfs64
+
+	.globl	compat_sys_mq_open_wrapper
+compat_sys_mq_open_wrapper:
+	llgtr	%r2,%r2			# const char *
+	lgfr	%r3,%r3			# int
+	llgfr	%r4,%r4			# mode_t
+	llgtr	%r5,%r5			# struct compat_mq_attr *
+	jg	compat_sys_mq_open
+
+	.globl	sys_mq_unlink_wrapper
+sys32_mq_unlink_wrapper:
+	llgtr	%r2,%r2			# const char *
+	jg	sys_mq_unlink
+
+	.globl	compat_sys_mq_timedsend_wrapper
+compat_sys_mq_timedsend_wrapper:
+	lgfr	%r2,%r2			# mqd_t
+	llgtr	%r3,%r3			# const char *
+	llgfr	%r4,%r4			# size_t
+	llgfr	%r5,%r5			# unsigned int
+	llgtr	%r6,%r6			# const struct compat_timespec *
+	jg	compat_sys_mq_timedsend
+
+	.globl	compat_sys_mq_timedreceive_wrapper
+compat_sys_mq_timedreceive_wrapper:
+	lgfr	%r2,%r2			# mqd_t
+	llgtr	%r3,%r3			# char *
+	llgfr	%r4,%r4			# size_t
+	llgtr	%r5,%r5			# unsigned int *
+	llgtr	%r6,%r6			# const struct compat_timespec *
+	jg	compat_sys_mq_timedreceive
+
+	.globl	compat_sys_mq_notify_wrapper
+compat_sys_mq_notify_wrapper:
+	lgfr	%r2,%r2			# mqd_t
+	llgtr	%r3,%r3			# struct compat_sigevent *
+	jg	compat_sys_mq_notify
+
+	.globl	compat_sys_mq_getsetattr_wrapper
+compat_sys_mq_getsetattr_wrapper:
+	lgfr	%r2,%r2			# mqd_t
+	llgtr	%r3,%r3			# struct compat_mq_attr *
+	llgtr	%r4,%r4			# struct compat_mq_attr *
+	jg	compat_sys_mq_getsetattr

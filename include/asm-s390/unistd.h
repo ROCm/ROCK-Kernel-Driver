@@ -233,9 +233,7 @@
 #define __NR_sched_setaffinity	239
 #define __NR_sched_getaffinity	240
 #define __NR_tgkill		241
-/*
- * Number 242 is reserved for tux
- */
+/* Number 242 is reserved for tux */
 #define __NR_io_setup		243
 #define __NR_io_destroy		244
 #define __NR_io_getevents	245
@@ -256,15 +254,22 @@
 #define __NR_clock_gettime	(__NR_timer_create+6)
 #define __NR_clock_getres	(__NR_timer_create+7)
 #define __NR_clock_nanosleep	(__NR_timer_create+8)
-
-/*
- * Number 263 is reserved for vserver
- */
+/* Number 263 is reserved for vserver */
 #define __NR_fadvise64_64	264
 #define __NR_statfs64		265
 #define __NR_fstatfs64		266
+/* Number 267 is reserved for new sys_remap_file_pages */
+/* Number 268 is reserved for new sys_mbind */
+/* Number 269 is reserved for new sys_get_mempolicy */
+/* Number 270 is reserved for new sys_set_mempolicy */
+#define __NR_mq_open		271
+#define __NR_mq_unlink		272
+#define __NR_mq_timedsend	273
+#define __NR_mq_timedreceive	274
+#define __NR_mq_notify		275
+#define __NR_mq_getsetattr	276
 
-#define NR_syscalls 267
+#define NR_syscalls 277
 
 /* 
  * There are some system calls that are not present on 64 bit, some
