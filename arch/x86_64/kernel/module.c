@@ -53,14 +53,10 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 		loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rel[i].r_offset;
 
-		/* This is the symbol it is referring to */
+		/* This is the symbol it is referring to.  Note that all
+		   undefined symbols have been resolved.  */
 		sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
 			+ ELF64_R_SYM(rel[i].r_info);
-		if (!sym->st_value) {
-			printk(KERN_WARNING "%s: Unknown symbol %s\n",
-			       me->name, strtab + sym->st_name);
-			return -ENOENT;
-		}
 
 	        DEBUGP("type %d st_value %Lx r_addend %Lx loc %Lx\n",
 		       (int)ELF64_R_TYPE(rel[i].r_info), 

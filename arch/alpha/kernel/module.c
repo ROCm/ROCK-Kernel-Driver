@@ -190,15 +190,10 @@ apply_relocate_add(Elf64_Shdr *sechdrs, const char *strtab,
 		/* This is where to make the change.  */
 		location = base + rela[i].r_offset;
 
-		/* This is the symbol it is referring to.  */
+		/* This is the symbol it is referring to.  Note that all
+		   unresolved symbols have been resolved.  */
 		sym = symtab + r_sym;
-		value = sym->st_value;
-		if (!value) {
-			printk(KERN_ERR "module %s: Unknown symbol %s\n",
-			       me->name, strtab + sym->st_name);
-			return -ENOENT;
-		}
-		value += rela[i].r_addend;
+		value = sym->st_value + rela[i].r_addend;
 
 		switch (r_type) {
 		case R_ALPHA_NONE:

@@ -185,15 +185,11 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 
 		BUG_ON(((u64)location >> (u64)32) != (u64)0);
 
-		/* This is the symbol it is referring to */
+		/* This is the symbol it is referring to.  Note that all
+		   undefined symbols have been resolved.  */
 		sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
 			+ ELF64_R_SYM(rel[i].r_info);
-		if (!(v = sym->st_value)) {
-			printk(KERN_WARNING "%s: Unknown symbol %s\n",
-			       me->name, strtab + sym->st_name);
-			return -ENOENT;
-		}
-		v += rel[i].r_addend;
+		v = sym->st_value + rel[i].r_addend;
 
 		switch (ELF64_R_TYPE(rel[i].r_info) & 0xff) {
 		case R_SPARC_64:
