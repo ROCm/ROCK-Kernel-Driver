@@ -183,6 +183,18 @@ static void mark_offset_tsc(void)
 
 	count = inb_p(PIT_CH0);    /* read the latched count */
 	count |= inb(PIT_CH0) << 8;
+
+	/*
+	 * VIA686a test code... reset the latch if count > max + 1
+	 * from timer_pit.c - cjb
+	 */
+	if (count > LATCH) {
+		outb_p(0x34, PIT_MODE);
+		outb_p(LATCH & 0xff, PIT_CH0);
+		outb(LATCH >> 8, PIT_CH0);
+		count = LATCH - 1;
+	}
+
 	spin_unlock(&i8253_lock);
 
 	if (pit_latch_buggy) {
