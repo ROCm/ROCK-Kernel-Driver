@@ -187,6 +187,9 @@ struct cpufreq_driver {
 				 unsigned int target_freq,
 				 unsigned int relation);
 
+	/* should be defined, if possible */
+	unsigned int	(*get)	(unsigned int cpu);
+
 	/* optional */
 	int	(*exit)		(struct cpufreq_policy *policy);
 	int	(*resume)	(struct cpufreq_policy *policy);
@@ -234,6 +237,9 @@ int cpufreq_set_policy(struct cpufreq_policy *policy);
 int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
 int cpufreq_update_policy(unsigned int cpu);
 
+/* query the current CPU frequency (in kHz). If zero, cpufreq couldn't detect it */
+unsigned int cpufreq_get(unsigned int cpu);
+
 /* the proc_intf.c needs this */
 int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor);
 
@@ -241,13 +247,10 @@ int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpu
 /*********************************************************************
  *                      CPUFREQ USERSPACE GOVERNOR                   *
  *********************************************************************/
-int cpufreq_gov_userspace_init(void);
-
 #ifdef CONFIG_CPU_FREQ_24_API
 
 int cpufreq_setmax(unsigned int cpu);
 int cpufreq_set(unsigned int kHz, unsigned int cpu);
-unsigned int cpufreq_get(unsigned int cpu);
 
 
 /* /proc/sys/cpu */

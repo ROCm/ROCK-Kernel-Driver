@@ -478,6 +478,38 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	return 0;
 }
 
+
+/** 
+ * cpufreq_get - get the current CPU frequency (in kHz)
+ * @cpu: CPU number
+ *
+ * Get the CPU current (static) CPU frequency
+ */
+unsigned int cpufreq_get(unsigned int cpu)
+{
+	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+	unsigned int ret = 0;
+
+	if (!policy)
+		return 0;
+
+	if (!cpufreq_driver->get)
+		goto out;
+
+	down(&policy->lock);
+
+	ret = cpufreq_driver->get(cpu);
+
+	up(&policy->lock);
+
+ out:
+	cpufreq_cpu_put(policy);
+
+	return (ret);
+}
+EXPORT_SYMBOL(cpufreq_get);
+
+
 /**
  *	cpufreq_resume - restore the CPU clock frequency after resume
  *
