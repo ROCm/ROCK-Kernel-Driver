@@ -940,7 +940,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		sessinit is sent but no second negprot */
 		struct rfc1002_session_packet * ses_init_buf;
 		struct smb_hdr * smb_buf;
-		ses_init_buf = cifs_kcalloc(36, GFP_KERNEL);
+		ses_init_buf = cifs_kcalloc(sizeof(struct rfc1002_session_packet), GFP_KERNEL);
 		if(ses_init_buf) {
 			ses_init_buf->trailer.session_req.called_len = 32;
 			rfc1002mangle(ses_init_buf->trailer.session_req.called_name,
