@@ -461,7 +461,8 @@ titan_kill_arch(int mode)
 /*
  * IO map support.
  */
-unsigned long
+
+void __iomem *
 titan_ioremap(unsigned long addr, unsigned long size)
 {
 	int h = (addr & TITAN_HOSE_MASK) >> TITAN_HOSE_SHIFT;
@@ -487,15 +488,19 @@ titan_ioremap(unsigned long addr, unsigned long size)
 	 * Find the hose.
 	 */
 	for (hose = hose_head; hose; hose = hose->next)
-		if (hose->index == h) break;
-	if (!hose) return (unsigned long)NULL;
+		if (hose->index == h)
+			break;
+	if (!hose)
+		return NULL;
 
 	/*
 	 * Is it direct-mapped?
 	 */
 	if ((baddr >= __direct_map_base) && 
-	    ((baddr + size - 1) < __direct_map_base + __direct_map_size)) 
-		return addr - __direct_map_base + TITAN_MEM_BIAS;
+	    ((baddr + size - 1) < __direct_map_base + __direct_map_size)) {
+		vaddr = addr - __direct_map_base + TITAN_MEM_BIAS;
+		return (void __iomem *) vaddr;
+	}
 
 	/* 
 	 * Check the scatter-gather arena.
@@ -516,7 +521,9 @@ titan_ioremap(unsigned long addr, unsigned long size)
 		 * Map it
 		 */
 		area = get_vm_area(size, VM_IOREMAP);
-		if (!area) return (unsigned long)NULL;
+		if (!area)
+			return NULL;
+
 		ptes = hose->sg_pci->ptes;
 		for (vaddr = (unsigned long)area->addr; 
 		    baddr <= last; 
@@ -525,7 +532,7 @@ titan_ioremap(unsigned long addr, unsigned long size)
 			if (!(pfn & 1)) {
 				printk("ioremap failed... pte not valid...\n");
 				vfree(area->addr);
-				return (unsigned long)NULL;
+				return NULL;
 			}
 			pfn >>= 1;	/* make it a true pfn */
 			
@@ -534,35 +541,42 @@ titan_ioremap(unsigned long addr, unsigned long size)
 						     PAGE_SIZE, 0)) {
 				printk("FAILED to map...\n");
 				vfree(area->addr);
-				return (unsigned long)NULL;
+				return NULL;
 			}
 		}
 
 		flush_tlb_all();
 
 		vaddr = (unsigned long)area->addr + (addr & ~PAGE_MASK);
-		return vaddr;
+		return (void __iomem *) vaddr;
 	}
 
-	/*
-	 * Not found - assume legacy ioremap.
-	 */
-	return addr + TITAN_MEM_BIAS;
-
+	return NULL;
 }
 
 void
-titan_iounmap(unsigned long addr)
+titan_iounmap(volatile void __iomem *xaddr)
 {
-	if (((long)addr >> 41) == -2)
-		return;	/* kseg map, nothing to do */
-	if (addr)
+	unsigned long addr = (unsigned long) xaddr;
+	if (addr >= VMALLOC_START)
 		vfree((void *)(PAGE_MASK & addr)); 
+}
+
+int
+titan_is_mmio(const volatile void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+
+	if (addr >= VMALLOC_START)
+		return 1;
+	else
+		return (addr & 0x100000000UL) == 0;
 }
 
 #ifndef CONFIG_ALPHA_GENERIC
 EXPORT_SYMBOL(titan_ioremap);
 EXPORT_SYMBOL(titan_iounmap);
+EXPORT_SYMBOL(titan_is_mmio);
 #endif
 
 /*

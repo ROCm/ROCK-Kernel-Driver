@@ -66,7 +66,7 @@ titan_update_irq_hw(unsigned long mask)
 	register int bcpu = boot_cpuid;
 
 #ifdef CONFIG_SMP
-	register unsigned long cpm = cpu_present_mask;
+	cpumask_t cpm = cpu_present_mask;
 	volatile unsigned long *dim0, *dim1, *dim2, *dim3;
 	unsigned long mask0, mask1, mask2, mask3, dummy;
 
@@ -85,10 +85,10 @@ titan_update_irq_hw(unsigned long mask)
 	dim1 = &cchip->dim1.csr;
 	dim2 = &cchip->dim2.csr;
 	dim3 = &cchip->dim3.csr;
-	if ((cpm & 1) == 0) dim0 = &dummy;
-	if ((cpm & 2) == 0) dim1 = &dummy;
-	if ((cpm & 4) == 0) dim2 = &dummy;
-	if ((cpm & 8) == 0) dim3 = &dummy;
+	if (!cpu_isset(0, cpm)) dim0 = &dummy;
+	if (!cpu_isset(1, cpm)) dim1 = &dummy;
+	if (!cpu_isset(2, cpm)) dim2 = &dummy;
+	if (!cpu_isset(3, cpm)) dim3 = &dummy;
 
 	*dim0 = mask0;
 	*dim1 = mask1;
@@ -369,7 +369,6 @@ struct alpha_machine_vector titan_mv __initmv = {
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TITAN_IO,
-	DO_TITAN_BUS,
 	.machine_check		= titan_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
@@ -397,7 +396,6 @@ struct alpha_machine_vector privateer_mv __initmv = {
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TITAN_IO,
-	DO_TITAN_BUS,
 	.machine_check		= privateer_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,

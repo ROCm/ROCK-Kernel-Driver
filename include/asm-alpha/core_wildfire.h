@@ -273,69 +273,19 @@ typedef struct {
 #define __IO_EXTERN_INLINE
 #endif
 
-#define vucp	volatile unsigned char *
-#define vusp	volatile unsigned short *
-#define vuip	volatile unsigned int *
-#define vulp	volatile unsigned long *
-
-__EXTERN_INLINE u8 wildfire_inb(unsigned long addr)
-{
-	/* ??? I wish I could get rid of this.  But there's no ioremap
-	   equivalent for I/O space.  PCI I/O can be forced into the
-	   correct hose's I/O region, but that doesn't take care of
-	   legacy ISA crap.  */
-
-	addr += WILDFIRE_IO_BIAS;
-	return __kernel_ldbu(*(vucp)addr);
-}
-
-__EXTERN_INLINE void wildfire_outb(u8 b, unsigned long addr)
-{
-	addr += WILDFIRE_IO_BIAS;
-	__kernel_stb(b, *(vucp)addr);
-	mb();
-}
-
-__EXTERN_INLINE u16 wildfire_inw(unsigned long addr)
-{
-	addr += WILDFIRE_IO_BIAS;
-	return __kernel_ldwu(*(vusp)addr);
-}
-
-__EXTERN_INLINE void wildfire_outw(u16 b, unsigned long addr)
-{
-	addr += WILDFIRE_IO_BIAS;
-	__kernel_stw(b, *(vusp)addr);
-	mb();
-}
-
-__EXTERN_INLINE u32 wildfire_inl(unsigned long addr)
-{
-	addr += WILDFIRE_IO_BIAS;
-	return *(vuip)addr;
-}
-
-__EXTERN_INLINE void wildfire_outl(u32 b, unsigned long addr)
-{
-	addr += WILDFIRE_IO_BIAS;
-	*(vuip)addr = b;
-	mb();
-}
-
 /*
  * Memory functions.  all accesses are done through linear space.
  */
 
-__EXTERN_INLINE unsigned long wildfire_ioremap(unsigned long addr, 
-					       unsigned long size
-					       __attribute__((unused)))
+__EXTERN_INLINE void __iomem *wildfire_ioportmap(unsigned long addr)
 {
-	return addr + WILDFIRE_MEM_BIAS;
+	return (void __iomem *)(addr + WILDFIRE_IO_BIAS);
 }
 
-__EXTERN_INLINE void wildfire_iounmap(unsigned long addr)
+__EXTERN_INLINE void __iomem *wildfire_ioremap(unsigned long addr, 
+					       unsigned long size)
 {
-	return;
+	return (void __iomem *)(addr + WILDFIRE_MEM_BIAS);
 }
 
 __EXTERN_INLINE int wildfire_is_ioaddr(unsigned long addr)
@@ -343,87 +293,20 @@ __EXTERN_INLINE int wildfire_is_ioaddr(unsigned long addr)
 	return addr >= WILDFIRE_BASE;
 }
 
-__EXTERN_INLINE u8 wildfire_readb(unsigned long addr)
+__EXTERN_INLINE int wildfire_is_mmio(const volatile void __iomem *xaddr)
 {
-	return __kernel_ldbu(*(vucp)addr);
+	unsigned long addr = (unsigned long)addr;
+	return (addr & 0x100000000UL) == 0;
 }
 
-__EXTERN_INLINE u16 wildfire_readw(unsigned long addr)
-{
-	return __kernel_ldwu(*(vusp)addr);
-}
-
-__EXTERN_INLINE u32 wildfire_readl(unsigned long addr)
-{
-	return (*(vuip)addr) & 0xffffffff;
-}
-
-__EXTERN_INLINE u64 wildfire_readq(unsigned long addr)
-{
-	return *(vulp)addr;
-}
-
-__EXTERN_INLINE void wildfire_writeb(u8 b, unsigned long addr)
-{
-	__kernel_stb(b, *(vucp)addr);
-}
-
-__EXTERN_INLINE void wildfire_writew(u16 b, unsigned long addr)
-{
-	__kernel_stw(b, *(vusp)addr);
-}
-
-__EXTERN_INLINE void wildfire_writel(u32 b, unsigned long addr)
-{
-	*(vuip)addr = b;
-}
-
-__EXTERN_INLINE void wildfire_writeq(u64 b, unsigned long addr)
-{
-	*(vulp)addr = b;
-}
-
-#undef vucp
-#undef vusp
-#undef vuip
-#undef vulp
-
-#ifdef __WANT_IO_DEF
-
-#define __inb(p)		wildfire_inb((unsigned long)(p))
-#define __inw(p)		wildfire_inw((unsigned long)(p))
-#define __inl(p)		wildfire_inl((unsigned long)(p))
-#define __outb(x,p)		wildfire_outb((x),(unsigned long)(p))
-#define __outw(x,p)		wildfire_outw((x),(unsigned long)(p))
-#define __outl(x,p)		wildfire_outl((x),(unsigned long)(p))
-#define __readb(a)		wildfire_readb((unsigned long)(a))
-#define __readw(a)		wildfire_readw((unsigned long)(a))
-#define __readl(a)		wildfire_readl((unsigned long)(a))
-#define __readq(a)		wildfire_readq((unsigned long)(a))
-#define __writeb(x,a)		wildfire_writeb((x),(unsigned long)(a))
-#define __writew(x,a)		wildfire_writew((x),(unsigned long)(a))
-#define __writel(x,a)		wildfire_writel((x),(unsigned long)(a))
-#define __writeq(x,a)		wildfire_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		wildfire_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		wildfire_iounmap((unsigned long)(a))
-#define __is_ioaddr(a)		wildfire_is_ioaddr((unsigned long)(a))
-
-#define inb(p)			__inb(p)
-#define inw(p)			__inw(p)
-#define inl(p)			__inl(p)
-#define outb(x,p)		__outb((x),(p))
-#define outw(x,p)		__outw((x),(p))
-#define outl(x,p)		__outl((x),(p))
-#define __raw_readb(a)		__readb(a)
-#define __raw_readw(a)		__readw(a)
-#define __raw_readl(a)		__readl(a)
-#define __raw_readq(a)		__readq(a)
-#define __raw_writeb(v,a)	__writeb((v),(a))
-#define __raw_writew(v,a)	__writew((v),(a))
-#define __raw_writel(v,a)	__writel((v),(a))
-#define __raw_writeq(v,a)	__writeq((v),(a))
-
-#endif /* __WANT_IO_DEF */
+#undef __IO_PREFIX
+#define __IO_PREFIX			wildfire
+#define wildfire_trivial_rw_bw		1
+#define wildfire_trivial_rw_lq		1
+#define wildfire_trivial_io_bw		1
+#define wildfire_trivial_io_lq		1
+#define wildfire_trivial_iounmap	1
+#include <asm/io_trivial.h>
 
 #ifdef __IO_EXTERN_INLINE
 #undef __EXTERN_INLINE

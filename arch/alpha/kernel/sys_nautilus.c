@@ -250,7 +250,6 @@ struct alpha_machine_vector nautilus_mv __initmv = {
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_IRONGATE_IO,
-	DO_IRONGATE_BUS,
 	.machine_check		= nautilus_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,

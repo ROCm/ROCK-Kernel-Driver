@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <asm/compiler.h>
 
 #ifndef __EXTERN_INLINE
 #define __EXTERN_INLINE extern inline
