@@ -938,6 +938,32 @@ err_out:
 	DPRINTK("EXIT - badcmd\n");
 }
 
+static inline struct ata_device *
+ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
+{
+	struct ata_device *dev;
+
+	/* skip commands not addressed to targets we simulate */
+	if (likely(cmd->device->id < ATA_MAX_DEVICES))
+		dev = &ap->device[cmd->device->id];
+	else
+		return NULL;
+
+	if (unlikely((cmd->device->channel != 0) ||
+		     (cmd->device->lun != 0)))
+		return NULL;
+
+	if (unlikely(!ata_dev_present(dev)))
+		return NULL;
+
+#ifndef ATA_ENABLE_ATAPI
+	if (unlikely(dev->class == ATA_DEV_ATAPI))
+		return NULL;
+#endif
+
+	return dev;
+}
+
 /**
  *	ata_scsi_queuecmd - Issue SCSI cdb to libata-managed device
  *	@cmd: SCSI command to be sent
@@ -963,12 +989,6 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 	struct ata_port *ap;
 	struct ata_device *dev;
 	struct ata_scsi_args args;
-	const unsigned int atapi_support =
-#ifdef ATA_ENABLE_ATAPI
-					   1;
-#else
-					   0;
-#endif
 
 	ap = (struct ata_port *) &cmd->device->host->hostdata[0];
 
@@ -979,35 +999,16 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 		scsicmd[4], scsicmd[5], scsicmd[6], scsicmd[7],
 		scsicmd[8]);
 
-	/* skip commands not addressed to targets we care about */
-	if ((cmd->device->channel != 0) || (cmd->device->lun != 0) ||
-	    (cmd->device->id >= ATA_MAX_DEVICES)) {
-		cmd->result = (DID_BAD_TARGET << 16); /* FIXME: correct? */
+	dev = ata_scsi_find_dev(ap, cmd);
+	if (unlikely(!dev)) {
+		cmd->result = (DID_BAD_TARGET << 16);
 		done(cmd);
-		goto out;
-	}
-
-	dev = &ap->device[cmd->device->id];
-
-	if (!ata_dev_present(dev)) {
-		DPRINTK("no device\n");
-		cmd->result = (DID_BAD_TARGET << 16); /* FIXME: correct? */
-		done(cmd);
-		goto out_unlock;
-	}
-
-	if (dev->class == ATA_DEV_ATAPI) {
-		if (atapi_support)
-			atapi_scsi_queuecmd(ap, dev, cmd, done);
-		else {
-			cmd->result = (DID_BAD_TARGET << 16); /* correct? */
-			done(cmd);
-		}
 		goto out_unlock;
 	}
 
 	/* fast path */
-	switch(scsicmd[0]) {
+	if (dev->class == ATA_DEV_ATA) {
+		switch(scsicmd[0]) {
 		case READ_6:
 		case WRITE_6:
 			ata_scsi_rw_queue(ap, dev, cmd, done, 6);
@@ -1026,6 +1027,12 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 		default:
 			/* do nothing */
 			break;
+		}
+
+	} else {
+		assert (dev->class == ATA_DEV_ATAPI);
+		atapi_scsi_queuecmd(ap, dev, cmd, done);
+		goto out_unlock;
 	}
 
 	/*
@@ -1100,8 +1107,7 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 			break;
 	}
 
-out_unlock:		/* I will kill this soon... reduces 2.4 diff */
-out:
+out_unlock:
 	return 0;
 }
 
