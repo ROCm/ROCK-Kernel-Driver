@@ -627,33 +627,10 @@ EXPORT_SYMBOL_GPL(cpufreq_register_governor);
 
 void cpufreq_unregister_governor(struct cpufreq_governor *governor)
 {
-	unsigned int i;
-	
 	if (!governor)
 		return;
 
 	down(&cpufreq_governor_sem);
-
-	/* 
-	 * Unless the user uses rmmod -f, we can be safe. But we never
-	 * know, so check whether if it's currently used. If so,
-	 * stop it and replace it with the default governor.
-	 */
-	for (i=0; i<NR_CPUS; i++)
-	{
-		if (!cpufreq_cpu_get(i))
-			continue;
-		if ((cpufreq_driver->policy[i].policy == CPUFREQ_POLICY_GOVERNOR) && 
-		    (cpufreq_driver->policy[i].governor == governor)) {
-			cpufreq_governor(i, CPUFREQ_GOV_STOP);
-			cpufreq_driver->policy[i].policy = CPUFREQ_POLICY_PERFORMANCE;
-			cpufreq_governor(i, CPUFREQ_GOV_START);
-			cpufreq_governor(i, CPUFREQ_GOV_LIMITS);
-		}
-		cpufreq_cpu_put(i);
-	}
-
-	/* now we can safely remove it from the list */
 	list_del(&governor->governor_list);
 	up(&cpufreq_governor_sem);
 	return;
@@ -821,7 +798,7 @@ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 	switch (state) {
 	case CPUFREQ_PRECHANGE:
 		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_PRECHANGE, freqs);
-		adjust_jiffies(CPUFREQ_PRECHANGE, freqs);		
+		adjust_jiffies(CPUFREQ_PRECHANGE, freqs);
 		break;
 	case CPUFREQ_POSTCHANGE:
 		adjust_jiffies(CPUFREQ_POSTCHANGE, freqs);
