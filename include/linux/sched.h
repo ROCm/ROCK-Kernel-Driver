@@ -343,6 +343,8 @@ struct k_itimer {
 	struct task_struct *it_process;	/* process to send signal to */
 	struct timer_list it_timer;
 	struct sigqueue *sigq;		/* signal queue entry. */
+	struct list_head abs_timer_entry; /* clock abs_timer_list */
+	struct timespec wall_to_prev;   /* wall_to_monotonic used when set */
 };
 
 
