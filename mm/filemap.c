@@ -1262,7 +1262,7 @@ ssize_t generic_file_read(struct file * filp, char * buf, size_t count, loff_t *
 	}
 }
 
-static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset , unsigned long size)
+static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
 	ssize_t written;
 	unsigned long count = desc->count;
@@ -1271,22 +1271,8 @@ static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned
 	if (size > count)
 		size = count;
 
- 	if (file->f_op->sendpage) {
- 		written = file->f_op->sendpage(file, page, offset,
-					       size, &file->f_pos, size<count);
-	} else {
-		char *kaddr;
-		mm_segment_t old_fs;
-
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-
-		kaddr = kmap(page);
-		written = file->f_op->write(file, kaddr + offset, size, &file->f_pos);
-		kunmap(page);
-
-		set_fs(old_fs);
-	}
+	written = file->f_op->sendpage(file, page, offset,
+				       size, &file->f_pos, size<count);
 	if (written < 0) {
 		desc->error = written;
 		written = 0;
@@ -1331,7 +1317,7 @@ static ssize_t common_sendfile(int out_fd, int in_fd, loff_t *offset, size_t cou
 	if (!(out_file->f_mode & FMODE_WRITE))
 		goto fput_out;
 	retval = -EINVAL;
-	if (!out_file->f_op || !out_file->f_op->write)
+	if (!out_file->f_op || !out_file->f_op->sendpage)
 		goto fput_out;
 	out_inode = out_file->f_dentry->d_inode;
 	retval = locks_verify_area(FLOCK_VERIFY_WRITE, out_inode, out_file, out_file->f_pos, count);
