@@ -6,7 +6,6 @@
 #define SIGEV_PAD_SIZE	((SIGEV_MAX_SIZE/sizeof(int)) - 4)
 
 #define HAVE_ARCH_COPY_SIGINFO
-#define HAVE_ARCH_COPY_SIGINFO_TO_USER
 
 #include <asm-generic/siginfo.h>
 
