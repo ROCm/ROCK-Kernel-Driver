@@ -10,15 +10,10 @@
 
 extern spinlock_t kernel_flag;
 
-#ifdef CONFIG_SMP
-#define kernel_locked()		spin_is_locked(&kernel_flag)
-#else
-#ifdef CONFIG_PREEMPT
-#define kernel_locked()		preempt_count()
-#else
-#define kernel_locked()		1
-#endif
-#endif
+#define kernel_locked()		(current->lock_depth >= 0)
+
+#define get_kernel_lock()	spin_lock(&kernel_flag)
+#define put_kernel_lock()	spin_unlock(&kernel_flag)
 
 /*
  * Release global kernel lock and global interrupt lock
@@ -26,7 +21,7 @@ extern spinlock_t kernel_flag;
 #define release_kernel_lock(task)		\
 do {						\
 	if (unlikely(task->lock_depth >= 0))	\
-		spin_unlock(&kernel_flag);	\
+		put_kernel_lock();		\
 } while (0)
 
 /*
@@ -35,7 +30,7 @@ do {						\
 #define reacquire_kernel_lock(task)		\
 do {						\
 	if (unlikely(task->lock_depth >= 0))	\
-		spin_lock(&kernel_flag);	\
+		get_kernel_lock();		\
 } while (0)
 
 
@@ -48,40 +43,16 @@ do {						\
  */
 static __inline__ void lock_kernel(void)
 {
-#ifdef CONFIG_PREEMPT
-	if (current->lock_depth == -1)
-		spin_lock(&kernel_flag);
-	++current->lock_depth;
-#else
-#if 1
-	if (!++current->lock_depth)
-		spin_lock(&kernel_flag);
-#else
-	__asm__ __volatile__(
-		"incl %1\n\t"
-		"jne 9f"
-		spin_lock_string
-		"\n9:"
-		:"=m" (__dummy_lock(&kernel_flag)),
-		 "=m" (current->lock_depth));
-#endif
-#endif
+	int depth = current->lock_depth+1;
+	if (!depth)
+		get_kernel_lock();
+	current->lock_depth = depth;
 }
 
 static __inline__ void unlock_kernel(void)
 {
 	if (current->lock_depth < 0)
 		BUG();
-#if 1
 	if (--current->lock_depth < 0)
-		spin_unlock(&kernel_flag);
-#else
-	__asm__ __volatile__(
-		"decl %1\n\t"
-		"jns 9f\n\t"
-		spin_unlock_string
-		"\n9:"
-		:"=m" (__dummy_lock(&kernel_flag)),
-		 "=m" (current->lock_depth));
-#endif
+		put_kernel_lock();
 }
