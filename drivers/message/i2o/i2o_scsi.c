@@ -301,6 +301,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 	if (msg->u.head[0] & (1 << 13)) {
 		struct i2o_message *pmsg;	/* preserved message */
 		u32 pm;
+		int err = DID_ERROR;
 
 		pm = le32_to_cpu(&msg->body[3]);
 
@@ -318,7 +319,10 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 		if (msg->body[0] & (1 << 18))
 			printk(KERN_ERR "Path State.\n");
 		if (msg->body[0] & (1 << 18))
+		{
 			printk(KERN_ERR "Congestion.\n");
+			err = DID_BUS_BUSY;
+		}
 
 		printk(KERN_DEBUG "Failing message is %p.\n", pmsg);
 
@@ -326,7 +330,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 		if (!cmd)
 			return 1;
 
-		cmd->result = DID_ERROR << 16;
+		cmd->result = err << 16;
 		cmd->scsi_done(cmd);
 
 		/* Now flush the message by making it a NOP */
