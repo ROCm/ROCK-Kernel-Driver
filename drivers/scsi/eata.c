@@ -750,63 +750,34 @@ static int max_queue_depth = CONFIG_SCSI_EATA_MAX_TAGS;
 static int max_queue_depth = MAX_CMD_PER_LUN;
 #endif
 
-static void select_queue_depths(struct Scsi_Host *host, Scsi_Device *devlist) {
-   Scsi_Device *dev;
-   int j, ntag = 0, nuntag = 0, tqd, utqd;
+static int eata2x_slave_attach(Scsi_Device *dev) {
+   int j, tqd, utqd;
+   char *link_suffix = "";
+   struct Scsi_Host *host = dev->host;
 
    j = ((struct hostdata *) host->hostdata)->board_number;
 
-   for(dev = devlist; dev; dev = dev->next) {
-
-      if (dev->host != host) continue;
-
-      if (TLDEV(dev->type) && (dev->tagged_supported || linked_comm))
-         ntag++;
-      else
-         nuntag++;
-      }
-
    utqd = MAX_CMD_PER_LUN;
+   tqd = (host->can_queue - utqd);
 
-   tqd = (host->can_queue - utqd * nuntag) / (ntag ? ntag : 1);
-
-   if (tqd > max_queue_depth) tqd = max_queue_depth;
-
-   if (tqd < MAX_CMD_PER_LUN) tqd = MAX_CMD_PER_LUN;
-
-   for(dev = devlist; dev; dev = dev->next) {
-      char *tag_suffix = "", *link_suffix = "";
-
-      if (dev->host != host) continue;
-
-      if (TLDEV(dev->type) && (dev->tagged_supported || linked_comm))
-         dev->queue_depth = tqd;
+   if (TLDEV(dev->type) && (dev->tagged_supported || linked_comm)) {
+      if(!dev->tagged_supported)
+         scsi_adjust_queue_depth(dev, 0, tqd);
       else
-         dev->queue_depth = utqd;
+         scsi_adjust_queue_depth(dev, MSG_SIMPLE_TAG, tqd);
+   } else {
+      scsi_adjust_queue_depth(dev, 0, utqd);
+   }
 
-      if (TLDEV(dev->type)) {
-         if (linked_comm && dev->queue_depth > 2)
-            link_suffix = ", sorted";
-         else
-            link_suffix = ", unsorted";
-         }
+   if (!dev->simple_tags && dev->new_queue_depth > 2)
+      link_suffix = ", sorted";
+   else if (dev->simple_tags)
+      link_suffix = ", unsorted";
 
-      if (tagged_comm && dev->tagged_supported && TLDEV(dev->type)) {
-         dev->tagged_queue = 1;
-         dev->current_tag = 1;
-         }
-
-      if (dev->tagged_supported && TLDEV(dev->type) && dev->tagged_queue)
-         tag_suffix = ", soft-tagged";
-      else if (dev->tagged_supported && TLDEV(dev->type))
-         tag_suffix = ", tagged";
-
-      printk("%s: scsi%d, channel %d, id %d, lun %d, cmds/lun %d%s%s.\n",
-             BN(j), host->host_no, dev->channel, dev->id, dev->lun,
-             dev->queue_depth, link_suffix, tag_suffix);
-      }
-
-   return;
+   printk("%s: scsi%d, channel %d, id %d, lun %d, cmds/lun %d%s.\n",
+          BN(j), host->host_no, dev->channel, dev->id, dev->lun,
+          dev->new_queue_depth, link_suffix);
+   return 0;
 }
 
 static inline int wait_on_busy(unsigned long iobase, unsigned int loop) {
@@ -1071,7 +1042,6 @@ static inline int port_detect \
    sh[j]->this_id = (ushort) info.host_addr[3];
    sh[j]->can_queue = (ushort) be16_to_cpu(info.queue_size);
    sh[j]->cmd_per_lun = MAX_CMD_PER_LUN;
-   sh[j]->select_queue_depths = select_queue_depths;
    memset(HD(j), 0, sizeof(struct hostdata));
    HD(j)->subversion = subversion;
    HD(j)->protocol_rev = protocol_rev;
@@ -1542,7 +1512,7 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    /* Map DMA buffers and SG list */
    map_dma(i, j);
 
-   if (SCpnt->device->tagged_queue) {
+   if (SCpnt->device->simple_tags) {
 
       if (HD(j)->target_redo[SCpnt->target][SCpnt->channel] ||
             HD(j)->target_to[SCpnt->target][SCpnt->channel])
@@ -1560,8 +1530,7 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
       cpp->mess[1] = SCpnt->device->current_tag++;
       }
 
-   if (linked_comm && SCpnt->device->queue_depth > 2
-                                     && TLDEV(SCpnt->device->type)) {
+   if (SCpnt->device->queue_depth > 2 && !SCpnt->device->simple_tags) {
       HD(j)->cp_stat[i] = READY;
       flush_dev(SCpnt->device, SCpnt->request->sector, j, FALSE);
       return 0;
