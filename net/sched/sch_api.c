@@ -306,8 +306,7 @@ dev_graft_qdisc(struct net_device *dev, struct Qdisc *qdisc)
 	if (dev->flags & IFF_UP)
 		dev_deactivate(dev);
 
-	write_lock(&qdisc_tree_lock);
-	spin_lock_bh(&dev->queue_lock);
+	qdisc_lock_tree(dev);
 	if (qdisc && qdisc->flags&TCQ_F_INGRES) {
 		oqdisc = dev->qdisc_ingress;
 		/* Prune old scheduler */
@@ -334,8 +333,7 @@ dev_graft_qdisc(struct net_device *dev, struct Qdisc *qdisc)
 		dev->qdisc = &noop_qdisc;
 	}
 
-	spin_unlock_bh(&dev->queue_lock);
-	write_unlock(&qdisc_tree_lock);
+	qdisc_unlock_tree(dev);
 
 	if (dev->flags & IFF_UP)
 		dev_activate(dev);
@@ -454,10 +452,11 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	 * before we set a netdevice's qdisc pointer to sch */
 	smp_wmb();
 	if (!ops->init || (err = ops->init(sch, tca[TCA_OPTIONS-1])) == 0) {
-		write_lock(&qdisc_tree_lock);
+		qdisc_lock_tree(dev);
 		sch->next = dev->qdisc_list;
 		dev->qdisc_list = sch;
-		write_unlock(&qdisc_tree_lock);
+		qdisc_unlock_tree(dev);
+
 #ifdef CONFIG_NET_ESTIMATOR
 		if (tca[TCA_RATE-1])
 			qdisc_new_estimator(&sch->stats, sch->stats_lock,

@@ -1320,6 +1320,13 @@ int __skb_linearize(struct sk_buff *skb, int gfp_mask)
 	}						\
 }
 
+static inline void qdisc_run(struct net_device *dev)
+{
+	while (!netif_queue_stopped(dev) &&
+	       qdisc_restart(dev)<0)
+		/* NOTHING */;
+}
+
 /**
  *	dev_queue_xmit - transmit a buffer
  *	@skb: buffer to transmit

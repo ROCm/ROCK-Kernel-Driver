@@ -105,43 +105,15 @@ struct qdisc_rate_table
 	int		refcnt;
 };
 
-static inline void sch_tree_lock(struct Qdisc *q)
-{
-	write_lock(&qdisc_tree_lock);
-	spin_lock_bh(&q->dev->queue_lock);
-}
+extern void qdisc_lock_tree(struct net_device *dev);
+extern void qdisc_unlock_tree(struct net_device *dev);
 
-static inline void sch_tree_unlock(struct Qdisc *q)
-{
-	spin_unlock_bh(&q->dev->queue_lock);
-	write_unlock(&qdisc_tree_lock);
-}
+#define sch_tree_lock(q)	qdisc_lock_tree((q)->dev)
+#define sch_tree_unlock(q)	qdisc_unlock_tree((q)->dev)
+#define tcf_tree_lock(tp)	qdisc_lock_tree((tp)->q->dev)
+#define tcf_tree_unlock(tp)	qdisc_unlock_tree((tp)->q->dev)
 
-static inline void tcf_tree_lock(struct tcf_proto *tp)
-{
-	write_lock(&qdisc_tree_lock);
-	spin_lock_bh(&tp->q->dev->queue_lock);
-}
-
-static inline void tcf_tree_unlock(struct tcf_proto *tp)
-{
-	spin_unlock_bh(&tp->q->dev->queue_lock);
-	write_unlock(&qdisc_tree_lock);
-}
-
-
-static inline unsigned long
-cls_set_class(struct tcf_proto *tp, unsigned long *clp, unsigned long cl)
-{
-	unsigned long old_cl;
-
-	tcf_tree_lock(tp);
-	old_cl = *clp;
-	*clp = cl;
-	tcf_tree_unlock(tp);
-	return old_cl;
-}
-
+#define cls_set_class(tp, clp, cl) tcf_set_class(tp, clp, cl)
 static inline unsigned long
 __cls_set_class(unsigned long *clp, unsigned long cl)
 {
@@ -407,6 +379,8 @@ extern int tcf_act_police_dump(struct sk_buff *, struct tc_action *, int, int);
 extern int tcf_act_police(struct sk_buff **skb, struct tc_action *a);
 #endif
 
+extern unsigned long tcf_set_class(struct tcf_proto *tp, unsigned long *clp, 
+				   unsigned long cl);
 extern int tcf_police(struct sk_buff *skb, struct tcf_police *p);
 extern int qdisc_copy_stats(struct sk_buff *skb, struct tc_stats *st, spinlock_t *lock);
 extern void tcf_police_destroy(struct tcf_police *p);
@@ -457,13 +431,6 @@ struct qdisc_rate_table *qdisc_get_rtab(struct tc_ratespec *r, struct rtattr *ta
 void qdisc_put_rtab(struct qdisc_rate_table *tab);
 
 extern int qdisc_restart(struct net_device *dev);
-
-static inline void qdisc_run(struct net_device *dev)
-{
-	while (!netif_queue_stopped(dev) &&
-	       qdisc_restart(dev)<0)
-		/* NOTHING */;
-}
 
 /* Calculate maximal size of packet seen by hard_start_xmit
    routine of this device.

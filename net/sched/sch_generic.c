@@ -54,6 +54,18 @@
  */
 rwlock_t qdisc_tree_lock = RW_LOCK_UNLOCKED;
 
+void qdisc_lock_tree(struct net_device *dev)
+{
+	write_lock(&qdisc_tree_lock);
+	spin_lock_bh(&dev->queue_lock);
+}
+
+void qdisc_unlock_tree(struct net_device *dev)
+{
+	spin_unlock_bh(&dev->queue_lock);
+	write_unlock(&qdisc_tree_lock);
+}
+
 /* 
    dev->queue_lock serializes queue accesses for this device
    AND dev->qdisc pointer itself.
@@ -513,13 +525,11 @@ void dev_deactivate(struct net_device *dev)
 
 void dev_init_scheduler(struct net_device *dev)
 {
-	write_lock(&qdisc_tree_lock);
-	spin_lock_bh(&dev->queue_lock);
+	qdisc_lock_tree(dev);
 	dev->qdisc = &noop_qdisc;
-	spin_unlock_bh(&dev->queue_lock);
 	dev->qdisc_sleeping = &noop_qdisc;
 	dev->qdisc_list = NULL;
-	write_unlock(&qdisc_tree_lock);
+	qdisc_unlock_tree(dev);
 
 	dev_watchdog_init(dev);
 }
@@ -528,8 +538,7 @@ void dev_shutdown(struct net_device *dev)
 {
 	struct Qdisc *qdisc;
 
-	write_lock(&qdisc_tree_lock);
-	spin_lock_bh(&dev->queue_lock);
+	qdisc_lock_tree(dev);
 	qdisc = dev->qdisc_sleeping;
 	dev->qdisc = &noop_qdisc;
 	dev->qdisc_sleeping = &noop_qdisc;
@@ -543,8 +552,7 @@ void dev_shutdown(struct net_device *dev)
 	BUG_TRAP(dev->qdisc_list == NULL);
 	BUG_TRAP(!timer_pending(&dev->watchdog_timer));
 	dev->qdisc_list = NULL;
-	spin_unlock_bh(&dev->queue_lock);
-	write_unlock(&qdisc_tree_lock);
+	qdisc_unlock_tree(dev);
 }
 
 EXPORT_SYMBOL(__netdev_watchdog_up);
@@ -554,4 +562,5 @@ EXPORT_SYMBOL(qdisc_create_dflt);
 EXPORT_SYMBOL(qdisc_destroy);
 EXPORT_SYMBOL(qdisc_reset);
 EXPORT_SYMBOL(qdisc_restart);
-EXPORT_SYMBOL(qdisc_tree_lock);
+EXPORT_SYMBOL(qdisc_lock_tree);
+EXPORT_SYMBOL(qdisc_unlock_tree);

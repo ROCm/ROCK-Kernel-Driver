@@ -236,12 +236,12 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 			kfree(tp);
 			goto errout;
 		}
-		write_lock(&qdisc_tree_lock);
-		spin_lock_bh(&dev->queue_lock);
+
+		qdisc_lock_tree(dev);
 		tp->next = *back;
 		*back = tp;
-		spin_unlock_bh(&dev->queue_lock);
-		write_unlock(&qdisc_tree_lock);
+		qdisc_unlock_tree(dev);
+
 	} else if (tca[TCA_KIND-1] && rtattr_strcmp(tca[TCA_KIND-1], tp->ops->kind))
 		goto errout;
 
@@ -249,11 +249,10 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 
 	if (fh == 0) {
 		if (n->nlmsg_type == RTM_DELTFILTER && t->tcm_handle == 0) {
-			write_lock(&qdisc_tree_lock);
-			spin_lock_bh(&dev->queue_lock);
+			qdisc_lock_tree(dev);
 			*back = tp->next;
-			spin_unlock_bh(&dev->queue_lock);
-			write_unlock(&qdisc_tree_lock);
+			qdisc_unlock_tree(dev);
+
 			tfilter_notify(skb, n, tp, fh_s, RTM_DELTFILTER);
 			tcf_destroy(tp);
 			err = 0;
@@ -293,6 +292,19 @@ errout:
 		cops->put(q, cl);
 	return err;
 }
+
+unsigned long tcf_set_class(struct tcf_proto *tp, unsigned long *clp, 
+			    unsigned long cl)
+{
+	unsigned long old_cl;
+
+	tcf_tree_lock(tp);
+	old_cl = __cls_set_class(clp, cl);
+	tcf_tree_unlock(tp);
+
+	return old_cl;
+}
+
 
 static int
 tcf_fill_node(struct sk_buff *skb, struct tcf_proto *tp, unsigned long fh,
@@ -459,3 +471,4 @@ subsys_initcall(tc_filter_init);
 
 EXPORT_SYMBOL(register_tcf_proto_ops);
 EXPORT_SYMBOL(unregister_tcf_proto_ops);
+EXPORT_SYMBOL(tcf_set_class);
