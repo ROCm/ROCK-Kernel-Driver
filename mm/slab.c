@@ -1370,6 +1370,9 @@ static inline void * __kmem_cache_alloc (kmem_cache_t *cachep, int flags)
 	unsigned long save_flags;
 	void* objp;
 
+	if (flags & __GFP_WAIT)
+		might_sleep();
+
 	kmem_cache_alloc_head(cachep, flags);
 try_again:
 	local_irq_save(save_flags);

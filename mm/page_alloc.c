@@ -321,6 +321,9 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	struct page * page;
 	int freed, i;
 
+	if (gfp_mask & __GFP_WAIT)
+		might_sleep();
+
 	KERNEL_STAT_ADD(pgalloc, 1<<order);
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
