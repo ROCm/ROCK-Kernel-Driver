@@ -49,10 +49,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#define SYM_VERSION "2.1.18j"
-#define SYM_DRIVER_NAME	"sym-" SYM_VERSION
-
 #include "sym_glue.h"
 #include "sym_nvram.h"
 

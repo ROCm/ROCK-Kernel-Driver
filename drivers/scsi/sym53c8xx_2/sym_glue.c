@@ -2283,6 +2283,7 @@ static int sym_detach(struct sym_hcb *np)
 }
 
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_VERSION(SYM_VERSION);
 
 /*
  * Driver host template.
