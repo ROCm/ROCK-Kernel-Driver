@@ -3889,7 +3889,6 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 			}
 		}
 		/* Fall through */
-	case TCP_LAST_ACK:
 	case TCP_ESTABLISHED: 
 		tcp_data_queue(sk, skb);
 		queued = 1;
