@@ -278,7 +278,7 @@ $u_eoc:
 	extqh	t2, a1, t0	# e0    : extract low bits for last word
 	or	t1, t0, t1	# e1    :
 
-1:	cmpbge	zero, t1, t7
+1:	cmpbge	zero, t1, t8
 	mov	t1, t0
 
 $u_eocfin:			# end-of-count, final word

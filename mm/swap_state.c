@@ -199,16 +199,14 @@ void delete_from_swap_cache(struct page *page)
 int move_to_swap_cache(struct page *page, swp_entry_t entry)
 {
 	struct address_space *mapping = page->mapping;
-	void **pslot;
 	int err;
 
 	write_lock(&swapper_space.page_lock);
 	write_lock(&mapping->page_lock);
 
-	err = radix_tree_reserve(&swapper_space.page_tree, entry.val, &pslot);
+	err = radix_tree_insert(&swapper_space.page_tree, entry.val, page);
 	if (!err) {
 		__remove_from_page_cache(page);
-		*pslot = page;
 		___add_to_page_cache(page, &swapper_space, entry.val);
 	}
 
@@ -231,7 +229,6 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		struct address_space *mapping)
 {
 	swp_entry_t entry;
-	void **pslot;
 	int err;
 
 	BUG_ON(!PageLocked(page));
@@ -243,10 +240,9 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 	write_lock(&swapper_space.page_lock);
 	write_lock(&mapping->page_lock);
 
-	err = radix_tree_reserve(&mapping->page_tree, index, &pslot);
+	err = radix_tree_insert(&mapping->page_tree, index, page);
 	if (!err) {
 		__delete_from_swap_cache(page);
-		*pslot = page;
 		___add_to_page_cache(page, mapping, index);
 	}
 

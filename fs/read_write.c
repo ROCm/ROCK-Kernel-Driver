@@ -316,7 +316,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	size_t tot_len;
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov=iovstack;
-	ssize_t ret = -EINVAL;
+	ssize_t ret;
 	int seg;
 	io_fn_t fn;
 	iov_fn_t fnv;
@@ -325,8 +325,9 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	/*
 	 * SuS says "The readv() function *may* fail if the iovcnt argument
 	 * was less than or equal to 0, or greater than {IOV_MAX}.  Linux has
-	 * traditionally returned -EINVAL for zero segments, so...
+	 * traditionally returned zero for zero segments, so...
 	 */
+	ret = 0;
 	if (nr_segs == 0)
 		goto out;
 
@@ -334,6 +335,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	 * First get the "struct iovec" from user memory and
 	 * verify all the pointers
 	 */
+	ret = -EINVAL;
 	if ((nr_segs > UIO_MAXIOV) || (nr_segs <= 0))
 		goto out;
 	if (!file->f_op)

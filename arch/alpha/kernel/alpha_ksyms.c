@@ -161,7 +161,6 @@ EXPORT_SYMBOL(sys_read);
 EXPORT_SYMBOL(sys_lseek);
 EXPORT_SYMBOL(__kernel_execve);
 EXPORT_SYMBOL(sys_setsid);
-EXPORT_SYMBOL(sys_sync);
 EXPORT_SYMBOL(sys_wait4);
 
 /* Networking helper routines. */

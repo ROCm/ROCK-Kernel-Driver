@@ -99,30 +99,32 @@ export libs-y
 
 MAKEBOOT = $(MAKE) -C arch/alpha/boot
 
-rawboot:
+rawboot:	vmlinux
 	@$(MAKEBOOT) rawboot
+
+boot:	vmlinux
+	@$(MAKEBOOT)
 
 #
 # My boot writes directly to a specific disk partition, I doubt most
 # people will want to do that without changes..
 #
-msb my-special-boot:
+msb my-special-boot:	vmlinux
 	@$(MAKEBOOT) msb
 
-bootimage:
+bootimage:	vmlinux
 	@$(MAKEBOOT) bootimage
 
-srmboot:
+srmboot:	vmlinux
 	@$(MAKEBOOT) srmboot
 
 archclean:
-	@$(MAKE) -C arch/alpha/kernel clean
 	@$(MAKEBOOT) clean
 
 archmrproper:
 	rm -f include/asm-alpha/asm_offsets.h
 
-bootpfile:
+bootpfile:	vmlinux
 	@$(MAKEBOOT) bootpfile
 
 
