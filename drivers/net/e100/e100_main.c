@@ -3005,8 +3005,13 @@ err:
 void
 e100_isolate_driver(struct e100_private *bdp)
 {
-	if (netif_running(bdp->device)) {
-		e100_dis_intr(bdp);
+
+	/* Check if interface is up                              */
+	/* NOTE: Can't use netif_running(bdp->device) because    */
+	/* dev_close clears __LINK_STATE_START before calling    */
+	/* e100_close (aka dev->stop)                            */
+	if (bdp->device->flags & IFF_UP) {
+		e100_disable_clear_intr(bdp);
 		del_timer_sync(&bdp->watchdog_timer);
 		del_timer_sync(&bdp->hwi_timer);
 		/* If in middle of cable diag, */
