@@ -132,7 +132,6 @@ xfs-y				+= $(addprefix linux/, \
 # Objects in support/
 xfs-y				+= $(addprefix support/, \
 				   debug.o \
-				   kmem.o \
 				   ktrace.o \
 				   move.o \
 				   mrlock.o \

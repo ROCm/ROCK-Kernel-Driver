@@ -1897,13 +1897,6 @@ pagebuf_readstats(
 }
 #endif  /* CONFIG_PROC_FS */
 
-STATIC void
-pagebuf_shaker(void)
-{
-	pagebuf_daemon_wakeup(1);
-}
-
-
 /*
  *	Initialization and Termination
  */
@@ -1943,7 +1936,6 @@ pagebuf_init(void)
 #endif
 
 	pagebuf_daemon_start();
-	kmem_shake_register(pagebuf_shaker);
 	return 0;
 }
 
@@ -1959,7 +1951,6 @@ pagebuf_terminate(void)
 	pagebuf_daemon_stop();
 
 	kmem_cache_destroy(pagebuf_cache);
-	kmem_shake_deregister(pagebuf_shaker);
 
 	unregister_sysctl_table(pagebuf_table_header);
 #ifdef  CONFIG_PROC_FS
