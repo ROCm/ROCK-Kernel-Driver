@@ -117,7 +117,6 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 #ifdef CONFIG_PPC_STD_MMU
 	unsigned int kptes = 0, uptes = 0;
 	PTE *ptr;
-	struct task_struct *p;
 #endif /* CONFIG_PPC_STD_MMU */
 	char buffer[512];
 
@@ -150,22 +149,18 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 		goto return_string;
 	}
 
-	for ( ptr = Hash ; ptr < Hash_end ; ptr++)
-	{
-		unsigned int ctx, mctx, vsid;
+	for (ptr = Hash; ptr < Hash_end; ptr++) {
+		unsigned int mctx, vsid;
 
 		if (!ptr->v)
 			continue;
-		/* make sure someone is using this context/vsid */
-		/* first undo the esid skew */
+		/* undo the esid skew */
 		vsid = ptr->vsid;
 		mctx = ((vsid - (vsid & 0xf) * 0x111) >> 4) & 0xfffff;
-		if (mctx == 0) {
+		if (mctx == 0)
 			kptes++;
-			continue;
-		}
-		/* now undo the context skew; 801921 * 897 == 1 mod 2^20 */
-		ctx = (mctx * 801921) & 0xfffff;
+		else
+			uptes++;
 	}
 	
 	n += sprintf( buffer + n,
@@ -196,7 +191,7 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 		      primary_pteg_full, htab_evicts);
 return_string:
 #endif /* CONFIG_PPC_STD_MMU */
-	
+
 	n += sprintf( buffer + n,
 		      "Non-error misses: %lu\n"
 		      "Error misses\t: %lu\n",
