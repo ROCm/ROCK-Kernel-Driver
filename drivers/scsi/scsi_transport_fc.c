@@ -631,7 +631,7 @@ fc_stat_show(const struct class_device *cdev, char *buf, unsigned long offset)
 		stats = (i->f->get_fc_host_stats)(shost);
 		if (stats)
 			ret = snprintf(buf, 20, "0x%llx\n",
-			      *(u64 *)(((u8 *) stats) + offset));
+			      (unsigned long long)*(u64 *)(((u8 *) stats) + offset));
 	}
 	return ret;
 }
