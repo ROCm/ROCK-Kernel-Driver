@@ -619,6 +619,9 @@ UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
  *   are using transport protocol CB.
  * - They don't like the INQUIRY command. So we must handle this command
  *   of the SCSI layer ourselves.
+ * - Some cameras with idProduct=0x1001 and bcdDevice=0x1000 have
+ *   bInterfaceProtocol=0x00 (US_PR_CBI) while others have 0x01 (US_PR_CB).
+ *   So don't remove the US_PR_CB override!
  */
 UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
 		"Casio",
