@@ -5109,11 +5109,11 @@ static void __exit megaraid_exit(void)
 	 */
 	unregister_chrdev(major, "megadev");
 
+	pci_unregister_driver(&megaraid_pci_driver);
+
 #ifdef CONFIG_PROC_FS
 	remove_proc_entry("megaraid", &proc_root);
 #endif
-
-	pci_unregister_driver(&megaraid_pci_driver);
 }
 
 module_init(megaraid_init);
