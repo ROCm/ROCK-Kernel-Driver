@@ -527,13 +527,6 @@ static inline struct device *scsi_get_device(struct Scsi_Host *shost)
         return shost->host_gendev;
 }
 
-/*
- * Prototypes for functions/data in scsi_scan.c
- */
-extern void scsi_scan_host(struct Scsi_Host *);
-extern void scsi_forget_host(struct Scsi_Host *);
-
-
 struct Scsi_Device_Template
 {
     struct list_head list;
@@ -572,16 +565,8 @@ extern int scsi_remove_host(struct Scsi_Host *);
 extern int scsi_register_host(Scsi_Host_Template *);
 extern int scsi_unregister_host(Scsi_Host_Template *);
 
-extern struct Scsi_Host *scsi_host_get_next(struct Scsi_Host *);
 extern struct Scsi_Host *scsi_host_hn_get(unsigned short);
 extern void scsi_host_put(struct Scsi_Host *);
-extern void scsi_host_init(void);
-
-/*
- * host_busy inc/dec/test functions
- */
-extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
-extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
 
 /**
  * scsi_find_device - find a device given the host
@@ -610,21 +595,3 @@ extern void scsi_upper_driver_unregister(struct Scsi_Device_Template *);
 extern struct device_class shost_devclass;
 
 #endif
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

@@ -56,6 +56,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 
 /*
  * Definitions and constants.

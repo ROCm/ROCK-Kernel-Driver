@@ -32,19 +32,19 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/mm.h>
-#include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
 #include <linux/completion.h>
-
-#define __KERNEL_SYSCALLS__
-
 #include <linux/unistd.h>
 #include <asm/dma.h>
 
 #include "scsi.h"
 #include "hosts.h"
+
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 
 static LIST_HEAD(scsi_host_list);
 static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;

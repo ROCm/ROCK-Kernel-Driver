@@ -29,6 +29,10 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
+
 /* 4K page size, but our output routines, use some slack for overruns */
 #define PROC_BLOCK_SIZE (3*1024)
 

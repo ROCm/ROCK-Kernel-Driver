@@ -33,9 +33,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
-#ifdef CONFIG_KMOD
-#include <linux/kmod.h>
-#endif
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 
 /*
  * Flags for SCSI devices that need special treatment

@@ -52,6 +52,7 @@
 #include <linux/version.h>
 #endif
 
+#include "scsi_logging.h"
 #include "scsi_debug.h"
 
 static const char * scsi_debug_version_str = "Version: 1.69 (20030329)";

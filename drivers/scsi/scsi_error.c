@@ -28,6 +28,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 #ifdef DEBUG
 #define SENSE_TIMEOUT SCSI_TIMEOUT
 #else

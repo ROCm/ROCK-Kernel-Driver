@@ -52,6 +52,9 @@
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsicam.h>
 
+#include "scsi_logging.h"
+
+
 /*
  * Remaining dev_t-handling stuff
  */

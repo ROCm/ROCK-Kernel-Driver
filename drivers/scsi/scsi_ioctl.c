@@ -23,6 +23,8 @@
 #include "hosts.h"
 #include <scsi/scsi_ioctl.h>
 
+#include "scsi_logging.h"
+
 #define NORMAL_RETRIES			5
 #define IOCTL_NORMAL_TIMEOUT			(10 * HZ)
 #define FORMAT_UNIT_TIMEOUT		(2 * 60 * 60 * HZ)

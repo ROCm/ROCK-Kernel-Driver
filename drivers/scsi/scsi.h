@@ -18,7 +18,6 @@
 #include <linux/config.h>	    /* for CONFIG_SCSI_LOGGING */
 #include <scsi/scsi.h>
 
-
 /*
  * These are the values that the SCpnt->sc_data_direction and 
  * SRpnt->sr_data_direction can take.  These need to be set
@@ -126,143 +125,10 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define SCSI_STATE_BHQUEUE         0x100a
 #define SCSI_STATE_MLQUEUE         0x100b
 
-/*
- * These are the values that the owner field can take.
- * They are used as an indication of who the command belongs to.
- */
-#define SCSI_OWNER_HIGHLEVEL      0x100
-#define SCSI_OWNER_MIDLEVEL       0x101
-#define SCSI_OWNER_LOWLEVEL       0x102
-#define SCSI_OWNER_ERROR_HANDLER  0x103
-#define SCSI_OWNER_BH_HANDLER     0x104
-#define SCSI_OWNER_NOBODY         0x105
-
 #define IDENTIFY_BASE       0x80
 #define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\
 		     ((can_disconnect) ?  0x40 : 0) |\
 		     ((lun) & 0x07))
-
-
-/*
- * This defines the scsi logging feature.  It is a means by which the
- * user can select how much information they get about various goings on,
- * and it can be really useful for fault tracing.  The logging word is divided
- * into 8 nibbles, each of which describes a loglevel.  The division of things
- * is somewhat arbitrary, and the division of the word could be changed if it
- * were really needed for any reason.  The numbers below are the only place where these
- * are specified.  For a first go-around, 3 bits is more than enough, since this
- * gives 8 levels of logging (really 7, since 0 is always off).  Cutting to 2 bits
- * might be wise at some point.
- */
-
-#define SCSI_LOG_ERROR_SHIFT              0
-#define SCSI_LOG_TIMEOUT_SHIFT            3
-#define SCSI_LOG_SCAN_SHIFT               6
-#define SCSI_LOG_MLQUEUE_SHIFT            9
-#define SCSI_LOG_MLCOMPLETE_SHIFT         12
-#define SCSI_LOG_LLQUEUE_SHIFT            15
-#define SCSI_LOG_LLCOMPLETE_SHIFT         18
-#define SCSI_LOG_HLQUEUE_SHIFT            21
-#define SCSI_LOG_HLCOMPLETE_SHIFT         24
-#define SCSI_LOG_IOCTL_SHIFT              27
-
-#define SCSI_LOG_ERROR_BITS               3
-#define SCSI_LOG_TIMEOUT_BITS             3
-#define SCSI_LOG_SCAN_BITS                3
-#define SCSI_LOG_MLQUEUE_BITS             3
-#define SCSI_LOG_MLCOMPLETE_BITS          3
-#define SCSI_LOG_LLQUEUE_BITS             3
-#define SCSI_LOG_LLCOMPLETE_BITS          3
-#define SCSI_LOG_HLQUEUE_BITS             3
-#define SCSI_LOG_HLCOMPLETE_BITS          3
-#define SCSI_LOG_IOCTL_BITS               3
-
-#ifdef CONFIG_SCSI_LOGGING
-
-#define SCSI_CHECK_LOGGING(SHIFT, BITS, LEVEL, CMD)     \
-{                                                       \
-        unsigned int mask;                              \
-                                                        \
-        mask = (1 << (BITS)) - 1;                       \
-        if( ((scsi_logging_level >> (SHIFT)) & mask) > (LEVEL) ) \
-        {                                               \
-                (CMD);                                  \
-        }						\
-}
-
-#define SCSI_SET_LOGGING(SHIFT, BITS, LEVEL)            \
-{                                                       \
-        unsigned int mask;                              \
-                                                        \
-        mask = ((1 << (BITS)) - 1) << SHIFT;            \
-        scsi_logging_level = ((scsi_logging_level & ~mask) \
-                              | ((LEVEL << SHIFT) & mask));     \
-}
-
-
-
-#else
-
-/*
- * With no logging enabled, stub these out so they don't do anything.
- */
-#define SCSI_SET_LOGGING(SHIFT, BITS, LEVEL)
-
-#define SCSI_CHECK_LOGGING(SHIFT, BITS, LEVEL, CMD)
-#endif
-
-/*
- * These are the macros that are actually used throughout the code to
- * log events.  If logging isn't enabled, they are no-ops and will be
- * completely absent from the user's code.
- *
- * The 'set' versions of the macros are really intended to only be called
- * from the /proc filesystem, and in production kernels this will be about
- * all that is ever used.  It could be useful in a debugging environment to
- * bump the logging level when certain strange events are detected, however.
- */
-#define SCSI_LOG_ERROR_RECOVERY(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_ERROR_SHIFT, SCSI_LOG_ERROR_BITS, LEVEL,CMD);
-#define SCSI_LOG_TIMEOUT(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_TIMEOUT_SHIFT, SCSI_LOG_TIMEOUT_BITS, LEVEL,CMD);
-#define SCSI_LOG_SCAN_BUS(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_SCAN_SHIFT, SCSI_LOG_SCAN_BITS, LEVEL,CMD);
-#define SCSI_LOG_MLQUEUE(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_MLQUEUE_SHIFT, SCSI_LOG_MLQUEUE_BITS, LEVEL,CMD);
-#define SCSI_LOG_MLCOMPLETE(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_MLCOMPLETE_SHIFT, SCSI_LOG_MLCOMPLETE_BITS, LEVEL,CMD);
-#define SCSI_LOG_LLQUEUE(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_LLQUEUE_SHIFT, SCSI_LOG_LLQUEUE_BITS, LEVEL,CMD);
-#define SCSI_LOG_LLCOMPLETE(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_LLCOMPLETE_SHIFT, SCSI_LOG_LLCOMPLETE_BITS, LEVEL,CMD);
-#define SCSI_LOG_HLQUEUE(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_HLQUEUE_SHIFT, SCSI_LOG_HLQUEUE_BITS, LEVEL,CMD);
-#define SCSI_LOG_HLCOMPLETE(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_HLCOMPLETE_SHIFT, SCSI_LOG_HLCOMPLETE_BITS, LEVEL,CMD);
-#define SCSI_LOG_IOCTL(LEVEL,CMD)  \
-        SCSI_CHECK_LOGGING(SCSI_LOG_IOCTL_SHIFT, SCSI_LOG_IOCTL_BITS, LEVEL,CMD);
-
-
-#define SCSI_SET_ERROR_RECOVERY_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_ERROR_SHIFT, SCSI_LOG_ERROR_BITS, LEVEL);
-#define SCSI_SET_TIMEOUT_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_TIMEOUT_SHIFT, SCSI_LOG_TIMEOUT_BITS, LEVEL);
-#define SCSI_SET_SCAN_BUS_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_SCAN_SHIFT, SCSI_LOG_SCAN_BITS, LEVEL);
-#define SCSI_SET_MLQUEUE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_MLQUEUE_SHIFT, SCSI_LOG_MLQUEUE_BITS, LEVEL);
-#define SCSI_SET_MLCOMPLETE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_MLCOMPLETE_SHIFT, SCSI_LOG_MLCOMPLETE_BITS, LEVEL);
-#define SCSI_SET_LLQUEUE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_LLQUEUE_SHIFT, SCSI_LOG_LLQUEUE_BITS, LEVEL);
-#define SCSI_SET_LLCOMPLETE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_LLCOMPLETE_SHIFT, SCSI_LOG_LLCOMPLETE_BITS, LEVEL);
-#define SCSI_SET_HLQUEUE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_HLQUEUE_SHIFT, SCSI_LOG_HLQUEUE_BITS, LEVEL);
-#define SCSI_SET_HLCOMPLETE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_HLCOMPLETE_SHIFT, SCSI_LOG_HLCOMPLETE_BITS, LEVEL);
-#define SCSI_SET_IOCTL_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_IOCTL_SHIFT, SCSI_LOG_IOCTL_BITS, LEVEL);
 
 /* host byte codes */
 #define DID_OK          0x00	/* NO error                                */
@@ -356,6 +222,7 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
  * Forward-declaration of structs for prototypes.
  */
 struct Scsi_Host;
+struct scsi_target;
 struct scatterlist;
 
 /*
@@ -365,24 +232,12 @@ typedef struct scsi_device Scsi_Device;
 typedef struct scsi_cmnd Scsi_Cmnd;
 typedef struct scsi_request Scsi_Request;
 
-#define SCSI_CMND_MAGIC 0xE25C23A5
-#define SCSI_REQ_MAGIC  0x75F6D354
-
-/*
- * Here is where we prototype most of the mid-layer.
- */
-
-extern unsigned int scsi_logging_level;		/* What do we log? */
-
 /*
  * These are the error handling functions defined in scsi_error.c
  */
-extern void scsi_times_out(Scsi_Cmnd * SCpnt);
 extern void scsi_add_timer(Scsi_Cmnd * SCset, int timeout,
 			   void (*complete) (Scsi_Cmnd *));
 extern int scsi_delete_timer(Scsi_Cmnd * SCset);
-extern void scsi_error_handler(void *host);
-extern int scsi_decide_disposition(Scsi_Cmnd * SCpnt);
 extern int scsi_block_when_processing_errors(Scsi_Device *);
 extern void scsi_sleep(int);
 
@@ -396,23 +251,12 @@ extern int  scsi_partsize(unsigned char *buf, unsigned long capacity,
 /*
  * Prototypes for functions in scsi_lib.c
  */
-extern int scsi_maybe_unblock_host(Scsi_Device * SDpnt);
-extern void scsi_setup_cmd_retry(Scsi_Cmnd *SCpnt);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
-extern int scsi_queue_insert(struct scsi_cmnd *cmd, int reason);
-extern void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd);
-extern request_queue_t *scsi_alloc_queue(struct scsi_device *sdev);
-extern void scsi_free_queue(request_queue_t *q);
-extern int scsi_init_queue(void);
-extern void scsi_exit_queue(void);
 
 /*
  * Prototypes for functions in scsi.c
  */
-extern int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt);
-extern int scsi_setup_command_freelist(struct Scsi_Host *shost);
-extern void scsi_destroy_command_freelist(struct Scsi_Host *shost);
 extern struct scsi_cmnd *scsi_get_command(struct scsi_device *dev, int flags);
 extern void scsi_put_command(struct scsi_cmnd *cmd);
 extern void scsi_adjust_queue_depth(Scsi_Device *, int, int);
@@ -422,13 +266,6 @@ extern void scsi_slave_detach(struct scsi_device *);
 extern int scsi_device_get(struct scsi_device *);
 extern void scsi_device_put(struct scsi_device *);
 extern void scsi_set_device_offline(struct scsi_device *);
-extern void scsi_done(Scsi_Cmnd * SCpnt);
-extern void scsi_finish_command(Scsi_Cmnd *);
-extern int scsi_retry_command(Scsi_Cmnd *);
-extern int scsi_attach_device(struct scsi_device *);
-extern void scsi_detach_device(struct scsi_device *);
-extern void scsi_rescan_device(struct scsi_device *);
-extern int scsi_get_device_flags(unsigned char *vendor, unsigned char *model);
 
 /*
  * Newer request-based interfaces.
@@ -438,30 +275,10 @@ extern void scsi_release_request(Scsi_Request *);
 extern void scsi_wait_req(Scsi_Request *, const void *cmnd,
 			  void *buffer, unsigned bufflen,
 			  int timeout, int retries);
-
 extern void scsi_do_req(Scsi_Request *, const void *cmnd,
 			void *buffer, unsigned bufflen,
 			void (*done) (struct scsi_cmnd *),
 			int timeout, int retries);
-extern int scsi_insert_special_req(Scsi_Request * SRpnt, int);
-extern void scsi_init_cmd_from_req(Scsi_Cmnd *, Scsi_Request *);
-
-/*
- * Prototypes for functions in scsi_proc.c
- */
-#ifdef CONFIG_PROC_FS
-extern int scsi_init_procfs(void);
-extern void scsi_exit_procfs(void);
-
-extern void scsi_proc_host_add(struct Scsi_Host *);
-extern void scsi_proc_host_rm(struct Scsi_Host *);
-#else
-static inline int scsi_init_procfs(void) { return 0; }
-static inline void scsi_exit_procfs(void) { ; }
-
-static inline void scsi_proc_host_add(struct Scsi_Host *);
-static inline void scsi_proc_host_rm(struct Scsi_Host *);
-#endif /* CONFIG_PROC_FS */
 
 /*
  * Prototypes for functions in scsi_scan.c
@@ -486,40 +303,6 @@ extern int print_msg(const unsigned char *);
 extern const char *scsi_sense_key_string(unsigned char);
 extern const char *scsi_extd_sense_format(unsigned char, unsigned char);
 
-/*
- * dev_info: for the black/white list in the old scsi_static_device_list
- */
-struct dev_info {
-	char *vendor;
-	char *model;
-	char *revision;	/* revision known to be bad, unused */
-	unsigned flags;
-};
-
-extern struct dev_info scsi_static_device_list[];
-
-/*
- * scsi_dev_info_list: structure to hold black/white listed devices.
- */
-struct scsi_dev_info_list {
-	struct list_head dev_info_list;
-	char vendor[8];
-	char model[16];
-	unsigned flags;
-	unsigned compatible; /* for use with scsi_static_device_list entries */
-};
-extern struct list_head scsi_dev_info_list;
-extern int scsi_dev_info_list_add_str(char *);
-
-/*
- * scsi_target: representation of a scsi target, for now, this is only
- * used for single_lun devices. If no one has active IO to the target,
- * starget_sdev_user is NULL, else it points to the active sdev.
- */
-struct scsi_target {
-	struct scsi_device *starget_sdev_user;
-	unsigned int starget_refcnt;
-};
 
 /*
  *  The scsi_device struct contains what we know about each given scsi
@@ -817,11 +600,6 @@ struct scsi_cmnd {
 };
 
 /*
- *  Flag bit for the internal_timeout array
- */
-#define NORMAL_TIMEOUT 0
-
-/*
  * Definitions and prototypes used for scsi mid-level queue.
  */
 #define SCSI_MLQUEUE_HOST_BUSY   0x1055
@@ -829,8 +607,7 @@ struct scsi_cmnd {
 #define SCSI_MLQUEUE_EH_RETRY    0x1057
 
 /*
- * old style reset request from external source
- * (private to sg.c and scsi_error.c, supplied by scsi_obsolete.c)
+ * Reset request from external source
  */
 #define SCSI_TRY_RESET_DEVICE	1
 #define SCSI_TRY_RESET_BUS	2
@@ -922,34 +699,6 @@ static inline Scsi_Cmnd *scsi_find_tag(Scsi_Device *SDpnt, int tag) {
         return (Scsi_Cmnd *)req->special;
 }
 
-#define scsi_eh_eflags_chk(scp, flags) (scp->eh_eflags & flags)
-
-#define scsi_eh_eflags_set(scp, flags) do { \
-	scp->eh_eflags |= flags; \
-	} while(0)
-
-#define scsi_eh_eflags_clr(scp, flags) do { \
-	scp->eh_eflags &= ~flags; \
-	} while(0)
-
-#define scsi_eh_eflags_clr_all(scp) (scp->eh_eflags = 0)
-
-/*
- * Scsi Error Handler Flags
- */
-#define SCSI_EH_CANCEL_CMD	0x0001	/* Cancel this cmd */
-#define SCSI_EH_REC_TIMEOUT	0x0002	/* EH retry timed out */
-
-#define SCSI_SENSE_VALID(scmd) ((scmd->sense_buffer[0] & 0x70) == 0x70)
-
-extern int scsi_eh_scmd_add(struct scsi_cmnd *, int);
-
 int scsi_set_medium_removal(Scsi_Device *dev, char state);
-
-extern int scsi_device_register(struct scsi_device *);
-extern void scsi_device_unregister(struct scsi_device *);
-
-extern int scsi_sysfs_register(void);
-extern void scsi_sysfs_unregister(void);
 
 #endif /* _SCSI_H */

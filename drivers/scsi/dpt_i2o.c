@@ -2495,8 +2495,6 @@ static s32 adpt_i2o_reparse_lct(adpt_hba* pHba)
 				pDev->pScsi_dev->online = FALSE;
 				if (pDev->pScsi_dev->access_count) {
 					// A drive that was mounted is no longer there... bad!
-					SCSI_LOG_ERROR_RECOVERY(1, printk ("%s:Rescan: Previously "
-								 "mounted drive not found!\n",pHba->name));
 					printk(KERN_WARNING"%s:Mounted drive taken offline\n",pHba->name);
 				}
 			}

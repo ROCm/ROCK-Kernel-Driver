@@ -19,6 +19,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 
 #define SG_MEMPOOL_NR		5
 #define SG_MEMPOOL_SIZE		32

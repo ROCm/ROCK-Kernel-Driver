@@ -67,6 +67,8 @@ static int sg_version_num = 30528;	/* 2 digits for each component */
 #include <scsi/scsi_ioctl.h>
 #include <scsi/sg.h>
 
+#include "scsi_logging.h"
+
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
 static int sg_proc_init(void);
