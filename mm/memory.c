@@ -1384,7 +1384,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct page * new_page;
 	struct address_space *mapping = NULL;
 	pte_t entry;
-	int sequence = 0, reserved, anon;
+	int sequence = 0, reserved, anon, pageable, as;
 	int ret = VM_FAULT_MINOR;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
@@ -1401,15 +1401,22 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 retry:
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, &ret);
 
-	/*
-	 * non-ram cannot be mapped via ->nopage, it must
-	 * be mapped via remap_page_range instead synchronously
-	 * in the ->mmap device driver callback.
-	 *
-	 * ReservedPages cannot be mapped as far as they're under
-	 * a VM_RESERVED vma.
-	 */
+	/* no page was available -- either SIGBUS or OOM */
+	if (new_page == NOPAGE_SIGBUS)
+		return VM_FAULT_SIGBUS;
+	if (new_page == NOPAGE_OOM)
+		return VM_FAULT_OOM;
+
+#ifndef CONFIG_DISCONTIGMEM
+	/* this check is unreliable with numa enabled */
 	BUG_ON(!pfn_valid(page_to_pfn(new_page)));
+#endif
+	pageable = !PageReserved(new_page);
+	as = !!new_page->mapping;
+
+	BUG_ON(!pageable && as);
+
+	pageable &= as;
 
 	/* ->nopage cannot return swapcache */
 	BUG_ON(PageSwapCache(new_page));
@@ -1420,17 +1427,9 @@ retry:
 	 * This is the entry point for memory under VM_RESERVED vmas.
 	 * That memory will not be tracked by the vm. These aren't
 	 * real anonymous pages, they're "device" reserved pages instead.
-	 * These pages under VM_RESERVED vmas are the only pages mapped
-	 * by the VM into userspace with page->as.mapping = NULL.
 	 */
-	reserved = vma->vm_flags & VM_RESERVED;
-	BUG_ON(!reserved && (!new_page->mapping || PageReserved(new_page)));
-
-	/* no page was available -- either SIGBUS or OOM */
-	if (new_page == NOPAGE_SIGBUS)
-		return VM_FAULT_SIGBUS;
-	if (new_page == NOPAGE_OOM)
-		return VM_FAULT_OOM;
+	reserved = !!(vma->vm_flags & VM_RESERVED);
+	BUG_ON(reserved == pageable);
 
 	/*
 	 * Should we do an early C-O-W break?
@@ -1484,7 +1483,7 @@ retry:
 		if (write_access)
 			entry = maybe_mkwrite(pte_mkdirty(entry), vma);
 		set_pte(page_table, entry);
-		if (likely(!reserved))
+		if (likely(pageable))
 			page_add_rmap(new_page, vma, address, anon);
 		pte_unmap(page_table);
 	} else {

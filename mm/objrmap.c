@@ -254,7 +254,7 @@ void fastcall page_add_rmap(struct page *page, struct vm_area_struct * vma,
 {
 	int last_anon;
 
-	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
+	if (PageReserved(page))
 		return;
 
 	BUG_ON(vma->vm_flags & VM_RESERVED);
@@ -319,7 +319,7 @@ static inline void anon_vma_page_unlink(struct page * page)
  */
 void fastcall page_remove_rmap(struct page *page)
 {
-	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
+	if (PageReserved(page))
 		return;
 
 	page_map_lock(page);

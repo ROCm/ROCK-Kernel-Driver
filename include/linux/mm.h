@@ -207,6 +207,14 @@ struct page {
 	page_flags_t flags;		/* atomic flags, some possibly
 					   updated asynchronously */
 	atomic_t count;			/* Usage count, see below. */
+	/*
+	 * Number of ptes mapping this page.
+	 * It's serialized by PG_maplock.
+	 * This is needed only to maintain the nr_mapped global info
+	 * so it would be nice to drop it.
+	 */
+	unsigned int mapcount;		
+
 	pgoff_t index;			/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by zone->lru_lock !! */
@@ -223,15 +231,7 @@ struct page {
 	 * The anon_vma can't go away under us if we hold the
 	 * PG_maplock.
 	 */
-	 struct address_space * mapping;
-
-	/*
-	 * Number of ptes mapping this page.
-	 * It's serialized by PG_maplock.
-	 * This is needed only to maintain the nr_mapped global info
-	 * so it would be nice to drop it.
-	 */
-	unsigned long mapcount;		
+	struct address_space * mapping;
 
 	unsigned long private;		/* mapping-private opaque data */
 
