@@ -371,15 +371,27 @@ _GLOBAL(ret_from_except)
 	andc	r9,r10,r4	/* clear MSR_EE */
 	mtmsrd	r9,1		/* Update machine state */
 
+#ifdef CONFIG_PREEMPT
+	clrrdi	r9,r1,THREAD_SHIFT	/* current_thread_info() */
+	ld	r3,_MSR(r1)
+	ld	r4,TI_FLAGS(r9)
+	andi.	r0,r3,MSR_PR
+	mtcrf	1,r4		/* get bottom 4 thread flags into cr7 */
+	bt	31-TIF_NEED_RESCHED,do_resched
+	beq	restore		/* if returning to kernel */
+	bt	31-TIF_SIGPENDING,do_user_signal
+
+#else /* !CONFIG_PREEMPT */
 	ld	r3,_MSR(r1)	/* Returning to user mode? */
 	andi.	r3,r3,MSR_PR
 	beq	restore		/* if not, just restore regs and return */
 
 	/* Check current_thread_info()->flags */
-	clrrdi	r3,r1,THREAD_SHIFT
-	ld	r3,TI_FLAGS(r3)
-	andi.	r0,r3,_TIF_USER_WORK_MASK
+	clrrdi	r9,r1,THREAD_SHIFT
+	ld	r4,TI_FLAGS(r9)
+	andi.	r0,r4,_TIF_USER_WORK_MASK
 	bne	do_work
+#endif
 
 	addi	r0,r1,INT_FRAME_SIZE	/* size of frame */
 	ld	r4,PACACURRENT(r13)
@@ -452,18 +464,47 @@ restore:
 
 	rfid
 
+#ifndef CONFIG_PREEMPT
 /* Note: this must change if we start using the  TIF_NOTIFY_RESUME bit */
 do_work:
-	/* Enable interrupts */
-	mtmsrd	r10,1
+	andi.	r0,r4,_TIF_NEED_RESCHED
+	beq	do_user_signal
 
-	andi.	r0,r3,_TIF_NEED_RESCHED
-	beq	1f
+#else /* CONFIG_PREEMPT */
+do_resched:
+	bne	do_user_resched		/* if returning to user mode */
+	/* Check that preempt_count() == 0 and interrupts are enabled */
+	lwz	r8,TI_PREEMPT(r9)
+	cmpwi	cr1,r8,0
+#ifdef CONFIG_PPC_ISERIES
+	ld	r0,SOFTE(r1)
+	cmpdi	r0,0
+#else
+	andi.	r0,r3,MSR_EE
+#endif
+	crandc	eq,cr1*4+eq,eq
+	bne	restore
+	/* here we are preempting the current task */
+1:	lis	r0,PREEMPT_ACTIVE@h
+	stw	r0,TI_PREEMPT(r9)
+#ifdef CONFIG_PPC_ISERIES
+	li	r0,1
+	stb	r0,PACAPROCENABLED(r13)
+#endif
+#endif /* CONFIG_PREEMPT */
+
+do_user_resched:
+	mtmsrd	r10,1		/* reenable interrupts */
 	bl	.schedule
+#ifdef CONFIG_PREEMPT
+	clrrdi	r9,r1,THREAD_SHIFT
+	li	r0,0
+	stw	r0,TI_PREEMPT(r9)
+#endif
 	b	.ret_from_except
 
-1:	andi.	r0,r3,_TIF_SIGPENDING
-	beq	.ret_from_except
+do_user_signal:
+	mtmsrd	r10,1
 	li	r3,0
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 	bl	.do_signal

@@ -198,7 +198,6 @@ config SCHED_SMT
 
 config PREEMPT
 	bool "Preemptible Kernel"
-	depends on BROKEN
 	help
 	  This option reduces the latency of the kernel when reacting to
 	  real-time or interactive events by allowing a low priority process to

@@ -48,6 +48,7 @@ int main(void)
 	DEFINE(THREAD_SHIFT, THREAD_SHIFT);
 	DEFINE(THREAD_SIZE, THREAD_SIZE);
 	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
+	DEFINE(TI_PREEMPT, offsetof(struct thread_info, preempt_count));
 
 	/* task_struct->thread */
 	DEFINE(THREAD, offsetof(struct task_struct, thread));

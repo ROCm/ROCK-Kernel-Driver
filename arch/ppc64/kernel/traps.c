@@ -308,8 +308,7 @@ static void parse_fpe(struct pt_regs *regs)
 	siginfo_t info;
 	unsigned long fpscr;
 
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
+	flush_fp_to_thread(current);
 
 	fpscr = current->thread.fpscr;
 
@@ -531,8 +530,7 @@ AlignmentException(struct pt_regs *regs)
 void
 AltivecAssistException(struct pt_regs *regs)
 {
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
+	flush_altivec_to_thread(current);
 	/* XXX quick hack for now: set the non-Java bit in the VSCR */
 	current->thread.vscr.u[3] |= 0x10000;
 }
