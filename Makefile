@@ -813,7 +813,7 @@ define filechk_version.h
 	)
 endef
 
-include/linux/version.h: FORCE
+include/linux/version.h: $(srctree)/Makefile FORCE
 	$(call filechk,version.h)
 
 # ---------------------------------------------------------------------------
