@@ -309,7 +309,7 @@ unsigned int uart_calculate_quot(struct uart_info *info, unsigned int baud)
 	/* Old HI/VHI/custom speed handling */
 	if (baud == 38400 &&
 	    ((port->flags & UPF_SPD_MASK) == UPF_SPD_CUST))
-		quot = info->state->custom_divisor;
+		quot = port->custom_divisor;
 	else
 		quot = port->uartclk / (16 * baud);
 
@@ -617,7 +617,7 @@ static int uart_get_info(struct uart_info *info, struct serial_struct *retinfo)
 	tmp.baud_base	    = port->uartclk / 16;
 	tmp.close_delay	    = state->close_delay;
 	tmp.closing_wait    = state->closing_wait;
-	tmp.custom_divisor  = state->custom_divisor;
+	tmp.custom_divisor  = port->custom_divisor;
 	tmp.hub6	    = port->hub6;
 	tmp.io_type         = port->iotype;
 	tmp.iomem_reg_shift = port->regshift;
@@ -672,7 +672,7 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 		      new_serial.type != port->type;
 
 	old_flags = port->flags;
-	old_custom_divisor = state->custom_divisor;
+	old_custom_divisor = port->custom_divisor;
 
 	if (!capable(CAP_SYS_ADMIN)) {
 		retval = -EPERM;
@@ -685,7 +685,7 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 			goto exit;
 		port->flags = ((port->flags & ~UPF_USR_MASK) |
 			       (new_serial.flags & UPF_USR_MASK));
-		state->custom_divisor = new_serial.custom_divisor;
+		port->custom_divisor = new_serial.custom_divisor;
 		goto check_and_exit;
 	}
 
@@ -777,7 +777,7 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 	port->irq              = new_serial.irq;
 	port->uartclk          = new_serial.baud_base * 16;
 	port->flags            = new_serial.flags & UPF_FLAGS;
-	state->custom_divisor  = new_serial.custom_divisor;
+	port->custom_divisor   = new_serial.custom_divisor;
 	state->close_delay     = new_serial.close_delay * HZ / 100;
 	state->closing_wait    = new_serial.closing_wait * HZ / 100;
 	port->fifosize         = new_serial.xmit_fifo_size;
@@ -789,7 +789,7 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 		goto exit;
 	if (info->flags & UIF_INITIALIZED) {
 		if (((old_flags ^ port->flags) & UPF_SPD_MASK) ||
-		    old_custom_divisor != state->custom_divisor)
+		    old_custom_divisor != port->custom_divisor)
 			uart_change_speed(info, NULL);
 	} else
 		retval = uart_startup(info, 1);
