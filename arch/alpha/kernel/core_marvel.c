@@ -5,6 +5,12 @@
  */
 
 #include <linux/config.h>
+
+#define __EXTERN_INLINE inline
+#include <asm/io.h>
+#include <asm/core_marvel.h>
+#undef __EXTERN_INLINE
+
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -13,6 +19,7 @@
 #include <linux/vmalloc.h>
 #include <linux/mc146818rtc.h>
 #include <linux/rtc.h>
+#include <linux/module.h>
 
 #include <asm/ptrace.h>
 #include <asm/system.h>
@@ -23,12 +30,7 @@
 #include <asm/tlbflush.h>
 #include <asm/rtc.h>
 
-#define __EXTERN_INLINE inline
-#include <asm/io.h>
-#include <asm/core_marvel.h>
-#undef __EXTERN_INLINE
-
-#include <linux/bootmem.h>	/* this must be *after* io.h / core_marvel.h */
+#include <linux/bootmem.h>
 
 #include "proto.h"
 #include "pci_impl.h"
@@ -726,6 +728,10 @@ marvel_iounmap(unsigned long addr)
 		return vfree((void *)(PAGE_MASK & addr)); 
 }
 
+#ifndef CONFIG_ALPHA_GENERIC
+EXPORT_SYMBOL(marvel_ioremap);
+EXPORT_SYMBOL(marvel_iounmap);
+#endif
 
 /*
  * SRMCons support

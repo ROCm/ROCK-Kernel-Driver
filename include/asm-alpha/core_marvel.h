@@ -374,8 +374,10 @@ __EXTERN_INLINE u8 marvel_inb(unsigned long addr)
 {
 	FIXUP_IOADDR(addr);
 	if (!marvel_is_ioaddr(addr)) {
-		if (__marvel_is_port_kbd(addr)) return (u8)0;
-		if (__marvel_is_port_rtc(addr)) return __marvel_rtc_inb(addr);
+		if (__marvel_is_port_kbd(addr))
+			return (u8)0;
+		if (__marvel_is_port_rtc(addr))
+			return __marvel_rtc_inb(addr);
 		IOBUG_FILTER_IOADDR(addr, 
 				    ("Bad IO addr %lx - reading -1\n", addr));
 		return (u8)-1;
@@ -533,12 +535,12 @@ __EXTERN_INLINE void marvel_writeq(u64 q, unsigned long addr)
 
 #ifdef __WANT_IO_DEF
 
-#define __inb(p)		alpha_mv.mv_inb((unsigned long)(p))
-#define __inw(p)		alpha_mv.mv_inw((unsigned long)(p))
-#define __inl(p)		alpha_mv.mv_inl((unsigned long)(p))
-#define __outb(x,p)		alpha_mv.mv_outb((x),(unsigned long)(p))
-#define __outw(x,p)		alpha_mv.mv_outw((x),(unsigned long)(p))
-#define __outl(x,p)		alpha_mv.mv_outl((x),(unsigned long)(p))
+#define __inb(p)		marvel_inb((unsigned long)(p))
+#define __inw(p)		marvel_inw((unsigned long)(p))
+#define __inl(p)		marvel_inl((unsigned long)(p))
+#define __outb(x,p)		marvel_outb((x),(unsigned long)(p))
+#define __outw(x,p)		marvel_outw((x),(unsigned long)(p))
+#define __outl(x,p)		marvel_outl((x),(unsigned long)(p))
 #define __readb(a)		marvel_readb((unsigned long)(a))
 #define __readw(a)		marvel_readw((unsigned long)(a))
 #define __readl(a)		marvel_readl((unsigned long)(a))
@@ -547,25 +549,21 @@ __EXTERN_INLINE void marvel_writeq(u64 q, unsigned long addr)
 #define __writew(x,a)		marvel_writew((x),(unsigned long)(a))
 #define __writel(x,a)		marvel_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		marvel_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		alpha_mv.mv_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		alpha_mv.mv_iounmap((unsigned long)(a))
+#define __ioremap(a,s)		marvel_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		marvel_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		marvel_is_ioaddr((unsigned long)(a))
 
-#define inb(port)		__inb((port))
-#define inw(port)		__inw((port))
-#define inl(port)		__inl((port))
-#define outb(v, port)		__outb((v),(port))
-#define outw(v, port)		__outw((v),(port))
-#define outl(v, port)		__outl((v),(port))
-
-#define __raw_readb(a)		__readb((unsigned long)(a))
-#define __raw_readw(a)		__readw((unsigned long)(a))
-#define __raw_readl(a)		__readl((unsigned long)(a))
-#define __raw_readq(a)		__readq((unsigned long)(a))
-#define __raw_writeb(v,a)	__writeb((v),(unsigned long)(a))
-#define __raw_writew(v,a)	__writew((v),(unsigned long)(a))
-#define __raw_writel(v,a)	__writel((v),(unsigned long)(a))
-#define __raw_writeq(v,a)	__writeq((v),(unsigned long)(a))
+/* Disable direct inlining of these calls with the debug checks present.  */
+#if 0
+#define __raw_readb(a)		__readb(a)
+#define __raw_readw(a)		__readw(a)
+#define __raw_readl(a)		__readl(a)
+#define __raw_readq(a)		__readq(a)
+#define __raw_writeb(v,a)	__writeb(v,a)
+#define __raw_writew(v,a)	__writew(v,a)
+#define __raw_writel(v,a)	__writel(v,a)
+#define __raw_writeq(v,a)	__writeq(v,a)
+#endif
 
 #endif /* __WANT_IO_DEF */
 

@@ -567,8 +567,10 @@ titan_iounmap(unsigned long addr)
 		vfree((void *)(PAGE_MASK & addr)); 
 }
 
+#ifndef CONFIG_ALPHA_GENERIC
 EXPORT_SYMBOL(titan_ioremap);
 EXPORT_SYMBOL(titan_iounmap);
+#endif
 
 /*
  * AGP GART Support.
