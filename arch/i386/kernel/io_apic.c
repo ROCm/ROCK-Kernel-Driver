@@ -41,8 +41,6 @@
 
 #include "io_ports.h"
 
-#define APIC_LOCKUP_DEBUG
-
 static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
 
 /*
@@ -1858,30 +1856,11 @@ static void end_level_ioapic_irq (unsigned int irq)
 	ack_APIC_irq();
 
 	if (!(v & (1 << (i & 0x1f)))) {
-#ifdef APIC_LOCKUP_DEBUG
-		struct irq_pin_list *entry;
-#endif
-
 #ifdef APIC_MISMATCH_DEBUG
 		atomic_inc(&irq_mis_count);
 #endif
 		spin_lock(&ioapic_lock);
 		__mask_and_edge_IO_APIC_irq(irq);
-#ifdef APIC_LOCKUP_DEBUG
-		for (entry = irq_2_pin + irq;;) {
-			unsigned int reg;
-
-			if (entry->pin == -1)
-				break;
-			reg = io_apic_read(entry->apic, 0x10 + entry->pin * 2);
-			if (reg & 0x00004000)
-				printk(KERN_CRIT "Aieee!!!  Remote IRR"
-					" still set after unlock!\n");
-			if (!entry->next)
-				break;
-			entry = irq_2_pin + entry->next;
-		}
-#endif
 		__unmask_and_level_IO_APIC_irq(irq);
 		spin_unlock(&ioapic_lock);
 	}
