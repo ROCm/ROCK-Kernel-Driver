@@ -17,10 +17,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#ifndef	_PPC_TYPES_H
-#include	<asm/types.h>
-#endif
-
 #ifndef _LPARDATA_H
 #define _LPARDATA_H
 
@@ -40,7 +36,6 @@
 #include <asm/iSeries/ItExtVpdPanel.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/IoHriProcessorVpd.h>
-#include <asm/page.h>
 
 extern struct LparMap	xLparMap;
 extern struct HvReleaseData hvReleaseData;
