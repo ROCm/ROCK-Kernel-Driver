@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc-stub.c 1.6 05/17/01 18:14:21 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * ppc-stub.c:  KGDB support for the Linux kernel.
@@ -61,7 +61,7 @@
  *
  *    The following gdb commands are supported:
  *
- * command          function                               Return value
+ * command          function		          Return value
  *
  *    g             return the value of the CPU registers  hex data or ENN
  *    G             set the value of the CPU registers     OK or ENN
@@ -131,11 +131,15 @@ static int kgdb_started;
 static u_int fault_jmp_buf[100];
 static int kdebug;
 
+
 static const char hexchars[]="0123456789abcdef";
 
 /* Place where we save old trap entries for restoration - sparc*/
 /* struct tt_entry kgdb_savettable[256]; */
 /* typedef void (*trapfunc_t)(void); */
+
+static void kgdb_fault_handler(struct pt_regs *regs);
+static void handle_exception (struct pt_regs *regs);
 
 #if 0
 /* Install an exception handler for kgdb */
@@ -188,14 +192,45 @@ static unsigned char *
 mem2hex(char *mem, char *buf, int count)
 {
 	unsigned char ch;
+	unsigned short tmp_s;
+	unsigned long tmp_l;
 
 	if (kgdb_setjmp((long*)fault_jmp_buf) == 0) {
 		debugger_fault_handler = kgdb_fault_handler;
-		while (count-- > 0) {
-			ch = *mem++;
-			*buf++ = hexchars[ch >> 4];
-			*buf++ = hexchars[ch & 0xf];
+
+		/* Accessing 16 bit and 32 bit objects in a single
+		** load instruction is required to avoid bad side
+		** effects for some IO registers.
+		*/
+
+		if ((count == 2) && (((long)mem & 1) == 0)) {
+			tmp_s = *(unsigned short *)mem;
+			mem += 2;
+			*buf++ = hexchars[(tmp_s >> 12) & 0xf];
+			*buf++ = hexchars[(tmp_s >> 8) & 0xf];
+			*buf++ = hexchars[(tmp_s >> 4) & 0xf];
+			*buf++ = hexchars[tmp_s & 0xf];
+
+		} else if ((count == 4) && (((long)mem & 3) == 0)) {
+			tmp_l = *(unsigned int *)mem;
+			mem += 4;
+			*buf++ = hexchars[(tmp_l >> 28) & 0xf];
+			*buf++ = hexchars[(tmp_l >> 24) & 0xf];
+			*buf++ = hexchars[(tmp_l >> 20) & 0xf];
+			*buf++ = hexchars[(tmp_l >> 16) & 0xf];
+			*buf++ = hexchars[(tmp_l >> 12) & 0xf];
+			*buf++ = hexchars[(tmp_l >> 8) & 0xf];
+			*buf++ = hexchars[(tmp_l >> 4) & 0xf];
+			*buf++ = hexchars[tmp_l & 0xf];
+
+		} else {
+			while (count-- > 0) {
+				ch = *mem++;
+				*buf++ = hexchars[ch >> 4];
+				*buf++ = hexchars[ch & 0xf];
+			}
 		}
+
 	} else {
 		/* error condition */
 	}
@@ -210,17 +245,58 @@ mem2hex(char *mem, char *buf, int count)
 static char *
 hex2mem(char *buf, char *mem, int count)
 {
-	int i;
 	unsigned char ch;
+	int i;
+	char *orig_mem;
+	unsigned short tmp_s;
+	unsigned long tmp_l;
+
+	orig_mem = mem;
 
 	if (kgdb_setjmp((long*)fault_jmp_buf) == 0) {
 		debugger_fault_handler = kgdb_fault_handler;
-		for (i=0; i<count; i++) {
-			ch = hex(*buf++) << 4;
-			ch |= hex(*buf++);
-			*mem++ = ch;
+
+		/* Accessing 16 bit and 32 bit objects in a single
+		** store instruction is required to avoid bad side
+		** effects for some IO registers.
+		*/
+
+		if ((count == 2) && (((long)mem & 1) == 0)) {
+			tmp_s = hex(*buf++) << 12;
+			tmp_s |= hex(*buf++) << 8;
+			tmp_s |= hex(*buf++) << 4;
+			tmp_s |= hex(*buf++);
+
+			*(unsigned short *)mem = tmp_s;
+			mem += 2;
+
+		} else if ((count == 4) && (((long)mem & 3) == 0)) {
+			tmp_l = hex(*buf++) << 28;
+			tmp_l |= hex(*buf++) << 24;
+			tmp_l |= hex(*buf++) << 20;
+			tmp_l |= hex(*buf++) << 16;
+			tmp_l |= hex(*buf++) << 12;
+			tmp_l |= hex(*buf++) << 8;
+			tmp_l |= hex(*buf++) << 4;
+			tmp_l |= hex(*buf++);
+
+			*(unsigned long *)mem = tmp_l;
+			mem += 4;
+
+		} else {
+			for (i=0; i<count; i++) {
+				ch = hex(*buf++) << 4;
+				ch |= hex(*buf++);
+				*mem++ = ch;
+			}
 		}
-		flush_icache_range((int)mem, (int)mem+count);
+
+
+		/*
+		** Flush the data cache, invalidate the instruction cache.
+		*/
+		flush_icache_range((int)orig_mem, (int)orig_mem + count - 1);
+
 	} else {
 		/* error condition */
 	}
@@ -253,14 +329,14 @@ hexToInt(char **ptr, int *intValue)
 			(*ptr)++;
 		}
 	} else {
-	     /* error condition */
+		/* error condition */
 	}
 	debugger_fault_handler = 0;
 
 	return (numChars);
 }
 
-/* scan for the sequence $<data>#<checksum>     */
+/* scan for the sequence $<data>#<checksum> */
 static void
 getpacket(char *buffer)
 {
@@ -316,14 +392,14 @@ getpacket(char *buffer)
 	} while (checksum != xmitcsum);
 }
 
-/* send the packet in buffer.  */
+/* send the packet in buffer. */
 static void putpacket(unsigned char *buffer)
 {
 	unsigned char checksum;
 	int count;
 	unsigned char ch, recv;
 
-	/*  $<packet info>#<checksum>. */
+	/* $<packet info>#<checksum>. */
 	do {
 		putDebugChar('$');
 		checksum = 0;
@@ -428,7 +504,7 @@ int kgdb_dabr_match(struct pt_regs *regs)
 	return 1;
 }
 
-/* Convert the SPARC hardware trap type code to a unix signal number. */
+/* Convert the hardware trap type code to a unix signal number. */
 /*
  * This table contains the mapping between PowerPC hardware trap types, and
  * signals, which are primarily what GDB understands.
@@ -438,20 +514,47 @@ static struct hard_trap_info
 	unsigned int tt;		/* Trap type code for powerpc */
 	unsigned char signo;		/* Signal that we map this trap into */
 } hard_trap_info[] = {
-	{ 0x200, SIGSEGV },			/* machine check */
-	{ 0x300, SIGSEGV },			/* address error (store) */
-	{ 0x400, SIGBUS },			/* instruction bus error */
-	{ 0x500, SIGINT },			/* interrupt */
-	{ 0x600, SIGBUS },			/* alingment */
-	{ 0x700, SIGTRAP },			/* breakpoint trap */
-	{ 0x800, SIGFPE },			/* fpu unavail */
-	{ 0x900, SIGALRM },			/* decrementer */
-	{ 0xa00, SIGILL },			/* reserved */
-	{ 0xb00, SIGILL },			/* reserved */
-	{ 0xc00, SIGCHLD },			/* syscall */
-	{ 0xd00, SIGTRAP },			/* single-step/watch */
-	{ 0xe00, SIGFPE },			/* fp assist */
+#if defined(CONFIG_4xx)
+	{ 0x100, SIGINT  },		/* critical input interrupt */
+	{ 0x200, SIGSEGV },		/* machine check */
+	{ 0x300, SIGSEGV },		/* data storage */
+	{ 0x400, SIGBUS  },		/* instruction storage */
+	{ 0x500, SIGINT  },		/* interrupt */
+	{ 0x600, SIGBUS  },		/* alignment */
+	{ 0x700, SIGILL  },		/* program */
+	{ 0x800, SIGILL  },		/* reserved */
+	{ 0x900, SIGILL  },		/* reserved */
+	{ 0xa00, SIGILL  },		/* reserved */
+	{ 0xb00, SIGILL  },		/* reserved */
+	{ 0xc00, SIGCHLD },		/* syscall */
+	{ 0xd00, SIGILL  },		/* reserved */
+	{ 0xe00, SIGILL  },		/* reserved */
+	{ 0xf00, SIGILL  },		/* reserved */
+	/*
+	** 0x1000  PIT
+	** 0x1010  FIT
+	** 0x1020  watchdog
+	** 0x1100  data TLB miss
+	** 0x1200  instruction TLB miss
+	*/
+	{ 0x2000, SIGTRAP},		/* debug */
+#else
+	{ 0x200, SIGSEGV },		/* machine check */
+	{ 0x300, SIGSEGV },		/* address error (store) */
+	{ 0x400, SIGBUS },		/* instruction bus error */
+	{ 0x500, SIGINT },		/* interrupt */
+	{ 0x600, SIGBUS },		/* alingment */
+	{ 0x700, SIGTRAP },		/* breakpoint trap */
+	{ 0x800, SIGFPE },		/* fpu unavail */
+	{ 0x900, SIGALRM },		/* decrementer */
+	{ 0xa00, SIGILL },		/* reserved */
+	{ 0xb00, SIGILL },		/* reserved */
+	{ 0xc00, SIGCHLD },		/* syscall */
+	{ 0xd00, SIGTRAP },		/* single-step/watch */
+	{ 0xe00, SIGFPE },		/* fp assist */
+#endif
 	{ 0, 0}				/* Must be last */
+
 };
 
 static int computeSignal(unsigned int tt)
@@ -462,7 +565,7 @@ static int computeSignal(unsigned int tt)
 		if (ht->tt == tt)
 			return ht->signo;
 
-	return SIGHUP;         /* default for things we don't know about */
+	return SIGHUP; /* default for things we don't know about */
 }
 
 #define PC_REGNUM 64
@@ -493,7 +596,7 @@ handle_exception (struct pt_regs *regs)
 
 #ifdef KGDB_DEBUG
 	printk("kgdb: entering handle_exception; trap [0x%x]\n",
-	       (unsigned int)regs->trap);
+			(unsigned int)regs->trap);
 #endif
 
 	kgdb_interruptible(0);
@@ -510,7 +613,7 @@ handle_exception (struct pt_regs *regs)
 	sigval = computeSignal(regs->trap);
 	ptr = remcomOutBuffer;
 
-#if 0
+#if defined(CONFIG_4xx)
 	*ptr++ = 'S';
 	*ptr++ = hexchars[sigval >> 4];
 	*ptr++ = hexchars[sigval & 0xf];
@@ -533,6 +636,8 @@ handle_exception (struct pt_regs *regs)
 	*ptr++ = 0;
 
 	putpacket(remcomOutBuffer);
+	if (kdebug)
+		printk("remcomOutBuffer: %s\n", remcomOutBuffer);
 
 	/* XXX We may want to add some features dealing with poking the
 	 * XXX page tables, ... (look at sparc-stub.c for more info)
@@ -544,7 +649,7 @@ handle_exception (struct pt_regs *regs)
 
 		getpacket(remcomInBuffer);
 		switch (remcomInBuffer[0]) {
-		case '?':               /* report most recent signal */
+		case '?': /* report most recent signal */
 			remcomOutBuffer[0] = 'S';
 			remcomOutBuffer[1] = hexchars[sigval >> 4];
 			remcomOutBuffer[2] = hexchars[sigval & 0xf];
@@ -601,7 +706,7 @@ handle_exception (struct pt_regs *regs)
 		}
 			break;
 
-		case 'G':   /* set the value of the CPU registers */
+		case 'G': /* set the value of the CPU registers */
 		{
 			ptr = &remcomInBuffer[1];
 
@@ -639,15 +744,14 @@ handle_exception (struct pt_regs *regs)
 
 			ptr = &remcomInBuffer[1];
 
-			if (hexToInt(&ptr, &addr)
-			    && *ptr++ == ','
-			    && hexToInt(&ptr, &length))	{
-				if (mem2hex((char *)addr, remcomOutBuffer,length))
+			if (hexToInt(&ptr, &addr) && *ptr++ == ','
+					&& hexToInt(&ptr, &length)) {
+				if (mem2hex((char *)addr, remcomOutBuffer,
+							length))
 					break;
-				strcpy (remcomOutBuffer, "E03");
-			} else {
-				strcpy(remcomOutBuffer,"E01");
-			}
+				strcpy(remcomOutBuffer, "E03");
+			} else
+				strcpy(remcomOutBuffer, "E01");
 			break;
 
 		case 'M': /* MAA..AA,LLLL: Write LLLL bytes at address AA.AA return OK */
@@ -655,50 +759,63 @@ handle_exception (struct pt_regs *regs)
 
 			ptr = &remcomInBuffer[1];
 
-			if (hexToInt(&ptr, &addr)
-			    && *ptr++ == ','
-			    && hexToInt(&ptr, &length)
-			    && *ptr++ == ':') {
-				if (hex2mem(ptr, (char *)addr, length)) {
+			if (hexToInt(&ptr, &addr) && *ptr++ == ','
+					&& hexToInt(&ptr, &length)
+					&& *ptr++ == ':') {
+				if (hex2mem(ptr, (char *)addr, length))
 					strcpy(remcomOutBuffer, "OK");
-				} else {
+				else
 					strcpy(remcomOutBuffer, "E03");
-				}
 				flush_icache_range(addr, addr+length);
-			} else {
+			} else
 				strcpy(remcomOutBuffer, "E02");
-			}
 			break;
 
 
-		case 'k':    /* kill the program, actually just continue */
-		case 'c':    /* cAA..AA  Continue; address AA..AA optional */
+		case 'k': /* kill the program, actually just continue */
+		case 'c': /* cAA..AA  Continue; address AA..AA optional */
 			/* try to read optional parameter, pc unchanged if no parm */
 
 			ptr = &remcomInBuffer[1];
-			if (hexToInt(&ptr, &addr)) {
+			if (hexToInt(&ptr, &addr))
 				regs->nip = addr;
-			}
 
 /* Need to flush the instruction cache here, as we may have deposited a
  * breakpoint, and the icache probably has no way of knowing that a data ref to
  * some location may have changed something that is in the instruction cache.
  */
 			kgdb_flush_cache_all();
+#if defined(CONFIG_4xx)
+			strcpy(remcomOutBuffer, "OK");
+			putpacket(remcomOutBuffer);
+#endif
 			set_msr(msr);
+
 			kgdb_interruptible(1);
 			unlock_kernel();
 			kgdb_active = 0;
+			if (kdebug) {
+				printk("remcomInBuffer: %s\n", remcomInBuffer);
+				printk("remcomOutBuffer: %s\n", remcomOutBuffer);
+			}
 			return;
 
 		case 's':
 			kgdb_flush_cache_all();
+#if defined(CONFIG_4xx)
+			regs->msr |= MSR_DE;
+			regs->dbcr0 |= (DBCR0_IDM | DBCR0_IC);
+			set_msr(msr);
+#else
 			regs->msr |= MSR_SE;
-#if 0
 			set_msr(msr | MSR_SE);
 #endif
 			unlock_kernel();
 			kgdb_active = 0;
+			if (kdebug) {
+				printk("remcomInBuffer: %s\n", remcomInBuffer);
+				printk("remcomOutBuffer: %s\n", remcomOutBuffer);
+			}
 			return;
 
 		case 'r':		/* Reset (if user process..exit ???)*/
@@ -729,7 +846,7 @@ breakpoint(void)
 
 	asm("	.globl breakinst
 	     breakinst: .long 0x7d821008
-            ");
+	    ");
 }
 
 /* Output string in GDB O-packet format if GDB has connected. If nothing
@@ -739,24 +856,23 @@ kgdb_output_string (const char* s, unsigned int count)
 {
 	char buffer[512];
 
-        if (!kgdb_started)
-            return 0;
+	if (!kgdb_started)
+		return 0;
 
-	count = (count <= (sizeof(buffer) / 2 - 2)) 
+	count = (count <= (sizeof(buffer) / 2 - 2))
 		? count : (sizeof(buffer) / 2 - 2);
 
 	buffer[0] = 'O';
 	mem2hex (s, &buffer[1], count);
 	putpacket(buffer);
 
-        return 1;
+	return 1;
  }
 
-#ifndef CONFIG_8xx
+#if defined(CONFIG_6xx) || defined(CONFIG_POWER3) || defined(CONFIG_ISERIES)
 
-/* I don't know why other platforms don't need this.  The function for
- * the 8xx is found in arch/ppc/8xx_io/uart.c.  -- Dan
- */
+/* This is used on arches which don't have a serial driver that maps
+ * the ports for us */
 void
 kgdb_map_scc(void)
 {

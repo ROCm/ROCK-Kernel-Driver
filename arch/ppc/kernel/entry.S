@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.entry.S 1.22 08/15/01 22:43:06 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  PowerPC version 
@@ -11,6 +11,7 @@
  *  rewritten by Paul Mackerras.
  *    Copyright (C) 1996 Paul Mackerras.
  *  MPC8xx modifications Copyright (C) 1997 Dan Malek (dmalek@jlc.net).
+ *  Adaptations for iSeries Lpar by Mike Corrigan & Dave Boutcher
  *
  *  This file contains the system call entry code, context switch
  *  code, and exception/interrupt return code for PowerPC.
@@ -22,7 +23,6 @@
  *	
  */
 
-#include "ppc_asm.h"
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/sys.h>
@@ -31,6 +31,11 @@
 #include <asm/page.h>
 #include <asm/mmu.h>
 #include <asm/cputable.h>
+#include <asm/ppc_asm.h>
+#include "ppc_defs.h"
+#ifdef	CONFIG_PPC_ISERIES
+#include "iSeries_asm.h"
+#endif /* CONFIG_PPC_ISERIES */
 
 #undef SHOW_SYSCALLS
 #undef SHOW_SYSCALLS_TASK
@@ -45,6 +50,10 @@ show_syscalls_task:
  * Handle a system call.
  */
 	.text
+	.stabs	"arch/ppc/kernel/",N_SO,0,0,0f
+	.stabs	"entry.S",N_SO,0,0,0f
+0:
+
 _GLOBAL(DoSyscall)
 	stw	r0,THREAD+LAST_SYSCALL(r2)
 	lwz	r11,_CCR(r1)	/* Clear SO bit in CR */
@@ -86,8 +95,8 @@ _GLOBAL(DoSyscall)
 	beq-	10f
 	cmpi    0,r0,0x6666     /* Special case for 'sys_rt_sigreturn' */
 	beq-    16f
-	lwz	r10,TASK_PTRACE(r2)
-	andi.	r10,r10,PT_TRACESYS
+	lbz	r10,SYSCALL_TRACE(r2)
+	cmpwi	r10,0
 	bne-	50f
 	cmpli	0,r0,NR_syscalls
 	bge-	66f
@@ -142,7 +151,7 @@ ret_from_syscall_1:
 	bge	ret_from_except
 	b	20b
 /* Traced system call support */
-50:	bl	syscall_trace
+50:	bl	do_syscall_trace
 	lwz	r0,GPR0(r1)	/* Restore original registers */
 	lwz	r3,GPR3(r1)
 	lwz	r4,GPR4(r1)
@@ -177,7 +186,7 @@ ret_from_syscall_2:
 	oris	r10,r10,0x1000
 	stw	r10,_CCR(r1)
 60:	stw	r3,GPR3(r1)	/* Update return value */
-	bl	syscall_trace
+	bl	do_syscall_trace
 	b	ret_from_except
 66:	li	r3,ENOSYS
 	b	52b
@@ -196,6 +205,9 @@ ret_from_syscall_2:
  * Finally, we can return to the second process.
  * On entry, r3 points to the THREAD for the current task, r4
  * points to the THREAD for the new task.
+ *
+ * This routine is always called with interrupts disabled
+ * (soft disabled for iSeries).
  *
  * Note: there are two ways to get to the "going out" portion
  * of this code; either by coming in via the entry (_switch)
@@ -216,6 +228,7 @@ _GLOBAL(_switch)
 	SAVE_8GPRS(14, r1)
 	SAVE_10GPRS(22, r1)
 	mflr	r20		/* Return to switch caller */
+	stw	r20,INT_FRAME_SIZE+4(r1)
 	mfmsr	r22
 	li	r0,MSR_FP	/* Disable floating-point */
 #ifdef CONFIG_ALTIVEC
@@ -223,10 +236,12 @@ BEGIN_FTR_SECTION
 	oris	r0,r0,MSR_VEC@h	/* Disable altivec */
 END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 #endif /* CONFIG_ALTIVEC */
+	and.	r0,r0,r22	/* FP or altivec enabled? */
+	beq+	1f
 	andc	r22,r22,r0
 	mtmsr	r22
 	isync
-	stw	r20,_NIP(r1)
+1:	stw	r20,_NIP(r1)
 	stw	r22,_MSR(r1)
 	stw	r20,_LINK(r1)
 	mfcr	r20
@@ -261,9 +276,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	.globl	ret_from_fork
 ret_from_fork:
 	bl	schedule_tail
-#error	lwz	r0,TASK_PTRACE(r2)
-	andi.	r0,r0,PT_TRACESYS
-#error	bnel-	syscall_trace
+	lbz	r0,SYSCALL_TRACE(r2)
+	cmpwi	r0,0
+	bnel-	do_syscall_trace
 	b	ret_from_except
 
 	.globl	ret_from_intercept
@@ -276,94 +291,115 @@ ret_from_intercept:
 	beq	restore
 	.globl	ret_from_except
 ret_from_except:
-	lwz	r3,_MSR(r1)	/* Returning to user mode? */
-	andi.	r3,r3,MSR_PR
-	beq+	do_signal_ret	/* if so, check need_resched and signals */
-#error	lwz	r3,NEED_RESCHED(r2)
-	cmpi	0,r3,0		/* check need_resched flag */
-	beq+	7f
-	bl	schedule
-#error 7:	lwz	r5,SIGPENDING(r2) /* Check for pending unblocked signals */
-	cmpwi	0,r5,0
-	beq+	do_signal_ret
-	li	r3,0
-	addi	r4,r1,STACK_FRAME_OVERHEAD
-#error	bl	do_signal
-	.globl	do_signal_ret
-do_signal_ret:
-	.globl ret_to_user_hook	
-ret_to_user_hook:
-	nop
-restore:
-	lwz	r3,_XER(r1)
-	mtspr	XER,r3
-	REST_10GPRS(9,r1)
-	REST_10GPRS(19,r1)
-	REST_2GPRS(29,r1)
+	REST_10GPRS(13,r1)
+	REST_8GPRS(23,r1)
 	REST_GPR(31,r1)
 
-	/* make sure we hard disable here, even if rtl is active, to protect
-	 * SRR[01] and SPRG2 -- Cort 
-	 */
-	mfmsr	r0		/* Get current interrupt state */
-	rlwinm	r0,r0,0,17,15	/* clear MSR_EE in r0 */
+	/* Hard-disable interrupts so that current->work can't change
+	 * between when we test it and when we return from the interrupt. */
+recheck:
+	mfmsr	r10
+	rlwinm	r0,r10,0,17,15	/* clear MSR_EE in r0 */
+#ifdef CONFIG_4xx
+ 	rlwinm	r0,r0,0,23,21	/* clear MSR_DE in r0 */
+#endif
 	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0		/* Update machine state */
 
-	stwcx.	r0,0,r1		/* to clear the reservation */
+	lwz	r3,_MSR(r1)	/* Returning to user mode? */
+	andi.	r3,r3,MSR_PR
+	beq+	restore		/* if not, just restore regs and return */
 
-	/* if returning to user mode, set new sprg2 and save kernel SP */
-	lwz	r0,_MSR(r1)
-	andi.	r0,r0,MSR_PR
-	beq+	1f
+	/* Check current->work */
+	lwz	r3,TASK_WORK(r2)
+	rlwinm.	r0,r3,0,16,7	/* need_resched, sigpending, notify_resume */
+	bne	do_work
+
+	.globl ret_to_user_hook	
+ret_to_user_hook:
+	nop
+
 #ifdef CONFIG_ALTIVEC
 BEGIN_FTR_SECTION
 	lwz	r0,THREAD+THREAD_VRSAVE(r2)
 	mtspr	SPRN_VRSAVE,r0		/* if G4, restore VRSAVE reg */
 END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 #endif /* CONFIG_ALTIVEC */
+
 	addi	r0,r1,INT_FRAME_SIZE	/* size of frame */
 	stw	r0,THREAD+KSP(r2)	/* save kernel stack pointer */
+
+#ifndef CONFIG_PPC_ISERIES
 	tophys(r8,r1)
 	CLR_TOP32(r8)
 	mtspr	SPRG2,r8		/* phys exception stack pointer */
-1:
+#else /* CONFIG_PPC_ISERIES */
+	mfspr	r2,SPRG1		/* Get Paca address */
+	stw	r1,PACAKSAVE(r2)	/* save exception stack pointer */
+#endif /* CONFIG_PPC_ISERIES */
+
+	/* interrupts are hard-disabled at this point */
+restore:
+	REST_8GPRS(4, r1)
+	REST_GPR(12, r1)
+	lwz	r3,_XER(r1)
+	mtspr	XER,r3
+
+	PPC405_ERR77(0,r1)
+	stwcx.	r0,0,r1			/* to clear the reservation */
+
 	lwz	r3,_CTR(r1)
 	lwz	r0,_LINK(r1)
 	mtctr	r3
 	mtlr	r0
-	REST_4GPRS(3, r1)
-	REST_2GPRS(7, r1)
-
-	/* We have to "dummy" load from the context save area in case
-	 * these instructions cause an MMU fault.  If this happens
-	 * after we load SRR0/SRR1, our return context is hosed.  -- Dan
-	 */
-	lwz	r0,GPR0(r1)
-	lwz	r0,GPR2(r1)
-	lwz	r0,GPR1(r1)
-
-	/* We re-use r3,r4 here (the load above was to cause the MMU
-	 * fault if necessary).  Using r3,r4 removes the need to "dummy"
-	 * load the CCR and NIP.  Since we load them we may as well
-	 * use them.
-	 */
-	lwz	r3,_CCR(r1)
-	lwz	r4,_NIP(r1)
 
 	lwz	r0,_MSR(r1)
+	lwz	r3,_CCR(r1)
 	FIX_SRR1(r0,r2)
-	mtspr	SRR1,r0
+	lwz	r2,_NIP(r1)
 	mtcrf	0xFF,r3
-	mtspr	SRR0,r4
+
+	/*
+	 * We can't afford to take an exception between setting SRR0/1
+	 * and the rfi.  Since GPR0(r1) .. GPR3(r1) are in the same cache
+	 * line, loading r3 here should mean that we should have a HPTE
+	 * (for classic PPC) or TLB entry (for 4xx/8xx) for that cache
+	 * line, even if it isn't covered by a BAT register.
+	 * In addition, the cache line itself will be in L1 cache.
+	 * There is still the possibility of the HPTE getting evicted
+	 * on SMP systems.
+	 */
+	lwz	r3,GPR3(r1)
+
+	mtspr	SRR1,r0
+	mtspr	SRR0,r2
 	lwz	r0,GPR0(r1)
 	lwz	r2,GPR2(r1)
-	lwz	r3,GPR3(r1)
-	lwz	r4,GPR4(r1)
 	lwz	r1,GPR1(r1)
 	SYNC
+	PPC405_ERR77_SYNC
 	RFI
 
+do_work:
+	ori	r10,r10,MSR_EE
+	SYNC
+	mtmsr	r10		/* hard-enable interrupts */
+	rlwinm.	r0,r3,0,0,7	/* test need_resched */
+	beq	1f
+	bl	schedule
+	b	recheck
+1:
+	rlwinm.	r0,r3,0,16,23	/* test sigpending */
+	beq	2f
+	li	r3,0
+	addi	r4,r1,STACK_FRAME_OVERHEAD
+	bl	do_signal
+	b	recheck
+2:
+	/* nobody uses work.notify_resume yet */
+	li	r0,0
+	stb	r0,NOTIFY_RESUME(r2)
+	b	recheck
 
 /*
  * PROM code for specific machines follows.  Put it 
@@ -375,8 +411,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
  * On CHRP, the Run-Time Abstraction Services (RTAS) have to be
  * called with the MMU off.
  */
-	.globl	enter_rtas
-enter_rtas:
+_GLOBAL(enter_rtas)
 	mflr	r0
 	stw	r0,20(r1)
 	lis	r4,rtas_data@ha
@@ -391,9 +426,9 @@ enter_rtas:
 	mfmsr	r9
 	stw	r9,8(r1)
 	li	r0,0
-	ori	r0,r0,MSR_EE|MSR_SE|MSR_BE
+	ori	r0,r0,MSR_EE|MSR_SE|MSR_BE|MSR_FE0|MSR_FE1
 	andc	r0,r9,r0
-	li	r10,MSR_IR|MSR_DR|MSR_FE0|MSR_FE1|MSR_FP
+	li	r10,MSR_IR|MSR_DR|MSR_FP
 	andc	r9,r0,r10
 	SYNC			/* disable interrupts so SRR0/1 */
 	mtmsr	r0		/* don't get trashed */

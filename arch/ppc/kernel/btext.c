@@ -44,10 +44,10 @@ unsigned long disp_BAT[2] __initdata = {0, 0};
 
 static unsigned char vga_font[cmapsz];
 
-int boot_text_mapped = 1;
+int boot_text_mapped;
+int force_printk_to_btext = 0;
 
-boot_infos_t *disp_bi;
-boot_infos_t fake_bi;
+boot_infos_t disp_bi;
 
 extern char *klimit;
 
@@ -69,48 +69,47 @@ extern char *klimit;
 void __init
 btext_init(boot_infos_t *bi)
 {
-	unsigned long offset = reloc_offset();
-
-	RELOC(g_loc_X) = 0;
-	RELOC(g_loc_Y) = 0;
-	RELOC(g_max_loc_X) = (bi->dispDeviceRect[2] - bi->dispDeviceRect[0]) / 8;
-	RELOC(g_max_loc_Y) = (bi->dispDeviceRect[3] - bi->dispDeviceRect[1]) / 16;
-	RELOC(disp_bi) = PTRUNRELOC(bi);
+	g_loc_X = 0;
+	g_loc_Y = 0;
+	g_max_loc_X = (bi->dispDeviceRect[2] - bi->dispDeviceRect[0]) / 8;
+	g_max_loc_Y = (bi->dispDeviceRect[3] - bi->dispDeviceRect[1]) / 16;
+	disp_bi = *bi;
+	boot_text_mapped = 1;
 }
 
 void __init
-btext_welcome(boot_infos_t* bi)
+btext_welcome(void)
 {
-	unsigned long offset = reloc_offset();
 	unsigned long flags;
 	unsigned long pvr;
-	
-	btext_drawstring(RELOC("Welcome to Linux, kernel " UTS_RELEASE "\n"));
-	btext_drawstring(RELOC("\nlinked at        : 0x"));
+	boot_infos_t* bi = &disp_bi;
+
+	btext_drawstring("Welcome to Linux, kernel " UTS_RELEASE "\n");
+	btext_drawstring("\nlinked at        : 0x");
 	btext_drawhex(KERNELBASE);
-	btext_drawstring(RELOC("\nframe buffer at  : 0x"));
+	btext_drawstring("\nframe buffer at  : 0x");
 	btext_drawhex((unsigned long)bi->dispDeviceBase);
-	btext_drawstring(RELOC(" (phys), 0x"));
+	btext_drawstring(" (phys), 0x");
 	btext_drawhex((unsigned long)bi->logicalDisplayBase);
-	btext_drawstring(RELOC(" (log)"));
-	btext_drawstring(RELOC("\nklimit           : 0x"));
-	btext_drawhex((unsigned long)RELOC(klimit));
-	btext_drawstring(RELOC("\nMSR              : 0x"));
+	btext_drawstring(" (log)");
+	btext_drawstring("\nklimit           : 0x");
+	btext_drawhex((unsigned long)klimit);
+	btext_drawstring("\nMSR              : 0x");
 	__asm__ __volatile__ ("mfmsr %0" : "=r" (flags));
 	btext_drawhex(flags);
 	__asm__ __volatile__ ("mfspr %0, 287" : "=r" (pvr));
 	pvr >>= 16;
 	if (pvr > 1) {
-	    btext_drawstring(RELOC("\nHID0             : 0x"));
+	    btext_drawstring("\nHID0             : 0x");
 	    __asm__ __volatile__ ("mfspr %0, 1008" : "=r" (flags));
 	    btext_drawhex(flags);
 	}
 	if (pvr == 8 || pvr == 12 || pvr == 0x800c) {
-	    btext_drawstring(RELOC("\nICTC             : 0x"));
+	    btext_drawstring("\nICTC             : 0x");
 	    __asm__ __volatile__ ("mfspr %0, 1019" : "=r" (flags));
 	    btext_drawhex(flags);
 	}
-	btext_drawstring(RELOC("\n\n"));
+	btext_drawstring("\n\n");
 }
 
 /* Calc BAT values for mapping the display and store them
@@ -131,28 +130,28 @@ btext_welcome(boot_infos_t* bi)
 void __init
 btext_prepare_BAT(void)
 {
-	unsigned long offset = reloc_offset();
-	boot_infos_t* bi = PTRRELOC(RELOC(disp_bi));
-	unsigned long addr = (unsigned long)bi->dispDeviceBase;
+	boot_infos_t* bi = &disp_bi;
 	unsigned long vaddr = KERNELBASE + 0x10000000;
+	unsigned long addr;
 	unsigned long lowbits;
 
-	if (!RELOC(disp_bi)) {
-		RELOC(boot_text_mapped) = 0;
+	addr = (unsigned long)bi->dispDeviceBase;
+	if (!addr) {
+		boot_text_mapped = 0;
 		return;
 	}
 	if (PVR_VER(mfspr(PVR)) != 1) {
 		/* 603, 604, G3, G4, ... */
 		lowbits = addr & ~0xFF000000UL;
 		addr &= 0xFF000000UL;
-		RELOC(disp_BAT[0]) = vaddr | (BL_16M<<2) | 2;
-		RELOC(disp_BAT[1]) = addr | (_PAGE_NO_CACHE | _PAGE_GUARDED | BPP_RW);		
+		disp_BAT[0] = vaddr | (BL_16M<<2) | 2;
+		disp_BAT[1] = addr | (_PAGE_NO_CACHE | _PAGE_GUARDED | BPP_RW);		
 	} else {
 		/* 601 */
 		lowbits = addr & ~0xFF800000UL;
 		addr &= 0xFF800000UL;
-		RELOC(disp_BAT[0]) = vaddr | (_PAGE_NO_CACHE | PP_RWXX) | 4;
-		RELOC(disp_BAT[1]) = addr | BL_8M | 0x40;
+		disp_BAT[0] = vaddr | (_PAGE_NO_CACHE | PP_RWXX) | 4;
+		disp_BAT[1] = addr | BL_8M | 0x40;
 	}
 	bi->logicalDisplayBase = (void *) (vaddr + lowbits);
 }
@@ -164,15 +163,12 @@ void __init
 btext_setup_display(int width, int height, int depth, int pitch,
 		    unsigned long address)
 {
-	unsigned long offset = reloc_offset();
-	boot_infos_t* bi;
+	boot_infos_t* bi = &disp_bi;
 
-	RELOC(disp_bi) = &fake_bi;
-	bi = PTRRELOC((&fake_bi));
-	RELOC(g_loc_X) = 0;
-	RELOC(g_loc_Y) = 0;
-	RELOC(g_max_loc_X) = width / 8;
-	RELOC(g_max_loc_Y) = height / 16;
+	g_loc_X = 0;
+	g_loc_Y = 0;
+	g_max_loc_X = width / 8;
+	g_max_loc_Y = height / 16;
 	bi->logicalDisplayBase = (unsigned char *)address;
 	bi->dispDeviceBase = (unsigned char *)address;
 	bi->dispDeviceRowBytes = pitch;
@@ -180,6 +176,7 @@ btext_setup_display(int width, int height, int depth, int pitch,
 	bi->dispDeviceRect[0] = bi->dispDeviceRect[1] = 0;
 	bi->dispDeviceRect[2] = width;
 	bi->dispDeviceRect[3] = height;
+	boot_text_mapped = 1;
 }
 
 /* Here's a small text engine to use during early boot
@@ -197,16 +194,18 @@ void __openfirmware
 map_boot_text(void)
 {
 	unsigned long base, offset, size;
-	if (disp_bi == 0)
+	boot_infos_t *bi = &disp_bi;
+
+	if (bi->dispDeviceBase == 0)
 		return;
-	base = ((unsigned long) disp_bi->dispDeviceBase) & 0xFFFFF000UL;
-	offset = ((unsigned long) disp_bi->dispDeviceBase) - base;
-	size = disp_bi->dispDeviceRowBytes * disp_bi->dispDeviceRect[3] + offset
-		+ disp_bi->dispDeviceRect[0];
-	disp_bi->logicalDisplayBase = ioremap(base, size);
-	if (disp_bi->logicalDisplayBase == 0)
+	base = ((unsigned long) bi->dispDeviceBase) & 0xFFFFF000UL;
+	offset = ((unsigned long) bi->dispDeviceBase) - base;
+	size = bi->dispDeviceRowBytes * bi->dispDeviceRect[3] + offset
+		+ bi->dispDeviceRect[0];
+	bi->logicalDisplayBase = ioremap(base, size);
+	if (bi->logicalDisplayBase == 0)
 		return;
-	disp_bi->logicalDisplayBase += offset;
+	bi->logicalDisplayBase += offset;
 	boot_text_mapped = 1;
 }
 
@@ -229,22 +228,24 @@ void
 btext_update_display(unsigned long phys, int width, int height,
 		     int depth, int pitch)
 {
-	if (disp_bi == 0)
-		return;
-	/* check it's the same frame buffer (within 64MB) */
-	if ((phys ^ (unsigned long)disp_bi->dispDeviceBase) & 0xfc000000) {
-		return;
-	}
+	boot_infos_t *bi = &disp_bi;
 
-	disp_bi->dispDeviceBase = (__u8 *) phys;
-	disp_bi->dispDeviceRect[0] = 0;
-	disp_bi->dispDeviceRect[1] = 0;
-	disp_bi->dispDeviceRect[2] = width;
-	disp_bi->dispDeviceRect[3] = height;
-	disp_bi->dispDeviceDepth = depth;
-	disp_bi->dispDeviceRowBytes = pitch;
+	if (bi->dispDeviceBase == 0)
+		return;
+
+	/* check it's the same frame buffer (within 256MB) */
+	if ((phys ^ (unsigned long)bi->dispDeviceBase) & 0xf0000000)
+		return;
+
+	bi->dispDeviceBase = (__u8 *) phys;
+	bi->dispDeviceRect[0] = 0;
+	bi->dispDeviceRect[1] = 0;
+	bi->dispDeviceRect[2] = width;
+	bi->dispDeviceRect[3] = height;
+	bi->dispDeviceDepth = depth;
+	bi->dispDeviceRowBytes = pitch;
 	if (boot_text_mapped) {
-		iounmap(disp_bi->logicalDisplayBase);
+		iounmap(bi->logicalDisplayBase);
 		boot_text_mapped = 0;
 	}
 	map_boot_text();
@@ -256,8 +257,7 @@ btext_update_display(unsigned long phys, int width, int height,
 
 void BTEXT btext_clearscreen(void)
 {
-	unsigned long offset	= reloc_offset();
-	boot_infos_t* bi	= PTRRELOC(RELOC(disp_bi));
+	boot_infos_t* bi	= &disp_bi;
 	unsigned long *base	= (unsigned long *)calc_base(bi, 0, 0);
 	unsigned long width 	= ((bi->dispDeviceRect[2] - bi->dispDeviceRect[0]) *
 					(bi->dispDeviceDepth >> 3)) >> 2;
@@ -279,8 +279,7 @@ __inline__ void dcbst(const void* addr)
 
 void BTEXT btext_flushscreen(void)
 {
-	unsigned long offset	= reloc_offset();
-	boot_infos_t* bi	= PTRRELOC(RELOC(disp_bi));
+	boot_infos_t* bi	= &disp_bi;
 	unsigned long *base	= (unsigned long *)calc_base(bi, 0, 0);
 	unsigned long width 	= ((bi->dispDeviceRect[2] - bi->dispDeviceRect[0]) *
 					(bi->dispDeviceDepth >> 3)) >> 2;
@@ -301,8 +300,7 @@ void BTEXT btext_flushscreen(void)
 static BTEXT void
 scrollscreen(void)
 {
-	unsigned long offset		= reloc_offset();
-	boot_infos_t* bi		= PTRRELOC(RELOC(disp_bi));
+	boot_infos_t* bi		= &disp_bi;
 	unsigned long *src		= (unsigned long *)calc_base(bi,0,16);
 	unsigned long *dst		= (unsigned long *)calc_base(bi,0,0);
 	unsigned long width		= ((bi->dispDeviceRect[2] - bi->dispDeviceRect[0]) *
@@ -336,49 +334,48 @@ scrollscreen(void)
 
 void BTEXT btext_drawchar(char c)
 {
-	unsigned long offset = reloc_offset();
 	int cline = 0, x;
 
-	if (!RELOC(boot_text_mapped))
+	if (!boot_text_mapped)
 		return;
 
 	switch (c) {
 	case '\b':
-		if (RELOC(g_loc_X) > 0)
-			--RELOC(g_loc_X);
+		if (g_loc_X > 0)
+			--g_loc_X;
 		break;
 	case '\t':
-		RELOC(g_loc_X) = (RELOC(g_loc_X) & -8) + 8;
+		g_loc_X = (g_loc_X & -8) + 8;
 		break;
 	case '\r':
-		RELOC(g_loc_X) = 0;
+		g_loc_X = 0;
 		break;
 	case '\n':
-		RELOC(g_loc_X) = 0;
-		RELOC(g_loc_Y)++;
+		g_loc_X = 0;
+		g_loc_Y++;
 		cline = 1;
 		break;
 	default:
-		draw_byte(c, RELOC(g_loc_X)++, RELOC(g_loc_Y));
+		draw_byte(c, g_loc_X++, g_loc_Y);
 	}
-	if (RELOC(g_loc_X) >= RELOC(g_max_loc_X)) {
-		RELOC(g_loc_X) = 0;
-		RELOC(g_loc_Y)++;
+	if (g_loc_X >= g_max_loc_X) {
+		g_loc_X = 0;
+		g_loc_Y++;
 		cline = 1;
 	}
 #ifndef NO_SCROLL
-	while (RELOC(g_loc_Y) >= RELOC(g_max_loc_Y)) {
+	while (g_loc_Y >= g_max_loc_Y) {
 		scrollscreen();
-		RELOC(g_loc_Y)--;
+		g_loc_Y--;
 	}
 #else
 	/* wrap around from bottom to top of screen so we don't
 	   waste time scrolling each line.  -- paulus. */
-	if (RELOC(g_loc_Y) >= RELOC(g_max_loc_Y))
-		RELOC(g_loc_Y) = 0;
+	if (g_loc_Y >= g_max_loc_Y)
+		g_loc_Y = 0;
 	if (cline) {
-		for (x = 0; x < RELOC(g_max_loc_X); ++x)
-			draw_byte(' ', x, RELOC(g_loc_Y));
+		for (x = 0; x < g_max_loc_X; ++x)
+			draw_byte(' ', x, g_loc_Y);
 	}
 #endif
 }
@@ -386,9 +383,7 @@ void BTEXT btext_drawchar(char c)
 void BTEXT
 btext_drawstring(const char *c)
 {
-	unsigned long offset	= reloc_offset();
-
-	if (!RELOC(boot_text_mapped))
+	if (!boot_text_mapped)
 		return;
 	while (*c)
 		btext_drawchar(*c++);
@@ -398,34 +393,34 @@ void BTEXT
 btext_drawhex(unsigned long v)
 {
 	static char hex_table[] = "0123456789abcdef";
-	unsigned long offset	= reloc_offset();
 	
-	if (!RELOC(boot_text_mapped))
+	if (!boot_text_mapped)
 		return;
-	btext_drawchar(RELOC(hex_table)[(v >> 28) & 0x0000000FUL]);
-	btext_drawchar(RELOC(hex_table)[(v >> 24) & 0x0000000FUL]);
-	btext_drawchar(RELOC(hex_table)[(v >> 20) & 0x0000000FUL]);
-	btext_drawchar(RELOC(hex_table)[(v >> 16) & 0x0000000FUL]);
-	btext_drawchar(RELOC(hex_table)[(v >> 12) & 0x0000000FUL]);
-	btext_drawchar(RELOC(hex_table)[(v >>  8) & 0x0000000FUL]);
-	btext_drawchar(RELOC(hex_table)[(v >>  4) & 0x0000000FUL]);
-	btext_drawchar(RELOC(hex_table)[(v >>  0) & 0x0000000FUL]);
+	btext_drawchar(hex_table[(v >> 28) & 0x0000000FUL]);
+	btext_drawchar(hex_table[(v >> 24) & 0x0000000FUL]);
+	btext_drawchar(hex_table[(v >> 20) & 0x0000000FUL]);
+	btext_drawchar(hex_table[(v >> 16) & 0x0000000FUL]);
+	btext_drawchar(hex_table[(v >> 12) & 0x0000000FUL]);
+	btext_drawchar(hex_table[(v >>  8) & 0x0000000FUL]);
+	btext_drawchar(hex_table[(v >>  4) & 0x0000000FUL]);
+	btext_drawchar(hex_table[(v >>  0) & 0x0000000FUL]);
 	btext_drawchar(' ');
 }
 
 static void BTEXT
 draw_byte(unsigned char c, long locX, long locY)
 {
-	unsigned long offset	= reloc_offset();
-	boot_infos_t* bi	= PTRRELOC(RELOC(disp_bi));
+	boot_infos_t* bi	= &disp_bi;
 	unsigned char *base	= calc_base(bi, locX << 3, locY << 4);
-	unsigned char *font	= &RELOC(vga_font)[((unsigned long)c) * 16];
+	unsigned char *font	= &vga_font[((unsigned long)c) * 16];
 	int rb			= bi->dispDeviceRowBytes;
 	
 	switch(bi->dispDeviceDepth) {
+	case 24:
 	case 32:
 		draw_byte_32(font, (unsigned long *)base, rb);
 		break;
+	case 15:
 	case 16:
 		draw_byte_16(font, (unsigned long *)base, rb);
 		break;
@@ -490,8 +485,7 @@ draw_byte_16(unsigned char *font, unsigned long *base, int rb)
 	int l, bits;	
 	int fg = 0xFFFFFFFFUL;
 	int bg = 0x00000000UL;
-	unsigned long offset = reloc_offset();
-	unsigned long *eb = RELOC(expand_bits_16);
+	unsigned long *eb = expand_bits_16;
 
 	for (l = 0; l < 16; ++l)
 	{
@@ -510,8 +504,7 @@ draw_byte_8(unsigned char *font, unsigned long *base, int rb)
 	int l, bits;	
 	int fg = 0x0F0F0F0FUL;
 	int bg = 0x00000000UL;
-	unsigned long offset = reloc_offset();
-	unsigned long *eb = RELOC(expand_bits_8);
+	unsigned long *eb = expand_bits_8;
 
 	for (l = 0; l < 16; ++l)
 	{

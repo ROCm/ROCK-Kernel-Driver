@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prom.c 1.42 09/08/01 15:47:42 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Procedures for interfacing to the Open Firmware PROM on
@@ -19,6 +19,9 @@
 #include <linux/version.h>
 #include <linux/threads.h>
 #include <linux/spinlock.h>
+#include <linux/ioport.h>
+#include <linux/pci.h>
+#include <linux/slab.h>
 
 #include <asm/sections.h>
 #include <asm/prom.h>
@@ -34,27 +37,12 @@
 #include <asm/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/btext.h>
-#include "open_pic.h"
+#include <asm/pci-bridge.h>
+#include <asm/open_pic.h>
 
 #ifdef CONFIG_FB
 #include <asm/linux_logo.h>
 #endif
-
-/*
- * Properties whose value is longer than this get excluded from our
- * copy of the device tree.  This way we don't waste space storing
- * things like "driver,AAPL,MacOS,PowerPC" properties.  But this value
- * does need to be big enough to ensure that we don't lose things
- * like the interrupt-map property on a PCI-PCI bridge.
- */
-#define MAX_PROPERTY_LENGTH	4096
-
-struct prom_args {
-	const char *service;
-	int nargs;
-	int nret;
-	void *args[10];
-};
 
 struct pci_address {
 	unsigned a_hi;
@@ -68,24 +56,10 @@ struct pci_reg_property {
 	unsigned size_lo;
 };
 
-struct pci_range {
-	struct pci_address addr;
-	unsigned phys;
-	unsigned size_hi;
-	unsigned size_lo;
-};
-
 struct isa_reg_property {
 	unsigned space;
 	unsigned address;
 	unsigned size;
-};
-
-struct pci_intr_map {
-	struct pci_address addr;
-	unsigned dunno;
-	phandle int_ctrler;
-	unsigned intr;
 };
 
 typedef unsigned long interpret_func(struct device_node *, unsigned long,
@@ -96,27 +70,7 @@ static interpret_func interpret_isa_props;
 static interpret_func interpret_macio_props;
 static interpret_func interpret_root_props;
 
-#ifndef FB_MAX			/* avoid pulling in all of the fb stuff */
-#define FB_MAX	8
-#endif
-char *prom_display_paths[FB_MAX] __initdata = { 0, };
-phandle prom_display_nodes[FB_MAX] __initdata;
-unsigned int prom_num_displays __initdata = 0;
-char *of_stdout_device __initdata = 0;
-ihandle prom_disp_node __initdata = 0;
-
-prom_entry prom __initdata = 0;
-ihandle prom_chosen __initdata = 0;
-ihandle prom_stdout __initdata = 0;
-
 extern char *klimit;
-char *bootpath;
-char *bootdevice;
-
-unsigned int rtas_data;   /* physical pointer */
-unsigned int rtas_entry;  /* physical pointer */
-unsigned int rtas_size;
-unsigned int old_rtas;
 
 /* Set for a newworld or CHRP machine */
 int use_of_interrupt_tree;
@@ -125,553 +79,30 @@ int num_interrupt_controllers;
 
 int pmac_newworld;
 
-static struct device_node *allnodes;
+extern unsigned int rtas_entry;  /* physical pointer */
 
-static void *call_prom(const char *service, int nargs, int nret, ...);
-static void prom_exit(void);
-static unsigned long copy_device_tree(unsigned long, unsigned long);
-static unsigned long inspect_node(phandle, struct device_node *, unsigned long,
-				  unsigned long, struct device_node ***);
+extern struct device_node *allnodes;
+
 static unsigned long finish_node(struct device_node *, unsigned long,
 				 interpret_func *, int, int);
 static unsigned long finish_node_interrupts(struct device_node *, unsigned long);
-static unsigned long check_display(unsigned long);
-static int prom_next_node(phandle *);
-static void *early_get_property(unsigned long, unsigned long, char *);
 static struct device_node *find_phandle(phandle);
-
-#ifdef CONFIG_BOOTX_TEXT
-static void setup_disp_fake_bi(ihandle dp);
-#endif
 
 extern void enter_rtas(void *);
 void phys_call_rtas(int, int, int, ...);
 
 extern char cmd_line[512];	/* XXX */
-boot_infos_t *boot_infos;
+extern boot_infos_t *boot_infos;
 unsigned long dev_tree_size;
 
-#define ALIGN(x) (((x) + sizeof(unsigned long)-1) & -sizeof(unsigned long))
-
-/* Is boot-info compatible ? */
-#define BOOT_INFO_IS_COMPATIBLE(bi)		((bi)->compatible_version <= BOOT_INFO_VERSION)
-#define BOOT_INFO_IS_V2_COMPATIBLE(bi)	((bi)->version >= 2)
-#define BOOT_INFO_IS_V4_COMPATIBLE(bi)	((bi)->version >= 4)
-
-/*
- * Note that prom_init() and anything called from prom_init() must
- * use the RELOC/PTRRELOC macros to access any static data in
- * memory, since the kernel may be running at an address that is
- * different from the address that it was linked at.
- * (Note that strings count as static variables.)
- */
-
-static void __init
-prom_exit()
-{
-	struct prom_args args;
-	unsigned long offset = reloc_offset();
-
-	args.service = "exit";
-	args.nargs = 0;
-	args.nret = 0;
-	RELOC(prom)(&args);
-	for (;;)			/* should never get here */
-		;
-}
-
-void __init
-prom_enter(void)
-{
-	struct prom_args args;
-	unsigned long offset = reloc_offset();
-
-	args.service = RELOC("enter");
-	args.nargs = 0;
-	args.nret = 0;
-	RELOC(prom)(&args);
-}
-
-static void * __init
-call_prom(const char *service, int nargs, int nret, ...)
-{
-	va_list list;
-	int i;
-	unsigned long offset = reloc_offset();
-	struct prom_args prom_args;
-
-	prom_args.service = service;
-	prom_args.nargs = nargs;
-	prom_args.nret = nret;
-	va_start(list, nret);
-	for (i = 0; i < nargs; ++i)
-		prom_args.args[i] = va_arg(list, void *);
-	va_end(list);
-	for (i = 0; i < nret; ++i)
-		prom_args.args[i + nargs] = 0;
-	RELOC(prom)(&prom_args);
-	return prom_args.args[nargs];
-}
-
-void __init
-prom_print(const char *msg)
-{
-	const char *p, *q;
-	unsigned long offset = reloc_offset();
-
-	if (RELOC(prom_stdout) == 0)
-		return;
-
-	for (p = msg; *p != 0; p = q) {
-		for (q = p; *q != 0 && *q != '\n'; ++q)
-			;
-		if (q > p)
-			call_prom(RELOC("write"), 3, 1, RELOC(prom_stdout),
-				  p, q - p);
-		if (*q != 0) {
-			++q;
-			call_prom(RELOC("write"), 3, 1, RELOC(prom_stdout),
-				  RELOC("\r\n"), 2);
-		}
-	}
-}
-
-static void __init
-prom_print_hex(unsigned int v)
-{
-	char buf[16];
-	int i, c;
-
-	for (i = 0; i < 8; ++i) {
-		c = (v >> ((7-i)*4)) & 0xf;
-		c += (c >= 10)? ('a' - 10): '0';
-		buf[i] = c;
-	}
-	buf[i] = ' ';
-	buf[i+1] = 0;
-	prom_print(buf);
-}
-
-unsigned long smp_chrp_cpu_nr __initdata = 0;
-
-#ifdef CONFIG_SMP
-/*
- * With CHRP SMP we need to use the OF to start the other
- * processors so we can't wait until smp_boot_cpus (the OF is
- * trashed by then) so we have to put the processors into
- * a holding pattern controlled by the kernel (not OF) before
- * we destroy the OF.
- *
- * This uses a chunk of high memory, puts some holding pattern
- * code there and sends the other processors off to there until
- * smp_boot_cpus tells them to do something.  We do that by using
- * physical address 0x0.  The holding pattern checks that address
- * until its cpu # is there, when it is that cpu jumps to
- * __secondary_start().  smp_boot_cpus() takes care of setting those
- * values.
- *
- * We also use physical address 0x4 here to tell when a cpu
- * is in its holding pattern code.
- *
- * -- Cort
- */
-static void __init
-prom_hold_cpus(unsigned long mem)
-{
-	extern void __secondary_hold(void);
-	unsigned long i;
-	int cpu;
-	phandle node;
-	unsigned long offset = reloc_offset();
-	char type[16], *path;
-	unsigned int reg;
-
-	/*
-	 * XXX: hack to make sure we're chrp, assume that if we're
-	 *      chrp we have a device_type property -- Cort
-	 */
-	node = call_prom(RELOC("finddevice"), 1, 1, RELOC("/"));
-	if ( (int)call_prom(RELOC("getprop"), 4, 1, node,
-			    RELOC("device_type"),type, sizeof(type)) <= 0)
-		return;
-
-	/* copy the holding pattern code to someplace safe (0) */
-	/* the holding pattern is now within the first 0x100
-	   bytes of the kernel image -- paulus */
-	memcpy((void *)0, (void *)(KERNELBASE + offset), 0x100);
-	flush_icache_range(0, 0x100);
-
-	/* look for cpus */
-	*(unsigned long *)(0x0) = 0;
-	asm volatile("dcbf 0,%0": : "r" (0) : "memory");
-	for (node = 0; prom_next_node(&node); ) {
-		type[0] = 0;
-		call_prom(RELOC("getprop"), 4, 1, node, RELOC("device_type"),
-			  type, sizeof(type));
-		if (strcmp(type, RELOC("cpu")) != 0)
-			continue;
-		path = (char *) mem;
-		memset(path, 0, 256);
-		if ((int) call_prom(RELOC("package-to-path"), 3, 1,
-				    node, path, 255) < 0)
-			continue;
-		reg = -1;
-		call_prom(RELOC("getprop"), 4, 1, node, RELOC("reg"),
-			  &reg, sizeof(reg));
-		cpu = RELOC(smp_chrp_cpu_nr)++;
-		RELOC(smp_hw_index)[cpu] = reg;
-		/* XXX: hack - don't start cpu 0, this cpu -- Cort */
-		if (cpu == 0)
-			continue;
-		prom_print(RELOC("starting cpu "));
-		prom_print(path);
-		*(ulong *)(0x4) = 0;
-		call_prom(RELOC("start-cpu"), 3, 0, node,
-			  __pa(__secondary_hold), cpu);
-		prom_print(RELOC("..."));
-		for ( i = 0 ; (i < 10000) && (*(ulong *)(0x4) == 0); i++ )
-			;
-		if (*(ulong *)(0x4) == cpu)
-			prom_print(RELOC("ok\n"));
-		else {
-			prom_print(RELOC("failed: "));
-			prom_print_hex(*(ulong *)0x4);
-			prom_print(RELOC("\n"));
-		}
-	}
-}
-#endif /* CONFIG_SMP */
-
-void __init
-bootx_init(unsigned long r4, unsigned long phys)
-{
-	boot_infos_t *bi = (boot_infos_t *) r4;
-	unsigned long space;
-	unsigned long ptr, x;
-	char *model;
-	unsigned long offset = reloc_offset();
-
-	RELOC(boot_infos) = PTRUNRELOC(bi);
-	if (!BOOT_INFO_IS_V2_COMPATIBLE(bi))
-		bi->logicalDisplayBase = 0;
-
-#ifdef CONFIG_BOOTX_TEXT
-	btext_init(bi);
-
-	/*
-	 * Test if boot-info is compatible.  Done only in config
-	 * CONFIG_BOOTX_TEXT since there is nothing much we can do
-	 * with an incompatible version, except display a message
-	 * and eventually hang the processor...
-	 *
-	 * I'll try to keep enough of boot-info compatible in the
-	 * future to always allow display of this message;
-	 */
-	if (!BOOT_INFO_IS_COMPATIBLE(bi)) {
-		btext_drawstring(RELOC(" !!! WARNING - Incompatible version of BootX !!!\n\n\n"));
-		btext_flushscreen();
-	}
-#endif	/* CONFIG_BOOTX_TEXT */	
-		
-	/* New BootX enters kernel with MMU off, i/os are not allowed
-	   here. This hack will have been done by the boostrap anyway.
-	*/
-	if (bi->version < 4) {
-		/*
-		 * XXX If this is an iMac, turn off the USB controller.
-		 */
-		model = (char *) early_get_property
-			(r4 + bi->deviceTreeOffset, 4, RELOC("model"));
-		if (model
-		    && (strcmp(model, RELOC("iMac,1")) == 0
-			|| strcmp(model, RELOC("PowerMac1,1")) == 0)) {
-			out_le32((unsigned *)0x80880008, 1);	/* XXX */
-		}
-	}
-		
-	/* Move klimit to enclose device tree, args, ramdisk, etc... */
-	if (bi->version < 5) {
-		space = bi->deviceTreeOffset + bi->deviceTreeSize;
-		if (bi->ramDisk)
-			space = bi->ramDisk + bi->ramDiskSize;
-	} else
-		space = bi->totalParamsSize;
-	RELOC(klimit) = PTRUNRELOC((char *) bi + space);
-
-	/* New BootX will have flushed all TLBs and enters kernel with
-	   MMU switched OFF, so this should not be useful anymore.
-	*/
-	if (bi->version < 4) {
-		/*
-		 * Touch each page to make sure the PTEs for them
-		 * are in the hash table - the aim is to try to avoid
-		 * getting DSI exceptions while copying the kernel image.
-		 */
-		for (ptr = (KERNELBASE + offset) & PAGE_MASK;
-		     ptr < (unsigned long)bi + space; ptr += PAGE_SIZE)
-			x = *(volatile unsigned long *)ptr;
-	}
-		
-#ifdef CONFIG_BOOTX_TEXT
-	/*
-	 * Note that after we call prepare_disp_BAT, we can't do
-	 * prom_draw*, flushscreen or clearscreen until we turn the MMU
-	 * on, since prepare_disp_BAT sets disp_bi->logicalDisplayBase
-	 * to a virtual address.
-	 */
-	btext_prepare_BAT();
-#endif
-}
-
-#ifdef CONFIG_PPC64BRIDGE
-/*
- * Set up a hash table with a set of entries in it to map the
- * first 64MB of RAM.  This is used on 64-bit machines since
- * some of them don't have BATs.
- * We assume the PTE will fit in the primary PTEG.
- */
-
-static inline void make_pte(unsigned long htab, unsigned int hsize,
-			    unsigned int va, unsigned int pa, int mode)
-{
-	unsigned int *pteg;
-	unsigned int hash, i, vsid;
-
-	vsid = ((va >> 28) * 0x111) << 12;
-	hash = ((va ^ vsid) >> 5) & 0x7fff80;
-	pteg = (unsigned int *)(htab + (hash & (hsize - 1)));
-	for (i = 0; i < 8; ++i, pteg += 4) {
-		if ((pteg[1] & 1) == 0) {
-			pteg[1] = vsid | ((va >> 16) & 0xf80) | 1;
-			pteg[3] = pa | mode;
-			break;
-		}
-	}
-}
-
-extern unsigned long _SDR1;
-extern PTE *Hash;
-extern unsigned long Hash_size;
-
-static void __init
-prom_alloc_htab(void)
-{
-	unsigned int hsize;
-	unsigned long htab;
-	unsigned int addr;
-	unsigned long offset = reloc_offset();
-
-	/*
-	 * Because of OF bugs we can't use the "claim" client
-	 * interface to allocate memory for the hash table.
-	 * This code is only used on 64-bit PPCs, and the only
-	 * 64-bit PPCs at the moment are RS/6000s, and their
-	 * OF is based at 0xc00000 (the 12M point), so we just
-	 * arbitrarily use the 0x800000 - 0xc00000 region for the
-	 * hash table.
-	 *  -- paulus.
-	 */
-#ifdef CONFIG_POWER4
-	hsize = 4 << 20;	/* POWER4 has no BATs */
-#else
-	hsize = 2 << 20;
-#endif /* CONFIG_POWER4 */
-	htab = (8 << 20);
-	RELOC(Hash) = (void *)(htab + KERNELBASE);
-	RELOC(Hash_size) = hsize;
-	RELOC(_SDR1) = htab + __ilog2(hsize) - 18;
-
-	/*
-	 * Put in PTEs for the first 64MB of RAM
-	 */
-	cacheable_memzero((void *)htab, hsize);
-	for (addr = 0; addr < 0x4000000; addr += 0x1000)
-		make_pte(htab, hsize, addr + KERNELBASE, addr,
-			 _PAGE_ACCESSED | _PAGE_COHERENT | PP_RWXX);
-}
-#endif /* CONFIG_PPC64BRIDGE */
-
-static void __init
-prom_instantiate_rtas(void)
-{
-	ihandle prom_rtas;
-	unsigned int i;
-	struct prom_args prom_args;
-	unsigned long offset = reloc_offset();
-
-	prom_rtas = call_prom(RELOC("finddevice"), 1, 1, RELOC("/rtas"));
-	if (prom_rtas == (void *) -1)
-		return;
-
-	RELOC(rtas_size) = 0;
-	call_prom(RELOC("getprop"), 4, 1, prom_rtas,
-		  RELOC("rtas-size"), &RELOC(rtas_size), sizeof(rtas_size));
-	prom_print(RELOC("instantiating rtas"));
-	if (RELOC(rtas_size) == 0) {
-		RELOC(rtas_data) = 0;
-	} else {
-		/*
-		 * Ask OF for some space for RTAS.
-		 * Actually OF has bugs so we just arbitrarily
-		 * use memory at the 6MB point.
-		 */
-		RELOC(rtas_data) = 6 << 20;
-		prom_print(RELOC(" at "));
-		prom_print_hex(RELOC(rtas_data));
-	}
-
-	prom_rtas = call_prom(RELOC("open"), 1, 1, RELOC("/rtas"));
-	prom_print(RELOC("..."));
-	prom_args.service = RELOC("call-method");
-	prom_args.nargs = 3;
-	prom_args.nret = 2;
-	prom_args.args[0] = RELOC("instantiate-rtas");
-	prom_args.args[1] = prom_rtas;
-	prom_args.args[2] = (void *) RELOC(rtas_data);
-	RELOC(prom)(&prom_args);
-	i = 0;
-	if (prom_args.args[3] == 0)
-		i = (unsigned int)prom_args.args[4];
-	RELOC(rtas_entry) = i;
-	if ((RELOC(rtas_entry) == -1) || (RELOC(rtas_entry) == 0))
-		prom_print(RELOC(" failed\n"));
-	else
-		prom_print(RELOC(" done\n"));
-}
-
-/*
- * We enter here early on, when the Open Firmware prom is still
- * handling exceptions and the MMU hash table for us.
- */
-unsigned long __init
-prom_init(int r3, int r4, prom_entry pp)
-{
-	unsigned long mem;
-	ihandle prom_mmu;
-	unsigned long offset = reloc_offset();
-	int l;
-	char *p, *d;
- 	unsigned long phys;
-
- 	/* Default */
- 	phys = offset + KERNELBASE;
-
-	/* First get a handle for the stdout device */
-	RELOC(prom) = pp;
-	RELOC(prom_chosen) = call_prom(RELOC("finddevice"), 1, 1,
-				       RELOC("/chosen"));
-	if (RELOC(prom_chosen) == (void *)-1)
-		prom_exit();
-	if ((int) call_prom(RELOC("getprop"), 4, 1, RELOC(prom_chosen),
-			    RELOC("stdout"), &RELOC(prom_stdout),
-			    sizeof(prom_stdout)) <= 0)
-		prom_exit();
-
-	/* Get the full OF pathname of the stdout device */
-	mem = (unsigned long) RELOC(klimit) + offset;
-	p = (char *) mem;
-	memset(p, 0, 256);
-	call_prom(RELOC("instance-to-path"), 3, 1, RELOC(prom_stdout), p, 255);
-	RELOC(of_stdout_device) = PTRUNRELOC(p);
-	mem += strlen(p) + 1;
-
-	/* Get the boot device and translate it to a full OF pathname. */
-	p = (char *) mem;
-	l = (int) call_prom(RELOC("getprop"), 4, 1, RELOC(prom_chosen),
-			    RELOC("bootpath"), p, 1<<20);
-	if (l > 0) {
-		p[l] = 0;	/* should already be null-terminated */
-		RELOC(bootpath) = PTRUNRELOC(p);
-		mem += l + 1;
-		d = (char *) mem;
-		*d = 0;
-		call_prom(RELOC("canon"), 3, 1, p, d, 1<<20);
-		RELOC(bootdevice) = PTRUNRELOC(d);
-		mem = ALIGN(mem + strlen(d) + 1);
-	}
-
-	prom_instantiate_rtas();
-
-#ifdef CONFIG_PPC64BRIDGE
-	/*
-	 * Find out how much memory we have and allocate a
-	 * suitably-sized hash table.
-	 */
-	prom_alloc_htab();
-#endif
-
-	mem = check_display(mem);
-
-	prom_print(RELOC("copying OF device tree..."));
-	mem = copy_device_tree(mem, mem + (1<<20));
-	prom_print(RELOC("done\n"));
-
-#ifdef CONFIG_SMP
-	prom_hold_cpus(mem);
-#endif
-
-	RELOC(klimit) = (char *) (mem - offset);
-
-	/* If we are already running at 0xc0000000, we assume we were loaded by
-	 * an OF bootloader which did set a BAT for us. This breaks OF translate
-	 * so we force phys to be 0
-	 */
-	if (offset == 0)
-		phys = 0;
-	else {
- 	    if ((int) call_prom(RELOC("getprop"), 4, 1, RELOC(prom_chosen),
-			    RELOC("mmu"), &prom_mmu, sizeof(prom_mmu)) <= 0) {	
-		prom_print(RELOC(" no MMU found\n"));
-	    } else {
-		int nargs;
-		struct prom_args prom_args;
-		nargs = 4;
-		prom_args.service = RELOC("call-method");
-		prom_args.nargs = nargs;
-		prom_args.nret = 4;
-		prom_args.args[0] = RELOC("translate");
-		prom_args.args[1] = prom_mmu;
-		prom_args.args[2] = (void *)(offset + KERNELBASE);
-		prom_args.args[3] = (void *)1;
-		RELOC(prom)(&prom_args);
-
-		/* We assume the phys. address size is 3 cells */
-		if (prom_args.args[nargs] != 0)
-			prom_print(RELOC(" (translate failed)\n"));
-		else
-			phys = (unsigned long)prom_args.args[nargs+3];
-	    }
-	}
-
-#ifdef CONFIG_BOOTX_TEXT
-	if (RELOC(prom_disp_node) != 0)
-		setup_disp_fake_bi(RELOC(prom_disp_node));
-#endif
-
-	/* Use quiesce call to get OF to shut down any devices it's using */
-	prom_print(RELOC("Calling quiesce ...\n"));
-	call_prom(RELOC("quiesce"), 0, 0);
-
-#ifdef CONFIG_BOOTX_TEXT
-	btext_prepare_BAT();
-#endif
-
-	prom_print(RELOC("returning "));
-	prom_print_hex(phys);
-	prom_print(RELOC(" from prom_init\n"));
-	RELOC(prom_stdout) = 0;
-
-	return phys;
-}
-
-void phys_call_rtas(int service, int nargs, int nret, ...)
+void __openfirmware
+phys_call_rtas(int service, int nargs, int nret, ...)
 {
 	va_list list;
 	union {
 		unsigned long words[16];
 		double align;
 	} u;
-	unsigned long offset = reloc_offset();
 	void (*rtas)(void *, unsigned long);
 	int i;
 
@@ -683,340 +114,8 @@ void phys_call_rtas(int service, int nargs, int nret, ...)
 		u.words[i+3] = va_arg(list, unsigned long);
 	va_end(list);
 
-	rtas = (void (*)(void *, unsigned long)) RELOC(rtas_entry);
-	rtas(&u, RELOC(rtas_data));
-}
-
-static int __init
-prom_set_color(ihandle ih, int i, int r, int g, int b)
-{
-	struct prom_args prom_args;
-	unsigned long offset = reloc_offset();
-
-	prom_args.service = RELOC("call-method");
-	prom_args.nargs = 6;
-	prom_args.nret = 1;
-	prom_args.args[0] = RELOC("color!");
-	prom_args.args[1] = ih;
-	prom_args.args[2] = (void *) i;
-	prom_args.args[3] = (void *) b;
-	prom_args.args[4] = (void *) g;
-	prom_args.args[5] = (void *) r;
-	RELOC(prom)(&prom_args);
-	return (int) prom_args.args[6];
-}
-
-/*
- * If we have a display that we don't know how to drive,
- * we will want to try to execute OF's open method for it
- * later.  However, OF will probably fall over if we do that
- * we've taken over the MMU.
- * So we check whether we will need to open the display,
- * and if so, open it now.
- */
-static unsigned long __init
-check_display(unsigned long mem)
-{
-	phandle node;
-	ihandle ih;
-	int i;
-	unsigned long offset = reloc_offset();
-	char type[16], *path;
-	static unsigned char default_colors[] = {
-		0x00, 0x00, 0x00,
-		0x00, 0x00, 0xaa,
-		0x00, 0xaa, 0x00,
-		0x00, 0xaa, 0xaa,
-		0xaa, 0x00, 0x00,
-		0xaa, 0x00, 0xaa,
-		0xaa, 0xaa, 0x00,
-		0xaa, 0xaa, 0xaa,
-		0x55, 0x55, 0x55,
-		0x55, 0x55, 0xff,
-		0x55, 0xff, 0x55,
-		0x55, 0xff, 0xff,
-		0xff, 0x55, 0x55,
-		0xff, 0x55, 0xff,
-		0xff, 0xff, 0x55,
-		0xff, 0xff, 0xff
-	};
-
-	RELOC(prom_disp_node) = 0;
-
-	for (node = 0; prom_next_node(&node); ) {
-		type[0] = 0;
-		call_prom(RELOC("getprop"), 4, 1, node, RELOC("device_type"),
-			  type, sizeof(type));
-		if (strcmp(type, RELOC("display")) != 0)
-			continue;
-		/* It seems OF doesn't null-terminate the path :-( */
-		path = (char *) mem;
-		memset(path, 0, 256);
-		if ((int) call_prom(RELOC("package-to-path"), 3, 1,
-				    node, path, 255) < 0)
-			continue;
-
-		/*
-		 * If this display is the device that OF is using for stdout,
-		 * move it to the front of the list.
-		 */
-		mem += strlen(path) + 1;
-		i = RELOC(prom_num_displays)++;
-		if (RELOC(of_stdout_device) != 0 && i > 0
-		    && strcmp(PTRRELOC(RELOC(of_stdout_device)), path) == 0) {
-			for (; i > 0; --i) {
-				RELOC(prom_display_paths[i])
-					= RELOC(prom_display_paths[i-1]);
-				RELOC(prom_display_nodes[i])
-					= RELOC(prom_display_nodes[i-1]);
-			}
-		}
-		RELOC(prom_display_paths[i]) = PTRUNRELOC(path);
-		RELOC(prom_display_nodes[i]) = node;
-		if (i == 0)
-			RELOC(prom_disp_node) = node;
-		if (RELOC(prom_num_displays) >= FB_MAX)
-			break;
-	}
-
-try_again:
-	/*
-	 * Open the first display and set its colormap.
-	 */
-	if (RELOC(prom_num_displays) > 0) {
-		path = PTRRELOC(RELOC(prom_display_paths[0]));
-		prom_print(RELOC("opening display "));
-		prom_print(path);
-		ih = call_prom(RELOC("open"), 1, 1, path);
-		if (ih == 0 || ih == (ihandle) -1) {
-			prom_print(RELOC("... failed\n"));
-			for (i=1; i<RELOC(prom_num_displays); i++) {
-				RELOC(prom_display_paths[i-1]) = RELOC(prom_display_paths[i]);
-				RELOC(prom_display_nodes[i-1]) = RELOC(prom_display_nodes[i]);
-			}	
-			if (--RELOC(prom_num_displays) > 0)
-				RELOC(prom_disp_node) = RELOC(prom_display_nodes[0]);
-			else
-				RELOC(prom_disp_node) = NULL;
-			goto try_again;
-		} else {
-			prom_print(RELOC("... ok\n"));
-			/*
-			 * Setup a usable color table when the appropriate
-			 * method is available.
-			 * Should update this to use set-colors.
-			 */
-			for (i = 0; i < 32; i++)
-				if (prom_set_color(ih, i, RELOC(default_colors)[i*3],
-						   RELOC(default_colors)[i*3+1],
-						   RELOC(default_colors)[i*3+2]) != 0)
-					break;
-
-#ifdef CONFIG_FB
-			for (i = 0; i < LINUX_LOGO_COLORS; i++)
-				if (prom_set_color(ih, i + 32,
-						   RELOC(linux_logo_red)[i],
-						   RELOC(linux_logo_green)[i],
-						   RELOC(linux_logo_blue)[i]) != 0)
-					break;
-#endif /* CONFIG_FB */
-		}
-	}
-
-	return ALIGN(mem);
-}
-
-/* This function will enable the early boot text when doing OF booting. This
- * way, xmon output should work too
- */
-#ifdef CONFIG_BOOTX_TEXT
-static void __init
-setup_disp_fake_bi(ihandle dp)
-{
-	int width = 640, height = 480, depth = 8, pitch;
-	unsigned address;
-	unsigned long offset = reloc_offset();
-	struct pci_reg_property addrs[8];
-	int i, naddrs;
-	char name[32];
-	char *getprop = RELOC("getprop");
-
-	prom_print(RELOC("Initializing fake screen: "));
-
-	memset(name, 0, sizeof(name));
-	call_prom(getprop, 4, 1, dp, RELOC("name"), name, sizeof(name));
-	name[sizeof(name)-1] = 0;
-	prom_print(name);
-	prom_print(RELOC("\n"));
-	call_prom(getprop, 4, 1, dp, RELOC("width"), &width, sizeof(width));
-	call_prom(getprop, 4, 1, dp, RELOC("height"), &height, sizeof(height));
-	call_prom(getprop, 4, 1, dp, RELOC("depth"), &depth, sizeof(depth));
-	pitch = width * ((depth + 7) / 8);
-	call_prom(getprop, 4, 1, dp, RELOC("linebytes"),
-		  &pitch, sizeof(pitch));
-	if (pitch == 1)
-		pitch = 0x1000;		/* for strange IBM display */
-	address = 0;
-	call_prom(getprop, 4, 1, dp, RELOC("address"),
-		  &address, sizeof(address));
-	if (address == 0) {
-		/* look for an assigned address with a size of >= 1MB */
-		naddrs = (int) call_prom(getprop, 4, 1, dp,
-				RELOC("assigned-addresses"),
-				addrs, sizeof(addrs));
-		naddrs /= sizeof(struct pci_reg_property);
-		for (i = 0; i < naddrs; ++i) {
-			if (addrs[i].size_lo >= (1 << 20)) {
-				address = addrs[i].addr.a_lo;
-				/* use the BE aperture if possible */
-				if (addrs[i].size_lo >= (16 << 20))
-					address += (8 << 20);
-				break;
-			}
-		}
-		if (address == 0) {
-			prom_print(RELOC("Failed to get address\n"));
-			return;
-		}
-	}
-	/* kludge for valkyrie */
-	if (strcmp(name, RELOC("valkyrie")) == 0) 
-		address += 0x1000;
-
-	btext_setup_display(width, height, depth, pitch, address);
-}
-#endif
-
-static int __init
-prom_next_node(phandle *nodep)
-{
-	phandle node;
-	unsigned long offset = reloc_offset();
-
-	if ((node = *nodep) != 0
-	    && (*nodep = call_prom(RELOC("child"), 1, 1, node)) != 0)
-		return 1;
-	if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
-		return 1;
-	for (;;) {
-		if ((node = call_prom(RELOC("parent"), 1, 1, node)) == 0)
-			return 0;
-		if ((*nodep = call_prom(RELOC("peer"), 1, 1, node)) != 0)
-			return 1;
-	}
-}
-
-/*
- * Make a copy of the device tree from the PROM.
- */
-static unsigned long __init
-copy_device_tree(unsigned long mem_start, unsigned long mem_end)
-{
-	phandle root;
-	unsigned long new_start;
-	struct device_node **allnextp;
-	unsigned long offset = reloc_offset();
-
-	root = call_prom(RELOC("peer"), 1, 1, (phandle)0);
-	if (root == (phandle)0) {
-		prom_print(RELOC("couldn't get device tree root\n"));
-		prom_exit();
-	}
-	allnextp = &RELOC(allnodes);
-	mem_start = ALIGN(mem_start);
-	new_start = inspect_node(root, 0, mem_start, mem_end, &allnextp);
-	*allnextp = 0;
-	return new_start;
-}
-
-static unsigned long __init
-inspect_node(phandle node, struct device_node *dad,
-	     unsigned long mem_start, unsigned long mem_end,
-	     struct device_node ***allnextpp)
-{
-	int l;
-	phandle child;
-	struct device_node *np;
-	struct property *pp, **prev_propp;
-	char *prev_name, *namep;
-	unsigned char *valp;
-	unsigned long offset = reloc_offset();
-
-	np = (struct device_node *) mem_start;
-	mem_start += sizeof(struct device_node);
-	memset(np, 0, sizeof(*np));
-	np->node = node;
-	**allnextpp = PTRUNRELOC(np);
-	*allnextpp = &np->allnext;
-	if (dad != 0) {
-		np->parent = PTRUNRELOC(dad);
-		/* we temporarily use the `next' field as `last_child'. */
-		if (dad->next == 0)
-			dad->child = PTRUNRELOC(np);
-		else
-			dad->next->sibling = PTRUNRELOC(np);
-		dad->next = np;
-	}
-
-	/* get and store all properties */
-	prev_propp = &np->properties;
-	prev_name = RELOC("");
-	for (;;) {
-		pp = (struct property *) mem_start;
-		namep = (char *) (pp + 1);
-		pp->name = PTRUNRELOC(namep);
-		if ((int) call_prom(RELOC("nextprop"), 3, 1, node, prev_name,
-				    namep) <= 0)
-			break;
-		mem_start = ALIGN((unsigned long)namep + strlen(namep) + 1);
-		prev_name = namep;
-		valp = (unsigned char *) mem_start;
-		pp->value = PTRUNRELOC(valp);
-		pp->length = (int)
-			call_prom(RELOC("getprop"), 4, 1, node, namep,
-				  valp, mem_end - mem_start);
-		if (pp->length < 0)
-			continue;
-#ifdef MAX_PROPERTY_LENGTH
-		if (pp->length > MAX_PROPERTY_LENGTH)
-			continue; /* ignore this property */
-#endif
-		mem_start = ALIGN(mem_start + pp->length);
-		*prev_propp = PTRUNRELOC(pp);
-		prev_propp = &pp->next;
-	}
-	if (np->node != NULL) {
-		/* Add a "linux,phandle" property" */
-		pp = (struct property *) mem_start;
-		*prev_propp = PTRUNRELOC(pp);
-		prev_propp = &pp->next;
-		namep = (char *) (pp + 1);
-		pp->name = PTRUNRELOC(namep);
-		strcpy(namep, RELOC("linux,phandle"));
-		mem_start = ALIGN((unsigned long)namep + strlen(namep) + 1);
-		pp->value = (unsigned char *) PTRUNRELOC(&np->node);
-		pp->length = sizeof(np->node);
-	}
-	*prev_propp = NULL;
-
-	/* get the node's full name */
-	l = (int) call_prom(RELOC("package-to-path"), 3, 1, node,
-			    (char *) mem_start, mem_end - mem_start);
-	if (l >= 0) {
-		np->full_name = PTRUNRELOC((char *) mem_start);
-		*(char *)(mem_start + l) = 0;
-		mem_start = ALIGN(mem_start + l + 1);
-	}
-
-	/* do all our children */
-	child = call_prom(RELOC("child"), 1, 1, node);
-	while (child != (void *)0) {
-		mem_start = inspect_node(child, np, mem_start, mem_end,
-					 allnextpp);
-		child = call_prom(RELOC("peer"), 1, 1, child);
-	}
-
-	return mem_start;
+	rtas = (void (*)(void *, unsigned long)) rtas_entry;
+	rtas(&u, rtas_data);
 }
 
 /*
@@ -1081,26 +180,6 @@ finish_device_tree(void)
 	klimit = (char *) mem;
 }
 
-/*
- * early_get_property is used to access the device tree image prepared
- * by BootX very early on, before the pointers in it have been relocated.
- */
-static void * __init
-early_get_property(unsigned long base, unsigned long node, char *prop)
-{
-	struct device_node *np = (struct device_node *)(base + node);
-	struct property *pp;
-
-	for (pp = np->properties; pp != 0; pp = pp->next) {
-		pp = (struct property *) (base + (unsigned long)pp);
-		if (strcmp((char *)((unsigned long)pp->name + base),
-			   prop) == 0) {
-			return (void *)((unsigned long)pp->value + base);
-		}
-	}
-	return 0;
-}
-
 static unsigned long __init
 finish_node(struct device_node *np, unsigned long mem_start,
 	    interpret_func *ifunc, int naddrc, int nsizec)
@@ -1111,10 +190,15 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	np->name = get_property(np, "name", 0);
 	np->type = get_property(np, "device_type", 0);
 
+	if (!np->name)
+		np->name = "<NULL>";
+	if (!np->type)
+		np->type = "<NULL>";
+
 	/* get the device addresses and interrupts */
-	if (ifunc != NULL) {
+	if (ifunc != NULL)
 		mem_start = ifunc(np, mem_start, naddrc, nsizec);
-	}
+
 	if (use_of_interrupt_tree)
 		mem_start = finish_node_interrupts(np, mem_start);
 
@@ -1125,12 +209,6 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	ip = (int *) get_property(np, "#size-cells", 0);
 	if (ip != NULL)
 		nsizec = *ip;
-
-	/* the f50 sets the name to 'display' and 'compatible' to what we
-	 * expect for the name -- Cort
-	 */
-	if (!strcmp(np->name, "display"))
-		np->name = get_property(np, "compatible", 0);
 
 	if (np->parent == NULL)
 		ifunc = interpret_root_props;
@@ -1145,6 +223,8 @@ finish_node(struct device_node *np, unsigned long mem_start,
 		ifunc = interpret_macio_props;
 	else if (!strcmp(np->type, "isa"))
 		ifunc = interpret_isa_props;
+	else if (!strcmp(np->name, "uni-n"))
+		ifunc = interpret_root_props;
 	else if (!((ifunc == interpret_dbdma_props
 		    || ifunc == interpret_macio_props)
 		   && (!strcmp(np->type, "escc")
@@ -1508,7 +588,7 @@ interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= sizeof(struct reg_property)) >= 0) {
-			adr[i].space = 0;
+			adr[i].space = 2;
 			adr[i].address = rp[i].address + base_address;
 			adr[i].size = rp[i].size;
 			++i;
@@ -1544,14 +624,13 @@ interpret_macio_props(struct device_node *np, unsigned long mem_start,
 	struct reg_property *rp;
 	struct address_range *adr;
 	unsigned long base_address;
-	int i, l, keylargo, *ip;
+	int i, l, *ip;
 	struct device_node *db;
 
 	base_address = 0;
 	for (db = np->parent; db != NULL; db = db->parent) {
 		if (!strcmp(db->type, "mac-io") && db->n_addrs != 0) {
 			base_address = db->addrs[0].address;
-			keylargo = device_is_compatible(db, "Keylargo");
 			break;
 		}
 	}
@@ -1561,7 +640,7 @@ interpret_macio_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= sizeof(struct reg_property)) >= 0) {
-			adr[i].space = 0;
+			adr[i].space = 2;
 			adr[i].address = rp[i].address + base_address;
 			adr[i].size = rp[i].size;
 			++i;
@@ -1616,7 +695,7 @@ interpret_isa_props(struct device_node *np, unsigned long mem_start,
 
 	if (use_of_interrupt_tree)
 		return mem_start;
- 
+
 	ip = (int *) get_property(np, "interrupts", &l);
 	if (ip != 0) {
 		np->intrs = (struct interrupt_info *) mem_start;
@@ -1645,7 +724,7 @@ interpret_root_props(struct device_node *np, unsigned long mem_start,
 		i = 0;
 		adr = (struct address_range *) mem_start;
 		while ((l -= rpsize) >= 0) {
-			adr[i].space = (naddrc >= 2? rp[naddrc-2]: 0);
+			adr[i].space = (naddrc >= 2? rp[naddrc-2]: 2);
 			adr[i].address = rp[naddrc - 1];
 			adr[i].size = rp[naddrc + nsizec - 1];
 			++i;
@@ -1786,7 +865,7 @@ int
 machine_is_compatible(const char *compat)
 {
 	struct device_node *root;
-	
+
 	root = find_path_device("/");
 	if (root == 0)
 		return 0;
@@ -1870,10 +949,176 @@ prom_add_property(struct device_node* np, struct property* prop)
 {
 	struct property **next = &np->properties;
 
-	prop->next = NULL;	
+	prop->next = NULL;
 	while (*next)
 		next = &(*next)->next;
 	*next = prop;
+}
+
+/* I quickly hacked that one, check against spec ! */
+static inline unsigned long __openfirmware
+bus_space_to_resource_flags(unsigned int bus_space)
+{
+	u8 space = (bus_space >> 24) & 0xf;
+	if (space == 0)
+		space = 0x02;
+	if (space == 0x02)
+		return IORESOURCE_MEM;
+	else if (space == 0x01)
+		return IORESOURCE_IO;
+	else {
+		printk(KERN_WARNING "prom.c: bus_space_to_resource_flags(), space: %x\n",
+		    	bus_space);
+		return 0;
+	}
+}
+
+static struct resource* __openfirmware
+find_parent_pci_resource(struct pci_dev* pdev, struct address_range *range)
+{
+	unsigned long mask;
+	int i;
+	
+	/* Check this one */ 
+	mask = bus_space_to_resource_flags(range->space);
+	for (i=0; i<DEVICE_COUNT_RESOURCE; i++) {
+		if ((pdev->resource[i].flags & mask) == mask &&
+			pdev->resource[i].start <= range->address &&
+			pdev->resource[i].end > range->address) {
+				if ((range->address + range->size - 1) > pdev->resource[i].end) {
+					/* Add better message */
+					printk(KERN_WARNING "PCI/OF resource overlap !\n");
+					return NULL;
+				}
+				break;
+			}
+	}
+	if (i == DEVICE_COUNT_RESOURCE)
+		return NULL;
+	return &pdev->resource[i];
+}
+
+/*
+ * Request an OF device resource. Currently handles child of PCI devices,
+ * or other nodes attached to the root node. Ultimately, put some
+ * link to resources in the OF node.
+ * WARNING: out_resource->name should be initialized before calling this
+ * function.
+ */
+struct resource* __openfirmware
+request_OF_resource(struct device_node* node, int index, const char* name_postfix)
+{
+	struct pci_dev* pcidev;
+	u8 pci_bus, pci_devfn;
+	unsigned long iomask;
+	struct device_node* nd;
+	struct resource* parent;
+	struct resource *res = NULL;
+	int nlen, plen;
+
+	if (index >= node->n_addrs)
+		goto fail;
+
+	/* Sanity check on bus space */
+	iomask = bus_space_to_resource_flags(node->addrs[index].space);
+	if (iomask & IORESOURCE_MEM)
+		parent = &iomem_resource;
+	else if (iomask & IORESOURCE_IO)
+		parent = &ioport_resource;
+	else
+		goto fail;
+		
+	/* Find a PCI parent if any */
+	nd = node;
+	pcidev = NULL;
+	while(nd) {
+		if (!pci_device_from_OF_node(nd, &pci_bus, &pci_devfn))
+			pcidev = pci_find_slot(pci_bus, pci_devfn);
+		if (pcidev) break;
+		nd = nd->parent;
+	}
+	if (pcidev)
+		parent = find_parent_pci_resource(pcidev, &node->addrs[index]);
+	if (!parent) {
+		printk(KERN_WARNING "request_OF_resource(%s), parent not found\n",
+			node->name);
+		goto fail;
+	}
+
+	res = __request_region(parent, node->addrs[index].address, node->addrs[index].size, NULL);
+	if (!res)
+		goto fail;
+	nlen = strlen(node->name);
+	plen = name_postfix ? strlen(name_postfix) : 0;
+	res->name = (const char *)kmalloc(nlen+plen+1, GFP_KERNEL);
+	if (res->name) {
+		strcpy((char *)res->name, node->name);
+		if (plen)
+			strcpy((char *)res->name+nlen, name_postfix);
+	}
+	return res;
+fail:
+	return NULL;
+}
+
+int __openfirmware
+release_OF_resource(struct device_node* node, int index)
+{
+	struct pci_dev* pcidev;
+	u8 pci_bus, pci_devfn;
+	unsigned long iomask;
+	struct device_node* nd;
+	struct resource* parent;
+	struct resource *res = NULL;
+
+	if (index >= node->n_addrs)
+		return -EINVAL;
+
+	/* Sanity check on bus space */
+	iomask = bus_space_to_resource_flags(node->addrs[index].space);
+	if (iomask & IORESOURCE_MEM)
+		parent = &iomem_resource;
+	else if (iomask & IORESOURCE_IO)
+		parent = &ioport_resource;
+	else
+		return -EINVAL;
+		
+	/* Find a PCI parent if any */
+	nd = node;
+	pcidev = NULL;
+	while(nd) {
+		if (!pci_device_from_OF_node(nd, &pci_bus, &pci_devfn))
+			pcidev = pci_find_slot(pci_bus, pci_devfn);
+		if (pcidev) break;
+		nd = nd->parent;
+	}
+	if (pcidev)
+		parent = find_parent_pci_resource(pcidev, &node->addrs[index]);
+	if (!parent) {
+		printk(KERN_WARNING "request_OF_resource(%s), parent not found\n",
+			node->name);
+		return -ENODEV;
+	}
+
+	/* Find us in the parent */
+	res = parent->child;
+	while (res) {
+		if (res->start == node->addrs[index].address &&
+		    res->end == (res->start + node->addrs[index].size - 1))
+		    	break;
+		res = res->sibling;
+	}
+	if (!res)
+		return -ENODEV;
+
+	if (res->name) {
+		kfree(res->name);
+		res->name = NULL;
+	}
+	release_resource(res);
+	kfree(res);
+
+	return 0;
 }
 
 #if 0
@@ -1961,11 +1206,11 @@ call_rtas(const char *service, int nargs, int nret,
 		u.words[i+3] = va_arg(list, unsigned long);
 	va_end(list);
 
-	/* Shouldn't we enable kernel FP here ? enter_rtas will play
-	 * with MSR_FE0|MSR_FE1|MSR_FP so I assume rtas might use
-	 * floating points. If that's the case, then we need to make
-	 * sure any lazy FP context is backed up
-	 * --BenH
+	/*
+	 * RTAS doesn't use floating point.
+	 * Or at least, according to the CHRP spec we enter RTAS
+	 * with FP disabled, and it doesn't change the FP registers.
+	 *  -- paulus.
 	 */
 	spin_lock_irqsave(&rtas_lock, s);
 	enter_rtas((void *)__pa(&u));
@@ -1975,14 +1220,4 @@ call_rtas(const char *service, int nargs, int nret,
 		for (i = 0; i < nret-1; ++i)
 			outputs[i] = u.words[i+nargs+4];
 	return u.words[nargs+3];
-}
-
-void __init
-abort()
-{
-#ifdef CONFIG_XMON
-	xmon(NULL);
-#endif
-	for (;;)
-		prom_exit();
 }

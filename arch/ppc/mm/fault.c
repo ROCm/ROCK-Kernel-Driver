@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.fault.c 1.15 09/24/01 16:35:10 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  arch/ppc/mm/fault.c
@@ -29,6 +29,7 @@
 #include <linux/mman.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/highmem.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -54,6 +55,7 @@ unsigned int probingmem;
 extern void die_if_kernel(char *, struct pt_regs *, long);
 void bad_page_fault(struct pt_regs *, unsigned long, int sig);
 void do_page_fault(struct pt_regs *, unsigned long, unsigned long);
+extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
 
 /*
  * For 600- and 800-family processors, the error_code parameter is DSISR
@@ -136,6 +138,36 @@ good_area:
 	if (is_write) {
 		if (!(vma->vm_flags & VM_WRITE))
 			goto bad_area;
+#if defined(CONFIG_4xx)
+	/* an exec  - 4xx allows for per-page execute permission */
+	} else if (regs->trap == 0x400) {
+		pte_t *ptep;
+
+#if 0
+		/* It would be nice to actually enforce the VM execute
+		   permission on CPUs which can do so, but far too
+		   much stuff in userspace doesn't get the permissions
+		   right, so we let any page be executed for now. */
+		if (! (vma->vm_flags & VM_EXEC))
+			goto bad_area;
+#endif
+
+		/* Since 4xx supports per-page execute permission,
+		 * we lazily flush dcache to icache. */
+		if (get_pteptr(mm, address, &ptep) && pte_present(*ptep)) {
+			struct page *page = pte_page(*ptep);
+
+			if (! test_bit(PG_arch_1, &page->flags)) {
+				__flush_dcache_icache((unsigned long)kmap(page));
+				kunmap(page);
+				set_bit(PG_arch_1, &page->flags);
+			}
+			pte_update(ptep, 0, _PAGE_HWEXEC);
+			_tlbie(address);
+			up_read(&mm->mmap_sem);
+			return;
+		}
+#endif
 	/* a read */
 	} else {
 		/* protection fault */
@@ -197,8 +229,7 @@ bad_area:
 out_of_memory:
 	up_read(&mm->mmap_sem);
 	if (current->pid == 1) {
-		current->policy |= SCHED_YIELD;
-		schedule();
+		yield();
 		down_read(&mm->mmap_sem);
 		goto survive;
 	}

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.smp.c 1.34 10/11/01 12:06:01 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Smp support for ppc.
@@ -38,8 +38,6 @@
 #include <asm/residual.h>
 #include <asm/time.h>
 
-#include "open_pic.h"
-
 int smp_threads_ready;
 volatile int smp_commenced;
 int smp_num_cpus = 1;
@@ -68,6 +66,10 @@ int start_secondary(void *);
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 void smp_message_pass(int target, int msg, unsigned long data, int wait);
+
+#ifdef CONFIG_PPC_ISERIES
+extern void smp_iSeries_space_timers( unsigned nr );
+#endif
 
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  * 
@@ -290,9 +292,7 @@ void __init smp_boot_cpus(void)
 	 * cpu 0, the master -- Cort
 	 */
 	cpu_callin_map[0] = 1;
-	current->processor = 0;
-
-	init_idle();
+	current->cpu = 0;
 
 	for (i = 0; i < NR_CPUS; i++) {
 		prof_counter[i] = 1;
@@ -320,37 +320,26 @@ void __init smp_boot_cpus(void)
 	 */
 	if (cpu_nr > max_cpus)
 		cpu_nr = max_cpus;
+#ifdef CONFIG_PPC_ISERIES
+	smp_iSeries_space_timers( cpu_nr );
+#endif
 	for (i = 1; i < cpu_nr; i++) {
 		int c;
 		struct pt_regs regs;
 		
 		/* create a process for the processor */
-		/* we don't care about the values in regs since we'll
-		   never reschedule the forked task. */
-		/* We DO care about one bit in the pt_regs we
-		   pass to do_fork.  That is the MSR_FP bit in 
-		   regs.msr.  If that bit is on, then do_fork
-		   (via copy_thread) will call giveup_fpu.
-		   giveup_fpu will get a pointer to our (current's)
-		   last register savearea via current->thread.regs 
-		   and using that pointer will turn off the MSR_FP,
-		   MSR_FE0 and MSR_FE1 bits.  At this point, this 
-		   pointer is pointing to some arbitrary point within
-		   our stack. */
-
+		/* only regs.msr is actually used, and 0 is OK for it */
 		memset(&regs, 0, sizeof(struct pt_regs));
-		
 		if (do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0) < 0)
 			panic("failed fork for CPU %d", i);
 		p = init_task.prev_task;
 		if (!p)
 			panic("No idle task for CPU %d", i);
-		del_from_runqueue(p);
+		init_idle(p, i);
 		unhash_process(p);
-		init_tasks[i] = p;
 
-		p->processor = i;
-		p->cpus_runnable = 1 << i; /* we schedule the first task manually */
+		p->cpu = i;
+		p->cpus_allowed = 1 << i; /* we schedule the first task manually */
 		current_set[i] = p;
 
 		/*
@@ -506,8 +495,6 @@ void __init smp_callin(void)
 	cpu_callin_map[cpu] = 1;
 
 	smp_ops->setup_cpu(cpu);
-
-	init_idle();
 
 	/*
 	 * This cpu is now "online".  Only set them online

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc8xx_pic.c 1.10 05/17/01 18:14:21 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #include <linux/config.h>
 #include <linux/stddef.h>
@@ -44,6 +44,21 @@ static void m8xx_unmask_irq(unsigned int irq_nr)
 						ppc_cached_irq_mask[word];
 }
 
+static void m8xx_end_irq(unsigned int irq_nr)
+{
+	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))) {
+		int bit, word;
+
+		bit = irq_nr & 0x1f;
+		word = irq_nr >> 5;
+
+		ppc_cached_irq_mask[word] |= (1 << (31-bit));
+		((immap_t *)IMAP_ADDR)->im_siu_conf.sc_simask = 
+			ppc_cached_irq_mask[word];
+	}
+}
+
+
 static void m8xx_mask_and_ack(unsigned int irq_nr)
 {
 	int	bit, word;
@@ -64,6 +79,7 @@ struct hw_interrupt_type ppc8xx_pic = {
 	m8xx_unmask_irq,
 	m8xx_mask_irq,
 	m8xx_mask_and_ack,
+	m8xx_end_irq,
 	0
 };
 
@@ -97,19 +113,26 @@ m8xx_do_IRQ(struct pt_regs *regs,
 #endif
 
 
+/*
+ * We either return a valid interrupt or -1 if there is nothing pending
+ */
 int
 m8xx_get_irq(struct pt_regs *regs)
 {
 	int irq;
-        unsigned long bits = 0;
 
-        /* For MPC8xx, read the SIVEC register and shift the bits down
-         * to get the irq number.         */
-        bits = ((immap_t *)IMAP_ADDR)->im_siu_conf.sc_sivec;
-        irq = bits >> 26;
-#if 0
-        irq += ppc8xx_pic.irq_offset;
-#endif
+	/* For MPC8xx, read the SIVEC register and shift the bits down
+	 * to get the irq number.
+	 */
+	irq = ((immap_t *)IMAP_ADDR)->im_siu_conf.sc_sivec >> 26;
+
+	/*
+	 * When we read the sivec without an interrupt to process, we will 
+	 * get back SIU_LEVEL7.  In this case, return -1
+	 */
+	if (irq == SIU_LEVEL7)
+		return -1;
+
 	return irq;
 }
 

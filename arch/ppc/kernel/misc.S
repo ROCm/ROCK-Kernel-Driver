@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.S 1.32 10/18/01 17:29:53 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * This file contains miscellaneous low-level functions.
@@ -23,7 +23,9 @@
 #include <asm/page.h>
 #include <asm/cache.h>
 #include <asm/cputable.h>
-#include "ppc_asm.h"
+#include <asm/mmu.h>
+#include <asm/ppc_asm.h>
+#include "ppc_defs.h"
 
 	.text
 
@@ -39,7 +41,6 @@ _GLOBAL(__delay)
  * Returns (address we're running at) - (address we were linked at)
  * for use before the text and data are mapped to KERNELBASE.
  */
-
 _GLOBAL(reloc_offset)
 	mflr	r0
 	bl	1f
@@ -48,6 +49,62 @@ _GLOBAL(reloc_offset)
 	addi	r4,r4,1b@l
 	subf	r3,r4,r3
 	mtlr	r0
+	blr
+
+/*
+ * add_reloc_offset(x) returns x + reloc_offset().
+ */
+_GLOBAL(add_reloc_offset)
+	mflr	r0
+	bl	1f
+1:	mflr	r5
+	lis	r4,1b@ha
+	addi	r4,r4,1b@l
+	subf	r5,r4,r5
+	add	r3,r3,r5
+	mtlr	r0
+	blr
+
+/*
+ * sub_reloc_offset(x) returns x - reloc_offset().
+ */
+_GLOBAL(sub_reloc_offset)
+	mflr	r0
+	bl	1f
+1:	mflr	r5
+	lis	r4,1b@ha
+	addi	r4,r4,1b@l
+	subf	r5,r4,r5
+	subf	r3,r5,r3
+	mtlr	r0
+	blr
+
+/*
+ * reloc_got2 runs through the .got2 section adding an offset
+ * to each entry.
+ */
+_GLOBAL(reloc_got2)
+	mflr	r11
+	lis	r7,__got2_start@ha
+	addi	r7,r7,__got2_start@l
+	lis	r8,__got2_end@ha
+	addi	r8,r8,__got2_end@l
+	subf	r8,r7,r8
+	srwi.	r8,r8,2
+	beqlr
+	mtctr	r8
+	bl	1f
+1:	mflr	r0
+	lis	r4,1b@ha
+	addi	r4,r4,1b@l
+	subf	r0,r4,r0
+	add	r7,r0,r7
+2:	lwz	r0,0(r7)
+	add	r0,r0,r3
+	stw	r0,0(r7)
+	addi	r7,r7,4
+	bdnz	2b
+	mtlr	r11
 	blr
 
 /*
@@ -81,6 +138,7 @@ _GLOBAL(identify_cpu)
  * r3 = data offset (not changed)
  */
 _GLOBAL(do_cpu_ftr_fixups)
+#ifndef CONFIG_PPC_ISERIES
 	/* Get CPU 0 features */
 	addis	r6,r3,cur_cpu_spec@ha
 	addi	r6,r6,cur_cpu_spec@l
@@ -124,10 +182,16 @@ _GLOBAL(do_cpu_ftr_fixups)
 	sync			/* additional sync needed on g4 */
 	isync
 	b	1b
+#else /* CONFIG_PPC_ISERIES */
+	blr
+#endif /* CONFIG_PPC_ISERIES */
 
 /*
  * call_setup_cpu - call the setup_cpu function for this cpu
  * r3 = data offset, r24 = cpu number
+ *
+ * Don't change register layout, the setup function may rely
+ * on r5 containing a relocated pointer to the current cpu spec.
  */
 _GLOBAL(call_setup_cpu)
 	addis	r5,r3,cur_cpu_spec@ha
@@ -141,6 +205,7 @@ _GLOBAL(call_setup_cpu)
 	mr	r3,r24
 	bctr
 
+#ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_misc.S */
 /* void __save_flags_ptr(unsigned long *flags) */
 _GLOBAL(__save_flags_ptr)
 	mfmsr	r4
@@ -268,7 +333,7 @@ _GLOBAL(__sti)
 	nop
 	nop
 _GLOBAL(__sti_end)
-
+#endif /* CONFIG_PPC_ISERIES */
 
 /*
  * complement mask on the msr then "or" some values on.
@@ -288,6 +353,20 @@ _GLOBAL(_nmask_and_or_msr)
  * Flush MMU TLB
  */
 _GLOBAL(_tlbia)
+#if defined(CONFIG_4xx) && defined(CONFIG_PIN_TLB)
+	/* This needs to be coordinated with other pinning functions since
+	 * we don't keep a memory location of number of entries to reduce
+	 * cache pollution during these operations.
+	 */
+	lis	r3, 0
+	sync
+1:
+	tlbwe	r3, r3, TLB_TAG		/* just ensure V is clear */
+	addi	r3, r3, 1		/*   so r3 works fine for that */
+	cmpwi	0, r3, 61		/* reserve last two entries */
+	ble	1b
+	isync
+#else
 #if defined(CONFIG_SMP)
 	mfmsr	r10
 	SYNC
@@ -296,11 +375,12 @@ _GLOBAL(_tlbia)
 	SYNC
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,PROCESSOR(r2)
+	lwz	r8,CPU(r2)
 	oris	r8,r8,10
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
 	bne-	10b
+	/* No 405 Erratum 77 fix needed here, because 4xx can't do SMP */
 	stwcx.	r8,0,r9
 	bne-	10b
 #endif /* CONFIG_SMP */
@@ -314,12 +394,24 @@ _GLOBAL(_tlbia)
 	mtmsr	r10
 	SYNC
 #endif
+#endif
 	blr	
 
 /*
  * Flush MMU TLB for a particular address
  */
 _GLOBAL(_tlbie)
+#ifdef CONFIG_4xx
+	tlbsx.	r3, 0, r3
+	bne	10f
+	sync
+	/* There are only 64 TLB entries, so r3 < 64, which means bit 25, is clear.
+	 * Since 25 is the V bit in the TLB_TAG, loading this value will invalidate
+	 * the TLB entry. */
+	tlbwe	r3, r3, TLB_TAG
+	isync
+10:
+#else
 #if defined(CONFIG_SMP)
 	mfmsr	r10
 	SYNC
@@ -328,11 +420,12 @@ _GLOBAL(_tlbie)
 	SYNC
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,PROCESSOR(r2)
+	lwz	r8,CPU(r2)
 	oris	r8,r8,11
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
 	bne-	10b
+	PPC405_ERR77(0,r9)
 	stwcx.	r8,0,r9
 	bne-	10b
 	eieio
@@ -346,6 +439,7 @@ _GLOBAL(_tlbie)
 	mtmsr	r10
 	SYNC
 #endif
+#endif /* CONFIG_4xx */
 	blr
 
 /*
@@ -358,8 +452,17 @@ _GLOBAL(flush_instruction_cache)
 	lis	r5, IDC_INVALL@h
 	mtspr	IC_CST, r5
 #elif defined(CONFIG_4xx)
+#ifdef CONFIG_403GCX
+	li      r3, 512
+	mtctr   r3
+	lis     r4, KERNELBASE@h
+1:	iccci   0, r4 
+	addi    r4, r4, 16
+	bdnz    1b
+#else
 	lis	r3, KERNELBASE@h
 	iccci	0,r3
+#endif
 #else
 	mfspr	r3,PVR
 	rlwinm	r3,r3,16,16,31
@@ -369,10 +472,11 @@ _GLOBAL(flush_instruction_cache)
 	mfspr	r3,HID0
 	ori	r3,r3,HID0_ICFI
 	mtspr	HID0,r3
-#endif /* CONFIG_8xx */
+#endif /* CONFIG_8xx/4xx */
 	isync
 	blr
 
+#ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_misc.S */
 /*
  * Write any modified data cache blocks out to memory
  * and invalidate the corresponding instruction cache blocks.
@@ -469,15 +573,40 @@ _GLOBAL(invalidate_dcache_range)
 	sync				/* wait for dcbi's to get to ram */
 	blr
 
+#ifdef CONFIG_NOT_COHERENT_CACHE
+/* This is a bad one....It is used by 'consistent_sync' functions when
+ * there isn't any handle on the virtual address needed by the usual
+ * cache flush instructions.  On the MPC8xx, we can use the cache line
+ * flush command, on others all we can do is read enough data to completely
+ * reload the cache, flushing old data out.
+ */
+
+/* Cache organization.  The 4xx has a 8K (128 line) cache, and the 8xx
+ * has 1, 2, 4, 8K variants.  For now, cover worst case.  When we can
+ * deteremine actual size, we will use that later.
+ */
+#define CACHE_NWAYS	2
+#define CACHE_NLINES	128
+
+_GLOBAL(flush_dcache_all)
+	li	r4, (CACHE_NWAYS * CACHE_NLINES)
+	mtctr	r4
+	lis     r5, KERNELBASE@h
+1:	lwz	r3, 0(r5)		/* Load one word from every line */
+	addi	r5, r5, L1_CACHE_LINE_SIZE
+	bdnz    1b
+	blr
+#endif /* CONFIG_NOT_COHERENT_CACHE */
+
 /*
  * Flush a particular page from the data cache to RAM.
  * Note: this is necessary because the instruction cache does *not*
  * snoop from the data cache.
  * This is a no-op on the 601 which has a unified cache.
  *
- *	void __flush_page_to_ram(void *page)
+ *	void __flush_dcache_icache(void *page)
  */
-_GLOBAL(__flush_page_to_ram)
+_GLOBAL(__flush_dcache_icache)
 	mfspr	r5,PVR
 	rlwinm	r5,r5,16,16,31
 	cmpi	0,r5,1
@@ -493,28 +622,6 @@ _GLOBAL(__flush_page_to_ram)
 	mtctr	r4
 1:	icbi	0,r6
 	addi	r6,r6,L1_CACHE_LINE_SIZE
-	bdnz	1b
-	sync
-	isync
-	blr
-
-/*
- * Flush a particular page from the instruction cache.
- * Note: this is necessary because the instruction cache does *not*
- * snoop from the data cache.
- * This is a no-op on the 601 which has a unified cache.
- *
- *	void __flush_icache_page(void *page)
- */
-_GLOBAL(__flush_icache_page)
-	mfspr	r5,PVR
-	rlwinm	r5,r5,16,16,31
-	cmpi	0,r5,1
-	beqlr					/* for 601, do nothing */
-	li	r4,4096/L1_CACHE_LINE_SIZE	/* Number of lines in a page */
-	mtctr	r4
-1:	icbi	0,r3
-	addi	r3,r3,L1_CACHE_LINE_SIZE
 	bdnz	1b
 	sync
 	isync
@@ -563,8 +670,8 @@ _GLOBAL(copy_page)
 	li	r5,4
 
 #ifndef CONFIG_8xx
-#if MAX_L1_COPY_PREFETCH > 1
-	li	r0,MAX_L1_COPY_PREFETCH
+#if MAX_COPY_PREFETCH > 1
+	li	r0,MAX_COPY_PREFETCH
 	li	r11,4
 	mtctr	r0
 11:	dcbt	r11,r4
@@ -599,6 +706,7 @@ _GLOBAL(copy_page)
 #endif
 	bdnz	1b
 	blr
+#endif /* CONFIG_PPC_ISERIES */
 
 /*
  * Atomic [test&set] exchange
@@ -610,6 +718,7 @@ _GLOBAL(copy_page)
 _GLOBAL(xchg_u32)
 	mr	r5,r3		/* Save pointer */
 10:	lwarx	r3,0,r5		/* Fetch old value & reserve */
+	PPC405_ERR77(0,r5)
 	stwcx.	r4,0,r5		/* Update with new value */
 	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
 	blr
@@ -621,12 +730,14 @@ _GLOBAL(xchg_u32)
 _GLOBAL(atomic_clear_mask)
 10:	lwarx	r5,0,r4
 	andc	r5,r5,r3
+	PPC405_ERR77(0,r4)
 	stwcx.	r5,0,r4
 	bne-	10b
 	blr
 _GLOBAL(atomic_set_mask)
 10:	lwarx	r5,0,r4
 	or	r5,r5,r3
+	PPC405_ERR77(0,r4)
 	stwcx.	r5,0,r4
 	bne-	10b
 	blr
@@ -866,10 +977,8 @@ _GLOBAL(kernel_thread)
 	sc
 	cmpi	0,r3,0		/* parent or child? */
 	bnelr			/* return if parent */
-	li	r0,0		/* clear out p->thread.regs */
-	stw	r0,THREAD+PT_REGS(r2)	/* since we don't have user ctx */
-	addi	r1,r2,TASK_UNION_SIZE-STACK_FRAME_OVERHEAD
-	stw	r0,0(r1)
+	li	r0,0		/* make top-level stack frame */
+	stwu	r0,-16(r1)
 	mtlr	r6              /* fn addr in lr */
 	mr	r3,r4	        /* load arg and call fn */
 	blrl

@@ -30,13 +30,19 @@
 	***********
 	Thu, July 13, 2000.
 	- Terry: Added isync to correct for an errata.
+
+	22 August 2001.
+	- DanM: Finally added the 7450 patch I've had for the past
+		several months.  The L2CR is similar, but I'm going
+		to assume the user of this functions knows what they
+		are doing.
 	
 	Author:	Terry Greeniaus (tgree@phys.ualberta.ca)
 	Please e-mail updates to this file to me, thanks!
 */
 #include <asm/processor.h>
 #include <asm/cputable.h>
-#include "ppc_asm.h"
+#include <asm/ppc_asm.h>
 
 /* Usage:
 	
@@ -71,6 +77,15 @@
 	features, such as L2DO which caches only data, or L2TS which
 	causes cache pushes from the L1 cache to go to the L2 cache
 	instead of to main memory.
+
+IMPORTANT:
+	Starting with the 7450, the bits in this register have moved
+	or behave differently.  The Enable, Parity Enable, Size,
+	and L2 Invalidate are the only bits that have not moved.
+	The size is read-only for these processors with internal L2
+	cache, and the invalidate is a control as well as status.
+		-- Dan
+
 */
 /*
  * Summary: this procedure ignores the L2I bit in the value passed in,
@@ -115,6 +130,8 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L2CR)
 	 /**** Might be a good idea to set L2DO here - to prevent instructions
 	       from getting into the cache.  But since we invalidate
 	       the next time we enable the cache it doesn't really matter.
+	       Don't do this unless you accomodate all processor variations.
+	       The bit moved on the 7450.....
 	  ****/
 
 	lis	r4,0x0002
@@ -159,12 +176,21 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L2CR)
 	sync
 	isync				/* For errata */
 
+BEGIN_FTR_SECTION
+	/* On the 7450, we wait for the L2I bit to clear......
+	*/
+10:	mfspr	r3,L2CR
+	andis.	r4,r3,0x0020
+	bne	10b
+	b	11f
+END_FTR_SECTION_IFSET(CPU_FTR_SPEC7450)
+
 	/* Wait for the invalidation to complete */
 3:	mfspr	r3,L2CR
 	rlwinm.	r4,r3,0,31,31
 	bne	3b
 	
-	rlwinm	r3,r3,0,11,9		/* Turn off the L2I bit */
+11:	rlwinm	r3,r3,0,11,9		/* Turn off the L2I bit */
 	sync
 	mtspr	L2CR,r3
 	sync

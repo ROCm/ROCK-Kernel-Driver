@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.idle.c 1.16 10/16/01 15:58:42 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Idle daemon for PowerPC.  Idle daemon will handle any action
@@ -32,6 +32,20 @@
 #include <asm/mmu.h>
 #include <asm/cache.h>
 #include <asm/cputable.h>
+#ifdef CONFIG_PPC_ISERIES
+#include <asm/time.h>
+#include <asm/iSeries/LparData.h>
+#include <asm/iSeries/HvCall.h>
+#include <asm/hardirq.h>
+
+static void yield_shared_processor(void);
+static void run_light_on(int on);
+
+extern unsigned long yield_count;
+
+#else /* CONFIG_PPC_ISERIES */
+#define run_light_on(x)         do { } while (0)
+#endif /* CONFIG_PPC_ISERIES */
 
 void zero_paged(void);
 void power_save(void);
@@ -53,21 +67,27 @@ int idled(void)
 		do_power_save = 1;
 
 	/* endless loop with no priority at all */
-	current->nice = 20;
-	init_idle();
 	for (;;) {
+#ifdef CONFIG_PPC_ISERIES
+		if (!current->need_resched) {
+			/* Turn off the run light */
+			run_light_on(0);
+                	yield_shared_processor(); 
+		}
+		HMT_low();
+#endif
 #ifdef CONFIG_SMP
-
 		if (!do_power_save) {
 			/*
 			 * Deal with another CPU just having chosen a thread to
 			 * run here:
 			 */
-			int oldval = xchg(&current->need_resched, -1);
+			unsigned long oldval;
 
-			if (!oldval) {
-				while (need_resched())
-					barrier(); /* Do Nothing */
+			oldval = xchg(&current->work, 0xff000000);
+			if (!(oldval & 0xff000000)) {
+				while (current->work.need_resched == -1)
+					barrier();	/* Do Nothing */
 			}
 		}
 #endif
@@ -75,9 +95,17 @@ int idled(void)
 			power_save();
 
 		if (need_resched()) {
+			run_light_on(1);
 			schedule();
 			check_pgt_cache();
 		}
+#ifdef CONFIG_PPC_ISERIES
+		else {
+			run_light_on(0);
+			yield_shared_processor();
+			HMT_low();
+		}
+#endif /* CONFIG_PPC_ISERIES */
 	}
 	return 0;
 }
@@ -108,6 +136,7 @@ unsigned long get_zero_page_fast(void)
 		register unsigned long tmp;
 		asm (	"101:lwarx  %1,0,%3\n"  /* reserve zero_cache */
 			"    lwz    %0,0(%1)\n" /* get next -- new zero_cache */
+			PPC405_ERR77(0,%3)
 			"    stwcx. %0,0,%3\n"  /* update zero_cache */
 			"    bne-   101b\n"     /* if lost reservation try again */
 			: "=&r" (tmp), "=&r" (page), "+m" (zero_cache)
@@ -205,6 +234,7 @@ void zero_paged(void)
 #ifdef CONFIG_SMP
 			"    sync\n"            /* let store settle */
 #endif			
+ 			PPC405_ERR77(0,%2)
 			"    stwcx. %3,0,%2\n"  /* update zero_cache in mem */
 			"    bne-   101b\n"     /* if lost reservation try again */
 			: "=&r" (tmp), "+m" (zero_quicklist)
@@ -228,6 +258,13 @@ void zero_paged(void)
 void power_save(void)
 {
 	unsigned long hid0;
+	int nap = powersave_nap;
+	
+	/* 7450 has no DOZE mode mode, we return if powersave_nap
+	 * isn't enabled
+	 */
+	if (!nap &&  cur_cpu_spec[smp_processor_id()]->cpu_features & CPU_FTR_SPEC7450)
+		return;
 	/*
 	 * Disable interrupts to prevent a lost wakeup
 	 * when going to sleep.  This is necessary even with
@@ -255,3 +292,64 @@ void power_save(void)
 	_nmask_and_or_msr(0, MSR_EE);
 }
 
+#ifdef CONFIG_PPC_ISERIES
+
+extern void fake_interrupt(void);
+extern u64  get_tb64(void);
+
+void run_light_on(int on)
+{
+	unsigned long CTRL;
+
+	CTRL = mfspr(CTRLF);
+	CTRL = on? (CTRL | RUNLATCH): (CTRL & ~RUNLATCH);
+	mtspr(CTRLT, CTRL);
+}
+
+void yield_shared_processor(void)
+{
+	struct Paca *paca;
+	u64 tb;
+
+	/* Poll for I/O events */
+	__cli();
+	__sti();
+	
+	paca = (struct Paca *)mfspr(SPRG1);
+	if ( paca->xLpPaca.xSharedProc ) {
+		HvCall_setEnabledInterrupts( HvCall_MaskIPI |
+                        HvCall_MaskLpEvent |
+                        HvCall_MaskLpProd |
+                        HvCall_MaskTimeout );
+
+		/*
+		 * Check here for any of the above pending...
+		 * IPI and Decrementers are indicated in ItLpPaca
+		 * LpEvents are indicated on the LpQueue
+		 *
+		 * Disabling/enabling will check for LpEvents, IPIs
+		 * and decrementers
+		 */
+		__cli();
+		__sti();
+
+		++yield_count;
+
+		/* Get current tb value */
+		tb = get_tb64();
+		/* Compute future tb value when yield will expire */
+		tb += tb_ticks_per_jiffy;
+		HvCall_yieldProcessor( HvCall_YieldTimed, tb );
+
+		/* Check here for any of the above pending or timeout expired*/
+		__cli();
+		/*
+		 * The decrementer stops during the yield.  Just force
+		 * a fake decrementer now and the timer_interrupt
+		 * code will straighten it all out
+		 */
+		paca->xLpPaca.xDecrInt = 1;
+		__sti();
+	}
+}
+#endif /* CONFIG_PPC_ISERIES */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.c 1.20 09/24/01 18:42:54 trini
+ * BK Id: %F% %I% %G% %U% %#%
  *
  * arch/ppc/boot/prep/misc.c
  *
@@ -32,12 +32,16 @@
  */
 char *avail_ram;
 char *end_avail;
+
+/* The linker tells us where the image is. */
+extern char __image_begin, __image_end;
+extern char __ramdisk_begin, __ramdisk_end;
 extern char _end[];
 
 #ifdef CONFIG_CMDLINE
 #define CMDLINE CONFIG_CMDLINE
 #else
-#define CMDLINE "";
+#define CMDLINE ""
 #endif
 char cmd_preset[] = CMDLINE;
 char cmd_buf[256];
@@ -46,16 +50,9 @@ char *cmd_line = cmd_buf;
 int keyb_present = 1;	/* keyboard controller is present by default */
 RESIDUAL hold_resid_buf;
 RESIDUAL *hold_residual = &hold_resid_buf;
-unsigned long initrd_start = 0, initrd_end = 0;
+unsigned long initrd_size = 0;
+unsigned long orig_MSR;
 
-/* These values must be variables.  If not, the compiler optimizer
- * will remove some code, causing the size of the code to vary
- * when these values are zero.  This is bad because we first
- * compile with these zero to determine the size and offsets
- * in an image, than compile again with these set to the proper
- * discovered value.
- */
-unsigned int initrd_offset, initrd_size;
 char *zimage_start;
 int zimage_size;
 
@@ -71,16 +68,14 @@ int orig_x, orig_y = 24;
 extern int CRT_tstc(void);
 extern void of_init(void *handler);
 extern int of_finddevice(const char *device_specifier, int *phandle);
-extern int of_getprop(int phandle, const char *name, void *buf, int buflen, 
+extern int of_getprop(int phandle, const char *name, void *buf, int buflen,
 		int *size);
 extern int vga_init(unsigned char *ISA_mem);
 extern void gunzip(void *, int, unsigned char *, int *);
 
-extern void _put_HID0(unsigned int val);
 extern void _put_MSR(unsigned int val);
-extern unsigned int _get_HID0(void);
-extern unsigned int _get_MSR(void);
-extern unsigned long serial_init(int chan);
+extern unsigned long serial_init(int chan, void *ignored);
+extern void setup_legacy(void);
 
 void
 writel(unsigned int val, unsigned int address)
@@ -90,7 +85,7 @@ writel(unsigned int val, unsigned int address)
 	*(unsigned int *)address = cpu_to_le32(val);
 }
 
-unsigned int 
+unsigned int
 readl(unsigned int address)
 {
 	/* Ensure I/O operations complete */
@@ -98,8 +93,8 @@ readl(unsigned int address)
 	return le32_to_cpu(*(unsigned int *)address);
 }
 
-#define PCI_CFG_ADDR(dev,off)	((0x80<<24) | (dev<<8) | (off&0xfc)) 
-#define PCI_CFG_DATA(off)	(0x80000cfc+(off&3))  
+#define PCI_CFG_ADDR(dev,off)	((0x80<<24) | (dev<<8) | (off&0xfc))
+#define PCI_CFG_DATA(off)	(0x80000cfc+(off&3))
 
 static void
 pci_read_config_32(unsigned char devfn,
@@ -123,38 +118,14 @@ scroll(void)
 }
 #endif /* CONFIG_VGA_CONSOLE */
 
-/*
- * This routine is used to control the second processor on the 
- * Motorola dual processor platforms.  
- */
-void
-park_cpus(void)
-{
-	volatile void (*go)(RESIDUAL *, int, int, char *, int);
-	unsigned int i;
-	volatile unsigned long *smp_iar = &(hold_residual->VitalProductData.SmpIar);
-
-	/* Wait for indication to continue.  If the kernel
-	   was not compiled with SMP support then the second 
-	   processor will spin forever here makeing the kernel
-	   multiprocessor safe. */
-	while (*smp_iar == 0) {
-                for (i=0; i < 512; i++);
-	}
-
-	(unsigned long)go = hold_residual->VitalProductData.SmpIar;
-	go(hold_residual, 0, 0, cmd_line, sizeof(cmd_preset));
-}
-
 unsigned long
 decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		  RESIDUAL *residual, void *OFW_interface)
 {
-	int timer;
+	int timer = 0;
 	extern unsigned long start;
 	char *cp, ch;
 	unsigned long TotalMemory;
-	unsigned long orig_MSR;
 	int dev_handle;
 	int mem_info[2];
 	int res, size;
@@ -162,26 +133,42 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	unsigned char base_mod;
 	int start_multi = 0;
 	unsigned int pci_viddid, pci_did, tulip_pci_base, tulip_base;
-	
-	/*
-	 * IBM's have the MMU on, so we have to disable it or
-	 * things get really unhappy in the kernel when
-	 * trying to setup the BATs with the MMU on
-	 * -- Cort
-	 */
-	flush_instruction_cache();
-	_put_HID0(_get_HID0() & ~0x0000C000);
-	_put_MSR((orig_MSR = _get_MSR()) & ~0x0030);
 
+	setup_legacy();
 #if defined(CONFIG_SERIAL_CONSOLE)
-	com_port = serial_init(0);
+	com_port = serial_init(0, NULL);
 #endif /* CONFIG_SERIAL_CONSOLE */
 #if defined(CONFIG_VGA_CONSOLE)
 	vga_init((unsigned char *)0xC0000000);
 #endif /* CONFIG_VGA_CONSOLE */
 
-	if (residual)
-	{
+	/*
+	 * Tell the user where we were loaded at and where we were relocated
+	 * to for debugging this process.
+	 */
+	puts("loaded at:     "); puthex(load_addr);
+	puts(" "); puthex((unsigned long)(load_addr + (4*num_words))); puts("\n");
+	if ( (unsigned long)load_addr != (unsigned long)&start ) {
+		puts("relocated to:  "); puthex((unsigned long)&start);
+		puts(" ");
+		puthex((unsigned long)((unsigned long)&start + (4*num_words)));
+		puts("\n");
+	}
+
+	if (residual) {
+		/*
+		 * Tell the user where the residual data is.
+		 */
+		puts("board data at: "); puthex((unsigned long)residual);
+		puts(" ");
+		puthex((unsigned long)((unsigned long)residual +
+					sizeof(RESIDUAL)));
+		puts("\nrelocated to:  ");puthex((unsigned long)hold_residual);
+		puts(" ");
+		puthex((unsigned long)((unsigned long)hold_residual +
+					sizeof(RESIDUAL)));
+		puts("\n");
+
 		/* Is this Motorola PPCBug? */
 		if ((1 & residual->VitalProductData.FirmwareSupports) &&
 		    (1 == residual->VitalProductData.FirmwareSupplier)) {
@@ -198,8 +185,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 				((pci_did == PCI_DEVICE_ID_DEC_TULIP_FAST) ||
 				(pci_did == PCI_DEVICE_ID_DEC_TULIP) ||
 				(pci_did == PCI_DEVICE_ID_DEC_TULIP_PLUS) ||
-				(pci_did == PCI_DEVICE_ID_DEC_21142)))
-			{
+				(pci_did == PCI_DEVICE_ID_DEC_21142))) {
 				pci_read_config_32(0x70,
 						0x10,
 						&tulip_pci_base);
@@ -213,7 +199,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 			/* If this is genesis 2 board then check for no
 			 * keyboard controller and more than one processor.
 			 */
-			if (board_type == 0xe0) {	
+			if (board_type == 0xe0) {
 				base_mod = inb(0x803);
 				/* if a MVME2300/2400 or a Sitka then no keyboard */
 				if((base_mod == 0xFA) || (base_mod == 0xF9) ||
@@ -225,14 +211,17 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 			 * park the other processor so that the
 			 * kernel knows where to find them.
 			 */
-			if (residual->MaxNumCpus > 1) {
+			if (residual->MaxNumCpus > 1)
 				start_multi = 1;
-			}
 		}
 		memcpy(hold_residual,residual,sizeof(RESIDUAL));
 	} else {
+		/* Tell the user we didn't find anything. */
+		puts("No residual data found.\n");
+
 		/* Assume 32M in the absence of more info... */
 		TotalMemory = 0x02000000;
+
 		/*
 		 * This is a 'best guess' check.  We want to make sure
 		 * we don't try this on a PReP box without OF
@@ -240,118 +229,66 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		 */
 		while (OFW_interface && ((unsigned long)OFW_interface < 0x10000000) )
 		{
-			/* The MMU needs to be on when we call OFW */
+			/* We need to restore the slightly inaccurate
+			 * MSR so that OpenFirmware will behave. -- Tom
+			 */
 			_put_MSR(orig_MSR);
 			of_init(OFW_interface);
 
 			/* get handle to memory description */
-			res = of_finddevice("/memory@0", 
+			res = of_finddevice("/memory@0",
 					    &dev_handle);
-			// puthex(res);  puts("\n");
-			if (res) break;
-			
+			if (res)
+				break;
+
 			/* get the info */
-			// puts("get info = ");
-			res = of_getprop(dev_handle, 
-					 "reg", 
-					 mem_info, 
-					 sizeof(mem_info), 
+			res = of_getprop(dev_handle,
+					 "reg",
+					 mem_info,
+					 sizeof(mem_info),
 					 &size);
-			// puthex(res);  puts(", info = "); puthex(mem_info[0]);  
-			// puts(" ");  puthex(mem_info[1]);   puts("\n");
-			if (res) break;
-			
+			if (res)
+				break;
+
 			TotalMemory = mem_info[1];
 			break;
 		}
+
 		hold_residual->TotalMemory = TotalMemory;
 		residual = hold_residual;
-		/* Turn MMU back off */
-		_put_MSR(orig_MSR & ~0x0030);
-        }
 
-	if (start_multi) {
-		hold_residual->VitalProductData.SmpIar = 0;
-		hold_residual->Cpus[1].CpuState = CPU_GOOD_FW;
-		residual->VitalProductData.SmpIar = (unsigned long)park_cpus;
-		residual->Cpus[1].CpuState = CPU_GOOD;
-		hold_residual->VitalProductData.Reserved5 = 0xdeadbeef;
-	}
+		/* Enforce a sane MSR for booting. */
+		_put_MSR(MSR_IP);
+        }
 
 	/* assume the chunk below 8M is free */
 	end_avail = (char *)0x00800000;
 
-	/* tell the user where we were loaded at and where we
-	 * were relocated to for debugging this process
+	/*
+	 * We link ourself to 0x00800000.  When we run, we relocate
+	 * ourselves there.  So we just need __image_begin for the
+	 * start. -- Tom
 	 */
-	puts("loaded at:     "); puthex(load_addr);
-	puts(" "); puthex((unsigned long)(load_addr + (4*num_words))); puts("\n");
-	if ( (unsigned long)load_addr != (unsigned long)&start )
-	{
-		puts("relocated to:  "); puthex((unsigned long)&start);
-		puts(" ");
-		puthex((unsigned long)((unsigned long)&start + (4*num_words)));
-		puts("\n");
-	}
+	zimage_start = (char *)(unsigned long)(&__image_begin);
+	zimage_size = (unsigned long)(&__image_end) -
+			(unsigned long)(&__image_begin);
 
-	if ( residual )
-	{
-		puts("board data at: "); puthex((unsigned long)residual);
-		puts(" ");
-		puthex((unsigned long)((unsigned long)residual + sizeof(RESIDUAL)));
-		puts("\n");
-		puts("relocated to:  ");
-		puthex((unsigned long)hold_residual);
-		puts(" ");
-		puthex((unsigned long)((unsigned long)hold_residual + sizeof(RESIDUAL)));
-		puts("\n");
-	}
-
-	/* we have to subtract 0x10000 here to correct for objdump including the
-	   size of the elf header which we strip -- Cort */
-	zimage_start = (char *)(load_addr - 0x10000 + ZIMAGE_OFFSET);
-	zimage_size = ZIMAGE_SIZE;
-	initrd_offset = INITRD_OFFSET;
-	initrd_size = INITRD_SIZE;
-
-	if ( initrd_offset )
-		initrd_start = load_addr - 0x10000 + initrd_offset;
-	else
-		initrd_start = 0;
-	initrd_end = initrd_size + initrd_start;
+	initrd_size = (unsigned long)(&__ramdisk_end) -
+		(unsigned long)(&__ramdisk_begin);
 
 	/*
-	 * Find a place to stick the zimage and initrd and 
-	 * relocate them if we have to. -- Cort
+	 * The zImage and initrd will be between start and _end, so they've
+	 * already been moved once.  We're good to go now. -- Tom
 	 */
 	avail_ram = (char *)PAGE_ALIGN((unsigned long)_end);
 	puts("zimage at:     "); puthex((unsigned long)zimage_start);
-	puts(" "); puthex((unsigned long)(zimage_size+zimage_start)); puts("\n");
-	if ( (unsigned long)zimage_start <= 0x00800000 )
-	{
-		memcpy( (void *)avail_ram, (void *)zimage_start, zimage_size );
-		zimage_start = (char *)avail_ram;
-		puts("relocated to:  "); puthex((unsigned long)zimage_start);
-		puts(" ");
-		puthex((unsigned long)zimage_size+(unsigned long)zimage_start);
-		puts("\n");
+	puts(" "); puthex((unsigned long)(zimage_size+zimage_start));
+	puts("\n");
 
-		/* relocate initrd */
-		if ( initrd_start )
-		{
-			puts("initrd at:     "); puthex(initrd_start);
-			puts(" "); puthex(initrd_end); puts("\n");
-			avail_ram = (char *)PAGE_ALIGN(
-				(unsigned long)zimage_size+(unsigned long)zimage_start);
-			memcpy ((void *)avail_ram, (void *)initrd_start, initrd_size );
-			initrd_start = (unsigned long)avail_ram;
-			initrd_end = initrd_start + initrd_size;
-			puts("relocated to:  "); puthex(initrd_start);
-			puts(" "); puthex(initrd_end); puts("\n");
-		}
-	} else if ( initrd_start ) {
-		puts("initrd at:     "); puthex(initrd_start);
-		puts(" "); puthex(initrd_end); puts("\n");
+	if ( initrd_size ) {
+		puts("initrd at:     ");
+		puthex((unsigned long)(&__ramdisk_begin));
+		puts(" "); puthex((unsigned long)(&__ramdisk_end));puts("\n");
 	}
 
 	avail_ram = (char *)0x00400000;
@@ -363,10 +300,10 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		CRT_tstc();  /* Forces keyboard to be initialized */
 
 	puts("\nLinux/PPC load: ");
-	timer = 0;
 	cp = cmd_line;
 	memcpy (cmd_line, cmd_preset, sizeof(cmd_preset));
-	while ( *cp ) putc(*cp++);
+	while ( *cp )
+		putc(*cp++);
 	while (timer++ < 5*1000) {
 		if (tstc()) {
 			while ((ch = getc()) != '\n' && ch != '\r') {
@@ -392,26 +329,24 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		udelay(1000);  /* 1 msec */
 	}
 	*cp = 0;
-	puts("\n");
+	puts("\nUncompressing Linux...");
 
-	/* mappings on early boot can only handle 16M */
-	if ( (int)(cmd_line[0]) > (16<<20))
-		puts("cmd_line located > 16M\n");
-	if ( (int)hold_residual > (16<<20))
-		puts("hold_residual located > 16M\n");
-	if ( initrd_start > (16<<20))
-		puts("initrd_start located > 16M\n");
-
-	puts("Uncompressing Linux...");
-	
 	gunzip(0, 0x400000, zimage_start, &zimage_size);
 	puts("done.\n");
-	
+
+	if (start_multi) {
+		puts("Parking cpu1 at 0xc0\n");
+		residual->VitalProductData.SmpIar = (unsigned long)0xc0;
+		residual->Cpus[1].CpuState = CPU_GOOD;
+		hold_residual->VitalProductData.Reserved5 = 0xdeadbeef;
+	}
+
 	{
 		struct bi_record *rec;
-	    
-		rec = (struct bi_record *)_ALIGN((unsigned long)(zimage_size)+(1<<20)-1,(1<<20));
-	    
+		
+		rec = (struct bi_record *)_ALIGN((unsigned long)(zimage_size) +
+				(1 << 20) - 1, (1 << 20));
+
 		rec->tag = BI_FIRST;
 		rec->size = sizeof(struct bi_record);
 		rec = (struct bi_record *)((unsigned long)rec + rec->size);
@@ -420,31 +355,33 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		memcpy( (void *)rec->data, "prepboot", 9);
 		rec->size = sizeof(struct bi_record) + 8 + 1;
 		rec = (struct bi_record *)((unsigned long)rec + rec->size);
-	    
+
 		rec->tag = BI_MACHTYPE;
 		rec->data[0] = _MACH_prep;
 		rec->data[1] = 0;
-		rec->size = sizeof(struct bi_record) + 2 * sizeof(unsigned long);
+		rec->size = sizeof(struct bi_record) + 2 *
+			sizeof(unsigned long);
 		rec = (struct bi_record *)((unsigned long)rec + rec->size);
-	    
+
 		rec->tag = BI_CMD_LINE;
 		memcpy( (char *)rec->data, cmd_line, strlen(cmd_line)+1);
 		rec->size = sizeof(struct bi_record) + strlen(cmd_line) + 1;
-		rec = (struct bi_record *)((ulong)rec + rec->size);
-		
+		rec = (struct bi_record *)((unsigned long)rec + rec->size);
+
+		if ( initrd_size ) {
+			rec->tag = BI_INITRD;
+			rec->data[0] = (unsigned long)(&__ramdisk_begin);
+			rec->data[1] = initrd_size;
+			rec->size = sizeof(struct bi_record) + 2 *
+				sizeof(unsigned long);
+			rec = (struct bi_record *)((unsigned long)rec +
+					rec->size);
+		}
+
 		rec->tag = BI_LAST;
 		rec->size = sizeof(struct bi_record);
 		rec = (struct bi_record *)((unsigned long)rec + rec->size);
 	}
 	puts("Now booting the kernel\n");
 	return (unsigned long)hold_residual;
-}
-
-/*
- * PCI/ISA I/O support
- */
-unsigned long
-local_to_PCI(unsigned long addr)
-{
-	return (addr | 0x80000000);
 }

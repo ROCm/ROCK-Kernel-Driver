@@ -33,6 +33,9 @@ SECTIONS
     *(.text)
     *(.fixup)
     *(.got1)
+    __got2_start = .;
+    *(.got2)
+    __got2_end = .;
   }
   _etext = .;
   PROVIDE (etext = .);

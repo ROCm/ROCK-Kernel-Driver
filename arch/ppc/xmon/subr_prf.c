@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.subr_prf.c 1.5 05/17/01 18:14:23 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Written by Cort Dougan to replace the version originally used
@@ -51,3 +51,8 @@ xmon_fprintf(void *f, const char *fmt, ...)
 	va_end(ap);
 }
 
+void
+xmon_puts(char *s)
+{
+	xmon_write(stdout, s, strlen(s));
+}

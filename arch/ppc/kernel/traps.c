@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.traps.c 1.22 10/11/01 10:33:09 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  linux/arch/ppc/kernel/traps.c
@@ -38,6 +38,9 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
+#ifdef CONFIG_PMAC_BACKLIGHT
+#include <asm/backlight.h>
+#endif
 
 extern int fix_alignment(struct pt_regs *);
 extern void bad_page_fault(struct pt_regs *, unsigned long, int sig);
@@ -66,6 +69,13 @@ int (*debugger_sstep)(struct pt_regs *regs);
 int (*debugger_iabr_match)(struct pt_regs *regs);
 int (*debugger_dabr_match)(struct pt_regs *regs);
 void (*debugger_fault_handler)(struct pt_regs *regs);
+#else
+#define debugger(regs)			do { } while (0)
+#define debugger_bpt(regs)		0
+#define debugger_sstep(regs)		0
+#define debugger_iabr_match(regs)	0
+#define debugger_dabr_match(regs)	0
+#define debugger_fault_handler		((void (*)(struct pt_regs *))0)
 #endif
 #endif
 
@@ -74,15 +84,19 @@ void (*debugger_fault_handler)(struct pt_regs *regs);
  */
 
 
-spinlock_t oops_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 void die(const char * str, struct pt_regs * fp, long err)
 {
 	console_verbose();
-	spin_lock_irq(&oops_lock);
+	spin_lock_irq(&die_lock);
+#ifdef CONFIG_PMAC_BACKLIGHT
+	set_backlight_enable(1);
+	set_backlight_level(BACKLIGHT_MAX);
+#endif
 	printk("Oops: %s, sig: %ld\n", str, err);
 	show_regs(fp);
-	spin_unlock_irq(&oops_lock);
+	spin_unlock_irq(&die_lock);
 	/* do_exit() should take care of panic'ing from an interrupt
 	 * context so we don't handle it here
 	 */
@@ -94,9 +108,7 @@ _exception(int signr, struct pt_regs *regs)
 {
 	if (!user_mode(regs))
 	{
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 		debugger(regs);
-#endif
 		die("Exception in kernel mode", regs, signr);
 	}
 	force_sig(signr, current);
@@ -111,7 +123,7 @@ MachineCheckException(struct pt_regs *regs)
 	unsigned long msr = regs->msr;
 
 	if (user_mode(regs)) {
-		_exception(SIGSEGV, regs);	
+		_exception(SIGSEGV, regs);
 		return;
 	}
 
@@ -120,12 +132,10 @@ MachineCheckException(struct pt_regs *regs)
 	bad_page_fault(regs, regs->dar, SIGBUS);
 	return;
 #endif
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	if (debugger_fault_handler) {
 		debugger_fault_handler(regs);
 		return;
 	}
-#endif
 
 #ifdef CONFIG_ALL_PPC
 	/*
@@ -135,7 +145,7 @@ MachineCheckException(struct pt_regs *regs)
 	 * table.
 	 * Note that the 601 only takes a machine check on TEA
 	 * (transfer error ack) signal assertion, and does not
-	 * set of the top 16 bits of SRR1.
+	 * set any of the top 16 bits of SRR1.
 	 *  -- paulus.
 	 */
 	if (((msr & 0xffff0000) == 0 || (msr & (0x80000 | 0x40000)))
@@ -169,12 +179,13 @@ MachineCheckException(struct pt_regs *regs)
 #endif /* CONFIG_ALL_PPC */
 	printk("Machine check in kernel mode.\n");
 	printk("Caused by (from SRR1=%lx): ", msr);
-	switch (msr & 0xF0000) {
+	switch (msr & 0x601F0000) {
 	case 0x80000:
 		printk("Machine check signal\n");
 		break;
 	case 0:		/* for 601 */
 	case 0x40000:
+	case 0x140000:	/* 7450 MSS error and TEA */
 		printk("Transfer error ack signal\n");
 		break;
 	case 0x20000:
@@ -183,26 +194,30 @@ MachineCheckException(struct pt_regs *regs)
 	case 0x10000:
 		printk("Address parity error signal\n");
 		break;
+	case 0x20000000:
+		printk("L1 Data Cache error\n");
+		break;
+	case 0x40000000:
+		printk("L1 Instruction Cache error\n");
+		break;
+	case 0x00100000:
+		printk("L2 data cache parity error\n");
+		break;
 	default:
 		printk("Unknown values in msr\n");
 	}
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	debugger(regs);
-#endif
 	die("machine check", regs, SIGBUS);
 }
 
 void
 SMIException(struct pt_regs *regs)
 {
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-	{
-		debugger(regs);
-		return;
-	}
-#endif
+	debugger(regs);
+#if !(defined(CONFIG_XMON) || defined(CONFIG_KGDB))
 	show_regs(regs);
 	panic("System Management Interrupt");
+#endif
 }
 
 void
@@ -210,23 +225,21 @@ UnknownException(struct pt_regs *regs)
 {
 	printk("Bad trap at PC: %lx, SR: %lx, vector=%lx    %s\n",
 	       regs->nip, regs->msr, regs->trap, print_tainted());
-	_exception(SIGTRAP, regs);	
+	_exception(SIGTRAP, regs);
 }
 
 void
 InstructionBreakpoint(struct pt_regs *regs)
 {
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	if (debugger_iabr_match(regs))
 		return;
-#endif
 	_exception(SIGTRAP, regs);
 }
 
 void
 RunModeException(struct pt_regs *regs)
 {
-	_exception(SIGTRAP, regs);	
+	_exception(SIGTRAP, regs);
 }
 
 /* Illegal instruction emulation support.  Originally written to
@@ -272,51 +285,54 @@ emulate_instruction(struct pt_regs *regs)
 void
 ProgramCheckException(struct pt_regs *regs)
 {
+	int errcode;
+
 #if defined(CONFIG_4xx)
 	unsigned int esr = mfspr(SPRN_ESR);
+	int isbpt = esr & ESR_PTR;
+	extern int do_mathemu(struct pt_regs *regs);
 
-	if (esr & ESR_PTR) {
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-		if (debugger_bpt(regs))
-			return;
-#endif
-		_exception(SIGTRAP, regs);
-	} else {
-		_exception(SIGILL, regs);
-	}
-#else
+	if (isbpt)
+		mtspr(SPRN_DBSR, DBSR_TIE);
+#ifdef CONFIG_MATH_EMULATION
+	if (!isbpt && do_mathemu(regs) == 0)
+		return;
+#endif /* CONFIG_MATH_EMULATION */
+
+#else /* ! CONFIG_4xx */
+	int isbpt = regs->msr & 0x20000;
+
 	if (regs->msr & 0x100000) {
 		/* IEEE FP exception */
 		_exception(SIGFPE, regs);
-	} else if (regs->msr & 0x20000) {
+		return;
+	}
+#endif /* ! CONFIG_4xx */
+
+	if (isbpt) {
 		/* trap exception */
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 		if (debugger_bpt(regs))
 			return;
-#endif
 		_exception(SIGTRAP, regs);
-	} else {
-		/* Try to emulate it if we should. */
-		int errcode;
-		if ((errcode = emulate_instruction(regs))) {
-			if (errcode == -EFAULT)
-				_exception(SIGBUS, regs);
-			else
-				_exception(SIGILL, regs);
-		}
+		return;
 	}
-#endif
+
+	/* Try to emulate it if we should. */
+	if ((errcode = emulate_instruction(regs))) {
+		if (errcode == -EFAULT)
+			_exception(SIGBUS, regs);
+		else
+			_exception(SIGILL, regs);
+	}
 }
 
 void
 SingleStepException(struct pt_regs *regs)
 {
 	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	if (debugger_sstep(regs))
 		return;
-#endif
-	_exception(SIGTRAP, regs);	
+	_exception(SIGTRAP, regs);
 }
 
 void
@@ -337,7 +353,7 @@ AlignmentException(struct pt_regs *regs)
 			bad_page_fault(regs, regs->dar, SIGSEGV);
 		return;
 	}
-	_exception(SIGBUS, regs);	
+	_exception(SIGBUS, regs);
 }
 
 void
@@ -345,9 +361,7 @@ StackOverflow(struct pt_regs *regs)
 {
 	printk(KERN_CRIT "Kernel stack overflow in process %p, r1=%lx\n",
 	       current, regs->gpr[1]);
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	debugger(regs);
-#endif
 	show_regs(regs);
 	panic("kernel stack overflow");
 }
@@ -365,20 +379,20 @@ void
 SoftwareEmulation(struct pt_regs *regs)
 {
 	extern int do_mathemu(struct pt_regs *);
+	extern int Soft_emulate_8xx(struct pt_regs *);
 	int errcode;
 
 	if (!user_mode(regs)) {
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 		debugger(regs);
-#endif
 		die("Kernel Mode Software FPU Emulation", regs, SIGFPE);
 	}
 
 #ifdef CONFIG_MATH_EMULATION
-	if ((errcode = do_mathemu(regs))) {
+	errcode = do_mathemu(regs);
 #else
-	if ((errcode = Soft_emulate_8xx(regs))) {
+	errcode = Soft_emulate_8xx(regs);
 #endif
+	if (errcode) {
 		if (errcode > 0)
 			_exception(SIGFPE, regs);
 		else if (errcode == -EFAULT)
@@ -387,7 +401,36 @@ SoftwareEmulation(struct pt_regs *regs)
 			_exception(SIGILL, regs);
 	}
 }
-#endif
+#endif /* CONFIG_8xx */
+
+#if defined(CONFIG_4xx)
+
+void DebugException(struct pt_regs *regs)
+{
+	unsigned long debug_status;
+
+	debug_status = mfspr(SPRN_DBSR);
+
+	regs->msr &= ~MSR_DE;  /* Turn off 'debug' bit */
+	if (debug_status & DBSR_TIE) {		/* trap instruction*/
+
+		mtspr(SPRN_DBSR, DBSR_TIE);
+
+		if (!user_mode(regs) && debugger_bpt(regs))
+			return;
+		_exception(SIGTRAP, regs);
+
+	} else if (debug_status & DBSR_IC) {	/* instruction completion */
+
+		mtspr(SPRN_DBSR, DBSR_IC);
+		regs->dbcr0 &=  ~DBCR0_IC;
+
+		if (!user_mode(regs) && debugger_sstep(regs))
+			return;
+		_exception(SIGTRAP, regs);
+	}
+}
+#endif /* CONFIG_4xx */
 
 #if !defined(CONFIG_TAU_INT)
 void

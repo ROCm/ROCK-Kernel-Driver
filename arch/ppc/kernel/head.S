@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head.S 1.31 10/18/01 15:02:09 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  PowerPC version 
@@ -22,17 +22,18 @@
  *  modify it under the terms of the GNU General Public License
  *  as published by the Free Software Foundation; either version
  *  2 of the License, or (at your option) any later version.
- *	
+ *
  */
 
 #include <linux/config.h>
-#include "ppc_asm.h"
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/cputable.h>
 #include <asm/cache.h>
+#include <asm/ppc_asm.h>
+#include "ppc_defs.h"
 
 #ifdef CONFIG_APUS
 #include <asm/amigappc.h>
@@ -48,9 +49,9 @@
 	ld	RB,(n*32)+24(reg);	\
 	mtspr	DBAT##n##U,RA;		\
 	mtspr	DBAT##n##L,RB;		\
-	
+
 #else /* CONFIG_PPC64BRIDGE */
-	
+
 /* 601 only have IBAT; cr0.eq is set on 601 when using this macro */
 #define LOAD_BAT(n, reg, RA, RB)	\
 	/* see the comment for clear_bats() -- Cort */ \
@@ -66,10 +67,13 @@
 	lwz	RB,(n*16)+12(reg);	\
 	mtspr	DBAT##n##U,RA;		\
 	mtspr	DBAT##n##L,RB;		\
-1:	
+1:
 #endif /* CONFIG_PPC64BRIDGE */	 
 
 	.text
+	.stabs	"arch/ppc/kernel/",N_SO,0,0,0f
+	.stabs	"head.S",N_SO,0,0,0f
+0:
 	.globl	_stext
 _stext:
 
@@ -86,8 +90,8 @@ _start:
 	 * but we're always started by some kind of bootloader now.
 	 *  -- Cort
 	 */
-	nop
-	nop
+	nop	/* used by __secondary_hold on prep (mtx) and chrp smp */
+	nop	/* used by __secondary_hold on prep (mtx) and chrp smp */
 	nop
 
 /* PMAC
@@ -113,7 +117,7 @@ _start:
  * PREP
  * This is jumped to on prep systems right after the kernel is relocated
  * to its proper place in memory by the boot loader.  The expected layout
- * of the regs is:	
+ * of the regs is:
  *   r3: ptr to residual data
  *   r4: initrd_start or if no initrd then 0
  *   r5: initrd_end - unused if r4 is 0
@@ -124,7 +128,7 @@ _start:
  * start_here() to do the real work.
  * -- Cort
  */
-	
+
 	.globl	__start
 __start:
 /*
@@ -153,7 +157,6 @@ __start:
 	bl	fix_mem_constants
 #endif /* CONFIG_APUS */
 
-#ifndef CONFIG_GEMINI
 /* Switch MMU off, clear BATs and flush TLB. At this point, r3 contains
  * the physical address we are running at, returned by early_init()
  */
@@ -161,28 +164,11 @@ __start:
 __after_mmu_off:
 	bl	clear_bats
 	bl	flush_tlbs
-#endif
 
-#ifndef CONFIG_POWER4
-	/* POWER4 doesn't have BATs */
 	bl	initial_bats
 #if !defined(CONFIG_APUS) && defined(CONFIG_BOOTX_TEXT)
 	bl	setup_disp_bat
 #endif
-#else /* CONFIG_POWER4 */
-/*
- * Load up the SDR1 and segment register values now
- * since we don't have the BATs.
- */
-	bl	reloc_offset
-	addis	r4,r3,_SDR1@ha		/* get the value from _SDR1 */
-	lwz	r4,_SDR1@l(r4)		/* assume hash table below 4GB */
-	mtspr	SDR1,r4
-	slbia
-	lis	r5,0x2000		/* set pseudo-segment reg 12 */
-	ori	r5,r5,0x0ccc
-	mtsr	12,r5
-#endif /* CONFIG_POWER4 */
 
 #ifndef CONFIG_APUS
 /*
@@ -217,11 +203,17 @@ turn_on_mmu:
 	SYNC
 	RFI				/* enables MMU */
 
-#ifdef CONFIG_SMP
+/*
+ * We need __secondary_hold as a place to hold the other cpus on
+ * an SMP machine, even when we are running a UP kernel.
+ */
+	. = 0xc0			/* for prep bootloader */
+	li	r3,1			/* MTX only has 1 cpu */
 	.globl	__secondary_hold
 __secondary_hold:
 	/* tell the master we're here */
 	stw	r3,4(0)
+#ifdef CONFIG_SMP
 100:	lwz	r4,0(0)
 	/* wait until we're told to start */
 	cmpw	0,r4,r3
@@ -229,7 +221,9 @@ __secondary_hold:
 	/* our cpu # was at addr 0 - go */
 	mr	r24,r3			/* cpu # */
 	b	__secondary_start
-#endif
+#else
+	b	.
+#endif /* CONFIG_SMP */
 
 /*
  * Exception entry code.  This code runs with address translation
@@ -289,13 +283,11 @@ i##n:						\
 	.long	ret_from_except
 
 /* System reset */
-#ifdef CONFIG_SMP /* MVME/MTX and gemini start the secondary here */
-#ifdef CONFIG_GEMINI
+/* core99 pmac starts the seconary here by changing the vector, and
+   putting it back to what it was (UnknownException) when done.  */
+#if defined(CONFIG_GEMINI) && defined(CONFIG_SMP)
 	. = 0x100
 	b	__secondary_start_gemini
-#else /* CONFIG_GEMINI */
-	STD_EXCEPTION(0x100, Reset, __secondary_start_psurge)
-#endif /* CONFIG_GEMINI */
 #else
 	STD_EXCEPTION(0x100, Reset, UnknownException)
 #endif
@@ -388,16 +380,12 @@ HardwareInterrupt:
 	EXCEPTION_PROLOG;
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	li	r20,MSR_KERNEL
-#ifndef CONFIG_APUS
 	li	r4,0
 	bl	transfer_to_handler
 	.globl do_IRQ_intercept
 do_IRQ_intercept:
 	.long	do_IRQ;
 	.long	ret_from_intercept
-#else
-	bl	apus_interrupt_entry
-#endif /* CONFIG_APUS */
 
 /* Alignment exception */
 	. = 0x600
@@ -487,7 +475,7 @@ trap_0f_cont:
 Trap_0f:
 	EXCEPTION_PROLOG
 	b	trap_0f_cont
-	
+
 /*
  * Handle TLB miss for instruction on 603/603e.
  * Note: we get an alternate set of r0 - r3 to use automatically.
@@ -636,7 +624,7 @@ DataAddressInvalid:
 	mtcrf	0x80,r3		/* Restore CR0 */
 	mtmsr	r0
 	b	DataAccess
-	
+
 /*
  * Handle TLB miss for DATA Store on 603/603e
  */
@@ -809,11 +797,11 @@ stack_ovf:
 	RFI
 
 /*
- * Disable FP for the task which had the FPU previously,
+ * This task wants to use the FPU now.
+ * On UP, disable FP for the task which had the FPU previously,
  * and save its floating-point registers in its thread_struct.
- * Enables the FPU for use in the kernel on return.
- * On SMP we know the fpu is free, since we give it up every
- * switch.  -- Cort
+ * Load up this task's FP registers from its thread_struct,
+ * enable the FPU for the current task and return to the task.
  */
 load_up_fpu:
 	mfmsr	r5
@@ -830,14 +818,13 @@ load_up_fpu:
  * to another.  Instead we call giveup_fpu in switch_to.
  */
 #ifndef CONFIG_SMP
-	lis	r6,0                    /* get __pa constant */
-	tophys(r6,r6)
+	tophys(r6,0)			/* get __pa constant */
 	addis	r3,r6,last_task_used_math@ha
 	lwz	r4,last_task_used_math@l(r3)
 	cmpi	0,r4,0
 	beq	1f
 	add	r4,r4,r6
-	addi	r4,r4,THREAD	        /* want THREAD of last_task_used_math */
+	addi	r4,r4,THREAD		/* want last_task_used_math->thread */
 	SAVE_32FPRS(0, r4)
 	mffs	fr0
 	stfd	fr0,THREAD_FPSCR-4(r4)
@@ -850,8 +837,10 @@ load_up_fpu:
 1:
 #endif /* CONFIG_SMP */
 	/* enable use of FP after return */
-	ori	r23,r23,MSR_FP|MSR_FE0|MSR_FE1
 	mfspr	r5,SPRG3		/* current task's THREAD (phys) */
+	lwz	r4,THREAD_FPEXC_MODE(r5)
+	ori	r23,r23,MSR_FP		/* enable FP for current */
+	or	r23,r23,r4
 	lfd	fr0,THREAD_FPSCR-4(r5)
 	mtfsf	0xff,fr0
 	REST_32FPRS(0, r5)
@@ -875,7 +864,7 @@ load_up_fpu:
 	lwz	r21,GPR21(r21)
 	SYNC
 	RFI
-	
+
 /*
  * FP unavailable trap from kernel - print a message, but let
  * the task use FP in the kernel until it returns to user mode.
@@ -1020,7 +1009,7 @@ giveup_altivec:
 #endif /* CONFIG_SMP */
 	blr
 #endif /* CONFIG_ALTIVEC */
-	
+
 /*
  * giveup_fpu(tsk)
  * Disable FP for the task given as the argument,
@@ -1031,9 +1020,10 @@ giveup_altivec:
 giveup_fpu:
 	mfmsr	r5
 	ori	r5,r5,MSR_FP
-	SYNC
+	SYNC_601
+	ISYNC_601
 	mtmsr	r5			/* enable use of fpu now */
-	SYNC
+	SYNC_601
 	isync
 	cmpi	0,r3,0
 	beqlr-				/* if no previous owner, done */
@@ -1172,62 +1162,6 @@ fix_mem_constants:
 	sync				/* additional sync needed on g4 */
 	isync				/* No speculative loading until now */
 	blr
-	
-apus_interrupt_entry:
-	/* This is horrible, but there's no way around it. Enable the
-	 * data cache so the IRQ hardware register can be accessed
-	 * without cache intervention. Then disable interrupts and get
-	 * the current emulated m68k IPL value. 
-	 */
-	
-	mfmsr	20
-	xori	r20,r20,MSR_DR
-	SYNC
-	mtmsr	r20
-	isync
-
-	lis	r4,APUS_IPL_EMU@h
-
-	li	r20,(IPLEMU_SETRESET|IPLEMU_DISABLEINT)
-	stb	r20,APUS_IPL_EMU@l(r4)
-	eieio
-
-	lbz	r3,APUS_IPL_EMU@l(r4)
-
-	li	r2,IPLEMU_IPLMASK
-	rlwinm. r20,r3,32-3,29,31
-	bne	2f
-	mr	r20,r2		/* lvl7! Need to reset state machine. */
-	b	3f
-2:	cmp	0,r20,r2
-	beq	1f
-3:	eieio
-	stb     r2,APUS_IPL_EMU@l(r4)
-	ori	r20,r20,IPLEMU_SETRESET
-	eieio
-	stb     r20,APUS_IPL_EMU@l(r4)
-1:	eieio
-	li	r20,IPLEMU_DISABLEINT
-	stb	r20,APUS_IPL_EMU@l(r4)
-
-	/* At this point we could do some magic to avoid the overhead
-	 * of calling the C interrupt handler in case of a spurious
-	 * interrupt. Could not get a simple hack to work though.
-	 */
-	
-	mfmsr	r20
-	xori	r20,r20,MSR_DR
-	SYNC
-	mtmsr	r20
-	isync
-
-	stw	r3,(_CCR+4)(r21);
-
-	addi	r3,r1,STACK_FRAME_OVERHEAD;
-	li	r20,MSR_KERNEL;
-	bl	transfer_to_handler;
-	.long	do_IRQ;
-	.long	ret_from_except
 
 /***********************************************************************
  *  Please note that on APUS the exception handlers are located at the
@@ -1247,10 +1181,9 @@ __secondary_start_gemini:
         andc    r4,r4,r3
         mtspr   HID0,r4
         sync
-        bl      prom_init
+        bl      gemini_prom_init
         b       __secondary_start
 #endif /* CONFIG_GEMINI */
-	
 	.globl	__secondary_start_psurge
 __secondary_start_psurge:
 	li	r24,1			/* cpu # */
@@ -1310,7 +1243,6 @@ __secondary_start:
 	mtspr	SPRG3,r4
 	li	r3,0
 	mtspr	SPRG2,r3	/* 0 => r1 has kernel sp */
-	stw	r3,PT_REGS(r4)	/* set thread.regs to 0 for kernel thread */
 
 	/* enable MMU and jump to start_secondary */
 	li	r4,MSR_KERNEL
@@ -1347,11 +1279,21 @@ _GLOBAL(__setup_cpu_7400)
 	bl	setup_750_7400_hid0
 	mtlr	r4
 	blr
+_GLOBAL(__setup_cpu_7410)
+	mflr	r4
+	bl	setup_common_caches
+	bl	setup_750_7400_hid0
+	li	r3,0
+	mtspr	SPRN_L2CR2,r3
+	mtlr	r4
+	blr
 _GLOBAL(__setup_cpu_7450)
+	mflr	r4
+	bl	setup_common_caches
+	bl	setup_7450_hid0
+	mtlr	r4
 	blr
 _GLOBAL(__setup_cpu_power3)
-	blr
-_GLOBAL(__setup_cpu_power4)
 	blr
 _GLOBAL(__setup_cpu_generic)
 	blr
@@ -1407,6 +1349,47 @@ setup_750_7400_hid0:
 	isync
 	blr
 
+/* 7450
+ * Enable Store Gathering (SGE), Branch Folding (FOLD)
+ * Branch History Table (BHTE), Branch Target ICache (BTIC)
+ * Dynamic Power Management (DPM), Speculative (SPD)
+ * Ensure our data cache instructions really operate.
+ * Timebase has to be running or we wouldn't have made it here,
+ * just ensure we don't disable it.
+ * Clear Instruction cache throttling (ICTC)
+ */
+setup_7450_hid0:
+	/* We check for the presence of an L3 cache setup by
+	 * the firmware. If any, we disable DOZE capability
+	 */
+	mfspr	r11,SPRN_L3CR
+	andis.	r11,r11,L3CR_L3E@h
+	beq	1f
+	li	r7,CPU_FTR_CAN_DOZE
+	lwz	r6,CPU_SPEC_FEATURES(r5)
+	andc	r6,r6,r7
+	stw	r6,CPU_SPEC_FEATURES(r5)
+1:	
+	mfspr	r11,HID0
+
+	/* All of the bits we have to set.....
+	*/
+	ori	r11,r11,HID0_SGE | HID0_FOLD | HID0_BHTE | HID0_BTIC
+	oris	r11,r11,HID0_DPM@h	/* enable dynamic power mgmt */
+
+	/* All of the bits we have to clear....
+	*/
+	li	r3,HID0_SPD | HID0_NOPDST | HID0_NOPTI
+	andc	r11,r11,r3		/* clear SPD: enable speculative */
+ 	li	r3,0
+
+ 	mtspr	ICTC,r3			/* Instruction Cache Throttling off */
+	isync
+	mtspr	HID0,r11
+	sync
+	isync
+	blr
+
 /*
  * Load stuff into the MMU.  Intended to be called with
  * IR=0 and DR=0.
@@ -1417,7 +1400,7 @@ load_up_mmu:
 	tophys(r6,r6)
 	lwz	r6,_SDR1@l(r6)
 	mtspr	SDR1,r6
-#ifdef CONFIG_PPC64BRIDGE	
+#ifdef CONFIG_PPC64BRIDGE
 	/* clear the ASR so we only use the pseudo-segment registers. */
 	li	r6,0
 	mtasr	r6
@@ -1430,7 +1413,6 @@ load_up_mmu:
 	addi	r3,r3,0x111	/* increment VSID */
 	addis	r4,r4,0x1000	/* address of next segment */
 	bdnz	3b
-#ifndef CONFIG_POWER4
 /* Load the BAT registers with the values set up by MMU_init.
    MMU_init takes care of whether we're on a 601 or not. */
 	mfpvr	r3
@@ -1443,7 +1425,6 @@ load_up_mmu:
 	LOAD_BAT(1,r3,r4,r5)
 	LOAD_BAT(2,r3,r4,r5)
 	LOAD_BAT(3,r3,r4,r5)
-#endif /* CONFIG_POWER4 */
 	blr
 
 /*
@@ -1519,6 +1500,19 @@ start_here:
 	TLBSYNC			/* ... on all CPUs */
 
 	bl	load_up_mmu
+
+	/* Add helper information for the Abatron bdiGDB debugger.
+	 * We do this here because we know the mmu is disabled, and
+	 * will be enabled for real in just a few instructions.
+	 */
+	lis	r5, abatron_pteptrs@h
+	ori	r5, r5, abatron_pteptrs@l
+	stw	r5, 0xf0(r0)	/* This much match your Abatron config */
+	lis	r6, swapper_pg_dir@h
+	ori	r6, r6, swapper_pg_dir@l
+	tophys(r5, r5)
+	stw	r6, 0(r5)
+
 /* Now turn on the MMU for real! */
 	li	r4,MSR_KERNEL
 	FIX_SRR1(r4,r5)
@@ -1538,6 +1532,15 @@ _GLOBAL(set_context)
 	addis	r3,r3,0x6000	/* Set Ks, Ku bits */
 	li	r0,NUM_USER_SEGMENTS
 	mtctr	r0
+
+#ifdef CONFIG_BDI_SWITCH
+	/* Context switch the PTE pointer for the Abatron BDI2000.
+	 * The PGDIR is passed as second argument.
+	 */
+	lis	r5, KERNELBASE@h
+	lwz	r5, 0xf0(r5)
+	stw	r4, 0x4(r5)
+#endif
 	li	r4,0
 3:
 #ifdef CONFIG_PPC64BRIDGE
@@ -1561,22 +1564,21 @@ _GLOBAL(set_context)
  *  -- Cort 
  */
 clear_bats:
-#if !defined(CONFIG_GEMINI)
 	li	r20,0
 	mfspr	r9,PVR
 	rlwinm	r9,r9,16,16,31		/* r9 = 1 for 601, 4 for 604 */
 	cmpwi	r9, 1
 	beq	1f
-	
+
 	mtspr	DBAT0U,r20
-	mtspr	DBAT0L,r20	
+	mtspr	DBAT0L,r20
 	mtspr	DBAT1U,r20
 	mtspr	DBAT1L,r20
 	mtspr	DBAT2U,r20
-	mtspr	DBAT2L,r20	
+	mtspr	DBAT2L,r20
 	mtspr	DBAT3U,r20
 	mtspr	DBAT3L,r20
-1:	
+1:
 	mtspr	IBAT0U,r20
 	mtspr	IBAT0L,r20
 	mtspr	IBAT1U,r20
@@ -1585,10 +1587,8 @@ clear_bats:
 	mtspr	IBAT2L,r20
 	mtspr	IBAT3U,r20
 	mtspr	IBAT3L,r20
-#endif /* !defined(CONFIG_GEMINI) */
 	blr
 
-#ifndef CONFIG_GEMINI
 flush_tlbs:
 	lis	r20, 0x40
 1:	addic.	r20, r20, -0x1000
@@ -1607,9 +1607,7 @@ mmu_off:
 	mtspr	SRR1,r3
 	sync
 	RFI
-#endif
 
-#ifndef CONFIG_POWER4	
 /*
  * Use the first pair of BAT registers to map the 1st 16MB
  * of RAM to KERNELBASE.  From this point on we can't safely
@@ -1645,7 +1643,7 @@ initial_bats:
 #else
 	ori	r11,r11,BL_256M<<2|0x2	/* set up BAT registers for 604 */
 #endif /* CONFIG_APUS */
-	
+
 #ifdef CONFIG_PPC64BRIDGE
 	/* clear out the high 32 bits in the BAT */
 	clrldi	r11,r11,32
@@ -1682,7 +1680,6 @@ setup_disp_bat:
 	blr
 
 #endif /* !defined(CONFIG_APUS) && defined(CONFIG_BOOTX_TEXT) */
-#endif /* CONFIG_POWER4 */
 
 #ifdef CONFIG_8260
 /* Jump into the system reset for the rom.
@@ -1734,12 +1731,12 @@ empty_zero_page:
 
 	.globl	swapper_pg_dir
 swapper_pg_dir:
-	.space	4096	
+	.space	4096
 
 /*
  * This space gets a copy of optional info passed to us by the bootstrap
  * Used to pass parameters into the kernel like root=/dev/sda1, etc.
- */	
+ */
 	.globl	cmd_line
 cmd_line:
 	.space	512
@@ -1752,3 +1749,9 @@ intercept_table:
 	.long 0, 0, 0, 0, 0, 0, 0, 0
 	.long 0, 0, 0, 0, 0, 0, 0, 0
 	.long 0, 0, 0, 0, 0, 0, 0, 0
+
+/* Room for two PTE pointers, usually the kernel and current user pointers
+ * to their respective root page table.
+ */
+abatron_pteptrs:
+	.space	8

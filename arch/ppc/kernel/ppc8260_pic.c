@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc8260_pic.c 1.5 05/17/01 18:14:21 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 
 #include <linux/stddef.h>
@@ -85,6 +85,22 @@ static void m8260_mask_and_ack(unsigned int irq_nr)
 	sipnr[word] = 1 << (31 - bit);
 }
 
+static void m8260_end_irq(unsigned int irq_nr)
+{
+	int	bit, word;
+	volatile uint	*simr;
+
+	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))) {
+
+		bit = irq_to_siubit[irq_nr];
+		word = irq_to_siureg[irq_nr];
+
+		simr = &(immr->im_intctl.ic_simrh);
+		ppc_cached_irq_mask[word] |= (1 << (31 - bit));
+		simr[word] = ppc_cached_irq_mask[word];
+	}
+}
+
 struct hw_interrupt_type ppc8260_pic = {
 	" 8260 SIU  ",
 	NULL,
@@ -92,6 +108,7 @@ struct hw_interrupt_type ppc8260_pic = {
 	m8260_unmask_irq,
 	m8260_mask_irq,
 	m8260_mask_and_ack,
+	m8260_end_irq,
 	0
 };
 
@@ -106,6 +123,9 @@ m8260_get_irq(struct pt_regs *regs)
          * to get the irq number.         */
         bits = immr->im_intctl.ic_sivec;
         irq = bits >> 26;
+
+	if (irq == 0)
+		return(-1);
 #if 0
         irq += ppc8260_pic.irq_offset;
 #endif

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.machdep.h 1.25 11/13/01 21:26:07 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifdef __KERNEL__
 #ifndef _PPC_MACHDEP_H
@@ -15,6 +15,11 @@ struct pt_regs;
 struct pci_bus;	
 struct pci_dev;
 struct seq_file;
+
+/* We export this macro for external modules like Alsa to know if
+ * ppc_md.feature_call is implemented or not
+ */
+#define CONFIG_PPC_HAS_FEATURE_CALLS
 
 struct machdep_calls {
 	void		(*setup_arch)(void);
@@ -94,6 +99,12 @@ struct machdep_calls {
 
 	/* this is for modules, since _machine can be a define -- Cort */
 	int ppc_machine;
+
+	/* Motherboard/chipset features. This is a kind of general purpose
+	 * hook used to control some machine specific features (like reset
+	 * lines, chip power control, etc...).
+	 */
+	int (*feature_call)(unsigned int feature, ...);
 
 #ifdef CONFIG_SMP
 	/* functions for dealing with other cpus */

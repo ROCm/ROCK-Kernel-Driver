@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8xx_setup.c 1.40 11/13/01 21:26:07 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  *
  *  linux/arch/ppc/kernel/setup.c
  *
@@ -43,8 +43,9 @@
 #include <asm/mpc8xx.h>
 #include <asm/8xx_immap.h>
 #include <asm/machdep.h>
-
+#include <asm/bootinfo.h>
 #include <asm/time.h>
+
 #include "ppc8xx_pic.h"
 
 static int m8xx_set_rtc_time(unsigned long time);
@@ -57,25 +58,30 @@ extern void m8xx_ide_init(void);
 
 extern unsigned long find_available_memory(void);
 extern void m8xx_cpm_reset(uint);
+extern void rpxfb_alloc_pages(void);
 
 void __init
 m8xx_setup_arch(void)
 {
 	int	cpm_page;
-	
+
 	cpm_page = (int) alloc_bootmem_pages(PAGE_SIZE);
-	
+
 	/* Reset the Communication Processor Module.
 	*/
 	m8xx_cpm_reset(cpm_page);
 
+#ifdef CONFIG_FB_RPX
+	rpxfb_alloc_pages();
+#endif
+
 #ifdef notdef
 	ROOT_DEV = to_kdev_t(0x0301); /* hda1 */
 #endif
-	
+
 #ifdef CONFIG_BLK_DEV_INITRD
 #if 0
-	ROOT_DEV = to_kdev_t(0x0200); /* floppy */  
+	ROOT_DEV = to_kdev_t(0x0200); /* floppy */
 	rd_prompt = 1;
 	rd_doload = 1;
 	rd_image_start = 0;
@@ -105,6 +111,9 @@ abort(void)
 	xmon(0);
 #endif
 	machine_restart(NULL);
+
+	/* not reached */
+	for (;;);
 }
 
 /* A place holder for time base interrupts, if they are ever enabled. */
@@ -217,7 +226,7 @@ m8xx_restart(char *cmd)
 	__asm__("mtmsr %0" : : "r" (msr) );
 
 	dummy = ((immap_t *)IMAP_ADDR)->im_clkrst.res[0];
-	printk("Restart failed\n"); 
+	printk("Restart failed\n");
 	while(1);
 }
 
@@ -240,9 +249,9 @@ m8xx_show_percpuinfo(struct seq_file *m, int i)
 	bd_t	*bp;
 
 	bp = (bd_t *)__res;
-			
-	seq_printf(m, "clock\t\t: %ldMHz\n"
-		   "bus clock\t: %ldMHz\n",
+
+	seq_printf(m, "clock\t\t: %dMHz\n"
+		   "bus clock\t: %dMHz\n",
 		   bp->bi_intfreq / 1000000,
 		   bp->bi_busfreq / 1000000);
 
@@ -263,7 +272,7 @@ m8xx_init_IRQ(void)
 
         for ( i = 0 ; i < NR_SIU_INTS ; i++ )
                 irq_desc[i].handler = &ppc8xx_pic;
-	
+
 	/* We could probably incorporate the CPM into the multilevel
 	 * interrupt structure.
 	 */
@@ -296,7 +305,7 @@ m8xx_find_end_of_memory(void)
 {
 	bd_t	*binfo;
 	extern unsigned char __res[];
-	
+
 	binfo = (bd_t *)__res;
 
 	return binfo->bi_memsize;
@@ -343,9 +352,11 @@ void __init
 platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		unsigned long r6, unsigned long r7)
 {
+	parse_bootinfo(find_bootinfo());
+
 	if ( r3 )
 		memcpy( (void *)__res,(void *)(r3+KERNELBASE), sizeof(bd_t) );
-	
+
 #ifdef CONFIG_PCI
 	m8xx_setup_pci_ptrs();
 #endif
@@ -360,7 +371,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif /* CONFIG_BLK_DEV_INITRD */
 	/* take care of cmd line */
 	if ( r6 )
-	{	
+	{
 		*(char *)(r7+KERNELBASE) = 0;
 		strcpy(cmd_line, (char *)(r6+KERNELBASE));
 	}
@@ -394,5 +405,5 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	m8xx_ide_init();
-#endif		
+#endif
 }

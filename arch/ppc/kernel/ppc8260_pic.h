@@ -1,11 +1,11 @@
 /*
- * BK Id: SCCS/s.ppc8260_pic.h 1.7 05/17/01 18:14:21 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 
 #ifndef _PPC_KERNEL_PPC8260_H
 #define _PPC_KERNEL_PPC8260_H
 
-#include "local_irq.h"
+#include <linux/irq.h>
 
 extern struct hw_interrupt_type ppc8260_pic;
 
