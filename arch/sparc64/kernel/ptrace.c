@@ -570,7 +570,7 @@ flush_and_out:
 	{
 		unsigned long va;
 
-		if (tlb_type == cheetah) {
+		if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 			for (va = 0; va < (1 << 16); va += (1 << 5))
 				spitfire_put_dcache_tag(va, 0x0);
 			/* No need to mess with I-cache on Cheetah. */

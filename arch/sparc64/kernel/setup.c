@@ -193,7 +193,7 @@ int prom_callback(long *args)
 
 			if (tlb_type == spitfire)
 				tte = spitfire_get_dtlb_data(SPITFIRE_HIGHEST_LOCKED_TLBENT);
-			else if (tlb_type == cheetah)
+			else if (tlb_type == cheetah || tlb_type == cheetah_plus)
 				tte = cheetah_get_ldtlb_data(CHEETAH_HIGHEST_LOCKED_TLBENT);
 
 			res = PROM_TRUE;
