@@ -39,7 +39,6 @@ extern int ei_debug;
 #define ei_debug 1
 #endif
 
-extern int ethdev_init(struct net_device *dev);
 extern void NS8390_init(struct net_device *dev, int startp);
 extern int ei_open(struct net_device *dev);
 extern int ei_close(struct net_device *dev);
@@ -88,7 +87,7 @@ struct ei_device {
 /* The maximum time waited (in jiffies) before assuming a Tx failed. (20ms) */
 #define TX_TIMEOUT (20*HZ/100)
 
-#define ei_status (*(struct ei_device *)(dev->priv))
+#define ei_status (*(struct ei_device *)netdev_priv(dev))
 
 /* Some generic ethernet register configurations. */
 #define E8390_TX_IRQ_MASK	0xa	/* For register EN0_ISR */
