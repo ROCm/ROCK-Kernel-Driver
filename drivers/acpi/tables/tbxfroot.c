@@ -387,35 +387,58 @@ acpi_tb_scan_memory_for_rsdp (
 	u8                              *start_address,
 	u32                             length)
 {
-	u32                             offset;
 	u8                              *mem_rover;
+	u8                              *end_address;
+	u8                              checksum;
 
 
 	ACPI_FUNCTION_TRACE ("tb_scan_memory_for_rsdp");
 
 
-	/* Search from given start addr for the requested length  */
+	end_address = start_address + length;
 
-	for (offset = 0, mem_rover = start_address;
-		 offset < length;
-		 offset += ACPI_RSDP_SCAN_STEP, mem_rover += ACPI_RSDP_SCAN_STEP) {
+	/* Search from given start address for the requested length */
 
+	for (mem_rover = start_address; mem_rover < end_address;
+		 mem_rover += ACPI_RSDP_SCAN_STEP) {
 		/* The signature and checksum must both be correct */
 
-		if (ACPI_STRNCMP ((char *) mem_rover,
-				RSDP_SIG, sizeof (RSDP_SIG)-1) == 0 &&
-			acpi_tb_checksum (mem_rover, ACPI_RSDP_CHECKSUM_LENGTH) == 0) {
-			/* If so, we have found the RSDP */
+		if (ACPI_STRNCMP ((char *) mem_rover, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0) {
+			/* No signature match, keep looking */
+
+			continue;
+		}
+
+		/* Signature matches, check the appropriate checksum */
+
+		if (((struct rsdp_descriptor *) mem_rover)->revision < 2) {
+			/* ACPI version 1.0 */
+
+			checksum = acpi_tb_checksum (mem_rover, ACPI_RSDP_CHECKSUM_LENGTH);
+		}
+		else {
+			/* Post ACPI 1.0, use extended_checksum */
+
+			checksum = acpi_tb_checksum (mem_rover, ACPI_RSDP_XCHECKSUM_LENGTH);
+		}
+
+		if (checksum == 0) {
+			/* Checksum valid, we have found a valid RSDP */
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-				"RSDP located at physical address %p\n",mem_rover));
+				"RSDP located at physical address %p\n", mem_rover));
 			return_PTR (mem_rover);
 		}
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+			"Found an RSDP at physical address %p, but it has a bad checksum\n",
+			mem_rover));
 	}
 
 	/* Searched entire block, no RSDP was found */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,"Searched entire block, no RSDP was found.\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"Searched entire block, no valid RSDP was found.\n"));
 	return_PTR (NULL);
 }
 
