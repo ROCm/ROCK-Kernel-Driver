@@ -2803,6 +2803,26 @@ asmlinkage int sys32_sendfile64(int out_fd, int in_fd, __kernel_loff_t32 *offset
 	return ret;
 }
 
+static int do_set_sock_timeout(int fd, int level, int optname, char *optval, int optlen)
+{
+	struct timeval32 *up = (struct timeval32 *) optval;
+	struct timeval ktime;
+	mm_segment_t old_fs;
+	int err;
+
+	if (optlen < sizeof(*up))
+		return -EINVAL;
+	if (get_user(ktime.tv_sec, &up->tv_sec) ||
+	    __get_user(ktime.tv_usec, &up->tv_usec))
+		return -EFAULT;
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_setsockopt(fd, level, optname, (char *) &ktime, sizeof(ktime));
+	set_fs(old_fs);
+
+	return err;
+}
+
 extern asmlinkage int sys_setsockopt(int fd, int level, int optname, char *optval, int optlen);
 
 asmlinkage long sys32_setsockopt(int fd, int level, int optname, char* optval, int optlen)
@@ -2840,11 +2860,49 @@ asmlinkage long sys32_setsockopt(int fd, int level, int optname, char* optval, i
 		kfree(kfilter);
 		return ret;
 	}
+
+	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
+		return do_set_sock_timeout(fd, level, optname, optval, optlen);
+
 	return sys_setsockopt(fd, level, optname, optval, optlen);
 }
 
+extern asmlinkage long sys_getsockopt(int fd, int level, int optname,
+				      char *optval, int *optlen);
 
+static int do_get_sock_timeout(int fd, int level, int optname, char *optval, int *optlen)
+{
+	struct timeval32 *up = (struct timeval32 *) optval;
+	struct timeval ktime;
+	mm_segment_t old_fs;
+	int len, err;
 
+	if (get_user(len, optlen))
+		return -EFAULT;
+	if (len < sizeof(*up))
+		return -EINVAL;
+	len = sizeof(ktime);
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_getsockopt(fd, level, optname, (char *) &ktime, &len);
+	set_fs(old_fs);
+
+	if (!err) {
+		if (put_user(sizeof(*up), optlen) ||
+		    put_user(ktime.tv_sec, &up->tv_sec) ||
+		    __put_user(ktime.tv_usec, &up->tv_usec))
+			err = -EFAULT;
+	}
+	return err;
+}
+
+asmlinkage int sys32_getsockopt(int fd, int level, int optname,
+				char *optval, int *optlen)
+{
+	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
+		return do_get_sock_timeout(fd, level, optname, optval, optlen);
+	return sys_getsockopt(fd, level, optname, optval, optlen);
+}
 
 #define MAX_SOCK_ADDR	128		/* 108 for Unix domain -  16 for IP, 16 for IPX, 24 for IPv6, about 80 for AX.25 */
 #define __CMSG32_NXTHDR(ctl, len, cmsg, cmsglen) __cmsg32_nxthdr((ctl),(len),(cmsg),(cmsglen))
