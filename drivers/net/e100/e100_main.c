@@ -3740,8 +3740,8 @@ e100_ethtool_led_blink(struct net_device *dev, struct ifreq *ifr)
 
 	set_current_state(TASK_INTERRUPTIBLE);
 
-	if ((!ecmd.data) || (ecmd.data > MAX_SCHEDULE_TIMEOUT / HZ))
-		ecmd.data = MAX_SCHEDULE_TIMEOUT / HZ;
+	if ((!ecmd.data) || (ecmd.data > (u32)(MAX_SCHEDULE_TIMEOUT / HZ)))
+		ecmd.data = (u32)(MAX_SCHEDULE_TIMEOUT / HZ);
 
 	schedule_timeout(ecmd.data * HZ);
 
@@ -3839,6 +3839,7 @@ exit:
 
 }
 
+#ifdef CONFIG_PM
 static void
 e100_do_wol(struct pci_dev *pcid, struct e100_private *bdp)
 {
@@ -3853,6 +3854,7 @@ e100_do_wol(struct pci_dev *pcid, struct e100_private *bdp)
 		printk(KERN_ERR "e100: config WOL failed\n");
 	}
 }
+#endif
 
 static u16
 e100_get_ip_lbytes(struct net_device *dev)
