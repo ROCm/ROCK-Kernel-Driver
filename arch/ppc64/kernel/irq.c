@@ -501,58 +501,55 @@ out:
 	spin_unlock(&desc->lock);
 }
 
-int do_IRQ(struct pt_regs *regs, int isfake)
+int do_IRQ(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
-	int irq;
-	struct Paca * paca;
-	struct ItLpQueue * lpq;
+	int irq, first = 1;
+#ifdef CONFIG_PPC_ISERIES
+	struct Paca *paca;
+	struct ItLpQueue *lpq;
+#endif
 
-	/* if(cpu) udbg_printf("Entering do_IRQ\n");  */
+	irq_enter(cpu);
 
-        irq_enter(cpu);
-
-	if ( _machine != _MACH_iSeries ) {
-	
-		/* every arch is required to have a get_irq -- Cort */
-		irq = ppc_md.get_irq( regs );
-
-		if ( irq >= 0 ) {
-			ppc_irq_dispatch_handler( regs, irq );
-			if (ppc_md.post_irq)
-				ppc_md.post_irq( regs, irq );
-		} else {
-			/* -2 means ignore, already handled */
-			if (irq != -2) {
-				printk(KERN_DEBUG "Bogus interrupt %d from PC = %lx\n",
-					irq, regs->nip);
-				ppc_spurious_interrupts++;
-			}
-		}
-	}
-	/* if on iSeries partition */
-	else {
-		paca = (struct Paca *)mfspr(SPRG3);
+#ifdef CONFIG_PPC_ISERIES
+	paca = get_paca();
 #ifdef CONFIG_SMP
-		if ( paca->xLpPaca.xIntDword.xFields.xIpiCnt ) {
-			paca->xLpPaca.xIntDword.xFields.xIpiCnt = 0;
-			iSeries_smp_message_recv( regs );
-		}
-#endif /* CONFIG_SMP */
-		lpq = paca->lpQueuePtr;
-		if ( lpq && ItLpQueue_isLpIntPending( lpq ) )
-			lpEvent_count += ItLpQueue_process( lpq, regs );
+	if (paca->xLpPaca.xIntDword.xFields.xIpiCnt) {
+		paca->xLpPaca.xIntDword.xFields.xIpiCnt = 0;
+		iSeries_smp_message_recv(regs);
 	}
-		
+#endif /* CONFIG_SMP */
+	lpq = paca->lpQueuePtr;
+	if (lpq && ItLpQueue_isLpIntPending(lpq))
+		lpEvent_count += ItLpQueue_process(lpq, regs);
+#else
+	/*
+	 * Every arch is required to implement ppc_md.get_irq.
+	 * This function will either return an irq number or -1 to
+	 * indicate there are no more pending.  But the first time
+	 * through the loop this means there wasn't an IRQ pending.
+	 * The value -2 is for buggy hardware and means that this IRQ
+	 * has already been handled. -- Tom
+	 */
+	while ((irq = ppc_md.get_irq(regs)) >= 0) {
+		ppc_irq_dispatch_handler(regs, irq);
+		first = 0;
+	}
+	if (irq != -2 && first)
+		/* That's not SMP safe ... but who cares ? */
+		ppc_spurious_interrupts++;
+#endif
+
         irq_exit(cpu);
 
-	if ( _machine == _MACH_iSeries ) {
-		if ( paca->xLpPaca.xIntDword.xFields.xDecrInt ) {
-			paca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
-			/* Signal a fake decrementer interrupt */
-			timer_interrupt( regs );
-		}
+#ifdef CONFIG_PPC_ISERIES
+	if (paca->xLpPaca.xIntDword.xFields.xDecrInt) {
+		paca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
+		/* Signal a fake decrementer interrupt */
+		timer_interrupt(regs);
 	}
+#endif
 
 	if (softirq_pending(cpu))
 		do_softirq();

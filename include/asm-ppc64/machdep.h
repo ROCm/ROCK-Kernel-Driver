@@ -78,7 +78,6 @@ struct machdep_calls {
 	void		(*init_IRQ)(void);
 	void		(*init_ras_IRQ)(void);
 	int		(*get_irq)(struct pt_regs *);
-	void		(*post_irq)( struct pt_regs *, int );
 	
 	/* A general init function, called by ppc_init in init/main.c.
 	   May be NULL. */

@@ -233,9 +233,9 @@ xics_get_irq(struct pt_regs *regs)
 		}
 	} else if( vec == XICS_IRQ_SPURIOUS ) {
 		irq = -1;
-		printk("spurious PPC interrupt!\n");
-	} else
+	} else {
 		irq = real_irq_to_virt(vec) + XICS_IRQ_OFFSET;
+	}
 	return irq;
 }
 

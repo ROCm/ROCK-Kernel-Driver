@@ -238,11 +238,9 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	if(naca->interrupt_controller == IC_OPEN_PIC) {
 		ppc_md.init_IRQ       = openpic_init_IRQ; 
 		ppc_md.get_irq        = openpic_get_irq;
-		ppc_md.post_irq	      = NULL;
 	} else {
 		ppc_md.init_IRQ       = xics_init_IRQ;
 		ppc_md.get_irq        = xics_get_irq;
-		ppc_md.post_irq	      = NULL;
 	}
 	ppc_md.init_ras_IRQ = init_ras_IRQ;
 
