@@ -94,7 +94,6 @@
 #include <linux/list.h>
 #include <linux/interrupt.h>  /* for in_interrupt () */
 #include <linux/usb.h>
-#include <linux/version.h>
 #include "../core/hcd.h"
 
 #include <asm/io.h>

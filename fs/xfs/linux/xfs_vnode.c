@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -31,7 +31,6 @@
  */
 
 #include <xfs.h>
-#include <linux/pagemap.h>
 
 
 uint64_t vn_generation;		/* vnode generation number */
@@ -73,19 +72,19 @@ vn_init(void)
  * Clean a vnode of filesystem-specific data and prepare it for reuse.
  */
 STATIC int
-vn_reclaim(struct vnode *vp)
+vn_reclaim(
+	struct vnode	*vp)
 {
-	int	error;
+	int		error;
 
 	XFS_STATS_INC(xfsstats.vn_reclaim);
-
 	vn_trace_entry(vp, "vn_reclaim", (inst_t *)__return_address);
 
 	/*
 	 * Only make the VOP_RECLAIM call if there are behaviors
 	 * to call.
 	 */
-	if (vp->v_fbhv != NULL) {
+	if (vp->v_fbhv) {
 		VOP_RECLAIM(vp, error);
 		if (error)
 			return -error;
@@ -108,18 +107,19 @@ vn_reclaim(struct vnode *vp)
 }
 
 STATIC void
-vn_wakeup(struct vnode *vp)
+vn_wakeup(
+	struct vnode	*vp)
 {
 	VN_LOCK(vp);
-	if (vp->v_flag & VWAIT) {
+	if (vp->v_flag & VWAIT)
 		sv_broadcast(vptosync(vp));
-	}
 	vp->v_flag &= ~(VRECLM|VWAIT|VMODIFIED);
 	VN_UNLOCK(vp, 0);
 }
 
 int
-vn_wait(struct vnode *vp)
+vn_wait(
+	struct vnode	*vp)
 {
 	VN_LOCK(vp);
 	if (vp->v_flag & (VINACT | VRECLM)) {
@@ -132,7 +132,8 @@ vn_wait(struct vnode *vp)
 }
 
 struct vnode *
-vn_initialize(struct inode *inode)
+vn_initialize(
+	struct inode	*inode)
 {
 	struct vnode	*vp = LINVFS_GET_VP(inode);
 
@@ -165,7 +166,9 @@ vn_initialize(struct inode *inode)
  * Get a reference on a vnode.
  */
 vnode_t *
-vn_get(struct vnode *vp, vmap_t *vmap)
+vn_get(
+	struct vnode	*vp,
+	vmap_t		*vmap)
 {
 	struct inode	*inode;
 
@@ -175,7 +178,7 @@ vn_get(struct vnode *vp, vmap_t *vmap)
 		return NULL;
 
 	inode = ilookup(vmap->v_vfsp->vfs_super, vmap->v_ino);
-	if (inode == NULL)		/* Inode not present */
+	if (!inode)	/* Inode not present */
 		return NULL;
 
 	vn_trace_exit(vp, "vn_get", (inst_t *)__return_address);
@@ -187,16 +190,17 @@ vn_get(struct vnode *vp, vmap_t *vmap)
  * Revalidate the Linux inode from the vnode.
  */
 int
-vn_revalidate(struct vnode *vp)
+vn_revalidate(
+	struct vnode	*vp)
 {
-	int		error;
 	struct inode	*inode;
 	vattr_t		va;
+	int		error;
 
 	vn_trace_entry(vp, "vn_revalidate", (inst_t *)__return_address);
 	ASSERT(vp->v_fbhv != NULL);
 
-	va.va_mask = XFS_AT_STAT|XFS_AT_GENCOUNT;
+	va.va_mask = XFS_AT_STAT;
 	VOP_GETATTR(vp, &va, 0, NULL, error);
 	if (!error) {
 		inode = LINVFS_GET_IP(vp);
@@ -206,12 +210,9 @@ vn_revalidate(struct vnode *vp)
 		inode->i_gid	    = va.va_gid;
 		inode->i_size	    = va.va_size;
 		inode->i_blocks	    = va.va_nblocks;
-		inode->i_mtime.tv_sec	    = va.va_mtime.tv_sec;
-		inode->i_mtime.tv_nsec	    = va.va_mtime.tv_nsec;
-		inode->i_ctime.tv_sec	    = va.va_ctime.tv_sec;
-		inode->i_ctime.tv_nsec	    = va.va_ctime.tv_nsec;
-		inode->i_atime.tv_sec	    = va.va_atime.tv_sec;
-		inode->i_atime.tv_nsec	    = va.va_atime.tv_nsec;
+		inode->i_mtime	    = va.va_mtime;
+		inode->i_ctime	    = va.va_ctime;
+		inode->i_atime	    = va.va_atime;
 		VUNMODIFY(vp);
 	}
 	return -error;
@@ -224,7 +225,9 @@ vn_revalidate(struct vnode *vp)
  * get a handle (via vn_get) on the vnode (usually done via a mount/vfs lock).
  */
 void
-vn_purge(struct vnode *vp, vmap_t *vmap)
+vn_purge(
+	struct vnode	*vp,
+	vmap_t		*vmap)
 {
 	vn_trace_entry(vp, "vn_purge", (inst_t *)__return_address);
 
@@ -284,9 +287,10 @@ again:
  * Add a reference to a referenced vnode.
  */
 struct vnode *
-vn_hold(struct vnode *vp)
+vn_hold(
+	struct vnode	*vp)
 {
-	struct inode *inode;
+	struct inode	*inode;
 
 	XFS_STATS_INC(xfsstats.vn_hold);
 
@@ -302,10 +306,11 @@ vn_hold(struct vnode *vp)
  *  Call VOP_INACTIVE on last reference.
  */
 void
-vn_rele(struct vnode *vp)
+vn_rele(
+	struct vnode	*vp)
 {
-	int	vcnt;
-	int	cache;
+	int		vcnt;
+	int		cache;
 
 	XFS_STATS_INC(xfsstats.vn_rele);
 
@@ -319,7 +324,7 @@ vn_rele(struct vnode *vp)
 	 * that i_count won't be decremented after we
 	 * return.
 	 */
-	if (vcnt == 0) {
+	if (!vcnt) {
 		/*
 		 * As soon as we turn this on, noone can find us in vn_get
 		 * until we turn off VINACT or VRECLM
@@ -331,19 +336,14 @@ vn_rele(struct vnode *vp)
 		 * Do not make the VOP_INACTIVE call if there
 		 * are no behaviors attached to the vnode to call.
 		 */
-		if (vp->v_fbhv != NULL) {
+		if (vp->v_fbhv)
 			VOP_INACTIVE(vp, NULL, cache);
-		}
 
 		VN_LOCK(vp);
-		if (vp->v_flag & VWAIT) {
-			if (vp->v_flag & VWAIT) {
-				sv_broadcast(vptosync(vp));
-			}
-		}
+		if (vp->v_flag & VWAIT)
+			sv_broadcast(vptosync(vp));
 
 		vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VMODIFIED);
-
 	}
 
 	VN_UNLOCK(vp, 0);
@@ -355,17 +355,16 @@ vn_rele(struct vnode *vp)
  * Finish the removal of a vnode.
  */
 void
-vn_remove(struct vnode *vp)
+vn_remove(
+	struct vnode	*vp)
 {
-	/* REFERENCED */
-	vmap_t	vmap;
+	vmap_t		vmap;
 
 	/* Make sure we don't do this to the same vnode twice */
 	if (!(vp->v_fbhv))
 		return;
 
 	XFS_STATS_INC(xfsstats.vn_remove);
-
 	vn_trace_exit(vp, "vn_remove", (inst_t *)__return_address);
 
 	/*

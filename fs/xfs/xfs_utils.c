@@ -232,7 +232,7 @@ xfs_dir_ialloc(
 			xfs_buf_relse(ialloc_context);
 			if (dqinfo) {
 				tp->t_dqinfo = dqinfo;
-				xfs_trans_free_dqinfo(tp);
+				XFS_TRANS_FREE_DQINFO(tp->t_mountp, tp);
 			}
 			*tpp = ntp;
 			*ipp = NULL;
@@ -254,7 +254,7 @@ xfs_dir_ialloc(
 			*ipp = NULL;
 			return code;
 		}
-		xfs_trans_bjoin (tp, ialloc_context);
+		xfs_trans_bjoin(tp, ialloc_context);
 
 		/*
 		 * Call ialloc again. Since we've locked out all

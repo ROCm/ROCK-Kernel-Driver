@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/mm.h>
 #include <asm/byteorder.h>
 
 #include "hcd.h"	/* for usbcore internals */

@@ -37,9 +37,7 @@ struct pci_socket_ops {
 	int (*get_status)(struct pci_socket *, unsigned int *);
 	int (*get_socket)(struct pci_socket *, socket_state_t *);
 	int (*set_socket)(struct pci_socket *, socket_state_t *);
-	int (*get_io_map)(struct pci_socket *, struct pccard_io_map *);
 	int (*set_io_map)(struct pci_socket *, struct pccard_io_map *);
-	int (*get_mem_map)(struct pci_socket *, struct pccard_mem_map *);
 	int (*set_mem_map)(struct pci_socket *, struct pccard_mem_map *);
 	void (*proc_setup)(struct pci_socket *, struct proc_dir_entry *base);
 };

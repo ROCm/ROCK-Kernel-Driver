@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -33,15 +33,25 @@
 #include <xfs.h>
 
 
-static xfs_fsize_t
+STATIC xfs_fsize_t
 xfs_size_fn(
-	xfs_inode_t	*ip)
+	xfs_inode_t		*ip)
 {
 	return (ip->i_d.di_size);
 }
 
+STATIC int
+xfs_ioinit(
+	struct vfs		*vfsp,
+	struct xfs_mount_args	*mntargs,
+	int			flags)
+{
+	return xfs_mountfs(vfsp, XFS_VFSTOM(vfsp),
+			   vfsp->vfs_super->s_bdev->bd_dev, flags);
+}
+
 xfs_ioops_t	xfs_iocore_xfs = {
-	.xfs_ioinit		= (xfs_ioinit_t) fs_noerr,
+	.xfs_ioinit		= (xfs_ioinit_t) xfs_ioinit,
 	.xfs_bmapi_func		= (xfs_bmapi_t) xfs_bmapi,
 	.xfs_bmap_eof_func	= (xfs_bmap_eof_t) xfs_bmap_eof,
 	.xfs_iomap_write_direct =
@@ -67,11 +77,9 @@ xfs_iocore_inode_reinit(
 {
 	xfs_iocore_t	*io = &ip->i_iocore;
 
-	io->io_flags = XFS_IOCORE_ISXFS;
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+	io->io_flags = 0;
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
 		io->io_flags |= XFS_IOCORE_RT;
-	}
-
 	io->io_dmevmask = ip->i_d.di_dmevmask;
 	io->io_dmstate = ip->i_d.di_dmstate;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -40,7 +40,7 @@
 /*
  * System memory size - used to scale certain data structures in XFS.
  */
-unsigned long	xfs_physmem;
+unsigned long xfs_physmem;
 
 /*
  * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
@@ -51,24 +51,14 @@ xfs_param_t xfs_params = { 0, 1, 0, 0, 0, 3 };
 /*
  * Used to serialize atomicIncWithWrap.
  */
-spinlock_t Atomic_spin = SPIN_LOCK_UNLOCKED;
+spinlock_t xfs_atomic_spin = SPIN_LOCK_UNLOCKED;
 
 /*
  * Global system credential structure.
  */
 cred_t sys_cred_val, *sys_cred = &sys_cred_val;
 
-/*
- * The global quota manager. There is only one of these for the entire
- * system, _not_ one per file system. XQM keeps track of the overall
- * quota functionality, including maintaining the freelist and hash
- * tables of dquots.
- */
-struct xfs_qm	*xfs_Gqm;
-mutex_t		xfs_Gqm_lock;
-
 /* Export XFS symbols used by xfsidbg */
-EXPORT_SYMBOL(xfs_Gqm);
 EXPORT_SYMBOL(xfs_next_bit);
 EXPORT_SYMBOL(xfs_contig_bits);
 EXPORT_SYMBOL(xfs_bmbt_get_all);

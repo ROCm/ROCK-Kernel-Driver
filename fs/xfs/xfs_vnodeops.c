@@ -254,28 +254,26 @@ xfs_getattr(
  */
 STATIC int
 xfs_setattr(
-	bhv_desc_t	*bdp,
-	vattr_t		*vap,
-	int		flags,
-	cred_t		*credp)
+	bhv_desc_t		*bdp,
+	vattr_t			*vap,
+	int			flags,
+	cred_t			*credp)
 {
-	xfs_inode_t	*ip;
-	xfs_trans_t	*tp;
-	xfs_mount_t	*mp;
-	int		mask;
-	int		code;
-	uint		lock_flags;
-	uint		commit_flags=0;
-	uid_t		uid=0, iuid=0;
-	gid_t		gid=0, igid=0;
-	int		timeflags = 0;
-	vnode_t		*vp;
-	xfs_prid_t	projid=0, iprojid=0;
-	int		privileged;
-	int		mandlock_before, mandlock_after;
-	uint		qflags;
-	xfs_dquot_t	*udqp, *gdqp, *olddquot1, *olddquot2;
-	int		file_owner;
+	xfs_inode_t		*ip;
+	xfs_trans_t		*tp;
+	xfs_mount_t		*mp;
+	int			mask;
+	int			code;
+	uint			lock_flags;
+	uint			commit_flags=0;
+	uid_t			uid=0, iuid=0;
+	gid_t			gid=0, igid=0;
+	int			timeflags = 0;
+	vnode_t			*vp;
+	xfs_prid_t		projid=0, iprojid=0;
+	int			mandlock_before, mandlock_after;
+	struct xfs_dquot	*udqp, *gdqp, *olddquot1, *olddquot2;
+	int			file_owner;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
@@ -319,7 +317,8 @@ xfs_setattr(
 	 * because the i_*dquot fields will get updated anyway.
 	 */
 	if (XFS_IS_QUOTA_ON(mp) && (mask & (XFS_AT_UID|XFS_AT_GID))) {
-		qflags = 0;
+		uint	qflags = 0;
+
 		if (mask & XFS_AT_UID) {
 			uid = vap->va_uid;
 			qflags |= XFS_QMOPT_UQUOTA;
@@ -339,8 +338,8 @@ xfs_setattr(
 		 */
 		ASSERT(udqp == NULL);
 		ASSERT(gdqp == NULL);
-		if ((code = xfs_qm_vop_dqalloc(mp, ip, uid, gid, qflags,
-						    &udqp, &gdqp)))
+		code = XFS_QM_DQVOPALLOC(mp, ip, uid,gid, qflags, &udqp, &gdqp);
+		if (code)
 			return (code);
 	}
 
@@ -365,7 +364,7 @@ xfs_setattr(
 	} else {
 		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_TRUNCATE) &&
 		    !(flags & ATTR_DMI)) {
-			code = xfs_dm_send_data_event (DM_EVENT_TRUNCATE, bdp,
+			code = XFS_SEND_DATA(mp, DM_EVENT_TRUNCATE, bdp,
 				vap->va_size, 0, AT_DELAY_FLAG(flags), NULL);
 			if (code) {
 				lock_flags = 0;
@@ -482,15 +481,10 @@ xfs_setattr(
 		if ((XFS_IS_UQUOTA_ON(mp) && iuid != uid) ||
 		    (XFS_IS_GQUOTA_ON(mp) && igid != gid)) {
 			ASSERT(tp);
-			/*
-			 * XXX:casey - This may result in unnecessary auditing.
-			 */
-			privileged = capable(CAP_FOWNER);
-			if ((code = xfs_qm_vop_chown_reserve(tp, ip, udqp, gdqp,
-							  privileged ?
-							  XFS_QMOPT_FORCE_RES :
-							  0)))
-				/* out of quota */
+			code = XFS_QM_DQVOPCHOWNRESV(mp, tp, ip, udqp, gdqp,
+						capable(CAP_FOWNER) ?
+						XFS_QMOPT_FORCE_RES : 0);
+			if (code)	/* out of quota */
 				goto error_return;
 		}
 	}
@@ -520,10 +514,8 @@ xfs_setattr(
 		/*
 		 * Make sure that the dquots are attached to the inode.
 		 */
-		if (XFS_IS_QUOTA_ON(mp) && XFS_NOT_DQATTACHED(mp, ip)) {
-			if ((code = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED)))
-				goto error_return;
-		}
+		if ((code = XFS_QM_DQATTACH(mp, ip, XFS_QMOPT_ILOCKED)))
+			goto error_return;
 	}
 
 	/*
@@ -730,13 +722,8 @@ xfs_setattr(
 			if (XFS_IS_UQUOTA_ON(mp)) {
 				ASSERT(mask & XFS_AT_UID);
 				ASSERT(udqp);
-				ASSERT(xfs_qm_dqid(udqp) == (xfs_dqid_t)uid);
-				olddquot1 = xfs_qm_vop_chown(tp, ip,
-							     &ip->i_udquot,
-							     udqp);
-				/*
-				 * We'll dqrele olddquot at the end.
-				 */
+				olddquot1 = XFS_QM_DQVOPCHOWN(mp, tp, ip,
+							&ip->i_udquot, udqp);
 			}
 			ip->i_d.di_uid = uid;
 		}
@@ -744,10 +731,8 @@ xfs_setattr(
 			if (XFS_IS_GQUOTA_ON(mp)) {
 				ASSERT(mask & XFS_AT_GID);
 				ASSERT(gdqp);
-				ASSERT(xfs_qm_dqid(gdqp) == gid);
-				olddquot2 = xfs_qm_vop_chown(tp, ip,
-							     &ip->i_gdquot,
-							     gdqp);
+				olddquot2 = XFS_QM_DQVOPCHOWN(mp, tp, ip,
+							&ip->i_gdquot, gdqp);
 			}
 			ip->i_d.di_gid = gid;
 		}
@@ -802,9 +787,6 @@ xfs_setattr(
 			ip->i_d.di_flags = 0;
 			if (vap->va_xflags & XFS_XFLAG_REALTIME) {
 				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
-				/* This is replicated in the io core for
-				 * CXFS use
-				 */
 				ip->i_iocore.io_flags |= XFS_IOCORE_RT;
 			}
 			/* can't set PREALLOC this way, just ignore it */
@@ -866,16 +848,12 @@ xfs_setattr(
 	xfs_iunlock(ip, lock_flags);
 
 	/*
-	 * release any dquot(s) inode had kept before chown
+	 * Release any dquot(s) the inode had kept before chown.
 	 */
-	if (olddquot1)
-		xfs_qm_dqrele(olddquot1);
-	if (olddquot2)
-		xfs_qm_dqrele(olddquot2);
-	if (udqp)
-		xfs_qm_dqrele(udqp);
-	if (gdqp)
-		xfs_qm_dqrele(gdqp);
+	XFS_QM_DQRELE(mp, olddquot1);
+	XFS_QM_DQRELE(mp, olddquot2);
+	XFS_QM_DQRELE(mp, udqp);
+	XFS_QM_DQRELE(mp, gdqp);
 
 	if (code) {
 		return code;
@@ -883,9 +861,9 @@ xfs_setattr(
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_ATTRIBUTE) &&
 	    !(flags & ATTR_DMI)) {
-		(void) dm_send_namesp_event (DM_EVENT_ATTRIBUTE, bdp, DM_RIGHT_NULL,
-				NULL, DM_RIGHT_NULL, NULL, NULL,
-			0, 0, AT_DELAY_FLAG(flags));
+		(void) XFS_SEND_NAMESP(mp, DM_EVENT_ATTRIBUTE, bdp, DM_RIGHT_NULL,
+					NULL, DM_RIGHT_NULL, NULL, NULL,
+					0, 0, AT_DELAY_FLAG(flags));
 	}
 	return 0;
 
@@ -893,10 +871,8 @@ xfs_setattr(
 	commit_flags |= XFS_TRANS_ABORT;
 	/* FALLTHROUGH */
  error_return:
-	if (udqp)
-		xfs_qm_dqrele(udqp);
-	if (gdqp)
-		xfs_qm_dqrele(gdqp);
+	XFS_QM_DQRELE(mp, udqp);
+	XFS_QM_DQRELE(mp, gdqp);
 	if (tp) {
 		xfs_trans_cancel(tp, commit_flags);
 	}
@@ -1286,14 +1262,8 @@ xfs_inactive_free_eofblocks(
 		/*
 		 * Attach the dquots to the inode up front.
 		 */
-		if (XFS_IS_QUOTA_ON(mp) &&
-		    ip->i_ino != mp->m_sb.sb_uquotino &&
-		    ip->i_ino != mp->m_sb.sb_gquotino) {
-			if (XFS_NOT_DQATTACHED(mp, ip)) {
-				if ((error = xfs_qm_dqattach(ip, 0)))
-					return (error);
-			}
-		}
+		if ((error = XFS_QM_DQATTACH(mp, ip, 0)))
+			return (error);
 
 		/*
 		 * There are blocks after the end of file.
@@ -1683,7 +1653,7 @@ xfs_inactive(
 
 	if (ip->i_d.di_nlink == 0 &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_DESTROY)) {
-		(void) dm_send_destroy_event(bdp, DM_RIGHT_NULL);
+		(void) XFS_SEND_DESTROY(mp, bdp, DM_RIGHT_NULL);
 	}
 
 	error = 0;
@@ -1709,14 +1679,9 @@ xfs_inactive(
 
 	ASSERT(ip->i_d.di_nlink == 0);
 
-	if (XFS_IS_QUOTA_ON(mp) &&
-	    ip->i_ino != mp->m_sb.sb_uquotino &&
-	    ip->i_ino != mp->m_sb.sb_gquotino) {
-		if (XFS_NOT_DQATTACHED(mp, ip)) {
-			if ((error = xfs_qm_dqattach(ip, 0)))
-				return (VN_INACTIVE_CACHE);
-		}
-	}
+	if ((error = XFS_QM_DQATTACH(mp, ip, 0)))
+		return (VN_INACTIVE_CACHE);
+
 	tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 	if (truncate) {
 		/*
@@ -1826,20 +1791,18 @@ xfs_inactive(
 		 * might do that, we need to make sure.	 Otherwise the
 		 * inode might be lost for a long time or forever.
 		 */
-		if (!XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
+		if (!XFS_FORCED_SHUTDOWN(mp)) {
 			cmn_err(CE_NOTE,
-				"xfs_inactive:	xfs_ifree() returned an error = %d on %s",
-				error,tp->t_mountp->m_fsname);
-			xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR);
+		"xfs_inactive:	xfs_ifree() returned an error = %d on %s",
+				error, mp->m_fsname);
+			xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 		}
 		xfs_trans_cancel(tp, commit_flags | XFS_TRANS_ABORT);
 	} else {
 		/*
 		 * Credit the quota account(s). The inode is gone.
 		 */
-		if (XFS_IS_QUOTA_ON(tp->t_mountp))
-			xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_ICOUNT,
-							 -1);
+		XFS_TRANS_MOD_DQUOT_BYINO(mp, tp, ip, XFS_TRANS_DQ_ICOUNT, -1);
 
 		/*
 		 * Just ignore errors at this point.  There is
@@ -1850,8 +1813,7 @@ xfs_inactive(
 	/*
 	 * Release the dquots held by inode, if any.
 	 */
-	if (ip->i_udquot || ip->i_gdquot)
-		xfs_qm_dqdettach_inode(ip);
+	XFS_QM_DQDETACH(mp, ip);
 
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 
@@ -1925,7 +1887,7 @@ xfs_create(
 	uint			cancel_flags;
 	int			committed;
 	xfs_prid_t		prid;
-	xfs_dquot_t		*udqp, *gdqp;
+	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
 	int			dm_di_mode;
 	int			namelen;
@@ -1935,21 +1897,21 @@ xfs_create(
 	vn_trace_entry(dir_vp, __FUNCTION__, (inst_t *)__return_address);
 
 	dp = XFS_BHVTOI(dir_bdp);
+	mp = dp->i_mount;
 
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
 	namelen = VNAMELEN(dentry);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
-		error = dm_send_namesp_event(DM_EVENT_CREATE,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_CREATE,
 				dir_bdp, DM_RIGHT_NULL, NULL,
 				DM_RIGHT_NULL, name, NULL,
 				dm_di_mode, 0, 0);
+
 		if (error)
 			return error;
 		dm_event_sent = 1;
 	}
-
-	mp = dp->i_mount;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
@@ -1965,14 +1927,10 @@ xfs_create(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		error = xfs_qm_vop_dqalloc(mp, dp,
-					   current->fsuid, current->fsgid,
-					   XFS_QMOPT_QUOTALL|XFS_QMOPT_INHERIT,
-					   &udqp, &gdqp);
-		if (error)
-			goto std_return;
-	}
+	error = XFS_QM_DQVOPALLOC(mp, dp, current->fsuid, current->fsgid,
+			XFS_QMOPT_QUOTALL|XFS_QMOPT_INHERIT, &udqp, &gdqp);
+	if (error)
+		goto std_return;
 
 	ip = NULL;
 	dp_joined_to_trans = B_FALSE;
@@ -2008,13 +1966,10 @@ xfs_create(
 	/*
 	 * Reserve disk quota and the inode.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (xfs_trans_reserve_quota(tp, udqp, gdqp, resblks,
-					    1, 0)) {
-			error = EDQUOT;
-			goto error_return;
-		}
-	}
+	error = XFS_TRANS_RESERVE_QUOTA(mp, tp, udqp, gdqp, resblks, 1, 0);
+	if (error)
+		goto error_return;
+
 	if (resblks == 0 &&
 	    (error = XFS_DIR_CANENTER(mp, tp, dp, name, namelen)))
 		goto error_return;
@@ -2074,9 +2029,7 @@ xfs_create(
 	 * These ids of the inode couldn't have changed since the new
 	 * inode has been locked ever since it was created.
 	 */
-	if (XFS_IS_QUOTA_ON(mp))
-		xfs_qm_vop_dqattach_and_dqmod_newinode(tp, ip, udqp,
-						       gdqp);
+	XFS_QM_DQVOPCREATE(mp, tp, ip, udqp, gdqp);
 
 	/*
 	 * xfs_trans_commit normally decrements the vnode ref count
@@ -2099,10 +2052,8 @@ xfs_create(
 		goto error_return;
 	}
 
-	if (udqp)
-		xfs_qm_dqrele(udqp);
-	if (gdqp)
-		xfs_qm_dqrele(gdqp);
+	XFS_QM_DQRELE(mp, udqp);
+	XFS_QM_DQRELE(mp, gdqp);
 
 	/*
 	 * Propogate the fact that the vnode changed after the
@@ -2118,7 +2069,7 @@ std_return:
 	if ( (*vpp || (error != 0 && dm_event_sent != 0)) &&
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 							DM_EVENT_POSTCREATE)) {
-		(void) dm_send_namesp_event(DM_EVENT_POSTCREATE,
+		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTCREATE,
 			dir_bdp, DM_RIGHT_NULL,
 			*vpp ? vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops):NULL,
 			DM_RIGHT_NULL, name, NULL,
@@ -2136,10 +2087,8 @@ std_return:
 
 	if (!dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
-	if (udqp)
-		xfs_qm_dqrele(udqp);
-	if (gdqp)
-		xfs_qm_dqrele(gdqp);
+	XFS_QM_DQRELE(mp, udqp);
+	XFS_QM_DQRELE(mp, gdqp);
 
 	goto std_return;
 
@@ -2153,10 +2102,8 @@ std_return:
 	xfs_trans_cancel(tp, cancel_flags);
 	IRELE(ip);
 
-	if (udqp)
-		xfs_qm_dqrele(udqp);
-	if (gdqp)
-		xfs_qm_dqrele(gdqp);
+	XFS_QM_DQRELE(mp, udqp);
+	XFS_QM_DQRELE(mp, gdqp);
 
 	goto std_return;
 }
@@ -2437,8 +2384,8 @@ xfs_remove(
 	namelen = VNAMELEN(dentry);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
-		error = dm_send_namesp_event(DM_EVENT_REMOVE, dir_bdp, DM_RIGHT_NULL,
-					NULL, DM_RIGHT_NULL,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_REMOVE, dir_bdp,
+					DM_RIGHT_NULL, NULL, DM_RIGHT_NULL,
 					name, NULL, 0, 0, 0);
 		if (error)
 			return error;
@@ -2471,17 +2418,13 @@ xfs_remove(
 
 	ITRACE(ip);
 
-	if (XFS_IS_QUOTA_ON(mp)) {
-		ASSERT(! error);
-		if (XFS_NOT_DQATTACHED(mp, dp))
-			error = xfs_qm_dqattach(dp, 0);
-		if (!error && dp != ip && XFS_NOT_DQATTACHED(mp, ip))
-			error = xfs_qm_dqattach(ip, 0);
-		if (error) {
-			REMOVE_DEBUG_TRACE(__LINE__);
-			IRELE(ip);
-			goto std_return;
-		}
+	error = XFS_QM_DQATTACH(mp, dp, 0);
+	if (!error && dp != ip)
+		error = XFS_QM_DQATTACH(mp, ip, 0);
+	if (error) {
+		REMOVE_DEBUG_TRACE(__LINE__);
+		IRELE(ip);
+		goto std_return;
 	}
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_REMOVE);
@@ -2606,7 +2549,7 @@ xfs_remove(
  std_return:
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp,
 						DM_EVENT_POSTREMOVE)) {
-		(void) dm_send_namesp_event(DM_EVENT_POSTREMOVE,
+		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTREMOVE,
 				dir_bdp, DM_RIGHT_NULL,
 				NULL, DM_RIGHT_NULL,
 				name, NULL, dm_di_mode, error, 0);
@@ -2690,7 +2633,7 @@ xfs_link(
 		return XFS_ERROR(EIO);
 
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, tdp, DM_EVENT_LINK)) {
-		error = dm_send_namesp_event(DM_EVENT_LINK,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_LINK,
 					target_dir_bdp, DM_RIGHT_NULL,
 					src_bdp, DM_RIGHT_NULL,
 					target_name, NULL, 0, 0, 0);
@@ -2700,15 +2643,11 @@ xfs_link(
 
 	/* Return through std_return after this point. */
 
-	if (XFS_IS_QUOTA_ON(mp)) {
-		error = 0;
-		if (XFS_NOT_DQATTACHED(mp, sip))
-			error = xfs_qm_dqattach(sip, 0);
-		if (!error && sip != tdp && XFS_NOT_DQATTACHED(mp, tdp))
-			error = xfs_qm_dqattach(tdp, 0);
-		if (error)
-			goto std_return;
-	}
+	error = XFS_QM_DQATTACH(mp, sip, 0);
+	if (!error && sip != tdp)
+		error = XFS_QM_DQATTACH(mp, tdp, 0);
+	if (error)
+		goto std_return;
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_LINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
@@ -2798,7 +2737,7 @@ xfs_link(
 std_return:
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, sip,
 						DM_EVENT_POSTLINK)) {
-		(void) dm_send_namesp_event(DM_EVENT_POSTLINK,
+		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTLINK,
 				target_dir_bdp, DM_RIGHT_NULL,
 				src_bdp, DM_RIGHT_NULL,
 				target_name, NULL, 0, error, 0);
@@ -2813,8 +2752,6 @@ std_return:
 
 	goto std_return;
 }
-
-
 /*
  * xfs_mkdir
  *
@@ -2844,7 +2781,7 @@ xfs_mkdir(
 	boolean_t		created = B_FALSE;
 	int			dm_event_sent = 0;
 	xfs_prid_t		prid;
-	xfs_dquot_t		*udqp, *gdqp;
+	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
 	int			dm_di_mode;
 	int			dir_namelen;
@@ -2863,7 +2800,7 @@ xfs_mkdir(
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
-		error = dm_send_namesp_event(DM_EVENT_CREATE,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_CREATE,
 					dir_bdp, DM_RIGHT_NULL, NULL,
 					DM_RIGHT_NULL, dir_name, NULL,
 					dm_di_mode, 0, 0);
@@ -2886,14 +2823,10 @@ xfs_mkdir(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		error = xfs_qm_vop_dqalloc(mp, dp,
-					   current->fsuid, current->fsgid,
-					   XFS_QMOPT_QUOTALL|XFS_QMOPT_INHERIT,
-					   &udqp, &gdqp);
-		if (error)
-			goto std_return;
-	}
+	error = XFS_QM_DQVOPALLOC(mp, dp, current->fsuid, current->fsgid,
+			XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT, &udqp, &gdqp);
+	if (error)
+		goto std_return;
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
@@ -2925,12 +2858,9 @@ xfs_mkdir(
 	/*
 	 * Reserve disk quota and the inode.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (xfs_trans_reserve_quota(tp, udqp, gdqp, resblks, 1, 0)) {
-			error = XFS_ERROR(EDQUOT);
-			goto error_return;
-		}
-	}
+	error = XFS_TRANS_RESERVE_QUOTA(mp, tp, udqp, gdqp, resblks, 1, 0);
+	if (error)
+		goto error_return;
 
 	if (resblks == 0 &&
 	    (error = XFS_DIR_CANENTER(mp, tp, dp, dir_name, dir_namelen)))
@@ -2999,9 +2929,7 @@ xfs_mkdir(
 	/*
 	 * Attach the dquots to the new inode and modify the icount incore.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		xfs_qm_vop_dqattach_and_dqmod_newinode(tp, cdp, udqp, gdqp);
-	}
+	XFS_QM_DQVOPCREATE(mp, tp, cdp, udqp, gdqp);
 
 	/*
 	 * If this is a synchronous mount, make sure that the
@@ -3019,11 +2947,8 @@ xfs_mkdir(
 	}
 
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
-	if (udqp)
-		 xfs_qm_dqrele(udqp);
-	if (gdqp)
-		 xfs_qm_dqrele(gdqp);
-
+	XFS_QM_DQRELE(mp, udqp);
+	XFS_QM_DQRELE(mp, gdqp);
 	if (error) {
 		IRELE(cdp);
 	}
@@ -3035,7 +2960,7 @@ std_return:
 	if ( (created || (error != 0 && dm_event_sent != 0)) &&
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 						DM_EVENT_POSTCREATE)) {
-		(void) dm_send_namesp_event(DM_EVENT_POSTCREATE,
+		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTCREATE,
 					dir_bdp, DM_RIGHT_NULL,
 					created ? XFS_ITOBHV(cdp):NULL,
 					DM_RIGHT_NULL,
@@ -3051,11 +2976,8 @@ std_return:
 	cancel_flags |= XFS_TRANS_ABORT;
  error_return:
 	xfs_trans_cancel(tp, cancel_flags);
-
-	if (udqp)
-		xfs_qm_dqrele(udqp);
-	if (gdqp)
-		xfs_qm_dqrele(gdqp);
+	XFS_QM_DQRELE(mp, udqp);
+	XFS_QM_DQRELE(mp, gdqp);
 
 	if (!dp_joined_to_trans && (dp != NULL)) {
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -3093,6 +3015,7 @@ xfs_rmdir(
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	dp = XFS_BHVTOI(dir_bdp);
+	mp = dp->i_mount;
 
 	vn_trace_entry(dir_vp, __FUNCTION__, (inst_t *)__return_address);
 
@@ -3101,7 +3024,7 @@ xfs_rmdir(
 	namelen = VNAMELEN(dentry);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
-		error = dm_send_namesp_event(DM_EVENT_REMOVE,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_REMOVE,
 					dir_bdp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL,
 					name, NULL, 0, 0, 0);
@@ -3136,17 +3059,13 @@ xfs_rmdir(
 	/*
 	 * Get the dquots for the inodes.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		ASSERT(! error);
-		if (XFS_NOT_DQATTACHED(mp, dp))
-			error = xfs_qm_dqattach(dp, 0);
-		if (!error && dp != cdp && XFS_NOT_DQATTACHED(mp, cdp))
-			error = xfs_qm_dqattach(cdp, 0);
-		if (error) {
-			IRELE(cdp);
-			REMOVE_DEBUG_TRACE(__LINE__);
-			goto std_return;
-		}
+	error = XFS_QM_DQATTACH(mp, dp, 0);
+	if (!error && dp != cdp)
+		error = XFS_QM_DQATTACH(mp, cdp, 0);
+	if (error) {
+		IRELE(cdp);
+		REMOVE_DEBUG_TRACE(__LINE__);
+		goto std_return;
 	}
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RMDIR);
@@ -3298,9 +3217,8 @@ xfs_rmdir(
 	/* Fall through to std_return with error = 0 or the errno
 	 * from xfs_trans_commit. */
 std_return:
-	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp,
-						DM_EVENT_POSTREMOVE)) {
-		(void) dm_send_namesp_event(DM_EVENT_POSTREMOVE,
+	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_POSTREMOVE)) {
+		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTREMOVE,
 					dir_bdp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL,
 					name, NULL, dm_di_mode,
@@ -3391,7 +3309,7 @@ xfs_symlink(
 	int			n;
 	xfs_buf_t		*bp;
 	xfs_prid_t		prid;
-	xfs_dquot_t		*udqp, *gdqp;
+	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
 	char			*link_name = VNAME(dentry);
 	int			link_namelen;
@@ -3446,10 +3364,9 @@ xfs_symlink(
 	}
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_SYMLINK)) {
-		error = dm_send_namesp_event(DM_EVENT_SYMLINK, dir_bdp, DM_RIGHT_NULL,
-						NULL, DM_RIGHT_NULL,
-						link_name, target_path,
-						0, 0, 0);
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_SYMLINK, dir_bdp,
+					DM_RIGHT_NULL, NULL, DM_RIGHT_NULL,
+					link_name, target_path, 0, 0, 0);
 		if (error)
 			return error;
 	}
@@ -3465,14 +3382,10 @@ xfs_symlink(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		error = xfs_qm_vop_dqalloc(mp, dp,
-					   current->fsuid, current->fsgid,
-					   XFS_QMOPT_QUOTALL|XFS_QMOPT_INHERIT,
-					   &udqp, &gdqp);
-		if (error)
-			goto std_return;
-	}
+	error = XFS_QM_DQVOPALLOC(mp, dp, current->fsuid, current->fsgid,
+			XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT, &udqp, &gdqp);
+	if (error)
+		goto std_return;
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SYMLINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
@@ -3503,12 +3416,9 @@ xfs_symlink(
 	/*
 	 * Reserve disk quota : blocks and inode.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (xfs_trans_reserve_quota(tp, udqp, gdqp, resblks, 1, 0)) {
-			error = XFS_ERROR(EDQUOT);
-			goto error_return;
-		}
-	}
+	error = XFS_TRANS_RESERVE_QUOTA(mp, tp, udqp, gdqp, resblks, 1, 0);
+	if (error)
+		goto error_return;
 
 	/*
 	 * Check for ability to enter directory entry, if no space reserved.
@@ -3543,9 +3453,7 @@ xfs_symlink(
 	/*
 	 * Also attach the dquot(s) to it, if applicable.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		xfs_qm_vop_dqattach_and_dqmod_newinode(tp, ip, udqp, gdqp);
-	}
+	XFS_QM_DQVOPCREATE(mp, tp, ip, udqp, gdqp);
 
 	if (resblks)
 		resblks -= XFS_IALLOC_SPACE_RES(mp);
@@ -3641,22 +3549,19 @@ xfs_symlink(
 		goto error2;
 	}
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
-	if (udqp)
-		xfs_qm_dqrele(udqp);
-	if (gdqp)
-		xfs_qm_dqrele(gdqp);
+	XFS_QM_DQRELE(mp, udqp);
+	XFS_QM_DQRELE(mp, gdqp);
 
 	/* Fall through to std_return with error = 0 or errno from
 	 * xfs_trans_commit	*/
 std_return:
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 			     DM_EVENT_POSTSYMLINK)) {
-		(void) dm_send_namesp_event(DM_EVENT_POSTSYMLINK,
-						dir_bdp, DM_RIGHT_NULL,
-						error? NULL:XFS_ITOBHV(ip),
-						DM_RIGHT_NULL,
-						link_name, target_path,
-						0, error, 0);
+		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTSYMLINK,
+					dir_bdp, DM_RIGHT_NULL,
+					error ? NULL : XFS_ITOBHV(ip),
+					DM_RIGHT_NULL, link_name, target_path,
+					0, error, 0);
 	}
 
 	if (!error) {
@@ -3675,10 +3580,8 @@ std_return:
 	cancel_flags |= XFS_TRANS_ABORT;
  error_return:
 	xfs_trans_cancel(tp, cancel_flags);
-	if (udqp)
-		xfs_qm_dqrele(udqp);
-	if (gdqp)
-		xfs_qm_dqrele(gdqp);
+	XFS_QM_DQRELE(mp, udqp);
+	XFS_QM_DQRELE(mp, gdqp);
 
 	if (!dp_joined_to_trans && (dp != NULL)) {
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -4165,7 +4068,7 @@ xfs_alloc_file_space(
 	/*
 	 * determine if this is a realtime file
 	 */
-	if ((rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) != 0) {
+	if ((rt = XFS_IS_REALTIME_INODE(ip)) != 0) {
 		if (ip->i_d.di_extsize)
 			rtextsize = ip->i_d.di_extsize;
 		else
@@ -4173,12 +4076,8 @@ xfs_alloc_file_space(
 	} else
 		rtextsize = 0;
 
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (XFS_NOT_DQATTACHED(mp, ip)) {
-			if ((error = xfs_qm_dqattach(ip, 0)))
-				return error;
-		}
-	}
+	if ((error = XFS_QM_DQATTACH(mp, ip, 0)))
+		return error;
 
 	if (len <= 0)
 		return XFS_ERROR(EINVAL);
@@ -4200,7 +4099,7 @@ xfs_alloc_file_space(
 		end_dmi_offset = offset+len;
 		if (end_dmi_offset > ip->i_d.di_size)
 			end_dmi_offset = ip->i_d.di_size;
-		error = xfs_dm_send_data_event(DM_EVENT_WRITE, XFS_ITOBHV(ip),
+		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOBHV(ip),
 			offset, end_dmi_offset - offset,
 			0, NULL);
 		if (error)
@@ -4255,15 +4154,11 @@ retry:
 			break;
 		}
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		if (XFS_IS_QUOTA_ON(mp)) {
-			if (xfs_trans_reserve_quota(tp,
-						    ip->i_udquot,
-						    ip->i_gdquot,
-						    resblks, 0, 0)) {
-				error = XFS_ERROR(EDQUOT);
-				goto error1;
-			}
-		}
+		error = XFS_TRANS_RESERVE_QUOTA_BYDQUOTS(mp, tp,
+				ip->i_udquot, ip->i_gdquot, resblks, 0, rt ?
+				XFS_QMOPT_RES_RTBLKS : XFS_QMOPT_RES_REGBLKS);
+		if (error)
+			goto error1;
 
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
@@ -4308,13 +4203,13 @@ dmapi_enospc_check:
 	if (error == ENOSPC && (attr_flags&ATTR_DMI) == 0 &&
 	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_NOSPACE)) {
 
-		error = dm_send_namesp_event(DM_EVENT_NOSPACE,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_NOSPACE,
 				XFS_ITOBHV(ip), DM_RIGHT_NULL,
 				XFS_ITOBHV(ip), DM_RIGHT_NULL,
 				NULL, NULL, 0, 0, 0); /* Delay flag intentionally unused */
 		if (error == 0)
 			goto retry;	/* Maybe DMAPI app. has made space */
-		/* else fall through with error from xfs_dm_send_data_event */
+		/* else fall through with error from XFS_SEND_DATA */
 	}
 
 	return error;
@@ -4434,38 +4329,32 @@ xfs_free_file_space(
 	int			nimap;
 	uint			resblks;
 	int			rounding;
-	int			specrt;
+	int			rt;
 	xfs_fileoff_t		startoffset_fsb;
 	xfs_trans_t		*tp;
 
 	vn_trace_entry(XFS_ITOV(ip), __FUNCTION__, (inst_t *)__return_address);
 	mp = ip->i_mount;
 
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (XFS_NOT_DQATTACHED(mp, ip)) {
-			if ((error = xfs_qm_dqattach(ip, 0)))
-				return error;
-		}
-	}
+	if ((error = XFS_QM_DQATTACH(mp, ip, 0)))
+		return error;
 
 	error = 0;
 	if (len <= 0)	/* if nothing being freed */
 		return error;
-	specrt =
-		(ip->i_d.di_flags & XFS_DIFLAG_REALTIME) &&
-		!XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb);
+	rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME);
 	startoffset_fsb = XFS_B_TO_FSB(mp, offset);
 	end_dmi_offset = offset + len;
 	endoffset_fsb = XFS_B_TO_FSBT(mp, end_dmi_offset);
 
 	if (offset < ip->i_d.di_size &&
-	    (attr_flags&ATTR_DMI) == 0	&&
+	    (attr_flags & ATTR_DMI) == 0 &&
 	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_WRITE)) {
 		if (end_dmi_offset > ip->i_d.di_size)
 			end_dmi_offset = ip->i_d.di_size;
-		error = xfs_dm_send_data_event(DM_EVENT_WRITE, XFS_ITOBHV(ip),
-			offset, end_dmi_offset - offset,
-			AT_DELAY_FLAG(attr_flags), NULL);
+		error = XFS_SEND_DATA(mp, DM_EVENT_WRITE, XFS_ITOBHV(ip),
+				offset, end_dmi_offset - offset,
+				AT_DELAY_FLAG(attr_flags), NULL);
 		if (error)
 			return(error);
 	}
@@ -4480,11 +4369,11 @@ xfs_free_file_space(
 	xfs_inval_cached_pages(XFS_ITOV(ip), &(ip->i_iocore), ioffset, 0, 0);
 	/*
 	 * Need to zero the stuff we're not freeing, on disk.
-	 * If its specrt (realtime & can't use unwritten extents) then
-	 * we actually need to zero the extent edges.  Otherwise xfs_bunmapi
+	 * If its a realtime file & can't use unwritten extents then we
+	 * actually need to zero the extent edges.  Otherwise xfs_bunmapi
 	 * will take care of it for us.
 	 */
-	if (specrt) {
+	if (rt && !XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb)) {
 		nimap = 1;
 		error = xfs_bmapi(NULL, ip, startoffset_fsb, 1, 0, NULL, 0,
 			&imap, &nimap, NULL);
@@ -4561,15 +4450,11 @@ xfs_free_file_space(
 			break;
 		}
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		if (XFS_IS_QUOTA_ON(mp)) {
-			if (xfs_trans_reserve_quota(tp,
-						    ip->i_udquot,
-						    ip->i_gdquot,
-						    resblks, 0, 0)) {
-				error = XFS_ERROR(EDQUOT);
-				goto error1;
-			}
-		}
+		error = XFS_TRANS_RESERVE_QUOTA(mp, tp,
+				ip->i_udquot, ip->i_gdquot, resblks, 0, rt ?
+				XFS_QMOPT_RES_RTBLKS : XFS_QMOPT_RES_REGBLKS);
+		if (error)
+			goto error1;
 
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -31,7 +31,7 @@
  */
 
 #include <xfs.h>
-#include <xfs_quota_priv.h>
+#include "xfs_qm.h"
 
 
 /*
@@ -290,37 +290,45 @@ xfs_qm_dqwarn(
 
 	warned = 0;
 	if (INT_GET(d->d_blk_softlimit, ARCH_CONVERT) &&
-	    (INT_GET(d->d_bcount, ARCH_CONVERT) >= INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) {
+	    (INT_GET(d->d_bcount, ARCH_CONVERT) >=
+	     INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) {
 		if (flags & XFS_QMOPT_DOWARN) {
 			INT_MOD(d->d_bwarns, ARCH_CONVERT, +1);
 			warned++;
 		}
 	} else {
 		if (INT_ISZERO(d->d_blk_softlimit, ARCH_CONVERT) ||
-		    (INT_GET(d->d_bcount, ARCH_CONVERT) < INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) {
+		    (INT_GET(d->d_bcount, ARCH_CONVERT) <
+		     INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) {
 			INT_ZERO(d->d_bwarns, ARCH_CONVERT);
 		}
 	}
 
 	if (INT_GET(d->d_ino_softlimit, ARCH_CONVERT) > 0 &&
-	    (INT_GET(d->d_icount, ARCH_CONVERT) >= INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) {
+	    (INT_GET(d->d_icount, ARCH_CONVERT) >=
+	     INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) {
 		if (flags & XFS_QMOPT_DOWARN) {
 			INT_MOD(d->d_iwarns, ARCH_CONVERT, +1);
 			warned++;
 		}
 	} else {
 		if ((INT_ISZERO(d->d_ino_softlimit, ARCH_CONVERT)) ||
-		    (INT_GET(d->d_icount, ARCH_CONVERT) < INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) {
+		    (INT_GET(d->d_icount, ARCH_CONVERT) <
+		     INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) {
 			INT_ZERO(d->d_iwarns, ARCH_CONVERT);
 		}
 	}
 #ifdef QUOTADEBUG
 	if (INT_GET(d->d_iwarns, ARCH_CONVERT))
-		printk("--------@@Inode warnings running : %Lu >= %Lu\n",
-		       INT_GET(d->d_icount, ARCH_CONVERT), INT_GET(d->d_ino_softlimit, ARCH_CONVERT));
+		cmn_err(CE_DEBUG,
+			"--------@@Inode warnings running : %Lu >= %Lu",
+			INT_GET(d->d_icount, ARCH_CONVERT),
+			INT_GET(d->d_ino_softlimit, ARCH_CONVERT));
 	if (INT_GET(d->d_bwarns, ARCH_CONVERT))
-		printk("--------@@Blks warnings running : %Lu >= %Lu\n",
-		       INT_GET(d->d_bcount, ARCH_CONVERT), INT_GET(d->d_blk_softlimit, ARCH_CONVERT));
+		cmn_err(CE_DEBUG,
+			"--------@@Blks warnings running : %Lu >= %Lu",
+			INT_GET(d->d_bcount, ARCH_CONVERT),
+			INT_GET(d->d_blk_softlimit, ARCH_CONVERT));
 #endif
 	return (warned);
 }
@@ -869,7 +877,7 @@ xfs_qm_dqget(
 	if (xfs_do_dqerror) {
 		if ((xfs_dqerror_dev == mp->m_dev) &&
 		    (xfs_dqreq_num++ % xfs_dqerror_mod) == 0) {
-			printk("Returning error in dqget\n");
+			cmn_err(CE_DEBUG, "Returning error in dqget");
 			return (EIO);
 		}
 	}
@@ -894,7 +902,7 @@ xfs_qm_dqget(
 	 * The chain is kept locked during lookup.
 	 */
 	if (xfs_qm_dqlookup(mp, id, h, O_dqpp) == 0) {
-		XFS_STATS_INC(xfsstats.xs_qm_dqcachehits);
+		XQM_STATS_INC(xqmstats.xs_qm_dqcachehits);
 		/*
 		 * The dquot was found, moved to the front of the chain,
 		 * taken off the freelist if it was on it, and locked
@@ -906,7 +914,7 @@ xfs_qm_dqget(
 		xfs_dqtrace_entry(*O_dqpp, "DQGET DONE (FROM CACHE)");
 		return (0);	/* success */
 	}
-	XFS_STATS_INC(xfsstats.xs_qm_dqcachemisses);
+	XQM_STATS_INC(xqmstats.xs_qm_dqcachemisses);
 
 	/*
 	 * Dquot cache miss. We don't want to keep the inode lock across
@@ -1006,7 +1014,7 @@ xfs_qm_dqget(
 			xfs_qm_dqput(tmpdqp);
 			XFS_DQ_HASH_UNLOCK(h);
 			xfs_qm_dqdestroy(dqp);
-			XFS_STATS_INC(xfsstats.xs_qm_dquot_dups);
+			XQM_STATS_INC(xqmstats.xs_qm_dquot_dups);
 			goto again;
 		}
 	}
@@ -1373,18 +1381,6 @@ xfs_dqlock2(
 
 
 /*
- * A rarely used accessor. This exists because we don't really want
- * to expose the internals of a dquot to the outside world.
- */
-xfs_dqid_t
-xfs_qm_dqid(
-	xfs_dquot_t	*dqp)
-{
-	return (INT_GET(dqp->q_core.d_id, ARCH_CONVERT));
-}
-
-
-/*
  * Take a dquot out of the mount's dqlist as well as the hashlist.
  * This is called via unmount as well as quotaoff, and the purge
  * will always succeed unless there are soft (temp) references
@@ -1483,145 +1479,41 @@ xfs_qm_dqpurge(
 }
 
 
-/*
- * Do some primitive error checking on ondisk dquot
- * data structures. Not just for debugging, actually;
- * this can be useful for detecting data corruption mainly due to
- * disk failures.
- */
-/* ARGSUSED */
-int
-xfs_qm_dqcheck(
-	xfs_disk_dquot_t *ddq,
-	xfs_dqid_t	 id,
-	uint		 type,	  /* used only when IO_dorepair is true */
-	uint		 flags,
-	char		 *str)
-{
-	int errs;
-
-	errs = 0;
-	/* ASSERT(flags & (XFS_QMOPT_DQREPAIR|XFS_QMOPT_DOWARN)); */
-	/*
-	 * We can encounter an uninitialized dquot buffer for 2 reasons:
-	 * 1. If we crash while deleting the quotainode(s), and those blks get used
-	 *    for some user data. This is because we take the path of regular
-	 *    file deletion; however, the size field of quotainodes is never
-	 *    updated, so all the tricks that we play in itruncate_finish
-	 *    don't quite matter.
-	 *
-	 * 2. We don't play the quota buffers when there's a quotaoff logitem.
-	 *    But the allocation will be replayed so we'll end up with an
-	 *    uninitialized quota block.
-	 *
-	 * This is all fine; things are still consistent, and we haven't lost
-	 * any quota information. Just don't complain about bad dquot blks.
-	 */
-	if (INT_GET(ddq->d_magic, ARCH_CONVERT) != XFS_DQUOT_MAGIC) {
-		if (flags & XFS_QMOPT_DOWARN)
-			cmn_err(CE_ALERT,
-			"%s : XFS dquot ID 0x%x, magic 0x%x != 0x%x",
-			str, id, INT_GET(ddq->d_magic, ARCH_CONVERT), XFS_DQUOT_MAGIC);
-		errs++;
-	}
-	if (INT_GET(ddq->d_version, ARCH_CONVERT) != XFS_DQUOT_VERSION) {
-		if (flags & XFS_QMOPT_DOWARN)
-			cmn_err(CE_ALERT,
-			"%s : XFS dquot ID 0x%x, version 0x%x != 0x%x",
-			str, id, INT_GET(ddq->d_magic, ARCH_CONVERT), XFS_DQUOT_VERSION);
-		errs++;
-	}
-
-	if (INT_GET(ddq->d_flags, ARCH_CONVERT) != XFS_DQ_USER && INT_GET(ddq->d_flags, ARCH_CONVERT) != XFS_DQ_GROUP) {
-		if (flags & XFS_QMOPT_DOWARN)
-			cmn_err(CE_ALERT,
-			"%s : XFS dquot ID 0x%x, unknown flags 0x%x",
-			str, id, INT_GET(ddq->d_flags, ARCH_CONVERT));
-		errs++;
-	}
-
-	if (id != -1 && id != INT_GET(ddq->d_id, ARCH_CONVERT)) {
-		if (flags & XFS_QMOPT_DOWARN)
-			cmn_err(CE_ALERT,
-			"%s : ondisk-dquot 0x%x, ID mismatch: "
-			"0x%x expected, found id 0x%x",
-			str, ddq, id, INT_GET(ddq->d_id, ARCH_CONVERT));
-		errs++;
-	}
-
-	if (! errs) {
-		if (INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT) &&
-		    INT_GET(ddq->d_bcount, ARCH_CONVERT) >= INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT)) {
-			if (INT_ISZERO(ddq->d_btimer, ARCH_CONVERT) && !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
-				if (flags & XFS_QMOPT_DOWARN)
-					cmn_err(CE_ALERT,
-					"%s : Dquot ID 0x%x (0x%x) "
-					"BLK TIMER NOT STARTED",
-					str, (int) INT_GET(ddq->d_id, ARCH_CONVERT), ddq);
-				errs++;
-			}
-		}
-		if (INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT) &&
-		    INT_GET(ddq->d_icount, ARCH_CONVERT) >= INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT)) {
-			if (INT_ISZERO(ddq->d_itimer, ARCH_CONVERT) && !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
-				if (flags & XFS_QMOPT_DOWARN)
-					cmn_err(CE_ALERT,
-					"%s : Dquot ID 0x%x (0x%x) "
-					"INODE TIMER NOT STARTED",
-					str, (int) INT_GET(ddq->d_id, ARCH_CONVERT), ddq);
-				errs++;
-			}
-		}
-	}
-
-	if (!errs || !(flags & XFS_QMOPT_DQREPAIR))
-		return (errs);
-
-	if (flags & XFS_QMOPT_DOWARN)
-		cmn_err(CE_NOTE, "Re-initializing dquot ID 0x%x", id);
-
-	/*
-	 * Typically, a repair is only requested by quotacheck.
-	 */
-	ASSERT(id != -1);
-	ASSERT(flags & XFS_QMOPT_DQREPAIR);
-	memset(ddq, 0, sizeof(xfs_dqblk_t));
-	xfs_qm_dqinit_core(id, type, (xfs_dqblk_t *)ddq);
-	return (errs);
-}
-
 #ifdef QUOTADEBUG
 void
 xfs_qm_dqprint(xfs_dquot_t *dqp)
 {
-	printk( "-----------KERNEL DQUOT----------------\n");
-	printk( "---- dquot ID	=  %d\n", (int) INT_GET(dqp->q_core.d_id, ARCH_CONVERT));
-	printk( "---- type	=  %s\n", XFS_QM_ISUDQ(dqp) ? "USR" : "GRP");
-	printk( "---- fs	=  0x%p\n", dqp->q_mount);
-	printk( "---- blkno	=  0x%x\n", (int) dqp->q_blkno);
-	printk( "---- boffset	=  0x%x\n", (int) dqp->q_bufoffset);
-	printk( "---- blkhlimit =  %Lu (0x%x)\n",
-	       INT_GET(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT),
-	       (int) INT_GET(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT));
-	printk( "---- blkslimit =  %Lu (0x%x)\n",
-	       INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT),
-	       (int)INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT));
-	printk( "---- inohlimit =  %Lu (0x%x)\n",
-	       INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT),
-	       (int)INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT));
-	printk( "---- inoslimit =  %Lu (0x%x)\n",
-	       INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT),
-	       (int)INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT));
-	printk( "---- bcount	=  %Lu (0x%x)\n",
-	       INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT),
-	       (int)INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT));
-	printk( "---- icount	=  %Lu (0x%x)\n",
-	       INT_GET(dqp->q_core.d_icount, ARCH_CONVERT),
-	       (int)INT_GET(dqp->q_core.d_icount, ARCH_CONVERT));
-	printk( "---- btimer	=  %d\n", (int)INT_GET(dqp->q_core.d_btimer, ARCH_CONVERT));
-	printk( "---- itimer	=  %d\n", (int)INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT));
-
-	printk( "---------------------------\n");
+	cmn_err(CE_DEBUG, "-----------KERNEL DQUOT----------------");
+	cmn_err(CE_DEBUG, "---- dquotID =  %d",
+		(int)INT_GET(dqp->q_core.d_id, ARCH_CONVERT));
+	cmn_err(CE_DEBUG, "---- type    =  %s",
+		XFS_QM_ISUDQ(dqp) ? "USR" : "GRP");
+	cmn_err(CE_DEBUG, "---- fs      =  0x%p", dqp->q_mount);
+	cmn_err(CE_DEBUG, "---- blkno   =  0x%x", (int) dqp->q_blkno);
+	cmn_err(CE_DEBUG, "---- boffset =  0x%x", (int) dqp->q_bufoffset);
+	cmn_err(CE_DEBUG, "---- blkhlimit =  %Lu (0x%x)",
+		INT_GET(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT),
+		(int) INT_GET(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT));
+	cmn_err(CE_DEBUG, "---- blkslimit =  %Lu (0x%x)",
+		INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT),
+		(int)INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT));
+	cmn_err(CE_DEBUG, "---- inohlimit =  %Lu (0x%x)",
+		INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT),
+		(int)INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT));
+	cmn_err(CE_DEBUG, "---- inoslimit =  %Lu (0x%x)",
+		INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT),
+		(int)INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT));
+	cmn_err(CE_DEBUG, "---- bcount  =  %Lu (0x%x)",
+		INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT),
+		(int)INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT));
+	cmn_err(CE_DEBUG, "---- icount  =  %Lu (0x%x)",
+		INT_GET(dqp->q_core.d_icount, ARCH_CONVERT),
+		(int)INT_GET(dqp->q_core.d_icount, ARCH_CONVERT));
+	cmn_err(CE_DEBUG, "---- btimer  =  %d",
+		(int)INT_GET(dqp->q_core.d_btimer, ARCH_CONVERT));
+	cmn_err(CE_DEBUG, "---- itimer  =  %d",
+		(int)INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT));
+	cmn_err(CE_DEBUG, "---------------------------");
 }
 #endif
 

@@ -32,11 +32,12 @@
 
 #include <xfs.h>
 #include <linux/proc_fs.h>
+#include "xfs_qm.h"
 
-struct xfsstats xfsstats;
+struct xqmstats xqmstats;
 
 STATIC int
-xfs_read_xfsstats(
+xfs_qm_read_xfsquota(
 	char		*buffer,
 	char		**start,
 	off_t		offset,
@@ -44,42 +45,49 @@ xfs_read_xfsstats(
 	int		*eof,
 	void		*data)
 {
-	int		i, j, len;
-	static struct xstats_entry {
-		char	*desc;
-		int	endpoint;
-	} xstats[] = {
-		{ "extent_alloc",	XFSSTAT_END_EXTENT_ALLOC	},
-		{ "abt",		XFSSTAT_END_ALLOC_BTREE		},
-		{ "blk_map",		XFSSTAT_END_BLOCK_MAPPING	},
-		{ "bmbt",		XFSSTAT_END_BLOCK_MAP_BTREE	},
-		{ "dir",		XFSSTAT_END_DIRECTORY_OPS	},
-		{ "trans",		XFSSTAT_END_TRANSACTIONS	},
-		{ "ig",			XFSSTAT_END_INODE_OPS		},
-		{ "log",		XFSSTAT_END_LOG_OPS		},
-		{ "push_ail",		XFSSTAT_END_TAIL_PUSHING	},
-		{ "xstrat",		XFSSTAT_END_WRITE_CONVERT	},
-		{ "rw",			XFSSTAT_END_READ_WRITE_OPS	},
-		{ "attr",		XFSSTAT_END_ATTRIBUTE_OPS	},
-		{ "icluster",		XFSSTAT_END_INODE_CLUSTER	},
-		{ "vnodes",		XFSSTAT_END_VNODE_OPS		},
-	};
+	int		len;
 
-	for (i=j=len = 0; i < sizeof(xstats)/sizeof(struct xstats_entry); i++) {
-		len += sprintf(buffer + len, xstats[i].desc);
-		/* inner loop does each group */
-		while (j < xstats[i].endpoint) {
-			len += sprintf(buffer + len, " %u",
-					*(((__u32*)&xfsstats) + j));
-			j++;
-		}
-		buffer[len++] = '\n';
+	/* maximum; incore; ratio free to inuse; freelist */
+	len = sprintf(buffer, "%d\t%d\t%d\t%u\n",
+			ndquot,
+			xfs_Gqm? atomic_read(&xfs_Gqm->qm_totaldquots) : 0,
+			xfs_Gqm? xfs_Gqm->qm_dqfree_ratio : 0,
+			xfs_Gqm? xfs_Gqm->qm_dqfreelist.qh_nelems : 0);
+
+	if (offset >= len) {
+		*start = buffer;
+		*eof = 1;
+		return 0;
 	}
-	/* extra precision counters */
-	len += sprintf(buffer + len, "xpc %Lu %Lu %Lu\n",
-			xfsstats.xs_xstrat_bytes,
-			xfsstats.xs_write_bytes,
-			xfsstats.xs_read_bytes);
+	*start = buffer + offset;
+	if ((len -= offset) > count)
+		return count;
+	*eof = 1;
+
+	return len;
+}
+
+STATIC int
+xfs_qm_read_stats(
+	char		*buffer,
+	char		**start,
+	off_t		offset,
+	int		count,
+	int		*eof,
+	void		*data)
+{
+	int		len;
+
+	/* quota performance statistics */
+	len = sprintf(buffer, "qm %u %u %u %u %u %u %u %u\n",
+			xqmstats.xs_qm_dqreclaims,
+			xqmstats.xs_qm_dqreclaim_misses,
+			xqmstats.xs_qm_dquot_dups,
+			xqmstats.xs_qm_dqcachemisses,
+			xqmstats.xs_qm_dqcachehits,
+			xqmstats.xs_qm_dqwants,
+			xqmstats.xs_qm_dqshake_reclaims,
+			xqmstats.xs_qm_dqinact_reclaims);
 
 	if (offset >= len) {
 		*start = buffer;
@@ -95,16 +103,15 @@ xfs_read_xfsstats(
 }
 
 void
-xfs_init_procfs(void)
+xfs_qm_init_procfs(void)
 {
-	if (!proc_mkdir("fs/xfs", 0))
-		return;
-	create_proc_read_entry("fs/xfs/stat", 0, 0, xfs_read_xfsstats, NULL);
+	create_proc_read_entry("fs/xfs/xqmstat", 0, 0, xfs_qm_read_stats, NULL);
+	create_proc_read_entry("fs/xfs/xqm", 0, 0, xfs_qm_read_xfsquota, NULL);
 }
 
 void
-xfs_cleanup_procfs(void)
+xfs_qm_cleanup_procfs(void)
 {
-	remove_proc_entry("fs/xfs/stat", NULL);
-	remove_proc_entry("fs/xfs", NULL);
+	remove_proc_entry("fs/xfs/xqm", NULL);
+	remove_proc_entry("fs/xfs/xqmstat", NULL);
 }

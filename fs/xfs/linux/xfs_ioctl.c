@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -130,7 +130,7 @@ xfs_find_handle(
 		int		lock_mode;
 
 		/* need to get access to the xfs_inode to read the generation */
-		bhv = VNODE_TO_FIRST_BHV(vp);
+		bhv = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
 		ASSERT(bhv);
 		ip = XFS_BHVTOI(bhv);
 		ASSERT(ip);

@@ -124,6 +124,9 @@ typedef struct page_buf_s xfs_buf_t;
 typedef struct pb_target xfs_buftarg_t;
 #define xfs_buftarg pb_target
 
+#define XFS_BUF_DATAIO(x)	((x)->pb_flags |= PBF_FS_DATAIOD)
+#define XFS_BUF_UNDATAIO(x)	((x)->pb_flags &= ~PBF_FS_DATAIOD)
+
 #define XFS_BUF_IODONE_FUNC(buf)	(buf)->pb_iodone
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\
 			(buf)->pb_iodone = (func)
@@ -244,7 +247,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 
 
 #define xfs_biodone(pb)		    \
-	    pagebuf_iodone(pb, 0, 0)
+	    pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 0)
 
 #define xfs_incore(buftarg,blkno,len,lockit) \
 	    pagebuf_find(buftarg, blkno ,len, lockit)

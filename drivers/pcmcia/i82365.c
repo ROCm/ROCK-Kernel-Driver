@@ -1250,29 +1250,6 @@ static int i365_set_socket(u_short sock, socket_state_t *state)
 
 /*====================================================================*/
 
-static int i365_get_io_map(u_short sock, struct pccard_io_map *io)
-{
-    u_char map, ioctl, addr;
-    
-    map = io->map;
-    if (map > 1) return -EINVAL;
-    io->start = i365_get_pair(sock, I365_IO(map)+I365_W_START);
-    io->stop = i365_get_pair(sock, I365_IO(map)+I365_W_STOP);
-    ioctl = i365_get(sock, I365_IOCTL);
-    addr = i365_get(sock, I365_ADDRWIN);
-    io->speed = to_ns(ioctl & I365_IOCTL_WAIT(map)) ? 1 : 0;
-    io->flags  = (addr & I365_ENA_IO(map)) ? MAP_ACTIVE : 0;
-    io->flags |= (ioctl & I365_IOCTL_0WS(map)) ? MAP_0WS : 0;
-    io->flags |= (ioctl & I365_IOCTL_16BIT(map)) ? MAP_16BIT : 0;
-    io->flags |= (ioctl & I365_IOCTL_IOCS16(map)) ? MAP_AUTOSZ : 0;
-    DEBUG(1, "i82365: GetIOMap(%d, %d) = %#2.2x, %d ns, "
-	  "%#4.4x-%#4.4x\n", sock, map, io->flags, io->speed,
-	  io->start, io->stop);
-    return 0;
-} /* i365_get_io_map */
-
-/*====================================================================*/
-
 static int i365_set_io_map(u_short sock, struct pccard_io_map *io)
 {
     u_char map, ioctl;
@@ -1302,42 +1279,6 @@ static int i365_set_io_map(u_short sock, struct pccard_io_map *io)
 
 /*====================================================================*/
 
-static int i365_get_mem_map(u_short sock, struct pccard_mem_map *mem)
-{
-    u_short base, i;
-    u_char map, addr;
-    
-    map = mem->map;
-    if (map > 4) return -EINVAL;
-    addr = i365_get(sock, I365_ADDRWIN);
-    mem->flags = (addr & I365_ENA_MEM(map)) ? MAP_ACTIVE : 0;
-    base = I365_MEM(map);
-    
-    i = i365_get_pair(sock, base+I365_W_START);
-    mem->flags |= (i & I365_MEM_16BIT) ? MAP_16BIT : 0;
-    mem->flags |= (i & I365_MEM_0WS) ? MAP_0WS : 0;
-    mem->sys_start = ((u_long)(i & 0x0fff) << 12);
-    
-    i = i365_get_pair(sock, base+I365_W_STOP);
-    mem->speed  = (i & I365_MEM_WS0) ? 1 : 0;
-    mem->speed += (i & I365_MEM_WS1) ? 2 : 0;
-    mem->speed = to_ns(mem->speed);
-    mem->sys_stop = ((u_long)(i & 0x0fff) << 12) + 0x0fff;
-    
-    i = i365_get_pair(sock, base+I365_W_OFF);
-    mem->flags |= (i & I365_MEM_WRPROT) ? MAP_WRPROT : 0;
-    mem->flags |= (i & I365_MEM_REG) ? MAP_ATTRIB : 0;
-    mem->card_start = ((u_int)(i & 0x3fff) << 12) + mem->sys_start;
-    mem->card_start &= 0x3ffffff;
-    
-    DEBUG(1, "i82365: GetMemMap(%d, %d) = %#2.2x, %d ns, %#5.5lx-%#5."
-	  "5lx, %#5.5x\n", sock, mem->map, mem->flags, mem->speed,
-	  mem->sys_start, mem->sys_stop, mem->card_start);
-    return 0;
-} /* i365_get_mem_map */
-
-/*====================================================================*/
-  
 static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
 {
     u_short base, i;
@@ -1506,28 +1447,12 @@ static int pcic_set_socket(unsigned int sock, socket_state_t *state)
 	LOCKED(i365_set_socket(sock, state));
 }
 
-static int pcic_get_io_map(unsigned int sock, struct pccard_io_map *io)
-{
-	if (socket[sock].flags & IS_ALIVE)
-		return -EINVAL;
-
-	LOCKED(i365_get_io_map(sock, io));
-}
-
 static int pcic_set_io_map(unsigned int sock, struct pccard_io_map *io)
 {
 	if (socket[sock].flags & IS_ALIVE)
 		return -EINVAL;
 
 	LOCKED(i365_set_io_map(sock, io));
-}
-
-static int pcic_get_mem_map(unsigned int sock, struct pccard_mem_map *mem)
-{
-	if (socket[sock].flags & IS_ALIVE)
-		return -EINVAL;
-
-	LOCKED(i365_get_mem_map(sock, mem));
 }
 
 static int pcic_set_mem_map(unsigned int sock, struct pccard_mem_map *mem)
@@ -1571,9 +1496,7 @@ static struct pccard_operations pcic_operations = {
 	.get_status		= pcic_get_status,
 	.get_socket		= pcic_get_socket,
 	.set_socket		= pcic_set_socket,
-	.get_io_map		= pcic_get_io_map,
 	.set_io_map		= pcic_set_io_map,
-	.get_mem_map		= pcic_get_mem_map,
 	.set_mem_map		= pcic_set_mem_map,
 	.proc_setup		= pcic_proc_setup,
 };

@@ -269,21 +269,7 @@ static void CDCEther_tx_timeout( struct net_device *net )
 static int CDCEther_start_xmit( struct sk_buff *skb, struct net_device *net )
 {
 	ether_dev_t	*ether_dev = net->priv;
-	int 	count;
 	int 	res;
-
-	// If we are told to transmit an ethernet frame that fits EXACTLY 
-	// into an integer number of USB packets, we force it to send one 
-	// more byte so the device will get a runt USB packet signalling the 
-	// end of the ethernet frame
-	if ( (skb->len) ^ (ether_dev->data_ep_out_size) ) {
-		// It was not an exact multiple
-		// no need to add anything extra
-		count = skb->len;
-	} else {
-		// Add one to make it NOT an exact multiple
-		count = skb->len + 1;
-	}
 
 	// Tell the kernel, "No more frames 'til we are done
 	// with this one.'
@@ -299,7 +285,10 @@ static int CDCEther_start_xmit( struct sk_buff *skb, struct net_device *net )
 			write_bulk_callback, ether_dev );
 
 	// Tell the URB how much it will be transporting today
-	ether_dev->tx_urb->transfer_buffer_length = count;
+	ether_dev->tx_urb->transfer_buffer_length = skb->len;
+
+	/* Deal with the zero length problem, I hope */
+	ether_dev->tx_urb->transfer_flags |= URB_ZERO_PACKET;
 	
 	// Send the URB on its merry way.
 	if ((res = usb_submit_urb(ether_dev->tx_urb, GFP_ATOMIC)))  {
