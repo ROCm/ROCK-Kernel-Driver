@@ -217,9 +217,7 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 	sector_t block;
 	struct scsi_device *sdp = SCpnt->device;
 
-	timeout = SD_TIMEOUT;
-	if (SCpnt->device->type != TYPE_DISK)
-		timeout = SD_MOD_TIMEOUT;
+	timeout = sdp->timeout;
 
 	/*
 	 * these are already setup, just copy cdb basically
@@ -1388,6 +1386,13 @@ static int sd_probe(struct device *dev)
 	sdkp->disk = gd;
 	sdkp->index = index;
 	sdkp->openers = 0;
+
+	if (!sdp->timeout) {
+		if (sdp->type == TYPE_DISK)
+			sdp->timeout = SD_TIMEOUT;
+		else
+			sdp->timeout = SD_MOD_TIMEOUT;
+	}
 
 	devno = make_sd_dev(index, 0);
 	gd->major = MAJOR(devno);
