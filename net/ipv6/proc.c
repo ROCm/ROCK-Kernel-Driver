@@ -20,6 +20,8 @@
 #include <linux/socket.h>
 #include <linux/net.h>
 #include <linux/ipv6.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/stddef.h>
 #include <net/sock.h>
 #include <net/tcp.h>
@@ -37,22 +39,17 @@ static int fold_prot_inuse(struct proto *proto)
 	return res;
 }
 
-int afinet6_get_info(char *buffer, char **start, off_t offset, int length)
+static int sockstat6_seq_show(struct seq_file *seq, void *v)
 {
-	int len = 0;
-	len += sprintf(buffer+len, "TCP6: inuse %d\n",
+	seq_printf(seq, "TCP6: inuse %d\n",
 		       fold_prot_inuse(&tcpv6_prot));
-	len += sprintf(buffer+len, "UDP6: inuse %d\n",
+	seq_printf(seq, "UDP6: inuse %d\n",
 		       fold_prot_inuse(&udpv6_prot));
-	len += sprintf(buffer+len, "RAW6: inuse %d\n",
+	seq_printf(seq, "RAW6: inuse %d\n",
 		       fold_prot_inuse(&rawv6_prot));
-	len += sprintf(buffer+len, "FRAG6: inuse %d memory %d\n",
+	seq_printf(seq, "FRAG6: inuse %d memory %d\n",
 		       ip6_frag_nqueues, atomic_read(&ip6_frag_mem));
-	*start = buffer + offset;
-	len -= offset;
-	if(len > length)
-		len = length;
-	return len;
+	return 0;
 }
 
 
@@ -154,23 +151,63 @@ fold_field(void *mib[], int offt)
         return res;
 }
 
-int afinet6_get_snmp(char *buffer, char **start, off_t offset, int length)
+static int snmp6_seq_show(struct seq_file *seq, void *v)
 {
-	int len = 0;
 	int i;
 
 	for (i=0; i<sizeof(snmp6_list)/sizeof(snmp6_list[0]); i++)
-		len += sprintf(buffer+len, "%-32s\t%ld\n", snmp6_list[i].name,
+		seq_printf(seq, "%-32s\t%ld\n", snmp6_list[i].name,
 			       fold_field(snmp6_list[i].mib, snmp6_list[i].offset));
 
-	len -= offset;
+	return 0;
+}
 
-	if (len > length)
-		len = length;
-	if(len < 0)
-		len = 0;
 
-	*start = buffer + offset;
+static int sockstat6_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sockstat6_seq_show, NULL);
+}
 
-	return len;
+static struct file_operations sockstat6_seq_fops = {
+	.open	 = sockstat6_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = single_release,
+};
+
+static int snmp6_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, snmp6_seq_show, NULL);
+}
+
+static struct file_operations snmp6_seq_fops = {
+	.open	 = snmp6_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = single_release,
+};
+
+int __init ipv6_misc_proc_init(void)
+{
+	int rc = 0;
+	struct proc_dir_entry *p;
+
+	p = create_proc_entry("snmp6", S_IRUGO, proc_net);
+	if (!p)
+		goto proc_snmp6_fail;
+	else
+		p->proc_fops = &snmp6_seq_fops;
+	p = create_proc_entry("sockstat6", S_IRUGO, proc_net);
+	if (!p)
+		goto proc_sockstat6_fail;
+	else
+		p->proc_fops = &sockstat6_seq_fops;
+out:
+	return rc;
+
+proc_sockstat6_fail:
+	remove_proc_entry("snmp6", proc_net);
+proc_snmp6_fail:
+	rc = -ENOMEM;
+	goto out;
 }

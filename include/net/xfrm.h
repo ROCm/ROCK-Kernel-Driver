@@ -119,6 +119,9 @@ struct xfrm_state
 	struct xfrm_algo	*ealg;
 	struct xfrm_algo	*calg;
 
+	/* Data for encapsulator */
+	struct xfrm_encap_tmpl	*encap;
+
 	/* State for replay detection */
 	struct xfrm_replay_state replay;
 
@@ -192,6 +195,7 @@ extern int xfrm_state_unregister_afinfo(struct xfrm_state_afinfo *afinfo);
 extern struct xfrm_state_afinfo *xfrm_state_get_afinfo(unsigned short family);
 extern void xfrm_state_put_afinfo(struct xfrm_state_afinfo *afinfo);
 
+struct xfrm_decap_state;
 struct xfrm_type
 {
 	char			*description;
@@ -200,7 +204,8 @@ struct xfrm_type
 
 	int			(*init_state)(struct xfrm_state *x, void *args);
 	void			(*destructor)(struct xfrm_state *);
-	int			(*input)(struct xfrm_state *, struct sk_buff *skb);
+	int			(*input)(struct xfrm_state *, struct xfrm_decap_state *, struct sk_buff *skb);
+	int			(*post_input)(struct xfrm_state *, struct xfrm_decap_state *, struct sk_buff *skb);
 	int			(*output)(struct sk_buff *skb);
 	/* Estimate maximal size of result of transformation of a dgram */
 	u32			(*get_max_size)(struct xfrm_state *, int size);
@@ -246,7 +251,7 @@ struct xfrm_tmpl
 	__u32			calgos;
 };
 
-#define XFRM_MAX_DEPTH		3
+#define XFRM_MAX_DEPTH		4
 
 struct xfrm_policy
 {
@@ -278,6 +283,7 @@ struct xfrm_mgr
 	int			(*notify)(struct xfrm_state *x, int event);
 	int			(*acquire)(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *xp, int dir);
 	struct xfrm_policy	*(*compile_policy)(u16 family, int opt, u8 *data, int len, int *dir);
+	int			(*new_mapping)(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport);
 };
 
 extern int xfrm_register_km(struct xfrm_mgr *km);
@@ -498,12 +504,26 @@ struct xfrm_dst
 	} u;
 };
 
+/* Decapsulation state, used by the input to store data during
+ * decapsulation procedure, to be used later (during the policy
+ * check
+ */
+struct xfrm_decap_state {
+	char	decap_data[20];
+	__u16	decap_type;
+};   
+
+struct sec_decap_state {
+	struct xfrm_state	*xvec;
+	struct xfrm_decap_state decap;
+};
+
 struct sec_path
 {
 	kmem_cache_t		*pool;
 	atomic_t		refcnt;
 	int			len;
-	struct xfrm_state	*xvec[XFRM_MAX_DEPTH];
+	struct sec_decap_state	x[XFRM_MAX_DEPTH];
 };
 
 static inline struct sec_path *
@@ -730,6 +750,7 @@ extern int xfrm_replay_check(struct xfrm_state *x, u32 seq);
 extern void xfrm_replay_advance(struct xfrm_state *x, u32 seq);
 extern int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl);
 extern int xfrm4_rcv(struct sk_buff *skb);
+extern int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type);
 extern int xfrm6_rcv(struct sk_buff **pskb);
 extern int xfrm6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int dir);
 extern int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen);
@@ -760,6 +781,7 @@ extern wait_queue_head_t km_waitq;
 extern void km_warn_expired(struct xfrm_state *x);
 extern void km_expired(struct xfrm_state *x);
 extern int km_query(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *pol);
+extern int km_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport);
 
 extern void xfrm4_input_init(void);
 extern void xfrm6_input_init(void);

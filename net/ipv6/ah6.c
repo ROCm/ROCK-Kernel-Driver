@@ -36,8 +36,6 @@
 #include <net/xfrm.h>
 #include <asm/scatterlist.h>
 
-#define AH_HLEN_NOICV	12
-
 /* XXX no ipv6 ah specific */
 #define NIP6(addr) \
 	ntohs((addr).s6_addr16[0]),\
@@ -110,8 +108,8 @@ int ah6_output(struct sk_buff *skb)
 	skb->nh.ipv6h->hop_limit    = 0;
 
 	ahp = x->data;
-	ah->hdrlen  = (XFRM_ALIGN8(ahp->icv_trunc_len +
-		AH_HLEN_NOICV) >> 2) - 2;
+	ah->hdrlen  = (XFRM_ALIGN8(sizeof(struct ipv6_auth_hdr) + 
+				   ahp->icv_trunc_len) >> 2) - 2;
 
 	ah->reserved = 0;
 	ah->spi = x->id.spi;
@@ -148,7 +146,7 @@ error_nolock:
 	return err;
 }
 
-int ah6_input(struct xfrm_state *x, struct sk_buff *skb)
+int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
 	int ah_hlen;
 	struct ipv6hdr *iph;
@@ -165,8 +163,8 @@ int ah6_input(struct xfrm_state *x, struct sk_buff *skb)
 	ahp = x->data;
         ah_hlen = (ah->hdrlen + 2) << 2;
 
-        if (ah_hlen != XFRM_ALIGN8(ahp->icv_full_len + AH_HLEN_NOICV) &&
-            ah_hlen != XFRM_ALIGN8(ahp->icv_trunc_len + AH_HLEN_NOICV))
+        if (ah_hlen != XFRM_ALIGN8(sizeof(struct ipv6_auth_hdr) + ahp->icv_full_len) &&
+            ah_hlen != XFRM_ALIGN8(sizeof(struct ipv6_auth_hdr) + ahp->icv_trunc_len))
                 goto out;
 
 	if (!pskb_may_pull(skb, ah_hlen))
@@ -285,7 +283,7 @@ static int ah6_init_state(struct xfrm_state *x, void *args)
 	if (!ahp->work_icv)
 		goto error;
 	
-	x->props.header_len = XFRM_ALIGN8(ahp->icv_trunc_len + AH_HLEN_NOICV);
+	x->props.header_len = XFRM_ALIGN8(sizeof(struct ipv6_auth_hdr) + ahp->icv_trunc_len);
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct ipv6hdr);
 	x->data = ahp;

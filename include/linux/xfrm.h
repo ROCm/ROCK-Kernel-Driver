@@ -130,12 +130,19 @@ struct xfrm_user_tmpl {
 	__u32			calgos;
 };
 
+struct xfrm_encap_tmpl {
+	__u16		encap_type;
+	__u16		encap_sport;
+	__u16		encap_dport;
+};
+
 /* Netlink message attributes.  */
 enum xfrm_attr_type_t {
 	XFRMA_UNSPEC,
 	XFRMA_ALG_AUTH,		/* struct xfrm_algo */
 	XFRMA_ALG_CRYPT,	/* struct xfrm_algo */
 	XFRMA_ALG_COMP,		/* struct xfrm_algo */
+	XFRMA_ENCAP,		/* struct xfrm_algo + struct xfrm_encap_tmpl */
 	XFRMA_TMPL,		/* 1 or more struct xfrm_user_tmpl */
 
 #define XFRMA_MAX XFRMA_TMPL

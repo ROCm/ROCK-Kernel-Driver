@@ -1945,9 +1945,8 @@ static int __init af_unix_init(void)
 	struct sk_buff *dummy_skb;
 
 	printk(banner);
-	if (sizeof(struct unix_skb_parms) > sizeof(dummy_skb->cb))
-	{
-		printk(KERN_CRIT "unix_proto_init: panic\n");
+	if (sizeof(struct unix_skb_parms) > sizeof(dummy_skb->cb)) {
+		printk(KERN_CRIT "%s: panic\n", __FUNCTION__);
 		return -1;
 	}
         /* allocate our sock slab cache */

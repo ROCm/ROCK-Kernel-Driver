@@ -132,6 +132,8 @@
 #include <linux/stat.h>
 #include <linux/version.h>
 
+MODULE_LICENSE("Dual BSD/GPL");
+
 /*
  *	Implement IP packet firewall
  */

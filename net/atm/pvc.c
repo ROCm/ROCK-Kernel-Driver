@@ -4,8 +4,7 @@
 
 
 #include <linux/config.h>
-#include <linux/net.h>		/* struct socket, struct net_proto,
-				   struct proto_ops */
+#include <linux/net.h>		/* struct socket, struct proto_ops */
 #include <linux/atm.h>		/* ATM stuff */
 #include <linux/atmdev.h>	/* ATM devices */
 #include <linux/atmclip.h>	/* Classical IP over ATM */
@@ -111,8 +110,8 @@ static int pvc_create(struct socket *sock,int protocol)
 
 
 static struct net_proto_family pvc_family_ops = {
-	.family =PF_ATMPVC,
-	.create =pvc_create,
+	.family = PF_ATMPVC,
+	.create = pvc_create,
 };
 
 

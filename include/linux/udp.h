@@ -30,10 +30,15 @@ struct udphdr {
 
 /* UDP socket options */
 #define UDP_CORK	1	/* Never send partially complete segments */
+#define UDP_ENCAP	100	/* Set the socket to accept encapsulated packets */
+
+/* UDP encapsulation types */
+#define UDP_ENCAP_ESPINUDP	2 /* draft-ietf-ipsec-udp-encaps-06 */
 
 struct udp_opt {
 	int		pending;	/* Any pending frames ? */
 	unsigned int	corkflag;	/* Cork is required */
+  	__u16		encap_type;	/* Is this an Encapsulation socket? */
 	/*
 	 * Following members retains the infomation to create a UDP header
 	 * when the socket is uncorked.

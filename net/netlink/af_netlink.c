@@ -1050,8 +1050,8 @@ struct proto_ops netlink_ops = {
 };
 
 struct net_proto_family netlink_family_ops = {
-	.family =PF_NETLINK,
-	.create =netlink_create,
+	.family = PF_NETLINK,
+	.create = netlink_create,
 };
 
 static int __init netlink_proto_init(void)
