@@ -369,51 +369,6 @@ sa1100_pcmcia_register_callback(struct pcmcia_socket *sock,
 }
 
 
-/* sa1100_pcmcia_inquire_socket()
- * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- * Implements the inquire_socket() operation for the in-kernel PCMCIA
- * service (formerly SS_InquireSocket in Card Services).  We set
- * SS_CAP_STATIC_MAP, which disables the memory resource database
- * check. (Mapped memory is set up within the socket driver itself.)
- *
- * In conjunction with the STATIC_MAP capability is a new field,
- * `io_offset', recommended by David Hinds. Rather than go through
- * the SetIOMap interface (which is not quite suited for communicating
- * window locations up from the socket driver), we just pass up
- * an offset which is applied to client-requested base I/O addresses
- * in alloc_io_space().
- *
- * SS_CAP_STATIC_MAP: don't bother with the (user-configured) memory
- *   resource database; we instead pass up physical address ranges
- *   and allow other parts of Card Services to deal with remapping.
- *
- * SS_CAP_PCCARD: we can deal with 16-bit PCMCIA & CF cards, but
- *   not 32-bit CardBus devices.
- *
- * Return value is irrelevant; the pcmcia subsystem ignores it.
- */
-static int
-sa1100_pcmcia_inquire_socket(struct pcmcia_socket *sock, socket_cap_t *cap)
-{
-	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
-	int ret = -1;
-
-	if (skt) {
-		DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
-
-		cap->features  = SS_CAP_STATIC_MAP|SS_CAP_PCCARD;
-		cap->irq_mask  = 0;
-		cap->map_size  = PAGE_SIZE;
-		cap->pci_irq   = skt->irq;
-		cap->io_offset = (unsigned long)skt->virt_io;
-
-		ret = 0;
-	}
-
-	return ret;
-}
-
-
 /* sa1100_pcmcia_get_status()
  * ^^^^^^^^^^^^^^^^^^^^^^^^^^
  * Implements the get_status() operation for the in-kernel PCMCIA
@@ -704,7 +659,6 @@ static struct pccard_operations sa11xx_pcmcia_operations = {
 	.init			= sa1100_pcmcia_sock_init,
 	.suspend		= sa1100_pcmcia_suspend,
 	.register_callback	= sa1100_pcmcia_register_callback,
-	.inquire_socket		= sa1100_pcmcia_inquire_socket,
 	.get_status		= sa1100_pcmcia_get_status,
 	.get_socket		= sa1100_pcmcia_get_socket,
 	.set_socket		= sa1100_pcmcia_set_socket,
@@ -877,6 +831,12 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 		ret = ops->hw_init(skt);
 		if (ret)
 			goto out_err_6;
+
+		skt->socket.features = SS_CAP_STATIC_MAP|SS_CAP_PCCARD;
+		skt->socket.irq_mask = 0;
+		skt->socket.map_size = PAGE_SIZE;
+		skt->socket.pci_irq = skt->irq;
+		skt->socket.io_offset = (unsigned long)skt->virt_io;
 
 		skt->status = sa1100_pcmcia_skt_state(skt);
 
