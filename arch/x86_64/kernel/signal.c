@@ -371,7 +371,7 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 				regs->rax = regs->orig_rax;
 				regs->rip -= 2;
 		}
-		if (regs->rax == -ERESTART_RESTARTBLOCK){
+		if (regs->rax == (unsigned long)-ERESTART_RESTARTBLOCK){
 			regs->rax = __NR_restart_syscall;
  			regs->rip -= 2;
  		}		
@@ -446,9 +446,10 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 	/* Did we come from a system call? */
 	if (regs->orig_rax >= 0) {
 		/* Restart the system call - no handlers present */
-		if (regs->rax == -ERESTARTNOHAND ||
-		    regs->rax == -ERESTARTSYS ||
-		    regs->rax == -ERESTARTNOINTR) {
+		long res = regs->rax;
+		if (res == -ERESTARTNOHAND ||
+		    res == -ERESTARTSYS ||
+		    res == -ERESTARTNOINTR) {
 			regs->rax = regs->orig_rax;
 			regs->rip -= 2;
 		}

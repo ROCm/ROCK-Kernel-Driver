@@ -39,7 +39,7 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 
-#define Dprintk(x...) printk(x)
+#define Dprintk(x...)
 
 struct mmu_gather mmu_gathers[NR_CPUS];
 

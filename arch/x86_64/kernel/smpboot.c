@@ -123,7 +123,7 @@ static void __init synchronize_tsc_bp (void)
 	unsigned long long t0;
 	unsigned long long sum, avg;
 	long long delta;
-	unsigned long one_usec;
+	long one_usec;
 	int buggy = 0;
 	extern unsigned cpu_khz;
 
@@ -421,7 +421,7 @@ static struct task_struct * __init fork_by_hand(void)
 #if APIC_DEBUG
 static inline void inquire_remote_apic(int apicid)
 {
-	int i, regs[] = { APIC_ID >> 4, APIC_LVR >> 4, APIC_SPIV >> 4 };
+	unsigned i, regs[] = { APIC_ID >> 4, APIC_LVR >> 4, APIC_SPIV >> 4 };
 	char *names[] = { "ID", "VERSION", "SPIV" };
 	int timeout, status;
 
@@ -708,7 +708,7 @@ unsigned long cache_decay_ticks;
 
 static void smp_tune_scheduling (void)
 {
-	unsigned long cachesize;       /* kB   */
+	int cachesize;       /* kB   */
 	unsigned long bandwidth = 1000; /* MB/s */
 	/*
 	 * Rough estimation for SMP scheduling, this is the number of
@@ -753,7 +753,7 @@ static void smp_tune_scheduling (void)
 
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
-	int apicid, cpu;
+	unsigned apicid, cpu;
 
 	/*
 	 * Setup boot CPU information

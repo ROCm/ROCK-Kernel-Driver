@@ -104,6 +104,9 @@ extern void __set_fixmap (enum fixed_addresses idx,
 #define __FIXADDR_SIZE	(__end_of_permanent_fixed_addresses << PAGE_SHIFT)
 #define FIXADDR_START	(FIXADDR_TOP - __FIXADDR_SIZE)
 
+#define VSYSCALL_START FIXADDR_START
+#define VSYSCALL_END   FIXADDR_TOP
+
 #define __fix_to_virt(x)	(FIXADDR_TOP - ((x) << PAGE_SHIFT))
 #define __virt_to_fix(x)	((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
 

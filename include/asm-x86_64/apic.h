@@ -9,7 +9,7 @@
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
-#define APIC_DEBUG 1
+#define APIC_DEBUG 0
 
 #if APIC_DEBUG
 #define Dprintk(x...) printk(x)

@@ -285,7 +285,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 
 	childregs->rax = 0;
 	childregs->rsp = rsp;
-	if (rsp == ~0) {
+	if (rsp == ~0UL) {
 		childregs->rsp = (unsigned long)childregs;
 	}
 	p->set_child_tid = p->clear_child_tid = NULL;

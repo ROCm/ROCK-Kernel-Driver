@@ -689,8 +689,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 
 		vma = find_extend_vma(mm, start);
 
-#ifdef FIXADDR_START
-		if (!vma && start >= FIXADDR_START && start < FIXADDR_TOP) {
+#ifdef VSYSCALL_START
+		if (!vma && start >= VSYSCALL_START && start < VSYSCALL_END) {
 			static struct vm_area_struct fixmap_vma = {
 				/* Catch users - if there are any valid
 				   ones, we can make this be "&init_mm" or

@@ -66,7 +66,7 @@ copy_user_generic:
 	   the small movements in ioctls etc., but not penalize the bigger
 	   filesystem data copies too much. */
 	pushq %rbx
-	prefetch (%rsi)
+//	prefetch (%rsi)
 	xorl %eax,%eax		/*zero for the exception handler */
 
 #ifdef FIX_ALIGNMENT

@@ -110,6 +110,8 @@ EXPORT_SYMBOL(_mmx_memcpy);
 EXPORT_SYMBOL(mmx_clear_page);
 EXPORT_SYMBOL(mmx_copy_page);
 #endif
+EXPORT_SYMBOL(clear_page);
+EXPORT_SYMBOL(copy_page);
 
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_data);

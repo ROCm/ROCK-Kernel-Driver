@@ -15,7 +15,7 @@
 #include <asm/dma.h>
 #include <asm/numa.h>
 
-#define Dprintk(x...) printk(x)
+#define Dprintk(x...)
 
 struct pglist_data *node_data[MAXNODE];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];

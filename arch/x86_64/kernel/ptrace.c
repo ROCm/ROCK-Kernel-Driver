@@ -178,11 +178,11 @@ static unsigned long getreg(struct task_struct *child, unsigned long regno)
 
 }
 
-asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
+asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data)
 {
 	struct task_struct *child;
-	struct user * dummy = NULL;
 	long i, ret;
+	unsigned ui;
 
 	/* This lock_kernel fixes a subtle race with suid exec */
 	lock_kernel();
@@ -240,16 +240,16 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		unsigned long tmp;
 
 		ret = -EIO;
-		if ((addr & 7) || addr < 0 || 
+		if ((addr & 7) ||
 		    addr > sizeof(struct user) - 7)
 			break;
 
 		tmp = 0;  /* Default return condition */
 		if(addr < sizeof(struct user_regs_struct))
 			tmp = getreg(child, addr);
-		if(addr >= (long) &dummy->u_debugreg[0] &&
-		   addr <= (long) &dummy->u_debugreg[7]){
-			addr -= (long) &dummy->u_debugreg[0];
+		if(addr >= offsetof(struct user, u_debugreg[0]) &&
+		   addr <= offsetof(struct user, u_debugreg[7])) {
+			addr -= offsetof(struct user, u_debugreg[0]);
 			addr = addr >> 3;
 			tmp = child->thread.debugreg[addr];
 		}
@@ -268,7 +268,7 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 
 	case PTRACE_POKEUSR: /* write the word at location addr in the USER area */
 		ret = -EIO;
-		if ((addr & 7) || addr < 0 || 
+		if ((addr & 7) ||
 		    addr > sizeof(struct user) - 7)
 			break;
 
@@ -282,27 +282,28 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		   to modify. */
 
 		  ret = -EIO;
-		  if(addr >= (long) &dummy->u_debugreg[0] &&
-		     addr <= (long) &dummy->u_debugreg[7]){
+		  if(addr >= offsetof(struct user, u_debugreg[0]) &&
+		     addr <= offsetof(struct user, u_debugreg[7])) {
 
-			  if(addr == (long) &dummy->u_debugreg[4]) break;
-			  if(addr == (long) &dummy->u_debugreg[5]) break;
-			  if(addr < (long) &dummy->u_debugreg[4] &&
+			  if(addr == offsetof(struct user, u_debugreg[4])) break;
+			  if(addr == offsetof(struct user, u_debugreg[5])) break;
+			  /* Disallows to set a breakpoint into the vsyscall */
+			  if(addr < offsetof(struct user, u_debugreg[4]) &&
 			     ((unsigned long) data) >= TASK_SIZE-3) break;
 			  
-			  if (addr == (long) &dummy->u_debugreg[6]) {
+			  if (addr == offsetof(struct user, u_debugreg[6])) {
 				  if (data >> 32)
 					  goto out_tsk;
 			  }
 
-			  if(addr == (long) &dummy->u_debugreg[7]) {
+			  if(addr == offsetof(struct user, u_debugreg[7])) {
 				  data &= ~DR_CONTROL_RESERVED;
 				  for(i=0; i<4; i++)
 					  if ((0x5454 >> ((data >> (16 + 4*i)) & 0xf)) & 1)
 						  goto out_tsk;
 			  }
 
-			  addr -= (long) &dummy->u_debugreg;
+			  addr -= offsetof(struct user, u_debugreg);
 			  addr = addr >> 3;
 			  child->thread.debugreg[addr] = data;
 			  ret = 0;
@@ -408,8 +409,8 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		for ( i = 0; i < sizeof(struct user_regs_struct); i += sizeof(long) ) {
-			__put_user(getreg(child, i),(unsigned long *) data);
+		for (ui = 0; ui < sizeof(struct user_regs_struct); ui += sizeof(long)) {
+			__put_user(getreg(child, ui),(unsigned long *) data);
 			data += sizeof(long);
 		}
 		ret = 0;
@@ -422,9 +423,9 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		for ( i = 0; i < sizeof(struct user_regs_struct); i += sizeof(long) ) {
+		for (ui = 0; ui < sizeof(struct user_regs_struct); ui += sizeof(long)) {
 			__get_user(tmp, (unsigned long *) data);
-			putreg(child, i, tmp);
+			putreg(child, ui, tmp);
 			data += sizeof(long);
 		}
 		ret = 0;

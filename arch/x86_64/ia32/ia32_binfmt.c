@@ -22,12 +22,17 @@
 #include <asm/i387.h>
 #include <asm/uaccess.h>
 #include <asm/ia32.h>
+#include <asm/vsyscall32.h>
 
 #define ELF_NAME "elf/i386"
 
 #define AT_SYSINFO 32
+#define AT_SYSINFO_EHDR		33
 
-#define ARCH_DLINFO NEW_AUX_ENT(AT_SYSINFO, 0xffffe000)
+#define ARCH_DLINFO do {  \
+	NEW_AUX_ENT(AT_SYSINFO, (u32)(u64)VSYSCALL32_VSYSCALL); \
+	NEW_AUX_ENT(AT_SYSINFO_EHDR, VSYSCALL32_BASE);    \
+} while(0)
 
 struct file;
 struct elf_phdr; 
@@ -52,6 +57,47 @@ typedef unsigned int elf_greg_t;
 
 #define ELF_NGREG (sizeof (struct user_regs_struct32) / sizeof(elf_greg_t))
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+
+/*
+ * These macros parameterize elf_core_dump in fs/binfmt_elf.c to write out
+ * extra segments containing the vsyscall DSO contents.  Dumping its
+ * contents makes post-mortem fully interpretable later without matching up
+ * the same kernel and hardware config to see what PC values meant.
+ * Dumping its extra ELF program headers includes all the other information
+ * a debugger needs to easily find how the vsyscall DSO was being used.
+ */
+#define ELF_CORE_EXTRA_PHDRS		(VSYSCALL32_EHDR->e_phnum)
+#define ELF_CORE_WRITE_EXTRA_PHDRS					      \
+do {									      \
+	const struct elf32_phdr *const vsyscall_phdrs =			      \
+		(const struct elf32_phdr *) (VSYSCALL32_BASE		      \
+					   + VSYSCALL32_EHDR->e_phoff);	      \
+	int i;								      \
+	Elf32_Off ofs = 0;						      \
+	for (i = 0; i < VSYSCALL32_EHDR->e_phnum; ++i) {		      \
+		struct elf_phdr phdr = vsyscall_phdrs[i];		      \
+		if (phdr.p_type == PT_LOAD) {				      \
+			ofs = phdr.p_offset = offset;			      \
+			offset += phdr.p_filesz;			      \
+		}							      \
+		else							      \
+			phdr.p_offset += ofs;				      \
+		phdr.p_paddr = 0; /* match other core phdrs */		      \
+		DUMP_WRITE(&phdr, sizeof(phdr));			      \
+	}								      \
+} while (0)
+#define ELF_CORE_WRITE_EXTRA_DATA					      \
+do {									      \
+	const struct elf32_phdr *const vsyscall_phdrs =			      \
+		(const struct elf32_phdr *) (VSYSCALL32_BASE		      \
+					   + VSYSCALL32_EHDR->e_phoff);	      \
+	int i;								      \
+	for (i = 0; i < VSYSCALL32_EHDR->e_phnum; ++i) {		      \
+		if (vsyscall_phdrs[i].p_type == PT_LOAD)		      \
+			DUMP_WRITE((void *) (u64) vsyscall_phdrs[i].p_vaddr,	      \
+				   vsyscall_phdrs[i].p_filesz);		      \
+	}								      \
+} while (0)
 
 struct elf_siginfo
 {

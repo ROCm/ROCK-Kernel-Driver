@@ -31,6 +31,7 @@ extern const unsigned char scsi_command_size[8];
 #define FORMAT_UNIT           0x04
 #define READ_BLOCK_LIMITS     0x05
 #define REASSIGN_BLOCKS       0x07
+#define INITIALIZE_ELEMENT_STATUS 0x07
 #define READ_6                0x08
 #define WRITE_6               0x0a
 #define SEEK_6                0x0b
@@ -55,6 +56,7 @@ extern const unsigned char scsi_command_size[8];
 #define READ_10               0x28
 #define WRITE_10              0x2a
 #define SEEK_10               0x2b
+#define POSITION_TO_ELEMENT   0x2b
 #define WRITE_VERIFY          0x2e
 #define VERIFY                0x2f
 #define SEARCH_HIGH           0x30
@@ -87,6 +89,7 @@ extern const unsigned char scsi_command_size[8];
 #define PERSISTENT_RESERVE_OUT 0x5f
 #define REPORT_LUNS           0xa0
 #define MOVE_MEDIUM           0xa5
+#define EXCHANGE_MEDIUM       0xa6
 #define READ_12               0xa8
 #define WRITE_12              0xaa
 #define WRITE_VERIFY_12       0xae

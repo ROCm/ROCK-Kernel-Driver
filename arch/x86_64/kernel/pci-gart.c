@@ -536,7 +536,9 @@ void __init pci_iommu_init(void)
 	iommu_gatt_base = agp_gatt_table + (iommu_start>>PAGE_SHIFT);
 	bad_dma_address = iommu_bus_base;
 
+#if 0 /* FIXME */
 	change_page_attr(virt_to_page(__va(iommu_start)), iommu_pages, PAGE_KERNEL); 
+#endif
 	global_flush_tlb(); 
 } 
 
