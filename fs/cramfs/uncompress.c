@@ -18,7 +18,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/vmalloc.h>
-#include <linux/zlib_fs.h>
+#include <linux/zlib.h>
 
 static z_stream stream;
 static int initialized;
@@ -34,14 +34,14 @@ int cramfs_uncompress_block(void *dst, int dstlen, void *src, int srclen)
 	stream.next_out = dst;
 	stream.avail_out = dstlen;
 
-	err = zlib_fs_inflateReset(&stream);
+	err = zlib_inflateReset(&stream);
 	if (err != Z_OK) {
-		printk("zlib_fs_inflateReset error %d\n", err);
-		zlib_fs_inflateEnd(&stream);
-		zlib_fs_inflateInit(&stream);
+		printk("zlib_inflateReset error %d\n", err);
+		zlib_inflateEnd(&stream);
+		zlib_inflateInit(&stream);
 	}
 
-	err = zlib_fs_inflate(&stream, Z_FINISH);
+	err = zlib_inflate(&stream, Z_FINISH);
 	if (err != Z_STREAM_END)
 		goto err;
 	return stream.total_out;
@@ -55,14 +55,14 @@ err:
 int cramfs_uncompress_init(void)
 {
 	if (!initialized++) {
-		stream.workspace = vmalloc(zlib_fs_inflate_workspacesize());
+		stream.workspace = vmalloc(zlib_inflate_workspacesize());
 		if ( !stream.workspace ) {
 			initialized = 0;
 			return -ENOMEM;
 		}
 		stream.next_in = NULL;
 		stream.avail_in = 0;
-		zlib_fs_inflateInit(&stream);
+		zlib_inflateInit(&stream);
 	}
 	return 0;
 }
@@ -70,7 +70,7 @@ int cramfs_uncompress_init(void)
 int cramfs_uncompress_exit(void)
 {
 	if (!--initialized) {
-		zlib_fs_inflateEnd(&stream);
+		zlib_inflateEnd(&stream);
 		vfree(stream.workspace);
 	}
 	return 0;
