@@ -127,6 +127,12 @@
 /* http://home.earthlink.net/~jrhees/USBUIRT/index.htm */
 #define FTDI_USB_UIRT_PID	0xF850	/* Product Id */
 
+/*
+ * Definitions for ID TECH (www.idt-net.com) devices
+ */
+#define IDTECH_VID		0x0ACD	/* ID TECH Vendor ID */
+#define IDTECH_IDT1221U_PID	0x0300	/* IDT1221U USB to RS-232 adapter */
+
 /* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */

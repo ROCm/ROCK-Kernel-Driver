@@ -101,6 +101,7 @@ ohci_pci_start (struct usb_hcd *hcd)
 		ohci_stop (hcd);
 		return -EBUSY;
 	}
+	create_debug_files (ohci);
 
 #ifdef	DEBUG
 	ohci_dump (ohci, 1);
@@ -115,6 +116,7 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 	unsigned long		flags;
 	u16			cmd;
+	u32			tmp;
 
 	if ((ohci->hc_control & OHCI_CTRL_HCFS) != OHCI_USB_OPER) {
 		ohci_dbg (ohci, "can't suspend (state is %s)\n",
@@ -156,15 +158,12 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 	(void) readl (&ohci->regs->control);
 	mdelay (500); /* No schedule here ! */
 
-	switch (readl (&ohci->regs->control) & OHCI_CTRL_HCFS) {
+	tmp = readl (&ohci->regs->control) | OHCI_CTRL_HCFS;
+	switch (tmp) {
 		case OHCI_USB_RESET:
-			ohci_dbg (ohci, "suspend->reset ?\n");
-			break;
 		case OHCI_USB_RESUME:
-			ohci_dbg (ohci, "suspend->resume ?\n");
-			break;
 		case OHCI_USB_OPER:
-			ohci_dbg (ohci, "suspend->operational ?\n");
+			ohci_err (ohci, "can't suspend; hcfs %d\n", tmp);
 			break;
 		case OHCI_USB_SUSPEND:
 			ohci_dbg (ohci, "suspended\n");
