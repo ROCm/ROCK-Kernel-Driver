@@ -43,6 +43,7 @@
 #include <linux/nfsd/xdr.h>
 #include <linux/nfsd/syscall.h>
 #include <linux/poll.h>
+#include <linux/eventpoll.h>
 #include <linux/personality.h>
 #include <linux/ptrace.h>
 #include <linux/stat.h>
@@ -2702,6 +2703,95 @@ out_error:
 	put_unused_fd(fd);
 	fd = error;
 	goto out;
+}
+
+/* Structure for ia32 emulation on ia64 */
+struct epoll_event32
+{
+	u32 events;
+	u64 data;
+} __attribute__((packed));
+
+asmlinkage long
+sys32_epoll_ctl(int epfd, int op, int fd, struct epoll_event32 *event)
+{
+	mm_segment_t old_fs = get_fs();
+	struct epoll_event event64;
+	int error = -EFAULT;
+	u32 data_halfword;
+
+	if ((error = verify_area(VERIFY_READ, event,
+				 sizeof(struct epoll_event32))))
+		return error;
+
+	__get_user(event64.events, &event->events);
+	__get_user(data_halfword, (u32*)(&event->data));
+	event64.data = data_halfword;
+	__get_user(data_halfword, ((u32*)(&event->data) + 1));
+ 	event64.data |= ((u64)data_halfword) << 32;
+
+	set_fs(KERNEL_DS);
+	error = sys_epoll_ctl(epfd, op, fd, &event64);
+	set_fs(old_fs);
+
+	return error;
+}
+
+asmlinkage long
+sys32_epoll_wait(int epfd, struct epoll_event32 *events, int maxevents,
+		 int timeout)
+{
+	struct epoll_event *events64 = NULL;
+	mm_segment_t old_fs = get_fs();
+	int error;
+	int evt_idx;
+
+	if (maxevents <= 0) {
+		return -EINVAL;
+	}
+
+	/* Verify that the area passed by the user is writeable */
+	if ((error = verify_area(VERIFY_WRITE, events,
+				 maxevents * sizeof(struct epoll_event32))))
+		return error;
+
+	/* Allocate the space needed for the intermediate copy */
+	events64 = kmalloc(maxevents * sizeof(struct epoll_event), GFP_KERNEL);
+	if (events64 == NULL) {
+		return -ENOMEM;
+	}
+
+	/* Expand the 32-bit structures into the 64-bit structures */
+	for (evt_idx = 0; evt_idx < maxevents; evt_idx++) {
+		u32 data_halfword;
+		__get_user(events64[evt_idx].events, &events[evt_idx].events);
+		__get_user(data_halfword, (u32*)(&events[evt_idx].data));
+		events64[evt_idx].data = data_halfword;
+		__get_user(data_halfword, ((u32*)(&events[evt_idx].data) + 1));
+		events64[evt_idx].data |= ((u64)data_halfword) << 32;
+	}
+
+	/* Do the system call */
+	set_fs(KERNEL_DS); /* copy_to/from_user should work on kernel mem*/
+	error = sys_epoll_wait(epfd, events64, maxevents, timeout);
+	set_fs(old_fs);
+
+	/* Don't modify userspace memory if we're returning an error */
+	if (!error) {
+		/* Translate the 64-bit structures back into the 32-bit
+		   structures */
+		for (evt_idx = 0; evt_idx < maxevents; evt_idx++) {
+			__put_user(events64[evt_idx].events,
+				   &events[evt_idx].events);
+			__put_user((u32)(events64[evt_idx].data),
+				   (u32*)(&events[evt_idx].data));
+			__put_user((u32)(events64[evt_idx].data >> 32),
+				   ((u32*)(&events[evt_idx].data) + 1));
+		}
+	}
+
+	kfree(events64);
+	return error;
 }
 
 #ifdef	NOTYET  /* UNTESTED FOR IA64 FROM HERE DOWN */
