@@ -33,9 +33,10 @@ ip2_loadmain(int *, int  *, unsigned char *, int ); // ref into ip2main.c
 */
 static int io[IP2_MAX_BOARDS]= { 0, 0, 0, 0 };
 static int irq[IP2_MAX_BOARDS] = { -1, -1, -1, -1 }; 
-static int poll_only = 0;
 
 #ifdef MODULE
+
+static int poll_only = 0;
 
 #	if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 		MODULE_AUTHOR("Doug McNash");

@@ -419,8 +419,8 @@ edd_show_info_flags(struct edd_device *edev, char *buf, size_t count,
 		return 0;
 	}
 
-	if (info->params.info_flags & EDD_INFO_DMA_BOUNDRY_ERROR_TRANSPARENT)
-		p += snprintf(p, left, "DMA boundry error transparent\n");
+	if (info->params.info_flags & EDD_INFO_DMA_BOUNDARY_ERROR_TRANSPARENT)
+		p += snprintf(p, left, "DMA boundary error transparent\n");
 	if (info->params.info_flags & EDD_INFO_GEOMETRY_VALID)
 		p += snprintf(p, left, "geometry valid\n");
 	if (info->params.info_flags & EDD_INFO_REMOVABLE)
