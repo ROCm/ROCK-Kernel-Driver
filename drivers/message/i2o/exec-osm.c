@@ -33,6 +33,8 @@
 
 struct i2o_driver i2o_exec_driver;
 
+static int i2o_exec_lct_notify(struct i2o_controller *c, u32 change_ind);
+
 /* Module internal functions from other sources */
 extern int i2o_device_parse_lct(struct i2o_controller *);
 
@@ -436,7 +438,7 @@ int i2o_exec_lct_get(struct i2o_controller *c)
  *	replies immediately after the request. If change_ind > 0 the reply is
  *	send after change indicator of the LCT is > change_ind.
  */
-int i2o_exec_lct_notify(struct i2o_controller *c, u32 change_ind)
+static int i2o_exec_lct_notify(struct i2o_controller *c, u32 change_ind)
 {
 	i2o_status_block *sb = c->status_block.virt;
 	struct device *dev;
@@ -503,4 +505,3 @@ void __exit i2o_exec_exit(void)
 
 EXPORT_SYMBOL(i2o_msg_post_wait_mem);
 EXPORT_SYMBOL(i2o_exec_lct_get);
-EXPORT_SYMBOL(i2o_exec_lct_notify);

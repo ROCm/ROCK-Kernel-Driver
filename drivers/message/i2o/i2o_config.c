@@ -51,7 +51,6 @@
 extern int i2o_parm_issue(struct i2o_device *, int, void *, int, void *, int);
 
 static spinlock_t i2o_config_lock = SPIN_LOCK_UNLOCKED;
-struct wait_queue *i2o_wait_queue;
 
 #define MODINC(x,y) ((x) = ((x) + 1) % (y))
 
@@ -79,7 +78,7 @@ static ulong i2o_cfg_info_id = 0;
  *	multiplexed by the i2o_core code
  */
 
-struct i2o_driver i2o_config_driver = {
+static struct i2o_driver i2o_config_driver = {
 	.name = "Config-OSM"
 };
 

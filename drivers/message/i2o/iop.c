@@ -38,6 +38,8 @@ LIST_HEAD(i2o_controllers);
  */
 static struct i2o_dma i2o_systab;
 
+static int i2o_hrt_get(struct i2o_controller *c);
+
 /* Module internal functions from other sources */
 extern struct i2o_driver i2o_exec_driver;
 extern int i2o_exec_lct_get(struct i2o_controller *);
@@ -564,7 +566,7 @@ static int i2o_iop_reset(struct i2o_controller *c)
  *
  *	Returns 0 on success or a negative errno code on failure.
  */
-int i2o_iop_init_outbound_queue(struct i2o_controller *c)
+static int i2o_iop_init_outbound_queue(struct i2o_controller *c)
 {
 	u8 *status = c->status.virt;
 	u32 m;
@@ -1050,7 +1052,7 @@ int i2o_status_get(struct i2o_controller *c)
  *
  *	Returns 0 on success or negativer error code on failure.
  */
-int i2o_hrt_get(struct i2o_controller *c)
+static int i2o_hrt_get(struct i2o_controller *c)
 {
 	int rc;
 	int i;
@@ -1310,5 +1312,4 @@ EXPORT_SYMBOL(i2o_find_iop);
 EXPORT_SYMBOL(i2o_iop_find_device);
 EXPORT_SYMBOL(i2o_event_register);
 EXPORT_SYMBOL(i2o_status_get);
-EXPORT_SYMBOL(i2o_hrt_get);
 EXPORT_SYMBOL(i2o_controllers);

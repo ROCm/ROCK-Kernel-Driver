@@ -4,39 +4,13 @@
 #include <linux/pci.h>
 #include <linux/i2o.h>
 
-static int verbose;
 extern struct i2o_driver **i2o_drivers;
 extern unsigned int i2o_max_drivers;
 static void i2o_report_util_cmd(u8 cmd);
 static void i2o_report_exec_cmd(u8 cmd);
-void i2o_report_fail_status(u8 req_status, u32 * msg);
-void i2o_report_common_status(u8 req_status);
+static void i2o_report_fail_status(u8 req_status, u32 * msg);
+static void i2o_report_common_status(u8 req_status);
 static void i2o_report_common_dsc(u16 detailed_status);
-
-void i2o_dump_status_block(i2o_status_block * sb)
-{
-	pr_debug("Organization ID: %d\n", sb->org_id);
-	pr_debug("IOP ID:          %d\n", sb->iop_id);
-	pr_debug("Host Unit ID:    %d\n", sb->host_unit_id);
-	pr_debug("Segment Number:  %d\n", sb->segment_number);
-	pr_debug("I2O Version:     %d\n", sb->i2o_version);
-	pr_debug("IOP State:       %d\n", sb->iop_state);
-	pr_debug("Messanger Type:  %d\n", sb->msg_type);
-	pr_debug("Inbound Frame Size:      %d\n", sb->inbound_frame_size);
-	pr_debug("Init Code:               %d\n", sb->init_code);
-	pr_debug("Max Inbound MFrames:     %d\n", sb->max_inbound_frames);
-	pr_debug("Current Inbound MFrames: %d\n", sb->cur_inbound_frames);
-	pr_debug("Max Outbound MFrames:    %d\n", sb->max_outbound_frames);
-	pr_debug("Product ID String: %s\n", sb->product_id);
-	pr_debug("Expected LCT Size: %d\n", sb->expected_lct_size);
-	pr_debug("IOP Capabilities:  %d\n", sb->iop_capabilities);
-	pr_debug("Desired Private MemSize: %d\n", sb->desired_mem_size);
-	pr_debug("Current Private MemSize: %d\n", sb->current_mem_size);
-	pr_debug("Current Private MemBase: %d\n", sb->current_mem_base);
-	pr_debug("Desired Private IO Size: %d\n", sb->desired_io_size);
-	pr_debug("Current Private IO Size: %d\n", sb->current_io_size);
-	pr_debug("Current Private IO Base: %d\n", sb->current_io_base);
-};
 
 /*
  * Used for error reporting/debugging purposes.
@@ -91,71 +65,12 @@ void i2o_dump_message(struct i2o_message *m)
 #endif
 }
 
-/**
- *	i2o_report_controller_unit - print information about a tid
- *	@c: controller
- *	@d: device
- *
- *	Dump an information block associated with a given unit (TID). The
- *	tables are read and a block of text is output to printk that is
- *	formatted intended for the user.
- */
-
-void i2o_report_controller_unit(struct i2o_controller *c, struct i2o_device *d)
-{
-	char buf[64];
-	char str[22];
-	int ret;
-
-	if (verbose == 0)
-		return;
-
-	printk(KERN_INFO "Target ID %03x.\n", d->lct_data.tid);
-	if ((ret = i2o_parm_field_get(d, 0xF100, 3, buf, 16)) >= 0) {
-		buf[16] = 0;
-		printk(KERN_INFO "     Vendor: %s\n", buf);
-	}
-	if ((ret = i2o_parm_field_get(d, 0xF100, 4, buf, 16)) >= 0) {
-		buf[16] = 0;
-		printk(KERN_INFO "     Device: %s\n", buf);
-	}
-	if (i2o_parm_field_get(d, 0xF100, 5, buf, 16) >= 0) {
-		buf[16] = 0;
-		printk(KERN_INFO "     Description: %s\n", buf);
-	}
-	if ((ret = i2o_parm_field_get(d, 0xF100, 6, buf, 8)) >= 0) {
-		buf[8] = 0;
-		printk(KERN_INFO "        Rev: %s\n", buf);
-	}
-
-	printk(KERN_INFO "    Class: ");
-	//sprintf(str, "%-21s", i2o_get_class_name(d->lct_data.class_id));
-	printk(KERN_DEBUG "%s\n", str);
-
-	printk(KERN_INFO "  Subclass: 0x%04X\n", d->lct_data.sub_class);
-	printk(KERN_INFO "     Flags: ");
-
-	if (d->lct_data.device_flags & (1 << 0))
-		printk(KERN_DEBUG "C");	// ConfigDialog requested
-	if (d->lct_data.device_flags & (1 << 1))
-		printk(KERN_DEBUG "U");	// Multi-user capable
-	if (!(d->lct_data.device_flags & (1 << 4)))
-		printk(KERN_DEBUG "P");	// Peer service enabled!
-	if (!(d->lct_data.device_flags & (1 << 5)))
-		printk(KERN_DEBUG "M");	// Mgmt service enabled!
-	printk(KERN_DEBUG "\n");
-}
-
-/*
-module_param(verbose, int, 0644);
-MODULE_PARM_DESC(verbose, "Verbose diagnostics");
-*/
 /*
  * Used for error reporting/debugging purposes.
  * Following fail status are common to all classes.
  * The preserved message must be handled in the reply handler.
  */
-void i2o_report_fail_status(u8 req_status, u32 * msg)
+static void i2o_report_fail_status(u8 req_status, u32 * msg)
 {
 	static char *FAIL_STATUS[] = {
 		"0x80",		/* not used */
@@ -213,7 +128,7 @@ void i2o_report_fail_status(u8 req_status, u32 * msg)
  * Used for error reporting/debugging purposes.
  * Following reply status are common to all classes.
  */
-void i2o_report_common_status(u8 req_status)
+static void i2o_report_common_status(u8 req_status)
 {
 	static char *REPLY_STATUS[] = {
 		"SUCCESS",
@@ -476,20 +391,6 @@ void i2o_debug_state(struct i2o_controller *c)
 	}
 };
 
-void i2o_systab_debug(struct i2o_sys_tbl *sys_tbl)
-{
-	u32 *table;
-	int count;
-	u32 size;
-
-	table = (u32 *) sys_tbl;
-	size = sizeof(struct i2o_sys_tbl) + sys_tbl->num_entries
-	    * sizeof(struct i2o_sys_tbl_entry);
-
-	for (count = 0; count < (size >> 2); count++)
-		printk(KERN_INFO "sys_tbl[%d] = %0#10x\n", count, table[count]);
-}
-
 void i2o_dump_hrt(struct i2o_controller *c)
 {
 	u32 *rows = (u32 *) c->hrt.virt;
@@ -577,5 +478,4 @@ void i2o_dump_hrt(struct i2o_controller *c)
 	}
 }
 
-EXPORT_SYMBOL(i2o_dump_status_block);
 EXPORT_SYMBOL(i2o_dump_message);
