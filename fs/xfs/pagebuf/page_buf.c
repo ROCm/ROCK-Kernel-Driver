@@ -119,8 +119,8 @@ pb_trace_func(
 
 STATIC kmem_cache_t *pagebuf_cache;
 STATIC void pagebuf_daemon_wakeup(int);
+STATIC void pagebuf_delwri_queue(page_buf_t *, int);
 STATIC struct workqueue_struct *pagebuf_workqueue;
-
 
 /*
  * Pagebuf module configuration parameters, exported via
@@ -1516,7 +1516,7 @@ STATIC int pbd_active = 1;
 STATIC LIST_HEAD(pbd_delwrite_queue);
 STATIC spinlock_t pbd_delwrite_lock = SPIN_LOCK_UNLOCKED;
 
-void
+STATIC void
 pagebuf_delwri_queue(
 	page_buf_t		*pb,
 	int			unlock)

@@ -350,7 +350,6 @@ extern int pagebuf_ispin( page_buf_t *); /* check if pagebuf is pinned	*/
 
 /* Reading and writing pages */
 
-extern void pagebuf_delwri_queue(page_buf_t *, int);
 extern void pagebuf_delwri_dequeue(page_buf_t *);
 
 #define PBDF_WAIT    0x01
