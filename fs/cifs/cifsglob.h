@@ -87,6 +87,13 @@ enum securityEnum {
 	Kerberos		/* Kerberos via SPNEGO */
 };
 
+enum protocolEnum {
+	IPV4 = 0,
+	IPV6,
+	SCTP
+	/* Netbios frames protocol not supported at this time */
+};
+
 /*
  *****************************************************************
  * Except the CIFS PDUs themselves all the
@@ -104,7 +111,7 @@ struct TCP_Server_Info {
 	void *Server_NlsInfo;	/* BB - placeholder for future NLS info  */
 	unsigned short server_codepage;	/* codepage for the server    */
 	unsigned long ip_address;	/* IP addr for the server if known     */
-	unsigned long svType;	/* computer type                       */
+	enum protocolEnum protocolType;	
 	char versionMajor;
 	char versionMinor;
 	int svlocal:1;		/* local server or remote */

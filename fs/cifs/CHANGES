@@ -1,3 +1,8 @@
+Version 1.03
+------------
+Fix problem not attempting connect to server when port number 
+override not specified.
+
 Version 1.02
 ------------
 Fix caching problem when files opened by multiple clients in which 

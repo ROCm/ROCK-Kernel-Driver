@@ -67,6 +67,7 @@ struct smb_vol {
 };
 
 int ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket);
+int ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 
 
 	/* 
@@ -144,7 +145,11 @@ cifs_reconnect(struct TCP_Server_Info *server)
 
 	while ((server->tcpStatus != CifsExiting) && (server->tcpStatus != CifsGood))
 	{
-		rc = ipv4_connect(&server->sockAddr, &server->ssocket);
+		if(server->protocolType == IPV6) {
+			rc = ipv6_connect(&server->sockAddr,&server->ssocket);
+		} else {
+			rc = ipv4_connect(&server->sockAddr, &server->ssocket);
+		}
 		if(rc) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(3 * HZ);
@@ -786,6 +791,7 @@ int
 ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 {
 	int rc = 0;
+	int connected = 0;
 
 	if(*csocket == NULL) {
 		rc = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
@@ -800,13 +806,16 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	}
 
 	psin_server->sin_family = AF_INET;
+	
 	if(psin_server->sin_port) { /* user overrode default port */
 		rc = (*csocket)->ops->connect(*csocket,
 				(struct sockaddr *) psin_server,
 				sizeof (struct sockaddr_in),0);
-	}
+		if (rc >= 0)
+			connected = 1;
+	} 
 
-	if(rc < 0) {
+	if(!connected) {
 		/* do not retry on the same port we just failed on */
 		if(psin_server->sin_port != htons(CIFS_PORT)) {
 			psin_server->sin_port = htons(CIFS_PORT);
@@ -814,20 +823,26 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 			rc = (*csocket)->ops->connect(*csocket,
 					(struct sockaddr *) psin_server,
 					sizeof (struct sockaddr_in),0);
+			if (rc >= 0)
+				connected = 1;
 		}
 	}
-	if (rc < 0) {
+	if (!connected) {
 		psin_server->sin_port = htons(RFC1001_PORT);
 		rc = (*csocket)->ops->connect(*csocket, (struct sockaddr *)
 					      psin_server, sizeof (struct sockaddr_in),0);
-		if (rc < 0) {
-			cFYI(1, ("Error connecting to socket. %d", rc));
-			sock_release(*csocket);
-			*csocket = NULL;
-			return rc;
-		}
+		if (rc >= 0) 
+			connected = 1;
 	}
 
+	/* give up here - unless we want to retry on different
+		protocol families some day */
+	if (!connected) {
+		cFYI(1,("Error %d connecting to server via ipv4",rc));
+		sock_release(*csocket);
+		*csocket = NULL;
+		return rc;
+	}
 	/* Eventually check for other socket options to change from 
 		the default. sock_setsockopt not used because it expects 
 		user space buffer */
@@ -840,48 +855,66 @@ int
 ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 {
 	int rc = 0;
+	int connected = 0;
 
-	rc = sock_create(PF_INET6, SOCK_STREAM,
-			 IPPROTO_TCP /* IPPROTO_IPV6 ? */ , csocket);
-	if (rc < 0) {
-		cERROR(1, ("Error creating socket. Aborting operation"));
-		return rc;
+	if(*csocket == NULL) {
+		rc = sock_create(PF_INET6, SOCK_STREAM, IPPROTO_TCP, csocket);
+		if (rc < 0) {
+			cERROR(1, ("Error %d creating ipv6 socket",rc));
+			*csocket = NULL;
+			return rc;
+		} else {
+		/* BB other socket options to set KEEPALIVE, NODELAY? */
+			 cFYI(1,("ipv6 Socket created"));
+		}
 	}
 
 	psin_server->sin6_family = AF_INET6;
+
 	if(psin_server->sin6_port) { /* user overrode default port */
 		rc = (*csocket)->ops->connect(*csocket,
 				(struct sockaddr *) psin_server,
 				sizeof (struct sockaddr_in6),0);
-		if (rc >= 0) {
-                /* BB other socket options to set KEEPALIVE, timeouts? NODELAY? */
-			return rc;
+		if (rc >= 0)
+			connected = 1;
+	} 
+
+	if(!connected) {
+		/* do not retry on the same port we just failed on */
+		if(psin_server->sin6_port != htons(CIFS_PORT)) {
+			psin_server->sin6_port = htons(CIFS_PORT);
+
+			rc = (*csocket)->ops->connect(*csocket,
+					(struct sockaddr *) psin_server,
+					sizeof (struct sockaddr_in6),0);
+			if (rc >= 0)
+				connected = 1;
 		}
 	}
-
-	/* do not retry on the same port we just failed on */
-	if(psin_server->sin6_port != htons(CIFS_PORT)) {
-		psin_server->sin6_port = htons(CIFS_PORT);
-
-		rc = (*csocket)->ops->connect(*csocket,
-				(struct sockaddr *) psin_server,
-				sizeof (struct sockaddr_in6), 0);
-/* BB fix the timeout to be shorter above - and check flags */
-	}
-	if (rc < 0) {
+	if (!connected) {
 		psin_server->sin6_port = htons(RFC1001_PORT);
 		rc = (*csocket)->ops->connect(*csocket, (struct sockaddr *)
-					      psin_server,
-					      sizeof (struct sockaddr_in6), 0);
-		if (rc < 0) {
-			cFYI(1,
-			     ("Error connecting to socket (via ipv6). %d",
-			      rc));
-			sock_release(*csocket);
-			*csocket = NULL;
-			return rc;
-		}
+					 psin_server, sizeof (struct sockaddr_in6),0);
+		if (rc >= 0) 
+			connected = 1;
 	}
+
+	/* give up here - unless we want to retry on different
+		protocol families some day */
+	if (!connected) {
+		cFYI(1,("Error %d connecting to server via ipv6",rc));
+		sock_release(*csocket);
+		*csocket = NULL;
+		return rc;
+	}
+	/* Eventually check for other socket options to change from 
+		the default. sock_setsockopt not used because it expects 
+		user space buffer */
+	(*csocket)->sk->sk_rcvtimeo = 7 * HZ;
+		
+	return rc;
+
+
 
 	return rc;
 }
@@ -925,9 +958,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		return -EINVAL;
 	}
 
-	if (volume_info.UNC) {
+	if (volume_info.UNCip) {
 		sin_server.sin_addr.s_addr = cifs_inet_addr(volume_info.UNCip);
-		cFYI(1, ("UNC: %s  ", volume_info.UNC));
+		cFYI(1, ("UNC: %s  ", volume_info.UNCip));
 	} else {
 		/* BB we could connect to the DFS root? but which server do we ask? */
 		cERROR(1,
@@ -957,6 +990,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	} else {	/* create socket */
 		if(volume_info.port)
 			sin_server.sin_port = htons(volume_info.port);
+		else
+			sin_server.sin_port = 0;
 		rc = ipv4_connect(&sin_server, &csocket);
 		if (rc < 0) {
 			cERROR(1,
@@ -982,6 +1017,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			memcpy(&srvTcp->sockAddr, &sin_server, sizeof (struct sockaddr_in));	
             /* BB Add code for ipv6 case too */
 			srvTcp->ssocket = csocket;
+			srvTcp->protocolType = IPV4;
 			init_waitqueue_head(&srvTcp->response_q);
 			INIT_LIST_HEAD(&srvTcp->pending_mid_q);
 			srvTcp->tcpStatus = CifsNew;
