@@ -385,6 +385,8 @@ struct platform_device {
 	struct resource	* resource;
 };
 
+#define to_platform_device(x) container_of((x), struct platform_device, dev)
+
 extern int platform_device_register(struct platform_device *);
 extern void platform_device_unregister(struct platform_device *);
 
