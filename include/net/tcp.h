@@ -1475,7 +1475,8 @@ static __inline__ void tcp_set_state(struct sock *sk, int state)
 			TCP_INC_STATS(TcpEstabResets);
 
 		sk->sk_prot->unhash(sk);
-		if (sk->sk_prev && !(sk->sk_userlocks & SOCK_BINDPORT_LOCK))
+		if (tcp_sk(sk)->bind_hash &&
+		    !(sk->sk_userlocks & SOCK_BINDPORT_LOCK))
 			tcp_put_port(sk);
 		/* fall through */
 	default:

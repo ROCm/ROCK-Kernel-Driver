@@ -3078,9 +3078,9 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	 */
 success:
 	inet_sk(sk)->num = snum;
-	if (!sk->sk_prev) {
+	if (!sctp_sk(sk)->bind_hash) {
 		sk_add_bind_node(sk, &pp->sk_list);
-		sk->sk_prev = (struct sock *) pp;
+		sctp_sk(sk)->bind_hash = pp;
 	}
 	ret = 0;
 
@@ -3345,9 +3345,9 @@ static __inline__ void __sctp_put_port(struct sock *sk)
 	struct sctp_bind_bucket *pp;
 
 	sctp_spin_lock(&head->lock);
-	pp = (struct sctp_bind_bucket *)sk->sk_prev;
+	pp = sctp_sk(sk)->bind_hash;
 	hlist_del(&sk->sk_bind_node);
-	sk->sk_prev = NULL;
+	sctp_sk(sk)->bind_hash = NULL;
 	inet_sk(sk)->num = 0;
 	sctp_bucket_destroy(pp);
 	sctp_spin_unlock(&head->lock);
