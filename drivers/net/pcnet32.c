@@ -923,7 +923,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
      */
 
     if (fset) {
-	a->write_bcr(ioaddr, 18, (a->read_bcr(ioaddr, 18) | 0x0800));
+	a->write_bcr(ioaddr, 18, (a->read_bcr(ioaddr, 18) | 0x0860));
 	a->write_csr(ioaddr, 80, (a->read_csr(ioaddr, 80) & 0x0C00) | 0x0c00);
 	dxsuflo = 1;
 	ltint = 1;
