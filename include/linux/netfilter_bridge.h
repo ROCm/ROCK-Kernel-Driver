@@ -30,6 +30,7 @@
 #define BRNF_PKT_TYPE			0x01
 #define BRNF_BRIDGED_DNAT		0x02
 #define BRNF_DONT_TAKE_PARENT		0x04
+#define BRNF_BRIDGED			0x08
 
 enum nf_br_hook_priorities {
 	NF_BR_PRI_FIRST = INT_MIN,

@@ -300,8 +300,9 @@ ipq_enqueue_packet(struct sk_buff *skb, struct nf_info *info, void *data)
 	write_lock_bh(&queue_lock);
 	
 	if (!peer_pid)
-		goto err_out_unlock;
+		goto err_out_free_nskb; 
 
+ 	/* netlink_unicast will either free the nskb or attach it to a socket */ 
 	status = netlink_unicast(ipqnl, nskb, peer_pid, MSG_DONTWAIT);
 	if (status < 0)
 		goto err_out_unlock;
@@ -312,6 +313,9 @@ ipq_enqueue_packet(struct sk_buff *skb, struct nf_info *info, void *data)
 
 	write_unlock_bh(&queue_lock);
 	return status;
+
+err_out_free_nskb:
+	kfree_skb(nskb); 
 	
 err_out_unlock:
 	write_unlock_bh(&queue_lock);
