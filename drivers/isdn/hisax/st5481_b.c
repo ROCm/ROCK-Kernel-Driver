@@ -257,13 +257,18 @@ static void st5481B_mode(struct st5481_bcs *bcs, int mode)
 static int st5481_setup_b_out(struct st5481_bcs *bcs)
 {
 	struct usb_device *dev = bcs->adapter->usb_dev;
-	struct usb_host_interface *altsetting;
+	struct usb_interface *intf;
+	struct usb_host_interface *altsetting = NULL;
 	struct usb_host_endpoint *endpoint;
   	struct st5481_b_out *b_out = &bcs->b_out;
 
 	DBG(4,"");
 
-	altsetting = &(dev->config->interface[0]->altsetting[3]);
+	intf = usb_ifnum_to_if(dev, 0);
+	if (intf)
+		altsetting = usb_altnum_to_altsetting(intf, 3);
+	if (!altsetting)
+		return -ENXIO;
 
 	// Allocate URBs and buffers for the B channel out
 	endpoint = &altsetting->endpoint[EP_B1_OUT - 1 + bcs->channel * 2];
