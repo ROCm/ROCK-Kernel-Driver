@@ -111,6 +111,24 @@ static ssize_t node_read_numastat(struct sys_device * dev, char * buf)
 }
 static SYSDEV_ATTR(numastat, S_IRUGO, node_read_numastat, NULL);
 
+static ssize_t node_read_distance(struct sys_device * dev, char * buf)
+{
+	int nid = dev->id;
+	int len = 0;
+	int i;
+
+	/* buf currently PAGE_SIZE, need ~4 chars per node */
+	BUILD_BUG_ON(NR_NODES*4 > PAGE_SIZE/2);
+
+	for (i = 0; i < numnodes; i++)
+		len += sprintf(buf + len, "%s%d", i ? " " : "", node_distance(nid, i));
+
+	len += sprintf(buf + len, "\n");
+	return len;
+}
+static SYSDEV_ATTR(distance, S_IRUGO, node_read_distance, NULL);
+
+
 /*
  * register_node - Setup a driverfs device for a node.
  * @num - Node number to use when creating the device.
@@ -129,6 +147,7 @@ int __init register_node(struct node *node, int num, struct node *parent)
 		sysdev_create_file(&node->sysdev, &attr_cpumap);
 		sysdev_create_file(&node->sysdev, &attr_meminfo);
 		sysdev_create_file(&node->sysdev, &attr_numastat);
+		sysdev_create_file(&node->sysdev, &attr_distance);
 	}
 	return error;
 }
