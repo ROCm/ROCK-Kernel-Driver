@@ -196,7 +196,7 @@ static __inline__ unsigned long __ffs(unsigned long word)
 	return result;
 }
 
-static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
+static __inline__ int find_next_zero_bit (const unsigned long * addr, int size, int offset)
 {
 	unsigned long *p = (unsigned long *)(((unsigned long)addr + (offset >> 3)) & ~3);
 	unsigned long result = offset & ~31UL;
