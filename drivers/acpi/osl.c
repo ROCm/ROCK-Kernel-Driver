@@ -71,6 +71,12 @@ static struct workqueue_struct *kacpid_wq;
 acpi_status
 acpi_os_initialize(void)
 {
+	return AE_OK;
+}
+
+acpi_status
+acpi_os_initialize1(void)
+{
 	/*
 	 * Initialize PCI configuration space access, as we'll need to access
 	 * it while walking the namespace (bus 0 and root bridges w/ _BBNs).
@@ -470,6 +476,8 @@ acpi_os_read_pci_configuration (struct acpi_pci_id *pci_id, u32 reg, void *value
 		return AE_ERROR;
 	}
 
+	BUG_ON(!raw_pci_ops);
+
 	result = raw_pci_ops->read(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
 				reg, size, value);
@@ -495,6 +503,8 @@ acpi_os_write_pci_configuration (struct acpi_pci_id *pci_id, u32 reg, acpi_integ
 	default:
 		return AE_ERROR;
 	}
+
+	BUG_ON(!raw_pci_ops);
 
 	result = raw_pci_ops->write(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
