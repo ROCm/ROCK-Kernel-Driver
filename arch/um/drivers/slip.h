@@ -2,6 +2,9 @@
 #define __UM_SLIP_H
 
 #define BUF_SIZE 1500
+ /* two bytes each for a (pathological) max packet of escaped chars +  * 
+  * terminating END char + initial END char                            */
+#define ENC_BUF_SIZE (2 * BUF_SIZE + 2)
 
 struct slip_data {
 	void *dev;
@@ -9,10 +12,9 @@ struct slip_data {
 	char *addr;
 	char *gate_addr;
 	int slave;
-	/* two bytes each for a (pathological) max packet of escaped chars + 
-	 * terminating END char + inital END char
-	 */
-	char buf[2 * BUF_SIZE + 2];
+	char ibuf[ENC_BUF_SIZE];
+	char obuf[ENC_BUF_SIZE];
+	int more; /* more data: do not read fd until ibuf has been drained */
 	int pos;
 	int esc;
 };
