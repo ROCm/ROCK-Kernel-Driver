@@ -449,6 +449,15 @@ dasd_devmap_from_kdev(kdev_t kdev)
 }
 
 /*
+ * Find the devmap for a device corresponding to a block_device.
+ */
+dasd_devmap_t *
+dasd_devmap_from_bdev(struct block_device *bdev)
+{
+	return dasd_devmap_from_kdev(to_kdev_t(bdev->bd_dev));
+}
+
+/*
  * Find the device structure for device number devno. If it does not
  * exists yet, allocate it. Increase the reference counter in the device
  * structure and return a pointer to it.
