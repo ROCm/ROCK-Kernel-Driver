@@ -52,12 +52,12 @@ drivers-$(CONFIG_MATHEMU) += arch/$(ARCH)/math-emu/
 
 boot		:= arch/$(ARCH)/boot
 
-all: image kerntypes.o
+all: image
 
 install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
-image kerntypes.o: vmlinux
+image: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 archclean:
