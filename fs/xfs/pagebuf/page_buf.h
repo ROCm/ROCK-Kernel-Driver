@@ -340,7 +340,7 @@ extern caddr_t	pagebuf_offset(page_buf_t *, off_t);
 
 extern void pagebuf_iomove(		/* move data in/out of pagebuf	*/
 		page_buf_t *,		/* buffer to manipulate		*/
-		off_t,			/* starting buffer offset	*/
+		size_t,			/* starting buffer offset	*/
 		size_t,			/* length in buffer		*/
 		caddr_t,		/* data pointer			*/
 		page_buf_rw_t);		/* direction			*/

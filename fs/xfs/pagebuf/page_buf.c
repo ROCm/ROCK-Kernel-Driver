@@ -1503,44 +1503,6 @@ pagebuf_offset(
 }
 
 /*
- *	pagebuf_segment
- *
- *	pagebuf_segment is used to retrieve the various contiguous
- *	segments of a buffer.  The variable addressed by the
- *	loff_t * should be initialized to 0, and successive
- *	calls will update to point to the segment following the one
- *	returned.
- */
-STATIC void
-pagebuf_segment(
-	page_buf_t		*pb,	/* buffer to examine		*/
-	loff_t			*boff_p,/* offset in buffer of next	*/
-					/* next segment (updated)	*/
-	struct page		**spage_p, /* page (updated)		*/
-					/* (NULL if not in page array)	*/
-	size_t			*soff_p,/* offset in page (updated)	*/
-	size_t			*ssize_p) /* segment length (updated)	*/
-{
-	loff_t			kpboff;	/* offset in pagebuf		*/
-	int			kpi;	/* page index in pagebuf	*/
-	size_t			slen;	/* segment length		*/
-
-	kpboff = *boff_p;
-
-	kpi = page_buf_btoct(kpboff + pb->pb_offset);
-
-	*spage_p = pb->pb_pages[kpi];
-
-	*soff_p = page_buf_poff(kpboff + pb->pb_offset);
-	slen = PAGE_CACHE_SIZE - *soff_p;
-	if (slen > (pb->pb_count_desired - kpboff))
-		slen = (pb->pb_count_desired - kpboff);
-	*ssize_p = slen;
-
-	*boff_p = *boff_p + slen;
-}
-
-/*
  *	pagebuf_iomove
  *
  *	Move data into or out of a buffer.
@@ -1548,21 +1510,21 @@ pagebuf_segment(
 void
 pagebuf_iomove(
 	page_buf_t		*pb,	/* buffer to process		*/
-	off_t			boff,	/* starting buffer offset	*/
+	size_t			boff,	/* starting buffer offset	*/
 	size_t			bsize,	/* length to copy		*/
 	caddr_t			data,	/* data address			*/
 	page_buf_rw_t		mode)	/* read/write flag		*/
 {
-	loff_t			cboff;
-	size_t			cpoff;
-	size_t			csize;
+	size_t			bend, cpoff, csize;
 	struct page		*page;
 
-	cboff = boff;
-	boff += bsize; /* last */
+	bend = boff + bsize;
+	while (boff < bend) {
+		page = pb->pb_pages[page_buf_btoct(boff + pb->pb_offset)];
+		cpoff = page_buf_poff(boff + pb->pb_offset);
+		csize = min_t(size_t,
+			      PAGE_CACHE_SIZE-cpoff, pb->pb_count_desired-boff);
 
-	while (cboff < boff) {
-		pagebuf_segment(pb, &cboff, &page, &cpoff, &csize);
 		ASSERT(((csize + cpoff) <= PAGE_CACHE_SIZE));
 
 		switch (mode) {
@@ -1576,6 +1538,7 @@ pagebuf_iomove(
 			memcpy(page_address(page) + cpoff, data, csize);
 		}
 
+		boff += csize;
 		data += csize;
 	}
 }
