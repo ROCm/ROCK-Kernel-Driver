@@ -306,6 +306,23 @@ mpc10x_bridge_init(struct pci_controller *hose,
 	mpc10x_disable_store_gathering(hose);
 #endif
 
+	/*
+	 * 8240 erratum 26, 8241/8245 erratum 29, 107 erratum 23: speculative
+	 * PCI reads may return stale data so turn off.
+	 */
+	if ((host_bridge == MPC10X_BRIDGE_8240)
+		|| (host_bridge == MPC10X_BRIDGE_8245)
+		|| (host_bridge == MPC10X_BRIDGE_107)) {
+
+		early_read_config_dword(hose, 0, PCI_DEVFN(0,0),
+			MPC10X_CFG_PICR1_REG, &picr1);
+
+		picr1 &= ~MPC10X_CFG_PICR1_SPEC_PCI_RD;
+
+		early_write_config_dword(hose, 0, PCI_DEVFN(0,0),
+			MPC10X_CFG_PICR1_REG, picr1);
+	}
+
 	if (ppc_md.progress) ppc_md.progress("mpc10x:exit", 0x100);
 	return 0;
 }
