@@ -248,7 +248,6 @@ slot_bconn(struct fsm_inst *fi, int pr, void *arg)
 
 	fsm_change_state(fi, ST_SLOT_ACTIVE);
 
-//FIXME	drivers[di]->online |= (1 << (c->arg));
 	isdn_info_update();
 
 	do_stat_cb(slot, ctrl);
@@ -495,7 +494,6 @@ static char *drv_ev_str[] = {
 
 /* Description of hardware-level-driver */
 struct isdn_driver {
-	unsigned long       online;           /* Channel Online flags        */
 	unsigned long       flags;            /* Misc driver Flags           */
 	int                 locks;            /* Number of locks             */
 	int                 channels;         /* Number of channels          */
@@ -1273,7 +1271,6 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("DHUP: %d\n", i);
-			drivers[di]->online &= ~(1 << (c->arg));
 			isdn_info_update();
 			/* Signal hangup to network-devices */
 			if (isdn_net_stat_callback(i, c))
@@ -1289,7 +1286,6 @@ isdn_status_callback(isdn_ctrl * c)
 				return -1;
 			dbg_statcallb("BCONN: %ld\n", c->arg);
 			/* Signal B-channel-connect to network-devices */
-			drivers[di]->online |= (1 << (c->arg));
 			isdn_info_update();
 			if (isdn_net_stat_callback(i, c))
 				break;
@@ -1301,7 +1297,6 @@ isdn_status_callback(isdn_ctrl * c)
 			if (i < 0)
 				return -1;
 			dbg_statcallb("BHUP: %d\n", i);
-			drivers[di]->online &= ~(1 << (c->arg));
 			isdn_info_update();
 			/* Signal hangup to network-devices */
 			if (isdn_net_stat_callback(i, c))
@@ -1505,7 +1500,7 @@ isdn_statstr(void)
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_DRIVERS; i++) {
 		if (drivers[i]) {
-			sprintf(p, "%ld ", drivers[i]->online);
+			sprintf(p, "0 ");
 			p = istatbuf + strlen(istatbuf);
 		} else {
 			sprintf(p, "? ");
