@@ -41,6 +41,7 @@ struct dma_struct {
 	unsigned int	dma_base;	/* Controller base address	*/
 	int		dma_irq;	/* Controller IRQ		*/
 	struct scatterlist cur_sg;	/* Current controller buffer	*/
+	unsigned int	state;
 
 	struct dma_ops	*d_ops;
 };
