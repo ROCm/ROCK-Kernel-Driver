@@ -119,13 +119,13 @@ enum dl2x_offsets {
 	McstOctetRcvOk = 0xac,
 	BcstOctetRcvOk = 0xb0,
 	FramesRcvOk = 0xb4,
-	McstFramesRcvOk = 0xb8,
-	BcstFramesRcvOk = 0xbe,
+	McstFramesRcvdOk = 0xb8,
+	BcstFramesRcvdOk = 0xbe,
 	MacControlFramesRcvd = 0xc6,
 	FrameTooLongErrors = 0xc8,
 	InRangeLengthErrors = 0xca,
-	FrameCheckSeqError = 0xcc,
-	FrameLostRxError = 0xce,
+	FramesCheckSeqErrors = 0xcc,
+	FramesLostRxErrors = 0xce,
 	OctetXmtOk = 0xd0,
 	McstOctetXmtOk = 0xd4,
 	BcstOctetXmtOk = 0xd8,
@@ -264,6 +264,7 @@ enum RFS_bits {
 	FrameEnd = 0x40000000,
 	RFDDone = 0x80000000,
 	TCIShift = 32,
+	RFS_Errors = 0x003f0000,
 };
 
 #define MII_RESET_TIME_OUT		10000
@@ -648,7 +649,7 @@ struct netdev_private {
 	dma_addr_t tx_ring_dma;
 	dma_addr_t rx_ring_dma;
 	struct pci_dev *pdev;
-	spinlock_t lock;
+	spinlock_t tx_lock;
 	spinlock_t rx_lock;
 	struct net_device_stats stats;
 	unsigned int rx_buf_sz;		/* Based on MTU+slack. */
@@ -657,7 +658,6 @@ struct netdev_private {
 	unsigned int chip_id;		/* PCI table chip id */
 	unsigned int rx_coalesce; 	/* Maximum frames each RxDMAComplete intr */
 	unsigned int rx_timeout; 	/* Wait time between RxDMAComplete intr */
-	unsigned int tx_full:1;		/* The Tx queue is full. */
 	unsigned int full_duplex:1;	/* Full-duplex operation requested. */
 	unsigned int an_enable:2;	/* Auto-Negotiated Enable */
 	unsigned int jumbo:1;		/* Jumbo frame enable */
@@ -665,6 +665,7 @@ struct netdev_private {
 	unsigned int tx_flow:1;		/* Tx flow control enable */
 	unsigned int rx_flow:1;		/* Rx flow control enable */
 	unsigned int phy_media:1;	/* 1: fiber, 0: copper */
+	unsigned int link_status:1;	/* Current link status */
 	unsigned char pci_rev_id;	/* PCI revision ID */
 	struct netdev_desc *last_tx;	/* Last Tx descriptor used. */
 	unsigned long cur_rx, old_rx;	/* Producer/consumer ring indices */
@@ -677,8 +678,6 @@ struct netdev_private {
 	u16 advertising;	/* NWay media advertisement */
 	u16 negotiate;		/* Negotiated media */
 	int phy_addr;		/* PHY addresses. */
-	int tx_debug;
-	int rx_debug;
 };
 
 /* The station address location in the EEPROM. */
@@ -707,114 +706,4 @@ MODULE_DEVICE_TABLE (pci, rio_pci_tbl);
 #define DEFAULT_RXT		750
 #define DEFAULT_TXC		1
 #define MAX_TXC			8
-#ifdef RIO_DEBUG
-#define DEBUG_TFD_DUMP(x) debug_tfd_dump(x)
-#define DEBUG_RFD_DUMP(x,flag) debug_rfd_dump(x,flag)
-#define DEBUG_PKT_DUMP(x,len) debug_pkt_dump(x,len)
-#define DEBUG_PRINT printk
-
-static inline void
-debug_tfd_dump (struct netdev_private *np)
-{
-	int i;
-	struct netdev_desc *desc;
-
-	if (np->tx_debug == 6) {
-		printk ("TFDone Dump: ");
-		for (i = 0; i < TX_RING_SIZE; i++) {
-			desc = &np->tx_ring[i];
-			if ((desc->fraginfo & 0xffffffffff) == 0)
-				printk ("X");
-			else
-				printk ("%d", (desc->status & TFDDone) ? 1 : 0);
-		}
-		printk ("\n");
-	}
-	if (np->tx_debug == 5) {
-		for (i = 0; i < TX_RING_SIZE; i++) {
-			desc = &np->tx_ring[i];
-			printk
-			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
-			     (u32) np->tx_ring_dma + i * sizeof (*desc),
-			     (u32) desc->next_desc, (u32) desc->status,
-			     (u32) (desc->fraginfo >> 32),
-			     (u32) desc->fraginfo);
-			printk ("\n");
-		}
-		printk ("\n");
-	}
-}
-static inline void
-debug_rfd_dump (struct netdev_private *np, int flag)
-{
-	int i;
-	struct netdev_desc *desc;
-	int entry = np->cur_rx % RX_RING_SIZE;
-
-	if (np->rx_debug == 5) {
-		for (i = 0; i < RX_RING_SIZE; i++) {
-			desc = &np->rx_ring[i];
-			printk
-			    ("cur:%08x next:%08x status:%08x frag1:%08x frag0:%08x",
-			     (u32) np->rx_ring_dma + i * sizeof (*desc),
-			     (u32) desc->next_desc, (u32) desc->status,
-			     (u32) (desc->fraginfo >> 32),
-			     (u32) desc->fraginfo);
-			printk ("\n");
-		}
-		printk ("\n");
-	}
-
-	if (np->rx_debug == 6) {
-		if (flag == 1)
-			printk ("RFDone Dump: ");
-		else if (flag == 2)
-			printk ("Re-Filling:  ");
-		for (i = 0; i < RX_RING_SIZE; i++) {
-			desc = &np->rx_ring[i];
-			printk ("%d", (desc->status & RFDDone) ? 1 : 0);
-		}
-		printk ("\n");
-	}
-	if (np->rx_debug == 7) {
-		printk (" In rcv_pkt(), entry %d status %4.4x %4.4x.\n",
-			entry, (u32) (np->rx_ring[entry].status >> 32),
-			(u32) np->rx_ring[entry].status);
-	}
-
-}
-
-static inline void
-debug_pkt_dump (struct netdev_private *np, int pkt_len)
-{
-	int entry = np->cur_rx % RX_RING_SIZE;
-	struct netdev_desc *desc = &np->rx_ring[entry];
-	u64 frame_status = le64_to_cpu (desc->status);
-	unsigned char *pchar;
-	unsigned char *phead;
-	int i;
-
-	if (np->rx_debug == 4) {
-		printk ("  rcv_pkt: status was %4.4x %4.4x.\n",
-			(u32) (frame_status >> 32), (u32) frame_status);
-	}
-	if (np->rx_debug == 7) {
-
-#error Please convert me to Documentation/DMA-mapping.txt
-		phead =
-		    bus_to_virt (le64_to_cpu (desc->fraginfo & 0xffffffffff));
-		for (pchar = phead, i = 0; i < pkt_len; i++, pchar++) {
-			printk ("%02x ", *pchar);
-			if ((i + 1) % 20 == 0)
-				printk ("\n");
-		}
-	}
-}
-#else
-#define DEBUG_TFD_DUMP(x) {}
-#define DEBUG_RFD_DUMP(x,flag) {}
-#define DEBUG_PKT_DUMP(x,len) {}
-#define DEBUG_PRINT() {}
-#endif
-
 #endif				/* __DL2K_H__ */
