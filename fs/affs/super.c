@@ -210,9 +210,7 @@ parse_options(char *options, uid_t *uid, gid_t *gid, int *mode, int *reserved, s
 			optn = "volume";
 			if (!value || !*value)
 				goto out_no_arg;
-			if (strlen(value) > 30)
-				value[30] = 0;
-			strncpy(volume,value,30);
+			strlcpy(volume,value,31);
 		} else if (!strcmp(this_char,"mode")) {
 			optn = "mode";
 			if (!value || !*value)

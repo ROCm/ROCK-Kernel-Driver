@@ -308,7 +308,7 @@ void register_disk(struct gendisk *disk)
 	int j;
 	int err;
 
-	strncpy(disk->kobj.name,disk->disk_name,KOBJ_NAME_LEN);
+	strlcpy(disk->kobj.name,disk->disk_name,KOBJ_NAME_LEN);
 	/* ewww... some of these buggers have / in name... */
 	s = strchr(disk->kobj.name, '/');
 	if (s)

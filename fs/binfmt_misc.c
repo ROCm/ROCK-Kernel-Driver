@@ -113,10 +113,8 @@ static int load_misc_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	/* to keep locking time low, we copy the interpreter string */
 	read_lock(&entries_lock);
 	fmt = check_file(bprm);
-	if (fmt) {
-		strncpy(iname, fmt->interpreter, BINPRM_BUF_SIZE - 1);
-		iname[BINPRM_BUF_SIZE - 1] = '\0';
-	}
+	if (fmt)
+		strlcpy(iname, fmt->interpreter, BINPRM_BUF_SIZE);
 	read_unlock(&entries_lock);
 	if (!fmt)
 		goto _ret;
