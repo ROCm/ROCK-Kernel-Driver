@@ -59,7 +59,7 @@
 
 	|section	8
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	|xref	dnrm_lp
 	|xref	nrm_set

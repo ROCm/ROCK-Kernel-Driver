@@ -160,7 +160,7 @@
 
 	|section	8
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	|xref	fpsp_fmt_error
 

@@ -51,7 +51,7 @@
 
 	|section 8
  
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	|xref	b1238_fix
 

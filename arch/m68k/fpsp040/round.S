@@ -16,7 +16,7 @@
 
 	|section	8
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 |
 |	round --- round result according to precision/mode
