@@ -375,7 +375,7 @@ static int dummy_disable (struct usb_ep *_ep)
 	dum = ep_to_dummy (ep);
 
 	spin_lock_irqsave (&dum->lock, flags);
-	ep->desc = 0;
+	ep->desc = NULL;
 	retval = 0;
 	nuke (dum, ep);
 	spin_unlock_irqrestore (&dum->lock, flags);
@@ -391,12 +391,12 @@ dummy_alloc_request (struct usb_ep *_ep, int mem_flags)
 	struct dummy_request	*req;
 
 	if (!_ep)
-		return 0;
+		return NULL;
 	ep = usb_ep_to_dummy_ep (_ep);
 
 	req = kmalloc (sizeof *req, mem_flags);
 	if (!req)
-		return 0;
+		return NULL;
 	memset (req, 0, sizeof *req);
 	INIT_LIST_HEAD (&req->queue);
 	return &req->req;
@@ -432,7 +432,7 @@ dummy_alloc_buffer (
 	dum = ep_to_dummy (ep);
 
 	if (!dum->driver)
-		return 0;
+		return NULL;
 	retval = kmalloc (bytes, mem_flags);
 	*dma = (dma_addr_t) retval;
 	return retval;
@@ -516,7 +516,7 @@ static int dummy_dequeue (struct usb_ep *_ep, struct usb_request *_req)
 	struct dummy		*dum;
 	int			retval = -EINVAL;
 	unsigned long		flags;
-	struct dummy_request	*req = 0;
+	struct dummy_request	*req = NULL;
 
 	if (!_ep || !_req)
 		return retval;
@@ -730,7 +730,7 @@ usb_gadget_register_driver (struct usb_gadget_driver *driver)
 		ep->ep.maxpacket = ~0;
 		ep->last_io = jiffies;
 		ep->gadget = &dum->gadget;
-		ep->desc = 0;
+		ep->desc = NULL;
 		INIT_LIST_HEAD (&ep->queue);
 	}
 
@@ -744,8 +744,8 @@ usb_gadget_register_driver (struct usb_gadget_driver *driver)
 	dev_dbg (dummy_dev(dum), "binding gadget driver '%s'\n",
 			driver->driver.name);
 	if ((retval = driver->bind (&dum->gadget)) != 0) {
-		dum->driver = 0;
-		dum->gadget.dev.driver = 0;
+		dum->driver = NULL;
+		dum->gadget.dev.driver = NULL;
 		return retval;
 	}
 
@@ -807,7 +807,7 @@ usb_gadget_unregister_driver (struct usb_gadget_driver *driver)
 	spin_unlock_irqrestore (&dum->lock, flags);
 
 	driver->unbind (&dum->gadget);
-	dum->driver = 0;
+	dum->driver = NULL;
 
 	device_release_driver (&dum->gadget.dev);
 
@@ -1117,7 +1117,7 @@ restart:
 		struct urb		*urb;
 		struct dummy_request	*req;
 		u8			address;
-		struct dummy_ep		*ep = 0;
+		struct dummy_ep		*ep = NULL;
 		int			type;
 
 		urb = urbp->urb;
@@ -1372,7 +1372,7 @@ return_urb:
 			ep->already_seen = ep->setup_stage = 0;
 
 		spin_unlock (&dum->lock);
-		usb_hcd_giveback_urb (dummy_to_hcd(dum), urb, 0);
+		usb_hcd_giveback_urb (dummy_to_hcd(dum), urb, NULL);
 		spin_lock (&dum->lock);
 
 		goto restart;
@@ -1644,7 +1644,7 @@ static int dummy_start (struct usb_hcd *hcd)
 
 	INIT_LIST_HEAD (&dum->urbp_list);
 
-	root = usb_alloc_dev (0, &hcd->self, 0);
+	root = usb_alloc_dev (NULL, &hcd->self, 0);
 	if (!root)
 		return -ENOMEM;
 
@@ -1696,7 +1696,7 @@ static void dummy_stop (struct usb_hcd *hcd)
 
 static int dummy_h_get_frame (struct usb_hcd *hcd)
 {
-	return dummy_g_get_frame (0);
+	return dummy_g_get_frame (NULL);
 }
 
 static const struct hc_driver dummy_hcd = {
