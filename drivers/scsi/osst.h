@@ -518,7 +518,7 @@ struct osst_buffer {
   int writing;
   int midlevel_result;
   int syscall_result;
-  Scsi_Request *last_SRpnt;
+  struct scsi_request *last_SRpnt;
   unsigned char *b_data;
   os_aux_t *aux;               /* onstream AUX structure at end of each block     */
   unsigned short use_sg;       /* zero or number of s/g segments for this adapter */
@@ -531,7 +531,7 @@ struct osst_buffer {
 struct osst_tape {
   struct scsi_driver *driver;
   unsigned capacity;
-  Scsi_Device* device;
+  struct scsi_device *device;
   struct semaphore lock;       /* for serialization */
   struct completion wait;      /* for SCSI commands */
   struct osst_buffer * buffer;
