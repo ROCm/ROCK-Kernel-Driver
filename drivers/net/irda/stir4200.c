@@ -913,6 +913,8 @@ static int stir_net_open(struct net_device *netdev)
 	if (err)
 		goto err_out1;
 
+	err = -ENOMEM;
+
 	/* Note: Max SIR frame possible is 4273 */
 	stir->tx_data = kmalloc(STIR_FIFO_SIZE, GFP_KERNEL);
 	if (!stir->tx_data) {
@@ -956,7 +958,6 @@ static int stir_net_open(struct net_device *netdev)
 	 * Note : will send immediately a speed change...
 	 */
 	sprintf(hwname, "usb#%d", stir->usbdev->devnum);
-	err = -ENOMEM;
 	stir->irlap = irlap_open(netdev, &stir->qos, hwname);
 	if (!stir->irlap) {
 		ERROR("%s(): irlap_open failed\n", __FUNCTION__);
