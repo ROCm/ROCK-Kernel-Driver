@@ -597,9 +597,9 @@ struct sched_domain {
 	.cache_nice_tries	= 0,			\
 	.per_cpu_gain		= 15,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
-				 | SD_WAKE_AFFINE	\
-				 | SD_WAKE_IDLE		\
-				 | SD_SHARE_CPUPOWER,	\
+				| SD_WAKE_AFFINE	\
+				| SD_WAKE_IDLE		\
+				| SD_SHARE_CPUPOWER,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
 	.nr_balance_failed	= 0,			\

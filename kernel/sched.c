@@ -187,6 +187,8 @@ static inline unsigned int task_timeslice(task_t *p)
 	return BASE_TIMESLICE(p);
 }
 
+#define task_hot(p, now, sd) ((now) - (p)->timestamp < (sd)->cache_hot_time)
+
 /*
  * These are the runqueue data structures:
  */
@@ -704,13 +706,11 @@ static inline int wake_idle(int cpu, task_t *p)
  */
 static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 {
+	int cpu, this_cpu, success = 0;
 	unsigned long flags;
-	int success = 0;
 	long old_state;
 	runqueue_t *rq;
-	int cpu, this_cpu;
 #ifdef CONFIG_SMP
-	unsigned long long now;
 	unsigned long load, this_load;
 	struct sched_domain *sd;
 	int new_cpu;
@@ -753,8 +753,6 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	if (load > this_load + SCHED_LOAD_SCALE*2)
 		goto out_set_cpu;
 
-	now = sched_clock();
-
 	/*
 	 * Migrate the task to the waking domain.
 	 * Do not violate hard affinity.
@@ -762,7 +760,7 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	for_each_domain(this_cpu, sd) {
 		if (!(sd->flags & SD_WAKE_AFFINE))
 			break;
-		if (rq->timestamp_last_tick - p->timestamp < sd->cache_hot_time)
+		if (task_hot(p, rq->timestamp_last_tick, sd))
 			break;
 
 		if (cpu_isset(cpu, sd->span))
@@ -774,22 +772,18 @@ out_set_cpu:
 	new_cpu = wake_idle(new_cpu, p);
 	if (new_cpu != cpu && cpu_isset(new_cpu, p->cpus_allowed)) {
 		set_task_cpu(p, new_cpu);
-		goto repeat_lock_task;
+		task_rq_unlock(rq, &flags);
+		/* might preempt at this point */
+		rq = task_rq_lock(p, &flags);
+		old_state = p->state;
+		if (!(old_state & state))
+			goto out;
+		if (p->array)
+			goto out_running;
+
+		this_cpu = smp_processor_id();
+		cpu = task_cpu(p);
 	}
-	goto out_activate;
-
-repeat_lock_task:
-	task_rq_unlock(rq, &flags);
-	rq = task_rq_lock(p, &flags);
-	old_state = p->state;
-	if (!(old_state & state))
-		goto out;
-
-	if (p->array)
-		goto out_running;
-
-	this_cpu = smp_processor_id();
-	cpu = task_cpu(p);
 
 out_activate:
 #endif /* CONFIG_SMP */
@@ -1301,7 +1295,7 @@ int can_migrate_task(task_t *p, runqueue_t *rq, int this_cpu,
 	/* Aggressive migration if we've failed balancing */
 	if (idle == NEWLY_IDLE ||
 			sd->nr_balance_failed < sd->cache_nice_tries) {
-		if (rq->timestamp_last_tick - p->timestamp < sd->cache_hot_time)
+		if (task_hot(p, rq->timestamp_last_tick, sd))
 			return 0;
 	}
 
@@ -1319,10 +1313,9 @@ static int move_tasks(runqueue_t *this_rq, int this_cpu, runqueue_t *busiest,
 			unsigned long max_nr_move, struct sched_domain *sd,
 			enum idle_type idle)
 {
-	int idx;
-	int pulled = 0;
 	prio_array_t *array, *dst_array;
 	struct list_head *head, *curr;
+	int idx, pulled = 0;
 	task_t *tmp;
 
 	if (max_nr_move <= 0 || busiest->nr_running <= 1)
@@ -1411,10 +1404,8 @@ find_busiest_group(struct sched_domain *sd, int this_cpu,
 		/* Tally up the load of all CPUs in the group */
 		avg_load = 0;
 		cpus_and(tmp, group->cpumask, cpu_online_map);
-		if (unlikely(cpus_empty(tmp))) {
-			WARN_ON(1);
-			return NULL;
-		}
+		if (unlikely(cpus_empty(tmp)))
+			goto nextgroup;
 
 		for_each_cpu_mask(i, tmp) {
 			/* Bias balancing toward cpus of our domain */
