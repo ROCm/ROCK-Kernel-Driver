@@ -100,6 +100,7 @@ static int loglevel_write(struct file *file, const char *buffer,
 
 #ifdef CONFIG_JFS_STATISTICS
 extern read_proc_t jfs_lmstats_read;
+extern read_proc_t jfs_txstats_read;
 extern read_proc_t jfs_xtstat_read;
 extern read_proc_t jfs_mpstat_read;
 #endif
@@ -111,6 +112,7 @@ static struct {
 } Entries[] = {
 #ifdef CONFIG_JFS_STATISTICS
 	{ "lmstats",	jfs_lmstats_read, },
+	{ "txstats",	jfs_txstats_read, },
 	{ "xtstat",	jfs_xtstat_read, },
 	{ "mpstat",	jfs_mpstat_read, },
 #endif

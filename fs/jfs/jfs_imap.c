@@ -1170,7 +1170,7 @@ int diFree(struct inode *ip)
 	 * invalidate any page of the inode extent freed from buffer cache;
 	 */
 	freepxd = iagp->inoext[extno];
-	invalidate_pxd_metapages(ip->i_sb->s_bdev->bd_inode, freepxd);
+	invalidate_pxd_metapages(ip, freepxd);
 
 	/*
 	 *      update iag list(s) (careful update step 2)

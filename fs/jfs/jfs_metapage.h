@@ -38,7 +38,6 @@ struct metapage {
 	struct metapage *hash_prev;
 	struct metapage *hash_next;	/* Also used for free list */
 
-	struct list_head inode_list;	/* per-inode metapage list */
 	/*
 	 * mapping & index become redundant, but we need these here to
 	 * add the metapage to the hash before we have the real page
@@ -109,9 +108,7 @@ extern void __invalidate_metapages(struct inode *, s64, int);
 	__invalidate_metapages((ip), addressPXD(&(pxd)), lengthPXD(&(pxd)))
 #define invalidate_dxd_metapages(ip, dxd) \
 	__invalidate_metapages((ip), addressDXD(&(dxd)), lengthDXD(&(dxd)))
+#define invalidate_xad_metapages(ip, xad) \
+	__invalidate_metapages((ip), addressXAD(&(xad)), lengthXAD(&(xad)))
 
-/*
- * This one uses mp_list to invalidate all pages for an inode
- */
-extern void invalidate_inode_metapages(struct inode *inode);
 #endif				/* _H_JFS_METAPAGE */
