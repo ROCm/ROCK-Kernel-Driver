@@ -73,7 +73,7 @@ extern int  kgdb_output_string (const char* s, unsigned int count);
 static char *serial_name = "CPM UART driver";
 static char *serial_version = "0.03";
 
-static struct tty_driver serial_driver;
+static struct tty_driver *serial_driver;
 int serial_console_setup(struct console *co, char *options);
 
 /*
@@ -2462,7 +2462,7 @@ void kgdb_map_scc(void)
 static struct tty_struct *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 
@@ -2495,6 +2495,25 @@ long console_360_init(long kmem_start, long kmem_end)
 */
 static	int	baud_idx;
 
+static struct tty_operations rs_360_ops = {
+	.open = rs_360_open,
+	.close = rs_360_close,
+	.write = rs_360_write,
+	.put_char = rs_360_put_char,
+	.write_room = rs_360_write_room,
+	.chars_in_buffer = rs_360_chars_in_buffer,
+	.flush_buffer = rs_360_flush_buffer,
+	.ioctl = rs_360_ioctl,
+	.throttle = rs_360_throttle,
+	.unthrottle = rs_360_unthrottle,
+	/* .send_xchar = rs_360_send_xchar, */
+	.set_termios = rs_360_set_termios,
+	.stop = rs_360_stop,
+	.start = rs_360_start,
+	.hangup = rs_360_hangup,
+	/* .wait_until_sent = rs_360_wait_until_sent, */
+	/* .read_proc = rs_360_read_proc, */
+};
 
 /* int __init rs_360_init(void) */
 int rs_360_init(void)
@@ -2513,45 +2532,24 @@ int rs_360_init(void)
 	volatile	struct uart_pram	*sup;
 	/* volatile	immap_t		*immap; */
 	
+	serial_driver = alloc_tty_driver(NR_PORTS);
+	if (!serial_driver)
+		return -1;
+
 	show_serial_version();
 
-	/* Initialize the tty_driver structure */
-	
-	/* __clear_user(&serial_driver,sizeof(struct tty_driver)); */
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	/* serial_driver.driver_name = "serial"; */
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = NR_PORTS;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		baud_idx | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	serial_driver.open = rs_360_open;
-	serial_driver.close = rs_360_close;
-	serial_driver.write = rs_360_write;
-	serial_driver.put_char = rs_360_put_char;
-	serial_driver.write_room = rs_360_write_room;
-	serial_driver.chars_in_buffer = rs_360_chars_in_buffer;
-	serial_driver.flush_buffer = rs_360_flush_buffer;
-	serial_driver.ioctl = rs_360_ioctl;
-	serial_driver.throttle = rs_360_throttle;
-	serial_driver.unthrottle = rs_360_unthrottle;
-	/* serial_driver.send_xchar = rs_360_send_xchar; */
-	serial_driver.set_termios = rs_360_set_termios;
-	serial_driver.stop = rs_360_stop;
-	serial_driver.start = rs_360_start;
-	serial_driver.hangup = rs_360_hangup;
-	/* serial_driver.wait_until_sent = rs_360_wait_until_sent; */
-	/* serial_driver.read_proc = rs_360_read_proc; */
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &rs_360_ops);
 	
-	if (tty_register_driver(&serial_driver))
+	if (tty_register_driver(serial_driver))
 		panic("Couldn't register serial driver\n");
 
 	cp = pquicc;	/* Get pointer to Communication Processor */
@@ -2859,7 +2857,7 @@ int rs_360_init(void)
 			/* cpm_install_handler(IRQ_MACHSPEC | state->irq, rs_360_interrupt, info);  */
 			/*request_irq(IRQ_MACHSPEC | state->irq, rs_360_interrupt, */
 			request_irq(state->irq, rs_360_interrupt,
-						IRQ_FLG_LOCK, serial_driver.name, (void *)info);
+						IRQ_FLG_LOCK, "ttyS", (void *)info);
 
 			/* Set up the baud rate generator.
 			*/
