@@ -272,10 +272,8 @@ int call_usermodehelper(char *path, char **argv, char **envp, int wait)
 }
 EXPORT_SYMBOL(call_usermodehelper);
 
-static __init int usermodehelper_init(void)
+void __init usermodehelper_init(void)
 {
 	khelper_wq = create_singlethread_workqueue("khelper");
 	BUG_ON(!khelper_wq);
-	return 0;
 }
-core_initcall(usermodehelper_init);
