@@ -106,6 +106,8 @@ static struct pci_device_id e1000_pci_tbl[] __devinitdata = {
 	{0x8086, 0x1016, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1017, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x101E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1013, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1019, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	/* required last entry */
 	{0,}
 };
@@ -144,6 +146,7 @@ static void e1000_free_rx_resources(struct e1000_adapter *adapter);
 static void e1000_set_multi(struct net_device *netdev);
 static void e1000_update_phy_info(unsigned long data);
 static void e1000_watchdog(unsigned long data);
+static void e1000_82547_tx_fifo_stall(unsigned long data);
 static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
 static struct net_device_stats * e1000_get_stats(struct net_device *netdev);
 static int e1000_change_mtu(struct net_device *netdev, int new_mtu);
@@ -167,6 +170,9 @@ static inline void e1000_rx_checksum(struct e1000_adapter *adapter,
                                      struct sk_buff *skb);
 static void e1000_tx_timeout(struct net_device *dev);
 static void e1000_tx_timeout_task(struct net_device *dev);
+static void e1000_smartspeed(struct e1000_adapter *adapter);
+static inline int e1000_82547_fifo_workaround(struct e1000_adapter *adapter,
+					      struct sk_buff *skb);
 
 static void e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp);
 static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
@@ -284,6 +290,7 @@ e1000_down(struct e1000_adapter *adapter)
 
 	e1000_irq_disable(adapter);
 	free_irq(netdev->irq, netdev);
+	del_timer_sync(&adapter->tx_fifo_stall_timer);
 	del_timer_sync(&adapter->watchdog_timer);
 	del_timer_sync(&adapter->phy_info_timer);
 	adapter->link_speed = 0;
@@ -299,14 +306,28 @@ e1000_down(struct e1000_adapter *adapter)
 void
 e1000_reset(struct e1000_adapter *adapter)
 {
+	uint32_t pba;
 	/* Repartition Pba for greater than 9k mtu
 	 * To take effect CTRL.RST is required.
 	 */
 
-	if(adapter->rx_buffer_len > E1000_RXBUFFER_8192)
-		E1000_WRITE_REG(&adapter->hw, PBA, E1000_JUMBO_PBA);
-	else
-		E1000_WRITE_REG(&adapter->hw, PBA, E1000_DEFAULT_PBA);
+	if(adapter->hw.mac_type < e1000_82547) {
+		if(adapter->rx_buffer_len > E1000_RXBUFFER_8192)
+			pba = E1000_PBA_40K;
+		else
+			pba = E1000_PBA_48K;
+	} else {
+		if(adapter->rx_buffer_len > E1000_RXBUFFER_8192)
+			pba = E1000_PBA_22K;
+		else
+			pba = E1000_PBA_30K;
+		adapter->tx_fifo_head = 0;
+		adapter->tx_head_addr = pba << E1000_TX_HEAD_ADDR_SHIFT;
+		adapter->tx_fifo_size =
+			(E1000_PBA_40K - pba) << E1000_TX_FIFO_SIZE_SHIFT;
+		atomic_set(&adapter->tx_fifo_stall, 0);
+	}
+	E1000_WRITE_REG(&adapter->hw, PBA, pba);
 
 	adapter->hw.fc = adapter->hw.original_fc;
 	e1000_reset_hw(&adapter->hw);
@@ -397,11 +418,11 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->change_mtu = &e1000_change_mtu;
 	netdev->do_ioctl = &e1000_ioctl;
 	netdev->tx_timeout = &e1000_tx_timeout;
-	netdev->watchdog_timeo = HZ;
 #ifdef CONFIG_E1000_NAPI
 	netdev->poll = &e1000_poll;
 	netdev->weight = 64;
 #endif
+	netdev->watchdog_timeo = 5 * HZ;
 	netdev->vlan_rx_register = e1000_vlan_rx_register;
 	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
 	netdev->vlan_rx_kill_vid = e1000_vlan_rx_kill_vid;
@@ -421,17 +442,18 @@ e1000_probe(struct pci_dev *pdev,
 
 	if(adapter->hw.mac_type >= e1000_82543) {
 		netdev->features = NETIF_F_SG |
-			           NETIF_F_HW_CSUM |
-		       	           NETIF_F_HW_VLAN_TX |
-		                   NETIF_F_HW_VLAN_RX |
+				   NETIF_F_HW_CSUM |
+				   NETIF_F_HW_VLAN_TX |
+				   NETIF_F_HW_VLAN_RX |
 				   NETIF_F_HW_VLAN_FILTER;
 	} else {
 		netdev->features = NETIF_F_SG;
 	}
 
-	if(adapter->hw.mac_type >= e1000_82544)
+	if((adapter->hw.mac_type >= e1000_82544) &&
+	   (adapter->hw.mac_type != e1000_82547))
 		netdev->features |= NETIF_F_TSO;
- 
+
 	if(pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
 
@@ -461,6 +483,9 @@ e1000_probe(struct pci_dev *pdev,
 	else
 		adapter->max_data_per_txd = MAX_JUMBO_FRAME_SIZE;
 
+	init_timer(&adapter->tx_fifo_stall_timer);
+	adapter->tx_fifo_stall_timer.function = &e1000_82547_tx_fifo_stall;
+	adapter->tx_fifo_stall_timer.data = (unsigned long) adapter;
 
 	init_timer(&adapter->watchdog_timer);
 	adapter->watchdog_timer.function = &e1000_watchdog;
@@ -490,10 +515,11 @@ e1000_probe(struct pci_dev *pdev,
 	 * enable the ACPI Magic Packet filter
 	 */
 
-	e1000_read_eeprom(&adapter->hw, EEPROM_INIT_CONTROL2_REG, &eeprom_data);
+	e1000_read_eeprom(&adapter->hw, EEPROM_INIT_CONTROL2_REG,1, &eeprom_data);
 	if((adapter->hw.mac_type >= e1000_82544) &&
 	   (eeprom_data & E1000_EEPROM_APME))
 		adapter->wol |= E1000_WUFC_MAG;
+
 
 	/* reset the hardware with the new settings */
 
@@ -586,12 +612,19 @@ e1000_sw_init(struct e1000_adapter *adapter)
 		return -1;
 	}
 
+	/* initialize eeprom parameters */
+
+	e1000_init_eeprom_params(hw);
+
 	/* flow control settings */
 
 	hw->fc_high_water = E1000_FC_HIGH_THRESH;
 	hw->fc_low_water = E1000_FC_LOW_THRESH;
 	hw->fc_pause_time = E1000_FC_PAUSE_TIME;
 	hw->fc_send_xon = 1;
+
+	if((hw->mac_type == e1000_82541) || (hw->mac_type == e1000_82547))
+		hw->phy_init_script = 1;
 
 	/* Media type - copper or fiber */
 
@@ -1192,9 +1225,9 @@ e1000_set_multi(struct net_device *netdev)
 	if(hw->mac_type == e1000_82542_rev2_0)
 		e1000_enter_82542_rst(adapter);
 
-	/* load the first 15 multicast address into the exact filters 1-15
+	/* load the first 14 multicast address into the exact filters 1-14
 	 * RAR 0 is used for the station MAC adddress
-	 * if there are not 15 addresses, go ahead and clear the filters
+	 * if there are not 14 addresses, go ahead and clear the filters
 	 */
 	mc_ptr = netdev->mc_list;
 
@@ -1235,6 +1268,48 @@ e1000_update_phy_info(unsigned long data)
 }
 
 /**
+ * e1000_82547_tx_fifo_stall - Timer Call-back
+ * @data: pointer to adapter cast into an unsigned long
+ **/
+
+static void
+e1000_82547_tx_fifo_stall(unsigned long data)
+{
+	struct e1000_adapter *adapter = (struct e1000_adapter *) data;
+	struct net_device *netdev = adapter->netdev;
+	uint32_t tctl;
+
+	if(atomic_read(&adapter->tx_fifo_stall)) {
+		if((E1000_READ_REG(&adapter->hw, TDT) ==
+		    E1000_READ_REG(&adapter->hw, TDH)) &&
+		   (E1000_READ_REG(&adapter->hw, TDFT) ==
+		    E1000_READ_REG(&adapter->hw, TDFH)) &&
+		   (E1000_READ_REG(&adapter->hw, TDFTS) ==
+		    E1000_READ_REG(&adapter->hw, TDFHS))) {
+			tctl = E1000_READ_REG(&adapter->hw, TCTL);
+			E1000_WRITE_REG(&adapter->hw, TCTL,
+					tctl & ~E1000_TCTL_EN);
+			E1000_WRITE_REG(&adapter->hw, TDFT,
+					adapter->tx_head_addr);
+			E1000_WRITE_REG(&adapter->hw, TDFH,
+					adapter->tx_head_addr);
+			E1000_WRITE_REG(&adapter->hw, TDFTS,
+					adapter->tx_head_addr);
+			E1000_WRITE_REG(&adapter->hw, TDFHS,
+					adapter->tx_head_addr);
+			E1000_WRITE_REG(&adapter->hw, TCTL, tctl);
+			E1000_WRITE_FLUSH(&adapter->hw);
+
+			adapter->tx_fifo_head = 0;
+			atomic_set(&adapter->tx_fifo_stall, 0);
+			netif_wake_queue(netdev);
+		} else {
+			mod_timer(&adapter->tx_fifo_stall_timer, jiffies + 1);
+		}
+	}
+}
+
+/**
  * e1000_watchdog - Timer Call-back
  * @data: pointer to netdev cast into an unsigned long
  **/
@@ -1264,6 +1339,7 @@ e1000_watchdog(unsigned long data)
 			netif_carrier_on(netdev);
 			netif_wake_queue(netdev);
 			mod_timer(&adapter->phy_info_timer, jiffies + 2 * HZ);
+			adapter->smartspeed = 0;
 		}
 	} else {
 		if(netif_carrier_ok(netdev)) {
@@ -1276,6 +1352,8 @@ e1000_watchdog(unsigned long data)
 			netif_stop_queue(netdev);
 			mod_timer(&adapter->phy_info_timer, jiffies + 2 * HZ);
 		}
+
+		e1000_smartspeed(adapter);
 	}
 
 	e1000_update_stats(adapter);
@@ -1501,6 +1579,49 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 }
 
 #define TXD_USE_COUNT(S, X) (((S) / (X)) + (((S) % (X)) ? 1 : 0))
+/**
+ * 82547 workaround to avoid controller hang in half-duplex environment.
+ * The workaround is to avoid queuing a large packet that would span
+ * the internal Tx FIFO ring boundary by notifying the stack to resend
+ * the packet at a later time.  This gives the Tx FIFO an opportunity to
+ * flush all packets.  When that occurs, we reset the Tx FIFO pointers
+ * to the beginning of the Tx FIFO.
+ **/
+
+#define E1000_FIFO_HDR			0x10
+#define E1000_82547_PAD_LEN		0x3E0
+
+static inline int
+e1000_82547_fifo_workaround(struct e1000_adapter *adapter, struct sk_buff *skb)
+{
+	uint32_t fifo_space = adapter->tx_fifo_size - adapter->tx_fifo_head;
+	uint32_t skb_fifo_len = skb->len + E1000_FIFO_HDR;
+
+	E1000_ROUNDUP(skb_fifo_len, E1000_FIFO_HDR);
+
+	if(adapter->link_duplex != HALF_DUPLEX)
+		goto no_fifo_stall_required;
+
+	if(atomic_read(&adapter->tx_fifo_stall))
+		return 1;
+
+	if(skb_fifo_len >= (E1000_82547_PAD_LEN + fifo_space)) {
+		atomic_set(&adapter->tx_fifo_stall, 1);
+		return 1;
+	}
+
+no_fifo_stall_required:
+	adapter->tx_fifo_head += skb_fifo_len;
+	if(adapter->tx_fifo_head >= adapter->tx_fifo_size)
+		adapter->tx_fifo_head -= adapter->tx_fifo_size;
+	return 0;
+}
+
+/* Tx Descriptors needed, worst case */
+#define TXD_USE_COUNT(S) (((S) >> E1000_MAX_TXD_PWR) + \
+			 (((S) & (E1000_MAX_DATA_PER_TXD - 1)) ? 1 : 0))
+#define DESC_NEEDED TXD_USE_COUNT(MAX_JUMBO_FRAME_SIZE) + \
+	MAX_SKB_FRAGS * TXD_USE_COUNT(PAGE_SIZE) + 1
 
 static int
 e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
@@ -1526,6 +1647,14 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count) {
 		netif_stop_queue(netdev);
 		return 1;
+	}
+
+	if(adapter->hw.mac_type == e1000_82547) {
+		if(e1000_82547_fifo_workaround(adapter, skb)) {
+			netif_stop_queue(netdev);
+			mod_timer(&adapter->tx_fifo_stall_timer, jiffies);
+			return 1;
+		}
 	}
 
 	if(adapter->vlgrp && vlan_tx_tag_present(skb)) {
@@ -2220,6 +2349,61 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 	}
 
 	rx_ring->next_to_use = i;
+}
+
+/**
+ * e1000_smartspeed - Workaround for SmartSpeed on 82541 and 82547 controllers.
+ * @adapter:
+ **/
+
+static void
+e1000_smartspeed(struct e1000_adapter *adapter)
+{
+	uint16_t phy_status;
+	uint16_t phy_ctrl;
+
+	if((adapter->hw.phy_type != e1000_phy_igp) || !adapter->hw.autoneg ||
+	   !(adapter->hw.autoneg_advertised & ADVERTISE_1000_FULL))
+		return;
+
+	if(adapter->smartspeed == 0) {
+		/* If Master/Slave config fault is asserted twice,
+		 * we assume back-to-back */
+		e1000_read_phy_reg(&adapter->hw, PHY_1000T_STATUS, &phy_status);
+		if(!(phy_status & SR_1000T_MS_CONFIG_FAULT)) return;
+		e1000_read_phy_reg(&adapter->hw, PHY_1000T_STATUS, &phy_status);
+		if(!(phy_status & SR_1000T_MS_CONFIG_FAULT)) return;
+		e1000_read_phy_reg(&adapter->hw, PHY_1000T_CTRL, &phy_ctrl);
+		if(phy_ctrl & CR_1000T_MS_ENABLE) {
+			phy_ctrl &= ~CR_1000T_MS_ENABLE;
+			e1000_write_phy_reg(&adapter->hw, PHY_1000T_CTRL,
+					    phy_ctrl);
+			adapter->smartspeed++;
+			if(!e1000_phy_setup_autoneg(&adapter->hw) &&
+			   !e1000_read_phy_reg(&adapter->hw, PHY_CTRL,
+				   	       &phy_ctrl)) {
+				phy_ctrl |= (MII_CR_AUTO_NEG_EN |
+					     MII_CR_RESTART_AUTO_NEG);
+				e1000_write_phy_reg(&adapter->hw, PHY_CTRL,
+						    phy_ctrl);
+			}
+		}
+		return;
+	} else if(adapter->smartspeed == E1000_SMARTSPEED_DOWNSHIFT) {
+		/* If still no link, perhaps using 2/3 pair cable */
+		e1000_read_phy_reg(&adapter->hw, PHY_1000T_CTRL, &phy_ctrl);
+		phy_ctrl |= CR_1000T_MS_ENABLE;
+		e1000_write_phy_reg(&adapter->hw, PHY_1000T_CTRL, phy_ctrl);
+		if(!e1000_phy_setup_autoneg(&adapter->hw) &&
+		   !e1000_read_phy_reg(&adapter->hw, PHY_CTRL, &phy_ctrl)) {
+			phy_ctrl |= (MII_CR_AUTO_NEG_EN |
+				     MII_CR_RESTART_AUTO_NEG);
+			e1000_write_phy_reg(&adapter->hw, PHY_CTRL, phy_ctrl);
+		}
+	}
+	/* Restart process after E1000_SMARTSPEED_MAX iterations */
+	if(adapter->smartspeed++ == E1000_SMARTSPEED_MAX)
+		adapter->smartspeed = 0;
 }
 
 /**

@@ -145,16 +145,6 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 	return 0;
 }
 
-static inline int
-e1000_eeprom_size(struct e1000_hw *hw)
-{
-	if((hw->mac_type > e1000_82544) &&
-	   (E1000_READ_REG(hw, EECD) & E1000_EECD_SIZE))
-		return 512;
-	else
-		return 128;
-}
-
 static void
 e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
                        struct ethtool_drvinfo *drvinfo)
@@ -166,7 +156,7 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 	drvinfo->n_stats = E1000_STATS_LEN;
 #define E1000_REGS_LEN 32
 	drvinfo->regdump_len  = E1000_REGS_LEN * sizeof(uint32_t);
-	drvinfo->eedump_len  = e1000_eeprom_size(&adapter->hw);
+	drvinfo->eedump_len = adapter->hw.eeprom.word_size * 2;
 }
 
 static void
@@ -200,9 +190,8 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, uint16_t *eeprom_buff)
 {
 	struct e1000_hw *hw = &adapter->hw;
-	int max_len, first_word, last_word;
+	int first_word, last_word;
 	int ret_val = 0;
-	int i;
 
 	if(eeprom->len == 0) {
 		ret_val = -EINVAL;
@@ -211,22 +200,28 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 
 	eeprom->magic = hw->vendor_id | (hw->device_id << 16);
 
-	max_len = e1000_eeprom_size(hw);
-
 	if(eeprom->offset > eeprom->offset + eeprom->len) {
 		ret_val = -EINVAL;
 		goto geeprom_error;
 	}
 
-	if((eeprom->offset + eeprom->len) > max_len)
-		eeprom->len = (max_len - eeprom->offset);
+	if((eeprom->offset + eeprom->len) > (hw->eeprom.word_size * 2))
+		eeprom->len = ((hw->eeprom.word_size * 2) - eeprom->offset);
 
 	first_word = eeprom->offset >> 1;
 	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
 
-	for(i = 0; i <= (last_word - first_word); i++)
-		e1000_read_eeprom(hw, first_word + i, &eeprom_buff[i]);
-
+	if(hw->eeprom.type == e1000_eeprom_spi)
+		ret_val = e1000_read_eeprom(hw, first_word,
+					    last_word - first_word + 1,
+					    eeprom_buff);
+	else {
+		uint16_t i;
+		for (i = 0; i < last_word - first_word + 1; i++)
+			if((ret_val = e1000_read_eeprom(hw, first_word + i, 1,
+						       &eeprom_buff[i])))
+				break;
+	}
 geeprom_error:
 	return ret_val;
 }
@@ -237,9 +232,8 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 {
 	struct e1000_hw *hw = &adapter->hw;
 	uint16_t *eeprom_buff;
-	int max_len, first_word, last_word;
 	void *ptr;
-	int i;
+	int max_len, first_word, last_word, ret_val = 0;
 
 	if(eeprom->len == 0)
 		return -EOPNOTSUPP;
@@ -247,7 +241,7 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	if(eeprom->magic != (hw->vendor_id | (hw->device_id << 16)))
 		return -EFAULT;
 
-	max_len = e1000_eeprom_size(hw);
+	max_len = hw->eeprom.word_size * 2;
 
 	if((eeprom->offset + eeprom->len) > max_len)
 		eeprom->len = (max_len - eeprom->offset);
@@ -263,30 +257,31 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	if(eeprom->offset & 1) {
 		/* need read/modify/write of first changed EEPROM word */
 		/* only the second byte of the word is being modified */
-		e1000_read_eeprom(hw, first_word, &eeprom_buff[0]);
+		ret_val = e1000_read_eeprom(hw, first_word, 1,
+					    &eeprom_buff[0]);
 		ptr++;
 	}
-	if((eeprom->offset + eeprom->len) & 1) {
+	if(((eeprom->offset + eeprom->len) & 1) && (ret_val == 0)) {
 		/* need read/modify/write of last changed EEPROM word */
 		/* only the first byte of the word is being modified */
-		e1000_read_eeprom(hw, last_word,
+		ret_val = e1000_read_eeprom(hw, last_word, 1,
 		                  &eeprom_buff[last_word - first_word]);
 	}
-	if(copy_from_user(ptr, user_data, eeprom->len)) {
-		kfree(eeprom_buff);
-		return -EFAULT;
+	if((ret_val != 0) || copy_from_user(ptr, user_data, eeprom->len)) {
+		ret_val = -EFAULT;
+		goto seeprom_error;
 	}
 
-	for(i = 0; i <= (last_word - first_word); i++)
-		e1000_write_eeprom(hw, first_word + i, eeprom_buff[i]);
+	ret_val = e1000_write_eeprom(hw, first_word,
+				     last_word - first_word + 1, eeprom_buff);
 
 	/* Update the checksum over the first part of the EEPROM if needed */
-	if(first_word <= EEPROM_CHECKSUM_REG)
+	if((ret_val == 0) && first_word <= EEPROM_CHECKSUM_REG)
 		e1000_update_eeprom_checksum(hw);
 
+seeprom_error:
 	kfree(eeprom_buff);
-
-	return 0;
+	return ret_val;
 }
 
 static void

@@ -95,6 +95,15 @@ struct e1000_adapter;
 #define E1000_RXBUFFER_8192  8192
 #define E1000_RXBUFFER_16384 16384
 
+/* SmartSpeed delimiters */
+#define E1000_SMARTSPEED_DOWNSHIFT 3
+#define E1000_SMARTSPEED_MAX       15
+
+/* Packet Buffer allocations */
+#define E1000_TX_FIFO_SIZE_SHIFT 0xA
+#define E1000_TX_HEAD_ADDR_SHIFT 7
+#define E1000_PBA_TX_MASK 0xFFFF0000
+
 /* Flow Control High-Watermark: 43464 bytes */
 #define E1000_FC_HIGH_THRESH 0xA9C8
 
@@ -108,9 +117,6 @@ struct e1000_adapter;
 #define E1000_TX_QUEUE_WAKE	16
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
 #define E1000_RX_BUFFER_WRITE	16
-
-#define E1000_JUMBO_PBA      0x00000028
-#define E1000_DEFAULT_PBA    0x00000030
 
 #define AUTO_ALL_MODES       0
 #define E1000_EEPROM_APME    4
@@ -155,6 +161,7 @@ struct e1000_desc_ring {
 /* board specific private data structure */
 
 struct e1000_adapter {
+	struct timer_list tx_fifo_stall_timer;
 	struct timer_list watchdog_timer;
 	struct timer_list phy_info_timer;
 	struct vlan_group *vlgrp;
@@ -163,6 +170,7 @@ struct e1000_adapter {
 	uint32_t rx_buffer_len;
 	uint32_t part_num;
 	uint32_t wol;
+	uint32_t smartspeed;
 	uint16_t link_speed;
 	uint16_t link_duplex;
 	spinlock_t stats_lock;
@@ -178,6 +186,10 @@ struct e1000_adapter {
 	uint32_t tx_int_delay;
 	uint32_t tx_abs_int_delay;
 	int max_data_per_txd;
+	uint32_t tx_fifo_head;
+	uint32_t tx_head_addr;
+	uint32_t tx_fifo_size;
+	atomic_t tx_fifo_stall;
 
 	/* RX */
 	struct e1000_desc_ring rx_ring;

@@ -1904,6 +1904,7 @@ config E1000
 	  82544       PRO/1000 XF Server Adapter           A50484-xxx
 	  82544       PRO/1000 T Desktop Adapter           A62947-xxx
 	  82540       PRO/1000 MT Desktop Adapter          A78408-xxx
+	  82541       PRO/1000 MT Desktop Adapter          C91016-xxx
 	  82545       PRO/1000 MT Server Adapter           A92165-xxx
 	  82546       PRO/1000 MT Dual Port Server Adapter A92111-xxx
 	  82545       PRO/1000 MF Server Adapter           A91622-xxx
