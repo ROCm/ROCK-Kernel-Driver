@@ -321,12 +321,13 @@ config BLK_DEV_RAM
 	  thus say N here.
 
 config BLK_DEV_RAM_SIZE
-	int "Default RAM disk size"
+	int "Default RAM disk size (kbytes)"
 	depends on BLK_DEV_RAM
 	default "4096"
 	help
-	  The default value is 4096. Only change this if you know what are
-	  you doing. If you are using IBM S/390, then set this to 8192.
+	  The default value is 4096 kilobytes. Only change this if you know
+	  what are you doing. If you are using IBM S/390, then set this to
+	  8192.
 
 config BLK_DEV_INITRD
 	bool "Initial RAM disk (initrd) support"

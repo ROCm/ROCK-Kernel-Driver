@@ -57,6 +57,8 @@
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
 #include <linux/backing-dev.h>
 #include <linux/blkpg.h>
+#include <linux/writeback.h>
+
 #include <asm/uaccess.h>
 
 /* The RAM disk size is now a parameter */
@@ -119,20 +121,48 @@ static int ramdisk_prepare_write(struct file *file, struct page *page,
 		kunmap_atomic(kaddr, KM_USER0);
 		SetPageUptodate(page);
 	}
-	SetPageDirty(page);
 	return 0;
 }
 
 static int ramdisk_commit_write(struct file *file, struct page *page,
 				unsigned offset, unsigned to)
 {
+	set_page_dirty(page);
+	return 0;
+}
+
+/*
+ * ->writepage to the the blockdev's mapping has to redirty the page so that the
+ * VM doesn't go and steal it.  We return WRITEPAGE_ACTIVATE so that the VM
+ * won't try to (pointlessly) write the page again for a while.
+ *
+ * Really, these pages should not be on the LRU at all.
+ */
+static int ramdisk_writepage(struct page *page, struct writeback_control *wbc)
+{
+	redirty_page_for_writepage(wbc, page);
+	if (wbc->for_reclaim)
+		return WRITEPAGE_ACTIVATE;
+	unlock_page(page);
+	return 0;
+}
+
+/*
+ * ramdisk blockdev pages have their own ->set_page_dirty() because we don't
+ * want them to contribute to dirty memory accounting.
+ */
+static int ramdisk_set_page_dirty(struct page *page)
+{
+	SetPageDirty(page);
 	return 0;
 }
 
 static struct address_space_operations ramdisk_aops = {
-	.readpage = ramdisk_readpage,
-	.prepare_write = ramdisk_prepare_write,
-	.commit_write = ramdisk_commit_write,
+	.readpage	= ramdisk_readpage,
+	.prepare_write	= ramdisk_prepare_write,
+	.commit_write	= ramdisk_commit_write,
+	.writepage	= ramdisk_writepage,
+	.set_page_dirty	= ramdisk_set_page_dirty,
 };
 
 static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
@@ -195,11 +225,11 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
 		if (rw == READ) {
 			flush_dcache_page(vec->bv_page);
 		} else {
-			SetPageDirty(page);
+			set_page_dirty(page);
 		}
 		if (unlock)
 			unlock_page(page);
-		__free_page(page);
+		put_page(page);
 	} while (size);
 
  out:
@@ -251,7 +281,7 @@ static int rd_ioctl(struct inode *inode, struct file *file,
 	struct block_device *bdev = inode->i_bdev;
 
 	if (cmd != BLKFLSBUF)
-		return -EINVAL;
+		return -ENOTTY;
 
 	/*
 	 * special: we want to release the ramdisk memory, it's not like with
@@ -268,10 +298,21 @@ static int rd_ioctl(struct inode *inode, struct file *file,
 	return error;
 }
 
+/*
+ * The backing_dev_info is shared between files which are backed by the ramdisk
+ * inode and by the ramdisk inode itself.  This is a bit unfortunate because
+ * they really want separate semantics.  The files *do* want full writeback
+ * and dirty-memory accounting treatment, whereas the ramdisk blockdev mapping
+ * wants neither.
+ *
+ * So we make things look like a regular blockdev and the cheat in various ways
+ * in the ramdisk inode's a_ops.
+ */
+
 static struct backing_dev_info rd_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
-	.unplug_io_fn = default_unplug_io_fn,
+	.unplug_io_fn	= default_unplug_io_fn,
 };
 
 static int rd_open(struct inode *inode, struct file *filp)
