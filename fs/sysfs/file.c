@@ -344,6 +344,24 @@ static struct file_operations sysfs_file_operations = {
 	.release	= sysfs_release,
 };
 
+
+int sysfs_add_file(struct dentry * dir, struct attribute * attr)
+{
+	struct dentry * dentry;
+	int error;
+
+	down(&dir->d_inode->i_sem);
+	dentry = sysfs_get_dentry(dir,attr->name);
+	if (!IS_ERR(dentry)) {
+		dentry->d_fsdata = (void *)attr;
+		error = sysfs_create(dentry,(attr->mode & S_IALLUGO) | S_IFREG,init_file);
+	} else
+		error = PTR_ERR(dentry);
+	up(&dir->d_inode->i_sem);
+	return error;
+}
+
+
 /**
  *	sysfs_create_file - create an attribute file for an object.
  *	@kobj:	object we're creating for. 
@@ -352,24 +370,9 @@ static struct file_operations sysfs_file_operations = {
 
 int sysfs_create_file(struct kobject * kobj, struct attribute * attr)
 {
-	struct dentry * dentry;
-	struct dentry * parent;
-	int error = 0;
-
-	if (!kobj || !attr)
-		return -EINVAL;
-
-	parent = kobj->dentry;
-
-	down(&parent->d_inode->i_sem);
-	dentry = sysfs_get_dentry(parent,attr->name);
-	if (!IS_ERR(dentry)) {
-		dentry->d_fsdata = (void *)attr;
-		error = sysfs_create(dentry,(attr->mode & S_IALLUGO) | S_IFREG,init_file);
-	} else
-		error = PTR_ERR(dentry);
-	up(&parent->d_inode->i_sem);
-	return error;
+	if (kobj && attr)
+		return sysfs_add_file(kobj->dentry,attr);
+	return -EINVAL;
 }
 
 

@@ -20,6 +20,38 @@ static int init_dir(struct inode * inode)
 	return 0;
 }
 
+
+static struct dentry * 
+create_dir(struct kobject * k, struct dentry * p, char * n)
+{
+	struct dentry * dentry;
+
+	down(&p->d_inode->i_sem);
+	dentry = sysfs_get_dentry(p,n);
+	if (!IS_ERR(dentry)) {
+		int error;
+
+		dentry->d_fsdata = (void *)k;
+		error = sysfs_create(dentry,
+				     (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO),
+				     init_dir);
+		if (!error)
+			p->d_inode->i_nlink++;
+		else {
+			dput(dentry);
+			dentry = ERR_PTR(error);
+		}
+	}
+	up(&p->d_inode->i_sem);
+	return dentry;
+}
+
+
+struct dentry * sysfs_create_subdir(struct kobject * k, char * n)
+{
+	return create_dir(k,k->dentry,n);
+}
+
 /**
  *	sysfs_create_dir - create a directory for an object.
  *	@parent:	parent parent object.
@@ -42,22 +74,33 @@ int sysfs_create_dir(struct kobject * kobj)
 	else
 		return -EFAULT;
 
-	down(&parent->d_inode->i_sem);
-	dentry = sysfs_get_dentry(parent,kobj->name);
-	if (!IS_ERR(dentry)) {
-		dentry->d_fsdata = (void *)kobj;
+	dentry = create_dir(kobj,parent,kobj->name);
+	if (!IS_ERR(dentry))
 		kobj->dentry = dentry;
-		error = sysfs_create(dentry,(S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO),
-				     init_dir);
-		if (!error)
-			parent->d_inode->i_nlink++;
-	} else
+	else
 		error = PTR_ERR(dentry);
-	up(&parent->d_inode->i_sem);
-
 	return error;
 }
 
+
+static void remove_dir(struct dentry * d)
+{
+	struct dentry * parent = dget(d->d_parent);
+	down(&parent->d_inode->i_sem);
+	d_delete(d);
+	simple_rmdir(parent->d_inode,d);
+
+	pr_debug(" o %s removing done (%d)\n",d->d_name.name,
+		 atomic_read(&d->d_count));
+
+	up(&parent->d_inode->i_sem);
+	dput(parent);
+}
+
+void sysfs_remove_subdir(struct dentry * d)
+{
+	remove_dir(d);
+}
 
 
 /**
@@ -73,14 +116,11 @@ void sysfs_remove_dir(struct kobject * kobj)
 {
 	struct list_head * node;
 	struct dentry * dentry = dget(kobj->dentry);
-	struct dentry * parent;
 
 	if (!dentry)
 		return;
 
 	pr_debug("sysfs %s: removing dir\n",dentry->d_name.name);
-	parent = dget(dentry->d_parent);
-	down(&parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
 	spin_lock(&dcache_lock);
@@ -107,18 +147,12 @@ void sysfs_remove_dir(struct kobject * kobj)
 	}
 	spin_unlock(&dcache_lock);
 	up(&dentry->d_inode->i_sem);
-	d_delete(dentry);
-	simple_rmdir(parent->d_inode,dentry);
 
-	pr_debug(" o %s removing done (%d)\n",dentry->d_name.name,
-		 atomic_read(&dentry->d_count));
-
+	remove_dir(dentry);
 	/**
 	 * Drop reference from dget() on entrance.
 	 */
 	dput(dentry);
-	up(&parent->d_inode->i_sem);
-	dput(parent);
 }
 
 void sysfs_rename_dir(struct kobject * kobj, char *new_name)
