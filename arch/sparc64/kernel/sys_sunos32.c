@@ -800,15 +800,16 @@ asmlinkage int sunos_setpgrp(pid_t pid, pid_t pgid)
 }
 
 /* So stupid... */
-extern asmlinkage int sys32_wait4(compat_pid_t pid,
-				  u32 stat_addr, int options, u32 ru);
+extern long compat_sys_wait4(compat_pid_t, compat_uint_t *, int,
+			     struct compat_rusage *);
 
 asmlinkage int sunos_wait4(compat_pid_t pid, u32 stat_addr, int options, u32 ru)
 {
 	int ret;
 
-	ret = sys32_wait4((pid ? pid : ((compat_pid_t)-1)),
-			  stat_addr, options, ru);
+	ret = compat_sys_wait4((pid ? pid : ((compat_pid_t)-1)),
+			       (compat_uint_t *)A(stat_addr), options,
+			       (struct compat_rusage *)A(ru));
 	return ret;
 }
 
