@@ -32,7 +32,7 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
  * It's completely gone from HC data structures.
  * PRECONDITION:  no locks held  (Giveback can call into HCD.)
  */
-static void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
+static void finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
 {
 	unsigned long	flags;
 
@@ -59,7 +59,7 @@ static void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
 #ifdef OHCI_VERBOSE_DEBUG
 	urb_print (urb, "RET", usb_pipeout (urb->pipe));
 #endif
-	usb_hcd_giveback_urb (&ohci->hcd, urb);
+	usb_hcd_giveback_urb (&ohci->hcd, urb, regs);
 }
 
 
@@ -848,7 +848,7 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 #define tick_before(t1,t2) ((((s16)(t1))-((s16)(t2))) < 0)
 
 /* there are some urbs/eds to unlink; called in_irq(), with HCD locked */
-static void finish_unlinks (struct ohci_hcd *ohci, u16 tick)
+static void finish_unlinks (struct ohci_hcd *ohci, u16 tick, struct pt_regs *regs)
 {
 	struct ed	*ed, **last;
 
@@ -913,7 +913,7 @@ rescan_this:
 			if (urb_priv->td_cnt == urb_priv->length) {
 				modified = completed = 1;
 				spin_unlock (&ohci->lock);
-				finish_urb (ohci, urb);
+				finish_urb (ohci, urb, regs);
 				spin_lock (&ohci->lock);
 			}
 		}
@@ -976,7 +976,7 @@ rescan_this:
  * path is finish_unlinks(), which unlinks URBs using ed_rm_list, instead of
  * scanning the (re-reversed) donelist as this does.
  */
-static void dl_done_list (struct ohci_hcd *ohci, struct td *td)
+static void dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
 {
 	unsigned long	flags;
 
@@ -994,7 +994,7 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td)
 		/* If all this urb's TDs are done, call complete() */
   		if (urb_priv->td_cnt == urb_priv->length) {
      			spin_unlock_irqrestore (&ohci->lock, flags);
-  			finish_urb (ohci, urb);
+  			finish_urb (ohci, urb, regs);
   			spin_lock_irqsave (&ohci->lock, flags);
   		}
 

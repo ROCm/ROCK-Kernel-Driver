@@ -338,7 +338,7 @@ static void cmd_free(ctlr_info_t *h, CommandList_struct *c, int got_from_pool)
  */
 static int cciss_open(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - MAJOR_NR;
+	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
 	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
@@ -368,7 +368,7 @@ static int cciss_open(struct inode *inode, struct file *filep)
  */
 static int cciss_release(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - MAJOR_NR;
+	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
 	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
@@ -388,7 +388,7 @@ static int cciss_release(struct inode *inode, struct file *filep)
 static int cciss_ioctl(struct inode *inode, struct file *filep, 
 		unsigned int cmd, unsigned long arg)
 {
-	int ctlr = major(inode->i_rdev) - MAJOR_NR;
+	int ctlr = major(inode->i_rdev) - COMPAQ_CISS_MAJOR;
 	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
 
 #ifdef CCISS_DEBUG
@@ -723,7 +723,7 @@ static int revalidate_allvol(kdev_t dev)
 	int ctlr, i;
 	unsigned long flags;
 
-	ctlr = major(dev) - MAJOR_NR;
+	ctlr = major(dev) - COMPAQ_CISS_MAJOR;
         if (minor(dev) != 0)
                 return -ENXIO;
 
@@ -2344,10 +2344,10 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	if( register_blkdev(MAJOR_NR+i, hba[i]->devname, &cciss_fops))
+	if( register_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname, &cciss_fops))
 	{
 		printk(KERN_ERR "cciss:  Unable to get major number "
-			"%d for %s\n", MAJOR_NR+i, hba[i]->devname);
+			"%d for %s\n", COMPAQ_CISS_MAJOR+i, hba[i]->devname);
 		release_io_mem(hba[i]);
 		free_hba(i);
 		return(-1);
@@ -2360,7 +2360,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	{
 		printk(KERN_ERR "ciss: Unable to get irq %d for %s\n",
 			hba[i]->intr, hba[i]->devname);
-		unregister_blkdev( MAJOR_NR+i, hba[i]->devname);
+		unregister_blkdev( COMPAQ_CISS_MAJOR+i, hba[i]->devname);
 		release_io_mem(hba[i]);
 		free_hba(i);
 		return(-1);
@@ -2388,7 +2388,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 				hba[i]->errinfo_pool, 
 				hba[i]->errinfo_pool_dhandle);
                 free_irq(hba[i]->intr, hba[i]);
-                unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
+                unregister_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname);
 		release_io_mem(hba[i]);
 		free_hba(i);
                 printk( KERN_ERR "cciss: out of memory");
@@ -2435,7 +2435,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		struct gendisk *disk = hba[i]->gendisk[j];
 
 		sprintf(disk->disk_name, "cciss/c%dd%d", i, j);
-		disk->major = MAJOR_NR + i;
+		disk->major = COMPAQ_CISS_MAJOR + i;
 		disk->first_minor = j << NWD_SHIFT;
 		disk->fops = &cciss_fops;
 		disk->queue = &hba[i]->queue;
@@ -2486,7 +2486,7 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	pci_set_drvdata(pdev, NULL);
 	iounmap((void*)hba[i]->vaddr);
 	cciss_unregister_scsi(i);  /* unhook from SCSI subsystem */
-	unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
+	unregister_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname);
 	remove_proc_entry(hba[i]->devname, proc_cciss);	
 	
 	/* remove it from the disk list */

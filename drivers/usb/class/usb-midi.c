@@ -308,7 +308,7 @@ static DECLARE_WAIT_QUEUE_HEAD(open_wait);
 
 /* ------------------------------------------------------------------------- */
 
-static void usb_write_callback(struct urb *urb)
+static void usb_write_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct midi_out_endpoint *ep = (struct midi_out_endpoint *)urb->context;
 
@@ -331,7 +331,7 @@ static int usb_write( struct midi_out_endpoint *ep, unsigned char *buf, int len 
 	d = ep->usbdev;
 	pipe = usb_sndbulkpipe(d, ep->endpoint);
 	usb_fill_bulk_urb( ep->urb, d, pipe, (unsigned char*)buf, len,
-		       (usb_complete_t)usb_write_callback, ep );
+		       usb_write_callback, ep );
 
 	status = usb_submit_urb(ep->urb, GFP_KERNEL);
     
@@ -364,7 +364,7 @@ static int usb_write( struct midi_out_endpoint *ep, unsigned char *buf, int len 
  *
  **/
 
-static void usb_bulk_read(struct urb *urb)
+static void usb_bulk_read(struct urb *urb, struct pt_regs *regs)
 {
 	struct midi_in_endpoint *ep = (struct midi_in_endpoint *)(urb->context);
 	unsigned char *data = urb->transfer_buffer;
@@ -1048,7 +1048,7 @@ static struct midi_in_endpoint *alloc_midi_in_endpoint( struct usb_device *d, in
 	usb_fill_bulk_urb( ep->urb, d, 
 		       usb_rcvbulkpipe(d, endPoint),
 		       (unsigned char *)ep->recvBuf, bufSize,
-		       (usb_complete_t)usb_bulk_read, ep );
+		       usb_bulk_read, ep );
 
 	/* ep->bufRdPtr     = 0; */
 	/* ep->bufWrPtr     = 0; */

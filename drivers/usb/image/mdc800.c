@@ -248,7 +248,7 @@ static int mdc800_isReady (char *ch)
 /*
  * USB IRQ Handler for InputLine
  */
-static void mdc800_usb_irq (struct urb *urb)
+static void mdc800_usb_irq (struct urb *urb, struct pt_regs *res)
 {
 	int data_received=0, wake_up;
 	unsigned char* b=urb->transfer_buffer;
@@ -351,7 +351,7 @@ static int mdc800_usb_waitForIRQ (int mode, int msec)
 /*
  * The write_urb callback function
  */
-static void mdc800_usb_write_notify (struct urb *urb)
+static void mdc800_usb_write_notify (struct urb *urb, struct pt_regs *res)
 {
 	struct mdc800_data* mdc800=urb->context;
 
@@ -371,7 +371,7 @@ static void mdc800_usb_write_notify (struct urb *urb)
 /*
  * The download_urb callback function
  */
-static void mdc800_usb_download_notify (struct urb *urb)
+static void mdc800_usb_download_notify (struct urb *urb, struct pt_regs *res)
 {
 	struct mdc800_data* mdc800=urb->context;
 

@@ -90,7 +90,6 @@ static kmem_cache_t *uhci_up_cachep;	/* urb_priv */
 static int uhci_get_current_frame_number(struct uhci_hcd *uhci);
 static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb);
 static void uhci_unlink_generic(struct uhci_hcd *uhci, struct urb *urb);
-static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb);
 
 static int  ports_active(struct uhci_hcd *uhci);
 static void suspend_hc(struct uhci_hcd *uhci);
@@ -1798,7 +1797,7 @@ static void uhci_free_pending_qhs(struct uhci_hcd *uhci)
 	spin_unlock_irqrestore(&uhci->qh_remove_list_lock, flags);
 }
 
-static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb)
+static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs)
 {
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
@@ -1813,10 +1812,10 @@ static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb)
 		urb->status = status;
 	spin_unlock_irqrestore(&urb->lock, flags);
 
-	usb_hcd_giveback_urb(hcd, urb);
+	usb_hcd_giveback_urb(hcd, urb, regs);
 }
 
-static void uhci_finish_completion(struct usb_hcd *hcd)
+static void uhci_finish_completion(struct usb_hcd *hcd, struct pt_regs *regs)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	struct list_head *tmp, *head;
@@ -1832,7 +1831,7 @@ static void uhci_finish_completion(struct usb_hcd *hcd)
 		list_del_init(&urbp->complete_list);
 		spin_unlock_irqrestore(&uhci->complete_list_lock, flags);
 
-		uhci_finish_urb(hcd, urb);
+		uhci_finish_urb(hcd, urb, regs);
 
 		spin_lock_irqsave(&uhci->complete_list_lock, flags);
 		head = &uhci->complete_list;
@@ -1864,7 +1863,7 @@ static void uhci_remove_pending_qhs(struct uhci_hcd *uhci)
 	spin_unlock_irqrestore(&uhci->urb_remove_list_lock, flags);
 }
 
-static void uhci_irq(struct usb_hcd *hcd)
+static void uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned int io_addr = uhci->io_addr;
@@ -1915,7 +1914,7 @@ static void uhci_irq(struct usb_hcd *hcd)
 	}
 	spin_unlock(&uhci->urb_list_lock);
 
-	uhci_finish_completion(hcd);
+	uhci_finish_completion(hcd, regs);
 }
 
 static void reset_hc(struct uhci_hcd *uhci)

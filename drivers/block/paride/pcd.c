@@ -137,7 +137,7 @@ enum {D_PRT, D_PRO, D_UNI, D_MOD, D_SLV, D_DLY};
 #include <linux/delay.h>
 #include <linux/cdrom.h>
 #include <linux/spinlock.h>
-
+#include <linux/blk.h>
 #include <asm/uaccess.h>
 
 static spinlock_t pcd_lock;
@@ -172,13 +172,6 @@ MODULE_PARM(drive2, "1-6i");
 MODULE_PARM(drive3, "1-6i");
 
 #include "paride.h"
-
-/* set up defines for blk.h,  why don't all drivers do it this way ? */
-
-#define MAJOR_NR	major
-
-#include <linux/blk.h>
-
 #include "pseudo.h"
 
 #define PCD_RETRIES	     5
@@ -949,8 +942,8 @@ static int __init pcd_init(void)
 	/* get the atapi capabilities page */
 	pcd_probe_capabilities();
 
-	if (register_blkdev(MAJOR_NR, name, &pcd_bdops)) {
-		printk("pcd: unable to get major number %d\n", MAJOR_NR);
+	if (register_blkdev(major, name, &pcd_bdops)) {
+		printk("pcd: unable to get major number %d\n", major);
 		for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++)
 			put_disk(cd->disk);
 		return -1;
@@ -984,7 +977,7 @@ static void __exit pcd_exit(void)
 		put_disk(cd->disk);
 	}
 	blk_cleanup_queue(&pcd_queue);
-	unregister_blkdev(MAJOR_NR, name);
+	unregister_blkdev(major, name);
 }
 
 MODULE_LICENSE("GPL");

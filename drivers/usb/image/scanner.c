@@ -354,7 +354,7 @@
 #include "scanner.h"
 
 static void
-irq_scanner(struct urb *urb)
+irq_scanner(struct urb *urb, struct pt_regs *regs)
 {
 
 /*

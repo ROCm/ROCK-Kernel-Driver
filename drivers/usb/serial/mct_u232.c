@@ -114,9 +114,9 @@ static int  mct_u232_write	         (struct usb_serial_port *port,
 					  int from_user,
 					  const unsigned char *buf,
 					  int count);
-static void mct_u232_write_bulk_callback (struct urb *urb);
+static void mct_u232_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
 #endif
-static void mct_u232_read_int_callback   (struct urb *urb);
+static void mct_u232_read_int_callback   (struct urb *urb, struct pt_regs *regs);
 static void mct_u232_set_termios         (struct usb_serial_port *port,
 					  struct termios * old);
 static int  mct_u232_ioctl	         (struct usb_serial_port *port,
@@ -479,7 +479,7 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 	return bytes_sent;
 } /* mct_u232_write */
 
-static void mct_u232_write_bulk_callback (struct urb *urb)
+static void mct_u232_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = port->serial;
@@ -514,7 +514,7 @@ static void mct_u232_write_bulk_callback (struct urb *urb)
 } /* mct_u232_write_bulk_callback */
 #endif
 
-static void mct_u232_read_int_callback (struct urb *urb)
+static void mct_u232_read_int_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct mct_u232_private *priv = (struct mct_u232_private *)port->private;

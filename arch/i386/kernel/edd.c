@@ -575,17 +575,25 @@ static EDD_DEVICE_ATTR(interface, 0444, edd_show_interface, edd_has_edd30);
 static EDD_DEVICE_ATTR(host_bus, 0444, edd_show_host_bus, edd_has_edd30);
 
 
+/* These are default attributes that are added for every edd
+ * device discovered.
+ */
 static struct attribute * def_attrs[] = {
 	&edd_attr_raw_data.attr,
 	&edd_attr_version.attr,
 	&edd_attr_extensions.attr,
 	&edd_attr_info_flags.attr,
 	&edd_attr_sectors.attr,
-	&edd_attr_default_cylinders.attr,
-	&edd_attr_default_heads.attr,
-	&edd_attr_default_sectors_per_track.attr,
-	&edd_attr_interface.attr,
-	&edd_attr_host_bus.attr,
+	NULL,
+};
+
+/* These attributes are conditional and only added for some devices. */
+static struct edd_attribute * edd_attrs[] = {
+	&edd_attr_default_cylinders,
+	&edd_attr_default_heads,
+	&edd_attr_default_sectors_per_track,
+	&edd_attr_interface,
+	&edd_attr_host_bus,
 	NULL,
 };
 
@@ -686,8 +694,6 @@ edd_match_scsidev(struct edd_device *edev, struct scsi_device *sd)
  * The reference counting probably isn't the best it could be.
  */
 
-#define	to_scsi_host(d)	\
-	container_of(d, struct Scsi_Host, host_driverfs_dev)
 #define children_to_dev(n) container_of(n,struct device,node)
 static struct scsi_device *
 edd_find_matching_scsi_device(struct edd_device *edev)
@@ -697,7 +703,6 @@ edd_find_matching_scsi_device(struct edd_device *edev)
 	struct scsi_device *sd = NULL;
 	struct device *shost_dev, *sdev_dev;
 	struct pci_dev *pci_dev;
-	struct Scsi_Host *sh;
 
 	rc = edd_dev_is_type(edev, "SCSI");
 	if (rc)
@@ -712,7 +717,6 @@ edd_find_matching_scsi_device(struct edd_device *edev)
 	list_for_each(shost_node, &pci_dev->dev.children) {
 		shost_dev = children_to_dev(shost_node);
 		get_device(shost_dev);
-		sh = to_scsi_host(shost_dev);
 
 		list_for_each(sdev_node, &shost_dev->children) {
 			sdev_dev = children_to_dev(sdev_node);
@@ -771,6 +775,24 @@ edd_device_unregister(struct edd_device *edev)
 	kobject_unregister(&edev->kobj);
 }
 
+static void populate_dir(struct edd_device * edev)
+{
+	struct edd_attribute * attr;
+	int error = 0;
+	int i;
+
+	for (i = 0; (attr = edd_attrs[i]) && !error; i++) {
+		if (!attr->test || 
+		    (attr->test && !attr->test(edev)))
+			error = sysfs_create_file(&edev->kobj,&attr->attr);
+	}
+	
+	if (!error) {
+		edd_create_symlink_to_pcidev(edev);
+		edd_create_symlink_to_scsidev(edev);
+	}
+}
+
 static int
 edd_device_register(struct edd_device *edev, int i)
 {
@@ -780,15 +802,12 @@ edd_device_register(struct edd_device *edev, int i)
 		return 1;
 	memset(edev, 0, sizeof (*edev));
 	edd_dev_set_info(edev, &edd[i]);
-	kobject_init(&edev->kobj);
 	snprintf(edev->kobj.name, EDD_DEVICE_NAME_SIZE, "int13_dev%02x",
 		 edd[i].device);
 	edev->kobj.subsys = &edd_subsys;
 	error = kobject_register(&edev->kobj);
-	if (!error) {
-		edd_create_symlink_to_pcidev(edev);
-		edd_create_symlink_to_scsidev(edev);
-	}
+	if (!error)
+		populate_dir(edev);
 	return error;
 }
 

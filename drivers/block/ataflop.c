@@ -100,8 +100,6 @@
 
 static struct request_queue floppy_queue;
 
-#define MAJOR_NR FLOPPY_MAJOR
-#define DEVICE_NAME "floppy"
 #define QUEUE (&floppy_queue)
 #define CURRENT elv_next_request(&floppy_queue)
 
@@ -1936,8 +1934,8 @@ int __init atari_floppy_init (void)
 		/* Hades doesn't have Atari-compatible floppy */
 		return -ENXIO;
 
-	if (register_blkdev(MAJOR_NR,"fd",&floppy_fops)) {
-		printk(KERN_ERR "Unable to get major %d for floppy\n",MAJOR_NR);
+	if (register_blkdev(FLOPPY_MAJOR,"fd",&floppy_fops)) {
+		printk(KERN_ERR "Unable to get major %d for floppy\n",FLOPPY_MAJOR);
 		return -EBUSY;
 	}
 
@@ -1973,7 +1971,7 @@ int __init atari_floppy_init (void)
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].track = -1;
 		unit[i].flags = 0;
-		unit[i].disk->major = MAJOR_NR;
+		unit[i].disk->major = FLOPPY_MAJOR;
 		unit[i].disk->first_minor = i;
 		sprintf(unit[i].disk->disk_name, "fd%d", i);
 		unit[i].disk->fops = &floppy_fops;
@@ -1983,7 +1981,7 @@ int __init atari_floppy_init (void)
 		add_disk(unit[i].disk);
 	}
 
-	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
+	blk_register_region(MKDEV(FLOPPY_MAJOR, 0), 256, THIS_MODULE,
 				floppy_find, NULL, NULL);
 
 	printk(KERN_INFO "Atari floppy driver: max. %cD, %strack buffering\n",
@@ -1995,7 +1993,7 @@ int __init atari_floppy_init (void)
 Enomem:
 	while (i--)
 		put_disk(unit[i].disk);
-	unregister_blkdev(MAJOR_NR, "fd");
+	unregister_blkdev(FLOPPY_MAJOR, "fd");
 	return -ENOMEM;
 }
 
@@ -2042,12 +2040,12 @@ int init_module (void)
 void cleanup_module (void)
 {
 	int i;
-	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
+	blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		del_gendisk(unit[i].disk);
 		put_disk(unit[i].disk);
 	}
-	unregister_blkdev(MAJOR_NR, "fd");
+	unregister_blkdev(FLOPPY_MAJOR, "fd");
 
 	blk_cleanup_queue(&floppy_queue);
 	del_timer_sync(&fd_timer);

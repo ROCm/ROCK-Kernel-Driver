@@ -120,9 +120,6 @@ MODULE_PARM(fd_def_df0,"l");
 MODULE_LICENSE("GPL");
 
 static struct request_queue floppy_queue;
-
-#define MAJOR_NR FLOPPY_MAJOR
-#define DEVICE_NAME "floppy"
 #define QUEUE (&floppy_queue)
 #define CURRENT elv_next_request(&floppy_queue)
 
@@ -1620,7 +1617,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	restore_flags(flags);
 
 	if (old_dev != system)
-		invalidate_buffers(mk_kdev(MAJOR_NR, drive + (system << 2)));
+		invalidate_buffers(mk_kdev(FLOPPY_MAJOR, drive + (system << 2)));
 
 	unit[drive].dtype=&data_types[system];
 	unit[drive].blocks=unit[drive].type->heads*unit[drive].type->tracks*
@@ -1727,7 +1724,7 @@ static int __init fd_probe_drives(void)
 			nomem = 1;
 		}
 		printk("fd%d ",drive);
-		disk->major = MAJOR_NR;
+		disk->major = FLOPPY_MAJOR;
 		disk->first_minor = drive;
 		disk->fops = &floppy_fops;
 		sprintf(disk->disk_name, "fd%d", drive);
@@ -1762,8 +1759,8 @@ int __init amiga_floppy_init(void)
 	if (!AMIGAHW_PRESENT(AMI_FLOPPY))
 		return -ENXIO;
 
-	if (register_blkdev(MAJOR_NR,"fd",&floppy_fops)) {
-		printk("fd: Unable to get major %d for floppy\n",MAJOR_NR);
+	if (register_blkdev(FLOPPY_MAJOR,"fd",&floppy_fops)) {
+		printk("fd: Unable to get major %d for floppy\n",FLOPPY_MAJOR);
 		return -EBUSY;
 	}
 	/*
@@ -1772,21 +1769,21 @@ int __init amiga_floppy_init(void)
 	 */
 	if (!request_mem_region(CUSTOM_PHYSADDR+0x20, 8, "amiflop [Paula]")) {
 		printk("fd: cannot get floppy registers\n");
-		unregister_blkdev(MAJOR_NR,"fd");
+		unregister_blkdev(FLOPPY_MAJOR,"fd");
 		return -EBUSY;
 	}
 	if ((raw_buf = (char *)amiga_chip_alloc (RAW_BUF_SIZE, "Floppy")) ==
 	    NULL) {
 		printk("fd: cannot get chip mem buffer\n");
 		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-		unregister_blkdev(MAJOR_NR,"fd");
+		unregister_blkdev(FLOPPY_MAJOR,"fd");
 		return -ENOMEM;
 	}
 	if (request_irq(IRQ_AMIGA_DSKBLK, fd_block_done, 0, "floppy_dma", NULL)) {
 		printk("fd: cannot get irq for dma\n");
 		amiga_chip_free(raw_buf);
 		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-		unregister_blkdev(MAJOR_NR,"fd");
+		unregister_blkdev(FLOPPY_MAJOR,"fd");
 		return -EBUSY;
 	}
 	if (request_irq(IRQ_AMIGA_CIAA_TB, ms_isr, 0, "floppy_timer", NULL)) {
@@ -1794,7 +1791,7 @@ int __init amiga_floppy_init(void)
 		free_irq(IRQ_AMIGA_DSKBLK, NULL);
 		amiga_chip_free(raw_buf);
 		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-		unregister_blkdev(MAJOR_NR,"fd");
+		unregister_blkdev(FLOPPY_MAJOR,"fd");
 		return -EBUSY;
 	}
 	if (fd_probe_drives() < 1) { /* No usable drives */
@@ -1802,10 +1799,10 @@ int __init amiga_floppy_init(void)
 		free_irq(IRQ_AMIGA_DSKBLK, NULL);
 		amiga_chip_free(raw_buf);
 		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-		unregister_blkdev(MAJOR_NR,"fd");
+		unregister_blkdev(FLOPPY_MAJOR,"fd");
 		return -ENXIO;
 	}
-	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
+	blk_register_region(MKDEV(FLOPPY_MAJOR, 0), 256, THIS_MODULE,
 				floppy_find, NULL, NULL);
 
 	/* initialize variables */
@@ -1866,13 +1863,13 @@ void cleanup_module(void)
 			kfree(unit[i].trackbuf);
 		}
 	}
-	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
+	blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
 	free_irq(IRQ_AMIGA_CIAA_TB, NULL);
 	free_irq(IRQ_AMIGA_DSKBLK, NULL);
 	custom.dmacon = DMAF_DISK; /* disable DMA */
 	amiga_chip_free(raw_buf);
 	blk_cleanup_queue(&floppy_queue);
 	release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-	unregister_blkdev(MAJOR_NR, "fd");
+	unregister_blkdev(FLOPPY_MAJOR, "fd");
 }
 #endif

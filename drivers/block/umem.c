@@ -97,7 +97,6 @@ MODULE_PARM_DESC(pci_write_cmd, "PCI write command");
 static int pci_cmds;
 
 static int major_nr;
-#define MAJOR_NR	(major_nr)
 
 #include <linux/blk.h>
 #include <linux/blkpg.h>
@@ -1177,7 +1176,7 @@ int __init mm_init(void)
 	return 0;
 
 out:
-	unregister_blkdev(MAJOR_NR, "umem");
+	unregister_blkdev(major_nr, "umem");
 	while (i--)
 		put_disk(mm_gendisk[i]);
 	return -ENOMEM;
@@ -1201,7 +1200,7 @@ void __exit mm_cleanup(void)
 
 	pci_unregister_driver(&mm_pci_driver);
 
-	unregister_blkdev(MAJOR_NR, "umem");
+	unregister_blkdev(major_nr, "umem");
 }
 
 module_init(mm_init);

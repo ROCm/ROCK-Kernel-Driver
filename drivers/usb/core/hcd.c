@@ -80,7 +80,7 @@
 
 /* host controllers we manage */
 LIST_HEAD (usb_bus_list);
-EXPORT_SYMBOL (usb_bus_list);
+EXPORT_SYMBOL_GPL (usb_bus_list);
 
 /* used when allocating bus numbers */
 #define USB_MAXBUS		64
@@ -91,7 +91,7 @@ static struct usb_busmap busmap;
 
 /* used when updating list of hcds */
 DECLARE_MUTEX (usb_bus_list_lock);	/* exported only for usbfs */
-EXPORT_SYMBOL (usb_bus_list_lock);
+EXPORT_SYMBOL_GPL (usb_bus_list_lock);
 
 /* used when updating hcd data */
 static spinlock_t hcd_data_lock = SPIN_LOCK_UNLOCKED;
@@ -435,7 +435,7 @@ error:
 	}
 
 	/* any errors get returned through the urb completion */
-	usb_hcd_giveback_urb (hcd, urb);
+	usb_hcd_giveback_urb (hcd, urb, NULL);
 	return 0;
 }
 
@@ -496,7 +496,7 @@ static void rh_report_status (unsigned long ptr)
 				urb->actual_length = length;
 				urb->status = 0;
 				urb->hcpriv = 0;
-				urb->complete (urb);
+				urb->complete (urb, NULL);
 				return;
 			}
 		} else
@@ -511,7 +511,7 @@ static void rh_report_status (unsigned long ptr)
 		urb->hcpriv = 0;
 		spin_unlock_irqrestore (&urb->lock, flags);
 
-		usb_hcd_giveback_urb (hcd, urb);
+		usb_hcd_giveback_urb (hcd, urb, NULL);
 	}
 }
 
@@ -546,7 +546,7 @@ void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	spin_unlock_irqrestore (&hcd_data_lock, flags);
 
 	/* we rely on RH callback code not unlinking its URB! */
-	usb_hcd_giveback_urb (hcd, urb);
+	usb_hcd_giveback_urb (hcd, urb, NULL);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1062,11 +1062,11 @@ struct completion_splice {		// modified urb context:
 	struct completion	done;
 
 	/* original urb data */
-	void			(*complete)(struct urb *);
+	usb_complete_t		complete;
 	void			*context;
 };
 
-static void unlink_complete (struct urb *urb)
+static void unlink_complete (struct urb *urb, struct pt_regs *regs)
 {
 	struct completion_splice	*splice;
 
@@ -1075,7 +1075,7 @@ static void unlink_complete (struct urb *urb)
 	/* issue original completion call */
 	urb->complete = splice->complete;
 	urb->context = splice->context;
-	urb->complete (urb);
+	urb->complete (urb, regs);
 
 	/* then let the synchronous unlink call complete */
 	complete (&splice->done);
@@ -1275,6 +1275,7 @@ EXPORT_SYMBOL (usb_hcd_operations);
  * usb_hcd_giveback_urb - return URB from HCD to device driver
  * @hcd: host controller returning the URB
  * @urb: urb being returned to the USB device driver.
+ * @regs: pt_regs, passed down to the URB completion handler
  * Context: in_interrupt()
  *
  * This hands the URB from HCD to its USB device driver, using its
@@ -1283,7 +1284,7 @@ EXPORT_SYMBOL (usb_hcd_operations);
  * the device driver won't cause problems if it frees, modifies,
  * or resubmits this URB.
  */
-void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
+void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs)
 {
 	urb_unlink (urb);
 
@@ -1306,7 +1307,7 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 	}
 
 	/* pass ownership to the completion handler */
-	urb->complete (urb);
+	urb->complete (urb, regs);
 	usb_put_urb (urb);
 }
 EXPORT_SYMBOL (usb_hcd_giveback_urb);
@@ -1317,7 +1318,7 @@ EXPORT_SYMBOL (usb_hcd_giveback_urb);
  * usb_hcd_irq - hook IRQs to HCD framework (bus glue)
  * @irq: the IRQ being raised
  * @__hcd: pointer to the HCD whose IRQ is beinng signaled
- * @r: saved hardware registers (not passed to HCD)
+ * @r: saved hardware registers
  *
  * When registering a USB bus through the HCD framework code, use this
  * to handle interrupts.  The PCI glue layer does so automatically; only
@@ -1331,7 +1332,7 @@ void usb_hcd_irq (int irq, void *__hcd, struct pt_regs * r)
 	if (unlikely (hcd->state == USB_STATE_HALT))	/* irq sharing? */
 		return;
 
-	hcd->driver->irq (hcd);
+	hcd->driver->irq (hcd, r);
 	if (hcd->state != start && hcd->state == USB_STATE_HALT)
 		usb_hc_died (hcd);
 }
