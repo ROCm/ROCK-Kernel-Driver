@@ -843,6 +843,9 @@ static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 	case BLKPG:
 		ret = blk_ioctl(bdev, cmd, arg);
 		break;
+	case BLKRRPART:
+		ret = blkdev_reread_part(bdev);
+		break;
 	default:
 		if (bdev->bd_op->ioctl)
 			ret =bdev->bd_op->ioctl(inode, file, cmd, arg);
@@ -854,8 +857,6 @@ static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 				case BLKROSET:
 					ret = blk_ioctl(bdev,cmd,arg);
 					break;
-				case BLKRRPART:
-					ret = blkdev_reread_part(bdev);
 			}
 		}
 	}

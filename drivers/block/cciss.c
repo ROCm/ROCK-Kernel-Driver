@@ -769,11 +769,8 @@ static int revalidate_allvol(kdev_t dev)
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->block_size;
 		disk->major_name = hba[ctlr]->names + 12 * i;
-		add_gendisk(disk);
-		register_disk(disk,
-			      mk_kdev(disk->major, disk->first_minor),
-			      1<<disk->minor_shift, disk->fops,
-			      drv->nr_blocks);
+		set_capacity(disk, drv->nr_blocks);
+		add_disk(disk);
 	}
         hba[ctlr]->usage_count--;
         return 0;
@@ -1241,12 +1238,8 @@ static int register_new_disk(int ctlr)
 	/* setup partitions per disk */
         disk = &hba[ctlr]->gendisk[logvol];
 	disk->major_name = hba[ctlr]->names + 12 * logvol;
-	add_gendisk(disk);
-	register_disk(disk,
-		      mk_kdev(disk->major, disk->first_minor),
-		      1<<disk->minor_shift,
-		      disk->fops,
-		      hba[ctlr]->drv[logvol].nr_blocks);
+	set_capacity(disk, hba[ctlr]->drv[logvol].nr_blocks);
+	add_disk(disk);
 	
 	kfree(ld_buff);
 	kfree(size_buff);
@@ -2449,11 +2442,8 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->block_size;
 		disk->major_name = hba[i]->names + 12 * j;
-		add_gendisk(disk);
-		register_disk(disk,
-			      mk_kdev(disk->major, disk->first_minor),
-			      1<<disk->minor_shift, disk->fops,
-			      drv->nr_blocks);
+		set_capacity(disk, drv->nr_blocks);
+		add_disk(disk);
 	}
 
 	cciss_register_scsi(i, 1);  /* hook ourself into SCSI subsystem */

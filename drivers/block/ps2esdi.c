@@ -435,11 +435,9 @@ static int __init ps2esdi_geninit(void)
 
 	for (i = 0; i < ps2esdi_drives; i++) {
 		struct gendisk *disk = ps2esdi_gendisk + i;
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(disk->major,disk->first_minor),
-				1<<disk->minor_shift, disk->fops,
-				ps2esdi_info[i].head * ps2esdi_info[i].sect *
+		set_capacity(disk, ps2esdi_info[i].head * ps2esdi_info[i].sect *
 				ps2esdi_info[i].cyl);
+		add_disk(disk);
 	}
 	return 0;
 

@@ -1199,11 +1199,8 @@ int __init mm_init(void)
 		disk->major_name = mm_names + i*6;
 		disk->minor_shift = MM_SHIFT;
 		disk->fops = &mm_fops;
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-			      1<<disk->minor_shift,
-			      disk->fops,
-			      cards[i].mm_size << 1);
+		set_capacity(disk, cards[i].mm_size << 1);
+		add_disk(disk);
 	}
 
 	init_battery_timer();

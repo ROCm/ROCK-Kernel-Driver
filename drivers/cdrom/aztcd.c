@@ -319,27 +319,9 @@ static spinlock_t aztSpin = SPIN_LOCK_UNLOCKED;
   ###########################################################################
 */
 /* CDROM Drive Low Level I/O Functions */
-void op_ok(void);
-void pa_ok(void);
-void sten_low(void);
-void dten_low(void);
-void statusAzt(void);
 static void aztStatTimer(void);
 
 /* CDROM Drive Command Functions */
-static int aztSendCmd(int cmd);
-static int sendAztCmd(int cmd, struct azt_Play_msf *params);
-static int aztSeek(struct azt_Play_msf *params);
-static int aztSetDiskType(int type);
-static int aztStatus(void);
-static int getAztStatus(void);
-static int aztPlay(struct azt_Play_msf *arg);
-static void aztCloseDoor(void);
-static void aztLockDoor(void);
-static void aztUnlockDoor(void);
-static int aztGetValue(unsigned char *result);
-static int aztGetQChannelInfo(struct azt_Toc *qp);
-static int aztUpdateToc(void);
 static int aztGetDiskInfo(void);
 #if AZT_MULTISESSION
 static int aztGetMultiDiskInfo(void);
@@ -350,21 +332,15 @@ static int aztGetToc(int multi);
 static int check_aztcd_media_change(kdev_t full_dev);
 static int aztcd_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 		       unsigned long arg);
-static void azt_transfer(void);
-static void do_aztcd_request(request_queue_t *);
-static void azt_invalidate_buffers(void);
-int aztcd_open(struct inode *ip, struct file *fp);
-
+static int aztcd_open(struct inode *ip, struct file *fp);
 static int aztcd_release(struct inode *inode, struct file *file);
 
-int aztcd_init(void);
-
 static struct block_device_operations azt_fops = {
-	owner:THIS_MODULE,
-	open:aztcd_open,
-	release:aztcd_release,
-	ioctl:aztcd_ioctl,
-	check_media_change:check_aztcd_media_change,
+	.owner			= THIS_MODULE,
+	.open			= aztcd_open,
+	.release		= aztcd_release,
+	.ioctl			= aztcd_ioctl,
+	.check_media_change	= check_aztcd_media_change,
 };
 
 /* Aztcd State Machine: Controls Drive Operating State */
@@ -384,7 +360,7 @@ static int azt_bcd2bin(unsigned char bcd);
    busy waiting */
 /* Wait for OP_OK = drive answers with AFL_OP_OK after receiving a command*/
 # define OP_OK op_ok()
-void op_ok(void)
+static void op_ok(void)
 {
 	aztTimeOutCount = 0;
 	do {
@@ -399,7 +375,7 @@ void op_ok(void)
 
 /* Wait for PA_OK = drive answers with AFL_PA_OK after receiving parameters*/
 # define PA_OK pa_ok()
-void pa_ok(void)
+static void pa_ok(void)
 {
 	aztTimeOutCount = 0;
 	do {
@@ -414,7 +390,7 @@ void pa_ok(void)
 
 /* Wait for STEN=Low = handshake signal 'AFL_.._OK available or command executed*/
 # define STEN_LOW  sten_low()
-void sten_low(void)
+static void sten_low(void)
 {
 	aztTimeOutCount = 0;
 	do {
@@ -432,7 +408,7 @@ void sten_low(void)
 
 /* Wait for DTEN=Low = handshake signal 'Data available'*/
 # define DTEN_LOW dten_low()
-void dten_low(void)
+static void dten_low(void)
 {
 	aztTimeOutCount = 0;
 	do {
@@ -450,7 +426,7 @@ void dten_low(void)
  * may cause kernel panic when used in the wrong place
 */
 #define STEN_LOW_WAIT   statusAzt()
-void statusAzt(void)
+static void statusAzt(void)
 {
 	AztTimeout = AZT_STATUS_DELAY;
 	SET_TIMER(aztStatTimer, HZ / 100);
@@ -757,7 +733,7 @@ static int aztGetValue(unsigned char *result)
  * Read the current Q-channel info.  Also used for reading the
  * table of contents.
  */
-int aztGetQChannelInfo(struct azt_Toc *qp)
+static int aztGetQChannelInfo(struct azt_Toc *qp)
 {
 	unsigned char notUsed;
 	int st;
@@ -1648,7 +1624,7 @@ static void azt_invalidate_buffers(void)
 /*
  * Open the device special file.  Check that a disk is in.
  */
-int aztcd_open(struct inode *ip, struct file *fp)
+static int aztcd_open(struct inode *ip, struct file *fp)
 {
 	int st;
 
@@ -1714,13 +1690,19 @@ static int aztcd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-
+static struct gendisk azt_disk = {
+	.major = MAJOR_NR,
+	.first_minor = 0,
+	.minor_shift = 0,
+	.fops = &azt_fops,
+	.major_name = "aztcd"
+};
 
 /*
  * Test for presence of drive and initialize it.  Called at boot time.
  */
 
-int __init aztcd_init(void)
+static int __init aztcd_init(void)
 {
 	long int count, max_count;
 	unsigned char result[50];
@@ -1939,7 +1921,7 @@ int __init aztcd_init(void)
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_aztcd_request, &aztSpin);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
-	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &azt_fops, 0);
+	add_disk(&azt_disk);
 
 	azt_invalidate_buffers();
 	aztPresent = 1;
@@ -1955,9 +1937,10 @@ int __init aztcd_init(void)
 
 }
 
-void __exit aztcd_exit(void)
+static void __exit aztcd_exit(void)
 {
 	devfs_find_and_unregister(NULL, "aztcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	del_gendisk(&azt_disk);
 	if ((unregister_blkdev(MAJOR_NR, "aztcd") == -EINVAL)) {
 		printk("What's that: can't unregister aztcd\n");
 		return;
@@ -1971,9 +1954,7 @@ void __exit aztcd_exit(void)
 	printk(KERN_INFO "aztcd module released.\n");
 }
 
-#ifdef MODULE
 module_init(aztcd_init);
-#endif
 module_exit(aztcd_exit);
 
 /*##########################################################################

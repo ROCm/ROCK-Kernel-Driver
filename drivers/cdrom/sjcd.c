@@ -1528,7 +1528,7 @@ static void do_sjcd_request(request_queue_t * q)
 /*
  * Open the device special file. Check disk is in.
  */
-int sjcd_open(struct inode *ip, struct file *fp)
+static int sjcd_open(struct inode *ip, struct file *fp)
 {
 	/*
 	 * Check the presence of device.
@@ -1647,11 +1647,11 @@ static int sjcd_release(struct inode *inode, struct file *file)
  * A list of file operations allowed for this cdrom.
  */
 static struct block_device_operations sjcd_fops = {
-	owner:THIS_MODULE,
-	open:sjcd_open,
-	release:sjcd_release,
-	ioctl:sjcd_ioctl,
-	check_media_change:sjcd_disk_change,
+	.owner			= THIS_MODULE,
+	.open			= sjcd_open,
+	.release		= sjcd_release,
+	.ioctl			= sjcd_ioctl,
+	.check_media_change	= sjcd_disk_change,
 };
 
 /*
@@ -1664,11 +1664,20 @@ static struct {
 	unsigned char major, minor;
 } sjcd_version;
 
+static struct gendisk sjcd_disk =
+{
+	.major = MAJOR_NR,
+	.first_minor = 0,
+	.minor_shift = 0,
+	.fops = &sjcd_fops,
+	.major_name = "sjcd"
+};
+
 /*
  * Test for presence of drive and initialize it. Called at boot time.
  * Probe cdrom, find out version and status.
  */
-int __init sjcd_init(void)
+static int __init sjcd_init(void)
 {
 	int i;
 
@@ -1688,7 +1697,6 @@ int __init sjcd_init(void)
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_sjcd_request, &sjcd_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
-	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &sjcd_fops, 0);
 
 	if (check_region(sjcd_base, 4)) {
 		printk
@@ -1782,6 +1790,7 @@ int __init sjcd_init(void)
 	printk(KERN_INFO "SJCD: Status: port=0x%x.\n", sjcd_base);
 	devfs_register(NULL, "sjcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &sjcd_fops, NULL);
+	add_disk(&sjcd_disk);
 
 	sjcd_present++;
 	return (0);
@@ -1800,19 +1809,17 @@ static int sjcd_cleanup(void)
 }
 
 
-void __exit sjcd_exit(void)
+static void __exit sjcd_exit(void)
 {
 	devfs_find_and_unregister(NULL, "sjcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	del_gendisk(&sjcd_disk);
 	if (sjcd_cleanup())
 		printk("SJCD: module: cannot be removed.\n");
 	else
 		printk(KERN_INFO "SJCD: module: removed.\n");
 }
 
-#ifdef MODULE
 module_init(sjcd_init);
-#endif
 module_exit(sjcd_exit);
-
 
 MODULE_LICENSE("GPL");

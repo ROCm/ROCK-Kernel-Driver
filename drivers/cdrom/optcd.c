@@ -742,7 +742,7 @@ static struct cdrom_subchnl toc[MAX_TRACKS];
 
 
 #if DEBUG_TOC
-void toc_debug_info(int i)
+static void toc_debug_info(int i)
 {
 	printk(KERN_DEBUG "#%3d ctl %1x, adr %1x, track %2d index %3d"
 		"  %2d:%02d.%02d %2d:%02d.%02d\n",
@@ -1973,11 +1973,11 @@ static int __init version_ok(void)
 
 
 static struct block_device_operations opt_fops = {
-	owner:			THIS_MODULE,
-	open:			opt_open,
-	release:		opt_release,
-	ioctl:			opt_ioctl,
-	check_media_change:	opt_media_change,
+	.owner			= THIS_MODULE,
+	.open			= opt_open,
+	.release		= opt_release,
+	.ioctl			= opt_ioctl,
+	.check_media_change	= opt_media_change,
 };
 
 #ifndef MODULE
@@ -1997,9 +1997,17 @@ __setup("optcd=", optcd_setup);
 
 #endif /* MODULE */
 
+static struct gendisk optcd_disk = {
+	.major = MAJOR_NR,
+	.first_minor = 0,
+	.minor_shift = 0,
+	.fops = &opt_fops,
+	.major_name = "optcd"
+};
+
 /* Test for presence of drive and initialize it. Called at boot time
    or during module initialisation. */
-int __init optcd_init(void)
+static int __init optcd_init(void)
 {
 	int status;
 
@@ -2041,16 +2049,17 @@ int __init optcd_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_optcd_request,
 		       &optcd_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
-	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &opt_fops, 0);
+	add_disk(&optcd_disk);
 
 	printk(KERN_INFO "optcd: DOLPHIN 8000 AT CDROM at 0x%x\n", optcd_port);
 	return 0;
 }
 
 
-void __exit optcd_exit(void)
+static void __exit optcd_exit(void)
 {
 	devfs_find_and_unregister(NULL, "optcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	del_gendisk(&optcd_disk);
 	if (unregister_blkdev(MAJOR_NR, "optcd") == -EINVAL) {
 		printk(KERN_ERR "optcd: what's that: can't unregister\n");
 		return;
@@ -2060,10 +2069,7 @@ void __exit optcd_exit(void)
 	printk(KERN_INFO "optcd: module released.\n");
 }
 
-#ifdef MODULE
 module_init(optcd_init);
-#endif
 module_exit(optcd_exit);
-
 
 MODULE_LICENSE("GPL");

@@ -416,6 +416,8 @@ static struct floppy_drive_params drive_params[N_DRIVE];
 static struct floppy_drive_struct drive_state[N_DRIVE];
 static struct floppy_write_errors write_errors[N_DRIVE];
 static struct timer_list motor_off_timer[N_DRIVE];
+static struct gendisk disks[N_DRIVE];
+static char names[N_DRIVE][4];
 static struct floppy_raw_cmd *raw_cmd, default_raw_cmd;
 
 /*
@@ -3775,6 +3777,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	}
 
 	UDRS->fd_device = minor(inode->i_rdev);
+	set_capacity(&disks[drive], floppy_sizes[minor(inode->i_rdev)]);
 	if (old_dev != -1 && old_dev != minor(inode->i_rdev)) {
 		if (buffer_drive == drive)
 			buffer_track = -1;
@@ -3952,6 +3955,7 @@ static int floppy_revalidate(kdev_t dev)
 			poll_drive(0, FD_RAW_NEED_DISK);
 		process_fd_request();
 	}
+	set_capacity(&disks[drive], floppy_sizes[minor(dev)]);
 	return 0;
 }
 
@@ -4219,6 +4223,16 @@ static struct device device_floppy = {
 	bus_id:		"03?0",
 };
 
+static struct gendisk *floppy_find(int minor)
+{
+	int drive = (minor&3) | ((minor&0x80) >> 5);
+	if (drive >= N_DRIVE ||
+	    !(allowed_drive_mask & (1 << drive)) ||
+	    fdc_state[FDC(drive)].version == FDC_NONE)
+		return NULL;
+	return &disks[drive];
+}
+
 int __init floppy_init(void)
 {
 	int i,unit,drive;
@@ -4231,13 +4245,22 @@ int __init floppy_init(void)
 		return -EBUSY;
 	}
 
+	for (i=0; i<N_DRIVE; i++) {
+		disks[i].major = MAJOR_NR;
+		disks[i].first_minor = TOMINOR(i);
+		disks[i].fops = &floppy_fops;
+		sprintf(names[i], "fd%d", i);
+		disks[i].major_name = names[i];
+	}
+
+	blk_set_probe(MAJOR_NR, floppy_find);
+
 	for (i=0; i<256; i++)
 		if (ITYPE(i))
 			floppy_sizes[i] = (floppy_type[ITYPE(i)].size+1) >> 1;
 		else
 			floppy_sizes[i] = MAX_DISK_SIZE;
 
-	blk_size[MAJOR_NR] = floppy_sizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &floppy_lock);
 	reschedule_timeout(MAXTIMEOUT, "floppy init", MAXTIMEOUT);
 	config_types();
@@ -4262,6 +4285,7 @@ int __init floppy_init(void)
 		unregister_blkdev(MAJOR_NR,"fd");
 		del_timer(&fd_timeout);
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+		blk_set_probe(MAJOR_NR, NULL);
 		return -ENODEV;
 	}
 #if N_FDC > 1
@@ -4273,6 +4297,7 @@ int __init floppy_init(void)
 		del_timer(&fd_timeout);
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		unregister_blkdev(MAJOR_NR,"fd");
+		blk_set_probe(MAJOR_NR, NULL);
 		return -EBUSY;
 	}
 
@@ -4336,6 +4361,7 @@ int __init floppy_init(void)
 			floppy_release_irq_and_dma();
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		unregister_blkdev(MAJOR_NR,"fd");
+		blk_set_probe(MAJOR_NR, NULL);
 	}
 	
 	for (drive = 0; drive < N_DRIVE; drive++) {
@@ -4345,9 +4371,7 @@ int __init floppy_init(void)
 			continue;
 		if (fdc_state[FDC(drive)].version == FDC_NONE)
 			continue;
-		for (i = 0; i<NUMBER(floppy_type); i++)
-			register_disk(NULL, mk_kdev(MAJOR_NR,TOMINOR(drive)+i*4),
-					1, &floppy_fops, 0);
+		add_disk(disks + drive);
 	}
 
 	register_sys_device(&device_floppy);
@@ -4532,15 +4556,21 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	int dummy;
+	int i;
 		
 	unregister_sys_device(&device_floppy);
 	devfs_unregister (devfs_handle);
 	unregister_blkdev(MAJOR_NR, "fd");
+	blk_set_probe(MAJOR_NR, NULL);
+	for (drive = 0; drive < N_DRIVE; drive++) {
+		if ((allowed_drive_mask & (1 << drive)) &&
+		    fdc_state[FDC(drive)].version != FDC_NONE)
+			del_gendisk(disks + drive);
+	}
 
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	/* eject disk, if any */
-	dummy = fd_eject(0);
+	fd_eject(0);
 }
 
 MODULE_PARM(floppy,"s");

@@ -2111,10 +2111,7 @@ static int idefloppy_attach (ide_drive_t *drive)
 	g->de = drive->de;
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
 	g->flags |= GENHD_FL_DEVFS;
-	add_gendisk(g);
-	register_disk(g, mk_kdev(g->major,g->first_minor),
-		      1<<g->minor_shift, ide_fops,
-		      get_capacity(g));
+	add_disk(g);
 	return 0;
 failed:
 	return 1;

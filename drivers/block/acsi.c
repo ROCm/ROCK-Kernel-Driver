@@ -1698,11 +1698,8 @@ static void acsi_geninit(void)
 		disk->major_name = acsi_names + 4*i;
 		disk->minor_shift = (acsi_info[i].type==HARDDISK)?4:0;
 		disk->fops = &acsi_fops;
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-				1<<disk->minor_shift,
-				disk->fops,
-				acsi_info[i].size);
+		set_capacity(disk, acsi_info[i].size);
+		add_disk(disk);
 	}
 }
 

@@ -77,7 +77,8 @@ int initrd_below_start_ok;
  */
 
 static unsigned long rd_length[NUM_RAMDISKS];	/* Size of RAM disks in bytes   */
-static int rd_kbsize[NUM_RAMDISKS];	/* Size in blocks of 1024 bytes */
+static struct gendisk rd_disks[NUM_RAMDISKS];
+static char rd_names[NUM_RAMDISKS][5];
 static devfs_handle_t devfs_handle;
 static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
 
@@ -286,36 +287,37 @@ static int rd_make_request(request_queue_t * q, struct bio *sbh)
 
 static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	int error = -EINVAL;
-	unsigned int minor;
+	int error;
 
-	if (!inode || kdev_none(inode->i_rdev))
-		goto out;
+	if (cmd != BLKFLSBUF)
+		return -EINVAL;
 
-	minor = minor(inode->i_rdev);
-
-	switch (cmd) {
-		case BLKFLSBUF:
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
-			/* special: we want to release the ramdisk memory,
-			   it's not like with the other blockdevices where
-			   this ioctl only flushes away the buffer cache. */
-			error = -EBUSY;
-			down(&inode->i_bdev->bd_sem);
-			if (inode->i_bdev->bd_openers <= 2) {
-				truncate_inode_pages(inode->i_mapping, 0);
-				error = 0;
-			}
-			up(&inode->i_bdev->bd_sem);
-			break;
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+	/* special: we want to release the ramdisk memory,
+	   it's not like with the other blockdevices where
+	   this ioctl only flushes away the buffer cache. */
+	error = -EBUSY;
+	down(&inode->i_bdev->bd_sem);
+	if (inode->i_bdev->bd_openers <= 2) {
+		truncate_inode_pages(inode->i_mapping, 0);
+		error = 0;
 	}
-out:
+	up(&inode->i_bdev->bd_sem);
 	return error;
 }
 
 
 #ifdef CONFIG_BLK_DEV_INITRD
+
+static struct block_device_operations rd_bd_op;
+static struct gendisk initrd_disk = {
+	.major = MAJOR_NR,
+	.first_minor = INITRD_MINOR,
+	.minor_shift = 0,
+	.fops = &rd_bd_op,	
+	.major_name = "initrd"
+};
 
 static ssize_t initrd_read(struct file *file, char *buf,
 			   size_t count, loff_t *ppos)
@@ -339,6 +341,7 @@ static int initrd_release(struct inode *inode,struct file *file)
 	spin_lock(&initrd_users_lock);
 	if (!--initrd_users) {
 		spin_unlock(&initrd_users_lock);
+		del_gendisk(&initrd_disk);
 		free_initrd_mem(initrd_start, initrd_end);
 		initrd_start = 0;
 	} else {
@@ -410,6 +413,7 @@ static void __exit rd_cleanup (void)
 			invalidate_bdev(bdev, 1);
 			blkdev_put(bdev, BDEV_FILE);
 		}
+		del_gendisk(rd_disks + i);
 	}
 
 	devfs_unregister (devfs_handle);
@@ -437,9 +441,16 @@ static int __init rd_init (void)
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), &rd_make_request);
 
 	for (i = 0; i < NUM_RAMDISKS; i++) {
+		struct gendisk *disk = rd_disks + i;
 		/* rd_size is given in kB */
 		rd_length[i] = rd_size << 10;
-		rd_kbsize[i] = rd_size;
+		disk->major = MAJOR_NR;
+		disk->first_minor = 0;
+		disk->minor_shift = 0;
+		disk->fops = &rd_bd_op;
+		sprintf(rd_names[i], "rd%d", i);
+		disk->major_name = rd_names[i];
+		set_capacity(disk, rd_size * 2);
 	}
 	devfs_handle = devfs_mk_dir (NULL, "rd", NULL);
 	devfs_register_series (devfs_handle, "%u", NUM_RAMDISKS,
@@ -448,17 +459,14 @@ static int __init rd_init (void)
 			       &rd_bd_op, NULL);
 
 	for (i = 0; i < NUM_RAMDISKS; i++)
-		register_disk(NULL, mk_kdev(MAJOR_NR,i), 1, &rd_bd_op,
-			      rd_size<<1);
+		add_disk(rd_disks + i);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* We ought to separate initrd operations here */
-	register_disk(NULL, mk_kdev(MAJOR_NR,INITRD_MINOR), 1, &rd_bd_op, rd_size<<1);
+	add_disk(&initrd_disk);
 	devfs_register(devfs_handle, "initrd", DEVFS_FL_DEFAULT, MAJOR_NR,
 			INITRD_MINOR, S_IFBLK | S_IRUSR, &rd_bd_op, NULL);
 #endif
-
-	blk_size[MAJOR_NR] = rd_kbsize;		/* Size of the RAM disk in kB  */
 
 	/* rd_size is given in kB */
 	printk("RAMDISK driver initialized: "

@@ -59,6 +59,8 @@ typedef struct {
 
 static xpram_device_t xpram_devices[XPRAM_MAX_DEVS];
 static int xpram_sizes[XPRAM_MAX_DEVS];
+static struct gendisk xpram_disks[XPRAM_MAX_DEVS];
+static char xpram_names[XPRAM_MAX_DEV][8];
 static unsigned long xpram_pages;
 static int xpram_devs;
 static devfs_handle_t xpram_devfs_handle;
@@ -459,16 +461,24 @@ static int __init xpram_setup_blkdev(void)
 	q = BLK_DEFAULT_QUEUE(XPRAM_MAJOR);
 	blk_queue_make_request(q,xpram_make_request);
 	blk_queue_hardsect_size(q, 4096);
-	blk_size[XPRAM_MAJOR] = xpram_sizes;
 
 	/*
 	 * Setup device structures.
 	 */
 	offset = 0;
 	for (i = 0; i < xpram_devs; i++) {
+		struct gendisk *disk = xpram_disks + i;
 		xpram_devices[i].size = xpram_sizes[i] / 4;
 		xpram_devices[i].offset = offset;
 		offset += xpram_devices[i].size;
+		disk->major = XPRAM_MAJOR;
+		disk->first_minor = i;
+		disk->minor_shift = 0;
+		disk->fops = &xpram_devops;
+		sprintf(xpram_names[i], "slram%d", i);
+		disk->major_name = xpram_names[i];
+		set_capacity(disk, xpram_sizes[i] << 1);
+		add_disk(disk);
 	}
 
 	return 0;
@@ -479,6 +489,9 @@ static int __init xpram_setup_blkdev(void)
  */
 static void __exit xpram_exit(void)
 {
+	int i;
+	for (i = 0; i < xpram_devs; i++)
+		del_gendisk(xpram_disks + i);
 	blk_clear(XPRAM_MAJOR);
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_unregister(xpram_devfs_handle);

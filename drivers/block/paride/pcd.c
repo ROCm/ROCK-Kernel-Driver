@@ -176,8 +176,6 @@ MODULE_PARM(drive3, "1-6i");
 /* set up defines for blk.h,  why don't all drivers do it this way ? */
 
 #define MAJOR_NR	major
-#define DEVICE_NR(device) (minor(device))
-#define DEVICE_OFF(device)
 
 #include <linux/blk.h>
 
@@ -224,6 +222,7 @@ struct pcd_unit {
 	int present;		/* does this unit exist ? */
 	char *name;		/* pcd0, pcd1, etc */
 	struct cdrom_device_info info;	/* uniform cdrom interface */
+	struct gendisk disk;
 };
 
 struct pcd_unit pcd[PCD_UNITS];
@@ -282,6 +281,7 @@ static void pcd_init_units(void)
 
 	pcd_drive_count = 0;
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
+		struct gendisk *disk = &cd->disk;
 		cd->pi = &cd->pia;
 		cd->present = 0;
 		cd->last_sense = 0;
@@ -298,6 +298,11 @@ static void pcd_init_units(void)
 		cd->info.speed = 0;
 		cd->info.capacity = 1;
 		cd->info.mask = 0;
+		disk->major = major;
+		disk->first_minor = unit;
+		disk->minor_shift = 0;
+		disk->major_name = cd->name;
+		disk->fops = &pcd_bdops;
 	}
 }
 
@@ -925,8 +930,9 @@ static int __init pcd_init(void)
 
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
 		if (cd->present) {
+			struct gendisk *disk = &cd->disk;
 			register_cdrom(&cd->info);
-			devfs_plain_cdrom(&cd->info, &pcd_bdops);
+			add_disk(disk);
 		}
 	}
 
@@ -942,6 +948,7 @@ static void __exit pcd_exit(void)
 
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
 		if (cd->present) {
+			del_gendisk(&cd->disk);
 			pi_release(cd->pi);
 			unregister_cdrom(&cd->info);
 		}
