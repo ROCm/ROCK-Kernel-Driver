@@ -66,6 +66,9 @@ struct bus_type {
 	atomic_t		refcount;
 	u32			present;
 
+	struct subsystem	subsys;
+	struct subsystem	drvsubsys;
+	struct subsystem	devsubsys;
 	struct list_head	node;
 	struct list_head	devices;
 	struct list_head	drivers;

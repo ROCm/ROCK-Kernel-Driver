@@ -12,12 +12,76 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/errno.h>
+#include <linux/init.h>
 #include "base.h"
 
 static LIST_HEAD(bus_driver_list);
 
 #define to_dev(node) container_of(node,struct device,bus_list)
 #define to_drv(node) container_of(node,struct device_driver,bus_list)
+
+#define to_bus_attr(_attr) container_of(_attr,struct bus_attribute,attr)
+#define to_bus(obj) container_of(obj,struct bus_type,subsys.kobj)
+
+/*
+ * sysfs bindings for buses
+ */
+
+
+static ssize_t
+bus_attr_show(struct kobject * kobj, struct attribute * attr,
+	      char * buf, size_t count, loff_t off)
+{
+	struct bus_attribute * bus_attr = to_bus_attr(attr);
+	struct bus_type * bus = to_bus(kobj);
+	ssize_t ret = 0;
+
+	if (bus_attr->show)
+		ret = bus_attr->show(bus,buf,count,off);
+	return ret;
+}
+
+static ssize_t
+bus_attr_store(struct kobject * kobj, struct attribute * attr,
+	       const char * buf, size_t count, loff_t off)
+{
+	struct bus_attribute * bus_attr = to_bus_attr(attr);
+	struct bus_type * bus = to_bus(kobj);
+	ssize_t ret = 0;
+
+	if (bus_attr->store)
+		ret = bus_attr->store(bus,buf,count,off);
+	return ret;
+}
+
+static struct sysfs_ops bus_sysfs_ops = {
+	.show	= bus_attr_show,
+	.store	= bus_attr_store,
+};
+
+int bus_create_file(struct bus_type * bus, struct bus_attribute * attr)
+{
+	int error;
+	if (get_bus(bus)) {
+		error = sysfs_create_file(&bus->subsys.kobj,&attr->attr);
+		put_bus(bus);
+	} else
+		error = -EINVAL;
+	return error;
+}
+
+void bus_remove_file(struct bus_type * bus, struct bus_attribute * attr)
+{
+	if (get_bus(bus)) {
+		sysfs_remove_file(&bus->subsys.kobj,&attr->attr);
+		put_bus(bus);
+	}
+}
+
+struct subsystem bus_subsys = {
+	.kobj	= { .name = "bus" },
+	.sysfs_ops	= &bus_sysfs_ops,
+};
 
 /**
  * bus_for_each_dev - walk list of devices and do something to each
@@ -206,7 +270,7 @@ int bus_add_device(struct device * dev)
 		list_add_tail(&dev->bus_list,&dev->bus->devices);
 		device_attach(dev);
 		up_write(&dev->bus->rwsem);
-		device_bus_link(dev);
+		sysfs_create_link(&bus->devsubsys.kobj,&dev->kobj,dev->bus_id);
 	}
 	return 0;
 }
@@ -221,9 +285,9 @@ int bus_add_device(struct device * dev)
 void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
+		sysfs_remove_link(&dev->bus->devsubsys.kobj,dev->bus_id);
 		down_write(&dev->bus->rwsem);
 		pr_debug("bus %s: remove device %s\n",dev->bus->name,dev->bus_id);
-		device_remove_symlink(&dev->bus->device_dir,dev->bus_id);
 		device_detach(dev);
 		list_del_init(&dev->bus_list);
 		up_write(&dev->bus->rwsem);
@@ -286,6 +350,18 @@ int bus_register(struct bus_type * bus)
 	atomic_set(&bus->refcount,2);
 	bus->present = 1;
 
+	strncpy(bus->subsys.kobj.name,bus->name,KOBJ_NAME_LEN);
+	bus->subsys.parent = &bus_subsys;
+	subsystem_register(&bus->subsys);
+
+	snprintf(bus->devsubsys.kobj.name,KOBJ_NAME_LEN,"devices");
+	bus->devsubsys.parent = &bus->subsys;
+	subsystem_register(&bus->devsubsys);
+
+	snprintf(bus->drvsubsys.kobj.name,KOBJ_NAME_LEN,"drivers");
+	bus->drvsubsys.parent = &bus->subsys;
+	subsystem_register(&bus->drvsubsys);
+
 	spin_lock(&device_lock);
 	list_add_tail(&bus->node,&bus_driver_list);
 	spin_unlock(&device_lock);
@@ -309,6 +385,13 @@ void bus_unregister(struct bus_type * bus)
 	put_bus(bus);
 }
 
+static int __init bus_subsys_init(void)
+{
+	return subsystem_register(&bus_subsys);
+}
+
+core_initcall(bus_subsys_init);
+
 EXPORT_SYMBOL(bus_for_each_dev);
 EXPORT_SYMBOL(bus_for_each_drv);
 EXPORT_SYMBOL(bus_add_device);
@@ -317,3 +400,6 @@ EXPORT_SYMBOL(bus_register);
 EXPORT_SYMBOL(bus_unregister);
 EXPORT_SYMBOL(get_bus);
 EXPORT_SYMBOL(put_bus);
+
+EXPORT_SYMBOL(bus_create_file);
+EXPORT_SYMBOL(bus_remove_file);
