@@ -154,7 +154,7 @@ int fat_add_cluster(struct inode *inode)
 			new_fclus, inode->i_blocks >> (cluster_bits - 9));
 		fat_cache_inval_inode(inode);
 	}
-	inode->i_blocks += (1 << cluster_bits) >> 9;
+	inode->i_blocks += MSDOS_SB(sb)->cluster_size >> 9;
 
 	return new_dclus;
 }
@@ -163,7 +163,7 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *bh, *res = NULL;
-	int nr, cluster_size = MSDOS_SB(sb)->cluster_size;
+	int nr, sec_per_clus = MSDOS_SB(sb)->sec_per_clus;
 	sector_t sector, last_sector;
 
 	if (MSDOS_SB(sb)->fat_bits != 32) {
@@ -175,8 +175,8 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 	if (nr < 0)
 		return ERR_PTR(nr);
 	
-	sector = ((sector_t)nr - 2) * cluster_size + MSDOS_SB(sb)->data_start;
-	last_sector = sector + cluster_size;
+	sector = ((sector_t)nr - 2) * sec_per_clus + MSDOS_SB(sb)->data_start;
+	last_sector = sector + sec_per_clus;
 	for ( ; sector < last_sector; sector++) {
 		if ((bh = sb_getblk(sb, sector))) {
 			memset(bh->b_data, 0, sb->s_blocksize);
@@ -195,8 +195,8 @@ struct buffer_head *fat_extend_dir(struct inode *inode)
 		inode->i_size = (inode->i_size + sb->s_blocksize)
 			& ~(sb->s_blocksize - 1);
 	}
-	inode->i_size += 1 << MSDOS_SB(sb)->cluster_bits;
-	MSDOS_I(inode)->mmu_private += 1 << MSDOS_SB(sb)->cluster_bits;
+	inode->i_size += MSDOS_SB(sb)->cluster_size;
+	MSDOS_I(inode)->mmu_private += MSDOS_SB(sb)->cluster_size;
 
 	return res;
 }

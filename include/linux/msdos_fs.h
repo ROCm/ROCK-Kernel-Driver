@@ -117,7 +117,7 @@ struct fat_boot_sector {
 	__u8	system_id[8];	/* Name - can be used to special case
 				   partition manager volumes */
 	__u8	sector_size[2];	/* bytes per logical sector */
-	__u8	cluster_size;	/* sectors/cluster */
+	__u8	sec_per_clus;	/* sectors/cluster */
 	__u16	reserved;	/* reserved sectors */
 	__u8	fats;		/* number of FATs */
 	__u8	dir_entries[2];	/* root directory entries */

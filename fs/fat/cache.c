@@ -371,12 +371,12 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys)
 		return 0;
 
 	cluster = sector >> (sbi->cluster_bits - sb->s_blocksize_bits);
-	offset  = sector & (sbi->cluster_size - 1);
+	offset  = sector & (sbi->sec_per_clus - 1);
 	cluster = fat_bmap_cluster(inode, cluster);
 	if (cluster < 0)
 		return cluster;
 	else if (cluster) {
-		*phys = ((sector_t)cluster - 2) * sbi->cluster_size
+		*phys = ((sector_t)cluster - 2) * sbi->sec_per_clus
 			+ sbi->data_start + offset;
 	}
 	return 0;
@@ -434,7 +434,7 @@ int fat_free(struct inode *inode, int skip)
 		}
 		if (MSDOS_SB(sb)->free_clusters != -1)
 			MSDOS_SB(sb)->free_clusters++;
-		inode->i_blocks -= (1 << MSDOS_SB(sb)->cluster_bits) >> 9;
+		inode->i_blocks -= MSDOS_SB(sb)->cluster_size >> 9;
 	} while (nr != FAT_ENT_EOF);
 	fat_clusters_flush(sb);
 	nr = 0;

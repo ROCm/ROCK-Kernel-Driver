@@ -504,9 +504,9 @@ static int fat_read_root(struct inode *inode)
 		MSDOS_I(inode)->i_start = 0;
 		inode->i_size = sbi->dir_entries * sizeof(struct msdos_dir_entry);
 	}
-	inode->i_blksize = 1 << sbi->cluster_bits;
-	inode->i_blocks = ((inode->i_size + inode->i_blksize - 1)
-			   & ~((loff_t)inode->i_blksize - 1)) >> 9;
+	inode->i_blksize = sbi->cluster_size;
+	inode->i_blocks = ((inode->i_size + (sbi->cluster_size - 1))
+			   & ~((loff_t)sbi->cluster_size - 1)) >> 9;
 	MSDOS_I(inode)->i_logstart = 0;
 	MSDOS_I(inode)->mmu_private = inode->i_size;
 
@@ -810,12 +810,12 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 		goto out_invalid;
 	}
-	sbi->cluster_size = b->cluster_size;
-	if (!sbi->cluster_size
-	    || (sbi->cluster_size & (sbi->cluster_size - 1))) {
+	sbi->sec_per_clus = b->sec_per_clus;
+	if (!sbi->sec_per_clus
+	    || (sbi->sec_per_clus & (sbi->sec_per_clus - 1))) {
 		if (!silent)
-			printk(KERN_ERR "FAT: bogus cluster size %d\n",
-			       sbi->cluster_size);
+			printk(KERN_ERR "FAT: bogus sectors per cluster %d\n",
+			       sbi->sec_per_clus);
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -844,7 +844,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		b = (struct fat_boot_sector *) bh->b_data;
 	}
 
-	sbi->cluster_bits = ffs(sb->s_blocksize * sbi->cluster_size) - 1;
+	sbi->cluster_size = sb->s_blocksize * sbi->sec_per_clus;
+	sbi->cluster_bits = ffs(sbi->cluster_size) - 1;
 	sbi->fats = b->fats;
 	sbi->fat_bits = 0;		/* Don't know yet */
 	sbi->fat_start = CF_LE_W(b->reserved);
@@ -912,7 +913,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	total_sectors = CF_LE_W(get_unaligned((unsigned short *)&b->sectors));
 	if (total_sectors == 0)
 		total_sectors = CF_LE_L(b->total_sect);
-	sbi->clusters = (total_sectors - sbi->data_start) / sbi->cluster_size;
+	sbi->clusters = (total_sectors - sbi->data_start) / sbi->sec_per_clus;
 
 	if (sbi->fat_bits != 32)
 		sbi->fat_bits = (sbi->clusters > MSDOS_FAT12) ? 16 : 12;
@@ -1028,7 +1029,7 @@ int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 	}
 
 	buf->f_type = sb->s_magic;
-	buf->f_bsize = 1 << MSDOS_SB(sb)->cluster_bits;
+	buf->f_bsize = MSDOS_SB(sb)->cluster_size;
 	buf->f_blocks = MSDOS_SB(sb)->clusters;
 	buf->f_bfree = free;
 	buf->f_bavail = free;
@@ -1141,9 +1142,9 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 			inode->i_flags |= S_IMMUTABLE;
 	MSDOS_I(inode)->i_attrs = de->attr & ATTR_UNUSED;
 	/* this is as close to the truth as we can get ... */
-	inode->i_blksize = 1 << sbi->cluster_bits;
-	inode->i_blocks = ((inode->i_size + inode->i_blksize - 1)
-			   & ~((loff_t)inode->i_blksize - 1)) >> 9;
+	inode->i_blksize = sbi->cluster_size;
+	inode->i_blocks = ((inode->i_size + (sbi->cluster_size - 1))
+			   & ~((loff_t)sbi->cluster_size - 1)) >> 9;
 	inode->i_mtime.tv_sec = inode->i_atime.tv_sec =
 		date_dos2unix(CF_LE_W(de->time),CF_LE_W(de->date));
 	inode->i_mtime.tv_nsec = inode->i_atime.tv_nsec = 0;
