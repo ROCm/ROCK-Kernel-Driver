@@ -1720,12 +1720,7 @@ void tcp_send_probe0(struct sock *sk)
 	}
 }
 
-EXPORT_SYMBOL(tcp_acceptable_seq);
 EXPORT_SYMBOL(tcp_connect);
-EXPORT_SYMBOL(tcp_connect_init);
 EXPORT_SYMBOL(tcp_make_synack);
-EXPORT_SYMBOL(tcp_send_synack);
 EXPORT_SYMBOL(tcp_simple_retransmit);
 EXPORT_SYMBOL(tcp_sync_mss);
-EXPORT_SYMBOL(tcp_write_wakeup);
-EXPORT_SYMBOL(tcp_write_xmit);
