@@ -1268,7 +1268,7 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 		return ide_stopped;
 	}
 	if (rq->flags & REQ_CMD) {
-		if ((rq->sector % floppy->bs_factor) ||
+		if (((long)rq->sector % floppy->bs_factor) ||
 		    (rq->nr_sectors % floppy->bs_factor)) {
 			printk("%s: unsupported r/w request size\n",
 				drive->name);

@@ -5,14 +5,13 @@
  * add_gd_partition adds a partitions details to the devices partition
  * description.
  */
-
 enum { MAX_PART = 256 };
 
 struct parsed_partitions {
 	char name[40];
 	struct {
-		unsigned long from;
-		unsigned long size;
+		sector_t from;
+		sector_t size;
 		int flags;
 	} parts[MAX_PART];
 	int next;
@@ -20,7 +19,7 @@ struct parsed_partitions {
 };
 
 static inline void
-put_partition(struct parsed_partitions *p, int n, int from, int size)
+put_partition(struct parsed_partitions *p, int n, sector_t from, sector_t size)
 {
 	if (n < p->limit) {
 		p->parts[n].from = from;

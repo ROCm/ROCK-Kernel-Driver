@@ -371,7 +371,7 @@ static int idedisk_start_tag(ide_drive_t *drive, struct request *rq)
  * using LBA if supported, or CHS otherwise, to address sectors.
  * It also takes care of issuing special DRIVE_CMDs.
  */
-static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 lba48		= (drive->addressing == 1) ? 1 : 0;
@@ -418,10 +418,13 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 			tasklets[5] = (task_ioreg_t) (block>>8);
 			tasklets[6] = (task_ioreg_t) (block>>16);
 			tasklets[7] = (task_ioreg_t) (block>>24);
-			tasklets[8] = (task_ioreg_t) 0;
-			tasklets[9] = (task_ioreg_t) 0;
-//			tasklets[8] = (task_ioreg_t) (block>>32);
-//			tasklets[9] = (task_ioreg_t) (block>>40);
+			if (sizeof(block) == 4) {
+				tasklets[8] = (task_ioreg_t) 0;
+				tasklets[9] = (task_ioreg_t) 0;
+			} else {
+				tasklets[8] = (task_ioreg_t)((u64)block >> 32);
+				tasklets[9] = (task_ioreg_t)((u64)block >> 40);
+			}
 #ifdef DEBUG
 			printk("%s: %sing: LBAsect=%lu, sectors=%ld, "
 				"buffer=0x%08lx, LBAsect=0x%012lx\n",
@@ -450,10 +453,11 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 			hwif->OUTB(0x00|drive->select.all,IDE_SELECT_REG);
 		} else {
 #ifdef DEBUG
-			printk("%s: %sing: LBAsect=%ld, sectors=%d, "
+			printk("%s: %sing: LBAsect=%llu, sectors=%ld, "
 				"buffer=0x%08lx\n",
-				drive->name,rq_data_dir(rq)==READ?"read":"writ",
-				block, nsectors.b.low,
+				drive->name,
+				rq_data_dir(rq)==READ?"read":"writ",
+				(unsigned long long)block, rq->nr_sectors,
 				(unsigned long) rq->buffer);
 #endif
 			if (blk_rq_tagged(rq)) {
@@ -471,8 +475,8 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 		}
 	} else {
 		unsigned int sect,head,cyl,track;
-		track = block / drive->sect;
-		sect  = block % drive->sect + 1;
+		track = (int)block / drive->sect;
+		sect  = (int)block % drive->sect + 1;
 		hwif->OUTB(sect, IDE_SECTOR_REG);
 		head  = track % drive->head;
 		cyl   = track / drive->head;
@@ -586,7 +590,7 @@ static ide_startstop_t lba_48_rw_disk(ide_drive_t *, struct request *, unsigned 
  * using LBA if supported, or CHS otherwise, to address sectors.
  * It also takes care of issuing special DRIVE_CMDs.
  */
-static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	BUG_ON(drive->blocked);
 	if (!blk_fs_request(rq)) {
@@ -901,8 +905,8 @@ static u8 idedisk_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 				}
 			}
 			if (HWGROUP(drive) && HWGROUP(drive)->rq)
-				printk(", sector=%ld",
-					HWGROUP(drive)->rq->sector);
+				printk(", sector=%llu",
+					(unsigned long long)HWGROUP(drive)->rq->sector);
 		}
 	}
 #endif	/* FANCY_STATUS_DUMPS */
