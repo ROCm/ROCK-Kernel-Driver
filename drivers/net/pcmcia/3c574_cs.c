@@ -1048,7 +1048,7 @@ static void media_check(unsigned long arg)
 	}
 	if (lp->fast_poll) {
 		lp->fast_poll--;
-		lp->media.expires = jiffies + 2;
+		lp->media.expires = jiffies + 2*HZ/100;
 		add_timer(&lp->media);
 		return;
 	}

@@ -1996,7 +1996,7 @@ static void media_check(u_long arg)
     }
     if (smc->fast_poll) {
 	smc->fast_poll--;
-	smc->media.expires = jiffies + 1;
+	smc->media.expires = jiffies + HZ/100;
 	add_timer(&smc->media);
 	SMC_SELECT_BANK(saved_bank);
 	return;
