@@ -41,7 +41,6 @@
 #include <linux/proc_fs.h>
 #include <linux/random.h>
 #include <linux/kallsyms.h>
-#include <linux/bootmem.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -1003,22 +1002,15 @@ void irq_ctx_init(void)
 {
 	struct thread_info *tp;
 	int i;
-	void *stack;
 
-	for_each_cpu(i) {
-		stack = __alloc_bootmem(THREAD_SIZE, THREAD_SIZE, 0);
-		BUG_ON(!stack);
-		memset(stack, 0, THREAD_SIZE);
-		tp = (struct thread_info *) stack;
-		softirq_ctx[i] = tp;
+	for (i = 0; i < NR_CPUS; i++) {
+		memset((void *)softirq_ctx[i], 0, THREAD_SIZE);
+		tp = softirq_ctx[i];
 		tp->cpu = i;
 		tp->preempt_count = SOFTIRQ_OFFSET;
 
-		stack = __alloc_bootmem(THREAD_SIZE, THREAD_SIZE, 0);
-		BUG_ON(!stack);
-		memset(stack, 0, THREAD_SIZE);
-		tp = (struct thread_info *) stack;
-		hardirq_ctx[i] = tp;
+		memset((void *)hardirq_ctx[i], 0, THREAD_SIZE);
+		tp = hardirq_ctx[i];
 		tp->cpu = i;
 		tp->preempt_count = HARDIRQ_OFFSET;
 	}

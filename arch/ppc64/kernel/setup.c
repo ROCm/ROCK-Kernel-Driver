@@ -45,6 +45,7 @@
 #include <asm/btext.h>
 #include <asm/nvram.h>
 #include <asm/system.h>
+#include <asm/lmb.h>
 
 extern unsigned long klimit;
 /* extern void *stab; */
@@ -569,6 +570,25 @@ void __init ppc64_calibrate_delay(void)
 
 extern void (*calibrate_delay)(void);
 
+#ifdef CONFIG_IRQSTACKS
+static void __init irqstack_early_init(void)
+{
+	int i;
+
+	/* interrupt stacks must be under 256MB, we cannot afford to take SLB misses on them */
+	for (i = 0; i < NR_CPUS; i++) {
+		softirq_ctx[i] = (struct thread_info *)__va(lmb_alloc_base(THREAD_SIZE,
+					THREAD_SIZE, 0x10000000));
+		hardirq_ctx[i] = (struct thread_info *)__va(lmb_alloc_base(THREAD_SIZE,
+					THREAD_SIZE, 0x10000000));
+	}
+}
+#else
+static void __init irqstack_early_init(void)
+{
+}
+#endif
+
 /*
  * Called into from start_kernel, after lock_kernel has been called.
  * Initializes bootmem, which is unsed to manage page allocation until
@@ -613,6 +633,8 @@ void __init setup_arch(char **cmdline_p)
 	/* Save unparsed command line copy for /proc/cmdline */
 	strlcpy(saved_command_line, cmd_line, sizeof(saved_command_line));
 	*cmdline_p = cmd_line;
+
+	irqstack_early_init();
 
 	/* set up the bootmem stuff with available memory */
 	do_init_bootmem();
