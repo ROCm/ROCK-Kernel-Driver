@@ -197,7 +197,7 @@ static int i810tco_release (struct inode *inode, struct file *file)
 	/*
 	 *      Shut off the timer.
 	 */
-	if (tco_expect_close == 42 && !nowayout) {
+	if (tco_expect_close == 42) {
 		tco_timer_stop ();
 	} else {
 		tco_timer_reload ();
@@ -217,17 +217,21 @@ static ssize_t i810tco_write (struct file *file, const char *data,
 
 	/* See if we got the magic character 'V' and reload the timer */
 	if (len) {
-		size_t i;
+		if (!nowayout) {
+			size_t i;
 
-		tco_expect_close = 0;
+			/* note: just in case someone wrote the magic character
+			 * five months ago... */
+			tco_expect_close = 0;
 
-		/* scan to see whether or not we got the magic character */
-		for (i = 0; i != len; i++) {
-			u8 c;
-			if(get_user(c, data+i))
-				return -EFAULT;
-			if (c == 'V')
-				tco_expect_close = 42;
+			/* scan to see whether or not we got the magic character */
+			for (i = 0; i != len; i++) {
+				u8 c;
+				if(get_user(c, data+i))
+					return -EFAULT;
+				if (c == 'V')
+					tco_expect_close = 42;
+			}
 		}
 
 		/* someone wrote to us, we should reload the timer */
