@@ -55,17 +55,17 @@ SECTIONS
 	  __stop___ex_table = .;
 	}
 
-  __vtop_patchlist : AT(ADDR(__vtop_patchlist) - LOAD_OFFSET)
+  .data.patch.vtop : AT(ADDR(.data.patch.vtop) - LOAD_OFFSET)
 	{
 	  __start___vtop_patchlist = .;
-	  *(__vtop_patchlist)
+	  *(.data.patch.vtop)
 	  __end____vtop_patchlist = .;
 	}
 
-  __mckinley_e9_bundles : AT(ADDR(__mckinley_e9_bundles) - LOAD_OFFSET)
+  .data.patch.mckinley_e9 : AT(ADDR(.data.patch.mckinley_e9) - LOAD_OFFSET)
 	{
 	  __start___mckinley_e9_bundles = .;
-	  *(__mckinley_e9_bundles)
+	  *(.data.patch.mckinley_e9)
 	  __end___mckinley_e9_bundles = .;
 	}
 
@@ -159,7 +159,7 @@ SECTIONS
   .data.page_aligned : AT(ADDR(.data.page_aligned) - LOAD_OFFSET)
         { *(__special_page_section)
 	  __start_gate_section = .;
-	  *(.text.gate)
+	  *(.data.gate)
 	  __stop_gate_section = .;
 	}
 

@@ -37,6 +37,7 @@
 #include <asm/machvec.h>
 #include <asm/mca.h>
 #include <asm/page.h>
+#include <asm/patch.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
@@ -358,64 +359,16 @@ find_memory (void)
 #endif
 }
 
-/*
- * We need sometimes to load the physical address of a kernel
- * object.  Often we can convert the virtual address to physical
- * at execution time, but sometimes (either for performance reasons
- * or during error recovery) we cannot to this.  Patch the marked
- * bundles to load the physical address.
- * The 64-bit value in a "movl reg=value" is scattered between the
- * two words of the bundle like this:
- *
- * 6  6         5         4         3         2         1
- * 3210987654321098765432109876543210987654321098765432109876543210
- * ABBBBBBBBBBBBBBBBBBBBBBBCCCCCCCCCCCCCCCCCCDEEEEEFFFFFFFFFGGGGGGG
- *
- * CCCCCCCCCCCCCCCCCCxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
- * xxxxAFFFFFFFFFEEEEEDxGGGGGGGxxxxxxxxxxxxxBBBBBBBBBBBBBBBBBBBBBBB
- */
-static void __init
-patch_physical (void)
-{
-	extern unsigned long *__start___vtop_patchlist[], *__end____vtop_patchlist[];
-	unsigned long **e, *p, paddr, vaddr;
-
-	for (e = __start___vtop_patchlist; e < __end____vtop_patchlist; e++) {
-		p = *e;
-
-		vaddr = ((p[1] & 0x0800000000000000UL) << 4)  | /*A*/
-			((p[1] & 0x00000000007fffffUL) << 40) | /*B*/
-			((p[0] & 0xffffc00000000000UL) >> 24) | /*C*/
-			((p[1] & 0x0000100000000000UL) >> 23) | /*D*/
-			((p[1] & 0x0003e00000000000UL) >> 29) | /*E*/
-			((p[1] & 0x07fc000000000000UL) >> 43) | /*F*/
-			((p[1] & 0x000007f000000000UL) >> 36);  /*G*/
-
-		paddr = ia64_tpa(vaddr);
-
-		*p = (*p & 0x3fffffffffffUL) |
-			((paddr & 0x000000ffffc00000UL)<<24);	/*C*/
-		p++;
-		*p = (*p & 0xf000080fff800000UL) |
-			((paddr & 0x8000000000000000UL) >> 4)  | /*A*/
-			((paddr & 0x7fffff0000000000UL) >> 40) | /*B*/
-			((paddr & 0x0000000000200000UL) << 23) | /*D*/
-			((paddr & 0x00000000001f0000UL) << 29) | /*E*/
-			((paddr & 0x000000000000ff80UL) << 43) | /*F*/
-			((paddr & 0x000000000000007fUL) << 36);  /*G*/
-	}
-}
-
-
 void __init
 setup_arch (char **cmdline_p)
 {
+	extern unsigned long *__start___vtop_patchlist[], *__end____vtop_patchlist[];
 	extern unsigned long ia64_iobase;
 	unsigned long phys_iobase;
 
 	unw_init();
 
-	patch_physical();
+	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end____vtop_patchlist);
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
 	strncpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
@@ -522,8 +475,6 @@ setup_arch (char **cmdline_p)
 
 	platform_setup(cmdline_p);
 	paging_init();
-
-	unw_create_gate_table();
 }
 
 /*
@@ -860,27 +811,9 @@ cpu_init (void)
 void
 check_bugs (void)
 {
-	extern int __start___mckinley_e9_bundles[];
-	extern int __end___mckinley_e9_bundles[];
-	u64 *bundle;
-	int *wp;
+	extern char __start___mckinley_e9_bundles[];
+	extern char __end___mckinley_e9_bundles[];
 
-	if (local_cpu_data->family == 0x1f && local_cpu_data->model == 0)
-		printk(KERN_INFO "check_bugs: leaving McKinley Errata 9 workaround enabled\n");
-	else {
-		printk(KERN_INFO "check_bugs: McKinley Errata 9 workaround not needed; "
-		       "disabling it\n");
-		for (wp = __start___mckinley_e9_bundles; wp < __end___mckinley_e9_bundles; ++wp) {
-			bundle = (u64 *) ((char *) wp + *wp);
-			/* install a bundle of NOPs: */
-			bundle[0] = 0x0000000100000000;
-			bundle[1] = 0x0004000000000200;
-			ia64_fc(bundle);
-		}
-		ia64_insn_group_barrier();
-		ia64_sync_i();
-		ia64_insn_group_barrier();
-		ia64_srlz_i();
-		ia64_insn_group_barrier();
-	}
+	ia64_patch_mckinley_e9((unsigned long) __start___mckinley_e9_bundles,
+			       (unsigned long) __end___mckinley_e9_bundles);
 }

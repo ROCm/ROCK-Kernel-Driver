@@ -128,7 +128,8 @@ ENTRY(vhpt_miss)
 	;;
 (p7)	dep r17=r17,r19,(PAGE_SHIFT-3),3	// put region number bits in place
 
-	LOAD_PHYSICAL(srlz.d, p6, r19, swapper_pg_dir)	// region 5 is rooted at swapper_pg_dir
+	srlz.d
+	LOAD_PHYSICAL(p6, r19, swapper_pg_dir)	// region 5 is rooted at swapper_pg_dir
 
 	.pred.rel "mutex", p6, p7
 (p6)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT
@@ -423,7 +424,8 @@ ENTRY(nested_dtlb_miss)
 	;;
 (p7)	dep r17=r17,r19,(PAGE_SHIFT-3),3	// put region number bits in place
 
-	LOAD_PHYSICAL(srlz.d, p6, r19, swapper_pg_dir)	// region 5 is rooted at swapper_pg_dir
+	srlz.d
+	LOAD_PHYSICAL(p6, r19, swapper_pg_dir)	// region 5 is rooted at swapper_pg_dir
 
 	.pred.rel "mutex", p6, p7
 (p6)	shr.u r21=r21,PGDIR_SHIFT+PAGE_SHIFT

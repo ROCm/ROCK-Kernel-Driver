@@ -50,7 +50,7 @@
  *		6. GR12 = Return address to location within SAL_CHECK
  */
 #define SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(_tmp)		\
-	LOAD_PHYSICAL(nop 0, p0, _tmp, ia64_sal_to_os_handoff_state);; \
+	LOAD_PHYSICAL(p0, _tmp, ia64_sal_to_os_handoff_state);; \
 	st8	[_tmp]=r1,0x08;;			\
 	st8	[_tmp]=r8,0x08;;			\
 	st8	[_tmp]=r9,0x08;;			\
@@ -71,8 +71,8 @@
  *	returns ptr to SAL rtn save loc in _tmp
  */
 #define OS_MCA_TO_SAL_HANDOFF_STATE_RESTORE(_tmp)	\
-	LOAD_PHYSICAL(nop 0, p6, _tmp, ia64_sal_to_os_handoff_state);; \
-	LOAD_PHYSICAL(nop 0, p7, _tmp, ia64_os_to_sal_handoff_state);; \
+	LOAD_PHYSICAL(p6, _tmp, ia64_sal_to_os_handoff_state);; \
+	LOAD_PHYSICAL(p7, _tmp, ia64_os_to_sal_handoff_state);; \
 (p6)	movl	r8=IA64_MCA_COLD_BOOT;			\
 (p6)	movl	r10=IA64_MCA_SAME_CONTEXT;		\
 (p6)	add     _tmp=0x18,_tmp;;			\

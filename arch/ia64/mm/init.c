@@ -1,7 +1,7 @@
 /*
  * Initialize MMU support.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #include <linux/config.h>
@@ -9,13 +9,14 @@
 #include <linux/init.h>
 
 #include <linux/bootmem.h>
+#include <linux/efi.h>
+#include <linux/elf.h>
 #include <linux/mm.h>
+#include <linux/mmzone.h>
 #include <linux/personality.h>
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
-#include <linux/efi.h>
-#include <linux/mmzone.h>
 
 #include <asm/a.out.h>
 #include <asm/bitops.h>
@@ -23,12 +24,13 @@
 #include <asm/ia32.h>
 #include <asm/io.h>
 #include <asm/machvec.h>
+#include <asm/patch.h>
 #include <asm/pgalloc.h>
 #include <asm/sal.h>
 #include <asm/system.h>
+#include <asm/tlb.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
-#include <asm/tlb.h>
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
@@ -247,18 +249,17 @@ show_mem(void)
 }
 
 /*
- * This is like put_dirty_page() but installs a clean page with PAGE_GATE protection
- * (execute-only, typically).
+ * This is like put_dirty_page() but installs a clean page in the kernel's page table.
  */
 struct page *
-put_gate_page (struct page *page, unsigned long address)
+put_kernel_page (struct page *page, unsigned long address, pgprot_t pgprot)
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
 
 	if (!PageReserved(page))
-		printk(KERN_ERR "put_gate_page: gate page at 0x%p not in reserved memory\n",
+		printk(KERN_ERR "put_kernel_page: page at 0x%p not in reserved memory\n",
 		       page_address(page));
 
 	pgd = pgd_offset_k(address);		/* note: this is NOT pgd_offset()! */
@@ -275,12 +276,25 @@ put_gate_page (struct page *page, unsigned long address)
 			pte_unmap(pte);
 			goto out;
 		}
-		set_pte(pte, mk_pte(page, PAGE_GATE));
+		set_pte(pte, mk_pte(page, pgprot));
 		pte_unmap(pte);
 	}
   out:	spin_unlock(&init_mm.page_table_lock);
 	/* no need for flush_tlb */
 	return page;
+}
+
+static void
+setup_gate (void)
+{
+	extern char __start_gate_section[];
+
+	/* install the read-only and privilege-promote pages in the global page table: */
+	put_kernel_page(virt_to_page(ia64_imva(__start_gate_section)), GATE_ADDR, PAGE_READONLY);
+	put_kernel_page(virt_to_page(ia64_imva(__start_gate_section + PAGE_SIZE)),
+			GATE_ADDR + PAGE_SIZE, PAGE_GATE);
+
+	ia64_patch_gate((Elf64_Ehdr *) __start_gate_section);
 }
 
 void __init
@@ -582,8 +596,6 @@ count_reserved_pages (u64 start, u64 end, void *arg)
 	return 0;
 }
 
-#ifdef CONFIG_FSYS
-
 /*
  * Boot command-line option "nolwsys" can be used to disable the use of any light-weight
  * system call handler.  When this option is in effect, all fsyscalls will end up bubbling
@@ -603,15 +615,13 @@ nolwsys_setup (char *s)
 
 __setup("nolwsys", nolwsys_setup);
 
-#endif /* CONFIG_FSYS */
-
 void
 mem_init (void)
 {
-	extern char __start_gate_section[];
 	long reserved_pages, codesize, datasize, initsize;
 	unsigned long num_pgt_pages;
 	pg_data_t *pgdat;
+	int i;
 
 #ifdef CONFIG_PCI
 	/*
@@ -658,27 +668,19 @@ mem_init (void)
 	if (num_pgt_pages > (u64) pgt_cache_water[1])
 		pgt_cache_water[1] = num_pgt_pages;
 
-#ifdef CONFIG_FSYS
-	{
-		int i;
+	/*
+	 * For fsyscall entrpoints with no light-weight handler, use the ordinary
+	 * (heavy-weight) handler, but mark it by setting bit 0, so the fsyscall entry
+	 * code can tell them apart.
+	 */
+	for (i = 0; i < NR_syscalls; ++i) {
+		extern unsigned long fsyscall_table[NR_syscalls];
+		extern unsigned long sys_call_table[NR_syscalls];
 
-		/*
-		 * For fsyscall entrpoints with no light-weight handler, use the ordinary
-		 * (heavy-weight) handler, but mark it by setting bit 0, so the fsyscall entry
-		 * code can tell them apart.
-		 */
-		for (i = 0; i < NR_syscalls; ++i) {
-			extern unsigned long fsyscall_table[NR_syscalls];
-			extern unsigned long sys_call_table[NR_syscalls];
-
-			if (!fsyscall_table[i] || nolwsys)
-				fsyscall_table[i] = sys_call_table[i] | 1;
-		}
+		if (!fsyscall_table[i] || nolwsys)
+			fsyscall_table[i] = sys_call_table[i] | 1;
 	}
-#endif
-
-	/* install the gate page in the global page table: */
-	put_gate_page(virt_to_page(ia64_imva(__start_gate_section)), GATE_ADDR);
+	setup_gate();	/* setup gate pages before we free up boot memory... */
 
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_gdt_init();

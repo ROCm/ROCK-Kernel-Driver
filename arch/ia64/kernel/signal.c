@@ -395,14 +395,14 @@ static long
 setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	     struct sigscratch *scr)
 {
-	extern char ia64_sigtramp[], __start_gate_section[];
+	extern char __kernel_sigtramp[];
 	unsigned long tramp_addr, new_rbs = 0;
 	struct sigframe *frame;
 	struct siginfo si;
 	long err;
 
 	frame = (void *) scr->pt.r12;
-	tramp_addr = GATE_ADDR + (ia64_sigtramp - __start_gate_section);
+	tramp_addr = (unsigned long) __kernel_sigtramp;
 	if ((ka->sa.sa_flags & SA_ONSTACK) && sas_ss_flags((unsigned long) frame) == 0) {
 		frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
 				  & ~(STACK_ALIGN - 1));

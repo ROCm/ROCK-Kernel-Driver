@@ -528,9 +528,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	      case 29: /* Debug */
 	      case 35: /* Taken Branch Trap */
 	      case 36: /* Single Step Trap */
-#ifdef CONFIG_FSYS
 		if (fsys_mode(current, regs)) {
-			extern char syscall_via_break[], __start_gate_section[];
+			extern char __kernel_syscall_via_break[];
 			/*
 			 * Got a trap in fsys-mode: Taken Branch Trap and Single Step trap
 			 * need special handling; Debug trap is not supposed to happen.
@@ -541,12 +540,11 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 				return;
 			}
 			/* re-do the system call via break 0x100000: */
-			regs->cr_iip = GATE_ADDR + (syscall_via_break - __start_gate_section);
+			regs->cr_iip = (unsigned long) __kernel_syscall_via_break;
 			ia64_psr(regs)->ri = 0;
 			ia64_psr(regs)->cpl = 3;
 			return;
 		}
-#endif
 		switch (vector) {
 		      case 29:
 			siginfo.si_code = TRAP_HWBKPT;

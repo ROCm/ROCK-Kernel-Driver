@@ -258,6 +258,7 @@ ia64_phys_addr_valid (unsigned long addr)
 /*
  * The following have defined behavior only work if pte_present() is true.
  */
+#define pte_user(pte)		((pte_val(pte) & _PAGE_PL_MASK) == _PAGE_PL_3)
 #define pte_read(pte)		(((pte_val(pte) & _PAGE_AR_MASK) >> _PAGE_AR_SHIFT) < 6)
 #define pte_write(pte)	((unsigned) (((pte_val(pte) & _PAGE_AR_MASK) >> _PAGE_AR_SHIFT) - 2) <= 4)
 #define pte_exec(pte)		((pte_val(pte) & _PAGE_AR_RX) != 0)
@@ -485,5 +486,9 @@ typedef pte_t *pte_addr_t;
  * No page table caches to initialise
  */
 #define pgtable_cache_init()	do { } while (0)
+
+/* These tell get_user_pages() that the first gate page is accessible from user-level.  */
+#define FIXADDR_START	GATE_ADDR
+#define FIXADDR_TOP	(GATE_ADDR + PAGE_SIZE)
 
 #endif /* _ASM_IA64_PGTABLE_H */

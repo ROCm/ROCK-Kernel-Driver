@@ -56,15 +56,12 @@ name:
  * path (ivt.S - TLB miss processing) or in places where it might not be
  * safe to use a "tpa" instruction (mca_asm.S - error recovery).
  */
-	.section "__vtop_patchlist", "a"	// declare section & section attributes
+	.section ".data.patch.vtop", "a"	// declare section & section attributes
 	.previous
 
-#define	LOAD_PHYSICAL(op, preg, reg, obj)	\
-1: {	.mlx;					\
-	op;					\
-(preg)	movl reg = obj;				\
-   };						\
-	.xdata8 "__vtop_patchlist", 1b
+#define	LOAD_PHYSICAL(pr, reg, obj)		\
+[1:](pr)movl reg = obj;				\
+	.xdata4 ".data.patch.vtop", 1b-.
 
 /*
  * For now, we always put in the McKinley E9 workaround.  On CPUs that don't need it,
@@ -72,11 +69,11 @@ name:
  */
 #define DO_MCKINLEY_E9_WORKAROUND
 #ifdef DO_MCKINLEY_E9_WORKAROUND
-	.section "__mckinley_e9_bundles", "a"
+	.section ".data.patch.mckinley_e9", "a"
 	.previous
 /* workaround for Itanium 2 Errata 9: */
 # define MCKINLEY_E9_WORKAROUND			\
-	.xdata4 "__mckinley_e9_bundles", 1f-.;	\
+	.xdata4 ".data.patch.mckinley_e9", 1f-.;\
 1:{ .mib;					\
 	nop.m 0;				\
 	nop.i 0;				\

@@ -392,7 +392,7 @@ GLOBAL_ENTRY(fsys_bubble_down)
 	movl r9=PSR_PRESERVED_BITS
 
 	mov ar.rsc=0			// set enforced lazy mode, pl 0, little-endian, loadrs=0
-	movl r28=GATE_ADDR	// cr.iip XXX fix me!! Should be: GATE_ADDR(syscall_via_break)
+	movl r28=__kernel_syscall_via_break
 	;;
 	mov r23=ar.bspstore		// save ar.bspstore (12 cyc)
 	mov r31=pr			// save pr (2 cyc)

@@ -27,6 +27,7 @@
  *	  acquired, then the read-write lock must be acquired first.
  */
 #include <linux/bootmem.h>
+#include <linux/elf.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -1840,11 +1841,7 @@ unw_unwind (struct unw_frame_info *info)
 		return -1;
 	}
 	ip = info->ip = *info->rp_loc;
-	if (ip < GATE_ADDR + PAGE_SIZE) {
-		/*
-		 * We don't have unwind info for the gate page, so we consider that part
-		 * of user-space for the purpose of unwinding.
-		 */
+	if (ip < GATE_ADDR) {
 		UNW_DPRINT(2, "unwind.%s: reached user-space (ip=0x%lx)\n", __FUNCTION__, ip);
 		STAT(unw.stat.api.unwind_time += ia64_get_itc() - start; local_irq_restore(flags));
 		return -1;
@@ -1917,11 +1914,7 @@ unw_unwind_to_user (struct unw_frame_info *info)
 				   __FUNCTION__, ip);
 			return -1;
 		}
-		/*
-		 * We don't have unwind info for the gate page, so we consider that part
-		 * of user-space for the purpose of unwinding.
-		 */
-		if (ip < GATE_ADDR + PAGE_SIZE)
+		if (ip < GATE_ADDR)
 			return 0;
 	}
 	unw_get_ip(info, &ip);
@@ -2131,30 +2124,41 @@ unw_remove_unwind_table (void *handle)
 	kfree(table);
 }
 
-void
-unw_create_gate_table (void)
+static void __init
+create_gate_table (void)
 {
-	extern char __start_gate_section[], __stop_gate_section[];
-	unsigned long *lp, start, end, segbase = unw.kernel_table.segment_base;
-	const struct unw_table_entry *entry, *first, *unw_table_end;
-	extern int ia64_unw_end;
+	const struct unw_table_entry *entry, *start, *end;
+	unsigned long *lp, segbase = GATE_ADDR;
 	size_t info_size, size;
 	char *info;
+	Elf64_Phdr *punw = NULL, *phdr = (Elf64_Phdr *) (GATE_ADDR + GATE_EHDR->e_phoff);
+	int i;
 
-	start = (unsigned long) __start_gate_section - segbase;
-	end   = (unsigned long) __stop_gate_section - segbase;
-	unw_table_end = (struct unw_table_entry *) &ia64_unw_end;
+	for (i = 0; i < GATE_EHDR->e_phnum; ++i, ++phdr)
+		if (phdr->p_type == PT_IA_64_UNWIND) {
+			punw = phdr;
+			break;
+		}
+
+	if (!punw) {
+		printk("%s: failed to find gate DSO's unwind table!\n", __FUNCTION__);
+		return;
+	}
+
+	start = (const struct unw_table_entry *) punw->p_vaddr;
+	end = (struct unw_table_entry *) ((char *) start + punw->p_memsz);
 	size  = 0;
-	first = lookup(&unw.kernel_table, start);
 
-	for (entry = first; entry < unw_table_end && entry->start_offset < end; ++entry)
+	unw_add_unwind_table("linux-gate.so", segbase, 0, start, end);
+
+	for (entry = start; entry < end; ++entry)
 		size += 3*8 + 8 + 8*UNW_LENGTH(*(u64 *) (segbase + entry->info_offset));
 	size += 8;	/* reserve space for "end of table" marker */
 
-	unw.gate_table = alloc_bootmem(size);
+	unw.gate_table = kmalloc(size, GFP_KERNEL);
 	if (!unw.gate_table) {
 		unw.gate_table_size = 0;
-		printk(KERN_ERR "unwind: unable to create unwind data for gate page!\n");
+		printk(KERN_ERR "%s: unable to create unwind data for gate page!\n", __FUNCTION__);
 		return;
 	}
 	unw.gate_table_size = size;
@@ -2162,19 +2166,21 @@ unw_create_gate_table (void)
 	lp = unw.gate_table;
 	info = (char *) unw.gate_table + size;
 
-	for (entry = first; entry < unw_table_end && entry->start_offset < end; ++entry, lp += 3) {
+	for (entry = start; entry < end; ++entry, lp += 3) {
 		info_size = 8 + 8*UNW_LENGTH(*(u64 *) (segbase + entry->info_offset));
 		info -= info_size;
 		memcpy(info, (char *) segbase + entry->info_offset, info_size);
 
-		lp[0] = entry->start_offset - start + GATE_ADDR;	/* start */
-		lp[1] = entry->end_offset - start + GATE_ADDR;		/* end */
-		lp[2] = info - (char *) unw.gate_table;			/* info */
+		lp[0] = segbase + entry->start_offset;		/* start */
+		lp[1] = segbase + entry->end_offset;		/* end */
+		lp[2] = info - (char *) unw.gate_table;		/* info */
 	}
 	*lp = 0;	/* end-of-table marker */
 }
 
-void
+__initcall(create_gate_table);
+
+void __init
 unw_init (void)
 {
 	extern int ia64_unw_start, ia64_unw_end, __gp;
@@ -2215,6 +2221,14 @@ unw_init (void)
 }
 
 /*
+ * DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED
+ *
+ *	This system call has been deprecated.  The new and improved way to get
+ *	at the kernel's unwind info is via the gate DSO.  The address of the
+ *	ELF header for this DSO is passed to user-level via AT_SYSINFO_EHDR.
+ *
+ * DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED DEPRECATED
+ *
  * This system call copies the unwind data into the buffer pointed to by BUF and returns
  * the size of the unwind data.  If BUF_SIZE is smaller than the size of the unwind data
  * or if BUF is NULL, nothing is copied, but the system call still returns the size of the
