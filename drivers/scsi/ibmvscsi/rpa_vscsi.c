@@ -165,12 +165,11 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 		goto malloc_failed;
 	queue->size = PAGE_SIZE / sizeof(*queue->msgs);
 
-	if ((queue->msg_token = dma_map_single(hostdata->dev,
-					       queue->msgs,
-					       queue->size *
-					       sizeof(*queue->msgs),
-					       PCI_DMA_BIDIRECTIONAL)) ==
-	    NO_TCE)
+	queue->msg_token = dma_map_single(hostdata->dev, queue->msgs,
+					  queue->size * sizeof(*queue->msgs),
+					  PCI_DMA_BIDIRECTIONAL);
+
+	if (pci_dma_error(queue->msg_token))
 		goto map_failed;
 
 	rc = plpar_hcall_norets(H_REG_CRQ,

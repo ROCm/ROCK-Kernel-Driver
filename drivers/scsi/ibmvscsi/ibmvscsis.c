@@ -1859,10 +1859,11 @@ static int initialize_crq_queue(struct crq_queue *queue, struct server_adapter *
 		goto malloc_failed;
 	queue->size = PAGE_SIZE / sizeof(*queue->msgs);
 
-	if((queue->msg_token = vio_map_single(adapter->dma_dev, 
-					      queue->msgs, 
-					      queue->size * sizeof(*queue->msgs), 
-					      PCI_DMA_BIDIRECTIONAL)) == NO_TCE)
+	queue->msg_token = vio_map_single(adapter->dma_dev, queue->msgs,
+					  queue->size * sizeof(*queue->msgs),
+					  PCI_DMA_BIDIRECTIONAL);
+
+	if (pci_dma_error(queue->msg_token))
 		goto map_failed;
 
 	rc = plpar_hcall_norets(H_REG_CRQ, adapter->dma_dev->unit_address, queue->msg_token, PAGE_SIZE);
