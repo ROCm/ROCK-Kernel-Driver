@@ -941,7 +941,7 @@ xfs_ioc_bulkstat(
 		return -XFS_ERROR(EINVAL);
 
 	if (cmd == XFS_IOC_FSINUMBERS)
-		error = xfs_inumbers(mp, NULL, &inlast, &count,
+		error = xfs_inumbers(mp, &inlast, &count,
 						bulkreq.ubuffer);
 	else if (cmd == XFS_IOC_FSBULKSTAT_SINGLE)
 		error = xfs_bulkstat_single(mp, &inlast,
@@ -952,7 +952,7 @@ xfs_ioc_bulkstat(
 			error = xfs_bulkstat_single(mp, &inlast,
 					bulkreq.ubuffer, &done);
 		} else {
-			error = xfs_bulkstat(mp, NULL, &inlast, &count,
+			error = xfs_bulkstat(mp, &inlast, &count,
 				(bulkstat_one_pf)xfs_bulkstat_one, NULL,
 				sizeof(xfs_bstat_t), bulkreq.ubuffer,
 				BULKSTAT_FG_QUICK, &done);
@@ -1049,6 +1049,25 @@ xfs_merge_ioc_xflags(
 	return xflags;
 }
 
+STATIC unsigned int
+xfs_di2lxflags(
+	__uint16_t	di_flags)
+{
+	unsigned int	flags = 0;
+
+	if (di_flags & XFS_DIFLAG_IMMUTABLE)
+		flags |= LINUX_XFLAG_IMMUTABLE;
+	if (di_flags & XFS_DIFLAG_APPEND)
+		flags |= LINUX_XFLAG_APPEND;
+	if (di_flags & XFS_DIFLAG_SYNC)
+		flags |= LINUX_XFLAG_SYNC;
+	if (di_flags & XFS_DIFLAG_NOATIME)
+		flags |= LINUX_XFLAG_NOATIME;
+	if (di_flags & XFS_DIFLAG_NODUMP)
+		flags |= LINUX_XFLAG_NODUMP;
+	return flags;
+}
+
 STATIC int
 xfs_ioc_xattr(
 	vnode_t			*vp,
@@ -1113,17 +1132,7 @@ xfs_ioc_xattr(
 	}
 
 	case XFS_IOC_GETXFLAGS: {
-		flags = 0;
-		if (ip->i_d.di_flags & XFS_XFLAG_IMMUTABLE)
-			flags |= LINUX_XFLAG_IMMUTABLE;
-		if (ip->i_d.di_flags & XFS_XFLAG_APPEND)
-			flags |= LINUX_XFLAG_APPEND;
-		if (ip->i_d.di_flags & XFS_XFLAG_SYNC)
-			flags |= LINUX_XFLAG_SYNC;
-		if (ip->i_d.di_flags & XFS_XFLAG_NOATIME)
-			flags |= LINUX_XFLAG_NOATIME;
-		if (ip->i_d.di_flags & XFS_XFLAG_NODUMP)
-			flags |= LINUX_XFLAG_NODUMP;
+		flags = xfs_di2lxflags(ip->i_d.di_flags);
 		if (copy_to_user((unsigned int *)arg, &flags, sizeof(flags)))
 			return -XFS_ERROR(EFAULT);
 		return 0;
@@ -1143,7 +1152,8 @@ xfs_ioc_xattr(
 			attr_flags |= ATTR_NONBLOCK;
 
 		va.va_mask = XFS_AT_XFLAGS;
-		va.va_xflags = xfs_merge_ioc_xflags(flags, ip->i_d.di_flags);
+		va.va_xflags = xfs_merge_ioc_xflags(flags,
+				xfs_dic2xflags(&ip->i_d, ARCH_NOCONVERT));
 
 		VOP_SETATTR(vp, &va, attr_flags, NULL, error);
 		if (!error)

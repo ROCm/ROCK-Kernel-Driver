@@ -700,7 +700,7 @@ error0:
 	return error;
 }
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /*
  * Get the data from the pointed-to record.
  */
