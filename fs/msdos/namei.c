@@ -34,9 +34,10 @@ static char bad_if_strict_atari[] = " "; /* GEMDOS is less restrictive */
 /***** Formats an MS-DOS file name. Rejects invalid names. */
 static int msdos_format_name(const char *name,int len,
 	char *res,struct fat_mount_options *opts)
-	/* conv is relaxed/normal/strict, name is proposed name,
-	 * len is the length of the proposed name, res is the result name,
-	 * dotsOK is if hidden files get dots.
+	/* name is the proposed name, len is its length, res is
+	 * the resulting name, opts->name_check is either (r)elaxed,
+	 * (n)ormal or (s)trict, opts->dotsOK allows dots at the
+	 * beginning of name (for hidden files)
 	 */
 {
 	char *walk;
@@ -58,11 +59,11 @@ static int msdos_format_name(const char *name,int len,
 	for (walk = res; len && walk-res < 8; walk++) {
 	    	c = *name++;
 		len--;
-		if (opts->conversion != 'r' && strchr(bad_chars,c))
+		if (opts->name_check != 'r' && strchr(bad_chars,c))
 			return -EINVAL;
-		if (opts->conversion == 's' && strchr(bad_if_strict(opts),c))
+		if (opts->name_check == 's' && strchr(bad_if_strict(opts),c))
 			return -EINVAL;
-  		if (c >= 'A' && c <= 'Z' && opts->conversion == 's')
+  		if (c >= 'A' && c <= 'Z' && opts->name_check == 's')
 			return -EINVAL;
 		if (c < ' ' || c == ':' || c == '\\') return -EINVAL;
 /*  0xE5 is legal as a first character, but we must substitute 0x05     */
@@ -75,7 +76,7 @@ static int msdos_format_name(const char *name,int len,
 		*walk = (!opts->nocase && c >= 'a' && c <= 'z') ? c-32 : c;
 	}
 	if (space) return -EINVAL;
-	if (opts->conversion == 's' && len && c != '.') {
+	if (opts->name_check == 's' && len && c != '.') {
 		c = *name++;
 		len--;
 		if (c != '.') return -EINVAL;
@@ -86,25 +87,25 @@ static int msdos_format_name(const char *name,int len,
 		while (len > 0 && walk-res < MSDOS_NAME) {
 			c = *name++;
 			len--;
-			if (opts->conversion != 'r' && strchr(bad_chars,c))
+			if (opts->name_check != 'r' && strchr(bad_chars,c))
 				return -EINVAL;
-			if (opts->conversion == 's' &&
+			if (opts->name_check == 's' &&
 			    strchr(bad_if_strict(opts),c))
 				return -EINVAL;
 			if (c < ' ' || c == ':' || c == '\\')
 				return -EINVAL;
 			if (c == '.') {
-				if (opts->conversion == 's')
+				if (opts->name_check == 's')
 					return -EINVAL;
 				break;
 			}
-			if (c >= 'A' && c <= 'Z' && opts->conversion == 's')
+			if (c >= 'A' && c <= 'Z' && opts->name_check == 's')
 				return -EINVAL;
 			space = c == ' ';
 			*walk++ = (!opts->nocase && c >= 'a' && c <= 'z') ? c-32 : c;
 		}
 		if (space) return -EINVAL;
-		if (opts->conversion == 's' && len) return -EINVAL;
+		if (opts->name_check == 's' && len) return -EINVAL;
 	}
 	while (walk-res < MSDOS_NAME) *walk++ = ' ';
 	if (!opts->atari)
