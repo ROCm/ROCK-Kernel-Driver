@@ -173,7 +173,7 @@ RTN *FNAME ARGS										\
 			if (set && !INPLACE && test_bit(CACHE_VALID, &tmp->MEMBER.flags) && !new) \
 				break;							\
 											\
-			atomic_inc(&tmp->MEMBER.refcnt);				\
+			cache_get(&tmp->MEMBER);					\
 			if (set) {							\
 				if (!INPLACE && test_bit(CACHE_VALID, &tmp->MEMBER.flags))\
 				{ /* need to swap in new */				\
@@ -221,7 +221,7 @@ RTN *FNAME ARGS										\
 	new = kmalloc(sizeof(*new), GFP_KERNEL);					\
 	if (new) {									\
 		cache_init(&new->MEMBER);						\
-		atomic_inc(&new->MEMBER.refcnt);					\
+		cache_get(&new->MEMBER);						\
 		INIT;									\
 		tmp = new;								\
 		goto retry;								\
