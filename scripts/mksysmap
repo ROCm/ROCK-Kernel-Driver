@@ -18,7 +18,7 @@
 # they are used by the sparc BTFIXUP logic - and is assumed to be undefined.
 
 
-if [ "`$NM -u $1 | grep -v ' ____'`" != "" ]; then
+if [ "`$NM -u $1 | grep -v ' ___'`" != "" ]; then
 	echo "$1: error: undefined symbol(s) found:"
 	$NM -u $1 | grep -v ' ___'
 	exit 1
