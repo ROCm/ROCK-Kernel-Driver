@@ -436,56 +436,6 @@ void bd_release(struct block_device *bdev)
 	spin_unlock(&bdev_lock);
 }
 
-static const char *blkdevs[MAX_BLKDEV];
-
-int get_blkdev_list(char * p)
-{
-	int i;
-	int len;
-
-	len = sprintf(p, "\nBlock devices:\n");
-	for (i = 0; i < MAX_BLKDEV ; i++) {
-		if (blkdevs[i])
-			len += sprintf(p+len, "%3d %s\n", i, blkdevs[i]);
-	}
-	return len;
-}
-
-int register_blkdev(unsigned int major, const char * name, struct block_device_operations *bdops)
-{
-	if (devfs_only())
-		return 0;
-	if (major == 0) {
-		for (major = MAX_BLKDEV-1; major > 0; major--) {
-			if (blkdevs[major] == NULL) {
-				blkdevs[major] = name;
-				return major;
-			}
-		}
-		return -EBUSY;
-	}
-	if (major >= MAX_BLKDEV)
-		return -EINVAL;
-	if (blkdevs[major])
-		return -EBUSY;
-	blkdevs[major] = name;
-	return 0;
-}
-
-int unregister_blkdev(unsigned int major, const char * name)
-{
-	if (devfs_only())
-		return 0;
-	if (major >= MAX_BLKDEV)
-		return -EINVAL;
-	if (!blkdevs[major])
-		return -EINVAL;
-	if (strcmp(blkdevs[major], name))
-		return -EINVAL;
-	blkdevs[major] = NULL;
-	return 0;
-}
-
 /*
  * This routine checks whether a removable media has been changed,
  * and invalidates all buffer-cache-entries in that case. This
@@ -784,18 +734,6 @@ int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 	res = blkdev_ioctl(bdev->bd_inode, NULL, cmd, arg);
 	set_fs(old_fs);
 	return res;
-}
-
-const char *__bdevname(dev_t dev)
-{
-	static char buffer[32];
-	const char * name = blkdevs[MAJOR(dev)];
-
-	if (!name)
-		name = "unknown-block";
-
-	sprintf(buffer, "%s(%d,%d)", name, MAJOR(dev), MINOR(dev));
-	return buffer;
 }
 
 /**

@@ -18,7 +18,8 @@
 #include <linux/notifier.h>
 #include <linux/threads.h>
 #include <linux/device.h>
-
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
 
 #define CPUFREQ_NAME_LEN 16
 
@@ -69,6 +70,8 @@ struct cpufreq_policy {
 	struct cpufreq_cpuinfo  cpuinfo;     /* see above */
 	struct device		* dev;
 	struct kobject		kobj;
+ 	struct semaphore	lock;   /* CPU ->setpolicy or ->target may
+					   only be called once a time */
 };
 
 #define CPUFREQ_ADJUST          (0)
@@ -131,18 +134,13 @@ struct cpufreq_governor {
 };
 
 /* pass a target to the cpufreq driver 
- * _l : (cpufreq_driver_sem is not held)
  */
 inline int cpufreq_driver_target(struct cpufreq_policy *policy,
 				 unsigned int target_freq,
 				 unsigned int relation);
 
-inline int cpufreq_driver_target_l(struct cpufreq_policy *policy,
-				   unsigned int target_freq,
-				   unsigned int relation);
-
 /* pass an event to the cpufreq governor */
-int cpufreq_governor_l(unsigned int cpu, unsigned int event);
+int cpufreq_governor(unsigned int cpu, unsigned int event);
 
 int cpufreq_register_governor(struct cpufreq_governor *governor);
 void cpufreq_unregister_governor(struct cpufreq_governor *governor);
@@ -154,6 +152,8 @@ void cpufreq_unregister_governor(struct cpufreq_governor *governor);
 #define CPUFREQ_RELATION_L 0  /* lowest frequency at or above target */
 #define CPUFREQ_RELATION_H 1  /* highest frequency below or at target */
 
+struct freq_attr;
+
 struct cpufreq_driver {
 	/* needed by all drivers */
 	int	(*verify)	(struct cpufreq_policy *policy);
@@ -164,16 +164,15 @@ struct cpufreq_driver {
 	int	(*target)	(struct cpufreq_policy *policy,
 				 unsigned int target_freq,
 				 unsigned int relation);
+	struct module           *owner;
 	/* optional, for the moment */
 	int	(*init)		(struct cpufreq_policy *policy);
 	int	(*exit)		(struct cpufreq_policy *policy);
+	struct freq_attr	**attr;
 };
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
 int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
-/* deprecated */
-#define cpufreq_register(x)   cpufreq_register_driver(x)
-#define cpufreq_unregister() cpufreq_unregister_driver(NULL)
 
 
 void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state);
@@ -193,6 +192,13 @@ static inline void cpufreq_verify_within_limits(struct cpufreq_policy *policy, u
 		policy->min = policy->max;
 	return;
 }
+
+struct freq_attr {
+	struct attribute attr;
+	ssize_t (*show)(struct cpufreq_policy *, char *);
+	ssize_t (*store)(struct cpufreq_policy *, const char *, size_t count);
+};
+
 
 /*********************************************************************
  *                        CPUFREQ 2.6. INTERFACE                     *
@@ -289,15 +295,20 @@ int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
 int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
 				   struct cpufreq_frequency_table *table);
 
-int cpufreq_frequency_table_setpolicy(struct cpufreq_policy *policy,
-				      struct cpufreq_frequency_table *table,
-				      unsigned int *index);
-
 int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 				   struct cpufreq_frequency_table *table,
 				   unsigned int target_freq,
 				   unsigned int relation,
 				   unsigned int *index);
+
+/* the following are really really optional */
+extern struct freq_attr cpufreq_freq_attr_scaling_available_freqs;
+
+void cpufreq_frequency_table_get_attr(struct cpufreq_frequency_table *table, 
+				      unsigned int cpu);
+
+void cpufreq_frequency_table_put_attr(unsigned int cpu);
+
 
 #endif /* CONFIG_CPU_FREQ_TABLE */
 

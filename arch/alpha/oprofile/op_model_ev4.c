@@ -34,7 +34,7 @@ ev4_reg_setup(struct op_register_config *reg,
 	   for these "disabled" counter overflows are ignored by the
 	   interrupt handler.
 
-	   This is most irritating, becuase the hardware *can* enable and
+	   This is most irritating, because the hardware *can* enable and
 	   disable the interrupts for these counters independently, but the
 	   wrperfmon interface doesn't allow it.  */
 

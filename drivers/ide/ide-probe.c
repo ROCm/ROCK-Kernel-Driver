@@ -1292,11 +1292,8 @@ int hwif_init (ide_hwif_t *hwif)
 	/* we set it back to 1 if all is ok below */	
 	hwif->present = 0;
 
-	if (register_blkdev (hwif->major, hwif->name, ide_fops)) {
-		printk("%s: UNABLE TO GET MAJOR NUMBER %d\n",
-			hwif->name, hwif->major);
+	if (register_blkdev(hwif->major, hwif->name))
 		return 0;
-	}
 
 	if (alloc_disks(hwif) < 0)
 		goto out;

@@ -137,13 +137,12 @@ int swimiop_init(void)
 	current_req = NULL;
 	floppy_count = 0;
 
-	if (!iop_ism_present) return -ENODEV;
+	if (!iop_ism_present)
+		return -ENODEV;
 
-	if (register_blkdev(FLOPPY_MAJOR, "fd", &floppy_fops)) {
-		printk(KERN_ERR "SWIM-IOP: Unable to get major %d for floppy\n",
-		       FLOPPY_MAJOR);
+	if (register_blkdev(FLOPPY_MAJOR, "fd"))
 		return -EBUSY;
-	}
+
 	blk_init_queue(&swim_queue, do_fd_request, &swim_iop_lock);
 	printk("SWIM-IOP: %s by Joshua M. Thompson (funaho@jurai.org)\n",
 		DRIVER_VERSION);

@@ -2451,14 +2451,12 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	if( register_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname, &cciss_fops))
-	{
-		printk(KERN_ERR "cciss:  Unable to get major number "
-			"%d for %s\n", COMPAQ_CISS_MAJOR+i, hba[i]->devname);
+	if (register_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname)) {
 		release_io_mem(hba[i]);
 		free_hba(i);
-		return(-1);
+		return -1;
 	}
+
 	/* make sure the board interrupts are off */
 	hba[i]->access.set_intr_mask(hba[i], CCISS_INTR_OFF);
 	if( request_irq(hba[i]->intr, do_cciss_intr, 

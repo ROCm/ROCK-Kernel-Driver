@@ -562,7 +562,7 @@ void do_generic_mapping_read(struct address_space *mapping,
 find_page:
 		page = find_get_page(mapping, index);
 		if (unlikely(page == NULL)) {
-			handle_ra_miss(mapping, ra);
+			handle_ra_miss(mapping, ra, index);
 			goto no_cached_page;
 		}
 		if (!PageUptodate(page))
@@ -978,7 +978,7 @@ retry_find:
 	page = find_get_page(mapping, pgoff);
 	if (!page) {
 		if (did_readahead) {
-			handle_ra_miss(mapping,ra);
+			handle_ra_miss(mapping, ra, pgoff);
 			did_readahead = 0;
 		}
 		goto no_cached_page;

@@ -35,6 +35,10 @@ speed limits (like LCD drivers on ARM architecture). Additionally, the
 kernel "constant" loops_per_jiffy is updated on frequency changes
 here.
 
+Reference counting is done by cpufreq_get_cpu and cpufreq_put_cpu,
+which make sure that the cpufreq processor driver is correctly
+registered with the core, and will not be unloaded until
+cpufreq_put_cpu is called.
 
 2. CPUFreq notifiers
 ====================

@@ -1613,7 +1613,6 @@ void acsi_attach_SLMs( int (*attach_func)( int, int ) )
 
 
 int acsi_init( void )
-
 {
 	int err = 0;
 	int i, target, lun;
@@ -1623,8 +1622,7 @@ int acsi_init( void )
 #endif
 	if (!MACH_IS_ATARI || !ATARIHW_PRESENT(ACSI))
 		return 0;
-	if (register_blkdev( ACSI_MAJOR, "ad", &acsi_fops )) {
-		printk( KERN_ERR "Unable to get major %d for ACSI\n", ACSI_MAJOR );
+	if (register_blkdev(ACSI_MAJOR, "ad")) {
 		err = -EBUSY;
 		goto out1;
 	}

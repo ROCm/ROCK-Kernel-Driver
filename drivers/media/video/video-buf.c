@@ -83,6 +83,8 @@ videobuf_pages_to_sg(struct page **pages, int nr_pages, int offset)
 		return NULL;
 	memset(sglist, 0, sizeof(*sglist) * nr_pages);
 
+	if (NULL == pages[0])
+		goto nopage;
 	if (PageHighMem(pages[0]))
 		/* DMA to highmem pages might not work */
 		goto highmem;
@@ -118,7 +120,7 @@ int videobuf_lock(struct page **pages, int nr_pages)
 	for (i = 0; i < nr_pages; i++)
 		if (TryLockPage(pages[i]))
 			goto err;
-	dprintk(2,"lock ok\n");
+	dprintk(2,"lock ok [%d pages]\n",nr_pages);
 	return 0;
 
  err:
@@ -136,7 +138,7 @@ int videobuf_unlock(struct page **pages, int nr_pages)
 	dprintk(2,"unlock start ...\n");
 	for (i = 0; i < nr_pages; i++)
 		unlock_page(pages[i]);
-	dprintk(2,"unlock ok\n");
+	dprintk(2,"unlock ok [%d pages]\n",nr_pages);
 	return 0;
 }
 
@@ -270,7 +272,7 @@ int videobuf_dma_free(struct videobuf_dmabuf *dma)
 
 /* --------------------------------------------------------------------- */
 
-void* videobuf_alloc(int size)
+void* videobuf_alloc(unsigned int size)
 {
 	struct videobuf_buffer *vb;
 
@@ -340,7 +342,7 @@ videobuf_queue_init(struct videobuf_queue *q,
 		    spinlock_t *irqlock,
 		    enum v4l2_buf_type type,
 		    enum v4l2_field field,
-		    int msize)
+		    unsigned int msize)
 {
 	memset(q,0,sizeof(*q));
 
@@ -417,11 +419,11 @@ videobuf_next_field(struct videobuf_queue *q)
 
 	if (V4L2_FIELD_ALTERNATE == field) {
 		if (V4L2_FIELD_TOP == q->last) {
-			field   = V4L2_FIELD_TOP;
-			q->last = V4L2_FIELD_TOP;
-		} else {
 			field   = V4L2_FIELD_BOTTOM;
 			q->last = V4L2_FIELD_BOTTOM;
+		} else {
+			field   = V4L2_FIELD_TOP;
+			q->last = V4L2_FIELD_TOP;
 		}
 	}
 	return field;
@@ -463,7 +465,8 @@ int
 videobuf_reqbufs(struct file *file, struct videobuf_queue *q,
 		 struct v4l2_requestbuffers *req)
 {
-	int size,count,retval;
+	unsigned int size,count;
+	int retval;
 
 	if (req->type != q->type)
 		return -EINVAL;
@@ -477,6 +480,8 @@ videobuf_reqbufs(struct file *file, struct videobuf_queue *q,
 	size = 0;
 	q->ops->buf_setup(file,&count,&size);
 	size = PAGE_ALIGN(size);
+	dprintk(1,"reqbufs: bufs=%d, size=0x%x [%d pages total]\n",
+		count, size, (count*size)>>PAGE_SHIFT);
 
 	retval = videobuf_mmap_setup(file,q,count,size);
 	if (retval < 0)
@@ -660,7 +665,10 @@ videobuf_read_zerocopy(struct file *file, struct videobuf_queue *q,
         retval = videobuf_waiton(q->read_buf,0,0);
         if (0 == retval) {
 		videobuf_dma_pci_sync(q->pci,&q->read_buf->dma);
-                retval = q->read_buf->size;
+		if (STATE_ERROR == q->read_buf->state)
+			retval = -EIO;
+		else
+			retval = q->read_buf->size;
 	}
 
  done:
@@ -676,7 +684,8 @@ ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
 {
 	enum v4l2_field field;
 	unsigned long flags;
-	int retval, bytes, size, nbufs;
+	unsigned size, nbufs, bytes;
+	int retval;
 
 	down(&q->lock);
 
@@ -686,7 +695,7 @@ ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
 	    count >= size        &&
 	    !(file->f_flags & O_NONBLOCK)) {
 		retval = videobuf_read_zerocopy(file,q,data,count,ppos);
-		if (retval >= 0)
+		if (retval >= 0  ||  retval == -EIO)
 			/* ok, all done */
 			goto done;
 		/* fallback to kernel bounce buffer on failures */
@@ -713,6 +722,15 @@ ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
 	if (0 != retval)
 		goto done;
 	videobuf_dma_pci_sync(q->pci,&q->read_buf->dma);
+
+	if (STATE_ERROR == q->read_buf->state) {
+		/* catch I/O errors */
+		q->ops->buf_release(file,q->read_buf);
+		kfree(q->read_buf);
+		q->read_buf = NULL;
+		retval = -EIO;
+		goto done;
+	}
 
 	/* copy to userspace */
 	bytes = count;
@@ -788,8 +806,8 @@ ssize_t videobuf_read_stream(struct file *file, struct videobuf_queue *q,
 			     char *data, size_t count, loff_t *ppos,
 			     int vbihack)
 {
-	unsigned int *fc;
-	int err, bytes, retval;
+	unsigned int *fc, bytes;
+	int err, retval;
 	unsigned long flags;
 	
 	down(&q->lock);
@@ -968,9 +986,10 @@ static struct vm_operations_struct videobuf_vm_ops =
 };
 
 int videobuf_mmap_setup(struct file *file, struct videobuf_queue *q,
-			int bcount, int bsize)
+			unsigned int bcount, unsigned int bsize)
 {
-	int i,err;
+	unsigned int i;
+	int err;
 
 	err = videobuf_mmap_free(file,q);
 	if (0 != err)
@@ -1008,7 +1027,8 @@ int videobuf_mmap_mapper(struct vm_area_struct *vma,
 			 struct videobuf_queue *q)
 {
 	struct videobuf_mapping *map;
-	int first,last,size,i,retval;
+	unsigned int first,last,size,i;
+	int retval;
 
 	down(&q->lock);
 	retval = -EINVAL;
@@ -1025,7 +1045,7 @@ int videobuf_mmap_mapper(struct vm_area_struct *vma,
 	for (first = 0; first < VIDEO_MAX_FRAME; first++) {
 		if (NULL == q->bufs[first])
 			continue;
-		if (q->bufs[first]->boff  == (vma->vm_pgoff << PAGE_SHIFT))
+		if (q->bufs[first]->boff == (vma->vm_pgoff << PAGE_SHIFT))
 			break;
 	}
 	if (VIDEO_MAX_FRAME == first) {

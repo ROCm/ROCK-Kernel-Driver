@@ -1033,7 +1033,7 @@ extern void vfs_caches_init(unsigned long);
 #define putname(name)	kmem_cache_free(names_cachep, (void *)(name))
 
 enum {BDEV_FILE, BDEV_SWAP, BDEV_FS, BDEV_RAW};
-extern int register_blkdev(unsigned int, const char *, struct block_device_operations *);
+extern int register_blkdev(unsigned int, const char *);
 extern int unregister_blkdev(unsigned int, const char *);
 extern struct block_device *bdget(dev_t);
 extern int bd_acquire(struct inode *inode);

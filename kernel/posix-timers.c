@@ -1273,7 +1273,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		spin_unlock_irq(&nanosleep_abs_list_lock);
 	}
 	if (active) {
-		unsigned long jiffies_f = jiffies;
+		long jiffies_left;
 
 		/*
 		 * Always restart abs calls from scratch to pick up any
@@ -1282,7 +1282,12 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (abs)
 			return -ERESTARTNOHAND;
 
-		jiffies_to_timespec(new_timer.expires - jiffies_f, tsave);
+		jiffies_left = new_timer.expires - jiffies;
+
+		if (jiffies_left < 0)
+			return 0;
+
+		jiffies_to_timespec(jiffies_left, tsave);
 
 		while (tsave->tv_nsec < 0) {
 			tsave->tv_nsec += NSEC_PER_SEC;

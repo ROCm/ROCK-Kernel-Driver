@@ -154,9 +154,9 @@ static int __init xd_init(void)
 
 #ifdef MODULE
 	for (i = 4; i > 0; i--)
-		if(((xd[i] = xd[i-1]) >= 0) && !count)
+		if (((xd[i] = xd[i-1]) >= 0) && !count)
 			count = i;
-	if((xd[0] = count))
+	if ((xd[0] = count))
 		do_xd_setup(xd);
 #endif
 
@@ -170,10 +170,9 @@ static int __init xd_init(void)
 	}
 
 	err = -EBUSY;
-	if (register_blkdev(XT_DISK_MAJOR,"xd",&xd_fops)) {
-		printk("xd: Unable to get major number %d\n",XT_DISK_MAJOR);
+	if (register_blkdev(XT_DISK_MAJOR, "xd"))
 		goto out1;
-	}
+
 	devfs_mk_dir(NULL, "xd", NULL);
 	blk_init_queue(&xd_queue, do_xd_request, &xd_lock);
 	if (xd_detect(&controller,&address)) {

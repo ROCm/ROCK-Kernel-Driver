@@ -9,10 +9,6 @@ config MMU
 	bool
 	default n
 
-config SWAP
-	bool
-	default n
-
 config FPU
 	bool
 	default n

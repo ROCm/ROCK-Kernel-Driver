@@ -78,6 +78,7 @@ int show_interrupts(struct seq_file *p, void *v)
 {
 	int i;
 	struct irqaction * action;
+	unsigned long flags;
 
 	seq_puts(p, "           ");
 	for (i=0; i < 1 /*smp_num_cpus*/; i++)
@@ -87,10 +88,10 @@ int show_interrupts(struct seq_file *p, void *v)
 	for (i = 0 ; i < NR_IRQS ; i++) {
 		int j, count, num;
 		const char *type_name = irq_desc[i].handler->typename;
-
+		spin_lock_irqsave(&irq_desc[j].lock, flags);
 		action = irq_desc[i].action;
 		if (!action) 
-			continue;
+			goto skip;
 
 		count = 0;
 		num = -1;
@@ -108,11 +109,13 @@ int show_interrupts(struct seq_file *p, void *v)
 			seq_printf(p, " %*s%d", 14 - prec, type_name, num);
 		} else
 			seq_printf(p, " %14s", type_name);
+		
 		seq_printf(p, "  %s", action->name);
-
 		for (action=action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
 		seq_putc(p, '\n');
+skip:
+		spin_unlock_irqrestore(&irq_desc[j].lock, flags);
 	}
 	seq_printf(p, "ERR: %10lu\n", irq_err_count);
 	return 0;

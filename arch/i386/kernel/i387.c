@@ -52,29 +52,13 @@ void init_fpu(struct task_struct *tsk)
  * FPU lazy state save handling.
  */
 
-static inline void __save_init_fpu( struct task_struct *tsk )
-{
-	if ( cpu_has_fxsr ) {
-		asm volatile( "fxsave %0 ; fnclex"
-			      : "=m" (tsk->thread.i387.fxsave) );
-	} else {
-		asm volatile( "fnsave %0 ; fwait"
-			      : "=m" (tsk->thread.i387.fsave) );
-	}
-	clear_tsk_thread_flag(tsk, TIF_USEDFPU);
-}
-
-void save_init_fpu( struct task_struct *tsk )
-{
-	__save_init_fpu(tsk);
-	stts();
-}
-
 void kernel_fpu_begin(void)
 {
+	struct thread_info *thread = current_thread_info();
+
 	preempt_disable();
-	if (test_thread_flag(TIF_USEDFPU)) {
-		__save_init_fpu(current);
+	if (thread->status & TS_USEDFPU) {
+		__save_init_fpu(thread->task);
 		return;
 	}
 	clts();
