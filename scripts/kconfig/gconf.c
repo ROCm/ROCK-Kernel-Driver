@@ -1173,7 +1173,7 @@ on_treeview1_button_press_event(GtkWidget * widget,
 
 	gtk_widget_realize(tree2_w);
 	gtk_tree_view_set_cursor(view, path, NULL, FALSE);
-	gtk_widget_grab_focus(GTK_WIDGET(tree2_w));
+	gtk_widget_grab_focus(tree2_w);
 
 	return FALSE;
 }
@@ -1402,7 +1402,6 @@ static void update_tree(struct menu *src, GtkTreeIter * dst)
 	struct symbol *sym;
 	struct property *prop;
 	struct menu *menu1, *menu2;
-	static GtkTreePath *path = NULL;
 
 	if (src == &rootmenu)
 		indent = 1;
@@ -1527,8 +1526,8 @@ static void display_tree(struct menu *menu)
 		if (((menu != &rootmenu) && !(menu->flags & MENU_ROOT)) ||
 		    (view_mode == FULL_VIEW)
 		    || (view_mode == SPLIT_VIEW))*/
-		if ((view_mode == SINGLE_VIEW) && (menu->flags & MENU_ROOT) 
-		|| (view_mode == FULL_VIEW) || (view_mode == SPLIT_VIEW)) {
+		if (((view_mode == SINGLE_VIEW) && (menu->flags & MENU_ROOT))
+		    || (view_mode == FULL_VIEW) || (view_mode == SPLIT_VIEW)) {
 			indent++;
 			display_tree(child);
 			indent--;
