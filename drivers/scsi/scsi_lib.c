@@ -327,9 +327,9 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
 }
 
 /*
- * Called for single_lun devices on IO completion. Clear starget_busy, and
- * Call __blk_run_queue for all the scsi_devices on the target - including
- * current_sdev first.
+ * Called for single_lun devices on IO completion. Clear starget_sdev_user,
+ * and call __blk_run_queue for all the scsi_devices on the target -
+ * including current_sdev first.
  *
  * Called with *no* scsi locks held.
  */
@@ -338,19 +338,33 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	struct scsi_device *sdev;
 	unsigned int flags, flags2;
 
-	spin_lock_irqsave(current_sdev->request_queue->queue_lock, flags2);
 	spin_lock_irqsave(current_sdev->host->host_lock, flags);
-	WARN_ON(!current_sdev->sdev_target->starget_busy);
-	if (current_sdev->device_busy == 0)
-		current_sdev->sdev_target->starget_busy = 0;
+	WARN_ON(!current_sdev->sdev_target->starget_sdev_user);
+	current_sdev->sdev_target->starget_sdev_user = NULL;
 	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
 
 	/*
 	 * Call __blk_run_queue for all LUNs on the target, starting with
-	 * current_sdev.
+	 * current_sdev. We race with others (to set starget_sdev_user),
+	 * but in most cases, we will be first. Ideally, each LU on the
+	 * target would get some limited time or requests on the target.
 	 */
+	spin_lock_irqsave(current_sdev->request_queue->queue_lock, flags2);
 	__blk_run_queue(current_sdev->request_queue);
 	spin_unlock_irqrestore(current_sdev->request_queue->queue_lock, flags2);
+
+	spin_lock_irqsave(current_sdev->host->host_lock, flags);
+	if (current_sdev->sdev_target->starget_sdev_user) {
+		/*
+		 * After unlock, this races with anyone clearing
+		 * starget_sdev_user, but we (should) always enter this
+		 * function again, avoiding any problems.
+		 */
+		spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+		return;
+	}
+	spin_unlock_irqrestore(current_sdev->host->host_lock, flags);
+
 	list_for_each_entry(sdev, &current_sdev->same_target_siblings,
 			    same_target_siblings) {
 		spin_lock_irqsave(sdev->request_queue->queue_lock, flags2);
@@ -397,7 +411,7 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
  */
 void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 {
-	struct scsi_device *sdev, *sdev2;
+	struct scsi_device *sdev;
 	struct Scsi_Host *shost;
 	unsigned long flags;
 
@@ -446,16 +460,23 @@ void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 		 * scsi_request_fn must get the host_lock before checking
 		 * or modifying starved_list or starved_entry.
 		 */
-		sdev2 = list_entry(shost->starved_list.next,
+		sdev = list_entry(shost->starved_list.next,
 					  struct scsi_device, starved_entry);
-		list_del_init(&sdev2->starved_entry);
+		list_del_init(&sdev->starved_entry);
 		spin_unlock_irqrestore(shost->host_lock, flags);
 
-		spin_lock_irqsave(sdev2->request_queue->queue_lock, flags);
-		__blk_run_queue(sdev2->request_queue);
-		spin_unlock_irqrestore(sdev2->request_queue->queue_lock, flags);
+		spin_lock_irqsave(sdev->request_queue->queue_lock, flags);
+		__blk_run_queue(sdev->request_queue);
+		spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags);
 
 		spin_lock_irqsave(shost->host_lock, flags);
+		if (unlikely(!list_empty(&sdev->starved_entry)))
+			/*
+			 * sdev lost a race, and was put back on the
+			 * starved list. This is unlikely but without this
+			 * in theory we could loop forever.
+			 */
+			break;
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
@@ -1074,9 +1095,10 @@ static inline int scsi_dev_queue_ready(struct request_queue *q,
 
 /*
  * scsi_host_queue_ready: if we can send requests to shost, return 1 else
- * return 0.
+ * return 0. We must end up running the queue again whenever 0 is
+ * returned, else IO can hang.
  *
- * Called with queue_lock and host_lock held.
+ * Called with host_lock held.
  */
 static inline int scsi_host_queue_ready(struct request_queue *q,
 				   struct Scsi_Host *shost,
@@ -1101,15 +1123,7 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 		return 0;
 	if ((shost->can_queue > 0 && shost->host_busy >= shost->can_queue) ||
 	    shost->host_blocked || shost->host_self_blocked) {
-		SCSI_LOG_MLQUEUE(3,
-			printk("add starved dev <%d,%d,%d,%d>; host "
-			       "limit %d, busy %d, blocked %d selfblocked %d\n",
-			       sdev->host->host_no, sdev->channel,
-			       sdev->id, sdev->lun,
-			       shost->can_queue, shost->host_busy,
-			       shost->host_blocked, shost->host_self_blocked));
-		list_add_tail(&sdev->starved_entry,
-			      &shost->starved_list);
+		list_add_tail(&sdev->starved_entry, &shost->starved_list);
 		return 0;
 	}
 
@@ -1143,33 +1157,50 @@ static void scsi_request_fn(request_queue_t *q)
 		if (blk_queue_plugged(q))
 			goto completed;
 
-		if (!scsi_dev_queue_ready(q, sdev))
-			goto completed;
-
-		spin_lock_irqsave(shost->host_lock, flags);
-		if (!scsi_host_queue_ready(q, shost, sdev))
-			goto after_host_lock;
-
-		if (sdev->single_lun && !sdev->device_busy &&
-		    sdev->sdev_target->starget_busy)
-			goto after_host_lock;
-
 		/*
 		 * get next queueable request.  We do this early to make sure
 		 * that the request is fully prepared even if we cannot 
-		 * accept it.  If there is no request, we'll detect this
-		 * lower down.
+		 * accept it.
 		 */
 		req = elv_next_request(q);
 
 		if (!req) {
-			/* If the device is busy, a returning I/O
-			 * will restart the queue.  Otherwise, we have
-			 * to plug the queue */
-			if (sdev->device_busy == 1)
+			/*
+			 * If the device is busy, a returning I/O will
+			 * restart the queue. Otherwise, we have to plug
+			 * the queue
+			 */
+			if (sdev->device_busy == 0)
 				blk_plug_device(q);
-			goto after_host_lock;
+			goto completed;
 		}
+
+		if (!scsi_dev_queue_ready(q, sdev))
+			goto completed;
+
+		/*
+		 * Remove the request from the request list.
+		 */
+		if (!(blk_queue_tagged(q) && (blk_queue_start_tag(q, req) == 0)))
+			blkdev_dequeue_request(req);
+
+		sdev->device_busy++;
+		spin_unlock_irq(q->queue_lock);
+
+		spin_lock_irqsave(shost->host_lock, flags);
+		if (!scsi_host_queue_ready(q, shost, sdev))
+			goto host_lock_held;
+
+		if (sdev->single_lun) {
+			if (sdev->sdev_target->starget_sdev_user &&
+			    (sdev->sdev_target->starget_sdev_user != sdev))
+				goto host_lock_held;
+			else
+				sdev->sdev_target->starget_sdev_user = sdev;
+		}
+
+		shost->host_busy++;
+		spin_unlock_irqrestore(shost->host_lock, flags);
 
 		cmd = req->special;
 
@@ -1178,26 +1209,6 @@ static void scsi_request_fn(request_queue_t *q)
 		 * please mail the stack trace to linux-scsi@vger.kernel.org
 		 */
 		BUG_ON(!cmd);
-
-		/*
-		 * Finally, before we release the lock, we copy the
-		 * request to the command block, and remove the
-		 * request from the request list.  Note that we always
-		 * operate on the queue head - there is absolutely no
-		 * reason to search the list, because all of the
-		 * commands in this queue are for the same device.
-		 */
-		if (!(blk_queue_tagged(q) && (blk_queue_start_tag(q, req) == 0)))
-			blkdev_dequeue_request(req);
-	
-		if (sdev->single_lun)
-			sdev->sdev_target->starget_busy = 1;
-
-		shost->host_busy++;
-		spin_unlock_irqrestore(shost->host_lock, flags);
-
-		sdev->device_busy++;
-		spin_unlock_irq(q->queue_lock);
 
 		/*
 		 * Finally, initialize any error handling parameters, and set up
@@ -1219,8 +1230,21 @@ static void scsi_request_fn(request_queue_t *q)
 completed:
 	return;
 
-after_host_lock:
+host_lock_held:
 	spin_unlock_irqrestore(shost->host_lock, flags);
+	/*
+	 * lock q, handle tag, requeue req, and decrement device_busy. We
+	 * must return with queue_lock held.
+	 *
+	 * Decrementing device_busy without checking it is OK, as all such
+	 * cases (host limits or settings) should run the queue at some
+	 * later time.
+	 */
+	spin_lock_irq(q->queue_lock);
+	if (blk_rq_tagged(req))
+		blk_queue_end_tag(q, req);
+	__elv_add_request(q, req, 0, 0);
+	sdev->device_busy--;
 }
 
 u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
