@@ -664,7 +664,7 @@ static int tg3_phy_reset_5703_4_5(struct tg3 *tp)
 /* This will reset the tigon3 PHY if there is no valid
  * link unless the FORCE argument is non-zero.
  */
-static int tg3_phy_reset(struct tg3 *tp, int force)
+static int tg3_phy_reset(struct tg3 *tp)
 {
 	u32 phy_status;
 	int err;
@@ -673,12 +673,6 @@ static int tg3_phy_reset(struct tg3 *tp, int force)
 	err |= tg3_readphy(tp, MII_BMSR, &phy_status);
 	if (err != 0)
 		return -EBUSY;
-
-	/* If we have link, and not forcing a reset, then nothing
-	 * to do.
-	 */
-	if ((phy_status & BMSR_LSTATUS) != 0 && (force == 0))
-		return 0;
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 ||
@@ -1265,7 +1259,7 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 			force_reset = 1;
 	}
 	if (force_reset)
-		tg3_phy_reset(tp, 1);
+		tg3_phy_reset(tp);
 
 	if ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401) {
 		tg3_readphy(tp, MII_BMSR, &bmsr);
@@ -1292,7 +1286,7 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 			if ((tp->phy_id & PHY_ID_REV_MASK) == PHY_REV_BCM5401_B0 &&
 			    !(bmsr & BMSR_LSTATUS) &&
 			    tp->link_config.active_speed == SPEED_1000) {
-				err = tg3_phy_reset(tp, 1);
+				err = tg3_phy_reset(tp);
 				if (!err)
 					err = tg3_init_5401phy_dsp(tp);
 				if (err)
@@ -6491,7 +6485,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		}
 	}
 
-	err = tg3_phy_reset(tp, 1);
+	err = tg3_phy_reset(tp);
 	if (err)
 		return err;
 
