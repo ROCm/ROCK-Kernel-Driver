@@ -584,8 +584,8 @@ int blk_queue_start_tag(request_queue_t *q, struct request *rq)
 
 	if (unlikely((rq->flags & REQ_QUEUED))) {
 		printk(KERN_ERR 
-		       "request %p for device [02%x:02%x] already tagged %d",
-		       rq, major(rq->rq_dev), minor(rq->rq_dev), rq->tag);
+		       "request %p for device [%s] already tagged %d",
+		       rq, rq->rq_disk ? rq->rq_disk->disk_name : "?", rq->tag);
 		BUG();
 	}
 
@@ -665,7 +665,8 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 {
 	int bit;
 
-	printk("%s: dev %02x:%02x: flags = ", msg, major(rq->rq_dev), minor(rq->rq_dev));
+	printk("%s: dev %s: flags = ", msg,
+		rq->rq_disk ? rq->rq_disk->disk_name : "?");
 	bit = 0;
 	do {
 		if (rq->flags & (1 << bit))
@@ -1410,9 +1411,8 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 
 void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
-	unsigned int major = major(rq->rq_dev);
 	int rw = rq_data_dir(rq);
-	unsigned int index;
+	unsigned int major, index;
 
 	if (!rq->rq_disk)
 		return;
@@ -1431,6 +1431,7 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 		rq->rq_disk->in_flight++;
 	}
 
+	major = rq->rq_disk->major;
 	index = rq->rq_disk->first_minor >> rq->rq_disk->minor_shift;
 
 	if ((index >= DK_MAX_DISK) || (major >= DK_MAX_MAJOR))
@@ -1586,7 +1587,7 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 		return;
 
 	if (rq_data_dir(req) != rq_data_dir(next)
-	    || !kdev_same(req->rq_dev, next->rq_dev)
+	    || req->rq_disk != next->rq_disk
 	    || next->waiting || next->special)
 		return;
 
@@ -2018,7 +2019,7 @@ static int __end_that_request_first(struct request *req, int uptodate,
 		error = -EIO;
 		if (!(req->flags & REQ_QUIET))
 			printk("end_request: I/O error, dev %s, sector %llu\n",
-				kdevname(req->rq_dev),
+				req->rq_disk ? req->rq_disk->disk_name : "?",
 				(unsigned long long)req->sector);
 	}
 
