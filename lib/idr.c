@@ -150,7 +150,7 @@ EXPORT_SYMBOL(idr_pre_get);
 
 static inline int sub_alloc(struct idr *idp, int shift, void *ptr)
 {
-	int n, v = 0;
+	long n, v = 0;
 	struct idr_layer *p;
 	struct idr_layer **pa[MAX_LEVEL];
 	struct idr_layer ***paa = &pa[0];
@@ -211,7 +211,7 @@ static inline int sub_alloc(struct idr *idp, int shift, void *ptr)
 
 int idr_get_new(struct idr *idp, void *ptr)
 {
-	int v;
+	long v;
 	
 	if (idp->id_free_cnt < idp->layers + 1) 
 		return (-1);
@@ -236,7 +236,7 @@ int idr_get_new(struct idr *idp, void *ptr)
 		idp->count++;
 		v += (idp->count << MAX_ID_SHIFT);
 		if ( unlikely( v == -1 ))
-		     v += (1 << MAX_ID_SHIFT);
+		     v += (1L << MAX_ID_SHIFT);
 	}
 	return(v);
 }
@@ -259,7 +259,7 @@ static inline void sub_remove(struct idr *idp, int shift, int id)
 		p = p->ary[n];
 		shift -= IDR_BITS;
 	}
-	if ( likely(p)){
+	if (likely(p != NULL)){
 		int n = id & IDR_MASK;
 		__clear_bit(n, &p->bitmap);
 		p->ary[n] = NULL;

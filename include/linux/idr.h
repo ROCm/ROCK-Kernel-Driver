@@ -28,7 +28,7 @@
 /* Leave the possibility of an incomplete final layer */
 #define MAX_LEVEL (BITS_PER_LONG - RESERVED_ID_BITS + IDR_BITS - 1) / IDR_BITS
 #define MAX_ID_SHIFT (BITS_PER_LONG - RESERVED_ID_BITS)
-#define MAX_ID_BIT (1 << MAX_ID_SHIFT)
+#define MAX_ID_BIT (1L << MAX_ID_SHIFT)
 #define MAX_ID_MASK (MAX_ID_BIT - 1)
 
 /* Number of id_layer structs to leave in free list */
@@ -43,7 +43,7 @@ struct idr_layer {
 struct idr {
 	struct idr_layer *top;
 	int		  layers;
-	int		  count;
+	long		  count;
 	struct idr_layer *id_free;
 	int               id_free_cnt;
 	spinlock_t        lock;
