@@ -53,18 +53,18 @@ extern int esp_reset(Scsi_Cmnd *, unsigned int);
 extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
 			 int hostno, int inout);
 
-#define SCSI_BLZ2060      { proc_name:		"esp-blz2060", \
-			    proc_info:		esp_proc_info, \
-			    name:		"Blizzard2060 SCSI", \
-			    detect:		blz2060_esp_detect, \
-			    release:		blz2060_esp_release, \
-			    queuecommand:	esp_queue, \
-			    abort:		esp_abort, \
-			    reset:		esp_reset, \
-			    can_queue:          7, \
-			    this_id:		7, \
-			    sg_tablesize:	SG_ALL, \
-			    cmd_per_lun:	1, \
-			    use_clustering:	ENABLE_CLUSTERING }
+#define SCSI_BLZ2060      { .proc_name		= "esp-blz2060", \
+			    .proc_info		= esp_proc_info, \
+			    .name		= "Blizzard2060 SCSI", \
+			    .detect		= blz2060_esp_detect, \
+			    .release		= blz2060_esp_release, \
+			    .queuecommand	= esp_queue, \
+			    .abort		= esp_abort, \
+			    .reset		= esp_reset, \
+			    .can_queue          = 7, \
+			    .this_id		= 7, \
+			    .sg_tablesize	= SG_ALL, \
+			    .cmd_per_lun	= 1, \
+			    .use_clustering	= ENABLE_CLUSTERING }
 
 #endif /* BLZ2060_H */
