@@ -93,23 +93,42 @@ struct file * get_empty_filp(void)
 
 /*
  * Clear and initialize a (private) struct file for the given dentry,
- * and call the open function (if any).  The caller must verify that
- * inode->i_fop is not NULL.
+ * allocate the security structure, and call the open function (if any).  
+ * The file should be released using close_private_file.
  */
-int init_private_file(struct file *filp, struct dentry *dentry, int mode)
+int open_private_file(struct file *filp, struct dentry *dentry, int flags)
 {
+	int error;
 	memset(filp, 0, sizeof(*filp));
 	eventpoll_init_file(filp);
-	filp->f_mode   = mode;
+	filp->f_flags  = flags;
+	filp->f_mode   = (flags+1) & O_ACCMODE;
 	atomic_set(&filp->f_count, 1);
 	filp->f_dentry = dentry;
 	filp->f_uid    = current->fsuid;
 	filp->f_gid    = current->fsgid;
 	filp->f_op     = dentry->d_inode->i_fop;
-	if (filp->f_op->open)
-		return filp->f_op->open(dentry->d_inode, filp);
-	else
-		return 0;
+	error = security_file_alloc(filp);
+	if (!error)
+		if (filp->f_op && filp->f_op->open) {
+			error = filp->f_op->open(dentry->d_inode, filp);
+			if (error)
+				security_file_free(filp);
+		}
+	return error;
+}
+
+/*
+ * Release a private file by calling the release function (if any) and
+ * freeing the security structure.
+ */
+void close_private_file(struct file *file)
+{
+	struct inode * inode = file->f_dentry->d_inode;
+
+	if (file->f_op && file->f_op->release)
+		file->f_op->release(inode, file);
+	security_file_free(file);
 }
 
 void fput(struct file * file)

@@ -361,10 +361,8 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 			result = dir->i_op->lookup(dir, dentry);
 			if (result)
 				dput(dentry);
-			else {
+			else
 				result = dentry;
-				security_inode_post_lookup(dir, result);
-			}
 		}
 		up(&dir->i_sem);
 		return result;
@@ -897,10 +895,9 @@ struct dentry * lookup_hash(struct qstr *name, struct dentry * base)
 		if (!new)
 			goto out;
 		dentry = inode->i_op->lookup(inode, new);
-		if (!dentry) {
+		if (!dentry)
 			dentry = new;
-			security_inode_post_lookup(inode, dentry);
-		} else
+		else
 			dput(new);
 	}
 out:
