@@ -244,7 +244,6 @@ typedef struct _mgslpc_info {
 	char netname[10];
 	struct net_device *netdev;
 	struct net_device_stats netstats;
-	struct net_device netdevice;
 #endif
 } MGSLPC_INFO;
 
@@ -4206,35 +4205,46 @@ void tx_timeout(unsigned long context)
 #ifdef CONFIG_SYNCLINK_SYNCPPP
 /* syncppp net device routines
  */
+ 
+static void mgslpc_setup(struct net_device *dev)
+{
+	dev->open = mgslpc_sppp_open;
+	dev->stop = mgslpc_sppp_close;
+	dev->hard_start_xmit = mgslpc_sppp_tx;
+	dev->do_ioctl = mgslpc_sppp_ioctl;
+	dev->get_stats = mgslpc_net_stats;
+	dev->tx_timeout = mgslpc_sppp_tx_timeout;
+	dev->watchdog_timeo = 10*HZ;
+}
 
 void mgslpc_sppp_init(MGSLPC_INFO *info)
 {
 	struct net_device *d;
 
 	sprintf(info->netname,"mgslp%d",info->line);
+ 
+	d = alloc_netdev(0, info->netname, mgslpc_setup);
+	if (!d) {
+		printk(KERN_WARNING "%s: alloc_netdev failed.\n",
+						info->netname);
+		return;
+	}
 
 	info->if_ptr = &info->pppdev;
-	info->netdev = info->pppdev.dev = &info->netdevice;
+	info->netdev = info->pppdev.dev = d;
 
 	sppp_attach(&info->pppdev);
 
-	d = info->netdev;
-	strcpy(d->name,info->netname);
 	d->base_addr = info->io_base;
 	d->irq = info->irq_level;
 	d->priv = info;
-	d->init = NULL;
-	d->open = mgslpc_sppp_open;
-	d->stop = mgslpc_sppp_close;
-	d->hard_start_xmit = mgslpc_sppp_tx;
-	d->do_ioctl = mgslpc_sppp_ioctl;
-	d->get_stats = mgslpc_net_stats;
-	d->tx_timeout = mgslpc_sppp_tx_timeout;
-	d->watchdog_timeo = 10*HZ;
 
 	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(info->netdev);
+		info->netdev = NULL;
+		info->pppdev.dev = NULL;
+		free_netdev(d);
 		return;
 	}
 
@@ -4246,8 +4256,11 @@ void mgslpc_sppp_delete(MGSLPC_INFO *info)
 {
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("mgslpc_sppp_delete(%s)\n",info->netname);	
-	sppp_detach(info->netdev);
 	unregister_netdev(info->netdev);
+	sppp_detach(info->netdev);
+	free_netdev(info->netdev);
+	info->netdev = NULL;
+	info->pppdev.dev = NULL;
 }
 
 int mgslpc_sppp_open(struct net_device *d)
