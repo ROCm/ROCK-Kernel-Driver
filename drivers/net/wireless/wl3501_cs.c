@@ -757,7 +757,7 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 	return rc;
 }
 
-#define WL3501_STUPID_LOOP
+#undef WL3501_STUPID_LOOP
 #ifdef WL3501_STUPID_LOOP
 #define wl3501_loop(__cmd) \
 ({	int i; \
@@ -1008,6 +1008,15 @@ static int wl3501_esbq_confirm(struct wl3501_card *this)
 	return tmp & 0x80;
 }
 
+static void wl3501_online(struct wl3501_card *this)
+{
+	this->card_start = 1;
+	printk(KERN_INFO "Wireless LAN On-Line. BSSID: "
+	       "%02X %02X %02X %02X %02X %02X\n",
+	       this->bssid.b0, this->bssid.b1, this->bssid.b2,
+	       this->bssid.b3, this->bssid.b4, this->bssid.b5);
+}
+
 static void wl3501_esbq_confirm_done(struct wl3501_card *this)
 {
 	u8 tmp = 0;
@@ -1081,17 +1090,13 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev,
 				wl3501_loop(wl3501_mgmt_auth(this));
 			}
 		} else {
-			this->card_start = 1;
 			i = this->join_sta_bss;
 			memcpy((char *)&(this->bssid),
 			       (char *)&(this->bss_set[i].bssid), ETH_ALEN);
 			this->chan = this->bss_set[i].phy_pset[2];
 			memcpy((char *)this->keep_essid,
 			       (char *)this->bss_set[i].ssid, 34);
-			printk(KERN_INFO "Wireless LAN On-Line  Join:"
-			       " %2X %2X %2X %2X %2X %2X\n", this->bssid.b0,
-			       this->bssid.b1, this->bssid.b2, this->bssid.b3,
-			       this->bssid.b4, this->bssid.b5);
+			wl3501_online(this);
 		}
 	} else {
 		this->join_sta_bss++;
@@ -1230,14 +1235,9 @@ static inline void wl3501_assoc_confirm_interrupt(struct net_device *dev,
 
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 
-	if (sig.status == WL3501_STATUS_SUCCESS) {
-		printk(KERN_INFO "Wireless LAN On-Line  Join:"
-				 " %2X %2X %2X %2X %2X %2X\n",
-		       this->bssid.b0, this->bssid.b1,
-		       this->bssid.b2, this->bssid.b3,
-		       this->bssid.b4, this->bssid.b5);
-		this->card_start = 1;
-	} else
+	if (sig.status == WL3501_STATUS_SUCCESS)
+		wl3501_online(this);
+	else
 		this->card_start = 0;
 
 	if (this->card_start)
