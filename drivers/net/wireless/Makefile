@@ -3,7 +3,9 @@
 #
 
 obj-$(CONFIG_STRIP) += strip.o
-obj-$(CONFIG_ARLAN) += arlan.o arlan-proc.o
+obj-$(CONFIG_ARLAN) += arlan.o 
+
+arlan-objs := arlan-main.o arlan-proc.o
 
 # Obsolete cards
 obj-$(CONFIG_WAVELAN)		+= wavelan.o

@@ -341,7 +341,9 @@ static struct {
         { 0, 0, "SMC/2632W", "atmel_at76c502d.bin", "SMC 2632W-V3" },
 	{ 0xd601, 0x0007, NULL, "atmel_at76c502.bin", "Sitecom WLAN-011"}, /* suspect - from a usenet posting. */
 	{ 0x01bf, 0x3302, NULL, "atmel_at76c502d.bin", "Belkin F5D6060u"},  /*    "        "  "    "      "     */
-	{ 0, 0, "BT/Voyager 1020 Laptop Adapter", "atmel_at76c502.bin", "BT Voyager 1020"}
+	{ 0, 0, "BT/Voyager 1020 Laptop Adapter", "atmel_at76c502.bin", "BT Voyager 1020"},
+        { 0, 0, "IEEE 802.11b/Wireless LAN PC Card", "atmel_at76c502.bin", "Siemens Gigaset PC Card II" },
+	{ 0, 0, "CNet/CNWLC 11Mbps Wireless PC Card V-5", "atmel_at76c502e.bin", "CNet CNWLC-811ARL" }
 };
 
 /* This is strictly temporary, until PCMCIA devices get integrated into the device model. */

@@ -1,45 +1,26 @@
-/* ne.c: A general non-shared-memory NS8390 ethernet driver for linux. */
 /*
-    Written 1992-94 by Donald Becker.
 
+  ne2k_cbus.c: A driver for the NE2000 like ethernet on NEC PC-9800.
+
+	This is a copy of the 2.5.66 Linux ISA NE2000 driver "ne.c" 
+	(Donald Becker/Paul Gortmaker) with the NEC PC-9800 specific
+	changes added by Osamu Tomita. 
+
+From ne.c:
+-----------
     Copyright 1993 United States Government as represented by the
     Director, National Security Agency.
 
     This software may be used and distributed according to the terms
     of the GNU General Public License, incorporated herein by reference.
-
-    The author may be reached as becker@scyld.com, or C/O
-    Scyld Computing Corporation, 410 Severn Ave., Suite 210, Annapolis MD 21403
-
-    This driver should work with many programmed-I/O 8390-based ethernet
-    boards.  Currently it supports the NE1000, NE2000, many clones,
-    and some Cabletron products.
-
-    Changelog:
-
-    Paul Gortmaker	: use ENISR_RDC to monitor Tx PIO uploads, made
-			  sanity checks and bad clone support optional.
-    Paul Gortmaker	: new reset code, reset card after probe at boot.
-    Paul Gortmaker	: multiple card support for module users.
-    Paul Gortmaker	: Support for PCI ne2k clones, similar to lance.c
-    Paul Gortmaker	: Allow users with bad cards to avoid full probe.
-    Paul Gortmaker	: PCI probe changes, more PCI cards supported.
-    rjohnson@analogic.com : Changed init order so an interrupt will only
-    occur after memory is allocated for dev->priv. Deallocated memory
-    last in cleanup_modue()
-    Richard Guenther    : Added support for ISAPnP cards
-    Paul Gortmaker	: Discontinued PCI support - use ne2k-pci.c instead.
-    Osamu Tomita	: Separate driver for NEC PC-9800.
+-----------
 
 */
 
 /* Routines for the NatSemi-based designs (NE[12]000). */
 
-static const char version1[] =
-"ne.c:v1.10 9/23/94 Donald Becker (becker@scyld.com)\n";
-static const char version2[] =
-"Last modified Nov 1, 2000 by Paul Gortmaker\n";
-
+static const char version[] =
+"ne2k_cbus.c:v1.0 3/24/03 Osamu Tomita\n";
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -273,7 +254,7 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 	}
 
 	if (ei_debug  &&  version_printed++ == 0)
-		printk(KERN_INFO "%s" KERN_INFO "%s", version1, version2);
+		printk(KERN_INFO "%s", version);
 
 	printk(KERN_INFO "NE*000 ethercard probe at %#3x:", ioaddr);
 
@@ -839,9 +820,9 @@ int init_module(void)
 			return 0;
 		}
 		if (io[this_dev] != 0)
-			printk(KERN_WARNING "ne.c: No NE*000 card found at i/o = %#x\n", io[this_dev]);
+			printk(KERN_WARNING "ne2k_cbus: No NE*000 card found at i/o = %#x\n", io[this_dev]);
 		else
-			printk(KERN_NOTICE "ne.c: You must supply \"io=0xNNN\" value(s) for C-Bus cards.\n");
+			printk(KERN_NOTICE "ne2k_cbus: You must supply \"io=0xNNN\" value(s) for C-Bus cards.\n");
 		return -ENXIO;
 	}
 	return 0;
@@ -869,11 +850,3 @@ void cleanup_module(void)
 }
 #endif /* MODULE */
 
-
-/*
- * Local variables:
- *  compile-command: "gcc -DKERNEL -Wall -O6 -fomit-frame-pointer -I/usr/src/linux/net/tcp -c ne.c"
- *  version-control: t
- *  kept-new-versions: 5
- * End:
- */
