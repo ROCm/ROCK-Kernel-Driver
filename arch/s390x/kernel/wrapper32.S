@@ -288,10 +288,10 @@ sys32_setregid16_wrapper:
 
 #sys32_sigsuspend_wrapper		# done in sigsuspend_glue 
 
-	.globl  sys32_sigpending_wrapper 
-sys32_sigpending_wrapper:
-	llgtr	%r2,%r2			# old_sigset_emu31_t *
-	jg	sys32_sigpending	# branch to system call
+	.globl  compat_sys_sigpending_wrapper 
+compat_sys_sigpending_wrapper:
+	llgtr	%r2,%r2			# compat_old_sigset_t *
+	jg	compat_sys_sigpending	# branch to system call
 
 	.globl  sys32_sethostname_wrapper 
 sys32_sethostname_wrapper:
@@ -557,12 +557,12 @@ sys32_mprotect_wrapper:
 	llgfr	%r4,%r4			# unsigned long
 	jg	sys_mprotect		# branch to system call
 
-	.globl  sys32_sigprocmask_wrapper 
-sys32_sigprocmask_wrapper:
+	.globl  compat_sys_sigprocmask_wrapper 
+compat_sys_sigprocmask_wrapper:
 	lgfr	%r2,%r2			# int
-	llgtr	%r3,%r3			# old_sigset_emu31 *
-	llgtr	%r4,%r4			# old_sigset_emu31 *
-	jg	sys32_sigprocmask		# branch to system call
+	llgtr	%r3,%r3			# compat_old_sigset_t *
+	llgtr	%r4,%r4			# compat_old_sigset_t *
+	jg	compat_sys_sigprocmask		# branch to system call
 
 	.globl  sys32_init_module_wrapper 
 sys32_init_module_wrapper:
