@@ -24,6 +24,10 @@
  * End Change Activity 
  */
 
+#include <linux/config.h>
+#include <linux/proc_fs.h>
+#include <linux/spinlock.h>
+
 #include <asm/proc_fs.h>
 #include <asm/paca.h>
 #include <asm/iSeries/ItLpPaca.h>
@@ -33,9 +37,6 @@
 #include <asm/processor.h>
 #include <asm/time.h>
 #include <asm/iSeries/LparData.h>
-
-#include <linux/proc_fs.h>
-#include <linux/spinlock.h>
 #include <asm/pmc.h>
 #include <asm/uaccess.h>
 #include <asm/naca.h>

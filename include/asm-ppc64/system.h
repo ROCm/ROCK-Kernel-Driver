@@ -16,13 +16,6 @@
 #include <asm/memory.h>
 
 /*
- * System defines.
- */
-#define KERNEL_START_PHYS	0x800000 
-#define KERNEL_START	        (PAGE_OFFSET+KERNEL_START_PHYS)
-#define START_ADDR	        (PAGE_OFFSET+KERNEL_START_PHYS+0x00000)
-
-/*
  * Memory barrier.
  * The sync instruction guarantees that all memory accesses initiated
  * by this processor have been performed (with respect to all other
@@ -88,11 +81,6 @@ extern void flush_instruction_cache(void);
 extern void hard_reset_now(void);
 extern void poweroff_now(void);
 extern int _get_PVR(void);
-extern long _get_L2CR(void);
-extern void _set_L2CR(unsigned long);
-extern void via_cuda_init(void);
-extern void pmac_nvram_init(void);
-extern void pmac_find_display(void);
 extern void giveup_fpu(struct task_struct *);
 extern void enable_kernel_fp(void);
 extern void giveup_altivec(struct task_struct *);

@@ -33,24 +33,13 @@
 #ifndef __ASSEMBLY__
 #include <asm/naca.h>
 
-#define STRICT_MM_TYPECHECKS
+#undef STRICT_MM_TYPECHECKS
 
 #define REGION_SIZE   4UL
-#define OFFSET_SIZE   60UL
 #define REGION_SHIFT  60UL
-#define OFFSET_SHIFT  0UL
 #define REGION_MASK   (((1UL<<REGION_SIZE)-1UL)<<REGION_SHIFT)
 #define REGION_STRIDE (1UL << REGION_SHIFT)
 
-typedef union ppc64_va {
-        struct {
-                unsigned long off : OFFSET_SIZE;  /* intra-region offset */
-                unsigned long reg : REGION_SIZE;  /* region number */
-        } f;
-        unsigned long l;
-        void *p;
-} ppc64_va;
-       
 static __inline__ void clear_page(void *addr)
 {
 	unsigned long lines, line_size;
