@@ -542,40 +542,6 @@ static void neigh_connect(struct neighbour *neigh)
 		hh->hh_output = neigh->ops->hh_output;
 }
 
-/*
-   Transitions NUD_STALE <-> NUD_REACHABLE do not occur
-   when fast path is built: we have no timers associated with
-   these states, we do not have time to check state when sending.
-   neigh_periodic_timer check periodically neigh->confirmed
-   time and moves NUD_REACHABLE -> NUD_STALE.
-
-   If a routine wants to know TRUE entry state, it calls
-   neigh_sync before checking state.
-
-   Called with write_locked neigh.
- */
-
-static void neigh_sync(struct neighbour *n)
-{
-	unsigned long now = jiffies;
-	u8 state = n->nud_state;
-
-	if (state & (NUD_NOARP | NUD_PERMANENT))
-		return;
-	if (state & NUD_REACHABLE) {
-		if (time_after(now, n->confirmed + n->parms->reachable_time)) {
-			n->nud_state = NUD_STALE;
-			neigh_suspect(n);
-		}
-	} else if (state & NUD_VALID) {
-		if (time_before(now, n->confirmed + n->parms->reachable_time)) {
-			neigh_del_timer(n);
-			n->nud_state = NUD_REACHABLE;
-			neigh_connect(n);
-		}
-	}
-}
-
 static void neigh_periodic_timer(unsigned long arg)
 {
 	struct neigh_table *tbl = (struct neigh_table *)arg;
@@ -624,12 +590,6 @@ static void neigh_periodic_timer(unsigned long arg)
 				neigh_release(n);
 				continue;
 			}
-
-			if (n->nud_state & NUD_REACHABLE &&
-			    time_after(now, n->confirmed + n->parms->reachable_time)) {
-				n->nud_state = NUD_STALE;
-				neigh_suspect(n);
-			}
 			write_unlock(&n->lock);
 
 next_elt:
@@ -654,7 +614,7 @@ static __inline__ int neigh_max_probes(struct neighbour *n)
 
 static void neigh_timer_handler(unsigned long arg)
 {
-	unsigned long now = jiffies;
+	unsigned long now, next;
 	struct neighbour *neigh = (struct neighbour *)arg;
 	unsigned state;
 	int notify = 0;
@@ -662,6 +622,8 @@ static void neigh_timer_handler(unsigned long arg)
 	write_lock(&neigh->lock);
 
 	state = neigh->nud_state;
+	now = jiffies;
+	next = now + HZ;
 
 	if (!(state & NUD_IN_TIMER)) {
 #ifndef CONFIG_SMP
@@ -670,20 +632,42 @@ static void neigh_timer_handler(unsigned long arg)
 		goto out;
 	}
 
-	if ((state & NUD_VALID) &&
-	    time_before(now, neigh->confirmed + neigh->parms->reachable_time)) {
-		neigh->nud_state = NUD_REACHABLE;
-		NEIGH_PRINTK2("neigh %p is still alive.\n", neigh);
-		neigh_connect(neigh);
-		goto out;
-	}
-	if (state == NUD_DELAY) {
-		NEIGH_PRINTK2("neigh %p is probed.\n", neigh);
-		neigh->nud_state = NUD_PROBE;
-		atomic_set(&neigh->probes, 0);
+	if (state & NUD_REACHABLE) {
+		if (time_before_eq(now, 
+				   neigh->confirmed + neigh->parms->reachable_time)) {
+			NEIGH_PRINTK2("neigh %p is still alive.\n", neigh);
+			next = neigh->confirmed + neigh->parms->reachable_time;
+		} else if (time_before_eq(now,
+					  neigh->used + neigh->parms->delay_probe_time)) {
+			NEIGH_PRINTK2("neigh %p is delayed.\n", neigh);
+			neigh->nud_state = NUD_DELAY;
+			neigh_suspect(neigh);
+			next = now + neigh->parms->delay_probe_time;
+		} else {
+			NEIGH_PRINTK2("neigh %p is suspected.\n", neigh);
+			neigh->nud_state = NUD_STALE;
+			neigh_suspect(neigh);
+		}
+	} else if (state & NUD_DELAY) {
+		if (time_before_eq(now, 
+				   neigh->confirmed + neigh->parms->delay_probe_time)) {
+			NEIGH_PRINTK2("neigh %p is now reachable.\n", neigh);
+			neigh->nud_state = NUD_REACHABLE;
+			neigh_connect(neigh);
+			next = neigh->confirmed + neigh->parms->reachable_time;
+		} else {
+			NEIGH_PRINTK2("neigh %p is probed.\n", neigh);
+			neigh->nud_state = NUD_PROBE;
+			atomic_set(&neigh->probes, 0);
+			next = now + neigh->parms->retrans_time;
+		}
+	} else {
+		/* NUD_PROBE|NUD_INCOMPLETE */
+		next = now + neigh->parms->retrans_time;
 	}
 
-	if (atomic_read(&neigh->probes) >= neigh_max_probes(neigh)) {
+	if ((neigh->nud_state & (NUD_INCOMPLETE | NUD_PROBE)) &&
+	    atomic_read(&neigh->probes) >= neigh_max_probes(neigh)) {
 		struct sk_buff *skb;
 
 		neigh->nud_state = NUD_FAILED;
@@ -703,19 +687,24 @@ static void neigh_timer_handler(unsigned long arg)
 			write_lock(&neigh->lock);
 		}
 		skb_queue_purge(&neigh->arp_queue);
-		goto out;
 	}
 
-	neigh->timer.expires = now + neigh->parms->retrans_time;
-	add_timer(&neigh->timer);
-	write_unlock(&neigh->lock);
-
-	neigh->ops->solicit(neigh, skb_peek(&neigh->arp_queue));
-	atomic_inc(&neigh->probes);
-	return;
-
+	if (neigh->nud_state & NUD_IN_TIMER) {
+		neigh_hold(neigh);
+		if (time_before(next, jiffies + HZ/2))
+			next = jiffies + HZ/2;
+		neigh->timer.expires = next;
+		add_timer(&neigh->timer);
+	}
+	if (neigh->nud_state & (NUD_INCOMPLETE | NUD_PROBE)) {
+		write_unlock(&neigh->lock);
+		neigh->ops->solicit(neigh, skb_peek(&neigh->arp_queue));
+		atomic_inc(&neigh->probes);
+	} else {
 out:
-	write_unlock(&neigh->lock);
+		write_unlock(&neigh->lock);
+	}
+
 #ifdef CONFIG_ARPD
 	if (notify && neigh->parms->app_probes)
 		neigh_app_notify(neigh);
@@ -726,6 +715,7 @@ out:
 int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 {
 	int rc;
+	unsigned long now;
 
 	write_lock_bh(&neigh->lock);
 
@@ -733,18 +723,15 @@ int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 	if (neigh->nud_state & (NUD_CONNECTED | NUD_DELAY | NUD_PROBE))
 		goto out_unlock_bh;
 
+	now = jiffies;
+	
 	if (!(neigh->nud_state & (NUD_STALE | NUD_INCOMPLETE))) {
 		if (neigh->parms->mcast_probes + neigh->parms->app_probes) {
 			atomic_set(&neigh->probes, neigh->parms->ucast_probes);
 			neigh->nud_state     = NUD_INCOMPLETE;
 			neigh_hold(neigh);
-			neigh->timer.expires = jiffies +
-					       neigh->parms->retrans_time;
+			neigh->timer.expires = now + 1;
 			add_timer(&neigh->timer);
-			write_unlock_bh(&neigh->lock);
-			neigh->ops->solicit(neigh, skb);
-			atomic_inc(&neigh->probes);
-			write_lock_bh(&neigh->lock);
 		} else {
 			neigh->nud_state = NUD_FAILED;
 			write_unlock_bh(&neigh->lock);
@@ -753,6 +740,12 @@ int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 				kfree_skb(skb);
 			return 1;
 		}
+	} else if (neigh->nud_state & NUD_STALE) {
+		NEIGH_PRINTK2("neigh %p is delayed.\n", neigh);
+		neigh_hold(neigh);
+		neigh->nud_state = NUD_DELAY;
+		neigh->timer.expires = jiffies + neigh->parms->delay_probe_time;
+		add_timer(&neigh->timer);
 	}
 
 	if (neigh->nud_state == NUD_INCOMPLETE) {
@@ -767,13 +760,6 @@ int __neigh_event_send(struct neighbour *neigh, struct sk_buff *skb)
 			__skb_queue_tail(&neigh->arp_queue, skb);
 		}
 		rc = 1;
-	} else if (neigh->nud_state == NUD_STALE) {
-		NEIGH_PRINTK2("neigh %p is delayed.\n", neigh);
-		neigh_hold(neigh);
-		neigh->nud_state = NUD_DELAY;
-		neigh->timer.expires = jiffies + neigh->parms->delay_probe_time;
-		add_timer(&neigh->timer);
-		rc = 0;
 	}
 out_unlock_bh:
 	write_unlock_bh(&neigh->lock);
@@ -874,8 +860,6 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		lladdr = neigh->ha;
 	}
 
-	neigh_sync(neigh);
-	old = neigh->nud_state;
 	if (new & NUD_CONNECTED)
 		neigh->confirmed = jiffies;
 	neigh->updated = jiffies;
@@ -903,8 +887,18 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		}
 	}
 
-	neigh_del_timer(neigh);
-	neigh->nud_state = new;
+	if (new != old) {
+		neigh_del_timer(neigh);
+		if (new & NUD_IN_TIMER) {
+			neigh_hold(neigh);
+			neigh->timer.expires = jiffies + 
+						((new & NUD_REACHABLE) ? 
+						 neigh->parms->reachable_time : 0);
+			add_timer(&neigh->timer);
+		}
+		neigh->nud_state = new;
+	}
+
 	if (lladdr != neigh->ha) {
 		memcpy(&neigh->ha, lladdr, dev->addr_len);
 		neigh_update_hhs(neigh);
