@@ -1689,6 +1689,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
+		.vendor = 0x10f1,
+		.device = 0x2885,
+		.name = "AMD64 Mobo",	/* ALC650 */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
 		.vendor = 0x110a,
 		.device = 0x0056,
 		.name = "Fujitsu-Siemens Scenic",	/* AD1981? */
@@ -1698,6 +1704,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.vendor = 0x11d4,
 		.device = 0x5375,
 		.name = "ADI AD1985 (discrete)",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1462,
+		.device = 0x5470,
+		.name = "MSI P4 ATX 645 Ultra",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
