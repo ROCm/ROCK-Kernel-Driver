@@ -907,6 +907,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 	int priority;
 	int i;
 	struct reclaim_state *reclaim_state = current->reclaim_state;
+	unsigned long total_scanned = 0;
 
 	inc_page_state(pageoutrun);
 
@@ -918,7 +919,6 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 
 	for (priority = DEF_PRIORITY; priority; priority--) {
 		int all_zones_ok = 1;
-		int pages_scanned = 0;
 		int end_zone = 0;	/* Inclusive.  0 = ZONE_DMA */
 
 
@@ -955,9 +955,9 @@ scan:
 		 */
 		for (i = 0; i <= end_zone; i++) {
 			struct zone *zone = pgdat->node_zones + i;
-			int total_scanned = 0;
 			int max_scan;
 			int reclaimed;
+			int scanned = 0;
 
 			if (zone->all_unreclaimable && priority != DEF_PRIORITY)
 				continue;
@@ -969,10 +969,10 @@ scan:
 			zone->temp_priority = priority;
 			max_scan = zone->nr_inactive >> priority;
 			reclaimed = shrink_zone(zone, max_scan, GFP_KERNEL,
-					&total_scanned, ps);
-			total_scanned += pages_scanned;
+					&scanned, ps);
+			total_scanned += scanned;
 			reclaim_state->reclaimed_slab = 0;
-			shrink_slab(total_scanned, GFP_KERNEL);
+			shrink_slab(scanned, GFP_KERNEL);
 			reclaimed += reclaim_state->reclaimed_slab;
 			to_free -= reclaimed;
 			if (zone->all_unreclaimable)
@@ -988,7 +988,7 @@ scan:
 		 * OK, kswapd is getting into trouble.  Take a nap, then take
 		 * another pass across the zones.
 		 */
-		if (pages_scanned && priority < DEF_PRIORITY - 2)
+		if (total_scanned && priority < DEF_PRIORITY - 2)
 			blk_congestion_wait(WRITE, HZ/10);
 	}
 out:
