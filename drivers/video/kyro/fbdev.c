@@ -97,7 +97,6 @@ static int nomtrr __initdata = 0;
 static int kyrofb_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 static void kyrofb_remove(struct pci_dev *pdev);
 
-#ifndef MODULE
 static struct fb_videomode kyro_modedb[] __initdata = {
 	{
 		/* 640x350 @ 85Hz */
@@ -306,7 +305,6 @@ enum {
 	VMODE_1920_1440_60,
 	VMODE_1920_1440_75,
 };
-#endif
 
 /* Accessors */
 int kyro_dev_video_mode_set(struct fb_info *info)
@@ -722,10 +720,8 @@ static int __devinit kyrofb_probe(struct pci_dev *pdev,
 	deviceInfo.ulOverlayOffset = 0;
 
 	/* This should give a reasonable default video mode */
-#ifndef MODULE
 	if (!fb_find_mode(&info->var, info, mode_option, kyro_modedb,
 			  NUM_TOTAL_MODES, &kyro_modedb[VMODE_1024_768_75], 32))
-#endif
 		info->var = kyro_var;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
@@ -737,7 +733,7 @@ static int __devinit kyrofb_probe(struct pci_dev *pdev,
 			       info->var.bits_per_pixel);
 	size *= info->var.yres_virtual;
 
-	memset_io((unsigned long)info->screen_base, 0, size);
+	fb_memset((unsigned long)info->screen_base, 0, size);
 
 	if (register_framebuffer(info) < 0)
 		goto out_unmap;
