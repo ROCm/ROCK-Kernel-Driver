@@ -149,12 +149,18 @@ quiet_cmd_fig2eps = FIG2EPS $@
       cmd_fig2eps = fig2dev -Leps $< $@
 
 %.eps: %.fig
+	@(which fig2dev > /dev/null 2>&1) || \
+	 (echo "*** You need to install transfig ***"; \
+	  exit 1)
 	$(call cmd,fig2eps)
 
 quiet_cmd_fig2png = FIG2PNG $@
       cmd_fig2png = fig2dev -Lpng $< $@
 
 %.png: %.fig
+	@(which fig2dev > /dev/null 2>&1) || \
+	 (echo "*** You need to install transfig ***"; \
+	  exit 1)
 	$(call cmd,fig2png)
 
 ###
