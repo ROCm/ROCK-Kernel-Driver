@@ -430,7 +430,7 @@ EXPORT_SYMBOL(do_settimeofday);
  * fields itself.  This way, the fields which are used for 
  * do_settimeofday get updated too.
  */
-long ppc64_sys32_stime(int* tptr)
+long ppc64_sys32_stime(int __user * tptr)
 {
 	int value;
 	struct timespec myTimeval;
@@ -455,7 +455,7 @@ long ppc64_sys32_stime(int* tptr)
  * fields itself.  This way, the fields which are used for 
  * do_settimeofday get updated too.
  */
-long ppc64_sys_stime(long* tptr)
+long ppc64_sys_stime(long __user * tptr)
 {
 	long value;
 	struct timespec myTimeval;

@@ -40,7 +40,7 @@ extern void die_if_kernel(char *,struct pt_regs *,long, unsigned long *);
 unsigned long last_asn = ASN_FIRST_VERSION;
 #endif
 
-extern void
+void
 __load_new_mm_context(struct mm_struct *next_mm)
 {
 	unsigned long mmc;

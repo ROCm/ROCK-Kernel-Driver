@@ -112,10 +112,17 @@ struct pcmcia_irqs {
 	const char *str;
 };
 
+struct soc_pcmcia_timing {
+	unsigned short io;
+	unsigned short mem;
+	unsigned short attr;
+};
+
 extern int soc_pcmcia_request_irqs(struct soc_pcmcia_socket *skt, struct pcmcia_irqs *irqs, int nr);
 extern void soc_pcmcia_free_irqs(struct soc_pcmcia_socket *skt, struct pcmcia_irqs *irqs, int nr);
 extern void soc_pcmcia_disable_irqs(struct soc_pcmcia_socket *skt, struct pcmcia_irqs *irqs, int nr);
 extern void soc_pcmcia_enable_irqs(struct soc_pcmcia_socket *skt, struct pcmcia_irqs *irqs, int nr);
+extern void soc_common_pcmcia_get_timing(struct soc_pcmcia_socket *, struct soc_pcmcia_timing *);
 
 
 extern struct list_head soc_pcmcia_sockets;

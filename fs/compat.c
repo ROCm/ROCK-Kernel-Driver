@@ -50,7 +50,7 @@
  * Not all architectures have sys_utime, so implement this in terms
  * of sys_utimes.
  */
-asmlinkage long compat_sys_utime(char *filename, struct compat_utimbuf *t)
+asmlinkage long compat_sys_utime(char __user *filename, struct compat_utimbuf __user *t)
 {
 	struct timeval tv[2];
 
@@ -64,7 +64,7 @@ asmlinkage long compat_sys_utime(char *filename, struct compat_utimbuf *t)
 	return do_utimes(filename, t ? tv : NULL);
 }
 
-asmlinkage long compat_sys_utimes(char *filename, struct compat_timeval *t)
+asmlinkage long compat_sys_utimes(char __user *filename, struct compat_timeval __user *t)
 {
 	struct timeval tv[2];
 
@@ -78,8 +78,8 @@ asmlinkage long compat_sys_utimes(char *filename, struct compat_timeval *t)
 	return do_utimes(filename, t ? tv : NULL);
 }
 
-asmlinkage long compat_sys_newstat(char * filename,
-		struct compat_stat *statbuf)
+asmlinkage long compat_sys_newstat(char __user * filename,
+		struct compat_stat __user *statbuf)
 {
 	struct kstat stat;
 	int error = vfs_stat(filename, &stat);
@@ -89,8 +89,8 @@ asmlinkage long compat_sys_newstat(char * filename,
 	return error;
 }
 
-asmlinkage long compat_sys_newlstat(char * filename,
-		struct compat_stat *statbuf)
+asmlinkage long compat_sys_newlstat(char __user * filename,
+		struct compat_stat __user *statbuf)
 {
 	struct kstat stat;
 	int error = vfs_lstat(filename, &stat);
@@ -101,7 +101,7 @@ asmlinkage long compat_sys_newlstat(char * filename,
 }
 
 asmlinkage long compat_sys_newfstat(unsigned int fd,
-		struct compat_stat * statbuf)
+		struct compat_stat __user * statbuf)
 {
 	struct kstat stat;
 	int error = vfs_fstat(fd, &stat);
@@ -111,7 +111,7 @@ asmlinkage long compat_sys_newfstat(unsigned int fd,
 	return error;
 }
 
-static int put_compat_statfs(struct compat_statfs *ubuf, struct kstatfs *kbuf)
+static int put_compat_statfs(struct compat_statfs __user *ubuf, struct kstatfs *kbuf)
 {
 	
 	if (sizeof ubuf->f_blocks == 4) {
@@ -145,7 +145,7 @@ static int put_compat_statfs(struct compat_statfs *ubuf, struct kstatfs *kbuf)
  * The following statfs calls are copies of code from fs/open.c and
  * should be checked against those from time to time
  */
-asmlinkage long compat_sys_statfs(const char *path, struct compat_statfs *buf)
+asmlinkage long compat_sys_statfs(const char __user *path, struct compat_statfs __user *buf)
 {
 	struct nameidata nd;
 	int error;
@@ -161,7 +161,7 @@ asmlinkage long compat_sys_statfs(const char *path, struct compat_statfs *buf)
 	return error;
 }
 
-asmlinkage long compat_sys_fstatfs(unsigned int fd, struct compat_statfs *buf)
+asmlinkage long compat_sys_fstatfs(unsigned int fd, struct compat_statfs __user *buf)
 {
 	struct file * file;
 	struct kstatfs tmp;
@@ -179,7 +179,7 @@ out:
 	return error;
 }
 
-static int put_compat_statfs64(struct compat_statfs64 *ubuf, struct kstatfs *kbuf)
+static int put_compat_statfs64(struct compat_statfs64 __user *ubuf, struct kstatfs *kbuf)
 {
 	if (sizeof ubuf->f_blocks == 4) {
 		if ((kbuf->f_blocks | kbuf->f_bfree |
@@ -203,7 +203,7 @@ static int put_compat_statfs64(struct compat_statfs64 *ubuf, struct kstatfs *kbu
 	return 0;
 }
 
-asmlinkage long compat_statfs64(const char *path, compat_size_t sz, struct compat_statfs64 *buf)
+asmlinkage long compat_statfs64(const char __user *path, compat_size_t sz, struct compat_statfs64 __user *buf)
 {
 	struct nameidata nd;
 	int error;
@@ -222,7 +222,7 @@ asmlinkage long compat_statfs64(const char *path, compat_size_t sz, struct compa
 	return error;
 }
 
-asmlinkage long compat_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 *buf)
+asmlinkage long compat_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 __user *buf)
 {
 	struct file * file;
 	struct kstatfs tmp;
@@ -450,7 +450,7 @@ out2:
 	return error;
 }
 
-static int get_compat_flock(struct flock *kfl, struct compat_flock *ufl)
+static int get_compat_flock(struct flock *kfl, struct compat_flock __user *ufl)
 {
 	if (!access_ok(VERIFY_READ, ufl, sizeof(*ufl)) ||
 	    __get_user(kfl->l_type, &ufl->l_type) ||
@@ -462,7 +462,7 @@ static int get_compat_flock(struct flock *kfl, struct compat_flock *ufl)
 	return 0;
 }
 
-static int put_compat_flock(struct flock *kfl, struct compat_flock *ufl)
+static int put_compat_flock(struct flock *kfl, struct compat_flock __user *ufl)
 {
 	if (!access_ok(VERIFY_WRITE, ufl, sizeof(*ufl)) ||
 	    __put_user(kfl->l_type, &ufl->l_type) ||
@@ -475,7 +475,7 @@ static int put_compat_flock(struct flock *kfl, struct compat_flock *ufl)
 }
 
 #ifndef HAVE_ARCH_GET_COMPAT_FLOCK64
-static int get_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
+static int get_compat_flock64(struct flock *kfl, struct compat_flock64 __user *ufl)
 {
 	if (!access_ok(VERIFY_READ, ufl, sizeof(*ufl)) ||
 	    __get_user(kfl->l_type, &ufl->l_type) ||
@@ -489,7 +489,7 @@ static int get_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
 #endif
 
 #ifndef HAVE_ARCH_PUT_COMPAT_FLOCK64
-static int put_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
+static int put_compat_flock64(struct flock *kfl, struct compat_flock64 __user *ufl)
 {
 	if (!access_ok(VERIFY_WRITE, ufl, sizeof(*ufl)) ||
 	    __put_user(kfl->l_type, &ufl->l_type) ||
@@ -566,7 +566,7 @@ asmlinkage long compat_sys_fcntl(unsigned int fd, unsigned int cmd,
 }
 
 asmlinkage long
-compat_sys_io_setup(unsigned nr_reqs, u32 *ctx32p)
+compat_sys_io_setup(unsigned nr_reqs, u32 __user *ctx32p)
 {
 	long ret;
 	aio_context_t ctx64;
@@ -576,7 +576,8 @@ compat_sys_io_setup(unsigned nr_reqs, u32 *ctx32p)
 		return -EFAULT;
 
 	set_fs(KERNEL_DS);
-	ret = sys_io_setup(nr_reqs, &ctx64);
+	/* The __user pointer cast is valid because of the set_fs() */
+	ret = sys_io_setup(nr_reqs, (aio_context_t __user *) &ctx64);
 	set_fs(oldfs);
 	/* truncating is ok because it's a user address */
 	if (!ret)
@@ -588,12 +589,12 @@ asmlinkage long
 compat_sys_io_getevents(aio_context_t ctx_id,
 				 unsigned long min_nr,
 				 unsigned long nr,
-				 struct io_event *events,
-				 struct compat_timespec *timeout)
+				 struct io_event __user *events,
+				 struct compat_timespec __user *timeout)
 {
 	long ret;
 	struct timespec t;
-	struct timespec *ut = NULL;
+	struct timespec __user *ut = NULL;
 
 	ret = -EFAULT;
 	if (unlikely(!access_ok(VERIFY_WRITE, events, 
@@ -613,7 +614,7 @@ out:
 }
 
 static inline long
-copy_iocb(long nr, u32 *ptr32, u64 *ptr64)
+copy_iocb(long nr, u32 __user *ptr32, struct iocb __user * __user *ptr64)
 {
 	compat_uptr_t uptr;
 	int i;
@@ -621,7 +622,7 @@ copy_iocb(long nr, u32 *ptr32, u64 *ptr64)
 	for (i = 0; i < nr; ++i) {
 		if (get_user(uptr, ptr32 + i))
 			return -EFAULT;
-		if (put_user((u64)compat_ptr(uptr), ptr64 + i))
+		if (put_user(compat_ptr(uptr), ptr64 + i))
 			return -EFAULT;
 	}
 	return 0;
@@ -630,9 +631,9 @@ copy_iocb(long nr, u32 *ptr32, u64 *ptr64)
 #define MAX_AIO_SUBMITS 	(PAGE_SIZE/sizeof(struct iocb *))
 
 asmlinkage long
-compat_sys_io_submit(aio_context_t ctx_id, int nr, u32 *iocb)
+compat_sys_io_submit(aio_context_t ctx_id, int nr, u32 __user *iocb)
 {
-	struct iocb **iocb64; 
+	struct iocb __user * __user *iocb64; 
 	long ret;
 
 	if (unlikely(nr < 0))
@@ -642,7 +643,7 @@ compat_sys_io_submit(aio_context_t ctx_id, int nr, u32 *iocb)
 		nr = MAX_AIO_SUBMITS;
 	
 	iocb64 = compat_alloc_user_space(nr * sizeof(*iocb64));
-	ret = copy_iocb(nr, iocb, (u64 *) iocb64);
+	ret = copy_iocb(nr, iocb, iocb64);
 	if (!ret)
 		ret = sys_io_submit(ctx_id, nr, iocb64);
 	return ret;
@@ -980,7 +981,7 @@ out:
  * a copy of count() from fs/exec.c, except that it works with 32 bit argv
  * and envp pointers.
  */
-static int compat_count(compat_uptr_t *argv, int max)
+static int compat_count(compat_uptr_t __user *argv, int max)
 {
 	int i = 0;
 
@@ -1452,7 +1453,7 @@ union compat_nfsctl_res {
 	struct knfsd_fh		cr32_getfs;
 };
 
-static int compat_nfs_svc_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg *arg)
+static int compat_nfs_svc_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg __user *arg)
 {
 	int err;
 
@@ -1463,7 +1464,7 @@ static int compat_nfs_svc_trans(struct nfsctl_arg *karg, struct compat_nfsctl_ar
 	return (err) ? -EFAULT : 0;
 }
 
-static int compat_nfs_clnt_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg *arg)
+static int compat_nfs_clnt_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg __user *arg)
 {
 	int err;
 
@@ -1487,7 +1488,7 @@ static int compat_nfs_clnt_trans(struct nfsctl_arg *karg, struct compat_nfsctl_a
 	return (err) ? -EFAULT : 0;
 }
 
-static int compat_nfs_exp_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg *arg)
+static int compat_nfs_exp_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg __user *arg)
 {
 	int err;
 
@@ -1515,7 +1516,7 @@ static int compat_nfs_exp_trans(struct nfsctl_arg *karg, struct compat_nfsctl_ar
 	return (err) ? -EFAULT : 0;
 }
 
-static int compat_nfs_getfd_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg *arg)
+static int compat_nfs_getfd_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg __user *arg)
 {
 	int err;
 
@@ -1533,7 +1534,7 @@ static int compat_nfs_getfd_trans(struct nfsctl_arg *karg, struct compat_nfsctl_
 	return (err) ? -EFAULT : 0;
 }
 
-static int compat_nfs_getfs_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg *arg)
+static int compat_nfs_getfs_trans(struct nfsctl_arg *karg, struct compat_nfsctl_arg __user *arg)
 {
 	int err;
 
@@ -1554,7 +1555,7 @@ static int compat_nfs_getfs_trans(struct nfsctl_arg *karg, struct compat_nfsctl_
 /* This really doesn't need translations, we are only passing
  * back a union which contains opaque nfs file handle data.
  */
-static int compat_nfs_getfh_res_trans(union nfsctl_res *kres, union compat_nfsctl_res *res)
+static int compat_nfs_getfh_res_trans(union nfsctl_res *kres, union compat_nfsctl_res __user *res)
 {
 	int err;
 
@@ -1563,8 +1564,8 @@ static int compat_nfs_getfh_res_trans(union nfsctl_res *kres, union compat_nfsct
 	return (err) ? -EFAULT : 0;
 }
 
-asmlinkage long compat_sys_nfsservctl(int cmd, struct compat_nfsctl_arg *arg,
-					union compat_nfsctl_res *res)
+asmlinkage long compat_sys_nfsservctl(int cmd, struct compat_nfsctl_arg __user *arg,
+					union compat_nfsctl_res __user *res)
 {
 	struct nfsctl_arg *karg;
 	union nfsctl_res *kres;
@@ -1611,7 +1612,8 @@ asmlinkage long compat_sys_nfsservctl(int cmd, struct compat_nfsctl_arg *arg,
 
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = sys_nfsservctl(cmd, karg, kres);
+	/* The __user pointer casts are valid because of the set_fs() */
+	err = sys_nfsservctl(cmd, (void __user *) karg, (void __user *) kres);
 	set_fs(oldfs);
 
 	if (err)

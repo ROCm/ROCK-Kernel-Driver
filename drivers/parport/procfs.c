@@ -33,7 +33,7 @@
 #define PARPORT_MAX_SPINTIME_VALUE 1000
 
 static int do_active_device(ctl_table *table, int write, struct file *filp,
-		      void *result, size_t *lenp)
+		      void __user *result, size_t *lenp)
 {
 	struct parport *port = (struct parport *)table->extra1;
 	char buffer[256];
@@ -70,7 +70,7 @@ static int do_active_device(ctl_table *table, int write, struct file *filp,
 
 #ifdef CONFIG_PARPORT_1284
 static int do_autoprobe(ctl_table *table, int write, struct file *filp,
-			void *result, size_t *lenp)
+			void __user *result, size_t *lenp)
 {
 	struct parport_device_info *info = table->extra2;
 	const char *str;
@@ -112,7 +112,7 @@ static int do_autoprobe(ctl_table *table, int write, struct file *filp,
 #endif /* IEEE1284.3 support. */
 
 static int do_hardware_base_addr (ctl_table *table, int write,
-				  struct file *filp, void *result,
+				  struct file *filp, void __user *result,
 				  size_t *lenp)
 {
 	struct parport *port = (struct parport *)table->extra1;
@@ -140,7 +140,7 @@ static int do_hardware_base_addr (ctl_table *table, int write,
 }
 
 static int do_hardware_irq (ctl_table *table, int write,
-			    struct file *filp, void *result,
+			    struct file *filp, void __user *result,
 			    size_t *lenp)
 {
 	struct parport *port = (struct parport *)table->extra1;
@@ -168,7 +168,7 @@ static int do_hardware_irq (ctl_table *table, int write,
 }
 
 static int do_hardware_dma (ctl_table *table, int write,
-			    struct file *filp, void *result,
+			    struct file *filp, void __user *result,
 			    size_t *lenp)
 {
 	struct parport *port = (struct parport *)table->extra1;
@@ -196,7 +196,7 @@ static int do_hardware_dma (ctl_table *table, int write,
 }
 
 static int do_hardware_modes (ctl_table *table, int write,
-			      struct file *filp, void *result,
+			      struct file *filp, void __user *result,
 			      size_t *lenp)
 {
 	struct parport *port = (struct parport *)table->extra1;

@@ -286,7 +286,7 @@ void nf_debug_ip_finish_output2(struct sk_buff *skb)
 
 /* Call get/setsockopt() */
 static int nf_sockopt(struct sock *sk, int pf, int val, 
-		      char *opt, int *len, int get)
+		      char __user *opt, int *len, int get)
 {
 	struct list_head *i;
 	struct nf_sockopt_ops *ops;
@@ -329,13 +329,13 @@ static int nf_sockopt(struct sock *sk, int pf, int val,
 	return ret;
 }
 
-int nf_setsockopt(struct sock *sk, int pf, int val, char *opt,
+int nf_setsockopt(struct sock *sk, int pf, int val, char __user *opt,
 		  int len)
 {
 	return nf_sockopt(sk, pf, val, opt, &len, 0);
 }
 
-int nf_getsockopt(struct sock *sk, int pf, int val, char *opt, int *len)
+int nf_getsockopt(struct sock *sk, int pf, int val, char __user *opt, int *len)
 {
 	return nf_sockopt(sk, pf, val, opt, len, 1);
 }

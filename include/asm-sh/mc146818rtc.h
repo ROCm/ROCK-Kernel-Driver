@@ -16,7 +16,6 @@
 
 /* FIXME:RTC Interrupt feature is not implemented yet. */
 #undef  RTC_IRQ
-#define RTC_IRQ		0
 
 #if defined(CONFIG_CPU_SH3)
 #define RTC_PORT(n)		(R64CNT+(n)*2)

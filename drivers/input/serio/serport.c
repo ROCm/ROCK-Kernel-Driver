@@ -140,7 +140,7 @@ static int serport_ldisc_room(struct tty_struct *tty)
  * returning 0 characters.
  */
 
-static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, unsigned char * buf, size_t nr)
+static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, unsigned char __user * buf, size_t nr)
 {
 	struct serport *serport = (struct serport*) tty->disc_data;
 	char name[64];
@@ -167,7 +167,7 @@ static int serport_ldisc_ioctl(struct tty_struct * tty, struct file * file, unsi
 	struct serport *serport = (struct serport*) tty->disc_data;
 	
 	if (cmd == SPIOCSTYPE)
-		return get_user(serport->serio.type, (unsigned long *) arg);
+		return get_user(serport->serio.type, (unsigned long __user *) arg);
 
 	return -EINVAL;
 }

@@ -949,7 +949,7 @@ loop_info64_to_old(const struct loop_info64 *info64, struct loop_info *info)
 }
 
 static int
-loop_set_status_old(struct loop_device *lo, const struct loop_info *arg)
+loop_set_status_old(struct loop_device *lo, const struct loop_info __user *arg)
 {
 	struct loop_info info;
 	struct loop_info64 info64;
@@ -961,7 +961,7 @@ loop_set_status_old(struct loop_device *lo, const struct loop_info *arg)
 }
 
 static int
-loop_set_status64(struct loop_device *lo, const struct loop_info64 *arg)
+loop_set_status64(struct loop_device *lo, const struct loop_info64 __user *arg)
 {
 	struct loop_info64 info64;
 
@@ -971,7 +971,7 @@ loop_set_status64(struct loop_device *lo, const struct loop_info64 *arg)
 }
 
 static int
-loop_get_status_old(struct loop_device *lo, struct loop_info *arg) {
+loop_get_status_old(struct loop_device *lo, struct loop_info __user *arg) {
 	struct loop_info info;
 	struct loop_info64 info64;
 	int err = 0;
@@ -989,7 +989,7 @@ loop_get_status_old(struct loop_device *lo, struct loop_info *arg) {
 }
 
 static int
-loop_get_status64(struct loop_device *lo, struct loop_info64 *arg) {
+loop_get_status64(struct loop_device *lo, struct loop_info64 __user *arg) {
 	struct loop_info64 info64;
 	int err = 0;
 
@@ -1021,16 +1021,16 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 		err = loop_clr_fd(lo, inode->i_bdev);
 		break;
 	case LOOP_SET_STATUS:
-		err = loop_set_status_old(lo, (struct loop_info *) arg);
+		err = loop_set_status_old(lo, (struct loop_info __user *) arg);
 		break;
 	case LOOP_GET_STATUS:
-		err = loop_get_status_old(lo, (struct loop_info *) arg);
+		err = loop_get_status_old(lo, (struct loop_info __user *) arg);
 		break;
 	case LOOP_SET_STATUS64:
-		err = loop_set_status64(lo, (struct loop_info64 *) arg);
+		err = loop_set_status64(lo, (struct loop_info64 __user *) arg);
 		break;
 	case LOOP_GET_STATUS64:
-		err = loop_get_status64(lo, (struct loop_info64 *) arg);
+		err = loop_get_status64(lo, (struct loop_info64 __user *) arg);
 		break;
 	default:
 		err = lo->ioctl ? lo->ioctl(lo, cmd, arg) : -EINVAL;

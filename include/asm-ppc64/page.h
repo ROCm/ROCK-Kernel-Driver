@@ -15,7 +15,8 @@
 #ifdef __ASSEMBLY__
   #define ASM_CONST(x) x
 #else
-  #define ASM_CONST(x) x##UL
+  #define __ASM_CONST(x) x##UL
+  #define ASM_CONST(x) __ASM_CONST(x)
 #endif
 
 /* PAGE_SHIFT determines the page size */

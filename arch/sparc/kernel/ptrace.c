@@ -50,8 +50,10 @@ static inline void pt_succ_return(struct pt_regs *regs, unsigned long value)
 static void
 pt_succ_return_linux(struct pt_regs *regs, unsigned long value, long *addr)
 {
-	if(put_user(value, addr))
-		return pt_error_return(regs, EFAULT);
+	if (put_user(value, (long __user *) addr)) {
+		pt_error_return(regs, EFAULT);
+		return;
+	}
 	regs->u_regs[UREG_I0] = 0;
 	regs->psr &= ~PSR_C;
 	regs->pc = regs->npc;
@@ -368,7 +370,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 	}
 
 	case PTRACE_GETREGS: {
-		struct pt_regs *pregs = (struct pt_regs *) addr;
+		struct pt_regs __user *pregs = (struct pt_regs __user *) addr;
 		struct pt_regs *cregs = child->thread.kregs;
 		int rval;
 
@@ -391,7 +393,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 	}
 
 	case PTRACE_SETREGS: {
-		struct pt_regs *pregs = (struct pt_regs *) addr;
+		struct pt_regs __user *pregs = (struct pt_regs __user *) addr;
 		struct pt_regs *cregs = child->thread.kregs;
 		unsigned long psr, pc, npc, y;
 		int i;
@@ -433,7 +435,8 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 				unsigned long *insnaddr;
 				unsigned long insn;
 			} fpq[16];
-		} *fps = (struct fps *) addr;
+		};
+		struct fps __user *fps = (struct fps __user *) addr;
 		int i;
 
 		i = verify_area(VERIFY_WRITE, fps, sizeof(struct fps));
@@ -467,7 +470,8 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 				unsigned long *insnaddr;
 				unsigned long insn;
 			} fpq[16];
-		} *fps = (struct fps *) addr;
+		};
+		struct fps __user *fps = (struct fps __user *) addr;
 		int i;
 
 		i = verify_area(VERIFY_READ, fps, sizeof(struct fps));
@@ -489,7 +493,8 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 
 	case PTRACE_READTEXT:
 	case PTRACE_READDATA: {
-		int res = ptrace_readdata(child, addr, (void *) addr2, data);
+		int res = ptrace_readdata(child, addr,
+					  (void __user *) addr2, data);
 
 		if (res == data) {
 			pt_succ_return(regs, 0);
@@ -504,7 +509,8 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 
 	case PTRACE_WRITETEXT:
 	case PTRACE_WRITEDATA: {
-		int res = ptrace_writedata(child, (void *) addr2, addr, data);
+		int res = ptrace_writedata(child, (void __user *) addr2,
+					   addr, data);
 
 		if (res == data) {
 			pt_succ_return(regs, 0);

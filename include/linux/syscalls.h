@@ -160,7 +160,7 @@ asmlinkage long sys_kexec_load(void *entry, unsigned long nr_segments,
 
 asmlinkage long sys_exit(int error_code);
 asmlinkage void sys_exit_group(int error_code);
-asmlinkage long sys_wait4(pid_t pid, unsigned int *stat_addr,
+asmlinkage long sys_wait4(pid_t pid, unsigned int __user *stat_addr,
 				int options, struct rusage __user *ru);
 asmlinkage long sys_waitpid(pid_t pid, unsigned int __user *stat_addr, int options);
 asmlinkage long sys_set_tid_address(int __user *tidptr);

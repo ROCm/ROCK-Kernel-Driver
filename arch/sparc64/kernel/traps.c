@@ -1708,7 +1708,7 @@ void instruction_dump (unsigned int *pc)
 	printk("\n");
 }
 
-void user_instruction_dump (unsigned int *pc)
+static void user_instruction_dump (unsigned int __user *pc)
 {
 	int i;
 	unsigned int buf[9];
@@ -1813,7 +1813,7 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 			regs->tpc &= 0xffffffff;
 			regs->tnpc &= 0xffffffff;
 		}
-		user_instruction_dump ((unsigned int *) regs->tpc);
+		user_instruction_dump ((unsigned int __user *) regs->tpc);
 	}
 #ifdef CONFIG_SMP
 	smp_report_regs();
@@ -1838,7 +1838,7 @@ void do_illegal_instruction(struct pt_regs *regs)
 		die_if_kernel("Kernel illegal instruction", regs);
 	if (test_thread_flag(TIF_32BIT))
 		pc = (u32)pc;
-	if (get_user(insn, (u32 *)pc) != -EFAULT) {
+	if (get_user(insn, (u32 __user *) pc) != -EFAULT) {
 		if ((insn & 0xc1ffc000) == 0x81700000) /* POPC */ {
 			if (handle_popc(insn, regs))
 				return;
@@ -1862,9 +1862,12 @@ void mem_address_unaligned(struct pt_regs *regs, unsigned long sfar, unsigned lo
 	if (regs->tstate & TSTATE_PRIV) {
 		extern void kernel_unaligned_trap(struct pt_regs *regs,
 						  unsigned int insn, 
-						  unsigned long sfar, unsigned long sfsr);
+						  unsigned long sfar,
+						  unsigned long sfsr);
 
-		return kernel_unaligned_trap(regs, *((unsigned int *)regs->tpc), sfar, sfsr);
+		kernel_unaligned_trap(regs, *((unsigned int *)regs->tpc),
+				      sfar, sfsr);
+		return;
 	}
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;

@@ -1294,35 +1294,43 @@ int unregister_dnaddr_notifier(struct notifier_block *nb)
  * it as a compile time option. Probably you should use the
  * rtnetlink interface instead.
  */
-int dnet_gifconf(struct net_device *dev, char *buf, int len)
+int dnet_gifconf(struct net_device *dev, char __user *buf, int len)
 {
 	struct dn_dev *dn_db = (struct dn_dev *)dev->dn_ptr;
 	struct dn_ifaddr *ifa;
-	struct ifreq *ifr = (struct ifreq *)buf;
+	char buffer[DN_IFREQ_SIZE];
+	struct ifreq *ifr = (struct ifreq *)buffer;
+	struct sockaddr_dn *addr = (struct sockaddr_dn *)&ifr->ifr_addr;
 	int done = 0;
 
 	if ((dn_db == NULL) || ((ifa = dn_db->ifa_list) == NULL))
 		return 0;
 
 	for(; ifa; ifa = ifa->ifa_next) {
-		if (!ifr) {
+		if (!buf) {
 			done += sizeof(DN_IFREQ_SIZE);
 			continue;
 		}
 		if (len < DN_IFREQ_SIZE)
 			return done;
-		memset(ifr, 0, DN_IFREQ_SIZE);
+		memset(buffer, 0, DN_IFREQ_SIZE);
 
 		if (ifa->ifa_label)
 			strcpy(ifr->ifr_name, ifa->ifa_label);
 		else
 			strcpy(ifr->ifr_name, dev->name);
 
-		(*(struct sockaddr_dn *) &ifr->ifr_addr).sdn_family = AF_DECnet;
-		(*(struct sockaddr_dn *) &ifr->ifr_addr).sdn_add.a_len = 2;
-		(*(dn_address *)(*(struct sockaddr_dn *) &ifr->ifr_addr).sdn_add.a_addr) = ifa->ifa_local;
+		addr->sdn_family = AF_DECnet;
+		addr->sdn_add.a_len = 2;
+		memcpy(addr->sdn_add.a_addr, &ifa->ifa_local,
+			sizeof(dn_address));
 
-		ifr = (struct ifreq *)((char *)ifr + DN_IFREQ_SIZE);
+		if (copy_to_user(buf, buffer, DN_IFREQ_SIZE)) {
+			done = -EFAULT;
+			break;
+		}
+
+		buf  += DN_IFREQ_SIZE;
 		len  -= DN_IFREQ_SIZE;
 		done += DN_IFREQ_SIZE;
 	}

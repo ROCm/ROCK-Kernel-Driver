@@ -115,11 +115,14 @@ static int pxa2xx_pcmcia_set_mcatt( int sock, int speed, int clock )
 
 static int pxa2xx_pcmcia_set_mcxx(struct soc_pcmcia_socket *skt, unsigned int lclk)
 {
+	struct soc_pcmcia_timing timing;
 	int sock = skt->nr;
 
-	pxa2xx_pcmcia_set_mcmem( sock, SOC_PCMCIA_5V_MEM_ACCESS, lclk );
-	pxa2xx_pcmcia_set_mcatt( sock, SOC_PCMCIA_ATTR_MEM_ACCESS, lclk );
-	pxa2xx_pcmcia_set_mcio( sock, SOC_PCMCIA_IO_ACCESS, lclk );
+	soc_common_pcmcia_get_timing(skt, &timing);
+
+	pxa2xx_pcmcia_set_mcmem(sock, timing.mem, lclk);
+	pxa2xx_pcmcia_set_mcatt(sock, timing.attr, lclk);
+	pxa2xx_pcmcia_set_mcio(sock, timing.io, lclk);
 
 	return 0;
 }
@@ -237,12 +240,7 @@ static void pxa2xx_pcmcia_update_mcxx(unsigned int clock)
 
 	down(&soc_sockets_lock);
 	list_for_each_entry(skt, &soc_sockets, node) {
-		pxa2xx_pcmcia_set_mcio(skt->nr, calc_speed(skt->spd_io,
-				       MAX_IO_WIN, SOC_PCMCIA_IO_ACCESS), clock);
-		pxa2xx_pcmcia_set_mcmem(skt->nr, calc_speed(skt->spd_io,
-					MAX_IO_WIN, SOC_PCMCIA_3V_MEM_ACCESS), clock );
-		pxa2xx_pcmcia_set_mcatt(skt->nr, calc_speed(skt->spd_io,
-					MAX_IO_WIN, SOC_PCMCIA_3V_MEM_ACCESS), clock );
+		pxa2xx_pcmcia_set_mcxx(skt, clock);
 	}
 	up(&soc_sockets_lock);
 }

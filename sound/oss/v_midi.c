@@ -120,7 +120,7 @@ static int v_midi_end_read (int dev)
 
 /* why -EPERM and not -EINVAL?? */
 
-static inline int v_midi_ioctl (int dev, unsigned cmd, caddr_t arg)
+static inline int v_midi_ioctl (int dev, unsigned cmd, void __user *arg)
 {
 	return -EPERM;
 }

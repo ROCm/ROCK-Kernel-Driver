@@ -610,6 +610,8 @@ extern int sysctl_tcp_nometrics_save;
 extern int sysctl_tcp_bic;
 extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
+extern int sysctl_tcp_default_win_scale;
+extern int sysctl_tcp_moderate_rcvbuf;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
@@ -720,14 +722,14 @@ struct tcp_func {
 	int			(*setsockopt)		(struct sock *sk, 
 							 int level, 
 							 int optname, 
-							 char *optval, 
+							 char __user *optval, 
 							 int optlen);
 
 	int			(*getsockopt)		(struct sock *sk, 
 							 int level, 
 							 int optname, 
-							 char *optval, 
-							 int *optlen);
+							 char __user *optval, 
+							 int __user *optlen);
 
 
 	void			(*addr2sockaddr)	(struct sock *sk,
@@ -800,6 +802,8 @@ extern int			tcp_rcv_established(struct sock *sk,
 						    struct tcphdr *th, 
 						    unsigned len);
 
+extern void			tcp_rcv_space_adjust(struct sock *sk);
+
 enum tcp_ack_state_t
 {
 	TCP_ACK_SCHED = 1,
@@ -869,10 +873,11 @@ extern unsigned int		tcp_poll(struct file * file, struct socket *sock, struct po
 extern void			tcp_write_space(struct sock *sk); 
 
 extern int			tcp_getsockopt(struct sock *sk, int level, 
-					       int optname, char *optval, 
-					       int *optlen);
+					       int optname,
+					       char __user *optval, 
+					       int __user *optlen);
 extern int			tcp_setsockopt(struct sock *sk, int level, 
-					       int optname, char *optval, 
+					       int optname, char __user *optval, 
 					       int optlen);
 extern void			tcp_set_keepalive(struct sock *sk, int val);
 extern int			tcp_recvmsg(struct kiocb *iocb, struct sock *sk,
@@ -1751,6 +1756,9 @@ static inline void tcp_select_initial_window(int __space, __u32 mss,
 		if (*rcv_wscale && sysctl_tcp_app_win && space>=mss &&
 		    space - max((space>>sysctl_tcp_app_win), mss>>*rcv_wscale) < 65536/2)
 			(*rcv_wscale)--;
+
+		*rcv_wscale = max((__u8)sysctl_tcp_default_win_scale,
+				  *rcv_wscale);
 	}
 
 	/* Set initial window to value enough for senders,

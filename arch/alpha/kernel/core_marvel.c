@@ -718,7 +718,7 @@ marvel_iounmap(unsigned long addr)
 	if (((long)addr >> 41) == -2)
 		return;	/* kseg map, nothing to do */
 	if (addr)
-		return vfree((void *)(PAGE_MASK & addr)); 
+		vfree((void *)(PAGE_MASK & addr)); 
 }
 
 #ifndef CONFIG_ALPHA_GENERIC

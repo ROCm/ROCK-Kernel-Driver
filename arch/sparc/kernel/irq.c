@@ -216,7 +216,8 @@ void free_irq(unsigned int irq, void *dev_id)
 	if (sparc_cpu_model == sun4d) {
 		extern void sun4d_free_irq(unsigned int, void *);
 		
-		return sun4d_free_irq(irq, dev_id);
+		sun4d_free_irq(irq, dev_id);
+		return;
 	}
 	cpu_irq = irq & (NR_IRQS - 1);
         if (cpu_irq > 14) {  /* 14 irq levels on the sparc */

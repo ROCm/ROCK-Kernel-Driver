@@ -6,6 +6,7 @@
  * Copyright (C) 1998 Jakub Jelinek   (jj@ultra.linux.cz)
  */
 
+#include <linux/config.h>
 #include <asm/errno.h>
 
 /* NOTE: call as jump breaks return stack, we have to avoid that */
@@ -77,6 +78,18 @@ sys32_mq_timedsend:
 sys32_mq_timedreceive:
 	sethi		%hi(compat_sys_mq_timedreceive), %g1
 	jmpl		%g1 + %lo(compat_sys_mq_timedreceive), %g0
+	 srl		%o4, 0, %o4
+
+	.globl		sys32_select
+sys32_select:
+	sethi		%hi(compat_sys_select), %g1
+	jmpl		%g1 + %lo(compat_sys_select), %g0
+	 srl		%o4, 0, %o4
+
+	.globl		sys32_futex
+sys32_futex:
+	sethi		%hi(compat_sys_futex), %g1
+	jmpl		%g1 + %lo(compat_sys_futex), %g0
 	 srl		%o4, 0, %o4
 
 	.align		32

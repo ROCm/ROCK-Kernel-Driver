@@ -825,7 +825,7 @@ static inline void writeq(u64 val, void *addr)
  */
 static int __devinit s2io_init_nic(struct pci_dev *pdev,
 				   const struct pci_device_id *pre);
-static void __exit s2io_rem_nic(struct pci_dev *pdev);
+static void __devexit s2io_rem_nic(struct pci_dev *pdev);
 static int initSharedMem(struct s2io_nic *sp);
 static void freeSharedMem(struct s2io_nic *sp);
 static int initNic(struct s2io_nic *nic);

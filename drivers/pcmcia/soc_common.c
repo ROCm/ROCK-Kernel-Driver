@@ -68,6 +68,29 @@ void soc_pcmcia_debug(struct soc_pcmcia_socket *skt, const char *func,
 
 #define to_soc_pcmcia_socket(x)	container_of(x, struct soc_pcmcia_socket, socket)
 
+static unsigned short
+calc_speed(unsigned short *spds, int num, unsigned short dflt)
+{
+	unsigned short speed = 0;
+	int i;
+
+	for (i = 0; i < num; i++)
+		if (speed < spds[i])
+			speed = spds[i];
+	if (speed == 0)
+		speed = dflt;
+
+	return speed;
+}
+
+void soc_common_pcmcia_get_timing(struct soc_pcmcia_socket *skt, struct soc_pcmcia_timing *timing)
+{
+	timing->io = calc_speed(skt->spd_io, MAX_IO_WIN, SOC_PCMCIA_IO_ACCESS);
+	timing->mem = calc_speed(skt->spd_mem, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
+	timing->attr = calc_speed(skt->spd_attr, MAX_WIN, SOC_PCMCIA_3V_MEM_ACCESS);
+}
+EXPORT_SYMBOL(soc_common_pcmcia_get_timing);
+
 static unsigned int soc_common_pcmcia_skt_state(struct soc_pcmcia_socket *skt)
 {
 	struct pcmcia_state state;

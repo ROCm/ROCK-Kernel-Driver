@@ -9,9 +9,9 @@
  * Virtual -> physical identity mapping starts at this offset
  */
 #ifdef USE_48_BIT_KSEG
-#define IDENT_ADDR     0xffff800000000000
+#define IDENT_ADDR     0xffff800000000000UL
 #else
-#define IDENT_ADDR     0xfffffc0000000000
+#define IDENT_ADDR     0xfffffc0000000000UL
 #endif
 
 #ifdef __KERNEL__

@@ -84,8 +84,8 @@ osf_sigprocmask(int how, unsigned long newmask, long a2, long a3,
 }
 
 asmlinkage int 
-osf_sigaction(int sig, const struct osf_sigaction *act,
-	      struct osf_sigaction *oact)
+osf_sigaction(int sig, const struct osf_sigaction __user *act,
+	      struct osf_sigaction __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -115,8 +115,9 @@ osf_sigaction(int sig, const struct osf_sigaction *act,
 }
 
 asmlinkage long
-sys_rt_sigaction(int sig, const struct sigaction *act, struct sigaction *oact,
-		 size_t sigsetsize, void *restorer)
+sys_rt_sigaction(int sig, const struct sigaction __user *act,
+		 struct sigaction __user *oact,
+		 size_t sigsetsize, void __user *restorer)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -165,7 +166,7 @@ do_sigsuspend(old_sigset_t mask, struct pt_regs *reg, struct switch_stack *sw)
 }
 
 asmlinkage int
-do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize,
+do_rt_sigsuspend(sigset_t __user *uset, size_t sigsetsize,
 		 struct pt_regs *reg, struct switch_stack *sw)
 {
 	sigset_t oldset, set;
@@ -192,7 +193,7 @@ do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize,
 }
 
 asmlinkage int
-sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss)
 {
 	return do_sigaltstack(uss, uoss, rdusp());
 }
@@ -223,7 +224,7 @@ struct rt_sigframe
 #define INSN_CALLSYS		0x00000083
 
 static long
-restore_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
+restore_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
 		   struct switch_stack *sw)
 {
 	unsigned long usp;
@@ -276,7 +277,7 @@ restore_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
    registers and transfer control from userland.  */
 
 asmlinkage void
-do_sigreturn(struct sigcontext *sc, struct pt_regs *regs,
+do_sigreturn(struct sigcontext __user *sc, struct pt_regs *regs,
 	     struct switch_stack *sw)
 {
 	sigset_t set;
@@ -314,7 +315,7 @@ give_sigsegv:
 }
 
 asmlinkage void
-do_rt_sigreturn(struct rt_sigframe *frame, struct pt_regs *regs,
+do_rt_sigreturn(struct rt_sigframe __user *frame, struct pt_regs *regs,
 		struct switch_stack *sw)
 {
 	sigset_t set;
@@ -356,17 +357,17 @@ give_sigsegv:
  * Set up a signal frame.
  */
 
-static inline void *
+static inline void __user *
 get_sigframe(struct k_sigaction *ka, unsigned long sp, size_t frame_size)
 {
 	if ((ka->sa.sa_flags & SA_ONSTACK) != 0 && ! on_sig_stack(sp))
 		sp = current->sas_ss_sp + current->sas_ss_size;
 
-	return (void *)((sp - frame_size) & -32ul);
+	return (void __user *)((sp - frame_size) & -32ul);
 }
 
 static long
-setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs, 
+setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs, 
 		 struct switch_stack *sw, unsigned long mask, unsigned long sp)
 {
 	long i, err = 0;
@@ -426,7 +427,7 @@ setup_frame(int sig, struct k_sigaction *ka, sigset_t *set,
 	    struct pt_regs *regs, struct switch_stack * sw)
 {
 	unsigned long oldsp, r26, err = 0;
-	struct sigframe *frame;
+	struct sigframe __user *frame;
 
 	oldsp = rdusp();
 	frame = get_sigframe(ka, oldsp, sizeof(*frame));
@@ -479,7 +480,7 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	       sigset_t *set, struct pt_regs *regs, struct switch_stack * sw)
 {
 	unsigned long oldsp, r26, err = 0;
-	struct rt_sigframe *frame;
+	struct rt_sigframe __user *frame;
 
 	oldsp = rdusp();
 	frame = get_sigframe(ka, oldsp, sizeof(*frame));

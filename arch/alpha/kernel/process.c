@@ -239,8 +239,9 @@ release_thread(struct task_struct *dead_task)
  * with parameters (SIGCHLD, 0).
  */
 int
-alpha_clone(unsigned long clone_flags, unsigned long usp, int *parent_tid,
-	    int *child_tid, unsigned long tls_value, struct pt_regs *regs)
+alpha_clone(unsigned long clone_flags, unsigned long usp,
+	    int __user *parent_tid, int __user *child_tid,
+	    unsigned long tls_value, struct pt_regs *regs)
 {
 	if (!usp)
 		usp = rdusp();
@@ -464,7 +465,8 @@ dump_elf_task_fp(elf_fpreg_t *dest, struct task_struct *task)
  * Don't do this at home.
  */
 asmlinkage int
-sys_execve(char *ufilename, char **argv, char **envp,
+sys_execve(char __user *ufilename, char __user * __user *argv,
+	   char __user * __user *envp,
 	   unsigned long a3, unsigned long a4, unsigned long a5,
 	   struct pt_regs regs)
 {

@@ -5,10 +5,12 @@
 # define __user		__attribute__((noderef, address_space(1)))
 # define __kernel	/* default address space */
 # define __safe		__attribute__((safe))
+# define __force	__attribute__((force))
 #else
 # define __user
 # define __kernel
 # define __safe
+# define __force
 #endif
 
 #ifdef __KERNEL__

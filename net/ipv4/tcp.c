@@ -276,6 +276,8 @@ kmem_cache_t *tcp_timewait_cachep;
 
 atomic_t tcp_orphan_count = ATOMIC_INIT(0);
 
+int sysctl_tcp_default_win_scale;
+
 int sysctl_tcp_mem[3];
 int sysctl_tcp_wmem[3] = { 4 * 1024, 16 * 1024, 128 * 1024 };
 int sysctl_tcp_rmem[3] = { 4 * 1024, 87380, 87380 * 2 };
@@ -528,7 +530,7 @@ int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 		return -ENOIOCTLCMD;
 	};
 
-	return put_user(answ, (int *)arg);
+	return put_user(answ, (int __user *)arg);
 }
 
 
@@ -964,7 +966,7 @@ ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset,
 #define TCP_PAGE(sk)	(inet_sk(sk)->sndmsg_page)
 #define TCP_OFF(sk)	(inet_sk(sk)->sndmsg_off)
 
-static inline int tcp_copy_to_page(struct sock *sk, char *from,
+static inline int tcp_copy_to_page(struct sock *sk, char __user *from,
 				   struct sk_buff *skb, struct page *page,
 				   int off, int copy)
 {
@@ -989,7 +991,7 @@ static inline int tcp_copy_to_page(struct sock *sk, char *from,
 	return 0;
 }
 
-static inline int skb_add_data(struct sk_buff *skb, char *from, int copy)
+static inline int skb_add_data(struct sk_buff *skb, char __user *from, int copy)
 {
 	int err = 0;
 	unsigned int csum;
@@ -1063,7 +1065,7 @@ int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	while (--iovlen >= 0) {
 		int seglen = iov->iov_len;
-		unsigned char *from = iov->iov_base;
+		unsigned char __user *from = iov->iov_base;
 
 		iov++;
 
@@ -1480,6 +1482,9 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 			break;
 	}
 	tp->copied_seq = seq;
+
+	tcp_rcv_space_adjust(sk);
+
 	/* Clean up data we have read: This will do ACK frames. */
 	if (copied)
 		cleanup_rbuf(sk, copied);
@@ -1739,6 +1744,8 @@ do_prequeue:
 		*seq += used;
 		copied += used;
 		len -= used;
+
+		tcp_rcv_space_adjust(sk);
 
 skip_copy:
 		if (tp->urg_data && after(tp->copied_seq, tp->urg_seq)) {
@@ -2271,7 +2278,7 @@ out:
 /*
  *	Socket option code for TCP.
  */
-int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
+int tcp_setsockopt(struct sock *sk, int level, int optname, char __user *optval,
 		   int optlen)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -2285,7 +2292,7 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
 	if (optlen < sizeof(int))
 		return -EINVAL;
 
-	if (get_user(val, (int *)optval))
+	if (get_user(val, (int __user *)optval))
 		return -EFAULT;
 
 	lock_sock(sk);
@@ -2435,8 +2442,8 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char *optval,
 	return err;
 }
 
-int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
-		   int *optlen)
+int tcp_getsockopt(struct sock *sk, int level, int optname, char __user *optval,
+		   int __user *optlen)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	int val, len;
@@ -2675,10 +2682,6 @@ void __init tcp_init(void)
 	sysctl_tcp_mem[0] =  768 << order;
 	sysctl_tcp_mem[1] = 1024 << order;
 	sysctl_tcp_mem[2] = 1536 << order;
-	if (sysctl_tcp_mem[2] - sysctl_tcp_mem[1] > 512)
-		sysctl_tcp_mem[1] = sysctl_tcp_mem[2] - 512;
-	if (sysctl_tcp_mem[1] - sysctl_tcp_mem[0] > 512)
-		sysctl_tcp_mem[0] = sysctl_tcp_mem[1] - 512;
 
 	if (order < 3) {
 		sysctl_tcp_wmem[2] = 64 * 1024;

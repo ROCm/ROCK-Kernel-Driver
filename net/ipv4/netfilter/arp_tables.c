@@ -778,7 +778,7 @@ static void get_counters(const struct arpt_table_info *t,
 
 static int copy_entries_to_user(unsigned int total_size,
 				struct arpt_table *table,
-				void *userptr)
+				void __user *userptr)
 {
 	unsigned int off, num, countersize;
 	struct arpt_entry *e;
@@ -838,7 +838,7 @@ static int copy_entries_to_user(unsigned int total_size,
 }
 
 static int get_entries(const struct arpt_get_entries *entries,
-		       struct arpt_get_entries *uptr)
+		       struct arpt_get_entries __user *uptr)
 {
 	int ret;
 	struct arpt_table *t;
@@ -864,7 +864,7 @@ static int get_entries(const struct arpt_get_entries *entries,
 	return ret;
 }
 
-static int do_replace(void *user, unsigned int len)
+static int do_replace(void __user *user, unsigned int len)
 {
 	int ret;
 	struct arpt_replace tmp;
@@ -980,7 +980,7 @@ static inline int add_counter_to_entry(struct arpt_entry *e,
 	return 0;
 }
 
-static int do_add_counters(void *user, unsigned int len)
+static int do_add_counters(void __user *user, unsigned int len)
 {
 	unsigned int i;
 	struct arpt_counters_info tmp, *paddc;
@@ -1027,7 +1027,7 @@ static int do_add_counters(void *user, unsigned int len)
 	return ret;
 }
 
-static int do_arpt_set_ctl(struct sock *sk, int cmd, void *user, unsigned int len)
+static int do_arpt_set_ctl(struct sock *sk, int cmd, void __user *user, unsigned int len)
 {
 	int ret;
 
@@ -1051,7 +1051,7 @@ static int do_arpt_set_ctl(struct sock *sk, int cmd, void *user, unsigned int le
 	return ret;
 }
 
-static int do_arpt_get_ctl(struct sock *sk, int cmd, void *user, int *len)
+static int do_arpt_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 {
 	int ret;
 

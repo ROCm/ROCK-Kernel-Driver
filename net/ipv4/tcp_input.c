@@ -90,6 +90,8 @@ int sysctl_tcp_nometrics_save;
 int sysctl_tcp_westwood;
 int sysctl_tcp_vegas_cong_avoid;
 
+int sysctl_tcp_moderate_rcvbuf;
+
 /* Default values of the Vegas variables, in fixed-point representation
  * with V_PARAM_SHIFT bits to the right of the binary point.
  */
@@ -305,6 +307,8 @@ static void tcp_init_buffer_space(struct sock *sk)
 	if (!(sk->sk_userlocks & SOCK_SNDBUF_LOCK))
 		tcp_fixup_sndbuf(sk);
 
+	tp->rcvq_space.space = tp->rcv_wnd;
+
 	maxwin = tcp_full_space(sk);
 
 	if (tp->window_clamp >= maxwin) {
@@ -364,6 +368,122 @@ static void tcp_clamp_window(struct sock *sk, struct tcp_opt *tp)
 	}
 }
 
+/* Receiver "autotuning" code.
+ *
+ * The algorithm for RTT estimation w/o timestamps is based on
+ * Dynamic Right-Sizing (DRS) by Wu Feng and Mike Fisk of LANL.
+ * <http://www.lanl.gov/radiant/website/pubs/drs/lacsi2001.ps>
+ *
+ * More detail on this code can be found at
+ * <http://www.psc.edu/~jheffner/senior_thesis.ps>,
+ * though this reference is out of date.  A new paper
+ * is pending.
+ */
+static void tcp_rcv_rtt_update(struct tcp_opt *tp, u32 sample, int win_dep)
+{
+	u32 new_sample = tp->rcv_rtt_est.rtt;
+	long m = sample;
+
+	if (m == 0)
+		m = 1;
+
+	if (new_sample != 0) {
+		/* If we sample in larger samples in the non-timestamp
+		 * case, we could grossly overestimate the RTT especially
+		 * with chatty applications or bulk transfer apps which
+		 * are stalled on filesystem I/O.
+		 *
+		 * Also, since we are only going for a minimum in the
+		 * non-timestamp case, we do not smoothe things out
+		 * else with timestamps disabled convergance takes too
+		 * long.
+		 */
+		if (!win_dep) {
+			m -= (new_sample >> 3);
+			new_sample += m;
+		} else if (m < new_sample)
+			new_sample = m << 3;
+	} else {
+		/* No previous mesaure. */
+		new_sample = m << 3;
+	}
+
+	if (tp->rcv_rtt_est.rtt != new_sample)
+		tp->rcv_rtt_est.rtt = new_sample;
+}
+
+static inline void tcp_rcv_rtt_measure(struct tcp_opt *tp)
+{
+	if (tp->rcv_rtt_est.time == 0)
+		goto new_measure;
+	if (before(tp->rcv_nxt, tp->rcv_rtt_est.seq))
+		return;
+	tcp_rcv_rtt_update(tp,
+			   jiffies - tp->rcv_rtt_est.time,
+			   1);
+
+new_measure:
+	tp->rcv_rtt_est.seq = tp->rcv_nxt + tp->rcv_wnd;
+	tp->rcv_rtt_est.time = tcp_time_stamp;
+}
+
+static inline void tcp_rcv_rtt_measure_ts(struct tcp_opt *tp, struct sk_buff *skb)
+{
+	if (tp->rcv_tsecr &&
+	    (TCP_SKB_CB(skb)->end_seq -
+	     TCP_SKB_CB(skb)->seq >= tp->ack.rcv_mss))
+		tcp_rcv_rtt_update(tp, tcp_time_stamp - tp->rcv_tsecr, 0);
+}
+
+/*
+ * This function should be called every time data is copied to user space.
+ * It calculates the appropriate TCP receive buffer space.
+ */
+void tcp_rcv_space_adjust(struct sock *sk)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	int time;
+	int space;
+	
+	if (tp->rcvq_space.time == 0)
+		goto new_measure;
+	
+	time = tcp_time_stamp - tp->rcvq_space.time;
+	if (time < (tp->rcv_rtt_est.rtt >> 3) ||
+	    tp->rcv_rtt_est.rtt == 0)
+		return;
+	
+	space = 2 * (tp->copied_seq - tp->rcvq_space.seq);
+
+	space = max(tp->rcvq_space.space, space);
+
+	if (tp->rcvq_space.space != space) {
+		int rcvmem;
+
+		tp->rcvq_space.space = space;
+
+		if (sysctl_tcp_moderate_rcvbuf) {
+			/* Receive space grows, normalize in order to
+			 * take into account packet headers and sk_buff
+			 * structure overhead.
+			 */
+			space /= tp->advmss;
+			if (!space)
+				space = 1;
+			rcvmem = (tp->advmss + MAX_TCP_HEADER +
+				  16 + sizeof(struct sk_buff));
+			space *= rcvmem;
+			space = min(space, sysctl_tcp_rmem[2]);
+			if (space > sk->sk_rcvbuf)
+				sk->sk_rcvbuf = space;
+		}
+	}
+	
+new_measure:
+	tp->rcvq_space.seq = tp->copied_seq;
+	tp->rcvq_space.time = tcp_time_stamp;
+}
+
 /* There is something which you must keep in mind when you analyze the
  * behavior of the tp->ato delayed ack timeout interval.  When a
  * connection starts up, we want to ack as quickly as possible.  The
@@ -382,6 +502,8 @@ static void tcp_event_data_recv(struct sock *sk, struct tcp_opt *tp, struct sk_b
 
 	tcp_measure_rcv_mss(tp, skb);
 
+	tcp_rcv_rtt_measure(tp);
+	
 	now = tcp_time_stamp;
 
 	if (!tp->ack.ato) {
@@ -3318,6 +3440,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 				tp->ucopy.len -= chunk;
 				tp->copied_seq += chunk;
 				eaten = (chunk == skb->len && !th->fin);
+				tcp_rcv_space_adjust(sk);
 			}
 			local_bh_disable();
 		}
@@ -3918,6 +4041,7 @@ static int tcp_copy_to_iovec(struct sock *sk, struct sk_buff *skb, int hlen)
 	if (!err) {
 		tp->ucopy.len -= chunk;
 		tp->copied_seq += chunk;
+		tcp_rcv_space_adjust(sk);
 	}
 
 	local_bh_disable();
@@ -4045,6 +4169,9 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 				    (sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED) &&
 				    tp->rcv_nxt == tp->rcv_wup)
 					tcp_store_ts_recent(tp);
+
+				tcp_rcv_rtt_measure_ts(tp, skb);
+
 				/* We know that such packets are checksummed
 				 * on entry.
 				 */
@@ -4076,6 +4203,8 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 					    tp->rcv_nxt == tp->rcv_wup)
 						tcp_store_ts_recent(tp);
 
+					tcp_rcv_rtt_measure_ts(tp, skb);
+
 					__skb_pull(skb, tcp_header_len);
 					tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
 					NET_INC_STATS_BH(TCPHPHitsToUser);
@@ -4094,6 +4223,8 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 				    (sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED) &&
 				    tp->rcv_nxt == tp->rcv_wup)
 					tcp_store_ts_recent(tp);
+
+				tcp_rcv_rtt_measure_ts(tp, skb);
 
 				if ((int)skb->truesize > sk->sk_forward_alloc)
 					goto step5;
@@ -4190,6 +4321,8 @@ slow_path:
 step5:
 	if(th->ack)
 		tcp_ack(sk, skb, FLAG_SLOWPATH);
+
+	tcp_rcv_rtt_measure_ts(tp, skb);
 
 	/* Process urgent data. */
 	tcp_urg(sk, skb, th);

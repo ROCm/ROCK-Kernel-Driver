@@ -349,8 +349,8 @@ static unsigned via_num_cards;
 static int via_init_one (struct pci_dev *dev, const struct pci_device_id *id);
 static void __devexit via_remove_one (struct pci_dev *pdev);
 
-static ssize_t via_dsp_read(struct file *file, char *buffer, size_t count, loff_t *ppos);
-static ssize_t via_dsp_write(struct file *file, const char *buffer, size_t count, loff_t *ppos);
+static ssize_t via_dsp_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos);
+static ssize_t via_dsp_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos);
 static unsigned int via_dsp_poll(struct file *file, struct poll_table_struct *wait);
 static int via_dsp_ioctl (struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 static int via_dsp_open (struct inode *inode, struct file *file);
@@ -2254,11 +2254,11 @@ out:
 
 
 static ssize_t via_dsp_do_read (struct via_info *card,
-				char *userbuf, size_t count,
+				char __user *userbuf, size_t count,
 				int nonblock)
 {
         DECLARE_WAITQUEUE(wait, current);
-	const char *orig_userbuf = userbuf;
+	const char __user *orig_userbuf = userbuf;
 	struct via_channel *chan = &card->ch_in;
 	size_t size;
 	int n, tmp;
@@ -2388,7 +2388,7 @@ out:
 }
 
 
-static ssize_t via_dsp_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t via_dsp_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct via_info *card;
 	int nonblock = (file->f_flags & O_NONBLOCK);
@@ -2431,11 +2431,11 @@ out:
 
 
 static ssize_t via_dsp_do_write (struct via_info *card,
-				 const char *userbuf, size_t count,
+				 const char __user *userbuf, size_t count,
 				 int nonblock)
 {
         DECLARE_WAITQUEUE(wait, current);
-	const char *orig_userbuf = userbuf;
+	const char __user *orig_userbuf = userbuf;
 	struct via_channel *chan = &card->ch_out;
 	volatile struct via_sgd_table *sgtable = chan->sgtable;
 	size_t size;
@@ -2576,7 +2576,7 @@ out:
 }
 
 
-static ssize_t via_dsp_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t via_dsp_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct via_info *card;
 	ssize_t rc;
@@ -2779,7 +2779,7 @@ out:
 
 static int via_dsp_ioctl_space (struct via_info *card,
 				struct via_channel *chan,
-				void *arg)
+				void __user *arg)
 {
 	audio_buf_info info;
 
@@ -2824,7 +2824,7 @@ static int via_dsp_ioctl_space (struct via_info *card,
 
 static int via_dsp_ioctl_ptr (struct via_info *card,
 				struct via_channel *chan,
-				void *arg)
+				void __user *arg)
 {
 	count_info info;
 
@@ -2900,6 +2900,8 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	struct via_info *card;
 	struct via_channel *chan;
 	int nonblock = (file->f_flags & O_NONBLOCK);
+	int __user *ip = (int __user *)arg;
+	void __user *p = (void __user *)arg;
 
 	assert (file != NULL);
 	card = file->private_data;
@@ -2920,18 +2922,18 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	/* OSS API version.  XXX unverified */
 	case OSS_GETVERSION:
 		DPRINTK ("ioctl OSS_GETVERSION, EXIT, returning SOUND_VERSION\n");
-		rc = put_user (SOUND_VERSION, (int *)arg);
+		rc = put_user (SOUND_VERSION, ip);
 		break;
 
 	/* list of supported PCM data formats */
 	case SNDCTL_DSP_GETFMTS:
 		DPRINTK ("DSP_GETFMTS, EXIT, returning AFMT U8|S16_LE\n");
-                rc = put_user (AFMT_U8 | AFMT_S16_LE, (int *)arg);
+                rc = put_user (AFMT_U8 | AFMT_S16_LE, ip);
 		break;
 
 	/* query or set current channel's PCM data format */
 	case SNDCTL_DSP_SETFMT:
-		if (get_user(val, (int *)arg)) {
+		if (get_user(val, ip)) {
 			rc = -EFAULT;
 			break;
 		}
@@ -2957,12 +2959,12 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 				val = AFMT_U8;
 		}
 		DPRINTK ("SETFMT EXIT, returning %d\n", val);
-                rc = put_user (val, (int *)arg);
+                rc = put_user (val, ip);
 		break;
 
 	/* query or set number of channels (1=mono, 2=stereo, 4/6 for multichannel) */
         case SNDCTL_DSP_CHANNELS:
-		if (get_user(val, (int *)arg)) {
+		if (get_user(val, ip)) {
 			rc = -EFAULT;
 			break;
 		}
@@ -2987,12 +2989,12 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 				val = card->ch_out.channels;
 		}
 		DPRINTK ("CHANNELS EXIT, returning %d\n", val);
-                rc = put_user (val, (int *)arg);
+                rc = put_user (val, ip);
 		break;
 
 	/* enable (val is not zero) or disable (val == 0) stereo */
         case SNDCTL_DSP_STEREO:
-		if (get_user(val, (int *)arg)) {
+		if (get_user(val, ip)) {
 			rc = -EFAULT;
 			break;
 		}
@@ -3010,12 +3012,12 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 		val = rc - 1;
 
 		DPRINTK ("STEREO EXIT, returning %d\n", val);
-		rc = put_user(val, (int *) arg);
+		rc = put_user(val, ip);
 		break;
 
 	/* query or set sampling rate */
         case SNDCTL_DSP_SPEED:
-		if (get_user(val, (int *)arg)) {
+		if (get_user(val, ip)) {
 			rc = -EFAULT;
 			break;
 		}
@@ -3045,7 +3047,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 				val = 0;
 		}
 		DPRINTK ("SPEED EXIT, returning %d\n", val);
-                rc = put_user (val, (int *)arg);
+                rc = put_user (val, ip);
 		break;
 
 	/* wait until all buffers have been played, and then stop device */
@@ -3086,7 +3088,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	/* obtain bitmask of device capabilities, such as mmap, full duplex, etc. */
 	case SNDCTL_DSP_GETCAPS:
 		DPRINTK ("DSP_GETCAPS\n");
-		rc = put_user(VIA_DSP_CAP, (int *)arg);
+		rc = put_user(VIA_DSP_CAP, ip);
 		break;
 
 	/* obtain buffer fragment size */
@@ -3095,10 +3097,10 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 
 		if (rd) {
 			via_chan_set_buffering(card, &card->ch_in, -1);
-			rc = put_user(card->ch_in.frag_size, (int *)arg);
+			rc = put_user(card->ch_in.frag_size, ip);
 		} else if (wr) {
 			via_chan_set_buffering(card, &card->ch_out, -1);
-			rc = put_user(card->ch_out.frag_size, (int *)arg);
+			rc = put_user(card->ch_out.frag_size, ip);
 		}
 		break;
 
@@ -3106,28 +3108,28 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	case SNDCTL_DSP_GETISPACE:
 		DPRINTK ("DSP_GETISPACE\n");
 		if (rd)
-			rc = via_dsp_ioctl_space (card, &card->ch_in, (void*) arg);
+			rc = via_dsp_ioctl_space (card, &card->ch_in, p);
 		break;
 
 	/* obtain information about output buffering */
 	case SNDCTL_DSP_GETOSPACE:
 		DPRINTK ("DSP_GETOSPACE\n");
 		if (wr)
-			rc = via_dsp_ioctl_space (card, &card->ch_out, (void*) arg);
+			rc = via_dsp_ioctl_space (card, &card->ch_out, p);
 		break;
 
 	/* obtain information about input hardware pointer */
 	case SNDCTL_DSP_GETIPTR:
 		DPRINTK ("DSP_GETIPTR\n");
 		if (rd)
-			rc = via_dsp_ioctl_ptr (card, &card->ch_in, (void*) arg);
+			rc = via_dsp_ioctl_ptr (card, &card->ch_in, p);
 		break;
 
 	/* obtain information about output hardware pointer */
 	case SNDCTL_DSP_GETOPTR:
 		DPRINTK ("DSP_GETOPTR\n");
 		if (wr)
-			rc = via_dsp_ioctl_ptr (card, &card->ch_out, (void*) arg);
+			rc = via_dsp_ioctl_ptr (card, &card->ch_out, p);
 		break;
 
 	/* return number of bytes remaining to be played by DMA engine */
@@ -3157,7 +3159,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 		assert (val <= (chan->frag_size * chan->frag_number));
 
 		DPRINTK ("GETODELAY EXIT, val = %d bytes\n", val);
-                rc = put_user (val, (int *)arg);
+                rc = put_user (val, ip);
 		break;
 		}
 
@@ -3166,7 +3168,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	 * occur in the future
 	 */
 	case SNDCTL_DSP_SETTRIGGER:
-		if (get_user(val, (int *)arg)) {
+		if (get_user(val, ip)) {
 			rc = -EFAULT;
 			break;
 		}
@@ -3190,7 +3192,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 			val |= PCM_ENABLE_INPUT;
 		if ((file->f_mode & FMODE_WRITE) && card->ch_out.is_enabled)
 			val |= PCM_ENABLE_OUTPUT;
-		rc = put_user(val, (int *)arg);
+		rc = put_user(val, ip);
 		break;
 
 	/* Enable full duplex.  Since we do this as soon as we are opened
@@ -3205,7 +3207,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 
 	/* set fragment size.  implemented as a successful no-op for now */
 	case SNDCTL_DSP_SETFRAGMENT:
-		if (get_user(val, (int *)arg)) {
+		if (get_user(val, ip)) {
 			rc = -EFAULT;
 			break;
 		}
@@ -3241,7 +3243,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	/* not implemented */
 	default:
 		DPRINTK ("unhandled ioctl, cmd==%u, arg==%p\n",
-			 cmd, (void*) arg);
+			 cmd, p);
 		break;
 	}
 

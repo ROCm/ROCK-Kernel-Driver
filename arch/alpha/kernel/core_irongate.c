@@ -287,9 +287,9 @@ irongate_init_arch(void)
 	hose->sparse_mem_base = 0;
 	hose->sparse_io_base = 0;
 	hose->dense_mem_base
-	  = (IRONGATE_MEM & 0xffffffffff) | 0x80000000000;
+	  = (IRONGATE_MEM & 0xffffffffffUL) | 0x80000000000UL;
 	hose->dense_io_base
-	  = (IRONGATE_IO & 0xffffffffff) | 0x80000000000;
+	  = (IRONGATE_IO & 0xffffffffffUL) | 0x80000000000UL;
 
 	hose->sg_isa = hose->sg_pci = NULL;
 	__direct_map_base = 0;

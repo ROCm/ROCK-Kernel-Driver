@@ -517,7 +517,7 @@ extern int blk_remove_plug(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern int blk_phys_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);
-extern int scsi_cmd_ioctl(struct gendisk *, unsigned int, unsigned long);
+extern int scsi_cmd_ioctl(struct gendisk *, unsigned int, void __user *);
 extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
 extern void __blk_stop_queue(request_queue_t *q);

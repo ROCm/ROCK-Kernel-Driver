@@ -42,7 +42,7 @@ extern void reprogram_timer(void);
 
 #define USE_AUTOINIT_DMA
 
-extern caddr_t sound_mem_blocks[1024];
+extern void *sound_mem_blocks[1024];
 extern int sound_nblocks;
 
 #undef PSEUDO_DMA_AUTOINIT

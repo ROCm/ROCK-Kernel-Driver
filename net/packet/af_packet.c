@@ -1292,7 +1292,7 @@ static void packet_flush_mclist(struct sock *sk)
 #endif
 
 static int
-packet_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen)
+packet_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	int ret;
@@ -1347,7 +1347,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, char *optval, int
 }
 
 int packet_getsockopt(struct socket *sock, int level, int optname,
-		      char *optval, int *optlen)
+		      char __user *optval, int __user *optlen)
 {
 	int len;
 	struct sock *sk = sock->sk;
@@ -1450,7 +1450,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 		case SIOCOUTQ:
 		{
 			int amount = atomic_read(&sk->sk_wmem_alloc);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 		case SIOCINQ:
 		{
@@ -1462,10 +1462,10 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 			if (skb)
 				amount = skb->len;
 			spin_unlock_bh(&sk->sk_receive_queue.lock);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 		case SIOCGSTAMP:
-			return sock_get_timestamp(sk, (struct timeval *)arg);
+			return sock_get_timestamp(sk, (struct timeval __user *)arg);
 			
 #ifdef CONFIG_INET
 		case SIOCADDRT:
@@ -1486,7 +1486,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 #endif
 
 		default:
-			return dev_ioctl(cmd, (void *)arg);
+			return dev_ioctl(cmd, (void __user *)arg);
 	}
 	return 0;
 }

@@ -42,7 +42,8 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 /* {set, get}context() needed for 64-bit SparcLinux userland. */
 asmlinkage void sparc64_set_context(struct pt_regs *regs)
 {
-	struct ucontext *ucp = (struct ucontext __user *) regs->u_regs[UREG_I0];
+	struct ucontext __user *ucp = (struct ucontext __user *)
+		regs->u_regs[UREG_I0];
 	mc_gregset_t __user *grp;
 	unsigned long pc, npc, tstate;
 	unsigned long fp, i7;
@@ -139,7 +140,8 @@ do_sigsegv:
 
 asmlinkage void sparc64_get_context(struct pt_regs *regs)
 {
-	struct ucontext *ucp = (struct ucontext __user *) regs->u_regs[UREG_I0];
+	struct ucontext __user *ucp = (struct ucontext __user *)
+		regs->u_regs[UREG_I0];
 	mc_gregset_t __user *grp;
 	mcontext_t __user *mcp;
 	unsigned long fp, i7;
@@ -427,7 +429,7 @@ void do_rt_sigreturn(struct pt_regs *regs)
 	   call it and ignore errors.  */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	do_sigaltstack(&st, NULL, (unsigned long)sf);
+	do_sigaltstack((const stack_t __user *) &st, NULL, (unsigned long)sf);
 	set_fs(old_fs);
 
 	sigdelsetmask(&set, ~_BLOCKABLE);

@@ -545,7 +545,7 @@ int reiserfs_copy_from_user_to_file_region(
 								 array to
 								 prepared pages
 								*/
-				const char *buf /* Pointer to user-supplied
+				const char __user *buf /* Pointer to user-supplied
 						   data*/
 				)
 {
@@ -1062,7 +1062,7 @@ failed_read:
 
 */
 ssize_t reiserfs_file_write( struct file *file, /* the file we are going to write into */
-                             const char *buf, /*  pointer to user supplied data
+                             const char __user *buf, /*  pointer to user supplied data
 (in userspace) */
                              size_t count, /* amount of bytes to write */
                              loff_t *ppos /* pointer to position in file that we start writing at. Should be updated to

@@ -215,8 +215,9 @@ fix_alignment(struct pt_regs *regs)
 	unsigned long i;
 	int ret;
 	unsigned dsisr;
-	unsigned char *addr, *p;
-	unsigned long *lp;
+	unsigned char __user *addr;
+	unsigned char __user *p;
+	unsigned long __user *lp;
 	union {
 		long ll;
 		double dd;
@@ -241,9 +242,9 @@ fix_alignment(struct pt_regs *regs)
 
 	if (cur_cpu_spec->cpu_features & CPU_FTR_NODSISRALIGN) {
 	    unsigned int real_instr;
-	    if (__get_user(real_instr, (unsigned int *)regs->nip))
+	    if (__get_user(real_instr, (unsigned int __user *)regs->nip))
 		return 0;
-	    dsisr = make_dsisr(*((unsigned *)regs->nip));
+	    dsisr = make_dsisr(real_instr);
 	}
 
 	/* extract the operation and registers from the dsisr */
@@ -257,7 +258,7 @@ fix_alignment(struct pt_regs *regs)
 	flags = aligninfo[instr].flags;
 
 	/* DAR has the operand effective address */
-	addr = (unsigned char *)regs->dar;
+	addr = (unsigned char __user *)regs->dar;
 
 	/* A size of 0 indicates an instruction we don't support */
 	/* we also don't support the multiples (lmw, stmw, lmd, stmd) */
@@ -270,7 +271,7 @@ fix_alignment(struct pt_regs *regs)
 	 * storage
 	 */
 	if (instr == DCBZ)
-		addr = (unsigned char *) ((unsigned long)addr & -L1_CACHE_BYTES);
+		addr = (unsigned char __user *) ((unsigned long)addr & -L1_CACHE_BYTES);
 
 	/* Verify the address of the operand */
 	if (user_mode(regs)) {
@@ -360,7 +361,7 @@ fix_alignment(struct pt_regs *regs)
 		p = addr;
 		switch (nb) {
 		case 128:	/* Special case - must be dcbz */
-			lp = (unsigned long *)p;
+			lp = (unsigned long __user *)p;
 			for (i = 0; i < L1_CACHE_BYTES / sizeof(long); ++i)
 				ret |= __put_user(0, lp++);
 			break;

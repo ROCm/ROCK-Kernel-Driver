@@ -367,6 +367,9 @@ void register_disk(struct gendisk *disk)
 		return;
 
 	bdev = bdget_disk(disk, 0);
+	if (!bdev)
+		return;
+
 	if (blkdev_get(bdev, FMODE_READ, 0) < 0)
 		return;
 	state = check_partition(disk, bdev);

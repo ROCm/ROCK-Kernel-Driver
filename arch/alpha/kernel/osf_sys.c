@@ -91,7 +91,7 @@ osf_set_program_attributes(unsigned long text_start, unsigned long text_len,
  * braindamage (it can't really handle filesystems where the directory
  * offset differences aren't the same as "d_reclen").
  */
-#define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
+#define NAME_OFFSET(de) ((int) ((de)->d_name - (char __user *) (de)))
 #define ROUND_UP(x) (((x)+3) & ~3)
 
 struct osf_dirent {
@@ -102,8 +102,8 @@ struct osf_dirent {
 };
 
 struct osf_dirent_callback {
-	struct osf_dirent *dirent;
-	long *basep;
+	struct osf_dirent __user *dirent;
+	long __user *basep;
 	unsigned int count;
 	int error;
 };
@@ -112,7 +112,7 @@ static int
 osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
 	    ino_t ino, unsigned int d_type)
 {
-	struct osf_dirent *dirent;
+	struct osf_dirent __user *dirent;
 	struct osf_dirent_callback *buf = (struct osf_dirent_callback *) __buf;
 	unsigned int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1);
 
@@ -131,15 +131,15 @@ osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
 	if (copy_to_user(dirent->d_name, name, namlen) ||
 	    put_user(0, dirent->d_name + namlen))
 		return -EFAULT;
-	dirent = (void *)dirent + reclen;
+	dirent = (void __user *)dirent + reclen;
 	buf->dirent = dirent;
 	buf->count -= reclen;
 	return 0;
 }
 
 asmlinkage int
-osf_getdirentries(unsigned int fd, struct osf_dirent *dirent,
-		  unsigned int count, long *basep)
+osf_getdirentries(unsigned int fd, struct osf_dirent __user *dirent,
+		  unsigned int count, long __user *basep)
 {
 	int error;
 	struct file *file;
@@ -215,10 +215,10 @@ struct osf_statfs {
 	int f_files;
 	int f_ffree;
 	__kernel_fsid_t f_fsid;
-} *osf_stat;
+};
 
 static int
-linux_to_osf_statfs(struct kstatfs *linux_stat, struct osf_statfs *osf_stat,
+linux_to_osf_statfs(struct kstatfs *linux_stat, struct osf_statfs __user *osf_stat,
 		    unsigned long bufsiz)
 {
 	struct osf_statfs tmp_stat;
@@ -239,7 +239,7 @@ linux_to_osf_statfs(struct kstatfs *linux_stat, struct osf_statfs *osf_stat,
 }
 
 static int
-do_osf_statfs(struct dentry * dentry, struct osf_statfs *buffer,
+do_osf_statfs(struct dentry * dentry, struct osf_statfs __user *buffer,
 	      unsigned long bufsiz)
 {
 	struct kstatfs linux_stat;
@@ -250,7 +250,7 @@ do_osf_statfs(struct dentry * dentry, struct osf_statfs *buffer,
 }
 
 asmlinkage int
-osf_statfs(char *path, struct osf_statfs *buffer, unsigned long bufsiz)
+osf_statfs(char __user *path, struct osf_statfs __user *buffer, unsigned long bufsiz)
 {
 	struct nameidata nd;
 	int retval;
@@ -264,7 +264,7 @@ osf_statfs(char *path, struct osf_statfs *buffer, unsigned long bufsiz)
 }
 
 asmlinkage int
-osf_fstatfs(unsigned long fd, struct osf_statfs *buffer, unsigned long bufsiz)
+osf_fstatfs(unsigned long fd, struct osf_statfs __user *buffer, unsigned long bufsiz)
 {
 	struct file *file;
 	int retval;
@@ -284,13 +284,13 @@ osf_fstatfs(unsigned long fd, struct osf_statfs *buffer, unsigned long bufsiz)
  * Although to be frank, neither are the native Linux/i386 ones..
  */
 struct ufs_args {
-	char *devname;
+	char __user *devname;
 	int flags;
 	uid_t exroot;
 };
 
 struct cdfs_args {
-	char *devname;
+	char __user *devname;
 	int flags;
 	uid_t exroot;
 
@@ -299,7 +299,7 @@ struct cdfs_args {
 };
 
 struct procfs_args {
-	char *devname;
+	char __user *devname;
 	int flags;
 	uid_t exroot;
 };
@@ -313,7 +313,7 @@ struct procfs_args {
  * unhappy with OSF UFS. [CHECKME]
  */
 static int
-osf_ufs_mount(char *dirname, struct ufs_args *args, int flags)
+osf_ufs_mount(char *dirname, struct ufs_args __user *args, int flags)
 {
 	int retval;
 	struct cdfs_args tmp;
@@ -333,7 +333,7 @@ osf_ufs_mount(char *dirname, struct ufs_args *args, int flags)
 }
 
 static int
-osf_cdfs_mount(char *dirname, struct cdfs_args *args, int flags)
+osf_cdfs_mount(char *dirname, struct cdfs_args __user *args, int flags)
 {
 	int retval;
 	struct cdfs_args tmp;
@@ -353,7 +353,7 @@ osf_cdfs_mount(char *dirname, struct cdfs_args *args, int flags)
 }
 
 static int
-osf_procfs_mount(char *dirname, struct procfs_args *args, int flags)
+osf_procfs_mount(char *dirname, struct procfs_args __user *args, int flags)
 {
 	struct procfs_args tmp;
 
@@ -364,7 +364,7 @@ osf_procfs_mount(char *dirname, struct procfs_args *args, int flags)
 }
 
 asmlinkage int
-osf_mount(unsigned long typenr, char *path, int flag, void *data)
+osf_mount(unsigned long typenr, char __user *path, int flag, void __user *data)
 {
 	int retval = -EINVAL;
 	char *name;
@@ -377,13 +377,13 @@ osf_mount(unsigned long typenr, char *path, int flag, void *data)
 		goto out;
 	switch (typenr) {
 	case 1:
-		retval = osf_ufs_mount(name, (struct ufs_args *) data, flag);
+		retval = osf_ufs_mount(name, data, flag);
 		break;
 	case 6:
-		retval = osf_cdfs_mount(name, (struct cdfs_args *) data, flag);
+		retval = osf_cdfs_mount(name, data, flag);
 		break;
 	case 9:
-		retval = osf_procfs_mount(name, (struct procfs_args *) data, flag);
+		retval = osf_procfs_mount(name, data, flag);
 		break;
 	default:
 		printk("osf_mount(%ld, %x)\n", typenr, flag);
@@ -395,7 +395,7 @@ osf_mount(unsigned long typenr, char *path, int flag, void *data)
 }
 
 asmlinkage int
-osf_utsname(char *name)
+osf_utsname(char __user *name)
 {
 	int error;
 
@@ -434,7 +434,7 @@ sys_getdtablesize(void)
  * For compatibility with OSF/1 only.  Use utsname(2) instead.
  */
 asmlinkage int
-osf_getdomainname(char *name, int namelen)
+osf_getdomainname(char __user *name, int namelen)
 {
 	unsigned len;
 	int i, error;
@@ -459,7 +459,7 @@ osf_getdomainname(char *name, int namelen)
 }
 
 asmlinkage long
-osf_shmat(int shmid, void *shmaddr, int shmflg)
+osf_shmat(int shmid, void __user *shmaddr, int shmflg)
 {
 	unsigned long raddr;
 	long err;
@@ -497,39 +497,39 @@ struct proplistname_args {
 
 union pl_args {
 	struct setargs {
-		char *path;
+		char __user *path;
 		long follow;
 		long nbytes;
-		char *buf;
+		char __user *buf;
 	} set;
 	struct fsetargs {
 		long fd;
 		long nbytes;
-		char *buf;
+		char __user *buf;
 	} fset;
 	struct getargs {
-		char *path;
+		char __user *path;
 		long follow;
-		struct proplistname_args *name_args;
+		struct proplistname_args __user *name_args;
 		long nbytes;
-		char *buf;
-		int *min_buf_size;
+		char __user *buf;
+		int __user *min_buf_size;
 	} get;
 	struct fgetargs {
 		long fd;
-		struct proplistname_args *name_args;
+		struct proplistname_args __user *name_args;
 		long nbytes;
-		char *buf;
-		int *min_buf_size;
+		char __user *buf;
+		int __user *min_buf_size;
 	} fget;
 	struct delargs {
-		char *path;
+		char __user *path;
 		long follow;
-		struct proplistname_args *name_args;
+		struct proplistname_args __user *name_args;
 	} del;
 	struct fdelargs {
 		long fd;
-		struct proplistname_args *name_args;
+		struct proplistname_args __user *name_args;
 	} fdel;
 };
 
@@ -540,24 +540,20 @@ enum pl_code {
 };
 
 asmlinkage long
-osf_proplist_syscall(enum pl_code code, union pl_args *args)
+osf_proplist_syscall(enum pl_code code, union pl_args __user *args)
 {
 	long error;
-	int *min_buf_size_ptr;
+	int __user *min_buf_size_ptr;
 
 	lock_kernel();
 	switch (code) {
 	case PL_SET:
-		error = verify_area(VERIFY_READ, &args->set.nbytes,
-				    sizeof(args->set.nbytes));
-		if (!error)
-			error = args->set.nbytes;
+		if (get_user(error, &args->set.nbytes))
+			error = -EFAULT;
 		break;
 	case PL_FSET:
-		error = verify_area(VERIFY_READ, &args->fset.nbytes,
-				    sizeof(args->fset.nbytes));
-		if (!error)
-			error = args->fset.nbytes;
+		if (get_user(error, &args->fset.nbytes))
+			error = -EFAULT;
 		break;
 	case PL_GET:
 		error = get_user(min_buf_size_ptr, &args->get.min_buf_size);
@@ -584,7 +580,7 @@ osf_proplist_syscall(enum pl_code code, union pl_args *args)
 }
 
 asmlinkage int
-osf_sigstack(struct sigstack *uss, struct sigstack *uoss)
+osf_sigstack(struct sigstack __user *uss, struct sigstack __user *uoss)
 {
 	unsigned long usp = rdusp();
 	unsigned long oss_sp = current->sas_ss_sp + current->sas_ss_size;
@@ -625,7 +621,7 @@ osf_sigstack(struct sigstack *uss, struct sigstack *uoss)
 }
 
 asmlinkage long
-osf_sysinfo(int command, char *buf, long count)
+osf_sysinfo(int command, char __user *buf, long count)
 {
 	static char * sysinfo_table[] = {
 		system_utsname.sysname,
@@ -664,8 +660,8 @@ osf_sysinfo(int command, char *buf, long count)
 }
 
 asmlinkage unsigned long
-osf_getsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
-	       int *start, void *arg)
+osf_getsysinfo(unsigned long op, void __user *buffer, unsigned long nbytes,
+	       int __user *start, void __user *arg)
 {
 	unsigned long w;
 	struct percpu_struct *cpu;
@@ -677,7 +673,7 @@ osf_getsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
 
  		w = current_thread_info()->ieee_state & IEEE_SW_MASK;
  		w = swcr_update_status(w, rdfpcr());
-		if (put_user(w, (unsigned long *) buffer))
+		if (put_user(w, (unsigned long __user *) buffer))
 			return -EFAULT;
 		return 0;
 
@@ -693,7 +689,7 @@ osf_getsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
 		if (nbytes < sizeof(unsigned int))
 			return -EINVAL;
  		w = (current_thread_info()->flags >> UAC_SHIFT) & UAC_BITMASK;
- 		if (put_user(w, (unsigned int *)buffer))
+ 		if (put_user(w, (unsigned int __user *)buffer))
  			return -EFAULT;
  		return 1;
 
@@ -703,7 +699,7 @@ osf_getsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
 		cpu = (struct percpu_struct*)
 		  ((char*)hwrpb + hwrpb->processor_offset);
 		w = cpu->type;
-		if (put_user(w, (unsigned long *)buffer))
+		if (put_user(w, (unsigned long  __user*)buffer))
 			return -EFAULT;
 		return 1;
 
@@ -722,8 +718,8 @@ osf_getsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
 }
 
 asmlinkage unsigned long
-osf_setsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
-	       int *start, void *arg)
+osf_setsysinfo(unsigned long op, void __user *buffer, unsigned long nbytes,
+	       int __user *start, void __user *arg)
 {
 	switch (op) {
 	case SSI_IEEE_FP_CONTROL: {
@@ -737,7 +733,7 @@ osf_setsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
 		 */
 
 		/* Update softare trap enable bits.  */
-		if (get_user(swcr, (unsigned long *)buffer))
+		if (get_user(swcr, (unsigned long __user *)buffer))
 			return -EFAULT;
 		current_thread_info()->ieee_state
 		  = ((current_thread_info()->ieee_state & ~IEEE_SW_MASK)
@@ -788,9 +784,9 @@ osf_setsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
 		
  		for (i = 0; i < nbytes; ++i) {
 
- 			if (get_user(v, 2*i + (unsigned int *)buffer))
+ 			if (get_user(v, 2*i + (unsigned int __user *)buffer))
  				return -EFAULT;
- 			if (get_user(w, 2*i + 1 + (unsigned int *)buffer))
+ 			if (get_user(w, 2*i + 1 + (unsigned int __user *)buffer))
  				return -EFAULT;
  			switch (v) {
  			case SSIN_UACPROC:
@@ -835,7 +831,7 @@ struct itimerval32
 };
 
 static inline long
-get_tv32(struct timeval *o, struct timeval32 *i)
+get_tv32(struct timeval *o, struct timeval32 __user *i)
 {
 	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
 		(__get_user(o->tv_sec, &i->tv_sec) |
@@ -843,7 +839,7 @@ get_tv32(struct timeval *o, struct timeval32 *i)
 }
 
 static inline long
-put_tv32(struct timeval32 *o, struct timeval *i)
+put_tv32(struct timeval32 __user *o, struct timeval *i)
 {
 	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
 		(__put_user(i->tv_sec, &o->tv_sec) |
@@ -851,7 +847,7 @@ put_tv32(struct timeval32 *o, struct timeval *i)
 }
 
 static inline long
-get_it32(struct itimerval *o, struct itimerval32 *i)
+get_it32(struct itimerval *o, struct itimerval32 __user *i)
 {
 	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
 		(__get_user(o->it_interval.tv_sec, &i->it_interval.tv_sec) |
@@ -861,7 +857,7 @@ get_it32(struct itimerval *o, struct itimerval32 *i)
 }
 
 static inline long
-put_it32(struct itimerval32 *o, struct itimerval *i)
+put_it32(struct itimerval32 __user *o, struct itimerval *i)
 {
 	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
 		(__put_user(i->it_interval.tv_sec, &o->it_interval.tv_sec) |
@@ -878,7 +874,7 @@ jiffies_to_timeval32(unsigned long jiffies, struct timeval32 *value)
 }
 
 asmlinkage int
-osf_gettimeofday(struct timeval32 *tv, struct timezone *tz)
+osf_gettimeofday(struct timeval32 __user *tv, struct timezone __user *tz)
 {
 	if (tv) {
 		struct timeval ktv;
@@ -894,7 +890,7 @@ osf_gettimeofday(struct timeval32 *tv, struct timezone *tz)
 }
 
 asmlinkage int
-osf_settimeofday(struct timeval32 *tv, struct timezone *tz)
+osf_settimeofday(struct timeval32 __user *tv, struct timezone __user *tz)
 {
 	struct timespec kts;
 	struct timezone ktz;
@@ -914,7 +910,7 @@ osf_settimeofday(struct timeval32 *tv, struct timezone *tz)
 }
 
 asmlinkage int
-osf_getitimer(int which, struct itimerval32 *it)
+osf_getitimer(int which, struct itimerval32 __user *it)
 {
 	struct itimerval kit;
 	int error;
@@ -927,7 +923,7 @@ osf_getitimer(int which, struct itimerval32 *it)
 }
 
 asmlinkage int
-osf_setitimer(int which, struct itimerval32 *in, struct itimerval32 *out)
+osf_setitimer(int which, struct itimerval32 __user *in, struct itimerval32 __user *out)
 {
 	struct itimerval kin, kout;
 	int error;
@@ -950,16 +946,9 @@ osf_setitimer(int which, struct itimerval32 *in, struct itimerval32 *out)
 }
 
 asmlinkage int
-osf_utimes(const char *filename, struct timeval32 *tvs)
+osf_utimes(char __user *filename, struct timeval32 __user *tvs)
 {
-	char *kfilename;
 	struct timeval ktvs[2];
-	mm_segment_t old_fs;
-	int ret;
-
-	kfilename = getname(filename);
-	if (IS_ERR(kfilename))
-		return PTR_ERR(kfilename);
 
 	if (tvs) {
 		if (get_tv32(&ktvs[0], &tvs[0]) ||
@@ -967,22 +956,15 @@ osf_utimes(const char *filename, struct timeval32 *tvs)
 			return -EFAULT;
 	}
 
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_utimes(kfilename, tvs ? ktvs : 0);
-	set_fs(old_fs);
-
-	putname(kfilename);
-
-	return ret;
+	return do_utimes(filename, tvs ? ktvs : 0);
 }
 
 #define MAX_SELECT_SECONDS \
 	((unsigned long) (MAX_SCHEDULE_TIMEOUT / HZ)-1)
 
 asmlinkage int
-osf_select(int n, fd_set *inp, fd_set *outp, fd_set *exp,
-	   struct timeval32 *tvp)
+osf_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp,
+	   struct timeval32 __user *tvp)
 {
 	fd_set_bits fds;
 	char *bits;
@@ -1081,7 +1063,7 @@ struct rusage32 {
 };
 
 asmlinkage int
-osf_getrusage(int who, struct rusage32 *ru)
+osf_getrusage(int who, struct rusage32 __user *ru)
 {
 	struct rusage32 r;
 
@@ -1116,7 +1098,7 @@ osf_getrusage(int who, struct rusage32 *ru)
 }
 
 asmlinkage int
-osf_wait4(pid_t pid, int *ustatus, int options, struct rusage32 *ur)
+osf_wait4(pid_t pid, int __user *ustatus, int options, struct rusage32 __user *ur)
 {
 	if (!ur) {
 		return sys_wait4(pid, ustatus, options, NULL);
@@ -1163,7 +1145,7 @@ osf_wait4(pid_t pid, int *ustatus, int options, struct rusage32 *ur)
  * one is the time remaining.. Ho humm.. No documentation.
  */
 asmlinkage int
-osf_usleep_thread(struct timeval32 *sleep, struct timeval32 *remain)
+osf_usleep_thread(struct timeval32 __user *sleep, struct timeval32 __user *remain)
 {
 	struct timeval tmp;
 	unsigned long ticks;
@@ -1221,7 +1203,7 @@ struct timex32 {
 };
 
 asmlinkage int
-sys_old_adjtimex(struct timex32 *txc_p)
+sys_old_adjtimex(struct timex32 __user *txc_p)
 {
         struct timex txc;
 	int ret;
@@ -1316,12 +1298,12 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
    compatibility with old versions of OSF/1 where iov_len
    was defined as int. */
 static int
-osf_fix_iov_len(const struct iovec *iov, unsigned long count)
+osf_fix_iov_len(const struct iovec __user *iov, unsigned long count)
 {
 	unsigned long i;
 
 	for (i = 0 ; i < count ; i++) {
-		int *iov_len_high = (int *)&iov[i].iov_len + 1;
+		int *iov_len_high = (int __user *)&iov[i].iov_len + 1;
 
 		if (put_user(0, iov_len_high))
 			return -EFAULT;
@@ -1330,7 +1312,7 @@ osf_fix_iov_len(const struct iovec *iov, unsigned long count)
 }
 
 asmlinkage ssize_t
-osf_readv(unsigned long fd, const struct iovec * vector, unsigned long count)
+osf_readv(unsigned long fd, const struct iovec __user * vector, unsigned long count)
 {
 	if (unlikely(personality(current->personality) == PER_OSF4))
 		if (osf_fix_iov_len(vector, count))
@@ -1339,7 +1321,7 @@ osf_readv(unsigned long fd, const struct iovec * vector, unsigned long count)
 }
 
 asmlinkage ssize_t
-osf_writev(unsigned long fd, const struct iovec * vector, unsigned long count)
+osf_writev(unsigned long fd, const struct iovec __user * vector, unsigned long count)
 {
 	if (unlikely(personality(current->personality) == PER_OSF4))
 		if (osf_fix_iov_len(vector, count))

@@ -521,7 +521,8 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
  * sys_execve() executes a new program.
  */
 asmlinkage 
-long sys_execve(char *name, char **argv,char **envp, struct pt_regs regs)
+long sys_execve(char __user *name, char __user * __user *argv,
+		char __user * __user *envp, struct pt_regs regs)
 {
 	long error;
 	char * filename;
@@ -550,7 +551,7 @@ asmlinkage long sys_fork(struct pt_regs regs)
 	return do_fork(SIGCHLD, regs.rsp, &regs, 0, NULL, NULL);
 }
 
-asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void *parent_tid, void *child_tid, struct pt_regs regs)
+asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void __user *parent_tid, void __user *child_tid, struct pt_regs regs)
 {
 	if (!newsp)
 		newsp = regs.rsp;
@@ -664,7 +665,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			rdmsrl(MSR_FS_BASE, base);
 		} else
 			base = task->thread.fs;
-		ret = put_user(base, (unsigned long *)addr); 
+		ret = put_user(base, (unsigned long __user *)addr); 
 		break; 
 	}
 	case ARCH_GET_GS: { 
@@ -675,7 +676,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			rdmsrl(MSR_KERNEL_GS_BASE, base);
 		} else
 			base = task->thread.gs;
-		ret = put_user(base, (unsigned long *)addr); 
+		ret = put_user(base, (unsigned long __user *)addr); 
 		break;
 	}
 

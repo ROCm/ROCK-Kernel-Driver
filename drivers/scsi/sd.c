@@ -511,7 +511,7 @@ static int sd_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int sd_hdio_getgeo(struct block_device *bdev, struct hd_geometry *loc)
+static int sd_hdio_getgeo(struct block_device *bdev, struct hd_geometry __user *loc)
 {
 	struct scsi_disk *sdkp = scsi_disk(bdev->bd_disk);
 	struct scsi_device *sdp = sdkp->device;
@@ -536,7 +536,7 @@ static int sd_hdio_getgeo(struct block_device *bdev, struct hd_geometry *loc)
 	if (put_user(diskinfo[2], &loc->cylinders))
 		return -EFAULT;
 	if (put_user((unsigned)get_start_sect(bdev),
-	             (unsigned long *)&loc->start))
+	             (unsigned long __user *)&loc->start))
 		return -EFAULT;
 	return 0;
 }
@@ -561,6 +561,7 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 	struct block_device *bdev = inode->i_bdev;
 	struct gendisk *disk = bdev->bd_disk;
 	struct scsi_device *sdp = scsi_disk(disk)->device;
+	void __user *p = (void __user *)arg;
 	int error;
     
 	SCSI_LOG_IOCTL(1, printk("sd_ioctl: disk=%s, cmd=0x%x\n",
@@ -578,7 +579,7 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 	if (cmd == HDIO_GETGEO) {
 		if (!arg)
 			return -EINVAL;
-		return sd_hdio_getgeo(bdev, (struct hd_geometry *)arg);
+		return sd_hdio_getgeo(bdev, p);
 	}
 
 	/*
@@ -589,13 +590,13 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 	switch (cmd) {
 		case SCSI_IOCTL_GET_IDLUN:
 		case SCSI_IOCTL_GET_BUS_NUMBER:
-			return scsi_ioctl(sdp, cmd, (void *)arg);
+			return scsi_ioctl(sdp, cmd, p);
 		default:
-			error = scsi_cmd_ioctl(disk, cmd, arg);
+			error = scsi_cmd_ioctl(disk, cmd, p);
 			if (error != -ENOTTY)
 				return error;
 	}
-	return scsi_ioctl(sdp, cmd, (void *)arg);
+	return scsi_ioctl(sdp, cmd, p);
 }
 
 static void set_media_not_present(struct scsi_disk *sdkp)

@@ -1502,6 +1502,10 @@ static int nodemgr_host_thread(void *__hi)
 			 * start the the waiting over again */
 			while (!down_trylock(&hi->reset_sem))
 				i = 0;
+
+			/* Check the kill_me again */
+			if (hi->kill_me)
+				goto caught_signal;
 		}
 
 		if (!nodemgr_check_irm_capability(host, reset_cycles)) {
@@ -1702,12 +1706,23 @@ static struct hpsb_highlevel nodemgr_highlevel = {
 	.remove_host =	nodemgr_remove_host,
 };
 
-void init_ieee1394_nodemgr(void)
+int init_ieee1394_nodemgr(void)
 {
-	class_register(&nodemgr_ne_class);
-	class_register(&nodemgr_ud_class);
+	int ret;
+
+	ret = class_register(&nodemgr_ne_class);
+	if (ret < 0)
+		return ret;
+
+	ret = class_register(&nodemgr_ud_class);
+	if (ret < 0) {
+		class_unregister(&nodemgr_ne_class);
+		return ret;
+	}
 
 	hpsb_register_highlevel(&nodemgr_highlevel);
+
+	return 0;
 }
 
 void cleanup_ieee1394_nodemgr(void)

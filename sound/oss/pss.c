@@ -453,20 +453,36 @@ static void pss_mixer_reset(pss_confdata *devc)
 	}
 }
 
-static void arg_to_volume_mono(unsigned int volume, int *aleft)
+static int set_volume_mono(unsigned __user *p, int *aleft)
 {
 	int left;
+	unsigned volume;
+	if (get_user(volume, p))
+		return -EFAULT;
 	
-	left = volume & 0x00ff;
+	left = volume & 0xff;
 	if (left > 100)
 		left = 100;
 	*aleft = left;
+	return 0;
 }
 
-static void arg_to_volume_stereo(unsigned int volume, int *aleft, int *aright)
+static int set_volume_stereo(unsigned __user *p, int *aleft, int *aright)
 {
-	arg_to_volume_mono(volume, aleft);
-	arg_to_volume_mono(volume >> 8, aright);
+	int left, right;
+	unsigned volume;
+	if (get_user(volume, p))
+		return -EFAULT;
+
+	left = volume & 0xff;
+	if (left > 100)
+		left = 100;
+	right = (volume >> 8) & 0xff;
+	if (right > 100)
+		right = 100;
+	*aleft = left;
+	*aright = right;
+	return 0;
 }
 
 static int ret_vol_mono(int left)
@@ -479,7 +495,7 @@ static int ret_vol_stereo(int left, int right)
 	return ((right << 8) | left);
 }
 
-static int call_ad_mixer(pss_confdata *devc,unsigned int cmd, caddr_t arg)
+static int call_ad_mixer(pss_confdata *devc,unsigned int cmd, void __user *arg)
 {
 	if (devc->ad_mixer_dev != NO_WSS_MIXER) 
 		return mixer_devs[devc->ad_mixer_dev]->ioctl(devc->ad_mixer_dev, cmd, arg);
@@ -487,7 +503,7 @@ static int call_ad_mixer(pss_confdata *devc,unsigned int cmd, caddr_t arg)
 		return -EINVAL;
 }
 
-static int pss_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
+static int pss_mixer_ioctl (int dev, unsigned int cmd, void __user *arg)
 {
 	pss_confdata *devc = mixer_devs[dev]->devc;
 	int cmdf = cmd & 0xff;
@@ -513,33 +529,38 @@ static int pss_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 					return call_ad_mixer(devc, cmd, arg);
 				else
 				{
-					if (*(int *)arg != 0)
+					int v;
+					if (get_user(v, (int __user *)arg))
+						return -EFAULT;
+					if (v != 0)
 						return -EINVAL;
 					return 0;
 				}
 			case SOUND_MIXER_VOLUME:
-				arg_to_volume_stereo(*(unsigned int *)arg, &devc->mixer.volume_l,
-					&devc->mixer.volume_r); 
+				if (set_volume_stereo(arg,
+					&devc->mixer.volume_l,
+					&devc->mixer.volume_r))
+					return -EFAULT;
 				set_master_volume(devc, devc->mixer.volume_l,
 					devc->mixer.volume_r);
 				return ret_vol_stereo(devc->mixer.volume_l,
 					devc->mixer.volume_r);
 		  
 			case SOUND_MIXER_BASS:
-				arg_to_volume_mono(*(unsigned int *)arg,
-					&devc->mixer.bass);
+				if (set_volume_mono(arg, &devc->mixer.bass))
+					return -EFAULT;
 				set_bass(devc, devc->mixer.bass);
 				return ret_vol_mono(devc->mixer.bass);
 		  
 			case SOUND_MIXER_TREBLE:
-				arg_to_volume_mono(*(unsigned int *)arg,
-					&devc->mixer.treble);
+				if (set_volume_mono(arg, &devc->mixer.treble))
+					return -EFAULT;
 				set_treble(devc, devc->mixer.treble);
 				return ret_vol_mono(devc->mixer.treble);
 		  
 			case SOUND_MIXER_SYNTH:
-				arg_to_volume_mono(*(unsigned int *)arg,
-					&devc->mixer.synth);
+				if (set_volume_mono(arg, &devc->mixer.synth))
+					return -EFAULT;
 				set_synth_volume(devc, devc->mixer.synth);
 				return ret_vol_mono(devc->mixer.synth);
 		  
@@ -549,54 +570,67 @@ static int pss_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 	}
 	else			
 	{
+		int val, and_mask = 0, or_mask = 0;
 		/*
 		 * Return parameters
 		 */
 		switch (cmdf)
 		{
-
 			case SOUND_MIXER_DEVMASK:
 				if (call_ad_mixer(devc, cmd, arg) == -EINVAL)
-					*(int *)arg = 0; /* no mixer devices */
-				return (*(int *)arg |= SOUND_MASK_VOLUME | SOUND_MASK_BASS | SOUND_MASK_TREBLE | SOUND_MASK_SYNTH);
+					break;
+				and_mask = ~0;
+				or_mask = SOUND_MASK_VOLUME | SOUND_MASK_BASS | SOUND_MASK_TREBLE | SOUND_MASK_SYNTH;
+				break;
 		  
 			case SOUND_MIXER_STEREODEVS:
 				if (call_ad_mixer(devc, cmd, arg) == -EINVAL)
-					*(int *)arg = 0; /* no stereo devices */
-				return (*(int *)arg |= SOUND_MASK_VOLUME);
+					break;
+				and_mask = ~0;
+				or_mask = SOUND_MASK_VOLUME;
+				break;
 		  
 			case SOUND_MIXER_RECMASK:
 				if (devc->ad_mixer_dev != NO_WSS_MIXER)
 					return call_ad_mixer(devc, cmd, arg);
-				else
-					return (*(int *)arg = 0); /* no record devices */
+				break;
 
 			case SOUND_MIXER_CAPS:
 				if (devc->ad_mixer_dev != NO_WSS_MIXER)
 					return call_ad_mixer(devc, cmd, arg);
-				else
-					return (*(int *)arg = SOUND_CAP_EXCL_INPUT);
+				or_mask = SOUND_CAP_EXCL_INPUT;
+				break;
 
 			case SOUND_MIXER_RECSRC:
 				if (devc->ad_mixer_dev != NO_WSS_MIXER)
 					return call_ad_mixer(devc, cmd, arg);
-				else
-					return (*(int *)arg = 0); /* no record source */
+				break;
 
 			case SOUND_MIXER_VOLUME:
-				return (*(int *)arg = ret_vol_stereo(devc->mixer.volume_l, devc->mixer.volume_r));
+				or_mask =  ret_vol_stereo(devc->mixer.volume_l, devc->mixer.volume_r);
+				break;
 			  
 			case SOUND_MIXER_BASS:
-				return (*(int *)arg = ret_vol_mono(devc->mixer.bass));
+				or_mask =  ret_vol_mono(devc->mixer.bass);
+				break;
 			  
 			case SOUND_MIXER_TREBLE:
-				return (*(int *)arg = ret_vol_mono(devc->mixer.treble));
+				or_mask = ret_vol_mono(devc->mixer.treble);
+				break;
 			  
 			case SOUND_MIXER_SYNTH:
-				return (*(int *)arg = ret_vol_mono(devc->mixer.synth));
+				or_mask = ret_vol_mono(devc->mixer.synth);
+				break;
 			default:
 				return -EINVAL;
 		}
+		if (get_user(val, (int __user *)arg))
+			return -EFAULT;
+		val &= and_mask;
+		val |= or_mask;
+		if (put_user(val, (int __user *)arg))
+			return -EFAULT;
+		return val;
 	}
 }
 
@@ -803,7 +837,7 @@ static int download_boot_block(void *dev_info, copr_buffer * buf)
 	return 0;
 }
 
-static int pss_coproc_ioctl(void *dev_info, unsigned int cmd, caddr_t arg, int local)
+static int pss_coproc_ioctl(void *dev_info, unsigned int cmd, void __user *arg, int local)
 {
 	copr_buffer *buf;
 	copr_msg *mbuf;

@@ -182,17 +182,17 @@ static void sg_finish_rem_req(Sg_request * srp);
 static int sg_build_indirect(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size);
 static int sg_build_sgat(Sg_scatter_hold * schp, const Sg_fd * sfp,
 			 int tablesize);
-static ssize_t sg_new_read(Sg_fd * sfp, char *buf, size_t count,
+static ssize_t sg_new_read(Sg_fd * sfp, char __user *buf, size_t count,
 			   Sg_request * srp);
-static ssize_t sg_new_write(Sg_fd * sfp, const char *buf, size_t count,
+static ssize_t sg_new_write(Sg_fd * sfp, const char __user *buf, size_t count,
 			    int blocking, int read_only, Sg_request ** o_srp);
 static int sg_common_write(Sg_fd * sfp, Sg_request * srp,
 			   unsigned char *cmnd, int timeout, int blocking);
 static int sg_u_iovec(sg_io_hdr_t * hp, int sg_num, int ind,
-		      int wr_xf, int *countp, unsigned char **up);
+		      int wr_xf, int *countp, unsigned char __user **up);
 static int sg_write_xfer(Sg_request * srp);
 static int sg_read_xfer(Sg_request * srp);
-static int sg_read_oxfer(Sg_request * srp, char *outp, int num_read_xfer);
+static int sg_read_oxfer(Sg_request * srp, char __user *outp, int num_read_xfer);
 static void sg_remove_scat(Sg_scatter_hold * schp);
 static void sg_build_reserve(Sg_fd * sfp, int req_size);
 static void sg_link_reserve(Sg_fd * sfp, Sg_request * srp, int size);
@@ -329,7 +329,7 @@ sg_release(struct inode *inode, struct file *filp)
 }
 
 static ssize_t
-sg_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
+sg_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 {
 	int k, res;
 	Sg_device *sdp;
@@ -443,7 +443,7 @@ sg_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
 }
 
 static ssize_t
-sg_new_read(Sg_fd * sfp, char *buf, size_t count, Sg_request * srp)
+sg_new_read(Sg_fd * sfp, char __user *buf, size_t count, Sg_request * srp)
 {
 	sg_io_hdr_t *hp = &srp->header;
 	int err = 0;
@@ -481,7 +481,7 @@ sg_new_read(Sg_fd * sfp, char *buf, size_t count, Sg_request * srp)
 }
 
 static ssize_t
-sg_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
+sg_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 {
 	int mxsize, cmd_size, k;
 	int input_size, blocking;
@@ -558,7 +558,7 @@ sg_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
 	else
 		hp->dxfer_direction = (mxsize > 0) ? SG_DXFER_FROM_DEV : SG_DXFER_NONE;
 	hp->dxfer_len = mxsize;
-	hp->dxferp = (unsigned char *) buf + cmd_size;
+	hp->dxferp = (char __user *)buf + cmd_size;
 	hp->sbp = NULL;
 	hp->timeout = old_hdr.reply_len;	/* structure abuse ... */
 	hp->flags = input_size;	/* structure abuse ... */
@@ -571,7 +571,7 @@ sg_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
 }
 
 static ssize_t
-sg_new_write(Sg_fd * sfp, const char *buf, size_t count,
+sg_new_write(Sg_fd * sfp, const char __user *buf, size_t count,
 	     int blocking, int read_only, Sg_request ** o_srp)
 {
 	int k;
@@ -726,6 +726,8 @@ static int
 sg_ioctl(struct inode *inode, struct file *filp,
 	 unsigned int cmd_in, unsigned long arg)
 {
+	void __user *p = (void __user *)arg;
+	int __user *ip = p;
 	int result, val, read_only;
 	Sg_device *sdp;
 	Sg_fd *sfp;
@@ -747,12 +749,11 @@ sg_ioctl(struct inode *inode, struct file *filp,
 				return -ENODEV;
 			if (!scsi_block_when_processing_errors(sdp->device))
 				return -ENXIO;
-			result = verify_area(VERIFY_WRITE, (void *) arg,
-					SZ_SG_IO_HDR);
+			result = verify_area(VERIFY_WRITE, p, SZ_SG_IO_HDR);
 			if (result)
 				return result;
 			result =
-			    sg_new_write(sfp, (const char *) arg, SZ_SG_IO_HDR,
+			    sg_new_write(sfp, p, SZ_SG_IO_HDR,
 					 blocking, read_only, &srp);
 			if (result < 0)
 				return result;
@@ -772,11 +773,11 @@ sg_ioctl(struct inode *inode, struct file *filp,
 				return result;	/* -ERESTARTSYS because signal hit process */
 			}
 			srp->done = 2;
-			result = sg_new_read(sfp, (char *) arg, SZ_SG_IO_HDR, srp);
+			result = sg_new_read(sfp, p, SZ_SG_IO_HDR, srp);
 			return (result < 0) ? result : 0;
 		}
 	case SG_SET_TIMEOUT:
-		result = get_user(val, (int *) arg);
+		result = get_user(val, ip);
 		if (result)
 			return result;
 		if (val < 0)
@@ -791,7 +792,7 @@ sg_ioctl(struct inode *inode, struct file *filp,
 				/* strange ..., for backward compatibility */
 		return sfp->timeout_user;
 	case SG_SET_FORCE_LOW_DMA:
-		result = get_user(val, (int *) arg);
+		result = get_user(val, ip);
 		if (result)
 			return result;
 		if (val) {
@@ -808,15 +809,14 @@ sg_ioctl(struct inode *inode, struct file *filp,
 		}
 		return 0;
 	case SG_GET_LOW_DMA:
-		return put_user((int) sfp->low_dma, (int *) arg);
+		return put_user((int) sfp->low_dma, ip);
 	case SG_GET_SCSI_ID:
 		result =
-		    verify_area(VERIFY_WRITE, (void *) arg,
-				sizeof (sg_scsi_id_t));
+		    verify_area(VERIFY_WRITE, p, sizeof (sg_scsi_id_t));
 		if (result)
 			return result;
 		else {
-			sg_scsi_id_t *sg_idp = (sg_scsi_id_t *) arg;
+			sg_scsi_id_t __user *sg_idp = p;
 
 			if (sdp->detached)
 				return -ENODEV;
@@ -836,13 +836,13 @@ sg_ioctl(struct inode *inode, struct file *filp,
 			return 0;
 		}
 	case SG_SET_FORCE_PACK_ID:
-		result = get_user(val, (int *) arg);
+		result = get_user(val, ip);
 		if (result)
 			return result;
 		sfp->force_packid = val ? 1 : 0;
 		return 0;
 	case SG_GET_PACK_ID:
-		result = verify_area(VERIFY_WRITE, (void *) arg, sizeof (int));
+		result = verify_area(VERIFY_WRITE, ip, sizeof (int));
 		if (result)
 			return result;
 		read_lock_irqsave(&sfp->rq_list_lock, iflags);
@@ -850,12 +850,12 @@ sg_ioctl(struct inode *inode, struct file *filp,
 			if ((1 == srp->done) && (!srp->sg_io_owned)) {
 				read_unlock_irqrestore(&sfp->rq_list_lock,
 						       iflags);
-				__put_user(srp->header.pack_id, (int *) arg);
+				__put_user(srp->header.pack_id, ip);
 				return 0;
 			}
 		}
 		read_unlock_irqrestore(&sfp->rq_list_lock, iflags);
-		__put_user(-1, (int *) arg);
+		__put_user(-1, ip);
 		return 0;
 	case SG_GET_NUM_WAITING:
 		read_lock_irqsave(&sfp->rq_list_lock, iflags);
@@ -864,11 +864,11 @@ sg_ioctl(struct inode *inode, struct file *filp,
 				++val;
 		}
 		read_unlock_irqrestore(&sfp->rq_list_lock, iflags);
-		return put_user(val, (int *) arg);
+		return put_user(val, ip);
 	case SG_GET_SG_TABLESIZE:
-		return put_user(sdp->sg_tablesize, (int *) arg);
+		return put_user(sdp->sg_tablesize, ip);
 	case SG_SET_RESERVED_SIZE:
-		result = get_user(val, (int *) arg);
+		result = get_user(val, ip);
 		if (result)
 			return result;
                 if (val < 0)
@@ -882,37 +882,37 @@ sg_ioctl(struct inode *inode, struct file *filp,
 		return 0;
 	case SG_GET_RESERVED_SIZE:
 		val = (int) sfp->reserve.bufflen;
-		return put_user(val, (int *) arg);
+		return put_user(val, ip);
 	case SG_SET_COMMAND_Q:
-		result = get_user(val, (int *) arg);
+		result = get_user(val, ip);
 		if (result)
 			return result;
 		sfp->cmd_q = val ? 1 : 0;
 		return 0;
 	case SG_GET_COMMAND_Q:
-		return put_user((int) sfp->cmd_q, (int *) arg);
+		return put_user((int) sfp->cmd_q, ip);
 	case SG_SET_KEEP_ORPHAN:
-		result = get_user(val, (int *) arg);
+		result = get_user(val, ip);
 		if (result)
 			return result;
 		sfp->keep_orphan = val;
 		return 0;
 	case SG_GET_KEEP_ORPHAN:
-		return put_user((int) sfp->keep_orphan, (int *) arg);
+		return put_user((int) sfp->keep_orphan, ip);
 	case SG_NEXT_CMD_LEN:
-		result = get_user(val, (int *) arg);
+		result = get_user(val, ip);
 		if (result)
 			return result;
 		sfp->next_cmd_len = (val > 0) ? val : 0;
 		return 0;
 	case SG_GET_VERSION_NUM:
-		return put_user(sg_version_num, (int *) arg);
+		return put_user(sg_version_num, ip);
 	case SG_GET_ACCESS_COUNT:
 		/* faked - we don't have a real access count anymore */
 		val = (sdp->device ? 1 : 0);
-		return put_user(val, (int *) arg);
+		return put_user(val, ip);
 	case SG_GET_REQUEST_TABLE:
-		result = verify_area(VERIFY_WRITE, (void *) arg,
+		result = verify_area(VERIFY_WRITE, p,
 				     SZ_SG_REQ_INFO * SG_MAX_QUEUE);
 		if (result)
 			return result;
@@ -940,13 +940,13 @@ sg_ioctl(struct inode *inode, struct file *filp,
 				}
 			}
 			read_unlock_irqrestore(&sfp->rq_list_lock, iflags);
-			return (__copy_to_user((void *) arg, rinfo,
+			return (__copy_to_user(p, rinfo,
 			        SZ_SG_REQ_INFO * SG_MAX_QUEUE) ? -EFAULT : 0);
 		}
 	case SG_EMULATED_HOST:
 		if (sdp->detached)
 			return -ENODEV;
-		return put_user(sdp->device->host->hostt->emulated, (int *) arg);
+		return put_user(sdp->device->host->hostt->emulated, ip);
 	case SG_SCSI_RESET:
 		if (sdp->detached)
 			return -ENODEV;
@@ -956,7 +956,7 @@ sg_ioctl(struct inode *inode, struct file *filp,
 				return -EBUSY;
 		} else if (!scsi_block_when_processing_errors(sdp->device))
 			return -EBUSY;
-		result = get_user(val, (int *) arg);
+		result = get_user(val, ip);
 		if (result)
 			return result;
 		if (SG_SCSI_RESET_NOTHING == val)
@@ -983,16 +983,16 @@ sg_ioctl(struct inode *inode, struct file *filp,
 			return -ENODEV;
 		if (read_only) {
 			unsigned char opcode = WRITE_6;
-			Scsi_Ioctl_Command *siocp = (void *) arg;
+			Scsi_Ioctl_Command __user *siocp = p;
 
 			if (copy_from_user(&opcode, siocp->data, 1))
 				return -EFAULT;
 			if (!sg_allow_access(opcode, sdp->device->type))
 				return -EPERM;
 		}
-		return scsi_ioctl_send_command(sdp->device, (void *) arg);
+		return scsi_ioctl_send_command(sdp->device, p);
 	case SG_SET_DEBUG:
-		result = get_user(val, (int *) arg);
+		result = get_user(val, ip);
 		if (result)
 			return result;
 		sdp->sgdebug = (char) val;
@@ -1003,11 +1003,11 @@ sg_ioctl(struct inode *inode, struct file *filp,
 	case SG_GET_TRANSFORM:
 		if (sdp->detached)
 			return -ENODEV;
-		return scsi_ioctl(sdp->device, cmd_in, (void *) arg);
+		return scsi_ioctl(sdp->device, cmd_in, p);
 	default:
 		if (read_only)
 			return -EPERM;	/* don't know so take safe approach */
-		return scsi_ioctl(sdp->device, cmd_in, (void *) arg);
+		return scsi_ioctl(sdp->device, cmd_in, p);
 	}
 }
 
@@ -1901,7 +1901,7 @@ sg_write_xfer(Sg_request * srp)
 	int iovec_count = (int) hp->iovec_count;
 	int dxfer_dir = hp->dxfer_direction;
 	unsigned char *p;
-	unsigned char *up;
+	unsigned char __user *up;
 	int new_interface = ('\0' == hp->interface_id) ? 0 : 1;
 
 	if ((SG_DXFER_UNKNOWN == dxfer_dir) || (SG_DXFER_TO_DEV == dxfer_dir) ||
@@ -1987,26 +1987,23 @@ sg_write_xfer(Sg_request * srp)
 
 static int
 sg_u_iovec(sg_io_hdr_t * hp, int sg_num, int ind,
-	   int wr_xf, int *countp, unsigned char **up)
+	   int wr_xf, int *countp, unsigned char __user **up)
 {
 	int num_xfer = (int) hp->dxfer_len;
-	unsigned char *p;
+	unsigned char __user *p = hp->dxferp;
 	int count, k;
-	sg_iovec_t u_iovec;
 
 	if (0 == sg_num) {
-		p = (unsigned char *) hp->dxferp;
 		if (wr_xf && ('\0' == hp->interface_id))
 			count = (int) hp->flags;	/* holds "old" input_size */
 		else
 			count = num_xfer;
 	} else {
-		if (__copy_from_user(&u_iovec,
-				     (unsigned char *) hp->dxferp +
-				     (ind * SZ_SG_IOVEC), SZ_SG_IOVEC))
+		sg_iovec_t iovec;
+		if (__copy_from_user(&iovec, p + ind*SZ_SG_IOVEC, SZ_SG_IOVEC))
 			return -EFAULT;
-		p = (unsigned char *) u_iovec.iov_base;
-		count = (int) u_iovec.iov_len;
+		p = iovec.iov_base;
+		count = (int) iovec.iov_len;
 	}
 	if ((k = verify_area(wr_xf ? VERIFY_READ : VERIFY_WRITE, p, count)))
 		return k;
@@ -2058,7 +2055,7 @@ sg_read_xfer(Sg_request * srp)
 	int iovec_count = (int) hp->iovec_count;
 	int dxfer_dir = hp->dxfer_direction;
 	unsigned char *p;
-	unsigned char *up;
+	unsigned char __user *up;
 	int new_interface = ('\0' == hp->interface_id) ? 0 : 1;
 
 	if ((SG_DXFER_UNKNOWN == dxfer_dir) || (SG_DXFER_FROM_DEV == dxfer_dir)
@@ -2143,7 +2140,7 @@ sg_read_xfer(Sg_request * srp)
 }
 
 static int
-sg_read_oxfer(Sg_request * srp, char *outp, int num_read_xfer)
+sg_read_oxfer(Sg_request * srp, char __user *outp, int num_read_xfer)
 {
 	Sg_scatter_hold *schp = &srp->data;
 

@@ -198,7 +198,7 @@ static int pcd_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn);
 static int pcd_audio_ioctl(struct cdrom_device_info *cdi,
 			   unsigned int cmd, void *arg);
 static int pcd_packet(struct cdrom_device_info *cdi,
-		      struct cdrom_generic_command *cgc);
+		      struct packet_command *cgc);
 
 static int pcd_detect(void);
 static void pcd_probe_capabilities(void);
@@ -501,7 +501,7 @@ static int pcd_atapi(struct pcd_unit *cd, char *cmd, int dlen, char *buf, char *
 	return r;
 }
 
-static int pcd_packet(struct cdrom_device_info *cdi, struct cdrom_generic_command *cgc)
+static int pcd_packet(struct cdrom_device_info *cdi, struct packet_command *cgc)
 {
 	return pcd_atapi(cdi->handle, cgc->cmd, cgc->buflen, cgc->buffer,
 			 "generic packet");

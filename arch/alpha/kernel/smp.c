@@ -779,7 +779,7 @@ handle_ipi(struct pt_regs *regs)
 void
 smp_send_reschedule(int cpu)
 {
-#if DEBUG_IPI_MSG
+#ifdef DEBUG_IPI_MSG
 	if (cpu == hard_smp_processor_id())
 		printk(KERN_WARNING
 		       "smp_send_reschedule: Sending IPI to self.\n");
@@ -791,7 +791,7 @@ void
 smp_send_stop(void)
 {
 	unsigned long to_whom = cpu_present_mask & ~(1UL << smp_processor_id());
-#if DEBUG_IPI_MSG
+#ifdef DEBUG_IPI_MSG
 	if (hard_smp_processor_id() != boot_cpu_id)
 		printk(KERN_WARNING "smp_send_stop: Not on boot cpu.\n");
 #endif

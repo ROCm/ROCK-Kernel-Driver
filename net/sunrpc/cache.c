@@ -575,7 +575,7 @@ struct cache_reader {
 };
 
 static ssize_t
-cache_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+cache_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct cache_reader *rp = filp->private_data;
 	struct cache_request *rq;
@@ -656,7 +656,7 @@ cache_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 static char write_buf[8192]; /* protected by queue_io_sem */
 
 static ssize_t
-cache_write(struct file *filp, const char *buf, size_t count,
+cache_write(struct file *filp, const char __user *buf, size_t count,
 	    loff_t *ppos)
 {
 	int err;
@@ -743,7 +743,7 @@ cache_ioctl(struct inode *ino, struct file *filp,
 		}
 	spin_unlock(&queue_lock);
 
-	return put_user(len, (int *)arg);
+	return put_user(len, (int __user *)arg);
 }
 
 static int
@@ -1166,7 +1166,7 @@ static struct file_operations content_file_operations = {
 	.release	= content_release,
 };
 
-static ssize_t read_flush(struct file *file, char *buf,
+static ssize_t read_flush(struct file *file, char __user *buf,
 			    size_t count, loff_t *ppos)
 {
 	struct cache_detail *cd = PDE(file->f_dentry->d_inode)->data;
@@ -1187,7 +1187,7 @@ static ssize_t read_flush(struct file *file, char *buf,
 	return len;
 }
 
-static ssize_t write_flush(struct file * file, const char * buf,
+static ssize_t write_flush(struct file * file, const char __user * buf,
 			     size_t count, loff_t *ppos)
 {
 	struct cache_detail *cd = PDE(file->f_dentry->d_inode)->data;

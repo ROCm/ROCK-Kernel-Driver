@@ -8,28 +8,9 @@
 #define __ASM_ARCH_MEMORY_H
 
 /*
- * Task size: 3GB
+ * Physical DRAM offset.
  */
-#define TASK_SIZE	(0xbf000000UL)
-#define TASK_SIZE_26	(0x04000000UL)
-
-/*
- * This decides where the kernel will search for a free chunk of vm
- * space during mmap's.
- */
-#define TASK_UNMAPPED_BASE (0x40000000)
-
-/*
- * Page offset: 3GB
- */
-#define PAGE_OFFSET		(0xc0000000UL)
 #define PHYS_OFFSET		(0x80000000UL)
-
-/*
- * DRAM is contiguous
- */
-#define __virt_to_phys(vpage) ((vpage) - PAGE_OFFSET + PHYS_OFFSET)
-#define __phys_to_virt(ppage) ((ppage) + PAGE_OFFSET - PHYS_OFFSET)
 
 /*
  * Bus view is the same as physical view

@@ -204,7 +204,7 @@ void acct_file_reopen(struct file *file)
  *  should be written. If the filename is NULL, accounting will be
  *  shutdown.
  */
-asmlinkage long sys_acct(const char *name)
+asmlinkage long sys_acct(const char __user *name)
 {
 	struct file *file = NULL;
 	char *tmp;

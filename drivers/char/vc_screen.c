@@ -102,7 +102,7 @@ extern char con_buf[PAGE_SIZE];
 extern struct semaphore con_buf_sem;
 
 static ssize_t
-vcs_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+vcs_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	unsigned int currcons = iminor(inode);
@@ -271,7 +271,7 @@ unlock_out:
 }
 
 static ssize_t
-vcs_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+vcs_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	unsigned int currcons = iminor(inode);

@@ -232,7 +232,7 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 		ret = -EIO;
 		if (copied != sizeof(tmp))
 			break;
-		ret = put_user(tmp,(unsigned long *) data);
+		ret = put_user(tmp,(unsigned long __user *) data);
 		break;
 	}
 
@@ -271,7 +271,7 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 			tmp = 0;
 			break;
 		}
-		ret = put_user(tmp,(unsigned long *) data);
+		ret = put_user(tmp,(unsigned long __user *) data);
 		break;
 	}
 
@@ -360,19 +360,20 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 		   don't use it against 64bit processes, use
 		   PTRACE_ARCH_PRCTL instead. */
 	case PTRACE_SET_THREAD_AREA: {
+		struct user_desc __user *p;
 		int old; 
-		get_user(old,  &((struct user_desc *)data)->entry_number); 
-		put_user(addr, &((struct user_desc *)data)->entry_number);
-		ret = do_set_thread_area(&child->thread, 
-					 (struct user_desc *)data);
-		put_user(old,  &((struct user_desc *)data)->entry_number); 
+		p = (struct user_desc __user *)data;
+		get_user(old,  &p->entry_number); 
+		put_user(addr, &p->entry_number);
+		ret = do_set_thread_area(&child->thread, p);
+		put_user(old,  &p->entry_number); 
 		break;
 	case PTRACE_GET_THREAD_AREA:
-		get_user(old,  &((struct user_desc *)data)->entry_number); 
-		put_user(addr, &((struct user_desc *)data)->entry_number);
-		ret = do_get_thread_area(&child->thread, 
-					 (struct user_desc *)data);
-		put_user(old,  &((struct user_desc *)data)->entry_number); 
+		p = (struct user_desc __user *)data;
+		get_user(old,  &p->entry_number); 
+		put_user(addr, &p->entry_number);
+		ret = do_get_thread_area(&child->thread, p);
+		put_user(old,  &p->entry_number); 
 		break;
 	} 
 #endif
@@ -428,12 +429,12 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 		break;
 
 	case PTRACE_GETREGS: { /* Get all gp regs from the child. */
-	  	if (!access_ok(VERIFY_WRITE, (unsigned *)data, FRAME_SIZE)) {
+	  	if (!access_ok(VERIFY_WRITE, (unsigned __user *)data, FRAME_SIZE)) {
 			ret = -EIO;
 			break;
 		}
 		for (ui = 0; ui < sizeof(struct user_regs_struct); ui += sizeof(long)) {
-			__put_user(getreg(child, ui),(unsigned long *) data);
+			__put_user(getreg(child, ui),(unsigned long __user *) data);
 			data += sizeof(long);
 		}
 		ret = 0;
@@ -442,12 +443,12 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 
 	case PTRACE_SETREGS: { /* Set all gp regs in the child. */
 		unsigned long tmp;
-	  	if (!access_ok(VERIFY_READ, (unsigned *)data, FRAME_SIZE)) {
+	  	if (!access_ok(VERIFY_READ, (unsigned __user *)data, FRAME_SIZE)) {
 			ret = -EIO;
 			break;
 		}
 		for (ui = 0; ui < sizeof(struct user_regs_struct); ui += sizeof(long)) {
-			__get_user(tmp, (unsigned long *) data);
+			__get_user(tmp, (unsigned long __user *) data);
 			putreg(child, ui, tmp);
 			data += sizeof(long);
 		}
@@ -456,23 +457,23 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 	}
 
 	case PTRACE_GETFPREGS: { /* Get the child extended FPU state. */
-		if (!access_ok(VERIFY_WRITE, (unsigned *)data,
+		if (!access_ok(VERIFY_WRITE, (unsigned __user *)data,
 			       sizeof(struct user_i387_struct))) {
 			ret = -EIO;
 			break;
 		}
-		ret = get_fpregs((struct user_i387_struct *)data, child);
+		ret = get_fpregs((struct user_i387_struct __user *)data, child);
 		break;
 	}
 
 	case PTRACE_SETFPREGS: { /* Set the child extended FPU state. */
-		if (!access_ok(VERIFY_READ, (unsigned *)data,
+		if (!access_ok(VERIFY_READ, (unsigned __user *)data,
 			       sizeof(struct user_i387_struct))) {
 			ret = -EIO;
 			break;
 		}
 		child->used_math = 1;
-		ret = set_fpregs(child, (struct user_i387_struct *)data);
+		ret = set_fpregs(child, (struct user_i387_struct __user *)data);
 		break;
 	}
 

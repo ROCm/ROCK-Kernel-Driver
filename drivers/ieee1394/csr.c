@@ -251,8 +251,6 @@ static void add_host(struct hpsb_host *host)
 
 	csr1212_init_local_csr(host->csr.rom, bus_info, host->csr.max_rom);
 
-	host->csr.rom->max_rom = host->csr.max_rom;
-
 	root = host->csr.rom->root_kv;
 
 	if(csr1212_attach_keyval_to_directory(root, node_cap) != CSR1212_SUCCESS) {

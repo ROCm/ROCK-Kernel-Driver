@@ -56,7 +56,8 @@ struct thread_info {
 	unsigned long		gsr[7];
 	unsigned long		xfsr[7];
 
-	__u64			*user_cntd0, *user_cntd1;
+	__u64			__user *user_cntd0;
+	__u64			__user *user_cntd1;
 	__u64			kernel_cntd0, kernel_cntd1;
 	__u64			pcr_reg;
 

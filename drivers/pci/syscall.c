@@ -57,13 +57,13 @@ sys_pciconfig_read(unsigned long bus, unsigned long dfn,
 
 	switch (len) {
 	case 1:
-		err = put_user(byte, (unsigned char *)buf);
+		err = put_user(byte, (unsigned char __user *)buf);
 		break;
 	case 2:
-		err = put_user(word, (unsigned short *)buf);
+		err = put_user(word, (unsigned short __user *)buf);
 		break;
 	case 4:
-		err = put_user(dword, (unsigned int *)buf);
+		err = put_user(dword, (unsigned int __user *)buf);
 		break;
 	};
 	return err;
@@ -74,13 +74,13 @@ error:
 	   they get instead of a machine check on x86.  */
 	switch (len) {
 	case 1:
-		put_user(-1, (unsigned char *)buf);
+		put_user(-1, (unsigned char __user *)buf);
 		break;
 	case 2:
-		put_user(-1, (unsigned short *)buf);
+		put_user(-1, (unsigned short __user *)buf);
 		break;
 	case 4:
-		put_user(-1, (unsigned int *)buf);
+		put_user(-1, (unsigned int __user *)buf);
 		break;
 	};
 	return err;
@@ -106,7 +106,7 @@ sys_pciconfig_write(unsigned long bus, unsigned long dfn,
 	lock_kernel();
 	switch(len) {
 	case 1:
-		err = get_user(byte, (u8 *)buf);
+		err = get_user(byte, (u8 __user *)buf);
 		if (err)
 			break;
 		err = pci_write_config_byte(dev, off, byte);
@@ -115,7 +115,7 @@ sys_pciconfig_write(unsigned long bus, unsigned long dfn,
 		break;
 
 	case 2:
-		err = get_user(word, (u16 *)buf);
+		err = get_user(word, (u16 __user *)buf);
 		if (err)
 			break;
 		err = pci_write_config_word(dev, off, word);
@@ -124,7 +124,7 @@ sys_pciconfig_write(unsigned long bus, unsigned long dfn,
 		break;
 
 	case 4:
-		err = get_user(dword, (u32 *)buf);
+		err = get_user(dword, (u32 __user *)buf);
 		if (err)
 			break;
 		err = pci_write_config_dword(dev, off, dword);
