@@ -61,6 +61,9 @@ int sis_apic_bug = -1;
  */
 int nr_ioapic_registers[MAX_IO_APICS];
 
+/* Set by dmi_scan */
+extern int need_timer_irq_tweak;
+
 /*
  * Rough estimation of how many shared IRQs there are, can
  * be changed anytime.
@@ -1281,6 +1284,11 @@ void __init setup_IO_APIC_irqs(void)
 		
 			if (!apic && (irq < 16))
 				disable_8259A_irq(irq);
+		}
+		/* Timer interrupt */
+		if (need_timer_irq_tweak && irq == 0) {
+			entry.delivery_mode = 0;
+			entry.dest_mode = 0;
 		}
 		spin_lock_irqsave(&ioapic_lock, flags);
 		io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));

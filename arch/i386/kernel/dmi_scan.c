@@ -21,6 +21,7 @@ EXPORT_SYMBOL(i8042_dmi_noloop);
 int is_sony_vaio_laptop;
 int is_unsafe_smbus;
 int es7000_plat = 0;
+int need_timer_irq_tweak;
 
 struct dmi_header
 {
@@ -505,6 +506,17 @@ static __init int init_ints_after_s1(struct dmi_blacklist *d)
 {
 	printk(KERN_WARNING "Toshiba with broken S1 detected.\n");
 	dmi_broken |= BROKEN_INIT_AFTER_S1;
+	return 0;
+}
+
+/*
+ * HP Proliant DL 760 G2 needs to tweak the IRQ delivery mode for timer IRQ
+ */
+
+static __init int enable_timer_irq_tweak(struct dmi_blacklist *d)
+{
+	printk(KERN_WARNING "Enable tweak for timer IRQ delivery mode.\n");
+	need_timer_irq_tweak = 1;
 	return 0;
 }
 
@@ -994,6 +1006,11 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME , "ProLiant"),
 			MATCH(DMI_PRODUCT_VERSION, "DL760"),
 			NO_MATCH }},
+
+	{ enable_timer_irq_tweak, "HP ProLiant DL760 G2", {
+			MATCH(DMI_BIOS_VENDOR, "HP"),
+			MATCH(DMI_BIOS_VERSION, "P44-"),
+			NO_MATCH, NO_MATCH }},
 
 #ifdef	CONFIG_ACPI_BOOT
 	/*
