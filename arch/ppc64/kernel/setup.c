@@ -112,15 +112,12 @@ static struct notifier_block ppc64_panic_block = {
  * these processors use on existing boards.  -- Dan
  */ 
 struct screen_info screen_info = {
-	0, 25,			/* orig-x, orig-y */
-	0,			/* unused */
-	0,			/* orig-video-page */
-	0,			/* orig-video-mode */
-	80,			/* orig-video-cols */
-	0,0,0,			/* ega_ax, ega_bx, ega_cx */
-	25,			/* orig-video-lines */
-	1,			/* orig-video-isVGA */
-	16			/* orig-video-points */
+	.orig_x = 0,
+	.orig_y = 25,
+	.orig_video_cols = 80,
+	.orig_video_lines = 25,
+	.orig_video_isVGA = 1,
+	.orig_video_points = 16
 };
 
 /*
