@@ -170,7 +170,6 @@ enum Phase {
 /* Static function prototypes */
 static void NCR53c406a_intr(int, void *, struct pt_regs *);
 static irqreturn_t do_NCR53c406a_intr(int, void *, struct pt_regs *);
-static void wait_intr(void);
 static void chip_init(void);
 static void calc_port_addr(void);
 #ifndef IRQ_LEV
@@ -665,6 +664,7 @@ static const char *NCR53c406a_info(struct Scsi_Host *SChost)
 	return (info_msg);
 }
 
+#if 0
 static void wait_intr(void)
 {
 	unsigned long i = jiffies + WATCHDOG;
@@ -684,6 +684,7 @@ static void wait_intr(void)
 
 	NCR53c406a_intr(0, NULL, NULL);
 }
+#endif
 
 static int NCR53c406a_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 {

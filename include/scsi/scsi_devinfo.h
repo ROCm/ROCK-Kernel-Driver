@@ -4,7 +4,8 @@
  * Flags for SCSI devices that need special treatment
  */
 #define BLIST_NOLUN     	0x001	/* Only scan LUN 0 */
-#define BLIST_FORCELUN  	0x002	/* Known to have LUNs, force scanning */
+#define BLIST_FORCELUN  	0x002	/* Known to have LUNs, force scanning,
+					   deprecated: Use max_luns=N */
 #define BLIST_BORKEN    	0x004	/* Flag for broken handshaking */
 #define BLIST_KEY       	0x008	/* unlock by special command */
 #define BLIST_SINGLELUN 	0x010	/* Do not use LUNs in parallel */
@@ -20,4 +21,7 @@
 #define BLIST_MS_SKIP_PAGE_3F	0x4000	/* do not send ms page 0x3f */
 #define BLIST_USE_10_BYTE_MS	0x8000	/* use 10 byte ms before 6 byte ms */
 #define BLIST_MS_192_BYTES_FOR_3F	0x10000	/*  192 byte ms page 0x3f request */
+#define BLIST_REPORTLUN2	0x20000	/* try REPORT_LUNS even for SCSI-2 devs
+ 					   (if HBA supports more than 8 LUNs) */
+#define BLIST_NOREPORTLUN	0x40000	/* don't try REPORT_LUNS scan (SCSI-3 devs) */
 #endif

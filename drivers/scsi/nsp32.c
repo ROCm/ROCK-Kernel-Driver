@@ -38,7 +38,6 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/ctype.h>
-#include <linux/interrupt.h>
 
 #include <asm/dma.h>
 #include <asm/system.h>
