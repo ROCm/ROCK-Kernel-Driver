@@ -104,27 +104,12 @@ const u64 sha512_K[80] = {
 
 static inline void LOAD_OP(int I, u64 *W, const u8 *input)
 {
-        u64 t1  = input[(8*I)  ] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+1] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+2] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+3] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+4] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+5] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+6] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+7] & 0xff;
-        W[I] = t1;
+	W[I] = __be64_to_cpu( ((u64*)(input))[I] );
 }
 
 static inline void BLEND_OP(int I, u64 *W)
 {
-        W[I] = s1(W[I-2]) + W[I-7] + s0(W[I-15]) + W[I-16];
+	W[I] = s1(W[I-2]) + W[I-7] + s0(W[I-15]) + W[I-16];
 }
 
 static void
