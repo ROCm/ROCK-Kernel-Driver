@@ -239,7 +239,7 @@ static int st_chk_result(Scsi_Tape *STp, Scsi_Request * SRpnt)
 		scode = 0;
 	}
 
-	dev = TAPE_NR(SRpnt->sr_request.rq_dev);
+	dev = TAPE_NR(SRpnt->sr_request->rq_dev);
         DEB(
         if (debugging) {
                 printk(ST_DEB_MSG "st%d: Error: %x, cmd: %x %x %x %x %x %x Len: %d\n",
@@ -316,7 +316,7 @@ static void st_sleep_done(Scsi_Cmnd * SCpnt)
 	int remainder;
 	Scsi_Tape *STp;
 
-	st_nbr = TAPE_NR(SCpnt->request.rq_dev);
+	st_nbr = TAPE_NR(SCpnt->request->rq_dev);
 	read_lock(&st_dev_arr_lock);
 	STp = scsi_tapes[st_nbr];
 	read_unlock(&st_dev_arr_lock);
@@ -338,11 +338,11 @@ static void st_sleep_done(Scsi_Cmnd * SCpnt)
 			(STp->buffer)->midlevel_result = INT_MAX;	/* OK */
 	} else
 		(STp->buffer)->midlevel_result = SCpnt->result;
-	SCpnt->request.rq_status = RQ_SCSI_DONE;
+	SCpnt->request->rq_status = RQ_SCSI_DONE;
 	(STp->buffer)->last_SRpnt = SCpnt->sc_request;
 	DEB( STp->write_pending = 0; )
 
-	complete(SCpnt->request.waiting);
+	complete(SCpnt->request->waiting);
 }
 
 
@@ -381,16 +381,16 @@ static Scsi_Request *
 		bp = (STp->buffer)->b_data;
 	SRpnt->sr_data_direction = direction;
 	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_request.waiting = &(STp->wait);
-	SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;
-	SRpnt->sr_request.rq_dev = STp->devt;
+	SRpnt->sr_request->waiting = &(STp->wait);
+	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
+	SRpnt->sr_request->rq_dev = STp->devt;
 
 	scsi_do_req(SRpnt, (void *) cmd, bp, bytes,
 		    st_sleep_done, timeout, retries);
 
 	if (do_wait) {
-		wait_for_completion(SRpnt->sr_request.waiting);
-		SRpnt->sr_request.waiting = NULL;
+		wait_for_completion(SRpnt->sr_request->waiting);
+		SRpnt->sr_request->waiting = NULL;
 		(STp->buffer)->syscall_result = st_chk_result(STp, SRpnt);
 	}
 	return SRpnt;
@@ -413,7 +413,7 @@ static void write_behind_check(Scsi_Tape * STp)
         ) /* end DEB */
 
 	wait_for_completion(&(STp->wait));
-	(STp->buffer)->last_SRpnt->sr_request.waiting = NULL;
+	(STp->buffer)->last_SRpnt->sr_request->waiting = NULL;
 
 	(STp->buffer)->syscall_result = st_chk_result(STp, (STp->buffer)->last_SRpnt);
 	scsi_release_request((STp->buffer)->last_SRpnt);

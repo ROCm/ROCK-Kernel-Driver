@@ -656,7 +656,7 @@ struct scsi_request {
 	struct Scsi_Host *sr_host;
 	Scsi_Device *sr_device;
 	Scsi_Cmnd *sr_command;
-	struct request sr_request;	/* A copy of the command we are
+	struct request *sr_request;	/* A copy of the command we are
 				   working on */
 	unsigned sr_bufflen;	/* Size of data buffer */
 	void *sr_buffer;		/* Data buffer */
@@ -767,8 +767,8 @@ struct scsi_cmnd {
 				   transferred less actual number
 				   transferred (0 if not supported) */
 
-	struct request request;	/* A copy of the command we are
-				   working on */
+	struct request *request;	/* The command we are
+				   	   working on */
 
 	unsigned char sense_buffer[SCSI_SENSE_BUFFERSIZE];		/* obtained by REQUEST SENSE
 						 * when CHECK CONDITION is

@@ -695,7 +695,7 @@ static int sg_common_write(Sg_fd * sfp, Sg_request * srp,
 
     srp->my_cmdp = SRpnt;
     q = &SRpnt->sr_device->request_queue;
-    SRpnt->sr_request.rq_dev = sdp->i_rdev;
+    SRpnt->sr_request->rq_dev = sdp->i_rdev;
     SRpnt->sr_sense_buffer[0] = 0;
     SRpnt->sr_cmd_len = hp->cmd_len;
     if (! (hp->flags & SG_FLAG_LUN_INHIBIT)) {
@@ -1222,7 +1222,7 @@ static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt)
     SRpnt->sr_bufflen = 0;
     SRpnt->sr_buffer = NULL;
     SRpnt->sr_underflow = 0;
-    SRpnt->sr_request.rq_dev = mk_kdev(0, 0);  /* "sg" _disowns_ request blk */
+    SRpnt->sr_request->rq_dev = mk_kdev(0, 0);  /* "sg" _disowns_ request blk */
 
     srp->my_cmdp = NULL;
     srp->done = 1;

@@ -256,7 +256,7 @@ static void scsi_wait_done(Scsi_Cmnd * SCpnt)
 {
 	struct request *req;
 
-	req = &SCpnt->request;
+	req = SCpnt->request;
 	req->rq_status = RQ_SCSI_DONE;	/* Busy, but indicate request done */
 
 	if (req->waiting)
@@ -297,17 +297,19 @@ static spinlock_t scsi_bhqueue_lock = SPIN_LOCK_UNLOCKED;
 Scsi_Request *scsi_allocate_request(Scsi_Device * device)
 {
   	Scsi_Request *SRpnt = NULL;
+        const int offset = ALIGN(sizeof(Scsi_Request), 4);
+        const int size = offset + sizeof(struct request);
   
   	if (!device)
   		panic("No device passed to scsi_allocate_request().\n");
   
-	SRpnt = (Scsi_Request *) kmalloc(sizeof(Scsi_Request), GFP_ATOMIC);
+        SRpnt = (Scsi_Request *) kmalloc(size, GFP_ATOMIC);
 	if( SRpnt == NULL )
 	{
 		return NULL;
 	}
-
-	memset(SRpnt, 0, sizeof(Scsi_Request));
+	memset(SRpnt, 0, size);
+        SRpnt->sr_request = (struct request *)(((char *)SRpnt) + offset);
 	SRpnt->sr_device = device;
 	SRpnt->sr_host = device->host;
 	SRpnt->sr_magic = SCSI_REQ_MAGIC;
@@ -435,7 +437,7 @@ Scsi_Cmnd *scsi_allocate_device(Scsi_Device * device, int wait,
 			 * Now we can check for a free command block for this device.
 			 */
 			for (SCpnt = device->device_queue; SCpnt; SCpnt = SCpnt->next) {
-				if (SCpnt->request.rq_status == RQ_INACTIVE)
+				if (SCpnt->request == NULL)
 					break;
 			}
 		}
@@ -504,9 +506,7 @@ Scsi_Cmnd *scsi_allocate_device(Scsi_Device * device, int wait,
 		}
 	}
 
-	SCpnt->request.rq_status = RQ_SCSI_BUSY;
-	SCpnt->request.waiting = NULL;	/* And no one is waiting for this
-					 * to complete */
+	SCpnt->request = NULL;
 	atomic_inc(&SCpnt->host->host_active);
 	atomic_inc(&SCpnt->device->device_active);
 
@@ -549,7 +549,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 
         SDpnt = SCpnt->device;
 
-	SCpnt->request.rq_status = RQ_INACTIVE;
+	SCpnt->request = NULL;
 	SCpnt->state = SCSI_STATE_UNUSED;
 	SCpnt->owner = SCSI_OWNER_NOBODY;
 	atomic_dec(&SCpnt->host->host_active);
@@ -772,13 +772,13 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
 	DECLARE_COMPLETION(wait);
 	request_queue_t *q = &SRpnt->sr_device->request_queue;
 	
-	SRpnt->sr_request.waiting = &wait;
-	SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;
+	SRpnt->sr_request->waiting = &wait;
+	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
 	scsi_do_req (SRpnt, (void *) cmnd,
 		buffer, bufflen, scsi_wait_done, timeout, retries);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);
-	SRpnt->sr_request.waiting = NULL;
+	SRpnt->sr_request->waiting = NULL;
 	if( SRpnt->sr_command != NULL )
 	{
 		scsi_release_command(SRpnt->sr_command);
@@ -929,8 +929,7 @@ void scsi_init_cmd_from_req(Scsi_Cmnd * SCpnt, Scsi_Request * SRpnt)
 	SCpnt->cmd_len = SRpnt->sr_cmd_len;
 	SCpnt->use_sg = SRpnt->sr_use_sg;
 
-	memcpy((void *) &SCpnt->request, (const void *) &SRpnt->sr_request,
-	       sizeof(SRpnt->sr_request));
+        SCpnt->request = SRpnt->sr_request;
 	memcpy((void *) SCpnt->data_cmnd, (const void *) SRpnt->sr_cmnd, 
 	       sizeof(SCpnt->data_cmnd));
 	SCpnt->reset_chain = NULL;
@@ -1488,7 +1487,7 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt)
 		SCpnt->target = SDpnt->id;
 		SCpnt->lun = SDpnt->lun;
 		SCpnt->channel = SDpnt->channel;
-		SCpnt->request.rq_status = RQ_INACTIVE;
+		SCpnt->request = NULL;
 		SCpnt->use_sg = 0;
 		SCpnt->old_use_sg = 0;
 		SCpnt->old_cmd_len = 0;
@@ -2060,16 +2059,16 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 			     SCpnt = SCpnt->next) {
 				online_status = SDpnt->online;
 				SDpnt->online = FALSE;
-				if (SCpnt->request.rq_status != RQ_INACTIVE) {
+				if (SCpnt->request && SCpnt->request->rq_status != RQ_INACTIVE) {
 					printk(KERN_ERR "SCSI device not inactive - rq_status=%d, target=%d, pid=%ld, state=%d, owner=%d.\n",
-					       SCpnt->request.rq_status, SCpnt->target, SCpnt->pid,
+					       SCpnt->request->rq_status, SCpnt->target, SCpnt->pid,
 					     SCpnt->state, SCpnt->owner);
 					for (SDpnt1 = shpnt->host_queue; SDpnt1;
 					     SDpnt1 = SDpnt1->next) {
 						for (SCpnt = SDpnt1->device_queue; SCpnt;
 						     SCpnt = SCpnt->next)
-							if (SCpnt->request.rq_status == RQ_SCSI_DISCONNECTING)
-								SCpnt->request.rq_status = RQ_INACTIVE;
+							if (SCpnt->request->rq_status == RQ_SCSI_DISCONNECTING)
+								SCpnt->request->rq_status = RQ_INACTIVE;
 					}
 					SDpnt->online = online_status;
 					printk(KERN_ERR "Device busy???\n");
@@ -2080,7 +2079,8 @@ int scsi_unregister_host(Scsi_Host_Template * tpnt)
 				 * continue on.
 				 */
 				SCpnt->state = SCSI_STATE_DISCONNECTING;
-				SCpnt->request.rq_status = RQ_SCSI_DISCONNECTING;	/* Mark as busy */
+                                if(SCpnt->request)
+                                        SCpnt->request->rq_status = RQ_SCSI_DISCONNECTING;	/* Mark as busy */
 			}
 		}
 	}
@@ -2390,11 +2390,11 @@ static void scsi_dump_status(int level)
 				       SCpnt->target,
 				       SCpnt->lun,
 
-				       kdevname(SCpnt->request.rq_dev),
-				       SCpnt->request.sector,
-				       SCpnt->request.nr_sectors,
-				       (long)SCpnt->request.current_nr_sectors,
-				       SCpnt->request.rq_status,
+				       kdevname(SCpnt->request->rq_dev),
+				       SCpnt->request->sector,
+				       SCpnt->request->nr_sectors,
+				       (long)SCpnt->request->current_nr_sectors,
+				       SCpnt->request->rq_status,
 				       SCpnt->use_sg,
 
 				       SCpnt->retries,
@@ -2711,16 +2711,18 @@ int
 scsi_reset_provider(Scsi_Device *dev, int flag)
 {
 	Scsi_Cmnd SC, *SCpnt = &SC;
+        struct request req;
 	int rtn;
 
+        SCpnt->request = &req;
 	memset(&SCpnt->eh_timeout, 0, sizeof(SCpnt->eh_timeout));
 	SCpnt->host                    	= dev->host;
 	SCpnt->device                  	= dev;
 	SCpnt->target                  	= dev->id;
 	SCpnt->lun                     	= dev->lun;
 	SCpnt->channel                 	= dev->channel;
-	SCpnt->request.rq_status       	= RQ_SCSI_BUSY;
-	SCpnt->request.waiting        	= NULL;
+	SCpnt->request->rq_status      	= RQ_SCSI_BUSY;
+	SCpnt->request->waiting        	= NULL;
 	SCpnt->use_sg                  	= 0;
 	SCpnt->old_use_sg              	= 0;
 	SCpnt->old_cmd_len             	= 0;
