@@ -136,7 +136,7 @@ static int mach_proc_infos(unsigned char *contents, char *buffer, int *len,
 static __inline__ unsigned char
 nvram_read_int(int i)
 {
-	return (CMOS_READ(RTC_FIRST_BYTE + i));
+	return CMOS_READ(RTC_FIRST_BYTE + i);
 }
 
 static __inline__ void
@@ -148,7 +148,7 @@ nvram_write_int(unsigned char c, int i)
 static __inline__ int
 nvram_check_checksum_int(void)
 {
-	return (mach_check_checksum());
+	return mach_check_checksum();
 }
 
 static __inline__ void
@@ -179,7 +179,7 @@ nvram_read_byte(int i)
 	spin_lock_irqsave(&rtc_lock, flags);
 	c = nvram_read_int(i);
 	spin_unlock_irqrestore(&rtc_lock, flags);
-	return (c);
+	return c;
 }
 
 /* This races nicely with trying to read with checksum checking (nvram_read) */
@@ -202,7 +202,7 @@ nvram_check_checksum(void)
 	spin_lock_irqsave(&rtc_lock, flags);
 	rv = nvram_check_checksum_int();
 	spin_unlock_irqrestore(&rtc_lock, flags);
-	return (rv);
+	return rv;
 }
 
 void
@@ -237,7 +237,7 @@ nvram_llseek(struct file *file, loff_t offset, int origin)
 		break;
 	}
 	unlock_kernel();
-	return ((offset >= 0) ? (file->f_pos = offset) : -EINVAL);
+	return (offset >= 0) ? (file->f_pos = offset) : -EINVAL;
 }
 
 static ssize_t
@@ -262,7 +262,7 @@ nvram_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 
 	*ppos = i;
 
-	return (tmp - contents);
+	return tmp - contents;
 
       checksum_err:
 	spin_unlock_irq(&rtc_lock);
@@ -294,7 +294,7 @@ nvram_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 
 	*ppos = i;
 
-	return (tmp - contents);
+	return tmp - contents;
 
       checksum_err:
 	spin_unlock_irq(&rtc_lock);
@@ -311,7 +311,7 @@ nvram_ioctl(struct inode *inode, struct file *file,
 
 	case NVRAM_INIT:	/* initialize NVRAM contents and checksum */
 		if (!capable(CAP_SYS_ADMIN))
-			return (-EACCES);
+			return -EACCES;
 
 		spin_lock_irq(&rtc_lock);
 
@@ -320,21 +320,21 @@ nvram_ioctl(struct inode *inode, struct file *file,
 		nvram_set_checksum_int();
 
 		spin_unlock_irq(&rtc_lock);
-		return (0);
+		return 0;
 
 	case NVRAM_SETCKS:	/* just set checksum, contents unchanged
 				 * (maybe useful after checksum garbaged
 				 * somehow...) */
 		if (!capable(CAP_SYS_ADMIN))
-			return (-EACCES);
+			return -EACCES;
 
 		spin_lock_irq(&rtc_lock);
 		nvram_set_checksum_int();
 		spin_unlock_irq(&rtc_lock);
-		return (0);
+		return 0;
 
 	default:
-		return (-ENOTTY);
+		return -ENOTTY;
 	}
 }
 
@@ -346,7 +346,7 @@ nvram_open(struct inode *inode, struct file *file)
 	    (nvram_open_mode & NVRAM_EXCL) ||
 	    ((file->f_mode & 2) && (nvram_open_mode & NVRAM_WRITE))) {
 		spin_unlock(&nvram_open_lock);
-		return (-EBUSY);
+		return -EBUSY;
 	}
 
 	if (file->f_flags & O_EXCL)
@@ -355,7 +355,7 @@ nvram_open(struct inode *inode, struct file *file)
 		nvram_open_mode |= NVRAM_WRITE;
 	nvram_open_cnt++;
 	spin_unlock(&nvram_open_lock);
-	return (0);
+	return 0;
 }
 
 static int
@@ -368,7 +368,7 @@ nvram_release(struct inode *inode, struct file *file)
 	if (file->f_mode & 2)
 		nvram_open_mode &= ~NVRAM_WRITE;
 	spin_unlock(&nvram_open_lock);
-	return (0);
+	return 0;
 }
 
 #ifndef CONFIG_PROC_FS
@@ -396,9 +396,9 @@ nvram_read_proc(char *buffer, char **start, off_t offset,
 	*eof = mach_proc_infos(contents, buffer, &len, &begin, offset, size);
 
 	if (offset >= begin + len)
-		return (0);
+		return 0;
 	*start = buffer + (offset - begin);
-	return (size < begin + len - offset ? size : begin + len - offset);
+	return (size < begin + len - offset) ? size : begin + len - offset;
 
 }
 
@@ -406,9 +406,9 @@ nvram_read_proc(char *buffer, char **start, off_t offset,
  * this like that... */
 #define	PRINT_PROC(fmt,args...)					\
 	do {							\
-		*len += sprintf( buffer+*len, fmt, ##args );	\
+		*len += sprintf(buffer+*len, fmt, ##args);	\
 		if (*begin + *len > offset + size)		\
-			return( 0 );				\
+			return 0;				\
 		if (*begin + *len < offset) {			\
 			*begin += *len;				\
 			*len = 0;				\
@@ -440,7 +440,7 @@ nvram_init(void)
 
 	/* First test whether the driver should init at all */
 	if (!CHECK_DRIVER_INIT())
-		return (-ENXIO);
+		return -ENXIO;
 
 	ret = misc_register(&nvram_dev);
 	if (ret) {
@@ -457,7 +457,7 @@ nvram_init(void)
 	ret = 0;
 	printk(KERN_INFO "Non-volatile memory driver v" NVRAM_VERSION "\n");
       out:
-	return (ret);
+	return ret;
       outmisc:
 	misc_deregister(&nvram_dev);
 	goto out;
@@ -488,8 +488,7 @@ pc_check_checksum(void)
 	for (i = PC_CKS_RANGE_START; i <= PC_CKS_RANGE_END; ++i)
 		sum += nvram_read_int(i);
 	return ((sum & 0xffff) ==
-	    ((nvram_read_int(PC_CKS_LOC) << 8) |
-		nvram_read_int(PC_CKS_LOC + 1)));
+	    ((nvram_read_int(PC_CKS_LOC)<<8) | nvram_read_int(PC_CKS_LOC+1)));
 }
 
 static void
@@ -578,7 +577,7 @@ pc_proc_infos(unsigned char *nvram, char *buffer, int *len,
 	PRINT_PROC("FPU            : %sinstalled\n",
 	    (nvram[6] & 2) ? "" : "not ");
 
-	return (1);
+	return 1;
 }
 #endif
 
@@ -716,7 +715,7 @@ atari_proc_infos(unsigned char *nvram, char *buffer, int *len,
 	    vmode & 256 ?
 	    (vmode & 16 ? ", line doubling" : ", half screen") : "");
 
-	return (1);
+	return 1;
 }
 #endif
 
