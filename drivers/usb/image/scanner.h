@@ -105,6 +105,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0638, 0x0a10) },	/* iVina FB1600 (=Umax Astra 4500) */
 	/* Benq: see Acer */
 	/* Brother */
+	{ USB_DEVICE(0x04f9, 0x010f) },	/* MFC 5100C */
 	{ USB_DEVICE(0x04f9, 0x0111) },	/* MFC 6800 */
 	/* Canon */
 	{ USB_DEVICE(0x04a9, 0x2201) }, /* CanoScan FB320U */
@@ -118,9 +119,11 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04a9, 0x220c) },	/* CanoScan D1250U2 */
 	{ USB_DEVICE(0x04a9, 0x220d) }, /* CanoScan N670U/N676U/LIDE 20 */
 	{ USB_DEVICE(0x04a9, 0x220e) }, /* CanoScan N1240U/LIDE 30 */
+	{ USB_DEVICE(0x04a9, 0x2213) },	/* LIDE 50 */
 	{ USB_DEVICE(0x04a9, 0x3042) }, /* FS4000US */
 	/* Colorado -- See Primax/Colorado below */
 	/* Compaq */
+	{ USB_DEVICE(0x049f, 0x001a) },	/* S4 100 */
 	{ USB_DEVICE(0x049f, 0x0021) },	/* S200 */
 	/* Epson -- See Seiko/Epson below */
 	/* Fujitsu */
@@ -152,6 +155,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x03f0, 0x0705) }, /* ScanJet 4400C */
 	//	{ USB_DEVICE(0x03f0, 0x0801) },	/* ScanJet 7400C - NOT SUPPORTED - use hpusbscsi driver */
 	{ USB_DEVICE(0x03f0, 0x0901) }, /* ScanJet 2300C */
+	{ USB_DEVICE(0x03F0, 0x1005) },	/* ScanJet 5400C */
+	{ USB_DEVICE(0x03F0, 0x1105) },	/* ScanJet 5470C */
 	{ USB_DEVICE(0x03f0, 0x1305) },	/* Scanjet 4570c */
 	{ USB_DEVICE(0x03f0, 0x2005) },	/* ScanJet 3570c */
 	{ USB_DEVICE(0x03f0, 0x2205) },	/* ScanJet 3500c */
@@ -159,12 +164,16 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0638, 0x0268) }, /* 1200U */
 	/* Lexmark */
 	{ USB_DEVICE(0x043d, 0x002d) }, /* X70/X73 */
+	{ USB_DEVICE(0x043d, 0x003d) }, /* X83 */
+	/* LG Electronics */
+	{ USB_DEVICE(0x0461, 0x0364) },	/* Scanworks 600U (repackaged Primax?) */
 	/* Medion */
 	{ USB_DEVICE(0x0461, 0x0377) },	/* MD 5345 - repackaged Primax? */
 	/* Memorex */
 	{ USB_DEVICE(0x0461, 0x0346) }, /* 6136u - repackaged Primax ? */
 	/* Microtek */
 	{ USB_DEVICE(0x05da, 0x30ce) },	/* ScanMaker 3800 */
+	{ USB_DEVICE(0x05da, 0x30cf) },	/* ScanMaker 4800 */
 	/* The following SCSI-over-USB Microtek devices are supported by the
 	   microtek driver: Enable SCSI and USB Microtek in kernel config */
 	//	{ USB_DEVICE(0x05da, 0x0099) },	/* ScanMaker X6 - X6U */
@@ -259,7 +268,11 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04b8, 0x0802) }, /* Stylus CX3200 */
 	/* SYSCAN */
 	{ USB_DEVICE(0x0a82, 0x4600) }, /* TravelScan 460/464 */
+	/* Trust */
+	{ USB_DEVICE(0x05cb, 0x1483) }, /* CombiScan 19200 */
+	{ USB_DEVICE(0x05d8, 0x4006) }, /* Easy Webscan 19200 (repackaged Artec?) */
 	/* Umax */
+	{ USB_DEVICE(0x05d8, 0x4009) },	/* Astraslim (actually Artec?) */
 	{ USB_DEVICE(0x1606, 0x0010) },	/* Astra 1220U */
 	{ USB_DEVICE(0x1606, 0x0030) },	/* Astra 2000U */
 	{ USB_DEVICE(0x1606, 0x0060) }, /* Astra 3400U/3450U */
