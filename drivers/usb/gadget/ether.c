@@ -55,6 +55,8 @@
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 
+#include "gadget_chips.h"
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -62,25 +64,28 @@
  *
  * CDC Ethernet is the standard USB solution for sending Ethernet frames
  * using USB.  Real hardware tends to use the same framing protocol but look
- * different for control features.  And Microsoft pushes their own approach
- * (RNDIS) instead of the standard.
+ * different for control features.  This driver strongly prefers to use
+ * this USB-IF standard as its open-systems interoperability solution;
+ * most host side USB stacks (except from Microsoft) support it.
  *
  * There's some hardware that can't talk CDC.  We make that hardware
  * implement a "minimalist" vendor-agnostic CDC core:  same framing, but
  * link-level setup only requires activating the configuration.
+ * Linux supports it, but other host operating systems may not.
+ *
+ * A third option is also in use.  Rather than CDC Ethernet, or something
+ * simpler, Microsoft pushes their own approach: RNDIS.  The published
+ * RNDIS specs are ambiguous and appear to be incomplete, and are also
+ * needlessly complex.
  */
 
 #define DRIVER_DESC		"Ethernet Gadget"
-#define DRIVER_VERSION		"Bastille Day 2003"
+#define DRIVER_VERSION		"St Patrick's Day 2004"
 
 static const char shortname [] = "ether";
 static const char driver_desc [] = DRIVER_DESC;
 
-#define MIN_PACKET	sizeof(struct ethhdr)
-#define	MAX_PACKET	ETH_DATA_LEN	/* biggest packet we'll rx/tx */
 #define RX_EXTRA	20		/* guard against rx overflows */
-
-/* FIXME allow high speed jumbograms */
 
 /*-------------------------------------------------------------------------*/
 
@@ -100,9 +105,20 @@ struct eth_dev {
 	atomic_t		tx_qlen;
 
 	struct work_struct	work;
+	unsigned		zlp:1;
+	unsigned		cdc:1;
 	unsigned long		todo;
 #define	WORK_RX_MEMORY		0
 };
+
+/* This version autoconfigures as much as possible at run-time.
+ *
+ * It also ASSUMES a self-powered device, without remote wakeup,
+ * although remote wakeup support would make sense.
+ */
+static const char *EP_IN_NAME;
+static const char *EP_OUT_NAME;
+static const char *EP_STATUS_NAME;
 
 /*-------------------------------------------------------------------------*/
 
@@ -111,203 +127,52 @@ struct eth_dev {
  * DO NOT REUSE THESE IDs with a protocol-incompatible driver!!  Ever!!
  * Instead:  allocate your own, using normal USB-IF procedures.
  */
-#define DRIVER_VENDOR_NUM	0x0525		/* NetChip */
-#define DRIVER_PRODUCT_NUM	0xa4a1		/* Linux-USB Ethernet Gadget */
+#define CDC_VENDOR_NUM	0x0525		/* NetChip */
+#define CDC_PRODUCT_NUM	0xa4a1		/* Linux-USB Ethernet Gadget */
 
-/*-------------------------------------------------------------------------*/
-
-/*
- * hardware-specific configuration, controlled by which device
- * controller driver was configured.
- *
- * CHIP ... hardware identifier
- * DRIVER_VERSION_NUM ... alerts the host side driver to differences
- * EP_*_NAME ... which endpoints do we use for which purpose?
- * EP_*_NUM ... numbers for them (often limited by hardware)
- * WAKEUP ... if hardware supports remote wakeup AND we will issue the
- * 	usb_gadget_wakeup() call to initiate it, USB_CONFIG_ATT_WAKEUP
- *
- * hw_optimize(gadget) ... for any hardware tweaks we want to kick in
- * 	before we enable our endpoints
- *
- * add other defines for other portability issues, like hardware that
- * for some reason doesn't handle full speed bulk maxpacket of 64.
- */
-
-#define DEV_CONFIG_VALUE	3	/* some hardware cares */
-
-/* #undef on hardware that can't implement CDC */
-#define	DEV_CONFIG_CDC
-
-/* undef on bus-powered hardware, and #define MAX_USB_POWER */
-#define SELFPOWER
-
-/*
- * NetChip 2280, PCI based.
- *
- * use DMA with fat fifos for all data traffic, PIO for the status channel
- * where its 64 byte maxpacket ceiling is no issue.
- *
- * performance note:  only PIO needs per-usb-packet IRQs (ep0, ep-e, ep-f)
- * otherwise IRQs are per-Ethernet-packet unless TX_DELAY and chaining help.
- */
-#ifdef	CONFIG_USB_GADGET_NET2280
-#define CHIP			"net2280"
-#define DEFAULT_QLEN		4		/* has dma chaining */
-#define DRIVER_VERSION_NUM	0x0101
-static const char EP_OUT_NAME [] = "ep-a";
-#define EP_OUT_NUM	1
-static const char EP_IN_NAME [] = "ep-b";
-#define EP_IN_NUM	2
-static const char EP_STATUS_NAME [] = "ep-f";
-#define EP_STATUS_NUM	3
-/* supports remote wakeup, but this driver doesn't */
-
-extern int net2280_set_fifo_mode (struct usb_gadget *gadget, int mode);
-
-static inline void hw_optimize (struct usb_gadget *gadget)
-{
-	/* we can have bigger ep-a/ep-b fifos (2KB each, 4 USB packets
-	 * for highspeed bulk) because we're not using ep-c/ep-d.
-	 */
-	net2280_set_fifo_mode (gadget, 1);
-}
-#endif
-
-/*
- * PXA-2xx UDC:  widely used in second gen Linux-capable ARM PDAs
- * and other products.
- *
- * multiple interfaces (or altsettings) aren't usable.  so this hardware
- * can't implement CDC, which needs both capabilities.
- */
-#ifdef	CONFIG_USB_GADGET_PXA2XX
-#undef	DEV_CONFIG_CDC
-#define CHIP			"pxa2xx"
-#define DRIVER_VERSION_NUM	0x0103
-static const char EP_OUT_NAME [] = "ep2out-bulk";
-#define EP_OUT_NUM	2
-static const char EP_IN_NAME [] = "ep1in-bulk";
-#define EP_IN_NUM	1
-/* supports remote wakeup, but this driver doesn't */
-
-/* no hw optimizations to apply */
-#define hw_optimize(g) do {} while (0)
-#endif
-
-/*
- * SA-1100 UDC:  widely used in first gen Linux-capable PDAs.
- *
- * can't have a notification endpoint, since there are only the two
- * bulk-capable ones.  the CDC spec allows that.
- */
-#ifdef	CONFIG_USB_GADGET_SA1100
-#define CHIP			"sa1100"
-#define DRIVER_VERSION_NUM	0x0105
-static const char EP_OUT_NAME [] = "ep1out-bulk";
-#define EP_OUT_NUM	1
-static const char EP_IN_NAME [] = "ep2in-bulk";
-#define EP_IN_NUM	2
-// EP_STATUS_NUM is undefined
-/* doesn't support remote wakeup? */
-
-/* no hw optimizations to apply */
-#define hw_optimize(g) do {} while (0)
-#endif
-
-/*
- * Toshiba TC86C001 ("Goku-S") UDC
- *
- * This has three semi-configurable full speed bulk/interrupt endpoints.
- */
-#ifdef	CONFIG_USB_GADGET_GOKU
-#define CHIP			"goku"
-#define DRIVER_VERSION_NUM	0x0106
-static const char EP_OUT_NAME [] = "ep1-bulk";
-#define EP_OUT_NUM	1
-static const char EP_IN_NAME [] = "ep2-bulk";
-#define EP_IN_NUM	2
-static const char EP_STATUS_NAME [] = "ep3-bulk";
-#define EP_STATUS_NUM	3
-/* doesn't support remote wakeup */
-
-#define hw_optimize(g) do {} while (0)
-#endif
-
-/*
- * SuperH UDC:  UDC built-in to some Renesas SH processors.
- *
- * This has three semi-configurable full speed bulk/interrupt endpoints.
- *
- * Only one configuration and interface is supported.  So this hardware
- * can't implement CDC.
- */
-#ifdef	CONFIG_USB_GADGET_SUPERH
-#undef	DEV_CONFIG_CDC
-#define CHIP			"superh"
-#define DRIVER_VERSION_NUM	0x0107
-static const char EP_OUT_NAME[] = "ep1out-bulk";
-#define EP_OUT_NUM		1
-static const char EP_IN_NAME[] = "ep2in-bulk";
-#define EP_IN_NUM		2
-
-#define hw_optimize(g) do {} while (0)
-#endif
-
-/*-------------------------------------------------------------------------*/
-
-#ifndef CHIP
-#	error Configure some USB peripheral controller driver!
-#endif
-
-/* We normally expect hardware that can talk CDC.  That involves
- * using multiple interfaces and altsettings, and maybe a status
- * interrupt.  Driver binding to be done according to USB-IF class,
- * though you can use different VENDOR and PRODUCT numbers if you
- * want (and they're officially assigned).
- * 
- * For hardware that can't talk CDC, we use the same vendor ID that
+/* For hardware that can't talk CDC, we use the same vendor ID that
  * ARM Linux has used for ethernet-over-usb, both with sa1100 and
  * with pxa250.  We're protocol-compatible, if the host-side drivers
- * use the endpoint descriptors.  DRIVER_VERSION_NUM is nonzero, so
+ * use the endpoint descriptors.  bcdDevice (version) is nonzero, so
  * drivers that need to hard-wire endpoint numbers have a hook.
  */
-#ifdef	DEV_CONFIG_CDC
-#define	DEV_CONFIG_CLASS	USB_CLASS_COMM
-#else	
-#define	DEV_CONFIG_CLASS	USB_CLASS_VENDOR_SPEC
-#undef	EP_STATUS_NUM
-#undef	DRIVER_VENDOR_NUM
-#undef	DRIVER_PRODUCT_NUM
-#define	DRIVER_VENDOR_NUM	0x049f
-#define	DRIVER_PRODUCT_NUM	0x505a
-#endif /* CONFIG_CDC_ETHER */
+#define	SIMPLE_VENDOR_NUM	0x049f
+#define	SIMPLE_PRODUCT_NUM	0x505a
 
-/* power usage is config specific.
- * hardware that supports remote wakeup defaults to disabling it.
+/*-------------------------------------------------------------------------*/
+
+#define DEV_CONFIG_VALUE	1	/* some hardware cares */
+
+/* Include CDC code/data only if we could run on CDC-capable hardware.
+ *
+ * FIXME this driver should know how to choose between CDC and non-CDC
+ * configurations as it initializes, and while handling SET_CONFIGURATION
+ * and SET_INTERFACE requests.  It doesn't yet.
  */
 
-#ifndef	MAX_USB_POWER
-#ifdef	SELFPOWER
-/* some hosts are confused by 0mA  */
-#define MAX_USB_POWER	2	/* mA */
-#else
-/* bus powered */
-#error	Define your bus power consumption!
+#ifdef CONFIG_USB_GADGET_NET2280
+#define	DEV_CONFIG_CDC
 #endif
-#endif	/* MAX_USB_POWER */
 
-#ifndef	WAKEUP
-/* default: this driver won't do remote wakeup */
-#define WAKEUP		0
-/* else value must be USB_CONFIG_ATT_WAKEUP */
+#ifdef CONFIG_USB_GADGET_DUMMY_HCD
+// #define	DEV_CONFIG_CDC
+#endif
+
+#ifdef CONFIG_USB_GADGET_GOKU
+#define	DEV_CONFIG_CDC
+#endif
+
+#ifdef CONFIG_USB_GADGET_MQ11XX
+#define	DEV_CONFIG_CDC
+#endif
+
+#ifdef CONFIG_USB_GADGET_OMAP
+#define	DEV_CONFIG_CDC
 #endif
 
 /*-------------------------------------------------------------------------*/
 
-#ifndef DEFAULT_QLEN
 #define DEFAULT_QLEN	2	/* double buffering by default */
-#endif
 
 #ifdef CONFIG_USB_GADGET_DUALSPEED
 
@@ -320,7 +185,7 @@ module_param (qmult, uint, S_IRUGO|S_IWUSR);
 	(DEFAULT_QLEN*((gadget->speed == USB_SPEED_HIGH) ? qmult : 1))
 
 /* also defer IRQs on highspeed TX */
-#define TX_DELAY	DEFAULT_QLEN
+#define TX_DELAY	qmult
 
 #else	/* full speed (low speed doesn't do bulk) */
 #define qlen(gadget) DEFAULT_QLEN
@@ -386,13 +251,12 @@ device_desc = {
 
 	.bcdUSB =		__constant_cpu_to_le16 (0x0200),
 
-	.bDeviceClass =		DEV_CONFIG_CLASS,
+	.bDeviceClass =		USB_CLASS_COMM,
 	.bDeviceSubClass =	0,
 	.bDeviceProtocol =	0,
 
-	.idVendor =		__constant_cpu_to_le16 (DRIVER_VENDOR_NUM),
-	.idProduct =		__constant_cpu_to_le16 (DRIVER_PRODUCT_NUM),
-	.bcdDevice =		__constant_cpu_to_le16 (DRIVER_VERSION_NUM),
+	.idVendor =		__constant_cpu_to_le16 (CDC_VENDOR_NUM),
+	.idProduct =		__constant_cpu_to_le16 (CDC_PRODUCT_NUM),
 	.iManufacturer =	STRING_MANUFACTURER,
 	.iProduct =		STRING_PRODUCT,
 	.bNumConfigurations =	1,
@@ -404,39 +268,32 @@ eth_config = {
 	.bDescriptorType =	USB_DT_CONFIG,
 
 	/* compute wTotalLength on the fly */
-#ifdef	DEV_CONFIG_CDC
 	.bNumInterfaces =	2,
-#else
-	.bNumInterfaces =	1,
-#endif
 	.bConfigurationValue =	DEV_CONFIG_VALUE,
 	.iConfiguration =	STRING_PRODUCT,
-	.bmAttributes =		USB_CONFIG_ATT_ONE | WAKEUP,
-	.bMaxPower =		(MAX_USB_POWER + 1) / 2,
+	.bmAttributes =		USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
+	.bMaxPower =		1,
 };
 
 #ifdef	DEV_CONFIG_CDC
 
 /*
  * Compared to the "minimalist" non-CDC model, the CDC model adds
- * three class descriptors, two interface descrioptors, and a status
+ * three class descriptors, two interface descriptors, optional status
  * endpoint.  Both have a "data" interface and two bulk endpoints.
  * There are also differences in how control requests are handled.
  */
 
 /* master comm interface optionally has a status notification endpoint */
 
-static const struct usb_interface_descriptor
+static struct usb_interface_descriptor
 control_intf = {
 	.bLength =		sizeof control_intf,
 	.bDescriptorType =	USB_DT_INTERFACE,
 
 	.bInterfaceNumber =	0,
-#ifdef	EP_STATUS_NUM
+	/* status endpoint is optional; this may be patched later */
 	.bNumEndpoints =	1,
-#else
-	.bNumEndpoints =	0,
-#endif
 	.bInterfaceClass =	USB_CLASS_COMM,
 	.bInterfaceSubClass =	6,	/* ethernet control model */
 	.bInterfaceProtocol =	0,
@@ -501,12 +358,10 @@ static const struct ether_desc ether_desc = {
 	/* this descriptor actually adds value, surprise! */
 	.iMACAddress =		STRING_ETHADDR,
 	.bmEthernetStatistics =	__constant_cpu_to_le32 (0), /* no statistics */
-	.wMaxSegmentSize =	__constant_cpu_to_le16 (MAX_PACKET + ETH_HLEN),
+	.wMaxSegmentSize =	__constant_cpu_to_le16 (ETH_FRAME_LEN),
 	.wNumberMCFilters =	__constant_cpu_to_le16 (0),
 	.bNumberPowerFilters =	0,
 };
-
-#ifdef	EP_STATUS_NUM
 
 /* include the status endpoint if we can, even though it's optional.
  *
@@ -518,17 +373,16 @@ static const struct ether_desc ether_desc = {
  
 #define LOG2_STATUS_INTERVAL_MSEC	6
 #define STATUS_BYTECOUNT		16	/* 8 byte header + data */
-static const struct usb_endpoint_descriptor
+static struct usb_endpoint_descriptor
 fs_status_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	EP_STATUS_NUM | USB_DIR_IN,
+	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize =	__constant_cpu_to_le16 (STATUS_BYTECOUNT),
 	.bInterval =		1 << LOG2_STATUS_INTERVAL_MSEC,
 };
-#endif
 
 /* the default data interface has no endpoints ... */
 
@@ -585,24 +439,22 @@ data_intf = {
 #endif	/* DEV_CONFIG_CDC */
 
 
-static const struct usb_endpoint_descriptor
+static struct usb_endpoint_descriptor
 fs_source_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	EP_IN_NUM | USB_DIR_IN,
+	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	__constant_cpu_to_le16 (64),
 };
 
-static const struct usb_endpoint_descriptor
+static struct usb_endpoint_descriptor
 fs_sink_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	EP_OUT_NUM,
+	.bEndpointAddress =	USB_DIR_OUT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	__constant_cpu_to_le16 (64),
 };
 
 static const struct usb_descriptor_header *fs_function [] = {
@@ -612,9 +464,8 @@ static const struct usb_descriptor_header *fs_function [] = {
 	(struct usb_descriptor_header *) &header_desc,
 	(struct usb_descriptor_header *) &union_desc,
 	(struct usb_descriptor_header *) &ether_desc,
-#ifdef	EP_STATUS_NUM
+	/* NOTE: status endpoint may need to be removed */
 	(struct usb_descriptor_header *) &fs_status_desc,
-#endif
 	(struct usb_descriptor_header *) &data_nop_intf,
 #endif /* DEV_CONFIG_CDC */
 	/* minimalist core */
@@ -631,39 +482,34 @@ static const struct usb_descriptor_header *fs_function [] = {
  * descriptors, unless they only run at full speed.
  */
 
-#ifdef	EP_STATUS_NUM
-static const struct usb_endpoint_descriptor
+#ifdef DEV_CONFIG_CDC
+static struct usb_endpoint_descriptor
 hs_status_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	EP_STATUS_NUM | USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize =	__constant_cpu_to_le16 (STATUS_BYTECOUNT),
 	.bInterval =		LOG2_STATUS_INTERVAL_MSEC + 3,
 };
-#endif
+#endif /* DEV_CONFIG_CDC */
 
-static const struct usb_endpoint_descriptor
+static struct usb_endpoint_descriptor
 hs_source_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	EP_IN_NUM | USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	__constant_cpu_to_le16 (512),
-	.bInterval =		1,
 };
 
-static const struct usb_endpoint_descriptor
+static struct usb_endpoint_descriptor
 hs_sink_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
 
-	.bEndpointAddress =	EP_OUT_NUM,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	__constant_cpu_to_le16 (512),
-	.bInterval =		1,
 };
 
 static struct usb_qualifier_descriptor
@@ -672,7 +518,7 @@ dev_qualifier = {
 	.bDescriptorType =	USB_DT_DEVICE_QUALIFIER,
 
 	.bcdUSB =		__constant_cpu_to_le16 (0x0200),
-	.bDeviceClass =		DEV_CONFIG_CLASS,
+	.bDeviceClass =		USB_CLASS_COMM,
 
 	.bNumConfigurations =	1,
 };
@@ -684,9 +530,8 @@ static const struct usb_descriptor_header *hs_function [] = {
 	(struct usb_descriptor_header *) &header_desc,
 	(struct usb_descriptor_header *) &union_desc,
 	(struct usb_descriptor_header *) &ether_desc,
-#ifdef	EP_STATUS_NUM
+	/* NOTE: status endpoint may need to be removed */
 	(struct usb_descriptor_header *) &hs_status_desc,
-#endif
 	(struct usb_descriptor_header *) &data_nop_intf,
 #endif /* DEV_CONFIG_CDC */
 	/* minimalist core */
@@ -711,6 +556,8 @@ static const struct usb_descriptor_header *hs_function [] = {
 
 /* descriptors that are built on-demand */
 
+static char				manufacturer [40];
+
 #ifdef	DEV_CONFIG_CDC
 /* address that the host will use ... usually assigned at random */
 static char				ethaddr [2 * ETH_ALEN + 1];
@@ -718,7 +565,7 @@ static char				ethaddr [2 * ETH_ALEN + 1];
 
 /* static strings, in iso 8859/1 */
 static struct usb_string		strings [] = {
-	{ STRING_MANUFACTURER,	UTS_SYSNAME " " UTS_RELEASE "/" CHIP, },
+	{ STRING_MANUFACTURER,	manufacturer, },
 	{ STRING_PRODUCT,	driver_desc, },
 #ifdef	DEV_CONFIG_CDC
 	{ STRING_ETHADDR,	ethaddr, },
@@ -780,6 +627,9 @@ set_ether_config (struct eth_dev *dev, int gfp_flags)
 		/* With CDC,  the host isn't allowed to use these two data
 		 * endpoints in the default altsetting for the interface.
 		 * so we don't activate them yet.
+		 *
+		 * RNDIS is the same, but activation is a side effect of
+		 * an RPC setting a packet filter (no SET_INTERFACE).
 		 */
 
 		/* one endpoint writes data back IN to the host */
@@ -799,9 +649,9 @@ set_ether_config (struct eth_dev *dev, int gfp_flags)
 			continue;
 		}
 
-#ifdef	EP_STATUS_NUM
 		/* optional status/notification endpoint */
-		else if (strcmp (ep->name, EP_STATUS_NAME) == 0) {
+		else if (EP_STATUS_NAME &&
+				strcmp (ep->name, EP_STATUS_NAME) == 0) {
 			d = ep_desc (gadget, &hs_status_desc, &fs_status_desc);
 			result = usb_ep_enable (ep, d);
 			if (result == 0) {
@@ -811,7 +661,6 @@ set_ether_config (struct eth_dev *dev, int gfp_flags)
 				continue;
 			}
 		}
-#endif
 
 #else	/* !CONFIG_CDC_ETHER */
 
@@ -918,12 +767,10 @@ static void eth_reset_config (struct eth_dev *dev)
 		dev->out_ep = 0;
 	}
 
-#ifdef	EP_STATUS_NUM
 	if (dev->status_ep) {
 		usb_ep_disable (dev->status_ep);
 		dev->status_ep = 0;
 	}
-#endif
 	dev->config = 0;
 }
 
@@ -939,20 +786,20 @@ eth_set_config (struct eth_dev *dev, unsigned number, int gfp_flags)
 	if (number == dev->config)
 		return 0;
 
-#ifdef CONFIG_USB_GADGET_SA1100
-	if (dev->config && atomic_read (&dev->tx_qlen) != 0) {
+	if (gadget_is_sa1100 (gadget)
+			&& dev->config
+			&& atomic_read (&dev->tx_qlen) != 0) {
 		/* tx fifo is full, but we can't clear it...*/
 		INFO (dev, "can't change configurations\n");
 		return -ESPIPE;
 	}
-#endif
 	eth_reset_config (dev);
-	hw_optimize (gadget);
 
 	switch (number) {
 	case DEV_CONFIG_VALUE:
 		result = set_ether_config (dev, gfp_flags);
 		break;
+	// OR:  RNDIS_CONFIG_VALUE ...
 	default:
 		result = -EINVAL;
 		/* FALL THROUGH */
@@ -982,7 +829,7 @@ eth_set_config (struct eth_dev *dev, unsigned number, int gfp_flags)
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef	EP_STATUS_NUM
+#ifdef	DEV_CONFIG_CDC
 
 /* section 3.8.2 table 11 of the CDC spec lists Ethernet notifications */
 #define CDC_NOTIFY_NETWORK_CONNECTION	0x00	/* required; 6.3.1 */
@@ -1175,17 +1022,6 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		value = eth_set_config (dev, ctrl->wValue, GFP_ATOMIC);
 		spin_unlock (&dev->lock);
 		break;
-#ifdef	CONFIG_USB_GADGET_PXA2XX
-	/* PXA UDC prevents us from using SET_INTERFACE in normal ways.
-	 * And it hides GET_CONFIGURATION and GET_INTERFACE too.
-	 */
-	case USB_REQ_SET_INTERFACE:
-		spin_lock (&dev->lock);
-		value = eth_set_config (dev, DEV_CONFIG_VALUE, GFP_ATOMIC);
-		spin_unlock (&dev->lock);
-		break;
-
-#else	/* hardware that that stays out of our way */
 	case USB_REQ_GET_CONFIGURATION:
 		if (ctrl->bRequestType != USB_DIR_IN)
 			break;
@@ -1198,17 +1034,28 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				|| !dev->config
 				|| ctrl->wIndex > 1)
 			break;
+		if (!dev->cdc && ctrl->wIndex != 0)
+			break;
 		spin_lock (&dev->lock);
+
+		/* PXA hardware partially handles SET_INTERFACE;
+		 * we need to kluge around that interference.
+		 */
+		if (gadget_is_pxa (gadget)) {
+			value = eth_set_config (dev, DEV_CONFIG_VALUE,
+						GFP_ATOMIC);
+			goto done_set_intf;
+		}
+
+#ifdef DEV_CONFIG_CDC
 		switch (ctrl->wIndex) {
 		case 0:		/* control/master intf */
 			if (ctrl->wValue != 0)
 				break;
-#ifdef	EP_STATUS_NUM
 			if (dev->status_ep) {
 				usb_ep_disable (dev->status_ep);
 				usb_ep_enable (dev->status_ep, dev->status);
 			}
-#endif
 			value = 0;
 			break;
 		case 1:		/* data intf */
@@ -1225,9 +1072,8 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				usb_ep_enable (dev->in_ep, dev->in);
 				usb_ep_enable (dev->out_ep, dev->out);
 				netif_carrier_on (dev->net);
-#ifdef	EP_STATUS_NUM
-				issue_start_status (dev);
-#endif
+				if (dev->status_ep)
+					issue_start_status (dev);
 				if (netif_running (dev->net)) {
 					spin_unlock (&dev->lock);
 					eth_start (dev, GFP_ATOMIC);
@@ -1240,12 +1086,22 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			value = 0;
 			break;
 		}
+#else
+		/* FIXME this is wrong, as is the assumption that
+		 * all non-PXA hardware talks real CDC ...
+		 */
+		dev_warn (&gadget->dev, "set_interface ignored!\n");
+#endif /* DEV_CONFIG_CDC */
+
+done_set_intf:
 		spin_unlock (&dev->lock);
 		break;
 	case USB_REQ_GET_INTERFACE:
 		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE)
 				|| !dev->config
 				|| ctrl->wIndex > 1)
+			break;
+		if (!dev->cdc && ctrl->wIndex != 0)
 			break;
 
 		/* if carrier is on, data interface is active. */
@@ -1255,7 +1111,6 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				: 0,
 		value = min (ctrl->wLength, (u16) 1);
 		break;
-#endif
 
 #ifdef DEV_CONFIG_CDC
 	case CDC_SET_ETHERNET_PACKET_FILTER:
@@ -1263,8 +1118,10 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		 * wValue = packet filter bitmap
 		 */
 		if (ctrl->bRequestType != (USB_TYPE_CLASS|USB_RECIP_INTERFACE)
+				|| !dev->cdc
 				|| ctrl->wLength != 0
 				|| ctrl->wIndex > 1)
+			break;
 		DEBUG (dev, "NOP packet filter %04x\n", ctrl->wValue);
 		/* NOTE: table 62 has 5 filter bits to reduce traffic,
 		 * and we "must" support multicast and promiscuous.
@@ -1321,7 +1178,7 @@ static int eth_change_mtu (struct net_device *net, int new_mtu)
 {
 	struct eth_dev	*dev = (struct eth_dev *) net->priv;
 
-	if (new_mtu <= MIN_PACKET || new_mtu > MAX_PACKET)
+	if (new_mtu <= ETH_HLEN || new_mtu > ETH_FRAME_LEN)
 		return -ERANGE;
 	/* no zero-length packet read wanted after mtu-sized packets */
 	if (((new_mtu + sizeof (struct ethhdr)) % dev->in_ep->maxpacket) == 0)
@@ -1351,7 +1208,8 @@ static int eth_ethtool_ioctl (struct net_device *net, void *useraddr)
 		info.cmd = ETHTOOL_GDRVINFO;
 		strlcpy (info.driver, shortname, sizeof info.driver);
 		strlcpy (info.version, DRIVER_VERSION, sizeof info.version);
-		strlcpy (info.fw_version, CHIP, sizeof info.fw_version);
+		strlcpy (info.fw_version, dev->gadget->name,
+			sizeof info.fw_version);
 		strlcpy (info.bus_info, dev->gadget->dev.bus_id,
 			sizeof info.bus_info);
 		if (copy_to_user (useraddr, &info, sizeof (info)))
@@ -1439,8 +1297,7 @@ static void rx_complete (struct usb_ep *ep, struct usb_request *req)
 	/* normal completion */
 	case 0:
 		skb_put (skb, req->actual);
-		if (MIN_PACKET > skb->len
-				|| skb->len > (MAX_PACKET + ETH_HLEN)) {
+		if (ETH_HLEN > skb->len || skb->len > ETH_FRAME_LEN) {
 			dev->stats.rx_errors++;
 			dev->stats.rx_length_errors++;
 			DEBUG (dev, "rx length %d\n", skb->len);
@@ -1642,16 +1499,14 @@ static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 	req->context = skb;
 	req->complete = tx_complete;
 
-#ifdef	CONFIG_USB_GADGET_SA1100
-	/* don't demand zlp (req->zero) support from all hardware */
-	if ((length % dev->in_ep->maxpacket) == 0)
-		length++;
-#else
 	/* use zlp framing on tx for strict CDC-Ether conformance,
 	 * though any robust network rx path ignores extra padding.
+	 * and some hardware doesn't like to write zlps.
 	 */
 	req->zero = 1;
-#endif
+	if (!dev->zlp && (length % dev->in_ep->maxpacket) == 0)
+		length++;
+
 	req->length = length;
 
 #ifdef	CONFIG_USB_GADGET_DUALSPEED
@@ -1727,10 +1582,10 @@ static int eth_stop (struct net_device *net)
 			usb_ep_enable (dev->in_ep, dev->in);
 			usb_ep_enable (dev->out_ep, dev->out);
 		}
-#ifdef	EP_STATUS_NUM
-		usb_ep_disable (dev->status_ep);
-		usb_ep_enable (dev->status_ep, dev->status);
-#endif
+		if (dev->status_ep) {
+			usb_ep_disable (dev->status_ep);
+			usb_ep_enable (dev->status_ep, dev->status);
+		}
 	}
 
 	return 0;
@@ -1762,30 +1617,122 @@ eth_unbind (struct usb_gadget *gadget)
 	set_gadget_data (gadget, 0);
 }
 
-static int
+static int __init
 eth_bind (struct usb_gadget *gadget)
 {
 	struct eth_dev		*dev;
 	struct net_device	*net;
+	u8			cdc = 1, zlp = 1;
+	struct usb_ep		*ep;
 	int			status = -ENOMEM;
-#ifdef	DEV_CONFIG_CDC
-	u8			node_id [ETH_ALEN];
 
-	/* just one upstream link at a time */
-	if (ethaddr [0] != 0)
+	/* Because most host side USB stacks handle CDC Ethernet, that
+	 * standard protocol is _strongly_ preferred for interop purposes.
+	 * (By everyone except Microsoft.)
+	 */
+	if (gadget_is_net2280 (gadget)) {
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0201);
+	} else if (gadget_is_dummy (gadget)) {
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0202);
+	} else if (gadget_is_pxa (gadget)) {
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0203);
+		/* pxa doesn't support altsettings */
+		cdc = 0;
+	} else if (gadget_is_sh(gadget)) {
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0204);
+		/* sh doesn't support multiple interfaces or configs */
+		cdc = 0;
+	} else if (gadget_is_sa1100 (gadget)) {
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0205);
+		/* hardware can't write zlps */
+		zlp = 0;
+		/* sa1100 CAN do CDC, without status endpoint ... we use
+		 * non-CDC to be compatible with ARM Linux-2.4 "usb-eth".
+		 */
+		cdc = 0;
+	} else if (gadget_is_goku (gadget)) {
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0206);
+	} else if (gadget_is_mq11xx (gadget)) {
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0207);
+	} else if (gadget_is_omap (gadget)) {
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0208);
+	} else {
+		/* can't assume CDC works.  don't want to default to
+		 * anything less functional on CDC-capable hardware,
+		 * so we fail in this case.
+		 */
+		dev_err (&gadget->dev,
+			"controller '%s' not recognized\n",
+			gadget->name);
 		return -ENODEV;
+	}
+
+#ifndef	DEV_CONFIG_CDC
+	/* in case someone doesn't add their hardware correctly */
+	if (cdc) {
+		dev_err (&gadget->dev,
+			"CDC Ethernet support for '%s' is missing\n",
+			gadget->name);
+		return -ENODEV;
+	}
+#endif
+
+	/* all we really need is bulk IN/OUT */
+	usb_ep_autoconfig_reset (gadget);
+	ep = usb_ep_autoconfig (gadget, &fs_source_desc);
+	if (!ep) {
+autoconf_fail:
+		dev_err (&gadget->dev,
+			"can't autoconfigure on %s\n",
+			gadget->name);
+		return -ENODEV;
+	}
+	EP_IN_NAME = ep->name;
+	ep->driver_data = ep;	/* claim */
+	
+	ep = usb_ep_autoconfig (gadget, &fs_sink_desc);
+	if (!ep)
+		goto autoconf_fail;
+	EP_OUT_NAME = ep->name;
+	ep->driver_data = ep;	/* claim */
+
+#ifdef	DEV_CONFIG_CDC
+	/* CDC Ethernet control interface doesn't require a status endpoint.
+	 * Since some hosts expect one, try to allocate one anyway.
+	 */
+	if (cdc) {
+		ep = usb_ep_autoconfig (gadget, &fs_status_desc);
+		if (ep) {
+			EP_STATUS_NAME = ep->name;
+			ep->driver_data = ep;	/* claim */
+		} else {
+			control_intf.bNumEndpoints = 0;
+			/* FIXME remove endpoint from descriptor list */
+		}
+	} else
+#endif
+		eth_config.bNumInterfaces = 1;
+
+#ifdef	CONFIG_USB_GADGET_DUALSPEED
+	if (!cdc)
+		dev_qualifier.bDeviceClass = USB_CLASS_VENDOR_SPEC;
+
+	/* assumes ep0 uses the same value for both speeds ... */
+	dev_qualifier.bMaxPacketSize0 = device_desc.bMaxPacketSize0;
+
+	/* and that all endpoints are dual-speed */
+	hs_source_desc.bEndpointAddress = fs_source_desc.bEndpointAddress;
+	hs_sink_desc.bEndpointAddress = fs_sink_desc.bEndpointAddress;
+#ifdef	DEV_CONFIG_CDC
+	if (EP_STATUS_NAME)
+		hs_status_desc.bEndpointAddress =
+				fs_status_desc.bEndpointAddress;
+#endif
+
 #endif
 
 	device_desc.bMaxPacketSize0 = gadget->ep0->maxpacket;
-#ifdef	CONFIG_USB_GADGET_DUALSPEED
-	/* assumes ep0 uses the same value for both speeds ... */
-	dev_qualifier.bMaxPacketSize0 = device_desc.bMaxPacketSize0;
-#endif
-
-#ifdef	SELFPOWERED
-	eth_config.bmAttributes |= USB_CONFIG_ATT_SELFPOWERED;
 	usb_gadget_set_selfpowered (gadget);
-#endif
 
  	net = alloc_etherdev (sizeof *dev);
  	if (!net)
@@ -1800,6 +1747,12 @@ eth_bind (struct usb_gadget *gadget)
 	dev->net = net;
 	SET_MODULE_OWNER (net);
 	strcpy (net->name, "usb%d");
+	dev->cdc = cdc;
+	dev->zlp = zlp;
+
+	/* FIXME make these addresses configurable with module params.
+	 * also the manufacturer and product strings.
+	 */
 
 	/* one random address for the gadget device ... both of these could
 	 * reasonably come from an id prom or a module parameter.
@@ -1812,12 +1765,16 @@ eth_bind (struct usb_gadget *gadget)
 	/* ... another address for the host, on the other end of the
 	 * link, gets exported through CDC (see CDC spec table 41)
 	 */
-	get_random_bytes (node_id, sizeof node_id);
-	node_id [0] &= 0xfe;	// clear multicast bit
-	node_id [0] |= 0x02;    // set local assignment bit (IEEE802)
-	snprintf (ethaddr, sizeof ethaddr, "%02X%02X%02X%02X%02X%02X",
-		node_id [0], node_id [1], node_id [2],
-		node_id [3], node_id [4], node_id [5]);
+	if (cdc) {
+		u8		node_id [ETH_ALEN];
+
+		get_random_bytes (node_id, sizeof node_id);
+		node_id [0] &= 0xfe;	// clear multicast bit
+		node_id [0] |= 0x02;    // set local assignment bit (IEEE802)
+		snprintf (ethaddr, sizeof ethaddr, "%02X%02X%02X%02X%02X%02X",
+			node_id [0], node_id [1], node_id [2],
+			node_id [3], node_id [4], node_id [5]);
+	}
 #endif
 
 	net->change_mtu = eth_change_mtu;
@@ -1857,11 +1814,33 @@ eth_bind (struct usb_gadget *gadget)
  	status = register_netdev (dev->net);
  	if (status == 0) {
 
-		INFO (dev, "%s, " CHIP ", version: " DRIVER_VERSION "\n",
-				driver_desc);
+		INFO (dev, "%s, version: " DRIVER_VERSION "\n", driver_desc);
+		INFO (dev, "using %s, OUT %s IN %s%s%s\n", gadget->name,
+			EP_OUT_NAME, EP_IN_NAME,
+			EP_STATUS_NAME ? " STATUS " : "",
+			EP_STATUS_NAME ? EP_STATUS_NAME : ""
+			);
+		INFO (dev, "MAC %02x:%02x:%02x:%02x:%02x:%02x\n",
+			net->dev_addr [0], net->dev_addr [1],
+			net->dev_addr [2], net->dev_addr [3],
+			net->dev_addr [4], net->dev_addr [5]);
+
+		if (!cdc) {
+			device_desc.bDeviceClass = USB_CLASS_VENDOR_SPEC;
+			device_desc.idVendor =
+				__constant_cpu_to_le16(SIMPLE_VENDOR_NUM);
+			device_desc.idProduct =
+				__constant_cpu_to_le16(SIMPLE_PRODUCT_NUM);
+		}
 #ifdef	DEV_CONFIG_CDC
-		INFO (dev, "CDC host enet %s\n", ethaddr);
+		else
+			INFO (dev, "CDC host enet %s\n", ethaddr);
 #endif
+
+		snprintf (manufacturer, sizeof manufacturer,
+			UTS_SYSNAME " " UTS_RELEASE "/%s",
+			gadget->name);
+
  		return status;
 	}
 	dev_dbg(&gadget->dev, "register_netdev failed, %d\n", status);

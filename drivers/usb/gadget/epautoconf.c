@@ -91,7 +91,7 @@ ep_matches (
 				/* bulk endpoints handle interrupt transfers,
 				 * except the toggle-quirky iso-synch kind
 				 */
-				if ('s' != tmp[2])	// == "-iso"
+				if ('s' == tmp[2])	// == "-iso"
 					return 0;
 				/* for now, avoid PXA "interrupt-in";
 				 * it's documented as never using DATA1.
