@@ -1064,7 +1064,10 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     if ( count == 0 )
 	goto out;
 
-    remove_suid(file->f_dentry);
+    res = remove_suid(file->f_dentry);
+    if (res)
+	goto out;
+
     inode_update_time(inode, 1); /* Both mtime and ctime */
 
     // Ok, we are done with all the checks.

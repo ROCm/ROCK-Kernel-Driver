@@ -1193,7 +1193,10 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 		}
 	}
 
-	remove_suid(file->f_dentry);
+	err = remove_suid(file->f_dentry);
+	if (err)
+		goto out;
+
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 
 	do {

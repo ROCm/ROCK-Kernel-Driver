@@ -1502,10 +1502,11 @@ repeat:
  *	if suid or (sgid and xgrp)
  *		remove privs
  */
-void remove_suid(struct dentry *dentry)
+int remove_suid(struct dentry *dentry)
 {
 	mode_t mode = dentry->d_inode->i_mode;
 	int kill = 0;
+	int result = 0;
 
 	/* suid always must be killed */
 	if (unlikely(mode & S_ISUID))
@@ -1522,8 +1523,9 @@ void remove_suid(struct dentry *dentry)
 		struct iattr newattrs;
 
 		newattrs.ia_valid = ATTR_FORCE | kill;
-		notify_change(dentry, &newattrs);
+		result = notify_change(dentry, &newattrs);
 	}
+	return result;
 }
 EXPORT_SYMBOL(remove_suid);
 
@@ -1777,11 +1779,13 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	if (err)
 		goto out;
 
-
 	if (count == 0)
 		goto out;
 
-	remove_suid(file->f_dentry);
+	err = remove_suid(file->f_dentry);
+	if (err)
+		goto out;
+
 	inode_update_time(inode, 1);
 
 	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
