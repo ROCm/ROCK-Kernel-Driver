@@ -1001,6 +1001,9 @@ static struct module *load_module(void *umod,
 			/* Internal symbols */
 			DEBUGP("Symbol table in section %u\n", i);
 			symindex = i;
+			/* Strings */
+			strindex = sechdrs[i].sh_link;
+			DEBUGP("String table found in section %u\n", strindex);
 		} else if (strcmp(secstrings+sechdrs[i].sh_name,
 				  ".gnu.linkonce.this_module") == 0) {
 			/* The module struct */
@@ -1011,11 +1014,6 @@ static struct module *load_module(void *umod,
 			/* Exported symbols. */
 			DEBUGP("EXPORT table in section %u\n", i);
 			exportindex = i;
-		} else if (strcmp(secstrings + sechdrs[i].sh_name, ".strtab")
-			   == 0) {
-			/* Strings */
-			DEBUGP("String table found in section %u\n", i);
-			strindex = i;
 		} else if (strcmp(secstrings+sechdrs[i].sh_name, "__param")
 			   == 0) {
 			/* Setup parameter info */
