@@ -65,12 +65,10 @@ board_setup_arch(void)
 {
 	bd_t *bip = (bd_t *) __res;
 
-#ifdef CONFIG_PPC_RTC
 	if (bip->bi_nvramsize == 512*1024) {
 		/* FIXME: we should properly handle NVRTCs of different sizes */
 		TODC_INIT(TODC_TYPE_DS1557, ep405_nvram, ep405_nvram, ep405_nvram, 8);
 	}
-#endif
 }
 
 void __init
@@ -178,9 +176,9 @@ board_setup_irq(void)
 void __init
 board_init(void)
 {
+#ifdef CONFIG_PPC_RTC
 	bd_t *bip = (bd_t *) __res;
 
-#ifdef CONFIG_PPC_RTC
 	/* FIXME: we should be able to access the NVRAM even if PPC_RTC is not configured */
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
