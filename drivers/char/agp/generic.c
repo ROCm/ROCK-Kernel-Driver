@@ -468,7 +468,7 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 		if (!(*tmp & AGPSTAT3_8X)) {
 			*cmd &= ~(AGPSTAT3_8X | AGPSTAT3_RSVD);
 			*cmd |= ~AGPSTAT3_4X;
-			printk ("%s requested AGPx8 but device not capable.\n", current->comm);
+			printk ("%s requested AGPx8 but graphic card not capable.\n", current->comm);
 			return;
 		}
 		/* All set, bridge & device can do AGP x8*/
@@ -489,6 +489,10 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 			printk (KERN_INFO PFX "Badness. Don't know which AGP mode to set. "
 							"[cmd:%x tmp:%x fell back to:- cmd:%x tmp:%x]\n",
 							origcmd, origtmp, *cmd, *tmp);
+			if (!(*cmd & AGPSTAT3_4X))
+				printk (KERN_INFO PFX "Bridge couldn't do AGP x4.\n");
+			if (!(*tmp & AGPSTAT3_4X))
+				printk (KERN_INFO PFX "Graphic card couldn't do AGP x4.\n");
 		}
 	}
 }
