@@ -152,6 +152,20 @@ static int __devinit snd_ice1712_hoontech_init(ice1712_t *ice)
 {
 	int box, chn;
 
+	/* EZ8 Hack: Change shortname and subvendor id, Recall functions called in
+	 * snd_ice1712_chip_init when it still thinks it is a Hoontech DSP24 card.
+	 */
+	if (ice->ez8) {
+		strcpy(ice->card->shortname, "Event Electronics EZ8");
+		ice->eeprom.subvendor = 0;
+		ice->gpio.write_mask = ice->eeprom.gpiomask;
+		ice->gpio.direction = ice->eeprom.gpiodir;
+		snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, ice->eeprom.gpiomask);
+		snd_ice1712_write(ice, ICE1712_IREG_GPIO_DIRECTION, ice->eeprom.gpiodir);
+		snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, ice->eeprom.gpiostate);
+		return 0;
+	}
+
 	ice->num_total_dacs = 8;
 	ice->num_total_adcs = 8;
 

@@ -23,9 +23,9 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/time.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -49,32 +49,33 @@ static int seq_ports[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4};
 static int max_synth_voices[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 64};
 static int max_buffer_size[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 128};
 static int enable_ir[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the EMU10K1 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the EMU10K1 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable the EMU10K1 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(extin, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(extin, int, boot_devs, 0444);
 MODULE_PARM_DESC(extin, "Available external inputs for FX8010. Zero=default.");
 MODULE_PARM_SYNTAX(extin, SNDRV_ENABLED "allows:{{0,0x0ffff}},base:16");
-MODULE_PARM(extout, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(extout, int, boot_devs, 0444);
 MODULE_PARM_DESC(extout, "Available external outputs for FX8010. Zero=default.");
 MODULE_PARM_SYNTAX(extout, SNDRV_ENABLED "allows:{{0,0x0ffff}},base:16");
-MODULE_PARM(seq_ports, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(seq_ports, int, boot_devs, 0444);
 MODULE_PARM_DESC(seq_ports, "Allocated sequencer ports for internal synthesizer.");
 MODULE_PARM_SYNTAX(seq_ports, SNDRV_ENABLED "allows:{{0,32}}");
-MODULE_PARM(max_synth_voices, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(max_synth_voices, int, boot_devs, 0444);
 MODULE_PARM_DESC(max_synth_voices, "Maximum number of voices for WaveTable.");
 MODULE_PARM_SYNTAX(max_synth_voices, SNDRV_ENABLED);
-MODULE_PARM(max_buffer_size, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(max_buffer_size, int, boot_devs, 0444);
 MODULE_PARM_DESC(max_buffer_size, "Maximum sample buffer size in MB.");
 MODULE_PARM_SYNTAX(max_buffer_size, SNDRV_ENABLED);
-MODULE_PARM(enable_ir, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable_ir, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable_ir, "Enable IR.");
 MODULE_PARM_SYNTAX(enable_ir, SNDRV_ENABLE_DESC);
 
@@ -211,15 +212,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_emu10k1_init(void)
 {
-	int err;
-
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "EMU10K1/Audigy soundcard not found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_emu10k1_exit(void)
@@ -229,27 +222,3 @@ static void __exit alsa_card_emu10k1_exit(void)
 
 module_init(alsa_card_emu10k1_init)
 module_exit(alsa_card_emu10k1_exit)
-
-#ifndef MODULE
-
-/* format is: snd-emu10k1=enable,index,id,
-			  seq_ports,max_synth_voices */
-
-static int __init alsa_card_emu10k1_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&seq_ports[nr_dev]) == 2 &&
-	       get_option(&str,&max_synth_voices[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-emu10k1=", alsa_card_emu10k1_setup);
-
-#endif /* ifndef MODULE */

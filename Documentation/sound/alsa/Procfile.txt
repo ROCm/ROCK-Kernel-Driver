@@ -131,6 +131,12 @@ card*/codec97#*/ac97#?-?
 card*/codec97#0/ac97#?-?+regs
 	Shows the AC97 register dump.  Useful for debugging.
 
+	When CONFIG_SND_DEBUG is enabled, you can write to this file for
+	changing an AC97 register directly.  Pass two hex numbers.
+	For example,
+
+	# echo 02 9f1f > /proc/asound/card0/codec97#0/ac97#0-0+regs
+
 
 Sequencer Information
 ---------------------

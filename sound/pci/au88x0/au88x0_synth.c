@@ -36,6 +36,7 @@ static int vortex_wt_SetReg(vortex_t * vortex, unsigned char reg, int wt,
 
 /* WT */
 
+/* Put 2 WT channels together for one stereo interlaced channel. */
 static void vortex_wt_setstereo(vortex_t * vortex, u32 wt, u32 stereo)
 {
 	int temp;
@@ -47,6 +48,7 @@ static void vortex_wt_setstereo(vortex_t * vortex, u32 wt, u32 stereo)
 	hwwrite(vortex->mmio, WT_STEREO(wt), temp);
 }
 
+/* Join to mixdown route. */
 static void vortex_wt_setdsout(vortex_t * vortex, u32 wt, int en)
 {
 	int temp;
@@ -60,7 +62,7 @@ static void vortex_wt_setdsout(vortex_t * vortex, u32 wt, int en)
 	hwwrite(vortex->mmio, WT_DSREG((wt >= 0x20) ? 1 : 0), temp);
 }
 
-// WT routing is still a mistery.
+/* Setup WT route. */
 static int vortex_wt_allocroute(vortex_t * vortex, int wt, int nr_ch)
 {
 	wt_voice_t *voice = &(vortex->wt_voice[wt]);
@@ -68,13 +70,15 @@ static int vortex_wt_allocroute(vortex_t * vortex, int wt, int nr_ch)
 
 	//FIXME: WT audio routing.
 	if (nr_ch) {
-		vortex_fifo_wtinitialize(vortex, wt, 2);
+		vortex_fifo_wtinitialize(vortex, wt, 1);
 		vortex_fifo_setwtvalid(vortex, wt, 1);
 		vortex_wt_setstereo(vortex, wt, nr_ch - 1);
 	} else
 		vortex_fifo_setwtvalid(vortex, wt, 0);
-
-	vortex_wt_setdsout(vortex, wt, 0);
+	
+	/* Set mixdown mode. */
+	vortex_wt_setdsout(vortex, wt, 1);
+	/* Set other parameter registers. */
 	hwwrite(vortex->mmio, WT_SRAMP(0), 0x880000);
 	//hwwrite(vortex->mmio, WT_GMODE(0), 0xffffffff);
 #ifdef CHIP_AU8830
@@ -87,7 +91,7 @@ static int vortex_wt_allocroute(vortex_t * vortex, int wt, int nr_ch)
 
 	temp = hwread(vortex->mmio, WT_PARM(wt, 3));
 	printk("vortex: WT PARM3: %x\n", temp);
-	hwwrite(vortex->mmio, WT_PARM(wt, 3), temp);
+	//hwwrite(vortex->mmio, WT_PARM(wt, 3), temp);
 
 	hwwrite(vortex->mmio, WT_DELAY(wt, 0), 0);
 	hwwrite(vortex->mmio, WT_DELAY(wt, 1), 0);
@@ -105,6 +109,7 @@ static int vortex_wt_allocroute(vortex_t * vortex, int wt, int nr_ch)
 	printk("vortex: WT GMODE 2 : %x\n", hwread(vortex->mmio, WT_GMODE(wt)));
 	return 0;
 }
+
 
 static void vortex_wt_connect(vortex_t * vortex, int en)
 {
@@ -129,15 +134,12 @@ static void vortex_wt_connect(vortex_t * vortex, int en)
 				     ADB_WTOUT(i, ii + 0x20), ADB_MIXIN(mix));
 
 			vortex_connection_mixin_mix(vortex, en, mix,
-						    vortex->mixplayb[ii %
-								     2], 0);
+						    vortex->mixplayb[ii % 2], 0);
 			if (VORTEX_IS_QUAD(vortex))
 				vortex_connection_mixin_mix(vortex, en,
 							    mix,
-							    vortex->
-							    mixplayb[2 +
-								     (ii %
-								      2)], 0);
+							    vortex->mixplayb[2 +
+								     (ii % 2)], 0);
 		}
 	}
 	for (i = 0; i < NR_WT; i++) {

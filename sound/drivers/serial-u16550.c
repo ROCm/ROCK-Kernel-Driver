@@ -35,9 +35,9 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/rawmidi.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #include <linux/serial_reg.h>
@@ -77,39 +77,40 @@ static int outs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};	 /* 1 to 16 */
 static int ins[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};	/* 1 to 16 */
 static int adaptor[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = SNDRV_SERIAL_SOUNDCANVAS};
 static int droponfull[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS -1)] = SNDRV_SERIAL_NORMALBUFF };
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Serial MIDI.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Serial MIDI.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable UART16550A chip.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for UART16550A chip.");
 MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
-MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for UART16550A chip.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
-MODULE_PARM(speed, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(speed, int, boot_devs, 0444);
 MODULE_PARM_DESC(speed, "Speed in bauds.");
 MODULE_PARM_SYNTAX(speed, SNDRV_ENABLED ",allows:{9600,19200,38400,57600,115200},dialog:list");
-MODULE_PARM(base, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(base, int, boot_devs, 0444);
 MODULE_PARM_DESC(base, "Base for divisor in bauds.");
 MODULE_PARM_SYNTAX(base, SNDRV_ENABLED ",allows:{57600,115200,230400,460800},dialog:list");
-MODULE_PARM(outs, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(outs, int, boot_devs, 0444);
 MODULE_PARM_DESC(outs, "Number of MIDI outputs.");
-MODULE_PARM(ins, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(ins, int, boot_devs, 0444);
 MODULE_PARM_DESC(ins, "Number of MIDI inputs.");
-MODULE_PARM(droponfull, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(droponfull, bool, boot_devs, 0444);
 MODULE_PARM_DESC(droponfull, "Flag to enable drop-on-full buffer mode");
 MODULE_PARM_SYNTAX(droponfull, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 MODULE_PARM_SYNTAX(outs, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
 MODULE_PARM_SYNTAX(ins, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
-MODULE_PARM(adaptor, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(adaptor, int, boot_devs, 0444);
 MODULE_PARM_DESC(adaptor, "Type of adaptor.");
 MODULE_PARM_SYNTAX(adaptor, SNDRV_ENABLED ",allows:{{0=Soundcanvas,1=MS-124T,2=MS-124W S/A,3=MS-124W M/B,4=Generic}},dialog:list");
 
@@ -987,34 +988,3 @@ static void __exit alsa_card_serial_exit(void)
 
 module_init(alsa_card_serial_init)
 module_exit(alsa_card_serial_exit)
-
-#ifndef MODULE
-
-/* format is: snd-serial=enable,index,id,
-			 port,irq,speed,base,outs,
- 			 ins,adaptor,droponfull */
-
-static int __init alsa_card_serial_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option_long(&str,&port[nr_dev]) == 2 &&
-	       get_option(&str,&irq[nr_dev]) == 2 &&
-	       get_option(&str,&speed[nr_dev]) == 2 &&
-	       get_option(&str,&base[nr_dev]) == 2 &&
-	       get_option(&str,&outs[nr_dev]) == 2 &&
-	       get_option(&str,&ins[nr_dev]) == 2 &&
-	       get_option(&str,&adaptor[nr_dev]) == 2 &&
-	       get_option(&str,&droponfull[nr_dev]) == 2 );
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-serial=", alsa_card_serial_setup);
-
-#endif /* ifndef MODULE */

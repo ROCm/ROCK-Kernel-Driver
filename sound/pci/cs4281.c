@@ -27,13 +27,13 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/gameport.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
 #include <sound/ac97_codec.h>
 #include <sound/opl3.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 
@@ -47,17 +47,18 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
 static int dual_codec[SNDRV_CARDS];	/* dual codec */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for CS4281 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for CS4281 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable CS4281 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(dual_codec, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dual_codec, bool, boot_devs, 0444);
 MODULE_PARM_DESC(dual_codec, "Secondary Codec ID (0 = disabled).");
 MODULE_PARM_SYNTAX(dual_codec, SNDRV_ENABLED ",allows:{{0,3}}");
 
@@ -1395,7 +1396,8 @@ static int snd_cs4281_dev_free(snd_device_t *device)
 
 static int snd_cs4281_chip_init(cs4281_t *chip); /* defined below */
 #ifdef CONFIG_PM
-static int snd_cs4281_set_power_state(snd_card_t *card, unsigned int power_state);
+static int cs4281_suspend(snd_card_t *card, unsigned int state);
+static int cs4281_resume(snd_card_t *card, unsigned int state);
 #endif
 
 static int __devinit snd_cs4281_create(snd_card_t * card,
@@ -1461,10 +1463,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 
 	snd_cs4281_proc_init(chip);
 
-#ifdef CONFIG_PM
-	card->set_power_state = snd_cs4281_set_power_state;
-	card->power_state_private_data = chip;
-#endif
+	snd_card_set_pm_callback(card, cs4281_suspend, cs4281_resume, chip);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_cs4281_free(chip);
@@ -1481,7 +1480,9 @@ static int snd_cs4281_chip_init(cs4281_t *chip)
 {
 	unsigned int tmp;
 	int timeout;
+	int retry_count = 2;
 
+      __retry:
 	tmp = snd_cs4281_peekBA0(chip, BA0_CFLR);
 	if (tmp != BA0_CFLR_DEFAULT) {
 		snd_cs4281_pokeBA0(chip, BA0_CFLR, BA0_CFLR_DEFAULT);
@@ -1629,6 +1630,8 @@ static int snd_cs4281_chip_init(cs4281_t *chip)
 		snd_cs4281_delay_long();
 	} while (timeout-- > 0);
 
+	if (--retry_count > 0)
+		goto __retry;
 	snd_printk(KERN_ERR "never read ISV3 and ISV4 from AC'97\n");
 	return -EIO;
 
@@ -1999,15 +2002,14 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 		return err;
 	}
 
-	pci_set_drvdata(pci, chip);
+	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
 }
 
 static void __devexit snd_cs4281_remove(struct pci_dev *pci)
 {
-	cs4281_t *chip = pci_get_drvdata(pci);
-	snd_card_free(chip->card);
+	snd_card_free(pci_get_drvdata(pci));
 	pci_set_drvdata(pci, NULL);
 }
 
@@ -2036,16 +2038,18 @@ static int saved_regs[SUSPEND_REGISTERS] = {
 
 #define CLKCR1_CKRA                             0x00010000L
 
-static void cs4281_suspend(cs4281_t *chip)
+static int cs4281_suspend(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	cs4281_t *chip = snd_magic_cast(cs4281_t, card->pm_private_data, return -EINVAL);
 	u32 ulCLK;
 	unsigned int i;
 
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
-
 	snd_pcm_suspend_all(chip->pcm);
+
+	if (chip->ac97)
+		snd_ac97_suspend(chip->ac97);
+	if (chip->ac97_secondary)
+		snd_ac97_suspend(chip->ac97_secondary);
 
 	ulCLK = snd_cs4281_peekBA0(chip, BA0_CLKCR1);
 	ulCLK |= CLKCR1_CKRA;
@@ -2076,16 +2080,14 @@ static void cs4281_suspend(cs4281_t *chip)
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void cs4281_resume(cs4281_t *chip)
+static int cs4281_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
+	cs4281_t *chip = snd_magic_cast(cs4281_t, card->pm_private_data, return -EINVAL);
 	unsigned int i;
 	u32 ulCLK;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
 
 	pci_enable_device(chip->pci);
 
@@ -2110,41 +2112,8 @@ static void cs4281_resume(cs4281_t *chip)
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-}
-
-static int snd_cs4281_suspend(struct pci_dev *dev, u32 state)
-{
-	cs4281_t *chip = snd_magic_cast(cs4281_t, pci_get_drvdata(dev), return -ENXIO);
-	cs4281_suspend(chip);
 	return 0;
 }
-static int snd_cs4281_resume(struct pci_dev *dev)
-{
-	cs4281_t *chip = snd_magic_cast(cs4281_t, pci_get_drvdata(dev), return -ENXIO);
-	cs4281_resume(chip);
-	return 0;
-}
-
-/* callback */
-static int snd_cs4281_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	cs4281_t *chip = snd_magic_cast(cs4281_t, card->power_state_private_data, return -ENXIO);
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		cs4281_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		cs4281_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
-}
-
 #endif /* CONFIG_PM */
 
 static struct pci_driver driver = {
@@ -2152,23 +2121,12 @@ static struct pci_driver driver = {
 	.id_table = snd_cs4281_ids,
 	.probe = snd_cs4281_probe,
 	.remove = __devexit_p(snd_cs4281_remove),
-#ifdef CONFIG_PM
-	.suspend = snd_cs4281_suspend,
-	.resume = snd_cs4281_resume,
-#endif
+	SND_PCI_PM_CALLBACKS
 };
 	
 static int __init alsa_card_cs4281_init(void)
 {
-	int err;
-
-	if ((err = pci_module_init(&driver)) < 0) {
-#ifdef MODULE
-		printk(KERN_ERR "CS4281 soundcard not found or device busy\n");
-#endif
-		return err;
-	}
-	return 0;
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_cs4281_exit(void)
@@ -2178,24 +2136,3 @@ static void __exit alsa_card_cs4281_exit(void)
 
 module_init(alsa_card_cs4281_init)
 module_exit(alsa_card_cs4281_exit)
-
-#ifndef MODULE
-
-/* format is: snd-cs4281=enable,index,id */
-
-static int __init alsa_card_cs4281_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-cs4281=", alsa_card_cs4281_setup);
-
-#endif /* ifndef MODULE */

@@ -1343,6 +1343,7 @@ static int snd_cs4231_capture_close(snd_pcm_substream_t * substream)
 
 #ifdef CONFIG_PM
 
+/* lowlevel suspend callback for CS4231 */
 static void snd_cs4231_suspend(cs4231_t *chip)
 {
 	int reg;
@@ -1354,6 +1355,7 @@ static void snd_cs4231_suspend(cs4231_t *chip)
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 }
 
+/* lowlevel resume callback for CS4231 */
 static void snd_cs4231_resume(cs4231_t *chip)
 {
 	int reg;
@@ -1395,25 +1397,25 @@ static void snd_cs4231_resume(cs4231_t *chip)
 #endif
 }
 
-static int snd_cs4231_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+static int snd_cs4231_pm_suspend(snd_card_t *card, unsigned int state)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, dev->data, return 0);
-
-	switch (rqst) {
-	case PM_SUSPEND:
-		if (chip->suspend) {
-			snd_pcm_suspend_all(chip->pcm);
-			(*chip->suspend)(chip);
-		}
-		break;
-	case PM_RESUME:
-		if (chip->resume)
-			(*chip->resume)(chip);
-		break;
+	cs4231_t *chip = snd_magic_cast(cs4231_t, card->pm_private_data, return -EINVAL);
+	if (chip->suspend) {
+		chip->suspend(chip);
+		snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	}
 	return 0;
 }
 
+static int snd_cs4231_pm_resume(snd_card_t *card, unsigned int state)
+{
+	cs4231_t *chip = snd_magic_cast(cs4231_t, card->pm_private_data, return -EINVAL);
+	if (chip->resume) {
+		chip->resume(chip);
+		snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+	}
+	return 0;
+}
 #endif /* CONFIG_PM */
 
 #ifdef LEGACY_SUPPORT
@@ -1441,10 +1443,6 @@ static int snd_cs4231_free(cs4231_t *chip)
 		snd_dma_disable(chip->dma2);
 		free_dma(chip->dma2);
 	}
-#ifdef CONFIG_PM
-	if (chip->pm_dev)
-		pm_unregister(chip->pm_dev);
-#endif
 	if (chip->timer)
 		snd_device_free(chip->card, chip->timer);
 	snd_magic_kfree(chip);
@@ -1587,9 +1585,7 @@ int snd_cs4231_create(snd_card_t * card,
 	/* Power Management */
 	chip->suspend = snd_cs4231_suspend;
 	chip->resume = snd_cs4231_resume;
-	chip->pm_dev = pm_register(PM_ISA_DEV, 0, snd_cs4231_pm_callback);
-	if (chip->pm_dev)
-		chip->pm_dev->data = chip;
+	snd_card_set_isa_pm_callback(card, snd_cs4231_pm_suspend, snd_cs4231_pm_resume, chip);
 #endif
 
 	*rchip = chip;
@@ -1659,7 +1655,7 @@ int snd_cs4231_pcm(cs4231_t *chip, int device, snd_pcm_t **rpcm)
 #else
 #  ifdef EBUS_SUPPORT
         if (chip->ebus_flag) {
-                snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+                snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
                 				      chip->dev_u.pdev,
 						      64*1024, 128*1024);
         } else {

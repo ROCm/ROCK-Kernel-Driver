@@ -162,7 +162,6 @@ struct snd_pmac {
 	void (*update_automute)(pmac_t *chip, int do_notify);
 	int (*detect_headphone)(pmac_t *chip);
 #ifdef CONFIG_PMAC_PBOOK
-	unsigned int sleep_registered : 1;
 	void (*suspend)(pmac_t *chip);
 	void (*resume)(pmac_t *chip);
 #endif
@@ -180,6 +179,7 @@ int snd_pmac_awacs_init(pmac_t *chip);
 int snd_pmac_burgundy_init(pmac_t *chip);
 int snd_pmac_daca_init(pmac_t *chip);
 int snd_pmac_tumbler_init(pmac_t *chip);
+int snd_pmac_tumbler_post_init(void);
 
 /* i2c functions */
 typedef struct snd_pmac_keywest {

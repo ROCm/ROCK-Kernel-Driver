@@ -70,11 +70,11 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/wait.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include <sound/info.h>
 #include <asm/hardware.h>
@@ -140,6 +140,17 @@ MODULE_DEVICES("{{ALSA,Harmony soundcard}}");
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;
+static int boot_devs;
+
+module_param_array(index, int, boot_devs, 0444);
+MODULE_PARM_DESC(index, "Index value for Sun CS4231 soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+module_param_array(id, charp, boot_devs, 0444);
+MODULE_PARM_DESC(id, "ID string for Sun CS4231 soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+module_param_array(enable, bool, boot_devs, 0444);
+MODULE_PARM_DESC(enable, "Enable Sun CS4231 soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 
 /* Register offset (from base hpa) */
 #define REG_ID		0x00
@@ -847,7 +858,7 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	harmony->pcm = pcm;
 	
 	/* initialize graveyard buffer */
-	harmony->dma_dev.type = SNDRV_DMA_TYPE_PCI;
+	harmony->dma_dev.type = SNDRV_DMA_TYPE_DEV;
 	harmony->dma_dev.dev = snd_dma_pci_data(harmony->fake_pci_dev); 
 	harmony->graveyard_addr = snd_dma_alloc_pages(&chip->dma_dev,
 			HARMONY_BUF_SIZE*GRAVEYARD_BUFS, &harmony->graveyard_dma);

@@ -29,6 +29,7 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
+#include <linux/moduleparam.h>
 #include <asm/semaphore.h>
 #include <sound/memalloc.h>
 #ifdef CONFIG_SBUS
@@ -45,7 +46,8 @@ MODULE_LICENSE("GPL");
 #define SNDRV_CARDS	8
 #endif
 static int enable[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+static int boot_devs;
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable cards to allocate buffers.");
 
 /*
@@ -89,32 +91,7 @@ struct snd_mem_list {
  *  Hacks
  */
 
-static void *snd_dma_alloc_coherent1(struct device *dev, size_t size,
-				     dma_addr_t *dma_handle, int flags)
-{
-	if (dev)
-		return dma_alloc_coherent(dev, size, dma_handle, flags);
-	else /* FIXME: dma_alloc_coherent does't always accept dev=NULL */
-		return pci_alloc_consistent(NULL, size, dma_handle);
-}
-
-static void snd_dma_free_coherent1(struct device *dev, size_t size, void *dma_addr,
-				   dma_addr_t dma_handle)
-{
-	if (dev)
-		return dma_free_coherent(dev, size, dma_addr, dma_handle);
-	else
-		return pci_free_consistent(NULL, size, dma_addr, dma_handle);
-}
-
-#undef dma_alloc_coherent
-#define dma_alloc_coherent snd_dma_alloc_coherent1
-#undef dma_free_coherent
-#define dma_free_coherent snd_dma_free_coherent1
-
-
 #if defined(__i386__) || defined(__ppc__) || defined(__x86_64__)
-
 /*
  * A hack to allocate large buffers via dma_alloc_coherent()
  *
@@ -135,14 +112,17 @@ static void *snd_dma_hack_alloc_coherent(struct device *dev, size_t size,
 					 dma_addr_t *dma_handle, int flags)
 {
 	void *ret;
-	u64 dma_mask;
+	u64 dma_mask, coherent_dma_mask;
 
 	if (dev == NULL || !dev->dma_mask)
 		return dma_alloc_coherent(dev, size, dma_handle, flags);
 	dma_mask = *dev->dma_mask;
+	coherent_dma_mask = dev->coherent_dma_mask;
 	*dev->dma_mask = 0xffffffff; 	/* do without masking */
+	dev->coherent_dma_mask = 0xffffffff; 	/* do without masking */
 	ret = dma_alloc_coherent(dev, size, dma_handle, flags);
 	*dev->dma_mask = dma_mask;	/* restore */
+	dev->coherent_dma_mask = coherent_dma_mask;	/* restore */
 	if (ret) {
 		/* obtained address is out of range? */
 		if (((unsigned long)*dma_handle + size - 1) & ~dma_mask) {
@@ -152,8 +132,12 @@ static void *snd_dma_hack_alloc_coherent(struct device *dev, size_t size,
 		}
 	} else {
 		/* wish to success now with the proper mask... */
-		if (dma_mask != 0xffffffffUL)
+		if (dma_mask != 0xffffffffUL) {
+			/* allocation with GFP_ATOMIC to avoid the long stall */
+			flags &= ~GFP_KERNEL;
+			flags |= GFP_ATOMIC;
 			ret = dma_alloc_coherent(dev, size, dma_handle, flags);
+		}
 	}
 	return ret;
 }
@@ -841,25 +825,6 @@ static void __exit snd_mem_exit(void)
 module_init(snd_mem_init)
 module_exit(snd_mem_exit)
 
-
-#ifndef MODULE
-
-/* format is: snd-page-alloc=enable */
-
-static int __init snd_mem_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-page-alloc=", snd_mem_setup);
-
-#endif
 
 /*
  * exports

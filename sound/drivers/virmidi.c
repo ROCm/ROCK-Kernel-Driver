@@ -45,10 +45,10 @@
 #include <linux/init.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/seq_kernel.h>
 #include <sound/seq_virmidi.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 /* hack: OSS defines midi_devs, so undefine it (versioned symbols) */
@@ -66,17 +66,18 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = {1, [1 ... (SNDRV_CARDS - 1)] = 0};
 static int midi_devs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4};
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for virmidi soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for virmidi soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable this soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(midi_devs, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(midi_devs, int, boot_devs, 0444);
 MODULE_PARM_DESC(midi_devs, "MIDI devices # (1-8)");
 MODULE_PARM_SYNTAX(midi_devs, SNDRV_ENABLED ",allows:{{1,8}}");
 
@@ -162,25 +163,3 @@ static void __exit alsa_card_virmidi_exit(void)
 
 module_init(alsa_card_virmidi_init)
 module_exit(alsa_card_virmidi_exit)
-
-#ifndef MODULE
-
-/* format is: snd-virmidi=enable,index,id,midi_devs */
-
-static int __init alsa_card_virmidi_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&midi_devs[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-virmidi=", alsa_card_virmidi_setup);
-
-#endif /* ifndef MODULE */
