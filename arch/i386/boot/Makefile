@@ -28,6 +28,8 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 EXTRA_TARGETS	:= vmlinux.bin bootsect bootsect.o \
 		   setup setup.o zImage bzImage
 
+subdir- 	:= compressed
+
 host-progs	:= tools/build
 
 # 	Default
@@ -78,11 +80,6 @@ zlilo: $(BOOTIMAGE)
 
 install: $(BOOTIMAGE)
 	sh $(src)/install.sh $(KERNELRELEASE) $(BOOTIMAGE) System.map "$(INSTALL_PATH)"
-
-clean:
-	@echo 'Cleaning up (boot)'
-	@rm -f $(host-progs) $(EXTRA_TARGETS)
-	+@$(call descend,$(obj)/compressed) clean
 
 archhelp:
 	@echo  '* bzImage	- Compressed kernel image (arch/$(ARCH)/boot/bzImage)'

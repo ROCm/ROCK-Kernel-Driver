@@ -260,7 +260,7 @@ static void do_update_one(void *unused)
 			
 			if (microcode[i].rev < rev) {
 				spin_unlock_irqrestore(&microcode_update_lock, flags);
-				printk(KERN_ERR 
+				printk(KERN_INFO
 				       "microcode: CPU%d not 'upgrading' to earlier revision"
 				       " %d (current=%d)\n", cpu_num, microcode[i].rev, rev);
 				return;
@@ -268,7 +268,7 @@ static void do_update_one(void *unused)
 				/* notify the caller of success on this cpu */
 				req->err = 0;
 				spin_unlock_irqrestore(&microcode_update_lock, flags);
-				printk(KERN_ERR 
+				printk(KERN_INFO
 					"microcode: CPU%d already at revision"
 					" %d (current=%d)\n", cpu_num, microcode[i].rev, rev);
 				return;

@@ -740,7 +740,7 @@ static inline int exp_for_packet(struct ip_conntrack_expect *exp,
 	int ret = 1;
 
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	proto = ip_ct_find_proto((*pskb)->nh.iph->protocol);
+	proto = __ip_ct_find_proto((*pskb)->nh.iph->protocol);
 	if (proto->exp_matches_pkt)
 		ret = proto->exp_matches_pkt(exp, pskb);
 

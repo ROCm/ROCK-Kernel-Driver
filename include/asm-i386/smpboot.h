@@ -24,15 +24,6 @@
 #endif /* CONFIG_CLUSTERED_APIC */
 
 /*
- * How to map from the cpu_present_map
- */
-#ifdef CONFIG_CLUSTERED_APIC
- #define cpu_present_to_apicid(mps_cpu) ( ((mps_cpu/4)*16) + (1<<(mps_cpu%4)) )
-#else /* !CONFIG_CLUSTERED_APIC */
- #define cpu_present_to_apicid(apicid) (apicid)
-#endif /* CONFIG_CLUSTERED_APIC */
-
-/*
  * Mappings between logical cpu number and logical / physical apicid
  * The first four macros are trivial, but it keeps the abstraction consistent
  */

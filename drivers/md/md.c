@@ -200,6 +200,7 @@ static mddev_t * mddev_find(int unit)
 	INIT_LIST_HEAD(&new->disks);
 	INIT_LIST_HEAD(&new->all_mddevs);
 	atomic_set(&new->active, 1);
+	blk_queue_make_request(&new->queue, md_fail_request);
 
 	goto retry;
 }
@@ -1275,6 +1276,39 @@ abort:
 	return 1;
 }
 
+static struct gendisk *md_probe(dev_t dev, int *part, void *data)
+{
+	static DECLARE_MUTEX(disks_sem);
+	int unit = MINOR(dev);
+	mddev_t *mddev = mddev_find(unit);
+	struct gendisk *disk;
+
+	if (!mddev)
+		return NULL;
+
+	down(&disks_sem);
+	if (disks[unit]) {
+		up(&disks_sem);
+		mddev_put(mddev);
+		return NULL;
+	}
+	disk = alloc_disk(1);
+	if (!disk) {
+		up(&disks_sem);
+		mddev_put(mddev);
+		return NULL;
+	}
+	disk->major = MD_MAJOR;
+	disk->first_minor = mdidx(mddev);
+	sprintf(disk->disk_name, "md%d", mdidx(mddev));
+	disk->fops = &md_fops;
+	disk->private_data = mddev;
+	disk->queue = &mddev->queue;
+	add_disk(disk);
+	disks[mdidx(mddev)] = disk;
+	up(&disks_sem);
+	return NULL;
+}
 
 #define TOO_BIG_CHUNKSIZE KERN_ERR \
 "too big chunk_size: %d > %d\n"
@@ -1394,15 +1428,10 @@ static int do_md_run(mddev_t * mddev)
 #endif
 	}
 
-	disk = alloc_disk();
+	md_probe(mdidx(mddev), NULL, NULL);
+	disk = disks[mdidx(mddev)];
 	if (!disk)
 		return -ENOMEM;
-	disk->major = MD_MAJOR;
-	disk->first_minor = mdidx(mddev);
-	disk->minor_shift = 0;
-	sprintf(disk->disk_name, "md%d", mdidx(mddev));
-	disk->fops = &md_fops;
-
 	mddev->pers = pers[pnum];
 
 	blk_queue_make_request(&mddev->queue, mddev->pers->make_request);
@@ -1418,7 +1447,6 @@ static int do_md_run(mddev_t * mddev)
 	if (err) {
 		printk(KERN_ERR "md: pers->run() failed ...\n");
 		mddev->pers = NULL;
-		put_disk(disk);
 		return -EINVAL;
 	}
 
@@ -1431,9 +1459,6 @@ static int do_md_run(mddev_t * mddev)
 	md_update_sb(mddev);
 	md_recover_arrays();
 	set_capacity(disk, md_size[mdidx(mddev)]<<1);
-	add_disk(disk);
-	disks[mdidx(mddev)] = disk;
-
 	return (0);
 }
 
@@ -1544,13 +1569,8 @@ static int do_md_stop(mddev_t * mddev, int ro)
 
 		md_size[mdidx(mddev)] = 0;
 		disk = disks[mdidx(mddev)];
-		disks[mdidx(mddev)] = NULL;
-
-		if (disk) {
-			del_gendisk(disk);
-			put_disk(disk);
-		}
-
+		if (disk)
+			set_capacity(disk, 0);
 	} else
 		printk(KERN_INFO "md: md%d switched to read-only mode.\n", mdidx(mddev));
 	err = 0;
@@ -2732,18 +2752,9 @@ int unregister_md_personality(int pnum)
 	return 0;
 }
 
-static unsigned int sync_io[DK_MAX_MAJOR][DK_MAX_DISK];
 void md_sync_acct(mdk_rdev_t *rdev, unsigned long nr_sectors)
 {
-	kdev_t dev = to_kdev_t(rdev->bdev->bd_dev);
-	unsigned int major = major(dev);
-	unsigned int index;
-
-	index = disk_index(dev);
-	if ((index >= DK_MAX_DISK) || (major >= DK_MAX_MAJOR))
-		return;
-
-	sync_io[major][index] += nr_sectors;
+	rdev->bdev->bd_disk->sync_io += nr_sectors;
 }
 
 static int is_mddev_idle(mddev_t *mddev)
@@ -2755,16 +2766,8 @@ static int is_mddev_idle(mddev_t *mddev)
 
 	idle = 1;
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		kdev_t dev = to_kdev_t(rdev->bdev->bd_dev);
-		int major = major(dev);
-		int idx = disk_index(dev);
-
-		if ((idx >= DK_MAX_DISK) || (major >= DK_MAX_MAJOR))
-			continue;
-
-		curr_events = kstat.dk_drive_rblk[major][idx] +
-						kstat.dk_drive_wblk[major][idx] ;
-		curr_events -= sync_io[major][idx];
+		struct gendisk *disk = rdev->bdev->bd_disk;
+		curr_events = disk->reads + disk->writes - disk->sync_io;
 		if ((curr_events - rdev->last_events) > 32) {
 			rdev->last_events = curr_events;
 			idle = 0;
@@ -3101,18 +3104,6 @@ static void md_geninit(void)
 #endif
 }
 
-request_queue_t * md_queue_proc(kdev_t dev)
-{
-	mddev_t *mddev = mddev_find(minor(dev));
-	request_queue_t *q = BLK_DEFAULT_QUEUE(MAJOR_NR);
-	if (mddev) {
-		if (mddev->pers)
-			q = &mddev->queue;
-		mddev_put(mddev);
-	}
-	return q;
-}
-
 int __init md_init(void)
 {
 	static char * name = "mdrecoveryd";
@@ -3127,6 +3118,8 @@ int __init md_init(void)
 		return (-1);
 	}
 	devfs_handle = devfs_mk_dir (NULL, "md", NULL);
+	blk_register_region(MKDEV(MAJOR_NR, 0), MAX_MD_DEVS, THIS_MODULE,
+				md_probe, NULL, NULL);
 	for (minor=0; minor < MAX_MD_DEVS; ++minor) {
 		char devname[128];
 		sprintf (devname, "%u", minor);
@@ -3134,10 +3127,6 @@ int __init md_init(void)
 			devname, DEVFS_FL_DEFAULT, MAJOR_NR, minor,
 			S_IFBLK | S_IRUSR | S_IWUSR, &md_fops, NULL);
 	}
-
-	/* all requests on an uninitialised device get failed... */
-	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), md_fail_request);
-	blk_dev[MAJOR_NR].queue = md_queue_proc;
 
 	md_recovery_thread = md_register_thread(md_do_recovery, NULL, name);
 	if (!md_recovery_thread)
@@ -3465,6 +3454,8 @@ int init_module(void)
 
 void cleanup_module(void)
 {
+	int i;
+	blk_unregister_region(MKDEV(MAJOR_NR,0), MAX_MD_DEVS);
 	md_unregister_thread(md_recovery_thread);
 	devfs_unregister(devfs_handle);
 
@@ -3474,8 +3465,16 @@ void cleanup_module(void)
 #ifdef CONFIG_PROC_FS
 	remove_proc_entry("mdstat", NULL);
 #endif
-
-	blk_dev[MAJOR_NR].queue = NULL;
+	for (i = 0; i < MAX_MD_DEVS; i++) {
+		struct gendisk *disk = disks[i];
+		mddev_t *mddev;
+		if (!disks[i])
+			continue;
+		mddev = disk->private_data;
+		del_gendisk(disk);
+		put_disk(disk);
+		mddev_put(mddev);
+	}
 }
 #endif
 

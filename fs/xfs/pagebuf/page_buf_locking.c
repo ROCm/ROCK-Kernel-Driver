@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * Portions Copyright (c) 2002 Christoph Hellwig.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -57,10 +56,6 @@
 #include <support/debug.h>
 
 #include "page_buf_internal.h"
-
-#ifndef EVMS_MAJOR
-#define EVMS_MAJOR      117
-#endif
 
 /*
  *	pagebuf_cond_lock
@@ -124,82 +119,6 @@ pagebuf_lock(
 	PB_SET_OWNER(pb);
 	PB_TRACE(pb, PB_TRACE_REC(locked), 0);
 	return 0;
-}
-
-/*
- *	pagebuf_lock_disable
- *
- *	pagebuf_lock_disable disables buffer object locking for an inode.
- *	remove_super() does a blkdev_put for us on the data device, hence
- * 	the do_blkdev_put argument.
- */
-void
-pagebuf_lock_disable(
-	pb_target_t		*target,
-	int			do_blkdev_put)
-{
-	pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
-	if (do_blkdev_put)
-		blkdev_put(target->pbr_bdev, BDEV_FS);
-	kfree(target);
-}
-
-/*
- *	pagebuf_lock_enable
- *
- *	get_sb_bdev() does a blkdev_get for us on the data device, hence
- *	the do_blkdev_get argument.
- */
-pb_target_t *
-pagebuf_lock_enable(
-	dev_t			dev,
-	int			do_blkdev_get)
-{
-	struct block_device	*bdev;
-	pb_target_t		*target;
-	int			error = -ENOMEM;
-
-	target = kmalloc(sizeof(pb_target_t), GFP_KERNEL);
-	if (unlikely(!target))
-		return ERR_PTR(error);
-
-	bdev = bdget(dev);
-	if (unlikely(!bdev))
-		goto fail;
-
-	if (do_blkdev_get) {
-		error = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
-		if (unlikely(error))
-			goto fail;
-	}
-
-	target->pbr_dev = dev;
-	target->pbr_bdev = bdev;
-	target->pbr_mapping = bdev->bd_inode->i_mapping;
-
-	pagebuf_target_blocksize(target, PAGE_CACHE_SIZE);
-	
-	if ((MAJOR(dev) == MD_MAJOR) || (MAJOR(dev) == EVMS_MAJOR))
-		target->pbr_flags = PBR_ALIGNED_ONLY;
-	else if (MAJOR(dev) == LVM_BLK_MAJOR)
-		target->pbr_flags = PBR_SECTOR_ONLY;
-	else
-		target->pbr_flags = 0;
-
-	return target;
-
-fail:
-	kfree(target);
-	return ERR_PTR(error);
-}
-
-void
-pagebuf_target_blocksize(
-	pb_target_t		*target,
-	unsigned int		blocksize)
-{
-	target->pbr_blocksize = blocksize;
-	target->pbr_blocksize_bits = ffs(blocksize) - 1;
 }
 
 void

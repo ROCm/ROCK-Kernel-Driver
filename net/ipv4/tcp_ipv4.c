@@ -781,6 +781,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 
 	__sk_dst_set(sk, &rt->u.dst);
 	tcp_v4_setup_caps(sk, &rt->u.dst);
+	tp->ext_header_len += rt->u.dst.header_len;
 
 	if (!inet->opt || !inet->opt->srr)
 		daddr = rt->rt_dst;
@@ -1187,7 +1188,6 @@ static void tcp_v4_send_reset(struct sk_buff *skb)
 	arg.csum = csum_tcpudp_nofold(skb->nh.iph->daddr,
 				      skb->nh.iph->saddr, /*XXX*/
 				      sizeof(struct tcphdr), IPPROTO_TCP, 0);
-	arg.n_iov = 1;
 	arg.csumoffset = offsetof(struct tcphdr, check) / 2;
 
 	inet_sk(tcp_socket->sk)->ttl = sysctl_ip_default_ttl;
@@ -1216,7 +1216,6 @@ static void tcp_v4_send_ack(struct sk_buff *skb, u32 seq, u32 ack,
 
 	arg.iov[0].iov_base = (unsigned char *)&rep;
 	arg.iov[0].iov_len  = sizeof(rep.th);
-	arg.n_iov = 1;
 	if (ts) {
 		rep.tsopt[0] = htonl((TCPOPT_NOP << 24) | (TCPOPT_NOP << 16) |
 				     (TCPOPT_TIMESTAMP << 8) |
@@ -1577,6 +1576,7 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	newtp->ext_header_len = 0;
 	if (newinet->opt)
 		newtp->ext_header_len = newinet->opt->optlen;
+	newtp->ext_header_len += dst->header_len;
 	newinet->id = newtp->write_seq ^ jiffies;
 
 	tcp_sync_mss(newsk, dst->pmtu);
@@ -2087,8 +2087,8 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 		tcp_put_port(sk);
 
 	/* If sendmsg cached page exists, toss it. */
-	if (tp->sndmsg_page)
-		__free_page(tp->sndmsg_page);
+	if (inet_sk(sk)->sndmsg_page)
+		__free_page(inet_sk(sk)->sndmsg_page);
 
 	atomic_dec(&tcp_sockets_allocated);
 

@@ -15,6 +15,7 @@
 
 #define MAXTOKEN 64
 
+/* Set during early boot */
 int cpu_has_cmov = 1;
 int cpu_has_xmm = 0;
 

@@ -36,18 +36,6 @@
 LABEL(sunosnop):
 	CC_AND_RETT
 
-#if 0
-/* Not SMP safe */
-	.globl	LABEL(sunosgetpid)
-LABEL(sunosgetpid):
-	LOAD_CURRENT(l4, l5)
-	ld	[%l4 + TI_TASK], %l4
-	ld	[%l4 + AOFF_task_pid], %i0
-	ld	[%l4 + AOFF_task_p_opptr], %l5
-	ld	[%l5 + AOFF_task_pid], %i1
-	CC_AND_RETT
-#endif
-
 #if (ASIZ_task_uid == 2 && ASIZ_task_euid == 2)
 	.globl	LABEL(sunosgetuid)
 LABEL(sunosgetuid):

@@ -142,7 +142,7 @@ void __wait_on_buffer(struct buffer_head * bh)
 	finish_wait(wqh, &wait);
 }
 
-static inline void
+static void
 __set_page_buffers(struct page *page, struct buffer_head *head)
 {
 	if (page_has_buffers(page))
@@ -152,7 +152,7 @@ __set_page_buffers(struct page *page, struct buffer_head *head)
 	page->private = (unsigned long)head;
 }
 
-static inline void
+static void
 __clear_page_buffers(struct page *page)
 {
 	ClearPagePrivate(page);
@@ -594,14 +594,14 @@ still_busy:
  * PageLocked prevents anyone from starting writeback of a page which is
  * under read I/O (PageWriteback is only ever set against a locked page).
  */
-inline void mark_buffer_async_read(struct buffer_head *bh)
+void mark_buffer_async_read(struct buffer_head *bh)
 {
 	bh->b_end_io = end_buffer_async_read;
 	set_buffer_async_read(bh);
 }
 EXPORT_SYMBOL(mark_buffer_async_read);
 
-inline void mark_buffer_async_write(struct buffer_head *bh)
+void mark_buffer_async_write(struct buffer_head *bh)
 {
 	bh->b_end_io = end_buffer_async_write;
 	set_buffer_async_write(bh);
@@ -811,6 +811,13 @@ int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 			if (buffer_dirty(bh)) {
 				get_bh(bh);
 				spin_unlock(lock);
+				/*
+				 * Ensure any pending I/O completes so that
+				 * ll_rw_block() actually writes the current
+				 * contents - it is a noop if I/O is still in
+				 * flight on potentially older contents.
+				 */
+				wait_on_buffer(bh);
 				ll_rw_block(WRITE, 1, &bh);
 				brelse(bh);
 				spin_lock(lock);
@@ -953,7 +960,7 @@ link_dev_buffers(struct page *page, struct buffer_head *head)
 /*
  * Initialise the state of a blockdev page's buffers.
  */ 
-static /*inline*/ void
+static void
 init_page_buffers(struct page *page, struct block_device *bdev,
 			int block, int size)
 {
@@ -982,7 +989,7 @@ init_page_buffers(struct page *page, struct block_device *bdev,
  *
  * This is user purely for blockdev mappings.
  */
-static /*inline*/ struct page *
+static struct page *
 grow_dev_page(struct block_device *bdev, unsigned long block,
 			unsigned long index, int size)
 {
@@ -1409,7 +1416,7 @@ EXPORT_SYMBOL(set_bh_page);
 /*
  * Called when truncating a buffer on a page completely.
  */
-static /* inline */ void discard_buffer(struct buffer_head * bh)
+static inline void discard_buffer(struct buffer_head * bh)
 {
 	lock_buffer(bh);
 	clear_buffer_dirty(bh);
@@ -2444,7 +2451,7 @@ static inline int buffer_busy(struct buffer_head *bh)
 		(bh->b_state & ((1 << BH_Dirty) | (1 << BH_Lock)));
 }
 
-static inline int
+static int
 drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 {
 	struct buffer_head *head = page_buffers(page);

@@ -705,10 +705,6 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 	SRpnt->sr_request->rq_dev = sdp->i_rdev;
 	SRpnt->sr_sense_buffer[0] = 0;
 	SRpnt->sr_cmd_len = hp->cmd_len;
-	if (!(hp->flags & SG_FLAG_LUN_INHIBIT)) {
-		if (sdp->device->scsi_level <= SCSI_2)
-			cmnd[1] = (cmnd[1] & 0x1f) | (sdp->device->lun << 5);
-	}
 	SRpnt->sr_use_sg = srp->data.k_use_sg;
 	SRpnt->sr_sglist_len = srp->data.sglist_len;
 	SRpnt->sr_bufflen = srp->data.bufflen;
@@ -852,7 +848,7 @@ sg_ioctl(struct inode *inode, struct file *filp,
 			__put_user((int) sdp->device->type, &sg_idp->scsi_type);
 			__put_user((short) sdp->device->host->cmd_per_lun,
 				   &sg_idp->h_cmd_per_lun);
-			__put_user((short) sdp->device->queue_depth,
+			__put_user((short) sdp->device->new_queue_depth,
 				   &sg_idp->d_queue_depth);
 			__put_user(0, &sg_idp->unused[0]);
 			__put_user(0, &sg_idp->unused[1]);
@@ -1659,7 +1655,7 @@ exit_sg(void)
 		sg_dev_arr = NULL;
 	}
 	sg_template.dev_max = 0;
-	remove_driver(&sg_template.scsi_driverfs_driver);
+	driver_unregister(&sg_template.scsi_driverfs_driver);
 }
 
 static int
@@ -3039,7 +3035,7 @@ sg_proc_dev_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
 				   scsidp->host->host_no, scsidp->channel,
 				   scsidp->id, scsidp->lun, (int) scsidp->type,
 				   (int) scsidp->access_count,
-				   (int) scsidp->queue_depth,
+				   (int) scsidp->new_queue_depth,
 				   (int) scsidp->device_busy,
 				   (int) scsidp->online);
 		else
@@ -3103,7 +3099,8 @@ sg_proc_host_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
 	struct Scsi_Host *shp;
 	int k;
 
-	for (k = 0, shp = scsi_hostlist; shp; shp = shp->next, ++k) {
+	for (k = 0, shp = scsi_host_get_next(NULL); shp;
+	     shp = scsi_host_get_next(shp), ++k) {
 		for (; k < shp->host_no; ++k)
 			PRINT_PROC("-1\t-1\t-1\t-1\t-1\t-1\n");
 		PRINT_PROC("%u\t%hu\t%hd\t%hu\t%d\t%d\n",
@@ -3147,7 +3144,8 @@ sg_proc_hoststrs_info(char *buffer, int *len, off_t * begin,
 	char buff[SG_MAX_HOST_STR_LEN];
 	char *cp;
 
-	for (k = 0, shp = scsi_hostlist; shp; shp = shp->next, ++k) {
+	for (k = 0, shp = scsi_host_get_next(NULL); shp;
+	     shp = scsi_host_get_next(shp), ++k) {
 		for (; k < shp->host_no; ++k)
 			PRINT_PROC("<no active host>\n");
 		strncpy(buff, shp->hostt->info ? shp->hostt->info(shp) :

@@ -172,7 +172,8 @@ else
   if [ "$CONFIG_X86_NUMA" = "y" ]; then
      #Platform Choices
      bool 'Multiquad (IBM/Sequent) NUMAQ support' CONFIG_X86_NUMAQ
-     if [ "$CONFIG_X86_NUMAQ" = "y" ]; then
+     bool 'IBM x440 (Summit/EXA) support' CONFIG_X86_SUMMIT
+     if [ "$CONFIG_X86_NUMAQ" = "y" -o "$CONFIG_X86_SUMMIT" = "y" ]; then
         define_bool CONFIG_CLUSTERED_APIC y
      fi
      # Common NUMA Features
@@ -214,6 +215,10 @@ tristate 'Dell laptop support' CONFIG_I8K
 tristate '/dev/cpu/microcode - Intel IA32 CPU microcode support' CONFIG_MICROCODE
 tristate '/dev/cpu/*/msr - Model-specific register support' CONFIG_X86_MSR
 tristate '/dev/cpu/*/cpuid - CPU information support' CONFIG_X86_CPUID
+
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   tristate 'BIOS Enhanced Disk Drive calls determine boot disk (EXPERIMENTAL)' CONFIG_EDD
+fi
 
 choice 'High Memory Support' \
 	"off           CONFIG_NOHIGHMEM \
@@ -442,6 +447,8 @@ source drivers/usb/Config.in
 
 source net/bluetooth/Config.in
 
+source arch/i386/oprofile/Config.in
+ 
 mainmenu_option next_comment
 comment 'Kernel hacking'
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
@@ -450,6 +457,7 @@ fi
 
 bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
 if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Check for stack overflows' CONFIG_DEBUG_STACKOVERFLOW
    bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
    bool '  Memory mapped I/O debugging' CONFIG_DEBUG_IOVIRT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ

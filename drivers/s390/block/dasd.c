@@ -2110,8 +2110,6 @@ dasd_open(struct inode *inp, struct file *filp)
 	dasd_device_t *device;
 	int rc;
 	
-	if ((!inp) || kdev_none(inp->i_rdev))
-		return -EINVAL;
 	if (dasd_probeonly) {
 		MESSAGE(KERN_INFO,
 			"No access to device (%d:%d) due to probeonly mode",
@@ -2154,8 +2152,6 @@ dasd_release(struct inode *inp, struct file *filp)
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 
-	if ((!inp) || kdev_none(inp->i_rdev))
-		return -EINVAL;
 	devmap = dasd_devmap_from_kdev(inp->i_rdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);

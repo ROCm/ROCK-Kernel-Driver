@@ -23,7 +23,7 @@
 */
 
 /*
- * BlueZ HCI virtual device driver.
+ * Bluetooth HCI virtual device driver.
  *
  * $Id: hci_vhci.c,v 1.3 2002/04/17 17:37:20 maxk Exp $ 
  */
@@ -136,7 +136,7 @@ static inline ssize_t hci_vhci_get_user(struct hci_vhci_struct *hci_vhci, const 
 	if (count > HCI_MAX_FRAME_SIZE)
 		return -EINVAL;
 
-	if (!(skb = bluez_skb_alloc(count, GFP_KERNEL)))
+	if (!(skb = bt_skb_alloc(count, GFP_KERNEL)))
 		return -ENOMEM;
 	
 	if (copy_from_user(skb_put(skb, count), buf, count)) {
@@ -172,7 +172,7 @@ static inline ssize_t hci_vhci_put_user(struct hci_vhci_struct *hci_vhci,
 	int len = count, total = 0;
 	char *ptr = buf;
 
-	len = MIN(skb->len, len); 
+	len = min_t(unsigned int, skb->len, len);
 	if (copy_to_user(ptr, skb->data, len))
 		return -EFAULT;
 	total += len;
@@ -331,7 +331,7 @@ static struct miscdevice hci_vhci_miscdev=
 
 int __init hci_vhci_init(void)
 {
-	BT_INFO("BlueZ VHCI driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",  
+	BT_INFO("Bluetooth VHCI driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",  
 		VERSION);
 	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 
@@ -352,5 +352,5 @@ module_init(hci_vhci_init);
 module_exit(hci_vhci_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
-MODULE_DESCRIPTION("BlueZ VHCI driver ver " VERSION);
+MODULE_DESCRIPTION("Bluetooth VHCI driver ver " VERSION);
 MODULE_LICENSE("GPL"); 

@@ -21,9 +21,13 @@
 #define UMID_LEN 64
 #define UML_DIR "~/.uml/"
 
+/* Changed by set_umid and make_umid, which are run early in boot */
 static char umid[UMID_LEN] = { 0 };
+
+/* Changed by set_uml_dir and make_uml_dir, which are run early in boot */
 static char *uml_dir = UML_DIR;
 
+/* Changed by set_umid */
 static int umid_is_random = 1;
 static int umid_inited = 0;
 

@@ -24,9 +24,11 @@
 # Free Software Foundation;  either version 2 of the  License, or (at your
 # option) any later version.
 
-# Normally, we use the 'misc-simple.c' file for decompress_kernel and
+boot: zImage
+
+# Normally, we use the 'misc.c' file for decompress_kernel and
 # whatnot.  Sometimes we need to override this however.
-MISC				:= ../common/misc-simple.o
+MISC				:= misc.o
 ifeq ($(CONFIG_IBM_OPENBIOS),y)
 ZIMAGE				:= zImage-TREE
 ZIMAGEINITRD			:= zImage.initrd-TREE
@@ -37,6 +39,14 @@ endif
 ifeq ($(CONFIG_EMBEDDEDBOOT),y)
 TFTPIMAGE			:= /tftpboot/zImage.embedded
 MISC				:= misc-embedded.o
+endif
+ifeq ($(CONFIG_EBONY),y)
+ZIMAGE				:= zImage-TREE
+ZIMAGEINITRD			:= zImage.initrd-TREE
+EXTRA				:= direct.o
+END				:= ebony
+ENTRYPOINT			:= 0x01000000
+TFTPIMAGE			:= /tftpboot/zImage.$(END)
 endif
 ifeq ($(CONFIG_EV64260),y)
 EXTRA				:= direct.o misc-ev64260.o
@@ -72,11 +82,8 @@ endif
 ifeq ($(CONFIG_PPLUS),y)
 EXTRA				:= legacy.o
 endif
-ifeq ($(CONFIG_LOPEC),y)
-EXTRA				+= ../common/mpc10x_memory.o
-endif
 ifeq ($(CONFIG_PAL4),y)
-EXTRA				:= direct.o ../common/cpc700_memory.o
+EXTRA				:= direct.o
 endif
 ifeq ($(CONFIG_PCORE)$(CONFIG_POWERPMC250),y)
 ZIMAGE				:= zImage-STRIPELF
@@ -122,21 +129,25 @@ endif
 # Default linker args.  Link at 0x00800000 or 0x00400000 by default, but
 # allow it to be overridden.
 ifeq ($(CONFIG_BOOT_LOAD_BOOL),y)
-LD_ARGS				:= -T ../ld.script -Ttext $(CONFIG_BOOT_LOAD) \
-					-Bstatic
+LD_ARGS				:= -T $(boot)/ld.script \
+					-Ttext $(CONFIG_BOOT_LOAD) -Bstatic
 else
-LD_ARGS				= -T ../ld.script -Ttext 0x00800000 -Bstatic
-ifeq ($(CONFIG_8260)$(CONFIG_4xx)$(CONFIG_8xx),y)
-LD_ARGS				:= -T ../ld.script -Ttext 0x00400000 -Bstatic
+LD_ARGS				= -T $(boot)/ld.script \
+					-Ttext 0x00800000 -Bstatic
+ifeq ($(CONFIG_8260)$(CONFIG_40x)$(CONFIG_8xx),y)
+LD_ARGS				:= -T $(boot)/ld.script -Ttext 0x00400000 \
+					-Bstatic
+endif
+ifeq ($(CONFIG_440),y)
+LD_ARGS				:= -T $(boot)/ld.script -Ttext 0x01000000 \
+					-Bstatic
 endif
 endif
 OBJCOPY_ARGS			:= -O elf32-powerpc
 
-# head.o and ../common/relocate.o must be at the start.
-boot-y				:= head.o ../common/relocate.o $(EXTRA) \
-				$(MISC) ../common/misc-common.o \
-				../common/string.o ../common/util.o
-boot-$(CONFIG_4xx)		+= embed_config.o
+# head.o and relocate.o must be at the start.
+boot-y				:= head.o relocate.o $(EXTRA) $(MISC) 
+boot-$(CONFIG_40x)		+= embed_config.o
 boot-$(CONFIG_8xx)		+= embed_config.o
 boot-$(CONFIG_8260)		+= embed_config.o
 boot-$(CONFIG_BSEIP)		+= iic.o
@@ -149,84 +160,97 @@ boot-$(CONFIG_8xx)		+= m8xx_tty.o
 boot-$(CONFIG_8260)		+= m8260_tty.o
 boot-$(CONFIG_GT64260_CONSOLE)	+= gt64260_tty.o
 endif
-boot-$(CONFIG_SERIAL_8250_CONSOLE) += ../common/ns16550.o
+
+boot				:= arch/ppc/boot
+common				:= $(boot)/common
+utils				:= $(boot)/utils
+bootlib				:= $(boot)/lib
+images				:= $(boot)/images
 
 EXTRA_TARGETS			:= $(boot-y)
-LIBS				:= ../lib/lib.a
+LIBS				:=  $(common)/lib.a $(bootlib)/lib.a
+
+include $(TOPDIR)/Rules.make
+
+OBJS				:= $(addprefix $(obj)/,$(boot-y))
 
 # Tools
-MKBUGBOOT			:= ../utils/mkbugboot
-MKPREP				:= ../utils/mkprep
-MKTREE				:= ../utils/mktree
+MKBUGBOOT			:= $(utils)/mkbugboot
+MKPREP				:= $(utils)/mkprep
+MKTREE				:= $(utils)/mktree
 
-zvmlinux: $(boot-y) $(LIBS) ../ld.script ../images/vmlinux.gz ../common/dummy.o
+$(obj)/dummy.o: $(common)/dummy.c
+	$(CC) -c -o $@ $(common)/dummy.c
+
+$(obj)/zvmlinux: $(OBJS) $(LIBS) $(boot)/ld.script $(images)/vmlinux.gz \
+	$(obj)/dummy.o
 	$(OBJCOPY) $(OBJCOPY_ARGS) \
-		--add-section=.image=../images/vmlinux.gz \
+		--add-section=.image=$(images)/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data \
-		../common/dummy.o image.o
-	$(LD) $(LD_ARGS) -o $@ $(boot-y) image.o $(LIBS)
-	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab -R .stabstr \
-		-R .ramdisk -R .sysmap
+		$(obj)/dummy.o $(obj)/image.o
+	$(LD) $(LD_ARGS) -o $@ $(OBJS) $(obj)/image.o $(LIBS)
+	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab \
+		-R .stabstr -R .ramdisk -R .sysmap
 
-zvmlinux.initrd: $(boot-y) $(LIBS) ../ld.script ../images/vmlinux.gz \
-		../common/dummy.o
+$(obj)/zvmlinux.initrd: $(OBJS) $(LIBS) $(boot)/ld.script \
+		$(images)/vmlinux.gz $(obj)/dummy.o
 	$(OBJCOPY) $(OBJCOPY_ARGS) \
-		--add-section=.ramdisk=../images/ramdisk.image.gz \
+		--add-section=.ramdisk=$(images)/ramdisk.image.gz \
 		--set-section-flags=.ramdisk=contents,alloc,load,readonly,data \
-		--add-section=.image=../images/vmlinux.gz \
+		--add-section=.image=$(images)/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data \
-		../common/dummy.o image.o
-	$(LD) $(LD_ARGS) -o $@ $(boot-y) image.o $(LIBS)
-	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab -R .stabstr \
-		-R .sysmap
+		$(obj)/dummy.o $(obj)/image.o
+	$(LD) $(LD_ARGS) -o $@ $(OBJS) $(obj)/image.o $(LIBS)
+	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab \
+		-R .stabstr -R .sysmap
 
 # Sort-of dummy rules, that let us format the image we want.
-zImage: $(ZIMAGE) zvmlinux
-	cp -f zvmlinux ../images/zImage.elf
-	rm -f zvmlinux
+zImage: $(images)/$(ZIMAGE) $(obj)/zvmlinux
+	cp -f $(obj)/zvmlinux $(images)/zImage.elf
+	rm -f $(obj)/zvmlinux
 
-zImage.initrd: $(ZIMAGEINITRD) zvmlinux.initrd
-	cp -f zvmlinux.initrd ../images/zImage.initrd.elf
-	rm -f zvmlinux.initrd
+zImage.initrd: $(images)/$(ZIMAGEINITRD) $(obj)/zvmlinux.initrd
+	cp -f $(obj)/zvmlinux.initrd $(images)/zImage.initrd.elf
+	rm -f $(obj)/zvmlinux.initrd
 
 znetboot: zImage
 ifneq ($(ZNETBOOT),)
-	cp ../images/$(ZNETBOOT) $(TFTPIMAGE)
+	cp $(images)/$(ZNETBOOT) $(TFTPIMAGE)
 else
-	cp ../images/zImage.* $(TFTPIMAGE)
+	cp $(images)/zImage.* $(TFTPIMAGE)
 endif
 
 znetboot.initrd: zImage.initrd
 ifneq ($(ZNETBOOTRD),)
-	cp ../images/$(ZNETBOOTRD) $(TFTPIMAGE)
+	cp $(images)/$(ZNETBOOTRD) $(TFTPIMAGE)
 else
-	cp ../images/zImage.* $(TFTPIMAGE)
+	cp $(images)/zImage.* $(TFTPIMAGE)
 endif
 
-zImage-STRIPELF: zvmlinux
-	dd if=zvmlinux of=../images/zImage.$(END) skip=64 bs=1k
+$(images)/zImage-STRIPELF: $(obj)/zvmlinux
+	dd if=$(obj)/zvmlinux of=$(images)/zImage.$(END) skip=64 bs=1k
 
-zImage.initrd-STRIPELF: zvmlinux.initrd
-	dd if=zvmlinux.initrd of=../images/zImage.initrd.$(END) skip=64 bs=1k
+$(images)/zImage.initrd-STRIPELF: $(obj)/zvmlinux.initrd
+	dd if=$(obj)/zvmlinux.initrd of=$(images)/zImage.initrd.$(END) \
+		skip=64 bs=1k
 
-zImage-TREE: zvmlinux
-	$(MKTREE) zvmlinux ../images/zImage.$(END) $(ENTRYPOINT)
+$(images)/zImage-TREE: $(obj)/zvmlinux
+	$(MKTREE) $(obj)/zvmlinux $(images)/zImage.$(END) $(ENTRYPOINT)
 
-zImage.initrd-TREE: zvmlinux.initrd
-	$(MKTREE) zvmlinux.initrd ../images/zImage.initrd.$(END) $(ENTRYPOINT)
+$(images)/zImage.initrd-TREE: $(obj)/zvmlinux.initrd
+	$(MKTREE) $(obj)/zvmlinux.initrd $(images)/zImage.initrd.$(END) \
+		$(ENTRYPOINT)
 
-zImage-MENF1: zvmlinux
-	$(MKPREP) -pbp zvmlinux ../images/zImage.menf1
+$(images)/zImage-MENF1: $(obj)/zvmlinux
+	$(MKPREP) -pbp $(obj)/zvmlinux $(images)/zImage.menf1
 
-zImage.initrd-MENF1: zvmlinux.initrd
-	$(MKPREP) -pbp zvmlinux.initrd ../images/zImage.initrd.menf1
+$(images)/zImage.initrd-MENF1: $(obj)/zvmlinux.initrd
+	$(MKPREP) -pbp $(obj)/zvmlinux.initrd $(images)/zImage.initrd.menf1
 
-zImage-PPLUS: zvmlinux $(MKPREP) $(MKBUGBOOT)
-	$(MKPREP) -pbp zvmlinux ../images/zImage.pplus
-	$(MKBUGBOOT) zvmlinux ../images/zImage.bugboot
+$(images)/zImage-PPLUS: $(obj)/zvmlinux $(MKPREP) $(MKBUGBOOT)
+	$(MKPREP) -pbp $(obj)/zvmlinux $(images)/zImage.pplus
+	$(MKBUGBOOT) $(obj)/zvmlinux $(images)/zImage.bugboot
 
-zImage.initrd-PPLUS: zvmlinux.initrd $(MKPREP) $(MKBUGBOOT)
-	$(MKPREP) -pbp zvmlinux.initrd ../images/zImage.initrd.pplus
-	$(MKBUGBOOT) zvmlinux.initrd ../images/zImage.initrd.bugboot
-
-include $(TOPDIR)/Rules.make
+$(images)/zImage.initrd-PPLUS: $(obj)/zvmlinux.initrd $(MKPREP) $(MKBUGBOOT)
+	$(MKPREP) -pbp $(obj)/zvmlinux.initrd $(images)/zImage.initrd.pplus
+	$(MKBUGBOOT) $(obj)/zvmlinux.initrd $(images)/zImage.initrd.bugboot

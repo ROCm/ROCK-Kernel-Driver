@@ -161,6 +161,7 @@ EXPORT_SYMBOL(put_cmsg);
 EXPORT_SYMBOL(sock_kmalloc);
 EXPORT_SYMBOL(sock_kfree_s);
 EXPORT_SYMBOL(sock_map_fd);
+EXPORT_SYMBOL(sockfd_lookup);
 
 #ifdef CONFIG_FILTER
 EXPORT_SYMBOL(sk_run_filter);
@@ -222,9 +223,6 @@ EXPORT_SYMBOL(destroy_EII_client);
 EXPORT_SYMBOL(dev_change_flags);
 EXPORT_SYMBOL(vlan_ioctl_hook);
 #endif
-
-EXPORT_SYMBOL(sklist_destroy_socket);
-EXPORT_SYMBOL(sklist_insert_socket);
 
 EXPORT_SYMBOL(scm_detach_fds);
 
@@ -433,7 +431,6 @@ EXPORT_SYMBOL(neigh_dump_info);
 
 EXPORT_SYMBOL(dev_set_allmulti);
 EXPORT_SYMBOL(dev_set_promiscuity);
-EXPORT_SYMBOL(sklist_remove_socket);
 EXPORT_SYMBOL(rtnl_sem);
 EXPORT_SYMBOL(rtnl_lock);
 EXPORT_SYMBOL(rtnl_unlock);

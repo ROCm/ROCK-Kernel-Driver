@@ -51,6 +51,7 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 #include "smpboot_hooks.h"
+#include "mach_apic.h"
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;

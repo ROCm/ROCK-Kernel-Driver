@@ -1327,66 +1327,63 @@ static int device_queue_depth(hcb_p np, int target, int lun)
 /*
  * Linux entry point for device queue sizing.
  */
-static void 
-sym53c8xx_select_queue_depths(struct Scsi_Host *host, 
-                              struct scsi_device *devlist)
+int
+sym53c8xx_slave_attach(Scsi_Device *device)
 {
-	struct scsi_device *device;
+	struct Scsi_Host *host = device->host;
+	hcb_p np;
+	tcb_p tp;
+	lcb_p lp;
+	int reqtags, depth_to_use;
 
-	for (device = devlist; device; device = device->next) {
-		hcb_p np;
-		tcb_p tp;
-		lcb_p lp;
-		int reqtags;
+	np = ((struct host_data *) host->hostdata)->ncb;
+	tp = &np->target[device->id];
 
-		if (device->host != host)
-			continue;
+	/*
+	 *  Get user settings for transfer parameters.
+	 */
+	tp->inq_byte7_valid = (INQ7_SYNC|INQ7_WIDE16);
+	sym_update_trans_settings(np, tp);
 
-		np = ((struct host_data *) host->hostdata)->ncb;
-		tp = &np->target[device->id];
+	/*
+	 *  Allocate the LCB if not yet.
+	 *  If it fail, we may well be in the sh*t. :)
+	 */
+	lp = sym_alloc_lcb(np, device->id, device->lun);
+	if (!lp)
+		return -ENOMEM;
 
-		/*
-		 *  Get user settings for transfer parameters.
-		 */
-		tp->inq_byte7_valid = (INQ7_SYNC|INQ7_WIDE16);
-		sym_update_trans_settings(np, tp);
+	/*
+	 *  Get user flags.
+	 */
+	lp->curr_flags = lp->user_flags;
 
-		/*
-		 *  Allocate the LCB if not yet.
-		 *  If it fail, we may well be in the sh*t. :)
-		 */
-		lp = sym_alloc_lcb(np, device->id, device->lun);
-		if (!lp) {
-			device->queue_depth = 1;
-			continue;
-		}
-
-		/*
-		 *  Get user flags.
-		 */
-		lp->curr_flags = lp->user_flags;
-
-		/*
-		 *  Select queue depth from driver setup.
-		 *  Donnot use more than configured by user.
-		 *  Use at least 2.
-		 *  Donnot use more than our maximum.
-		 */
-		reqtags = device_queue_depth(np, device->id, device->lun);
-		if (reqtags > tp->usrtags)
-			reqtags = tp->usrtags;
-		if (!device->tagged_supported)
-			reqtags = 0;
+	/*
+	 *  Select queue depth from driver setup.
+	 *  Donnot use more than configured by user.
+	 *  Use at least 2.
+	 *  Donnot use more than our maximum.
+	 */
+	reqtags = device_queue_depth(np, device->id, device->lun);
+	if (reqtags > tp->usrtags)
+		reqtags = tp->usrtags;
+	if (!device->tagged_supported)
+		reqtags = 0;
 #if 1 /* Avoid to locally queue commands for no good reasons */
-		if (reqtags > SYM_CONF_MAX_TAG)
-			reqtags = SYM_CONF_MAX_TAG;
-		device->queue_depth = reqtags ? reqtags : 2;
+	if (reqtags > SYM_CONF_MAX_TAG)
+		reqtags = SYM_CONF_MAX_TAG;
+	depth_to_use = (reqtags ? reqtags : 2);
 #else
-		device->queue_depth = reqtags ? SYM_CONF_MAX_TAG : 2;
+	depth_to_use = (reqtags ? SYM_CONF_MAX_TAG : 2);
 #endif
-		lp->s.scdev_depth = device->queue_depth;
-		sym_tune_dev_queuing(np, device->id, device->lun, reqtags);
-	}
+	scsi_adjust_queue_depth(device,
+				(device->tagged_supported ?
+				 MSG_SIMPLE_TAG : 0),
+				depth_to_use);
+	lp->s.scdev_depth = depth_to_use;
+	sym_tune_dev_queuing(np, device->id, device->lun, reqtags);
+
+	return 0;
 }
 
 /*
@@ -1796,16 +1793,12 @@ static int sym53c8xx_proc_info(char *buffer, char **start, off_t offset,
 	hcb_p np = 0;
 	int retv;
 
-	for (host = first_host; host; host = host->next) {
-		if (host->hostt != first_host->hostt)
-			continue;
-		if (host->host_no == hostno) {
-			host_data = (struct host_data *) host->hostdata;
-			np = host_data->ncb;
-			break;
-		}
-	}
+	host = scsi_host_hn_get(hostno);
+	if (!host)
+		return -EINVAL;
 
+	host_data = (struct host_data *) host->hostdata;
+	np = host_data->ncb;
 	if (!np)
 		return -EINVAL;
 
@@ -1826,6 +1819,7 @@ static int sym53c8xx_proc_info(char *buffer, char **start, off_t offset,
 #endif
 	}
 
+	scsi_host_put(host);
 	return retv;
 }
 #endif /* SYM_LINUX_PROC_INFO_SUPPORT */
@@ -2132,7 +2126,6 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
 	instance->max_cmd_len	= 16;
 #endif
-	instance->select_queue_depths = sym53c8xx_select_queue_depths;
 	instance->highmem_io	= 1;
 
 	SYM_UNLOCK_HCB(np, flags);

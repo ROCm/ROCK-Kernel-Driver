@@ -28,7 +28,7 @@
 
 #define MAJOR_NR  FLOPPY_MAJOR
 #define DEVICE_NAME "floppy"
-#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
+#define QUEUE (&swim_queue)
 
 #include <linux/stddef.h>
 #include <linux/kernel.h>
@@ -97,7 +97,7 @@ static char *drive_names[7] = {
 
 int swimiop_init(void);
 static void swimiop_init_request(struct swim_iop_req *);
-static int swimiop_send_request(CURRENT, struct swim_iop_req *);
+static int swimiop_send_request(struct swim_iop_req *);
 static void swimiop_receive(struct iop_msg *, struct pt_regs *);
 static void swimiop_status_update(int, struct swim_drvstatus *);
 static int swimiop_eject(struct floppy_state *fs);
@@ -106,8 +106,8 @@ static int floppy_ioctl(struct inode *inode, struct file *filp,
 			unsigned int cmd, unsigned long param);
 static int floppy_open(struct inode *inode, struct file *filp);
 static int floppy_release(struct inode *inode, struct file *filp);
-static int floppy_check_change(kdev_t dev);
-static int floppy_revalidate(kdev_t dev);
+static int floppy_check_change(struct gendisk *disk);
+static int floppy_revalidate(struct gendisk *disk);
 static int grab_drive(struct floppy_state *fs, enum swim_state state,
 		      int interruptible);
 static void release_drive(struct floppy_state *fs);
@@ -118,13 +118,14 @@ static void do_fd_request(request_queue_t * q);
 static void start_request(struct floppy_state *fs);
 
 static struct block_device_operations floppy_fops = {
-	open:			floppy_open,
-	release:		floppy_release,
-	ioctl:			floppy_ioctl,
-	check_media_change:	floppy_check_change,
-	revalidate:		floppy_revalidate,
+	.open		= floppy_open,
+	.release	= floppy_release,
+	.ioctl		= floppy_ioctl,
+	.media_changed	= floppy_check_change,
+	.revalidate_disk= floppy_revalidate,
 };
 
+static struct request_queue swim_queue;
 /*
  * SWIM IOP initialization
  */
@@ -147,8 +148,7 @@ int swimiop_init(void)
 		       MAJOR_NR);
 		return -EBUSY;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request,
-			&swim_iop_lock);
+	blk_init_queue(&swim_queue, do_fd_request, &swim_iop_lock);
 	printk("SWIM-IOP: %s by Joshua M. Thompson (funaho@jurai.org)\n",
 		DRIVER_VERSION);
 
@@ -166,7 +166,7 @@ int swimiop_init(void)
 		swimiop_init_request(&req);
 		cmd->code = CMD_STATUS;
 		cmd->drive_num = i + 1;
-		if (swimiop_send_request(CURRENT, &req) != 0) continue;
+		if (swimiop_send_request(&req) != 0) continue;
 		while (!req.complete);
 		if (cmd->error != 0) {
 			printk(KERN_ERR "SWIM-IOP: probe on drive %d returned error %d\n", i, (uint) cmd->error);
@@ -188,13 +188,15 @@ int swimiop_init(void)
 	printk("SWIM-IOP: detected %d installed drives.\n", floppy_count);
 
 	for (i = 0; i < floppy_count; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			continue;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
 		disk->fops = &floppy_fops;
 		sprintf(disk->disk_name, "fd%d", i);
+		disk->private_data = &floppy_states[i];
+		disk->queue = &swim_queue;
 		set_capacity(disk, 2880 * 2);
 		add_disk(disk);
 	}
@@ -209,7 +211,7 @@ static void swimiop_init_request(struct swim_iop_req *req)
 	req->done = NULL;
 }
 
-static int swimiop_send_request(CURRENT, struct swim_iop_req *req)
+static int swimiop_send_request(struct swim_iop_req *req)
 {
 	unsigned long cpu_flags;
 	int err;
@@ -324,7 +326,7 @@ static int swimiop_eject(struct floppy_state *fs)
 	swimiop_init_request(&req);
 	cmd->code = CMD_EJECT;
 	cmd->drive_num = fs->drive_num;
-	err = swimiop_send_request(CURRENT, &req);
+	err = swimiop_send_request(&req);
 	if (err) {
 		release_drive(fs);
 		return err;
@@ -348,17 +350,11 @@ static struct floppy_struct floppy_type =
 static int floppy_ioctl(struct inode *inode, struct file *filp,
 			unsigned int cmd, unsigned long param)
 {
-	struct floppy_state *fs;
+	struct floppy_state *fs = inode->i_bdev->bd_disk->private_data;
 	int err;
-	int devnum = MINOR(inode->i_rdev);
 
-	if (devnum >= floppy_count)
-		return -ENODEV;
-		
 	if ((cmd & 0x80) && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
-
-	fs = &floppy_states[devnum];
 
 	switch (cmd) {
 	case FDEJECT:
@@ -377,32 +373,19 @@ static int floppy_ioctl(struct inode *inode, struct file *filp,
 
 static int floppy_open(struct inode *inode, struct file *filp)
 {
-	struct floppy_state *fs;
-	int err;
-	int devnum = MINOR(inode->i_rdev);
+	struct floppy_state *fs = inode->i_bdev->bd_disk->private_data;
 
-	if (devnum >= floppy_count)
-		return -ENODEV;
-	if (filp == 0)
-		return -EIO;
-		
-	fs = &floppy_states[devnum];
-	err = 0;
-	if (fs->ref_count == -1 || filp->f_flags & O_EXCL) return -EBUSY;
+	if (fs->ref_count == -1 || filp->f_flags & O_EXCL)
+		return -EBUSY;
 
-	if (err == 0 && (filp->f_flags & O_NDELAY) == 0
-	    && (filp->f_mode & 3)) {
+	if ((filp->f_flags & O_NDELAY) == 0 && (filp->f_mode & 3)) {
 		check_disk_change(inode->i_bdev);
 		if (fs->ejected)
-			err = -ENXIO;
+			return -ENXIO;
 	}
 
-	if (err == 0 && (filp->f_mode & 2)) {
-		if (fs->write_prot)
-			err = -EROFS;
-	}
-
-	if (err) return err;
+	if ((filp->f_mode & 2) && fs->write_prot)
+		return -EROFS;
 
 	if (filp->f_flags & O_EXCL)
 		fs->ref_count = -1;
@@ -414,43 +397,24 @@ static int floppy_open(struct inode *inode, struct file *filp)
 
 static int floppy_release(struct inode *inode, struct file *filp)
 {
-	struct floppy_state *fs;
-	int devnum = MINOR(inode->i_rdev);
-
-	if (devnum >= floppy_count)
-		return -ENODEV;
-
-	fs = &floppy_states[devnum];
-	if (fs->ref_count > 0) fs->ref_count--;
+	struct floppy_state *fs = inode->i_bdev->bd_disk->private_data;
+	if (fs->ref_count > 0)
+		fs->ref_count--;
 	return 0;
 }
 
-static int floppy_check_change(kdev_t dev)
+static int floppy_check_change(struct gendisk *disk)
 {
-	struct floppy_state *fs;
-	int devnum = MINOR(dev);
-
-	if (MAJOR(dev) != MAJOR_NR || (devnum >= floppy_count))
-		return 0;
-		
-	fs = &floppy_states[devnum];
+	struct floppy_state *fs = disk->private_data;
 	return fs->ejected;
 }
 
-static int floppy_revalidate(kdev_t dev)
+static int floppy_revalidate(struct gendisk *disk)
 {
-	struct floppy_state *fs;
-	int devnum = MINOR(dev);
-
-	if (MAJOR(dev) != MAJOR_NR || (devnum >= floppy_count))
-		return 0;
-
-	fs = &floppy_states[devnum];
-
+	struct floppy_state *fs = disk->private_data;
 	grab_drive(fs, revalidating, 0);
 	/* yadda, yadda */
 	release_drive(fs);
-
 	return 0;
 }
 
@@ -604,7 +568,7 @@ static void start_request(struct floppy_state *fs)
 		cmd->first_block = CURRENT->sector;
 		cmd->num_blocks = CURRENT->current_nr_sectors;
 
-		if (swimiop_send_request(CURRENT, &req)) {
+		if (swimiop_send_request(&req)) {
 			end_request(CURRENT, 0);
 			continue;
 		}

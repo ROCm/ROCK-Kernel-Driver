@@ -63,10 +63,8 @@ HEAD		:= arch/arm/mach-arc/head.o arch/arm/kernel/init_task.o
   ifeq ($(CONFIG_ROM_KERNEL),y)
     DATAADDR	 = 0x02080000
     TEXTADDR	 = 0x03800000
-    LDSCRIPT	 = arch/arm/vmlinux-armo-rom.lds.in
   else
     TEXTADDR	 = 0x02080000
-    LDSCRIPT	 = arch/arm/vmlinux-armo.lds.in
   endif
 endif
 
@@ -191,8 +189,7 @@ drivers-$(CONFIG_ARCH_L7200)	+= drivers/acorn/char/
 
 libs-y				+= arch/arm/lib/
 
-MAKEBOOT	 =$(MAKE) -C arch/$(ARCH)/boot
-MAKETOOLS	 =$(MAKE) -C arch/$(ARCH)/tools
+makeboot = $(call descend,arch/arm/boot,$(1))
 
 #	Update machine arch and proc symlinks if something which affects
 #	them changed.  We use .arch and .proc to indicate when they were
@@ -212,13 +209,16 @@ include/asm-arm/.proc: $(wildcard include/config/cpu/32.h) $(wildcard include/co
 
 prepare: maketools
 
-.PHONY: maketools
+.PHONY: maketools FORCE
 maketools: include/asm-arm/.arch include/asm-arm/.proc \
-	 include/asm-arm/constants.h include/linux/version.h FORCE
-	@$(MAKETOOLS)
+	   include/asm-arm/constants.h include/linux/version.h FORCE
+	+@$(call descend,arch/arm/tools, include/asm-arm/mach-types.h)
 
-bzImage zImage zinstall Image bootpImage install: vmlinux
-	@$(MAKEBOOT) $@
+zImage Image bootpImage: vmlinux
+	+@$(call makeboot,arch/arm/boot/$@)
+
+bzImage zinstall install: vmlinux
+	+@$(call makeboot,$@)
 
 MRPROPER_FILES	+= \
 	include/asm-arm/arch include/asm-arm/.arch \
@@ -227,18 +227,16 @@ MRPROPER_FILES	+= \
 	include/asm-arm/mach-types.h
 
 # We use MRPROPER_FILES and CLEAN_FILES now
-archmrproper: FORCE
-	@/bin/true
-
+archmrproper:
 archclean: FORCE
-	@$(MAKEBOOT) clean
+	+@$(call makeboot,clean)
 
 # My testing targets (that short circuit a few dependencies)
-zImg:;	@$(MAKEBOOT) zImage
-Img:;	@$(MAKEBOOT) Image
-i:;	@$(MAKEBOOT) install
-zi:;	@$(MAKEBOOT) zinstall
-bp:;	@$(MAKEBOOT) bootpImage
+zImg:;	+@$(call makeboot, zImage)
+Img:;	+@$(call makeboot, Image)
+i:;	+@$(call makeboot, install)
+zi:;	+@$(call makeboot, zinstall)
+bp:;	+@$(call makeboot, bootpImage)
 
 #
 # Configuration targets.  Use these to select a

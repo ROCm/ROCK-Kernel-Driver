@@ -41,6 +41,7 @@ struct pluto_inquiry {
 int pluto_detect(Scsi_Host_Template *);
 int pluto_release(struct Scsi_Host *);
 const char * pluto_info(struct Scsi_Host *);
+int pluto_slave_attach(Scsi_Device *);
 
 #define PLUTO {							\
 	name:			"Sparc Storage Array 100/200",	\
@@ -48,6 +49,7 @@ const char * pluto_info(struct Scsi_Host *);
 	release:		pluto_release,			\
 	info:			pluto_info,			\
 	queuecommand:		fcp_scsi_queuecommand,		\
+	slave_attach:		pluto_slave_attach,		\
 	can_queue:		PLUTO_CAN_QUEUE,		\
 	this_id:		-1,				\
 	sg_tablesize:		1,				\

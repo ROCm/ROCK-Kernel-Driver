@@ -354,6 +354,13 @@
  * Marcin Dalecki
  */
 
+/*
+ * Add bio/kdev_t changes for 2.5.x required to make it work again. 
+ * Still room for improvement in the request handling here if anyone
+ * actually cares.  Bring your own chainsaw.    Paul G.  02/2002
+ */
+
+
 #include <linux/module.h>
 
 #include <linux/version.h>
@@ -456,6 +463,7 @@ static int sbpcd[] =
  * Protects access to global structures etc.
  */
 static spinlock_t sbpcd_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+static struct request_queue sbpcd_queue;
 
 MODULE_PARM(sbpcd, "2i");
 MODULE_PARM(max_drives, "i");
@@ -4841,7 +4849,7 @@ static void do_sbpcd_request(request_queue_t * q)
 #ifdef DEBUG_GTL
 	xnr=++xx_nr;
 
-	if(blk_queue_empty(QUEUE))
+	if(blk_queue_empty(q))
 	{
 		printk( "do_sbpcd_request[%di](NULL), Pid:%d, Time:%li\n",
 			xnr, current->pid, jiffies);
@@ -4850,32 +4858,26 @@ static void do_sbpcd_request(request_queue_t * q)
 		return;
 	}
 
-	printk(" do_sbpcd_request[%di](%p:%ld+%ld), Pid:%d, Time:%li\n",
-		xnr, CURRENT, CURRENT->sector, CURRENT->nr_sectors, current->pid, jiffies);
-#endif
+	req = elv_next_request(q);
 
-	if (blk_queue_empty(QUEUE))
+	printk(" do_sbpcd_request[%di](%p:%ld+%ld), Pid:%d, Time:%li\n",
+		xnr, req, req->sector, req->nr_sectors, current->pid, jiffies);
+#endif
+	if (blk_queue_empty(q))
 		return;
 
-	req = CURRENT;		/* take out our request so no other */
-	blkdev_dequeue_request(req);	/* task can fuck it up         GTL  */
-
+	req = elv_next_request(q);		/* take out our request so no other */
 	if (req -> sector == -1)
-		end_request(CURRENT, 0);
+		end_request(req, 0);
 	spin_unlock_irq(q->queue_lock);
 
 	down(&ioctl_read_sem);
-	if (req->cmd != READ)
+	if (rq_data_dir(elv_next_request(q)) != READ)
 	{
-		msg(DBG_INF, "bad cmd %d\n", req->cmd);
+		msg(DBG_INF, "bad cmd %d\n", req->cmd[0]);
 		goto err_done;
 	}
-	p = D_S + minor(req->rq_dev);
-	if (p->drv_id==-1) {
-		msg(DBG_INF, "do_request: bad device: %s\n",
-			kdevname(req->rq_dev));
-		goto err_done;
-	}
+	p = req->rq_disk->private_data;
 #if OLD_BUSY
 	while (busy_audio) sbp_sleep(HZ); /* wait a bit */
 	busy_data=1;
@@ -4903,7 +4905,7 @@ static void do_sbpcd_request(request_queue_t * q)
 #endif
 		up(&ioctl_read_sem);
 		spin_lock_irq(q->queue_lock);
-		end_request(CURRENT, 1);
+		end_request(req, 1);
 		goto request_loop;
 	}
 
@@ -4944,7 +4946,7 @@ static void do_sbpcd_request(request_queue_t * q)
 #endif
 			up(&ioctl_read_sem);
 			spin_lock_irq(q->queue_lock);
-			end_request(CURRENT, 1);
+			end_request(req, 1);
 			goto request_loop;
 		}
 	}
@@ -4960,7 +4962,7 @@ static void do_sbpcd_request(request_queue_t * q)
 	up(&ioctl_read_sem);
 	sbp_sleep(0);    /* wait a bit, try again */
 	spin_lock_irq(q->queue_lock);
-	end_request(CURRENT, 0);
+	end_request(req, 0);
 	goto request_loop;
 }
 /*==========================================================================*/
@@ -5351,13 +5353,38 @@ static int sbp_data(struct request *req)
 }
 /*==========================================================================*/
 
+static int sbpcd_block_open(struct inode *inode, struct file *file)
+{
+	struct sbpcd_drive *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_open(p->sbpcd_infop, inode, file);
+}
+
+static int sbpcd_block_release(struct inode *inode, struct file *file)
+{
+	struct sbpcd_drive *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_release(p->sbpcd_infop, file);
+}
+
+static int sbpcd_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	struct sbpcd_drive *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_ioctl(p->sbpcd_infop, inode, cmd, arg);
+}
+
+static int sbpcd_block_media_changed(struct gendisk *disk)
+{
+	struct sbpcd_drive *p = disk->private_data;
+	return cdrom_media_changed(p->sbpcd_infop);
+}
+
 static struct block_device_operations sbpcd_bdops =
 {
-	owner:			THIS_MODULE,
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
+	.owner		= THIS_MODULE,
+	.open		= sbpcd_block_open,
+	.release	= sbpcd_block_release,
+	.ioctl		= sbpcd_block_ioctl,
+	.media_changed	= sbpcd_block_media_changed,
 };
 /*==========================================================================*/
 /*
@@ -5752,6 +5779,12 @@ int __init sbpcd_init(void)
 		if (i>=0) p->CD_changed=1;
 	}
 
+	if (!request_region(CDo_command,4,major_name))
+	{
+		printk(KERN_WARNING "sbpcd: Unable to request region 0x%x\n", CDo_command);
+		return -EIO;
+	}
+
 	/*
 	 * Turn on the CD audio channels.
 	 * The addresses are obtained from SOUND_BASE (see sbpcd.h).
@@ -5770,11 +5803,10 @@ int __init sbpcd_init(void)
 		goto init_done;
 #endif /* MODULE */
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_sbpcd_request, &sbpcd_lock);
-
-	request_region(CDo_command,4,major_name);
+	blk_init_queue(&sbpcd_queue, do_sbpcd_request, &sbpcd_lock);
 
 	devfs_handle = devfs_mk_dir (NULL, "sbp", NULL);
+
 	for (j=0;j<NR_SBPCD;j++)
 	{
 		struct cdrom_device_info * sbpcd_infop;
@@ -5804,7 +5836,7 @@ int __init sbpcd_init(void)
 				printk("Can't unregister %s\n", major_name);
 			}
 			release_region(CDo_command,4);
-			blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+			blk_cleanup_queue(&sbpcd_queue);
 			return -EIO;
 		}
 #ifdef MODULE
@@ -5820,7 +5852,7 @@ int __init sbpcd_init(void)
 		if (sbpcd_infop == NULL)
 		{
                         release_region(CDo_command,4);
-			blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+			blk_cleanup_queue(&sbpcd_queue);
                         return -ENOMEM;
 		}
 		memset(sbpcd_infop, 0, sizeof(struct cdrom_device_info));
@@ -5828,13 +5860,11 @@ int __init sbpcd_init(void)
 		sbpcd_infop->speed = 2;
 		sbpcd_infop->capacity = 1;
 		sprintf(sbpcd_infop->name, "sbpcd%d", j);
-		sbpcd_infop->dev = mk_kdev(MAJOR_NR, j);
 		sbpcd_infop->handle = p;
 		p->sbpcd_infop = sbpcd_infop;
-		disk = alloc_disk();
+		disk = alloc_disk(1);
 		disk->major = MAJOR_NR;
 		disk->first_minor = j;
-		disk->minor_shift = 0;
 		disk->fops = &sbpcd_bdops;
 		strcpy(disk->disk_name, sbpcd_infop->name);
 		disk->flags = GENHD_FL_CD;
@@ -5845,9 +5875,11 @@ int __init sbpcd_init(void)
 		{
 			printk(" sbpcd: Unable to register with Uniform CD-ROm driver\n");
 		}
+		disk->private_data = p;
+		disk->queue = &sbpcd_queue;
 		add_disk(disk);
 	}
-	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CD_FRAMESIZE);
+	blk_queue_hardsect_size(&sbpcd_queue, CD_FRAMESIZE);
 
 #ifndef MODULE
  init_done:
@@ -5866,7 +5898,7 @@ void sbpcd_exit(void)
 		return;
 	}
 	release_region(CDo_command,4);
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&sbpcd_queue);
 	devfs_unregister (devfs_handle);
 	for (j=0;j<NR_SBPCD;j++)
 	{
@@ -5875,7 +5907,6 @@ void sbpcd_exit(void)
 		put_disk(D_S[j].disk);
 		vfree(D_S[j].sbp_buf);
 		if (D_S[j].sbp_audsiz>0) vfree(D_S[j].aud_buf);
-		devfs_unregister(D_S[j].disk.de);
 		if ((unregister_cdrom(D_S[j].sbpcd_infop) == -EINVAL))
 		{
 			msg(DBG_INF, "What's that: can't unregister info %s.\n", major_name);
@@ -5885,6 +5916,7 @@ void sbpcd_exit(void)
 	}
 	msg(DBG_INF, "%s module released.\n", major_name);
 }
+
 
 module_init(__sbpcd_init) /*HACK!*/;
 module_exit(sbpcd_exit);
@@ -5900,9 +5932,8 @@ static int sbpcd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
         {
                 p->CD_changed=0;
                 msg(DBG_CHK,"medium changed (drive %s)\n", cdi->name);
-		/* BUG! Should invalidate buffers! --AJK */
-		/* Why should it do the above at all?! --mdcki */
 		current_drive->diskstate_flags &= ~toc_bit;
+		/* we *don't* need invalidate here, it's done by caller */
 		current_drive->diskstate_flags &= ~cd_size_bit;
 #if SAFE_MIXED
 		current_drive->has_data=0;

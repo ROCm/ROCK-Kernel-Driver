@@ -14,6 +14,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/tty.h>
+#include <linux/highmem.h>
 
 #include <asm/semaphore.h>
 #include <asm/processor.h>
@@ -29,6 +30,8 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
+#include <asm/nmi.h>
+#include <asm/edd.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
 extern spinlock_t rtc_lock;
@@ -151,6 +154,10 @@ EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(flush_tlb_page);
 #endif
 
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PM)
+EXPORT_SYMBOL_GPL(set_nmi_pm_callback);
+EXPORT_SYMBOL_GPL(unset_nmi_pm_callback);
+#endif
 #ifdef CONFIG_X86_IO_APIC
 EXPORT_SYMBOL(IO_APIC_get_PCI_irq_vector);
 #endif
@@ -167,6 +174,11 @@ EXPORT_SYMBOL(get_wchan);
 
 EXPORT_SYMBOL(rtc_lock);
 
+EXPORT_SYMBOL_GPL(register_profile_notifier);
+EXPORT_SYMBOL_GPL(unregister_profile_notifier);
+EXPORT_SYMBOL_GPL(set_nmi_callback);
+EXPORT_SYMBOL_GPL(unset_nmi_callback);
+ 
 #undef memcpy
 #undef memset
 extern void * memset(void *,int,__kernel_size_t);
@@ -182,3 +194,16 @@ extern int is_sony_vaio_laptop;
 EXPORT_SYMBOL(is_sony_vaio_laptop);
 
 EXPORT_SYMBOL(__PAGE_KERNEL);
+
+#ifdef CONFIG_HIGHMEM
+EXPORT_SYMBOL(kmap);
+EXPORT_SYMBOL(kunmap);
+EXPORT_SYMBOL(kmap_atomic);
+EXPORT_SYMBOL(kunmap_atomic);
+EXPORT_SYMBOL(kmap_atomic_to_page);
+#endif
+
+#ifdef CONFIG_EDD_MODULE
+EXPORT_SYMBOL(edd);
+EXPORT_SYMBOL(eddnr);
+#endif

@@ -34,21 +34,14 @@ struct {
 	struct timeval end;
 } syscall_record[1024];
 
-int syscall_index = 0;
-
-extern int kern_timer_on;
-
 void syscall_handler(int sig, struct uml_pt_regs *regs)
 {
 	void *sc;
 	long result;
-	int index, syscall;
+	int index, max, syscall;
 
-	lock_syscall();
-	if(syscall_index == 1024) syscall_index = 0;
-	index = syscall_index;
-	syscall_index++;
-	unlock_syscall();
+	max = sizeof(syscall_record)/sizeof(syscall_record[0]);
+	index = next_syscall_index(max);
 
 	syscall = regs->syscall;
 	sc = regs->sc;

@@ -957,6 +957,19 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 	if (subs->interface >= 0 && subs->interface != fmt->iface) {
 		usb_set_interface(subs->dev, subs->interface, 0);
 		subs->interface = -1;
+		subs->format = 0;
+	}
+
+	/* set interface */
+	if (subs->interface != fmt->iface || subs->format != fmt->altset_idx) {
+		if (usb_set_interface(dev, fmt->iface, fmt->altset_idx) < 0) {
+			snd_printk(KERN_ERR "%d:%d:%d: usb_set_interface failed\n",
+				   dev->devnum, fmt->iface, fmt->altsetting);
+			return -EIO;
+		}
+		snd_printdd(KERN_INFO "setting usb interface %d:%d\n", fmt->iface, fmt->altset_idx);
+		subs->interface = fmt->iface;
+		subs->format = fmt->altset_idx;
 	}
 
 	/* create a data pipe */
@@ -965,7 +978,6 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 		subs->datapipe = usb_sndisocpipe(dev, ep);
 	else
 		subs->datapipe = usb_rcvisocpipe(dev, ep);
-	subs->format = fmt->altset_idx;
 	subs->syncpipe = subs->syncinterval = 0;
 	subs->maxpacksize = alts->endpoint[0].wMaxPacketSize;
 	subs->maxframesize = bytes_to_frames(runtime, subs->maxpacksize);
@@ -997,15 +1009,6 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 			subs->syncpipe = usb_sndisocpipe(dev, ep);
 		subs->syncinterval = alts->endpoint[1].bRefresh;
 	}
-
-	/* set interface */
-	if (usb_set_interface(dev, fmt->iface, fmt->altset_idx) < 0) {
-		snd_printk(KERN_ERR "%d:%d:%d: usb_set_interface failed\n",
-			   dev->devnum, fmt->iface, fmt->altsetting);
-		return -EIO;
-	}
-	snd_printdd(KERN_INFO "setting usb interface %d:%d\n", fmt->iface, fmt->altset_idx);
-	subs->interface = fmt->iface;
 
 	ep = alts->endpoint[0].bEndpointAddress;
 	/* if endpoint has pitch control, enable it */
@@ -1171,6 +1174,7 @@ static int snd_usb_pcm_open(snd_pcm_substream_t *substream, int direction,
 	snd_usb_substream_t *subs = &as->substream[direction];
 
 	subs->interface = -1;
+	subs->format = 0;
 	runtime->hw = *hw;
 	runtime->private_data = subs;
 	subs->pcm_substream = substream;
@@ -1601,6 +1605,10 @@ static int parse_audio_format_type(struct usb_device *dev, int iface_no, int alt
 	/* FIXME: correct endianess and sign? */
 	pcm_format = -1;
 	switch (format) {
+	case 0: /* some devices don't define this correctly... */
+		snd_printd(KERN_INFO "%d:%u:%d : format type 0 is detected, processed as PCM\n",
+			   dev->devnum, iface_no, altno);
+		/* fall-through */
 	case USB_AUDIO_FORMAT_PCM:
 		/* check the format byte size */
 		switch (fmt[6]) {

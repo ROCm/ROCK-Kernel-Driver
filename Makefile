@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 42
+SUBLEVEL = 44
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -239,7 +239,7 @@ ifdef include-config
 
 #	If .config doesn't exist - tough luck
 
-.config: arch/$(ARCH)/config.in $(shell find . -name Config.in)
+.config: arch/$(ARCH)/config.in # FIXME $(shell find . -name Config.in)
 	@echo '***'
 	@if [ -f $@ ]; then \
 	  echo '*** The tree was updated, so your .config may be'; \
@@ -456,18 +456,23 @@ include/linux/version.h: Makefile
 
 depend dep: .hdepend
 
-#	.hdepend is our (misnomed) marker for whether we've run
+#	.hdepend is our (misnomed) marker for whether we've
 #	generated module versions
 
-.hdepend: $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
+make-versions := $(strip $(if $(filter dep depend,$(MAKECMDGOALS)),1) \
+			 $(if $(wildcard .hdepend),,1))
+
+.hdepend: prepare FORCE
+ifneq ($(make-versions),)
 	@$(MAKE) include/linux/modversions.h
 	@touch $@
+endif
 
 ifdef CONFIG_MODVERSIONS
 
 # 	Update modversions.h, but only if it would change.
 
-include/linux/modversions.h: scripts/fixdep prepare FORCE
+include/linux/modversions.h: FORCE
 	@rm -rf .tmp_export-objs
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
 	@echo -n '  Generating $@'
@@ -661,90 +666,61 @@ allmodconfig:
 defconfig:
 	yes '' | $(CONFIG_SHELL) $(src)/scripts/Configure -d arch/$(ARCH)/config.in
 
-# Cleaning up
-# ---------------------------------------------------------------------------
+###
+# Cleaning is done on three levels.
+# make clean     Delete all automatically generated files, including
+#                tools and firmware.
+# make mrproper  Delete the current configuration, and related files
+#                Any core files spread around is deleted as well
+# make distclean Remove editor backup files, patch leftover files and the like
 
-#	files removed with 'make clean'
-CLEAN_FILES += \
-	include/linux/compile.h \
-	vmlinux System.map \
-	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
-	drivers/char/conmakehash \
-	drivers/char/drm/*-mod.c \
-	drivers/char/defkeymap.c drivers/char/qtronixmap.c \
-	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
-	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
-	sound/oss/bin2hex sound/oss/hex2hex \
-	drivers/atm/fore200e_mkfirm drivers/atm/{pca,sba}*{.bin,.bin1,.bin2} \
-	drivers/scsi/aic7xxx/aic7xxx_seq.h \
-	drivers/scsi/aic7xxx/aic7xxx_reg.h \
-	drivers/scsi/aic7xxx/aicasm/aicasm_gram.c \
-	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
-	drivers/scsi/aic7xxx/aicasm/y.tab.h \
-	drivers/scsi/aic7xxx/aicasm/aicasm \
-	drivers/scsi/53c700_d.h drivers/scsi/sim710_d.h \
-	drivers/scsi/53c7xx_d.h drivers/scsi/53c7xx_u.h \
-	drivers/scsi/53c8xx_d.h drivers/scsi/53c8xx_u.h \
-	net/802/cl2llc.c net/802/transit/pdutr.h net/802/transit/timertr.h \
-	net/802/pseudo/pseudocode.h \
-	net/khttpd/make_times_h net/khttpd/times.h \
-	submenu*
+# Files removed with 'make clean'
+CLEAN_FILES += vmlinux System.map MC*
 
-# 	files removed with 'make mrproper'
+# Files removed with 'make mrproper'
 MRPROPER_FILES += \
 	include/linux/autoconf.h include/linux/version.h \
-	drivers/net/hamradio/soundmodem/sm_tbl_{afsk1200,afsk2666,fsk9600}.h \
-	drivers/net/hamradio/soundmodem/sm_tbl_{hapn4800,psk4800}.h \
-	drivers/net/hamradio/soundmodem/sm_tbl_{afsk2400_7,afsk2400_8}.h \
-	drivers/net/hamradio/soundmodem/gentbl \
-	sound/oss/*_boot.h sound/oss/.*.boot \
-	sound/oss/msndinit.c \
-	sound/oss/msndperm.c \
-	sound/oss/pndsperm.c \
-	sound/oss/pndspini.c \
-	drivers/atm/fore200e_*_fw.c drivers/atm/.fore200e_*.fw \
-	.version .config* config.in config.old \
-	scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp \
-	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
+	.version .config .config.old config.in config.old \
 	.menuconfig.log \
 	include/asm \
 	.hdepend include/linux/modversions.h \
 	tags TAGS kernel.spec \
 	.tmp*
 
-# 	directories removed with 'make mrproper'
+# Directories removed with 'make mrproper'
 MRPROPER_DIRS += \
 	.tmp_export-objs \
 	include/config \
 	include/linux/modules
 
-clean:	archclean
-	@echo 'Cleaning up'
-	@find . $(RCS_FIND_IGNORE) \
-		\( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
-		-name .\*.tmp -o -name .\*.d \) -type f -print \
-		| grep -v lxdialog/ | xargs rm -f
-	@rm -f $(CLEAN_FILES)
-	+@$(call descend,Documentation/DocBook,clean)
+# clean - Delete all intermediate files
+#
+clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
 
-mrproper: clean archmrproper
-	@echo 'Making mrproper'
-	@find . $(RCS_FIND_IGNORE) \
-		\( -name .depend -o -name .\*.cmd \) \
-		-type f -print | xargs rm -f
-	@rm -rf $(MRPROPER_DIRS)
-	@rm -f $(MRPROPER_FILES)
-	+@$(call descend,scripts,mrproper)
-	+@$(call descend,Documentation/DocBook,mrproper)
+$(addprefix _clean_,$(clean-dirs)):
+	$(MAKE) MAKEFILES= -rR -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
 
-distclean: mrproper
-	@echo 'Making distclean'
+quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
+cmd_rmclean	  = rm -f $(CLEAN_FILES)
+clean: archclean $(addprefix _clean_,$(clean-dirs))
+	$(call cmd,rmclean)
 	@find . $(RCS_FIND_IGNORE) \
-		\( -not -type d \) -and \
+	 	\( -name '*.[oas]' -o -name '.*.cmd' -o -name '.*.d' \
+		-o -name '.*.tmp' \) -type f -print | xargs rm -f
+
+# mrproper - delete configuration + modules + core files
+#
+quiet_cmd_mrproper = RM  $$(MRPROPER_DIRS) + $$(MRPROPER_FILES)
+cmd_mrproper = rm -rf $(MRPROPER_DIRS) && rm -f $(MRPROPER_FILES)
+mrproper distclean: clean archmrproper
+	@echo '  Making $@ in the srctree'
+	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
-	 	-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f \
-		-print | xargs rm -f
+	 	-o -name '.*.rej' -o -size 0 \
+		-o -name '*%' -o -name '.*.cmd' -o -name 'core' \) \
+		-type f -print | xargs rm -f
+	$(call cmd,mrproper)
 
 # Generate tags for editors
 # ---------------------------------------------------------------------------

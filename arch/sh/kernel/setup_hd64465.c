@@ -89,13 +89,13 @@ static void shutdown_hd64465_irq(unsigned int irq)
 
 
 static struct hw_interrupt_type hd64465_irq_type = {
-	typename:	"HD64465-IRQ",
-	startup:	startup_hd64465_irq,
-	shutdown:	shutdown_hd64465_irq,
-	enable:		enable_hd64465_irq,
-	disable:	disable_hd64465_irq,
-	ack:		mask_and_ack_hd64465,
-	end:		end_hd64465_irq
+	.typename	= "HD64465-IRQ",
+	.startup	= startup_hd64465_irq,
+	.shutdown	= shutdown_hd64465_irq,
+	.enable		= enable_hd64465_irq,
+	.disable	= disable_hd64465_irq,
+	.ack		= mask_and_ack_hd64465,
+	.end		= end_hd64465_irq
 };
 
 

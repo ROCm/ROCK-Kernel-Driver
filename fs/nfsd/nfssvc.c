@@ -8,7 +8,6 @@
  * Copyright (C) 1995, 1996, 1997 Olaf Kirch <okir@monad.swb.de>
  */
 
-#define __NO_VERSION__
 #include <linux/config.h>
 #include <linux/module.h>
 
@@ -17,7 +16,6 @@
 #include <linux/nfs.h>
 #include <linux/in.h>
 #include <linux/uio.h>
-#include <linux/version.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/smp.h>
@@ -31,9 +29,6 @@
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/stats.h>
 #include <linux/nfsd/cache.h>
-#include <linux/nfsd/xdr.h>
-#include <linux/nfsd/xdr3.h>
-#include <linux/nfsd/xdr4.h>
 #include <linux/lockd/bind.h>
 
 #define NFSDDBG_FACILITY	NFSDDBG_SVC
@@ -93,7 +88,7 @@ nfsd_svc(unsigned short port, int nrservs)
 	if (!nfsd_serv) {
 		atomic_set(&nfsd_busy, 0);
 		error = -ENOMEM;
-		nfsd_serv = svc_create(&nfsd_program, NFSD_BUFSIZE, NFSSVC_XDRSIZE);
+		nfsd_serv = svc_create(&nfsd_program, NFSD_BUFSIZE);
 		if (nfsd_serv == NULL)
 			goto out;
 		error = svc_makesock(nfsd_serv, IPPROTO_UDP, port);
@@ -258,7 +253,7 @@ nfsd(struct svc_rqst *rqstp)
 	MOD_DEC_USE_COUNT;
 }
 
-static int
+int
 nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 {
 	struct svc_procedure	*proc;
@@ -319,34 +314,12 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 	return 1;
 }
 
-static struct svc_version	nfsd_version2 = {
-		.vs_vers	= 2,
-		.vs_nproc	= 18,
-		.vs_proc	= nfsd_procedures2,
-		.vs_dispatch	= nfsd_dispatch
-};
-#ifdef CONFIG_NFSD_V3
-static struct svc_version	nfsd_version3 = {
-		.vs_vers	= 3,
-		.vs_nproc	= 22,
-		.vs_proc	= nfsd_procedures3,
-		.vs_dispatch	= nfsd_dispatch
-};
-#endif
-#ifdef CONFIG_NFSD_V4
-static struct svc_version	nfsd_version4 = {
-		.vs_vers	= 4,
-		.vs_nproc	= 2,
-		.vs_proc	= nfsd_procedures4,
-		.vs_dispatch	= nfsd_dispatch
-};
-#endif
+extern struct svc_version nfsd_version2, nfsd_version3, nfsd_version4;
+
 static struct svc_version *	nfsd_version[] = {
 	[2] = &nfsd_version2,
 #if defined(CONFIG_NFSD_V3)
 	[3] = &nfsd_version3,
-#elif defined(CONFIG_NFSD_V4)
-	[3] = NULL,
 #endif
 #if defined(CONFIG_NFSD_V4)
 	[4] = &nfsd_version4,
@@ -356,8 +329,6 @@ static struct svc_version *	nfsd_version[] = {
 #define NFSD_NRVERS		(sizeof(nfsd_version)/sizeof(nfsd_version[0]))
 struct svc_program		nfsd_program = {
 	.pg_prog		= NFS_PROGRAM,		/* program number */
-	.pg_lovers		= 2,			// version
-	.pg_hivers		= NFSD_NRVERS-1,	// range
 	.pg_nvers		= NFSD_NRVERS,		/* nr of entries in nfsd_version */
 	.pg_vers		= nfsd_version,		/* version table */
 	.pg_name		= "nfsd",		/* program name */

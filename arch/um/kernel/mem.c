@@ -26,33 +26,32 @@
 #include "kern.h"
 #include "init.h"
 
+/* Changed during early boot */
+pgd_t swapper_pg_dir[1024];
 unsigned long high_physmem;
-unsigned long low_physmem;
-
 unsigned long vm_start;
 unsigned long vm_end;
-
 unsigned long highmem;
-
-pgd_t swapper_pg_dir[1024];
-
 unsigned long *empty_zero_page = NULL;
-
 unsigned long *empty_bad_page = NULL;
 
+/* Not modified */
 const char bad_pmd_string[] = "Bad pmd in pte_alloc: %08lx\n";
 
 extern char __init_begin, __init_end;
 extern long physmem_size;
 
+/* Not changed by UML */
 mmu_gather_t mmu_gathers[NR_CPUS];
 
+/* Changed during early boot */
 int kmalloc_ok = 0;
 
 #define NREGIONS (phys_region_index(0xffffffff) - phys_region_index(0x0) + 1)
 struct mem_region *regions[NREGIONS] = { [ 0 ... NREGIONS - 1 ] = NULL };
 #define REGION_SIZE ((0xffffffff & ~REGION_MASK) + 1)
 
+/* Changed during early boot */
 static unsigned long brk_end;
 
 static void map_cb(void *unused)
@@ -108,6 +107,7 @@ void mem_init(void)
 }
 
 #if CONFIG_HIGHMEM
+/* Changed during early boot */
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
@@ -187,18 +187,22 @@ int init_maps(struct mem_region *region)
 	return(0);
 }
 
+DECLARE_MUTEX(regions_sem);
+
 static int setup_one_range(int fd, char *driver, unsigned long start, 
 			   unsigned long pfn, int len, 
 			   struct mem_region *region)
 {
 	int i;
 
+	down(&regions_sem);
 	for(i = 0; i < NREGIONS; i++){
 		if(regions[i] == NULL) break;		
 	}
 	if(i == NREGIONS){
 		printk("setup_range : no free regions\n");
-		return(-1);
+		i = -1;
+		goto out;
 	}
 
 	if(fd == -1)
@@ -216,6 +220,8 @@ static int setup_one_range(int fd, char *driver, unsigned long start,
 					 len :		len, 
 					 fd :		fd } );
 	regions[i] = region;
+ out:
+	up(&regions_sem);
 	return(i);
 }
 
@@ -373,7 +379,8 @@ void show_mem(void)
         printk("%d pages swap cached\n", cached);
 }
 
-unsigned long kmem_top = 0;
+/* Changed during early boot */
+static unsigned long kmem_top = 0;
 
 unsigned long get_kmem_end(void)
 {
@@ -428,8 +435,10 @@ struct page *arch_validate(struct page *page, int mask, int order)
 	goto again;
 }
 
+DECLARE_MUTEX(vm_reserved_sem);
 static struct list_head vm_reserved = LIST_HEAD_INIT(vm_reserved);
 
+/* Static structures, linked in to the list in early boot */
 static struct vm_reserved head = {
 	list :		LIST_HEAD_INIT(head.list),
 	start :		0,
@@ -455,7 +464,9 @@ int reserve_vm(unsigned long start, unsigned long end, void *e)
 {
 	struct vm_reserved *entry = e, *reserved, *prev;
 	struct list_head *ele;
+	int err;
 
+	down(&vm_reserved_sem);
 	list_for_each(ele, &vm_reserved){
 		reserved = list_entry(ele, struct vm_reserved, list);
 		if(reserved->start >= end) goto found;
@@ -469,13 +480,17 @@ int reserve_vm(unsigned long start, unsigned long end, void *e)
 		entry = kmalloc(sizeof(*entry), GFP_KERNEL);
 	if(entry == NULL){
 		printk("reserve_vm : Failed to allocate entry\n");
-		return(-ENOMEM);
+		err = -ENOMEM;
+		goto out;
 	}
 	*entry = ((struct vm_reserved) 
 		{ list :	LIST_HEAD_INIT(entry->list),
 		  start :	start,
 		  end :		end });
 	list_add(&entry->list, &prev->list);
+	err = 0;
+ out:
+	up(&vm_reserved_sem);
 	return(0);
 }
 
@@ -486,6 +501,7 @@ unsigned long get_vm(unsigned long len)
 	unsigned long start;
 	int err;
 	
+	down(&vm_reserved_sem);
 	list_for_each(ele, &vm_reserved){
 		this = list_entry(ele, struct vm_reserved, list);
 		next = list_entry(ele->next, struct vm_reserved, list);
@@ -493,8 +509,10 @@ unsigned long get_vm(unsigned long len)
 		   (this->end + len + PAGE_SIZE <= next->start))
 			goto found;
 	}
+	up(&vm_reserved_sem);
 	return(0);
  found:
+	up(&vm_reserved_sem);
 	start = (unsigned long) ROUND_UP(this->end) + PAGE_SIZE;
 	err = reserve_vm(start, start + len, NULL);
 	if(err) return(0);
@@ -533,7 +551,11 @@ struct iomem {
 	unsigned long size;
 };
 
-struct iomem iomem_regions[NREGIONS] = { [ 0 ... NREGIONS - 1 ] = 
+/* iomem regions can only be added on the command line at the moment.  
+ * Locking will be needed when they can be added via mconsole.
+ */
+
+struct iomem iomem_regions[NREGIONS] = { [ 0 ... NREGIONS - 1 ] =
 					 { name : 	NULL,
 					   fd : 	-1,
 					   size :	0 } };
@@ -569,6 +591,7 @@ __initcall(setup_iomem);
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
 
+/* Changed during early boot */
 static struct mem_region physmem_region;
 static struct vm_reserved physmem_reserved;
 

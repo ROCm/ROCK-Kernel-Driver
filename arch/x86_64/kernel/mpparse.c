@@ -785,7 +785,7 @@ void __init mp_register_ioapic (
 	mp_ioapic_routing[idx].irq_end = irq_base + 
 		io_apic_get_redir_entries(idx);
 
-	printk("IOAPIC[%d]: apic_id %d, version %d, address 0x%lx, "
+	printk("IOAPIC[%d]: apic_id %d, version %d, address 0x%x, "
 		"IRQ %d-%d\n", idx, mp_ioapics[idx].mpc_apicid, 
 		mp_ioapics[idx].mpc_apicver, mp_ioapics[idx].mpc_apicaddr,
 		mp_ioapic_routing[idx].irq_start,

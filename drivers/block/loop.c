@@ -437,7 +437,7 @@ static struct bio *loop_get_bio(struct loop_device *lo)
 static int loop_end_io_transfer(struct bio *bio, unsigned int bytes_done, int err)
 {
 	struct bio *rbh = bio->bi_private;
-	struct loop_device *lo = &loop_dev[minor(to_kdev_t(rbh->bi_bdev->bd_dev))];
+	struct loop_device *lo = rbh->bi_bdev->bd_disk->private_data;
 
 	if (bio->bi_size)
 		return 1;
@@ -916,20 +916,9 @@ static int loop_get_status(struct loop_device *lo, struct loop_info *arg)
 static int lo_ioctl(struct inode * inode, struct file * file,
 	unsigned int cmd, unsigned long arg)
 {
-	struct loop_device *lo;
-	int dev, err;
+	struct loop_device *lo = inode->i_bdev->bd_disk->private_data;
+	int err;
 
-	if (!inode)
-		return -EINVAL;
-	if (major(inode->i_rdev) != MAJOR_NR) {
-		printk(KERN_WARNING "lo_ioctl: pseudo-major != %d\n",
-		       MAJOR_NR);
-		return -ENODEV;
-	}
-	dev = minor(inode->i_rdev);
-	if (dev >= max_loop)
-		return -ENODEV;
-	lo = &loop_dev[dev];
 	down(&lo->lo_ctl_mutex);
 	switch (cmd) {
 	case LOOP_SET_FD:
@@ -953,14 +942,9 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 
 static int lo_open(struct inode *inode, struct file *file)
 {
-	struct loop_device *lo;
-	int	dev, type;
+	struct loop_device *lo = inode->i_bdev->bd_disk->private_data;
+	int type;
 
-	dev = minor(inode->i_rdev);
-	if (dev >= max_loop)
-		return -ENODEV;
-
-	lo = &loop_dev[dev];
 	down(&lo->lo_ctl_mutex);
 
 	type = lo->lo_encrypt_type; 
@@ -973,14 +957,9 @@ static int lo_open(struct inode *inode, struct file *file)
 
 static int lo_release(struct inode *inode, struct file *file)
 {
-	struct loop_device *lo;
-	int	dev, type;
+	struct loop_device *lo = inode->i_bdev->bd_disk->private_data;
+	int type;
 
-	dev = minor(inode->i_rdev);
-	if (dev >= max_loop)
-		return 0;
-
-	lo = &loop_dev[dev];
 	down(&lo->lo_ctl_mutex);
 	type = lo->lo_encrypt_type;
 	--lo->lo_refcnt;
@@ -1034,16 +1013,6 @@ int loop_unregister_transfer(int number)
 EXPORT_SYMBOL(loop_register_transfer);
 EXPORT_SYMBOL(loop_unregister_transfer);
 
-request_queue_t *loop_get_queue(kdev_t dev)
-{
-	int minor = minor(dev);
-
-	if (minor < max_loop)
-		return &loop_dev[minor].lo_queue;
-
-	return NULL;
-}
-
 int __init loop_init(void) 
 {
 	int	i;
@@ -1075,7 +1044,7 @@ int __init loop_init(void)
 		goto out_mem;
 
 	for (i = 0; i < max_loop; i++) {
-		disks[i] = alloc_disk();
+		disks[i] = alloc_disk(1);
 		if (!disks[i])
 			goto out_mem2;
 	}
@@ -1093,11 +1062,10 @@ int __init loop_init(void)
 		disk->first_minor = i;
 		disk->fops = &lo_fops;
 		sprintf(disk->disk_name, "loop%d", i);
+		disk->private_data = lo;
+		disk->queue = &lo->lo_queue;
 		add_disk(disk);
 	}
-
-	blk_dev[LOOP_MAJOR].queue = loop_get_queue;
-
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);
 	return 0;
 

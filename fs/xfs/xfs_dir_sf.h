@@ -46,7 +46,7 @@ typedef struct { __uint8_t i[sizeof(xfs_ino_t)]; } xfs_dir_ino_t;
  * be calculated on the fly.
  *
  * Entries are packed toward the top as tight as possible.  The header
- * and the elements much be bcopy()'d out into a work area to get correct
+ * and the elements much be memcpy'd out into a work area to get correct
  * alignment for the inode number fields.
  */
 typedef struct xfs_dir_shortform {

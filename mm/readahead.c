@@ -22,18 +22,18 @@ struct backing_dev_info default_backing_dev_info = {
 /*
  * Return max readahead size for this inode in number-of-pages.
  */
-static inline unsigned long get_max_readahead(struct file *file)
+static inline unsigned long get_max_readahead(struct file_ra_state *ra)
 {
-	return file->f_ra.ra_pages;
+	return ra->ra_pages;
 }
 
-static inline unsigned long get_min_readahead(struct file *file)
+static inline unsigned long get_min_readahead(struct file_ra_state *ra)
 {
 	return (VM_MIN_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 }
 
 static int
-read_pages(struct file *file, struct address_space *mapping,
+read_pages(struct address_space *mapping, struct file *filp,
 		struct list_head *pages, unsigned nr_pages)
 {
 	unsigned page_idx;
@@ -48,7 +48,7 @@ read_pages(struct file *file, struct address_space *mapping,
 		struct page *page = list_entry(pages->prev, struct page, list);
 		list_del(&page->list);
 		if (!add_to_page_cache(page, mapping, page->index)) {
-			mapping->a_ops->readpage(file, page);
+			mapping->a_ops->readpage(filp, page);
 			if (!pagevec_add(&lru_pvec, page))
 				__pagevec_lru_add(&lru_pvec);
 		} else {
@@ -134,10 +134,11 @@ read_pages(struct file *file, struct address_space *mapping,
  *
  * Returns the number of pages which actually had IO started against them.
  */
-int do_page_cache_readahead(struct file *file,
-			unsigned long offset, unsigned long nr_to_read)
+int do_page_cache_readahead(struct address_space *mapping,
+			    struct file *filp,
+			    unsigned long offset,
+			    unsigned long nr_to_read)
 {
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	struct inode *inode = mapping->host;
 	struct page *page;
 	unsigned long end_index;	/* The last page we want to read */
@@ -181,7 +182,7 @@ int do_page_cache_readahead(struct file *file,
 	 * will then handle the error.
 	 */
 	if (ret) {
-		read_pages(file, mapping, &page_pool, ret);
+		read_pages(mapping, filp, &page_pool, ret);
 		blk_run_queues();
 	}
 	BUG_ON(!list_empty(&page_pool));
@@ -216,9 +217,9 @@ check_ra_success(struct file_ra_state *ra, pgoff_t attempt,
  * page_cache_readahead is the main function.  If performs the adaptive
  * readahead window size management and submits the readahead I/O.
  */
-void page_cache_readahead(struct file *file, unsigned long offset)
+void page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
+			  struct file *filp, unsigned long offset)
 {
-	struct file_ra_state *ra = &file->f_ra;
 	unsigned max;
 	unsigned min;
 	unsigned orig_next_size;
@@ -239,11 +240,11 @@ void page_cache_readahead(struct file *file, unsigned long offset)
 	if (ra->next_size == -1UL)
 		goto out;	/* Maximally shrunk */
 
-	max = get_max_readahead(file);
+	max = get_max_readahead(ra);
 	if (max == 0)
 		goto out;	/* No readahead */
 
-	min = get_min_readahead(file);
+	min = get_min_readahead(ra);
 	orig_next_size = ra->next_size;
 
 	if (ra->next_size == 0 && offset == 0) {
@@ -316,7 +317,8 @@ do_io:
 		ra->ahead_start = 0;		/* Invalidate these */
 		ra->ahead_size = 0;
 
-		actual = do_page_cache_readahead(file, offset, ra->size);
+		actual = do_page_cache_readahead(mapping, filp, offset,
+						 ra->size);
 		check_ra_success(ra, ra->size, actual, orig_next_size);
 	} else {
 		/*
@@ -327,7 +329,7 @@ do_io:
 		if (ra->ahead_start == 0) {
 			ra->ahead_start = ra->start + ra->size;
 			ra->ahead_size = ra->next_size;
-			actual = do_page_cache_readahead(file,
+			actual = do_page_cache_readahead(mapping, filp,
 					ra->ahead_start, ra->ahead_size);
 			check_ra_success(ra, ra->ahead_size,
 					actual, orig_next_size);
@@ -342,12 +344,11 @@ out:
  * but somewhat ascending.  So readaround favours pages beyond the target one.
  * We also boost the window size, as it can easily shrink due to misses.
  */
-void page_cache_readaround(struct file *file, unsigned long offset)
+void page_cache_readaround(struct address_space *mapping, struct file_ra_state *ra,
+			   struct file *filp, unsigned long offset)
 {
-	struct file_ra_state *ra = &file->f_ra;
-
 	if (ra->next_size != -1UL) {
-		const unsigned long min = get_min_readahead(file) * 2;
+		const unsigned long min = get_min_readahead(ra) * 2;
 		unsigned long target;
 		unsigned long backward;
 
@@ -365,7 +366,7 @@ void page_cache_readaround(struct file *file, unsigned long offset)
 			target = 0;
 		else
 			target -= backward;
-		page_cache_readahead(file, target);
+		page_cache_readahead(mapping, ra, filp, target);
 	}
 }
 
@@ -383,10 +384,9 @@ void page_cache_readaround(struct file *file, unsigned long offset)
  * that the readahead window size will stabilise around the maximum level at
  * which there is no thrashing.
  */
-void handle_ra_miss(struct file *file)
+void handle_ra_miss(struct address_space *mapping, struct file_ra_state *ra)
 {
-	struct file_ra_state *ra = &file->f_ra;
-	const unsigned long min = get_min_readahead(file);
+	const unsigned long min = get_min_readahead(ra);
 
 	if (ra->next_size == -1UL) {
 		ra->next_size = min;

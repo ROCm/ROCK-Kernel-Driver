@@ -447,11 +447,6 @@ struct socket *sockfd_lookup(int fd, int *err)
 	return sock;
 }
 
-extern __inline__ void sockfd_put(struct socket *sock)
-{
-	fput(sock->file);
-}
-
 /**
  *	sock_alloc	-	allocate a socket
  *	

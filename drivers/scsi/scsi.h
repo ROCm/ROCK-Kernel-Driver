@@ -557,15 +557,19 @@ struct scsi_device {
 	 */
 	struct scsi_device *next;	/* Used for linked list */
 	struct scsi_device *prev;	/* Used for linked list */
+	struct list_head    siblings;   /* list of all devices on this host */
+	struct list_head    same_target_siblings; /* just the devices sharing same target id */
 	wait_queue_head_t   scpnt_wait;	/* Used to wait if
 					   device is busy */
 	struct Scsi_Host *host;
 	request_queue_t request_queue;
         atomic_t                device_active; /* commands checked out for device */
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
+	struct list_head free_cmnds;    /* list of available Scsi_Cmnd structs */
+	struct list_head busy_cmnds;    /* list of Scsi_Cmnd structs in use */
 	Scsi_Cmnd *device_queue;	/* queue of SCSI Command structures */
         Scsi_Cmnd *current_cmnd;	/* currently active command */
-	unsigned short queue_depth;	/* How deep of a queue we have */
+	unsigned short current_queue_depth;/* How deep of a queue we have */
 	unsigned short new_queue_depth; /* How deep of a queue we want */
 
 	unsigned int id, lun, channel;
@@ -713,6 +717,7 @@ struct scsi_cmnd {
 	Scsi_Request *sc_request;
 	struct scsi_cmnd *next;
 	struct scsi_cmnd *reset_chain;
+	struct list_head list_entry; /* Used to place us on the cmd lists */
 
 	int eh_state;		/* Used for state tracking in error handlr */
 	int eh_eflags;		/* Used by error handlr */
@@ -872,6 +877,12 @@ struct scsi_cmnd {
 
 extern int scsi_reset_provider(Scsi_Device *, int);
 
+#define MSG_SIMPLE_TAG	0x20
+#define MSG_HEAD_TAG	0x21
+#define MSG_ORDERED_TAG	0x22
+
+#define SCSI_NO_TAG	(-1)    /* identify no tag in use */
+
 /**
  * scsi_activate_tcq - turn on tag command queueing
  * @SDpnt:	device to turn on TCQ for
@@ -887,7 +898,7 @@ static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
 
         if(SDpnt->tagged_supported && !blk_queue_tagged(q)) {
                 blk_queue_init_tags(q, depth);
-                SDpnt->tagged_queue = 1;
+		scsi_adjust_queue_depth(SDpnt, MSG_ORDERED_TAG, depth);
         }
 }
 
@@ -897,13 +908,8 @@ static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
  **/
 static inline void scsi_deactivate_tcq(Scsi_Device *SDpnt) {
         blk_queue_free_tags(&SDpnt->request_queue);
-        SDpnt->tagged_queue = 0;
+	scsi_adjust_queue_depth(SDpnt, 0, 2);
 }
-#define MSG_SIMPLE_TAG	0x20
-#define MSG_HEAD_TAG	0x21
-#define MSG_ORDERED_TAG	0x22
-
-#define SCSI_NO_TAG	(-1)    /* identify no tag in use */
 
 /**
  * scsi_populate_tag_msg - place a tag message in a buffer

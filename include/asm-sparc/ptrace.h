@@ -73,7 +73,12 @@ extern void show_regs(struct pt_regs *);
 #define REGWIN_SZ         0x40
 #endif
 
-#include <asm/asm_offsets.h>
+/*
+ * The asm_offsets.h is a generated file, so we cannot include it.
+ * It may be OK for glibc headers, but it's utterly pointless for C code.
+ * The assembly code using those offsets has to include it explicitly.
+ */
+/* #include <asm/asm_offsets.h> */
 
 /* These are for pt_regs. */
 #define PT_PSR    0x0

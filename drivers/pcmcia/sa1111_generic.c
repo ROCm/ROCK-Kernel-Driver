@@ -297,7 +297,7 @@ static int __init sa1111_drv_pcmcia_init(void)
 
 static void __exit sa1111_drv_pcmcia_exit(void)
 {
-	remove_driver(&pcmcia_driver.drv);
+	driver_unregister(&pcmcia_driver.drv);
 }
 
 module_init(sa1111_drv_pcmcia_init);

@@ -33,7 +33,7 @@ IA32_CPP := $(CROSS_COMPILE)gcc -m32 -E
 export IA32_CC IA32_LD IA32_AS IA32_OBJCOPY IA32_CPP
 
 
-LD=$(CROSS_COMPILE)ld -m elf_x86_64
+LDFLAGS		:= -m elf_x86_64
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux := -e stext
 
@@ -47,51 +47,38 @@ CFLAGS += -finline-limit=2000
 
 HEAD := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 
-SUBDIRS += arch/x86_64/kernel arch/x86_64/mm arch/x86_64/lib
-CORE_FILES := arch/x86_64/kernel/kernel.o $(CORE_FILES)
-CORE_FILES +=  arch/x86_64/mm/mm.o
-LIBS := $(TOPDIR)/arch/x86_64/lib/lib.a $(LIBS)
-
-ifdef CONFIG_IA32_EMULATION
-SUBDIRS += arch/x86_64/ia32
-CORE_FILES += arch/x86_64/ia32/ia32.o
-endif
-
-ifdef CONFIG_PCI
-SUBDIRS += arch/x86_64/pci
-DRIVERS += arch/x86_64/pci/pci.o
-endif
-
-CORE_FILES += $(core-y)
+libs-y 					+= arch/x86_64/lib/
+core-y					+= arch/x86_64/kernel/ arch/x86_64/mm/
+core-$(CONFIG_IA32_EMULATION)		+= arch/x86_64/ia32/
+drivers-$(CONFIG_PCI)			+= arch/x86_64/pci/
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
+makeboot = $(call descend,arch/x86_64/boot,$(1))
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper
 
-bzImage: vmlinux
-	@$(MAKEBOOT) bzImage
+BOOTIMAGE=arch/x86_64/boot/bzImage
+zImage zlilo zdisk: BOOTIMAGE=arch/x86_64/boot/zImage
 
-bzImage-padded: vmlinux
-	@$(MAKEBOOT) bzImage-padded
+zImage bzImage: vmlinux
+	+@$(call makeboot,$(BOOTIMAGE))
 
-tmp:
-	@$(MAKEBOOT) BOOTIMAGE=bzImage zlilo
+compressed: zImage
 
-bzlilo: vmlinux
-	@$(MAKEBOOT) BOOTIMAGE=bzImage zlilo
+zlilo bzlilo: vmlinux
+	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
 
-bzdisk: vmlinux
-	@$(MAKEBOOT) BOOTIMAGE=bzImage zdisk
+zdisk bzdisk: vmlinux
+	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
 
 install: vmlinux
-	@$(MAKEBOOT) BOOTIMAGE=bzImage install
+	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
 
 archclean:
-	@$(MAKEBOOT) clean
+	+@$(call makeboot,clean)
 
 archmrproper:
-
 
 prepare: include/asm-$(ARCH)/offset.h
 

@@ -8,7 +8,7 @@ export-objs	:= core.o 8250.o suncore.o
 
 serial-8250-y :=
 serial-8250-$(CONFIG_PCI) += 8250_pci.o
-serial-8250-$(CONFIG_ISAPNP) += 8250_pnp.o
+serial-8250-$(CONFIG_PNP) += 8250_pnp.o
 obj-$(CONFIG_SERIAL_CORE) += core.o
 obj-$(CONFIG_SERIAL_21285) += 21285.o
 obj-$(CONFIG_SERIAL_8250) += 8250.o $(serial-8250-y)

@@ -57,12 +57,13 @@
  *                         (Jan 7, 2001)
  * Zwane Mwaikambo	   Added PM support. (Dec 4 2001)
  *
+ * Adam Belay              Converted driver to new PnP Layer (Oct 12, 2002)
  */
 
 #include <linux/config.h>
+#include <linux/pnp.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/isapnp.h>
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include "sound_config.h"
@@ -107,7 +108,7 @@
 #define CHIPSET_OPL3SA2 0
 #define CHIPSET_OPL3SA3 1
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 #define OPL3SA2_CARDS_MAX 4
 #else
 #define OPL3SA2_CARDS_MAX 1
@@ -161,13 +162,13 @@ static int __initdata dma2	= -1;
 static int __initdata ymode	= -1;
 static int __initdata loopback	= -1;
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 /* PnP specific parameters */
 static int __initdata isapnp = 1;
 static int __initdata multiple = 1;
 
 /* PnP devices */
-struct pci_dev* opl3sa2_dev[OPL3SA2_CARDS_MAX];
+struct pnp_dev* opl3sa2_dev[OPL3SA2_CARDS_MAX];
 
 /* Whether said devices have been activated */
 static int opl3sa2_activated[OPL3SA2_CARDS_MAX];
@@ -205,7 +206,7 @@ MODULE_PARM_DESC(ymode, "Set Yamaha 3D enhancement mode (0 = Desktop/Normal, 1 =
 MODULE_PARM(loopback, "i");
 MODULE_PARM_DESC(loopback, "Set A/D input source. Useful for echo cancellation (0 = Mic Rch (default), 1 = Mono output loopback)");
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 MODULE_PARM(isapnp, "i");
 MODULE_PARM_DESC(isapnp, "When set to 0, ISA PnP support will be disabled");
 
@@ -834,89 +835,60 @@ static void __exit unload_opl3sa2(struct address_info* hw_config, int card)
 		sound_unload_mixerdev(opl3sa2_mixer[card]);
 }
 
-
-#ifdef __ISAPNP__
-
-struct isapnp_device_id isapnp_opl3sa2_list[] __initdata = {
-	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
-		ISAPNP_VENDOR('Y','M','H'), ISAPNP_FUNCTION(0x0021),
-		0 },
-	{0}
+#ifdef CONFIG_PNP
+struct pnp_id pnp_opl3sa2_list[] = {
+	{.id = "YMH0021", .driver_data = 0},
+	{.id = ""}
 };
 
-MODULE_DEVICE_TABLE(isapnp, isapnp_opl3sa2_list);
+/*MODULE_DEVICE_TABLE(isapnp, isapnp_opl3sa2_list);*/
 
-static int __init opl3sa2_isapnp_probe(struct address_info* hw_cfg,
-				       struct address_info* mss_cfg,
-				       struct address_info* mpu_cfg,
-				       int card)
+static int opl3sa2_pnp_probe(struct pnp_dev *dev, const struct pnp_id *card_id,
+			     const struct pnp_id *dev_id)
 {
-	static struct pci_dev* dev;
-	int ret;
-
-	/* Find and configure device */
-	dev = isapnp_find_dev(NULL,
-			      ISAPNP_VENDOR('Y','M','H'),
-			      ISAPNP_FUNCTION(0x0021),
-			      dev);
-	if(dev == NULL) {
-		return -ENODEV;
-	}
-
-	/*
-	 * If device is active, assume configured with /proc/isapnp
-	 * and use anyway. Any other way to check this?
-	 */
-	ret = dev->prepare(dev);
-	if(ret && ret != -EBUSY) {
-		printk(KERN_ERR "opl3sa2: ISA PnP found device that could not be autoconfigured.\n");
-		return -ENODEV;
-	}
-	if(ret == -EBUSY) {
-		opl3sa2_activated[card] = 1;
-	}
-	else {
-		if(dev->activate(dev) < 0) {
-			printk(KERN_WARNING "opl3sa2: ISA PnP activate failed\n");
-			opl3sa2_activated[card] = 0;
-			return -ENODEV;
-		}
-
-		printk(KERN_DEBUG
-		       "opl3sa2: Activated ISA PnP card %d (active=%d)\n",
-		       card, dev->active);
-
-	}
+	int card = opl3sa2_cards_num;
+	if (opl3sa2_cards_num == OPL3SA2_CARDS_MAX)
+		return 0;
+	opl3sa2_activated[card] = 1;
 
 	/* Our own config: */
-	hw_cfg->io_base = dev->resource[4].start;
-	hw_cfg->irq     = dev->irq_resource[0].start;
-	hw_cfg->dma     = dev->dma_resource[0].start;
-	hw_cfg->dma2    = dev->dma_resource[1].start;
-	
-	/* The MSS config: */
-	mss_cfg->io_base      = dev->resource[1].start;
-	mss_cfg->irq          = dev->irq_resource[0].start;
-	mss_cfg->dma          = dev->dma_resource[0].start;
-	mss_cfg->dma2         = dev->dma_resource[1].start;
-	mss_cfg->card_subtype = 1; /* No IRQ or DMA setup */
+	cfg[card].io_base = dev->resource[4].start;
+	cfg[card].irq     = dev->irq_resource[0].start;
+	cfg[card].dma     = dev->dma_resource[0].start;
+	cfg[card].dma2    = dev->dma_resource[1].start;
 
-	mpu_cfg->io_base       = dev->resource[3].start;
-	mpu_cfg->irq           = dev->irq_resource[0].start;
-	mpu_cfg->dma           = -1;
-	mpu_cfg->dma2          = -1;
-	mpu_cfg->always_detect = 1; /* It's there, so use shared IRQs */
+	/* The MSS config: */
+	cfg_mss[card].io_base      = dev->resource[1].start;
+	cfg_mss[card].irq          = dev->irq_resource[0].start;
+	cfg_mss[card].dma          = dev->dma_resource[0].start;
+	cfg_mss[card].dma2         = dev->dma_resource[1].start;
+	cfg_mss[card].card_subtype = 1; /* No IRQ or DMA setup */
+
+	cfg_mpu[card].io_base       = dev->resource[3].start;
+	cfg_mpu[card].irq           = dev->irq_resource[0].start;
+	cfg_mpu[card].dma           = -1;
+	cfg_mpu[card].dma2          = -1;
+	cfg_mpu[card].always_detect = 1; /* It's there, so use shared IRQs */
 
 	/* Call me paranoid: */
-	opl3sa2_clear_slots(hw_cfg);
-	opl3sa2_clear_slots(mss_cfg);
-	opl3sa2_clear_slots(mpu_cfg);
+	opl3sa2_clear_slots(&cfg[card]);
+	opl3sa2_clear_slots(&cfg_mss[card]);
+	opl3sa2_clear_slots(&cfg_mpu[card]);
 
 	opl3sa2_dev[card] = dev;
+	opl3sa2_cards_num++;
 
 	return 0;
 }
-#endif /* __ISAPNP__ */
+
+static struct pnp_driver opl3sa2_driver = {
+	.name		= "opl3sa2",
+	.card_id_table	= NULL,
+	.id_table	= pnp_opl3sa2_list,
+	.probe		= opl3sa2_pnp_probe,
+};
+
+#endif /* CONFIG_PNP */
 
 /* End of component functions */
 
@@ -1003,28 +975,21 @@ static int __init init_opl3sa2(void)
 	/* Sanitize isapnp and multiple settings */
 	isapnp = isapnp != 0 ? 1 : 0;
 	multiple = multiple != 0 ? 1 : 0;
-	
+
 	max = (multiple && isapnp) ? OPL3SA2_CARDS_MAX : 1;
-	for(card = 0; card < max; card++, opl3sa2_cards_num++) {
-#ifdef __ISAPNP__
-		/*
-		 * Please remember that even with __ISAPNP__ defined one
-		 * should still be able to disable PNP support for this 
-		 * single driver!
-		 */
-		if(isapnp && opl3sa2_isapnp_probe(&cfg[card],
-						  &cfg_mss[card],
-						  &cfg_mpu[card],
-						  card) < 0) {
-			if(!opl3sa2_cards_num)
-				printk(KERN_INFO "opl3sa2: No PnP cards found\n");
-			if(io == -1)
-				break;
-			isapnp=0;
-			printk(KERN_INFO "opl3sa2: Search for a card at 0x%d.\n", io);
-			/* Fall through */
+
+#ifdef CONFIG_PNP
+	if (isapnp){
+		pnp_register_driver(&opl3sa2_driver);
+		if(!opl3sa2_cards_num){
+			printk(KERN_INFO "opl3sa2: No PnP cards found\n");
+			isapnp = 0;
 		}
+		max = opl3sa2_cards_num;
+	}
 #endif
+
+	for(card = 0; card < max; card++) {
 		/* If a user wants an I/O then assume they meant it */
 		
 		if(!isapnp) {
@@ -1033,6 +998,7 @@ static int __init init_opl3sa2(void)
 				printk(KERN_ERR
 				       "opl3sa2: io, mss_io, irq, dma, and dma2 must be set\n");
 				return -EINVAL;
+				opl3sa2_cards_num++;
 			}
 
 			/*
@@ -1145,14 +1111,8 @@ static void __exit cleanup_opl3sa2(void)
 		unload_opl3sa2_mss(&cfg_mss[card]);
 		unload_opl3sa2(&cfg[card], card);
 
-#ifdef __ISAPNP__
-		if(opl3sa2_activated[card] && opl3sa2_dev[card]) {
-			opl3sa2_dev[card]->deactivate(opl3sa2_dev[card]);
-
-			printk(KERN_DEBUG
-			       "opl3sa2: Deactivated ISA PnP card %d (active=%d)\n",
-			       card, opl3sa2_dev[card]->active);
-		}
+#ifdef CONFIG_PNP
+		pnp_unregister_driver(&opl3sa2_driver);
 #endif
 	}
 }
@@ -1164,7 +1124,7 @@ module_exit(cleanup_opl3sa2);
 static int __init setup_opl3sa2(char *str)
 {
 	/* io, irq, dma, dma2,... */
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	int ints[11];
 #else
 	int ints[9];
@@ -1179,7 +1139,7 @@ static int __init setup_opl3sa2(char *str)
 	mpu_io   = ints[6];
 	ymode    = ints[7];
 	loopback = ints[8];
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	isapnp   = ints[9];
 	multiple = ints[10];
 #endif

@@ -22,6 +22,8 @@
  * mb() prevents loads and stores being reordered across this point.
  * rmb() prevents loads being reordered across this point.
  * wmb() prevents stores being reordered across this point.
+ * read_barrier_depends() prevents data-dependant loads being reordered
+ *	across this point (nop on PPC).
  *
  * We can use the eieio instruction for wmb, but since it doesn't
  * give any ordering guarantees about loads, we have to use the
@@ -30,6 +32,7 @@
 #define mb()  __asm__ __volatile__ ("sync" : : : "memory")
 #define rmb()  __asm__ __volatile__ ("sync" : : : "memory")
 #define wmb()  __asm__ __volatile__ ("eieio" : : : "memory")
+#define read_barrier_depends()  do { } while(0)
 
 #define set_mb(var, value)	do { var = value; mb(); } while (0)
 #define set_wmb(var, value)	do { var = value; wmb(); } while (0)
@@ -38,10 +41,12 @@
 #define smp_mb()	mb()
 #define smp_rmb()	rmb()
 #define smp_wmb()	wmb()
+#define smp_read_barrier_depends()	read_barrier_depends()
 #else
 #define smp_mb()	__asm__ __volatile__("": : :"memory")
 #define smp_rmb()	__asm__ __volatile__("": : :"memory")
 #define smp_wmb()	__asm__ __volatile__("": : :"memory")
+#define smp_read_barrier_depends()	do { } while(0)
 #endif /* CONFIG_SMP */
 
 #ifdef __KERNEL__
@@ -119,14 +124,14 @@ extern void __xchg_called_with_bad_pointer(void);
 #define xchg(ptr,x) ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
 #define tas(ptr) (xchg((ptr),1))
 
-static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
+static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 {
 	switch (size) {
 	case 4:
-		return (unsigned long )xchg_u32(ptr, x);
+		return (unsigned long) xchg_u32(ptr, x);
 #if 0	/* xchg_u64 doesn't exist on 32-bit PPC */
 	case 8:
-		return (unsigned long )xchg_u64(ptr, x);
+		return (unsigned long) xchg_u64(ptr, x);
 #endif /* 0 */
 	}
 	__xchg_called_with_bad_pointer();

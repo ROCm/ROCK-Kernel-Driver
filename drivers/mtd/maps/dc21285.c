@@ -5,9 +5,9 @@
  *
  * This code is GPL
  * 
- * $Id: dc21285.c,v 1.6 2001/10/02 15:05:14 dwmw2 Exp $
+ * $Id: dc21285.c,v 1.9 2002/10/14 12:22:10 rmk Exp $
  */
-
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -44,15 +44,15 @@ void dc21285_copy_from(struct map_info *map, void *to, unsigned long from, ssize
 
 void dc21285_write8(struct map_info *map, __u8 d, unsigned long adr)
 {
-	*CSR_ROMWRITEREG = adr;
+	*CSR_ROMWRITEREG = adr & 3;
 	adr &= ~3;
 	*(__u8*)(map->map_priv_1 + adr) = d;
 }
 
 void dc21285_write16(struct map_info *map, __u16 d, unsigned long adr)
 {
-	*CSR_ROMWRITEREG = adr;
-	adr &= ~1;
+	*CSR_ROMWRITEREG = adr & 3;
+	adr &= ~3;
 	*(__u16*)(map->map_priv_1 + adr) = d;
 }
 
@@ -131,7 +131,7 @@ int __init init_dc21285(void)
 		dc21285_map.buswidth*8);
 
 	/* Let's map the flash area */
-	dc21285_map.map_priv_1 = (unsigned long)__ioremap(DC21285_FLASH, 16*1024*1024, 0);
+	dc21285_map.map_priv_1 = (unsigned long)ioremap(DC21285_FLASH, 16*1024*1024);
 	if (!dc21285_map.map_priv_1) {
 		printk("Failed to ioremap\n");
 		return -EIO;
@@ -139,20 +139,21 @@ int __init init_dc21285(void)
 
 	mymtd = do_map_probe("cfi_probe", &dc21285_map);
 	if (mymtd) {
-		int nrparts;
+		int nrparts = 0;
 
 		mymtd->module = THIS_MODULE;
 			
 		/* partition fixup */
 
+#ifdef CONFIG_MTD_REDBOOT_PARTS
 		nrparts = parse_redboot_partitions(mymtd, &dc21285_parts);
-		if (nrparts <=0) {
+#endif
+		if (nrparts > 0) {
+			add_mtd_partitions(mymtd, dc21285_parts, nrparts);
+		} else if (nrparts == 0) {
 			printk(KERN_NOTICE "RedBoot partition table failed\n");
-			iounmap((void *)dc21285_map.map_priv_1);
-			return -ENXIO;
+			add_mtd_device(mymtd);
 		}
-
-		add_mtd_partitions(mymtd, dc21285_parts, nrparts);
 
 		/* 
 		 * Flash timing is determined with bits 19-16 of the

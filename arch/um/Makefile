@@ -43,9 +43,8 @@ ARCH_INCLUDE = $(TOPDIR)/$(ARCH_DIR)/include
 # in CFLAGS.  Otherwise, it would cause ld to complain about the two different
 # errnos.
 
-CFLAGS += $(DEBUG) $(PROFILE) $(ARCH_CFLAGS) -D__arch_um__ \
-	-DSUBARCH=\"$(SUBARCH)\" -D_LARGEFILE64_SOURCE -I$(ARCH_INCLUDE) \
-	-Derrno=kernel_errno
+CFLAGS += $(DEBUG) $(PROFILE) -D__arch_um__ -DSUBARCH=\"$(SUBARCH)\" \
+	-D_LARGEFILE64_SOURCE -I$(ARCH_INCLUDE) -Derrno=kernel_errno
 
 LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 
@@ -71,7 +70,7 @@ LDFLAGS_vmlinux = -r $(ARCH_DIR)/main.o
 vmlinux: $(ARCH_DIR)/main.o 
 
 
-$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S
+$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S scripts FORCE
 	$(call if_changed_dep,as_s_S)
 
 AFLAGS_uml.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \

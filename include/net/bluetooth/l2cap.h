@@ -89,37 +89,34 @@ struct l2cap_qos {
 #define L2CAP_INFO_RSP    0x0b
 
 /* L2CAP structures */
-typedef struct {
+struct l2cap_hdr {
 	__u16      len;
 	__u16      cid;
-} __attribute__ ((packed)) 	l2cap_hdr;
+} __attribute__ ((packed));
 #define L2CAP_HDR_SIZE		4
 
-typedef struct {
+struct l2cap_cmd_hdr {
 	__u8       code;
 	__u8       ident;
 	__u16      len;
-} __attribute__ ((packed))	l2cap_cmd_hdr;
+} __attribute__ ((packed));
 #define L2CAP_CMD_HDR_SIZE	4
 
-typedef struct {
+struct l2cap_cmd_rej {
 	__u16      reason;
-} __attribute__ ((packed))	l2cap_cmd_rej;
-#define L2CAP_CMD_REJ_SIZE	2
+} __attribute__ ((packed));
 
-typedef struct {
+struct l2cap_conn_req {
 	__u16      psm;
 	__u16      scid;
-} __attribute__ ((packed))	l2cap_conn_req;
-#define L2CAP_CONN_REQ_SIZE	4
+} __attribute__ ((packed));
 
-typedef struct {
+struct l2cap_conn_rsp {
 	__u16      dcid;
 	__u16      scid;
 	__u16      result;
 	__u16      status;
-} __attribute__ ((packed))	l2cap_conn_rsp;
-#define L2CAP_CONN_RSP_SIZE	8
+} __attribute__ ((packed));
 
 /* connect result */
 #define L2CAP_CR_SUCCESS    0x0000
@@ -133,29 +130,27 @@ typedef struct {
 #define L2CAP_CS_AUTHEN_PEND  0x0001
 #define L2CAP_CS_AUTHOR_PEND  0x0002
 
-typedef struct {
+struct l2cap_conf_req {
 	__u16      dcid;
 	__u16      flags;
 	__u8       data[0];
-} __attribute__ ((packed))	l2cap_conf_req;
-#define L2CAP_CONF_REQ_SIZE	4
+} __attribute__ ((packed));
 
-typedef struct {
+struct l2cap_conf_rsp {
 	__u16      scid;
 	__u16      flags;
 	__u16      result;
 	__u8       data[0];
-} __attribute__ ((packed))	l2cap_conf_rsp;
-#define L2CAP_CONF_RSP_SIZE   	6
+} __attribute__ ((packed));
 
 #define L2CAP_CONF_SUCCESS	0x00
 #define L2CAP_CONF_UNACCEPT	0x01
 
-typedef struct {
+struct l2cap_conf_opt {
 	__u8       type;
 	__u8       len;
 	__u8       val[0];
-} __attribute__ ((packed))	l2cap_conf_opt;
+} __attribute__ ((packed));
 #define L2CAP_CONF_OPT_SIZE	2
 
 #define L2CAP_CONF_MTU		0x01
@@ -164,30 +159,26 @@ typedef struct {
 
 #define L2CAP_CONF_MAX_SIZE	22
 
-typedef struct {
+struct l2cap_disconn_req {
 	__u16      dcid;
 	__u16      scid;
-} __attribute__ ((packed)) 	l2cap_disconn_req;
-#define L2CAP_DISCONN_REQ_SIZE	4
+} __attribute__ ((packed));
 
-typedef struct {
+struct l2cap_disconn_rsp {
 	__u16      dcid;
 	__u16      scid;
-} __attribute__ ((packed)) 	l2cap_disconn_rsp;
-#define L2CAP_DISCONN_RSP_SIZE	4
+} __attribute__ ((packed));
 
-typedef struct {
+struct l2cap_info_req {
 	__u16       type;
 	__u8        data[0];
-} __attribute__ ((packed))	l2cap_info_req;
-#define L2CAP_INFO_REQ_SIZE	2
+} __attribute__ ((packed));
 
-typedef struct {
+struct l2cap_info_rsp {
 	__u16       type;
 	__u16       result;
 	__u8        data[0];
-} __attribute__ ((packed))	l2cap_info_rsp;
-#define L2CAP_INFO_RSP_SIZE	4
+} __attribute__ ((packed));
 
 /* ----- L2CAP connections ----- */
 struct l2cap_chan_list {

@@ -223,7 +223,7 @@
 #define __NR_readahead          205 /* Linux Specific                              */
 #define __NR_socketcall         206 /* Linux Specific                              */
 #define __NR_syslog             207 /* Linux Specific                              */
-/* #define __NR_olduname        208    Linux Specific                              */
+#define __NR_lookup_dcookie     208 /* Linux Specific                              */
 /* #define __NR_iopl            209    Linux Specific - i386 specific, unused      */
 /* #define __NR_idle            210    Linux Specific - was sys_idle, now unused   */
 /* #define __NR_vm86            211    Linux Specific - i386 specific, unused      */

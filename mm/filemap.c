@@ -570,10 +570,15 @@ void mark_page_accessed(struct page *page)
  *
  * This is really ugly. But the goto's actually try to clarify some
  * of the logic when it comes to error handling etc.
+ * - note the struct file * is only passed for the use of readpage
  */
-void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * desc, read_actor_t actor)
+void do_generic_mapping_read(struct address_space *mapping,
+			     struct file_ra_state *ra,
+			     struct file * filp,
+			     loff_t *ppos,
+			     read_descriptor_t * desc,
+			     read_actor_t actor)
 {
-	struct address_space *mapping = filp->f_dentry->d_inode->i_mapping;
 	struct inode *inode = mapping->host;
 	unsigned long index, offset;
 	struct page *cached_page;
@@ -598,7 +603,7 @@ void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * 
 				break;
 		}
 
-		page_cache_readahead(filp, index);
+		page_cache_readahead(mapping, ra, filp, index);
 
 		nr = nr - offset;
 
@@ -610,7 +615,7 @@ find_page:
 		page = radix_tree_lookup(&mapping->page_tree, index);
 		if (!page) {
 			read_unlock(&mapping->page_lock);
-			handle_ra_miss(filp);
+			handle_ra_miss(mapping,ra);
 			goto no_cached_page;
 		}
 		page_cache_get(page);
@@ -891,6 +896,7 @@ generic_file_aio_read(struct kiocb *iocb, char *buf, size_t count, loff_t pos)
 	BUG_ON(iocb->ki_pos != pos);
 	return __generic_file_aio_read(iocb, &local_iov, 1, &iocb->ki_pos);
 }
+EXPORT_SYMBOL(generic_file_aio_read);
 
 ssize_t
 generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
@@ -946,9 +952,9 @@ ssize_t generic_file_sendfile(struct file *out_file, struct file *in_file,
 }
 
 static ssize_t
-do_readahead(struct file *file, unsigned long index, unsigned long nr)
+do_readahead(struct address_space *mapping, struct file *filp,
+	     unsigned long index, unsigned long nr)
 {
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	unsigned long max;
 	unsigned long active;
 	unsigned long inactive;
@@ -962,7 +968,7 @@ do_readahead(struct file *file, unsigned long index, unsigned long nr)
 	if (nr > max)
 		nr = max;
 
-	do_page_cache_readahead(file, index, nr);
+	do_page_cache_readahead(mapping, filp, index, nr);
 	return 0;
 }
 
@@ -975,10 +981,11 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 	file = fget(fd);
 	if (file) {
 		if (file->f_mode & FMODE_READ) {
+			struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 			unsigned long start = offset >> PAGE_CACHE_SHIFT;
 			unsigned long end = (offset + count - 1) >> PAGE_CACHE_SHIFT;
 			unsigned long len = end - start + 1;
-			ret = do_readahead(file, start, len);
+			ret = do_readahead(mapping, file, start, len);
 		}
 		fput(file);
 	}
@@ -999,6 +1006,7 @@ struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address
 	int error;
 	struct file *file = area->vm_file;
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct file_ra_state *ra = &file->f_ra;
 	struct inode *inode = mapping->host;
 	struct page *page;
 	unsigned long size, pgoff, endoff;
@@ -1031,7 +1039,7 @@ retry_all:
 	 */
 	if (VM_SequentialReadHint(area)) {
 		did_readahead = 1;
-		page_cache_readahead(area->vm_file, pgoff);
+		page_cache_readahead(mapping, ra, file, pgoff);
 	}
 
 	/*
@@ -1040,7 +1048,7 @@ retry_all:
 	 */
 	if ((pgoff < size) && !VM_RandomReadHint(area)) {
 		did_readahead = 1;
-		page_cache_readaround(file, pgoff);
+		page_cache_readaround(mapping, ra, file, pgoff);
 	}
 
 	/*
@@ -1050,7 +1058,7 @@ retry_find:
 	page = find_get_page(mapping, pgoff);
 	if (!page) {
 		if (did_readahead) {
-			handle_ra_miss(file);
+			handle_ra_miss(mapping,ra);
 			did_readahead = 0;
 		}
 		goto no_cached_page;
@@ -1650,6 +1658,7 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char *buf,
 {
 	return generic_file_write(iocb->ki_filp, buf, count, &iocb->ki_pos);
 }
+EXPORT_SYMBOL(generic_file_aio_write);
 
 ssize_t generic_file_write(struct file *file, const char *buf,
 			   size_t count, loff_t *ppos)

@@ -376,10 +376,6 @@ struct swap_info_struct;
  * @file_free_security:
  *	Deallocate and free any security structures stored in file->f_security.
  *	@file contains the file structure being modified.
- * @file_llseek:
- *	Check permission before re-positioning the file offset in @file.
- *	@file contains the file structure being modified.
- *	Return 0 if permission is granted.
  * @file_ioctl:
  *	@file contains the file structure.
  *	@cmd contains the operation to perform.
@@ -790,7 +786,6 @@ struct security_operations {
 	int (*file_permission) (struct file * file, int mask);
 	int (*file_alloc_security) (struct file * file);
 	void (*file_free_security) (struct file * file);
-	int (*file_llseek) (struct file * file);
 	int (*file_ioctl) (struct file * file, unsigned int cmd,
 			   unsigned long arg);
 	int (*file_mmap) (struct file * file,

@@ -40,7 +40,6 @@ static void dst_run_gc(unsigned long);
 static struct timer_list dst_gc_timer =
 	{ data: DST_GC_MIN, function: dst_run_gc };
 
-
 static void dst_run_gc(unsigned long dummy)
 {
 	int    delayed = 0;
@@ -60,7 +59,11 @@ static void dst_run_gc(unsigned long dummy)
 			delayed++;
 			continue;
 		}
-		*dstp = dst->next;
+		if (dst->child) {
+			dst->child->next = dst->next;
+			*dstp = dst->child;
+		} else
+			*dstp = dst->next;
 		dst_destroy(dst);
 	}
 	if (!dst_garbage_list) {
@@ -141,10 +144,16 @@ void __dst_free(struct dst_entry * dst)
 	spin_unlock_bh(&dst_lock);
 }
 
-void dst_destroy(struct dst_entry * dst)
+struct dst_entry *dst_destroy(struct dst_entry * dst)
 {
-	struct neighbour *neigh = dst->neighbour;
-	struct hh_cache *hh = dst->hh;
+	struct dst_entry *child;
+	struct neighbour *neigh;
+	struct hh_cache *hh;
+
+again:
+	neigh = dst->neighbour;
+	hh = dst->hh;
+	child = dst->child;
 
 	dst->hh = NULL;
 	if (hh && atomic_dec_and_test(&hh->hh_refcnt))
@@ -165,6 +174,12 @@ void dst_destroy(struct dst_entry * dst)
 	atomic_dec(&dst_total);
 #endif
 	kmem_cache_free(dst->ops->kmem_cachep, dst);
+
+	dst = child;
+	if (dst && !atomic_read(&dst->__refcnt))
+		goto again;
+
+	return dst;
 }
 
 static int dst_dev_event(struct notifier_block *this, unsigned long event, void *ptr)

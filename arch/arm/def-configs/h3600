@@ -934,7 +934,7 @@ CONFIG_SOUND_H3600_UDA1341=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

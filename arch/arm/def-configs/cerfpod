@@ -879,7 +879,7 @@ CONFIG_FONT_8x16=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

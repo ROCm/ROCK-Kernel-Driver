@@ -533,8 +533,12 @@ void do_io(struct io_thread_req *req)
 	return;
 }
 
+/* Changed in start_io_thread, which is serialized by being called only
+ * from ubd_init, which is an initcall.
+ */
 int kernel_fd = -1;
 
+/* Only changed by the io thread */
 int io_count = 0;
 
 int io_thread(void *arg)

@@ -649,7 +649,7 @@ CONFIG_USB_MOUSE=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

@@ -248,7 +248,7 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 	write_unlock(&mm->ioctx_list_lock);
 
 	dprintk("aio: allocated ioctx %p[%ld]: mm=%p mask=0x%x\n",
-		ctx, ctx->user_id, current->mm, ctx->ring_info.ring->nr);
+		ctx, ctx->user_id, current->mm, ctx->ring_info.nr);
 	return ctx;
 
 out_cleanup:
@@ -281,12 +281,12 @@ static void aio_cancel_all(struct kioctx *ctx)
 		struct kiocb *iocb = list_kiocb(pos);
 		list_del_init(&iocb->ki_list);
 		cancel = iocb->ki_cancel;
-		if (cancel)
+		if (cancel) {
 			iocb->ki_users++;
-		spin_unlock_irq(&ctx->ctx_lock);
-		if (cancel)
+			spin_unlock_irq(&ctx->ctx_lock);
 			cancel(iocb, &res);
-		spin_lock_irq(&ctx->ctx_lock);
+			spin_lock_irq(&ctx->ctx_lock);
+		}
 	}
 	spin_unlock_irq(&ctx->ctx_lock);
 }
@@ -376,7 +376,7 @@ void __put_ioctx(struct kioctx *ctx)
 /* aio_get_req
  *	Allocate a slot for an aio request.  Increments the users count
  * of the kioctx so that the kioctx stays around until all requests are
- * complete.  Returns -EAGAIN if no requests are free.
+ * complete.  Returns NULL if no requests are free.
  */
 static struct kiocb *FASTCALL(__aio_get_req(struct kioctx *ctx));
 static struct kiocb *__aio_get_req(struct kioctx *ctx)
@@ -409,8 +409,6 @@ static struct kiocb *__aio_get_req(struct kioctx *ctx)
 		req->ki_user_obj = NULL;
 		req->ki_ctx = ctx;
 		req->ki_users = 1;
-	} else {
-		kmem_cache_free(kiocb_cachep, req);
 		okay = 1;
 	}
 	kunmap_atomic(ring, KM_USER0);
@@ -478,7 +476,7 @@ static void aio_fput_routine(void *data)
 /* __aio_put_req
  *	Returns true if this put was the last user of the request.
  */
-static inline int __aio_put_req(struct kioctx *ctx, struct kiocb *req)
+static int __aio_put_req(struct kioctx *ctx, struct kiocb *req)
 {
 	dprintk(KERN_DEBUG "aio_put(%p): f_count=%d\n",
 		req, atomic_read(&req->ki_filp->f_count));
@@ -525,7 +523,7 @@ int aio_put_req(struct kiocb *req)
 /*	Lookup an ioctx id.  ioctx_list is lockless for reads.
  *	FIXME: this is O(n) and is only suitable for development.
  */
-static inline struct kioctx *lookup_ioctx(unsigned long ctx_id)
+static struct kioctx *lookup_ioctx(unsigned long ctx_id)
 {
 	struct kioctx *ioctx;
 	struct mm_struct *mm;
@@ -845,13 +843,13 @@ static int read_events(struct kioctx *ctx,
 
 	/* End fast path */
 
+	init_timeout(&to);
 	if (timeout) {
 		struct timespec	ts;
 		ret = -EFAULT;
 		if (unlikely(copy_from_user(&ts, timeout, sizeof(ts))))
 			goto out;
 
-		init_timeout(&to);
 		set_timeout(start_jiffies, &to, &ts);
 	}
 
@@ -1197,6 +1195,9 @@ asmlinkage long sys_io_cancel(aio_context_t ctx_id, struct iocb *iocb,
 	if (NULL != cancel) {
 		struct io_event tmp;
 		printk("calling cancel\n");
+		memset(&tmp, 0, sizeof(tmp));
+		tmp.obj = (u64)(unsigned long)kiocb->ki_user_obj;
+		tmp.data = kiocb->ki_user_data;
 		ret = cancel(kiocb, &tmp);
 		if (!ret) {
 			/* Cancellation succeeded -- copy the result

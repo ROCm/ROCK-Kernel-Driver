@@ -225,7 +225,6 @@ int snd_minor_info_oss_init(void);
 int snd_minor_info_oss_done(void);
 
 int snd_oss_init_module(void);
-void snd_oss_cleanup_module(void);
 
 #endif
 

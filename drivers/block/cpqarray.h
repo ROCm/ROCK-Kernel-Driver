@@ -105,6 +105,7 @@ struct ctlr_info {
 	cmdlist_t *cmd_pool;
 	dma_addr_t cmd_pool_dhandle;
 	unsigned long *cmd_pool_bits;
+	struct request_queue queue;
 	spinlock_t lock;
 
 	unsigned int Qdepth;
@@ -117,7 +118,7 @@ struct ctlr_info {
 	unsigned int misc_tflags;
 };
 
-#define IDA_LOCK(i)	((BLK_DEFAULT_QUEUE(MAJOR_NR + i))->queue_lock)
+#define IDA_LOCK(i)	(&hba[i]->lock)
 
 #endif
 

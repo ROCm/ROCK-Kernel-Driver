@@ -146,7 +146,7 @@ xfs_bulkstat_one(
 	buf->bs_extsize = INT_GET(dic->di_extsize, arch) << mp->m_sb.sb_blocklog;
 	buf->bs_extents = INT_GET(dic->di_nextents, arch);
 	buf->bs_gen = INT_GET(dic->di_gen, arch);
-	bzero(buf->bs_pad, sizeof(buf->bs_pad));
+	memset(buf->bs_pad, 0, sizeof(buf->bs_pad));
 	buf->bs_dmevmask = INT_GET(dic->di_dmevmask, arch);
 	buf->bs_dmstate = INT_GET(dic->di_dmstate, arch);
 	buf->bs_aextents = INT_GET(dic->di_anextents, arch);

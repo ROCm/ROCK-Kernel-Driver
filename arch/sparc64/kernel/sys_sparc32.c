@@ -273,7 +273,7 @@ struct itimerval32
     struct timeval32 it_value;
 };
 
-static inline long get_tv32(struct timeval *o, struct timeval32 *i)
+static long get_tv32(struct timeval *o, struct timeval32 *i)
 {
 	return (!access_ok(VERIFY_READ, tv32, sizeof(*tv32)) ||
 		(__get_user(o->tv_sec, &i->tv_sec) |
@@ -296,7 +296,7 @@ static inline long get_it32(struct itimerval *o, struct itimerval32 *i)
 		 __get_user(o->it_value.tv_usec, &i->it_value.tv_usec)));
 }
 
-static inline long put_it32(struct itimerval32 *o, struct itimerval *i)
+static long put_it32(struct itimerval32 *o, struct itimerval *i)
 {
 	return (!access_ok(VERIFY_WRITE, i32, sizeof(*i32)) ||
 		(__put_user(i->it_interval.tv_sec, &o->it_interval.tv_sec) |
@@ -890,7 +890,7 @@ asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long a
 	return sys32_fcntl(fd, cmd, arg);
 }
 
-static inline int put_statfs (struct statfs32 *ubuf, struct statfs *kbuf)
+static int put_statfs (struct statfs32 *ubuf, struct statfs *kbuf)
 {
 	int err;
 	
@@ -1272,8 +1272,7 @@ out:
  * 64-bit unsigned longs.
  */
 
-static inline int
-get_fd_set32(unsigned long n, unsigned long *fdset, u32 *ufdset)
+static int get_fd_set32(unsigned long n, unsigned long *fdset, u32 *ufdset)
 {
 	if (ufdset) {
 		unsigned long odd;
@@ -1303,8 +1302,7 @@ get_fd_set32(unsigned long n, unsigned long *fdset, u32 *ufdset)
 	return 0;
 }
 
-static inline void
-set_fd_set32(unsigned long n, u32 *ufdset, unsigned long *fdset)
+static void set_fd_set32(unsigned long n, u32 *ufdset, unsigned long *fdset)
 {
 	unsigned long odd;
 
@@ -1584,6 +1582,8 @@ static void *do_smb_super_data_conv(void *raw_data)
 	struct smb_mount_data news, *s = &news;
 	struct smb_mount_data32 *s32 = (struct smb_mount_data32 *)raw_data;
 
+	if (s32->version != SMB_MOUNT_OLDVERSION)
+		goto out;
 	s->version = s32->version;
 	s->mounted_uid = low2highuid(s32->mounted_uid);
 	s->uid = low2highuid(s32->uid);
@@ -1591,6 +1591,7 @@ static void *do_smb_super_data_conv(void *raw_data)
 	s->file_mode = s32->file_mode;
 	s->dir_mode = s32->dir_mode;
 	memcpy(raw_data, s, sizeof(struct smb_mount_data)); 
+out:
 	return raw_data;
 }
 
@@ -2133,14 +2134,6 @@ asmlinkage int sys32_getrusage(int who, struct rusage32 *ru)
 					   24 for IPv6,
 					   about 80 for AX.25 */
 
-extern struct socket *sockfd_lookup(int fd, int *err);
-
-/* XXX This as well... */
-extern __inline__ void sockfd_put(struct socket *sock)
-{
-	fput(sock->file);
-}
-
 struct msghdr32 {
         u32               msg_name;
         int               msg_namelen;
@@ -2217,8 +2210,8 @@ static inline int iov_from_user32_to_kern(struct iovec *kiov,
 	return tot_len;
 }
 
-static inline int msghdr_from_user32_to_kern(struct msghdr *kmsg,
-					     struct msghdr32 *umsg)
+static int msghdr_from_user32_to_kern(struct msghdr *kmsg,
+				      struct msghdr32 *umsg)
 {
 	u32 tmp1, tmp2, tmp3;
 	int err;

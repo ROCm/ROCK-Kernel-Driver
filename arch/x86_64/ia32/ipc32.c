@@ -264,6 +264,9 @@ semctl32 (int first, int second, int third, void *uptr)
 		if (err2)
 		    err = -EFAULT;
 		break;
+	default:
+		err = -EINVAL;
+		break;
 	}
 	return err;
 }
@@ -284,7 +287,7 @@ do_sys32_msgsnd (int first, int second, int third, void *uptr)
 	if (!p)
 		return -ENOMEM;
 	err = get_user(p->mtype, &up->mtype);
-	err |= copy_from_user(p->mtext, &up->mtext, second);
+	err |= (copy_from_user(p->mtext, &up->mtext, second) ? -EFAULT : 0);
 	if (err)
 		goto out;
 	old_fs = get_fs();

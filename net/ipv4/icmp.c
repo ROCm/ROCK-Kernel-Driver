@@ -101,7 +101,6 @@ struct icmp_bxm {
 	int offset;
 	int data_len;
 
-	unsigned int csum;
 	struct {
 		struct icmphdr icmph;
 		__u32	       times[3];
@@ -356,37 +355,45 @@ static void icmp_out_count(int type)
  *	Checksum each fragment, and on the first include the headers and final
  *	checksum.
  */
-static int icmp_glue_bits(const void *p, char *to, unsigned int offset,
-			  unsigned int fraglen)
+int
+icmp_glue_bits(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb)
 {
-	struct icmp_bxm *icmp_param = (struct icmp_bxm *)p;
-	struct icmphdr *icmph;
+	struct icmp_bxm *icmp_param = (struct icmp_bxm *)from;
 	unsigned int csum;
 
-	if (offset) {
-		icmp_param->csum =
-			skb_copy_and_csum_bits(icmp_param->skb,
-					       icmp_param->offset +
-					       (offset - icmp_param->head_len),
-						to, fraglen, icmp_param->csum);
-		goto out;
-	}
+	csum = skb_copy_and_csum_bits(icmp_param->skb,
+				      icmp_param->offset + offset,
+				      to, len, 0);
 
-	/*
-	 *	First fragment includes header. Note that we've done
-	 *	the other fragments first, so that we get the checksum
-	 *	for the whole packet here.
-	 */
-	csum = csum_partial_copy_nocheck((void *)&icmp_param->data,
-					 to, icmp_param->head_len,
-					 icmp_param->csum);
-	csum = skb_copy_and_csum_bits(icmp_param->skb, icmp_param->offset,
-				      to + icmp_param->head_len,
-				      fraglen - icmp_param->head_len, csum);
-	icmph = (struct icmphdr *)to;
-	icmph->checksum = csum_fold(csum);
-out:
+	skb->csum = csum_block_add(skb->csum, csum, odd);
 	return 0;
+}
+
+static void
+icmp_push_reply(struct icmp_bxm *icmp_param, struct ipcm_cookie *ipc, struct rtable *rt)
+{
+	struct sk_buff *skb;
+
+	ip_append_data(icmp_socket->sk, icmp_glue_bits, icmp_param,
+		       icmp_param->data_len+icmp_param->head_len,
+		       icmp_param->head_len,
+		       ipc, rt, MSG_DONTWAIT);
+
+	if ((skb = skb_peek(&icmp_socket->sk->write_queue)) != NULL) {
+		struct icmphdr *icmph = skb->h.icmph;
+		unsigned int csum = 0;
+		struct sk_buff *skb1;
+
+		skb_queue_walk(&icmp_socket->sk->write_queue, skb1) {
+			csum = csum_add(csum, skb1->csum);
+		}
+		csum = csum_partial_copy_nocheck((void *)&icmp_param->data,
+						 (char*)icmph, icmp_param->head_len,	
+						 csum);
+		icmph->checksum = csum_fold(csum);
+		skb->ip_summed = CHECKSUM_NONE;
+		ip_push_pending_frames(icmp_socket->sk);
+	}
 }
 
 /*
@@ -406,7 +413,6 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 		goto out;
 
 	icmp_param->data.icmph.checksum = 0;
-	icmp_param->csum = 0;
 	icmp_out_count(icmp_param->data.icmph.type);
 
 	inet->tos = skb->nh.iph->tos;
@@ -427,11 +433,8 @@ static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 			goto out_unlock;
 	}
 	if (icmpv4_xrlim_allow(rt, icmp_param->data.icmph.type,
-			       icmp_param->data.icmph.code)) {
-		ip_build_xmit(sk, icmp_glue_bits, icmp_param,
-			      icmp_param->data_len+icmp_param->head_len,
-			      &ipc, rt, MSG_DONTWAIT);
-	}
+			       icmp_param->data.icmph.code))
+		icmp_push_reply(icmp_param, &ipc, rt);
 	ip_rt_put(rt);
 out_unlock:
 	icmp_xmit_unlock_bh();
@@ -563,7 +566,6 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 	icmp_param.data.icmph.code	 = code;
 	icmp_param.data.icmph.un.gateway = info;
 	icmp_param.data.icmph.checksum	 = 0;
-	icmp_param.csum	  = 0;
 	icmp_param.skb	  = skb_in;
 	icmp_param.offset = skb_in->nh.raw - skb_in->data;
 	icmp_out_count(icmp_param.data.icmph.type);
@@ -597,9 +599,7 @@ void icmp_send(struct sk_buff *skb_in, int type, int code, u32 info)
 		icmp_param.data_len = room;
 	icmp_param.head_len = sizeof(struct icmphdr);
 
-	ip_build_xmit(icmp_socket->sk, icmp_glue_bits, &icmp_param,
-		      icmp_param.data_len + sizeof(struct icmphdr),
-		      &ipc, rt, MSG_DONTWAIT);
+	icmp_push_reply(&icmp_param, &ipc, rt);
 ende:
 	ip_rt_put(rt);
 out_unlock:

@@ -12,6 +12,7 @@ int eata2x_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int eata2x_abort(Scsi_Cmnd *);
 int eata2x_reset(Scsi_Cmnd *);
 int eata2x_biosparam(Disk *, struct block_device *, int *);
+static int eata2x_slave_attach(Scsi_Device *);
 
 #define EATA_VERSION "7.22.00"
 
@@ -27,6 +28,7 @@ int eata2x_biosparam(Disk *, struct block_device *, int *);
                 eh_bus_reset_handler:    NULL,                               \
                 eh_host_reset_handler:   eata2x_reset,                       \
                 bios_param:              eata2x_biosparam,                   \
+		slave_attach:		 eata2x_slave_attach,		     \
                 this_id:                 7,                                  \
                 unchecked_isa_dma:       1,                                  \
                 use_clustering:          ENABLE_CLUSTERING,                  \

@@ -2,9 +2,6 @@
 #include "linux/stddef.h"  // for NULL
 #include "linux/elf.h"  // for AT_NULL
 
-/* unsigned int local_bh_count[NR_CPUS]; */
-unsigned long isa_io_base = 0;
-
 /* The following function nicked from arch/ppc/kernel/process.c and
  * adapted slightly */
 /*

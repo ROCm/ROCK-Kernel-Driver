@@ -149,12 +149,13 @@ struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
 	bio_init(bio);
 
 	if (unlikely(!nr_iovecs))
-		goto out;
+		goto noiovec;
 
 	bvl = bvec_alloc(gfp_mask, nr_iovecs, &idx);
 	if (bvl) {
 		bio->bi_flags |= idx << BIO_POOL_OFFSET;
 		bio->bi_max_vecs = bvec_array[idx].nr_vecs;
+noiovec:
 		bio->bi_io_vec = bvl;
 		bio->bi_destructor = bio_destructor;
 out:

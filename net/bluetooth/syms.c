@@ -23,7 +23,7 @@
 */
 
 /*
- * BlueZ symbols.
+ * Bluetooth symbols.
  *
  * $Id: syms.c,v 1.1 2002/03/08 21:06:59 maxk Exp $
  */
@@ -44,6 +44,9 @@
 /* HCI Core */
 EXPORT_SYMBOL(hci_register_dev);
 EXPORT_SYMBOL(hci_unregister_dev);
+EXPORT_SYMBOL(hci_suspend_dev);
+EXPORT_SYMBOL(hci_resume_dev);
+
 EXPORT_SYMBOL(hci_register_proto);
 EXPORT_SYMBOL(hci_unregister_proto);
 
@@ -53,26 +56,25 @@ EXPORT_SYMBOL(hci_dev_get);
 EXPORT_SYMBOL(hci_conn_auth);
 EXPORT_SYMBOL(hci_conn_encrypt);
 
-EXPORT_SYMBOL(hci_recv_frame);
 EXPORT_SYMBOL(hci_send_acl);
 EXPORT_SYMBOL(hci_send_sco);
 EXPORT_SYMBOL(hci_send_raw);
 EXPORT_SYMBOL(hci_si_event);
 
-/* BlueZ lib */
-EXPORT_SYMBOL(bluez_dump);
+/* Bluetooth lib */
+EXPORT_SYMBOL(bt_dump);
 EXPORT_SYMBOL(baswap);
 EXPORT_SYMBOL(batostr);
-EXPORT_SYMBOL(bterr);
+EXPORT_SYMBOL(bt_err);
 
-/* BlueZ sockets */
-EXPORT_SYMBOL(bluez_sock_register);
-EXPORT_SYMBOL(bluez_sock_unregister);
-EXPORT_SYMBOL(bluez_sock_alloc);
-EXPORT_SYMBOL(bluez_sock_link);
-EXPORT_SYMBOL(bluez_sock_unlink);
-EXPORT_SYMBOL(bluez_sock_recvmsg);
-EXPORT_SYMBOL(bluez_sock_poll);
-EXPORT_SYMBOL(bluez_accept_enqueue);
-EXPORT_SYMBOL(bluez_accept_dequeue);
-EXPORT_SYMBOL(bluez_sock_w4_connect);
+/* Bluetooth sockets */
+EXPORT_SYMBOL(bt_sock_register);
+EXPORT_SYMBOL(bt_sock_unregister);
+EXPORT_SYMBOL(bt_sock_alloc);
+EXPORT_SYMBOL(bt_sock_link);
+EXPORT_SYMBOL(bt_sock_unlink);
+EXPORT_SYMBOL(bt_sock_recvmsg);
+EXPORT_SYMBOL(bt_sock_poll);
+EXPORT_SYMBOL(bt_accept_enqueue);
+EXPORT_SYMBOL(bt_accept_dequeue);
+EXPORT_SYMBOL(bt_sock_w4_connect);

@@ -249,8 +249,6 @@ static e100_proc_entry e100_proc_list[] = {
 	{"Rx_TCO_Packets",        read_gen_ulong, 0, bdp_drv_off(rcv_tco_pkts)},
 	{"\n",},
 	{"Rx_Interrupt_Packets",  read_gen_ulong, 0, bdp_drv_off(rx_intr_pkts)},
-	{"Rx_Polling_Packets",    read_gen_ulong, 0, bdp_drv_off(rx_tasklet_pkts)},
-	{"Polling_Interrupt_Switch", read_gen_ulong, 0, bdp_drv_off(poll_intr_switch)},
 	{"Identify_Adapter", 0, write_blink_led_timer, 0},
 	{"", 0, 0, 0}
 };
@@ -291,7 +289,7 @@ read_info(char *page, char **start, off_t off, int count, int *eof, void *data)
 	return generic_read(page, start, off, count, eof, len);
 }
 
-static struct proc_dir_entry * __devinit
+static struct proc_dir_entry *
 create_proc_rw(char *name, void *data, struct proc_dir_entry *parent,
 	       read_proc_t * read_proc, write_proc_t * write_proc)
 {
@@ -318,7 +316,7 @@ create_proc_rw(char *name, void *data, struct proc_dir_entry *parent,
 }
 
 void
-e100_remove_proc_subdir(struct e100_private *bdp)
+e100_remove_proc_subdir(struct e100_private *bdp, char *name)
 {
 	e100_proc_entry *pe;
 	char info[256];
@@ -329,8 +327,8 @@ e100_remove_proc_subdir(struct e100_private *bdp)
 		return;
 	}
 
-	len = strlen(bdp->device->name);
-	strncpy(info, bdp->device->name, sizeof (info));
+	len = strlen(bdp->ifname);
+	strncpy(info, bdp->ifname, sizeof (info));
 	strncat(info + len, ".info", sizeof (info) - len);
 
 	if (bdp->proc_parent) {
@@ -341,7 +339,7 @@ e100_remove_proc_subdir(struct e100_private *bdp)
 			remove_proc_entry(pe->name, bdp->proc_parent);
 		}
 
-		remove_proc_entry(bdp->device->name, adapters_proc_dir);
+		remove_proc_entry(bdp->ifname, adapters_proc_dir);
 		bdp->proc_parent = NULL;
 	}
 
@@ -351,7 +349,7 @@ e100_remove_proc_subdir(struct e100_private *bdp)
 	e100_proc_cleanup();
 }
 
-int __devinit
+int
 e100_create_proc_subdir(struct e100_private *bdp)
 {
 	struct proc_dir_entry *dev_dir;
@@ -366,7 +364,7 @@ e100_create_proc_subdir(struct e100_private *bdp)
 			return -ENOMEM;
 	}
 
-	strncpy(info, bdp->device->name, sizeof (info));
+	strncpy(info, bdp->ifname, sizeof (info));
 	len = strlen(info);
 	strncat(info + len, ".info", sizeof (info) - len);
 
@@ -376,12 +374,12 @@ e100_create_proc_subdir(struct e100_private *bdp)
 		return -ENOMEM;
 	}
 
-	dev_dir = create_proc_entry(bdp->device->name, S_IFDIR,
+	dev_dir = create_proc_entry(bdp->ifname, S_IFDIR,
 				    adapters_proc_dir);
 	bdp->proc_parent = dev_dir;
 
 	if (!dev_dir) {
-		e100_remove_proc_subdir(bdp);
+		e100_remove_proc_subdir(bdp, bdp->ifname);
 		return -ENOMEM;
 	}
 
@@ -396,7 +394,7 @@ e100_create_proc_subdir(struct e100_private *bdp)
 
 		if (!(create_proc_rw(pe->name, data, dev_dir,
 				     pe->read_proc, pe->write_proc))) {
-			e100_remove_proc_subdir(bdp);
+			e100_remove_proc_subdir(bdp, bdp->ifname);
 			return -ENOMEM;
 		}
 	}

@@ -51,7 +51,6 @@
 
 #define MAJOR_NR SCSI_CDROM_MAJOR
 #define LOCAL_END_REQUEST
-#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
@@ -196,8 +195,7 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 	int this_count = SCpnt->bufflen >> 9;
 	int good_sectors = (result == 0 ? this_count : 0);
 	int block_sectors = 0;
-	int device_nr = DEVICE_NR(SCpnt->request->rq_dev);
-	Scsi_CD *cd = &scsi_CDs[device_nr];
+	Scsi_CD *cd = SCpnt->request->rq_disk->private_data;
 
 #ifdef DEBUG
 	printk("sr.c done: %x %p\n", result, SCpnt->request->bh->b_data);
@@ -247,31 +245,14 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 	scsi_io_completion(SCpnt, good_sectors, block_sectors);
 }
 
-
-static request_queue_t *sr_find_queue(kdev_t dev)
-{
-	Scsi_CD *cd;
-
-	if (minor(dev) >= sr_template.dev_max)
-		return NULL;
-	cd = &scsi_CDs[minor(dev)];
-	if (!cd->device)
-		return NULL;
-	return &cd->device->request_queue;
-}
-
 static int sr_init_command(Scsi_Cmnd * SCpnt)
 {
-	int dev, devm, block=0, this_count, s_size;
-	Scsi_CD *cd;
+	int block=0, this_count, s_size, timeout = SR_TIMEOUT;
+	Scsi_CD *cd = SCpnt->request->rq_disk->private_data;
 
-	devm = minor(SCpnt->request->rq_dev);
-	dev = DEVICE_NR(SCpnt->request->rq_dev);
-	cd = &scsi_CDs[dev];
+	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %s, block = %d\n", cd->disk->disk_name, block));
 
-	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %d, block = %d\n", devm, block));
-
-	if (dev >= sr_template.nr_dev || !cd->device || !cd->device->online) {
+	if (!cd->device || !cd->device->online) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", SCpnt->request->nr_sectors));
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
 		return 0;
@@ -283,6 +264,30 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 		 * changed bit has been reset
 		 */
 		return 0;
+	}
+
+	/*
+	 * these are already setup, just copy cdb basically
+	 */
+	if (SCpnt->request->flags & REQ_BLOCK_PC) {
+		struct request *rq = SCpnt->request;
+
+		if (sizeof(rq->cmd) > sizeof(SCpnt->cmnd))
+			return 0;
+
+		memcpy(SCpnt->cmnd, rq->cmd, sizeof(SCpnt->cmnd));
+		if (rq_data_dir(rq) == WRITE)
+			SCpnt->sc_data_direction = SCSI_DATA_WRITE;
+		else if (rq->data_len)
+			SCpnt->sc_data_direction = SCSI_DATA_READ;
+		else
+			SCpnt->sc_data_direction = SCSI_DATA_NONE;
+
+		this_count = rq->data_len;
+		if (rq->timeout)
+			timeout = rq->timeout;
+
+		goto queue;
 	}
 
 	if (!(SCpnt->request->flags & REQ_CMD)) {
@@ -336,9 +341,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 		   (rq_data_dir(SCpnt->request) == WRITE) ? "writing" : "reading",
 				 this_count, SCpnt->request->nr_sectors));
 
-	SCpnt->cmnd[1] = (SCpnt->device->scsi_level <= SCSI_2) ?
-			 ((SCpnt->lun << 5) & 0xe0) : 0;
-
+	SCpnt->cmnd[1] = 0;
 	block = (unsigned int)SCpnt->request->sector / (s_size >> 9);
 
 	if (this_count > 0xffff)
@@ -357,11 +360,12 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	 * host adapter, it's safe to assume that we can at least transfer
 	 * this many bytes between each connect / disconnect.
 	 */
+queue:
 	SCpnt->transfersize = cd->device->sector_size;
 	SCpnt->underflow = this_count << 9;
 
 	SCpnt->allowed = MAX_RETRIES;
-	SCpnt->timeout_per_command = SR_TIMEOUT;
+	SCpnt->timeout_per_command = timeout;
 
 	/*
 	 * This is the completion routine we use.  This is matched in terms
@@ -388,13 +392,38 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	return 1;
 }
 
+static int sr_block_open(struct inode *inode, struct file *file)
+{
+	Scsi_CD *cd = inode->i_bdev->bd_disk->private_data;
+	return cdrom_open(&cd->cdi, inode, file);
+}
+
+static int sr_block_release(struct inode *inode, struct file *file)
+{
+	Scsi_CD *cd = inode->i_bdev->bd_disk->private_data;
+	return cdrom_release(&cd->cdi, file);
+}
+
+static int sr_block_ioctl(struct inode *inode, struct file *file, unsigned cmd,
+			  unsigned long arg)
+{
+	Scsi_CD *cd = inode->i_bdev->bd_disk->private_data;
+	return cdrom_ioctl(&cd->cdi, inode, cmd, arg);
+}
+
+static int sr_block_media_changed(struct gendisk *disk)
+{
+	Scsi_CD *cd = disk->private_data;
+	return cdrom_media_changed(&cd->cdi);
+}
+
 struct block_device_operations sr_bdops =
 {
-	owner:			THIS_MODULE,
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
+	.owner		= THIS_MODULE,
+	.open		= sr_block_open,
+	.release	= sr_block_release,
+	.ioctl		= sr_block_ioctl,
+	.media_changed	= sr_block_media_changed,
 };
 
 static int sr_open(struct cdrom_device_info *cdi, int purpose)
@@ -486,9 +515,7 @@ static void get_sectorsize(Scsi_CD *cd)
 
 	do {
 		cmd[0] = READ_CAPACITY;
-		cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-			 ((cd->device->lun << 5) & 0xe0) : 0;
-		memset((void *) &cmd[2], 0, 8);
+		memset((void *) &cmd[1], 0, 9);
 		SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;	/* Mark as really busy */
 		SRpnt->sr_cmd_len = 0;
 
@@ -599,8 +626,6 @@ void get_capabilities(Scsi_CD *cd)
 	}
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.cmd[0] = MODE_SENSE;
-	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		     ((cd->device->lun << 5) & 0xe0) : 0;
 	cgc.cmd[2] = 0x2a;
 	cgc.cmd[4] = 128;
 	cgc.buffer = buffer;
@@ -678,13 +703,6 @@ void get_capabilities(Scsi_CD *cd)
  */
 static int sr_packet(struct cdrom_device_info *cdi, struct cdrom_generic_command *cgc)
 {
-	Scsi_CD *cd = cdi->handle;
-	Scsi_Device *device = cd->device;
-	
-	/* set the LUN */
-	if (device->scsi_level <= SCSI_2)
-		cgc->cmd[1] |= device->lun << 5;
-
 	if (cgc->timeout <= 0)
 		cgc->timeout = IOCTL_TIMEOUT;
 
@@ -726,29 +744,9 @@ cleanup_dev:
 	return 1;
 }
 
-/* Driverfs file support */
-static ssize_t sr_device_kdev_read(struct device *driverfs_dev, 
-				   char *page, size_t count, loff_t off)
-{
-	kdev_t kdev; 
-	kdev.value=(int)(long)driverfs_dev->driver_data;
-	return off ? 0 : sprintf(page, "%x\n",kdev.value);
-}
-static DEVICE_ATTR(kdev,S_IRUGO,sr_device_kdev_read,NULL);
-
-static ssize_t sr_device_type_read(struct device *driverfs_dev, 
-				   char *page, size_t count, loff_t off) 
-{
-	return off ? 0 : sprintf (page, "CHR\n");
-}
-static DEVICE_ATTR(type,S_IRUGO,sr_device_type_read,NULL);
-
-
 void sr_finish()
 {
 	int i;
-
-	blk_dev[MAJOR_NR].queue = sr_find_queue;
 
 	for (i = 0; i < sr_template.nr_dev; ++i) {
 		struct gendisk *disk;
@@ -757,7 +755,7 @@ void sr_finish()
 		 * with loadable modules. */
 		if (cd->disk)
 			continue;
-		disk = alloc_disk();
+		disk = alloc_disk(1);
 		if (!disk)
 			continue;
 		if (cd->disk) {
@@ -766,7 +764,6 @@ void sr_finish()
 		}
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
-		disk->minor_shift = 0;
 		strcpy(disk->disk_name, cd->cdi.name);
 		disk->fops = &sr_bdops;
 		disk->flags = GENHD_FL_CD;
@@ -789,7 +786,6 @@ void sr_finish()
 
 		cd->cdi.ops = &sr_dops;
 		cd->cdi.handle = cd;
-		cd->cdi.dev = mk_kdev(MAJOR_NR, i);
 		cd->cdi.mask = 0;
 		cd->cdi.capacity = 1;
 		/*
@@ -798,24 +794,12 @@ void sr_finish()
 		 */
 		get_capabilities(cd);
 		sr_vendor_init(cd);
-
-		sprintf(cd->cdi.cdrom_driverfs_dev.bus_id, "%s:cd",
-			cd->device->sdev_driverfs_dev.bus_id);
-		sprintf(cd->cdi.cdrom_driverfs_dev.name, "%scdrom",
-			cd->device->sdev_driverfs_dev.name);
-		cd->cdi.cdrom_driverfs_dev.parent = 
-			&cd->device->sdev_driverfs_dev;
-		cd->cdi.cdrom_driverfs_dev.bus = &scsi_driverfs_bus_type;
-		cd->cdi.cdrom_driverfs_dev.driver_data = 
-			(void *)(long)__mkdev(MAJOR_NR, i);
-		device_register(&cd->cdi.cdrom_driverfs_dev);
-		device_create_file(&cd->cdi.cdrom_driverfs_dev,
-				   &dev_attr_type);
-		device_create_file(&cd->cdi.cdrom_driverfs_dev,
-				   &dev_attr_kdev);
 		disk->de = cd->device->de;
+		disk->driverfs_dev = &cd->device->sdev_driverfs_dev;
 		register_cdrom(&cd->cdi);
 		set_capacity(disk, cd->capacity);
+		disk->private_data = cd;
+		disk->queue = &cd->device->request_queue;
 		add_disk(disk);
 	}
 }
@@ -872,7 +856,7 @@ static void __exit exit_sr(void)
 		kfree(scsi_CDs);
 
 	sr_template.dev_max = 0;
-	remove_driver(&sr_template.scsi_driverfs_driver);
+	driver_unregister(&sr_template.scsi_driverfs_driver);
 }
 
 module_init(init_sr);

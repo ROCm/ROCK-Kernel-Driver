@@ -102,7 +102,7 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR MITSUMI_CDROM_MAJOR
-#define DEVICE_NR(device) (minor(device))
+#define QUEUE (&mcd_queue)
 #include <linux/blk.h>
 
 #define mcd_port mcd		/* for compatible parameter passing with "insmod" */
@@ -116,6 +116,7 @@ static int mcd1xhold;
 
 /* Is the drive connected properly and responding?? */
 static int mcdPresent;
+static struct request_queue mcd_queue;
 
 #define QUICK_LOOP_DELAY udelay(45)	/* use udelay */
 #define QUICK_LOOP_COUNT 20
@@ -123,7 +124,6 @@ static int mcdPresent;
 static int current_valid(void)
 {
         return !blk_queue_empty(QUEUE) &&
-	        major(CURRENT->rq_dev) == MAJOR_NR &&
 		CURRENT->cmd == READ &&
 		CURRENT->sector != -1;
 }
@@ -188,18 +188,9 @@ static void mcd_release(struct cdrom_device_info *cdi);
 static int mcd_media_changed(struct cdrom_device_info *cdi, int disc_nr);
 static int mcd_tray_move(struct cdrom_device_info *cdi, int position);
 static spinlock_t mcd_spinlock = SPIN_LOCK_UNLOCKED;
-int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
+static int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		    void *arg);
-int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
-
-struct block_device_operations mcd_bdops =
-{
-	.owner			= THIS_MODULE,
-	.open			= cdrom_open,
-	.release		= cdrom_release,
-	.ioctl			= cdrom_ioctl,
-	.check_media_change	= cdrom_media_changed,
-};
+static int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
 
 static struct timer_list mcd_timer;
 
@@ -219,6 +210,36 @@ static struct cdrom_device_info mcd_info = {
 	.speed		= 2,
 	.capacity	= 1,
 	.name		= "mcd",
+};
+
+static int mcd_block_open(struct inode *inode, struct file *file)
+{
+	return cdrom_open(&mcd_info, inode, file);
+}
+
+static int mcd_block_release(struct inode *inode, struct file *file)
+{
+	return cdrom_release(&mcd_info, file);
+}
+
+static int mcd_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	return cdrom_ioctl(&mcd_info, inode, cmd, arg);
+}
+
+static int mcd_block_media_changed(struct gendisk *disk)
+{
+	return cdrom_media_changed(&mcd_info);
+}
+
+static struct block_device_operations mcd_bdops =
+{
+	.owner		= THIS_MODULE,
+	.open		= mcd_block_open,
+	.release	= mcd_block_release,
+	.ioctl		= mcd_block_ioctl,
+	.media_changed	= mcd_block_media_changed,
 };
 
 static struct gendisk *mcd_gendisk;
@@ -1031,7 +1052,7 @@ static void mcd_release(struct cdrom_device_info *cdi)
 
 int __init mcd_init(void)
 {
-	struct gendisk *disk = alloc_disk();
+	struct gendisk *disk = alloc_disk(1);
 	int count;
 	unsigned char result[3];
 	char msg[80];
@@ -1055,8 +1076,7 @@ int __init mcd_init(void)
 		goto out_region;
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mcd_request,
-		       &mcd_spinlock);
+	blk_init_queue(&mcd_queue, do_mcd_request, &mcd_spinlock);
 
 	/* check for card */
 
@@ -1124,17 +1144,16 @@ int __init mcd_init(void)
 
 	disk->major = MAJOR_NR;
 	disk->first_minor = 0;
-	disk->minor_shift = 0;
 	sprintf(disk->disk_name, "mcd");
 	disk->fops = &mcd_bdops;
 	disk->flags = GENHD_FL_CD;
 	mcd_gendisk = disk;
-	mcd_info.dev = mk_kdev(MAJOR_NR, 0);
 
 	if (register_cdrom(&mcd_info) != 0) {
 		printk(KERN_ERR "mcd: Unable to register Mitsumi CD-ROM.\n");
 		goto out_cdrom;
 	}
+	disk->queue = &mcd_queue;
 	add_disk(disk);
 	printk(msg);
 	return 0;
@@ -1145,7 +1164,7 @@ out_probe:
 	release_region(mcd_port, 4);
 out_region:
 	unregister_blkdev(MAJOR_NR, "mcd");
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&mcd_queue);
 	put_disk(disk);
 	return -EIO;
 }
@@ -1524,7 +1543,7 @@ void __exit mcd_exit(void)
 		printk(KERN_WARNING "Can't unregister major mcd\n");
 		return;
 	}
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&mcd_queue);
 	del_timer_sync(&mcd_timer);
 }
 

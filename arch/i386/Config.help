@@ -73,6 +73,12 @@ CONFIG_X86_CYCLONE
   If you are suffering from time skew using a multi-CEC system, say YES.
   Otherwise it is safe to say NO.
 
+CONFIG_X86_SUMMIT
+  This option is needed for IBM systems that use the Summit/EXA chipset.
+  In particular, it is needed for the x440.
+
+  If you don't have one of these computers, you should say N here.
+
 CONFIG_X86_UP_IOAPIC
   An IO-APIC (I/O Advanced Programmable Interrupt Controller) is an
   SMP-capable replacement for PC-style interrupt controllers. Most
@@ -1048,6 +1054,11 @@ CONFIG_DEBUG_OBSOLETE
   Say Y here if you want to reduce the chances of the tree compiling,
   and are prepared to dig into driver internals to fix compile errors.
 
+Profiling support
+CONFIG_PROFILING
+  Say Y here to enable the extended profiling support mechanisms used
+  by profilers such as OProfile.
+ 
 Software Suspend
 CONFIG_SOFTWARE_SUSPEND
   Enable the possibilty of suspendig machine. It doesn't need APM.
@@ -1083,3 +1094,11 @@ CONFIG_SCx200
 
   This support is also available as a module.  If compiled as a
   module, it will be called scx200.o.
+
+CONFIG_EDD
+  Say Y or M here if you want to enable BIOS Enhanced Disk Drive
+  Services real mode BIOS calls to determine which disk
+  BIOS tries boot from.  This information is then exported via driverfs.
+
+  This option is experimental, but believed to be safe,
+  and most disk controller BIOS vendors do not yet implement this feature.

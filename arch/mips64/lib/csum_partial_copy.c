@@ -16,8 +16,8 @@
 /*
  * copy while checksumming, otherwise like csum_partial
  */
-unsigned int csum_partial_copy(const char *src, char *dst, 
-                               int len, unsigned int sum)
+unsigned int csum_partial_copy_nocheck(const char *src, char *dst, 
+				       int len, unsigned int sum)
 {
 	/*
 	 * It's 2:30 am and I don't feel like doing it real ...

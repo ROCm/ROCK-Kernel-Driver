@@ -27,7 +27,7 @@
  */ 	
 ENTRY(ia32_cstar_target)
 	movq $-ENOSYS,%rax
-	sysret
+	sysretl
 	
 /* 
  * Emulated IA32 system calls via int 0x80. 
@@ -77,6 +77,7 @@ ia32_tracesys:
 	jmp ia32_do_syscall
 
 ia32_badsys:
+	movq $0,ORIG_RAX-ARGOFFSET(%rsp)
 	movq $-ENOSYS,RAX-ARGOFFSET(%rsp)
 	jmp int_ret_from_sys_call
 
@@ -84,6 +85,10 @@ ni_syscall:
 	movq %rax,%rdi
 	jmp  sys32_ni_syscall			
 
+quiet_ni_syscall:
+	movq $-ENOSYS,%rax
+	ret
+	
 	.macro PTREGSCALL label, func
 	.globl \label
 \label:
@@ -229,7 +234,7 @@ ia32_sys_call_table:
 	.quad stub32_iopl		/* 110 */
 	.quad sys_vhangup
 	.quad ni_syscall	/* old "idle" system call */
-	.quad ni_syscall	/* vm86old */ 
+	.quad sys32_vm86_warning	/* vm86old */ 
 	.quad sys32_wait4
 	.quad sys_swapoff		/* 115 */
 	.quad sys32_sysinfo
@@ -238,7 +243,7 @@ ia32_sys_call_table:
 	.quad stub32_sigreturn
 	.quad stub32_clone		/* 120 */
 	.quad sys_setdomainname
-	.quad sys32_newuname
+	.quad sys_uname
 	.quad sys_modify_ldt
 	.quad sys32_adjtimex
 	.quad sys32_mprotect		/* 125 */
@@ -282,8 +287,8 @@ ia32_sys_call_table:
 	.quad sys_mremap
 	.quad sys_setresuid16
 	.quad sys_getresuid16	/* 165 */
-	.quad ni_syscall	/* vm86 */ 
-	.quad ni_syscall	/* query_module */
+	.quad sys32_vm86_warning	/* vm86 */ 
+	.quad quiet_ni_syscall	/* query_module */
 	.quad sys_poll
 	.quad sys32_nfsservctl
 	.quad sys_setresgid16	/* 170 */
@@ -368,7 +373,7 @@ ia32_sys_call_table:
 	.quad sys_io_cancel
 	.quad sys_ni_syscall /* 250 alloc_huge_pages */
 	.quad sys_ni_syscall /* free_huge_pages */
-	.quad sys_ni_syscall /* exit_group */
+	.quad sys_exit_group /* exit_group */
 ia32_syscall_end:		
 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
 		.quad ni_syscall

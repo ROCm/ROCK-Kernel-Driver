@@ -42,4 +42,4 @@ obj-y		+= $(sort $(p-y))
 include $(TOPDIR)/Rules.make
 
 # Special dependencies
-$(p-y):	$(TOPDIR)/include/asm-arm/constants.h
+$(obj)/$(p-y):	include/asm-arm/constants.h

@@ -198,7 +198,6 @@ History:
 #include <asm/io.h>
 
 #define MAJOR_NR CM206_CDROM_MAJOR
-#define DEVICE_NR(device) (minor(device))
 
 #include <linux/blk.h>
 
@@ -302,6 +301,7 @@ struct cm206_struct {
 #define PLAY_TO cd->toc[0]	/* toc[0] records end-time in play */
 
 static struct cm206_struct *cd;	/* the main memory structure */
+static struct request_queue cm206_queue;
 static spinlock_t cm206_lock = SPIN_LOCK_UNLOCKED;
 
 /* First, we define some polling functions. These are actually
@@ -770,15 +770,6 @@ void get_disc_status(void)
 	}
 }
 
-struct block_device_operations cm206_bdops =
-{
-	.owner			= THIS_MODULE,
-	.open			= cdrom_open,
-	.release		= cdrom_release,
-	.ioctl			= cdrom_ioctl,
-	.check_media_change	= cdrom_media_changed,
-};
-
 /* The new open. The real opening strategy is defined in cdrom.c. */
 
 static int cm206_open(struct cdrom_device_info *cdi, int purpose)
@@ -860,24 +851,25 @@ static void do_cm206_request(request_queue_t * q)
 	long int i, cd_sec_no;
 	int quarter, error;
 	uch *source, *dest;
+	struct request *req;
 
-	while (1) {		/* repeat until all requests have been satisfied */
-		if (blk_queue_empty(QUEUE))
+	while (1) {	/* repeat until all requests have been satisfied */
+		if (blk_queue_empty(q))
 			return;
 
-		if (CURRENT->cmd != READ) {
-			debug(("Non-read command %d on cdrom\n",
-			       CURRENT->cmd));
-			end_request(CURRENT, 0);
+		req = elv_next_request(q);
+		if (req->cmd != READ) {
+			debug(("Non-read command %d on cdrom\n", req->cmd));
+			end_request(req, 0);
 			continue;
 		}
 		spin_unlock_irq(q->queue_lock);
 		error = 0;
-		for (i = 0; i < CURRENT->nr_sectors; i++) {
+		for (i = 0; i < req->nr_sectors; i++) {
 			int e1, e2;
-			cd_sec_no = (CURRENT->sector + i) / BLOCKS_ISO;	/* 4 times 512 bytes */
-			quarter = (CURRENT->sector + i) % BLOCKS_ISO;
-			dest = CURRENT->buffer + i * LINUX_BLOCK_SIZE;
+			cd_sec_no = (req->sector + i) / BLOCKS_ISO;	/* 4 times 512 bytes */
+			quarter = (req->sector + i) % BLOCKS_ISO;
+			dest = req->buffer + i * LINUX_BLOCK_SIZE;
 			/* is already in buffer memory? */
 			if (cd->sector_first <= cd_sec_no
 			    && cd_sec_no < cd->sector_last) {
@@ -899,7 +891,7 @@ static void do_cm206_request(request_queue_t * q)
 			}
 		}
 		spin_lock_irq(q->queue_lock);
-		end_request(CURRENT, !error);
+		end_request(req, !error);
 	}
 }
 
@@ -1357,6 +1349,36 @@ static struct cdrom_device_info cm206_info = {
 	.name		= "cm206",
 };
 
+static int cm206_block_open(struct inode *inode, struct file *file)
+{
+	return cdrom_open(&cm206_info, inode, file);
+}
+
+static int cm206_block_release(struct inode *inode, struct file *file)
+{
+	return cdrom_release(&cm206_info, file);
+}
+
+static int cm206_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	return cdrom_ioctl(&cm206_info, inode, cmd, arg);
+}
+
+static int cm206_block_media_changed(struct gendisk *disk)
+{
+	return cdrom_media_changed(&cm206_info);
+}
+
+static struct block_device_operations cm206_bdops =
+{
+	.owner		= THIS_MODULE,
+	.open		= cm206_block_open,
+	.release	= cm206_block_release,
+	.ioctl		= cm206_block_ioctl,
+	.media_changed	= cm206_block_media_changed,
+};
+
 static struct gendisk *cm206_gendisk;
 
 /* This function probes for the adapter card. It returns the base
@@ -1470,25 +1492,23 @@ int __init cm206_init(void)
 		printk(KERN_INFO "Cannot register for major %d!\n", MAJOR_NR);
 		goto out_blkdev;
 	}
-	disk = alloc_disk();
+	disk = alloc_disk(1);
 	if (!disk)
 		goto out_disk;
 	disk->major = MAJOR_NR;
 	disk->first_minor = 0;
-	disk->minor_shift = 0;
 	sprintf(disk->disk_name, "cm206");
 	disk->fops = &cm206_bdops;
 	disk->flags = GENHD_FL_CD;
 	cm206_gendisk = disk;
-	cm206_info.dev = mk_kdev(MAJOR_NR, 0);
 	if (register_cdrom(&cm206_info) != 0) {
 		printk(KERN_INFO "Cannot register for cdrom %d!\n", MAJOR_NR);
 		goto out_cdrom;
 	}
+	blk_init_queue(&cm206_queue, do_cm206_request, &cm206_lock);
+	blk_queue_hardsect_size(&cm206_queue, 2048);
+	disk->queue = &cm206_queue;
 	add_disk(disk);
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_cm206_request,
-		       &cm206_lock);
-	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
 
 	memset(cd, 0, sizeof(*cd));	/* give'm some reasonable value */
 	cd->sector_last = -1;	/* flag no data buffered */
@@ -1551,7 +1571,7 @@ void __exit cm206_exit(void)
 		printk("Can't unregister major cm206\n");
 		return;
 	}
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&cm206_queue);
 	free_irq(cm206_irq, NULL);
 	kfree(cd);
 	release_region(cm206_base, 16);

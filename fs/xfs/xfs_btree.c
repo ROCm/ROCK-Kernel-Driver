@@ -261,9 +261,9 @@ xfs_btree_check_rec(
 
 		r1 = ar1;
 		r2 = ar2;
-		ASSERT(xfs_bmbt_get_startoff(r1) +
-		       xfs_bmbt_get_blockcount(r1) <=
-		       xfs_bmbt_get_startoff(r2));
+		ASSERT(xfs_bmbt_disk_get_startoff(r1) +
+		       xfs_bmbt_disk_get_blockcount(r1) <=
+		       xfs_bmbt_disk_get_startoff(r2));
 		break;
 	    }
 	case XFS_BTNUM_INO: {

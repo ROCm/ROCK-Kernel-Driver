@@ -360,7 +360,7 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		size = (int)((char *)&leaf->ents[INT_GET(leaf->hdr.count, ARCH_CONVERT)] -
 			     (char *)leaf);
 	}
-	bcopy(oldroot, node, size);
+	memcpy(node, oldroot, size);
 	xfs_da_log_buf(tp, bp, 0, size - 1);
 	xfs_da_buf_done(blk1->bp);
 	blk1->bp = bp;
@@ -527,7 +527,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 			tmp *= (uint)sizeof(xfs_da_node_entry_t);
 			btree_s = &node2->btree[0];
 			btree_d = &node2->btree[count];
-			ovbcopy(btree_s, btree_d, tmp);
+			memmove(btree_d, btree_s, tmp);
 		}
 
 		/*
@@ -538,7 +538,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		tmp = count * (uint)sizeof(xfs_da_node_entry_t);
 		btree_s = &node1->btree[INT_GET(node1->hdr.count, ARCH_CONVERT) - count];
 		btree_d = &node2->btree[0];
-		bcopy(btree_s, btree_d, tmp);
+		memcpy(btree_d, btree_s, tmp);
 		INT_MOD(node1->hdr.count, ARCH_CONVERT, -(count));
 
 	} else {
@@ -550,7 +550,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		tmp = count * (uint)sizeof(xfs_da_node_entry_t);
 		btree_s = &node2->btree[0];
 		btree_d = &node1->btree[INT_GET(node1->hdr.count, ARCH_CONVERT)];
-		bcopy(btree_s, btree_d, tmp);
+		memcpy(btree_d, btree_s, tmp);
 		INT_MOD(node1->hdr.count, ARCH_CONVERT, count);
 		xfs_da_log_buf(tp, blk1->bp,
 			XFS_DA_LOGRANGE(node1, btree_d, tmp));
@@ -562,7 +562,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		tmp *= (uint)sizeof(xfs_da_node_entry_t);
 		btree_s = &node2->btree[count];
 		btree_d = &node2->btree[0];
-		ovbcopy(btree_s, btree_d, tmp);
+		memmove(btree_d, btree_s, tmp);
 		INT_MOD(node2->hdr.count, ARCH_CONVERT, -(count));
 	}
 
@@ -622,7 +622,7 @@ xfs_da_node_add(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	btree = &node->btree[ oldblk->index ];
 	if (oldblk->index < INT_GET(node->hdr.count, ARCH_CONVERT)) {
 		tmp = (INT_GET(node->hdr.count, ARCH_CONVERT) - oldblk->index) * (uint)sizeof(*btree);
-		ovbcopy(btree, btree + 1, tmp);
+		memmove(btree + 1, btree, tmp);
 	}
 	INT_SET(btree->hashval, ARCH_CONVERT, newblk->hashval);
 	INT_SET(btree->before, ARCH_CONVERT, newblk->blkno);
@@ -790,7 +790,7 @@ xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
 	}
 	ASSERT(INT_ISZERO(blkinfo->forw, ARCH_CONVERT));
 	ASSERT(INT_ISZERO(blkinfo->back, ARCH_CONVERT));
-	bcopy(bp->data, root_blk->bp->data, state->blocksize);
+	memcpy(root_blk->bp->data, bp->data, state->blocksize);
 	xfs_da_log_buf(args->trans, root_blk->bp, 0, state->blocksize - 1);
 	error = xfs_da_shrink_inode(args, child, bp);
 	return(error);
@@ -842,7 +842,7 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 		 * path point to the block we want to drop (this one).
 		 */
 		forward = (!INT_ISZERO(info->forw, ARCH_CONVERT));
-		bcopy(&state->path, &state->altpath, sizeof(state->path));
+		memcpy(&state->altpath, &state->path, sizeof(state->path));
 		error = xfs_da_path_shift(state, &state->altpath, forward,
 						 0, &retval);
 		if (error)
@@ -898,7 +898,7 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 	 * Make altpath point to the block we want to keep (the lower
 	 * numbered block) and path point to the block we want to drop.
 	 */
-	bcopy(&state->path, &state->altpath, sizeof(state->path));
+	memcpy(&state->altpath, &state->path, sizeof(state->path));
 	if (blkno < blk->blkno) {
 		error = xfs_da_path_shift(state, &state->altpath, forward,
 						 0, &retval);
@@ -1001,12 +1001,12 @@ xfs_da_node_remove(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk)
 	if (drop_blk->index < (INT_GET(node->hdr.count, ARCH_CONVERT)-1)) {
 		tmp  = INT_GET(node->hdr.count, ARCH_CONVERT) - drop_blk->index - 1;
 		tmp *= (uint)sizeof(xfs_da_node_entry_t);
-		ovbcopy(btree + 1, btree, tmp);
+		memmove(btree, btree + 1, tmp);
 		xfs_da_log_buf(state->args->trans, drop_blk->bp,
 		    XFS_DA_LOGRANGE(node, btree, tmp));
 		btree = &node->btree[ INT_GET(node->hdr.count, ARCH_CONVERT)-1 ];
 	}
-	bzero((char *)btree, sizeof(xfs_da_node_entry_t));
+	memset((char *)btree, 0, sizeof(xfs_da_node_entry_t));
 	xfs_da_log_buf(state->args->trans, drop_blk->bp,
 	    XFS_DA_LOGRANGE(node, btree, sizeof(*btree)));
 	INT_MOD(node->hdr.count, ARCH_CONVERT, -1);
@@ -1049,7 +1049,7 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	{
 		btree = &save_node->btree[ INT_GET(drop_node->hdr.count, ARCH_CONVERT) ];
 		tmp = INT_GET(save_node->hdr.count, ARCH_CONVERT) * (uint)sizeof(xfs_da_node_entry_t);
-		ovbcopy(&save_node->btree[0], btree, tmp);
+		memmove(btree, &save_node->btree[0], tmp);
 		btree = &save_node->btree[0];
 		xfs_da_log_buf(tp, save_blk->bp,
 			XFS_DA_LOGRANGE(save_node, btree,
@@ -1067,7 +1067,7 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	 * Move all the B-tree elements from drop_blk to save_blk.
 	 */
 	tmp = INT_GET(drop_node->hdr.count, ARCH_CONVERT) * (uint)sizeof(xfs_da_node_entry_t);
-	bcopy(&drop_node->btree[0], btree, tmp);
+	memcpy(btree, &drop_node->btree[0], tmp);
 	INT_MOD(save_node->hdr.count, ARCH_CONVERT, INT_GET(drop_node->hdr.count, ARCH_CONVERT));
 
 	xfs_da_log_buf(tp, save_blk->bp,
@@ -1798,7 +1798,7 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 	/*
 	 * Copy the last block into the dead buffer and log it.
 	 */
-	bcopy(last_buf->data, dead_buf->data, mp->m_dirblksize);
+	memcpy(dead_buf->data, last_buf->data, mp->m_dirblksize);
 	xfs_da_log_buf(tp, dead_buf, 0, mp->m_dirblksize - 1);
 	dead_info = dead_buf->data;
 	/*
@@ -2343,7 +2343,7 @@ xfs_da_state_free(xfs_da_state_t *state)
 	if (state->extravalid && state->extrablk.bp)
 		xfs_da_buf_done(state->extrablk.bp);
 #ifdef DEBUG
-	bzero((char *)state, sizeof(*state));
+	memset((char *)state, 0, sizeof(*state));
 #endif /* DEBUG */
 	kmem_zone_free(xfs_da_state_zone, state);
 }
@@ -2390,7 +2390,7 @@ xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 		dabuf->data = kmem_alloc(BBTOB(dabuf->bbcount), KM_SLEEP);
 		for (i = off = 0; i < nbuf; i++, off += XFS_BUF_COUNT(bp)) {
 			bp = bps[i];
-			bcopy(XFS_BUF_PTR(bp), (char *)dabuf->data + off,
+			memcpy((char *)dabuf->data + off, XFS_BUF_PTR(bp),
 				XFS_BUF_COUNT(bp));
 		}
 	}
@@ -2431,7 +2431,7 @@ xfs_da_buf_clean(xfs_dabuf_t *dabuf)
 		for (i = off = 0; i < dabuf->nbuf;
 				i++, off += XFS_BUF_COUNT(bp)) {
 			bp = dabuf->bps[i];
-			bcopy((char *)dabuf->data + off, XFS_BUF_PTR(bp),
+			memcpy(XFS_BUF_PTR(bp), (char *)dabuf->data + off,
 				XFS_BUF_COUNT(bp));
 		}
 	}
@@ -2462,7 +2462,7 @@ xfs_da_buf_done(xfs_dabuf_t *dabuf)
 			dabuf->next->prev = dabuf->prev;
 		mutex_spinunlock(&xfs_dabuf_global_lock, s);
 	}
-	bzero(dabuf, XFS_DA_BUF_SIZE(dabuf->nbuf));
+	memset(dabuf, 0, XFS_DA_BUF_SIZE(dabuf->nbuf));
 #endif
 	if (dabuf->nbuf == 1)
 		kmem_zone_free(xfs_dabuf_zone, dabuf);
@@ -2532,7 +2532,7 @@ xfs_da_brelse(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
 		bp = dabuf->bps[0];
 	} else {
 		bplist = kmem_alloc(nbuf * sizeof(*bplist), KM_SLEEP);
-		bcopy(dabuf->bps, bplist, nbuf * sizeof(*bplist));
+		memcpy(bplist, dabuf->bps, nbuf * sizeof(*bplist));
 	}
 	xfs_da_buf_done(dabuf);
 	for (i = 0; i < nbuf; i++)
@@ -2558,7 +2558,7 @@ xfs_da_binval(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
 		bp = dabuf->bps[0];
 	} else {
 		bplist = kmem_alloc(nbuf * sizeof(*bplist), KM_SLEEP);
-		bcopy(dabuf->bps, bplist, nbuf * sizeof(*bplist));
+		memcpy(bplist, dabuf->bps, nbuf * sizeof(*bplist));
 	}
 	xfs_da_buf_done(dabuf);
 	for (i = 0; i < nbuf; i++)

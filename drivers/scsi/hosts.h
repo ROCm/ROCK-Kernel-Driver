@@ -16,14 +16,13 @@
  *  of the same type.
  *
  *  Jiffies wrap fixes (host->resetting), 3 Dec 1998 Andrea Arcangeli
+ *
+ *  Restructured scsi_host lists and associated functions.
+ *  September 04, 2002 Mike Anderson (andmike@us.ibm.com)
  */
 
 #ifndef _HOSTS_H
 #define _HOSTS_H
-
-/*
-    $Header: /vger/u4/cvs/linux/drivers/scsi/hosts.h,v 1.6 1997/01/19 23:07:13 davem Exp $
-*/
 
 #include <linux/config.h>
 #include <linux/proc_fs.h>
@@ -58,8 +57,7 @@ typedef struct scsi_disk Disk;
 typedef struct	SHT
 {
 
-    /* Used with loadable modules so we can construct a linked list. */
-    struct SHT * next;
+    struct list_head	shtp_list;
 
     /* Used with loadable modules so that we know when it is safe to unload */
     struct module * module;
@@ -266,14 +264,6 @@ typedef struct	SHT
      */
     int (* bios_param)(Disk *, struct block_device *, int []);
 
-
-    /*
-     * Used to set the queue depth for a specific device.
-     *
-     * Once the slave_attach() function is in full use, this will go away.
-     */
-    void (*select_queue_depths)(struct Scsi_Host *, Scsi_Device *);
-
     /*
      * This determines if we will use a non-interrupt driven
      * or an interrupt driven scheme,  It is set to the maximum number
@@ -382,8 +372,10 @@ struct Scsi_Host
      * This information is private to the scsi mid-layer.  Wrapping it in a
      * struct private is a way of marking it in a sort of C++ type of way.
      */
-    struct Scsi_Host      * next;
+    struct list_head      sh_list;
     Scsi_Device           * host_queue;
+    struct list_head	  all_scsi_hosts;
+    struct list_head	  my_devices;
 
     spinlock_t		  default_lock;
     spinlock_t		  *host_lock;
@@ -489,8 +481,6 @@ struct Scsi_Host
      */
     unsigned int max_host_blocked;
 
-    void (*select_queue_depths)(struct Scsi_Host *, Scsi_Device *);
-
     /*
      * For SCSI hosts which are PCI devices, set pci_dev so that
      * we can do BIOS EDD 3.0 mappings
@@ -518,28 +508,26 @@ struct Scsi_Host
  * thing.  This physical pseudo-device isn't real and won't be available
  * from any high-level drivers.
  */
-extern void scsi_free_host_dev(Scsi_Device * SDpnt);
-extern Scsi_Device * scsi_get_host_dev(struct Scsi_Host * SHpnt);
+extern void scsi_free_host_dev(Scsi_Device *);
+extern Scsi_Device * scsi_get_host_dev(struct Scsi_Host *);
 
-extern void scsi_unblock_requests(struct Scsi_Host * SHpnt);
-extern void scsi_block_requests(struct Scsi_Host * SHpnt);
-extern void scsi_report_bus_reset(struct Scsi_Host * SHpnt, int channel);
+extern void scsi_unblock_requests(struct Scsi_Host *);
+extern void scsi_block_requests(struct Scsi_Host *);
+extern void scsi_report_bus_reset(struct Scsi_Host *, int);
 
 typedef struct SHN
-    {
-    struct SHN * next;
-    char * name;
-    unsigned short host_no;
-    unsigned short host_registered;
-    } Scsi_Host_Name;
+{
+	struct list_head shn_list;
+	char *name;
+	unsigned short host_no;
+	unsigned short host_registered;
+} Scsi_Host_Name;
 	
-extern Scsi_Host_Name * scsi_host_no_list;
-extern struct Scsi_Host * scsi_hostlist;
 extern struct Scsi_Device_Template * scsi_devicelist;
 
-extern Scsi_Host_Template * scsi_hosts;
-
-extern void build_proc_dir_entries(Scsi_Host_Template  *);
+extern void scsi_proc_host_mkdir(Scsi_Host_Template *);
+extern void scsi_proc_host_add(struct Scsi_Host *);
+extern void scsi_proc_host_rm(struct Scsi_Host *);
 
 /*
  *  scsi_init initializes the scsi hosts.
@@ -548,34 +536,33 @@ extern void build_proc_dir_entries(Scsi_Host_Template  *);
 extern int next_scsi_host;
 
 unsigned int scsi_init(void);
-extern struct Scsi_Host * scsi_register(Scsi_Host_Template *, int j);
-extern void scsi_unregister(struct Scsi_Host * i);
-extern void scsi_register_blocked_host(struct Scsi_Host * SHpnt);
-extern void scsi_deregister_blocked_host(struct Scsi_Host * SHpnt);
+extern struct Scsi_Host * scsi_register(Scsi_Host_Template *, int);
+extern void scsi_unregister(struct Scsi_Host *);
+extern void scsi_register_blocked_host(struct Scsi_Host *);
+extern void scsi_deregister_blocked_host(struct Scsi_Host *);
 
-static inline void scsi_assign_lock(struct Scsi_Host *host, spinlock_t *lock)
+static inline void scsi_assign_lock(struct Scsi_Host *shost, spinlock_t *lock)
 {
-	host->host_lock = lock;
+	shost->host_lock = lock;
 }
 
-static inline void scsi_set_pci_device(struct Scsi_Host *SHpnt,
+static inline void scsi_set_pci_device(struct Scsi_Host *shost,
                                        struct pci_dev *pdev)
 {
-	SHpnt->pci_dev = pdev;
-	SHpnt->host_driverfs_dev.parent=&pdev->dev;
+	shost->pci_dev = pdev;
+	shost->host_driverfs_dev.parent=&pdev->dev;
+
+	/* register parent with driverfs */
+	device_register(&shost->host_driverfs_dev);
 }
 
 
 /*
  * Prototypes for functions/data in scsi_scan.c
  */
-extern void scan_scsis(struct Scsi_Host *shpnt,
-		       uint hardcoded,
-		       uint hchannel,
-		       uint hid,
-                       uint hlun);
+extern void scan_scsis(struct Scsi_Host *, uint, uint, uint, uint);
 
-extern void scsi_mark_host_reset(struct Scsi_Host *Host);
+extern void scsi_mark_host_reset(struct Scsi_Host *);
 
 #define BLANK_HOST {"", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
@@ -604,7 +591,7 @@ struct Scsi_Device_Template
     struct device_driver scsi_driverfs_driver;
 };
 
-void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt);
+void  scsi_initialize_queue(Scsi_Device *, struct Scsi_Host *);
 
 
 /*
@@ -615,13 +602,18 @@ extern int scsi_unregister_device(struct Scsi_Device_Template *);
 extern int scsi_register_host(Scsi_Host_Template *);
 extern int scsi_unregister_host(Scsi_Host_Template *);
 
+extern struct Scsi_Host *scsi_host_get_next(struct Scsi_Host *);
+extern struct Scsi_Host *scsi_host_hn_get(unsigned short);
+extern void scsi_host_put(struct Scsi_Host *);
+extern void scsi_host_hn_init(char *);
+extern void scsi_host_hn_release(void);
+
 /*
  * host_busy inc/dec/test functions
  */
 extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_failed_inc_and_test(struct Scsi_Host *);
-
 
 /*
  * This is an ugly hack.  If we expect to be able to load devices at run time,
@@ -651,21 +643,22 @@ extern void scsi_host_failed_inc_and_test(struct Scsi_Host *);
 
 /**
  * scsi_find_device - find a device given the host
+ * @shost:	SCSI host pointer
  * @channel:	SCSI channel (zero if only one channel)
  * @pun:	SCSI target number (physical unit number)
  * @lun:	SCSI Logical Unit Number
  **/
-static inline Scsi_Device *scsi_find_device(struct Scsi_Host *host,
+static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
                                             int channel, int pun, int lun) {
-        Scsi_Device *SDpnt;
+        Scsi_Device *sdev;
 
-        for(SDpnt = host->host_queue;
-            SDpnt != NULL;
-            SDpnt = SDpnt->next)
-                if(SDpnt->channel == channel && SDpnt->id == pun
-                   && SDpnt->lun ==lun)
+        for (sdev = shost->host_queue;
+            sdev != NULL;
+            sdev = sdev->next)
+                if (sdev->channel == channel && sdev->id == pun
+                   && sdev->lun ==lun)
                         break;
-        return SDpnt;
+        return sdev;
 }
     
 #endif

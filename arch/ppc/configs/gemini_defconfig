@@ -626,7 +626,7 @@ CONFIG_SOLARIS_X86_PARTITION=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

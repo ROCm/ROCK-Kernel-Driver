@@ -124,9 +124,7 @@ int sr_set_blocklength(Scsi_CD *cd, int blocklength)
 #endif
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.cmd[0] = MODE_SELECT;
-	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		     (cd->device->lun << 5) : 0;
-	cgc.cmd[1] |= (1 << 4);
+	cgc.cmd[1] = (1 << 4);
 	cgc.cmd[4] = 12;
 	modesel = (struct ccs_modesel_head *) buffer;
 	memset(modesel, 0, sizeof(*modesel));
@@ -180,8 +178,6 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 
 	case VENDOR_SCSI3:
 		cgc.cmd[0] = READ_TOC;
-		cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-			     (cd->device->lun << 5) : 0;
 		cgc.cmd[8] = 12;
 		cgc.cmd[9] = 0x40;
 		cgc.buffer = buffer;
@@ -210,9 +206,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	case VENDOR_NEC:{
 			unsigned long min, sec, frame;
 			cgc.cmd[0] = 0xde;
-			cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-				     (cd->device->lun << 5) : 0;
-			cgc.cmd[1] |= 0x03;
+			cgc.cmd[1] = 0x03;
 			cgc.cmd[2] = 0xb0;
 			cgc.buffer = buffer;
 			cgc.buflen = 0x16;
@@ -242,9 +236,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			/* we request some disc information (is it a XA-CD ?,
 			 * where starts the last session ?) */
 			cgc.cmd[0] = 0xc7;
-			cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-				     (cd->device->lun << 5) : 0;
-			cgc.cmd[1] |= 0x03;
+			cgc.cmd[1] = 0x03;
 			cgc.buffer = buffer;
 			cgc.buflen = 4;
 			cgc.quiet = 1;
@@ -272,8 +264,6 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 
 	case VENDOR_WRITER:
 		cgc.cmd[0] = READ_TOC;
-		cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-			     (cd->device->lun << 5) : 0;
 		cgc.cmd[8] = 0x04;
 		cgc.cmd[9] = 0x40;
 		cgc.buffer = buffer;
@@ -291,8 +281,6 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			break;
 		}
 		cgc.cmd[0] = READ_TOC;	/* Read TOC */
-		cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-			     (cd->device->lun << 5) : 0;
 		cgc.cmd[6] = rc & 0x7f;	/* number of last session */
 		cgc.cmd[8] = 0x0c;
 		cgc.cmd[9] = 0x40;

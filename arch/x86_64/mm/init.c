@@ -37,6 +37,8 @@
 #include <asm/tlb.h>
 #include <asm/mmu_context.h>
 
+unsigned long start_pfn, end_pfn;
+
 mmu_gather_t mmu_gathers[NR_CPUS];
 
 /*
@@ -49,19 +51,24 @@ void show_mem(void)
 {
 	int i, total = 0, reserved = 0;
 	int shared = 0, cached = 0;
+	pg_data_t *pgdat;
+	struct page *page;
 
 	printk("Mem-info:\n");
 	show_free_areas();
 	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
-	i = max_mapnr;
-	while (i-- > 0) {
+
+	for_each_pgdat(pgdat) {
+               for (i = 0; i < pgdat->node_size; ++i) {
+                       page = pgdat->node_mem_map + i;
 		total++;
-		if (PageReserved(mem_map+i))
+                       if (PageReserved(page))
 			reserved++;
-		else if (PageSwapCache(mem_map+i))
+                       else if (PageSwapCache(page))
 			cached++;
-		else if (page_count(mem_map+i))
-			shared += page_count(mem_map+i) - 1;
+                       else if (page_count(page))
+                               shared += page_count(page) - 1;
+               }
 	}
 	printk("%d pages of RAM\n", total);
 	printk("%d reserved pages\n",reserved);
@@ -264,16 +271,15 @@ void __init paging_init(void)
 {
 	{
 		unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
-		unsigned int max_dma, low;
+		unsigned int max_dma;
 
 		max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-		low = max_low_pfn;
 
-		if (low < max_dma)
-			zones_size[ZONE_DMA] = low;
+		if (end_pfn < max_dma)
+			zones_size[ZONE_DMA] = end_pfn;
 		else {
 			zones_size[ZONE_DMA] = max_dma;
-			zones_size[ZONE_NORMAL] = low - max_dma;
+			zones_size[ZONE_NORMAL] = end_pfn - max_dma;
 		}
 		free_area_init(zones_size);
 	}
@@ -308,11 +314,15 @@ void __init mem_init(void)
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
 
+	printk("mem_init\n");
+
 	if (!mem_map)
 		BUG();
 
-	max_mapnr = num_physpages = max_low_pfn;
-	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
+	max_low_pfn = end_pfn;
+	max_pfn = end_pfn;
+	max_mapnr = num_physpages = end_pfn;
+	high_memory = (void *) __va(end_pfn * PAGE_SIZE);
 
 	/* clear the zero-page */
 	memset(empty_zero_page, 0, PAGE_SIZE);
@@ -323,7 +333,7 @@ void __init mem_init(void)
 	after_bootmem = 1;
 
 	reservedpages = 0;
-	for (tmp = 0; tmp < max_low_pfn; tmp++)
+	for (tmp = 0; tmp < end_pfn; tmp++)
 		/*
 		 * Only count reserved RAM pages
 		 */

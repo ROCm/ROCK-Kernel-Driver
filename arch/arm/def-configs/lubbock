@@ -855,7 +855,7 @@ CONFIG_SOUND_PRIME=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

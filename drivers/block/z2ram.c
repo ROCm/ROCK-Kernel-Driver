@@ -345,11 +345,10 @@ static struct block_device_operations z2_fops =
 	.release	= z2_release,
 };
 
-static struct gendisk *z2_find(int minor)
+static struct gendisk *z2_find(dev_t dev, int *part, void *data)
 {
-	if (minor > Z2MINOR_COUNT)
-		return NULL;
-	return z2ram_gendisk;
+	*part = 0;
+	return get_disk(z2ram_gendisk);
 }
 
 int __init 
@@ -365,20 +364,20 @@ z2_init( void )
 	    MAJOR_NR );
 	return -EBUSY;
     }
-    z2ram_gendisk = alloc_disk();
+    z2ram_gendisk = alloc_disk(1);
     if (!z2ram_gendisk) {
 	unregister_blkdev( MAJOR_NR, DEVICE_NAME );
 	return -ENOMEM;
     }
     z2ram_gendisk->major = MAJOR_NR;
     z2ram_gendisk->first_minor = 0;
-    z2ram_gendisk->minor_shift = 0;
     z2ram_gendisk->fops = &z2_fops;
     sprintf(z2ram_gendisk->disk_name, "z2ram");
 
     blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_z2_request, &z2ram_lock);
     add_disk(z2ram_gendisk);
-    blk_set_probe(MAJOR_NR, z2_find);
+    blk_register_region(MKDEV(MAJOR_NR, 0), Z2MINOR_COUNT, THIS_MODULE,
+				z2_find, NULL, NULL);
 
     return 0;
 }
@@ -405,8 +404,7 @@ void
 cleanup_module( void )
 {
     int i, j;
-
-    blk_set_probe(MAJOR_NR, NULL);
+    blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
     if ( unregister_blkdev( MAJOR_NR, DEVICE_NAME ) != 0 )
 	printk( KERN_ERR DEVICE_NAME ": unregister of device failed\n");
 

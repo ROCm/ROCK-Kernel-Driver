@@ -75,7 +75,7 @@ static inline int proto_cmpfn(const struct ip_conntrack_protocol *curr,
 	return protocol == curr->proto;
 }
 
-struct ip_conntrack_protocol *__find_proto(u_int8_t protocol)
+struct ip_conntrack_protocol *__ip_ct_find_proto(u_int8_t protocol)
 {
 	struct ip_conntrack_protocol *p;
 
@@ -93,7 +93,7 @@ struct ip_conntrack_protocol *ip_ct_find_proto(u_int8_t protocol)
 	struct ip_conntrack_protocol *p;
 
 	READ_LOCK(&ip_conntrack_lock);
-	p = __find_proto(protocol);
+	p = __ip_ct_find_proto(protocol);
 	READ_UNLOCK(&ip_conntrack_lock);
 	return p;
 }
@@ -1061,7 +1061,10 @@ int ip_conntrack_expect_related(struct ip_conntrack *related_to,
 int ip_conntrack_change_expect(struct ip_conntrack_expect *expect,
 			       struct ip_conntrack_tuple *newtuple)
 {
+	int ret;
+
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
+	WRITE_LOCK(&ip_conntrack_expect_tuple_lock);
 
 	DEBUGP("change_expect:\n");
 	DEBUGP("exp tuple: "); DUMP_TUPLE(&expect->tuple);
@@ -1074,26 +1077,25 @@ int ip_conntrack_change_expect(struct ip_conntrack_expect *expect,
 		    && LIST_FIND(&ip_conntrack_expect_list, expect_clash,
 			         struct ip_conntrack_expect *, newtuple, &expect->mask)) {
 			/* Force NAT to find an unused tuple */
-			return -1;
+			ret = -1;
 		} else {
-			WRITE_LOCK(&ip_conntrack_expect_tuple_lock);
 			memcpy(&expect->ct_tuple, &expect->tuple, sizeof(expect->tuple));
 			memcpy(&expect->tuple, newtuple, sizeof(expect->tuple));
-			WRITE_UNLOCK(&ip_conntrack_expect_tuple_lock);
-			return 0;
+			ret = 0;
 		}
 	} else {
 		/* Resent packet */
 		DEBUGP("change expect: resent packet\n");
 		if (ip_ct_tuple_equal(&expect->tuple, newtuple)) {
-			return 0;
+			ret = 0;
 		} else {
 			/* Force NAT to choose again the same port */
-			return -1;
+			ret = -1;
 		}
 	}
+	WRITE_UNLOCK(&ip_conntrack_expect_tuple_lock);
 	
-	return -1;
+	return ret;
 }
 
 /* Alter reply tuple (maybe alter helper).  If it's already taken,

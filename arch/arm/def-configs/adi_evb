@@ -664,7 +664,7 @@ CONFIG_PARTITION_ADVANCED=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

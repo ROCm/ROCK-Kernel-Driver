@@ -17,6 +17,7 @@
 #include "tlb.h"
 #include "2_5compat.h"
 #include "os.h"
+#include "time_user.h"
 
 /* See comment above fork_tramp for why sigstop is defined and used like
  * this
@@ -28,7 +29,6 @@ static int exec_tramp(void *sig_stack)
 {
 	int sig = sigstop;
 
-	block_signals();
 	init_new_thread(sig_stack, NULL);
 	kill(os_getpid(), sig);
 	return(0);
@@ -62,6 +62,7 @@ void flush_thread(void)
 	unprotect_stack((unsigned long) current->thread_info);
 	os_usr1_process(os_getpid());
 
+	enable_timer();
 	free_page(stack);
 	protect(uml_reserved, high_physmem - uml_reserved, 1, 1, 0, 1);
 	task_protections((unsigned long) current->thread_info);

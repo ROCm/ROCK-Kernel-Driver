@@ -559,7 +559,7 @@ CONFIG_8xx_CPU6=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

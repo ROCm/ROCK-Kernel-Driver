@@ -15,8 +15,7 @@ static inline void do_timer_interrupt_hook(struct pt_regs *regs)
  * system, in that case we have to call the local interrupt handler.
  */
 #ifndef CONFIG_X86_LOCAL_APIC
-	if (!user_mode(regs))
-		x86_do_profile(regs->eip);
+	x86_do_profile(regs);
 #else
 	if (!using_apic_timer)
 		smp_local_timer_interrupt(regs);

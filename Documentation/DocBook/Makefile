@@ -13,14 +13,6 @@ DOCBOOKS := wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
 	    writing_usb_driver.sgml scsidrivers.sgml sis900.sgml \
 	    kernel-api.sgml journal-api.sgml lsm.sgml
 
-JBDSOURCES :=  $(TOPDIR)/include/linux/jbd.h \
-	$(TOPDIR)/fs/jbd/journal.c \
-	$(TOPDIR)/fs/jbd/recovery.c \
-	$(TOPDIR)/fs/jbd/transaction.c
-
-journal-api.sgml: journal-api.tmpl $(JBDSOURCES)
-	$(TOPDIR)/scripts/docgen   $(JBDSOURCES) \
-	<journal-api.tmpl >journal-api.sgml
 ###
 # The build process is as follows (targets):
 #              (sgmldocs)
@@ -32,7 +24,7 @@ journal-api.sgml: journal-api.tmpl $(JBDSOURCES)
 # The targets that may be used.
 .PHONY:	sgmldocs psdocs pdfdocs htmldocs clean mrproper
 
-BOOKS := $(addprefix Documentation/DocBook/,$(DOCBOOKS))
+BOOKS := $(addprefix $(obj)/,$(DOCBOOKS))
 sgmldocs: $(BOOKS)
 
 PS := $(patsubst %.sgml, %.ps, $(BOOKS))
@@ -86,19 +78,19 @@ $(BOOKS): $(KERNELDOC)
 ###
 # procfs guide uses a .c file as example code.
 # This requires an explicit dependency
-C-procfs-example = Documentation/DocBook/procfs_example.sgml
-Documentation/DocBook/procfs-guide.sgml: $(C-procfs-example)
+C-procfs-example = procfs_example.sgml
+C-procfs-example2 = $(addprefix $(obj)/,$(C-procfs-example))
+$(obj)/procfs-guide.sgml: $(C-procfs-example2)
 
 ###
 # The parportbook includes a few images.
 # Force them to be build before the books 
 IMG-parportbook := parport-share.fig parport-multi.fig parport-structure.fig
-IMG-parportbook2 := $(addprefix Documentation/DocBook/,$(IMG-parportbook))
+IMG-parportbook2 := $(addprefix $(obj)/,$(IMG-parportbook))
 EPS-parportbook := $(patsubst %.fig,%.eps, $(IMG-parportbook2))
 PNG-parportbook := $(patsubst %.fig,%.png, $(IMG-parportbook2))
-Documentation/DocBook/parportbook.html:	$(PNG-parportbook)
-Documentation/DocBook/parportbook.ps Documentation/DocBook/parportbook.pdf:\
-	$(EPS-parportbook)
+$(obj)/parportbook.html: $(PNG-parportbook)
+$(obj)/parportbook.ps $(obj)/parportbook.pdf: $(EPS-parportbook)
 
 ###
 # Rules to generate postscript, PDF and HTML
@@ -155,21 +147,21 @@ dochelp:
 ###
 # clean and mrproper as used by the top-level makefile 
 # Temporary files left by various tools
-DVI     :=      $(patsubst %.sgml, %.dvi, $(BOOKS))
-AUX     :=      $(patsubst %.sgml, %.aux, $(BOOKS))
-TEX     :=      $(patsubst %.sgml, %.tex, $(BOOKS))
-LOG     :=      $(patsubst %.sgml, %.log, $(BOOKS))
-OUT     :=      $(patsubst %.sgml, %.out, $(BOOKS))
+clean-files := $(DOCBOOKS) \
+	$(patsubst %.sgml, %.dvi,  $(DOCBOOKS)) \
+	$(patsubst %.sgml, %.aux,  $(DOCBOOKS)) \
+	$(patsubst %.sgml, %.tex,  $(DOCBOOKS)) \
+	$(patsubst %.sgml, %.log,  $(DOCBOOKS)) \
+	$(patsubst %.sgml, %.out,  $(DOCBOOKS)) \
+	$(patsubst %.sgml, %.ps,   $(DOCBOOKS)) \
+	$(patsubst %.sgml, %.pdf,  $(DOCBOOKS)) \
+	$(patsubst %.sgml, %.html, $(DOCBOOKS)) \
+	$(patsubst %.fig,%.eps, $(IMG-parportbook)) \
+	$(patsubst %.fig,%.png, $(IMG-parportbook)) \
+	$(C-procfs-example)
 
-clean:
-	@rm -f $(BOOKS)
-	@rm -f $(DVI) $(AUX) $(TEX) $(LOG) $(OUT)
-	@rm -f $(PNG-parportbook) $(EPS-parportbook)
-	@rm -f $(C-procfs-example)
-
-mrproper:
-	@rm -f $(PS) $(PDF)
-	@rm -f -r $(HTML) $(patsubst %.html,%,$(HTML))
+ifneq ($(wildcard $(BOOKS)),)
+clean-rule := rm -rf $(wildcard $(BOOKS))
+endif
 
 include $(TOPDIR)/Rules.make
-

@@ -60,7 +60,7 @@ MODULE_PARM(irq_mask, "i");
 MODULE_PARM(irq_list, "1-4i");
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
-MODULE_DESCRIPTION("BlueZ driver for the Anycom BlueCard (LSE039/LSE041)");
+MODULE_DESCRIPTION("Bluetooth driver for the Anycom BlueCard (LSE039/LSE041)");
 MODULE_LICENSE("GPL");
 
 
@@ -396,7 +396,7 @@ static void bluecard_receive(bluecard_info_t *info, unsigned int offset)
 		if (info->rx_skb == NULL) {
 			info->rx_state = RECV_WAIT_PACKET_TYPE;
 			info->rx_count = 0;
-			if (!(info->rx_skb = bluez_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
+			if (!(info->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
 				printk(KERN_WARNING "bluecard_cs: Can't allocate mem for new packet.\n");
 				return;
 			}
@@ -571,7 +571,7 @@ static int bluecard_hci_set_baud_rate(struct hci_dev *hdev, int baud)
 	/* Ericsson baud rate command */
 	unsigned char cmd[] = { HCI_COMMAND_PKT, 0x09, 0xfc, 0x01, 0x03 };
 
-	if (!(skb = bluez_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
+	if (!(skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC))) {
 		printk(KERN_WARNING "bluecard_cs: Can't allocate mem for new packet.\n");
 		return -1;
 	}

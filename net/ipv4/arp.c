@@ -66,6 +66,8 @@
  *		Alexey Kuznetsov:	new arp state machine;
  *					now it is in net/core/neighbour.c.
  *		Krzysztof Halasa:	Added Frame Relay ARP support.
+ *		Arnaldo C. Melo :	move proc stuff to seq_file and
+ *					net/ipv4/ip_proc.c
  */
 
 #include <linux/types.h>
@@ -85,7 +87,6 @@
 #include <linux/if_arp.h>
 #include <linux/trdevice.h>
 #include <linux/skbuff.h>
-#include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/init.h>
 #ifdef CONFIG_SYSCTL
@@ -851,7 +852,7 @@ out_of_mem:
 }
 
 /*
- *	User level interface (ioctl, /proc)
+ *	User level interface (ioctl)
  */
 
 /*
@@ -918,7 +919,7 @@ int arp_req_set(struct arpreq *r, struct net_device * dev)
 	return err;
 }
 
-static unsigned arp_state_to_flags(struct neighbour *neigh)
+unsigned arp_state_to_flags(struct neighbour *neigh)
 {
 	unsigned flags = 0;
 	if (neigh->nud_state&NUD_PERMANENT)
@@ -1066,111 +1067,6 @@ out:
 	return err;
 }
 
-/*
- *	Write the contents of the ARP cache to a PROCfs file.
- */
-#ifndef CONFIG_PROC_FS
-static int arp_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	return 0;
-}
-#else
-#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
-static char *ax2asc2(ax25_address *a, char *buf);
-#endif
-#define HBUFFERLEN 30
-
-static int arp_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	char hbuffer[HBUFFERLEN];
-	int i,j,k;
-	const char hexbuf[] = "0123456789ABCDEF";
-	int size = sprintf(buffer, "IP address       HW type     Flags       "
-				   "HW address            Mask     Device\n");
-	int len = size;
-	off_t pos = size;
-
-	for (i = 0; i <= NEIGH_HASHMASK; i++) {
-		struct neighbour *n;
-		read_lock_bh(&arp_tbl.lock);
-		for (n = arp_tbl.hash_buckets[i]; n; n = n->next) {
-			char tbuf[16];
-			struct net_device *dev = n->dev;
-			int hatype = dev->type;
-
-			/* Do not confuse users "arp -a" with magic entries */
-			if (!(n->nud_state & ~NUD_NOARP))
-				continue;
-
-			read_lock(&n->lock);
-			/* Convert hardware address to XX:XX:XX:XX ... form. */
-#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
-			if (hatype == ARPHRD_AX25 || hatype == ARPHRD_NETROM)
-				ax2asc2((ax25_address *)n->ha, hbuffer);
-			else {
-#endif
-			for (k = 0, j = 0; k < HBUFFERLEN - 3 &&
-					   j < dev->addr_len; j++) {
-				hbuffer[k++] = hexbuf[(n->ha[j] >> 4) & 15];
-				hbuffer[k++] = hexbuf[n->ha[j] & 15];
-				hbuffer[k++] = ':';
-			}
-			hbuffer[--k] = 0;
-#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
-			}
-#endif
-			sprintf(tbuf, "%u.%u.%u.%u",
-				NIPQUAD(*(u32*)n->primary_key));
-			size = sprintf(buffer + len, "%-16s 0x%-10x0x%-10x%s"
-						     "     *        %s\n",
-				       tbuf, hatype, arp_state_to_flags(n), 
-				       hbuffer, dev->name);
-			read_unlock(&n->lock);
-
-			len += size;
-			pos += size;
-		  
-			if (pos <= offset)
-				len = 0;
-			if (pos >= offset + length) {
-				read_unlock_bh(&arp_tbl.lock);
- 				goto done;
-			}
-		}
-		read_unlock_bh(&arp_tbl.lock);
-	}
-
-	for (i = 0; i <= PNEIGH_HASHMASK; i++) {
-		struct pneigh_entry *n;
-		for (n = arp_tbl.phash_buckets[i]; n; n = n->next) {
-			struct net_device *dev = n->dev;
-			int hatype = dev ? dev->type : 0;
-			char tbuf[16];
-			sprintf(tbuf, "%u.%u.%u.%u", NIPQUAD(*(u32*)n->key));
-			size = sprintf(buffer + len, "%-16s 0x%-10x0x%-10x%s"
-						     "     *        %s\n",
-					tbuf, hatype, ATF_PUBL | ATF_PERM,
-					"00:00:00:00:00:00",
-					dev ? dev->name : "*");
-			len += size;
-			pos += size;
-		  
-			if (pos <= offset)
-				len = 0;
-			if (pos >= offset+length)
-				goto done;
-		}
-	}
-done:	*start = buffer + len - (pos - offset);	/* Start of wanted data */
-	len = pos - offset;			/* Start slop */
-	if (len > length)
-		len = length;			/* Ending slop */
-	if (len < 0)
-		len = 0;
-	return len;
-}
-#endif
-
 /* Note, that it is not on notifier chain.
    It is necessary, that this routine was called after route cache will be
    flushed.
@@ -1191,54 +1087,13 @@ static struct packet_type arp_packet_type = {
 	.data =	(void*) 1, /* understand shared skbs */
 };
 
-void __init arp_init (void)
+void __init arp_init(void)
 {
 	neigh_table_init(&arp_tbl);
 
 	dev_add_pack(&arp_packet_type);
-
-	proc_net_create ("arp", 0, arp_get_info);
-
 #ifdef CONFIG_SYSCTL
 	neigh_sysctl_register(NULL, &arp_tbl.parms, NET_IPV4,
 			      NET_IPV4_NEIGH, "ipv4");
 #endif
 }
-
-
-#ifdef CONFIG_PROC_FS
-#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
-
-/*
- *	ax25 -> ASCII conversion
- */
-char *ax2asc2(ax25_address *a, char *buf)
-{
-	char c, *s;
-	int n;
-
-	for (n = 0, s = buf; n < 6; n++) {
-		c = (a->ax25_call[n] >> 1) & 0x7F;
-
-		if (c != ' ') *s++ = c;
-	}
-	
-	*s++ = '-';
-
-	if ((n = ((a->ax25_call[6] >> 1) & 0x0F)) > 9) {
-		*s++ = '1';
-		n -= 10;
-	}
-	
-	*s++ = n + '0';
-	*s++ = '\0';
-
-	if (*buf == '\0' || *buf == '-')
-	   return "*";
-
-	return buf;
-
-}
-
-#endif
-#endif

@@ -978,17 +978,10 @@ static int refcnt = 0;
 
 static void do_stram_request(request_queue_t *q)
 {
-	void *start;
-	unsigned long len;
-
-	while (1) {
-		struct request *req;
-		if (blk_queue_empty(QUEUE))
-			return;
-
-		req = CURRENT;
-		start = swap_start + (req->sector << 9);
-		len   = req->current_nr_sectors << 9;
+	while (!blk_queue_empty(q)) {
+		struct request *req = elv_next_request(q);
+		void *start = swap_start + (req->sector << 9);
+		unsigned long len = req->current_nr_sectors << 9;
 		if ((start + len) > swap_end) {
 			printk( KERN_ERR "stram: bad access beyond end of device: "
 					"block=%ld, count=%ld\n",
@@ -1021,8 +1014,6 @@ static int stram_open( struct inode *inode, struct file *filp )
 		printk( KERN_NOTICE "Only kernel can open ST-RAM device\n" );
 		return( -EPERM );
 	}
-	if (MINOR(inode->i_rdev) != STRAM_MINOR)
-		return( -ENXIO );
 	if (refcnt)
 		return( -EBUSY );
 	++refcnt;
@@ -1047,6 +1038,8 @@ static struct block_device_operations stram_fops = {
 };
 
 static struct gendisk *stram_disk;
+static struct request_queue stram_queue;
+static spinlock_t stram_lock = SPIN_LOCK_UNLOCKED;
 
 int __init stram_device_init(void)
 {
@@ -1057,7 +1050,7 @@ int __init stram_device_init(void)
 	if (!max_swap_size)
 		/* swapping not enabled */
 		return -ENXIO;
-	stram_disk = alloc_disk();
+	stram_disk = alloc_disk(1);
 	if (!stram_disk)
 		return -ENOMEM;
 
@@ -1067,11 +1060,11 @@ int __init stram_device_init(void)
 		return -ENXIO;
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(STRAM_MAJOR), do_stram_request);
+	blk_init_queue(&stram_queue, do_stram_request, &stram_lock);
 	stram_disk->major = STRAM_MAJOR;
 	stram_disk->first_minor = STRAM_MINOR;
-	stram_disk->minor_shift = 0;
 	stram_disk->fops = &stram_fops;
+	stram_disk->queue = &stram_queue;
 	sprintf(stram_disk->disk_name, "stram");
 	set_capacity(stram_disk, (swap_end - swap_start)/512);
 	add_disk(stram_disk);

@@ -31,6 +31,19 @@
 
 /* Change Log
  *
+ * 4.4.12       10/15/02
+ *   o Clean up: use members of pci_device rather than direct calls to
+ *     pci_read_config_word.
+ *   o Bug fix: changed default flow control settings.
+ *   o Clean up: ethtool file now has an inclusive list for adapters in the
+ *     Wake-On-LAN capabilities instead of an exclusive list.
+ *   o Bug fix: miscellaneous WoL bug fixes.
+ *   o Added software interrupt for clearing rx ring
+ *   o Bug fix: easier to undo "forcing" of 1000/fd using ethtool.
+ *   o Now setting netdev->mem_end in e1000_probe.
+ *   o Clean up: Moved tx_timeout from interrupt context to process context
+ *     using schedule_task.
+ *
  *   o Feature: merged in modified NAPI patch from Robert Olsson
  *     <Robert.Olsson@its.uu.se> Uppsala Univeristy, Sweden.
  *
@@ -47,31 +60,13 @@
  *   o Feature: exposed two Tx and one Rx interrupt delay knobs for finer
  *     control over interurpt rate tuning.
  *   o Misc ethtool bug fixes.
- *         
- * 4.3.2       7/5/02
- *   o Bug fix: perform controller reset using I/O rather than mmio because
- *     some chipsets try to perform a 64-bit write, but the controller ignores
- *     the upper 32-bit write once the reset is intiated by the lower 32-bit
- *     write, causing a master abort.
- *   o Bug fix: fixed jumbo frames sized from 1514 to 2048.
- *   o ASF support: disable ARP when driver is loaded or resumed; enable when 
- *     driver is removed or suspended.
- *   o Bug fix: changed default setting for RxIntDelay to 0 for 82542/3/4
- *     controllers to workaround h/w errata where controller will hang when
- *     RxIntDelay <> 0 under certian network conditions.
- *   o Clean up: removed unused and undocumented user-settable settings for
- *     PHY.
- *   o Bug fix: ethtool GEEPROM was using byte address rather than word
- *     addressing.
- *   o Feature: added support for ethtool SEEPROM.
- *   o Feature: added support for entropy pool.
  *
- * 4.2.17      5/30/02
+ * 4.3.2       7/5/02
  */
  
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.3.15-k1";
+char e1000_driver_version[] = "4.4.12-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -113,6 +108,9 @@ static struct pci_device_id e1000_pci_tbl[] __devinitdata = {
 	{0x8086, 0x1011, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1010, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1016, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x1017, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0x8086, 0x101E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	/* required last entry */
 	{0,}
 };
@@ -179,13 +177,20 @@ static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
 static void e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid);
 
 static int e1000_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
+static int e1000_notify_netdev(struct notifier_block *, unsigned long event, void *ptr);
 static int e1000_suspend(struct pci_dev *pdev, uint32_t state);
 #ifdef CONFIG_PM
 static int e1000_resume(struct pci_dev *pdev);
 #endif
 
-struct notifier_block e1000_notifier = {
+struct notifier_block e1000_notifier_reboot = {
 	.notifier_call	= e1000_notify_reboot,
+	.next		= NULL,
+	.priority	= 0
+};
+
+struct notifier_block e1000_notifier_netdev = {
+	.notifier_call	= e1000_notify_netdev,
 	.next		= NULL,
 	.priority	= 0
 };
@@ -230,8 +235,10 @@ e1000_init_module(void)
 	printk(KERN_INFO "%s\n", e1000_copyright);
 
 	ret = pci_module_init(&e1000_driver);
-	if(ret >= 0)
-		register_reboot_notifier(&e1000_notifier);
+	if(ret >= 0) {
+		register_reboot_notifier(&e1000_notifier_reboot);
+		register_netdevice_notifier(&e1000_notifier_netdev);
+	}
 	return ret;
 }
 
@@ -247,7 +254,8 @@ module_init(e1000_init_module);
 static void __exit
 e1000_exit_module(void)
 {
-	unregister_reboot_notifier(&e1000_notifier);
+	unregister_reboot_notifier(&e1000_notifier_reboot);
+	unregister_netdevice_notifier(&e1000_notifier_netdev);
 	pci_unregister_driver(&e1000_driver);
 }
 
@@ -408,6 +416,7 @@ e1000_probe(struct pci_dev *pdev,
 
 	netdev->irq = pdev->irq;
 	netdev->mem_start = mmio_start;
+	netdev->mem_end = mmio_start + mmio_len;
 	netdev->base_addr = adapter->hw.io_base;
 
 	adapter->bd_number = cards_found;
@@ -475,6 +484,8 @@ e1000_probe(struct pci_dev *pdev,
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
 	register_netdev(netdev);
+	memcpy(adapter->ifname, netdev->name, IFNAMSIZ);
+	adapter->ifname[IFNAMSIZ-1] = 0;
 
 	/* we're going to reset, so assume we have no link for now */
 
@@ -527,7 +538,7 @@ e1000_remove(struct pci_dev *pdev)
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
 	uint32_t manc;
-	
+
 	if(adapter->hw.mac_type >= e1000_82540) {
 		manc = E1000_READ_REG(&adapter->hw, MANC);
 		if(manc & E1000_MANC_SMBUS_EN) {
@@ -535,7 +546,7 @@ e1000_remove(struct pci_dev *pdev)
 			E1000_WRITE_REG(&adapter->hw, MANC, manc);
 		}
 	}
-		
+
 	unregister_netdev(netdev);
 
 	e1000_phy_hw_reset(&adapter->hw);
@@ -588,9 +599,9 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	/* flow control settings */
 
-	hw->fc_high_water = FC_DEFAULT_HI_THRESH;
-	hw->fc_low_water = FC_DEFAULT_LO_THRESH;
-	hw->fc_pause_time = FC_DEFAULT_TX_TIMER;
+	hw->fc_high_water = E1000_FC_HIGH_THRESH;
+	hw->fc_low_water = E1000_FC_LOW_THRESH;
+	hw->fc_pause_time = E1000_FC_PAUSE_TIME;
 	hw->fc_send_xon = 1;
 
 	/* Media type - copper or fiber */
@@ -911,8 +922,9 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 
 	/* set the Receive Delay Timer Register */
 
+	E1000_WRITE_REG(&adapter->hw, RDTR, adapter->rx_int_delay);
+
 	if(adapter->hw.mac_type >= e1000_82540) {
-		E1000_WRITE_REG(&adapter->hw, RDTR, adapter->rx_int_delay);
 		E1000_WRITE_REG(&adapter->hw, RADV, adapter->rx_abs_int_delay);
 
 		/* Set the interrupt throttling rate.  Value is calculated
@@ -920,9 +932,6 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 #define MAX_INTS_PER_SEC        8000
 #define DEFAULT_ITR             1000000000/(MAX_INTS_PER_SEC * 256)
 		E1000_WRITE_REG(&adapter->hw, ITR, DEFAULT_ITR);
-
-	} else {
-		E1000_WRITE_REG(&adapter->hw, RDTR, adapter->rx_int_delay);
 	}
 
 	/* Setup the Base and Length of the Rx Descriptor Ring */
@@ -1280,6 +1289,10 @@ e1000_watchdog(unsigned long data)
 	e1000_update_stats(adapter);
 	e1000_update_adaptive(&adapter->hw);
 
+
+	/* Cause software interrupt to ensure rx ring is cleaned */
+	E1000_WRITE_REG(&adapter->hw, ICS, E1000_ICS_RXDMT0);
+
 	/* Early detection of hung controller */
 	i = txdr->next_to_clean;
 	if(txdr->buffer_info[i].dma &&
@@ -1496,7 +1509,6 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	int tx_flags = 0, count;
 
 	int f;
-
 
 	count = TXD_USE_COUNT(skb->len - skb->data_len,
 	                      adapter->max_data_per_txd);
@@ -1744,6 +1756,7 @@ e1000_update_stats(struct e1000_adapter *adapter)
 	                               adapter->stats.latecol;
 	adapter->net_stats.tx_aborted_errors = adapter->stats.ecol;
 	adapter->net_stats.tx_window_errors = adapter->stats.latecol;
+	adapter->net_stats.tx_carrier_errors = adapter->stats.tncrs;
 
 	/* Tx Dropped needs to be maintained elsewhere */
 
@@ -1756,7 +1769,8 @@ e1000_update_stats(struct e1000_adapter *adapter)
 			adapter->phy_stats.idle_errors += phy_tmp;
 		}
 
-		if(!e1000_read_phy_reg(hw, M88E1000_RX_ERR_CNTR, &phy_tmp))
+		if((hw->mac_type <= e1000_82546) &&
+		   !e1000_read_phy_reg(hw, M88E1000_RX_ERR_CNTR, &phy_tmp))
 			adapter->phy_stats.receive_errors += phy_tmp;
 	}
 }
@@ -2164,8 +2178,7 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 	while(!rx_ring->buffer_info[i].skb) {
 		rx_desc = E1000_RX_DESC(*rx_ring, i);
 
-		skb = alloc_skb(adapter->rx_buffer_len + reserve_len,
-		                GFP_ATOMIC);
+		skb = dev_alloc_skb(adapter->rx_buffer_len + reserve_len);
 
 		if(!skb) {
 			/* Better luck next round */
@@ -2397,6 +2410,29 @@ e1000_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 }
 
 static int
+e1000_notify_netdev(struct notifier_block *nb, unsigned long event, void *p)
+{
+	struct e1000_adapter *adapter;
+	struct net_device *netdev = p;
+	if(netdev == NULL)
+		return NOTIFY_DONE;
+
+	switch(event) {
+	case NETDEV_CHANGENAME:
+		if(netdev->open == e1000_open) {
+			adapter = netdev->priv;
+			/* rename the proc nodes the easy way */
+			e1000_proc_dev_free(adapter);
+			memcpy(adapter->ifname, netdev->name, IFNAMSIZ);
+			adapter->ifname[IFNAMSIZ-1] = 0;
+			e1000_proc_dev_setup(adapter);
+		}
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
+static int
 e1000_suspend(struct pci_dev *pdev, uint32_t state)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
@@ -2412,30 +2448,40 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 		e1000_setup_rctl(adapter);
 		e1000_set_multi(netdev);
 
+		/* turn on all-multi mode if wake on multicast is enabled */
 		if(adapter->wol & E1000_WUFC_MC) {
 			rctl = E1000_READ_REG(&adapter->hw, RCTL);
 			rctl |= E1000_RCTL_MPE;
 			E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
 		}
 
-		if(adapter->hw.media_type == e1000_media_type_fiber) {
-			#define E1000_CTRL_ADVD3WUC 0x00100000
+		if(adapter->hw.mac_type >= e1000_82540) {
 			ctrl = E1000_READ_REG(&adapter->hw, CTRL);
-			ctrl |= E1000_CTRL_ADVD3WUC;
+			/* advertise wake from D3Cold */
+			#define E1000_CTRL_ADVD3WUC 0x00100000
+			/* phy power management enable */
+			#define E1000_CTRL_EN_PHY_PWR_MGMT 0x00200000
+			ctrl |= E1000_CTRL_ADVD3WUC |
+				E1000_CTRL_EN_PHY_PWR_MGMT;
 			E1000_WRITE_REG(&adapter->hw, CTRL, ctrl);
+		}
 
+		if(adapter->hw.media_type == e1000_media_type_fiber) {
+			/* keep the laser running in D3 */
 			ctrl_ext = E1000_READ_REG(&adapter->hw, CTRL_EXT);
-        		ctrl_ext |= E1000_CTRL_EXT_SDP7_DATA;
+			ctrl_ext |= E1000_CTRL_EXT_SDP7_DATA;
 			E1000_WRITE_REG(&adapter->hw, CTRL_EXT, ctrl_ext);
 		}
 
-		E1000_WRITE_REG(&adapter->hw, WUC, 0);
+		E1000_WRITE_REG(&adapter->hw, WUC, E1000_WUC_PME_EN);
 		E1000_WRITE_REG(&adapter->hw, WUFC, adapter->wol);
 		pci_enable_wake(pdev, 3, 1);
+		pci_enable_wake(pdev, 4, 1); /* 4 == D3 cold */
 	} else {
 		E1000_WRITE_REG(&adapter->hw, WUC, 0);
 		E1000_WRITE_REG(&adapter->hw, WUFC, 0);
 		pci_enable_wake(pdev, 3, 0);
+		pci_enable_wake(pdev, 4, 0); /* 4 == D3 cold */
 	}
 
 	pci_save_state(pdev, adapter->pci_state);
@@ -2445,9 +2491,12 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 		if(manc & E1000_MANC_SMBUS_EN) {
 			manc |= E1000_MANC_ARP_EN;
 			E1000_WRITE_REG(&adapter->hw, MANC, manc);
+			state = 0;
 		}
-	} else
-		pci_set_power_state(pdev, 3);
+	}
+
+	state = (state > 0) ? 3 : 0;
+	pci_set_power_state(pdev, state);
 
 	return 0;
 }
@@ -2462,10 +2511,11 @@ e1000_resume(struct pci_dev *pdev)
 
 	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev, adapter->pci_state);
-	pci_enable_wake(pdev, 0, 0);
 
-	/* Clear the wakeup status bits */
+	pci_enable_wake(pdev, 3, 0);
+	pci_enable_wake(pdev, 4, 0); /* 4 == D3 cold */
 
+	e1000_reset(adapter);
 	E1000_WRITE_REG(&adapter->hw, WUS, ~0);
 
 	if(netif_running(netdev))

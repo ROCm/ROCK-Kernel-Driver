@@ -104,7 +104,6 @@ static void jsf_outl(unsigned long addr, __u32 data)
 struct jsfd_part {
 	unsigned long dbase;
 	unsigned long dsize;
-	int refcnt;
 };
 
 struct jsflash {
@@ -191,53 +190,38 @@ static void jsfd_read(char *buf, unsigned long p, size_t togo) {
 
 static void jsfd_do_request(request_queue_t *q)
 {
-	struct request *req;
-	int dev;
-	struct jsfd_part *jdp;
-	unsigned long offset;
-	size_t len;
+	while (!blk_queue_empty(q)) {
+		struct request *req = elv_next_request(q);
+		struct jsfd_part *jdp = req->rq_disk->private_data;
+		unsigned long offset = req->sector << 9;
+		size_t len = req->current_nr_sectors << 9;
 
-	for (;;) {
-		if (blk_queue_empty(QUEUE))
-			return;
-
-		req = CURRENT;
-
-		dev = MINOR(req->rq_dev);
-		if (dev >= JSF_MAX || (dev & JSF_PART_MASK) >= JSF_NPART) {
-			end_request(CURRENT, 0);
-			continue;
-		}
-		jdp = &jsf0.dv[dev & JSF_PART_MASK];
-
-		offset = req->sector << 9;
-		len = req->current_nr_sectors << 9;
 		if ((offset + len) > jdp->dsize) {
-               		end_request(CURRENT, 0);
+               		end_request(req, 0);
 			continue;
 		}
 
 		if (req->cmd == WRITE) {
 			printk(KERN_ERR "jsfd: write\n");
-			end_request(CURRENT, 0);
+			end_request(req, 0);
 			continue;
 		}
 		if (req->cmd != READ) {
 			printk(KERN_ERR "jsfd: bad req->cmd %d\n", req->cmd);
-			end_request(CURRENT, 0);
+			end_request(req, 0);
 			continue;
 		}
 
 		if ((jdp->dbase & 0xff000000) != 0x20000000) {
 			printk(KERN_ERR "jsfd: bad base %x\n", (int)jdp->dbase);
-			end_request(CURRENT, 0);
+			end_request(req, 0);
 			continue;
 		}
 
-/* printk("jsfd%d: read buf %p off %x len %x\n", dev, req->buffer, (int)offset, (int)len); */ /* P3 */
+/* printk("%s: read buf %p off %x len %x\n", req->rq_disk->disk_name, req->buffer, (int)offset, (int)len); */ /* P3 */
 		jsfd_read(req->buffer, jdp->dbase + offset, len);
 
-		end_request(CURRENT, 1);
+		end_request(req, 1);
 	}
 }
 
@@ -454,51 +438,9 @@ static int jsf_open(struct inode * inode, struct file * filp)
 	return 0;	/* XXX What security? */
 }
 
-static int jsfd_open(struct inode *inode, struct file *file)
-{
-	struct jsfd_part *jdp;
-	int dev;
-
-	if (!inode)
-		return -EINVAL;
-	dev = MINOR(inode->i_rdev);
-	if (dev >= JSF_MAX || (dev & JSF_PART_MASK) >= JSF_NPART) {
-		printk(KERN_ALERT "jsfd_open: illegal minor %d\n", dev);
-		return -ENODEV;
-	}
-
-	jdp = &jsf0.dv[dev];
-	jdp->refcnt++;
-
-	return 0;
-}
-
 static int jsf_release(struct inode *inode, struct file *file)
 {
 	jsf0.busy = 0;
-	return 0;
-}
-
-static int jsfd_release(struct inode *inode, struct file *file)
-{
-	struct jsfd_part *jdp;
-	int dev;
-
-	if (!inode)
-		return -ENODEV;
-	dev = MINOR(inode->i_rdev);
-	if (dev >= JSF_MAX || (dev & JSF_PART_MASK) >= JSF_NPART) {
-		printk(KERN_ALERT "jsfd_release: illegal minor %d\n", dev);
-		return -ENODEV;
-	}
-
-	jdp = &jsf0.dv[dev];
-	if (jdp->refcnt <= 0) {
-		printk(KERN_ALERT "jsfd_release: bad ref on minor %d\n", dev);
-	} else {
-		--jdp->refcnt;
-	}
-	/* N.B. Doesn't lo->file need an fput?? */
 	return 0;
 }
 
@@ -517,8 +459,6 @@ static struct miscdevice jsf_dev = { JSF_MINOR, "jsflash", &jsf_fops };
 
 static struct block_device_operations jsfd_fops = {
 	.owner =	THIS_MODULE,
-	.open =		jsfd_open,
-	.release =	jsfd_release,
 };
 
 static int jsflash_init(void)
@@ -609,6 +549,8 @@ static int jsflash_init(void)
 	return 0;
 }
 
+static struct request_queue jsf_queue;
+
 static int jsfd_init(void)
 {
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
@@ -622,7 +564,7 @@ static int jsfd_init(void)
 
 	err = -ENOMEM;
 	for (i = 0; i < JSF_MAX; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			goto out;
 		jsfd_disk[i] = disk;
@@ -635,21 +577,20 @@ static int jsfd_init(void)
 		goto out;
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), jsfd_do_request, &lock);
+	blk_init_queue(&jsf_queue, jsfd_do_request, &lock);
 	for (i = 0; i < JSF_MAX; i++) {
 		struct gendisk *disk = jsfd_disk[i];
 		if ((i & JSF_PART_MASK) >= JSF_NPART) continue;
 		jsf = &jsf0;	/* actually, &jsfv[i >> JSF_PART_BITS] */
 		jdp = &jsf->dv[i&JSF_PART_MASK];
 
-		jdp->refcnt = 0;
-
 		disk->major = JSFD_MAJOR;
 		disk->first_minor = i;
 		sprintf(disk->disk_name, "jsfd%d", i);
 		disk->fops = &jsfd_fops;
-		disk->minor_shift = 0;
 		set_capacity(disk, jdp->dsize >> 9);
+		disk->private_data = jdp;
+		disk->queue = &jsf_queue;
 		add_disk(disk);
 		set_device_ro(MKDEV(JSFD_MAJOR, i), 1);
 	}
@@ -689,7 +630,7 @@ static void __exit jsflash_cleanup_module(void)
 	misc_deregister(&jsf_dev);
 	if (unregister_blkdev(JSFD_MAJOR, "jsfd") != 0)
 		printk("jsfd: cleanup_module failed\n");
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&jsf_queue);
 }
 
 module_init(jsflash_init_module);

@@ -241,9 +241,9 @@ asmlinkage long sys_security (unsigned int id, unsigned int call,
 	return security_ops->sys_security (id, call, args);
 }
 
-EXPORT_SYMBOL (register_security);
-EXPORT_SYMBOL (unregister_security);
-EXPORT_SYMBOL (mod_reg_security);
-EXPORT_SYMBOL (mod_unreg_security);
-EXPORT_SYMBOL (capable);
-EXPORT_SYMBOL (security_ops);
+EXPORT_SYMBOL_GPL(register_security);
+EXPORT_SYMBOL_GPL(unregister_security);
+EXPORT_SYMBOL_GPL(mod_reg_security);
+EXPORT_SYMBOL_GPL(mod_unreg_security);
+EXPORT_SYMBOL(capable);
+EXPORT_SYMBOL(security_ops);

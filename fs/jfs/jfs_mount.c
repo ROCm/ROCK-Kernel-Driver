@@ -478,12 +478,12 @@ int readSuper(struct super_block *sb, struct buffer_head **bpp)
 {
 	/* read in primary superblock */
 	*bpp = sb_bread(sb, SUPER1_OFF >> sb->s_blocksize_bits);
-	if (bpp)
+	if (*bpp)
 		return 0;
 
 	/* read in secondary/replicated superblock */
 	*bpp = sb_bread(sb, SUPER2_OFF >> sb->s_blocksize_bits);
-	if (bpp)
+	if (*bpp)
 		return 0;
 
 	return -EIO;

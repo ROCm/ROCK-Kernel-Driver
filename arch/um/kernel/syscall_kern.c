@@ -384,6 +384,7 @@ static int check_bogosity(struct pt_regs *regs)
 	return(0);
 }
 
+/*  Unlocked, I don't care if this is a bit off */
 int nsyscalls = 0;
 
 extern syscall_handler_t *sys_call_table[];
@@ -417,14 +418,18 @@ long execute_syscall(void *r)
 
 spinlock_t syscall_lock = SPIN_LOCK_UNLOCKED;
 
-void lock_syscall(void)
-{
-	spin_lock(&syscall_lock);
-}
+static int syscall_index = 0;
 
-void unlock_syscall(void)
+int next_syscall_index(int limit)
 {
+	int ret;
+
+	spin_lock(&syscall_lock);
+	ret = syscall_index;
+	if(++syscall_index == limit)
+		syscall_index = 0;
 	spin_unlock(&syscall_lock);
+	return(ret);
 }
 
 /*

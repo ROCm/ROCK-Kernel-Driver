@@ -61,9 +61,6 @@ EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(vme_brdtype);
 #endif
 
-/* Networking helper routines. */
-EXPORT_SYMBOL(csum_partial_copy);
-
 /* The following are special because they're not called
    explicitly (the C compiler generates them).  Fortunately,
    their interface isn't gonna change any time soon now, so

@@ -177,7 +177,6 @@
 #include "cdu31a.h"
 
 #define MAJOR_NR CDU31A_CDROM_MAJOR
-#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 
 #define CDU31A_READAHEAD 4	/* 128 sector, 64kB, 32 reads read-ahead */
@@ -238,6 +237,7 @@ static volatile unsigned short sony_cd_result_reg;
 static volatile unsigned short sony_cd_read_reg;
 static volatile unsigned short sony_cd_fifost_reg;
 
+static struct request_queue cdu31a_queue;
 static spinlock_t cdu31a_lock = SPIN_LOCK_UNLOCKED; /* queue lock */
 
 static int sony_spun_up = 0;	/* Has the drive been spun up? */
@@ -1531,6 +1531,7 @@ read_data_block(char *buffer,
  */
 static void do_cdu31a_request(request_queue_t * q)
 {
+	struct request *req;
 	int block;
 	int nblock;
 	unsigned char res_reg[12];
@@ -1578,125 +1579,111 @@ static void do_cdu31a_request(request_queue_t * q)
 	del_timer(&cdu31a_abort_timer);
 
 	while (1) {
-	      cdu31a_request_startover:
 		/*
 		 * The beginning here is stolen from the hard disk driver.  I hope
 		 * it's right.
 		 */
-		if (blk_queue_empty(QUEUE))
+		if (blk_queue_empty(q))
 			goto end_do_cdu31a_request;
 
-		if (!sony_spun_up) {
+		if (!sony_spun_up)
 			scd_spinup();
-		}
 
-		block = CURRENT->sector;
-		nblock = CURRENT->nr_sectors;
+		req = elv_next_request(q);
+		block = req->sector;
+		nblock = req->nr_sectors;
 
 		if (!sony_toc_read) {
 			printk("CDU31A: TOC not read\n");
-			end_request(CURRENT, 0);
-			goto cdu31a_request_startover;
+			end_request(req, 0);
+			continue;
 		}
 
-		if(CURRENT->flags & REQ_CMD) {
-			switch (rq_data_dir(CURRENT)) {
-			case READ:
-				/*
-				 * If the block address is invalid or the request goes beyond the end of
-				 * the media, return an error.
-				 */
-				if ((block / 4) >= sony_toc.lead_out_start_lba) {
-					printk
-						("CDU31A: Request past end of media\n");
-					end_request(CURRENT, 0);
-					goto cdu31a_request_startover;
-				}
-				if (((block + nblock) / 4) >=
-				    sony_toc.lead_out_start_lba) {
-					printk
-						("CDU31A: Request past end of media\n");
-					end_request(CURRENT, 0);
-					goto cdu31a_request_startover;
-				}
+		/* WTF??? */
+		if (!(req->flags & REQ_CMD))
+			continue;
+		if (rq_data_dir(req) == WRITE) {
+			end_request(req, 0);
+			continue;
+		}
+		if (rq_data_dir(req) != READ)
+			panic("CDU31A: Unknown cmd");
+		/*
+		 * If the block address is invalid or the request goes beyond the end of
+		 * the media, return an error.
+		 */
+		if ((block / 4) >= sony_toc.lead_out_start_lba) {
+			printk("CDU31A: Request past end of media\n");
+			end_request(req, 0);
+			continue;
+		}
+		if (((block + nblock) / 4) >= sony_toc.lead_out_start_lba) {
+			printk("CDU31A: Request past end of media\n");
+			end_request(req, 0);
+			continue;
+		}
 
-				num_retries = 0;
+		num_retries = 0;
 
-			try_read_again:
-				while (handle_sony_cd_attention());
+	try_read_again:
+		while (handle_sony_cd_attention());
 
-				if (!sony_toc_read) {
-					printk("CDU31A: TOC not read\n");
-					end_request(CURRENT, 0);
-					goto cdu31a_request_startover;
-				}
+		if (!sony_toc_read) {
+			printk("CDU31A: TOC not read\n");
+			end_request(req, 0);
+			continue;
+		}
 
-				/* If no data is left to be read from the drive, start the
-				   next request. */
-				if (sony_blocks_left == 0) {
-					if (start_request
-					    (block / 4, CDU31A_READAHEAD / 4, 0)) {
-						end_request(CURRENT, 0);
-						goto cdu31a_request_startover;
-					}
-				}
-				/* If the requested block is not the next one waiting in
-				   the driver, abort the current operation and start a
-				   new one. */
-				else if (block != sony_next_block) {
-#if DEBUG
-					printk
-						("CDU31A Warning: Read for block %d, expected %d\n",
-						 block, sony_next_block);
-#endif
-					abort_read();
-					if (!sony_toc_read) {
-						printk("CDU31A: TOC not read\n");
-						end_request(CURRENT, 0);
-						goto cdu31a_request_startover;
-					}
-					if (start_request
-					    (block / 4, CDU31A_READAHEAD / 4, 0)) {
-						printk
-							("CDU31a: start request failed\n");
-						end_request(CURRENT, 0);
-						goto cdu31a_request_startover;
-					}
-				}
-
-				read_data_block(CURRENT->buffer, block, nblock,
-						res_reg, &res_size);
-				if (res_reg[0] == 0x20) {
-					if (num_retries > MAX_CDU31A_RETRIES) {
-						end_request(CURRENT, 0);
-						goto cdu31a_request_startover;
-					}
-
-					num_retries++;
-					if (res_reg[1] == SONY_NOT_SPIN_ERR) {
-						do_sony_cd_cmd(SONY_SPIN_UP_CMD,
-							       NULL, 0, res_reg,
-							       &res_size);
-					} else {
-						printk
-							("CDU31A: %s error for block %d, nblock %d\n",
-							 translate_error(res_reg[1]),
-							 block, nblock);
-					}
-					goto try_read_again;
-				} else {
-					end_request(CURRENT, 1);
-				}
-				break;
-
-			case WRITE:
-				end_request(CURRENT, 0);
-				break;
-
-			default:
-				panic("CDU31A: Unknown cmd");
+		/* If no data is left to be read from the drive, start the
+		   next request. */
+		if (sony_blocks_left == 0) {
+			if (start_request(block / 4, CDU31A_READAHEAD / 4, 0)) {
+				end_request(req, 0);
+				continue;
 			}
 		}
+		/* If the requested block is not the next one waiting in
+		   the driver, abort the current operation and start a
+		   new one. */
+		else if (block != sony_next_block) {
+#if DEBUG
+			printk("CDU31A Warning: Read for block %d, expected %d\n",
+				 block, sony_next_block);
+#endif
+			abort_read();
+			if (!sony_toc_read) {
+				printk("CDU31A: TOC not read\n");
+				end_request(req, 0);
+				continue;
+			}
+			if (start_request(block / 4, CDU31A_READAHEAD / 4, 0)) {
+				printk("CDU31a: start request failed\n");
+				end_request(req, 0);
+				continue;
+			}
+		}
+
+		read_data_block(req->buffer, block, nblock, res_reg, &res_size);
+
+		if (res_reg[0] != 0x20) {
+			end_request(req, 1);
+			continue;
+		}
+
+		if (num_retries > MAX_CDU31A_RETRIES) {
+			end_request(req, 0);
+			continue;
+		}
+
+		num_retries++;
+		if (res_reg[1] == SONY_NOT_SPIN_ERR) {
+			do_sony_cd_cmd(SONY_SPIN_UP_CMD, NULL, 0, res_reg,
+					&res_size);
+		} else {
+			printk("CDU31A: %s error for block %d, nblock %d\n",
+				 translate_error(res_reg[1]), block, nblock);
+		}
+		goto try_read_again;
 	}
       end_do_cdu31a_request:
 	spin_lock_irq(q->queue_lock);
@@ -3151,15 +3138,6 @@ static void scd_release(struct cdrom_device_info *cdi)
 	sony_usage--;
 }
 
-struct block_device_operations scd_bdops =
-{
-	.owner			= THIS_MODULE,
-	.open			= cdrom_open,
-	.release		= cdrom_release,
-	.ioctl			= cdrom_ioctl,
-	.check_media_change	= cdrom_media_changed,
-};
-
 static struct cdrom_device_ops scd_dops = {
 	.open			= scd_open,
 	.release		= scd_release,
@@ -3186,6 +3164,36 @@ static struct cdrom_device_info scd_info = {
 	.speed		= 2,
 	.capacity	= 1,
 	.name		= "cdu31a"
+};
+
+static int scd_block_open(struct inode *inode, struct file *file)
+{
+	return cdrom_open(&scd_info, inode, file);
+}
+
+static int scd_block_release(struct inode *inode, struct file *file)
+{
+	return cdrom_release(&scd_info, file);
+}
+
+static int scd_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	return cdrom_ioctl(&scd_info, inode, cmd, arg);
+}
+
+static int scd_block_media_changed(struct gendisk *disk)
+{
+	return cdrom_media_changed(&scd_info);
+}
+
+struct block_device_operations scd_bdops =
+{
+	.owner		= THIS_MODULE,
+	.open		= scd_block_open,
+	.release	= scd_block_release,
+	.ioctl		= scd_block_ioctl,
+	.media_changed	= scd_block_media_changed,
 };
 
 static struct gendisk *scd_gendisk;
@@ -3366,12 +3374,11 @@ int __init cdu31a_init(void)
 		goto errout2;
 	}
 
-	disk = alloc_disk();
+	disk = alloc_disk(1);
 	if (!disk)
 		goto errout1;
 	disk->major = MAJOR_NR;
 	disk->first_minor = 0;
-	disk->minor_shift = 0;
 	sprintf(disk->disk_name, "cdu31a");
 	disk->fops = &scd_bdops;
 	disk->flags = GENHD_FL_CD;
@@ -3431,18 +3438,16 @@ int __init cdu31a_init(void)
 	is_a_cdu31a =
 	    strcmp("CD-ROM CDU31A", drive_config.product_id) == 0;
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
-		       do_cdu31a_request,
-		       &cdu31a_lock);
+	blk_init_queue(&cdu31a_queue, do_cdu31a_request, &cdu31a_lock);
 
 	init_timer(&cdu31a_abort_timer);
 	cdu31a_abort_timer.function = handle_abort_timeout;
 
-	scd_info.dev = mk_kdev(MAJOR_NR, 0);
 	scd_info.mask = deficiency;
 	scd_gendisk = disk;
 	if (register_cdrom(&scd_info))
 		goto errout0;
+	disk->queue = &cdu31a_queue;
 	add_disk(disk);
 
 	disk_changed = 1;
@@ -3450,7 +3455,7 @@ int __init cdu31a_init(void)
 
 errout0:
 	printk("Unable to register CDU-31a with Uniform cdrom driver\n");
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&cdu31a_queue);
 	put_disk(disk);
 errout1:
 	if (unregister_blkdev(MAJOR_NR, "cdu31a")) {
@@ -3477,7 +3482,7 @@ void __exit cdu31a_exit(void)
 		return;
 	}
 
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&cdu31a_queue);
 
 	if (cdu31a_irq > 0)
 		free_irq(cdu31a_irq, NULL);

@@ -112,12 +112,12 @@ char saved_command_line[COMMAND_LINE_SIZE];
  */
 
 struct screen_info screen_info = {
-	orig_x: 0,
-	orig_y: 25,
-	orig_video_cols: 80,
-	orig_video_lines: 25,
-	orig_video_isVGA: 1,
-	orig_video_points: 16
+	.orig_x = 0,
+	.orig_y = 25,
+	.orig_video_cols = 80,
+	.orig_video_lines = 25,
+	.orig_video_isVGA = 1,
+	.orig_video_points = 16
 };
 
 /*
@@ -452,12 +452,12 @@ static int __init srm_console_setup(struct console *co, char *options)
 }
 
 static struct console srmcons = {
-	name:		"srm0",
-	write:		srm_console_write,
-	device:		srm_console_device,
-	setup:		srm_console_setup,
-	flags:		CON_PRINTBUFFER | CON_ENABLED, /* fake it out */
-	index:		-1,
+	.name		= "srm0",
+	.write		= srm_console_write,
+	.device		= srm_console_device,
+	.setup		= srm_console_setup,
+	.flags		= CON_PRINTBUFFER | CON_ENABLED, /* fake it out */
+	.index		= -1,
 };
 
 #else
@@ -1150,10 +1150,10 @@ c_stop(struct seq_file *f, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start	= c_start,
+	.next	= c_next,
+	.stop	= c_stop,
+	.show	= show_cpuinfo,
 };
 
 

@@ -333,12 +333,15 @@ static void *do_smb_super_data_conv(void *raw_data)
 	struct smb_mount_data *s = (struct smb_mount_data *)raw_data;
 	struct smb_mount_data32 *s32 = (struct smb_mount_data32 *)raw_data;
 
+	if (s32->version != SMB_MOUNT_OLDVERSION)
+		goto out;
 	s->version = s32->version;
 	s->mounted_uid = s32->mounted_uid;
 	s->uid = s32->uid;
 	s->gid = s32->gid;
 	s->file_mode = s32->file_mode;
 	s->dir_mode = s32->dir_mode;
+out:
 	return raw_data;
 }
 
@@ -2894,13 +2897,6 @@ __inline__ struct cmsghdr32 *cmsg32_nxthdr (struct msghdr *__msg,
 {
 	return __cmsg32_nxthdr(__msg->msg_control, __msg->msg_controllen,
 			       __cmsg, __cmsg_len);
-}
-
-extern struct socket *sockfd_lookup(int fd, int *err);
-
-extern __inline__ void sockfd_put(struct socket *sock)
-{
-	fput(sock->file);
 }
 
 static inline int msghdr_from_user32_to_kern(struct msghdr *kmsg, struct msghdr32 *umsg)

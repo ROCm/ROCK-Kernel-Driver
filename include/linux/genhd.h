@@ -62,22 +62,26 @@ struct hd_struct {
 	sector_t start_sect;
 	sector_t nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
-	struct device hd_driverfs_dev;  /* support driverfs hiearchy     */
+	struct device *hd_driverfs_dev;  /* support driverfs hiearchy     */
 };
 
 #define GENHD_FL_REMOVABLE  1
 #define GENHD_FL_DRIVERFS  2
 #define GENHD_FL_DEVFS	4
 #define GENHD_FL_CD	8
+#define GENHD_FL_UP	16
 
 struct gendisk {
 	int major;			/* major number of driver */
 	int first_minor;
+	int minors;
 	int minor_shift;		/* number of times minor is shifted to
 					   get real minor */
 	char disk_name[16];		/* name of major driver */
 	struct hd_struct *part;		/* [indexed by minor] */
 	struct block_device_operations *fops;
+	struct request_queue *queue;
+	void *private_data;
 	sector_t capacity;
 	struct list_head list;
 	struct list_head full_list;
@@ -88,6 +92,10 @@ struct gendisk {
 	devfs_handle_t disk_de;		/* piled higher and deeper */
 	struct device *driverfs_dev;
 	struct device disk_dev;
+
+	unsigned sync_io;		/* RAID */
+	unsigned reads, writes;
+	unsigned rio, wio;
 };
 
 /* drivers/block/genhd.c */
@@ -260,20 +268,19 @@ struct unixware_disklabel {
 char *disk_name (struct gendisk *hd, int part, char *buf);
 
 extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
-extern void update_partition(struct gendisk *disk, int part);
+extern void add_partition(struct gendisk *, int, sector_t, sector_t);
+extern void delete_partition(struct gendisk *, int);
 
-extern struct gendisk *alloc_disk(void);
+extern struct gendisk *alloc_disk(int minors);
+extern struct gendisk *get_disk(struct gendisk *disk);
 extern void put_disk(struct gendisk *disk);
 
-/* will go away */
-extern void blk_set_probe(int major, struct gendisk *(p)(int));
-
-static inline unsigned int disk_index (kdev_t dev)
-{
-	int part;
-	struct gendisk *g = get_gendisk(kdev_t_to_nr(dev), &part);
-	return g ? (minor(dev) >> g->minor_shift) : 0;
-}
+extern void blk_register_region(dev_t dev, unsigned long range,
+			struct module *module,
+			struct gendisk *(*probe)(dev_t, int *, void *),
+			void (*lock)(dev_t, void *),
+			void *data);
+extern void blk_unregister_region(dev_t dev, unsigned long range);
 
 #endif
 

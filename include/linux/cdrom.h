@@ -730,9 +730,7 @@ struct cdrom_device_info {
 	struct cdrom_device_ops  *ops;  /* link to device_ops */
 	struct cdrom_device_info *next; /* next device_info for this major */
 	void *handle;		        /* driver-dependent data */
-	struct device cdrom_driverfs_dev; /* driverfs implementation */
 /* specifications */
-        kdev_t dev;	                /* device number */
 	int mask;                       /* mask of capability: disables them */
 	int speed;			/* maximum speed for reading data */
 	int capacity;			/* number of discs in jukebox */
@@ -777,10 +775,10 @@ struct cdrom_device_ops {
 };
 
 /* the general block_device operations structure: */
-extern int cdrom_open(struct inode *, struct file *);
-extern int cdrom_release(struct inode *, struct file *);
-extern int cdrom_ioctl(struct inode *, struct file *, unsigned, unsigned long);
-extern int cdrom_media_changed(kdev_t);
+extern int cdrom_open(struct cdrom_device_info *, struct inode *, struct file *);
+extern int cdrom_release(struct cdrom_device_info *, struct file *);
+extern int cdrom_ioctl(struct cdrom_device_info *, struct inode *, unsigned, unsigned long);
+extern int cdrom_media_changed(struct cdrom_device_info *);
 
 extern int register_cdrom(struct cdrom_device_info *cdi);
 extern int unregister_cdrom(struct cdrom_device_info *cdi);

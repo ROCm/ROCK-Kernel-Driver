@@ -972,7 +972,7 @@ CONFIG_USB_SERIAL_KEYSPAN_USA49W=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

@@ -27,6 +27,8 @@ obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o nmi.o
 obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o
 obj-$(CONFIG_SOFTWARE_SUSPEND)	+= suspend.o
 obj-$(CONFIG_X86_NUMAQ)		+= numaq.o
+obj-$(CONFIG_PROFILING)		+= profile.o
+obj-$(CONFIG_EDD)             	+= edd.o
 
 EXTRA_AFLAGS   := -traditional
 

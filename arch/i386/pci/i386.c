@@ -291,7 +291,7 @@ void pcibios_set_master(struct pci_dev *dev)
 		lat = pcibios_max_latency;
 	else
 		return;
-	printk("PCI: Setting latency timer of device %s to %d\n", dev->slot_name, lat);
+	printk(KERN_DEBUG "PCI: Setting latency timer of device %s to %d\n", dev->slot_name, lat);
 	pci_write_config_byte(dev, PCI_LATENCY_TIMER, lat);
 }
 

@@ -158,13 +158,13 @@ wildfire_end_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type wildfire_irq_type = {
-	typename:	"WILDFIRE",
-	startup:	wildfire_startup_irq,
-	shutdown:	wildfire_disable_irq,
-	enable:		wildfire_enable_irq,
-	disable:	wildfire_disable_irq,
-	ack:		wildfire_mask_and_ack_irq,
-	end:		wildfire_end_irq,
+	.typename	= "WILDFIRE",
+	.startup	= wildfire_startup_irq,
+	.shutdown	= wildfire_disable_irq,
+	.enable		= wildfire_enable_irq,
+	.disable	= wildfire_disable_irq,
+	.ack		= wildfire_mask_and_ack_irq,
+	.end		= wildfire_end_irq,
 };
 
 static void __init
@@ -173,8 +173,8 @@ wildfire_init_irq_per_pca(int qbbno, int pcano)
 	int i, irq_bias;
 	unsigned long io_bias;
 	static struct irqaction isa_enable = {
-		handler:	no_action,
-		name:		"isa_enable",
+		.handler	= no_action,
+		.name		= "isa_enable",
 	};
 
 	irq_bias = qbbno * (WILDFIRE_PCA_PER_QBB * WILDFIRE_IRQ_PER_PCA)
@@ -333,25 +333,25 @@ wildfire_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
  */
 
 struct alpha_machine_vector wildfire_mv __initmv = {
-	vector_name:		"WILDFIRE",
+	.vector_name		= "WILDFIRE",
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_WILDFIRE_IO,
 	DO_WILDFIRE_BUS,
-	machine_check:		wildfire_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	DEFAULT_MEM_BASE,
+	.machine_check		= wildfire_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= DEFAULT_MEM_BASE,
 
-	nr_irqs:		WILDFIRE_NR_IRQS,
-	device_interrupt:	wildfire_device_interrupt,
+	.nr_irqs		= WILDFIRE_NR_IRQS,
+	.device_interrupt	= wildfire_device_interrupt,
 
-	init_arch:		wildfire_init_arch,
-	init_irq:		wildfire_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		common_init_pci,
-	kill_arch:		wildfire_kill_arch,
-	pci_map_irq:		wildfire_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= wildfire_init_arch,
+	.init_irq		= wildfire_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= common_init_pci,
+	.kill_arch		= wildfire_kill_arch,
+	.pci_map_irq		= wildfire_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(wildfire)

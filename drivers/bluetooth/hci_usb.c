@@ -23,7 +23,7 @@
 */
 
 /*
- * BlueZ HCI USB driver.
+ * Bluetooth HCI USB driver.
  * Based on original USB Bluetooth driver for Linux kernel
  *    Copyright (c) 2000 Greg Kroah-Hartman        <greg@kroah.com>
  *    Copyright (c) 2000 Mark Douglas Corner       <mcorner@umich.edu>
@@ -59,14 +59,14 @@
 
 #define HCI_MAX_PENDING (HCI_MAX_BULK_RX + HCI_MAX_BULK_TX + 1)
 
-#ifndef HCI_USB_DEBUG
+#ifndef CONFIG_BT_HCIUSB_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #undef  BT_DMP
 #define BT_DMP( A... )
 #endif
 
-#ifndef CONFIG_BLUEZ_USB_ZERO_PACKET
+#ifndef CONFIG_BT_USB_ZERO_PACKET
 #undef  USB_ZERO_PACKET
 #define USB_ZERO_PACKET 0
 #endif
@@ -167,7 +167,7 @@ static int hci_usb_rx_submit(struct hci_usb *husb, struct urb *urb)
 
         size = HCI_MAX_FRAME_SIZE;
 
-	if (!(skb = bluez_skb_alloc(size, GFP_ATOMIC))) {
+	if (!(skb = bt_skb_alloc(size, GFP_ATOMIC))) {
 		usb_free_urb(urb);
 		return -ENOMEM;
 	}
@@ -434,7 +434,7 @@ static void hci_usb_interrupt(struct urb *urb)
 	struct hci_usb *husb = (void *) urb->context;
 	struct hci_usb_scb *scb;
 	struct sk_buff *skb;
-	hci_event_hdr *eh;
+	struct hci_event_hdr *eh;
 	__u8 *data = urb->transfer_buffer;
 	int count = urb->actual_length;
 	int len = HCI_EVENT_HDR_SIZE;
@@ -459,13 +459,13 @@ static void hci_usb_interrupt(struct urb *urb)
 		if (count < HCI_EVENT_HDR_SIZE)
 			goto bad_len;
 
-		eh  = (hci_event_hdr *) data;
+		eh  = (struct hci_event_hdr *) data;
 		len = eh->plen + HCI_EVENT_HDR_SIZE;
 
 		if (count > len)
 			goto bad_len;
 
-		skb = bluez_skb_alloc(len, GFP_ATOMIC);
+		skb = bt_skb_alloc(len, GFP_ATOMIC);
 		if (!skb) {
 			BT_ERR("%s no memory for event packet", husb->hdev.name);
 			goto done;
@@ -545,7 +545,7 @@ static void hci_usb_rx_complete(struct urb *urb)
 	struct hci_dev *hdev = (struct hci_dev *) skb->dev;
 	struct hci_usb *husb = (struct hci_usb *) hdev->driver_data;
 	int status, count = urb->actual_length;
-	hci_acl_hdr *ah;
+	struct hci_acl_hdr *ah;
 	int dlen, size;
 
 	BT_DBG("%s urb %p status %d count %d flags %x", husb->hdev.name, urb,
@@ -561,7 +561,7 @@ static void hci_usb_rx_complete(struct urb *urb)
 
 	husb->hdev.stat.byte_rx += count;
 
-	ah   = (hci_acl_hdr *) skb->data;
+	ah   = (struct hci_acl_hdr *) skb->data;
 	dlen = __le16_to_cpu(ah->dlen);
 	size = HCI_ACL_HDR_SIZE + dlen;
 
@@ -569,7 +569,7 @@ static void hci_usb_rx_complete(struct urb *urb)
 	if (count != size) {
 		BT_ERR("%s corrupted ACL packet: count %d, dlen %d",
 				husb->hdev.name, count, dlen);
-		bluez_dump("hci_usb", skb->data, count);
+		bt_dump("hci_usb", skb->data, count);
 		husb->hdev.stat.err_rx++;
 		goto resubmit;
 	}
@@ -639,7 +639,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	
 	/* Find endpoints that we need */
 
-	ifn = MIN(udev->actconfig->bNumInterfaces, HCI_MAX_IFACE_NUM);
+	ifn = min_t(unsigned int, udev->actconfig->bNumInterfaces, HCI_MAX_IFACE_NUM);
 	for (i = 0; i < ifn; i++) {
 		iface = &udev->actconfig->interface[i];
 		for (a = 0; a < iface->num_altsetting; a++) {
@@ -781,7 +781,7 @@ int hci_usb_init(void)
 {
 	int err;
 
-	BT_INFO("BlueZ HCI USB driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",  
+	BT_INFO("Bluetooth HCI USB driver ver %s Copyright (C) 2000,2001 Qualcomm Inc",  
 		VERSION);
 	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
 
@@ -800,5 +800,5 @@ module_init(hci_usb_init);
 module_exit(hci_usb_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
-MODULE_DESCRIPTION("BlueZ HCI USB driver ver " VERSION);
+MODULE_DESCRIPTION("Bluetooth HCI USB driver ver " VERSION);
 MODULE_LICENSE("GPL");

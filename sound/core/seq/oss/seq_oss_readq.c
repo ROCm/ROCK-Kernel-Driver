@@ -159,9 +159,10 @@ snd_seq_oss_readq_pick(seq_oss_readq_t *q, int blocking, unsigned long *rflags)
 	spin_lock_irqsave(&q->lock, *rflags);
 	if (q->qlen == 0) {
 		if (blocking) {
-			snd_seq_sleep_timeout_in_lock(&q->midi_sleep,
-						      &q->lock,
-						      q->pre_event_timeout);
+			spin_unlock(&q->lock);
+			interruptible_sleep_on_timeout(&q->midi_sleep,
+						       q->pre_event_timeout);
+			spin_lock(&q->lock);
 		}
 		if (q->qlen == 0) {
 			spin_unlock_irqrestore(&q->lock, *rflags);

@@ -135,7 +135,7 @@ EXPORT_SYMBOL(snd_seq_event_port_attach);
 EXPORT_SYMBOL(snd_seq_event_port_detach);
   /* seq_lock.c */
 #if defined(__SMP__) || defined(CONFIG_SND_DEBUG)
-EXPORT_SYMBOL(snd_seq_sleep_in_lock);
-EXPORT_SYMBOL(snd_seq_sleep_timeout_in_lock);
+/*EXPORT_SYMBOL(snd_seq_sleep_in_lock);*/
+/*EXPORT_SYMBOL(snd_seq_sleep_timeout_in_lock);*/
 EXPORT_SYMBOL(snd_use_lock_sync_helper);
 #endif

@@ -727,11 +727,15 @@ static int flock_lock_file(struct file *filp, struct file_lock *new_fl)
 	}
 	unlock_kernel();
 
-	if (found)
-		yield();
-
 	if (new_fl->fl_type == F_UNLCK)
 		return 0;
+
+	/*
+	 * If a higher-priority process was blocked on the old file lock,
+	 * give it the opportunity to lock the file.
+	 */
+	if (found)
+		cond_resched();
 
 	lock_kernel();
 	for_each_lock(inode, before) {

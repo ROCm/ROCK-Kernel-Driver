@@ -220,13 +220,38 @@ struct s_drive_stuff {
 int mcdx_init(void);
 void do_mcdx_request(request_queue_t * q);
 
-struct block_device_operations mcdx_bdops =
+static int mcdx_block_open(struct inode *inode, struct file *file)
 {
-	owner:			THIS_MODULE,
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
+	struct s_drive_stuff *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_open(&p->info, inode, file);
+}
+
+static int mcdx_block_release(struct inode *inode, struct file *file)
+{
+	struct s_drive_stuff *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_release(&p->info, file);
+}
+
+static int mcdx_block_ioctl(struct inode *inode, struct file *file,
+				unsigned cmd, unsigned long arg)
+{
+	struct s_drive_stuff *p = inode->i_bdev->bd_disk->private_data;
+	return cdrom_ioctl(&p->info, inode, cmd, arg);
+}
+
+static int mcdx_block_media_changed(struct gendisk *disk)
+{
+	struct s_drive_stuff *p = disk->private_data;
+	return cdrom_media_changed(&p->info);
+}
+
+static struct block_device_operations mcdx_bdops =
+{
+	.owner		= THIS_MODULE,
+	.open		= mcdx_block_open,
+	.release	= mcdx_block_release,
+	.ioctl		= mcdx_block_ioctl,
+	.media_changed	= mcdx_block_media_changed,
 };
 
 
@@ -292,6 +317,7 @@ static struct s_drive_stuff *mcdx_irq_map[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0
 };
 static spinlock_t mcdx_lock = SPIN_LOCK_UNLOCKED;
+static struct request_queue mcdx_queue;
 MODULE_PARM(mcdx, "1-4i");
 
 static struct cdrom_device_ops mcdx_dops = {
@@ -550,66 +576,63 @@ static int mcdx_audio_ioctl(struct cdrom_device_info *cdi,
 
 void do_mcdx_request(request_queue_t * q)
 {
-	int dev;
 	struct s_drive_stuff *stuffp;
+	struct request *req;
 
       again:
 
-	if (blk_queue_empty(QUEUE))
+	if (blk_queue_empty(q))
 		return;
 
-	dev = minor(CURRENT->rq_dev);
-	stuffp = mcdx_stuffp[dev];
+	req = elv_next_request(q);
+	stuffp = req->rq_disk->private_data;
 
-	if ((dev < 0)
-	    || (dev >= MCDX_NDRIVES)
-	    || !stuffp || (!stuffp->present)) {
-		xwarn("do_request(): bad device: %s\n",
-		      kdevname(CURRENT->rq_dev));
+	if (!stuffp->present) {
+		xwarn("do_request(): bad device: %s\n",req->rq_disk->disk_name);
 		xtrace(REQUEST, "end_request(0): bad device\n");
-		end_request(CURRENT, 0);
+		end_request(req, 0);
 		return;
 	}
 
 	if (stuffp->audio) {
 		xwarn("do_request() attempt to read from audio cd\n");
 		xtrace(REQUEST, "end_request(0): read from audio\n");
-		end_request(CURRENT, 0);
+		end_request(req, 0);
 		return;
 	}
 
 	xtrace(REQUEST, "do_request() (%lu + %lu)\n",
-	       CURRENT->sector, CURRENT->nr_sectors);
+	       req->sector, req->nr_sectors);
 
-	if (CURRENT->cmd != READ) {
+	if (req->cmd != READ) {
 		xwarn("do_request(): non-read command to cd!!\n");
 		xtrace(REQUEST, "end_request(0): write\n");
-		end_request(CURRENT, 0);
+		end_request(req, 0);
 		return;
 	}
 	else {
 		stuffp->status = 0;
-		while (CURRENT->nr_sectors) {
+		while (req->nr_sectors) {
 			int i;
 
 			i = mcdx_transfer(stuffp,
-					  CURRENT->buffer,
-					  CURRENT->sector,
-					  CURRENT->nr_sectors);
+					  req->buffer,
+					  req->sector,
+					  req->nr_sectors);
 
 			if (i == -1) {
-				end_request(CURRENT, 0);
+				end_request(req, 0);
 				goto again;
 			}
-			CURRENT->sector += i;
-			CURRENT->nr_sectors -= i;
-			CURRENT->buffer += (i * 512);
+			req->sector += i;
+			req->nr_sectors -= i;
+			req->buffer += (i * 512);
 		}
-		end_request(CURRENT, 1);
+		end_request(req, 1);
 		goto again;
 
 		xtrace(REQUEST, "end_request(1)\n");
-		end_request(CURRENT, 1);
+		end_request(req, 1);
 	}
 
 	goto again;
@@ -1041,10 +1064,10 @@ void __exit mcdx_exit(void)
 		kfree(stuffp);
 	}
 
-	if (devfs_unregister_blkdev(MAJOR_NR, "mcdx") != 0) {
+	if (unregister_blkdev(MAJOR_NR, "mcdx") != 0) {
 		xwarn("cleanup() unregister_blkdev() failed\n");
 	}
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&mcdx_queue);
 #if !MCDX_QUIET
 	else
 	xinfo("cleanup() succeeded\n");
@@ -1076,7 +1099,7 @@ int __init mcdx_init_drive(int drive)
 		return 1;
 	}
 
-	disk = alloc_disk();
+	disk = alloc_disk(1);
 	if (!disk) {
 		xwarn("init() malloc failed\n");
 		kfree(stuffp);
@@ -1179,8 +1202,7 @@ int __init mcdx_init_drive(int drive)
 		return 1;
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mcdx_request,
-		       &mcdx_lock);
+	blk_init_queue(&mcdx_queue, do_mcdx_request, &mcdx_lock);
 
 	xtrace(INIT, "init() subscribe irq and i/o\n");
 	mcdx_irq_map[stuffp->irq] = stuffp;
@@ -1190,7 +1212,7 @@ int __init mcdx_init_drive(int drive)
 		xwarn("%s=0x%3p,%d: Init failed. Can't get irq (%d).\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, stuffp->irq);
 		stuffp->irq = 0;
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+		blk_cleanup_queue(&mcdx_queue);
 		kfree(stuffp);
 		put_disk(disk);
 		return 0;
@@ -1218,10 +1240,8 @@ int __init mcdx_init_drive(int drive)
 	stuffp->info.capacity = 1;
 	stuffp->info.handle = stuffp;
 	sprintf(stuffp->info.name, "mcdx%d", drive);
-	stuffp->info.dev = mk_kdev(MAJOR_NR, drive);
 	disk->major = MAJOR_NR;
 	disk->first_minor = drive;
-	disk->minor_shift = 0;
 	strcpy(disk->disk_name, stuffp->info.name);
 	disk->fops = &mcdx_bdops;
 	disk->flags = GENHD_FL_CD;
@@ -1241,9 +1261,11 @@ int __init mcdx_init_drive(int drive)
 		put_disk(disk);
 		if (unregister_blkdev(MAJOR_NR, "mcdx") != 0)
 			xwarn("cleanup() unregister_blkdev() failed\n");
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+		blk_cleanup_queue(&mcdx_queue);
 		return 2;
 	}
+	disk->private_data = stuffp;
+	disk->queue = &mcdx_queue;
 	add_disk(disk);
 	printk(msg);
 	return 0;

@@ -8,8 +8,6 @@
 # Copyright (C) 1995-2002 Russell King
 #
 
-SYSTEM	=$(TOPDIR)/vmlinux
-
 # Note: the following conditions must always be true:
 #   ZRELADDR == virt_to_phys(TEXTADDR)
 #   PARAMS_PHYS must be with 4MB of ZRELADDR
@@ -121,38 +119,57 @@ ZTEXTADDR	=0
 ZBSSADDR	=ALIGN(4)
 endif
 
-export	SYSTEM ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS PARAMS_PHYS
+export	ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS PARAMS_PHYS
 
-Image:	$(SYSTEM)
-	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+include $(TOPDIR)/Rules.make
 
-bzImage: zImage
+$(obj)/Image: vmlinux FORCE
+	$(call if_changed,objcopy)
 
-zImage:	compressed/vmlinux
-	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+bzImage: $(obj)/zImage
 
-bootpImage: bootp/bootp
-	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+$(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
+	$(call if_changed,objcopy)
 
-compressed/vmlinux: $(TOPDIR)/vmlinux FORCE
-	@$(MAKE) -C compressed vmlinux
+$(obj)/bootpImage: $(obj)/bootp/bootp FORCE
+	$(call if_changed,objcopy)
 
-bootp/bootp: zImage initrd FORCE
-	@$(MAKE) -C bootp bootp
+$(obj)/compressed/vmlinux: vmlinux FORCE
+	+@$(call descend,arch/arm/boot/compressed, $(obj)/compressed/vmlinux)
 
+$(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
+	+@$(call descend,arch/arm/boot/bootp, $(obj)/bootp/bootp)
+
+.PHONY: initrd
 initrd:
-	@test "$(INITRD_PHYS)" != "" || (echo This machine does not support INITRD; exit -1)
-	@test "$(INITRD)" != "" || (echo You must specify INITRD; exit -1)
+	@test "$(INITRD_PHYS)" != "" || \
+	(echo This machine does not support INITRD; exit -1)
+	@test "$(INITRD)" != "" || \
+	(echo You must specify INITRD; exit -1)
 
-install: Image
-	sh ./install.sh $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) Image $(TOPDIR)/System.map "$(INSTALL_PATH)"
+install: $(obj)/Image
+	$(CONFIG_SHELL) $(obj)/install.sh \
+	$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) \
+	$(obj)/Image System.map "$(INSTALL_PATH)"
 
-zinstall: zImage
-	sh ./install.sh $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) zImage $(TOPDIR)/System.map "$(INSTALL_PATH)"
+zinstall: $(obj)/zImage
+	$(CONFIG_SHELL) $(obj)/install.sh \
+	$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) \
+	$(obj)/zImage System.map "$(INSTALL_PATH)"
 
 clean:
-	$(RM) Image zImage bootpImage
-	@$(MAKE) -C compressed clean
-	@$(MAKE) -C bootp clean
+	$(RM) $(addprefix $(obj)/,Image zImage bootpImage)
+	+@$(call descend,arch/arm/boot/bootp, clean)
+	+@$(call descend,arch/arm/boot/compressed, clean)
 
-FORCE:
+archhelp:
+	@echo  '* bzImage/zImage- Compressed kernel image (arch/$(ARCH)/boot/zImage)'
+	@echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
+	@echo  '  bootpImage    - Combined zImage and initial RAM disk' 
+	@echo  '  install       - Install uncompressed kernel'
+	@echo  '  zinstall      - Install compressed kernel'
+	@echo  '                  Install using (your) ~/bin/installkernel or'
+	@echo  '                  (distribution) /sbin/installkernel or'
+	@echo  '                  install to $$(INSTALL_PATH) and run lilo'
+
+

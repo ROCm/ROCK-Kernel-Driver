@@ -53,6 +53,7 @@ const char *advansys_info(struct Scsi_Host *);
 int advansys_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 int advansys_reset(Scsi_Cmnd *);
 int advansys_biosparam(Disk *, struct block_device *, int[]);
+static int advansys_slave_attach(Scsi_Device *);
 #ifdef CONFIG_PROC_FS
 #if LINUX_VERSION_CODE < ASC_LINUX_VERSION(2,3,28)
 extern struct proc_dir_entry proc_scsi_advansys;
@@ -79,6 +80,7 @@ void advansys_setup(char *, int *);
     queuecommand:               advansys_queuecommand, \
     eh_bus_reset_handler:	advansys_reset, \
     bios_param:                 advansys_biosparam, \
+    slave_attach:		advansys_slave_attach, \
     /* \
      * Because the driver may control an ISA adapter 'unchecked_isa_dma' \
      * must be set. The flag will be cleared in advansys_detect for non-ISA \

@@ -907,16 +907,15 @@ static int bsd_decompress (void *state, struct sk_buff *skb_in, struct sk_buff *
  *************************************************************/
 
 static struct isdn_ppp_compressor ippp_bsd_compress = {
-	NULL,NULL,		/* prev,next: overwritten by isdn_ppp */
-	CI_BSD_COMPRESS,	/* compress_proto */
-	bsd_alloc,		/* alloc */
-	bsd_free,		/* free */
-	bsd_init,		/* init */
-	bsd_reset,		/* reset */
-	bsd_compress,		/* compress */
-	bsd_decompress,		/* decompress */
-	bsd_incomp,		/* incomp */
-	bsd_stats		/* comp_stat */
+	.num            = CI_BSD_COMPRESS,
+	.alloc          = bsd_alloc,
+	.free           = bsd_free,
+	.init           = bsd_init,
+	.reset          = bsd_reset,
+	.compress       = bsd_compress,
+	.decompress     = bsd_decompress,
+	.incomp         = bsd_incomp,
+	.stat           = bsd_stats,
 };
 
 /*************************************************************

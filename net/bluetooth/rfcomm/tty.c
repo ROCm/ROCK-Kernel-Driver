@@ -40,7 +40,7 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/rfcomm.h>
 
-#ifndef CONFIG_BLUEZ_RFCOMM_DEBUG
+#ifndef CONFIG_BT_RFCOMM_DEBUG
 #undef  BT_DBG
 #define BT_DBG(D...)
 #endif
@@ -64,6 +64,8 @@ struct rfcomm_dev {
 	bdaddr_t		dst;
 	u8 			channel;
 
+	uint 			modem_status;
+
 	struct rfcomm_dlc	*dlc;
 	struct tty_struct	*tty;
 	wait_queue_head_t       wait;
@@ -78,7 +80,7 @@ static rwlock_t rfcomm_dev_lock = RW_LOCK_UNLOCKED;
 
 static void rfcomm_dev_data_ready(struct rfcomm_dlc *dlc, struct sk_buff *skb);
 static void rfcomm_dev_state_change(struct rfcomm_dlc *dlc, int err);
-static void rfcomm_dev_modem_status(struct rfcomm_dlc *dlc, int v24_sig);
+static void rfcomm_dev_modem_status(struct rfcomm_dlc *dlc, u8 v24_sig);
 
 static void rfcomm_tty_wakeup(unsigned long arg);
 
@@ -266,6 +268,9 @@ static struct sk_buff *rfcomm_wmalloc(struct rfcomm_dev *dev, unsigned long size
 }
 
 /* ---- Device IOCTLs ---- */
+
+#define NOCAP_FLAGS ((1 << RFCOMM_REUSE_DLC) | (1 << RFCOMM_RELEASE_ONHUP))
+
 static int rfcomm_create_dev(struct sock *sk, unsigned long arg)
 {
 	struct rfcomm_dev_req req;
@@ -277,7 +282,14 @@ static int rfcomm_create_dev(struct sock *sk, unsigned long arg)
 
 	BT_DBG("sk %p dev_id %id flags 0x%x", sk, req.dev_id, req.flags);
 
+	if (req.flags != NOCAP_FLAGS && !capable(CAP_NET_ADMIN))
+		return -EPERM;
+	
 	if (req.flags & (1 << RFCOMM_REUSE_DLC)) {
+		/* Socket must be connected */
+		if (sk->state != BT_CONNECTED)
+			return -EBADFD;
+
 		dlc = rfcomm_pi(sk)->dlc;
 		rfcomm_dlc_hold(dlc);
 	} else {
@@ -311,6 +323,9 @@ static int rfcomm_release_dev(unsigned long arg)
 
 	BT_DBG("dev_id %id flags 0x%x", req.dev_id, req.flags);
 
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+	
 	if (!(dev = rfcomm_dev_get(req.dev_id)))
 		return -ENODEV;
 
@@ -476,11 +491,20 @@ static void rfcomm_dev_state_change(struct rfcomm_dlc *dlc, int err)
 	}
 }
 
-static void rfcomm_dev_modem_status(struct rfcomm_dlc *dlc, int v24_sig)
+static void rfcomm_dev_modem_status(struct rfcomm_dlc *dlc, u8 v24_sig)
 {
-	BT_DBG("dlc %p v24_sig 0x%02x", dlc, v24_sig);
-}
+	struct rfcomm_dev *dev = dlc->owner;
+	if (!dev)
+		return;
+	
+	BT_DBG("dlc %p dev %p v24_sig 0x%02x", dlc, dev, v24_sig);
 
+	dev->modem_status = 
+		(v24_sig & RFCOMM_V24_RTC) ? (TIOCM_DSR | TIOCM_DTR) : 0 |
+		(v24_sig & RFCOMM_V24_RTR) ? (TIOCM_RTS | TIOCM_CTS) : 0 |
+		(v24_sig & RFCOMM_V24_IC)  ? TIOCM_RI : 0 |
+		(v24_sig & RFCOMM_V24_DV)  ? TIOCM_CD : 0;
+}
 
 /* ---- TTY functions ---- */
 static void rfcomm_tty_wakeup(unsigned long arg)
@@ -629,11 +653,38 @@ static int rfcomm_tty_write_room(struct tty_struct *tty)
 	return dlc->mtu * (dlc->tx_credits ? : 10);
 }
 
+static int rfcomm_tty_set_modem_status(uint cmd, struct rfcomm_dlc *dlc, uint status)
+{
+	u8 v24_sig, mask;
+
+	BT_DBG("dlc %p cmd 0x%02x", dlc, cmd);
+
+	if (cmd == TIOCMSET)
+		v24_sig = 0;
+	else
+		rfcomm_dlc_get_modem_status(dlc, &v24_sig);
+
+	mask =  (status & TIOCM_DSR) ? RFCOMM_V24_RTC : 0 |
+		(status & TIOCM_DTR) ? RFCOMM_V24_RTC : 0 |
+		(status & TIOCM_RTS) ? RFCOMM_V24_RTR : 0 |
+		(status & TIOCM_CTS) ? RFCOMM_V24_RTR : 0 |
+		(status & TIOCM_RI)  ? RFCOMM_V24_IC  : 0 |
+		(status & TIOCM_CD)  ? RFCOMM_V24_DV  : 0;
+
+	if (cmd == TIOCMBIC)
+		v24_sig &= ~mask;
+	else
+		v24_sig |= mask;
+
+	rfcomm_dlc_set_modem_status(dlc, v24_sig);
+	return 0;
+}
+
 static int rfcomm_tty_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
 	struct rfcomm_dlc *dlc = dev->dlc;
-	unsigned int modeminfo;
+	uint status;
 	int err;
 
 	BT_DBG("tty %p cmd 0x%02x", tty, cmd);
@@ -650,34 +701,14 @@ static int rfcomm_tty_ioctl(struct tty_struct *tty, struct file *filp, unsigned 
 	case TIOCMGET:
 		BT_DBG("TIOCMGET");
 
-		modeminfo = ((dlc->v24_sig & RFCOMM_V24_RTC) ? TIOCM_DSR | TIOCM_DTR : 0)
-			  | ((dlc->v24_sig & RFCOMM_V24_RTR) ? TIOCM_RTS | TIOCM_CTS : 0)
-			  | ((dlc->v24_sig & RFCOMM_V24_IC) ? TIOCM_RI : 0)
-			  | ((dlc->v24_sig & RFCOMM_V24_DV) ? TIOCM_CD : 0);
+		return put_user(dev->modem_status, (unsigned int *)arg);
 
-		return put_user(modeminfo, (unsigned int *)arg);
-
-	case TIOCMBIS:
-		BT_DBG("TIOCMBIS");
-
-		if ((err = get_user(modeminfo, (unsigned int *)arg)))
+	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
+	case TIOCMBIS: /* Turns on the lines as specified by the mask */
+	case TIOCMBIC: /* Turns off the lines as specified by the mask */
+		if ((err = get_user(status, (unsigned int *)arg)))
 			return err;
-
-		dlc->v24_sig |= (modeminfo & TIOCM_DSR) ? RFCOMM_V24_RTC : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_DTR) ? RFCOMM_V24_RTC : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_RTS) ? RFCOMM_V24_RTR : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_CTS) ? RFCOMM_V24_RTR : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_RI) ? RFCOMM_V24_IC : 0;
-		dlc->v24_sig |= (modeminfo & TIOCM_CD) ? RFCOMM_V24_DV : 0;
-
-		// rfcomm_send_msc(dlc->session, dlc->dlci, 1, dlc->v24_sig);
-
-		return 0;
-
-	case TIOCMBIC:
-	case TIOCMSET:
-		BT_DBG("set modem info");
-		break;
+		return rfcomm_tty_set_modem_status(cmd, dlc, status);
 
 	case TIOCMIWAIT:
 		BT_DBG("TIOCMIWAIT");

@@ -17,6 +17,9 @@
 #ifndef _LINUX_UDP_H
 #define _LINUX_UDP_H
 
+#include <asm/byteorder.h>
+#include <net/sock.h>
+#include <linux/ip.h>
 
 struct udphdr {
 	__u16	source;
@@ -25,5 +28,33 @@ struct udphdr {
 	__u16	check;
 };
 
+/* UDP socket options */
+#define UDP_CORK	1	/* Never send partially complete segments */
+
+struct udp_opt {
+	int		pending;	/* Any pending frames ? */
+	unsigned int	corkflag;	/* Cork is required */
+	/*
+	 * Following members retains the infomation to create a UDP header
+	 * when the socket is uncorked.
+	 */
+	u32		saddr;		/* source address */
+	u32		daddr;		/* destination address */
+	__u16		sport;		/* source port */
+	__u16		dport;		/* destination port */
+	__u16		len;		/* total length of pending frames */
+};
+
+/* WARNING: don't change the layout of the members in udp_sock! */
+struct udp_sock {
+	struct sock	  sk;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	struct ipv6_pinfo *pinet6;
+#endif
+	struct inet_opt	  inet;
+	struct udp_opt	  udp;
+};
+
+#define udp_sk(__sk) (&((struct udp_sock *)__sk)->udp)
 
 #endif	/* _LINUX_UDP_H */

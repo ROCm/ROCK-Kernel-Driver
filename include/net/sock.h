@@ -249,6 +249,8 @@ struct proto {
 					   struct msghdr *msg,
 					int len, int noblock, int flags, 
 					int *addr_len);
+	int			(*sendpage)(struct sock *sk, struct page *page,
+					int offset, size_t size, int flags);
 	int			(*bind)(struct sock *sk, 
 					struct sockaddr *uaddr, int addr_len);
 
@@ -436,10 +438,6 @@ extern void sock_def_destruct(struct sock *);
 
 /* Initialise core socket variables */
 extern void sock_init_data(struct socket *sock, struct sock *sk);
-
-extern void sklist_remove_socket(struct sock **list, struct sock *sk);
-extern void sklist_insert_socket(struct sock **list, struct sock *sk);
-extern void sklist_destroy_socket(struct sock **list, struct sock *sk);
 
 #ifdef CONFIG_FILTER
 

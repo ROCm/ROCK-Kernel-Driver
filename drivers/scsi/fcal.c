@@ -70,17 +70,21 @@ static unsigned char target2alpa[] = {
 
 static int fcal_encode_addr(Scsi_Cmnd *SCpnt, u16 *addr, fc_channel *fc, fcp_cmnd *fcmd);
 
-static void fcal_select_queue_depths(struct Scsi_Host *host, Scsi_Device *devlist)
+int fcal_slave_attach(Scsi_Device *device)
 {
-	Scsi_Device *device;
+	int depth_to_use;
 	
-	for (device = devlist; device; device = device->next) {
-		if (device->host != host) continue;
-		if (device->tagged_supported)
-			device->queue_depth = /* 254 */ 8;
-		else
-			device->queue_depth = 2;
-	}
+	if (device->tagged_supported)
+		depth_to_use = /* 254 */ 8;
+	else
+		depth_to_use = 2;
+
+	scsi_adjust_queue_depth(device,
+				(device->tagged_supported ?
+				 MSG_SIMPLE_TAG : 0),
+				depth_to_use);
+
+	return 0;
 }
 
 /* Detect all FC Arbitrated Loops attached to the machine.
@@ -165,7 +169,6 @@ int __init fcal_detect(Scsi_Host_Template *tpnt)
 #ifdef __sparc_v9__
 		host->unchecked_isa_dma = 1;
 #endif
-		host->select_queue_depths = fcal_select_queue_depths;
 
 		fc->channels = 1;
 		fc->targets = 127;
@@ -210,9 +213,7 @@ int fcal_proc_info (char *buffer, char **start, off_t offset, int length, int ho
 	char *pos = buffer;
 	int i, j;
 
-	for (host=scsi_hostlist; host; host=host->next)
-		if (host->host_no == hostno)
-                      break;
+	host = scsi_host_hn_get(hostno);
 
 	if (!host) return -ESRCH;
 

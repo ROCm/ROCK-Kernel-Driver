@@ -1077,7 +1077,7 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 			     driver->name, ps->dev->devnum, ctrl.ifno);
 			usb_device_remove(&ifp->dev);
 		} else
-			retval = -EINVAL;
+			retval = -ENODATA;
 		break;
 
 	/* let kernel drivers try to (re)bind to the interface */

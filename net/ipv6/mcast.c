@@ -18,6 +18,12 @@
 /* Changes:
  *
  *	yoshfuji	: fix format of router-alert option
+ *	YOSHIFUJI Hideaki @USAGI:
+ *		Fixed source address for MLD message based on
+ *		<draft-ietf-magma-mld-source-02.txt>.
+ *	YOSHIFUJI Hideaki @USAGI:
+ *		- Ignore Queries for invalid addresses.
+ *		- MLD for link-local addresses.
  */
 
 #define __NO_VERSION__
@@ -406,6 +412,7 @@ int igmp6_event_query(struct sk_buff *skb)
 	unsigned long resptime;
 	struct inet6_dev *idev;
 	struct icmp6hdr *hdr;
+	int addr_type;
 
 	if (!pskb_may_pull(skb, sizeof(struct in6_addr)))
 		return -EINVAL;
@@ -421,6 +428,11 @@ int igmp6_event_query(struct sk_buff *skb)
 	resptime = (resptime<<10)/(1024000/HZ);
 
 	addrp = (struct in6_addr *) (hdr + 1);
+	addr_type = ipv6_addr_type(addrp);
+
+	if (addr_type != IPV6_ADDR_ANY &&
+	    !(addr_type&IPV6_ADDR_MULTICAST))
+		return -EINVAL;
 
 	idev = in6_dev_get(skb->dev);
 
@@ -428,7 +440,7 @@ int igmp6_event_query(struct sk_buff *skb)
 		return 0;
 
 	read_lock(&idev->lock);
-	if (ipv6_addr_any(addrp)) {
+	if (addr_type == IPV6_ADDR_ANY) {
 		for (ma = idev->mc_list; ma; ma=ma->next)
 			igmp6_group_queried(ma, resptime);
 	} else {
@@ -452,6 +464,7 @@ int igmp6_event_report(struct sk_buff *skb)
 	struct in6_addr *addrp;
 	struct inet6_dev *idev;
 	struct icmp6hdr *hdr;
+	int addr_type;
 
 	/* Our own report looped back. Ignore it. */
 	if (skb->pkt_type == PACKET_LOOPBACK)
@@ -463,7 +476,9 @@ int igmp6_event_report(struct sk_buff *skb)
 	hdr = (struct icmp6hdr*) skb->h.raw;
 
 	/* Drop reports with not link local source */
-	if (!(ipv6_addr_type(&skb->nh.ipv6h->saddr)&IPV6_ADDR_LINKLOCAL))
+	addr_type = ipv6_addr_type(&skb->nh.ipv6h->saddr);
+	if (addr_type != IPV6_ADDR_ANY && 
+	    !(addr_type&IPV6_ADDR_LINKLOCAL))
 		return -EINVAL;
 
 	addrp = (struct in6_addr *) (hdr + 1);
@@ -530,11 +545,11 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	}
 
 	if (ipv6_get_lladdr(dev, &addr_buf)) {
-#if MCAST_DEBUG >= 1
-		printk(KERN_DEBUG "igmp6: %s no linklocal address\n",
-		       dev->name);
-#endif
-		goto out;
+		/* <draft-ietf-magma-mld-source-02.txt>:
+		 * use unspecified address as the source address 
+		 * when a valid link-local address is not available.
+		 */
+		memset(&addr_buf, 0, sizeof(addr_buf));
 	}
 
 	ip6_nd_hdr(sk, skb, dev, &addr_buf, snd_addr, NEXTHDR_HOP, payload_len);
@@ -567,11 +582,9 @@ out:
 static void igmp6_join_group(struct ifmcaddr6 *ma)
 {
 	unsigned long delay;
-	int addr_type;
 
-	addr_type = ipv6_addr_type(&ma->mca_addr);
-
-	if ((addr_type & (IPV6_ADDR_LINKLOCAL|IPV6_ADDR_LOOPBACK)))
+	if (IPV6_ADDR_MC_SCOPE(&ma->mca_addr) < IPV6_ADDR_SCOPE_LINKLOCAL ||
+	    ipv6_addr_is_ll_all_nodes(&ma->mca_addr))
 		return;
 
 	igmp6_send(&ma->mca_addr, ma->idev->dev, ICMPV6_MGM_REPORT);
@@ -592,11 +605,8 @@ static void igmp6_join_group(struct ifmcaddr6 *ma)
 
 static void igmp6_leave_group(struct ifmcaddr6 *ma)
 {
-	int addr_type;
-
-	addr_type = ipv6_addr_type(&ma->mca_addr);
-
-	if ((addr_type & IPV6_ADDR_LINKLOCAL))
+	if (IPV6_ADDR_MC_SCOPE(&ma->mca_addr) < IPV6_ADDR_SCOPE_LINKLOCAL ||
+	    ipv6_addr_is_ll_all_nodes(&ma->mca_addr))
 		return;
 
 	if (ma->mca_flags & MAF_LAST_REPORTER)

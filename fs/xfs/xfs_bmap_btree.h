@@ -509,6 +509,41 @@ xfs_exntst_t
 xfs_bmbt_get_state(
 	xfs_bmbt_rec_t	*r);
 
+#if ARCH_CONVERT != ARCH_NOCONVERT
+void
+xfs_bmbt_disk_get_all(
+	xfs_bmbt_rec_t	*r,
+	xfs_bmbt_irec_t *s);
+
+xfs_exntst_t
+xfs_bmbt_disk_get_state(
+	xfs_bmbt_rec_t	*r);
+
+xfs_filblks_t
+xfs_bmbt_disk_get_blockcount(
+	xfs_bmbt_rec_t	*r);
+
+xfs_fsblock_t
+xfs_bmbt_disk_get_startblock(
+	xfs_bmbt_rec_t	*r);
+
+xfs_fileoff_t
+xfs_bmbt_disk_get_startoff(
+	xfs_bmbt_rec_t	*r);
+
+#else
+#define xfs_bmbt_disk_get_all(r, s) \
+	xfs_bmbt_get_all(r, s)
+#define xfs_bmbt_disk_get_state(r) \
+	xfs_bmbt_get_state(r)
+#define xfs_bmbt_disk_get_blockcount(r) \
+	xfs_bmbt_get_blockcount(r)
+#define xfs_bmbt_disk_get_startblock(r) \
+	xfs_bmbt_get_blockcount(r)
+#define xfs_bmbt_disk_get_startoff(r) \
+	xfs_bmbt_get_startoff(r)
+#endif
+
 int
 xfs_bmbt_increment(
 	struct xfs_btree_cur *,
@@ -606,6 +641,26 @@ void
 xfs_bmbt_set_state(
 	xfs_bmbt_rec_t	*r,
 	xfs_exntst_t	v);
+
+#if ARCH_CONVERT != ARCH_NOCONVERT
+void
+xfs_bmbt_disk_set_all(
+	xfs_bmbt_rec_t	*r,
+	xfs_bmbt_irec_t *s);
+
+void
+xfs_bmbt_disk_set_allf(
+	xfs_bmbt_rec_t	*r,
+	xfs_fileoff_t	o,
+	xfs_fsblock_t	b,
+	xfs_filblks_t	c,
+	xfs_exntst_t	v);
+#else
+#define xfs_bmbt_disk_set_all(r, s) \
+	xfs_bmbt_set_all(r, s)
+#define xfs_bmbt_disk_set_allf(r, o, b, c, v) \
+	xfs_bmbt_set_allf(r, o, b, c, v)
+#endif
 
 void
 xfs_bmbt_to_bmdr(

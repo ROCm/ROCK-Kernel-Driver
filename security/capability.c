@@ -442,11 +442,6 @@ static void cap_file_free_security (struct file *file)
 	return;
 }
 
-static int cap_file_llseek (struct file *file)
-{
-	return 0;
-}
-
 static int cap_file_ioctl (struct file *file, unsigned int command,
 			   unsigned long arg)
 {
@@ -787,7 +782,6 @@ static struct security_operations capability_ops = {
 	.file_permission =		cap_file_permission,
 	.file_alloc_security =		cap_file_alloc_security,
 	.file_free_security =		cap_file_free_security,
-	.file_llseek =			cap_file_llseek,
 	.file_ioctl =			cap_file_ioctl,
 	.file_mmap =			cap_file_mmap,
 	.file_mprotect =		cap_file_mprotect,

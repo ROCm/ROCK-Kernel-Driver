@@ -36,11 +36,6 @@
 #include <linux/uio.h>
 #include <asm/uaccess.h>
 
-#define bzero(p,s)	memset((p), 0, (s))
-#define bcopy(s,d,n)	memcpy((d),(s),(n))
-#define bcmp(s1,s2,l)	memcmp(s1,s2,l)
-#define ovbcopy(from,to,count)	memmove(to,from,count)
-
 typedef struct iovec iovec_t;
 
 typedef struct uio {

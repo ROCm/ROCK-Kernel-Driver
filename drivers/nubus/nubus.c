@@ -72,7 +72,7 @@ struct nubus_board* nubus_boards;
    Etcetera, etcetera.  Hopefully this clears up some confusion over
    what the following code actually does.  */
  
-extern inline int not_useful(void *p, int map)
+static inline int not_useful(void *p, int map)
 {
 	unsigned long pv=(unsigned long)p;
 	pv &= 3;
@@ -148,14 +148,14 @@ static void nubus_move(unsigned char **ptr, int len, int map)
    have to expand it from a 24-bit signed number to a 32-bit signed
    number. */
 
-extern inline long nubus_expand32(long foo)
+static inline long nubus_expand32(long foo)
 {
 	if(foo & 0x00800000)	/* 24bit negative */
 		foo |= 0xFF000000;
 	return foo;
 }
 
-extern inline void *nubus_rom_addr(int slot)
+static inline void *nubus_rom_addr(int slot)
 {	
 	/*
 	 *	Returns the first byte after the card. We then walk

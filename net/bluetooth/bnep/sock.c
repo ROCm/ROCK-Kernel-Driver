@@ -50,36 +50,11 @@
 
 #include "bnep.h"
 
-#ifndef CONFIG_BLUEZ_BNEP_DEBUG
+#ifndef CONFIG_BT_BNEP_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #endif
 
-static struct socket *sockfd_lookup(int fd, int *err)
-{
-	struct file *file;
-	struct inode *inode;
-	struct socket *sock;
-
-	if (!(file = fget(fd))) {
-		*err = -EBADF;
-		return NULL;
-	}
-
-	inode = file->f_dentry->d_inode;
-	if (!inode->i_sock || !(sock = SOCKET_I(inode))) {
-		*err = -ENOTSOCK;
-		fput(file);
-		return NULL;
-	}
-
-	if (sock->file != file) {
-		printk(KERN_ERR "socki_lookup: socket file changed!\n");
-		sock->file = file;
-	}
-	return sock;
-}
- 
 static int bnep_sock_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
@@ -198,7 +173,7 @@ static int bnep_sock_create(struct socket *sock, int protocol)
 	if (sock->type != SOCK_RAW)
 		return -ESOCKTNOSUPPORT;
 
-	if (!(sk = bluez_sock_alloc(sock, PF_BLUETOOTH, 0, GFP_KERNEL)))
+	if (!(sk = bt_sock_alloc(sock, PF_BLUETOOTH, 0, GFP_KERNEL)))
 		return -ENOMEM;
 	sock->ops = &bnep_sock_ops;
 
@@ -219,13 +194,13 @@ static struct net_proto_family bnep_sock_family_ops = {
 
 int bnep_sock_init(void)
 {
-	bluez_sock_register(BTPROTO_BNEP, &bnep_sock_family_ops);
+	bt_sock_register(BTPROTO_BNEP, &bnep_sock_family_ops);
 	return 0;
 }
 
 int bnep_sock_cleanup(void)
 {
-	if (bluez_sock_unregister(BTPROTO_BNEP))
+	if (bt_sock_unregister(BTPROTO_BNEP))
 		BT_ERR("Can't unregister BNEP socket");
 	return 0;
 }

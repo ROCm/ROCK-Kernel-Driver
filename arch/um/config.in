@@ -28,8 +28,13 @@ tristate 'Host filesystem' CONFIG_HOSTFS
 bool 'Management console' CONFIG_MCONSOLE
 dep_bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ $CONFIG_MCONSOLE
 bool '2G/2G host address space split' CONFIG_HOST_2G_2G
+
 bool 'Symmetric multi-processing support' CONFIG_UML_SMP
 define_bool CONFIG_SMP $CONFIG_UML_SMP
+if [ "$CONFIG_SMP" = "y" ]; then
+  int  'Maximum number of CPUs (2-32)' CONFIG_NR_CPUS 32
+fi
+
 int 'Nesting level' CONFIG_NEST_LEVEL 0
 int 'Kernel address space size (in .5G units)' CONFIG_KERNEL_HALF_GIGS 1
 bool 'Highmem support' CONFIG_HIGHMEM

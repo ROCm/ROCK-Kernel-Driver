@@ -1664,20 +1664,11 @@ cmsg32_recvmsg_fixup (struct msghdr *kmsg, unsigned long orig_cmsg_uptr)
 	kmsg->msg_control = (void *) orig_cmsg_uptr;
 }
 
-static inline void
-sockfd_put (struct socket *sock)
-{
-	fput(sock->file);
-}
-
 /* XXX This really belongs in some header file... -DaveM */
 #define MAX_SOCK_ADDR	128		/* 108 for Unix domain -
 					   16 for IP, 16 for IPX,
 					   24 for IPv6,
 					   about 80 for AX.25 */
-
-extern struct socket *sockfd_lookup (int fd, int *err);
-
 /*
  *	BSD sendmsg interface
  */
@@ -3772,12 +3763,15 @@ do_smb_super_data_conv(void *raw_data)
 	struct smb_mount_data *s = (struct smb_mount_data *)raw_data;
 	struct smb_mount_data32 *s32 = (struct smb_mount_data32 *)raw_data;
 
+	if (s32->version != SMB_MOUNT_OLDVERSION)
+		goto out;
 	s->version = s32->version;
 	s->mounted_uid = s32->mounted_uid;
 	s->uid = s32->uid;
 	s->gid = s32->gid;
 	s->file_mode = s32->file_mode;
 	s->dir_mode = s32->dir_mode;
+out:
 	return raw_data;
 }
 

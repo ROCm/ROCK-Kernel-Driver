@@ -175,16 +175,16 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 		     u_int cmd, u_long arg);
 static int ftl_open(struct inode *inode, struct file *file);
 static release_t ftl_close(struct inode *inode, struct file *file);
-static int ftl_revalidate(kdev_t dev);
+static int ftl_revalidate(struct gendisk *disk);
 
 static void ftl_erase_callback(struct erase_info *done);
 
 static struct block_device_operations ftl_blk_fops = {
-    owner:	THIS_MODULE,
-    open:	ftl_open,
-    release:	ftl_close,
-    ioctl:	ftl_ioctl,
-    revalidate:	ftl_revalidate,
+	.owner		= THIS_MODULE,
+	.open		= ftl_open,
+	.release	= ftl_close,
+	.ioctl		= ftl_ioctl,
+	.revalidate_disk= ftl_revalidate,
 };
 
 /*======================================================================
@@ -823,61 +823,53 @@ static u_int32_t find_free(partition_t *part)
 
 static int ftl_open(struct inode *inode, struct file *file)
 {
-    int minor = minor(inode->i_rdev);
-    partition_t *partition;
+	partition_t *partition = inode->i_bdev->bd_disk->private_data;
+	if (!partition)
+		return -ENODEV;
 
-    if (minor>>4 >= MAX_MTD_DEVICES)
-	return -ENODEV;
-
-    partition = myparts[minor>>4];
-
-    if (!partition)
-	return -ENODEV;
-
-    if (partition->state != FTL_FORMATTED)
-	return -ENXIO;
+	if (partition->state != FTL_FORMATTED)
+		return -ENXIO;
     
-    if (get_capacity(partition->disk) == 0)
-	return -ENXIO;
+	if (get_capacity(partition->disk) == 0)
+		return -ENXIO;
 
-    if (!get_mtd_device(partition->mtd, -1))
-	    return /* -E'SBUGGEREDOFF */ -ENXIO;
+	if (!get_mtd_device(partition->mtd, -1))
+		return /* -E'SBUGGEREDOFF */ -ENXIO;
 
-    if ((file->f_mode & 2) && !(partition->mtd->flags & MTD_CLEAR_BITS) ) {
-	    put_mtd_device(partition->mtd);
-            return -EROFS;
-    }
+	if ((file->f_mode & 2) && !(partition->mtd->flags & MTD_CLEAR_BITS) ) {
+		put_mtd_device(partition->mtd);
+		return -EROFS;
+	}
     
-    DEBUG(0, "ftl_cs: ftl_open(%d)\n", minor);
+	DEBUG(0, "ftl_cs: ftl_open(%s)\n", inode->i_bdev->b_disk->disk_name);
 
-    atomic_inc(&partition->open);
+	atomic_inc(&partition->open);
 
-    return 0;
+	return 0;
 }
 
 /*====================================================================*/
 
 static release_t ftl_close(struct inode *inode, struct file *file)
 {
-    int minor = minor(inode->i_rdev);
-    partition_t *part = myparts[minor >> 4];
-    int i;
+	partition_t *part = inode->i_bdev->bd_disk->private_data;
+	int i;
     
-    DEBUG(0, "ftl_cs: ftl_close(%d)\n", minor);
+	DEBUG(0, "ftl_cs: ftl_close(%s)\n", inode->i_bdev->b_disk->disk_name);
 
-    /* Wait for any pending erase operations to complete */
-    if (part->mtd->sync)
-	    part->mtd->sync(part->mtd);
+	/* Wait for any pending erase operations to complete */
+	if (part->mtd->sync)
+		part->mtd->sync(part->mtd);
     
-    for (i = 0; i < part->header.NumTransferUnits; i++) {
-	if (part->XferInfo[i].state == XFER_ERASED)
-	    prepare_xfer(part, i);
-    }
+	for (i = 0; i < part->header.NumTransferUnits; i++) {
+		if (part->XferInfo[i].state == XFER_ERASED)
+			prepare_xfer(part, i);
+	}
 
-    atomic_dec(&part->open);
+	atomic_dec(&part->open);
 
-    put_mtd_device(part->mtd);
-    release_return(0);
+	put_mtd_device(part->mtd);
+	release_return(0);
 } /* ftl_close */
 
 
@@ -1091,25 +1083,26 @@ static int ftl_write(partition_t *part, caddr_t buffer,
 static int ftl_ioctl(struct inode *inode, struct file *file,
 		     u_int cmd, u_long arg)
 {
-    struct hd_geometry *geo = (struct hd_geometry *)arg;
-    int ret = 0, minor = minor(inode->i_rdev);
-    partition_t *part= myparts[minor >> 4];
-    u_long sect;
+	partition_t *part = inode->i_bdev->bd_disk->private_data;
+	struct hd_geometry *geo = (struct hd_geometry *)arg;
+	int ret = 0;
+	u_long sect;
 
-    if (!part)
-	return -ENODEV; /* How? */
+	if (!part)
+		return -ENODEV; /* How? */
 
-    if (cmd != HDIO_GETGEO)
-	return -EINVAL;
-    ret = verify_area(VERIFY_WRITE, (long *)arg, sizeof(*geo));
-    if (ret) return ret;
-    /* Sort of arbitrary: round size down to 4K boundary */
-    sect = le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE;
-    put_user(1, (char *)&geo->heads);
-    put_user(8, (char *)&geo->sectors);
-    put_user((sect>>3), (short *)&geo->cylinders);
-    put_user(get_start_sect(inode->i_bdev), (u_long *)&geo->start);
-    return 0;
+	if (cmd != HDIO_GETGEO)
+		return -EINVAL;
+	ret = verify_area(VERIFY_WRITE, (long *)arg, sizeof(*geo));
+	if (ret)
+		return ret;
+	/* Sort of arbitrary: round size down to 4K boundary */
+	sect = le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE;
+	put_user(1, (char *)&geo->heads);
+	put_user(8, (char *)&geo->sectors);
+	put_user((sect>>3), (short *)&geo->cylinders);
+	put_user(get_start_sect(inode->i_bdev), (u_long *)&geo->start);
+	return 0;
 } /* ftl_ioctl */
 
 /*======================================================================
@@ -1118,13 +1111,11 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 
 ======================================================================*/
 
-static int ftl_revalidate(kdev_t dev)
+static int ftl_revalidate(struct gendisk *disk)
 {
-	int unit = minor(dev) >> 4;
-	partition_t *part = myparts[unit];
+	partition_t *part = disk->private_data;
 	scan_header(part);
-	set_capacity(part->disk,
-		le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE);
+	set_capacity(disk, le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE);
 	return 0;
 }
 
@@ -1134,50 +1125,48 @@ static int ftl_revalidate(kdev_t dev)
 
 ======================================================================*/
 
-static void do_ftl_request(request_arg_t)
+static struct request_queue ftl_queue;
+
+static void do_ftl_request(struct request_queue *q)
 {
-    int ret, minor;
-    partition_t *part;
+	struct request *req;
+	partition_t *part;
+	int ret;
 
-    do {
-	//	    sti();
-	if (blk_queue_empty(QUEUE))
-		return;
+	do {
+		//	    sti();
+		if (blk_queue_empty(q))
+			return;
+		req = elv_next_request(q);
+		part = req->rq_disk->private_data;
+		if (part) {
+			ret = 0;
+			switch (rq_data_dir(CURRENT)) {
+			case READ:
+				ret = ftl_read(part, req->buffer, req->sector,
+						req->current_nr_sectors);
+				if (ret)
+					printk("ftl_read returned %d\n", ret);
+				break;
+			case WRITE:
+				ret = ftl_write(part, req->buffer, req->sector,
+						req->current_nr_sectors);
+				if (ret)
+					printk("ftl_write returned %d\n", ret);
+				break;
+			default:
+				panic("ftl_cs: unknown block command!\n");
+			}
+		} else {
+			ret = 1;
+			printk("NULL part in ftl_request\n");
+		}
+		 
+		if (!ret)
+			req->sector += req->current_nr_sectors;
 
-	minor = minor(CURRENT->rq_dev);
-
-	part = myparts[minor >> 4];
-	if (part) {
-	  ret = 0;
-	  
-	  switch (rq_data_dir(CURRENT)) {
-	  case READ:
-	    ret = ftl_read(part, CURRENT->buffer, CURRENT->sector,
-			   CURRENT->current_nr_sectors);
-	    if (ret) printk("ftl_read returned %d\n", ret);
-	    break;
-	    
-	  case WRITE:
-	    ret = ftl_write(part, CURRENT->buffer, CURRENT->sector,
-			    CURRENT->current_nr_sectors);
-	    if (ret) printk("ftl_write returned %d\n", ret);
-	    break;
-	    
-	  default:
-	    panic("ftl_cs: unknown block command!\n");
-	    
-	  }
-	} else {
-	  ret = 1;
-	  printk("NULL part in ftl_request\n");
-	}
-	 
-	if (!ret) {
-	  CURRENT->sector += CURRENT->current_nr_sectors;
-	}
-	
-	end_request(CURRENT, (ret == 0) ? 1 : 0);
-    } while (1);
+		end_request(req, (ret == 0) ? 1 : 0);
+	} while (1);
 } /* do_ftl_request */
 
 /*====================================================================*/
@@ -1223,7 +1212,7 @@ static void ftl_notify_add(struct mtd_info *mtd)
 	}
 
 	partition = kmalloc(sizeof(partition_t), GFP_KERNEL);
-	disk = alloc_disk();
+	disk = alloc_disk(1 << PART_BITS);
 		
 	if (!partition||!disk) {
 		printk(KERN_WARNING "No memory to scan for FTL on %s\n",
@@ -1237,7 +1226,6 @@ static void ftl_notify_add(struct mtd_info *mtd)
 	sprintf(disk->disk_name, "ftl%c", 'a' + device);
 	disk->major = FTL_MAJOR;
 	disk->first_minor = device << 4;
-	disk->minor_shift = PART_BITS;
 	disk->fops = &ftl_blk_fops;
 	partition->mtd = mtd;
 	partition->disk = disk;
@@ -1247,6 +1235,8 @@ static void ftl_notify_add(struct mtd_info *mtd)
 		atomic_set(&partition->open, 0);
 		myparts[device] = partition;
 		set_capacity(disk, le32_to_cpu(partition->header.FormattedSize)/SECTOR_SIZE);
+		disk->private_data = partition;
+		disk->queue = &ftl_queue;
 		add_disk(disk);
 #ifdef PCMCIA_DEBUG
 		printk(KERN_INFO "ftl_cs: opening %d kb FTL partition\n",
@@ -1288,30 +1278,28 @@ static void ftl_notify_remove(struct mtd_info *mtd)
 
 int init_ftl(void)
 {
-    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
-    DEBUG(0, "$Id: ftl.c,v 1.39 2001/10/02 15:05:11 dwmw2 Exp $\n");
-    
-    if (register_blkdev(FTL_MAJOR, "ftl", &ftl_blk_fops)) {
-	printk(KERN_NOTICE "ftl_cs: unable to grab major "
-	       "device number!\n");
-	return -EAGAIN;
-    }
-    blk_init_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR), &do_ftl_request, &lock);
-    register_mtd_user(&ftl_notifier);
-    
-    return 0;
+	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	DEBUG(0, "$Id: ftl.c,v 1.39 2001/10/02 15:05:11 dwmw2 Exp $\n");
+
+	if (register_blkdev(FTL_MAJOR, "ftl", &ftl_blk_fops)) {
+		printk(KERN_NOTICE "ftl_cs: unable to grab major "
+		       "device number!\n");
+		return -EAGAIN;
+	}
+	blk_init_queue(&ftl_queue, &do_ftl_request, &lock);
+	register_mtd_user(&ftl_notifier);
+	return 0;
 }
 
 static void __exit cleanup_ftl(void)
 {
-    unregister_mtd_user(&ftl_notifier);
-    unregister_blkdev(FTL_MAJOR, "ftl");
-    blk_cleanup_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR));
+	unregister_mtd_user(&ftl_notifier);
+	unregister_blkdev(FTL_MAJOR, "ftl");
+	blk_cleanup_queue(&ftl_queue);
 }
 
 module_init(init_ftl);
 module_exit(cleanup_ftl);
-
 
 MODULE_LICENSE("Dual MPL/GPL");
 MODULE_AUTHOR("David Hinds <dhinds@sonic.net>");

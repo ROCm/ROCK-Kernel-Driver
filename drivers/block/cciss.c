@@ -105,7 +105,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		unsigned int cmd, unsigned long arg);
 
 static int revalidate_allvol(kdev_t dev);
-static int cciss_revalidate(kdev_t dev);
+static int cciss_revalidate(struct gendisk *disk);
 static int deregister_disk(int ctlr, int logvol);
 static int register_new_disk(int cltr);
 
@@ -125,11 +125,11 @@ static void cciss_procinit(int i) {}
 #endif /* CONFIG_PROC_FS */
 
 static struct block_device_operations cciss_fops  = {
-	owner:			THIS_MODULE,
-	open:			cciss_open, 
-	release:        	cciss_release,
-        ioctl:			cciss_ioctl,
-	revalidate:		cciss_revalidate,
+	.owner		= THIS_MODULE,
+	.open		= cciss_open, 
+	.release       	= cciss_release,
+        .ioctl		= cciss_ioctl,
+	.revalidate_disk= cciss_revalidate,
 };
 
 #include "cciss_scsi.c"		/* For SCSI tape support */
@@ -699,12 +699,10 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	
 }
 
-static int cciss_revalidate(kdev_t dev)
+static int cciss_revalidate(struct gendisk *disk)
 {
-        int ctlr = major(dev) - MAJOR_NR;
-	int target = minor(dev) >> NWD_SHIFT;
-        struct gendisk *disk = hba[ctlr]->gendisk[target];
-	set_capacity(disk, hba[ctlr]->drv[target].nr_blocks);
+	drive_info_struct *drv = disk->private_data;
+	set_capacity(disk, drv->nr_blocks);
 	return 0;
 }
 
@@ -740,7 +738,7 @@ static int revalidate_allvol(kdev_t dev)
 
 	for(i=0; i< NWD; i++) {
 		struct gendisk *disk = hba[ctlr]->gendisk[i];
-		if (disk->part)
+		if (disk->flags & GENHD_FL_UP)
 			del_gendisk(disk);
 	}
 
@@ -765,7 +763,7 @@ static int revalidate_allvol(kdev_t dev)
 		drive_info_struct *drv = &(hba[ctlr]->drv[i]);
 		if (!drv->nr_blocks)
 			continue;
-		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->block_size;
+		hba[ctlr]->queue.hardsect_size = drv->block_size;
 		set_capacity(disk, drv->nr_blocks);
 		add_disk(disk);
 	}
@@ -792,7 +790,7 @@ static int deregister_disk(int ctlr, int logvol)
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
 	/* invalidate the devices and deregister the disk */ 
-	if (disk->part)
+	if (disk->flags & GENHD_FL_UP)
 		del_gendisk(disk);
 	/* check to see if it was the last disk */
 	if (logvol == h->highest_lun) {
@@ -1690,10 +1688,11 @@ static void do_cciss_request(request_queue_t *q)
 {
 	ctlr_info_t *h= q->queuedata; 
 	CommandList_struct *c;
-	int log_unit, start_blk, seg;
+	int start_blk, seg;
 	struct request *creq;
 	u64bit temp64;
 	struct scatterlist tmp_sg[MAXSGENTRIES];
+	drive_info_struct *drv;
 	int i, dir;
 
 	if (blk_queue_plugged(q))
@@ -1707,16 +1706,6 @@ queue:
 	if (creq->nr_phys_segments > MAXSGENTRIES)
                 BUG();
 
-        if (h->ctlr != major(creq->rq_dev)-MAJOR_NR )
-        {
-                printk(KERN_WARNING "doreq cmd for %d, %x at %p\n",
-                                h->ctlr, major(creq->rq_dev), creq);
-                blkdev_dequeue_request(creq);
-                complete_buffers(creq->bio, 0);
-		end_that_request_last(creq);
-		goto startio;
-        }
-
 	if (( c = cmd_alloc(h, 1)) == NULL)
 		goto startio;
 
@@ -1728,10 +1717,10 @@ queue:
 	c->rq = creq;
 	
 	/* fill in the request */ 
-	log_unit = minor(creq->rq_dev) >> NWD_SHIFT; 
+	drv = creq->rq_disk->private_data;
 	c->Header.ReplyQueue = 0;  // unused in simple mode
 	c->Header.Tag.lower = c->busaddr;  // use the physical address the cmd block for tag
-	c->Header.LUN.LogDev.VolId= hba[h->ctlr]->drv[log_unit].LunID;
+	c->Header.LUN.LogDev.VolId= drv->LunID;
 	c->Header.LUN.LogDev.Mode = 1;
 	c->Request.CDBLen = 10; // 12 byte commands not in FW yet;
 	c->Request.Type.Type =  TYPE_CMD; // It is a command. 
@@ -1854,7 +1843,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 	 * See if we can queue up some more IO
 	 */
 	spin_unlock_irqrestore(CCISS_LOCK(h->ctlr), flags);
-	blk_start_queue(BLK_DEFAULT_QUEUE(MAJOR_NR + h->ctlr));
+	blk_start_queue(&h->queue);
 }
 /* 
  *  We cannot read the structure directly, for portablity we must use 
@@ -2274,7 +2263,7 @@ static int alloc_cciss_hba(void)
 	struct gendisk *disk[NWD];
 	int i, n;
 	for (n = 0; n < NWD; n++) {
-		disk[n] = alloc_disk();
+		disk[n] = alloc_disk(1 << NWD_SHIFT);
 		if (!disk[n])
 			goto out;
 	}
@@ -2425,7 +2414,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	cciss_procinit(i);
 
-	q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
+	q = &hba[i]->queue;
         q->queuedata = hba[i];
 	spin_lock_init(&hba[i]->lock);
         blk_init_queue(q, do_cciss_request, &hba[i]->lock);
@@ -2447,10 +2436,12 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		sprintf(disk->disk_name, "cciss/c%dd%d", i, j);
 		disk->major = MAJOR_NR + i;
 		disk->first_minor = j << NWD_SHIFT;
-		disk->minor_shift = NWD_SHIFT;
+		disk->fops = &cciss_fops;
+		disk->queue = &hba[i]->queue;
+		disk->private_data = drv;
 		if( !(drv->nr_blocks))
 			continue;
-		(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->block_size;
+		hba[i]->queue.hardsect_size = drv->block_size;
 		set_capacity(disk, drv->nr_blocks);
 		add_disk(disk);
 	}
@@ -2500,7 +2491,7 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	/* remove it from the disk list */
 	for (j = 0; j < NWD; j++) {
 		struct gendisk *disk = hba[i]->gendisk[j];
-		if (disk->part)
+		if (disk->flags & GENHD_FL_UP)
 			del_gendisk(disk);
 	}
 

@@ -113,14 +113,14 @@ struct channel_info {
 
 #if OPEN_READ == FMODE_READ && OPEN_WRITE == FMODE_WRITE
 
-extern __inline__ int translate_mode(struct file *file)
+static inline int translate_mode(struct file *file)
 {
 	return file->f_mode;
 }
 
 #else
 
-extern __inline__ int translate_mode(struct file *file)
+static inline int translate_mode(struct file *file)
 {
 	return ((file->f_mode & FMODE_READ) ? OPEN_READ : 0) |
 		((file->f_mode & FMODE_WRITE) ? OPEN_WRITE : 0);

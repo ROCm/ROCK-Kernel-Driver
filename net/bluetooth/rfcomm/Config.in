@@ -1,7 +1,7 @@
 
-dep_tristate 'RFCOMM protocol support' CONFIG_BLUEZ_RFCOMM $CONFIG_BLUEZ_L2CAP
+dep_tristate 'RFCOMM protocol support' CONFIG_BT_RFCOMM $CONFIG_BT_L2CAP
 
-if [ "$CONFIG_BLUEZ_RFCOMM" != "n" ]; then
-   bool '  RFCOMM TTY support' CONFIG_BLUEZ_RFCOMM_TTY
+if [ "$CONFIG_BT_RFCOMM" != "n" ]; then
+   bool '  RFCOMM TTY support' CONFIG_BT_RFCOMM_TTY
 fi
 

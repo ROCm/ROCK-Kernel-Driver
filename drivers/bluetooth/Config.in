@@ -1,23 +1,23 @@
 mainmenu_option next_comment
 comment 'Bluetooth device drivers'
 
-dep_tristate 'HCI USB driver' CONFIG_BLUEZ_HCIUSB $CONFIG_BLUEZ $CONFIG_USB
-if [ "$CONFIG_BLUEZ_HCIUSB" != "n" ]; then
-   bool '  USB zero packet support'  CONFIG_BLUEZ_USB_ZERO_PACKET
+dep_tristate 'HCI USB driver' CONFIG_BT_HCIUSB $CONFIG_BT $CONFIG_USB
+if [ "$CONFIG_BT_HCIUSB" != "n" ]; then
+   bool '  USB zero packet support'  CONFIG_BT_USB_ZERO_PACKET
 fi
 
-dep_tristate 'HCI UART driver' CONFIG_BLUEZ_HCIUART $CONFIG_BLUEZ
-if [ "$CONFIG_BLUEZ_HCIUART" != "n" ]; then
-   bool '  UART (H4) protocol support' CONFIG_BLUEZ_HCIUART_H4
-   bool '  BCSP protocol support' CONFIG_BLUEZ_HCIUART_BCSP
+dep_tristate 'HCI UART driver' CONFIG_BT_HCIUART $CONFIG_BT
+if [ "$CONFIG_BT_HCIUART" != "n" ]; then
+   bool '  UART (H4) protocol support' CONFIG_BT_HCIUART_H4
+   bool '  BCSP protocol support' CONFIG_BT_HCIUART_BCSP
 fi
 
-dep_tristate 'HCI DTL1 (PC Card) driver' CONFIG_BLUEZ_HCIDTL1 $CONFIG_PCMCIA $CONFIG_BLUEZ
+dep_tristate 'HCI DTL1 (PC Card) driver' CONFIG_BT_HCIDTL1 $CONFIG_PCMCIA $CONFIG_BT
 
-dep_tristate 'HCI BT3C (PC Card) driver' CONFIG_BLUEZ_HCIBT3C $CONFIG_PCMCIA $CONFIG_BLUEZ
+dep_tristate 'HCI BT3C (PC Card) driver' CONFIG_BT_HCIBT3C $CONFIG_PCMCIA $CONFIG_BT
 
-dep_tristate 'HCI BlueCard (PC Card) driver' CONFIG_BLUEZ_HCIBLUECARD $CONFIG_PCMCIA $CONFIG_BLUEZ
+dep_tristate 'HCI BlueCard (PC Card) driver' CONFIG_BT_HCIBLUECARD $CONFIG_PCMCIA $CONFIG_BT
 
-dep_tristate 'HCI VHCI (Virtual HCI device) driver' CONFIG_BLUEZ_HCIVHCI $CONFIG_BLUEZ
+dep_tristate 'HCI VHCI (Virtual HCI device) driver' CONFIG_BT_HCIVHCI $CONFIG_BT
 
 endmenu

@@ -416,7 +416,7 @@ CONFIG_SUN_PARTITION=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Watchdog

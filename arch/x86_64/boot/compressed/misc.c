@@ -190,7 +190,7 @@ static void puts(const char *s)
 	outb_p(0xff & (pos >> 1), vidport+1);
 }
 
-void* memset(void* s, int c, size_t n)
+void* memset(void* s, int c, unsigned n)
 {
 	int i;
 	char *ss = (char*)s;
@@ -199,14 +199,13 @@ void* memset(void* s, int c, size_t n)
 	return s;
 }
 
-void* memcpy(void* __dest, __const void* __src,
-			    size_t __n)
+void* memcpy(void* dest, const void* src, unsigned n)
 {
 	int i;
-	char *d = (char *)__dest, *s = (char *)__src;
+	char *d = (char *)dest, *s = (char *)src;
 
-	for (i=0;i<__n;i++) d[i] = s[i];
-	return __dest;
+	for (i=0;i<n;i++) d[i] = s[i];
+	return dest;
 }
 
 /* ===========================================================================

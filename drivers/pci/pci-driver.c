@@ -141,7 +141,7 @@ pci_register_driver(struct pci_driver *drv)
 void
 pci_unregister_driver(struct pci_driver *drv)
 {
-	remove_driver(&drv->driver);
+	driver_unregister(&drv->driver);
 }
 
 static struct pci_driver pci_compat_driver = {

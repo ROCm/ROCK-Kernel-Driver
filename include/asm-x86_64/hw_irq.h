@@ -20,6 +20,10 @@
 #include <linux/config.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
+#include <linux/profile.h>
+#include <linux/smp.h>
+
+struct hw_interrupt_type;
 #endif
 
 /*
@@ -126,19 +130,22 @@ __asm__( \
 	"push $" #nr "-256 ; " \
 	"jmp common_interrupt");
 
-extern unsigned long prof_cpu_mask;
-extern unsigned int * prof_buffer;
-extern unsigned long prof_len;
-extern unsigned long prof_shift;
-
-/*
- * x86 profiling function, SMP safe. We might want to do this in
- * assembly totally?
- */
-static inline void x86_do_profile (unsigned long rip)
+static inline void x86_do_profile (struct pt_regs *regs) 
 {
+	unsigned long rip;
+	extern unsigned long prof_cpu_mask;
+	extern char _stext;
+#ifdef CONFIG_PROFILING
+	extern void x86_profile_hook(struct pt_regs *);
+ 
+	x86_profile_hook(regs);
+#endif
+	if (user_mode(regs))
+		return;
 	if (!prof_buffer)
 		return;
+
+	rip = regs->rip;
 
 	/*
 	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
@@ -158,6 +165,11 @@ static inline void x86_do_profile (unsigned long rip)
 		rip = prof_len-1;
 	atomic_inc((atomic_t *)&prof_buffer[rip]);
 }
+
+struct notifier_block;
+ 
+int register_profile_notifier(struct notifier_block * nb);
+int unregister_profile_notifier(struct notifier_block * nb);
 
 #ifdef CONFIG_SMP /*more of this file should probably be ifdefed SMP */
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {

@@ -204,6 +204,8 @@
  *		Andi Kleen 	:	Make poll agree with SIGIO
  *	Salvatore Sanfilippo	:	Support SO_LINGER with linger == 1 and
  *					lingertime == 0 (RFC 793 ABORT Call)
+ *	Hirokazu Takahashi	:	Use copy_from_user() instead of
+ *					csum_and_copy_from_user() if possible.
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -958,8 +960,8 @@ ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset,
 	return res;
 }
 
-#define TCP_PAGE(sk)	(tcp_sk(sk)->sndmsg_page)
-#define TCP_OFF(sk)	(tcp_sk(sk)->sndmsg_off)
+#define TCP_PAGE(sk)	(inet_sk(sk)->sndmsg_page)
+#define TCP_OFF(sk)	(inet_sk(sk)->sndmsg_off)
 
 static inline int tcp_copy_to_page(struct sock *sk, char *from,
 				   struct sk_buff *skb, struct page *page,
@@ -968,18 +970,22 @@ static inline int tcp_copy_to_page(struct sock *sk, char *from,
 	int err = 0;
 	unsigned int csum;
 
-	csum = csum_and_copy_from_user(from, page_address(page) + off,
+	if (skb->ip_summed == CHECKSUM_NONE) {
+		csum = csum_and_copy_from_user(from, page_address(page) + off,
 				       copy, 0, &err);
-	if (!err) {
-		if (skb->ip_summed == CHECKSUM_NONE)
-			skb->csum = csum_block_add(skb->csum, csum, skb->len);
-		skb->len += copy;
-		skb->data_len += copy;
-		skb->truesize += copy;
-		sk->wmem_queued += copy;
-		sk->forward_alloc -= copy;
+		if (err) return err;
+		skb->csum = csum_block_add(skb->csum, csum, skb->len);
+	} else {
+		if (copy_from_user(page_address(page) + off, from, copy))
+			return -EFAULT;
 	}
-	return err;
+
+	skb->len += copy;
+	skb->data_len += copy;
+	skb->truesize += copy;
+	sk->wmem_queued += copy;
+	sk->forward_alloc -= copy;
+	return 0;
 }
 
 static inline int skb_add_data(struct sk_buff *skb, char *from, int copy)
@@ -988,11 +994,16 @@ static inline int skb_add_data(struct sk_buff *skb, char *from, int copy)
 	unsigned int csum;
 	int off = skb->len;
 
-	csum = csum_and_copy_from_user(from, skb_put(skb, copy),
+	if (skb->ip_summed == CHECKSUM_NONE) {
+		csum = csum_and_copy_from_user(from, skb_put(skb, copy),
 				       copy, 0, &err);
-	if (!err) {
-		skb->csum = csum_block_add(skb->csum, csum, off);
-		return 0;
+		if (!err) {
+			skb->csum = csum_block_add(skb->csum, csum, off);
+			return 0;
+		}
+	} else {
+		if (!copy_from_user(skb_put(skb, copy), from, copy))
+			return 0;
 	}
 
 	__skb_trim(skb, off);
@@ -1074,6 +1085,12 @@ new_segment:
 						     0, sk->allocation);
 				if (!skb)
 					goto wait_for_memory;
+
+				/*
+				 * Check whether we can use HW checksum.
+				 */
+				if (sk->route_caps & (NETIF_F_IP_CSUM|NETIF_F_NO_CSUM|NETIF_F_HW_CSUM))
+					skb->ip_summed = CHECKSUM_HW;
 
 				skb_entail(sk, tp, skb);
 				copy = mss_now;

@@ -243,13 +243,13 @@ static int irqdma_allocated;
 #define MAJOR_NR FLOPPY_MAJOR
 #define DEVICE_NAME "floppy"
 #define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
-
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h> /* for the compatibility eject ioctl */
 #include <linux/completion.h>
 
 static struct request *current_req;
+static struct request_queue floppy_queue;
 
 #ifndef fd_get_dma_residue
 #define fd_get_dma_residue() get_dma_residue(FLOPPY_DMA)
@@ -2295,12 +2295,10 @@ static int do_format(kdev_t device, struct format_descr *tmp_format_req)
 
 static inline void end_request(struct request *req, int uptodate)
 {
-	kdev_t dev = req->rq_dev;
-
 	if (end_that_request_first(req, uptodate, current_count_sectors))
 		return;
-	add_blkdev_randomness(major(dev));
-	floppy_off(DEVICE_NR(dev));
+	add_blkdev_randomness(MAJOR_NR);
+	floppy_off((int)req->rq_disk->private_data);
 	blkdev_dequeue_request(req);
 	end_that_request_last(req);
 
@@ -2313,7 +2311,7 @@ static inline void end_request(struct request *req, int uptodate)
  * logical buffer */
 static void request_done(int uptodate)
 {
-	struct request_queue *q = QUEUE;
+	struct request_queue *q = &floppy_queue;
 	struct request *req = current_req;
 	unsigned long flags;
 	int block;
@@ -2913,7 +2911,7 @@ static void redo_fd_request(void)
 
 	for (;;) {
 		if (!current_req) {
-			struct request *req = elv_next_request(QUEUE);
+			struct request *req = elv_next_request(&floppy_queue);
 			if (!req) {
 				do_floppy = NULL;
 				unlock_fdc();
@@ -2921,9 +2919,6 @@ static void redo_fd_request(void)
 			}
 			current_req = req;
 		}
-		if (major(current_req->rq_dev) != MAJOR_NR)
-			panic(DEVICE_NAME ": request list destroyed");
-
 		device = current_req->rq_dev;
 		set_fdc(DRIVE(device));
 		reschedule_timeout(current_reqD, "redo fd request", 0);
@@ -3488,16 +3483,6 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			loc.start = 0;
 			return _COPYOUT(loc);
 		}
-
-		case BLKGETSIZE:
-			ECALL(get_floppy_geometry(drive, type, &g));
-			return put_user(g->size, (unsigned long *) param);
-
-		case BLKGETSIZE64:
-			ECALL(get_floppy_geometry(drive, type, &g));
-			return put_user((u64)g->size << 9, (u64 *) param);
-		/* BLKRRPART is not defined as floppies don't have
-		 * partition tables */
 	}
 
 	/* convert the old style command into a new style command */
@@ -3806,14 +3791,9 @@ static int floppy_open(struct inode * inode, struct file * filp)
 /*
  * Check if the disk has been changed or if a change has been faked.
  */
-static int check_floppy_change(kdev_t dev)
+static int check_floppy_change(struct gendisk *disk)
 {
-	int drive = DRIVE(dev);
-
-	if (major(dev) != MAJOR_NR) {
-		DPRINT("check_floppy_change: not a floppy\n");
-		return 0;
-	}
+	int drive = (int)disk->private_data;
 
 	if (UTESTF(FD_DISK_CHANGED) || UTESTF(FD_VERIFY))
 		return 1;
@@ -3832,7 +3812,7 @@ static int check_floppy_change(kdev_t dev)
 	if (UTESTF(FD_DISK_CHANGED) ||
 	   UTESTF(FD_VERIFY) ||
 	   test_bit(drive, &fake_change) ||
-	   (!TYPE(dev) && !current_type[drive]))
+	   (!ITYPE(UDRS->fd_device) && !current_type[drive]))
 		return 1;
 	return 0;
 }
@@ -3894,16 +3874,17 @@ static int __floppy_read_block_0(struct block_device *bdev)
 	return 0;
 }
 
-static int floppy_read_block_0(kdev_t dev)
+static int floppy_read_block_0(struct gendisk *disk)
 {
 	struct block_device *bdev;
 	int ret;
 
-	bdev = bdget(kdev_t_to_nr(dev));
+	bdev = bdget(MKDEV(disk->major, disk->first_minor));
 	if (!bdev) {
-		printk("No block device for %s\n", __bdevname(dev));
+		printk("No block device for %s\n", disk->disk_name);
 		BUG();
 	}
+	bdev->bd_disk = disk;	/* ewww */
 	ret = __floppy_read_block_0(bdev);
 	atomic_dec(&bdev->bd_count);
 	return ret;
@@ -3913,10 +3894,10 @@ static int floppy_read_block_0(kdev_t dev)
  * the bootblock (block 0). "Autodetection" is also needed to check whether
  * there is a disk in the drive at all... Thus we also do it for fixed
  * geometry formats */
-static int floppy_revalidate(kdev_t dev)
+static int floppy_revalidate(struct gendisk *disk)
 {
-#define NO_GEOM (!current_type[drive] && !TYPE(dev))
-	int drive=DRIVE(dev);
+	int drive=(int)disk->private_data;
+#define NO_GEOM (!current_type[drive] && !ITYPE(UDRS->fd_device))
 	int cf;
 	int res = 0;
 
@@ -3944,24 +3925,24 @@ static int floppy_revalidate(kdev_t dev)
 			UDRS->generation++;
 		if (NO_GEOM){
 			/* auto-sensing */
-			res = floppy_read_block_0(dev);
+			res = floppy_read_block_0(disk);
 		} else {
 			if (cf)
 				poll_drive(0, FD_RAW_NEED_DISK);
 			process_fd_request();
 		}
 	}
-	set_capacity(disks[drive], floppy_sizes[minor(dev)]);
+	set_capacity(disk, floppy_sizes[UDRS->fd_device]);
 	return res;
 }
 
 static struct block_device_operations floppy_fops = {
-	owner:			THIS_MODULE,
-	open:			floppy_open,
-	release:		floppy_release,
-	ioctl:			fd_ioctl,
-	check_media_change:	check_floppy_change,
-	revalidate:		floppy_revalidate,
+	.owner		= THIS_MODULE,
+	.open		= floppy_open,
+	.release	= floppy_release,
+	.ioctl		= fd_ioctl,
+	.media_changed	= check_floppy_change,
+	.revalidate_disk= floppy_revalidate,
 };
 
 static void __init register_devfs_entries (int drive)
@@ -4222,14 +4203,14 @@ static struct platform_device floppy_device = {
 	},
 };
 
-static struct gendisk *floppy_find(int minor)
+static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 {
-	int drive = (minor&3) | ((minor&0x80) >> 5);
+	int drive = (*part&3) | ((*part&0x80) >> 5);
 	if (drive >= N_DRIVE ||
 	    !(allowed_drive_mask & (1 << drive)) ||
 	    fdc_state[FDC(drive)].version == FDC_NONE)
 		return NULL;
-	return disks[drive];
+	return get_disk(disks[drive]);
 }
 
 int __init floppy_init(void)
@@ -4240,7 +4221,7 @@ int __init floppy_init(void)
 	raw_cmd = NULL;
 
 	for (i=0; i<N_DRIVE; i++) {
-		disks[i] = alloc_disk();
+		disks[i] = alloc_disk(1);
 		if (!disks[i])
 			goto Enomem;
 	}
@@ -4259,7 +4240,8 @@ int __init floppy_init(void)
 		sprintf(disks[i]->disk_name, "fd%d", i);
 	}
 
-	blk_set_probe(MAJOR_NR, floppy_find);
+	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
+				floppy_find, NULL, NULL);
 
 	for (i=0; i<256; i++)
 		if (ITYPE(i))
@@ -4267,7 +4249,7 @@ int __init floppy_init(void)
 		else
 			floppy_sizes[i] = MAX_DISK_SIZE << 1;
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &floppy_lock);
+	blk_init_queue(&floppy_queue, do_fd_request, &floppy_lock);
 	reschedule_timeout(MAXTIMEOUT, "floppy init", MAXTIMEOUT);
 	config_types();
 
@@ -4369,6 +4351,9 @@ int __init floppy_init(void)
 			continue;
 		if (fdc_state[FDC(drive)].version == FDC_NONE)
 			continue;
+		/* to be cleaned up... */
+		disks[drive]->private_data = (void*)drive;
+		disks[drive]->queue = &floppy_queue;
 		add_disk(disks[drive]);
 	}
 
@@ -4378,9 +4363,9 @@ int __init floppy_init(void)
 out1:
 	del_timer(&fd_timeout);
 out2:
+	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
 	unregister_blkdev(MAJOR_NR,"fd");
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	blk_set_probe(MAJOR_NR, NULL);
+	blk_cleanup_queue(&floppy_queue);
 out:
 	for (i=0; i<N_DRIVE; i++)
 		put_disk(disks[i]);
@@ -4573,8 +4558,8 @@ void cleanup_module(void)
 		
 	platform_device_unregister(&floppy_device);
 	devfs_unregister (devfs_handle);
+	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
 	unregister_blkdev(MAJOR_NR, "fd");
-	blk_set_probe(MAJOR_NR, NULL);
 	for (drive = 0; drive < N_DRIVE; drive++) {
 		if ((allowed_drive_mask & (1 << drive)) &&
 		    fdc_state[FDC(drive)].version != FDC_NONE)
@@ -4582,7 +4567,7 @@ void cleanup_module(void)
 		put_disk(disks[drive]);
 	}
 
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&floppy_queue);
 	/* eject disk, if any */
 	fd_eject(0);
 }

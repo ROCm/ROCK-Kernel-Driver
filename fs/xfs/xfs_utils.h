@@ -76,7 +76,7 @@ xfs_dir_ialloc(
 	struct xfs_inode	*dp,
 	mode_t			mode,
 	nlink_t			nlink,
-	dev_t			rdev,
+	xfs_dev_t		rdev,
 	struct cred		*credp,
 	prid_t			prid,
 	int			okalloc,

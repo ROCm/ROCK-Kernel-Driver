@@ -59,6 +59,7 @@ static void read_debugregs(int pid, unsigned long *regs)
 	}
 }
 
+/* Accessed only by the tracing thread */
 static unsigned long kernel_debugregs[8] = { [ 0 ... 7 ] = 0 };
 static int debugregs_seq = 0;
 

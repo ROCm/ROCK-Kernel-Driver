@@ -47,6 +47,7 @@
 #include <linux/ide.h>
 #include <linux/spinlock.h>
 #include <linux/pci.h>
+#include <linux/kmod.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -971,6 +972,41 @@ int init_irq (ide_hwif_t *hwif)
 
 EXPORT_SYMBOL(init_irq);
 
+static void ata_lock(dev_t dev, void *data)
+{
+	ide_hwif_t *hwif = data;
+	int unit = MINOR(dev) >> PARTN_BITS;
+	get_disk(hwif->drives[unit].disk);
+}
+
+struct gendisk *ata_probe(dev_t dev, int *part, void *data)
+{
+	ide_hwif_t *hwif = data;
+	int unit = MINOR(dev) >> PARTN_BITS;
+	ide_drive_t *drive = &hwif->drives[unit];
+	if (!drive->present) {
+		put_disk(drive->disk);
+		return NULL;
+	}
+	if (!drive->driver) {
+		if (drive->media == ide_disk)
+			(void) request_module("ide-disk");
+		if (drive->scsi)
+			(void) request_module("ide-scsi");
+		if (drive->media == ide_cdrom)
+			(void) request_module("ide-cd");
+		if (drive->media == ide_tape)
+			(void) request_module("ide-tape");
+		if (drive->media == ide_floppy)
+			(void) request_module("ide-floppy");
+	}
+	if (!drive->driver) {
+		put_disk(drive->disk);
+		return NULL;
+	}
+	return drive->disk;
+}
+
 /*
  * init_gendisk() (as opposed to ide_geninit) is called for each major device,
  * after probing for drives, to allocate partition tables and other data
@@ -986,19 +1022,21 @@ static void init_gendisk (ide_hwif_t *hwif)
 	units = MAX_DRIVES;
 
 	for (unit = 0; unit < MAX_DRIVES; unit++) {
-		disks[unit] = alloc_disk();
+		disks[unit] = alloc_disk(1 << PARTN_BITS);
 		if (!disks[unit])
 			goto err_kmalloc_gd;
 	}
 
 	for (unit = 0; unit < units; ++unit) {
+		ide_drive_t *drive = &hwif->drives[unit];
 		struct gendisk *disk = disks[unit];
 		disk->major  = hwif->major;
 		disk->first_minor = unit << PARTN_BITS;
 		sprintf(disk->disk_name,"hd%c",'a'+hwif->index*MAX_DRIVES+unit);
-		disk->minor_shift = PARTN_BITS; 
 		disk->fops = ide_fops;
-		hwif->drives[unit].disk = disk;
+		disk->private_data = drive;
+		disk->queue = &drive->queue;
+		drive->disk = disk;
 	}
 
 	for (unit = 0; unit < units; ++unit) {
@@ -1024,6 +1062,9 @@ static void init_gendisk (ide_hwif_t *hwif)
 		if (drive->present)
 			device_register(&drive->gendev);
 	}
+
+	blk_register_region(MKDEV(hwif->major, 0), units << PARTN_BITS,
+			THIS_MODULE, ata_probe, ata_lock, hwif);
 
 	return;
 
@@ -1084,10 +1125,7 @@ int hwif_init (ide_hwif_t *hwif)
 		printk("%s: probed IRQ %d failed, using default.\n",
 			hwif->name, hwif->irq);
 	}
-	
 	init_gendisk(hwif);
-	blk_dev[hwif->major].data = hwif;
-	blk_dev[hwif->major].queue = ide_get_queue;
 	hwif->present = 1;	/* success */
 	return 1;
 }
@@ -1151,7 +1189,7 @@ int ideprobe_init (void)
 }
 
 #ifdef MODULE
-extern int (*ide_xlate_1024_hook)(kdev_t, int, int, const char *);
+extern int (*ide_xlate_1024_hook)(struct block_device *, int, int, const char *);
 
 int init_module (void)
 {

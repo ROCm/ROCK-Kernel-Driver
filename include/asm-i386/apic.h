@@ -7,8 +7,6 @@
 #include <asm/apicdef.h>
 #include <asm/system.h>
 
-#ifdef CONFIG_X86_LOCAL_APIC
-
 #define APIC_DEBUG 0
 
 #if APIC_DEBUG
@@ -16,6 +14,8 @@
 #else
 #define Dprintk(x...)
 #endif
+
+#ifdef CONFIG_X86_LOCAL_APIC
 
 /*
  * Basic functions accessing APICs.

@@ -5,7 +5,7 @@
 
 #include "linux/config.h"
 
-/* CPU online map */
+/* CPU online map, set by smp_boot_cpus */
 unsigned long cpu_online_map = 1;
 
 #ifdef CONFIG_SMP
@@ -21,24 +21,31 @@ unsigned long cpu_online_map = 1;
 #include "user_util.h"
 #include "kern_util.h"
 #include "kern.h"
+#include "irq_user.h"
 #include "os.h"
 
-/* The 'big kernel lock' */
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
-/* Per CPU bogomips and other parameters */
+/* Per CPU bogomips and other parameters
+ * The only piece used here is the ipi pipe, which is set before SMP is
+ * started and never changed.
+ */
 struct cpuinfo_um cpu_data[NR_CPUS];
 
 spinlock_t um_bh_lock = SPIN_LOCK_UNLOCKED;
 
 atomic_t global_bh_count;
 
+/* Not used by UML */
 unsigned char global_irq_holder = NO_PROC_ID;
 unsigned volatile long global_irq_lock;
 
 /* Set when the idlers are all forked */
 int smp_threads_ready = 0;
+
+/* A statistic, can be a little off */
 int num_reschedules_sent = 0;
+
+/* Small, random number, never changed */
+unsigned long cache_decay_ticks = 5;
 
 void smp_send_reschedule(int cpu)
 {
@@ -83,30 +90,24 @@ void synchronize_bh(void)
 
 void smp_send_stop(void)
 {
-	printk(KERN_INFO "Stopping all CPUs\n");
+	int i;
+
+	printk(KERN_INFO "Stopping all CPUs...");
+	for(i = 0; i < num_online_cpus(); i++){
+		if(i == current->thread_info->cpu)
+			continue;
+		write(cpu_data[i].ipi_pipe[1], "S", 1);
+	}
+	printk("done\n");
 }
 
-
-static atomic_t smp_commenced = ATOMIC_INIT(0);
+static unsigned long smp_commenced_mask;
 static volatile unsigned long smp_callin_map = 0;
 
-void smp_commence(void)
+static int idle_proc(void *cpup)
 {
-	printk("All CPUs are go!\n");
+	int cpu = (int) cpup, err;
 
-	wmb();
-	atomic_set(&smp_commenced, 1);
-}
-
-static int idle_proc(void *unused)
-{
-	int cpu, err;
-
-	set_current(current);
-	del_from_runqueue(current);
-	unhash_process(current);
-
-	cpu = current->processor;
 	err = os_pipe(cpu_data[cpu].ipi_pipe, 1, 1);
 	if(err)
 		panic("CPU#%d failed to create IPI pipe, errno = %d", cpu, 
@@ -115,46 +116,41 @@ static int idle_proc(void *unused)
 	activate_ipi(cpu_data[cpu].ipi_pipe[0], current->thread.extern_pid);
  
 	wmb();
-	if (test_and_set_bit(current->processor, &smp_callin_map)) {
-		printk("huh, CPU#%d already present??\n", current->processor);
+	if (test_and_set_bit(cpu, &smp_callin_map)) {
+		printk("huh, CPU#%d already present??\n", cpu);
 		BUG();
 	}
 
-	while (!atomic_read(&smp_commenced))
+	while (!test_bit(cpu, &smp_commenced_mask))
 		cpu_relax();
 
-	init_idle();
+	set_bit(cpu, &cpu_online_map);
 	default_idle();
 	return(0);
 }
 
-int inited_cpus = 1;
-
-static int idle_thread(int (*fn)(void *), int cpu)
+static struct task_struct *idle_thread(int cpu)
 {
-	struct task_struct *p;
-	int pid;
+	struct task_struct *new_task;
 	unsigned char c;
 
-        current->thread.request.u.thread.proc = fn;
-        current->thread.request.u.thread.arg = NULL;
-	p = do_fork(CLONE_VM | CLONE_PID, 0, NULL, 0);
-	if(IS_ERR(p)) panic("do_fork failed in idle_thread");
+        current->thread.request.u.thread.proc = idle_proc;
+        current->thread.request.u.thread.arg = (void *) cpu;
+	new_task = do_fork(CLONE_VM | CLONE_IDLETASK, 0, NULL, 0, NULL);
+	if(IS_ERR(new_task)) panic("do_fork failed in idle_thread");
 
-	cpu_tasks[cpu].pid = p->thread.extern_pid;
-	cpu_tasks[cpu].task = p;
-	inited_cpus++;
-	init_tasks[cpu] = p;
-	p->processor = cpu;
-	p->cpus_allowed = 1 << cpu;
-	p->cpus_runnable = p->cpus_allowed;
-	write(p->thread.switch_pipe[1], &c, sizeof(c));
-	return(p->thread.extern_pid);
+	cpu_tasks[cpu] = ((struct cpu_task) 
+		          { .pid = 	new_task->thread.extern_pid,
+			    .task = 	new_task } );
+	write(new_task->thread.switch_pipe[1], &c, sizeof(c));
+	return(new_task);
 }
 
-void smp_boot_cpus(void)
+void smp_prepare_cpus(unsigned int maxcpus)
 {
-	int err;
+	struct task_struct *idle;
+	unsigned long waittime;
+	int err, cpu;
 
 	set_bit(0, &cpu_online_map);
 	set_bit(0, &smp_callin_map);
@@ -164,44 +160,30 @@ void smp_boot_cpus(void)
 
 	activate_ipi(cpu_data[0].ipi_pipe[0], current->thread.extern_pid);
 
-	if(ncpus < 1){
-		printk(KERN_INFO "ncpus set to 1\n");
-		ncpus = 1;
+	for(cpu = 1; cpu < ncpus; cpu++){
+		printk("Booting processor %d...\n", cpu);
+		
+		idle = idle_thread(cpu);
+
+		init_idle(idle, cpu);
+		unhash_process(idle);
+
+		waittime = 200000000;
+		while (waittime-- && !test_bit(cpu, &smp_callin_map))
+			cpu_relax();
+
+		if (test_bit(cpu, &smp_callin_map))
+			printk("done\n");
+		else printk("failed\n");
 	}
-	else if(ncpus > NR_CPUS){
-		printk(KERN_INFO 
-		       "ncpus can't be greater than NR_CPUS, set to %d\n",
-		       NR_CPUS);
-		ncpus = NR_CPUS;
-	}
+}
 
-	if(ncpus > 1){
-		int i, pid;
-
-		printk(KERN_INFO "Starting up other processors:\n");
-		for(i=1;i<ncpus;i++){
-			int waittime;
-
-			/* Do this early, for hard_smp_processor_id()  */
-			cpu_tasks[i].pid = -1;
-			set_bit(i, &cpu_online_map);
-
-			pid = idle_thread(idle_proc, i);
-			printk(KERN_INFO "\t#%d - idle thread pid = %d.. ",
-			       i, pid);
-
-			waittime = 200000000;
-			while (waittime-- && !test_bit(i, &smp_callin_map))
-				cpu_relax();
-
-			if (test_bit(i, &smp_callin_map))
-				printk("online\n");
-			else {
-				printk("failed\n");
-				clear_bit(i, &cpu_online_map);
-			}
-		}
-	}
+int __cpu_up(unsigned int cpu)
+{
+	set_bit(cpu, &smp_commenced_mask);
+	while (!test_bit(cpu, &cpu_online_map))
+		mb();
+	return(0);
 }
 
 int setup_profiling_timer(unsigned int multiplier)
@@ -225,7 +207,13 @@ void IPI_handler(int cpu)
 			break;
 
 		case 'R':
-			current->need_resched = 1;
+			set_tsk_need_resched(current);
+			break;
+
+		case 'S':
+			printk("CPU#%d stopping\n", cpu);
+			while(1)
+				pause();
 			break;
 
 		default:
@@ -269,7 +257,8 @@ int smp_call_function(void (*_func)(void *info), void *_info, int nonatomic,
 	info = _info;
 
 	for (i=0;i<NR_CPUS;i++)
-		if (i != current->processor && test_bit(i, &cpu_online_map))
+		if((i != current->thread_info->cpu) && 
+		   test_bit(i, &cpu_online_map))
 			write(cpu_data[i].ipi_pipe[1], "C", 1);
 
 	while (atomic_read(&scf_started) != cpus)

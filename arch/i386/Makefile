@@ -57,6 +57,8 @@ core-y					+= arch/i386/kernel/ \
 					   arch/i386/$(MACHINE)/
 drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
 drivers-$(CONFIG_PCI)			+= arch/i386/pci/
+# FIXME: is drivers- right ?
+drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 
 CFLAGS += -Iarch/i386/$(MACHINE)
 AFLAGS += -Iarch/i386/$(MACHINE)
@@ -86,6 +88,6 @@ install: vmlinux
 	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
 
 archclean:
-	+@$(call makeboot,clean)
+	$(MAKE) -rR -f scripts/Makefile.clean obj=arch/i386/boot
 
 archmrproper:

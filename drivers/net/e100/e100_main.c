@@ -46,6 +46,15 @@
 
 /* Change Log
  *
+ * 2.1.24       10/7/02
+ *   o Bug fix: Wrong files under /proc/net/PRO_LAN_Adapters/ when interface
+ *     name is changed
+ *   o Bug fix: Rx skb corruption when Rx polling code and Rx interrupt code
+ *     are executing during stress traffic at shared interrupt system. 
+ *     Removed Rx polling code
+ *   o Added detailed printk if selftest failed when insmod
+ *   o Removed misleading printks
+ *
  * 2.1.12       8/2/02
  *   o Feature: ethtool register dump
  *   o Bug fix: Driver passes wrong name to /proc/interrupts
@@ -62,25 +71,6 @@
  *   o Bug fix: PHY loopback diagnostic fails
  *
  * 2.1.6        7/5/02
- *   o Added device ID support for Dell LOM.
- *   o Added device ID support for 82511QM mobile nics.
- *   o Bug fix: ethtool get/set EEPROM routines modified to use byte
- *     addressing rather than word addressing.
- *   o Feature: added MDIX mode support for 82550 and up.
- *   o Bug fix: added reboot notifer to setup WOL settings when
- *     shutting system down.
- *   o Cleanup: removed yield() redefinition (Andrew Morton, 
- *     akpm@zip.com.au).
- *   o Bug fix: flow control now working when link partner is 
- *     autoneg capable but not flow control capable.
- *   o Bug fix: added check for corrupted EEPROM
- *   o Bug fix: don't report checksum offloading for the older
- *     controllers that don't support the feature.
- *   o Bug fix: calculate cable diagnostics when link goes down
- *     rather than when queuering /proc file.
- *   o Cleanup: move mdi_access_lock to local get/set mdi routines.
- *
- * 2.0.30       5/30/02
  */
  
 #include <linux/config.h>
@@ -94,8 +84,8 @@
 #include "e100_vendor.h"
 
 #ifdef CONFIG_PROC_FS
-extern int e100_create_proc_subdir(struct e100_private *);
-extern void e100_remove_proc_subdir(struct e100_private *);
+extern int e100_create_proc_subdir(struct e100_private *, char *);
+extern void e100_remove_proc_subdir(struct e100_private *, char *);
 #else
 #define e100_create_proc_subdir(X) 0
 #define e100_remove_proc_subdir(X) do {} while(0)
@@ -145,7 +135,7 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.15-k1";
+char e100_driver_version[]="2.1.24-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -154,12 +144,19 @@ static int e100nics = 0;
 static int e100_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
 static int e100_suspend(struct pci_dev *pcid, u32 state);
 static int e100_resume(struct pci_dev *pcid);
-struct notifier_block e100_notifier = {
+struct notifier_block e100_notifier_reboot = {
         notifier_call:  e100_notify_reboot,
         next:           NULL,
         priority:       0
 };
 #endif
+static int e100_notify_netdev(struct notifier_block *, unsigned long event, void *ptr);
+ 
+struct notifier_block e100_notifier_netdev = {
+	notifier_call:  e100_notify_netdev,
+	next:           NULL,
+	priority:       0
+};
 
 static void e100_get_mdix_status(struct e100_private *bdp);
 
@@ -349,9 +346,7 @@ e100_alloc_skbs(struct e100_private *bdp)
 }
 
 void e100_tx_srv(struct e100_private *);
-u32 e100_rx_srv(struct e100_private *, u32, int *);
-
-void e100_polling_tasklet(unsigned long);
+u32 e100_rx_srv(struct e100_private *);
 
 void e100_watchdog(struct net_device *);
 static void e100_do_hwi(struct net_device *);
@@ -379,9 +374,6 @@ E100_PARAM(IntDelay, "Value for CPU saver's interrupt delay");
 E100_PARAM(BundleSmallFr, "Disable or enable interrupt bundling of small frames");
 E100_PARAM(BundleMax, "Maximum number for CPU saver's packet bundling");
 E100_PARAM(IFS, "Disable or enable the adaptive IFS algorithm");
-E100_PARAM(RxCongestionControl, "Disable or enable switch to polling mode");
-E100_PARAM(PollingMaxWork, "Max number of receive packets processed on single "
-	   "polling call");
 
 /**
  * e100_exec_cmd - issue a comand
@@ -656,6 +648,8 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	if ((rc = register_netdev(dev)) != 0) {
 		goto err_pci;
 	}
+        memcpy(bdp->ifname, dev->name, IFNAMSIZ);
+        bdp->ifname[IFNAMSIZ-1] = 0;	
 
 	bdp->device_type = ent->driver_data;
 	printk(KERN_NOTICE
@@ -674,7 +668,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 			bdp->cable_status = "Not available";
 	}
 
-	if (e100_create_proc_subdir(bdp) < 0) {
+	if (e100_create_proc_subdir(bdp, bdp->ifname) < 0) {
 		printk(KERN_ERR "e100: Failed to create proc dir for %s\n",
 		       bdp->device->name);
 	}
@@ -738,7 +732,7 @@ e100_remove1(struct pci_dev *pcid)
 
 	unregister_netdev(dev);
 
-	e100_remove_proc_subdir(bdp);
+	e100_remove_proc_subdir(bdp, bdp->ifname);
 
 	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
 
@@ -772,10 +766,12 @@ e100_init_module(void)
 	int ret;
         ret = pci_module_init(&e100_driver);
 
-#ifdef CONFIG_PM	
-	if(ret >= 0)
-		register_reboot_notifier(&e100_notifier);
-#endif	
+	if(ret >= 0) {
+#ifdef CONFIG_PM
+		register_reboot_notifier(&e100_notifier_reboot);
+#endif 
+		register_netdevice_notifier(&e100_notifier_netdev);
+	}
 
 	return ret;
 }
@@ -784,8 +780,9 @@ static void __exit
 e100_cleanup_module(void)
 {
 #ifdef CONFIG_PM	
-	unregister_reboot_notifier(&e100_notifier);
-#endif	
+	unregister_reboot_notifier(&e100_notifier_reboot);
+#endif 
+	unregister_netdevice_notifier(&e100_notifier_netdev);
 
 	pci_unregister_driver(&e100_driver);
 }
@@ -856,14 +853,6 @@ e100_check_options(int board, struct e100_private *bdp)
 			    0xFFFF, E100_DEFAULT_CPUSAVER_BUNDLE_MAX,
 			    "CPU saver bundle max value");
 
-	e100_set_bool_option(bdp, RxCongestionControl[board], PRM_RX_CONG,
-			     E100_DEFAULT_RX_CONGESTION_CONTROL,
-			     "Rx Congestion Control value");
-
-	e100_set_int_option(&(bdp->params.PollingMaxWork),
-			    PollingMaxWork[board], 1, E100_MAX_RFD,
-			    bdp->params.RxDescriptors,
-			    "Polling Max Work value");
 }
 
 /**
@@ -991,11 +980,6 @@ e100_open(struct net_device *dev)
 		del_timer_sync(&bdp->watchdog_timer);
 		goto err_exit;
 	}
-	if (bdp->params.b_params & PRM_RX_CONG) {
-		DECLARE_TASKLET(polling_tasklet,
-				e100_polling_tasklet, (unsigned long) bdp);
-		bdp->polling_tasklet = polling_tasklet;
-	}
 	bdp->intr_mask = 0;
 	e100_set_intr_mask(bdp);
 
@@ -1023,10 +1007,6 @@ e100_close(struct net_device *dev)
 	bdp->cur_dplx_mode = 0;
 	free_irq(dev->irq, dev);
 	e100_clear_pools(bdp);
-
-	if (bdp->params.b_params & PRM_RX_CONG) {
-		tasklet_kill(&(bdp->polling_tasklet));
-	}
 
 	/* set the isolate flag to false, so e100_open can be called */
 	bdp->driver_isolated = false;
@@ -1263,12 +1243,21 @@ e100_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 static unsigned char __devinit
 e100_init(struct e100_private *bdp)
 {
+	u32 st_timeout = 0;
+	u32 st_result = 0;
 	e100_sw_init(bdp);
 
-	if (!e100_selftest(bdp, NULL, NULL)) {
-		printk(KERN_ERR "e100: selftest failed\n");
+	if (!e100_selftest(bdp, &st_timeout, &st_result)) {
+        	if (st_timeout) {
+			printk(KERN_ERR "e100: selftest timeout\n");
+		} else {
+			printk(KERN_ERR "e100: selftest failed. Results: %x\n",
+					st_result);
+		}
 		return false;
 	}
+	else
+		printk(KERN_DEBUG "e100: selftest OK.\n");
 
 	/* read the MAC address from the eprom */
 	e100_rd_eaddr(bdp);
@@ -1802,47 +1791,6 @@ e100_manage_adaptive_ifs(struct e100_private *bdp)
 	}
 }
 
-void
-e100_polling_tasklet(unsigned long ptr)
-{
-	struct e100_private *bdp = (struct e100_private *) ptr;
-	unsigned int rx_congestion = 0;
-	u32 skb_cnt;
-
-	/* the device is closed, don't continue or else bad things may happen. */
-	if (!netif_running(bdp->device)) {
-		return;
-	}
-
-	read_lock(&(bdp->isolate_lock));
-	if (bdp->driver_isolated) {
-		tasklet_schedule(&(bdp->polling_tasklet));
-		goto exit;
-	}
-
-	e100_alloc_skbs(bdp);
-
-	skb_cnt = e100_rx_srv(bdp, bdp->params.PollingMaxWork, &rx_congestion);
-
-	bdp->drv_stats.rx_tasklet_pkts += skb_cnt;
-
-	if (rx_congestion || skb_cnt) {
-		tasklet_schedule(&(bdp->polling_tasklet));
-	} else {
-		bdp->intr_mask &= ~SCB_INT_MASK;
-
-		bdp->drv_stats.poll_intr_switch++;
-	}
-
-	bdp->tx_count = 0;	/* restart tx interrupt batch count */
-	e100_tx_srv(bdp);
-
-	e100_set_intr_mask(bdp);
-
-exit:
-	read_unlock(&(bdp->isolate_lock));
-}
-
 /**
  * e100intr - interrupt handler
  * @irq: the IRQ number
@@ -1892,18 +1840,8 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 
 	/* do recv work if any */
 	if (intr_status &
-	    (SCB_STATUS_ACK_FR | SCB_STATUS_ACK_RNR | SCB_STATUS_ACK_SWI)) {
-		int rx_congestion;
-
-		bdp->drv_stats.rx_intr_pkts +=
-			e100_rx_srv(bdp, 0, &rx_congestion);
-		if ((bdp->params.b_params & PRM_RX_CONG) && rx_congestion) {
-			bdp->intr_mask |= SCB_INT_MASK;
-			tasklet_schedule(&(bdp->polling_tasklet));
-
-			bdp->drv_stats.poll_intr_switch++;
-		}
-	}
+	    (SCB_STATUS_ACK_FR | SCB_STATUS_ACK_RNR | SCB_STATUS_ACK_SWI)) 
+		bdp->drv_stats.rx_intr_pkts += e100_rx_srv(bdp);
 
 	/* clean up after tx'ed packets */
 	if (intr_status & (SCB_STATUS_ACK_CNA | SCB_STATUS_ACK_CX)) {
@@ -1997,8 +1935,7 @@ e100_tx_srv(struct e100_private *bdp)
  * It returns the number of serviced RFDs.
  */
 u32
-e100_rx_srv(struct e100_private *bdp, u32 max_number_of_rfds,
-	    int *rx_congestion)
+e100_rx_srv(struct e100_private *bdp)
 {
 	rfd_t *rfd;		/* new rfd, received rfd */
 	int i;
@@ -2008,10 +1945,6 @@ e100_rx_srv(struct e100_private *bdp, u32 max_number_of_rfds,
 	unsigned int data_sz;
 	struct rx_list_elem *rx_struct;
 	u32 rfd_cnt = 0;
-
-	if (rx_congestion) {
-		*rx_congestion = 0;
-	}
 
 	dev = bdp->device;
 
@@ -2027,9 +1960,6 @@ e100_rx_srv(struct e100_private *bdp, u32 max_number_of_rfds,
 	 *    (watchdog trigger SWI intr and isr should allocate new skbs)
 	 */
 	for (i = 0; i < bdp->params.RxDescriptors; i++) {
-		if (max_number_of_rfds && (rfd_cnt >= max_number_of_rfds)) {
-			break;
-		}
 		if (list_empty(&(bdp->active_rx_list))) {
 			break;
 		}
@@ -2094,20 +2024,12 @@ e100_rx_srv(struct e100_private *bdp, u32 max_number_of_rfds,
 		} else {
 			skb->ip_summed = CHECKSUM_NONE;
 		}
-
 		switch (netif_rx(skb)) {
 		case NET_RX_BAD:
-			break;
-
 		case NET_RX_DROP:
 		case NET_RX_CN_MOD:
 		case NET_RX_CN_HIGH:
-			if (bdp->params.b_params & PRM_RX_CONG) {
-				if (rx_congestion) {
-					*rx_congestion = 1;
-				}
-			}
-			/* FALL THROUGH TO STATISTICS UPDATE */
+			break;
 		default:
 			bdp->drv_stats.net_stats.rx_bytes += skb->len;
 			break;
@@ -3032,11 +2954,6 @@ e100_print_brd_conf(struct e100_private *bdp)
 		       "  Mem:0x%08lx  IRQ:%d  Speed:%d Mbps  Dx:%s\n",
 		       (unsigned long) bdp->device->mem_start,
 		       bdp->device->irq, 0, "N/A");
-
-		/* Auto negotiation failed so we should display an error */
-		printk(KERN_NOTICE "  Failed to detect cable link\n");
-		printk(KERN_NOTICE "  Speed and duplex will be determined "
-		       "at time of connection\n");
 	}
 
 	/* Print the string if checksum Offloading was enabled */
@@ -4176,11 +4093,34 @@ exit:
 	spin_unlock_bh(&(bdp->bd_non_tx_lock));
 }
 
+int e100_notify_netdev(struct notifier_block *nb, unsigned long event, void *p)
+{
+	struct e100_private *bdp;
+	struct net_device *netdev = p;
+	
+	if(netdev == NULL)
+		return NOTIFY_DONE;
+	
+	switch(event) {
+	case NETDEV_CHANGENAME:
+		if(netdev->open == e100_open) {
+			bdp = netdev->priv;
+			/* rename the proc nodes the easy way */
+			e100_remove_proc_subdir(bdp, bdp->ifname);
+			memcpy(bdp->ifname, netdev->name, IFNAMSIZ);
+			bdp->ifname[IFNAMSIZ-1] = 0;
+			e100_create_proc_subdir(bdp, bdp->ifname);
+		}
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
 #ifdef CONFIG_PM
 static int
 e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 {
-        struct pci_dev *pdev = NULL;
+        struct pci_dev *pdev;
 	
         switch(event) {
         case SYS_DOWN:

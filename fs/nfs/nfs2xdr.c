@@ -596,37 +596,18 @@ nfs_xdr_writeres(struct rpc_rqst *req, u32 *p, struct nfs_writeres *res)
  * Decode STATFS reply
  */
 static int
-nfs_xdr_statfsres(struct rpc_rqst *req, u32 *p, struct nfs_fsinfo *res)
+nfs_xdr_statfsres(struct rpc_rqst *req, u32 *p, struct nfs2_fsstat *res)
 {
 	int	status;
-	u32	xfer_size;
 
 	if ((status = ntohl(*p++)))
 		return -nfs_stat_to_errno(status);
 
-	/* For NFSv2, we more or less have to guess the preferred
-	 * read/write/readdir sizes from the single 'transfer size'
-	 * value.
-	 */
-	xfer_size = ntohl(*p++);	/* tsize */
-	res->rtmax  = 8 * 1024;
-	res->rtpref = xfer_size;
-	res->rtmult = xfer_size;
-	res->wtmax  = 8 * 1024;
-	res->wtpref = xfer_size;
-	res->wtmult = xfer_size;
-	res->dtpref = PAGE_CACHE_SIZE;
-	res->maxfilesize = 0x7FFFFFFF;	/* just a guess */
+	res->tsize  = ntohl(*p++);
 	res->bsize  = ntohl(*p++);
-
-	res->tbytes = ntohl(*p++) * res->bsize;
-	res->fbytes = ntohl(*p++) * res->bsize;
-	res->abytes = ntohl(*p++) * res->bsize;
-	res->tfiles = 0;
-	res->ffiles = 0;
-	res->afiles = 0;
-	res->namelen = 0;
-
+	res->blocks = ntohl(*p++);
+	res->bfree  = ntohl(*p++);
+	res->bavail = ntohl(*p++);
 	return 0;
 }
 

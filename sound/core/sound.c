@@ -318,9 +318,6 @@ static int __init alsa_sound_init(void)
 #endif
 	if (register_chrdev(snd_major, "alsa", &snd_fops)) {
 		snd_printk(KERN_ERR "unable to register native major device number %d\n", snd_major);
-#ifdef CONFIG_SND_OSSEMUL
-		snd_oss_cleanup_module();
-#endif
 		return -EIO;
 	}
 #ifdef CONFIG_SND_DEBUG_MEMORY
@@ -329,9 +326,6 @@ static int __init alsa_sound_init(void)
 	if (snd_info_init() < 0) {
 #ifdef CONFIG_SND_DEBUG_MEMORY
 		snd_memory_done();
-#endif
-#ifdef CONFIG_SND_OSSEMUL
-		snd_oss_cleanup_module();
 #endif
 		return -ENOMEM;
 	}
@@ -369,7 +363,6 @@ static void __exit alsa_sound_exit(void)
 	
 #ifdef CONFIG_SND_OSSEMUL
 	snd_info_minor_unregister();
-	snd_oss_cleanup_module();
 #endif
 	snd_info_done();
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) && defined(CONFIG_APM)
@@ -455,6 +448,7 @@ EXPORT_SYMBOL(snd_dma_disable);
 EXPORT_SYMBOL(snd_dma_residue);
 #endif
   /* info.c */
+#ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(snd_seq_root);
 EXPORT_SYMBOL(snd_create_proc_entry);
 EXPORT_SYMBOL(snd_remove_proc_entry);
@@ -468,8 +462,9 @@ EXPORT_SYMBOL(snd_info_create_device);
 EXPORT_SYMBOL(snd_info_free_device);
 EXPORT_SYMBOL(snd_info_register);
 EXPORT_SYMBOL(snd_info_unregister);
+#endif
   /* info_oss.c */
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_OSSEMUL) && defined(CONFIG_PROC_FS)
 EXPORT_SYMBOL(snd_oss_info_register);
 #endif
   /* control.c */

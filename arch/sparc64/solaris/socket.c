@@ -248,31 +248,6 @@ asmlinkage int solaris_getsockname(int fd, struct sockaddr *addr, int *addrlen)
 					   24 for IPv6,
 					   about 80 for AX.25 */
 
-extern __inline__ struct socket *sockfd_lookup(int fd, int *err)
-{
-	struct file *file;
-	struct inode *inode;
-
-	if (!(file = fget(fd))) {
-		*err = -EBADF;
-		return NULL;
-	}
-
-	inode = file->f_dentry->d_inode;
-	if (!inode->i_sock) {
-		*err = -ENOTSOCK;
-		fput(file);
-		return NULL;
-	}
-
-	return SOCKET_I(inode);
-}
-
-extern __inline__ void sockfd_put(struct socket *sock)
-{
-	fput(sock->file);
-}
-
 struct sol_nmsghdr {
 	u32		msg_name;
 	int		msg_namelen;

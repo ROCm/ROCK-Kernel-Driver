@@ -317,7 +317,7 @@ EXPORT_SYMBOL(mpage_readpage);
  * written, so it can intelligently allocate a suitably-sized BIO.  For now,
  * just allocate full-size (16-page) BIOs.
  */
-static inline struct bio *
+static struct bio *
 mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 			sector_t *last_block_in_bio, int *ret)
 {

@@ -750,7 +750,7 @@ static void queue_loose(struct cache_detail *detail, struct cache_head *ch)
  *
  */
 
-void add_word(char **bpp, int *lp, char *str)
+void qword_add(char **bpp, int *lp, char *str)
 {
 	char *bp = *bpp;
 	int len = *lp;
@@ -785,7 +785,7 @@ void add_word(char **bpp, int *lp, char *str)
 	*lp = len;
 }
 
-void add_hex(char **bpp, int *lp, char *buf, int blen)
+void qword_addhex(char **bpp, int *lp, char *buf, int blen)
 {
 	char *bp = *bpp;
 	int len = *lp;
@@ -879,7 +879,7 @@ static int cache_make_upcall(struct cache_detail *detail, struct cache_head *h)
  */
 
 #define isodigit(c) (isdigit(c) && c <= '7')
-int get_word(char **bpp, char *dest, int bufsize)
+int qword_get(char **bpp, char *dest, int bufsize)
 {
 	/* return bytes copied, or -1 on error */
 	char *bp = *bpp;

@@ -40,13 +40,57 @@ static __inline__ int __sem_update_count(struct semaphore *sem, int incr)
 	return old_count;
 }
 
-void __up(struct semaphore *sem)
+static void __up(struct semaphore *sem)
 {
 	__sem_update_count(sem, 1);
 	wake_up(&sem->wait);
 }
 
-void __down(struct semaphore * sem)
+void up(struct semaphore *sem)
+{
+	/* This atomically does:
+	 * 	old_val = sem->count;
+	 *	new_val = sem->count + 1;
+	 *	sem->count = new_val;
+	 *	if (old_val < 0)
+	 *		__up(sem);
+	 *
+	 * The (old_val < 0) test is equivalent to
+	 * the more straightforward (new_val <= 0),
+	 * but it is easier to test the former because
+	 * of how the CAS instruction works.
+	 */
+
+	__asm__ __volatile__("\n"
+"	! up sem(%0)\n"
+"	membar	#StoreLoad | #LoadLoad\n"
+"1:	lduw	[%0], %%g5\n"
+"	add	%%g5, 1, %%g7\n"
+"	cas	[%0], %%g5, %%g7\n"
+"	cmp	%%g5, %%g7\n"
+"	bne,pn	%%icc, 1b\n"
+"	 addcc	%%g7, 1, %%g0\n"
+"	ble,pn	%%icc, 3f\n"
+"	 membar	#StoreLoad | #StoreStore\n"
+"2:\n"
+"	.subsection 2\n"
+"3:	mov	%0, %%g5\n"
+"	save	%%sp, -160, %%sp\n"
+"	mov	%%g1, %%l1\n"
+"	mov	%%g2, %%l2\n"
+"	mov	%%g3, %%l3\n"
+"	call	%1\n"
+"	 mov	%%g5, %%o0\n"
+"	mov	%%l1, %%g1\n"
+"	mov	%%l2, %%g2\n"
+"	ba,pt	%%xcc, 2b\n"
+"	 restore %%l3, %%g0, %%g3\n"
+"	.previous\n"
+	: : "r" (sem), "i" (__up)
+	: "g5", "g7", "memory", "cc");
+}
+
+static void __down(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -64,7 +108,90 @@ void __down(struct semaphore * sem)
 	wake_up(&sem->wait);
 }
 
-int __down_interruptible(struct semaphore * sem)
+void down(struct semaphore *sem)
+{
+	/* This atomically does:
+	 * 	old_val = sem->count;
+	 *	new_val = sem->count - 1;
+	 *	sem->count = new_val;
+	 *	if (old_val < 1)
+	 *		__down(sem);
+	 *
+	 * The (old_val < 1) test is equivalent to
+	 * the more straightforward (new_val < 0),
+	 * but it is easier to test the former because
+	 * of how the CAS instruction works.
+	 */
+
+	__asm__ __volatile__("\n"
+"	! down sem(%0)\n"
+"1:	lduw	[%0], %%g5\n"
+"	sub	%%g5, 1, %%g7\n"
+"	cas	[%0], %%g5, %%g7\n"
+"	cmp	%%g5, %%g7\n"
+"	bne,pn	%%icc, 1b\n"
+"	 cmp	%%g7, 1\n"
+"	bl,pn	%%icc, 3f\n"
+"	 membar	#StoreLoad | #StoreStore\n"
+"2:\n"
+"	.subsection 2\n"
+"3:	mov	%0, %%g5\n"
+"	save	%%sp, -160, %%sp\n"
+"	mov	%%g1, %%l1\n"
+"	mov	%%g2, %%l2\n"
+"	mov	%%g3, %%l3\n"
+"	call	%1\n"
+"	 mov	%%g5, %%o0\n"
+"	mov	%%l1, %%g1\n"
+"	mov	%%l2, %%g2\n"
+"	ba,pt	%%xcc, 2b\n"
+"	 restore %%l3, %%g0, %%g3\n"
+"	.previous\n"
+	: : "r" (sem), "i" (__down)
+	: "g5", "g7", "memory", "cc");
+}
+
+int down_trylock(struct semaphore *sem)
+{
+	int ret;
+
+	/* This atomically does:
+	 * 	old_val = sem->count;
+	 *	new_val = sem->count - 1;
+	 *	if (old_val < 1) {
+	 *		ret = 1;
+	 *	} else {
+	 *		sem->count = new_val;
+	 *		ret = 0;
+	 *	}
+	 *
+	 * The (old_val < 1) test is equivalent to
+	 * the more straightforward (new_val < 0),
+	 * but it is easier to test the former because
+	 * of how the CAS instruction works.
+	 */
+
+	__asm__ __volatile__("\n"
+"	! down_trylock sem(%1) ret(%0)\n"
+"1:	lduw	[%1], %%g5\n"
+"	sub	%%g5, 1, %%g7\n"
+"	cmp	%%g5, 1\n"
+"	bl,pn	%%icc, 2f\n"
+"	 mov	1, %0\n"
+"	cas	[%1], %%g5, %%g7\n"
+"	cmp	%%g5, %%g7\n"
+"	bne,pn	%%icc, 1b\n"
+"	 mov	0, %0\n"
+"	membar	#StoreLoad | #StoreStore\n"
+"2:\n"
+	: "=&r" (ret)
+	: "r" (sem)
+	: "g5", "g7", "memory", "cc");
+
+	return ret;
+}
+
+static int __down_interruptible(struct semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -86,4 +213,52 @@ int __down_interruptible(struct semaphore * sem)
 	remove_wait_queue(&sem->wait, &wait);
 	wake_up(&sem->wait);
 	return retval;
+}
+
+int down_interruptible(struct semaphore *sem)
+{
+	int ret = 0;
+	
+	/* This atomically does:
+	 * 	old_val = sem->count;
+	 *	new_val = sem->count - 1;
+	 *	sem->count = new_val;
+	 *	if (old_val < 1)
+	 *		ret = __down_interruptible(sem);
+	 *
+	 * The (old_val < 1) test is equivalent to
+	 * the more straightforward (new_val < 0),
+	 * but it is easier to test the former because
+	 * of how the CAS instruction works.
+	 */
+
+	__asm__ __volatile__("\n"
+"	! down_interruptible sem(%2) ret(%0)\n"
+"1:	lduw	[%2], %%g5\n"
+"	sub	%%g5, 1, %%g7\n"
+"	cas	[%2], %%g5, %%g7\n"
+"	cmp	%%g5, %%g7\n"
+"	bne,pn	%%icc, 1b\n"
+"	 cmp	%%g7, 1\n"
+"	bl,pn	%%icc, 3f\n"
+"	 membar	#StoreLoad | #StoreStore\n"
+"2:\n"
+"	.subsection 2\n"
+"3:	mov	%2, %%g5\n"
+"	save	%%sp, -160, %%sp\n"
+"	mov	%%g1, %%l1\n"
+"	mov	%%g2, %%l2\n"
+"	mov	%%g3, %%l3\n"
+"	call	%3\n"
+"	 mov	%%g5, %%o0\n"
+"	mov	%%l1, %%g1\n"
+"	mov	%%l2, %%g2\n"
+"	mov	%%l3, %%g3\n"
+"	ba,pt	%%xcc, 2b\n"
+"	 restore %%o0, %%g0, %0\n"
+"	.previous\n"
+	: "=r" (ret)
+	: "0" (ret), "r" (sem), "i" (__down_interruptible)
+	: "g5", "g7", "memory", "cc");
+	return ret;
 }

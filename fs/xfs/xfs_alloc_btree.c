@@ -132,9 +132,9 @@ xfs_alloc_delrec(
 		}
 #endif
 		if (ptr < INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
-			ovbcopy(&lkp[ptr], &lkp[ptr - 1],
+			memmove(&lkp[ptr - 1], &lkp[ptr],
 				(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr) * sizeof(*lkp)); /* INT_: mem copy */
-			ovbcopy(&lpp[ptr], &lpp[ptr - 1],
+			memmove(&lpp[ptr - 1], &lpp[ptr],
 				(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr) * sizeof(*lpp)); /* INT_: mem copy */
 			xfs_alloc_log_ptrs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT) - 1);
 			xfs_alloc_log_keys(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT) - 1);
@@ -147,7 +147,7 @@ xfs_alloc_delrec(
 	else {
 		lrp = XFS_ALLOC_REC_ADDR(block, 1, cur);
 		if (ptr < INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
-			ovbcopy(&lrp[ptr], &lrp[ptr - 1],
+			memmove(&lrp[ptr - 1], &lrp[ptr],
 				(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr) * sizeof(*lrp));
 			xfs_alloc_log_recs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_CONVERT) - 1);
 		}
@@ -223,6 +223,23 @@ xfs_alloc_delrec(
 			if ((error = xfs_alloc_put_freelist(cur->bc_tp,
 					cur->bc_private.a.agbp, NULL, bno)))
 				return error;
+			/*
+			 * Since blocks move to the free list without the
+			 * coordination used in xfs_bmap_finish, we can't allow
+			 * block to be available for reallocation and
+			 * non-transaction writing (user data) until we know
+			 * that the transaction that moved it to the free list
+			 * is permanently on disk. We track the blocks by
+			 * declaring these blocks as "busy"; the busy list is
+			 * maintained on a per-ag basis and each transaction
+			 * records which entries should be removed when the
+			 * iclog commits to disk. If a busy block is
+			 * allocated, the iclog is pushed up to the LSN
+			 * that freed the block.
+			 */
+			xfs_alloc_mark_busy(cur->bc_tp,
+				INT_GET(agf->agf_seqno, ARCH_CONVERT), bno, 1);
+
 			xfs_trans_agbtree_delta(cur->bc_tp, -1);
 			xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 				XFS_AGF_ROOTS | XFS_AGF_LEVELS);
@@ -464,8 +481,8 @@ xfs_alloc_delrec(
 				return error;
 		}
 #endif
-		bcopy(rkp, lkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lkp)); /* INT_: structure copy */
-		bcopy(rpp, lpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lpp)); /* INT_: structure copy */
+		memcpy(lkp, rkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lkp)); /* INT_: structure copy */
+		memcpy(lpp, rpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lpp)); /* INT_: structure copy */
 		xfs_alloc_log_keys(cur, lbp, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1,
 				   INT_GET(left->bb_numrecs, ARCH_CONVERT) + INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		xfs_alloc_log_ptrs(cur, lbp, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1,
@@ -476,7 +493,7 @@ xfs_alloc_delrec(
 		 */
 		lrp = XFS_ALLOC_REC_ADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1, cur);
 		rrp = XFS_ALLOC_REC_ADDR(right, 1, cur);
-		bcopy(rrp, lrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lrp));
+		memcpy(lrp, rrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*lrp));
 		xfs_alloc_log_recs(cur, lbp, INT_GET(left->bb_numrecs, ARCH_CONVERT) + 1,
 				   INT_GET(left->bb_numrecs, ARCH_CONVERT) + INT_GET(right->bb_numrecs, ARCH_CONVERT));
 	}
@@ -528,6 +545,21 @@ xfs_alloc_delrec(
 	if ((error = xfs_alloc_put_freelist(cur->bc_tp, cur->bc_private.a.agbp,
 			NULL, rbno)))
 		return error;
+	/*
+	 * Since blocks move to the free list without the coordination
+	 * used in xfs_bmap_finish, we can't allow block to be available
+	 * for reallocation and non-transaction writing (user data)
+	 * until we know that the transaction that moved it to the free
+	 * list is permanently on disk. We track the blocks by declaring
+	 * these blocks as "busy"; the busy list is maintained on a
+	 * per-ag basis and each transaction records which entries
+	 * should be removed when the iclog commits to disk. If a
+	 * busy block is allocated, the iclog is pushed up to the
+	 * LSN that freed the block.
+	 */
+	xfs_alloc_mark_busy(cur->bc_tp,
+		INT_GET(agf->agf_seqno, ARCH_CONVERT), bno, 1);
+
 	xfs_trans_agbtree_delta(cur->bc_tp, -1);
 	/*
 	 * Adjust the current level's cursor so that we're left referring
@@ -697,9 +729,9 @@ xfs_alloc_insrec(
 				return error;
 		}
 #endif
-		ovbcopy(&kp[ptr - 1], &kp[ptr],
+		memmove(&kp[ptr], &kp[ptr - 1],
 			(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr + 1) * sizeof(*kp)); /* INT_: copy */
-		ovbcopy(&pp[ptr - 1], &pp[ptr],
+		memmove(&pp[ptr], &pp[ptr - 1],
 			(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr + 1) * sizeof(*pp)); /* INT_: copy */
 #ifdef DEBUG
 		if ((error = xfs_btree_check_sptr(cur, *bnop, level)))
@@ -723,7 +755,7 @@ xfs_alloc_insrec(
 		 * It's a leaf entry.  Make a hole for the new record.
 		 */
 		rp = XFS_ALLOC_REC_ADDR(block, 1, cur);
-		ovbcopy(&rp[ptr - 1], &rp[ptr],
+		memmove(&rp[ptr], &rp[ptr - 1],
 			(INT_GET(block->bb_numrecs, ARCH_CONVERT) - ptr + 1) * sizeof(*rp));
 		/*
 		 * Now stuff the new record in, bump numrecs
@@ -1217,12 +1249,12 @@ xfs_alloc_lshift(
 				return error;
 		}
 #endif
-		ovbcopy(rkp + 1, rkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
-		ovbcopy(rpp + 1, rpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
+		memmove(rkp, rkp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
+		memmove(rpp, rpp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
 		xfs_alloc_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		xfs_alloc_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 	} else {
-		ovbcopy(rrp + 1, rrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
+		memmove(rrp, rrp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
 		xfs_alloc_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		key.ar_startblock = rrp->ar_startblock; /* INT_: direct copy */
 		key.ar_blockcount = rrp->ar_blockcount; /* INT_: direct copy */
@@ -1475,8 +1507,8 @@ xfs_alloc_rshift(
 				return error;
 		}
 #endif
-		ovbcopy(rkp, rkp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
-		ovbcopy(rpp, rpp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
+		memmove(rkp + 1, rkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp));
+		memmove(rpp + 1, rpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));
 #ifdef DEBUG
 		if ((error = xfs_btree_check_sptr(cur, INT_GET(*lpp, ARCH_CONVERT), level)))
 			return error;
@@ -1492,7 +1524,7 @@ xfs_alloc_rshift(
 
 		lrp = XFS_ALLOC_REC_ADDR(left, INT_GET(left->bb_numrecs, ARCH_CONVERT), cur);
 		rrp = XFS_ALLOC_REC_ADDR(right, 1, cur);
-		ovbcopy(rrp, rrp + 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
+		memmove(rrp + 1, rrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
 		*rrp = *lrp;
 		xfs_alloc_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT) + 1);
 		key.ar_startblock = rrp->ar_startblock; /* INT_: direct copy */
@@ -1608,8 +1640,8 @@ xfs_alloc_split(
 				return error;
 		}
 #endif
-		bcopy(lkp, rkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp)); /* INT_: copy */
-		bcopy(lpp, rpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp));/* INT_: copy */
+		memcpy(rkp, lkp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rkp)); /* INT_: copy */
+		memcpy(rpp, lpp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rpp)); /* INT_: copy */
 		xfs_alloc_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		xfs_alloc_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		*keyp = *rkp;
@@ -1623,7 +1655,7 @@ xfs_alloc_split(
 
 		lrp = XFS_ALLOC_REC_ADDR(left, i, cur);
 		rrp = XFS_ALLOC_REC_ADDR(right, 1, cur);
-		bcopy(lrp, rrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
+		memcpy(rrp, lrp, INT_GET(right->bb_numrecs, ARCH_CONVERT) * sizeof(*rrp));
 		xfs_alloc_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_CONVERT));
 		keyp->ar_startblock = rrp->ar_startblock; /* INT_: direct copy */
 		keyp->ar_blockcount = rrp->ar_blockcount; /* INT_: direct copy */

@@ -176,7 +176,7 @@ xfs_dir2_block_to_sf(
 	 * and add local data.
 	 */
 	block = kmem_alloc(mp->m_dirblksize, KM_SLEEP);
-	bcopy(bp->data, block, mp->m_dirblksize);
+	memcpy(block, bp->data, mp->m_dirblksize);
 	logflags = XFS_ILOG_CORE;
 	if ((error = xfs_dir2_shrink_inode(args, mp->m_dirdatablk, bp))) {
 		ASSERT(error != ENOSPC);
@@ -198,7 +198,7 @@ xfs_dir2_block_to_sf(
 	 * Copy the header into the newly allocate local space.
 	 */
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
-	bcopy(sfhp, sfp, XFS_DIR2_SF_HDR_SIZE(sfhp->i8count));
+	memcpy(sfp, sfhp, XFS_DIR2_SF_HDR_SIZE(sfhp->i8count));
 	dp->i_d.di_size = size;
 	/*
 	 * Set up to loop over the block's entries.
@@ -241,7 +241,7 @@ xfs_dir2_block_to_sf(
 			XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,
 				(xfs_dir2_data_aoff_t)
 				((char *)dep - (char *)block), ARCH_CONVERT);
-			bcopy(dep->name, sfep->name, dep->namelen);
+			memcpy(sfep->name, dep->name, dep->namelen);
 			temp=INT_GET(dep->inumber, ARCH_CONVERT);
 			XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &temp,
 				XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT);
@@ -405,7 +405,7 @@ xfs_dir2_sf_addname_easy(
 	 */
 	sfep->namelen = args->namelen;
 	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep, offset, ARCH_CONVERT);
-	bcopy(args->name, sfep->name, sfep->namelen);
+	memcpy(sfep->name, args->name, sfep->namelen);
 	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &args->inumber,
 		XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT);
 	/*
@@ -457,7 +457,7 @@ xfs_dir2_sf_addname_hard(
 	old_isize = (int)dp->i_d.di_size;
 	buf = kmem_alloc(old_isize, KM_SLEEP);
 	oldsfp = (xfs_dir2_sf_t *)buf;
-	bcopy(sfp, oldsfp, old_isize);
+	memcpy(oldsfp, sfp, old_isize);
 	/*
 	 * Loop over the old directory finding the place we're going
 	 * to insert the new entry.
@@ -490,14 +490,14 @@ xfs_dir2_sf_addname_hard(
 	 * Copy the first part of the directory, including the header.
 	 */
 	nbytes = (int)((char *)oldsfep - (char *)oldsfp);
-	bcopy(oldsfp, sfp, nbytes);
+	memcpy(sfp, oldsfp, nbytes);
 	sfep = (xfs_dir2_sf_entry_t *)((char *)sfp + nbytes);
 	/*
 	 * Fill in the new entry, and update the header counts.
 	 */
 	sfep->namelen = args->namelen;
 	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep, offset, ARCH_CONVERT);
-	bcopy(args->name, sfep->name, sfep->namelen);
+	memcpy(sfep->name, args->name, sfep->namelen);
 	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &args->inumber,
 		XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT);
 	sfp->hdr.count++;
@@ -510,7 +510,7 @@ xfs_dir2_sf_addname_hard(
 	 */
 	if (!eof) {
 		sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep);
-		bcopy(oldsfep, sfep, old_isize - nbytes);
+		memcpy(sfep, oldsfep, old_isize - nbytes);
 	}
 	kmem_free(buf, old_isize);
 	dp->i_d.di_size = new_isize;
@@ -916,7 +916,7 @@ xfs_dir2_sf_lookup(
 	     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
 		if (sfep->namelen == args->namelen &&
 		    sfep->name[0] == args->name[0] &&
-		    bcmp(args->name, sfep->name, args->namelen) == 0) {
+		    memcmp(args->name, sfep->name, args->namelen) == 0) {
 			args->inumber =
 				XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
 					XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT);
@@ -971,7 +971,7 @@ xfs_dir2_sf_removename(
 	     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
 		if (sfep->namelen == args->namelen &&
 		    sfep->name[0] == args->name[0] &&
-		    bcmp(sfep->name, args->name, args->namelen) == 0) {
+		    memcmp(sfep->name, args->name, args->namelen) == 0) {
 			ASSERT(XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
 					XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT) ==
 				args->inumber);
@@ -994,7 +994,7 @@ xfs_dir2_sf_removename(
 	 * Copy the part if any after the removed entry, sliding it down.
 	 */
 	if (byteoff + entsize < oldsize)
-		ovbcopy((char *)sfp + byteoff + entsize, (char *)sfp + byteoff,
+		memmove((char *)sfp + byteoff, (char *)sfp + byteoff + entsize,
 			oldsize - (byteoff + entsize));
 	/*
 	 * Fix up the header and file size.
@@ -1108,7 +1108,7 @@ xfs_dir2_sf_replace(
 		     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
 			if (sfep->namelen == args->namelen &&
 			    sfep->name[0] == args->name[0] &&
-			    bcmp(args->name, sfep->name, args->namelen) == 0) {
+			    memcmp(args->name, sfep->name, args->namelen) == 0) {
 #if XFS_BIG_FILESYSTEMS || defined(DEBUG)
 				ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
 					XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT);
@@ -1196,7 +1196,7 @@ xfs_dir2_sf_toino4(
 	buf = kmem_alloc(oldsize, KM_SLEEP);
 	oldsfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	ASSERT(oldsfp->hdr.i8count == 1);
-	bcopy(oldsfp, buf, oldsize);
+	memcpy(buf, oldsfp, oldsize);
 	/*
 	 * Compute the new inode size.
 	 */
@@ -1228,7 +1228,7 @@ xfs_dir2_sf_toino4(
 		  oldsfep = XFS_DIR2_SF_NEXTENTRY(oldsfp, oldsfep)) {
 		sfep->namelen = oldsfep->namelen;
 		sfep->offset = oldsfep->offset;
-		bcopy(oldsfep->name, sfep->name, sfep->namelen);
+		memcpy(sfep->name, oldsfep->name, sfep->namelen);
 		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(oldsfp,
 			XFS_DIR2_SF_INUMBERP(oldsfep), ARCH_CONVERT);
 		XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &ino, XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT);
@@ -1273,7 +1273,7 @@ xfs_dir2_sf_toino8(
 	buf = kmem_alloc(oldsize, KM_SLEEP);
 	oldsfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	ASSERT(oldsfp->hdr.i8count == 0);
-	bcopy(oldsfp, buf, oldsize);
+	memcpy(buf, oldsfp, oldsize);
 	/*
 	 * Compute the new inode size.
 	 */
@@ -1305,7 +1305,7 @@ xfs_dir2_sf_toino8(
 		  oldsfep = XFS_DIR2_SF_NEXTENTRY(oldsfp, oldsfep)) {
 		sfep->namelen = oldsfep->namelen;
 		sfep->offset = oldsfep->offset;
-		bcopy(oldsfep->name, sfep->name, sfep->namelen);
+		memcpy(sfep->name, oldsfep->name, sfep->namelen);
 		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(oldsfp,
 			XFS_DIR2_SF_INUMBERP(oldsfep), ARCH_CONVERT);
 		XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &ino, XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT);

@@ -1099,7 +1099,7 @@ CONFIG_USB_OHCI_SA1111=m
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

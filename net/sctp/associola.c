@@ -207,6 +207,7 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	asoc->next_tsn = asoc->c.initial_tsn;
 
 	asoc->ctsn_ack_point = asoc->next_tsn - 1;
+	asoc->highest_sacked = asoc->ctsn_ack_point;
 
 	asoc->unack_data = 0;
 
@@ -472,13 +473,6 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 		/* Set a default msg_name for events. */
 		memcpy(&asoc->peer.primary_addr, &peer->ipaddr,
 		       sizeof(sockaddr_storage_t));
-		asoc->peer.active_path = peer;
-		asoc->peer.retran_path = peer;
-	}
-
-	/* If we do not yet have a primary path, set one.  */
-	if (NULL == asoc->peer.primary_path) {
-		asoc->peer.primary_path = peer;
 		asoc->peer.active_path = peer;
 		asoc->peer.retran_path = peer;
 	}

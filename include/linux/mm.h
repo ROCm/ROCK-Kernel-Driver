@@ -504,7 +504,6 @@ extern unsigned long page_unuse(struct page *);
 extern void truncate_inode_pages(struct address_space *, loff_t);
 
 /* generic vm_area_ops exported for stackable file systems */
-extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned int);
 extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
 /* mm/page-writeback.c */
@@ -513,11 +512,18 @@ int write_one_page(struct page *page, int wait);
 /* readahead.c */
 #define VM_MAX_READAHEAD	128	/* kbytes */
 #define VM_MIN_READAHEAD	16	/* kbytes (includes current page) */
-int do_page_cache_readahead(struct file *file,
+int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			unsigned long offset, unsigned long nr_to_read);
-void page_cache_readahead(struct file *file, unsigned long offset);
-void page_cache_readaround(struct file *file, unsigned long offset);
-void handle_ra_miss(struct file *file);
+void page_cache_readahead(struct address_space *mapping, 
+			  struct file_ra_state *ra,
+			  struct file *filp,
+			  unsigned long offset);
+void page_cache_readaround(struct address_space *mapping, 
+			   struct file_ra_state *ra,
+			   struct file *filp,
+			   unsigned long offset);
+void handle_ra_miss(struct address_space *mapping, 
+		    struct file_ra_state *ra);
 
 /* Do stack extension */
 extern int expand_stack(struct vm_area_struct * vma, unsigned long address);

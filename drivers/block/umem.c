@@ -67,7 +67,6 @@
 #define MM_BLKSIZE 1024  /* 1k blocks */
 #define MM_HARDSECT 512  /* 512-byte hardware sectors */
 #define MM_SHIFT 6       /* max 64 partitions on 4 cards  */
-#define DEVICE_NR(device) (minor(device)>>MM_SHIFT)
 
 /*
  * Version Information
@@ -812,10 +811,10 @@ static void del_battery_timer(void)
  *	That's crap, since doing that while some partitions are opened
  * or mounted will give you really nasty results.
  */
-static int mm_revalidate(kdev_t i_rdev)
+static int mm_revalidate(struct gendisk *disk)
 {
-	int card_number = DEVICE_NR(i_rdev);
-	set_capacity(mm_gendisk[card_number], cards[card_number].mm_size << 1);
+	struct cardinfo *card = disk->private_data;
+	set_capacity(disk, card->mm_size << 1);
 	return 0;
 }
 /*
@@ -826,17 +825,14 @@ static int mm_revalidate(kdev_t i_rdev)
 static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned long arg)
 {
 	if (cmd == HDIO_GETGEO) {
-		unsigned int minor = minor(i->i_rdev);
-		int err, size, card_number = (minor >> MM_SHIFT);
+		struct cardinfo *card = i->i_bdev->bd_disk->private_data;
+		int size = card->mm_size * (1024 / MM_HARDSECT);
 		struct hd_geometry geo;
 		/*
 		 * get geometry: we have to fake one...  trim the size to a
 		 * multiple of 2048 (1M): tell we have 32 sectors, 64 heads,
 		 * whatever cylinders.
 		 */
-		err = ! access_ok(VERIFY_WRITE, arg, sizeof(geo));
-		if (err) return -EFAULT;
-		size = cards[card_number].mm_size * (1024 / MM_HARDSECT);
 		geo.heads     = 64;
 		geo.sectors   = 32;
 		geo.start     = get_start_sect(i->i_bdev);
@@ -855,25 +851,9 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 -----------------------------------------------------------------------------------
   Future support for removable devices
 */
-static int mm_check_change(kdev_t i_rdev)
+static int mm_check_change(struct gendisk *disk)
 {
-	int card_number = DEVICE_NR(i_rdev);
-/*  struct cardinfo *dev = cards + card_number; */
-	if (card_number >= num_cards) /* paranoid */
-		return 0;
-
-	return 0;
-}
-
-/*
------------------------------------------------------------------------------------
---                            mm_open
------------------------------------------------------------------------------------
-*/
-static int mm_open(struct inode *i, struct file *filp)
-{
-	if (DEVICE_NR(i->i_rdev) >= num_cards)
-		return -ENXIO;
+/*  struct cardinfo *dev = disk->private_data; */
 	return 0;
 }
 /*
@@ -882,11 +862,10 @@ static int mm_open(struct inode *i, struct file *filp)
 -----------------------------------------------------------------------------------
 */
 static struct block_device_operations mm_fops = {
-	owner:		THIS_MODULE,
-	open:		mm_open,
-	ioctl:		mm_ioctl,
-	revalidate:	mm_revalidate,
-	check_media_change: mm_check_change,
+	.owner		= THIS_MODULE,
+	.ioctl		= mm_ioctl,
+	.revalidate_disk= mm_revalidate,
+	.media_changed	= mm_check_change,
 };
 /*
 -----------------------------------------------------------------------------------
@@ -1162,16 +1141,6 @@ static struct pci_driver mm_pci_driver = {
 -----------------------------------------------------------------------------------
 */
 
-static request_queue_t * mm_queue_proc(kdev_t dev)
-{
-	int c = DEVICE_NR(dev);
-
-	if (c < MM_MAXCARDS)
-		return &cards[c].queue;
-	else
-		return BLK_DEFAULT_QUEUE(MAJOR_NR);
-}
-	
 int __init mm_init(void)
 {
 	int retval, i;
@@ -1190,21 +1159,21 @@ int __init mm_init(void)
 	}
 
 	for (i = 0; i < num_cards; i++) {
-		mm_gendisk[i] = alloc_disk();
+		mm_gendisk[i] = alloc_disk(1 << MM_SHIFT);
 		if (!mm_gendisk[i])
 			goto out;
 	}
 	devfs_handle = devfs_mk_dir(NULL, "umem", NULL);
 
-	blk_dev[MAJOR_NR].queue = mm_queue_proc;
 	for (i = 0; i < num_cards; i++) {
 		struct gendisk *disk = mm_gendisk[i];
 		sprintf(disk->disk_name, "umem%c", 'a'+i);
 		spin_lock_init(&cards[i].lock);
 		disk->major = major_nr;
 		disk->first_minor  = i << MM_SHIFT;
-		disk->minor_shift = MM_SHIFT;
 		disk->fops = &mm_fops;
+		disk->private_data = &cards[i];
+		disk->queue = &cards[i].queue;
 		set_capacity(disk, cards[i].mm_size << 1);
 		add_disk(disk);
 	}

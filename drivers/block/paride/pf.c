@@ -191,7 +191,6 @@ MODULE_PARM(drive3, "1-7i");
 /* set up defines for blk.h,  why don't all drivers do it this way ? */
 
 #define MAJOR_NR   major
-#define DEVICE_NR(device) minor(device)
 
 #include <linux/blk.h>
 #include <linux/blkpg.h>
@@ -272,7 +271,7 @@ struct pf_unit units[PF_UNITS];
 static int pf_identify(struct pf_unit *pf);
 static void pf_lock(struct pf_unit *pf, int func);
 static void pf_eject(struct pf_unit *pf);
-static int pf_check_media(kdev_t dev);
+static int pf_check_media(struct gendisk *disk);
 
 static char pf_scratch[512];	/* scratch block buffer */
 
@@ -294,11 +293,11 @@ static char *pf_buf;		/* buffer for request in progress */
 /* kernel glue structures */
 
 static struct block_device_operations pf_fops = {
-	.owner			= THIS_MODULE,
-	.open			= pf_open,
-	.release		= pf_release,
-	.ioctl			= pf_ioctl,
-	.check_media_change	= pf_check_media,
+	.owner		= THIS_MODULE,
+	.open		= pf_open,
+	.release	= pf_release,
+	.ioctl		= pf_ioctl,
+	.media_changed	= pf_check_media,
 };
 
 void pf_init_units(void)
@@ -308,7 +307,7 @@ void pf_init_units(void)
 
 	pf_drive_count = 0;
 	for (unit = 0, pf = units; unit < PF_UNITS; unit++, pf++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			continue;
 		pf->disk = disk;
@@ -320,7 +319,6 @@ void pf_init_units(void)
 		disk->major = MAJOR_NR;
 		disk->first_minor = unit;
 		strcpy(disk->disk_name, pf->name);
-		disk->minor_shift = 0;
 		disk->fops = &pf_fops;
 		if (!(*drives[unit])[D_PRT])
 			pf_drive_count++;
@@ -329,11 +327,7 @@ void pf_init_units(void)
 
 static int pf_open(struct inode *inode, struct file *file)
 {
-	int unit = DEVICE_NR(inode->i_rdev);
-	struct pf_unit *pf = units + unit;
-
-	if ((unit >= PF_UNITS) || (!pf->present))
-		return -ENODEV;
+	struct pf_unit *pf = inode->i_bdev->bd_disk->private_data;
 
 	pf_identify(pf);
 
@@ -352,10 +346,9 @@ static int pf_open(struct inode *inode, struct file *file)
 
 static int pf_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	int unit = DEVICE_NR(inode->i_rdev);
+	struct pf_unit *pf = inode->i_bdev->bd_disk->private_data;
 	struct hd_geometry *geo = (struct hd_geometry *) arg;
 	struct hd_geometry g;
-	struct pf_unit *pf = units + unit;
 	sector_t capacity;
 
 	if (cmd == CDROMEJECT) {
@@ -384,10 +377,9 @@ static int pf_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 
 static int pf_release(struct inode *inode, struct file *file)
 {
-	int unit = DEVICE_NR(inode->i_rdev);
-	struct pf_unit *pf = units + unit;
+	struct pf_unit *pf = inode->i_bdev->bd_disk->private_data;
 
-	if ((unit >= PF_UNITS) || (pf->access <= 0))
+	if (pf->access <= 0)
 		return -EINVAL;
 
 	pf->access--;
@@ -399,7 +391,7 @@ static int pf_release(struct inode *inode, struct file *file)
 
 }
 
-static int pf_check_media(kdev_t dev)
+static int pf_check_media(struct gendisk *disk)
 {
 	return 1;
 }
@@ -788,25 +780,23 @@ static int pf_ready(void)
 	return (((status_reg(pf_current) & (STAT_BUSY | pf_mask)) == pf_mask));
 }
 
+static struct request_queue pf_queue;
+
 static void do_pf_request(request_queue_t * q)
 {
-	int unit;
-
 	if (pf_busy)
 		return;
-      repeat:
-	if (elv_queue_empty(QUEUE))
+repeat:
+	if (elv_queue_empty(q))
 		return;
 
-	pf_req = elv_next_request(QUEUE);
-	unit = DEVICE_NR(pf_req->rq_dev);
-	pf_current = units + unit;
+	pf_req = elv_next_request(q);
+	pf_current = pf_req->rq_disk->private_data;
 	pf_block = pf_req->sector;
 	pf_run = pf_req->nr_sectors;
 	pf_count = pf_req->current_nr_sectors;
 
-	if ((unit >= PF_UNITS) ||
-	    (pf_block + pf_count > get_capacity(pf_current->disk))) {
+	if (pf_block + pf_count > get_capacity(pf_req->rq_disk)) {
 		end_request(pf_req, 0);
 		goto repeat;
 	}
@@ -853,7 +843,7 @@ static inline void next_request(int success)
 	spin_lock_irqsave(&pf_spin_lock, saved_flags);
 	end_request(pf_req, success);
 	pf_busy = 0;
-	do_pf_request(NULL);
+	do_pf_request(&pf_queue);
 	spin_unlock_irqrestore(&pf_spin_lock, saved_flags);
 }
 
@@ -964,7 +954,6 @@ static int __init pf_init(void)
 {				/* preliminary initialisation */
 	struct pf_unit *pf;
 	int unit;
-	request_queue_t *q;
 
 	if (disable)
 		return -1;
@@ -981,15 +970,16 @@ static int __init pf_init(void)
 			put_disk(pf->disk);
 		return -1;
 	}
-	q = BLK_DEFAULT_QUEUE(MAJOR_NR);
-	blk_init_queue(q, do_pf_request, &pf_spin_lock);
-	blk_queue_max_phys_segments(q, cluster);
-	blk_queue_max_hw_segments(q, cluster);
+	blk_init_queue(&pf_queue, do_pf_request, &pf_spin_lock);
+	blk_queue_max_phys_segments(&pf_queue, cluster);
+	blk_queue_max_hw_segments(&pf_queue, cluster);
 
 	for (pf = units, unit = 0; unit < PF_UNITS; pf++, unit++) {
 		struct gendisk *disk = pf->disk;
 		if (!pf->present)
 			continue;
+		disk->private_data = pf;
+		disk->queue = &pf_queue;
 		add_disk(disk);
 	}
 	return 0;
@@ -1007,6 +997,7 @@ static void __exit pf_exit(void)
 		put_disk(pf->disk);
 		pi_release(pf->pi);
 	}
+	blk_cleanup_queue(&pf_queue);
 }
 
 MODULE_LICENSE("GPL");

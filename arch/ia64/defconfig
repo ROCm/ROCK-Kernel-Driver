@@ -919,7 +919,7 @@ CONFIG_USB_MOUSE=m
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

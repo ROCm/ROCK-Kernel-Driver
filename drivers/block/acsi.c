@@ -45,7 +45,6 @@
 
 #define MAJOR_NR ACSI_MAJOR
 #define DEVICE_NAME "ACSI"
-#define DEVICE_NR(device) (minor(device) >> 4)
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -59,6 +58,7 @@
 #include <linux/delay.h>
 #include <linux/mm.h>
 #include <linux/major.h>
+#define QUEUE (&acsi_queue)
 #include <linux/blk.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
@@ -80,6 +80,7 @@ typedef void Scsi_Device; /* hack to avoid including scsi.h */
 #include <asm/atari_stram.h>
 
 static void (*do_acsi)(void) = NULL;
+static struct request_queue acsi_queue;
 
 #define DEBUG
 #undef DEBUG_DETECT
@@ -119,6 +120,7 @@ struct acsi_info_struct {
 	unsigned		old_atari_disk : 1; /* Is an old Atari disk       */
 	unsigned		changed : 1;	/* Medium has been changed */
 	unsigned long 	size;			/* #blocks */
+	int access_count;
 } acsi_info[MAX_DEV];
 
 /*
@@ -232,8 +234,8 @@ typedef union {
 /* Default size if capacity cannot be determined (1 GByte) */
 #define	DEFAULT_SIZE	0x1fffff
 
-#define CARTRCH_STAT(dev,buf)					\
-	(acsi_info[(dev)].old_atari_disk ?			\
+#define CARTRCH_STAT(aip,buf)						\
+	(aip->old_atari_disk ?						\
 	 (((buf)[0] & 0x7f) == 0x28) :					\
 	 ((((buf)[0] & 0x70) == 0x70) ?					\
 	  (((buf)[2] & 0x0f) == 0x06) :					\
@@ -245,7 +247,6 @@ char 			*acsi_buffer;
 unsigned long 	phys_acsi_buffer;
 
 static int NDevices;
-static int access_count[MAX_DEV];
 
 static int				CurrentNReq;
 static int				CurrentNSect;
@@ -348,7 +349,7 @@ struct acsi_error {
 static int acsicmd_dma( const char *cmd, char *buffer, int blocks, int
                         rwflag, int enable);
 static int acsi_reqsense( char *buffer, int targ, int lun);
-static void acsi_print_error( const unsigned char *errblk, int dev );
+static void acsi_print_error(const unsigned char *errblk, int struct acsi_info_struct *aip);
 static void acsi_interrupt (int irq, void *data, struct pt_regs *fp);
 static void unexpected_acsi_interrupt( void );
 static void bad_rw_intr( void );
@@ -364,10 +365,10 @@ static int acsi_ioctl( struct inode *inode, struct file *file, unsigned int
                        cmd, unsigned long arg );
 static int acsi_open( struct inode * inode, struct file * filp );
 static int acsi_release( struct inode * inode, struct file * file );
-static void acsi_prevent_removal( int target, int flag );
+static void acsi_prevent_removal(struct acsi_info_struct *aip, int flag );
 static int acsi_change_blk_size( int target, int lun);
 static int acsi_mode_sense( int target, int lun, SENSE_DATA *sd );
-static int acsi_revalidate (kdev_t);
+static int acsi_revalidate (struct gendisk *disk);
 
 /************************* End of Prototypes **************************/
 
@@ -691,12 +692,12 @@ int acsi_extcmd( unsigned char *buffer, int cnt )
 #endif
 
 
-static void acsi_print_error( const unsigned char *errblk, int dev  )
+static void acsi_print_error(const unsigned char *errblk, struct acsi_info_struct *aip)
 
 {	int atari_err, i, errcode;
 	struct acsi_error *arr;
 
-	atari_err = acsi_info[dev].old_atari_disk;
+	atari_err = aip->old_atari_disk;
 	if (atari_err)
 		errcode = errblk[0] & 0x7f;
 	else
@@ -780,15 +781,15 @@ static void read_intr( void )
 	
 	status = acsi_getstatus();
 	if (status != 0) {
-		int dev = DEVICE_NR(CURRENT->rq_dev);
-		printk( KERN_ERR "ad%c: ", dev+'a' );
-		if (!acsi_reqsense( acsi_buffer, acsi_info[dev].target, 
-					acsi_info[dev].lun))
+		struct gendisk *disk = CURRENT->rq_disk;
+		struct acsi_info_struct *aip = disk->private_data;
+		printk(KERN_ERR "%s: ", disk->disk_name);
+		if (!acsi_reqsense(acsi_buffer, aip->target, aip->lun))
 			printk( "ACSI error and REQUEST SENSE failed (status=0x%02x)\n", status );
 		else {
-			acsi_print_error( acsi_buffer, dev );
-			if (CARTRCH_STAT( dev, acsi_buffer ))
-				acsi_info[dev].changed = 1;
+			acsi_print_error(acsi_buffer, aip);
+			if (CARTRCH_STAT(aip, acsi_buffer))
+				aip->changed = 1;
 		}
 		ENABLE_IRQ();
 		bad_rw_intr();
@@ -811,15 +812,15 @@ static void write_intr(void)
 
 	status = acsi_getstatus();
 	if (status != 0) {
-		int	dev = DEVICE_NR(CURRENT->rq_dev);
-		printk( KERN_ERR "ad%c: ", dev+'a' );
-		if (!acsi_reqsense( acsi_buffer, acsi_info[dev].target,
-					acsi_info[dev].lun))
+		struct gendisk *disk = CURRENT->rq_disk;
+		struct acsi_info_struct *aip = disk->private_data;
+		printk( KERN_ERR "%s: ", disk->disk_name);
+		if (!acsi_reqsense( acsi_buffer, aip->target, aip->lun))
 			printk( "ACSI error and REQUEST SENSE failed (status=0x%02x)\n", status );
 		else {
-			acsi_print_error( acsi_buffer, dev );
-			if (CARTRCH_STAT( dev, acsi_buffer ))
-				acsi_info[dev].changed = 1;
+			acsi_print_error(acsi_buffer, aip);
+			if (CARTRCH_STAT(aip, acsi_buffer))
+				aip->changed = 1;
 		}
 		bad_rw_intr();
 		redo_acsi_request();
@@ -944,11 +945,13 @@ static void do_acsi_request( request_queue_t * q )
 
 
 static void redo_acsi_request( void )
-
-{	unsigned			block, dev, target, lun, nsect;
+{
+	unsigned			block, target, lun, nsect;
 	char 				*buffer;
 	unsigned long		pbuffer;
 	struct buffer_head	*bh;
+	struct gendisk *disk;
+	struct acsi_info_struct *aip;
 
   repeat:
 	CLEAR_TIMER();
@@ -963,35 +966,33 @@ static void redo_acsi_request( void )
 		return;
 	}
 
-	if (major(CURRENT->rq_dev) != MAJOR_NR)
-		panic(DEVICE_NAME ": request list destroyed");
+	disk = CURRENT->rq_disk;
+	aip = disk->private_data;
 	if (CURRENT->bh) {
 		if (!CURRENT->bh && !buffer_locked(CURRENT->bh))
 			panic(DEVICE_NAME ": block not locked");
 	}
 
-	dev = DEVICE_NR(CURRENT->rq_dev);
 	block = CURRENT->sector;
-	if (dev >= NDevices ||
-		block+CURRENT->nr_sectors >= get_capacity(acsi_gendisk[dev])) {
+	if (block+CURRENT->nr_sectors >= get_capacity(disk)) {
 #ifdef DEBUG
-		printk( "ad%c: attempted access for blocks %d...%ld past end of device at block %ld.\n",
-		       dev+'a',
+		printk( "%s: attempted access for blocks %d...%ld past end of device at block %ld.\n",
+		       disk->disk_name,
 		       block, block + CURRENT->nr_sectors - 1,
-		       get_capacity(acsi_gendisk[dev]));
+		       get_capacity(disk));
 #endif
 		end_request(CURRENT, 0);
 		goto repeat;
 	}
-	if (acsi_info[dev].changed) {
-		printk( KERN_NOTICE "ad%c: request denied because cartridge has "
-				"been changed.\n", dev+'a' );
+	if (aip->changed) {
+		printk( KERN_NOTICE "%s: request denied because cartridge has "
+				"been changed.\n", disk->disk_name);
 		end_request(CURRENT, 0);
 		goto repeat;
 	}
 	
-	target = acsi_info[dev].target;
-	lun    = acsi_info[dev].lun;
+	target = aip->target;
+	lun    = aip->lun;
 
 	/* Find out how many sectors should be transferred from/to
 	 * consecutive buffers and thus can be done with a single command.
@@ -1085,9 +1086,8 @@ static void redo_acsi_request( void )
 static int acsi_ioctl( struct inode *inode, struct file *file,
 					   unsigned int cmd, unsigned long arg )
 {
-	int dev = DEVICE_NR(inode->i_rdev);
-	if (dev >= NDevices)
-		return -EINVAL;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct acsi_info_struct *aip = disk->private_data;
 	switch (cmd) {
 	  case HDIO_GETGEO:
 		/* HDIO_GETGEO is supported more for getting the partition's
@@ -1097,13 +1097,13 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 		 * easy, use Adaptec's usual 64/32 mapping */
 	    put_user( 64, &geo->heads );
 	    put_user( 32, &geo->sectors );
-	    put_user( acsi_info[dev].size >> 11, &geo->cylinders );
+	    put_user( aip->size >> 11, &geo->cylinders );
 		put_user(get_start_sect(inode->i_bdev), &geo->start);
 		return 0;
 	  }
 	  case SCSI_IOCTL_GET_IDLUN:
 		/* SCSI compatible GET_IDLUN call to get target's ID and LUN number */
-		put_user( acsi_info[dev].target | (acsi_info[dev].lun << 8),
+		put_user( aip->target | (aip->lun << 8),
 				  &((Scsi_Idlun *) arg)->dev_id );
 		put_user( 0, &((Scsi_Idlun *) arg)->host_unique_id );
 		return 0;
@@ -1130,24 +1130,19 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 
 static int acsi_open( struct inode * inode, struct file * filp )
 {
-	int  device;
-	struct acsi_info_struct *aip;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct acsi_info_struct *aip = disk->private_data;
 
-	device = DEVICE_NR(inode->i_rdev);
-	if (device >= NDevices)
-		return -ENXIO;
-	aip = &acsi_info[device];
-
-	if (access_count[device] == 0 && aip->removable) {
+	if (aip->access_count == 0 && aip->removable) {
 #if 0
 		aip->changed = 1;	/* safety first */
 #endif
 		check_disk_change( inode->i_bdev );
 		if (aip->changed)	/* revalidate was not successful (no medium) */
 			return -ENXIO;
-		acsi_prevent_removal(device, 1);
+		acsi_prevent_removal(aip, 1);
 	}
-	access_count[device]++;
+	aip->access_count++;
 
 	if (filp && filp->f_mode) {
 		check_disk_change( inode->i_bdev );
@@ -1169,9 +1164,10 @@ static int acsi_open( struct inode * inode, struct file * filp )
 
 static int acsi_release( struct inode * inode, struct file * file )
 {
-	int device = DEVICE_NR(inode->i_rdev);
-	if (--access_count[device] == 0 && acsi_info[device].removable)
-		acsi_prevent_removal(device, 0);
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct acsi_info_struct *aip = disk->private_data;
+	if (--aip->access_count == 0 && aip->removable)
+		acsi_prevent_removal(aip, 0);
 	return( 0 );
 }
 
@@ -1179,12 +1175,11 @@ static int acsi_release( struct inode * inode, struct file * file )
  * Prevent or allow a media change for removable devices.
  */
 
-static void acsi_prevent_removal(int device, int flag)
+static void acsi_prevent_removal(struct acsi_info_struct *aip, int flag)
 {
 	stdma_lock( NULL, NULL );
 	
-	CMDSET_TARG_LUN(pa_med_rem_cmd, acsi_info[device].target,
-			acsi_info[device].lun);
+	CMDSET_TARG_LUN(pa_med_rem_cmd, aip->target, aip->lun);
 	CMDSET_LEN( pa_med_rem_cmd, flag );
 	
 	if (acsicmd_nodma(pa_med_rem_cmd, 0) && acsi_wait_for_IRQ(3*HZ))
@@ -1195,12 +1190,10 @@ static void acsi_prevent_removal(int device, int flag)
 	stdma_release();
 }
 
-static int acsi_media_change (kdev_t dev)
+static int acsi_media_change(struct gendisk *disk)
 {
-	int device = DEVICE_NR(dev);
-	struct acsi_info_struct *aip;
+	struct acsi_info_struct *aip = disk->private_data;
 
-	aip = &acsi_info[device];
 	if (!aip->removable) 
 		return 0;
 
@@ -1221,19 +1214,19 @@ static int acsi_media_change (kdev_t dev)
 	    acsi_wait_for_IRQ(3*HZ)) {
 		if (acsi_getstatus()) {
 			if (acsi_reqsense(acsi_buffer, aip->target, aip->lun)) {
-				if (CARTRCH_STAT(device, acsi_buffer))
+				if (CARTRCH_STAT(aip, acsi_buffer))
 					aip->changed = 1;
 			}
 			else {
-				printk( KERN_ERR "ad%c: REQUEST SENSE failed in test for "
-				       "medium change; assuming a change\n", device + 'a' );
+				printk( KERN_ERR "%s: REQUEST SENSE failed in test for "
+				       "medium change; assuming a change\n", disk->disk_name );
 				aip->changed = 1;
 			}
 		}
 	}
 	else {
-		printk( KERN_ERR "ad%c: Test for medium changed timed out; "
-				"assuming a change\n", device + 'a');
+		printk( KERN_ERR "%s: Test for medium changed timed out; "
+				"assuming a change\n", disk->disk_name);
 		aip->changed = 1;
 	}
 	ENABLE_IRQ();
@@ -1598,12 +1591,12 @@ int SLM_devices[8];
 #endif
 
 static struct block_device_operations acsi_fops = {
-	owner:			THIS_MODULE,
-	open:			acsi_open,
-	release:		acsi_release,
-	ioctl:			acsi_ioctl,
-	check_media_change:	acsi_media_change,
-	revalidate:		acsi_revalidate,
+	.owner		= THIS_MODULE,
+	.open		= acsi_open,
+	.release	= acsi_release,
+	.ioctl		= acsi_ioctl,
+	.media_changed	= acsi_media_change,
+	.revalidate_disk= acsi_revalidate,
 };
 
 #ifdef CONFIG_ATARI_SLM_MODULE
@@ -1647,7 +1640,7 @@ int acsi_init( void )
 	phys_acsi_buffer = virt_to_phys( acsi_buffer );
 	STramMask = ATARIHW_PRESENT(EXTD_DMA) ? 0x00000000 : 0xff000000;
 	
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_acsi_request, &acsi_lock);
+	blk_init_queue(&acsi_queue, do_acsi_request, &acsi_lock);
 #ifdef CONFIG_ATARI_SLM
 	err = slm_init();
 #endif
@@ -1729,7 +1722,7 @@ int acsi_init( void )
 #endif
 	err = -ENOMEM;
 	for( i = 0; i < NDevices; ++i ) {
-		acsi_gendisk[i] = alloc_disk();
+		acsi_gendisk[i] = alloc_disk(16);
 		if (!acsi_gendisk[i])
 			goto out4;
 	}
@@ -1739,9 +1732,14 @@ int acsi_init( void )
 		sprintf(disk->disk_name, "ad%c", 'a'+i);
 		disk->major = MAJOR_NR;
 		disk->first_minor = i << 4;
-		disk->minor_shift = (acsi_info[i].type==HARDDISK)?4:0;
+		if (acsi_info[i].type != HARDDISK) {
+			disk->minor_shift = 0;
+			disk->minors = 1;
+		}
 		disk->fops = &acsi_fops;
+		disk->private_data = &acsi_info[i];
 		set_capacity(disk, acsi_info[i].size);
+		disk->queue = &acsi_queue;
 		add_disk(disk);
 	}
 	return 0;
@@ -1749,7 +1747,7 @@ out4:
 	while (i--)
 		put_disk(acsi_gendisk[i]);
 out3:
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&acsi_queue);
 	atari_stram_free( acsi_buffer );
 out2:
 	unregister_blkdev( MAJOR_NR, "ad" );
@@ -1776,7 +1774,7 @@ void cleanup_module(void)
 {
 	int i;
 	del_timer( &acsi_timer );
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&acsi_queue);
 	atari_stram_free( acsi_buffer );
 
 	if (unregister_blkdev( MAJOR_NR, "ad" ) != 0)
@@ -1808,10 +1806,9 @@ void cleanup_module(void)
  *
  */
 
-static int acsi_revalidate(kdev_t dev)
+static int acsi_revalidate(struct gendisk *disk)
 {
-	int unit = DEVICE_NR(dev);
-	struct acsi_info_struct *aip = &acsi_info[unit];
+	struct acsi_info_struct *aip = disk->private_data;
 	stdma_lock( NULL, NULL );
 	if (acsi_devinit(aip) != DEV_SUPPORTED) {
 		printk( KERN_ERR "ACSI: revalidate failed for target %d lun %d\n",
@@ -1824,6 +1821,6 @@ static int acsi_revalidate(kdev_t dev)
 
 	ENABLE_IRQ();
 	stdma_release();
-	set_capacity(acsi_gendisk[unit], aip->size);
+	set_capacity(disk, aip->size);
 	return 0;
 }

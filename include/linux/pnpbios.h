@@ -108,38 +108,9 @@ struct pnp_bios_node {
 };
 #pragma pack()
 
-struct pnpbios_device_id
-{
-	char id[8];
-	unsigned long driver_data;
-};
-
-struct pnpbios_driver {
-	struct list_head node;
-	char *name;
-	const struct pnpbios_device_id *id_table;	/* NULL if wants all devices */
-	int  (*probe)  (struct pci_dev *dev, const struct pnpbios_device_id *id);	/* New device inserted */
-	void (*remove) (struct pci_dev *dev);		/* Device removed, either due to hotplug remove or module remove */
-};
-
 #ifdef CONFIG_PNPBIOS
 
-/* exported */
-extern int  pnpbios_register_driver(struct pnpbios_driver *drv);
-extern void pnpbios_unregister_driver(struct pnpbios_driver *drv);
-
 /* non-exported */
-#define pnpbios_for_each_dev(dev) \
-	for(dev = pnpbios_dev_g(pnpbios_devices.next); dev != pnpbios_dev_g(&pnpbios_devices); dev = pnpbios_dev_g(dev->global_list.next))
-
-
-#define pnpbios_dev_g(n) list_entry(n, struct pci_dev, global_list)
-
-static __inline struct pnpbios_driver *pnpbios_dev_driver(const struct pci_dev *dev)
-{
-	return (struct pnpbios_driver *)dev->driver;
-}
-
 extern int  pnpbios_dont_use_current_config;
 extern void *pnpbios_kmalloc(size_t size, int f);
 extern int pnpbios_init (void);
@@ -161,52 +132,8 @@ extern int pnp_bios_apm_id_table (char *table, u16 *size);
 extern int pnp_bios_write_escd (char *data, u32 nvram_base);
 #endif
 
-/*
- * a helper function which helps ensure correct pnpbios_driver
- * setup and cleanup for commonly-encountered hotplug/modular cases
- *
- * This MUST stay in a header, as it checks for -DMODULE
- */
- 
-static inline int pnpbios_module_init(struct pnpbios_driver *drv)
-{
-	int rc = pnpbios_register_driver (drv);
-
-	if (rc > 0)
-		return 0;
-
-	/* iff CONFIG_HOTPLUG and built into kernel, we should
-	 * leave the driver around for future hotplug events.
-	 * For the module case, a hotplug daemon of some sort
-	 * should load a module in response to an insert event. */
-#if defined(CONFIG_HOTPLUG) && !defined(MODULE)
-	if (rc == 0)
-		return 0;
-#else
-	if (rc == 0)
-		rc = -ENODEV;		
-#endif
-
-	/* if we get here, we need to clean up pci driver instance
-	 * and return some sort of error */
-	pnpbios_unregister_driver (drv);
-	
-	return rc;
-}
-
-#else /* CONFIG_PNPBIOS */
-
-static __inline__ int pnpbios_register_driver(struct pnpbios_driver *drv)
-{
-	return 0;
-}
-
-static __inline__ void pnpbios_unregister_driver(struct pnpbios_driver *drv)
-{
-	return;
-}
-
 #endif /* CONFIG_PNPBIOS */
+
 #endif /* __KERNEL__ */
 
 #endif /* _LINUX_PNPBIOS_H */
