@@ -60,7 +60,7 @@
 #endif
 
 #define task_map_rq(rq, flags)		ide_map_buffer((rq), (flags))
-#define task_unmap_rq(rq, buf, flags)	ide_unmap_buffer((buf), (flags))
+#define task_unmap_rq(rq, buf, flags)	ide_unmap_buffer((rq), (buf), (flags))
 
 inline u32 task_read_24 (ide_drive_t *drive)
 {

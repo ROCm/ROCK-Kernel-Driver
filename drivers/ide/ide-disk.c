@@ -173,7 +173,7 @@ read_next:
 		drive->name, rq->sector, rq->sector+nsect-1,
 		(unsigned long) rq->buffer+(nsect<<9), rq->nr_sectors-nsect);
 #endif
-	ide_unmap_buffer(to, &flags);
+	ide_unmap_buffer(rq, to, &flags);
 	rq->sector += nsect;
 	rq->errors = 0;
 	i = (rq->nr_sectors -= nsect);
@@ -227,7 +227,7 @@ static ide_startstop_t write_intr (ide_drive_t *drive)
 				unsigned long flags;
 				char *to = ide_map_buffer(rq, &flags);
 				taskfile_output_data(drive, to, SECTOR_WORDS);
-				ide_unmap_buffer(to, &flags);
+				ide_unmap_buffer(rq, to, &flags);
 				if (HWGROUP(drive)->handler != NULL)
 					BUG();
 				ide_set_handler(drive, &write_intr, WAIT_CMD, NULL);
@@ -304,7 +304,7 @@ int ide_multwrite (ide_drive_t *drive, unsigned int mcount)
 		 * re-entering us on the last transfer.
 		 */
 		taskfile_output_data(drive, buffer, nsect<<7);
-		ide_unmap_buffer(buffer, &flags);
+		ide_unmap_buffer(rq, buffer, &flags);
 	} while (mcount);
 
         return 0;
@@ -522,7 +522,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 				BUG();
 			ide_set_handler(drive, &write_intr, WAIT_CMD, NULL);
 			taskfile_output_data(drive, to, SECTOR_WORDS);
-			ide_unmap_buffer(to, &flags);
+			ide_unmap_buffer(rq, to, &flags);
 		}
 		return ide_started;
 	}
