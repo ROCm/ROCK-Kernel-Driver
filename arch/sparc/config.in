@@ -208,6 +208,8 @@ if [ "$CONFIG_NET" = "y" ]; then
    endmenu
 fi
 
+source net/ax25/Config.in
+
 # This one must be before the filesystem configs. -DaveM
 mainmenu_option next_comment
 comment 'Unix98 PTY support'
