@@ -21,6 +21,8 @@ ACPI_MODULE_NAME		("sleep")
 
 u8 sleep_states[ACPI_S_STATE_COUNT];
 
+extern void do_suspend_lowlevel_s4bios(int);
+
 /**
  * acpi_system_restore_state - OS-specific restoration of state
  * @state:	sleep state we're exiting
