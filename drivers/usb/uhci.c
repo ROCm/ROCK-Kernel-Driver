@@ -2370,15 +2370,15 @@ static void uhci_call_completion(struct urb *urb)
 	urb->dev = NULL;
 	spin_unlock_irqrestore(&urb->lock, flags);
 
-	if (urb->complete) {
+	if (urb->complete)
 		urb->complete(urb);
 
+	if (resubmit_interrupt)
 		/* Recheck the status. The completion handler may have */
 		/*  unlinked the resubmitting interrupt URB */
 		killed = (urb->status == -ENOENT ||
 			  urb->status == -ECONNABORTED ||
 			  urb->status == -ECONNRESET);
-	}
 
 	if (resubmit_interrupt && !killed) {
 		urb->dev = dev;
