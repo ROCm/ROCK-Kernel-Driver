@@ -4777,6 +4777,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		edata.data = netif_carrier_ok(tp->dev) ? 1 : 0;
 		if (copy_to_user(useraddr, &edata, sizeof(edata)))
 			return -EFAULT;
+		return 0;
 	}
 	case ETHTOOL_GCOALESCE: {
 		struct ethtool_coalesce ecoal = { ETHTOOL_GCOALESCE };
