@@ -18,7 +18,6 @@
 ======================================================================*/
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/init.h>
 
 #include <linux/kernel.h>
@@ -42,7 +41,6 @@
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
-#include <linux/config.h>
 #include <linux/pci.h>
 #include <asm/uaccess.h>
 
