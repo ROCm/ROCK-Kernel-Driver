@@ -175,7 +175,7 @@ void machine_real_restart(unsigned char *code, int length)
 {
 	unsigned long flags;
 
-	cli();
+	local_irq_disable();
 
 	/* Write zero to CMOS register number 0x0f, which the BIOS POST
 	   routine will recognize as telling it to do a proper reboot.  (Well
