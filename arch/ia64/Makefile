@@ -27,7 +27,7 @@ GCC_MINOR_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | 
 
 GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
 
-arch-cppflags	:= $(shell arch/ia64/scripts/toolchain-flags $(CC) $(LD) $(OBJDUMP))
+arch-cppflags	:= $(shell arch/ia64/scripts/toolchain-flags $(CC) $(OBJDUMP))
 cflags-y	+= $(arch-cppflags)
 AFLAGS		+= $(arch-cppflags)
 
