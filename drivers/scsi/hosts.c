@@ -183,8 +183,10 @@ static int scsi_host_legacy_release(struct Scsi_Host *shost)
 {
 	if (shost->irq)
 		free_irq(shost->irq, NULL);
+#ifdef CONFIG_GENERIC_ISA_DMA
 	if (shost->dma_channel != 0xff)
 		free_dma(shost->dma_channel);
+#endif
 	if (shost->io_port && shost->n_io_port)
 		release_region(shost->io_port, shost->n_io_port);
 
