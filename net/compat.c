@@ -322,7 +322,7 @@ static int do_netfilter_replace(int fd, int level, int optname,
 	u32 origsize, tmp32, num_counters;
 	unsigned int repl_nat_size;
 	int ret;
-	int i, num_ents;
+	int i;
 	compat_uptr_t ucntrs;
 
 	if (get_user(origsize, &urepl->size))
@@ -366,15 +366,10 @@ static int do_netfilter_replace(int fd, int level, int optname,
 	    __put_user(compat_ptr(ucntrs), &repl_nat->counters))
 		goto out;
 
-	num_ents = origsize / sizeof(struct ipt_entry);
-
-	for (i = 0; i < num_ents; i++) {
-		struct ipt_entry ent;
-
-		if (__copy_from_user(&ent, &urepl->entries[i], sizeof(ent)) ||
-		    __copy_to_user(&repl_nat->entries[i], &ent, sizeof(ent)))
-			goto out;
-	}
+	if (__copy_in_user(&repl_nat->entries[0],
+			   &urepl->entries[0],
+			   origsize))
+		goto out;
 
 	for (i = 0; i < NF_IP_NUMHOOKS; i++) {
 		if (__get_user(tmp32, &urepl->hook_entry[i]) ||
