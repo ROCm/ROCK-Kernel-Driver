@@ -1130,6 +1130,14 @@ ENTRY(sys_call_table)
 	.long sys_utimes
  	.long sys_fadvise64_64_wrapper
 	.long sys_ni_syscall	/* Reserved for vserver */
-	.long sys_ni_syscall
+	.long sys_ni_syscall	/* Reserved for mbind */
+	.long sys_ni_syscall	/* 275 - get_mempolicy */
+	.long sys_ni_syscall	/* set_mempolicy */
+	.long sys_mq_open
+	.long sys_mq_unlink
+	.long sys_mq_timedsend
+	.long sys_mq_timedreceive       /* 280 */
+	.long sys_mq_notify
+	.long sys_mq_getsetattr
 
 /* End of entry.S */

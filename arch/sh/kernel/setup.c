@@ -25,15 +25,12 @@
 #include <asm/io_generic.h>
 #include <asm/sections.h>
 #include <asm/irq.h>
-#ifdef CONFIG_SH_EARLY_PRINTK
-#include <asm/sh_bios.h>
-#endif
 
 #ifdef CONFIG_SH_KGDB
 #include <asm/kgdb.h>
 static int kgdb_parse_options(char *options);
 #endif
-
+extern void * __rd_start, * __rd_end;
 /*
  * Machine setup..
  */
@@ -118,130 +115,6 @@ static struct resource ram_resources[] = {
 
 unsigned long memory_start, memory_end;
 
-/* XXX: MRB-remove - blatant hack */
-#if 1
-#define SCIF_REG	0xffe80000
-
-static void scif_sercon_putc(int c)
-{
-	while (!(ctrl_inw(SCIF_REG + 0x10) & 0x20)) ;
-
-	ctrl_outb(c, SCIF_REG + 12);
-	ctrl_outw((ctrl_inw(SCIF_REG + 0x10) & 0x9f), SCIF_REG + 0x10);
-
-	if (c == '\n')
-		scif_sercon_putc('\r');
-}
-
-static void scif_sercon_flush(void)
-{
-	ctrl_outw((ctrl_inw(SCIF_REG + 0x10) & 0xbf), SCIF_REG + 0x10);
-
-	while (!(ctrl_inw(SCIF_REG + 0x10) & 0x40)) ;
-
-	ctrl_outw((ctrl_inw(SCIF_REG + 0x10) & 0xbf), SCIF_REG + 0x10);
-}
-
-static void scif_sercon_write(struct console *con, const char *s, unsigned count)
-{
-	while (count-- > 0)
-		scif_sercon_putc(*s++);
-
-	scif_sercon_flush();
-}
-
-static int __init scif_sercon_setup(struct console *con, char *options)
-{
-	con->cflag = CREAD | HUPCL | CLOCAL | B57600 | CS8;
-
-	return 0;
-}
-
-static struct console scif_sercon = {
-	.name		= "sercon",
-	.write		= scif_sercon_write,
-	.setup		= scif_sercon_setup,
-	.flags		= CON_PRINTBUFFER,
-	.index		= -1,
-};
-
-void scif_sercon_init(int baud)
-{
-	ctrl_outw(0, SCIF_REG + 8);
-	ctrl_outw(0, SCIF_REG);
-
-	/* Set baud rate */
-	ctrl_outb((50000000 / (32 * baud)) - 1, SCIF_REG + 4);
-
-	ctrl_outw(12, SCIF_REG + 24);
-	ctrl_outw(8, SCIF_REG + 24);
-	ctrl_outw(0, SCIF_REG + 32);
-	ctrl_outw(0x60, SCIF_REG + 16);
-	ctrl_outw(0, SCIF_REG + 36);
-	ctrl_outw(0x30, SCIF_REG + 8);
-
-	register_console(&scif_sercon);
-}
-
-void scif_sercon_unregister(void)
-{
-	unregister_console(&scif_sercon);
-}
-#endif
-
-#ifdef CONFIG_SH_EARLY_PRINTK
-/*
- *	Print a string through the BIOS
- */
-static void sh_console_write(struct console *co, const char *s,
-				 unsigned count)
-{
-    	sh_bios_console_write(s, count);
-}
-
-/*
- *	Setup initial baud/bits/parity. We do two things here:
- *	- construct a cflag setting for the first rs_open()
- *	- initialize the serial port
- *	Return non-zero if we didn't find a serial port.
- */
-static int __init sh_console_setup(struct console *co, char *options)
-{
-	int	cflag = CREAD | HUPCL | CLOCAL;
-
-	/*
-	 *	Now construct a cflag setting.
-	 *  	TODO: this is a totally bogus cflag, as we have
-	 *  	no idea what serial settings the BIOS is using, or
-	 *  	even if its using the serial port at all.
-	 */
-    	cflag |= B115200 | CS8 | /*no parity*/0;
-
-	co->cflag = cflag;
-
-	return 0;
-}
-
-static struct console sh_console = {
-	.name		= "bios",
-	.write		= sh_console_write,
-	.setup		= sh_console_setup,
-	.flags		= CON_PRINTBUFFER,
-	.index		= -1,
-};
-
-void sh_console_init(void)
-{
-	register_console(&sh_console);
-}
-
-void sh_console_unregister(void)
-{
-	unregister_console(&sh_console);
-}
-
-#endif
-
 static inline void parse_cmdline (char ** cmdline_p, char mv_name[MV_NAME_SIZE],
 				  struct sh_machine_vector** mvp,
 				  unsigned long *mv_io_base,
@@ -323,10 +196,6 @@ static int __init sh_mv_setup(char **cmdline_p)
 
 	parse_cmdline(cmdline_p, mv_name, &mv, &mv_io_base, &mv_mmio_enable);
 
-#ifdef CONFIG_CMDLINE_BOOL
-        sprintf(*cmdline_p, CONFIG_CMDLINE);
-#endif
-
 #ifdef CONFIG_SH_GENERIC
 	if (mv == NULL) {
 		mv = &mv_unknown;
@@ -380,14 +249,15 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long bootmap_size;
 	unsigned long start_pfn, max_pfn, max_low_pfn;
 
-/* XXX: MRB-remove */
-#if 0
-	scif_sercon_init(57600);
+#ifdef CONFIG_EARLY_PRINTK
+	extern void enable_early_printk(void);
+
+	enable_early_printk();
 #endif
-#ifdef CONFIG_SH_EARLY_PRINTK
-	sh_console_init();
+#ifdef CONFIG_CMDLINE_BOOL
+        strcpy(COMMAND_LINE, CONFIG_CMDLINE);
 #endif
-	
+
 	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
 
 #ifdef CONFIG_BLK_DEV_RAM
@@ -490,6 +360,13 @@ void __init setup_arch(char **cmdline_p)
 	reserve_bootmem_node(NODE_DATA(0), __MEMORY_START, PAGE_SIZE);
 
 #ifdef CONFIG_BLK_DEV_INITRD
+ 	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+ 	if (&__rd_start != &__rd_end) {
+		LOADER_TYPE = 1;
+		INITRD_START = PHYSADDR((unsigned long)&__rd_start) - __MEMORY_START;
+		INITRD_SIZE = (unsigned long)&__rd_end - (unsigned long)&__rd_start;
+ 	}
+
 	if (LOADER_TYPE && INITRD_START) {
 		if (INITRD_START + INITRD_SIZE <= (max_low_pfn << PAGE_SHIFT)) {
 			reserve_bootmem_node(NODE_DATA(0), INITRD_START+__MEMORY_START, INITRD_SIZE);
@@ -555,8 +432,10 @@ subsys_initcall(topology_init);
 
 static const char *cpu_name[] = {
 	[CPU_SH7604]	= "SH7604",
+	[CPU_SH7705]	= "SH7705",
 	[CPU_SH7708]	= "SH7708",
 	[CPU_SH7729]	= "SH7729",
+	[CPU_SH7300]	= "SH7300",
 	[CPU_SH7750]	= "SH7750",
 	[CPU_SH7750S]	= "SH7750S",
 	[CPU_SH7750R]	= "SH7750R",
@@ -593,8 +472,8 @@ static void show_cpuflags(struct seq_file *m)
 
 	for (i = 0; i < cpu_data->flags; i++)
 		if ((cpu_data->flags & (1 << i)))
-			seq_printf(m, " %s", cpu_flags[i]);
-	
+			seq_printf(m, " %s", cpu_flags[i+1]);
+
 	seq_printf(m, "\n");
 }
 

@@ -188,13 +188,7 @@ adding a machine called vapor):
  - add a new file include/asm-sh/vapor/io.h which contains prototypes for
    any machine specific IO functions prefixed with the machine name, for
    example vapor_inb. These will be needed when filling out the machine
-   vector. In addition, a section is required which defines what to do when
-   building a machine specific version. For example:
-
-     #ifdef __WANT_IO_DEF
-     #define inb  vapor_inb
-     ...
-     #endif
+   vector.
 
    This is the minimum that is required, however there are ample
    opportunities to optimise this. In particular, by making the prototypes

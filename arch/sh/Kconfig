@@ -45,6 +45,12 @@ config SH_7751_SOLUTION_ENGINE
 	  Select 7751 SolutionEngine if configuring for a Hitachi SH7751
 	  evalutation board.
 
+config SH_7300_SOLUTION_ENGINE
+	bool "SolutionEngine7300"
+	help
+	  Select 7300 SolutionEngine if configuring for a Hitachi SH7300(SH-Mobile V)
+	  evalutation board.
+
 config SH_7751_SYSTEMH
 	bool "SystemH7751R"
 	help
@@ -138,6 +144,18 @@ config SH_SECUREEDGE5410
 	  This includes both the OEM SecureEdge products as well as the
 	  SME product line.
 
+config SH_HS7751RVOIP
+	bool "HS7751RVOIP"
+	help
+	  Select HS7751RVOIP if configuring for a Renesas Technology
+	  Sales VoIP board.
+
+config SH_RTS7751R2D
+	bool "RTS7751R2D"
+	help
+	  Select RTS7751R2D if configuring for a Renesas Technology
+	  Sales SH-Graphics board.
+
 config SH_UNKNOWN
 	bool "BareCPU"
 	help
@@ -186,7 +204,11 @@ config CPU_SUBTYPE_SH7604
 config CPU_SUBTYPE_SH7300
 	bool "SH7300"
 	depends on CPU_SH3
-	  
+
+config CPU_SUBTYPE_SH7705
+	bool "SH7705"
+	depends on CPU_SH3
+
 config CPU_SUBTYPE_SH7707
 	bool "SH7707"
 	depends on CPU_SH3
@@ -224,10 +246,17 @@ config CPU_SUBTYPE_SH7760
 	depends on CPU_SH4
 
 config CPU_SUBTYPE_ST40STB1
-	bool "ST40STB1"
-	depends on CPU_SH4
-	help
-	  Select ST40STB1 if you have a ST40STB1 CPU.
+       bool "ST40STB1 / ST40RA"
+       depends on CPU_SH4
+       help
+         Select ST40STB1 if you have a ST40RA CPU.
+         This was previously called the ST40STB1, hence the option name.
+
+config CPU_SUBTYPE_ST40GX1
+       bool "ST40GX1"
+       depends on CPU_SH4
+       help
+         Select ST40GX1 if you have a ST40GX1 CPU.
 
 endchoice
 
@@ -268,7 +297,7 @@ config CMDLINE
 config MEMORY_START
 	hex "Physical memory start address" if !MEMORY_SET || MEMORY_OVERRIDE
 	default "0x08000000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || SH_MPC1211 || SH_SECUREEDGE5410
-	default "0x0c000000" if !MEMORY_OVERRIDE && (SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE)
+	default "0x0c000000" if !MEMORY_OVERRIDE && (SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_HS7751RVOIP || SH_RTS7751R2D)
 	---help---
 	  Computers built with Hitachi SuperH processors always
 	  map the ROM starting at address zero.  But the processor
@@ -287,7 +316,7 @@ config MEMORY_SIZE
 	hex "Physical memory size" if !MEMORY_SET || MEMORY_OVERRIDE
 	default "0x00400000" if !MEMORY_SET || MEMORY_OVERRIDE || !MEMORY_OVERRIDE && SH_ADX || !MEMORY_OVERRIDE && (SH_HP600 || SH_BIGSUR || SH_SH2000)
 	default "0x01000000" if !MEMORY_OVERRIDE && SH_DREAMCAST || SH_SECUREEDGE5410
-	default "0x04000000" if !MEMORY_OVERRIDE && SH_7751_SOLUTION_ENGINE
+	default "0x04000000" if !MEMORY_OVERRIDE && (SH_7751_SOLUTION_ENGINE || SH_HS7751RVOIP || SH_RTS7751R2D)
 	default "0x02000000" if !MEMORY_OVERRIDE && SH_SOLUTION_ENGINE
 	default "0x08000000" if SH_MPC1211
 	help
@@ -299,7 +328,7 @@ config MEMORY_SIZE
 
 config MEMORY_SET
 	bool
-	depends on !MEMORY_OVERRIDE && (SH_MPC1211 || SH_ADX || SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_SECUREEDGE5410)
+	depends on !MEMORY_OVERRIDE && (SH_MPC1211 || SH_ADX || SH_DREAMCAST || SH_HP600 || SH_BIGSUR || SH_SH2000 || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_SECUREEDGE5410 || SH_HS7751RVOIP || SH_RTS7751R2D)
 	default y
 	help
 	  This is an option about which you will never be asked a question.
@@ -358,7 +387,7 @@ config CF_BASE_ADDR
 # The SH7750 RTC module is disabled in the Dreamcast
 config SH_RTC
 	bool
-	depends on !SH_DREAMCAST && !SH_SATURN
+	depends on !SH_DREAMCAST && !SH_SATURN && !SH_7300_SOLUTION_ENGINE
 	default y
 	help
 	  Selecting this option will allow the Linux kernel to emulate
@@ -377,10 +406,25 @@ config SH_DSP
 
 	  This option must be set in order to enable the DSP.
 
+config SH_ADC
+	bool "ADC support"
+	depends on CPU_SH3
+	default y
+	help
+	  Selecting this option will allow the Linux kernel to use SH3 on-chip
+	  ADC module.
+
+	  If unsure, say N.
+
 config SH_HP600
 	bool
 	depends on SH_HP620 || SH_HP680 || SH_HP690
 	default y
+
+config CPU_SUBTYPE_ST40
+       bool
+       depends on CPU_SUBTYPE_ST40STB1 || CPU_SUBTYPE_ST40GX1
+       default y
 
 config DISCONTIGMEM
 	bool
@@ -514,10 +558,32 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
+config HS7751RVOIP_CODEC
+	bool "Support VoIP Codec section"
+	depends on SH_HS7751RVOIP
+	help
+	  Selecting this option will support CODEC section.
+
+config RTS7751R2D_REV11
+	bool "RTS7751R2D Rev. 1.1 board support"
+	depends on SH_RTS7751R2D
+	help
+	  Selecting this option will support version rev. 1.1.
+
+config SH_PCLK_CALC
+	bool
+	default n if CPU_SUBTYPE_SH7300
+	default y
+	help
+	  This option will cause the PCLK value to be probed at run-time. It
+	  will display a notification if the probed value has greater than a
+	  1% variance of the hardcoded CONFIG_SH_PCLK_FREQ.
+
 config SH_PCLK_FREQ
 	int "Peripheral clock frequency (in Hz)"
 	default "49876504" if CPU_SUBTYPE_SH7750
 	default "60013568" if CPU_SUBTYPE_SH7751
+	default "33333333" if CPU_SUBTYPE_SH7300
 	default "1193182"
 	help
 	  This option is used to specify the peripheral clock frequency. This
@@ -570,11 +636,17 @@ source "arch/sh/cchips/Kconfig"
 
 config HEARTBEAT
 	bool "Heartbeat LED"
-	depends on SH_MPC1211 || SH_CAT68701 || SH_STB1_HARP || SH_STB1_OVERDRIVE || SH_BIGSUR || SH_7751_SOLUTION_ENGINE || SH_SOLUTION_ENGINE
+	depends on SH_MPC1211 || SH_CAT68701 || SH_STB1_HARP || SH_STB1_OVERDRIVE || SH_BIGSUR || SH_7751_SOLUTION_ENGINE || SH_7300_SOLUTION_ENGINE || SH_SOLUTION_ENGINE || SH_RTS7751R2D
 	help
 	  Use the power-on LED on your machine as a load meter.  The exact
 	  behavior is platform-dependent, but normally the flash frequency is
 	  a hyperbolic function of the 5-minute load average.
+
+config RTC_9701JE
+	tristate "EPSON RTC-9701JE support"
+	depends on SH_RTS7751R2D
+	help
+	  Selecting this option will support EPSON RTC-9701JE.
 
 endmenu
 
@@ -646,6 +718,24 @@ source "fs/Kconfig.binfmt"
 
 endmenu
 
+menu "SH initrd options"
+	depends on BLK_DEV_INITRD
+
+config EMBEDDED_RAMDISK
+	bool "Embed root filesystem ramdisk into the kernel"
+
+config EMBEDDED_RAMDISK_IMAGE
+	string "Filename of gziped ramdisk image"
+	depends on EMBEDDED_RAMDISK
+	default "ramdisk.gz"
+	help
+	  This is the filename of the ramdisk image to be built into the
+	  kernel.  Relative pathnames are relative to arch/mips/ramdisk/.
+	  The ramdisk image is not part of the kernel distribution; you must
+	  provide one yourself.
+
+endmenu
+
 source "drivers/Kconfig"
 
 source "fs/Kconfig"
@@ -675,6 +765,14 @@ config DEBUG_SPINLOCK
 	  best used in conjunction with the NMI watchdog so that spinlock
 	  deadlocks are also debuggable.
 
+config DEBUG_INFO
+        bool "Compile the kernel with debug info"
+        help
+          If you say Y here the resulting kernel image will include
+          debugging info resulting in a larger kernel image.
+          Say Y here only if you plan to use gdb to debug the kernel.
+          If you don't debug the kernel, you can say N.
+
 config SH_STANDARD_BIOS
 	bool "Use LinuxSH standard BIOS"
 	help
@@ -688,9 +786,13 @@ config SH_STANDARD_BIOS
 	  mask ROM and no flash (WindowsCE machines fall in this category).
 	  If unsure, say N.
 
-config SH_EARLY_PRINTK
+config EARLY_SCIF_CONSOLE
+	bool "Use early SCIF console"
+	depends on CPU_SH4
+
+config EARLY_PRINTK
 	bool "Early printk support"
-	depends on SH_STANDARD_BIOS
+	depends on SH_STANDARD_BIOS || EARLY_SCIF_CONSOLE
 	help
 	  Say Y here to redirect kernel printk messages to the serial port
 	  used by the SH-IPL bootloader, starting very early in the boot
