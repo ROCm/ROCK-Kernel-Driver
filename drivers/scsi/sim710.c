@@ -294,12 +294,17 @@ sim710_eisa_probe(struct device *dev)
 	unsigned char irq, differential = 0, scsi_id = 7;
 
 	if(strcmp(edev->id.sig, "HWP0C80") == 0) {
+		__u8 val;
 		eisa_irqs =  eisa_hwp_irqs;
 		irq_index = (inb(io_addr + 0xc85) & 0x7) - 1;
-#if 0
-		/* this doesn't seem to work at the moment */
-		scsi_id = ffs(inb(io_addr + 0x4));
-#endif
+
+		val = inb(io_addr + 0x4);
+		scsi_id = ffs(val) - 1;
+
+		if(scsi_id > 7 || (val & ~(1<<scsi_id)) != 0) {
+			printk(KERN_ERR "sim710.c, EISA card %s has incorrect scsi_id, setting to 7\n", dev->name);
+			scsi_id = 7;
+		}
 	} else {
 		eisa_irqs = eisa_cpq_irqs;
 		irq_index = inb(io_addr + 0xc88) & 0x07;
