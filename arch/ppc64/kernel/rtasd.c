@@ -165,11 +165,12 @@ static int get_eventscan_parms(void)
 	struct device_node *node;
 	int *ip;
 
-	node = find_path_device("/rtas");
+	node = of_find_node_by_path("/rtas");
 
 	ip = (int *)get_property(node, "rtas-event-scan-rate", NULL);
 	if (ip == NULL) {
 		printk(KERN_ERR "rtasd: no rtas-event-scan-rate\n");
+		of_node_put(node);
 		return -1;
 	}
 	rtas_event_scan_rate = *ip;
@@ -178,6 +179,7 @@ static int get_eventscan_parms(void)
 	ip = (int *)get_property(node, "rtas-error-log-max", NULL);
 	if (ip == NULL) {
 		printk(KERN_ERR "rtasd: no rtas-error-log-max\n");
+		of_node_put(node);
 		return -1;
 	}
 	rtas_error_log_max = *ip;
@@ -187,6 +189,7 @@ static int get_eventscan_parms(void)
 		printk(KERN_ERR "rtasd: truncated error log from %d to %d bytes\n", rtas_error_log_max, RTAS_ERROR_LOG_MAX);
 		rtas_error_log_max = RTAS_ERROR_LOG_MAX;
 	}
+	of_node_put(node);
 
 	return 0;
 }

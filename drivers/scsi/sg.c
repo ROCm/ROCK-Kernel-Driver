@@ -1330,6 +1330,9 @@ sg_add(struct class_device *cdev)
 	unsigned long iflags;
 	int k, error;
 
+	if (scsidp->type == 255)
+		return 0;
+
 	disk = alloc_disk(1);
 	if (!disk)
 		return -ENOMEM;

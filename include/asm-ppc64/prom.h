@@ -171,19 +171,36 @@ extern struct prom_t prom;
 
 extern int boot_cpuid;
 
-/* Prototypes */
-extern void abort(void);
-extern unsigned long prom_init(unsigned long, unsigned long, unsigned long,
-    unsigned long, unsigned long);
-extern void prom_print(const char *msg);
-extern void relocate_nodes(void);
-extern void finish_device_tree(void);
+/* OBSOLETE: Old stlye node lookup */
 extern struct device_node *find_devices(const char *name);
 extern struct device_node *find_type_devices(const char *type);
 extern struct device_node *find_path_device(const char *path);
 extern struct device_node *find_compatible_devices(const char *type,
 						   const char *compat);
 extern struct device_node *find_all_nodes(void);
+
+/* New style node lookup */
+extern struct device_node *of_find_node_by_name(struct device_node *from,
+	const char *name);
+extern struct device_node *of_find_node_by_type(struct device_node *from,
+	const char *type);
+extern struct device_node *of_find_compatible_node(struct device_node *from,
+	const char *type, const char *compat);
+extern struct device_node *of_find_node_by_path(const char *path);
+extern struct device_node *of_find_all_nodes(struct device_node *prev);
+extern struct device_node *of_get_parent(const struct device_node *node);
+extern struct device_node *of_get_next_child(const struct device_node *node,
+					     struct device_node *prev);
+extern struct device_node *of_node_get(struct device_node *node);
+extern void of_node_put(struct device_node *node);
+
+/* Other Prototypes */
+extern void abort(void);
+extern unsigned long prom_init(unsigned long, unsigned long, unsigned long,
+	unsigned long, unsigned long);
+extern void prom_print(const char *msg);
+extern void relocate_nodes(void);
+extern void finish_device_tree(void);
 extern int device_is_compatible(struct device_node *device, const char *);
 extern int machine_is_compatible(const char *compat);
 extern unsigned char *get_property(struct device_node *node, const char *name,

@@ -234,12 +234,14 @@ void pSeriesLP_init_early(void)
 	 * is the starting termno (the one we use) and the second is the
 	 * number of terminals.
 	 */
-	np = find_path_device("/rtas");
+	np = of_find_node_by_path("/rtas");
 	if (np) {
 		u32 *termno = (u32 *)get_property(np, "ibm,termno", 0);
 		if (termno)
 			vtermno = termno[0];
+		of_node_put(np);
 	}
+
 	ppc_md.udbg_putc = udbg_putcLP;
 	ppc_md.udbg_getc = udbg_getcLP;
 	ppc_md.udbg_getc_poll = udbg_getc_pollLP;
@@ -289,19 +291,18 @@ int hvc_count(int *start_termno)
 {
 	u32 *termno;
 	struct device_node *dn;
+	int ret = 0;
 
-	if ((dn = find_path_device("/rtas")) != NULL) {
+	if ((dn = of_find_node_by_path("/rtas")) != NULL) {
 		if ((termno = (u32 *)get_property(dn, "ibm,termno", 0)) != NULL) {
 			if (start_termno)
 				*start_termno = termno[0];
-			return termno[1];
+			ret = termno[1];
 		}
+		of_node_put(dn);
 	}
-	return 0;
+	return ret;
 }
-
-
-
 
 long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 			      unsigned long va, unsigned long prpn,

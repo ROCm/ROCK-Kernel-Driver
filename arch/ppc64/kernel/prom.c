@@ -150,13 +150,8 @@ int boot_cpuid = 0;
 
 struct device_node *allnodes = 0;
 
-#define UNDEFINED_IRQ 0xffff
-unsigned short real_irq_to_virt_map[NR_HW_IRQS];
-unsigned short virt_irq_to_real_map[NR_IRQS];
-int last_virt_irq = 2;	/* index of last virt_irq.  Skip through IPI */
-
 static unsigned long call_prom(const char *service, int nargs, int nret, ...);
-static void prom_exit(void);
+static void prom_panic(const char *reason);
 static unsigned long copy_device_tree(unsigned long);
 static unsigned long inspect_node(phandle, struct device_node *, unsigned long,
 				  unsigned long, struct device_node ***);
@@ -223,10 +218,12 @@ call_prom(const char *service, int nargs, int nret, ...)
 
 
 static void __init
-prom_exit()
+prom_panic(const char *reason)
 {
 	unsigned long offset = reloc_offset();
 
+	prom_print(reason);
+	/* ToDo: should put up an SRC here */
 	call_prom(RELOC("exit"), 0, 0);
 
 	for (;;)			/* should never get here */
@@ -785,8 +782,7 @@ prom_initialize_tce_table(void)
 		base = lmb_alloc(minsize, align);
 
 		if ( !base ) {
-			prom_print(RELOC("ERROR, cannot find space for TCE table.\n"));
-			prom_exit();
+			prom_panic(RELOC("ERROR, cannot find space for TCE table.\n"));
 		}
 
 		vbase = absolute_to_virt(base);
@@ -1060,7 +1056,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	  unsigned long r6, unsigned long r7)
 {
 	unsigned long mem;
-	ihandle prom_root, prom_cpu;
+	ihandle prom_mmu,prom_root, prom_cpu;
 	phandle cpu_pkg;
 	unsigned long offset = reloc_offset();
 	long l;
@@ -1092,12 +1088,12 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 				       RELOC("/chosen"));
 
 	if ((long)_prom->chosen <= 0)
-		prom_exit();
+		prom_panic(RELOC("cannot find chosen")); /* msg won't be printed :( */
 
         if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
 			    RELOC("stdout"), &getprop_rval,
 			    sizeof(getprop_rval)) <= 0)
-                prom_exit();
+                prom_panic(RELOC("cannot find stdout"));
 
         _prom->stdout = (ihandle)(unsigned long)getprop_rval;
 
@@ -1123,7 +1119,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
         if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
 			    RELOC("cpu"), &getprop_rval,
 			    sizeof(getprop_rval)) <= 0)
-                prom_exit();
+                prom_panic(RELOC("cannot find boot cpu"));
 
 	prom_cpu = (ihandle)(unsigned long)getprop_rval;
 	cpu_pkg = call_prom(RELOC("instance-to-package"), 1, 1, prom_cpu);
@@ -1188,9 +1184,34 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
 
-	prom_print(RELOC("Calling quiesce ...\n"));
-	call_prom(RELOC("quiesce"), 0, 0);
-	phys = KERNELBASE - offset;
+ 	if ((long) call_prom(RELOC("getprop"), 4, 1,
+				_prom->chosen,
+				RELOC("mmu"),
+				&getprop_rval,
+				sizeof(getprop_rval)) <= 0) {	
+                prom_panic(RELOC(" no MMU found\n"));
+	}
+
+	/* We assume the phys. address size is 3 cells */
+	RELOC(prom_mmu) = (ihandle)(unsigned long)getprop_rval;
+
+	if ((long)call_prom(RELOC("call-method"), 4, 4,
+				RELOC("translate"),
+				prom_mmu,
+				(void *)(KERNELBASE - offset),
+				(void *)1) != 0) {
+		prom_print(RELOC(" (translate failed) "));
+	} else {
+		prom_print(RELOC(" (translate ok) "));
+		phys = (unsigned long)_prom->args.rets[3];
+	}
+
+	/* If OpenFirmware version >= 3, then use quiesce call */
+	if (_prom->version >= 3) {
+		prom_print(RELOC("Calling quiesce ...\n"));
+		call_prom(RELOC("quiesce"), 0, 0);
+		phys = KERNELBASE - offset;
+	}
 
 	prom_print(RELOC("returning from prom_init\n"));
 	return phys;
@@ -1308,46 +1329,6 @@ check_display(unsigned long mem)
 	return DOUBLEWORD_ALIGN(mem);
 }
 
-void
-virt_irq_init(void)
-{
-	int i;
-	for (i = 0; i < NR_IRQS; i++)
-		virt_irq_to_real_map[i] = UNDEFINED_IRQ;
-	for (i = 0; i < NR_HW_IRQS; i++)
-		real_irq_to_virt_map[i] = UNDEFINED_IRQ;
-}
-
-/* Create a mapping for a real_irq if it doesn't already exist.
- * Return the virtual irq as a convenience.
- */
-unsigned long
-virt_irq_create_mapping(unsigned long real_irq)
-{
-	unsigned long virq;
-	if (naca->interrupt_controller == IC_OPEN_PIC)
-		return real_irq;	/* no mapping for openpic (for now) */
-	virq = real_irq_to_virt(real_irq);
-	if (virq == UNDEFINED_IRQ) {
-		/* Assign a virtual IRQ number */
-		if (real_irq < NR_IRQS && virt_irq_to_real(real_irq) == UNDEFINED_IRQ) {
-			/* A 1-1 mapping will work. */
-			virq = real_irq;
-		} else {
-			while (last_virt_irq < NR_IRQS &&
-			       virt_irq_to_real(++last_virt_irq) != UNDEFINED_IRQ)
-				/* skip irq's in use */;
-			if (last_virt_irq >= NR_IRQS)
-				panic("Too many IRQs are required on this system.  NR_IRQS=%d\n", NR_IRQS);
-			virq = last_virt_irq;
-		}
-		virt_irq_to_real_map[virq] = real_irq;
-		real_irq_to_virt_map[real_irq] = virq;
-	}
-	return virq;
-}
-
-
 static int __init
 prom_next_node(phandle *nodep)
 {
@@ -1381,8 +1362,7 @@ copy_device_tree(unsigned long mem_start)
 
 	root = call_prom(RELOC("peer"), 1, 1, (phandle)0);
 	if (root == (phandle)0) {
-		prom_print(RELOC("couldn't get device tree root\n"));
-		prom_exit();
+		prom_panic(RELOC("couldn't get device tree root\n"));
 	}
 	allnextp = &RELOC(allnodes);
 	mem_start = DOUBLEWORD_ALIGN(mem_start);
@@ -1477,8 +1457,6 @@ finish_device_tree(void)
 {
 	unsigned long mem = klimit;
 
-	virt_irq_init();
-
 	mem = finish_node(allnodes, mem, NULL, 0, 0);
 	dev_tree_size = mem - (unsigned long) allnodes;
 
@@ -1487,7 +1465,7 @@ finish_device_tree(void)
 
 	klimit = mem;
 
-	rtas.dev = find_devices("rtas");
+	rtas.dev = of_find_node_by_name(NULL, "rtas");
 }
 
 static unsigned long __init
@@ -1704,7 +1682,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 		n = map_interrupt(&irq, &ic, np, ints, intrcells);
 		if (n <= 0)
 			continue;
-		np->intrs[i].line = openpic_to_irq(virt_irq_create_mapping(irq[0]));
+		np->intrs[i].line = irq_offset_up(irq[0]);
 		if (n > 1)
 			np->intrs[i].sense = irq[1];
 		if (n > 2) {
@@ -1939,11 +1917,14 @@ int
 machine_is_compatible(const char *compat)
 {
 	struct device_node *root;
-	
-	root = find_path_device("/");
-	if (root == 0)
-		return 0;
-	return device_is_compatible(root, compat);
+	int rc = 0;
+  
+	root = of_find_node_by_path("/");
+	if (root) {
+		rc = device_is_compatible(root, compat);
+		of_node_put(root);
+	}
+	return rc;
 }
 
 /*
@@ -1981,6 +1962,185 @@ find_path_device(const char *path)
 		if (np->full_name != 0 && strcasecmp(np->full_name, path) == 0)
 			return np;
 	return NULL;
+}
+
+/*******
+ *
+ * New implementation of the OF "find" APIs, return a refcounted
+ * object, call of_node_put() when done. Currently, still lacks
+ * locking as old implementation, this is being done for ppc64.
+ *
+ * Note that property management will need some locking as well,
+ * this isn't dealt with yet.
+ *
+ *******/
+
+/**
+ *	of_find_node_by_name - Find a node by its "name" property
+ *	@from:	The node to start searching from or NULL, the node
+ *		you pass will not be searched, only the next one
+ *		will; typically, you pass what the previous call
+ *		returned. of_node_put() will be called on it
+ *	@name:	The name string to match against
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_find_node_by_name(struct device_node *from,
+	const char *name)
+{
+	struct device_node *np = from ? from->allnext : allnodes;
+
+	for (; np != 0; np = np->allnext)
+		if (np->name != 0 && strcasecmp(np->name, name) == 0)
+			break;
+	if (from)
+		of_node_put(from);
+	return of_node_get(np);
+}
+
+/**
+ *	of_find_node_by_type - Find a node by its "device_type" property
+ *	@from:	The node to start searching from or NULL, the node
+ *		you pass will not be searched, only the next one
+ *		will; typically, you pass what the previous call
+ *		returned. of_node_put() will be called on it
+ *	@name:	The type string to match against
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_find_node_by_type(struct device_node *from,
+	const char *type)
+{
+	struct device_node *np = from ? from->allnext : allnodes;
+
+	for (; np != 0; np = np->allnext)
+		if (np->type != 0 && strcasecmp(np->type, type) == 0)
+			break;
+	if (from)
+		of_node_put(from);
+	return of_node_get(np);
+}
+
+/**
+ *	of_find_compatible_node - Find a node based on type and one of the
+ *                                tokens in its "compatible" property
+ *	@from:		The node to start searching from or NULL, the node
+ *			you pass will not be searched, only the next one
+ *			will; typically, you pass what the previous call
+ *			returned. of_node_put() will be called on it
+ *	@type:		The type string to match "device_type" or NULL to ignore
+ *	@compatible:	The string to match to one of the tokens in the device
+ *			"compatible" list.
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_find_compatible_node(struct device_node *from,
+	const char *type, const char *compatible)
+{
+	struct device_node *np = from ? from->allnext : allnodes;
+
+	for (; np != 0; np = np->allnext) {
+		if (type != NULL
+		    && !(np->type != 0 && strcasecmp(np->type, type) == 0))
+			continue;
+		if (device_is_compatible(np, compatible))
+			break;
+	}
+	if (from)
+		of_node_put(from);
+	return of_node_get(np);
+}
+
+/**
+ *	of_find_node_by_path - Find a node matching a full OF path
+ *	@path:	The full path to match
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_find_node_by_path(const char *path)
+{
+	struct device_node *np = allnodes;
+
+	for (; np != 0; np = np->allnext)
+		if (np->full_name != 0 && strcasecmp(np->full_name, path) == 0)
+			break;
+	return of_node_get(np);
+}
+
+/**
+ *	of_find_all_nodes - Get next node in global list
+ *	@prev:	Previous node or NULL to start iteration
+ *		of_node_put() will be called on it
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_find_all_nodes(struct device_node *prev)
+{
+	struct device_node *np = prev ? prev->allnext : allnodes;
+
+	if (prev)
+		of_node_put(prev);
+	return of_node_get(np);
+}
+
+/**
+ *	of_get_parent - Get a node's parent if any
+ *	@node:	Node to get parent
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_get_parent(const struct device_node *node)
+{
+	return node ? of_node_get(node->parent) : NULL;
+}
+
+/**
+ *	of_get_next_child - Iterate a node childs
+ *	@node:	parent node
+ *	@prev:	previous child of the parent node, or NULL to get first
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_get_next_child(const struct device_node *node,
+	struct device_node *prev)
+{
+	struct device_node *next = prev ? prev->sibling : node->child;
+
+	for (; next != 0; next = next->sibling)
+		if (of_node_get(next))
+			break;
+	if (prev)
+		of_node_put(prev);
+	return next;
+}
+
+/**
+ *	of_node_get - Increment refcount of a node
+ *	@node:	Node to inc refcount, NULL is supported to
+ *		simplify writing of callers
+ *
+ *	Returns the node itself or NULL if gone.
+ */
+struct device_node *of_node_get(struct device_node *node)
+{
+	return node;
+}
+
+/**
+ *	of_node_put - Decrement refcount of a node
+ *	@node:	Node to dec refcount, NULL is supported to
+ *		simplify writing of callers
+ *
+ */
+void of_node_put(struct device_node *node)
+{
 }
 
 /*
@@ -2080,17 +2240,6 @@ print_properties(struct device_node *np)
 	}
 }
 #endif
-
-
-void __init
-abort()
-{
-#ifdef CONFIG_XMON
-	xmon(NULL);
-#endif
-	for (;;)
-		prom_exit();
-}
 
 
 /* Verify bi_recs are good */

@@ -708,6 +708,21 @@ HardwareInterrupt_entry:
 	bl      .do_IRQ
 	b       .ret_from_except
 
+3:
+	/* error - counts out of sync                                      */
+#ifdef CONFIG_XMON
+	bl	.xmon
+#endif
+#ifdef CONFIG_KDB
+        /*          kdb(KDB_REASON_FAULT,regs->trap,regs); */
+	li      r3,1
+	li 	r4,0x200
+	li      r5,0
+	bl	.kdb
+#endif
+4:	b	4b
+
+
 	.globl Alignment_common
 Alignment_common:
 	EXCEPTION_PROLOG_COMMON

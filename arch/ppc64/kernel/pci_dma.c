@@ -98,7 +98,7 @@ void free_tce_range_nolock(struct TceTable *,
 			   unsigned order );
 
 /* allocates a range of tces and sets them to the pages  */
-static inline dma_addr_t get_tces( struct TceTable *, 
+/*static*/ inline dma_addr_t get_tces( struct TceTable *, 
 				   unsigned order, 
 				   void *page, 
 				   unsigned numPages,
@@ -210,7 +210,7 @@ static void tce_build_pSeries(struct TceTable *tbl, long tcenum,
  * Build a TceTable structure.  This contains a multi-level bit map which
  * is used to manage allocation of the tce space.
  */
-static struct TceTable *build_tce_table( struct TceTable * tbl )
+/*static*/ struct TceTable *build_tce_table( struct TceTable * tbl )
 {
 	unsigned long bits, bytes, totalBytes;
 	unsigned long numBits[NUM_TCE_LEVELS], numBytes[NUM_TCE_LEVELS];
@@ -518,7 +518,7 @@ static long test_tce_range( struct TceTable *tbl, long tcenum, unsigned order )
 	return retval;
 }
 
-static inline dma_addr_t get_tces( struct TceTable *tbl, unsigned order, void *page, unsigned numPages, int direction )
+/*static*/ inline dma_addr_t get_tces( struct TceTable *tbl, unsigned order, void *page, unsigned numPages, int direction )
 {
 	long tcenum;
 	unsigned long uaddr;
@@ -581,7 +581,7 @@ static void tce_free_one_pSeries( struct TceTable *tbl, long tcenum )
 }
 #endif
 
-static void tce_free(struct TceTable *tbl, dma_addr_t dma_addr, 
+/*static*/ void tce_free(struct TceTable *tbl, dma_addr_t dma_addr, 
 			     unsigned order, unsigned num_pages)
 {
 	long tcenum, total_tces, free_tce;

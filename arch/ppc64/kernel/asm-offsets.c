@@ -85,7 +85,7 @@ int main(void)
 	DEFINE(PACAEXCSP, offsetof(struct paca_struct, exception_sp));
 	DEFINE(PACAPROCENABLED, offsetof(struct paca_struct, xProcEnabled));
 	DEFINE(PACADEFAULTDECR, offsetof(struct paca_struct, default_decr));
-	DEFINE(PACAPROFENABLED, offsetof(struct paca_struct, prof_enabled));
+/*	DEFINE(PACAPROFENABLED, offsetof(struct paca_struct, prof_enabled)); */
 	DEFINE(PACAPROFLEN, offsetof(struct paca_struct, prof_len));
 	DEFINE(PACAPROFSHIFT, offsetof(struct paca_struct, prof_shift));
 	DEFINE(PACAPROFBUFFER, offsetof(struct paca_struct, prof_buffer));

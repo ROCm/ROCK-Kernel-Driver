@@ -1,4 +1,3 @@
-
 /*
  * ras.c
  * Copyright (C) 2001 Dave Engebretsen IBM Corporation
@@ -70,27 +69,29 @@ static int __init init_ras_IRQ(void)
 	struct device_node *np;
 	unsigned int *ireg, len, i;
 
-	if((np = find_path_device("/event-sources/internal-errors")) &&
-	   (ireg = (unsigned int *)get_property(np, "open-pic-interrupt", 
-						&len))) {
-		for(i=0; i<(len / sizeof(*ireg)); i++) {
-			request_irq(virt_irq_create_mapping(*(ireg)) + NUM_8259_INTERRUPTS, 
+	if ((np = of_find_node_by_path("/event-sources/internal-errors")) &&
+	    (ireg = (unsigned int *)get_property(np, "open-pic-interrupt",
+						 &len))) {
+		for (i=0; i<(len / sizeof(*ireg)); i++) {
+			request_irq(irq_offset_up(*(ireg)), 
 				    ras_error_interrupt, 0, 
 				    "RAS_ERROR", NULL);
 			ireg++;
 		}
 	}
+	of_node_put(np);
 
-	if((np = find_path_device("/event-sources/epow-events")) &&
-	   (ireg = (unsigned int *)get_property(np, "open-pic-interrupt", 
-						&len))) {
-		for(i=0; i<(len / sizeof(*ireg)); i++) {
-			request_irq(virt_irq_create_mapping(*(ireg)) + NUM_8259_INTERRUPTS, 
+	if ((np = of_find_node_by_path("/event-sources/epow-events")) &&
+	    (ireg = (unsigned int *)get_property(np, "open-pic-interrupt",
+						 &len))) {
+		for (i=0; i<(len / sizeof(*ireg)); i++) {
+			request_irq(irq_offset_up(*(ireg)),
 				    ras_epow_interrupt, 0, 
 				    "RAS_EPOW", NULL);
 			ireg++;
 		}
 	}
+	of_node_put(np);
 
 	return 1;
 }

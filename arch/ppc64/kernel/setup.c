@@ -38,6 +38,7 @@
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
+#include <asm/cputable.h>
 #include <asm/sections.h>
 
 extern unsigned long klimit;
@@ -315,13 +316,14 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		struct device_node *cpu_node;
 		int *fp;
 
-		cpu_node = find_type_devices("cpu");
+		cpu_node = of_find_node_by_type(NULL, "cpu");
 		if (cpu_node) {
 			fp = (int *) get_property(cpu_node, "clock-frequency",
 						  NULL);
 			if (fp)
 				seq_printf(m, "clock\t\t: %dMHz\n",
 					   *fp / 1000000);
+			of_node_put(cpu_node);
 		}
 	}
 
@@ -375,11 +377,12 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	strlcpy(cmd_line, CONFIG_CMDLINE, sizeof(cmd_line));
 #endif /* CONFIG_CMDLINE */
 
-	chosen = find_devices("chosen");
+	chosen = of_find_node_by_name(NULL, "chosen");
 	if (chosen != NULL) {
 		p = get_property(chosen, "bootargs", NULL);
 		if (p != NULL && p[0] != 0)
 			strlcpy(cmd_line, p, sizeof(cmd_line));
+		of_node_put(chosen);
 	}
 
 	/* Look for mem= option on command line */

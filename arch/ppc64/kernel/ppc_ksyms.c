@@ -203,7 +203,6 @@ EXPORT_SYMBOL_NOVERS(memcmp);
 EXPORT_SYMBOL(abs);
 
 EXPORT_SYMBOL(timer_interrupt);
-EXPORT_SYMBOL(irq_desc);
 EXPORT_SYMBOL(get_wchan);
 EXPORT_SYMBOL(console_drivers);
 #ifdef CONFIG_XMON

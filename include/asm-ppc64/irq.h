@@ -11,35 +11,16 @@
 
 #include <asm/atomic.h>
 
+#define NR_IRQS			512
+
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
-/*
- * this is the maximum number of virtual irqs we will use.
- */
-#define NR_IRQS			512
-
-#define NUM_8259_INTERRUPTS	16
-
-/* Interrupt numbers are virtual in case they are sparsely
- * distributed by the hardware.
- */
-#define NR_HW_IRQS		8192
-extern unsigned short real_irq_to_virt_map[NR_HW_IRQS];
-extern unsigned short virt_irq_to_real_map[NR_IRQS];
-/* Create a mapping for a real_irq if it doesn't already exist.
- * Return the virtual irq as a convenience.
- */
-unsigned long virt_irq_create_mapping(unsigned long real_irq);
-
-/* These funcs map irqs between real and virtual */
-static inline unsigned long real_irq_to_virt(unsigned long real_irq) {
-	return real_irq_to_virt_map[real_irq];
-}
-static inline unsigned long virt_irq_to_real(unsigned long virt_irq) {
-	return virt_irq_to_real_map[virt_irq];
-}
+extern void *_get_irq_desc(unsigned int irq);
+extern void *_get_real_irq_desc(unsigned int irq);
+#define get_irq_desc(irq) ((irq_desc_t *)_get_irq_desc(irq))
+#define get_real_irq_desc(irq) ((irq_desc_t *)_get_real_irq_desc(irq))
 
 /*
  * This gets called from serial.c, which is now used on
@@ -51,7 +32,34 @@ static __inline__ int irq_canonicalize(int irq)
 	return irq;
 }
 
-#define NR_MASK_WORDS	((NR_IRQS + 63) / 64)
+/*
+ * Because many systems have two overlapping names spaces for
+ * interrupts (ISA and XICS for example), and the ISA interrupts
+ * have historically not been easy to renumber, we allow ISA
+ * interrupts to take values 0 - 15, and shift up the remaining 
+ * interrupts by 0x10.  
+ *
+ * This would be nice to remove at some point as it adds confusion
+ * and adds a nasty end case if any platform native interrupts have 
+ * values within 0x10 of the end of that namespace.
+ */
+
+#define NUM_ISA_INTERRUPTS	0x10
+
+extern inline int irq_offset_up(int irq)
+{
+	return(irq + NUM_ISA_INTERRUPTS);
+}
+
+extern inline int irq_offset_down(int irq)
+{
+	return(irq - NUM_ISA_INTERRUPTS);
+}
+
+extern inline int irq_offset_value(void)
+{
+	return NUM_ISA_INTERRUPTS;
+}
 
 #endif /* _ASM_IRQ_H */
 #endif /* __KERNEL__ */

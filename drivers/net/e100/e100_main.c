@@ -1500,7 +1500,7 @@ e100_setup_tcb_pool(tcb_t *head, unsigned int qlen, struct e100_private *bdp)
 		pcurr_tcb->tcb_skb = NULL;
 	}
 
-	wmb();
+	mb();
 }
 
 /***************************************************************************/
@@ -1753,7 +1753,7 @@ e100_watchdog(struct net_device *dev)
 	/* Check for command completion on next watchdog timer. */
 	e100_dump_stats_cntrs(bdp);
 
-	wmb();
+	mb();
 
 	/* relaunch watchdog timer in 2 sec */
 	mod_timer(&(bdp->watchdog_timer), jiffies + (2 * HZ));
@@ -2229,7 +2229,7 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 
 	bdp->tcb_pool.tail = NEXT_TCB_TOUSE(bdp->tcb_pool.tail);
 
-	wmb();
+	mb();
 
 	e100_start_cu(bdp, tcb);
 
@@ -2516,7 +2516,7 @@ e100_clr_cntrs(struct e100_private *bdp)
 	/* clear the dump counter complete word */
 	pcmd_complete = e100_cmd_complete_location(bdp);
 	*pcmd_complete = 0;
-	wmb();
+	mb();
 
 	if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys, SCB_CUC_DUMP_ADDR, 0))
 		return false;
@@ -2651,7 +2651,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 	ntcb_hdr->cb_status = 0;
 	ntcb_hdr->cb_lnk_ptr = 0;
 
-	wmb();
+	mb();
 	if (in_interrupt())
 		return e100_delayed_exec_non_cu_cmd(bdp, command);
 

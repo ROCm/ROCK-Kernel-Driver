@@ -124,8 +124,8 @@ static void i8259_unmask_irq(unsigned int irq_nr)
 
 static void i8259_end_irq(unsigned int irq)
 {
-	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)) &&
-	    irq_desc[irq].action)
+	if (!(get_irq_desc(irq)->status & (IRQ_DISABLED|IRQ_INPROGRESS)) &&
+	    get_irq_desc(irq)->action)
 		i8259_unmask_irq(irq);
 }
 

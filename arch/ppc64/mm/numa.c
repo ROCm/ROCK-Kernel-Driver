@@ -45,29 +45,29 @@ static inline void map_cpu_to_node(int cpu, int node)
 
 static int __init parse_numa_properties(void)
 {
-	struct device_node *cpu;
-	struct device_node *memory;
+	struct device_node *cpu = NULL;
+	struct device_node *memory = NULL;
 	int *cpu_associativity;
 	int *memory_associativity;
 	int depth;
 	int max_domain = 0;
 
-	cpu = find_type_devices("cpu");
+	cpu = of_find_node_by_type(NULL, "cpu");
 	if (!cpu)
-		return -1;
+		goto err;
 
-	memory = find_type_devices("memory");
+	memory = of_find_node_by_type(NULL, "memory");
 	if (!memory)
-		return -1;
+		goto err;
 
 	cpu_associativity = (int *)get_property(cpu, "ibm,associativity", NULL);
 	if (!cpu_associativity)
-		return -1;
+		goto err;
 
 	memory_associativity = (int *)get_property(memory, "ibm,associativity",
 						   NULL);
 	if (!memory_associativity)
-		return -1;
+		goto err;
 
 	/* find common depth */
 	if (cpu_associativity[0] < memory_associativity[0])
@@ -75,7 +75,7 @@ static int __init parse_numa_properties(void)
 	else
 		depth = memory_associativity[0];
 
-	for (cpu = find_type_devices("cpu"); cpu; cpu = cpu->next) {
+	for (; cpu; cpu = of_find_node_by_type(cpu, "cpu")) {
 		int *tmp;
 		int cpu_nr, numa_domain;
 
@@ -105,8 +105,7 @@ static int __init parse_numa_properties(void)
 		map_cpu_to_node(cpu_nr, numa_domain);
 	}
 
-	for (memory = find_type_devices("memory"); memory;
-	     memory = memory->next) {
+	for (; memory; memory = of_find_node_by_type(memory, "memory")) {
 		int *tmp1, *tmp2;
 		unsigned long i;
 		unsigned long start = 0;
@@ -195,6 +194,10 @@ new_range:
 	numnodes = max_domain + 1;
 
 	return 0;
+err:
+	of_node_put(cpu);
+	of_node_put(memory);
+	return -1;
 }
 
 void setup_nonnuma(void)
@@ -306,6 +309,7 @@ void __init paging_init(void)
 {
 	unsigned long zones_size[MAX_NR_ZONES];
 	int i, nid;
+	struct page *node_mem_map; 
 
 	for (i = 1; i < MAX_NR_ZONES; i++)
 		zones_size[i] = 0;
@@ -314,16 +318,24 @@ void __init paging_init(void)
 		unsigned long start_pfn;
 		unsigned long end_pfn;
 
-		if (node_data[nid].node_spanned_pages == 0)
-			continue;
-
 		start_pfn = plat_node_bdata[nid].node_boot_start >> PAGE_SHIFT;
 		end_pfn = plat_node_bdata[nid].node_low_pfn;
 
 		zones_size[ZONE_DMA] = end_pfn - start_pfn;
 		dbg("free_area_init node %d %lx %lx\n", nid,
 				zones_size[ZONE_DMA], start_pfn);
-		free_area_init_node(nid, NODE_DATA(nid), NULL, zones_size,
-				    start_pfn, NULL);
+
+		/* 
+		 * Give this empty node a dummy struct page to avoid
+		 * us from trying to allocate a node local mem_map
+		 * in free_area_init_node (which will fail).
+		 */
+		if (!node_data[nid].node_spanned_pages)
+			node_mem_map = alloc_bootmem(sizeof(struct page));
+		else
+			node_mem_map = NULL;
+
+		free_area_init_node(nid, NODE_DATA(nid), node_mem_map,
+				    zones_size, start_pfn, NULL);
 	}
 }

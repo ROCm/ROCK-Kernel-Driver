@@ -2159,8 +2159,7 @@ sym53c8xx_pci_init(struct pci_dev *pdev, struct sym_device *device)
 
 	/* If the chip can do Memory Write Invalidate, enable it */
 	if (chip->features & FE_WRIE) {
-		if (pci_set_mwi(pdev))
-			return -1;
+			pci_set_mwi(pdev);
 	}
 
 	/*

@@ -176,7 +176,7 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		limit |= (io_limit_hi << 16);
 	}
 
-	if (base && base <= limit) {
+	if (base <= limit) {
 		res->flags = (io_base_lo & PCI_IO_RANGE_TYPE_MASK) | IORESOURCE_IO;
 		res->start = base;
 		res->end = limit + 0xfff;
@@ -572,12 +572,14 @@ int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 		list_add_tail(&dev->bus_list, &bus->devices);
 		nr++;
 
+#if 0
 		/*
 		 * If this is a single function device,
 		 * don't scan past the first function.
 		 */
 		if (!dev->multifunction)
 			break;
+#endif
 	}
 	return nr;
 }

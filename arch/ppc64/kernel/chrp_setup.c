@@ -69,6 +69,7 @@ extern volatile unsigned char *chrp_int_ack_special;
 void chrp_progress(char *, unsigned short);
 
 extern void openpic_init_IRQ(void);
+extern void openpic_init_irq_desc(irq_desc_t *);
 
 extern void find_and_init_phbs(void);
 
@@ -96,16 +97,19 @@ chrp_get_cpuinfo(struct seq_file *m)
 
 	seq_printf(m, "timebase\t: %lu\n", ppc_tb_freq);
 
-	root = find_path_device("/");
+	root = of_find_node_by_path("/");
 	if (root)
 		model = get_property(root, "model", NULL);
 	seq_printf(m, "machine\t\t: CHRP %s\n", model);
+	of_node_put(root);
 }
 
 #define I8042_DATA_REG 0x60
 
-void __init chrp_request_regions(void) 
+void __init chrp_request_regions(void)
 {
+	struct device_node *i8042;
+
 	request_region(0x20,0x20,"pic1");
 	request_region(0xa0,0x20,"pic2");
 	request_region(0x00,0x20,"dma1");
@@ -118,8 +122,9 @@ void __init chrp_request_regions(void)
 	 * tree and reserve the region if it does not appear. Later on
 	 * the i8042 code will try and reserve this region and fail.
 	 */
-	if (!find_type_devices("8042"))
+	if (!(i8042 = of_find_node_by_type(NULL, "8042")))
 		request_region(I8042_DATA_REG, 16, "reserved (no i8042)");
+	of_node_put(i8042);
 }
 
 void __init
@@ -158,7 +163,7 @@ chrp_setup_arch(void)
 #endif
 
 	/* Find the Open PIC if present */
-	root = find_path_device("/");
+	root = of_find_node_by_path("/");
 	opprop = (unsigned int *) get_property(root,
 				"platform-open-pic", NULL);
 	if (opprop != 0) {
@@ -170,6 +175,7 @@ chrp_setup_arch(void)
 		printk(KERN_DEBUG "OpenPIC addr: %lx\n", openpic);
 		OpenPIC_Addr = __ioremap(openpic, 0x40000, _PAGE_NO_CACHE);
 	}
+	of_node_put(root);
 
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
@@ -244,10 +250,12 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_residual = NULL;
 	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
 	if(naca->interrupt_controller == IC_OPEN_PIC) {
-		ppc_md.init_IRQ       = openpic_init_IRQ; 
+		ppc_md.init_IRQ       = openpic_init_IRQ;
+		ppc_md.init_irq_desc  = openpic_init_irq_desc;
 		ppc_md.get_irq        = openpic_get_irq;
 	} else {
 		ppc_md.init_IRQ       = xics_init_IRQ;
+		ppc_md.init_irq_desc  = xics_init_irq_desc;
 		ppc_md.get_irq        = xics_get_irq;
 	}
 
@@ -271,7 +279,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	struct device_node * dn;
 	char * hypertas;
 	unsigned int len;
-	dn = find_path_device("/rtas");
+	dn = of_find_node_by_path("/rtas");
 	cur_cpu_spec->firmware_features = 0;
 	hypertas = get_property(dn, "ibm,hypertas-functions", &len);
 	if (hypertas) {
@@ -290,6 +298,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		hypertas+= hypertas_len +1;
 	    }
 	}
+	of_node_put(dn);
 	udbg_printf("firmware_features bitmask: 0x%x \n",
 		    cur_cpu_spec->firmware_features);
 }
@@ -318,6 +327,13 @@ chrp_progress(char *s, unsigned short hex)
 			max_width = 0x10;
 		display_character = rtas_token("display-character");
 		set_indicator = rtas_token("set-indicator");
+	}
+	if (display_character == RTAS_UNKNOWN_SERVICE) {
+		/* use hex display */
+		if (set_indicator == RTAS_UNKNOWN_SERVICE)
+			return;
+		rtas_call(set_indicator, 3, 1, NULL, 6, 0, hex);
+		return;
 	}
 
 	if(display_character == RTAS_UNKNOWN_SERVICE) {
@@ -405,11 +421,11 @@ void __init pSeries_calibrate_decr(void)
 
 	/*
 	 * The cpu node should have a timebase-frequency property
-	 * to tell us the rate at which the decrementer counts. 
+	 * to tell us the rate at which the decrementer counts.
 	 */
 	freq = 16666000;        /* hardcoded default */
-	cpu = find_type_devices("cpu");
-	if (cpu != 0) { 
+	cpu = of_find_node_by_type(NULL, "cpu");
+	if (cpu != 0) {
 		fp = (int *) get_property(cpu, "timebase-frequency", NULL);
 		if (fp != 0)
 			freq = *fp;
@@ -422,11 +438,12 @@ void __init pSeries_calibrate_decr(void)
 			processor_freq = *fp;
 	}
 	ppc_proc_freq = processor_freq;
-	
-        printk("time_init: decrementer frequency = %lu.%.6lu MHz\n", 
-	       freq/1000000, freq%1000000 );
+	of_node_put(cpu);
+
+	printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
+	       freq/1000000, freq%1000000);
 	printk("time_init: processor frequency   = %lu.%.6lu MHz\n",
-		processor_freq/1000000, processor_freq%1000000 );
+	       processor_freq/1000000, processor_freq%1000000);
 
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_ticks_per_sec = tb_ticks_per_jiffy * HZ;

@@ -257,7 +257,7 @@ void eeh_init(void)
 
 	/* Enable EEH for all adapters.  Note that eeh requires buid's */
 	info.adapters_enabled = 0;
-	for (phb = find_devices("pci"); phb; phb = phb->next) {
+	for (phb = of_find_node_by_name(NULL, "pci"); phb; phb = of_find_node_by_name(phb, "pci")) {
 		int len;
 		int *buid_vals = (int *) get_property(phb, "ibm,fw-phb-id", &len);
 		if (!buid_vals)
