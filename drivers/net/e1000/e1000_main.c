@@ -1903,7 +1903,8 @@ e1000_get_stats(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 
-	e1000_update_stats(adapter);
+	if (adapter->pdev->current_state == 0)
+		e1000_update_stats(adapter);
 	return &adapter->net_stats;
 }
 
