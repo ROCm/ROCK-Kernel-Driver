@@ -1012,7 +1012,7 @@ static struct saa7146_extension extension = {
 	.irq_func	= NULL,
 };	
 
-int __init mxb_init_module(void) 
+static int __init mxb_init_module(void)
 {
 	if( 0 != saa7146_register_extension(&extension)) {
 		DEB_S(("failed to register extension.\n"));
@@ -1022,7 +1022,7 @@ int __init mxb_init_module(void)
 	return 0;
 }
 
-void __exit mxb_cleanup_module(void) 
+static void __exit mxb_cleanup_module(void)
 {
 	saa7146_unregister_extension(&extension);
 }

@@ -896,7 +896,7 @@ static struct video_device pms_template=
 	.fops           = &pms_fops,
 };
 
-struct pms_device pms_device;
+static struct pms_device pms_device;
 
 
 /*

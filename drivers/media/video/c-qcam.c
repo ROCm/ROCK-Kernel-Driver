@@ -741,7 +741,7 @@ static struct qcam_device *qcam_init(struct parport *port)
 static struct qcam_device *qcams[MAX_CAMS];
 static unsigned int num_cams = 0;
 
-int init_cqcam(struct parport *port)
+static int init_cqcam(struct parport *port)
 {
 	struct qcam_device *qcam;
 
@@ -798,7 +798,7 @@ int init_cqcam(struct parport *port)
 	return 0;
 }
 
-void close_cqcam(struct qcam_device *qcam)
+static void close_cqcam(struct qcam_device *qcam)
 {
 	video_unregister_device(&qcam->vdev);
 	parport_unregister_device(qcam->pdev);

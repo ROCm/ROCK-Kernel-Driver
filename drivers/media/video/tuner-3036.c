@@ -197,14 +197,14 @@ static struct i2c_client client_template =
 	.name		= "SAB3036",
 };
 
-int __init
+static int __init
 tuner3036_init(void)
 {
 	i2c_add_driver(&i2c_driver_tuner);
 	return 0;
 }
 
-void __exit
+static void __exit
 tuner3036_exit(void)
 {
 	i2c_del_driver(&i2c_driver_tuner);

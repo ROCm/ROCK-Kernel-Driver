@@ -225,7 +225,7 @@ static void dump_statusregs(struct saa7134_dev *dev)
 /* ------------------------------------------------------------------ */
 
 /* nr of (saa7134-)pages for the given buffer size */
-int saa7134_buffer_pages(int size)
+static int saa7134_buffer_pages(int size)
 {
 	size  = PAGE_ALIGN(size);
 	size += PAGE_SIZE; /* for non-page-aligned buffers */

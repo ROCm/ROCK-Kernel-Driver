@@ -95,7 +95,7 @@ struct timing {
 };
 
 /* for values, see the bt819 datasheet */
-struct timing timing_data[] = {
+static struct timing timing_data[] = {
 	{864 - 24, 20, 625 - 2, 1, 0x0504, 0x0000},
 	{858 - 24, 20, 525 - 2, 1, 0x00f8, 0x0000},
 };

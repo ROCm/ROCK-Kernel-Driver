@@ -441,7 +441,7 @@ static int qc_setscanmode(struct qcam_device *q)
 /* Reset the QuickCam and program for brightness, contrast,
  * white-balance, and resolution. */
 
-void qc_set(struct qcam_device *q)
+static void qc_set(struct qcam_device *q)
 {
 	int val;
 	int val2;
@@ -591,7 +591,7 @@ static inline int qc_readbytes(struct qcam_device *q, char buffer[])
  * n=2^(bit depth)-1.  Ask me for more details if you don't understand
  * this. */
 
-long qc_capture(struct qcam_device * q, char __user *buf, unsigned long len)
+static long qc_capture(struct qcam_device * q, char __user *buf, unsigned long len)
 {
 	int i, j, k, yield;
 	int bytes;
@@ -891,7 +891,7 @@ static struct video_device qcam_template=
 static struct qcam_device *qcams[MAX_CAMS];
 static unsigned int num_cams = 0;
 
-int init_bwqcam(struct parport *port)
+static int init_bwqcam(struct parport *port)
 {
 	struct qcam_device *qcam;
 
@@ -934,7 +934,7 @@ int init_bwqcam(struct parport *port)
 	return 0;
 }
 
-void close_bwqcam(struct qcam_device *qcam)
+static void close_bwqcam(struct qcam_device *qcam)
 {
 	video_unregister_device(&qcam->vdev);
 	parport_unregister_device(qcam->pdev);
