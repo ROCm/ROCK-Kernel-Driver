@@ -361,9 +361,8 @@ static ssize_t store_spi_host_signalling(struct class_device *cdev,
 	enum spi_signal_type type = spi_signal_to_value(buf);
 
 	if (type != SPI_SIGNAL_UNKNOWN)
-		return count;
+		i->f->set_signalling(shost, type);
 
-	i->f->set_signalling(shost, type);
 	return count;
 }
 static CLASS_DEVICE_ATTR(signalling, S_IRUGO | S_IWUSR,
