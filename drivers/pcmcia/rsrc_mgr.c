@@ -458,7 +458,6 @@ static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 {
     resource_map_t *m, mm;
     static u_char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
-    static int hi = 0, lo = 0;
     u_long b, i, ok = 0;
 
     /* We do up to four passes through the list */
