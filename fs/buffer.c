@@ -410,9 +410,7 @@ void buffer_insert_list(spinlock_t *lock,
 	if (lock == NULL)
 		lock = &global_bufferlist_lock;
 	spin_lock(lock);
-	if (bh->b_inode)
-		list_del(&bh->b_inode_buffers);
-	bh->b_inode = 1;
+	list_del(&bh->b_inode_buffers);
 	list_add(&bh->b_inode_buffers, list);
 	spin_unlock(lock);
 }
@@ -422,10 +420,7 @@ void buffer_insert_list(spinlock_t *lock,
  */
 static inline void __remove_inode_queue(struct buffer_head *bh)
 {
-	if (bh->b_inode) {
-		list_del(&bh->b_inode_buffers);
-		bh->b_inode = 0;
-	}
+	list_del_init(&bh->b_inode_buffers);
 }
 
 int inode_has_buffers(struct inode *inode)
@@ -653,11 +648,8 @@ int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 	spin_lock(lock);
 	while (!list_empty(list)) {
 		bh = BH_ENTRY(list->next);
-		list_del(&bh->b_inode_buffers);
-		if (!buffer_dirty(bh) && !buffer_locked(bh))
-			bh->b_inode = 0;
-		else {
-			bh->b_inode = 1;
+		list_del_init(&bh->b_inode_buffers);
+		if (buffer_dirty(bh) || buffer_locked(bh)) {
 			list_add(&bh->b_inode_buffers, &tmp);
 			if (buffer_dirty(bh)) {
 				get_bh(bh);
@@ -2229,8 +2221,7 @@ EXPORT_SYMBOL(alloc_buffer_head);
 
 void free_buffer_head(struct buffer_head *bh)
 {
-	if (bh->b_inode)
-		BUG();
+	BUG_ON(!list_empty(&bh->b_inode_buffers));
 	mempool_free(bh, bh_mempool);
 }
 EXPORT_SYMBOL(free_buffer_head);
@@ -2243,6 +2234,7 @@ static void init_buffer_head(void *data, kmem_cache_t *cachep, unsigned long fla
 
 		memset(bh, 0, sizeof(*bh));
 		bh->b_blocknr = -1;
+		INIT_LIST_HEAD(&bh->b_inode_buffers);
 		init_waitqueue_head(&bh->b_wait);
 	}
 }

@@ -256,7 +256,6 @@ struct buffer_head {
 
 	wait_queue_head_t b_wait;
 
-	int b_inode;				/* will go away */
 	struct list_head     b_inode_buffers;	/* doubly linked list of inode dirty buffers */
 };
 
