@@ -335,10 +335,14 @@ static void __init init_ide_data (void)
 
 static int ide_system_bus_speed(void)
 {
+#ifdef CONFIG_PCI
 	static struct pci_device_id pci_default[] = {
 		{ PCI_DEVICE(PCI_ANY_ID, PCI_ANY_ID) },
 		{ }
 	};
+#else
+#define pci_default 0
+#endif /* CONFIG_PCI */
 
 	if (!system_bus_speed) {
 		if (idebus_parameter) {
