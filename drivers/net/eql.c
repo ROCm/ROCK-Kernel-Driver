@@ -495,6 +495,8 @@ static int eql_g_slave_cfg(struct net_device *dev, slave_config_t __user *scp)
 		return -EFAULT;
 
 	slave_dev = dev_get_by_name(sc.slave_name);
+	if (!slave_dev)
+		return -ENODEV;
 
 	ret = -EINVAL;
 
@@ -527,11 +529,13 @@ static int eql_s_slave_cfg(struct net_device *dev, slave_config_t __user *scp)
 	if (copy_from_user(&sc, scp, sizeof (slave_config_t)))
 		return -EFAULT;
 
-	eql = dev->priv;
 	slave_dev = dev_get_by_name(sc.slave_name);
+	if (!slave_dev)
+		return -ENODEV;
 
 	ret = -EINVAL;
 
+	eql = dev->priv;
 	spin_lock_bh(&eql->queue.lock);
 	if (eql_is_slave(slave_dev)) {
 		slave = __eql_find_slave_dev(&eql->queue, slave_dev);
