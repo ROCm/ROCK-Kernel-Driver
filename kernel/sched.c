@@ -84,8 +84,8 @@
  */
 #define __MIN_TIMESLICE		  5000 /* usec userspace */
 #define __DEF_TIMESLICE		105000 /* usec userspace */
-#define __MIN_TIMESLICE_DESKTOP	  2000 /* usec userspace */
-#define __DEF_TIMESLICE_DESKTOP	 41000 /* usec userspace */
+#define __MIN_TIMESLICE_DESKTOP	  1000 /* usec userspace */
+#define __DEF_TIMESLICE_DESKTOP	 21000 /* usec userspace */
 int def_timeslice = __DEF_TIMESLICE, min_timeslice = __MIN_TIMESLICE;
 #define MIN_TIMESLICE ((min_timeslice * HZ + 999999) / 1000000)
 #define DEF_TIMESLICE ((def_timeslice * HZ + 999999) / 1000000)
