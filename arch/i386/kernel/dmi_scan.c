@@ -841,7 +841,7 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ acer_cpufreq_pst, "Acer Aspire", {
 			MATCH(DMI_SYS_VENDOR, "Insyde Software"),
 			MATCH(DMI_BIOS_VERSION, "3A71"),
-			NO_MATCH, NO_MATCH, NO_MATCH
+			NO_MATCH, NO_MATCH,
 			} },
 
 	{ NULL, }
