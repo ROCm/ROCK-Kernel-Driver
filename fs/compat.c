@@ -1392,6 +1392,8 @@ int compat_do_execve(char * filename,
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
+	bprm.interp_flags = 0;
+	bprm.interp_data = 0;
 	bprm.security = NULL;
 	bprm.mm = mm_alloc();
 	retval = -ENOMEM;
