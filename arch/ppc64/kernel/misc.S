@@ -916,8 +916,8 @@ _GLOBAL(sys_call_table)
 	.llong .sys_rt_sigtimedwait
 	.llong .sys_rt_sigqueueinfo
 	.llong .sys_rt_sigsuspend
-	.llong .sys_pread
-	.llong .sys_pwrite	        /* 180 */
+	.llong .sys_pread64
+	.llong .sys_pwrite64	        /* 180 */
 	.llong .sys_chown
 	.llong .sys_getcwd
 	.llong .sys_capget
