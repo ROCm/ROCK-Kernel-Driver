@@ -367,7 +367,7 @@ static int scsi_ioctl_get_pci(struct scsi_device *sdev, void *arg)
 
         if (!dev)
 		return -ENXIO;
-        return copy_to_user(arg, dev->bus_id, sizeof(dev->bus_id));
+        return copy_to_user(arg, dev->bus_id, sizeof(dev->bus_id))? -EFAULT: 0;
 }
 
 
