@@ -480,7 +480,7 @@ struct nls_table *load_nls_default(void)
 	if (default_nls != NULL)
 		return default_nls;
 	else
-               return &default_table;
+		return &default_table;
 }
 
 EXPORT_SYMBOL(register_nls);
@@ -492,3 +492,5 @@ EXPORT_SYMBOL(utf8_mbtowc);
 EXPORT_SYMBOL(utf8_mbstowcs);
 EXPORT_SYMBOL(utf8_wctomb);
 EXPORT_SYMBOL(utf8_wcstombs);
+
+MODULE_LICENSE("Dual BSD/GPL");
