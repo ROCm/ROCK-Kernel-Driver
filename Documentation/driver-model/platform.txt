@@ -10,9 +10,9 @@ host bridges to peripheral buses.
 
 Platform drivers
 ~~~~~~~~~~~~~~~~
-Drivers for platform devices have typically very simple and
+Drivers for platform devices are typically very simple and
 unstructured. Either the device was present at a particular I/O port
-and the driver was loaded, or there was not. There was no possibility
+and the driver was loaded, or it was not. There was no possibility
 of hotplugging or alternative discovery besides probing at a specific
 I/O address and expecting a specific response.
 
@@ -49,7 +49,7 @@ devices that it discovers via the bus's add() callback:
 
 Bus IDs
 ~~~~~~~
-Bus IDs are the canonical name for the device. There is no globally
+Bus IDs are the canonical names for the devices. There is no globally
 standard addressing mechanism for legacy devices. In the IA-32 world,
 we have Pnp IDs to use, as well as the legacy I/O ports. However,
 neither tell what the device really is or have any meaning on other
@@ -62,7 +62,7 @@ within the scope of the kernel).
 
 For example, a serial driver might find a device at I/O 0x3f8. The
 ACPI firmware might also discover a device with PnP ID (_HID)
-PNP0501. Both correspond to the same device should be mapped to the
+PNP0501. Both correspond to the same device and should be mapped to the
 canonical name 'serial'. 
 
 The bus_id field should be a concatenation of the canonical name and
@@ -88,7 +88,7 @@ Driver Binding
 ~~~~~~~~~~~~~~
 Legacy drivers assume they are bound to the device once they start up
 and probe an I/O port. Divorcing them from this will be a difficult
-process. However, that shouldn't prevent us from impelementing
+process. However, that shouldn't prevent us from implementing
 firmware-based enumeration. 
 
 The firmware should notify the platform bus about devices before the
