@@ -393,6 +393,7 @@ struct ehci_fstn {
 
 /*-------------------------------------------------------------------------*/
 
+#include <linux/version.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,32)
 
 #define SUBMIT_URB(urb,mem_flags) usb_submit_urb(urb)
