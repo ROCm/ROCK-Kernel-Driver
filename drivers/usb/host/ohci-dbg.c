@@ -466,13 +466,17 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 }
 
 static ssize_t
-show_async (struct device *dev, char *buf)
+show_async (struct class_device *class_dev, char *buf)
 {
+	struct usb_bus		*bus;
+	struct usb_hcd		*hcd;
 	struct ohci_hcd		*ohci;
 	size_t			temp;
 	unsigned long		flags;
 
-	ohci = dev_to_ohci(dev);
+	bus = to_usb_bus(class_dev);
+	hcd = bus->hcpriv;
+	ohci = hcd_to_ohci(hcd);
 
 	/* display control and bulk lists together, for simplicity */
 	spin_lock_irqsave (&ohci->lock, flags);
@@ -482,14 +486,16 @@ show_async (struct device *dev, char *buf)
 
 	return temp;
 }
-static DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
+static CLASS_DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
 
 
 #define DBG_SCHED_LIMIT 64
 
 static ssize_t
-show_periodic (struct device *dev, char *buf)
+show_periodic (struct class_device *class_dev, char *buf)
 {
+	struct usb_bus		*bus;
+	struct usb_hcd		*hcd;
 	struct ohci_hcd		*ohci;
 	struct ed		**seen, *ed;
 	unsigned long		flags;
@@ -501,7 +507,9 @@ show_periodic (struct device *dev, char *buf)
 		return 0;
 	seen_count = 0;
 
-	ohci = dev_to_ohci(dev);
+	bus = to_usb_bus(class_dev);
+	hcd = bus->hcpriv;
+	ohci = hcd_to_ohci(hcd);
 	next = buf;
 	size = PAGE_SIZE;
 
@@ -573,14 +581,16 @@ show_periodic (struct device *dev, char *buf)
 
 	return PAGE_SIZE - size;
 }
-static DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
+static CLASS_DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
 
 
 #undef DBG_SCHED_LIMIT
 
 static ssize_t
-show_registers (struct device *dev, char *buf)
+show_registers (struct class_device *class_dev, char *buf)
 {
+	struct usb_bus		*bus;
+	struct usb_hcd		*hcd;
 	struct ohci_hcd		*ohci;
 	struct ohci_regs	*regs;
 	unsigned long		flags;
@@ -588,7 +598,9 @@ show_registers (struct device *dev, char *buf)
 	char			*next;
 	u32			rdata;
 
-	ohci = dev_to_ohci(dev);
+	bus = to_usb_bus(class_dev);
+	hcd = bus->hcpriv;
+	ohci = hcd_to_ohci(hcd);
 	regs = ohci->regs;
 	next = buf;
 	size = PAGE_SIZE;
@@ -642,22 +654,22 @@ show_registers (struct device *dev, char *buf)
 
 	return PAGE_SIZE - size;
 }
-static DEVICE_ATTR (registers, S_IRUGO, show_registers, NULL);
+static CLASS_DEVICE_ATTR (registers, S_IRUGO, show_registers, NULL);
 
 
 static inline void create_debug_files (struct ohci_hcd *bus)
 {
-	device_create_file (bus->hcd.controller, &dev_attr_async);
-	device_create_file (bus->hcd.controller, &dev_attr_periodic);
-	device_create_file (bus->hcd.controller, &dev_attr_registers);
+	class_device_create_file(&bus->hcd.self.class_dev, &class_device_attr_async);
+	class_device_create_file(&bus->hcd.self.class_dev, &class_device_attr_periodic);
+	class_device_create_file(&bus->hcd.self.class_dev, &class_device_attr_registers);
 	ohci_dbg (bus, "created debug files\n");
 }
 
 static inline void remove_debug_files (struct ohci_hcd *bus)
 {
-	device_remove_file (bus->hcd.controller, &dev_attr_async);
-	device_remove_file (bus->hcd.controller, &dev_attr_periodic);
-	device_remove_file (bus->hcd.controller, &dev_attr_registers);
+	class_device_remove_file(&bus->hcd.self.class_dev, &class_device_attr_async);
+	class_device_remove_file(&bus->hcd.self.class_dev, &class_device_attr_periodic);
+	class_device_remove_file(&bus->hcd.self.class_dev, &class_device_attr_registers);
 }
 
 #endif
