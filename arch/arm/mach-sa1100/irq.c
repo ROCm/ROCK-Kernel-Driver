@@ -58,7 +58,7 @@ static int sa1100_gpio_type(unsigned int irq, unsigned int type)
 	if (type == IRQT_PROBE) {
 		if ((GPIO_IRQ_rising_edge | GPIO_IRQ_falling_edge) & mask)
 			return 0;
-		type == __IRQT_RISEDGE | __IRQT_FALEDGE;
+		type = __IRQT_RISEDGE | __IRQT_FALEDGE;
 	}
 
 	if (type & __IRQT_RISEDGE) {

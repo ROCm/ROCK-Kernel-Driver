@@ -7,6 +7,26 @@
  * This is included by serial.c -- serial_sa1100.c makes no use of it.
  */
 
+/* Standard COM flags */
+#define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
+
+/*
+ * Rather empty table...
+ * Hardwired serial ports should be defined here.
+ * PCMCIA will fill it dynamically.
+ */
+#ifdef CONFIG_SA1100_TRIZEPS
+
+#define RS_TABLE_SIZE 2
+
+#define STD_SERIAL_PORT_DEFNS	\
+       /* UART	CLK     	PORT		IRQ		FLAGS		*/ \
+	{ 0,	1500000,	TRIZEPS_UART5,	IRQ_GPIO16,	STD_COM_FLAGS },   \
+	{ 0,	1500000,	TRIZEPS_UART6,	IRQ_GPIO17,	STD_COM_FLAGS }
+
+#else
+
+#define RS_TABLE_SIZE 4
 
 /*
  * This assumes you have a 1.8432 MHz clock for your UART.
@@ -17,17 +37,6 @@
  */
 #define BASE_BAUD ( 1843200 / 16 )
 
-/* Standard COM flags */
-#define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
-
-#define RS_TABLE_SIZE 4
-
-
-/*
- * Rather empty table...
- * Hardwired serial ports should be defined here.
- * PCMCIA will fill it dynamically.
- */
 #define STD_SERIAL_PORT_DEFNS	\
        /* UART	CLK     	PORT		IRQ	FLAGS		*/ \
 	{ 0,	BASE_BAUD,	0, 		0,	STD_COM_FLAGS },   \
@@ -35,5 +44,6 @@
 	{ 0,	BASE_BAUD,	0, 		0,	STD_COM_FLAGS },   \
 	{ 0,	BASE_BAUD,	0, 		0,	STD_COM_FLAGS }
 
-#define EXTRA_SERIAL_PORT_DEFNS
+#endif
 
+#define EXTRA_SERIAL_PORT_DEFNS

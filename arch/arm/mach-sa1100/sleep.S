@@ -44,7 +44,8 @@ ENTRY(sa1100_cpu_suspend)
 	mrc 	p15, 0, r7, c1, c0, 0		@ control reg
 
 	@ store them plus current virtual stack ptr on stack
-	stmfd	sp!, {r4 - r7, sp}
+	mov	r8, sp
+	stmfd	sp!, {r4 - r8}
 
 	@ preserve phys address of stack
 	mov	r0, sp
