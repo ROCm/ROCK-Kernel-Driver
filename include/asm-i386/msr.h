@@ -200,7 +200,7 @@
 #define MSR_K7_HWCR			0xC0010015
 #define MSR_K7_CLK_CTL			0xC001001b
 #define MSR_K7_FID_VID_CTL		0xC0010041
-#define MSR_K7_VID_STATUS		0xC0010042
+#define MSR_K7_FID_VID_STATUS		0xC0010042
 
 /* Centaur-Hauls/IDT defined MSRs. */
 #define MSR_IDT_FCR1			0x107
