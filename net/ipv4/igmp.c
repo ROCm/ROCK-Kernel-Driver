@@ -367,12 +367,6 @@ int igmp_rcv(struct sk_buff *skb)
 		return 0;
 	}
 
-	if (skb->pkt_type!=PACKET_MULTICAST) {
-		in_dev_put(in_dev);
-		kfree_skb(skb);
-		return 0;
-	}
-
 	switch (ih->type) {
 	case IGMP_HOST_MEMBERSHIP_QUERY:
 		igmp_heard_query(in_dev, ih->code, ih->group);
