@@ -426,7 +426,9 @@ acpi_ds_exec_end_op (
 				(walk_state->operands[0]->common.type == ACPI_TYPE_LOCAL_REFERENCE) &&
 				(walk_state->operands[1]->common.type == ACPI_TYPE_LOCAL_REFERENCE) &&
 				(walk_state->operands[0]->reference.opcode ==
-				 walk_state->operands[1]->reference.opcode)) {
+				 walk_state->operands[1]->reference.opcode) &&
+				(walk_state->operands[0]->reference.offset ==
+				 walk_state->operands[1]->reference.offset)) {
 				status = AE_OK;
 			}
 			else {

@@ -251,10 +251,26 @@ acpi_tb_convert_fadt1 (
 	local_fadt->cst_cnt = 0;
 
 	/*
-	 * Since there isn't any equivalence in 1.0 and since it highly likely
-	 * that a 1.0 system has legacy support.
+	 * FADT Rev 2 was an interim FADT released between ACPI 1.0 and ACPI 2.0.
+	 * It primarily adds the FADT reset mechanism.
 	 */
-	local_fadt->iapc_boot_arch = BAF_LEGACY_DEVICES;
+	if ((original_fadt->revision == 2) &&
+		(original_fadt->length == sizeof (struct fadt_descriptor_rev2_minus))) {
+		/*
+		 * Grab the entire generic address struct, plus the 1-byte reset value
+		 * that immediately follows.
+		 */
+		ACPI_MEMCPY (&local_fadt->reset_register,
+			&((struct fadt_descriptor_rev2_minus *) original_fadt)->reset_register,
+			sizeof (struct acpi_generic_address) + 1);
+	}
+	else {
+		/*
+		 * Since there isn't any equivalence in 1.0 and since it is highly
+		 * likely that a 1.0 system has legacy support.
+		 */
+		local_fadt->iapc_boot_arch = BAF_LEGACY_DEVICES;
+	}
 
 	/*
 	 * Convert the V1.0 block addresses to V2.0 GAS structures
@@ -418,21 +434,19 @@ acpi_tb_convert_table_fadt (void)
 
 
 	/*
-	 * acpi_gbl_FADT is valid
-	 * Allocate and zero the 2.0 FADT buffer
-	 */
-	local_fadt = ACPI_MEM_CALLOCATE (sizeof (struct fadt_descriptor_rev2));
-	if (local_fadt == NULL) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
-	/*
-	 * FADT length and version validation.  The table must be at least as
-	 * long as the version 1.0 FADT
+	 * acpi_gbl_FADT is valid. Validate the FADT length. The table must be
+	 * at least as long as the version 1.0 FADT
 	 */
 	if (acpi_gbl_FADT->length < sizeof (struct fadt_descriptor_rev1)) {
-		ACPI_REPORT_ERROR (("Invalid FADT table length: 0x%X\n", acpi_gbl_FADT->length));
+		ACPI_REPORT_ERROR (("FADT is invalid, too short: 0x%X\n", acpi_gbl_FADT->length));
 		return_ACPI_STATUS (AE_INVALID_TABLE_LENGTH);
+	}
+
+	/* Allocate buffer for the ACPI 2.0(+) FADT */
+
+	local_fadt = ACPI_MEM_CALLOCATE (sizeof (struct fadt_descriptor_rev2));
+	if (!local_fadt) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	if (acpi_gbl_FADT->revision >= FADT2_REVISION_ID) {

@@ -92,7 +92,10 @@ extern      u32                                 acpi_gbl_nesting_level;
 /*
  * Enable "slack" in the AML interpreter?  Default is FALSE, and the
  * interpreter strictly follows the ACPI specification.  Setting to TRUE
- * allows the interpreter to forgive certain bad AML constructs.
+ * allows the interpreter to forgive certain bad AML constructs.  Currently:
+ * 1) Allow "implicit return" of last value in a control method
+ * 2) Allow access beyond end of operation region
+ * 3) Allow access to uninitialized locals/args (auto-init to integer 0)
  */
 ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_enable_interpreter_slack, FALSE);
 
