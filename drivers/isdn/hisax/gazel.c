@@ -636,7 +636,7 @@ setup_gazelpci(struct IsdnCardState *cs)
 			if (cs->hw.gazel.cfg_reg & 0x80) {
 				pci_read_config_byte(dev_tel, PCI_REVISION_ID, &pci_rev);
 				if (pci_rev == 1) {
-					printk(KERN_INFO "Gazel: PLX9050 rev1 workaround activated");
+					printk(KERN_INFO "Gazel: PLX9050 rev1 workaround activated\n");
 					set_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags);
 				}
 			}
