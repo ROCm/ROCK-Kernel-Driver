@@ -526,6 +526,10 @@ CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 	if (rc)
 		return rc;
 
+        /* tcon and ses pointer are checked in smb_init */
+        if (tcon->ses->server == NULL)
+                return -ECONNABORTED;
+
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = netfid;
 	pSMB->OffsetLow = cpu_to_le32(lseek & 0xFFFFFFFF);
@@ -584,6 +588,9 @@ CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 		      (void **) &pSMBr);
 	if (rc)
 		return rc;
+	/* tcon and ses pointer are checked in smb_init */
+	if (tcon->ses->server == NULL)
+		return -ECONNABORTED;
 
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = netfid;

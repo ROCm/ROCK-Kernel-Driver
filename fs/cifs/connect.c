@@ -233,9 +233,9 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				    (checkSMBhdr
 				     (smb_buffer, smb_buffer->Mid))) {
 					cERROR(1,
-					       (KERN_ERR
-						"Invalid size or format for SMB found with length %d and pdu_lenght %d",
+					    ("Invalid size or format for SMB found with length %d and pdu_lenght %d",
 						length, pdu_length));
+					cifs_dump_mem("Received Data is: ",temp,sizeof(struct smb_hdr));
 					/* BB fix by finding next smb signature - and reading off data until next smb ? BB */
 
 					/* BB add reconnect here */
