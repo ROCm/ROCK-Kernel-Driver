@@ -257,7 +257,7 @@ ipi_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				printk(KERN_CRIT "Unknown IPI num on CPU%d: %lu\n",
 					this_cpu, which);
 				ops &= ~(1 << which);
-				return;
+				return IRQ_NONE;
 			} /* Switch */
 		} /* while (ops) */
 	}
@@ -326,7 +326,7 @@ int
 smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 {
 	struct smp_call_struct data;
-	long timeout;
+	unsigned long timeout;
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 	
 	data.func = func;
@@ -375,6 +375,8 @@ smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(smp_call_function);
 
 
 

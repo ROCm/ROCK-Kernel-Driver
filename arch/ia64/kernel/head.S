@@ -864,7 +864,7 @@ SET_REG(b5);
 	 * the clobber lists for spin_lock() in include/asm-ia64/spinlock.h.
 	 */
 
-#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
+#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
 
 GLOBAL_ENTRY(ia64_spinlock_contention_pre3_4)
 	.prologue

@@ -2946,6 +2946,7 @@ static struct addrconf_sysctl_table
 			.maxlen		=	sizeof(int),
 			.mode		=	0644,
          		.proc_handler	=	&proc_dointvec_jiffies,
+			.strategy	=	&sysctl_jiffies,
 		},
 		{
 			.ctl_name	=	NET_IPV6_RTR_SOLICIT_DELAY,
@@ -2954,6 +2955,7 @@ static struct addrconf_sysctl_table
 			.maxlen		=	sizeof(int),
 			.mode		=	0644,
          		.proc_handler	=	&proc_dointvec_jiffies,
+			.strategy	=	&sysctl_jiffies,
 		},
 #ifdef CONFIG_IPV6_PRIVACY
 		{

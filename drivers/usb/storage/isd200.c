@@ -543,7 +543,6 @@ void isd200_invoke_transport( struct us_data *us,
 	int result;
 
 	/* send the command to the transport layer */
-	srb->resid = 0;
 	memcpy(srb->cmnd, ataCdb, sizeof(ataCdb->generic));
 	srb->cmd_len = sizeof(ataCdb->generic);
 	transferStatus = usb_stor_Bulk_transport(srb, us);
@@ -1117,60 +1116,6 @@ int isd200_get_inquiry_data( struct us_data *us )
 
 
 /**************************************************************************
- * isd200_data_copy
- *									 
- * Copy data into the srb request buffer.  Use scatter gather if required.
- *
- * RETURNS:
- *    void
- */
-void isd200_data_copy(Scsi_Cmnd *srb, char * src, int length)
-{
-	unsigned int len = length;
-	struct scatterlist *sg;
-
-	if (srb->use_sg) {
-		int i;
-		unsigned int total = 0;
-
-		/* Add up the sizes of all the sg segments */
-		sg = (struct scatterlist *) srb->request_buffer;
-		for (i = 0; i < srb->use_sg; i++)
-			total += sg[i].length;
-
-		if (length > total)
-			len = total;
-
-		total = 0;
-
-		/* Copy data into sg buffer(s) */
-		for (i = 0; i < srb->use_sg; i++) {
-			if ((len > total) && (len > 0)) {
-				/* transfer the lesser of the next buffer or the
-				 * remaining data */
-				if (len - total >= sg[i].length) {
-					memcpy(sg_address(sg[i]), src + total, sg[i].length);
-					total += sg[i].length;
-				} else {
-					memcpy(sg_address(sg[i]), src + total, len - total);
-					total = len;
-				}
-			} 
-			else
-				break;
-		}
-	} else	{
-		/* Make sure length does not exceed buffer length */
-		if (length > srb->request_bufflen)
-			len = srb->request_bufflen;
-
-		if (len > 0)
-			memcpy(srb->request_buffer, src, len);
-	}
-}
-
-
-/**************************************************************************
  * isd200_scsi_to_ata
  *									 
  * Translate SCSI commands to ATA commands.
@@ -1198,11 +1143,9 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 	case INQUIRY:
 		US_DEBUGP("   ATA OUT - INQUIRY\n");
 
-		if (srb->request_bufflen > sizeof(struct inquiry_data))
-			srb->request_bufflen = sizeof(struct inquiry_data);
-
 		/* copy InquiryData */
-		isd200_data_copy(srb, (char *) &info->InquiryData, srb->request_bufflen);
+		usb_stor_set_xfer_buf((unsigned char *) &info->InquiryData,
+				sizeof(info->InquiryData), srb);
 		srb->result = SAM_STAT_GOOD;
 		sendToTransport = FALSE;
 		break;
@@ -1211,7 +1154,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 		US_DEBUGP("   ATA OUT - SCSIOP_MODE_SENSE\n");
 
 		/* Initialize the return buffer */
-		isd200_data_copy(srb, (char *) &senseData, 8);
+		usb_stor_set_xfer_buf(senseData, sizeof(senseData), srb);
 
 		if (info->DeviceFlags & DF_MEDIA_STATUS_ENABLED)
 		{
@@ -1230,9 +1173,6 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 
 	case TEST_UNIT_READY:
 		US_DEBUGP("   ATA OUT - SCSIOP_TEST_UNIT_READY\n");
-
-		/* Initialize the return buffer */
-		isd200_data_copy(srb, (char *) &senseData, 8);
 
 		if (info->DeviceFlags & DF_MEDIA_STATUS_ENABLED)
 		{
@@ -1266,10 +1206,8 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 		readCapacityData.LogicalBlockAddress = cpu_to_be32(capacity);
 		readCapacityData.BytesPerBlock = cpu_to_be32(0x200);
 
-		if (srb->request_bufflen > sizeof(struct read_capacity_data))
-			srb->request_bufflen = sizeof(struct read_capacity_data);
-
-		isd200_data_copy(srb, (char *) &readCapacityData, srb->request_bufflen);
+		usb_stor_set_xfer_buf((unsigned char *) &readCapacityData,
+				sizeof(readCapacityData), srb);
 		srb->result = SAM_STAT_GOOD;
 		sendToTransport = FALSE;
 	}
@@ -1362,9 +1300,6 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 	case START_STOP:    
 		US_DEBUGP("   ATA OUT - SCSIOP_START_STOP_UNIT\n");
 		US_DEBUGP("   srb->cmnd[4] = 0x%X\n", srb->cmnd[4]);
-
-		/* Initialize the return buffer */
-		isd200_data_copy(srb, (char *) &senseData, 8);
 
 		if ((srb->cmnd[4] & 0x3) == 0x2) {
 			US_DEBUGP("   Media Eject\n");
@@ -1500,6 +1435,7 @@ void isd200_ata_command(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("ERROR Driver not initialized\n");
 
 	/* Convert command */
+	srb->resid = 0;
 	sendToTransport = isd200_scsi_to_ata(srb, us, &ataCdb);
 
 	/* send the command to the transport layer */

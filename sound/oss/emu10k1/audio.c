@@ -989,7 +989,7 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 	return 0;
 }
 
-static struct page *emu10k1_mm_nopage (struct vm_area_struct * vma, unsigned long address, int write_access)
+static struct page *emu10k1_mm_nopage (struct vm_area_struct * vma, unsigned long address, int *type)
 {
 	struct emu10k1_wavedevice *wave_dev = vma->vm_private_data;
 	struct woinst *woinst = wave_dev->woinst;
@@ -1032,6 +1032,8 @@ static struct page *emu10k1_mm_nopage (struct vm_area_struct * vma, unsigned lon
 	get_page (dmapage);
 
 	DPD(3, "page: %#lx\n", (unsigned long) dmapage);
+	if (type)
+		*type = VM_FAULT_MINOR;
 	return dmapage;
 }
 

@@ -273,6 +273,17 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 			p->rdev = rdev;
 			blk_queue_stack_limits(mddev->queue,
 					       rdev->bdev->bd_disk->queue);
+
+		/* as we don't honour merge_bvec_fn, we must never risk
+		 * violating it, so limit ->max_sector to one PAGE, as
+		 * a one page request is never in violation.
+		 * (Note: it is very unlikely that a device with
+		 * merge_bvec_fn will be involved in multipath.)
+		 */
+			if (rdev->bdev->bd_disk->queue->merge_bvec_fn &&
+			    mddev->queue->max_sectors > (PAGE_SIZE>>9))
+				mddev->queue->max_sectors = (PAGE_SIZE>>9);
+
 			conf->working_disks++;
 			rdev->raid_disk = path;
 			rdev->in_sync = 1;
@@ -410,8 +421,16 @@ static int multipath_run (mddev_t *mddev)
 
 		disk = conf->multipaths + disk_idx;
 		disk->rdev = rdev;
+
 		blk_queue_stack_limits(mddev->queue,
 				       rdev->bdev->bd_disk->queue);
+		/* as we don't honour merge_bvec_fn, we must never risk
+		 * violating it, not that we ever expect a device with
+		 * a merge_bvec_fn to be involved in multipath */
+		if (rdev->bdev->bd_disk->queue->merge_bvec_fn &&
+		    mddev->queue->max_sectors > (PAGE_SIZE>>9))
+			mddev->queue->max_sectors = (PAGE_SIZE>>9);
+
 		if (!rdev->faulty) 
 			conf->working_disks++;
 	}

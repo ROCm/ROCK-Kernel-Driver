@@ -1916,7 +1916,7 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 {
     struct pcmcia_socket *s;
     config_t *c;
-    int ret = 0, irq = 0;
+    int ret = CS_IN_USE, irq = 0;
     
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
@@ -1928,13 +1928,9 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 	return CS_CONFIGURATION_LOCKED;
     if (c->state & CONFIG_IRQ_REQ)
 	return CS_IN_USE;
-    
-    /* Short cut: if there are no ISA interrupts, then it is PCI */
-    if (!s->irq_mask) {
-	irq = s->pci_irq;
-	ret = (irq) ? 0 : CS_IN_USE;
+
 #ifdef CONFIG_PCMCIA_PROBE
-    } else if (s->irq.AssignedIRQ != 0) {
+    if (s->irq.AssignedIRQ != 0) {
 	/* If the interrupt is already assigned, it must match */
 	irq = s->irq.AssignedIRQ;
 	if (req->IRQInfo1 & IRQ_INFO2_VALID) {
@@ -1943,7 +1939,6 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 	} else
 	    ret = ((req->IRQInfo1&IRQ_MASK) == irq) ? 0 : CS_BAD_ARGS;
     } else {
-	ret = CS_IN_USE;
 	if (req->IRQInfo1 & IRQ_INFO2_VALID) {
 	    u_int try, mask = req->IRQInfo2 & s->irq_mask;
 	    for (try = 0; try < 2; try++) {
@@ -1958,12 +1953,13 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 	    irq = req->IRQInfo1 & IRQ_MASK;
 	    ret = try_irq(req->Attributes, irq, 1);
 	}
-#else
-    } else {
-	ret = CS_UNSUPPORTED_MODE;
-#endif
     }
-    if (ret != 0) return ret;
+#endif
+    if (ret != 0) {
+	if (!s->pci_irq)
+	    return ret;
+	irq = s->pci_irq;
+    }
 
     if (req->Attributes & IRQ_HANDLE_PRESENT) {
 	if (request_irq(irq, req->Handler,

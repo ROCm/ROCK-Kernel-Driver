@@ -90,7 +90,6 @@
 #include <net/snmp.h>
 #include <net/sctp/structs.h>
 #include <net/sctp/constants.h>
-#include <net/sctp/sm.h>
 
 
 /* Set SCTP_DEBUG flag via config if not already set. */

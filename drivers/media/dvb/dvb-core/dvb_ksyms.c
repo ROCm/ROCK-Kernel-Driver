@@ -18,6 +18,7 @@ EXPORT_SYMBOL(dvb_dmx_release);
 EXPORT_SYMBOL(dvb_dmx_swfilter_packet);
 EXPORT_SYMBOL(dvb_dmx_swfilter_packets);
 EXPORT_SYMBOL(dvb_dmx_swfilter);
+EXPORT_SYMBOL(dvb_dmx_swfilter_204);
 EXPORT_SYMBOL(dvbdmx_connect_frontend);
 EXPORT_SYMBOL(dvbdmx_disconnect_frontend);
 

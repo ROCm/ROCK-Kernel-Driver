@@ -34,14 +34,14 @@ ENTRY(v4_flush_kern_cache_all)
 	mov	pc, lr
 
 /*
- *	flush_user_cache_range(start, end, vma)
+ *	flush_user_cache_range(start, end, flags)
  *
  *	Invalidate a range of cache entries in the specified
  *	address space.
  *
  *	- start - start address (may not be aligned)
  *	- end	- end address (exclusive, may not be aligned)
- *	- vma	- vma_area_struct describing address space
+ *	- flags	- vma_area_struct flags describing address space
  */
 ENTRY(v4_flush_user_cache_range)
 	mov	ip, #0

@@ -1907,9 +1907,8 @@ kuw_patch1:
 	wr	%o5, 0x0, %psr			! re-enable interrupts
 	WRITE_PAUSE				! burn baby burn
 3:
-	ld	[%g6 + TI_TASK], %o4
 	retl					! return
-	 st	%g0, [%o4 + AOFF_task_thread + AOFF_thread_w_saved]	! no windows saved
+	 st	%g0, [%g6 + TI_W_SAVED]		! no windows saved
 
 	.align	4
 	.globl	C_LABEL(restore_current)

@@ -360,33 +360,6 @@ ENTRY(alt_dtlb_miss)
 	rfi
 END(alt_dtlb_miss)
 
-	//-----------------------------------------------------------------------------------
-	// call do_page_fault (predicates are in r31, psr.dt may be off, r16 is faulting address)
-ENTRY(page_fault)
-	ssm psr.dt
-	;;
-	srlz.i
-	;;
-	SAVE_MIN_WITH_COVER
-	alloc r15=ar.pfs,0,0,3,0
-	mov out0=cr.ifa
-	mov out1=cr.isr
-	adds r3=8,r2				// set up second base pointer
-	;;
-	ssm psr.ic | PSR_DEFAULT_BITS
-	;;
-	srlz.i					// guarantee that interruption collectin is on
-	;;
-(p15)	ssm psr.i				// restore psr.i
-	movl r14=ia64_leave_kernel
-	;;
-	SAVE_REST
-	mov rp=r14
-	;;
-	adds out2=16,r12			// out2 = pointer to pt_regs
-	br.call.sptk.many b6=ia64_do_page_fault	// ignore return address
-END(page_fault)
-
 	.org ia64_ivt+0x1400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1400 Entry 5 (size 64 bundles) Data nested TLB (6,45)
@@ -458,6 +431,33 @@ ENTRY(ikey_miss)
 	DBG_FAULT(6)
 	FAULT(6)
 END(ikey_miss)
+
+	//-----------------------------------------------------------------------------------
+	// call do_page_fault (predicates are in r31, psr.dt may be off, r16 is faulting address)
+ENTRY(page_fault)
+	ssm psr.dt
+	;;
+	srlz.i
+	;;
+	SAVE_MIN_WITH_COVER
+	alloc r15=ar.pfs,0,0,3,0
+	mov out0=cr.ifa
+	mov out1=cr.isr
+	adds r3=8,r2				// set up second base pointer
+	;;
+	ssm psr.ic | PSR_DEFAULT_BITS
+	;;
+	srlz.i					// guarantee that interruption collectin is on
+	;;
+(p15)	ssm psr.i				// restore psr.i
+	movl r14=ia64_leave_kernel
+	;;
+	SAVE_REST
+	mov rp=r14
+	;;
+	adds out2=16,r12			// out2 = pointer to pt_regs
+	br.call.sptk.many b6=ia64_do_page_fault	// ignore return address
+END(page_fault)
 
 	.org ia64_ivt+0x1c00
 /////////////////////////////////////////////////////////////////////////////////////////

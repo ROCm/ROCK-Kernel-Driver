@@ -167,7 +167,7 @@ extern long ia64_cmpxchg_called_with_bad_pointer (void);
 	if (_cmpxchg_bugcheck_count-- <= 0) {					\
 		void *ip;							\
 		extern int printk(const char *fmt, ...);			\
-		ip = ia64_getreg(_IA64_REG_IP);					\
+		ip = (void *) ia64_getreg(_IA64_REG_IP);			\
 		printk("CMPXCHG_BUGCHECK: stuck at %p on word %p\n", ip, (v));	\
 		break;								\
 	}									\

@@ -947,6 +947,12 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 		dio_bio_submit(dio);
 
 	/*
+	 * It is possible that, we return short IO due to end of file.
+	 * In that case, we need to release all the pages we got hold on.
+	 */
+	dio_cleanup(dio);
+
+	/*
 	 * OK, all BIOs are submitted, so we can decrement bio_count to truly
 	 * reflect the number of to-be-processed BIOs.
 	 */

@@ -182,16 +182,21 @@ static int wait_for_helper(void *data)
 {
 	struct subprocess_info *sub_info = data;
 	pid_t pid;
+	struct k_sigaction sa;
 
-	sub_info->retval = 0;
+	/* Install a handler: if SIGCLD isn't handled sys_wait4 won't
+	 * populate the status, but will return -ECHILD. */
+	sa.sa.sa_handler = SIG_IGN;
+	sa.sa.sa_flags = 0;
+	siginitset(&sa.sa.sa_mask, sigmask(SIGCHLD));
+	do_sigaction(SIGCHLD, &sa, (struct k_sigaction *)0);
+	allow_signal(SIGCHLD);
+
 	pid = kernel_thread(____call_usermodehelper, sub_info, SIGCHLD);
 	if (pid < 0)
 		sub_info->retval = pid;
 	else
-		/* We don't have a SIGCHLD signal handler, so this
-		 * always returns -ECHILD, but the important thing is
-		 * that it blocks. */
-		sys_wait4(pid, NULL, 0, NULL);
+		sys_wait4(pid, &sub_info->retval, 0, NULL);
 
 	complete(sub_info->complete);
 	return 0;
@@ -210,7 +215,7 @@ static void __call_usermodehelper(void *data)
 	 * until that is done.  */
 	if (sub_info->wait)
 		pid = kernel_thread(wait_for_helper, sub_info,
-				    CLONE_KERNEL | SIGCHLD);
+				    CLONE_FS | CLONE_FILES | SIGCHLD);
 	else
 		pid = kernel_thread(____call_usermodehelper, sub_info,
 				    CLONE_VFORK | SIGCHLD);

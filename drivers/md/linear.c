@@ -113,8 +113,17 @@ static int linear_run (mddev_t *mddev)
 		}
 
 		disk->rdev = rdev;
+
 		blk_queue_stack_limits(mddev->queue,
 				       rdev->bdev->bd_disk->queue);
+		/* as we don't honour merge_bvec_fn, we must never risk
+		 * violating it, so limit ->max_sector to one PAGE, as
+		 * a one page request is never in violation.
+		 */
+		if (rdev->bdev->bd_disk->queue->merge_bvec_fn &&
+		    mddev->queue->max_sectors > (PAGE_SIZE>>9))
+			mddev->queue->max_sectors = (PAGE_SIZE>>9);
+
 		disk->size = rdev->size;
 		mddev->array_size += rdev->size;
 

@@ -760,6 +760,7 @@ void usb_stor_stop_transport(struct us_data *us)
 int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 {
 	unsigned int transfer_length = srb->request_bufflen;
+	unsigned int pipe = 0;
 	int result;
 
 	/* COMMAND STAGE */
@@ -785,7 +786,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* DATA STAGE */
 	/* transfer the data payload for this command, if one exists*/
 	if (transfer_length) {
-		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
+		pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
 		result = usb_stor_bulk_transfer_sg(us, pipe,
 					srb->request_buffer, transfer_length,
@@ -813,12 +814,9 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 		if (srb->cmnd[0] == REQUEST_SENSE ||
 		    srb->cmnd[0] == INQUIRY)
 			return USB_STOR_TRANSPORT_GOOD;
-		else {
-			if (us->iobuf[0])
-				return USB_STOR_TRANSPORT_FAILED;
-			else
-				return USB_STOR_TRANSPORT_GOOD;
-		}
+		if (us->iobuf[0])
+			goto Failed;
+		return USB_STOR_TRANSPORT_GOOD;
 	}
 
 	/* If not UFI, we interpret the data as a result code 
@@ -835,13 +833,17 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 		case 0x00: 
 			return USB_STOR_TRANSPORT_GOOD;
 		case 0x01: 
-			return USB_STOR_TRANSPORT_FAILED;
-		default: 
-			return USB_STOR_TRANSPORT_ERROR;
+			goto Failed;
 	}
-
-	/* we should never get here, but if we do, we're in trouble */
 	return USB_STOR_TRANSPORT_ERROR;
+
+	/* the CBI spec requires that the bulk pipe must be cleared
+	 * following any data-in/out command failure (section 2.4.3.1.3)
+	 */
+  Failed:
+	if (pipe)
+		usb_stor_clear_halt(us, pipe);
+	return USB_STOR_TRANSPORT_FAILED;
 }
 
 /*
@@ -924,6 +926,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	struct bulk_cb_wrap *bcb = (struct bulk_cb_wrap *) us->iobuf;
 	struct bulk_cs_wrap *bcs = (struct bulk_cs_wrap *) us->iobuf;
 	unsigned int transfer_length = srb->request_bufflen;
+	unsigned int residue;
 	int result;
 	int fake_sense = 0;
 
@@ -999,9 +1002,10 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return USB_STOR_TRANSPORT_ERROR;
 
 	/* check bulk status */
-	US_DEBUGP("Bulk Status S 0x%x T 0x%x R %d Stat 0x%x\n",
+	residue = le32_to_cpu(bcs->Residue);
+	US_DEBUGP("Bulk Status S 0x%x T 0x%x R %u Stat 0x%x\n",
 			le32_to_cpu(bcs->Signature), bcs->Tag, 
-			bcs->Residue, bcs->Status);
+			residue, bcs->Status);
 	if ((bcs->Signature != cpu_to_le32(US_BULK_CS_SIGN) &&
 		    bcs->Signature != cpu_to_le32(US_BULK_CS_OLYMPUS_SIGN)) ||
 			bcs->Tag != srb->serial_number || 
@@ -1009,6 +1013,11 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("Bulk logical error\n");
 		return USB_STOR_TRANSPORT_ERROR;
 	}
+
+	/* try to compute the actual residue, based on how much data
+	 * was really transferred and what the device tells us */
+	residue = min(residue, transfer_length);
+	srb->resid = max(srb->resid, (int) residue);
 
 	/* based on the status code, we report good or bad */
 	switch (bcs->Status) {

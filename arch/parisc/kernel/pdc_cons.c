@@ -61,16 +61,6 @@ static struct tty_driver * pdc_console_device (struct console *c, int *index)
 	*index = c->index ? c->index-1 : fg_console;
 	return &console_driver;
 }
-
-#elif defined(CONFIG_SERIAL_MUX)
-#warning CONFIG_SERIAL_MUX
-#define PDC_CONSOLE_DEVICE pdc_console_device
-#warning "FIXME - should be: static struct tty_driver * pdc_console_device (struct console *c, int *index)"
-static kdev_t pdc_console_device (struct console *c, int *index)
-{
-        return mk_kdev(MUX_MAJOR, 0);
-}
-
 #else
 #define PDC_CONSOLE_DEVICE NULL
 #endif
@@ -105,7 +95,7 @@ static void pdc_console_init_force(void)
 
 void __init pdc_console_init(void)
 {
-#if defined(EARLY_BOOTUP_DEBUG) || defined(CONFIG_PDC_CONSOLE) || defined(CONFIG_SERIAL_MUX)
+#if defined(EARLY_BOOTUP_DEBUG) || defined(CONFIG_PDC_CONSOLE)
 	pdc_console_init_force();
 #endif
 #ifdef EARLY_BOOTUP_DEBUG

@@ -26,10 +26,6 @@ EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strstr);
 EXPORT_SYMBOL(strpbrk);
 
-#include <asm/processor.h>
-EXPORT_SYMBOL(kernel_thread);
-EXPORT_SYMBOL(boot_cpu_data);
-
 #include <linux/pm.h>
 EXPORT_SYMBOL(pm_power_off);
 
@@ -63,15 +59,6 @@ EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(__memcpy_toio);
 EXPORT_SYMBOL(__memcpy_fromio);
 EXPORT_SYMBOL(__memset_io);
-
-#include <asm/cache.h>
-EXPORT_SYMBOL(flush_kernel_dcache_range_asm);
-EXPORT_SYMBOL(flush_kernel_dcache_page);
-EXPORT_SYMBOL(flush_data_cache_local);
-EXPORT_SYMBOL(flush_kernel_icache_range_asm);
-EXPORT_SYMBOL(flush_all_caches);
-EXPORT_SYMBOL(dcache_stride);
-EXPORT_SYMBOL(flush_cache_all_local);
 
 #include <asm/unistd.h>
 extern long sys_open(const char *, int, int);

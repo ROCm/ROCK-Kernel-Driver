@@ -109,7 +109,7 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	}
 
 	if (!shost->shost_gendev.parent)
-		shost->shost_gendev.parent = dev ? dev : &legacy_bus;
+		shost->shost_gendev.parent = dev ? dev : &platform_bus;
 
 	error = device_add(&shost->shost_gendev);
 	if (error)

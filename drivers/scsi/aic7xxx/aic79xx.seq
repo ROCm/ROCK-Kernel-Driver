@@ -40,7 +40,7 @@
  * $FreeBSD$
  */
 
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#94 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#99 $"
 PATCH_ARG_LIST = "struct ahd_softc *ahd"
 PREFIX = "ahd_"
 
@@ -163,8 +163,8 @@ return:
 idle_loop_cchan:
 	SET_MODE(M_CCHAN, M_CCHAN)
 	test	QOFF_CTLSTA, HS_MAILBOX_ACT jz	hs_mailbox_empty;
-	mov	LOCAL_HS_MAILBOX, HS_MAILBOX;
 	or	QOFF_CTLSTA, HS_MAILBOX_ACT;
+	mov	LOCAL_HS_MAILBOX, HS_MAILBOX;
 hs_mailbox_empty:
 BEGIN_CRITICAL;
 	test	CCSCBCTL, CCARREN|CCSCBEN jz scbdma_idle;
@@ -276,7 +276,7 @@ fetch_new_scb_done:
 	 * knows the correct location to store the SCB.
 	 * Set it to zero before processing the SCB.
 	 */
-	mov	SCB_FIFO_USE_COUNT, ALLZEROS;
+	clr	SCB_FIFO_USE_COUNT;
 	/* Update the next SCB address to download. */
 	bmov	NEXT_QUEUED_SCB_ADDR, SCB_NEXT_SCB_BUSADDR, 4;
 	mvi	SCB_NEXT[1], SCB_LIST_NULL;
@@ -492,12 +492,13 @@ SET_DST_MODE	M_SCSI;
 select_in:
 	if ((ahd->bugs & AHD_BUSFREEREV_BUG) != 0) {
 		/*
-		 * This exposes a window whereby a
-		 * busfree just after a selection will
-		 * be missed, but there is no other safe
-		 * way to enable busfree detection if
-		 * the busfreerev function is broken.
+		 * Test to ensure that the bus has not
+		 * already gone free prior to clearing
+		 * any stale busfree status.  This avoids
+		 * a window whereby a busfree just after
+		 * a selection could be missed.
 		 */
+		test	SCSISIGI, BSYI jz . + 2;
 		mvi	CLRSINT1,CLRBUSFREE;
 		or	SIMODE1, ENBUSFREE;
 	}
@@ -582,9 +583,6 @@ found_last_sent_scb:
 		bmov	CURRSCB, SCBPTR, 2;
 curscb_ww_done:
 	} else {
-		/*
-		 * Untested - Verify with Rev B.
-		 */
 		bmov	SCBPTR, CURRSCB, 2;
 	}
 
@@ -651,12 +649,13 @@ select_out_non_packetized:
 	and     SCSISEQ0, ~ENSELO;
 	if ((ahd->bugs & AHD_BUSFREEREV_BUG) != 0) {
 		/*
-		 * This exposes a window whereby a
-		 * busfree just after a selection will
-		 * be missed, but there is no other safe
-		 * way to enable busfree detection if
-		 * the busfreerev function is broken.
+		 * Test to ensure that the bus has not
+		 * already gone free prior to clearing
+		 * any stale busfree status.  This avoids
+		 * a window whereby a busfree just after
+		 * a selection could be missed.
 		 */
+		test	SCSISIGI, BSYI jz . + 2;
 		mvi	CLRSINT1,CLRBUSFREE;
 		or	SIMODE1, ENBUSFREE;
 	}
@@ -729,13 +728,38 @@ p_command_embedded:
 	mvi	DFCNTRL, SCSIEN;
 p_command_xfer:
 	and	SEQ_FLAGS, ~NO_CDB_SENT;
-	test	DFCNTRL, SCSIEN jnz .;
+	if ((ahd->features & AHD_FAST_CDB_DELIVERY) != 0) {
+		/*
+		 * To speed up CDB delivery in Rev B, all CDB acks
+		 * are "released" to the output sync as soon as the
+		 * command phase starts.  There is only one problem
+		 * with this approach.  If the target changes phase
+		 * before all data are sent, we have left over acks
+		 * that can go out on the bus in a data phase.  Due
+		 * to other chip contraints, this only happens if
+		 * the target goes to data-in, but if the acks go
+		 * out before we can test SDONE, we'll think that
+		 * the transfer has completed successfully.  Work
+		 * around this by taking advantage of the 400ns or
+		 * 800ns dead time between command phase and the REQ
+		 * of the new phase.  If the transfer has completed
+		 * successfully, SCSIEN should fall *long* before we
+		 * see a phase change.  We thus treat any phasemiss
+		 * that occurs before SCSIEN falls as an incomplete
+		 * transfer.
+		 */
+		test	SSTAT1, PHASEMIS jnz p_command_xfer_failed;
+		test	DFCNTRL, SCSIEN jnz . - 1;
+	} else {
+		test	DFCNTRL, SCSIEN jnz .;
+	}
 	/*
 	 * DMA Channel automatically disabled.
 	 * Don't allow a data phase if the command
 	 * was not fully transferred.
 	 */
 	test	SSTAT2, SDONE jnz ITloop;
+p_command_xfer_failed:
 	or	SEQ_FLAGS, NO_CDB_SENT;
 	jmp	ITloop;
 
@@ -1959,12 +1983,14 @@ SET_DST_MODE	M_SCSI;
 	test	SSTAT0, SELDO jnz return;
 	mvi	SCBPTR[1], SCB_LIST_NULL;
 unexpected_nonpkt_phase:
-	test	MODE_PTR, ~(MK_MODE(M_DFF1, M_DFF1)) jnz . + 3;
+	test	MODE_PTR, ~(MK_MODE(M_DFF1, M_DFF1))
+		jnz unexpected_nonpkt_mode_cleared;
 SET_SRC_MODE	M_DFF0;
 SET_DST_MODE	M_DFF0;
 	or	LONGJMP_ADDR[1], INVALID_ADDR;
 	dec	SCB_FIFO_USE_COUNT;
 	mvi	DFFSXFRCTL, CLRCHN;
+unexpected_nonpkt_mode_cleared:
 	mvi	CLRSINT2, CLRNONPACKREQ;
 	test	SCSIPHASE, ~(MSG_IN_PHASE|MSG_OUT_PHASE) jnz illegal_phase;
 	SET_SEQINTCODE(ENTERING_NONPACK)

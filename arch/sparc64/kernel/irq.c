@@ -128,16 +128,16 @@ static void register_irq_proc (unsigned int irq);
 int show_interrupts(struct seq_file *p, void *v)
 {
 	unsigned long flags;
-	int i;
+	int i = *(loff_t *) v;
 	struct irqaction *action;
 #ifdef CONFIG_SMP
 	int j;
 #endif
 
 	spin_lock_irqsave(&irq_action_lock, flags);
-	for (i = 0; i < (NR_IRQS + 1); i++) {
+	if (i <= NR_IRQS) {
 		if (!(action = *(i + irq_action)))
-			continue;
+			goto out_unlock;
 		seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
@@ -157,6 +157,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		}
 		seq_putc(p, '\n');
 	}
+out_unlock:
 	spin_unlock_irqrestore(&irq_action_lock, flags);
 
 	return 0;
@@ -1204,11 +1205,17 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 {
 	struct ino_bucket *bp = ivector_table + (long)data;
 	struct irqaction *ap = bp->irq_info;
-	unsigned long mask = get_smpaff_in_irqaction(ap);
+	cpumask_t mask = get_smpaff_in_irqaction(ap);
+	int len;
 
-	if (count < HEX_DIGITS+1)
+	if (cpus_empty(mask))
+		mask = cpu_online_map;
+
+	len = cpumask_snprintf(page, count, mask);
+	if (count - len < 2)
 		return -EINVAL;
-	return sprintf (page, "%016lx\n", mask == 0 ? ~0UL : mask);
+	len += sprintf(page + len, "\n");
+	return len;
 }
 
 static inline void set_intr_affinity(int irq, unsigned long hw_aff)

@@ -136,10 +136,10 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 
 	/* Add the adapter to the driver core.
 	 * If the parent pointer is not set up,
-	 * we add this adapter to the legacy bus.
+	 * we add this adapter to the host bus.
 	 */
 	if (adap->dev.parent == NULL)
-		adap->dev.parent = &legacy_bus;
+		adap->dev.parent = &platform_bus;
 	sprintf(adap->dev.bus_id, "i2c-%d", adap->nr);
 	adap->dev.driver = &i2c_adapter_driver;
 	adap->dev.release = &i2c_adapter_dev_release;

@@ -59,12 +59,6 @@
  *  They may be defined in platform specific headers, if they 
  *  are useful.
  *
- *    SYM_OPT_NO_BUS_MEMORY_MAPPING
- *        When this option is set, the driver will not load the 
- *        on-chip RAM using MMIO, but let the SCRIPTS processor 
- *        do the work using MOVE MEMORY instructions.
- *        (set for Linux/PPC)
- *
  *    SYM_OPT_HANDLE_DIR_UNKNOWN
  *        When this option is set, the SCRIPTS used by the driver 
  *        are able to handle SCSI transfers with direction not 
@@ -74,12 +68,6 @@
  *    SYM_OPT_HANDLE_DEVICE_QUEUEING
  *        When this option is set, the driver will use a queue per 
  *        device and handle QUEUE FULL status requeuing internally.
- *
- *    SYM_OPT_BUS_DMA_ABSTRACTION
- *        When this option is set, the driver allocator is responsible 
- *        of maintaining bus physical addresses and so provides virtual 
- *        to bus physical address translation of driver data structures.
- *        (set for FreeBSD-4 and Linux 2.3)
  *
  *    SYM_OPT_SNIFF_INQUIRY
  *        When this option is set, the driver sniff out successful 
@@ -92,10 +80,8 @@
  *        (set for Linux)
  */
 #if 0
-#define SYM_OPT_NO_BUS_MEMORY_MAPPING
 #define SYM_OPT_HANDLE_DIR_UNKNOWN
 #define SYM_OPT_HANDLE_DEVICE_QUEUEING
-#define SYM_OPT_BUS_DMA_ABSTRACTION
 #define SYM_OPT_SNIFF_INQUIRY
 #define SYM_OPT_LIMIT_COMMAND_REORDERING
 #endif
@@ -958,9 +944,7 @@ struct sym_hcb {
 	/*
 	 *  DMA pool handle for this HBA.
 	 */
-#ifdef	SYM_OPT_BUS_DMA_ABSTRACTION
 	m_pool_ident_t	bus_dmat;
-#endif
 
 	/*
 	 *  O/S specific data structure
@@ -1133,9 +1117,20 @@ struct sym_hcb {
 /*
  *  NVRAM reading (sym_nvram.c).
  */
+#if SYM_CONF_NVRAM_SUPPORT
 void sym_nvram_setup_host (hcb_p np, struct sym_nvram *nvram);
 void sym_nvram_setup_target (hcb_p np, int target, struct sym_nvram *nvp);
 int sym_read_nvram (sdev_p np, struct sym_nvram *nvp);
+#else
+static inline void sym_nvram_setup_host(hcb_p np, struct sym_nvram *nvram) { }
+static inline void sym_nvram_setup_target(hcb_p np, struct sym_nvram *nvram) { }
+static inline int sym_read_nvram(sdev_p np, struct sym_nvram *nvp)
+{
+	nvp->type = 0;
+	return 0;
+}
+#endif
+
 
 /*
  *  FIRMWARES (sym_fw.c)
@@ -1347,7 +1342,6 @@ typedef struct sym_m_link {
  *  Virtual to bus physical translation for a given cluster.
  *  Such a structure is only useful with DMA abstraction.
  */
-#ifdef	SYM_OPT_BUS_DMA_ABSTRACTION
 typedef struct sym_m_vtob {	/* Virtual to Bus address translation */
 	struct sym_m_vtob *next;
 #ifdef	SYM_HAVE_M_SVTOB
@@ -1363,7 +1357,6 @@ typedef struct sym_m_vtob {	/* Virtual to Bus address translation */
 #define VTOB_HASH_MASK		(VTOB_HASH_SIZE-1)
 #define VTOB_HASH_CODE(m)	\
 	((((m_addr_t) (m)) >> SYM_MEM_CLUSTER_SHIFT) & VTOB_HASH_MASK)
-#endif	/* SYM_OPT_BUS_DMA_ABSTRACTION */
 
 /*
  *  Memory pool of a given kind.
@@ -1375,7 +1368,6 @@ typedef struct sym_m_vtob {	/* Virtual to Bus address translation */
  *     method are expected to tell the driver about.
  */
 typedef struct sym_m_pool {
-#ifdef	SYM_OPT_BUS_DMA_ABSTRACTION
 	m_pool_ident_t	dev_dmat;	/* Identifies the pool (see above) */
 	m_addr_t (*get_mem_cluster)(struct sym_m_pool *);
 #ifdef	SYM_MEM_FREE_UNUSED
@@ -1389,10 +1381,6 @@ typedef struct sym_m_pool {
 	int nump;
 	m_vtob_p vtob[VTOB_HASH_SIZE];
 	struct sym_m_pool *next;
-#else
-#define M_GET_MEM_CLUSTER()		sym_get_mem_cluster()
-#define M_FREE_MEM_CLUSTER(p)		sym_free_mem_cluster(p)
-#endif	/* SYM_OPT_BUS_DMA_ABSTRACTION */
 	struct sym_m_link h[SYM_MEM_CLUSTER_SHIFT - SYM_MEM_SHIFT + 1];
 } *m_pool_p;
 
@@ -1406,12 +1394,10 @@ void *sym_calloc_unlocked(int size, char *name);
  *  Alloc, free and translate addresses to bus physical 
  *  for DMAable memory.
  */
-#ifdef	SYM_OPT_BUS_DMA_ABSTRACTION
 void *__sym_calloc_dma_unlocked(m_pool_ident_t dev_dmat, int size, char *name);
 void 
 __sym_mfree_dma_unlocked(m_pool_ident_t dev_dmat, void *m,int size, char *name);
 u32 __vtobus_unlocked(m_pool_ident_t dev_dmat, void *m);
-#endif
 
 /*
  * Verbs used by the driver code for DMAable memory handling.

@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#17 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#19 $
  */
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
@@ -278,8 +278,13 @@ done:
  * Return information to handle /proc support for the driver.
  */
 int
-ahd_linux_proc_info(struct Scsi_Host *shost, char *buffer, char **start, off_t offset,
-		  int length, int inout)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+ahd_linux_proc_info(char *buffer, char **start, off_t offset,
+		    int length, int hostno, int inout)
+#else
+ahd_linux_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
+		    off_t offset, int length, int inout)
+#endif
 {
 	struct	ahd_softc *ahd;
 	struct	info_str info;
@@ -291,10 +296,14 @@ ahd_linux_proc_info(struct Scsi_Host *shost, char *buffer, char **start, off_t o
 
 	retval = -EINVAL;
 	ahd_list_lock(&l);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	TAILQ_FOREACH(ahd, &ahd_tailq, links) {
-		if (ahd->platform_data->host == shost)
+		if (ahd->platform_data->host->host_no == hostno)
 			break;
 	}
+#else
+	ahd = ahd_find_softc(*(struct ahd_softc **)shost->hostdata);
+#endif
 
 	if (ahd == NULL)
 		goto done;

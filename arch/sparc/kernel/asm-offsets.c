@@ -38,12 +38,6 @@ int foo(void)
 	DEFINE(AOFF_thread_fork_kpsr,
 			offsetof(struct thread_struct, fork_kpsr));
 	BLANK();
-	DEFINE(AOFF_thread_w_saved, offsetof(struct thread_struct, w_saved));
-	DEFINE(AOFF_thread_rwbuf_stkptrs,
-			offsetof(struct thread_struct, rwbuf_stkptrs));
-	DEFINE(AOFF_thread_reg_window,
-			offsetof(struct thread_struct, reg_window));
-	BLANK();
 	DEFINE(AOFF_mm_context, offsetof(struct mm_struct, context));
 
 	/* DEFINE(NUM_USER_SEGMENTS, TASK_SIZE>>28); */

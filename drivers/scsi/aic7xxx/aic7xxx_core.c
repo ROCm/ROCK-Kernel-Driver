@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#131 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#134 $
  *
  * $FreeBSD$
  */
@@ -1304,17 +1304,23 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 				ahc_qinfifo_requeue_tail(ahc, scb);
 				printerror = 0;
 			} else if (ahc_sent_msg(ahc, AHCMSG_EXT,
-						MSG_EXT_WDTR, FALSE)
-				|| ahc_sent_msg(ahc, AHCMSG_EXT,
-						MSG_EXT_SDTR, FALSE)) {
+						MSG_EXT_WDTR, FALSE)) {
 				/*
-				 * Negotiation Rejected.  Go-async and
+				 * Negotiation Rejected.  Go-narrow and
 				 * retry command.
 				 */
 				ahc_set_width(ahc, &devinfo,
 					      MSG_EXT_WDTR_BUS_8_BIT,
 					      AHC_TRANS_CUR|AHC_TRANS_GOAL,
 					      /*paused*/TRUE);
+				ahc_qinfifo_requeue_tail(ahc, scb);
+				printerror = 0;
+			} else if (ahc_sent_msg(ahc, AHCMSG_EXT,
+						MSG_EXT_SDTR, FALSE)) {
+				/*
+				 * Negotiation Rejected.  Go-async and
+				 * retry command.
+				 */
 				ahc_set_syncrate(ahc, &devinfo,
 						/*syncrate*/NULL,
 						/*period*/0, /*offset*/0,
@@ -1463,7 +1469,7 @@ ahc_clear_critical_section(struct ahc_softc *ahc)
 				 * current connection, so we must
 				 * leave it on while single stepping.
 				 */
-				ahc_outb(ahc, SIMODE1, ENBUSFREE);
+				ahc_outb(ahc, SIMODE1, simode1 & ENBUSFREE);
 			else
 				ahc_outb(ahc, SIMODE1, 0);
 			ahc_outb(ahc, CLRINT, CLRSCSIINT);
@@ -2373,6 +2379,7 @@ ahc_build_transfer_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	 * may change.
 	 */
 	period = tinfo->goal.period;
+	offset = tinfo->goal.offset;
 	ppr_options = tinfo->goal.ppr_options;
 	/* Target initiated PPR is not allowed in the SCSI spec */
 	if (devinfo->role == ROLE_TARGET)
@@ -2380,7 +2387,7 @@ ahc_build_transfer_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	rate = ahc_devlimited_syncrate(ahc, tinfo, &period,
 				       &ppr_options, devinfo->role);
 	dowide = tinfo->curr.width != tinfo->goal.width;
-	dosync = tinfo->curr.period != period;
+	dosync = tinfo->curr.offset != offset || tinfo->curr.period != period;
 	/*
 	 * Only use PPR if we have options that need it, even if the device
 	 * claims to support it.  There might be an expander in the way
@@ -3176,23 +3183,30 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 				response = TRUE;
 				sending_reply = TRUE;
 			}
+			/*
+			 * After a wide message, we are async, but
+			 * some devices don't seem to honor this portion
+			 * of the spec.  Force a renegotiation of the
+			 * sync component of our transfer agreement even
+			 * if our goal is async.  By updating our width
+			 * after forcing the negotiation, we avoid
+			 * renegotiating for width.
+			 */
+			ahc_update_neg_request(ahc, devinfo, tstate,
+					       tinfo, AHC_NEG_ALWAYS);
 			ahc_set_width(ahc, devinfo, bus_width,
 				      AHC_TRANS_ACTIVE|AHC_TRANS_GOAL,
 				      /*paused*/TRUE);
-			/* After a wide message, we are async */
-			ahc_set_syncrate(ahc, devinfo,
-					 /*syncrate*/NULL, /*period*/0,
-					 /*offset*/0, /*ppr_options*/0,
-					 AHC_TRANS_ACTIVE, /*paused*/TRUE);
 			if (sending_reply == FALSE && reject == FALSE) {
 
-				if (tinfo->goal.offset) {
-					ahc->msgout_index = 0;
-					ahc->msgout_len = 0;
-					ahc_build_transfer_msg(ahc, devinfo);
-					ahc->msgout_index = 0;
-					response = TRUE;
-				}
+				/*
+				 * We will always have an SDTR to send.
+				 */
+				ahc->msgout_index = 0;
+				ahc->msgout_len = 0;
+				ahc_build_transfer_msg(ahc, devinfo);
+				ahc->msgout_index = 0;
+				response = TRUE;
 			}
 			done = MSGLOOP_MSGCOMPLETE;
 			break;
@@ -4033,7 +4047,7 @@ ahc_shutdown(void *arg)
 	ahc = (struct ahc_softc *)arg;
 
 	/* This will reset most registers to 0, but not all */
-	ahc_reset(ahc);
+	ahc_reset(ahc, /*reinit*/FALSE);
 	ahc_outb(ahc, SCSISEQ, 0);
 	ahc_outb(ahc, SXFRCTL0, 0);
 	ahc_outb(ahc, DSPCISTATUS, 0);
@@ -4044,10 +4058,15 @@ ahc_shutdown(void *arg)
 
 /*
  * Reset the controller and record some information about it
- * that is only available just after a reset.
+ * that is only available just after a reset.  If "reinit" is
+ * non-zero, this reset occured after initial configuration
+ * and the caller requests that the chip be fully reinitialized
+ * to a runable state.  Chip interrupts are *not* enabled after
+ * a reinitialization.  The caller must enable interrupts via
+ * ahc_intr_enable().
  */
 int
-ahc_reset(struct ahc_softc *ahc)
+ahc_reset(struct ahc_softc *ahc, int reinit)
 {
 	u_int	sblkctl;
 	u_int	sxfrctl1_a, sxfrctl1_b;
@@ -4143,7 +4162,7 @@ ahc_reset(struct ahc_softc *ahc)
 	ahc_outb(ahc, SXFRCTL1, sxfrctl1_a);
 
 	error = 0;
-	if (ahc->init_level > 0)
+	if (reinit != 0)
 		/*
 		 * If a recovery action has forced a chip reset,
 		 * re-initialize the chip to our liking.
@@ -4725,14 +4744,12 @@ ahc_chip_init(struct ahc_softc *ahc)
 		 * never settle, so don't complain if we
 		 * fail here.
 		 */
-		ahc_pause(ahc);
 		for (wait = 5000;
 		     (ahc_inb(ahc, SBLKCTL) & (ENAB40|ENAB20)) == 0 && wait;
 		     wait--)
 			ahc_delay(100);
-		ahc_unpause(ahc);
 	}
-
+	ahc_restart(ahc);
 	return (0);
 }
 
@@ -5145,7 +5162,9 @@ int
 ahc_resume(struct ahc_softc *ahc)
 {
 
-	ahc_reset(ahc);
+	ahc_reset(ahc, /*reinit*/TRUE);
+	ahc_intr_enable(ahc, TRUE); 
+	ahc_restart(ahc);
 	return (0);
 }
 
@@ -6407,7 +6426,6 @@ ahc_loadseq(struct ahc_softc *ahc)
 		memcpy(ahc->critical_sections, cs_table, cs_count);
 	}
 	ahc_outb(ahc, SEQCTL, PERRORDIS|FAILDIS|FASTMODE);
-	ahc_restart(ahc);
 
 	if (bootverbose) {
 		printf(" %d instructions downloaded\n", downloaded);
@@ -6968,11 +6986,12 @@ ahc_handle_en_lun(struct ahc_softc *ahc, struct cam_sim *sim, union ccb *ccb)
 			 */
 			ahc->flags = saved_flags;
 			(void)ahc_loadseq(ahc);
-			ahc_unpause(ahc);
+			ahc_restart(ahc);
 			ahc_unlock(ahc, &s);
 			ccb->ccb_h.status = CAM_FUNC_NOTAVAIL;
 			return;
 		}
+		ahc_restart(ahc);
 		ahc_unlock(ahc, &s);
 	}
 	cel = &ccb->cel;
@@ -7207,12 +7226,16 @@ ahc_handle_en_lun(struct ahc_softc *ahc, struct cam_sim *sim, union ccb *ccb)
 				printf("Configuring Initiator Mode\n");
 				ahc->flags &= ~AHC_TARGETROLE;
 				ahc->flags |= AHC_INITIATORROLE;
-				ahc_pause(ahc);
 				/*
 				 * Returning to a configuration that
 				 * fit previously will always succeed.
 				 */
 				(void)ahc_loadseq(ahc);
+				ahc_restart(ahc);
+				/*
+				 * Unpaused.  The extra unpause
+				 * that follows is harmless.
+				 */
 			}
 		}
 		ahc_unpause(ahc);

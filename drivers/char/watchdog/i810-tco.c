@@ -232,9 +232,8 @@ static ssize_t i810tco_write (struct file *file, const char *data,
 
 		/* someone wrote to us, we should reload the timer */
 		tco_timer_reload ();
-		return 1;
 	}
-	return 0;
+	return len;
 }
 
 static int i810tco_ioctl (struct inode *inode, struct file *file,

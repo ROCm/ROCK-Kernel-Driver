@@ -1,45 +1,10 @@
-/**********************************************************************/
- * DRV6000reg.H
+/*
  * Public Include File for DRV6000 users
+ * (ie. NxtWave Communications - NXT6000 demodulator driver)
  *
  * Copyright (C) 2001 NxtWave Communications, Inc.
  *
- * $Log: nxt6000.h,v $
- * Revision 1.2  2003/01/27 12:32:42  fschirmer
- * Lots of bugfixes and new features
- *
- * Revision 1.1  2003/01/21 18:43:09  fschirmer
- * Nxt6000 based frontend driver
- *
- * Revision 1.1  2003/01/03 02:25:45  obi
- * alps tdme7 driver
- *
- * 
- *    Rev 1.10   Jun 12 2002 11:28:02   dkoeger
- * Updated for SA in GUi work
- * 
- *    Rev 1.9   Apr 01 2002 10:38:46   dkoeger
- * Updated for 1.0.31 GUI
- * 
- *    Rev 1.8   Mar 11 2002 10:04:56   dkoeger
- * Updated for 1.0.31 GUI version
- * 
- *    Rev 1.5   Dec 07 2001 14:40:40   dkoeger
- * Updated for 1.0.28 GUI
- * 
- *    Rev 1.4   Nov 13 2001 11:09:00   dkoeger
- * No change.
- * 
- *    Rev 1.3   Aug 23 2001 14:21:02   dkoeger
- * Updated for driver version 2.1.9
- * 
- *    Rev 1.2   Jul 09 2001 09:20:04   dkoeger
- * Updated for 1.0.18
- * 
- *    Rev 1.1   Jun 13 2001 16:14:24   dkoeger
- * Updated to reflect NXT6000 GUI BETA 1.0.11 6/13/2001
- **********************************************************************/
-
+ */
 
 /*  Nxt6000 Register Addresses and Bit Masks */
 

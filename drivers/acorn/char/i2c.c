@@ -280,13 +280,15 @@ static int ioc_client_reg(struct i2c_client *client)
 	    client->addr == 0x50) {
 		struct rtc_tm rtctm;
 		unsigned int year;
+		struct timespec tv;
 
 		rtc_client = client;
 		get_rtc_time(&rtctm, &year);
 
-		xtime.tv_nsec = rtctm.cs * 10000000;
-		xtime.tv_sec  = mktime(year, rtctm.mon, rtctm.mday,
-				       rtctm.hours, rtctm.mins, rtctm.secs);
+		tv.tv_nsec = rtctm.cs * 10000000;
+		tv.tv_sec  = mktime(year, rtctm.mon, rtctm.mday,
+				    rtctm.hours, rtctm.mins, rtctm.secs);
+		do_settimeofday(&tv);
 		set_rtc = k_set_rtc_time;
 	}
 

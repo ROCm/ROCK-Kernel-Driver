@@ -186,7 +186,7 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_d
 {
 	u32 status = 0, mc2 = 0;
 	int trial = 0;
-	int timeout;
+	unsigned long timeout;
 
 	/* write out i2c-command */
 	DEB_I2C(("before: 0x%08x (status: 0x%08x), %d\n",*dword,saa7146_read(dev, I2C_STATUS), dev->i2c_op));
@@ -218,7 +218,7 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_d
 			if( 0 != mc2 ) {
 				break;
 			}
-			if (jiffies > timeout) {
+			if (time_after(jiffies,timeout)) {
 				printk(KERN_WARNING "saa7146_i2c_writeout: timed out waiting for MC2\n");
 				return -EIO;
 			}
@@ -233,7 +233,7 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_d
 			status = saa7146_i2c_status(dev);
 			if ((status & 0x3) != 1)
 				break;
-			if (jiffies > timeout) {
+			if (time_after(jiffies,timeout)) {
 				/* this is normal when probing the bus
 				 * (no answer from nonexisistant device...)
 				 */
@@ -301,7 +301,8 @@ int saa7146_i2c_transfer(struct saa7146_dev *dev, const struct i2c_msg msgs[], i
 		goto out;
 	}
 
-        if (count > 3) short_delay = 1;
+	if ( count > 3 || 0 != (SAA7146_I2C_SHORT_DELAY & dev->ext->flags) )
+		short_delay = 1;
   
 	do {
 		/* reset the i2c-device if necessary */
@@ -403,19 +404,29 @@ int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c
 {
 	DEB_EE(("bitrate: 0x%08x\n",bitrate));
 	
+	/* enable i2c-port pins */
+	saa7146_write(dev, MC1, (MASK_08 | MASK_24));
+
 	dev->i2c_bitrate = bitrate;
 	saa7146_i2c_reset(dev);
 
 	if( NULL != i2c_adapter ) {
 		memset(i2c_adapter,0,sizeof(struct i2c_adapter));
 		strcpy(i2c_adapter->name, dev->name);	
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
+		i2c_adapter->data = dev;
+#else
 		i2c_set_adapdata(i2c_adapter,dev);
-		i2c_adapter->class	   = I2C_ADAP_CLASS_TV_ANALOG;
+#endif
 		i2c_adapter->algo	   = &saa7146_algo;
 		i2c_adapter->algo_data     = NULL;
 		i2c_adapter->id 	   = I2C_ALGO_SAA7146;
 		i2c_adapter->timeout = SAA7146_I2C_TIMEOUT;
 		i2c_adapter->retries = SAA7146_I2C_RETRIES;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
+#else
+		i2c_adapter->class = I2C_ADAP_CLASS_TV_ANALOG;
+#endif
 	}
 	
 	return 0;

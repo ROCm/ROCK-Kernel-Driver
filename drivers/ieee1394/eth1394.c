@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1043 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1079 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -220,7 +220,7 @@ static int ether1394_init_bc(struct net_device *dev)
 
 			priv->iso = hpsb_iso_recv_init(priv->host, 16 * 4096,
 						       16, priv->broadcast_channel,
-						       1, ether1394_iso);
+						       HPSB_ISO_DMA_PACKET_PER_BUFFER, 1, ether1394_iso);
 			if (priv->iso == NULL) {
 				ETH1394_PRINT(KERN_ERR, dev->name,
 					      "failed to change broadcast "
@@ -475,7 +475,7 @@ static void ether1394_add_host (struct hpsb_host *host)
 	priv->broadcast_channel = host->csr.broadcast_channel & 0x3f;
 
 	priv->iso = hpsb_iso_recv_init(host, 16 * 4096, 16, priv->broadcast_channel,
-				       1, ether1394_iso);
+					HPSB_ISO_DMA_PACKET_PER_BUFFER, 1, ether1394_iso);
 	if (priv->iso == NULL) {
 		priv->bc_state = ETHER1394_BC_CLOSED;
 	}
@@ -1258,7 +1258,7 @@ static inline struct hpsb_packet *ether1394_alloc_common_packet(struct hpsb_host
 {
 	struct hpsb_packet *p;
 
-	p = alloc_hpsb_packet(0);
+	p = hpsb_alloc_packet(0);
 	if (p) {
 		p->host = host;
 		p->data = NULL;
@@ -1327,7 +1327,7 @@ static inline void ether1394_free_packet(struct hpsb_packet *packet)
 	if (packet->tcode != TCODE_STREAM_DATA)
 		hpsb_free_tlabel(packet);
 	packet->data = NULL;
-	free_hpsb_packet(packet);
+	hpsb_free_packet(packet);
 }
 
 static void ether1394_complete_cb(void *__ptask);
@@ -1349,7 +1349,7 @@ static int ether1394_send_packet(struct packet_task *ptask, unsigned int tx_len)
 					       ptask->dest_node,
 					       ptask->addr, ptask->skb->data,
 					       tx_len)) {
-		free_hpsb_packet(packet);
+		hpsb_free_packet(packet);
 		return -1;
 	}
 
@@ -1357,7 +1357,7 @@ static int ether1394_send_packet(struct packet_task *ptask, unsigned int tx_len)
 	hpsb_set_packet_complete_task(ptask->packet, ether1394_complete_cb,
 				      ptask);
 
-	if (!hpsb_send_packet(packet)) {
+	if (hpsb_send_packet(packet) < 0) {
 		ether1394_free_packet(packet);
 		return -1;
 	}
@@ -1599,7 +1599,7 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1043 $");
+			strcpy (info.version, "$Rev: 1079 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))

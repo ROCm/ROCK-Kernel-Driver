@@ -215,29 +215,30 @@ EXPORT_SYMBOL(enable_irq);
 int show_interrupts(struct seq_file *p, void *v)
 {
 #ifdef CONFIG_PROC_FS
-	unsigned int regnr = 0;
+	unsigned int regnr = *(loff_t *) v, i = 0;
 
-	seq_puts(p, "     ");
+	if (regnr == 0) {
+		seq_puts(p, "     ");
 #ifdef CONFIG_SMP
-	for (regnr = 0; regnr < NR_CPUS; regnr++)
+		for (i = 0; i < NR_CPUS; i++)
 #endif
-		seq_printf(p, "      CPU%02d ", regnr);
+			seq_printf(p, "      CPU%02d ", i);
 
 #ifdef PARISC_IRQ_CR16_COUNTS
-	seq_printf(p, "[min/avg/max] (CPU cycle counts)");
+		seq_printf(p, "[min/avg/max] (CPU cycle counts)");
 #endif
-	seq_putc(p, '\n');
+		seq_putc(p, '\n');
+	}
 
 	/* We don't need *irqsave lock variants since this is
 	** only allowed to change while in the base context.
 	*/
 	spin_lock(&irq_lock);
-	for (regnr = 0; regnr < NR_IRQ_REGS; regnr++) {
-	    unsigned int i;
+	if (regnr < NR_IRQ_REGS) {
 	    struct irq_region *region = irq_region[regnr];
 
             if (!region || !region->action)
-		continue;
+		    goto skip;
 
 	    for (i = 0; i <= MAX_CPU_IRQ; i++) {
 		struct irqaction *action = &region->action[i];
@@ -286,9 +287,9 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 	    }
 	}
+  skip:
 	spin_unlock(&irq_lock);
 
-	seq_putc(p, '\n');
 #endif	/* CONFIG_PROC_FS */
 	return 0;
 }

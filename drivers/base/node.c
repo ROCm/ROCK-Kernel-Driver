@@ -18,18 +18,16 @@ static struct sysdev_class node_class = {
 static ssize_t node_read_cpumap(struct sys_device * dev, char * buf)
 {
 	struct node *node_dev = to_node(dev);
-	cpumask_t tmp = node_dev->cpumap;
-	int k, len = 0;
+	cpumask_t mask = node_dev->cpumap;
+	int len;
 
-	for (k = 0; k < sizeof(cpumask_t)/sizeof(u16); ++k) {
-		int j = sprintf(buf, "%04hx", (u16)cpus_coerce(tmp));
-		len += j;
-		buf += j;
-		cpus_shift_right(tmp, tmp, 16);
-	}
-        len += sprintf(buf, "\n");
+	/* FIXME - someone should pass us a buffer size (count) or
+	 * use seq_file or something to avoid buffer overrun risk. */
+	len = cpumask_snprintf(buf, 99 /* XXX FIXME */, mask);
+	len += sprintf(buf + len, "\n");
 	return len;
 }
+
 static SYSDEV_ATTR(cpumap,S_IRUGO,node_read_cpumap,NULL);
 
 #define K(x) ((x) << (PAGE_SHIFT - 10))

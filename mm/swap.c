@@ -386,17 +386,19 @@ EXPORT_SYMBOL(vm_acct_memory);
 #ifdef CONFIG_SMP
 void percpu_counter_mod(struct percpu_counter *fbc, long amount)
 {
+	long count;
+	long *pcount;
 	int cpu = get_cpu();
-	long count = fbc->counters[cpu].count;
 
-	count += amount;
+	pcount = per_cpu_ptr(fbc->counters, cpu);
+	count = *pcount + amount;
 	if (count >= FBC_BATCH || count <= -FBC_BATCH) {
 		spin_lock(&fbc->lock);
 		fbc->count += count;
 		spin_unlock(&fbc->lock);
 		count = 0;
 	}
-	fbc->counters[cpu].count = count;
+	*pcount = count;
 	put_cpu();
 }
 EXPORT_SYMBOL(percpu_counter_mod);

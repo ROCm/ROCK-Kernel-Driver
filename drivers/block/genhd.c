@@ -296,7 +296,9 @@ extern int blk_dev_init(void);
 
 static struct kobject *base_probe(dev_t dev, int *part, void *data)
 {
-	request_module("block-major-%d", MAJOR(dev));
+	if (request_module("block-major-%d-%d", MAJOR(dev), MINOR(dev)) > 0)
+		/* Make old-style 2.4 aliases work */
+		request_module("block-major-%d", MAJOR(dev));
 	return NULL;
 }
 

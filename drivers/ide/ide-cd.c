@@ -3343,7 +3343,8 @@ static int idecd_open(struct inode * inode, struct file * file)
 	drive->usage++;
 
 	if (!info->buffer)
-		info->buffer = (char *) kmalloc(SECTOR_BUFFER_SIZE, GFP_KERNEL);
+		info->buffer = kmalloc(SECTOR_BUFFER_SIZE,
+					GFP_KERNEL|__GFP_REPEAT);
         if (!info->buffer || (rc = cdrom_open(&info->devinfo, inode, file)))
 		drive->usage--;
 	return rc;

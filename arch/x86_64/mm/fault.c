@@ -73,6 +73,9 @@ static int is_prefetch(struct pt_regs *regs, unsigned long addr)
 	if (regs->cs & (1<<2))
 		return 0;
 
+	if ((regs->cs & 3) != 0 && regs->rip >= TASK_SIZE)
+		return 0;
+
 	while (scan_more && instr < max_instr) { 
 		unsigned char opcode;
 		unsigned char instr_hi;
@@ -337,7 +340,8 @@ bad_area_nosemaphore:
 		}
        
 		tsk->thread.cr2 = address;
-		tsk->thread.error_code = error_code;
+		/* Kernel addresses are always protection faults */
+		tsk->thread.error_code = error_code | (address >= TASK_SIZE);
 		tsk->thread.trap_no = 14;
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;

@@ -172,8 +172,14 @@ static const int cc_to_error [16] = {
 struct ohci_hcca {
 #define NUM_INTS 32
 	__u32	int_table [NUM_INTS];	/* periodic schedule */
-	__u16	frame_no;		/* current frame number */
-	__u16	pad1;			/* set to 0 on each frame_no change */
+
+	/* 
+	 * OHCI defines u16 frame_no, followed by u16 zero pad.
+	 * Since some processors can't do 16 bit bus accesses,
+	 * portable access must be a 32 bit byteswapped access.
+	 */
+	u32	frame_no;		/* current frame number */
+#define OHCI_FRAME_NO(hccap) ((u16)le32_to_cpup(&(hccap)->frame_no))
 	__u32	done_head;		/* info returned for an interrupt */
 	u8	reserved_for_hc [116];
 	u8	what [4];		/* spec only identifies 252 bytes :) */

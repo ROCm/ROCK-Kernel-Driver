@@ -39,6 +39,7 @@ static inline cpumask_t target_cpus(void)
 #endif
 
 #define APIC_BROADCAST_ID	(0xff)
+#define NO_IOAPIC_CHECK (0)
 
 static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
 { 

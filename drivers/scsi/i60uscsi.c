@@ -108,9 +108,6 @@ ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp);
 /* ---- EXTERNAL FUNCTIONS ---- */
 extern void inia100SCBPost(BYTE * pHcb, BYTE * pScb);
 
-/* ---- INTERNAL VARIABLES ---- */
-struct inia100_Adpt_Struc *inia100_adpt;
-
 NVRAM nvram, *nvramp = &nvram;
 static UCHAR dftNvRam[64] =
 {
@@ -701,83 +698,6 @@ void orc_release_dma(ORC_HCS * hcsp, Scsi_Cmnd * SCpnt)
 			scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
 	}
 }
-
-/*****************************************************************************
- Function name	: Addinia100_into_Adapter_table
- Description	: This function will scan PCI bus to get all Orchid card
- Input		: None.
- Output		: None.
- Return		: SUCCESSFUL	- Successful scan
- ohterwise	- No drives founded
-*****************************************************************************/
-int Addinia100_into_Adapter_table(WORD wBIOS, WORD wBASE, struct pci_dev *pdev,
-		int iAdapters)
-{
-	unsigned int i, j;
-
-	for (i = 0; i < iAdapters; i++) {
-		if (inia100_adpt[i].ADPT_BIOS < wBIOS)
-			continue;
-		if (inia100_adpt[i].ADPT_BIOS == wBIOS) {
-			if (inia100_adpt[i].ADPT_BASE == wBASE) {
-				if (inia100_adpt[i].ADPT_pdev->bus->number != 0xFF)
-					return (FAILURE);
-			} else if (inia100_adpt[i].ADPT_BASE < wBASE)
-				continue;
-		}
-		for (j = iAdapters - 1; j > i; j--) {
-			inia100_adpt[j].ADPT_BASE = inia100_adpt[j - 1].ADPT_BASE;
-			inia100_adpt[j].ADPT_BIOS = inia100_adpt[j - 1].ADPT_BIOS;
-			inia100_adpt[j].ADPT_pdev = inia100_adpt[j - 1].ADPT_pdev;
-		}
-		inia100_adpt[i].ADPT_BASE = wBASE;
-		inia100_adpt[i].ADPT_BIOS = wBIOS;
-		inia100_adpt[i].ADPT_pdev = pdev;
-		return (SUCCESSFUL);
-	}
-	return (FAILURE);
-}
-
-
-/*****************************************************************************
- Function name	: init_inia100Adapter_table
- Description	: This function will scan PCI bus to get all Orchid card
- Input		: None.
- Output		: None.
- Return		: 0 on success, 1 on failure
-*****************************************************************************/
-int init_inia100Adapter_table(int iAdapters)
-{
-	int i;
-
-	inia100_adpt = kmalloc(sizeof(INIA100_ADPT_STRUCT) * iAdapters,
-			GFP_KERNEL);
-	if(inia100_adpt == NULL)
-		return 1;
-
-	for (i = 0; i < iAdapters; i++) {/* Initialize adapter structure */
-		inia100_adpt[i].ADPT_BIOS = 0xffff;
-		inia100_adpt[i].ADPT_BASE = 0xffff;
-		inia100_adpt[i].ADPT_pdev = NULL;
-	}
-	return 0;
-}
-
-/*****************************************************************************
- Function name  : get_orcPCIConfig
- Description    : 
- Input          : pHCB  -       Pointer to host adapter structure
- Output         : None.
- Return         : pSRB  -       Pointer to SCSI request block.
-*****************************************************************************/
-void get_orcPCIConfig(ORC_HCS * pCurHcb, int ch_idx)
-{
-	pCurHcb->HCS_Base = inia100_adpt[ch_idx].ADPT_BASE;	/* Supply base address  */
-	pCurHcb->HCS_BIOS = inia100_adpt[ch_idx].ADPT_BIOS;	/* Supply BIOS address  */
-	pCurHcb->HCS_Intr = inia100_adpt[ch_idx].ADPT_pdev->irq;	/* Supply interrupt line */
-	return;
-}
-
 
 /*****************************************************************************
  Function name  : abort_SCB

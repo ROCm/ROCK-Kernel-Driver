@@ -277,15 +277,50 @@ static int proc_root_link(struct inode *inode, struct dentry **dentry, struct vf
 	return result;
 }
 
+#define MAY_PTRACE(task) \
+	(task == current || \
+	(task->parent == current && \
+	(task->ptrace & PT_PTRACED) &&  task->state == TASK_STOPPED && \
+	 security_ptrace(current,task) == 0))
+
+static int may_ptrace_attach(struct task_struct *task)
+{
+	int retval = 0;
+
+	task_lock(task);
+
+	if (!task->mm)
+		goto out;
+	if (((current->uid != task->euid) ||
+	     (current->uid != task->suid) ||
+	     (current->uid != task->uid) ||
+	     (current->gid != task->egid) ||
+	     (current->gid != task->sgid) ||
+	     (current->gid != task->gid)) && !capable(CAP_SYS_PTRACE))
+		goto out;
+	rmb();
+	if (!task->mm->dumpable && !capable(CAP_SYS_PTRACE))
+		goto out;
+	if (security_ptrace(current, task))
+		goto out;
+
+	retval = 1;
+out:
+	task_unlock(task);
+	return retval;
+}
+
 static int proc_pid_environ(struct task_struct *task, char * buffer)
 {
 	int res = 0;
 	struct mm_struct *mm = get_task_mm(task);
 	if (mm) {
-		int len = mm->env_end - mm->env_start;
+		unsigned int len = mm->env_end - mm->env_start;
 		if (len > PAGE_SIZE)
 			len = PAGE_SIZE;
 		res = access_process_vm(task, mm->env_start, buffer, len, 0);
+		if (!may_ptrace_attach(task))
+			res = -ESRCH;
 		mmput(mm);
 	}
 	return res;
@@ -294,7 +329,7 @@ static int proc_pid_environ(struct task_struct *task, char * buffer)
 static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 {
 	int res = 0;
-	int len;
+	unsigned int len;
 	struct mm_struct *mm = get_task_mm(task);
 	if (!mm)
 		goto out;
@@ -521,10 +556,6 @@ static struct file_operations proc_info_file_operations = {
 	.read		= proc_info_read,
 };
 
-#define MAY_PTRACE(p) \
-(p==current||(p->parent==current&&(p->ptrace & PT_PTRACED)&&p->state==TASK_STOPPED&&security_ptrace(current,p)==0))
-
-
 static int mem_open(struct inode* inode, struct file* file)
 {
 	file->private_data = (void*)((long)current->self_exec_id);
@@ -540,7 +571,7 @@ static ssize_t mem_read(struct file * file, char * buf,
 	int ret = -ESRCH;
 	struct mm_struct *mm;
 
-	if (!MAY_PTRACE(task))
+	if (!MAY_PTRACE(task) || !may_ptrace_attach(task))
 		goto out;
 
 	ret = -ENOMEM;
@@ -566,7 +597,7 @@ static ssize_t mem_read(struct file * file, char * buf,
 
 		this_len = (count > PAGE_SIZE) ? PAGE_SIZE : count;
 		retval = access_process_vm(task, src, page, this_len, 0);
-		if (!retval) {
+		if (!retval || !MAY_PTRACE(task) || !may_ptrace_attach(task)) {
 			if (!ret)
 				ret = -EIO;
 			break;
@@ -604,7 +635,7 @@ static ssize_t mem_write(struct file * file, const char * buf,
 	struct task_struct *task = proc_task(file->f_dentry->d_inode);
 	unsigned long dst = *ppos;
 
-	if (!MAY_PTRACE(task))
+	if (!MAY_PTRACE(task) || !may_ptrace_attach(task))
 		return -ESRCH;
 
 	page = (char *)__get_free_page(GFP_USER);
@@ -1524,6 +1555,7 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct
 	struct inode *inode;
 	struct proc_inode *ei;
 	unsigned tgid;
+	int died;
 
 	if (dentry->d_name.len == 4 && !memcmp(dentry->d_name.name,"self",4)) {
 		inode = new_inode(dir->i_sb);
@@ -1567,12 +1599,21 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct
 
 	dentry->d_op = &pid_base_dentry_operations;
 
+	died = 0;
+	d_add(dentry, inode);
 	spin_lock(&task->proc_lock);
 	task->proc_dentry = dentry;
-	d_add(dentry, inode);
+	if (!pid_alive(task)) {
+		dentry = proc_pid_unhash(task);
+		died = 1;
+	}
 	spin_unlock(&task->proc_lock);
 
 	put_task_struct(task);
+	if (died) {
+		proc_pid_flush(dentry);
+		goto out;
+	}
 	return NULL;
 out:
 	return ERR_PTR(-ENOENT);
@@ -1612,10 +1653,7 @@ static struct dentry *proc_task_lookup(struct inode *dir, struct dentry * dentry
 
 	dentry->d_op = &pid_base_dentry_operations;
 
-	spin_lock(&task->proc_lock);
-	task->proc_dentry = dentry;
 	d_add(dentry, inode);
-	spin_unlock(&task->proc_lock);
 
 	put_task_struct(task);
 	return NULL;

@@ -40,10 +40,13 @@
 extern unsigned int scsi_logging_level;
 
 #ifdef CONFIG_SCSI_LOGGING
+
+#define SCSI_LOG_LEVEL(SHIFT, BITS)				\
+        ((scsi_logging_level >> (SHIFT)) & ((1 << (BITS)) - 1))
+
 #define SCSI_CHECK_LOGGING(SHIFT, BITS, LEVEL, CMD)		\
 {								\
-        unsigned int mask = (1 << (BITS)) - 1;			\
-        if (((scsi_logging_level >> (SHIFT)) & mask) > (LEVEL))	\
+        if ((SCSI_LOG_LEVEL(SHIFT, BITS)) > (LEVEL))		\
 		(CMD);						\
 }
 #else

@@ -115,10 +115,15 @@ config ACPI_SRAT
 	default y
 	depends on NUMA && (X86_SUMMIT || X86_GENERICARCH)
 
+config X86_SUMMIT_NUMA
+	bool
+	default y
+	depends on NUMA && (X86_SUMMIT || X86_GENERICARCH)
+
 config X86_CYCLONE_TIMER
-       bool 
-       default y
-       depends on X86_SUMMIT || X86_GENERICARCH
+	bool
+	default y
+	depends on X86_SUMMIT || X86_GENERICARCH
 
 config ES7000_CLUSTERED_APIC
 	bool
@@ -784,6 +789,25 @@ config MTRR
 
 	  See <file:Documentation/mtrr.txt> for more information.
 
+config EFI
+	bool "Boot from EFI support (EXPERIMENTAL)"
+	depends on ACPI
+	default n
+	---help---
+
+	This enables the the kernel to boot on EFI platforms using
+	system configuration information passed to it from the firmware.
+	This also enables the kernel to use any EFI runtime services that are
+	available (such as the EFI variable services).
+
+	This option is only useful on systems that have EFI firmware
+	and will result in a kernel image that is ~8k larger.  In addition,
+	you must use the latest ELILO loader available at
+	ftp.hpl.hp.com/pub/linux-ia64/ in order to take advantage of kernel
+	initialization using EFI information (neither GRUB nor LILO know
+	anything about EFI).  However, even with this option, the resultant
+	kernel should continue to boot on existing non-EFI platforms.
+
 config HAVE_DEC_LOCK
 	bool
 	depends on (SMP || PREEMPT) && X86_CMPXCHG
@@ -793,7 +817,7 @@ config HAVE_DEC_LOCK
 # Summit needs it only when NUMA is on
 config BOOT_IOREMAP
 	bool
-	depends on ((X86_SUMMIT || X86_GENERICARCH) && NUMA)
+	depends on (((X86_SUMMIT || X86_GENERICARCH) && NUMA) || (X86 && EFI))
 	default y
 
 endmenu
@@ -1029,6 +1053,25 @@ config PCI_DIRECT
 	bool
  	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
 	default y
+
+config PCI_USE_VECTOR
+	bool "Vector-based interrupt indexing"
+	depends on X86_LOCAL_APIC
+	default n
+	help
+	   This replaces the current existing IRQ-based index interrupt scheme
+	   with the vector-base index scheme. The advantages of vector base
+	   over IRQ base are listed below:
+	   1) Support MSI implementation.
+	   2) Support future IOxAPIC hotplug
+
+	   Note that this enables MSI, Message Signaled Interrupt, on all
+	   MSI capable device functions detected if users also install the
+	   MSI patch. Message Signal Interrupt enables an MSI-capable
+	   hardware device to send an inbound Memory Write on its PCI bus
+	   instead of asserting IRQ signal on device IRQ pin.
+
+	   If you don't know what to do here, say N.
 
 source "drivers/pci/Kconfig"
 

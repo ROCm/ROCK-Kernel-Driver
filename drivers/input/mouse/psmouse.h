@@ -22,10 +22,20 @@
 #define PSMOUSE_ACTIVATED	1
 #define PSMOUSE_IGNORE		2
 
+struct psmouse;
+
+struct psmouse_ptport {
+	struct serio serio;
+
+	void (*activate)(struct psmouse *parent);
+	void (*deactivate)(struct psmouse *parent);
+};
+
 struct psmouse {
 	void *private;
 	struct input_dev dev;
 	struct serio *serio;
+	struct psmouse_ptport *ptport;
 	char *vendor;
 	char *name;
 	unsigned char cmdbuf[8];
@@ -41,6 +51,9 @@ struct psmouse {
 	char error;
 	char devname[64];
 	char phys[32];
+
+	int (*reconnect)(struct psmouse *psmouse);
+	void (*disconnect)(struct psmouse *psmouse);
 };
 
 #define PSMOUSE_PS2		1

@@ -44,4 +44,18 @@ struct statfs64 {
 	long f_spare[5];
 };
 
+struct compat_statfs64 {
+	__u32 f_type;
+	__u32 f_bsize;
+	__u64 f_blocks;
+	__u64 f_bfree;
+	__u64 f_bavail;
+	__u64 f_files;
+	__u64 f_ffree;
+	__kernel_fsid_t f_fsid;
+	__u32 f_namelen;
+	__u32 f_frsize;
+	__u32 f_spare[5];
+};
+
 #endif  /* _PPC64_STATFS_H */

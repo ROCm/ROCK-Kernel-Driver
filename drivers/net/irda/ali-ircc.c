@@ -8,6 +8,8 @@
  * Created at:    2000/10/16 03:46PM
  * Modified at:   2001/1/3 02:55PM
  * Modified by:   Benjamin Kong <benjamin_kong@ali.com.tw>
+ * Modified at:   2003/11/6 and support for ALi south-bridge chipsets M1563
+ * Modified by:   Clear Zhang <clear_zhang@ali.com.tw>
  * 
  *     Copyright (c) 2000 Benjamin Kong <benjamin_kong@ali.com.tw>
  *     All Rights Reserved
@@ -68,6 +70,7 @@ static ali_chip_t chips[] =
 {
 	{ "M1543", { 0x3f0, 0x370 }, 0x51, 0x23, 0x20, 0x43, ali_ircc_probe_53, ali_ircc_init_43 },
 	{ "M1535", { 0x3f0, 0x370 }, 0x51, 0x23, 0x20, 0x53, ali_ircc_probe_53, ali_ircc_init_53 },
+	{ "M1563", { 0x3f0, 0x370 }, 0x51, 0x23, 0x20, 0x63, ali_ircc_probe_53, ali_ircc_init_53 },
 	{ NULL }
 };
 
@@ -1331,7 +1334,7 @@ static int ali_ircc_net_open(struct net_device *dev)
 	}
 	
 	/* Turn on interrups */
-	outb(UART_IER_RLSI | UART_IER_RDI |UART_IER_THRI, iobase+UART_IER);
+	outb(UART_IER_RDI , iobase+UART_IER);
 
 	/* Ready to play! */
 	netif_start_queue(dev); //benjamin by irport

@@ -660,24 +660,6 @@ void saa7146_set_hps_source_and_sync(struct saa7146_dev *dev, int source, int sy
 	vv->current_hps_sync = sync;
 } 
 
-/* write "data" to the gpio-pin "pin" */
-void saa7146_set_gpio(struct saa7146_dev *dev, u8 pin, u8 data)
-{
-	u32 value = 0;
-
-	/* sanity check */
-	if(pin > 3)
-		return;
-
-	/* read old register contents */
-	value = saa7146_read(dev, GPIO_CTRL );
-	
-	value &= ~(0xff << (8*pin));
-	value |= (data << (8*pin));
-
-	saa7146_write(dev, GPIO_CTRL, value);
-}
-
 /* reprogram hps, enable(1) / disable(0) video */
 void saa7146_set_overlay(struct saa7146_dev *dev, struct saa7146_fh *fh, int v)
 {
@@ -710,13 +692,15 @@ void saa7146_write_out_dma(struct saa7146_dev* dev, int which, struct saa7146_vi
 	/* calculate starting address */
 	where  = (which-1)*0x18;
 
+/*
 	if( 0 != (dev->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
 		saa7146_write(dev, where, 	vdma->base_even);
 		saa7146_write(dev, where+0x04, 	vdma->base_odd);
 	} else {
+*/
 		saa7146_write(dev, where, 	vdma->base_odd);
 		saa7146_write(dev, where+0x04, 	vdma->base_even);
-	}
+//	}
 	saa7146_write(dev, where+0x08, 	vdma->prot_addr);
 	saa7146_write(dev, where+0x0c, 	vdma->pitch);
 	saa7146_write(dev, where+0x10, 	vdma->base_page);
@@ -971,12 +955,13 @@ static void program_capture_engine(struct saa7146_dev *dev, int planar)
 	unsigned long e_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_E_FID_A : CMD_E_FID_B;
 	unsigned long o_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_O_FID_A : CMD_O_FID_B;
 
+/*
 	if( 0 != (dev->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
 		unsigned long tmp = e_wait;
 		e_wait = o_wait;
 		o_wait = tmp;
 	}
-
+*/
 	/* wait for o_fid_a/b / e_fid_a/b toggle only if rps register 0 is not set*/
 	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | o_wait);
 	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | e_wait);

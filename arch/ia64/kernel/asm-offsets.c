@@ -12,6 +12,7 @@
 #include <asm-ia64/ptrace.h>
 #include <asm-ia64/siginfo.h>
 #include <asm-ia64/sigcontext.h>
+#include <asm-ia64/mca.h>
 
 #include "../kernel/sigframe.h"
 
@@ -203,5 +204,8 @@ void foo(void)
 #if CLONE_SETTLS != (1<<19)
 # error "CLONE_SETTLS_BIT incorrect, please fix"
 #endif
+
+	BLANK();
+	DEFINE(IA64_MCA_TLB_INFO_SIZE, sizeof (struct ia64_mca_tlb_info));
 
 }

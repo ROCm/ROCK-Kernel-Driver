@@ -64,8 +64,8 @@ static struct saa7146_pci_extension_data x_var = { \
 	.ext_priv = &x_var ## _info, \
 	.ext = &budget_extension };
 
-#define TS_WIDTH  (4*188)
-#define TS_HEIGHT (1024/4)
+#define TS_WIDTH  (376)
+#define TS_HEIGHT (512)
 #define TS_BUFLEN (TS_WIDTH*TS_HEIGHT)
 #define TS_MAX_PACKETS (TS_BUFLEN/TS_SIZE)
 
