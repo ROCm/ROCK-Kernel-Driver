@@ -2,7 +2,7 @@
  * layout.h - All NTFS associated on-disk structures. Part of the Linux-NTFS
  *	      project.
  *
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -941,7 +941,7 @@ typedef struct {
 					   modified. */
 /* 18*/	s64 last_mft_change_time;	/* Time this mft record was last
 					   modified. */
-/* 20*/	s64 last_access_time;		/* Last time this mft record was
+/* 20*/	s64 last_access_time;		/* Time this mft record was last
 					   accessed. */
 /* 28*/	s64 allocated_size;		/* Byte size of allocated space for the
 					   data attribute. NOTE: Is a multiple
