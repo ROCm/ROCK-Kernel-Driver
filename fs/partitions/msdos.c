@@ -389,8 +389,23 @@ int msdos_partition(struct parsed_partitions *state, struct block_device *bdev)
 		put_dev_sector(sect);
 		return 0;
 	}
+
+	/*
+	 * Now that the 55aa signature is present, this is probably
+	 * either the boot sector of a FAT filesystem or a DOS-type
+	 * partition table. Reject this in case the boot indicator
+	 * is not 0 or 0x80.
+	 */
 	p = (struct partition *) (data + 0x1be);
+	for (slot = 1; slot <= 4; slot++, p++) {
+		if (p->boot_ind != 0 && p->boot_ind != 0x80) {
+			put_dev_sector(sect);
+			return 0;
+		}
+	}
+
 #ifdef CONFIG_EFI_PARTITION
+	p = (struct partition *) (data + 0x1be);
 	for (slot = 1 ; slot <= 4 ; slot++, p++) {
 		/* If this is an EFI GPT disk, msdos should ignore it. */
 		if (SYS_IND(p) == EFI_PMBR_OSTYPE_EFI_GPT) {
@@ -398,8 +413,8 @@ int msdos_partition(struct parsed_partitions *state, struct block_device *bdev)
 			return 0;
 		}
 	}
-	p = (struct partition *) (data + 0x1be);
 #endif
+	p = (struct partition *) (data + 0x1be);
 
 	/*
 	 * Look for partitions in two passes:
