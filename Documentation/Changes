@@ -107,8 +107,8 @@ assembling the 16-bit boot code, removing the need for as86 to compile
 your kernel.  This change does, however, mean that you need a recent
 release of binutils.
 
-System utililities
-==================
+System utilities
+================
 
 Architectural changes
 ---------------------

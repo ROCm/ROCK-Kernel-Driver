@@ -3,7 +3,7 @@
  *
  *  Mikulas Patocka (mikulas@artax.karlin.mff.cuni.cz), 1998-1999
  *
- *  mouning, unmounting, error handling
+ *  mounting, unmounting, error handling
  */
 
 #include <linux/string.h>

@@ -29,7 +29,7 @@
  *	NET/ROM 006	Alan(GW4PTS)	Brought in line with the ANK changes
  *			Jonathan(G4KLX)	Removed hdrincl.
  *	NET/ROM 007	Jonathan(G4KLX)	New timer architecture.
- *					Impmented Idle timer.
+ *					Implemented Idle timer.
  *			Arnaldo C. Melo s/suser/capable/, micro cleanups
  */
 
