@@ -1,0 +1,13 @@
+# ALSA Sparc drivers
+
+mainmenu_option next_comment
+comment 'ALSA Sparc devices'
+
+if [ "$CONFIG_SBUS" != "n" ]; then
+  dep_tristate 'Sun AMD7930' CONFIG_SND_SUN_AMD7930 $CONFIG_SND
+  dep_tristate 'Sun DBRI' CONFIG_SND_SUN_DBRI $CONFIG_SND
+fi
+
+dep_tristate 'Sun CS4231' CONFIG_SND_SUN_CS4231 $CONFIG_SND
+
+endmenu
