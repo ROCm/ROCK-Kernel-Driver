@@ -100,18 +100,6 @@ static sn9c102_eof_header_t sn9c102_eof_header[] = {
 };
 
 /*****************************************************************************/
-
-static inline unsigned long kvirt_to_pa(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = (unsigned long)page_address(vmalloc_to_page((void *)adr));
-	kva |= adr & (PAGE_SIZE-1);
-	ret = __pa(kva);
-	return ret;
-}
-
-
 static void* rvmalloc(size_t size)
 {
 	void* mem;
@@ -1567,8 +1555,8 @@ static int sn9c102_mmap(struct file* filp, struct vm_area_struct *vma)
 
 	pos = (unsigned long)cam->frame[i].bufmem;
 	while (size > 0) { /* size is page-aligned */
-		page = kvirt_to_pa(pos);
-		if (remap_page_range(vma, start, page, PAGE_SIZE, 
+		page = page_to_pfn(vmalloc_to_page((void *)pos));
+		if (remap_pfn_range(vma, start, page, PAGE_SIZE,
 		                     vma->vm_page_prot)) {
 			up(&cam->fileop_sem);
 			return -EAGAIN;

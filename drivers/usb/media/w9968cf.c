@@ -457,7 +457,6 @@ static int w9968cf_i2c_control(struct i2c_adapter*, unsigned int cmd,
                                unsigned long arg);
 
 /* Memory management */
-static inline unsigned long kvirt_to_pa(unsigned long adr);
 static void* rvmalloc(unsigned long size);
 static void rvfree(void *mem, unsigned long size);
 static void w9968cf_deallocate_memory(struct w9968cf_device*);
@@ -611,20 +610,6 @@ static struct w9968cf_symbolic_list urb_errlist[] = {
 /****************************************************************************
  * Memory management functions                                              *
  ****************************************************************************/
-
-/* Here we want the physical address of the memory.
-   This is used when initializing the contents of the area. */
-static inline unsigned long kvirt_to_pa(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-	return ret;
-}
-
-
 static void* rvmalloc(unsigned long size)
 {
 	void* mem;
@@ -2919,9 +2904,9 @@ static int w9968cf_mmap(struct file* filp, struct vm_area_struct *vma)
 		return -EINVAL;
 
 	while (vsize > 0) {
-		page = kvirt_to_pa(pos) + vma->vm_pgoff;
-		if (remap_page_range(vma, start, page, PAGE_SIZE, 
-		                     vma->vm_page_prot))
+		page = page_to_pfn(vmalloc_to_page((void *)pos));
+		if (remap_pfn_range(vma, start, page + vma->vm_pgoff,
+						PAGE_SIZE, vma->vm_page_prot))
 			return -EAGAIN;
 		start += PAGE_SIZE;
 		pos += PAGE_SIZE;

@@ -140,7 +140,7 @@ static int mmtimer_ioctl(struct inode *inode, struct file *file,
  * @file: file structure for the device
  * @vma: VMA to map the registers into
  *
- * Calls remap_page_range() to map the clock's registers into
+ * Calls remap_pfn_range() to map the clock's registers into
  * the calling process' address space.
  */
 static int mmtimer_mmap(struct file *file, struct vm_area_struct *vma)
@@ -163,9 +163,9 @@ static int mmtimer_mmap(struct file *file, struct vm_area_struct *vma)
 	mmtimer_addr &= ~(PAGE_SIZE - 1);
 	mmtimer_addr &= 0xfffffffffffffffUL;
 
-	if (remap_page_range(vma, vma->vm_start, mmtimer_addr, PAGE_SIZE,
-			     vma->vm_page_prot)) {
-		printk(KERN_ERR "remap_page_range failed in mmtimer.c\n");
+	if (remap_pfn_range(vma, vma->vm_start, mmtimer_addr >> PAGE_SHIFT,
+					PAGE_SIZE, vma->vm_page_prot)) {
+		printk(KERN_ERR "remap_pfn_range failed in mmtimer.c\n");
 		return -EAGAIN;
 	}
 

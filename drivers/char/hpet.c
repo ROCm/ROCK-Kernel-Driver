@@ -273,9 +273,9 @@ static int hpet_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	addr = __pa(addr);
 
-	if (remap_page_range
-	    (vma, vma->vm_start, addr, PAGE_SIZE, vma->vm_page_prot)) {
-		printk(KERN_ERR "remap_page_range failed in hpet.c\n");
+	if (remap_pfn_range(vma, vma->vm_start, addr >> PAGE_SHIFT,
+					PAGE_SIZE, vma->vm_page_prot)) {
+		printk(KERN_ERR "remap_pfn_range failed in hpet.c\n");
 		return -EAGAIN;
 	}
 

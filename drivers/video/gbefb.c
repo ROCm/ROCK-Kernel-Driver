@@ -1018,8 +1018,8 @@ static int gbefb_mmap(struct fb_info *info, struct file *file,
 		else
 			phys_size = TILE_SIZE - offset;
 
-		if (remap_page_range
-		    (vma, addr, phys_addr, phys_size, vma->vm_page_prot))
+		if (remap_pfn_range(vma, addr, phys_addr >> PAGE_SHIFT,
+						phys_size, vma->vm_page_prot))
 			return -EAGAIN;
 
 		offset = 0;
