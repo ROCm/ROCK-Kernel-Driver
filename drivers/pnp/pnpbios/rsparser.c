@@ -7,6 +7,7 @@
 #include <linux/ctype.h>
 #include <linux/pnp.h>
 #include <linux/pnpbios.h>
+#include <linux/pci.h>
 
 #include "pnpbios.h"
 
@@ -58,6 +59,7 @@ pnpbios_parse_allocated_irqresource(struct pnp_resource_table * res, int irq)
 		}
 		res->irq_resource[i].start =
 		res->irq_resource[i].end = (unsigned long) irq;
+		pcibios_penalize_isa_irq(irq);
 	}
 }
 
