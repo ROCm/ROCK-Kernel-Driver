@@ -1,8 +1,8 @@
 /*
  * Safe Encapsulated USB Serial Driver
  *
- *      Copyright (c) 2001 Lineo
- *      Copyright (c) 2001 Hewlett-Packard
+ *      Copyright (C) 2001 Lineo
+ *      Copyright (C) 2001 Hewlett-Packard
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by

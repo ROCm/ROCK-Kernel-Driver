@@ -1,8 +1,8 @@
 /*
  * bluetty.c   Version 0.13
  *
- * Copyright (c) 2000, 2001 Greg Kroah-Hartman	<greg@kroah.com>
- * Copyright (c) 2000 Mark Douglas Corner	<mcorner@umich.edu>
+ * Copyright (C) 2000, 2001 Greg Kroah-Hartman	<greg@kroah.com>
+ * Copyright (C) 2000 Mark Douglas Corner	<mcorner@umich.edu>
  *
  * USB Bluetooth TTY driver, based on the Bluetooth Spec version 1.0B
  * 

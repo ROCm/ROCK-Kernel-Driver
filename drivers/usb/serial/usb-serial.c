@@ -2,8 +2,8 @@
  * USB Serial Converter driver
  *
  * Copyright (C) 1999 - 2003 Greg Kroah-Hartman (greg@kroah.com)
- * Copyright (c) 2000 Peter Berger (pberger@brimson.com)
- * Copyright (c) 2000 Al Borchers (borchers@steinerpoint.com)
+ * Copyright (C) 2000 Peter Berger (pberger@brimson.com)
+ * Copyright (C) 2000 Al Borchers (borchers@steinerpoint.com)
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License version

@@ -1,9 +1,9 @@
 /*
  * USB Keyspan PDA / Xircom / Entregra Converter driver
  *
- * Copyright (c) 1999 - 2001 Greg Kroah-Hartman	<greg@kroah.com>
- * Copyright (c) 1999, 2000 Brian Warner	<warner@lothar.com>
- * Copyright (c) 2000 Al Borchers		<borchers@steinerpoint.com>
+ * Copyright (C) 1999 - 2001 Greg Kroah-Hartman	<greg@kroah.com>
+ * Copyright (C) 1999, 2000 Brian Warner	<warner@lothar.com>
+ * Copyright (C) 2000 Al Borchers		<borchers@steinerpoint.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by

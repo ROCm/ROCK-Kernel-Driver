@@ -1,8 +1,8 @@
 /*
  * USB Xircom PGS Firmware
  *
- * Copyright (c) 1999, 2000 Brian Warner        <warner@lothar.com>
- * Copyright (c) 2001 Cristian M. Craciunescu	<cristi@dnt.ro>
+ * Copyright (C) 1999, 2000 Brian Warner        <warner@lothar.com>
+ * Copyright (C) 2001 Cristian M. Craciunescu	<cristi@dnt.ro>
  *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
