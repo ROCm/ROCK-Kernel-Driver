@@ -55,19 +55,7 @@
 
 #include <linux/config.h>
 
-/*
- *  Use normal IO if configured.
- *  Normal IO forced for alpha.
- *  Forced to MMIO for sparc.
- */
-#if defined(__alpha__)
-#define	SYM_CONF_IOMAPPED
-#elif defined(__sparc__)
-#undef SYM_CONF_IOMAPPED
-/* #elif defined(__powerpc__) */
-/* #define	SYM_CONF_IOMAPPED */
-/* #define SYM_OPT_NO_BUS_MEMORY_MAPPING */
-#elif defined(CONFIG_SCSI_SYM53C8XX_IOMAPPED)
+#ifdef CONFIG_SCSI_SYM53C8XX_IOMAPPED
 #define	SYM_CONF_IOMAPPED
 #endif
 
@@ -93,8 +81,6 @@
  */
 #if 1
 #define SYM_CONF_NVRAM_SUPPORT		(1)
-#define SYM_SETUP_SYMBIOS_NVRAM		(1)
-#define SYM_SETUP_TEKRAM_NVRAM		(1)
 #endif
 
 /*

@@ -2,7 +2,7 @@ Documentation for CMI 8330 (SoundPRO)
 -------------------------------------
 Alessandro Zummo <azummo@ita.flashnet.it>
 
-( Be sure to read Documentation/sound/SoundPro too )
+( Be sure to read Documentation/sound/oss/SoundPro too )
 
 
 This adapter is now directly supported by the sb driver.

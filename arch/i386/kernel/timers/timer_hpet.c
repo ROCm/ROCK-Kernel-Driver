@@ -108,7 +108,7 @@ static void mark_offset_hpet(void)
 	offset = hpet_readl(HPET_T0_CMP) - hpet_tick;
 	if (unlikely(((offset - hpet_last) > hpet_tick) && (hpet_last != 0))) {
 		int lost_ticks = (offset - hpet_last) / hpet_tick;
-		jiffies += lost_ticks;
+		jiffies_64 += lost_ticks;
 	}
 	hpet_last = offset;
 

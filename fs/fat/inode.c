@@ -191,9 +191,9 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 	int isvfat = opts->isvfat;
 
 	if (opts->fs_uid != 0)
-		seq_printf(m, ",uid=%d", opts->fs_uid);
+		seq_printf(m, ",uid=%u", opts->fs_uid);
 	if (opts->fs_gid != 0)
-		seq_printf(m, ",gid=%d", opts->fs_gid);
+		seq_printf(m, ",gid=%u", opts->fs_gid);
 	seq_printf(m, ",fmask=%04o", opts->fs_fmask);
 	seq_printf(m, ",dmask=%04o", opts->fs_dmask);
 	if (sbi->nls_disk)
@@ -765,8 +765,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
 	struct msdos_sb_info *sbi;
-	int logical_sector_size, fat_clusters, debug, cp, first;
-	unsigned int total_sectors, rootdir_sectors;
+	u16 logical_sector_size;
+	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
+	int debug, cp, first;
 	unsigned int media;
 	long error;
 	char buf[50];
@@ -831,14 +832,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 		goto out_invalid;
 	}
-	logical_sector_size =
-		CF_LE_W(get_unaligned((unsigned short *) &b->sector_size));
+	logical_sector_size = CF_LE_W(get_unaligned((u16 *)&b->sector_size));
 	if (!logical_sector_size
 	    || (logical_sector_size & (logical_sector_size - 1))
 	    || (logical_sector_size < 512)
 	    || (PAGE_CACHE_SIZE < logical_sector_size)) {
 		if (!silent)
-			printk(KERN_ERR "FAT: bogus logical sector size %d\n",
+			printk(KERN_ERR "FAT: bogus logical sector size %u\n",
 			       logical_sector_size);
 		brelse(bh);
 		goto out_invalid;
@@ -847,7 +847,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (!sbi->sec_per_clus
 	    || (sbi->sec_per_clus & (sbi->sec_per_clus - 1))) {
 		if (!silent)
-			printk(KERN_ERR "FAT: bogus sectors per cluster %d\n",
+			printk(KERN_ERR "FAT: bogus sectors per cluster %u\n",
 			       sbi->sec_per_clus);
 		brelse(bh);
 		goto out_invalid;
@@ -855,7 +855,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 	if (logical_sector_size < sb->s_blocksize) {
 		printk(KERN_ERR "FAT: logical sector size too small for device"
-		       " (logical sector size = %d)\n", logical_sector_size);
+		       " (logical sector size = %u)\n", logical_sector_size);
 		brelse(bh);
 		goto out_fail;
 	}
@@ -863,7 +863,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 
 		if (!sb_set_blocksize(sb, logical_sector_size)) {
-			printk(KERN_ERR "FAT: unable to set blocksize %d\n",
+			printk(KERN_ERR "FAT: unable to set blocksize %u\n",
 			       logical_sector_size);
 			goto out_fail;
 		}
@@ -885,7 +885,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->fat_length = CF_LE_W(b->fat_length);
 	sbi->root_cluster = 0;
 	sbi->free_clusters = -1;	/* Don't know yet */
-	sbi->prev_free = 0;
+	sbi->prev_free = -1;
 
 	if (!sbi->fat_length && b->fat32_length) {
 		struct fat_boot_fsinfo *fsinfo;
@@ -932,10 +932,11 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->dir_per_block_bits = ffs(sbi->dir_per_block) - 1;
 
 	sbi->dir_start = sbi->fat_start + sbi->fats * sbi->fat_length;
-	sbi->dir_entries =
-		CF_LE_W(get_unaligned((unsigned short *)&b->dir_entries));
+	sbi->dir_entries = CF_LE_W(get_unaligned((u16 *)&b->dir_entries));
 	if (sbi->dir_entries & (sbi->dir_per_block - 1)) {
-		printk(KERN_ERR "FAT: bogus directroy-entries per block\n");
+		if (!silent)
+			printk(KERN_ERR "FAT: bogus directroy-entries per block"
+			       " (%u)\n", sbi->dir_entries);
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -943,18 +944,27 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	rootdir_sectors = sbi->dir_entries
 		* sizeof(struct msdos_dir_entry) / sb->s_blocksize;
 	sbi->data_start = sbi->dir_start + rootdir_sectors;
-	total_sectors = CF_LE_W(get_unaligned((unsigned short *)&b->sectors));
+	total_sectors = CF_LE_W(get_unaligned((u16 *)&b->sectors));
 	if (total_sectors == 0)
 		total_sectors = CF_LE_L(b->total_sect);
-	sbi->clusters = (total_sectors - sbi->data_start) / sbi->sec_per_clus;
+
+	total_clusters = (total_sectors - sbi->data_start) / sbi->sec_per_clus;
 
 	if (sbi->fat_bits != 32)
-		sbi->fat_bits = (sbi->clusters > MSDOS_FAT12) ? 16 : 12;
+		sbi->fat_bits = (total_clusters > MAX_FAT12) ? 16 : 12;
 
 	/* check that FAT table does not overflow */
 	fat_clusters = sbi->fat_length * sb->s_blocksize * 8 / sbi->fat_bits;
-	if (sbi->clusters > fat_clusters - 2)
-		sbi->clusters = fat_clusters - 2;
+	total_clusters = min(total_clusters, fat_clusters - 2);
+	if (total_clusters > MAX_FAT(sb)) {
+		if (!silent)
+			printk(KERN_ERR "FAT: count of clusters too big (%u)\n",
+			       total_clusters);
+		brelse(bh);
+		goto out_invalid;
+	}
+
+	sbi->clusters = total_clusters;
 
 	brelse(bh);
 
@@ -968,6 +978,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		/* all is as it should be */
 	} else if (media == 0xf8 && FAT_FIRST_ENT(sb, 0xfe) == first) {
 		/* bad, reported on pc9800 */
+	} else if (media == 0xf0 && FAT_FIRST_ENT(sb, 0xf8) == first) {
+		/* bad, reported with a MO disk on win95/me */
 	} else if (first == 0) {
 		/* bad, reported with a SmartMedia card */
 	} else {
@@ -1047,7 +1059,7 @@ out_fail:
 
 int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 {
-	int free, nr;
+	int free, nr, ret;
        
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		free = MSDOS_SB(sb)->free_clusters;
@@ -1057,9 +1069,14 @@ int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 			free = MSDOS_SB(sb)->free_clusters;
 		else {
 			free = 0;
-			for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++)
-				if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
+			for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++) {
+				ret = fat_access(sb, nr, -1);
+				if (ret < 0) {
+					unlock_fat(sb);
+					return ret;
+				} else if (ret == FAT_ENT_FREE)
 					free++;
+			}
 			MSDOS_SB(sb)->free_clusters = free;
 		}
 		unlock_fat(sb);
@@ -1209,10 +1226,10 @@ retry:
 	}
 	lock_kernel();
 	if (!(bh = sb_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
-		fat_fs_panic(sb, "unable to read i-node block (i_pos %lld)",
-			     i_pos);
+		printk(KERN_ERR "FAT: unable to read inode block "
+		       "for updating (i_pos %lld)", i_pos);
 		unlock_kernel();
-		return;
+		return /* -EIO */;
 	}
 	spin_lock(&fat_inode_lock);
 	if (i_pos != MSDOS_I(inode)->i_pos) {

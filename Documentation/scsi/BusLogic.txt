@@ -577,7 +577,7 @@ LILO Linux Boot Loader (in /etc/lilo.conf):
 INSMOD Loadable Kernel Module Installation Facility:
 
   insmod BusLogic.o \
-      'BusLogic_Options="QueueDepth:[,7,15];QueueDepth:31,BusSettleTime:30"'
+      'BusLogic="QueueDepth:[,7,15];QueueDepth:31,BusSettleTime:30"'
 
 NOTE: Module Utilities 2.1.71 or later is required for correct parsing
       of driver options containing commas.

@@ -520,10 +520,6 @@ struct adapter_ops
 
 struct aac_driver_ident
 {
-	u16	vendor;
-	u16	device;
-	u16	subsystem_vendor;
-	u16	subsystem_device;
 	int 	(*init)(struct aac_dev *dev, unsigned long num);
 	char *	name;
 	char *	vname;
@@ -1466,6 +1462,8 @@ static inline u32 cap_to_cyls(sector_t capacity, u32 divisor)
 	return (u32)capacity;
 }
 
+struct scsi_cmnd;
+
 const char *aac_driverinfo(struct Scsi_Host *);
 struct fib *fib_alloc(struct aac_dev *dev);
 int fib_setup(struct aac_dev *dev);
@@ -1480,10 +1478,9 @@ int aac_consumer_avail(struct aac_dev * dev, struct aac_queue * q);
 void aac_consumer_free(struct aac_dev * dev, struct aac_queue * q, u32 qnum);
 int fib_complete(struct fib * context);
 #define fib_data(fibctx) ((void *)(fibctx)->hw_fib->data)
-int aac_detach(struct aac_dev *dev);
 struct aac_dev *aac_init_adapter(struct aac_dev *dev);
 int aac_get_containers(struct aac_dev *dev);
-int aac_scsi_cmd(Scsi_Cmnd *scsi_cmnd_ptr);
+int aac_scsi_cmd(struct scsi_cmnd *cmd);
 int aac_dev_ioctl(struct aac_dev *dev, int cmd, void *arg);
 int aac_do_ioctl(struct aac_dev * dev, int cmd, void *arg);
 int aac_rx_init(struct aac_dev *dev, unsigned long devNumber);
@@ -1495,3 +1492,4 @@ int aac_close_fib_context(struct aac_dev * dev, struct aac_fib_context *fibctx);
 int fib_adapter_complete(struct fib * fibptr, unsigned short size);
 struct aac_driver_ident* aac_get_driver_ident(int devtype);
 int aac_get_adapter_info(struct aac_dev* dev);
+int aac_send_shutdown(struct aac_dev *dev);

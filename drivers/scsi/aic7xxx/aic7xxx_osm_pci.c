@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm_pci.c#45 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm_pci.c#47 $
  */
 
 #include "aic7xxx_osm.h"
@@ -51,11 +51,9 @@ static int	ahc_linux_pci_dev_probe(struct pci_dev *pdev,
 					const struct pci_device_id *ent);
 static int	ahc_linux_pci_reserve_io_region(struct ahc_softc *ahc,
 						u_long *base);
-#ifdef MMAPIO
 static int	ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 						 u_long *bus_addr,
 						 uint8_t **maddr);
-#endif /* MMAPIO */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static void	ahc_linux_pci_dev_remove(struct pci_dev *pdev);
 
@@ -161,7 +159,7 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 	pci_set_master(pdev);
 
-	mask_39bit = (bus_addr_t)(0x7FFFFFFFFFULL & (bus_addr_t)~0);
+	mask_39bit = (bus_addr_t)0x7FFFFFFFFFULL;
 	if (sizeof(bus_addr_t) > 4
 	 && ahc_linux_get_memsize() > 0x80000000
 	 && ahc_pci_set_dma_mask(pdev, mask_39bit) == 0) {
@@ -254,7 +252,6 @@ ahc_linux_pci_reserve_io_region(struct ahc_softc *ahc, u_long *base)
 	return (0);
 }
 
-#ifdef MMAPIO
 static int
 ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 				 u_long *bus_addr,
@@ -296,7 +293,6 @@ ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 		error = ENOMEM;
 	return (error);
 }
-#endif /* MMAPIO */
 
 int
 ahc_pci_map_registers(struct ahc_softc *ahc)
@@ -313,7 +309,6 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 	command &= ~(PCIM_CMD_PORTEN|PCIM_CMD_MEMEN);
 	base = 0;
 	maddr = NULL;
-#ifdef MMAPIO
 	error = ahc_linux_pci_reserve_mem_region(ahc, &base, &maddr);
 	if (error == 0) {
 		ahc->platform_data->mem_busaddr = base;
@@ -350,7 +345,6 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 		       ahc_get_pci_function(ahc->dev_softc),
 		       base);
 	}
-#endif /* MMAPIO */
 
 	/*
 	 * We always prefer memory mapped access.

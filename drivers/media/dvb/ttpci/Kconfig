@@ -1,6 +1,7 @@
 config DVB_AV7110
 	tristate "AV7110 cards"
 	depends on DVB_CORE
+	select FW_LOADER
 	select VIDEO_DEV
 	select VIDEO_SAA7146_VV
 	help

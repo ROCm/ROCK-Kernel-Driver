@@ -44,6 +44,15 @@
 #endif 
 
 /*
+ * DMX_MAX_SECFEED_SIZE: Maximum length (in bytes) of a private section feed filter.
+ */ 
+
+#ifndef DMX_MAX_SECFEED_SIZE 
+#define DMX_MAX_SECFEED_SIZE 4096
+#endif 
+
+
+/*
  * enum dmx_success: Success codes for the Demux Callback API. 
  */ 
 
@@ -143,9 +152,9 @@ struct dmx_section_feed {
         int check_crc;
 	u32 crc_val;
 
-        u8 secbuf[4096];
-        int secbufp;
-        int seclen;
+        u8 *secbuf;
+        u8 secbuf_base[DMX_MAX_SECFEED_SIZE];
+        u16 secbufp, seclen, tsfeedp;
 
         int (*set) (struct dmx_section_feed* feed, 
 		    u16 pid, 

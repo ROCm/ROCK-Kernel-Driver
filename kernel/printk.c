@@ -181,6 +181,7 @@ int __init add_preferred_console(char *name, int idx, char *options)
 static int __init log_buf_len_setup(char *str)
 {
 	unsigned long size = memparse(str, &str);
+	unsigned long flags;
 
 	if (size > log_buf_len) {
 		unsigned long start, dest_idx, offset;
@@ -192,7 +193,7 @@ static int __init log_buf_len_setup(char *str)
 			goto out;
 		}
 
-		spin_lock_irq(&logbuf_lock);
+		spin_lock_irqsave(&logbuf_lock, flags);
 		log_buf_len = size;
 		log_buf = new_log_buf;
 
@@ -206,7 +207,7 @@ static int __init log_buf_len_setup(char *str)
 		log_start -= offset;
 		con_start -= offset;
 		log_end -= offset;
-		spin_unlock_irq(&logbuf_lock);
+		spin_unlock_irqrestore(&logbuf_lock, flags);
 
 		printk("log_buf_len: %d\n", log_buf_len);
 	}

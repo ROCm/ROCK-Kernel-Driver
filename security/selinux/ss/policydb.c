@@ -3,6 +3,11 @@
  *
  * Author : Stephen Smalley, <sds@epoch.ncsc.mil>
  */
+#include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/string.h>
+#include <linux/errno.h>
+#include "security.h"
 #include "policydb.h"
 #include "mls.h"
 

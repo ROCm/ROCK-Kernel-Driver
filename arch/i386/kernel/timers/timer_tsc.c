@@ -30,7 +30,6 @@ struct timer_opts timer_tsc;
 int tsc_disable __initdata = 0;
 
 extern spinlock_t i8253_lock;
-extern volatile unsigned long jiffies;
 
 static int use_tsc;
 /* Number of usecs that the last interrupt was delayed */
@@ -141,7 +140,7 @@ unsigned long long sched_clock(void)
 #ifndef CONFIG_NUMA
 	if (!use_tsc)
 #endif
-		return (unsigned long long)jiffies * (1000000000 / HZ);
+		return (unsigned long long)get_jiffies_64() * (1000000000 / HZ);
 
 	/* Read the Time Stamp Counter */
 	rdtscll(this_offset);
@@ -184,6 +183,18 @@ static void mark_offset_tsc(void)
 
 	count = inb_p(PIT_CH0);    /* read the latched count */
 	count |= inb(PIT_CH0) << 8;
+
+	/*
+	 * VIA686a test code... reset the latch if count > max + 1
+	 * from timer_pit.c - cjb
+	 */
+	if (count > LATCH) {
+		outb_p(0x34, PIT_MODE);
+		outb_p(LATCH & 0xff, PIT_CH0);
+		outb(LATCH >> 8, PIT_CH0);
+		count = LATCH - 1;
+	}
+
 	spin_unlock(&i8253_lock);
 
 	if (pit_latch_buggy) {
@@ -215,7 +226,7 @@ static void mark_offset_tsc(void)
 	lost = delta/(1000000/HZ);
 	delay = delta%(1000000/HZ);
 	if (lost >= 2) {
-		jiffies += lost-1;
+		jiffies_64 += lost-1;
 
 		/* sanity check to ensure we're not always losing ticks */
 		if (lost_count++ > 100) {
@@ -241,7 +252,7 @@ static void mark_offset_tsc(void)
 	 * usec delta is > 90% # of usecs/tick)
 	 */
 	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
-		jiffies++;
+		jiffies_64++;
 }
 
 static void delay_tsc(unsigned long loops)
@@ -283,7 +294,7 @@ static void mark_offset_tsc_hpet(void)
 	offset = hpet_readl(HPET_T0_CMP) - hpet_tick;
 	if (unlikely(((offset - hpet_last) > hpet_tick) && (hpet_last != 0))) {
 		int lost_ticks = (offset - hpet_last) / hpet_tick;
-		jiffies += lost_ticks;
+		jiffies_64 += lost_ticks;
 	}
 	hpet_last = hpet_current;
 

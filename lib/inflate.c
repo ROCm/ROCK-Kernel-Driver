@@ -221,7 +221,7 @@ STATIC const ush mask_bits[] = {
     0x01ff, 0x03ff, 0x07ff, 0x0fff, 0x1fff, 0x3fff, 0x7fff, 0xffff
 };
 
-#define NEXTBYTE()  (uch)get_byte()
+#define NEXTBYTE()  ({ int v = get_byte(); if (v < 0) goto underrun; (uch)v; })
 #define NEEDBITS(n) {while(k<(n)){b|=((ulg)NEXTBYTE())<<k;k+=8;}}
 #define DUMPBITS(n) {b>>=(n);k-=(n);}
 
@@ -620,6 +620,9 @@ STATIC int inflate_codes(
 
   /* done */
   return 0;
+
+ underrun:
+  return 4;			/* Input underrun */
 }
 
 
@@ -676,6 +679,9 @@ DEBG("<stor");
 
   DEBG(">");
   return 0;
+
+ underrun:
+  return 4;			/* Input underrun */
 }
 
 
@@ -908,6 +914,9 @@ DEBG("dyn7 ");
 
   DEBG(">");
   return 0;
+
+ underrun:
+  return 4;			/* Input underrun */
 }
 
 
@@ -956,6 +965,9 @@ STATIC int inflate_block(
 
   /* bad block type */
   return 2;
+
+ underrun:
+  return 4;			/* Input underrun */
 }
 
 
@@ -1079,9 +1091,9 @@ static int gunzip(void)
     ulg orig_len = 0;       /* original uncompressed length */
     int res;
 
-    magic[0] = (unsigned char)get_byte();
-    magic[1] = (unsigned char)get_byte();
-    method = (unsigned char)get_byte();
+    magic[0] = NEXTBYTE();
+    magic[1] = NEXTBYTE();
+    method   = NEXTBYTE();
 
     if (magic[0] != 037 ||
 	((magic[1] != 0213) && (magic[1] != 0236))) {
@@ -1108,29 +1120,29 @@ static int gunzip(void)
 	    error("Input has invalid flags");
 	    return -1;
     }
-    (ulg)get_byte();	/* Get timestamp */
-    ((ulg)get_byte()) << 8;
-    ((ulg)get_byte()) << 16;
-    ((ulg)get_byte()) << 24;
+    NEXTBYTE();	/* Get timestamp */
+    NEXTBYTE();
+    NEXTBYTE();
+    NEXTBYTE();
 
-    (void)get_byte();  /* Ignore extra flags for the moment */
-    (void)get_byte();  /* Ignore OS type for the moment */
+    (void)NEXTBYTE();  /* Ignore extra flags for the moment */
+    (void)NEXTBYTE();  /* Ignore OS type for the moment */
 
     if ((flags & EXTRA_FIELD) != 0) {
-	    unsigned len = (unsigned)get_byte();
-	    len |= ((unsigned)get_byte())<<8;
-	    while (len--) (void)get_byte();
+	    unsigned len = (unsigned)NEXTBYTE();
+	    len |= ((unsigned)NEXTBYTE())<<8;
+	    while (len--) (void)NEXTBYTE();
     }
 
     /* Get original file name if it was truncated */
     if ((flags & ORIG_NAME) != 0) {
 	    /* Discard the old name */
-	    while (get_byte() != 0) /* null */ ;
+	    while (NEXTBYTE() != 0) /* null */ ;
     } 
 
     /* Discard file comment if any */
     if ((flags & COMMENT) != 0) {
-	    while (get_byte() != 0) /* null */ ;
+	    while (NEXTBYTE() != 0) /* null */ ;
     }
 
     /* Decompress */
@@ -1147,6 +1159,9 @@ static int gunzip(void)
 	    case 3:
 		    error("out of memory");
 		    break;
+	    case 4:
+		    error("out of input data");
+		    break;
 	    default:
 		    error("invalid compressed format (other)");
 	    }
@@ -1157,15 +1172,15 @@ static int gunzip(void)
     /* crc32  (see algorithm.doc)
      * uncompressed input size modulo 2^32
      */
-    orig_crc = (ulg) get_byte();
-    orig_crc |= (ulg) get_byte() << 8;
-    orig_crc |= (ulg) get_byte() << 16;
-    orig_crc |= (ulg) get_byte() << 24;
+    orig_crc = (ulg) NEXTBYTE();
+    orig_crc |= (ulg) NEXTBYTE() << 8;
+    orig_crc |= (ulg) NEXTBYTE() << 16;
+    orig_crc |= (ulg) NEXTBYTE() << 24;
     
-    orig_len = (ulg) get_byte();
-    orig_len |= (ulg) get_byte() << 8;
-    orig_len |= (ulg) get_byte() << 16;
-    orig_len |= (ulg) get_byte() << 24;
+    orig_len = (ulg) NEXTBYTE();
+    orig_len |= (ulg) NEXTBYTE() << 8;
+    orig_len |= (ulg) NEXTBYTE() << 16;
+    orig_len |= (ulg) NEXTBYTE() << 24;
     
     /* Validate decompression */
     if (orig_crc != CRC_VALUE) {
@@ -1177,6 +1192,10 @@ static int gunzip(void)
 	    return -1;
     }
     return 0;
+
+ underrun:			/* NEXTBYTE() goto's here if needed */
+    error("out of input data");
+    return -1;
 }
 
 

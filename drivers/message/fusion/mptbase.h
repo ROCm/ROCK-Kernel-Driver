@@ -8,10 +8,10 @@
  *  Credits:
  *     (see mptbase.c)
  *
- *  Copyright (c) 1999-2002 LSI Logic Corporation
+ *  Copyright (c) 1999-2003 LSI Logic Corporation
  *  Originally By: Steven J. Ralston
  *  (mailto:sjralston1@netscape.net)
- *  (mailto:Pam.Delaney@lsil.com)
+ *  (mailto:mpt_linux_developer@lsil.com)
  *
  *  $Id: mptbase.h,v 1.144 2003/01/28 21:31:56 pdelaney Exp $
  */
@@ -77,11 +77,11 @@
 #endif
 
 #ifndef COPYRIGHT
-#define COPYRIGHT	"Copyright (c) 1999-2002 " MODULEAUTHOR
+#define COPYRIGHT	"Copyright (c) 1999-2003 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"2.05.00.03"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.05.00.03"
+#define MPT_LINUX_VERSION_COMMON	"2.05.00.05"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.05.00.05"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \

@@ -1518,6 +1518,7 @@ struct neigh_sysctl_table {
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &proc_dointvec_jiffies,
+			.strategy	= &sysctl_jiffies,
 		},
 		{
 			.ctl_name	= NET_NEIGH_DELAY_PROBE_TIME,
@@ -1525,6 +1526,7 @@ struct neigh_sysctl_table {
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &proc_dointvec_jiffies,
+			.strategy	= &sysctl_jiffies,
 		},
 		{
 			.ctl_name	= NET_NEIGH_GC_STALE_TIME,
@@ -1532,6 +1534,7 @@ struct neigh_sysctl_table {
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &proc_dointvec_jiffies,
+			.strategy	= &sysctl_jiffies,
 		},
 		{
 			.ctl_name	= NET_NEIGH_UNRES_QLEN,
@@ -1574,6 +1577,7 @@ struct neigh_sysctl_table {
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &proc_dointvec_jiffies,
+			.strategy	= &sysctl_jiffies,
 		},
 		{
 			.ctl_name	= NET_NEIGH_GC_THRESH1,

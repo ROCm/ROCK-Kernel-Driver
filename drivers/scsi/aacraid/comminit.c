@@ -29,7 +29,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -41,14 +40,10 @@
 #include <linux/completion.h>
 #include <linux/mm.h>
 #include <asm/semaphore.h>
-#include "scsi.h"
-#include "hosts.h"
 
 #include "aacraid.h"
 
 struct aac_common aac_config;
-
-static struct aac_dev *devices;
 
 static int aac_alloc_comm(struct aac_dev *dev, void **commaddr, unsigned long commsize, unsigned long commalign)
 {
@@ -163,7 +158,7 @@ static void aac_queue_init(struct aac_dev * dev, struct aac_queue * q, u32 *mem,
  *	This routine will send a VM_CloseAll (shutdown) request to the adapter.
  */
 
-static int aac_send_shutdown(struct aac_dev * dev)
+int aac_send_shutdown(struct aac_dev * dev)
 {
 	struct fib * fibctx;
 	struct aac_close *cmd;
@@ -188,35 +183,6 @@ static int aac_send_shutdown(struct aac_dev * dev)
 		fib_complete(fibctx);
 	fib_free(fibctx);
 	return status;
-}
-
-/**
- *	aac_detach	-	detach adapter
- *	@detach: adapter to disconnect
- *
- *	Disconnect and shutdown an AAC based adapter, freeing resources
- *	as we go.
- */
-
-int aac_detach(struct aac_dev *detach)
-{
-	struct aac_dev **dev = &devices;
-	
-	while(*dev)
-	{
-		if(*dev == detach)
-		{
-			*dev = detach->next;
-			aac_send_shutdown(detach);
-			fib_map_free(detach);
-			pci_free_consistent(detach->pdev, detach->comm_size, detach->comm_addr, detach->comm_phys);
-			kfree(detach->queues);
-			return 1;
-		}
-		dev=&((*dev)->next);
-	}
-	BUG();
-	return 0;
 }
 
 /**
@@ -344,11 +310,7 @@ struct aac_dev *aac_init_adapter(struct aac_dev *dev)
 		
 	INIT_LIST_HEAD(&dev->fib_list);
 	init_completion(&dev->aif_completion);
-	/*
-	 *	Add this adapter in to our dev List.
-	 */
-	dev->next = devices;
-	devices = dev;
+
 	return dev;
 }
 

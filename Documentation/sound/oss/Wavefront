@@ -105,7 +105,7 @@ design and implementation of the driver.
    drivers/sound/wf_midi.c              -- the "uart401" driver 
    				              to support virtual MIDI mode.
    include/wavefront.h                  -- the header file
-   Documentation/sound/Tropez+          -- short docs on configuration
+   Documentation/sound/oss/Tropez+          -- short docs on configuration
 
 **********************************************************************
 4) How do I compile/install/use it ?
