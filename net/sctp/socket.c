@@ -1081,6 +1081,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	list_for_each_safe(pos, temp, &datamsg->chunks) {
 		chunk = list_entry(pos, struct sctp_chunk, frag_list);
 		list_del_init(pos);
+		sctp_datamsg_track(chunk);
 
 		/* Do accounting for the write space.  */
 		sctp_set_owner_w(chunk);

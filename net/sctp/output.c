@@ -219,21 +219,16 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 		/* Both control chunks and data chunks with TSNs are
 		 * non-fragmentable.
 		 */
-		int fragmentable = sctp_chunk_is_data(chunk) &&
-			(!chunk->has_tsn);
 		if (packet_empty) {
-			if (fragmentable) {
-				retval = SCTP_XMIT_MUST_FRAG;
-				goto finish;
-			} else {
-				/* The packet is too big but we can
-				 * not fragment it--we have to just
-				 * transmit and rely on IP
-				 * fragmentation.
-				 */
-				packet->ipfragok = 1;
-				goto append;
-			}
+
+			/* We no longer do refragmentation at all.  
+			 * Just fragment at the IP layer, if we 
+			 * actually hit this condition
+			 */
+
+			packet->ipfragok = 1;
+			goto append;
+
 		} else { /* !packet_empty */
 			retval = SCTP_XMIT_PMTU_FULL;
 			goto finish;
@@ -374,7 +369,6 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 					chunk->rtt_in_progress = 1;
 					tp->rto_pending = 1;
 				}
-				sctp_datamsg_track(chunk);
 			} else
 				chunk->resent = 1;
 
