@@ -307,8 +307,6 @@ static inline void ata_exec(struct ata_port *ap, struct ata_taskfile *tf)
 
 static void ata_tf_to_host(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	init_MUTEX_LOCKED(&ap->sem);
-
 	ap->ops->tf_load(ap, tf);
 
 	ata_exec(ap, tf);
@@ -329,8 +327,6 @@ static void ata_tf_to_host(struct ata_port *ap, struct ata_taskfile *tf)
 
 void ata_tf_to_host_nolock(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	init_MUTEX_LOCKED(&ap->sem);
-
 	ap->ops->tf_load(ap, tf);
 	ap->ops->exec_command(ap, tf);
 }
@@ -2716,36 +2712,6 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 }
 
 /**
- *	ata_thread_wake -
- *	@ap:
- *	@thr_state:
- *
- *	LOCKING:
- *	spin_lock_irqsave(host_set lock)
- */
-
-void ata_thread_wake(struct ata_port *ap, unsigned int thr_state)
-{
-	assert(ap->thr_state == THR_IDLE);
-	ap->thr_state = thr_state;
-	up(&ap->thr_sem);
-}
-
-/**
- *	ata_thread_timer -
- *	@opaque:
- *
- *	LOCKING:
- */
-
-static void ata_thread_timer(unsigned long opaque)
-{
-	struct ata_port *ap = (struct ata_port *) opaque;
-
-	up(&ap->thr_sem);
-}
-
-/**
  *	ata_thread_iter -
  *	@ap:
  *
@@ -2768,7 +2734,6 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 		break;
 
 	case THR_PROBE_START:
-		down(&ap->sem);
 		ap->thr_state = THR_PORT_RESET;
 		break;
 
@@ -2787,11 +2752,8 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 		break;
 
 	case THR_AWAIT_DEATH:
-		timeout = -1;
-		break;
-
 	case THR_IDLE:
-		timeout = 30 * HZ;
+		timeout = -1;
 		break;
 
 	default:
@@ -2803,84 +2765,6 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 	DPRINTK("ata%u: new thr_state %s, returning %ld\n",
 		ap->id, ata_thr_state_name(ap->thr_state), timeout);
 	return timeout;
-}
-
-/**
- *	ata_thread -
- *	@data:
- *
- *	LOCKING:
- *
- *	RETURNS:
- *
- */
-
-static int ata_thread (void *data)
-{
-        struct ata_port *ap = data;
-	long timeout;
-
-	daemonize ("katad-%u", ap->id);
-	allow_signal(SIGTERM);
-
-        while (1) {
-		cond_resched();
-
-		timeout = ata_thread_iter(ap);
-
-                if (signal_pending (current))
-                        flush_signals(current);
-
-                if (current->flags & PF_FREEZE)
-			refrigerator(PF_FREEZE);
-
-
-                if ((timeout < 0) || (ap->time_to_die))
-                        break;
-
- 		/* note sleeping for full timeout not guaranteed (that's ok) */
-		if (timeout) {
-			mod_timer(&ap->thr_timer, jiffies + timeout);
-			down_interruptible(&ap->thr_sem);
-
-                	if (signal_pending (current))
-                        	flush_signals(current);
-
-                	if (ap->time_to_die)
-                        	break;
-		}
-        }
-
-	printk(KERN_DEBUG "ata%u: thread exiting\n", ap->id);
-	ap->thr_pid = -1;
-	del_timer_sync(&ap->thr_timer);
-	complete_and_exit (&ap->thr_exited, 0);
-}
-
-/**
- *	ata_thread_kill - kill per-port kernel thread
- *	@ap: port those thread is to be killed
- *
- *	LOCKING:
- *
- */
-
-static int ata_thread_kill(struct ata_port *ap)
-{
-	int ret = 0;
-
-	if (ap->thr_pid >= 0) {
-		ap->time_to_die = 1;
-		wmb();
-		ret = kill_proc(ap->thr_pid, SIGTERM, 1);
-		if (ret)
-			printk(KERN_ERR "ata%d: unable to kill kernel thread\n",
-			       ap->id);
-		else
-			wait_for_completion(&ap->thr_exited);
-	}
-
-	return ret;
 }
 
 /**
@@ -2972,6 +2856,23 @@ void ata_port_stop (struct ata_port *ap)
 	pci_free_consistent(pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
 }
 
+static void ata_probe_task(void *_data)
+{
+	struct ata_port *ap = _data;
+	long timeout;
+
+	timeout = ata_thread_iter(ap);
+	if (timeout < 0)
+		return;
+
+	if (timeout > 0) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(timeout);
+	}
+
+	queue_work(ata_wq, &ap->probe_task);
+}
+
 /**
  *	ata_host_remove -
  *	@ap:
@@ -2988,8 +2889,6 @@ static void ata_host_remove(struct ata_port *ap, unsigned int do_unregister)
 
 	if (do_unregister)
 		scsi_remove_host(sh);
-
-	ata_thread_kill(ap);	/* FIXME: check return val */
 
 	ap->ops->port_stop(ap);
 }
@@ -3039,18 +2938,12 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	INIT_LIST_HEAD(&ap->eng.q);
 	INIT_WORK(&ap->packet_task, atapi_packet_task, ap);
 	INIT_WORK(&ap->pio_task, ata_pio_task, ap);
+	INIT_WORK(&ap->probe_task, ata_probe_task, ap);
 
 	for (i = 0; i < ATA_MAX_DEVICES; i++)
 		ap->device[i].devno = i;
 
-	init_completion(&ap->thr_exited);
 	init_MUTEX_LOCKED(&ap->probe_sem);
-	init_MUTEX_LOCKED(&ap->sem);
-	init_MUTEX_LOCKED(&ap->thr_sem);
-
-	init_timer(&ap->thr_timer);
-	ap->thr_timer.function = ata_thread_timer;
-	ap->thr_timer.data = (unsigned long) ap;
 
 #ifdef ATA_IRQ_TRAP
 	ap->stats.unhandled_irq = 1;
@@ -3093,17 +2986,7 @@ static struct ata_port * ata_host_add(struct ata_probe_ent *ent,
 	if (rc)
 		goto err_out;
 
-	ap->thr_pid = kernel_thread(ata_thread, ap, CLONE_FS | CLONE_FILES);
-	if (ap->thr_pid < 0) {
-		printk(KERN_ERR "ata%d: unable to start kernel thread\n",
-		       ap->id);
-		goto err_out_free;
-	}
-
 	return ap;
-
-err_out_free:
-	ap->ops->port_stop(ap);
 
 err_out:
 	scsi_host_put(host);
@@ -3184,7 +3067,7 @@ int ata_device_add(struct ata_probe_ent *ent)
 		ap = host_set->ports[i];
 
 		DPRINTK("ata%u: probe begin\n", ap->id);
-		up(&ap->sem);		/* start probe */
+		queue_work(ata_wq, &ap->probe_task);	/* start probe */
 
 		DPRINTK("ata%u: probe-wait begin\n", ap->id);
 		down(&ap->probe_sem);	/* wait for end */

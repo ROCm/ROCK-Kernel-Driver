@@ -311,21 +311,17 @@ struct ata_port {
 	struct ata_host_stats	stats;
 	struct ata_host_set	*host_set;
 
-	struct semaphore	sem;
 	struct semaphore	probe_sem;
 
 	unsigned int		thr_state;
-	int			time_to_die;
-	pid_t			thr_pid;
-	struct completion	thr_exited;
-	struct semaphore	thr_sem;
-	struct timer_list	thr_timer;
 
 	struct work_struct	packet_task;
 
 	struct work_struct	pio_task;
 	unsigned int		pio_task_state;
 	unsigned long		pio_task_timeout;
+
+	struct work_struct	probe_task;
 
 	void			*private_data;
 };
