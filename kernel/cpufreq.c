@@ -337,11 +337,9 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	 */
 	policy = &cpufreq_driver->policy[cpu];
 	policy->cpu = cpu;
-	if (cpufreq_driver->init) {
-		ret = cpufreq_driver->init(policy);
-		if (ret)
-			goto out;
-	}
+	ret = cpufreq_driver->init(policy);
+	if (ret)
+		goto out;
 
 	/* set default policy on this CPU */
 	down(&cpufreq_driver_sem);
