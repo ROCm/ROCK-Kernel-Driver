@@ -172,8 +172,6 @@ memory.txt
 	- info on typical Linux memory problems.
 mips/
 	- directory with info about Linux on MIPS architecture.
-mkdev.cciss
-	- script to make /dev entries for SMART controllers (see cciss.txt).
 mono.txt
 	- how to execute Mono-based .NET binaries with the help of BINFMT_MISC.
 moxa-smartio
