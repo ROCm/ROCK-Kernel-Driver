@@ -592,6 +592,7 @@ int hidinput_connect(struct hid_device *hid)
 				hidinput->input.id.vendor = dev->descriptor.idVendor;
 				hidinput->input.id.product = dev->descriptor.idProduct;
 				hidinput->input.id.version = dev->descriptor.bcdDevice;
+				hidinput->input.dev = &hid->intf->dev;
 			}
 
 			for (i = 0; i < report->maxfield; i++)

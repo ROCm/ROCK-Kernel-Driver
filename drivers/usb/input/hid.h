@@ -342,6 +342,7 @@ struct hid_device {							/* device report descriptor */
 	struct hid_report_enum report_enum[HID_REPORT_TYPES];
 
 	struct usb_device *dev;						/* USB device */
+	struct usb_interface *intf;					/* USB interface */
 	int ifnum;							/* USB interface number */
 
 	unsigned long iofl;						/* I/O flags (CTRL_RUNNING, OUT_RUNNING) */
