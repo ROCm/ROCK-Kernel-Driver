@@ -285,7 +285,7 @@ void __init cpu_init (void)
 	/*
 	 * set up and load the per-CPU TSS
 	 */
-	for (v = 1; v <= N_EXCEPTION_STACKS; v++) {
+	for (v = 0; v < N_EXCEPTION_STACKS; v++) {
 		if (cpu) {
 			estacks = (char *)__get_free_pages(GFP_ATOMIC, 
 						   EXCEPTION_STACK_ORDER);
