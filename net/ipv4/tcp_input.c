@@ -1399,11 +1399,11 @@ static void tcp_cwnd_down(struct tcp_opt *tp)
 
 	/*
 	 * TCP Westwood
-         * Here limit is evaluated as BWestimation*RTTmin (for obtaining it
-	 * in packets we use mss_cache). If CONFIG_TCP_WESTWOOD is not defined
-	 * westwood_bw_rttmin() returns 0. In such case snd_ssthresh is still
-	 * used as usual. It prevents other strange cases in which BWE*RTTmin
-	 * could assume value 0. It should not happen but...
+	 * Here limit is evaluated as BWestimation*RTTmin (for obtaining it
+	 * in packets we use mss_cache). If sysctl_tcp_westwood is off
+	 * tcp_westwood_bw_rttmin() returns 0. In such case snd_ssthresh is
+	 * still used as usual. It prevents other strange cases in which
+	 * BWE*RTTmin could assume value 0. It should not happen but...
 	 */
 
 	if (!(limit = tcp_westwood_bw_rttmin(tp)))
