@@ -38,7 +38,6 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include <linux/init.h>
 #include <asm/irq.h>
 #include <asm/io.h>

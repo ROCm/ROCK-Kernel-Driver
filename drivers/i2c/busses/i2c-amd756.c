@@ -37,7 +37,6 @@
 
 /* #define DEBUG 1 */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
