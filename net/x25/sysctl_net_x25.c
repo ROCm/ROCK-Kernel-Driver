@@ -5,7 +5,6 @@
  * Added /proc/sys/net/x25 directory entry (empty =) ). [MS]
  */
 
-#include <linux/mm.h>
 #include <linux/sysctl.h>
 #include <linux/skbuff.h>
 #include <linux/socket.h>
