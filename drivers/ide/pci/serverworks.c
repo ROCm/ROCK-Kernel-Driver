@@ -801,7 +801,6 @@ static int __devinit svwks_init_one(struct pci_dev *dev, const struct pci_device
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -828,13 +827,7 @@ static int svwks_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void svwks_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(svwks_ide_init);
-module_exit(svwks_ide_exit);
 
 MODULE_AUTHOR("Michael Aubry. Andrzej Krzysztofowicz, Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for Serverworks OSB4/CSB5/CSB6 IDE");

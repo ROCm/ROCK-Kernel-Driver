@@ -554,7 +554,6 @@ static int __devinit sc1200_init_one(struct pci_dev *dev, const struct pci_devic
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -576,13 +575,7 @@ static int sc1200_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void sc1200_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(sc1200_ide_init);
-module_exit(sc1200_ide_exit);
 
 MODULE_AUTHOR("Mark Lord");
 MODULE_DESCRIPTION("PCI driver module for NS SC1200 IDE");

@@ -413,7 +413,6 @@ static int __devinit cs5530_init_one(struct pci_dev *dev, const struct pci_devic
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -433,13 +432,7 @@ static int cs5530_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void cs5530_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(cs5530_ide_init);
-module_exit(cs5530_ide_exit);
 
 MODULE_AUTHOR("Mark Lord");
 MODULE_DESCRIPTION("PCI driver module for Cyrix/NS 5530 IDE");

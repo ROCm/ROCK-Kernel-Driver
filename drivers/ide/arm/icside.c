@@ -954,18 +954,10 @@ icside_probe(struct expansion_card *ec, const struct ecard_id *id)
 		break;
 	}
 
-	if (ret == 0) {
+	if (ret == 0)
 		ecard_set_drvdata(ec, state);
-
-		/*
-		 * this locks the driver in-core - remove this
-		 * comment and the line below when we can
-		 * safely remove interfaces.
-		 */
-		MOD_INC_USE_COUNT;
-	} else {
+	else
 		kfree(state);
-	}
  out:
 	return ret;
 }
@@ -1048,14 +1040,8 @@ static int __init icside_init(void)
 	return ecard_register_driver(&icside_driver);
 }
 
-static void __exit icside_exit(void)
-{
-	ecard_remove_driver(&icside_driver);
-}
-
 MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("ICS IDE driver");
 
 module_init(icside_init);
-module_exit(icside_exit);

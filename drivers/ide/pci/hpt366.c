@@ -1220,7 +1220,6 @@ static int __devinit hpt366_init_one(struct pci_dev *dev, const struct pci_devic
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -1244,13 +1243,7 @@ static int hpt366_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void hpt366_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(hpt366_ide_init);
-module_exit(hpt366_ide_exit);
 
 MODULE_AUTHOR("Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for Highpoint HPT366 IDE");

@@ -743,7 +743,6 @@ static int __devinit piix_init_one(struct pci_dev *dev, const struct pci_device_
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -815,13 +814,7 @@ static int piix_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void piix_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(piix_ide_init);
-module_exit(piix_ide_exit);
 
 MODULE_AUTHOR("Andre Hedrick, Andrzej Krzysztofowicz");
 MODULE_DESCRIPTION("PCI driver module for Intel PIIX IDE");

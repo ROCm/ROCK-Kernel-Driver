@@ -953,7 +953,6 @@ static int __devinit sis5513_init_one(struct pci_dev *dev, const struct pci_devi
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -973,13 +972,7 @@ static int sis5513_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void sis5513_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(sis5513_ide_init);
-module_exit(sis5513_ide_exit);
 
 MODULE_AUTHOR("Lionel Bouton, L C Chang, Andre Hedrick, Vojtech Pavlik");
 MODULE_DESCRIPTION("PCI driver module for SIS IDE");

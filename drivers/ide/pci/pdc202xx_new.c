@@ -675,7 +675,6 @@ static int __devinit pdc202new_init_one(struct pci_dev *dev, const struct pci_de
 	if (dev->device != d->device)
 		BUG();
 	d->init_setup(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -701,13 +700,7 @@ static int pdc202new_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void pdc202new_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(pdc202new_ide_init);
-module_exit(pdc202new_ide_exit);
 
 MODULE_AUTHOR("Andre Hedrick, Frank Tiernan");
 MODULE_DESCRIPTION("PCI driver module for Promise PDC20268 and higher");
