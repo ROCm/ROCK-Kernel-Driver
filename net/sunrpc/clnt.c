@@ -335,7 +335,7 @@ void rpc_clnt_sigunmask(struct rpc_clnt *clnt, sigset_t *oldset)
  */
 int rpc_call_sync(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
 {
-	struct rpc_task	my_task, *task = &my_task;
+	struct rpc_task	*task;
 	sigset_t	oldset;
 	int		status;
 
@@ -343,15 +343,15 @@ int rpc_call_sync(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
 	if (clnt->cl_dead) 
 		return -EIO;
 
-	if (flags & RPC_TASK_ASYNC) {
-		printk("rpc_call_sync: Illegal flag combination for synchronous task\n");
-		flags &= ~RPC_TASK_ASYNC;
-	}
+	BUG_ON(flags & RPC_TASK_ASYNC);
 
 	rpc_clnt_sigmask(clnt, &oldset);		
 
-	/* Create/initialize a new RPC task */
-	rpc_init_task(task, clnt, NULL, flags);
+	status = -ENOMEM;
+	task = rpc_new_task(clnt, NULL, flags);
+	if (task == NULL)
+		goto out;
+
 	rpc_call_setup(task, msg, 0);
 
 	/* Set up the call info struct and execute the task */
@@ -362,6 +362,7 @@ int rpc_call_sync(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
 		rpc_release_task(task);
 	}
 
+out:
 	rpc_clnt_sigunmask(clnt, &oldset);		
 
 	return status;
