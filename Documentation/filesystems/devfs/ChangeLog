@@ -1926,3 +1926,8 @@ Changes for patch v211
 Changes for patch v212
 
 - Added BKL to <devfs_open> because drivers still need it
+===============================================================================
+Changes for patch v213
+
+- Protected <scan_dir_for_removable> and <get_removable_partition>
+  from changing directory contents
