@@ -44,7 +44,7 @@
 /*
  * log of the size of each IO TLB slab.  The number of slabs is command line controllable.
  */
-#define IO_TLB_SHIFT 16
+#define IO_TLB_SHIFT 11
 
 /*
  * Used to do a quick range check in swiotlb_unmap_single and swiotlb_sync_single_*, to see
@@ -56,7 +56,7 @@ static char *io_tlb_start, *io_tlb_end;
  * The number of IO TLB blocks (in groups of 64) betweeen io_tlb_start and io_tlb_end.
  * This is command line adjustable via setup_io_tlb_npages.
  */
-static unsigned long io_tlb_nslabs = 1024;
+static unsigned long io_tlb_nslabs = 32768;
 
 /*
  * This is a free list describing the number of free entries available from each index
