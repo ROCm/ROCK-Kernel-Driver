@@ -81,8 +81,6 @@
 
 #define RS_EVENT_WRITE_WAKEUP	0
 
-static DECLARE_TASK_QUEUE(tq_riscom);
-
 static struct riscom_board * IRQ_to_board[16];
 static struct tty_driver *riscom_driver;
 static unsigned char * tmp_buf;
@@ -332,17 +330,8 @@ out_release:
 
 static inline void rc_mark_event(struct riscom_port * port, int event)
 {
-	/* 
-         * I'm not quite happy with current scheme all serial
-	 * drivers use their own BH routine.
-         * It seems this easily can be done with one BH routine
-	 * serving for all serial drivers.
-	 * For now I must introduce another one - RISCOM8_BH.
-	 * Still hope this will be changed in near future.
-         */
 	set_bit(event, &port->event);
-	queue_task(&port->tqueue, &tq_riscom);
-	mark_bh(RISCOM8_BH);
+	schedule_work(&port->tqueue);
 }
 
 static inline struct riscom_port * rc_get_port(struct riscom_board const * bp,
@@ -425,7 +414,7 @@ static inline void rc_receive_exc(struct riscom_board const * bp)
 	
 	*tty->flip.char_buf_ptr++ = ch;
 	tty->flip.count++;
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_delayed_work(&tty->flip.work, 1);
 }
 
 static inline void rc_receive(struct riscom_board const * bp)
@@ -456,7 +445,7 @@ static inline void rc_receive(struct riscom_board const * bp)
 		*tty->flip.flag_buf_ptr++ = 0;
 		tty->flip.count++;
 	}
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_delayed_work(&tty->flip.work, 1);
 }
 
 static inline void rc_transmit(struct riscom_board const * bp)
@@ -544,7 +533,7 @@ static inline void rc_check_modem(struct riscom_board const * bp)
 		if (rc_in(bp, CD180_MSVR) & MSVR_CD) 
 			wake_up_interruptible(&port->open_wait);
 		else
-			schedule_task(&port->tqueue_hangup);
+			schedule_work(&port->tqueue_hangup);
 	}
 	
 #ifdef RISCOM_BRAIN_DAMAGED_CTS
@@ -1598,11 +1587,11 @@ static void rc_start(struct tty_struct * tty)
 }
 
 /*
- * This routine is called from the scheduler tqueue when the interrupt
+ * This routine is called from the work queue when the interrupt
  * routine has signalled that a hangup has occurred.  The path of
  * hangup processing is:
  *
- * 	serial interrupt routine -> (scheduler tqueue) ->
+ * 	serial interrupt routine -> (workqueue) ->
  * 	do_rc_hangup() -> tty->hangup() -> rc_hangup()
  * 
  */
@@ -1657,11 +1646,6 @@ static void rc_set_termios(struct tty_struct * tty, struct termios * old_termios
 	}
 }
 
-static void do_riscom_bh(void)
-{
-	 run_task_queue(&tq_riscom);
-}
-
 static void do_softint(void *private_)
 {
 	struct riscom_port	*port = (struct riscom_port *) private_;
@@ -1710,7 +1694,6 @@ static inline int rc_init_drivers(void)
 		put_tty_driver(riscom_driver);
 		return 1;
 	}
-	init_bh(RISCOM8_BH, do_riscom_bh);
 	memset(IRQ_to_board, 0, sizeof(IRQ_to_board));
 	riscom_driver->owner = THIS_MODULE;
 	riscom_driver->name = "ttyL";
@@ -1734,10 +1717,8 @@ static inline int rc_init_drivers(void)
 	memset(rc_port, 0, sizeof(rc_port));
 	for (i = 0; i < RC_NPORT * RC_NBOARD; i++)  {
 		rc_port[i].magic = RISCOM8_MAGIC;
-		rc_port[i].tqueue.routine = do_softint;
-		rc_port[i].tqueue.data = &rc_port[i];
-		rc_port[i].tqueue_hangup.routine = do_rc_hangup;
-		rc_port[i].tqueue_hangup.data = &rc_port[i];
+		INIT_WORK(&rc_port[i].tqueue, do_softint, &rc_port[i]);
+		INIT_WORK(&rc_port[i].tqueue_hangup, do_rc_hangup, &rc_port[i]);
 		rc_port[i].close_delay = 50 * HZ/100;
 		rc_port[i].closing_wait = 3000 * HZ/100;
 		init_waitqueue_head(&rc_port[i].open_wait);
@@ -1753,7 +1734,6 @@ static void rc_release_drivers(void)
 
 	save_flags(flags);
 	cli();
-	remove_bh(RISCOM8_BH);
 	free_page((unsigned long)tmp_buf);
 	tty_unregister_driver(riscom_driver);
 	put_tty_driver(riscom_driver);
