@@ -296,7 +296,7 @@ static int __fat_access(struct super_block *sb, int nr, int new_value)
 	return next;
 }
 
-/* 
+/*
  * Returns the this'th FAT entry, -1 if it is an end-of-file entry. If
  * new_value is != -1, that FAT entry is replaced by it.
  */
@@ -343,7 +343,7 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 	int nr;
 
 	BUG_ON(MSDOS_I(inode)->i_start == 0);
-	
+
 	*fclus = 0;
 	*dclus = MSDOS_I(inode)->i_start;
 	if (cluster == 0)
@@ -368,7 +368,7 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 
 		nr = fat_access(sb, *dclus, -1);
 		if (nr < 0)
- 			return nr;
+			return nr;
 		else if (nr == FAT_ENT_FREE) {
 			fat_fs_panic(sb, "%s: invalid cluster chain"
 				     " (i_pos %lld)", __FUNCTION__,
@@ -436,66 +436,4 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys)
 			+ sbi->data_start + offset;
 	}
 	return 0;
-}
-
-/* Free all clusters after the skip'th cluster. */
-int fat_free(struct inode *inode, int skip)
-{
-	struct super_block *sb = inode->i_sb;
-	int nr, ret, fclus, dclus;
-
-	if (MSDOS_I(inode)->i_start == 0)
-		return 0;
-
-	if (skip) {
-		ret = fat_get_cluster(inode, skip - 1, &fclus, &dclus);
-		if (ret < 0)
-			return ret;
-		else if (ret == FAT_ENT_EOF)
-			return 0;
-
-		nr = fat_access(sb, dclus, -1);
-		if (nr == FAT_ENT_EOF)
-			return 0;
-		else if (nr > 0) {
-			/*
-			 * write a new EOF, and get the remaining cluster
-			 * chain for freeing.
-			 */
-			nr = fat_access(sb, dclus, FAT_ENT_EOF);
-		}
-		if (nr < 0)
-			return nr;
-
-		fat_cache_inval_inode(inode);
-	} else {
-		fat_cache_inval_inode(inode);
-
-		nr = MSDOS_I(inode)->i_start;
-		MSDOS_I(inode)->i_start = 0;
-		MSDOS_I(inode)->i_logstart = 0;
-		mark_inode_dirty(inode);
-	}
-
-	lock_fat(sb);
-	do {
-		nr = fat_access(sb, nr, FAT_ENT_FREE);
-		if (nr < 0)
-			goto error;
-		else if (nr == FAT_ENT_FREE) {
-			fat_fs_panic(sb, "%s: deleting beyond EOF (i_pos %lld)",
-				     __FUNCTION__, MSDOS_I(inode)->i_pos);
-			nr = -EIO;
-			goto error;
-		}
-		if (MSDOS_SB(sb)->free_clusters != -1)
-			MSDOS_SB(sb)->free_clusters++;
-		inode->i_blocks -= MSDOS_SB(sb)->cluster_size >> 9;
-	} while (nr != FAT_ENT_EOF);
-	fat_clusters_flush(sb);
-	nr = 0;
-error:
-	unlock_fat(sb);
-
-	return nr;
 }

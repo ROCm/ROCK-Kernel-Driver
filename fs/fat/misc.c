@@ -88,8 +88,8 @@ int fat_add_cluster(struct inode *inode)
 	struct super_block *sb = inode->i_sb;
 	int ret, count, limit, new_dclus, new_fclus, last;
 	int cluster_bits = MSDOS_SB(sb)->cluster_bits;
-	
-	/* 
+
+	/*
 	 * We must locate the last cluster of the file to add this new
 	 * one (new_dclus) to the end of the link list (the FAT).
 	 *
@@ -109,7 +109,7 @@ int fat_add_cluster(struct inode *inode)
 
 	/* find free FAT entry */
 	lock_fat(sb);
-	
+
 	if (MSDOS_SB(sb)->free_clusters == 0) {
 		unlock_fat(sb);
 		return -ENOSPC;
@@ -145,7 +145,7 @@ int fat_add_cluster(struct inode *inode)
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		MSDOS_SB(sb)->free_clusters--;
 	fat_clusters_flush(sb);
-	
+
 	unlock_fat(sb);
 
 	/* add new one to the last of the cluster chain */
@@ -169,65 +169,23 @@ int fat_add_cluster(struct inode *inode)
 	return new_dclus;
 }
 
-struct buffer_head *fat_extend_dir(struct inode *inode)
-{
-	struct super_block *sb = inode->i_sb;
-	struct buffer_head *bh, *res = NULL;
-	int nr, sec_per_clus = MSDOS_SB(sb)->sec_per_clus;
-	sector_t sector, last_sector;
-
-	if (MSDOS_SB(sb)->fat_bits != 32) {
-		if (inode->i_ino == MSDOS_ROOT_INO)
-			return ERR_PTR(-ENOSPC);
-	}
-
-	nr = fat_add_cluster(inode);
-	if (nr < 0)
-		return ERR_PTR(nr);
-	
-	sector = ((sector_t)nr - 2) * sec_per_clus + MSDOS_SB(sb)->data_start;
-	last_sector = sector + sec_per_clus;
-	for ( ; sector < last_sector; sector++) {
-		if ((bh = sb_getblk(sb, sector))) {
-			memset(bh->b_data, 0, sb->s_blocksize);
-			set_buffer_uptodate(bh);
-			mark_buffer_dirty(bh);
-			if (!res)
-				res = bh;
-			else
-				brelse(bh);
-		}
-	}
-	if (res == NULL)
-		res = ERR_PTR(-EIO);
-	if (inode->i_size & (sb->s_blocksize - 1)) {
-		fat_fs_panic(sb, "Odd directory size");
-		inode->i_size = (inode->i_size + sb->s_blocksize)
-			& ~((loff_t)sb->s_blocksize - 1);
-	}
-	inode->i_size += MSDOS_SB(sb)->cluster_size;
-	MSDOS_I(inode)->mmu_private += MSDOS_SB(sb)->cluster_size;
-
-	return res;
-}
-
-/* Linear day numbers of the respective 1sts in non-leap years. */
-
-static int day_n[] = { 0,31,59,90,120,151,181,212,243,273,304,334,0,0,0,0 };
-		  /* JanFebMarApr May Jun Jul Aug Sep Oct Nov Dec */
-
-
 extern struct timezone sys_tz;
 
+/* Linear day numbers of the respective 1sts in non-leap years. */
+static int day_n[] = {
+   /* Jan  Feb  Mar  Apr   May  Jun  Jul  Aug  Sep  Oct  Nov  Dec */
+	0,  31,  59,  90,  120, 151, 181, 212, 243, 273, 304, 334, 0, 0, 0, 0
+};
 
 /* Convert a MS-DOS time/date pair to a UNIX date (seconds since 1 1 70). */
-
-int date_dos2unix(unsigned short time,unsigned short date)
+int date_dos2unix(unsigned short time, unsigned short date)
 {
-	int month,year,secs;
+	int month, year, secs;
 
-	/* first subtract and mask after that... Otherwise, if
-	   date == 0, bad things happen */
+	/*
+	 * first subtract and mask after that... Otherwise, if
+	 * date == 0, bad things happen
+	 */
 	month = ((date >> 5) - 1) & 15;
 	year = date >> 9;
 	secs = (time & 31)*2+60*((time >> 5) & 63)+(time >> 11)*3600+86400*
@@ -238,12 +196,10 @@ int date_dos2unix(unsigned short time,unsigned short date)
 	return secs;
 }
 
-
 /* Convert linear UNIX date to a MS-DOS time/date pair. */
-
-void fat_date_unix2dos(int unix_date,__le16 *time, __le16 *date)
+void fat_date_unix2dos(int unix_date, __le16 *time, __le16 *date)
 {
-	int day,year,nl_day,month;
+	int day, year, nl_day, month;
 
 	unix_date -= sys_tz.tz_minuteswest*60;
 
@@ -255,16 +211,18 @@ void fat_date_unix2dos(int unix_date,__le16 *time, __le16 *date)
 	    (((unix_date/3600) % 24) << 11));
 	day = unix_date/86400-3652;
 	year = day/365;
-	if ((year+3)/4+365*year > day) year--;
+	if ((year+3)/4+365*year > day)
+		year--;
 	day -= (year+3)/4+365*year;
 	if (day == 59 && !(year & 3)) {
 		nl_day = day;
 		month = 2;
-	}
-	else {
+	} else {
 		nl_day = (year & 3) || day <= 59 ? day : day-1;
-		for (month = 0; month < 12; month++)
-			if (day_n[month] > nl_day) break;
+		for (month = 0; month < 12; month++) {
+			if (day_n[month] > nl_day)
+				break;
+		}
 	}
 	*date = cpu_to_le16(nl_day-day_n[month-1]+1+(month << 5)+(year << 9));
 }
@@ -279,10 +237,10 @@ EXPORT_SYMBOL(fat_date_unix2dos);
    AV. want the next entry (took one explicit de=NULL in vfat/namei.c).
    AV. It's done in fat_get_entry() (inlined), here the slow case lives.
    AV. Additionally, when we return -1 (i.e. reached the end of directory)
-   AV. we make bh NULL. 
+   AV. we make bh NULL.
  */
 
-int fat__get_entry(struct inode *dir, loff_t *pos,struct buffer_head **bh,
+int fat__get_entry(struct inode *dir, loff_t *pos, struct buffer_head **bh,
 		   struct msdos_dir_entry **de, loff_t *i_pos)
 {
 	struct super_block *sb = dir->i_sb;
