@@ -829,8 +829,6 @@ static void destroy_serial (struct kobject *kobj)
 		}
 	}
 
-	usb_put_dev(serial->dev);
-	serial->dev = NULL;
 	serial_shutdown (serial);
 
 	for (i = 0; i < serial->num_ports; ++i)
@@ -868,6 +866,8 @@ static void destroy_serial (struct kobject *kobj)
 	}
 	/* return the minor range that this device had */
 	return_serial (serial);
+
+	usb_put_dev(serial->dev);
 
 	/* free up any memory that we allocated */
 	kfree (serial);
