@@ -212,7 +212,7 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	if (in_interrupt() || !mm)
 		goto no_context;
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
@@ -270,7 +270,7 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
                 goto out_of_memory;
 	}
 
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	return;
 	
 	/*
@@ -280,7 +280,7 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 
  bad_area:
 
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
  bad_area_nosemaphore:
 	DPG(show_registers(regs));
@@ -334,14 +334,14 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	 */
 
  out_of_memory:
-        up(&mm->mmap_sem);
+        up_read(&mm->mmap_sem);
 	printk("VM: killing process %s\n", tsk->comm);
 	if(user_mode(regs))
 		do_exit(SIGKILL);
 	goto no_context;
 
  do_sigbus:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	/*
          * Send a sigbus, regardless of whether we were in kernel

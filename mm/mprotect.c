@@ -242,7 +242,8 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len, unsigned long prot
 	if (end == start)
 		return 0;
 
-	down(&current->mm->mmap_sem);
+	/* XXX: maybe this could be down_read ??? - Rik */
+	down_write(&current->mm->mmap_sem);
 
 	vma = find_vma(current->mm, start);
 	error = -EFAULT;
@@ -278,6 +279,6 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len, unsigned long prot
 		}
 	}
 out:
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return error;
 }

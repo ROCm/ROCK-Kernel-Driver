@@ -32,7 +32,7 @@ bdflush:
 
 This file controls the operation of the bdflush kernel
 daemon. The source code to this struct can be found in
-linux/mm/buffer.c. It currently contains 9 integer values,
+linux/fs/buffer.c. It currently contains 9 integer values,
 of which 6 are actually used by the kernel.
 
 From linux/fs/buffer.c:

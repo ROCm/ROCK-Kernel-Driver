@@ -102,7 +102,7 @@ ia64_brk (unsigned long brk, long arg1, long arg2, long arg3,
 	 * check and the clearing of r8.  However, we can't call sys_brk() because we need
 	 * to acquire the mmap_sem before we can do the test...
 	 */
-	down(&mm->mmap_sem);
+	down_write(&mm->mmap_sem);
 
 	if (brk < mm->end_code)
 		goto out;
@@ -142,7 +142,7 @@ set_brk:
 	mm->brk = brk;
 out:
 	retval = mm->brk;
-	up(&mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	regs->r8 = 0;		/* ensure large retval isn't mistaken as error code */
 	return retval;
 }
@@ -200,9 +200,9 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 	if (flags & MAP_SHARED)
 		current->thread.flags |= IA64_THREAD_MAP_SHARED;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	addr = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	current->thread.flags &= ~IA64_THREAD_MAP_SHARED;
 

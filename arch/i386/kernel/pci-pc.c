@@ -968,13 +968,23 @@ static void __init pci_fixup_vt8363(struct pci_dev *d)
 		printk("PCI: Bus master Pipeline request disabled\n");
 		pci_write_config_byte(d, 0x54, tmp & ~(1<<2));
 	}
+	pci_read_config_byte(d, 0x54, &tmp);
+	if(tmp & (1)) {
+		printk("PCI: Fast Write to Read turnaround disabled\n");
+		pci_write_config_byte(d, 0x54, tmp & ~(1));
+	}
 	pci_read_config_byte(d, 0x70, &tmp);
 	if(tmp & (1<<3)) {
 		printk("PCI: Disabled enhanced CPU to PCI writes\n");
 		pci_write_config_byte(d, 0x70, tmp & ~(1<<3));
 	}
+	pci_read_config_byte(d, 0x70, &tmp);
+	if(tmp & (1<<2)) {
+		printk("PCI: Disabled Master Read Caching\n");
+		pci_write_config_byte(d, 0x70, tmp & ~(1<<2));
+	}
 	pci_read_config_byte(d, 0x71, &tmp);
-	if(!(tmp & (1<<3))) {
+	if ((tmp & (1<<3))==0) {
 		printk("PCI: Bursting cornercase bug worked around\n");
 		pci_write_config_byte(d, 0x71, tmp | (1<<3));
 	}
@@ -984,6 +994,34 @@ static void __init pci_fixup_vt8363(struct pci_dev *d)
 		pci_write_config_byte(d, 0x76, tmp & ~(1<<7));
 	}
 }
+
+static void __init pci_fixup_via691(struct pci_dev *d)
+{
+	/*
+	 * The VIA bridge corrupts with Posting enabled
+	 */
+	u8 tmp;
+	
+	pci_read_config_byte(d, 0x70, &tmp);
+	if(tmp & (1<<7)) {
+		printk("PCI: Disabled enhanced CPU to PCI posting\n");
+		pci_write_config_byte(d, 0x70, tmp & ~(1<<7));
+	}
+}
+static void __init pci_fixup_via691_2(struct pci_dev *d)
+{
+	/*
+	 * The VIA bridge corrupts with Posting enabled
+	 */
+	u8 tmp;
+	
+	pci_read_config_byte(d, 0x40, &tmp);
+	if(tmp & (1<<7)) {
+		printk("PCI: Disabled enhanced CPU to PCI posting #2\n");
+		pci_write_config_byte(d, 0x40, tmp & ~(1<<7));
+	}
+}
+
 
 struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82451NX,	pci_fixup_i450nx },
@@ -1005,7 +1043,10 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5598,		pci_fixup_latency },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	pci_fixup_via_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	pci_fixup_via_acpi },
- 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	pci_fixup_vt8363 },	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	pci_fixup_piix4_acpi },
+ 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	pci_fixup_vt8363 },
+ 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C691,	pci_fixup_via691 },
+ 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C598_1,	pci_fixup_via691_2 },
+ 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	pci_fixup_piix4_acpi },
 	{ 0 }
 };
 

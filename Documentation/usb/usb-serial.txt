@@ -223,6 +223,28 @@ MCT USB Single Port Serial Adapter U232
  this driver. Also, D-Link's DU-H3SP USB BAY also works with this driver.
 
 
+Inside Out Networks Edgeport Driver
+
+  This driver supports all devices made by Inside Out Networks, specifically
+  the following models:
+       Edgeport/4
+       Rapidport/4
+       Edgeport/4t
+       Edgeport/2
+       Edgeport/4i
+       Edgeport/2i
+       Edgeport/421
+       Edgeport/21
+       Edgeport/8
+       Edgeport/8 Dual
+       Edgeport/2D8
+       Edgeport/4D8
+       Edgeport/8i
+       Edgeport/2 DIN
+       Edgeport/4 DIN
+       Edgeport/16 Dual
+
+
 Generic Serial driver
 
   If your device is not one of the above listed devices, compatible with

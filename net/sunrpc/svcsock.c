@@ -214,8 +214,6 @@ svc_sock_release(struct svc_rqst *rqstp)
 	struct svc_sock	*svsk = rqstp->rq_sock;
 	struct svc_serv	*serv = svsk->sk_server;
 
-	if (!svsk)
-		return;
 	svc_release_skb(rqstp);
 	rqstp->rq_sock = NULL;
 

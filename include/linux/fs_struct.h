@@ -13,7 +13,7 @@ struct fs_struct {
 #define INIT_FS { \
 	ATOMIC_INIT(1), \
 	RW_LOCK_UNLOCKED, \
-	0022, \
+	0000, \
 	NULL, NULL, NULL, NULL, NULL, NULL \
 }
 

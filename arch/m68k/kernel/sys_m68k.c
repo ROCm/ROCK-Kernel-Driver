@@ -59,9 +59,9 @@ static inline long do_mmap2(
 			goto out;
 	}
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	if (file)
 		fput(file);
@@ -146,9 +146,9 @@ asmlinkage long sys_mmap64(struct mmap_arg_struct64 *arg)
 	}
 	a.flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	error = do_mmap_pgoff(file, a.addr, a.len, a.prot, a.flags, pgoff);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	if (file)
 		fput(file);
 out:

@@ -60,7 +60,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 	printk("[%s:%d:%08lx:%ld:%08lx]\n", current->comm, current->pid,
 	       address, write, regs->cp0_epc);
 #endif
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
@@ -103,7 +103,7 @@ good_area:
 		goto out_of_memory;
 	}
 
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	return;
 
 /*
@@ -111,7 +111,7 @@ good_area:
  * Fix it, but check if it's kernel or user first..
  */
 bad_area:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	if (user_mode(regs)) {
 		tsk->thread.cp0_badvaddr = address;
@@ -163,14 +163,14 @@ no_context:
  * us unable to handle the page fault gracefully.
  */
 out_of_memory:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	printk("VM: killing process %s\n", tsk->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
 	goto no_context;
 
 do_sigbus:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	/*
 	 * Send a sigbus, regardless of whether we were in kernel

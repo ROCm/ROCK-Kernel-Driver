@@ -159,7 +159,7 @@ struct usb_serial_device_type handspring_device = {
 
 
 #define NUM_URBS			24
-#define URB_TRANSFER_BUFFER_SIZE	64
+#define URB_TRANSFER_BUFFER_SIZE	768
 static struct urb	*write_urb_pool[NUM_URBS];
 static spinlock_t	write_urb_pool_lock;
 static int		bytes_in;

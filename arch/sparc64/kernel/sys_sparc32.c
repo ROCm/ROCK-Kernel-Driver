@@ -4133,7 +4133,7 @@ asmlinkage unsigned long sys32_mremap(unsigned long addr,
 		goto out;
 	if (addr > 0xf0000000UL - old_len)
 		goto out;
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	vma = find_vma(current->mm, addr);
 	if (vma && (vma->vm_flags & VM_SHARED))
 		current->thread.flags |= SPARC_FLAG_MMAPSHARED;
@@ -4152,7 +4152,7 @@ asmlinkage unsigned long sys32_mremap(unsigned long addr,
 	ret = do_mremap(addr, old_len, new_len, flags, new_addr);
 out_sem:
 	current->thread.flags &= ~(SPARC_FLAG_MMAPSHARED);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 out:
 	return ret;       
 }

@@ -346,7 +346,8 @@ typedef struct
 
 
 typedef struct ohci {
-	struct ohci_hcca hcca;		/* hcca */
+	struct ohci_hcca *hcca;		/* hcca */
+	u32 hcca_dma;
 
 	int irq;
 	int disabled;			/* e.g. got a UE, we're hung */

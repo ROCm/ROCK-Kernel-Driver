@@ -4,7 +4,7 @@ The intent of this file is to have an uptodate, running commentary
 from different people about how locking and synchronization is done 
 in the Linux vm code.
 
-page_table_lock
+page_table_lock & mmap_sem
 --------------------------------------
 
 Page stealers pick processes out of the process pool and scan for 
@@ -23,29 +23,23 @@ present in the user's pte is not released till after swapout() returns.
 
 Any code that modifies the vmlist, or the vm_start/vm_end/
 vm_flags:VM_LOCKED/vm_next of any vma *in the list* must prevent 
-kswapd from looking at the chain. This does not include driver mmap() 
-methods, for example, since the vma is still not in the list.
+kswapd from looking at the chain.
 
 The rules are:
-1. To modify the vmlist (add/delete or change fields in an element), 
-you must hold mmap_sem to guard against clones doing mmap/munmap/faults, 
-(ie all vm system calls and faults), and from ptrace, swapin due to 
-swap deletion etc.
-2. To modify the vmlist (add/delete or change fields in an element), 
-you must also hold page_table_lock, to guard against page stealers 
-scanning the list.
-3. To scan the vmlist (find_vma()), you must either 
-        a. grab mmap_sem, which should be done by all cases except 
-	   page stealer.
-or
-        b. grab page_table_lock, only done by page stealer.
-4. While holding the page_table_lock, you must be able to guarantee
-that no code path will lead to page stealing. A better guarantee is
-to claim non sleepability, which ensures that you are not sleeping
-for a lock, whose holder might in turn be doing page stealing.
+1. To scan the vmlist (look but don't touch) you must hold the
+   mmap_sem with read bias, i.e. down_read(&mm->mmap_sem)
+2. To modify the vmlist you need to hold the mmap_sem with
+   read&write bias, i.e. down_write(&mm->mmap_sem)  *AND*
+   you need to take the page_table_lock.
+3. The swapper takes _just_ the page_table_lock, this is done
+   because the mmap_sem can be an extremely long lived lock
+   and the swapper just cannot sleep on that.
+4. The exception to this rule is expand_stack, which just
+   takes the read lock and the page_table_lock, this is ok
+   because it doesn't really modify fields anybody relies on.
 5. You must be able to guarantee that while holding page_table_lock
-or page_table_lock of mm A, you will not try to get either lock
-for mm B.
+   or page_table_lock of mm A, you will not try to get either lock
+   for mm B.
 
 The caveats are:
 1. find_vma() makes use of, and updates, the mmap_cache pointer hint.

@@ -60,7 +60,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	if (in_interrupt() || !mm)
 		goto no_context;
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 
 	vma = find_vma_prev(mm, address, &prev_vma);
 	if (!vma)
@@ -112,7 +112,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	      default:
 		goto out_of_memory;
 	}
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	return;
 
   check_expansion:
@@ -135,7 +135,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	goto good_area;
 
   bad_area:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	if (isr & IA64_ISR_SP) {
 		/*
 		 * This fault was due to a speculative load set the "ed" bit in the psr to
@@ -185,7 +185,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	return;
 
   out_of_memory:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);

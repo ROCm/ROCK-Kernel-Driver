@@ -1752,7 +1752,7 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 	struct vm_area_struct * vma;
 	int unmapped_error, error = -EINVAL;
 
-	down(&current->mm->mmap_sem);
+	down_read(&current->mm->mmap_sem);
 	if (start & ~PAGE_MASK)
 		goto out;
 	len = (len + ~PAGE_MASK) & PAGE_MASK;
@@ -1798,7 +1798,7 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 		vma = vma->vm_next;
 	}
 out:
-	up(&current->mm->mmap_sem);
+	up_read(&current->mm->mmap_sem);
 	return error;
 }
 
@@ -2097,7 +2097,7 @@ asmlinkage long sys_madvise(unsigned long start, size_t len, int behavior)
 	int unmapped_error = 0;
 	int error = -EINVAL;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 
 	if (start & ~PAGE_MASK)
 		goto out;
@@ -2148,7 +2148,7 @@ asmlinkage long sys_madvise(unsigned long start, size_t len, int behavior)
 	}
 
 out:
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return error;
 }
 
@@ -2250,7 +2250,7 @@ asmlinkage long sys_mincore(unsigned long start, size_t len,
 	int unmapped_error = 0;
 	long error = -EINVAL;
 
-	down(&current->mm->mmap_sem);
+	down_read(&current->mm->mmap_sem);
 
 	if (start & ~PAGE_CACHE_MASK)
 		goto out;
@@ -2302,7 +2302,7 @@ asmlinkage long sys_mincore(unsigned long start, size_t len,
 	}
 
 out:
-	up(&current->mm->mmap_sem);
+	up_read(&current->mm->mmap_sem);
 	return error;
 }
 

@@ -49,7 +49,7 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 	if (address >= end)
 		BUG();
 	do {
-		pte_t * pte = pte_alloc_kernel(pmd, address);
+		pte_t * pte = pte_alloc(&init_mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		remap_area_pte(pte, address, end - address, address + phys_addr, flags);
@@ -72,7 +72,7 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
 		BUG();
 	do {
 		pmd_t *pmd;
-		pmd = pmd_alloc_kernel(dir, address);
+		pmd = pmd_alloc(&init_mm, dir, address);
 		if (!pmd)
 			return -ENOMEM;
 		if (remap_area_pmd(pmd, address, end - address,

@@ -100,12 +100,12 @@ asmlinkage u32 sunos_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u32 of
 	flags &= ~_MAP_NEW;
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	retval = do_mmap(file,
 			 (unsigned long) addr, (unsigned long) len,
 			 (unsigned long) prot, (unsigned long) flags,
 			 (unsigned long) off);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	if(!ret_type)
 		retval = ((retval < 0xf0000000) ? 0 : retval);
 out_putf:
@@ -126,7 +126,7 @@ asmlinkage int sunos_brk(u32 baddr)
 	unsigned long rlim;
 	unsigned long newbrk, oldbrk, brk = (unsigned long) baddr;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	if (brk < current->mm->end_code)
 		goto out;
 	newbrk = PAGE_ALIGN(brk);
@@ -170,7 +170,7 @@ asmlinkage int sunos_brk(u32 baddr)
 	do_brk(oldbrk, newbrk-oldbrk);
 	retval = 0;
 out:
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return retval;
 }
 

@@ -260,11 +260,11 @@ elf_map32 (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 #	define IA32_PAGEOFFSET(_v) ((_v) & (ELF_EXEC_PAGESIZE-1))
 #	define IA32_PAGEALIGN(_v) (((_v) + ELF_EXEC_PAGESIZE - 1) & ~(ELF_EXEC_PAGESIZE - 1))
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	retval = ia32_do_mmap(filep, IA32_PAGESTART(addr),
 			      eppnt->p_filesz + IA32_PAGEOFFSET(eppnt->p_vaddr), prot, type,
 			      eppnt->p_offset - IA32_PAGEOFFSET(eppnt->p_vaddr));
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 #endif
 	return retval;
 }

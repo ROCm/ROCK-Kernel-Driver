@@ -201,7 +201,7 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 {
 	atomic_set(&mm->mm_users, 1);
 	atomic_set(&mm->mm_count, 1);
-	init_MUTEX(&mm->mmap_sem);
+	init_rwsem(&mm->mmap_sem);
 	mm->page_table_lock = SPIN_LOCK_UNLOCKED;
 	mm->pgd = pgd_alloc();
 	if (mm->pgd)
@@ -314,9 +314,9 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	if (!mm_init(mm))
 		goto fail_nomem;
 
-	down(&oldmm->mmap_sem);
+	down_write(&oldmm->mmap_sem);
 	retval = dup_mmap(mm);
-	up(&oldmm->mmap_sem);
+	up_write(&oldmm->mmap_sem);
 
 	/*
 	 * Add it to the mmlist after the parent.

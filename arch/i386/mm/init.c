@@ -111,61 +111,23 @@ void __handle_bad_pmd_kernel(pmd_t *pmd)
 	set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(get_bad_pte_table())));
 }
 
-pte_t *get_pte_kernel_slow(pmd_t *pmd, unsigned long offset)
-{
-	pte_t *pte;
-
-	pte = (pte_t *) __get_free_page(GFP_KERNEL);
-	if (pmd_none(*pmd)) {
-		if (pte) {
-			clear_page(pte);
-			set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)));
-			return pte + offset;
-		}
-		set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(get_bad_pte_table())));
-		return NULL;
-	}
-	free_page((unsigned long)pte);
-	if (pmd_bad(*pmd)) {
-		__handle_bad_pmd_kernel(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
-
-pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
-{
-	unsigned long pte;
-
-	pte = (unsigned long) __get_free_page(GFP_KERNEL);
-	if (pmd_none(*pmd)) {
-		if (pte) {
-			clear_page((void *)pte);
-			set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)));
-			return (pte_t *)pte + offset;
-		}
-		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(get_bad_pte_table())));
-		return NULL;
-	}
-	free_page(pte);
-	if (pmd_bad(*pmd)) {
-		__handle_bad_pmd(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
-
 int do_check_pgt_cache(int low, int high)
 {
 	int freed = 0;
 	if(pgtable_cache_size > high) {
 		do {
-			if(pgd_quicklist)
-				free_pgd_slow(get_pgd_fast()), freed++;
-			if(pmd_quicklist)
-				free_pmd_slow(get_pmd_fast()), freed++;
-			if(pte_quicklist)
-				free_pte_slow(get_pte_fast()), freed++;
+			if (pgd_quicklist) {
+				free_pgd_slow(get_pgd_fast());
+				freed++;
+			}
+			if (pmd_quicklist) {
+				pmd_free_slow(pmd_alloc_one_fast());
+				freed++;
+			}
+			if (pte_quicklist) {
+				pte_free_slow(pte_alloc_one_fast());
+				freed++;
+			}
 		} while(pgtable_cache_size > low);
 	}
 	return freed;

@@ -286,11 +286,11 @@ qcntl_ioctl (struct inode *inode, struct file *filp, unsigned int cmd, unsigned 
 			s = req.arg * sizeof (struct shmqevent) +
 			    sizeof (struct sharedMemoryInputQueue);
 			v = sys_munmap (vaddr, s);
-			down(&current->mm->mmap_sem);
+			down_write(&current->mm->mmap_sem);
 			do_munmap(current->mm, vaddr, s);
 			do_mmap(filp, vaddr, s, PROT_READ | PROT_WRITE,
 			        MAP_PRIVATE|MAP_FIXED, 0);
-			up(&current->mm->mmap_sem);
+			up_write(&current->mm->mmap_sem);
 			shmiqs[minor].events = req.arg;
 			shmiqs[minor].mapped = 1;
 

@@ -69,9 +69,9 @@ do_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
 			goto out;
 	}
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	if (file)
 		fput(file);

@@ -208,7 +208,7 @@ struct mm_struct {
 	atomic_t mm_users;			/* How many users with user space? */
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */
 	int map_count;				/* number of VMAs */
-	struct semaphore mmap_sem;
+	struct rw_semaphore mmap_sem;
 	spinlock_t page_table_lock;
 
 	struct list_head mmlist;		/* List of all active mm's */
@@ -236,7 +236,7 @@ extern int mmlist_nr;
 	mm_users:	ATOMIC_INIT(2), 		\
 	mm_count:	ATOMIC_INIT(1), 		\
 	map_count:	1, 				\
-	mmap_sem:	__MUTEX_INITIALIZER(name.mmap_sem), \
+	mmap_sem:	__RWSEM_INITIALIZER(name.mmap_sem, RW_LOCK_BIAS), \
 	page_table_lock: SPIN_LOCK_UNLOCKED, 		\
 	mmlist:		LIST_HEAD_INIT(name.mmlist),	\
 }

@@ -51,9 +51,9 @@ static inline pte_t *alloc_one_pte(struct mm_struct *mm, unsigned long addr)
 	pmd_t * pmd;
 	pte_t * pte = NULL;
 
-	pmd = pmd_alloc(pgd_offset(mm, addr), addr);
+	pmd = pmd_alloc(mm, pgd_offset(mm, addr), addr);
 	if (pmd)
-		pte = pte_alloc(pmd, addr);
+		pte = pte_alloc(mm, pmd, addr);
 	return pte;
 }
 
@@ -62,7 +62,6 @@ static inline int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
 	int error = 0;
 	pte_t pte;
 
-	spin_lock(&mm->page_table_lock);
 	if (!pte_none(*src)) {
 		pte = ptep_get_and_clear(src);
 		if (!dst) {
@@ -72,7 +71,6 @@ static inline int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
 		}
 		set_pte(dst, pte);
 	}
-	spin_unlock(&mm->page_table_lock);
 	return error;
 }
 
@@ -81,9 +79,11 @@ static int move_one_page(struct mm_struct *mm, unsigned long old_addr, unsigned 
 	int error = 0;
 	pte_t * src;
 
+	spin_lock(&mm->page_table_lock);
 	src = get_one_pte(mm, old_addr);
 	if (src)
 		error = copy_one_pte(mm, src, alloc_one_pte(mm, new_addr));
+	spin_unlock(&mm->page_table_lock);
 	return error;
 }
 
@@ -292,8 +292,8 @@ asmlinkage unsigned long sys_mremap(unsigned long addr,
 {
 	unsigned long ret;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	ret = do_mremap(addr, old_len, new_len, flags, new_addr);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return ret;
 }

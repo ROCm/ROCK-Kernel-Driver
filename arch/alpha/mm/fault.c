@@ -113,7 +113,7 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
 		goto vmalloc_fault;
 #endif
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
@@ -146,7 +146,7 @@ good_area:
 	 * the fault.
 	 */
 	fault = handle_mm_fault(mm, vma, address, cause > 0);
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	if (fault < 0)
 		goto out_of_memory;
@@ -160,7 +160,7 @@ good_area:
  * Fix it, but check if it's kernel or user first..
  */
 bad_area:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	if (user_mode(regs)) {
 		force_sig(SIGSEGV, current);

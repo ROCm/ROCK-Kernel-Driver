@@ -214,11 +214,11 @@ elf_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int pro
 {
 	unsigned long map_addr;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	map_addr = do_mmap(filep, ELF_PAGESTART(addr),
 			   eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr), prot, type,
 			   eppnt->p_offset - ELF_PAGEOFFSET(eppnt->p_vaddr));
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return(map_addr);
 }
 
@@ -732,10 +732,10 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		   Since we do not have the power to recompile these, we
 		   emulate the SVr4 behavior.  Sigh.  */
 		/* N.B. Shouldn't the size here be PAGE_SIZE?? */
-		down(&current->mm->mmap_sem);
+		down_write(&current->mm->mmap_sem);
 		error = do_mmap(NULL, 0, 4096, PROT_READ | PROT_EXEC,
 				MAP_FIXED | MAP_PRIVATE, 0);
-		up(&current->mm->mmap_sem);
+		up_write(&current->mm->mmap_sem);
 	}
 
 #ifdef ELF_PLAT_INIT
@@ -816,7 +816,7 @@ static int load_elf_library(struct file *file)
 	while (elf_phdata->p_type != PT_LOAD) elf_phdata++;
 
 	/* Now use mmap to map the library into memory. */
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	error = do_mmap(file,
 			ELF_PAGESTART(elf_phdata->p_vaddr),
 			(elf_phdata->p_filesz +
@@ -825,7 +825,7 @@ static int load_elf_library(struct file *file)
 			MAP_FIXED | MAP_PRIVATE | MAP_DENYWRITE,
 			(elf_phdata->p_offset -
 			 ELF_PAGEOFFSET(elf_phdata->p_vaddr)));
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	if (error != ELF_PAGESTART(elf_phdata->p_vaddr))
 		goto out_free_ph;
 
@@ -1203,15 +1203,15 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 			pte_t *pte;
 
 			pgd = pgd_offset(vma->vm_mm, addr);
-			pmd = pmd_alloc(pgd, addr);
+			pmd = pmd_offset(pgd, addr);
 	
 			if (!pmd)
-				goto end_coredump;
-			pte = pte_alloc(pmd, addr);
+				goto nextpage_coredump;
+			pte = pte_offset(pmd, addr);
 			if (!pte)
-				goto end_coredump;
-			if (!pte_present(*pte) &&
-			    pte_none(*pte)) {
+				goto nextpage_coredump;
+			if (pte_none(*pte)) {
+nextpage_coredump:
 				DUMP_SEEK (file->f_pos + PAGE_SIZE);
 			} else {
 				DUMP_WRITE((void*)addr, PAGE_SIZE);

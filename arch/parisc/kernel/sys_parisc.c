@@ -51,7 +51,7 @@ int sys_mmap(unsigned long addr, unsigned long len,
 	struct file * file = NULL;
 	int error;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	lock_kernel();
 	if (!(flags & MAP_ANONYMOUS)) {
 		error = -EBADF;
@@ -65,7 +65,7 @@ int sys_mmap(unsigned long addr, unsigned long len,
 		fput(file);
 out:
 	unlock_kernel();
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return error;
 }
 

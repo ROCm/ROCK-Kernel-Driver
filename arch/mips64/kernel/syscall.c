@@ -64,9 +64,9 @@ sys_mmap(unsigned long addr, size_t len, unsigned long prot,
 	}
         flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
         error = do_mmap(file, addr, len, prot, flags, offset);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
         if (file)
                 fput(file);
 out:

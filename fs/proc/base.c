@@ -64,7 +64,7 @@ static int proc_exe_link(struct inode *inode, struct dentry **dentry, struct vfs
 	task_unlock(task);
 	if (!mm)
 		goto out;
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	vma = mm->mmap;
 	while (vma) {
 		if ((vma->vm_flags & VM_EXECUTABLE) && 
@@ -76,7 +76,7 @@ static int proc_exe_link(struct inode *inode, struct dentry **dentry, struct vfs
 		}
 		vma = vma->vm_next;
 	}
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	mmput(mm);
 out:
 	return result;

@@ -86,7 +86,7 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 	 * the GDT index of the LDT is allocated dynamically, and is
 	 * limited by MAX_LDT_DESCRIPTORS.
 	 */
-	down(&mm->mmap_sem);
+	down_write(&mm->mmap_sem);
 	if (!mm->context.segments) {
 		error = -ENOMEM;
 		mm->context.segments = vmalloc(LDT_ENTRIES*LDT_ENTRY_SIZE);
@@ -141,7 +141,7 @@ install:
 	error = 0;
 
 out_unlock:
-	up(&mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 out:
 	return error;
 }

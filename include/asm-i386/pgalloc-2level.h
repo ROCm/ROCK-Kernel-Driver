@@ -3,21 +3,14 @@
 
 /*
  * traditional i386 two-level paging, page table allocation routines:
+ * We don't have any real pmd's, and this code never triggers because
+ * the pgd will always be present..
  */
-
-extern __inline__ pmd_t *get_pmd_fast(void)
-{
-	return (pmd_t *)0;
-}
-
-extern __inline__ void free_pmd_fast(pmd_t *pmd) { }
-extern __inline__ void free_pmd_slow(pmd_t *pmd) { }
-
-extern inline pmd_t * pmd_alloc(pgd_t *pgd, unsigned long address)
-{
-	if (!pgd)
-		BUG();
-	return (pmd_t *) pgd;
-}
+#define pmd_alloc_one_fast()		({ BUG(); ((pmd_t *)1); })
+#define pmd_alloc_one()			({ BUG(); ((pmd_t *)2); })
+#define pmd_free_slow(x)		do { } while (0)
+#define pmd_free_fast(x)		do { } while (0)
+#define pmd_free(x)			do { } while (0)
+#define pgd_populate(pmd, pte)		BUG()
 
 #endif /* _I386_PGALLOC_2LEVEL_H */

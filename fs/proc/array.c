@@ -181,7 +181,7 @@ static inline char * task_mem(struct mm_struct *mm, char *buffer)
 	unsigned long data = 0, stack = 0;
 	unsigned long exec = 0, lib = 0;
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		unsigned long len = (vma->vm_end - vma->vm_start) >> 10;
 		if (!vma->vm_file) {
@@ -212,7 +212,7 @@ static inline char * task_mem(struct mm_struct *mm, char *buffer)
 		mm->rss << (PAGE_SHIFT-10),
 		data - stack, stack,
 		exec - lib, lib);
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	return buffer;
 }
 
@@ -321,7 +321,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	task_unlock(task);
 	if (mm) {
 		struct vm_area_struct *vma;
-		down(&mm->mmap_sem);
+		down_read(&mm->mmap_sem);
 		vma = mm->mmap;
 		while (vma) {
 			vsize += vma->vm_end - vma->vm_start;
@@ -329,7 +329,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		}
 		eip = KSTK_EIP(task);
 		esp = KSTK_ESP(task);
-		up(&mm->mmap_sem);
+		up_read(&mm->mmap_sem);
 	}
 
 	wchan = get_wchan(task);
@@ -484,7 +484,7 @@ int proc_pid_statm(struct task_struct *task, char * buffer)
 	task_unlock(task);
 	if (mm) {
 		struct vm_area_struct * vma;
-		down(&mm->mmap_sem);
+		down_read(&mm->mmap_sem);
 		vma = mm->mmap;
 		while (vma) {
 			pgd_t *pgd = pgd_offset(mm, vma->vm_start);
@@ -505,7 +505,7 @@ int proc_pid_statm(struct task_struct *task, char * buffer)
 				drs += pages;
 			vma = vma->vm_next;
 		}
-		up(&mm->mmap_sem);
+		up_read(&mm->mmap_sem);
 		mmput(mm);
 	}
 	return sprintf(buffer,"%d %d %d %d %d %d %d\n",
@@ -582,7 +582,7 @@ ssize_t proc_pid_read_maps (struct task_struct *task, struct file * file, char *
 	column = *ppos & (MAPS_LINE_LENGTH-1);
 
 	/* quickly go to line lineno */
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	for (map = mm->mmap, i = 0; map && (i < lineno); map = map->vm_next, i++)
 		continue;
 
@@ -644,9 +644,7 @@ ssize_t proc_pid_read_maps (struct task_struct *task, struct file * file, char *
 		i = len-column;
 		if (i > count)
 			i = count;
-		up(&mm->mmap_sem);
 		copy_to_user(destptr, line+column, i); /* may have slept */
-		down(&mm->mmap_sem);
 		destptr += i;
 		count   -= i;
 		column  += i;
@@ -665,7 +663,7 @@ ssize_t proc_pid_read_maps (struct task_struct *task, struct file * file, char *
 		if (volatile_task)
 			break;
 	}
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	/* encode f_pos */
 	*ppos = (lineno << MAPS_LINE_SHIFT) + column;

@@ -395,11 +395,25 @@ extern int remap_page_range(unsigned long from, unsigned long to, unsigned long 
 extern int zeromap_page_range(unsigned long from, unsigned long size, pgprot_t prot);
 
 extern void vmtruncate(struct inode * inode, loff_t offset);
+extern pmd_t *FASTCALL(__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address));
+extern pte_t *FASTCALL(pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
 extern int handle_mm_fault(struct mm_struct *mm,struct vm_area_struct *vma, unsigned long address, int write_access);
 extern int make_pages_present(unsigned long addr, unsigned long end);
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
 extern int ptrace_readdata(struct task_struct *tsk, unsigned long src, char *dst, int len);
 extern int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long dst, int len);
+
+/*
+ * On a two-level page table, this ends up being trivial. Thus the
+ * inlining and the symmetry break with pte_alloc() that does all
+ * of this out-of-line.
+ */
+static inline pmd_t *pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
+{
+	if (!pgd_present(*pgd))
+		return __pmd_alloc(mm, pgd, address);
+	return pmd_offset(pgd, address);
+}
 
 extern int pgt_cache_water[2];
 extern int check_pgt_cache(void);
@@ -492,11 +506,13 @@ static inline int expand_stack(struct vm_area_struct * vma, unsigned long addres
 	if (vma->vm_end - address > current->rlim[RLIMIT_STACK].rlim_cur ||
 	    ((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) > current->rlim[RLIMIT_AS].rlim_cur)
 		return -ENOMEM;
+	spin_lock(&vma->vm_mm->page_table_lock);
 	vma->vm_start = address;
 	vma->vm_pgoff -= grow;
 	vma->vm_mm->total_vm += grow;
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
+	spin_unlock(&vma->vm_mm->page_table_lock);
 	return 0;
 }
 

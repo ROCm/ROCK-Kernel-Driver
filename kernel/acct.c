@@ -315,13 +315,13 @@ static void do_acct_process(long exitcode, struct file *file)
 	vsize = 0;
 	if (current->mm) {
 		struct vm_area_struct *vma;
-		down(&current->mm->mmap_sem);
+		down_read(&current->mm->mmap_sem);
 		vma = current->mm->mmap;
 		while (vma) {
 			vsize += vma->vm_end - vma->vm_start;
 			vma = vma->vm_next;
 		}
-		up(&current->mm->mmap_sem);
+		up_read(&current->mm->mmap_sem);
 	}
 	vsize = vsize / 1024;
 	ac.ac_mem = encode_comp_t(vsize);

@@ -54,7 +54,7 @@
 #define	PEGASUS_USE_INTR
 #define	PEGASUS_WRITE_EEPROM
 
-static const char *version = __FILE__ ": v0.4.17 2000/11/13 (C) 1999-2000 Petko Manolov (petkan@dce.bg)";
+static const char *version = __FILE__ ": v0.4.18 2001/03/18 (C) 1999-2000 Petko Manolov (petkan@dce.bg)";
 
 
 static int loopback = 0;
@@ -124,6 +124,7 @@ static void ctrl_callback( urb_t *urb )
 static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 {
 	int	ret;
+	DECLARE_WAITQUEUE(wait, current);
 
 	while ( pegasus->flags & ETH_REGS_CHANGED ) {
 		pegasus->flags |= CTRL_URB_SLEEP;
@@ -131,22 +132,27 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	}
 	pegasus->dr.requesttype = PEGASUS_REQT_READ;
 	pegasus->dr.request = PEGASUS_REQ_GET_REGS;
-	pegasus->dr.value = 0;
+	pegasus->dr.value = cpu_to_le16 (0);
 	pegasus->dr.index = cpu_to_le16p(&indx);
-	pegasus->dr.length = 
-	pegasus->ctrl_urb.transfer_buffer_length = cpu_to_le16p(&size);
+	pegasus->dr.length = cpu_to_le16p(&size);
+	pegasus->ctrl_urb.transfer_buffer_length = size;
 
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
 			  usb_rcvctrlpipe(pegasus->usb,0),
 			  (char *)&pegasus->dr,
 			  data, size, ctrl_callback, pegasus );
 
+	add_wait_queue( &pegasus->ctrl_wait, &wait );
+	set_current_state( TASK_INTERRUPTIBLE );
+	pegasus->flags |= CTRL_URB_SLEEP;
+
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRLs %d", ret);
 		goto out;
 	}
-	pegasus->flags |= CTRL_URB_SLEEP;
-	interruptible_sleep_on( &pegasus->ctrl_wait );
+
+	schedule();
+	remove_wait_queue( &pegasus->ctrl_wait, &wait );
 out:
 	return	ret;
 }
@@ -155,6 +161,7 @@ out:
 static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 {
 	int	ret;
+	DECLARE_WAITQUEUE(wait, current);
 
 	while ( pegasus->flags & ETH_REGS_CHANGED ) {
 		pegasus->flags |= CTRL_URB_SLEEP ;
@@ -162,22 +169,27 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	}
 	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
 	pegasus->dr.request = PEGASUS_REQ_SET_REGS;
-	pegasus->dr.value = 0;
+	pegasus->dr.value = cpu_to_le16 (0);
 	pegasus->dr.index = cpu_to_le16p( &indx );
-	pegasus->dr.length = 
-	pegasus->ctrl_urb.transfer_buffer_length = cpu_to_le16p( &size );
+	pegasus->dr.length = cpu_to_le16p( &size );
+	pegasus->ctrl_urb.transfer_buffer_length = size;
 
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
 			  usb_sndctrlpipe(pegasus->usb,0),
 			  (char *)&pegasus->dr,
 			  data, size, ctrl_callback, pegasus );
+			  
+	add_wait_queue( &pegasus->ctrl_wait, &wait );
+	set_current_state( TASK_INTERRUPTIBLE );
+	pegasus->flags |= CTRL_URB_SLEEP;
 
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRL %d", ret);
 		return	ret;
 	}
-	pegasus->flags |= CTRL_URB_SLEEP;
-	interruptible_sleep_on( &pegasus->ctrl_wait );
+
+	schedule();
+	remove_wait_queue( &pegasus->ctrl_wait, &wait );
 
 	return	ret;
 }
@@ -186,29 +198,37 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 {
 	int	ret;
-
+	__u16 dat = data;
+	DECLARE_WAITQUEUE(wait, current);
+	
 	while ( pegasus->flags & ETH_REGS_CHANGED ) {
 		pegasus->flags |= CTRL_URB_SLEEP;
 		interruptible_sleep_on( &pegasus->ctrl_wait );
 	}
 	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
 	pegasus->dr.request = PEGASUS_REQ_SET_REG;
-	pegasus->dr.value = data;
+	pegasus->dr.value = cpu_to_le16p( &dat);
 	pegasus->dr.index = cpu_to_le16p( &indx );
-	pegasus->dr.length = pegasus->ctrl_urb.transfer_buffer_length = 1;
+	pegasus->dr.length = cpu_to_le16( 1 );
+	pegasus->ctrl_urb.transfer_buffer_length = 1;
 
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
 			  usb_sndctrlpipe(pegasus->usb,0),
 			  (char *)&pegasus->dr,
 			  &data, 1, ctrl_callback, pegasus );
 
+	add_wait_queue( &pegasus->ctrl_wait, &wait );
+	set_current_state( TASK_INTERRUPTIBLE );
+	pegasus->flags |= CTRL_URB_SLEEP;
+
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRL %d", ret);
 		return	ret;
 	}
-	pegasus->flags |= CTRL_URB_SLEEP;
-	interruptible_sleep_on( &pegasus->ctrl_wait );
-	
+
+	schedule();
+	remove_wait_queue( &pegasus->ctrl_wait, &wait );
+
 	return	ret;
 }
 
@@ -220,8 +240,8 @@ static int update_eth_regs_async( pegasus_t *pegasus )
 	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
 	pegasus->dr.request = PEGASUS_REQ_SET_REGS;
 	pegasus->dr.value = 0;
-	pegasus->dr.index = EthCtrl0;
-	pegasus->dr.length = 
+	pegasus->dr.index =  cpu_to_le16(EthCtrl0);
+	pegasus->dr.length = cpu_to_le16(3);
 	pegasus->ctrl_urb.transfer_buffer_length = 3;
 
 	FILL_CONTROL_URB( &pegasus->ctrl_urb, pegasus->usb,
@@ -240,7 +260,8 @@ static int read_mii_word( pegasus_t *pegasus, __u8 phy, __u8 indx, __u16 *regd )
 {
 	int	i;
 	__u8	data[4] = { phy, 0, 0, indx };
-
+	__u16  regdi;
+	
 	set_register( pegasus, PhyCtrl, 0 );
 	set_registers( pegasus, PhyAddr, sizeof(data), data );
 	set_register( pegasus, PhyCtrl, (indx | PHY_READ) );
@@ -250,7 +271,8 @@ static int read_mii_word( pegasus_t *pegasus, __u8 phy, __u8 indx, __u16 *regd )
 			break;
 	}
 	if ( i < REG_TIMEOUT ) {
-		get_registers( pegasus, PhyData, 2, regd );
+		get_registers( pegasus, PhyData, 2, &regdi );
+		*regd = le16_to_cpu(regdi);
 		return	0;
 	}
 	warn( __FUNCTION__ " failed" );
@@ -283,18 +305,22 @@ static int write_mii_word( pegasus_t *pegasus, __u8 phy, __u8 indx, __u16 regd )
 
 static int read_eprom_word( pegasus_t *pegasus, __u8 index, __u16 *retdata )
 {
-	int	i, tmp;
-
+	int	i;
+	__u8 tmp;
+	__u16 retdatai;
+	
 	set_register( pegasus, EpromCtrl, 0 );
 	set_register( pegasus, EpromOffset, index );
 	set_register( pegasus, EpromCtrl, EPROM_READ); 
+
 	for ( i=0; i < REG_TIMEOUT; i++ ) {
 		get_registers( pegasus, EpromCtrl, 1, &tmp );
 		if ( tmp & EPROM_DONE )
 			break;
 	}
 	if ( i < REG_TIMEOUT ) {
-		get_registers( pegasus, EpromData, 2, retdata );
+		get_registers( pegasus, EpromData, 2, &retdatai );
+		*retdata = le16_to_cpu (retdatai);
 		return	0;
 	}
 	warn( __FUNCTION__ " failed" );
@@ -349,9 +375,12 @@ static int write_eprom_word( pegasus_t *pegasus, __u8 index, __u16 data )
 static inline void get_node_id( pegasus_t *pegasus, __u8 *id )
 {
 	int	i;
-
-	for (i = 0; i < 3; i++)
-		read_eprom_word( pegasus, i, (__u16 *)&id[i*2]);
+	__u16 w16;
+	
+	for (i = 0; i < 3; i++) {
+		read_eprom_word( pegasus, i, &w16);
+		((__u16 *) id)[i] = cpu_to_le16p (&w16);
+	}
 }
 
 
@@ -473,7 +502,7 @@ static void read_bulk_callback( struct urb *urb )
 	if ( !count )
 		goto goon;
 
-	rx_status = *(int *)(pegasus->rx_buff + count - 4);
+	rx_status = le32_to_cpu(*(int *)(pegasus->rx_buff + count - 4));
 	if ( rx_status & 0x000e0000 ) {
 		dbg("%s: RX packet error %x", net->name, rx_status & 0xe0000);
 		pegasus->stats.rx_errors++;
@@ -585,10 +614,11 @@ static int pegasus_start_xmit( struct sk_buff *skb, struct net_device *net )
 	pegasus_t	*pegasus = net->priv;
 	int 	count = ((skb->len+2) & 0x3f) ? skb->len+2 : skb->len+3;
 	int 	res;
-
+	__u16 l16 = skb->len;
+	
 	netif_stop_queue( net );
 		
-	((__u16 *)pegasus->tx_buff)[0] = skb->len;
+	((__u16 *)pegasus->tx_buff)[0] = cpu_to_le16( l16 );
 	memcpy(pegasus->tx_buff+2, skb->data, skb->len);
 	FILL_BULK_URB( &pegasus->tx_urb, pegasus->usb,
 			usb_sndbulkpipe(pegasus->usb, 2),

@@ -123,7 +123,7 @@ static inline int alloc_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 	if (end > PGDIR_SIZE)
 		end = PGDIR_SIZE;
 	do {
-		pte_t * pte = pte_alloc_kernel(pmd, address);
+		pte_t * pte = pte_alloc(&init_mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		if (alloc_area_pte(pte, address, end - address, gfp_mask, prot))
@@ -147,7 +147,7 @@ inline int vmalloc_area_pages (unsigned long address, unsigned long size,
 	do {
 		pmd_t *pmd;
 		
-		pmd = pmd_alloc_kernel(dir, address);
+		pmd = pmd_alloc(&init_mm, dir, address);
 		ret = -ENOMEM;
 		if (!pmd)
 			break;

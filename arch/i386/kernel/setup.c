@@ -418,8 +418,9 @@ static void __init print_memory_map(char *who)
 	int i;
 
 	for (i = 0; i < e820.nr_map; i++) {
-		printk(" %s: %016Lx @ %016Lx ", who,
-			e820.map[i].size, e820.map[i].addr);
+		printk(" %s: %016Lx - %016Lx ", who,
+			e820.map[i].addr,
+			e820.map[i].addr + e820.map[i].size);
 		switch (e820.map[i].type) {
 		case E820_RAM:	printk("(usable)\n");
 				break;

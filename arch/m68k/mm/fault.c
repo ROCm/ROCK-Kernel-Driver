@@ -101,7 +101,7 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	if (in_interrupt() || !mm)
 		goto no_context;
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -168,7 +168,7 @@ good_area:
 	#warning should be obsolete now...
 	if (CPU_IS_040_OR_060)
 		flush_tlb_page(vma, address);
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	return 0;
 
 /*
@@ -203,6 +203,6 @@ acc_err:
 	current->thread.faddr = address;
 
 send_sig:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	return send_fault_sig(regs);
 }

@@ -71,7 +71,9 @@ static int shm_tot; /* total number of shared memory pages */
 void __init shm_init (void)
 {
 	ipc_init_ids(&shm_ids, 1);
+#ifdef CONFIG_PROC_FS
 	create_proc_read_entry("sysvipc/shm", 0, 0, sysvipc_shm_read_proc, NULL);
+#endif
 }
 
 static inline int shm_checkid(struct shmid_kernel *s, int id)
@@ -605,9 +607,9 @@ asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
 	shp->shm_nattch++;
 	shm_unlock(shmid);
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	user_addr = (void *) do_mmap (file, addr, file->f_dentry->d_inode->i_size, prot, flags, 0);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	down (&shm_ids.sem);
 	if(!(shp = shm_lock(shmid)))
@@ -636,14 +638,14 @@ asmlinkage long sys_shmdt (char *shmaddr)
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *shmd, *shmdnext;
 
-	down(&mm->mmap_sem);
+	down_write(&mm->mmap_sem);
 	for (shmd = mm->mmap; shmd; shmd = shmdnext) {
 		shmdnext = shmd->vm_next;
 		if (shmd->vm_ops == &shm_vm_ops
 		    && shmd->vm_start - (shmd->vm_pgoff << PAGE_SHIFT) == (ulong) shmaddr)
 			do_munmap(mm, shmd->vm_start, shmd->vm_end - shmd->vm_start);
 	}
-	up(&mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	return 0;
 }
 

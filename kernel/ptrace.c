@@ -140,13 +140,13 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 	if (!mm)
 		return 0;
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	vma = find_extend_vma(mm, addr);
 	copied = 0;
 	if (vma)
 		copied = access_mm(mm, vma, addr, buf, len, write);
 
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	mmput(mm);
 	return copied;
 }

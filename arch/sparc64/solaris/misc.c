@@ -92,12 +92,12 @@ static u32 do_solaris_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u64 o
 	ret_type = flags & _MAP_NEW;
 	flags &= ~_MAP_NEW;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	retval = do_mmap(file,
 			 (unsigned long) addr, (unsigned long) len,
 			 (unsigned long) prot, (unsigned long) flags, off);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	if(!ret_type)
 		retval = ((retval < 0xf0000000) ? 0 : retval);
 	                        

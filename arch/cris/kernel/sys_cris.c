@@ -62,9 +62,9 @@ asmlinkage unsigned long sys_mmap(unsigned long addr, size_t len,
         }
         
         flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
-        down(&current->mm->mmap_sem);
+        down_write(&current->mm->mmap_sem);
         ret = do_mmap(file, addr, len, prot, flags, offset);
-        up(&current->mm->mmap_sem);
+        up_write(&current->mm->mmap_sem);
         if (file)
                 fput(file);
  out:
@@ -87,9 +87,9 @@ do_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
                         goto out;
         }
 
-        down(&current->mm->mmap_sem);
+        down_write(&current->mm->mmap_sem);
         error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-        up(&current->mm->mmap_sem);
+        up_write(&current->mm->mmap_sem);
 
         if (file)
                 fput(file);

@@ -485,10 +485,10 @@ int drm_mapbufs(struct inode *inode, struct file *filp, unsigned int cmd,
 		return -EFAULT;
 
 	if (request.count >= dma->buf_count) {
-		down(&current->mm->mmap_sem);
+		down_write(&current->mm->mmap_sem);
 		virtual = do_mmap(filp, 0, dma->byte_count,
 				  PROT_READ|PROT_WRITE, MAP_SHARED, 0);
-		up(&current->mm->mmap_sem);
+		up_write(&current->mm->mmap_sem);
 		if (virtual > -1024UL) {
 				/* Real error */
 			retcode = (signed long)virtual;

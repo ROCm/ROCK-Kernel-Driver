@@ -236,9 +236,9 @@ static unsigned long do_mmap2(unsigned long addr, unsigned long len,
 	if (flags & MAP_SHARED)
 		current->thread.flags |= SPARC_FLAG_MMAPSHARED;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	retval = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	current->thread.flags &= ~(SPARC_FLAG_MMAPSHARED);
 
@@ -284,7 +284,7 @@ asmlinkage unsigned long sparc_mremap(unsigned long addr,
 	if (old_len > TASK_SIZE - PAGE_SIZE ||
 	    new_len > TASK_SIZE - PAGE_SIZE)
 		goto out;
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	vma = find_vma(current->mm, addr);
 	if (vma && (vma->vm_flags & VM_SHARED))
 		current->thread.flags |= SPARC_FLAG_MMAPSHARED;
@@ -309,7 +309,7 @@ asmlinkage unsigned long sparc_mremap(unsigned long addr,
 	ret = do_mremap(addr, old_len, new_len, flags, new_addr);
 out_sem:
 	current->thread.flags &= ~(SPARC_FLAG_MMAPSHARED);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 out:
 	return ret;       
 }

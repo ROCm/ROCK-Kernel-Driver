@@ -94,7 +94,7 @@ remove_mapping (struct task_struct *task, unsigned long start, unsigned long end
 	unsigned long beg = start;
 	pgd_t *dir;
 
-	down (&task->mm->mmap_sem);
+	down_write (&task->mm->mmap_sem);
 	dir = pgd_offset (task->mm, start);
 	flush_cache_range (task->mm, beg, end);
 	while (start < end){
@@ -103,7 +103,7 @@ remove_mapping (struct task_struct *task, unsigned long start, unsigned long end
 		dir++;
 	}
 	flush_tlb_range (task->mm, beg, end);
-	up (&task->mm->mmap_sem);
+	up_write (&task->mm->mmap_sem);
 }
 
 void *vmalloc_uncached (unsigned long size)

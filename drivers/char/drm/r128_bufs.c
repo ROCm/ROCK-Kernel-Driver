@@ -249,17 +249,17 @@ int r128_mapbufs(struct inode *inode, struct file *filp, unsigned int cmd,
 				goto done;
 			}
 
-			down(&current->mm->mmap_sem);
+			down_write(&current->mm->mmap_sem);
 			virtual = do_mmap(filp, 0, map->size,
 					  PROT_READ|PROT_WRITE,
 					  MAP_SHARED,
 					  (unsigned long)map->offset);
-			up(&current->mm->mmap_sem);
+			up_write(&current->mm->mmap_sem);
 		} else {
-			down(&current->mm->mmap_sem);
+			down_write(&current->mm->mmap_sem);
 			virtual = do_mmap(filp, 0, dma->byte_count,
 					  PROT_READ|PROT_WRITE, MAP_SHARED, 0);
-			up(&current->mm->mmap_sem);
+			up_write(&current->mm->mmap_sem);
 		}
 		if (virtual > -1024UL) {
 			/* Real error */

@@ -120,12 +120,12 @@ int stack)
 	 *  `execve' frees all current memory we only have to do an
 	 *  `munmap' if the `execve' failes.
 	 */
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 
 	av = (char **) do_mmap_pgoff(0, 0UL, len, PROT_READ | PROT_WRITE,
 				     MAP_PRIVATE | MAP_ANONYMOUS, 0);
 
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	if (IS_ERR(av))
 		return (long)av;
@@ -247,9 +247,9 @@ do_mmap_fake(struct file *file, unsigned long addr, unsigned long len,
 		back = kmalloc(PAGE_SIZE - ((addr + len) & ~PAGE_MASK), GFP_KERNEL);
 		__copy_user(back, (char *)addr + len, PAGE_SIZE - ((addr + len) & ~PAGE_MASK));
 	}
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	r = do_mmap(0, baddr, len + (addr - baddr), prot, flags | MAP_ANONYMOUS, 0);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	if (r < 0)
 		return(r);
 	if (addr == 0)
@@ -293,9 +293,9 @@ ia32_do_mmap (struct file *file, unsigned int addr, unsigned int len, unsigned i
  		poff = offset & PAGE_MASK;
  		len += offset - poff;
 
- 		down(&current->mm->mmap_sem);
+ 		down_write(&current->mm->mmap_sem);
  		error = do_mmap_pgoff(file, addr, len, prot, flags, poff >> PAGE_SHIFT);
-  		up(&current->mm->mmap_sem);
+  		up_write(&current->mm->mmap_sem);
 
  		if (!IS_ERR((void *) error))
  			error += offset - poff;
@@ -2573,7 +2573,7 @@ sys_iopl (int level, long arg1, long arg2, long arg3)
 		return(-EFAULT);
 	}
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	lock_kernel();
 
 	addr = do_mmap_pgoff(file, IA32_IOBASE,
@@ -2581,7 +2581,7 @@ sys_iopl (int level, long arg1, long arg2, long arg3)
 			(ia64_iobase & ~PAGE_OFFSET) >> PAGE_SHIFT);
 
 	unlock_kernel();
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	if (addr >= 0) {
 		__asm__ __volatile__("mov ar.k0=%0 ;;" :: "r"(addr));

@@ -133,7 +133,7 @@ asmlinkage unsigned long sys_brk(unsigned long brk)
 	unsigned long newbrk, oldbrk;
 	struct mm_struct *mm = current->mm;
 
-	down(&mm->mmap_sem);
+	down_write(&mm->mmap_sem);
 
 	if (brk < mm->end_code)
 		goto out;
@@ -169,7 +169,7 @@ set_brk:
 	mm->brk = brk;
 out:
 	retval = mm->brk;
-	up(&mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	return retval;
 }
 
@@ -776,9 +776,9 @@ asmlinkage long sys_munmap(unsigned long addr, size_t len)
 	int ret;
 	struct mm_struct *mm = current->mm;
 
-	down(&mm->mmap_sem);
+	down_write(&mm->mmap_sem);
 	ret = do_munmap(mm, addr, len);
-	up(&mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	return ret;
 }
 

@@ -141,7 +141,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (in_interrupt() || !mm)
 		goto no_context;
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -214,7 +214,7 @@ good_area:
 		if (bit < 32)
 			tsk->thread.screen_bitmap |= 1 << bit;
 	}
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	return;
 
 /*
@@ -222,7 +222,7 @@ good_area:
  * Fix it, but check if it's kernel or user first..
  */
 bad_area:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 bad_area_nosemaphore:
 	/* User mode accesses just cause a SIGSEGV */
@@ -290,14 +290,14 @@ no_context:
  * us unable to handle the page fault gracefully.
  */
 out_of_memory:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	printk("VM: killing process %s\n", tsk->comm);
 	if (error_code & 4)
 		do_exit(SIGKILL);
 	goto no_context;
 
 do_sigbus:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	/*
 	 * Send a sigbus, regardless of whether we were in kernel

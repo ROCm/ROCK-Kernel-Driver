@@ -198,9 +198,9 @@ unsigned long sys_mmap(unsigned long addr, size_t len,
 			goto out;
 	}
 	
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	ret = do_mmap(file, addr, len, prot, flags, offset);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	if (file)
 		fput(file);
 out:

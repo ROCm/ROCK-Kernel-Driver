@@ -472,7 +472,7 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 		if (retval)
 			return retval;
 
-		down(&mm->mmap_sem);
+		down_read(&mm->mmap_sem);
 		pgdp = pgd_offset(mm, addr);
 		pmdp = pmd_offset(pgdp, addr);
 		ptep = pte_offset(pmdp, addr);
@@ -485,7 +485,7 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 				                   PAGE_SHIFT, pageno);
 			}
 		}
-		up(&mm->mmap_sem);
+		up_read(&mm->mmap_sem);
 		break;
 	}
 
@@ -535,7 +535,7 @@ asmlinkage int irix_brk(unsigned long brk)
 	struct mm_struct *mm = current->mm;
 	int ret;
 
-	down(&mm->mmap_sem);
+	down_write(&mm->mmap_sem);
 	if (brk < mm->end_code) {
 		ret = -ENOMEM;
 		goto out;
@@ -593,7 +593,7 @@ asmlinkage int irix_brk(unsigned long brk)
 	ret = 0;
 
 out:
-	up(&mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	return ret;
 }
 
@@ -1083,9 +1083,9 @@ asmlinkage unsigned long irix_mmap32(unsigned long addr, size_t len, int prot,
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	retval = do_mmap(file, addr, len, prot, flags, offset);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	if (file)
 		fput(file);
 
@@ -1643,9 +1643,9 @@ asmlinkage int irix_mmap64(struct pt_regs *regs)
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	if (file)
 		fput(file);

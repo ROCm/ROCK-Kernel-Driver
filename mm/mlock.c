@@ -198,7 +198,7 @@ asmlinkage long sys_mlock(unsigned long start, size_t len)
 	unsigned long lock_limit;
 	int error = -ENOMEM;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	len = PAGE_ALIGN(len + (start & ~PAGE_MASK));
 	start &= PAGE_MASK;
 
@@ -219,7 +219,7 @@ asmlinkage long sys_mlock(unsigned long start, size_t len)
 
 	error = do_mlock(start, len, 1);
 out:
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return error;
 }
 
@@ -227,11 +227,11 @@ asmlinkage long sys_munlock(unsigned long start, size_t len)
 {
 	int ret;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	len = PAGE_ALIGN(len + (start & ~PAGE_MASK));
 	start &= PAGE_MASK;
 	ret = do_mlock(start, len, 0);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return ret;
 }
 
@@ -268,7 +268,7 @@ asmlinkage long sys_mlockall(int flags)
 	unsigned long lock_limit;
 	int ret = -EINVAL;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	if (!flags || (flags & ~(MCL_CURRENT | MCL_FUTURE)))
 		goto out;
 
@@ -286,7 +286,7 @@ asmlinkage long sys_mlockall(int flags)
 
 	ret = do_mlockall(flags);
 out:
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return ret;
 }
 
@@ -294,8 +294,8 @@ asmlinkage long sys_munlockall(void)
 {
 	int ret;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	ret = do_mlockall(0);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return ret;
 }

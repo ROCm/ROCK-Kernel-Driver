@@ -243,9 +243,9 @@ asmlinkage unsigned long sys_mmap(unsigned long addr, unsigned long len,
 	if (flags & MAP_SHARED)
 		current->thread.flags |= SPARC_FLAG_MMAPSHARED;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	retval = do_mmap(file, addr, len, prot, flags, off);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	current->thread.flags &= ~(SPARC_FLAG_MMAPSHARED);
 
@@ -263,9 +263,9 @@ asmlinkage long sys64_munmap(unsigned long addr, size_t len)
 	if (len > -PAGE_OFFSET ||
 	    (addr < PAGE_OFFSET && addr + len > -PAGE_OFFSET))
 		return -EINVAL;
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	ret = do_munmap(current->mm, addr, len);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return ret;
 }
 
@@ -285,7 +285,7 @@ asmlinkage unsigned long sys64_mremap(unsigned long addr,
 		goto out;
 	if (addr < PAGE_OFFSET && addr + old_len > -PAGE_OFFSET)
 		goto out;
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	vma = find_vma(current->mm, addr);
 	if (vma && (vma->vm_flags & VM_SHARED))
 		current->thread.flags |= SPARC_FLAG_MMAPSHARED;
@@ -305,7 +305,7 @@ asmlinkage unsigned long sys64_mremap(unsigned long addr,
 	ret = do_mremap(addr, old_len, new_len, flags, new_addr);
 out_sem:
 	current->thread.flags &= ~(SPARC_FLAG_MMAPSHARED);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 out:
 	return ret;       
 }

@@ -99,7 +99,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 		bad_page_fault(regs, address, SIGSEGV);
 		return;
 	}
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
@@ -159,7 +159,7 @@ good_area:
                 goto out_of_memory;
 	}
 
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	/*
 	 * keep track of tlb+htab misses that are good addrs but
 	 * just need pte's created via handle_mm_fault()
@@ -169,7 +169,7 @@ good_area:
 	return;
 
 bad_area:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	pte_errors++;	
 
 	/* User mode accesses cause a SIGSEGV */
@@ -190,7 +190,7 @@ bad_area:
  * us unable to handle the page fault gracefully.
  */
 out_of_memory:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
@@ -198,7 +198,7 @@ out_of_memory:
 	return;
 
 do_sigbus:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;

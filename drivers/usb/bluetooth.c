@@ -1,10 +1,16 @@
 /*
- * bluetooth.c   Version 0.7
+ * bluetooth.c   Version 0.8
  *
  * Copyright (c) 2000 Greg Kroah-Hartman	<greg@kroah.com>
  * Copyright (c) 2000 Mark Douglas Corner	<mcorner@umich.edu>
  *
  * USB Bluetooth driver, based on the Bluetooth Spec version 1.0B
+ *
+ * (2001/03/10) Version 0.8 gkh
+ *	Fixed problem with not unlinking interrupt urb on device close
+ *	and resubmitting the read urb on error with bluetooth struct.
+ *	Thanks to Narayan Mohanram <narayan@RovingNetworks.com> for the
+ *	fixes.
  *
  * (11/29/2000) Version 0.7 gkh
  *	Fixed problem with overrunning the tty flip buffer.
@@ -379,6 +385,7 @@ static void bluetooth_close (struct tty_struct *tty, struct file * filp)
 	for (i = 0; i < NUM_BULK_URBS; ++i)
 		usb_unlink_urb (bluetooth->write_urb_pool[i]);
 	usb_unlink_urb (bluetooth->read_urb);
+	usb_unlink_urb (bluetooth->interrupt_in_urb);
 
 	bluetooth->active = 0;
 }
@@ -852,7 +859,7 @@ static void bluetooth_read_bulk_callback (struct urb *urb)
 
 	if (!bluetooth) {
 		dbg(__FUNCTION__ " - bad bluetooth pointer, exiting");
-		goto exit;
+		return;
 	}
 
 	if (urb->status) {

@@ -1013,7 +1013,7 @@ do_last:
 		error = -ELOOP;
 		if (flag & O_NOFOLLOW)
 			goto exit_dput;
-		do __follow_down(&nd->mnt,&dentry); while(d_mountpoint(dentry));
+		while (__follow_down(&nd->mnt,&dentry) && d_mountpoint(dentry));
 	}
 	error = -ENOENT;
 	if (!dentry->d_inode)

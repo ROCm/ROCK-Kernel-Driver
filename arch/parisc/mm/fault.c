@@ -175,7 +175,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long code,
 	if (in_interrupt() || !mm)
 		goto no_context;
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	vma = pa_find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
@@ -218,14 +218,14 @@ good_area:
 	      default:
 		goto out_of_memory;
 	}
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	return;
 
 /*
  * Something tried to access memory that isn't in our memory map..
  */
 bad_area:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	if (user_mode(regs)) {
 		struct siginfo si;
@@ -275,7 +275,7 @@ no_context:
 	parisc_terminate("Bad Address (null pointer deref?)",regs,code,address);
 
   out_of_memory:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);

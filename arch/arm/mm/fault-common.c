@@ -223,9 +223,9 @@ int do_page_fault(unsigned long addr, int mode, struct pt_regs *regs)
 	if (in_interrupt() || !mm)
 		goto no_context;
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	fault = __do_page_fault(mm, addr, mode, tsk);
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 ret:
 	/*

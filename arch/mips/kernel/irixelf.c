@@ -314,12 +314,12 @@ static unsigned int load_irix_interp(struct elfhdr * interp_elf_ex,
 		   (unsigned long) elf_prot, (unsigned long) elf_type,
 		   (unsigned long) (eppnt->p_offset & 0xfffff000));
 #endif
-	    down(&current->mm->mmap_sem);
+	    down_write(&current->mm->mmap_sem);
 	    error = do_mmap(interpreter, vaddr,
 			    eppnt->p_filesz + (eppnt->p_vaddr & 0xfff),
 			    elf_prot, elf_type,
 			    eppnt->p_offset & 0xfffff000);
-	    up(&current->mm->mmap_sem);
+	    up_write(&current->mm->mmap_sem);
 
 	    if(error < 0 && error > -1024) {
 		    printk("Aieee IRIX interp mmap error=%d\n", error);
@@ -498,12 +498,12 @@ static inline void map_executable(struct file *fp, struct elf_phdr *epp, int pnu
 		prot  = (epp->p_flags & PF_R) ? PROT_READ : 0;
 		prot |= (epp->p_flags & PF_W) ? PROT_WRITE : 0;
 		prot |= (epp->p_flags & PF_X) ? PROT_EXEC : 0;
-	        down(&current->mm->mmap_sem);
+	        down_write(&current->mm->mmap_sem);
 		(void) do_mmap(fp, (epp->p_vaddr & 0xfffff000),
 			       (epp->p_filesz + (epp->p_vaddr & 0xfff)),
 			       prot, EXEC_MAP_FLAGS,
 			       (epp->p_offset & 0xfffff000));
-	        up(&current->mm->mmap_sem);
+	        up_write(&current->mm->mmap_sem);
 
 		/* Fixup location tracking vars. */
 		if((epp->p_vaddr & 0xfffff000) < *estack)
@@ -762,10 +762,10 @@ static int load_irix_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	 * Since we do not have the power to recompile these, we
 	 * emulate the SVr4 behavior.  Sigh.
 	 */
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	(void) do_mmap(NULL, 0, 4096, PROT_READ | PROT_EXEC,
 		       MAP_FIXED | MAP_PRIVATE, 0);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 #endif
 
 	start_thread(regs, elf_entry, bprm->p);
@@ -837,14 +837,14 @@ static int load_irix_library(struct file *file)
 	while(elf_phdata->p_type != PT_LOAD) elf_phdata++;
 	
 	/* Now use mmap to map the library into memory. */
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	error = do_mmap(file,
 			elf_phdata->p_vaddr & 0xfffff000,
 			elf_phdata->p_filesz + (elf_phdata->p_vaddr & 0xfff),
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_FIXED | MAP_PRIVATE | MAP_DENYWRITE,
 			elf_phdata->p_offset & 0xfffff000);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 
 	k = elf_phdata->p_vaddr + elf_phdata->p_filesz;
 	if (k > elf_bss) elf_bss = k;
@@ -916,12 +916,12 @@ unsigned long irix_mapelf(int fd, struct elf_phdr *user_phdrp, int cnt)
 		prot  = (hp->p_flags & PF_R) ? PROT_READ : 0;
 		prot |= (hp->p_flags & PF_W) ? PROT_WRITE : 0;
 		prot |= (hp->p_flags & PF_X) ? PROT_EXEC : 0;
-		down(&current->mm->mmap_sem);
+		down_write(&current->mm->mmap_sem);
 		retval = do_mmap(filp, (hp->p_vaddr & 0xfffff000),
 				 (hp->p_filesz + (hp->p_vaddr & 0xfff)),
 				 prot, (MAP_FIXED | MAP_PRIVATE | MAP_DENYWRITE),
 				 (hp->p_offset & 0xfffff000));
-		up(&current->mm->mmap_sem);
+		up_write(&current->mm->mmap_sem);
 
 		if(retval != (hp->p_vaddr & 0xfffff000)) {
 			printk("irix_mapelf: do_mmap fails with %d!\n", retval);

@@ -234,7 +234,7 @@ asmlinkage void do_sparc64_fault(struct pt_regs *regs)
 	if (in_interrupt() || !mm)
 		goto handle_kernel_fault;
 
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
@@ -308,7 +308,7 @@ good_area:
 		goto out_of_memory;
 	}
 
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	goto fault_done;
 
 	/*
@@ -316,7 +316,7 @@ good_area:
 	 * Fix it, but check if it's kernel or user first..
 	 */
 bad_area:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 handle_kernel_fault:
 	do_kernel_fault(regs, si_code, fault_code, insn, address);
@@ -328,14 +328,14 @@ handle_kernel_fault:
  * us unable to handle the page fault gracefully.
  */
 out_of_memory:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	printk("VM: killing process %s\n", current->comm);
 	if (!(regs->tstate & TSTATE_PRIV))
 		do_exit(SIGKILL);
 	goto handle_kernel_fault;
 
 do_sigbus:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
 	/*
 	 * Send a sigbus, regardless of whether we were in kernel

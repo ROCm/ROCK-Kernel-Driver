@@ -353,7 +353,7 @@ static inline size_t read_zero_pagealigned(char * buf, size_t size)
 
 	mm = current->mm;
 	/* Oops, this was forgotten before. -ben */
-	down(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 
 	/* For private mappings, just map in zero pages. */
 	for (vma = find_vma(mm, addr); vma; vma = vma->vm_next) {
@@ -367,10 +367,8 @@ static inline size_t read_zero_pagealigned(char * buf, size_t size)
 		if (count > size)
 			count = size;
 
-		flush_cache_range(mm, addr, addr + count);
 		zap_page_range(mm, addr, count);
         	zeromap_page_range(addr, count, PAGE_COPY);
-        	flush_tlb_range(mm, addr, addr + count);
 
 		size -= count;
 		buf += count;
@@ -379,7 +377,7 @@ static inline size_t read_zero_pagealigned(char * buf, size_t size)
 			goto out_up;
 	}
 
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	
 	/* The shared case is hard. Let's do the conventional zeroing. */ 
 	do {
@@ -394,7 +392,7 @@ static inline size_t read_zero_pagealigned(char * buf, size_t size)
 
 	return size;
 out_up:
-	up(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	return size;
 }
 

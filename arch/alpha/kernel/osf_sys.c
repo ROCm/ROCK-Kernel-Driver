@@ -242,9 +242,9 @@ asmlinkage unsigned long osf_mmap(unsigned long addr, unsigned long len,
 			goto out;
 	}
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	ret = do_mmap(file, addr, len, prot, flags, off);
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	if (file)
 		fput(file);
 out:

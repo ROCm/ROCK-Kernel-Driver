@@ -153,11 +153,11 @@ sgi_graphics_ioctl (struct inode *inode, struct file *file, unsigned int cmd, un
 		 * sgi_graphics_mmap
 		 */
 		disable_gconsole ();
-		down(&current->mm->mmap_sem);
+		down_write(&current->mm->mmap_sem);
 		r = do_mmap (file, (unsigned long)vaddr,
 			     cards[board].g_regs_size, PROT_READ|PROT_WRITE,
 			     MAP_FIXED|MAP_PRIVATE, 0);
-		up(&current->mm->mmap_sem);
+		up_write(&current->mm->mmap_sem);
 		if (r)
 			return r;
 	}

@@ -192,7 +192,7 @@ static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
 	if(buf_priv->currently_mapped == I810_BUF_MAPPED) return -EINVAL;
 
 	if(VM_DONTCOPY != 0) {
-		down(&current->mm->mmap_sem);
+		down_write(&current->mm->mmap_sem);
 		old_fops = filp->f_op;
 		filp->f_op = &i810_buffer_fops;
 		dev_priv->mmap_buffer = buf;
@@ -208,7 +208,7 @@ static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
 			retcode = (signed int)buf_priv->virtual;
 			buf_priv->virtual = 0;
 		}
-   		up(&current->mm->mmap_sem);
+   		up_write(&current->mm->mmap_sem);
 	} else {
 		buf_priv->virtual = buf_priv->kernel_virtual;
    		buf_priv->currently_mapped = I810_BUF_MAPPED;
@@ -224,7 +224,7 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 	if(VM_DONTCOPY != 0) {
 		if(buf_priv->currently_mapped != I810_BUF_MAPPED) 
 			return -EINVAL;
-		down(&current->mm->mmap_sem);
+		down_write(&current->mm->mmap_sem);
 #if LINUX_VERSION_CODE < 0x020399
         	retcode = do_munmap((unsigned long)buf_priv->virtual, 
 				    (size_t) buf->total);
@@ -233,7 +233,7 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 				    (unsigned long)buf_priv->virtual, 
 				    (size_t) buf->total);
 #endif
-   		up(&current->mm->mmap_sem);
+   		up_write(&current->mm->mmap_sem);
 	}
    	buf_priv->currently_mapped = I810_BUF_UNMAPPED;
    	buf_priv->virtual = 0;

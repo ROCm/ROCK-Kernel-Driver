@@ -12,6 +12,7 @@
  * 
  * History:
  * 
+ * 2001/03/07 hcca allocation uses pci_alloc_consistent (Steve Longerbeam)
  * 2000/09/26 fixed races in removing the private portion of the urb
  * 2000/09/07 disable bulk and control lists when unlinking the last
  *	endpoint descriptor in order to avoid unrecoverable errors on
@@ -208,7 +209,7 @@ void ep_print_int_eds (ohci_t * ohci, char * str) {
 	 __u32 * ed_p;
 	for (i= 0; i < 32; i++) {
 		j = 5;
-		ed_p = &(ohci->hcca.int_table [i]);
+		ed_p = &(ohci->hcca->int_table [i]);
 		if (*ed_p == 0)
 		    continue;
 		printk (KERN_DEBUG __FILE__ ": %s branch int %2d(%2x):", str, i, i);
@@ -371,7 +372,7 @@ static void ohci_dump (ohci_t *controller, int verbose)
 	ohci_dump_status (controller);
 	if (verbose)
 		ep_print_int_eds (controller, "hcca");
-	dbg ("hcca frame #%04x", controller->hcca.frame_no);
+	dbg ("hcca frame #%04x", controller->hcca->frame_no);
 	ohci_dump_roothub (controller, 1);
 }
 
@@ -555,7 +556,7 @@ static int sohci_submit_urb (urb_t * urb)
 			if (urb->transfer_flags & USB_ISO_ASAP) { 
 				urb->start_frame = ((ed->state == ED_OPER)
 					? (ed->last_iso + 1)
-					: (le16_to_cpu (ohci->hcca.frame_no) + 10)) & 0xffff;
+					: (le16_to_cpu (ohci->hcca->frame_no) + 10)) & 0xffff;
 			}	
 			/* FALLTHROUGH */
 		case PIPE_INTERRUPT:
@@ -751,7 +752,7 @@ static int sohci_free_dev (struct usb_device * usb_dev)
 				 * the controller won't ever be touching
 				 * these lists again!!
 				dl_del_list (ohci,
-					le16_to_cpu (ohci->hcca.frame_no) & 1);
+					le16_to_cpu (ohci->hcca->frame_no) & 1);
 				 */
 				warn ("TD leak, %d", cnt);
 
@@ -795,7 +796,7 @@ static int sohci_get_current_frame_number (struct usb_device *usb_dev)
 {
 	ohci_t * ohci = usb_dev->bus->hcpriv;
 	
-	return le16_to_cpu (ohci->hcca.frame_no);
+	return le16_to_cpu (ohci->hcca->frame_no);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -914,7 +915,7 @@ static int ep_link (ohci_t * ohci, ed_t * edi)
 		
 		for (i = 0; i < ep_rev (6, interval); i += inter) {
 			inter = 1;
-			for (ed_p = &(ohci->hcca.int_table[ep_rev (5, i) + int_branch]); 
+			for (ed_p = &(ohci->hcca->int_table[ep_rev (5, i) + int_branch]); 
 				(*ed_p != 0) && (((ed_t *) bus_to_virt (le32_to_cpup (ed_p)))->int_interval >= interval); 
 				ed_p = &(((ed_t *) bus_to_virt (le32_to_cpup (ed_p)))->hwNextED)) 
 					inter = ep_rev (6, ((ed_t *) bus_to_virt (le32_to_cpup (ed_p)))->int_interval);
@@ -935,7 +936,7 @@ static int ep_link (ohci_t * ohci, ed_t * edi)
 		} else {
 			for ( i = 0; i < 32; i += inter) {
 				inter = 1;
-				for (ed_p = &(ohci->hcca.int_table[ep_rev (5, i)]); 
+				for (ed_p = &(ohci->hcca->int_table[ep_rev (5, i)]); 
 					*ed_p != 0; 
 					ed_p = &(((ed_t *) bus_to_virt (le32_to_cpup (ed_p)))->hwNextED)) 
 						inter = ep_rev (6, ((ed_t *) bus_to_virt (le32_to_cpup (ed_p)))->int_interval);
@@ -1009,7 +1010,7 @@ static int ep_unlink (ohci_t * ohci, ed_t * ed)
 		interval = ed->int_interval;
 
 		for (i = 0; i < ep_rev (6, interval); i += inter) {
-			for (ed_p = &(ohci->hcca.int_table[ep_rev (5, i) + int_branch]), inter = 1; 
+			for (ed_p = &(ohci->hcca->int_table[ep_rev (5, i) + int_branch]), inter = 1; 
 				(*ed_p != 0) && (*ed_p != ed->hwNextED); 
 				ed_p = &(((ed_t *) bus_to_virt (le32_to_cpup (ed_p)))->hwNextED), 
 				inter = ep_rev (6, ((ed_t *) bus_to_virt (le32_to_cpup (ed_p)))->int_interval)) {				
@@ -1036,7 +1037,7 @@ static int ep_unlink (ohci_t * ohci, ed_t * ed)
 			ed->ed_prev->hwNextED = ed->hwNextED;
 		} else {
 			for (i = 0; i < 32; i++) {
-				for (ed_p = &(ohci->hcca.int_table[ep_rev (5, i)]); 
+				for (ed_p = &(ohci->hcca->int_table[ep_rev (5, i)]); 
 						*ed_p != 0; 
 						ed_p = &(((ed_t *) bus_to_virt (le32_to_cpup (ed_p)))->hwNextED)) {
 					// inter = ep_rev (6, ((ed_t *) bus_to_virt (le32_to_cpup (ed_p)))->int_interval);
@@ -1148,7 +1149,7 @@ static void ep_rm_ed (struct usb_device * usb_dev, ed_t * ed)
 		}
 	}
 
-	frame = le16_to_cpu (ohci->hcca.frame_no) & 0x1;
+	frame = le16_to_cpu (ohci->hcca->frame_no) & 0x1;
 	ed->ed_rm_list = ohci->ed_rm_list[frame];
 	ohci->ed_rm_list[frame] = ed;
 
@@ -1361,8 +1362,8 @@ static td_t * dl_reverse_done_list (ohci_t * ohci)
   	
   	spin_lock_irqsave (&usb_ed_lock, flags);
   	
-	td_list_hc = le32_to_cpup (&ohci->hcca.done_head) & 0xfffffff0;
-	ohci->hcca.done_head = 0;
+	td_list_hc = le32_to_cpup (&ohci->hcca->done_head) & 0xfffffff0;
+	ohci->hcca->done_head = 0;
 	
 	while (td_list_hc) {		
 		td_list = (td_t *) bus_to_virt (td_list_hc);
@@ -2018,7 +2019,7 @@ static int hc_start (ohci_t * ohci)
 	writel (0, &ohci->regs->ed_controlhead);
 	writel (0, &ohci->regs->ed_bulkhead);
 	
-	writel (virt_to_bus (&ohci->hcca), &ohci->regs->hcca); /* a reset clears this */
+	writel (ohci->hcca_dma, &ohci->regs->hcca); /* a reset clears this */
    
   	fminterval = 0x2edf;
 	writel ((fminterval * 9) / 10, &ohci->regs->periodicstart);
@@ -2075,13 +2076,13 @@ static void hc_interrupt (int irq, void * __ohci, struct pt_regs * r)
 	struct ohci_regs * regs = ohci->regs;
  	int ints; 
 
-	if ((ohci->hcca.done_head != 0) && !(le32_to_cpup (&ohci->hcca.done_head) & 0x01)) {
+	if ((ohci->hcca->done_head != 0) && !(le32_to_cpup (&ohci->hcca->done_head) & 0x01)) {
 		ints =  OHCI_INTR_WDH;
 	} else if ((ints = (readl (&regs->intrstatus) & readl (&regs->intrenable))) == 0) {
 		return;
 	} 
 
-	// dbg("Interrupt: %x frame: %x", ints, le16_to_cpu (ohci->hcca.frame_no));
+	// dbg("Interrupt: %x frame: %x", ints, le16_to_cpu (ohci->hcca->frame_no));
 
 	if (ints & OHCI_INTR_UE) {
 		ohci->disabled++;
@@ -2111,7 +2112,7 @@ static void hc_interrupt (int irq, void * __ohci, struct pt_regs * r)
 	}
 
 	if (ints & OHCI_INTR_SF) { 
-		unsigned int frame = le16_to_cpu (ohci->hcca.frame_no) & 1;
+		unsigned int frame = le16_to_cpu (ohci->hcca->frame_no) & 1;
 		writel (OHCI_INTR_SF, &regs->intrdisable);	
 		if (ohci->ed_rm_list[!frame] != NULL) {
 			dl_del_list (ohci, !frame);
@@ -2139,7 +2140,15 @@ static ohci_t * __devinit hc_alloc_ohci (struct pci_dev *dev, void * mem_base)
 		return NULL;
 		
 	memset (ohci, 0, sizeof (ohci_t));
-	
+
+	ohci->hcca = pci_alloc_consistent (dev, sizeof *ohci->hcca,
+			&ohci->hcca_dma);
+        if (!ohci->hcca) {
+                kfree (ohci);
+                return NULL;
+        }
+        memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
+
 	ohci->disabled = 1;
 	ohci->irq = -1;
 	ohci->regs = mem_base;   
@@ -2192,7 +2201,9 @@ static void hc_release_ohci (ohci_t * ohci)
     
 	/* unmap the IO address space */
 	iounmap (ohci->regs);
-       
+
+	pci_free_consistent (ohci->ohci_dev, sizeof *ohci->hcca,
+		ohci->hcca, ohci->hcca_dma);
 	kfree (ohci);
 }
 
@@ -2290,7 +2301,7 @@ static void hc_restart (ohci_t *ohci)
 	
 	/* empty the interrupt branches */
 	for (i = 0; i < NUM_INTS; i++) ohci->ohci_int_load[i] = 0;
-	for (i = 0; i < NUM_INTS; i++) ohci->hcca.int_table[i] = 0;
+	for (i = 0; i < NUM_INTS; i++) ohci->hcca->int_table[i] = 0;
 	
 	/* no EDs to remove */
 	ohci->ed_rm_list [0] = NULL;

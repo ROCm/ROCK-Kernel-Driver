@@ -193,11 +193,11 @@ elf_map32 (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 	if(!addr)
 		addr = 0x40000000;
 
-	down(&current->mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 	map_addr = do_mmap(filep, ELF_PAGESTART(addr),
 			   eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr), prot, type,
 			   eppnt->p_offset - ELF_PAGEOFFSET(eppnt->p_vaddr));
-	up(&current->mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return(map_addr);
 }
 

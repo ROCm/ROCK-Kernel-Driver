@@ -1097,6 +1097,10 @@ nfs_permission(struct inode *inode, int mask)
 
 	if (!NFS_PROTO(inode)->access)
 		goto out;
+
+	if (error == -EROFS)
+		goto out;
+
 	/*
 	 * Trust UNIX mode bits except:
 	 *

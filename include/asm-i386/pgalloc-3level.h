@@ -8,7 +8,7 @@
  * Copyright (C) 1999 Ingo Molnar <mingo@redhat.com>
  */
 
-extern __inline__ pmd_t *get_pmd_slow(void)
+extern __inline__ pmd_t *pmd_alloc_one(void)
 {
 	pmd_t *ret = (pmd_t *)__get_free_page(GFP_KERNEL);
 
@@ -17,7 +17,7 @@ extern __inline__ pmd_t *get_pmd_slow(void)
 	return ret;
 }
 
-extern __inline__ pmd_t *get_pmd_fast(void)
+extern __inline__ pmd_t *pmd_alloc_one_fast(void)
 {
 	unsigned long *ret;
 
@@ -30,39 +30,16 @@ extern __inline__ pmd_t *get_pmd_fast(void)
 	return (pmd_t *)ret;
 }
 
-extern __inline__ void free_pmd_fast(pmd_t *pmd)
+extern __inline__ void pmd_free_fast(pmd_t *pmd)
 {
 	*(unsigned long *)pmd = (unsigned long) pmd_quicklist;
 	pmd_quicklist = (unsigned long *) pmd;
 	pgtable_cache_size++;
 }
 
-extern __inline__ void free_pmd_slow(pmd_t *pmd)
+extern __inline__ void pmd_free_slow(pmd_t *pmd)
 {
 	free_page((unsigned long)pmd);
-}
-
-extern inline pmd_t * pmd_alloc(pgd_t *pgd, unsigned long address)
-{
-	if (!pgd)
-		BUG();
-	address = (address >> PMD_SHIFT) & (PTRS_PER_PMD - 1);
-	if (pgd_none(*pgd)) {
-		pmd_t *page = get_pmd_fast();
-
-		if (!page)
-			page = get_pmd_slow();
-		if (page) {
-			if (pgd_none(*pgd)) {
-				set_pgd(pgd, __pgd(1 + __pa(page)));
-				__flush_tlb();
-				return page + address;
-			} else
-				free_pmd_fast(page);
-		} else
-			return NULL;
-	}
-	return (pmd_t *)pgd_page(*pgd) + address;
 }
 
 #endif /* _I386_PGALLOC_3LEVEL_H */
