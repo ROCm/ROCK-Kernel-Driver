@@ -1,4 +1,4 @@
-/* ld script to make s390 Linux kernel
+/*	
  * Written by Martin Schwidefsky (schwidefsky@de.ibm.com)
  */
 OUTPUT_FORMAT("elf64-s390", "elf64-s390", "elf64-s390")
@@ -25,6 +25,7 @@ SECTIONS
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
+  . = ALIGN(64);
   __start___ksymtab = .;	/* Kernel symbol table */
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
@@ -40,18 +41,31 @@ SECTIONS
 	CONSTRUCTORS
 	}
 
+  . = ALIGN(4096);
+  __nosave_begin = .;
+  .data_nosave : { *(.data.nosave) }
+  . = ALIGN(4096);
+  __nosave_end = .;
+
+  . = ALIGN(4096);
+  .data.page_aligned : { *(.data.idt) }
+
+  . = ALIGN(32);
+  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
+
   _edata = .;			/* End of data section */
 
-  . = ALIGN(16384);		/* init_task */
+  . = ALIGN(8192);		/* init_task */
   .data.init_task : { *(.data.init_task) }
 
+  /* will be freed after init */
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { *(.data.init) }
+  .init.text : { *(.init.text) }
+  .init.data : { *(.init.data) }
   . = ALIGN(256);
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : {
@@ -65,24 +79,29 @@ SECTIONS
   }
   __initcall_end = .;
   . = ALIGN(256);
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.initramfs) }
+  __initramfs_end = .;
+  . = ALIGN(256);
   __per_cpu_start = .;
   .data.percpu  : { *(.data.percpu) }
   __per_cpu_end = .;
   . = ALIGN(4096);
   __init_end = .;
-
-  . = ALIGN(32);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
-
-  . = ALIGN(4096);
-  .data.page_aligned : { *(.data.idt) }
-
+  /* freed after init ends here */
 
   __bss_start = .;		/* BSS */
-  .bss : {
-	*(.bss)
-	}
+  .bss : { *(.bss) }
+  __bss_stop = .;
+
   _end = . ;
+
+  /* Sections to be discarded */
+  /DISCARD/ : {
+	*(.exit.text)
+	*(.exit.data)
+	*(.exitcall.exit)
+	}
 
   /* Stabs debugging sections.  */
   .stab 0 : { *(.stab) }
