@@ -1216,8 +1216,6 @@ static int sd_attach(struct scsi_device * sdp)
 	sdkp->driver = &sd_template;
 	sdkp->disk = gd;
 
-	sd_init_onedisk(sdkp, gd);
-
 	gd->de = sdp->de;
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
@@ -1226,6 +1224,9 @@ static int sd_attach(struct scsi_device * sdp)
 		sprintf(gd->disk_name, "sd%c%c",'a'+dsk_nr/26-1,'a'+dsk_nr%26);
 	else
 		sprintf(gd->disk_name, "sd%c",'a'+dsk_nr%26);
+
+	sd_init_onedisk(sdkp, gd);
+
 	gd->driverfs_dev = &sdp->sdev_driverfs_dev;
 	gd->flags = GENHD_FL_DRIVERFS | GENHD_FL_DEVFS;
 	if (sdp->removable)
