@@ -101,7 +101,7 @@ static int __init pcibios_init(void)
 	printk(KERN_INFO "PCI: Lithium bridge A bus: %u, "
 		"bridge B (PIIX4) bus: %u\n", pci_bus1, pci_bus0);
 
-	raw_pci_ops =3D &pci_direct_conf1;
+	raw_pci_ops = &pci_direct_conf1;
 	pci_scan_bus(pci_bus0, &pci_root_ops, NULL);
 	pci_scan_bus(pci_bus1, &pci_root_ops, NULL);
 	pci_fixup_irqs(visws_swizzle, visws_map_irq);

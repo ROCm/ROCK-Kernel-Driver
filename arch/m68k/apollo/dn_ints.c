@@ -46,7 +46,7 @@ void dn_init_IRQ(void) {
 int dn_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id) {
 
   if((irq<0) || (irq>15)) {
-    printk("Trying to request illegal IRQ\n");
+    printk("Trying to request invalid IRQ\n");
     return -ENXIO;
   }
 
@@ -72,7 +72,7 @@ int dn_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct 
 void dn_free_irq(unsigned int irq, void *dev_id) {
 
   if((irq<0) || (irq>15)) {
-    printk("Trying to free illegal IRQ\n");
+    printk("Trying to free invalid IRQ\n");
     return ;
   }
 

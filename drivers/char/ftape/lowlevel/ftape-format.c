@@ -44,6 +44,8 @@
 #define FT_FMT_SEGS_PER_BUF (FT_BUFF_SIZE/(4*FT_SECTORS_PER_SEGMENT))
 #endif
 
+static spinlock_t ftape_format_lock;
+
 /*
  *  first segment of the new buffer
  */
@@ -129,9 +131,9 @@ int ftape_format_track(const unsigned int track, const __u8 gap3)
 	head->status = formatting;
 	TRACE_CATCH(ftape_seek_head_to_track(track),);
 	TRACE_CATCH(ftape_command(QIC_LOGICAL_FORWARD),);
-	save_flags(flags); cli();
+	spin_lock_irqsave(&ftape_format_lock, flags);
 	TRACE_CATCH(fdc_setup_formatting(head), restore_flags(flags));
-	restore_flags(flags);	
+	spin_unlock_irqrestore(&ftape_format_lock, flags);
 	TRACE_EXIT 0;
 }
 

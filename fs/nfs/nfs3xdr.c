@@ -124,8 +124,6 @@ xdr_decode_fhandle(u32 *p, struct nfs_fh *fh)
 
 /*
  * Encode/decode time.
- * Since the VFS doesn't care for fractional times, we ignore the
- * nanosecond field.
  */
 static inline u32 *
 xdr_encode_time3(u32 *p, struct timespec *timep)
