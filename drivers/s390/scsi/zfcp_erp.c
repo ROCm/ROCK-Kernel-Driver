@@ -31,7 +31,7 @@
 
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
-#define ZFCP_ERP_REVISION "$Revision: 1.85 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.86 $"
 
 #include "zfcp_ext.h"
 
@@ -369,7 +369,7 @@ zfcp_erp_adisc(struct zfcp_adapter *adapter, fc_id_t d_id)
 		ZFCP_LOG_NORMAL("error: initiation of Send ELS failed for port "
 				"0x%08x on adapter %s\n", d_id,
 				zfcp_get_busid_by_adapter(adapter));
-		del_timer_sync(send_els->timer);
+		del_timer(send_els->timer);
 		goto freemem;
 	}
 
@@ -969,7 +969,7 @@ zfcp_erp_async_handler_nolock(struct zfcp_erp_action *erp_action,
 		debug_event(adapter->erp_dbf, 2, &erp_action->action,
 			    sizeof (int));
 		if (!(set_mask & ZFCP_STATUS_ERP_TIMEDOUT))
-			del_timer_sync(&erp_action->timer);
+			del_timer(&erp_action->timer);
 		erp_action->status |= set_mask;
 		zfcp_erp_action_ready(erp_action);
 		retval = 0;

@@ -30,7 +30,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_FSF_C_REVISION "$Revision: 1.88 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.92 $"
 
 #include "zfcp_ext.h"
 
@@ -3203,7 +3203,9 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 			      sizeof (union fsf_status_qual));
 		debug_text_event(adapter->erp_dbf, 2,
 				 "fsf_s_l_sh_vio");
-		zfcp_erp_unit_failed(unit);
+		zfcp_erp_unit_access_denied(unit);
+		atomic_clear_mask(ZFCP_STATUS_UNIT_SHARED, &unit->status);
+		atomic_clear_mask(ZFCP_STATUS_UNIT_READONLY, &unit->status);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
 
@@ -4320,22 +4322,19 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 
 	/* check for underrun */
 	if (unlikely(fcp_rsp_iu->validity.bits.fcp_resid_under)) {
-		ZFCP_LOG_DEBUG("A data underrun was detected for a command. "
-			       "unit 0x%016Lx, port 0x%016Lx, adapter %s. "
-			       "The response data length is "
-			       "%d, the original length was %d.\n",
-			       unit->fcp_lun,
-			       unit->port->wwpn,
-			       zfcp_get_busid_by_unit(unit),
-			       fcp_rsp_iu->fcp_resid,
-			       (int) zfcp_get_fcp_dl(fcp_cmnd_iu));
-		/*
-		 * It may not have been possible to send all data and the
-		 * underrun on send may already be in scpnt->resid, so it's add
-		 * not equals in the below statement.
-		 */
-		scpnt->resid += fcp_rsp_iu->fcp_resid;
-		ZFCP_LOG_TRACE("scpnt->resid=0x%x\n", scpnt->resid);
+		ZFCP_LOG_INFO("A data underrun was detected for a command. "
+			      "unit 0x%016Lx, port 0x%016Lx, adapter %s. "
+			      "The response data length is "
+			      "%d, the original length was %d.\n",
+			      unit->fcp_lun,
+			      unit->port->wwpn,
+			      zfcp_get_busid_by_unit(unit),
+			      fcp_rsp_iu->fcp_resid,
+			      (int) zfcp_get_fcp_dl(fcp_cmnd_iu));
+
+		scpnt->resid = fcp_rsp_iu->fcp_resid;
+		if (scpnt->request_bufflen - scpnt->resid < scpnt->underflow)
+			scpnt->result |= DID_ERROR << 16;
 	}
 
  skip_fsfstatus:
@@ -5023,7 +5022,7 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 		 * timer might be expired (absolutely unlikely)
 		 */
 		if (timer)
-			del_timer_sync(timer);
+			del_timer(timer);
 		write_lock_irqsave(&adapter->fsf_req_list_lock, flags);
 		list_del(&fsf_req->list);
 		write_unlock_irqrestore(&adapter->fsf_req_list_lock, flags);
