@@ -127,4 +127,9 @@ static inline void enable_apic_mode(void)
 {
 }
 
+static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
+{
+	return cpuid_apic >> index_msb;
+}
+
 #endif /* __ASM_MACH_APIC_H */

@@ -14,6 +14,7 @@ Supported:
 	Hotplug firmware loader under 2.6 kernels
 
 In Progress:
+	DEC2540-t
 	DEC3000-s
 
 To Do:
@@ -23,21 +24,34 @@ To Do:
 
 Getting the Firmware
 --------------------
-Currently, the driver only works with v2.15a of the firmware.  The firmwares
-can be obtained in this way:
+The firmware can be found in the software update zip files on this page:
+http://www.hauppauge.de/sw_dec.htm
 
-wget http://hauppauge.lightpath.net/de/dec215a.exe
-unzip -j dec215a.exe Software/Oem/STB/App/Boot/STB_PC_T.bin
-unzip -j dec215a.exe Software/Oem/STB/App/Boot/STB_PC_S.bin
+The firmwares are named as follows:
+DEC2000-t:	STB_PC_T.bin
+DEC2540-t:	STB_PC_X.bin
+DEC3000-s:	STB_PC_S.bin
+
+Note that firmwares since version 2.16 beta2 for the DEC2000-t give the device
+the USB ID of the DEC3000-s.  The driver copes with this.
+
+Instructions follow for retrieving version 2.16 of the firmware:
+
+wget http://hauppauge.lightpath.net/de/dec216.exe
+unzip -j dec216.exe software/OEM/STB/App/Boot/STB_PC_T.bin
+unzip -j dec216.exe software/OEM/STB/App/Boot/STB_PC_X.bin
+unzip -j dec216.exe software/OEM/STB/App/Boot/STB_PC_S.bin
 
 
 Compilation Notes for 2.4 kernels
 ---------------------------------
 For 2.4 kernels the firmware for the DECs is compiled into the driver itself.
-The firmwares are expected to be in /etc/dvb at compilation time.
+The firmwares are expected to be in the build-2.4 directory at compilation
+time.
 
-mv STB_PC_T.bin /etc/dvb/dec2000t.bin
-mv STB_PC_S.bin /etc/dvb/dec3000s.bin
+mv STB_PC_T.bin build-2.4/dvb-ttusb-dec-2000t.fw
+mv STB_PC_X.bin build-2.4/dvb-ttusb-dec-2540t.fw
+mv STB_PC_S.bin build-2.4/dvb-ttusb-dec-3000s.fw
 
 
 Hotplug Firmware Loading for 2.6 kernels
@@ -45,5 +59,6 @@ Hotplug Firmware Loading for 2.6 kernels
 For 2.6 kernels the firmware is loaded at the point that the driver module is
 loaded.  See linux/Documentation/dvb/firmware.txt for more information.
 
-mv STB_PC_T.bin /usr/lib/hotplug/firmware/dvb-ttusb-dec-2000t-2.15a.fw
-mv STB_PC_S.bin /usr/lib/hotplug/firmware/dvb-ttusb-dec-3000s-2.15a.fw
+mv STB_PC_T.bin /usr/lib/hotplug/firmware/dvb-ttusb-dec-2000t.fw
+mv STB_PC_X.bin /usr/lib/hotplug/firmware/dvb-ttusb-dec-2540t.fw
+mv STB_PC_S.bin /usr/lib/hotplug/firmware/dvb-ttusb-dec-3000s.fw

@@ -201,10 +201,13 @@ sys_sigaltstack(const stack_t *uss, stack_t *uoss)
  * Do a signal return; undo the signal stack.
  */
 
+#if _NSIG_WORDS > 1
+# error "Non SA_SIGINFO frame needs rearranging"
+#endif
+
 struct sigframe
 {
 	struct sigcontext sc;
-	unsigned long extramask[_NSIG_WORDS-1];
 	unsigned int retcode[3];
 };
 
@@ -268,19 +271,20 @@ restore_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 	return err;
 }
 
+/* Note that this syscall is also used by setcontext(3) to install
+   a given sigcontext.  This because it's impossible to set *all*
+   registers and transfer control from userland.  */
+
 asmlinkage void
-do_sigreturn(struct sigframe *frame, struct pt_regs *regs,
+do_sigreturn(struct sigcontext *sc, struct pt_regs *regs,
 	     struct switch_stack *sw)
 {
 	sigset_t set;
 
 	/* Verify that it's a good sigcontext before using it */
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (verify_area(VERIFY_READ, sc, sizeof(*sc)))
 		goto give_sigsegv;
-	if (__get_user(set.sig[0], &frame->sc.sc_mask)
-	    || (_NSIG_WORDS > 1
-		&& __copy_from_user(&set.sig[1], &frame->extramask,
-				    sizeof(frame->extramask))))
+	if (__get_user(set.sig[0], &sc->sc_mask))
 		goto give_sigsegv;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
@@ -289,7 +293,7 @@ do_sigreturn(struct sigframe *frame, struct pt_regs *regs,
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
-	if (restore_sigcontext(&frame->sc, regs, sw))
+	if (restore_sigcontext(sc, regs, sw))
 		goto give_sigsegv;
 
 	/* Send SIGTRAP if we're single-stepping: */
@@ -314,10 +318,9 @@ do_rt_sigreturn(struct rt_sigframe *frame, struct pt_regs *regs,
 		struct switch_stack *sw)
 {
 	sigset_t set;
-	stack_t st;
 
-	/* Verify that it's a good sigcontext before using it */
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	/* Verify that it's a good ucontext_t before using it */
+	if (verify_area(VERIFY_READ, &frame->uc, sizeof(frame->uc)))
 		goto give_sigsegv;
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
 		goto give_sigsegv;
@@ -330,12 +333,6 @@ do_rt_sigreturn(struct rt_sigframe *frame, struct pt_regs *regs,
 
 	if (restore_sigcontext(&frame->uc.uc_mcontext, regs, sw))
 		goto give_sigsegv;
-
-	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st)))
-		goto give_sigsegv;
-	/* It is more difficult to avoid calling this function than to
-	   call it and ignore errors.  */
-	do_sigaltstack(&st, NULL, rdusp());
 
 	/* Send SIGTRAP if we're single-stepping: */
 	if (ptrace_cancel_bpt (current)) {
@@ -437,10 +434,6 @@ setup_frame(int sig, struct k_sigaction *ka, sigset_t *set,
 		goto give_sigsegv;
 
 	err |= setup_sigcontext(&frame->sc, regs, sw, set->sig[0], oldsp);
-	if (_NSIG_WORDS > 1) {
-		err |= __copy_to_user(frame->extramask, &set->sig[1], 
-				      sizeof(frame->extramask));
-	}
 	if (err)
 		goto give_sigsegv;
 

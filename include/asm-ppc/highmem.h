@@ -63,8 +63,7 @@ static inline void *kmap(struct page *page)
 
 static inline void kunmap(struct page *page)
 {
-	if (in_interrupt())
-		BUG();
+	BUG_ON(in_interrupt());
 	if (page < highmem_start_page)
 		return;
 	kunmap_high(page);
@@ -89,8 +88,7 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 	idx = type + KM_TYPE_NR*smp_processor_id();
 	vaddr = KMAP_FIX_BEGIN + idx * PAGE_SIZE;
 #if HIGHMEM_DEBUG
-	if (!pte_none(*(kmap_pte+idx)))
-		BUG();
+	BUG_ON(!pte_none(*(kmap_pte+idx)));
 #endif
 	set_pte(kmap_pte+idx, mk_pte(page, kmap_prot));
 	flush_tlb_page(0, vaddr);
@@ -110,8 +108,7 @@ static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 		return;
 	}
 
-	if (vaddr != KMAP_FIX_BEGIN + idx * PAGE_SIZE)
-		BUG();
+	BUG_ON(vaddr != KMAP_FIX_BEGIN + idx * PAGE_SIZE);
 
 	/*
 	 * force other mappings to Oops if they'll try to access

@@ -439,12 +439,13 @@ typedef enum {
 	 * 0x0101          Operation Refused Due to Resource Shortage.
 	 * 0x0102          Request to Delete Source IP Address.
 	 * 0x0103          Association Aborted due to illegal ASCONF-ACK
+	 * 0x0104          Request refused - no authorization.
 	 */
 	SCTP_ERROR_DEL_LAST_IP	= __constant_htons(0x0100),
 	SCTP_ERROR_RSRC_LOW	= __constant_htons(0x0101),
 	SCTP_ERROR_DEL_SRC_IP	= __constant_htons(0x0102),
 	SCTP_ERROR_ASCONF_ACK   = __constant_htons(0x0103),
-
+	SCTP_ERROR_REQ_REFUSED	= __constant_htons(0x0104)
 } sctp_error_t;
 
 

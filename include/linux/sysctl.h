@@ -580,6 +580,7 @@ enum {
 	NET_SCTP_HB_INTERVAL             = 10,
 	NET_SCTP_PRESERVE_ENABLE         = 11,
 	NET_SCTP_MAX_BURST               = 12,
+	NET_SCTP_ADDIP_ENABLE		 = 13,
 };
 
 /* /proc/sys/net/bridge */
@@ -737,6 +738,8 @@ extern int proc_dointvec_minmax(ctl_table *, int, struct file *,
 				void __user *, size_t *);
 extern int proc_dointvec_jiffies(ctl_table *, int, struct file *,
 				 void __user *, size_t *);
+extern int proc_dointvec_userhz_jiffies(ctl_table *, int, struct file *,
+					void __user *, size_t *);
 extern int proc_doulongvec_minmax(ctl_table *, int, struct file *,
 				  void __user *, size_t *);
 extern int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int,

@@ -1891,6 +1891,7 @@ static struct miscdevice apm_device = {
 static int __init apm_init(void)
 {
 	struct proc_dir_entry *apm_proc;
+	int ret;
 	int i;
 
 	if (apm_info.bios.version == 0) {
@@ -2008,7 +2009,11 @@ static int __init apm_init(void)
 	if (apm_proc)
 		apm_proc->owner = THIS_MODULE;
 
-	kernel_thread(apm, NULL, CLONE_KERNEL | SIGCHLD);
+	ret = kernel_thread(apm, NULL, CLONE_KERNEL | SIGCHLD);
+	if (ret < 0) {
+		printk(KERN_ERR "apm: disabled - Unable to start kernel thread.\n");
+		return -ENOMEM;
+	}
 
 	if (num_online_cpus() > 1 && !smp ) {
 		printk(KERN_NOTICE

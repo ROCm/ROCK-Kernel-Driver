@@ -104,13 +104,6 @@ extern struct task_struct * _switch(struct thread_struct *prev,
 struct pt_regs;
 extern void dump_regs(struct pt_regs *);
 
-#define irqs_disabled()				\
-({						\
-	unsigned long flags;			\
-	local_save_flags(flags);		\
-	!(flags & MSR_EE);			\
-})
-
 static inline int __is_processor(unsigned long pv)
 {
 	unsigned long pvr;

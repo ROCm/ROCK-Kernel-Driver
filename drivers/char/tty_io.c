@@ -2069,79 +2069,7 @@ static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 	tty->driver->write(tty, 0, &ch, 1);
 }
 
-struct tty_dev {
-	struct list_head node;
-	dev_t dev;
-	struct class_device class_dev;
-};
-#define to_tty_dev(d) container_of(d, struct tty_dev, class_dev)
-
-static void release_tty_dev(struct class_device *class_dev)
-{
-	struct tty_dev *tty_dev = to_tty_dev(class_dev);
-	kfree(tty_dev);
-}
-
-static struct class tty_class = {
-	.name		= "tty",
-	.release	= &release_tty_dev,
-};
-
-static LIST_HEAD(tty_dev_list);
-static spinlock_t tty_dev_list_lock = SPIN_LOCK_UNLOCKED;
-
-static ssize_t show_dev(struct class_device *class_dev, char *buf)
-{
-	struct tty_dev *tty_dev = to_tty_dev(class_dev);
-	return print_dev_t(buf, tty_dev->dev);
-}
-static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
-
-static void tty_add_class_device(char *name, dev_t dev, struct device *device)
-{
-	struct tty_dev *tty_dev = NULL;
-	int retval;
-
-	tty_dev = kmalloc(sizeof(*tty_dev), GFP_KERNEL);
-	if (!tty_dev)
-		return;
-	memset(tty_dev, 0x00, sizeof(*tty_dev));
-
-	tty_dev->class_dev.dev = device;
-	tty_dev->class_dev.class = &tty_class;
-	snprintf(tty_dev->class_dev.class_id, BUS_ID_SIZE, "%s", name);
-	retval = class_device_register(&tty_dev->class_dev);
-	if (retval)
-		goto error;
-	class_device_create_file (&tty_dev->class_dev, &class_device_attr_dev);
-	tty_dev->dev = dev;
-	spin_lock(&tty_dev_list_lock);
-	list_add(&tty_dev->node, &tty_dev_list);
-	spin_unlock(&tty_dev_list_lock);
-	return;
-error:
-	kfree(tty_dev);
-}
-
-static void tty_remove_class_device(dev_t dev)
-{
-	struct tty_dev *tty_dev = NULL;
-	struct list_head *tmp;
-	int found = 0;
-
-	spin_lock(&tty_dev_list_lock);
-	list_for_each (tmp, &tty_dev_list) {
-		tty_dev = list_entry(tmp, struct tty_dev, node);
-		if (tty_dev->dev == dev) {
-			list_del(&tty_dev->node);
-			found = 1;
-			break;
-		}
-	}
-	spin_unlock(&tty_dev_list_lock);
-	if (found)
-		class_device_unregister(&tty_dev->class_dev);
-}
+static struct class_simple *tty_class;
 
 /**
  * tty_register_device - register a tty device
@@ -2174,7 +2102,7 @@ void tty_register_device(struct tty_driver *driver, unsigned index,
 	if (driver->type != TTY_DRIVER_TYPE_PTY) {
 		char name[64];
 		tty_line_name(driver, index, name);
-		tty_add_class_device(name, dev, device);
+		class_simple_device_add(tty_class, dev, device, name);
 	}
 }
 
@@ -2189,7 +2117,7 @@ void tty_register_device(struct tty_driver *driver, unsigned index,
 void tty_unregister_device(struct tty_driver *driver, unsigned index)
 {
 	devfs_remove("%s%d", driver->devfs_name, index + driver->name_base);
-	tty_remove_class_device(MKDEV(driver->major, driver->minor_start) + index);
+	class_simple_device_remove(MKDEV(driver->major, driver->minor_start) + index);
 }
 
 EXPORT_SYMBOL(tty_register_device);
@@ -2406,7 +2334,10 @@ extern int vty_init(void);
 
 static int __init tty_class_init(void)
 {
-	return class_register(&tty_class);
+	tty_class = class_simple_create(THIS_MODULE, "tty");
+	if (IS_ERR(tty_class))
+		return PTR_ERR(tty_class);
+	return 0;
 }
 
 postcore_initcall(tty_class_init);
@@ -2431,7 +2362,7 @@ static int __init tty_init(void)
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 0), 1, "/dev/tty") < 0)
 		panic("Couldn't register /dev/tty driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 0), S_IFCHR|S_IRUGO|S_IWUGO, "tty");
-	tty_add_class_device ("tty", MKDEV(TTYAUX_MAJOR, 0), NULL);
+	class_simple_device_add(tty_class, MKDEV(TTYAUX_MAJOR, 0), NULL, "tty");
 
 	strcpy(console_cdev.kobj.name, "dev.console");
 	cdev_init(&console_cdev, &console_fops);
@@ -2439,7 +2370,7 @@ static int __init tty_init(void)
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 1), 1, "/dev/console") < 0)
 		panic("Couldn't register /dev/console driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 1), S_IFCHR|S_IRUSR|S_IWUSR, "console");
-	tty_add_class_device ("console", MKDEV(TTYAUX_MAJOR, 1), NULL);
+	class_simple_device_add(tty_class, MKDEV(TTYAUX_MAJOR, 1), NULL, "console");
 
 	tty_kobj.kset = tty_cdev.kobj.kset;
 	kobject_register(&tty_kobj);
@@ -2451,7 +2382,7 @@ static int __init tty_init(void)
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 2), 1, "/dev/ptmx") < 0)
 		panic("Couldn't register /dev/ptmx driver\n");
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 2), S_IFCHR|S_IRUGO|S_IWUGO, "ptmx");
-	tty_add_class_device ("ptmx", MKDEV(TTYAUX_MAJOR, 2), NULL);
+	class_simple_device_add(tty_class, MKDEV(TTYAUX_MAJOR, 2), NULL, "ptmx");
 #endif
 	
 #ifdef CONFIG_VT
@@ -2461,7 +2392,7 @@ static int __init tty_init(void)
 	    register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1, "/dev/vc/0") < 0)
 		panic("Couldn't register /dev/tty0 driver\n");
 	devfs_mk_cdev(MKDEV(TTY_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vc/0");
-	tty_add_class_device ("tty0", MKDEV(TTY_MAJOR, 0), NULL);
+	class_simple_device_add(tty_class, MKDEV(TTY_MAJOR, 0), NULL, "tty0");
 
 	vty_init();
 #endif

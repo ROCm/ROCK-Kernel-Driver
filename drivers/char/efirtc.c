@@ -118,6 +118,7 @@ convert_to_efi_time(struct rtc_time *wtime, efi_time_t *eft)
 static void
 convert_from_efi_time(efi_time_t *eft, struct rtc_time *wtime)
 {
+	memset(wtime, 0, sizeof(*wtime));
 	wtime->tm_sec  = eft->second;
 	wtime->tm_min  = eft->minute;
 	wtime->tm_hour = eft->hour;

@@ -559,7 +559,9 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 		goto fput_in;
 	if (!in_file->f_op || !in_file->f_op->sendfile)
 		goto fput_in;
-	retval = locks_verify_area(FLOCK_VERIFY_READ, in_inode, in_file, in_file->f_pos, count);
+	if (!ppos)
+		ppos = &in_file->f_pos;
+	retval = locks_verify_area(FLOCK_VERIFY_READ, in_inode, in_file, *ppos, count);
 	if (retval)
 		goto fput_in;
 
@@ -587,9 +589,6 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	retval = security_file_permission (out_file, MAY_WRITE);
 	if (retval)
 		goto fput_out;
-
-	if (!ppos)
-		ppos = &in_file->f_pos;
 
 	if (!max)
 		max = min(in_inode->i_sb->s_maxbytes, out_inode->i_sb->s_maxbytes);

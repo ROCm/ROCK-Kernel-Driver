@@ -7,6 +7,7 @@
    Changes:
 
    - RAID-1/RAID-5 extensions by Miguel de Icaza, Gadi Oxman, Ingo Molnar
+   - RAID-6 extensions by H. Peter Anvin <hpa@zytor.com>
    - boot support for linear and striped mode by Harald Hoyer <HarryH@Royal.Net>
    - kerneld support by Boris Tobotras <boris@xtalk.msk.su>
    - kmod support by: Cyrus Durgin
@@ -123,11 +124,9 @@ static ctl_table raid_root_table[] = {
 
 static struct block_device_operations md_fops;
 
-static struct gendisk *disks[MAX_MD_DEVS];
-
 /*
  * Enables to iterate over all existing md arrays
- * all_mddevs_lock protects this list as well as mddev_map.
+ * all_mddevs_lock protects this list.
  */
 static LIST_HEAD(all_mddevs);
 static spinlock_t all_mddevs_lock = SPIN_LOCK_UNLOCKED;
@@ -155,8 +154,6 @@ static spinlock_t all_mddevs_lock = SPIN_LOCK_UNLOCKED;
 		tmp = tmp->next;})					\
 		)
 
-static mddev_t *mddev_map[MAX_MD_DEVS];
-
 static int md_fail_request (request_queue_t *q, struct bio *bio)
 {
 	bio_io_error(bio, bio->bi_size);
@@ -175,7 +172,6 @@ static void mddev_put(mddev_t *mddev)
 		return;
 	if (!mddev->raid_disks && list_empty(&mddev->disks)) {
 		list_del(&mddev->all_mddevs);
-		mddev_map[mdidx(mddev)] = NULL;
 		blk_put_queue(mddev->queue);
 		kfree(mddev);
 	}
@@ -188,15 +184,16 @@ static mddev_t * mddev_find(int unit)
 
  retry:
 	spin_lock(&all_mddevs_lock);
-	if (mddev_map[unit]) {
-		mddev =  mddev_get(mddev_map[unit]);
-		spin_unlock(&all_mddevs_lock);
-		if (new)
-			kfree(new);
-		return mddev;
-	}
+	list_for_each_entry(mddev, &all_mddevs, all_mddevs)
+		if (mdidx(mddev) == unit) {
+			mddev_get(mddev);
+			spin_unlock(&all_mddevs_lock);
+			if (new)
+				kfree(new);
+			return mddev;
+		}
+
 	if (new) {
-		mddev_map[unit] = new;
 		list_add(&new->all_mddevs, &all_mddevs);
 		spin_unlock(&all_mddevs_lock);
 		return new;
@@ -245,6 +242,9 @@ static inline int mddev_trylock(mddev_t * mddev)
 static inline void mddev_unlock(mddev_t * mddev)
 {
 	up(&mddev->reconfig_sem);
+
+	if (mddev->thread)
+		md_wakeup_thread(mddev->thread);
 }
 
 mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr)
@@ -1435,11 +1435,12 @@ static int analyze_sbs(mddev_t * mddev)
 		goto abort;
 	}
 
-	if ((mddev->recovery_cp != MaxSector) && ((mddev->level == 1) ||
-			(mddev->level == 4) || (mddev->level == 5)))
+	if ((mddev->recovery_cp != MaxSector) &&
+	    ((mddev->level == 1) ||
+	     ((mddev->level >= 4) && (mddev->level <= 6))))
 		printk(KERN_ERR "md: md%d: raid array is not clean"
-			" -- starting background reconstruction\n", 
-			mdidx(mddev));
+		       " -- starting background reconstruction\n",
+		       mdidx(mddev));
 
 	return 0;
 abort:
@@ -1458,7 +1459,7 @@ static struct kobject *md_probe(dev_t dev, int *part, void *data)
 		return NULL;
 
 	down(&disks_sem);
-	if (disks[unit]) {
+	if (mddev->gendisk) {
 		up(&disks_sem);
 		mddev_put(mddev);
 		return NULL;
@@ -1476,7 +1477,7 @@ static struct kobject *md_probe(dev_t dev, int *part, void *data)
 	disk->private_data = mddev;
 	disk->queue = mddev->queue;
 	add_disk(disk);
-	disks[mdidx(mddev)] = disk;
+	mddev->gendisk = disk;
 	up(&disks_sem);
 	return NULL;
 }
@@ -1594,7 +1595,7 @@ static int do_md_run(mddev_t * mddev)
 
 	unit = mdidx(mddev);
 	md_probe(0, &unit, NULL);
-	disk = disks[unit];
+	disk = mddev->gendisk;
 	if (!disk)
 		return -ENOMEM;
 
@@ -1624,7 +1625,10 @@ static int do_md_run(mddev_t * mddev)
 	mddev->in_sync = 1;
 	
 	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
-	md_wakeup_thread(mddev->thread);
+	
+	if (mddev->sb_dirty)
+		md_update_sb(mddev);
+
 	set_capacity(disk, mddev->array_size<<1);
 
 	/* If we call blk_queue_make_request here, it will
@@ -1642,7 +1646,7 @@ static int do_md_run(mddev_t * mddev)
 
 static int restart_array(mddev_t *mddev)
 {
-	struct gendisk *disk = disks[mdidx(mddev)];
+	struct gendisk *disk = mddev->gendisk;
 	int err;
 
 	/*
@@ -1682,7 +1686,7 @@ out:
 static int do_md_stop(mddev_t * mddev, int ro)
 {
 	int err = 0;
-	struct gendisk *disk = disks[mdidx(mddev)];
+	struct gendisk *disk = mddev->gendisk;
 
 	if (mddev->pers) {
 		if (atomic_read(&mddev->active)>2) {
@@ -1715,7 +1719,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			if (mddev->ro)
 				mddev->ro = 0;
 		}
-		if (mddev->raid_disks) {
+		if (!mddev->in_sync) {
 			/* mark array as shutdown cleanly */
 			mddev->in_sync = 1;
 			md_update_sb(mddev);
@@ -1733,7 +1737,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 		export_array(mddev);
 
 		mddev->array_size = 0;
-		disk = disks[mdidx(mddev)];
+		disk = mddev->gendisk;
 		if (disk)
 			set_capacity(disk, 0);
 	} else
@@ -2288,7 +2292,7 @@ abort_export:
 /*
  * set_array_info is used two different ways
  * The original usage is when creating a new array.
- * In this usage, raid_disks is > = and it together with
+ * In this usage, raid_disks is > 0 and it together with
  *  level, size, not_persistent,layout,chunksize determine the
  *  shape of the array.
  *  This will always create an array with a type-0.90.0 superblock.
@@ -2339,6 +2343,7 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 
 	mddev->max_disks     = MD_SB_DISKS;
 
+	mddev->sb_dirty      = 1;
 
 	/*
 	 * Generate a 128 bit UUID
@@ -2354,10 +2359,10 @@ static int set_disk_faulty(mddev_t *mddev, dev_t dev)
 
 	rdev = find_rdev(mddev, dev);
 	if (!rdev)
-		return 0;
+		return -ENODEV;
 
 	md_error(mddev, rdev);
-	return 1;
+	return 0;
 }
 
 static int md_ioctl(struct inode *inode, struct file *file,
@@ -2405,7 +2410,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 	 * Commands creating/starting a new array:
 	 */
 
-	mddev = inode->i_bdev->bd_inode->u.generic_ip;
+	mddev = inode->i_bdev->bd_disk->private_data;
 
 	if (!mddev) {
 		BUG();
@@ -2523,7 +2528,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			err = put_user (4, (char *) &loc->sectors);
 			if (err)
 				goto abort_unlock;
-			err = put_user(get_capacity(disks[mdidx(mddev)])/8,
+			err = put_user(get_capacity(mddev->gendisk)/8,
 						(short *) &loc->cylinders);
 			if (err)
 				goto abort_unlock;
@@ -2569,19 +2574,8 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			goto done_unlock;
 
 		case RUN_ARRAY:
-		{
 			err = do_md_run (mddev);
-			/*
-			 * we have to clean up the mess if
-			 * the array cannot be run for some
-			 * reason ...
-			 * ->pers will not be set, to superblock will
-			 * not be updated.
-			 */
-			if (err)
-				do_md_stop (mddev, 0);
 			goto done_unlock;
-		}
 
 		default:
 			if (_IOC_TYPE(cmd) == MD_MAJOR)
@@ -2608,29 +2602,26 @@ abort:
 static int md_open(struct inode *inode, struct file *file)
 {
 	/*
-	 * Succeed if we can find or allocate a mddev structure.
+	 * Succeed if we can lock the mddev, which confirms that
+	 * it isn't being stopped right now.
 	 */
-	mddev_t *mddev = mddev_find(iminor(inode));
-	int err = -ENOMEM;
-
-	if (!mddev)
-		goto out;
+	mddev_t *mddev = inode->i_bdev->bd_disk->private_data;
+	int err;
 
 	if ((err = mddev_lock(mddev)))
-		goto put;
+		goto out;
 
 	err = 0;
+	mddev_get(mddev);
 	mddev_unlock(mddev);
-	inode->i_bdev->bd_inode->u.generic_ip = mddev_get(mddev);
- put:
-	mddev_put(mddev);
+
  out:
 	return err;
 }
 
 static int md_release(struct inode *inode, struct file * file)
 {
- 	mddev_t *mddev = inode->i_bdev->bd_inode->u.generic_ip;
+ 	mddev_t *mddev = inode->i_bdev->bd_disk->private_data;
 
 	if (!mddev)
 		BUG();
@@ -3014,7 +3005,9 @@ static struct file_operations md_seq_fops = {
 int register_md_personality(int pnum, mdk_personality_t *p)
 {
 	if (pnum >= MAX_PERSONALITY) {
-		MD_BUG();
+		printk(KERN_ERR
+		       "md: tried to install personality %s as nr %d, but max is %lu\n",
+		       p->name, pnum, MAX_PERSONALITY-1);
 		return -EINVAL;
 	}
 
@@ -3111,6 +3104,10 @@ void md_write_end(mddev_t *mddev)
 
 static inline void md_enter_safemode(mddev_t *mddev)
 {
+	if (!mddev->safemode) return;
+	if (mddev->safemode == 2 &&
+	    (atomic_read(&mddev->writes_pending) || mddev->in_sync))
+		return; /* avoid the lock */
 	mddev_lock_uninterruptible(mddev);
 	if (mddev->safemode && !atomic_read(&mddev->writes_pending) &&
 	    !mddev->in_sync && mddev->recovery_cp == MaxSector) {
@@ -3131,8 +3128,7 @@ void md_handle_safemode(mddev_t *mddev)
 		mddev->safemode = 2;
 		flush_signals(current);
 	}
-	if (mddev->safemode)
-		md_enter_safemode(mddev);
+	md_enter_safemode(mddev);
 }
 
 
@@ -3320,8 +3316,7 @@ static void md_do_sync(mddev_t *mddev)
 			mddev->recovery_cp = MaxSector;
 	}
 
-	if (mddev->safemode)
-		md_enter_safemode(mddev);
+	md_enter_safemode(mddev);
  skip:
 	mddev->curr_resync = 0;
 	set_bit(MD_RECOVERY_DONE, &mddev->recovery);
@@ -3372,25 +3367,30 @@ void md_check_recovery(mddev_t *mddev)
 		if (mddev->sb_dirty)
 			md_update_sb(mddev);
 		if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery) &&
-		    !test_bit(MD_RECOVERY_DONE, &mddev->recovery))
+		    !test_bit(MD_RECOVERY_DONE, &mddev->recovery)) {
 			/* resync/recovery still happening */
+			clear_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 			goto unlock;
+		}
 		if (mddev->sync_thread) {
 			/* resync has finished, collect result */
 			md_unregister_thread(mddev->sync_thread);
 			mddev->sync_thread = NULL;
-			if (!test_bit(MD_RECOVERY_ERR, &mddev->recovery)) {
+			if (!test_bit(MD_RECOVERY_ERR, &mddev->recovery) &&
+			    !test_bit(MD_RECOVERY_INTR, &mddev->recovery)) {
 				/* success...*/
 				/* activate any spares */
 				mddev->pers->spare_active(mddev);
 			}
 			md_update_sb(mddev);
 			mddev->recovery = 0;
+			/* flag recovery needed just to double check */
+			set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 			wake_up(&resync_wait);
 			goto unlock;
 		}
 		if (mddev->recovery) {
-			/* that's odd.. */
+			/* probably just the RECOVERY_NEEDED flag */
 			mddev->recovery = 0;
 			wake_up(&resync_wait);
 		}
@@ -3482,11 +3482,9 @@ static void md_geninit(void)
 
 	dprintk("md: sizeof(mdp_super_t) = %d\n", (int)sizeof(mdp_super_t));
 
-#ifdef CONFIG_PROC_FS
 	p = create_proc_entry("mdstat", S_IRUGO, NULL);
 	if (p)
 		p->proc_fops = &md_seq_fops;
-#endif
 }
 
 int __init md_init(void)
@@ -3567,6 +3565,8 @@ static void autostart_arrays(void)
 
 static __exit void md_exit(void)
 {
+	mddev_t *mddev;
+	struct list_head *tmp;
 	int i;
 	blk_unregister_region(MKDEV(MAJOR_NR,0), MAX_MD_DEVS);
 	for (i=0; i < MAX_MD_DEVS; i++)
@@ -3576,18 +3576,15 @@ static __exit void md_exit(void)
 	unregister_blkdev(MAJOR_NR,"md");
 	unregister_reboot_notifier(&md_notifier);
 	unregister_sysctl_table(raid_table_header);
-#ifdef CONFIG_PROC_FS
 	remove_proc_entry("mdstat", NULL);
-#endif
-	for (i = 0; i < MAX_MD_DEVS; i++) {
-		struct gendisk *disk = disks[i];
-		mddev_t *mddev;
-		if (!disks[i])
+	ITERATE_MDDEV(mddev,tmp) {
+		struct gendisk *disk = mddev->gendisk;
+		if (!disk)
 			continue;
-		mddev = disk->private_data;
 		export_array(mddev);
 		del_gendisk(disk);
 		put_disk(disk);
+		mddev->gendisk = NULL;
 		mddev_put(mddev);
 	}
 }

@@ -16,10 +16,6 @@
  *      as published by the Free Software Foundation.
  */
 
-#define XATTR_SECURITY_PREFIX "security."
-#define XATTR_SELINUX_SUFFIX "selinux"
-#define XATTR_NAME_SELINUX XATTR_SECURITY_PREFIX XATTR_SELINUX_SUFFIX
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -64,6 +60,9 @@
 #include "avc.h"
 #include "objsec.h"
 #include "netif.h"
+
+#define XATTR_SELINUX_SUFFIX "selinux"
+#define XATTR_NAME_SELINUX XATTR_SECURITY_PREFIX XATTR_SELINUX_SUFFIX
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
 int selinux_enforcing = 0;

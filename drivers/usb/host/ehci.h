@@ -153,9 +153,12 @@ timer_action (struct ehci_hcd *ehci, enum ehci_timer_action action)
 
 /* Section 2.2 Host Controller Capability Registers */
 struct ehci_caps {
-	u8		length;		/* CAPLENGTH - size of this struct */
-	u8		reserved;       /* offset 0x1 */
-	u16		hci_version;    /* HCIVERSION - offset 0x2 */
+	/* these fields are specified as 8 and 16 bit registers,
+	 * but some hosts can't perform 8 or 16 bit PCI accesses.
+	 */
+	u32	hc_capbase;
+#define HC_LENGTH(p)		(((p)>>00)&0x00ff)	/* bits 7:0 */
+#define HC_VERSION(p)		(((p)>>16)&0xffff)	/* bits 31:16 */
 	u32		hcs_params;     /* HCSPARAMS - offset 0x4 */
 #define HCS_DEBUG_PORT(p)	(((p)>>20)&0xf)	/* bits 23:20, debug port? */
 #define HCS_INDICATOR(p)	((p)&(1 << 16))	/* true: has port indicators */
@@ -378,8 +381,65 @@ struct ehci_qh {
 	unsigned short		period;		/* polling interval */
 	unsigned short		start;		/* where polling starts */
 #define NO_FRAME ((unsigned short)~0)			/* pick new start */
-
+	struct usb_device	*dev;		/* access to TT */
 } __attribute__ ((aligned (32)));
+
+/*-------------------------------------------------------------------------*/
+
+/* description of one iso highspeed transaction (up to 3 KB data) */
+struct ehci_iso_uframe {
+	/* These will be copied to iTD when scheduling */
+	u64			bufp;		/* itd->hw_bufp{,_hi}[pg] |= */
+	u32			transaction;	/* itd->hw_transaction[i] |= */
+	u8			cross;		/* buf crosses pages */
+};
+
+/* temporary schedule data for highspeed packets from iso urbs
+ * each packet is one uframe's usb transactions, in some itd,
+ * beginning at stream->next_uframe
+ */
+struct ehci_itd_sched {
+	struct list_head	itd_list;
+	unsigned		span;
+	struct ehci_iso_uframe	packet [0];
+};
+
+/*
+ * ehci_iso_stream - groups all (s)itds for this endpoint.
+ * acts like a qh would, if EHCI had them for ISO.
+ */
+struct ehci_iso_stream {
+	/* first two fields match QH, but info1 == 0 */
+	u32			hw_next;
+	u32			hw_info1;
+
+	u32			refcount;
+	u8			bEndpointAddress;
+	struct list_head	itd_list;	/* queued itds */
+	struct list_head	free_itd_list;	/* list of unused itds */
+	struct hcd_dev		*dev;
+
+	/* output of (re)scheduling */
+	unsigned long		start;		/* jiffies */
+	unsigned long		rescheduled;
+	int			next_uframe;
+
+	/* the rest is derived from the endpoint descriptor,
+	 * trusting urb->interval == (1 << (epdesc->bInterval - 1)),
+	 * including the extra info for hw_bufp[0..2]
+	 */
+	u8			interval;
+	u8			usecs;		
+	u16			maxp;
+	unsigned		bandwidth;
+
+	/* This is used to initialize iTD's hw_bufp fields */
+	u32			buf0;		
+	u32			buf1;		
+	u32			buf2;
+
+	/* ... sITD won't use buf[012], and needs TT access ... */
+};
 
 /*-------------------------------------------------------------------------*/
 
@@ -397,8 +457,10 @@ struct ehci_itd {
 #define EHCI_ISOC_BUF_ERR       (1<<30)        /* Data buffer error */
 #define EHCI_ISOC_BABBLE        (1<<29)        /* babble detected */
 #define EHCI_ISOC_XACTERR       (1<<28)        /* XactErr - transaction error */
-#define	EHCI_ITD_LENGTH(tok)	(((tok)>>16) & 0x7fff)
+#define	EHCI_ITD_LENGTH(tok)	(((tok)>>16) & 0x0fff)
 #define	EHCI_ITD_IOC		(1 << 15)	/* interrupt on complete */
+
+#define ISO_ACTIVE	__constant_cpu_to_le32(EHCI_ISOC_ACTIVE)
 
 	u32			hw_bufp [7];	/* see EHCI 3.3.3 */ 
 	u32			hw_bufp_hi [7];	/* Appendix B */
@@ -408,14 +470,14 @@ struct ehci_itd {
 	union ehci_shadow	itd_next;	/* ptr to periodic q entry */
 
 	struct urb		*urb;
-	struct list_head	itd_list;	/* list of urb frames' itds */
-	dma_addr_t		buf_dma;	/* frame's buffer address */
+	struct ehci_iso_stream	*stream;	/* endpoint's queue */
+	struct list_head	itd_list;	/* list of stream's itds */
 
-	/* for now, only one hw_transaction per itd */
-	u32			transaction;
-	u16			index;		/* in urb->iso_frame_desc */
-	u16			uframe;		/* in periodic schedule */
-	u16			usecs;
+	/* any/all hw_transactions here may be used by that urb */
+	unsigned		frame;		/* where scheduled */
+	unsigned		pg;
+	unsigned		index[8];	/* in urb->iso_frame_desc */
+	u8			usecs[8];
 } __attribute__ ((aligned (32)));
 
 /*-------------------------------------------------------------------------*/

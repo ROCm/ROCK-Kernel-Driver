@@ -7,4 +7,4 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
-obj-y	 := init.o fault.o memory.o kmap.o extable.o
+obj-y	 := init.o fault.o memory.o kmap.o

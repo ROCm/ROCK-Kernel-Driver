@@ -55,7 +55,10 @@
  * Add adapter resets
  */
 
-/* #define DEBUG 1 */
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -311,13 +314,12 @@ static s32 sis5595_access(struct i2c_adapter *adap, u16 addr,
 		break;
 /*
 	case I2C_SMBUS_BLOCK_DATA:
-		printk("sis5595.o: Block data not yet implemented!\n");
+		printk(KERN_WARNING "sis5595.o: Block data not yet implemented!\n");
 		return -1;
 		break;
 */
 	default:
-		printk
-		    (KERN_WARNING "sis5595.o: Unsupported transaction %d\n", size);
+		printk(KERN_WARNING "sis5595.o: Unsupported transaction %d\n", size);
 		return -1;
 	}
 

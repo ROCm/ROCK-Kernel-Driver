@@ -25,6 +25,11 @@
 /* Partialy rewriten by Oleg I. Vdovikin for mmapped support of 
    for Alpha Processor Inc. UP-2000(+) boards */
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
@@ -50,7 +55,6 @@ static int irq;
 static int clock  = 0x1c;
 static int own    = 0x55;
 static int mmapped;
-static int i2c_debug;
 
 /* vdovikin: removed static struct i2c_pcf_isa gpi; code - 
   this module in real supports only one device, due to missing arguments
@@ -59,12 +63,6 @@ static int i2c_debug;
 
 static wait_queue_head_t pcf_wait;
 static int pcf_pending;
-
-/* ----- global defines -----------------------------------------------	*/
-#define DEB(x)	if (i2c_debug>=1) x
-#define DEB2(x) if (i2c_debug>=2) x
-#define DEB3(x) if (i2c_debug>=3) x
-#define DEBE(x)	x	/* error messages 				*/
 
 /* ----- local functions ----------------------------------------------	*/
 
@@ -77,7 +75,7 @@ static void pcf_isa_setbyte(void *data, int ctl, int val)
 		val |= I2C_PCF_ENI;
 	}
 
-	DEB3(printk(KERN_DEBUG "i2c-elektor: Write 0x%X 0x%02X\n", address, val & 255));
+	pr_debug("i2c-elektor: Write 0x%X 0x%02X\n", address, val & 255);
 
 	switch (mmapped) {
 	case 0: /* regular I/O */
@@ -98,7 +96,7 @@ static int pcf_isa_getbyte(void *data, int ctl)
 	int address = ctl ? (base + 1) : base;
 	int val = mmapped ? readb(address) : inb(address);
 
-	DEB3(printk(KERN_DEBUG "i2c-elektor: Read 0x%X 0x%02X\n", address, val));
+	pr_debug("i2c-elektor: Read 0x%X 0x%02X\n", address, val);
 
 	return (val);
 }
@@ -196,7 +194,7 @@ static int __init i2c_pcfisa_init(void)
 			/* yeap, we've found cypress, let's check config */
 			if (!pci_read_config_byte(cy693_dev, 0x47, &config)) {
 				
-				DEB3(printk(KERN_DEBUG "i2c-elektor: found cy82c693, config register 0x47 = 0x%02x.\n", config));
+				pr_debug("i2c-elektor: found cy82c693, config register 0x47 = 0x%02x.\n", config);
 
 				/* UP2000 board has this register set to 0xe1,
                                    but the most significant bit as seems can be 
@@ -280,7 +278,6 @@ MODULE_PARM(irq, "i");
 MODULE_PARM(clock, "i");
 MODULE_PARM(own, "i");
 MODULE_PARM(mmapped, "i");
-MODULE_PARM(i2c_debug, "i");
 
 module_init(i2c_pcfisa_init);
 module_exit(i2c_pcfisa_exit);

@@ -19,7 +19,7 @@
 #include <asm/bootinfo.h>
 #include <asm/mmu.h>
 #include <asm/byteorder.h>
-
+#include "of1275.h"
 #include "nonstdio.h"
 #include "zlib.h"
 
@@ -114,16 +114,18 @@ scroll(void)
 
 unsigned long
 decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
-		  RESIDUAL *residual)
+		  RESIDUAL *residual, void *OFW_interface)
 {
 	int timer = 0;
 	extern unsigned long start;
 	char *cp, ch;
 	unsigned long TotalMemory;
-	unsigned char board_type;
-	unsigned char base_mod;
 	int start_multi = 0;
 	unsigned int pci_viddid, pci_did, tulip_pci_base, tulip_base;
+
+	/* If we have Open Firmware, initialise it immediately */
+	if (OFW_interface)
+		ofinit(OFW_interface);
 
 	serial_fixups();
 #if defined(CONFIG_SERIAL_8250_CONSOLE)
@@ -163,7 +165,8 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		/* Is this Motorola PPCBug? */
 		if ((1 & residual->VitalProductData.FirmwareSupports) &&
 		    (1 == residual->VitalProductData.FirmwareSupplier)) {
-			board_type = inb(0x800) & 0xF0;
+			unsigned char base_mod;
+			unsigned char board_type = inb(0x800) & 0xF0;
 
 			/*
 			 * Reset the onboard 21x4x Ethernet
@@ -229,8 +232,31 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	/* If it's not, see if we have anything in the residual data. */
 	else if (residual && residual->TotalMemory)
 		TotalMemory = residual->TotalMemory;
-	/* Fall back to hard-coding 32MB. */
-	else
+	else if (OFW_interface) {
+		/*
+		 * This is a 'best guess' check.  We want to make sure
+		 * we don't try this on a PReP box without OF
+		 *     -- Cort
+		 */
+		while (OFW_interface)
+		{
+			phandle dev_handle;
+			int mem_info[2];
+
+			/* get handle to memory description */
+			if (!(dev_handle = finddevice("/memory@0")))
+				break;
+
+			/* get the info */
+			if (getprop(dev_handle, "reg", mem_info,
+						sizeof(mem_info)) != 8)
+				break;
+
+			TotalMemory = mem_info[1];
+			break;
+		}
+	} else
+		/* Fall back to hard-coding 32MB. */
 		TotalMemory = 32*1024*1024;
 
 
@@ -303,6 +329,18 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	}
 	*cp = 0;
 	puts("\nUncompressing Linux...");
+
+	/*
+	 * If we have OF, then we have deferred setting the MSR.
+	 * We must set it now because we are about to overwrite
+	 * the exception table.  The new MSR value will disable
+	 * machine check exceptions and point the exception table
+	 * to the ROM.
+	 */
+	if (OFW_interface) {
+		mtmsr(MSR_IP | MSR_FP);
+		asm volatile("isync");
+	}
 
 	gunzip(0, 0x400000, zimage_start, &zimage_size);
 	puts("done.\n");

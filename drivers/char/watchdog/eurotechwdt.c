@@ -1,5 +1,5 @@
 /*
- *	Eurotech CPU-1220/1410 on board WDT driver for Linux 2.4.x
+ *	Eurotech CPU-1220/1410 on board WDT driver
  *
  *	(c) Copyright 2001 Ascensit <support@ascensit.com>
  *	(c) Copyright 2001 Rodolfo Giometti <giometti@ascensit.com>
@@ -64,11 +64,11 @@ static char eur_expect_close;
  * You must set these - there is no sane way to probe for this board.
  * You can use eurwdt=x,y to set these now.
  */
- 
+
 static int io = 0x3f0;
 static int irq = 10;
 static char *ev = "int";
- 
+
 #define WDT_TIMEOUT		60                /* 1 minute */
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
@@ -81,7 +81,7 @@ MODULE_PARM(nowayout,"i");
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 /*
- * Some symbolic names 
+ * Some symbolic names
  */
 
 #define WDT_CTRL_REG		0x30
@@ -92,7 +92,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 #define WDT_UNIT_SECS		0x80
 #define WDT_TIMEOUT_VAL		0xf2
 #define WDT_TIMER_CFG		0xf3
- 
+
 
 #ifndef MODULE
 
@@ -104,26 +104,26 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
  * get the user to tell us the configuration. Sane people build it
  * modular but the others come here.
  */
- 
+
 static int __init eurwdt_setup(char *str)
 {
 	int ints[4];
- 
+
 str = get_options (str, ARRAY_SIZE(ints), ints);
- 
+
 	if (ints[0] > 0) {
 		io = ints[1];
 		if (ints[0] > 1)
 			irq = ints[2];
 	}
- 
+
 	return 1;
 }
- 
+
 __setup("eurwdt=", eurwdt_setup);
 
 #endif /* !MODULE */
- 
+
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "Eurotech WDT io port (default=0x3f0)");
 MODULE_PARM(irq, "i");
@@ -162,7 +162,7 @@ static inline void eurwdt_disable_timer(void)
 {
 	eurwdt_set_timeout(0);
 }
- 
+
 static void eurwdt_activate_timer(void)
 {
 	eurwdt_disable_timer();
@@ -180,18 +180,18 @@ static void eurwdt_activate_timer(void)
 	eurwdt_write_reg(WDT_TIMER_CFG, irq<<4);
 
 	eurwdt_write_reg(WDT_UNIT_SEL, WDT_UNIT_SECS);	/* we use seconds */
-	eurwdt_set_timeout(0);	/* the default timeout */ 
+	eurwdt_set_timeout(0);	/* the default timeout */
 }
 
 
 /*
  * Kernel methods.
  */
- 
+
 static irqreturn_t eurwdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	printk(KERN_CRIT "timeout WDT timeout\n");
- 
+
 #ifdef ONLY_TESTING
 	printk(KERN_CRIT "Would Reboot.\n");
 #else
@@ -207,13 +207,13 @@ static irqreturn_t eurwdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  *
  * Reload counter one with the watchdog timeout.
  */
- 
+
 static void eurwdt_ping(void)
 {
 	/* Write the watchdog default value */
 	eurwdt_set_timeout(eurwdt_timeout);
 }
- 
+
 /**
  * eurwdt_write:
  * @file: file handle to the watchdog
@@ -224,14 +224,14 @@ static void eurwdt_ping(void)
  * A write to a watchdog device is defined as a keepalive signal. Any
  * write of data will do, as we we don't define content meaning.
  */
- 
+
 static ssize_t eurwdt_write(struct file *file, const char *buf, size_t count,
 loff_t *ppos)
 {
 	/*  Can't seek (pwrite) on this device  */
 	if (ppos != &file->f_pos)
 	return -ESPIPE;
- 
+
 	if (count) 	{
 		if (!nowayout) {
 			size_t i;
@@ -262,7 +262,7 @@ loff_t *ppos)
  * The watchdog API defines a common set of functions for all watchdogs
  * according to their available features.
  */
- 
+
 static int eurwdt_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
@@ -274,15 +274,15 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
 
 	int time;
 	int options, retval = -EINVAL;
- 
+
 	switch(cmd) {
 	default:
-		return -ENOTTY;
+		return -ENOIOCTLCMD;
 
 	case WDIOC_GETSUPPORT:
 		return copy_to_user((struct watchdog_info *)arg, &ident,
 			sizeof(ident)) ? -EFAULT : 0;
- 
+
 	case WDIOC_GETSTATUS:
 	case WDIOC_GETBOOTSTATUS:
 		return put_user(0, (int *) arg);
@@ -299,8 +299,8 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
 		if (time < 0 || time > 255)
 			return -EINVAL;
 
-		eurwdt_timeout = time; 
-		eurwdt_set_timeout(time); 
+		eurwdt_timeout = time;
+		eurwdt_set_timeout(time);
 		/* Fall */
 
 	case WDIOC_GETTIMEOUT:
@@ -330,7 +330,7 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
  * The misc device has been opened. The watchdog device is single
  * open and on opening we load the counter.
  */
- 
+
 static int eurwdt_open(struct inode *inode, struct file *file)
 {
 	if (test_and_set_bit(0, &eurwdt_is_open))
@@ -340,7 +340,7 @@ static int eurwdt_open(struct inode *inode, struct file *file)
 	eurwdt_activate_timer();
 	return 0;
 }
- 
+
 /**
  * eurwdt_release:
  * @inode: inode to board
@@ -352,7 +352,7 @@ static int eurwdt_open(struct inode *inode, struct file *file)
  * reboots. In the former case we disable the counters, in the latter
  * case you have to open it again very soon.
  */
- 
+
 static int eurwdt_release(struct inode *inode, struct file *file)
 {
 	if (eur_expect_close == 42) {
@@ -360,12 +360,12 @@ static int eurwdt_release(struct inode *inode, struct file *file)
 	} else {
 		printk(KERN_CRIT "eurwdt: Unexpected close, not stopping watchdog!\n");
 		eurwdt_ping();
-    }
+	}
 	clear_bit(0, &eurwdt_is_open);
 	eur_expect_close = 0;
 	return 0;
 }
- 
+
 /**
  * eurwdt_notify_sys:
  * @this: our notifier block
@@ -377,7 +377,7 @@ static int eurwdt_release(struct inode *inode, struct file *file)
  * test or worse yet during the following fsck. This would suck, in fact
  * trust me - if it happens it does suck.
  */
- 
+
 static int eurwdt_notify_sys(struct notifier_block *this, unsigned long code,
 	void *unused)
 {
@@ -388,12 +388,12 @@ static int eurwdt_notify_sys(struct notifier_block *this, unsigned long code,
 
 	return NOTIFY_DONE;
 }
- 
+
 /*
  * Kernel Interfaces
  */
- 
- 
+
+
 static struct file_operations eurwdt_fops = {
 	.owner	= THIS_MODULE,
 	.llseek	= no_llseek,
@@ -406,18 +406,18 @@ static struct file_operations eurwdt_fops = {
 static struct miscdevice eurwdt_miscdev = {
 	.minor	= WATCHDOG_MINOR,
 	.name	= "watchdog",
-	.fops	= &eurwdt_fops
+	.fops	= &eurwdt_fops,
 };
- 
+
 /*
  * The WDT card needs to learn about soft shutdowns in order to
  * turn the timebomb registers off.
  */
- 
+
 static struct notifier_block eurwdt_notifier = {
 	.notifier_call = eurwdt_notify_sys,
 };
- 
+
 /**
  * cleanup_module:
  *
@@ -427,7 +427,7 @@ static struct notifier_block eurwdt_notifier = {
  * will not touch PC memory so all is fine. You just have to load a new
  * module in 60 seconds or reboot.
  */
- 
+
 static void __exit eurwdt_exit(void)
 {
 	eurwdt_lock_chip();
@@ -438,15 +438,15 @@ static void __exit eurwdt_exit(void)
 	release_region(io, 2);
 	free_irq(irq, NULL);
 }
- 
+
 /**
  * eurwdt_init:
  *
- * Set up the WDT watchdog board. After grabbing the resources 
+ * Set up the WDT watchdog board. After grabbing the resources
  * we require we need also to unlock the device.
  * The open() function will actually kick the board off.
  */
- 
+
 static int __init eurwdt_init(void)
 {
 	int ret;
@@ -477,15 +477,15 @@ static int __init eurwdt_init(void)
 	}
 
 	eurwdt_unlock_chip();
- 
+
 	ret = 0;
 	printk(KERN_INFO "Eurotech WDT driver 0.01 at %X (Interrupt %d)"
-		" - timeout event: %s\n", 
+		" - timeout event: %s\n",
 		io, irq, (!strcmp("int", ev) ? "int" : "reboot"));
 
 out:
 	return ret;
- 
+
 outreg:
 	release_region(io, 2);
 
@@ -496,10 +496,10 @@ outmisc:
 	misc_deregister(&eurwdt_miscdev);
 	goto out;
 }
- 
+
 module_init(eurwdt_init);
 module_exit(eurwdt_exit);
- 
+
 MODULE_AUTHOR("Rodolfo Giometti");
 MODULE_DESCRIPTION("Driver for Eurotech CPU-1220/1410 on board watchdog");
 MODULE_LICENSE("GPL");

@@ -45,6 +45,7 @@ struct ext2_sb_info {
 	int s_desc_per_block_bits;
 	int s_inode_size;
 	int s_first_ino;
+	spinlock_t s_next_gen_lock;
 	u32 s_next_generation;
 	unsigned long s_dir_count;
 	u8 *s_debts;

@@ -349,6 +349,7 @@ static unsigned long load_elf_interp(struct elfhdr * interp_elf_ex,
 	    	elf_type |= MAP_FIXED;
 
 	    map_addr = elf_map(interpreter, load_addr + vaddr, eppnt, elf_prot, elf_type);
+	    error = map_addr;
 	    if (BAD_ADDR(map_addr))
 	    	goto out_close;
 

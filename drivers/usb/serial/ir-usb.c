@@ -567,7 +567,9 @@ static void ir_set_termios (struct usb_serial_port *port, struct termios *old_te
 			case B115200:  ir_baud = SPEED_115200;  break;
 			case B576000:  ir_baud = SPEED_576000;  break;
 			case B1152000: ir_baud = SPEED_1152000; break;
+#ifdef B4000000
 			case B4000000: ir_baud = SPEED_4000000; break;
+#endif
 		}
 
 		if (xbof == -1) {

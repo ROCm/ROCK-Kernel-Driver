@@ -14,9 +14,11 @@
 
 #include "types.h"
 
+struct afs_async_op;
+
 struct afs_async_op_ops {
-	void (*attend)(afs_async_op_t *op);
-	void (*discard)(afs_async_op_t *op);
+	void (*attend)(struct afs_async_op *op);
+	void (*discard)(struct afs_async_op *op);
 };
 
 /*****************************************************************************/
@@ -26,13 +28,14 @@ struct afs_async_op_ops {
 struct afs_async_op
 {
 	struct list_head		link;
-	afs_server_t			*server;	/* server being contacted */
+	struct afs_server		*server;	/* server being contacted */
 	struct rxrpc_call		*call;		/* RxRPC call performing op */
 	wait_queue_t			waiter;		/* wait queue for kafsasyncd */
 	const struct afs_async_op_ops	*ops;		/* operations */
 };
 
-static inline void afs_async_op_init(afs_async_op_t *op, const struct afs_async_op_ops *ops)
+static inline void afs_async_op_init(struct afs_async_op *op,
+				     const struct afs_async_op_ops *ops)
 {
 	INIT_LIST_HEAD(&op->link);
 	op->call = NULL;
@@ -42,8 +45,8 @@ static inline void afs_async_op_init(afs_async_op_t *op, const struct afs_async_
 extern int afs_kafsasyncd_start(void);
 extern void afs_kafsasyncd_stop(void);
 
-extern void afs_kafsasyncd_begin_op(afs_async_op_t *op);
-extern void afs_kafsasyncd_attend_op(afs_async_op_t *op);
-extern void afs_kafsasyncd_terminate_op(afs_async_op_t *op);
+extern void afs_kafsasyncd_begin_op(struct afs_async_op *op);
+extern void afs_kafsasyncd_attend_op(struct afs_async_op *op);
+extern void afs_kafsasyncd_terminate_op(struct afs_async_op *op);
 
 #endif /* _LINUX_AFS_KAFSASYNCD_H */

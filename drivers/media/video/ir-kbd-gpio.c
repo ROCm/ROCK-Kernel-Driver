@@ -18,6 +18,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/delay.h>
@@ -170,8 +171,8 @@ struct IR {
 	struct timer_list       timer;
 };
 
-static int debug = 0;    /* debug level (0,1,2) */
-MODULE_PARM(debug,"i");
+static int debug;
+module_param(debug, int, 0644);    /* debug level (0,1,2) */
 
 #define DEVNAME "ir-kbd-gpio"
 #define dprintk(fmt, arg...)	if (debug) \

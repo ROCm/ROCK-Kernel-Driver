@@ -67,8 +67,7 @@ extern int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 
 static inline void rxrpc_get_connection(struct rxrpc_connection *conn)
 {
-	if (atomic_read(&conn->usage)<0)
-		BUG();
+	BUG_ON(atomic_read(&conn->usage)<0);
 	atomic_inc(&conn->usage);
 	//printk("rxrpc_get_conn(%p{u=%d})\n",conn,atomic_read(&conn->usage));
 }

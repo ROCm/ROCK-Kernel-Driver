@@ -510,7 +510,7 @@ static int sctp_v6_available(union sctp_addr *addr, struct sctp_opt *sp)
 	if (!(type & IPV6_ADDR_UNICAST))
 		return 0;
 
-	return ipv6_chk_addr(in6, NULL);
+	return ipv6_chk_addr(in6, NULL, 0);
 }
 
 /* This function checks if the address is a valid address to be used for

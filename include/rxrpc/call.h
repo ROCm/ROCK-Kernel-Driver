@@ -187,8 +187,7 @@ extern int rxrpc_incoming_call(struct rxrpc_connection *conn,
 
 static inline void rxrpc_get_call(struct rxrpc_call *call)
 {
-	if (atomic_read(&call->usage)<=0)
-		BUG();
+	BUG_ON(atomic_read(&call->usage)<=0);
 	atomic_inc(&call->usage);
 	/*printk("rxrpc_get_call(%p{u=%d})\n",(C),atomic_read(&(C)->usage));*/
 }

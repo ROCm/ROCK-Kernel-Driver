@@ -27,7 +27,7 @@ extern void flush_tlb_all(void);
 
 static inline void flush_tlb_mm(struct mm_struct *mm)
 {
-	if (mm == &init_mm) BUG(); /* Should never happen */
+	BUG_ON(mm == &init_mm); /* Should never happen */
 
 #ifdef CONFIG_SMP
 	flush_tlb_all();

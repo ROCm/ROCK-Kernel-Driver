@@ -182,24 +182,21 @@ config USB_W9968CF
 	tristate "USB W996[87]CF JPEG Dual Mode Camera support"
 	depends on USB && VIDEO_DEV && I2C
 	---help---
-	  Say Y here if you want support for cameras based on
+	  Say Y here if you want support for cameras based on OV681 or
 	  Winbond W9967CF/W9968CF JPEG USB Dual Mode Camera Chips.
 	
 	  This driver has an optional plugin, which is distributed as a
-	  separate module only (released under GPL). It contains code that 
-	  allows you to use higher resolutions and framerates, and can't
-	  be included into the official Linux kernel for performance 
-	  purposes.
-	  At the moment the driver needs a third-part module for the CMOS 
+	  separate module only (released under GPL). It allows to use higher 
+	  resolutions and framerates, but cannot be included in the official 
+	  Linux kernel for performance purposes.
+	  At the moment the driver needs a third-party module for the CMOS 
 	  sensors, which is available on internet: it is recommended to read
 	  <file:Documentation/usb/w9968cf.txt> for more informations and for
 	  a list of supported cameras.
 	
-	  This driver uses the Video For Linux and the I2C APIs. 
-	  You must say Y or M to both "Video For Linux" and 
-	  "I2C Support" to use this driver.
-	  Information on this API and pointers to "v4l" programs may be found
-	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  This driver uses the Video For Linux and the I2C APIs. You must say
+	  Y or M to both "Video For Linux" and "I2C Support" to use this 
+	  driver.
 	
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).

@@ -1395,7 +1395,14 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 
 	first_sector = raid5_compute_sector(stripe*data_disks*sectors_per_chunk
 		+ chunk_offset, raid_disks, data_disks, &dd_idx, &pd_idx, conf);
-	sh = get_active_stripe(conf, sector_nr, pd_idx, 0);
+	sh = get_active_stripe(conf, sector_nr, pd_idx, 1);
+	if (sh == NULL) {
+		sh = get_active_stripe(conf, sector_nr, pd_idx, 0);
+		/* make sure we don't swamp the stripe cache if someone else
+		 * is trying to get access 
+		 */
+		yield();
+	}
 	spin_lock(&sh->lock);	
 	set_bit(STRIPE_SYNCING, &sh->state);
 	clear_bit(STRIPE_INSYNC, &sh->state);

@@ -1,4 +1,4 @@
-/* $Id: platform.h,v 1.32 2003/09/18 06:59:59 schindler Exp $
+/* $Id: platform.h,v 1.35 2003/12/05 18:45:05 armin Exp $
  *
  * platform.h
  * 
@@ -116,6 +116,8 @@
 #define MEM_TYPE_ADDRESS	6
 #define MEM_TYPE_CONFIG		7
 #define MEM_TYPE_CONTROL	8
+
+#define MAX_MEM_TYPE		10
 
 #define DIVA_OS_MEM_ATTACH_RAM(a)	((a)->ram)
 #define DIVA_OS_MEM_ATTACH_PORT(a)	((a)->port)

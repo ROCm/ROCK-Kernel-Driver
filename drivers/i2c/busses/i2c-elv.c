@@ -21,6 +21,11 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -35,12 +40,6 @@
 #define DEFAULT_BASE 0x378
 static int base=0;
 static unsigned char port_data = 0;
-
-/* ----- global defines -----------------------------------------------	*/
-#define DEB(x)		/* should be reasonable open, close &c. 	*/
-#define DEB2(x) 	/* low level debugging - very slow 		*/
-#define DEBE(x)	x	/* error messages 				*/
-#define DEBINIT(x) x	/* detection status messages			*/
 
 /* --- Convenience defines for the parallel port:			*/
 #define BASE	(unsigned int)(data)
@@ -89,7 +88,7 @@ static int bit_elv_init(void)
 		return -ENODEV;
 
 	if (inb(base+1) & 0x80) {	/* BUSY should be high	*/
-		DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Busy was low.\n"));
+		pr_debug("i2c-elv: Busy was low.\n");
 		goto fail;
 	} 
 
@@ -97,7 +96,7 @@ static int bit_elv_init(void)
 	udelay(400);
 	if (!(inb(base+1) && 0x10)) {
 		outb(0x04,base+2);
-		DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Select was high.\n"));
+		pr_debug("i2c-elv: Select was high.\n");
 		goto fail;
 	}
 
@@ -153,7 +152,7 @@ static int __init i2c_bitelv_init(void)
 			return -ENODEV;
 		}
 	}
-	printk(KERN_DEBUG "i2c-elv.o: found device at %#x.\n",base);
+	pr_debug("i2c-elv: found device at %#x.\n",base);
 	return 0;
 }
 

@@ -109,29 +109,6 @@ config FB_SA1100
 	  If you plan to use the LCD display with your SA-1100 system, say
 	  Y here.
 
-choice
-	prompt "CerfBoard LCD Display Size"
-	depends on FB_SA1100 && SA1100_CERF
-	default CERF_LCD_57_A
-
-config CERF_LCD_38_A
-	bool "3.8_Color"
-
-config CERF_LCD_38_B
-	bool "3.8_Mono"
-
-config CERF_LCD_57_A
-	bool "5.7"
-
-config CERF_LCD_72_A
-	bool "7.2"
-
-endchoice
-
-config SA1100_CERF_LCD_BACKLIGHT
-	bool "Cerfboard Backlight (CerfPDA)"
-	depends on FB_SA1100 && SA1100_CERF_CPLD
-
 config FB_CYBER2000
 	tristate "CyberPro 2000/2010/5000 support"
 	depends on FB && PCI
@@ -571,7 +548,8 @@ config FB_MATROX_G100
 
 config FB_MATROX_I2C
 	tristate "Matrox I2C support"
-	depends on FB_MATROX && I2C_ALGOBIT
+	depends on FB_MATROX && I2C
+	select I2C_ALGOBIT
 	---help---
 	  This drivers creates I2C buses which are needed for accessing the
 	  DDC (I2C) bus present on all Matroxes, an I2C bus which
