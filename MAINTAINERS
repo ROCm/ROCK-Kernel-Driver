@@ -954,6 +954,11 @@ W:	http://www.linuxppc.org/
 L:	linuxppc-dev@lists.linuxppc.org
 S:	Maintained
 
+LLC (802.2)
+P:	Arnaldo Carvalho de Melo
+M:	acme@conectiva.com.br
+S:	Maintained
+
 LINUX FOR 64BIT POWERPC
 P:	David Engebretsen
 M:	engebret@us.ibm.com
