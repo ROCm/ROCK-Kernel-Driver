@@ -7,7 +7,7 @@
  * @remark Copyright 2004 Dave Jiang <dave.jiang@intel.com>
  * @remark Copyright 2004 Intel Corporation
  * @remark Copyright 2004 Zwane Mwaikambo <zwane@arm.linux.org.uk>
- * @remark Copyright 2004 Oprofile Authors
+ * @remark Copyright 2004 OProfile Authors
  *
  * @remark Read the file COPYING
  *
@@ -249,7 +249,7 @@ static int xscale_setup_ctrs(void)
 	int i;
 
 	for (i = CCNT; i < MAX_COUNTERS; i++) {
-		if (counter_config[i].event)
+		if (counter_config[i].enabled)
 			continue;
 
 		counter_config[i].event = EVT_UNUSED;
