@@ -4,7 +4,7 @@
 * QLogic  QLA1280 (Ultra2)  and  QLA12160 (Ultra3) SCSI driver
 * Copyright (C) 2000 Qlogic Corporation (www.qlogic.com)
 * Copyright (C) 2001-2004 Jes Sorensen, Wild Open Source Inc.
-* Copyright (C) 2003 Christoph Hellwig
+* Copyright (C) 2003-2004 Christoph Hellwig
 *
 * This program is free software; you can redistribute it and/or modify it
 * under the terms of the GNU General Public License as published by the
@@ -17,9 +17,12 @@
 * General Public License for more details.
 *
 ******************************************************************************/
-#define QLA1280_VERSION      "3.24.3"
+#define QLA1280_VERSION      "3.24.4"
 /*****************************************************************************
     Revision History:
+    Rev  3.24.4 June 7, 2004 Christoph Hellwig
+	- restructure firmware loading, cleanup initialization code
+	- prepare support for ISP1020/1040 chips
     Rev  3.24.3 January 19, 2004, Jes Sorensen
 	- Handle PCI DMA mask settings correctly
 	- Correct order of error handling in probe_one, free_irq should not
