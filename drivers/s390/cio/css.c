@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.72 $
+ *   $Revision: 1.73 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -124,24 +124,6 @@ css_probe_device(int irq)
 	return ret;
 }
 
-static struct subchannel *
-__get_subchannel_by_stsch(int irq)
-{
-	struct subchannel *sch;
-	int cc;
-	struct schib schib;
-
-	cc = stsch(irq, &schib);
-	if (cc || !schib.pmcw.dnv)
-		return NULL;
-	sch = (struct subchannel *)(unsigned long)schib.pmcw.intparm;
-	if (!sch)
-		return NULL;
-	if (get_device(&sch->dev))
-		return sch;
-	return NULL;
-}
-
 struct subchannel *
 get_subchannel_by_schid(int irq)
 {
@@ -151,13 +133,8 @@ get_subchannel_by_schid(int irq)
 
 	if (!get_bus(&css_bus_type))
 		return NULL;
-
-	/* Try to get subchannel from pmcw first. */ 
-	sch = __get_subchannel_by_stsch(irq);
-	if (sch)
-		goto out;
 	down_read(&css_bus_type.subsys.rwsem);
-
+	sch = NULL;
 	list_for_each(entry, &css_bus_type.devices.list) {
 		dev = get_device(container_of(entry,
 					      struct device, bus_list));
@@ -170,7 +147,6 @@ get_subchannel_by_schid(int irq)
 		sch = NULL;
 	}
 	up_read(&css_bus_type.subsys.rwsem);
-out:
 	put_bus(&css_bus_type);
 
 	return sch;
