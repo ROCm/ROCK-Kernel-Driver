@@ -331,9 +331,9 @@ static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
 		if ((err = ide_config_drive_speed(drive, speed)))
 			return err;
 
-	if (speed > XFER_UDMA_2 && (piix_config->flags & PIIX_UDMA >= PIIX_UDMA_66))
+	if (speed > XFER_UDMA_2 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_66)
 		umul = 2;
-	if (speed > XFER_UDMA_4 && (piix_config->flags & PIIX_UDMA >= PIIX_UDMA_100))
+	if (speed > XFER_UDMA_4 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100)
 		umul = 4;
 	
 	T = 1000000000 / piix_clock;
@@ -465,7 +465,7 @@ unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
 	switch (piix_config->flags & PIIX_UDMA) {
 
 		case PIIX_UDMA_66:
-			if (piix->config && PIIX_VICTORY) {
+			if (piix_config->flags && PIIX_VICTORY) {
 				pci_read_config_byte(dev, PIIX_IDESTAT, &t);
 				piix_80w = ((t & 2) ? 1 : 0) | ((t & 1) ? 2 : 0);
 				break;
