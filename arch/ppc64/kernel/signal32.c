@@ -405,7 +405,7 @@ badframe:
  *
  *  Other routines
  *        setup_rt_frame32
- *        siginfo64to32
+ *        copy_siginfo_to_user32
  *        siginfo32to64
  */
 
@@ -639,43 +639,46 @@ long sys32_rt_sigpending(sigset32_t *set,
 }
 
 
-siginfo_t32 *siginfo64to32(siginfo_t32 *d, siginfo_t *s)
+static int copy_siginfo_to_user32(siginfo_t32 *d, siginfo_t *s)
 {
-	memset (d, 0, sizeof(siginfo_t32));
-	d->si_signo = s->si_signo;
-	d->si_errno = s->si_errno;
-	/* XXX why dont we just implement copy_siginfo_to_user32? - Anton */
-	d->si_code = s->si_code & 0xffff;
+	int err;
+
+	if (!access_ok (VERIFY_WRITE, d, sizeof(*d)))
+		return -EFAULT;
+
+	err = __put_user(s->si_signo, &d->si_signo);
+	err |= __put_user(s->si_errno, &d->si_errno);
+	err |= __put_user((short)s->si_code, &d->si_code);
 	if (s->si_signo >= SIGRTMIN) {
-		d->si_pid = s->si_pid;
-		d->si_uid = s->si_uid;
-		d->si_int = s->si_int;
+		err |= __put_user(s->si_pid, &d->si_pid);
+		err |= __put_user(s->si_uid, &d->si_uid);
+		err |= __put_user(s->si_int, &d->si_int);
 	} else {
 		switch (s->si_signo) {
 		/* XXX: What about POSIX1.b timers */
 		case SIGCHLD:
-			d->si_pid = s->si_pid;
-			d->si_status = s->si_status;
-			d->si_utime = s->si_utime;
-			d->si_stime = s->si_stime;
+			err |= __put_user(s->si_pid, &d->si_pid);
+			err |= __put_user(s->si_status, &d->si_status);
+			err |= __put_user(s->si_utime, &d->si_utime);
+			err |= __put_user(s->si_stime, &d->si_stime);
 			break;
 		case SIGSEGV:
 		case SIGBUS:
 		case SIGFPE:
 		case SIGILL:
-			d->si_addr = (long)(s->si_addr);
+			err |= __put_user((long)(s->si_addr), &d->si_addr);
 	        break;
 		case SIGPOLL:
-			d->si_band = s->si_band;
-			d->si_fd = s->si_fd;
+			err |= __put_user(s->si_band, &d->si_band);
+			err |= __put_user(s->si_fd, &d->si_fd);
 			break;
 		default:
-			d->si_pid = s->si_pid;
-			d->si_uid = s->si_uid;
+			err |= __put_user(s->si_pid, &d->si_pid);
+			err |= __put_user(s->si_uid, &d->si_uid);
 			break;
 		}
 	}
-	return d;
+	return err;
 }
 
 
@@ -692,8 +695,7 @@ long sys32_rt_sigtimedwait(sigset32_t *uthese, siginfo_t32 *uinfo,
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	siginfo_t info;
-	siginfo_t32 info32;
-		
+
 	if (copy_from_user(&s32, uthese, sizeof(sigset32_t)))
 		return -EFAULT;
 	switch (_NSIG_WORDS) {
@@ -716,8 +718,7 @@ long sys32_rt_sigtimedwait(sigset32_t *uthese, siginfo_t32 *uinfo,
 				sigsetsize);
 	set_fs(old_fs);
 	if (ret >= 0 && uinfo) {
-		if (copy_to_user (uinfo, siginfo64to32(&info32, &info),
-				  sizeof(siginfo_t32)))
+		if (copy_siginfo_to_user32(uinfo, &info))
 			return -EFAULT;
 	}
 	return ret;
@@ -725,7 +726,7 @@ long sys32_rt_sigtimedwait(sigset32_t *uthese, siginfo_t32 *uinfo,
 
 
 
-siginfo_t * siginfo32to64(siginfo_t *d, siginfo_t32 *s)
+static siginfo_t * siginfo32to64(siginfo_t *d, siginfo_t32 *s)
 {
 	d->si_signo = s->si_signo;
 	d->si_errno = s->si_errno;
@@ -937,8 +938,7 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 		unsigned int frame)
 {
 	struct sigcontext32_struct *sc;
-	struct rt_sigframe_32 *rt_stack_frame;
-	siginfo_t32 siginfo32bit;
+	struct rt_sigframe_32 *rt_sf;
 	struct k_sigaction *ka = &current->sig->action[sig-1];
 
 	if (regs->trap == 0x0C00 /* System Call! */
@@ -952,36 +952,29 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 	 * Determine if a real time frame and a siginfo is required
 	 */
 	if (ka->sa.sa_flags & SA_SIGINFO) {
-		siginfo64to32(&siginfo32bit,info);
-		*newspp -= sizeof(*rt_stack_frame);
-		rt_stack_frame = (struct rt_sigframe_32 *)(u64)(*newspp);
-
-		if (verify_area(VERIFY_WRITE, rt_stack_frame,
-					sizeof(*rt_stack_frame)))
+		*newspp -= sizeof(*rt_sf);
+		rt_sf = (struct rt_sigframe_32 *)(u64)(*newspp);
+		if (verify_area(VERIFY_WRITE, rt_sf, sizeof(*rt_sf)))
 			goto badframe;
 		if (__put_user((u32)(u64)ka->sa.sa_handler,
-					&rt_stack_frame->uc.uc_mcontext.handler)
-		    || __put_user((u32)(u64)&rt_stack_frame->info,
-			    &rt_stack_frame->pinfo)
-		    || __put_user((u32)(u64)&rt_stack_frame->uc,
-			    &rt_stack_frame->puc)
+					&rt_sf->uc.uc_mcontext.handler)
+		    || __put_user((u32)(u64)&rt_sf->info, &rt_sf->pinfo)
+		    || __put_user((u32)(u64)&rt_sf->uc, &rt_sf->puc)
 		    /*  put the siginfo on the user stack                    */
-		    || __copy_to_user(&rt_stack_frame->info, &siginfo32bit,
-			    sizeof(siginfo32bit))
+		    || copy_siginfo_to_user32(&rt_sf->info, info)
 		    /*  set the ucontext on the user stack                   */ 
-		    || __put_user(0, &rt_stack_frame->uc.uc_flags)
-		    || __put_user(0, &rt_stack_frame->uc.uc_link)
-		    || __put_user(current->sas_ss_sp,
-			    &rt_stack_frame->uc.uc_stack.ss_sp)
+		    || __put_user(0, &rt_sf->uc.uc_flags)
+		    || __put_user(0, &rt_sf->uc.uc_link)
+		    || __put_user(current->sas_ss_sp, &rt_sf->uc.uc_stack.ss_sp)
 		    || __put_user(sas_ss_flags(regs->gpr[1]),
-			    &rt_stack_frame->uc.uc_stack.ss_flags)
+			    &rt_sf->uc.uc_stack.ss_flags)
 		    || __put_user(current->sas_ss_size,
-			    &rt_stack_frame->uc.uc_stack.ss_size)
-		    || __copy_to_user(&rt_stack_frame->uc.uc_sigmask,
+			    &rt_sf->uc.uc_stack.ss_size)
+		    || __copy_to_user(&rt_sf->uc.uc_sigmask,
 			    oldset, sizeof(*oldset))
 		    /* point the mcontext.regs to the pramble register frame  */
-		    || __put_user(frame, &rt_stack_frame->uc.uc_mcontext.regs)
-		    || __put_user(sig,&rt_stack_frame->uc.uc_mcontext.signal))
+		    || __put_user(frame, &rt_sf->uc.uc_mcontext.regs)
+		    || __put_user(sig,&rt_sf->uc.uc_mcontext.signal))
 			goto badframe; 
 	} else {
 		/* Put a sigcontext on the stack */
