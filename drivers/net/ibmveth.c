@@ -530,7 +530,7 @@ static int ibmveth_open(struct net_device *netdev)
 		ibmveth_error_printk("unable to request irq 0x%x, rc %d\n", netdev->irq, rc);
 		do {
 			rc = h_free_logical_lan(adapter->vdev->unit_address);
-		} while H_isLongBusy(rc);
+		} while (H_isLongBusy(rc) || (rc == H_Busy));
 
 		ibmveth_cleanup(adapter);
 		return rc;
@@ -562,7 +562,7 @@ static int ibmveth_close(struct net_device *netdev)
 
 	do {
 		lpar_rc = h_free_logical_lan(adapter->vdev->unit_address);
-	} while H_isLongBusy(lpar_rc);
+	} while (H_isLongBusy(lpar_rc) || (lpar_rc == H_Busy));
 
 	if(lpar_rc != H_Success)
 	{
