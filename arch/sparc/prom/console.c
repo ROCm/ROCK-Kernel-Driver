@@ -105,7 +105,7 @@ prom_putchar(char c)
 
 /* Query for input device type */
 enum prom_input_device
-prom_query_input_device()
+prom_query_input_device(void)
 {
 	unsigned long flags;
 	int st_p;
@@ -155,7 +155,7 @@ prom_query_input_device()
 /* Query for output device type */
 
 enum prom_output_device
-prom_query_output_device()
+prom_query_output_device(void)
 {
 	unsigned long flags;
 	int st_p;
