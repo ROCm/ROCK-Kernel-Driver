@@ -196,23 +196,21 @@ static int __init ne_probe_isapnp(struct net_device *dev)
 	int i;
 
 	for (i = 0; isapnp_clone_list[i].vendor != 0; i++) {
-		struct pci_dev *idev = NULL;
+		struct pnp_dev *idev = NULL;
 
-		while ((idev = isapnp_find_dev(NULL,
+		while ((idev = pnp_find_dev(NULL,
 					       isapnp_clone_list[i].vendor,
 					       isapnp_clone_list[i].function,
 					       idev))) {
 			/* Avoid already found cards from previous calls */
-			if (idev->prepare(idev))
-				continue;
-			if (idev->activate(idev))
+			if (pnp_activate_dev(idev, NULL))
 				continue;
 			/* if no irq, search for next */
-			if (idev->irq_resource[0].start == 0)
+			if (pnp_irq(idev, 0) == -1)
 				continue;
 			/* found it */
-			dev->base_addr = idev->resource[0].start;
-			dev->irq = idev->irq_resource[0].start;
+			dev->base_addr = pnp_port_start(idev, 0);
+			dev->irq = pnp_irq(idev, 0);
 			printk(KERN_INFO "ne.c: ISAPnP reports %s at i/o %#lx, irq %d.\n",
 				(char *) isapnp_clone_list[i].driver_data,
 
