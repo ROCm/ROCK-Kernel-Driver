@@ -2,6 +2,20 @@ ToDo:
 	- Find and fix bugs.
 	- Enable NFS exporting of NTFS.
 
+2.0.23 - Major bug fixes (races, deadlocks, non-i386 architectures).
+
+	- Massive internal locking changes to mft record locking. Fixes lock
+	  recursion and replaces the mrec_lock read/write semaphore with a
+	  mutex. Also removes the now superfluous mft_count. This fixes several
+	  race conditions and deadlocks, especially in the future write code.
+	- Fix ntfs over loopback for compressed files by adding an
+	  optimization barrier. (gcc was screwing up otherwise ?)
+	- Miscellaneous cleanups all over the code and a fix or two in error
+	  handling code paths.
+	Thanks go to Christoph Hellwig for pointing out the following two:
+	- Remove now unused function fs/ntfs/malloc.h::vmalloc_nofs().
+	- Fix ntfs_free() for ia64 and parisc by checking for VMALLOC_END, too.
+
 2.0.22 - Cleanups, mainly to ntfs_readdir(), and use C99 initializers.
 
 	- Change fs/ntfs/dir.c::ntfs_reddir() to only read/write ->f_pos once

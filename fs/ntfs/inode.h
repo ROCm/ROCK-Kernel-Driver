@@ -72,9 +72,8 @@ struct _ntfs_inode {
 	 * The following fields are only valid for real inodes and extent
 	 * inodes.
 	 */
-	struct rw_semaphore mrec_lock;	/* Lock for serializing access to the
+	struct semaphore mrec_lock; /* Lock for serializing access to the
 				   mft record belonging to this inode. */
-	atomic_t mft_count;	/* Mapping reference count for book keeping. */
 	struct page *page;	/* The page containing the mft record of the
 				   inode. This should only be touched by the
 				   (un)map_mft_record*() functions. */
