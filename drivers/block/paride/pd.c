@@ -194,7 +194,7 @@ MODULE_PARM(drive3, "1-8i");
 
 static void ps_tq_int( void *data);
 
-static void (* ps_continuation)(void);
+static void (*phase)(void);
 static unsigned long ps_timeout;
 
 static DECLARE_WORK(ps_tq, ps_tq_int, NULL);
@@ -207,9 +207,14 @@ static void ps_set_intr(void)
 		schedule_delayed_work(&ps_tq, nice-1);
 }
 
+static void run_fsm(void)
+{
+	phase();
+}
+
 static void ps_tq_int(void *data)
 {
-	ps_continuation();
+	run_fsm();
 }
 
 #define PD_BITS    4
@@ -750,7 +755,7 @@ static void do_pd_request(request_queue_t * q)
 	if (!pd_req)
 		return;
 
-	ps_continuation = do_pd_io;
+	phase = do_pd_io;
 	ps_set_intr();
 }
 
@@ -787,14 +792,15 @@ static inline void next_request(int success)
 	}
 	spin_unlock_irqrestore(&pd_lock, saved_flags);
 
-	ps_continuation = do_pd_io;
+	phase = do_pd_io;
 	ps_set_intr();
 }
 
 static void do_pd_io(void)
 {
 	pd_current = pd_req->rq_disk->private_data;
-	pi_do_claimed(pd_current->pi, do_pd_io_start);
+	phase = do_pd_io_start;
+	pi_do_claimed(pd_current->pi, run_fsm);
 }
 
 static void do_pd_io_start(void)
@@ -829,14 +835,14 @@ static void do_pd_read_start(void)
 		pi_disconnect(pd_current->pi);
 		if (pd_retries < PD_MAX_RETRIES) {
 			pd_retries++;
-			pi_do_claimed(pd_current->pi, do_pd_read_start);
+			pi_do_claimed(pd_current->pi, run_fsm);
 			return;
 		}
 		next_request(0);
 		return;
 	}
 	pd_ide_command(pd_current, IDE_READ, pd_block, pd_run);
-	ps_continuation = do_pd_read_drq;
+	phase = do_pd_read_drq;
 	ps_timeout = jiffies + PD_TMO;
 	ps_set_intr();
 }
@@ -852,7 +858,8 @@ static void do_pd_read_drq(void)
 			pi_disconnect(pd_current->pi);
 			if (pd_retries < PD_MAX_RETRIES) {
 				pd_retries++;
-				pi_do_claimed(pd_current->pi, do_pd_read_start);
+				phase = do_pd_read_start;
+				pi_do_claimed(pd_current->pi, run_fsm);
 				return;
 			}
 			next_request(0);
@@ -873,7 +880,7 @@ static void do_pd_write_start(void)
 		pi_disconnect(pd_current->pi);
 		if (pd_retries < PD_MAX_RETRIES) {
 			pd_retries++;
-			pi_do_claimed(pd_current->pi, do_pd_write_start);
+			pi_do_claimed(pd_current->pi, run_fsm);
 			return;
 		}
 		next_request(0);
@@ -885,7 +892,7 @@ static void do_pd_write_start(void)
 			pi_disconnect(pd_current->pi);
 			if (pd_retries < PD_MAX_RETRIES) {
 				pd_retries++;
-				pi_do_claimed(pd_current->pi, do_pd_write_start);
+				pi_do_claimed(pd_current->pi, run_fsm);
 				return;
 			}
 			next_request(0);
@@ -895,7 +902,7 @@ static void do_pd_write_start(void)
 		if (pd_next_buf())
 			break;
 	}
-	ps_continuation = do_pd_write_done;
+	phase = do_pd_write_done;
 	ps_timeout = jiffies + PD_TMO;
 	ps_set_intr();
 }
@@ -910,7 +917,8 @@ static void do_pd_write_done(void)
 		pi_disconnect(pd_current->pi);
 		if (pd_retries < PD_MAX_RETRIES) {
 			pd_retries++;
-			pi_do_claimed(pd_current->pi, do_pd_write_start);
+			phase = do_pd_write_start;
+			pi_do_claimed(pd_current->pi, run_fsm);
 			return;
 		}
 		next_request(0);
