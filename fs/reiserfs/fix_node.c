@@ -795,8 +795,9 @@ static int  get_empty_nodes(
   else /* If we have enough already then there is nothing to do. */
     return CARRY_ON;
 
-  if ( reiserfs_new_form_blocknrs (p_s_tb, a_n_blocknrs,
-                                   n_amount_needed) == NO_DISK_SPACE )
+  /* No need to check quota - is not allocated for blocks used for formatted nodes */
+  if (reiserfs_new_form_blocknrs (p_s_tb, a_n_blocknrs,
+                                   n_amount_needed) == NO_DISK_SPACE)
     return NO_DISK_SPACE;
 
   /* for each blocknumber we just got, get a buffer and stick it on FEB */
@@ -2492,7 +2493,7 @@ void unfix_nodes (struct tree_balance * tb)
 	    /* de-allocated block which was not used by balancing and
                bforget about buffer for it */
 	    brelse (tb->FEB[i]);
-	    reiserfs_free_block (tb->transaction_handle, blocknr);
+	    reiserfs_free_block (tb->transaction_handle, NULL, blocknr, 0);
 	}
 	if (tb->used[i]) {
 	    /* release used as new nodes including a new root */
