@@ -107,12 +107,6 @@ enum {
 	ATA_FLAG_MMIO		= (1 << 6), /* use MMIO, not PIO */
 	ATA_FLAG_SATA_RESET	= (1 << 7), /* use COMRESET */
 
-	/* struct ata_taskfile flags */
-	ATA_TFLAG_LBA48		= (1 << 0),
-	ATA_TFLAG_ISADDR	= (1 << 1), /* enable r/w to nsect/lba regs */
-	ATA_TFLAG_DEVICE	= (1 << 2), /* enable r/w to device reg */
-
-	ATA_QCFLAG_WRITE	= (1 << 0), /* read==0, write==1 */
 	ATA_QCFLAG_ACTIVE	= (1 << 1), /* cmd not yet ack'd to scsi lyer */
 	ATA_QCFLAG_DMA		= (1 << 2), /* data delivered via DMA */
 	ATA_QCFLAG_ATAPI	= (1 << 3), /* is ATAPI packet command? */
@@ -223,29 +217,6 @@ struct ata_host_set {
 	struct ata_port *	ports[0];
 };
 
-struct ata_taskfile {
-	unsigned long		flags;		/* ATA_TFLAG_xxx */
-	u8			protocol;	/* ATA_PROT_xxx */
-
-	u8			ctl;		/* control reg */
-
-	u8			hob_feature;	/* additional data */
-	u8			hob_nsect;	/* to support LBA48 */
-	u8			hob_lbal;
-	u8			hob_lbam;
-	u8			hob_lbah;
-
-	u8			feature;
-	u8			nsect;
-	u8			lbal;
-	u8			lbam;
-	u8			lbah;
-
-	u8			device;
-
-	u8			command;	/* IO operation */
-};
-
 struct ata_queued_cmd {
 	struct ata_port		*ap;
 	struct ata_device	*dev;
@@ -293,6 +264,11 @@ struct ata_device {
 						 * ATAPI7 spec size, 40 ASCII
 						 * characters
 						 */
+
+	/* cache info about current transfer mode */
+	u8			xfer_protocol;	/* taskfile xfer protocol */
+	u8			read_cmd;	/* opcode to use on read */
+	u8			write_cmd;	/* opcode to use on write */
 };
 
 struct ata_engine {
@@ -408,7 +384,6 @@ extern int ata_scsi_detect(Scsi_Host_Template *sht);
 extern int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *));
 extern int ata_scsi_error(struct Scsi_Host *host);
 extern int ata_scsi_release(struct Scsi_Host *host);
-extern int ata_scsi_slave_config(struct scsi_device *sdev);
 extern unsigned int ata_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc);
 /*
  * Default driver ops implementations
@@ -433,6 +408,7 @@ extern void ata_eng_timeout(struct ata_port *ap);
 extern int ata_std_bios_param(struct scsi_device *sdev,
 			      struct block_device *bdev,
 			      sector_t capacity, int geom[]);
+extern int ata_scsi_slave_config(struct scsi_device *sdev);
 
 
 static inline unsigned long msecs_to_jiffies(unsigned long msecs)

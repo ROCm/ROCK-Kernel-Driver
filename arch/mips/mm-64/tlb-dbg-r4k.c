@@ -24,7 +24,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 asmlinkage void tlb_refill_debug(struct pt_regs regs)
 {
 	show_regs(&regs);
-	panic(__FUNCTION__ " called.  This Does Not Happen (TM).");
+	panic("%s called.  This Does Not Happen (TM).", __FUNCTION__);
 }
 
 asmlinkage void xtlb_refill_debug(struct pt_regs *regs)

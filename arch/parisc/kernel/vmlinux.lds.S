@@ -50,6 +50,7 @@ SECTIONS
   _text = .;			/* Text and read-only data */
   .text ALIGN(16) : {
 	*(.text*)
+	SCHED_TEXT
 	*(.PARISC.unwind)
 	*(.fixup)
 	*(.lock.text)		/* out-of-line lock text */

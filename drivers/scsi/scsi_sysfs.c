@@ -19,6 +19,32 @@
 #include "scsi_priv.h"
 #include "scsi_logging.h"
 
+static struct {
+	enum scsi_device_state	value;
+	char			*name;
+} sdev_states[] = {
+	{ SDEV_CREATED, "created" },
+	{ SDEV_RUNNING, "running" },
+	{ SDEV_CANCEL, "cancel" },
+	{ SDEV_DEL, "deleted" },
+	{ SDEV_QUIESCE, "quiesce" },
+	{ SDEV_OFFLINE,	"offline" },
+};
+
+const char *scsi_device_state_name(enum scsi_device_state state)
+{
+	int i;
+	char *name = NULL;
+
+	for (i = 0; i < sizeof(sdev_states)/sizeof(sdev_states[0]); i++) {
+		if (sdev_states[i].value == state) {
+			name = sdev_states[i].name;
+			break;
+		}
+	}
+	return name;
+}
+
 static int check_set(unsigned int *val, char *src)
 {
 	char *last;
@@ -222,6 +248,9 @@ sdev_store_##field (struct device *dev, const char *buf, size_t count)	\
 }									\
 static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, sdev_show_##field, sdev_store_##field)
 
+/* Currently we don't export bit fields, but we might in future,
+ * so leave this code in */
+#if 0
 /*
  * sdev_rd_attr: create a function and attribute variable for a
  * read/write bit field.
@@ -260,7 +289,7 @@ static int scsi_sdev_check_buf_bit(const char *buf)
 	} else
 		return -EINVAL;
 }
-
+#endif
 /*
  * Create the actual show/store functions and data structures.
  */
@@ -271,7 +300,6 @@ sdev_rd_attr (scsi_level, "%d\n");
 sdev_rd_attr (vendor, "%.8s\n");
 sdev_rd_attr (model, "%.16s\n");
 sdev_rd_attr (rev, "%.4s\n");
-sdev_rw_attr_bit (online);
 
 static ssize_t
 store_rescan_field (struct device *dev, const char *buf, size_t count) 
@@ -289,6 +317,44 @@ static ssize_t sdev_store_delete(struct device *dev, const char *buf,
 };
 static DEVICE_ATTR(delete, S_IWUSR, NULL, sdev_store_delete);
 
+static ssize_t
+store_state_field(struct device *dev, const char *buf, size_t count)
+{
+	int i;
+	struct scsi_device *sdev = to_scsi_device(dev);
+	enum scsi_device_state state = 0;
+
+	for (i = 0; i < sizeof(sdev_states)/sizeof(sdev_states[0]); i++) {
+		const int len = strlen(sdev_states[i].name);
+		if (strncmp(sdev_states[i].name, buf, len) == 0 &&
+		   buf[len] == '\n') {
+			state = sdev_states[i].value;
+			break;
+		}
+	}
+	if (!state)
+		return -EINVAL;
+
+	if (scsi_device_set_state(sdev, state))
+		return -EINVAL;
+	return count;
+}
+
+static ssize_t
+show_state_field(struct device *dev, char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	const char *name = scsi_device_state_name(sdev->sdev_state);
+
+	if (!name)
+		return -EINVAL;
+
+	return snprintf(buf, 20, "%s\n", name);
+}
+
+DEVICE_ATTR(state, S_IRUGO | S_IWUSR, show_state_field, store_state_field);
+
+
 /* Default template for device attributes.  May NOT be modified */
 static struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	&dev_attr_device_blocked,
@@ -298,9 +364,9 @@ static struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	&dev_attr_vendor,
 	&dev_attr_model,
 	&dev_attr_rev,
-	&dev_attr_online,
 	&dev_attr_rescan,
 	&dev_attr_delete,
+	&dev_attr_state,
 	NULL
 };
 
@@ -436,18 +502,19 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
  **/
 void scsi_remove_device(struct scsi_device *sdev)
 {
-	if (sdev->sdev_state == SDEV_RUNNING || sdev->sdev_state == SDEV_CANCEL) {
-		scsi_device_set_state(sdev, SDEV_DEL);
-		class_device_unregister(&sdev->sdev_classdev);
-		if(sdev->transport_classdev.class)
-			class_device_unregister(&sdev->transport_classdev);
-		device_del(&sdev->sdev_gendev);
-		if (sdev->host->hostt->slave_destroy)
-			sdev->host->hostt->slave_destroy(sdev);
-		if (sdev->host->transportt->cleanup)
-			sdev->host->transportt->cleanup(sdev);
-		put_device(&sdev->sdev_gendev);
-	}
+	if (scsi_device_set_state(sdev, SDEV_CANCEL) != 0)
+		return;
+
+	class_device_unregister(&sdev->sdev_classdev);
+	if (sdev->transport_classdev.class)
+		class_device_unregister(&sdev->transport_classdev);
+	device_del(&sdev->sdev_gendev);
+	scsi_device_set_state(sdev, SDEV_DEL);
+	if (sdev->host->hostt->slave_destroy)
+		sdev->host->hostt->slave_destroy(sdev);
+	if (sdev->host->transportt->cleanup)
+		sdev->host->transportt->cleanup(sdev);
+	put_device(&sdev->sdev_gendev);
 }
 
 int scsi_register_driver(struct device_driver *drv)

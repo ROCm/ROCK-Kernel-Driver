@@ -38,10 +38,14 @@
 static void transport_class_release(struct class_device *class_dev);
 
 #define SPI_NUM_ATTRS 10	/* increase this if you add attributes */
+#define SPI_OTHER_ATTRS 1	/* Increase this if you add "always
+				 * on" attributes */
 
 #define SPI_MAX_ECHO_BUFFER_SIZE	4096
 
+/* Private data accessors (keep these out of the header file) */
 #define spi_dv_pending(x) (((struct spi_transport_attrs *)&(x)->transport_data)->dv_pending)
+#define spi_dv_sem(x) (((struct spi_transport_attrs *)&(x)->transport_data)->dv_sem)
 
 struct spi_internal {
 	struct scsi_transport_template t;
@@ -50,7 +54,7 @@ struct spi_internal {
 	struct class_device_attribute private_attrs[SPI_NUM_ATTRS];
 	/* The array of null terminated pointers to attributes 
 	 * needed by scsi_sysfs.c */
-	struct class_device_attribute *attrs[SPI_NUM_ATTRS + 1];
+	struct class_device_attribute *attrs[SPI_NUM_ATTRS + SPI_OTHER_ATTRS + 1];
 };
 
 #define to_spi_internal(tmpl)	container_of(tmpl, struct spi_internal, t)
@@ -104,6 +108,7 @@ static int spi_setup_transport_attrs(struct scsi_device *sdev)
 	spi_rti(sdev) = 0;
 	spi_pcomp_en(sdev) = 0;
 	spi_dv_pending(sdev) = 0;
+	init_MUTEX(&spi_dv_sem(sdev));
 
 	return 0;
 }
@@ -159,6 +164,16 @@ spi_transport_rd_attr(wr_flow, "%d\n");
 spi_transport_rd_attr(rd_strm, "%d\n");
 spi_transport_rd_attr(rti, "%d\n");
 spi_transport_rd_attr(pcomp_en, "%d\n");
+
+static ssize_t
+store_spi_revalidate(struct class_device *cdev, const char *buf, size_t count)
+{
+	struct scsi_device *sdev = transport_class_to_sdev(cdev);
+
+	spi_dv_device(sdev);
+	return count;
+}
+static CLASS_DEVICE_ATTR(revalidate, S_IWUSR, NULL, store_spi_revalidate)
 
 /* Translate the period into ns according to the current spec
  * for SDTR/PPR messages */
@@ -246,7 +261,8 @@ static CLASS_DEVICE_ATTR(period, S_IRUGO | S_IWUSR,
 
 #define DV_LOOPS	3
 #define DV_TIMEOUT	(10*HZ)
-#define DV_RETRIES	5
+#define DV_RETRIES	3	/* should only need at most 
+				 * two cc/ua clears */
 
 
 /* This is for read/write Domain Validation:  If the device supports
@@ -307,7 +323,8 @@ spi_dv_device_echo_buffer(struct scsi_request *sreq, u8 *buffer,
 		sreq->sr_data_direction = DMA_TO_DEVICE;
 		scsi_wait_req(sreq, spi_write_buffer, buffer, len,
 			      DV_TIMEOUT, DV_RETRIES);
-		if(sreq->sr_result) {
+		if(sreq->sr_result || !scsi_device_online(sdev)) {
+			scsi_device_set_state(sdev, SDEV_QUIESCE);
 			SPI_PRINTK(sdev, KERN_ERR, "Write Buffer failure %x\n", sreq->sr_result);
 			return 0;
 		}
@@ -317,6 +334,7 @@ spi_dv_device_echo_buffer(struct scsi_request *sreq, u8 *buffer,
 		sreq->sr_data_direction = DMA_FROM_DEVICE;
 		scsi_wait_req(sreq, spi_read_buffer, ptr, len,
 			      DV_TIMEOUT, DV_RETRIES);
+		scsi_device_set_state(sdev, SDEV_QUIESCE);
 
 		if (memcmp(buffer, ptr, len) != 0)
 			return 0;
@@ -332,6 +350,7 @@ spi_dv_device_compare_inquiry(struct scsi_request *sreq, u8 *buffer,
 {
 	int r;
 	const int len = sreq->sr_device->inquiry_len;
+	struct scsi_device *sdev = sreq->sr_device;
 	const char spi_inquiry[] = {
 		INQUIRY, 0, 0, 0, len, 0
 	};
@@ -344,6 +363,11 @@ spi_dv_device_compare_inquiry(struct scsi_request *sreq, u8 *buffer,
 
 		scsi_wait_req(sreq, spi_inquiry, ptr, len,
 			      DV_TIMEOUT, DV_RETRIES);
+		
+		if(sreq->sr_result || !scsi_device_online(sdev)) {
+			scsi_device_set_state(sdev, SDEV_QUIESCE);
+			return 0;
+		}
 
 		/* If we don't have the inquiry data already, the
 		 * first read gets it */
@@ -466,7 +490,7 @@ spi_dv_device_internal(struct scsi_request *sreq, u8 *buffer)
 	}
 
 	/* test width */
-	if (i->f->set_width) {
+	if (i->f->set_width && sdev->wdtr) {
 		i->f->set_width(sdev, 1);
 
 		if (!spi_dv_device_compare_inquiry(sreq, buffer,
@@ -478,6 +502,10 @@ spi_dv_device_internal(struct scsi_request *sreq, u8 *buffer)
 	}
 
 	if (!i->f->set_period)
+		return;
+
+	/* device can't handle synchronous */
+	if(!sdev->ppr && !sdev->sdtr)
 		return;
 
 	/* now set up to the maximum */
@@ -536,11 +564,17 @@ spi_dv_device(struct scsi_device *sdev)
 	if (unlikely(scsi_device_quiesce(sdev)))
 		goto out_free;
 
+	spi_dv_pending(sdev) = 1;
+	down(&spi_dv_sem(sdev));
+
 	SPI_PRINTK(sdev, KERN_INFO, "Beginning Domain Validation\n");
 
 	spi_dv_device_internal(sreq, buffer);
 
 	SPI_PRINTK(sdev, KERN_INFO, "Ending Domain Validation\n");
+
+	up(&spi_dv_sem(sdev));
+	spi_dv_pending(sdev) = 0;
 
 	scsi_device_resume(sdev);
 
@@ -593,7 +627,8 @@ spi_schedule_dv_device(struct scsi_device *sdev)
 		kfree(wqw);
 		return;
 	}
-
+	/* Set pending early (dv_device doesn't check it, only sets it) */
+	spi_dv_pending(sdev) = 1;
 	if (unlikely(scsi_device_get(sdev))) {
 		kfree(wqw);
 		spi_dv_pending(sdev) = 0;
@@ -632,7 +667,7 @@ spi_attach_transport(struct spi_function_template *ft)
 	i->t.attrs = &i->attrs[0];
 	i->t.class = &spi_transport_class;
 	i->t.setup = &spi_setup_transport_attrs;
-	i->t.size = sizeof(struct spi_transport_attrs) - sizeof(unsigned long);
+	i->t.size = sizeof(struct spi_transport_attrs);
 	i->f = ft;
 
 	SETUP_ATTRIBUTE(period);
@@ -649,6 +684,8 @@ spi_attach_transport(struct spi_function_template *ft)
 	/* if you add an attribute but forget to increase SPI_NUM_ATTRS
 	 * this bug will trigger */
 	BUG_ON(count > SPI_NUM_ATTRS);
+
+	i->attrs[count++] = &class_device_attr_revalidate;
 
 	i->attrs[count] = NULL;
 

@@ -353,7 +353,7 @@ static int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype, in
 	u8 addr;
 	u32 div;
 	u8 buf[4];
-        int i, divisor, regcode;
+	int divisor, regcode;
 
 	dprintk ("%s: freq %i, ftype %i\n", __FUNCTION__, freq, ftype);
 

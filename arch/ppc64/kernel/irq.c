@@ -67,6 +67,7 @@ irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 	}
 };
 
+int __irq_offset_value;
 int ppc_spurious_interrupts = 0;
 unsigned long lpEvent_count = 0;
 
@@ -76,7 +77,7 @@ setup_irq(unsigned int irq, struct irqaction * new)
 	int shared = 0;
 	unsigned long flags;
 	struct irqaction *old, **p;
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_irq_desc(irq);
 
 	/*
 	 * Some drivers like serial.c use request_irq() heavily,
@@ -134,7 +135,7 @@ setup_irq(unsigned int irq, struct irqaction * new)
 
 inline void synchronize_irq(unsigned int irq)
 {
-	while (irq_desc[irq].status & IRQ_INPROGRESS)
+	while (get_irq_desc(irq)->status & IRQ_INPROGRESS)
 		cpu_relax();
 }
 
@@ -148,11 +149,10 @@ EXPORT_SYMBOL(synchronize_irq);
 static int
 do_free_irq(int irq, void* dev_id)
 {
-	irq_desc_t *desc;
+	irq_desc_t *desc = get_irq_desc(irq);
 	struct irqaction **p;
 	unsigned long flags;
 
-	desc = irq_desc + irq;
 	spin_lock_irqsave(&desc->lock,flags);
 	p = &desc->action;
 	for (;;) {
@@ -247,7 +247,7 @@ EXPORT_SYMBOL(free_irq);
  
 inline void disable_irq_nosync(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_irq_desc(irq);
 	unsigned long flags;
 
 	spin_lock_irqsave(&desc->lock, flags);
@@ -276,7 +276,7 @@ EXPORT_SYMBOL(disable_irq_nosync);
  
 void disable_irq(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_irq_desc(irq);
 	disable_irq_nosync(irq);
 	if (desc->action)
 		synchronize_irq(irq);
@@ -296,7 +296,7 @@ EXPORT_SYMBOL(disable_irq);
  
 void enable_irq(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_irq_desc(irq);
 	unsigned long flags;
 
 	spin_lock_irqsave(&desc->lock, flags);
@@ -327,6 +327,7 @@ int show_interrupts(struct seq_file *p, void *v)
 {
 	int i = *(loff_t *) v, j;
 	struct irqaction * action;
+	irq_desc_t *desc;
 	unsigned long flags;
 
 	if (i == 0) {
@@ -339,8 +340,9 @@ int show_interrupts(struct seq_file *p, void *v)
 	}
 
 	if (i < NR_IRQS) {
-		spin_lock_irqsave(&irq_desc[i].lock, flags);
-		action = irq_desc[i].action;
+		desc = get_irq_desc(i);
+		spin_lock_irqsave(&desc->lock, flags);
+		action = desc->action;
 		if (!action || !action->handler)
 			goto skip;
 		seq_printf(p, "%3d: ", i);
@@ -352,17 +354,17 @@ int show_interrupts(struct seq_file *p, void *v)
 #else
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #endif /* CONFIG_SMP */
-		if (irq_desc[i].handler)		
-			seq_printf(p, " %s ", irq_desc[i].handler->typename );
+		if (desc->handler)
+			seq_printf(p, " %s ", desc->handler->typename );
 		else
 			seq_printf(p, "  None      ");
-		seq_printf(p, "%s", (irq_desc[i].status & IRQ_LEVEL) ? "Level " : "Edge  ");
+		seq_printf(p, "%s", (desc->status & IRQ_LEVEL) ? "Level " : "Edge  ");
 		seq_printf(p, "    %s",action->name);
 		for (action=action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
 		seq_putc(p, '\n');
 skip:
-		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
+		spin_unlock_irqrestore(&desc->lock, flags);
 	} else if (i == NR_IRQS)
 		seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
 	return 0;
@@ -482,7 +484,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	int status;
 	struct irqaction *action;
 	int cpu = smp_processor_id();
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_irq_desc(irq);
 	irqreturn_t action_ret;
 
 	kstat_cpu(cpu).irqs[irq]++;
@@ -564,11 +566,11 @@ out:
 	 * The ->end() handler has to deal with interrupts which got
 	 * disabled while the handler was running.
 	 */
-	if (irq_desc[irq].handler) {
-		if (irq_desc[irq].handler->end)
-			irq_desc[irq].handler->end(irq);
-		else if (irq_desc[irq].handler->enable)
-			irq_desc[irq].handler->enable(irq);
+	if (desc->handler) {
+		if (desc->handler->end)
+			desc->handler->end(irq);
+		else if (desc->handler->enable)
+			desc->handler->enable(irq);
 	}
 	spin_unlock(&desc->lock);
 }
@@ -683,6 +685,7 @@ static struct proc_dir_entry * root_irq_dir;
 static struct proc_dir_entry * irq_dir [NR_IRQS];
 static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
+/* Protected by get_irq_desc(irq)->lock. */
 #ifdef CONFIG_IRQ_ALL_CPUS
 cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
 #else  /* CONFIG_IRQ_ALL_CPUS */
@@ -702,16 +705,18 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
-	int irq = (long)data, full_count = count, err;
+	unsigned int irq = (long)data;
+	irq_desc_t *desc = get_irq_desc(irq);
+	int ret;
 	cpumask_t new_value, tmp;
 	cpumask_t allcpus = CPU_MASK_ALL;
 
-	if (!irq_desc[irq].handler->set_affinity)
+	if (!desc->handler->set_affinity)
 		return -EIO;
 
-	err = cpumask_parse(buffer, count, new_value);
-	if (err)
-		return err;
+	ret = cpumask_parse(buffer, count, new_value);
+	if (ret != 0)
+		return ret;
 
 	/*
 	 * We check for CPU_MASK_ALL in xics to send irqs to all cpus.
@@ -722,18 +727,29 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	cpus_and(new_value, new_value, allcpus);
 
 	/*
+	 * Grab lock here so cpu_online_map can't change, and also
+	 * protect irq_affinity[].
+	 */
+	spin_lock(&desc->lock);
+
+	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least
 	 * one online CPU still has to be targeted.
 	 */
 	cpus_and(tmp, new_value, cpu_online_map);
-	if (cpus_empty(tmp))
-		return -EINVAL;
+	if (cpus_empty(tmp)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	irq_affinity[irq] = new_value;
-	irq_desc[irq].handler->set_affinity(irq, new_value);
+	desc->handler->set_affinity(irq, new_value);
+	ret = count;
 
-	return full_count;
+out:
+	spin_unlock(&desc->lock);
+	return ret;
 }
 
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
@@ -828,8 +844,8 @@ void init_irq_proc (void)
 	/*
 	 * Create entries for all existing IRQs.
 	 */
-	for (i = 0; i < NR_IRQS; i++) {
-		if (irq_desc[i].handler == NULL)
+	for_each_irq(i) {
+		if (get_irq_desc(i)->handler == NULL)
 			continue;
 		register_irq_proc(i);
 	}
@@ -857,7 +873,7 @@ unsigned int virt_irq_to_real_map[NR_IRQS];
  * we don't end up with an interrupt number >= NR_IRQS.
  */
 #define MIN_VIRT_IRQ	3
-#define MAX_VIRT_IRQ	(NR_IRQS - NUM_8259_INTERRUPTS - 1)
+#define MAX_VIRT_IRQ	(NR_IRQS - NUM_ISA_INTERRUPTS - 1)
 #define NR_VIRT_IRQS	(MAX_VIRT_IRQ - MIN_VIRT_IRQ + 1)
 
 void
@@ -945,6 +961,5 @@ unsigned int real_irq_to_virt_slowpath(unsigned int real_irq)
 	return NO_IRQ;
 
 }
-
 
 #endif

@@ -204,11 +204,11 @@
    </para>
 
    <para>
-    <filename class=headerfile>include/linux/interrupt.h</filename> lists the 
+    <filename class="headerfile">include/linux/interrupt.h</filename> lists the
     different BH's.  No matter how many CPUs you have, no two BHs will run at 
     the same time. This made the transition to SMP simpler, but sucks hard for
     scalable performance.  A very important bottom half is the timer
-    BH (<filename class=headerfile>include/linux/timer.h</filename>): you 
+    BH (<filename class="headerfile">include/linux/timer.h</filename>): you
     can register to have it call functions for you in a given length of time.
    </para>
 
@@ -224,7 +224,7 @@
    </para>
 
    <para>
-    tasklets (<filename class=headerfile>include/linux/interrupt.h</filename>) 
+    tasklets (<filename class="headerfile">include/linux/interrupt.h</filename>)
     are like softirqs, except they are dynamically-registrable (meaning you 
     can have as many as you want), and they also guarantee that any tasklet 
     will only run on one CPU at any time, although different tasklets can 
@@ -241,7 +241,7 @@
    <para>
     You can tell you are in a softirq (or bottom half, or tasklet)
     using the <function>in_softirq()</function> macro 
-    (<filename class=headerfile>include/asm/hardirq.h</filename>).
+    (<filename class="headerfile">include/asm/hardirq.h</filename>).
    </para>
    <caution>
     <para>
@@ -330,7 +330,7 @@ asmlinkage long sys_mycall(int arg)
    You create a character device and implement an appropriate ioctl
    for it.  This is much more flexible than system calls, doesn't have
    to be entered in every architecture's
-   <filename class=headerfile>include/asm/unistd.h</filename> and
+   <filename class="headerfile">include/asm/unistd.h</filename> and
    <filename>arch/kernel/entry.S</filename> file, and is much more
    likely to be accepted by Linus.
   </para>
@@ -343,7 +343,7 @@ asmlinkage long sys_mycall(int arg)
   <para>
    Inside the ioctl you're in user context to a process.  When a
    error occurs you return a negated errno (see
-   <filename class=headerfile>include/linux/errno.h</filename>),
+   <filename class="headerfile">include/linux/errno.h</filename>),
    otherwise you return <returnvalue>0</returnvalue>.
   </para>
 
@@ -429,7 +429,7 @@ cond_resched(); /* Will sleep */
   <sect1 id="routines-printk">
    <title>
     <function>printk()</function>
-    <filename class=headerfile>include/linux/kernel.h</filename>
+    <filename class="headerfile">include/linux/kernel.h</filename>
    </title>
 
    <para>
@@ -447,7 +447,7 @@ printk(KERN_INFO "i = %u\n", i);
    </programlisting>
 
    <para>
-    See <filename class=headerfile>include/linux/kernel.h</filename>;
+    See <filename class="headerfile">include/linux/kernel.h</filename>;
     for other KERN_ values; these are interpreted by syslog as the
     level.  Special case: for printing an IP address use
    </para>
@@ -487,7 +487,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
     <function>get_user()</function>
     /
     <function>put_user()</function>
-    <filename class=headerfile>include/asm/uaccess.h</filename>
+    <filename class="headerfile">include/asm/uaccess.h</filename>
    </title>  
 
    <para>
@@ -525,7 +525,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
 
   <sect1 id="routines-kmalloc">
    <title><function>kmalloc()</function>/<function>kfree()</function>
-    <filename class=headerfile>include/linux/slab.h</filename></title>
+    <filename class="headerfile">include/linux/slab.h</filename></title>
 
    <para>
     <emphasis>[MAY SLEEP: SEE BELOW]</emphasis>
@@ -593,10 +593,10 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
 
    <para>
     If you are allocating at least <constant>PAGE_SIZE</constant>
-    (<filename class=headerfile>include/asm/page.h</filename>) bytes,
+    (<filename class="headerfile">include/asm/page.h</filename>) bytes,
     consider using <function>__get_free_pages()</function>
 
-    (<filename class=headerfile>include/linux/mm.h</filename>).  It
+    (<filename class="headerfile">include/linux/mm.h</filename>).  It
     takes an order argument (0 for page sized, 1 for double page, 2
     for four pages etc.) and the same memory priority flag word as
     above.
@@ -619,13 +619,13 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
    <para>
     Before inventing your own cache of often-used objects consider
     using a slab cache in
-    <filename class=headerfile>include/linux/slab.h</filename>
+    <filename class="headerfile">include/linux/slab.h</filename>
    </para>
   </sect1>
 
   <sect1 id="routines-current">
    <title><function>current</function>
-    <filename class=headerfile>include/asm/current.h</filename></title>
+    <filename class="headerfile">include/asm/current.h</filename></title>
 
    <para>
     This global variable (really a macro) contains a pointer to
@@ -638,8 +638,8 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
 
   <sect1 id="routines-udelay">
    <title><function>udelay()</function>/<function>mdelay()</function>
-     <filename class=headerfile>include/asm/delay.h</filename> 
-     <filename class=headerfile>include/linux/delay.h</filename> 
+     <filename class="headerfile">include/asm/delay.h</filename>
+     <filename class="headerfile">include/linux/delay.h</filename>
    </title>
 
    <para>
@@ -652,7 +652,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
  
   <sect1 id="routines-endian">
    <title><function>cpu_to_be32()</function>/<function>be32_to_cpu()</function>/<function>cpu_to_le32()</function>/<function>le32_to_cpu()</function>
-     <filename class=headerfile>include/asm/byteorder.h</filename> 
+     <filename class="headerfile">include/asm/byteorder.h</filename>
    </title>
 
    <para>
@@ -675,7 +675,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
 
   <sect1 id="routines-local-irqs">
    <title><function>local_irq_save()</function>/<function>local_irq_restore()</function>
-    <filename class=headerfile>include/asm/system.h</filename>
+    <filename class="headerfile">include/asm/system.h</filename>
    </title>
 
    <para>
@@ -690,7 +690,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
 
   <sect1 id="routines-softirqs">
    <title><function>local_bh_disable()</function>/<function>local_bh_enable()</function>
-    <filename class=headerfile>include/linux/interrupt.h</filename></title>
+    <filename class="headerfile">include/linux/interrupt.h</filename></title>
 
    <para>
     These routines disable soft interrupts on the local CPU, and
@@ -703,7 +703,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
 
   <sect1 id="routines-processorids">
    <title><function>smp_processor_id</function>()
-    <filename class=headerfile>include/asm/smp.h</filename></title>
+    <filename class="headerfile">include/asm/smp.h</filename></title>
    
    <para>
     <function>smp_processor_id()</function> returns the current
@@ -715,7 +715,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
 
   <sect1 id="routines-init">
    <title><type>__init</type>/<type>__exit</type>/<type>__initdata</type>
-    <filename class=headerfile>include/linux/init.h</filename></title>
+    <filename class="headerfile">include/linux/init.h</filename></title>
 
    <para>
     After boot, the kernel frees up a special section; functions
@@ -738,7 +738,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
 
   <sect1 id="routines-init-again">
    <title><function>__initcall()</function>/<function>module_init()</function>
-    <filename class=headerfile>include/linux/init.h</filename></title>
+    <filename class="headerfile">include/linux/init.h</filename></title>
    <para>
     Many parts of the kernel are well served as a module
     (dynamically-loadable parts of the kernel).  Using the
@@ -768,7 +768,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
   
   <sect1 id="routines-moduleexit">
    <title> <function>module_exit()</function>
-    <filename class=headerfile>include/linux/init.h</filename> </title>
+    <filename class="headerfile">include/linux/init.h</filename> </title>
 
    <para>
     This macro defines the function to be called at module removal
@@ -781,7 +781,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
 
   <sect1 id="routines-module-use-counters">
    <title> <function>MOD_INC_USE_COUNT</function>/<function>MOD_DEC_USE_COUNT</function>
-    <filename class=headerfile>include/linux/module.h</filename></title>
+    <filename class="headerfile">include/linux/module.h</filename></title>
 
    <para>
     These manipulate the module usage count, to protect against
@@ -839,7 +839,7 @@ foo_open (...)
 
  <chapter id="queues">
   <title>Wait Queues
-   <filename class=headerfile>include/linux/wait.h</filename>
+   <filename class="headerfile">include/linux/wait.h</filename>
   </title>
   <para>
    <emphasis>[SLEEPS]</emphasis>
@@ -874,7 +874,7 @@ foo_open (...)
     There is a macro to do this:
     <function>wait_event_interruptible()</function>
 
-    <filename class=headerfile>include/linux/sched.h</filename> The
+    <filename class="headerfile">include/linux/sched.h</filename> The
     first argument is the wait queue head, and the second is an
     expression which is evaluated; the macro returns
     <returnvalue>0</returnvalue> when this expression is true, or
@@ -900,7 +900,7 @@ foo_open (...)
    <para>
     Call <function>wake_up()</function>
 
-    <filename class=headerfile>include/linux/sched.h</filename>;,
+    <filename class="headerfile">include/linux/sched.h</filename>;,
     which will wake up every process in the queue.  The exception is
     if one has <constant>TASK_EXCLUSIVE</constant> set, in which case
     the remainder of the queue will not be woken.
@@ -915,7 +915,7 @@ foo_open (...)
    Certain operations are guaranteed atomic on all platforms.  The
    first class of operations work on <type>atomic_t</type>
 
-   <filename class=headerfile>include/asm/atomic.h</filename>; this
+   <filename class="headerfile">include/asm/atomic.h</filename>; this
    contains a signed integer (at least 24 bits long), and you must use
    these functions to manipulate or read atomic_t variables.
    <function>atomic_read()</function> and
@@ -943,7 +943,7 @@ foo_open (...)
    The second class of atomic operations is atomic bit operations on a
    <type>long</type>, defined in
 
-   <filename class=headerfile>include/asm/bitops.h</filename>.  These
+   <filename class="headerfile">include/asm/bitops.h</filename>.  These
    operations generally take a pointer to the bit pattern, and a bit
    number: 0 is the least significant bit.
    <function>set_bit()</function>, <function>clear_bit()</function>
@@ -982,7 +982,7 @@ foo_open (...)
 
   <sect1 id="sym-exportsymbols">
    <title><function>EXPORT_SYMBOL()</function>
-    <filename class=headerfile>include/linux/module.h</filename></title>
+    <filename class="headerfile">include/linux/module.h</filename></title>
 
    <para>
     This is the classic method of exporting a symbol, and it works
@@ -995,7 +995,7 @@ foo_open (...)
 
   <sect1 id="sym-exportsymbols-gpl">
    <title><function>EXPORT_SYMBOL_GPL()</function>
-    <filename class=headerfile>include/linux/module.h</filename></title>
+    <filename class="headerfile">include/linux/module.h</filename></title>
 
    <para>
     Similar to <function>EXPORT_SYMBOL()</function> except that the
@@ -1012,7 +1012,7 @@ foo_open (...)
 
   <sect1 id="conventions-doublelinkedlist">
    <title>Double-linked lists
-    <filename class=headerfile>include/linux/list.h</filename></title>
+    <filename class="headerfile">include/linux/list.h</filename></title>
 
    <para>
     There are three sets of linked-list routines in the kernel
@@ -1039,7 +1039,7 @@ foo_open (...)
    <para>
     The filesystem code uses <function>ERR_PTR()</function>
 
-    <filename class=headerfile>include/linux/fs.h</filename>; to
+    <filename class="headerfile">include/linux/fs.h</filename>; to
     encode a negative error number into a pointer, and
     <function>IS_ERR()</function> and <function>PTR_ERR()</function>
     to get it back out again: avoids a separate pointer parameter for

@@ -11,10 +11,11 @@ host-progs 		:= gen-devlist
 clean-files := devlist.h
 
 # Dependencies on generated files need to be listed explicitly
-
 $(obj)/names.o: $(obj)/devlist.h
 
 # And that's how to generate them
-
+quiet_cmd_devlist = DEVLIST $@
+      cmd_devlist = ( cd $(obj); ./gen-devlist ) < $<
 $(obj)/devlist.h: $(src)/zorro.ids $(obj)/gen-devlist
-	( cd $(obj); ./gen-devlist ) < $<
+	$(call cmd,devlist)
+

@@ -63,7 +63,7 @@
 //#define DEBUG				// Undef me for production
 
 #ifdef DEBUG
-#define DPRINTF(x, a...) printk(KERN_DEBUG "W9966: "__FUNCTION__ "(): "x, ##a)
+#define DPRINTF(x, a...) printk(KERN_DEBUG "W9966: %s(): "x, __FUNCTION__ , ##a)
 #else
 #define DPRINTF(x...)
 #endif

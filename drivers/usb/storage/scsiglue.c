@@ -64,6 +64,17 @@ static const char* host_info(struct Scsi_Host *host)
 	return "SCSI emulation for USB Mass Storage devices";
 }
 
+static int slave_alloc (struct scsi_device *sdev)
+{
+	/*
+	 * Set default bflags. These can be overridden for individual
+	 * models and vendors via the scsi devinfo mechanism.
+	 */
+	sdev->sdev_bflags = (BLIST_MS_SKIP_PAGE_08 | BLIST_MS_SKIP_PAGE_3F |
+			     BLIST_USE_10_BYTE_MS);
+	return 0;
+}
+
 static int slave_configure(struct scsi_device *sdev)
 {
 	struct us_data *us = (struct us_data *) sdev->host->hostdata[0];
@@ -377,6 +388,7 @@ struct scsi_host_template usb_stor_host_template = {
 	/* unknown initiator id */
 	.this_id =			-1,
 
+	.slave_alloc =			slave_alloc,
 	.slave_configure =		slave_configure,
 
 	/* lots of sg segments can be handled */
@@ -396,10 +408,6 @@ struct scsi_host_template usb_stor_host_template = {
 
 	/* sysfs device attributes */
 	.sdev_attrs =			sysfs_device_attr_list,
-
-	/* modify scsi_device bits on probe */
-	.flags = (BLIST_MS_SKIP_PAGE_08 | BLIST_MS_SKIP_PAGE_3F |
-		  BLIST_USE_10_BYTE_MS),
 
 	/* module management */
 	.module =			THIS_MODULE

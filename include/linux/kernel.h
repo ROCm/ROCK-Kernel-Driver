@@ -109,9 +109,15 @@ static inline void console_verbose(void)
 extern void bust_spinlocks(int yes);
 extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in progress */
 extern int panic_on_oops;
-extern int system_running;
+extern int system_state;		/* See values below */
 extern int tainted;
 extern const char *print_tainted(void);
+
+/* Values used for system_state */
+#define SYSTEM_BOOTING 0
+#define SYSTEM_RUNNING 1
+#define SYSTEM_SHUTDOWN 2
+
 #define TAINT_PROPRIETARY_MODULE	(1<<0)
 #define TAINT_FORCED_MODULE		(1<<1)
 #define TAINT_UNSAFE_SMP		(1<<2)

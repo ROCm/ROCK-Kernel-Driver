@@ -26,6 +26,7 @@
 #include <linux/errno.h>
 #include <linux/in.h>
 #include <linux/sched.h>
+#include <linux/audit.h>
 #include <asm/semaphore.h>
 #include "flask.h"
 #include "avc.h"
@@ -399,7 +400,7 @@ int security_sid_to_context(u32 sid, char **scontext, u32 *scontext_len)
 			char *scontextp;
 
 			*scontext_len = strlen(initial_sid_to_string[sid]) + 1;
-			scontextp = kmalloc(*scontext_len,GFP_KERNEL);
+			scontextp = kmalloc(*scontext_len,GFP_ATOMIC);
 			strcpy(scontextp, initial_sid_to_string[sid]);
 			*scontext = scontextp;
 			goto out;
@@ -548,32 +549,34 @@ out:
 	return rc;
 }
 
-static inline int compute_sid_handle_invalid_context(
+static int compute_sid_handle_invalid_context(
 	struct context *scontext,
 	struct context *tcontext,
 	u16 tclass,
 	struct context *newcontext)
 {
-	int rc = 0;
+	char *s = NULL, *t = NULL, *n = NULL;
+	u32 slen, tlen, nlen;
 
-	if (selinux_enforcing) {
-		rc = -EACCES;
-	} else {
-		char *s, *t, *n;
-		u32 slen, tlen, nlen;
-
-		context_struct_to_string(scontext, &s, &slen);
-		context_struct_to_string(tcontext, &t, &tlen);
-		context_struct_to_string(newcontext, &n, &nlen);
-		printk(KERN_ERR "security_compute_sid:  invalid context %s", n);
-		printk(" for scontext=%s", s);
-		printk(" tcontext=%s", t);
-		printk(" tclass=%s\n", policydb.p_class_val_to_name[tclass-1]);
-		kfree(s);
-		kfree(t);
-		kfree(n);
-	}
-	return rc;
+	if (context_struct_to_string(scontext, &s, &slen) < 0)
+		goto out;
+	if (context_struct_to_string(tcontext, &t, &tlen) < 0)
+		goto out;
+	if (context_struct_to_string(newcontext, &n, &nlen) < 0)
+		goto out;
+	audit_log(current->audit_context,
+		  "security_compute_sid:  invalid context %s"
+		  " for scontext=%s"
+		  " tcontext=%s"
+		  " tclass=%s",
+		  n, s, t, policydb.p_class_val_to_name[tclass-1]);
+out:
+	kfree(s);
+	kfree(t);
+	kfree(n);
+	if (!selinux_enforcing)
+		return 0;
+	return -EACCES;
 }
 
 static int security_compute_sid(u32 ssid,
@@ -1187,6 +1190,18 @@ out:
 	return rc;
 }
 
+static int match_ipv6_addrmask(u32 *input, u32 *addr, u32 *mask)
+{
+	int i, fail = 0;
+
+	for(i = 0; i < 4; i++)
+		if(addr[i] != (input[i] & mask[i])) {
+			fail = 1;
+			break;
+		}
+
+	return !fail;
+}
 
 /**
  * security_node_sid - Obtain the SID for a node (host).
@@ -1201,22 +1216,47 @@ int security_node_sid(u16 domain,
 		      u32 *out_sid)
 {
 	int rc = 0;
-	u32 addr;
 	struct ocontext *c;
 
 	POLICY_RDLOCK;
 
-	if (domain != AF_INET || addrlen != sizeof(u32)) {
+	switch (domain) {
+	case AF_INET: {
+		u32 addr;
+
+		if (addrlen != sizeof(u32)) {
+			rc = -EINVAL;
+			goto out;
+		}
+
+		addr = *((u32 *)addrp);
+
+		c = policydb.ocontexts[OCON_NODE];
+		while (c) {
+			if (c->u.node.addr == (addr & c->u.node.mask))
+				break;
+			c = c->next;
+		}
+		break;
+	}
+
+	case AF_INET6:
+		if (addrlen != sizeof(u64) * 2) {
+			rc = -EINVAL;
+			goto out;
+		}
+		c = policydb.ocontexts[OCON_NODE6];
+		while (c) {
+			if (match_ipv6_addrmask(addrp, c->u.node6.addr,
+						c->u.node6.mask))
+				break;
+			c = c->next;
+		}
+		break;
+
+	default:
 		*out_sid = SECINITSID_NODE;
 		goto out;
-	}
-	addr = *((u32 *)addrp);
-
-	c = policydb.ocontexts[OCON_NODE];
-	while (c) {
-		if (c->u.node.addr == (addr & c->u.node.mask))
-			break;
-		c = c->next;
 	}
 
 	if (c) {

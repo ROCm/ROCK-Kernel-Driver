@@ -14,7 +14,7 @@ config VIDEO_BT848
 	---help---
 	  Support for BT848 based frame grabber/overlay boards. This includes
 	  the Miro, Hauppauge and STB boards. Please read the material in
-	  <file:Documentation/video4linux/bttv> for more information.
+	  <file:Documentation/video4linux/bttv/> for more information.
 
 	  If you say Y or M here, you need to say Y or M to "I2C support" and
 	  "I2C bit-banging interfaces" in the character device section.
@@ -37,8 +37,8 @@ config VIDEO_PLANB
 	help
 	  PlanB is the V4L driver for the PowerMac 7x00/8x00 series video
 	  input hardware. If you want to experiment with this, say Y.
-	  Otherwise, or if you don't understand a word, say N.
-	  See <http://www.cpu.lu/~mlan/planb.html> for more info.
+	  Otherwise, or if you don't understand a word, say N. See
+	  <http://www.cpu.lu/~mlan/linux/dev/planb.html> for more info.
 
 	  Saying M will compile this driver as a module (planb).
 

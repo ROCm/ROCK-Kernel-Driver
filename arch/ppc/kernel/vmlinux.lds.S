@@ -31,6 +31,7 @@ SECTIONS
   .text      :
   {
     *(.text)
+    SCHED_TEXT
     *(.fixup)
     *(.got1)
     __got2_start = .;

@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.16 2004/02/05 12:39:55 felfert Exp $
+ * $Id: ctctty.c,v 1.17 2004/03/31 17:06:34 ptiedem Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -1232,7 +1232,7 @@ ctc_tty_cleanup(void) {
 	ctc_tty_shuttingdown = 1;
 	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 	tty_unregister_driver(driver->ctc_tty_device);
-	kfree(driver);
 	put_tty_driver(driver->ctc_tty_device);
+	kfree(driver);
 	driver = NULL;
 }

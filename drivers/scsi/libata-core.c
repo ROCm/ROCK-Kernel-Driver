@@ -118,7 +118,7 @@ static const char *ata_thr_state_name(unsigned int thr_state)
 static void msleep(unsigned long msecs)
 {
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(msecs_to_jiffies(msecs));
+	schedule_timeout(msecs_to_jiffies(msecs) + 1);
 }
 
 /**
@@ -439,6 +439,81 @@ u8 ata_check_status_mmio(struct ata_port *ap)
        	return readb((void *) ap->ioaddr.status_addr);
 }
 
+/**
+ *	ata_prot_to_cmd - determine which read/write opcodes to use
+ *	@protocol: ATA_PROT_xxx taskfile protocol
+ *	@lba48: true is lba48 is present
+ *
+ *	Given necessary input, determine which read/write commands
+ *	to use to transfer data.
+ *
+ *	LOCKING:
+ *	None.
+ */
+static int ata_prot_to_cmd(int protocol, int lba48)
+{
+	int rcmd = 0, wcmd = 0;
+
+	switch (protocol) {
+	case ATA_PROT_PIO:
+		if (lba48) {
+			rcmd = ATA_CMD_PIO_READ_EXT;
+			wcmd = ATA_CMD_PIO_WRITE_EXT;
+		} else {
+			rcmd = ATA_CMD_PIO_READ;
+			wcmd = ATA_CMD_PIO_WRITE;
+		}
+		break;
+
+	case ATA_PROT_DMA:
+		if (lba48) {
+			rcmd = ATA_CMD_READ_EXT;
+			wcmd = ATA_CMD_WRITE_EXT;
+		} else {
+			rcmd = ATA_CMD_READ;
+			wcmd = ATA_CMD_WRITE;
+		}
+		break;
+
+	default:
+		return -1;
+	}
+
+	return rcmd | (wcmd << 8);
+}
+
+/**
+ *	ata_dev_set_protocol - set taskfile protocol and r/w commands
+ *	@dev: device to examine and configure
+ *
+ *	Examine the device configuration, after we have
+ *	read the identify-device page and configured the
+ *	data transfer mode.  Set internal state related to
+ *	the ATA taskfile protocol (pio, pio mult, dma, etc.)
+ *	and calculate the proper read/write commands to use.
+ *
+ *	LOCKING:
+ *	caller.
+ */
+static void ata_dev_set_protocol(struct ata_device *dev)
+{
+	int pio = (dev->flags & ATA_DFLAG_PIO);
+	int lba48 = (dev->flags & ATA_DFLAG_LBA48);
+	int proto, cmd;
+
+	if (pio)
+		proto = dev->xfer_protocol = ATA_PROT_PIO;
+	else
+		proto = dev->xfer_protocol = ATA_PROT_DMA;
+
+	cmd = ata_prot_to_cmd(proto, lba48);
+	if (cmd < 0)
+		BUG();
+
+	dev->read_cmd = cmd & 0xff;
+	dev->write_cmd = (cmd >> 8) & 0xff;
+}
+
 static const char * udma_str[] = {
 	"UDMA/16",
 	"UDMA/25",
@@ -478,12 +553,21 @@ static const char *ata_udma_string(unsigned int udma_mask)
 }
 
 /**
- *	ata_pio_devchk -
- *	@ap:
- *	@device:
+ *	ata_pio_devchk - PATA device presence detection
+ *	@ap: ATA channel to examine
+ *	@device: Device to examine (starting at zero)
+ *
+ *	This technique was originally described in
+ *	Hale Landis's ATADRVR (www.ata-atapi.com), and
+ *	later found its way into the ATA/ATAPI spec.
+ *
+ *	Write a pattern to the ATA shadow registers,
+ *	and if a device is present, it will respond by
+ *	correctly storing and echoing back the
+ *	ATA shadow register contents.
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
 static unsigned int ata_pio_devchk(struct ata_port *ap,
@@ -513,12 +597,21 @@ static unsigned int ata_pio_devchk(struct ata_port *ap,
 }
 
 /**
- *	ata_mmio_devchk -
- *	@ap:
- *	@device:
+ *	ata_mmio_devchk - PATA device presence detection
+ *	@ap: ATA channel to examine
+ *	@device: Device to examine (starting at zero)
+ *
+ *	This technique was originally described in
+ *	Hale Landis's ATADRVR (www.ata-atapi.com), and
+ *	later found its way into the ATA/ATAPI spec.
+ *
+ *	Write a pattern to the ATA shadow registers,
+ *	and if a device is present, it will respond by
+ *	correctly storing and echoing back the
+ *	ATA shadow register contents.
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
 static unsigned int ata_mmio_devchk(struct ata_port *ap,
@@ -548,12 +641,16 @@ static unsigned int ata_mmio_devchk(struct ata_port *ap,
 }
 
 /**
- *	ata_dev_devchk -
- *	@ap:
- *	@device:
+ *	ata_dev_devchk - PATA device presence detection
+ *	@ap: ATA channel to examine
+ *	@device: Device to examine (starting at zero)
+ *
+ *	Dispatch ATA device presence detection, depending
+ *	on whether we are using PIO or MMIO to talk to the
+ *	ATA shadow registers.
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
 static unsigned int ata_dev_devchk(struct ata_port *ap,
@@ -604,16 +701,24 @@ static unsigned int ata_dev_classify(struct ata_taskfile *tf)
 }
 
 /**
- *	ata_dev_try_classify -
- *	@ap:
- *	@device:
+ *	ata_dev_try_classify - Parse returned ATA device signature
+ *	@ap: ATA channel to examine
+ *	@device: Device to examine (starting at zero)
+ *
+ *	After an event -- SRST, E.D.D., or SATA COMRESET -- occurs,
+ *	an ATA/ATAPI-defined set of values is placed in the ATA
+ *	shadow registers, indicating the results of device detection
+ *	and diagnostics.
+ *
+ *	Select the ATA device, and read the values from the ATA shadow
+ *	registers.  Then parse according to the Error register value,
+ *	and the spec-defined values examined by ata_dev_classify().
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
-static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device,
-			       unsigned int maybe_have_dev)
+static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device)
 {
 	struct ata_device *dev = &ap->device[device];
 	struct ata_taskfile tf;
@@ -650,44 +755,51 @@ static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device,
 }
 
 /**
- *	ata_dev_id_string -
- *	@dev:
- *	@s:
- *	@ofs:
- *	@len:
+ *	ata_dev_id_string - Convert IDENTIFY DEVICE page into string
+ *	@dev: Device whose IDENTIFY DEVICE results we will examine
+ *	@s: string into which data is output
+ *	@ofs: offset into identify device page
+ *	@len: length of string to return
+ *
+ *	The strings in the IDENTIFY DEVICE page are broken up into
+ *	16-bit chunks.  Run through the string, and output each
+ *	8-bit chunk linearly, regardless of platform.
  *
  *	LOCKING:
- *
- *	RETURNS:
- *
+ *	caller.
  */
 
-unsigned int ata_dev_id_string(struct ata_device *dev, unsigned char *s,
-			       unsigned int ofs, unsigned int len)
+void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
+		       unsigned int ofs, unsigned int len)
 {
-	unsigned int c, ret = 0;
+	unsigned int c;
 
 	while (len > 0) {
 		c = dev->id[ofs] >> 8;
 		*s = c;
 		s++;
 
-		ret = c = dev->id[ofs] & 0xff;
+		c = dev->id[ofs] & 0xff;
 		*s = c;
 		s++;
 
 		ofs++;
 		len -= 2;
 	}
-
-	return ret;
 }
 
 /**
- *	ata_dev_parse_strings -
- *	@dev:
+ *	ata_dev_parse_strings - Store useful IDENTIFY DEVICE page strings
+ *	@dev: Device whose IDENTIFY DEVICE page info we use
+ *
+ *	We store 'vendor' and 'product' strings read from the device,
+ *	for later use in the SCSI simulator's INQUIRY data.
+ *
+ *	Set these strings here, in the case of 'product', using
+ *	data read from the ATA IDENTIFY DEVICE page.
  *
  *	LOCKING:
+ *	caller.
  */
 
 static void ata_dev_parse_strings(struct ata_device *dev)
@@ -700,12 +812,16 @@ static void ata_dev_parse_strings(struct ata_device *dev)
 }
 
 /**
- *	__ata_dev_select -
- *	@ap:
- *	@device:
+ *	__ata_dev_select - Select device 0/1 on ATA bus
+ *	@ap: ATA channel to manipulate
+ *	@device: ATA device (numbered from zero) to select
+ *
+ *	Use the method defined in the ATA specification to
+ *	make either device 0, or device 1, active on the
+ *	ATA channel.
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
 static void __ata_dev_select (struct ata_port *ap, unsigned int device)
@@ -726,16 +842,22 @@ static void __ata_dev_select (struct ata_port *ap, unsigned int device)
 }
 
 /**
- *	ata_dev_select -
- *	@ap:
- *	@device:
- *	@wait:
- *	@can_sleep:
+ *	ata_dev_select - Select device 0/1 on ATA bus
+ *	@ap: ATA channel to manipulate
+ *	@device: ATA device (numbered from zero) to select
+ *	@wait: non-zero to wait for Status register BSY bit to clear
+ *	@can_sleep: non-zero if context allows sleeping
+ *
+ *	Use the method defined in the ATA specification to
+ *	make either device 0, or device 1, active on the
+ *	ATA channel.
+ *
+ *	This is a high-level version of __ata_dev_select(),
+ *	which additionally provides the services of inserting
+ *	the proper pauses and status polling, where needed.
  *
  *	LOCKING:
- *
- *	RETURNS:
- *
+ *	caller.
  */
 
 void ata_dev_select(struct ata_port *ap, unsigned int device,
@@ -757,10 +879,14 @@ void ata_dev_select(struct ata_port *ap, unsigned int device,
 }
 
 /**
- *	ata_dump_id -
- *	@dev:
+ *	ata_dump_id - IDENTIFY DEVICE info debugging output
+ *	@dev: Device whose IDENTIFY DEVICE page we will dump
+ *
+ *	Dump selected 16-bit words from a detected device's
+ *	IDENTIFY PAGE page.
  *
  *	LOCKING:
+ *	caller.
  */
 
 static inline void ata_dump_id(struct ata_device *dev)
@@ -843,7 +969,7 @@ static void ata_dev_identify(struct ata_port *ap, unsigned int device)
 retry:
 	ata_tf_init(ap, &tf, device);
 	tf.ctl |= ATA_NIEN;
-	tf.protocol = ATA_PROT_PIO_READ;
+	tf.protocol = ATA_PROT_PIO;
 
 	if (dev->class == ATA_DEV_ATA) {
 		tf.command = ATA_CMD_ID_ATA;
@@ -1129,7 +1255,7 @@ void ata_port_disable(struct ata_port *ap)
  */
 static void ata_set_mode(struct ata_port *ap)
 {
-	unsigned int force_pio;
+	unsigned int force_pio, i;
 
 	ata_host_set_pio(ap);
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
@@ -1148,19 +1274,21 @@ static void ata_set_mode(struct ata_port *ap)
 	if (force_pio) {
 		ata_dev_set_pio(ap, 0);
 		ata_dev_set_pio(ap, 1);
-
-		if (ap->flags & ATA_FLAG_PORT_DISABLED)
-			return;
 	} else {
 		ata_dev_set_udma(ap, 0);
 		ata_dev_set_udma(ap, 1);
-
-		if (ap->flags & ATA_FLAG_PORT_DISABLED)
-			return;
 	}
+
+	if (ap->flags & ATA_FLAG_PORT_DISABLED)
+		return;
 
 	if (ap->ops->post_set_mode)
 		ap->ops->post_set_mode(ap);
+
+	for (i = 0; i < 2; i++) {
+		struct ata_device *dev = &ap->device[i];
+		ata_dev_set_protocol(dev);
+	}
 }
 
 /**
@@ -1386,9 +1514,9 @@ void ata_bus_reset(struct ata_port *ap)
 	/*
 	 * determine by signature whether we have ATA or ATAPI devices
 	 */
-	err = ata_dev_try_classify(ap, 0, dev0);
+	err = ata_dev_try_classify(ap, 0);
 	if ((slave_possible) && (err != 0x81))
-		ata_dev_try_classify(ap, 1, dev1);
+		ata_dev_try_classify(ap, 1);
 
 	/* re-enable interrupts */
 	ata_irq_on(ap);
@@ -1725,6 +1853,7 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 	int dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 	struct scatterlist *sg = qc->sg;
 	unsigned int have_sg = (qc->flags & ATA_QCFLAG_SG);
+	dma_addr_t dma_address;
 
 	assert(sg == &qc->sgent);
 	assert(qc->n_elem == 1);
@@ -1736,12 +1865,15 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 	if (!have_sg)
 		return 0;
 
-	sg_dma_address(sg) = pci_map_single(ap->host_set->pdev,
-					 cmd->request_buffer,
-					 cmd->request_bufflen, dir);
+	dma_address = pci_map_single(ap->host_set->pdev, cmd->request_buffer,
+				     cmd->request_bufflen, dir);
+	if (pci_dma_mapping_error(dma_address))
+		return -1;
+
+	sg_dma_address(sg) = dma_address;
 
 	DPRINTK("mapped buffer of %d bytes for %s\n", cmd->request_bufflen,
-		qc->flags & ATA_QCFLAG_WRITE ? "write" : "read");
+		qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read");
 
 	return 0;
 }
@@ -1842,8 +1974,7 @@ static void ata_pio_start (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 
-	assert((qc->tf.protocol == ATA_PROT_PIO_READ) ||
-	       (qc->tf.protocol == ATA_PROT_PIO_WRITE));
+	assert(qc->tf.protocol == ATA_PROT_PIO);
 
 	qc->flags |= ATA_QCFLAG_POLL;
 	qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
@@ -1963,12 +2094,12 @@ static void ata_pio_sector(struct ata_port *ap)
 		}
 
 	DPRINTK("data %s, drv_stat 0x%X\n",
-		qc->flags & ATA_QCFLAG_WRITE ? "write" : "read",
+		qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read",
 		status);
 
 	/* do the actual data transfer */
 	/* FIXME: mmio-ize */
-	if (qc->flags & ATA_QCFLAG_WRITE)
+	if (qc->tf.flags & ATA_TFLAG_WRITE)
 		outsl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
 	else
 		insl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
@@ -2033,8 +2164,7 @@ void ata_eng_timeout(struct ata_port *ap)
 	qc->scsidone = scsi_finish_command;
 
 	switch (qc->tf.protocol) {
-	case ATA_PROT_DMA_READ:
-	case ATA_PROT_DMA_WRITE:
+	case ATA_PROT_DMA:
 		if (ap->flags & ATA_FLAG_MMIO) {
 			void *mmio = (void *) ap->ioaddr.bmdma_addr;
 			host_stat = readb(mmio + ATA_DMA_STATUS);
@@ -2258,7 +2388,7 @@ err_out:
 void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	unsigned int rw = (qc->flags & ATA_QCFLAG_WRITE);
+	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
 	u8 host_stat, dmactl;
 	void *mmio = (void *) ap->ioaddr.bmdma_addr;
 
@@ -2307,7 +2437,7 @@ void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
 void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	unsigned int rw = (qc->flags & ATA_QCFLAG_WRITE);
+	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
 	u8 host_stat, dmactl;
 
 	/* load PRD table addr. */
@@ -2402,8 +2532,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 	unsigned int handled = 0;
 
 	switch (qc->tf.protocol) {
-	case ATA_PROT_DMA_READ:
-	case ATA_PROT_DMA_WRITE:
+	case ATA_PROT_DMA:
 		if (ap->flags & ATA_FLAG_MMIO) {
 			void *mmio = (void *) ap->ioaddr.bmdma_addr;
 			host_stat = readb(mmio + ATA_DMA_STATUS);
@@ -2810,6 +2939,7 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	host->unique_id = ata_unique_id++;
 	host->max_cmd_len = 12;
 	scsi_set_device(host, &ent->pdev->dev);
+	scsi_assign_lock(host, &host_set->lock);
 
 	ap->flags = ATA_FLAG_PORT_DISABLED;
 	ap->id = host->unique_id;

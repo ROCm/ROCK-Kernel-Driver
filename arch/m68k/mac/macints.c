@@ -644,7 +644,7 @@ void mac_default_handler(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 }
 
-static int num_debug[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static int num_debug[8];
 
 irqreturn_t mac_debug_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -655,8 +655,8 @@ irqreturn_t mac_debug_handler(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-static int in_nmi = 0;
-static volatile int nmi_hold = 0;
+static int in_nmi;
+static volatile int nmi_hold;
 
 irqreturn_t mac_nmi_handler(int irq, void *dev_id, struct pt_regs *fp)
 {

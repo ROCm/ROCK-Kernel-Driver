@@ -28,7 +28,7 @@ extern int (*rtc_set_time)(const time_t);
 
 /**
  * aica_rtc_gettimeofday - Get the time from the AICA RTC
- * @tv: pointer to resulting timeval
+ * @ts: pointer to resulting timespec
  *
  * Grabs the current RTC seconds counter and adjusts it to the Unix Epoch.
  */
@@ -51,7 +51,7 @@ void aica_rtc_gettimeofday(struct timespec *ts) {
 
 /**
  * aica_rtc_settimeofday - Set the AICA RTC to the current time
- * @tv: contains the timeval to set
+ * @secs: contains the time_t to set
  *
  * Adjusts the given @tv to the AICA Epoch and sets the RTC seconds counter.
  */

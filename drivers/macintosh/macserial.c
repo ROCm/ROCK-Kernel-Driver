@@ -1790,11 +1790,8 @@ static int rs_tiocmget(struct tty_struct *tty, struct file *file)
 	if (serial_paranoia_check(info, tty->name, __FUNCTION__))
 		return -ENODEV;
 
-	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
-	    (cmd != TIOCSERCONFIG) && (cmd != TIOCSERGSTRUCT)) {
-		if (tty->flags & (1 << TTY_IO_ERROR))
-		    return -EIO;
-	}
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
 	spin_lock_irqsave(&info->lock, flags);
 	control = info->curregs[5];
@@ -1820,11 +1817,8 @@ static int rs_tiocmset(struct tty_struct *tty, struct file *file,
 	if (serial_paranoia_check(info, tty->name, __FUNCTION__))
 		return -ENODEV;
 
-	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
-	    (cmd != TIOCSERCONFIG) && (cmd != TIOCSERGSTRUCT)) {
-		if (tty->flags & (1 << TTY_IO_ERROR))
-		    return -EIO;
-	}
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
 	spin_lock_irqsave(&info->lock, flags);
 	if (set & TIOCM_RTS)

@@ -221,9 +221,11 @@ static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
 		tlbiel(va);
 	} else {
-		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
+		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+			spin_lock_irqsave(&pSeries_tlbie_lock, flags);
 		tlbie(va, large);
-		spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
+		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+			spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
 	}
 
 	return ret;
@@ -255,9 +257,11 @@ static void pSeries_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 	set_pp_bit(newpp, hptep);
 
 	/* Ensure it is out of the tlb too */
-	spin_lock_irqsave(&pSeries_tlbie_lock, flags);
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
 	tlbie(va, 0);
-	spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
 }
 
 static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
@@ -287,9 +291,11 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
 		tlbiel(va);
 	} else {
-		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
+		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+			spin_lock_irqsave(&pSeries_tlbie_lock, flags);
 		tlbie(va, large);
-		spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
+		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+			spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
 	}
 }
 
@@ -356,7 +362,8 @@ static void pSeries_flush_hash_range(unsigned long context,
 		asm volatile("ptesync":::"memory");
 	} else {
 		/* XXX double check that it is safe to take this late */
-		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
+		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+			spin_lock_irqsave(&pSeries_tlbie_lock, flags);
 
 		asm volatile("ptesync":::"memory");
 
@@ -365,7 +372,8 @@ static void pSeries_flush_hash_range(unsigned long context,
 
 		asm volatile("eieio; tlbsync; ptesync":::"memory");
 
-		spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
+		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+			spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
 	}
 }
 
@@ -384,8 +392,12 @@ void hpte_init_pSeries(void)
 	root = of_find_node_by_path("/");
 	if (root) {
 		model = get_property(root, "model", NULL);
-		if (strcmp(model, "CHRP IBM,9076-N81"))
-			ppc_md.flush_hash_range = pSeries_flush_hash_range;
+		if (!strcmp(model, "CHRP IBM,9076-N81")) {
+			of_node_put(root);
+			return;
+		}
 		of_node_put(root);
 	}
+
+	ppc_md.flush_hash_range = pSeries_flush_hash_range;
 }

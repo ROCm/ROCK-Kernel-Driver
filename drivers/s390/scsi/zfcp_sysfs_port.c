@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.37 $"
+#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.39 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -43,11 +43,7 @@
 void
 zfcp_sysfs_port_release(struct device *dev)
 {
-	struct zfcp_port *port;
-
-	port = dev_get_drvdata(dev);
-	zfcp_port_dequeue(port);
-	return;
+	kfree(dev);
 }
 
 /**
@@ -112,7 +108,6 @@ zfcp_sysfs_unit_add_store(struct device *dev, const char *buf, size_t count)
 
 	zfcp_erp_unit_reopen(unit, 0);
 	zfcp_erp_wait(unit->port->adapter);
-	wait_event(unit->scsi_add_wq, atomic_read(&unit->scsi_add_work) == 0);
 	zfcp_unit_put(unit);
  out:
 	up(&zfcp_data.config_sema);
@@ -168,8 +163,7 @@ zfcp_sysfs_unit_remove_store(struct device *dev, const char *buf, size_t count)
 	zfcp_erp_unit_shutdown(unit, 0);
 	zfcp_erp_wait(unit->port->adapter);
 	zfcp_unit_put(unit);
-	zfcp_sysfs_unit_remove_files(&unit->sysfs_device);
-	device_unregister(&unit->sysfs_device);
+	zfcp_unit_dequeue(unit);
  out:
 	up(&zfcp_data.config_sema);
 	return retval ? retval : count;

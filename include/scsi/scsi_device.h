@@ -12,7 +12,9 @@ struct scsi_mode_data;
 
 
 /*
- * sdev state
+ * sdev state: If you alter this, you also need to alter scsi_sysfs.c
+ * (for the ascii descriptions) and the state model enforcer:
+ * scsi_lib:scsi_device_set_state().
  */
 enum scsi_device_state {
 	SDEV_CREATED = 1,	/* device created but not added to sysfs
@@ -26,6 +28,8 @@ enum scsi_device_state {
 	SDEV_QUIESCE,		/* Device quiescent.  No block commands
 				 * will be accepted, only specials (which
 				 * originate in the mid-layer) */
+	SDEV_OFFLINE,		/* Device offlined (by error handling or
+				 * user request */
 };
 
 struct scsi_device {
@@ -67,8 +71,10 @@ struct scsi_device {
 	unsigned char current_tag;	/* current tag */
 	struct scsi_target      *sdev_target;   /* used only for single_lun */
 
-	unsigned online:1;
-
+	unsigned int	sdev_bflags; /* black/white flags as also found in
+				 * scsi_devinfo.[hc]. For now used only to
+				 * pass settings from slave_alloc to scsi
+				 * core. */
 	unsigned writeable:1;
 	unsigned removable:1;
 	unsigned changed:1;	/* Data invalid due to media change */
@@ -96,6 +102,7 @@ struct scsi_device {
 	unsigned use_10_for_ms:1; /* first try 10-byte mode sense/select */
 	unsigned skip_ms_page_8:1;	/* do not use MODE SENSE page 0x08 */
 	unsigned skip_ms_page_3f:1;	/* do not use MODE SENSE page 0x3f */
+	unsigned use_192_bytes_for_3f:1; /* ask for 192 bytes from page 0x3f */
 	unsigned no_start_on_add:1;	/* do not issue start on add */
 	unsigned allow_restart:1; /* issue START_UNIT in error handler */
 
@@ -177,4 +184,9 @@ extern int scsi_device_set_state(struct scsi_device *sdev,
 				 enum scsi_device_state state);
 extern int scsi_device_quiesce(struct scsi_device *sdev);
 extern void scsi_device_resume(struct scsi_device *sdev);
+extern const char *scsi_device_state_name(enum scsi_device_state);
+static int inline scsi_device_online(struct scsi_device *sdev)
+{
+	return sdev->sdev_state != SDEV_OFFLINE;
+}
 #endif /* _SCSI_SCSI_DEVICE_H */

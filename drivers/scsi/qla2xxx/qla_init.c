@@ -2,7 +2,7 @@
  *                  QLOGIC LINUX SOFTWARE
  *
  * QLogic ISP2x00 device driver for Linux 2.6.x
- * Copyright (C) 2003 QLogic Corporation
+ * Copyright (C) 2003-2004 QLogic Corporation
  * (www.qlogic.com)
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -603,7 +603,10 @@ qla2x00_chip_diag(scsi_qla_host_t *ha)
 	ha->product_id[3] = mb[4];
 
 	/* Adjust fw RISC transfer size */
-	ha->fw_transfer_size = REQUEST_ENTRY_SIZE * REQUEST_ENTRY_CNT;
+	if (REQUEST_ENTRY_CNT > 1024)
+		ha->fw_transfer_size = REQUEST_ENTRY_SIZE * 1024;
+	else
+		ha->fw_transfer_size = REQUEST_ENTRY_SIZE * REQUEST_ENTRY_CNT;
 
 	if (IS_QLA2200(ha) &&
 	    RD_MAILBOX_REG(ha, reg, 7) == QLA2200A_RISC_ROM_VER) {
@@ -1360,6 +1363,8 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		ha->login_retry_count = ha->port_down_retry_count;
 	else if (ha->port_down_retry_count > (int)ha->login_retry_count)
 		ha->login_retry_count = ha->port_down_retry_count;
+	if (ql2xloginretrycount)
+		ha->login_retry_count = ql2xloginretrycount;
 
 	ha->binding_type = Bind;
 	if (ha->binding_type != BIND_BY_PORT_NAME &&
@@ -1492,7 +1497,7 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 {
 	int  rval;
 	uint8_t  rval1 = 0;
-	static unsigned long  flags, save_flags;
+	unsigned long flags, save_flags;
 
 	rval = QLA_SUCCESS;
 
@@ -1590,6 +1595,14 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 		    __func__, ha->host_no));
 	} else {
 		DEBUG3(printk("%s: exiting normally\n", __func__));
+	}
+
+	/* Restore state if a resync event occured during processing */
+	if (test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)) {
+		if (test_bit(LOCAL_LOOP_UPDATE, &save_flags))
+			set_bit(LOCAL_LOOP_UPDATE, &ha->dpc_flags);
+		if (test_bit(RSCN_UPDATE, &save_flags))
+			set_bit(RSCN_UPDATE, &ha->dpc_flags);
 	}
 
 	return (rval);
@@ -1798,6 +1811,20 @@ cleanup_allocation:
 	}
 
 	return (rval);
+}
+
+static void
+qla2x00_probe_for_all_luns(scsi_qla_host_t *ha) 
+{
+	fc_port_t	*fcport;
+
+	qla2x00_mark_all_devices_lost(ha); 
+ 	list_for_each_entry(fcport, &ha->fcports, list) {
+		if (fcport->port_type != FCT_TARGET)
+			continue;
+
+		qla2x00_update_fcport(ha, fcport); 
+	}
 }
 
 /*
@@ -2100,6 +2127,7 @@ qla2x00_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
 	case TYPE_MEDIUM_CHANGER:
 	case TYPE_ENCLOSURE:
 	case 0x20:
+	case 0x0C:
 		break;
 	case TYPE_TAPE:
 		fcport->flags |= FCF_TAPE_PRESENT;
@@ -3172,7 +3200,6 @@ qla2x00_restart_queues(scsi_qla_host_t *ha, uint8_t flush)
 		qla2x00_done(ha);
 }
 
-//FIXME - Document
 void
 qla2x00_rescan_fcports(scsi_qla_host_t *ha)
 {
@@ -3189,10 +3216,12 @@ qla2x00_rescan_fcports(scsi_qla_host_t *ha)
 
 		rescan_done = 1;
 	}
+	qla2x00_probe_for_all_luns(ha); 
 
 	/* Update OS target and lun structures if necessary. */
-	if (rescan_done)
+	if (rescan_done) {
 		qla2x00_config_os(ha);
+	}
 }
 
 
@@ -3219,7 +3248,7 @@ qla2x00_config_os(scsi_qla_host_t *ha)
 		if ((tq = TGT_Q(ha, tgt)) == NULL)
 			continue;
 
-		tq->flags &= ~TQF_ONLINE;
+		clear_bit(TQF_ONLINE, &tq->flags);
 	}
 
 	list_for_each_entry(fcport, &ha->fcports, list) {
@@ -3321,7 +3350,7 @@ qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport)
 		fcport->tgt_queue = tq;
 		fcport->flags |= FCF_PERSISTENT_BOUND;
 		tq->fcport = fcport;
-		tq->flags |= TQF_ONLINE;
+		set_bit(TQF_ONLINE, &tq->flags);
 		tq->port_down_retry_count = ha->port_down_retry_count;
 
 #if 0

@@ -10,6 +10,8 @@
 
 #ifdef __KERNEL__
 
+#include <asm/types.h>
+
 
 /* Values for nocacheflag and cmode */
 #define IOMAP_FULL_CACHING		0
@@ -28,21 +30,21 @@ extern void __iounmap(void *addr, unsigned long size);
  * two accesses to memory, which may be undesirable for some devices.
  */
 #define in_8(addr) \
-    ({ unsigned char __v = (*(volatile unsigned char *) (addr)); __v; })
+    ({ u8 __v = (*(volatile u8 *) (addr)); __v; })
 #define in_be16(addr) \
-    ({ unsigned short __v = (*(volatile unsigned short *) (addr)); __v; })
+    ({ u16 __v = (*(volatile u16 *) (addr)); __v; })
 #define in_be32(addr) \
-    ({ unsigned int __v = (*(volatile unsigned int *) (addr)); __v; })
+    ({ u32 __v = (*(volatile u32 *) (addr)); __v; })
 #define in_le16(addr) \
-    ({ unsigned short __v = le16_to_cpu(*(volatile unsigned short *) (addr)); __v; })
+    ({ u16 __v = le16_to_cpu(*(volatile u16 *) (addr)); __v; })
 #define in_le32(addr) \
-    ({ unsigned int __v = le32_to_cpu(*(volatile unsigned int *) (addr)); __v; })
+    ({ u32 __v = le32_to_cpu(*(volatile u32 *) (addr)); __v; })
 
-#define out_8(addr,b) (void)((*(volatile unsigned char *) (addr)) = (b))
-#define out_be16(addr,w) (void)((*(volatile unsigned short *) (addr)) = (w))
-#define out_be32(addr,l) (void)((*(volatile unsigned int *) (addr)) = (l))
-#define out_le16(addr,w) (void)((*(volatile unsigned short *) (addr)) = cpu_to_le16(w))
-#define out_le32(addr,l) (void)((*(volatile unsigned int *) (addr)) = cpu_to_le32(l))
+#define out_8(addr,b) (void)((*(volatile u8 *) (addr)) = (b))
+#define out_be16(addr,w) (void)((*(volatile u16 *) (addr)) = (w))
+#define out_be32(addr,l) (void)((*(volatile u32 *) (addr)) = (l))
+#define out_le16(addr,w) (void)((*(volatile u16 *) (addr)) = cpu_to_le16(w))
+#define out_le32(addr,l) (void)((*(volatile u32 *) (addr)) = cpu_to_le32(l))
 
 #define raw_inb in_8
 #define raw_inw in_be16
@@ -52,8 +54,7 @@ extern void __iounmap(void *addr, unsigned long size);
 #define raw_outw(val,port) out_be16((port),(val))
 #define raw_outl(val,port) out_be32((port),(val))
 
-static inline void raw_insb(volatile unsigned char *port, unsigned char *buf,
-			    unsigned int len)
+static inline void raw_insb(volatile u8 *port, u8 *buf, unsigned int len)
 {
 	unsigned int i;
 
@@ -61,8 +62,8 @@ static inline void raw_insb(volatile unsigned char *port, unsigned char *buf,
 		*buf++ = in_8(port);
 }
 
-static inline void raw_outsb(volatile unsigned char *port,
-			     const unsigned char *buf, unsigned int len)
+static inline void raw_outsb(volatile u8 *port, const u8 *buf,
+			     unsigned int len)
 {
 	unsigned int i;
 
@@ -70,8 +71,7 @@ static inline void raw_outsb(volatile unsigned char *port,
 		out_8(port, *buf++);
 }
 
-static inline void raw_insw(volatile unsigned short *port, unsigned short *buf,
-			    unsigned int nr)
+static inline void raw_insw(volatile u16 *port, u16 *buf, unsigned int nr)
 {
 	unsigned int tmp;
 
@@ -110,8 +110,8 @@ static inline void raw_insw(volatile unsigned short *port, unsigned short *buf,
 	}
 }
 
-static inline void raw_outsw(volatile unsigned short *port,
-			     const unsigned short *buf, unsigned int nr)
+static inline void raw_outsw(volatile u16 *port, const u16 *buf,
+			     unsigned int nr)
 {
 	unsigned int tmp;
 
@@ -150,8 +150,7 @@ static inline void raw_outsw(volatile unsigned short *port,
 	}
 }
 
-static inline void raw_insl(volatile unsigned int *port, unsigned int *buf,
-			    unsigned int nr)
+static inline void raw_insl(volatile u32 *port, u32 *buf, unsigned int nr)
 {
 	unsigned int tmp;
 
@@ -190,8 +189,8 @@ static inline void raw_insl(volatile unsigned int *port, unsigned int *buf,
 	}
 }
 
-static inline void raw_outsl(volatile unsigned int *port,
-			     const unsigned int *buf, unsigned int nr)
+static inline void raw_outsl(volatile u32 *port, const u32 *buf,
+			     unsigned int nr)
 {
 	unsigned int tmp;
 
@@ -231,8 +230,8 @@ static inline void raw_outsl(volatile unsigned int *port,
 }
 
 
-static inline void raw_insw_swapw(volatile unsigned short *port,
-				  unsigned short *buf, unsigned int nr)
+static inline void raw_insw_swapw(volatile u16 *port, u16 *buf,
+				  unsigned int nr)
 {
     if ((nr) % 8)
 	__asm__ __volatile__
@@ -284,8 +283,8 @@ static inline void raw_insw_swapw(volatile unsigned short *port,
 		: "d0", "a0", "a1", "d6");
 }
 
-static inline void raw_outsw_swapw(volatile unsigned short *port,
-				   const unsigned short *buf, unsigned int nr)
+static inline void raw_outsw_swapw(volatile u16 *port, const u16 *buf,
+				   unsigned int nr)
 {
     if ((nr) % 8)
 	__asm__ __volatile__

@@ -12,8 +12,6 @@
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
-#define MAX_BITMAP_BITS	512U	/* for ia64 NR_CPUS maximum */
-
 int bitmap_empty(const unsigned long *bitmap, int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
@@ -71,33 +69,85 @@ void bitmap_complement(unsigned long *bitmap, int bits)
 }
 EXPORT_SYMBOL(bitmap_complement);
 
+/*
+ * bitmap_shift_right - logical right shift of the bits in a bitmap
+ *   @dst - destination bitmap
+ *   @src - source bitmap
+ *   @nbits - shift by this many bits
+ *   @bits - bitmap size, in bits
+ *
+ * Shifting right (dividing) means moving bits in the MS -> LS bit
+ * direction.  Zeros are fed into the vacated MS positions and the
+ * LS bits shifted off the bottom are lost.
+ */
 void bitmap_shift_right(unsigned long *dst,
 			const unsigned long *src, int shift, int bits)
 {
-	int k;
-	DECLARE_BITMAP(__shr_tmp, MAX_BITMAP_BITS);
+	int k, lim = BITS_TO_LONGS(bits), left = bits % BITS_PER_LONG;
+	int off = shift/BITS_PER_LONG, rem = shift % BITS_PER_LONG;
+	unsigned long mask = (1UL << left) - 1;
+	for (k = 0; off + k < lim; ++k) {
+		unsigned long upper, lower;
 
-	BUG_ON(bits > MAX_BITMAP_BITS);
-	bitmap_clear(__shr_tmp, bits);
-	for (k = 0; k < bits - shift; ++k)
-		if (test_bit(k + shift, src))
-			set_bit(k, __shr_tmp);
-	bitmap_copy(dst, __shr_tmp, bits);
+		/*
+		 * If shift is not word aligned, take lower rem bits of
+		 * word above and make them the top rem bits of result.
+		 */
+		if (!rem || off + k + 1 >= lim)
+			upper = 0;
+		else {
+			upper = src[off + k + 1];
+			if (off + k + 1 == lim - 1 && left)
+				upper &= mask;
+		}
+		lower = src[off + k];
+		if (left && off + k == lim - 1)
+			lower &= mask;
+		dst[k] = upper << (BITS_PER_LONG - rem) | lower >> rem;
+		if (left && k == lim - 1)
+			dst[k] &= mask;
+	}
+	if (off)
+		memset(&dst[lim - off], 0, off*sizeof(unsigned long));
 }
 EXPORT_SYMBOL(bitmap_shift_right);
 
+/*
+ * bitmap_shift_left - logical left shift of the bits in a bitmap
+ *   @dst - destination bitmap
+ *   @src - source bitmap
+ *   @nbits - shift by this many bits
+ *   @bits - bitmap size, in bits
+ *
+ * Shifting left (multiplying) means moving bits in the LS -> MS
+ * direction.  Zeros are fed into the vacated LS bit positions
+ * and those MS bits shifted off the top are lost.
+ */
 void bitmap_shift_left(unsigned long *dst,
 			const unsigned long *src, int shift, int bits)
 {
-	int k;
-	DECLARE_BITMAP(__shl_tmp, MAX_BITMAP_BITS);
+	int k, lim = BITS_TO_LONGS(bits), left = bits % BITS_PER_LONG;
+	int off = shift/BITS_PER_LONG, rem = shift % BITS_PER_LONG;
+	for (k = lim - off - 1; k >= 0; --k) {
+		unsigned long upper, lower;
 
-	BUG_ON(bits > MAX_BITMAP_BITS);
-	bitmap_clear(__shl_tmp, bits);
-	for (k = bits; k >= shift; --k)
-		if (test_bit(k - shift, src))
-			set_bit(k, __shl_tmp);
-	bitmap_copy(dst, __shl_tmp, bits);
+		/*
+		 * If shift is not word aligned, take upper rem bits of
+		 * word below and make them the bottom rem bits of result.
+		 */
+		if (rem && k > 0)
+			lower = src[k - 1];
+		else
+			lower = 0;
+		upper = src[k];
+		if (left && k == lim - 1)
+			upper &= (1UL << left) - 1;
+		dst[k + off] = lower  >> (BITS_PER_LONG - rem) | upper << rem;
+		if (left && k + off == lim - 1)
+			dst[k + off] &= (1UL << left) - 1;
+	}
+	if (off)
+		memset(dst, 0, off*sizeof(unsigned long));
 }
 EXPORT_SYMBOL(bitmap_shift_left);
 
@@ -223,7 +273,7 @@ int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
 	int c, old_c, totaldigits, ndigits, nchunks, nbits;
 	u32 chunk;
 
-	bitmap_clear(maskp, nmaskbits);
+	bitmap_zero(maskp, nmaskbits);
 
 	nchunks = nbits = totaldigits = c = 0;
 	do {
@@ -269,7 +319,7 @@ int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
 		if (nchunks == 0 && chunk == 0)
 			continue;
 
-		bitmap_shift_right(maskp, maskp, CHUNKSZ, nmaskbits);
+		bitmap_shift_left(maskp, maskp, CHUNKSZ, nmaskbits);
 		*maskp |= chunk;
 		nchunks++;
 		nbits += (nchunks == 1) ? nbits_to_hold_value(chunk) : CHUNKSZ;

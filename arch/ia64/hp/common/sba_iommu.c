@@ -1732,7 +1732,6 @@ ioc_init(u64 hpa, void *handle)
 
 	if ((long) ~iovp_mask > (long) ia64_max_iommu_merge_mask)
 		ia64_max_iommu_merge_mask = ~iovp_mask;
-	MAX_DMA_ADDRESS = ~0UL;
 
 	printk(KERN_INFO PFX
 		"%s %d.%d HPA 0x%lx IOVA space %dMb at 0x%lx\n",
@@ -1965,6 +1964,18 @@ sba_init(void)
 }
 
 subsys_initcall(sba_init); /* must be initialized after ACPI etc., but before any drivers... */
+
+extern void dig_setup(char**);
+/*
+ * MAX_DMA_ADDRESS needs to be setup prior to paging_init to do any good,
+ * so we use the platform_setup hook to fix it up.
+ */
+void __init
+sba_setup(char **cmdline_p)
+{
+	MAX_DMA_ADDRESS = ~0UL;
+	dig_setup(cmdline_p);
+}
 
 static int __init
 nosbagart(char *str)

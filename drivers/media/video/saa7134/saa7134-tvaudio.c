@@ -60,8 +60,9 @@ MODULE_PARM_DESC(audio_clock_tweak, "Audio clock tick fine tuning for cards with
 #define print_regb(reg) printk("%s:   reg 0x%03x [%-16s]: 0x%02x\n", \
 		dev->name,(SAA7134_##reg),(#reg),saa_readb((SAA7134_##reg)))
 
-#define SCAN_INITIAL_DELAY  (HZ)
-#define SCAN_SAMPLE_DELAY   (HZ/5)
+#define SCAN_INITIAL_DELAY     (HZ)
+#define SCAN_SAMPLE_DELAY      (HZ/5)
+#define SCAN_SUBCARRIER_DELAY  (HZ*2)
 
 /* ------------------------------------------------------------------ */
 /* saa7134 code                                                       */
@@ -557,7 +558,7 @@ static int tvaudio_thread(void *data)
 			if (UNSET == audio)
 				audio = i;
 			tvaudio_setmode(dev,&tvaudio[i],"trying");
-			if (tvaudio_sleep(dev,HZ*2))
+			if (tvaudio_sleep(dev,SCAN_SUBCARRIER_DELAY))
 				goto restart;
 			if (-1 != tvaudio_getstereo(dev,&tvaudio[i])) {
 				audio = i;

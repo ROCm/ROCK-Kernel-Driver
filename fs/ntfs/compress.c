@@ -23,6 +23,7 @@
 
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
+#include <linux/blkdev.h>
 
 #include "ntfs.h"
 
@@ -668,7 +669,7 @@ lock_retry_remap:
 					"uptodate! Unplugging the disk queue "
 					"and rescheduling.");
 			get_bh(tbh);
-			blk_run_queues();
+			blk_run_address_space(mapping);
 			schedule();
 			put_bh(tbh);
 			if (unlikely(!buffer_uptodate(tbh)))

@@ -196,8 +196,9 @@ static int	mptscsih_doDv(MPT_SCSI_HOST *hd, int channel, int target);
 static void	mptscsih_dv_parms(MPT_SCSI_HOST *hd, DVPARAMETERS *dv,void *pPage);
 static void	mptscsih_fillbuf(char *buffer, int size, int index, int width);
 #endif
+#ifdef MODULE
 static int	mptscsih_setup(char *str);
-
+#endif
 /* module entry point */
 static int  __init   mptscsih_init  (void);
 static void __exit   mptscsih_exit  (void);
@@ -1061,26 +1062,6 @@ search_doneQ_for_cmd(MPT_SCSI_HOST *hd, Scsi_Cmnd *SCpnt)
 	return;
 }
 
-static void
-mptscsih_reset_timeouts (MPT_SCSI_HOST *hd)
-{
-	Scsi_Cmnd	*SCpnt;
-	int		 ii;
-	int		 max = hd->ioc->req_depth;
-		
-
-	for (ii= 0; ii < max; ii++) {
-		if ((SCpnt = hd->ScsiLookup[ii]) != NULL) {
-	/* calling mod_timer() panics in 2.6 kernel...
-	 * need to investigate
-	 */
-//			mod_timer(&SCpnt->eh_timeout, jiffies + (HZ * 60));
-			dtmprintk((MYIOC_s_WARN_FMT "resetting SCpnt=%p timeout + 60HZ",
-				(hd && hd->ioc) ? hd->ioc->name : "ioc?", SCpnt));
-		}
-	}
-}
-
 /*
  *	mptscsih_flush_running_cmds - For each command found, search
  *		Scsi_Host instance taskQ and reply to OS.
@@ -1239,6 +1220,16 @@ mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init)
 	int		sz, ii, num_chain;
 	int 		scale, num_sge;
 
+	/* chain buffer allocation done from PrimeIocFifos */	
+	if (hd->ioc->fifo_pool == NULL) 
+		return -1;
+	
+	hd->ChainBuffer = hd->ioc->chain_alloc;
+	hd->ChainBufferDMA = hd->ioc->chain_alloc_dma;
+	
+	dprintk((KERN_INFO "  ChainBuffer    @ %p(%p), sz=%d\n",
+		 hd->ChainBuffer, (void *)(ulong)hd->ChainBufferDMA, hd->ioc->chain_alloc_sz));
+		
 	/* ReqToChain size must equal the req_depth
 	 * index = req_idx
 	 */
@@ -1294,26 +1285,7 @@ mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init)
 		mem = (u8 *) hd->ChainToChain;
 	}
 	memset(mem, 0xFF, sz);
-	sz = num_chain * hd->ioc->req_sz;
-	if (hd->ChainBuffer == NULL) {
-		/* Allocate free chain buffer pool
-		 */
-#if defined(MPTBASE_MEM_ALLOC_FIFO_FIX)
-		mem = pci_alloc_consistent(&hd->ioc->pcidev32, sz, &hd->ChainBufferDMA);
-#else		
-		mem = pci_alloc_consistent(hd->ioc->pcidev, sz, &hd->ChainBufferDMA);
-#endif		
-		if (mem == NULL)
-			return -1;
 
-		hd->ChainBuffer = (u8*)mem;
-	} else {
-		mem = (u8 *) hd->ChainBuffer;
-	}
-	memset(mem, 0, sz);
-
-	dprintk((KERN_INFO "  ChainBuffer    @ %p(%p), sz=%d\n",
-		 hd->ChainBuffer, (void *)(ulong)hd->ChainBufferDMA, sz));
 
 	/* Initialize the free chain Q.
 	 */
@@ -1366,8 +1338,8 @@ mptscsih_report_queue_full(Scsi_Cmnd *sc, SCSIIOReply_t *pScsiReply, SCSIIOReque
 
 		if (sc->device && sc->device->host != NULL && sc->device->host->hostdata != NULL)
 			ioc_str = ((MPT_SCSI_HOST *)sc->device->host->hostdata)->ioc->name;
-		printk(MYIOC_s_WARN_FMT "Device (%d:%d:%d) reported QUEUE_FULL!\n",
-				ioc_str, 0, sc->device->id, sc->device->lun);
+		dprintk((MYIOC_s_WARN_FMT "Device (%d:%d:%d) reported QUEUE_FULL!\n",
+				ioc_str, 0, sc->device->id, sc->device->lun));
 		last_queue_full = time;
 	}
 }
@@ -1761,7 +1733,6 @@ mptscsih_remove(struct pci_dev *pdev)
 		int sz1, sz2, sz3, sztarget=0;
 		int szr2chain = 0;
 		int szc2chain = 0;
-		int szchain = 0;
 		int szQ = 0;
 
 		mptscsih_shutdown(&pdev->dev);
@@ -1784,15 +1755,6 @@ mptscsih_remove(struct pci_dev *pdev)
 			szc2chain = hd->num_chain * sizeof(int);
 			kfree(hd->ChainToChain);
 			hd->ChainToChain = NULL;
-		}
-
-		if (hd->ChainBuffer != NULL) {
-			sz2 = hd->num_chain * hd->ioc->req_sz;
-			szchain = szr2chain + szc2chain + sz2;
-
-			pci_free_consistent(hd->ioc->pcidev, sz2,
-				    hd->ChainBuffer, hd->ChainBufferDMA);
-			hd->ChainBuffer = NULL;
 		}
 
 		if (hd->memQ != NULL) {
@@ -3375,7 +3337,7 @@ mptscsih_slave_destroy(Scsi_Device *device)
 					raid_volume==0;i++)
 						
 					if(device->id == 
-					  hd->ioc->spi_data.pIocPg3->PhysDisk[i].PhysDiskNum) {
+					  hd->ioc->spi_data.pIocPg3->PhysDisk[i].PhysDiskID) {
 						raid_volume=1;
 						hd->ioc->spi_data.forceDv |=
 						  MPT_SCSICFG_RELOAD_IOC_PG3;
@@ -3706,8 +3668,6 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		 */
 		hd->resetPending = 1;
 
-		mptscsih_reset_timeouts (hd);
-	
 	} else if (reset_phase == MPT_IOC_PRE_RESET) {
 		dtmprintk((MYIOC_s_WARN_FMT "Pre-Diag Reset\n", ioc->name));
 
@@ -4519,7 +4479,7 @@ void mptscsih_setTargetNegoParms(MPT_SCSI_HOST *hd, VirtDevice *target, char byt
 					if (nfactor < pspi_data->minSyncFactor )
 						nfactor = pspi_data->minSyncFactor;
 
-					factor = MAX (factor, nfactor);
+					factor = max(factor, nfactor);
 					if (factor == MPT_ASYNC)
 						offset = 0;
 				} else {
@@ -4727,7 +4687,7 @@ mptscsih_writeSDP1(MPT_SCSI_HOST *hd, int portnum, int target_id, int flags)
 		maxid = ioc->sh->max_id - 1;
 	} else if (ioc->sh) {
 		id = target_id;
-		maxid = MIN(id, ioc->sh->max_id - 1);
+		maxid = min_t(int, id, ioc->sh->max_id - 1);
 	}
 
 	for (; id <= maxid; id++) {
@@ -5134,7 +5094,7 @@ mptscsih_scandv_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 				sense_data = ((u8 *)hd->ioc->sense_buf_pool +
 					(req_idx * MPT_SENSE_BUFFER_ALLOC));
 
-				sz = MIN (pReq->SenseBufferLength,
+				sz = min_t(int, pReq->SenseBufferLength,
 							SCSI_STD_SENSE_BYTES);
 				memcpy(hd->pLocal->sense, sense_data, sz);
 
@@ -5786,7 +5746,7 @@ mptscsih_domainValidation(void *arg)
 				ioc->spi_data.forceDv &= ~MPT_SCSICFG_RELOAD_IOC_PG3;
 			}
 
-			maxid = MIN (ioc->sh->max_id, MPT_MAX_SCSI_DEVICES);
+			maxid = min_t(int, ioc->sh->max_id, MPT_MAX_SCSI_DEVICES);
 
 			for (id = 0; id < maxid; id++) {
 				spin_lock_irqsave(&dvtaskQ_lock, flags);
@@ -6509,7 +6469,7 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int bus_number, int id)
 	if (echoBufSize > 0) {
 		iocmd.flags |= MPT_ICFLAG_ECHO;
 		if (dataBufSize > 0)
-			bufsize = MIN(echoBufSize, dataBufSize);
+			bufsize = min(echoBufSize, dataBufSize);
 		else
 			bufsize = echoBufSize;
 	} else if (dataBufSize == 0)
@@ -6520,7 +6480,7 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int bus_number, int id)
 
 	/* Data buffers for write-read-compare test max 1K.
 	 */
-	sz = MIN(bufsize, 1024);
+	sz = min(bufsize, 1024);
 
 	/* --- loop ----
 	 * On first pass, always issue a reserve.
@@ -6875,9 +6835,9 @@ mptscsih_dv_parms(MPT_SCSI_HOST *hd, DVPARAMETERS *dv,void *pPage)
 		}
 
 		/* limit by adapter capabilities */
-		width = MIN(width, hd->ioc->spi_data.maxBusWidth);
-		offset = MIN(offset, hd->ioc->spi_data.maxSyncOffset);
-		factor = MAX(factor, hd->ioc->spi_data.minSyncFactor);
+		width = min(width, hd->ioc->spi_data.maxBusWidth);
+		offset = min(offset, hd->ioc->spi_data.maxSyncOffset);
+		factor = max(factor, hd->ioc->spi_data.minSyncFactor);
 
 		/* Check Consistency */
 		if (offset && (factor < MPT_ULTRA2) && !width)
@@ -7217,19 +7177,22 @@ mptscsih_fillbuf(char *buffer, int size, int index, int width)
 #define	ARG_SEP	','
 #endif
 
+#ifdef MODULE
 static char setup_token[] __initdata =
 	"dv:"
 	"width:"
 	"factor:"
 	"saf-te:"
        ;	/* DO NOT REMOVE THIS ';' */
-
+#endif
+       
 #define OPT_DV			1
 #define OPT_MAX_WIDTH		2
 #define OPT_MIN_SYNC_FACTOR	3
 #define OPT_SAF_TE		4
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+#ifdef MODULE
 static int
 get_setup_token(char *p)
 {
@@ -7298,7 +7261,7 @@ mptscsih_setup(char *str)
 	}
 	return 1;
 }
-
+#endif
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 

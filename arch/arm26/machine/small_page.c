@@ -95,7 +95,7 @@ again:
 		offset = ffz(USED_MAP(page));
 		SET_USED(page, offset);
 		if (USED_MAP(page) == order->all_used)
-			list_del_init(&page->list);
+			list_del_init(&page->lru);
 		spin_unlock_irqrestore(&small_page_lock, flags);
 
 		return (unsigned long) page_address(page) + (offset << order->shift);
@@ -110,7 +110,7 @@ need_new_page:
 				goto no_page;
 			SetPageReserved(page);
 			USED_MAP(page) = 0;
-			list_add(&page->list, &order->queue);
+			list_add(&page->lru, &order->queue);
 			goto again;
 		}
 
@@ -151,7 +151,7 @@ static void __free_small_page(unsigned long spage, struct order *order)
 		spin_lock_irqsave(&small_page_lock, flags);
 
 		if (USED_MAP(page) == order->all_used)
-			list_add(&page->list, &order->queue);
+			list_add(&page->lru, &order->queue);
 
 		if (!TEST_AND_CLEAR_USED(page, spage))
 			goto already_free;
@@ -167,7 +167,7 @@ free_page:
 	/*
 	 * unlink the page from the small page queue and free it
 	 */
-	list_del_init(&page->list);
+	list_del_init(&page->lru);
 	spin_unlock_irqrestore(&small_page_lock, flags);
 	ClearPageReserved(page);
 	__free_page(page);

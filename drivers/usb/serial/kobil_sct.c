@@ -503,7 +503,7 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 
 static int kobil_write_room (struct usb_serial_port *port)
 {
-	//dbg(__FUNCTION__ " - port %d", port->number);
+	//dbg("%s - port %d", __FUNCTION__, port->number);
 	return 8;
 }
 

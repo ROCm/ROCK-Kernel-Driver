@@ -767,6 +767,7 @@ DataAccessSLB_common:
 	beq     fast_exception_return   /* Return if we succeeded */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	DO_COPY_EE()
+	ld      r4,_DAR(r1)
 	li	r6,0x380
 	li	r5,0
 	bl      .save_remaining_regs
@@ -810,6 +811,7 @@ InstructionAccessSLB_common:
 
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	DO_COPY_EE()
+	mr      r4,r22                  /* SRR0 = NIA        */
 	li	r6,0x480
 	li	r5,0
 	bl      .save_remaining_regs

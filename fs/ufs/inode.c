@@ -50,7 +50,7 @@
 #define UFSD(x)
 #endif
 
-static int ufs_block_to_path(struct inode *inode, long i_block, int offsets[4])
+static int ufs_block_to_path(struct inode *inode, sector_t i_block, sector_t offsets[4])
 {
 	struct ufs_sb_private_info *uspi = UFS_SB(inode->i_sb)->s_uspi;
 	int ptrs = uspi->s_apb;
@@ -60,6 +60,8 @@ static int ufs_block_to_path(struct inode *inode, long i_block, int offsets[4])
 		double_blocks = (1 << (ptrs_bits * 2));
 	int n = 0;
 
+
+	UFSD(("ptrs=uspi->s_apb = %d,double_blocks=%d \n",ptrs,double_blocks));
 	if (i_block < 0) {
 		ufs_warning(inode->i_sb, "ufs_block_to_path", "block < 0");
 	} else if (i_block < direct_blocks) {
@@ -87,20 +89,23 @@ static int ufs_block_to_path(struct inode *inode, long i_block, int offsets[4])
  * the begining of the filesystem.
  */
 
-u64  ufs_frag_map(struct inode *inode, int frag)
+u64  ufs_frag_map(struct inode *inode, sector_t frag)
 {
 	struct ufs_inode_info *ufsi = UFS_I(inode);
 	struct super_block *sb = inode->i_sb;
 	struct ufs_sb_private_info *uspi = UFS_SB(sb)->s_uspi;
-	int mask = uspi->s_apbmask>>uspi->s_fpbshift;
+	u64 mask = (u64) uspi->s_apbmask>>uspi->s_fpbshift;
 	int shift = uspi->s_apbshift-uspi->s_fpbshift;
-	int offsets[4], *p;
+	sector_t offsets[4], *p;
 	int depth = ufs_block_to_path(inode, frag >> uspi->s_fpbshift, offsets);
-	int ret = 0;
+	u64  ret = 0L;
 	u32 block;
-	u64 u2_block = 0;
+	u64 u2_block = 0L;
 	unsigned flags = UFS_SB(sb)->s_flags;
-	u64 temp = 0;
+	u64 temp = 0L;
+
+	UFSD((": frag = %lu  depth = %d\n",frag,depth));
+	UFSD((": uspi->s_fpbshift = %d ,uspi->s_apbmask = %x, mask=%llx\n",uspi->s_fpbshift,uspi->s_apbmask,mask));
 
 	if (depth == 0)
 		return 0;
@@ -116,7 +121,7 @@ u64  ufs_frag_map(struct inode *inode, int frag)
 		goto out;
 	while (--depth) {
 		struct buffer_head *bh;
-		int n = *p++;
+		sector_t n = *p++;
 
 		bh = sb_bread(sb, uspi->s_sbbase + fs32_to_cpu(sb, block)+(n>>shift));
 		if (!bh)
@@ -126,20 +131,21 @@ u64  ufs_frag_map(struct inode *inode, int frag)
 		if (!block)
 			goto out;
 	}
-	ret = uspi->s_sbbase + fs32_to_cpu(sb, block) + (frag & uspi->s_fpbmask);
+	ret = (u64) (uspi->s_sbbase + fs32_to_cpu(sb, block) + (frag & uspi->s_fpbmask));
 	goto out;
 ufs2:
 	u2_block = ufsi->i_u1.u2_i_data[*p++];
 	if (!u2_block)
 		goto out;
 
-	temp = (u64)uspi->s_sbbase + fs64_to_cpu(sb, u2_block);
 
 	while (--depth) {
 		struct buffer_head *bh;
-		u64 n = *p++;
+		sector_t n = *p++;
 
-		bh = sb_bread(sb, temp +(n>>shift));
+
+		temp = (u64)(uspi->s_sbbase) + fs64_to_cpu(sb, u2_block);
+		bh = sb_bread(sb, temp +(u64) (n>>shift));
 		if (!bh)
 			goto out;
 		u2_block = ((u64*)bh->b_data)[n & mask];
@@ -147,7 +153,8 @@ ufs2:
 		if (!u2_block)
 			goto out;
 	}
-	ret = temp + (frag & uspi->s_fpbmask);
+	temp = (u64)uspi->s_sbbase + fs64_to_cpu(sb, u2_block);
+	ret = temp + (u64) (frag & uspi->s_fpbmask);
 
 out:
 	unlock_kernel();
@@ -379,6 +386,7 @@ static int ufs_getfrag_block (struct inode *inode, sector_t fragment, struct buf
 	
 	if (!create) {
 		phys64 = ufs_frag_map(inode, fragment);
+		UFSD(("phys64 = %lu \n",phys64));
 		if (phys64)
 			map_bh(bh_result, sb, phys64);
 		return 0;

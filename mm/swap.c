@@ -34,6 +34,27 @@
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
 
+#ifdef CONFIG_HUGETLB_PAGE
+
+void put_page(struct page *page)
+{
+	if (unlikely(PageCompound(page))) {
+		page = (struct page *)page->private;
+		if (put_page_testzero(page)) {
+			if (page[1].mapping) {	/* destructor? */
+				(*(void (*)(struct page *))page[1].mapping)(page);
+			} else {
+				__page_cache_release(page);
+			}
+		}
+		return;
+	}
+	if (!PageReserved(page) && put_page_testzero(page))
+		__page_cache_release(page);
+}
+EXPORT_SYMBOL(put_page);
+#endif
+
 /*
  * Writeback is about to end against a page which has been marked for immediate
  * reclaim.  If it still appears to be reclaimable, move it to the tail of the
@@ -70,7 +91,7 @@ int rotate_reclaimable_page(struct page *page)
 		list_add_tail(&page->lru, &zone->inactive_list);
 		inc_page_state(pgrotated);
 	}
-	if (!TestClearPageWriteback(page))
+	if (!test_clear_page_writeback(page))
 		BUG();
 	spin_unlock_irqrestore(&zone->lru_lock, flags);
 	return 0;
@@ -353,10 +374,18 @@ void pagevec_strip(struct pagevec *pvec)
  *
  * pagevec_lookup() returns the number of pages which were found.
  */
-unsigned int pagevec_lookup(struct pagevec *pvec, struct address_space *mapping,
-		pgoff_t start, unsigned int nr_pages)
+unsigned pagevec_lookup(struct pagevec *pvec, struct address_space *mapping,
+		pgoff_t start, unsigned nr_pages)
 {
 	pvec->nr = find_get_pages(mapping, start, nr_pages, pvec->pages);
+	return pagevec_count(pvec);
+}
+
+unsigned pagevec_lookup_tag(struct pagevec *pvec, struct address_space *mapping,
+		pgoff_t *index, int tag, unsigned nr_pages)
+{
+	pvec->nr = find_get_pages_tag(mapping, index, tag,
+					nr_pages, pvec->pages);
 	return pagevec_count(pvec);
 }
 

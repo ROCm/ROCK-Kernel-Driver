@@ -434,6 +434,17 @@ inactive:
 	goto out;
 }
 
+/*
+ * kick off io on the underlying address space
+ */
+static void loop_unplug(request_queue_t *q)
+{
+	struct loop_device *lo = q->queuedata;
+
+	clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags);
+	blk_run_address_space(lo->lo_backing_file->f_mapping);
+}
+
 struct switch_request {
 	struct file *file;
 	struct completion wait;
@@ -614,7 +625,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 {
 	struct file	*file;
 	struct inode	*inode;
-	struct block_device *lo_device = NULL;
 	struct address_space *mapping;
 	unsigned lo_blocksize;
 	int		lo_flags = 0;
@@ -671,7 +681,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	set_device_ro(bdev, (lo_flags & LO_FLAGS_READ_ONLY) != 0);
 
 	lo->lo_blocksize = lo_blocksize;
-	lo->lo_device = lo_device;
+	lo->lo_device = bdev;
 	lo->lo_flags = lo_flags;
 	lo->lo_backing_file = file;
 	lo->transfer = NULL;
@@ -688,6 +698,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	 */
 	blk_queue_make_request(lo->lo_queue, loop_make_request);
 	lo->lo_queue->queuedata = lo;
+	lo->lo_queue->unplug_fn = loop_unplug;
 
 	set_capacity(disks[lo->lo_number], size);
 	bd_set_size(bdev, size << 9);

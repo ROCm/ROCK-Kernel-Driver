@@ -129,6 +129,7 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp,
 		         unsigned int cmd, unsigned long arg)
 {
 	unsigned int card, i, j, signature, status, portcount = 0;
+	unsigned long t;
 	unsigned short word_count, base;
 	bin_frame frame;
 	/* exec_record exec_rec; */
@@ -152,12 +153,12 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp,
 								
 			inw(base+0x8);
 			
-			for(i=jiffies+HZ/100;time_before(jiffies, i););
+			for(t=jiffies+HZ/100;time_before(jiffies, t););
 				
 			outw(0,base+0x8); /* Reset */
 			
 			for(j=1;j<=3;j++) {
-				for(i=jiffies+HZ;time_before(jiffies, i););
+				for(t=jiffies+HZ;time_before(jiffies, t););
 				printk(".");
 			}	
 			signature=(inw(base+0x4)) & 0xff;	
@@ -1312,7 +1313,6 @@ static int isicom_tiocmset(struct tty_struct *tty, struct file *file,
 			   unsigned int set, unsigned int clear)
 {
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
-	unsigned int arg;
 	unsigned long flags;
 	
 	if (isicom_paranoia_check(port, tty->name, "isicom_ioctl"))
@@ -1649,8 +1649,8 @@ static int register_drivers(void)
 
 static void unregister_drivers(void)
 {
-	int error;
-	if (tty_unregister_driver(isicom_normal))
+	int error = tty_unregister_driver(isicom_normal);
+	if (error)
 		printk(KERN_DEBUG "ISICOM: couldn't unregister normal driver error=%d.\n",error);
 	put_tty_driver(isicom_normal);
 }

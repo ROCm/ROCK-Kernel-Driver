@@ -9,9 +9,9 @@ config MTD_PMC551
 	depends on MTD && PCI
 	---help---
 	  This provides a MTD device driver for the Ramix PMC551 RAM PCI card
-	  from Ramix Inc. <http://www.ramix.com/products/memory/pmc551.html>.
-	  These devices come in memory configurations from 32M - 1G.  If you
-	  have one, you probably want to enable this.
+	  from Ramix Inc. <http://www.ramix.com/products/>. These devices come
+	  in memory configurations from 32M - 1G.  If you have one, you
+	  probably want to enable this.
 
 	  If this driver is compiled as a module you get the ability to select
 	  the size of the aperture window pointing into the devices memory.

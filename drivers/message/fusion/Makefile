@@ -22,11 +22,6 @@ EXTRA_CFLAGS += ${MPT_CFLAGS}
 #EXTRA_CFLAGS += -DMPT_DEBUG_MSG_FRAME
 #EXTRA_CFLAGS += -DMPT_DEBUG_SG
 
-# This is a temporary fix for the reply/request fifo
-# for some 64bit archs. Uncommenting this line
-# will place the fifo's in 32bit space
-#EXTRA_CFLAGS += -DMPTBASE_MEM_ALLOC_FIFO_FIX
-
 #
 # driver/module specifics...
 #

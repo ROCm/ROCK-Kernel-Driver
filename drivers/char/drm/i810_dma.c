@@ -844,11 +844,13 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
 	if (buf_priv->currently_mapped == I810_BUF_MAPPED) {
 		unsigned int prim = (sarea_priv->vertex_prim & PR_MASK);
 
-		*(u32 *)buf_priv->virtual = (GFX_OP_PRIMITIVE | prim | 
-					     ((used/4)-2));
+		put_user((GFX_OP_PRIMITIVE | prim |
+					     ((used/4)-2)),
+		(u32 *)buf_priv->virtual);
 
 		if (used & 4) {
-			*(u32 *)((u32)buf_priv->virtual + used) = 0;
+			put_user(0,
+			(u32 *)((u32)buf_priv->virtual + used));
 			used += 4;
 		}
 

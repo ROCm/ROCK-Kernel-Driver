@@ -487,9 +487,12 @@ static int __devinit agp_intelmch_probe(struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
+	struct resource *r;
 	char *name = "(unknown)";
 	u8 cap_ptr = 0;
-	struct resource *r;
+
+	if (!boot_cpu_has(X86_FEATURE_LM))
+		return -ENODEV;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
 

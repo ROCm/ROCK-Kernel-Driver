@@ -2,7 +2,7 @@
  *                  QLOGIC LINUX SOFTWARE
  *
  * QLogic ISP2x00 device driver for Linux 2.6.x
- * Copyright (C) 2003 QLogic Corporation
+ * Copyright (C) 2003-2004 QLogic Corporation
  * (www.qlogic.com)
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -292,15 +292,17 @@ qla2x00_iodesc_timeout(unsigned long data)
  *
  * NOTE:
  * The firmware shall timeout an outstanding mailbox IOCB in 2 * R_A_TOV (in
- * tenths of a second).  The driver will wait 2.5 * R_A_TOV before scheduling
- * a recovery (big hammer).
+ * tenths of a second) after it hits the wire.  But, if there are any request
+ * resource contraints (i.e. during heavy I/O), exchanges can be held off for
+ * at most R_A_TOV.  Therefore, the driver will wait 4 * R_A_TOV before
+ * scheduling a recovery (big hammer).
  */
 static inline void
 qla2x00_add_iodesc_timer(struct io_descriptor *iodesc)
 {
 	unsigned long timeout;
 
-	timeout = ((iodesc->ha->r_a_tov * 2) + (iodesc->ha->r_a_tov / 2)) / 10;
+	timeout = (iodesc->ha->r_a_tov * 4) / 10;
 	init_timer(&iodesc->timer);
 	iodesc->timer.data = (unsigned long) iodesc;
 	iodesc->timer.expires = jiffies + (timeout * HZ);

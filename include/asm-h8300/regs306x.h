@@ -125,8 +125,8 @@
 #define RDR2  0xFFFFC5
 #define SCMR2 0xFFFFC6
 
-#define MDCR   0xFEE000
-#define SYSCR  0xFEE001
+#define MDCR   0xFEE011
+#define SYSCR  0xFEE012
 #define DIVCR  0xFEE01B
 #define MSTCRH 0xFEE01C
 #define MSTCRL 0xFEE01D

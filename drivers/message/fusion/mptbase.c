@@ -123,12 +123,6 @@ MODULE_LICENSE("GPL");
 /*
  *  cmd line parameters
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,59)
-MODULE_PARM(PortIo, "0-1i");
-MODULE_PARM_DESC(PortIo, "[0]=Use mmap, 1=Use port io");
-#endif
-static int PortIo = 0;
-
 #ifdef MFCNT
 static int mfcounter = 0;
 #define PRINT_MF_COUNT 20000
@@ -269,8 +263,6 @@ struct _mpt_ioc_proc_list {
  */
 
 static struct pci_device_id mptbase_pci_table[] = {
-	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC909,
-		PCI_ANY_ID, PCI_ANY_ID },
 	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC929,
 		PCI_ANY_ID, PCI_ANY_ID },
 	{ PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FC919,
@@ -287,39 +279,10 @@ static struct pci_device_id mptbase_pci_table[] = {
 };
 MODULE_DEVICE_TABLE(pci, mptbase_pci_table);
 
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/* 20000207 -sralston
- *  GRRRRR...  IOSpace (port i/o) register access (for the 909) is back!
- * 20000517 -sralston
- *  Let's trying going back to default mmap register access...
- */
-
-static inline u32 CHIPREG_READ32(volatile u32 *a)
-{
-	if (PortIo)
-		return inl((unsigned long)a);
-	else
-		return readl(a);
-}
-
-static inline void CHIPREG_WRITE32(volatile u32 *a, u32 v)
-{
-	if (PortIo)
-		outl(v, (unsigned long)a);
-	else
-		writel(v, a);
-}
-
-static inline void CHIPREG_PIO_WRITE32(volatile u32 *a, u32 v)
-{
-	outl(v, (unsigned long)a);
-}
-
-static inline u32 CHIPREG_PIO_READ32(volatile u32 *a)
-{
-	return inl((unsigned long)a);
-}
+#define CHIPREG_READ32(addr) 		readl(addr)
+#define CHIPREG_WRITE32(addr,val) 	writel(val, addr)
+#define CHIPREG_PIO_WRITE32(addr,val)	outl(val, (unsigned long)addr)
+#define CHIPREG_PIO_READ32(addr) 	inl((unsigned long)addr)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -1280,17 +1243,12 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return r;
 	}
 
-#if 0
-	/* broken because some code assumes that multiple calls
-	   to pci_alloc_consistent return data in the same 4GB segment. 
-	   This cannot work on machines with enough memory. */
 	if (!pci_set_consistent_dma_mask(pdev, mask))
 		dprintk((KERN_INFO MYNAM
 			": Using 64 bit consistent mask\n"));
 	else
 		dprintk((KERN_INFO MYNAM
 			": Not using 64 bit consistent mask\n"));
-#endif
 
 	ioc = kmalloc(sizeof(MPT_ADAPTER), GFP_ATOMIC);
 	if (ioc == NULL) {
@@ -1303,23 +1261,6 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ioc->reply_sz = MPT_REPLY_FRAME_SIZE;
 
 	ioc->pcidev = pdev;
-
-#if defined(MPTBASE_MEM_ALLOC_FIFO_FIX)
-	memcpy(&ioc->pcidev32,ioc->pcidev,sizeof(struct pci_dev));
-	if (pci_set_dma_mask(&ioc->pcidev32, 0xFFFFFFFF)) {
-		dprintk((KERN_INFO MYNAM
-			": error setting 32bit mask\n"));
-		kfree(ioc);
-		return -ENODEV;
-	}
-
-	if (pci_set_consistent_dma_mask(&ioc->pcidev32, 0xFFFFFFFF)) {
-		dprintk((KERN_INFO MYNAM
-			": error setting 32bit mask\n"));
-		kfree(ioc);
-		return -ENODEV;
-	}
-#endif
 
 	ioc->diagPending = 0;
 	spin_lock_init(&ioc->diagLock);
@@ -1382,32 +1323,24 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dprintk((KERN_INFO MYNAM ": MPT adapter @ %lx, msize=%dd bytes\n", mem_phys, msize));
 	dprintk((KERN_INFO MYNAM ": (port i/o @ %lx, psize=%dd bytes)\n", port, psize));
-	dprintk((KERN_INFO MYNAM ": Using %s register access method\n", PortIo ? "PortIo" : "MemMap"));
 
 	mem = NULL;
-	if (! PortIo) {
-		/* Get logical ptr for PciMem0 space */
-		/*mem = ioremap(mem_phys, msize);*/
-		mem = ioremap(mem_phys, 0x100);
-		if (mem == NULL) {
-			printk(KERN_ERR MYNAM ": ERROR - Unable to map adapter memory!\n");
-			kfree(ioc);
-			return -EINVAL;
-		}
-		ioc->memmap = mem;
+	/* Get logical ptr for PciMem0 space */
+	/*mem = ioremap(mem_phys, msize);*/
+	mem = ioremap(mem_phys, 0x100);
+	if (mem == NULL) {
+		printk(KERN_ERR MYNAM ": ERROR - Unable to map adapter memory!\n");
+		kfree(ioc);
+		return -EINVAL;
 	}
+	ioc->memmap = mem;
 	dprintk((KERN_INFO MYNAM ": mem = %p, mem_phys = %lx\n", mem, mem_phys));
 
 	dprintk((KERN_INFO MYNAM ": facts @ %p, pfacts[0] @ %p\n",
 			&ioc->facts, &ioc->pfacts[0]));
-	if (PortIo) {
-		u8 *pmem = (u8*)port;
-		ioc->mem_phys = port;
-		ioc->chip = (SYSIF_REGS*)pmem;
-	} else {
-		ioc->mem_phys = mem_phys;
-		ioc->chip = (SYSIF_REGS*)mem;
-	}
+
+	ioc->mem_phys = mem_phys;
+	ioc->chip = (SYSIF_REGS*)mem;
 
 	/* Save Port IO values incase we need to do downloadboot */
 	{
@@ -1417,11 +1350,7 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	ioc->chip_type = FCUNK;
-	if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC909) {
-		ioc->chip_type = FC909;
-		ioc->prod_name = "LSIFC909";
-	}
-	else if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC929) {
+	if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC929) {
 		ioc->chip_type = FC929;
 		ioc->prod_name = "LSIFC929";
 	}
@@ -2075,7 +2004,7 @@ static void
 mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 {
 	if (this != NULL) {
-		int sz;
+		int sz=0;
 		u32 state;
 		int ret;
 
@@ -2100,28 +2029,18 @@ mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 		/* Clear any lingering interrupt */
 		CHIPREG_WRITE32(&this->chip->IntStatus, 0);
 
-		if (freeup && this->reply_alloc != NULL) {
-			sz = (this->reply_sz * this->reply_depth) + 128;
-			pci_free_consistent(this->pcidev, sz,
-					this->reply_alloc, this->reply_alloc_dma);
+		if (freeup && this->fifo_pool != NULL) {
+			pci_free_consistent(this->pcidev,
+				this->fifo_pool_sz,
+				this->fifo_pool, this->fifo_pool_dma);
 			this->reply_frames = NULL;
 			this->reply_alloc = NULL;
-			this->alloc_total -= sz;
-		}
-
-		if (freeup && this->req_alloc != NULL) {
-			sz = (this->req_sz * this->req_depth) + 128;
-			/*
-			 *  Rounding UP to nearest 4-kB boundary here...
-			 */
-			sz = ((sz + 0x1000UL - 1UL) / 0x1000) * 0x1000;
-			pci_free_consistent(this->pcidev, sz,
-					this->req_alloc, this->req_alloc_dma);
 			this->req_frames = NULL;
 			this->req_alloc = NULL;
-			this->alloc_total -= sz;
+			this->chain_alloc = NULL;
+			this->fifo_pool = NULL;
+			this->alloc_total -= this->fifo_pool_sz;
 		}
-
 		if (freeup && this->sense_buf_pool != NULL) {
 			sz = (this->req_depth * MPT_SENSE_BUFFER_ALLOC);
 			pci_free_consistent(this->pcidev, sz,
@@ -2572,10 +2491,10 @@ GetIocFacts(MPT_ADAPTER *ioc, int sleepFlag, int reason)
 			 * Set values for this IOC's request & reply frame sizes,
 			 * and request & reply queue depths...
 			 */
-			ioc->req_sz = MIN(MPT_DEFAULT_FRAME_SIZE, facts->RequestFrameSize * 4);
-			ioc->req_depth = MIN(MPT_MAX_REQ_DEPTH, facts->GlobalCredits);
+			ioc->req_sz = min(MPT_DEFAULT_FRAME_SIZE, facts->RequestFrameSize * 4);
+			ioc->req_depth = min_t(int, MPT_MAX_REQ_DEPTH, facts->GlobalCredits);
 			ioc->reply_sz = MPT_REPLY_FRAME_SIZE;
-			ioc->reply_depth = MIN(MPT_DEFAULT_REPLY_DEPTH, facts->ReplyQueueDepth);
+			ioc->reply_depth = min_t(int, MPT_DEFAULT_REPLY_DEPTH, facts->ReplyQueueDepth);
 
 			dprintk((MYIOC_s_INFO_FMT "reply_sz=%3d, reply_depth=%4d\n",
 				ioc->name, ioc->reply_sz, ioc->reply_depth));
@@ -3799,37 +3718,113 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 	unsigned long b;
 	unsigned long flags;
 	dma_addr_t aligned_mem_dma;
-	u8 *mem, *aligned_mem;
+	u8 *aligned_mem;
 	int i, sz;
+	int chain_buffer_sz, reply_buffer_sz, request_buffer_sz;
+	int scale, num_sge, num_chain;
 
-	/*  Prime reply FIFO...  */
+	/* request buffer size,  rounding UP to nearest 4-kB boundary */
+	request_buffer_sz = (ioc->req_sz * ioc->req_depth) + 128;
+	request_buffer_sz = ((request_buffer_sz + 0x1000UL - 1UL) / 0x1000) * 0x1000;
 
-	if (ioc->reply_frames == NULL) {
-		sz = (ioc->reply_sz * ioc->reply_depth) + 128;
-#if defined(MPTBASE_MEM_ALLOC_FIFO_FIX)
-		mem = pci_alloc_consistent(&ioc->pcidev32, sz, &ioc->reply_alloc_dma);
-#else		
-		mem = pci_alloc_consistent(ioc->pcidev, sz, &ioc->reply_alloc_dma);
-#endif		
-		if (mem == NULL)
+	/* reply buffer size */
+	reply_buffer_sz = (ioc->reply_sz * ioc->reply_depth) + 128;
+
+	/* chain buffer size, copied from from mptscsih_initChainBuffers()
+	 *
+	 * Calculate the number of chain buffers needed(plus 1) per I/O
+	 * then multiply the the maximum number of simultaneous cmds
+	 *
+	 * num_sge = num sge in request frame + last chain buffer
+	 * scale = num sge per chain buffer if no chain element
+	 */
+
+	scale = ioc->req_sz/(sizeof(dma_addr_t) + sizeof(u32));
+	if (sizeof(dma_addr_t) == sizeof(u64))
+		num_sge =  scale + (ioc->req_sz - 60) / (sizeof(dma_addr_t) + sizeof(u32));
+	else
+		num_sge =  1 + scale + (ioc->req_sz - 64) / (sizeof(dma_addr_t) + sizeof(u32));
+
+	num_chain = 1;
+	while (MPT_SCSI_SG_DEPTH - num_sge > 0) {
+		num_chain++;
+		num_sge += (scale - 1);
+	}
+	num_chain++;
+
+	if ((int)ioc->chip_type > (int) FC929)
+		num_chain *= MPT_SCSI_CAN_QUEUE;
+	else
+		num_chain *= MPT_FC_CAN_QUEUE;
+
+	chain_buffer_sz = num_chain * ioc->req_sz;
+
+	if(ioc->fifo_pool == NULL) {
+
+		ioc->fifo_pool_sz = request_buffer_sz +
+			reply_buffer_sz + chain_buffer_sz;
+
+		ioc->fifo_pool = pci_alloc_consistent(ioc->pcidev,
+		ioc->fifo_pool_sz, &ioc->fifo_pool_dma);
+
+		if( ioc->fifo_pool == NULL)
 			goto out_fail;
 
-		memset(mem, 0, sz);
-		ioc->alloc_total += sz;
-		ioc->reply_alloc = mem;
-		dprintk((KERN_INFO MYNAM ": %s.reply_alloc  @ %p[%p], sz=%d bytes\n",
-			 	ioc->name, mem, (void *)(ulong)ioc->reply_alloc_dma, sz));
+		ioc->alloc_total += ioc->fifo_pool_sz;
+		memset(ioc->fifo_pool, 0, ioc->fifo_pool_sz);
 
-		b = (unsigned long) mem;
+		/* reply fifo pointers */
+		ioc->reply_alloc = ioc->fifo_pool;
+		ioc->reply_alloc_dma = ioc->fifo_pool_dma;
+		/* request fifo pointers */
+		ioc->req_alloc = ioc->reply_alloc+reply_buffer_sz;
+		ioc->req_alloc_dma = ioc->reply_alloc_dma+reply_buffer_sz;
+		/* chain buffer pointers */
+		ioc->chain_alloc = ioc->req_alloc+request_buffer_sz;
+		ioc->chain_alloc_dma = ioc->req_alloc_dma+request_buffer_sz;
+		ioc->chain_alloc_sz = chain_buffer_sz;
+
+		/*  Prime reply FIFO...  */
+		dprintk((KERN_INFO MYNAM ": %s.reply_alloc  @ %p[%p], sz=%d bytes\n",
+			 	ioc->name, mem, (void *)(ulong)ioc->reply_alloc_dma, reply_buffer_sz));
+
+		b = (unsigned long) ioc->reply_alloc;
 		b = (b + (0x80UL - 1UL)) & ~(0x80UL - 1UL); /* round up to 128-byte boundary */
 		aligned_mem = (u8 *) b;
 		ioc->reply_frames = (MPT_FRAME_HDR *) aligned_mem;
 		ioc->reply_frames_dma =
-			(ioc->reply_alloc_dma + (aligned_mem - mem));
+			(ioc->reply_alloc_dma + (aligned_mem - ioc->reply_alloc));
 
 		ioc->reply_frames_low_dma = (u32) (ioc->reply_frames_dma & 0xFFFFFFFF);
-	}
+	
+		/*  Request FIFO - WE manage this!  */
+		dprintk((KERN_INFO MYNAM ": %s.req_alloc    @ %p[%p], sz=%d bytes\n",
+			 	ioc->name, mem, (void *)(ulong)ioc->req_alloc_dma, request_buffer_sz));
 
+		b = (unsigned long) ioc->req_alloc;
+		b = (b + (0x80UL - 1UL)) & ~(0x80UL - 1UL); /* round up to 128-byte boundary */
+		aligned_mem = (u8 *) b;
+		ioc->req_frames = (MPT_FRAME_HDR *) aligned_mem;
+		ioc->req_frames_dma =
+			(ioc->req_alloc_dma + (aligned_mem - ioc->req_alloc));
+
+		ioc->req_frames_low_dma = (u32) (ioc->req_frames_dma & 0xFFFFFFFF);
+
+#if defined(CONFIG_MTRR) && 0
+		/*
+		 *  Enable Write Combining MTRR for IOC's memory region.
+		 *  (at least as much as we can; "size and base must be
+		 *  multiples of 4 kiB"
+		 */
+		ioc->mtrr_reg = mtrr_add(ioc->fifo_pool,
+					 ioc->fifo_pool_sz,
+					 MTRR_TYPE_WRCOMB, 1);
+		dprintk((MYIOC_s_INFO_FMT "MTRR region registered (base:size=%08x:%x)\n",
+				ioc->name, ioc->fifo_pool, ioc->fifo_pool_sz));
+#endif
+
+	} /* ioc->fifo_pool == NULL */
+	
 	/* Post Reply frames to FIFO
 	 */
 	aligned_mem_dma = ioc->reply_frames_dma;
@@ -3842,61 +3837,6 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 		aligned_mem_dma += ioc->reply_sz;
 	}
 
-
-	/*  Request FIFO - WE manage this!  */
-
-	if (ioc->req_frames == NULL) {
-		sz = (ioc->req_sz * ioc->req_depth) + 128;
-		/*
-		 *  Rounding UP to nearest 4-kB boundary here...
-		 */
-		sz = ((sz + 0x1000UL - 1UL) / 0x1000) * 0x1000;
-
-#if defined(MPTBASE_MEM_ALLOC_FIFO_FIX)
-		mem = pci_alloc_consistent(&ioc->pcidev32, sz, &ioc->req_alloc_dma);
-#else
-		mem = pci_alloc_consistent(ioc->pcidev, sz, &ioc->req_alloc_dma);
-#endif		
-		if (mem == NULL)
-			goto out_fail;
-
-		memset(mem, 0, sz);
-		ioc->alloc_total += sz;
-		ioc->req_alloc = mem;
-		dprintk((KERN_INFO MYNAM ": %s.req_alloc    @ %p[%p], sz=%d bytes\n",
-			 	ioc->name, mem, (void *)(ulong)ioc->req_alloc_dma, sz));
-
-		b = (unsigned long) mem;
-		b = (b + (0x80UL - 1UL)) & ~(0x80UL - 1UL); /* round up to 128-byte boundary */
-		aligned_mem = (u8 *) b;
-		ioc->req_frames = (MPT_FRAME_HDR *) aligned_mem;
-		ioc->req_frames_dma =
-			(ioc->req_alloc_dma + (aligned_mem - mem));
-
-		ioc->req_frames_low_dma = (u32) (ioc->req_frames_dma & 0xFFFFFFFF);
-
-		if (sizeof(dma_addr_t) == sizeof(u64)) {
-			/* Check: upper 32-bits of the request and reply frame
-			 * physical addresses must be the same.
-			 */
-			if (((u64)ioc->req_frames_dma >> 32) != ((u64)ioc->reply_frames_dma >> 32)){
-				goto out_fail;
-			}
-		}
-
-#if defined(CONFIG_MTRR) && 0
-		/*
-		 *  Enable Write Combining MTRR for IOC's memory region.
-		 *  (at least as much as we can; "size and base must be
-		 *  multiples of 4 kiB"
-		 */
-		ioc->mtrr_reg = mtrr_add(ioc->req_alloc_dma,
-					 sz,
-					 MTRR_TYPE_WRCOMB, 1);
-		dprintk((MYIOC_s_INFO_FMT "MTRR region registered (base:size=%08x:%x)\n",
-				ioc->name, ioc->req_alloc_dma, sz));
-#endif
-	}
 
 	/* Initialize Request frames linked list
 	 */
@@ -3931,24 +3871,17 @@ PrimeIocFifos(MPT_ADAPTER *ioc)
 	return 0;
 
 out_fail:
-	if (ioc->reply_alloc != NULL) {
-		sz = (ioc->reply_sz * ioc->reply_depth) + 128;
+	if (ioc->fifo_pool != NULL) {
 		pci_free_consistent(ioc->pcidev,
-				sz,
-				ioc->reply_alloc, ioc->reply_alloc_dma);
+				ioc->fifo_pool_sz,
+				ioc->fifo_pool, ioc->fifo_pool_dma);
 		ioc->reply_frames = NULL;
 		ioc->reply_alloc = NULL;
-		ioc->alloc_total -= sz;
-	}
-	if (ioc->req_alloc != NULL) {
-		sz = (ioc->req_sz * ioc->req_depth) + 128;
-		/*
-		 *  Rounding UP to nearest 4-kB boundary here...
-		 */
-		sz = ((sz + 0x1000UL - 1UL) / 0x1000) * 0x1000;
-		pci_free_consistent(ioc->pcidev,
-				sz,
-				ioc->req_alloc, ioc->req_alloc_dma);
+		ioc->req_frames = NULL;
+		ioc->req_alloc = NULL;
+		ioc->chain_alloc = NULL;
+		ioc->fifo_pool = NULL;
+		ioc->alloc_total -= ioc->fifo_pool_sz;
 #if defined(CONFIG_MTRR) && 0
 		if (ioc->mtrr_reg > 0) {
 			mtrr_del(ioc->mtrr_reg, 0, 0);
@@ -3956,9 +3889,6 @@ out_fail:
 					ioc->name));
 		}
 #endif
-		ioc->req_frames = NULL;
-		ioc->req_alloc = NULL;
-		ioc->alloc_total -= sz;
 	}
 	if (ioc->sense_buf_pool != NULL) {
 		sz = (ioc->req_depth * MPT_SENSE_BUFFER_ALLOC);
@@ -4070,7 +4000,7 @@ mpt_handshake_req_reply_wait(MPT_ADAPTER *ioc, int reqBytes, u32 *req,
 		/*
 		 * Copy out the cached reply...
 		 */
-		for (ii=0; ii < MIN(replyBytes/2,mptReply->MsgLength*2); ii++)
+		for (ii=0; ii < min(replyBytes/2,mptReply->MsgLength*2); ii++)
 			u16reply[ii] = ioc->hs_reply[ii];
 	} else {
 		return -99;
@@ -4317,7 +4247,7 @@ GetLanConfigPages(MPT_ADAPTER *ioc)
 
 			if ((rc = mpt_config(ioc, &cfg)) == 0) {
 				/* save the data */
-				copy_sz = MIN(sizeof(LANPage0_t), data_sz);
+				copy_sz = min_t(int, sizeof(LANPage0_t), data_sz);
 				memcpy(&ioc->lan_cnfg_page0, ppage0_alloc, copy_sz);
 
 			}
@@ -4362,7 +4292,7 @@ GetLanConfigPages(MPT_ADAPTER *ioc)
 
 		if ((rc = mpt_config(ioc, &cfg)) == 0) {
 			/* save the data */
-			copy_sz = MIN(sizeof(LANPage1_t), data_sz);
+			copy_sz = min_t(int, sizeof(LANPage1_t), data_sz);
 			memcpy(&ioc->lan_cnfg_page1, ppage1_alloc, copy_sz);
 		}
 
@@ -4431,7 +4361,7 @@ GetFcPortPage0(MPT_ADAPTER *ioc, int portnum)
 		if ((rc = mpt_config(ioc, &cfg)) == 0) {
 			/* save the data */
 			pp0dest = &ioc->fc_port_page0[portnum];
-			copy_sz = MIN(sizeof(FCPortPage0_t), data_sz);
+			copy_sz = min_t(int, sizeof(FCPortPage0_t), data_sz);
 			memcpy(pp0dest, ppage0_alloc, copy_sz);
 
 			/*
@@ -5517,9 +5447,7 @@ procmpt_destroy(void)
 			(void) sprintf(pname+namelen, "/%s", mpt_ioc_proc_list[ii].name);
 			remove_proc_entry(pname, NULL);
 		}
-
 		remove_proc_entry(ioc->name, mpt_proc_root_dir);
-
 		ioc = mpt_adapter_find_next(ioc);
 	}
 
@@ -6329,7 +6257,6 @@ fusion_exit(void)
 {
 
 	dprintk((KERN_INFO MYNAM ": fusion_exit() called!\n"));
-	pci_unregister_driver(&mptbase_driver);
 
 	/* Whups?  20010120 -sralston
 	 *  Moved this *above* removal of all MptAdapters!
@@ -6337,7 +6264,7 @@ fusion_exit(void)
 #ifdef CONFIG_PROC_FS
 	(void) procmpt_destroy();
 #endif
-
+	pci_unregister_driver(&mptbase_driver);
 	mpt_reset_deregister(mpt_base_index);
 }
 

@@ -13,6 +13,7 @@
  */
 #include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/init.h>
 
 #include <asm/semaphore.h>
 
@@ -54,7 +55,7 @@ void __up(struct semaphore *sem)
 
 static spinlock_t semaphore_lock = SPIN_LOCK_UNLOCKED;
 
-void __down(struct semaphore * sem)
+void __sched __down(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -87,7 +88,7 @@ void __down(struct semaphore * sem)
 	wake_up(&sem->wait);
 }
 
-int __down_interruptible(struct semaphore * sem)
+int __sched __down_interruptible(struct semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -176,7 +177,8 @@ int __down_trylock(struct semaphore * sem)
  * registers (r0 to r3 and lr), but not ip, as we use it as a return
  * value in some cases..
  */
-asm("	.align	5				\n\
+asm("	.section .sched.text			\n\
+	.align	5				\n\
 	.globl	__down_failed			\n\
 __down_failed:					\n\
 	stmfd	sp!, {r0 - r3, lr}		\n\

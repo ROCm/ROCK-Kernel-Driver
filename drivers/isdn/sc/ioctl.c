@@ -30,6 +30,17 @@ int GetStatus(int card, boardInfo *);
  */
 int sc_ioctl(int card, scs_ioctl *data)
 {
+	int		status;
+	RspMessage	*rcvmsg;
+	char		*spid;
+	char		*dn;
+	char		switchtype;
+	char		speed;
+
+	rcvmsg = kmalloc(sizeof(RspMessage), GFP_KERNEL);
+	if (!rcvmsg)
+		return -ENOMEM;
+
 	switch(data->command) {
 	case SCIOCRESET:	/* Perform a hard reset of the adapter */
 	{
@@ -41,26 +52,37 @@ int sc_ioctl(int card, scs_ioctl *data)
 
 	case SCIOCLOAD:
 	{
-		RspMessage	rcvmsg;
-		char		srec[SCIOC_SRECSIZE];
-		int		status;
+		char *srec;
 
+		srec = kmalloc(SCIOC_SRECSIZE, GFP_KERNEL);
+		if (!srec) {
+			kfree(rcvmsg);
+			return -ENOMEM;
+		}
 		pr_debug("%s: SCIOLOAD: ioctl received\n",
 				sc_adapter[card]->devicename);
 		if(sc_adapter[card]->EngineUp) {
 			pr_debug("%s: SCIOCLOAD: command failed, LoadProc while engine running.\n",
 				sc_adapter[card]->devicename);
+			kfree(rcvmsg);
+			kfree(srec);
 			return -1;
 		}
 
 		/*
 		 * Get the SRec from user space
 		 */
-		if (copy_from_user(srec, (char *) data->dataptr, sizeof(srec)))
+		if (copy_from_user(srec, (char *) data->dataptr, sizeof(srec))) {
+			kfree(rcvmsg);
+			kfree(srec);
 			return -EFAULT;
+		}
 
 		status = send_and_receive(card, CMPID, cmReqType2, cmReqClass0, cmReqLoadProc,
-				0, sizeof(srec), srec, &rcvmsg, SAR_TIMEOUT);
+				0, sizeof(srec), srec, rcvmsg, SAR_TIMEOUT);
+		kfree(rcvmsg);
+		kfree(srec);
+
 		if(status) {
 			pr_debug("%s: SCIOCLOAD: command failed, status = %d\n", 
 				sc_adapter[card]->devicename, status);
@@ -90,10 +112,6 @@ int sc_ioctl(int card, scs_ioctl *data)
 
 	case SCIOCSETSWITCH:
 	{
-		RspMessage	rcvmsg;
-		char		switchtype;
-		int 		status;
-
 		pr_debug("%s: SCIOSETSWITCH: ioctl received\n",
 				sc_adapter[card]->devicename);
 
@@ -101,32 +119,32 @@ int sc_ioctl(int card, scs_ioctl *data)
 		 * Get the switch type from user space
 		 */
 		if (copy_from_user(&switchtype, (char *)data->dataptr,
-				   sizeof(char)))
+				   sizeof(char))) {
+			kfree(rcvmsg);
 			return -EFAULT;
+		}
 
 		pr_debug("%s: SCIOCSETSWITCH: setting switch type to %d\n",
 			sc_adapter[card]->devicename,
 			switchtype);
 		status = send_and_receive(card, CEPID, ceReqTypeCall, ceReqClass0, ceReqCallSetSwitchType,
-						0, sizeof(char),&switchtype,&rcvmsg, SAR_TIMEOUT);
-		if(!status && !rcvmsg.rsp_status) {
+						0, sizeof(char),&switchtype, rcvmsg, SAR_TIMEOUT);
+		if(!status && !(rcvmsg->rsp_status)) {
 			pr_debug("%s: SCIOCSETSWITCH: command successful\n",
 				sc_adapter[card]->devicename);
+			kfree(rcvmsg);
 			return 0;
 		}
 		else {
 			pr_debug("%s: SCIOCSETSWITCH: command failed (status = %d)\n",
 				sc_adapter[card]->devicename, status);
+			kfree(rcvmsg);
 			return status;
 		}
 	}
 		
 	case SCIOCGETSWITCH:
 	{
-		RspMessage 	rcvmsg;
-		char		switchtype;
-		int		status;
-
 		pr_debug("%s: SCIOGETSWITCH: ioctl received\n",
 				sc_adapter[card]->devicename);
 
@@ -134,43 +152,48 @@ int sc_ioctl(int card, scs_ioctl *data)
 		 * Get the switch type from the board
 		 */
 		status = send_and_receive(card, CEPID, ceReqTypeCall, ceReqClass0, 
-			ceReqCallGetSwitchType, 0, 0, 0, &rcvmsg, SAR_TIMEOUT);
-		if (!status && !rcvmsg.rsp_status) {
+			ceReqCallGetSwitchType, 0, 0, 0, rcvmsg, SAR_TIMEOUT);
+		if (!status && !(rcvmsg->rsp_status)) {
 			pr_debug("%s: SCIOCGETSWITCH: command successful\n",
 					sc_adapter[card]->devicename);
 		}
 		else {
 			pr_debug("%s: SCIOCGETSWITCH: command failed (status = %d)\n",
 				sc_adapter[card]->devicename, status);
+			kfree(rcvmsg);
 			return status;
 		}
 
-		switchtype = rcvmsg.msg_data.byte_array[0];
+		switchtype = rcvmsg->msg_data.byte_array[0];
 
 		/*
 		 * Package the switch type and send to user space
 		 */
 		if (copy_to_user((char *)data->dataptr, &switchtype,
-				 sizeof(char)))
+				 sizeof(char))) {
+			kfree(rcvmsg);
 			return -EFAULT;
+		}
 
+		kfree(rcvmsg);
 		return 0;
 	}
 
 	case SCIOCGETSPID:
 	{
-		RspMessage	rcvmsg;
-		char		spid[SCIOC_SPIDSIZE];
-		int		status;
-
 		pr_debug("%s: SCIOGETSPID: ioctl received\n",
 				sc_adapter[card]->devicename);
 
+		spid = kmalloc(SCIOC_SPIDSIZE, GFP_KERNEL);
+		if(!spid) {
+			kfree(rcvmsg);
+			return -ENOMEM;
+		}
 		/*
 		 * Get the spid from the board
 		 */
 		status = send_and_receive(card, CEPID, ceReqTypeCall, ceReqClass0, ceReqCallGetSPID,
-					data->channel, 0, 0, &rcvmsg, SAR_TIMEOUT);
+					data->channel, 0, 0, rcvmsg, SAR_TIMEOUT);
 		if (!status) {
 			pr_debug("%s: SCIOCGETSPID: command successful\n",
 					sc_adapter[card]->devicename);
@@ -178,57 +201,67 @@ int sc_ioctl(int card, scs_ioctl *data)
 		else {
 			pr_debug("%s: SCIOCGETSPID: command failed (status = %d)\n",
 				sc_adapter[card]->devicename, status);
+			kfree(rcvmsg);
 			return status;
 		}
-		strcpy(spid, rcvmsg.msg_data.byte_array);
+		strcpy(spid, rcvmsg->msg_data.byte_array);
 
 		/*
 		 * Package the switch type and send to user space
 		 */
-		if (copy_to_user((char *)data->dataptr, spid, sizeof(spid)))
+		if (copy_to_user((char *)data->dataptr, spid, SCIOC_SPIDSIZE)) {
+			kfree(spid);
+			kfree(rcvmsg);
 			return -EFAULT;
+		}
 
+		kfree(spid);
+		kfree(rcvmsg);
 		return 0;
 	}	
 
 	case SCIOCSETSPID:
 	{
-		RspMessage	rcvmsg;
-		char		spid[SCIOC_SPIDSIZE];
-		int 		status;
-
 		pr_debug("%s: DCBIOSETSPID: ioctl received\n",
 				sc_adapter[card]->devicename);
+
+		spid = kmalloc(SCIOC_SPIDSIZE, GFP_KERNEL);
+		if(!spid) {
+			kfree(rcvmsg);
+			return -ENOMEM;
+		}
 
 		/*
 		 * Get the spid from user space
 		 */
-		if (copy_from_user(spid, (char *) data->dataptr, sizeof(spid)))
+		if (copy_from_user(spid, (char *) data->dataptr, SCIOC_SPIDSIZE)) {
+			kfree(rcvmsg);
 			return -EFAULT;
+		}
 
 		pr_debug("%s: SCIOCSETSPID: setting channel %d spid to %s\n", 
 			sc_adapter[card]->devicename, data->channel, spid);
 		status = send_and_receive(card, CEPID, ceReqTypeCall, 
 			ceReqClass0, ceReqCallSetSPID, data->channel, 
-			strlen(spid), spid, &rcvmsg, SAR_TIMEOUT);
-		if(!status && !rcvmsg.rsp_status) {
+			strlen(spid), spid, rcvmsg, SAR_TIMEOUT);
+		if(!status && !(rcvmsg->rsp_status)) {
 			pr_debug("%s: SCIOCSETSPID: command successful\n", 
 				sc_adapter[card]->devicename);
+			kfree(rcvmsg);
+			kfree(spid);
 			return 0;
 		}
 		else {
 			pr_debug("%s: SCIOCSETSPID: command failed (status = %d)\n",
 				sc_adapter[card]->devicename, status);
+			kfree(rcvmsg);
+			kfree(spid);
 			return status;
 		}
 	}
 
 	case SCIOCGETDN:
 	{
-		RspMessage	rcvmsg;
-		char		dn[SCIOC_DNSIZE];
-		int		status;
-
 		pr_debug("%s: SCIOGETDN: ioctl received\n",
 				sc_adapter[card]->devicename);
 
@@ -236,7 +269,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		 * Get the dn from the board
 		 */
 		status = send_and_receive(card, CEPID, ceReqTypeCall, ceReqClass0, ceReqCallGetMyNumber,
-					data->channel, 0, 0, &rcvmsg, SAR_TIMEOUT);
+					data->channel, 0, 0, rcvmsg, SAR_TIMEOUT);
 		if (!status) {
 			pr_debug("%s: SCIOCGETDN: command successful\n",
 					sc_adapter[card]->devicename);
@@ -244,48 +277,65 @@ int sc_ioctl(int card, scs_ioctl *data)
 		else {
 			pr_debug("%s: SCIOCGETDN: command failed (status = %d)\n",
 				sc_adapter[card]->devicename, status);
+			kfree(rcvmsg);
 			return status;
 		}
 
-		strcpy(dn, rcvmsg.msg_data.byte_array);
+		dn = kmalloc(SCIOC_DNSIZE, GFP_KERNEL);
+		if (!dn) {
+			kfree(rcvmsg);
+			return -ENOMEM;
+		}
+		strcpy(dn, rcvmsg->msg_data.byte_array);
+		kfree(rcvmsg);
 
 		/*
 		 * Package the dn and send to user space
 		 */
-		if (copy_to_user((char *)data->dataptr, dn, sizeof(dn)))
+		if (copy_to_user((char *)data->dataptr, dn, SCIOC_DNSIZE)) {
+			kfree(dn);
 			return -EFAULT;
-
+		}
+		kfree(dn);
 		return 0;
 	}	
 
 	case SCIOCSETDN:
 	{
-		RspMessage	rcvmsg;
-		char		dn[SCIOC_DNSIZE];
-		int 		status;
-
 		pr_debug("%s: SCIOSETDN: ioctl received\n",
 				sc_adapter[card]->devicename);
 
+		dn = kmalloc(SCIOC_DNSIZE, GFP_KERNEL);
+		if (!dn) {
+			kfree(rcvmsg);
+			return -ENOMEM;
+		}
 		/*
 		 * Get the spid from user space
 		 */
-		if (copy_from_user(dn, (char *)data->dataptr, sizeof(dn)))
+		if (copy_from_user(dn, (char *)data->dataptr, SCIOC_DNSIZE)) {
+			kfree(rcvmsg);
+			kfree(dn);
 			return -EFAULT;
+		}
 
 		pr_debug("%s: SCIOCSETDN: setting channel %d dn to %s\n", 
 			sc_adapter[card]->devicename, data->channel, dn);
 		status = send_and_receive(card, CEPID, ceReqTypeCall, 
 			ceReqClass0, ceReqCallSetMyNumber, data->channel, 
-			strlen(dn),dn,&rcvmsg, SAR_TIMEOUT);
-		if(!status && !rcvmsg.rsp_status) {
+			strlen(dn),dn,rcvmsg, SAR_TIMEOUT);
+		if(!status && !(rcvmsg->rsp_status)) {
 			pr_debug("%s: SCIOCSETDN: command successful\n", 
 				sc_adapter[card]->devicename);
+			kfree(rcvmsg);
+			kfree(dn);
 			return 0;
 		}
 		else {
 			pr_debug("%s: SCIOCSETDN: command failed (status = %d)\n",
 				sc_adapter[card]->devicename, status);
+			kfree(rcvmsg);
+			kfree(dn);
 			return status;
 		}
 	}
@@ -302,25 +352,32 @@ int sc_ioctl(int card, scs_ioctl *data)
 
 	case SCIOCSTAT:
 	{
-		boardInfo bi;
+		boardInfo *bi;
 
 		pr_debug("%s: SCIOSTAT: ioctl received\n",
 				sc_adapter[card]->devicename);
-		GetStatus(card, &bi);
-		
-		if (copy_to_user((boardInfo *)data->dataptr, &bi,
-				 sizeof(boardInfo)))
-			return -EFAULT;
 
+		bi = kmalloc (sizeof(boardInfo), GFP_KERNEL);
+		if (!bi) {
+			kfree(rcvmsg);
+			return -ENOMEM;
+		}
+
+		kfree(rcvmsg);
+		GetStatus(card, bi);
+
+		if (copy_to_user((boardInfo *)data->dataptr, bi,
+				 sizeof(boardInfo))) {
+			kfree(bi);
+			return -EFAULT;
+		}
+
+		kfree(bi);
 		return 0;
 	}
 
 	case SCIOCGETSPEED:
 	{
-		RspMessage	rcvmsg;
-		char		speed;
-		int		status;
-
 		pr_debug("%s: SCIOGETSPEED: ioctl received\n",
 				sc_adapter[card]->devicename);
 
@@ -328,22 +385,26 @@ int sc_ioctl(int card, scs_ioctl *data)
 		 * Get the speed from the board
 		 */
 		status = send_and_receive(card, CEPID, ceReqTypeCall, ceReqClass0, 
-			ceReqCallGetCallType, data->channel, 0, 0, &rcvmsg, SAR_TIMEOUT);
-		if (!status && !rcvmsg.rsp_status) {
+			ceReqCallGetCallType, data->channel, 0, 0, rcvmsg, SAR_TIMEOUT);
+		if (!status && !(rcvmsg->rsp_status)) {
 			pr_debug("%s: SCIOCGETSPEED: command successful\n",
 				sc_adapter[card]->devicename);
 		}
 		else {
 			pr_debug("%s: SCIOCGETSPEED: command failed (status = %d)\n",
 				sc_adapter[card]->devicename, status);
+			kfree(rcvmsg);
 			return status;
 		}
 
-		speed = rcvmsg.msg_data.byte_array[0];
+		speed = rcvmsg->msg_data.byte_array[0];
+
+		kfree(rcvmsg);
 
 		/*
 		 * Package the switch type and send to user space
 		 */
+
 		if (copy_to_user((char *) data->dataptr, &speed, sizeof(char)))
 			return -EFAULT;
 
@@ -361,9 +422,11 @@ int sc_ioctl(int card, scs_ioctl *data)
 		break;
 
 	default:
+		kfree(rcvmsg);
 		return -1;
 	}
 
+	kfree(rcvmsg);
 	return 0;
 }
 

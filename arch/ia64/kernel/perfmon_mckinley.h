@@ -101,12 +101,15 @@ pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 {
 	int ret = 0, check_case1 = 0;
 	unsigned long val8 = 0, val14 = 0, val13 = 0;
+	int is_loaded;
 
 	/* first preserve the reserved fields */
 	pfm_mck_reserved(cnum, val, regs);
 
 	/* sanitfy check */
 	if (ctx == NULL) return -EINVAL;
+
+	is_loaded = ctx->ctx_state == PFM_CTX_LOADED || ctx->ctx_state == PFM_CTX_MASKED;
 
 	/*
 	 * we must clear the debug registers if pmc13 has a value which enable
@@ -120,7 +123,9 @@ pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 	 *
 	 * For now, we just check on cfg_dbrXX != 0x3.
 	 */
-	if (cnum == 13 && ((*val & 0x18181818UL) != 0x18181818UL) && ctx->ctx_fl_using_dbreg == 0) {
+	DPRINT(("cnum=%u val=0x%lx, using_dbreg=%d loaded=%d\n", cnum, *val, ctx->ctx_fl_using_dbreg, is_loaded));
+
+	if (cnum == 13 && is_loaded && ((*val & 0x18181818UL) != 0x18181818UL) && ctx->ctx_fl_using_dbreg == 0) {
 
 		DPRINT(("pmc[%d]=0x%lx has active pmc13 settings, clearing dbr\n", cnum, *val));
 
@@ -131,14 +136,14 @@ pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 		 * a count of 0 will mark the debug registers as in use and also
 		 * ensure that they are properly cleared.
 		 */
-		ret = pfm_write_ibr_dbr(1, ctx, NULL, 0, regs);
+		ret = pfm_write_ibr_dbr(PFM_DATA_RR, ctx, NULL, 0, regs);
 		if (ret) return ret;
 	}
 	/*
 	 * we must clear the (instruction) debug registers if any pmc14.ibrpX bit is enabled
 	 * before they are (fl_using_dbreg==0) to avoid picking up stale information.
 	 */
-	if (cnum == 14 && ((*val & 0x2222UL) != 0x2222UL) && ctx->ctx_fl_using_dbreg == 0) {
+	if (cnum == 14 && is_loaded && ((*val & 0x2222UL) != 0x2222UL) && ctx->ctx_fl_using_dbreg == 0) {
 
 		DPRINT(("pmc[%d]=0x%lx has active pmc14 settings, clearing ibr\n", cnum, *val));
 
@@ -149,7 +154,7 @@ pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 		 * a count of 0 will mark the debug registers as in use and also
 		 * ensure that they are properly cleared.
 		 */
-		ret = pfm_write_ibr_dbr(0, ctx, NULL, 0, regs);
+		ret = pfm_write_ibr_dbr(PFM_CODE_RR, ctx, NULL, 0, regs);
 		if (ret) return ret;
 
 	}

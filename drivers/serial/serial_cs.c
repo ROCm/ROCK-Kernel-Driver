@@ -54,6 +54,8 @@
 #include <pcmcia/ds.h>
 #include <pcmcia/cisreg.h>
 
+#include "8250.h"
+
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
@@ -155,6 +157,38 @@ static void serial_remove(dev_link_t *link)
 		}
 
 		info->link.state &= ~DEV_CONFIG;
+	}
+}
+
+static void serial_suspend(dev_link_t *link)
+{
+	link->state |= DEV_SUSPEND;
+
+	if (link->state & DEV_CONFIG) {
+		struct serial_info *info = link->priv;
+		int i;
+
+		for (i = 0; i < info->ndev; i++)
+			serial8250_suspend_port(info->line[i]);
+
+		if (!info->slave)
+			pcmcia_release_configuration(link->handle);
+	}
+}
+
+static void serial_resume(dev_link_t *link)
+{
+	link->state &= ~DEV_SUSPEND;
+
+	if (DEV_OK(link)) {
+		struct serial_info *info = link->priv;
+		int i;
+
+		if (!info->slave)
+			pcmcia_request_configuration(link->handle, &link->conf);
+
+		for (i = 0; i < info->ndev; i++)
+			serial8250_resume_port(info->line[i]);
 	}
 }
 
@@ -674,16 +708,18 @@ serial_event(event_t event, int priority, event_callback_args_t * args)
 		break;
 
 	case CS_EVENT_PM_SUSPEND:
-		link->state |= DEV_SUSPEND;
-		/* Fall through... */
+		serial_suspend(link);
+		break;
+
 	case CS_EVENT_RESET_PHYSICAL:
 		if ((link->state & DEV_CONFIG) && !info->slave)
 			pcmcia_release_configuration(link->handle);
 		break;
 
 	case CS_EVENT_PM_RESUME:
-		link->state &= ~DEV_SUSPEND;
-		/* Fall through... */
+		serial_resume(link);
+		break;
+
 	case CS_EVENT_CARD_RESET:
 		if (DEV_OK(link) && !info->slave)
 			pcmcia_request_configuration(link->handle, &link->conf);

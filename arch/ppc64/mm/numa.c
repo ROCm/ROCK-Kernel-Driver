@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <asm/lmb.h>
 #include <asm/machdep.h>
+#include <asm/abs_addr.h>
 
 #if 1
 #define dbg(args...) udbg_printf(args)
@@ -31,9 +32,7 @@
 
 int numa_cpu_lookup_table[NR_CPUS] = { [ 0 ... (NR_CPUS - 1)] =
 	ARRAY_INITIALISER};
-int numa_memory_lookup_table[MAX_MEMORY >> MEMORY_INCREMENT_SHIFT] =
-	{ [ 0 ... ((MAX_MEMORY >> MEMORY_INCREMENT_SHIFT) - 1)] =
-	ARRAY_INITIALISER};
+char *numa_memory_lookup_table;
 cpumask_t numa_cpumask_lookup_table[MAX_NUMNODES];
 int nr_cpus_in_node[MAX_NUMNODES] = { [0 ... (MAX_NUMNODES -1)] = 0};
 
@@ -65,11 +64,19 @@ static int __init parse_numa_properties(void)
 	int *memory_associativity;
 	int depth;
 	int max_domain = 0;
+	long entries = lmb_end_of_DRAM() >> MEMORY_INCREMENT_SHIFT;
+	long i;
 
 	if (strstr(saved_command_line, "numa=off")) {
 		printk(KERN_WARNING "NUMA disabled by user\n");
 		return -1;
 	}
+
+	numa_memory_lookup_table =
+		(char *)abs_to_virt(lmb_alloc(entries * sizeof(char), 1));
+
+	for (i = 0; i < entries ; i++)
+		numa_memory_lookup_table[i] = ARRAY_INITIALISER;
 
 	cpu = of_find_node_by_type(NULL, "cpu");
 	if (!cpu)
@@ -124,6 +131,9 @@ static int __init parse_numa_properties(void)
 			max_domain = numa_domain;
 
 		map_cpu_to_node(cpu_nr, numa_domain);
+		/* register the second thread on an SMT machine */
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+			map_cpu_to_node(cpu_nr ^ 0x1, numa_domain);
 	}
 
 	for (; memory; memory = of_find_node_by_type(memory, "memory")) {
@@ -231,6 +241,14 @@ static void __init setup_nonnuma(void)
 	       top_of_ram, total_ram);
 	printk(KERN_INFO "Memory hole size: %ldMB\n",
 	       (top_of_ram - total_ram) >> 20);
+
+	if (!numa_memory_lookup_table) {
+		long entries = top_of_ram >> MEMORY_INCREMENT_SHIFT;
+		numa_memory_lookup_table =
+			(char *)abs_to_virt(lmb_alloc(entries * sizeof(char), 1));
+		for (i = 0; i < entries ; i++)
+			numa_memory_lookup_table[i] = ARRAY_INITIALISER;
+	}
 
 	for (i = 0; i < NR_CPUS; i++)
 		map_cpu_to_node(i, 0);

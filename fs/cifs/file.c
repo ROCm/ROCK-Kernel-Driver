@@ -923,8 +923,8 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 		if(list_empty(pages))
 			break;
 
-		page = list_entry(pages->prev, struct page, list);
-		list_del(&page->list);
+		page = list_entry(pages->prev, struct page, lru);
+		list_del(&page->lru);
 
 		if (add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
 			page_cache_release(page);
@@ -994,7 +994,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		if(list_empty(page_list)) {
 			break;
 		}
-		page = list_entry(page_list->prev, struct page, list);
+		page = list_entry(page_list->prev, struct page, lru);
 		offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
 
 		/* count adjacent pages that we will read into */
@@ -1033,11 +1033,11 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			/* BB need to check return code here */
 		}
 		if ((rc < 0) || (smb_read_data == NULL)) {
-			cERROR(1,("Read error in readpages: %d",rc)); 
-			/* clean up remaing pages off list */            
+			cFYI(1,("Read error in readpages: %d",rc));
+			/* clean up remaing pages off list */
 			while (!list_empty(page_list) && (i < num_pages)) {
-				page = list_entry(page_list->prev, struct page, list);
-				list_del(&page->list);
+				page = list_entry(page_list->prev, struct page, lru);
+				list_del(&page->lru);
 				page_cache_release(page);
 			}
 			break;
@@ -1069,8 +1069,8 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			cFYI(1,("No bytes read (%d) at offset %lld . Cleaning remaining pages from readahead list",bytes_read,offset)); 
 			/* BB turn off caching and do new lookup on file size at server? */
 			while (!list_empty(page_list) && (i < num_pages)) {
-				page = list_entry(page_list->prev, struct page, list);
-				list_del(&page->list);
+				page = list_entry(page_list->prev, struct page, lru);
+				list_del(&page->lru);
 				page_cache_release(page); /* BB removeme - replace with zero of page? */
 			}
 			break;

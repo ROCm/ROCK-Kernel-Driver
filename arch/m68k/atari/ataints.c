@@ -138,7 +138,7 @@ static struct irqparam irq_param[NUM_INT_SOURCES];
  * (new vectors starting from 0x70 can be allocated by
  * atari_register_vme_int())
  */
-static int free_vme_vec_bitmap = 0;
+static int free_vme_vec_bitmap;
 
 /* check for valid int number (complex, sigh...) */
 #define	IS_VALID_INTNO(n)											\
@@ -233,38 +233,38 @@ BUILD_SLOW_IRQ(30);
 BUILD_SLOW_IRQ(31);
 
 asm_irq_handler slow_handlers[32] = {
-	atari_slow_irq_0_handler,
-	atari_slow_irq_1_handler,
-	atari_slow_irq_2_handler,
-	atari_slow_irq_3_handler,
-	atari_slow_irq_4_handler,
-	atari_slow_irq_5_handler,
-	atari_slow_irq_6_handler,
-	atari_slow_irq_7_handler,
-	atari_slow_irq_8_handler,
-	atari_slow_irq_9_handler,
-	atari_slow_irq_10_handler,
-	atari_slow_irq_11_handler,
-	atari_slow_irq_12_handler,
-	atari_slow_irq_13_handler,
-	atari_slow_irq_14_handler,
-	atari_slow_irq_15_handler,
-	atari_slow_irq_16_handler,
-	atari_slow_irq_17_handler,
-	atari_slow_irq_18_handler,
-	atari_slow_irq_19_handler,
-	atari_slow_irq_20_handler,
-	atari_slow_irq_21_handler,
-	atari_slow_irq_22_handler,
-	atari_slow_irq_23_handler,
-	atari_slow_irq_24_handler,
-	atari_slow_irq_25_handler,
-	atari_slow_irq_26_handler,
-	atari_slow_irq_27_handler,
-	atari_slow_irq_28_handler,
-	atari_slow_irq_29_handler,
-	atari_slow_irq_30_handler,
-	atari_slow_irq_31_handler
+	[0]	= atari_slow_irq_0_handler,
+	[1]	= atari_slow_irq_1_handler,
+	[2]	= atari_slow_irq_2_handler,
+	[3]	= atari_slow_irq_3_handler,
+	[4]	= atari_slow_irq_4_handler,
+	[5]	= atari_slow_irq_5_handler,
+	[6]	= atari_slow_irq_6_handler,
+	[7]	= atari_slow_irq_7_handler,
+	[8]	= atari_slow_irq_8_handler,
+	[9]	= atari_slow_irq_9_handler,
+	[10]	= atari_slow_irq_10_handler,
+	[11]	= atari_slow_irq_11_handler,
+	[12]	= atari_slow_irq_12_handler,
+	[13]	= atari_slow_irq_13_handler,
+	[14]	= atari_slow_irq_14_handler,
+	[15]	= atari_slow_irq_15_handler,
+	[16]	= atari_slow_irq_16_handler,
+	[17]	= atari_slow_irq_17_handler,
+	[18]	= atari_slow_irq_18_handler,
+	[19]	= atari_slow_irq_19_handler,
+	[20]	= atari_slow_irq_20_handler,
+	[21]	= atari_slow_irq_21_handler,
+	[22]	= atari_slow_irq_22_handler,
+	[23]	= atari_slow_irq_23_handler,
+	[24]	= atari_slow_irq_24_handler,
+	[25]	= atari_slow_irq_25_handler,
+	[26]	= atari_slow_irq_26_handler,
+	[27]	= atari_slow_irq_27_handler,
+	[28]	= atari_slow_irq_28_handler,
+	[29]	= atari_slow_irq_29_handler,
+	[30]	= atari_slow_irq_30_handler,
+	[31]	= atari_slow_irq_31_handler
 };
 
 asmlinkage void atari_fast_irq_handler( void );

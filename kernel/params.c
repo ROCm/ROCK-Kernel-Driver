@@ -96,6 +96,13 @@ static char *next_arg(char *args, char **param, char **val)
 	else {
 		args[equals] = '\0';
 		*val = args + equals + 1;
+
+		/* Don't include quotes in value. */
+		if (**val == '"') {
+			(*val)++;
+			if (args[i-1] == '"')
+				args[i-1] = '\0';
+		}
 	}
 
 	if (args[i]) {

@@ -603,8 +603,6 @@ struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
 
 int in_gate_area(struct task_struct *task, unsigned long addr)
 {
-	struct vm_area_struct *vma = &gate_vma;
-	if (test_tsk_thread_flag(task, TIF_IA32))
-		vma = &gate32_vma;
+	struct vm_area_struct *vma = get_gate_vma(task);
 	return (addr >= vma->vm_start) && (addr < vma->vm_end);
 }

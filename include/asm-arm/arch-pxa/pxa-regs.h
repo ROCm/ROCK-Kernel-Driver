@@ -1076,6 +1076,35 @@ typedef void            (*ExcpHndlr) (void) ;
 #define SSITR		__REG(0x4100000C)  /* SSP Interrupt Test Register */
 #define SSDR		__REG(0x41000010)  /* (Write / Read) SSP Data Write Register/SSP Data Read Register */
 
+#define SSCR0_DSS	(0x0000000f)	/* Data Size Select (mask) */
+#define SSCR0_DataSize(x)  ((x) - 1)	/* Data Size Select [4..16] */
+#define SSCR0_FRF	(0x00000030)	/* FRame Format (mask) */
+#define SSCR0_Motorola	(0x0 << 4)	/* Motorola's Serial Peripheral Interface (SPI) */
+#define SSCR0_TI	(0x1 << 4)	/* Texas Instruments' Synchronous Serial Protocol (SSP) */
+#define SSCR0_National	(0x2 << 4)	/* National Microwire */
+#define SSCR0_ECS	(1 << 6)	/* External clock select */
+#define SSCR0_SSE	(1 << 7)	/* Synchronous Serial Port Enable */
+#define SSCR0_SCR	(0x0000ff00)	/* Serial Clock Rate (mask) */
+#define SSCR0_SerClkDiv(x) ((((x) - 2)/2) << 8) /* Divisor [2..512] */
+
+#define SSCR1_RIE	(1 << 0)	/* Receive FIFO Interrupt Enable */
+#define SSCR1_TIE	(1 << 1)	/* Transmit FIFO Interrupt Enable */
+#define SSCR1_LBM	(1 << 2)	/* Loop-Back Mode */
+#define SSCR1_SPO	(1 << 3)	/* Motorola SPI SSPSCLK polarity setting */
+#define SSCR1_SPH	(1 << 4)	/* Motorola SPI SSPSCLK phase setting */
+#define SSCR1_MWDS	(1 << 5)	/* Microwire Transmit Data Size */
+#define SSCR1_TFT	(0x000003c0)	/* Transmit FIFO Threshold (mask) */
+#define SSCR1_TxTresh(x) (((x) - 1) << 6) /* level [1..16] */
+#define SSCR1_RFT	(0x00003c00)	/* Receive FIFO Threshold (mask) */
+#define SSCR1_RxTresh(x) (((x) - 1) << 10) /* level [1..16] */
+
+#define SSSR_TNF	(1 << 2)	/* Transmit FIFO Not Full */
+#define SSSR_RNE	(1 << 3)	/* Receive FIFO Not Empty */
+#define SSSR_BSY	(1 << 4)	/* SSP Busy */
+#define SSSR_TFS	(1 << 5)	/* Transmit FIFO Service Request */
+#define SSSR_RFS	(1 << 6)	/* Receive FIFO Service Request */
+#define SSSR_ROR	(1 << 7)	/* Receive FIFO Overrun */
+
 
 /*
  * MultiMediaCard (MMC) controller

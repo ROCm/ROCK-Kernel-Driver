@@ -4,7 +4,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.32 $
+ * $Revision: 1.33 $
  */
 
 #include <linux/config.h>
@@ -205,7 +205,7 @@ dasd_fba_examine_error(struct dasd_ccw_req * cqr, struct irb * irb)
 		return dasd_era_none;
 	
 	cdev = device->cdev;
-	switch (cdev->id.dev_model) {
+	switch (cdev->id.dev_type) {
 	case 0x3370:
 		return dasd_3370_erp_examine(cqr, irb);
 	case 0x9336:

@@ -61,7 +61,7 @@ static int gIER,gIFR,gBufA,gBufB;
 #define MAC_CLOCK_LOW		(MAC_CLOCK_TICK&0xFF)
 #define MAC_CLOCK_HIGH		(MAC_CLOCK_TICK>>8)
 
-static int  nubus_active = 0;
+static int  nubus_active;
 
 void via_debug_dump(void);
 irqreturn_t via1_irq(int, void *, struct pt_regs *);

@@ -47,10 +47,10 @@ static struct hole initholes[64];
 
 #ifdef DVMA_DEBUG
 
-static unsigned long dvma_allocs = 0;
-static unsigned long dvma_frees = 0;
-static unsigned long long dvma_alloc_bytes = 0;
-static unsigned long long dvma_free_bytes = 0;
+static unsigned long dvma_allocs;
+static unsigned long dvma_frees;
+static unsigned long long dvma_alloc_bytes;
+static unsigned long long dvma_free_bytes;
 
 static void print_use(void) 
 {

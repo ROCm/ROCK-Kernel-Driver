@@ -33,7 +33,7 @@
 #define BCD2BIN(val) (((val)&15) + ((val)>>4)*10)
 #define BIN2BCD(val) ((((val)/10)<<4) + (val)%10)
 
-static unsigned char days_in_mo[] =
+static const unsigned char days_in_mo[] =
 {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 static atomic_t rtc_ready = ATOMIC_INIT(1);

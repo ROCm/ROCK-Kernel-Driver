@@ -181,7 +181,7 @@ static int tty_ldiscs_read_proc(char *page, char **start, off_t off,
 }
 
 /*
- * Thsi function is called by register_tty_driver() to handle
+ * This function is called by tty_register_driver() to handle
  * registering the driver's /proc handler into /proc/tty/driver/<foo>
  */
 void proc_tty_register_driver(struct tty_driver *driver)
@@ -205,7 +205,7 @@ void proc_tty_register_driver(struct tty_driver *driver)
 }
 
 /*
- * This function is called by unregister_tty_driver()
+ * This function is called by tty_unregister_driver()
  */
 void proc_tty_unregister_driver(struct tty_driver *driver)
 {

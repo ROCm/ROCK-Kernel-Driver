@@ -19,26 +19,22 @@
 #include <asm/errno.h>
 #include <asm/io.h>
 #include <asm/smp.h>
-#include <asm/desc.h>
-#include <asm/io_apic.h>
-#include <mach_apic.h>
 
 #include "msi.h"
-
 
 static spinlock_t msi_lock = SPIN_LOCK_UNLOCKED;
 static struct msi_desc* msi_desc[NR_IRQS] = { [0 ... NR_IRQS-1] = NULL };
 static kmem_cache_t* msi_cachep;
 
 static int pci_msi_enable = 1;
-static int nr_alloc_vectors = 0;
+static int last_alloc_vector = 0;
 static int nr_released_vectors = 0;
 static int nr_reserved_vectors = NR_HP_RESERVED_VECTORS;
 static int nr_msix_devices = 0;
 
 #ifndef CONFIG_X86_IO_APIC
-int vector_irq[NR_IRQS] = { [0 ... NR_IRQS -1] = -1};
-u8 irq_vector[NR_IRQS] = { FIRST_DEVICE_VECTOR , 0 };
+int vector_irq[NR_VECTORS] = { [0 ... NR_VECTORS - 1] = -1};
+u8 irq_vector[NR_IRQ_VECTORS] = { FIRST_DEVICE_VECTOR , 0 };
 #endif
 
 static void msi_cache_ctor(void *p, kmem_cache_t *cache, unsigned long flags)
@@ -96,7 +92,6 @@ static void set_msi_affinity(unsigned int vector, cpumask_t cpu_mask)
 {
 	struct msi_desc *entry;
 	struct msg_address address;
-	unsigned int dest_id;
 
 	entry = (struct msi_desc *)msi_desc[vector];
 	if (!entry || !entry->dev)
@@ -113,10 +108,9 @@ static void set_msi_affinity(unsigned int vector, cpumask_t cpu_mask)
 	        entry->dev->bus->ops->read(entry->dev->bus, entry->dev->devfn,
 			msi_lower_address_reg(pos), 4,
 			&address.lo_address.value);
-		dest_id = (address.lo_address.u.dest_id &
-			MSI_ADDRESS_HEADER_MASK) |
-			(cpu_mask_to_apicid(cpu_mask) << MSI_TARGET_CPU_SHIFT);
-		address.lo_address.u.dest_id = dest_id;
+		address.lo_address.value &= MSI_ADDRESS_DEST_ID_MASK;
+		address.lo_address.value |= (cpu_mask_to_apicid(cpu_mask) <<
+			MSI_TARGET_CPU_SHIFT);
 		entry->msi_attrib.current_cpu = cpu_mask_to_apicid(cpu_mask);
 		entry->dev->bus->ops->write(entry->dev->bus, entry->dev->devfn,
 			msi_lower_address_reg(pos), 4,
@@ -129,10 +123,9 @@ static void set_msi_affinity(unsigned int vector, cpumask_t cpu_mask)
 			PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET;
 
 		address.lo_address.value = readl(entry->mask_base + offset);
-		dest_id = (address.lo_address.u.dest_id &
-			MSI_ADDRESS_HEADER_MASK) |
-			(cpu_mask_to_apicid(cpu_mask) << MSI_TARGET_CPU_SHIFT);
-		address.lo_address.u.dest_id = dest_id;
+		address.lo_address.value &= MSI_ADDRESS_DEST_ID_MASK;
+		address.lo_address.value |= (cpu_mask_to_apicid(cpu_mask) <<
+			MSI_TARGET_CPU_SHIFT);
 		entry->msi_attrib.current_cpu = cpu_mask_to_apicid(cpu_mask);
 		writel(address.lo_address.value, entry->mask_base + offset);
 		break;
@@ -265,61 +258,11 @@ static void msi_address_init(struct msg_address *msi_address)
 
 	memset(msi_address, 0, sizeof(struct msg_address));
 	msi_address->hi_address = (u32)0;
-	dest_id = (MSI_ADDRESS_HEADER << MSI_ADDRESS_HEADER_SHIFT) |
-		 (MSI_TARGET_CPU << MSI_TARGET_CPU_SHIFT);
-	msi_address->lo_address.u.dest_mode = MSI_LOGICAL_MODE;
+	dest_id = (MSI_ADDRESS_HEADER << MSI_ADDRESS_HEADER_SHIFT);
+	msi_address->lo_address.u.dest_mode = MSI_DEST_MODE;
 	msi_address->lo_address.u.redirection_hint = MSI_REDIRECTION_HINT_MODE;
 	msi_address->lo_address.u.dest_id = dest_id;
-}
-
-static int pci_vector_resources(void)
-{
-	static int res = -EINVAL;
-	int nr_free_vectors;
-
-	if (res == -EINVAL) {
-		int i, repeat;
-		for (i = NR_REPEATS; i > 0; i--) {
-			if ((FIRST_DEVICE_VECTOR + i * 8) > FIRST_SYSTEM_VECTOR)
-				continue;
-			break;
-		}
-		i++;
-		repeat = (FIRST_SYSTEM_VECTOR - FIRST_DEVICE_VECTOR)/i;
-		res = i * repeat - NR_RESERVED_VECTORS + 1;
-	}
-
-	nr_free_vectors = res + nr_released_vectors - nr_alloc_vectors;
-
-	return nr_free_vectors;
-}
-
-int assign_irq_vector(int irq)
-{
-	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
-
-	if (irq != MSI_AUTO && IO_APIC_VECTOR(irq) > 0)
-		return IO_APIC_VECTOR(irq);
-next:
-	current_vector += 8;
-	if (current_vector == SYSCALL_VECTOR)
-		goto next;
-
-	if (current_vector > FIRST_SYSTEM_VECTOR) {
-		offset++;
-		current_vector = FIRST_DEVICE_VECTOR + offset;
-	}
-
-	if (current_vector == FIRST_SYSTEM_VECTOR)
-		return -ENOSPC;
-
-	vector_irq[current_vector] = irq;
-	if (irq != MSI_AUTO)
-		IO_APIC_VECTOR(irq) = current_vector;
-
-	nr_alloc_vectors++;
-
-	return current_vector;
+	msi_address->lo_address.value |= (MSI_TARGET_CPU << MSI_TARGET_CPU_SHIFT);
 }
 
 static int assign_msi_vector(void)
@@ -333,10 +276,6 @@ static int assign_msi_vector(void)
 	 * vector is assigned unique among drivers.
 	 */
 	spin_lock_irqsave(&msi_lock, flags);
-	if (!(pci_vector_resources() > 0)) {
-		spin_unlock_irqrestore(&msi_lock, flags);
-		return -EBUSY;
-	}
 
 	if (!new_vector_avail) {
 		/*
@@ -363,9 +302,9 @@ static int assign_msi_vector(void)
 		spin_unlock_irqrestore(&msi_lock, flags);
 		return -EBUSY;
 	}
-
-	vector = assign_irq_vector(MSI_AUTO);
-	if (vector  == (FIRST_SYSTEM_VECTOR - 8))
+	vector = assign_irq_vector(AUTO_ASSIGN);
+	last_alloc_vector = vector;
+	if (vector  == LAST_DEVICE_VECTOR)
 		new_vector_avail = 0;
 
 	spin_unlock_irqrestore(&msi_lock, flags);
@@ -924,7 +863,8 @@ int msi_alloc_vectors(struct pci_dev* dev, int *vector, int nvec)
 	 * msi_lock is provided to ensure that enough vectors resources are
 	 * available before granting.
 	 */
-	free_vectors = pci_vector_resources();
+	free_vectors = pci_vector_resources(last_alloc_vector,
+				nr_released_vectors);
 	/* Ensure that each MSI/MSI-X device has one vector reserved by
 	   default to avoid any MSI-X driver to take all available
  	   resources */

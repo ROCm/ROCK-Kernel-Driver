@@ -636,7 +636,7 @@ static journal_t * journal_init_common (void)
 	spin_lock_init(&journal->j_list_lock);
 	spin_lock_init(&journal->j_state_lock);
 
-	journal->j_commit_interval = (HZ * 5);
+	journal->j_commit_interval = (HZ * JBD_DEFAULT_MAX_COMMIT_AGE);
 
 	/* The journal is marked for error until we succeed with recovery! */
 	journal->j_flags = JFS_ABORT;

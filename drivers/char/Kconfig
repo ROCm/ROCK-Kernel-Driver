@@ -7,7 +7,7 @@ menu "Character devices"
 config VT
 	bool "Virtual terminal" if EMBEDDED
 	select INPUT
-	default y
+	default y if !VIOCONS
 	---help---
 	  If you say Y here, you will get support for terminal devices with
 	  display and keyboard devices. These are called "virtual" because you
@@ -110,7 +110,7 @@ config ROCKETPORT
 
 config CYCLADES
 	tristate "Cyclades async mux support"
-	depends on SERIAL_NONSTANDARD && BROKEN_ON_SMP
+	depends on SERIAL_NONSTANDARD
 	---help---
 	  This is a driver for a card that gives you many serial ports. You
 	  would need something like this to connect more than two modems to
@@ -305,7 +305,7 @@ config RIO
 	help
 	  This is a driver for the Specialix RIO, a smart serial card which
 	  drives an outboard box that can support up to 128 ports.  Product
-	  information is at <http://www.sphinxcst.co.uk/perle/multi.htm>.
+	  information is at <http://www.perle.com/support/documentation.html#multiport>.
 	  There are both ISA and PCI versions.
 
 config RIO_OLDPCI
@@ -415,7 +415,7 @@ config IT8172_SCR0
 	  Say Y here to support smart-card reader 0 (SCR0) on the Integrated
 	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
 	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
-	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+	  board at <http://www.mvista.com/partners/semiconductor/ite.html>.
 
 config IT8172_SCR1
 	bool "Enable Smart Card Reader 1 Support "
@@ -424,7 +424,7 @@ config IT8172_SCR1
 	  Say Y here to support smart-card reader 1 (SCR1) on the Integrated
 	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
 	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
-	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
+	  board at <http://www.mvista.com/partners/semiconductor/ite.html>.
 
 config A2232
 	tristate "Commodore A2232 serial support (EXPERIMENTAL)"
@@ -768,7 +768,7 @@ config RTC
 
 config GEN_RTC
 	tristate "Generic /dev/rtc emulation"
-	depends on RTC!=y
+	depends on RTC!=y && !IA64
 	---help---
 	  If you say Y here and create a character special file /dev/rtc with
 	  major number 10 and minor number 135 using mknod ("man mknod"), you

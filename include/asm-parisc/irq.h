@@ -96,4 +96,7 @@ extern unsigned long txn_alloc_addr(int);
 /* soft power switch support (power.c) */
 extern struct tasklet_struct power_tasklet;
 
+struct irqaction;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
+
 #endif	/* _ASM_PARISC_IRQ_H */

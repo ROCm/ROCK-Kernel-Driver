@@ -233,7 +233,7 @@ static struct tunertype tuners[] = {
 	{ "Philips 1236D ATSC/NTSC daul in",Philips,ATSC,
 	  16*157.25,16*454.00,0xa0,0x90,0x30,0x8e,732},
         { "Philips NTSC MK3 (FM1236MK3 or FM1236/F)", Philips, NTSC,
-          16*160.00,16*442.00,0x01,0x02,0x04,0x8,732},
+          16*160.00,16*442.00,0x01,0x02,0x04,0x8e,732},
 
         { "Philips 4 in 1 (ATI TV Wonder Pro/Conexant)", Philips, NTSC,
           16*160.00,16*442.00,0x01,0x02,0x04,0x8e,732},
@@ -1050,8 +1050,12 @@ static int tuner_attach(struct i2c_adapter *adap, int addr, int kind)
 	t->radio_if2  = 10700*1000; // 10.7MHz - FM radio
 
         i2c_attach_client(client);
-	if (type < TUNERS)
+	if (type < TUNERS) {
 		set_type(client, type, "insmod option");
+		printk("tuner: The type=<n> insmod option will go away soon.\n");
+		printk("tuner: Please use the tuner=<n> option provided by\n");
+		printk("tuner: tv card core driver (bttv, saa7134, ...) instead.\n");
+	}
 	return 0;
 }
 

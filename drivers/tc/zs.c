@@ -1988,7 +1988,8 @@ unsigned int register_zs_hook(unsigned int channel, struct zs_hook *hook)
 	struct dec_serial *info = &zs_soft[channel];
 
 	if (info->hook) {
-		printk(__FUNCTION__": line %d has already a hook registered\n", channel);
+		printk("%s: line %d has already a hook registered\n",
+		       __FUNCTION__, channel);
 
 		return 0;
 	} else {
@@ -2015,8 +2016,8 @@ unsigned int unregister_zs_hook(unsigned int channel)
                 info->hook = NULL;
                 return 1;
         } else {
-                printk(__FUNCTION__": trying to unregister hook on line %d,"
-                       " but none is registered\n", channel);
+                printk("%s: trying to unregister hook on line %d,"
+                       " but none is registered\n", __FUNCTION__, channel);
                 return 0;
         }
 }

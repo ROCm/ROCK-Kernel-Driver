@@ -118,7 +118,9 @@ static int powernow_k6_verify(struct cpufreq_policy *policy)
 
 /**
  * powernow_k6_setpolicy - sets a new CPUFreq policy
- * @policy - new policy
+ * @policy: new policy
+ * @target_freq: the target frequency
+ * @relation: how that frequency relates to achieved frequency (CPUFREQ_RELATION_L or CPUFREQ_RELATION_H)
  *
  * sets a new CPUFreq policy
  */

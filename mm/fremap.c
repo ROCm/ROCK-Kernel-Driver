@@ -12,7 +12,7 @@
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/swapops.h>
-#include <linux/rmap-locking.h>
+#include <linux/rmap.h>
 #include <linux/module.h>
 
 #include <asm/mmu_context.h>

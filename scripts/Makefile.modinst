@@ -12,10 +12,6 @@ include scripts/Makefile.lib
 __modules := $(shell head -q -n1 /dev/null $(wildcard $(MODVERDIR)/*.mod))
 modules := $(patsubst %.o,%.ko,$(wildcard $(__modules:.ko=.o)))
 
-ifneq ($(filter-out $(modules),$(__modules)),)
-  $(warning *** Uh-oh, you have stale module entries. You messed with SUBDIRS, do not complain if something goes wrong.)
-endif
-
 .PHONY: $(modules)
 __modinst: $(modules)
 	@:

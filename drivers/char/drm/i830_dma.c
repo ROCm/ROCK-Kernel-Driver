@@ -39,6 +39,7 @@
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/pagemap.h>	/* For FASTCALL on unlock_page() */
 #include <linux/delay.h>
+#include <asm/uaccess.h>
 
 #define I830_BUF_FREE		2
 #define I830_BUF_CLIENT		1
@@ -160,7 +161,7 @@ static int i830_map_buffer(drm_buf_t *buf, struct file *filp)
 	old_fops = filp->f_op;
 	filp->f_op = &i830_buffer_fops;
 	dev_priv->mmap_buffer = buf;
-	buf_priv->virtual = (void *)do_mmap(filp, 0, buf->total, 
+	buf_priv->virtual = (void __user *)do_mmap(filp, 0, buf->total,
 					    PROT_READ|PROT_WRITE,
 					    MAP_SHARED, 
 					    buf->bus_address);
@@ -462,7 +463,7 @@ static int i830_dma_initialize(drm_device_t *dev,
 }
 
 int i830_dma_init(struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg)
+		  unsigned int cmd, unsigned long __user arg)
 {
    	drm_file_t *priv = filp->private_data;
    	drm_device_t *dev = priv->dev;
@@ -470,7 +471,7 @@ int i830_dma_init(struct inode *inode, struct file *filp,
    	drm_i830_init_t init;
    	int retcode = 0;
 	
-  	if (copy_from_user(&init, (drm_i830_init_t *)arg, sizeof(init)))
+  	if (copy_from_user(&init, (void * __user) arg, sizeof(init)))
 		return -EFAULT;
 	
    	switch(init.func) {
@@ -1164,19 +1165,19 @@ static void i830_dma_dispatch_vertex(drm_device_t *dev,
    	DRM_DEBUG(  "start + used - 4 : %ld\n", start + used - 4);
 
 	if (buf_priv->currently_mapped == I830_BUF_MAPPED) {
-		u32 *vp = buf_priv->virtual;
+		u32  *vp = buf_priv->virtual;
 
-		vp[0] = (GFX_OP_PRIMITIVE |
+		put_user( (GFX_OP_PRIMITIVE |
 			 sarea_priv->vertex_prim |
-			 ((used/4)-2));
+			  ((used/4)-2)), &vp[0]);
 
 		if (dev_priv->use_mi_batchbuffer_start) {
-			vp[used/4] = MI_BATCH_BUFFER_END; 
+			put_user(MI_BATCH_BUFFER_END, &vp[used/4]);
 			used += 4; 
 		}
 		
 		if (used & 4) {
-			vp[used/4] = 0;
+			put_user(0, &vp[used/4]);
 			used += 4;
 		}
 
@@ -1314,7 +1315,7 @@ void i830_reclaim_buffers( struct file *filp )
 }
 
 int i830_flush_ioctl(struct inode *inode, struct file *filp, 
-		     unsigned int cmd, unsigned long arg)
+		     unsigned int cmd, unsigned long __user arg)
 {
    	drm_file_t	  *priv	  = filp->private_data;
    	drm_device_t	  *dev	  = priv->dev;
@@ -1329,7 +1330,7 @@ int i830_flush_ioctl(struct inode *inode, struct file *filp,
 }
 
 int i830_dma_vertex(struct inode *inode, struct file *filp,
-	       unsigned int cmd, unsigned long arg)
+	       unsigned int cmd, unsigned long __user arg)
 {
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;
@@ -1340,7 +1341,7 @@ int i830_dma_vertex(struct inode *inode, struct file *filp,
      					dev_priv->sarea_priv; 
 	drm_i830_vertex_t vertex;
 
-	if (copy_from_user(&vertex, (drm_i830_vertex_t *)arg, sizeof(vertex)))
+	if (copy_from_user(&vertex, (drm_i830_vertex_t __user *)arg, sizeof(vertex)))
 		return -EFAULT;
 
    	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
@@ -1364,13 +1365,13 @@ int i830_dma_vertex(struct inode *inode, struct file *filp,
 }
 
 int i830_clear_bufs(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg)
+		   unsigned int cmd, unsigned long __user arg)
 {
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;
 	drm_i830_clear_t clear;
 
-   	if (copy_from_user(&clear, (drm_i830_clear_t *)arg, sizeof(clear)))
+   	if (copy_from_user(&clear, (drm_i830_clear_t __user *)arg, sizeof(clear)))
 		return -EFAULT;
    
    	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
@@ -1391,7 +1392,7 @@ int i830_clear_bufs(struct inode *inode, struct file *filp,
 }
 
 int i830_swap_bufs(struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg)
+		  unsigned int cmd, unsigned long __user arg)
 {
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;
@@ -1434,7 +1435,7 @@ int i830_do_cleanup_pageflip( drm_device_t *dev )
 }
 
 int i830_flip_bufs(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg)
+		   unsigned int cmd, unsigned long __user arg)
 {
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;
@@ -1455,7 +1456,7 @@ int i830_flip_bufs(struct inode *inode, struct file *filp,
 }
 
 int i830_getage(struct inode *inode, struct file *filp, unsigned int cmd,
-		unsigned long arg)
+		unsigned long __user arg)
 {
    	drm_file_t	  *priv	    = filp->private_data;
 	drm_device_t	  *dev	    = priv->dev;
@@ -1469,7 +1470,7 @@ int i830_getage(struct inode *inode, struct file *filp, unsigned int cmd,
 }
 
 int i830_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
-		unsigned long arg)
+		unsigned long __user arg)
 {
 	drm_file_t	  *priv	    = filp->private_data;
 	drm_device_t	  *dev	    = priv->dev;
@@ -1481,7 +1482,7 @@ int i830_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
      					dev_priv->sarea_priv; 
 
 	DRM_DEBUG("getbuf\n");
-   	if (copy_from_user(&d, (drm_i830_dma_t *)arg, sizeof(d)))
+   	if (copy_from_user(&d, (drm_i830_dma_t __user *)arg, sizeof(d)))
 		return -EFAULT;
    
 	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
@@ -1496,7 +1497,7 @@ int i830_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
 	DRM_DEBUG("i830_dma: %d returning %d, granted = %d\n",
 		  current->pid, retcode, d.granted);
 
-	if (copy_to_user((drm_dma_t *)arg, &d, sizeof(d)))
+	if (copy_to_user((drm_dma_t __user *)arg, &d, sizeof(d)))
 		return -EFAULT;
    	sarea_priv->last_dispatch = (int) hw_status[5];
 
@@ -1506,7 +1507,7 @@ int i830_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
 int i830_copybuf(struct inode *inode,
 		 struct file *filp, 
 		 unsigned int cmd,
-		 unsigned long arg)
+		 unsigned long __user arg)
 {
 	/* Never copy - 2.4.x doesn't need it */
 	return 0;
@@ -1521,7 +1522,7 @@ int i830_docopy(struct inode *inode, struct file *filp, unsigned int cmd,
 
 
 int i830_getparam( struct inode *inode, struct file *filp, unsigned int cmd,
-		      unsigned long arg )
+		      unsigned long __user arg )
 {
 	drm_file_t	  *priv	    = filp->private_data;
 	drm_device_t	  *dev	    = priv->dev;
@@ -1534,7 +1535,7 @@ int i830_getparam( struct inode *inode, struct file *filp, unsigned int cmd,
 		return -EINVAL;
 	}
 
-	if (copy_from_user(&param, (drm_i830_getparam_t *)arg, sizeof(param) ))
+	if (copy_from_user(&param, (drm_i830_getparam_t __user *)arg, sizeof(param) ))
 		return -EFAULT;
 
 	switch( param.param ) {
@@ -1555,7 +1556,7 @@ int i830_getparam( struct inode *inode, struct file *filp, unsigned int cmd,
 
 
 int i830_setparam( struct inode *inode, struct file *filp, unsigned int cmd,
-		   unsigned long arg )
+		   unsigned long __user arg )
 {
 	drm_file_t	  *priv	    = filp->private_data;
 	drm_device_t	  *dev	    = priv->dev;
@@ -1567,7 +1568,7 @@ int i830_setparam( struct inode *inode, struct file *filp, unsigned int cmd,
 		return -EINVAL;
 	}
 
-	if (copy_from_user(&param, (drm_i830_setparam_t *)arg, sizeof(param) ))
+	if (copy_from_user(&param, (drm_i830_setparam_t __user *)arg, sizeof(param) ))
 		return -EFAULT;
 
 	switch( param.param ) {

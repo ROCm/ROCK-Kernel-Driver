@@ -87,7 +87,7 @@
     <table>
      <title>Expected Results</title>
 
-     <tgroup cols=2 align=left>
+     <tgroup cols="2" align="left">
 
       <thead>
        <row>
@@ -133,7 +133,7 @@
     <table>
      <title>Possible Results</title>
 
-     <tgroup cols=2 align=left>
+     <tgroup cols="2" align="left">
       <thead>
        <row>
         <entry>Instance 1</entry>
@@ -222,14 +222,14 @@
    <para>
      There are two main types of kernel locks.  The fundamental type
      is the spinlock 
-     (<filename class=headerfile>include/asm/spinlock.h</filename>), 
+     (<filename class="headerfile">include/asm/spinlock.h</filename>),
      which is a very simple single-holder lock: if you can't get the 
      spinlock, you keep trying (spinning) until you can.  Spinlocks are 
      very small and fast, and can be used anywhere.
    </para>
    <para>
      The second type is a semaphore
-     (<filename class=headerfile>include/asm/semaphore.h</filename>): it
+     (<filename class="headerfile">include/asm/semaphore.h</filename>): it
      can have more than one holder at any time (the number decided at
      initialization time), although it is most commonly used as a
      single-holder lock (a mutex).  If you can't get a semaphore,
@@ -315,7 +315,7 @@
       user context can be interrupted by a softirq, and secondly, the
       critical region could be entered from another CPU.  This is where
       <function>spin_lock_bh()</function> 
-      (<filename class=headerfile>include/linux/spinlock.h</filename>) is 
+      (<filename class="headerfile">include/linux/spinlock.h</filename>) is
       used.  It disables softirqs on that CPU, then grabs the lock.
       <function>spin_unlock_bh()</function> does the reverse.  (The
       '_bh' suffix is a historical reference to "Bottom Halves", the
@@ -333,7 +333,7 @@
       This works perfectly for <firstterm linkend="gloss-up"><acronym>UP
       </acronym></firstterm> as well: the spin lock vanishes, and this macro 
       simply becomes <function>local_bh_disable()</function>
-      (<filename class=headerfile>include/linux/interrupt.h</filename>), which
+      (<filename class="headerfile">include/linux/interrupt.h</filename>), which
       protects you from the softirq being run.
     </para>
    </sect1>
@@ -463,7 +463,7 @@
     <para>
       This works perfectly for UP as well: the spin lock vanishes,
       and this macro simply becomes <function>local_irq_disable()</function>
-      (<filename class=headerfile>include/asm/smp.h</filename>), which 
+      (<filename class="headerfile">include/asm/smp.h</filename>), which
       protects you from the softirq/tasklet/BH being run.
     </para>
 
@@ -545,7 +545,7 @@
    </para>
    <table>
 <title>Table of Locking Requirements</title>
-<TGROUP COLS=11>
+<TGROUP COLS="11">
 <TBODY>
 <ROW>
 <ENTRY></ENTRY>
@@ -1026,7 +1026,7 @@ In practice, <type>atomic_t</type> would usually be used for
 <structfield>refcnt</structfield>.  There are a number of atomic
 operations defined in
 
-<filename class=headerfile>include/asm/atomic.h</filename>: these are
+<filename class="headerfile">include/asm/atomic.h</filename>: these are
 guaranteed to be seen atomically from all CPUs in the system, so no
 lock is required.  In this case, it is simpler than using spinlocks,
 although for anything non-trivial using spinlocks is clearer.  The
@@ -1296,7 +1296,7 @@ as Alan Cox says, <quote>Lock data, not code</quote>.
     <table>
      <title>Consequences</title>
 
-     <tgroup cols=2 align=left>
+     <tgroup cols="2" align="left">
 
       <thead>
        <row>
@@ -1437,7 +1437,7 @@ as Alan Cox says, <quote>Lock data, not code</quote>.
       themselves (by calling <function>add_timer()</function> at the end
       of their timer function).  Because this is a fairly common case
       which is prone to races, you should use <function>del_timer_sync()</function>
-      (<filename class=headerfile>include/linux/timer.h</filename>)
+      (<filename class="headerfile">include/linux/timer.h</filename>)
       to handle this case.  It returns the number of times the timer
       had to be deleted before we finally stopped it from adding itself back
       in.
@@ -1749,7 +1749,7 @@ machines due to caching.
       an exclusive lock.  See <function>DEFINE_PER_CPU()</function>,
       <function>get_cpu_var()</function> and
       <function>put_cpu_var()</function>
-      (<filename class=headerfile>include/linux/percpu.h</filename>).
+      (<filename class="headerfile">include/linux/percpu.h</filename>).
     </para>
 
     <para>
@@ -1757,7 +1757,7 @@ machines due to caching.
       <type>local_t</type> type, and the
       <function>cpu_local_inc()</function> and related functions,
       which are more efficient than simple code on some architectures
-      (<filename class=headerfile>include/asm/local.h</filename>).
+      (<filename class="headerfile">include/asm/local.h</filename>).
     </para>
 
     <para>

@@ -49,11 +49,12 @@ static irqreturn_t dn_timer_int(int irq,void *, struct pt_regs *);
 static irqreturn_t (*sched_timer_handler)(int, void *, struct pt_regs *)=NULL;
 static void dn_get_model(char *model);
 static const char *apollo_models[] = {
-	"DN3000 (Otter)",
-	"DN3010 (Otter)",
-	"DN3500 (Cougar II)",
-	"DN4000 (Mink)",
-	"DN4500 (Roadrunner)" };
+	[APOLLO_DN3000-APOLLO_DN3000] = "DN3000 (Otter)",
+	[APOLLO_DN3010-APOLLO_DN3000] = "DN3010 (Otter)",
+	[APOLLO_DN3500-APOLLO_DN3000] = "DN3500 (Cougar II)",
+	[APOLLO_DN4000-APOLLO_DN3000] = "DN4000 (Mink)",
+	[APOLLO_DN4500-APOLLO_DN3000] = "DN4500 (Roadrunner)"
+};
 
 int apollo_parse_bootinfo(const struct bi_record *record) {
 

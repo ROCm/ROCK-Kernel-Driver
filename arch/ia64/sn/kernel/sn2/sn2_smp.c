@@ -91,7 +91,7 @@ sn2_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 	short			nasids[NR_NODES], nix;
 	DECLARE_BITMAP(nodes_flushed, NR_NODES);
 
-	CLEAR_BITMAP(nodes_flushed, NR_NODES);
+	bitmap_zero(nodes_flushed, NR_NODES);
 
 	i = 0;
 

@@ -1,4 +1,4 @@
-#define QLA_MODEL_NAMES         0x1B
+#define QLA_MODEL_NAMES         0x21
 
 /*
  * Adapter model names.
@@ -31,6 +31,12 @@ char	*qla2x00_model_name[QLA_MODEL_NAMES] = {
 	" ",		/* 0x118 */
 	"QLA200",	/* 0x119 */
 	"QLA200C"	/* 0x11A */
+	"QLA200P"	/* 0x11B */
+	"QLA200P"	/* 0x11C */
+	"QLA4040"	/* 0x11D */
+	"QLA4040"	/* 0x11E */
+	"QLA4040C"	/* 0x11F */
+	"QLA4040C"	/* 0x120 */
 };
 
 char	*qla2x00_model_desc[QLA_MODEL_NAMES] = {
@@ -61,5 +67,10 @@ char	*qla2x00_model_desc[QLA_MODEL_NAMES] = {
 	" ",						/* 0x118 */
 	"133MHz PCI-X to 2Gb FC Optical",		/* 0x119 */
 	"133MHz PCI-X to 2Gb FC Copper"			/* 0x11A */
+	"133MHz PCI-X to 2Gb FC SFP"			/* 0x11B */
+	"133MHz PCI-X to 2Gb FC SFP"			/* 0x11C */
+	"Optical- 133MHz to 1Gb NIC with IPSEC",	/* 0x11D */
+	"Optical- 133MHz to 1Gb iSCSI with IPSEC",	/* 0x11E */
+	"Copper- 133MHz to 1Gb NIC with IPSEC",		/* 0x11F */
+	"Copper- 133MHz to 1Gb iSCSI with IPSEC",	/* 0x120 */
 };
-

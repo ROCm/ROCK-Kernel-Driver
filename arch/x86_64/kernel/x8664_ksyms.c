@@ -98,8 +98,10 @@ EXPORT_SYMBOL(copy_to_user);
 EXPORT_SYMBOL(copy_in_user);
 EXPORT_SYMBOL(strnlen_user);
 
+#ifdef CONFIG_PCI
 EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);
+#endif
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(pcibios_penalize_isa_irq);

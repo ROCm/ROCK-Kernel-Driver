@@ -34,6 +34,7 @@
 # include <asm/smp.h>
 #endif
 #include <asm/irq.h>
+#include <asm/hw_irq.h>
 
 
 #undef DEBUG
@@ -441,7 +442,6 @@ pcibios_enable_device (struct pci_dev *dev, int mask)
 	if (ret < 0)
 		return ret;
 
-	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", dev->irq, pci_name(dev));
 	return acpi_pci_irq_enable(dev);
 }
 
@@ -566,4 +566,13 @@ pcibios_prep_mwi (struct pci_dev *dev)
 		}
 	}
 	return rc;
+}
+
+int pci_vector_resources(int last, int nr_released)
+{
+	int count = nr_released;
+
+ 	count += (IA64_LAST_DEVICE_VECTOR - last);
+
+	return count;
 }

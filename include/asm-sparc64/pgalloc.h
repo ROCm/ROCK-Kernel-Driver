@@ -189,7 +189,15 @@ static __inline__ void free_pmd_slow(pmd_t *pmd)
 	pmd_populate_kernel(MM,PMD,page_address(PTE_PAGE))
 
 extern pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address);
-#define pte_alloc_one(MM,ADDR)	virt_to_page(pte_alloc_one_kernel(MM,ADDR))
+
+static inline struct page *
+pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+{
+	pte_t *pte = pte_alloc_one_kernel(mm, addr);
+	if (pte)
+		return virt_to_page(pte);
+	return 0;
+}
 
 static __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {

@@ -743,7 +743,7 @@ lock_retry_remap:
 	}
 
 	BUG_ON(PageWriteback(page));
-	SetPageWriteback(page);		/* Keeps try_to_free_buffers() away. */
+	set_page_writeback(page);	/* Keeps try_to_free_buffers() away. */
 	unlock_page(page);
 
 	/*
@@ -885,7 +885,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	// FIXME: Make sure it is ok to SetPageError() on unlocked page under
 	// writeback before doing the change!
 #if 0
-	SetPageWriteback(page);
+	set_page_writeback(page);
 	unlock_page(page);
 #endif
 

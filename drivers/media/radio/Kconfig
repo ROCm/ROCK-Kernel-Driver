@@ -14,11 +14,11 @@ config RADIO_CADET
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  Further documentation on this driver can be found on the WWW at
-	  <http://linux.blackhawke.net/cadet.html>.
+	  <http://linux.blackhawke.net/cadet/>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-cadet.
@@ -41,9 +41,9 @@ config RADIO_RTRACK
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.  More
-	  information is contained in the file
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>. More information is
+	  contained in the file
 	  <file:Documentation/video4linux/radiotrack.txt>.
 
 	  To compile this driver as a module, choose M here: the
@@ -66,8 +66,8 @@ config RADIO_RTRACK2
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-rtrack2.
@@ -89,8 +89,8 @@ config RADIO_AZTECH
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-aztech.
@@ -113,8 +113,8 @@ config RADIO_GEMTEK
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-gemtek.
@@ -137,8 +137,8 @@ config RADIO_GEMTEK_PCI
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video for Linux API.  Information on 
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-gemtek-pci.
@@ -152,8 +152,8 @@ config RADIO_MAXIRADIO
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-maxiradio.
@@ -167,8 +167,8 @@ config RADIO_MAESTRO
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-maestro.
@@ -183,8 +183,8 @@ config RADIO_MIROPCM20
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called miropcm20.
@@ -217,8 +217,8 @@ config RADIO_SF16FMI
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-sf16fmi.
@@ -248,12 +248,12 @@ config RADIO_TERRATEC
 	  frequency control and muting works at least for me, but
 	  unfortunately I have not found anybody who wants to use this card
 	  with Linux.  So if it is this what YOU are trying to do right now,
-	  PLEASE DROP ME A NOTE!!  Rolf Offermanns (rolf@offermanns.de)
+	  PLEASE DROP ME A NOTE!!  Rolf Offermanns <rolf@offermanns.de>.
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-terratec.
@@ -293,8 +293,8 @@ config RADIO_TYPHOON
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-typhoon.
@@ -337,8 +337,8 @@ config RADIO_ZOLTRIX
 
 	  In order to control your radio card, you will need to use programs
 	  that are compatible with the Video For Linux API.  Information on
-	  this API and pointers to "v4l" programs may be found on the WWW at
-	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+	  this API and pointers to "v4l" programs may be found at
+	  <file:Documentation/video4linux/API.html>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called radio-zoltrix.

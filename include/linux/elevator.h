@@ -94,6 +94,11 @@ extern elevator_t iosched_deadline;
  */
 extern elevator_t iosched_as;
 
+/*
+ * completely fair queueing I/O scheduler
+ */
+extern elevator_t iosched_cfq;
+
 extern int elevator_init(request_queue_t *, elevator_t *);
 extern void elevator_exit(request_queue_t *);
 extern int elv_rq_merge_ok(struct request *, struct bio *);

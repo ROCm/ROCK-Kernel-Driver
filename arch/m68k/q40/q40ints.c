@@ -423,8 +423,14 @@ static irqreturn_t default_handler(int lev, void *dev_id, struct pt_regs *regs)
 }
 
 irqreturn_t (*q40_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
-	 default_handler, default_handler, default_handler, default_handler,
-	 default_handler, default_handler, default_handler, default_handler
+	 [0] = default_handler,
+	 [1] = default_handler,
+	 [2] = default_handler,
+	 [3] = default_handler,
+	 [4] = default_handler,
+	 [5] = default_handler,
+	 [6] = default_handler,
+	 [7] = default_handler
 };
 
 

@@ -66,7 +66,8 @@
  *				is NOT for the length of the hostname.
  *	Hua Qin		:	Support for mounting root file system via
  *				NFS over TCP.
- */
+ *	Fabian Frederick:	Option parser rebuilt (using parser lib)
+*/
 
 #include <linux/config.h>
 #include <linux/types.h>
@@ -85,6 +86,7 @@
 #include <linux/inet.h>
 #include <linux/root_dev.h>
 #include <net/ipconfig.h>
+#include <linux/parser.h>
 
 /* Define this to allow debugging output */
 #undef NFSROOT_DEBUG
@@ -114,98 +116,164 @@ static int mount_port __initdata = 0;		/* Mount daemon port number */
 
  ***************************************************************************/
 
-/*
- *  The following integer options are recognized
- */
-static struct nfs_int_opts {
-	char *name;
-	int  *val;
-} root_int_opts[] __initdata = {
-	{ "port",	&nfs_port },
-	{ "rsize",	&nfs_data.rsize },
-	{ "wsize",	&nfs_data.wsize },
-	{ "timeo",	&nfs_data.timeo },
-	{ "retrans",	&nfs_data.retrans },
-	{ "acregmin",	&nfs_data.acregmin },
-	{ "acregmax",	&nfs_data.acregmax },
-	{ "acdirmin",	&nfs_data.acdirmin },
-	{ "acdirmax",	&nfs_data.acdirmax },
-	{ NULL,		NULL }
+enum {
+	Opt_port, Opt_rsize, Opt_wsize, Opt_timeo, Opt_retrans, Opt_acregmin,
+	Opt_acregmax, Opt_acdirmin, Opt_acdirmax, Opt_soft, Opt_hard, Opt_intr,
+	Opt_nointr, Opt_posix, Opt_noposix, Opt_cto, Opt_nocto, Opt_ac, 
+	Opt_noac, Opt_lock, Opt_nolock, Opt_v2, Opt_v3, Opt_udp, Opt_tcp,
+	Opt_broken_suid, Opt_err,
 };
 
-
-/*
- *  And now the flag options
- */
-static struct nfs_bool_opts {
-	char *name;
-	int  and_mask;
-	int  or_mask;
-} root_bool_opts[] __initdata = {
-	{ "soft",	~NFS_MOUNT_SOFT,	NFS_MOUNT_SOFT },
-	{ "hard",	~NFS_MOUNT_SOFT,	0 },
-	{ "intr",	~NFS_MOUNT_INTR,	NFS_MOUNT_INTR },
-	{ "nointr",	~NFS_MOUNT_INTR,	0 },
-	{ "posix",	~NFS_MOUNT_POSIX,	NFS_MOUNT_POSIX },
-	{ "noposix",	~NFS_MOUNT_POSIX,	0 },
-	{ "cto",	~NFS_MOUNT_NOCTO,	0 },
-	{ "nocto",	~NFS_MOUNT_NOCTO,	NFS_MOUNT_NOCTO },
-	{ "ac",		~NFS_MOUNT_NOAC,	0 },
-	{ "noac",	~NFS_MOUNT_NOAC,	NFS_MOUNT_NOAC },
-	{ "lock",	~NFS_MOUNT_NONLM,	0 },
-	{ "nolock",	~NFS_MOUNT_NONLM,	NFS_MOUNT_NONLM },
-#ifdef CONFIG_NFS_V3
-	{ "v2",		~NFS_MOUNT_VER3,	0 },
-	{ "v3",		~NFS_MOUNT_VER3,	NFS_MOUNT_VER3 },
-#endif
-	{ "udp",	~NFS_MOUNT_TCP,		0 },
-	{ "tcp",	~NFS_MOUNT_TCP,		NFS_MOUNT_TCP },
-	{ "broken_suid",~NFS_MOUNT_BROKEN_SUID,	NFS_MOUNT_BROKEN_SUID },
-	{ NULL,		0,			0 }
+static match_table_t tokens = {
+	{Opt_port, "port=%u"},
+	{Opt_rsize, "rsize=%u"},
+	{Opt_wsize, "wsize=%u"},
+	{Opt_timeo, "timeo=%u"},
+	{Opt_retrans, "retrans=%u"},
+	{Opt_acregmin, "acregmin=%u"},
+	{Opt_acregmax, "acregmax=%u"},
+	{Opt_acdirmin, "acdirmin=%u"},
+	{Opt_acdirmax, "acdirmax=%u"},
+	{Opt_soft, "soft"},
+	{Opt_hard, "hard"},
+	{Opt_intr, "intr"},
+	{Opt_nointr, "nointr"},
+	{Opt_posix, "posix"},
+	{Opt_noposix, "noposix"},
+	{Opt_cto, "cto"},
+	{Opt_nocto, "nocto"},
+	{Opt_ac, "ac"},
+	{Opt_noac, "noac"},
+	{Opt_lock, "lock"},
+	{Opt_nolock, "nolock"},
+	{Opt_v2, "v2"},
+	{Opt_v3, "v3"},
+	{Opt_udp, "udp"},
+	{Opt_tcp, "tcp"},
+	{Opt_broken_suid, "broken_suid"},
+	{Opt_err, NULL}
+	
 };
-
 
 /*
  *  Parse option string.
  */
-static void __init root_nfs_parse(char *name, char *buf)
-{
-	char *options, *val, *cp;
 
-	if ((options = strchr(name, ','))) {
-		*options++ = 0;
-		while ((cp = strsep(&options, ",")) != NULL) {
-			if (!*cp)
-				continue;
-			if ((val = strchr(cp, '='))) {
-				struct nfs_int_opts *opts = root_int_opts;
-				*val++ = '\0';
-				while (opts->name && strcmp(opts->name, cp))
-					opts++;
-				if (opts->name)
-					*(opts->val) = (int) simple_strtoul(val, NULL, 10);
-			} else {
-				struct nfs_bool_opts *opts = root_bool_opts;
-				while (opts->name && strcmp(opts->name, cp))
-					opts++;
-				if (opts->name) {
-					nfs_data.flags &= opts->and_mask;
-					nfs_data.flags |= opts->or_mask;
-				}
-			}
+static int __init root_nfs_parse(char *name, char *buf)
+{
+
+	char *p;
+	substring_t args[MAX_OPT_ARGS];
+	int option;
+
+	if (!name)
+		return 1;
+
+	if (name[0] && strcmp(name, "default")){
+		strlcpy(buf, name, NFS_MAXPATHLEN);
+		return 1;
+	}
+	while ((p = strsep (&name, ",")) != NULL) {
+		int token; 
+		if (!*p)
+			continue;
+		token = match_token(p, tokens, args);
+
+		/* %u tokens only */
+		if (match_int(&args[0], &option))
+			return 0;
+		switch (token) {
+			case Opt_port:
+				nfs_port = option;
+				break;
+			case Opt_rsize:
+				nfs_data.rsize = option;
+				break;
+			case Opt_wsize:
+				nfs_data.wsize = option;
+				break;
+			case Opt_timeo:
+				nfs_data.timeo = option;
+				break;
+			case Opt_retrans:
+				nfs_data.retrans = option;
+				break;
+			case Opt_acregmin:
+				nfs_data.acregmin = option;
+				break;
+			case Opt_acregmax:
+				nfs_data.acregmax = option;
+				break;
+			case Opt_acdirmin:
+				nfs_data.acdirmin = option;
+				break;
+			case Opt_acdirmax:
+				nfs_data.acdirmax = option;
+				break;
+			case Opt_soft:
+				nfs_data.flags |= NFS_MOUNT_SOFT;
+				break;
+			case Opt_hard:
+				nfs_data.flags &= ~NFS_MOUNT_SOFT;
+				break;
+			case Opt_intr:
+				nfs_data.flags |= NFS_MOUNT_INTR;
+				break;
+			case Opt_nointr:
+				nfs_data.flags &= ~NFS_MOUNT_INTR;
+				break;
+			case Opt_posix:
+				nfs_data.flags |= NFS_MOUNT_POSIX;
+				break;
+			case Opt_noposix:
+				nfs_data.flags &= ~NFS_MOUNT_POSIX;
+				break;
+			case Opt_cto:
+				nfs_data.flags &= ~NFS_MOUNT_NOCTO;
+				break;
+			case Opt_nocto:
+				nfs_data.flags |= NFS_MOUNT_NOCTO;
+				break;
+			case Opt_ac:
+				nfs_data.flags &= ~NFS_MOUNT_NOAC;
+				break;
+			case Opt_noac:
+				nfs_data.flags |= NFS_MOUNT_NOAC;
+				break;
+			case Opt_lock:
+				nfs_data.flags &= ~NFS_MOUNT_NONLM;
+				break;
+			case Opt_nolock:
+				nfs_data.flags |= NFS_MOUNT_NONLM;
+				break;
+			case Opt_v2:
+				nfs_data.flags &= ~NFS_MOUNT_VER3;
+				break;
+			case Opt_v3:
+				nfs_data.flags |= NFS_MOUNT_VER3;
+				break;
+			case Opt_udp:
+				nfs_data.flags &= ~NFS_MOUNT_TCP;
+				break;
+			case Opt_tcp:
+				nfs_data.flags |= NFS_MOUNT_TCP;
+				break;
+			case Opt_broken_suid:
+				nfs_data.flags |= NFS_MOUNT_BROKEN_SUID;
+				break;
+			default : 
+				return 0;
 		}
 	}
-	if (name[0] && strcmp(name, "default"))
-		strlcpy(buf, name, NFS_MAXPATHLEN);
+	return 1;
 }
-
 
 /*
  *  Prepare the NFS data structure and parse all options.
  */
 static int __init root_nfs_name(char *name)
 {
-	char buf[NFS_MAXPATHLEN];
+	static char buf[NFS_MAXPATHLEN];
 	char *cp;
 
 	/* Set some default values */

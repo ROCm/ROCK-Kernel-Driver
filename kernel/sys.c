@@ -260,6 +260,17 @@ cond_syscall(sys_msgctl)
 cond_syscall(sys_shmget)
 cond_syscall(sys_shmdt)
 cond_syscall(sys_shmctl)
+cond_syscall(sys_mq_open)
+cond_syscall(sys_mq_unlink)
+cond_syscall(sys_mq_timedsend)
+cond_syscall(sys_mq_timedreceive)
+cond_syscall(sys_mq_notify)
+cond_syscall(sys_mq_getsetattr)
+cond_syscall(compat_sys_mq_open)
+cond_syscall(compat_sys_mq_timedsend)
+cond_syscall(compat_sys_mq_timedreceive)
+cond_syscall(compat_sys_mq_notify)
+cond_syscall(compat_sys_mq_getsetattr)
 
 /* arch-specific weak syscall entries */
 cond_syscall(sys_pciconfig_read)
@@ -436,7 +447,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 	switch (cmd) {
 	case LINUX_REBOOT_CMD_RESTART:
 		notifier_call_chain(&reboot_notifier_list, SYS_RESTART, NULL);
-		system_running = 0;
+		system_state = SYSTEM_SHUTDOWN;
 		device_shutdown();
 		printk(KERN_EMERG "Restarting system.\n");
 		machine_restart(NULL);
@@ -452,7 +463,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 
 	case LINUX_REBOOT_CMD_HALT:
 		notifier_call_chain(&reboot_notifier_list, SYS_HALT, NULL);
-		system_running = 0;
+		system_state = SYSTEM_SHUTDOWN;
 		device_shutdown();
 		printk(KERN_EMERG "System halted.\n");
 		machine_halt();
@@ -462,7 +473,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 
 	case LINUX_REBOOT_CMD_POWER_OFF:
 		notifier_call_chain(&reboot_notifier_list, SYS_POWER_OFF, NULL);
-		system_running = 0;
+		system_state = SYSTEM_SHUTDOWN;
 		device_shutdown();
 		printk(KERN_EMERG "Power down.\n");
 		machine_power_off();
@@ -478,7 +489,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 		buffer[sizeof(buffer) - 1] = '\0';
 
 		notifier_call_chain(&reboot_notifier_list, SYS_RESTART, buffer);
-		system_running = 0;
+		system_state = SYSTEM_SHUTDOWN;
 		device_shutdown();
 		printk(KERN_EMERG "Restarting system with command '%s'.\n", buffer);
 		machine_restart(buffer);
@@ -979,7 +990,7 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 
 	if (p->parent == current || p->real_parent == current) {
 		err = -EPERM;
-		if (p->session != current->session)
+		if (p->signal->session != current->signal->session)
 			goto out;
 		err = -EACCES;
 		if (p->did_exec)
@@ -991,7 +1002,7 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 	}
 
 	err = -EPERM;
-	if (p->leader)
+	if (p->signal->leader)
 		goto out;
 
 	if (pgid != pid) {
@@ -1000,7 +1011,7 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 		struct list_head *l;
 
 		for_each_task_pid(pgid, PIDTYPE_PGID, p, l, pid)
-			if (p->session == current->session)
+			if (p->signal->session == current->signal->session)
 				goto ok_pgid;
 		goto out;
 	}
@@ -1012,7 +1023,7 @@ ok_pgid:
 
 	if (process_group(p) != pgid) {
 		detach_pid(p, PIDTYPE_PGID);
-		p->group_leader->__pgrp = pgid;
+		p->signal->pgrp = pgid;
 		attach_pid(p, PIDTYPE_PGID, pgid);
 	}
 
@@ -1054,7 +1065,7 @@ asmlinkage long sys_getpgrp(void)
 asmlinkage long sys_getsid(pid_t pid)
 {
 	if (!pid) {
-		return current->session;
+		return current->signal->session;
 	} else {
 		int retval;
 		struct task_struct *p;
@@ -1066,7 +1077,7 @@ asmlinkage long sys_getsid(pid_t pid)
 		if(p) {
 			retval = security_task_getsid(p);
 			if (!retval)
-				retval = p->session;
+				retval = p->signal->session;
 		}
 		read_unlock(&tasklist_lock);
 		return retval;
@@ -1087,10 +1098,10 @@ asmlinkage long sys_setsid(void)
 	if (pid)
 		goto out;
 
-	current->leader = 1;
+	current->signal->leader = 1;
 	__set_special_pids(current->pid, current->pid);
-	current->tty = NULL;
-	current->tty_old_pgrp = 0;
+	current->signal->tty = NULL;
+	current->signal->tty_old_pgrp = 0;
 	err = process_group(current);
 out:
 	write_unlock_irq(&tasklist_lock);
@@ -1521,7 +1532,6 @@ int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 			r.ru_nivcsw = p->nivcsw;
 			r.ru_minflt = p->min_flt;
 			r.ru_majflt = p->maj_flt;
-			r.ru_nswap = p->nswap;
 			break;
 		case RUSAGE_CHILDREN:
 			jiffies_to_timeval(p->cutime, &r.ru_utime);
@@ -1530,7 +1540,6 @@ int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 			r.ru_nivcsw = p->cnivcsw;
 			r.ru_minflt = p->cmin_flt;
 			r.ru_majflt = p->cmaj_flt;
-			r.ru_nswap = p->cnswap;
 			break;
 		default:
 			jiffies_to_timeval(p->utime + p->cutime, &r.ru_utime);
@@ -1539,7 +1548,6 @@ int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 			r.ru_nivcsw = p->nivcsw + p->cnivcsw;
 			r.ru_minflt = p->min_flt + p->cmin_flt;
 			r.ru_majflt = p->maj_flt + p->cmaj_flt;
-			r.ru_nswap = p->nswap + p->cnswap;
 			break;
 	}
 	return copy_to_user(ru, &r, sizeof(r)) ? -EFAULT : 0;

@@ -2150,7 +2150,6 @@ static int mxser_tiocmget(struct tty_struct *tty, struct file *file)
 {
 	struct mxser_struct *info = (struct mxser_struct *) tty->driver_data;
 	unsigned char control, status;
-	unsigned int result;
 	unsigned long flags;
 
 	if (PORTNO(tty) == MXSER_PORTS)
@@ -2177,7 +2176,6 @@ static int mxser_tiocmset(struct tty_struct *tty, struct file *file,
 			  unsigned int set, unsigned int clear)
 {
 	struct mxser_struct *info = (struct mxser_struct *) tty->driver_data;
-	unsigned int arg;
 	unsigned long flags;
 
 	if (PORTNO(tty) == MXSER_PORTS)

@@ -1920,7 +1920,6 @@ wavefront_reset_to_cleanliness (snd_wavefront_t *dev)
 #include <linux/syscalls.h>
 #include <asm/uaccess.h>
 
-static int errno;
 
 static int __init
 wavefront_download_firmware (snd_wavefront_t *dev, char *path)

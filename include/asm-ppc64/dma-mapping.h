@@ -36,10 +36,43 @@ extern int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 		enum dma_data_direction direction);
 extern void dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 		int nhwentries, enum dma_data_direction direction);
-extern void dma_sync_single(struct device *dev, dma_addr_t dma_handle,
-		size_t size, enum dma_data_direction direction);
-extern void dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
-		enum dma_data_direction direction);
+
+static inline void
+dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
+			enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+	/* nothing to do */
+}
+
+static inline void
+dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
+			   enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+	/* nothing to do */
+}
+
+static inline void
+dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
+		    enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+	/* nothing to do */
+}
+
+static inline void
+dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
+		       enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+	/* nothing to do */
+}
+
+static inline int dma_mapping_error(dma_addr_t dma_addr)
+{
+	return (dma_addr == DMA_ERROR_CODE);
+}
 
 /* Now for the API extensions over the pci_ one */
 
@@ -56,27 +89,29 @@ dma_get_cache_alignment(void)
 }
 
 static inline void
-dma_sync_single_range(struct device *dev, dma_addr_t dma_handle,
-		      unsigned long offset, size_t size,
-		      enum dma_data_direction direction)
+dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
+			      unsigned long offset, size_t size,
+			      enum dma_data_direction direction)
 {
-	/* just sync everything, that's all the pci API can do */
-	dma_sync_single(dev, dma_handle, offset+size, direction);
+	BUG_ON(direction == DMA_NONE);
+	/* nothing to do */
+}
+
+static inline void
+dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
+				 unsigned long offset, size_t size,
+				 enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+	/* nothing to do */
 }
 
 static inline void
 dma_cache_sync(void *vaddr, size_t size,
 	       enum dma_data_direction direction)
 {
-	/* could define this in terms of the dma_cache ... operations,
-	 * but if you get this on a platform, you should convert the platform
-	 * to using the generic device DMA API */
-	BUG();
-}
-
-static inline int dma_mapping_error(dma_addr_t dma_addr)
-{
-	return (dma_addr == DMA_ERROR_CODE);
+	BUG_ON(direction == DMA_NONE);
+	/* nothing to do */
 }
 
 #endif	/* _ASM_DMA_MAPPING_H */

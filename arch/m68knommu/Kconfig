@@ -171,6 +171,11 @@ config CLOCK_60MHz
 	help
 	  Select an 60MHz CPU clock frequency.
 
+config CLOCK_64MHz
+	bool "64MHz"
+	help
+	  Select an 64MHz CPU clock frequency.
+
 config CLOCK_66MHz
 	bool "66MHz"
 	help
@@ -282,11 +287,23 @@ config M5272C3
 	help
 	  Support for the Motorola M5272C3 board.
 
+config COBRA5272
+	bool "senTec COBRA5272 board support"
+	depends on M5272
+	help
+	  Support for the senTec COBRA5272 board.
+
 config M5282C3
 	bool "Motorola M5282C3 board support"
 	depends on M5282
 	help
 	  Support for the Motorola M5282C3 board.
+
+config COBRA5282
+	bool "senTec COBRA5282 board support"
+	depends on M5282
+	help
+	  Support for the senTec COBRA5282 board.
 
 config ARN5307
 	bool "Arnewsh 5307 board support"
@@ -357,6 +374,11 @@ config MOTOROLA
 	bool
 	default y
 	depends on (M5206eC3 || M5249C3 || M5272C3 || M5282C3 || M5307C3 || M5407C3)
+
+config senTec
+	bool
+	default y
+	depends on (COBRA5272 || COBRA5282)
 
 config LARGE_ALLOCS
 	bool "Allow allocating large blocks (> 1MB) of memory"
@@ -485,55 +507,9 @@ config PM
 
 endmenu
 
-
-source "drivers/base/Kconfig"
-
-source "drivers/mtd/Kconfig"
-
-source "drivers/parport/Kconfig"
-
-source "drivers/pnp/Kconfig"
-
-source "drivers/block/Kconfig"
-
-source "drivers/ide/Kconfig"
-
-source "drivers/scsi/Kconfig"
-
-source "drivers/cdrom/Kconfig"
-
-source "drivers/md/Kconfig"
-
-source "drivers/message/fusion/Kconfig"
-
-source "drivers/ieee1394/Kconfig"
-
-source "drivers/message/i2o/Kconfig"
-
-source "net/Kconfig"
-
-source "drivers/isdn/Kconfig"
-
-source "drivers/telephony/Kconfig"
-
-#
-# input before char - char/joystick depends on it. As does USB.
-#
-source "drivers/input/Kconfig"
-
-source "drivers/char/Kconfig"
-
-#source drivers/misc/Config.in
-source "drivers/media/Kconfig"
+source "drivers/Kconfig"
 
 source "fs/Kconfig"
-
-source "drivers/video/Kconfig"
-
-source "sound/Kconfig"
-
-source "drivers/usb/Kconfig"
-
 
 menu "Kernel hacking"
 
@@ -541,6 +517,14 @@ config FULLDEBUG
 	bool "Full Symbolic/Source Debugging support"
 	help
 	  Enable debuging symbols on kernel build.
+
+config FRAME_POINTER
+	bool "Compile the kernel with frame pointers"
+	help
+	  If you say Y here the resulting kernel image will be slightly larger
+	  and slower, but it will give very useful debugging information.
+	  If you don't debug the kernel, you can say N, but we may not be able
+	  to solve problems without frame pointers.
 
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"

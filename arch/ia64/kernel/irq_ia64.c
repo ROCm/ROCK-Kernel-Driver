@@ -73,13 +73,13 @@ irq_exit (void)
 }
 
 int
-ia64_alloc_vector (void)
+assign_irq_vector (int irq)
 {
 	static int next_vector = IA64_FIRST_DEVICE_VECTOR;
 
 	if (next_vector > IA64_LAST_DEVICE_VECTOR)
 		/* XXX could look for sharable vectors instead of panic'ing... */
-		panic("ia64_alloc_vector: out of interrupt vectors!");
+		panic("assign_irq_vector: out of interrupt vectors!");
 	return next_vector++;
 }
 

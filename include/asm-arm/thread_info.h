@@ -108,8 +108,8 @@ extern void free_thread_info(struct thread_info *);
 #define TI_CPU		20
 #define TI_CPU_DOMAIN	24
 #define TI_CPU_SAVE	28
-#define TI_USED_MATH	76
-#define TI_FPSTATE	(TI_USED_MATH+16)
+#define TI_USED_CP	76
+#define TI_FPSTATE	(TI_USED_CP+16)
 
 #endif
 

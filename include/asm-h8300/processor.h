@@ -51,16 +51,19 @@ extern inline void wrusp(unsigned long usp) {
 #define MCA_bus 0
 
 struct thread_struct {
-	unsigned long ksp;		/* kernel stack pointer */
-	unsigned long usp;		/* user stack pointer */
-	unsigned long ccr;		/* saved status register */
-	unsigned long esp0;             /* points to SR of stack frame */
-	unsigned long debugreg[8];      /* debug info */
+	unsigned long  ksp;		/* kernel stack pointer */
+	unsigned long  usp;		/* user stack pointer */
+	unsigned long  ccr;		/* saved status register */
+	unsigned long  esp0;            /* points to SR of stack frame */
+	struct {
+		unsigned short *addr;
+		unsigned short inst;
+	} breakinfo;
 };
 
 #define INIT_THREAD  { \
 	sizeof(init_stack) + (unsigned long) init_stack, 0, \
-	PS_S, \
+	PS_S,  0, {(unsigned short *)-1, 0}, \
 }
 
 /*

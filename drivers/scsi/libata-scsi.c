@@ -32,17 +32,28 @@
 
 #include "libata.h"
 
+static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
+			      struct scsi_cmnd *cmd,
+			      void (*done)(struct scsi_cmnd *));
+
 
 /**
- *	ata_std_bios_param - generic bios head/sector/cylinder calculator
- *	    used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS) 
- *	    mapping. Some situations may arise where the disk is not 
- *	    bootable if this is not used.
+ *	ata_std_bios_param - generic bios head/sector/cylinder calculator used by sd.
+ *	@sdev: SCSI device for which BIOS geometry is to be determined
+ *	@bdev: block device associated with @sdev
+ *	@capacity: capacity of SCSI device
+ *	@geom: location to which geometry will be output
+ *
+ *	Generic bios head/sector/cylinder calculator
+ *	used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS) 
+ *	mapping. Some situations may arise where the disk is not 
+ *	bootable if this is not used.
  *
  *	LOCKING:
+ *	Defined by the SCSI layer.  We don't really care.
  *
  *	RETURNS:
- *
+ *	Zero.
  */
 int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 		       sector_t capacity, int geom[]) 
@@ -56,6 +67,27 @@ int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 }
 
 
+/**
+ *	ata_scsi_qc_new - acquire new ata_queued_cmd reference
+ *	@ap: ATA port to which the new command is attached
+ *	@dev: ATA device to which the new command is attached
+ *	@cmd: SCSI command that originated this ATA command
+ *	@done: SCSI command completion function
+ *
+ *	Obtain a reference to an unused ata_queued_cmd structure,
+ *	which is the basic libata structure representing a single
+ *	ATA command sent to the hardware.
+ *
+ *	If a command was available, fill in the SCSI-specific
+ *	portions of the structure with information on the
+ *	current command.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ *
+ *	RETURNS:
+ *	Command allocated, or %NULL if none available.
+ */
 struct ata_queued_cmd *ata_scsi_qc_new(struct ata_port *ap,
 				       struct ata_device *dev,
 				       struct scsi_cmnd *cmd,
@@ -84,11 +116,18 @@ struct ata_queued_cmd *ata_scsi_qc_new(struct ata_port *ap,
 }
 
 /**
- *	ata_to_sense_error -
- *	@qc:
- *	@cmd:
+ *	ata_to_sense_error - convert ATA error to SCSI error
+ *	@qc: Command that we are erroring out
+ *
+ *	Converts an ATA error into a SCSI error.
+ *
+ *	Right now, this routine is laughably primitive.  We
+ *	don't even examine what ATA told us, we just look at
+ *	the command data direction, and return a fatal SCSI
+ *	sense error based on that.
  *
  *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
  */
 
 void ata_to_sense_error(struct ata_queued_cmd *qc)
@@ -102,7 +141,7 @@ void ata_to_sense_error(struct ata_queued_cmd *qc)
 	cmd->sense_buffer[7] = 14 - 8;	/* addnl. sense len. FIXME: correct? */
 
 	/* additional-sense-code[-qualifier] */
-	if ((qc->flags & ATA_QCFLAG_WRITE) == 0) {
+	if (cmd->sc_data_direction == SCSI_DATA_READ) {
 		cmd->sense_buffer[12] = 0x11; /* "unrecovered read error" */
 		cmd->sense_buffer[13] = 0x04;
 	} else {
@@ -112,11 +151,15 @@ void ata_to_sense_error(struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_scsi_slave_config -
- *	@sdev:
+ *	ata_scsi_slave_config - Set SCSI device attributes
+ *	@sdev: SCSI device to examine
+ *
+ *	This is called before we actually start reading
+ *	and writing to the device, to configure certain
+ *	SCSI mid-layer behaviors.
  *
  *	LOCKING:
- *
+ *	Defined by SCSI layer.  We don't really care.
  */
 
 int ata_scsi_slave_config(struct scsi_device *sdev)
@@ -155,24 +198,29 @@ int ata_scsi_error(struct Scsi_Host *host)
 }
 
 /**
- *	ata_scsi_rw_xlat -
- *	@qc:
- *	@scsicmd:
- *	@cmd_size:
+ *	ata_scsi_rw_xlat - Translate SCSI r/w command into an ATA one
+ *	@qc: Storage for translated ATA taskfile
+ *	@scsicmd: SCSI command to translate
+ *
+ *	Converts any of six SCSI read/write commands into the
+ *	ATA counterpart, including starting sector (LBA),
+ *	sector count, and taking into account the device's LBA48
+ *	support.
+ *
+ *	Commands %READ_6, %READ_10, %READ_16, %WRITE_6, %WRITE_10, and
+ *	%WRITE_16 are currently supported.
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
  *
  *	RETURNS:
- *
+ *	Zero on success, non-zero on error.
  */
 
-static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
-				   unsigned int cmd_size)
+static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 {
 	struct ata_taskfile *tf = &qc->tf;
 	unsigned int lba48 = tf->flags & ATA_TFLAG_LBA48;
-	unsigned int dma = qc->flags & ATA_QCFLAG_DMA;
 
 	qc->cursect = qc->cursg = qc->cursg_ofs = 0;
 	tf->flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
@@ -180,43 +228,18 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 	tf->hob_lbal = 0;
 	tf->hob_lbam = 0;
 	tf->hob_lbah = 0;
+	tf->protocol = qc->dev->xfer_protocol;
+	tf->device |= ATA_LBA;
 
 	if (scsicmd[0] == READ_10 || scsicmd[0] == READ_6 ||
 	    scsicmd[0] == READ_16) {
-		if (likely(dma)) {
-			if (lba48)
-				tf->command = ATA_CMD_READ_EXT;
-			else
-				tf->command = ATA_CMD_READ;
-			tf->protocol = ATA_PROT_DMA_READ;
-		} else {
-			if (lba48)
-				tf->command = ATA_CMD_PIO_READ_EXT;
-			else
-				tf->command = ATA_CMD_PIO_READ;
-			tf->protocol = ATA_PROT_PIO_READ;
-		}
-		qc->flags &= ~ATA_QCFLAG_WRITE;
-		VPRINTK("reading\n");
+		tf->command = qc->dev->read_cmd;
 	} else {
-		if (likely(dma)) {
-			if (lba48)
-				tf->command = ATA_CMD_WRITE_EXT;
-			else
-				tf->command = ATA_CMD_WRITE;
-			tf->protocol = ATA_PROT_DMA_WRITE;
-		} else {
-			if (lba48)
-				tf->command = ATA_CMD_PIO_WRITE_EXT;
-			else
-				tf->command = ATA_CMD_PIO_WRITE;
-			tf->protocol = ATA_PROT_PIO_WRITE;
-		}
-		qc->flags |= ATA_QCFLAG_WRITE;
-		VPRINTK("writing\n");
+		tf->command = qc->dev->write_cmd;
+		tf->flags |= ATA_TFLAG_WRITE;
 	}
 
-	if (cmd_size == 10) {
+	if (scsicmd[0] == READ_10 || scsicmd[0] == WRITE_10) {
 		if (lba48) {
 			tf->hob_nsect = scsicmd[7];
 			tf->hob_lbal = scsicmd[2];
@@ -234,7 +257,6 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 
 			qc->nsect = scsicmd[8];
 		}
-		tf->device |= ATA_LBA;
 
 		tf->nsect = scsicmd[8];
 		tf->lbal = scsicmd[5];
@@ -245,19 +267,17 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 		return 0;
 	}
 
-	if (cmd_size == 6) {
+	if (scsicmd[0] == READ_6 || scsicmd[0] == WRITE_6) {
 		qc->nsect = tf->nsect = scsicmd[4];
 		tf->lbal = scsicmd[3];
 		tf->lbam = scsicmd[2];
 		tf->lbah = scsicmd[1] & 0x1f; /* mask out reserved bits */
 
-		tf->device |= ATA_LBA;
-
 		VPRINTK("six-byte command\n");
 		return 0;
 	}
 
-	if (cmd_size == 16) {
+	if (scsicmd[0] == READ_16 || scsicmd[0] == WRITE_16) {
 		/* rule out impossible LBAs and sector counts */
 		if (scsicmd[2] || scsicmd[3] || scsicmd[10] || scsicmd[11])
 			return 1;
@@ -281,7 +301,6 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 
 			qc->nsect = scsicmd[13];
 		}
-		tf->device |= ATA_LBA;
 
 		tf->nsect = scsicmd[13];
 		tf->lbal = scsicmd[9];
@@ -297,20 +316,26 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 }
 
 /**
- *	ata_scsi_rw_queue -
- *	@ap:
- *	@dev:
- *	@cmd:
- *	@done:
- *	@cmd_size:
+ *	ata_scsi_translate - Translate then issue SCSI command to ATA device
+ *	@ap: ATA port to which the command is addressed
+ *	@dev: ATA device to which the command is addressed
+ *	@cmd: SCSI command to execute
+ *	@done: SCSI command completion function
+ *
+ *	Our ->queuecommand() function has decided that the SCSI
+ *	command issued can be directly translated into an ATA
+ *	command, rather than handled internally.
+ *
+ *	This function sets up an ata_queued_cmd structure for the
+ *	SCSI command, and sends that ata_queued_cmd to the hardware.
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_scsi_rw_queue(struct ata_port *ap, struct ata_device *dev,
-		      struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *),
-		      unsigned int cmd_size)
+static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
+			      struct scsi_cmnd *cmd,
+			      void (*done)(struct scsi_cmnd *))
 {
 	struct ata_queued_cmd *qc;
 	u8 *scsicmd = cmd->cmnd;
@@ -329,7 +354,7 @@ void ata_scsi_rw_queue(struct ata_port *ap, struct ata_device *dev,
 
 	qc->flags |= ATA_QCFLAG_SG;	/* data is present; dma-map it */
 
-	if (ata_scsi_rw_xlat(qc, scsicmd, cmd_size))
+	if (ata_scsi_rw_xlat(qc, scsicmd))
 		goto err_out;
 
 	/* select device, send command to hardware */
@@ -353,7 +378,6 @@ err_out:
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
- *	FIXME: kmap inside spin_lock_irqsave ok?
  *
  *	RETURNS:
  *	Length of response buffer.
@@ -368,7 +392,7 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 		struct scatterlist *sg;
 
 		sg = (struct scatterlist *) cmd->request_buffer;
-		buf = kmap(sg->page) + sg->offset;
+		buf = kmap_atomic(sg->page, KM_USER0) + sg->offset;
 		buflen = sg->length;
 	} else {
 		buf = cmd->request_buffer;
@@ -396,7 +420,7 @@ static inline void ata_scsi_rbuf_put(struct scsi_cmnd *cmd)
 		struct scatterlist *sg;
 
 		sg = (struct scatterlist *) cmd->request_buffer;
-		kunmap(sg->page);
+		kunmap_atomic(sg->page, KM_USER0);
 	}
 }
 
@@ -596,30 +620,6 @@ unsigned int ata_scsiop_noop(struct ata_scsi_args *args, u8 *rbuf,
 }
 
 /**
- *	ata_scsiop_sync_cache - Simulate SYNCHRONIZE CACHE command
- *	@args: Port / device / SCSI command of interest.
- *	@rbuf: Response buffer, to which simulated SCSI cmd output is sent.
- *	@buflen: Response buffer length.
- *
- *	Initiates flush of device's cache.
- *
- *	TODO:
- *	Actually do this :)
- *
- *	LOCKING:
- *	spin_lock_irqsave(host_set lock)
- */
-
-unsigned int ata_scsiop_sync_cache(struct ata_scsi_args *args, u8 *rbuf,
-				  unsigned int buflen)
-{
-	VPRINTK("ENTER\n");
-
-	/* FIXME */
-	return 1;
-}
-
-/**
  *	ata_msense_push - Push data onto MODE SENSE data output buffer
  *	@ptr_io: (input/output) Location to store more output data
  *	@last: End of output data buffer
@@ -649,9 +649,9 @@ static void ata_msense_push(u8 **ptr_io, const u8 *last,
 
 /**
  *	ata_msense_caching - Simulate MODE SENSE caching info page
- *	@dev:
- *	@ptr_io:
- *	@last:
+ *	@dev: Device associated with this MODE SENSE command
+ *	@ptr_io: (input/output) Location to store more output data
+ *	@last: End of output data buffer
  *
  *	Generate a caching info page, which conditionally indicates
  *	write caching to the SCSI layer, depending on device
@@ -674,9 +674,9 @@ static unsigned int ata_msense_caching(struct ata_device *dev, u8 **ptr_io,
 
 /**
  *	ata_msense_ctl_mode - Simulate MODE SENSE control mode page
- *	@dev:
- *	@ptr_io:
- *	@last:
+ *	@dev: Device associated with this MODE SENSE command
+ *	@ptr_io: (input/output) Location to store more output data
+ *	@last: End of output data buffer
  *
  *	Generate a generic MODE SENSE control mode page.
  *
@@ -834,11 +834,15 @@ unsigned int ata_scsiop_report_luns(struct ata_scsi_args *args, u8 *rbuf,
 }
 
 /**
- *	ata_scsi_badcmd -
- *	@cmd:
- *	@done:
- *	@asc:
- *	@ascq:
+ *	ata_scsi_badcmd - End a SCSI request with an error
+ *	@cmd: SCSI request to be handled
+ *	@done: SCSI command completion function
+ *	@asc: SCSI-defined additional sense code
+ *	@ascq: SCSI-defined additional sense code qualifier
+ *
+ *	Helper function that completes a SCSI command with
+ *	%SAM_STAT_CHECK_CONDITION, with a sense key %ILLEGAL_REQUEST
+ *	and the specified additional sense codes.
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
@@ -912,7 +916,7 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 
 	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	if (cmd->sc_data_direction == SCSI_DATA_WRITE) {
-		qc->flags |= ATA_QCFLAG_WRITE;
+		qc->tf.flags |= ATA_TFLAG_WRITE;
 		DPRINTK("direction: write\n");
 	}
 
@@ -967,6 +971,99 @@ err_out:
 }
 
 /**
+ *	ata_scsi_find_dev - lookup ata_device from scsi_cmnd
+ *	@ap: ATA port to which the device is attached
+ *	@cmd: SCSI command to be sent to the device
+ *
+ *	Given various information provided in struct scsi_cmnd,
+ *	map that onto an ATA bus, and using that mapping
+ *	determine which ata_device is associated with the
+ *	SCSI command to be sent.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ *
+ *	RETURNS:
+ *	Associated ATA device, or %NULL if not found.
+ */
+
+static inline struct ata_device *
+ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
+{
+	struct ata_device *dev;
+
+	/* skip commands not addressed to targets we simulate */
+	if (likely(cmd->device->id < ATA_MAX_DEVICES))
+		dev = &ap->device[cmd->device->id];
+	else
+		return NULL;
+
+	if (unlikely((cmd->device->channel != 0) ||
+		     (cmd->device->lun != 0)))
+		return NULL;
+
+	if (unlikely(!ata_dev_present(dev)))
+		return NULL;
+
+#ifndef ATA_ENABLE_ATAPI
+	if (unlikely(dev->class == ATA_DEV_ATAPI))
+		return NULL;
+#endif
+
+	return dev;
+}
+
+/**
+ *	ata_scsi_xlat_possible - check if SCSI to ATA translation is possible
+ *	@cmd: SCSI command opcode to consider
+ *
+ *	Look up the SCSI command given, and determine whether the
+ *	SCSI command is to be translated or simulated.
+ *
+ *	RETURNS:
+ *	Non-zero if possible, zero if not.
+ */
+
+static inline int ata_scsi_xlat_possible(u8 cmd)
+{
+	switch (cmd) {
+	case READ_6:
+	case READ_10:
+	case READ_16:
+
+	case WRITE_6:
+	case WRITE_10:
+	case WRITE_16:
+		return 1;
+	}
+
+	return 0;
+}
+
+/**
+ *	ata_scsi_dump_cdb - dump SCSI command contents to dmesg
+ *	@ap: ATA port to which the command was being sent
+ *	@cmd: SCSI command to dump
+ *
+ *	Prints the contents of a SCSI command via printk().
+ */
+
+static inline void ata_scsi_dump_cdb(struct ata_port *ap,
+				     struct scsi_cmnd *cmd)
+{
+#ifdef ATA_DEBUG
+	u8 *scsicmd = cmd->cmnd;
+
+	DPRINTK("CDB (%u:%d,%d,%d) %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+		ap->id,
+		cmd->device->channel, cmd->device->id, cmd->device->lun,
+		scsicmd[0], scsicmd[1], scsicmd[2], scsicmd[3],
+		scsicmd[4], scsicmd[5], scsicmd[6], scsicmd[7],
+		scsicmd[8]);
+#endif
+}
+
+/**
  *	ata_scsi_queuecmd - Issue SCSI cdb to libata-managed device
  *	@cmd: SCSI command to be sent
  *	@done: Completion function, called when command is complete
@@ -987,83 +1084,52 @@ err_out:
 
 int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
-	u8 *scsicmd = cmd->cmnd;
 	struct ata_port *ap;
 	struct ata_device *dev;
-	struct ata_scsi_args args;
-	const unsigned int atapi_support =
-#ifdef ATA_ENABLE_ATAPI
-					   1;
-#else
-					   0;
-#endif
-
-	/* Note: spin_lock_irqsave is held by caller... */
-	spin_unlock(cmd->device->host->host_lock);
 
 	ap = (struct ata_port *) &cmd->device->host->hostdata[0];
 
-	DPRINTK("CDB (%u:%d,%d,%d) %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		ap->id,
-		cmd->device->channel, cmd->device->id, cmd->device->lun,
-		scsicmd[0], scsicmd[1], scsicmd[2], scsicmd[3],
-		scsicmd[4], scsicmd[5], scsicmd[6], scsicmd[7],
-		scsicmd[8]);
+	ata_scsi_dump_cdb(ap, cmd);
 
-	/* skip commands not addressed to targets we care about */
-	if ((cmd->device->channel != 0) || (cmd->device->lun != 0) ||
-	    (cmd->device->id >= ATA_MAX_DEVICES)) {
-		cmd->result = (DID_BAD_TARGET << 16); /* FIXME: correct? */
-		done(cmd);
-		goto out;
-	}
-
-	spin_lock(&ap->host_set->lock);
-
-	dev = &ap->device[cmd->device->id];
-
-	if (!ata_dev_present(dev)) {
-		DPRINTK("no device\n");
-		cmd->result = (DID_BAD_TARGET << 16); /* FIXME: correct? */
+	dev = ata_scsi_find_dev(ap, cmd);
+	if (unlikely(!dev)) {
+		cmd->result = (DID_BAD_TARGET << 16);
 		done(cmd);
 		goto out_unlock;
 	}
 
-	if (dev->class == ATA_DEV_ATAPI) {
-		if (atapi_support)
-			atapi_scsi_queuecmd(ap, dev, cmd, done);
-		else {
-			cmd->result = (DID_BAD_TARGET << 16); /* correct? */
-			done(cmd);
-		}
-		goto out_unlock;
-	}
+	if (dev->class == ATA_DEV_ATA) {
+		if (ata_scsi_xlat_possible(cmd->cmnd[0]))
+			ata_scsi_translate(ap, dev, cmd, done);
+		else
+			ata_scsi_simulate(ap, dev, cmd, done);
+	} else
+		atapi_scsi_queuecmd(ap, dev, cmd, done);
 
-	/* fast path */
-	switch(scsicmd[0]) {
-		case READ_6:
-		case WRITE_6:
-			ata_scsi_rw_queue(ap, dev, cmd, done, 6);
-			goto out_unlock;
+out_unlock:
+	return 0;
+}
 
-		case READ_10:
-		case WRITE_10:
-			ata_scsi_rw_queue(ap, dev, cmd, done, 10);
-			goto out_unlock;
+/**
+ *	ata_scsi_simulate - simulate SCSI command on ATA device
+ *	@ap: Port to which ATA device is attached.
+ *	@dev: Target device for CDB.
+ *	@cmd: SCSI command being sent to device.
+ *	@done: SCSI command completion function.
+ *
+ *	Interprets and directly executes a select list of SCSI commands
+ *	that can be handled internally.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ */
 
-		case READ_16:
-		case WRITE_16:
-			ata_scsi_rw_queue(ap, dev, cmd, done, 16);
-			goto out_unlock;
-
-		default:
-			/* do nothing */
-			break;
-	}
-
-	/*
-	 * slow path
-	 */
+static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
+			      struct scsi_cmnd *cmd,
+			      void (*done)(struct scsi_cmnd *))
+{
+	struct ata_scsi_args args;
+	u8 *scsicmd = cmd->cmnd;
 
 	args.ap = ap;
 	args.dev = dev;
@@ -1102,13 +1168,6 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 			ata_bad_cdb(cmd, done);
 			break;
 
-		case SYNCHRONIZE_CACHE:
-			if ((dev->flags & ATA_DFLAG_WCACHE) == 0)
-				ata_bad_scsiop(cmd, done);
-			else
-				ata_scsi_rbuf_fill(&args, ata_scsiop_sync_cache);
-			break;
-
 		case READ_CAPACITY:
 			ata_scsi_rbuf_fill(&args, ata_scsiop_read_cap);
 			break;
@@ -1132,11 +1191,5 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 			ata_bad_scsiop(cmd, done);
 			break;
 	}
-
-out_unlock:
-	spin_unlock(&ap->host_set->lock);
-out:
-	spin_lock(cmd->device->host->host_lock);
-	return 0;
 }
 

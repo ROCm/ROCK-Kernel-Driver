@@ -93,6 +93,8 @@
 #undef UFS_SUPER_DEBUG
 #undef UFS_SUPER_DEBUG_MORE
 
+
+#undef UFS_SUPER_DEBUG_MORE
 #ifdef UFS_SUPER_DEBUG
 #define UFSD(x) printk("(%s, %d), %s: ", __FILE__, __LINE__, __FUNCTION__); printk x;
 #else
@@ -157,6 +159,8 @@ void ufs2_print_super_stuff(
 	printk("  magic:         0x%x\n", fs32_to_cpu(sb, usb->fs_magic));
 	printk("  fs_size:   %u\n",fs64_to_cpu(sb, usb->fs_u11.fs_u2.fs_size));
 	printk("  fs_dsize:  %u\n",fs64_to_cpu(sb, usb->fs_u11.fs_u2.fs_dsize));
+	printk("  bsize:         %u\n", fs32_to_cpu(usb, usb->fs_bsize));
+	printk("  fsize:         %u\n", fs32_to_cpu(usb, usb->fs_fsize));
 	printk("  fs_volname:  %s\n", usb->fs_u11.fs_u2.fs_volname);
 	printk("  fs_fsmnt:  %s\n", usb->fs_u11.fs_u2.fs_fsmnt);
 	printk("  fs_sblockloc: %u\n",fs64_to_cpu(sb,
@@ -897,6 +901,8 @@ magic_found:
 	uspi->s_fmask = fs32_to_cpu(sb, usb1->fs_fmask);
 	uspi->s_bshift = fs32_to_cpu(sb, usb1->fs_bshift);
 	uspi->s_fshift = fs32_to_cpu(sb, usb1->fs_fshift);
+	UFSD(("uspi->s_bshift = %d,uspi->s_fshift = %d", uspi->s_bshift,
+		uspi->s_fshift));
 	uspi->s_fpbshift = fs32_to_cpu(sb, usb1->fs_fragshift);
 	uspi->s_fsbtodb = fs32_to_cpu(sb, usb1->fs_fsbtodb);
 	/* s_sbsize already set */
@@ -929,7 +935,12 @@ magic_found:
 	 * Compute another frequently used values
 	 */
 	uspi->s_fpbmask = uspi->s_fpb - 1;
-	uspi->s_apbshift = uspi->s_bshift - 2;
+	if ((flags & UFS_TYPE_MASK) == UFS_TYPE_UFS2) {
+		uspi->s_apbshift = uspi->s_bshift - 3;
+	}
+	else {
+		uspi->s_apbshift = uspi->s_bshift - 2;
+	}
 	uspi->s_2apbshift = uspi->s_apbshift * 2;
 	uspi->s_3apbshift = uspi->s_apbshift * 3;
 	uspi->s_apb = 1 << uspi->s_apbshift;

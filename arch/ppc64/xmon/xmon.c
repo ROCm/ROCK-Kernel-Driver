@@ -452,7 +452,7 @@ insert_bpts()
 		}
 	}
 
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_DABR) && dabr.enabled)
+	if (dabr.enabled)
 		set_dabr(dabr.address);
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR) && iabr.enabled)
 		set_iabr(iabr.address);
@@ -465,8 +465,7 @@ remove_bpts()
 	struct bpt *bp;
 	unsigned instr;
 
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_DABR))
-		set_dabr(0);
+	set_dabr(0);
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR))
 		set_iabr(0);
 
@@ -543,8 +542,7 @@ cmds(struct pt_regs *excp)
 			symbol_lookup();
 			break;
 		case 'r':
-			if (excp != NULL)
-				prregs(excp);	/* print regs */
+			prregs(excp);	/* print regs */
 			break;
 		case 'e':
 			if (excp == NULL)
@@ -751,10 +749,6 @@ bpt_cmds(void)
 	cmd = inchar();
 	switch (cmd) {
 	case 'd':	/* bd - hardware data breakpoint */
-		if (!(cur_cpu_spec->cpu_features & CPU_FTR_DABR)) {
-			printf("Not implemented on this cpu\n");
-			break;
-		}
 		mode = 7;
 		cmd = inchar();
 		if (cmd == 'r')
@@ -971,8 +965,7 @@ static void backtrace(struct pt_regs *excp)
 
 spinlock_t exception_print_lock = SPIN_LOCK_UNLOCKED;
 
-void
-excprint(struct pt_regs *fp)
+void excprint(struct pt_regs *fp)
 {
 	unsigned long flags;
 
@@ -1007,21 +1000,31 @@ excprint(struct pt_regs *fp)
 	spin_unlock_irqrestore(&exception_print_lock, flags);
 }
 
-void
-prregs(struct pt_regs *fp)
+void prregs(struct pt_regs *fp)
 {
 	int n;
 	unsigned long base;
 
 	if (scanhex((void *)&base))
 		fp = (struct pt_regs *) base;
-	for (n = 0; n < 16; ++n)
-		printf("R%.2ld = %.16lx   R%.2ld = %.16lx\n", n, fp->gpr[n],
-		       n+16, fp->gpr[n+16]);
-	printf("pc  = %.16lx   msr = %.16lx\nlr  = %.16lx   cr  = %.16lx\n",
-	       fp->nip, fp->msr, fp->link, fp->ccr);
-	printf("ctr = %.16lx   xer = %.16lx   trap = %8lx\n",
-	       fp->ctr, fp->xer, fp->trap);
+
+	if (setjmp(bus_error_jmp) == 0) {
+		__debugger_fault_handler = handle_fault;
+		sync();
+		for (n = 0; n < 16; ++n)
+			printf("R%.2ld = %.16lx   R%.2ld = %.16lx\n", n,
+			       fp->gpr[n], n+16, fp->gpr[n+16]);
+		printf("pc  = %.16lx   msr = %.16lx\nlr  = %.16lx   "
+		       "cr  = %.16lx\n", fp->nip, fp->msr, fp->link, fp->ccr);
+		printf("ctr = %.16lx   xer = %.16lx   trap = %8lx\n",
+		       fp->ctr, fp->xer, fp->trap);
+
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
+	} else {
+		printf("*** Error reading regs\n");
+	}
 }
 
 void

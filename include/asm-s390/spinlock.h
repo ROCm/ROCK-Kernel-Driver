@@ -70,11 +70,9 @@ extern inline void _raw_spin_lock(spinlock_t *lp)
 
 extern inline int _raw_spin_trylock(spinlock_t *lp)
 {
-#ifndef __s390x__
-	unsigned long result, reg;
-#else /* __s390x__ */
-	unsigned int result, reg;
-#endif /* __s390x__ */
+	unsigned long reg;
+	unsigned int result;
+
 	__asm__ __volatile("    basr  %1,0\n"
 			   "0:  cs    %0,%1,0(%3)"
 			   : "=d" (result), "=&d" (reg), "=m" (lp->lock)
@@ -226,7 +224,7 @@ extern inline int _raw_write_trylock(rwlock_t *rw)
 			     "0: csg %0,%1,0(%3)\n"
 #endif /* __s390x__ */
 			     : "=d" (result), "=&d" (reg), "=m" (rw->lock)
-			     : "a" (&rw->lock), "m" (rw->lock), "0" (0)
+			     : "a" (&rw->lock), "m" (rw->lock), "0" (0UL)
 			     : "cc", "memory" );
 	return result == 0;
 }

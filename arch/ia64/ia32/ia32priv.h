@@ -494,7 +494,7 @@ struct ia32_user_desc {
 struct linux_binprm;
 
 extern void ia32_init_addr_space (struct pt_regs *regs);
-extern int ia32_setup_arg_pages (struct linux_binprm *bprm);
+extern int ia32_setup_arg_pages (struct linux_binprm *bprm, int exec_stack);
 extern unsigned long ia32_do_mmap (struct file *, unsigned long, unsigned long, int, int, loff_t);
 extern void ia32_load_segment_descriptors (struct task_struct *task);
 

@@ -22,14 +22,5 @@
 int gss_svc_init(void);
 int svcauth_gss_register_pseudoflavor(u32 pseudoflavor, char * name);
 
-
-struct gss_svc_data {
-	/* decoded gss client cred: */
-	struct rpc_gss_wire_cred	clcred;
-	/* pointer to the beginning of the procedure-specific results, which
-	 * may be encrypted/checksummed in svcauth_gss_release: */
-	u32				*body_start;
-};
-
 #endif /* __KERNEL__ */
 #endif /* _LINUX_SUNRPC_SVCAUTH_GSS_H */

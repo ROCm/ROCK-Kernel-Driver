@@ -82,10 +82,10 @@ static DECLARE_TASKLET(sn_sal_tasklet, sn_sal_tasklet_action, 0);
 static unsigned long sn_interrupt_timeout;
 
 extern u64 master_node_bedrock_address;
-static int sn_debug_printf(const char *fmt, ...);
 
 #undef DEBUG
 #ifdef DEBUG
+static int sn_debug_printf(const char *fmt, ...);
 #define DPRINTF(x...) sn_debug_printf(x)
 #else
 #define DPRINTF(x...) do { } while (0)
@@ -247,6 +247,7 @@ early_printk_sn_sal(const char *s, unsigned count)
 	sn_func->sal_puts(s, count);
 }
 
+#ifdef DEBUG
 /* this is as "close to the metal" as we can get, used when the driver
  * itself may be broken */
 static int
@@ -262,6 +263,7 @@ sn_debug_printf(const char *fmt, ...)
 	va_end(args);
 	return printed_len;
 }
+#endif /* DEBUG */
 
 /*
  * Interrupt handling routines.

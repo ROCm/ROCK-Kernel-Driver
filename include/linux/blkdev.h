@@ -243,7 +243,7 @@ typedef int (merge_requests_fn) (request_queue_t *, struct request *,
 typedef void (request_fn_proc) (request_queue_t *q);
 typedef int (make_request_fn) (request_queue_t *q, struct bio *bio);
 typedef int (prep_rq_fn) (request_queue_t *, struct request *);
-typedef void (unplug_fn) (void *q);
+typedef void (unplug_fn) (request_queue_t *);
 
 struct bio_vec;
 typedef int (merge_bvec_fn) (request_queue_t *, struct bio *, struct bio_vec *);
@@ -315,8 +315,6 @@ struct request_queue
 	unsigned long		bounce_pfn;
 	int			bounce_gfp;
 
-	struct list_head	plug_list;
-
 	/*
 	 * various queue flags, see QUEUE_* below
 	 */
@@ -350,6 +348,8 @@ struct request_queue
 
 	atomic_t		refcnt;
 
+	unsigned int		in_flight;
+
 	/*
 	 * sg stuff
 	 */
@@ -370,14 +370,18 @@ struct request_queue
 #define QUEUE_FLAG_WRITEFULL	4	/* read queue has been filled */
 #define QUEUE_FLAG_DEAD		5	/* queue being torn down */
 #define QUEUE_FLAG_REENTER	6	/* Re-entrancy avoidance */
+#define QUEUE_FLAG_PLUGGED	7	/* queue is plugged */
 
-#define blk_queue_plugged(q)	!list_empty(&(q)->plug_list)
+#define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
 #define blk_queue_stopped(q)	test_bit(QUEUE_FLAG_STOPPED, &(q)->queue_flags)
 
 #define blk_fs_request(rq)	((rq)->flags & REQ_CMD)
 #define blk_pc_request(rq)	((rq)->flags & REQ_BLOCK_PC)
 #define blk_noretry_request(rq)	((rq)->flags & REQ_FAILFAST)
+#define blk_rq_started(rq)	((rq)->flags & REQ_STARTED)
+
+#define blk_account_rq(rq)	(blk_rq_started(rq) && blk_fs_request(rq))
 
 #define blk_pm_suspend_request(rq)	((rq)->flags & REQ_PM_SUSPEND)
 #define blk_pm_resume_request(rq)	((rq)->flags & REQ_PM_RESUME)
@@ -515,7 +519,7 @@ extern int scsi_cmd_ioctl(struct gendisk *, unsigned int, unsigned long);
 extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
 extern void __blk_stop_queue(request_queue_t *q);
-extern void blk_run_queue(request_queue_t *q);
+extern void blk_run_queue(request_queue_t *);
 extern void blk_queue_activity_fn(request_queue_t *, activity_fn *, void *);
 extern struct request *blk_rq_map_user(request_queue_t *, int, void __user *, unsigned int);
 extern int blk_rq_unmap_user(struct request *, void __user *, unsigned int);
@@ -524,6 +528,18 @@ extern int blk_execute_rq(request_queue_t *, struct gendisk *, struct request *)
 static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {
 	return bdev->bd_disk->queue;
+}
+
+static inline void blk_run_backing_dev(struct backing_dev_info *bdi)
+{
+	if (bdi && bdi->unplug_io_fn)
+		bdi->unplug_io_fn(bdi);
+}
+
+static inline void blk_run_address_space(struct address_space *mapping)
+{
+	if (mapping)
+		blk_run_backing_dev(mapping->backing_dev_info);
 }
 
 /*
@@ -572,7 +588,7 @@ extern struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bd
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
-extern void generic_unplug_device(void *);
+extern void generic_unplug_device(request_queue_t *);
 extern long nr_blockdev_pages(void);
 
 int blk_get_queue(request_queue_t *);

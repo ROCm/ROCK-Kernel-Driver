@@ -217,6 +217,21 @@ nlmclnt_alloc_call(void)
 	return NULL;
 }
 
+static int nlm_wait_on_grace(wait_queue_head_t *queue)
+{
+	DEFINE_WAIT(wait);
+	int status = -EINTR;
+
+	prepare_to_wait(queue, &wait, TASK_INTERRUPTIBLE);
+	if (!signalled ()) {
+		schedule_timeout(NLMCLNT_GRACE_WAIT);
+		if (!signalled ())
+			status = 0;
+	}
+	finish_wait(queue, &wait);
+	return status;
+}
+
 /*
  * Generic NLM call
  */
@@ -241,10 +256,8 @@ nlmclnt_call(struct nlm_rqst *req, u32 proc)
 		msg.rpc_cred = nfs_file_cred(filp);
 
 	do {
-		if (host->h_reclaiming && !argp->reclaim) {
-			interruptible_sleep_on(&host->h_gracewait);
-			continue;
-		}
+		if (host->h_reclaiming && !argp->reclaim)
+			goto in_grace_period;
 
 		/* If we have no RPC client yet, create one. */
 		if ((clnt = nlm_bind_host(host)) == NULL)
@@ -279,22 +292,23 @@ nlmclnt_call(struct nlm_rqst *req, u32 proc)
 				return -ENOLCK;
 			}
 		} else {
+			if (!argp->reclaim) {
+				/* We appear to be out of the grace period */
+				wake_up_all(&host->h_gracewait);
+			}
 			dprintk("lockd: server returns status %d\n", resp->status);
 			return 0;	/* Okay, call complete */
 		}
 
-		/* Back off a little and try again */
-		interruptible_sleep_on_timeout(&host->h_gracewait, 15*HZ);
-
-		/* When the lock requested by F_SETLKW isn't available,
-		   we will wait until the request can be satisfied. If
-		   a signal is received during wait, we should return
-		   -EINTR. */
-		if (signalled ()) {
-			status = -EINTR;
-			break;
-		}
-	} while (1);
+in_grace_period:
+		/*
+		 * The server has rebooted and appears to be in the grace
+		 * period during which locks are only allowed to be
+		 * reclaimed.
+		 * We can only back off and try again later.
+		 */
+		status = nlm_wait_on_grace(&host->h_gracewait);
+	} while (status == 0);
 
 	return status;
 }

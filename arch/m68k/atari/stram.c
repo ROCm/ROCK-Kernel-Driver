@@ -150,7 +150,7 @@ static void *stram_start, *stram_end;
 
 /* set after memory_init() executed and allocations via start_mem aren't
  * possible anymore */
-static int mem_init_done = 0;
+static int mem_init_done;
 
 /* set if kernel is in ST-RAM */
 static int kernel_in_stram;
@@ -170,7 +170,7 @@ typedef struct stram_block {
 #define BLOCK_INSWAP	0x10	/* block allocated in swap space */
 
 /* list of allocated blocks */
-static BLOCK *alloc_list = NULL;
+static BLOCK *alloc_list;
 
 /* We can't always use kmalloc() to allocate BLOCK structures, since
  * stram_alloc() can be called rather early. So we need some pool of
@@ -210,9 +210,9 @@ static DECLARE_MUTEX(stram_swap_sem);
 #define MAGIC_FILE_P	(struct file *)0xffffdead
 
 #ifdef DO_PROC
-static unsigned stat_swap_read = 0;
-static unsigned stat_swap_write = 0;
-static unsigned stat_swap_force = 0;
+static unsigned stat_swap_read;
+static unsigned stat_swap_write;
+static unsigned stat_swap_force;
 #endif /* DO_PROC */
 
 #endif /* CONFIG_STRAM_SWAP */
@@ -967,7 +967,7 @@ void __init stram_swap_setup(char *str, int *ints)
 /*								ST-RAM device								*/
 /* ------------------------------------------------------------------------ */
 
-static int refcnt = 0;
+static int refcnt;
 
 static void do_stram_request(request_queue_t *q)
 {

@@ -299,11 +299,11 @@ static int hades_write_config_dword(struct pci_dev *dev, int where, u32 value)
 static void __init hades_fixup(int pci_modify)
 {
 	char irq_tab[4] = {
-			    IRQ_TT_MFP_IO0,	/* Slot 0. */
-			    IRQ_TT_MFP_IO1,	/* Slot 1. */
-			    IRQ_TT_MFP_SCC,	/* Slot 2. */
-			    IRQ_TT_MFP_SCSIDMA	/* Slot 3. */
-			  };
+		[0] = IRQ_TT_MFP_IO0,		/* Slot 0. */
+		[1] = IRQ_TT_MFP_IO1,		/* Slot 1. */
+		[2] = IRQ_TT_MFP_SCC,		/* Slot 2. */
+		[3] = IRQ_TT_MFP_SCSIDMA	/* Slot 3. */
+	};
 	struct pci_dev *dev = NULL;
 	unsigned char slot;
 

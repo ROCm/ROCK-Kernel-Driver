@@ -908,6 +908,42 @@ static ssize_t ecard_show_device(struct device *dev, char *buf)
 
 static DEVICE_ATTR(device, S_IRUGO, ecard_show_device, NULL);
 
+
+int ecard_request_resources(struct expansion_card *ec)
+{
+	int i, err = 0;
+
+	for (i = 0; i < ECARD_NUM_RESOURCES; i++) {
+		if (ecard_resource_end(ec, i) &&
+		    !request_mem_region(ecard_resource_start(ec, i),
+					ecard_resource_len(ec, i),
+					ec->dev.driver->name)) {
+			err = -EBUSY;
+			break;
+		}
+	}
+
+	if (err) {
+		while (i--)
+			if (ecard_resource_end(ec, i))
+				release_mem_region(ecard_resource_start(ec, i),
+						   ecard_resource_len(ec, i));
+	}
+	return err;
+}
+EXPORT_SYMBOL(ecard_request_resources);
+
+void ecard_release_resources(struct expansion_card *ec)
+{
+	int i;
+
+	for (i = 0; i < ECARD_NUM_RESOURCES; i++)
+		if (ecard_resource_end(ec, i))
+			release_mem_region(ecard_resource_start(ec, i),
+					   ecard_resource_len(ec, i));
+}
+EXPORT_SYMBOL(ecard_release_resources);
+
 /*
  * Probe for an expansion card.
  *

@@ -13,7 +13,7 @@ config HP_SIMSERIAL_CONSOLE
 	depends on HP_SIMSERIAL
 
 config HP_SIMSCSI
-	bool "Simulated SCSI disk"
+	tristate "Simulated SCSI disk"
 	depends on SCSI
 
 endmenu

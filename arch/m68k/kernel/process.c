@@ -65,8 +65,6 @@ asmlinkage void ret_from_fork(void);
  */
 unsigned long thread_saved_pc(struct task_struct *tsk)
 {
-	extern void scheduling_functions_start_here(void);
-	extern void scheduling_functions_end_here(void);
 	struct switch_stack *sw = (struct switch_stack *)tsk->thread.ksp;
 	/* Check whether the thread is blocked in resume() */
 	if (sw->retpc > (unsigned long)scheduling_functions_start_here &&
@@ -387,8 +385,6 @@ out:
 /*
  * These bracket the sleeping functions..
  */
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
 #define first_sched	((unsigned long) scheduling_functions_start_here)
 #define last_sched	((unsigned long) scheduling_functions_end_here)
 
@@ -407,7 +403,6 @@ unsigned long get_wchan(struct task_struct *p)
 		    fp >= 8184+stack_page)
 			return 0;
 		pc = ((unsigned long *)fp)[1];
-		/* FIXME: This depends on the order of these functions. */
 		if (pc < first_sched || pc >= last_sched)
 			return pc;
 		fp = *(unsigned long *) fp;

@@ -23,12 +23,12 @@
 extern char m68k_debug_device[];
 
 /* Flag that Modem1 port is already initialized and used */
-int atari_MFP_init_done = 0;
+int atari_MFP_init_done;
 /* Flag that Modem1 port is already initialized and used */
-int atari_SCC_init_done = 0;
+int atari_SCC_init_done;
 /* Can be set somewhere, if a SCC master reset has already be done and should
  * not be repeated; used by kgdb */
-int atari_SCC_reset_done = 0;
+int atari_SCC_reset_done;
 
 static struct console atari_console_driver = {
 	.name =		"debug",

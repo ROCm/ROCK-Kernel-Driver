@@ -37,8 +37,6 @@ MODULE_DESCRIPTION("ESS ESx688 lowlevel module");
 MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
 
-#define chip_t es1688_t
-
 static int snd_es1688_dsp_command(es1688_t *chip, unsigned char val)
 {
 	int i;

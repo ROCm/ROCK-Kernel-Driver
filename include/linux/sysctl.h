@@ -159,6 +159,8 @@ enum
 	VM_LOWER_ZONE_PROTECTION=20,/* Amount of protection of lower zones */
 	VM_MIN_FREE_KBYTES=21,	/* Minimum free kilobytes to maintain */
 	VM_MAX_MAP_COUNT=22,	/* int: Maximum number of mmaps/address-space */
+	VM_LAPTOP_MODE=23,	/* vm laptop mode */
+	VM_BLOCK_DUMP=24,	/* block dump mode */
 };
 
 

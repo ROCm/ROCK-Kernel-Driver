@@ -25,6 +25,12 @@
 		.macro	writeb, rb
 		str	\rb, [r3, #0x160]
 		.endm
+#elif defined(CONFIG_DEBUG_ICEDCC)
+		.macro	loadsp, rb
+		.endm
+		.macro writeb, rb
+		mcr	p14, 0, \rb, c0, c1, 0
+		.endm
 #elif defined(CONFIG_FOOTBRIDGE)
 		.macro	loadsp,	rb
 		mov	\rb, #0x7c000000

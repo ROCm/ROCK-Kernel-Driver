@@ -137,14 +137,6 @@ struct ia64_psr {
  * state comes earlier:
  */
 struct cpuinfo_ia64 {
-	/* irq_stat must be 64-bit aligned */
-	union {
-		struct {
-			__u32 irq_count;
-			__u32 bh_count;
-		} f;
-		__u64 irq_and_bh_counts;
-	} irq_stat;
 	__u32 softirq_pending;
 	__u64 itm_delta;	/* # of clock cycles between clock ticks */
 	__u64 itm_next;		/* interval timer mask value to use for next clock tick */

@@ -14,7 +14,6 @@
 
 #include <linux/init.h>
 #include <linux/console.h>
-#include <linux/pci.h>
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kobject.h>
@@ -26,7 +25,8 @@
 #include <asm/ppcdebug.h>
 #include <asm/vio.h>
 #include <asm/hvcall.h>
-#include "open_pic.h"
+#include <asm/iSeries/vio.h>
+#include <asm/iSeries/HvCallXm.h>
 
 #define DBGENTER() pr_debug("%s entered\n", __FUNCTION__)
 
@@ -34,8 +34,30 @@ extern struct subsystem devices_subsys; /* needed for vio_find_name() */
 
 struct iommu_table *vio_build_iommu_table(struct vio_dev *dev);
 
+#ifdef CONFIG_PPC_PSERIES
 static int vio_num_address_cells;
+#endif
 static struct vio_dev *vio_bus_device; /* fake "parent" device */
+
+#ifdef CONFIG_PPC_ISERIES
+static struct iommu_table veth_iommu_table;
+static struct iommu_table vio_iommu_table;
+
+static struct vio_dev _veth_dev = {
+	.iommu_table = &veth_iommu_table,
+	.dev.bus = &vio_bus_type
+};
+static struct vio_dev _vio_dev  = {
+	.iommu_table = &vio_iommu_table,
+	.dev.bus = &vio_bus_type
+};
+
+struct vio_dev *iSeries_veth_dev = &_veth_dev;
+struct device *iSeries_vio_dev = &_vio_dev.dev;
+
+EXPORT_SYMBOL(iSeries_veth_dev);
+EXPORT_SYMBOL(iSeries_vio_dev);
+#endif
 
 /* convert from struct device to struct vio_dev and pass to driver.
  * dev->driver has already been set by generic code because vio_bus_match
@@ -119,21 +141,67 @@ const struct vio_device_id * vio_match_device(const struct vio_device_id *ids,
 {
 	DBGENTER();
 
+#ifdef CONFIG_PPC_PSERIES
 	while (ids->type) {
 		if ((strncmp(dev->archdata->type, ids->type, strlen(ids->type)) == 0) &&
 			device_is_compatible((struct device_node*)dev->archdata, ids->compat))
 			return ids;
 		ids++;
 	}
+#endif
 	return NULL;
 }
+
+#ifdef CONFIG_PPC_ISERIES
+void __init iommu_vio_init(void)
+{
+	struct iommu_table *t;
+	struct iommu_table_cb cb;
+	unsigned long cbp;
+
+	cb.itc_busno = 255;    /* Bus 255 is the virtual bus */
+	cb.itc_virtbus = 0xff; /* Ask for virtual bus */
+
+	cbp = virt_to_abs(&cb);
+	HvCallXm_getTceTableParms(cbp);
+
+	veth_iommu_table.it_size        = cb.itc_size / 2;
+	veth_iommu_table.it_busno       = cb.itc_busno;
+	veth_iommu_table.it_offset      = cb.itc_offset;
+	veth_iommu_table.it_index       = cb.itc_index;
+	veth_iommu_table.it_type        = TCE_VB;
+	veth_iommu_table.it_entrysize	= sizeof(union tce_entry);
+	veth_iommu_table.it_blocksize	= 1;
+
+	t = iommu_init_table(&veth_iommu_table);
+
+	if (!t)
+		printk("Virtual Bus VETH TCE table failed.\n");
+
+	vio_iommu_table.it_size         = cb.itc_size - veth_iommu_table.it_size;
+	vio_iommu_table.it_busno        = cb.itc_busno;
+	vio_iommu_table.it_offset       = cb.itc_offset +
+		veth_iommu_table.it_size * (PAGE_SIZE/sizeof(union tce_entry));
+	vio_iommu_table.it_index        = cb.itc_index;
+	vio_iommu_table.it_type         = TCE_VB;
+	vio_iommu_table.it_entrysize	= sizeof(union tce_entry);
+	vio_iommu_table.it_blocksize	= 1;
+
+	t = iommu_init_table(&vio_iommu_table);
+
+	if (!t)
+		printk("Virtual Bus VIO TCE table failed.\n");
+}
+#endif
 
 /**
  * vio_bus_init: - Initialize the virtual IO bus
  */
 static int __init vio_bus_init(void)
 {
+#ifdef CONFIG_PPC_PSERIES
 	struct device_node *node_vroot, *of_node;
+#endif
 	int err;
 
 	err = bus_register(&vio_bus_type);
@@ -158,6 +226,7 @@ static int __init vio_bus_init(void)
 		return err;
 	}
 
+#ifdef CONFIG_PPC_PSERIES
 	node_vroot = find_devices("vdevice");
 	if ((node_vroot == NULL) || (node_vroot->child == NULL)) {
 		/* this machine doesn't do virtual IO, and that's ok */
@@ -177,6 +246,7 @@ static int __init vio_bus_init(void)
 
 		vio_register_device(of_node);
 	}
+#endif
 
 	return 0;
 }
@@ -184,6 +254,7 @@ static int __init vio_bus_init(void)
 __initcall(vio_bus_init);
 
 
+#ifdef CONFIG_PPC_PSERIES
 /* vio_dev refcount hit 0 */
 static void __devinit vio_dev_release(struct device *dev)
 {
@@ -256,7 +327,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 			printk(KERN_ERR "Unable to allocate interrupt "
 			       "number for %s\n", of_node->full_name);
 		} else
-			viodev->irq = openpic_to_irq(virq);
+			viodev->irq = irq_offset_up(virq);
 	}
 
 	/* init generic 'struct device' fields: */
@@ -414,146 +485,48 @@ int vio_disable_interrupts(struct vio_dev *dev)
 	return rc;
 }
 EXPORT_SYMBOL(vio_disable_interrupts);
-
+#endif
 
 dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
-			  size_t size, int direction )
+			  size_t size, enum dma_data_direction direction)
 {
-	struct iommu_table *tbl;
-	dma_addr_t dma_handle = DMA_ERROR_CODE;
-	unsigned long uaddr;
-	unsigned int npages;
-
-	BUG_ON(direction == PCI_DMA_NONE);
-
-	uaddr = (unsigned long)vaddr;
-	npages = PAGE_ALIGN( uaddr + size ) - ( uaddr & PAGE_MASK );
-	npages >>= PAGE_SHIFT;
-
-	tbl = dev->iommu_table;
-
-	if (tbl) {
-		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
-		dma_handle |= (uaddr & ~PAGE_MASK);
-	}
-
-	return dma_handle;
+	return iommu_map_single(dev->iommu_table, vaddr, size, direction);
 }
 EXPORT_SYMBOL(vio_map_single);
 
 void vio_unmap_single(struct vio_dev *dev, dma_addr_t dma_handle,
-		      size_t size, int direction)
+		      size_t size, enum dma_data_direction direction)
 {
-	struct iommu_table * tbl;
-	unsigned int npages;
-
-	BUG_ON(direction == PCI_DMA_NONE);
-
-	npages = PAGE_ALIGN( dma_handle + size ) - ( dma_handle & PAGE_MASK );
-	npages >>= PAGE_SHIFT;
-
-	tbl = dev->iommu_table;
-	if(tbl)
-		iommu_free(tbl, dma_handle, npages);
+	iommu_unmap_single(dev->iommu_table, dma_handle, size, direction);
 }
 EXPORT_SYMBOL(vio_unmap_single);
 
 int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
-	       int direction)
+	       enum dma_data_direction direction)
 {
-	struct iommu_table *tbl;
-
-	BUG_ON(direction == PCI_DMA_NONE);
-
-	if (nelems == 0)
-		return 0;
-
-	tbl = vdev->iommu_table;
-	if (!tbl)
-		return 0;
-
-	return iommu_alloc_sg(tbl, &vdev->dev, sglist, nelems, direction);
+	return iommu_map_sg(&vdev->dev, vdev->iommu_table, sglist,
+			nelems, direction);
 }
 EXPORT_SYMBOL(vio_map_sg);
 
 void vio_unmap_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
-		  int direction)
+		  enum dma_data_direction direction)
 {
-	struct iommu_table *tbl;
-
-	BUG_ON(direction == PCI_DMA_NONE);
-
-	tbl = vdev->iommu_table;
-	if (tbl)
-		iommu_free_sg(tbl, sglist, nelems);
+	iommu_unmap_sg(vdev->iommu_table, sglist, nelems, direction);
 }
 EXPORT_SYMBOL(vio_unmap_sg);
 
 void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 			   dma_addr_t *dma_handle)
 {
-	struct iommu_table * tbl;
-	void *ret = NULL;
-	unsigned int npages, order;
-	dma_addr_t tce;
-
-	size = PAGE_ALIGN(size);
-	npages = size >> PAGE_SHIFT;
-	order = get_order(size);
-
- 	/* Client asked for way to much space.  This is checked later anyway */
-	/* It is easier to debug here for the drivers than in the tce tables.*/
- 	if(order >= IOMAP_MAX_ORDER) {
- 		printk("VIO_DMA: vio_alloc_consistent size to large: 0x%lx \n", size);
- 		return (void *)DMA_ERROR_CODE;
- 	}
-
-	tbl = dev->iommu_table;
-
-	if (tbl) {
-		/* Alloc enough pages (and possibly more) */
-		ret = (void *)__get_free_pages(GFP_ATOMIC, order);
-		if (ret) {
-			/* Page allocation succeeded */
-			memset(ret, 0, npages << PAGE_SHIFT);
-			/* Set up tces to cover the allocated range */
-			tce = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL);
-			if (tce == DMA_ERROR_CODE) {
-				PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: iommu_alloc failed\n" );
-				free_pages((unsigned long)ret, order);
-				ret = NULL;
-			} else {
-				*dma_handle = tce;
-			}
-		}
-		else PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: __get_free_pages failed for size = %d\n", size);
-	}
-	else PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: get_iommu_table failed for 0x%016lx\n", dev);
-
-	PPCDBG(PPCDBG_TCE, "\tvio_alloc_consistent: dma_handle = 0x%16.16lx\n", *dma_handle);
-	PPCDBG(PPCDBG_TCE, "\tvio_alloc_consistent: return     = 0x%16.16lx\n", ret);
-	return ret;
+	return iommu_alloc_consistent(dev->iommu_table, size, dma_handle);
 }
 EXPORT_SYMBOL(vio_alloc_consistent);
 
 void vio_free_consistent(struct vio_dev *dev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
-	struct iommu_table *tbl;
-	unsigned int npages;
-
-	PPCDBG(PPCDBG_TCE, "vio_free_consistent:\n");
-	PPCDBG(PPCDBG_TCE, "\tdev = 0x%16.16lx, size = 0x%16.16lx, dma_handle = 0x%16.16lx, vaddr = 0x%16.16lx\n", dev, size, dma_handle, vaddr);
-
-	size = PAGE_ALIGN(size);
-	npages = size >> PAGE_SHIFT;
-
-	tbl = dev->iommu_table;
-
-	if ( tbl ) {
-		iommu_free(tbl, dma_handle, npages);
-		free_pages((unsigned long)vaddr, get_order(size));
-	}
+	iommu_free_consistent(dev->iommu_table, size, vaddr, dma_handle);
 }
 EXPORT_SYMBOL(vio_free_consistent);
 

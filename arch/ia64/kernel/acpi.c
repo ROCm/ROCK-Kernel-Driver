@@ -455,6 +455,7 @@ acpi_numa_arch_fixup (void)
 	for (i = 0; i < MAX_PXM_DOMAINS; i++) {
 		if (pxm_bit_test(i)) {
 			pxm_to_nid_map[i] = numnodes;
+			node_set_online(numnodes);
 			nid_to_pxm_map[numnodes++] = i;
 		}
 	}
@@ -506,6 +507,13 @@ acpi_numa_arch_fixup (void)
 }
 #endif /* CONFIG_ACPI_NUMA */
 
+unsigned int
+acpi_register_gsi (u32 gsi, int polarity, int trigger)
+{
+	return acpi_register_irq(gsi, polarity, trigger);
+}
+EXPORT_SYMBOL(acpi_register_gsi);
+
 static int __init
 acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
@@ -527,7 +535,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (fadt->iapc_boot_arch & BAF_LEGACY_DEVICES)
 		acpi_legacy_devices = 1;
 
-	acpi_register_irq(fadt->sci_int, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
+	acpi_register_gsi(fadt->sci_int, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
 	return 0;
 }
 

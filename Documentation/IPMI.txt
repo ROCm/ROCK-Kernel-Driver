@@ -22,6 +22,58 @@ are not familiar with IPMI itself, see the web site at
 http://www.intel.com/design/servers/ipmi/index.htm.  IPMI is a big
 subject and I can't cover it all here!
 
+Configuration
+-------------
+
+The LinuxIPMI driver is modular, which means you have to pick several
+things to have it work right depending on your hardware.  Most of
+these are available in the 'Character Devices' menu.
+
+No matter what, you must pick 'IPMI top-level message handler' to use
+IPMI.  What you do beyond that depends on your needs and hardware.
+
+The message handler does not provide any user-level interfaces.
+Kernel code (like the watchdog) can still use it.  If you need access
+from userland, you need to select 'Device interface for IPMI' if you
+want access through a device driver.  Another interface is also
+available, you may select 'IPMI sockets' in the 'Networking Support'
+main menu.  This provides a socket interface to IPMI.  You may select
+both of these at the same time, they will both work together.
+
+The driver interface depends on your hardware.  If you have a board
+with a standard interface (These will generally be either "KCS",
+"SMIC", or "BT", consult your hardware manual), choose the 'IPMI SI
+handler' option.  A driver also exists for direct I2C access to the
+IPMI management controller.  Some boards support this, but it is
+unknown if it will work on every board.  For this, choose 'IPMI SMBus
+handler', but be ready to try to do some figuring to see if it will
+work.
+
+There is also a KCS-only driver interface supplied, but it is
+depracated in favor of the SI interface.
+
+You should generally enable ACPI on your system, as systems with IPMI
+should have ACPI tables describing them.
+
+If you have a standard interface and the board manufacturer has done
+their job correctly, the IPMI controller should be automatically
+detect (via ACPI or SMBIOS tables) and should just work.  Sadly, many
+boards do not have this information.  The driver attempts standard
+defaults, but they may not work.  If you fall into this situation, you
+need to read the section below named 'The SI Driver' on how to
+hand-configure your system.
+
+IPMI defines a standard watchdog timer.  You can enable this with the
+'IPMI Watchdog Timer' config option.  If you compile the driver into
+the kernel, then via a kernel command-line option you can have the
+watchdog timer start as soon as it intitializes.  It also have a lot
+of other options, see the 'Watchdog' section below for more details.
+Note that you can also have the watchdog continue to run if it is
+closed (by default it is disabled on close).  Go into the 'Watchdog
+Cards' menu, enable 'Watchdog Timer Support', and enable the option
+'Disable watchdog shutdown on close'.
+
+
 Basic Design
 ------------
 
@@ -41,18 +93,30 @@ ipmi_devintf - This provides a userland IOCTL interface for the IPMI
 driver, each open file for this device ties in to the message handler
 as an IPMI user.
 
-ipmi_kcs_drv - A driver for the KCS SMI.  Most system have a KCS
-interface for IPMI.
+ipmi_si - A driver for various system interfaces.  This supports
+KCS, SMIC, and may support BT in the future.  Unless you have your own
+custom interface, you probably need to use this.
 
+ipmi_smb - A driver for accessing BMCs on the SMBus. It uses the
+I2C kernel driver's SMBus interfaces to send and receive IPMI messages
+over the SMBus.
+
+af_ipmi - A network socket interface to IPMI.  This doesn't take up
+a character device in your system.
+
+Note that the KCS-only interface ahs been removed.
 
 Much documentation for the interface is in the include files.  The
 IPMI include files are:
 
-ipmi.h - Contains the user interface and IOCTL interface for IPMI.
+net/af_ipmi.h - Contains the socket interface.
 
-ipmi_smi.h - Contains the interface for SMI drivers to use.
+linux/ipmi.h - Contains the user interface and IOCTL interface for IPMI.
 
-ipmi_msgdefs.h - General definitions for base IPMI messaging.
+linux/ipmi_smi.h - Contains the interface for system management interfaces
+(things that interface to IPMI controllers) to use.
+
+linux/ipmi_msgdefs.h - General definitions for base IPMI messaging.
 
 
 Addressing
@@ -260,70 +324,131 @@ they register with the message handler.  They are generally assigned
 in the order they register, although if an SMI unregisters and then
 another one registers, all bets are off.
 
-The ipmi_smi.h defines the interface for SMIs, see that for more
-details.
+The ipmi_smi.h defines the interface for management interfaces, see
+that for more details.
 
 
-The KCS Driver
---------------
+The SI Driver
+-------------
 
-The KCS driver allows up to 4 KCS interfaces to be configured in the
-system.  By default, the driver will register one KCS interface at the
-spec-specified I/O port 0xca2 without interrupts.  You can change this
-at module load time (for a module) with:
+The SI driver allows up to 4 KCS or SMIC interfaces to be configured
+in the system.  By default, scan the ACPI tables for interfaces, and
+if it doesn't find any the driver will attempt to register one KCS
+interface at the spec-specified I/O port 0xca2 without interrupts.
+You can change this at module load time (for a module) with:
 
-  insmod ipmi_kcs_drv.o kcs_ports=<port1>,<port2>... kcs_addrs=<addr1>,<addr2>
-       kcs_irqs=<irq1>,<irq2>... kcs_trydefaults=[0|1]
+  modprobe ipmi_si.o type=<type1>,<type2>....
+       ports=<port1>,<port2>... addrs=<addr1>,<addr2>...
+       irqs=<irq1>,<irq2>... trydefaults=[0|1]
 
-The KCS driver supports two types of interfaces, ports (for I/O port
-based KCS interfaces) and memory addresses (for KCS interfaces in
-memory).  The driver will support both of them simultaneously, setting
-the port to zero (or just not specifying it) will allow the memory
-address to be used.  The port will override the memory address if it
-is specified and non-zero.  kcs_trydefaults sets whether the standard
-IPMI interface at 0xca2 and any interfaces specified by ACPE are
-tried.  By default, the driver tries it, set this value to zero to
-turn this off.
+Each of these except si_trydefaults is a list, the first item for the
+first interface, second item for the second interface, etc.
+
+The si_type may be either "kcs", "smic", or "bt".  If you leave it blank, it
+defaults to "kcs".
+
+If you specify si_addrs as non-zero for an interface, the driver will
+use the memory address given as the address of the device.  This
+overrides si_ports.
+
+If you specify si_ports as non-zero for an interface, the driver will
+use the I/O port given as the device address.
+
+If you specify si_irqs as non-zero for an interface, the driver will
+attempt to use the given interrupt for the device.
+
+si_trydefaults sets whether the standard IPMI interface at 0xca2 and
+any interfaces specified by ACPE are tried.  By default, the driver
+tries it, set this value to zero to turn this off.
 
 When compiled into the kernel, the addresses can be specified on the
 kernel command line as:
 
-  ipmi_kcs=<bmc1>:<irq1>,<bmc2>:<irq2>....,[nodefault]
+  ipmi_si.type=<type1>,<type2>...
+       ipmi_si.ports=<port1>,<port2>... ipmi_si.addrs=<addr1>,<addr2>...
+       ipmi_si.irqs=<irq1>,<irq2>... ipmi_si.trydefaults=[0|1]
 
-The <bmcx> values is either "p<port>" or "m<addr>" for port or memory
-addresses.  So for instance, a KCS interface at port 0xca2 using
-interrupt 9 and a memory interface at address 0xf9827341 with no
-interrupt would be specified "ipmi_kcs=p0xca2:9,m0xf9827341".
-If you specify zero for in irq or don't specify it, the driver will
-run polled unless the software can detect the interrupt to use in the
-ACPI tables.
+It works the same as the module parameters of the same names.
 
-By default, the driver will attempt to detect a KCS device at the
-spec-specified 0xca2 address and any address specified by ACPI.  If
-you want to turn this off, use the "nodefault" option.
+By default, the driver will attempt to detect any device specified by
+ACPI, and if none of those then a KCS device at the spec-specified
+0xca2.  If you want to turn this off, set the "trydefaults" option to
+false.
 
 If you have high-res timers compiled into the kernel, the driver will
 use them to provide much better performance.  Note that if you do not
 have high-res timers enabled in the kernel and you don't have
 interrupts enabled, the driver will run VERY slowly.  Don't blame me,
-the KCS interface sucks.
+these interfaces suck.
+
+
+The SMBus Driver
+----------------
+
+The SMBus driver allows up to 4 SMBus devices to be configured in the
+system.  By default, the driver will register any SMBus interfaces it finds
+in the I2C address range of 0x20 to 0x4f on any adapter.  You can change this
+at module load time (for a module) with:
+
+  modprobe ipmi_smb.o
+	addr=<adapter1>,<i2caddr1>[,<adapter2>,<i2caddr2>[,...]]
+	dbg=<flags1>,<flags2>...
+	[defaultprobe=0] [dbg_probe=1]
+
+The addresses are specified in pairs, the first is the adapter ID and the
+second is the I2C address on that adapter.
+
+The debug flags are bit flags for each BMC found, they are:
+IPMI messages: 1, driver state: 2, timing: 4, I2C probe: 8
+
+Setting smb_defaultprobe to zero disabled the default probing of SMBus
+interfaces at address range 0x20 to 0x4f.  This means that only the
+BMCs specified on the smb_addr line will be detected.
+
+Setting smb_dbg_probe to 1 will enable debugging of the probing and
+detection process for BMCs on the SMBusses.
+
+Discovering the IPMI compilant BMC on the SMBus can cause devices
+on the I2C bus to fail. The SMBus driver writes a "Get Device ID" IPMI
+message as a block write to the I2C bus and waits for a response.
+This action can be detrimental to some I2C devices. It is highly recommended
+that the known I2c address be given to the SMBus driver in the smb_addr
+parameter. The default adrress range will not be used when a smb_addr
+parameter is provided.
+
+When compiled into the kernel, the addresses can be specified on the
+kernel command line as:
+
+  ipmb_smb.addr=<adapter1>,<i2caddr1>[,<adapter2>,<i2caddr2>[,...]]
+	ipmi_smb.dbg=<flags1>,<flags2>...
+	ipmi_smb.defaultprobe=0 ipmi_smb.dbg_probe=1
+
+These are the same options as on the module command line.
+
+Note that you might need some I2C changes if CONFIG_IPMI_PANIC_EVENT
+is enabled along with this, so the I2C driver knows to run to
+completion during sending a panic event.
 
 
 Other Pieces
 ------------
 
 Watchdog
+--------
 
 A watchdog timer is provided that implements the Linux-standard
 watchdog timer interface.  It has three module parameters that can be
 used to control it:
 
-  insmod ipmi_watchdog timeout=<t> pretimeout=<t> action=<action type>
-      preaction=<preaction type> preop=<preop type>
+  modprobe ipmi_watchdog timeout=<t> pretimeout=<t> action=<action type>
+      preaction=<preaction type> preop=<preop type> start_now=x
 
 The timeout is the number of seconds to the action, and the pretimeout
 is the amount of seconds before the reset that the pre-timeout panic will
-occur (if pretimeout is zero, then pretimeout will not be enabled).
+occur (if pretimeout is zero, then pretimeout will not be enabled).  Note
+that the pretimeout is the time before the final timeout.  So if the
+timeout is 50 seconds and the pretimeout is 10 seconds, then the pretimeout
+will occur in 40 second (10 seconds before the timeout).
 
 The action may be "reset", "power_cycle", or "power_off", and
 specifies what to do when the timer times out, and defaults to
@@ -344,16 +469,19 @@ When preop is set to "preop_give_data", one byte comes ready to read
 on the device when the pretimeout occurs.  Select and fasync work on
 the device, as well.
 
+If start_now is set to 1, the watchdog timer will start running as
+soon as the driver is loaded.
+
 When compiled into the kernel, the kernel command line is available
 for configuring the watchdog:
 
-  ipmi_wdog=<timeout>[,<pretimeout>[,<option>[,<options>....]]]
+  ipmi_watchdog.timeout=<t> ipmi_watchdog.pretimeout=<t>
+	ipmi_watchdog.action=<action type>
+	ipmi_watchdog.preaction=<preaction type>
+	ipmi_watchdog.preop=<preop type>
+	ipmi_watchdog.start_now=x
 
-The options are the actions and preaction above (if an option
-controlling the same thing is specified twice, the last is taken).  An
-options "start_now" is also there, if included, the watchdog will
-start running immediately when all the drivers are ready, it doesn't
-have to have a user hooked up to start it.
+The options are the same as the module parameter options.
 
 The watchdog will panic and start a 120 second reset timeout if it
 gets a pre-action.  During a panic or a reboot, the watchdog will

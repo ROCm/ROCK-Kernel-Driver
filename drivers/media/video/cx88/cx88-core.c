@@ -100,15 +100,6 @@ static const char *v4l2_ioctls[] = {
 };
 #define V4L2_IOCTLS ARRAY_SIZE(v4l2_ioctls)
 
-static const char *osspcm_ioctls[] = {
-	"RESET", "SYNC", "SPEED", "STEREO", "GETBLKSIZE", "SETFMT",
-	"CHANNELS", "?", "POST", "SUBDIVIDE", "SETFRAGMENT", "GETFMTS",
-	"GETOSPACE", "GETISPACE", "NONBLOCK", "GETCAPS", "GET/SETTRIGGER",
-	"GETIPTR", "GETOPTR", "MAPINBUF", "MAPOUTBUF", "SETSYNCRO",
-	"SETDUPLEX", "GETODELAY"
-};
-#define OSSPCM_IOCTLS ARRAY_SIZE(v4l2_ioctls)
-
 void cx88_print_ioctl(char *name, unsigned int cmd)
 {
 	char *dir;
@@ -130,15 +121,6 @@ void cx88_print_ioctl(char *name, unsigned int cmd)
 		printk(KERN_DEBUG "%s: ioctl 0x%08x (v4l2, %s, VIDIOC_%s)\n",
 		       name, cmd, dir, (_IOC_NR(cmd) < V4L2_IOCTLS) ?
 		       v4l2_ioctls[_IOC_NR(cmd)] : "???");
-		break;
-	case 'P':
-		printk(KERN_DEBUG "%s: ioctl 0x%08x (oss dsp, %s, SNDCTL_DSP_%s)\n",
-		       name, cmd, dir, (_IOC_NR(cmd) < OSSPCM_IOCTLS) ?
-		       osspcm_ioctls[_IOC_NR(cmd)] : "???");
-		break;
-	case 'M':
-		printk(KERN_DEBUG "%s: ioctl 0x%08x (oss mixer, %s, #%d)\n",
-		       name, cmd, dir, _IOC_NR(cmd));
 		break;
 	default:
 		printk(KERN_DEBUG "%s: ioctl 0x%08x (???, %s, #%d)\n",
@@ -296,6 +278,7 @@ struct sram_channel cx88_sram_channels[] = {
 		.name       = "video y / packed",
 		.cmds_start = 0x180040,
 		.ctrl_start = 0x180400,
+	        .cdt        = 0x180400 + 64,
 		.fifo_start = 0x180c00,
 		.fifo_size  = 0x002800,
 		.ptr1_reg   = MO_DMA21_PTR1,
@@ -307,6 +290,7 @@ struct sram_channel cx88_sram_channels[] = {
 		.name       = "video u",
 		.cmds_start = 0x180080,
 		.ctrl_start = 0x1804a0,
+	        .cdt        = 0x1804a0 + 64,
 		.fifo_start = 0x183400,
 		.fifo_size  = 0x000800,
 		.ptr1_reg   = MO_DMA22_PTR1,
@@ -318,6 +302,7 @@ struct sram_channel cx88_sram_channels[] = {
 		.name       = "video v",
 		.cmds_start = 0x1800c0,
 		.ctrl_start = 0x180540,
+	        .cdt        = 0x180540 + 64,
 		.fifo_start = 0x183c00,
 		.fifo_size  = 0x000800,
 		.ptr1_reg   = MO_DMA23_PTR1,
@@ -329,6 +314,7 @@ struct sram_channel cx88_sram_channels[] = {
 		.name       = "vbi",
 		.cmds_start = 0x180100,
 		.ctrl_start = 0x1805e0,
+	        .cdt        = 0x1805e0 + 64,
 		.fifo_start = 0x184400,
 		.fifo_size  = 0x001000,
 		.ptr1_reg   = MO_DMA24_PTR1,
@@ -340,6 +326,7 @@ struct sram_channel cx88_sram_channels[] = {
 		.name       = "audio from",
 		.cmds_start = 0x180140,
 		.ctrl_start = 0x180680,
+	        .cdt        = 0x180680 + 64,
 		.fifo_start = 0x185400,
 		.fifo_size  = 0x000200,
 		.ptr1_reg   = MO_DMA25_PTR1,
@@ -351,8 +338,9 @@ struct sram_channel cx88_sram_channels[] = {
 		.name       = "audio to",
 		.cmds_start = 0x180180,
 		.ctrl_start = 0x180720,
-		.fifo_start = 0x185600,
-		.fifo_size  = 0x000200,
+	        .cdt        = 0x180680 + 64,  /* same as audio IN */
+		.fifo_start = 0x185400,       /* same as audio IN */
+		.fifo_size  = 0x000200,       /* same as audio IN */
 		.ptr1_reg   = MO_DMA26_PTR1,
 		.ptr2_reg   = MO_DMA26_PTR2,
 		.cnt1_reg   = MO_DMA26_CNT1,
@@ -368,7 +356,7 @@ int cx88_sram_channel_setup(struct cx8800_dev *dev,
 	u32 cdt;
 
 	bpl   = (bpl + 7) & ~7; /* alignment */
-	cdt   = ch->ctrl_start + 64;
+	cdt   = ch->cdt;
 	lines = ch->fifo_size / bpl;
 	if (lines > 6)
 		lines = 6;
@@ -429,13 +417,13 @@ int cx88_risc_decode(u32 risc)
 	};
 	int i;
 
-	printk("0x%08x [ %s", risc, instr[risc >> 28] ?
-				instr[risc >> 28] : "INVALID");
+	printk("0x%08x [ %s", risc,
+	       instr[risc >> 28] ? instr[risc >> 28] : "INVALID");
 	for (i = ARRAY_SIZE(bits)-1; i >= 0; i--)
 		if (risc & (1 << (i + 12)))
 			printk(" %s",bits[i]);
 	printk(" count=%d ]\n", risc & 0xfff);
-	return incr[risc >> 28] ? 1 : incr[risc >> 28];
+	return incr[risc >> 28] ? incr[risc >> 28] : 1;
 }
 
 void cx88_risc_disasm(struct cx8800_dev *dev,

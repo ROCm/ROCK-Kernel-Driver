@@ -2221,7 +2221,7 @@ int __init DC390_detect (Scsi_Host_Template *psht)
 {
     PDEVDECL0;
     UCHAR   irq;
-    UINT    io_port;
+    ULONG   io_port;
 
     //dc390_pSHT_start = psht;
     dc390_pACB_start = NULL;

@@ -1047,6 +1047,7 @@ type name (atype a,btype b,ctype c,dtype d,etype e,ftype f) \
 
 #ifdef __KERNEL_SYSCALLS__
 
+#include <linux/linkage.h>
 #include <linux/compiler.h>
 #include <linux/types.h>
 #include <asm/ptrace.h>

@@ -135,6 +135,16 @@ config ARCH_SA1100
 config ARCH_SHARK
 	bool "Shark"
 
+config ARCH_S3C2410
+	bool "Samsung S3C2410"
+	help
+	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
+	  BAST (http://www.simtec.co.uk/products/EB110ITX/), the IPAQ 1940 or
+	  the Samsung SMDK2410 development board (and derviatives).
+
+config ARCH_OMAP
+	bool "TI OMAP"
+
 endchoice
 
 source "arch/arm/mach-clps711x/Kconfig"
@@ -150,6 +160,10 @@ source "arch/arm/mach-iop3xx/Kconfig"
 source "arch/arm/mach-pxa/Kconfig"
 
 source "arch/arm/mach-sa1100/Kconfig"
+
+source "arch/arm/mach-omap/Kconfig"
+
+source "arch/arm/mach-s3c2410/Kconfig"
 
 # Definitions to make life easier
 config ARCH_ACORN
@@ -500,7 +514,7 @@ config CMDLINE
 
 config LEDS
 	bool "Timer and CPU usage LEDs"
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP
 	help
 	  If you say Y here, the LEDs on your machine will be used
 	  to provide useful information about your current system status.
@@ -514,7 +528,7 @@ config LEDS
 
 config LEDS_TIMER
 	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T)
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP
 	default y if ARCH_EBSA110
 	help
 	  If you say Y here, one of the system LEDs (the green one on the
@@ -719,6 +733,18 @@ config DEBUG_LL
 	  in the kernel.  This is helpful if you are debugging code that
 	  executes before the console is initialized.
 
+config DEBUG_ICEDCC
+	bool "Kernel low-level debugging via EmbeddedICE DCC channel"
+	depends on DEBUG_LL
+	help
+	  Say Y here if you want the debug print routines to direct their
+	  output to the EmbeddedICE macrocell's DCC channel using
+	  co-processor 14. This is known to work on the ARM9 style ICE
+	  channel.
+
+	  It does include a timeout to ensure that the system does not
+	  totally freeze when there is nothing connected to read.
+
 config DEBUG_DC21285_PORT
 	bool "Kernel low-level debugging messages via footbridge serial port"
 	depends on DEBUG_LL && FOOTBRIDGE
@@ -735,6 +761,23 @@ config DEBUG_CLPS711X_UART2
 	  Say Y here if you want the debug print routines to direct their
 	  output to the second serial port on these devices.  Saying N will
 	  cause the debug messages to appear on the first serial port.
+
+config DEBUG_S3C2410_PORT
+	depends on DEBUG_LL && ARCH_S3C2410
+	bool "Kernel low-level debugging messages via S3C2410 UART"
+	help
+	  Say Y here if you want debug print routines to go to one of the
+	  S3C2410 internal UARTs. The chosen UART must have been configured
+	  before it is used.
+
+config DEBUG_S3C2410_UART
+	int
+	depends on DEBUG_LL && ARCH_S3C2410
+	default "0"
+	help
+	  Choice for UART for kernel low-level using S3C2410 UARTS,
+	  should be between zero and two. The port must have been
+	  initalised by the boot-loader before use.
 
 endmenu
 

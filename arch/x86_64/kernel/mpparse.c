@@ -83,6 +83,9 @@ extern int acpi_parse_ioapic (acpi_table_entry_header *header);
 #endif /*CONFIG_X86_IO_APIC*/
 #endif /*CONFIG_ACPI_BOOT*/
 
+u8 bios_cpu_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
+
+
 /*
  * Intel MP BIOS table parsing routines:
  */
@@ -147,6 +150,7 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 		ver = 0x10;
 	}
 	apic_version[m->mpc_apicid] = ver;
+	bios_cpu_apicid[num_processors - 1] = m->mpc_apicid;
 }
 
 static void __init MP_bus_info (struct mpc_config_bus *m)

@@ -44,10 +44,10 @@
 #include <asm/io.h>
 
 u_long atari_mch_cookie;
-u_long atari_mch_type = 0;
+u_long atari_mch_type;
 struct atari_hw_present atari_hw_present;
-u_long atari_switches = 0;
-int atari_dont_touch_floppy_select = 0;
+u_long atari_switches;
+int atari_dont_touch_floppy_select;
 int atari_rtc_year_offset;
 
 /* local function prototypes */
@@ -99,7 +99,7 @@ hwreg_present_bywrite(volatile void *regp, unsigned char val)
 {
     int		ret;
     long	save_sp, save_vbr;
-    static long tmp_vectors[3] = { 0, 0, (long)&&after_test };
+    static long tmp_vectors[3] = { [2] = (long)&&after_test };
 	
     __asm__ __volatile__
 	(	"movec	%/vbr,%2\n\t"	/* save vbr value            */

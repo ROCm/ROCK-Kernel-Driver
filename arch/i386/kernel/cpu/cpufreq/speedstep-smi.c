@@ -90,10 +90,12 @@ static int speedstep_smi_ownership (void)
 
 /**
  * speedstep_smi_get_freqs - get SpeedStep preferred & current freq.
+ * @low: the low frequency value is placed here
+ * @high: the high frequency value is placed here
+ *
  * Only available on later SpeedStep-enabled systems, returns false results or
  * even hangs [cf. bugme.osdl.org # 1422] on earlier systems. Empirical testing
  * shows that the latter occurs if !(ist_info.event & 0xFFFF).
- *
  */
 static int speedstep_smi_get_freqs (unsigned int *low, unsigned int *high)
 {
@@ -141,6 +143,7 @@ static int speedstep_get_state (void)
 /**
  * speedstep_set_state - set the SpeedStep state
  * @state: new processor frequency state (SPEEDSTEP_LOW or SPEEDSTEP_HIGH)
+ * @notify: whether to call cpufreq_notify_transition
  *
  */
 static void speedstep_set_state (unsigned int state, unsigned int notify)
@@ -224,7 +227,7 @@ static int speedstep_target (struct cpufreq_policy *policy,
 
 /**
  * speedstep_verify - verifies a new CPUFreq policy
- * @freq: new policy
+ * @policy: new policy
  *
  * Limit must be within speedstep_low_freq and speedstep_high_freq, with
  * at least one border included.

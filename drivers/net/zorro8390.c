@@ -60,7 +60,7 @@
 #define WORDSWAP(a)	((((a)>>8)&0xff) | ((a)<<8))
 
 
-static const struct card_info {
+static struct card_info {
     zorro_id id;
     const char *name;
     unsigned int offset;
@@ -208,11 +208,6 @@ static int __devinit zorro8390_init(struct net_device *dev,
 	dev->dev_addr[i] = SA_prom[i];
     }
 
-    printk("%s: %s at 0x%08lx, Ethernet Address "
-	   "%02x:%02x:%02x:%02x:%02x:%02x\n", dev->name, name, board,
-	   dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
-	   dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
-
     ei_status.name = name;
     ei_status.tx_start_page = start_page;
     ei_status.stop_page = stop_page;
@@ -233,9 +228,17 @@ static int __devinit zorro8390_init(struct net_device *dev,
 
     NS8390_init(dev, 0);
     err = register_netdev(dev);
-    if (err)
+    if (err) {
 	free_irq(IRQ_AMIGA_PORTS, dev);
-    return err;
+	return err;
+    }
+
+    printk("%s: %s at 0x%08lx, Ethernet Address "
+	   "%02x:%02x:%02x:%02x:%02x:%02x\n", dev->name, name, board,
+	   dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
+	   dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
+
+    return 0;
 }
 
 static int zorro8390_open(struct net_device *dev)

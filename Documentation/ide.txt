@@ -65,9 +65,7 @@ sixth..     ide5, usually PCI, probed
 
 To access devices on interfaces > ide0, device entries please make sure that
 device files for them are present in /dev.  If not, please create such
-entries, by simply running the included shell script:
-
-	/usr/src/linux/scripts/MAKEDEV.ide
+entries, by using /dev/MAKEDEV.
 
 This driver automatically probes for most IDE interfaces (including all PCI
 ones), for the drives/geometries attached to those interfaces, and for the IRQ
@@ -344,7 +342,7 @@ The character device interface consists of the following devices:
  nht1		major 37, minor 129	second IDE tape, no rewind on close.
  ...
 
-Run linux/scripts/MAKEDEV.ide to create the above entries.
+Run /dev/MAKEDEV to create the above entries.
 
 The general magnetic tape commands compatible interface, as defined by
 include/linux/mtio.h, is accessible through the character device.

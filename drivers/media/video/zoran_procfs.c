@@ -204,6 +204,10 @@ zoran_write_proc (struct file   *file,
 	char *line, *ldelim, *varname, *svar, *tdelim;
 	struct zoran *zr;
 
+	/* Random maximum */
+	if (count > 256)
+		return -EINVAL;
+
 	zr = (struct zoran *) data;
 
 	string = sp = vmalloc(count + 1);

@@ -63,8 +63,21 @@ static char s_cdtv[] __initdata = "CDTV";
 static char s_cd32[] __initdata = "CD32";
 static char s_draco[] __initdata = "Draco";
 static char *amiga_models[] __initdata = {
-    s_a500, s_a500p, s_a600, s_a1000, s_a1200, s_a2000, s_a2500, s_a3000,
-    s_a3000t, s_a3000p, s_a4000, s_a4000t, s_cdtv, s_cd32, s_draco,
+    [AMI_500-AMI_500]		= s_a500,
+    [AMI_500PLUS-AMI_500]	= s_a500p,
+    [AMI_600-AMI_500]		= s_a600,
+    [AMI_1000-AMI_500]		= s_a1000,
+    [AMI_1200-AMI_500]		= s_a1200,
+    [AMI_2000-AMI_500]		= s_a2000,
+    [AMI_2500-AMI_500]		= s_a2500,
+    [AMI_3000-AMI_500]		= s_a3000,
+    [AMI_3000T-AMI_500]		= s_a3000t,
+    [AMI_3000PLUS-AMI_500]	= s_a3000p,
+    [AMI_4000-AMI_500]		= s_a4000,
+    [AMI_4000T-AMI_500]		= s_a4000t,
+    [AMI_CDTV-AMI_500]		= s_cdtv,
+    [AMI_CD32-AMI_500]		= s_cd32,
+    [AMI_DRACO-AMI_500]		= s_draco,
 };
 
 static char amiga_model_name[13] = "Amiga ";
@@ -793,7 +806,7 @@ struct savekmsg {
     char data[0];
 };
 
-static struct savekmsg *savekmsg = NULL;
+static struct savekmsg *savekmsg;
 
 static void amiga_mem_console_write(struct console *co, const char *s,
 				    unsigned int count)

@@ -35,7 +35,7 @@
 #include "power.h"
 
 
-extern int pmdisk_arch_suspend(int resume);
+extern asmlinkage int pmdisk_arch_suspend(int resume);
 
 #define __ADDRESS(x)  ((unsigned long) phys_to_virt(x))
 #define ADDRESS(x) __ADDRESS((x) << PAGE_SHIFT)
@@ -859,7 +859,6 @@ static int end_io(struct bio * bio, unsigned int num, int err)
 
 static void wait_io(void)
 {
-	blk_run_queues();
 	while(atomic_read(&io_done))
 		io_schedule();
 }
@@ -898,7 +897,7 @@ static int submit(int rw, pgoff_t page_off, void * page)
 	if (rw == WRITE)
 		bio_set_pages_dirty(bio);
 	start_io();
-	submit_bio(rw,bio);
+	submit_bio(rw | (1 << BIO_RW_SYNC), bio);
 	wait_io();
  Done:
 	bio_put(bio);

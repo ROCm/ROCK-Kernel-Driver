@@ -31,15 +31,19 @@ struct ciabase {
 	char *name;
 	irq_handler_t irq_list[CIA_IRQS];
 } ciaa_base = {
-	&ciaa, 0, 0, IF_PORTS,
-	IRQ_AMIGA_AUTO_2, IRQ_AMIGA_CIAA,
-	IRQ_AMIGA_PORTS,
-	"CIAA handler"
+	.cia		= &ciaa,
+	.int_mask	= IF_PORTS,
+	.handler_irq	= IRQ_AMIGA_AUTO_2,
+	.cia_irq	= IRQ_AMIGA_CIAA,
+	.server_irq	= IRQ_AMIGA_PORTS,
+	.name		= "CIAA handler"
 }, ciab_base = {
-	&ciab, 0, 0, IF_EXTER,
-	IRQ_AMIGA_AUTO_6, IRQ_AMIGA_CIAB,
-	IRQ_AMIGA_EXTER,
-	"CIAB handler"
+	.cia		= &ciab,
+	.int_mask	= IF_EXTER,
+	.handler_irq	= IRQ_AMIGA_AUTO_6,
+	.cia_irq	= IRQ_AMIGA_CIAB,
+	.server_irq	= IRQ_AMIGA_EXTER,
+	.name		= "CIAB handler"
 };
 
 /*

@@ -896,7 +896,7 @@ extern void ufs_free_inode (struct inode *inode);
 extern struct inode * ufs_new_inode (struct inode *, int);
 
 /* inode.c */
-extern u64  ufs_frag_map (struct inode *, int);
+extern u64  ufs_frag_map (struct inode *, sector_t);
 extern void ufs_read_inode (struct inode *);
 extern void ufs_put_inode (struct inode *);
 extern void ufs_write_inode (struct inode *, int);

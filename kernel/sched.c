@@ -225,6 +225,13 @@ static DEFINE_PER_CPU(struct runqueue, runqueues);
 #define task_rq(p)		cpu_rq(task_cpu(p))
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
 
+extern unsigned long __scheduling_functions_start_here;
+extern unsigned long __scheduling_functions_end_here;
+const unsigned long scheduling_functions_start_here =
+			(unsigned long)&__scheduling_functions_start_here;
+const unsigned long scheduling_functions_end_here =
+			(unsigned long)&__scheduling_functions_end_here;
+
 /*
  * Default context-switch locking:
  */
@@ -1587,12 +1594,10 @@ out:
 	rebalance_tick(rq, 0);
 }
 
-void scheduling_functions_start_here(void) { }
-
 /*
  * schedule() is the main scheduler function.
  */
-asmlinkage void schedule(void)
+asmlinkage void __sched schedule(void)
 {
 	long *switch_count;
 	task_t *prev, *next;
@@ -1731,7 +1736,7 @@ EXPORT_SYMBOL(schedule);
  * off of preempt_enable.  Kernel preemptions off return from interrupt
  * occur there and call schedule directly.
  */
-asmlinkage void preempt_schedule(void)
+asmlinkage void __sched preempt_schedule(void)
 {
 	struct thread_info *ti = current_thread_info();
 
@@ -1842,7 +1847,6 @@ void fastcall __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exc
 		__wake_up_common(q, mode, nr_exclusive, 0);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
-
 EXPORT_SYMBOL_GPL(__wake_up_sync);	/* For internal use only */
 
 void fastcall complete(struct completion *x)
@@ -1855,7 +1859,6 @@ void fastcall complete(struct completion *x)
 			 1, 0);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
-
 EXPORT_SYMBOL(complete);
 
 void fastcall complete_all(struct completion *x)
@@ -1868,8 +1871,9 @@ void fastcall complete_all(struct completion *x)
 			 0, 0);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
+EXPORT_SYMBOL(complete_all);
 
-void fastcall wait_for_completion(struct completion *x)
+void fastcall __sched wait_for_completion(struct completion *x)
 {
 	might_sleep();
 	spin_lock_irq(&x->wait.lock);
@@ -1889,7 +1893,6 @@ void fastcall wait_for_completion(struct completion *x)
 	x->done--;
 	spin_unlock_irq(&x->wait.lock);
 }
-
 EXPORT_SYMBOL(wait_for_completion);
 
 #define	SLEEP_ON_VAR					\
@@ -1907,7 +1910,7 @@ EXPORT_SYMBOL(wait_for_completion);
 	__remove_wait_queue(q, &wait);			\
 	spin_unlock_irqrestore(&q->lock, flags);
 
-void fastcall interruptible_sleep_on(wait_queue_head_t *q)
+void fastcall __sched interruptible_sleep_on(wait_queue_head_t *q)
 {
 	SLEEP_ON_VAR
 
@@ -1920,7 +1923,7 @@ void fastcall interruptible_sleep_on(wait_queue_head_t *q)
 
 EXPORT_SYMBOL(interruptible_sleep_on);
 
-long fastcall interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
+long fastcall __sched interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
 	SLEEP_ON_VAR
 
@@ -1935,7 +1938,7 @@ long fastcall interruptible_sleep_on_timeout(wait_queue_head_t *q, long timeout)
 
 EXPORT_SYMBOL(interruptible_sleep_on_timeout);
 
-void fastcall sleep_on(wait_queue_head_t *q)
+void fastcall __sched sleep_on(wait_queue_head_t *q)
 {
 	SLEEP_ON_VAR
 
@@ -1948,7 +1951,7 @@ void fastcall sleep_on(wait_queue_head_t *q)
 
 EXPORT_SYMBOL(sleep_on);
 
-long fastcall sleep_on_timeout(wait_queue_head_t *q, long timeout)
+long fastcall __sched sleep_on_timeout(wait_queue_head_t *q, long timeout)
 {
 	SLEEP_ON_VAR
 
@@ -1962,8 +1965,6 @@ long fastcall sleep_on_timeout(wait_queue_head_t *q, long timeout)
 }
 
 EXPORT_SYMBOL(sleep_on_timeout);
-
-void scheduling_functions_end_here(void) { }
 
 void set_user_nice(task_t *p, long nice)
 {
@@ -2424,7 +2425,7 @@ asmlinkage long sys_sched_yield(void)
 	return 0;
 }
 
-void __cond_resched(void)
+void __sched __cond_resched(void)
 {
 	set_current_state(TASK_RUNNING);
 	schedule();
@@ -2438,7 +2439,7 @@ EXPORT_SYMBOL(__cond_resched);
  * this is a shortcut for kernel-space yielding - it marks the
  * thread runnable and calls sys_sched_yield().
  */
-void yield(void)
+void __sched yield(void)
 {
 	set_current_state(TASK_RUNNING);
 	sys_sched_yield();
@@ -2453,7 +2454,7 @@ EXPORT_SYMBOL(yield);
  * But don't do that if it is a deliberate, throttling IO wait (this task
  * has set its backing_dev_info: the queue against which it should throttle)
  */
-void io_schedule(void)
+void __sched io_schedule(void)
 {
 	struct runqueue *rq = this_rq();
 
@@ -2464,7 +2465,7 @@ void io_schedule(void)
 
 EXPORT_SYMBOL(io_schedule);
 
-long io_schedule_timeout(long timeout)
+long __sched io_schedule_timeout(long timeout)
 {
 	struct runqueue *rq = this_rq();
 	long ret;
@@ -2982,7 +2983,8 @@ void __might_sleep(char *file, int line)
 #if defined(in_atomic)
 	static unsigned long prev_jiffy;	/* ratelimiting */
 
-	if ((in_atomic() || irqs_disabled()) && system_running) {
+	if ((in_atomic() || irqs_disabled()) &&
+	    system_state == SYSTEM_RUNNING) {
 		if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
 			return;
 		prev_jiffy = jiffies;
@@ -3009,7 +3011,7 @@ EXPORT_SYMBOL(__might_sleep);
  *
  * Called inside preempt_disable().
  */
-void __preempt_spin_lock(spinlock_t *lock)
+void __sched __preempt_spin_lock(spinlock_t *lock)
 {
 	if (preempt_count() > 1) {
 		_raw_spin_lock(lock);
@@ -3025,7 +3027,7 @@ void __preempt_spin_lock(spinlock_t *lock)
 
 EXPORT_SYMBOL(__preempt_spin_lock);
 
-void __preempt_write_lock(rwlock_t *lock)
+void __sched __preempt_write_lock(rwlock_t *lock)
 {
 	if (preempt_count() > 1) {
 		_raw_write_lock(lock);

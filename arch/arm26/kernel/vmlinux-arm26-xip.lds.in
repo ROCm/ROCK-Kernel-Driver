@@ -66,6 +66,7 @@ SECTIONS
 	.text : {			/* Real text segment		*/
 		_text = .;		/* Text and read-only data	*/
 			*(.text)
+			SCHED_TEXT
 			*(.fixup)
 			*(.gnu.warning)
 			*(.rodata)

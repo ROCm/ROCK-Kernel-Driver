@@ -94,15 +94,24 @@ static irqreturn_t sun3_int5(int irq, void *dev_id, struct pt_regs *fp)
 /* handle requested ints, excepting 5 and 7, which always do the same
    thing */
 irqreturn_t (*sun3_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
-	sun3_inthandle, sun3_inthandle, sun3_inthandle, sun3_inthandle,
-	sun3_inthandle, sun3_int5, sun3_inthandle, sun3_int7
+	[0] = sun3_inthandle,
+	[1] = sun3_inthandle,
+	[2] = sun3_inthandle,
+	[3] = sun3_inthandle,
+	[4] = sun3_inthandle,
+	[5] = sun3_int5,
+	[6] = sun3_inthandle,
+	[7] = sun3_int7
 };
 
-static const char *dev_names[SYS_IRQS] = { NULL, NULL, NULL, NULL, 
-				     NULL, "timer", NULL, "int7 handler" };
+static const char *dev_names[SYS_IRQS] = {
+	[5] = "timer",
+	[7] = "int7 handler"
+};
 static void *dev_ids[SYS_IRQS];
 static irqreturn_t (*sun3_inthandler[SYS_IRQS])(int, void *, struct pt_regs *) = {
-	NULL, NULL, NULL, NULL, NULL, sun3_int5, NULL, sun3_int7
+	[5] = sun3_int5,
+	[7] = sun3_int7
 };
 static irqreturn_t (*sun3_vechandler[SUN3_INT_VECS])(int, void *, struct pt_regs *);
 static void *vec_ids[SUN3_INT_VECS];

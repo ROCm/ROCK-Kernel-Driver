@@ -180,9 +180,8 @@ struct page {
 	page_flags_t flags;		/* atomic flags, some possibly
 					   updated asynchronously */
 	atomic_t count;			/* Usage count, see below. */
-	struct list_head list;		/* ->mapping has some page lists. */
 	struct address_space *mapping;	/* The inode (or ...) we belong to. */
-	unsigned long index;		/* Our offset within mapping. */
+	pgoff_t index;			/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by zone->lru_lock !! */
 	union {
@@ -190,8 +189,11 @@ struct page {
 					 * protected by PG_chainlock */
 		pte_addr_t direct;
 	} pte;
-	unsigned long private;		/* mapping-private opaque data */
-
+	unsigned long private;		/* Mapping-private opaque data:
+					 * usually used for buffer_heads
+					 * if PagePrivate set; used for
+					 * swp_entry_t if PageSwapCache
+					 */
 	/*
 	 * On machines where all RAM is mapped into kernel address space,
 	 * we can simply calculate the virtual address. On machines with
@@ -242,33 +244,18 @@ extern void FASTCALL(__page_cache_release(struct page *));
 static inline int page_count(struct page *p)
 {
 	if (PageCompound(p))
-		p = (struct page *)p->lru.next;
+		p = (struct page *)p->private;
 	return atomic_read(&(p)->count);
 }
 
 static inline void get_page(struct page *page)
 {
-	if (PageCompound(page))
-		page = (struct page *)page->lru.next;
+	if (unlikely(PageCompound(page)))
+		page = (struct page *)page->private;
 	atomic_inc(&page->count);
 }
 
-static inline void put_page(struct page *page)
-{
-	if (PageCompound(page)) {
-		page = (struct page *)page->lru.next;
-		if (put_page_testzero(page)) {
-			if (page->lru.prev) {	/* destructor? */
-				(*(void (*)(struct page *))page->lru.prev)(page);
-			} else {
-				__page_cache_release(page);
-			}
-		}
-		return;
-	}
-	if (!PageReserved(page) && put_page_testzero(page))
-		__page_cache_release(page);
-}
+void put_page(struct page *page);
 
 #else		/* CONFIG_HUGETLB_PAGE */
 
@@ -349,7 +336,7 @@ static inline unsigned long page_zonenum(struct page *page)
 {
 	return (page->flags >> NODEZONE_SHIFT) & (~(~0UL << ZONES_SHIFT));
 }
-static inline unsigned long page_nodenum(struct page *page)
+static inline unsigned long page_to_nid(struct page *page)
 {
 	return (page->flags >> (NODEZONE_SHIFT + ZONES_SHIFT));
 }
@@ -402,6 +389,19 @@ void page_address_init(void);
 #define set_page_address(page, address)  do { } while(0)
 #define page_address_init()  do { } while(0)
 #endif
+
+/*
+ * On an anonymous page mapped into a user virtual memory area,
+ * page->mapping points to its anon_vma, not to a struct address_space.
+ *
+ * Please note that, confusingly, "page_mapping" refers to the inode
+ * address_space which maps the page from disk; whereas "page_mapped"
+ * refers to user virtual address space into which the page is mapped.
+ */
+static inline struct address_space *page_mapping(struct page *page)
+{
+	return PageAnon(page)? NULL: page->mapping;
+}
 
 /*
  * Return true if this page is mapped into pagetables.  Subtle: test pte.direct
@@ -472,7 +472,9 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
+int FASTCALL(set_page_dirty(struct page *page));
 int set_page_dirty_lock(struct page *page);
+int clear_page_dirty_for_io(struct page *page);
 
 /*
  * Prototype to add a shrinker callback for ageable caches.
@@ -496,23 +498,6 @@ typedef int (*shrinker_t)(int nr_to_scan, unsigned int gfp_mask);
 struct shrinker;
 extern struct shrinker *set_shrinker(int, shrinker_t);
 extern void remove_shrinker(struct shrinker *shrinker);
-
-/*
- * If the mapping doesn't provide a set_page_dirty a_op, then
- * just fall through and assume that it wants buffer_heads.
- * FIXME: make the method unconditional.
- */
-static inline int set_page_dirty(struct page *page)
-{
-	if (page->mapping) {
-		int (*spd)(struct page *);
-
-		spd = page->mapping->a_ops->set_page_dirty;
-		if (spd)
-			return (*spd)(page);
-	}
-	return __set_page_dirty_buffers(page);
-}
 
 /*
  * On a two-level page table, this ends up being trivial. Thus the
@@ -541,6 +526,9 @@ extern void si_meminfo_node(struct sysinfo *val, int nid);
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
 extern void __vma_link_rb(struct mm_struct *, struct vm_area_struct *,
 	struct rb_node **, struct rb_node *);
+extern struct vm_area_struct *copy_vma(struct vm_area_struct *,
+	unsigned long addr, unsigned long len, unsigned long pgoff);
+extern void vma_relink_file(struct vm_area_struct *, struct vm_area_struct *);
 extern void exit_mmap(struct mm_struct *);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);

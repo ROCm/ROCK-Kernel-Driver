@@ -46,11 +46,25 @@
    saved.  Notice that usp has no stack-slot and needs to be treated
    specially (see get_reg/put_reg below). */
 static int regoff[] = {
-	PT_REG(d1), PT_REG(d2), PT_REG(d3), PT_REG(d4),
-	PT_REG(d5), SW_REG(d6), SW_REG(d7), PT_REG(a0),
-	PT_REG(a1), PT_REG(a2), SW_REG(a3), SW_REG(a4),
-	SW_REG(a5), SW_REG(a6), PT_REG(d0), -1,
-	PT_REG(orig_d0), PT_REG(sr), PT_REG(pc),
+	[0]	= PT_REG(d1),
+	[1]	= PT_REG(d2),
+	[2]	= PT_REG(d3),
+	[3]	= PT_REG(d4),
+	[4]	= PT_REG(d5),
+	[5]	= SW_REG(d6),
+	[6]	= SW_REG(d7),
+	[7]	= PT_REG(a0),
+	[8]	= PT_REG(a1),
+	[9]	= PT_REG(a2),
+	[10]	= SW_REG(a3),
+	[11]	= SW_REG(a4),
+	[12]	= SW_REG(a5),
+	[13]	= SW_REG(a6),
+	[14]	= PT_REG(d0),
+	[15]	= -1,
+	[16]	= PT_REG(orig_d0),
+	[17]	= PT_REG(sr),
+	[18]	= PT_REG(pc),
 };
 
 /*

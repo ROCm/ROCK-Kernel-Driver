@@ -47,6 +47,11 @@
 #define NFS4_ACE_SYSTEM_AUDIT_ACE_TYPE   2
 #define NFS4_ACE_SYSTEM_ALARM_ACE_TYPE   3
 
+#define ACL4_SUPPORT_ALLOW_ACL 0x01
+#define ACL4_SUPPORT_DENY_ACL  0x02
+#define ACL4_SUPPORT_AUDIT_ACL 0x04
+#define ACL4_SUPPORT_ALARM_ACL 0x08
+
 typedef struct { char data[NFS4_VERIFIER_SIZE]; } nfs4_verifier;
 typedef struct { char data[16]; } nfs4_stateid;
 
@@ -217,63 +222,64 @@ enum lock_type4 {
 
 
 /* Mandatory Attributes */
-#define FATTR4_WORD0_SUPPORTED_ATTRS    (1)
-#define FATTR4_WORD0_TYPE               (1 << 1)
-#define FATTR4_WORD0_FH_EXPIRE_TYPE     (1 << 2)
-#define FATTR4_WORD0_CHANGE             (1 << 3)
-#define FATTR4_WORD0_SIZE               (1 << 4)
-#define FATTR4_WORD0_LINK_SUPPORT       (1 << 5)
-#define FATTR4_WORD0_SYMLINK_SUPPORT    (1 << 6)
-#define FATTR4_WORD0_NAMED_ATTR         (1 << 7)
-#define FATTR4_WORD0_FSID               (1 << 8)
-#define FATTR4_WORD0_UNIQUE_HANDLES     (1 << 9)
-#define FATTR4_WORD0_LEASE_TIME         (1 << 10)
-#define FATTR4_WORD0_RDATTR_ERROR       (1 << 11)
+#define FATTR4_WORD0_SUPPORTED_ATTRS    (1UL << 0)
+#define FATTR4_WORD0_TYPE               (1UL << 1)
+#define FATTR4_WORD0_FH_EXPIRE_TYPE     (1UL << 2)
+#define FATTR4_WORD0_CHANGE             (1UL << 3)
+#define FATTR4_WORD0_SIZE               (1UL << 4)
+#define FATTR4_WORD0_LINK_SUPPORT       (1UL << 5)
+#define FATTR4_WORD0_SYMLINK_SUPPORT    (1UL << 6)
+#define FATTR4_WORD0_NAMED_ATTR         (1UL << 7)
+#define FATTR4_WORD0_FSID               (1UL << 8)
+#define FATTR4_WORD0_UNIQUE_HANDLES     (1UL << 9)
+#define FATTR4_WORD0_LEASE_TIME         (1UL << 10)
+#define FATTR4_WORD0_RDATTR_ERROR       (1UL << 11)
 
 /* Recommended Attributes */
-#define FATTR4_WORD0_ACL                (1 << 12)
-#define FATTR4_WORD0_ACLSUPPORT         (1 << 13)
-#define FATTR4_WORD0_ARCHIVE            (1 << 14)
-#define FATTR4_WORD0_CANSETTIME         (1 << 15)
-#define FATTR4_WORD0_CASE_INSENSITIVE   (1 << 16)
-#define FATTR4_WORD0_CASE_PRESERVING    (1 << 17)
-#define FATTR4_WORD0_CHOWN_RESTRICTED   (1 << 18)
-#define FATTR4_WORD0_FILEHANDLE         (1 << 19)
-#define FATTR4_WORD0_FILEID             (1 << 20)
-#define FATTR4_WORD0_FILES_AVAIL        (1 << 21)
-#define FATTR4_WORD0_FILES_FREE         (1 << 22)
-#define FATTR4_WORD0_FILES_TOTAL        (1 << 23)
-#define FATTR4_WORD0_FS_LOCATIONS       (1 << 24)
-#define FATTR4_WORD0_HIDDEN             (1 << 25)
-#define FATTR4_WORD0_HOMOGENEOUS        (1 << 26)
-#define FATTR4_WORD0_MAXFILESIZE        (1 << 27)
-#define FATTR4_WORD0_MAXLINK            (1 << 28)
-#define FATTR4_WORD0_MAXNAME            (1 << 29)
-#define FATTR4_WORD0_MAXREAD            (1 << 30)
-#define FATTR4_WORD0_MAXWRITE           (1 << 31)
-#define FATTR4_WORD1_MIMETYPE           (1)
-#define FATTR4_WORD1_MODE               (1 << 1)
-#define FATTR4_WORD1_NO_TRUNC           (1 << 2)
-#define FATTR4_WORD1_NUMLINKS           (1 << 3)
-#define FATTR4_WORD1_OWNER              (1 << 4)
-#define FATTR4_WORD1_OWNER_GROUP        (1 << 5)
-#define FATTR4_WORD1_QUOTA_HARD         (1 << 6)
-#define FATTR4_WORD1_QUOTA_SOFT         (1 << 7)
-#define FATTR4_WORD1_QUOTA_USED         (1 << 8)
-#define FATTR4_WORD1_RAWDEV             (1 << 9)
-#define FATTR4_WORD1_SPACE_AVAIL        (1 << 10)
-#define FATTR4_WORD1_SPACE_FREE         (1 << 11)
-#define FATTR4_WORD1_SPACE_TOTAL        (1 << 12)
-#define FATTR4_WORD1_SPACE_USED         (1 << 13)
-#define FATTR4_WORD1_SYSTEM             (1 << 14)
-#define FATTR4_WORD1_TIME_ACCESS        (1 << 15)
-#define FATTR4_WORD1_TIME_ACCESS_SET    (1 << 16)
-#define FATTR4_WORD1_TIME_BACKUP        (1 << 17)
-#define FATTR4_WORD1_TIME_CREATE        (1 << 18)
-#define FATTR4_WORD1_TIME_DELTA         (1 << 19)
-#define FATTR4_WORD1_TIME_METADATA      (1 << 20)
-#define FATTR4_WORD1_TIME_MODIFY        (1 << 21)
-#define FATTR4_WORD1_TIME_MODIFY_SET    (1 << 22)
+#define FATTR4_WORD0_ACL                (1UL << 12)
+#define FATTR4_WORD0_ACLSUPPORT         (1UL << 13)
+#define FATTR4_WORD0_ARCHIVE            (1UL << 14)
+#define FATTR4_WORD0_CANSETTIME         (1UL << 15)
+#define FATTR4_WORD0_CASE_INSENSITIVE   (1UL << 16)
+#define FATTR4_WORD0_CASE_PRESERVING    (1UL << 17)
+#define FATTR4_WORD0_CHOWN_RESTRICTED   (1UL << 18)
+#define FATTR4_WORD0_FILEHANDLE         (1UL << 19)
+#define FATTR4_WORD0_FILEID             (1UL << 20)
+#define FATTR4_WORD0_FILES_AVAIL        (1UL << 21)
+#define FATTR4_WORD0_FILES_FREE         (1UL << 22)
+#define FATTR4_WORD0_FILES_TOTAL        (1UL << 23)
+#define FATTR4_WORD0_FS_LOCATIONS       (1UL << 24)
+#define FATTR4_WORD0_HIDDEN             (1UL << 25)
+#define FATTR4_WORD0_HOMOGENEOUS        (1UL << 26)
+#define FATTR4_WORD0_MAXFILESIZE        (1UL << 27)
+#define FATTR4_WORD0_MAXLINK            (1UL << 28)
+#define FATTR4_WORD0_MAXNAME            (1UL << 29)
+#define FATTR4_WORD0_MAXREAD            (1UL << 30)
+#define FATTR4_WORD0_MAXWRITE           (1UL << 31)
+#define FATTR4_WORD1_MIMETYPE           (1UL << 0)
+#define FATTR4_WORD1_MODE               (1UL << 1)
+#define FATTR4_WORD1_NO_TRUNC           (1UL << 2)
+#define FATTR4_WORD1_NUMLINKS           (1UL << 3)
+#define FATTR4_WORD1_OWNER              (1UL << 4)
+#define FATTR4_WORD1_OWNER_GROUP        (1UL << 5)
+#define FATTR4_WORD1_QUOTA_HARD         (1UL << 6)
+#define FATTR4_WORD1_QUOTA_SOFT         (1UL << 7)
+#define FATTR4_WORD1_QUOTA_USED         (1UL << 8)
+#define FATTR4_WORD1_RAWDEV             (1UL << 9)
+#define FATTR4_WORD1_SPACE_AVAIL        (1UL << 10)
+#define FATTR4_WORD1_SPACE_FREE         (1UL << 11)
+#define FATTR4_WORD1_SPACE_TOTAL        (1UL << 12)
+#define FATTR4_WORD1_SPACE_USED         (1UL << 13)
+#define FATTR4_WORD1_SYSTEM             (1UL << 14)
+#define FATTR4_WORD1_TIME_ACCESS        (1UL << 15)
+#define FATTR4_WORD1_TIME_ACCESS_SET    (1UL << 16)
+#define FATTR4_WORD1_TIME_BACKUP        (1UL << 17)
+#define FATTR4_WORD1_TIME_CREATE        (1UL << 18)
+#define FATTR4_WORD1_TIME_DELTA         (1UL << 19)
+#define FATTR4_WORD1_TIME_METADATA      (1UL << 20)
+#define FATTR4_WORD1_TIME_MODIFY        (1UL << 21)
+#define FATTR4_WORD1_TIME_MODIFY_SET    (1UL << 22)
+#define FATTR4_WORD1_MOUNTED_ON_FILEID  (1UL << 23)
 
 #define NFSPROC4_NULL 0
 #define NFSPROC4_COMPOUND 1
@@ -286,7 +292,6 @@ enum lock_type4 {
 
 enum {
 	NFSPROC4_CLNT_NULL = 0,		/* Unused */
-	NFSPROC4_CLNT_COMPOUND,		/* Soon to be unused */
 	NFSPROC4_CLNT_READ,
 	NFSPROC4_CLNT_WRITE,
 	NFSPROC4_CLNT_COMMIT,
@@ -303,6 +308,19 @@ enum {
 	NFSPROC4_CLNT_LOCK,
 	NFSPROC4_CLNT_LOCKT,
 	NFSPROC4_CLNT_LOCKU,
+	NFSPROC4_CLNT_ACCESS,
+	NFSPROC4_CLNT_GETATTR,
+	NFSPROC4_CLNT_LOOKUP,
+	NFSPROC4_CLNT_LOOKUP_ROOT,
+	NFSPROC4_CLNT_REMOVE,
+	NFSPROC4_CLNT_RENAME,
+	NFSPROC4_CLNT_LINK,
+	NFSPROC4_CLNT_CREATE,
+	NFSPROC4_CLNT_PATHCONF,
+	NFSPROC4_CLNT_STATFS,
+	NFSPROC4_CLNT_READLINK,
+	NFSPROC4_CLNT_READDIR,
+	NFSPROC4_CLNT_SERVER_CAPS,
 };
 
 #endif

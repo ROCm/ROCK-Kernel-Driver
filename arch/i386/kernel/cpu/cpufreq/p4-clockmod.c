@@ -181,21 +181,24 @@ static unsigned int cpufreq_p4_get_frequency(struct cpuinfo_x86 *c)
 {
 	if ((c->x86 == 0x06) && (c->x86_model == 0x09)) {
 		/* Pentium M */
-		printk(KERN_DEBUG PFX "Warning: Pentium M detected. The speedstep_centrino module\n");
-		printk(KERN_DEBUG PFX "offers voltage scaling in addition of frequency scaling. You\n");
-		printk(KERN_DEBUG PFX "should use that instead of p4-clockmod, if possible.\n");
+		printk(KERN_WARNING PFX "Warning: Pentium M detected. "
+		       "The speedstep_centrino module offers voltage scaling"
+		       " in addition of frequency scaling. You should use "
+		       "that instead of p4-clockmod, if possible.\n");
 		return speedstep_get_processor_frequency(SPEEDSTEP_PROCESSOR_PM);
 	}
 
 	if (c->x86 != 0xF) {
-		printk(KERN_DEBUG PFX "Unknown p4-clockmod-capable CPU. Please send an e-mail to <linux@brodo.de>\n");
+		printk(KERN_WARNING PFX "Unknown p4-clockmod-capable CPU. Please send an e-mail to <linux@brodo.de>\n");
 		return 0;
 	}
 
 	if (speedstep_detect_processor() == SPEEDSTEP_PROCESSOR_P4M) {
-		printk(KERN_DEBUG PFX "Warning: Pentium 4-M detected. The speedstep-ich or acpi cpufreq \n");
-		printk(KERN_DEBUG PFX "modules offers voltage scaling in addition of frequency scaling. You\n");
-		printk(KERN_DEBUG PFX "should use either one instead of p4-clockmod, if possible.\n");
+		printk(KERN_WARNING PFX "Warning: Pentium 4-M detected. "
+		       "The speedstep-ich or acpi cpufreq modules offer "
+		       "voltage scaling in addition of frequency scaling. "
+		       "You should use either one instead of p4-clockmod, "
+		       "if possible.\n");
 		return speedstep_get_processor_frequency(SPEEDSTEP_PROCESSOR_P4M);
 	}
 

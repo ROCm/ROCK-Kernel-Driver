@@ -1604,7 +1604,7 @@ static int vt_check(struct file *file)
 	 * To have permissions to do most of the vt ioctls, we either have
 	 * to be the owner of the tty, or super-user.
 	 */
-	if (current->tty == tty || capable(CAP_SYS_ADMIN))
+	if (current->signal->tty == tty || capable(CAP_SYS_ADMIN))
 		return 1;
 	return 0;                                                    
 }
