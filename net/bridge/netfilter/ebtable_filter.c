@@ -57,6 +57,7 @@ static struct ebt_table frame_filter =
 	.valid_hooks	= FILTER_VALID_HOOKS, 
 	.lock		= RW_LOCK_UNLOCKED,
 	.check		= check,
+	.me		= THIS_MODULE,
 };
 
 static unsigned int
