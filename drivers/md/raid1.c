@@ -225,14 +225,12 @@ static void reschedule_retry(r1bio_t *r1_bio)
  * operation and are ready to return a success/failure code to the buffer
  * cache layer.
  */
-static int raid_end_bio_io(r1bio_t *r1_bio, int uptodate, int nr_sectors)
+static void raid_end_bio_io(r1bio_t *r1_bio, int uptodate)
 {
 	struct bio *bio = r1_bio->master_bio;
 
-	bio_endio(bio, uptodate, nr_sectors);
+	bio_endio(bio, uptodate);
 	free_r1bio(r1_bio);
-
-	return 0;
 }
 
 /*
@@ -247,7 +245,7 @@ static void inline update_head_pos(int disk, r1bio_t *r1_bio)
 	atomic_dec(&conf->mirrors[disk].nr_pending);
 }
 
-static int end_request(struct bio *bio, int nr_sectors)
+static void end_request(struct bio *bio)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
@@ -278,8 +276,8 @@ static int end_request(struct bio *bio, int nr_sectors)
 		 * we have only one bio on the read side
 		 */
 		if (uptodate) {
-			raid_end_bio_io(r1_bio, uptodate, nr_sectors);
-			return 0;
+			raid_end_bio_io(r1_bio, uptodate);
+			return;
 		}
 		/*
 		 * oops, read error:
@@ -287,7 +285,7 @@ static int end_request(struct bio *bio, int nr_sectors)
 		printk(KERN_ERR "raid1: %s: rescheduling sector %lu\n",
 			partition_name(bio->bi_dev), r1_bio->sector);
 		reschedule_retry(r1_bio);
-		return 0;
+		return;
 	}
 
 	if (r1_bio->read_bio)
@@ -307,8 +305,7 @@ static int end_request(struct bio *bio, int nr_sectors)
 	 * already.
 	 */
 	if (atomic_dec_and_test(&r1_bio->remaining))
-		raid_end_bio_io(r1_bio, uptodate, nr_sectors);
-	return 0;
+		raid_end_bio_io(r1_bio, uptodate);
 }
 
 /*
@@ -518,7 +515,7 @@ static int make_request(mddev_t *mddev, int rw, struct bio * bio)
 		 * If all mirrors are non-operational
 		 * then return an IO error:
 		 */
-		raid_end_bio_io(r1_bio, 0, 0);
+		raid_end_bio_io(r1_bio, 0);
 		return 0;
 	}
 	atomic_set(&r1_bio->remaining, sum_bios);
@@ -930,7 +927,7 @@ abort:
 #define REDIRECT_SECTOR KERN_ERR \
 "raid1: %s: redirecting sector %lu to another mirror\n"
 
-static int end_sync_read(struct bio *bio, int nr_sectors)
+static void end_sync_read(struct bio *bio)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
@@ -948,11 +945,9 @@ static int end_sync_read(struct bio *bio, int nr_sectors)
 	else
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
 	reschedule_retry(r1_bio);
-
-	return 0;
 }
 
-static int end_sync_write(struct bio *bio, int nr_sectors)
+static void end_sync_write(struct bio *bio)
 {
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	r1bio_t * r1_bio = (r1bio_t *)(bio->bi_private);
@@ -974,7 +969,6 @@ static int end_sync_write(struct bio *bio, int nr_sectors)
 		resume_device(conf);
 		put_buf(r1_bio);
 	}
-	return 0;
 }
 
 static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
@@ -1100,7 +1094,7 @@ static void raid1d(void *data)
 			map(mddev, &bio->bi_dev);
 			if (kdev_same(bio->bi_dev, dev)) {
 				printk(IO_ERROR, partition_name(bio->bi_dev), r1_bio->sector);
-				raid_end_bio_io(r1_bio, 0, 0);
+				raid_end_bio_io(r1_bio, 0);
 				break;
 			}
 			printk(REDIRECT_SECTOR,
