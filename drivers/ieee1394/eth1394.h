@@ -51,7 +51,7 @@ struct host_info {
 	struct net_device *dev;
 };
 
-/* This is our task struct. It's used for the complete_tq callback.  */
+/* This is our task struct. It's used for the packet complete callback.  */
 struct packet_task {
 	struct sk_buff *skb;	/* Socket buffer we are sending */
 	nodeid_t dest_node;	/* Destination of the packet */
