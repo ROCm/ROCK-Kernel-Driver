@@ -92,12 +92,7 @@ static inline struct thread_info *current_thread_info(void)
 }
 
 /* how to get the current stack pointer from C */
-static inline unsigned long current_stack_pointer(void)
-{
-	unsigned long ti;
-	__asm__("movl %%esp,%0; ":"=r" (ti) : );
-	return ti;
-}
+register unsigned long current_stack_pointer asm("esp");
 
 /* thread information allocation */
 #ifdef CONFIG_DEBUG_STACK_USAGE
