@@ -749,6 +749,14 @@ static int read_super_block (struct super_block * s, int offset)
 	return 1;
     }
 
+    if ( rs->s_v1.s_root_block == -1 ) {
+       brelse(bh) ;
+       printk("dev %s: Unfinished reiserfsck --rebuild-tree run detected. Please run\n"
+              "reiserfsck --rebuild-tree and wait for a completion. If that fais\n"
+              "get newer reiserfsprogs package\n", kdevname (s->s_dev));
+       return 1;
+    }
+
     SB_BUFFER_WITH_SB (s) = bh;
     SB_DISK_SUPER_BLOCK (s) = rs;
 
