@@ -481,7 +481,7 @@ EXPORT_SYMBOL(jiffies_64);
 EXPORT_SYMBOL(xtime);
 EXPORT_SYMBOL(do_gettimeofday);
 EXPORT_SYMBOL(do_settimeofday);
-#ifdef CONFIG_DEBUG_KERNEL
+#ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 EXPORT_SYMBOL(__might_sleep);
 #endif
 #if !defined(__ia64__)
