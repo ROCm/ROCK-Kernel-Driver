@@ -19,6 +19,7 @@
 #include "linux/vmalloc.h"
 #include "linux/spinlock.h"
 #include "linux/proc_fs.h"
+#include "linux/ptrace.h"
 #include "asm/unistd.h"
 #include "asm/mman.h"
 #include "asm/segment.h"
@@ -453,6 +454,15 @@ int __init make_proc_sysemu(void)
 }
 
 late_initcall(make_proc_sysemu);
+
+int singlestepping(void * t)
+{
+	struct task_struct *task = t ? t : current;
+
+	if (task->thread.singlestep_syscall)
+		return(0);
+	return(task->ptrace & PT_DTRACE);
+}
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

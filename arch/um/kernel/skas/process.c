@@ -190,7 +190,7 @@ void userspace(union uml_pt_regs *regs)
 		local_using_sysemu = get_using_sysemu();
 		pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
 
-		op = singlestepping_skas() ? PTRACE_SINGLESTEP :
+		op = singlestepping(NULL) ? PTRACE_SINGLESTEP :
 			pt_syscall_parm;
 
 		err = ptrace(op, pid, 0, 0);

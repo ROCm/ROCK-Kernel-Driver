@@ -373,7 +373,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 			}
 
 			if(tracing){
-				if(singlestepping_tt(task))
+				if(singlestepping(task))
 					cont_type = PTRACE_SINGLESTEP;
 				else cont_type = pt_syscall_parm;
 			}

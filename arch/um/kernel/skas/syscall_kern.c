@@ -4,6 +4,7 @@
  */
 
 #include "linux/sys.h"
+#include "linux/ptrace.h"
 #include "asm/errno.h"
 #include "asm/unistd.h"
 #include "asm/ptrace.h"
@@ -26,6 +27,12 @@ long execute_syscall_skas(void *r)
 	if((syscall >= NR_syscalls) || (syscall < 0))
 		res = -ENOSYS;
 	else res = EXECUTE_SYSCALL(syscall, regs);
+
+	if(current->thread.singlestep_syscall){
+		current->thread.singlestep_syscall = 0;
+		current->ptrace &= ~PT_DTRACE;
+		force_sig(SIGTRAP, current);
+	}
 
 	return(res);
 }

@@ -28,7 +28,6 @@ extern int unmap(int fd, void *addr, int len);
 extern int protect(int fd, unsigned long addr, unsigned long len, 
 		   int r, int w, int x, int must_succeed);
 extern void user_signal(int sig, union uml_pt_regs *regs);
-extern int singlestepping_skas(void);
 extern int new_mm(int from);
 extern void save_registers(union uml_pt_regs *regs);
 extern void restore_registers(union uml_pt_regs *regs);

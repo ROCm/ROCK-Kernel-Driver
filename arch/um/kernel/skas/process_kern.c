@@ -24,14 +24,6 @@
 #include "mode.h"
 #include "proc_mm.h"
 
-int singlestepping_skas(void)
-{
-	int ret = current->ptrace & PT_DTRACE;
-
-	current->ptrace &= ~PT_DTRACE;
-	return(ret);
-}
-
 void *switch_to_skas(void *prev, void *next)
 {
 	struct task_struct *from, *to;

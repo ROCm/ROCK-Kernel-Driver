@@ -523,15 +523,6 @@ void set_init_pid(int pid)
 		      -err);
 }
 
-int singlestepping_tt(void *t)
-{
-	struct task_struct *task = t;
-
-	if(task->thread.singlestep_syscall)
-		return(0);
-	return(task->ptrace & PT_DTRACE);
-}
-
 void clear_singlestep(void *t)
 {
 	struct task_struct *task = t;
