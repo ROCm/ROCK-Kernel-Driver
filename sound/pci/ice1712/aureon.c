@@ -1290,9 +1290,9 @@ static int __devinit aureon_init(ice1712_t *ice)
 {
 	static unsigned short wm_inits_aureon[] = {
 		/* These come first to reduce init pop noise */
-		0x1b, 0x005,		/* ADC Mux (AC'97 source) */
-		0x1c, 0x00B,		/* Out Mux1 (VOUT1 = ADC+AUX, VOUT2 = ADC) */
-		0x1d, 0x009,		/* Out Mux2 (VOUT2 = ADC, VOUT3 = ADC) */
+		0x1b, 0x044,		/* ADC Mux (AC'97 source) */
+		0x1c, 0x00B,		/* Out Mux1 (VOUT1 = DAC+AUX, VOUT2 = DAC) */
+		0x1d, 0x009,		/* Out Mux2 (VOUT2 = DAC, VOUT3 = DAC) */
 
 		0x18, 0x000,		/* All power-up */
 
