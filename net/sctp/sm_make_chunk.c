@@ -1441,6 +1441,7 @@ no_hmac:
 
 	retval->next_tsn = retval->c.initial_tsn;
 	retval->ctsn_ack_point = retval->next_tsn - 1;
+	retval->addip_serial = retval->c.initial_tsn;
 
 	/* The INIT stuff will be done by the side effects.  */
 	return retval;
@@ -2035,7 +2036,7 @@ struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
 	if (!retval)
 		return NULL;
 
-	asconf.serial = asoc->addip_serial++;
+	asconf.serial = htonl(asoc->addip_serial++);
 
 	retval->subh.addip_hdr =
 		sctp_addto_chunk(retval, sizeof(asconf), &asconf);
@@ -2073,7 +2074,7 @@ struct sctp_chunk *sctp_make_asconf_update_ip(struct sctp_association *asoc,
 					      union sctp_addr	      *laddr,
 					      struct sockaddr	      *addrs,
 					      int		      addrcnt,
-					      int		      flags)
+					      __u16		      flags)
 {
 	sctp_addip_param_t	param;
 	struct sctp_chunk	*retval;
@@ -2112,7 +2113,7 @@ struct sctp_chunk *sctp_make_asconf_update_ip(struct sctp_association *asoc,
 		addr_param_len = af->to_addr_param(addr, &addr_param);
 		param.param_hdr.type = flags;
 		param.param_hdr.length = htons(paramlen + addr_param_len);
-		param.crr_id = htonl(i);
+		param.crr_id = i;
 
 		sctp_addto_chunk(retval, paramlen, &param);
 		sctp_addto_chunk(retval, addr_param_len, &addr_param);
@@ -2185,8 +2186,8 @@ struct sctp_chunk *sctp_make_asconf_set_prim(struct sctp_association *asoc,
  *
  * Create an ASCONF_ACK chunk with enough space for the parameter responses. 
  */
-struct sctp_chunk *sctp_make_asconf_ack(struct sctp_association	*asoc,
-					int serial, int vparam_len)
+struct sctp_chunk *sctp_make_asconf_ack(const struct sctp_association *asoc,
+					__u32 serial, int vparam_len)
 {
 	sctp_addiphdr_t		asconf;
 	struct sctp_chunk	*retval;
@@ -2197,7 +2198,7 @@ struct sctp_chunk *sctp_make_asconf_ack(struct sctp_association	*asoc,
 	if (!retval)
 		return NULL;
 
-	asconf.serial = serial;
+	asconf.serial = htonl(serial);
 
 	retval->subh.addip_hdr =
 		sctp_addto_chunk(retval, sizeof(asconf), &asconf);
@@ -2205,10 +2206,223 @@ struct sctp_chunk *sctp_make_asconf_ack(struct sctp_association	*asoc,
 	return retval;
 }
 
-struct sctp_chunk *sctp_process_asconf(struct sctp_association *asoc,
-					struct sctp_chunk *asconf,
-					int vparam_len)
+/* Add response parameters to an ASCONF_ACK chunk. */
+void sctp_add_asconf_response(struct sctp_chunk *chunk, __u32 crr_id,
+			      __u16 err_code, sctp_addip_param_t *asconf_param)
 {
-	// FIXME: process asconf chunk
-	return NULL;
+	sctp_addip_param_t 	ack_param;
+	sctp_errhdr_t		err_param;
+	int			asconf_param_len = 0;
+	int			err_param_len = 0;
+	__u16			response_type;
+
+	if (SCTP_ERROR_NO_ERROR == err_code) {
+		response_type = SCTP_PARAM_SUCCESS_REPORT;
+	} else {
+		response_type = SCTP_PARAM_ERR_CAUSE;
+		err_param_len = sizeof(err_param);
+		if (asconf_param)
+			asconf_param_len =
+				 ntohs(asconf_param->param_hdr.length);
+	}
+
+	/* Add Success Indication or Error Cause Indication parameter. */ 
+	ack_param.param_hdr.type = response_type;
+	ack_param.param_hdr.length = htons(sizeof(ack_param) +
+					   err_param_len +
+					   asconf_param_len);
+	ack_param.crr_id = crr_id;
+	sctp_addto_chunk(chunk, sizeof(ack_param), &ack_param);
+
+	if (SCTP_ERROR_NO_ERROR == err_code)
+		return;
+
+	/* Add Error Cause parameter. */
+	err_param.cause = err_code;
+	err_param.length = htons(err_param_len + asconf_param_len);
+	sctp_addto_chunk(chunk, err_param_len, &err_param);
+
+	/* Add the failed TLV copied from ASCONF chunk. */
+	if (asconf_param)
+		sctp_addto_chunk(chunk, asconf_param_len, asconf_param);
+}
+
+/* Process a asconf parameter. */
+__u16 sctp_process_asconf_param(struct sctp_association *asoc,
+				struct sctp_chunk *asconf,
+				sctp_addip_param_t *asconf_param,
+				union sctp_addr_param *addr_param)
+{
+	struct sctp_transport *peer;
+	struct sctp_af *af;
+	union sctp_addr	addr;
+	struct list_head *pos;
+				 
+	af = sctp_get_af_specific(param_type2af(addr_param->v4.param_hdr.type));
+	if (unlikely(!af))
+		return SCTP_ERROR_INV_PARAM;
+
+	af->from_addr_param(&addr, addr_param, asoc->peer.port, 0);
+	switch (asconf_param->param_hdr.type) {
+	case SCTP_PARAM_ADD_IP:
+		/* ADDIP 4.3 D9) If an endpoint receives an ADD IP address
+	 	 * request and does not have the local resources to add this
+	 	 * new address to the association, it MUST return an Error
+	 	 * Cause TLV set to the new error code 'Operation Refused
+	 	 * Due to Resource Shortage'.
+	 	 */
+
+		peer = sctp_assoc_add_peer(asoc, &addr, GFP_ATOMIC);
+		if (!peer)
+			return SCTP_ERROR_RSRC_LOW;
+
+		/* Start the heartbeat timer. */
+		if (!mod_timer(&peer->hb_timer, sctp_transport_timeout(peer)))
+			sctp_transport_hold(peer);
+		break;
+	case SCTP_PARAM_DEL_IP:
+		/* ADDIP 4.3 D7) If a request is received to delete the
+	 	 * last remaining IP address of a peer endpoint, the receiver
+	 	 * MUST send an Error Cause TLV with the error cause set to the
+	 	 * new error code 'Request to Delete Last Remaining IP Address'.
+	 	 */
+		pos = asoc->peer.transport_addr_list.next;
+		if (pos->next == &asoc->peer.transport_addr_list)
+			return SCTP_ERROR_DEL_LAST_IP;
+
+		/* ADDIP 4.3 D8) If a request is received to delete an IP
+		 * address which is also the source address of the IP packet
+		 * which contained the ASCONF chunk, the receiver MUST reject
+		 * this request. To reject the request the receiver MUST send
+		 * an Error Cause TLV set to the new error code 'Request to
+		 * Delete Source IP Address'
+		 */
+		if (sctp_cmp_addr_exact(sctp_source(asconf), &addr))
+			return SCTP_ERROR_DEL_SRC_IP;
+
+		sctp_assoc_del_peer(asoc, &addr);
+		break;
+	case SCTP_PARAM_SET_PRIMARY:
+		peer = sctp_assoc_lookup_paddr(asoc, &addr);
+		if (!peer)
+			return SCTP_ERROR_INV_PARAM;
+
+		sctp_assoc_set_primary(asoc, peer);
+		break;
+	default:
+		return SCTP_ERROR_INV_PARAM;
+		break;
+	}
+
+	return SCTP_ERROR_NO_ERROR;
+}
+
+/* Process an incoming ASCONF chunk with the next expected serial no. and 
+ * return an ASCONF_ACK chunk to be sent in response.
+ */
+struct sctp_chunk *sctp_process_asconf(struct sctp_association *asoc,
+				       struct sctp_chunk *asconf)
+{
+	sctp_addiphdr_t		*hdr;
+	union sctp_addr_param	*addr_param;
+	sctp_addip_param_t	*asconf_param;
+	struct sctp_chunk	*asconf_ack;
+
+	__u16	err_code;
+	int	length = 0;
+	int	chunk_len = ntohs(asconf->chunk_hdr->length);
+	int	asconf_param_len;
+	__u32	serial;
+	int	all_param_pass = 1;
+
+	hdr = (sctp_addiphdr_t *)asconf->skb->data;
+	serial = ntohl(hdr->serial);
+
+	/* Skip the chunkhdr. */ 
+	chunk_len -= sizeof(sctp_chunkhdr_t);
+
+	/* Skip the addiphdr and store a pointer to address parameter. */ 
+	length = sizeof(sctp_addiphdr_t);
+	addr_param = (union sctp_addr_param *)skb_pull(asconf->skb, length);
+	chunk_len -= length;
+
+	/* Skip the address parameter and store a pointer to the first
+	 * asconf paramter.
+	 */ 
+	length = ntohs(addr_param->v4.param_hdr.length);
+	asconf_param = (sctp_addip_param_t *)skb_pull(asconf->skb, length);
+	chunk_len -= length;
+
+	/* create an ASCONF_ACK chunk. 
+	 * Based on the definitions of parameters, we know that the size of
+	 * ASCONF_ACK parameters are less than or equal to the twice of ASCONF
+	 * paramter.
+	 */
+	asconf_ack = sctp_make_asconf_ack(asoc, serial, chunk_len * 2);
+	if (!asconf_ack)
+		goto done;
+
+	/* Process the TLVs contained within the ASCONF chunk. */
+	while (chunk_len > 0) {
+		asconf_param_len = ntohs(asconf_param->param_hdr.length);
+		length = sizeof(sctp_addip_param_t);
+
+		/* Unrecognized or unsupported	paramter. */
+		if (asconf_param_len <= length) {
+			sctp_add_asconf_response(asconf_ack, 0,
+						 SCTP_ERROR_UNKNOWN_PARAM,
+						 NULL);
+			goto done;
+		}
+
+		addr_param = (union sctp_addr_param *)skb_pull(asconf->skb,
+							       length);
+
+		err_code = sctp_process_asconf_param(asoc, asconf, asconf_param,
+						     addr_param);
+		/* ADDIP 4.1 A7)
+		 * If an error response is received for a TLV parameter,
+		 * all TLVs with no response before the failed TLV are
+		 * considered successful if not reported.  All TLVs after
+		 * the failed response are considered unsuccessful unless
+		 * a specific success indication is present for the parameter.
+		 */
+		if (SCTP_ERROR_NO_ERROR != err_code)
+			all_param_pass = 0;
+
+		if (!all_param_pass)
+			sctp_add_asconf_response(asconf_ack,
+						 asconf_param->crr_id, err_code,
+						 asconf_param);
+
+		/* ADDIP 4.3 D11) When an endpoint receiving an ASCONF to add
+		 * an IP address sends an 'Out of Resource' in its response, it
+		 * MUST also fail any subsequent add or delete requests bundled
+		 * in the ASCONF. 
+		 */
+		if (SCTP_ERROR_RSRC_LOW == err_code)
+			goto done;
+
+		/* Move to the next ASCONF param. */
+		length = ntohs(addr_param->v4.param_hdr.length);
+		asconf_param = (sctp_addip_param_t *)skb_pull(asconf->skb,
+							      length);
+		chunk_len -= asconf_param_len;
+	}
+	
+done:
+	asoc->peer.addip_serial++;
+
+	/* If we are sending a new ASCONF_ACK hold a reference to it in assoc
+	 * after freeing the reference to old asconf ack if any. 
+	 */
+	if (asconf_ack) {
+		if (asoc->addip_last_asconf_ack)
+			sctp_chunk_free(asoc->addip_last_asconf_ack);
+
+		sctp_chunk_hold(asconf_ack);
+		asoc->addip_last_asconf_ack = asconf_ack;
+	}
+
+	return asconf_ack;
 }

@@ -1708,6 +1708,8 @@ int sctp_assoc_lookup_laddr(struct sctp_association *asoc,
 struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *,
 				     const union sctp_addr *address,
 				     const int gfp);
+void sctp_assoc_del_peer(struct sctp_association *asoc,
+			 const union sctp_addr *addr);
 void sctp_assoc_control_transport(struct sctp_association *,
 				  struct sctp_transport *,
 				  sctp_transport_cmd_t, sctp_sn_error_t);

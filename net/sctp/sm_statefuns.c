@@ -3066,19 +3066,57 @@ sctp_disposition_t sctp_sf_do_8_5_1_E_sa(const struct sctp_endpoint *ep,
 	return sctp_sf_shut_8_4_5(ep, NULL, type, arg, commands);
 }
 
-/*
- * ADDIP Section 4.2 Upon reception of an ASCONF Chunk
- * When an endpoint receive an ASCONF Chunk from the remote peer
- * special procedures MAY be needed to identify the association the
- * ASCONF Chunk is associated with. To properly find the association
- * the following procedures should be L1 to L4 and C1 to C5
- */
+/* ADDIP Section 4.2 Upon reception of an ASCONF Chunk.  */
 sctp_disposition_t sctp_sf_do_asconf(const struct sctp_endpoint *ep,
-				const struct sctp_association *asoc,
-				const sctp_subtype_t type, void *arg,
-				sctp_cmd_seq_t *commands)
+				     const struct sctp_association *asoc,
+				     const sctp_subtype_t type, void *arg,
+				     sctp_cmd_seq_t *commands)
 {
-	// FIXME: Handle the ASCONF chunk
+	struct sctp_chunk	*chunk = arg;
+	struct sctp_chunk	*asconf_ack = NULL;
+	sctp_addiphdr_t		*hdr;
+	__u32			serial;
+
+	hdr = (sctp_addiphdr_t *)chunk->skb->data;
+	serial = ntohl(hdr->serial);
+
+	/* ADDIP 4.2 C1) Compare the value of the serial number to the value
+	 * the endpoint stored in a new association variable
+	 * 'Peer-Serial-Number'. 
+	 */
+	if (serial == asoc->peer.addip_serial + 1) {
+   		/* ADDIP 4.2 C2) If the value found in the serial number is
+		 * equal to the ('Peer-Serial-Number' + 1), the endpoint MUST
+		 * do V1-V5.
+		 */
+		asconf_ack = sctp_process_asconf((struct sctp_association *)
+						 asoc, chunk);
+		if (!asconf_ack)
+			return SCTP_DISPOSITION_NOMEM;
+	} else if (serial == asoc->peer.addip_serial) {
+		/* ADDIP 4.2 C3) If the value found in the serial number is
+		 * equal to the value stored in the 'Peer-Serial-Number'
+		 * IMPLEMENTATION NOTE: As an optimization a receiver may wish
+		 * to save the last ASCONF-ACK for some predetermined period of 		 * time and instead of re-processing the ASCONF (with the same
+		 * serial number) it may just re-transmit the ASCONF-ACK.
+		 */
+		if (asoc->addip_last_asconf_ack)
+			asconf_ack = asoc->addip_last_asconf_ack;
+		else
+			return SCTP_DISPOSITION_DISCARD;
+	} else {
+		/* ADDIP 4.2 C4) Otherwise, the ASCONF Chunk is discarded since 
+		 * it must be either a stale packet or from an attacker.
+		 */	
+		return SCTP_DISPOSITION_DISCARD;
+	}
+
+	/* ADDIP 4.2 C5) In both cases C2 and C3 the ASCONF-ACK MUST be sent
+	 * back to the source address contained in the IP header of the ASCONF
+	 * being responded to.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(asconf_ack));
+	
 	return SCTP_DISPOSITION_CONSUME;
 }
 
