@@ -172,6 +172,7 @@ static int __init eisa_init_device (struct eisa_root_device *root,
 {
 	char *sig;
         unsigned long sig_addr;
+	int i;
 
 	sig_addr = SLOT_ADDRESS (root, slot) + EISA_VENDOR_ID_OFFSET;
 
@@ -189,13 +190,13 @@ static int __init eisa_init_device (struct eisa_root_device *root,
 	edev->dev.dma_mask = &edev->dma_mask;
 	sprintf (edev->dev.bus_id, "%02X:%02X", root->bus_nr, slot);
 
+	for (i = 0; i < EISA_MAX_RESOURCES; i++) {
 #ifdef CONFIG_EISA_NAMES
-	{
-	  int i;
-	  for (i = 0; i < EISA_MAX_RESOURCES; i++)
 		edev->res[i].name = edev->pretty_name;
-	}
+#else
+		edev->res[i].name = edev->id.sig;
 #endif
+	}
 
 	if (is_forced_dev (enable_dev, root, edev))
 		edev->state = EISA_CONFIG_ENABLED | EISA_CONFIG_FORCED;
@@ -274,7 +275,8 @@ static int __init eisa_probe (struct eisa_root_device *root)
         int i, c;
 	struct eisa_device *edev;
 
-        printk (KERN_INFO "EISA: Probing bus %d\n", root->bus_nr);
+        printk (KERN_INFO "EISA: Probing bus %d at %s\n",
+		root->bus_nr, root->dev->bus_id);
 
 	/* First try to get hold of slot 0. If there is no device
 	 * here, simply fail, unless root->force_probe is set. */
