@@ -168,13 +168,12 @@ efivar_create_proc_entry(unsigned long variable_name_size,
 			 efi_char16_t *variable_name,
 			 efi_guid_t *vendor_guid)
 {
-
 	int i, short_name_size = variable_name_size / sizeof(efi_char16_t) + 38;
 	char *short_name;
 	efivar_entry_t *new_efivar;
 
-        short_name = kmalloc(short_name_size+1, GFP_KERNEL);
-        new_efivar = kmalloc(sizeof(efivar_entry_t), GFP_KERNEL);
+	short_name = kmalloc(short_name_size+1, GFP_KERNEL);
+	new_efivar = kmalloc(sizeof(efivar_entry_t), GFP_KERNEL);
 
 	if (!short_name || !new_efivar)  {
 		if (short_name)        kfree(short_name);
@@ -210,9 +209,9 @@ efivar_create_proc_entry(unsigned long variable_name_size,
 	new_efivar->entry->read_proc = efivar_read;
 	new_efivar->entry->write_proc = efivar_write;
 
-        spin_lock(&efivars_lock);
-        list_add(&new_efivar->list, &efivar_list);
-        spin_unlock(&efivars_lock);
+	spin_lock(&efivars_lock);
+	list_add(&new_efivar->list, &efivar_list);
+	spin_unlock(&efivars_lock);
 
 	return 0;
 }
@@ -283,7 +282,7 @@ efivar_write(struct file *file, const char *buffer,
 	if (!var_data)
 		return -ENOMEM;
 	if (copy_from_user(var_data, buffer, size)) {
-                kfree(var_data);
+		kfree(var_data);
 		return -EFAULT;
 	}
 
@@ -349,7 +348,6 @@ efivar_write(struct file *file, const char *buffer,
 static int __init
 efivars_init(void)
 {
-
 	efi_status_t status;
 	efi_guid_t vendor_guid;
 	efi_char16_t *variable_name = kmalloc(1024, GFP_KERNEL);
@@ -357,13 +355,13 @@ efivars_init(void)
 
 	printk(KERN_INFO "EFI Variables Facility v%s\n", EFIVARS_VERSION);
 
-        /* Since efi.c happens before procfs is available,
-           we create the directory here if it doesn't
-           already exist.  There's probably a better way
-           to do this.
-        */
-        if (!efi_dir)
-                efi_dir = proc_mkdir("efi", NULL);
+	/* Since efi.c happens before procfs is available,
+	   we create the directory here if it doesn't
+	   already exist.  There's probably a better way
+	   to do this.
+	*/
+	if (!efi_dir)
+		efi_dir = proc_mkdir("efi", NULL);
 
 	efi_vars_dir = proc_mkdir("vars", efi_dir);
 
@@ -407,7 +405,7 @@ efivars_exit(void)
 	struct list_head *pos, *n;
 	efivar_entry_t *efivar;
 
-        spin_lock(&efivars_lock);
+	spin_lock(&efivars_lock);
 	list_for_each_safe(pos, n, &efivar_list) {
 		efivar = efivar_entry(pos);
 		remove_proc_entry(efivar->entry->name, efi_vars_dir);
