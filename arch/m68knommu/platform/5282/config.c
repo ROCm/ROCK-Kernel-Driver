@@ -62,7 +62,7 @@ void config_BSP(char *commandp, int size)
 {
 	mcf_disableall();
 
-#if defined(CONFIG_BOOTPARAM)
+#ifdef CONFIG_BOOTPARAM
 	strncpy(commandp, CONFIG_BOOTPARAM_STRING, size);
 	commandp[size-1] = 0;
 #else
