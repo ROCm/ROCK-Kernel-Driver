@@ -22,6 +22,12 @@ LD              := $(LD) -m elf64ppc
 CC		:= $(CC) -m64
 endif
 
+new_nm := $(shell if $(NM) --help 2>&1 | grep -- '--synthetic' > /dev/null; then echo y; else echo n; fi)
+
+ifeq ($(new_nm),y)
+NM		:= $(NM) --synthetic
+endif
+
 CHECKFLAGS	+= -m64 -D__powerpc__=1
 
 LDFLAGS		:= -m elf64ppc
