@@ -475,7 +475,7 @@ static void my_ioctl_done (Scsi_Cmnd * SCpnt)
 {
     struct request * req;
     
-    req = &SCpnt->request;
+    req = SCpnt->request;
     req->rq_status = RQ_SCSI_DONE; /* Busy, but indicate request done */
   
     if (req->CPQFC_WAITING != NULL)
@@ -601,7 +601,7 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 
         {
           CPQFC_DECLARE_COMPLETION(wait);
-          ScsiPassThruCmnd->request.CPQFC_WAITING = &wait;
+          ScsiPassThruCmnd->request->CPQFC_WAITING = &wait;
           // eventually gets us to our own _quecommand routine
           scsi_do_cmd( ScsiPassThruCmnd, &vendor_cmd->cdb[0], 
 	       buf, 
@@ -611,7 +611,7 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
           // Other I/Os can now resume; we wait for our ioctl
 	  // command to complete
 	  CPQFC_WAIT_FOR_COMPLETION(&wait);
-          ScsiPassThruCmnd->request.CPQFC_WAITING = NULL;
+          ScsiPassThruCmnd->request->CPQFC_WAITING = NULL;
         }
 	
         result = ScsiPassThruCmnd->result;
@@ -1543,10 +1543,10 @@ int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev,
         
     SCpnt->SCp.buffers_residual = FCP_TARGET_RESET;
 
-	SCpnt->request.CPQFC_WAITING = &wait;
+	SCpnt->request->CPQFC_WAITING = &wait;
 	scsi_do_cmd(SCpnt,  scsi_cdb, NULL,  0, my_ioctl_done,  timeout, retries);
 	CPQFC_WAIT_FOR_COMPLETION(&wait);
-	SCpnt->request.CPQFC_WAITING = NULL;
+	SCpnt->request->CPQFC_WAITING = NULL;
   }
     
 /*

@@ -57,7 +57,8 @@ extern int BusLogic_QueueCommand(SCSI_Command_T *,
 				 void (*CompletionRoutine)(SCSI_Command_T *));
 extern int BusLogic_AbortCommand(SCSI_Command_T *);
 extern int BusLogic_ResetCommand(SCSI_Command_T *, unsigned int);
-extern int BusLogic_BIOSDiskParameters(SCSI_Disk_T *, struct block_device *, int *);
+extern int BusLogic_BIOSDiskParameters(SCSI_Disk_T *, struct block_device *,
+				       int *);
 extern int BusLogic_ProcDirectoryInfo(char *, char **, off_t, int, int, int);
 
 
@@ -371,6 +372,7 @@ typedef struct BusLogic_ProbeInfo
   BusLogic_HostAdapterBusType_T HostAdapterBusType;
   BusLogic_IO_Address_T IO_Address;
   BusLogic_PCI_Address_T PCI_Address;
+  PCI_Device_T *PCI_Device;
   unsigned char Bus;
   unsigned char Device;
   unsigned char IRQ_Channel;
@@ -1191,7 +1193,9 @@ typedef struct BusLogic_CCB
   /*
     BusLogic Linux Driver Defined Portion.
   */
-  boolean AllocationGroupHead;
+  dma_addr_t AllocationGroupHead;
+  unsigned int AllocationGroupSize;
+  BusLogic_BusAddress_T DMA_Handle;
   BusLogic_CCB_Status_T Status;
   unsigned long SerialNumber;
   SCSI_Command_T *Command;
@@ -1355,6 +1359,7 @@ FlashPoint_Info_T;
 typedef struct BusLogic_HostAdapter
 {
   SCSI_Host_T *SCSI_Host;
+  PCI_Device_T *PCI_Device;
   BusLogic_HostAdapterType_T HostAdapterType;
   BusLogic_HostAdapterBusType_T HostAdapterBusType;
   BusLogic_IO_Address_T IO_Address;
@@ -1443,9 +1448,13 @@ typedef struct BusLogic_HostAdapter
   BusLogic_IncomingMailbox_T *LastIncomingMailbox;
   BusLogic_IncomingMailbox_T *NextIncomingMailbox;
   BusLogic_TargetStatistics_T TargetStatistics[BusLogic_MaxTargetDevices];
-  unsigned char MailboxSpace[BusLogic_MaxMailboxes
+  unsigned char *MailboxSpace;
+  dma_addr_t	MailboxSpaceHandle;
+  unsigned int MailboxSize;
+  unsigned long CCB_Offset;
+/* [BusLogic_MaxMailboxes
 			     * (sizeof(BusLogic_OutgoingMailbox_T)
-				+ sizeof(BusLogic_IncomingMailbox_T))];
+				+ sizeof(BusLogic_IncomingMailbox_T))]; */
   char MessageBuffer[BusLogic_MessageBufferSize];
 }
 BusLogic_HostAdapter_T;
@@ -1504,9 +1513,9 @@ SCSI_Inquiry_T;
 */
 
 static inline
-void BusLogic_AcquireHostAdapterLock(BusLogic_HostAdapter_T *HostAdapter,
-				     ProcessorFlags_T *ProcessorFlags)
+void BusLogic_AcquireHostAdapterLock(BusLogic_HostAdapter_T *HostAdapter)
 {
+  spin_lock_irq(HostAdapter->SCSI_Host->host_lock);
 }
 
 
@@ -1515,9 +1524,9 @@ void BusLogic_AcquireHostAdapterLock(BusLogic_HostAdapter_T *HostAdapter,
 */
 
 static inline
-void BusLogic_ReleaseHostAdapterLock(BusLogic_HostAdapter_T *HostAdapter,
-				     ProcessorFlags_T *ProcessorFlags)
+void BusLogic_ReleaseHostAdapterLock(BusLogic_HostAdapter_T *HostAdapter)
 {
+  spin_unlock_irq(HostAdapter->SCSI_Host->host_lock);
 }
 
 
@@ -1648,12 +1657,7 @@ void BusLogic_StartMailboxCommand(BusLogic_HostAdapter_T *HostAdapter)
 
 static inline void BusLogic_Delay(int Seconds)
 {
-  int Milliseconds = 1000 * Seconds;
-  unsigned long ProcessorFlags;
-  save_flags(ProcessorFlags);
-  sti();
-  while (--Milliseconds >= 0) udelay(1000);
-  restore_flags(ProcessorFlags);
+  mdelay(1000 * Seconds);
 }
 
 
