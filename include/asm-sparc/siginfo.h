@@ -7,7 +7,6 @@
 
 #define __ARCH_SI_UID_T		unsigned int
 #define __ARCH_SI_TRAPNO
-#define HAVE_ARCH_COPY_SIGINFO_TO_USER
 
 #include <asm-generic/siginfo.h>
 
