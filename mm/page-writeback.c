@@ -26,6 +26,7 @@
 #include <linux/percpu.h>
 #include <linux/notifier.h>
 #include <linux/smp.h>
+#include <linux/sysctl.h>
 
 /*
  * The maximum number of pages to writeout in a single bdflush/kupdate
@@ -329,7 +330,24 @@ static void wb_kupdate(unsigned long arg)
 	}
 	if (time_before(next_jif, jiffies + HZ))
 		next_jif = jiffies + HZ;
-	mod_timer(&wb_timer, next_jif);
+	if (dirty_writeback_centisecs)
+		mod_timer(&wb_timer, next_jif);
+}
+
+/*
+ * sysctl handler for /proc/sys/vm/dirty_writeback_centisecs
+ */
+int dirty_writeback_centisecs_handler(ctl_table *table, int write,
+		struct file *file, void *buffer, size_t *length)
+{
+	proc_dointvec(table, write, file, buffer, length);
+	if (dirty_writeback_centisecs) {
+		mod_timer(&wb_timer,
+			jiffies + (dirty_writeback_centisecs * HZ) / 100);
+	} else {
+		del_timer(&wb_timer);
+	}
+	return 0;
 }
 
 static void wb_timer_fn(unsigned long unused)
