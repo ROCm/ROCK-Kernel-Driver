@@ -43,7 +43,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 	{
 		RspMessage	rcvmsg;
 		char		srec[SCIOC_SRECSIZE];
-		int		status, err;
+		int		status;
 
 		pr_debug("%s: SCIOLOAD: ioctl received\n", adapter[card]->devicename);
 		if(adapter[card]->EngineUp) {
@@ -89,7 +89,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 	{
 		RspMessage	rcvmsg;
 		char		switchtype;
-		int 		status, err;
+		int 		status;
 
 		pr_debug("%s: SCIOSETSWITCH: ioctl received\n", adapter[card]->devicename);
 
@@ -119,7 +119,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 	{
 		RspMessage 	rcvmsg;
 		char		switchtype;
-		int		status, err;
+		int		status;
 
 		pr_debug("%s: SCIOGETSWITCH: ioctl received\n", adapter[card]->devicename);
 
@@ -153,7 +153,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 	{
 		RspMessage	rcvmsg;
 		char		spid[SCIOC_SPIDSIZE];
-		int		status, err;
+		int		status;
 
 		pr_debug("%s: SCIOGETSPID: ioctl received\n", adapter[card]->devicename);
 
@@ -185,7 +185,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 	{
 		RspMessage	rcvmsg;
 		char		spid[SCIOC_SPIDSIZE];
-		int 		status, err;
+		int 		status;
 
 		pr_debug("%s: DCBIOSETSPID: ioctl received\n", adapter[card]->devicename);
 
@@ -216,7 +216,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 	{
 		RspMessage	rcvmsg;
 		char		dn[SCIOC_DNSIZE];
-		int		status, err;
+		int		status;
 
 		pr_debug("%s: SCIOGETDN: ioctl received\n", adapter[card]->devicename);
 
@@ -249,7 +249,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 	{
 		RspMessage	rcvmsg;
 		char		dn[SCIOC_DNSIZE];
-		int 		status, err;
+		int 		status;
 
 		pr_debug("%s: SCIOSETDN: ioctl received\n", adapter[card]->devicename);
 
@@ -287,7 +287,6 @@ int sc_ioctl(int card, scs_ioctl *data)
 	case SCIOCSTAT:
 	{
 		boardInfo bi;
-		int err;
 
 		pr_debug("%s: SCIOSTAT: ioctl received\n", adapter[card]->devicename);
 		GetStatus(card, &bi);
@@ -303,7 +302,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 	{
 		RspMessage	rcvmsg;
 		char		speed;
-		int		status, err;
+		int		status;
 
 		pr_debug("%s: SCIOGETSPEED: ioctl received\n", adapter[card]->devicename);
 
