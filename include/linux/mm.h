@@ -105,7 +105,7 @@ struct vm_area_struct {
 #define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */
 #define VM_RESERVED	0x00080000	/* Don't unmap it from swap_out */
 
-#define VM_STACK_FLAGS	0x00000177
+#define VM_STACK_FLAGS	(0x00000100 | VM_DATA_DEFAULT_FLAGS)
 
 #define VM_READHINTMASK			(VM_SEQ_READ | VM_RAND_READ)
 #define VM_ClearReadHint(v)		(v)->vm_flags &= ~VM_READHINTMASK
