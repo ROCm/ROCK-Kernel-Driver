@@ -336,12 +336,12 @@ static void klsi_105_shutdown (struct usb_serial *serial)
 			for (j = 0; j < NUM_URBS; j++) {
 				if (write_urbs[j]) {
 					/* FIXME - uncomment the following
-					 * usb_unlink_urb call when the host
+					 * usb_kill_urb call when the host
 					 * controllers get fixed to set
 					 * urb->dev = NULL after the urb is
 					 * finished.  Otherwise this call
 					 * oopses. */
-					/* usb_unlink_urb(write_urbs[j]); */
+					/* usb_kill_urb(write_urbs[j]); */
 					if (write_urbs[j]->transfer_buffer)
 						    kfree(write_urbs[j]->transfer_buffer);
 					usb_free_urb (write_urbs[j]);
@@ -467,12 +467,12 @@ static void klsi_105_close (struct usb_serial_port *port, struct file *filp)
 		    err("Disabling read failed (error = %d)", rc);
 
 	/* shutdown our bulk reads and writes */
-	usb_unlink_urb (port->write_urb);
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->write_urb);
+	usb_kill_urb(port->read_urb);
 	/* unlink our write pool */
 	/* FIXME */
 	/* wgg - do I need this? I think so. */
-	usb_unlink_urb (port->interrupt_in_urb);
+	usb_kill_urb(port->interrupt_in_urb);
 	info("kl5kusb105 port stats: %ld bytes in, %ld bytes out", priv->bytes_in, priv->bytes_out);
 } /* klsi_105_close */
 
@@ -994,7 +994,7 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 static void klsi_105_throttle (struct usb_serial_port *port)
 {
 	dbg("%s - port %d", __FUNCTION__, port->number);
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 }
 
 static void klsi_105_unthrottle (struct usb_serial_port *port)

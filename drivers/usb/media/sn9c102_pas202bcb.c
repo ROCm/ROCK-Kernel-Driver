@@ -1,5 +1,5 @@
 /***************************************************************************
- * Driver for PAS202BCB image sensor connected to the SN9C10[12] PC Camera *
+ * Driver for PAS202BCB image sensor connected to the SN9C10x PC Camera    *
  * Controllers                                                             *
  *                                                                         *
  * Copyright (C) 2004 by Carlos Eduardo Medaglia Dyonisio                  *
@@ -95,23 +95,23 @@ static int pas202bcb_set_ctrl(struct sn9c102_device* cam,
 
 	switch (ctrl->id) {
 	case V4L2_CID_RED_BALANCE:
-		err += sn9c102_i2c_write(cam, 0x09, ctrl->value & 0x0f);
+		err += sn9c102_i2c_write(cam, 0x09, ctrl->value);
 		break;
 	case V4L2_CID_BLUE_BALANCE:
-		err += sn9c102_i2c_write(cam, 0x07, ctrl->value & 0x0f);
+		err += sn9c102_i2c_write(cam, 0x07, ctrl->value);
 		break;
 	case V4L2_CID_GAIN:
-		err += sn9c102_i2c_write(cam, 0x10, ctrl->value & 0x1f);
+		err += sn9c102_i2c_write(cam, 0x10, ctrl->value);
 		break;
 	case V4L2_CID_BRIGHTNESS:
-		err += sn9c102_i2c_write(cam, 0x06, 0x0f-(ctrl->value & 0x0f));
+		err += sn9c102_i2c_write(cam, 0x06, 0x0f - ctrl->value);
 		break;
 	default:
 		return -EINVAL;
 	}
 	err += sn9c102_i2c_write(cam, 0x11, 0x01);
 
-	return err;
+	return err ? -EIO : 0;
 }
 
 

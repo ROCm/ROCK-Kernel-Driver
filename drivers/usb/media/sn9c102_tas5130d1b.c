@@ -1,6 +1,6 @@
 /***************************************************************************
- * Driver for TAS5130D1B image sensor connected to the SN9C10[12] PC       *
- * Camera Controllers                                                      *
+ * Driver for TAS5130D1B image sensor connected to the SN9C10x PC Camera   *
+ * Controllers                                                             *
  *                                                                         *
  * Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>       *
  *                                                                         *
@@ -24,6 +24,8 @@
 
 static struct sn9c102_sensor tas5130d1b;
 
+static struct v4l2_control tas5130d1b_gain, tas5130d1b_exposure;
+
 
 static int tas5130d1b_init(struct sn9c102_device* cam)
 {
@@ -38,25 +40,47 @@ static int tas5130d1b_init(struct sn9c102_device* cam)
 	err += sn9c102_write_reg(cam, 0x60, 0x17);
 	err += sn9c102_write_reg(cam, 0x07, 0x18);
 
-	err += sn9c102_i2c_try_raw_write(cam, &tas5130d1b, 4, 0x11, 0x00, 0x40,
-	                                 0x47, 0, 0);
-
 	return err;
+}
+
+
+static int tas5130d1b_get_ctrl(struct sn9c102_device* cam, 
+                               struct v4l2_control* ctrl)
+{
+	switch (ctrl->id) {
+	case V4L2_CID_GAIN:
+		ctrl->value = tas5130d1b_gain.value;
+		break;
+	case V4L2_CID_EXPOSURE:
+		ctrl->value = tas5130d1b_exposure.value;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 
 static int tas5130d1b_set_ctrl(struct sn9c102_device* cam, 
                                const struct v4l2_control* ctrl)
 {
+	int err = 0;
+
 	switch (ctrl->id) {
 	case V4L2_CID_GAIN:
-		return sn9c102_i2c_try_raw_write(cam, &tas5130d1b, 4, 0x11,
-		                                 0x02, 0x20,
-		                                 0xff - (ctrl->value & 0xff),
-		                                 0, 0);
+		if (!(err += sn9c102_i2c_write(cam, 0x20, 0xf6 - ctrl->value)))
+			tas5130d1b_gain.value = ctrl->value;
+		break;
+	case V4L2_CID_EXPOSURE:
+		if (!(err += sn9c102_i2c_write(cam, 0x40, 0x47 - ctrl->value)))
+			tas5130d1b_exposure.value = ctrl->value;
+		break;
 	default:
 		return -EINVAL;
 	}
+
+	return err ? -EIO : 0;
 }
 
 
@@ -85,6 +109,8 @@ static struct sn9c102_sensor tas5130d1b = {
 	.maintainer = "Luca Risolia <luca.risolia@studio.unibo.it>",
 	.frequency = SN9C102_I2C_100KHZ,
 	.interface = SN9C102_I2C_3WIRES,
+	.slave_read_id = 0xff, /* fictitious */
+	.slave_write_id = 0xff, /* fictitious */
 	.init = &tas5130d1b_init,
 	.qctrl = {
 		{
@@ -92,12 +118,23 @@ static struct sn9c102_sensor tas5130d1b = {
 			.type = V4L2_CTRL_TYPE_INTEGER,
 			.name = "global gain",
 			.minimum = 0x00,
-			.maximum = 0xff,
+			.maximum = 0xf6,
+			.step = 0x02,
+			.default_value = 0x00,
+			.flags = 0,
+		},
+		{
+			.id = V4L2_CID_EXPOSURE,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "exposure",
+			.minimum = 0x00,
+			.maximum = 0x47,
 			.step = 0x01,
 			.default_value = 0x00,
 			.flags = 0,
 		},
 	},
+	.get_ctrl = &tas5130d1b_get_ctrl,
 	.set_ctrl = &tas5130d1b_set_ctrl,
 	.cropcap = {
 		.bounds = {
@@ -129,7 +166,8 @@ int sn9c102_probe_tas5130d1b(struct sn9c102_device* cam)
 	sn9c102_attach_sensor(cam, &tas5130d1b);
 
 	/* At the moment, sensor detection is based on USB pid/vid */
-	if (tas5130d1b.usbdev->descriptor.idProduct != 0x6025)
+	if (tas5130d1b.usbdev->descriptor.idProduct != 0x6025 &&
+	    tas5130d1b.usbdev->descriptor.idProduct != 0x60aa)
 		return -ENODEV;
 
 	return 0;

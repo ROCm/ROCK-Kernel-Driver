@@ -388,7 +388,7 @@ static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_po
 
 		good_spot = 1;
 		for (j = 1; j <= num_ports-1; ++j)
-			if ((serial_table[i+j]) || (i+j >= SERIAL_TTY_MINORS)) {
+			if ((i+j >= SERIAL_TTY_MINORS) || (serial_table[i+j])) {
 				good_spot = 0;
 				i += j;
 				break;
@@ -455,15 +455,15 @@ static void destroy_serial(struct kref *kref)
 			if (!port)
 				continue;
 			if (port->read_urb) {
-				usb_unlink_urb(port->read_urb);
+				usb_kill_urb(port->read_urb);
 				usb_free_urb(port->read_urb);
 			}
 			if (port->write_urb) {
-				usb_unlink_urb(port->write_urb);
+				usb_kill_urb(port->write_urb);
 				usb_free_urb(port->write_urb);
 			}
 			if (port->interrupt_in_urb) {
-				usb_unlink_urb(port->interrupt_in_urb);
+				usb_kill_urb(port->interrupt_in_urb);
 				usb_free_urb(port->interrupt_in_urb);
 			}
 			kfree(port->bulk_in_buffer);
@@ -819,15 +819,15 @@ static void port_release(struct device *dev)
 
 	dbg ("%s - %s", __FUNCTION__, dev->bus_id);
 	if (port->read_urb) {
-		usb_unlink_urb(port->read_urb);
+		usb_kill_urb(port->read_urb);
 		usb_free_urb(port->read_urb);
 	}
 	if (port->write_urb) {
-		usb_unlink_urb(port->write_urb);
+		usb_kill_urb(port->write_urb);
 		usb_free_urb(port->write_urb);
 	}
 	if (port->interrupt_in_urb) {
-		usb_unlink_urb(port->interrupt_in_urb);
+		usb_kill_urb(port->interrupt_in_urb);
 		usb_free_urb(port->interrupt_in_urb);
 	}
 	kfree(port->bulk_in_buffer);

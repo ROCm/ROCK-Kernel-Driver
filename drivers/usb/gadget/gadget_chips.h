@@ -62,6 +62,12 @@
 #define	gadget_is_omap(g)	0
 #endif
 
+#ifdef CONFIG_USB_GADGET_N9604
+#define	gadget_is_n9604(g)	!strcmp("n9604_udc", (g)->name)
+#else
+#define	gadget_is_n9604(g)	0
+#endif
+
 // CONFIG_USB_GADGET_AT91RM9200
 // CONFIG_USB_GADGET_SX2
 // CONFIG_USB_GADGET_AU1X00

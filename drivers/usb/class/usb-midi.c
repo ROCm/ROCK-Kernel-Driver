@@ -805,7 +805,6 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 {
 	int minor = iminor(inode);
 	DECLARE_WAITQUEUE(wait, current);
-	struct list_head      *devs, *mdevs;
 	struct usb_midi_state *s;
 	struct usb_mididev    *m;
 	unsigned long flags;
@@ -817,10 +816,8 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 
 	for(;;) {
 		down(&open_sem);
-		list_for_each(devs, &mididevs) {
-			s = list_entry(devs, struct usb_midi_state, mididev);
-			list_for_each(mdevs, &s->midiDevList) {
-				m = list_entry(mdevs, struct usb_mididev, list);
+		list_for_each_entry(s, &mididevs, mididev) {
+			list_for_each_entry(m, &s->midiDevList, list) {
 				if ( !((m->dev_midi ^ minor) & ~0xf) )
 					goto device_found;
 			}
@@ -1994,7 +1991,6 @@ static int usb_midi_probe(struct usb_interface *intf,
 static void usb_midi_disconnect(struct usb_interface *intf)
 {
 	struct usb_midi_state *s = usb_get_intfdata (intf);
-	struct list_head      *list;
 	struct usb_mididev    *m;
 
 	if ( !s )
@@ -2012,8 +2008,7 @@ static void usb_midi_disconnect(struct usb_interface *intf)
 	s->usbdev = NULL;
 	usb_set_intfdata (intf, NULL);
 
-	list_for_each(list, &s->midiDevList) {
-		m = list_entry(list, struct usb_mididev, list);
+	list_for_each_entry(m, &s->midiDevList, list) {
 		wake_up(&(m->min.ep->wait));
 		wake_up(&(m->mout.ep->wait));
 		if ( m->dev_midi >= 0 ) {

@@ -1263,7 +1263,7 @@ static int hcd_unlink_urb (struct urb *urb, int status)
 	 * never get completion IRQs ... maybe even the ones we need to
 	 * finish unlinking the initial failed usb_set_address().
 	 */
-	if (!hcd->saw_irq) {
+	if (!hcd->saw_irq && hcd->rh_timer.data != (unsigned long) urb) {
 		dev_warn (hcd->self.controller, "Unlink after no-IRQ?  "
 			"Different ACPI or APIC settings may help."
 			"\n");
@@ -1572,13 +1572,12 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd, struct pt_regs * r)
 	struct usb_hcd		*hcd = __hcd;
 	int			start = hcd->state;
 
-	if (unlikely (hcd->state == USB_STATE_HALT))	/* irq sharing? */
+	if (start == USB_STATE_HALT)
 		return IRQ_NONE;
-
-	hcd->saw_irq = 1;
 	if (hcd->driver->irq (hcd, r) == IRQ_NONE)
 		return IRQ_NONE;
 
+	hcd->saw_irq = 1;
 	if (hcd->state != start && hcd->state == USB_STATE_HALT)
 		usb_hc_died (hcd);
 	return IRQ_HANDLED;
@@ -1586,22 +1585,6 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd, struct pt_regs * r)
 EXPORT_SYMBOL (usb_hcd_irq);
 
 /*-------------------------------------------------------------------------*/
-
-static void hcd_panic (void *_hcd)
-{
-	struct usb_hcd		*hcd = _hcd;
-	struct usb_device	*hub = hcd->self.root_hub;
-	unsigned		i;
-
-	/* hc's root hub is removed later removed in hcd->stop() */
-	down (&hub->serialize);
-	usb_set_device_state(hub, USB_STATE_NOTATTACHED);
-	for (i = 0; i < hub->maxchild; i++) {
-		if (hub->children [i])
-			usb_disconnect (&hub->children [i]);
-	}
-	up (&hub->serialize);
-}
 
 /**
  * usb_hc_died - report abnormal shutdown of a host controller (bus glue)
@@ -1615,9 +1598,9 @@ void usb_hc_died (struct usb_hcd *hcd)
 {
 	dev_err (hcd->self.controller, "HC died; cleaning up\n");
 
-	/* clean up old urbs and devices; needs a task context */
-	INIT_WORK (&hcd->work, hcd_panic, hcd);
-	(void) schedule_work (&hcd->work);
+	/* make khubd clean up old urbs and devices */
+	usb_set_device_state(hcd->self.root_hub, USB_STATE_NOTATTACHED);
+	mod_timer(&hcd->rh_timer, jiffies);
 }
 EXPORT_SYMBOL (usb_hc_died);
 

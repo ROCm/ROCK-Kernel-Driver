@@ -1,5 +1,5 @@
 /***************************************************************************
- * API for image sensors connected to the SN9C10[12] PC Camera Controllers *
+ * API for image sensors connected to the SN9C10x PC Camera Controllers    *
  *                                                                         *
  * Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>       *
  *                                                                         *
@@ -89,17 +89,44 @@ sn9c102_attach_sensor(struct sn9c102_device* cam,
 /* Each SN9C10X camera has proper PID/VID identifiers. Add them here in case.*/
 #define SN9C102_ID_TABLE                                                      \
 static const struct usb_device_id sn9c102_id_table[] = {                      \
-	{ USB_DEVICE(0xc45, 0x6001), }, /* TAS5110C1B */                      \
-	{ USB_DEVICE(0xc45, 0x6005), }, /* TAS5110C1B */                      \
-	{ USB_DEVICE(0xc45, 0x6009), }, /* PAS106B */                         \
-	{ USB_DEVICE(0xc45, 0x600d), }, /* PAS106B */                         \
-	{ USB_DEVICE(0xc45, 0x6024), },                                       \
-	{ USB_DEVICE(0xc45, 0x6025), }, /* TAS5130D1B and TAS5110C1B */       \
-	{ USB_DEVICE(0xc45, 0x6028), }, /* PAS202BCB */                       \
-	{ USB_DEVICE(0xc45, 0x6029), }, /* PAS106B */                         \
-	{ USB_DEVICE(0xc45, 0x602a), }, /* HV7131[D|E1] */                    \
-	{ USB_DEVICE(0xc45, 0x602c), }, /* OV7620 */                          \
-	{ USB_DEVICE(0xc45, 0x6030), }, /* MI03 */                            \
+	{ USB_DEVICE(0x0c45, 0x6001), }, /* TAS5110C1B */                     \
+	{ USB_DEVICE(0x0c45, 0x6005), }, /* TAS5110C1B */                     \
+	{ USB_DEVICE(0x0c45, 0x6009), }, /* PAS106B */                        \
+	{ USB_DEVICE(0x0c45, 0x600d), }, /* PAS106B */                        \
+	{ USB_DEVICE(0x0c45, 0x6024), },                                      \
+	{ USB_DEVICE(0x0c45, 0x6025), }, /* TAS5130D1B and TAS5110C1B */      \
+	{ USB_DEVICE(0x0c45, 0x6028), }, /* PAS202BCB */                      \
+	{ USB_DEVICE(0x0c45, 0x6029), }, /* PAS106B */                        \
+	{ USB_DEVICE(0x0c45, 0x602a), }, /* HV7131[D|E1] */                   \
+	{ USB_DEVICE(0x0c45, 0x602b), },                                      \
+	{ USB_DEVICE(0x0c45, 0x602c), }, /* OV7620 */                         \
+	{ USB_DEVICE(0x0c45, 0x6030), }, /* MI03x */                          \
+	{ USB_DEVICE(0x0c45, 0x6080), },                                      \
+	{ USB_DEVICE(0x0c45, 0x6082), }, /* MI0343 and MI0360 */              \
+	{ USB_DEVICE(0x0c45, 0x6083), }, /* HV7131[D|E1] */                   \
+	{ USB_DEVICE(0x0c45, 0x6088), },                                      \
+	{ USB_DEVICE(0x0c45, 0x608a), },                                      \
+	{ USB_DEVICE(0x0c45, 0x608b), },                                      \
+	{ USB_DEVICE(0x0c45, 0x608c), }, /* HV7131x */                        \
+	{ USB_DEVICE(0x0c45, 0x608e), }, /* CIS-VF10 */                       \
+	{ USB_DEVICE(0x0c45, 0x608f), }, /* OV7630 */                         \
+	{ USB_DEVICE(0x0c45, 0x60a0), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60a2), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60a3), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60a8), }, /* PAS106B */                        \
+	{ USB_DEVICE(0x0c45, 0x60aa), }, /* TAS5130D1B */                     \
+	{ USB_DEVICE(0x0c45, 0x60ab), }, /* TAS5110C1B */                     \
+	{ USB_DEVICE(0x0c45, 0x60ac), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60ae), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60af), }, /* PAS202BCB */                      \
+	{ USB_DEVICE(0x0c45, 0x60b0), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60b2), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60b3), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60b8), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60ba), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60bb), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60bc), },                                      \
+	{ USB_DEVICE(0x0c45, 0x60be), },                                      \
 	{ }                                                                   \
 };
 
@@ -173,9 +200,7 @@ struct sn9c102_sensor {
 
 	/*
 	   These identifiers must be provided if the image sensor implements
-	   the standard I2C protocol. TASC sensors don't, although they have a
-	   serial interface: so this is a case where the "raw" I2C version
-	   could be helpful.
+	   the standard I2C protocol.
 	*/
 	u8 slave_read_id, slave_write_id; /* reg. 0x09 */
 
@@ -214,7 +239,8 @@ struct sn9c102_sensor {
 	   the list above. The returned value must follow the V4L2
 	   specifications for the VIDIOC_G|C_CTRL ioctls. V4L2_CID_H|VCENTER
 	   are not supported by this driver, so do not implement them. Also,
-	   passed values are NOT checked to see if they are out of bounds.
+	   you don't have to check whether the passed values are out of bounds,
+	   given that this is done by the core module.
 	*/
 
 	struct v4l2_cropcap cropcap;

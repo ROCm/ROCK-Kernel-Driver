@@ -185,7 +185,7 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	/* shutdown our bulk read */
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* dev_info (&port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
 }
@@ -406,7 +406,7 @@ static void empeg_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static void empeg_throttle (struct usb_serial_port *port)
 {
 	dbg("%s - port %d", __FUNCTION__, port->number);
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 }
 
 
@@ -583,10 +583,10 @@ static void __exit empeg_exit (void)
 
 	for (i = 0; i < NUM_URBS; ++i) {
 		if (write_urb_pool[i]) {
-			/* FIXME - uncomment the following usb_unlink_urb call when
+			/* FIXME - uncomment the following usb_kill_urb call when
 			 * the host controllers get fixed to set urb->dev = NULL after
 			 * the urb is finished.  Otherwise this call oopses. */
-			/* usb_unlink_urb(write_urb_pool[i]); */
+			/* usb_kill_urb(write_urb_pool[i]); */
 			if (write_urb_pool[i]->transfer_buffer)
 				kfree(write_urb_pool[i]->transfer_buffer);
 			usb_free_urb (write_urb_pool[i]);

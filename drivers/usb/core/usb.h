@@ -22,8 +22,12 @@ extern int usb_get_device_descriptor(struct usb_device *dev,
 		unsigned int size);
 extern int usb_set_configuration(struct usb_device *dev, int configuration);
 
-extern void usb_set_device_state(struct usb_device *udev,
-		enum usb_device_state new_state);
 
 /* for labeling diagnostics */
 extern const char *usbcore_name;
+
+/* usbfs stuff */
+extern struct usb_driver usbfs_driver;
+extern struct file_operations usbfs_devices_fops;
+extern struct file_operations usbfs_device_file_operations;
+extern void usbfs_conn_disc_event(void);

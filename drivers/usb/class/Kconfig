@@ -9,7 +9,8 @@ config USB_AUDIO
 	depends on USB && SOUND
 	help
 	  Say Y here if you want to connect USB audio equipment such as
-	  speakers to your computer's USB port.
+	  speakers to your computer's USB port. You only need this if you use
+	  the OSS sound driver; ALSA has its own option for usb audio support.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called audio.

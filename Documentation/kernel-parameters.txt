@@ -1270,6 +1270,8 @@ running once the system is up.
 
 	uart6850=	[HW,OSS]
 			Format: <io>,<irq>
+
+	usb-handoff	[HW] Enable early USB BIOS -> OS handoff
  
 	video=		[FB] Frame buffer configuration
 			See Documentation/fb/modedb.txt.
