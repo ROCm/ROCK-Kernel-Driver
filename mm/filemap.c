@@ -150,7 +150,7 @@ void invalidate_inode_pages(struct inode * inode)
 		if (TryLockPage(page))
 			continue;
 
-		if (page->buffers && !try_to_free_buffers(page, 0))
+		if (PagePrivate(page) && !try_to_release_page(page, 0))
 			goto unlock;
 
 		if (page_count(page) != 1)
@@ -182,14 +182,18 @@ static int do_flushpage(struct page *page, unsigned long offset)
 static inline void truncate_partial_page(struct page *page, unsigned partial)
 {
 	memclear_highpage_flush(page, partial, PAGE_CACHE_SIZE-partial);
-	if (page->buffers)
+	if (PagePrivate(page))
 		do_flushpage(page, partial);
 }
 
+/*
+ * AKPM: the PagePrivate test here seems a bit bogus.  It bypasses the
+ * mapping's ->flushpage, which may still want to be called.
+ */
 static void truncate_complete_page(struct page *page)
 {
 	/* Leave it on the LRU if it gets converted into anonymous buffers */
-	if (!page->buffers || do_flushpage(page, 0))
+	if (!PagePrivate(page) || do_flushpage(page, 0))
 		lru_cache_del(page);
 
 	/*
@@ -301,9 +305,9 @@ static inline int invalidate_this_page2(struct address_space * mapping,
 
 	/*
 	 * The page is locked and we hold the mapping lock as well
-	 * so both page_count(page) and page->buffers stays constant here.
+	 * so both page_count(page) and page_buffers stays constant here.
 	 */
-	if (page_count(page) == 1 + !!page->buffers) {
+	if (page_count(page) == 1 + !!page_has_buffers(page)) {
 		/* Restart after this page */
 		list_del(head);
 		list_add_tail(head, curr);
@@ -312,7 +316,7 @@ static inline int invalidate_this_page2(struct address_space * mapping,
 		write_unlock(&mapping->page_lock);
 		truncate_complete_page(page);
 	} else {
-		if (page->buffers) {
+		if (page_has_buffers(page)) {
 			/* Restart after this page */
 			list_del(head);
 			list_add_tail(head, curr);
@@ -409,7 +413,7 @@ static int do_buffer_fdatasync(struct address_space *mapping,
 	while (curr != head) {
 		page = list_entry(curr, struct page, list);
 		curr = curr->next;
-		if (!page->buffers)
+		if (!page_has_buffers(page))
 			continue;
 		if (page->index >= end)
 			continue;
@@ -421,7 +425,7 @@ static int do_buffer_fdatasync(struct address_space *mapping,
 		lock_page(page);
 
 		/* The buffers could have been free'd while we waited for the page lock */
-		if (page->buffers)
+		if (page_has_buffers(page))
 			retval |= fn(page);
 
 		UnlockPage(page);

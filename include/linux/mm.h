@@ -154,7 +154,7 @@ typedef struct page {
 					   updated asynchronously */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by pagemap_lru_lock !! */
-	struct buffer_head * buffers;	/* Buffer maps us to a disk block. */
+	unsigned long private;		/* fs-private opaque data */
 
 	/*
 	 * On machines where all RAM is mapped into kernel address space,
@@ -177,7 +177,7 @@ typedef struct page {
  *
  * What counts for a page usage:
  * - cache mapping   (page->mapping)
- * - disk mapping    (page->buffers)
+ * - private data    (page->private)
  * - page mapped in a task's page tables, each mapping
  *   is counted separately
  *
@@ -220,13 +220,15 @@ typedef struct page {
  * page->mapping is the pointer to the inode, and page->index is the
  * file offset of the page, in units of PAGE_CACHE_SIZE.
  *
- * A page may have buffers allocated to it. In this case,
- * page->buffers is a circular list of these buffer heads. Else,
- * page->buffers == NULL.
+ * A page contains an opaque `private' member, which belongs to the
+ * page's address_space.  Usually, this is the address of a circular
+ * list of the page's disk buffers.
  *
+ * The PG_private bitflag is set if page->private contains a valid
+ * value.
  * For pages belonging to inodes, the page->count is the number of
- * attaches, plus 1 if buffers are allocated to the page, plus one
- * for the page cache itself.
+ * attaches, plus 1 if `private' contains something, plus one for
+ * the page cache itself.
  *
  * All pages belonging to an inode are in these doubly linked lists:
  * mapping->clean_pages, mapping->dirty_pages and mapping->locked_pages;
@@ -290,6 +292,8 @@ typedef struct page {
 #define PG_reserved		14
 #define PG_launder		15	/* written out by VM pressure.. */
 
+#define PG_private		16	/* Has something at ->private */
+
 /* Make it prettier to test the above... */
 #define UnlockPage(page)	unlock_page(page)
 #define Page_Uptodate(page)	test_bit(PG_uptodate, &(page)->flags)
@@ -306,6 +310,9 @@ typedef struct page {
 #define PageLaunder(page)	test_bit(PG_launder, &(page)->flags)
 #define SetPageLaunder(page)	set_bit(PG_launder, &(page)->flags)
 #define __SetPageReserved(page)	__set_bit(PG_reserved, &(page)->flags)
+#define SetPagePrivate(page)	set_bit(PG_private, &(page)->flags)
+#define ClearPagePrivate(page)	clear_bit(PG_private, &(page)->flags)
+#define PagePrivate(page)	test_bit(PG_private, &(page)->flags)
 
 /*
  * The zone field is never updated after free_area_init_core()
@@ -466,7 +473,7 @@ extern struct address_space swapper_space;
 
 static inline int is_page_cache_freeable(struct page * page)
 {
-	return page_count(page) - !!page->buffers == 1;
+	return page_count(page) - !!PagePrivate(page) == 1;
 }
 
 extern int can_share_swap_page(struct page *);

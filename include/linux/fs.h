@@ -285,6 +285,24 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 
 #define touch_buffer(bh)	mark_page_accessed(bh->b_page)
 
+/* If we *know* page->private refers to buffer_heads */
+#define page_buffers(page)					\
+	({							\
+		if (!PagePrivate(page))				\
+			BUG();					\
+		((struct buffer_head *)(page)->private);	\
+	})
+#define page_has_buffers(page)	PagePrivate(page)
+#define set_page_buffers(page, buffers)				\
+	do {							\
+		SetPagePrivate(page);				\
+		page->private = (unsigned long)buffers;		\
+	} while (0)
+#define clear_page_buffers(page)				\
+	do {							\
+		ClearPagePrivate(page);				\
+		page->private = 0;				\
+	} while (0)
 
 #include <linux/pipe_fs_i.h>
 /* #include <linux/umsdos_fs_i.h> */

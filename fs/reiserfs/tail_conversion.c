@@ -156,10 +156,10 @@ unmap_buffers(struct page *page, loff_t pos) {
   unsigned long cur_index ;
 
   if (page) {
-    if (page->buffers) {
+    if (page_has_buffers(page)) {
       tail_index = pos & (PAGE_CACHE_SIZE - 1) ;
       cur_index = 0 ;
-      head = page->buffers ;
+      head = page_buffers(page) ;
       bh = head ;
       do {
 	next = bh->b_this_page ;

@@ -240,7 +240,7 @@ static int exclusive_swap_page(struct page *page)
 		if (p->swap_map[SWP_OFFSET(entry)] == 1) {
 			/* Recheck the page count with the pagecache lock held.. */
 			read_lock(&swapper_space.page_lock);
-			if (page_count(page) - !!page->buffers == 2)
+			if (page_count(page) - !!PagePrivate(page) == 2)
 				retval = 1;
 			read_unlock(&swapper_space.page_lock);
 		}
@@ -265,7 +265,7 @@ int can_share_swap_page(struct page *page)
 		BUG();
 	switch (page_count(page)) {
 	case 3:
-		if (!page->buffers)
+		if (!PagePrivate(page))
 			break;
 		/* Fallthrough */
 	case 2:
@@ -295,7 +295,7 @@ int remove_exclusive_swap_page(struct page *page)
 		BUG();
 	if (!PageSwapCache(page))
 		return 0;
-	if (page_count(page) - !!page->buffers != 2)	/* 2: us + cache */
+	if (page_count(page) - !!PagePrivate(page) != 2) /* 2: us + cache */
 		return 0;
 
 	entry.val = page->index;
@@ -308,7 +308,7 @@ int remove_exclusive_swap_page(struct page *page)
 	if (p->swap_map[SWP_OFFSET(entry)] == 1) {
 		/* Recheck the page count with the pagecache lock held.. */
 		read_lock(&swapper_space.page_lock);
-		if (page_count(page) - !!page->buffers == 2) {
+		if (page_count(page) - !!PagePrivate(page) == 2) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
@@ -344,7 +344,7 @@ void free_swap_and_cache(swp_entry_t entry)
 	if (page) {
 		page_cache_get(page);
 		/* Only cache user (+us), or swap space full? Free it! */
-		if (page_count(page) - !!page->buffers == 2 || vm_swap_full()) {
+		if (page_count(page) - !!PagePrivate(page) == 2 || vm_swap_full()) {
 			delete_from_swap_cache(page);
 			SetPageDirty(page);
 		}

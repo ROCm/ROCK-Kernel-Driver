@@ -429,7 +429,7 @@ extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 	                                                                  \
 	if (__page != ZERO_PAGE(__physpage)) {                            \
 		int __users = page_count(__page);                         \
-		__users -= !!__page->buffers + !!__page->mapping;         \
+		__users -= !!PagePrivate(__page) + !!__page->mapping;     \
 	                                                                  \
 		if (__users == 1)                                         \
 			pte_val(__pte) |= _PAGE_MKCLEAR;                  \

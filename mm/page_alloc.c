@@ -97,7 +97,7 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	struct page *base;
 	zone_t *zone;
 
-	if (page->buffers)
+	if (PagePrivate(page))
 		BUG();
 	if (page->mapping)
 		BUG();
@@ -290,7 +290,7 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 					set_page_count(tmp, 1);
 					page = tmp;
 
-					if (page->buffers)
+					if (PagePrivate(page))
 						BUG();
 					if (page->mapping)
 						BUG();

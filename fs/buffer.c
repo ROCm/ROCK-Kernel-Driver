@@ -1327,21 +1327,13 @@ static void discard_buffer(struct buffer_head * bh)
 
 int try_to_release_page(struct page * page, int gfp_mask)
 {
+	struct address_space * const mapping = page->mapping;
+
 	if (!PageLocked(page))
 		BUG();
 	
-	if (!page->mapping)
-		goto try_to_free;
-	if (!page->mapping->a_ops->releasepage)
-		goto try_to_free;
-	if (page->mapping->a_ops->releasepage(page, gfp_mask))
-		goto try_to_free;
-	/*
-	 * We couldn't release buffer metadata; don't even bother trying
-	 * to release buffers.
-	 */
-	return 0;
-try_to_free:	
+	if (mapping && mapping->a_ops->releasepage)
+		return mapping->a_ops->releasepage(page, gfp_mask);
 	return try_to_free_buffers(page, gfp_mask);
 }
 
@@ -1359,10 +1351,10 @@ int discard_bh_page(struct page *page, unsigned long offset, int drop_pagecache)
 
 	if (!PageLocked(page))
 		BUG();
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		return 1;
 
-	head = page->buffers;
+	head = page_buffers(page);
 	bh = head;
 	do {
 		unsigned int next_off = curr_off + bh->b_size;
@@ -1401,7 +1393,7 @@ void create_empty_buffers(struct page *page, unsigned long blocksize)
 
 	/* FIXME: create_buffers should fail if there's no enough memory */
 	head = create_buffers(page, blocksize, 1);
-	if (page->buffers)
+	if (page_has_buffers(page))
 		BUG();
 
 	bh = head;
@@ -1411,7 +1403,7 @@ void create_empty_buffers(struct page *page, unsigned long blocksize)
 		bh = bh->b_this_page;
 	} while (bh);
 	tail->b_this_page = head;
-	page->buffers = head;
+	set_page_buffers(page, head);
 	page_cache_get(page);
 }
 EXPORT_SYMBOL(create_empty_buffers);
@@ -1467,9 +1459,9 @@ static int __block_write_full_page(struct inode *inode, struct page *page, get_b
 	if (!PageLocked(page))
 		BUG();
 
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		create_empty_buffers(page, 1 << inode->i_blkbits);
-	head = page->buffers;
+	head = page_buffers(page);
 
 	block = page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
 
@@ -1560,9 +1552,9 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	char *kaddr = kmap(page);
 
 	blocksize = 1 << inode->i_blkbits;
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		create_empty_buffers(page, blocksize);
-	head = page->buffers;
+	head = page_buffers(page);
 
 	bbits = inode->i_blkbits;
 	block = page->index << (PAGE_CACHE_SHIFT - bbits);
@@ -1653,7 +1645,7 @@ static int __block_commit_write(struct inode *inode, struct page *page,
 
 	blocksize = 1 << inode->i_blkbits;
 
-	for(bh = head = page->buffers, block_start = 0;
+	for(bh = head = page_buffers(page), block_start = 0;
 	    bh != head || !block_start;
 	    block_start=block_end, bh = bh->b_this_page) {
 		block_end = block_start + blocksize;
@@ -1701,9 +1693,9 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	if (!PageLocked(page))
 		PAGE_BUG(page);
 	blocksize = 1 << inode->i_blkbits;
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		create_empty_buffers(page, blocksize);
-	head = page->buffers;
+	head = page_buffers(page);
 
 	blocks = PAGE_CACHE_SIZE >> inode->i_blkbits;
 	iblock = page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
@@ -1953,11 +1945,11 @@ int block_truncate_page(struct address_space *mapping, loff_t from, get_block_t 
 	if (!page)
 		goto out;
 
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		create_empty_buffers(page, blocksize);
 
 	/* Find the buffer that contains "offset" */
-	bh = page->buffers;
+	bh = page_buffers(page);
 	pos = blocksize;
 	while (offset >= pos) {
 		bh = bh->b_this_page;
@@ -2044,7 +2036,7 @@ done:
  */
 int writeout_one_page(struct page *page)
 {
-	struct buffer_head *bh, *head = page->buffers;
+	struct buffer_head *bh, *head = page_buffers(page);
 
 	if (!PageLocked(page))
 		BUG();
@@ -2067,7 +2059,7 @@ EXPORT_SYMBOL(writeout_one_page);
 int waitfor_one_page(struct page *page)
 {
 	int error = 0;
-	struct buffer_head *bh, *head = page->buffers;
+	struct buffer_head *bh, *head = page_buffers(page);
 
 	bh = head;
 	do {
@@ -2210,9 +2202,9 @@ int brw_page(int rw, struct page *page, struct block_device *bdev, sector_t b[],
 	if (!PageLocked(page))
 		panic("brw_page: page not locked for I/O");
 
-	if (!page->buffers)
+	if (!page_has_buffers(page))
 		create_empty_buffers(page, size);
-	head = bh = page->buffers;
+	head = bh = page_buffers(page);
 
 	/* Stage 1: lock all the buffers */
 	do {
@@ -2280,7 +2272,7 @@ static inline void link_dev_buffers(struct page * page, struct buffer_head *head
 		bh = bh->b_this_page;
 	} while (bh);
 	tail->b_this_page = head;
-	page->buffers = head;
+	set_page_buffers(page, head);
 	page_cache_get(page);
 }
 
@@ -2299,8 +2291,8 @@ static struct page * grow_dev_page(struct block_device *bdev, unsigned long inde
 	if (!PageLocked(page))
 		BUG();
 
-	bh = page->buffers;
-	if (bh) {
+	if (page_has_buffers(page)) {
+		bh = page_buffers(page);
 		if (bh->b_size == size)
 			return page;
 		if (!try_to_free_buffers(page, GFP_NOFS))
@@ -2321,7 +2313,7 @@ failed:
 
 static void hash_page_buffers(struct page *page, struct block_device *bdev, int block, int size)
 {
-	struct buffer_head *head = page->buffers;
+	struct buffer_head *head = page_buffers(page);
 	struct buffer_head *bh = head;
 	unsigned int uptodate;
 
@@ -2447,7 +2439,7 @@ static int sync_page_buffers(struct buffer_head *head, unsigned int gfp_mask)
  */
 int try_to_free_buffers(struct page * page, unsigned int gfp_mask)
 {
-	struct buffer_head * tmp, * bh = page->buffers;
+	struct buffer_head * tmp, * bh = page_buffers(page);
 
 	BUG_ON(!PageLocked(page));
 	BUG_ON(!bh);
@@ -2484,7 +2476,7 @@ cleaned_buffers_try_again:
 	wake_up(&buffer_wait);
 
 	/* And free the page */
-	page->buffers = NULL;
+	clear_page_buffers(page);
 	page_cache_release(page);
 	write_unlock(&hash_table_lock);
 	spin_unlock(&lru_list_lock);

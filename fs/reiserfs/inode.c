@@ -146,8 +146,8 @@ static void add_to_flushlist(struct inode *inode, struct buffer_head *bh) {
 static inline void fix_tail_page_for_writing(struct page *page) {
     struct buffer_head *head, *next, *bh ;
 
-    if (page && page->buffers) {
-	head = page->buffers ;
+    if (page && page_has_buffers(page)) {
+	head = page_buffers(page) ;
 	bh = head ;
 	do {
 	    next = bh->b_this_page ;
@@ -1685,7 +1685,7 @@ static int grab_tail_page(struct inode *p_s_inode,
 
     kunmap(page) ; /* mapped by block_prepare_write */
 
-    head = page->buffers ;      
+    head = page_buffers(page) ;      
     bh = head;
     do {
 	if (pos >= start) {
@@ -1930,7 +1930,7 @@ static int reiserfs_write_full_page(struct page *page) {
     struct buffer_head *arr[PAGE_CACHE_SIZE/512] ;
     int nr = 0 ;
 
-    if (!page->buffers) {
+    if (!page_has_buffers(page)) {
         block_prepare_write(page, 0, 0, NULL) ;
 	kunmap(page) ;
     }
@@ -1948,7 +1948,7 @@ static int reiserfs_write_full_page(struct page *page) {
 	flush_dcache_page(page) ;
 	kunmap(page) ;
     }
-    head = page->buffers ;
+    head = page_buffers(page) ;
     bh = head ;
     block = page->index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits) ;
     do {

@@ -92,7 +92,8 @@ drop_pte:
 		mm->rss--;
 		UnlockPage(page);
 		{
-			int freeable = page_count(page) - !!page->buffers <= 2;
+			int freeable = page_count(page) -
+				!!PagePrivate(page) <= 2;
 			page_cache_release(page);
 			return freeable;
 		}
@@ -121,7 +122,7 @@ drop_pte:
 	 * Anonymous buffercache pages can be left behind by
 	 * concurrent truncate and pagefault.
 	 */
-	if (page->buffers)
+	if (PagePrivate(page))
 		goto preserve;
 
 	/*
@@ -384,7 +385,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			continue;
 
 		/* Racy check to avoid trylocking when not worthwhile */
-		if (!page->buffers && (page_count(page) != 1 || !page->mapping))
+		if (!PagePrivate(page) && (page_count(page) != 1 || !page->mapping))
 			goto page_mapped;
 
 		/*
@@ -435,7 +436,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 		 * associated with this page. If we succeed we try to free
 		 * the page as well.
 		 */
-		if (page->buffers) {
+		if (PagePrivate(page)) {
 			spin_unlock(&pagemap_lru_lock);
 
 			/* avoid to free a locked page */
