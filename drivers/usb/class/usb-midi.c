@@ -1750,7 +1750,7 @@ static int alloc_usb_midi_device( struct usb_device *d, struct usb_midi_state *s
 	return 0;
 
  error_end:
-	if ( mdevs != NULL && devices > 0 ) {
+	if ( mdevs != NULL ) {
 		for ( i=0 ; i<devices ; i++ ) {
 			if ( mdevs[i] != NULL ) {
 				unregister_sound_midi( mdevs[i]->dev_midi );

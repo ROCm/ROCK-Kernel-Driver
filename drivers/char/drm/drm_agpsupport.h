@@ -62,7 +62,7 @@ int DRM(agp_info)(struct inode *inode, struct file *filp,
 {
 	drm_file_t	 *priv	 = filp->private_data;
 	drm_device_t	 *dev	 = priv->dev;
-	struct agp_kern_info    *kern;
+	DRM_AGP_KERN     *kern;
 	drm_agp_info_t   info;
 
 	if (!dev->agp || !dev->agp->acquired || !drm_agp->copy_info)
@@ -198,7 +198,7 @@ int DRM(agp_alloc)(struct inode *inode, struct file *filp,
 	drm_device_t	 *dev	 = priv->dev;
 	drm_agp_buffer_t request;
 	drm_agp_mem_t    *entry;
-	struct agp_memory *memory;
+	DRM_AGP_MEM      *memory;
 	unsigned long    pages;
 	u32 		 type;
 
@@ -429,7 +429,7 @@ void DRM(agp_uninit)(void)
 }
 
 /** Calls drm_agp->allocate_memory() */
-struct agp_memory *DRM(agp_allocate_memory)(size_t pages, u32 type)
+DRM_AGP_MEM *DRM(agp_allocate_memory)(size_t pages, u32 type)
 {
 	if (!drm_agp->allocate_memory)
 		return NULL;
@@ -437,7 +437,7 @@ struct agp_memory *DRM(agp_allocate_memory)(size_t pages, u32 type)
 }
 
 /** Calls drm_agp->free_memory() */
-int DRM(agp_free_memory)(struct agp_memory *handle)
+int DRM(agp_free_memory)(DRM_AGP_MEM *handle)
 {
 	if (!handle || !drm_agp->free_memory)
 		return 0;
@@ -446,7 +446,7 @@ int DRM(agp_free_memory)(struct agp_memory *handle)
 }
 
 /** Calls drm_agp->bind_memory() */
-int DRM(agp_bind_memory)(struct agp_memory *handle, off_t start)
+int DRM(agp_bind_memory)(DRM_AGP_MEM *handle, off_t start)
 {
 	if (!handle || !drm_agp->bind_memory)
 		return -EINVAL;
@@ -454,7 +454,7 @@ int DRM(agp_bind_memory)(struct agp_memory *handle, off_t start)
 }
 
 /** Calls drm_agp->unbind_memory() */
-int DRM(agp_unbind_memory)(struct agp_memory *handle)
+int DRM(agp_unbind_memory)(DRM_AGP_MEM *handle)
 {
 	if (!handle || !drm_agp->unbind_memory)
 		return -EINVAL;

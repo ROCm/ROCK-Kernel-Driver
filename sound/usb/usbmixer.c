@@ -1358,6 +1358,9 @@ static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned 
 		return -EINVAL;
 	}
 
+	if (num_ins == 1) /* only one ? nonsense! */
+		return 0;
+
 	if (check_ignored_ctl(state, unitid, 0))
 		return 0;
 

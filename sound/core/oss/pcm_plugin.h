@@ -243,9 +243,9 @@ void zero_channel(snd_pcm_plugin_t *plugin,
 		  size_t samples);
 
 #ifdef PLUGIN_DEBUG
-#define pdprintf( args... ) printk( "plugin: " ##args)
+#define pdprintf( fmt, args... ) printk( "plugin: " fmt, ##args)
 #else
-#define pdprintf( args... ) { ; }
+#define pdprintf( fmt, args... ) 
 #endif
 
 #endif				/* __PCM_PLUGIN_H */

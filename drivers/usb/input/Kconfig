@@ -112,8 +112,8 @@ config USB_MOUSE
 	depends on USB && INPUT
 	---help---
 	  Say Y here only if you are absolutely sure that you don't want
-	  to use the generic HID driver for your USB keyboard and prefer
-	  to use the keyboard in its limited Boot Protocol mode instead.
+	  to use the generic HID driver for your USB mouse and prefer
+	  to use the mouse in its limited Boot Protocol mode instead.
 
 	  This is almost certainly not what you want.  This is mostly
 	  useful for embedded applications or simple mice.

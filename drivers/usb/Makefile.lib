@@ -1,4 +1,3 @@
-obj-$(CONFIG_USB_AX8817X)	+= crc32.o
 obj-$(CONFIG_USB_CATC)		+= crc32.o
 obj-$(CONFIG_USB_SPEEDTOUCH)	+= crc32.o
 obj-$(CONFIG_USB_USBNET)	+= crc32.o
