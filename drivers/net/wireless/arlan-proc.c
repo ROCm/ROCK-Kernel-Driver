@@ -108,7 +108,7 @@ static const char *arlan_diagnostic_info_string(struct net_device *dev)
 		default:
 			return "ERROR unknown Diagnostic info reply code ";
 	  }
-};
+}
 
 static const char *arlan_hardware_type_string(struct net_device *dev)
 {

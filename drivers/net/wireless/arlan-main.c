@@ -114,7 +114,7 @@ static inline long long arlan_time(void)
 	struct timeval timev;
 	do_gettimeofday(&timev);
 	return ((long long) timev.tv_sec * 1000000 + timev.tv_usec);
-};
+}
 
 #ifdef ARLAN_ENTRY_EXIT_DEBUGGING
 #define ARLAN_DEBUG_ENTRY(name) \
@@ -162,7 +162,7 @@ static inline int arlan_drop_tx(struct net_device *dev)
 			netif_wake_queue (dev);
 	}
 	return 1;
-};
+}
 
 
 int arlan_command(struct net_device *dev, int command_p)
@@ -314,7 +314,7 @@ int arlan_command(struct net_device *dev, int command_p)
 		if (priv->tx_command_given || priv->rx_command_given)
 		{
 			printk(KERN_ERR "%s: Reset under tx or rx command \n", dev->name);
-		};
+		}
 		netif_stop_queue (dev);
 		if (arlan_debug & ARLAN_DEBUG_RESET)
 			printk(KERN_ERR "%s: Doing chip reset\n", dev->name);
@@ -407,7 +407,7 @@ int arlan_command(struct net_device *dev, int command_p)
 			{
 				priv->waiting_command_mask &= ~ARLAN_COMMAND_TBUSY_CLEAR;
 				netif_wake_queue (dev);
-			};
+			}
 	}
 	else if (priv->waiting_command_mask & ARLAN_COMMAND_TX)
 	{
@@ -505,7 +505,7 @@ command_busy_end:
 	ARLAN_DEBUG_EXIT("arlan_command");
 	return 2;
 
-};
+}
 
 static inline void arlan_command_process(struct net_device *dev)
 {
@@ -616,7 +616,7 @@ static void arlan_registration_timer(unsigned long data)
 			jiffies - priv->tx_last_sent > 5*HZ ){
 			arlan_command(dev, ARLAN_COMMAND_CLEAN_AND_RESET);		
 			priv->tx_last_cleared = jiffies;
-		};
+		}
 	}
 
 
@@ -1018,7 +1018,7 @@ static int __init arlan_check_fingerprint(int memaddr)
 	if (check_mem_region(virt_to_phys((void *)memaddr),0x2000 )){
 		// printk(KERN_WARNING "arlan: memory region %lx excluded from probing \n",virt_to_phys((void*)memaddr));
 		return -ENODEV;
-	};
+	}
 	memcpy_fromio(tempBuf, arlan->textRegion, 29);
 	tempBuf[30] = 0;
 
@@ -1358,7 +1358,7 @@ static inline void arlan_queue_retransmit(struct net_device *dev)
 		priv->ReTransmitRequested++;
 
 	ARLAN_DEBUG_EXIT("arlan_queue_retransmit");
-};
+}
 
 static inline void RetryOrFail(struct net_device *dev)
 {
