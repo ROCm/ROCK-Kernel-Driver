@@ -455,6 +455,16 @@ static int iic_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	}		
 	for (i = 0; i < num; ++i){
 		if (unlikely(msgs[i].len <= 0)){
+			if (num == 1 && !msgs[0].len){
+				/* Special case for I2C_SMBUS_QUICK emulation.
+				 * Although this logic is FAR FROM PERFECT, this 
+				 * is what previous driver version did.
+				 * IBM IIC doesn't support 0-length transactions
+				 * (except bit-banging through IICx_DIRECTCNTL).
+				 */
+				DBG("%d: zero-length msg kludge\n", dev->idx); 
+				return 0;
+			}
 			DBG("%d: invalid len %d in msg[%d]\n", dev->idx, 
 				msgs[i].len, i);
 			return -EINVAL;
