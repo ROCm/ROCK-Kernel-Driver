@@ -24,6 +24,18 @@
 #undef  ISDN_DEBUG_NET_DIAL
 #undef  ISDN_DEBUG_NET_ICALL
 
+#ifdef ISDN_DEBUG_NET_DIAL
+#define dbg_net_dial(arg...) printk(KERN_DEBUG arg)
+#else
+#define dbg_net_dial(arg...) do {} while (0)
+#endif
+
+#ifdef ISDN_DEBUG_NET_ICALL
+#define dbg_net_icall(arg...) printk(KERN_DEBUG arg)
+#else
+#define dbg_net_icall(arg...) do {} while (0)
+#endif
+
 #define isdn_BUG() \
 do { printk(KERN_WARNING "ISDN Bug at %s:%d", __FILE__, __LINE__); \
 } while(0)
@@ -44,6 +56,8 @@ extern int isdn_msncmp( const char *,  const char *);
 extern int isdn_add_channels(driver *, int, int, int);
 #if defined(ISDN_DEBUG_NET_DUMP) || defined(ISDN_DEBUG_MODEM_DUMP)
 extern void isdn_dumppkt(char *, u_char *, int, int);
+#else
+static inline void isdn_dumppkt(char *s, u_char *d, int l, int m) { }
 #endif
 
 struct dial_info {

@@ -758,9 +758,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 	isdn_net_dev *p = lp->netdev;
 	isdn_ctrl cmd;
 
-#ifdef ISDN_DEBUG_NET_DIAL
-	printk(KERN_DEBUG "%s: dialstate=%d\n", lp->name, lp->dialstate);
-#endif
+	dbg_net_dial("%s: dialstate=%d\n", lp->name, lp->dialstate);
 
 	switch (lp->dialstate) {
 	case ST_0:
@@ -818,9 +816,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			/* Wait for B- or D-Channel-connect. If timeout,
 			 * switch back to state 3.
 			 */
-#ifdef ISDN_DEBUG_NET_DIAL
-			printk(KERN_DEBUG "dialtimer2: %d\n", lp->dtimer);
-#endif
+			dbg_net_dial("dialtimer2: %d\n", lp->dtimer);
 			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
 				lp->dialstate = ST_3;
 			return 1;
@@ -832,9 +828,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			/* Got incoming Call, setup L2 and L3 protocols,
 			 * then wait for D-Channel-connect
 			 */
-#ifdef ISDN_DEBUG_NET_DIAL
-			printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
-#endif
+			dbg_net_dial("dialtimer4: %d\n", lp->dtimer);
 			cmd.arg = lp->l2_proto << 8;
 			isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
 			cmd.arg = lp->l3_proto << 8;
@@ -863,9 +857,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 		switch (pr) {
 		case EV_NET_DIAL:
 		/*  Wait for B- or D-channel-connect */
-#ifdef ISDN_DEBUG_NET_DIAL
-			printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
-#endif
+			dbg_net_dial("dialtimer4: %d\n", lp->dtimer);
 			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
 				isdn_net_hangup(&p->dev);
 			else
@@ -1304,14 +1296,8 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 #endif
 	/* auto-dialing xmit function */
 	{
-#ifdef ISDN_DEBUG_NET_DUMP
-		u_char *buf;
-#endif
 		isdn_net_adjust_hdr(skb, ndev);
-#ifdef ISDN_DEBUG_NET_DUMP
-		buf = skb->data;
-		isdn_dumppkt("S:", buf, skb->len, 40);
-#endif
+		isdn_dumppkt("S:", skb->data, skb->len, 40);
 
 		if (!(lp->flags & ISDN_NET_CONNECTED)) {
 			int chi;
@@ -1898,9 +1884,7 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 	skb->dev = ndev;
 	skb->pkt_type = PACKET_HOST;
 	skb->mac.raw = skb->data;
-#ifdef ISDN_DEBUG_NET_DUMP
 	isdn_dumppkt("R:", skb->data, skb->len, 40);
-#endif
 	switch (lp->p_encap) {
 		case ISDN_NET_ENCAP_ETHER:
 			/* Ethernet over ISDN */
@@ -2179,9 +2163,7 @@ isdn_net_swapbind(int drvidx)
 {
 	isdn_net_dev *p;
 
-#ifdef ISDN_DEBUG_NET_ICALL
-	printk(KERN_DEBUG "n_fi: swapping ch of %d\n", drvidx);
-#endif
+	dbg_net_icall("n_fi: swapping ch of %d\n", drvidx);
 	p = dev->netdev;
 	while (p) {
 		if (p->local->pre_device == drvidx)
@@ -2203,9 +2185,7 @@ isdn_net_swap_usage(int i1, int i2)
 	int u1 = isdn_slot_usage(i1);
 	int u2 = isdn_slot_usage(i2);
 
-#ifdef ISDN_DEBUG_NET_ICALL
-	printk(KERN_DEBUG "n_fi: usage of %d and %d\n", i1, i2);
-#endif
+	dbg_net_icall("n_fi: usage of %d and %d\n", i1, i2);
 	isdn_slot_set_usage(i1, (u1 & ~ISDN_USAGE_EXCLUSIVE) | (u2 & ISDN_USAGE_EXCLUSIVE));
 	isdn_slot_set_usage(i2, (u2 & ~ISDN_USAGE_EXCLUSIVE) | (u1 & ISDN_USAGE_EXCLUSIVE));
 }
@@ -2273,10 +2253,8 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 n = (isdn_net_phone *) 0;
 p = dev->netdev;
 	ematch = wret = swapped = 0;
-#ifdef ISDN_DEBUG_NET_ICALL
-	printk(KERN_DEBUG "n_fi: di=%d ch=%d idx=%d usg=%d\n", di, ch, idx,
+	dbg_net_icall("n_fi: di=%d ch=%d idx=%d usg=%d\n", di, ch, idx,
 	       dev->usage[idx]);
-#endif
 	while (p) {
 		int matchret;
 		isdn_net_local *lp = p->local;
@@ -2313,10 +2291,8 @@ p = dev->netdev;
 		/* Remember if more numbers eventually can match */
 		if (matchret > wret)
 			wret = matchret;
-#ifdef ISDN_DEBUG_NET_ICALL
-		printk(KERN_DEBUG "n_fi: if='%s', l.msn=%s, l.flags=%d, l.dstate=%d\n",
+		dbg_net_icall("n_fi: if='%s', l.msn=%s, l.flags=%d, l.dstate=%d\n",
 		       lp->name, lp->msn, lp->flags, lp->dialstate);
-#endif
 		if ((!matchret) &&                                        /* EAZ is matching   */
 		    (((!(lp->flags & ISDN_NET_CONNECTED)) &&              /* but not connected */
 		      (USG_NONE(isdn_slot_usage(idx)))) ||                     /* and ch. unused or */
@@ -2324,10 +2300,8 @@ p = dev->netdev;
 		       (!(lp->flags & ISDN_NET_CALLBACK)))                /* but no callback   */
 		     )))
 			 {
-#ifdef ISDN_DEBUG_NET_ICALL
-			printk(KERN_DEBUG "n_fi: match1, pdev=%d pch=%d\n",
+			dbg_net_icall("n_fi: match1, pdev=%d pch=%d\n",
 			       lp->pre_device, lp->pre_channel);
-#endif
 			if (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) {
 				if ((lp->pre_channel != ch) ||
 				    (lp->pre_device != di)) {
@@ -2342,16 +2316,12 @@ p = dev->netdev;
 					 */
 					if (ch == 0) {
 						sidx = isdn_dc2minor(di, 1);
-#ifdef ISDN_DEBUG_NET_ICALL
-						printk(KERN_DEBUG "n_fi: ch is 0\n");
-#endif
+						dbg_net_icall("n_fi: ch is 0\n");
 						if (USG_NONE(isdn_slot_usage(sidx))) {
 							/* Second Channel is free, now see if it is bound
 							 * exclusive too. */
 							if (isdn_slot_usage(sidx) & ISDN_USAGE_EXCLUSIVE) {
-#ifdef ISDN_DEBUG_NET_ICALL
-								printk(KERN_DEBUG "n_fi: 2nd channel is down and bound\n");
-#endif
+								dbg_net_icall("n_fi: 2nd channel is down and bound\n");
 								/* Yes, swap bindings only, if the original
 								 * binding is bound to channel 1 of this driver */
 								if ((lp->pre_device == di) &&
@@ -2364,39 +2334,29 @@ p = dev->netdev;
 									continue;
 								}
 							} else {
-#ifdef ISDN_DEBUG_NET_ICALL
-								printk(KERN_DEBUG "n_fi: 2nd channel is down and unbound\n");
-#endif
+								dbg_net_icall("n_fi: 2nd channel is down and unbound\n");
 								/* No, swap always and swap excl-usage also */
 								isdn_net_swap_usage(idx, sidx);
 								isdn_net_swapbind(di);
 								swapped = 2;
 							}
 							/* Now check for exclusive binding again */
-#ifdef ISDN_DEBUG_NET_ICALL
-							printk(KERN_DEBUG "n_fi: final check\n");
-#endif
+							dbg_net_icall("n_fi: final check\n");
 							if ((isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) &&
 							    ((lp->pre_channel != ch) ||
 							     (lp->pre_device != di))) {
-#ifdef ISDN_DEBUG_NET_ICALL
-								printk(KERN_DEBUG "n_fi: final check failed\n");
-#endif
+								dbg_net_icall("n_fi: final check failed\n");
 								p = (isdn_net_dev *) p->next;
 								continue;
 							}
 						}
 					} else {
 						/* We are already on the second channel, so nothing to do */
-#ifdef ISDN_DEBUG_NET_ICALL
-						printk(KERN_DEBUG "n_fi: already on 2nd channel\n");
-#endif
+						dbg_net_icall("n_fi: already on 2nd channel\n");
 					}
 				}
 			}
-#ifdef ISDN_DEBUG_NET_ICALL
-			printk(KERN_DEBUG "n_fi: match2\n");
-#endif
+			dbg_net_icall("n_fi: match2\n");
 			n = lp->phone[0];
 			if (lp->flags & ISDN_NET_SECURE) {
 				while (n) {
@@ -2406,9 +2366,7 @@ p = dev->netdev;
 				}
 			}
 			if (n || (!(lp->flags & ISDN_NET_SECURE))) {
-#ifdef ISDN_DEBUG_NET_ICALL
-				printk(KERN_DEBUG "n_fi: match3\n");
-#endif
+				dbg_net_icall(KERN_DEBUG "n_fi: match3\n");
 				/* matching interface found */
 
 				/*
