@@ -255,7 +255,10 @@ void __exit_sighand(struct task_struct *tsk)
 	 * Do not let the thread group leader exit until all other
 	 * threads are done:
 	 */
-	while (current->tgid == current->pid && atomic_read(&sig->count) > 1) {
+	while (!list_empty(&current->thread_group) &&
+			current->tgid == current->pid &&
+			atomic_read(&sig->count) > 1) {
+
 		spin_unlock(&sig->siglock);
 		write_unlock_irq(&tasklist_lock);
 
@@ -265,17 +268,18 @@ void __exit_sighand(struct task_struct *tsk)
 		spin_lock(&sig->siglock);
 	}
 
-	__remove_thread_group(tsk, sig);
-
 	spin_lock(&tsk->sigmask_lock);
 	tsk->sig = NULL;
 	if (atomic_dec_and_test(&sig->count)) {
+		__remove_thread_group(tsk, sig);
 		spin_unlock(&sig->siglock);
 		flush_sigqueue(&sig->shared_pending);
 		kmem_cache_free(sigact_cachep, sig);
 	} else {
-		if (atomic_read(&sig->count) == 1)
+		if (!list_empty(&current->thread_group) &&
+					atomic_read(&sig->count) == 1)
 			complete(&sig->group_exit_done);
+		__remove_thread_group(tsk, sig);
 		spin_unlock(&sig->siglock);
 	}
 	clear_tsk_thread_flag(tsk,TIF_SIGPENDING);
