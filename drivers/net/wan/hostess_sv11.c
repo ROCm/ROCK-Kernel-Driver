@@ -337,7 +337,7 @@ static struct sv11_device *sv11_init(int iobase, int irq)
 		d->neigh_setup = hostess_neigh_setup_dev;
 		d->set_mac_address = NULL;
 		
-		if(register_netdev(d)==-1)
+		if(register_netdev(d))
 		{
 			printk(KERN_ERR "%s: unable to register device.\n",
 				d->name);
