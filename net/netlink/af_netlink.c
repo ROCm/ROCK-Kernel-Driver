@@ -69,6 +69,7 @@ struct netlink_opt
 
 static struct sock *nl_table[MAX_LINKS];
 static DECLARE_WAIT_QUEUE_HEAD(nl_table_wait);
+static unsigned nl_nonroot[MAX_LINKS];
 
 #ifdef NL_EMULATE_DEV
 static struct socket *netlink_kernel[MAX_LINKS];
@@ -317,6 +318,11 @@ retry:
 	return 0;
 }
 
+static inline int netlink_capable(struct socket *sock, unsigned flag) 
+{ 
+	return (nl_nonroot[sock->sk->protocol] & flag) || capable(CAP_NET_ADMIN);
+} 
+
 static int netlink_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
 {
 	struct sock *sk = sock->sk;
@@ -328,7 +334,7 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr, int addr_len
 		return -EINVAL;
 
 	/* Only superuser is allowed to listen multicasts */
-	if (nladdr->nl_groups && !capable(CAP_NET_ADMIN))
+	if (nladdr->nl_groups && !netlink_capable(sock, NL_NONROOT_RECV))
 		return -EPERM;
 
 	if (nlk->pid) {
@@ -368,7 +374,7 @@ static int netlink_connect(struct socket *sock, struct sockaddr *addr,
 		return -EINVAL;
 
 	/* Only superuser is allowed to send multicasts */
-	if (nladdr->nl_groups && !capable(CAP_NET_ADMIN))
+	if (nladdr->nl_groups && !netlink_capable(sock, NL_NONROOT_SEND))
 		return -EPERM;
 
 	if (!nlk->pid)
@@ -590,7 +596,7 @@ static int netlink_sendmsg(struct kiocb *iocb, struct socket *sock,
 			return -EINVAL;
 		dst_pid = addr->nl_pid;
 		dst_groups = addr->nl_groups;
-		if (dst_groups && !capable(CAP_NET_ADMIN))
+		if (dst_groups && !netlink_capable(sock, NL_NONROOT_SEND))
 			return -EPERM;
 	} else {
 		dst_pid = nlk->dst_pid;
@@ -742,6 +748,12 @@ netlink_kernel_create(int unit, void (*input)(struct sock *sk, int len))
 	netlink_insert(sk, 0);
 	return sk;
 }
+
+void netlink_set_nonroot(int protocol, unsigned flags)
+{ 
+	if ((unsigned)protocol < MAX_LINKS) 
+		nl_nonroot[protocol] = flags;
+} 
 
 static void netlink_destroy_callback(struct netlink_callback *cb)
 {

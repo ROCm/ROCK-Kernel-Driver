@@ -162,6 +162,10 @@ extern int netlink_dump_start(struct sock *ssk, struct sk_buff *skb,
 			      int (*done)(struct netlink_callback*));
 
 
+#define NL_NONROOT_RECV 0x1
+#define NL_NONROOT_SEND 0x2
+extern void netlink_set_nonroot(int protocol, unsigned flag);
+
 #endif /* __KERNEL__ */
 
 #endif	/* __LINUX_NETLINK_H */
