@@ -126,7 +126,7 @@ static void agp_remove_seg_from_client(struct agp_client *client)
 
 	if (client->segments != NULL) {
 		if (*(client->segments) != NULL) {
-			DBG("Freeing %p from client", *(client->segments), client);
+			DBG("Freeing %p from client %p", *(client->segments), client);
 			kfree(*(client->segments));
 		}
 		DBG("Freeing %p from client %p", client->segments, client);
