@@ -542,6 +542,8 @@ struct b44 {
 	u8			phy_addr;
 	u8			mdc_port;
 	u8			core_unit;
+
+	struct mii_if_info	mii_if;
 };
 
 #endif /* _B44_H */
