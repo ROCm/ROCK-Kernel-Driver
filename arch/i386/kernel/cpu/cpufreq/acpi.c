@@ -1,9 +1,9 @@
 /*
- * acpi_processor_perf.c - ACPI Processor P-States Driver ($Revision: 1.3 $)
+ * acpi-cpufreq-io.c - ACPI Processor P-States Driver ($Revision: 1.3 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
- *  Copyright (C) 2002, 2003 Dominik Brodowski <linux@brodo.de>
+ *  Copyright (C) 2002 - 2004 Dominik Brodowski <linux@brodo.de>
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
@@ -591,10 +591,6 @@ acpi_processor_get_performance_info (
 	if (result)
 		return_VALUE(result);
 
-	result = acpi_processor_get_platform_limit(perf->pr);
-	if (result)
-		return_VALUE(result);
-
 	return_VALUE(0);
 }
 
@@ -692,17 +688,12 @@ static int __init
 acpi_cpufreq_init (void)
 {
 	int                     result = 0;
-	int                     current_state = 0;
 	int                     i = 0;
 	struct acpi_processor   *pr = NULL;
-	struct acpi_processor_performance *perf = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_cpufreq_init");
 
 	/* alloc memory */
-	if (performance)
-		return_VALUE(-EBUSY);
-
 	performance = kmalloc(NR_CPUS * sizeof(struct acpi_processor_performance), GFP_KERNEL);
 	if (!performance)
 		return_VALUE(-ENOMEM);
@@ -720,69 +711,19 @@ acpi_cpufreq_init (void)
 			result = acpi_processor_get_performance_info(&performance[i]);
 	}
 
-	/* test it on one CPU */
-	for (i=0; i<NR_CPUS; i++) {
-		if (!cpu_online(i))
-			continue;
-		pr = performance[i].pr;
-		if (pr && pr->flags.performance)
-			goto found_capable_cpu;
-	}
-	result = -ENODEV;
-	goto err0;
-
- found_capable_cpu:
-	
  	result = cpufreq_register_driver(&acpi_cpufreq_driver);
-	if (result) 
-		goto err0;
-	
-	perf = pr->performance;
-	current_state = perf->state;
-
-	if (current_state == pr->limit.state.px) {
-		result = acpi_processor_set_performance(perf, (perf->state_count - 1));
-		if (result) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Disabled P-States due to failure while switching.\n"));
-			result = -ENODEV;
-			goto err1;
-		}
-	}
-
-	result = acpi_processor_set_performance(perf, pr->limit.state.px);
 	if (result) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Disabled P-States due to failure while switching.\n"));
-		result = -ENODEV;
-		goto err1;
-	}
-	
-	if (current_state != 0) {
-		result = acpi_processor_set_performance(perf, current_state);
-		if (result) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Disabled P-States due to failure while switching.\n"));
-			result = -ENODEV;
-			goto err1;
+		/* unregister struct acpi_processor_performance performance */
+		for (i=0; i<NR_CPUS; i++) {
+			if (performance[i].pr) {
+				performance[i].pr->flags.performance = 0;
+				performance[i].pr->performance = NULL;
+				performance[i].pr = NULL;
+			}
 		}
+		kfree(performance);
 	}
-
-	return_VALUE(0);
-
-	/* error handling */
- err1:
-	cpufreq_unregister_driver(&acpi_cpufreq_driver);
 	
- err0:
-	/* unregister struct acpi_processor_performance performance */
-	for (i=0; i<NR_CPUS; i++) {
-		if (performance[i].pr) {
-			performance[i].pr->flags.performance = 0;
-			performance[i].pr->performance = NULL;
-			performance[i].pr = NULL;
-		}
-	}
-	kfree(performance);
-	
-	printk(KERN_INFO "cpufreq: No CPUs supporting ACPI performance management found.\n");
 	return_VALUE(result);
 }
 
