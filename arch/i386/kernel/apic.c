@@ -91,7 +91,7 @@ int get_physical_broadcast(void)
 	unsigned int lvr, version;
 	lvr = apic_read(APIC_LVR);
 	version = GET_APIC_VERSION(lvr);
-	if (version >= 0x14)
+	if (!APIC_INTEGRATED(version) || version >= 0x14)
 		return 0xff;
 	else
 		return 0xf;
@@ -691,6 +691,12 @@ static int __init detect_init_APIC (void)
 	}
 
 	if (!cpu_has_apic) {
+		/*
+		 * Over-ride BIOS and try to enable LAPIC
+		 * only if "lapic" specified
+		 */
+		if (enable_local_apic != 1)
+			goto no_apic;
 		/*
 		 * Some BIOSes disable the local APIC in the
 		 * APIC_BASE MSR. This can only be done in

@@ -60,7 +60,7 @@ typedef struct siginfo {
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
 		struct {
-			void *_addr;		/* faulting insn/memory ref. */
+			void __user *_addr;	/* faulting insn/memory ref. */
 			int _imm;		/* immediate value for "break" */
 			unsigned int _flags;	/* see below */
 			unsigned long _isr;	/* isr */

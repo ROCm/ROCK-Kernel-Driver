@@ -234,7 +234,7 @@ ENTRY(fsys_gettimeofday)
 	cmp.eq p9,p0 = 1,r8	// MMIO64 ?
 	extr r2 = r21,24,8	// time_interpolator->jitter
 	cmp.eq p10,p0 = 2,r8	// MMIO32 ?
-	cmp.lt p11,p0 = 2,r8	// function?
+	cmp.ltu p11,p0 = 2,r8	// function or other clock
 (p11)	br.cond.spnt.many fsys_fallback_syscall
 	;;
 	setf.sig f7 = r3	// Setup for scaling of counter
@@ -338,7 +338,7 @@ ENTRY(fsys_clock_gettime)
 	.prologue
 	.altrp b6
 	.body
-	cmp4.lt p6, p0 = CLOCK_MONOTONIC, r32
+	cmp4.ltu p6, p0 = CLOCK_MONOTONIC, r32
 	// Fallback if this is not CLOCK_REALTIME or CLOCK_MONOTONIC
 (p6)	br.spnt.few fsys_fallback_syscall
 	mov r31 = r33

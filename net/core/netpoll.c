@@ -378,7 +378,7 @@ int netpoll_rx(struct sk_buff *skb)
 		return 1;
 	}
 
-	proto = ntohs(skb->mac.ethernet->h_proto);
+	proto = ntohs(eth_hdr(skb)->h_proto);
 	if (proto != ETH_P_IP)
 		goto out;
 	if (skb->pkt_type == PACKET_OTHERHOST)

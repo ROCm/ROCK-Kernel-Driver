@@ -1143,4 +1143,5 @@ void	ahd_platform_dump_card_state(struct ahd_softc *ahd);
 #endif
 #define bootverbose aic79xx_verbose
 extern uint32_t aic79xx_verbose;
+
 #endif /* _AIC79XX_LINUX_H_ */

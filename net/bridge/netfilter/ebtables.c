@@ -190,7 +190,7 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff **pskb,
 	base = private->entries;
 	i = 0;
 	while (i < nentries) {
-		if (ebt_basic_match(point, (**pskb).mac.ethernet, in, out))
+		if (ebt_basic_match(point, eth_hdr(*pskb), in, out))
 			goto letscontinue;
 
 		if (EBT_MATCH_ITERATE(point, ebt_do_match, *pskb, in, out) != 0)

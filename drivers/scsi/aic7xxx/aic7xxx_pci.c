@@ -56,6 +56,19 @@
 
 #include "aic7xxx_pci.h"
 
+static __inline uint64_t
+ahc_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
+{
+	uint64_t id;
+
+	id = subvendor
+	   | (subdevice << 16)
+	   | ((uint64_t)vendor << 32)
+	   | ((uint64_t)device << 48);
+
+	return (id);
+}
+
 #define AHC_PCI_IOADDR	PCIR_MAPS	/* I/O Address */
 #define AHC_PCI_MEMADDR	(PCIR_MAPS + 4)	/* Mem I/O Address */
 

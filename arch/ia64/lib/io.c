@@ -9,7 +9,7 @@
  * This needs to be optimized.
  */
 void
-__ia64_memcpy_fromio (void *to, unsigned long from, long count)
+__ia64_memcpy_fromio (void *to, volatile void __iomem *from, long count)
 {
 	char *dst = to;
 
@@ -25,7 +25,7 @@ EXPORT_SYMBOL(__ia64_memcpy_fromio);
  * This needs to be optimized.
  */
 void
-__ia64_memcpy_toio (unsigned long to, void *from, long count)
+__ia64_memcpy_toio (volatile void __iomem *to, void *from, long count)
 {
 	char *src = from;
 
@@ -41,7 +41,7 @@ EXPORT_SYMBOL(__ia64_memcpy_toio);
  * This needs to be optimized.
  */
 void
-__ia64_memset_c_io (unsigned long dst, unsigned long c, long count)
+__ia64_memset_c_io (volatile void __iomem *dst, unsigned long c, long count)
 {
 	unsigned char ch = (char)(c & 0xff);
 
@@ -111,49 +111,49 @@ __ia64_outl (unsigned int val, unsigned long port)
 }
 
 unsigned char
-__ia64_readb (void *addr)
+__ia64_readb (void __iomem *addr)
 {
 	return ___ia64_readb (addr);
 }
 
 unsigned short
-__ia64_readw (void *addr)
+__ia64_readw (void __iomem *addr)
 {
 	return ___ia64_readw (addr);
 }
 
 unsigned int
-__ia64_readl (void *addr)
+__ia64_readl (void __iomem *addr)
 {
 	return ___ia64_readl (addr);
 }
 
 unsigned long
-__ia64_readq (void *addr)
+__ia64_readq (void __iomem *addr)
 {
 	return ___ia64_readq (addr);
 }
 
 unsigned char
-__ia64_readb_relaxed (void *addr)
+__ia64_readb_relaxed (void __iomem *addr)
 {
 	return ___ia64_readb (addr);
 }
 
 unsigned short
-__ia64_readw_relaxed (void *addr)
+__ia64_readw_relaxed (void __iomem *addr)
 {
 	return ___ia64_readw (addr);
 }
 
 unsigned int
-__ia64_readl_relaxed (void *addr)
+__ia64_readl_relaxed (void __iomem *addr)
 {
 	return ___ia64_readl (addr);
 }
 
 unsigned long
-__ia64_readq_relaxed (void *addr)
+__ia64_readq_relaxed (void __iomem *addr)
 {
 	return ___ia64_readq (addr);
 }

@@ -8,9 +8,12 @@ USER_OBJS := bugs.o ptrace_user.o sigcontext.o fault.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 SYMLINKS = bitops.c semaphore.c highmem.c module.c
-SYMLINKS := $(foreach f,$(SYMLINKS),$(src)/$f)
 
+# this needs to be before the foreach, because clean-files does not accept
+# complete paths like $(src)/$f.
 clean-files := $(SYMLINKS)
+
+SYMLINKS := $(foreach f,$(SYMLINKS),$(src)/$f)
 
 bitops.c-dir = lib
 semaphore.c-dir = kernel

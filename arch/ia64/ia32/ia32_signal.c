@@ -66,7 +66,7 @@ struct rt_sigframe_ia32
 };
 
 int
-copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 *from)
+copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 __user *from)
 {
 	unsigned long tmp;
 	int err;
@@ -78,10 +78,10 @@ copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 *from)
 	err |= __get_user(to->si_errno, &from->si_errno);
 	err |= __get_user(to->si_code, &from->si_code);
 
-	if (from->si_code < 0)
+	if (to->si_code < 0)
 		err |= __copy_from_user(&to->_sifields._pad, &from->_sifields._pad, SI_PAD_SIZE);
 	else {
-		switch (from->si_code >> 16) {
+		switch (to->si_code >> 16) {
 		      case __SI_CHLD >> 16:
 			err |= __get_user(to->si_utime, &from->si_utime);
 			err |= __get_user(to->si_stime, &from->si_stime);
@@ -92,7 +92,7 @@ copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 *from)
 			break;
 		      case __SI_FAULT >> 16:
 			err |= __get_user(tmp, &from->si_addr);
-			to->si_addr = (void *) tmp;
+			to->si_addr = (void __user *) tmp;
 			break;
 		      case __SI_POLL >> 16:
 			err |= __get_user(to->si_band, &from->si_band);
@@ -110,7 +110,7 @@ copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 *from)
 }
 
 int
-copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
+copy_siginfo_to_user32 (siginfo_t32 __user *to, siginfo_t *from)
 {
 	unsigned int addr;
 	int err;
@@ -141,7 +141,8 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
 			err |= __put_user(from->si_uid, &to->si_uid);
 			break;
 		case __SI_FAULT >> 16:
-			err |= __put_user((long)from->si_addr, &to->si_addr);
+			/* avoid type-checking warnings by copying _pad[0] in lieu of si_addr... */
+			err |= __put_user(from->_sifields._pad[0], &to->si_addr);
 			break;
 		case __SI_POLL >> 16:
 			err |= __put_user(from->si_band, &to->si_band);
@@ -202,7 +203,7 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
  */
 
 static int
-save_ia32_fpstate_live (struct _fpstate_ia32 *save)
+save_ia32_fpstate_live (struct _fpstate_ia32 __user *save)
 {
 	struct task_struct *tsk = current;
 	struct pt_regs *ptp;
@@ -310,7 +311,7 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 }
 
 static int
-restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
+restore_ia32_fpstate_live (struct _fpstate_ia32 __user *save)
 {
 	struct task_struct *tsk = current;
 	struct pt_regs *ptp;
@@ -339,37 +340,37 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	fir = ia64_getreg(_IA64_REG_AR_FIR);
 	fdr = ia64_getreg(_IA64_REG_AR_FDR);
 
-	__get_user(mxcsr, (unsigned int *)&save->mxcsr);
+	__get_user(mxcsr, (unsigned int __user *)&save->mxcsr);
 	/* setting bits 0..5 8..12 with cw and 39..47 from mxcsr */
-	__get_user(lo, (unsigned int *)&save->cw);
+	__get_user(lo, (unsigned int __user *)&save->cw);
 	num64 = mxcsr & 0xff10;
 	num64 = (num64 << 32) | (lo & 0x1f3f);
-	fcr = (fcr & (~0xff1000001f3f)) | num64;
+	fcr = (fcr & (~0xff1000001f3fUL)) | num64;
 
 	/* setting bits 0..31 with sw and tag and 32..37 from mxcsr */
-	__get_user(lo, (unsigned int *)&save->sw);
+	__get_user(lo, (unsigned int __user *)&save->sw);
 	/* set bits 15,7 (fsw.b, fsw.es) to reflect the current error status */
 	if ( !(lo & 0x7f) )
 		lo &= (~0x8080);
-	__get_user(hi, (unsigned int *)&save->tag);
+	__get_user(hi, (unsigned int __user *)&save->tag);
 	num64 = mxcsr & 0x3f;
 	num64 = (num64 << 16) | (hi & 0xffff);
 	num64 = (num64 << 16) | (lo & 0xffff);
-	fsr = (fsr & (~0x3fffffffff)) | num64;
+	fsr = (fsr & (~0x3fffffffffUL)) | num64;
 
 	/* setting bits 0..47 with cssel and ipoff */
-	__get_user(lo, (unsigned int *)&save->ipoff);
-	__get_user(hi, (unsigned int *)&save->cssel);
+	__get_user(lo, (unsigned int __user *)&save->ipoff);
+	__get_user(hi, (unsigned int __user *)&save->cssel);
 	num64 = hi & 0xffff;
 	num64 = (num64 << 32) | lo;
-	fir = (fir & (~0xffffffffffff)) | num64;
+	fir = (fir & (~0xffffffffffffUL)) | num64;
 
 	/* setting bits 0..47 with datasel and dataoff */
-	__get_user(lo, (unsigned int *)&save->dataoff);
-	__get_user(hi, (unsigned int *)&save->datasel);
+	__get_user(lo, (unsigned int __user *)&save->dataoff);
+	__get_user(hi, (unsigned int __user *)&save->datasel);
 	num64 = hi & 0xffff;
 	num64 = (num64 << 32) | lo;
-	fdr = (fdr & (~0xffffffffffff)) | num64;
+	fdr = (fdr & (~0xffffffffffffUL)) | num64;
 
 	ia64_setreg(_IA64_REG_AR_FSR, fsr);
 	ia64_setreg(_IA64_REG_AR_FCR, fcr);
@@ -452,8 +453,8 @@ sigact_set_handler (struct k_sigaction *sa, unsigned int handler, unsigned int r
 		sa->sa.sa_handler = (__sighandler_t) (((unsigned long) restorer << 32) | handler);
 }
 
-asmlinkage long
-ia32_rt_sigsuspend (compat_sigset_t *uset, unsigned int sigsetsize, struct sigscratch *scr)
+long
+__ia32_rt_sigsuspend (compat_sigset_t *sset, unsigned int sigsetsize, struct sigscratch *scr)
 {
 	extern long ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall);
 	sigset_t oldset, set;
@@ -461,10 +462,7 @@ ia32_rt_sigsuspend (compat_sigset_t *uset, unsigned int sigsetsize, struct sigsc
 	scr->scratch_unat = 0;	/* avoid leaking kernel bits to user level */
 	memset(&set, 0, sizeof(&set));
 
-	if (sigsetsize > sizeof(sigset_t))
-		return -EINVAL;
-
-	if (copy_from_user(&set.sig, &uset->sig, sigsetsize))
+	if (memcpy(&set.sig, &sset->sig, sigsetsize))
 		return -EFAULT;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
@@ -492,9 +490,23 @@ ia32_rt_sigsuspend (compat_sigset_t *uset, unsigned int sigsetsize, struct sigsc
 }
 
 asmlinkage long
+ia32_rt_sigsuspend (compat_sigset_t __user *uset, unsigned int sigsetsize, struct sigscratch *scr)
+{
+	compat_sigset_t set;
+
+	if (sigsetsize > sizeof(compat_sigset_t))
+		return -EINVAL;
+
+	if (copy_from_user(&set.sig, &uset->sig, sigsetsize))
+		return -EFAULT;
+
+	return __ia32_rt_sigsuspend(&set, sigsetsize, scr);
+}
+
+asmlinkage long
 ia32_sigsuspend (unsigned int mask, struct sigscratch *scr)
 {
-	return ia32_rt_sigsuspend((compat_sigset_t *)&mask, sizeof(mask), scr);
+	return __ia32_rt_sigsuspend((compat_sigset_t *) &mask, sizeof(mask), scr);
 }
 
 asmlinkage long
@@ -512,8 +524,8 @@ sys32_signal (int sig, unsigned int handler)
 }
 
 asmlinkage long
-sys32_rt_sigaction (int sig, struct sigaction32 *act,
-		    struct sigaction32 *oact, unsigned int sigsetsize)
+sys32_rt_sigaction (int sig, struct sigaction32 __user *act,
+		    struct sigaction32 __user *oact, unsigned int sigsetsize)
 {
 	struct k_sigaction new_ka, old_ka;
 	unsigned int handler, restorer;
@@ -547,7 +559,8 @@ sys32_rt_sigaction (int sig, struct sigaction32 *act,
 
 
 asmlinkage long
-sys32_rt_sigprocmask (int how, compat_sigset_t *set, compat_sigset_t *oset, unsigned int sigsetsize)
+sys32_rt_sigprocmask (int how, compat_sigset_t __user *set, compat_sigset_t __user *oset,
+		      unsigned int sigsetsize)
 {
 	mm_segment_t old_fs = get_fs();
 	sigset_t s;
@@ -562,7 +575,9 @@ sys32_rt_sigprocmask (int how, compat_sigset_t *set, compat_sigset_t *oset, unsi
 			return -EFAULT;
 	}
 	set_fs(KERNEL_DS);
-	ret = sys_rt_sigprocmask(how, set ? &s : NULL, oset ? &s : NULL, sizeof(s));
+	ret = sys_rt_sigprocmask(how,
+				 set ? (sigset_t __user *) &s : NULL,
+				 oset ? (sigset_t __user *) &s : NULL, sizeof(s));
 	set_fs(old_fs);
 	if (ret)
 		return ret;
@@ -574,10 +589,9 @@ sys32_rt_sigprocmask (int how, compat_sigset_t *set, compat_sigset_t *oset, unsi
 }
 
 asmlinkage long
-sys32_rt_sigtimedwait (compat_sigset_t *uthese, siginfo_t32 *uinfo,
-		struct compat_timespec *uts, unsigned int sigsetsize)
+sys32_rt_sigtimedwait (compat_sigset_t __user *uthese, siginfo_t32 __user *uinfo,
+		       struct compat_timespec __user *uts, unsigned int sigsetsize)
 {
-	extern int copy_siginfo_to_user32 (siginfo_t32 *, siginfo_t *);
 	mm_segment_t old_fs = get_fs();
 	struct timespec t;
 	siginfo_t info;
@@ -589,8 +603,10 @@ sys32_rt_sigtimedwait (compat_sigset_t *uthese, siginfo_t32 *uinfo,
 	if (uts && get_compat_timespec(&t, uts))
 		return -EFAULT;
 	set_fs(KERNEL_DS);
-	ret = sys_rt_sigtimedwait(&s, uinfo ? &info : NULL, uts ? &t : NULL,
-			sigsetsize);
+	ret = sys_rt_sigtimedwait((sigset_t __user *) &s,
+				  uinfo ? (siginfo_t __user *) &info : NULL,
+				  uts ? (struct timespec __user *) &t : NULL,
+				  sigsetsize);
 	set_fs(old_fs);
 	if (ret >= 0 && uinfo) {
 		if (copy_siginfo_to_user32(uinfo, &info))
@@ -600,7 +616,7 @@ sys32_rt_sigtimedwait (compat_sigset_t *uthese, siginfo_t32 *uinfo,
 }
 
 asmlinkage long
-sys32_rt_sigqueueinfo (int pid, int sig, siginfo_t32 *uinfo)
+sys32_rt_sigqueueinfo (int pid, int sig, siginfo_t32 __user *uinfo)
 {
 	mm_segment_t old_fs = get_fs();
 	siginfo_t info;
@@ -609,13 +625,13 @@ sys32_rt_sigqueueinfo (int pid, int sig, siginfo_t32 *uinfo)
 	if (copy_siginfo_from_user32(&info, uinfo))
 		return -EFAULT;
 	set_fs(KERNEL_DS);
-	ret = sys_rt_sigqueueinfo(pid, sig, &info);
+	ret = sys_rt_sigqueueinfo(pid, sig, (siginfo_t __user *) &info);
 	set_fs(old_fs);
 	return ret;
 }
 
 asmlinkage long
-sys32_sigaction (int sig, struct old_sigaction32 *act, struct old_sigaction32 *oact)
+sys32_sigaction (int sig, struct old_sigaction32 __user *act, struct old_sigaction32 __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	unsigned int handler, restorer;
@@ -648,7 +664,7 @@ sys32_sigaction (int sig, struct old_sigaction32 *act, struct old_sigaction32 *o
 }
 
 static int
-setup_sigcontext_ia32 (struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate,
+setup_sigcontext_ia32 (struct sigcontext_ia32 __user *sc, struct _fpstate_ia32 __user *fpstate,
 		       struct pt_regs *regs, unsigned long mask)
 {
 	int  err = 0;
@@ -657,10 +673,10 @@ setup_sigcontext_ia32 (struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate
 	if (!access_ok(VERIFY_WRITE, sc, sizeof(*sc)))
 		return -EFAULT;
 
-	err |= __put_user((regs->r16 >> 32) & 0xffff, (unsigned int *)&sc->fs);
-	err |= __put_user((regs->r16 >> 48) & 0xffff, (unsigned int *)&sc->gs);
-	err |= __put_user((regs->r16 >> 16) & 0xffff, (unsigned int *)&sc->es);
-	err |= __put_user(regs->r16 & 0xffff, (unsigned int *)&sc->ds);
+	err |= __put_user((regs->r16 >> 32) & 0xffff, (unsigned int __user *)&sc->fs);
+	err |= __put_user((regs->r16 >> 48) & 0xffff, (unsigned int __user *)&sc->gs);
+	err |= __put_user((regs->r16 >> 16) & 0xffff, (unsigned int __user *)&sc->es);
+	err |= __put_user(regs->r16 & 0xffff, (unsigned int __user *)&sc->ds);
 	err |= __put_user(regs->r15, &sc->edi);
 	err |= __put_user(regs->r14, &sc->esi);
 	err |= __put_user(regs->r13, &sc->ebp);
@@ -674,14 +690,14 @@ setup_sigcontext_ia32 (struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate
 	err |= __put_user(current->tss.error_code, &sc->err);
 #endif
 	err |= __put_user(regs->cr_iip, &sc->eip);
-	err |= __put_user(regs->r17 & 0xffff, (unsigned int *)&sc->cs);
+	err |= __put_user(regs->r17 & 0xffff, (unsigned int __user *)&sc->cs);
 	/*
 	 *  `eflags' is in an ar register for this context
 	 */
 	flag = ia64_getreg(_IA64_REG_AR_EFLAG);
 	err |= __put_user((unsigned int)flag, &sc->eflags);
 	err |= __put_user(regs->r12, &sc->esp_at_signal);
-	err |= __put_user((regs->r17 >> 16) & 0xffff, (unsigned int *)&sc->ss);
+	err |= __put_user((regs->r17 >> 16) & 0xffff, (unsigned int __user *)&sc->ss);
 
 	if ( save_ia32_fpstate_live(fpstate) < 0 )
 		err = -EFAULT;
@@ -705,7 +721,7 @@ setup_sigcontext_ia32 (struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate
 }
 
 static int
-restore_sigcontext_ia32 (struct pt_regs *regs, struct sigcontext_ia32 *sc, int *peax)
+restore_sigcontext_ia32 (struct pt_regs *regs, struct sigcontext_ia32 __user *sc, int *peax)
 {
 	unsigned int err = 0;
 
@@ -775,10 +791,10 @@ restore_sigcontext_ia32 (struct pt_regs *regs, struct sigcontext_ia32 *sc, int *
 	}
 
 	{
-		struct _fpstate_ia32 *buf = NULL;
+		struct _fpstate_ia32 __user *buf = NULL;
 		u32    fpstate_ptr;
 		err |= get_user(fpstate_ptr, &(sc->fpstate));
-		buf = (struct _fpstate_ia32 *)(u64)fpstate_ptr;
+		buf = compat_ptr(fpstate_ptr);
 		if (buf) {
 			err |= restore_ia32_fpstate_live(buf);
 		}
@@ -808,7 +824,7 @@ restore_sigcontext_ia32 (struct pt_regs *regs, struct sigcontext_ia32 *sc, int *
 /*
  * Determine which stack to use..
  */
-static inline void *
+static inline void __user *
 get_sigframe (struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 {
 	unsigned long esp;
@@ -823,14 +839,14 @@ get_sigframe (struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 	}
 	/* Legacy stack switching not supported */
 
-	return (void *)((esp - frame_size) & -8ul);
+	return (void __user *)((esp - frame_size) & -8ul);
 }
 
 static int
 setup_frame_ia32 (int sig, struct k_sigaction *ka, sigset_t *set, struct pt_regs * regs)
 {
 	struct exec_domain *ed = current_thread_info()->exec_domain;
-	struct sigframe_ia32 *frame;
+	struct sigframe_ia32 __user *frame;
 	int err = 0;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
@@ -862,9 +878,9 @@ setup_frame_ia32 (int sig, struct k_sigaction *ka, sigset_t *set, struct pt_regs
 	 * See arch/i386/kernel/signal.c
 	 */
 
-	err |= __put_user(0xb858, (short *)(frame->retcode+0));
-	err |= __put_user(__IA32_NR_sigreturn, (int *)(frame->retcode+2));
-	err |= __put_user(0x80cd, (short *)(frame->retcode+6));
+	err |= __put_user(0xb858, (short __user *)(frame->retcode+0));
+	err |= __put_user(__IA32_NR_sigreturn, (int __user *)(frame->retcode+2));
+	err |= __put_user(0x80cd, (short __user *)(frame->retcode+6));
 
 	if (err)
 		goto give_sigsegv;
@@ -896,7 +912,8 @@ setup_rt_frame_ia32 (int sig, struct k_sigaction *ka, siginfo_t *info,
 		     sigset_t *set, struct pt_regs * regs)
 {
 	struct exec_domain *ed = current_thread_info()->exec_domain;
-	struct rt_sigframe_ia32 *frame;
+	compat_uptr_t pinfo, puc;
+	struct rt_sigframe_ia32 __user *frame;
 	int err = 0;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
@@ -906,8 +923,11 @@ setup_rt_frame_ia32 (int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	err |= __put_user((ed && ed->signal_invmap
 			   && sig < 32 ? ed->signal_invmap[sig] : sig), &frame->sig);
-	err |= __put_user((long)&frame->info, &frame->pinfo);
-	err |= __put_user((long)&frame->uc, &frame->puc);
+
+	pinfo = (long __user) &frame->info;
+	puc = (long __user) &frame->uc;
+	err |= __put_user(pinfo, &frame->pinfo);
+	err |= __put_user(puc, &frame->puc);
 	err |= copy_siginfo_to_user32(&frame->info, info);
 
 	/* Create the ucontext.  */
@@ -936,9 +956,9 @@ setup_rt_frame_ia32 (int sig, struct k_sigaction *ka, siginfo_t *info,
 	 * See arch/i386/kernel/signal.c
 	 */
 
-	err |= __put_user(0xb8, (char *)(frame->retcode+0));
-	err |= __put_user(__IA32_NR_rt_sigreturn, (int *)(frame->retcode+1));
-	err |= __put_user(0x80cd, (short *)(frame->retcode+5));
+	err |= __put_user(0xb8, (char __user *)(frame->retcode+0));
+	err |= __put_user(__IA32_NR_rt_sigreturn, (int __user *)(frame->retcode+1));
+	err |= __put_user(0x80cd, (short __user *)(frame->retcode+5));
 
 	if (err)
 		goto give_sigsegv;
@@ -982,7 +1002,7 @@ sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long esp = (unsigned int) regs->r12;
-	struct sigframe_ia32 *frame = (struct sigframe_ia32 *)(esp - 8);
+	struct sigframe_ia32 __user *frame = (struct sigframe_ia32 __user *)(esp - 8);
 	sigset_t set;
 	int eax;
 
@@ -996,7 +1016,7 @@ sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sighand->siglock);
-	current->blocked = (sigset_t) set;
+	current->blocked = set;
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
@@ -1015,9 +1035,8 @@ sys32_rt_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, 
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long esp = (unsigned int) regs->r12;
-	struct rt_sigframe_ia32 *frame = (struct rt_sigframe_ia32 *)(esp - 4);
+	struct rt_sigframe_ia32 __user *frame = (struct rt_sigframe_ia32 __user *)(esp - 4);
 	sigset_t set;
-	stack_t st;
 	int eax;
 
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
@@ -1034,11 +1053,9 @@ sys32_rt_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, 
 	if (restore_sigcontext_ia32(regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
 
-	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st)))
-		goto badframe;
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
-	do_sigaltstack(&st, NULL, esp);
+	do_sigaltstack((stack_t __user *) &frame->uc.uc_stack, NULL, esp);
 
 	return eax;
 

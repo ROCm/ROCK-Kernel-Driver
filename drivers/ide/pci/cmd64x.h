@@ -15,10 +15,6 @@
 #define cmdprintk(x...)
 #endif
 
-#ifndef SPLIT_BYTE
-#define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
-#endif
-
 /*
  * CMD64x specific registers definition.
  */

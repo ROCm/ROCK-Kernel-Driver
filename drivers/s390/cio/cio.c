@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.123 $
+ *   $Revision: 1.128 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -141,6 +141,7 @@ cio_tpi(void)
 	sch = (struct subchannel *)(unsigned long)tpi_info->intparm;
 	if (!sch)
 		return 1;
+	local_bh_disable();
 	irq_enter ();
 	spin_lock(&sch->lock);
 	memcpy (&sch->schib.scsw, &irb->scsw, sizeof (struct scsw));
@@ -148,6 +149,7 @@ cio_tpi(void)
 		sch->driver->irq(&sch->dev);
 	spin_unlock(&sch->lock);
 	irq_exit ();
+	__local_bh_enable();
 	return 1;
 }
 
@@ -409,10 +411,10 @@ cio_enable_subchannel (struct subchannel *sch, unsigned int isc)
 	if (ccode)
 		return -ENODEV;
 
-	sch->schib.pmcw.ena = 1;
-	sch->schib.pmcw.isc = isc;
-	sch->schib.pmcw.intparm = (__u32)(unsigned long)sch;
 	for (retry = 5, ret = 0; retry > 0; retry--) {
+		sch->schib.pmcw.ena = 1;
+		sch->schib.pmcw.isc = isc;
+		sch->schib.pmcw.intparm = (__u32)(unsigned long)sch;
 		ret = cio_modify(sch);
 		if (ret == -ENODEV)
 			break;
@@ -463,9 +465,8 @@ cio_disable_subchannel (struct subchannel *sch)
 		 */
 		return -EBUSY;
 
-
-	sch->schib.pmcw.ena = 0;
 	for (retry = 5, ret = 0; retry > 0; retry--) {
+		sch->schib.pmcw.ena = 0;
 		ret = cio_modify(sch);
 		if (ret == -ENODEV)
 			break;

@@ -1125,6 +1125,13 @@ got_data:
 		 * For this reason, we leave the thing in the table.
 		 */
 		sdkp->capacity = 0;
+		/*
+		 * set a bogus sector size so the normal read/write
+		 * logic in the block layer will eventually refuse any
+		 * request on this device without tripping over power
+		 * of two sector size assumptions
+		 */
+		sector_size = 512;
 	}
 	{
 		/*

@@ -167,6 +167,11 @@ config ARCH_VERSATILE_PB
 config ARCH_IMX
 	bool "IMX"
 
+config ARCH_H720X
+	bool "Hynix-HMS720x-based"
+	help
+	  This enables support for systems based on the Hynix HMS720x
+
 endchoice
 
 source "arch/arm/mach-clps711x/Kconfig"
@@ -194,6 +199,8 @@ source "arch/arm/mach-s3c2410/Kconfig"
 source "arch/arm/mach-lh7a40x/Kconfig"
 
 source "arch/arm/mach-imx/Kconfig"
+
+source "arch/arm/mach-h720x/Kconfig"
 
 # Definitions to make life easier
 config ARCH_ACORN

@@ -499,7 +499,7 @@ typedef struct _nsp32_autoparam {
 #define MSGIN03			BIT(1)		/* Auto Msg In 03 Flag  */
 
 typedef struct _nsp32_lunt {
-	Scsi_Cmnd	*SCpnt;	    /* Current Handling Scsi_Cmnd */
+	struct scsi_cmnd	*SCpnt;	    /* Current Handling struct scsi_cmnd */
 	unsigned long	 save_datp;  /* Save Data Pointer - saved position from initial address */
 	int		 msgin03;	/* auto msg in 03 flag     */
 	unsigned int	 sg_num;	/* Total number of SG entries */
@@ -567,7 +567,7 @@ typedef struct _nsp32_hw_data {
 #define NSP32_MMIO_OFFSET 0x0800
 	unsigned long MmioLength;
 
-	Scsi_Cmnd *CurrentSC;
+	struct scsi_cmnd *CurrentSC;
 
 	struct pci_dev             *Pci;
 	const struct pci_device_id *pci_devid;

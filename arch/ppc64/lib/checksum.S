@@ -92,19 +92,19 @@ _GLOBAL(csum_partial)
         adde    r5,r5,r6
         bdnz    2b
         andi.	r4,r4,7         /* compute bytes left to sum after doublewords */
-3:	cmpi	0,r4,4		/* is at least a full word left? */
+3:	cmpwi	0,r4,4		/* is at least a full word left? */
 	blt	4f
 	lwz	r6,8(r3)	/* sum this word */
 	addi	r3,r3,4
 	subi	r4,r4,4
 	adde	r5,r5,r6
-4:      cmpi    0,r4,2		/* is at least a halfword left? */
+4:	cmpwi	0,r4,2		/* is at least a halfword left? */
         blt+	5f
         lhz     r6,8(r3)        /* sum this halfword */
         addi    r3,r3,2
         subi    r4,r4,2
         adde    r5,r5,r6
-5:      cmpi    0,r4,1		/* is at least a byte left? */
+5:	cmpwi	0,r4,1		/* is at least a byte left? */
         bne+    6f
         lbz     r6,8(r3)        /* sum this byte */
         slwi    r6,r6,8         /* this byte is assumed to be the upper byte of a halfword */
@@ -150,7 +150,7 @@ _GLOBAL(csum_partial_copy_generic)
 	adde	r0,r0,r6
 	bdnz	82b
 	andi.	r5,r5,3
-3:	cmpi	0,r5,2
+3:	cmpwi	0,r5,2
 	blt+	4f
 83:	lhz	r6,4(r3)
 	addi	r3,r3,2
@@ -158,7 +158,7 @@ _GLOBAL(csum_partial_copy_generic)
 93:	sth	r6,4(r4)
 	addi	r4,r4,2
 	adde	r0,r0,r6
-4:	cmpi	0,r5,1
+4:	cmpwi	0,r5,1
 	bne+	5f
 84:	lbz	r6,4(r3)
 94:	stb	r6,4(r4)
@@ -198,7 +198,7 @@ src_error_3:
 	bdnz	97b
 	.globl src_error
 src_error:
-	cmpi	0,r7,0
+	cmpdi	0,r7,0
 	beq	1f
 	li	r6,-EFAULT
 	stw	r6,0(r7)
@@ -207,7 +207,7 @@ src_error:
 
 	.globl dst_error
 dst_error:
-	cmpi	0,r8,0
+	cmpdi	0,r8,0
 	beq	1f
 	li	r6,-EFAULT
 	stw	r6,0(r8)

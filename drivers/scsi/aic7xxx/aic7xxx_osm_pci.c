@@ -58,29 +58,27 @@ static int	ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static void	ahc_linux_pci_dev_remove(struct pci_dev *pdev);
 
+/* Define the macro locally since it's different for different class of chips.
+*/
+#define ID(x)	ID_C(x, PCI_CLASS_STORAGE_SCSI)
+
 static struct pci_device_id ahc_linux_pci_id_table[] = {
-#define LINUXID(x,s) (unsigned)((((x) >> s) & 0xffff) ?: PCI_ANY_ID)
-#define ID(x) \
-	{ \
-		LINUXID(x,32), LINUXID(x,48), LINUXID(x,0), LINUXID(x,16), \
-		PCI_CLASS_STORAGE_SCSI << 8, 0xFFFF00, 0 \
-	}
-#define ID4(x,y) \
-	ID(x | ((y+0)<<48)), ID(x | ((y+1)<<48)), ID(x | ((y+2)<<48)), \
-	ID(x | ((y+3)<<48))
-#define ID16(x) ID4(x,0ULL), ID4(x,4ULL), ID4(x,8ULL), ID4(x,12ULL)
+	/* aic7850 based controllers */
 	ID(ID_AHA_2902_04_10_15_20C_30C),
+	/* aic7860 based controllers */
 	ID(ID_AHA_2930CU),
 	ID(ID_AHA_1480A & ID_DEV_VENDOR_MASK),
 	ID(ID_AHA_2940AU_0 & ID_DEV_VENDOR_MASK),
 	ID(ID_AHA_2940AU_CN & ID_DEV_VENDOR_MASK),
 	ID(ID_AHA_2930C_VAR & ID_DEV_VENDOR_MASK),
+	/* aic7870 based controllers */
 	ID(ID_AHA_2940),
 	ID(ID_AHA_3940),
 	ID(ID_AHA_398X),
 	ID(ID_AHA_2944),
 	ID(ID_AHA_3944),
 	ID(ID_AHA_4944),
+	/* aic7880 based controllers */
 	ID(ID_AHA_2940U & ID_DEV_VENDOR_MASK),
 	ID(ID_AHA_3940U & ID_DEV_VENDOR_MASK),
 	ID(ID_AHA_2944U & ID_DEV_VENDOR_MASK),
@@ -90,13 +88,15 @@ static struct pci_device_id ahc_linux_pci_id_table[] = {
 	ID(ID_AHA_2930U & ID_DEV_VENDOR_MASK),
 	ID(ID_AHA_2940U_PRO & ID_DEV_VENDOR_MASK),
 	ID(ID_AHA_2940U_CN & ID_DEV_VENDOR_MASK),
+	/* aic7890 based controllers */
 	ID(ID_AHA_2930U2),
 	ID(ID_AHA_2940U2B),
 	ID(ID_AHA_2940U2_OEM),
 	ID(ID_AHA_2940U2),
 	ID(ID_AHA_2950U2B),
-	ID(ID_AIC7890_ARO),
+	ID16(ID_AIC7890_ARO & ID_AIC7895_ARO_MASK),
 	ID(ID_AAA_131U2),
+	/* aic7890 based controllers */
 	ID(ID_AHA_29160),
 	ID(ID_AHA_29160_CPQ),
 	ID(ID_AHA_29160N),
@@ -104,6 +104,7 @@ static struct pci_device_id ahc_linux_pci_id_table[] = {
 	ID(ID_AHA_29160B),
 	ID(ID_AHA_19160B),
 	ID(ID_AIC7892_ARO),
+	/* aic7892 based controllers */
 	ID(ID_AHA_2940U_DUAL),
 	ID(ID_AHA_3940AU),
 	ID(ID_AHA_3944AU),
@@ -113,20 +114,22 @@ static struct pci_device_id ahc_linux_pci_id_table[] = {
 	ID(ID_AHA_3950U2D_0),
 	ID(ID_AHA_3950U2D_1),
 	ID(ID_AIC7896_ARO),
+	/* aic7899 based controllers */
 	ID(ID_AHA_3960D),
 	ID(ID_AHA_3960D_CPQ),
 	ID(ID_AIC7899_ARO),
+	/* Generic chip probes for devices we don't know exactly. */
 	ID(ID_AIC7850 & ID_DEV_VENDOR_MASK),
 	ID(ID_AIC7855 & ID_DEV_VENDOR_MASK),
 	ID(ID_AIC7859 & ID_DEV_VENDOR_MASK),
 	ID(ID_AIC7860 & ID_DEV_VENDOR_MASK),
 	ID(ID_AIC7870 & ID_DEV_VENDOR_MASK),
 	ID(ID_AIC7880 & ID_DEV_VENDOR_MASK),
-	ID16(ID_AIC7890),
-	ID16(ID_AIC7892),
+ 	ID16(ID_AIC7890 & ID_9005_GENERIC_MASK),
+ 	ID16(ID_AIC7892 & ID_9005_GENERIC_MASK),
 	ID(ID_AIC7895 & ID_DEV_VENDOR_MASK),
-	ID(ID_AIC7896),
-	ID(ID_AIC7899),
+	ID16(ID_AIC7896 & ID_9005_GENERIC_MASK),
+	ID16(ID_AIC7899 & ID_9005_GENERIC_MASK),
 	ID(ID_AIC7810 & ID_DEV_VENDOR_MASK),
 	ID(ID_AIC7815 & ID_DEV_VENDOR_MASK),
 	{ 0 }
