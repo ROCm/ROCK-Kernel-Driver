@@ -25,7 +25,6 @@
 #include <linux/time.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
-#include <linux/init.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <asm/uaccess.h>

@@ -158,8 +158,6 @@
 
 #ifdef VWSND_DEBUG
 
-#include <linux/interrupt.h>		/* for in_interrupt() */
-
 static int shut_up = 1;
 
 /*

@@ -54,7 +54,6 @@ TODO:
 #include <linux/smp_lock.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <asm/dma.h>
 #include <asm/hardirq.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>

@@ -96,7 +96,6 @@
 #endif
 
 #if defined(VRC5477_AC97_DEBUG)
-#include <linux/kernel.h>
 #define ASSERT(x)  if (!(x)) { \
 	panic("assertion failed at %s:%d: %s\n", __FILE__, __LINE__, #x); }
 #else
