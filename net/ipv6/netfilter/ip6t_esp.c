@@ -48,7 +48,7 @@ match(const struct sk_buff *skb,
       unsigned int protoff,
       int *hotdrop)
 {
-	struct ip_esp_hdr *esp = NULL;
+	struct ip_esp_hdr _esp, *eh = NULL;
 	const struct ip6t_esp *espinfo = matchinfo;
 	unsigned int temp;
 	int len;
@@ -67,7 +67,7 @@ match(const struct sk_buff *skb,
 	temp = 0;
 
         while (ip6t_ext_hdr(nexthdr)) {
-        	struct ipv6_opt_hdr *hdr;
+        	struct ipv6_opt_hdr _hdr, *hp;
         	int hdrlen;
 
 		DEBUGP("ipv6_esp header iteration \n");
@@ -85,15 +85,16 @@ match(const struct sk_buff *skb,
 			break;
 		}
 
-		hdr=(struct ipv6_opt_hdr *)skb->data+ptr;
+		hp = skb_header_pointer(skb, ptr, sizeof(_hdr), &_hdr);
+		BUG_ON(hp == NULL);
 
 		/* Calculate the header length */
                 if (nexthdr == NEXTHDR_FRAGMENT) {
                         hdrlen = 8;
                 } else if (nexthdr == NEXTHDR_AUTH)
-                        hdrlen = (hdr->hdrlen+2)<<2;
+                        hdrlen = (hp->hdrlen+2)<<2;
                 else
-                        hdrlen = ipv6_optlen(hdr);
+                        hdrlen = ipv6_optlen(hp);
 
 		/* set the flag */
 		switch (nexthdr){
@@ -109,7 +110,7 @@ match(const struct sk_buff *skb,
 				break;
 		}
 
-                nexthdr = hdr->nexthdr;
+                nexthdr = hp->nexthdr;
                 len -= hdrlen;
                 ptr += hdrlen;
 		if ( ptr > skb->len ) {
@@ -126,13 +127,14 @@ match(const struct sk_buff *skb,
        		return 0;
        }
 
-	esp = (struct ip_esp_hdr *) (skb->data + ptr);
+	eh = skb_header_pointer(skb, ptr, sizeof(_esp), &_esp);
+	BUG_ON(eh == NULL);
 
-	DEBUGP("IPv6 ESP SPI %u %08X\n", ntohl(esp->spi), ntohl(esp->spi));
+	DEBUGP("IPv6 ESP SPI %u %08X\n", ntohl(eh->spi), ntohl(eh->spi));
 
-	return (esp != NULL)
+	return (eh != NULL)
 		&& spi_match(espinfo->spis[0], espinfo->spis[1],
-			      ntohl(esp->spi),
+			      ntohl(eh->spi),
 			      !!(espinfo->invflags & IP6T_ESP_INV_SPI));
 }
 
