@@ -2,6 +2,7 @@
 #define _ASM_S390X_S390_H
 
 #include <linux/config.h>
+#include <linux/compat.h>
 #include <linux/socket.h>
 #include <linux/nfs_fs.h>
 #include <linux/sunrpc/svc.h>
@@ -15,26 +16,6 @@
 	((unsigned long)(__x))
 
 /* Now 32bit compatibility types */
-typedef unsigned int           __kernel_size_t32;
-typedef int                    __kernel_ssize_t32;
-typedef int                    __kernel_ptrdiff_t32;
-typedef int                    __kernel_time_t32;
-typedef int                    __kernel_clock_t32;
-typedef int                    __kernel_pid_t32;
-typedef unsigned short         __kernel_ipc_pid_t32;
-typedef unsigned short         __kernel_uid_t32;
-typedef unsigned short         __kernel_gid_t32;
-typedef unsigned short         __kernel_dev_t32;
-typedef unsigned int           __kernel_ino_t32;
-typedef unsigned short         __kernel_mode_t32;
-typedef unsigned short         __kernel_umode_t32;
-typedef short                  __kernel_nlink_t32;
-typedef int                    __kernel_daddr_t32;
-typedef int                    __kernel_off_t32;
-typedef unsigned int           __kernel_caddr_t32;
-typedef long                   __kernel_loff_t32;
-typedef __kernel_fsid_t        __kernel_fsid_t32;  
-
 struct ipc_kludge_32 {
         __u32   msgp;                           /* pointer              */
         __s32   msgtyp;
@@ -47,34 +28,11 @@ struct ipc_kludge_32 {
 struct flock32 {
         short l_type;
         short l_whence;
-        __kernel_off_t32 l_start;
-        __kernel_off_t32 l_len;
-        __kernel_pid_t32 l_pid;
+        compat_off_t l_start;
+        compat_off_t l_len;
+        compat_pid_t l_pid;
         short __unused;
 }; 
-
-struct stat32 {
-	unsigned short	st_dev;
-	unsigned short	__pad1;
-	__u32		st_ino;
-	unsigned short	st_mode;
-	unsigned short	st_nlink;
-	unsigned short	st_uid;
-	unsigned short	st_gid;
-	unsigned short	st_rdev;
-	unsigned short	__pad2;
-	__u32		st_size;
-	__u32		st_blksize;
-	__u32		st_blocks;
-	__u32		st_atime;
-	__u32		__unused1;
-	__u32		st_mtime;
-	__u32		__unused2;
-	__u32		st_ctime;
-	__u32		__unused3;
-	__u32		__unused4;
-	__u32		__unused5;
-};
 
 struct statfs32 {
 	__s32			f_type;
@@ -141,8 +99,8 @@ typedef struct siginfo32 {
 			pid_t			_pid;	/* which child */
 			uid_t			_uid;	/* sender's uid */
 			int			_status;/* exit code */
-			__kernel_clock_t32	_utime;
-			__kernel_clock_t32	_stime;
+			compat_clock_t		_utime;
+			compat_clock_t		_stime;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
@@ -253,7 +211,7 @@ struct sigaction32 {
 typedef struct {
 	__u32			ss_sp;		/* pointer */
 	int			ss_flags;
-	__kernel_size_t32	ss_size;
+	compat_size_t		ss_size;
 } stack_t32;
 
 /* asm/ucontext.h */
