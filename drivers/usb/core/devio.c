@@ -165,31 +165,6 @@ err:
 	return ret;
 }
 
-extern inline unsigned int ld2(unsigned int x)
-{
-        unsigned int r = 0;
-        
-        if (x >= 0x10000) {
-                x >>= 16;
-                r += 16;
-        }
-        if (x >= 0x100) {
-                x >>= 8;
-                r += 8;
-        }
-        if (x >= 0x10) {
-                x >>= 4;
-                r += 4;
-        }
-        if (x >= 4) {
-                x >>= 2;
-                r += 2;
-        }
-        if (x >= 2)
-                r++;
-        return r;
-}
-
 /*
  * async list handling
  */
@@ -219,7 +194,7 @@ static void free_async(struct async *as)
         kfree(as);
 }
 
-extern __inline__ void async_newpending(struct async *as)
+static inline void async_newpending(struct async *as)
 {
         struct dev_state *ps = as->ps;
         unsigned long flags;
@@ -229,7 +204,7 @@ extern __inline__ void async_newpending(struct async *as)
         spin_unlock_irqrestore(&ps->lock, flags);
 }
 
-extern __inline__ void async_removepending(struct async *as)
+static inline void async_removepending(struct async *as)
 {
         struct dev_state *ps = as->ps;
         unsigned long flags;
@@ -239,7 +214,7 @@ extern __inline__ void async_removepending(struct async *as)
         spin_unlock_irqrestore(&ps->lock, flags);
 }
 
-extern __inline__ struct async *async_getcompleted(struct dev_state *ps)
+static inline struct async *async_getcompleted(struct dev_state *ps)
 {
         unsigned long flags;
         struct async *as = NULL;
@@ -253,7 +228,7 @@ extern __inline__ struct async *async_getcompleted(struct dev_state *ps)
         return as;
 }
 
-extern __inline__ struct async *async_getpending(struct dev_state *ps, void __user *userurb)
+static inline struct async *async_getpending(struct dev_state *ps, void __user *userurb)
 {
         unsigned long flags;
         struct async *as;
@@ -321,7 +296,7 @@ static void destroy_async_on_interface (struct dev_state *ps, unsigned int intf)
 	destroy_async(ps, &hitlist);
 }
 
-extern __inline__ void destroy_all_async(struct dev_state *ps)
+static inline void destroy_all_async(struct dev_state *ps)
 {
 	        destroy_async(ps, &ps->async_pending);
 }
