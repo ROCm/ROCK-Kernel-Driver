@@ -431,7 +431,7 @@ static void do_softint (void *private_data)
 static void do_serial_hangup (void *private_data)
 {
 	struct dz_serial *info = (struct dz_serial *) private_data;
-	struct tty_struct *tty = info->tty;;
+	struct tty_struct *tty = info->tty;
         
 	if (!tty)
 		return;

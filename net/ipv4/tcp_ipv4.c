@@ -1596,7 +1596,7 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	newinet->id = newtp->write_seq ^ jiffies;
 
 	tcp_sync_mss(newsk, dst_pmtu(dst));
-	newtp->advmss = dst_metric(dst, RTAX_ADVMSS);;
+	newtp->advmss = dst_metric(dst, RTAX_ADVMSS);
 	tcp_initialize_rcv_mss(newsk);
 
 	__tcp_v4_hash(newsk, 0);

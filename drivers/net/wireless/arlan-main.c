@@ -1281,7 +1281,7 @@ static void arlan_tx_done_interrupt(struct net_device *dev, int status)
 			priv->retransmissions = 0;
 			if (priv->Conf->tx_delay_ms)
 			{
-				priv->tx_done_delayed = jiffies + (priv->Conf->tx_delay_ms * HZ) / 1000 + 1;;
+				priv->tx_done_delayed = jiffies + (priv->Conf->tx_delay_ms * HZ) / 1000 + 1;
 			}
 			else
 			{

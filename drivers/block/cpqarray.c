@@ -1738,7 +1738,7 @@ static void getgeometry(int ctlr)
                 return;
         }
 
-	info_p->log_drives = id_ctlr_buf->nr_drvs;;
+	info_p->log_drives = id_ctlr_buf->nr_drvs;
 	for(i=0;i<4;i++)
 		info_p->firm_rev[i] = id_ctlr_buf->firm_rev[i];
 	info_p->ctlr_sig = id_ctlr_buf->cfg_sig;

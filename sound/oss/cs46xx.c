@@ -3253,7 +3253,7 @@ static int cs_open(struct inode *inode, struct file *file)
 			
 		if (dmabuf->channel == NULL) {
 			kfree (card->states[0]);
-			card->states[0] = NULL;;
+			card->states[0] = NULL;
 			return -ENODEV;
 		}
 
@@ -3324,7 +3324,7 @@ static int cs_open(struct inode *inode, struct file *file)
 			
 		if (dmabuf->channel == NULL) {
 			kfree (card->states[1]);
-			card->states[1] = NULL;;
+			card->states[1] = NULL;
 			return -ENODEV;
 		}
 

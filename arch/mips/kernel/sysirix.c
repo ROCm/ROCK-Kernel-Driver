@@ -1249,9 +1249,9 @@ static int irix_xstat64_xlate(struct kstat *stat, void *ubuf)
 	ks.st_atime.tv_sec = (s32) stat->atime.tv_sec;
 	ks.st_atime.tv_nsec = stat->atime.tv_nsec;
 	ks.st_mtime.tv_sec = (s32) stat->mtime.tv_sec;
-	ks.st_mtime.tv_nsec = stat->mtime.tv_nsec;;
+	ks.st_mtime.tv_nsec = stat->mtime.tv_nsec;
 	ks.st_ctime.tv_sec = (s32) stat->ctime.tv_sec;
-	ks.st_ctime.tv_nsec = stat->ctime.tv_nsec;;
+	ks.st_ctime.tv_nsec = stat->ctime.tv_nsec;
 
 	ks.st_blksize = (s32) stat->blksize;
 	ks.st_blocks = (long long) stat->blocks;

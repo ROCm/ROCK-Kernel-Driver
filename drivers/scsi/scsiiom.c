@@ -1674,7 +1674,7 @@ dc390_DoingSRB_Done( PACB pACB, PSCSICMD cmd )
 #endif	
 	    psrb  = psrb2;
 	}
-	pdcb->GoingSRBCnt = 0;;
+	pdcb->GoingSRBCnt = 0;
 	pdcb->pGoingSRB = NULL;
 	pdcb->TagMask = 0;
 	pdcb = pdcb->pNextDCB;

@@ -397,7 +397,7 @@ efi_set_virtual_address_map(void)
         fix_virt_function_pointer((void**)&runtime->set_variable);
         fix_virt_function_pointer((void**)&runtime->get_next_high_mono_count);
         fix_virt_function_pointer((void**)&runtime->reset_system);
-        return EFI_SUCCESS;;
+        return EFI_SUCCESS;
 }
 
 void

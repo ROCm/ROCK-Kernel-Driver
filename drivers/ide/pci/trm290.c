@@ -280,7 +280,7 @@ static int trm290_ide_dma_begin (ide_drive_t *drive)
 static int trm290_ide_dma_end (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
-	u16 status = 0;;
+	u16 status = 0;
 
 	drive->waiting_for_dma = 0;
 	/* purge DMA mappings */

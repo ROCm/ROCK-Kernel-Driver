@@ -1453,7 +1453,7 @@ static int selinux_quotactl(int cmds, int type, int id, struct super_block *sb)
 
 static int selinux_quota_on(struct file *f)
 {
-	return file_has_perm(current, f, FILE__QUOTAON);;
+	return file_has_perm(current, f, FILE__QUOTAON);
 }
 
 static int selinux_syslog(int type)

@@ -641,7 +641,7 @@ static void stv680_video_irq (struct urb *urb, struct pt_regs *regs)
 			stv680->scratch_overflow = 0;
 			stv680->scratch_next++;
 			if (stv680->scratch_next >= STV680_NUMSCRATCH)
-				stv680->scratch_next = 0;;
+				stv680->scratch_next = 0;
 			break;
 		}		/* switch  */
 	} else {
