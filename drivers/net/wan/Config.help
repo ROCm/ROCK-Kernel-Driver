@@ -426,3 +426,25 @@ CONFIG_C101
 
   If unsure, say N here.
 
+Cyclades-PC300 support
+CONFIG_PC300
+  This is a driver for the Cyclades-PC300 synchronous communication
+  boards. These boards provide synchronous serial interfaces to your
+  Linux box (interfaces currently available are RS-232/V.35, X.21 and
+  T1/E1). If you wish to support Multilink PPP, please select the
+  option below this one and read the file README.mlppp provided by PC300
+  package.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read Documentation/modules.txt. The module will be
+  called pc300.o.
+
+  If you haven't heard about it, it's safe to say N.
+
+Cyclades-PC300 Sync TTY (to MLPPP) support
+CONFIG_PC300_MLPPP
+  Say 'Y' to this option if you are planning to use Multilink PPP over the
+  PC300 synchronous communication boards.
+
+
