@@ -5,7 +5,7 @@ EXTRAVERSION =
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
-# More info can be located in ./Documentation/kbuild
+# More info can be located in ./README
 # Comments in this file are targeted only to the developer, do not
 # expect to learn how to build the kernel reading this file.
 
@@ -828,7 +828,7 @@ help:
 	@echo  '  make C=1   [targets] Check all c source with checker tool'
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
-	@echo  'For further info browse Documentation/kbuild/*'
+	@echo  'For further info see the ./README file'
 
 
 # Documentation targets
