@@ -2591,7 +2591,7 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 		(struct file_end_of_file_info *) (((char *) &pSMB->hdr.Protocol) +
 			pSMB->DataOffset);
 	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset); /* now safe to change to le */
-	parm_data->FileSize = size;
+	parm_data->FileSize = cpu_to_le64(size);
 	pSMB->Fid = fid;
 	if(SetAllocation) {
 		if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
