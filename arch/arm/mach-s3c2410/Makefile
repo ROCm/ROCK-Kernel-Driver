@@ -9,6 +9,8 @@ obj-m			:=
 obj-n			:=
 obj-			:=
 
+obj-$(CONFIG_S3C2410_DMA)  += dma.o
+
 obj-$(CONFIG_ARCH_BAST)    += mach-bast.o
 obj-$(CONFIG_MACH_H1940)   += mach-h1940.o
 obj-$(CONFIG_ARCH_H1940)   += mach-h1940.o
