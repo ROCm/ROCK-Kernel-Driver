@@ -35,6 +35,16 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
+2.1.14 - Fix an NFSd caused deadlock reported by several users.
+
+	- Modify fs/ntfs/ntfs_readdir() to copy the index root attribute value
+	  to a buffer so that we can put the search context and unmap the mft
+	  record before calling the filldir() callback.  We need to do this
+	  because of NFSd which calls ->lookup() from its filldir callback()
+	  and this causes NTFS to deadlock as ntfs_lookup() maps the mft record
+	  of the directory and since ntfs_readdir() has got it mapped already
+	  ntfs_lookup() deadlocks.
+
 2.1.13 - Enable overwriting of resident files and housekeeping of system files.
 
 	- Implement writing of mft records (fs/ntfs/mft.[hc]), which includes

@@ -273,6 +273,8 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.14:
+	- Fix an NFSd caused deadlock reported by several users.
 2.1.13:
 	- Implement writing of inodes (access time updates are not implemented
 	  yet so mounting with -o noatime,nodiratime is enforced).
