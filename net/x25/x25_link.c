@@ -1,8 +1,9 @@
 /*
  *	X.25 Packet Layer release 002
  *
- *	This is ALPHA test software. This code may break your machine, randomly fail to work with new 
- *	releases, misbehave and/or generally screw up. It might even work. 
+ *	This is ALPHA test software. This code may break your machine,
+ *	randomly fail to work with new releases, misbehave and/or generally
+ *	screw up. It might even work. 
  *
  *	This code REQUIRES 2.1.15 or higher
  *
@@ -42,7 +43,7 @@
 #include <linux/init.h>
 #include <net/x25.h>
 
-static struct x25_neigh *x25_neigh_list /* = NULL initially */;
+static struct x25_neigh *x25_neigh_list; /* = NULL initially */
 
 static void x25_t20timer_expiry(unsigned long);
 
@@ -82,7 +83,8 @@ static int x25_t20timer_pending(struct x25_neigh *neigh)
 /*
  *	This handles all restart and diagnostic frames.
  */
-void x25_link_control(struct sk_buff *skb, struct x25_neigh *neigh, unsigned short frametype)
+void x25_link_control(struct sk_buff *skb, struct x25_neigh *neigh,
+		      unsigned short frametype)
 {
 	struct sk_buff *skbn;
 	int confirm;
@@ -92,7 +94,8 @@ void x25_link_control(struct sk_buff *skb, struct x25_neigh *neigh, unsigned sho
 			confirm = !x25_t20timer_pending(neigh);
 			x25_stop_t20timer(neigh);
 			neigh->state = X25_LINK_STATE_3;
-			if (confirm) x25_transmit_restart_confirmation(neigh);
+			if (confirm)
+				x25_transmit_restart_confirmation(neigh);
 			break;
 
 		case X25_RESTART_CONFIRMATION:
@@ -101,18 +104,21 @@ void x25_link_control(struct sk_buff *skb, struct x25_neigh *neigh, unsigned sho
 			break;
 
 		case X25_DIAGNOSTIC:
-			printk(KERN_WARNING "x25: diagnostic #%d - %02X %02X %02X\n", skb->data[3], skb->data[4], skb->data[5], skb->data[6]);
+			printk(KERN_WARNING "x25: diagnostic #%d - "
+			       "%02X %02X %02X\n",
+			       skb->data[3], skb->data[4],
+			       skb->data[5], skb->data[6]);
 			break;
 			
 		default:
-			printk(KERN_WARNING "x25: received unknown %02X with LCI 000\n", frametype);
+			printk(KERN_WARNING "x25: received unknown %02X "
+			       "with LCI 000\n", frametype);
 			break;
 	}
 
-	if (neigh->state == X25_LINK_STATE_3) {
+	if (neigh->state == X25_LINK_STATE_3)
 		while ((skbn = skb_dequeue(&neigh->queue)) != NULL)
 			x25_send_frame(skbn, neigh);
-	}
 }
 
 /*
@@ -120,20 +126,18 @@ void x25_link_control(struct sk_buff *skb, struct x25_neigh *neigh, unsigned sho
  */
 void x25_transmit_restart_request(struct x25_neigh *neigh)
 {
-	struct sk_buff *skb;
 	unsigned char *dptr;
-	int len;
+	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 2;
+	struct sk_buff *skb = alloc_skb(len, GFP_ATOMIC);
 
-	len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 2;
-
-	if ((skb = alloc_skb(len, GFP_ATOMIC)) == NULL)
+	if (!skb)
 		return;
 
 	skb_reserve(skb, X25_MAX_L2_LEN);
 
 	dptr = skb_put(skb, X25_STD_MIN_LEN + 2);
 
-	*dptr++ = (neigh->extended) ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
+	*dptr++ = neigh->extended ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
 	*dptr++ = 0x00;
 	*dptr++ = X25_RESTART_REQUEST;
 	*dptr++ = 0x00;
@@ -149,20 +153,18 @@ void x25_transmit_restart_request(struct x25_neigh *neigh)
  */
 void x25_transmit_restart_confirmation(struct x25_neigh *neigh)
 {
-	struct sk_buff *skb;
 	unsigned char *dptr;
-	int len;
+	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN;
+	struct sk_buff *skb = alloc_skb(len, GFP_ATOMIC);
 
-	len = X25_MAX_L2_LEN + X25_STD_MIN_LEN;
-
-	if ((skb = alloc_skb(len, GFP_ATOMIC)) == NULL)
+	if (!skb)
 		return;
 
 	skb_reserve(skb, X25_MAX_L2_LEN);
 
 	dptr = skb_put(skb, X25_STD_MIN_LEN);
 
-	*dptr++ = (neigh->extended) ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
+	*dptr++ = neigh->extended ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
 	*dptr++ = 0x00;
 	*dptr++ = X25_RESTART_CONFIRMATION;
 
@@ -176,20 +178,18 @@ void x25_transmit_restart_confirmation(struct x25_neigh *neigh)
  */
 void x25_transmit_diagnostic(struct x25_neigh *neigh, unsigned char diag)
 {
-	struct sk_buff *skb;
 	unsigned char *dptr;
-	int len;
+	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 1;
+	struct sk_buff *skb = alloc_skb(len, GFP_ATOMIC);
 
-	len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 1;
-
-	if ((skb = alloc_skb(len, GFP_ATOMIC)) == NULL)
+	if (!skb)
 		return;
 
 	skb_reserve(skb, X25_MAX_L2_LEN);
 
 	dptr = skb_put(skb, X25_STD_MIN_LEN + 1);
 
-	*dptr++ = (neigh->extended) ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
+	*dptr++ = neigh->extended ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
 	*dptr++ = 0x00;
 	*dptr++ = X25_DIAGNOSTIC;
 	*dptr++ = diag;
@@ -205,21 +205,20 @@ void x25_transmit_diagnostic(struct x25_neigh *neigh, unsigned char diag)
  */
 void x25_transmit_clear_request(struct x25_neigh *neigh, unsigned int lci, unsigned char cause)
 {
-	struct sk_buff *skb;
 	unsigned char *dptr;
-	int len;
+	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 2;
+	struct sk_buff *skb = alloc_skb(len, GFP_ATOMIC);
 
-	len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 2;
-
-	if ((skb = alloc_skb(len, GFP_ATOMIC)) == NULL)
+	if (!skb)
 		return;
 
 	skb_reserve(skb, X25_MAX_L2_LEN);
 
 	dptr = skb_put(skb, X25_STD_MIN_LEN + 2);
 
-	*dptr++ = ((lci >> 8) & 0x0F) | (neigh->extended) ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
-	*dptr++ = ((lci >> 0) & 0xFF);
+	*dptr++ = ((lci >> 8) & 0x0F) | neigh->extended ? X25_GFI_EXTSEQ :
+							  X25_GFI_STDSEQ;
+	*dptr++ = (lci >> 0) & 0xFF;
 	*dptr++ = X25_CLEAR_REQUEST;
 	*dptr++ = cause;
 	*dptr++ = 0x00;
@@ -281,10 +280,10 @@ void x25_link_terminated(struct x25_neigh *neigh)
  */
 void x25_link_device_up(struct net_device *dev)
 {
-	struct x25_neigh *x25_neigh;
 	unsigned long flags;
+	struct x25_neigh *x25_neigh = kmalloc(sizeof(*x25_neigh), GFP_ATOMIC);
 
-	if ((x25_neigh = kmalloc(sizeof(*x25_neigh), GFP_ATOMIC)) == NULL)
+	if (!x25_neigh)
 		return;
 
 	skb_queue_head_init(&x25_neigh->queue);
@@ -295,7 +294,13 @@ void x25_link_device_up(struct net_device *dev)
 	x25_neigh->dev      = dev;
 	x25_neigh->state    = X25_LINK_STATE_0;
 	x25_neigh->extended = 0;
-	x25_neigh->global_facil_mask = (X25_MASK_REVERSE | X25_MASK_THROUGHPUT | X25_MASK_PACKET_SIZE | X25_MASK_WINDOW_SIZE); /* enables negotiation */
+	/*
+	 * Enables negotiation
+	 */
+	x25_neigh->global_facil_mask = X25_MASK_REVERSE |
+				       X25_MASK_THROUGHPUT |
+				       X25_MASK_PACKET_SIZE |
+				       X25_MASK_WINDOW_SIZE;
 	x25_neigh->t20      = sysctl_x25_restart_request_timeout;
 
 	save_flags(flags); cli();
@@ -317,23 +322,23 @@ static void x25_remove_neigh(struct x25_neigh *x25_neigh)
 
 	if ((s = x25_neigh_list) == x25_neigh) {
 		x25_neigh_list = x25_neigh->next;
-		restore_flags(flags);
-		kfree(x25_neigh);
-		return;
+		goto out_kfree_neigh;
 	}
 
-	while (s != NULL && s->next != NULL) {
+	while (s && s->next) {
 		if (s->next == x25_neigh) {
 			s->next = x25_neigh->next;
-			restore_flags(flags);
-			kfree(x25_neigh);
-			return;
+			goto out_kfree_neigh;
 		}
 
 		s = s->next;
 	}
-
+out:
 	restore_flags(flags);
+	return;
+out_kfree_neigh:
+	kfree(x25_neigh);
+	goto out;
 }
 
 /*
@@ -343,11 +348,11 @@ void x25_link_device_down(struct net_device *dev)
 {
 	struct x25_neigh *neigh, *x25_neigh = x25_neigh_list;
 
-	while (x25_neigh != NULL) {
+	while (x25_neigh) {
 		neigh     = x25_neigh;
 		x25_neigh = x25_neigh->next;
 
-		if (neigh->dev == dev){
+		if (neigh->dev == dev) {
 			x25_remove_neigh(neigh);
 			dev_put(dev);
 		}
@@ -359,13 +364,13 @@ void x25_link_device_down(struct net_device *dev)
  */
 struct x25_neigh *x25_get_neigh(struct net_device *dev)
 {
-	struct x25_neigh *x25_neigh;
+	struct x25_neigh *x25_neigh = x25_neigh_list;
 
-	for (x25_neigh = x25_neigh_list; x25_neigh != NULL; x25_neigh = x25_neigh->next)
+	for (; x25_neigh; x25_neigh = x25_neigh->next)
 		if (x25_neigh->dev == dev)
-			return x25_neigh;
+			break;
 
-	return NULL;
+	return x25_neigh;
 }
 
 /*
@@ -376,46 +381,42 @@ int x25_subscr_ioctl(unsigned int cmd, void *arg)
 	struct x25_subscrip_struct x25_subscr;
 	struct x25_neigh *x25_neigh;
 	struct net_device *dev;
+	int rc = -EINVAL;
 
-	switch (cmd) {
+	if (cmd != SIOCX25GSUBSCRIP && cmd != SIOCX25SSUBSCRIP)
+		goto out;
 
-		case SIOCX25GSUBSCRIP:
-			if (copy_from_user(&x25_subscr, arg, sizeof(struct x25_subscrip_struct)))
-				return -EFAULT;
-			if ((dev = x25_dev_get(x25_subscr.device)) == NULL)
-				return -EINVAL;
-			if ((x25_neigh = x25_get_neigh(dev)) == NULL) {
-				dev_put(dev);
-				return -EINVAL;
-			}
-			dev_put(dev);
-			x25_subscr.extended = x25_neigh->extended;
-			x25_subscr.global_facil_mask = x25_neigh->global_facil_mask;
-			if (copy_to_user(arg, &x25_subscr, sizeof(struct x25_subscrip_struct)))
-				return -EFAULT;
-			break;
+	rc = -EFAULT;
+	if (copy_from_user(&x25_subscr, arg, sizeof(x25_subscr)))
+		goto out;
 
-		case SIOCX25SSUBSCRIP:
-			if (copy_from_user(&x25_subscr, arg, sizeof(struct x25_subscrip_struct)))
-				return -EFAULT;
-			if ((dev = x25_dev_get(x25_subscr.device)) == NULL)
-				return -EINVAL;
-			if ((x25_neigh = x25_get_neigh(dev)) == NULL) {
-				dev_put(dev);
-				return -EINVAL;
-			}
-			dev_put(dev);
-			if (x25_subscr.extended != 0 && x25_subscr.extended != 1)
-				return -EINVAL;
-			x25_neigh->extended = x25_subscr.extended;
-			x25_neigh->global_facil_mask = x25_subscr.global_facil_mask;
-			break;
+	rc = -EINVAL;
+	if ((dev = x25_dev_get(x25_subscr.device)) == NULL)
+		goto out;
 
-		default:
-			return -EINVAL;
+	if ((x25_neigh = x25_get_neigh(dev)) == NULL)
+		goto out_put;
+
+	dev_put(dev);
+
+	if (cmd == SIOCX25GSUBSCRIP) {
+		x25_subscr.extended	     = x25_neigh->extended;
+		x25_subscr.global_facil_mask = x25_neigh->global_facil_mask;
+		rc = copy_to_user(arg, &x25_subscr,
+				  sizeof(x25_subscr)) ? -EFAULT : 0;
+	} else {
+		rc = -EINVAL;
+		if (x25_subscr.extended && x25_subscr.extended != 1)
+			goto out;
+		rc = 0;
+		x25_neigh->extended	     = x25_subscr.extended;
+		x25_neigh->global_facil_mask = x25_subscr.global_facil_mask;
 	}
-
-	return 0;
+out:
+	return rc;
+out_put:
+	dev_put(dev);
+	goto out;
 }
 
 
@@ -426,7 +427,7 @@ void __exit x25_link_free(void)
 {
 	struct x25_neigh *neigh, *x25_neigh = x25_neigh_list;
 
-	while (x25_neigh != NULL) {
+	while (x25_neigh) {
 		neigh     = x25_neigh;
 		x25_neigh = x25_neigh->next;
 

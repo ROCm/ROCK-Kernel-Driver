@@ -1,8 +1,9 @@
 /*
  *	X.25 Packet Layer release 002
  *
- *	This is ALPHA test software. This code may break your machine, randomly fail to work with new 
- *	releases, misbehave and/or generally screw up. It might even work. 
+ *	This is ALPHA test software. This code may break your machine,
+ *	randomly fail to work with new releases, misbehave and/or generally
+ *	screw up. It might even work. 
  *
  *	This code REQUIRES 2.1.15 or higher
  *
@@ -45,7 +46,7 @@ static int x25_pacsize_to_bytes(unsigned int pacsize)
 {
 	int bytes = 1;
 
-	if (pacsize == 0)
+	if (!pacsize)
 		return 128;
 
 	while (pacsize-- > 0)
@@ -79,18 +80,21 @@ int x25_output(struct sock *sk, struct sk_buff *skb)
 		frontlen = skb_headroom(skb);
 
 		while (skb->len > 0) {
-			if ((skbn = sock_alloc_send_skb(sk, frontlen + max_len, noblock, &err)) == NULL){
-				if(err == -EWOULDBLOCK && noblock){
+			if ((skbn = sock_alloc_send_skb(sk, frontlen + max_len,
+							noblock, &err)) == NULL){
+				if (err == -EWOULDBLOCK && noblock){
 					kfree_skb(skb);
 					return sent;
 				}
-				SOCK_DEBUG(sk, "x25_output: fragment allocation failed, err=%d, %d bytes sent\n", err, sent);
+				SOCK_DEBUG(sk, "x25_output: fragment alloc"
+					       " failed, err=%d, %d bytes "
+					       "sent\n", err, sent);
 				return err;
 			}
 				
 			skb_reserve(skbn, frontlen);
 
-			len = (max_len > skb->len) ? skb->len : max_len;
+			len = max_len > skb->len ? skb->len : max_len;
 
 			/* Copy the user data */
 			memcpy(skb_put(skbn, len), skb->data, len);
@@ -127,7 +131,7 @@ static void x25_send_iframe(struct sock *sk, struct sk_buff *skb)
 {
 	x25_cb *x25 = x25_sk(sk);
 
-	if (skb == NULL)
+	if (!skb)
 		return;
 
 	if (x25->neighbour->extended) {
@@ -168,9 +172,9 @@ void x25_kick(struct sock *sk)
 	if (skb_peek(&sk->write_queue) == NULL)
 		return;
 
-	modulus = (x25->neighbour->extended) ? X25_EMODULUS : X25_SMODULUS;
+	modulus = x25->neighbour->extended ? X25_EMODULUS : X25_SMODULUS;
 
-	start   = (skb_peek(&x25->ack_queue) == NULL) ? x25->va : x25->vs;
+	start   = skb_peek(&x25->ack_queue) ? x25->vs : x25->va;
 	end     = (x25->va + x25->facilities.winsize_out) % modulus;
 
 	if (start == end)
