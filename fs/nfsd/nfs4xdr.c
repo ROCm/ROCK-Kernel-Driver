@@ -852,16 +852,16 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 		v++;
 		write->wr_vec[v].iov_base = page_address(argp->pagelist[0]);
 		argp->pagelist++;
-		if (argp->pagelen >= PAGE_SIZE) {
+		if (len >= PAGE_SIZE) {
 			write->wr_vec[v].iov_len = PAGE_SIZE;
 			argp->pagelen -= PAGE_SIZE;
 		} else {
 			write->wr_vec[v].iov_len = argp->pagelen;
-			argp->pagelen = 0;
+			argp->pagelen -= len;
 		}
 	}
 	argp->end = (u32*) (write->wr_vec[v].iov_base + write->wr_vec[v].iov_len);
-	argp->p = (u32*)  (write->wr_vec[v].iov_base + len);
+	argp->p = (u32*)  (write->wr_vec[v].iov_base + (XDR_QUADLEN(len) << 2));
 	write->wr_vec[v].iov_len = len;
 	write->wr_vlen = v+1;
 
