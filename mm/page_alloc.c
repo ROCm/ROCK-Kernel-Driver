@@ -392,8 +392,11 @@ rebalance:
 				return page;
 		}
 nopage:
-		printk("%s: page allocation failure. order:%d, mode:0x%x\n",
-			current->comm, order, gfp_mask);
+		if (!(current->flags & PF_RADIX_TREE)) {
+			printk("%s: page allocation failure."
+				" order:%d, mode:0x%x\n",
+				current->comm, order, gfp_mask);
+		}
 		return NULL;
 	}
 

@@ -58,6 +58,7 @@ swap_out_add_to_swap_cache(struct page *page, swp_entry_t entry)
 	int ret;
 
 	current->flags &= ~PF_MEMALLOC;
+	current->flags |= PF_RADIX_TREE;
 	ret = add_to_swap_cache(page, entry);
 	current->flags = flags;
 	return ret;
