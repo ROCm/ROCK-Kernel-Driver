@@ -86,9 +86,6 @@ cifs_open(struct inode *inode, struct file *file)
 	if (file->f_flags & O_CREAT)
 		disposition = FILE_OVERWRITE;
 
-    /* BB first check if file has batch oplock (or oplock ?) */
-
-	/* BB finish adding in oplock support BB */
 	if (oplockEnabled)
 		oplock = REQ_OPLOCK;
 	else
