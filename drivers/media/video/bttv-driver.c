@@ -3942,7 +3942,7 @@ static int bttv_suspend(struct pci_dev *pci_dev, u32 state)
 
 	/* save pci state */
 	pci_save_state(pci_dev);
-	if (0 != pci_set_power_state(pci_dev, device_to_pci_power(pci_dev, state))) {
+	if (0 != pci_set_power_state(pci_dev, pci_choose_state(pci_dev, state))) {
 		pci_disable_device(pci_dev);
 		btv->state.disabled = 1;
 	}
