@@ -167,7 +167,7 @@ static struct sn9c102_sensor pas202bcb = {
 			.minimum = 0x00,
 			.maximum = 0x1f,
 			.step = 0x01,
-			.default_value = 0x06,
+			.default_value = 0x0c,
 			.flags = 0,
 		},
 		{

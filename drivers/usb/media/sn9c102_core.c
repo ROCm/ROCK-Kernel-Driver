@@ -1706,8 +1706,10 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 			}
 
 		/* Preserve R,G or B origin */
-		rect->left &= ~1L;
-		rect->top &= ~1L;
+		rect->left = (s->_rect.left & 1L) ?
+		             rect->left | 1L : rect->left & ~1L;
+		rect->top = (s->_rect.top & 1L) ?
+		            rect->top | 1L : rect->top & ~1L;
 
 		if (rect->width < 16)
 			rect->width = 16;
