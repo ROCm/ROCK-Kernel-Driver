@@ -115,7 +115,7 @@
 struct mpt_fw_xfer {
 	unsigned int	 iocnum;	/* IOC unit number */
 	unsigned int	 fwlen;
-	void		*bufp;		/* Pointer to firmware buffer */
+	void		__user *bufp;	/* Pointer to firmware buffer */
 };
 
 #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
@@ -332,10 +332,10 @@ typedef struct mpt_ioctl_replace_fw {
 struct mpt_ioctl_command {
 	mpt_ioctl_header hdr;
 	int		timeout;	/* optional (seconds) */
-	char		*replyFrameBufPtr;
-	char		*dataInBufPtr;
-	char		*dataOutBufPtr;
-	char		*senseDataPtr;
+	char		__user *replyFrameBufPtr;
+	char		__user *dataInBufPtr;
+	char		__user *dataOutBufPtr;
+	char		__user *senseDataPtr;
 	int		maxReplyBytes;
 	int		dataInSize;
 	int		dataOutSize;

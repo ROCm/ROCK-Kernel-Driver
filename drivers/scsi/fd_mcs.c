@@ -87,6 +87,7 @@
 #include <linux/delay.h>
 #include <linux/mca.h>
 #include <linux/spinlock.h>
+#include <scsi/scsicam.h>
 #include <linux/mca-legacy.h>
 
 #include <asm/io.h>
@@ -1337,23 +1338,14 @@ static int fd_mcs_bus_reset(Scsi_Cmnd * SCpnt) {
 static int fd_mcs_biosparam(struct scsi_device * disk, struct block_device *bdev,
 			    sector_t capacity, int *info_array) 
 {
-	unsigned char buf[512 + sizeof(int) * 2];
+	unsigned char *p = scsi_bios_ptable(bdev);
 	int size = capacity;
-	int *sizes = (int *) buf;
-	unsigned char *data = (unsigned char *) (sizes + 2);
-	unsigned char do_read[] = { READ_6, 0, 0, 0, 1, 0 };
-	int retcode;
 
 	/* BIOS >= 3.4 for MCA cards */
 	/* This algorithm was provided by Future Domain (much thanks!). */
 
-	sizes[0] = 0;	/* zero bytes out */
-	sizes[1] = 512;	/* one sector in */
-	memcpy(data, do_read, sizeof(do_read));
-	retcode = kernel_scsi_ioctl(disk, SCSI_IOCTL_SEND_COMMAND, (void *) buf);
-	if (!retcode	/* SCSI command ok */
-	    && data[511] == 0xaa && data[510] == 0x55	/* Partition table valid */
-	    && data[0x1c2]) {	/* Partition type */
+	if (p && p[65] == 0xaa && p[64] == 0x55	/* Partition table valid */
+	    && p[4]) {	/* Partition type */
 		/* The partition table layout is as follows:
 
 		   Start: 0x1b3h
@@ -1383,8 +1375,8 @@ static int fd_mcs_biosparam(struct scsi_device * disk, struct block_device *bdev
 		   Future Domain algorithm, but it seemed to be a reasonable thing
 		   to do, especially in the Linux and BSD worlds. */
 
-		info_array[0] = data[0x1c3] + 1;	/* heads */
-		info_array[1] = data[0x1c4] & 0x3f;	/* sectors */
+		info_array[0] = p[5] + 1;	/* heads */
+		info_array[1] = p[6] & 0x3f;	/* sectors */
 	} else {
 		/* Note that this new method guarantees that there will always be
 		   less than 1024 cylinders on a platter.  This is good for drives
@@ -1403,6 +1395,7 @@ static int fd_mcs_biosparam(struct scsi_device * disk, struct block_device *bdev
 	}
 	/* For both methods, compute the cylinders */
 	info_array[2] = (unsigned int) size / (info_array[0] * info_array[1]);
+	kfree(p);
 	return 0;
 }
 

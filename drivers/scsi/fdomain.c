@@ -279,6 +279,7 @@
 #include <linux/pci.h>
 #include <linux/stat.h>
 #include <linux/delay.h>
+#include <scsi/scsicam.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -1564,12 +1565,7 @@ static int fdomain_16x0_biosparam(struct scsi_device *sdev,
 		sector_t capacity, int *info_array)
 {
    int              drive;
-   unsigned char    buf[512 + sizeof (Scsi_Ioctl_Command)];
-   Scsi_Ioctl_Command *sic = (Scsi_Ioctl_Command *) buf;
    int		    size      = capacity;
-   unsigned char    *data     = sic->data;
-   unsigned char    do_read[] = { READ_6, 0, 0, 0, 1, 0 };
-   int              retcode;
    unsigned long    offset;
    struct drive_info {
       unsigned short cylinders;
@@ -1657,16 +1653,10 @@ static int fdomain_16x0_biosparam(struct scsi_device *sdev,
       info_array[2] = i.cylinders;
    } else {			/* 3.4 BIOS (and up?) */
       /* This algorithm was provided by Future Domain (much thanks!). */
+      unsigned char *p = scsi_bios_ptable(bdev);
 
-      sic->inlen  = 0;		/* zero bytes out */
-      sic->outlen = 512;		/* one sector in */
-      memcpy( data, do_read, sizeof( do_read ) );
-      retcode = kernel_scsi_ioctl( sdev,
-				   SCSI_IOCTL_SEND_COMMAND,
-				   sic );
-      if (!retcode				    /* SCSI command ok */
-	  && data[511] == 0xaa && data[510] == 0x55 /* Partition table valid */
-	  && data[0x1c2]) {			    /* Partition type */
+      if (p && p[65] == 0xaa && p[64] == 0x55 /* Partition table valid */
+	  && p[4]) {			    /* Partition type */
 
 	 /* The partition table layout is as follows:
 
@@ -1697,8 +1687,8 @@ static int fdomain_16x0_biosparam(struct scsi_device *sdev,
 	    Future Domain algorithm, but it seemed to be a reasonable thing
 	    to do, especially in the Linux and BSD worlds. */
 
-	 info_array[0] = data[0x1c3] + 1;	    /* heads */
-	 info_array[1] = data[0x1c4] & 0x3f;	    /* sectors */
+	 info_array[0] = p[5] + 1;	    /* heads */
+	 info_array[1] = p[6] & 0x3f;	    /* sectors */
       } else {
 
  	 /* Note that this new method guarantees that there will always be
@@ -1718,6 +1708,7 @@ static int fdomain_16x0_biosparam(struct scsi_device *sdev,
       }
 				/* For both methods, compute the cylinders */
       info_array[2] = (unsigned int)size / (info_array[0] * info_array[1] );
+      kfree(p);
    }
    
    return 0;

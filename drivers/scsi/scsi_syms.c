@@ -54,7 +54,6 @@ EXPORT_SYMBOL(scsi_print_msg);
 EXPORT_SYMBOL(scsi_print_status);
 EXPORT_SYMBOL(scsi_sense_key_string);
 EXPORT_SYMBOL(scsi_extd_sense_format);
-EXPORT_SYMBOL(kernel_scsi_ioctl);
 EXPORT_SYMBOL(scsi_block_when_processing_errors);
 EXPORT_SYMBOL(scsi_ioctl_send_command);
 EXPORT_SYMBOL(scsi_set_medium_removal);
