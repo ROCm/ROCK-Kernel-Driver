@@ -491,7 +491,7 @@ alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words)
 					 0x100000); 
 
 		/* 
-		 * Firmware doesnt always clear this bit which is critical
+		 * Firmware doesn't always clear this bit which is critical
 		 * for good performance - Anton
 		 */
 		{
