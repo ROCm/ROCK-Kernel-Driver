@@ -84,7 +84,7 @@
 static DECLARE_TASK_QUEUE(tq_riscom);
 
 static struct riscom_board * IRQ_to_board[16];
-static struct tty_driver riscom_driver;
+static struct tty_driver *riscom_driver;
 static unsigned char * tmp_buf;
 static DECLARE_MUTEX(tmp_buf_sem);
 
@@ -1678,49 +1678,53 @@ static void do_softint(void *private_)
 	}
 }
 
+static struct tty_operations riscom_ops = {
+	.open  = rc_open,
+	.close = rc_close,
+	.write = rc_write,
+	.put_char = rc_put_char,
+	.flush_chars = rc_flush_chars,
+	.write_room = rc_write_room,
+	.chars_in_buffer = rc_chars_in_buffer,
+	.flush_buffer = rc_flush_buffer,
+	.ioctl = rc_ioctl,
+	.throttle = rc_throttle,
+	.unthrottle = rc_unthrottle,
+	.set_termios = rc_set_termios,
+	.stop = rc_stop,
+	.start = rc_start,
+	.hangup = rc_hangup,
+};
+
 static inline int rc_init_drivers(void)
 {
 	int error;
 	int i;
 
+	riscom_driver = alloc_tty_driver(RC_NBOARD * RC_NPORT);
+	if (!riscom_driver)	
+		return -ENOMEM;
 	
 	if (!(tmp_buf = (unsigned char *) get_zeroed_page(GFP_KERNEL))) {
 		printk(KERN_ERR "rc: Couldn't get free page.\n");
+		put_tty_driver(riscom_driver);
 		return 1;
 	}
 	init_bh(RISCOM8_BH, do_riscom_bh);
 	memset(IRQ_to_board, 0, sizeof(IRQ_to_board));
-	memset(&riscom_driver, 0, sizeof(riscom_driver));
-	riscom_driver.magic = TTY_DRIVER_MAGIC;
-	riscom_driver.owner = THIS_MODULE;
-	riscom_driver.name = "ttyL";
-	riscom_driver.major = RISCOM8_NORMAL_MAJOR;
-	riscom_driver.num = RC_NBOARD * RC_NPORT;
-	riscom_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	riscom_driver.subtype = SERIAL_TYPE_NORMAL;
-	riscom_driver.init_termios = tty_std_termios;
-	riscom_driver.init_termios.c_cflag =
+	riscom_driver->owner = THIS_MODULE;
+	riscom_driver->name = "ttyL";
+	riscom_driver->major = RISCOM8_NORMAL_MAJOR;
+	riscom_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	riscom_driver->subtype = SERIAL_TYPE_NORMAL;
+	riscom_driver->init_termios = tty_std_termios;
+	riscom_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	riscom_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	riscom_driver.open  = rc_open;
-	riscom_driver.close = rc_close;
-	riscom_driver.write = rc_write;
-	riscom_driver.put_char = rc_put_char;
-	riscom_driver.flush_chars = rc_flush_chars;
-	riscom_driver.write_room = rc_write_room;
-	riscom_driver.chars_in_buffer = rc_chars_in_buffer;
-	riscom_driver.flush_buffer = rc_flush_buffer;
-	riscom_driver.ioctl = rc_ioctl;
-	riscom_driver.throttle = rc_throttle;
-	riscom_driver.unthrottle = rc_unthrottle;
-	riscom_driver.set_termios = rc_set_termios;
-	riscom_driver.stop = rc_stop;
-	riscom_driver.start = rc_start;
-	riscom_driver.hangup = rc_hangup;
-
-	if ((error = tty_register_driver(&riscom_driver)))  {
+	riscom_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(riscom_driver, &riscom_ops);
+	if ((error = tty_register_driver(riscom_driver)))  {
 		free_page((unsigned long)tmp_buf);
+		put_tty_driver(riscom_driver);
 		printk(KERN_ERR "rc: Couldn't register RISCom/8 driver, "
 				"error = %d\n",
 		       error);
@@ -1751,7 +1755,8 @@ static void rc_release_drivers(void)
 	cli();
 	remove_bh(RISCOM8_BH);
 	free_page((unsigned long)tmp_buf);
-	tty_unregister_driver(&riscom_driver);
+	tty_unregister_driver(riscom_driver);
+	put_tty_driver(riscom_driver);
 	restore_flags(flags);
 }
 
