@@ -467,6 +467,13 @@ static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		if (unlikely(pte_same(*pte, swp_pte))) {
 			unuse_pte(vma, offset + address, pte, entry, page);
 			pte_unmap(pte);
+
+			/*
+			 * Move the page to the active list so it is not
+			 * immediately swapped out again after swapon.
+			 */
+			activate_page(page);
+
 			/* add 1 since address may be 0 */
 			return 1 + offset + address;
 		}
