@@ -1960,49 +1960,134 @@ trunc_err:
 	return err;
 }
 
+/**
+ * ntfs_write_inode - write out a dirty inode
+ * @vi:		inode to write out
+ * @sync:	if true, write out synchronously
+ *
+ * Write out a dirty inode to disk including any extent inodes if present.
+ *
+ * If @sync is true, commit the inode to disk and wait for io completion.  This
+ * is done using write_mft_record().
+ *
+ * If @sync is false, just schedule the write to happen but do not wait for i/o
+ * completion.  In 2.6 kernels, scheduling usually happens just by virtue of
+ * marking the page (and in this case mft record) dirty but we do not implement
+ * this yet as write_mft_record() largely ignores the @sync parameter and
+ * always performs synchronous writes.
+ */
 void ntfs_write_inode(struct inode *vi, int sync)
 {
 	ntfs_inode *ni = NTFS_I(vi);
+#if 0
+	attr_search_context *ctx;
+#endif
+	MFT_RECORD *m;
+	int err = 0;
 
 	ntfs_debug("Entering for %sinode 0x%lx.", NInoAttr(ni) ? "attr " : "",
 			vi->i_ino);
-
 	/*
 	 * Dirty attribute inodes are written via their real inodes so just
-	 * clean them here.
+	 * clean them here.  TODO:  Take care of access time updates.
 	 */
 	if (NInoAttr(ni)) {
 		NInoClearDirty(ni);
 		return;
 	}
-
-	/* Write this base mft record. */
-	if (NInoDirty(ni)) {
-		ntfs_warning(vi->i_sb, "Cleaning dirty inode 0x%lx without "
-				"writing to disk as this is not yet "
-				"implemented.", vi->i_ino);
-		NInoClearDirty(ni);
+	/* Map, pin, and lock the mft record belonging to the inode. */
+	m = map_mft_record(ni);
+	if (unlikely(IS_ERR(m))) {
+		err = PTR_ERR(m);
+		goto err_out;
 	}
-
+#if 0
+	/* Obtain the standard information attribute. */
+	ctx = get_attr_search_ctx(ni, m);
+	if (unlikely(!ctx)) {
+		err = -ENOMEM;
+		goto unm_err_out;
+	}
+	if (unlikely(!lookup_attr(AT_STANDARD_INFORMATION, NULL, 0,
+			IGNORE_CASE, 0, NULL, 0, ctx))) {
+		put_attr_search_ctx(ctx);
+		err = -ENOENT;
+		goto unm_err_out;
+	}
+	// TODO:  Update the access times in the standard information attribute
+	// which is now in ctx->attr.
+	// - Probably want to have use sops->dirty_inode() to set a flag that
+	//   we need to update the times here rather than having to blindly do
+	//   it every time.  Or even don't do it here at all and do it in
+	//   sops->dirty_inode() instead.  Problem with this would be that
+	//   sops->dirty_inode() must be atomic under certain circumstances
+	//   and mapping mft records and such like is not atomic.
+	// - For atime updates also need to check whether they are enabled in
+	//   the superblock flags.
+	ntfs_warning(vi->i_sb, "Access time updates not implement yet.");
+	/*
+	 * We just modified the mft record containing the standard information
+	 * attribute.  So need to mark the mft record dirty, too, but we do it
+	 * manually so that mark_inode_dirty() is not called again.
+	 * TODO:  Only do this if there was a change in any of the times!
+	 */
+	if (!NInoTestSetDirty(ctx->ntfs_ino))
+		__set_page_dirty_nobuffers(ctx->ntfs_ino->page);
+	put_attr_search_ctx(ctx);
+#endif
+	/* Write this base mft record. */
+	if (NInoDirty(ni))
+		err = write_mft_record(ni, m, sync);
 	/* Write all attached extent mft records. */
 	down(&ni->extent_lock);
 	if (ni->nr_extents > 0) {
-		int i;
 		ntfs_inode **extent_nis = ni->ext.extent_ntfs_inos;
+		int i;
 
+		ntfs_debug("Writing %i extent inodes.", ni->nr_extents);
 		for (i = 0; i < ni->nr_extents; i++) {
 			ntfs_inode *tni = extent_nis[i];
 
 			if (NInoDirty(tni)) {
-				ntfs_warning(vi->i_sb, "Cleaning dirty extent "
-						"inode 0x%lx without writing "
-						"to disk as this is not yet "
-						"implemented.", tni->mft_no);
-				NInoClearDirty(tni);
+				MFT_RECORD *tm = map_mft_record(tni);
+				int ret;
+
+				if (unlikely(IS_ERR(tm))) {
+					if (!err || err == -ENOMEM)
+						err = PTR_ERR(tm);
+					continue;
+				}
+				ret = write_mft_record(tni, tm, sync);
+				unmap_mft_record(tni);
+				if (unlikely(ret)) {
+					if (!err || err == -ENOMEM)
+						err = ret;
+				}
 			}
 		}
 	}
 	up(&ni->extent_lock);
+	unmap_mft_record(ni);
+	if (unlikely(err))
+		goto err_out;
+	ntfs_debug("Done.");
+	return;
+#if 0
+unm_err_out:
+	unmap_mft_record(ni);
+#endif
+err_out:
+	if (err == -ENOMEM) {
+		ntfs_warning(vi->i_sb, "Not enough memory to write inode.  "
+				"Marking the inode dirty again, so the VFS "
+				"retries later.");
+		mark_inode_dirty(vi);
+	} else {
+		ntfs_error(vi->i_sb, "Failed (error code %i):  Marking inode "
+				"as bad.  You should run chkdsk.", -err);
+		make_bad_inode(vi);
+	}
+	return;
 }
 
 #endif /* NTFS_RW */

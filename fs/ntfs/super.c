@@ -1664,8 +1664,8 @@ struct super_operations ntfs_sops = {
 #ifdef NTFS_RW
 	//.dirty_inode	= NULL,			/* VFS: Called from
 	//					   __mark_inode_dirty(). */
-	//.write_inode	= NULL,			/* VFS: Write dirty inode to
-	//					   disk. */
+	.write_inode	= ntfs_write_inode,	/* VFS: Write dirty inode to
+						   disk. */
 	//.drop_inode	= NULL,			/* VFS: Called just after the
 	//					   inode reference count has
 	//					   been decreased to zero.

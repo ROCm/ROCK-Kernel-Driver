@@ -11,7 +11,10 @@ ToDo:
 	  pages as nothing can dirty a page other than ourselves. Should this
 	  change, we will really need to roll our own ->set_page_dirty().
 	- Implement sops->dirty_inode() to implement {a,m,c}time updates and
-	  such things.
+	  such things.  This should probably just flag the ntfs inode such that
+	  sops->write_inode(), i.e. ntfs_write_inode(), will copy the times
+	  when it is invoked rather than having to update the mft record
+	  every time.
 	- Implement sops->write_inode().
 	- In between ntfs_prepare/commit_write, need exclusion between
 	  simultaneous file extensions. Need perhaps an NInoResizeUnderway()
@@ -41,6 +44,9 @@ ToDo:
 	  I will wait for people to hit each one and only then implement it.
 	- Commit open system inodes at umount time.  This should make it
 	  virtually impossible for sync_mft_mirror_umount() to ever be needed.
+	- Implement ->write_inode (fs/ntfs/inode.c::ntfs_write_inode()) for the
+	  ntfs super operations.  This gives us inode writing via the VFS inode
+	  dirty code paths.  Note:  Access time updates are not implemented yet.
 
 2.1.12 - Fix the second fix to the decompression engine and some cleanups.
 
