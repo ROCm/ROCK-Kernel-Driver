@@ -1,7 +1,7 @@
 /*
  * USB HandSpring Visor driver
  *
- *	Copyright (C) 1999 - 2001
+ *	Copyright (C) 1999 - 2002
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -28,6 +28,7 @@
 #define SONY_VENDOR_ID			0x054C
 #define SONY_CLIE_3_5_ID		0x0038
 #define SONY_CLIE_4_0_ID		0x0066
+#define SONY_CLIE_S360_ID		0x0095
 
 /****************************************************************************
  * Handspring Visor Vendor specific request codes (bRequest values)
