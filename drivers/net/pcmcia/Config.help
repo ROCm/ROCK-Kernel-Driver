@@ -93,6 +93,18 @@ CONFIG_PCMCIA_XIRC2PS
   as a module, say M here and read <file:Documentation/modules.txt>.
   If unsure, say N.
 
+CONFIG_PCMCIA_AXNET
+  Say Y here if you intend to attach an Asix AX88190-based PCMCIA
+  (PC-card) Fast Ethernet card to your computer.  These cards are
+  nearly NE2000 compatible but need a separate driver due to a few
+  misfeatures.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called axnet_cs.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.  If
+  unsure, say N.
+
 CONFIG_ARCNET_COM20020_CS
   Say Y here if you intend to attach this type of ARCnet PCMCIA card
   to your computer.
@@ -112,6 +124,18 @@ CONFIG_PCMCIA_IBMTR
   inserted in and removed from the running kernel whenever you want).
   The module will be called ibmtr_cs.o.  If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_PCMCIA_XIRCOM
+  This driver is for the Digital "Tulip" Ethernet CardBus adapters.
+  It should work with most DEC 21*4*-based chips/ethercards, as well
+  as with work-alike chips from Lite-On (PNIC) and Macronix (MXIC) and
+  ASIX.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called xircom_tulip_cb.o.  If you want to compile
+  it as a module, say M here and read
+  <file:Documentation/modules.txt>. If unsure, say N.
 
 CONFIG_PCMCIA_XIRTULIP
   This driver is for the Digital "Tulip" Ethernet CardBus adapters.
