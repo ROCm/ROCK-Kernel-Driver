@@ -23,6 +23,7 @@
 #include "br_private.h"
 
 static struct net_bridge *bridge_list;
+static spinlock_t bridge_lock = SPIN_LOCK_UNLOCKED;
 
 static int br_initial_port_cost(struct net_device *dev)
 {
@@ -69,6 +70,7 @@ static int __br_del_if(struct net_bridge *br, struct net_device *dev)
 	return 0;
 }
 
+/* called with bridge_lock */
 static struct net_bridge **__find_br(char *name)
 {
 	struct net_bridge **b;
@@ -188,8 +190,10 @@ int br_add_bridge(char *name)
 		return -EEXIST;
 	}
 
+	spin_lock(&bridge_lock);
 	br->next = bridge_list;
 	bridge_list = br;
+	spin_unlock(&bridge_lock);
 
 	br_inc_use_count();
 	register_netdev(&br->dev);
@@ -202,17 +206,22 @@ int br_del_bridge(char *name)
 	struct net_bridge **b;
 	struct net_bridge *br;
 
-	if ((b = __find_br(name)) == NULL)
+	spin_lock(&bridge_lock);
+	if ((b = __find_br(name)) == NULL) {
+		spin_unlock(&bridge_lock);
 		return -ENXIO;
+	}
 
 	br = *b;
-
-	if (br->dev.flags & IFF_UP)
+	if (br->dev.flags & IFF_UP) {
+		spin_unlock(&bridge_lock);
 		return -EBUSY;
-
-	del_ifs(br);
+	}
 
 	*b = br->next;
+	spin_unlock(&bridge_lock);
+
+	del_ifs(br);
 
 	unregister_netdev(&br->dev);
 	kfree(br);
@@ -272,6 +281,7 @@ int br_get_bridge_ifindices(int *indices, int num)
 	struct net_bridge *br;
 	int i;
 
+	spin_lock(&bridge_lock);
 	br = bridge_list;
 	for (i=0;i<num;i++) {
 		if (br == NULL)
@@ -280,6 +290,7 @@ int br_get_bridge_ifindices(int *indices, int num)
 		indices[i] = br->dev.ifindex;
 		br = br->next;
 	}
+	spin_unlock(&bridge_lock);
 
 	return i;
 }
@@ -289,9 +300,11 @@ void br_get_port_ifindices(struct net_bridge *br, int *ifindices)
 {
 	struct net_bridge_port *p;
 
+	read_lock(&br->lock);
 	p = br->port_list;
 	while (p != NULL) {
 		ifindices[p->port_no] = p->dev->ifindex;
 		p = p->next;
 	}
+	read_unlock(&br->lock);
 }

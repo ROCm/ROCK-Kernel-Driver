@@ -1091,7 +1091,7 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 /*
  * sys_sysinfo - fill in sysinfo struct
  */ 
-asmlinkage long sys_sysinfo(struct sysinfo *info)
+asmlinkage long sys_sysinfo(struct sysinfo __user *info)
 {
 	struct sysinfo val;
 	u64 uptime;

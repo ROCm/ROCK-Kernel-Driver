@@ -610,9 +610,67 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 			}
 
 			if (optname == IP_ADD_MEMBERSHIP)
-				err = ip_mc_join_group(sk,&mreq);
+				err = ip_mc_join_group(sk, &mreq);
 			else
-				err = ip_mc_leave_group(sk,&mreq);
+				err = ip_mc_leave_group(sk, &mreq);
+			break;
+		}
+		case IP_MSFILTER:
+		{
+			struct ip_msfilter *msf;
+
+			if (optlen < IP_MSFILTER_SIZE(0))
+				goto e_inval;
+			msf = (struct ip_msfilter *)kmalloc(optlen, GFP_KERNEL);
+			if (msf == 0) {
+				err = -ENOBUFS;
+				break;
+			}
+			err = -EFAULT;
+			if (copy_from_user(msf, optval, optlen)) {
+				kfree(msf);
+				break;
+			}
+			err = ip_mc_msfilter(sk, msf);
+			kfree(msf);
+			break;
+		}
+		case IP_BLOCK_SOURCE:
+		case IP_UNBLOCK_SOURCE:
+		case IP_ADD_SOURCE_MEMBERSHIP:
+		case IP_DROP_SOURCE_MEMBERSHIP:
+		{
+			struct ip_mreq_source mreqs;
+			int omode, add;
+
+			if (optlen != sizeof(struct ip_mreq_source))
+				goto e_inval;
+			if (copy_from_user(&mreqs, optval, sizeof(mreqs))) {
+				err = -EFAULT;
+				break;
+			}
+			if (optname == IP_BLOCK_SOURCE) {
+				omode = MCAST_EXCLUDE;
+				add = 1;
+			} else if (optname == IP_UNBLOCK_SOURCE) {
+				omode = MCAST_EXCLUDE;
+				add = 0;
+			} else if (optname == IP_ADD_SOURCE_MEMBERSHIP) {
+				struct ip_mreqn mreq;
+
+				mreq.imr_multiaddr.s_addr = mreqs.imr_multiaddr;
+				mreq.imr_address.s_addr = mreqs.imr_interface;
+				mreq.imr_ifindex = 0;
+				err = ip_mc_join_group(sk, &mreq);
+				if (err)
+					break;
+				omode = MCAST_INCLUDE;
+				add = 1;
+			} else /*IP_DROP_SOURCE_MEMBERSHIP */ {
+				omode = MCAST_INCLUDE;
+				add = 0;
+			}
+			err = ip_mc_source(add, omode, sk, &mreqs);
 			break;
 		}
 		case IP_ROUTER_ALERT:	
@@ -762,6 +820,20 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 			if(copy_to_user((void *)optval, &addr, len))
 				return -EFAULT;
 			return 0;
+		}
+		case IP_MSFILTER:
+		{
+			struct ip_msfilter msf;
+			int err;
+
+			if (len < IP_MSFILTER_SIZE(0))
+				return -EINVAL;
+			if (copy_from_user(&msf, optval, IP_MSFILTER_SIZE(0)))
+				return -EFAULT;
+			err = ip_mc_msfget(sk, &msf,
+				(struct ip_msfilter *)optval, optlen);
+			release_sock(sk);
+			return err;
 		}
 		case IP_PKTOPTIONS:		
 		{

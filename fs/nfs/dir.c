@@ -736,9 +736,10 @@ int nfs_cached_lookup(struct inode *dir, struct dentry *dentry,
 
 		res = -EIO;
 		if (PageUptodate(page)) {
-			desc.ptr = kmap_atomic(page, KM_USER0);
+			void * kaddr = kmap_atomic(page, KM_USER0);
+			desc.ptr = kaddr;
 			res = find_dirent_name(&desc, page, dentry);
-			kunmap_atomic(desc.ptr, KM_USER0);
+			kunmap_atomic(kaddr, KM_USER0);
 		}
 		page_cache_release(page);
 
