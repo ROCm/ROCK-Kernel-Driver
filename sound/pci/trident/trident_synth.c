@@ -811,7 +811,7 @@ static void snd_trident_synth_free_private_instruments(snd_trident_port_t * p, i
 	snd_seq_instr_list_free_cond(p->trident->synth.ilist, &ifree, client, 0);
 }
 
-int snd_trident_synth_event_input(snd_seq_event_t * ev, int direct, void *private_data, int atomic, int hop)
+static int snd_trident_synth_event_input(snd_seq_event_t * ev, int direct, void *private_data, int atomic, int hop)
 {
 	snd_trident_port_t *p = (snd_trident_port_t *) private_data;
 

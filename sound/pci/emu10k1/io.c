@@ -313,28 +313,3 @@ unsigned int snd_emu10k1_rate_to_pitch(unsigned int rate)
 	return 0;		/* Should never reach this point */
 }
 
-/*
- *  Returns an attenuation based upon a cumulative volume value
- *  Algorithm calculates 0x200 - 0x10 log2 (input)
- */
- 
-unsigned char snd_emu10k1_sum_vol_attn(unsigned int value)
-{
-	unsigned short count = 16, ans;
-
-	if (value == 0)
-		return 0xFF;
-
-	/* Find first SET bit. This is the integer part of the value */
-	while ((value & 0x10000) == 0) {
-		value <<= 1;
-		count--;
-	}
-
-	/* The REST of the data is the fractional part. */
-	ans = (unsigned short) (0x110 - ((count << 4) + ((value & 0x0FFFFL) >> 12)));
-	if (ans > 0xFF)
-		ans = 0xFF;
-
-	return (unsigned char) ans;
-}

@@ -472,7 +472,8 @@ static char* channelName[] = {
                         "SPDIF-R",
 };
 
-u16 ClockSourceSelector[] = {0x8000,   // selects source as ADAT at 44.1 kHz
+static u16 ClockSourceSelector[] =
+                            {0x8000,   // selects source as ADAT at 44.1 kHz
                              0x0000,   // selects source as ADAT at 48 kHz
                              0x8001,   // selects source as S/PDIF at 44.1 kHz
                              0x0001,   // selects source as S/PDIF at 48 kHz

@@ -489,7 +489,7 @@ static void snd_emu10k1_audigy_write_op(emu10k1_fx8010_code_t *icode, unsigned i
 #define A_OP(icode, ptr, op, r, a, x, y) \
 	snd_emu10k1_audigy_write_op(icode, ptr, op, r, a, x, y)
 
-void snd_emu10k1_efx_write(emu10k1_t *emu, unsigned int pc, unsigned int data)
+static void snd_emu10k1_efx_write(emu10k1_t *emu, unsigned int pc, unsigned int data)
 {
 	pc += emu->audigy ? A_MICROCODEBASE : MICROCODEBASE;
 	snd_emu10k1_ptr_write(emu, pc, 0, data);

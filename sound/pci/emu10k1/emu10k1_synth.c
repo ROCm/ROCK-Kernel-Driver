@@ -28,7 +28,7 @@ MODULE_LICENSE("GPL");
 /*
  * create a new hardware dependent device for Emu10k1
  */
-int snd_emu10k1_synth_new_device(snd_seq_device_t *dev)
+static int snd_emu10k1_synth_new_device(snd_seq_device_t *dev)
 {
 	snd_emux_t *emu;
 	emu10k1_t *hw;
@@ -76,7 +76,7 @@ int snd_emu10k1_synth_new_device(snd_seq_device_t *dev)
 	return 0;
 }
 
-int snd_emu10k1_synth_delete_device(snd_seq_device_t *dev)
+static int snd_emu10k1_synth_delete_device(snd_seq_device_t *dev)
 {
 	snd_emux_t *emu;
 	emu10k1_t *hw;

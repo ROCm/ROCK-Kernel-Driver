@@ -3,7 +3,7 @@
 #ifndef __HEADER_cwcdma_H__
 #define __HEADER_cwcdma_H__
 
-symbol_entry_t cwcdma_symbols[] = {
+static symbol_entry_t cwcdma_symbols[] = {
   { 0x8000, "EXECCHILD",0x03 },
   { 0x8001, "EXECCHILD_98",0x03 },
   { 0x8003, "EXECCHILD_PUSH1IND",0x03 },
@@ -33,7 +33,7 @@ symbol_entry_t cwcdma_symbols[] = {
   { 0x0018, "#CODE_END",0x00 },
 }; /* cwcdma symbols */
 
-u32 cwcdma_code[] = {
+static u32 cwcdma_code[] = {
 /* OVERLAYBEGINADDRESS */
 /* 0000 */ 0x00002731,0x00001400,0x0004c108,0x000e5044,
 /* 0002 */ 0x0005f608,0x00000000,0x000007ae,0x000be300,
@@ -51,11 +51,11 @@ u32 cwcdma_code[] = {
 
 /* #CODE_END */
 
-segment_desc_t cwcdma_segments[] = {
+static segment_desc_t cwcdma_segments[] = {
   { SEGTYPE_SP_PROGRAM, 0x00000000, 0x00000030, cwcdma_code },
 };
 
-dsp_module_desc_t cwcdma_module = {
+static dsp_module_desc_t cwcdma_module = {
   "cwcdma",
   {
     27,

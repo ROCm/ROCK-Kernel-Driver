@@ -633,7 +633,7 @@ static int snd_ac97_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *
 				    (val1 << shift_left) | (val2 << shift_right));
 }
 
-int snd_ac97_getput_page(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol,
+static int snd_ac97_getput_page(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol,
 			 int (*func)(snd_kcontrol_t *, snd_ctl_elem_value_t *))
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
