@@ -114,7 +114,7 @@ extern int fmv18x_probe(struct net_device *dev);
 static int fmv18x_probe1(struct net_device *dev, short ioaddr);
 static int net_open(struct net_device *dev);
 static int net_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void net_rx(struct net_device *dev);
 static void net_timeout(struct net_device *dev);
 static int net_close(struct net_device *dev);
@@ -423,7 +423,7 @@ static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 /* The typical workload of the driver:
    Handle the network interface interrupts. */
-static void
+static irqreturn_t
 net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
@@ -476,7 +476,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			spin_unlock(&lp->lock);
 		}
 	}
-	return;
+	return IRQ_RETVAL(status);
 }
 
 /* We have a good packet(s), get it/them out of the buffers. */
