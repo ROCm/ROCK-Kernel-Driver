@@ -45,11 +45,24 @@ void diag10(unsigned long addr)
         if (addr >= 0x7ff00000)
                 return;
 #ifdef __s390x__
-        asm volatile ("sam31\n\t"
-                      "diag %0,%0,0x10\n\t"
-                      "sam64" : : "a" (addr) );
+        asm volatile (
+		"   sam31\n"
+		"   diag %0,%0,0x10\n"
+		"0: sam64\n"
+		".section __ex_table,\"a\"\n"
+		"   .align 8\n"
+		"   .quad 0b, 0b\n"
+		".previous\n"
+		: : "a" (addr));
 #else
-        asm volatile ("diag %0,%0,0x10" : : "a" (addr) );
+        asm volatile (
+		"   diag %0,%0,0x10\n"
+		"0:\n"
+		".section __ex_table,\"a\"\n"
+		"   .align 4\n"
+		"   .long 0b, 0b\n"
+		".previous\n"
+		: : "a" (addr));
 #endif
 }
 
