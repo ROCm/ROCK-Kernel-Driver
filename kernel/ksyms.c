@@ -62,8 +62,6 @@
 #include <linux/kmod.h>
 #endif
 
-extern void set_device_ro(kdev_t dev,int flag);
-
 extern struct timezone sys_tz;
 
 #ifdef CONFIG_MODVERSIONS
@@ -341,8 +339,6 @@ EXPORT_SYMBOL(tty_unregister_driver);
 EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
-EXPORT_SYMBOL(bdev_read_only);
-EXPORT_SYMBOL(set_device_ro);
 EXPORT_SYMBOL(bmap);
 EXPORT_SYMBOL(blkdev_open);
 EXPORT_SYMBOL(blkdev_get);

@@ -336,3 +336,40 @@ void put_disk(struct gendisk *disk)
 EXPORT_SYMBOL(alloc_disk);
 EXPORT_SYMBOL(get_disk);
 EXPORT_SYMBOL(put_disk);
+
+void set_device_ro(struct block_device *bdev, int flag)
+{
+	struct gendisk *disk = bdev->bd_disk;
+	if (bdev->bd_contains != bdev) {
+		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
+		struct hd_struct *p = &disk->part[part-1];
+		p->policy = flag;
+	} else
+		disk->policy = flag;
+}
+
+void set_disk_ro(struct gendisk *disk, int flag)
+{
+	int i;
+	disk->policy = flag;
+	for (i = 0; i < disk->minors; i++)
+		disk->part[i].policy = flag;
+}
+
+int bdev_read_only(struct block_device *bdev)
+{
+	struct gendisk *disk;
+	if (!bdev)
+		return 0;
+	disk = bdev->bd_disk;
+	if (bdev->bd_contains != bdev) {
+		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
+		struct hd_struct *p = &disk->part[part-1];
+		return p->policy;
+	} else
+		return disk->policy;
+}
+
+EXPORT_SYMBOL(bdev_read_only);
+EXPORT_SYMBOL(set_device_ro);
+EXPORT_SYMBOL(set_disk_ro);

@@ -330,7 +330,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	}
 
 	mtdblks[dev] = mtdblk;
-	set_device_ro (inode->i_rdev, !(mtdblk->mtd->flags & MTD_WRITEABLE));
+	set_device_ro(inode->i_bdev, !(mtdblk->mtd->flags & MTD_WRITEABLE));
 
 	spin_unlock(&mtdblks_lock);
 

@@ -428,17 +428,6 @@ dasd_state_accept_to_basic(dasd_device_t * device)
 }
 
 /*
- * get the kdev_t of a device 
- * FIXME: remove this when no longer needed
- */
-static inline kdev_t
-dasd_partition_to_kdev_t(dasd_device_t *device, unsigned int partition)
-{
-	return mk_kdev(device->gdp->major, device->gdp->first_minor+partition);
-}
-
-
-/*
  * Setup block device.
  */
 static inline int
@@ -449,8 +438,6 @@ dasd_state_accept_to_ready(dasd_device_t * device)
 
 	devmap = dasd_devmap_from_devno(device->devinfo.devno);
 	if (devmap->features & DASD_FEATURE_READONLY) {
-		for (i = 0; i < (1 << DASD_PARTN_BITS); i++)
-			set_device_ro(dasd_partition_to_kdev_t(device, i), 1);
 		device->ro_flag = 1;
 		DEV_MESSAGE (KERN_WARNING, device, "%s",
 			     "setting read-only mode ");

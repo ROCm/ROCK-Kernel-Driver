@@ -3062,7 +3062,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	/*
 	 * default to read-only always and fix latter at the bottom
 	 */
-	set_device_ro(mk_kdev(drive->disk->major, drive->disk->first_minor), 1);
+	set_disk_ro(drive->disk, 1);
 	blk_queue_hardsect_size(&drive->queue, CD_FRAMESIZE);
 
 	blk_queue_prep_rq(&drive->queue, ide_cdrom_prep_fn);
@@ -3185,7 +3185,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	nslots = ide_cdrom_probe_capabilities (drive);
 
 	if (CDROM_CONFIG_FLAGS(drive)->dvd_ram)
-		set_device_ro(mk_kdev(drive->disk->major, drive->disk->first_minor), 0);
+		set_disk_ro(drive->disk, 0);
 
 #if 0
 	drive->dsc_overlap = (HWIF(drive)->no_dsc) ? 0 : 1;

@@ -58,7 +58,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	}
 
 	if (ret == 0) {
-		set_device_ro(inode->i_rdev, !(mdev->mtd->flags & MTD_CAP_RAM));
+		set_device_ro(inode->i_bdev, !(mdev->mtd->flags & MTD_CAP_RAM));
 		mdev->open++;
 	}
 	up(&mtd_sem);

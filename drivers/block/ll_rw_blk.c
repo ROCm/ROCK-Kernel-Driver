@@ -1404,34 +1404,6 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
-/* RO fail safe mechanism */
-
-static long ro_bits[MAX_BLKDEV][8];
-
-int bdev_read_only(struct block_device *bdev)
-{
-	int minor,major;
-
-	if (!bdev)
-		return 0;
-	major = MAJOR(bdev->bd_dev);
-	minor = MINOR(bdev->bd_dev);
-	if (major < 0 || major >= MAX_BLKDEV)
-		return 0;
-	return ro_bits[major][minor >> 5] & (1 << (minor & 31));
-}
-
-void set_device_ro(kdev_t dev,int flag)
-{
-	int minor,major;
-
-	major = major(dev);
-	minor = minor(dev);
-	if (major < 0 || major >= MAX_BLKDEV) return;
-	if (flag) ro_bits[major][minor >> 5] |= 1 << (minor & 31);
-	else ro_bits[major][minor >> 5] &= ~(1 << (minor & 31));
-}
-
 void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
 	unsigned int major = major(rq->rq_dev);

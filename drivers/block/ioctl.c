@@ -202,7 +202,7 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			return -EACCES;
 		if (get_user(n, (int *)(arg)))
 			return -EFAULT;
-		set_device_ro(to_kdev_t(bdev->bd_dev), n);
+		set_device_ro(bdev, n);
 		return 0;
 	default:
 		if (bdev->bd_op->ioctl) {

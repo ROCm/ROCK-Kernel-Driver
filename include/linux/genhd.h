@@ -63,6 +63,7 @@ struct hd_struct {
 	sector_t nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
 	struct device *hd_driverfs_dev;  /* support driverfs hiearchy     */
+	int policy;
 };
 
 #define GENHD_FL_REMOVABLE  1
@@ -94,7 +95,7 @@ struct gendisk {
 	struct device disk_dev;
 
 	struct timer_rand_state *random;
-
+	int policy;
 
 	unsigned sync_io;		/* RAID */
 	unsigned reads, writes;

@@ -249,6 +249,8 @@ dasd_setup_partitions(dasd_device_t * device)
 	/* Make the disk known. */
 	set_capacity(device->gdp, device->blocks << device->s2b_shift);
 	device->gdp->queue = device->request_queue;
+	if (device->ro_flag)
+		set_disk_ro(device->gdp, 1);
 	add_disk(device->gdp);
 }
 

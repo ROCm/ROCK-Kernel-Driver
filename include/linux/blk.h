@@ -7,7 +7,8 @@
 #include <linux/spinlock.h>
 #include <linux/compiler.h>
 
-extern void set_device_ro(kdev_t dev,int flag);
+extern void set_device_ro(struct block_device *bdev, int flag);
+extern void set_disk_ro(struct gendisk *disk, int flag);
 extern void add_disk_randomness(struct gendisk *disk);
 extern void rand_initialize_disk(struct gendisk *disk);
 
