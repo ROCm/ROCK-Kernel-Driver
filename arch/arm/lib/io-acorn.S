@@ -6,8 +6,10 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ * 27/03/03 Ian Molton Clean up CONFIG_CPU
+ *
  */
-#include <linux/config.h> /* for CONFIG_CPU_nn */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 #include <asm/hardware.h>
@@ -53,21 +55,3 @@ ENTRY(outsl)
 		adr	r0, .iosl_warning
 		mov	r1, lr
 		b	printk
-
-@ Purpose: write a memc register
-@ Proto  : void memc_write(int register, int value);
-@ Returns: nothing
-
-#ifdef CONFIG_CPU_26
-ENTRY(memc_write)
-		cmp	r0, #7
-		RETINSTR(movgt,pc,lr)
-		mov	r0, r0, lsl #17
-		mov	r1, r1, lsl #15
-		mov	r1, r1, lsr #17
-		orr	r0, r0, r1, lsl #2
-		add	r0, r0, #0x03600000
-		strb	r0, [r0]
-		RETINSTR(mov,pc,lr)
-#endif
-
