@@ -2956,6 +2956,7 @@ static void tg3_set_txd(struct tg3 *tp, int entry,
 			dma_addr_t mapping, int len, u32 flags,
 			u32 mss_and_is_end)
 {
+	struct tg3_tx_buffer_desc *txd = &tp->tx_ring[entry];
 	int is_end = (mss_and_is_end & 0x1);
 	u32 mss = (mss_and_is_end >> 1);
 	u32 vlan_tag = 0;
@@ -2967,35 +2968,11 @@ static void tg3_set_txd(struct tg3 *tp, int entry,
 		flags &= 0xffff;
 	}
 	vlan_tag |= (mss << TXD_MSS_SHIFT);
-	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		struct tg3_tx_buffer_desc *txd = &tp->tx_ring[entry];
 
-		txd->addr_hi = ((u64) mapping >> 32);
-		txd->addr_lo = ((u64) mapping & 0xffffffff);
-		txd->len_flags = (len << TXD_LEN_SHIFT) | flags;
-		txd->vlan_tag = vlan_tag << TXD_VLAN_TAG_SHIFT;
-	} else {
-		struct tx_ring_info *txr = &tp->tx_buffers[entry];
-		unsigned long txd;
-
-		txd = (tp->regs +
-		       NIC_SRAM_WIN_BASE +
-		       NIC_SRAM_TX_BUFFER_DESC);
-		txd += (entry * TXD_SIZE);
-
-		/* Save some PIOs */
-		if (sizeof(dma_addr_t) != sizeof(u32))
-			writel(((u64) mapping >> 32),
-			       txd + TXD_ADDR + TG3_64BIT_REG_HIGH);
-
-		writel(((u64) mapping & 0xffffffff),
-		       txd + TXD_ADDR + TG3_64BIT_REG_LOW);
-		writel(len << TXD_LEN_SHIFT | flags, txd + TXD_LEN_FLAGS);
-		if (txr->prev_vlan_tag != vlan_tag) {
-			writel(vlan_tag << TXD_VLAN_TAG_SHIFT, txd + TXD_VLAN_TAG);
-			txr->prev_vlan_tag = vlan_tag;
-		}
-	}
+	txd->addr_hi = ((u64) mapping >> 32);
+	txd->addr_lo = ((u64) mapping & 0xffffffff);
+	txd->len_flags = (len << TXD_LEN_SHIFT) | flags;
+	txd->vlan_tag = vlan_tag << TXD_VLAN_TAG_SHIFT;
 }
 
 static inline int tg3_4g_overflow_test(dma_addr_t mapping, int len)
@@ -3184,19 +3161,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	/* Packets are ready, update Tx producer idx local and on card. */
-	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		tw32_tx_mbox((MAILBOX_SNDHOST_PROD_IDX_0 +
-			      TG3_64BIT_REG_LOW), entry);
-	} else {
-		/* First, make sure tg3 sees last descriptor fully
-		 * in SRAM.
-		 */
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW);
-
-		tw32_tx_mbox((MAILBOX_SNDNIC_PROD_IDX_0 +
-			      TG3_64BIT_REG_LOW), entry);
-	}
+	tw32_tx_mbox((MAILBOX_SNDHOST_PROD_IDX_0 + TG3_64BIT_REG_LOW), entry);
 
 	tp->tx_prod = entry;
 	if (TX_BUFFS_AVAIL(tp) <= (MAX_SKB_FRAGS + 1))
@@ -3335,7 +3300,6 @@ static void tg3_free_rings(struct tg3 *tp)
  */
 static void tg3_init_rings(struct tg3 *tp)
 {
-	unsigned long start, end;
 	u32 i;
 
 	/* Free up all the SKBs. */
@@ -3345,21 +3309,7 @@ static void tg3_init_rings(struct tg3 *tp)
 	memset(tp->rx_std, 0, TG3_RX_RING_BYTES);
 	memset(tp->rx_jumbo, 0, TG3_RX_JUMBO_RING_BYTES);
 	memset(tp->rx_rcb, 0, TG3_RX_RCB_RING_BYTES(tp));
-
-	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		memset(tp->tx_ring, 0, TG3_TX_RING_BYTES);
-	} else {
-		start = (tp->regs +
-			 NIC_SRAM_WIN_BASE +
-			 NIC_SRAM_TX_BUFFER_DESC);
-		end = start + TG3_TX_RING_BYTES;
-		while (start < end) {
-			writel(0, start);
-			start += 4;
-		}
-		for (i = 0; i < TG3_TX_RING_SIZE; i++)
-			tp->tx_buffers[i].prev_vlan_tag = 0;
-	}
+	memset(tp->tx_ring, 0, TG3_TX_RING_BYTES);
 
 	/* Initialize invariants of the rings, we only set this
 	 * stuff once.  This works because the card does not
@@ -3490,15 +3440,10 @@ static int tg3_alloc_consistent(struct tg3 *tp)
 	if (!tp->rx_rcb)
 		goto err_out;
 
-	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		tp->tx_ring = pci_alloc_consistent(tp->pdev, TG3_TX_RING_BYTES,
-						   &tp->tx_desc_mapping);
-		if (!tp->tx_ring)
-			goto err_out;
-	} else {
-		tp->tx_ring = NULL;
-		tp->tx_desc_mapping = 0;
-	}
+	tp->tx_ring = pci_alloc_consistent(tp->pdev, TG3_TX_RING_BYTES,
+					   &tp->tx_desc_mapping);
+	if (!tp->tx_ring)
+		goto err_out;
 
 	tp->hw_status = pci_alloc_consistent(tp->pdev,
 					     TG3_HW_STATUS_SIZE,
@@ -4962,10 +4907,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 			  GRC_MODE_4X_NIC_SEND_RINGS |
 			  GRC_MODE_NO_TX_PHDR_CSUM |
 			  GRC_MODE_NO_RX_PHDR_CSUM);
-	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS)
-		tp->grc_mode |= GRC_MODE_HOST_SENDBDS;
-	else
-		tp->grc_mode |= GRC_MODE_4X_NIC_SEND_RINGS;
+	tp->grc_mode |= GRC_MODE_HOST_SENDBDS;
 	if (tp->tg3_flags & TG3_FLAG_NO_TX_PSEUDO_CSUM)
 		tp->grc_mode |= GRC_MODE_NO_TX_PHDR_CSUM;
 	if (tp->tg3_flags & TG3_FLAG_NO_RX_PSEUDO_CSUM)
@@ -5118,18 +5060,11 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32_mailbox(MAILBOX_SNDHOST_PROD_IDX_0 + TG3_64BIT_REG_LOW, 0);
 	tw32_tx_mbox(MAILBOX_SNDNIC_PROD_IDX_0 + TG3_64BIT_REG_LOW, 0);
 
-	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		tg3_set_bdinfo(tp, NIC_SRAM_SEND_RCB,
-			       tp->tx_desc_mapping,
-			       (TG3_TX_RING_SIZE <<
-				BDINFO_FLAGS_MAXLEN_SHIFT),
-			       NIC_SRAM_TX_BUFFER_DESC);
-	} else {
-		tg3_set_bdinfo(tp, NIC_SRAM_SEND_RCB,
-			       0,
-			       BDINFO_FLAGS_DISABLED,
-			       NIC_SRAM_TX_BUFFER_DESC);
-	}
+	tg3_set_bdinfo(tp, NIC_SRAM_SEND_RCB,
+		       tp->tx_desc_mapping,
+		       (TG3_TX_RING_SIZE <<
+			BDINFO_FLAGS_MAXLEN_SHIFT),
+		       NIC_SRAM_TX_BUFFER_DESC);
 
 	/* There is only one receive return ring on 5705/5750, no need
 	 * to explicitly disable the others.
@@ -5675,8 +5610,8 @@ static int tg3_open(struct net_device *dev)
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
-	/* If you move this call, make sure TG3_FLAG_HOST_TXDS in
-	 * tp->tg3_flags is accurate at that new place.
+	/* The placement of this call is tied
+	 * to the setup and use of Host TX descriptors.
 	 */
 	err = tg3_alloc_consistent(tp);
 	if (err)
@@ -7629,23 +7564,6 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	udelay(50);
 	tg3_nvram_init(tp);
 
-	/* Always use host TXDs, it performs better in particular
-	 * with multi-frag packets.  The tests below are kept here
-	 * as documentation should we change this decision again
-	 * in the future.
-	 */
-	tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
-
-#if 0
-	/* Determine if TX descriptors will reside in
-	 * main memory or in the chip SRAM.
-	 */
-	if ((tp->tg3_flags & TG3_FLAG_PCIX_TARGET_HWBUG) != 0 ||
-	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ||
-	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
-		tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
-#endif
-
 	grc_misc_cfg = tr32(GRC_MISC_CFG);
 	grc_misc_cfg &= GRC_MISC_CFG_BOARD_ID_MASK;
 
@@ -8447,11 +8365,10 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 		printk("%2.2x%c", dev->dev_addr[i],
 		       i == 5 ? '\n' : ':');
 
-	printk(KERN_INFO "%s: HostTXDS[%d] RXcsums[%d] LinkChgREG[%d] "
+	printk(KERN_INFO "%s: RXcsums[%d] LinkChgREG[%d] "
 	       "MIirq[%d] ASF[%d] Split[%d] WireSpeed[%d] "
 	       "TSOcap[%d] \n",
 	       dev->name,
-	       (tp->tg3_flags & TG3_FLAG_HOST_TXDS) != 0,
 	       (tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) != 0,
 	       (tp->tg3_flags & TG3_FLAG_USE_LINKCHG_REG) != 0,
 	       (tp->tg3_flags & TG3_FLAG_USE_MI_INTERRUPT) != 0,
