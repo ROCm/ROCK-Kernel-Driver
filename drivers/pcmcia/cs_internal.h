@@ -136,7 +136,6 @@ typedef struct socket_info_t {
 #ifdef CONFIG_CARDBUS
     struct resource *		cb_cis_res;
     u_char			*cb_cis_virt;
-    struct cb_config_t		*cb_config;
 #endif
     struct {
 	u_int			AssignedIRQ;

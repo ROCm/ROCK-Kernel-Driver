@@ -396,11 +396,9 @@ int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
     tuple->TupleLink = tuple->Flags = 0;
 #ifdef CONFIG_CARDBUS
     if (s->state & SOCKET_CARDBUS) {
+	struct pci_dev *dev = s->cap.cb_dev;
 	u_int ptr;
-	struct pci_dev *dev = pci_find_slot (s->cap.cb_dev->subordinate->number, 0);
-	if (!dev)
-	    return CS_BAD_HANDLE;
-	pci_read_config_dword(dev, 0x28, &ptr);
+	pci_bus_read_config_dword(dev->subordinate, 0, PCI_CARDBUS_CIS, &ptr);
 	tuple->CISOffset = ptr & ~7;
 	SPACE(tuple->Flags) = (ptr & 7);
     } else
