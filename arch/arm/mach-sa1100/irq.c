@@ -211,14 +211,14 @@ static struct resource irq_resource = {
 	.end	= 0x9005ffff,
 };
 
-static struct {
+static struct sa1100irq_state {
 	unsigned int	saved;
 	unsigned int	icmr;
 	unsigned int	iclr;
 	unsigned int	iccr;
 } sa1100irq_state;
 
-static int sa1100irq_suspend(struct device *dev, u32 state, u32 level)
+static int sa1100irq_suspend(struct sys_device *dev, u32 state)
 {
 	struct sa1100irq_state *st = &sa1100irq_state;
 

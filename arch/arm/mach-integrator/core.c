@@ -31,6 +31,8 @@
 #include <asm/irq.h>
 #include <asm/setup.h>
 #include <asm/mach-types.h>
+#include <asm/hardware/amba.h>
+#include <asm/hardware/amba_kmi.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/irq.h>
@@ -104,7 +106,7 @@ static struct irqchip sc_chip = {
 	.mask	= sc_mask_irq,
 	.unmask = sc_unmask_irq,
 };
- 
+
 static void __init integrator_init_irq(void)
 {
 	unsigned int i;
@@ -125,6 +127,52 @@ static void __init integrator_init_irq(void)
 		}
 	}
 }
+
+static struct amba_device kmi0_device = {
+	.dev		= {
+		.bus_id	= "mb:18",
+	},
+	.res		= {
+		.start	= KMI0_BASE,
+		.end	= KMI0_BASE + KMI_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	.irq		= IRQ_KMIINT0,
+	.periphid	= 0x00041050,
+};
+
+static struct amba_device kmi1_device = {
+	.dev		= {
+		.bus_id	= "mb:19",
+	},
+	.res		= {
+		.start	= KMI1_BASE,
+		.end	= KMI1_BASE + KMI_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	.irq		= IRQ_KMIINT1,
+	.periphid	= 0x00041050,
+};
+
+static struct amba_device *amba_devs[] __initdata = {
+	&kmi0_device,
+	&kmi1_device,
+};
+
+static int __init register_devices(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
+		struct amba_device *d = amba_devs[i];
+
+		amba_device_register(d, &iomem_resource);
+	}
+
+	return 0;
+}
+
+arch_initcall(register_devices);
 
 MACHINE_START(INTEGRATOR, "ARM-Integrator")
 	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")

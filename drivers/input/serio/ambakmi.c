@@ -1,7 +1,7 @@
 /*
- *  linux/drivers/input/serio/amba_kmi.c
+ *  linux/drivers/input/serio/ambakmi.c
  *
- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
+ *  Copyright (C) 2000-2003 Deep Blue Solutions Ltd.
  *  Copyright (C) 2002 Russell King.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -21,6 +21,7 @@
 
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/hardware/amba.h>
 #include <asm/hardware/amba_kmi.h>
 
 #define KMI_BASE	(kmi->base)
@@ -28,11 +29,10 @@
 struct amba_kmi_port {
 	struct serio		io;
 	struct amba_kmi_port	*next;
-	void			*base;
+	unsigned char		*base;
 	unsigned int		irq;
 	unsigned int		divisor;
-	char			name[32];
-	char			phys[16];
+	unsigned int		open;
 	struct resource		*res;
 };
 
@@ -73,7 +73,7 @@ static int amba_kmi_open(struct serio *io)
 	writeb(kmi->divisor, KMICLKDIV);
 	writeb(KMICR_EN, KMICR);
 
-	ret = request_irq(kmi->irq, amba_kmi_int, 0, kmi->phys, kmi);
+	ret = request_irq(kmi->irq, amba_kmi_int, 0, kmi->io.phys, kmi);
 	if (ret) {
 		printk(KERN_ERR "kmi: failed to claim IRQ%d\n", kmi->irq);
 		writeb(0, KMICR);
@@ -94,9 +94,7 @@ static void amba_kmi_close(struct serio *io)
 	free_irq(kmi->irq, kmi);
 }
 
-static struct amba_kmi_port *list;
-
-static int __init amba_kmi_init_one(char *type, unsigned long base, int irq, int nr)
+static int amba_kmi_probe(struct amba_device *dev, void *id)
 {
 	struct amba_kmi_port *kmi;
 
@@ -110,58 +108,83 @@ static int __init amba_kmi_init_one(char *type, unsigned long base, int irq, int
 	kmi->io.write	= amba_kmi_write;
 	kmi->io.open	= amba_kmi_open;
 	kmi->io.close	= amba_kmi_close;
-	kmi->io.name	= kmi->name;
-	kmi->io.phys	= kmi->phys;
+	kmi->io.name	= dev->dev.name;
+	kmi->io.phys	= dev->dev.bus_id;
 	kmi->io.driver	= kmi;
 
-	snprintf(kmi->name, sizeof(kmi->name), "AMBA KMI PS/2 %s port", type);
-	snprintf(kmi->phys, sizeof(kmi->phys), "amba/serio%d", nr);
-
-	kmi->res	= request_mem_region(base, KMI_SIZE, kmi->phys);
+	kmi->res	= request_mem_region(dev->res.start, KMI_SIZE, kmi->io.phys);
 	if (!kmi->res) {
 		kfree(kmi);
 		return -EBUSY;
 	}
 
-	kmi->base	= ioremap(base, KMI_SIZE);
+	kmi->base	= ioremap(dev->res.start, KMI_SIZE);
 	if (!kmi->base) {
 		release_resource(kmi->res);
 		kfree(kmi);
 		return -ENOMEM;
 	}
 
-	kmi->irq	= irq;
+	kmi->irq	= dev->irq;
 	kmi->divisor	= 24 / 8 - 1;
 
-	kmi->next	= list;
-	list		= kmi;
+	amba_set_drvdata(dev, kmi);
 
 	serio_register_port(&kmi->io);
 	return 0;
 }
 
+static int amba_kmi_remove(struct amba_device *dev)
+{
+	struct amba_kmi_port *kmi = amba_get_drvdata(dev);
+
+	amba_set_drvdata(dev, NULL);
+
+	serio_unregister_port(&kmi->io);
+	iounmap(kmi->base);
+	release_resource(kmi->res);
+	kfree(kmi);
+	return 0;
+}
+
+static int amba_kmi_resume(struct amba_device *dev, u32 level)
+{
+	struct amba_kmi_port *kmi = amba_get_drvdata(dev);
+
+	if (level == RESUME_ENABLE) {
+		/* kick the serio layer to rescan this port */
+		serio_rescan(&kmi->io);
+	}
+
+	return 0;
+}
+
+static struct amba_id amba_kmi_idtable[] = {
+	{
+		.id	= 0x00041050,
+		.mask	= 0x000fffff,
+	},
+	{ 0, 0 }
+};
+
+static struct amba_driver ambakmi_driver = {
+	.drv		= {
+		.name	= "kmi-pl050",
+	},
+	.id_table	= amba_kmi_idtable,
+	.probe		= amba_kmi_probe,
+	.remove		= amba_kmi_remove,
+	.resume		= amba_kmi_resume,
+};
+
 static int __init amba_kmi_init(void)
 {
-	amba_kmi_init_one("keyboard", KMI0_BASE, IRQ_KMIINT0, 0);
-	amba_kmi_init_one("mouse", KMI1_BASE, IRQ_KMIINT1, 1);
-	return 0;
+	return amba_driver_register(&ambakmi_driver);
 }
 
 static void __exit amba_kmi_exit(void)
 {
-	struct amba_kmi_port *kmi, *next;
-
-	kmi = list;
-	while (kmi) {
-		next = kmi->next;
-
-		serio_unregister_port(&kmi->io);
-		iounmap(kmi->base);
-		release_resource(kmi->res);
-		kfree(kmi);
-
-		kmi = next;
-	}
+	return amba_driver_unregister(&ambakmi_driver);
 }
 
 module_init(amba_kmi_init);

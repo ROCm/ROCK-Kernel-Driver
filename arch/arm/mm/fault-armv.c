@@ -213,7 +213,7 @@ void __flush_dcache_page(struct page *page)
 		if (off >= (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT)
 			continue;
 
-		flush_cache_page(mpnt, off);
+		flush_cache_page(mpnt, mpnt->vm_start + (off << PAGE_SHIFT));
 	}
 }
 
