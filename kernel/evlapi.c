@@ -35,7 +35,6 @@ extern void evl_mk_rechdr(struct kern_log_entry *hdr,
 	const char *facility, int event_type, int severity, size_t size,
 	uint flags, int format);
 extern int evl_writeh(struct kern_log_entry *hdr, const char *vardata);
-extern void evl_unbrace(char *dest, const char *src, int bufsz);
 
 /**
  * evl_write() - write header + optional buffer to event handler
@@ -164,8 +163,19 @@ evl_end_args(struct evl_recbuf *b)
 		/* VERY long format string: even argsz is off end of record. */
 		return;
 	}
-	argsz = b->b_tail - args;
+	argsz = (int) (b->b_tail - args);
 	memcpy(b->b_argsz, &argsz, sizeof(int));
+}
+
+size_t
+evl_datasz(struct evl_recbuf *b, uint *flags)
+{
+	if (b->b_tail > b->b_end) {
+		*flags |= EVL_TRUNCATE;
+		return (size_t) (b->b_end - b->b_buf);
+	} else {
+		return (size_t) (b->b_tail - b->b_buf);
+	}
 }
 
 static inline void
@@ -345,8 +355,8 @@ evl_pack_args(struct evl_recbuf *b, const char *fmt, va_list args)
  * (1) we want events to be logged even in low-memory situations; and
  * (2) the buffer is too big to be an auto variable.
  */
-static spinlock_t msgbuf_lock = SPIN_LOCK_UNLOCKED;
-static char msgbuf[EVL_ENTRY_MAXLEN];
+spinlock_t evl_msgbuf_lock = SPIN_LOCK_UNLOCKED;
+char evl_msgbuf[EVL_ENTRY_MAXLEN];
 
 /**
  * evl_send_printf() - Format and log a PRINTF-format message.
@@ -365,19 +375,18 @@ evl_send_printf(struct kern_log_entry *hdr, const char *fmt, va_list args)
 	struct evl_recbuf b;
 	unsigned long iflags;
 
-	spin_lock_irqsave(&msgbuf_lock, iflags);
-	evl_init_recbuf(&b, msgbuf, EVL_ENTRY_MAXLEN);
+	spin_lock_irqsave(&evl_msgbuf_lock, iflags);
+	evl_init_recbuf(&b, evl_msgbuf, EVL_ENTRY_MAXLEN);
 	evl_puts(&b, fmt, 1);
 	evl_zap_newline(&b);
 	evl_end_fmt(&b);
 	evl_pack_args(&b, fmt, args);
 	evl_end_args(&b);
 
-	hdr->log_size = b.b_tail - b.b_buf;
-	/* Note: If size > EVL_ENTRY_MAXLEN, evl_writeh() will handle it. */
+	hdr->log_size = evl_datasz(&b, &hdr->log_flags);
 	
 	ret = evl_writeh(hdr, b.b_buf);
-	spin_unlock_irqrestore(&msgbuf_lock, iflags);
+	spin_unlock_irqrestore(&evl_msgbuf_lock, iflags);
 	return ret;
 }
 
@@ -393,7 +402,7 @@ evl_vprintk(const char *facility, int event_type, int severity,
 	const char *fmt, va_list args)
 {
 	struct kern_log_entry hdr;
-	unsigned int flags = 0;
+	uint flags = 0;
 	if (event_type == 0) {
 		flags |= EVL_EVTYCRC;
 	}
@@ -420,80 +429,86 @@ evl_printk(const char *facility, int event_type, int severity,
 	return ret;
 }
 
-/*** printkat support ***/
-
-static int
-try_extract_severity(const char *msg)
-{
-	if (msg[0] == '<'
-	    && msg[1] >= '0' && msg[1] <= '7'
-	    && msg[2] == '>') {
-		return msg[1] - '0';
-	}
-	return -1;
-}
-
-static int
-extract_severity(const char *fmt, va_list args)
-{
-	int sev = try_extract_severity(fmt);
-	if (sev == -1 && (fmt[0] == '<' || fmt[0] == '%')) {
-		/* Handle stuff like "<%d>..." and "%s..." */
-		char prefix[4];
-		(void) vsnprintf(prefix, 4, fmt, args);
-		sev = try_extract_severity(prefix);
-	}
-	return sev;
-}
+#ifdef CONFIG_EVLOG_FWPRINTK
+/*
+ * Support for forwarding printks
+ *
+ * Accumulate format segments and args in different buffers, in case
+ * multiple printk calls are used to construct a single message.
+ * These buffers are currently used only by evl_fwd_printk(), and hence
+ * are protected by printk's logbuf_lock.  They're too big to be auto
+ * variables in evl_fwd_printk().
+ */
+static char prtk_argbuf[EVL_ENTRY_MAXLEN];
+static struct evl_recbuf b_args;
+static char prtk_msgbuf[EVL_ENTRY_MAXLEN];
+static struct evl_recbuf b_msg;
 
 /**
- * evl_printkat() - Log a PRINTF-format record, stripping attribute names.
- * @facility: facility name (e.g., "kern", driver name)
- * @buf, @buflen: a scratch buffer in which we construct the record
- * @fmt: format string, possibly including severity-level prefix.
- *	Any attribute names in curly braces will be stripped out by
- *	evl_unbrace().
- * other args as per printk()
- * 
- * On return, buf contains the format string, purged of {id} constructs
- * and the "{{" trailer, if any.
+ * evl_fwd_printk() - Forward printk message to evlog.
+ * msg is the message obtained by applying vsnprintf() to
+ * fmt and args.  (Caller does this anyway, so we don't have to.)
+ * Create and log a PRINTF-format event record whose contents are:
+ *	format string (possibly concatenated from multiple segments)
+ *	int containing args size
+ *	args
+ *
+ * We consult msg only to determine the severity (e.g., "<1>") and whether
+ * we have a terminating newline.  If this message segment doesn't end
+ * in a newline, we save the fmt and args for concatenation with the next
+ * printk.
+ *
+ * @fmt - format string from printk
+ * @args - arg list from printk
+ * @msg - formatted message from printk
  */
 int
-evl_printkat(const char *facility, char *buf, size_t buflen, const char *fmt,
-	va_list args)
+evl_fwd_printk(const char *fmt, va_list args, const char *msg)
 {
-	int ret;
-	int severity;
-	struct evl_recbuf b;
-	struct kern_log_entry hdr;
+	static int sev = -1;
+	int ret = 0;
+	uint flags = EVL_PRINTK | EVL_EVTYCRC;
+	size_t reclen;
+	int msglen = strlen(msg);
+	int last_segment = (msglen > 0 && msg[msglen-1] == '\n');
 
-	evl_init_recbuf(&b, buf, buflen);
-	evl_unbrace(b.b_buf, fmt, (int) buflen);
-	b.b_tail = b.b_buf + strlen(b.b_buf) + 1;
-	evl_zap_newline(&b);
-	evl_end_fmt(&b);
-
-	evl_pack_args(&b, fmt, args);
-	evl_end_args(&b);
-
-	severity = extract_severity(b.b_buf, args);
-	if (severity < 0) {
-		/* See kernel.h and printk.c */
-		severity = default_message_loglevel;
+	if (sev == -1) {
+		/* Severity not yet defined.  Must be a new message. */
+		sev = default_message_loglevel;
+		if (msg[0] == '<'
+		    && msg[1] >= '0' && msg[1] <= '7'
+		    && msg[2] == '>') {
+			sev = msg[1] - '0';
+		}
+		evl_init_recbuf(&b_msg, prtk_msgbuf, EVL_ENTRY_MAXLEN);
+		evl_init_recbuf(&b_args, prtk_argbuf, EVL_ENTRY_MAXLEN);
 	}
 
-	evl_mk_rechdr(&hdr, facility, 0, severity, b.b_tail - b.b_buf,
-		EVL_EVTYCRC, EVL_PRINTF);
-	/* Note: If size > EVL_ENTRY_MAXLEN, evl_writeh() will handle it. */
-	
-	ret = evl_writeh(&hdr, b.b_buf);
+	evl_puts(&b_msg, fmt, last_segment);
+	evl_pack_args(&b_args, fmt, args);
+	if (!last_segment) {
+		return 0;
+	}
 
-	/* Put the newline back in case caller calls printk(). */
-	evl_unzap_newline(&b);
+	evl_zap_newline(&b_msg);
+	evl_end_fmt(&b_msg);
+	evl_put(&b_msg, b_args.b_buf, evl_datasz(&b_args, &flags));
+	reclen = evl_datasz(&b_msg, &flags);
+	ret = evl_write("kern", 0, sev, b_msg.b_buf, reclen, flags, EVL_PRINTF);
+	sev = -1;
 	return ret;
 }
+#endif	/* CONFIG_EVLOG_FWPRINTK */
 
 EXPORT_SYMBOL(evl_write);
 EXPORT_SYMBOL(evl_printk);
 EXPORT_SYMBOL(evl_vprintk);
-EXPORT_SYMBOL(evl_printkat);
+
+EXPORT_SYMBOL(evl_init_recbuf);
+EXPORT_SYMBOL(evl_put);
+EXPORT_SYMBOL(evl_puts);
+EXPORT_SYMBOL(evl_zap_newline);
+EXPORT_SYMBOL(evl_unzap_newline);
+EXPORT_SYMBOL(evl_end_fmt);
+EXPORT_SYMBOL(evl_end_args);
+EXPORT_SYMBOL(evl_datasz);

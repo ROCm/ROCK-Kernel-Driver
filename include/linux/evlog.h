@@ -114,15 +114,17 @@ extern void evl_init_recbuf(struct evl_recbuf *b, char *buf, size_t size);
 extern void evl_put(struct evl_recbuf *b, const void *data, size_t datasz);
 extern void evl_puts(struct evl_recbuf *b, const char *s, int null);
 extern void evl_zap_newline(struct evl_recbuf *b);
+extern void evl_unzap_newline(struct evl_recbuf *b);
 extern void evl_end_fmt(struct evl_recbuf *b);
 extern void evl_pack_args(struct evl_recbuf *b, const char *fmt, va_list args);
 extern void evl_end_args(struct evl_recbuf *b);
+extern size_t evl_datasz(struct evl_recbuf *b, uint *flags);
 #else	/* ! CONFIG_EVLOG */
 static inline int evl_write(const char *facility, int event_type,
 	int severity, const void *buf, size_t len, uint flags, int format)
 	{ return -ENOSYS; }
 static inline int evl_printk(const char *facility, int event_type, int sev,
-	const char *fmt, ...);
+	const char *fmt, ...)
 	{ return -ENOSYS; }
 static inline int evl_vprintk(const char *facility, int event_type, int sev,
 	const char *fmt, va_list args)

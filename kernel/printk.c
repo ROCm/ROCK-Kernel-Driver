@@ -30,18 +30,8 @@
 #include <linux/smp.h>
 #include <linux/security.h>
 #include <linux/bootmem.h>
-#include <linux/string.h>
-#include <linux/ctype.h>
 
 #include <asm/uaccess.h>
-#ifdef CONFIG_EVLOG
-#include <linux/evlog.h>
-extern int evl_printkat(const char *facname, char *buf, size_t buflen,
-	const char *fmt, va_list args);
-#define PRINTKAT_BUFLEN EVL_ENTRY_MAXLEN
-#else
-#define PRINTKAT_BUFLEN 512
-#endif
 
 #define __LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
 
@@ -122,6 +112,9 @@ static int preferred_console = -1;
 
 #ifdef CONFIG_EVLOG
 extern int evl_kbufread(char *, size_t);
+#ifdef CONFIG_EVLOG_FWPRINTK
+extern int evl_fwd_printk(const char *fmt, va_list args, const char *msg);
+#endif
 #endif
 
 /* Flag: console code may call schedule() */
@@ -526,20 +519,9 @@ static void emit_log_char(char c)
  * then changes console_loglevel may break. This is because console_loglevel
  * is inspected when the actual printing occurs.
  */
-int vprintk(const char *fmt, va_list args);
-
 asmlinkage int printk(const char *fmt, ...)
 {
-	int status;
 	va_list args;
-	va_start(args, fmt);
-	status = vprintk(fmt, args);
-	va_end(args);
-	return status;
-}
-
-int vprintk(const char *fmt, va_list args)
-{
 	unsigned long flags;
 	int printed_len;
 	char *p;
@@ -557,7 +539,12 @@ int vprintk(const char *fmt, va_list args)
 	spin_lock_irqsave(&logbuf_lock, flags);
 
 	/* Emit the output into the temporary buffer */
+	va_start(args, fmt);
 	printed_len = vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
+#ifdef CONFIG_EVLOG_FWPRINTK
+	(void) evl_fwd_printk(fmt, args, printk_buf);
+#endif
+	va_end(args);
 
 	/*
 	 * Copy the output into log_buf.  If the caller didn't provide
@@ -1008,108 +995,3 @@ void early_printk(const char *str, size_t len)
 }
 
 #endif /* CONFIG_IA64_EARLY_PRINTK */
-
-
-/*
- * Event logging: printk wrapper that strips {foo}% tags from the
- * format string.
- */
-static char printkat_buf[PRINTKAT_BUFLEN];
-static spinlock_t printkat_lock = SPIN_LOCK_UNLOCKED;
-
-/*
- * Copy src to dest, replacing strings of the form "{id}%" with "%".
- * If src contains "{{", strip out that and anything beyond it.
- * dest is a buffer of size bufsz.  Make sure we don't overflow it.
- */
-void evl_unbrace(char *dest, const char *src, int bufsz)
-{
-	const char *copy_this = src, *scan_this = src;
-	const char *c, *lcb, *rcb, *cut_here;
-	int copy_len, dlen = 0;
-
-	cut_here = strstr(src, "{{");
-	dest[0] = '\0';
-	for (;;) {
-		lcb = strchr(scan_this, '{');
-		if (!lcb) {
-			goto done;
-		}
-		rcb = strstr(lcb+2, "}%");
-		if (!rcb) {
-			goto done;
-		}
-		if (cut_here && cut_here < rcb) {
-			goto done;
-		}
-		/* Is it a valid identifier between the { and } ? */
-		c = lcb+1;
-		if (*c != '_' && !isalpha(*c)) {
-			goto scan_again;
-		}
-		for (c++; c < rcb; c++) {
-			if (*c != '_' && !isalnum(*c)) {
-				goto scan_again;
-			}
-		}
-		copy_len = min(lcb - copy_this, bufsz-(dlen+1));
-		strncat(dest + dlen, copy_this, copy_len);
-		dlen += copy_len;
-		copy_this = rcb+1;
-scan_again:
-		scan_this = rcb+2;
-	}
-done:
-	if (cut_here) {
-		copy_len = min(cut_here - copy_this, bufsz-(dlen+1));
-	} else {
-		copy_len = bufsz-(dlen+1);
-	}
-	strncat(dest + dlen, copy_this, copy_len);
-	return;
-}
-
-/**
- * printkat - Log message to printk and/or evlog, stripping {id}s.
- * @facname: facility name (e.g., driver name) for evlog event
- * @call_printk: 0 -> don't call printk
- * fmt and subsequent args are as with printk.  Log the message to printk
- * (via vprintk), and (if EVLOG is configured) also to evlog as an
- * EVL_PRINTF-format record.  Strip {id}s from the message, and also
- * anything following "{{".
- */
-/*ARGSUSED*/
-int __printkat(const char *facname, int call_printk,  const char *fmt, ...)
-{
-	int status;
-	unsigned long flags;
-	va_list args;
-
-	va_start(args, fmt);
-#ifdef CONFIG_EVLOG
-	spin_lock_irqsave(&printkat_lock, flags);
-	status = evl_printkat(facname, printkat_buf, PRINTKAT_BUFLEN, fmt,
-		args);
-	if (call_printk) {
-		(void) vprintk(printkat_buf, args);
-	}
-	spin_unlock_irqrestore(&printkat_lock, flags);
-#else
-	/* EVLOG disabled.  Just call printk, stripping {id}s as needed. */
-	if (!call_printk) {
-		return 0;
-	}
-	if (strstr(fmt, "}%") || strstr(fmt, "{{")) {
-		spin_lock_irqsave(&printkat_lock, flags);
-		evl_unbrace(printkat_buf, fmt, PRINTKAT_BUFLEN);
-		status = vprintk(printkat_buf, args);
-		spin_unlock_irqrestore(&printkat_lock, flags);
-	} else {
-		status = vprintk(fmt, args);
-	}
-#endif
-	va_end(args);
-
-	return status;
-}
-EXPORT_SYMBOL(__printkat);
