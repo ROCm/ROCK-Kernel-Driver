@@ -338,7 +338,7 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 
 		if (autoirq == 0)
 		{
-			printk("%s probe at %#x failed to detect IRQ line.\n",
+			printk(KERN_WARNING "%s probe at %#x failed to detect IRQ line.\n",
 				mname, ioaddr);
 			release_region(ioaddr, EL1_IO_EXTENT);
 			return -EAGAIN;
@@ -362,7 +362,7 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 #endif
 
 	if (el_debug)
-		printk("%s", version);
+		printk(KERN_DEBUG "%s", version);
 
 	/*
 	 *	Initialize the device structure.
@@ -421,7 +421,7 @@ static int el_open(struct net_device *dev)
 	unsigned long flags;
 
 	if (el_debug > 2)
-		printk("%s: Doing el_open()...", dev->name);
+		printk(KERN_DEBUG "%s: Doing el_open()...", dev->name);
 
 	if ((retval = request_irq(dev->irq, &el_interrupt, 0, dev->name, dev)))
 		return retval;
@@ -545,13 +545,13 @@ static int el_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			lp->loading=0;
 			dev->trans_start = jiffies;
 			if (el_debug > 2)
-				printk(" queued xmit.\n");
+				printk(KERN_DEBUG " queued xmit.\n");
 			dev_kfree_skb (skb);
 			return 0;
 		}
 		/* A receive upset our load, despite our best efforts */
 		if(el_debug>2)
-			printk("%s: burped during tx load.\n", dev->name);
+			printk(KERN_DEBUG "%s: burped during tx load.\n", dev->name);
 		spin_lock_irqsave(&lp->lock, flags);
 	}
 	while(1);
@@ -626,7 +626,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			if(el_debug > 2)
 			{
 				printk(KERN_DEBUG "%s: Interrupt while loading [", dev->name);
-				printk(" txsr=%02x gp=%04x rp=%04x]\n", txsr, inw(GP_LOW),inw(RX_LOW));
+				printk(KERN_DEBUG " txsr=%02x gp=%04x rp=%04x]\n", txsr, inw(GP_LOW),inw(RX_LOW));
 			}
 			lp->loading=2;		/* Force a reload */
 			spin_unlock(&lp->lock);
@@ -643,7 +643,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			 *	reset immediately ?
 			 */
 			if(el_debug>1)
-				printk("%s: Unusual interrupt during Tx, txsr=%02x axsr=%02x"
+				printk(KERN_DEBUG "%s: Unusual interrupt during Tx, txsr=%02x axsr=%02x"
 			  		" gp=%03x rp=%03x.\n", dev->name, txsr, axsr,
 			inw(ioaddr + EL1_DATAPTR), inw(ioaddr + EL1_RXPTR));
 			lp->txing = 0;
@@ -655,7 +655,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			 *	Timed out
 			 */
 			if (el_debug)
-				printk("%s: Transmit failed 16 times, Ethernet jammed?\n",dev->name);
+				printk (KERN_DEBUG "%s: Transmit failed 16 times, Ethernet jammed?\n",dev->name);
 			outb(AX_SYS, AX_CMD);
 			lp->txing = 0;
 			lp->stats.tx_aborted_errors++;
@@ -668,7 +668,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			 */
 
 			if (el_debug > 6)
-				printk(" retransmitting after a collision.\n");
+				printk(KERN_DEBUG " retransmitting after a collision.\n");
 			/*
 			 *	Poor little chip can't reset its own start pointer
 			 */
@@ -687,7 +687,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			 */
 			lp->stats.tx_packets++;
 			if (el_debug > 6)
-				printk(" Tx succeeded %s\n",
+				printk(KERN_DEBUG " Tx succeeded %s\n",
 		       			(txsr & TX_RDY) ? "." : "but tx is busy!");
 			/*
 			 *	This is safe the interrupt is atomic WRT itself.
@@ -705,7 +705,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 		int rxsr = inb(RX_STATUS);
 		if (el_debug > 5)
-			printk(" rxsr=%02x txsr=%02x rp=%04x", rxsr, inb(TX_STATUS),inw(RX_LOW));
+			printk(KERN_DEBUG " rxsr=%02x txsr=%02x rp=%04x", rxsr, inb(TX_STATUS),inw(RX_LOW));
 		/*
 		 *	Just reading rx_status fixes most errors.
 		 */
@@ -715,7 +715,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		{	/* Handled to avoid board lock-up. */
 			lp->stats.rx_length_errors++;
 			if (el_debug > 5)
-				printk(" runt.\n");
+				printk(KERN_DEBUG " runt.\n");
 		}
 		else if (rxsr & RX_GOOD)
 		{
@@ -730,12 +730,12 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			 *	Nothing?  Something is broken!
 			 */
 			if (el_debug > 2)
-				printk("%s: No packet seen, rxsr=%02x **resetting 3c501***\n",
+				printk(KERN_DEBUG "%s: No packet seen, rxsr=%02x **resetting 3c501***\n",
 					dev->name, rxsr);
 			el_reset(dev);
 		}
 		if (el_debug > 3)
-			printk(".\n");
+			printk(KERN_DEBUG ".\n");
 	}
 
 	/*
@@ -771,12 +771,12 @@ static void el_receive(struct net_device *dev)
 	pkt_len = inw(RX_LOW);
 
 	if (el_debug > 4)
-		printk(" el_receive %d.\n", pkt_len);
+		printk(KERN_DEBUG " el_receive %d.\n", pkt_len);
 
 	if ((pkt_len < 60)  ||  (pkt_len > 1536))
 	{
 		if (el_debug)
-			printk("%s: bogus packet, length=%d\n", dev->name, pkt_len);
+			printk(KERN_DEBUG "%s: bogus packet, length=%d\n", dev->name, pkt_len);
 		lp->stats.rx_over_errors++;
 		return;
 	}
@@ -795,7 +795,7 @@ static void el_receive(struct net_device *dev)
 	outw(0x00, GP_LOW);
 	if (skb == NULL)
 	{
-		printk("%s: Memory squeeze, dropping packet.\n", dev->name);
+		printk(KERN_INFO "%s: Memory squeeze, dropping packet.\n", dev->name);
 		lp->stats.rx_dropped++;
 		return;
 	}
@@ -833,7 +833,7 @@ static void  el_reset(struct net_device *dev)
 	int ioaddr = dev->base_addr;
 
 	if (el_debug> 2)
-		printk("3c501 reset...");
+		printk(KERN_INFO "3c501 reset...");
 	outb(AX_RESET, AX_CMD);		/* Reset the chip */
 	outb(AX_LOOP, AX_CMD);		/* Aux control, irq and loopback enabled */
 	{
@@ -866,7 +866,7 @@ static int el1_close(struct net_device *dev)
 	int ioaddr = dev->base_addr;
 
 	if (el_debug > 2)
-		printk("%s: Shutting down Ethernet card at %#x.\n", dev->name, ioaddr);
+		printk(KERN_INFO "%s: Shutting down Ethernet card at %#x.\n", dev->name, ioaddr);
 
 	netif_stop_queue(dev);
 	
