@@ -229,7 +229,7 @@ flush_thread(void)
 	wrfpcr(FPCR_DYN_NORMAL | ieee_swcr_to_fpcr(0));
 
 	/* Clean slate for TLS.  */
-	current->pcb.unique = 0;
+	current_thread_info()->pcb.unique = 0;
 }
 
 void
@@ -247,16 +247,15 @@ release_thread(struct task_struct *dead_task)
  * with parameters (SIGCHLD, 0).
  */
 int
-alpha_clone(unsigned long clone_flags, unsigned long usp,
-	    int *user_tid, struct switch_stack * swstack)
+alpha_clone(unsigned long clone_flags, unsigned long usp, int *user_tid,
+	    struct pt_regs *regs)
 {
 	struct task_struct *p;
-	struct pt_regs *u_regs = (struct pt_regs *) (swstack+1);
 
 	if (!usp)
 		usp = rdusp();
 
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, u_regs, 0, user_tid);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0, user_tid);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -285,7 +284,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	    unsigned long unused,
 	    struct task_struct * p, struct pt_regs * regs)
 {
-	extern void ret_from_sys_call(void);
 	extern void ret_from_fork(void);
 
 	struct thread_info *childti = p->thread_info;
@@ -307,11 +305,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	stack = ((struct switch_stack *) regs) - 1;
 	childstack = ((struct switch_stack *) childregs) - 1;
 	*childstack = *stack;
-#ifdef CONFIG_SMP
 	childstack->r26 = (unsigned long) ret_from_fork;
-#else
-	childstack->r26 = (unsigned long) ret_from_sys_call;
-#endif
 	childti->pcb.usp = usp;
 	childti->pcb.ksp = (unsigned long) childstack;
 	childti->pcb.flags = 1;	/* set FEN, clear everything else */

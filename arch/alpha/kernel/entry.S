@@ -1,7 +1,7 @@
 /*
- * alpha/entry.S
+ * arch/alpha/kernel/entry.S
  *
- * kernel entry-points
+ * Kernel entry-points.
  */
 
 #include <linux/config.h>
@@ -11,9 +11,10 @@
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
 
-/*
- * stack offsets
- */
+	.text
+	.set noat
+
+/* Stack offsets.  */
 #define SP_OFF			184
 #define SWITCH_STACK_SIZE	320
 
@@ -28,145 +29,578 @@
  */
 
 #define SAVE_ALL			\
-	subq	$30,SP_OFF,$30;		\
-	stq	$0,0($30);		\
-	stq	$1,8($30);		\
-	stq	$2,16($30);		\
-	stq	$3,24($30);		\
-	stq	$4,32($30);		\
-	stq	$28,144($30);		\
-	lda	$2,alpha_mv;		\
-	stq	$5,40($30);		\
-	stq	$6,48($30);		\
-	stq	$7,56($30);		\
-	stq	$8,64($30);		\
-	stq	$19,72($30);		\
-	stq	$20,80($30);		\
-	stq	$21,88($30);		\
-	ldq	$2,HAE_CACHE($2);	\
-	stq	$22,96($30);		\
-	stq	$23,104($30);		\
-	stq	$24,112($30);		\
-	stq	$25,120($30);		\
-	stq	$26,128($30);		\
-	stq	$27,136($30);		\
-	stq	$2,152($30);		\
-	stq	$16,160($30);		\
-	stq	$17,168($30);		\
-	stq	$18,176($30)
+	subq	$sp, SP_OFF, $sp;	\
+	stq	$0, 0($sp);		\
+	stq	$1, 8($sp);		\
+	stq	$2, 16($sp);		\
+	stq	$3, 24($sp);		\
+	stq	$4, 32($sp);		\
+	stq	$28, 144($sp);		\
+	lda	$2, alpha_mv;		\
+	stq	$5, 40($sp);		\
+	stq	$6, 48($sp);		\
+	stq	$7, 56($sp);		\
+	stq	$8, 64($sp);		\
+	stq	$19, 72($sp);		\
+	stq	$20, 80($sp);		\
+	stq	$21, 88($sp);		\
+	ldq	$2, HAE_CACHE($2);	\
+	stq	$22, 96($sp);		\
+	stq	$23, 104($sp);		\
+	stq	$24, 112($sp);		\
+	stq	$25, 120($sp);		\
+	stq	$26, 128($sp);		\
+	stq	$27, 136($sp);		\
+	stq	$2, 152($sp);		\
+	stq	$16, 160($sp);		\
+	stq	$17, 168($sp);		\
+	stq	$18, 176($sp)
 
 #define RESTORE_ALL			\
-	lda	$19,alpha_mv;		\
-	ldq	$0,0($30);		\
-	ldq	$1,8($30);		\
-	ldq	$2,16($30);		\
-	ldq	$3,24($30);		\
-	ldq	$21,152($30);		\
-	ldq	$20,HAE_CACHE($19);	\
-	ldq	$4,32($30);		\
-	ldq	$5,40($30);		\
-	ldq	$6,48($30);		\
-	ldq	$7,56($30);		\
-	subq	$20,$21,$20;		\
-	ldq	$8,64($30);		\
-	beq	$20,99f;		\
-	ldq	$20,HAE_REG($19);	\
-	stq	$21,HAE_CACHE($19);	\
-	stq	$21,0($20);		\
-	ldq	$0,0($30);		\
-	ldq	$1,8($30);		\
+	lda	$19, alpha_mv;		\
+	ldq	$0, 0($sp);		\
+	ldq	$1, 8($sp);		\
+	ldq	$2, 16($sp);		\
+	ldq	$3, 24($sp);		\
+	ldq	$21, 152($sp);		\
+	ldq	$20, HAE_CACHE($19);	\
+	ldq	$4, 32($sp);		\
+	ldq	$5, 40($sp);		\
+	ldq	$6, 48($sp);		\
+	ldq	$7, 56($sp);		\
+	subq	$20, $21, $20;		\
+	ldq	$8, 64($sp);		\
+	beq	$20, 99f;		\
+	ldq	$20, HAE_REG($19);	\
+	stq	$21, HAE_CACHE($19);	\
+	stq	$21, 0($20);		\
+	ldq	$0, 0($sp);		\
+	ldq	$1, 8($sp);		\
 99:;					\
-	ldq	$19,72($30);		\
-	ldq	$20,80($30);		\
-	ldq	$21,88($30);		\
-	ldq	$22,96($30);		\
-	ldq	$23,104($30);		\
-	ldq	$24,112($30);		\
-	ldq	$25,120($30);		\
-	ldq	$26,128($30);		\
-	ldq	$27,136($30);		\
-	ldq	$28,144($30);		\
-	addq	$30,SP_OFF,$30
+	ldq	$19, 72($sp);		\
+	ldq	$20, 80($sp);		\
+	ldq	$21, 88($sp);		\
+	ldq	$22, 96($sp);		\
+	ldq	$23, 104($sp);		\
+	ldq	$24, 112($sp);		\
+	ldq	$25, 120($sp);		\
+	ldq	$26, 128($sp);		\
+	ldq	$27, 136($sp);		\
+	ldq	$28, 144($sp);		\
+	addq	$sp, SP_OFF, $sp
 
-.text
-.set noat
+/*
+ * Non-syscall kernel entry points.
+ */
 
-.align 3
-.globl	entInt
-.ent	entInt
+	.align	4
+	.globl	entInt
+	.ent	entInt
 entInt:
 	SAVE_ALL
-	lda	$8,0x3fff
-	lda	$26,ret_from_sys_call
-	bic	$30,$8,$8
-	jsr	$31,do_entInt
+	lda	$8, 0x3fff
+	lda	$26, ret_from_sys_call
+	bic	$sp, $8, $8
+	mov	$sp, $19
+	jsr	$31, do_entInt
 .end entInt
 
-.align 3
-.globl	entMM
-.ent	entMM
+	.align	4
+	.globl	entArith
+	.ent	entArith
+entArith:
+	SAVE_ALL
+	lda	$8, 0x3fff
+	lda	$26, ret_from_sys_call
+	bic	$sp, $8, $8
+	mov	$sp, $18
+	jsr	$31, do_entArith
+.end entArith
+
+	.align	4
+	.globl	entMM
+	.ent	entMM
 entMM:
 	SAVE_ALL
 /* save $9 - $15 so the inline exception code can manipulate them.  */
-	subq	$30,56,$30
-	stq	$9,0($30)
-	stq	$10,8($30)
-	stq	$11,16($30)
-	stq	$12,24($30)
-	stq	$13,32($30)
-	stq	$14,40($30)
-	stq	$15,48($30)
-	addq	$30,56,$19
+	subq	$sp, 56, $sp
+	stq	$9, 0($sp)
+	stq	$10, 8($sp)
+	stq	$11, 16($sp)
+	stq	$12, 24($sp)
+	stq	$13, 32($sp)
+	stq	$14, 40($sp)
+	stq	$15, 48($sp)
+	addq	$sp, 56, $19
 /* handle the fault */
-	lda	$8,0x3fff
-	bic	$30,$8,$8
-	jsr	$26,do_page_fault
+	lda	$8, 0x3fff
+	bic	$sp, $8, $8
+	jsr	$26, do_page_fault
 /* reload the registers after the exception code played.  */
-	ldq	$9,0($30)
-	ldq	$10,8($30)
-	ldq	$11,16($30)
-	ldq	$12,24($30)
-	ldq	$13,32($30)
-	ldq	$14,40($30)
-	ldq	$15,48($30)
-	addq	$30,56,$30
+	ldq	$9, 0($sp)
+	ldq	$10, 8($sp)
+	ldq	$11, 16($sp)
+	ldq	$12, 24($sp)
+	ldq	$13, 32($sp)
+	ldq	$14, 40($sp)
+	ldq	$15, 48($sp)
+	addq	$sp, 56, $sp
 /* finish up the syscall as normal.  */
 	br	ret_from_sys_call
 .end entMM
 
-.align 3
-.globl	entArith
-.ent	entArith
-entArith:
-	SAVE_ALL
-	lda	$8,0x3fff
-	lda	$26,ret_from_sys_call
-	bic	$30,$8,$8
-	jsr	$31,do_entArith
-.end entArith
-
-.align 3
-.globl	entIF
-.ent	entIF
+	.align	4
+	.globl	entIF
+	.ent	entIF
 entIF:
 	SAVE_ALL
-	lda	$8,0x3fff
-	lda	$26,ret_from_sys_call
-	bic	$30,$8,$8
-	jsr	$31,do_entIF
+	lda	$8, 0x3fff
+	lda	$26, ret_from_sys_call
+	bic	$sp, $8, $8
+	mov	$sp, $17
+	jsr	$31, do_entIF
 .end entIF
 
-.align 3
-.globl	entDbg
-.ent	entDbg
+	.align	4
+	.globl	entUna
+	.ent	entUna
+entUna:
+	lda	$sp, -256($sp)
+	stq	$0, 0($sp)
+	ldq	$0, 256($sp)	/* get PS */
+	stq	$1, 8($sp)
+	stq	$2, 16($sp)
+	stq	$3, 24($sp)
+	and	$0, 8, $0		/* user mode? */
+	stq	$4, 32($sp)
+	bne	$0, entUnaUser	/* yup -> do user-level unaligned fault */
+	stq	$5, 40($sp)
+	stq	$6, 48($sp)
+	stq	$7, 56($sp)
+	stq	$8, 64($sp)
+	stq	$9, 72($sp)
+	stq	$10, 80($sp)
+	stq	$11, 88($sp)
+	stq	$12, 96($sp)
+	stq	$13, 104($sp)
+	stq	$14, 112($sp)
+	stq	$15, 120($sp)
+	/* 16-18 PAL-saved */
+	stq	$19, 152($sp)
+	stq	$20, 160($sp)
+	stq	$21, 168($sp)
+	stq	$22, 176($sp)
+	stq	$23, 184($sp)
+	stq	$24, 192($sp)
+	stq	$25, 200($sp)
+	stq	$26, 208($sp)
+	stq	$27, 216($sp)
+	stq	$28, 224($sp)
+	stq	$gp, 232($sp)
+	lda	$8, 0x3fff
+	stq	$31, 248($sp)
+	bic	$sp, $8, $8
+	jsr	$26, do_entUna
+	ldq	$0, 0($sp)
+	ldq	$1, 8($sp)
+	ldq	$2, 16($sp)
+	ldq	$3, 24($sp)
+	ldq	$4, 32($sp)
+	ldq	$5, 40($sp)
+	ldq	$6, 48($sp)
+	ldq	$7, 56($sp)
+	ldq	$8, 64($sp)
+	ldq	$9, 72($sp)
+	ldq	$10, 80($sp)
+	ldq	$11, 88($sp)
+	ldq	$12, 96($sp)
+	ldq	$13, 104($sp)
+	ldq	$14, 112($sp)
+	ldq	$15, 120($sp)
+	/* 16-18 PAL-saved */
+	ldq	$19, 152($sp)
+	ldq	$20, 160($sp)
+	ldq	$21, 168($sp)
+	ldq	$22, 176($sp)
+	ldq	$23, 184($sp)
+	ldq	$24, 192($sp)
+	ldq	$25, 200($sp)
+	ldq	$26, 208($sp)
+	ldq	$27, 216($sp)
+	ldq	$28, 224($sp)
+	ldq	$gp, 232($sp)
+	lda	$sp, 256($sp)
+	call_pal PAL_rti
+.end entUna
+
+	.align	4
+	.ent	entUnaUser
+entUnaUser:
+	ldq	$0, 0($sp)	/* restore original $0 */
+	lda	$sp, 256($sp)	/* pop entUna's stack frame */
+	SAVE_ALL		/* setup normal kernel stack */
+	lda	$sp, -56($sp)
+	stq	$9, 0($sp)
+	stq	$10, 8($sp)
+	stq	$11, 16($sp)
+	stq	$12, 24($sp)
+	stq	$13, 32($sp)
+	stq	$14, 40($sp)
+	stq	$15, 48($sp)
+	lda	$8, 0x3fff
+	addq	$sp, 56, $19
+	bic	$sp, $8, $8
+	jsr	$26, do_entUnaUser
+	ldq	$9, 0($sp)
+	ldq	$10, 8($sp)
+	ldq	$11, 16($sp)
+	ldq	$12, 24($sp)
+	ldq	$13, 32($sp)
+	ldq	$14, 40($sp)
+	ldq	$15, 48($sp)
+	lda	$sp, 56($sp)
+	br	ret_from_sys_call
+.end entUnaUser
+
+	.align	4
+	.globl	entDbg
+	.ent	entDbg
 entDbg:
 	SAVE_ALL
-	lda	$8,0x3fff
-	lda	$26,ret_from_sys_call
-	bic	$30,$8,$8
-	jsr	$31,do_entDbg
+	lda	$8, 0x3fff
+	lda	$26, ret_from_sys_call
+	bic	$sp, $8, $8
+	mov	$sp, $16
+	jsr	$31, do_entDbg
 .end entDbg
+
+/*
+ * The system call entry point is special.  Most importantly, it looks
+ * like a function call to userspace as far as clobbered registers.  We
+ * do preserve the argument registers (for syscall restarts) and $26
+ * (for leaf syscall functions).
+ *
+ * So much for theory.  We don't take advantage of this yet.
+ *
+ * Note that a0-a2 are not saved by PALcode as with the other entry points.
+ */
 
+	.align	4
+	.globl	entSys
+	.globl	ret_from_sys_call
+	.ent	entSys
+entSys:
+	SAVE_ALL
+	lda	$8, 0x3fff
+	bic	$sp, $8, $8
+	lda	$4, NR_SYSCALLS($31)
+	stq	$16, SP_OFF+24($sp)
+	lda	$5, sys_call_table
+	lda	$27, sys_ni_syscall
+	cmpult	$0, $4, $4
+	ldl	$3, TI_FLAGS($8)
+	stq	$17, SP_OFF+32($sp)
+	s8addq	$0, $5, $5
+	stq	$18, SP_OFF+40($sp)
+	blbs	$3, strace
+	beq	$4, 1f
+	ldq	$27, 0($5)
+1:	jsr	$26, ($27), alpha_ni_syscall
+	ldgp	$gp, 0($26)
+	blt	$0, $syscall_error	/* the call failed */
+	stq	$0, 0($sp)
+	stq	$31, 72($sp)		/* a3=0 => no error */
+
+	.align	4
+ret_from_sys_call:
+	cmovne	$26, 0, $19		/* $19 = 0 => non-restartable */
+	ldq	$0, SP_OFF($sp)
+	and	$0, 8, $0
+	beq	$0, restore_all
+ret_from_reschedule:
+	/* Make sure need_resched and sigpending don't change between
+		sampling and the rti.  */
+	lda	$16, 7
+	call_pal PAL_swpipl
+	ldl	$5, TI_FLAGS($8)
+	and	$5, _TIF_WORK_MASK, $2
+	bne	$5, work_pending
+restore_all:
+	RESTORE_ALL
+	call_pal PAL_rti
+
+	.align 3
+$syscall_error:
+	/*
+	 * Some system calls (e.g., ptrace) can return arbitrary
+	 * values which might normally be mistaken as error numbers.
+	 * Those functions must zero $0 (v0) directly in the stack
+	 * frame to indicate that a negative return value wasn't an
+	 * error number..
+	 */
+	ldq	$19, 0($sp)	/* old syscall nr (zero if success) */
+	beq	$19, $ret_success
+
+	ldq	$20, 72($sp)	/* .. and this a3 */
+	subq	$31, $0, $0	/* with error in v0 */
+	addq	$31, 1, $1	/* set a3 for errno return */
+	stq	$0, 0($sp)
+	mov	$31, $26	/* tell "ret_from_sys_call" we can restart */
+	stq	$1, 72($sp)	/* a3 for return */
+	br	ret_from_sys_call
+
+$ret_success:
+	stq	$0, 0($sp)
+	stq	$31, 72($sp)	/* a3=0 => no error */
+	br	ret_from_sys_call
+.end entSys
+
+/*
+ * Do all cleanup when returning from all interrupts and system calls.
+ *
+ * Arguments:
+ *       $5: TI_FLAGS.
+ *       $8: current.
+ *      $19: The old syscall number, or zero if this is not a return
+ *           from a syscall that errored and is possibly restartable.
+ *      $20: Error indication.
+ */
+
+	.align	4
+	.ent	work_pending
+work_pending:
+	and	$5, _TIF_NEED_RESCHED, $2
+	beq	$2, $work_notifysig
+
+$work_resched:
+	subq	$sp, 16, $sp
+	stq	$19, 0($sp)              /* save syscall nr */
+	stq	$20, 8($sp)              /* and error indication (a3) */
+	jsr	$26, schedule
+	ldq	$19, 0($sp)
+	ldq	$20, 8($sp)
+	addq	$sp, 16, $sp
+	/* Make sure need_resched and sigpending don't change between
+		sampling and the rti.  */
+	lda	$16, 7
+	call_pal PAL_swpipl
+	ldl	$5, TI_FLAGS($8)
+	and	$5, _TIF_WORK_MASK, $2
+	beq	$2, restore_all
+	and	$5, _TIF_NEED_RESCHED, $2
+	bne	$2, $work_resched
+
+$work_notifysig:
+	mov	$sp, $17
+	br	$1, do_switch_stack
+	mov	$5, $21
+	mov	$sp, $18
+	mov	$31, $16
+	jsr	$26, do_notify_resume
+	bsr	$1, undo_switch_stack
+	br	restore_all
+.end work_pending
+
+/*
+ * PTRACE syscall handler
+ */
+
+	.align	4
+	.ent	strace
+strace:
+	/* set up signal stack, call syscall_trace */
+	bsr	$1, do_switch_stack
+	jsr	$26, syscall_trace
+	bsr	$1, undo_switch_stack
+
+	/* get the system call number and the arguments back.. */
+	ldq	$0, 0($sp)
+	ldq	$16, SP_OFF+24($sp)
+	ldq	$17, SP_OFF+32($sp)
+	ldq	$18, SP_OFF+40($sp)
+	ldq	$19, 72($sp)
+	ldq	$20, 80($sp)
+	ldq	$21, 88($sp)
+
+	/* get the system call pointer.. */
+	lda	$1, NR_SYSCALLS($31)
+	lda	$2, sys_call_table
+	lda	$27, alpha_ni_syscall
+	cmpult	$0, $1, $1
+	s8addq	$0, $2, $2
+	beq	$1, 1f
+	ldq	$27, 0($2)
+1:	jsr	$26, ($27), sys_gettimeofday
+	ldgp	$gp, 0($26)
+
+	/* check return.. */
+	blt	$0, $strace_error	/* the call failed */
+	stq	$31, 72($sp)		/* a3=0 => no error */
+$strace_success:
+	stq	$0, 0($sp)		/* save return value */
+
+	bsr	$1, do_switch_stack
+	jsr	$26, syscall_trace
+	bsr	$1, undo_switch_stack
+	br	$31, ret_from_sys_call
+
+	.align	3
+$strace_error:
+	ldq	$19, 0($sp)	/* old syscall nr (zero if success) */
+	beq	$19, $strace_success
+	ldq	$20, 72($sp)	/* .. and this a3 */
+
+	subq	$31, $0, $0	/* with error in v0 */
+	addq	$31, 1, $1	/* set a3 for errno return */
+	stq	$0, 0($sp)
+	stq	$1, 72($sp)	/* a3 for return */
+
+	bsr	$1, do_switch_stack
+	mov	$19, $9		/* save old syscall number */
+	mov	$20, $10	/* save old a3 */
+	jsr	$26, syscall_trace
+	mov	$9, $19
+	mov	$10, $20
+	bsr	$1, undo_switch_stack
+
+	mov	$31, $26	/* tell "ret_from_sys_call" we can restart */
+	br	ret_from_sys_call
+.end strace
+
+/*
+ * Save and restore the switch stack -- aka the balance of the user context.
+ */
+
+	.align	4
+	.ent	do_switch_stack
+do_switch_stack:
+	lda	$sp, -SWITCH_STACK_SIZE($sp)
+	stq	$9, 0($sp)
+	stq	$10, 8($sp)
+	stq	$11, 16($sp)
+	stq	$12, 24($sp)
+	stq	$13, 32($sp)
+	stq	$14, 40($sp)
+	stq	$15, 48($sp)
+	stq	$26, 56($sp)
+	stt	$f0, 64($sp)
+	stt	$f1, 72($sp)
+	stt	$f2, 80($sp)
+	stt	$f3, 88($sp)
+	stt	$f4, 96($sp)
+	stt	$f5, 104($sp)
+	stt	$f6, 112($sp)
+	stt	$f7, 120($sp)
+	stt	$f8, 128($sp)
+	stt	$f9, 136($sp)
+	stt	$f10, 144($sp)
+	stt	$f11, 152($sp)
+	stt	$f12, 160($sp)
+	stt	$f13, 168($sp)
+	stt	$f14, 176($sp)
+	stt	$f15, 184($sp)
+	stt	$f16, 192($sp)
+	stt	$f17, 200($sp)
+	stt	$f18, 208($sp)
+	stt	$f19, 216($sp)
+	stt	$f20, 224($sp)
+	stt	$f21, 232($sp)
+	stt	$f22, 240($sp)
+	stt	$f23, 248($sp)
+	stt	$f24, 256($sp)
+	stt	$f25, 264($sp)
+	stt	$f26, 272($sp)
+	stt	$f27, 280($sp)
+	mf_fpcr	$f0		# get fpcr
+	stt	$f28, 288($sp)
+	stt	$f29, 296($sp)
+	stt	$f30, 304($sp)
+	stt	$f0, 312($sp)	# save fpcr in slot of $f31
+	ldt	$f0, 64($sp)	# dont let "do_switch_stack" change fp state.
+	ret	$31, ($1), 1
+.end do_switch_stack
+
+	.align	4
+	.ent	undo_switch_stack
+undo_switch_stack:
+	ldq	$9, 0($sp)
+	ldq	$10, 8($sp)
+	ldq	$11, 16($sp)
+	ldq	$12, 24($sp)
+	ldq	$13, 32($sp)
+	ldq	$14, 40($sp)
+	ldq	$15, 48($sp)
+	ldq	$26, 56($sp)
+	ldt	$f30, 312($sp)	# get saved fpcr
+	ldt	$f0, 64($sp)
+	ldt	$f1, 72($sp)
+	ldt	$f2, 80($sp)
+	ldt	$f3, 88($sp)
+	mt_fpcr	$f30		# install saved fpcr
+	ldt	$f4, 96($sp)
+	ldt	$f5, 104($sp)
+	ldt	$f6, 112($sp)
+	ldt	$f7, 120($sp)
+	ldt	$f8, 128($sp)
+	ldt	$f9, 136($sp)
+	ldt	$f10, 144($sp)
+	ldt	$f11, 152($sp)
+	ldt	$f12, 160($sp)
+	ldt	$f13, 168($sp)
+	ldt	$f14, 176($sp)
+	ldt	$f15, 184($sp)
+	ldt	$f16, 192($sp)
+	ldt	$f17, 200($sp)
+	ldt	$f18, 208($sp)
+	ldt	$f19, 216($sp)
+	ldt	$f20, 224($sp)
+	ldt	$f21, 232($sp)
+	ldt	$f22, 240($sp)
+	ldt	$f23, 248($sp)
+	ldt	$f24, 256($sp)
+	ldt	$f25, 264($sp)
+	ldt	$f26, 272($sp)
+	ldt	$f27, 280($sp)
+	ldt	$f28, 288($sp)
+	ldt	$f29, 296($sp)
+	ldt	$f30, 304($sp)
+	lda	$sp, SWITCH_STACK_SIZE($sp)
+	ret	$31, ($1), 1
+.end undo_switch_stack
+
+/*
+ * The meat of the context switch code.
+ */
+
+	.align	4
+	.globl	alpha_switch_to
+	.ent	alpha_switch_to
+alpha_switch_to:
+	.prologue 0
+	bsr	$1, do_switch_stack
+	call_pal PAL_swpctx
+	lda	$8, 0x3fff
+	bsr	$1, undo_switch_stack
+	bic	$sp, $8, $8
+	ret	$31, ($26), 1
+.end alpha_switch_to
+
+/*
+ * New processes begin life here.
+ */
+
+	.globl	ret_from_fork
+#if CONFIG_SMP || CONFIG_PREEMPT
+	.align	4
+	.ent	ret_from_fork
+ret_from_fork:
+	lda	$26, ret_from_sys_call
+	mov	$17, $16
+	jmp	$31, schedule_tail
+.end ret_from_fork
+#else
+ret_from_fork = ret_from_sys_call
+#endif
 
 /*
  * kernel_thread(fn, arg, clone_flags)
@@ -175,9 +609,9 @@ entDbg:
 	.globl	kernel_thread
 	.ent	kernel_thread
 kernel_thread:
-	ldgp	$29,0($27)	/* we can be called from a module */
+	ldgp	$gp, 0($27)	/* we can be called from a module */
 	.prologue 1
-	subq	$30,SP_OFF+6*8,$30
+	subq	$sp, SP_OFF+6*8, $sp
 	br	$1, 2f		/* load start address */
 
 	/* We've now "returned" from a fake system call.  */
@@ -186,9 +620,9 @@ kernel_thread:
 	ldi	$1, 0x3fff
 	beq	$20, 1f		/* parent or child?  */
 
-	bic	$30, $1, $8	/* in child.  */
+	bic	$sp, $1, $8	/* in child.  */
 	jsr	$26, ($27)
-	ldgp	$29, 0($26)
+	ldgp	$gp, 0($26)
 	mov	$0, $16
 	mov	$31, $26
 	jmp	$31, sys_exit
@@ -197,19 +631,19 @@ kernel_thread:
 
 	.align 4
 2:	/* Fake a system call stack frame, as we can't do system calls
-	   from kernel space.  Note that we store FN and ARG as they 
+	   from kernel space.  Note that we store FN and ARG as they
 	   need to be set up in the child for the call.  Also store $8
 	   and $26 for use in the parent.  */
-	stq	$31, SP_OFF($30)	/* ps */
-	stq	$1, SP_OFF+8($30)	/* pc */
-	stq	$29, SP_OFF+16($30)	/* gp */
-	stq	$16, 136($30)		/* $27; FN for child */
-	stq	$17, SP_OFF+24($30)	/* $16; ARG for child */
-	stq	$8, 64($30)		/* $8 */
-	stq	$26, 128($30)		/* $26 */
+	stq	$31, SP_OFF($sp)	/* ps */
+	stq	$1, SP_OFF+8($sp)	/* pc */
+	stq	$gp, SP_OFF+16($sp)	/* gp */
+	stq	$16, 136($sp)		/* $27; FN for child */
+	stq	$17, SP_OFF+24($sp)	/* $16; ARG for child */
+	stq	$8, 64($sp)		/* $8 */
+	stq	$26, 128($sp)		/* $26 */
 	/* Avoid the HAE being gratuitously wrong, to avoid restoring it.  */
 	ldq	$2, alpha_mv+HAE_CACHE
-	stq	$2, 152($30)		/* HAE */
+	stq	$2, 152($sp)		/* HAE */
 
 	/* Shuffle FLAGS to the front; add CLONE_VM.  */
 	ldi	$1, CLONE_VM|CLONE_UNTRACED
@@ -218,515 +652,126 @@ kernel_thread:
 
 	/* We don't actually care for a3 success widgetry in the kernel.
 	   Not for positive errno values.  */
-	stq	$0, 0($30)		/* $0 */
+	stq	$0, 0($sp)		/* $0 */
 	br	restore_all
-.end	kernel_thread
+.end kernel_thread
 
 /*
  * __kernel_execve(path, argv, envp, regs)
  */
-.align 3
-.globl	__kernel_execve
-.ent	__kernel_execve
+	.align	4
+	.globl	__kernel_execve
+	.ent	__kernel_execve
 __kernel_execve:
-	ldgp	$29,0($27)	/* we can be called from modules.  */
-	subq	$30,16,$30
-	.frame	$30,16,$26,0
-	stq	$26,0($30)
-	stq	$19,8($30)
+	ldgp	$gp, 0($27)	/* we can be called from modules.  */
+	subq	$sp, 16, $sp
+	.frame	$sp, 16, $26, 0
+	stq	$26, 0($sp)
+	stq	$19, 8($sp)
 	.prologue 1
-	jsr	$26,do_execve
-	bne	$0,1f		/* error! */
-	ldq	$30,8($30)
-	br	$31,ret_from_sys_call
-1:	ldq	$26,0($30)
-	addq	$30,16,$30
+	jsr	$26, do_execve
+	bne	$0, 1f		/* error! */
+	ldq	$sp, 8($sp)
+	br	$31, ret_from_sys_call
+1:	ldq	$26, 0($sp)
+	addq	$sp, 16, $sp
 	ret
-.end	__kernel_execve
+.end __kernel_execve
 
-.align 3
-.ent	do_switch_stack
-do_switch_stack:
-	lda	$30,-SWITCH_STACK_SIZE($30)
-	stq	$9,0($30)
-	stq	$10,8($30)
-	stq	$11,16($30)
-	stq	$12,24($30)
-	stq	$13,32($30)
-	stq	$14,40($30)
-	stq	$15,48($30)
-	stq	$26,56($30)
-	stt	$f0,64($30)
-	stt	$f1,72($30)
-	stt	$f2,80($30)
-	stt	$f3,88($30)
-	stt	$f4,96($30)
-	stt	$f5,104($30)
-	stt	$f6,112($30)
-	stt	$f7,120($30)
-	stt	$f8,128($30)
-	stt	$f9,136($30)
-	stt	$f10,144($30)
-	stt	$f11,152($30)
-	stt	$f12,160($30)
-	stt	$f13,168($30)
-	stt	$f14,176($30)
-	stt	$f15,184($30)
-	stt	$f16,192($30)
-	stt	$f17,200($30)
-	stt	$f18,208($30)
-	stt	$f19,216($30)
-	stt	$f20,224($30)
-	stt	$f21,232($30)
-	stt	$f22,240($30)
-	stt	$f23,248($30)
-	stt	$f24,256($30)
-	stt	$f25,264($30)
-	stt	$f26,272($30)
-	stt	$f27,280($30)
-	mf_fpcr	$f0		# get fpcr
-	stt	$f28,288($30)
-	stt	$f29,296($30)
-	stt	$f30,304($30)
-	stt	$f0,312($30)	# save fpcr in slot of $f31
-	ldt	$f0,64($30)	# dont let "do_switch_stack" change fp state.
-	ret	$31,($1),1
-.end do_switch_stack
-
-.align 3
-.ent	undo_switch_stack
-undo_switch_stack:
-	ldq	$9,0($30)
-	ldq	$10,8($30)
-	ldq	$11,16($30)
-	ldq	$12,24($30)
-	ldq	$13,32($30)
-	ldq	$14,40($30)
-	ldq	$15,48($30)
-	ldq	$26,56($30)
-	ldt	$f30,312($30)	# get saved fpcr
-	ldt	$f0,64($30)
-	ldt	$f1,72($30)
-	ldt	$f2,80($30)
-	ldt	$f3,88($30)
-	mt_fpcr	$f30		# install saved fpcr
-	ldt	$f4,96($30)
-	ldt	$f5,104($30)
-	ldt	$f6,112($30)
-	ldt	$f7,120($30)
-	ldt	$f8,128($30)
-	ldt	$f9,136($30)
-	ldt	$f10,144($30)
-	ldt	$f11,152($30)
-	ldt	$f12,160($30)
-	ldt	$f13,168($30)
-	ldt	$f14,176($30)
-	ldt	$f15,184($30)
-	ldt	$f16,192($30)
-	ldt	$f17,200($30)
-	ldt	$f18,208($30)
-	ldt	$f19,216($30)
-	ldt	$f20,224($30)
-	ldt	$f21,232($30)
-	ldt	$f22,240($30)
-	ldt	$f23,248($30)
-	ldt	$f24,256($30)
-	ldt	$f25,264($30)
-	ldt	$f26,272($30)
-	ldt	$f27,280($30)
-	ldt	$f28,288($30)
-	ldt	$f29,296($30)
-	ldt	$f30,304($30)
-	lda	$30,SWITCH_STACK_SIZE($30)
-	ret	$31,($1),1
-.end undo_switch_stack
-
-.align 3
-.globl	entUna
-.ent	entUna
-entUna:
-	lda	$30,-256($30)
-	stq	$0,0($30)
-	ldq	$0,256($30)	/* get PS */
-	stq	$1,8($30)
-	stq	$2,16($30)
-	stq	$3,24($30)
-	and	$0,8,$0		/* user mode? */
-	stq	$4,32($30)
-	bne	$0,entUnaUser	/* yup -> do user-level unaligned fault */
-	stq	$5,40($30)
-	stq	$6,48($30)
-	stq	$7,56($30)
-	stq	$8,64($30)
-	stq	$9,72($30)
-	stq	$10,80($30)
-	stq	$11,88($30)
-	stq	$12,96($30)
-	stq	$13,104($30)
-	stq	$14,112($30)
-	stq	$15,120($30)
-	/* 16-18 PAL-saved */
-	stq	$19,152($30)
-	stq	$20,160($30)
-	stq	$21,168($30)
-	stq	$22,176($30)
-	stq	$23,184($30)
-	stq	$24,192($30)
-	stq	$25,200($30)
-	stq	$26,208($30)
-	stq	$27,216($30)
-	stq	$28,224($30)
-	stq	$29,232($30)
-	lda	$8,0x3fff
-	stq	$31,248($30)
-	bic	$30,$8,$8
-	jsr	$26,do_entUna
-	ldq	$0,0($30)
-	ldq	$1,8($30)
-	ldq	$2,16($30)
-	ldq	$3,24($30)
-	ldq	$4,32($30)
-	ldq	$5,40($30)
-	ldq	$6,48($30)
-	ldq	$7,56($30)
-	ldq	$8,64($30)
-	ldq	$9,72($30)
-	ldq	$10,80($30)
-	ldq	$11,88($30)
-	ldq	$12,96($30)
-	ldq	$13,104($30)
-	ldq	$14,112($30)
-	ldq	$15,120($30)
-	/* 16-18 PAL-saved */
-	ldq	$19,152($30)
-	ldq	$20,160($30)
-	ldq	$21,168($30)
-	ldq	$22,176($30)
-	ldq	$23,184($30)
-	ldq	$24,192($30)
-	ldq	$25,200($30)
-	ldq	$26,208($30)
-	ldq	$27,216($30)
-	ldq	$28,224($30)
-	ldq	$29,232($30)
-	lda	$30,256($30)
-	call_pal PAL_rti
-.end entUna
-
-.align 3
-.ent	entUnaUser
-entUnaUser:
-	ldq	$0,0($30)	/* restore original $0 */
-	lda	$30,256($30)	/* pop entUna's stack frame */
-	SAVE_ALL		/* setup normal kernel stack */
-	lda	$30,-56($30)
-	stq	$9,0($30)
-	stq	$10,8($30)
-	stq	$11,16($30)
-	stq	$12,24($30)
-	stq	$13,32($30)
-	stq	$14,40($30)
-	stq	$15,48($30)
-	lda	$8,0x3fff
-	addq	$30,56,$19
-	bic	$30,$8,$8
-	jsr	$26,do_entUnaUser
-	ldq	$9,0($30)
-	ldq	$10,8($30)
-	ldq	$11,16($30)
-	ldq	$12,24($30)
-	ldq	$13,32($30)
-	ldq	$14,40($30)
-	ldq	$15,48($30)
-	lda	$30,56($30)
-	br	ret_from_sys_call
-.end	entUnaUser
-
+
 /*
- * A fork is the same as clone(SIGCHLD, 0);
+ * Special system calls.  Most of these are special in that they either
+ * have to play switch_stack games or in some way use the pt_regs struct.
  */
-.align 3
-.globl	sys_fork
-.ent	sys_fork
+	.align	4
+	.globl	sys_fork
+	.ent	sys_fork
 sys_fork:
-	bsr	$1,do_switch_stack
-	bis	$31,SIGCHLD,$16
-	mov	$31,$17
-	mov	$31,$18
-	mov	$30,$19
-	jsr	$26,alpha_clone
-	bsr	$1,undo_switch_stack
-	ret	$31,($26),1
-.end	sys_fork
+	mov	$sp, $19
+	bsr	$1, do_switch_stack
+	/* A fork is the same as clone(SIGCHLD, 0);  */
+	bis	$31, SIGCHLD, $16
+	mov	$31, $17
+	mov	$31, $18
+	jsr	$26, alpha_clone
+	bsr	$1, undo_switch_stack
+	ret	$31, ($26), 1
+.end sys_fork
 
-.align 3
-.globl	sys_clone
-.ent	sys_clone
+	.align	4
+	.globl	sys_clone
+	.ent	sys_clone
 sys_clone:
-	bsr	$1,do_switch_stack
+	mov	$sp, $19
+	bsr	$1, do_switch_stack
 	/* $16, $17, $18, $19 come from the user; $19 is used later
 	   via pt_regs->r19.  */
-	mov	$30,$19
-	jsr	$26,alpha_clone
-	bsr	$1,undo_switch_stack
-	ret	$31,($26),1
-.end	sys_clone
+	jsr	$26, alpha_clone
+	bsr	$1, undo_switch_stack
+	ret	$31, ($26), 1
+.end sys_clone
 
-.align 3
-.globl	sys_vfork
-.ent	sys_vfork
+	.align	4
+	.globl	sys_vfork
+	.ent	sys_vfork
 sys_vfork:
-	bsr	$1,do_switch_stack
-	mov	$30,$16
-	jsr	$26,alpha_vfork
-	bsr	$1,undo_switch_stack
-	ret	$31,($26),1
-.end	sys_vfork
+	bsr	$1, do_switch_stack
+	mov	$sp, $16
+	jsr	$26, alpha_vfork
+	bsr	$1, undo_switch_stack
+	ret	$31, ($26), 1
+.end sys_vfork
 
-.align 3
-.globl  alpha_switch_to
-.ent    alpha_switch_to
-alpha_switch_to:
-	.prologue 0
-	bsr	$1,do_switch_stack
-	call_pal PAL_swpctx
-	lda	$8,0x3fff
-	bsr	$1,undo_switch_stack
-	bic	$30,$8,$8
-	ret	$31,($26),1
-.end alpha_switch_to
-
-#if CONFIG_SMP || CONFIG_PREEMPT
-.globl  ret_from_fork
-.align 3
-.ent ret_from_fork
-ret_from_fork:
-	lda	$26,ret_from_sys_call
-	mov	$17,$16
-	jmp	$31,schedule_tail
-.end ret_from_fork
-#endif
-
-/*
- * Oh, well.. Disassembling OSF/1 binaries to find out how the
- * system calls work isn't much fun.
- *
- * entSys is special in that the PAL-code doesn't save a0-a2, so
- * we start off by doing that by hand.
- */
-.align 3
-.globl	entSys
-.globl	ret_from_sys_call
-.ent	entSys
-entSys:
-	SAVE_ALL
-	lda	$8,0x3fff
-	bic	$30,$8,$8
-	lda	$4,NR_SYSCALLS($31)
-	stq	$16,SP_OFF+24($30)
-	lda	$5,sys_call_table
-	lda	$27,sys_ni_syscall
-	cmpult	$0,$4,$4
-	ldl	$3,TI_FLAGS($8)
-	stq	$17,SP_OFF+32($30)
-	s8addq	$0,$5,$5
-	stq	$18,SP_OFF+40($30)
-	blbs	$3,strace
-	beq	$4,1f
-	ldq	$27,0($5)
-1:	jsr	$26,($27),alpha_ni_syscall
-	ldgp	$29,0($26)
-	blt	$0,syscall_error	/* the call failed */
-	stq	$0,0($30)
-	stq	$31,72($30)		/* a3=0 => no error */
-
-.align 3
-ret_from_sys_call:
-	cmovne	$26,0,$19		/* $19 = 0 => non-restartable */
-	ldq	$0,SP_OFF($30)
-	and	$0,8,$0
-	beq	$0,restore_all
-ret_from_reschedule:
-	/* Make sure need_resched and sigpending don't change between
-		sampling and the rti.  */
-	lda	$16,7
-	call_pal PAL_swpipl
-	ldl	$5,TI_FLAGS($8)
-	and	$5,_TIF_WORK_MASK,$2
-	bne	$5,work_pending
-restore_all:
-	RESTORE_ALL
-	call_pal PAL_rti
-
-work_pending:
-	and	$5,_TIF_NEED_RESCHED,$2
-	beq	$2,work_notifysig
-
-work_resched:
-	subq	$30,16,$30
-	stq	$19,0($30)              /* save syscall nr */
-	stq	$20,8($30)              /* and error indication (a3) */
-	jsr	$26,schedule
-	ldq	$19,0($30)
-	ldq	$20,8($30)
-	addq	$30,16,$30
-	/* Make sure need_resched and sigpending don't change between
-		sampling and the rti.  */
-	lda	$16,7
-	call_pal PAL_swpipl
-	ldl	$5,TI_FLAGS($8)
-	and	$5,_TIF_WORK_MASK,$2
-	beq	$2,restore_all
-	and	$5,_TIF_NEED_RESCHED,$2
-	bne	$2,work_resched
-
-work_notifysig:
-	mov	$30,$17
-	br	$1,do_switch_stack
-	mov	$5,$21
-	mov	$30,$18
-	mov	$31,$16
-	jsr	$26,do_notify_resume
-	bsr	$1,undo_switch_stack
-	br	restore_all
-
-/* PTRACE syscall handler */
-.align 3
-strace:
-	/* set up signal stack, call syscall_trace */
-	bsr	$1,do_switch_stack
-	jsr	$26,syscall_trace
-	bsr	$1,undo_switch_stack
-
-	/* get the system call number and the arguments back.. */
-	ldq	$0,0($30)
-	ldq	$16,SP_OFF+24($30)
-	ldq	$17,SP_OFF+32($30)
-	ldq	$18,SP_OFF+40($30)
-	ldq	$19,72($30)
-	ldq	$20,80($30)
-	ldq	$21,88($30)
-
-	/* get the system call pointer.. */
-	lda	$1,NR_SYSCALLS($31)
-	lda	$2,sys_call_table
-	lda	$27,alpha_ni_syscall
-	cmpult	$0,$1,$1
-	s8addq	$0,$2,$2
-	beq	$1,1f
-	ldq	$27,0($2)
-1:	jsr	$26,($27),sys_gettimeofday
-	ldgp	$29,0($26)
-
-	/* check return.. */
-	blt	$0,strace_error	/* the call failed */
-	stq	$31,72($30)		/* a3=0 => no error */
-strace_success:
-	stq	$0,0($30)		/* save return value */
-
-	bsr	$1,do_switch_stack
-	jsr	$26,syscall_trace
-	bsr	$1,undo_switch_stack
-	br	$31,ret_from_sys_call
-
-	.align	3
-strace_error:
-	ldq	$19,0($30)	/* old syscall nr (zero if success) */
-	beq	$19,strace_success
-	ldq	$20,72($30)	/* .. and this a3 */
-
-	subq	$31,$0,$0	/* with error in v0 */
-	addq	$31,1,$1	/* set a3 for errno return */
-	stq	$0,0($30)
-	stq	$1,72($30)	/* a3 for return */
-
-	bsr	$1,do_switch_stack
-	mov	$19,$9		/* save old syscall number */
-	mov	$20,$10		/* save old a3 */
-	jsr	$26,syscall_trace
-	mov	$9,$19
-	mov	$10,$20
-	bsr	$1,undo_switch_stack
-
-	mov	$31,$26		/* tell "ret_from_sys_call" we can restart */
-	br	ret_from_sys_call
-
-	.align 3
-syscall_error:
-	/*
-	 * Some system calls (e.g., ptrace) can return arbitrary
-	 * values which might normally be mistaken as error numbers.
-	 * Those functions must zero $0 (v0) directly in the stack
-	 * frame to indicate that a negative return value wasn't an
-	 * error number..
-	 */
-	ldq	$19,0($30)	/* old syscall nr (zero if success) */
-	beq	$19,ret_success
-
-	ldq	$20,72($30)	/* .. and this a3 */
-	subq	$31,$0,$0	/* with error in v0 */
-	addq	$31,1,$1	/* set a3 for errno return */
-	stq	$0,0($30)
-	mov	$31,$26		/* tell "ret_from_sys_call" we can restart */
-	stq	$1,72($30)	/* a3 for return */
-	br	ret_from_sys_call
-
-ret_success:
-	stq	$0,0($30)
-	stq	$31,72($30)	/* a3=0 => no error */
-	br	ret_from_sys_call
-.end entSys
-
-.align 3
-.globl sys_sigreturn
-.ent sys_sigreturn
+	.align	4
+	.globl	sys_sigreturn
+	.ent	sys_sigreturn
 sys_sigreturn:
-	mov	$30,$17
-	lda	$18,-SWITCH_STACK_SIZE($30)
-	lda	$30,-SWITCH_STACK_SIZE($30)
-	jsr	$26,do_sigreturn
-	br	$1,undo_switch_stack
+	mov	$sp, $17
+	lda	$18, -SWITCH_STACK_SIZE($sp)
+	lda	$sp, -SWITCH_STACK_SIZE($sp)
+	jsr	$26, do_sigreturn
+	br	$1, undo_switch_stack
 	br	ret_from_sys_call
 .end sys_sigreturn
 
-.align 3
-.globl sys_rt_sigreturn
-.ent sys_rt_sigreturn
+	.align	4
+	.globl	sys_rt_sigreturn
+	.ent	sys_rt_sigreturn
 sys_rt_sigreturn:
-	mov	$30,$17
-	lda	$18,-SWITCH_STACK_SIZE($30)
-	lda	$30,-SWITCH_STACK_SIZE($30)
-	jsr	$26,do_rt_sigreturn
-	br	$1,undo_switch_stack
+	mov	$sp, $17
+	lda	$18, -SWITCH_STACK_SIZE($sp)
+	lda	$sp, -SWITCH_STACK_SIZE($sp)
+	jsr	$26, do_rt_sigreturn
+	br	$1, undo_switch_stack
 	br	ret_from_sys_call
 .end sys_rt_sigreturn
 
-.align 3
-.globl sys_sigsuspend
-.ent sys_sigsuspend
+	.align	4
+	.globl	sys_sigsuspend
+	.ent	sys_sigsuspend
 sys_sigsuspend:
-	mov	$30,$17
-	br	$1,do_switch_stack
-	mov	$30,$18
-	subq	$30,16,$30
-	stq	$26,0($30)
-	jsr	$26,do_sigsuspend
-	ldq	$26,0($30)
-	lda	$30,SWITCH_STACK_SIZE+16($30)
-	ret	$31,($26),1
+	mov	$sp, $17
+	br	$1, do_switch_stack
+	mov	$sp, $18
+	subq	$sp, 16, $sp
+	stq	$26, 0($sp)
+	jsr	$26, do_sigsuspend
+	ldq	$26, 0($sp)
+	lda	$sp, SWITCH_STACK_SIZE+16($sp)
+	ret	$31, ($26), 1
 .end sys_sigsuspend
 
-.align 3
-.globl sys_rt_sigsuspend
-.ent sys_rt_sigsuspend
+	.align	4
+	.globl	sys_rt_sigsuspend
+	.ent	sys_rt_sigsuspend
 sys_rt_sigsuspend:
-	mov	$30,$18
-	br	$1,do_switch_stack
-	mov	$30,$19
-	subq	$30,16,$30
-	stq	$26,0($30)
-	jsr	$26,do_rt_sigsuspend
-	ldq	$26,0($30)
-	lda	$30,SWITCH_STACK_SIZE+16($30)
-	ret	$31,($26),1
+	mov	$sp, $18
+	br	$1, do_switch_stack
+	mov	$sp, $19
+	subq	$sp, 16, $sp
+	stq	$26, 0($sp)
+	jsr	$26, do_rt_sigsuspend
+	ldq	$26, 0($sp)
+	lda	$sp, SWITCH_STACK_SIZE+16($sp)
+	ret	$31, ($26), 1
 .end sys_rt_sigsuspend
