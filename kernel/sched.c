@@ -4446,6 +4446,7 @@ static void sched_domain_debug(void)
 				if (sd->parent)
 					printk(" ERROR !SD_LOAD_BALANCE domain has parent");
 				printk("\n");
+				break;
 			}
 
 			printk("span %s\n", str);
@@ -4454,8 +4455,6 @@ static void sched_domain_debug(void)
 				printk(KERN_DEBUG "ERROR domain->span does not contain CPU%d\n", i);
 			if (!cpu_isset(i, group->cpumask))
 				printk(KERN_DEBUG "ERROR domain->groups does not contain CPU%d\n", i);
-			if (!group->cpu_power)
-				printk(KERN_DEBUG "ERROR domain->cpu_power not set\n");
 
 			printk(KERN_DEBUG);
 			for (j = 0; j < level + 2; j++)
@@ -4466,6 +4465,9 @@ static void sched_domain_debug(void)
 					printk(" ERROR: NULL");
 					break;
 				}
+				
+				if (!group->cpu_power)
+					printk(KERN_DEBUG "ERROR group->cpu_power not set\n");
 
 				if (!cpus_weight(group->cpumask))
 					printk(" ERROR empty group:");
