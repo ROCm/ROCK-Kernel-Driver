@@ -2208,7 +2208,45 @@ struct devfs_lookup_struct
 {
     devfs_handle_t de;
     wait_queue_head_t wait_queue;
+    atomic_t count;
 };
+
+static struct devfs_lookup_struct *
+new_devfs_lookup_struct(void)
+{
+	struct devfs_lookup_struct *p = kmalloc(sizeof(*p), GFP_KERNEL);
+
+	if (!p)
+		return NULL;
+
+	init_waitqueue_head (&p->wait_queue);
+	atomic_set(&p->count, 1);
+	return p;
+}
+
+static void
+get_devfs_lookup_struct(struct devfs_lookup_struct *info)
+{
+	if (info)
+		atomic_inc(&info->count);
+	else {
+		printk(KERN_ERR "null devfs_lookup_struct pointer\n");
+		dump_stack();
+	}
+}
+
+static void
+put_devfs_lookup_struct(struct devfs_lookup_struct *info)
+{
+	if (info) {
+		if (!atomic_dec_and_test(&info->count))
+			return;
+		kfree(info);
+	} else {
+		printk(KERN_ERR "null devfs_lookup_struct pointer\n");
+		dump_stack();
+	}
+}
 
 /* XXX: this doesn't handle the case where we got a negative dentry
         but a devfs entry has been registered in the meanwhile */
@@ -2252,11 +2290,13 @@ static int devfs_d_revalidate_wait (struct dentry *dentry, struct nameidata *nd)
     read_lock (&parent->u.dir.lock);
     if (dentry->d_fsdata)
     {
+	get_devfs_lookup_struct(lookup_info);
 	set_current_state (TASK_UNINTERRUPTIBLE);
 	add_wait_queue (&lookup_info->wait_queue, &wait);
 	read_unlock (&parent->u.dir.lock);
 	schedule ();
 	remove_wait_queue (&lookup_info->wait_queue, &wait);
+	put_devfs_lookup_struct(lookup_info);
     }
     else read_unlock (&parent->u.dir.lock);
     return 1;
@@ -2268,7 +2308,7 @@ static int devfs_d_revalidate_wait (struct dentry *dentry, struct nameidata *nd)
 static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
     struct devfs_entry tmp;  /*  Must stay in scope until devfsd idle again  */
-    struct devfs_lookup_struct lookup_info;
+    struct devfs_lookup_struct *lookup_info;
     struct fs_info *fs_info = dir->i_sb->s_fs_info;
     struct devfs_entry *parent, *de;
     struct inode *inode;
@@ -2285,9 +2325,10 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry, st
     read_lock (&parent->u.dir.lock);
     de = _devfs_search_dir (parent, dentry->d_name.name, dentry->d_name.len);
     read_unlock (&parent->u.dir.lock);
-    lookup_info.de = de;
-    init_waitqueue_head (&lookup_info.wait_queue);
-    dentry->d_fsdata = &lookup_info;
+    lookup_info = new_devfs_lookup_struct();
+    if (!lookup_info) return ERR_PTR(-ENOMEM);
+    lookup_info->de = de;
+    dentry->d_fsdata = lookup_info;
     if (de == NULL)
     {   /*  Try with devfsd. For any kind of failure, leave a negative dentry
 	    so someone else can deal with it (in the case where the sysadmin
@@ -2297,6 +2338,7 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry, st
 	if (try_modload (parent, fs_info,
 			 dentry->d_name.name, dentry->d_name.len, &tmp) < 0)
 	{   /*  Lookup event was not queued to devfsd  */
+	    put_devfs_lookup_struct(lookup_info);
 	    d_add (dentry, NULL);
 	    return NULL;
 	}
@@ -2309,7 +2351,7 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry, st
     up (&dir->i_sem);
     wait_for_devfsd_finished (fs_info);  /*  If I'm not devfsd, must wait  */
     down (&dir->i_sem);      /*  Grab it again because them's the rules  */
-    de = lookup_info.de;
+    de = lookup_info->de;
     /*  If someone else has been so kind as to make the inode, we go home
 	early  */
     if (dentry->d_inode) goto out;
@@ -2333,10 +2375,11 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry, st
 	     de->name, de->inode.ino, inode, de, current->comm);
     d_instantiate (dentry, inode);
 out:
+    write_lock (&parent->u.dir.lock);
     dentry->d_op = &devfs_dops;
     dentry->d_fsdata = NULL;
-    write_lock (&parent->u.dir.lock);
-    wake_up (&lookup_info.wait_queue);
+    wake_up (&lookup_info->wait_queue);
+    put_devfs_lookup_struct(lookup_info);
     write_unlock (&parent->u.dir.lock);
     devfs_put (de);
     return retval;
