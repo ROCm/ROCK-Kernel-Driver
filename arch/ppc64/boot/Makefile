@@ -124,6 +124,5 @@ $(obj)/imagesize.c: vmlinux
 
 install: $(CONFIGURE) $(obj)/$(BOOTIMAGE)
 	sh -x $(src)/install.sh "$(KERNELRELEASE)" "$(obj)/$(BOOTIMAGE)" "$(TOPDIR)/System.map" "$(INSTALL_PATH)"
-	if [ -f init/kerntypes.o ]; then cp init/kerntypes.o $(INSTALL_PATH)/Kerntypes; fi
 
 clean-files := $(patsubst $(obj)/%,%, $(obj-boot))

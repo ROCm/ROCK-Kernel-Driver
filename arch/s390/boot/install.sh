@@ -35,14 +35,5 @@ if [ -f $5/System.map ]; then
 	mv $5/System.map $5/System.old
 fi
 
-if [ -f $5/Kerntypes ]; then
-	mv $5/Kerntypes $5/Kerntypes.old
-fi
-
 cat $2 > $5/vmlinuz
 cp $3 $5/System.map
-
-# copy the kernel type file if it exists
-if [ -f $4 ]; then
-	cp $4 $5/Kerntypes
-fi
