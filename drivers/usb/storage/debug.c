@@ -49,6 +49,7 @@
 void usb_stor_show_command(Scsi_Cmnd *srb)
 {
 	char *what = NULL;
+	int i;
 
 	switch (srb->cmnd[0]) {
 	case TEST_UNIT_READY: what = "TEST_UNIT_READY"; break;
@@ -143,29 +144,25 @@ void usb_stor_show_command(Scsi_Cmnd *srb)
 	default: what = "(unknown command)"; break;
 	}
 	US_DEBUGP("Command %s (%d bytes)\n", what, srb->cmd_len);
-	US_DEBUGP("%02x %02x %02x %02x "
-		  "%02x %02x %02x %02x "
-		  "%02x %02x %02x %02x\n",
-		  srb->cmnd[0], srb->cmnd[1], srb->cmnd[2], srb->cmnd[3],
-		  srb->cmnd[4], srb->cmnd[5], srb->cmnd[6], srb->cmnd[7],
-		  srb->cmnd[8], srb->cmnd[9], srb->cmnd[10],
-		  srb->cmnd[11]);
+	US_DEBUGP("");
+	for (i = 0; i < srb->cmd_len && i < 16; i++)
+		US_DEBUGPX(" %02x", srb->cmnd[i]);
+	US_DEBUGPX("\n");
 }
 
-void usb_stor_print_Scsi_Cmnd( Scsi_Cmnd* cmd )
+void usb_stor_print_Scsi_Cmnd(Scsi_Cmnd *cmd)
 {
 	int i=0, bufferSize = cmd->request_bufflen;
-	u8* buffer = cmd->request_buffer;
-	struct scatterlist* sg = (struct scatterlist*)cmd->request_buffer;
+	u8 *buffer = cmd->request_buffer;
+	struct scatterlist *sg = (struct scatterlist*)cmd->request_buffer;
 
-	US_DEBUGP("Dumping information about %p.\n", cmd );
-	US_DEBUGP("cmd->cmnd[0] value is %d.\n", cmd->cmnd[0] );
+	US_DEBUGP("Dumping information about %p.\n", cmd);
+	US_DEBUGP("cmd->cmnd[0] value is %d.\n", cmd->cmnd[0]);
 	US_DEBUGP("(MODE_SENSE is %d and MODE_SENSE_10 is %d)\n",
-		  MODE_SENSE, MODE_SENSE_10 );
+		  MODE_SENSE, MODE_SENSE_10);
 
-	US_DEBUGP("buffer is %p with length %d.\n", buffer, bufferSize );
-	for ( i=0; i<bufferSize; i+=16 )
-	{
+	US_DEBUGP("buffer is %p with length %d.\n", buffer, bufferSize);
+	for (i=0; i<bufferSize; i+=16) {
 		US_DEBUGP("%02x %02x %02x %02x %02x %02x %02x %02x\n"
 			  "%02x %02x %02x %02x %02x %02x %02x %02x\n",
 			  buffer[i],
@@ -187,8 +184,7 @@ void usb_stor_print_Scsi_Cmnd( Scsi_Cmnd* cmd )
 	}
 
 	US_DEBUGP("Buffer has %d scatterlists.\n", cmd->use_sg );
-	for ( i=0; i<cmd->use_sg; i++ )
-	{
+	for (i=0; i<cmd->use_sg; i++) {
 		char *adr = sg_address(sg[i]);
 		
 		US_DEBUGP("Length of scatterlist %d is %d.\n",i,sg[i].length);

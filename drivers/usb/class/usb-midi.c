@@ -337,7 +337,8 @@ static int usb_write( struct midi_out_endpoint *ep, unsigned char *buf, int len 
     
 	if (status) {
 		printk(KERN_ERR "usbmidi: Cannot submit urb (%d)\n",status);
-		ret = -EFAULT;
+		ret = -EIO;
+		goto error;
 	}
 
 	add_wait_queue( &ep->wait, &wait );
@@ -354,6 +355,7 @@ static int usb_write( struct midi_out_endpoint *ep, unsigned char *buf, int len 
 	set_current_state( TASK_RUNNING );
 	remove_wait_queue( &ep->wait, &wait );
 
+error:
 	return ret;
 }
 
@@ -369,7 +371,6 @@ static void usb_bulk_read(struct urb *urb, struct pt_regs *regs)
 	struct midi_in_endpoint *ep = (struct midi_in_endpoint *)(urb->context);
 	unsigned char *data = urb->transfer_buffer;
 	int i, j, wake;
-	unsigned long int flags;
 
 	if ( !ep->urbSubmitted ) {
 		return;
@@ -377,7 +378,7 @@ static void usb_bulk_read(struct urb *urb, struct pt_regs *regs)
 
 	if ( (urb->status == 0) && (urb->actual_length > 0) ) {
 		wake = 0;
-		spin_lock_irqsave( &ep->lock, flags );
+		spin_lock( &ep->lock );
 
 		for(j = 0; j < urb->actual_length; j += 4) {
 			int cin = (data[j]>>0)&0xf;
@@ -397,7 +398,7 @@ static void usb_bulk_read(struct urb *urb, struct pt_regs *regs)
 			}
 		}
 
-		spin_unlock_irqrestore( &ep->lock, flags );
+		spin_unlock ( &ep->lock );
 		if ( wake ) {
 			wake_up( &ep->wait );
 		}
@@ -407,7 +408,7 @@ static void usb_bulk_read(struct urb *urb, struct pt_regs *regs)
 	urb->dev = ep->usbdev;
 
 	urb->actual_length = 0;
-	usb_submit_urb(urb, GFP_KERNEL);
+	usb_submit_urb(urb, GFP_ATOMIC);
 }
 
 
@@ -855,7 +856,6 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 		add_wait_queue( &open_wait, &wait );
 		up(&open_sem);
 		schedule();
-		__set_current_state(TASK_RUNNING);
 		remove_wait_queue( &open_wait, &wait );
 		if ( signal_pending(current) ) {
 			return -ERESTARTSYS;

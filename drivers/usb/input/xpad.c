@@ -200,8 +200,10 @@ static int xpad_open (struct input_dev *dev)
 		return 0;
 	
 	xpad->irq_in->dev = xpad->udev;
-	if (usb_submit_urb(xpad->irq_in, GFP_KERNEL))
+	if (usb_submit_urb(xpad->irq_in, GFP_KERNEL)) {
+		xpad->open_count--;
 		return -EIO;
+	}
 	
 	return 0;
 }
