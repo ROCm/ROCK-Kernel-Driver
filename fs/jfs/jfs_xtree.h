@@ -32,10 +32,10 @@ typedef struct xad {
 	unsigned flag:8;	/* 1: flag */
 	unsigned rsvrd:16;	/* 2: reserved */
 	unsigned off1:8;	/* 1: offset in unit of fsblksize */
-	u32 off2;		/* 4: offset in unit of fsblksize */
+	__le32 off2;		/* 4: offset in unit of fsblksize */
 	unsigned len:24;	/* 3: length in unit of fsblksize */
 	unsigned addr1:8;	/* 1: address in unit of fsblksize */
-	u32 addr2;		/* 4: address in unit of fsblksize */
+	__le32 addr2;		/* 4: address in unit of fsblksize */
 } xad_t;			/* (16) */
 
 #define MAXXLEN         ((1 << 24) - 1)
@@ -90,14 +90,14 @@ struct xadlist {
  */
 typedef union {
 	struct xtheader {
-		s64 next;	/* 8: */
-		s64 prev;	/* 8: */
+		__le64 next;	/* 8: */
+		__le64 prev;	/* 8: */
 
 		u8 flag;	/* 1: */
 		u8 rsrvd1;	/* 1: */
-		s16 nextindex;	/* 2: next index = number of entries */
-		s16 maxentry;	/* 2: max number of entries */
-		s16 rsrvd2;	/* 2: */
+		__le16 nextindex;	/* 2: next index = number of entries */
+		__le16 maxentry;	/* 2: max number of entries */
+		__le16 rsrvd2;	/* 2: */
 
 		pxd_t self;	/* 8: self */
 	} header;		/* (32) */
