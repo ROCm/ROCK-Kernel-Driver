@@ -200,7 +200,9 @@ void q40_free_irq(unsigned int irq, void *dev_id)
 
 irqreturn_t q40_process_int (int level, struct pt_regs *fp)
 {
-  printk("unexpected interrupt %x\n",level);
+  printk("unexpected interrupt vec=%x, pc=%lx, d0=%lx, d0_orig=%lx, d1=%lx, d2=%lx\n",
+          level, fp->pc, fp->d0, fp->orig_d0, fp->d1, fp->d2);
+  printk("\tIIRQ_REG = %x, EIRQ_REG = %x\n",master_inb(IIRQ_REG),master_inb(EIRQ_REG));
   return IRQ_HANDLED;
 }
 
