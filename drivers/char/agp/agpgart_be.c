@@ -409,8 +409,18 @@ static void agp_generic_agp_enable(u32 mode)
 	 *        AGP devices and collect their data.
 	 */
 
-	while ((device = pci_find_class(PCI_CLASS_DISPLAY_VGA << 8,
-					device)) != NULL) {
+
+	pci_for_each_dev(device)
+	{
+		/*
+		 *	Enable AGP devices. Most will be VGA display but
+		 *	some may be coprocessors on non VGA devices too
+		 */
+		 
+		if((((device->class >> 16) & 0xFF) != PCI_BASE_CLASS_DISPLAY) &&
+			(device->class != (PCI_CLASS_PROCESSOR_CO << 8)))
+			continue;
+
 		pci_read_config_dword(device, 0x04, &scratch);
 
 		if (!(scratch & 0x00100000))
@@ -1826,7 +1836,7 @@ static int __init intel_820_setup (struct pci_dev *pdev)
        agp_bridge.needs_scratch_page = FALSE;
        agp_bridge.configure = intel_820_configure;
        agp_bridge.fetch_size = intel_8xx_fetch_size;
-       agp_bridge.cleanup = intel_cleanup;
+       agp_bridge.cleanup = intel_820_cleanup;
        agp_bridge.tlb_flush = intel_820_tlbflush;
        agp_bridge.mask_memory = intel_mask_memory;
        agp_bridge.agp_enable = agp_generic_agp_enable;
@@ -1839,6 +1849,9 @@ static int __init intel_820_setup (struct pci_dev *pdev)
        agp_bridge.free_by_type = agp_generic_free_by_type;
        agp_bridge.agp_alloc_page = agp_generic_alloc_page;
        agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+       agp_bridge.suspend = agp_generic_suspend;
+       agp_bridge.resume = agp_generic_resume;
+       agp_bridge.cant_use_aperture = 0;
 
        return 0;
 
@@ -1869,6 +1882,9 @@ static int __init intel_830mp_setup (struct pci_dev *pdev)
        agp_bridge.free_by_type = agp_generic_free_by_type;
        agp_bridge.agp_alloc_page = agp_generic_alloc_page;
        agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+       agp_bridge.suspend = agp_generic_suspend;
+       agp_bridge.resume = agp_generic_resume;
+       agp_bridge.cant_use_aperture = 0;
 
        return 0;
 
@@ -3307,8 +3323,18 @@ static void serverworks_agp_enable(u32 mode)
 	 *        AGP devices and collect their data.
 	 */
 
-	while ((device = pci_find_class(PCI_CLASS_DISPLAY_VGA << 8,
-					device)) != NULL) {
+
+	pci_for_each_dev(device)
+	{
+		/*
+		 *	Enable AGP devices. Most will be VGA display but
+		 *	some may be coprocessors on non VGA devices too
+		 */
+		 
+		if((((device->class >> 16) & 0xFF) != PCI_BASE_CLASS_DISPLAY) &&
+			(device->class != (PCI_CLASS_PROCESSOR_CO << 8)))
+			continue;
+
 		pci_read_config_dword(device, 0x04, &scratch);
 
 		if (!(scratch & 0x00100000))
@@ -3606,6 +3632,12 @@ static struct {
 		"i815",
 		intel_generic_setup },
 	{ PCI_DEVICE_ID_INTEL_820_0,
+		PCI_VENDOR_ID_INTEL,
+		INTEL_I820,
+		"Intel",
+		"i820",
+		intel_820_setup },
+	{ PCI_DEVICE_ID_INTEL_820_UP_0,
 		PCI_VENDOR_ID_INTEL,
 		INTEL_I820,
 		"Intel",

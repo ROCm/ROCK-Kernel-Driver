@@ -301,7 +301,7 @@ static agp_memory *agp_allocate_memory_wrap(size_t pg_count, u32 type)
 	agp_memory *memory;
 
 	memory = agp_allocate_memory(pg_count, type);
-   	printk(KERN_DEBUG "memory : %p\n", memory);
+   	printk(KERN_DEBUG "agp_allocate_memory: %p\n", memory);
 	if (memory == NULL) {
 		return NULL;
 	}

@@ -179,6 +179,9 @@ struct agp_bridge_data {
 #ifndef PCI_DEVICE_ID_INTEL_820_0
 #define PCI_DEVICE_ID_INTEL_820_0       0x2500
 #endif
+#ifndef PCI_DEVICE_ID_INTEL_820_UP_0
+#define PCI_DEVICE_ID_INTEL_820_UP_0    0x2501
+#endif
 #ifndef PCI_DEVICE_ID_INTEL_840_0
 #define PCI_DEVICE_ID_INTEL_840_0		0x1a21
 #endif
@@ -189,7 +192,7 @@ struct agp_bridge_data {
 #define PCI_DEVICE_ID_INTEL_850_0     0x2530
 #endif
 #ifndef PCI_DEVICE_ID_INTEL_860_0
-#define PCI_DEVICE_ID_INTEL_860_0	0x2532
+#define PCI_DEVICE_ID_INTEL_860_0     0x2531
 #endif
 #ifndef PCI_DEVICE_ID_INTEL_810_DC100_0
 #define PCI_DEVICE_ID_INTEL_810_DC100_0 0x7122
@@ -276,6 +279,7 @@ struct agp_bridge_data {
 #define I830_RDRAM_ND(x)           (((x) & 0x20) >> 5)
 #define I830_RDRAM_DDT(x)          (((x) & 0x18) >> 3)
 
+/* This one is for I830MP w. an external graphic card */
 #define INTEL_I830_ERRSTS          0x92
 
 /* intel i820 registers */
