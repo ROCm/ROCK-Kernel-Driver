@@ -348,12 +348,12 @@ static struct accessmap	nfs3_anyaccess[] = {
 };
 
 int
-nfsd_access(struct svc_rqst *rqstp, struct svc_fh *fhp, u32 *access)
+nfsd_access(struct svc_rqst *rqstp, struct svc_fh *fhp, u32 *access, u32 *supported)
 {
 	struct accessmap	*map;
 	struct svc_export	*export;
 	struct dentry		*dentry;
-	u32			query, result = 0;
+	u32			query, result = 0, sresult = 0;
 	unsigned int		error;
 
 	error = fh_verify(rqstp, fhp, 0, MAY_NOP);
@@ -375,6 +375,9 @@ nfsd_access(struct svc_rqst *rqstp, struct svc_fh *fhp, u32 *access)
 	for  (; map->access; map++) {
 		if (map->access & query) {
 			unsigned int err2;
+
+			sresult |= map->access;
+
 			err2 = nfsd_permission(export, dentry, map->how);
 			switch (err2) {
 			case nfs_ok:
@@ -395,6 +398,8 @@ nfsd_access(struct svc_rqst *rqstp, struct svc_fh *fhp, u32 *access)
 		}
 	}
 	*access = result;
+	if (supported)
+		*supported = sresult;
 
  out:
 	return error;
@@ -756,6 +761,9 @@ nfsd_commit(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	struct file	file;
 	int		err;
 
+	if ((u64)count > ~(u64)offset)
+		return nfserr_inval;
+
 	if ((err = nfsd_open(rqstp, fhp, S_IFREG, MAY_WRITE, &file)) != 0)
 		return err;
 	if (EX_ISSYNC(fhp->fh_export)) {
@@ -904,7 +912,8 @@ out_nfserr:
 int
 nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		char *fname, int flen, struct iattr *iap,
-		struct svc_fh *resfhp, int createmode, u32 *verifier)
+		struct svc_fh *resfhp, int createmode, u32 *verifier,
+	        int *truncp)
 {
 	struct dentry	*dentry, *dchild;
 	struct inode	*dirp;
@@ -966,6 +975,16 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		case NFS3_CREATE_UNCHECKED:
 			if (! S_ISREG(dchild->d_inode->i_mode))
 				err = nfserr_exist;
+			else if (truncp) {
+				/* in nfsv4, we need to treat this case a little
+				 * differently.  we don't want to truncate the
+				 * file now; this would be wrong if the OPEN
+				 * fails for some other reason.  furthermore,
+				 * if the size is nonzero, we should ignore it
+				 * according to spec!
+				 */
+				*truncp = (iap->ia_valid & ATTR_SIZE) && !iap->ia_size;
+			}
 			else {
 				iap->ia_valid &= ATTR_SIZE;
 				goto set_attr;
@@ -1326,6 +1345,9 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 		goto out;
 	}
 
+	if (!type)
+		type = rdentry->d_inode->i_mode & S_IFMT;
+
 	if (type != S_IFDIR) { /* It's UNLINK */
 #ifdef MSNFS
 		if ((fhp->fh_export->ex_flags & NFSEXP_MSNFS) &&
@@ -1359,7 +1381,7 @@ out_nfserr:
  */
 int
 nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset, 
-             encode_dent_fn func, u32 *buffer, int *countp, u32 *verf)
+             encode_dent_fn func, u32 *buffer, int *countp, u32 *verf, u32 *bmval)
 {
 	u32		*p;
 	int		oldlen, eof, err;
@@ -1380,6 +1402,10 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	cd.buffer = buffer;
 	cd.buflen = *countp; /* count of words */
 	cd.dirfh  = fhp;
+	if (bmval) {
+		cd.bmval[0] = bmval[0];
+		cd.bmval[1] = bmval[1];
+	}
 
 	/*
 	 * Read the directory entries. This silly loop is necessary because
@@ -1395,13 +1421,20 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 		if (err < 0)
 			goto out_nfserr;
 
+		err = cd.nfserr;
+		if (err)
+			goto out_close;
 	} while (oldlen != cd.buflen && !cd.eob);
+
+	err = nfserr_readdir_nospc;
+	if (rqstp->rq_vers == 4 && cd.eob && cd.buffer == buffer)
+		goto out_close;
 
 	/* If we didn't fill the buffer completely, we're at EOF */
 	eof = !cd.eob;
 
 	if (cd.offset) {
-		if (rqstp->rq_vers == 3)
+		if (rqstp->rq_vers > 2)
 			(void)xdr_encode_hyper(cd.offset, file.f_pos);
 		else
 			*cd.offset = htonl(file.f_pos);

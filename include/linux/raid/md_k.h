@@ -154,12 +154,26 @@ struct mdk_rdev_s
 	mdp_super_t	*sb;
 	unsigned long	sb_offset;
 
-	int alias_device;		/* device alias to the same disk */
+	/* A device can be in one of three states based on two flags:
+	 * Not working:   faulty==1 in_sync==0
+	 * Fully working: faulty==0 in_sync==1
+	 * Working, but not
+	 * in sync with array
+	 *                faulty==0 in_sync==0
+	 *
+	 * It can never have faulty==1, in_sync==1
+	 * This reduces the burden of testing multiple flags in many cases
+	 */
 	int faulty;			/* if faulty do not issue IO requests */
 	int in_sync;			/* device is a full member of the array */
 
 	int desc_nr;			/* descriptor index in the superblock */
 	int raid_disk;			/* role of device in array */
+
+	atomic_t	nr_pending;	/* number of pending requests.
+					 * only maintained for arrays that
+					 * support hot removal
+					 */
 };
 
 typedef struct mdk_personality_s mdk_personality_t;
@@ -202,7 +216,7 @@ struct mddev_s
 	int				in_sync;	/* know to not need resync */
 	struct semaphore		reconfig_sem;
 	atomic_t			active;
-	mdk_rdev_t			*spare;
+	int				spares;
 
 	int				degraded;	/* whether md should consider
 							 * adding a spare
@@ -223,11 +237,12 @@ struct mdk_personality_s
 	int (*run)(mddev_t *mddev);
 	int (*stop)(mddev_t *mddev);
 	int (*status)(char *page, mddev_t *mddev);
-	int (*error_handler)(mddev_t *mddev, struct block_device *bdev);
+	/* error_handler must set ->faulty and clear ->in_sync
+	 * if appropriate, and should abort recovery if needed 
+	 */
+	void (*error_handler)(mddev_t *mddev, mdk_rdev_t *rdev);
 	int (*hot_add_disk) (mddev_t *mddev, mdk_rdev_t *rdev);
 	int (*hot_remove_disk) (mddev_t *mddev, int number);
-	int (*spare_write) (mddev_t *mddev);
-	int (*spare_inactive) (mddev_t *mddev);
 	int (*spare_active) (mddev_t *mddev);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
 };
@@ -271,9 +286,6 @@ extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
  */
 #define ITERATE_RDEV_PENDING(rdev,tmp)					\
 	ITERATE_RDEV_GENERIC(pending_raid_disks,rdev,tmp)
-
-#define xchg_values(x,y) do { __typeof__(x) __tmp = x; \
-				x = y; y = __tmp; } while (0)
 
 typedef struct mdk_thread_s {
 	void			(*run) (void *data);

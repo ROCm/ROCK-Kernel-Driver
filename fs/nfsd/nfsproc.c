@@ -492,7 +492,7 @@ nfsd_proc_readdir(struct svc_rqst *rqstp, struct nfsd_readdirargs *argp,
 	/* Read directory and encode entries on the fly */
 	nfserr = nfsd_readdir(rqstp, &argp->fh, (loff_t) argp->cookie, 
 			      nfssvc_encode_entry,
-			      buffer, &count, NULL);
+			      buffer, &count, NULL, NULL);
 	resp->count = count;
 
 	fh_put(&argp->fh);

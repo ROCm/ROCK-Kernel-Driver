@@ -140,7 +140,7 @@ svc_sock_enqueue(struct svc_sock *svsk)
 	    && !test_bit(SK_CLOSE, &svsk->sk_flags)
 	    && !test_bit(SK_CONN, &svsk->sk_flags)) {
 		/* Don't enqueue while not enough space for reply */
-		dprintk("svc: socket %p  no space, %d > %ld, not enqueued\n",
+		dprintk("svc: socket %p  no space, %d*2 > %ld, not enqueued\n",
 			svsk->sk_sk, svsk->sk_reserved+serv->sv_bufsz,
 			sock_wspace(svsk->sk_sk));
 		goto out_unlock;
@@ -574,6 +574,14 @@ svc_udp_init(struct svc_sock *svsk)
 	svsk->sk_recvfrom = svc_udp_recvfrom;
 	svsk->sk_sendto = svc_udp_sendto;
 
+	/* initialise setting must have enough space to
+	 * receive and respond to one request.  
+	 * svc_udp_recvfrom will re-adjust if necessary
+	 */
+	svc_sock_setbufsize(svsk->sk_sock,
+			    3 * svsk->sk_server->sv_bufsz,
+			    3 * svsk->sk_server->sv_bufsz);
+
 	set_bit(SK_CHNGBUF, &svsk->sk_flags);
 
 	return 0;
@@ -679,6 +687,8 @@ svc_tcp_accept(struct svc_sock *svsk)
 		goto failed;		/* aborted connection or whatever */
 	}
 	set_bit(SK_CONN, &svsk->sk_flags);
+	svc_sock_enqueue(svsk);
+
 	slen = sizeof(sin);
 	err = ops->getname(newsock, (struct sockaddr *) &sin, &slen, 1);
 	if (err < 0) {
@@ -943,6 +953,14 @@ svc_tcp_init(struct svc_sock *svsk)
 
 		svsk->sk_reclen = 0;
 		svsk->sk_tcplen = 0;
+
+		/* initialise setting must have enough space to
+		 * receive and respond to one request.  
+		 * svc_tcp_recvfrom will re-adjust if necessary
+		 */
+		svc_sock_setbufsize(svsk->sk_sock,
+				    3 * svsk->sk_server->sv_bufsz,
+				    3 * svsk->sk_server->sv_bufsz);
 
 		set_bit(SK_CHNGBUF, &svsk->sk_flags);
 	}
@@ -1220,7 +1238,7 @@ svc_create_socket(struct svc_serv *serv, int protocol, struct sockaddr_in *sin)
 	}
 
 	if (protocol == IPPROTO_TCP) {
-		if ((error = sock->ops->listen(sock, 5)) < 0)
+		if ((error = sock->ops->listen(sock, 64)) < 0)
 			goto bummer;
 	}
 

@@ -153,15 +153,20 @@ int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
 	unsigned long address = VMALLOC_VMADDR(area->addr);
 	unsigned long end = address + (area->size-PAGE_SIZE);
 	pgd_t *dir;
+	int err = 0;
 
 	dir = pgd_offset_k(address);
 	spin_lock(&init_mm.page_table_lock);
 	do {
 		pmd_t *pmd = pmd_alloc(&init_mm, dir, address);
-		if (!pmd)
-			return -ENOMEM;
-		if (map_area_pmd(pmd, address, end - address, prot, pages))
-			return -ENOMEM;
+		if (!pmd) {
+			err = -ENOMEM;
+			break;
+		}
+		if (map_area_pmd(pmd, address, end - address, prot, pages)) {
+			err = -ENOMEM;
+			break;
+		}
 
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
@@ -169,7 +174,7 @@ int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
 
 	spin_unlock(&init_mm.page_table_lock);
 	flush_cache_all();
-	return 0;
+	return err;
 }
 
 
@@ -379,14 +384,20 @@ void *__vmalloc(unsigned long size, int gfp_mask, pgprot_t prot)
 
 	area->nr_pages = nr_pages;
 	area->pages = pages = kmalloc(array_size, (gfp_mask & ~__GFP_HIGHMEM));
-	if (!area->pages)
+	if (!area->pages) {
+		remove_vm_area(area->addr);
+		kfree(area);
 		return NULL;
+	}
 	memset(area->pages, 0, array_size);
 
 	for (i = 0; i < area->nr_pages; i++) {
 		area->pages[i] = alloc_page(gfp_mask);
-		if (unlikely(!area->pages[i]))
+		if (unlikely(!area->pages[i])) {
+			/* Successfully allocated i pages, free them in __vunmap() */
+			area->nr_pages = i;
 			goto fail;
+		}
 	}
 	
 	if (map_vm_area(area, prot, &pages))
