@@ -280,7 +280,6 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	write_unlock_bh(&xfrm_policy_lock);
 
 	if (delpol) {
-		atomic_dec(&delpol->refcnt);
 		xfrm_policy_kill(delpol);
 		xfrm_pol_put(delpol);
 	}

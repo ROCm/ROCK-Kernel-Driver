@@ -3,6 +3,7 @@
 
 #include <asm/ioctl.h>
 #include <asm/types.h>
+#include <linux/videodev2.h>
 
 struct matroxioc_output_mode {
 	__u32	output;		/* which output */
@@ -29,6 +30,14 @@ struct matroxioc_output_mode {
 #define MATROXFB_GET_AVAILABLE_OUTPUTS	_IOR('n',0xF9,sizeof(__u32))
 /* which outputs exist on this framebuffer */
 #define MATROXFB_GET_ALL_OUTPUTS	_IOR('n',0xFB,sizeof(__u32))
+
+enum matroxfb_ctrl_id {
+  MATROXFB_CID_TESTOUT	 = V4L2_CID_PRIVATE_BASE,
+  MATROXFB_CID_DEFLICKER,
+  MATROXFB_CID_LAST
+};
+
+#define FBIO_WAITFORVSYNC	_IOW('F', 0x20, u_int32_t)
 
 #endif
 
