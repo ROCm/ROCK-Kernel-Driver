@@ -46,7 +46,6 @@ aicdb.h:
 		echo "*** Install db development libraries";	\
 	 fi
 
-clean-files := $(CLEANFILES) $(PROG)
 clean:
 	rm -f $(clean-files)
 

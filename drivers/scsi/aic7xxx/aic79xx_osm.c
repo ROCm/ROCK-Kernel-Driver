@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#128 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#130 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -2391,7 +2391,7 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 	}
 	host->unique_id = ahd->unit;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4) && \
-    LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
+    LINUX_VERSION_CODE  < KERNEL_VERSION(2,5,0)
 	scsi_set_pci_device(host, ahd->dev_softc);
 #endif
 	ahd_linux_initialize_scsi_bus(ahd);
@@ -2421,9 +2421,9 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 		 * single bit selection (i.e. selecting ourselves).
 		 * It is expected that either an external application
 		 * or a modified kernel will be used to probe this
-		 * ID if it is appropriate.  To accomodate these installations,
-		 * ahc_linux_alloc_target() will allocate for our ID if
-		 * asked to do so.
+		 * ID if it is appropriate.  To accommodate these
+		 * installations, ahc_linux_alloc_target() will allocate
+		 * for our ID if asked to do so.
 		 */
 		if (target == ahd->our_id) 
 			continue;
@@ -2434,7 +2434,7 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 	ahd_linux_start_dv(ahd);
 	ahd_unlock(ahd, &s);
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	scsi_add_host(host, &ahd->dev_softc->dev);
 #endif
 	return (0);
@@ -2584,7 +2584,7 @@ ahd_platform_free(struct ahd_softc *ahd)
 		}
 		ahd_teardown_runq_tasklet(ahd);
 		if (ahd->platform_data->host != NULL) {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 			scsi_remove_host(ahd->platform_data->host);
 #endif
 			scsi_unregister(ahd->platform_data->host);
@@ -2627,10 +2627,12 @@ ahd_platform_free(struct ahd_softc *ahd)
 #endif
 		}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) && \
-    LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
+    LINUX_VERSION_CODE  < KERNEL_VERSION(2,5,0)
     		/*
 		 * In 2.4 we detach from the scsi midlayer before the PCI
-		 * layer invokes our remove callback.
+		 * layer invokes our remove callback.  No per-instance
+		 * detach is provided, so we must reach inside the PCI
+		 * subsystem's internals and detach our driver manually.
 		 */
 		if (ahd->dev_softc != NULL)
 			ahd->dev_softc->driver = NULL;
@@ -5348,9 +5350,10 @@ ahd_platform_dump_card_state(struct ahd_softc *ahd)
 	}
 }
 
-static int __init ahd_linux_init(void)
+static int __init
+ahd_linux_init(void)
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
        return (ahd_linux_detect(&aic79xx_driver_template) ? 0 : -ENODEV);
 #else
 	scsi_register_module(MODULE_SCSI_HA, &aic79xx_driver_template);
@@ -5364,9 +5367,15 @@ static int __init ahd_linux_init(void)
 #endif
 }
 
-static void __exit ahd_linux_exit(void)
+static void __exit
+ahd_linux_exit(void)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	/*
+	 * In 2.4 we have to unregister from the PCI core _after_
+	 * unregistering from the scsi midlayer to avoid dangling
+	 * references.
+	 */
 	scsi_unregister_module(MODULE_SCSI_HA, &aic79xx_driver_template);
 #endif
 	ahd_linux_pci_exit();
