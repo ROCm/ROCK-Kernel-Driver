@@ -489,19 +489,29 @@ sys_delete_module(const char *name_user, unsigned int flags)
 static void print_unload_info(struct seq_file *m, struct module *mod)
 {
 	struct module_use *use;
+	int printed_something = 0;
 
-	seq_printf(m, " %u", module_refcount(mod));
+	seq_printf(m, " %u ", module_refcount(mod));
 
-	list_for_each_entry(use, &mod->modules_which_use_me, list)
-		seq_printf(m, " %s", use->module_which_uses->name);
+	/* Always include a trailing , so userspace can differentiate
+           between this and the old multi-field proc format. */
+	list_for_each_entry(use, &mod->modules_which_use_me, list) {
+		printed_something = 1;
+		seq_printf(m, "%s,", use->module_which_uses->name);
+	}
 
-	if (mod->unsafe)
-		seq_printf(m, " [unsafe]");
+	if (mod->unsafe) {
+		printed_something = 1;
+		seq_printf(m, "[unsafe],");
+	}
 
-	if (mod->init != init_module && mod->exit == cleanup_module)
-		seq_printf(m, " [permanent]");
+	if (mod->init != init_module && mod->exit == cleanup_module) {
+		printed_something = 1;
+		seq_printf(m, "[permanent],");
+	}
 
-	seq_printf(m, "\n");
+	if (!printed_something)
+		seq_printf(m, "-");
 }
 
 void __symbol_put(const char *symbol)
@@ -542,7 +552,8 @@ EXPORT_SYMBOL_GPL(symbol_put_addr);
 #else /* !CONFIG_MODULE_UNLOAD */
 static void print_unload_info(struct seq_file *m, struct module *mod)
 {
-	seq_printf(m, "\n");
+	/* We don't know the usage count, or what modules are using. */
+	seq_printf(m, " - -");
 }
 
 static inline void module_unload_free(struct module *mod)
@@ -1421,8 +1432,15 @@ static int m_show(struct seq_file *m, void *p)
 	seq_printf(m, "%s %lu",
 		   mod->name, mod->init_size + mod->core_size);
 	print_unload_info(m, mod);
+	seq_printf(m, "\n");
 	return 0;
 }
+
+/* Format: modulename size refcount deps
+
+   Where refcount is a number or -, and deps is a comma-separated list
+   of depends or -.
+*/
 struct seq_operations modules_op = {
 	.start	= m_start,
 	.next	= m_next,
