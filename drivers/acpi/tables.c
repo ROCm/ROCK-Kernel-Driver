@@ -343,10 +343,11 @@ acpi_table_parse_madt_family (
 	entry = (acpi_table_entry_header *)
 		((unsigned long) madt + madt_size);
 
-	while (((unsigned long) entry) < madt_end) {
+	while (((unsigned long) entry) + sizeof(acpi_table_entry_header) < madt_end) {
 		if (entry->type == entry_id &&
 		    (!max_entries || count++ < max_entries))
-			handler(entry);
+			if (handler(entry, madt_end))
+				return -EINVAL;
 
 		entry = (acpi_table_entry_header *)
 			((unsigned long) entry + entry->length);

@@ -318,8 +318,10 @@ static int acpi_driver_detach(struct acpi_driver * drv)
 		struct acpi_device * dev = container_of(node,struct acpi_device,g_list);
 
 		if (dev->driver == drv) {
+			spin_unlock(&acpi_device_lock);
 			if (drv->ops.remove)
 				drv->ops.remove(dev,ACPI_BUS_REMOVAL_NORMAL);
+			spin_lock(&acpi_device_lock);
 			dev->driver = NULL;
 			dev->driver_data = NULL;
 			atomic_dec(&drv->references);

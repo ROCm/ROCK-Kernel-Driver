@@ -66,6 +66,7 @@ extern char line_buf[80];
 static unsigned int acpi_irq_irq;
 static OSD_HANDLER acpi_irq_handler;
 static void *acpi_irq_context;
+static struct workqueue_struct *kacpid_wq;
 
 acpi_status
 acpi_os_initialize(void)
@@ -80,6 +81,8 @@ acpi_os_initialize(void)
 		return AE_NULL_ENTRY;
 	}
 #endif
+	kacpid_wq = create_singlethread_workqueue("kacpid");
+	BUG_ON(!kacpid_wq);
 
 	return AE_OK;
 }
@@ -91,6 +94,8 @@ acpi_os_terminate(void)
 		acpi_os_remove_interrupt_handler(acpi_irq_irq,
 						 acpi_irq_handler);
 	}
+
+	destroy_workqueue(kacpid_wq);
 
 	return AE_OK;
 }
@@ -654,13 +659,20 @@ acpi_os_queue_for_execution(
 	task = (void *)(dpc+1);
 	INIT_WORK(task, acpi_os_execute_deferred, (void*)dpc);
 
-	if (!schedule_work(task)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to schedule_work() failed.\n"));
+	if (!queue_work(kacpid_wq, task)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to queue_work() failed.\n"));
 		kfree(dpc);
 		status = AE_ERROR;
 	}
 
 	return_ACPI_STATUS (status);
+}
+
+void
+acpi_os_wait_events_complete(
+	void *context)
+{
+	flush_workqueue(kacpid_wq);
 }
 
 /*
