@@ -13,7 +13,6 @@ FONTC	= drivers/video/console/font_acorn_8x8.c
 #
 ifeq ($(CONFIG_ARCH_ACORN),y)
 OBJS		+= ll_char_wr.o font.o
-CFLAGS_misc.o	:= -DPARAMS_PHYS=$(PARAMS_PHYS)
 endif
 
 ifeq ($(CONFIG_ARCH_SHARK),y)
@@ -65,14 +64,24 @@ ZTEXTADDR	:= 0
 ZBSSADDR	:= ALIGN(4)
 endif
 
-SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/LOAD_ADDR/$(ZRELADDR)/;s/BSS_START/$(ZBSSADDR)/
+SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
 
 targets       := vmlinux vmlinux.lds piggy piggy.gz piggy.o \
                  font.o head.o $(OBJS)
 EXTRA_CFLAGS  := -fpic
 EXTRA_AFLAGS  :=
 
-LDFLAGS_vmlinux := -p --no-undefined -X \
+# Supply ZRELADDR, INITRD_PHYS and PARAMS_PHYS to the decompressor via
+# linker symbols.  We only define initrd_phys and params_phys if the
+# machine class defined the corresponding makefile variable.
+LDFLAGS_vmlinux := --defsym zreladdr=$(ZRELADDR)
+ifneq ($(INITRD_PHYS),)
+LDFLAGS_vmlinux += --defsym initrd_phys=$(INITRD_PHYS)
+endif
+ifneq ($(PARAMS_PHYS),)
+LDFLAGS_vmlinux += --defsym params_phys=$(PARAMS_PHYS)
+endif
+LDFLAGS_vmlinux += -p --no-undefined -X \
 	$(shell $(CC) $(CFLAGS) --print-libgcc-file-name) -T
 
 $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.o \

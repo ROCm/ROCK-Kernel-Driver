@@ -75,14 +75,14 @@ move:		ldmia	r4!, {r7 - r10}		@ move 32-bytes at a time
 		.size	_start, . - _start
 
 		.type	data,#object
-data:		.word	initrd_addr		@ destination initrd address
+data:		.word	initrd_phys		@ destination initrd address
 		.word	initrd_len		@ initrd size
 
 		.word	0x54410001		@ r4 = ATAG_CORE
 		.word	0x54420005		@ r5 = ATAG_INITRD2
-		.word	initrd_addr		@ r6
+		.word	initrd_phys		@ r6
 		.word	initrd_len		@ r7
-		.word	params			@ r8
+		.word	params_phys		@ r8
 		.size	data, . - _data
 
 		.type	initrd_start,#object

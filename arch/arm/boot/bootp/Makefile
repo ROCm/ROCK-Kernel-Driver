@@ -4,8 +4,8 @@
 
 ZSYSTEM		= arch/arm/boot/zImage
 ZLDFLAGS	=-p -X -T $(obj)/bootp.lds \
-		 --defsym initrd_addr=$(INITRD_PHYS) \
-		 --defsym params=$(PARAMS_PHYS)
+		 --defsym initrd_phys=$(INITRD_PHYS) \
+		 --defsym params_phys=$(PARAMS_PHYS)
 
 extra-y := bootp
 
