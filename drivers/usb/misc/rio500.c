@@ -76,8 +76,6 @@ struct rio_usb_data {
 	struct semaphore lock;          /* general race avoidance */
 };
 
-extern devfs_handle_t usb_devfs_handle;	/* /dev/usb dir. */
-
 static struct rio_usb_data rio_instance;
 
 static int open_rio(struct inode *inode, struct file *file)
@@ -478,7 +476,7 @@ static int probe_rio(struct usb_interface *intf,
 	}
 	dbg("probe_rio: ibuf address:%p", rio->ibuf);
 
-	rio->devfs = devfs_register(usb_devfs_handle, "rio500",
+	rio->devfs = devfs_register(NULL, "usb/rio500",
 				    DEVFS_FL_DEFAULT, USB_MAJOR,
 				    RIO_MINOR,
 				    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |

@@ -111,7 +111,7 @@ typedef	u32		compat_uptr_t;
 
 static inline void *compat_ptr(compat_uptr_t uptr)
 {
-	return (void *)(uptr & 0x7fffffffUL);
+	return (void *)(unsigned long)(uptr & 0x7fffffffUL);
 }
 
 #endif /* _ASM_S390X_COMPAT_H */

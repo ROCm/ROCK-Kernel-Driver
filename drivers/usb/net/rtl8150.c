@@ -107,7 +107,6 @@ struct rtl8150 {
 typedef struct rtl8150 rtl8150_t;
 
 /* the global usb devfs handle */
-extern devfs_handle_t usb_devfs_handle;
 unsigned long multicast_filter_limit = 32;
 
 static void fill_skb_pool(rtl8150_t *);

@@ -458,7 +458,7 @@ static __inline__ int ffs(int x)
 	__asm__("bsfl %1,%0\n\t"
 		"jnz 1f\n\t"
 		"movl $-1,%0\n"
-		"1:" : "=r" (r) : "g" (x));
+		"1:" : "=r" (r) : "rm" (x));
 	return r+1;
 }
 

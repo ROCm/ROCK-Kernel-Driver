@@ -12,7 +12,7 @@
 
 static unsigned long eeprom_addr;
 
-static long long eisa_eeprom_llseek(struct file *file, loff_t offset, int origin )
+static loff_t eisa_eeprom_llseek(struct file *file, loff_t offset, int origin )
 {
 	switch (origin) {
 	  case 0:

@@ -176,93 +176,6 @@ static void devfs_register_partition(struct gendisk *dev, int part)
 #endif
 }
 
-#ifdef CONFIG_DEVFS_FS
-static struct unique_numspace disc_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
-static struct unique_numspace cdrom_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
-#endif
-
-static void devfs_create_partitions(struct gendisk *dev)
-{
-#ifdef CONFIG_DEVFS_FS
-	int pos = 0;
-	devfs_handle_t dir;
-	char dirname[64], symlink[16];
-
-	if (dev->flags & GENHD_FL_DEVFS) {
-		dir = dev->de;
-		if (!dir)  /*  Aware driver wants to block disc management  */
-			return;
-		pos = devfs_generate_path(dir, dirname + 3, sizeof dirname-3);
-		if (pos < 0)
-			return;
-		strncpy(dirname + pos, "../", 3);
-	} else {
-		/*  Unaware driver: construct "real" directory  */
-		sprintf(dirname, "../%s/disc%d", dev->disk_name,
-			dev->first_minor >> dev->minor_shift);
-		dir = devfs_mk_dir(dirname + 3);
-		dev->de = dir;
-	}
-	dev->number = devfs_alloc_unique_number (&disc_numspace);
-	sprintf(symlink, "discs/disc%d", dev->number);
-	devfs_mk_symlink(symlink, dirname + pos);
-	dev->disk_de = devfs_register(dir, "disc", 0,
-			    dev->major, dev->first_minor,
-			    S_IFBLK | S_IRUSR | S_IWUSR, dev->fops, NULL);
-#endif
-}
-
-static void devfs_create_cdrom(struct gendisk *dev)
-{
-#ifdef CONFIG_DEVFS_FS
-	char vname[23];
-
-	dev->number = devfs_alloc_unique_number(&cdrom_numspace);
-	sprintf(vname, "cdroms/cdrom%d", dev->number);
-	if (dev->de) {
-		int pos;
-		char rname[64];
-
-		dev->disk_de = devfs_register(dev->de, "cd", DEVFS_FL_DEFAULT,
-				     dev->major, dev->first_minor,
-				     S_IFBLK | S_IRUGO | S_IWUGO,
-				     dev->fops, NULL);
-
-		pos = devfs_generate_path(dev->disk_de, rname+3, sizeof(rname)-3);
-		if (pos >= 0) {
-			strncpy(rname + pos, "../", 3);
-			devfs_mk_symlink(vname, rname + pos);
-		}
-	} else {
-		dev->disk_de = devfs_register (NULL, vname, DEVFS_FL_DEFAULT,
-				    dev->major, dev->first_minor,
-				    S_IFBLK | S_IRUGO | S_IWUGO,
-				    dev->fops, NULL);
-	}
-#endif
-}
-
-static void devfs_remove_partitions(struct gendisk *dev)
-{
-#ifdef CONFIG_DEVFS_FS
-	devfs_unregister(dev->disk_de);
-	dev->disk_de = NULL;
-	if (dev->flags & GENHD_FL_CD) {
-		if (dev->de)
-			devfs_remove("cdroms/cdrom%d", dev->number);
-		devfs_dealloc_unique_number(&cdrom_numspace, dev->number);
-	} else {
-		devfs_remove("discs/disc%d", dev->number);
-		if (!(dev->flags & GENHD_FL_DEVFS)) {
-			devfs_unregister(dev->de);
-			dev->de = NULL;
-		}
-		devfs_dealloc_unique_number(&disc_numspace, dev->number);
-	}
-#endif
-}
-
-
 /*
  * sysfs bindings for partitions
  */
@@ -522,6 +435,7 @@ char *partition_name(dev_t dev)
 {
 	struct gendisk *hd;
 	static char nomem [] = "<nomem>";
+	char b[BDEVNAME_SIZE];
 	struct dev_name *dname;
 	struct list_head *tmp;
 	int part;
@@ -547,7 +461,7 @@ char *partition_name(dev_t dev)
 		put_disk(hd);
 	}
 	if (!dname->name) {
-		sprintf(dname->namebuf, "[dev %s]", kdevname(to_kdev_t(dev)));
+		sprintf(dname->namebuf, "[dev %s]", __bdevname(dev, b));
 		dname->name = dname->namebuf;
 	}
 
