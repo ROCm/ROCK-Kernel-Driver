@@ -35,11 +35,146 @@
 
 #include "drmP.h"
 
-/** No-op ioctl. */
-int DRM(noop)(struct inode *inode, struct file *filp, unsigned int cmd,
-	       unsigned long arg)
+/** 
+ * Lock ioctl.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_lock structure.
+ * \return zero on success or negative number on failure.
+ *
+ * Add the current task to the lock wait queue, and attempt to take to lock.
+ */
+int drm_lock( struct inode *inode, struct file *filp,
+	       unsigned int cmd, unsigned long arg )
 {
-	DRM_DEBUG("\n");
+        drm_file_t *priv = filp->private_data;
+        drm_device_t *dev = priv->dev;
+        DECLARE_WAITQUEUE( entry, current );
+        drm_lock_t lock;
+        int ret = 0;
+
+	++priv->lock_count;
+
+        if ( copy_from_user( &lock, (drm_lock_t __user *)arg, sizeof(lock) ) )
+		return -EFAULT;
+
+        if ( lock.context == DRM_KERNEL_CONTEXT ) {
+                DRM_ERROR( "Process %d using kernel context %d\n",
+			   current->pid, lock.context );
+                return -EINVAL;
+        }
+
+        DRM_DEBUG( "%d (pid %d) requests lock (0x%08x), flags = 0x%08x\n",
+		   lock.context, current->pid,
+		   dev->lock.hw_lock->lock, lock.flags );
+
+	if (drm_core_check_feature(dev, DRIVER_DMA_QUEUE))
+		if ( lock.context < 0 )
+			return -EINVAL;
+
+	add_wait_queue( &dev->lock.lock_queue, &entry );
+	for (;;) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		if ( !dev->lock.hw_lock ) {
+			/* Device has been unregistered */
+			ret = -EINTR;
+			break;
+		}
+		if ( drm_lock_take( &dev->lock.hw_lock->lock,
+				     lock.context ) ) {
+			dev->lock.filp      = filp;
+			dev->lock.lock_time = jiffies;
+			atomic_inc( &dev->counts[_DRM_STAT_LOCKS] );
+			break;  /* Got lock */
+		}
+		
+		/* Contention */
+		schedule();
+		if ( signal_pending( current ) ) {
+			ret = -ERESTARTSYS;
+			break;
+		}
+	}
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue( &dev->lock.lock_queue, &entry );
+
+	sigemptyset( &dev->sigmask );
+	sigaddset( &dev->sigmask, SIGSTOP );
+	sigaddset( &dev->sigmask, SIGTSTP );
+	sigaddset( &dev->sigmask, SIGTTIN );
+	sigaddset( &dev->sigmask, SIGTTOU );
+	dev->sigdata.context = lock.context;
+	dev->sigdata.lock    = dev->lock.hw_lock;
+	block_all_signals( drm_notifier,
+			   &dev->sigdata, &dev->sigmask );
+	
+	if (dev->driver->dma_ready && (lock.flags & _DRM_LOCK_READY))
+		dev->driver->dma_ready(dev);
+	
+	if ( dev->driver->dma_quiescent && (lock.flags & _DRM_LOCK_QUIESCENT ))
+		return dev->driver->dma_quiescent(dev);
+	
+	/* dev->driver->kernel_context_switch isn't used by any of the x86 
+	 *  drivers but is used by the Sparc driver.
+	 */
+	
+	if (dev->driver->kernel_context_switch && 
+	    dev->last_context != lock.context) {
+	  dev->driver->kernel_context_switch(dev, dev->last_context, 
+					    lock.context);
+	}
+        DRM_DEBUG( "%d %s\n", lock.context, ret ? "interrupted" : "has lock" );
+
+        return ret;
+}
+
+/** 
+ * Unlock ioctl.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_lock structure.
+ * \return zero on success or negative number on failure.
+ *
+ * Transfer and free the lock.
+ */
+int drm_unlock( struct inode *inode, struct file *filp,
+		 unsigned int cmd, unsigned long arg )
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_lock_t lock;
+
+	if ( copy_from_user( &lock, (drm_lock_t __user *)arg, sizeof(lock) ) )
+		return -EFAULT;
+
+	if ( lock.context == DRM_KERNEL_CONTEXT ) {
+		DRM_ERROR( "Process %d using kernel context %d\n",
+			   current->pid, lock.context );
+		return -EINVAL;
+	}
+
+	atomic_inc( &dev->counts[_DRM_STAT_UNLOCKS] );
+
+	/* kernel_context_switch isn't used by any of the x86 drm
+	 * modules but is required by the Sparc driver.
+	 */
+	if (dev->driver->kernel_context_switch_unlock)
+		dev->driver->kernel_context_switch_unlock(dev, &lock);
+	else {
+		drm_lock_transfer( dev, &dev->lock.hw_lock->lock, 
+				    DRM_KERNEL_CONTEXT );
+		
+		if ( drm_lock_free( dev, &dev->lock.hw_lock->lock,
+				     DRM_KERNEL_CONTEXT ) ) {
+			DRM_ERROR( "\n" );
+		}
+	}
+
+	unblock_all_signals();
 	return 0;
 }
 
@@ -52,7 +187,7 @@ int DRM(noop)(struct inode *inode, struct file *filp, unsigned int cmd,
  *
  * Attempt to mark the lock as held by the given context, via the \p cmpxchg instruction.
  */
-int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
+int drm_lock_take(__volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
 
@@ -90,7 +225,7 @@ int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
  * Resets the lock file pointer.
  * Marks the lock as held by the given context, via the \p cmpxchg instruction.
  */
-int DRM(lock_transfer)(drm_device_t *dev,
+int drm_lock_transfer(drm_device_t *dev,
 		       __volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
@@ -115,7 +250,7 @@ int DRM(lock_transfer)(drm_device_t *dev,
  * Marks the lock as not held, via the \p cmpxchg instruction. Wakes any task
  * waiting on the lock queue.
  */
-int DRM(lock_free)(drm_device_t *dev,
+int drm_lock_free(drm_device_t *dev,
 		   __volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
@@ -147,7 +282,7 @@ int DRM(lock_free)(drm_device_t *dev,
  * \return one if the signal should be delivered normally, or zero if the
  * signal should be blocked.
  */
-int DRM(notifier)(void *priv)
+int drm_notifier(void *priv)
 {
 	drm_sigdata_t *s = (drm_sigdata_t *)priv;
 	unsigned int  old, new, prev;

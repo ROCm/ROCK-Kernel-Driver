@@ -1,13 +1,13 @@
 /**
- * \file drm_drawable.h 
- * IOCTLs for drawables
+ * \file drm_init.h 
+ * Setup/Cleanup for DRM
  *
  * \author Rickard E. (Rik) Faith <faith@valinux.com>
  * \author Gareth Hughes <gareth@valinux.com>
  */
 
 /*
- * Created: Tue Feb  2 08:37:54 1999 by faith@valinux.com
+ * Created: Mon Jan  4 08:58:31 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
@@ -35,22 +35,18 @@
 
 #include "drmP.h"
 
-/** No-op. */
-int DRM(adddraw)(struct inode *inode, struct file *filp,
-		 unsigned int cmd, unsigned long arg)
+/**
+ * Check whether DRI will run on this CPU.
+ *
+ * \return non-zero if the DRI will run on this CPU, or zero otherwise.
+ */
+int drm_cpu_valid(void)
 {
-	drm_draw_t draw;
-
-	draw.handle = 0;	/* NOOP */
-	DRM_DEBUG("%d\n", draw.handle);
-	if (copy_to_user((drm_draw_t __user *)arg, &draw, sizeof(draw)))
-		return -EFAULT;
-	return 0;
-}
-
-/** No-op. */
-int DRM(rmdraw)(struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg)
-{
-	return 0;		/* NOOP */
+#if defined(__i386__)
+	if (boot_cpu_data.x86 == 3) return 0; /* No cmpxchg on a 386 */
+#endif
+#if defined(__sparc__) && !defined(__sparc_v9__)
+	return 0; /* No cmpxchg before v9 sparc. */
+#endif
+	return 1;
 }

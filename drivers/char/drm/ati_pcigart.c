@@ -52,7 +52,7 @@
 # define ATI_MAX_PCIGART_PAGES		8192	/**< 32 MB aperture, 4K pages */
 # define ATI_PCIGART_PAGE_SIZE		4096	/**< PCI GART page size */
 
-static unsigned long DRM(ati_alloc_pcigart_table)( void )
+unsigned long drm_ati_alloc_pcigart_table( void )
 {
 	unsigned long address;
 	struct page *page;
@@ -75,7 +75,7 @@ static unsigned long DRM(ati_alloc_pcigart_table)( void )
 	return address;
 }
 
-static void DRM(ati_free_pcigart_table)( unsigned long address )
+static void drm_ati_free_pcigart_table( unsigned long address )
 {
 	struct page *page;
 	int i;
@@ -91,85 +91,7 @@ static void DRM(ati_free_pcigart_table)( unsigned long address )
 	free_pages( address, ATI_PCIGART_TABLE_ORDER );
 }
 
-int DRM(ati_pcigart_init)( drm_device_t *dev,
-			   unsigned long *addr,
-			   dma_addr_t *bus_addr)
-{
-	drm_sg_mem_t *entry = dev->sg;
-	unsigned long address = 0;
-	unsigned long pages;
-	u32 *pci_gart, page_base, bus_address = 0;
-	int i, j, ret = 0;
-
-	if ( !entry ) {
-		DRM_ERROR( "no scatter/gather memory!\n" );
-		goto done;
-	}
-
-	address = DRM(ati_alloc_pcigart_table)();
-	if ( !address ) {
-		DRM_ERROR( "cannot allocate PCI GART page!\n" );
-		goto done;
-	}
-
-	if ( !dev->pdev ) {
-		DRM_ERROR( "PCI device unknown!\n" );
-		goto done;
-	}
-
-	bus_address = pci_map_single(dev->pdev, (void *)address,
-				  ATI_PCIGART_TABLE_PAGES * PAGE_SIZE,
-				  PCI_DMA_TODEVICE);
-	if (bus_address == 0) {
-		DRM_ERROR( "unable to map PCIGART pages!\n" );
-		DRM(ati_free_pcigart_table)( address );
-		address = 0;
-		goto done;
-	}
-
-	pci_gart = (u32 *)address;
-
-	pages = ( entry->pages <= ATI_MAX_PCIGART_PAGES )
-		? entry->pages : ATI_MAX_PCIGART_PAGES;
-
-	memset( pci_gart, 0, ATI_MAX_PCIGART_PAGES * sizeof(u32) );
-
-	for ( i = 0 ; i < pages ; i++ ) {
-		/* we need to support large memory configurations */
-		entry->busaddr[i] = pci_map_single(dev->pdev,
-					   page_address( entry->pagelist[i] ),
-					   PAGE_SIZE,
-					   PCI_DMA_TODEVICE);
-		if (entry->busaddr[i] == 0) {
-			DRM_ERROR( "unable to map PCIGART pages!\n" );
-			DRM(ati_pcigart_cleanup)( dev, address, bus_address );
-			address = 0;
-			bus_address = 0;
-			goto done;
-		}
-		page_base = (u32) entry->busaddr[i];
-
-		for (j = 0; j < (PAGE_SIZE / ATI_PCIGART_PAGE_SIZE); j++) {
-			*pci_gart++ = cpu_to_le32( page_base );
-			page_base += ATI_PCIGART_PAGE_SIZE;
-		}
-	}
-
-	ret = 1;
-
-#if defined(__i386__) || defined(__x86_64__)
-	asm volatile ( "wbinvd" ::: "memory" );
-#else
-	mb();
-#endif
-
-done:
-	*addr = address;
-	*bus_addr = bus_address;
-	return ret;
-}
-
-int DRM(ati_pcigart_cleanup)( drm_device_t *dev,
+int drm_ati_pcigart_cleanup( drm_device_t *dev,
 			      unsigned long addr,
 			      dma_addr_t bus_addr)
 {
@@ -199,8 +121,88 @@ int DRM(ati_pcigart_cleanup)( drm_device_t *dev,
 	}
 
 	if ( addr ) {
-		DRM(ati_free_pcigart_table)( addr );
+		drm_ati_free_pcigart_table( addr );
 	}
 
 	return 1;
 }
+EXPORT_SYMBOL(drm_ati_pcigart_cleanup);
+
+int drm_ati_pcigart_init( drm_device_t *dev,
+			   unsigned long *addr,
+			   dma_addr_t *bus_addr)
+{
+	drm_sg_mem_t *entry = dev->sg;
+	unsigned long address = 0;
+	unsigned long pages;
+	u32 *pci_gart, page_base, bus_address = 0;
+	int i, j, ret = 0;
+
+	if ( !entry ) {
+		DRM_ERROR( "no scatter/gather memory!\n" );
+		goto done;
+	}
+
+	address = drm_ati_alloc_pcigart_table();
+	if ( !address ) {
+		DRM_ERROR( "cannot allocate PCI GART page!\n" );
+		goto done;
+	}
+
+	if ( !dev->pdev ) {
+		DRM_ERROR( "PCI device unknown!\n" );
+		goto done;
+	}
+
+	bus_address = pci_map_single(dev->pdev, (void *)address,
+				  ATI_PCIGART_TABLE_PAGES * PAGE_SIZE,
+				  PCI_DMA_TODEVICE);
+	if (bus_address == 0) {
+		DRM_ERROR( "unable to map PCIGART pages!\n" );
+		drm_ati_free_pcigart_table( address );
+		address = 0;
+		goto done;
+	}
+
+	pci_gart = (u32 *)address;
+
+	pages = ( entry->pages <= ATI_MAX_PCIGART_PAGES )
+		? entry->pages : ATI_MAX_PCIGART_PAGES;
+
+	memset( pci_gart, 0, ATI_MAX_PCIGART_PAGES * sizeof(u32) );
+
+	for ( i = 0 ; i < pages ; i++ ) {
+		/* we need to support large memory configurations */
+		entry->busaddr[i] = pci_map_single(dev->pdev,
+					   page_address( entry->pagelist[i] ),
+					   PAGE_SIZE,
+					   PCI_DMA_TODEVICE);
+		if (entry->busaddr[i] == 0) {
+			DRM_ERROR( "unable to map PCIGART pages!\n" );
+			drm_ati_pcigart_cleanup( dev, address, bus_address );
+			address = 0;
+			bus_address = 0;
+			goto done;
+		}
+		page_base = (u32) entry->busaddr[i];
+
+		for (j = 0; j < (PAGE_SIZE / ATI_PCIGART_PAGE_SIZE); j++) {
+			*pci_gart++ = cpu_to_le32( page_base );
+			page_base += ATI_PCIGART_PAGE_SIZE;
+		}
+	}
+
+	ret = 1;
+
+#if defined(__i386__) || defined(__x86_64__)
+	asm volatile ( "wbinvd" ::: "memory" );
+#else
+	mb();
+#endif
+
+done:
+	*addr = address;
+	*bus_addr = bus_address;
+	return ret;
+}
+EXPORT_SYMBOL(drm_ati_pcigart_init);

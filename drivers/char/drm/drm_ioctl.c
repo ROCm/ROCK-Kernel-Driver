@@ -34,6 +34,7 @@
  */
 
 #include "drmP.h"
+#include "drm_core.h"
 
 #include "linux/pci.h"
 
@@ -48,7 +49,7 @@
  *
  * Copies the bus id from drm_device::unique into user space.
  */
-int DRM(getunique)(struct inode *inode, struct file *filp,
+int drm_getunique(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	 *priv	 = filp->private_data;
@@ -82,7 +83,7 @@ int DRM(getunique)(struct inode *inode, struct file *filp,
  * in interface version 1.1 and will return EBUSY when setversion has requested
  * version 1.1 or greater.
  */
-int DRM(setunique)(struct inode *inode, struct file *filp,
+int drm_setunique(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	 *priv	 = filp->private_data;
@@ -98,19 +99,19 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 	if (!u.unique_len || u.unique_len > 1024) return -EINVAL;
 
 	dev->unique_len = u.unique_len;
-	dev->unique	= DRM(alloc)(u.unique_len + 1, DRM_MEM_DRIVER);
+	dev->unique	= drm_alloc(u.unique_len + 1, DRM_MEM_DRIVER);
 	if(!dev->unique) return -ENOMEM;
 	if (copy_from_user(dev->unique, u.unique, dev->unique_len))
 		return -EFAULT;
 
 	dev->unique[dev->unique_len] = '\0';
 
-	dev->devname = DRM(alloc)(strlen(dev->name) + strlen(dev->unique) + 2,
+	dev->devname = drm_alloc(strlen(dev->driver->pci_driver.name) + strlen(dev->unique) + 2,
 				  DRM_MEM_DRIVER);
 	if (!dev->devname)
 		return -ENOMEM;
 
-	sprintf(dev->devname, "%s@%s", dev->name, dev->unique);
+	sprintf(dev->devname, "%s@%s", dev->driver->pci_driver.name, dev->unique);
 
 	/* Return error if the busid submitted doesn't match the device's actual
 	 * busid.
@@ -131,25 +132,25 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 }
 
 static int
-DRM(set_busid)(drm_device_t *dev)
+drm_set_busid(drm_device_t *dev)
 {
 	if (dev->unique != NULL)
 		return EBUSY;
 
 	dev->unique_len = 20;
-	dev->unique = DRM(alloc)(dev->unique_len + 1, DRM_MEM_DRIVER);
+	dev->unique = drm_alloc(dev->unique_len + 1, DRM_MEM_DRIVER);
 	if (dev->unique == NULL)
 		return ENOMEM;
 
 	snprintf(dev->unique, dev->unique_len, "pci:%04x:%02x:%02x.%d",
 		dev->pci_domain, dev->pci_bus, dev->pci_slot, dev->pci_func);
 
-	dev->devname = DRM(alloc)(strlen(dev->name) + dev->unique_len + 2,
+	dev->devname = drm_alloc(strlen(dev->driver->pci_driver.name) + dev->unique_len + 2,
 				DRM_MEM_DRIVER);
 	if (dev->devname == NULL)
 		return ENOMEM;
 
-	sprintf(dev->devname, "%s@%s", dev->name, dev->unique);
+	sprintf(dev->devname, "%s@%s", dev->driver->pci_driver.name, dev->unique);
 
 	return 0;
 }
@@ -168,7 +169,7 @@ DRM(set_busid)(drm_device_t *dev)
  * Searches for the mapping with the specified offset and copies its information
  * into userspace
  */
-int DRM(getmap)( struct inode *inode, struct file *filp,
+int drm_getmap( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	drm_file_t   *priv = filp->private_data;
@@ -228,7 +229,7 @@ int DRM(getmap)( struct inode *inode, struct file *filp,
  * Searches for the client with the specified index and copies its information
  * into userspace
  */
-int DRM(getclient)( struct inode *inode, struct file *filp,
+int drm_getclient( struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg )
 {
 	drm_file_t   *priv = filp->private_data;
@@ -272,7 +273,7 @@ int DRM(getclient)( struct inode *inode, struct file *filp,
  * 
  * \return zero on success or a negative number on failure.
  */
-int DRM(getstats)( struct inode *inode, struct file *filp,
+int drm_getstats( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
 	drm_file_t   *priv = filp->private_data;
@@ -303,10 +304,7 @@ int DRM(getstats)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-#define DRM_IF_MAJOR	1
-#define DRM_IF_MINOR	2
-
-int DRM(setversion)(DRM_IOCTL_ARGS)
+int drm_setversion(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 	drm_set_version_t sv;
@@ -333,7 +331,7 @@ int DRM(setversion)(DRM_IOCTL_ARGS)
 			/*
 			 * Version 1.1 includes tying of DRM to specific device
 			 */
-			DRM(set_busid)(dev);
+			drm_set_busid(dev);
 		}
 	}
 
@@ -342,8 +340,16 @@ int DRM(setversion)(DRM_IOCTL_ARGS)
 		    sv.drm_dd_minor < 0 || sv.drm_dd_minor > DRIVER_MINOR)
 			return EINVAL;
 
-		if (dev->fn_tbl.set_version)
-			dev->fn_tbl.set_version(dev, &sv);
+		if (dev->driver->set_version)
+			dev->driver->set_version(dev, &sv);
 	}
+	return 0;
+}
+
+/** No-op ioctl. */
+int drm_noop(struct inode *inode, struct file *filp, unsigned int cmd,
+	       unsigned long arg)
+{
+	DRM_DEBUG("\n");
 	return 0;
 }

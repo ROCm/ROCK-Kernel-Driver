@@ -31,13 +31,77 @@
  */
 
 #include <linux/config.h>
-#include "tdfx.h"
 #include "drmP.h"
+#include "tdfx_drv.h"
 
-#include "drm_core.h"
+#include "drm_pciids.h"
 
-void DRM(driver_register_fns)(drm_device_t *dev)
+static int postinit( struct drm_device *dev, unsigned long flags )
 {
-	dev->driver_features = DRIVER_USE_MTRR;
+	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d: %s\n",
+		DRIVER_NAME,
+		DRIVER_MAJOR,
+		DRIVER_MINOR,
+		DRIVER_PATCHLEVEL,
+		DRIVER_DATE,
+		dev->minor,
+		pci_pretty_name(dev->pdev)
+		);
+	return 0;
 }
 
+static int version( drm_version_t *version )
+{
+	int len;
+
+	version->version_major = DRIVER_MAJOR;
+	version->version_minor = DRIVER_MINOR;
+	version->version_patchlevel = DRIVER_PATCHLEVEL;
+	DRM_COPY( version->name, DRIVER_NAME );
+	DRM_COPY( version->date, DRIVER_DATE );
+	DRM_COPY( version->desc, DRIVER_DESC );
+	return 0;
+}
+
+static struct pci_device_id pciidlist[] = {
+	tdfx_PCI_IDS
+};
+
+static struct drm_driver driver = {
+	.driver_features = DRIVER_USE_MTRR,
+	.reclaim_buffers = drm_core_reclaim_buffers,
+	.get_map_ofs = drm_core_get_map_ofs,
+	.get_reg_ofs = drm_core_get_reg_ofs,
+	.postinit = postinit,
+	.version = version,
+	.fops = {
+		.owner = THIS_MODULE,
+		.open = drm_open,
+		.release = drm_release,
+		.ioctl = drm_ioctl,
+		.mmap = drm_mmap,
+		.poll = drm_poll,
+		.fasync = drm_fasync,
+	},
+	.pci_driver = {
+		.name          = DRIVER_NAME,
+		.id_table      = pciidlist,
+	}
+};
+
+static int __init tdfx_init(void)
+{
+	return drm_init(&driver);
+}
+
+static void __exit tdfx_exit(void)
+{
+	drm_exit(&driver);
+}
+
+module_init(tdfx_init);
+module_exit(tdfx_exit);
+
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL and additional rights");

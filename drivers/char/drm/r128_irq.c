@@ -30,7 +30,6 @@
  *    Eric Anholt <anholt@FreeBSD.org>
  */
 
-#include "r128.h"
 #include "drmP.h"
 #include "drm.h"
 #include "r128_drm.h"
@@ -50,7 +49,7 @@ irqreturn_t r128_driver_irq_handler( DRM_IRQ_ARGS )
 		R128_WRITE( R128_GEN_INT_STATUS, R128_CRTC_VBLANK_INT_AK );
 		atomic_inc(&dev->vbl_received);
 		DRM_WAKEUP(&dev->vbl_queue);
-		DRM(vbl_send_signals)( dev );
+		drm_vbl_send_signals( dev );
 		return IRQ_HANDLED;
 	}
 	return IRQ_NONE;

@@ -56,7 +56,7 @@
  * in drm_device::context_sareas, while holding the drm_device::struct_sem
  * lock.
  */
-void DRM(ctxbitmap_free)( drm_device_t *dev, int ctx_handle )
+void drm_ctxbitmap_free( drm_device_t *dev, int ctx_handle )
 {
 	if ( ctx_handle < 0 ) goto failed;
 	if ( !dev->ctx_bitmap ) goto failed;
@@ -84,7 +84,7 @@ failed:
  * drm_device::context_sareas to accommodate the new entry while holding the
  * drm_device::struct_sem lock.
  */
-int DRM(ctxbitmap_next)( drm_device_t *dev )
+int drm_ctxbitmap_next( drm_device_t *dev )
 {
 	int bit;
 
@@ -100,7 +100,7 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 			if(dev->context_sareas) {
 				drm_map_t **ctx_sareas;
 
-				ctx_sareas = DRM(realloc)(dev->context_sareas,
+				ctx_sareas = drm_realloc(dev->context_sareas,
 						(dev->max_context - 1) * 
 						sizeof(*dev->context_sareas),
 						dev->max_context * 
@@ -115,7 +115,7 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 				dev->context_sareas[bit] = NULL;
 			} else {
 				/* max_context == 1 at this point */
-				dev->context_sareas = DRM(alloc)(
+				dev->context_sareas = drm_alloc(
 						dev->max_context * 
 						sizeof(*dev->context_sareas),
 						DRM_MEM_MAPS);
@@ -142,13 +142,13 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
  * Allocates and initialize drm_device::ctx_bitmap and drm_device::context_sareas, while holding
  * the drm_device::struct_sem lock.
  */
-int DRM(ctxbitmap_init)( drm_device_t *dev )
+int drm_ctxbitmap_init( drm_device_t *dev )
 {
 	int i;
    	int temp;
 
 	down(&dev->struct_sem);
-	dev->ctx_bitmap = (unsigned long *) DRM(alloc)( PAGE_SIZE,
+	dev->ctx_bitmap = (unsigned long *) drm_alloc( PAGE_SIZE,
 							DRM_MEM_CTXBITMAP );
 	if ( dev->ctx_bitmap == NULL ) {
 		up(&dev->struct_sem);
@@ -160,7 +160,7 @@ int DRM(ctxbitmap_init)( drm_device_t *dev )
 	up(&dev->struct_sem);
 
 	for ( i = 0 ; i < DRM_RESERVED_CONTEXTS ; i++ ) {
-		temp = DRM(ctxbitmap_next)( dev );
+		temp = drm_ctxbitmap_next( dev );
 	   	DRM_DEBUG( "drm_ctxbitmap_init : %d\n", temp );
 	}
 
@@ -175,14 +175,14 @@ int DRM(ctxbitmap_init)( drm_device_t *dev )
  * Frees drm_device::ctx_bitmap and drm_device::context_sareas, while holding
  * the drm_device::struct_sem lock.
  */
-void DRM(ctxbitmap_cleanup)( drm_device_t *dev )
+void drm_ctxbitmap_cleanup( drm_device_t *dev )
 {
 	down(&dev->struct_sem);
-	if( dev->context_sareas ) DRM(free)( dev->context_sareas,
+	if( dev->context_sareas ) drm_free( dev->context_sareas,
 					     sizeof(*dev->context_sareas) * 
 					     dev->max_context,
 					     DRM_MEM_MAPS );
-	DRM(free)( (void *)dev->ctx_bitmap, PAGE_SIZE, DRM_MEM_CTXBITMAP );
+	drm_free( (void *)dev->ctx_bitmap, PAGE_SIZE, DRM_MEM_CTXBITMAP );
 	up(&dev->struct_sem);
 }
 
@@ -204,7 +204,7 @@ void DRM(ctxbitmap_cleanup)( drm_device_t *dev )
  * Gets the map from drm_device::context_sareas with the handle specified and
  * returns its handle.
  */
-int DRM(getsareactx)(struct inode *inode, struct file *filp,
+int drm_getsareactx(struct inode *inode, struct file *filp,
 		     unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	*priv	= filp->private_data;
@@ -243,7 +243,7 @@ int DRM(getsareactx)(struct inode *inode, struct file *filp,
  * Searches the mapping specified in \p arg and update the entry in
  * drm_device::context_sareas with it.
  */
-int DRM(setsareactx)(struct inode *inode, struct file *filp,
+int drm_setsareactx(struct inode *inode, struct file *filp,
 		     unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	*priv	= filp->private_data;
@@ -297,7 +297,7 @@ found:
  *
  * Attempt to set drm_device::context_flag.
  */
-int DRM(context_switch)( drm_device_t *dev, int old, int new )
+int drm_context_switch( drm_device_t *dev, int old, int new )
 {
         if ( test_and_set_bit( 0, &dev->context_flag ) ) {
                 DRM_ERROR( "Reentering -- FIXME\n" );
@@ -326,7 +326,7 @@ int DRM(context_switch)( drm_device_t *dev, int old, int new )
  * hardware lock is held, clears the drm_device::context_flag and wakes up
  * drm_device::context_wait.
  */
-int DRM(context_switch_complete)( drm_device_t *dev, int new )
+int drm_context_switch_complete( drm_device_t *dev, int new )
 {
         dev->last_context = new;  /* PRE/POST: This is the _only_ writer. */
         dev->last_switch  = jiffies;
@@ -353,7 +353,7 @@ int DRM(context_switch_complete)( drm_device_t *dev, int new )
  * \param arg user argument pointing to a drm_ctx_res structure.
  * \return zero on success or a negative number on failure.
  */
-int DRM(resctx)( struct inode *inode, struct file *filp,
+int drm_resctx( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	drm_ctx_res_t res;
@@ -391,7 +391,7 @@ int DRM(resctx)( struct inode *inode, struct file *filp,
  *
  * Get a new handle for the context and copy to userspace.
  */
-int DRM(addctx)( struct inode *inode, struct file *filp,
+int drm_addctx( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -403,10 +403,10 @@ int DRM(addctx)( struct inode *inode, struct file *filp,
 	if ( copy_from_user( &ctx, argp, sizeof(ctx) ) )
 		return -EFAULT;
 
-	ctx.handle = DRM(ctxbitmap_next)( dev );
+	ctx.handle = drm_ctxbitmap_next( dev );
 	if ( ctx.handle == DRM_KERNEL_CONTEXT ) {
 				/* Skip kernel's context and get a new one. */
-		ctx.handle = DRM(ctxbitmap_next)( dev );
+		ctx.handle = drm_ctxbitmap_next( dev );
 	}
 	DRM_DEBUG( "%d\n", ctx.handle );
 	if ( ctx.handle == -1 ) {
@@ -417,11 +417,11 @@ int DRM(addctx)( struct inode *inode, struct file *filp,
 
 	if ( ctx.handle != DRM_KERNEL_CONTEXT )
 	{
-		if (dev->fn_tbl.context_ctor)
-			dev->fn_tbl.context_ctor(dev, ctx.handle);
+		if (dev->driver->context_ctor)
+			dev->driver->context_ctor(dev, ctx.handle);
 	}
 
-	ctx_entry = DRM(alloc)( sizeof(*ctx_entry), DRM_MEM_CTXLIST );
+	ctx_entry = drm_alloc( sizeof(*ctx_entry), DRM_MEM_CTXLIST );
 	if ( !ctx_entry ) {
 		DRM_DEBUG("out of memory\n");
 		return -ENOMEM;
@@ -441,7 +441,7 @@ int DRM(addctx)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
-int DRM(modctx)( struct inode *inode, struct file *filp,
+int drm_modctx( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	/* This does nothing */
@@ -457,7 +457,7 @@ int DRM(modctx)( struct inode *inode, struct file *filp,
  * \param arg user argument pointing to a drm_ctx structure.
  * \return zero on success or a negative number on failure.
  */
-int DRM(getctx)( struct inode *inode, struct file *filp,
+int drm_getctx( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	drm_ctx_t __user *argp = (void __user *)arg;
@@ -485,7 +485,7 @@ int DRM(getctx)( struct inode *inode, struct file *filp,
  *
  * Calls context_switch().
  */
-int DRM(switchctx)( struct inode *inode, struct file *filp,
+int drm_switchctx( struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -496,7 +496,7 @@ int DRM(switchctx)( struct inode *inode, struct file *filp,
 		return -EFAULT;
 
 	DRM_DEBUG( "%d\n", ctx.handle );
-	return DRM(context_switch)( dev, dev->last_context, ctx.handle );
+	return drm_context_switch( dev, dev->last_context, ctx.handle );
 }
 
 /**
@@ -510,7 +510,7 @@ int DRM(switchctx)( struct inode *inode, struct file *filp,
  *
  * Calls context_switch_complete().
  */
-int DRM(newctx)( struct inode *inode, struct file *filp,
+int drm_newctx( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -521,7 +521,7 @@ int DRM(newctx)( struct inode *inode, struct file *filp,
 		return -EFAULT;
 
 	DRM_DEBUG( "%d\n", ctx.handle );
-	DRM(context_switch_complete)( dev, ctx.handle );
+	drm_context_switch_complete( dev, ctx.handle );
 
 	return 0;
 }
@@ -537,7 +537,7 @@ int DRM(newctx)( struct inode *inode, struct file *filp,
  *
  * If not the special kernel context, calls ctxbitmap_free() to free the specified context.
  */
-int DRM(rmctx)( struct inode *inode, struct file *filp,
+int drm_rmctx( struct inode *inode, struct file *filp,
 		unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -552,9 +552,9 @@ int DRM(rmctx)( struct inode *inode, struct file *filp,
 		priv->remove_auth_on_close = 1;
 	}
 	if ( ctx.handle != DRM_KERNEL_CONTEXT ) {
-		if (dev->fn_tbl.context_dtor)
-			dev->fn_tbl.context_dtor(dev, ctx.handle);
-		DRM(ctxbitmap_free)( dev, ctx.handle );
+		if (dev->driver->context_dtor)
+			dev->driver->context_dtor(dev, ctx.handle);
+		drm_ctxbitmap_free( dev, ctx.handle );
 	}
 
 	down( &dev->ctxlist_sem );
@@ -564,7 +564,7 @@ int DRM(rmctx)( struct inode *inode, struct file *filp,
 		list_for_each_entry_safe( pos, n, &dev->ctxlist->head, head ) {
 			if ( pos->handle == ctx.handle ) {
 				list_del( &pos->head );
-				DRM(free)( pos, sizeof(*pos), DRM_MEM_CTXLIST );
+				drm_free( pos, sizeof(*pos), DRM_MEM_CTXLIST );
 				--dev->ctx_count;
 			}
 		}
