@@ -1468,6 +1468,34 @@ pagebuf_iomove(
  *	Handling of buftargs.
  */
 
+/*
+ * Wait for any bufs with callbacks that have been submitted but
+ * have not yet returned... walk the hash list for the target.
+ */
+void
+xfs_wait_buftarg(
+	xfs_buftarg_t *target)
+{
+	xfs_buf_t	*pb, *n;
+	pb_hash_t	*h;
+	int		i;
+
+	for (i = 0; i < NHASH; i++) {
+		h = &pbhash[i];
+again:
+		spin_lock(&h->pb_hash_lock);
+		list_for_each_entry_safe(pb, n, &h->pb_hash, pb_hash_list) {
+			if (pb->pb_target == target &&
+					!(pb->pb_flags & PBF_FS_MANAGED)) {
+				spin_unlock(&h->pb_hash_lock);
+				delay(100);
+				goto again;
+			}
+		}
+		spin_unlock(&h->pb_hash_lock);
+	}
+}
+
 void
 xfs_free_buftarg(
 	xfs_buftarg_t		*btp,
