@@ -793,7 +793,7 @@ static int wl3501_esbq_confirm(struct wl3501_card *this)
 
 static void wl3501_online(struct net_device *dev)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 
 	printk(KERN_INFO "%s: Wireless LAN online. BSSID: "
 	       "%02X %02X %02X %02X %02X %02X\n", dev->name,
@@ -841,7 +841,7 @@ static int wl3501_mgmt_association(struct wl3501_card *this)
 
 static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	struct wl3501_join_confirm sig;
 
 	dprintk(3, "entry");
@@ -979,7 +979,7 @@ static inline void wl3501_start_confirm_interrupt(struct net_device *dev,
 static inline void wl3501_assoc_confirm_interrupt(struct net_device *dev,
 						  u16 addr)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	struct wl3501_assoc_confirm sig;
 
 	dprintk(3, "entry");
@@ -1008,7 +1008,7 @@ static inline void wl3501_rx_interrupt(struct net_device *dev)
 	int morepkts;
 	u16 addr;
 	u8 sig_id;
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 
 	dprintk(3, "entry");
 loop:
@@ -1191,7 +1191,7 @@ fail:
 
 static int wl3501_close(struct net_device *dev)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int rc = -ENODEV;
 	unsigned long flags;
 	dev_link_t *link;
@@ -1234,7 +1234,7 @@ out:
  */
 static int wl3501_reset(struct net_device *dev)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int rc = -ENODEV;
 
 	wl3501_block_interrupt(this);
@@ -1263,7 +1263,7 @@ out:
 
 static void wl3501_tx_timeout(struct net_device *dev)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	struct net_device_stats *stats = &this->stats;
 	unsigned long flags;
 	int rc;
@@ -1289,7 +1289,7 @@ static void wl3501_tx_timeout(struct net_device *dev)
 static int wl3501_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	int enabled, rc;
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	unsigned long flags;
 
 	spin_lock_irqsave(&this->lock, flags);
@@ -1316,7 +1316,7 @@ static int wl3501_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static int wl3501_open(struct net_device *dev)
 {
 	int rc = -ENODEV;
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	unsigned long flags;
 	dev_link_t *link;
 
@@ -1370,14 +1370,14 @@ static int wl3501_init(struct net_device *dev)
 
 struct net_device_stats *wl3501_get_stats(struct net_device *dev)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 
 	return &this->stats;
 }
 
 struct iw_statistics *wl3501_get_wireless_stats(struct net_device *dev)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	struct iw_statistics *wstats = &this->wstats;
 	u32 value; /* size checked: it is u32 */
 
@@ -1532,7 +1532,7 @@ static int wl3501_get_name(struct net_device *dev, struct iw_request_info *info,
 static int wl3501_set_freq(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int channel = wrqu->freq.m;
 	int rc = -EINVAL;
 
@@ -1546,7 +1546,7 @@ static int wl3501_set_freq(struct net_device *dev, struct iw_request_info *info,
 static int wl3501_get_freq(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 
 	wrqu->freq.m = wl3501_chan2freq[this->chan - 1] * 100000;
 	wrqu->freq.e = 1;
@@ -1561,7 +1561,7 @@ static int wl3501_set_mode(struct net_device *dev, struct iw_request_info *info,
 	if (wrqu->mode == IW_MODE_INFRA ||
 	    wrqu->mode == IW_MODE_ADHOC ||
 	    wrqu->mode == IW_MODE_AUTO) {
-		struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+		struct wl3501_card *this = dev->priv;
 
 		this->net_type = wrqu->mode;
 		rc = wl3501_reset(dev);
@@ -1572,7 +1572,7 @@ static int wl3501_set_mode(struct net_device *dev, struct iw_request_info *info,
 static int wl3501_get_mode(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 
 	wrqu->mode = this->net_type;
 	return 0;
@@ -1581,7 +1581,7 @@ static int wl3501_get_mode(struct net_device *dev, struct iw_request_info *info,
 static int wl3501_get_sens(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 
 	wrqu->sens.value = this->rssi;
 	wrqu->sens.disabled = !wrqu->sens.value;
@@ -1612,7 +1612,7 @@ static int wl3501_get_range(struct net_device *dev,
 static int wl3501_set_wap(struct net_device *dev, struct iw_request_info *info,
 			  union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	static const unsigned char bcast[ETH_ALEN] =
 					{ 255, 255, 255, 255, 255, 255 };
 	int rc = -EINVAL;
@@ -1633,7 +1633,7 @@ out:
 static int wl3501_get_wap(struct net_device *dev, struct iw_request_info *info,
 			  union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 
 	wrqu->ap_addr.sa_family = ARPHRD_ETHER;
 	memcpy(wrqu->ap_addr.sa_data, this->bssid, ETH_ALEN);
@@ -1644,7 +1644,7 @@ static int wl3501_set_essid(struct net_device *dev,
 			    struct iw_request_info *info,
 			    union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int rc = 0;
 
 	if (wrqu->data.flags) {
@@ -1659,7 +1659,7 @@ static int wl3501_get_essid(struct net_device *dev,
 			    struct iw_request_info *info,
 			    union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	unsigned long flags;
 
 	spin_lock_irqsave(&this->lock, flags);
@@ -1673,7 +1673,7 @@ static int wl3501_get_essid(struct net_device *dev,
 static int wl3501_set_nick(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 
 	if (wrqu->data.length > sizeof(this->nick))
 		return -E2BIG;
@@ -1684,7 +1684,7 @@ static int wl3501_set_nick(struct net_device *dev, struct iw_request_info *info,
 static int wl3501_get_nick(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 
 	strlcpy(extra, this->nick, 32);
 	wrqu->data.length = strlen(extra);
@@ -1709,7 +1709,7 @@ static int wl3501_get_rts_threshold(struct net_device *dev,
 				    union iwreq_data *wrqu, char *extra)
 {
 	u16 threshold; /* size checked: it is u16 */
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_RTS_THRESHOLD,
 				      &threshold, sizeof(threshold));
 	if (!rc) {
@@ -1725,7 +1725,7 @@ static int wl3501_get_frag_threshold(struct net_device *dev,
 				     union iwreq_data *wrqu, char *extra)
 {
 	u16 threshold; /* size checked: it is u16 */
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int rc = wl3501_get_mib_value(this, WL3501_MIB_ATTR_FRAG_THRESHOLD,
 				      &threshold, sizeof(threshold));
 	if (!rc) {
@@ -1741,7 +1741,7 @@ static int wl3501_get_txpow(struct net_device *dev,
 			    union iwreq_data *wrqu, char *extra)
 {
 	u16 txpow;
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int rc = wl3501_get_mib_value(this,
 				      WL3501_MIB_ATTR_CURRENT_TX_PWR_LEVEL,
 				      &txpow, sizeof(txpow));
@@ -1763,7 +1763,7 @@ static int wl3501_get_retry(struct net_device *dev,
 			    union iwreq_data *wrqu, char *extra)
 {
 	u8 retry; /* size checked: it is u8 */
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int rc = wl3501_get_mib_value(this,
 				      WL3501_MIB_ATTR_LONG_RETRY_LIMIT,
 				      &retry, sizeof(retry));
@@ -1790,7 +1790,7 @@ static int wl3501_get_encode(struct net_device *dev,
 			     union iwreq_data *wrqu, char *extra)
 {
 	u8 implemented, restricted, keys[100], len_keys, tocopy;
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int rc = wl3501_get_mib_value(this,
 				      WL3501_MIB_ATTR_PRIV_OPT_IMPLEMENTED,
 				      &implemented, sizeof(implemented));
@@ -1828,7 +1828,7 @@ static int wl3501_get_power(struct net_device *dev,
 			    union iwreq_data *wrqu, char *extra)
 {
 	u8 pwr_state;
-	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	struct wl3501_card *this = dev->priv;
 	int rc = wl3501_get_mib_value(this,
 				      WL3501_MIB_ATTR_CURRENT_PWR_STATE,
 				      &pwr_state, sizeof(pwr_state));
@@ -2036,14 +2036,14 @@ static void wl3501_config(dev_link_t *link)
 
 	SET_MODULE_OWNER(dev);
 
+	this = dev->priv;
 	/*
 	 * At this point, the dev_node_t structure(s) should be initialized and
 	 * arranged in a linked list at link->dev.
 	 */
-	link->dev = &((struct wl3501_card *)dev->priv)->node;
+	link->dev = &this->node;
 	link->state &= ~DEV_CONFIG_PENDING;
 
-	this = (struct wl3501_card *)dev->priv;
 	this->base_addr = dev->base_addr;
 
 	if (!wl3501_get_flash_mac_addr(this)) {
