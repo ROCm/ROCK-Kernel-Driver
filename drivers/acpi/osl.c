@@ -484,7 +484,7 @@ acpi_os_write_pci_configuration (
 	return (result ? AE_ERROR : AE_OK);
 }
 
-/* TODO: Rewrite this code!!! */
+/* TODO: Change code to take advantage of driver model more */
 void
 acpi_os_derive_pci_id (
 	acpi_handle     rhandle,        /* upper bound  */
