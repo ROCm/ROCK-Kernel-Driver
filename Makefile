@@ -893,5 +893,9 @@ define update-if-changed
 		mv -f $@.tmp $@; \
 	fi
 endef
+#	$(call descend,<dir>,<target>)
+#	Recursively call a sub-make in <dir> with target <target>
+
+descend = $(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
 
 FORCE:
