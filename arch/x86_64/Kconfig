@@ -420,7 +420,7 @@ source "arch/x86_64/oprofile/Kconfig"
 menu "Kernel hacking"
 
 config CRASH_DUMP
-       tristate "Crash dump supportr(EXPERIMENTAL)"
+       tristate "Crash dump support (EXPERIMENTAL)"
        depends on EXPERIMENTAL
        default n
        ---help---

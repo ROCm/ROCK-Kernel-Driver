@@ -214,7 +214,7 @@ EXPORT_SYMBOL(clear_page);
 #ifdef CONFIG_CRASH_DUMP_MODULE
 #ifdef CONFIG_SMP
 extern irq_desc_t irq_desc[NR_IRQS];
-extern cpumask_t irq_affinity[NR_IRQS];
+extern unsigned long irq_affinity[NR_IRQS];
 extern void stop_this_cpu(void *);
 EXPORT_SYMBOL(irq_desc);
 EXPORT_SYMBOL(irq_affinity);

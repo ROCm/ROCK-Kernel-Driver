@@ -77,7 +77,8 @@ extern volatile int dump_in_progress;
 extern struct __dump_header_asm dump_header_asm;
 
 #ifdef CONFIG_SMP
-extern unsigned long irq_affinity[];
+
+
 extern void dump_send_ipi(void);
 #else
 #define dump_send_ipi() do { } while(0)

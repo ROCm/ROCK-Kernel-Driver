@@ -367,7 +367,7 @@ void smp_kdb_stop(void)
 	send_IPI_allbutself(KDB_VECTOR);
 }
 
-/*static int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
+
 void dump_send_ipi(int (*dump_ipi_handler)(struct pt_regs *))*/
 void dump_send_ipi(void)
 {
@@ -439,7 +439,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	wmb();
 	/* Send a message to all other CPUs and wait for them to respond */
 	send_IPI_allbutself(CALL_FUNCTION_VECTOR);
-	
+
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
 		barrier();
@@ -477,10 +477,10 @@ void smp_stop_cpu(void)
 
 static void smp_really_stop_cpu(void *dummy)
 {
-	smp_stop_cpu();
-	for (;;)
-		asm("hlt");
-}
+	smp_stop_cpu(); 
+	for (;;) 
+		asm("hlt"); 
+} 
 
 void smp_send_stop(void)
 {

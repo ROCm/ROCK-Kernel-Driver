@@ -27,11 +27,13 @@
 #include <linux/dump.h>
 #include "dump_methods.h"
 #include <linux/mm.h>
+#include <linux/rcupdate.h>
 #include <asm/processor.h>
 #include <asm/hardirq.h>
 #include <asm/kdebug.h>
 #include <asm/uaccess.h>
 #include <asm/nmi.h>
+#include <asm/kdebug.h>
 
 static __s32 	saved_irq_count; /* saved preempt_count() flag */
 
@@ -134,7 +136,7 @@ __dump_save_other_cpus(void)
 
 		for (i = 0; i < NR_CPUS; i++)
 			dump_expect_ipi[i] = (i != cpu && cpu_online(i));
-
+		
 		set_nmi_callback(dump_nmi_callback);
 		wmb();
 
@@ -152,6 +154,7 @@ __dump_save_other_cpus(void)
 	}
 	return;
 }
+
 /*
  * Routine to save the old irq affinities and change affinities of all irqs to
  * the dumping cpu.
@@ -160,10 +163,9 @@ static void
 set_irq_affinity(void)
 {
 	int i;
-	/*int cpu = smp_processor_id();*/
 	cpumask_t cpu = CPU_MASK_NONE;
 
-	cpu_set(smp_processor_id(), cpu);
+	cpu_set(smp_processor_id(), cpu); 
 	memcpy(saved_affinity, irq_affinity, NR_IRQS * sizeof(unsigned long));
 	for (i = 0; i < NR_IRQS; i++) {
 		if (irq_desc[i].handler == NULL)
@@ -253,16 +255,25 @@ __dump_configure_header(const struct pt_regs *regs)
 	return (0);
 }
 
+static int notify(struct notifier_block *nb, unsigned long code, void *data)
+{
+	if (code == DIE_NMI_IPI && dump_oncpu)
+		return NOTIFY_BAD; 
+	return NOTIFY_DONE; 
+} 
+
+static struct notifier_block dump_notifier = { 
+	.notifier_call = notify,	
+}; 
+
 /*
  * Name: __dump_init()
- * Func: Initialize the dumping routine process.  This is in case
- *       it's necessary in the future.
+ * Func: Initialize the dumping routine process.
  */
 void
 __dump_init(uint64_t local_memory_start)
 {
-	/* return */
-	return;
+	notifier_chain_register(&die_chain, &dump_notifier);
 }
 
 /*
@@ -287,6 +298,8 @@ void
 __dump_cleanup(void)
 {
 	free_dha_stack();
+	notifier_chain_unregister(&die_chain, &dump_notifier);
+	synchronize_kernel(); 
 	return;
 }
 
