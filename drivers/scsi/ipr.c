@@ -3,7 +3,7 @@
  *
  * Written By: Brian King, IBM Corporation
  *
- * Copyright (C) 2003 IBM Corporation
+ * Copyright (C) 2003, 2004 IBM Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -163,197 +163,199 @@ static const char *ipr_gpdd_dev_bus_phases[] = {
 /*  A constant array of IOASCs/URCs/Error Messages */
 static const
 struct ipr_error_table_t ipr_error_table[] = {
-	{0x00000000, 0x8155, 0x8155, "Permanent", 1,
-	"An unknown error was received"},
-	{0x00330000, 0x0000, 0x0000, "None", 1,
+	{0x00000000, 1, 1,
+	"8155: An unknown error was received"},
+	{0x00330000, 0, 0,
 	"Soft underlength error"},
-	{0x005A0000, 0x0000, 0x0000, "None", 1,
+	{0x005A0000, 0, 0,
 	"Command to be cancelled not found"},
-	{0x00808000, 0x0000, 0x0000, "None", 1,
-	"Qualified success"},
-	{0x01080000, 0xFFFE, 0x8140, "Statistical", 1,
-	"Soft device bus error recovered by the IOA."},
-	{0x01170600, 0xFFF9, 0x8141, "Temporary", 1,
-	"Device sector reassign successful"},
-	{0x01170900, 0xFFF7, 0x8141, "Temporary", 1,
-	"Media error recovered by device rewrite procedures."},
-	{0x01180200, 0x7001, 0x8141, "Statistical", 1,
-	"IOA sector reassignment successful."},
-	{0x01180500, 0xFFF9, 0x8141, "Statistical", 1,
-	"Soft media error. Sector reassignment recommended."},
-	{0x01180600, 0xFFF7, 0x8141, "Temporary", 1,
-	"Media error recovered by IOA rewrite procedures."},
-	{0x01418000, 0x0000, 0xFF3D, "Statistical", 1,
-	"Soft PCI bus error recovered by the IOA."},
-	{0x01430000, 0x0000, 0x0000, "None", 1,
-	"Unsolicited device bus message received."},
-	{0x01440000, 0xFFF6, 0x8141, "Statistical", 1,
-	"Device hardware error recovered by the IOA."},
-	{0x01448100, 0xFFF6, 0x8141, "Statistical", 1,
-	"Device hardware error recovered by the device."},
-	{0x01448200, 0x0000, 0xFF3D, "Statistical", 1,
-	"Soft IOA error recovered by the IOA."},
-	{0x01448300, 0xFFFA, 0x8141, "Statistical", 1,
-	"Undefined device response recovered by the IOA."},
-	{0x014A0000, 0xFFF6, 0x8141, "Statistical", 1,
-	"Device bus error, message or command phase."},
-	{0x015D0000, 0xFFF6, 0x8145, "Threshold", 1,
-	"Failure prediction threshold exceeded."},
-	{0x015D9200, 0x0000, 0x8009, "Threshold", 1,
-	"Impending cache battery pack failure."},
-	{0x02040400, 0x0000, 0x34FF, "Informational", 1,
-	"Disk device format in progress."},
-	{0x023F0000, 0x0000, 0x0000, "None", 0,
-	"Synchronization required."},
-	{0x02448530, 0x0000, 0x0000, "None", 0,
+	{0x00808000, 0, 0,
+	"Qualified success"}, /* xxx? */
+	{0x01080000, 1, 1,
+	"FFFE: Soft device bus error recovered by the IOA"},
+	{0x01170600, 0, 1,
+	"FFF9: Device sector reassign successful"},
+	{0x01170900, 0, 1,
+	"FFF7: Media error recovered by device rewrite procedures"},
+	{0x01180200, 0, 1,
+	"7001: IOA sector reassignment successful"},
+	{0x01180500, 0, 1,
+	"FFF9: Soft media error. Sector reassignment recommended"},
+	{0x01180600, 0, 1,
+	"FFF7: Media error recovered by IOA rewrite procedures"},
+	{0x01418000, 0, 1,
+	"FF3D: Soft PCI bus error recovered by the IOA"},
+	{0x01430000, 1, 0,
+	"Unsolicited device bus message received"},
+	{0x01440000, 1, 1,
+	"FFF6: Device hardware error recovered by the IOA"},
+	{0x01448100, 0, 1,
+	"FFF6: Device hardware error recovered by the device"},
+	{0x01448200, 1, 1,
+	"FF3D: Soft IOA error recovered by the IOA"},
+	{0x01448300, 0, 1,
+	"FFFA: Undefined device response recovered by the IOA"},
+	{0x014A0000, 1, 1,
+	"FFF6: Device bus error, message or command phase"},
+	{0x015D0000, 0, 1,
+	"FFF6: Failure prediction threshold exceeded"},
+	{0x015D9200, 0, 1,
+	"8009: Impending cache battery pack failure"},
+	{0x02040400, 0, 0, 
+	"34FF: Disk device format in progress"},
+	{0x023F0000, 0, 0,
+	"Synchronization required"},
+	{0x02448530, 0, 0,
 	"ACA active"},
-	{0x02670100, 0x3020, 0x3400, "Permanent", 1,
-	"Storage subsystem configuration error."},
-	{0x03110B00, 0xFFF5, 0x3400, "Permanent", 1,
-	"Medium error, data unreadable, recommend reassign."},
-	{0x03110C00, 0x0000, 0x0000, "Permanent", 1,
-	"Medium error, data unreadable, do not reassign."},	/* 0x7000, 0x3400 */
-	{0x03310000, 0xFFF3, 0x3400, "Permanent", 1,
-	"Disk media format bad."},
-	{0x04050000, 0x3002, 0x3400, "Recoverable", 0,
-	"Addressed device failed to respond to selection."},
-	{0x04080000, 0x3100, 0x3100, "Permanent", 1,
-	"Device bus error."},
-	{0x04080100, 0x3109, 0x3400, "Recoverable", 1,
-	"IOA timed out a device command."},
-	{0x04088000, 0x0000, 0x3120, "Permanent", 1,
-	"SCSI bus is not operational."},
-	{0x04118000, 0x0000, 0x9000, "Permanent", 1,
-	"IOA reserved area data check"},
-	{0x04118100, 0x0000, 0x9001, "Permanent", 1,
-	"IOA reserved area invalid data pattern."},
-	{0x04118200, 0x0000, 0x9002, "Permanent", 1,
-	"IOA reserved area LRC error."},
-	{0x04320000, 0x102E, 0x3400, "Permanent", 1,
-	"Out of alternate sectors for disk storage."},
-	{0x04330000, 0xFFF4, 0x3400, "Permanent", 1,
-	"Data transfer underlength error."},
-	{0x04338000, 0xFFF4, 0x3400, "Permanent", 1,
-	"Data transfer overlength error."},
-	{0x043E0100, 0x0000, 0x3400, "Permanent", 1,
-	"Logical unit failure."},
-	{0x04408500, 0xFFF4, 0x3400, "Permanent", 1,
-	"Device microcode is corrupt."},
-	{0x04430000, 0x0000, 0x0000, "None", 0,
-	"Unsupported device bus message received."},
-	{0x04418000, 0x0000, 0x8150, "Permanent", 1,
-	"PCI bus error."},
-	{0x04440000, 0xFFF4, 0x3400, "Permanent", 1,
-	"Disk device problem."},
-	{0x04448200, 0x0000, 0x8150, "Permanent", 1,
-	"Permanent IOA failure."},
-	{0x04448300, 0x3010, 0x3400, "Permanent", 1,
-	"Disk device returned wrong response to IOA."},
-	{0x04448400, 0x0000, 0x8151, "Permanent", 1,
-	"IOA microcode error"},
-	{0x04448500, 0x0000, 0x0000, "None", 0,
+	{0x024E0000, 0, 0,
+	"No ready, IOA shutdown"},
+	{0x02670100, 0, 1,
+	"3020: Storage subsystem configuration error"},
+	{0x03110B00, 0, 0,
+	"FFF5: Medium error, data unreadable, recommend reassign"},
+	{0x03110C00, 0, 0,
+	"7000: Medium error, data unreadable, do not reassign"},
+	{0x03310000, 0, 1,
+	"FFF3: Disk media format bad"},
+	{0x04050000, 0, 1,
+	"3002: Addressed device failed to respond to selection"},
+	{0x04080000, 1, 1,
+	"3100: Device bus error"},
+	{0x04080100, 0, 1,
+	"3109: IOA timed out a device command"},
+	{0x04088000, 0, 0,
+	"3120: SCSI bus is not operational"},
+	{0x04118000, 0, 1,
+	"9000: IOA reserved area data check"},
+	{0x04118100, 0, 1,
+	"9001: IOA reserved area invalid data pattern"},
+	{0x04118200, 0, 1,
+	"9002: IOA reserved area LRC error"},
+	{0x04320000, 0, 1,
+	"102E: Out of alternate sectors for disk storage"},
+	{0x04330000, 1, 1,
+	"FFF4: Data transfer underlength error"},
+	{0x04338000, 1, 1,
+	"FFF4: Data transfer overlength error"},
+	{0x043E0100, 0, 1,
+	"3400: Logical unit failure"},
+	{0x04408500, 0, 1,
+	"FFF4: Device microcode is corrupt"},
+	{0x04418000, 1, 1,
+	"8150: PCI bus error"},
+	{0x04430000, 1, 0,
+	"Unsupported device bus message received"},
+	{0x04440000, 1, 1,
+	"FFF4: Disk device problem"},
+	{0x04448200, 1, 1,
+	"8150: Permanent IOA failure"},
+	{0x04448300, 0, 1,
+	"3010: Disk device returned wrong response to IOA"},
+	{0x04448400, 0, 1,
+	"8151: IOA microcode error"},
+	{0x04448500, 0, 0,
 	"Device bus status error"},
-	{0x04448600, 0x0000, 0x8157, "Permanent", 1,
-	"IOA error requiring IOA reset to recover"},
-	{0x04490000, 0x0000, 0x0000, "None", 0,
-	"Message reject received from the device."},
-	{0x04449200, 0x0000, 0x8008, "Permanent", 1,
-	"A permanent cache battery pack failure occurred"},
-	{0x0444A000, 0x0000, 0x9090, "Permanent", 1,
-	"Disk unit has been modified after the last known status"},
-	{0x0444A200, 0x0000, 0x9081, "Permanent", 1,
-	"IOA detected device error"},
-	{0x0444A300, 0x0000, 0x9082, "Permanent", 1,
-	"IOA detected device error"},
-	{0x044A0000, 0x3110, 0x3400, "Permanent", 1,
-	"Device bus error, message or command phase."},
-	{0x04670400, 0x0000, 0x9091, "Permanent", 1,
-	"Incorrect hardware configuration change has been detected."},
-	{0x046E0000, 0xFFF4, 0x3400, "Permanent", 1,
-	"Command to logical unit failed."},
-	{0x05240000, 0x0000, 0x0000, "None", 1,
-	"Illegal request, invalid request type or request packet."},
-	{0x05250000, 0x0000, 0x0000, "None", 0,
-	"Illegal request, invalid resource handle."},
-	{0x06040500, 0x0000, 0x9031, "Temporary", 1,
-	"Array protection temporarily suspended, protection resuming."},
-	{0x06040600, 0x0000, 0x9040, "Temporary", 1,
-	"Array protection temporarily suspended, protection resuming."},
-	{0x060A8000, 0x0000, 0x0000, "Permanent", 1,
-	"Not applicable."},
-	{0x06288000, 0x0000, 0x3140, "Informational", 1,
-	"SCSI bus is not operational."},
-	{0x06290000, 0xFFFB, 0x3400, "Informational", 1,
-	"SCSI bus was reset."},
-	{0x06290500, 0xFFFE, 0x8140, "Informational", 1,
-	"SCSI bus transition to single ended."},
-	{0x06290600, 0xFFFE, 0x8140, "Informational", 1,
-	"SCSI bus transition to LVD."},
-	{0x06298000, 0xFFFB, 0x3400, "Informational", 1,
-	"SCSI bus was reset by another initiator."},
-	{0x063F0300, 0x3029, 0x3400, "Informational", 1,
-	"A device replacement has occurred"},
-	{0x064C8000, 0x0000, 0x9051, "Permanent", 1,
-	"IOA cache data exists for a missing or failed device"},
-	{0x06670100, 0x0000, 0x9025, "Permanent", 1,
-	"Disk unit is not supported at its physical location"},
-	{0x06670600, 0x0000, 0x3020, "Permanent", 1,
-	"IOA detected a SCSI bus configuration error"},
-	{0x06678000, 0x0000, 0x3150, "Permanent", 1,
-	"SCSI bus configuration error"},
-	{0x06690200, 0x0000, 0x9041, "Temporary", 1,
-	"Array protection temporarily suspended"},
-	{0x066B0200, 0x0000, 0x9030, "Permanent", 1,
-	"Array no longer protected due to missing or failed disk unit"},
-	{0x06808000, 0x0000, 0x8012, "Permanent", 1,
-	"Attached read cache devices exceed capacity supported by IOA"},
-	{0x07278000, 0x0000, 0x9008, "Permanent", 1,
-	"IOA does not support functions expected by devices"},
-	{0x07278100, 0x0000, 0x9010, "Permanent", 1,
-	"Cache data associated with attached devices cannot be found"},
-	{0x07278200, 0x0000, 0x9011, "Permanent", 1,
-	"Cache data belongs to devices other than those attached"},
-	{0x07278400, 0x0000, 0x9020, "Permanent", 1,
-	"Array not functional due to present hardware configuration."},
-	{0x07278500, 0x0000, 0x9021, "Permanent", 1,
-	"Array not functional due to present hardware configuration"},
-	{0x07278600, 0x0000, 0x9022, "Permanent", 1,
-	"Array not functional due to present hardware configuration"},
-	{0x07278700, 0x0000, 0x9023, "Permanent", 1,
-	"Array member(s) not at required physical locations"},
-	{0x07278800, 0x0000, 0x9024, "Permanent", 1,
-	"Array not functional due to present hardware configuration"},
-	{0x07278900, 0x0000, 0x9026, "Permanent", 1,
-	"Array not functional due to present hardware configuration"},
-	{0x07278A00, 0x0000, 0x9027, "Permanent", 1,
-	"Array not functional due to present hardware configuration"},
-	{0x07278B00, 0x0000, 0x9028, "Permanent", 1,
-	"Maximum number of arrays already exist."},
-	{0x07278C00, 0x0000, 0x9050, "Permanent", 1,
-	"Required cache data cannot be located for a disk unit"},
-	{0x07278D00, 0x0000, 0x9052, "Permanent", 1,
-	"Cache data exists for a device that has been modified"},
-	{0x07278E00, 0x0000, 0x9053, "Permanent", 1,
-	"IOA resources not available due to previous problems"},
-	{0x07278F00, 0x0000, 0x9054, "Permanent", 1,
-	"IOA resources not available due to previous problems"},
-	{0x07279100, 0x0000, 0x9092, "Permanent", 1,
-	"Disk unit requires initialization before use"},
-	{0x07279200, 0x0000, 0x9029, "Permanent", 1,
-	"Incorrect hardware configuration change has been detected"},
-	{0x07279500, 0x0000, 0x9009, "Permanent", 1,
-	"Data Protect, device configuration sector is not convertible"},
-	{0x07279600, 0x0000, 0x9060, "Permanent", 1,
-	"One or more disk pairs are missing from an array"},
-	{0x07279700, 0x0000, 0x9061, "Permanent", 1,
-	"One or more disks are missing from an array"},
-	{0x07279800, 0x0000, 0x9062, "Permanent", 1,
-	"One or more disks are missing from an array"},
-	{0x07279900, 0x0000, 0x9063, "Permanent", 1,
-	"Maximum number of functional arrays has been exceeded"},
-	{0x0B260000, 0x0000, 0x0000, "None", 1,
+	{0x04448600, 0, 1,
+	"8157: IOA error requiring IOA reset to recover"},
+	{0x04490000, 0, 0,
+	"Message reject received from the device"},
+	{0x04449200, 0, 1,
+	"8008: A permanent cache battery pack failure occurred"},
+	{0x0444A000, 0, 1,
+	"9090: Disk unit has been modified after the last known status"},
+	{0x0444A200, 0, 1,
+	"9081: IOA detected device error"},
+	{0x0444A300, 0, 1,
+	"9082: IOA detected device error"},
+	{0x044A0000, 1, 1,
+	"3110: Device bus error, message or command phase"},
+	{0x04670400, 0, 1,
+	"9091: Incorrect hardware configuration change has been detected"},
+	{0x046E0000, 0, 1,
+	"FFF4: Command to logical unit failed"},
+	{0x05240000, 1, 0,
+	"Illegal request, invalid request type or request packet"},
+	{0x05250000, 0, 0,
+	"Illegal request, invalid resource handle"},
+	{0x05260000, 0, 0,
+	"Illegal request, invalid field in parameter list"},
+	{0x05260100, 0, 0,
+	"Illegal request, parameter not supported"},
+	{0x05260200, 0, 0,
+	"Illegal request, parameter value invalid"},
+	{0x052C0000, 0, 0,
+	"Illegal request, command sequence error"},
+	{0x06040500, 0, 1,
+	"9031: Array protection temporarily suspended, protection resuming"},
+	{0x06040600, 0, 1,
+	"9040: Array protection temporarily suspended, protection resuming"},
+	{0x06290000, 0, 1,
+	"FFFB: SCSI bus was reset"},
+	{0x06290500, 0, 0,
+	"FFFE: SCSI bus transition to single ended"},
+	{0x06290600, 0, 0,
+	"FFFE: SCSI bus transition to LVD"},
+	{0x06298000, 0, 1,
+	"FFFB: SCSI bus was reset by another initiator"},
+	{0x063F0300, 0, 1,
+	"3029: A device replacement has occurred"},
+	{0x064C8000, 0, 1,
+	"9051: IOA cache data exists for a missing or failed device"},
+	{0x06670100, 0, 1,
+	"9025: Disk unit is not supported at its physical location"},
+	{0x06670600, 0, 1,
+	"3020: IOA detected a SCSI bus configuration error"},
+	{0x06678000, 0, 1,
+	"3150: SCSI bus configuration error"},
+	{0x06690200, 0, 1,
+	"9041: Array protection temporarily suspended"},
+	{0x066B0200, 0, 1,
+	"9030: Array no longer protected due to missing or failed disk unit"},
+	{0x07270000, 0, 0,
+	"Failure due to other device"},
+	{0x07278000, 0, 1,
+	"9008: IOA does not support functions expected by devices"},
+	{0x07278100, 0, 1,
+	"9010: Cache data associated with attached devices cannot be found"},
+	{0x07278200, 0, 1,
+	"9011: Cache data belongs to devices other than those attached"},
+	{0x07278400, 0, 1,
+	"9020: Array missing 2 or more devices with only 1 device present"},
+	{0x07278500, 0, 1,
+	"9021: Array missing 2 or more devices with 2 or more devices present"},
+	{0x07278600, 0, 1,
+	"9022: Exposed array is missing a required device"},
+	{0x07278700, 0, 1,
+	"9023: Array member(s) not at required physical locations"},
+	{0x07278800, 0, 1,
+	"9024: Array not functional due to present hardware configuration"},
+	{0x07278900, 0, 1, 
+	"9026: Array not functional due to present hardware configuration"},
+	{0x07278A00, 0, 1, 
+	"9027: Array is missing a device and parity is out of sync"},
+	{0x07278B00, 0, 1, 
+	"9028: Maximum number of arrays already exist"},
+	{0x07278C00, 0, 1, 
+	"9050: Required cache data cannot be located for a disk unit"},
+	{0x07278D00, 0, 1, 
+	"9052: Cache data exists for a device that has been modified"},
+	{0x07278F00, 0, 1, 
+	"9054: IOA resources not available due to previous problems"},
+	{0x07279100, 0, 1, 
+	"9092: Disk unit requires initialization before use"},
+	{0x07279200, 0, 1, 
+	"9029: Incorrect hardware configuration change has been detected"},
+	{0x07279600, 0, 1, 
+	"9060: One or more disk pairs are missing from an array"},
+	{0x07279700, 0, 1, 
+	"9061: One or more disks are missing from an array"},
+	{0x07279800, 0, 1, 
+	"9062: One or more disks are missing from an array"},
+	{0x07279900, 0, 1, 
+	"9063: Maximum number of functional arrays has been exceeded"},
+	{0x0B260000, 0, 0, 
 	"Aborted command, invalid descriptor."},
-	{0x0B5A0000, 0x0000, 0x0000, "Informational", 1,
+	{0x0B5A0000, 0, 0, 
 	"Command terminated by host"}
 };
 
@@ -488,7 +490,7 @@ static void ipr_unmap_sglist(struct ipr_ioa_cfg *ioa_cfg,
 				     scsi_cmd->sc_data_direction);
 		} else {
 			pci_unmap_single(ioa_cfg->pdev, ipr_cmd->dma_handle,
-					 scsi_cmd->bufflen,
+					 scsi_cmd->request_bufflen,
 					 scsi_cmd->sc_data_direction);
 		}
 	}
@@ -526,30 +528,20 @@ static void ipr_mask_and_clear_all_interrupts(struct ipr_ioa_cfg *ioa_cfg)
  **/
 static int ipr_save_pcix_cmd_reg(struct ipr_ioa_cfg *ioa_cfg)
 {
-	int pcix_cmd_reg;
-
-	pcix_cmd_reg = pci_find_capability(ioa_cfg->pdev, PCI_CAP_ID_PCIX);
+	int pcix_cmd_reg = pci_find_capability(ioa_cfg->pdev, PCI_CAP_ID_PCIX);
 
 	if (pcix_cmd_reg == 0) {
-		dev_err(&ioa_cfg->pdev->dev,
-			"Failed to save PCI-X command register\n");
+		dev_err(&ioa_cfg->pdev->dev, "Failed to save PCI-X command register\n");
 		return -EIO;
 	}
 
 	if (pci_read_config_word(ioa_cfg->pdev, pcix_cmd_reg,
 				 &ioa_cfg->saved_pcix_cmd_reg) != PCIBIOS_SUCCESSFUL) {
-		dev_err(&ioa_cfg->pdev->dev, "Read of config space failed\n");
+		dev_err(&ioa_cfg->pdev->dev, "Failed to save PCI-X command register\n");
 		return -EIO;
 	}
 
 	ioa_cfg->saved_pcix_cmd_reg |= PCI_X_CMD_DPERR_E | PCI_X_CMD_ERO;
-
-	if (pci_write_config_word(ioa_cfg->pdev, pcix_cmd_reg,
-				  ioa_cfg->saved_pcix_cmd_reg) != PCIBIOS_SUCCESSFUL) {
-		dev_err(&ioa_cfg->pdev->dev, "Read of config space failed\n");
-		return -EIO;
-	}
-
 	return 0;
 }
 
@@ -562,14 +554,12 @@ static int ipr_save_pcix_cmd_reg(struct ipr_ioa_cfg *ioa_cfg)
  **/
 static int ipr_set_pcix_cmd_reg(struct ipr_ioa_cfg *ioa_cfg)
 {
-	int pcix_cmd_reg;
-
-	pcix_cmd_reg = pci_find_capability(ioa_cfg->pdev, PCI_CAP_ID_PCIX);
+	int pcix_cmd_reg = pci_find_capability(ioa_cfg->pdev, PCI_CAP_ID_PCIX);
 
 	if (pcix_cmd_reg) {
 		if (pci_write_config_word(ioa_cfg->pdev, pcix_cmd_reg,
 					  ioa_cfg->saved_pcix_cmd_reg) != PCIBIOS_SUCCESSFUL) {
-			dev_err(&ioa_cfg->pdev->dev, "Read of config space failed\n");
+			dev_err(&ioa_cfg->pdev->dev, "Failed to setup PCI-X command register\n");
 			return -EIO;
 		}
 	} else {
@@ -764,6 +754,25 @@ static void ipr_send_hcam(struct ipr_ioa_cfg *ioa_cfg, u8 type,
 }
 
 /**
+ * ipr_init_res_entry - Initialize a resource entry struct.
+ * @res:	resource entry struct
+ *
+ * Return value:
+ * 	none
+ **/
+static void ipr_init_res_entry(struct ipr_resource_entry *res)
+{
+	res->needs_sync_complete = 1;
+	res->in_erp = 0;
+	res->add_to_ml = 0;
+	res->del_from_ml = 0;
+	res->resetting_device = 0;
+	res->tcq_active = 0;
+	res->qdepth = IPR_MAX_CMD_PER_LUN;
+	res->sdev = NULL;
+}
+
+/**
  * ipr_handle_config_change - Handle a config change from the adapter
  * @ioa_cfg:	ioa config struct
  * @hostrcb:	hostrcb
@@ -799,7 +808,7 @@ static void ipr_handle_config_change(struct ipr_ioa_cfg *ioa_cfg,
 				 struct ipr_resource_entry, queue);
 
 		list_del(&res->queue);
-		memset(res, 0, sizeof(struct ipr_resource_entry));
+		ipr_init_res_entry(res);
 		res->add_to_ml = 1;
 		list_add_tail(&res->queue, &ioa_cfg->used_res_q);
 	}
@@ -809,11 +818,11 @@ static void ipr_handle_config_change(struct ipr_ioa_cfg *ioa_cfg,
 	if (hostrcb->notify_type == IPR_HOST_RCB_NOTIF_TYPE_REM_ENTRY) {
 		if (res->sdev) {
 			res->del_from_ml = 1;
-			schedule_work(&ioa_cfg->low_pri_work);
+			schedule_work(&ioa_cfg->work_q);
 		} else
 			list_move_tail(&res->queue, &ioa_cfg->free_res_q);
 	} else if (res->add_to_ml)
-		schedule_work(&ioa_cfg->low_pri_work);
+		schedule_work(&ioa_cfg->work_q);
 
 	ipr_send_hcam(ioa_cfg, IPR_HCAM_CDB_OP_CODE_CONFIG_CHANGE, hostrcb);
 }
@@ -931,8 +940,8 @@ static void ipr_log_config_error(struct ipr_ioa_cfg *ioa_cfg,
 		if (dev_entry->dev_res_addr.bus >= IPR_MAX_NUM_BUSES) {
 			ipr_err("Device %d: missing\n", i + 1);
 		} else {
-			ipr_err("Device %d: %s:%d:%d:%d\n", i + 1,
-				ioa_cfg->pdev->dev.bus_id, dev_entry->dev_res_addr.bus,
+			ipr_err("Device %d: %d:%d:%d:%d\n", i + 1,
+				ioa_cfg->host->host_no, dev_entry->dev_res_addr.bus,
 				dev_entry->dev_res_addr.target, dev_entry->dev_res_addr.lun);
 		}
 		ipr_log_vpd(&dev_entry->dev_vpids, dev_entry->dev_sn);
@@ -979,9 +988,9 @@ static void ipr_log_array_error(struct ipr_ioa_cfg *ioa_cfg,
 
 	ipr_err_separator;
 
-	ipr_err("RAID %s Array Configuration: %s:%d:%d:%d\n",
+	ipr_err("RAID %s Array Configuration: %d:%d:%d:%d\n",
 		error->protection_level,
-		ioa_cfg->pdev->dev.bus_id,
+		ioa_cfg->host->host_no,
 		error->last_func_vset_res_addr.bus,
 		error->last_func_vset_res_addr.target,
 		error->last_func_vset_res_addr.lun);
@@ -1005,8 +1014,8 @@ static void ipr_log_array_error(struct ipr_ioa_cfg *ioa_cfg,
 		if (array_entry->dev_res_addr.bus >= IPR_MAX_NUM_BUSES) {
 			ipr_err("Current Location: unknown\n");
 		} else {
-			ipr_err("Current Location: %s:%d:%d:%d\n",
-				ioa_cfg->pdev->dev.bus_id,
+			ipr_err("Current Location: %d:%d:%d:%d\n",
+				ioa_cfg->host->host_no,
 				array_entry->dev_res_addr.bus,
 				array_entry->dev_res_addr.target,
 				array_entry->dev_res_addr.lun);
@@ -1015,8 +1024,8 @@ static void ipr_log_array_error(struct ipr_ioa_cfg *ioa_cfg,
 		if (array_entry->dev_res_addr.bus >= IPR_MAX_NUM_BUSES) {
 			ipr_err("Expected Location: unknown\n");
 		} else {
-			ipr_err("Expected Location: %s:%d:%d:%d\n",
-				ioa_cfg->pdev->dev.bus_id,
+			ipr_err("Expected Location: %d:%d:%d:%d\n",
+				ioa_cfg->host->host_no,
 				array_entry->expected_dev_res_addr.bus,
 				array_entry->expected_dev_res_addr.target,
 				array_entry->expected_dev_res_addr.lun);
@@ -1061,84 +1070,6 @@ static void ipr_log_generic_error(struct ipr_ioa_cfg *ioa_cfg,
 }
 
 /**
- * ipr_adjust_urc - Munges the URC
- * @error_index:		index into IOASC table
- * @res_addr:			failing device resource address
- * @ioasc:				IOASC
- * @dev_urc:			device URC
- * #err_string:			error string describing the error
- *
- * Return value:
- * 	URC to use
- **/
-static u16 ipr_adjust_urc(u32 error_index,
-			  struct ipr_res_addr res_addr,
-			  u32 ioasc, int dev_urc, char *err_string)
-{
-	u16 urc;
-
-	if (dev_urc)
-		urc = ipr_error_table[error_index].dev_urc;
-	else
-		urc = ipr_error_table[error_index].iop_urc;
-
-	strcpy(err_string, ipr_error_table[error_index].error);
-
-	switch (ioasc) {
-	case 0x01080000:
-		if (!dev_urc)	/* 8140 and 813x */
-			strcpy(err_string, "IOA detected recoverable device bus error");
-
-		if (IPR_GET_PHYS_LOC(res_addr) != IPR_IOA_RES_ADDR) {
-			if (dev_urc)
-				urc = 0xfffe;
-			else
-				urc = 0x8130 | (res_addr.bus & 0xf);
-		}
-		break;
-	case 0x015D0000:
-		if (!dev_urc) {
-			if (IPR_GET_PHYS_LOC(res_addr) != IPR_IOA_RES_ADDR)
-				urc = 0x8146;
-			else	/* 8145 */
-				strcpy(err_string, "A recoverable IOA error occurred");
-		}
-		break;
-	case 0x04080000:
-	case 0x04088000:
-	case 0x06288000:
-	case 0x06678000:
-		urc |= (res_addr.bus & 0xf);
-		break;
-	case 0x06670600:
-		if (!dev_urc)
-			urc |= (res_addr.bus & 0xf);
-		break;
-	case 0x04080100:
-		if (IPR_GET_PHYS_LOC(res_addr) == IPR_IOA_RES_ADDR) {
-			if (dev_urc) {
-				urc = 0;
-			} else {
-				urc = 0x8150;
-				strcpy(err_string, "A permanent IOA failure occurred");
-			}
-		}
-		break;
-	default:
-		break;
-	}
-
-	if (urc == 0x8141)
-		strcpy(err_string, "IOA detected recoverable device error");
-	else if (urc == 0x3400)
-		strcpy(err_string, "IOA detected device error");
-	else if (urc == 0xFFFB)
-		strcpy(err_string, "SCSI bus reset occurred");
-
-	return urc;
-}
-
-/**
  * ipr_get_error - Find the specfied IOASC in the ipr_error_table.
  * @ioasc:	IOASC
  *
@@ -1173,10 +1104,8 @@ static u32 ipr_get_error(u32 ioasc)
 static void ipr_handle_log_data(struct ipr_ioa_cfg *ioa_cfg,
 				struct ipr_hostrcb *hostrcb)
 {
-	u16 urc;
 	u32 ioasc;
 	int error_index;
-	char error_string[100];
 
 	if (hostrcb->notify_type != IPR_HOST_RCB_NOTIF_TYPE_ERROR_LOG_ENTRY)
 		return;
@@ -1195,36 +1124,15 @@ static void ipr_handle_log_data(struct ipr_ioa_cfg *ioa_cfg,
 
 	error_index = ipr_get_error(ioasc);
 
-	if (hostrcb->error.failing_dev_res_handle == IPR_IOA_RES_HANDLE) {
-		urc = ipr_adjust_urc(error_index,
-				     hostrcb->error.failing_dev_res_addr, ioasc, 0,
-				     error_string);
+	if (!ipr_error_table[error_index].log_hcam)
+		return;
 
-		if (urc == 0)
-			return;
-
-		if (ipr_is_device(&hostrcb->error.failing_dev_res_addr)) {
-			ipr_res_err(ioa_cfg, hostrcb->error.failing_dev_res_addr,
-				    "SRC: %04X %04X, Class: %s, %s\n",
-				    ioa_cfg->type, urc, ipr_error_table[error_index].class,
-				    error_string);
-		} else {
-			dev_err(&ioa_cfg->pdev->dev, "SRC: %04X %04X, Class: %s, %s\n",
-				ioa_cfg->type, urc, ipr_error_table[error_index].class,
-				error_string);
-		}
-	} else {
-		urc = ipr_adjust_urc(error_index,
-				     hostrcb->error.failing_dev_res_addr, ioasc,
-				     1, error_string);
-
-		if (urc == 0)
-			return;
-
+	if (ipr_is_device(&hostrcb->error.failing_dev_res_addr)) {
 		ipr_res_err(ioa_cfg, hostrcb->error.failing_dev_res_addr,
-			    "SRC: 6600 %04X, Class: %s, %s\n",
-			    urc, ipr_error_table[error_index].class,
-			    error_string);
+			    "%s\n", ipr_error_table[error_index].error);
+	} else {
+		dev_err(&ioa_cfg->pdev->dev, "%s\n",
+			ipr_error_table[error_index].error);
 	}
 
 	/* Set indication we have logged an error */
@@ -1371,9 +1279,7 @@ static const struct ipr_ses_table_entry *
 ipr_find_ses_entry(struct ipr_resource_entry *res)
 {
 	int i, j, matches;
-	const struct ipr_ses_table_entry *ste;
-
-	ste = ipr_ses_table;
+	const struct ipr_ses_table_entry *ste = ipr_ses_table;
 
 	for (i = 0; i < ARRAY_SIZE(ipr_ses_table); i++, ste++) {
 		for (j = 0, matches = 0; j < IPR_PROD_ID_LEN; j++) {
@@ -1475,7 +1381,7 @@ static int ipr_get_ldump_data_section(struct ipr_ioa_cfg *ioa_cfg,
 				      u32 start_addr,
 				      u32 *dest, u32 length_in_words)
 {
-	u32 temp_pcii_reg;
+	volatile u32 temp_pcii_reg;
 	int i, delay = 0;
 
 	/* Write IOA interrupt reg starting LDUMP state  */
@@ -1487,7 +1393,7 @@ static int ipr_get_ldump_data_section(struct ipr_ioa_cfg *ioa_cfg,
 	if (ipr_wait_iodbg_ack(ioa_cfg,
 			       IPR_LDUMP_MAX_LONG_ACK_DELAY_IN_USEC)) {
 		dev_err(&ioa_cfg->pdev->dev,
-			"IOA long data transfer timeout\n");
+			"IOA dump long data transfer timeout\n");
 		return -EIO;
 	}
 
@@ -1508,7 +1414,8 @@ static int ipr_get_ldump_data_section(struct ipr_ioa_cfg *ioa_cfg,
 		if (ipr_wait_iodbg_ack(ioa_cfg,
 				       IPR_LDUMP_MAX_SHORT_ACK_DELAY_IN_USEC)) {
 			dev_err(&ioa_cfg->pdev->dev,
-				"IOA short data transfer timeout\n");
+				"IOA dump short data transfer timeout.i=%d, adx=0x%08X\n",
+				i, start_addr); /* xxx */
 			return -EIO;
 		}
 
@@ -1517,10 +1424,12 @@ static int ipr_get_ldump_data_section(struct ipr_ioa_cfg *ioa_cfg,
 		dest++;
 
 		/* For all but the last word of data, signal data received */
-		if (i < (length_in_words - 1))
+		if (i < (length_in_words - 1)) {
 			/* Signal dump data received - Clear IO debug Ack */
 			writel(IPR_PCII_IO_DEBUG_ACKNOWLEDGE,
 			       ioa_cfg->regs.clr_interrupt_reg);
+			mb();
+		}
 	}
 
 	/* Signal end of block transfer. Set reset alert then clear IO debug ack */
@@ -1533,6 +1442,7 @@ static int ipr_get_ldump_data_section(struct ipr_ioa_cfg *ioa_cfg,
 	/* Signal dump data received - Clear IO debug Ack */
 	writel(IPR_PCII_IO_DEBUG_ACKNOWLEDGE,
 	       ioa_cfg->regs.clr_interrupt_reg);
+	mb();
 
 	/* Wait for IOA to signal LDUMP exit - IOA reset alert will be cleared */
 	while (delay < IPR_LDUMP_MAX_SHORT_ACK_DELAY_IN_USEC) {
@@ -1540,11 +1450,10 @@ static int ipr_get_ldump_data_section(struct ipr_ioa_cfg *ioa_cfg,
 		    readl(ioa_cfg->regs.sense_uproc_interrupt_reg);
 
 		if (!(temp_pcii_reg & IPR_UPROCI_RESET_ALERT))
-			break;
+			return 0;
 
-		/* Delay 10 usecs. */
 		udelay(10);
-		delay += (10);
+		delay += 10;
 	}
 
 	return 0;
@@ -1566,13 +1475,15 @@ static int ipr_sdt_copy(struct ipr_ioa_cfg *ioa_cfg,
 			unsigned long pci_address, u32 length)
 {
 	int bytes_copied = 0;
-	int current_length, rc, rem_len, rem_page_len;
-	u32 *page = NULL;
+	int cur_len, rc, rem_len, rem_page_len;
+	u32 *page;
+	unsigned long lock_flags = 0;
+	struct ipr_ioa_dump *ioa_dump = &ioa_cfg->dump->ioa_dump;
 
 	while ((bytes_copied < length) && 
-	       ((ioa_cfg->ioa_dump->hdr.length + bytes_copied) < IPR_MAX_IOA_DUMP_SIZE)) {
-		if ((ioa_cfg->ioa_dump->page_offset >= PAGE_SIZE) ||
-		    (ioa_cfg->ioa_dump->page_offset == 0)) {
+	       ((ioa_dump->hdr.length + bytes_copied) < IPR_MAX_IOA_DUMP_SIZE)) {
+		if ((ioa_dump->page_offset >= PAGE_SIZE) ||
+		    (ioa_dump->page_offset == 0)) {
 			page = (u32 *)__get_free_page(GFP_ATOMIC);
 
 			if (!page) {
@@ -1580,171 +1491,164 @@ static int ipr_sdt_copy(struct ipr_ioa_cfg *ioa_cfg,
 				return bytes_copied;
 			}
 
-			ioa_cfg->ioa_dump->page_offset = 0;
-			ioa_cfg->ioa_dump->ioa_data[ioa_cfg->ioa_dump->next_page_index] = page;
-			ioa_cfg->ioa_dump->next_page_index++;
+			ioa_dump->page_offset = 0;
+			ioa_dump->ioa_data[ioa_dump->next_page_index] = page;
+			ioa_dump->next_page_index++;
 		} else
-			page = ioa_cfg->ioa_dump->ioa_data[ioa_cfg->ioa_dump->next_page_index - 1];
+			page = ioa_dump->ioa_data[ioa_dump->next_page_index - 1];
 
 		rem_len = length - bytes_copied;
-		rem_page_len = PAGE_SIZE - ioa_cfg->ioa_dump->page_offset;
+		rem_page_len = PAGE_SIZE - ioa_dump->page_offset;
+		cur_len = min(rem_len, rem_page_len);
 
-		/* Copy the min of remaining length to copy and the remaining space in this page */
-		current_length = min(rem_len, rem_page_len);
-
-		spin_lock_irq(ioa_cfg->host->host_lock);
-
+		spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 		if (ioa_cfg->sdt_state == ABORT_DUMP) {
 			rc = -EIO;
 		} else {
 			rc = ipr_get_ldump_data_section(ioa_cfg,
 							pci_address + bytes_copied,
-							&page[ioa_cfg->ioa_dump->page_offset / 4],
-							(current_length / sizeof(u32)));
+							&page[ioa_dump->page_offset / 4],
+							(cur_len / sizeof(u32)));
 		}
-
-		spin_unlock_irq(ioa_cfg->host->host_lock);
+		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 
 		if (!rc) {
-			ioa_cfg->ioa_dump->page_offset += current_length;
-			bytes_copied += current_length;
+			ioa_dump->page_offset += cur_len;
+			bytes_copied += cur_len;
 		} else {
 			ipr_trace;
 			break;
 		}
-
-		/* Since our dump could take a while, we want to let other people
-		 have some processor time while we dump */
-		schedule_timeout(HZ);
 	}
 
 	return bytes_copied;
 }
 
 /**
- * ipr_get_ioa_smart_dump - Fetch IOA smart dump.
- * @ioa_cfg:		ioa config struct
+ * ipr_get_ioa_dump - Perform a dump of the driver and adapter.
+ * @ioa_cfg:	ioa config struct
+ * @dump:		dump struct
  *
  * Return value:
  * 	nothing
  **/
-static void ipr_get_ioa_smart_dump(struct ipr_ioa_cfg *ioa_cfg)
+static void ipr_get_ioa_dump(struct ipr_ioa_cfg *ioa_cfg, struct ipr_dump *dump)
 {
-	unsigned long mailbox, sdt_start_addr;
-	unsigned long sdt_entry_word, dump_data_buffer;
-	u32 num_entries, num_entries_used, start_offset, end_offset;
+	unsigned long start_addr, sdt_word;
+	unsigned long lock_flags = 0;
+	struct ipr_driver_dump *driver_dump = &dump->driver_dump;
+	struct ipr_ioa_dump *ioa_dump = &dump->ioa_dump;
+	u32 num_entries, start_off, end_off;
 	u32 bytes_to_copy, bytes_copied, rc;
-	u32 *buffer;
 	struct ipr_sdt *sdt;
-	int sdt_entry_index;
+	int i;
 
 	ENTER;
-	mailbox = readl(ioa_cfg->ioa_mailbox);
-	start_offset = mailbox & IPR_FMT2_MBX_ADDR_MASK;
 
-	if (!ipr_sdt_is_fmt2(mailbox)) {
-		dev_err(&ioa_cfg->pdev->dev, "Invalid SDT format: %lx\n", mailbox);
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+
+	if (ioa_cfg->sdt_state != GET_DUMP)
+		return;
+
+	start_addr = readl(ioa_cfg->ioa_mailbox);
+
+	if (!ipr_sdt_is_fmt2(start_addr)) {
+		dev_err(&ioa_cfg->pdev->dev,
+			"Invalid dump table format: %lx\n", start_addr);
+		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return;
 	}
 
-	ioa_cfg->ioa_dump->format = IPR_SDT_FMT2;
-	sdt_start_addr = mailbox;
-
 	dev_err(&ioa_cfg->pdev->dev, "Dump of IOA initiated\n");
 
-	ioa_cfg->dump->hdr.eye_catcher = IPR_DUMP_EYE_CATCHER;
+	driver_dump->hdr.eye_catcher = IPR_DUMP_EYE_CATCHER;
 
 	/* Initialize the overall dump header */
-	ioa_cfg->dump->hdr.len = sizeof(struct ipr_driver_dump);
-	ioa_cfg->dump->hdr.num_elems = 1;
-	ioa_cfg->dump->hdr.first_entry_offset = sizeof(struct ipr_dump_header);
-	ioa_cfg->dump->hdr.status = IPR_DUMP_STATUS_SUCCESS;
+	driver_dump->hdr.len = sizeof(struct ipr_driver_dump);
+	driver_dump->hdr.num_elems = 1;
+	driver_dump->hdr.first_entry_offset = sizeof(struct ipr_dump_header);
+	driver_dump->hdr.status = IPR_DUMP_STATUS_SUCCESS;
 
 	/* IOA location data */
-	ioa_cfg->dump->location_entry.hdr.length =
+	driver_dump->location_entry.hdr.length =
 		sizeof(struct ipr_dump_location_entry) -
 		sizeof(struct ipr_dump_entry_header);
-	ioa_cfg->dump->location_entry.hdr.id = IPR_DUMP_TEXT_ID;
+	driver_dump->location_entry.hdr.id = IPR_DUMP_TEXT_ID;
 
-	strcpy(ioa_cfg->dump->location_entry.location, ioa_cfg->pdev->dev.bus_id);
+	strcpy(driver_dump->location_entry.location, ioa_cfg->pdev->dev.bus_id);
 
 	/* Trace table entry */
-	memcpy(ioa_cfg->dump->trace_entry.trace, ioa_cfg->trace, IPR_TRACE_SIZE);
+	memcpy(driver_dump->trace_entry.trace, ioa_cfg->trace, IPR_TRACE_SIZE);
 
-	ioa_cfg->dump->hdr.num_elems++;
+	driver_dump->hdr.num_elems++;
 
-	ioa_cfg->dump->trace_entry.hdr.length =
+	driver_dump->trace_entry.hdr.length =
 		sizeof(struct ipr_dump_trace_entry) -
 		sizeof(struct ipr_dump_entry_header);
-	ioa_cfg->dump->trace_entry.hdr.id = IPR_DUMP_TRACE_ID;
-
-	/* IOA Dump entry */
-	ioa_cfg->ioa_dump->hdr.length = 0;
-	ioa_cfg->ioa_dump->hdr.id = IPR_DUMP_IOA_DUMP_ID;
+	driver_dump->trace_entry.hdr.id = IPR_DUMP_TRACE_ID;
 
 	/* Update dump_header */
-	ioa_cfg->dump->hdr.len += sizeof(struct ipr_dump_entry_header);
-	ioa_cfg->dump->hdr.num_elems++;
+	driver_dump->hdr.len += sizeof(struct ipr_dump_entry_header);
+	driver_dump->hdr.num_elems++;
 
-	buffer = (u32 *)&ioa_cfg->ioa_dump->sdt;
-
-	rc = ipr_get_ldump_data_section(ioa_cfg,
-					sdt_start_addr, buffer,
-					sizeof(struct ipr_sdt) / sizeof(u32));
+	/* IOA Dump entry */
+	ioa_dump->format = IPR_SDT_FMT2;
+	ioa_dump->hdr.length = 0;
+	ioa_dump->hdr.id = IPR_DUMP_IOA_DUMP_ID;
 
 	/* First entries in sdt are actually a list of dump addresses and
 	 lengths to gather the real dump data.  sdt represents the pointer
 	 to the ioa generated dump table.  Dump data will be extracted based
 	 on entries in this table */
-	sdt = &ioa_cfg->ioa_dump->sdt;
+	sdt = &ioa_dump->sdt;
+
+	rc = ipr_get_ldump_data_section(ioa_cfg, start_addr, (u32 *)sdt,
+					sizeof(struct ipr_sdt) / sizeof(u32));
 
 	/* Smart Dump table is ready to use and the first entry is valid */
 	if (rc || (be32_to_cpu(sdt->hdr.state) != IPR_FMT2_SDT_READY_TO_USE)) {
 		dev_err(&ioa_cfg->pdev->dev,
 			"Dump of IOA failed. Dump table not valid: %d, %X.\n",
 			rc, be32_to_cpu(sdt->hdr.state));
-		ioa_cfg->dump->hdr.status = IPR_DUMP_STATUS_FAILED;
+		driver_dump->hdr.status = IPR_DUMP_STATUS_FAILED;
 		ioa_cfg->sdt_state = DUMP_OBTAINED;
+		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return;
 	}
 
-	num_entries = be32_to_cpu(sdt->hdr.num_entries);
-	num_entries_used = be32_to_cpu(sdt->hdr.num_entries_used);
+	num_entries = be32_to_cpu(sdt->hdr.num_entries_used);
 
-	spin_unlock_irq(ioa_cfg->host->host_lock);
+	if (num_entries > IPR_NUM_SDT_ENTRIES)
+		num_entries = IPR_NUM_SDT_ENTRIES;
 
-	for (sdt_entry_index = 0;
-	     sdt_entry_index < num_entries_used && sdt_entry_index < num_entries &&
-		     sdt_entry_index < IPR_NUM_SDT_ENTRIES &&
-		     ioa_cfg->ioa_dump->hdr.length < IPR_MAX_IOA_DUMP_SIZE;
-	     sdt_entry_index++) {
-		if (sdt->entry[sdt_entry_index].valid_entry) {
-			sdt_entry_word = be32_to_cpu(sdt->entry[sdt_entry_index].bar_str_offset);
-			start_offset = sdt_entry_word & IPR_FMT2_MBX_ADDR_MASK;
-			end_offset = be32_to_cpu(sdt->entry[sdt_entry_index].end_offset);
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 
-			if (ipr_sdt_is_fmt2(sdt_entry_word))
-				dump_data_buffer = sdt_entry_word;
-			else
-				dump_data_buffer = 0;
+	for (i = 0; i < num_entries; i++) {
+		if (ioa_dump->hdr.length > IPR_MAX_IOA_DUMP_SIZE)
+			break;
 
-			if (dump_data_buffer != 0) {
-				/* Dump_header will be updated after all ioa sdt
-				 dump entries have been obtained. */
+		if (sdt->entry[i].valid_entry) {
+			sdt_word = be32_to_cpu(sdt->entry[i].bar_str_offset);
+			start_off = sdt_word & IPR_FMT2_MBX_ADDR_MASK;
+			end_off = be32_to_cpu(sdt->entry[i].end_offset);
+
+			if (ipr_sdt_is_fmt2(sdt_word) && sdt_word) {
+				bytes_to_copy = end_off - start_off;
+				if (bytes_to_copy > IPR_MAX_IOA_DUMP_SIZE) {
+					sdt->entry[i].valid_entry = 0;
+					continue;
+				}
+
 				/* Copy data from adapter to driver buffers */
-				bytes_to_copy = (end_offset - start_offset);
-				bytes_copied = ipr_sdt_copy(ioa_cfg, dump_data_buffer,
+				bytes_copied = ipr_sdt_copy(ioa_cfg, sdt_word,
 							    bytes_to_copy);
 
-				/* Update dump_entry_header length */
-				ioa_cfg->ioa_dump->hdr.length += bytes_copied;
+				ioa_dump->hdr.length += bytes_copied;
 
 				if (bytes_copied != bytes_to_copy) {
 					dev_err(&ioa_cfg->pdev->dev, "Dump of IOA completed.\n");
-
-					ioa_cfg->dump->hdr.status = IPR_DUMP_STATUS_QUAL_SUCCESS;
-					ioa_cfg->dump->hdr.len += ioa_cfg->ioa_dump->hdr.length;
-					spin_lock_irq(ioa_cfg->host->host_lock);
+					driver_dump->hdr.status = IPR_DUMP_STATUS_QUAL_SUCCESS;
+					driver_dump->hdr.len += ioa_dump->hdr.length;
 					ioa_cfg->sdt_state = DUMP_OBTAINED;
 					return;
 				}
@@ -1752,19 +1656,17 @@ static void ipr_get_ioa_smart_dump(struct ipr_ioa_cfg *ioa_cfg)
 		}
 	}
 
-	spin_lock_irq(ioa_cfg->host->host_lock);
-
 	dev_err(&ioa_cfg->pdev->dev, "Dump of IOA completed.\n");
 
 	/* Update dump_header */
-	ioa_cfg->dump->hdr.len += ioa_cfg->ioa_dump->hdr.length;
-
+	driver_dump->hdr.len += ioa_dump->hdr.length;
+	wmb();
 	ioa_cfg->sdt_state = DUMP_OBTAINED;
 	LEAVE;
 }
 
 #else
-#define ipr_get_ioa_smart_dump(ioa_cfg) do { } while(0)
+#define ipr_get_ioa_dump(ioa_cfg, dump) do { } while(0)
 #endif
 
 /**
@@ -1783,6 +1685,7 @@ static void ipr_worker_thread(void *data)
 	unsigned long lock_flags;
 	struct ipr_resource_entry *res;
 	struct scsi_device *sdev;
+	struct ipr_dump *dump;
 	struct ipr_ioa_cfg *ioa_cfg = data;
 	u8 bus, target, lun;
 	int did_work;
@@ -1791,48 +1694,56 @@ static void ipr_worker_thread(void *data)
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 
 	if (ioa_cfg->sdt_state == GET_DUMP) {
-		ipr_get_ioa_smart_dump(ioa_cfg);
+		dump = ioa_cfg->dump;
+		if (!dump || !kobject_get(&dump->kobj)) {
+			spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+			return;
+		}
+		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+		ipr_get_ioa_dump(ioa_cfg, dump);
+		kobject_put(&dump->kobj);
+
+		spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 		if (ioa_cfg->sdt_state == DUMP_OBTAINED)
 			ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NONE);
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return;
 	}
 
+restart:
 	do {
 		did_work = 0;
-
 		if (!ioa_cfg->allow_cmds) {
-			ipr_trace;
 			spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 			return;
 		}
 
 		list_for_each_entry(res, &ioa_cfg->used_res_q, queue) {
-			if (res->add_to_ml) {
-				did_work = 1;
-				bus = res->cfgte.res_addr.bus;
-				target = res->cfgte.res_addr.target;
-				lun = res->cfgte.res_addr.lun;
-
-				ipr_trace;
-				spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-				scsi_add_device(ioa_cfg->host, bus, target, lun);
-				spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-				break;
-			} else if (res->del_from_ml && res->sdev) {
+			if (res->del_from_ml && res->sdev) {
 				did_work = 1;
 				sdev = res->sdev;
-
-				ipr_trace;
-				spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-				scsi_remove_device(sdev);
-				spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+				if (!scsi_device_get(sdev)) {
+					spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+					scsi_remove_device(sdev);
+					scsi_device_put(sdev);
+					spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+				}
 				break;
-			} else if (res->del_from_ml) {
-				ipr_trace;
 			}
 		}
 	} while(did_work);
+
+	list_for_each_entry(res, &ioa_cfg->used_res_q, queue) {
+		if (res->add_to_ml) {
+			bus = res->cfgte.res_addr.bus;
+			target = res->cfgte.res_addr.target;
+			lun = res->cfgte.res_addr.lun;
+			spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+			scsi_add_device(ioa_cfg->host, bus, target, lun);
+			spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+			goto restart;
+		}
+	}
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 	LEAVE;
@@ -2102,35 +2013,6 @@ static struct class_device_attribute ipr_fw_version_attr = {
 };
 
 /**
- * ipr_show_type - Show the adapter type
- * @class_dev:	class device struct
- * @buf:		buffer
- * 
- * Return value:
- * 	number of bytes printed to buffer
- **/
-static ssize_t ipr_show_type(struct class_device *class_dev, char *buf)
-{
-	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
-	unsigned long lock_flags = 0;
-	int len;
-
-	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	len = snprintf(buf, PAGE_SIZE, "%X\n", ioa_cfg->type);
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	return len;
-}
-
-static struct class_device_attribute ipr_type_attr = {
-	.attr = {
-		.name =		"type",
-		.mode =		S_IRUGO,
-	},
-	.show = ipr_show_type,
-};
-
-/**
  * ipr_show_log_level - Show the adapter's error logging level
  * @class_dev:	class device struct
  * @buf:		buffer
@@ -2268,6 +2150,7 @@ static ssize_t ipr_store_reset_adapter(struct class_device *class_dev,
 	}
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+	
 	return result;
 }
 
@@ -2394,6 +2277,7 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 	struct class_device *cdev = container_of(kobj,struct class_device,kobj); 
 	struct Scsi_Host *shost = class_to_shost(cdev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
+	struct ipr_dump *dump;
 	unsigned long lock_flags = 0;
 	char *src;
 	int len;
@@ -2403,42 +2287,45 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 		return -EACCES;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	dump = ioa_cfg->dump;
 
-	if (ioa_cfg->sdt_state != DUMP_OBTAINED) {
+	if (ioa_cfg->sdt_state != DUMP_OBTAINED || !dump || !kobject_get(&dump->kobj)) {
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return 0;
 	}
 
-	if (off > ioa_cfg->dump->hdr.len) {
-		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+
+	if (off > dump->driver_dump.hdr.len) {
+		kobject_put(&dump->kobj);
 		return 0;
 	}
 
-	if (off + count > ioa_cfg->dump->hdr.len) {
-		count = ioa_cfg->dump->hdr.len - off;
+	if (off + count > dump->driver_dump.hdr.len) {
+		count = dump->driver_dump.hdr.len - off;
 		rc = count;
 	}
 
-	if (count && off < sizeof(*ioa_cfg->dump)) {
-		if (off + count > sizeof(*ioa_cfg->dump))
-			len = sizeof(*ioa_cfg->dump) - off;
+	if (count && off < sizeof(dump->driver_dump)) {
+		if (off + count > sizeof(dump->driver_dump))
+			len = sizeof(dump->driver_dump) - off;
 		else
 			len = count;
-		src = (u8 *)ioa_cfg->dump + off;
+		src = (u8 *)&dump->driver_dump + off;
 		memcpy(buf, src, len);
 		buf += len;
 		off += len;
 		count -= len;
 	}
 
-	off -= sizeof(*ioa_cfg->dump);
+	off -= sizeof(dump->driver_dump);
 
 	if (count && off < offsetof(struct ipr_ioa_dump, ioa_data)) {
 		if (off + count > offsetof(struct ipr_ioa_dump, ioa_data))
 			len = offsetof(struct ipr_ioa_dump, ioa_data) - off;
 		else
 			len = count;
-		src = (u8 *)ioa_cfg->ioa_dump + off;
+		src = (u8 *)&dump->ioa_dump + off;
 		memcpy(buf, src, len);
 		buf += len;
 		off += len;
@@ -2452,7 +2339,7 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 			len = PAGE_ALIGN(off) - off;
 		else
 			len = count;
-		src = (u8 *)ioa_cfg->ioa_dump->ioa_data[(off & PAGE_MASK) >> PAGE_SHIFT];
+		src = (u8 *)dump->ioa_dump.ioa_data[(off & PAGE_MASK) >> PAGE_SHIFT];
 		src += off & ~PAGE_MASK;
 		memcpy(buf, src, len);
 		buf += len;
@@ -2460,10 +2347,40 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 		count -= len;
 	}
 
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-
+	kobject_put(&dump->kobj);
 	return rc;
 }
+
+/**
+ * ipr_release_dump - Free adapter dump memory
+ * @kobj:	kobject struct
+ * 
+ * Return value:
+ *	nothing
+ **/
+static void ipr_release_dump(struct kobject *kobj)
+{
+	struct ipr_dump *dump = container_of(kobj,struct ipr_dump,kobj);
+	struct ipr_ioa_cfg *ioa_cfg = dump->ioa_cfg;
+	unsigned long lock_flags = 0;
+	int i;
+
+	ENTER;
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	ioa_cfg->dump = NULL;
+	ioa_cfg->sdt_state = INACTIVE;
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+
+	for (i = 0; i < dump->ioa_dump.next_page_index; i++)
+		free_page((unsigned long) dump->ioa_dump.ioa_data[i]);
+
+	kfree(dump);
+	LEAVE;
+}
+
+static struct kobj_type ipr_dump_kobj_type = {
+	.release = ipr_release_dump,
+};
 
 /**
  * ipr_alloc_dump - Prepare for adapter dump
@@ -2474,46 +2391,36 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
  **/
 static int ipr_alloc_dump(struct ipr_ioa_cfg *ioa_cfg)
 {
-	struct ipr_ioa_dump *ioa_dump;
-	struct ipr_driver_dump *driver_dump;
+	struct ipr_dump *dump;
 	unsigned long lock_flags = 0;
 
 	ENTER;
-	ioa_dump = kmalloc(sizeof(struct ipr_ioa_dump),
-				 GFP_KERNEL);
+	dump = kmalloc(sizeof(struct ipr_dump), GFP_KERNEL);
 
-	if (!ioa_dump) {
+	if (!dump) {
 		ipr_err("Dump memory allocation failed\n");
 		return -ENOMEM;
 	}
 
-	memset(ioa_dump, 0, sizeof(struct ipr_ioa_dump));
-
-	driver_dump = kmalloc(sizeof(struct ipr_driver_dump),
-				     GFP_KERNEL);
-
-	if (!driver_dump) {
-		ipr_err("Dump memory allocation failed\n");
-		kfree(ioa_dump);
-		return -ENOMEM;
-	}
+	memset(dump, 0, sizeof(struct ipr_dump));
+	kobject_init(&dump->kobj);
+	dump->kobj.ktype = &ipr_dump_kobj_type;
+	dump->ioa_cfg = ioa_cfg;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 
 	if (INACTIVE != ioa_cfg->sdt_state) {
-		ipr_err("Invalid request, dump ioa already active\n");
+		ipr_err("Invalid request, dump already active\n");
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-		kfree(ioa_dump);
-		kfree(driver_dump);
+		kfree(dump);
 		return -EIO;
 	}
 
-	ioa_cfg->ioa_dump = ioa_dump;
-	ioa_cfg->dump = driver_dump;
+	ioa_cfg->dump = dump;
 	ioa_cfg->sdt_state = WAIT_FOR_DUMP;
 	if (ioa_cfg->ioa_is_dead && !ioa_cfg->dump_taken) {
 		ioa_cfg->dump_taken = 1;
-		schedule_work(&ioa_cfg->low_pri_work);
+		schedule_work(&ioa_cfg->work_q);
 	}
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 
@@ -2530,39 +2437,22 @@ static int ipr_alloc_dump(struct ipr_ioa_cfg *ioa_cfg)
  **/
 static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg)
 {
-	struct ipr_ioa_dump *ioa_dump;
-	struct ipr_driver_dump *driver_dump;
+	struct ipr_dump *dump;
 	unsigned long lock_flags = 0;
-	int i;
 
 	ENTER;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-
-	if (ioa_cfg->sdt_state == INACTIVE) {
-		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-		return 0;
-	}
-
-	if (ioa_cfg->sdt_state == GET_DUMP ||
-	    ioa_cfg->sdt_state == ABORT_DUMP) {
+	dump = ioa_cfg->dump;
+	if (!dump) {
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return -EIO;
 	}
 
-	ioa_dump = ioa_cfg->ioa_dump;
-	driver_dump = ioa_cfg->dump;
-
-	ioa_cfg->ioa_dump = NULL;
 	ioa_cfg->dump = NULL;
-	ioa_cfg->sdt_state = INACTIVE;
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 
-	for (i = 0; i < ioa_dump->next_page_index; i++)
-		free_page((unsigned long) ioa_dump->ioa_data[i]);
-
-	kfree(ioa_dump);
-	kfree(driver_dump);
+	kobject_put(&dump->kobj);
 
 	LEAVE;
 	return 0;
@@ -2611,11 +2501,12 @@ static struct bin_attribute ipr_dump_attr = {
 	.read = ipr_read_dump,
 	.write = ipr_write_dump
 };
+#else
+static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg) { return 0; };
 #endif
 
 static struct class_device_attribute *ipr_ioa_attrs[] = {
 	&ipr_fw_version_attr,
-	&ipr_type_attr,
 	&ipr_log_level_attr,
 	&ipr_diagnostics_attr,
 	&ipr_ioa_reset_attr,
@@ -2777,9 +2668,42 @@ static struct device_attribute ipr_tcqing_attr = {
 	.show = ipr_show_tcq_enable
 };
 
+/**
+ * ipr_show_adapter_handle - Show the adapter's resource handle for this device
+ * @dev:	device struct
+ * @buf:	buffer
+ * 
+ * Return value:
+ * 	number of bytes printed to buffer
+ **/
+static ssize_t ipr_show_adapter_handle(struct device *dev, char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)sdev->host->hostdata;
+	struct ipr_resource_entry *res;
+	unsigned long lock_flags = 0;
+	ssize_t len = -ENXIO;
+
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	res = (struct ipr_resource_entry *)sdev->hostdata;
+	if (res)
+		len = snprintf(buf, PAGE_SIZE, "%08X\n", res->cfgte.res_handle);
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+	return len;
+}
+
+static struct device_attribute ipr_adapter_handle_attr = {
+	.attr = {
+		.name = 	"adapter_handle",
+		.mode =		S_IRUSR,
+	},
+	.show = ipr_show_adapter_handle
+};
+
 static struct device_attribute *ipr_dev_attrs[] = {
 	&ipr_queue_depth_attr,
 	&ipr_tcqing_attr,
+	&ipr_adapter_handle_attr,
 	NULL,
 };
 
@@ -2868,6 +2792,11 @@ static int ipr_slave_configure(struct scsi_device *sdev)
 	if (res) {
 		if (ipr_is_af_dasd_device(res))
 			sdev->type = TYPE_RAID;
+		else if (ipr_is_vset_device(res))
+			sdev->allow_restart = 1;
+		if (ipr_is_af_dasd_device(res) || res->cfgte.is_ioa_resource)
+			sdev->scsi_level = 4;
+
 		scsi_adjust_queue_depth(sdev, 0, res->qdepth);
 	}
 
@@ -2900,8 +2829,6 @@ static int ipr_slave_alloc(struct scsi_device *sdev)
 		if ((res->cfgte.res_addr.bus == sdev->channel) &&
 		    (res->cfgte.res_addr.target == sdev->id) &&
 		    (res->cfgte.res_addr.lun == sdev->lun)) {
-			if (ioa_cfg->allow_ml_add_del)
-				ipr_trace;
 			res->sdev = sdev;
 			res->add_to_ml = 0;
 			sdev->hostdata = res;
@@ -2937,10 +2864,6 @@ static int ipr_eh_host_reset(struct scsi_cmnd * scsi_cmd)
 		ioa_cfg->sdt_state = GET_DUMP;
 
 	rc = ipr_reset_reload(ioa_cfg, IPR_SHUTDOWN_ABBREV);
-
-	if (rc != SUCCESS)
-		dev_printk(KERN_CRIT, &ioa_cfg->pdev->dev,
-			   "Reset of IOA failed.\n");
 
 	LEAVE;
 	return rc;
@@ -3124,7 +3047,7 @@ static irqreturn_t ipr_handle_other_interrupt(struct ipr_ioa_cfg *ioa_cfg,
 
 		del_timer(&ioa_cfg->reset_cmd->timer);
 		ipr_reset_ioa_job(ioa_cfg->reset_cmd);
-	} else if (int_reg & IPR_PCII_ERROR_INTERRUPTS) {
+	} else {
 		if (int_reg & IPR_PCII_IOA_UNIT_CHECKED)
 			ioa_cfg->ioa_unit_checked = 1;
 		else
@@ -3136,10 +3059,6 @@ static irqreturn_t ipr_handle_other_interrupt(struct ipr_ioa_cfg *ioa_cfg,
 
 		ipr_mask_and_clear_all_interrupts(ioa_cfg);
 		ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NONE);
-	} else {
-		rc = IRQ_NONE;
-		dev_err(&ioa_cfg->pdev->dev, "Unknown interrupt received: 0x%08X\n",
-			int_reg);
 	}
 
 	return rc;
@@ -3257,7 +3176,7 @@ static int ipr_build_ioadl(struct ipr_ioa_cfg *ioa_cfg,
 	struct ipr_ioarcb *ioarcb = &ipr_cmd->ioarcb;
 	struct ipr_ioadl_desc *ioadl = ipr_cmd->ioadl;
 
-	length = scsi_cmd->bufflen;
+	length = scsi_cmd->request_bufflen;
 
 	if (length == 0)
 		return 0;
@@ -3435,8 +3354,7 @@ static void ipr_erp_request_sense(struct ipr_cmnd *ipr_cmd)
 	u32 ioasc = be32_to_cpu(ipr_cmd->ioasa.ioasc);
 
 	/* xxx remove after testing this. should never happen */
-	if (IPR_IOASC_SENSE_KEY(ioasc) > 0)
-		ipr_trace;
+	BUG_ON(IPR_IOASC_SENSE_KEY(ioasc) > 0);
 
 	ipr_reinit_ipr_cmnd_for_erp(ipr_cmd);
 
@@ -3521,6 +3439,8 @@ static void ipr_dump_ioasa(struct ipr_ioa_cfg *ioa_cfg,
 	if (ioa_cfg->log_level < IPR_DEFAULT_LOG_LEVEL)
 		return;
 
+	error_index = ipr_get_error(ioasc);
+
 	if (ioa_cfg->log_level < IPR_MAX_LOG_LEVEL) {
 		/* Don't dump recovered errors */
 		if (IPR_IOASC_SENSE_KEY(ioasc) < 2)
@@ -3529,23 +3449,20 @@ static void ipr_dump_ioasa(struct ipr_ioa_cfg *ioa_cfg,
 		/* Don't log an error if the IOA already logged one */
 		if (ioasa->ilid != 0)
 			return;
+
+		if (ipr_error_table[error_index].log_ioasa == 0)
+			return;
 	}
 
-	error_index = ipr_get_error(ioasc);
-
-	if (ipr_error_table[error_index].log_ioasa == 0)
-		return;
+	ipr_sdev_err(ipr_cmd->scsi_cmd->device, "%s\n",
+		     ipr_error_table[error_index].error);
 
 	if ((ioasa->gpdd.device_end_state <= ARRAY_SIZE(ipr_gpdd_dev_end_states)) &&
 	    (ioasa->gpdd.device_bus_phase <= ARRAY_SIZE(ipr_gpdd_dev_bus_phases))) {
 		ipr_sdev_err(ipr_cmd->scsi_cmd->device,
-			     "%s End state: %s Phase: %s\n",
-			     ipr_error_table[error_index].error,
+			     "Device End state: %s Phase: %s\n",
 			     ipr_gpdd_dev_end_states[ioasa->gpdd.device_end_state],
 			     ipr_gpdd_dev_bus_phases[ioasa->gpdd.device_bus_phase]);
-	} else {
-		ipr_sdev_err(ipr_cmd->scsi_cmd->device, "%s\n",
-			     ipr_error_table[error_index].error);
 	}
 
 	if (sizeof(struct ipr_ioasa) < be16_to_cpu(ioasa->ret_stat_len))
@@ -3584,7 +3501,7 @@ static void ipr_gen_sense(struct ipr_cmnd *ipr_cmd)
 	if (ioasc >= IPR_FIRST_DRIVER_IOASC)
 		return;
 
-	ipr_cmd->scsi_cmd->result = (CHECK_CONDITION << 1);
+	ipr_cmd->scsi_cmd->result = SAM_STAT_CHECK_CONDITION;
 
 	if ((ioasc == IPR_IOASC_MED_DO_NOT_REALLOC) &&
 	    (ioasa->vset.failing_lba_hi != 0)) {
@@ -3674,10 +3591,10 @@ static void ipr_erp_start(struct ipr_ioa_cfg *ioa_cfg,
 		return;
 	}
 
-	if (ipr_is_vset_device(res))
-		ipr_gen_sense(ipr_cmd);
-	else if (ipr_is_gscsi(res))
+	if (ipr_is_gscsi(res))
 		ipr_dump_ioasa(ioa_cfg, ipr_cmd);
+	else
+		ipr_gen_sense(ipr_cmd);
 
 	switch (ioasc & IPR_IOASC_IOASC_MASK) {
 	case IPR_IOASC_NR_ACA_ACTIVE:
@@ -3715,9 +3632,12 @@ static void ipr_erp_start(struct ipr_ioa_cfg *ioa_cfg,
 		res->needs_sync_complete = 1;
 		break;
 	case IPR_IOASC_HW_DEV_BUS_STATUS:
+		ipr_trace;
 		scsi_cmd->result |= IPR_IOASC_SENSE_STATUS(ioasc);
 		ipr_erp_cancel_all(ipr_cmd);
 		return;
+	case IPR_IOASC_NR_INIT_CMD_REQUIRED:
+		break;
 	default:
 		scsi_cmd->result |= (DID_ERROR << 16);
 		if (!ipr_is_vset_device(res))
@@ -3765,9 +3685,9 @@ static void ipr_scsi_done(struct ipr_cmnd *ipr_cmd)
  * use following an adapter reset.
  *
  * Return value:
- *	none
+ *	0 on success / -ENOMEM on failure
  **/
-static void ipr_save_ioafp_mode_select(struct ipr_ioa_cfg *ioa_cfg,
+static int ipr_save_ioafp_mode_select(struct ipr_ioa_cfg *ioa_cfg,
 				       struct scsi_cmnd *scsi_cmd)
 {
 	if (!ioa_cfg->saved_mode_pages) {
@@ -3776,12 +3696,13 @@ static void ipr_save_ioafp_mode_select(struct ipr_ioa_cfg *ioa_cfg,
 		if (!ioa_cfg->saved_mode_pages) {
 			dev_err(&ioa_cfg->pdev->dev,
 				"IOA mode select buffer allocation failed\n");
-			return;
+			return -ENOMEM;
 		}
 	}
 
 	memcpy(ioa_cfg->saved_mode_pages, scsi_cmd->buffer, scsi_cmd->cmnd[4]);
 	ioa_cfg->saved_mode_page_len = scsi_cmd->cmnd[4];
+	return 0;
 }
 
 /**
@@ -3875,9 +3796,10 @@ static int ipr_queuecommand(struct scsi_cmnd *scsi_cmd,
 		ioarcb->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
 
 	if (res->cfgte.is_ioa_resource && scsi_cmd->cmnd[0] == MODE_SELECT)
-		ipr_save_ioafp_mode_select(ioa_cfg, scsi_cmd);
+		rc = ipr_save_ioafp_mode_select(ioa_cfg, scsi_cmd);
 
-	rc = ipr_build_ioadl(ioa_cfg, ipr_cmd);
+	if (likely(rc == 0))
+		rc = ipr_build_ioadl(ioa_cfg, ipr_cmd);
 
 	if (likely(rc == 0)) {
 		mb();
@@ -4001,7 +3923,7 @@ static int ipr_ioa_bringdown_done(struct ipr_cmnd *ipr_cmd)
 	wake_up_all(&ioa_cfg->reset_wait_q);
 
 	spin_unlock_irq(ioa_cfg->host->host_lock);
-	scsi_unblock_requests(ioa_cfg->host);
+	scsi_unblock_requests(ioa_cfg->host); 
 	spin_lock_irq(ioa_cfg->host->host_lock);
 	LEAVE;
 
@@ -4033,7 +3955,7 @@ static int ipr_ioa_reset_done(struct ipr_cmnd *ipr_cmd)
 	list_for_each_entry(res, &ioa_cfg->used_res_q, queue) {
 		if (res->add_to_ml || res->del_from_ml) {
 			ipr_trace;
-			schedule_work(&ioa_cfg->low_pri_work);
+			schedule_work(&ioa_cfg->work_q);
 			break;
 		}
 	}
@@ -4053,7 +3975,7 @@ static int ipr_ioa_reset_done(struct ipr_cmnd *ipr_cmd)
 	wake_up_all(&ioa_cfg->reset_wait_q);
 
 	if (ioa_cfg->sdt_state == DUMP_OBTAINED)
-		schedule_work(&ioa_cfg->low_pri_work);
+		schedule_work(&ioa_cfg->work_q);
 
 	spin_unlock_irq(ioa_cfg->host->host_lock);
 	scsi_unblock_requests(ioa_cfg->host);
@@ -4414,25 +4336,6 @@ static int ipr_ioafp_mode_sense_page28(struct ipr_cmnd *ipr_cmd)
 
 	LEAVE;
 	return IPR_RC_JOB_RETURN;
-}
-
-/**
- * ipr_init_res_entry - Initialize a resource entry struct.
- * @res:	resource entry struct
- *
- * Return value:
- * 	none
- **/
-static void ipr_init_res_entry(struct ipr_resource_entry *res)
-{
-	res->needs_sync_complete = 1;
-	res->in_erp = 0;
-	res->add_to_ml = 0;
-	res->del_from_ml = 0;
-	res->resetting_device = 0;
-	res->tcq_active = 0;
-	res->qdepth = IPR_MAX_CMD_PER_LUN;
-	res->sdev = NULL;
 }
 
 /**
@@ -4952,7 +4855,7 @@ static int ipr_reset_restore_cfg_space(struct ipr_cmnd *ipr_cmd)
 		if (GET_DUMP == ioa_cfg->sdt_state) {
 			ipr_reset_start_timer(ipr_cmd, IPR_DUMP_TIMEOUT);
 			ipr_cmd->job_step = ipr_reset_wait_for_dump;
-			schedule_work(&ioa_cfg->low_pri_work);
+			schedule_work(&ioa_cfg->work_q);
 			return IPR_RC_JOB_RETURN;
 		}
 	}
@@ -5088,7 +4991,6 @@ static int ipr_reset_ucode_download_done(struct ipr_cmnd *ipr_cmd)
 		     sglist->num_sg, DMA_TO_DEVICE);
 
 	ipr_cmd->job_step = ipr_reset_alert;
-
 	return IPR_RC_JOB_CONTINUE;
 }
 
@@ -5202,7 +5104,6 @@ static void ipr_reset_ioa_job(struct ipr_cmnd *ipr_cmd)
 			 * We are doing nested adapter resets and this is
 			 * not the current reset job.
 			 */
-			ipr_trace;
 			list_add_tail(&ipr_cmd->queue, &ioa_cfg->free_q);
 			return;
 		}
@@ -5239,6 +5140,9 @@ static void ipr_initiate_ioa_reset(struct ipr_ioa_cfg *ioa_cfg,
 				   enum ipr_shutdown_type shutdown_type)
 {
 	struct ipr_cmnd *ipr_cmd;
+
+	if (ioa_cfg->ioa_is_dead)
+		return;
 
 	if (ioa_cfg->in_reset_reload && ioa_cfg->sdt_state == GET_DUMP)
 		ioa_cfg->sdt_state = ABORT_DUMP;
@@ -5430,6 +5334,7 @@ static int __devinit ipr_alloc_cmd_blks(struct ipr_ioa_cfg *ioa_cfg)
 			return -ENOMEM;
 		}
 
+		memset(ipr_cmd, 0, sizeof(*ipr_cmd));
 		ioa_cfg->ipr_cmnd_list[i] = ipr_cmd;
 		ioa_cfg->ipr_cmnd_list_dma[i] = dma_addr;
 
@@ -5593,7 +5498,7 @@ static void __devinit ipr_init_ioa_cfg(struct ipr_ioa_cfg *ioa_cfg,
 	INIT_LIST_HEAD(&ioa_cfg->hostrcb_pending_q);
 	INIT_LIST_HEAD(&ioa_cfg->free_res_q);
 	INIT_LIST_HEAD(&ioa_cfg->used_res_q);
-	INIT_WORK(&ioa_cfg->low_pri_work, ipr_worker_thread, ioa_cfg);
+	INIT_WORK(&ioa_cfg->work_q, ipr_worker_thread, ioa_cfg);
 	init_waitqueue_head(&ioa_cfg->reset_wait_q);
 	ioa_cfg->sdt_state = INACTIVE;
 
@@ -5644,7 +5549,6 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 
 	dev_info(&pdev->dev, "Found IOA with IRQ: %d\n", pdev->irq);
 
-	/* Initialize SCSI Host structure */
 	host = scsi_host_alloc(&driver_template, sizeof(*ioa_cfg));
 
 	if (!host) {
@@ -5653,7 +5557,6 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 	}
 
 	ioa_cfg = (struct ipr_ioa_cfg *)host->hostdata;
-
 	memset(ioa_cfg, 0, sizeof(struct ipr_ioa_cfg));
 
 	ioa_cfg->chip_cfg = (const struct ipr_chip_cfg_t *)dev_id->driver_data;
@@ -5686,7 +5589,6 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 	ipr_init_ioa_cfg(ioa_cfg, host, pdev);
 
 	pci_set_master(pdev);
-
 	rc = pci_set_dma_mask(pdev, 0xffffffff);
 
 	if (rc != PCIBIOS_SUCCESSFUL) {
@@ -5699,7 +5601,7 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 				   ioa_cfg->chip_cfg->cache_line_size);
 
 	if (rc != PCIBIOS_SUCCESSFUL) {
-		dev_err(&pdev->dev, "Write of config space failed\n");
+		dev_err(&pdev->dev, "Write of cache line size failed\n");
 		rc = -EIO;
 		goto cleanup_nomem;
 	}
@@ -5708,7 +5610,7 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 	rc = pci_save_state(pdev, ioa_cfg->pci_cfg_buf);
 
 	if (rc != PCIBIOS_SUCCESSFUL) {
-		dev_err(&pdev->dev, "Read of config space failed\n");
+		dev_err(&pdev->dev, "Failed to save PCI config space\n");
 		rc = -EIO;
 		goto cleanup_nomem;
 	}
@@ -5721,7 +5623,6 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 
 	ipr_mask_and_clear_all_interrupts(ioa_cfg);
 
-	/* Request our IRQ */
 	rc = request_irq(pdev->irq, ipr_isr, SA_SHIRQ, IPR_NAME, ioa_cfg);
 
 	if (rc) {
@@ -5731,17 +5632,14 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 	}
 
 	spin_lock(&ipr_driver_lock);
-
-	/* Add this controller to the linked list of controllers */
 	list_add_tail(&ioa_cfg->queue, &ipr_ioa_head);
-
 	spin_unlock(&ipr_driver_lock);
 
 	LEAVE;
 	return 0;
 
 cleanup:
-	dev_err(&pdev->dev, "Couldn't allocate enough memory for device driver! \n");
+	dev_err(&pdev->dev, "Couldn't allocate enough memory for device driver!\n");
 cleanup_nolog:
 	ipr_free_mem(ioa_cfg);
 cleanup_nomem:
@@ -5810,7 +5708,6 @@ static void __ipr_remove(struct pci_dev *pdev)
 {
 	unsigned long host_lock_flags = 0;
 	struct ipr_ioa_cfg *ioa_cfg = pci_get_drvdata(pdev);
-
 	ENTER;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, host_lock_flags);
@@ -5945,7 +5842,7 @@ static void ipr_shutdown(struct device *dev)
 	wait_event(ioa_cfg->reset_wait_q, !ioa_cfg->in_reset_reload);
 }
 
-static const struct pci_device_id ipr_pci_table[] __devinitdata = {
+static struct pci_device_id ipr_pci_table[] __devinitdata = {
 	{ PCI_VENDOR_ID_MYLEX, PCI_DEVICE_ID_IBM_GEMSTONE,
 		PCI_VENDOR_ID_IBM, IPR_SUBS_DEV_ID_5702,
 		0, 0, (kernel_ulong_t)&ipr_chip_cfg[0] },
@@ -5977,8 +5874,8 @@ static struct pci_driver ipr_driver = {
  **/
 static int __init ipr_init(void)
 {
-	ipr_info("%s: IBM Power RAID SCSI Device Driver version: %s\n",
-		 IPR_NAME, IPR_DRIVER_VERSION);
+	ipr_info("IBM Power RAID SCSI Device Driver version: %s\n",
+		 IPR_DRIVER_VERSION);
 
 	pci_register_driver(&ipr_driver);
 

@@ -3,7 +3,7 @@
  *
  * Written By: Brian King, IBM Corporation
  *
- * Copyright (C) 2003 IBM Corporation
+ * Copyright (C) 2003, 2004 IBM Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@
 /*
  * Literals
  */
-#define IPR_DRIVER_VERSION "2.0.0-2 (January 23, 2004)"
+#define IPR_DRIVER_VERSION "2.0.0-4 (February 5, 2004)"
 
 /*
  * IPR_DBG_TRACE: Setting this to 1 will turn on some general function tracing
@@ -66,7 +66,7 @@
  */
 #define IPR_NUM_BASE_CMD_BLKS				100
 
-
+/* xxx remove */
 #ifndef PCI_DEVICE_ID_IBM_GEMSTONE
 #define PCI_DEVICE_ID_IBM_GEMSTONE		0xB166
 #endif
@@ -107,6 +107,7 @@
  * IOASCs
  */
 #define IPR_IOASC_RCV_DEV_BUS_MSG_RECEIVED	0x01430000
+#define IPR_IOASC_NR_INIT_CMD_REQUIRED		0x02040200
 #define IPR_IOASC_SYNC_REQUIRED			0x023f0000
 #define IPR_IOASC_NR_ACA_ACTIVE			0x02448530
 #define IPR_IOASC_MED_DO_NOT_REALLOC		0x03110C00
@@ -124,7 +125,7 @@
 #define IPR_IOASC_PCI_ACCESS_ERROR			0x10000002
 
 #define IPR_NUM_LOG_HCAMS				2
-#define IPR_NUM_CFG_CHG_HCAMS				4
+#define IPR_NUM_CFG_CHG_HCAMS				2
 #define IPR_NUM_HCAMS	(IPR_NUM_LOG_HCAMS + IPR_NUM_CFG_CHG_HCAMS)
 #define IPR_MAX_NUM_TARGETS_PER_BUS			0x10
 #define IPR_MAX_NUM_LUNS_PER_TARGET			256
@@ -200,7 +201,7 @@
 #define IPR_WAIT_FOR_RESET_TIMEOUT		(2 * HZ)
 #define IPR_CHECK_FOR_RESET_TIMEOUT		(HZ / 10)
 #define IPR_WAIT_FOR_BIST_TIMEOUT		(2 * HZ)
-#define IPR_DUMP_TIMEOUT			(30 * HZ) /* xxx too long? */
+#define IPR_DUMP_TIMEOUT			(15 * HZ)
 
 /*
  * SCSI Literals
@@ -256,23 +257,26 @@ IPR_PCII_NO_HOST_RRQ | IPR_PCII_IOARRIN_LOST | IPR_PCII_MMIO_ERROR)
 #define IPR_UPROCI_RESET_ALERT			(0x80000000 >> 7)
 #define IPR_UPROCI_IO_DEBUG_ALERT			(0x80000000 >> 9)
 
+#if 0
 #define IPR_LDUMP_MAX_LONG_ACK_DELAY_IN_USEC		1000000	/* 1 second */
-/* #define IPR_LDUMP_MAX_SHORT_ACK_DELAY_IN_USEC		500000	xxx *//* 500 ms */
-#define IPR_LDUMP_MAX_SHORT_ACK_DELAY_IN_USEC		1000000	/* 1 second */
+#define IPR_LDUMP_MAX_SHORT_ACK_DELAY_IN_USEC		500000	/* 500 ms */
+/* #define IPR_LDUMP_MAX_SHORT_ACK_DELAY_IN_USEC		1000000 */	/* 1 second */
+#endif
+
+#define IPR_LDUMP_MAX_LONG_ACK_DELAY_IN_USEC		500000	/* 500 ms */
+#define IPR_LDUMP_MAX_SHORT_ACK_DELAY_IN_USEC		500000	/* 500 ms */
 
 /*
  * Dump literals
  */
-#define IPR_MIN_DUMP_SIZE				(1 * 1024 * 1024)
 #define IPR_MAX_IOA_DUMP_SIZE				(4 * 1024 * 1024)
 #define IPR_NUM_SDT_ENTRIES				511
+#define IPR_MAX_NUM_DUMP_PAGES	((IPR_MAX_IOA_DUMP_SIZE / PAGE_SIZE) + 1)
 
 /*
  * Misc literals
  */
 #define IPR_NUM_IOADL_ENTRIES			IPR_MAX_SGLIST
-
-#define IPR_MAX_NUM_DUMP_PAGES	((IPR_MAX_IOA_DUMP_SIZE / PAGE_SIZE) + 1)
 
 /*
  * Adapter interface types
@@ -290,7 +294,7 @@ struct ipr_res_addr {
 struct ipr_std_inq_vpids {
 	u8 vendor_id[IPR_VENDOR_ID_LEN];
 	u8 product_id[IPR_PROD_ID_LEN];
-};
+}__attribute__((packed));
 
 struct ipr_std_inq_data {
 #if defined(__BIG_ENDIAN_BITFIELD)
@@ -827,7 +831,7 @@ struct ipr_bus_attributes {
 	u8 bus_width;
 	u8 reserved;
 	u32 max_xfer_rate;
-}__attribute__((packed, aligned (4)));
+};
 
 /*
  * SCSI Structures
@@ -1069,12 +1073,11 @@ struct ipr_ioa_cfg {
 	struct ipr_mode_pages *saved_mode_pages;
 	u8 saved_mode_page_len;
 
-	struct work_struct low_pri_work;
+	struct work_struct work_q;
 
 	wait_queue_head_t reset_wait_q;
 
-	struct ipr_ioa_dump *ioa_dump;
-	struct ipr_driver_dump *dump;
+	struct ipr_dump *dump;
 	enum ipr_sdt_state sdt_state;
 
 	struct ipr_misc_cbs *vpd_cbs;
@@ -1169,23 +1172,26 @@ struct ipr_ioa_dump {
 	u32 *ioa_data[IPR_MAX_NUM_DUMP_PAGES];
 }__attribute__((packed, aligned (4)));
 
+struct ipr_dump {
+	struct kobject kobj;
+	struct ipr_ioa_cfg *ioa_cfg;
+	struct ipr_driver_dump driver_dump;
+	struct ipr_ioa_dump ioa_dump;
+};
+
 struct ipr_error_table_t {
 	u32 ioasc;
-	u16 dev_urc;
-	u16 iop_urc;
-	char *class;
 	int log_ioasa;
+	int log_hcam;
 	char *error;
 };
 
-struct ipr_software_inq_lid_info
-{
+struct ipr_software_inq_lid_info {
     u32  load_id;
     u32  timestamp[3];
 }__attribute__((packed, aligned (4)));
 
-struct ipr_ucode_image_header
-{
+struct ipr_ucode_image_header {
     u32 header_length;
     u32 lid_table_offset;
     u8 major_release;
@@ -1313,18 +1319,6 @@ static inline int ipr_is_vset_device(struct ipr_resource_entry *res)
 		return 1;
 	else
 		return 0;
-}
-
-/**
- * ipr_is_af - Determine if a resource is an advanced function resource
- * @res:	resource entry struct
- *
- * Return value: 
- * 	1 if AF / 0 if not AF
- **/
-static inline int ipr_is_af(struct ipr_resource_entry *res)
-{
-	return (ipr_is_vset_device(res) | ipr_is_af_dasd_device(res));
 }
 
 /**
