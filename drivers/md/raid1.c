@@ -903,7 +903,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 
 		atomic_inc(&conf->mirrors[i].rdev->nr_pending);
 		atomic_inc(&r1_bio->remaining);
-		md_sync_acct(conf->mirrors[i].rdev, wbio->bi_size >> 9);
+		md_sync_acct(conf->mirrors[i].rdev->bdev, wbio->bi_size >> 9);
 		generic_make_request(wbio);
 	}
 
@@ -1143,7 +1143,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	bio = r1_bio->bios[disk];
 	r1_bio->sectors = nr_sectors;
 
-	md_sync_acct(mirror->rdev, nr_sectors);
+	md_sync_acct(mirror->rdev->bdev, nr_sectors);
 
 	generic_make_request(bio);
 

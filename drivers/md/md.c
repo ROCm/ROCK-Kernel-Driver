@@ -1648,6 +1648,8 @@ static int do_md_run(mddev_t * mddev)
 	mddev->pers = pers[pnum];
 	spin_unlock(&pers_lock);
 
+	mddev->resync_max_sectors = mddev->size << 1; /* may be over-ridden by personality */
+
 	err = mddev->pers->run(mddev);
 	if (err) {
 		printk(KERN_ERR "md: pers->run() failed ...\n");
@@ -2953,6 +2955,7 @@ void md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 	if (!mddev->pers->error_handler)
 		return;
 	mddev->pers->error_handler(mddev,rdev);
+	set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 	md_wakeup_thread(mddev->thread);
 }
@@ -2985,7 +2988,11 @@ static void status_resync(struct seq_file *seq, mddev_t * mddev)
 	unsigned long max_blocks, resync, res, dt, db, rt;
 
 	resync = (mddev->curr_resync - atomic_read(&mddev->recovery_active))/2;
-	max_blocks = mddev->size;
+
+	if (test_bit(MD_RECOVERY_SYNC, &mddev->recovery))
+		max_blocks = mddev->resync_max_sectors >> 1;
+	else
+		max_blocks = mddev->size;
 
 	/*
 	 * Should not happen.
@@ -3221,11 +3228,6 @@ int unregister_md_personality(int pnum)
 	return 0;
 }
 
-void md_sync_acct(mdk_rdev_t *rdev, unsigned long nr_sectors)
-{
-	rdev->bdev->bd_contains->bd_disk->sync_io += nr_sectors;
-}
-
 static int is_mddev_idle(mddev_t *mddev)
 {
 	mdk_rdev_t * rdev;
@@ -3238,8 +3240,12 @@ static int is_mddev_idle(mddev_t *mddev)
 		struct gendisk *disk = rdev->bdev->bd_contains->bd_disk;
 		curr_events = disk_stat_read(disk, read_sectors) + 
 				disk_stat_read(disk, write_sectors) - 
-				disk->sync_io;
-		if ((curr_events - rdev->last_events) > 32) {
+				atomic_read(&disk->sync_io);
+		/* Allow some slack between valud of curr_events and last_events,
+		 * as there are some uninteresting races.
+		 * Note: the following is an unsigned comparison.
+		 */
+		if ((curr_events - rdev->last_events + 32) > 64) {
 			rdev->last_events = curr_events;
 			idle = 0;
 		}
@@ -3373,7 +3379,14 @@ static void md_do_sync(mddev_t *mddev)
 		}
 	} while (mddev->curr_resync < 2);
 
-	max_sectors = mddev->size << 1;
+	if (test_bit(MD_RECOVERY_SYNC, &mddev->recovery))
+		/* resync follows the size requested by the personality,
+		 * which default to physical size, but can be virtual size
+		 */
+		max_sectors = mddev->resync_max_sectors;
+	else
+		/* recovery follows the physical size of devices */
+		max_sectors = mddev->size << 1;
 
 	printk(KERN_INFO "md: syncing RAID array %s\n", mdname(mddev));
 	printk(KERN_INFO "md: minimum _guaranteed_ reconstruction speed:"
@@ -3796,7 +3809,6 @@ module_exit(md_exit)
 EXPORT_SYMBOL(register_md_personality);
 EXPORT_SYMBOL(unregister_md_personality);
 EXPORT_SYMBOL(md_error);
-EXPORT_SYMBOL(md_sync_acct);
 EXPORT_SYMBOL(md_done_sync);
 EXPORT_SYMBOL(md_write_start);
 EXPORT_SYMBOL(md_write_end);

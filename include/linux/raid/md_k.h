@@ -216,6 +216,7 @@ struct mddev_s
 	unsigned long			resync_mark;	/* a recent timestamp */
 	sector_t			resync_mark_cnt;/* blocks written at resync_mark */
 
+	sector_t			resync_max_sectors; /* may be set by personality */
 	/* recovery/resync flags 
 	 * NEEDED:   we might need to start a resync/recover
 	 * RUNNING:  a thread is running, or about to be started
@@ -261,6 +262,11 @@ static inline void rdev_dec_pending(mdk_rdev_t *rdev, mddev_t *mddev)
 	int faulty = rdev->faulty;
 	if (atomic_dec_and_test(&rdev->nr_pending) && faulty)
 		set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+}
+
+static inline void md_sync_acct(struct block_device *bdev, unsigned long nr_sectors)
+{
+        atomic_add(nr_sectors, &bdev->bd_contains->bd_disk->sync_io);
 }
 
 struct mdk_personality_s

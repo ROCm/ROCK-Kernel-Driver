@@ -1071,7 +1071,8 @@ static void handle_stripe(struct stripe_head *sh)
 					PRINTK("Reading block %d (sync=%d)\n", 
 						i, syncing);
 					if (syncing)
-						md_sync_acct(conf->disks[i].rdev, STRIPE_SECTORS);
+						md_sync_acct(conf->disks[i].rdev->bdev,
+							     STRIPE_SECTORS);
 				}
 			}
 		}
@@ -1256,7 +1257,7 @@ static void handle_stripe(struct stripe_head *sh)
  
 		if (rdev) {
 			if (test_bit(R5_Syncio, &sh->dev[i].flags))
-				md_sync_acct(rdev, STRIPE_SECTORS);
+				md_sync_acct(rdev->bdev, STRIPE_SECTORS);
 
 			bi->bi_bdev = rdev->bdev;
 			PRINTK("for %llu schedule op %ld on disc %d\n",
