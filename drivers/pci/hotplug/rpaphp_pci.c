@@ -133,7 +133,7 @@ int rpaphp_get_pci_adapter_status(struct slot *slot, int is_init, u8 * value)
 			else if (rpaphp_find_pci_dev(slot->dn->child))
 				*value = CONFIGURED;
 			else {
-				err("%s: can't find pdev of adapter in slot[%s]\n", 
+				info("%s: can't find pdev of adapter in slot[%s]\n", 
 					__FUNCTION__, slot->dn->full_name);
 				*value = NOT_CONFIGURED;
 			}
@@ -268,6 +268,12 @@ static void print_slot_pci_funcs(struct slot *slot)
 			printk("	FOUND dev=%s\n", pci_name(func->pci_dev));
 		}
 	}
+	return;
+}
+#else
+static void print_slot_pci_funcs(struct slot *slot)
+{
+	return;
 }
 #endif
 
@@ -287,9 +293,7 @@ static int init_slot_pci_funcs(struct slot *slot)
 			INIT_LIST_HEAD(&func->sibling);
 			func->pci_dev = pdev;
 			list_add_tail(&func->sibling, &slot->dev.pci_funcs);
-#ifdef DEBUG
 			print_slot_pci_funcs(slot);
-#endif
 		} else {
 			err("%s: dn=%s has no pci_dev\n", 
 				__FUNCTION__, child->full_name);
@@ -324,9 +328,7 @@ static int rpaphp_config_pci_adapter(struct slot *slot)
 		rc = init_slot_pci_funcs(slot);
 		if (rc)
 			goto exit;
-#ifdef DEBUG
 		print_slot_pci_funcs(slot);
-#endif
 		if (!list_empty(&slot->dev.pci_funcs)) 
 			rc = 0;
 	} else {
@@ -337,7 +339,6 @@ exit:
 	dbg("Exit %s:  rc=%d\n", __FUNCTION__, rc);
 	return rc;
 }
-
 
 static void rpaphp_eeh_remove_bus_device(struct pci_dev *dev)
 {
@@ -399,7 +400,7 @@ static int setup_pci_hotplug_slot_info(struct slot *slot)
 				      &slot->hotplug_slot->info->
 				      adapter_status);
 	if (slot->hotplug_slot->info->adapter_status == NOT_VALID) {
-		dbg("%s: NOT_VALID: skip dn->full_name=%s\n",
+		err("%s: NOT_VALID: skip dn->full_name=%s\n",
 		    __FUNCTION__, slot->dn->full_name);
 		return -1;
 	}
@@ -427,13 +428,26 @@ static int setup_pci_slot(struct slot *slot)
 				__FUNCTION__, slot->name);
 			goto exit_rc;
 		}
-		if (init_slot_pci_funcs(slot)) {
-			err("%s: init_slot_pci_funcs failed\n", __FUNCTION__);
+
+		if (slot->hotplug_slot->info->adapter_status == NOT_CONFIGURED) {
+			dbg("%s CONFIGURING pci adapter in slot[%s]\n",  __FUNCTION__, slot->name);
+			if (rpaphp_config_pci_adapter(slot)) {
+				err("%s: CONFIG pci adapter failed\n", __FUNCTION__);
+				goto exit_rc;		
+			}
+		} else if (slot->hotplug_slot->info->adapter_status == CONFIGURED) {
+			if (init_slot_pci_funcs(slot)) {
+				err("%s: init_slot_pci_funcs failed\n", __FUNCTION__);
+				goto exit_rc;
+			}
+
+		} else {
+			err("%s: slot[%s]'s adapter_status is NOT_VALID.\n",
+				__FUNCTION__, slot->name);
 			goto exit_rc;
 		}
-#ifdef DEBUG
+		
 		print_slot_pci_funcs(slot);
-#endif	
 		if (!list_empty(&slot->dev.pci_funcs)) {
 			slot->state = CONFIGURED;
 	

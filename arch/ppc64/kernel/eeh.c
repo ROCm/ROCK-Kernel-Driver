@@ -74,6 +74,7 @@ int (*eeh_disable_slot)(struct pci_dev *) = NULL;
 static DEFINE_PER_CPU(unsigned long, total_mmio_ffs);
 static DEFINE_PER_CPU(unsigned long, false_positives);
 static DEFINE_PER_CPU(unsigned long, ignored_failures);
+static DEFINE_PER_CPU(unsigned long, slot_resets);
 
 static int eeh_check_opts_config(struct device_node *dn, int class_code,
 				 int vendor_id, int device_id,
@@ -420,18 +421,28 @@ static void eeh_event_handler(void *dummy)
 		if (event == NULL)
 			break;
 
-		rc = 1;
+		/* We can only recover ethernet adapters at this time. */
 		if (strcmp(event->dn->name, "ethernet") == 0) {
-			if (eeh_disable_slot != NULL)
-				rc = eeh_disable_slot(event->dev);
-		}
-
-		if (rc != 0)
-			eeh_panic(event->dev, event->reset_state);
-		else
-			printk(KERN_INFO "EEH: MMIO failure (%ld) has caused device "
-				"%s %s to be removed\n", event->reset_state,
+			printk(KERN_INFO "EEH: MMIO failure (%ld), will remove device "
+				"%s %s\n", event->reset_state,
 				pci_name(event->dev), pci_pretty_name(event->dev));
+
+			if (eeh_disable_slot != NULL) {
+				rc = eeh_disable_slot(event->dev);
+				if (rc != 0) {
+					printk(KERN_WARNING "EEH: Unable to disable slot, rc=%d\n", rc);
+				}
+				__get_cpu_var(slot_resets)++;
+			} else {
+				printk(KERN_WARNING "EEH: No way to disable slot\n");
+				eeh_panic(event->dev, event->reset_state);
+			}
+		} else {
+			printk(KERN_ERR "EEH: MMIO failure (%ld), recovery not supported "
+				"%s %s\n", event->reset_state,
+				pci_name(event->dev), pci_pretty_name(event->dev));
+			eeh_panic(event->dev, event->reset_state);
+		}
 
 		pci_dev_put(event->dev);
 		kfree(event);
@@ -534,6 +545,10 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 			list_add(&event->list, &eeh_eventlist);
 			spin_unlock_irqrestore(&eeh_eventlist_lock, flags);
 	
+			/* Most EEH events are due to device driver bugs.  Having
+			 * a stack trace will help the device-driver authors figure
+			 * out what happened.  So print that out. */
+			dump_stack();
 			schedule_work(&eeh_event_wq);
 		}
 		else
@@ -839,11 +854,13 @@ static int proc_eeh_show(struct seq_file *m, void *v)
 {
 	unsigned int cpu;
 	unsigned long ffs = 0, positives = 0, failures = 0;
+	unsigned long resets = 0;
 
 	for_each_cpu(cpu) {
 		ffs += per_cpu(total_mmio_ffs, cpu);
 		positives += per_cpu(false_positives, cpu);
 		failures += per_cpu(ignored_failures, cpu);
+		resets += per_cpu(slot_resets, cpu);
 	}
 
 	if (0 == eeh_subsystem_enabled) {
@@ -853,8 +870,9 @@ static int proc_eeh_show(struct seq_file *m, void *v)
 		seq_printf(m, "EEH Subsystem is enabled\n");
 		seq_printf(m, "eeh_total_mmio_ffs=%ld\n"
 			   "eeh_false_positives=%ld\n"
-			   "eeh_ignored_failures=%ld\n",
-			   ffs, positives, failures);
+			   "eeh_ignored_failures=%ld\n"
+			   "eeh_slot_resets=%ld\n",
+			   ffs, positives, failures, resets);
 	}
 
 	return 0;
