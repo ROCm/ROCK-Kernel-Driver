@@ -267,7 +267,7 @@ config X86_PM_TIMER
 	  (TSC) timing source.
 
 	  So, if you see messages like 'Losing too many ticks!' in the
-	  kernel logs, and/or you are using a this on a notebook which
+	  kernel logs, and/or you are using this on a notebook which
 	  does not yet have an HPET, you should say "Y" here.
 
 endmenu
