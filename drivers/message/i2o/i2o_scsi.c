@@ -296,15 +296,15 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 	struct device *dev;
 	u8 as, ds, st;
 
-	cmd = i2o_cntxt_list_get(c, readl(&msg->u.s.tcntxt));
+	cmd = i2o_cntxt_list_get(c, le32_to_cpu(&msg->u.s.tcntxt));
 
 	if (msg->u.head[0] & (1 << 13)) {
 		struct i2o_message *pmsg;	/* preserved message */
 		u32 pm;
 
-		pm = readl(&msg->body[3]);
+		pm = le32_to_cpu(&msg->body[3]);
 
-		pmsg = c->in_queue.virt + pm;
+		pmsg = i2o_msg_in_to_virt(c, pm);
 
 		printk(KERN_ERR "IOP fail.\n");
 		printk(KERN_ERR "From %d To %d Cmd %d.\n",
@@ -339,9 +339,9 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 	 *      Low byte is device status, next is adapter status,
 	 *      (then one byte reserved), then request status.
 	 */
-	ds = (u8) readl(&msg->body[0]);
-	as = (u8) (readl(&msg->body[0]) >> 8);
-	st = (u8) (readl(&msg->body[0]) >> 24);
+	ds = (u8) le32_to_cpu(&msg->body[0]);
+	as = (u8) (le32_to_cpu(&msg->body[0]) >> 8);
+	st = (u8) (le32_to_cpu(&msg->body[0]) >> 24);
 
 	/*
 	 *      Is this a control request coming back - eg an abort ?
@@ -350,7 +350,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 	if (!cmd) {
 		if (st)
 			printk(KERN_WARNING "SCSI abort: %08X",
-			       readl(&msg->body[0]));
+			       le32_to_cpu(&msg->body[0]));
 		printk(KERN_INFO "SCSI abort completed.\n");
 		return -EFAULT;
 	}
@@ -363,7 +363,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 
 		switch (st) {
 		case 0x06:
-			count = readl(&msg->body[1]);
+			count = le32_to_cpu(&msg->body[1]);
 			if (count < cmd->underflow) {
 				int i;
 				printk(KERN_ERR "SCSI: underflow 0x%08X 0x%08X"
@@ -378,7 +378,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 			break;
 
 		default:
-			error = readl(&msg->body[0]);
+			error = le32_to_cpu(&msg->body[0]);
 
 			printk(KERN_ERR "scsi-osm: SCSI error %08x\n", error);
 
