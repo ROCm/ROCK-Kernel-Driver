@@ -293,7 +293,7 @@ int sctp_raw_to_bind_addrs(struct sctp_bind_addr *bp, __u8 *raw_addr_list,
 /* Does this contain a specified address?  Allow wildcarding. */
 int sctp_bind_addr_match(struct sctp_bind_addr *bp, 
 			 const union sctp_addr *addr,
-			 struct sctp_opt *opt)
+			 struct sctp_sock *opt)
 {
 	struct sctp_sockaddr_entry *laddr;
 	struct list_head *pos;
@@ -313,7 +313,7 @@ int sctp_bind_addr_match(struct sctp_bind_addr *bp,
 union sctp_addr *sctp_find_unmatch_addr(struct sctp_bind_addr	*bp,
 					const union sctp_addr	*addrs,
 					int			addrcnt,
-					struct sctp_opt		*opt)
+					struct sctp_sock	*opt)
 {
 	struct sctp_sockaddr_entry	*laddr;
 	union sctp_addr			*addr;
