@@ -36,6 +36,10 @@
  *	            module_init & module_exit.
  *                  Torben Mathiasen <tmm@image.dk>
  *
+ * September 2003 - Fix SMP support by removing cli/sti calls.
+ *                  Using spinlocks with a wait_queue instead.
+ *                  Felipe Damasio <felipewd@terra.com.br>
+ *
  * Things to do:
  *  - handle errors and status better, put everything into a single word
  *  - use interrupts (code mostly there, but a big hole still missing)
@@ -340,10 +344,14 @@ sony_sleep(void)
 	if (sony535_irq_used <= 0) {	/* poll */
 		yield();
 	} else {	/* Interrupt driven */
-		cli();
+		DEFINE_WAIT(wait);
+		
+		spin_lock_irq(&sonycd535_lock);
 		enable_interrupts();
-		interruptible_sleep_on(&cdu535_irq_wait);
-		sti();
+		prepare_to_wait(&cdu535_irq_wait, &wait, TASK_INTERRUPTIBLE);
+		spin_unlock_irq(&sonycd535_lock);
+		schedule();
+		finish_wait(&cdu535_irq_wait, &wait);
 	}
 }
 
@@ -804,14 +812,14 @@ do_cdu535_request(request_queue_t * q)
 
 		block = req->sector;
 		nsect = req->nr_sectors;
-		if (!(req->flags & REQ_CMD))
-			continue;	/* FIXME */
+		if (!blk_fs_request(req)) {
+			end_request(req, 0);
+			continue;
+		}
 		if (rq_data_dir(req) == WRITE) {
 			end_request(req, 0);
 			continue;
 		}
-		if (rq_data_dir(req) != READ)
-			panic("Unknown SONY CD cmd");
 		/*
 		 * If the block address is invalid or the request goes beyond
 		 * the end of the media, return an error.
@@ -888,8 +896,10 @@ do_cdu535_request(request_queue_t * q)
 					}
 					if (readStatus == BAD_STATUS) {
 						/* Sleep for a while, then retry */
-						current->state = TASK_INTERRUPTIBLE;
+						set_current_state(TASK_INTERRUPTIBLE);
+						spin_unlock_irq(&sonycd535_lock);
 						schedule_timeout(RETRY_FOR_BAD_STATUS*HZ/10);
+						spin_lock_irq(&sonycd535_lock);
 					}
 #if DEBUG > 0
 					printk(CDU535_MESSAGE_NAME
@@ -1473,7 +1483,7 @@ static int __init sony535_init(void)
 	/* look for the CD-ROM, follows the procedure in the DOS driver */
 	inb(select_unit_reg);
 	/* wait for 40 18 Hz ticks (reverse-engineered from DOS driver) */
-	current->state = TASK_INTERRUPTIBLE;
+	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout((HZ+17)*40/18);
 	inb(result_reg);
 
