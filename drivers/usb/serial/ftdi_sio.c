@@ -346,7 +346,7 @@ static int  ftdi_sio_open (struct usb_serial_port *port, struct file *filp)
 	}
 
 	/* Start reading from the device */
-	FILL_BULK_URB(port->read_urb, serial->dev, 
+	usb_fill_bulk_urb(port->read_urb, serial->dev, 
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ftdi_sio_read_bulk_callback, port);
@@ -449,7 +449,7 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 	usb_serial_debug_data (__FILE__, __FUNCTION__, count, first_byte);
 		
 	/* send the data out the bulk port */
-	FILL_BULK_URB(port->write_urb, serial->dev, 
+	usb_fill_bulk_urb(port->write_urb, serial->dev, 
 		      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
 		      port->write_urb->transfer_buffer, count,
 		      ftdi_sio_write_bulk_callback, port);
@@ -608,7 +608,7 @@ static void ftdi_sio_read_bulk_callback (struct urb *urb)
 #endif
 
 	/* Continue trying to always read  */
-	FILL_BULK_URB(port->read_urb, serial->dev, 
+	usb_fill_bulk_urb(port->read_urb, serial->dev, 
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ftdi_sio_read_bulk_callback, port);

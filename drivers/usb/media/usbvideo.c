@@ -1914,7 +1914,7 @@ static int usbvideo_StartDataPump(struct uvd *uvd)
 		urb->context = uvd;
 		urb->pipe = usb_rcvisocpipe(dev, uvd->video_endp);
 		urb->interval = 1;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->transfer_buffer = uvd->sbuf[i].data;
 		urb->complete = usbvideo_IsocIrq;
 		urb->number_of_packets = FRAMES_PER_DESC;

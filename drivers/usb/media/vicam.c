@@ -1253,7 +1253,7 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	int bulkEndpoint = 0;
-	const struct usb_interface_descriptor *interface;
+	const struct usb_host_interface *interface;
 	const struct usb_endpoint_descriptor *endpoint;
 	struct vicam_camera *cam;
 	
@@ -1268,8 +1268,8 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 	interface = &intf->altsetting[0];
 
 	DBG(KERN_DEBUG "Interface %d. has %u. endpoints!\n",
-	       ifnum, (unsigned) (interface->bNumEndpoints));
-	endpoint = &interface->endpoint[0];
+	       ifnum, (unsigned) (interface->desc.bNumEndpoints));
+	endpoint = &interface->endpoint[0].desc;
 
 	if ((endpoint->bEndpointAddress & 0x80) &&
 	    ((endpoint->bmAttributes & 3) == 0x02)) {

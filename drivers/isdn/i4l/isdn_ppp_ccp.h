@@ -1,3 +1,13 @@
+/* Linux ISDN subsystem, PPP CCP support
+ *
+ * Copyright 1994-1998  by Fritz Elfert (fritz@isdn4linux.de)
+ *           1995,96    by Thinking Objects Software GmbH Wuerzburg
+ *           1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ *           1999-2002  by Kai Germaschewski <kai@germaschewski.name>
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ */
 
 #include <linux/kernel.h>
 #include <linux/isdn_ppp.h>
@@ -16,7 +26,7 @@
 */
 
 struct ippp_ccp {
-	int proto;
+	u16                         proto;
 	struct isdn_ppp_compressor *compressor;
 	struct isdn_ppp_compressor *decompressor;
 	void                       *comp_stat;
@@ -26,9 +36,8 @@ struct ippp_ccp {
 	int                         mru;
 	int                         debug;
 	void                       *priv;
-	void            (*xmit)(void *priv, struct sk_buff *skb);
+	void            (*xmit)(void *priv, struct sk_buff *skb, u16 proto);
 	void            (*kick_up)(void *priv);
-	void            (*push_header)(void *priv, struct sk_buff *skb, u16);
 	struct sk_buff *(*alloc_skb)(void *priv, int len, int gfp_mask);
 };
 
@@ -45,10 +54,10 @@ unsigned int
 ippp_ccp_get_flags(struct ippp_ccp *ccp);
 
 struct sk_buff *
-ippp_ccp_compress(struct ippp_ccp *ccp, struct sk_buff *skb, int *proto);
+ippp_ccp_compress(struct ippp_ccp *ccp, struct sk_buff *skb, u16 *proto);
 
 struct sk_buff *
-ippp_ccp_decompress(struct ippp_ccp *ccp, struct sk_buff *skb, int *proto);
+ippp_ccp_decompress(struct ippp_ccp *ccp, struct sk_buff *skb, u16 *proto);
 
 void
 ippp_ccp_send_ccp(struct ippp_ccp *ccp, struct sk_buff *skb);

@@ -118,6 +118,9 @@ CONFIG_USB_TEST
   with specialized device firmware for regression and stress testing,
   to help prevent problems from cropping up with 'real" drivers.
 
+  See <http://www.linux-usb.org/usbtest> for more information,
+  including sample test device firmware and "how to use it".
+
 CONFIG_USB_LCD
   Say Y here if you want to connect an USBLCD to your computer's
   USB port. The USBLCD is a small USB interface board for

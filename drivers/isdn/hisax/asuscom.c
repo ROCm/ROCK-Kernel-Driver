@@ -24,6 +24,7 @@ extern const char *CardType[];
 
 const char *Asuscom_revision = "$Revision: 1.11.6.3 $";
 
+static spinlock_t asuscom_lock = SPIN_LOCK_UNLOCKED;
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
@@ -46,13 +47,12 @@ static inline u_char
 readreg(unsigned int ale, unsigned int adr, u_char off)
 {
 	register u_char ret;
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&asuscom_lock, flags);
 	byteout(ale, off);
 	ret = bytein(adr);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&asuscom_lock, flags);
 	return (ret);
 }
 
@@ -69,13 +69,12 @@ readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size
 static inline void
 writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&asuscom_lock, flags);
 	byteout(ale, off);
 	byteout(adr, data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&asuscom_lock, flags);
 }
 
 static inline void
@@ -263,14 +262,10 @@ release_io_asuscom(struct IsdnCardState *cs)
 static void
 reset_asuscom(struct IsdnCardState *cs)
 {
-	long flags;
-
 	if (cs->subtyp == ASUS_IPAC)
 		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_POTA2, 0x20);
 	else
 		byteout(cs->hw.asus.adr, ASUS_RESET);	/* Reset On */
-	save_flags(flags);
-	sti();
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
 	if (cs->subtyp == ASUS_IPAC)
@@ -286,7 +281,6 @@ reset_asuscom(struct IsdnCardState *cs)
 		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_MASK, 0xc0);
 		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_PCFG, 0x12);
 	}
-	restore_flags(flags);
 }
 
 static int

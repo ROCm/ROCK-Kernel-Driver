@@ -16,28 +16,28 @@
 #endif
 #include <linux/usb.h>
 
-static void usb_show_endpoint(struct usb_endpoint_descriptor *endpoint)
+static void usb_show_endpoint(struct usb_host_endpoint *endpoint)
 {
-	usb_show_endpoint_descriptor(endpoint);
+	usb_show_endpoint_descriptor(&endpoint->desc);
 }
 
-static void usb_show_interface(struct usb_interface_descriptor *altsetting)
+static void usb_show_interface(struct usb_host_interface *altsetting)
 {
 	int i;
 
-	usb_show_interface_descriptor(altsetting);
+	usb_show_interface_descriptor(&altsetting->desc);
 
-	for (i = 0; i < altsetting->bNumEndpoints; i++)
+	for (i = 0; i < altsetting->desc.bNumEndpoints; i++)
 		usb_show_endpoint(altsetting->endpoint + i);
 }
 
-static void usb_show_config(struct usb_config_descriptor *config)
+static void usb_show_config(struct usb_host_config *config)
 {
 	int i, j;
 	struct usb_interface *ifp;
 
-	usb_show_config_descriptor(config);
-	for (i = 0; i < config->bNumInterfaces; i++) {
+	usb_show_config_descriptor(&config->desc);
+	for (i = 0; i < config->desc.bNumInterfaces; i++) {
 		ifp = config->interface + i;
 
 		if (!ifp)
@@ -124,7 +124,7 @@ void usb_show_config_descriptor(struct usb_config_descriptor *desc)
 	printk("  bConfigurationValue =   %02x\n", desc->bConfigurationValue);
 	printk("  iConfiguration      =   %02x\n", desc->iConfiguration);
 	printk("  bmAttributes        =   %02x\n", desc->bmAttributes);
-	printk("  MaxPower            = %4dmA\n", desc->MaxPower * 2);
+	printk("  bMaxPower            = %4dmA\n", desc->bMaxPower * 2);
 }
 
 void usb_show_interface_descriptor(struct usb_interface_descriptor *desc)

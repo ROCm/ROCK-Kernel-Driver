@@ -313,7 +313,7 @@ aiptek_probe(struct usb_interface *intf,
 	aiptek->dev.id.version = dev->descriptor.bcdDevice;
 	aiptek->usbdev = dev;
 
-	endpoint = intf->altsetting[0].endpoint + 0;
+	endpoint = &intf->altsetting[0].endpoint[0].desc;
 
 	if (aiptek->features->pktlen > 10)
 		BUG();

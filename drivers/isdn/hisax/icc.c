@@ -23,6 +23,7 @@
 
 #define DBUSY_TIMER_VALUE 80
 #define ARCOFI_USE 0
+static spinlock_t icc_lock = SPIN_LOCK_UNLOCKED;
 
 static char *ICCVer[] __initdata =
 {"2070 A1/A3", "2070 B1", "2070 B2/B3", "2070 V2.4"};
@@ -77,8 +78,9 @@ icc_new_ph(struct IsdnCardState *cs)
 }
 
 static void
-icc_bh(struct IsdnCardState *cs)
+icc_bh(void *data)
 {
+	struct IsdnCardState *cs = data;
 	struct PStack *stptr;
 	
 	if (!cs)
@@ -112,7 +114,7 @@ void
 icc_empty_fifo(struct IsdnCardState *cs, int count)
 {
 	u_char *ptr;
-	long flags;
+	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
 		debugl1(cs, "icc_empty_fifo");
@@ -127,11 +129,10 @@ icc_empty_fifo(struct IsdnCardState *cs, int count)
 	}
 	ptr = cs->rcvbuf + cs->rcvidx;
 	cs->rcvidx += count;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&icc_lock, flags);
 	cs->readisacfifo(cs, ptr, count);
 	cs->writeisac(cs, ICC_CMDR, 0x80);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&icc_lock, flags);
 	if (cs->debug & L1_DEB_ISAC_FIFO) {
 		char *t = cs->dlog;
 
@@ -146,7 +147,7 @@ icc_fill_fifo(struct IsdnCardState *cs)
 {
 	int count, more;
 	u_char *ptr;
-	long flags;
+	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
 		debugl1(cs, "icc_fill_fifo");
@@ -163,8 +164,7 @@ icc_fill_fifo(struct IsdnCardState *cs)
 		more = !0;
 		count = 32;
 	}
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&icc_lock, flags);
 	ptr = cs->tx_skb->data;
 	skb_pull(cs->tx_skb, count);
 	cs->tx_cnt += count;
@@ -177,7 +177,7 @@ icc_fill_fifo(struct IsdnCardState *cs)
 	init_timer(&cs->dbusytimer);
 	cs->dbusytimer.expires = jiffies + ((DBUSY_TIMER_VALUE * HZ)/1000);
 	add_timer(&cs->dbusytimer);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&icc_lock, flags);
 	if (cs->debug & L1_DEB_ISAC_FIFO) {
 		char *t = cs->dlog;
 
@@ -191,7 +191,7 @@ void
 icc_sched_event(struct IsdnCardState *cs, int event)
 {
 	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->tqueue);
+	schedule_work(&cs->work);
 }
 
 void
@@ -200,7 +200,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 	u_char exval, v1;
 	struct sk_buff *skb;
 	unsigned int count;
-	long flags;
+	unsigned long flags;
 
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "ICC interrupt %x", val);
@@ -227,8 +227,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			if (count == 0)
 				count = 32;
 			icc_empty_fifo(cs, count);
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&icc_lock, flags);
 			if ((count = cs->rcvidx) > 0) {
 				cs->rcvidx = 0;
 				if (!(skb = alloc_skb(count, GFP_ATOMIC)))
@@ -238,7 +237,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 					skb_queue_tail(&cs->rq, skb);
 				}
 			}
-			restore_flags(flags);
+			spin_unlock_irqrestore(&icc_lock, flags);
 		}
 		cs->rcvidx = 0;
 		icc_sched_event(cs, D_RCVBUFREADY);
@@ -624,7 +623,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 void __init
 initicc(struct IsdnCardState *cs)
 {
-	INIT_WORK(&cs->tqueue, (void *) (void *) icc_bh, NULL);
+	INIT_WORK(&cs->work, icc_bh, cs);
 	cs->setstack_d = setstack_icc;
 	cs->DC_Close = DC_Close_icc;
 	cs->dc.icc.mon_tx = NULL;

@@ -739,7 +739,7 @@ static void uhci_inc_fsbr(struct uhci_hcd *uhci, struct urb *urb)
 
 	spin_lock_irqsave(&uhci->frame_list_lock, flags);
 
-	if ((!(urb->transfer_flags & USB_NO_FSBR)) && !urbp->fsbr) {
+	if ((!(urb->transfer_flags & URB_NO_FSBR)) && !urbp->fsbr) {
 		urbp->fsbr = 1;
 		if (!uhci->fsbr++ && !uhci->fsbrtimeout)
 			uhci->skel_term_qh->link = cpu_to_le32(uhci->skel_hs_control_qh->dma_handle) | UHCI_PTR_QH;
@@ -755,7 +755,7 @@ static void uhci_dec_fsbr(struct uhci_hcd *uhci, struct urb *urb)
 
 	spin_lock_irqsave(&uhci->frame_list_lock, flags);
 
-	if ((!(urb->transfer_flags & USB_NO_FSBR)) && urbp->fsbr) {
+	if ((!(urb->transfer_flags & URB_NO_FSBR)) && urbp->fsbr) {
 		urbp->fsbr = 0;
 		if (!--uhci->fsbr)
 			uhci->fsbrtimeout = jiffies + FSBR_DELAY;
@@ -1124,13 +1124,13 @@ static int uhci_submit_common(struct uhci_hcd *uhci, struct urb *urb, struct urb
 	} while (len > 0);
 
 	/*
-	 * USB_ZERO_PACKET means adding a 0-length packet, if direction
+	 * URB_ZERO_PACKET means adding a 0-length packet, if direction
 	 * is OUT and the transfer_length was an exact multiple of maxsze,
 	 * hence (len = transfer_length - N * maxsze) == 0
 	 * however, if transfer_length == 0, the zero packet was already
 	 * prepared above.
 	 */
-	if (usb_pipeout(urb->pipe) && (urb->transfer_flags & USB_ZERO_PACKET) &&
+	if (usb_pipeout(urb->pipe) && (urb->transfer_flags & URB_ZERO_PACKET) &&
 	    !len && urb->transfer_buffer_length) {
 		td = uhci_alloc_td(uhci, urb->dev);
 		if (!td)
@@ -1306,7 +1306,7 @@ static int isochronous_find_start(struct uhci_hcd *uhci, struct urb *urb)
 
 	limits = isochronous_find_limits(uhci, urb, &start, &end);
 
-	if (urb->transfer_flags & USB_ISO_ASAP) {
+	if (urb->transfer_flags & URB_ISO_ASAP) {
 		if (limits) {
 			int curframe;
 
@@ -1752,7 +1752,7 @@ static void stall_callback(unsigned long ptr)
 
 		tmp = tmp->next;
 
-		u->transfer_flags |= USB_TIMEOUT_KILLED;
+		u->transfer_flags |= URB_TIMEOUT_KILLED;
 		uhci_urb_dequeue(hcd, u);
 	}
 

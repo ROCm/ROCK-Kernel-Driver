@@ -390,7 +390,7 @@ static int  klsi_105_open (struct usb_serial_port *port, struct file *filp)
 
 
 	/* READ_ON and urb submission */
-	FILL_BULK_URB(port->read_urb, serial->dev, 
+	usb_fill_bulk_urb(port->read_urb, serial->dev, 
 		      usb_rcvbulkpipe(serial->dev,
 				      port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer,
@@ -534,7 +534,7 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 		((__u8 *)urb->transfer_buffer)[1] = (__u8) ((size & 0xFF00)>>8);
 
 		/* set up our urb */
-		FILL_BULK_URB(urb, serial->dev,
+		usb_fill_bulk_urb(urb, serial->dev,
 			      usb_sndbulkpipe(serial->dev,
 					      port->bulk_out_endpointAddress),
 			      urb->transfer_buffer,
@@ -697,7 +697,7 @@ static void klsi_105_read_bulk_callback (struct urb *urb)
 		priv->bytes_in += bytes_sent;
 	}
 	/* Continue trying to always read  */
-	FILL_BULK_URB(port->read_urb, serial->dev, 
+	usb_fill_bulk_urb(port->read_urb, serial->dev, 
 		      usb_rcvbulkpipe(serial->dev,
 				      port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer,

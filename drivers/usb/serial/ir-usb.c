@@ -395,7 +395,7 @@ static int ir_write (struct usb_serial_port *port, int from_user, const unsigned
 		ir_write_bulk_callback,
 		port);
 
-	port->write_urb->transfer_flags = USB_ZERO_PACKET;
+	port->write_urb->transfer_flags = URB_ZERO_PACKET;
 
 	result = usb_submit_urb (port->write_urb, GFP_ATOMIC);
 	if (result)
@@ -597,7 +597,7 @@ static void ir_set_termios (struct usb_serial_port *port, struct termios *old_te
 			ir_write_bulk_callback,
 			port);
 
-		port->write_urb->transfer_flags = USB_ZERO_PACKET;
+		port->write_urb->transfer_flags = URB_ZERO_PACKET;
 
 		result = usb_submit_urb (port->write_urb, GFP_KERNEL);
 		if (result)

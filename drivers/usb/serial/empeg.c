@@ -168,7 +168,7 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 	bytes_out = 0;
 
 	/* Start reading from the device */
-	FILL_BULK_URB(
+	usb_fill_bulk_urb(
 		port->read_urb,
 		serial->dev, 
 		usb_rcvbulkpipe(serial->dev,
@@ -265,7 +265,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 		}
 
 		/* build up our urb */
-		FILL_BULK_URB (
+		usb_fill_bulk_urb (
 			urb,
 			serial->dev,
 			usb_sndbulkpipe(serial->dev,
@@ -413,7 +413,7 @@ static void empeg_read_bulk_callback (struct urb *urb)
 	}
 
 	/* Continue trying to always read  */
-	FILL_BULK_URB(
+	usb_fill_bulk_urb(
 		port->read_urb,
 		serial->dev, 
 		usb_rcvbulkpipe(serial->dev,

@@ -75,7 +75,7 @@
 
 
 const char *enternow_pci_rev = "$Revision: 1.1.2.1 $";
-
+static spinlock_t enternow_pci_lock = SPIN_LOCK_UNLOCKED;
 
 /* *************************** I/O-Interface functions ************************************* */
 
@@ -137,13 +137,9 @@ static void dummywr(struct IsdnCardState *cs, int chan, BYTE off, BYTE value)
 static void
 reset_enpci(struct IsdnCardState *cs)
 {
-	long flags;
-
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "enter:now PCI: reset");
 
-	save_flags(flags);
-	sti();
 	/* Reset on, (also for AMD) */
 	cs->hw.njet.ctrl_reg = 0x07;
 	OutByte(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
@@ -156,13 +152,11 @@ reset_enpci(struct IsdnCardState *cs)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	/* 80ms delay */
 	schedule_timeout((80*HZ)/1000);
-	restore_flags(flags);
 	cs->hw.njet.auxd = 0;  // LED-status
 	cs->hw.njet.dmactrl = 0;
 	OutByte(cs->hw.njet.base + NETJET_AUXCTRL, ~TJ_AMD_IRQ);
 	OutByte(cs->hw.njet.base + NETJET_IRQMASK1, TJ_AMD_IRQ);
 	OutByte(cs->hw.njet.auxa, cs->hw.njet.auxd); // LED off
-
 }
 
 
@@ -237,7 +231,7 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	BYTE sval, ir;
-	long flags;
+	unsigned long flags;
 
 
 	if (!cs) {
@@ -257,8 +251,7 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	/* DMA-Interrupt: B-channel-stuff */
 	/* set bits in sval to indicate which page is free */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&enternow_pci_lock, flags);
 	/* set bits in sval to indicate which page is free */
 	if (inl(cs->hw.njet.base + NETJET_DMA_WRITE_ADR) <
 		inl(cs->hw.njet.base + NETJET_DMA_WRITE_IRQ))
@@ -275,11 +268,11 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	if (sval != cs->hw.njet.last_is0) /* we have a DMA interrupt */
 	{
 		if (test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&enternow_pci_lock, flags);
 			return;
 		}
 		cs->hw.njet.irqstat0 = sval;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&enternow_pci_lock, flags);
 		if ((cs->hw.njet.irqstat0 & NETJET_IRQM0_READ) !=
 			(cs->hw.njet.last_is0 & NETJET_IRQM0_READ))
 			/* we have a read dma int */
@@ -290,7 +283,7 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			write_tiger(cs);
 		test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
 	} else
-		restore_flags(flags);
+		spin_unlock_irqrestore(&enternow_pci_lock, flags);
 }
 
 
@@ -303,7 +296,7 @@ setup_enternow_pci(struct IsdnCard *card)
 	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	long flags;
+	unsigned long flags;
 
 #if CONFIG_PCI
 #ifdef __BIG_ENDIAN

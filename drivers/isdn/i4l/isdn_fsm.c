@@ -1,17 +1,14 @@
-/* $Id: fsm.c,v 1.14.6.4 2001/09/23 22:24:47 kai Exp $
- *
- * Finite state machine
+/* Linux ISDN subsystem, finite state machine
  *
  * Author       Karsten Keil
- * Copyright    by Karsten Keil      <keil@isdn4linux.de>
- *              by Kai Germaschewski <kai.germaschewski@gmx.de>
+ * Copyright              by Karsten Keil      <keil@isdn4linux.de>
+ *              2001-2002 by Kai Germaschewski <kai@germaschewski.name>
  * 
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
  *
  * Thanks to    Jan den Ouden
  *              Fritz Elfert
- *
  */
 
 #include <linux/kernel.h>
@@ -19,7 +16,7 @@
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include "isdn_fsm.h"
+#include <linux/isdn/fsm.h>
 
 int
 fsm_new(struct fsm *fsm)

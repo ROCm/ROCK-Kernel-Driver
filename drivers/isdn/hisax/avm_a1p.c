@@ -57,116 +57,109 @@
 #define bytein(addr) inb(addr)
 
 static const char *avm_revision = "$Revision: 2.7.6.2 $";
+static spinlock_t avm_a1p_lock = SPIN_LOCK_UNLOCKED;
 
 static inline u_char
 ReadISAC(struct IsdnCardState *cs, u_char offset)
 {
-	long flags;
+	unsigned long flags;
         u_char ret;
 
         offset -= 0x20;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_a1p_lock, flags);
         byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,ISAC_REG_OFFSET+offset);
 	ret = bytein(cs->hw.avm.cfg_reg+DATAREG_OFFSET);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 	return ret;
 }
 
 static inline void
 WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	long flags;
+	unsigned long flags;
 
         offset -= 0x20;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_a1p_lock, flags);
         byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,ISAC_REG_OFFSET+offset);
 	byteout(cs->hw.avm.cfg_reg+DATAREG_OFFSET, value);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
 static inline void
 ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_a1p_lock, flags);
 	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,ISAC_FIFO_OFFSET);
 	insb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
 static inline void
 WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_a1p_lock, flags);
 	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,ISAC_FIFO_OFFSET);
 	outsb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
 static inline u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
 	u_char ret;
-	long flags;
+	unsigned long flags;
 
         offset -= 0x20;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_a1p_lock, flags);
 	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,
 			HSCX_REG_OFFSET+hscx*HSCX_CH_DIFF+offset);
 	ret = bytein(cs->hw.avm.cfg_reg+DATAREG_OFFSET);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 	return ret;
 }
 
 static inline void
 WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 {
-	long flags;
+	unsigned long flags;
 
         offset -= 0x20;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_a1p_lock, flags);
 	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,
 			HSCX_REG_OFFSET+hscx*HSCX_CH_DIFF+offset);
 	byteout(cs->hw.avm.cfg_reg+DATAREG_OFFSET, value);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
 static inline void
 ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_a1p_lock, flags);
 	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,
 			HSCX_FIFO_OFFSET+hscx*HSCX_CH_DIFF);
 	insb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
 static inline void
 WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_a1p_lock, flags);
 	byteout(cs->hw.avm.cfg_reg+ADDRREG_OFFSET,
 			HSCX_FIFO_OFFSET+hscx*HSCX_CH_DIFF);
 	outsb(cs->hw.avm.cfg_reg+DATAREG_OFFSET, data, size);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
 /*
@@ -253,7 +246,6 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 {
 	u_char model, vers;
 	struct IsdnCardState *cs = card->cs;
-	long flags;
 	char tmp[64];
 
 
@@ -267,9 +259,7 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	cs->irq = card->para[0];
 
 
-	save_flags(flags);
 	outb(cs->hw.avm.cfg_reg+ASL1_OFFSET, ASL1_W_ENABLE_S0);
-        sti();
 
 	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,0x00);
 	HZDELAY(HZ / 5 + 1);
@@ -278,8 +268,6 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,0x00);
 
 	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET, ASL0_W_TDISABLE|ASL0_W_TRESET);
-
-	restore_flags(flags);
 
 	model = bytein(cs->hw.avm.cfg_reg+MODREG_OFFSET);
 	vers = bytein(cs->hw.avm.cfg_reg+VERREG_OFFSET);
