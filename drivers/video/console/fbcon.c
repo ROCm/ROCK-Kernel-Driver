@@ -1993,7 +1993,7 @@ static int fbcon_blank(struct vc_data *vc, int blank)
 			update_screen(vc->vc_num);
 		return 0;
 	} else
-		return fb_blank(blank, info);
+		return info->fbops->fb_blank(blank, info);
 }
 
 static void fbcon_free_font(struct display *p)
