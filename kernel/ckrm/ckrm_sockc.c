@@ -213,6 +213,7 @@ cb_sockclass_listen_start(struct sock *sk)
 		
 	ns->ns_pid = current->pid;
 	ns->ns_tgid = current->tgid;
+	ns->ns_tsk = current;
 	ce_protect(&CT_sockclass);
 	CE_CLASSIFY_RET(newcls,&CT_sockclass,CKRM_EVENT_LISTEN_START,ns,current);
 	ce_release(&CT_sockclass);
@@ -383,6 +384,12 @@ sock_forced_reclassify_ns(struct ckrm_net_struct *tns, struct ckrm_core_class *c
 	}
 	ns = sk->sk_ns;
 	ckrm_ns_hold(ns);
+	if (!capable(CAP_NET_ADMIN) && (ns->ns_tsk->user != current->user)) { 
+		ckrm_ns_put(ns);
+		rc = -EPERM;
+		goto out;
+	}
+
 	oldcls = ns->core;
 	if ((oldcls == NULL) || (oldcls == newcls)) {
 		ckrm_ns_put(ns);

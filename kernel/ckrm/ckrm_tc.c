@@ -605,11 +605,11 @@ ckrm_forced_reclassify_pid(pid_t pid, struct ckrm_task_class *cls)
 	read_unlock(&tasklist_lock);
 
 	/* Check permissions */
-	if ( (!capable(CAP_SYS_NICE)) &&
-	     (!capable(CAP_SYS_RESOURCE)) &&
-	     (current->user != tsk->user))
+	if ((!capable(CAP_SYS_NICE)) &&
+		(!capable(CAP_SYS_RESOURCE)) && 
+		(current->user != tsk->user))
 		return -EPERM;
-	    
+	
 	down(&async_serializer);   // protect again race condition
 	
 	ce_protect(&CT_taskclass);

@@ -24,6 +24,7 @@ struct ckrm_net_struct {
 	struct sock     *ns_sk;         // pointer to socket
 	pid_t            ns_tgid;       // real process id
 	pid_t            ns_pid;        // calling thread's pid
+	struct task_struct *ns_tsk;	
 	int              ns_family;     // IPPROTO_IPV4 || IPPROTO_IPV6
 					// Currently only IPV4 is supported
 	union {
