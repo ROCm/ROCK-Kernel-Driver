@@ -48,7 +48,7 @@ struct NCR_Q720_private {
 	struct Scsi_Host	*hosts[4];
 };
 
-struct scsi_host_template NCR_Q720_tpnt = {
+static struct scsi_host_template NCR_Q720_tpnt = {
 	.module			= THIS_MODULE,
 	.proc_name		= "NCR_Q720",
 };
@@ -345,7 +345,7 @@ NCR_Q720_remove(struct device *dev)
 
 static short NCR_Q720_id_table[] = { NCR_Q720_MCA_ID, 0 };
 
-struct mca_driver NCR_Q720_driver = {
+static struct mca_driver NCR_Q720_driver = {
 	.id_table = NCR_Q720_id_table,
 	.driver = {
 		.name		= "NCR_Q720",
