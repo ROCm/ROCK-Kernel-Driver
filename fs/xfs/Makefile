@@ -30,7 +30,7 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
-EXTRA_CFLAGS +=	 -Ifs/xfs -Ifs/xfs/linux -funsigned-char
+EXTRA_CFLAGS +=	 -Ifs/xfs -Ifs/xfs/linux-2.6 -funsigned-char
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG
@@ -69,8 +69,8 @@ xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
 xfs-$(CONFIG_XFS_POSIX_CAP)	+= xfs_cap.o
 xfs-$(CONFIG_XFS_POSIX_MAC)	+= xfs_mac.o
-xfs-$(CONFIG_PROC_FS)		+= linux/xfs_stats.o
-xfs-$(CONFIG_SYSCTL)		+= linux/xfs_sysctl.o
+xfs-$(CONFIG_PROC_FS)		+= linux-2.6/xfs_stats.o
+xfs-$(CONFIG_SYSCTL)		+= linux-2.6/xfs_sysctl.o
 
 
 xfs-y				+= xfs_alloc.o \
@@ -124,8 +124,8 @@ xfs-y				+= xfs_alloc.o \
 
 xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
-# Objects in linux/
-xfs-y				+= $(addprefix linux/, \
+# Objects in linux-2.6/
+xfs-y				+= $(addprefix linux-2.6/, \
 				   xfs_aops.o \
 				   xfs_buf.o \
 				   xfs_file.o \
