@@ -65,7 +65,13 @@ uImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot)/images $(boot)/images/$@
 
 define archhelp
+  @echo '* zImage          - Compressed kernel image (arch/$(ARCH)/boot/images/zImage.*)'
   @echo '  uImage          - Create a bootable image for U-Boot / PPCBoot'
+  @echo '  install         - Install kernel using'
+  @echo '                    (your) ~/bin/installkernel or'
+  @echo '                    (distribution) /sbin/installkernel or'
+  @echo '                    install to $$(INSTALL_PATH) and run lilo'
+  @echo '  *_defconfig     - Select default config from arch/$(ARCH)/ppc/configs'
 endef
 
 archclean:

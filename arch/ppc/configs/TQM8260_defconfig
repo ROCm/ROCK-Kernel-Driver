@@ -469,11 +469,6 @@ CONFIG_FCC2_ENET=y
 # CONFIG_FCC3_ENET is not set
 
 #
-# Generic MPC8260 Options
-#
-CONFIG_DCACHE_DISABLE=y
-
-#
 # USB support
 #
 # CONFIG_USB_GADGET is not set
