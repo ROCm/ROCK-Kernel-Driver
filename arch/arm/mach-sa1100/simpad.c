@@ -10,6 +10,7 @@
 #include <linux/proc_fs.h>
 #include <linux/string.h> 
 #include <linux/pm.h>
+#include <linux/device.h>
 
 #include <asm/irq.h>
 #include <asm/hardware.h>
@@ -215,9 +216,31 @@ static void simpad_power_off(void)
 
 }
 
+
+/*
+ * MediaQ Video Device
+ */
+static struct platform_device simpad_mq200fb = {
+	.name = "simpad-mq200",
+	.id   = 0,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&simpad_mq200fb
+};
+
+
+
 static int __init simpad_init(void)
 {
+	int ret;
+
 	pm_power_off = simpad_power_off;
+
+	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+	if(ret)
+		printk(KERN_WARNING "simpad: Unable to register mq200 framebuffer device");
+
 	return 0;
 }
 
