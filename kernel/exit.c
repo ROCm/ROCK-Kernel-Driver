@@ -807,7 +807,8 @@ asmlinkage NORET_TYPE void do_exit(long code)
 		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
 	}
 
-	acct_process(code);
+	if (atomic_dec_and_test(&tsk->signal->live))
+		acct_process(code);
 	__exit_mm(tsk);
 
 	exit_sem(tsk);

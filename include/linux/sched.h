@@ -267,6 +267,7 @@ struct sighand_struct {
  */
 struct signal_struct {
 	atomic_t		count;
+	atomic_t		live;
 
 	/* current thread group signal load-balancing target: */
 	task_t			*curr_target;
