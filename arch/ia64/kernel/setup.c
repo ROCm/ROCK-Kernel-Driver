@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1998-2001 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 1998, 1999, 2001 Stephane Eranian <eranian@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 2000, Rohit Seth <rohit.seth@intel.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
@@ -20,6 +20,7 @@
 #include <linux/init.h>
 
 #include <linux/bootmem.h>
+#include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/reboot.h>
@@ -27,7 +28,7 @@
 #include <linux/seq_file.h>
 #include <linux/string.h>
 #include <linux/threads.h>
-#include <linux/console.h>
+#include <linux/tty.h>
 
 #include <asm/acpi-ext.h>
 #include <asm/ia32.h>
@@ -147,6 +148,10 @@ free_available_memory (unsigned long start, unsigned long end, void *arg)
 }
 
 
+/*
+ * Find a place to put the bootmap and return its starting address in bootmap_start.
+ * This address must be page-aligned.
+ */
 static int
 find_bootmap_location (unsigned long start, unsigned long end, void *arg)
 {
@@ -165,7 +170,7 @@ find_bootmap_location (unsigned long start, unsigned long end, void *arg)
 
 	for (i = 0; i < num_rsvd_regions; i++) {
 		range_start = MAX(start, free_start);
-		range_end   = MIN(end, rsvd_region[i].start);
+		range_end   = MIN(end, rsvd_region[i].start & PAGE_MASK);
 
 		if (range_end <= range_start) continue;	/* skip over empty range */
 
@@ -177,7 +182,7 @@ find_bootmap_location (unsigned long start, unsigned long end, void *arg)
 		/* nothing more available in this segment */
 		if (range_end == end) return 0;
 
-		free_start = rsvd_region[i].end;
+		free_start = PAGE_ALIGN(rsvd_region[i].end);
 	}
 	return 0;
 }
@@ -306,6 +311,10 @@ setup_arch (char **cmdline_p)
 	/* process SAL system table: */
 	ia64_sal_init(efi.sal_systab);
 
+#ifdef CONFIG_IA64_GENERIC
+	machvec_init(acpi_get_sysname());
+#endif
+
 	/*
 	 *  Set `iobase' to the appropriate address in region 6
 	 *    (uncached access range)
@@ -331,10 +340,6 @@ setup_arch (char **cmdline_p)
 #endif
 
 	cpu_init();	/* initialize the bootstrap CPU */
-
-#ifdef CONFIG_IA64_GENERIC
-	machvec_init(acpi_get_sysname());
-#endif
 
 	if (efi.acpi20) {
 		/* Parse the ACPI 2.0 tables */
@@ -371,17 +376,14 @@ show_cpuinfo (struct seq_file *m, void *v)
 {
 #ifdef CONFIG_SMP
 #	define lpj	c->loops_per_jiffy
+#	define cpunum	c->cpu
 #else
 #	define lpj	loops_per_jiffy
+#	define cpunum	0
 #endif
 	char family[32], features[128], *cp;
 	struct cpuinfo_ia64 *c = v;
-	unsigned long mask, cpu = c - cpu_data(0);
-
-#ifdef CONFIG_SMP
-	if (!(cpu_online_map & (1 << cpu)))
-		return 0;
-#endif
+	unsigned long mask;
 
 	mask = c->features;
 
@@ -403,7 +405,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 		sprintf(cp, " 0x%lx", mask);
 
 	seq_printf(m,
-		   "processor  : %lu\n"
+		   "processor  : %d\n"
 		   "vendor     : %s\n"
 		   "arch       : IA-64\n"
 		   "family     : %s\n"
@@ -416,7 +418,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 		   "cpu MHz    : %lu.%06lu\n"
 		   "itc MHz    : %lu.%06lu\n"
 		   "BogoMIPS   : %lu.%02lu\n\n",
-		   cpu, c->vendor, family, c->model, c->revision, c->archrev,
+		   cpunum, c->vendor, family, c->model, c->revision, c->archrev,
 		   features, c->ppn, c->number,
 		   c->proc_freq / 1000000, c->proc_freq % 1000000,
 		   c->itc_freq / 1000000, c->itc_freq % 1000000,
@@ -427,6 +429,10 @@ show_cpuinfo (struct seq_file *m, void *v)
 static void *
 c_start (struct seq_file *m, loff_t *pos)
 {
+#ifdef CONFIG_SMP
+	while (*pos < NR_CPUS && !(cpu_online_map & (1 << *pos)))
+		++*pos;
+#endif
 	return *pos < NR_CPUS ? cpu_data(*pos) : NULL;
 }
 
@@ -483,6 +489,9 @@ identify_cpu (struct cpuinfo_ia64 *c)
 		cpuid.bits[i] = ia64_get_cpuid(i);
 
 	memcpy(c->vendor, cpuid.field.vendor, 16);
+#ifdef CONFIG_SMP
+	c->cpu = smp_processor_id();
+#endif
 	c->ppn = cpuid.field.ppn;
 	c->number = cpuid.field.number;
 	c->revision = cpuid.field.revision;
@@ -534,7 +543,7 @@ cpu_init (void)
 				= alloc_bootmem_pages_node(NODE_DATA(numa_node_id()),
 							   sizeof(struct cpuinfo_ia64));
 		for (cpu = 1; cpu < NR_CPUS; ++cpu)
-			memcpy(my_cpu_data->cpu_data[cpu]->cpu_data_ptrs,
+			memcpy(my_cpu_data->cpu_data[cpu]->cpu_data,
 			       my_cpu_data->cpu_data, sizeof(my_cpu_data->cpu_data));
 	} else {
 		order = get_order(sizeof(struct cpuinfo_ia64));
@@ -577,6 +586,8 @@ cpu_init (void)
 
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
+	if (current->mm)
+		BUG();
 
 	ia64_mmu_init(my_cpu_data);
 
@@ -616,4 +627,6 @@ cpu_init (void)
 		num_phys_stacked = 96;
 	}
 	local_cpu_data->phys_stacked_size_p8 = num_phys_stacked*8 + 8;
+
+	platform_cpu_init();
 }

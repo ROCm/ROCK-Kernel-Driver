@@ -4,13 +4,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Jack Steiner (steiner@sgi.com)
+ * Copyright (C) 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
 
 
-#ifndef _ASM_SN_HACK_H
-#define _ASM_SN_HACK_H
+#ifndef _ASM_IA64_SN_HACK_H
+#define _ASM_IA64_SN_HACK_H
 
 #include <asm/sn/types.h>
 #include <asm/uaccess.h>		/* for copy_??_user */
@@ -32,7 +31,6 @@ struct cred { int x; };
 #include <linux/devfs_fs_kernel.h>
 
 #define DELAY(a)
-#define cpuid() 0
 
 /************************************************
  * Routines redefined to use linux equivalents. *
@@ -59,14 +57,14 @@ typedef int (*splfunc_t)(void);
 #define spl7	splhi()
 #define splx(s)
 
-extern void * kmem_alloc_node(register size_t, register int, cnodeid_t);
-extern void * kmem_zalloc(size_t, int);
-extern void * kmem_zalloc_node(register size_t, register int, cnodeid_t );
-extern void * kmem_zone_alloc(register zone_t *, int);
-extern zone_t * kmem_zone_init(register int , char *);
-extern void kmem_zone_free(register zone_t *, void *);
+extern void * snia_kmem_alloc_node(register size_t, register int, cnodeid_t);
+extern void * snia_kmem_zalloc(size_t, int);
+extern void * snia_kmem_zalloc_node(register size_t, register int, cnodeid_t );
+extern void * snia_kmem_zone_alloc(register zone_t *, int);
+extern zone_t * snia_kmem_zone_init(register int , char *);
+extern void snia_kmem_zone_free(register zone_t *, void *);
 extern int is_specified(char *);
 extern int cap_able(uint64_t);
 extern int compare_and_swap_ptr(void **, void *, void *);
 
-#endif	/* _ASM_SN_HACK_H */
+#endif /* _ASM_IA64_SN_HACK_H */

@@ -20,6 +20,7 @@ struct scatterlist;
 struct irq_desc;
 
 typedef void ia64_mv_setup_t (char **);
+typedef void ia64_mv_cpu_init_t(void);
 typedef void ia64_mv_irq_init_t (void);
 typedef void ia64_mv_pci_fixup_t (int);
 typedef unsigned long ia64_mv_map_nr_t (unsigned long);
@@ -59,6 +60,7 @@ typedef unsigned int ia64_mv_inl_t (unsigned long);
 typedef void ia64_mv_outb_t (unsigned char, unsigned long);
 typedef void ia64_mv_outw_t (unsigned short, unsigned long);
 typedef void ia64_mv_outl_t (unsigned int, unsigned long);
+typedef void ia64_mv_mmiob_t (void);
 
 extern void machvec_noop (void);
 
@@ -77,6 +79,7 @@ extern void machvec_noop (void);
 # else
 #  define platform_name		ia64_mv.name
 #  define platform_setup	ia64_mv.setup
+#  define platform_cpu_init	ia64_mv.cpu_init
 #  define platform_irq_init	ia64_mv.irq_init
 #  define platform_map_nr	ia64_mv.map_nr
 #  define platform_mca_init	ia64_mv.mca_init
@@ -105,11 +108,13 @@ extern void machvec_noop (void);
 #  define platform_outb		ia64_mv.outb
 #  define platform_outw		ia64_mv.outw
 #  define platform_outl		ia64_mv.outl
+#  define platofrm_mmiob        ia64_mv.mmiob
 # endif
 
 struct ia64_machine_vector {
 	const char *name;
 	ia64_mv_setup_t *setup;
+	ia64_mv_cpu_init_t *cpu_init;
 	ia64_mv_irq_init_t *irq_init;
 	ia64_mv_pci_fixup_t *pci_fixup;
 	ia64_mv_map_nr_t *map_nr;
@@ -137,6 +142,7 @@ struct ia64_machine_vector {
 	ia64_mv_outb_t *outb;
 	ia64_mv_outw_t *outw;
 	ia64_mv_outl_t *outl;
+	ia64_mv_mmiob_t *mmiob;
 };
 
 #define MACHVEC_INIT(name)			\
@@ -170,7 +176,8 @@ struct ia64_machine_vector {
 	platform_inl,				\
 	platform_outb,				\
 	platform_outw,				\
-	platform_outl				\
+	platform_outl,				\
+        platform_mmiob                          \
 }
 
 extern struct ia64_machine_vector ia64_mv;
@@ -200,6 +207,9 @@ extern ia64_mv_pci_dma_address swiotlb_dma_address;
  */
 #ifndef platform_setup
 # define platform_setup		((ia64_mv_setup_t *) machvec_noop)
+#endif
+#ifndef platform_cpu_init
+# define platform_cpu_init	((ia64_mv_cpu_init_t *) machvec_noop)
 #endif
 #ifndef platform_irq_init
 # define platform_irq_init	((ia64_mv_irq_init_t *) machvec_noop)
@@ -281,6 +291,9 @@ extern ia64_mv_pci_dma_address swiotlb_dma_address;
 #endif
 #ifndef platform_outl
 # define platform_outl		__ia64_outl
+#endif
+#ifndef platform_mmiob
+# define platform_mmiob         __ia64_mmiob
 #endif
 
 #endif /* _ASM_IA64_MACHVEC_H */

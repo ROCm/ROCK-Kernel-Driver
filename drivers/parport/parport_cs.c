@@ -45,6 +45,7 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/ioport.h>
+#include <linux/major.h>
 
 #include <linux/parport.h>
 #include <linux/parport_pc.h>
@@ -106,7 +107,6 @@ static dev_info_t dev_info = "parport_cs";
 static dev_link_t *dev_list = NULL;
 
 extern struct parport_operations parport_pc_ops;
-static struct parport_operations parport_cs_ops;
 
 /*====================================================================*/
 
@@ -458,13 +458,6 @@ static int __init init_parport_cs(void)
 	       "does not match!\n");
 	return -1;
     }
-
-#if (LINUX_VERSION_CODE < VERSION(2,3,6))
-    /* This is to protect against unloading modules out of order */
-    parport_cs_ops = parport_pc_ops;
-    parport_cs_ops.inc_use_count = &inc_use_count;
-    parport_cs_ops.dec_use_count = &dec_use_count;
-#endif
 
     register_pccard_driver(&dev_info, &parport_attach, &parport_detach);
     return 0;

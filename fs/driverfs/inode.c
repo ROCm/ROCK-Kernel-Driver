@@ -433,7 +433,7 @@ static struct file_system_type driverfs_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"driverfs",
 	get_sb:		driverfs_get_sb,
-	fs_flags:	FS_LITTER,
+	kill_sb:	kill_litter_super,
 };
 
 static int get_mount(void)

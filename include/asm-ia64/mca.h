@@ -7,9 +7,6 @@
  * Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
  */
 
-/* XXX use this temporary define for MP systems trying to INIT */
-#undef SAL_MPINIT_WORKAROUND
-
 #ifndef _ASM_IA64_MCA_H
 #define _ASM_IA64_MCA_H
 
@@ -101,12 +98,19 @@ enum {
 	IA64_MCA_HALT		=	-3	/* System to be halted by SAL */
 };
 
+enum {
+	IA64_MCA_SAME_CONTEXT	=	0x0,	/* SAL to return to same context */
+	IA64_MCA_NEW_CONTEXT	=	-1	/* SAL to return to new context */
+};
+
 typedef struct ia64_mca_os_to_sal_state_s {
 	u64		imots_os_status;	/*   OS status to SAL as to what happened
 						 *   with the MCA handling.
 						 */
 	u64		imots_sal_gp;		/* GP of the SAL - physical */
-	u64		imots_new_min_state;	/* Pointer to structure containing
+	u64		imots_context;		/* 0 if return to same context
+						   1 if return to new context */
+	u64		*imots_new_min_state;	/* Pointer to structure containing
 						 * new values of registers in the min state
 						 * save area.
 						 */
@@ -127,12 +131,19 @@ extern void ia64_mca_rendez_int_handler(int,void *,struct pt_regs *);
 extern void ia64_mca_wakeup_int_handler(int,void *,struct pt_regs *);
 extern void ia64_mca_cmc_int_handler(int,void *,struct pt_regs *);
 extern void ia64_mca_cpe_int_handler(int,void *,struct pt_regs *);
-extern void ia64_log_print(int,prfunc_t);
+extern int  ia64_log_print(int,prfunc_t);
 extern void ia64_mca_cmc_vector_setup(void);
 extern void ia64_mca_check_errors( void );
 extern u64  ia64_log_get(int, prfunc_t);
 
 #define PLATFORM_CALL(fn, args)	printk("Platform call TBD\n")
+
+#define platform_mem_dev_err_print ia64_log_prt_oem_data
+#define platform_pci_bus_err_print ia64_log_prt_oem_data
+#define platform_pci_comp_err_print ia64_log_prt_oem_data
+#define platform_plat_specific_err_print ia64_log_prt_oem_data
+#define platform_host_ctlr_err_print ia64_log_prt_oem_data
+#define platform_plat_bus_err_print ia64_log_prt_oem_data
 
 #undef	MCA_TEST
 

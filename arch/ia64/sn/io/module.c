@@ -4,13 +4,14 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
+#include <asm/sn/sn_sal.h>
+#include <asm/sn/io.h>
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
@@ -25,7 +26,7 @@
 #include <asm/sn/sn_cpuid.h>
 
 
-/* #define LDEBUG	1	*/
+/* #define LDEBUG	1 */
 
 #ifdef LDEBUG
 #define DPRINTF		printk
@@ -173,9 +174,35 @@ int module_probe_snum(module_t *m, nasid_t nasid)
     lboard_t	       *board;
     klmod_serial_num_t *comp;
     char * bcopy(const char * src, char * dest, int count);
+    char serial_number[16];
+
+    /*
+     * record brick serial number
+     */
+    board = find_lboard((lboard_t *) KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
+
+    if (! board || KL_CONFIG_DUPLICATE_BOARD(board))
+    {
+#if	LDEBUG
+	printf ("module_probe_snum: no IP35 board found!\n");
+#endif
+	return 0;
+    }
+
+    board_serial_number_get( board, serial_number );
+    if( serial_number[0] != '\0' ) {
+	encode_str_serial( serial_number, m->snum.snum_str );
+	m->snum_valid = 1;
+    }
+#if	LDEBUG
+    else {
+	printf("module_probe_snum: brick serial number is null!\n");
+    }
+    printf("module_probe_snum: brick serial number == %s\n", serial_number);
+#endif /* DEBUG */
 
     board = find_lboard((lboard_t *) KL_CONFIG_INFO(nasid),
-			KLTYPE_MIDPLANE8);
+			KLTYPE_IOBRICK_XBOW);
 
     if (! board || KL_CONFIG_DUPLICATE_BOARD(board))
 	return 0;
@@ -196,13 +223,13 @@ int module_probe_snum(module_t *m, nasid_t nasid)
 
 	    if (comp->snum.snum_str[0] != '\0') {
 		bcopy(comp->snum.snum_str,
-		      m->snum.snum_str,
+		      m->sys_snum,
 		      MAX_SERIAL_NUM_SIZE);
-		m->snum_valid = 1;
+		m->sys_snum_valid = 1;
 	    }
     }
 
-    if (m->snum_valid)
+    if (m->sys_snum_valid)
 	return 1;
     else {
 	DPRINTF("Invalid serial number for module %d, "
@@ -227,8 +254,7 @@ io_module_init(void)
     for (node = 0; node < numnodes; node++) {
 	nasid = COMPACT_TO_NASID_NODEID(node);
 
-	board = find_lboard((lboard_t *) KL_CONFIG_INFO(nasid),
-			    KLTYPE_IP27);
+	board = find_lboard((lboard_t *) KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 	ASSERT(board);
 
 	m = module_add_node(board->brd_module, node);
@@ -241,7 +267,7 @@ io_module_init(void)
 	    nserial);
 
     if (nserial == 0)
-	PRINT_WARNING("io_module_init: No serial number found.\n");
+	printk(KERN_WARNING  "io_module_init: No serial number found.\n");
 }
 
 elsc_t *get_elsc(void)

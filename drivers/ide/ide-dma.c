@@ -707,8 +707,11 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 /*
  * Needed for allowing full modular support of ide-driver
  */
-int ide_release_dma (ide_hwif_t *hwif)
+int ide_release_dma(ide_hwif_t *hwif)
 {
+	if (!hwif->dma_base)
+		return;
+
 	if (hwif->dmatable_cpu) {
 		pci_free_consistent(hwif->pci_dev,
 				    PRD_ENTRIES * PRD_BYTES,
@@ -723,6 +726,8 @@ int ide_release_dma (ide_hwif_t *hwif)
 	if ((hwif->dma_extra) && (hwif->channel == 0))
 		release_region((hwif->dma_base + 16), hwif->dma_extra);
 	release_region(hwif->dma_base, 8);
+	hwif->dma_base = 0;
+
 	return 1;
 }
 

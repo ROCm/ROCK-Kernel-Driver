@@ -115,6 +115,7 @@
 #define SA_PROBE		SA_ONESHOT
 #define SA_SAMPLE_RANDOM	SA_RESTART
 #define SA_SHIRQ		0x04000000
+#define SA_PERCPU_IRQ		0x02000000
 
 #endif /* __KERNEL__ */
 

@@ -4,13 +4,14 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_NIC_H
-#define _ASM_SN_NIC_H
+#ifndef _ASM_IA64_SN_NIC_H
+#define _ASM_IA64_SN_NIC_H
 
 #include <asm/types.h>
+#include <asm/sn/types.h>
+#include <linux/devfs_fs_kernel.h>
 
 #define MCR_DATA(x)			((int) ((x) & 1))
 #define MCR_DONE(x)			((x) & 2)
@@ -125,4 +126,4 @@ extern char *nic_hub_vertex_info(devfs_handle_t vertex);
 extern nic_vmce_t	nic_vmc_add(char *, nic_vmc_func *);
 extern void		nic_vmc_del(nic_vmce_t);
 
-#endif /* _ASM_SN_NIC_H */
+#endif /* _ASM_IA64_SN_NIC_H */

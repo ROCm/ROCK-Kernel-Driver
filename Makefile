@@ -246,14 +246,14 @@ MRPROPER_DIRS = \
 
 include arch/$(ARCH)/Makefile
 
-export	CPPFLAGS CFLAGS AFLAGS
+export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
 
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 
 .S.s:
-	$(CPP) $(AFLAGS) -traditional -o $*.s $<
+	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -traditional -o $*.s $<
 .S.o:
-	$(CC) $(AFLAGS) -traditional -c -o $*.o $<
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -traditional -c -o $*.o $<
 
 Version: dummy
 	@rm -f include/linux/compile.h

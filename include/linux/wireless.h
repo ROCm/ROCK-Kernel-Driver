@@ -1,10 +1,10 @@
 /*
  * This file define a set of standard wireless extensions
  *
- * Version :	13	6.12.01
+ * Version :	14	25.1.02
  *
  * Authors :	Jean Tourrilhes - HPL - <jt@hpl.hp.com>
- * Copyright (c) 1997-2001 Jean Tourrilhes, All Rights Reserved.
+ * Copyright (c) 1997-2002 Jean Tourrilhes, All Rights Reserved.
  */
 
 #ifndef _LINUX_WIRELESS_H
@@ -40,13 +40,18 @@
  *	# include/linux/netdevice.h (one place)
  *	# include/linux/proc_fs.h (one place)
  *
- * New driver API (2001 -> onward) :
+ * New driver API (2002 -> onward) :
  * -------------------------------
  * This file is only concerned with the user space API and common definitions.
  * The new driver API is defined and documented in :
  *	# include/net/iw_handler.h
  *
  * Note as well that /proc/net/wireless implementation has now moved in :
+ *	# include/linux/wireless.c
+ *
+ * Wireless Events (2002 -> onward) :
+ * --------------------------------
+ * Events are defined at the end of this file, and implemented in :
  *	# include/linux/wireless.c
  *
  * Other comments :
@@ -75,7 +80,7 @@
  * (there is some stuff that will be added in the future...)
  * I just plan to increment with each new version.
  */
-#define WIRELESS_EXT	13
+#define WIRELESS_EXT	14
 
 /*
  * Changes :
@@ -141,6 +146,13 @@
  *	- Document creation of new driver API.
  *	- Extract union iwreq_data from struct iwreq (for new driver API).
  *	- Rename SIOCSIWNAME as SIOCSIWCOMMIT
+ *
+ * V13 to V14
+ * ----------
+ *	- Wireless Events support : define struct iw_event
+ *	- Define additional specific event numbers
+ *	- Add "addr" and "param" fields in union iwreq_data
+ *	- AP scanning stuff (SIOCSIWSCAN and friends)
  */
 
 /**************************** CONSTANTS ****************************/
@@ -175,6 +187,8 @@
 #define SIOCSIWAP	0x8B14		/* set access point MAC addresses */
 #define SIOCGIWAP	0x8B15		/* get access point MAC addresses */
 #define SIOCGIWAPLIST	0x8B17		/* get list of access point in range */
+#define SIOCSIWSCAN	0x8B18		/* trigger scanning */
+#define SIOCGIWSCAN	0x8B19		/* get scanning results */
 
 /* 802.11 specific support */
 #define SIOCSIWESSID	0x8B1A		/* set ESSID (network name) */
@@ -237,6 +251,15 @@
 /* Even : get (world access), odd : set (root access) */
 #define IW_IS_SET(cmd)	(!((cmd) & 0x1))
 #define IW_IS_GET(cmd)	((cmd) & 0x1)
+
+/* ----------------------- WIRELESS EVENTS ----------------------- */
+/* Those are *NOT* ioctls, do not issue request on them !!! */
+/* Most events use the same identifier as ioctl requests */
+
+#define IWEVTXDROP	0x8C00		/* Packet dropped to excessive retry */
+#define IWEVQUAL	0x8C01		/* Quality part of statistics */
+
+#define IWEVFIRST	0x8C00
 
 /* ------------------------- PRIVATE INFO ------------------------- */
 /*
@@ -339,6 +362,19 @@
 #define IW_RETRY_MIN		0x0001	/* Value is a minimum  */
 #define IW_RETRY_MAX		0x0002	/* Value is a maximum */
 #define IW_RETRY_RELATIVE	0x0004	/* Value is not in seconds/ms/us */
+
+/* Scanning request flags */
+#define IW_SCAN_DEFAULT		0x0000	/* Default scan of the driver */
+#define IW_SCAN_ALL_ESSID	0x0001	/* Scan all ESSIDs */
+#define IW_SCAN_THIS_ESSID	0x0002	/* Scan only this ESSID */
+#define IW_SCAN_ALL_FREQ	0x0004	/* Scan all Frequencies */
+#define IW_SCAN_THIS_FREQ	0x0008	/* Scan only this Frequency */
+#define IW_SCAN_ALL_MODE	0x0010	/* Scan all Modes */
+#define IW_SCAN_THIS_MODE	0x0020	/* Scan only this Mode */
+#define IW_SCAN_ALL_RATE	0x0040	/* Scan all Bit-Rates */
+#define IW_SCAN_THIS_RATE	0x0080	/* Scan only this Bit-Rate */
+/* Maximum size of returned data */
+#define IW_SCAN_MAX_DATA	4096	/* In bytes */
 
 /****************************** TYPES ******************************/
 
@@ -466,9 +502,12 @@ union	iwreq_data
 
 	struct iw_point	encoding;	/* Encoding stuff : tokens */
 	struct iw_param	power;		/* PM duration/timeout */
+	struct iw_quality qual;		/* Quality part of statistics */
 
 	struct sockaddr	ap_addr;	/* Access point address */
+	struct sockaddr	addr;		/* Destination address (hw) */
 
+	struct iw_param	param;		/* Other small parameters */
 	struct iw_point	data;		/* Other large parameters */
 };
 
@@ -595,5 +634,36 @@ struct	iw_priv_args
 	__u16		get_args;	/* Type and number of args */
 	char		name[IFNAMSIZ];	/* Name of the extension */
 };
+
+/* ----------------------- WIRELESS EVENTS ----------------------- */
+/*
+ * Wireless events are carried through the rtnetlink socket to user
+ * space. They are encapsulated in the IFLA_WIRELESS field of
+ * a RTM_NEWLINK message.
+ */
+
+/*
+ * A Wireless Event. Contains basically the same data as the ioctl...
+ */
+struct iw_event
+{
+	__u16		len;			/* Real lenght of this stuff */
+	__u16		cmd;			/* Wireless IOCTL */
+	union iwreq_data	u;		/* IOCTL fixed payload */
+};
+
+/* Size of the Event prefix (including padding and alignement junk) */
+#define IW_EV_LCP_LEN	(sizeof(struct iw_event) - sizeof(union iwreq_data))
+/* Size of the various events */
+#define IW_EV_CHAR_LEN	(IW_EV_LCP_LEN + IFNAMSIZ)
+#define IW_EV_UINT_LEN	(IW_EV_LCP_LEN + sizeof(__u32))
+#define IW_EV_FREQ_LEN	(IW_EV_LCP_LEN + sizeof(struct iw_freq))
+#define IW_EV_POINT_LEN	(IW_EV_LCP_LEN + sizeof(struct iw_point))
+#define IW_EV_PARAM_LEN	(IW_EV_LCP_LEN + sizeof(struct iw_param))
+#define IW_EV_ADDR_LEN	(IW_EV_LCP_LEN + sizeof(struct sockaddr))
+#define IW_EV_QUAL_LEN	(IW_EV_LCP_LEN + sizeof(struct iw_quality))
+
+/* Note : in the case of iw_point, the extra data will come at the
+ * end of the event */
 
 #endif	/* _LINUX_WIRELESS_H */

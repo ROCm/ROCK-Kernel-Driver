@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc.  All rights reserved.
  */
 
 /* Implementation of Address/Length Lists. */
@@ -13,9 +12,9 @@
 
 #include <linux/types.h>
 #include <linux/slab.h>
+#include <linux/mmzone.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/alenlist.h>
-#include <asm/sn/mmzone_sn1.h>
 
 /*
  * Logically, an Address/Length List is a list of Pairs, where each pair
@@ -218,9 +217,9 @@ static void alenlist_show(alenlist_t);
 void
 alenlist_init(void)
 {
-	alenlist_zone = kmem_zone_init(sizeof(struct alenlist_s), "alenlist");
-	alenlist_chunk_zone = kmem_zone_init(sizeof(struct alenlist_chunk_s), "alchunk");
-	alenlist_cursor_zone = kmem_zone_init(sizeof(struct alenlist_cursor_s), "alcursor");
+	alenlist_zone = snia_kmem_zone_init(sizeof(struct alenlist_s), "alenlist");
+	alenlist_chunk_zone = snia_kmem_zone_init(sizeof(struct alenlist_chunk_s), "alchunk");
+	alenlist_cursor_zone = snia_kmem_zone_init(sizeof(struct alenlist_cursor_s), "alcursor");
 #if DEBUG
 	idbg_addfunc("alenshow", alenlist_show);
 #endif /* DEBUG */
@@ -250,7 +249,7 @@ alenlist_create(unsigned flags)
 {
 	alenlist_t alenlist;
 
-	alenlist = kmem_zone_alloc(alenlist_zone, flags & AL_NOSLEEP ? VM_NOSLEEP : 0);
+	alenlist = snia_kmem_zone_alloc(alenlist_zone, flags & AL_NOSLEEP ? VM_NOSLEEP : 0);
 	if (alenlist) {
 		INCR_COUNT(&alenlist_count);
 
@@ -334,7 +333,7 @@ alenlist_clear(alenlist_t alenlist)
 		while (chunk) {
 			freechunk = chunk;
 			chunk = chunk->alc_next;
-			kmem_zone_free(alenlist_chunk_zone, freechunk);
+			snia_kmem_zone_free(alenlist_chunk_zone, freechunk);
 			DECR_COUNT(&alenlist_chunk_count);
 		}
 		alenlist->al_actual_size = ALEN_CHUNK_SZ;
@@ -407,7 +406,7 @@ alenlist_destroy(alenlist_t alenlist)
 		alenlist_clear(alenlist);
 
 	/* Now, free the alenlist itself */
-	kmem_zone_free(alenlist_zone, alenlist);
+	snia_kmem_zone_free(alenlist_zone, alenlist);
 	DECR_COUNT(&alenlist_count);
 }
 
@@ -473,7 +472,7 @@ alenlist_append(	alenlist_t alenlist, 		/* append to this list */
 			} else {
 				alenlist_chunk_t new_chunk;
 
-				new_chunk = kmem_zone_alloc(alenlist_chunk_zone, 
+				new_chunk = snia_kmem_zone_alloc(alenlist_chunk_zone, 
 							flags & AL_NOSLEEP ? VM_NOSLEEP : 0);
 
 				if (new_chunk == NULL)
@@ -656,7 +655,7 @@ alenlist_cursor_create(alenlist_t alenlist, unsigned flags)
 	alenlist_cursor_t cursorp;
 
 	ASSERT(alenlist != NULL);
-	cursorp = kmem_zone_alloc(alenlist_cursor_zone, flags & AL_NOSLEEP ? VM_NOSLEEP : 0);
+	cursorp = snia_kmem_zone_alloc(alenlist_cursor_zone, flags & AL_NOSLEEP ? VM_NOSLEEP : 0);
 	if (cursorp) {
 		INCR_COUNT(&alenlist_cursor_count);
 		alenlist_cursor_init(alenlist, 0, cursorp);
@@ -671,7 +670,7 @@ void
 alenlist_cursor_destroy(alenlist_cursor_t cursorp)
 {
 	DECR_COUNT(&alenlist_cursor_count);
-	kmem_zone_free(alenlist_cursor_zone, cursorp);
+	snia_kmem_zone_free(alenlist_cursor_zone, cursorp);
 }
 
 
@@ -752,7 +751,7 @@ alenlist_get(	alenlist_t alenlist, 		/* in: get from this list */
 			maxlength -= 
 			   ((alenp->al_addr + cursorp->al_bcount) & maxlen1);
 
-		length = MIN(maxlength, length);
+		length = min(maxlength, length);
 	}
 
 	/* Update the cursor, if desired. */
@@ -842,7 +841,7 @@ kvaddr_to_alenlist(alenlist_t alenlist, caddr_t kvaddr, size_t length, unsigned 
 	offset = poff(kvaddr);
 
 	/* Handle first page */
-	piece_length = MIN(NBPP - offset, length);
+	piece_length = min((size_t)(NBPP - offset), length);
 	if (alenlist_append(alenlist, paddr, piece_length, flags) == ALENLIST_FAILURE)
 		goto failure;
 	length -= piece_length;

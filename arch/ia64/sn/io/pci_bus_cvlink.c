@@ -4,19 +4,21 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/pci.h>
+#include <linux/pci_ids.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <asm/sn/types.h>
 #include <asm/sn/hack.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/iobus.h>
+#include <asm/sn/io.h>
+#include <asm/sn/driver.h>
 #include <asm/sn/iograph.h>
 #include <asm/param.h>
 #include <asm/sn/pio.h>
@@ -26,20 +28,19 @@
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
-#include <asm/sn/agent.h>
 #include <asm/sn/intr.h>
 #include <asm/sn/xtalk/xtalkaddrs.h>
 #include <asm/sn/klconfig.h>
-#include <asm/sn/io.h>
-
+#include <asm/sn/nodepda.h>
 #include <asm/sn/pci/pciio.h>
-// #include <sys/ql.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
-extern int bridge_rev_b_data_check_disable;
 #include <asm/sn/pci/pci_bus_cvlink.h>
+#include <asm/sn/simulator.h>
+#include <asm/sn/sn_cpuid.h>
 
-#define MAX_PCI_XWIDGET 256
+extern int bridge_rev_b_data_check_disable;
+
 devfs_handle_t busnum_to_pcibr_vhdl[MAX_PCI_XWIDGET];
 nasid_t busnum_to_nid[MAX_PCI_XWIDGET];
 void * busnum_to_atedmamaps[MAX_PCI_XWIDGET];
@@ -54,6 +55,8 @@ devfs_handle_t devfn_to_vertex(unsigned char busnum, unsigned int devfn);
 #define MAX_IOPORTS_CHUNKS (MAX_IOPORTS / SN1_IOPORTS_UNIT)
 struct ioports_to_tlbs_s ioports_to_tlbs[MAX_IOPORTS_CHUNKS];
 unsigned long sn1_allocate_ioports(unsigned long pci_address);
+
+extern void sn1_init_irq_desc(void);
 
 
 
@@ -104,7 +107,7 @@ devfn_to_vertex(unsigned char busnum, unsigned int devfn)
 	int func = 0;
 	char	name[16];
 	devfs_handle_t  pci_bus = NULL;
-	devfs_handle_t	device_vertex = NULL;
+	devfs_handle_t	device_vertex = (devfs_handle_t)NULL;
 
 	/*
 	 * Go get the pci bus vertex.
@@ -129,11 +132,25 @@ devfn_to_vertex(unsigned char busnum, unsigned int devfn)
 	slot = PCI_SLOT(devfn);
 	func = PCI_FUNC(devfn);
 
-	if (func == 0)
+	/*
+	 * For a NON Multi-function card the name of the device looks like:
+	 * ../pci/1, ../pci/2 ..
+	 */
+	if (func == 0) {
         	sprintf(name, "%d", slot);
-	else
-		sprintf(name, "%d%c", slot, 'a'+func);
-
+		if (hwgraph_traverse(pci_bus, name, &device_vertex) == 
+			GRAPH_SUCCESS) {
+			if (device_vertex) {
+				return(device_vertex);
+			}
+		}
+	}
+			
+	/*
+	 * This maybe a multifunction card.  It's names look like:
+	 * ../pci/1a, ../pci/1b, etc.
+	 */
+	sprintf(name, "%d%c", slot, 'a'+func);
 	if (hwgraph_traverse(pci_bus, name, &device_vertex) != GRAPH_SUCCESS) {
 		if (!device_vertex) {
 			return(NULL);
@@ -141,6 +158,36 @@ devfn_to_vertex(unsigned char busnum, unsigned int devfn)
 	}
 
 	return(device_vertex);
+}
+
+/*
+ * For the given device, initialize the addresses for both the Device(x) Flush 
+ * Write Buffer register and the Xbow Flush Register for the port the PCI bus 
+ * is connected.
+ */
+static void
+set_flush_addresses(struct pci_dev *device_dev, 
+	struct sn1_device_sysdata *device_sysdata)
+{
+	pciio_info_t pciio_info = pciio_info_get(device_sysdata->vhdl);
+	pciio_slot_t pciio_slot = pciio_info_slot_get(pciio_info);
+	pcibr_soft_t pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
+    	bridge_t               *bridge = pcibr_soft->bs_base;
+
+	device_sysdata->dma_buf_sync = (volatile unsigned int *) 
+		&(bridge->b_wr_req_buf[pciio_slot].reg);
+	device_sysdata->xbow_buf_sync = (volatile unsigned int *)
+		XBOW_PRIO_LINKREGS_PTR(NODE_SWIN_BASE(get_nasid(), 0), 
+		pcibr_soft->bs_xid);
+#ifdef DEBUG
+
+	printk("set_flush_addresses: dma_buf_sync %p xbow_buf_sync %p\n", 
+		device_sysdata->dma_buf_sync, device_sysdata->xbow_buf_sync);
+
+	while((volatile unsigned int )*device_sysdata->dma_buf_sync);
+	while((volatile unsigned int )*device_sysdata->xbow_buf_sync);
+#endif
+
 }
 
 /*
@@ -189,7 +236,7 @@ set_sn1_pci64(struct pci_dev *dev)
  *	Address.  This address via the tlb entries generates the PCI Address 
  *	allocated by the SN1 IO Infrastructure Layer.
  */
-static unsigned long sn1_ioport_num = 0x100; /* Reserve room for Legacy stuff */
+static unsigned long sn1_ioport_num = 0x1000; /* Reserve room for Legacy stuff */
 unsigned long
 sn1_allocate_ioports(unsigned long pci_address)
 {
@@ -209,17 +256,19 @@ sn1_allocate_ioports(unsigned long pci_address)
 	 * Manual for details.
 	 */
 	ioport_index = sn1_ioport_num / SN1_IOPORTS_UNIT;
-	ioports_to_tlbs[ioport_index].ppn = pci_address;
+
 	ioports_to_tlbs[ioport_index].p = 1; /* Present Bit */
-	ioports_to_tlbs[ioport_index].ma = 5; /* Memory Attributes */
-	ioports_to_tlbs[ioport_index].a = 0; /* Set Data Access Bit Fault */
-	ioports_to_tlbs[ioport_index].d = 0; /* Dirty Bit */
-	ioports_to_tlbs[ioport_index].pl = 3;/* Privilege Level - All levels can R/W*/
-	ioports_to_tlbs[ioport_index].ar = 2; /* Access Rights - R/W only*/
+	ioports_to_tlbs[ioport_index].rv_1 = 0; /* 1 Bit */
+	ioports_to_tlbs[ioport_index].ma = 4; /* Memory Attributes 3 bits*/
+	ioports_to_tlbs[ioport_index].a = 1; /* Set Data Access Bit Fault 1 Bit*/
+	ioports_to_tlbs[ioport_index].d = 1; /* Dirty Bit */
+	ioports_to_tlbs[ioport_index].pl = 0;/* Privilege Level - All levels can R/W*/
+	ioports_to_tlbs[ioport_index].ar = 3; /* Access Rights - R/W only*/
+	ioports_to_tlbs[ioport_index].ppn = pci_address >> 12; /* 4K page size */
 	ioports_to_tlbs[ioport_index].ed = 0; /* Exception Deferral Bit */
 	ioports_to_tlbs[ioport_index].ig = 0; /* Ignored */
 
-	printk("sn1_allocate_ioports: ioport_index 0x%x ioports_to_tlbs 0x%p\n", ioport_index, ioports_to_tlbs[ioport_index].ppn);
+	/* printk("sn1_allocate_ioports: ioport_index 0x%x ioports_to_tlbs 0x%p\n", ioport_index, ioports_to_tlbs[ioport_index]); */
 	
 	sn1_ioport_num += SN1_IOPORTS_UNIT;
 
@@ -241,18 +290,29 @@ sn1_pci_fixup(int arg)
 	struct pci_dev *device_dev = NULL;
 	struct sn1_widget_sysdata *widget_sysdata;
 	struct sn1_device_sysdata *device_sysdata;
+#ifdef SN1_IOPORTS
 	unsigned long ioport;
+#endif
 	pciio_intr_t intr_handle;
 	int cpuid, bit;
-	devfs_handle_t *device_vertex;
+	devfs_handle_t device_vertex;
 	pciio_intr_line_t lines;
 	extern void sn1_pci_find_bios(void);
+#ifdef CONFIG_IA64_SGI_SN2
+	extern int numnodes;
+	int cnode;
+#endif /* CONFIG_IA64_SGI_SN2 */
 
-
-unsigned long   res;
 
 	if (arg == 0) {
+		sn1_init_irq_desc();
 		sn1_pci_find_bios();
+#ifdef CONFIG_IA64_SGI_SN2
+		for (cnode = 0; cnode < numnodes; cnode++) {
+				extern void intr_init_vecblk(nodepda_t *npda, cnodeid_t, int);
+				intr_init_vecblk(NODEPDA(cnode), cnode, 0);
+		} 
+#endif /* CONFIG_IA64_SGI_SN2 */
 		return;
 	}
 
@@ -274,13 +334,6 @@ unsigned long   res;
 #endif
 	done_probing = 1;
 
-	if ( IS_RUNNING_ON_SIMULATOR() ) {
-		printk("sn1_pci_fixup not supported on simulator.\n");
-		return;
-	}
-
-#ifdef REAL_HARDWARE
-
 	/*
 	 * Initialize the pci bus vertex in the pci_bus struct.
 	 */
@@ -296,8 +349,35 @@ unsigned long   res;
  	 * set the root start and end so that drivers calling check_region()
 	 * won't see a conflict
 	 */
-	ioport_resource.start |= IO_SWIZ_BASE;
-	ioport_resource.end |= (HSPEC_SWIZ_BASE-1);
+#ifdef SN1_IOPORTS
+	ioport_resource.start  = sn1_ioport_num;
+	ioport_resource.end = 0xffff;
+#else
+#if defined(CONFIG_IA64_SGI_SN1)
+	if ( IS_RUNNING_ON_SIMULATOR() ) {
+		/*
+		 * IDE legacy IO PORTs are supported in Medusa.
+		 * Just open up IO PORTs from 0 .. ioport_resource.end.
+		 */
+		ioport_resource.start = 0;
+	} else {
+		/*
+		 * We do not support Legacy IO PORT numbers.
+		 */
+		ioport_resource.start |= IO_SWIZ_BASE | __IA64_UNCACHED_OFFSET;
+	}
+	ioport_resource.end |= (HSPEC_SWIZ_BASE-1) | __IA64_UNCACHED_OFFSET;
+#else
+	// Need something here for sn2.... ZXZXZX
+#endif
+#endif
+
+	/*
+	 * Set the root start and end for Mem Resource.
+	 */
+	iomem_resource.start = 0;
+	iomem_resource.end = 0xffffffffffffffff;
+
 	/*
 	 * Initialize the device vertex in the pci_dev struct.
 	 */
@@ -307,6 +387,7 @@ unsigned long   res;
 		u16 cmd;
 		devfs_handle_t vhdl;
 		unsigned long size;
+		extern int bit_pos_to_irq(int);
 
 		if (device_dev->vendor == PCI_VENDOR_ID_SGI &&
 				device_dev->device == PCI_DEVICE_ID_SGI_IOC3) {
@@ -320,6 +401,12 @@ unsigned long   res;
 					GFP_KERNEL);
 		device_sysdata->vhdl = devfn_to_vertex(device_dev->bus->number, device_dev->devfn);
 		device_sysdata->isa64 = 0;
+		/*
+		 * Set the xbridge Device(X) Write Buffer Flush and Xbow Flush 
+		 * register addresses.
+		 */
+		(void) set_flush_addresses(device_dev, device_sysdata);
+
 		device_dev->sysdata = (void *) device_sysdata;
 		set_sn1_pci64(device_dev);
 		pci_read_config_word(device_dev, PCI_COMMAND, &cmd);
@@ -336,11 +423,8 @@ unsigned long   res;
 			size = device_dev->resource[idx].end -
 				device_dev->resource[idx].start;
 			if (size) {
-				res = 0;
-				res = pciio_config_get(vhdl, (unsigned) PCI_BASE_ADDRESS_0 + idx, 4);
 				device_dev->resource[idx].start = (unsigned long)pciio_pio_addr(vhdl, 0, PCIIO_SPACE_WIN(idx), 0, size, 0, PCIIO_BYTE_STREAM);
-
-/* printk("sn1_pci_fixup: Mapped Address = 0x%p size = 0x%x\n", device_dev->resource[idx].start, size); */
+				device_dev->resource[idx].start |= __IA64_UNCACHED_OFFSET;
 			}
 			else
 				continue;
@@ -348,6 +432,7 @@ unsigned long   res;
 			device_dev->resource[idx].end = 
 				device_dev->resource[idx].start + size;
 
+#ifdef CONFIG_IA64_SGI_SN1
 			/*
 			 * Adjust the addresses to go to the SWIZZLE ..
 			 */
@@ -355,15 +440,25 @@ unsigned long   res;
 				device_dev->resource[idx].start & 0xfffff7ffffffffff;
 			device_dev->resource[idx].end = 
 				device_dev->resource[idx].end & 0xfffff7ffffffffff;
-			res = 0;
-			res = pciio_config_get(vhdl, (unsigned) PCI_BASE_ADDRESS_0 + idx, 4);
+#endif
+
 			if (device_dev->resource[idx].flags & IORESOURCE_IO) {
 				cmd |= PCI_COMMAND_IO;
+#ifdef SN1_IOPORTS
 				ioport = sn1_allocate_ioports(device_dev->resource[idx].start);
-				/* device_dev->resource[idx].start = ioport; */
-				/* device_dev->resource[idx].end = ioport + SN1_IOPORTS_UNIT */
+				if (ioport < 0) {
+					printk("sn1_pci_fixup: PCI Device 0x%x on PCI Bus %d not mapped to IO PORTs .. IO PORTs exhausted\n", device_dev->devfn, device_dev->bus->number);
+					continue;
+				}
+				pciio_config_set(vhdl, (unsigned) PCI_BASE_ADDRESS_0 + (idx * 4), 4, (res + (ioport & 0xfff)));
+
+printk("sn1_pci_fixup: ioport number %d mapped to pci address 0x%lx\n", ioport, (res + (ioport & 0xfff)));
+
+				device_dev->resource[idx].start = ioport;
+				device_dev->resource[idx].end = ioport + SN1_IOPORTS_UNIT;
+#endif
 			}
-			else if (device_dev->resource[idx].flags & IORESOURCE_MEM)
+			if (device_dev->resource[idx].flags & IORESOURCE_MEM)
 				cmd |= PCI_COMMAND_MEMORY;
 		}
 		/*
@@ -371,17 +466,24 @@ unsigned long   res;
 		 */
 		size = device_dev->resource[PCI_ROM_RESOURCE].end -
 			device_dev->resource[PCI_ROM_RESOURCE].start;
-		device_dev->resource[PCI_ROM_RESOURCE].start =
+
+		if (size) {
+			device_dev->resource[PCI_ROM_RESOURCE].start =
 			(unsigned long) pciio_pio_addr(vhdl, 0, PCIIO_SPACE_ROM, 0, 
 				size, 0, PCIIO_BYTE_STREAM);
-		device_dev->resource[PCI_ROM_RESOURCE].end =
+			device_dev->resource[PCI_ROM_RESOURCE].start |= __IA64_UNCACHED_OFFSET;
+			device_dev->resource[PCI_ROM_RESOURCE].end =
 			device_dev->resource[PCI_ROM_RESOURCE].start + size;
 
-                /*
-                 * go through synergy swizzled space
-                 */
-		device_dev->resource[PCI_ROM_RESOURCE].start &= 0xfffff7ffffffffffUL;
-		device_dev->resource[PCI_ROM_RESOURCE].end   &= 0xfffff7ffffffffffUL;
+#ifdef CONFIG_IA64_SGI_SN1
+                	/*
+                 	 * go through synergy swizzled space
+                 	 */
+			device_dev->resource[PCI_ROM_RESOURCE].start &= 0xfffff7ffffffffffUL;
+			device_dev->resource[PCI_ROM_RESOURCE].end   &= 0xfffff7ffffffffffUL;
+#endif
+
+		}
 
 		/*
 		 * Update the Command Word on the Card.
@@ -390,14 +492,11 @@ unsigned long   res;
 					   /* bit gets dropped .. no harm */
 		pci_write_config_word(device_dev, PCI_COMMAND, cmd);
 
-		pci_read_config_byte(device_dev, PCI_INTERRUPT_PIN, &lines);
-#ifdef BRINGUP
+		pci_read_config_byte(device_dev, PCI_INTERRUPT_PIN, (unsigned char *)&lines);
 		if (device_dev->vendor == PCI_VENDOR_ID_SGI &&
 			device_dev->device == PCI_DEVICE_ID_SGI_IOC3 ) {
 				lines = 1;
 		}
-
-#endif
  
 		device_sysdata = (struct sn1_device_sysdata *)device_dev->sysdata;
 		device_vertex = device_sysdata->vhdl;
@@ -406,13 +505,33 @@ unsigned long   res;
 
 		bit = intr_handle->pi_irq;
 		cpuid = intr_handle->pi_cpu;
+#ifdef CONFIG_IA64_SGI_SN1
 		irq = bit_pos_to_irq(bit);
+#else /* SN2 */
+		irq = bit;
+#endif
 		irq = irq + (cpuid << 8);
-		pciio_intr_connect(intr_handle, NULL, NULL, NULL);
+		pciio_intr_connect(intr_handle);
 		device_dev->irq = irq;
+#ifdef ajmtestintr
+		{
+			int slot = PCI_SLOT(device_dev->devfn);
+			static int timer_set = 0;
+			pcibr_intr_t	pcibr_intr = (pcibr_intr_t)intr_handle;
+			pcibr_soft_t	pcibr_soft = pcibr_intr->bi_soft;
+			extern void intr_test_handle_intr(int, void*, struct pt_regs *);
+
+			if (!timer_set) {
+				intr_test_set_timer();
+				timer_set = 1;
+			}
+			intr_test_register_irq(irq, pcibr_soft, slot);
+			request_irq(irq, intr_test_handle_intr,0,NULL, NULL);
+		}
+#endif
 
 	}
-#endif	/* REAL_HARDWARE */
+
 #if 0
 
 {
@@ -430,6 +549,10 @@ unsigned long   res;
         printk("pci_fixup_ioc3: Devreg 6 0x%x\n", bridge->b_device[6].reg);
         printk("pci_fixup_ioc3: Devreg 7 0x%x\n", bridge->b_device[7].reg);
 }
+
+printk("testing Big Window: 0xC0000200c0000000 %p\n", *( (volatile uint64_t *)0xc0000200a0000000));
+printk("testing Big Window: 0xC0000200c0000008 %p\n", *( (volatile uint64_t *)0xc0000200a0000008));
+
 #endif
 
 }
@@ -472,12 +595,14 @@ pci_bus_map_create(devfs_handle_t xtalk)
 	 * Loop throught this vertex and get the Xwidgets ..
 	 */
 	for (widgetnum = HUB_WIDGET_ID_MAX; widgetnum >= HUB_WIDGET_ID_MIN; widgetnum--) {
+#if 0
         {
                 int pos;
                 char dname[256];
                 pos = devfs_generate_path(xtalk, dname, 256);
                 printk("%s : path= %s\n", __FUNCTION__, &dname[pos]);
         }
+#endif
 
 		sprintf(pathname, "%d", widgetnum);
 		xwidget = NULL;
@@ -512,12 +637,12 @@ pci_bus_map_create(devfs_handle_t xtalk)
 		 */
 		master_node_vertex = device_master_get(xwidget);
 		if (!master_node_vertex) {
-			printk("WARNING: pci_bus_map_create: Unable to get .master for vertex 0x%p\n", xwidget);
+			printk("WARNING: pci_bus_map_create: Unable to get .master for vertex 0x%p\n", (void *)xwidget);
 		}
 	
 		hubinfo_get(master_node_vertex, &hubinfo);
 		if (!hubinfo) {
-			printk("WARNING: pci_bus_map_create: Unable to get hubinfo for master node vertex 0x%p\n", master_node_vertex);
+			printk("WARNING: pci_bus_map_create: Unable to get hubinfo for master node vertex 0x%p\n", (void *)master_node_vertex);
 			return(1);
 		} else {
 			busnum_to_nid[num_bridges - 1] = hubinfo->h_nasid;
@@ -527,12 +652,12 @@ pci_bus_map_create(devfs_handle_t xtalk)
 		 * Pre assign DMA maps needed for 32 Bits Page Map DMA.
 		 */
 		busnum_to_atedmamaps[num_bridges - 1] = (void *) kmalloc(
-			sizeof(struct sn1_dma_maps_s) * 512, GFP_KERNEL);
+			sizeof(struct sn1_dma_maps_s) * MAX_ATE_MAPS, GFP_KERNEL);
 		if (!busnum_to_atedmamaps[num_bridges - 1])
-			printk("WARNING: pci_bus_map_create: Unable to precreate ATE DMA Maps for busnum %d vertex 0x%p\n", num_bridges - 1, xwidget);
+			printk("WARNING: pci_bus_map_create: Unable to precreate ATE DMA Maps for busnum %d vertex 0x%p\n", num_bridges - 1, (void *)xwidget);
 
 		memset(busnum_to_atedmamaps[num_bridges - 1], 0x0, 
-			sizeof(struct sn1_dma_maps_s) * 512);
+			sizeof(struct sn1_dma_maps_s) * MAX_ATE_MAPS);
 
 	}
 
@@ -552,14 +677,10 @@ pci_bus_to_hcl_cvlink(void)
 {
 
 	devfs_handle_t devfs_hdl = NULL;
-	devfs_handle_t module_comp = NULL;
-	devfs_handle_t node = NULL;
 	devfs_handle_t xtalk = NULL;
-	graph_vertex_place_t placeptr = EDGE_PLACE_WANT_REAL_EDGES;
 	int rv = 0;
 	char name[256];
 	int master_iobrick;
-	moduleid_t iobrick_id;
 	int i;
 
 	/*
@@ -619,66 +740,4 @@ pci_bus_to_hcl_cvlink(void)
 	}
 
 	return(0);
-}
-
-/*
- * sgi_pci_intr_support -
- */
-int
-sgi_pci_intr_support (unsigned int requested_irq, device_desc_t *dev_desc,
-	devfs_handle_t *bus_vertex, pciio_intr_line_t *lines,
-	devfs_handle_t *device_vertex)
-
-{
-
-	unsigned int bus;
-	unsigned int devfn;
-	struct pci_dev *pci_dev;
-	unsigned char intr_pin = 0;
-	struct sn1_widget_sysdata *widget_sysdata;
-	struct sn1_device_sysdata *device_sysdata;
-
-	if (!dev_desc || !bus_vertex || !device_vertex) {
-		printk("WARNING: sgi_pci_intr_support: Invalid parameter dev_desc 0x%p, bus_vertex 0x%p, device_vertex 0x%p\n", dev_desc, bus_vertex, device_vertex);
-		return(-1);
-	}
-
-	devfn = (requested_irq >> 8) & 0xff;
-	bus = (requested_irq >> 16) & 0xffff;
-	pci_dev = pci_find_slot(bus, devfn);
-	widget_sysdata = (struct sn1_widget_sysdata *)pci_dev->bus->sysdata;
-	*bus_vertex = widget_sysdata->vhdl;
-	device_sysdata = (struct sn1_device_sysdata *)pci_dev->sysdata;
-	*device_vertex = device_sysdata->vhdl;
-#if 0
-	{
-		int pos;
-		char dname[256];
-		pos = devfs_generate_path(*device_vertex, dname, 256);
-		printk("%s : path= %s pos %d\n", __FUNCTION__, &dname[pos], pos);
-	}
-#endif /* BRINGUP */
-
-
-	/*
-	 * Get the Interrupt PIN.
-	 */
-	pci_read_config_byte(pci_dev, PCI_INTERRUPT_PIN, &intr_pin);
-	*lines = (pciio_intr_line_t)intr_pin;
-
-#ifdef BRINGUP
-	/*
-	 * ioc3 can't decode the PCI_INTERRUPT_PIN field of its config
-	 * space so we have to set it here
-	 */
-	if (pci_dev->vendor == PCI_VENDOR_ID_SGI &&
-	    pci_dev->device == PCI_DEVICE_ID_SGI_IOC3 ) {
-		*lines = 1;
-	}
-#endif /* BRINGUP */
-
-	/* Not supported currently */
-	*dev_desc = NULL;
-	return(0);
-
 }

@@ -4,13 +4,14 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
+#include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/sn1/hubdev.h>
 #include <asm/sn/sn_private.h>
@@ -42,7 +43,7 @@ hubdev_register(int (*attach_method)(devfs_handle_t))
         
         ASSERT(attach_method);
 
-        callout =  (hubdev_callout_t *)kmem_zalloc(sizeof(hubdev_callout_t), KM_SLEEP);
+        callout =  (hubdev_callout_t *)snia_kmem_zalloc(sizeof(hubdev_callout_t), KM_SLEEP);
         ASSERT(callout);
         
 	mutex_lock(&hubdev_callout_mutex);
@@ -104,6 +105,9 @@ hubdev_docallouts(devfs_handle_t hub)
  * Given a hub vertex, return the base address of the Hspec space
  * for that hub.
  */
+
+#if defined(CONFIG_IA64_SGI_SN1)
+
 caddr_t
 hubdev_prombase_get(devfs_handle_t hub)
 {
@@ -124,3 +128,5 @@ hubdev_cnodeid_get(devfs_handle_t hub)
 
 	return hinfo->h_cnodeid;
 }
+
+#endif	/* CONFIG_IA64_SGI_SN1 */

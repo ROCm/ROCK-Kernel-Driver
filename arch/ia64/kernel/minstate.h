@@ -92,7 +92,6 @@
  *
  * Assumed state upon entry:
  *	psr.ic: off
- *	psr.dt: off
  *	r31:	contains saved predicates (pr)
  *
  * Upon exit, the state is as follows:
@@ -186,7 +185,6 @@
  *
  * Assumed state upon entry:
  *	psr.ic: on
- *	psr.dt: on
  *	r2:	points to &pt_regs.r16
  *	r3:	points to &pt_regs.r17
  */

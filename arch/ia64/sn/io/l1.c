@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992-1997, 2000-2002 Silicon Graphics, Inc.  All rights reserved.
  */
 
 /* In general, this file is organized in a hierarchy from lower-level
@@ -16,18 +15,12 @@
  *	System controller "message" interface (allows multiplexing
  *		of various kinds of requests and responses with
  *		console I/O)
- *	Console interfaces (there are two):
- *	  (1) "elscuart", used in the IP35prom and (maybe) some
- *		debugging situations elsewhere, and
- *	  (2) "l1_cons", the glue that allows the L1 to act
+ *	Console interface:
+ *	  "l1_cons", the glue that allows the L1 to act
  *		as the system console for the stdio libraries
  *
  * Routines making use of the system controller "message"-style interface
- * can be found in l1_command.c.  Their names are leftover from early SN0, 
- * when the "module system controller" (msc) was known as the "entry level
- * system controller" (elsc).  The names and signatures of those functions 
- * remain unchanged in order to keep the SN0 -> SN1 system controller
- * changes fairly localized.
+ * can be found in l1_command.c.
  */
 
 
@@ -35,45 +28,29 @@
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/delay.h>
 #include <asm/sn/sgi.h>
+#include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/eeprom.h>
-#include <asm/sn/ksys/i2c.h>
 #include <asm/sn/router.h>
 #include <asm/sn/module.h>
 #include <asm/sn/ksys/l1.h>
 #include <asm/sn/nodepda.h>
 #include <asm/sn/clksupport.h>
+#include <asm/sn/sn_sal.h>
+#include <asm/sn/sn_cpuid.h>
+#include <asm/sn/uart16550.h>
+#include <asm/sn/simulator.h>
 
-#include <asm/sn/sn1/uart16550.h>
 
-/*
- * Delete this when atomic_clear is part of atomic.h.
- */
-static __inline__ int
-atomic_clear (int i, atomic_t *v)
-{
-	__s32 old, new;
+/* Make all console writes atomic */
+#define SYNC_CONSOLE_WRITE	1
 
-	do {
-		old = atomic_read(v);
-		new = old & ~i;
-	} while (ia64_cmpxchg("acq", v, old, new, sizeof(atomic_t)) != old);
-	return new;
-}
-
-#if defined(EEPROM_DEBUG)
-#define db_printf(x) printk x
-#else
-#define db_printf(x)
-#endif
-
-// From irix/kern/sys/SN/SN1/bdrkhspecregs.h
-#define    HSPEC_UART_0              0x00000080    /* UART Registers         */
 
 /*********************************************************************
  * Hardware-level (UART) driver routines.
@@ -81,28 +58,33 @@ atomic_clear (int i, atomic_t *v)
 
 /* macros for reading/writing registers */
 
-#define LD(x)		(*(volatile uint64_t *)(x))
-#define SD(x, v)        (LD(x) = (uint64_t) (v))
+#define LD(x)			(*(volatile uint64_t *)(x))
+#define SD(x, v)        	(LD(x) = (uint64_t) (v))
 
 /* location of uart receive/xmit data register */
-#define L1_UART_BASE(n)	((ulong)REMOTE_HSPEC_ADDR((n), HSPEC_UART_0))
-#define LOCAL_HUB	LOCAL_HUB_ADDR
-#define LOCK_HUB	REMOTE_HUB_ADDR
+#if defined(CONFIG_IA64_SGI_SN1)
+#define L1_UART_BASE(n)		((ulong)REMOTE_HSPEC_ADDR((n), 0x00000080))
+#define LOCK_HUB		REMOTE_HUB_ADDR
+#elif defined(CONFIG_IA64_SGI_SN2)
+#define L1_UART_BASE(n)		((ulong)REMOTE_HUB((n), SH_JUNK_BUS_UART0))
+#define LOCK_HUB		REMOTE_HUB
+typedef u64 rtc_time_t;
+#endif
 
-#define ADDR_L1_REG(n, r)	\
-    (L1_UART_BASE(n) | ( (r) << 3 ))
 
-#define READ_L1_UART_REG(n, r) \
-    ( LD(ADDR_L1_REG((n), (r))) )
+#define ADDR_L1_REG(n, r)	( L1_UART_BASE(n) | ( (r) << 3 ) )
+#define READ_L1_UART_REG(n, r)	( LD(ADDR_L1_REG((n), (r))) )
+#define WRITE_L1_UART_REG(n, r, v) ( SD(ADDR_L1_REG((n), (r)), (v)) )
 
-#define WRITE_L1_UART_REG(n, r, v) \
-    ( SD(ADDR_L1_REG((n), (r)), (v)) )
+/* upper layer interface calling methods */
+#define SERIAL_INTERRUPT_MODE	0
+#define SERIAL_POLLED_MODE	1
 
 
 /* UART-related #defines */
 
 #define UART_BAUD_RATE		57600
-#define UART_FIFO_DEPTH		0xf0
+#define UART_FIFO_DEPTH		16
 #define UART_DELAY_SPAN		10
 #define UART_PUTC_TIMEOUT	50000
 #define UART_INIT_TIMEOUT	100000
@@ -114,17 +96,32 @@ atomic_clear (int i, atomic_t *v)
 #define UART_NO_CHAR		(-3)
 #define UART_VECTOR		(-4)
 
-#ifdef BRINGUP
-#define UART_DELAY(x)	{ int i; i = x * 1000; while (--i); }
-#else
-#define UART_DELAY(x)	us_delay(x)
-#endif
+#define UART_DELAY(x)		udelay(x)
+
+/* Some debug counters */
+#define L1C_INTERRUPTS		0
+#define L1C_OUR_R_INTERRUPTS	1
+#define L1C_OUR_X_INTERRUPTS	2
+#define L1C_SEND_CALLUPS	3
+#define L1C_RECEIVE_CALLUPS	4
+#define L1C_SET_BAUD		5
+#define L1C_ALREADY_LOCKED	L1C_SET_BAUD
+#define L1C_R_IRQ		6
+#define L1C_R_IRQ_RET		7
+#define L1C_LOCK_TIMEOUTS	8
+#define L1C_LOCK_COUNTER	9
+#define L1C_UNLOCK_COUNTER	10
+#define L1C_REC_STALLS		11
+#define L1C_CONNECT_CALLS	12
+#define L1C_SIZE		L1C_CONNECT_CALLS	/* Set to the last one */
+
+uint64_t L1_collectibles[L1C_SIZE + 1];
+
 
 /*
  *	Some macros for handling Endian-ness
  */
 
-#ifdef	LITTLE_ENDIAN
 #define COPY_INT_TO_BUFFER(_b, _i, _n)		\
 	{					\
 		_b[_i++] = (_n >> 24) & 0xff;	\
@@ -149,41 +146,61 @@ atomic_clear (int i, atomic_t *v)
 	    _xyz[1] = _b[_i++];			\
 	    _xyz[0] = _b[_i++];			\
 	}
-#else	/* BIG_ENDIAN */
 
-extern char *bcopy(const char * src, char * dest, int count);
+void snia_kmem_free(void *where, int size);
 
-#define COPY_INT_TO_BUFFER(_b, _i, _n)			\
-	{						\
-		bcopy((char *)&_n, _b, sizeof(_n));	\
-		_i += sizeof(_n);			\
-	}
-
-#define COPY_BUFFER_TO_INT(_b, _i, _n)			\
-	{						\
-		bcopy(&_b[_i], &_n, sizeof(_n));	\
-		_i += sizeof(_n);			\
-	}
-
-#define COPY_BUFFER_TO_BUFFER(_b, _i, _bn)		\
-	{						\
-            bcopy(&(_b[_i]), _bn, sizeof(int));		\
-            _i += sizeof(int);				\
-	}
-#endif	/* LITTLE_ENDIAN */
-
-void kmem_free(void *where, int size);
+#define ALREADY_LOCKED		1
+#define NOT_LOCKED		0
+static int early_l1_serial_out(nasid_t, char *, int, int /* defines above*/ );
 
 #define BCOPY(x,y,z)	memcpy(y,x,z)
+
+uint8_t L1_interrupts_connected;		/* Non-zero when we are in interrupt mode */
+
 
 /*
  * Console locking defines and functions.
  *
  */
 
-#ifdef BRINGUP
-#define FORCE_CONSOLE_NASID
-#endif
+uint8_t L1_cons_is_inited = 0;			/* non-zero when console is init'd */
+nasid_t Master_console_nasid = (nasid_t)-1;
+extern nasid_t console_nasid;
+
+u64 ia64_sn_get_console_nasid(void);
+
+inline nasid_t
+get_master_nasid(void)
+{
+#if defined(CONFIG_IA64_SGI_SN1)
+	nasid_t nasid = Master_console_nasid;
+
+	if ( nasid == (nasid_t)-1 ) {
+		nasid = (nasid_t)ia64_sn_get_console_nasid();
+		if ( (nasid < 0) || (nasid >= MAX_NASIDS) ) {
+			/* Out of bounds, use local */
+			console_nasid = nasid = get_nasid();
+		}
+		else {
+			/* Got a valid nasid, set the console_nasid */
+			char xx[100];
+/* zzzzzz - force nasid to 0 for now */
+			sprintf(xx, "Master console is set to nasid %d (%d)\n", 0, (int)nasid);
+nasid = 0;
+/* end zzzzzz */
+			xx[99] = (char)0;
+			early_l1_serial_out(nasid, xx, strlen(xx), NOT_LOCKED);
+			Master_console_nasid = console_nasid = nasid;
+		}
+	}
+	return(nasid);
+#else
+	return((nasid_t)0);
+#endif	/* CONFIG_IA64_SGI_SN1 */
+}
+
+
+#if defined(CONFIG_IA64_SGI_SN1)
 
 #define HUB_LOCK		16
 
@@ -198,7 +215,6 @@ void kmem_free(void *where, int size);
 #define HUB_CLEAR(n)		SD(LOCK_HUB(n,LB_SCRATCH_REG3),0)
 
 #define RTC_TIME_MAX		((rtc_time_t) ~0ULL)
-
 
 /*
  * primary_lock
@@ -295,26 +311,37 @@ hub_lock_timeout(nasid_t nasid, int level, rtc_time_t timeout)
 
 #define LOCK_TIMEOUT	(0x1500000 * 1) /* 0x1500000 is ~30 sec */
 
-inline void
+void
 lock_console(nasid_t nasid)
 {
 	int ret;
 
+	/* If we already have it locked, just return */
+	L1_collectibles[L1C_LOCK_COUNTER]++;
+
 	ret = hub_lock_timeout(nasid, HUB_LOCK, (rtc_time_t)LOCK_TIMEOUT);
 	if ( ret != 0 ) {
+		L1_collectibles[L1C_LOCK_TIMEOUTS]++;
 		/* timeout */
 		hub_unlock(nasid, HUB_LOCK);
 		/* If the 2nd lock fails, just pile ahead.... */
 		hub_lock_timeout(nasid, HUB_LOCK, (rtc_time_t)LOCK_TIMEOUT);
+		L1_collectibles[L1C_LOCK_TIMEOUTS]++;
 	}
 }
 
 inline void
 unlock_console(nasid_t nasid)
 {
+	L1_collectibles[L1C_UNLOCK_COUNTER]++;
 	hub_unlock(nasid, HUB_LOCK);
 }
 
+#else /* SN2 */
+inline void lock_console(nasid_t n)	{}
+inline void unlock_console(nasid_t n)	{}
+
+#endif	/* CONFIG_IA64_SGI_SN1 */
 
 int 
 get_L1_baud(void)
@@ -325,27 +352,18 @@ get_L1_baud(void)
 
 /* uart driver functions */
 
-static void
+static inline void
 uart_delay( rtc_time_t delay_span )
 {
     UART_DELAY( delay_span );
 }
 
-#define UART_PUTC_READY(n)      ( (READ_L1_UART_REG((n), REG_LSR) & LSR_XHRE) && (READ_L1_UART_REG((n), REG_MSR) & MSR_CTS) )
+#define UART_PUTC_READY(n)      (READ_L1_UART_REG((n), REG_LSR) & LSR_XHRE)
 
 static int
 uart_putc( l1sc_t *sc ) 
 {
-#ifdef BRINGUP
-    /* need a delay to avoid dropping chars */
-    UART_DELAY(57);
-#endif
-#ifdef FORCE_CONSOLE_NASID
-    /* We need this for the console write path _elscuart_flush() -> brl1_send() */
-    sc->nasid = 0;
-#endif
-    WRITE_L1_UART_REG( sc->nasid, REG_DAT,
-		       sc->send[sc->sent] );
+    WRITE_L1_UART_REG( sc->nasid, REG_DAT, sc->send[sc->sent] );
     return UART_SUCCESS;
 }
 
@@ -355,10 +373,6 @@ uart_getc( l1sc_t *sc )
 {
     u_char lsr_reg = 0;
     nasid_t nasid = sc->nasid;
-
-#ifdef FORCE_CONSOLE_NASID
-    nasid = sc->nasid = 0;
-#endif
 
     if( (lsr_reg = READ_L1_UART_REG( nasid, REG_LSR )) & 
 	(LSR_RCA | LSR_PARERR | LSR_FRMERR) ) 
@@ -396,9 +410,10 @@ uart_init( l1sc_t *sc, int baud )
 	}
     }
 
-    if ( sc->uart == BRL1_LOCALUART )
+    if ( sc->uart == BRL1_LOCALHUB_UART )
 	lock_console(nasid);
 
+    /* Setup for the proper baud rate */
     WRITE_L1_UART_REG( nasid, REG_LCR, LCR_DLAB );
 	uart_delay( UART_DELAY_SPAN );
     WRITE_L1_UART_REG( nasid, REG_DLH, (clkdiv >> 8) & 0xff );
@@ -407,6 +422,8 @@ uart_init( l1sc_t *sc, int baud )
 	uart_delay( UART_DELAY_SPAN );
 
     /* set operating parameters and set DLAB to 0 */
+
+    /* 8bit, one stop, clear request to send, auto flow control */
     WRITE_L1_UART_REG( nasid, REG_LCR, LCR_BITS8 | LCR_STOP1 );
 	uart_delay( UART_DELAY_SPAN );
     WRITE_L1_UART_REG( nasid, REG_MCR, MCR_RTS | MCR_AFE );
@@ -416,22 +433,27 @@ uart_init( l1sc_t *sc, int baud )
     WRITE_L1_UART_REG( nasid, REG_ICR, 0x0 );
 	uart_delay( UART_DELAY_SPAN );
 
-    /* enable FIFO mode and reset both FIFOs */
+    /* enable FIFO mode and reset both FIFOs, trigger on 1 */
     WRITE_L1_UART_REG( nasid, REG_FCR, FCR_FIFOEN );
 	uart_delay( UART_DELAY_SPAN );
-    WRITE_L1_UART_REG( nasid, REG_FCR,
-	FCR_FIFOEN | FCR_RxFIFO | FCR_TxFIFO );
+    WRITE_L1_UART_REG( nasid, REG_FCR, FCR_FIFOEN | FCR_RxFIFO | FCR_TxFIFO | RxLVL0);
 
-    if ( sc->uart == BRL1_LOCALUART )
+    if ( sc->uart == BRL1_LOCALHUB_UART )
 	unlock_console(nasid);
 }
 
 /* This requires the console lock */
+
+#if	defined(CONFIG_IA64_SGI_SN1)
+
 static void
 uart_intr_enable( l1sc_t *sc, u_char mask )
 {
     u_char lcr_reg, icr_reg;
     nasid_t nasid = sc->nasid;
+
+    if ( sc->uart == BRL1_LOCALHUB_UART )
+	lock_console(nasid);
 
     /* make sure that the DLAB bit in the LCR register is 0
      */
@@ -444,6 +466,9 @@ uart_intr_enable( l1sc_t *sc, u_char mask )
     icr_reg = READ_L1_UART_REG( nasid, REG_ICR );
     icr_reg |= mask;
     WRITE_L1_UART_REG( nasid, REG_ICR, icr_reg /*(ICR_RIEN | ICR_TIEN)*/ );
+
+    if ( sc->uart == BRL1_LOCALHUB_UART )
+	unlock_console(nasid);
 }
 
 /* This requires the console lock */
@@ -452,6 +477,9 @@ uart_intr_disable( l1sc_t *sc, u_char mask )
 {
     u_char lcr_reg, icr_reg;
     nasid_t nasid = sc->nasid;
+
+    if ( sc->uart == BRL1_LOCALHUB_UART )
+	lock_console(nasid);
 
     /* make sure that the DLAB bit in the LCR register is 0
      */
@@ -464,7 +492,11 @@ uart_intr_disable( l1sc_t *sc, u_char mask )
     icr_reg = READ_L1_UART_REG( nasid, REG_ICR );
     icr_reg &= mask;
     WRITE_L1_UART_REG( nasid, REG_ICR, icr_reg /*(ICR_RIEN | ICR_TIEN)*/ );
+
+    if ( sc->uart == BRL1_LOCALHUB_UART )
+	unlock_console(nasid);
 }
+#endif	/* CONFIG_IA64_SGI_SN1 */
 
 #define uart_enable_xmit_intr(sc) \
 	uart_intr_enable((sc), ICR_TIEN)
@@ -511,10 +543,6 @@ rtr_uart_putc( l1sc_t *sc )
     net_vec_t path = sc->uart;
     rtc_time_t expire = rtc_time() + RTR_UART_PUTC_TIMEOUT;
 
-#ifdef FORCE_CONSOLE_NASID
-    /* We need this for the console write path _elscuart_flush() -> brl1_send() */
-    nasid = sc->nasid = 0;
-#endif
     c = (sc->send[sc->sent] & 0xffULL);
     
     while( 1 ) 
@@ -542,10 +570,6 @@ rtr_uart_getc( l1sc_t *sc )
     uint64_t regval;
     nasid_t nasid = sc->nasid;
     net_vec_t path = sc->uart;
-
-#ifdef FORCE_CONSOLE_NASID
-    nasid = sc->nasid = 0;
-#endif
 
     READ_RTR_L1_UART_REG( path, nasid, REG_LSR, &regval );
     if( regval & (LSR_RCA | LSR_PARERR | LSR_FRMERR) )
@@ -617,6 +641,15 @@ rtr_uart_init( l1sc_t *sc, int baud )
     return 0;
 }
 
+/*********************************************************************
+ * locking macros 
+ */
+
+#define L1SC_SEND_LOCK(l,p)   { if ((l)->uart == BRL1_LOCALHUB_UART) spin_lock_irqsave(&((l)->send_lock),p); }
+#define L1SC_SEND_UNLOCK(l,p) { if ((l)->uart == BRL1_LOCALHUB_UART) spin_unlock_irqrestore(&((l)->send_lock), p); }
+#define L1SC_RECV_LOCK(l,p)   { if ((l)->uart == BRL1_LOCALHUB_UART) spin_lock_irqsave(&((l)->recv_lock), p); } 
+#define L1SC_RECV_UNLOCK(l,p) { if ((l)->uart == BRL1_LOCALHUB_UART) spin_unlock_irqrestore(&((l)->recv_lock), p); }
+
 
 /*********************************************************************
  * subchannel manipulation 
@@ -626,31 +659,43 @@ rtr_uart_init( l1sc_t *sc, int baud )
  * associated with particular subchannels (e.g., receive queues).
  *
  */
-
-#ifdef SPINLOCKS_WORK
-#define SUBCH_LOCK(sc)			spin_lock_irq( &((sc)->subch_lock) )
-#define SUBCH_UNLOCK(sc)		spin_unlock_irq( &((sc)->subch_lock) )
-#define SUBCH_DATA_LOCK(sbch) 		spin_lock_irq( &((sbch)->data_lock) )
-#define SUBCH_DATA_UNLOCK(sbch)		spin_unlock_irq( &((sbch)->data_lock) )
-#else
-#define SUBCH_LOCK(sc)
-#define SUBCH_UNLOCK(sc)
-#define SUBCH_DATA_LOCK(sbch)
-#define SUBCH_DATA_UNLOCK(sbch)
-#endif
+#define SUBCH_LOCK(sc, p)		spin_lock_irqsave( &((sc)->subch_lock), p )
+#define SUBCH_UNLOCK(sc, p)		spin_unlock_irqrestore( &((sc)->subch_lock), p )
+#define SUBCH_DATA_LOCK(sbch, p) 	spin_lock_irqsave( &((sbch)->data_lock), p )
+#define SUBCH_DATA_UNLOCK(sbch, p)	spin_unlock_irqrestore( &((sbch)->data_lock), p )
 
 
-/* get_myid is an internal function that reads the PI_CPU_NUM
- * register of the local bedrock to determine which of the
- * four possible CPU's "this" one is
+/*
+ * set a function to be called for subchannel ch in the event of
+ * a transmission low-water interrupt from the uart
  */
-static int
-get_myid( void )
+void
+subch_set_tx_notify( l1sc_t *sc, int ch, brl1_notif_t func )
 {
-    return( LD(LOCAL_HUB(PI_CPU_NUM)) );
+    unsigned long pl = 0;
+
+    L1SC_SEND_LOCK( sc, pl );
+#if	!defined(SYNC_CONSOLE_WRITE)
+    if ( func && !sc->send_in_use )
+	uart_enable_xmit_intr( sc );
+#endif
+    sc->subch[ch].tx_notify = func;
+    L1SC_SEND_UNLOCK(sc, pl );
 }
 
+/*
+ * set a function to be called for subchannel ch when data is received
+ */
+void
+subch_set_rx_notify( l1sc_t *sc, int ch, brl1_notif_t func )
+{
+    unsigned long pl = 0;
+    brl1_sch_t *subch = &(sc->subch[ch]);
 
+    SUBCH_DATA_LOCK( subch, pl );
+    sc->subch[ch].rx_notify = func;
+    SUBCH_DATA_UNLOCK( subch, pl );
+}
 
 /*********************************************************************
  * Queue manipulation macros
@@ -767,14 +812,16 @@ static unsigned short crc16_calc( unsigned short crc, u_char c )
  * brl1_discard_packet is a dummy "receive callback" used to get rid
  * of packets we don't want
  */
-void brl1_discard_packet( l1sc_t *sc, int ch )
+void brl1_discard_packet( int dummy0, void *dummy1, struct pt_regs *dummy2, l1sc_t *sc, int ch )
 {
+    unsigned long pl = 0;
     brl1_sch_t *subch = &sc->subch[ch];
+
     sc_cq_t *q = subch->iqp;
-    SUBCH_DATA_LOCK( subch );
+    SUBCH_DATA_LOCK( subch, pl );
     q->opos = q->ipos;
-    atomic_clear( &(subch->packet_arrived), ~((unsigned)0) );
-    SUBCH_DATA_UNLOCK( subch );
+    atomic_set(&(subch->packet_arrived), 0);
+    SUBCH_DATA_UNLOCK( subch, pl );
 }
 
 
@@ -789,17 +836,15 @@ void brl1_discard_packet( l1sc_t *sc, int ch )
 static int
 brl1_send_chars( l1sc_t *sc )
 {
-    /* In the kernel, we track the depth of the C brick's UART's
+    /* We track the depth of the C brick's UART's
      * fifo in software, and only check if the UART is accepting
      * characters when our count indicates that the fifo should
      * be full.
      *
-     * For remote (router) UARTs, and also for the local (C brick)
-     * UART in the prom, we check with the UART before sending every
+     * For remote (router) UARTs, we check with the UART before sending every
      * character.
      */
-    if( sc->uart == BRL1_LOCALUART ) 
-    {
+    if( sc->uart == BRL1_LOCALHUB_UART ) {
 	if( !(sc->fifo_space) && UART_PUTC_READY( sc->nasid ) )
 	    sc->fifo_space = UART_FIFO_DEPTH;
 	
@@ -809,16 +854,10 @@ brl1_send_chars( l1sc_t *sc )
 	    sc->sent++;
 	}
     }
+    else {
 
-    else
+	/* remote (router) UARTs */
 
-    /* The following applies to all UARTs in the prom, and to remote
-     * (router) UARTs in the kernel...
-     */
-
-#define TIMEOUT_RETRIES	30
-
-    {
 	int result;
 	int tries = 0;
 
@@ -831,7 +870,7 @@ brl1_send_chars( l1sc_t *sc )
 	    if( result == UART_TIMEOUT ) {
 		tries++;
 		/* send this character in TIMEOUT_RETRIES... */
-		if( tries < TIMEOUT_RETRIES ) {
+		if( tries < 30 /* TIMEOUT_RETRIES */ ) {
 		    continue;
 		}
 		/* ...or else... */
@@ -864,33 +903,39 @@ brl1_send_chars( l1sc_t *sc )
 static int
 brl1_send( l1sc_t *sc, char *msg, int len, u_char type_and_subch, int wait )
 {
+    unsigned long pl = 0;
     int index;
     int pkt_len = 0;
     unsigned short crc = INIT_CRC;
     char *send_ptr = sc->send;
 
-#ifdef BRINGUP
-    /* We want to be sure that we are sending the entire packet before returning */
-    wait = 1;
-#endif
-    if ( sc->uart == BRL1_LOCALUART )
-	lock_console(sc->nasid);
 
-    if( sc->send_in_use ) {
-	if( !wait ) {
-    	    if ( sc->uart == BRL1_LOCALUART )
-	    	unlock_console(sc->nasid);
-	    return 0; /* couldn't send anything; wait for buffer to drain */
-	}
-	else {
-	    /* buffer's in use, but we're synchronous I/O, so we're going
-	     * to send whatever's in there right now and take the buffer
-	     */
-	    while( sc->sent < sc->send_len )
+    if( sc->send_in_use && !(wait) ) {
+	/* We are in the middle of sending, but can wait until done */
+	return 0;
+    }
+    else if( sc->send_in_use ) {
+	/* buffer's in use, but we're synchronous I/O, so we're going
+	 * to send whatever's in there right now and take the buffer
+	 */
+	int counter = 0;
+
+	if ( sc->uart == BRL1_LOCALHUB_UART )
+		lock_console(sc->nasid);
+	L1SC_SEND_LOCK(sc, pl);
+	while( sc->sent < sc->send_len ) {
 		brl1_send_chars( sc );
+		if ( counter++ > 0xfffff ) {
+			char *str = "Looping waiting for uart to clear (1)\n";
+			early_l1_serial_out(sc->nasid, str, strlen(str), ALREADY_LOCKED);
+			break;
+		}
 	}
     }
     else {
+	if ( sc->uart == BRL1_LOCALHUB_UART )
+		lock_console(sc->nasid);
+	L1SC_SEND_LOCK(sc, pl);
 	sc->send_in_use = 1;
     }
     *send_ptr++ = BRL1_FLAG_CH;
@@ -948,23 +993,100 @@ brl1_send( l1sc_t *sc, char *msg, int len, u_char type_and_subch, int wait )
     sc->send_len = pkt_len;
     sc->sent = 0;
 
-    do {
-	brl1_send_chars( sc );
-    } while( (sc->sent < sc->send_len) && wait );
+    {
+	int counter = 0;
+	do {
+		brl1_send_chars( sc );
+		if ( counter++ > 0xfffff ) {
+			char *str = "Looping waiting for uart to clear (2)\n";
+			early_l1_serial_out(sc->nasid, str, strlen(str), ALREADY_LOCKED);
+			break;
+		}
+	} while( (sc->sent < sc->send_len) && wait );
+    }
+
+    if ( sc->uart == BRL1_LOCALHUB_UART )
+	unlock_console(sc->nasid);
 
     if( sc->sent == sc->send_len ) {
-	/* success! release the send buffer */
+	/* success! release the send buffer and call the callup */
+#if	!defined(SYNC_CONSOLE_WRITE)
+	brl1_notif_t callup;
+#endif
+
 	sc->send_in_use = 0;
+	/* call any upper layer that's asked for notification */
+#if	defined(XX_SYNC_CONSOLE_WRITE)
+	/*
+	 * This is probably not a good idea - since the l1_ write func can be called multiple
+	 * time within the callup function.
+	 */
+	callup = subch->tx_notify;
+	if( callup && (SUBCH(type_and_subch) == SC_CONS_SYSTEM) ) {
+		L1_collectibles[L1C_SEND_CALLUPS]++;
+		(*callup)(sc->subch[SUBCH(type_and_subch)].irq_frame.bf_irq,
+				sc->subch[SUBCH(type_and_subch)].irq_frame.bf_dev_id,
+				sc->subch[SUBCH(type_and_subch)].irq_frame.bf_regs, sc, SUBCH(type_and_subch));
+	}
+#endif	/* SYNC_CONSOLE_WRITE */
     }
-    else if( !wait ) {
+#if	!defined(SYNC_CONSOLE_WRITE)
+    else if ( !wait ) {
 	/* enable low-water interrupts so buffer will be drained */
 	uart_enable_xmit_intr(sc);
     }
-    if ( sc->uart == BRL1_LOCALUART )
-	unlock_console(sc->nasid);
+#endif
+
+    L1SC_SEND_UNLOCK(sc, pl);
+
     return len;
 }
 
+/* brl1_send_cont is intended to be called as an interrupt service
+ * routine.  It sends until the UART won't accept any more characters,
+ * or until an error is encountered (in which case we surrender the
+ * send buffer and give up trying to send the packet).  Once the
+ * last character in the packet has been sent, this routine releases
+ * the send buffer and calls any previously-registered "low-water"
+ * output routines.
+ */
+
+#if	!defined(SYNC_CONSOLE_WRITE)
+
+int
+brl1_send_cont( l1sc_t *sc )
+{
+    unsigned long pl = 0;
+    int done = 0;
+    brl1_notif_t callups[BRL1_NUM_SUBCHANS];
+    brl1_notif_t *callup;
+    brl1_sch_t *subch;
+    int index;
+
+    /*
+     * I'm not sure how I think this is to be handled - whether the lock is held
+     * over the interrupt - but it seems like it is a bad idea....
+     */
+
+    if ( sc->uart == BRL1_LOCALHUB_UART )
+	lock_console(sc->nasid);
+    L1SC_SEND_LOCK(sc, pl);
+    brl1_send_chars( sc );
+    done = (sc->sent == sc->send_len);
+    if( done ) {
+	sc->send_in_use = 0;
+#if	!defined(SYNC_CONSOLE_WRITE)
+	uart_disable_xmit_intr(sc);
+#endif
+    }
+    if ( sc->uart == BRL1_LOCALHUB_UART )
+	unlock_console(sc->nasid);
+    /* Release the lock */
+    L1SC_SEND_UNLOCK(sc, pl);
+
+    return 0;
+}
+#endif	/* SYNC_CONSOLE_WRITE */
 
 /* internal function -- used by brl1_receive to read a character 
  * from the uart and check whether errors occurred in the process.
@@ -1046,14 +1168,11 @@ BRL1_ESC (saw an escape (0x7d))	flag		BRL1_FLAG@
  * error (parity error, bad header, bad CRC, etc.).
  */
 
-#define STATE_SET(l,s)	((l)->brl1_state = (s))
-#define STATE_GET(l)	((l)->brl1_state)
+#define STATE_SET(l,s)		((l)->brl1_state = (s))
+#define STATE_GET(l)		((l)->brl1_state)
 
 #define LAST_HDR_SET(l,h)	((l)->brl1_last_hdr = (h))
 #define LAST_HDR_GET(l)		((l)->brl1_last_hdr)
-
-#define SEQSTAMP_INCR(l)
-#define SEQSTAMP_GET(l)
 
 #define VALID_HDR(c)				\
     ( SUBCH((c)) <= SC_CONS_SYSTEM		\
@@ -1061,25 +1180,21 @@ BRL1_ESC (saw an escape (0x7d))	flag		BRL1_FLAG@
 	: ( PKT_TYPE((c)) == BRL1_RESPONSE ||	\
 	    PKT_TYPE((c)) == BRL1_EVENT ) )
 
-#define IS_TTY_PKT(l) \
-         ( SUBCH(LAST_HDR_GET(l)) <= SC_CONS_SYSTEM ? 1 : 0 )
+#define IS_TTY_PKT(l)		( SUBCH(LAST_HDR_GET(l)) <= SC_CONS_SYSTEM ? 1 : 0 )
 
 
 int
-brl1_receive( l1sc_t *sc )
+brl1_receive( l1sc_t *sc, int mode )
 {
     int result;		/* value to be returned by brl1_receive */
     int c;		/* most-recently-read character	     	*/
     int done;		/* set done to break out of recv loop	*/
+    unsigned long pl = 0, cpl = 0;
     sc_cq_t *q;		/* pointer to queue we're working with	*/
 
     result = BRL1_NO_MESSAGE;
 
-#ifdef FORCE_CONSOLE_NASID
-    sc->nasid = 0;
-#endif
-    if ( sc->uart == BRL1_LOCALUART )
-	lock_console(sc->nasid);
+    L1SC_RECV_LOCK(sc, cpl);
 
     done = 0;
     while( !done )
@@ -1210,8 +1325,7 @@ brl1_receive( l1sc_t *sc )
 		 * starting a new packet
 		 */
 		STATE_SET( sc, BRL1_FLAG );
-		SEQSTAMP_INCR(sc); /* bump the packet sequence counter */
-		
+
 		/* if the packet body has less than 2 characters,
 		 * it can't be a well-formed packet.  Discard it.
 		 */
@@ -1258,7 +1372,7 @@ brl1_receive( l1sc_t *sc )
 
 		/* get the subchannel and lock it */
 		subch = &(sc->subch[SUBCH( LAST_HDR_GET(sc) )]);
-		SUBCH_DATA_LOCK( subch );
+		SUBCH_DATA_LOCK( subch, pl );
 		
 		/* if this isn't a console packet, we need to record
 		 * a length byte
@@ -1276,14 +1390,16 @@ brl1_receive( l1sc_t *sc )
 		 */
 		atomic_inc(&(subch->packet_arrived));
 		callup = subch->rx_notify;
-		SUBCH_DATA_UNLOCK( subch );
+		SUBCH_DATA_UNLOCK( subch, pl );
 
-		if( callup ) {
-		    if ( sc->uart == BRL1_LOCALUART )
-			unlock_console(sc->nasid);
-		    (*callup)( sc, SUBCH(LAST_HDR_GET(sc)) );
-		    if ( sc->uart == BRL1_LOCALUART )
-			lock_console(sc->nasid);
+		if( callup && (mode == SERIAL_INTERRUPT_MODE) ) {
+		    L1SC_RECV_UNLOCK( sc, cpl );
+		    L1_collectibles[L1C_RECEIVE_CALLUPS]++;
+		    (*callup)( sc->subch[SUBCH(LAST_HDR_GET(sc))].irq_frame.bf_irq,
+				sc->subch[SUBCH(LAST_HDR_GET(sc))].irq_frame.bf_dev_id,
+				sc->subch[SUBCH(LAST_HDR_GET(sc))].irq_frame.bf_regs,
+				sc, SUBCH(LAST_HDR_GET(sc)) );
+		    L1SC_RECV_LOCK( sc, cpl );
 		}
 		continue;	/* go back for more! */
 	    }
@@ -1351,9 +1467,8 @@ brl1_receive( l1sc_t *sc )
 
 	} /* end of switch( STATE_GET(sc) ) */
     } /* end of while(!done) */
-    
-    if ( sc->uart == BRL1_LOCALUART )
-	unlock_console(sc->nasid);
+
+    L1SC_RECV_UNLOCK( sc, cpl );
 
     return result;
 }	    
@@ -1370,13 +1485,10 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
     brl1_sch_t *subch;
 
     bzero( sc, sizeof( *sc ) );
-#ifdef FORCE_CONSOLE_NASID
-    nasid = (nasid_t)0;
-#endif
     sc->nasid = nasid;
     sc->uart = uart;
-    sc->getc_f = (uart == BRL1_LOCALUART ? uart_getc : rtr_uart_getc);
-    sc->putc_f = (uart == BRL1_LOCALUART ? uart_putc : rtr_uart_putc);
+    sc->getc_f = (uart == BRL1_LOCALHUB_UART ? uart_getc : rtr_uart_getc);
+    sc->putc_f = (uart == BRL1_LOCALHUB_UART ? uart_putc : rtr_uart_putc);
     sc->sol = 1;
     subch = sc->subch;
 
@@ -1403,9 +1515,8 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
     spin_lock_init( &(subch->data_lock) );
     sv_init( &(subch->arrive_sv), &subch->data_lock, SV_MON_SPIN | SV_ORDER_FIFO /* | SV_INTS */ );
     subch->tx_notify = NULL;
-    if( sc->uart == BRL1_LOCALUART ) {
-	subch->iqp = kmem_zalloc_node( sizeof(sc_cq_t), KM_NOSLEEP,
-				       NASID_TO_COMPACT_NODEID(nasid) );
+    if( sc->uart == BRL1_LOCALHUB_UART ) {
+	subch->iqp = snia_kmem_zalloc_node( sizeof(sc_cq_t), KM_NOSLEEP, NASID_TO_COMPACT_NODEID(nasid) );
 	ASSERT( subch->iqp );
 	cq_init( subch->iqp );
 	subch->rx_notify = NULL;
@@ -1440,8 +1551,10 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
     /* initialize synchronization structures
      */
     spin_lock_init( &(sc->subch_lock) );
+    spin_lock_init( &(sc->send_lock) );
+    spin_lock_init( &(sc->recv_lock) );
 
-    if( sc->uart == BRL1_LOCALUART ) {
+    if( sc->uart == BRL1_LOCALHUB_UART ) {
 	uart_init( sc, UART_BAUD_RATE );
     }
     else {
@@ -1461,23 +1574,397 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
     }
 }
 
+/*********************************************************************
+ * These are interrupt-related functions used in the kernel to service
+ * the L1.
+ */
+
+/*
+ * brl1_intrd is the function which is called on a console interrupt.
+ */
+
+#if defined(CONFIG_IA64_SGI_SN1)
+
+static void
+brl1_intrd(int irq, void *dev_id, struct pt_regs *stuff)
+{
+    u_char isr_reg;
+    l1sc_t *sc = get_elsc();
+    int ret;
+
+    L1_collectibles[L1C_INTERRUPTS]++;
+    isr_reg = READ_L1_UART_REG(sc->nasid, REG_ISR);
+
+    /* Save for callup args in console */
+    sc->subch[SC_CONS_SYSTEM].irq_frame.bf_irq = irq;
+    sc->subch[SC_CONS_SYSTEM].irq_frame.bf_dev_id = dev_id;
+    sc->subch[SC_CONS_SYSTEM].irq_frame.bf_regs = stuff;
+
+#if	defined(SYNC_CONSOLE_WRITE)
+    while( isr_reg & ISR_RxRDY )
+#else
+    while( isr_reg & (ISR_RxRDY | ISR_TxRDY) )
+#endif
+    {
+	if( isr_reg & ISR_RxRDY ) {
+	    L1_collectibles[L1C_OUR_R_INTERRUPTS]++;
+	    ret = brl1_receive(sc, SERIAL_INTERRUPT_MODE);
+	    if ( (ret != BRL1_VALID) && (ret != BRL1_NO_MESSAGE) && (ret != BRL1_PROTOCOL) && (ret != BRL1_CRC) )
+		L1_collectibles[L1C_REC_STALLS] = ret;
+	}
+#if	!defined(SYNC_CONSOLE_WRITE)
+	if( (isr_reg & ISR_TxRDY) || (sc->send_in_use && UART_PUTC_READY(sc->nasid)) ) {
+	    L1_collectibles[L1C_OUR_X_INTERRUPTS]++;
+	    brl1_send_cont(sc);
+	}
+#endif	/* SYNC_CONSOLE_WRITE */
+	isr_reg = READ_L1_UART_REG(sc->nasid, REG_ISR);
+    }
+}
+#endif	/* CONFIG_IA64_SGI_SN1 */
+
+
+/*
+ * Install a callback function for the system console subchannel 
+ * to allow an upper layer to be notified when the send buffer 
+ * has been emptied.
+ */
+static inline void
+l1_tx_notif( brl1_notif_t func )
+{
+	subch_set_tx_notify( &NODEPDA(NASID_TO_COMPACT_NODEID(get_master_nasid()))->module->elsc,
+			SC_CONS_SYSTEM, func );
+}
+
+
+/*
+ * Install a callback function for the system console subchannel
+ * to allow an upper layer to be notified when a packet has been
+ * received.
+ */
+static inline void
+l1_rx_notif( brl1_notif_t func )
+{
+	subch_set_rx_notify( &NODEPDA(NASID_TO_COMPACT_NODEID(get_master_nasid()))->module->elsc,
+				SC_CONS_SYSTEM, func );
+}
+
+
+/* brl1_intr is called directly from the uart interrupt; after it runs, the
+ * interrupt "daemon" xthread is signalled to continue.
+ */
+void
+brl1_intr( void )
+{
+}
+
+#define BRL1_INTERRUPT_LEVEL	65	/* linux request_irq() value */
+
+/* Return the current interrupt level */
+
+//#define CONSOLE_POLLING_ALSO
+
+int
+l1_get_intr_value( void )
+{
+#ifdef	CONSOLE_POLLING_ALSO
+	return(0);
+#else
+	return(BRL1_INTERRUPT_LEVEL);
+#endif
+}
+
+/* Disconnect the callup functions - throw away interrupts */
+
+void
+l1_unconnect_intr(void)
+{
+	/* UnRegister the upper-level callup functions */
+	l1_rx_notif((brl1_notif_t)NULL);
+	l1_tx_notif((brl1_notif_t)NULL);
+	/* We do NOT unregister the interrupts */
+}
+
+/* Set up uart interrupt handling for this node's uart */
+
+void
+l1_connect_intr(void *rx_notify, void *tx_notify)
+{
+	l1sc_t *sc;
+	nasid_t nasid;
+#if defined(CONFIG_IA64_SGI_SN1)
+	int tmp;
+#endif
+	nodepda_t *console_nodepda;
+	int intr_connect_level(cpuid_t, int, ilvl_t, intr_func_t);
+
+	if ( L1_interrupts_connected ) {
+		/* Interrupts are connected, so just register the callups */
+		l1_rx_notif((brl1_notif_t)rx_notify);
+		l1_tx_notif((brl1_notif_t)tx_notify);
+
+		L1_collectibles[L1C_CONNECT_CALLS]++;
+		return;
+	}
+	else
+		L1_interrupts_connected = 1;
+
+	nasid = get_master_nasid();
+	console_nodepda = NODEPDA(NASID_TO_COMPACT_NODEID(nasid));
+	sc = &console_nodepda->module->elsc;
+	sc->intr_cpu = console_nodepda->node_first_cpu;
+
+#if defined(CONFIG_IA64_SGI_SN1)
+	if ( intr_connect_level(sc->intr_cpu, UART_INTR, INTPEND0_MAXMASK, (intr_func_t)brl1_intr) ) {
+		L1_interrupts_connected = 0; /* FAILS !! */
+	}
+	else {
+		void synergy_intr_connect(int, int);
+
+		synergy_intr_connect(UART_INTR, sc->intr_cpu);
+		L1_collectibles[L1C_R_IRQ]++;
+		tmp = request_irq(BRL1_INTERRUPT_LEVEL, brl1_intrd, SA_INTERRUPT | SA_SHIRQ, "l1_protocol_driver", (void *)sc);
+		L1_collectibles[L1C_R_IRQ_RET] = (uint64_t)tmp;
+		if ( tmp ) {
+			L1_interrupts_connected = 0; /* FAILS !! */
+		}
+		else {
+			/* Register the upper-level callup functions */
+			l1_rx_notif((brl1_notif_t)rx_notify);
+			l1_tx_notif((brl1_notif_t)tx_notify);
+
+			/* Set the uarts the way we like it */
+			uart_enable_recv_intr( sc );
+			uart_disable_xmit_intr( sc );
+		}
+	}
+#endif	/* CONFIG_IA64_SGI_SN1 */
+}
+
+
+/* Set the line speed */
+
+void
+l1_set_baud(int baud)
+{
+#if 0
+	nasid_t nasid;
+	static void uart_init(l1sc_t *, int);
+#endif
+
+	L1_collectibles[L1C_SET_BAUD]++;
+
+#if 0
+	if ( L1_cons_is_inited ) {
+		nasid = get_master_nasid();
+		if ( NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->module != (module_t *)0 )
+			uart_init(&NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->module->elsc, baud);
+	}
+#endif
+	return;
+}
+
 
 /* These are functions to use from serial_in/out when in protocol
  * mode to send and receive uart control regs. These are external
  * interfaces into the protocol driver.
  */
+
 void
 l1_control_out(int offset, int value)
 {
-	nasid_t nasid = 0; //(get_elsc())->nasid;
+	nasid_t nasid = get_master_nasid();
 	WRITE_L1_UART_REG(nasid, offset, value); 
+}
+
+/* Console input exported interface. Return a register value.  */
+
+int
+l1_control_in_polled(int offset)
+{
+	static int l1_control_in_local(int, int);
+
+	return(l1_control_in_local(offset, SERIAL_POLLED_MODE));
 }
 
 int
 l1_control_in(int offset)
 {
-	nasid_t nasid = 0; //(get_elsc())->nasid;
-	return(READ_L1_UART_REG(nasid, offset)); 
+	static int l1_control_in_local(int, int);
+
+	return(l1_control_in_local(offset, SERIAL_INTERRUPT_MODE));
+}
+
+static int
+l1_control_in_local(int offset, int mode)
+{
+	nasid_t nasid;
+	int ret, input;
+	static int l1_poll(l1sc_t *, int);
+
+	nasid = get_master_nasid();
+	ret = READ_L1_UART_REG(nasid, offset); 
+
+	if ( offset == REG_LSR ) {
+		ret |= (LSR_XHRE | LSR_XSRE);	/* can send anytime */
+		if ( L1_cons_is_inited ) {
+			if ( NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->module != (module_t *)0 ) {
+				input = l1_poll(&NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->module->elsc, mode);
+				if ( input ) {
+					ret |= LSR_RCA;
+				}
+			}
+		}
+	}
+	return(ret);
+}
+
+/*
+ * Console input exported interface. Return a character (if one is available)
+ */
+
+int
+l1_serial_in_polled(void)
+{
+	static int l1_serial_in_local(int mode);
+
+	return(l1_serial_in_local(SERIAL_POLLED_MODE));
+}
+
+int
+l1_serial_in(void)
+{
+	static int l1_serial_in_local(int mode);
+
+	return(l1_serial_in_local(SERIAL_INTERRUPT_MODE));
+}
+
+static int
+l1_serial_in_local(int mode)
+{
+	nasid_t nasid;
+	l1sc_t *sc;
+	int value;
+	static int l1_getc( l1sc_t *, int );
+	static inline l1sc_t *early_sc_init(nasid_t);
+
+	nasid = get_master_nasid();
+	sc = early_sc_init(nasid);
+	if ( L1_cons_is_inited ) {
+		if ( NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->module != (module_t *)0 ) {
+			sc = &NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->module->elsc;
+		}
+	}
+	value = l1_getc(sc, mode);
+	return(value);
+}
+
+/* Console output exported interface. Write message to the console.  */
+
+int
+l1_serial_out( char *str, int len )
+{
+	nasid_t nasid = get_master_nasid();
+	int l1_write(l1sc_t *, char *, int, int);
+
+	if ( L1_cons_is_inited ) {
+		if ( NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->module != (module_t *)0 )
+			return(l1_write(&NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->module->elsc, str, len,
+#if	defined(SYNC_CONSOLE_WRITE)
+					1
+#else
+					!L1_interrupts_connected
+#endif
+							));
+	}
+	return(early_l1_serial_out(nasid, str, len, NOT_LOCKED));
+}
+
+
+/*
+ * These are the 'early' functions - when we need to do things before we have
+ * all the structs setup.
+ */
+
+static l1sc_t Early_console;		/* fake l1sc_t */
+static int Early_console_inited = 0;
+
+static void
+early_brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
+{
+    int i;
+    brl1_sch_t *subch;
+
+    bzero( sc, sizeof( *sc ) );
+    sc->nasid = nasid;
+    sc->uart = uart;
+    sc->getc_f = (uart == BRL1_LOCALHUB_UART ? uart_getc : rtr_uart_getc);
+    sc->putc_f = (uart == BRL1_LOCALHUB_UART ? uart_putc : rtr_uart_putc);
+    sc->sol = 1;
+    subch = sc->subch;
+
+    /* initialize L1 subchannels
+     */
+
+    /* assign processor TTY channels */
+    for( i = 0; i < CPUS_PER_NODE; i++, subch++ ) {
+	subch->use = BRL1_SUBCH_RSVD;
+	subch->packet_arrived = ATOMIC_INIT(0);
+	subch->tx_notify = NULL;
+	subch->rx_notify = NULL;
+	subch->iqp = &sc->garbage_q;
+    }
+
+    /* assign system TTY channel (first free subchannel after each
+     * processor's individual TTY channel has been assigned)
+     */
+    subch->use = BRL1_SUBCH_RSVD;
+    subch->packet_arrived = ATOMIC_INIT(0);
+    subch->tx_notify = NULL;
+    subch->rx_notify = NULL;
+    if( sc->uart == BRL1_LOCALHUB_UART ) {
+	static sc_cq_t x_iqp;
+
+	subch->iqp = &x_iqp;
+	ASSERT( subch->iqp );
+	cq_init( subch->iqp );
+    }
+    else {
+	/* we shouldn't be getting console input from remote UARTs */
+	subch->iqp = &sc->garbage_q;
+    }
+    subch++; i++;
+
+    /* "reserved" subchannels (0x05-0x0F); for now, throw away
+     * incoming packets
+     */
+    for( ; i < 0x10; i++, subch++ ) {
+	subch->use = BRL1_SUBCH_FREE;
+	subch->packet_arrived = ATOMIC_INIT(0);
+	subch->tx_notify = NULL;
+	subch->rx_notify = NULL;
+	subch->iqp = &sc->garbage_q;
+    }
+
+    /* remaining subchannels are free */
+    for( ; i < BRL1_NUM_SUBCHANS; i++, subch++ ) {
+	subch->use = BRL1_SUBCH_FREE;
+	subch->packet_arrived = ATOMIC_INIT(0);
+	subch->tx_notify = NULL;
+	subch->rx_notify = NULL;
+	subch->iqp = &sc->garbage_q;
+    }
+}
+
+static inline l1sc_t *
+early_sc_init(nasid_t nasid)
+{
+	/* This is for early I/O */
+	if ( Early_console_inited == 0 ) {
+    		early_brl1_init(&Early_console, nasid,  BRL1_LOCALHUB_UART);
+		Early_console_inited = 1;
+	}
+	return(&Early_console);
 }
 
 #define PUTCHAR(ch) \
@@ -1487,15 +1974,34 @@ l1_control_in(int offset)
         WRITE_L1_UART_REG( nasid, REG_DAT, (ch) ); \
     }
 
-int
-l1_serial_out( char *str, int len )
+static int
+early_l1_serial_out( nasid_t nasid, char *str, int len, int lock_state )
 {
-    int sent = len;
+	int ret, sent = 0;
+	char *msg = str;
+	static int early_l1_send( nasid_t nasid, char *str, int len, int lock_state );
+
+	while ( sent < len ) {
+		ret = early_l1_send(nasid, msg, len - sent, lock_state);
+		sent += ret;
+		msg += ret;
+	}
+	return(len);
+}
+
+static inline int
+early_l1_send( nasid_t nasid, char *str, int len, int lock_state )
+{
+    int sent;
     char crc_char;
     unsigned short crc = INIT_CRC;
-    nasid_t nasid = 0; //(get_elsc())->nasid;
 
-    lock_console(nasid);
+    if( len > (BRL1_QSIZE - 1) )
+	len = (BRL1_QSIZE - 1);
+
+    sent = len;
+    if ( lock_state == NOT_LOCKED )
+    	lock_console(nasid);
 
     PUTCHAR( BRL1_FLAG_CH );
     PUTCHAR( BRL1_EVENT | SC_CONS_SYSTEM );
@@ -1531,16 +2037,9 @@ l1_serial_out( char *str, int len )
     PUTCHAR( crc_char );
     PUTCHAR( BRL1_FLAG_CH );
 
-    unlock_console(nasid);
-    return sent - len;
-}
-
-int
-l1_serial_in(void)
-{
-	static int l1_cons_getc( l1sc_t *sc );
-
-	return(l1_cons_getc(get_elsc()));
+    if ( lock_state == NOT_LOCKED )
+    	unlock_console(nasid);
+    return sent;
 }
 
 
@@ -1555,12 +2054,16 @@ l1_serial_in(void)
  */
 
 static int
-l1_cons_poll( l1sc_t *sc )
+l1_poll( l1sc_t *sc, int mode )
 {
+    int ret;
+
     /* in case this gets called before the l1sc_t structure for the module_t
      * struct for this node is initialized (i.e., if we're called with a
      * zero l1sc_t pointer)...
      */
+
+
     if( !sc ) {
 	return 0;
     }
@@ -1569,7 +2072,9 @@ l1_cons_poll( l1sc_t *sc )
 	return 1;
     }
 
-    brl1_receive( sc );
+    ret = brl1_receive( sc, mode );
+    if ( (ret != BRL1_VALID) && (ret != BRL1_NO_MESSAGE) && (ret != BRL1_PROTOCOL) && (ret != BRL1_CRC) )
+	L1_collectibles[L1C_REC_STALLS] = ret;
 
     if( atomic_read(&sc->subch[SC_CONS_SYSTEM].packet_arrived) ) {
 	return 1;
@@ -1581,43 +2086,65 @@ l1_cons_poll( l1sc_t *sc )
 /* pull a character off of the system console queue (if one is available)
  */
 static int
-l1_cons_getc( l1sc_t *sc )
+l1_getc( l1sc_t *sc, int mode )
 {
+    unsigned long pl = 0;
     int c;
 
     brl1_sch_t *subch = &(sc->subch[SC_CONS_SYSTEM]);
     sc_cq_t *q = subch->iqp;
 
-    if( !l1_cons_poll( sc ) ) {
+    if( !l1_poll( sc, mode ) ) {
 	return 0;
     }
 
-    SUBCH_DATA_LOCK( subch );
+    SUBCH_DATA_LOCK( subch, pl );
     if( cq_empty( q ) ) {
 	atomic_set(&subch->packet_arrived, 0);
-	SUBCH_DATA_UNLOCK( subch );
+	SUBCH_DATA_UNLOCK( subch, pl );
 	return 0;
     }
     cq_rem( q, c );
     if( cq_empty( q ) )
 	atomic_set(&subch->packet_arrived, 0);
-    SUBCH_DATA_UNLOCK( subch );
+    SUBCH_DATA_UNLOCK( subch, pl );
 
     return c;
 }
 
+/*
+ * Write a message to the L1 on the system console subchannel.
+ *
+ * Danger: don't use a non-zero value for the wait parameter unless you're
+ * someone important (like a kernel error message).
+ */
+
+int
+l1_write( l1sc_t *sc, char *msg, int len, int wait )
+{
+	int sent = 0, ret = 0;
+
+	if ( wait ) {
+		while ( sent < len ) {
+			ret = brl1_send( sc, msg, len - sent, (SC_CONS_SYSTEM | BRL1_EVENT), wait );
+			sent += ret;
+			msg += ret;
+		}
+		ret = len;
+	}
+	else {
+		ret = brl1_send( sc, msg, len, (SC_CONS_SYSTEM | BRL1_EVENT), wait );
+	}
+	return(ret);
+}
 
 /* initialize the system console subchannel
  */
 void
-l1_cons_init( l1sc_t *sc )
+l1_init(void)
 {
-    brl1_sch_t *subch = &(sc->subch[SC_CONS_SYSTEM]);
-
-    SUBCH_DATA_LOCK( subch );
-    atomic_set(&subch->packet_arrived, 0);
-    cq_init( subch->iqp );
-    SUBCH_DATA_UNLOCK( subch );
+	/* All we do now is remember that we have been called */
+	L1_cons_is_inited = 1;
 }
 
 
@@ -1637,16 +2164,18 @@ l1_cons_init( l1sc_t *sc )
 #define L1_DBG_PRF(x)
 #endif
 
-/* sc_data_ready is called to signal threads that are blocked on 
- * l1 input.
+/*
+ * sc_data_ready is called to signal threads that are blocked on l1 input.
  */
 void
-sc_data_ready( l1sc_t *sc, int ch )
+sc_data_ready( int dummy0, void *dummy1, struct pt_regs *dummy2, l1sc_t *sc, int ch )
 {
+    unsigned long pl = 0;
+
     brl1_sch_t *subch = &(sc->subch[ch]);
-    SUBCH_DATA_LOCK( subch );
+    SUBCH_DATA_LOCK( subch, pl );
     sv_signal( &(subch->arrive_sv) );
-    SUBCH_DATA_UNLOCK( subch );
+    SUBCH_DATA_UNLOCK( subch, pl );
 }
 
 /* sc_open reserves a subchannel to send a request to the L1 (the
@@ -1661,9 +2190,10 @@ sc_open( l1sc_t *sc, uint target )
      * subchannel assignment.
      */
     int ch;
+    unsigned long pl = 0;
     brl1_sch_t *subch;
 
-    SUBCH_LOCK( sc );
+    SUBCH_LOCK( sc, pl );
 
     /* Look for a free subchannel. Subchannels 0-15 are reserved
      * for other purposes.
@@ -1676,12 +2206,12 @@ sc_open( l1sc_t *sc, uint target )
 
     if( ch == BRL1_NUM_SUBCHANS ) {
         /* there were no subchannels available! */
-        SUBCH_UNLOCK( sc );
+        SUBCH_UNLOCK( sc, pl );
         return SC_NSUBCH;
     }
 
     subch->use = BRL1_SUBCH_RSVD;
-    SUBCH_UNLOCK( sc );
+    SUBCH_UNLOCK( sc, pl );
 
     atomic_set(&subch->packet_arrived, 0);
     subch->target = target;
@@ -1689,7 +2219,7 @@ sc_open( l1sc_t *sc, uint target )
     sv_init( &(subch->arrive_sv), &(subch->data_lock), SV_MON_SPIN | SV_ORDER_FIFO /* | SV_INTS */);
     subch->tx_notify = NULL;
     subch->rx_notify = sc_data_ready;
-    subch->iqp = kmem_zalloc_node( sizeof(sc_cq_t), KM_NOSLEEP,
+    subch->iqp = snia_kmem_zalloc_node( sizeof(sc_cq_t), KM_NOSLEEP,
 				   NASID_TO_COMPACT_NODEID(sc->nasid) );
     ASSERT( subch->iqp );
     cq_init( subch->iqp );
@@ -1703,29 +2233,31 @@ sc_open( l1sc_t *sc, uint target )
 int
 sc_close( l1sc_t *sc, int ch )
 {
+    unsigned long pl = 0;
     brl1_sch_t *subch;
 
-    SUBCH_LOCK( sc );
+    SUBCH_LOCK( sc, pl );
     subch = &(sc->subch[ch]);
     if( subch->use != BRL1_SUBCH_RSVD ) {
         /* we're trying to close a subchannel that's not open */
+	SUBCH_UNLOCK( sc, pl );
         return SC_NOPEN;
     }
 
     atomic_set(&subch->packet_arrived, 0);
     subch->use = BRL1_SUBCH_FREE;
 
-    SUBCH_DATA_LOCK( subch );
     sv_broadcast( &(subch->arrive_sv) );
     sv_destroy( &(subch->arrive_sv) );
-    SUBCH_DATA_UNLOCK( subch );
     spin_lock_destroy( &(subch->data_lock) );
 
     ASSERT( subch->iqp && (subch->iqp != &sc->garbage_q) );
-    kmem_free( subch->iqp, sizeof(sc_cq_t) );
+    snia_kmem_free( subch->iqp, sizeof(sc_cq_t) );
     subch->iqp = &sc->garbage_q;
+    subch->tx_notify = NULL;
+    subch->rx_notify = brl1_discard_packet;
 
-    SUBCH_UNLOCK( sc );
+    SUBCH_UNLOCK( sc, pl );
 
     return SC_SUCCESS;
 }
@@ -2033,11 +2565,10 @@ sc_send( l1sc_t *sc, int ch, char *msg, int len, int wait )
 
     /* Verify that this is an open subchannel
      */
-    if( sc->subch[ch].use == BRL1_SUBCH_FREE )
-    {
+    if( sc->subch[ch].use == BRL1_SUBCH_FREE ) {
         return SC_NOPEN;
     }
-       
+
     type_and_subch = (BRL1_REQUEST | ((u_char)ch));
     result = brl1_send( sc, msg, len, type_and_subch, wait );
 
@@ -2115,6 +2646,7 @@ int
 sc_recv_poll( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 {
     int is_msg = 0;
+    unsigned long pl = 0;
     brl1_sch_t *subch = &(sc->subch[ch]);
 
     rtc_time_t exp_time = rtc_time() + block;
@@ -2127,7 +2659,7 @@ sc_recv_poll( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 
         /* kick the next lower layer and see if it pulls anything in
          */
-	brl1_receive( sc );
+	brl1_receive( sc, SERIAL_POLLED_MODE );
 	is_msg = atomic_read(&subch->packet_arrived);
 
     } while( block && !is_msg && (rtc_time() < exp_time) );
@@ -2137,9 +2669,9 @@ sc_recv_poll( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 	return( SC_NMSG );
     }
 
-    SUBCH_DATA_LOCK( subch );
+    SUBCH_DATA_LOCK( subch, pl );
     subch_pull_msg( subch, msg, len );
-    SUBCH_DATA_UNLOCK( subch );
+    SUBCH_DATA_UNLOCK( subch, pl );
 
     return( SC_SUCCESS );
 }
@@ -2156,10 +2688,11 @@ int
 sc_recv_intr( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 {
     int is_msg = 0;
+    unsigned long pl = 0;
     brl1_sch_t *subch = &(sc->subch[ch]);
 
     do {
-	SUBCH_DATA_LOCK(subch);
+	SUBCH_DATA_LOCK(subch, pl);
 	is_msg = atomic_read(&subch->packet_arrived);
 	if( !is_msg && block ) {
 	    /* wake me when you've got something */
@@ -2178,12 +2711,12 @@ sc_recv_intr( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 
     if( !is_msg ) {
 	/* no message and we didn't care to wait for one */
-	SUBCH_DATA_UNLOCK( subch );
+	SUBCH_DATA_UNLOCK( subch, pl );
 	return( SC_NMSG );
     }
 
     subch_pull_msg( subch, msg, len );
-    SUBCH_DATA_UNLOCK( subch );
+    SUBCH_DATA_UNLOCK( subch, pl );
 
     return( SC_SUCCESS );
 }
@@ -2206,7 +2739,7 @@ sc_recv_intr( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
  * rewriting of the L1 command interface anyway.)
  */
 #define __RETRIES	50
-#define __WAIT_SEND	( sc->uart != BRL1_LOCALUART )
+#define __WAIT_SEND	1	// ( sc->uart != BRL1_LOCALHUB_UART )
 #define __WAIT_RECV	10000000
 
 
@@ -2237,13 +2770,10 @@ sc_command( l1sc_t *sc, int ch, char *cmd, char *resp, int *len )
     }
     
     /* block on sc_recv_* */
-#ifdef LATER
-    if( sc->uart == BRL1_LOCALUART ) {
+    if( (sc->uart == BRL1_LOCALHUB_UART) && L1_interrupts_connected ) {
 	return( sc_recv_intr( sc, ch, resp, len, __WAIT_RECV ) );
     }
-    else
-#endif	/* LATER */
-    {
+    else {
 	return( sc_recv_poll( sc, ch, resp, len, __WAIT_RECV ) );
     }
 #endif /* CONFIG_SERIAL_SGI_L1_PROTOCOL */
@@ -2254,6 +2784,7 @@ sc_command( l1sc_t *sc, int ch, char *cmd, char *resp, int *len )
  * delayed until the send buffer clears.  sc_command should be used instead
  * under most circumstances.
  */
+
 int
 sc_command_kern( l1sc_t *sc, int ch, char *cmd, char *resp, int *len )
 {
@@ -2282,6 +2813,7 @@ sc_command_kern( l1sc_t *sc, int ch, char *cmd, char *resp, int *len )
  * Returns 1 if input is available on the given queue,
  * 0 otherwise.
  */
+
 int
 sc_poll( l1sc_t *sc, int ch )
 {
@@ -2290,7 +2822,7 @@ sc_poll( l1sc_t *sc, int ch )
     if( atomic_read(&subch->packet_arrived) )
 	return 1;
 
-    brl1_receive( sc );
+    brl1_receive( sc, SERIAL_POLLED_MODE );
 
     if( atomic_read(&subch->packet_arrived) )
 	return 1;
@@ -2298,8 +2830,8 @@ sc_poll( l1sc_t *sc, int ch )
     return 0;
 }
 
-/* for now, sc_init just calls brl1_init
- */
+/* for now, sc_init just calls brl1_init */
+
 void
 sc_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
 {
@@ -2311,7 +2843,7 @@ sc_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
  * network's environmental monitor tasks.
  */
 
-#ifdef LINUX_KERNEL_THREADS
+#if	defined(LINUX_KERNEL_THREADS)
 
 static void
 sc_dispatch_env_event( uint code, int argc, char *args, int maxlen )
@@ -2366,14 +2898,12 @@ sc_dispatch_env_event( uint code, int argc, char *args, int maxlen )
 	     i++ );
     }
 }
-#endif	/* LINUX_KERNEL_THREADS */
 
 
 /* sc_event waits for events to arrive from the system controller, and
  * prints appropriate messages to the syslog.
  */
 
-#ifdef LINUX_KERNEL_THREADS
 static void
 sc_event( l1sc_t *sc, int ch )
 {
@@ -2394,7 +2924,7 @@ sc_event( l1sc_t *sc, int ch )
 	 */
 	result = sc_recv_intr( sc, ch, event, &event_len, 1 );
 	if( result != SC_SUCCESS ) {
-	    PRINT_WARNING("Error receiving sysctl event on nasid %d\n",
+	    printk(KERN_WARNING  "Error receiving sysctl event on nasid %d\n",
 		     sc->nasid );
 	}
 	else {
@@ -2438,53 +2968,50 @@ sc_event( l1sc_t *sc, int ch )
 	
     }			
 }
-#endif	/* LINUX_KERNEL_THREADS */
 
 /* sc_listen sets up a service thread to listen for incoming events.
  */
+
 void
 sc_listen( l1sc_t *sc )
 {
     int result;
+    unsigned long pl = 0;
     brl1_sch_t *subch;
 
     char        msg[BRL1_QSIZE];
     int         len;    /* length of message being sent */
     int         ch;     /* system controller subchannel used */
 
-#ifdef LINUX_KERNEL_THREADS
     extern int msc_shutdown_pri;
-#endif
 
     /* grab the designated "event subchannel" */
-    SUBCH_LOCK( sc );
+    SUBCH_LOCK( sc, pl );
     subch = &(sc->subch[BRL1_EVENT_SUBCH]);
     if( subch->use != BRL1_SUBCH_FREE ) {
-	SUBCH_UNLOCK( sc );
-	PRINT_WARNING("sysctl event subchannel in use! "
+	SUBCH_UNLOCK( sc, pl );
+	printk(KERN_WARNING  "sysctl event subchannel in use! "
 		 "Not monitoring sysctl events.\n" );
 	return;
     }
     subch->use = BRL1_SUBCH_RSVD;
-    SUBCH_UNLOCK( sc );
+    SUBCH_UNLOCK( sc, pl );
 
     atomic_set(&subch->packet_arrived, 0);
-    subch->target = BRL1_LOCALUART;
+    subch->target = BRL1_LOCALHUB_UART;
     spin_lock_init( &(subch->data_lock) );
     sv_init( &(subch->arrive_sv), &(subch->data_lock), SV_MON_SPIN | SV_ORDER_FIFO /* | SV_INTS */);
     subch->tx_notify = NULL;
     subch->rx_notify = sc_data_ready;
-    subch->iqp = kmem_zalloc_node( sizeof(sc_cq_t), KM_NOSLEEP,
+    subch->iqp = snia_kmem_zalloc_node( sizeof(sc_cq_t), KM_NOSLEEP,
 				   NASID_TO_COMPACT_NODEID(sc->nasid) );
     ASSERT( subch->iqp );
     cq_init( subch->iqp );
 
-#ifdef LINUX_KERNEL_THREADS
     /* set up a thread to listen for events */
     sthread_create( "sysctl event handler", 0, 0, 0, msc_shutdown_pri,
 		    KT_PS, (st_func_t *) sc_event,
 		    (void *)sc, (void *)(uint64_t)BRL1_EVENT_SUBCH, 0, 0 );
-#endif
 
     /* signal the L1 to begin sending events */
     bzero( msg, BRL1_QSIZE );
@@ -2522,276 +3049,8 @@ sc_listen( l1sc_t *sc )
 	
 err_return:
     /* there was a problem; complain */
-    PRINT_WARNING("failed to set sysctl event-monitoring subchannel.  "
+    printk(KERN_WARNING  "failed to set sysctl event-monitoring subchannel.  "
 	     "Sysctl events will not be monitored.\n" );
 }
 
-
-/*********************************************************************
- * elscuart functions.  These provide a uart-like interface to the
- * bedrock/l1 protocol console channels.  They are similar in form
- * and intent to the elscuart_* functions defined for SN0 in elsc.c.
- *
- */
-
-int _elscuart_flush( l1sc_t *sc );
-
-/* Leave room in queue for CR/LF */
-#define ELSCUART_LINE_MAX       (BRL1_QSIZE - 2)
-
-
-/*
- * _elscuart_putc provides an entry point to the L1 interface driver;
- * writes a single character to the output queue.  Flushes at the
- * end of each line, and translates newlines into CR/LF.
- *
- * The kernel should generally use l1_cons_write instead, since it assumes
- * buffering, translation, prefixing, etc. are done at a higher
- * level.
- *
- */
-int
-_elscuart_putc( l1sc_t *sc, int c )
-{
-    sc_cq_t *q;
-    
-    q = &(sc->oq[ MAP_OQ(L1_ELSCUART_SUBCH(get_myid())) ]);
-
-    if( c != '\n' && c != '\r' && cq_used(q) >= ELSCUART_LINE_MAX ) {
-        cq_add( q, '\r' );
-        cq_add( q, '\n' );
-         _elscuart_flush( sc );
-        sc->sol = 1;
-    }
-
-    if( sc->sol && c != '\r' ) {
-        char            prefix[16], *s;
-
-        if( cq_room( q ) < 8 && _elscuart_flush(sc) < 0 )
-        {
-            return -1;
-        }
-	
-	if( sc->verbose )
-	{
-#ifdef  SUPPORT_PRINTING_M_FORMAT
-	    sprintf( prefix,
-		     "%c %d%d%d %M:",
-		     'A' + get_myid(),
-		     sc->nasid / 100,
-		     (sc->nasid / 10) % 10,
-		     sc->nasid / 10,
-		     sc->modid );
-#else
-	    sprintf( prefix,
-		     "%c %d%d%d 0x%x:",
-		     'A' + get_myid(),
-		     sc->nasid / 100,
-		     (sc->nasid / 10) % 10,
-		     sc->nasid / 10,
-		     sc->modid );
-#endif
-	    
-	    for( s = prefix; *s; s++ )
-		cq_add( q, *s );
-	}	    
-	sc->sol = 0;
-
-    }
-
-    if( cq_room( q ) < 2 && _elscuart_flush(sc) < 0 )
-    {
-        return -1;
-    }
-
-    if( c == '\n' ) {
-        cq_add( q, '\r' );
-        sc->sol = 1;
-    }
-
-    cq_add( q, (u_char) c );
-
-    if( c == '\n' ) {
-        /* flush buffered line */
-        if( _elscuart_flush( sc ) < 0 )
-        {
-            return -1;
-        }
-    }
-
-    if( c== '\r' )
-    {
-        sc->sol = 1;
-    }
-
-    return 0;
-}
-
-
-/*
- * _elscuart_getc reads a character from the input queue.  This
- * routine blocks.
- */
-int
-_elscuart_getc( l1sc_t *sc )
-{
-    int r;
-
-    while( (r = _elscuart_poll( sc )) == 0 );
-
-    if( r < 0 ) {
-	/* some error occurred */
-	return r;
-    }
-
-    return _elscuart_readc( sc );
-}
-
-
-
-/*
- * _elscuart_poll returns 1 if characters are ready for the
- * calling processor, 0 if they are not
- */
-int
-_elscuart_poll( l1sc_t *sc )
-{
-    int result;
-
-    if( sc->cons_listen ) {
-        result = l1_cons_poll( sc );
-        if( result )
-            return result;
-    }
-
-    return sc_poll( sc, L1_ELSCUART_SUBCH(get_myid()) );
-}
-
-
-
-/* _elscuart_readc is to be used only when _elscuart_poll has
- * indicated that a character is waiting.  Pulls a character
- * of this processor's console queue and returns it.
- *
- */
-int
-_elscuart_readc( l1sc_t *sc )
-{
-    int c;
-    sc_cq_t *q;
-    brl1_sch_t *subch;
-
-    if( sc->cons_listen ) {
-	subch = &(sc->subch[ SC_CONS_SYSTEM ]);
-	q = subch->iqp;
-	
-	SUBCH_DATA_LOCK( subch );
-        if( !cq_empty( q ) ) {
-            cq_rem( q, c );
-	    if( cq_empty( q ) ) {
-		atomic_set(&subch->packet_arrived, 0);
-	    }
-	    SUBCH_DATA_UNLOCK( subch );
-            return c;
-        }
-	SUBCH_DATA_UNLOCK( subch );
-    }
-
-    subch = &(sc->subch[ L1_ELSCUART_SUBCH(get_myid()) ]);
-    q = subch->iqp;
-
-    SUBCH_DATA_LOCK( subch );
-    if( cq_empty( q ) ) {
-	SUBCH_DATA_UNLOCK( subch );
-        return -1;
-    }
-
-    cq_rem( q, c );
-    if( cq_empty ( q ) ) {
-	atomic_set(&subch->packet_arrived, 0);
-    }
-    SUBCH_DATA_UNLOCK( subch );
-
-    return c;
-}
-
-
-/*
- * _elscuart_flush flushes queued output to the L1.
- * This routine blocks until the queue is flushed.
- */
-int
-_elscuart_flush( l1sc_t *sc )
-{
-    int r, n;
-    char buf[BRL1_QSIZE];
-    sc_cq_t *q = &(sc->oq[ MAP_OQ(L1_ELSCUART_SUBCH(get_myid())) ]);
-
-    while( (n = cq_used(q)) ) {
-
-        /* buffer queue contents */
-        r = BRL1_QSIZE - q->opos;
-
-        if( n > r ) {
-            BCOPY( q->buf + q->opos, buf, r  );
-            BCOPY( q->buf, buf + r, n - r  );
-        } else {
-            BCOPY( q->buf + q->opos, buf, n  );
-        }
-
-        /* attempt to send buffer contents */
-        r = brl1_send( sc, buf, cq_used( q ), 
-		       (BRL1_EVENT | L1_ELSCUART_SUBCH(get_myid())), 1 );
-
-        /* if no error, dequeue the sent characters; otherwise,
-         * return the error
-         */
-        if( r >= SC_SUCCESS ) {
-            q->opos = (q->opos + r) % BRL1_QSIZE;
-        }
-        else {
-            return r;
-        }
-    }
-
-    return 0;
-}
-
-
-
-/* _elscuart_probe returns non-zero if the L1 (and
- * consequently the elscuart) can be accessed
- */
-int
-_elscuart_probe( l1sc_t *sc )
-{
-#ifndef CONFIG_SERIAL_SGI_L1_PROTOCOL
-    return 0;
-#else
-    char ver[BRL1_QSIZE];
-    extern int elsc_version( l1sc_t *, char * );
-
-    if ( IS_RUNNING_ON_SIMULATOR() )
-    	return 0;
-    return( elsc_version(sc, ver) >= 0 );
-#endif /* CONFIG_SERIAL_SGI_L1_PROTOCOL */
-}
-
-
-
-/* _elscuart_init zeroes out the l1sc_t console
- * queues for this processor's console subchannel.
- */
-void
-_elscuart_init( l1sc_t *sc )
-{
-    brl1_sch_t *subch = &sc->subch[L1_ELSCUART_SUBCH(get_myid())];
-
-    SUBCH_DATA_LOCK(subch);
-
-    atomic_set(&subch->packet_arrived, 0);
-    cq_init( subch->iqp );
-    cq_init( &sc->oq[MAP_OQ(L1_ELSCUART_SUBCH(get_myid()))] );
-
-    SUBCH_DATA_UNLOCK(subch);
-}
+#endif	/* LINUX_KERNEL_THREADS */

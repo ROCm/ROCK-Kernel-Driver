@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 /*
@@ -18,12 +17,12 @@
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
+#include <asm/sn/sn_sal.h>
+#include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
-
-#include <asm/sn/agent.h>
 #include <asm/sn/kldir.h>
 #include <asm/sn/gda.h> 
 #include <asm/sn/klconfig.h>
@@ -43,8 +42,7 @@
 #include <asm/sn/sn_private.h>
 
 extern char arg_maxnodes[];
-extern int maxnodes;
-
+extern u64 klgraph_addr[];
 
 /*
  * Support for verbose inventory via hardware graph. 
@@ -139,192 +137,62 @@ klhwg_hub_invent_info(devfs_handle_t hubv,
 void
 klhwg_add_hub(devfs_handle_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 {
+#if defined(CONFIG_IA64_SGI_SN1)
 	devfs_handle_t myhubv;
+	devfs_handle_t hub_mon;
+	devfs_handle_t synergy;
+	devfs_handle_t fsb0;
+	devfs_handle_t fsb1;
 	int rc;
+	extern struct file_operations hub_mon_fops;
 
 	GRPRINTF(("klhwg_add_hub: adding %s\n", EDGE_LBL_HUB));
 
 	(void) hwgraph_path_add(node_vertex, EDGE_LBL_HUB, &myhubv);
 	rc = device_master_set(myhubv, node_vertex);
 
-#ifdef	LATER
 	/*
-	 * Activate when we support hub stats.
+	 * hub perf stats.
 	 */
 	rc = hwgraph_info_add_LBL(myhubv, INFO_LBL_HUB_INFO,
                         (arbitrary_info_t)(&NODEPDA(cnode)->hubstats));
-#endif
 
 	if (rc != GRAPH_SUCCESS) {
-		PRINT_WARNING("klhwg_add_hub: Can't add hub info label 0x%p, code %d",
-			myhubv, rc);
+		printk(KERN_WARNING  "klhwg_add_hub: Can't add hub info label 0x%p, code %d",
+			(void *)myhubv, rc);
 	}
 
 	klhwg_hub_invent_info(myhubv, cnode, hub);
 
-#ifndef BRINGUP
+	hub_mon = hwgraph_register(myhubv, EDGE_LBL_PERFMON,
+	    0, DEVFS_FL_AUTO_DEVNUM,
+	    0, 0,
+	    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
+	    &hub_mon_fops,
+	    (void *)(long)cnode);
+
 	init_hub_stats(cnode, NODEPDA(cnode));
-	sndrv_attach(myhubv);
-#else
+
 	/*
-	 * Need to call our driver to do the attach?
+	 * synergy perf
 	 */
-	FIXME("klhwg_add_hub: Need to add code to do the attach.\n");
-#endif
+	(void) hwgraph_path_add(myhubv, EDGE_LBL_SYNERGY, &synergy);
+	(void) hwgraph_path_add(synergy, "0", &fsb0);
+	(void) hwgraph_path_add(synergy, "1", &fsb1);
+
+	fsb0 = hwgraph_register(fsb0, EDGE_LBL_PERFMON,
+	    0, DEVFS_FL_AUTO_DEVNUM,
+	    0, 0,
+	    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
+	    &synergy_mon_fops, (void *)SYNERGY_PERF_INFO(cnode, 0));
+
+	fsb1 = hwgraph_register(fsb1, EDGE_LBL_PERFMON,
+	    0, DEVFS_FL_AUTO_DEVNUM,
+	    0, 0,
+	    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
+	    &synergy_mon_fops, (void *)SYNERGY_PERF_INFO(cnode, 1));
+#endif /* CONFIG_IA64_SGI_SN1 */
 }
-
-#ifndef BRINGUP
-
-void
-klhwg_add_rps(devfs_handle_t node_vertex, cnodeid_t cnode, int flag)
-{
-	devfs_handle_t myrpsv;
-	invent_rpsinfo_t *rps_invent;
-	int rc;
-
-        if(cnode == CNODEID_NONE)
-                return;                                                        
-	
-	GRPRINTF(("klhwg_add_rps: adding %s to vertex 0x%x\n", EDGE_LBL_RPS,
-		node_vertex));
-
-	rc = hwgraph_path_add(node_vertex, EDGE_LBL_RPS, &myrpsv);
-	if (rc != GRAPH_SUCCESS)
-		return;
-
-	device_master_set(myrpsv, node_vertex);
-
-        rps_invent = (invent_rpsinfo_t *)
-            klhwg_invent_alloc(cnode, INV_RPS, sizeof(invent_rpsinfo_t));
-
-        if (!rps_invent)
-            return;
-
-	rps_invent->ir_xbox = 0;	/* not an xbox RPS */
-
-        if (flag)
-            rps_invent->ir_gen.ig_flag = INVENT_ENABLED;
-        else
-            rps_invent->ir_gen.ig_flag = 0x0;                                  
-
-        hwgraph_info_add_LBL(myrpsv, INFO_LBL_DETAIL_INVENT,
-                             (arbitrary_info_t) rps_invent);
-        hwgraph_info_export_LBL(myrpsv, INFO_LBL_DETAIL_INVENT,
-                                sizeof(invent_rpsinfo_t));                     
-	
-}
-
-/*
- * klhwg_update_rps gets invoked when the system controller sends an 
- * interrupt indicating the power supply has lost/regained the redundancy.
- * It's responsible for updating the Hardware graph information.
- *	rps_state = 0 -> if the rps lost the redundancy
- *		  = 1 -> If it is redundant. 
- */
-void 
-klhwg_update_rps(cnodeid_t cnode, int rps_state)
-{
-        devfs_handle_t node_vertex;
-        devfs_handle_t rpsv;
-        invent_rpsinfo_t *rps_invent;                                          
-        int rc;
-        if(cnode == CNODEID_NONE)
-                return;                                                        
-
-        node_vertex = cnodeid_to_vertex(cnode);                                
-	rc = hwgraph_edge_get(node_vertex, EDGE_LBL_RPS, &rpsv);
-        if (rc != GRAPH_SUCCESS)  {
-		return;
-	}
-
-	rc = hwgraph_info_get_LBL(rpsv, INFO_LBL_DETAIL_INVENT, 
-				  (arbitrary_info_t *)&rps_invent);
-        if (rc != GRAPH_SUCCESS)  {
-                return;
-        }                                                                      
-
-	if (rps_state == 0 ) 
-		rps_invent->ir_gen.ig_flag = 0;
-	else 
-		rps_invent->ir_gen.ig_flag = INVENT_ENABLED;
-}
-
-void
-klhwg_add_xbox_rps(devfs_handle_t node_vertex, cnodeid_t cnode, int flag)
-{
-	devfs_handle_t myrpsv;
-	invent_rpsinfo_t *rps_invent;
-	int rc;
-
-        if(cnode == CNODEID_NONE)
-                return;                                                        
-	
-	GRPRINTF(("klhwg_add_rps: adding %s to vertex 0x%x\n", 
-		  EDGE_LBL_XBOX_RPS, node_vertex));
-
-	rc = hwgraph_path_add(node_vertex, EDGE_LBL_XBOX_RPS, &myrpsv);
-	if (rc != GRAPH_SUCCESS)
-		return;
-
-	device_master_set(myrpsv, node_vertex);
-
-        rps_invent = (invent_rpsinfo_t *)
-            klhwg_invent_alloc(cnode, INV_RPS, sizeof(invent_rpsinfo_t));
-
-        if (!rps_invent)
-            return;
-
-	rps_invent->ir_xbox = 1;	/* xbox RPS */
-
-        if (flag)
-            rps_invent->ir_gen.ig_flag = INVENT_ENABLED;
-        else
-            rps_invent->ir_gen.ig_flag = 0x0;                                  
-
-        hwgraph_info_add_LBL(myrpsv, INFO_LBL_DETAIL_INVENT,
-                             (arbitrary_info_t) rps_invent);
-        hwgraph_info_export_LBL(myrpsv, INFO_LBL_DETAIL_INVENT,
-                                sizeof(invent_rpsinfo_t));                     
-	
-}
-
-/*
- * klhwg_update_xbox_rps gets invoked when the xbox system controller
- * polls the status register and discovers that the power supply has 
- * lost/regained the redundancy.
- * It's responsible for updating the Hardware graph information.
- *	rps_state = 0 -> if the rps lost the redundancy
- *		  = 1 -> If it is redundant. 
- */
-void 
-klhwg_update_xbox_rps(cnodeid_t cnode, int rps_state)
-{
-        devfs_handle_t node_vertex;
-        devfs_handle_t rpsv;
-        invent_rpsinfo_t *rps_invent;                                          
-        int rc;
-        if(cnode == CNODEID_NONE)
-                return;                                                        
-
-        node_vertex = cnodeid_to_vertex(cnode);                                
-	rc = hwgraph_edge_get(node_vertex, EDGE_LBL_XBOX_RPS, &rpsv);
-        if (rc != GRAPH_SUCCESS)  {
-		return;
-	}
-
-	rc = hwgraph_info_get_LBL(rpsv, INFO_LBL_DETAIL_INVENT, 
-				  (arbitrary_info_t *)&rps_invent);
-        if (rc != GRAPH_SUCCESS)  {
-                return;
-        }                                                                      
-
-	if (rps_state == 0 ) 
-		rps_invent->ir_gen.ig_flag = 0;
-	else 
-		rps_invent->ir_gen.ig_flag = INVENT_ENABLED;
-}
-
-#endif /* BRINGUP */
 
 void
 klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
@@ -338,11 +206,8 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 	/*REFERENCED*/
 	graph_error_t err;
 
-#if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || defined(CONFIG_IA64_GENERIC)
-	if ((brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid),
-				KLTYPE_IOBRICK_XBOW)) == NULL)
+	if ((brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_IOBRICK_XBOW)) == NULL)
 			return;
-#endif
 
 	if (KL_CONFIG_DUPLICATE_BOARD(brd))
 	    return;
@@ -372,7 +237,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 
 		hub_nasid = XBOW_PORT_NASID(xbow_p, widgetnum);
 		if (hub_nasid == INVALID_NASID) {
-			PRINT_WARNING("hub widget %d, skipping xbow graph\n", widgetnum);
+			printk(KERN_WARNING  "hub widget %d, skipping xbow graph\n", widgetnum);
 			continue;
 		}
 
@@ -387,13 +252,13 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 		err = hwgraph_path_add(hubv, EDGE_LBL_XTALK, &xbow_v);
                 if (err != GRAPH_SUCCESS) {
                         if (err == GRAPH_DUP)
-                                PRINT_WARNING("klhwg_add_xbow: Check for "
+                                printk(KERN_WARNING  "klhwg_add_xbow: Check for "
                                         "working routers and router links!");
 
                         PRINT_PANIC("klhwg_add_xbow: Failed to add "
-                                "edge: vertex 0x%p (0x%p) to vertex 0x%p (0x%p),"
+                                "edge: vertex 0x%p to vertex 0x%p,"
                                 "error %d\n",
-                                hubv, hubv, xbow_v, xbow_v, err);
+                                (void *)hubv, (void *)xbow_v, err);
                 }
 		xswitch_vertex_init(xbow_v); 
 
@@ -416,7 +281,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 		err = hwgraph_edge_add(hubv, xbow_v, EDGE_LBL_XTALK);
 		if (err != GRAPH_SUCCESS) {
 			if (err == GRAPH_DUP)
-				PRINT_WARNING("klhwg_add_xbow: Check for "
+				printk(KERN_WARNING  "klhwg_add_xbow: Check for "
 					"working routers and router links!");
 
 			PRINT_PANIC("klhwg_add_xbow: Failed to add "
@@ -443,7 +308,7 @@ klhwg_add_node(devfs_handle_t hwgraph_root, cnodeid_t cnode, gda_t *gdap)
 	int board_disabled = 0;
 
 	nasid = COMPACT_TO_NASID_NODEID(cnode);
-	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_IP27);
+	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 	GRPRINTF(("klhwg_add_node: Adding cnode %d, nasid %d, brd 0x%p\n",
                 cnode, nasid, brd));
 	ASSERT(brd);
@@ -495,7 +360,7 @@ klhwg_add_node(devfs_handle_t hwgraph_root, cnodeid_t cnode, gda_t *gdap)
 		
 		brd = KLCF_NEXT(brd);
 		if (brd)
-			brd = find_lboard(brd, KLTYPE_IP27);
+			brd = find_lboard(brd, KLTYPE_SNIA);
 		else
 			break;
 	} while(brd);
@@ -513,7 +378,7 @@ klhwg_add_all_routers(devfs_handle_t hwgraph_root)
 	char path_buffer[100];
 	int rv;
 
-	for (cnode = 0; cnode < maxnodes; cnode++) {
+	for (cnode = 0; cnode < numnodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
 
 		GRPRINTF(("klhwg_add_all_routers: adding router on cnode %d\n",
@@ -594,7 +459,7 @@ klhwg_connect_one_router(devfs_handle_t hwgraph_root, lboard_t *brd,
 			return;
 
 	if (rc != GRAPH_SUCCESS)
-		PRINT_WARNING("Can't find router: %s", path_buffer);
+		printk(KERN_WARNING  "Can't find router: %s", path_buffer);
 
 	/* We don't know what to do with multiple router components */
 	if (brd->brd_numcompts != 1) {
@@ -650,7 +515,7 @@ klhwg_connect_one_router(devfs_handle_t hwgraph_root, lboard_t *brd,
 
 		if (rc != GRAPH_SUCCESS && !is_specified(arg_maxnodes))
 			PRINT_PANIC("Can't create edge: %s/%s to vertex 0x%p error 0x%x\n",
-				path_buffer, dest_path, dest_hndl, rc);
+				path_buffer, dest_path, (void *)dest_hndl, rc);
 		
 	}
 }
@@ -663,7 +528,7 @@ klhwg_connect_routers(devfs_handle_t hwgraph_root)
 	cnodeid_t cnode;
 	lboard_t *brd;
 
-	for (cnode = 0; cnode < maxnodes; cnode++) {
+	for (cnode = 0; cnode < numnodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
 
 		GRPRINTF(("klhwg_connect_routers: Connecting routers on cnode %d\n",
@@ -703,14 +568,13 @@ klhwg_connect_hubs(devfs_handle_t hwgraph_root)
 	char dest_path[50];
 	graph_error_t rc;
 
-	for (cnode = 0; cnode < maxnodes; cnode++) {
+	for (cnode = 0; cnode < numnodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
 
 		GRPRINTF(("klhwg_connect_hubs: Connecting hubs on cnode %d\n",
 			cnode));
 
-		brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid),
-				KLTYPE_IP27);
+		brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 		ASSERT(brd);
 
 		hub = (klhub_t *)find_first_component(brd, KLSTRUCT_HUB);
@@ -732,7 +596,7 @@ klhwg_connect_hubs(devfs_handle_t hwgraph_root)
 		rc = hwgraph_traverse(hwgraph_root, path_buffer, &hub_hndl);
 
 		if (rc != GRAPH_SUCCESS)
-			PRINT_WARNING("Can't find hub: %s", path_buffer);
+			printk(KERN_WARNING  "Can't find hub: %s", path_buffer);
 
 		dest_brd = (lboard_t *)NODE_OFFSET_TO_K0(
 				hub->hub_port.port_nasid,
@@ -757,7 +621,7 @@ klhwg_connect_hubs(devfs_handle_t hwgraph_root)
 
 			if (rc != GRAPH_SUCCESS)
 				PRINT_PANIC("Can't create edge: %s/%s to vertex 0x%p, error 0x%x\n",
-				path_buffer, dest_path, dest_hndl, rc);
+				path_buffer, dest_path, (void *)dest_hndl, rc);
 
 		}
 	}

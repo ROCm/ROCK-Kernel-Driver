@@ -387,6 +387,7 @@ static struct file_system_type capifs_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"capifs",
 	get_sb:		capifs_get_sb,
+	kill_sb:	kill_anon_super,
 };
 
 void capifs_new_ncci(char type, unsigned int num, kdev_t device)

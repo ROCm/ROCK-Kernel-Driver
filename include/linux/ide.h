@@ -240,11 +240,6 @@ typedef struct hw_regs_s {
 } hw_regs_t;
 
 /*
- * Register new hardware with ide
- */
-int ide_register_hw(hw_regs_t *hw, struct hwif_s **hwifp);
-
-/*
  * Set up hw_regs_t structure before calling ide_register_hw (optional)
  */
 void ide_setup_ports(hw_regs_t *hw,
@@ -337,6 +332,7 @@ typedef struct ide_drive_s {
 	unsigned autotune	: 2;	/* 1=autotune, 2=noautotune, 0=default */
 	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
+	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 	unsigned	addressing;	/* : 2; 0=28-bit, 1=48-bit, 2=64-bit */
 	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
 	select_t	select;		/* basic drive/head select reg value */
@@ -505,6 +501,12 @@ typedef struct hwif_s {
 	byte		bus_state;	/* power state of the IDE bus */
 	struct device	device;		/* global device tree handle */
 } ide_hwif_t;
+
+/*
+ * Register new hardware with ide
+ */
+extern int ide_register_hw(hw_regs_t *hw, struct hwif_s **hwifp);
+extern void ide_unregister(ide_hwif_t *hwif);
 
 /*
  * Status returned from various ide_ functions

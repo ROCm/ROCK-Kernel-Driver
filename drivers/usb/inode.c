@@ -489,12 +489,14 @@ static struct file_system_type usbdevice_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"usbdevfs",
 	get_sb:		usb_get_sb,
+	kill_sb:	kill_anon_super,
 };
 
 static struct file_system_type usb_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"usbfs",
 	get_sb:		usb_get_sb,
+	kill_sb:	kill_anon_super,
 };
 
 /* --------------------------------------------------------------------- */

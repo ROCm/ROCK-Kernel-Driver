@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -22,7 +21,7 @@
 #include <asm/sn/slotnum.h>
 
 void *
-kmem_zalloc(size_t size, int flag)
+snia_kmem_zalloc(size_t size, int flag)
 {
         void *ptr = kmalloc(size, GFP_KERNEL);
         BZERO(ptr, size);

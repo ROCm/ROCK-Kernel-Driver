@@ -490,6 +490,7 @@ static struct file_system_type sysv_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"sysv",
 	get_sb:		sysv_get_sb,
+	kill_sb:	kill_block_super,
 	fs_flags:	FS_REQUIRES_DEV,
 };
 
@@ -497,6 +498,7 @@ static struct file_system_type v7_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"v7",
 	get_sb:		v7_get_sb,
+	kill_sb:	kill_block_super,
 	fs_flags:	FS_REQUIRES_DEV,
 };
 

@@ -117,6 +117,8 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
  */
 static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
 {
+	if (drive->blocked)
+		panic("ide: Request while drive blocked? You don't like your data intact?");
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "do_rw_disk, bad command");
 		ide_end_request(drive, 0);
@@ -903,13 +905,36 @@ static void idedisk_add_settings(ide_drive_t *drive)
 	ide_add_setting(drive,	"max_failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->max_failures,		NULL);
 }
 
+static int idedisk_suspend(struct device *dev, u32 state, u32 level)
+{
+	int i;
+	ide_drive_t *drive = dev->driver_data;
+
+	printk("ide_disk_suspend()\n");
+	while (HWGROUP(drive)->handler)
+		schedule();
+	drive->blocked = 1;
+}
+
+static int idedisk_resume(struct device *dev, u32 level)
+{
+	ide_drive_t *drive = dev->driver_data;
+	if (!drive->blocked)
+		panic("ide: Resume but not suspended?\n");
+	drive->blocked = 0;
+}
+
+
 /* This is just a hook for the overall driver tree.
  *
  * FIXME: This is soon goig to replace the custom linked list games played up
  * to great extend between the different components of the IDE drivers.
  */
 
-static struct device_driver idedisk_devdrv = {};
+static struct device_driver idedisk_devdrv = {
+	suspend: idedisk_suspend,
+	resume: idedisk_resume,
+};
 
 static void idedisk_setup(ide_drive_t *drive)
 {
@@ -956,6 +981,7 @@ static void idedisk_setup(ide_drive_t *drive)
 	    sprintf(drive->device.name, "ide-disk");
 	    drive->device.driver = &idedisk_devdrv;
 	    drive->device.parent = &HWIF(drive)->device;
+	    drive->device.driver_data = drive;
 	    device_register(&drive->device);
 	}
 

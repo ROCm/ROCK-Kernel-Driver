@@ -4,14 +4,18 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #define	USRPCI	0
 
+#include <linux/init.h>
 #include <linux/types.h>
 #include <linux/config.h>
+#include <linux/pci.h>
+#include <linux/pci_ids.h>
+#include <linux/sched.h>
+#include <linux/ioport.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/xtalk/xbow.h>	/* Must be before iograph.h to get MAX_PORT_NUM */
@@ -25,13 +29,16 @@
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pciio_private.h>
 #include <asm/sn/sn_sal.h>
+#include <asm/sn/io.h>
+#include <asm/sn/pci/pci_bus_cvlink.h>
+#include <asm/sn/simulator.h>
 
 #define DEBUG_PCIIO
 #undef DEBUG_PCIIO	/* turn this on for yet more console output */
 
 
-#define NEW(ptr)	(ptr = kmalloc(sizeof (*(ptr)), GFP_KERNEL))
-#define DEL(ptr)	(kfree(ptr))
+#define GET_NEW(ptr)	(ptr = kmalloc(sizeof (*(ptr)), GFP_KERNEL))
+#define DO_DEL(ptr)	(kfree(ptr))
 
 char                    pciio_info_fingerprint[] = "pciio_info";
 
@@ -63,6 +70,14 @@ nasid_t
 get_console_nasid(void)
 {
 	extern nasid_t console_nasid;
+	if (console_nasid < 0) {
+		console_nasid = ia64_sn_get_console_nasid();
+		if (console_nasid < 0) {
+// ZZZ What do we do if we don't get a console nasid on the hardware????
+			if (IS_RUNNING_ON_SIMULATOR() )
+				console_nasid = master_nasid;
+		}
+	} 
 	return console_nasid;
 }
 
@@ -105,7 +120,7 @@ ioerror_dump(char *name, int error_code, int error_mode, ioerror_t *ioerror)
  * completely disappear.
  */
 
-#if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || CONFIG_IA64_GENERIC
+#if defined(CONFIG_IA64_SGI_SN1)
 /*
  *    For the moment, we will assume that IP27
  *      only use Bridge ASICs to provide PCI support.
@@ -115,7 +130,7 @@ ioerror_dump(char *name, int error_code, int error_mode, ioerror_t *ioerror)
 #define CAST_PIOMAP(x)		((pcibr_piomap_t)(x))
 #define CAST_DMAMAP(x)		((pcibr_dmamap_t)(x))
 #define CAST_INTR(x)		((pcibr_intr_t)(x))
-#endif /* CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 */
+#endif /* CONFIG_IA64_SGI_SN1 */
 
 /* =====================================================================
  *    Function Table of Contents
@@ -150,14 +165,11 @@ iopaddr_t               pciio_dma_addr(devfs_handle_t, device_desc_t, paddr_t, s
 
 pciio_intr_t            pciio_intr_alloc(devfs_handle_t, device_desc_t, pciio_intr_line_t, devfs_handle_t);
 void                    pciio_intr_free(pciio_intr_t);
-int                     pciio_intr_connect(pciio_intr_t, intr_func_t, intr_arg_t, void *thread);
+int                     pciio_intr_connect(pciio_intr_t);
 void                    pciio_intr_disconnect(pciio_intr_t);
 devfs_handle_t            pciio_intr_cpu_get(pciio_intr_t);
 
 void			pciio_slot_func_to_name(char *, pciio_slot_t, pciio_function_t);
-static pciio_info_t     pciio_cardinfo_get(devfs_handle_t, pciio_slot_t);
-int                     pciio_error_handler(devfs_handle_t, int, ioerror_mode_t, ioerror_t *);
-int                     pciio_error_devenable(devfs_handle_t, int);
 
 void                    pciio_provider_startup(devfs_handle_t);
 void                    pciio_provider_shutdown(devfs_handle_t);
@@ -257,7 +269,7 @@ pciio_to_provider_fns(devfs_handle_t dev)
 #if defined(SUPPORT_PRINTING_V_FORMAT)
 	PRINT_PANIC("%v: provider_fns == NULL", dev);
 #else
-	PRINT_PANIC("0x%x: provider_fns == NULL", dev);
+	PRINT_PANIC("0x%p: provider_fns == NULL", (void *)dev);
 #endif
 
     return provider_fns;
@@ -575,13 +587,10 @@ pciio_intr_free(pciio_intr_t intr_hdl)
  * Returns 0 on success, returns <0 on failure.
  */
 int
-pciio_intr_connect(pciio_intr_t intr_hdl,	/* pciio intr resource handle */
-		   intr_func_t intr_func,	/* pciio intr handler */
-		   intr_arg_t intr_arg,	/* arg to intr handler */
-		   void *thread)
-{					/* intr thread to use */
+pciio_intr_connect(pciio_intr_t intr_hdl)	/* pciio intr resource handle */
+{
     return INTR_FUNC(intr_hdl, intr_connect)
-	(CAST_INTR(intr_hdl), intr_func, intr_arg, thread);
+	(CAST_INTR(intr_hdl));
 }
 
 /*
@@ -605,10 +614,6 @@ pciio_intr_cpu_get(pciio_intr_t intr_hdl)
 	(CAST_INTR(intr_hdl));
 }
 
-/* =====================================================================
- *          ERROR MANAGEMENT
- */
-
 void
 pciio_slot_func_to_name(char		       *name,
 			pciio_slot_t		slot,
@@ -628,193 +633,6 @@ pciio_slot_func_to_name(char		       *name,
 	sprintf(name, "%d", slot);
     else
 	sprintf(name, "%d%c", slot, 'a'+func);
-}
-
-/*
- * pciio_cardinfo_get
- *
- * Get the pciio info structure corresponding to the
- * specified PCI "slot" (we like it when the same index
- * number is used for the PCI IDSEL, the REQ/GNT pair,
- * and the interrupt line being used for INTA. We like
- * it so much we call it the slot number).
- */
-static pciio_info_t
-pciio_cardinfo_get(
-		      devfs_handle_t pciio_vhdl,
-		      pciio_slot_t pci_slot)
-{
-    char                    namebuf[16];
-    pciio_info_t	    info = 0;
-    devfs_handle_t	    conn;
-
-    pciio_slot_func_to_name(namebuf, pci_slot, PCIIO_FUNC_NONE);
-    if (GRAPH_SUCCESS ==
-	hwgraph_traverse(pciio_vhdl, namebuf, &conn)) {
-	info = pciio_info_chk(conn);
-	hwgraph_vertex_unref(conn);
-    }
-
-    return info;
-}
-
-/*
- * pciio_error_handler:
- * dispatch an error to the appropriate
- * pciio connection point, or process
- * it as a generic pci error.
- * Yes, the first parameter is the
- * provider vertex at the middle of
- * the bus; we get to the pciio connect
- * point using the ioerror widgetdev field.
- *
- * This function is called by the
- * specific PCI provider, after it has figured
- * out where on the PCI bus (including which slot,
- * if it can tell) the error came from.
- */
-/*ARGSUSED */
-int
-pciio_error_handler(
-		       devfs_handle_t pciio_vhdl,
-		       int error_code,
-		       ioerror_mode_t mode,
-		       ioerror_t *ioerror)
-{
-    pciio_info_t            pciio_info;
-    devfs_handle_t            pconn_vhdl;
-#if USRPCI
-    devfs_handle_t            usrpci_v;
-#endif
-    pciio_slot_t            slot;
-
-    int                     retval;
-#if defined(CONFIG_SGI_IO_ERROR_HANDLING)
-    error_state_t	    e_state;
-#endif
-
-#if DEBUG && ERROR_DEBUG
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-    printk("%v: pciio_error_handler\n", pciio_vhdl);
-#else
-    printk("0x%x: pciio_error_handler\n", pciio_vhdl);
-#endif
-#endif
-
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-    IOERR_PRINTF(printk("%v: PCI Bus Error: Error code: %d Error mode: %d\n",
-			 pciio_vhdl, error_code, mode));
-#else
-    IOERR_PRINTF(printk("0x%x: PCI Bus Error: Error code: %d Error mode: %d\n",
-			 pciio_vhdl, error_code, mode));
-#endif
-
-    /* If there is an error handler sitting on
-     * the "no-slot" connection point, give it
-     * first crack at the error. NOTE: it is
-     * quite possible that this function may
-     * do further refining of the ioerror.
-     */
-    pciio_info = pciio_cardinfo_get(pciio_vhdl, PCIIO_SLOT_NONE);
-    if (pciio_info && pciio_info->c_efunc) {
-	pconn_vhdl = pciio_info_dev_get(pciio_info);
-#if defined(CONFIG_SGI_IO_ERROR_HANDLING)
-	e_state = error_state_get(pciio_vhdl);
-
-	if (e_state == ERROR_STATE_ACTION)
-	    (void)error_state_set(pciio_vhdl, ERROR_STATE_NONE);
-
-	if (error_state_set(pconn_vhdl,e_state) ==
-	    ERROR_RETURN_CODE_CANNOT_SET_STATE)
-	    return(IOERROR_UNHANDLED);
-#endif
-	retval = pciio_info->c_efunc
-	    (pciio_info->c_einfo, error_code, mode, ioerror);
-	if (retval != IOERROR_UNHANDLED)
-	    return retval;
-    }
-
-    /* Is the error associated with a particular slot?
-     */
-    if (IOERROR_FIELDVALID(ioerror, widgetdev)) {
-	/*
-	 * NOTE : 
-	 * widgetdev is a 4byte value encoded as slot in the higher order
-	 * 2 bytes and function in the lower order 2 bytes.
-	 */
-#ifdef LATER
-	slot = pciio_widgetdev_slot_get(IOERROR_GETVALUE(ioerror, widgetdev));
-#else
-	slot = 0;
-#endif
-
-	/* If this slot has an error handler,
-	 * deliver the error to it.
-	 */
-	pciio_info = pciio_cardinfo_get(pciio_vhdl, slot);
-	if (pciio_info != NULL) {
-	    if (pciio_info->c_efunc != NULL) {
-
-		pconn_vhdl = pciio_info_dev_get(pciio_info);
-#if defined(CONFIG_SGI_IO_ERROR_HANDLING)
-		e_state = error_state_get(pciio_vhdl);
-
-
-		if (e_state == ERROR_STATE_ACTION)
-		    (void)error_state_set(pciio_vhdl, ERROR_STATE_NONE);
-
-
-
-		if (error_state_set(pconn_vhdl,e_state) ==
-		    ERROR_RETURN_CODE_CANNOT_SET_STATE)
-		    return(IOERROR_UNHANDLED);
-#endif
-		retval = pciio_info->c_efunc
-		    (pciio_info->c_einfo, error_code, mode, ioerror);
-		if (retval != IOERROR_UNHANDLED)
-		    return retval;
-	    }
-
-#if USRPCI
-	    /* If the USRPCI driver is available and
-	     * knows about this connection point,
-	     * deliver the error to it.
-	     *
-	     * OK to use pconn_vhdl here, even though we
-	     * have already UNREF'd it, since we know that
-	     * it is not going away.
-	     */
-	    pconn_vhdl = pciio_info_dev_get(pciio_info);
-	    if (GRAPH_SUCCESS ==
-		hwgraph_traverse(pconn_vhdl, EDGE_LBL_USRPCI, &usrpci_v)) {
-		retval = usrpci_error_handler
-		    (usrpci_v, error_code, IOERROR_GETVALUE(ioerror, busaddr));
-		hwgraph_vertex_unref(usrpci_v);
-		if (retval != IOERROR_UNHANDLED) {
-		    /*
-		     * This unref is not needed.  If this code is called often enough,
-		     * the system will crash, due to vertex reference count reaching 0,
-		     * causing vertex to be unallocated.  -jeremy
-		     * hwgraph_vertex_unref(pconn_vhdl);
-		     */
-		    return retval;
-		}
-	    }
-#endif
-	}
-    }
-
-    return (mode == MODE_DEVPROBE)
-	? IOERROR_HANDLED	/* probes are OK */
-	: IOERROR_UNHANDLED;	/* otherwise, foo! */
-}
-
-int
-pciio_error_devenable(devfs_handle_t pconn_vhdl, int error_code)
-{
-    return DEV_FUNC(pconn_vhdl, error_devenable)
-	(pconn_vhdl, error_code);
-    /* no cleanup specific to this layer. */
 }
 
 /* =====================================================================
@@ -856,12 +674,12 @@ pciio_endian_set(devfs_handle_t dev,
 
 #if DEBUG
 #if defined(SUPPORT_PRINTING_V_FORMAT)
-    PRINT_ALERT("%v: pciio_endian_set is going away.\n"
+    printk(KERN_ALERT  "%v: pciio_endian_set is going away.\n"
 	    "\tplease use PCIIO_BYTE_STREAM or PCIIO_WORD_VALUES in your\n"
 	    "\tpciio_dmamap_alloc and pciio_dmatrans calls instead.\n",
 	    dev);
 #else
-    PRINT_ALERT("0x%x: pciio_endian_set is going away.\n"
+    printk(KERN_ALERT  "0x%x: pciio_endian_set is going away.\n"
 	    "\tplease use PCIIO_BYTE_STREAM or PCIIO_WORD_VALUES in your\n"
 	    "\tpciio_dmamap_alloc and pciio_dmatrans calls instead.\n",
 	    dev);
@@ -944,14 +762,6 @@ pciio_config_set(devfs_handle_t	dev,
 /* =====================================================================
  *          GENERIC PCI SUPPORT FUNCTIONS
  */
-pciio_slot_t
-pciio_error_extract(devfs_handle_t 	dev,
-		   pciio_space_t 	*space,
-		   iopaddr_t		*offset)
-{
-	ASSERT(dev != NODEV);
-	return DEV_FUNC(dev,error_extract)(dev,space,offset);
-}
 
 /*
  * Issue a hardware reset to a card.
@@ -1054,14 +864,9 @@ pciio_info_get(devfs_handle_t pciio)
     }
 #endif /* DEBUG_PCIIO */
 
-#ifdef BRINGUP
     if ((pciio_info != NULL) &&
 	(pciio_info->c_fingerprint != pciio_info_fingerprint)
 	&& (pciio_info->c_fingerprint != NULL)) {
-#else
-    if ((pciio_info != NULL) &&
-	(pciio_info->c_fingerprint != pciio_info_fingerprint)) {
-#endif /* BRINGUP */
 
 	return((pciio_info_t)-1); /* Should panic .. */
     }
@@ -1388,7 +1193,7 @@ pciio_device_info_new(
 		pciio_device_id_t device_id)
 {
     if (!pciio_info)
-	NEW(pciio_info);
+	GET_NEW(pciio_info);
     ASSERT(pciio_info != NULL);
 
     pciio_info->c_slot = slot;
@@ -1420,6 +1225,7 @@ pciio_device_info_register(
 {
     char		name[32];
     devfs_handle_t	pconn;
+    int device_master_set(devfs_handle_t, devfs_handle_t);
 
     pciio_slot_func_to_name(name,
 			    pciio_info->c_slot,
@@ -1431,16 +1237,14 @@ pciio_device_info_register(
 
     pciio_info->c_vertex = pconn;
     pciio_info_set(pconn, pciio_info);
-#ifdef BRINGUP
+#ifdef DEBUG_PCIIO
     {
 	int pos;
 	char dname[256];
 	pos = devfs_generate_path(pconn, dname, 256);
-#ifdef DEBUG_PCIIO
 	printk("%s : pconn path= %s \n", __FUNCTION__, &dname[pos]);
-#endif
     }
-#endif /* BRINGUP */
+#endif /* DEBUG_PCIIO */
 
     /*
      * create link to our pci provider
@@ -1520,7 +1324,6 @@ pciio_device_attach(devfs_handle_t pconn,
     pciio_info_t            pciio_info;
     pciio_vendor_id_t       vendor_id;
     pciio_device_id_t       device_id;
-    int pciba_attach(devfs_handle_t);
 
 
     pciio_device_inventory_add(pconn);
@@ -1535,11 +1338,6 @@ pciio_device_attach(devfs_handle_t pconn,
      * can assume here that we have a registry.
      */
     ASSERT(pciio_registry != NULL);
-
-    /*
-     * Since pciba is not called from cdl routines .. call it here.
-     */
-    pciba_attach(pconn);
 
     return(cdl_add_connpt(pciio_registry, vendor_id, device_id, pconn, drv_flags));
 }
@@ -1625,3 +1423,85 @@ pciio_dma_enabled(devfs_handle_t pconn_vhdl)
 {
 	return DEV_FUNC(pconn_vhdl, dma_enabled)(pconn_vhdl);
 }
+
+/*
+ * These are complementary Linux interfaces that takes in a pci_dev * as the 
+ * first arguement instead of devfs_handle_t.
+ */
+iopaddr_t               snia_pciio_dmatrans_addr(struct pci_dev *, device_desc_t, paddr_t, size_t, unsigned);
+pciio_dmamap_t          snia_pciio_dmamap_alloc(struct pci_dev *, device_desc_t, size_t, unsigned);
+void                    snia_pciio_dmamap_free(pciio_dmamap_t);
+iopaddr_t               snia_pciio_dmamap_addr(pciio_dmamap_t, paddr_t, size_t);
+void                    snia_pciio_dmamap_done(pciio_dmamap_t);
+pciio_endian_t          snia_pciio_endian_set(struct pci_dev *pci_dev, pciio_endian_t device_end,
+					      pciio_endian_t desired_end);
+
+#include <linux/module.h>
+EXPORT_SYMBOL(snia_pciio_dmatrans_addr);
+EXPORT_SYMBOL(snia_pciio_dmamap_alloc);
+EXPORT_SYMBOL(snia_pciio_dmamap_free);
+EXPORT_SYMBOL(snia_pciio_dmamap_addr);
+EXPORT_SYMBOL(snia_pciio_dmamap_done);
+EXPORT_SYMBOL(snia_pciio_endian_set);
+
+pciio_endian_t
+snia_pciio_endian_set(struct pci_dev *pci_dev,
+	pciio_endian_t device_end,
+	pciio_endian_t desired_end)
+{
+	devfs_handle_t dev = PCIDEV_VERTEX(pci_dev);
+	
+	return DEV_FUNC(dev, endian_set)
+		(dev, device_end, desired_end);
+}
+
+iopaddr_t
+snia_pciio_dmatrans_addr(struct pci_dev *pci_dev, /* translate for this device */
+                    device_desc_t dev_desc,     /* device descriptor */
+                    paddr_t paddr,      /* system physical address */
+                    size_t byte_count,  /* length */
+                    unsigned flags)
+{                                       /* defined in dma.h */
+
+    devfs_handle_t dev = PCIDEV_VERTEX(pci_dev);
+
+    return DEV_FUNC(dev, dmatrans_addr)
+        (dev, dev_desc, paddr, byte_count, flags);
+}
+
+pciio_dmamap_t
+snia_pciio_dmamap_alloc(struct pci_dev *pci_dev,  /* set up mappings for this device */
+                   device_desc_t dev_desc,      /* device descriptor */
+                   size_t byte_count_max,       /* max size of a mapping */
+                   unsigned flags)
+{                                       /* defined in dma.h */
+
+    devfs_handle_t dev = PCIDEV_VERTEX(pci_dev);
+
+    return (pciio_dmamap_t) DEV_FUNC(dev, dmamap_alloc)
+        (dev, dev_desc, byte_count_max, flags);
+}
+
+void
+snia_pciio_dmamap_free(pciio_dmamap_t pciio_dmamap)
+{
+    DMAMAP_FUNC(pciio_dmamap, dmamap_free)
+        (CAST_DMAMAP(pciio_dmamap));
+}
+
+iopaddr_t
+snia_pciio_dmamap_addr(pciio_dmamap_t pciio_dmamap,  /* use these mapping resources */
+                  paddr_t paddr,        /* map for this address */
+                  size_t byte_count)
+{                                       /* map this many bytes */
+    return DMAMAP_FUNC(pciio_dmamap, dmamap_addr)
+        (CAST_DMAMAP(pciio_dmamap), paddr, byte_count);
+}
+
+void
+snia_pciio_dmamap_done(pciio_dmamap_t pciio_dmamap)
+{
+    DMAMAP_FUNC(pciio_dmamap, dmamap_done)
+        (CAST_DMAMAP(pciio_dmamap));
+}
+

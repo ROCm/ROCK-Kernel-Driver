@@ -376,8 +376,6 @@ static void insert_super(struct super_block *s, struct file_system_type *type)
 	get_filesystem(type);
 }
 
-static void put_anon_dev(kdev_t dev);
-
 /**
  *	remove_super	-	makes superblock unreachable
  *	@s:	superblock in question
@@ -434,23 +432,6 @@ static void generic_shutdown_super(struct super_block *sb)
 	remove_super(sb);
 }
 
-static void shutdown_super(struct super_block *sb)
-{
-	struct file_system_type *fs = sb->s_type;
-	kdev_t dev = sb->s_dev;
-	struct block_device *bdev = sb->s_bdev;
-
-	/* Need to clean after the sucker */
-	if (fs->fs_flags & FS_LITTER && sb->s_root)
-		d_genocide(sb->s_root);
-	generic_shutdown_super(sb);
-	if (bdev) {
-		bd_release(bdev);
-		blkdev_put(bdev, BDEV_FS);
-	} else
-		put_anon_dev(dev);
-}
-
 void kill_super(struct super_block *sb)
 {
 	struct file_system_type *fs = sb->s_type;
@@ -459,7 +440,7 @@ void kill_super(struct super_block *sb)
 		return;
 
 	down_write(&sb->s_umount);
-	shutdown_super(sb);
+	fs->kill_sb(sb);
 	put_filesystem(fs);
 }
 
@@ -616,17 +597,6 @@ static unsigned long unnamed_dev_in_use[Max_anon/(8*sizeof(unsigned long))];
 static spinlock_t unnamed_dev_lock = SPIN_LOCK_UNLOCKED;/* protects the above */
 
 /**
- *	put_anon_dev	-	release anonymous device number.
- *	@dev:	device in question
- */
-static void put_anon_dev(kdev_t dev)
-{
-	spin_lock(&unnamed_dev_lock);
-	clear_bit(minor(dev), unnamed_dev_in_use);
-	spin_unlock(&unnamed_dev_lock);
-}
-
-/**
  *	get_anon_super	-	allocate a superblock for non-device fs
  *	@type:		filesystem type
  *	@compare:	check if existing superblock is what we want
@@ -681,6 +651,22 @@ retry:
 	s->s_dev = mk_kdev(0, dev);
 	insert_super(s, type);
 	return s;
+}
+ 
+void kill_anon_super(struct super_block *sb)
+{
+	int slot = minor(sb->s_dev);
+	generic_shutdown_super(sb);
+	spin_lock(&unnamed_dev_lock);
+	clear_bit(slot, unnamed_dev_in_use);
+	spin_unlock(&unnamed_dev_lock);
+}
+
+void kill_litter_super(struct super_block *sb)
+{
+	if (sb->s_root)
+		d_genocide(sb->s_root);
+	kill_anon_super(sb);
 }
 
 struct super_block *get_sb_bdev(struct file_system_type *fs_type,
@@ -742,7 +728,8 @@ restart:
 	spin_lock(&sb_lock);
 
 	list_for_each(p, &fs_type->fs_supers) {
-		struct super_block *old = sb_entry(p);
+		struct super_block *old;
+		old = list_entry(p, struct super_block, s_instances);
 		if (old->s_bdev != bdev)
 			continue;
 		if (!grab_super(old))
@@ -781,6 +768,14 @@ out1:
 out:
 	path_release(&nd);
 	return ERR_PTR(error);
+}
+
+void kill_block_super(struct super_block *sb)
+{
+	struct block_device *bdev = sb->s_bdev;
+	generic_shutdown_super(sb);
+	bd_release(bdev);
+	blkdev_put(bdev, BDEV_FS);
 }
 
 struct super_block *get_sb_nodev(struct file_system_type *fs_type,

@@ -549,6 +549,7 @@ static struct file_system_type qnx4_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"qnx4",
 	get_sb:		qnx4_get_sb,
+	kill_sb:	kill_block_super,
 	fs_flags:	FS_REQUIRES_DEV,
 };
 

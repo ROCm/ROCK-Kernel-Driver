@@ -2,8 +2,8 @@
 #define _ASM_IA64_SIGINFO_H
 
 /*
- * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/types.h>
@@ -57,7 +57,7 @@ typedef struct siginfo {
 		struct {
 			void *_addr;		/* faulting insn/memory ref. */
 			int _imm;		/* immediate value for "break" */
-			int _pad0;
+			unsigned int _flags;	/* see below */
 			unsigned long _isr;	/* isr */
 		} _sigfault;
 
@@ -70,7 +70,7 @@ typedef struct siginfo {
 		struct {
 			pid_t _pid;		/* which child */
 			uid_t _uid;		/* sender's uid */
-			unsigned long _pfm_ovfl_counters; /* which PMU counter overflowed */
+			unsigned long _pfm_ovfl_counters[4]; /* which PMU counter overflowed */
 		} _sigprof;
 	} _sifields;
 } siginfo_t;
@@ -88,10 +88,21 @@ typedef struct siginfo {
 #define si_ptr		_sifields._rt._sigval.sival_ptr
 #define si_addr		_sifields._sigfault._addr
 #define si_imm		_sifields._sigfault._imm	/* as per UNIX SysV ABI spec */
-#define si_isr		_sifields._sigfault._isr	/* valid if si_code==FPE_FLTxxx */
+#define si_flags	_sifields._sigfault._flags
+/*
+ * si_isr is valid for SIGILL, SIGFPE, SIGSEGV, SIGBUS, and SIGTRAP provided that
+ * si_code is non-zero and __ISR_VALID is set in si_flags.
+ */
+#define si_isr		_sifields._sigfault._isr
 #define si_band		_sifields._sigpoll._band
 #define si_fd		_sifields._sigpoll._fd
 #define si_pfm_ovfl	_sifields._sigprof._pfm_ovfl_counters
+
+/*
+ * Flag values for si_flags:
+ */
+#define __ISR_VALID_BIT	0
+#define __ISR_VALID	(1 << __ISR_VALID_BIT)
 
 /*
  * si_code values
@@ -119,12 +130,12 @@ typedef struct siginfo {
 
 #define SI_USER		0		/* sent by kill, sigsend, raise */
 #define SI_KERNEL	0x80		/* sent by the kernel from somewhere */
-#define SI_QUEUE	-1		/* sent by sigqueue */
+#define SI_QUEUE	(-1)		/* sent by sigqueue */
 #define SI_TIMER __SI_CODE(__SI_TIMER,-2) /* sent by timer expiration */
-#define SI_MESGQ	-3		/* sent by real time mesq state change */
-#define SI_ASYNCIO	-4		/* sent by AIO completion */
-#define SI_SIGIO	-5		/* sent by queued SIGIO */
-#define SI_TKILL	-6		/* sent by tkill system call */
+#define SI_MESGQ	(-3)		/* sent by real time mesq state change */
+#define SI_ASYNCIO	(-4)		/* sent by AIO completion */
+#define SI_SIGIO	(-5)		/* sent by queued SIGIO */
+#define SI_TKILL	(-6)		/* sent by tkill system call */
 
 #define SI_FROMUSER(siptr)	((siptr)->si_code <= 0)
 #define SI_FROMKERNEL(siptr)	((siptr)->si_code > 0)

@@ -2,8 +2,8 @@
 #define _ASM_IA64_SPINLOCK_H
 
 /*
- * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  *
  * This file is used for SMP configurations only.
@@ -31,7 +31,7 @@ typedef struct {
  * rather than a simple xchg to avoid writing the cache-line when
  * there is contention.
  */
-#define spin_lock(x)									\
+#define _raw_spin_lock(x)								\
 {											\
 	register char *addr __asm__ ("r31") = (char *) &(x)->lock;			\
 											\
@@ -49,7 +49,7 @@ typedef struct {
 		: "ar.ccv", "ar.pfs", "b7", "p15", "r28", "r29", "r30", "memory");	\
 }
 
-#define spin_trylock(x)									\
+#define _raw_spin_trylock(x)								\
 ({											\
 	register long result;								\
 											\
@@ -62,7 +62,7 @@ typedef struct {
 })
 
 #define spin_is_locked(x)	((x)->lock != 0)
-#define spin_unlock(x)		do { barrier(); ((spinlock_t *) x)->lock = 0;} while (0)
+#define _raw_spin_unlock(x)	do { barrier(); ((spinlock_t *) x)->lock = 0;} while (0)
 #define spin_unlock_wait(x)	do { barrier(); } while ((x)->lock)
 
 #else /* !NEW_LOCK */
@@ -79,7 +79,7 @@ typedef struct {
  * rather than a simple xchg to avoid writing the cache-line when
  * there is contention.
  */
-#define spin_lock(x) __asm__ __volatile__ (			\
+#define _raw_spin_lock(x) __asm__ __volatile__ (		\
 	"mov ar.ccv = r0\n"					\
 	"mov r29 = 1\n"						\
 	";;\n"							\
@@ -93,11 +93,11 @@ typedef struct {
 	"cmp4.eq p0,p7 = r0, r2\n"				\
 	"(p7) br.cond.spnt.few 1b\n"				\
 	";;\n"							\
-	:: "r"(&(x)->lock) : "r2", "r29", "memory")
+	:: "r"(&(x)->lock) : "ar.ccv", "p7", "r2", "r29", "memory")
 
 #define spin_is_locked(x)	((x)->lock != 0)
-#define spin_unlock(x)		do { barrier(); ((spinlock_t *) x)->lock = 0; } while (0)
-#define spin_trylock(x)		(cmpxchg_acq(&(x)->lock, 0, 1) == 0)
+#define _raw_spin_unlock(x)	do { barrier(); ((spinlock_t *) x)->lock = 0; } while (0)
+#define _raw_spin_trylock(x)	(cmpxchg_acq(&(x)->lock, 0, 1) == 0)
 #define spin_unlock_wait(x)	do { barrier(); } while ((x)->lock)
 
 #endif /* !NEW_LOCK */
@@ -110,7 +110,7 @@ typedef struct {
 
 #define rwlock_init(x) do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
-#define read_lock(rw)								\
+#define _raw_read_lock(rw)							\
 do {										\
 	int tmp = 0;								\
 	__asm__ __volatile__ ("1:\tfetchadd4.acq %0 = [%1], 1\n"		\
@@ -128,10 +128,10 @@ do {										\
 			      ";;\n"						\
 			      ".previous\n"					\
 			      : "=&r" (tmp)					\
-			      : "r" (rw): "memory");				\
+			      : "r" (rw) : "p6", "memory");			\
 } while(0)
 
-#define read_unlock(rw)								\
+#define _raw_read_unlock(rw)							\
 do {										\
 	int tmp = 0;								\
 	__asm__ __volatile__ ("fetchadd4.rel %0 = [%1], -1\n"			\
@@ -140,7 +140,7 @@ do {										\
 			      : "memory");					\
 } while(0)
 
-#define write_lock(rw)								\
+#define _raw_write_lock(rw)							\
 do {										\
  	__asm__ __volatile__ (							\
 		"mov ar.ccv = r0\n"						\
@@ -156,13 +156,13 @@ do {										\
 		"cmp4.eq p0,p7 = r0, r2\n"					\
 		"(p7) br.cond.spnt.few 1b\n"					\
 		";;\n"								\
-		:: "r"(rw) : "r2", "r29", "memory");				\
+		:: "r"(rw) : "ar.ccv", "p7", "r2", "r29", "memory");		\
 } while(0)
 
-/*
- * clear_bit() has "acq" semantics; we're really need "rel" semantics,
- * but for simplicity, we simply do a fence for now...
- */
-#define write_unlock(x)				({clear_bit(31, (x)); mb();})
+#define _raw_write_unlock(x)								\
+({											\
+	smp_mb__before_clear_bit();	/* need barrier before releasing lock... */	\
+	clear_bit(31, (x));								\
+})
 
 #endif /*  _ASM_IA64_SPINLOCK_H */

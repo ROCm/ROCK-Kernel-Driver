@@ -455,13 +455,19 @@ exp_getclient(struct sockaddr_in *sin)
 
 	for (hp = head; (tmp = *hp) != NULL; hp = &(tmp->h_next)) {
 		if (tmp->h_addr.s_addr == addr) {
+#if 0
+/* If we really want to do this, we need a spin
+lock to protect against multiple access (as we only
+have an exp_readlock) and need to protect
+the code in e_show() that walks this list too.
+*/
 			/* Move client to the front */
 			if (head != hp) {
 				*hp = tmp->h_next;
 				tmp->h_next = *head;
 				*head = tmp;
 			}
-
+#endif
 			return tmp->h_client;
 		}
 	}

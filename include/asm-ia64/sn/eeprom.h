@@ -6,11 +6,10 @@
  *
  * Public interface for reading Atmel EEPROMs via L1 system controllers
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_EEPROM_H
-#define _ASM_SN_EEPROM_H
+#ifndef _ASM_IA64_SN_EEPROM_H
+#define _ASM_IA64_SN_EEPROM_H
 
 #include <asm/sn/sgi.h>
 #include <asm/sn/vector.h>
@@ -385,14 +384,8 @@ int is_iobrick( int nasid, int widget_num );
 		          ( IO_BRICK, NASID_GET((r)), (v), 0 ) \
 		      : nic_bridge_vertex_info((v), (r)) )
 
-#ifdef BRINGUP /* will we read mfg info from IOC3's that aren't
-		* part of IO7 cards, or aren't in I/O bricks? */
-#define IOC3_VERTEX_MFG_INFO(v, r, e) \
-    eeprom_vertex_info_set( IO_IO7, NASID_GET((r)), (v), 0 )
-#endif /* BRINGUP */
-
 #define HUB_UID_GET(n,v,p)	cbrick_uid_get((n),(p))
 #define ROUTER_UID_GET(d,p)	rbrick_uid_get(get_nasid(),(d),(p))
 #define XBOW_UID_GET(n,p)	iobrick_uid_get((n),(p))
 
-#endif /* _ASM_SN_EEPROM_H */
+#endif /* _ASM_IA64_SN_EEPROM_H */

@@ -4,7 +4,7 @@
  * for more details.
  *
  * Copyright 1999 Ralf Baechle (ralf@gnu.org)
- * Copyright 1999 Silicon Graphics, Inc.
+ * Copyright 1999,2001 Silicon Graphics, Inc.
  */
 #ifndef _ASM_SN_ARC_TYPES_H
 #define _ASM_SN_ARC_TYPES_H

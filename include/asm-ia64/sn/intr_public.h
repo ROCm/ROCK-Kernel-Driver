@@ -4,56 +4,16 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_INTR_PUBLIC_H__
-#define _ASM_SN_INTR_PUBLIC_H__
+#ifndef _ASM_IA64_SN_INTR_PUBLIC_H
+#define _ASM_IA64_SN_INTR_PUBLIC_H
 
 #include <linux/config.h>
 
-/* REMEMBER: If you change these, the whole world needs to be recompiled.
- * It would also require changing the hubspl.s code and SN0/intr.c
- * Currently, the spl code has no support for multiple INTPEND1 masks.
- */
-
-#define	N_INTPEND0_MASKS	1
-#define	N_INTPEND1_MASKS	1
-
-#define INTPEND0_MAXMASK	(N_INTPEND0_MASKS - 1)
-#define INTPEND1_MAXMASK	(N_INTPEND1_MASKS - 1)
-
-#if _LANGUAGE_C
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-#include <asm/sn/sn1/arch.h>
+#if defined(CONFIG_IA64_SGI_SN1)
+#include <asm/sn/sn1/intr_public.h>
+#elif defined(CONFIG_IA64_SGI_SN2)
 #endif
-#include <asm/sn/arch.h>
 
-struct intr_vecblk_s;	/* defined in asm/sn/intr.h */
-
-/*
- * The following are necessary to create the illusion of a CEL
- * on the IP27 hub.  We'll add more priority levels soon, but for
- * now, any interrupt in a particular band effectively does an spl.
- * These must be in the PDA since they're different for each processor.
- * Users of this structure must hold the vector_lock in the appropriate vector
- * block before modifying the mask arrays.  There's only one vector block
- * for each Hub so a lock in the PDA wouldn't be adequate.
- */
-typedef struct hub_intmasks_s {
-	/*
-	 * The masks are stored with the lowest-priority (most inclusive)
-	 * in the lowest-numbered masks (i.e., 0, 1, 2...).
-	 */
-	/* INT_PEND0: */
-	hubreg_t		intpend0_masks[N_INTPEND0_MASKS]; 
-	/* INT_PEND1: */
-	hubreg_t		intpend1_masks[N_INTPEND1_MASKS];
-	/* INT_PEND0: */
-	struct intr_vecblk_s	*dispatch0;	
-	/* INT_PEND1: */
-	struct intr_vecblk_s	*dispatch1;
-} hub_intmasks_t;
-
-#endif /* _LANGUAGE_C */
-#endif /* _ASM_SN_INTR_PUBLIC_H__ */
+#endif /* _ASM_IA64_SN_INTR_PUBLIC_H */

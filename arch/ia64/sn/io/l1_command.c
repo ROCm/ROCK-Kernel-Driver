@@ -4,20 +4,20 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000 - 2001 Silicon Graphics, Inc.
+ * All rights reserved.
  */ 
 
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
+#include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/eeprom.h>
-#include <asm/sn/ksys/i2c.h>
 #include <asm/sn/router.h>
 #include <asm/sn/module.h>
 #include <asm/sn/ksys/l1.h>
@@ -27,7 +27,6 @@
 #define ELSC_TIMEOUT	1000000		/* ELSC response timeout (usec) */
 #define LOCK_TIMEOUT	5000000		/* Hub lock timeout (usec) */
 
-#define LOCAL_HUB	LOCAL_HUB_ADDR
 #define LD(x)		(*(volatile uint64_t *)(x))
 #define SD(x, v)	(LD(x) = (uint64_t) (v))
 
@@ -75,7 +74,7 @@ static char elsc_nvram_buffer[NVRAM_SIZE];
 
 void elsc_init(elsc_t *e, nasid_t nasid)
 {
-    sc_init((l1sc_t *)e, nasid, BRL1_LOCALUART);
+    sc_init((l1sc_t *)e, nasid, BRL1_LOCALHUB_UART);
 }
 
 
@@ -1376,85 +1375,4 @@ iobrick_sc_version( l1sc_t *sc, char *result )
     sprintf( result, "%d.%d.%d", major, minor, bugfix );
 
     return 0;
-}
-
-
-
-/* elscuart routines 
- *
- * Most of the elscuart functionality is implemented in l1.c.  The following
- * is directly "recycled" from elsc.c.
- */
-
-
-/*
- * _elscuart_puts
- */
-
-int _elscuart_puts(elsc_t *e, char *s)
-{
-    int			c;
-
-    if (s == 0)
-	s = "<NULL>";
-
-    while ((c = LBYTE(s)) != 0) {
-	if (_elscuart_putc(e, c) < 0)
-	    return -1;
-	s++;
-    }
-
-    return 0;
-}
-
-
-/*
- * elscuart wrapper routines
- *
- *   The following routines are similar to their counterparts in l1.c,
- *   except instead of taking an elsc_t pointer directly, they call
- *   a global routine "get_elsc" to obtain the pointer.
- *   This is useful when the elsc is employed for stdio.
- */
-
-int elscuart_probe(void)
-{
-    return _elscuart_probe(get_elsc());
-}
-
-void elscuart_init(void *init_data)
-{
-    _elscuart_init(get_elsc());
-    /* dummy variable included for driver compatability */
-    init_data = init_data;
-}
-
-int elscuart_poll(void)
-{
-    return _elscuart_poll(get_elsc());
-}
-
-int elscuart_readc(void)
-{
-    return _elscuart_readc(get_elsc());
-}
-
-int elscuart_getc(void)
-{
-    return _elscuart_getc(get_elsc());
-}
-
-int elscuart_puts(char *s)
-{
-    return _elscuart_puts(get_elsc(), s);
-}
-
-int elscuart_putc(int c)
-{
-    return _elscuart_putc(get_elsc(), c);
-}
-
-int elscuart_flush(void)
-{
-    return _elscuart_flush(get_elsc());
 }

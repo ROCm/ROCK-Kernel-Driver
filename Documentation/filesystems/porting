@@ -99,3 +99,20 @@ free to drop it...
 
 ->link() callers hold ->i_sem on the object we are linking to.  Some of your
 problems might be over...
+
+---
+[mandatory]
+
+new file_system_type method - kill_sb(superblock).  If you are converting
+an existing filesystem, set it according to ->fs_flags:
+	FS_REQUIRES_DEV		-	kill_block_super
+	FS_LITTER		-	kill_litter_super
+	neither			-	kill_anon_super
+FS_LITTER is gone - just remove it from fs_flags.
+
+---
+[mandatory]
+
+	FS_SINGLE is gone (actually, that had happened back when ->get_sb()
+went in - and hadn't been documented ;-/).  Just remove it from fs_flags
+(and see ->get_sb() entry for other actions).

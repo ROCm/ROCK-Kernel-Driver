@@ -467,8 +467,7 @@ void write_inode_now(struct inode *inode, int sync)
 
 	if (sb) {
 		spin_lock(&inode_lock);
-		while (inode->i_state & I_DIRTY)
-			sync_one(inode, sync);
+		sync_one(inode, sync);
 		spin_unlock(&inode_lock);
 		if (sync)
 			wait_on_inode(inode);

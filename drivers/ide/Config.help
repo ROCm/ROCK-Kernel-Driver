@@ -251,10 +251,6 @@ CONFIG_IDEDMA_NEW_DRIVE_LISTINGS
   be (U)DMA capable but aren't. This is a blanket on/off test with no
   speed limit options.
 
-  Straight GNU GCC 2.7.3/2.8.X compilers are known to be safe;
-  whereas, many versions of EGCS have a problem and miscompile if you
-  say Y here.
-
   If in doubt, say N.
 
 CONFIG_BLK_DEV_IDEDMA_TIMEOUT
@@ -318,10 +314,6 @@ CONFIG_IDEDMA_PCI_WIP
   simply skip those options.
 
   It is SAFEST to say N to this question.
-
-CONFIG_BLK_DEV_ADMA
-  Please read the comments at the top of
-  <file:drivers/ide/ide-adma.c>.
 
 CONFIG_BLK_DEV_PDC_ADMA
   Please read the comments at the top of <file:drivers/ide/ide-pci.c>.
@@ -515,10 +507,16 @@ CONFIG_PDC202XX_FORCE
   For FastTrak enable overriding BIOS.
 
 CONFIG_BLK_DEV_SIS5513
-  This driver ensures (U)DMA support for SIS5513 chipset based
-  mainboards. SiS620/530 UDMA mode 4, SiS5600/5597 UDMA mode 2, all
-  other DMA mode 2 limited chipsets are unsupported to date.
+  This driver ensures (U)DMA support for SIS5513 chipset family based
+  mainboards.
 
+  The following chipsets are supported:
+  ATA16:  SiS5511, SiS5513
+  ATA33:  SiS5591, SiS5597, SiS5598, SiS5600
+  ATA66:  SiS530, SiS540, SiS620, SiS630, SiS640
+  ATA100: SiS635, SiS645, SiS650, SiS730, SiS735, SiS740,
+          SiS745, SiS750
+ 
   If you say Y here, you need to say Y to "Use DMA by default when
   available" as well.
 
