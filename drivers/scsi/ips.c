@@ -725,7 +725,7 @@ ips_release(struct Scsi_Host *sh) {
    free_irq(ha->irq, ha);
 
    IPS_REMOVE_HOST(sh);
-   scsi_unregister(sh);
+   scsi_host_put(sh);
 
    ips_released_controllers++;
 
@@ -6732,7 +6732,7 @@ static int
 ips_register_scsi( int index){
 	struct Scsi_Host *sh;
 	ips_ha_t *ha, *oldha = ips_ha[index];
-	sh = scsi_register(&ips_driver_template, sizeof(ips_ha_t));
+	sh = scsi_host_alloc(&ips_driver_template, sizeof(ips_ha_t));
 	if(!sh) {
 		IPS_PRINTK(KERN_WARNING, oldha->pcidev, "Unable to register controller with SCSI subsystem\n");
 		return -1;
@@ -6743,7 +6743,7 @@ ips_register_scsi( int index){
 	/* Install the interrupt handler with the new ha */
 	if (request_irq(ha->irq, do_ipsintr, SA_SHIRQ, ips_name, ha)) {
 		IPS_PRINTK(KERN_WARNING, ha->pcidev, "Unable to install interrupt handler\n" );
-		scsi_unregister(sh);
+		scsi_host_put(sh);
 		return -1;
 	}
 
