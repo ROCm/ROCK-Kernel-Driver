@@ -693,7 +693,7 @@ SCTP_STATIC int sctp_setsockopt_bindx(struct sock* sk,
  *
  *  struct  linger {
  *     int     l_onoff;                // option on/off
- *     int     l_linger;               // linger time 
+ *     int     l_linger;               // linger time
  * };
  *
  * To enable the option, set l_onoff to 1.  If the l_linger value is set
@@ -2279,7 +2279,9 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 
 	if (copy_to_user(optval, &params, len))
 		return -EFAULT;
-	*optlen = len;
+
+	if (put_user(len, optlen))
+		return -EFAULT;
 
 	return 0;
 }
