@@ -104,7 +104,7 @@ static inline int slot_update (struct slot **sl)
 	if (rc) 
 		return rc;
 	if (!init_flag)
-		return get_cur_bus_info (sl);
+		rc = get_cur_bus_info(sl);
 	return rc;
 }
 
@@ -208,7 +208,7 @@ static inline int power_off (struct slot *slot_cur)
 		err ("command not completed successfully in power_off\n");
 		retval = -EIO;
 	}
-	return 0;
+	return retval;
 }
 
 static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 value)
@@ -216,7 +216,6 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 value)
 	int rc = 0;
 	struct slot *pslot;
 	u8 cmd;
-	int hpcrc = 0;
 
 	debug ("set_attention_status - Entry hotplug_slot[%lx] value[%x]\n", (ulong) hotplug_slot, value);
 	ibmphp_lock_operations ();
@@ -241,15 +240,12 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 value)
 		if (rc == 0) {
 			pslot = (struct slot *) hotplug_slot->private;
 			if (pslot)
-				hpcrc = ibmphp_hpc_writeslot (pslot, cmd);
+				rc = ibmphp_hpc_writeslot(pslot, cmd);
 			else
 				rc = -ENODEV;
 		}
 	} else	
 		rc = -ENODEV;
-
-	if (hpcrc)
-		rc = hpcrc;
 
 	ibmphp_unlock_operations ();
 
@@ -261,7 +257,6 @@ static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 * value)
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
-	int hpcrc = 0;
 	struct slot myslot;
 
 	debug ("get_attention_status - Entry hotplug_slot[%lx] pvalue[%lx]\n", (ulong) hotplug_slot, (ulong) value);
@@ -271,22 +266,16 @@ static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 * value)
 		pslot = (struct slot *) hotplug_slot->private;
 		if (pslot) {
 			memcpy ((void *) &myslot, (void *) pslot, sizeof (struct slot));
-			hpcrc = ibmphp_hpc_readslot (pslot, READ_SLOTSTATUS, &(myslot.status));
-			if (!hpcrc)
-				hpcrc = ibmphp_hpc_readslot (pslot, READ_EXTSLOTSTATUS, &(myslot.ext_status));
-			if (!hpcrc) {
+			rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS, &(myslot.status));
+			if (!rc)
+				rc = ibmphp_hpc_readslot(pslot, READ_EXTSLOTSTATUS, &(myslot.ext_status));
+			if (!rc)
 				*value = SLOT_ATTN (myslot.status, myslot.ext_status);
-				rc = 0;
-			}
 		}
-	} else
-		rc = -ENODEV;
-
-	if (hpcrc)
-		rc = hpcrc;
+	}
 
 	ibmphp_unlock_operations ();
-	debug ("get_attention_status - Exit rc[%d] hpcrc[%x] value[%x]\n", rc, hpcrc, *value);
+	debug("get_attention_status - Exit rc[%d] value[%x]\n", rc, *value);
 	return rc;
 }
 
@@ -294,7 +283,6 @@ static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 * value)
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
-	int hpcrc = 0;
 	struct slot myslot;
 
 	debug ("get_latch_status - Entry hotplug_slot[%lx] pvalue[%lx]\n", (ulong) hotplug_slot, (ulong) value);
@@ -303,20 +291,14 @@ static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 * value)
 		pslot = (struct slot *) hotplug_slot->private;
 		if (pslot) {
 			memcpy ((void *) &myslot, (void *) pslot, sizeof (struct slot));
-			hpcrc = ibmphp_hpc_readslot (pslot, READ_SLOTSTATUS, &(myslot.status));
-			if (!hpcrc) {
+			rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS, &(myslot.status));
+			if (!rc)
 				*value = SLOT_LATCH (myslot.status);
-				rc = 0;
-			}
 		}
-	} else
-		rc = -ENODEV;
-
-	if (hpcrc)
-		rc = hpcrc;
+	}
 
 	ibmphp_unlock_operations ();
-	debug ("get_latch_status - Exit rc[%d] hpcrc[%x] value[%x]\n", rc, hpcrc, *value);
+	debug("get_latch_status - Exit rc[%d] rc[%x] value[%x]\n", rc, rc, *value);
 	return rc;
 }
 
@@ -325,7 +307,6 @@ static int get_power_status (struct hotplug_slot *hotplug_slot, u8 * value)
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
-	int hpcrc = 0;
 	struct slot myslot;
 
 	debug ("get_power_status - Entry hotplug_slot[%lx] pvalue[%lx]\n", (ulong) hotplug_slot, (ulong) value);
@@ -334,20 +315,14 @@ static int get_power_status (struct hotplug_slot *hotplug_slot, u8 * value)
 		pslot = (struct slot *) hotplug_slot->private;
 		if (pslot) {
 			memcpy ((void *) &myslot, (void *) pslot, sizeof (struct slot));
-			hpcrc = ibmphp_hpc_readslot (pslot, READ_SLOTSTATUS, &(myslot.status));
-			if (!hpcrc) {
+			rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS, &(myslot.status));
+			if (!rc)
 				*value = SLOT_PWRGD (myslot.status);
-				rc = 0;
-			}
 		}
-	} else
-		rc = -ENODEV;
-
-	if (hpcrc)
-		rc = hpcrc;
+	}
 
 	ibmphp_unlock_operations ();
-	debug ("get_power_status - Exit rc[%d] hpcrc[%x] value[%x]\n", rc, hpcrc, *value);
+	debug("get_power_status - Exit rc[%d] rc[%x] value[%x]\n", rc, rc, *value);
 	return rc;
 }
 
@@ -356,7 +331,6 @@ static int get_adapter_present (struct hotplug_slot *hotplug_slot, u8 * value)
 	int rc = -ENODEV;
 	struct slot *pslot;
 	u8 present;
-	int hpcrc = 0;
 	struct slot myslot;
 
 	debug ("get_adapter_status - Entry hotplug_slot[%lx] pvalue[%lx]\n", (ulong) hotplug_slot, (ulong) value);
@@ -365,23 +339,19 @@ static int get_adapter_present (struct hotplug_slot *hotplug_slot, u8 * value)
 		pslot = (struct slot *) hotplug_slot->private;
 		if (pslot) {
 			memcpy ((void *) &myslot, (void *) pslot, sizeof (struct slot));
-			hpcrc = ibmphp_hpc_readslot (pslot, READ_SLOTSTATUS, &(myslot.status));
-			if (!hpcrc) {
+			rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS, &(myslot.status));
+			if (!rc) {
 				present = SLOT_PRESENT (myslot.status);
 				if (present == HPC_SLOT_EMPTY)
 					*value = 0;
 				else
 					*value = 1;
-				rc = 0;
 			}
 		}
-	} else
-		rc = -ENODEV;
-	if (hpcrc)
-		rc = hpcrc;
+	}
 
 	ibmphp_unlock_operations ();
-	debug ("get_adapter_present - Exit rc[%d] hpcrc[%x] value[%x]\n", rc, hpcrc, *value);
+	debug("get_adapter_present - Exit rc[%d] value[%x]\n", rc, *value);
 	return rc;
 }
 
@@ -475,7 +445,6 @@ static int get_max_adapter_speed_1 (struct hotplug_slot *hotplug_slot, u8 * valu
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
-	int hpcrc = 0;
 	struct slot myslot;
 
 	debug ("get_max_adapter_speed_1 - Entry hotplug_slot[%lx] pvalue[%lx]\n", (ulong)hotplug_slot, (ulong) value);
@@ -487,29 +456,21 @@ static int get_max_adapter_speed_1 (struct hotplug_slot *hotplug_slot, u8 * valu
 		pslot = (struct slot *) hotplug_slot->private;
 		if (pslot) {
 			memcpy ((void *) &myslot, (void *) pslot, sizeof (struct slot));
-			hpcrc = ibmphp_hpc_readslot (pslot, READ_SLOTSTATUS, &(myslot.status));
+			rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS, &(myslot.status));
 
 			if (!(SLOT_LATCH (myslot.status)) && (SLOT_PRESENT (myslot.status))) {
-				hpcrc = ibmphp_hpc_readslot (pslot, READ_EXTSLOTSTATUS, &(myslot.ext_status));
-				if (!hpcrc) {
+				rc = ibmphp_hpc_readslot(pslot, READ_EXTSLOTSTATUS, &(myslot.ext_status));
+				if (!rc)
 					*value = SLOT_SPEED (myslot.ext_status);
-					rc = 0;
-				}
-			} else {
+			} else
 				*value = MAX_ADAPTER_NONE;
-				rc = 0;
-			}
                 }
-        } else
-		rc = -ENODEV;
-
-	if (hpcrc)
-		rc = hpcrc;
+	}
 
 	if (flag)
 		ibmphp_unlock_operations ();
 
-	debug ("get_max_adapter_speed_1 - Exit rc[%d] hpcrc[%x] value[%x]\n", rc, hpcrc, *value);
+	debug("get_max_adapter_speed_1 - Exit rc[%d] value[%x]\n", rc, *value);
 	return rc;
 }
 
