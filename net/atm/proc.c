@@ -323,28 +323,25 @@ static void vc_info(struct atm_vcc *vcc,char *buf)
 	    atomic_read(&vcc->sk->sk_rmem_alloc), vcc->sk->sk_rcvbuf);
 }
 
-
-static void svc_info(struct atm_vcc *vcc,char *buf)
+static void svc_info(struct seq_file *seq, struct atm_vcc *vcc)
 {
-	char *here;
-	int i;
-
 	if (!vcc->dev)
-		sprintf(buf,sizeof(void *) == 4 ? "N/A@%p%10s" : "N/A@%p%2s",
-		    vcc,"");
-	else sprintf(buf,"%3d %3d %5d         ",vcc->dev->number,vcc->vpi,
-		    vcc->vci);
-	here = strchr(buf,0);
-	here += sprintf(here,"%-10s ",vcc_state(vcc));
-	here += sprintf(here,"%s%s",vcc->remote.sas_addr.pub,
+		seq_printf(seq, sizeof(void *) == 4 ?
+			   "N/A@%p%10s" : "N/A@%p%2s", vcc, "");
+	else
+		seq_printf(seq, "%3d %3d %5d         ",
+			   vcc->dev->number, vcc->vpi, vcc->vci);
+	seq_printf(seq, "%-10s ", vcc_state(vcc));
+	seq_printf(seq, "%s%s", vcc->remote.sas_addr.pub,
 	    *vcc->remote.sas_addr.pub && *vcc->remote.sas_addr.prv ? "+" : "");
-	if (*vcc->remote.sas_addr.prv)
-		for (i = 0; i < ATM_ESA_LEN; i++)
-			here += sprintf(here,"%02x",
-			    vcc->remote.sas_addr.prv[i]);
-	strcat(here,"\n");
-}
+	if (*vcc->remote.sas_addr.prv) {
+		int i;
 
+		for (i = 0; i < ATM_ESA_LEN; i++)
+			seq_printf(seq, "%02x", vcc->remote.sas_addr.prv[i]);
+	}
+	seq_putc(seq, '\n');
+}
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
 
@@ -493,30 +490,40 @@ static int atm_vc_info(loff_t pos,char *buf)
 	return 0;
 }
 
-
-static int atm_svc_info(loff_t pos,char *buf)
+static int svc_seq_show(struct seq_file *seq, void *v)
 {
-	struct hlist_node *node;
-	struct sock *s;
-	struct atm_vcc *vcc;
-	int left;
+	static char atm_svc_banner[] = 
+		"Itf VPI VCI           State      Remote\n";
 
-	if (!pos)
-		return sprintf(buf,"Itf VPI VCI           State      Remote\n");
-	left = pos-1;
-	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-		vcc = atm_sk(s);
-		if (vcc->sk->sk_family == PF_ATMSVC && !left--) {
-			svc_info(vcc,buf);
-			read_unlock(&vcc_sklist_lock);
-			return strlen(buf);
-		}
+	if (v == (void *)1)
+		seq_puts(seq, atm_svc_banner);
+	else {
+		struct vcc_state *state = seq->private;
+		struct atm_vcc *vcc = atm_sk(state->sk);
+
+		svc_info(seq, vcc);
 	}
-	read_unlock(&vcc_sklist_lock);
-
 	return 0;
 }
+
+static struct seq_operations svc_seq_ops = {
+	.start	= vcc_seq_start,
+	.next	= vcc_seq_next,
+	.stop	= vcc_seq_stop,
+	.show	= svc_seq_show,
+};
+
+static int svc_seq_open(struct inode *inode, struct file *file)
+{
+	return __vcc_seq_open(inode, file, PF_ATMSVC, &svc_seq_ops);
+}
+
+static struct file_operations svc_seq_fops = {
+	.open		= svc_seq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= vcc_seq_release,
+};
 
 #if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 static int atm_arp_info(loff_t pos,char *buf)
@@ -770,7 +777,7 @@ int __init atm_proc_init(void)
 		return -ENOMEM;
 	CREATE_SEQ_ENTRY(devices);
 	CREATE_SEQ_ENTRY(pvc);
-	CREATE_ENTRY(svc);
+	CREATE_SEQ_ENTRY(svc);
 	CREATE_ENTRY(vc);
 #if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 	CREATE_ENTRY(arp);
