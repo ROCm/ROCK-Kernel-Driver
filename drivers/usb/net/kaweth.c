@@ -1240,20 +1240,20 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
         init_waitqueue_head(&awd.wqh);
         awd.done = 0;
 
-        set_current_state(TASK_INTERRUPTIBLE);
         add_wait_queue(&awd.wqh, &wait);
         urb->context = &awd;
-        status = usb_submit_urb(urb, GFP_ATOMIC);
+        status = usb_submit_urb(urb, GFP_NOIO);
         if (status) {
                 // something went wrong
                 usb_free_urb(urb);
-                set_current_state(TASK_RUNNING);
                 remove_wait_queue(&awd.wqh, &wait);
                 return status;
         }
 
-	while (timeout && !awd.done)
+	while (timeout && !awd.done) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		timeout = schedule_timeout(timeout);
+	}
 
         set_current_state(TASK_RUNNING);
         remove_wait_queue(&awd.wqh, &wait);
