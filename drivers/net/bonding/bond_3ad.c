@@ -130,7 +130,6 @@ static const int ad_delta_in_ticks = (AD_TIMER_INTERVAL * HZ) / 1000;
 static u16 __get_link_speed(struct port *port);
 static u8 __get_duplex(struct port *port);
 static inline void __initialize_port_locks(struct port *port);
-static inline void __deinitialize_port_locks(struct port *port);
 //conversions
 static void __ntohs_lacpdu(struct lacpdu *lacpdu);
 static u16 __ad_timer_to_ticks(u16 timer_type, u16 Par);
@@ -443,15 +442,6 @@ static inline void __initialize_port_locks(struct port *port)
 {
 	// make sure it isn't called twice
 	spin_lock_init(&(SLAVE_AD_INFO(port->slave).rx_machine_lock));
-}
-
-/**
- * __deinitialize_port_locks - deinitialize a port's RX machine spinlock
- * @port: the port we're looking at
- *
- */
-static inline void __deinitialize_port_locks(struct port *port)
-{
 }
 
 //conversions

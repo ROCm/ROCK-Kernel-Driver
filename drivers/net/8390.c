@@ -1114,7 +1114,6 @@ EXPORT_SYMBOL(ei_interrupt);
 #ifdef CONFIG_NET_POLL_CONTROLLER
 EXPORT_SYMBOL(ei_poll);
 #endif
-EXPORT_SYMBOL(ei_tx_timeout);
 EXPORT_SYMBOL(NS8390_init);
 EXPORT_SYMBOL(__alloc_ei_netdev);
 

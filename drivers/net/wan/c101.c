@@ -113,9 +113,6 @@ static inline void openwin(card_t *card, u8 page)
 }
 
 
-#define close_windows(card) {} /* no hardware support */
-
-
 #include "hd6457x.c"
 
 
