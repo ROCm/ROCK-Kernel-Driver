@@ -920,7 +920,7 @@ static void expectation_timed_out(unsigned long ul_expect)
 }
 
 struct ip_conntrack_expect *
-ip_conntrack_expect_alloc()
+ip_conntrack_expect_alloc(void)
 {
 	struct ip_conntrack_expect *new;
 	

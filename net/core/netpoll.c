@@ -623,7 +623,7 @@ void netpoll_cleanup(struct netpoll *np)
 	np->dev = 0;
 }
 
-int netpoll_trap()
+int netpoll_trap(void)
 {
 	return trapped;
 }

@@ -692,14 +692,14 @@ static struct file_operations ip6fl_seq_fops = {
 #endif
 
 
-void ip6_flowlabel_init()
+void ip6_flowlabel_init(void)
 {
 #ifdef CONFIG_PROC_FS
 	proc_net_fops_create("ip6_flowlabel", S_IRUGO, &ip6fl_seq_fops);
 #endif
 }
 
-void ip6_flowlabel_cleanup()
+void ip6_flowlabel_cleanup(void)
 {
 	del_timer(&ip6_fl_gc_timer);
 #ifdef CONFIG_PROC_FS
