@@ -172,7 +172,7 @@ typedef struct pglist_data {
 } pg_data_t;
 
 extern int numnodes;
-extern pg_data_t *pgdat_list;
+extern struct pglist_data *pgdat_list;
 
 static inline int
 memclass(struct zone *pgzone, struct zone *classzone)
@@ -184,19 +184,8 @@ memclass(struct zone *pgzone, struct zone *classzone)
 	return 1;
 }
 
-/*
- * The following two are not meant for general usage. They are here as
- * prototypes for the discontig memory code.
- */
-struct page;
-extern void calculate_totalpages (pg_data_t *pgdat, unsigned long *zones_size,
-		unsigned long *zholes_size);
-extern void free_area_init_core(pg_data_t *pgdat, unsigned long *zones_size,
-		unsigned long *zholes_size);
 void get_zone_counts(unsigned long *active, unsigned long *inactive);
-extern void build_all_zonelists(void);
-
-extern pg_data_t contig_page_data;
+void build_all_zonelists(void);
 
 /**
  * for_each_pgdat - helper macro to iterate over all nodes
@@ -260,11 +249,10 @@ static inline struct zone *next_zone(struct zone *zone)
 #define numa_node_id()		(__cpu_to_node(smp_processor_id()))
 
 #ifndef CONFIG_DISCONTIGMEM
-
+extern struct pglist_data contig_page_data;
 #define NODE_DATA(nid)		(&contig_page_data)
 #define NODE_MEM_MAP(nid)	mem_map
 #define MAX_NR_NODES		1
-
 #else /* CONFIG_DISCONTIGMEM */
 
 #include <asm/mmzone.h>

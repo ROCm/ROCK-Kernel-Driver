@@ -26,10 +26,12 @@
 #include <linux/blkdev.h>
 #include <linux/slab.h>
 
+struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 int nr_swap_pages;
-pg_data_t *pgdat_list;
+int numnodes = 1;
+
 
 /*
  * Used by page_zone() to look up the address of the struct zone whose
@@ -778,23 +780,6 @@ void __init build_all_zonelists(void)
 		build_zonelists(NODE_DATA(i));
 }
 
-void __init calculate_totalpages (pg_data_t *pgdat, unsigned long *zones_size,
-	unsigned long *zholes_size)
-{
-	unsigned long realtotalpages, totalpages = 0;
-	int i;
-
-	for (i = 0; i < MAX_NR_ZONES; i++)
-		totalpages += zones_size[i];
-	pgdat->node_size = totalpages;
-
-	realtotalpages = totalpages;
-	if (zholes_size)
-		for (i = 0; i < MAX_NR_ZONES; i++)
-			realtotalpages -= zholes_size[i];
-	printk("On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
-}
-
 /*
  * Helper functions to size the waitqueue hash table.
  * Essentially these want to choose hash table sizes sufficiently
@@ -839,13 +824,46 @@ static inline unsigned long wait_table_bits(unsigned long size)
 
 #define LONG_ALIGN(x) (((x)+(sizeof(long))-1)&~((sizeof(long))-1))
 
+static void __init calculate_zone_totalpages(struct pglist_data *pgdat,
+		unsigned long *zones_size, unsigned long *zholes_size)
+{
+	unsigned long realtotalpages, totalpages = 0;
+	int i;
+
+	for (i = 0; i < MAX_NR_ZONES; i++)
+		totalpages += zones_size[i];
+	pgdat->node_size = totalpages;
+
+	realtotalpages = totalpages;
+	if (zholes_size)
+		for (i = 0; i < MAX_NR_ZONES; i++)
+			realtotalpages -= zholes_size[i];
+	printk("On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
+}
+
+/*
+ * Get space for the valid bitmap.
+ */
+static void __init calculate_zone_bitmap(struct pglist_data *pgdat,
+		unsigned long *zones_size)
+{
+	unsigned long size = 0;
+	int i;
+
+	for (i = 0; i < MAX_NR_ZONES; i++)
+		size += zones_size[i];
+	size = LONG_ALIGN((size + 7) >> 3);
+	pgdat->valid_addr_bitmap = (unsigned long *)alloc_bootmem_node(pgdat, size);
+	memset(pgdat->valid_addr_bitmap, 0, size);
+}
+
 /*
  * Set up the zone data structures:
  *   - mark all pages reserved
  *   - mark all memory queues empty
  *   - clear the memory bitmaps
  */
-void __init free_area_init_core(pg_data_t *pgdat,
+static void __init free_area_init_core(struct pglist_data *pgdat,
 		unsigned long *zones_size, unsigned long *zholes_size)
 {
 	unsigned long i, j;
@@ -980,7 +998,30 @@ void __init free_area_init_core(pg_data_t *pgdat,
 	}
 }
 
+void __init free_area_init_node(int nid, struct pglist_data *pgdat,
+		struct page *node_mem_map, unsigned long *zones_size,
+		unsigned long node_start_pfn, unsigned long *zholes_size)
+{
+	unsigned long size;
+
+	pgdat->node_id = nid;
+	pgdat->node_start_pfn = node_start_pfn;
+	calculate_zone_totalpages(pgdat, zones_size, zholes_size);
+	if (!node_mem_map) {
+		size = (pgdat->node_size + 1) * sizeof(struct page); 
+		node_mem_map = alloc_bootmem_node(pgdat, size);
+	}
+	pgdat->node_mem_map = node_mem_map;
+
+	free_area_init_core(pgdat, zones_size, zholes_size);
+
+	calculate_zone_bitmap(pgdat, zones_size);
+}
+
 #ifndef CONFIG_DISCONTIGMEM
+static bootmem_data_t contig_bootmem_data;
+struct pglist_data contig_page_data = { .bdata = &contig_bootmem_data };
+
 void __init free_area_init(unsigned long *zones_size)
 {
 	free_area_init_node(0, &contig_page_data, NULL, zones_size, 0, NULL);

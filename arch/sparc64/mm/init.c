@@ -1552,7 +1552,7 @@ void __init paging_init(void)
 		zones_size[ZONE_DMA] = npages;
 		zholes_size[ZONE_DMA] = npages - pages_avail;
 
-		free_area_init_node(0, NULL, NULL, zones_size,
+		free_area_init_node(0, &contig_page_data, NULL, zones_size,
 				    phys_base >> PAGE_SHIFT, zholes_size);
 	}
 
