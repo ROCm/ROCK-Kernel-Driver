@@ -74,6 +74,9 @@ irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned = {
 		.lock = SPIN_LOCK_UNLOCKED
 	}
 };
+#ifdef CONFIG_CRASH_DUMP_MODULE
+EXPORT_SYMBOL(_irq_desc);
+#endif
 
 #ifdef CONFIG_IA64_GENERIC
 irq_desc_t * __ia64_irq_desc (unsigned int irq)

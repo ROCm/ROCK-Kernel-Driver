@@ -122,3 +122,8 @@ EXPORT_SYMBOL(ia64_spinlock_contention);
 #  endif
 # endif
 #endif
+
+#ifdef CONFIG_CRASH_DUMP_MODULE
+extern char *_end;
+EXPORT_SYMBOL(_end);
+#endif

@@ -83,6 +83,7 @@ static volatile struct call_data_struct *call_data;
 #if defined(CONFIG_CRASH_DUMP) || defined(CONFIG_CRASH_DUMP_MODULE)
 #define IPI_DUMP_INTERRUPT      4
 	int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
+EXPORT_SYMBOL(dump_ipi_function_ptr);
 #endif
 
 /* This needs to be cacheline aligned because it is written to by *other* CPUs.  */
@@ -100,6 +101,7 @@ stop_this_cpu (void)
 	local_irq_disable();
 	cpu_halt();
 }
+EXPORT_SYMBOL(stop_this_cpu);
 
 irqreturn_t
 handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
@@ -410,3 +412,4 @@ void dump_send_ipi(void)
 {
         send_IPI_allbutself(IPI_DUMP_INTERRUPT);
 }
+EXPORT_SYMBOL(dump_send_ipi);
