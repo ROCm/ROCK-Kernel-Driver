@@ -509,6 +509,11 @@ TAUException(struct pt_regs *regs)
 }
 #endif /* CONFIG_INT_TAU */
 
+void show_stack(struct task_struct *task, unsigned long *sp)
+{
+	printk("FIXME: show_stack not implemented for ppc\n");
+}
+
 void __init trap_init(void)
 {
 }
