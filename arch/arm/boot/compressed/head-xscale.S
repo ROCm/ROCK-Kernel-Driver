@@ -40,6 +40,20 @@ __XScale_start:
 		mov	r7, #MACH_TYPE_IQ80321
 #endif
 
+#ifdef  CONFIG_ARCH_IQ31244
+		orr	pc, pc, #PHYS_OFFSET	@ jump to physical memory if we are not there.
+		nop
+		mov	r7, #(MACH_TYPE_IQ31244 & 0xff)
+		orr	r7, r7, #(MACH_TYPE_IQ31244 & 0xff00)
+#endif
+
+#ifdef  CONFIG_ARCH_IQ80331
+		orr	pc, pc, #PHYS_OFFSET	@ jump to physical memory if we are not there.
+		nop
+		mov	r7, #(MACH_TYPE_IQ80331 & 0xff)
+		orr	r7, r7, #(MACH_TYPE_IQ80331 & 0xff00)
+#endif
+
 #ifdef CONFIG_ARCH_LUBBOCK
 		mov	r7, #MACH_TYPE_LUBBOCK
 #endif
@@ -47,3 +61,4 @@ __XScale_start:
 #ifdef CONFIG_ARCH_COTULLA_IDP
 		mov	r7, #MACH_TYPE_COTULLA_IDP
 #endif
+
