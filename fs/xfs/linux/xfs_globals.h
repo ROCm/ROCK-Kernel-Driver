@@ -38,11 +38,7 @@
  */
 
 extern uint64_t xfs_panic_mask;		/* set to cause more panics */
-
 extern unsigned long xfs_physmem;
-
-extern spinlock_t xfs_atomic_spin;
-
 extern struct cred *sys_cred;
 
 #endif	/* __XFS_GLOBALS_H__ */

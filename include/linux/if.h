@@ -21,6 +21,8 @@
 
 #include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
 #include <linux/socket.h>		/* for "struct sockaddr" et al	*/
+
+#define	IFNAMSIZ	16
 #include <linux/hdlc/ioctl.h>
 
 /* Standard interface flags (netdevice->flags). */
@@ -69,7 +71,11 @@
 #define IF_PROTO_FR_ADD_PVC 0x2004	/*    Create FR PVC		*/
 #define IF_PROTO_FR_DEL_PVC 0x2005	/*    Delete FR PVC		*/
 #define IF_PROTO_X25	0x2006		/* X.25				*/
-
+#define IF_PROTO_HDLC_ETH 0x2007	/* raw HDLC, Ethernet emulation	*/
+#define IF_PROTO_FR_ADD_ETH_PVC 0x2008	/*  Create FR Ethernet-bridged PVC */
+#define IF_PROTO_FR_DEL_ETH_PVC 0x2009	/*  Delete FR Ethernet-bridged PVC */
+#define IF_PROTO_FR_PVC	0x200A		/* for reading PVC status	*/
+#define IF_PROTO_FR_ETH_PVC 0x200B
 
 
 /*
@@ -103,6 +109,7 @@ struct if_settings
 		cisco_proto		*cisco;
 		fr_proto		*fr;
 		fr_proto_pvc		*fr_pvc;
+		fr_proto_pvc_info	*fr_pvc_info;
 
 		/* interface settings */
 		sync_serial_settings	*sync;
@@ -120,7 +127,6 @@ struct if_settings
 struct ifreq 
 {
 #define IFHWADDRLEN	6
-#define	IFNAMSIZ	16
 	union
 	{
 		char	ifrn_name[IFNAMSIZ];		/* if name, e.g. "en0" */

@@ -34,22 +34,15 @@ typedef struct {
 } fr_proto_pvc;          /* for creating/deleting FR PVCs */
 
 typedef struct {
+	unsigned int dlci;
+	char master[IFNAMSIZ];	/* Name of master FRAD device */
+}fr_proto_pvc_info;		/* for returning PVC information only */
+
+typedef struct {
     unsigned int interval;
     unsigned int timeout;
 } cisco_proto;
 
 /* PPP doesn't need any info now - supply length = 0 to ioctl */
-
-union hdlc_settings {
-	raw_hdlc_proto		raw_hdlc;
-	cisco_proto		cisco;
-	fr_proto		fr;
-	fr_proto_pvc		fr_pvc;
-};
-
-union line_settings {
-	sync_serial_settings	sync;
-	te1_settings		te1;
-};
 
 #endif /* __HDLC_IOCTL_H__ */

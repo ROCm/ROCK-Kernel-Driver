@@ -364,19 +364,8 @@ static inline int activate_task(task_t *p, runqueue_t *rq)
 		 * boosting tasks that are related to maximum-interactive
 		 * tasks.
 		 */
-		if (sleep_avg > MAX_SLEEP_AVG) {
-			if (!in_interrupt()) {
-				sleep_avg += current->sleep_avg - MAX_SLEEP_AVG;
-				if (sleep_avg > MAX_SLEEP_AVG)
-					sleep_avg = MAX_SLEEP_AVG;
-
-				if (current->sleep_avg != sleep_avg) {
-					current->sleep_avg = sleep_avg;
-					requeue_waker = 1;
-				}
-			}
+		if (sleep_avg > MAX_SLEEP_AVG)
 			sleep_avg = MAX_SLEEP_AVG;
-		}
 		if (p->sleep_avg != sleep_avg) {
 			p->sleep_avg = sleep_avg;
 			p->prio = effective_prio(p);

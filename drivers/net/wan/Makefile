@@ -19,6 +19,7 @@ cyclomx-objs			:= $(cyclomx-y)
 
 hdlc-y				:= hdlc_generic.o
 hdlc-$(CONFIG_HDLC_RAW)		+= hdlc_raw.o
+hdlc-$(CONFIG_HDLC_RAW_ETH)	+= hdlc_raw_eth.o
 hdlc-$(CONFIG_HDLC_CISCO)	+= hdlc_cisco.o
 hdlc-$(CONFIG_HDLC_FR)		+= hdlc_fr.o
 hdlc-$(CONFIG_HDLC_PPP)		+= hdlc_ppp.o

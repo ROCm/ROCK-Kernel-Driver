@@ -1,12 +1,11 @@
 /*
  * Generic HDLC support routines for Linux
  *
- * Copyright (C) 1999-2002 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 1999-2003 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * under the terms of version 2 of the GNU General Public License
+ * as published by the Free Software Foundation.
  */
 
 #ifndef __HDLC_H
@@ -52,7 +51,7 @@
 #include <linux/hdlc/ioctl.h>
 
 #define HDLC_MAX_MTU 1500	/* Ethernet 1500 bytes */
-#define HDLC_MAX_MRU (HDLC_MAX_MTU + 10) /* max 10 bytes for FR */
+#define HDLC_MAX_MRU (HDLC_MAX_MTU + 10 + 14 + 4) /* for ETH+VLAN over FR */
 
 #define MAXLEN_LMISTAT  20	/* max size of status enquiry frame */
 
@@ -145,17 +144,20 @@ typedef struct {
 
 
 typedef struct pvc_device_struct {
-	struct net_device netdev; /* PVC net device - must be first */
-	struct net_device_stats stats;
 	struct hdlc_device_struct *master;
-	struct pvc_device_struct *next;
+	struct net_device *main;
+	struct net_device *ether; /* bridged Ethernet interface */
+	struct pvc_device_struct *next;	/* Sorted in ascending DLCI order */
+	int dlci;
+	int open_count;
 
 	struct {
-		int active;
-		int new;
-		int deleted;
-		int fecn;
-		int becn;
+		unsigned int new: 1;
+		unsigned int active: 1;
+		unsigned int exist: 1;
+		unsigned int deleted: 1;
+		unsigned int fecn: 1;
+		unsigned int becn: 1;
 	}state;
 }pvc_device;
 
@@ -180,18 +182,20 @@ typedef struct hdlc_device_struct {
 	void (*stop)(struct hdlc_device_struct *hdlc);
 	void (*proto_detach)(struct hdlc_device_struct *hdlc);
 	void (*netif_rx)(struct sk_buff *skb);
+	unsigned short (*type_trans)(struct sk_buff *skb,
+				     struct net_device *dev);
 	int proto;		/* IF_PROTO_HDLC/CISCO/FR/etc. */
 
 	union {
 		struct {
 			fr_proto settings;
 			pvc_device *first_pvc;
-			int pvc_count;
+			int dce_pvc_count;
 
 			struct timer_list timer;
 			int last_poll;
 			int reliable;
-			int changed;
+			int dce_changed;
 			int request;
 			int fullrep_sent;
 			u32 last_errors; /* last errors bit list */
@@ -226,6 +230,7 @@ typedef struct hdlc_device_struct {
 
 
 int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
+int hdlc_raw_eth_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
 int hdlc_cisco_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
 int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
 int hdlc_fr_ioctl(hdlc_device *hdlc, struct ifreq *ifr);
@@ -254,15 +259,9 @@ static __inline__ hdlc_device* dev_to_hdlc(struct net_device *dev)
 }
 
 
-static __inline__ struct net_device* pvc_to_dev(pvc_device *pvc)
-{
-	return &pvc->netdev;
-}
-
-
 static __inline__ pvc_device* dev_to_pvc(struct net_device *dev)
 {
-	return (pvc_device*)dev;
+	return (pvc_device*)dev->priv;
 }
 
 
@@ -270,19 +269,6 @@ static __inline__ const char *hdlc_to_name(hdlc_device *hdlc)
 {
 	return hdlc_to_dev(hdlc)->name;
 }
-
-
-static __inline__ const char *pvc_to_name(pvc_device *pvc)
-{
-	return pvc_to_dev(pvc)->name;
-}
-
-
-static __inline__ u16 netdev_dlci(struct net_device *dev)
-{
-	return ntohs(*(u16*)dev->dev_addr);
-}
-
 
 
 static __inline__ u16 q922_to_dlci(u8 *hdr)
@@ -344,6 +330,16 @@ static __inline__ void hdlc_proto_detach(hdlc_device *hdlc)
 	hdlc->proto_detach = NULL;
 }
 
+
+static __inline__ unsigned short hdlc_type_trans(struct sk_buff *skb,
+						 struct net_device *dev)
+{
+	hdlc_device *hdlc = dev_to_hdlc(skb->dev);
+	if (hdlc->type_trans)
+		return hdlc->type_trans(skb, dev);
+	else
+		return __constant_htons(ETH_P_HDLC);
+}
 
 #endif /* __KERNEL */
 #endif /* __HDLC_H */
