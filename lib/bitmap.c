@@ -165,7 +165,7 @@ EXPORT_SYMBOL(bitmap_weight);
 #define unhex(c)			(isdigit(c) ? (c - '0') : (toupper(c) - 'A' + 10))
 
 /**
- * bitmap_snprintf - convert bitmap to an ASCII hex string.
+ * bitmap_scnprintf - convert bitmap to an ASCII hex string.
  * @buf: byte buffer into which string is placed
  * @buflen: reserved size of @buf, in bytes
  * @maskp: pointer to bitmap to convert
@@ -174,7 +174,7 @@ EXPORT_SYMBOL(bitmap_weight);
  * Exactly @nmaskbits bits are displayed.  Hex digits are grouped into
  * comma-separated sets of eight digits per set.
  */
-int bitmap_snprintf(char *buf, unsigned int buflen,
+int bitmap_scnprintf(char *buf, unsigned int buflen,
 	const unsigned long *maskp, int nmaskbits)
 {
 	int i, word, bit, len = 0;
@@ -200,7 +200,7 @@ int bitmap_snprintf(char *buf, unsigned int buflen,
 	}
 	return len;
 }
-EXPORT_SYMBOL(bitmap_snprintf);
+EXPORT_SYMBOL(bitmap_scnprintf);
 
 /**
  * bitmap_parse - convert an ASCII hex string into a bitmap.

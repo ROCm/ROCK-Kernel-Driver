@@ -940,7 +940,7 @@ void set_irq_affinity_info (unsigned int irq, int hwid, int redir)
 static int irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	int len = cpumask_snprintf(page, count, irq_affinity[(long)data]);
+	int len = cpumask_scnprintf(page, count, irq_affinity[(long)data]);
 	if (count - len < 2)
 		return -EINVAL;
 	len += sprintf(page + len, "\n");
@@ -1005,7 +1005,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	int len = cpumask_snprintf(page, count, *(cpumask_t *)data);
+	int len = cpumask_scnprintf(page, count, *(cpumask_t *)data);
 	if (count - len < 2)
 		return -EINVAL;
 	len += sprintf(page + len, "\n");
