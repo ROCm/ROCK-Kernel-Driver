@@ -148,7 +148,7 @@ blkdev_get_blocks(struct inode *inode, sector_t iblock,
 	return 0;
 }
 
-static int
+static ssize_t
 blkdev_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs)
 {

@@ -317,7 +317,7 @@ struct address_space_operations {
 	sector_t (*bmap)(struct address_space *, sector_t);
 	int (*invalidatepage) (struct page *, unsigned long);
 	int (*releasepage) (struct page *, int);
-	int (*direct_IO)(int, struct kiocb *, const struct iovec *iov,
+	ssize_t (*direct_IO)(int, struct kiocb *, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs);
 };
 
@@ -1409,7 +1409,7 @@ static inline void do_generic_file_read(struct file * filp, loff_t *ppos,
 				actor);
 }
 
-int __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
+ssize_t __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	struct block_device *bdev, const struct iovec *iov, loff_t offset,
 	unsigned long nr_segs, get_blocks_t get_blocks, dio_iodone_t end_io,
 	int needs_special_locking);
@@ -1417,7 +1417,7 @@ int __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 /*
  * For filesystems which need locking between buffered and direct access
  */
-static inline int blockdev_direct_IO(int rw, struct kiocb *iocb,
+static inline ssize_t blockdev_direct_IO(int rw, struct kiocb *iocb,
 	struct inode *inode, struct block_device *bdev, const struct iovec *iov,
 	loff_t offset, unsigned long nr_segs, get_blocks_t get_blocks,
 	dio_iodone_t end_io)
@@ -1426,7 +1426,7 @@ static inline int blockdev_direct_IO(int rw, struct kiocb *iocb,
 				nr_segs, get_blocks, end_io, 1);
 }
 
-static inline int blockdev_direct_IO_no_locking(int rw, struct kiocb *iocb,
+static inline ssize_t blockdev_direct_IO_no_locking(int rw, struct kiocb *iocb,
 	struct inode *inode, struct block_device *bdev, const struct iovec *iov,
 	loff_t offset, unsigned long nr_segs, get_blocks_t get_blocks,
 	dio_iodone_t end_io)

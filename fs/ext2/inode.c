@@ -655,7 +655,7 @@ ext2_get_blocks(struct inode *inode, sector_t iblock, unsigned long max_blocks,
 	return ret;
 }
 
-static int
+static ssize_t
 ext2_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs)
 {
