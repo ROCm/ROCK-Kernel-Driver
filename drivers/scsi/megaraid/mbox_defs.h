@@ -18,19 +18,6 @@
 #include "lsi_defs.h"
 
 /*
- * All drivers must define the size of maximum transfer that can happen
- * through the firmware commands. If an application need to transfer more than
- * this amount of data, driver must allocate that memory on the fly and
- * release it after completing the command.
- */
-#define MBOX_IBUF_SIZE	4096
-
-
-#define SIGN_OFFSET_64BIT	0xA4	// signature offset of 64-bit HBAs
-#define HBA_SIGNATURE_64BIT	0x0299	// signature for 64-bit HBAs
-
-
-/*
  * Commands and states for mailbox based controllers
  */
 
@@ -149,34 +136,6 @@
 #define SPAN_DEPTH_4_SPANS		4
 
 
-/*
- * Parameters for the io-mapped controllers
- */
-
-/* I/O Port offsets */
-#define MBOX_CMD_PORT	 		0x00
-#define MBOX_ACK_PORT	 		0x00
-#define MBOX_TOGGLE_PORT		0x01
-#define MBOX_INTR_PORT	  		0x0a
-
-#define MBOX_BUSY_PORT     		0x00
-#define MBOX_PORT0	 		0x04
-#define MBOX_PORT1	 		0x05
-#define MBOX_PORT2	 		0x06
-#define MBOX_PORT3	 		0x07
-#define ENABLE_MBOX_REGION 		0x0B
-
-/* I/O Port Values */
-#define MBOX_ISSUE_BYTE	 		0x10
-#define MBOX_ACK_BYTE	   		0x08
-#define MBOX_ENABLE_INTR_BYTE   	0xc0
-#define MBOX_DISABLE_INTR_BYTE  	0x00
-#define MBOX_VALID_INTR_BYTE    	0x40
-#define MBOX_BUSY_BYTE     		0x10
-#define ENABLE_MBOX_BYTE   		0x00
-#define MBOX_INTR_VALID			0x40
-
-
 /**
  * struct mbox_t - Driver and f/w handshake structure.
  * @cmd		: firmware command
@@ -199,20 +158,20 @@
  */
 #define MBOX_MAX_FIRMWARE_STATUS	46
 typedef struct {
-	uint8_t			cmd;
-	uint8_t			cmdid;
-	uint16_t		numsectors;
-	uint32_t		lba;
-	uint32_t		xferaddr;
-	uint8_t			logdrv;
-	uint8_t			numsge;
-	uint8_t			resvd;
-	volatile uint8_t	busy;
-	volatile uint8_t	numstatus;
-	volatile uint8_t	status;
-	volatile uint8_t	completed[MBOX_MAX_FIRMWARE_STATUS];
-	volatile uint8_t	poll;
-	volatile uint8_t	ack;
+	uint8_t		cmd;
+	uint8_t		cmdid;
+	uint16_t	numsectors;
+	uint32_t	lba;
+	uint32_t	xferaddr;
+	uint8_t		logdrv;
+	uint8_t		numsge;
+	uint8_t		resvd;
+	uint8_t		busy;
+	uint8_t		numstatus;
+	uint8_t		status;
+	uint8_t		completed[MBOX_MAX_FIRMWARE_STATUS];
+	uint8_t		poll;
+	uint8_t		ack;
 } __attribute__ ((packed)) mbox_t;
 
 

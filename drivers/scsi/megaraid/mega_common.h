@@ -92,7 +92,6 @@ typedef struct {
  * struct adapter_t - driver's initialization structure
  * @param list			: list of megaraid host structures
  * @param dpc_h			: tasklet handle
- * @param slot			: slot number in global array of adapters
  * @param id			: PCI device identifier
  * @param host			: pointer to host structure of mid-layer
  * @param init_id		: initiator ID, the default value should be 7
@@ -110,12 +109,10 @@ typedef struct {
  * @param sglen			: max sg elements supported
  * @param max_sectors		: max sectors per request
  * @param cmd_per_lun		: max outstanding commands per LUN
- * @param highmem_dma		: can DMA beyond 4GB addresses. See also, NOTES.
  * @param fw_version		: firmware version
  * @param bios_version		: bios version
  * @param ibuf			: buffer to issue internal commands
  * @param ibuf_dma_h		: dma handle for the above buffer
- * @param flags			: controller specific flags
  * @param unique_id		: unique identifier for each adapter
  * @param irq			: IRQ for this adapter
  * @param mdevice		: each contoller's device data
@@ -124,14 +121,16 @@ typedef struct {
  * @param host_lock		: pointer to appropriate lock
  * @param scb_list		: pointer to the bulk of SCBs memory area
  * @param scb_pool		: pool of free scbs.
+ * @param scb_pool_lock		: lock for pool of free scbs.
  * @param pend_list		: pending commands list
+ * @param pend_list_lock	: exlusion lock for pending commands list
  * @param completed_list	: list of completed commands
+ * @param completed_list_lock	: exclusion lock for list of completed commands
  * @param quiescent		: driver is quiescent for now.
  * @param outstanding_cmds	: number of commands pending in the driver
  * @param iscb			: control block for command issued internally
  * @param isc			: associated SCSI command for generality
  * @param imtx			: allow only one internal pending command
- * @param iwq			: wait queue for synchronous internal commands
  * @param ito			: internal timeout value, (-1) means no timeout
  * @param icmd_recovery		: internal command path timed out
  * @param stats			: IO stastics about the controller
@@ -161,14 +160,6 @@ typedef struct {
  * If any internal command is timed out, icmd flag_recovery should be set and
  * further internal commands will return error until the command is actually
  * completed if ever.
- *
- * NOTES:
- * i.	the highmem_dma flag denotes whether we are registering ourselves as a
- * 64-bit capable driver or not. If a HBA supports 64-bit addressing, that
- * alone is not a sufficient condition for registering as 64-bit driver. The
- * kernel should also provide support for such arrangement. To denote if the
- * HBA supports 64-bit addressing, the flag DMA_64 is set in adapter_t
- * object.
  */
 
 /*
@@ -176,27 +167,14 @@ typedef struct {
  */
 #define VERSION_SIZE	16
 
-
-/*
- * Valid values for flags field of adapter_t structure.
- */
-#define MRAID_DMA_64		0x00000001	/* can dma in 64-bit address
-						range */
-#define MRAID_BOARD_MEMMAP	0x00000002	/* Is a memory-mapped
-						controller */
-#define MRAID_BOARD_IOMAP	0x00000004	/* Is a IO-mapped controller */
-
-
 typedef struct {
 	struct list_head		list;
 	struct tasklet_struct		dpc_h;
-	int				slot;
 
 	const struct pci_device_id	*pci_id;
 	struct pci_dev			*pdev;
 	uint32_t			unique_id;
 	uint8_t				irq;
-	bool_t				highmem_dma;
 
 	spinlock_t			*host_lock;
 	spinlock_t			lock;
@@ -208,7 +186,6 @@ typedef struct {
 #define MRAID_WAKEUP_NORM		1
 #define MRAID_WAKEUP_TIMEOUT		2
 #define MRAID_INTERNAL_COMMAND		VENDOR_SPECIFIC_COMMAND
-	wait_queue_head_t		iwq;
 
 	bool_t				quiescent;
 	int				outstanding_cmds;
@@ -219,8 +196,13 @@ typedef struct {
 
 	scb_t				*scb_list;
 	struct list_head		scb_pool;
+	spinlock_t			scb_pool_lock;
+
 	struct list_head		pend_list;
+	spinlock_t			pend_list_lock;
+
 	struct list_head		completed_list;
+	spinlock_t			completed_list_lock;
 
 	uint8_t				max_channel;
 	uint16_t			max_target;
@@ -243,17 +225,15 @@ typedef struct {
 	uint16_t			sglen;
 	uint16_t			max_sectors;
 	uint16_t			cmd_per_lun;
-	uint32_t			flags;
 
-#ifdef MRAID_HAVE_STATS
-	mraid_stats_t			stats;
-#endif
 	caddr_t				raid_device;
 
 	atomic_t			being_detached;
-
 } adapter_t;
 
+#define FREE_LIST_LOCK(adapter)		(&adapter->scb_pool_lock)
+#define PENDING_LIST_LOCK(adapter)	(&adapter->pend_list_lock)
+#define COMPLETED_LIST_LOCK(adapter)	(&adapter->completed_list_lock)
 
 /**
  * MRAID_GET_DEVICE_MAP - device ids
@@ -286,7 +266,7 @@ typedef struct {
 	}
 
 #define MRAID_IS_LOGICAL(adp, scp)	\
-	(SCP2CHANNEL(scp) == (adp)->virtual_ch) ? MRAID_TRUE : MRAID_FALSE;
+	(SCP2CHANNEL(scp) == (adp)->virtual_ch) ? 1 : 0;
 
 /**
  * struct mraid_driver_t - global driver data
@@ -297,26 +277,12 @@ typedef struct {
  * @param raid_device		: array of attached raid controllers
  *
  * mraid_driver_t contains information which is global to the driver.
- *
- * FIXME: we provide two external interfaces in addition to the regular IO
- * path, private ioctl and /proc. Care must be taken about using these two
- * interfaces while module is being unloaded. For now, we provide a macro,
- * IS_INTF_AVAILABLE(), which would return 1 if it is ok to use. In case of 0,
- * the corresponding entry points in each LLD must return w/o further
- * processing.
  */
-#define MAX_CONTROLLERS		32
 typedef struct _mraid_driver_t {
-	atomic_t		is_pvt_intf;
 	uint8_t			driver_version[8];
 	struct list_head	device_list;
 	uint8_t			attach_count;
-	adapter_t		*adapter[MAX_CONTROLLERS];
 } mraid_driver_t;
-
-#define SET_PRV_INTF_AVAILABLE() atomic_set(&mraid_driver_g.is_pvt_intf, 1)
-#define SET_PRV_INTF_UNAVAILABLE() atomic_set(&mraid_driver_g.is_pvt_intf, 0)
-#define IS_PRV_INTF_AVAILABLE() atomic_read(&mraid_driver_g.is_pvt_intf) ? 1 : 0
 
 
 /*
@@ -325,29 +291,6 @@ typedef struct _mraid_driver_t {
 extern int debug_level;
 #define LSI_DBGLVL debug_level
 
-/*
- * Assertaion helpers. The driver must use the foursome macros:
- * try_assertion {
- * 	ASSERT(expression);
- * }
- * catch_assertion {
- * 	// failed assetion steps
- * }
- * end_assertion
- *
- * Depending on compliation flag 'DEBUG' flag, the assert condition can panic
- * the machine or just print the assertion failure message. In the later case,
- * the driver will catch the failure in catch_assertion block and can take
- * recovery action.
- * NOTE: This is not a generic implementation since we only catch an integer
- * true-false assertion failure unlike C++ fullblown try-catch-throw
- * exceptions.
- */
-#define try_assertion {			\
-	int	__assertion_catched = 0;
-#define catch_assertion if( __assertion_catched )
-#define	end_assertion				}
-
 #if defined (_ASSERT_PANIC)
 #define ASSERT_ACTION	panic
 #else
@@ -355,8 +298,7 @@ extern int debug_level;
 #endif
 
 #define ASSERT(expression)						\
-	if( !(expression) ) {						\
-		__assertion_catched = 1;				\
+	if (!(expression)) {						\
 	ASSERT_ACTION("assertion failed:(%s), file: %s, line: %d:%s\n",	\
 			#expression, __FILE__, __LINE__, __FUNCTION__);	\
 	}
@@ -399,14 +341,8 @@ struct mraid_pci_blk {
 	dma_addr_t	dma_addr;
 };
 
+void mraid_sleep(int);
 void mraid_setup_device_map(adapter_t *);
-void mraid_icmd_done(struct scsi_cmnd *);
-void mraid_icmd_timeout(unsigned long);
-inline scb_t *mraid_get_icmd(adapter_t *);
-inline void mraid_free_icmd(adapter_t *);
-inline scb_t *mraid_alloc_scb(adapter_t *, struct scsi_cmnd *);
-inline void mraid_dealloc_scb(adapter_t *, scb_t *);
-void mraid_add_scb_to_pool(adapter_t *, scb_t *);
 struct mraid_pci_blk_pool *mraid_pci_blk_pool_create(struct pci_dev *,
 	size_t, size_t, size_t, struct mraid_pci_blk[]);
 void mraid_pci_blk_pool_destroy(struct mraid_pci_blk_pool *);

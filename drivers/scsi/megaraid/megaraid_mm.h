@@ -23,6 +23,9 @@
 #include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#include <linux/moduleparam.h>
+#endif
 #include <linux/proc_fs.h>
 #include <linux/pci.h>
 #include <linux/list.h>
@@ -30,8 +33,13 @@
 
 #include "mbox_defs.h"
 
-#define LSI_COMMON_MOD_VERSION	\
-	"v1.0.0.B1.04.07.2004 (Release Date: Wed Apr  7 17:20:39 EDT 2004)"
+#define LSI_COMMON_MOD_VERSION	"1.0.0.rc1"
+#define LSI_COMMON_MOD_EXT_VERSION	\
+	"(Release Date: Mon May 17 18:55:02 EDT 2004)"
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#define module_param(x,y,z)	MODULE_PARM(x, "i")
+#endif
 
 #define LSI_DBGLVL	dbglevel
 /*

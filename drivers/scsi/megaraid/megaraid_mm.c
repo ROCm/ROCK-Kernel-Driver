@@ -20,14 +20,15 @@
 MODULE_AUTHOR		("LSI Logic Corporation");
 MODULE_DESCRIPTION	("LSI Logic Management Module");
 MODULE_LICENSE		("GPL");
-MODULE_PARM		(dbglevel, "i");
+MODULE_VERSION		(LSI_COMMON_MOD_VERSION);
+static int		dbglevel	= CL_DLEVEL1;
+module_param		(dbglevel, int, 0);
 MODULE_PARM_DESC	(dbglevel, "Debug level (default=0)");
 
 EXPORT_SYMBOL		( mraid_mm_register_adp );
 EXPORT_SYMBOL		( mraid_mm_unregister_adp );
 
 static int		majorno;
-static int		dbglevel	= CL_DLEVEL1;
 spinlock_t		lc_lock		= SPIN_LOCK_UNLOCKED;
 static uint32_t		drvr_ver	= 0x01000000;
 
@@ -65,15 +66,15 @@ megaraid_mm_ioctl( struct inode* inode, struct file* filep, unsigned int cmd,
 		return -EINVAL;
 	}
 
-	/* 
-	 * Look for signature to see if this is the new or old ioctl format. 
+	/*
+	 * Look for signature to see if this is the new or old ioctl format.
 	 */
 	if( copy_from_user(signature, (char *)arg, EXT_IOCTL_SIGN_SZ) ) {
 		con_log(CL_ANN,(KERN_WARNING "cp from usr addr failed\n"));
 		return (-EFAULT);
-	}	
+	}
 
-	if( memcmp(signature, EXT_IOCTL_SIGN, EXT_IOCTL_SIGN_SZ) == 0 ) 
+	if( memcmp(signature, EXT_IOCTL_SIGN, EXT_IOCTL_SIGN_SZ) == 0 )
 		old_ioctl = MRAID_FALSE;
 	else
 		old_ioctl = MRAID_TRUE;
@@ -84,22 +85,22 @@ megaraid_mm_ioctl( struct inode* inode, struct file* filep, unsigned int cmd,
 	 */
 	rval = handle_drvrcmd( arg, old_ioctl, &drvrcmd_rval );
 
-	if (rval < 0)	
+	if (rval < 0)
 		return rval;
 	else if (rval == 0)
 		return drvrcmd_rval;
 
-	/* 
+	/*
 	 * Call the approprite converter to convert to kernel space
 	 */
 	if (old_ioctl == MRAID_FALSE) {
-		/* 
+		/*
 		 * User sent the new uioc_t packet. We don't support it yet.
 		 */
 		return (-EINVAL);
 	}
 	else {
-		/* 
+		/*
 		 * User sent the old mimd_t ioctl packet. Convert it to
 		 * uioc. If there is an error, the mutexes and other resources
 		 * would have been released already. So we can just return.
@@ -113,7 +114,7 @@ megaraid_mm_ioctl( struct inode* inode, struct file* filep, unsigned int cmd,
 	kioc		= &adp->kioc;
 	kioc->done	= ioctl_done;
 
-	/* 
+	/*
 	 * Issue the IOCTL to the low level driver
 	 */
 	if ((rval = lld_ioctl( adp, kioc ))) {
@@ -121,8 +122,8 @@ megaraid_mm_ioctl( struct inode* inode, struct file* filep, unsigned int cmd,
 		return rval;
 	}
 
-	/* 
-	 * Convert the kioc back to user space 
+	/*
+	 * Convert the kioc back to user space
 	 */
 	rval = kioc_to_mimd( kioc, (mimd_t*) arg );
 	up( &adp->kioc_mtx );
@@ -199,7 +200,7 @@ old_packet:
 
 /**
  * mimd_to_kioc	: Converter from old to new ioctl format
- * 
+ *
  * @umimd	: user space old MIMD IOCTL
  * @kioc	: kernel space new format IOCTL
  *
@@ -236,7 +237,7 @@ mimd_to_kioc( mimd_t* umimd, int* adp_index )
 	subopcode	= mimd.ui.fcs.subopcode;
 	adapno		= GETADAP(mimd.ui.fcs.adapno);
 
-	if( adapno >= slots_inuse ) 
+	if( adapno >= slots_inuse )
 		return (-ENODEV);
 
 	adp = &adparr[ adapno ];
@@ -302,19 +303,19 @@ mimd_to_kioc( mimd_t* umimd, int* adp_index )
 	}
 
 	memset( (void*)((ulong)kioc->cmdbuf), 0, bufsz );
-	
+
 	/*
 	 * If driver command, nothing else to do
 	 */
-	if( opcode == 0x82 ) 
+	if( opcode == 0x82 )
 		return 0;
 
 	/*
-	 * This is a mailbox cmd; copy the mailbox from mimd 
+	 * This is a mailbox cmd; copy the mailbox from mimd
 	 */
 	mbox64 = (mbox64_t*) ((ulong)kioc->cmdbuf);
 	memcpy( &(mbox64->mbox32), mimd.mbox, 18 );
-	
+
 	mbox64->xferaddr_lo	= mbox64->mbox32.xferaddr;
 	mbox64->xferaddr_hi	= 0;
 	mbox64->mbox32.xferaddr	= 0xffffffff;
@@ -322,11 +323,11 @@ mimd_to_kioc( mimd_t* umimd, int* adp_index )
 	if( mbox64->mbox32.cmd != 0x03 ) {	/* Not pthru; regular DCMD */
 
 		/*
-		 * We had allocated 28K for memblk. adp->kioc.cmdbuf is 
+		 * We had allocated 28K for memblk. adp->kioc.cmdbuf is
 		 * is pointing to the beginning for that memory block. Since
 		 * this is a mailbox command, the beginning of the block is
 		 * treated as a mailbox. Now we need the data. We will leave
-		 * the first 1k for mailbox and have int_data point to the 
+		 * the first 1k for mailbox and have int_data point to the
 		 * memblk + 1024
 		 */
 		adp->int_data		= adp->memblk + 1024;
@@ -336,9 +337,9 @@ mimd_to_kioc( mimd_t* umimd, int* adp_index )
 		mbox64->xferaddr_lo	= adp->int_data_dmah;
 		adp->int_data_len	= kioc->xferlen;
 		adp->int_data_user	= (caddr_t)(ulong)temp;
-		
+
 		if( kioc->data_dir & UIOC_WR ) {
-			if(copy_from_user(adp->int_data, 
+			if(copy_from_user(adp->int_data,
 					(void*)(ulong)temp, kioc->xferlen)){
 				up( &adp->kioc_mtx );
 				return (-EFAULT);
@@ -348,7 +349,7 @@ mimd_to_kioc( mimd_t* umimd, int* adp_index )
 		return 0;
 	}
 
-	/* 
+	/*
 	 * This is a regular 32-bit pthru cmd; mbox points to pthru struct.
 	 * Just like in above case, the beginning for memblk is treated as
 	 * a mailbox. The passthru will begin at next 1K boundary. And the
@@ -365,7 +366,7 @@ mimd_to_kioc( mimd_t* umimd, int* adp_index )
 	adp->int_pthru_len	= sizeof(mraid_passthru_t);
 	adp->int_pthru_user	= (caddr_t)(ulong)temp;
 
-	if( copy_from_user( pthru32, (void*)(ulong)temp, 
+	if( copy_from_user( pthru32, (void*)(ulong)temp,
 					sizeof(mraid_passthru_t)) ) {
 		up( &adp->kioc_mtx );
 		return (-EFAULT);
@@ -405,7 +406,7 @@ lld_ioctl( mraid_mmadp_t* adp, uioc_t* kioc )
 		return (-EINVAL);
 
 	kioc->status	= LC_PENDING;
-	rval		= adp->issue_uioc( adp->drvr_data, kioc, IOCTL_ISSUE); 
+	rval		= adp->issue_uioc( adp->drvr_data, kioc, IOCTL_ISSUE);
 
 	if( rval )
 		return rval;
@@ -429,7 +430,9 @@ lld_ioctl( mraid_mmadp_t* adp, uioc_t* kioc )
 	 * call, the ioctl either completed successfully or timedout.
 	 */
 	wait_event( wait_q, (kioc->status != LC_PENDING) );
-	del_timer_sync( tp );
+	if (tp) {
+		del_timer_sync( tp );
+	}
 
 	return 0;
 }
@@ -567,7 +570,7 @@ hinfo_to_cinfo( mraid_hba_info_t* hinfo, mcontroller_t* cinfo )
 	cinfo->irq		= hinfo->irq;
 	cinfo->numldrv		= hinfo->num_ldrv;
 	cinfo->pcibus		= hinfo->pci_bus;
-	cinfo->pcidev		= hinfo->pci_slot; 
+	cinfo->pcidev		= hinfo->pci_slot;
 	cinfo->pcifun		= PCI_FUNC(hinfo->pci_dev_fn);
 	cinfo->pciid		= hinfo->pci_device_id;
 	cinfo->pcivendor	= hinfo->pci_vendor_id;
@@ -589,7 +592,7 @@ mraid_mm_register_adp( mraid_mmadp_t* adp )
 	caddr_t		memblk;
 	dma_addr_t	memblk_dmah;
 
-	if (!adp) 
+	if (!adp)
 		return LC_EINVAL;
 
 	if (adp->drvr_type != DRVRTYPE_MBOX)
@@ -610,8 +613,8 @@ mraid_mm_register_adp( mraid_mmadp_t* adp )
 	cur_slot = slots_inuse++;
 	spin_unlock( &lc_lock );
 
-	/* 
-	 * Return error if it is a duplicate unique_id 
+	/*
+	 * Return error if it is a duplicate unique_id
 	 */
 	for (i=0; i < MAX_LSI_CMN_ADAPS; i++ ) {
 		if (adparr[i].unique_id == adp->unique_id) {
@@ -650,11 +653,13 @@ mraid_mm_unregister_adp( uint32_t unique_id )
 
 			pci_free_consistent( adparr[i].pdev, MEMBLK_SZ,
 				adparr[i].memblk, adparr[i].memblk_dmah );
-		
+
 			memset( &adparr[i], 0, sizeof(mraid_mmadp_t) );
 			spin_unlock( &lc_lock );
 
-			con_log( CL_ANN, ("Unregistered one lsi adp\n"));
+			con_log(CL_ANN, (
+				"megaraid_mm: Unregistered one lsi adp\n"));
+
 			return 0;
 		}
 	}
@@ -679,8 +684,8 @@ static int __init
 megaraid_mm_init(void)
 {
 	// Announce the driver version
-	con_log(CL_ANN, (KERN_INFO "megaraid_mm: %s\n", 
-					LSI_COMMON_MOD_VERSION));
+	con_log(CL_ANN, (KERN_INFO "megaraid_mm: %s %s\n",
+		LSI_COMMON_MOD_VERSION, LSI_COMMON_MOD_EXT_VERSION));
 
 	majorno = register_chrdev( 0, "megadev", &lsi_fops );
 
@@ -694,8 +699,8 @@ megaraid_mm_init(void)
 	slots_inuse = 0;
 
 	register_ioctl32_conversion( MEGAIOCCMD, megaraid_mm_compat_ioctl );
-	
-	return 0; 
+
+	return 0;
 }
 
 #ifdef LSI_CONFIG_COMPAT

@@ -18,6 +18,8 @@
 #include "kdep.h"
 #include "mega_common.h"
 
+static void __mraid_wakeup(unsigned long);
+
 /*
  * debug level - threshold for amount of information to be displayed by the
  * driver. This level can be changed through modules parameters, ioctl or
@@ -31,17 +33,16 @@ MODULE_PARM_DESC(debug_level, "Debug level for driver (default=0)");
  * mraid_setup_device_map - manage device ids
  * @adapter	: Driver's soft state
  *
- * Manange the device ids and shuffle the logical devices around if necessary
- * so that the boot device is first to be exported
- * The indexes are prepared so that for each channel/target requset coming
- * from the kernel can be mapped to appropriate LD or physical device
+ * Manange the device ids to have an appropraite mapping between the kernel
+ * scsi addresses and megaraid scsi and logical drive addresses. We export
+ * scsi devices on their actual addresses, whereas the logical drives are
+ * exported on a virtual scsi channel.
  **/
 void
 mraid_setup_device_map(adapter_t *adapter)
 {
 	uint8_t		c;
 	uint8_t		t;
-	uint32_t	tvar;
 
 	/*
 	 * First fill the values on the logical drive channel
@@ -58,114 +59,6 @@ mraid_setup_device_map(adapter_t *adapter)
 	for (c = 0; c < adapter->max_channel; c++)
 		for (t = 0; t < LSI_MAX_LOGICAL_DRIVES_64LD; t++)
 			adapter->device_ids[c][t] = (c << 8) | t;
-	/*
-	 * If the boot device is a logical drive, then swap the boot
-	 * logical drive with the first logical drive
-	 */
-	if ((adapter->bd_channel == 0xFF) && (adapter->bd_target != 0)) {
-
-		tvar = adapter->device_ids[adapter->max_channel][adapter->bd_target];
-		adapter->device_ids[adapter->max_channel][adapter->bd_target] =
-			adapter->device_ids[adapter->max_channel][0];
-
-		adapter->device_ids[adapter->max_channel][0] = tvar;
-	}
-}
-
-
-/**
- * mraid_get_icmd - get access rights to the internal command structure
- * @adapter	: pointer to our soft state
- *
- * Synchronize access to the single internal command strucuture.
- **/
-inline scb_t *
-mraid_get_icmd(adapter_t *adapter)
-{
-	down(&adapter->imtx);
-	return &adapter->iscb;
-}
-
-
-/**
- * mraid_free_icmd - release access rights to the internal command structure
- * @adapter	: pointer to our soft state
- *
- * Synchronize access to the single internal command strucuture.
- **/
-inline void
-mraid_free_icmd(adapter_t *adapter)
-{
-	up(&adapter->imtx);
-}
-
-
-/**
- * mraid_alloc_scb - detach and return a scb from the free list
- * @adapter	: controller's soft state
- *
- * return the scb from the head of the free list. NULL if there are none
- * available
- **/
-inline scb_t *
-mraid_alloc_scb(adapter_t *adapter, struct scsi_cmnd *scp)
-{
-	struct list_head *head = &adapter->scb_pool;
-	scb_t	*scb;
-
-	/* detach scb from free pool */
-	if (!list_empty(head)) {
-
-		scb = list_entry(head->next, scb_t, list);
-		list_del_init(head->next);
-		scb->state	= SCB_ACTIVE;
-		scb->scp	= scp;
-		scb->dma_type	= MRAID_DMA_NONE;
-
-		return scb;
-	}
-
-	return NULL;
-}
-
-
-/**
- * mraid_dealloc_scb - return the scb to the free pool
- * @adapter	: controller's soft state
- * @scb		: scb to be freed
- *
- * return the scb back to the free list of scbs. The caller must 'flush' the
- * SCB before calling us. E.g., performing pci_unamp and/or pci_sync etc.
- * NOTE NOTE: Make sure the scb is not on any list before calling this
- * routine.
- **/
-inline void
-mraid_dealloc_scb(adapter_t *adapter, scb_t *scb)
-{
-	/*
-	 * put scb in the free pool
-	 */
-	scb->state	= SCB_FREE;
-	scb->scp	= NULL;
-	list_add(&scb->list, &adapter->scb_pool);
-
-	return;
-}
-
-
-/**
- * mraid_add_scb_to_pool - add a newly allocated SCB to the free pool
- * @adapter	: controller's soft state
- * @scb		: newly allocated scb to be added
- *
- * LLDs allocate the SCB and than add them to the free pool.
- **/
-void
-mraid_add_scb_to_pool(adapter_t *adapter, scb_t *scb)
-{
-	list_add(&scb->list, &adapter->scb_pool);
-
-	return;
 }
 
 
@@ -337,6 +230,47 @@ mraid_pci_blk_pool_destroy(struct mraid_pci_blk_pool *blk_pool)
 	}
 
 	kfree( blk_pool );
+}
+
+
+/**
+ * mraid_sleep - induces sleep for specified number of seconds
+ * @param seconds	: number of seconds to sleep for
+ */
+void
+mraid_sleep(int seconds)
+{
+	struct timer_list	timer;
+	struct __sleep_obj {
+		wait_queue_head_t       wq;
+		int			sem;
+	} sleep_obj;
+
+
+	init_waitqueue_head(&sleep_obj.wq);
+	sleep_obj.sem = 0;
+
+	init_timer(&timer);
+	timer.function	= __mraid_wakeup;
+	timer.data	= (unsigned long)&sleep_obj;
+	timer.expires	= jiffies + seconds*HZ;
+	add_timer(&timer);
+
+	wait_event(sleep_obj.wq, sleep_obj.sem);
+
+}
+
+static void
+__mraid_wakeup(unsigned long ptr)
+{
+	struct __sleep_obj {
+		wait_queue_head_t       wq;
+		int			sem;
+	} *sleep_objp;
+
+	sleep_objp = (struct __sleep_obj *)ptr;
+
+	wake_up(&sleep_objp->wq);
 }
 
 /* vim: set ts=8 sw=8 tw=78 ai si: */

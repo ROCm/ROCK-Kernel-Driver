@@ -18,10 +18,6 @@
 #define LSI_MAX_CHANNELS			16
 #define LSI_MAX_DEVICES_PER_CHANNEL		16
 
-#define ADDR_LO(addr)	(((unsigned long)(addr)) & 0xffffffff)
-#define ADDR_HI(addr)	((((ulong)(addr)) & 0xffffffff00000000ULL) >> 32)
-#define ADDR_64(hi, lo)	((((uint64_t)(hi)) << 32) | (lo))
-
 typedef enum { MRAID_FALSE, MRAID_TRUE } bool_t;
 typedef enum { MRAID_SUCCESS, MRAID_FAILURE, MRAID_BUSY } status_t;
 
@@ -62,7 +58,7 @@ typedef enum { MRAID_SUCCESS, MRAID_FAILURE, MRAID_BUSY } status_t;
 #define UIOC_RD			0x00001
 #define UIOC_WR			0x00002
 
-#define MBOX_CMD		0x00000	
+#define MBOX_CMD		0x00000
 #define GET_DRIVER_VER		0x10000
 #define GET_N_ADAP		0x20000
 #define GET_ADAP_INFO		0x30000
@@ -124,13 +120,13 @@ typedef void(*DONE)(void);
 #define EXT_IOCTL_PACKET_SZ		128
 #define IOC_VALID_FIELDS_SZ		(46+sizeof(DONE))
 
-/* 
+/*
  * FIXME: reserve 32 bytes for driver at the bottom
  */
 typedef struct uioc {
 
 /* User Apps: */
-	
+
 	uint8_t		signature[EXT_IOCTL_SIGN_SZ];
 	uint8_t		mb_type;
 	uint8_t		app_type;
@@ -141,7 +137,7 @@ typedef struct uioc {
 	uint32_t	data_dir;
 	uint32_t	status;
 
-/* Driver Data: */	
+/* Driver Data: */
 	void (*done)(struct uioc*);
 
 	uint8_t		reserved[EXT_IOCTL_PACKET_SZ - IOC_VALID_FIELDS_SZ];
@@ -223,12 +219,12 @@ typedef struct mraid_mmadp {
 
 	uint32_t		unique_id;
 	uint32_t		drvr_type;
-	ulong			drvr_data;
+	unsigned long		drvr_data;
 	uint8_t			timeout;
 
 	struct pci_dev*		pdev;
 
-	int(*issue_uioc)(ulong, uioc_t*, uint32_t);
+	int(*issue_uioc)(unsigned long, uioc_t*, uint32_t);
 
 /* Maintained by common module */
 
