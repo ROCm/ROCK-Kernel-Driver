@@ -42,8 +42,8 @@ devclass_attr_store(struct kobject * kobj, struct attribute * attr,
 }
 
 static struct sysfs_ops class_sysfs_ops = {
-	show:	devclass_attr_show,
-	store:	devclass_attr_store,
+	.show	= devclass_attr_show,
+	.store	= devclass_attr_store,
 };
 
 static struct subsystem class_subsys = {
