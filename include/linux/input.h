@@ -332,6 +332,7 @@ struct input_absinfo {
 #define KEY_CANCEL		223
 #define KEY_BRIGHTNESSDOWN	224
 #define KEY_BRIGHTNESSUP	225
+#define KEY_MEDIA		226
 
 #define KEY_UNKNOWN		240
 
