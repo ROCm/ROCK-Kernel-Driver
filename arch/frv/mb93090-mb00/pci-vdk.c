@@ -44,9 +44,14 @@ struct pci_ops *__nongpreldata pci_root_ops;
 #define __get_PciCfgDataW(A) readw((volatile void __iomem *) __region_CS1 + 0x88 + ((A) & 2))
 #define __get_PciCfgDataL(A) readl((volatile void __iomem *) __region_CS1 + 0x88)
 
-#define __set_PciCfgDataB(A,V) writeb((V), (volatile void __iomem *) __region_CS1 + 0x88 + ((A) & 3))
-#define __set_PciCfgDataW(A,V) writew((V), (volatile void __iomem *) __region_CS1 + 0x88 + ((A) & 2))
-#define __set_PciCfgDataL(A,V) writel((V), (volatile void __iomem *) __region_CS1 + 0x88)
+#define __set_PciCfgDataB(A,V) \
+	writeb((V), (volatile void __iomem *) __region_CS1 + 0x88 + (3 - ((A) & 3)))
+
+#define __set_PciCfgDataW(A,V) \
+	writew((V), (volatile void __iomem *) __region_CS1 + 0x88 + (2 - ((A) & 2)))
+
+#define __set_PciCfgDataL(A,V) \
+	writel((V), (volatile void __iomem *) __region_CS1 + 0x88)
 
 #define __get_PciBridgeDataB(A) readb((volatile void __iomem *) __region_CS1 + 0x800 + (A))
 #define __get_PciBridgeDataW(A) readw((volatile void __iomem *) __region_CS1 + 0x800 + (A))
