@@ -108,6 +108,15 @@ UNUSUAL_DEV(  0x0482, 0x0103, 0x0100, 0x0100,
 		"Finecam S5",
 		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
 
+/* Patch for Kyocera Finecam L3
+ * Submitted by Michael Krauth <michael.krauth@web.de>
+ */
+UNUSUAL_DEV(  0x0482, 0x0105, 0x0100, 0x0100,
+		"Kyocera",
+		"Finecam L3",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_FIX_INQUIRY),
+
 /* Reported by Paul Stewart <stewart@wetlogic.net>
  * This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x04a4, 0x0004, 0x0001, 0x0001,
@@ -414,6 +423,28 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 		US_FL_SINGLE_LUN ),
 #endif
 
+/* Following three Minolta cameras reported by Martin Pool
+ * <mbp@sourcefrog.net>.  Originally discovered by Kedar Petankar,
+ * Matthew Geier, Mikael Lofj"ard, Marcel de Boer.
+ */
+UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
+		"Minolta",
+		"DiMAGE 7",
+		US_SC_SCSI, US_PR_DEVICE, NULL,
+		0 ),
+
+UNUSUAL_DEV( 0x0686, 0x400b, 0x0001, 0x0001,
+		"Minolta",
+		"DiMAGE 7i",
+		US_SC_SCSI, US_PR_DEVICE, NULL,
+		0 ),
+
+UNUSUAL_DEV( 0x0686, 0x400f, 0x0001, 0x0001,
+		"Minolta",
+		"DiMAGE 7Hi",
+		US_SC_SCSI, US_PR_DEVICE, NULL,
+		0 ),
+
 /* Submitted by Benny Sjostrand <benny@hostmobility.com> */
 UNUSUAL_DEV( 0x0686, 0x4011, 0x0001, 0x0001,
 		"Minolta",
@@ -425,28 +456,6 @@ UNUSUAL_DEV(  0x0686, 0x4017, 0x0001, 0x0001,
                 "Minolta",
                 "DIMAGE E223",
                 US_SC_SCSI, US_PR_DEVICE, NULL, 0 ),
-
-/* Following three Minolta cameras reported by Martin Pool
- * <mbp@sourcefrog.net>.  Originally discovered by Kedar Petankar,
- * Matthew Geier, Mikael Lofj"ard, Marcel de Boer.
- */
-UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
-             "Minolta",
-             "DiMAGE 7",
-             US_SC_SCSI, US_PR_DEVICE, NULL,
-             0 ),
-
-UNUSUAL_DEV( 0x0686, 0x400b, 0x0001, 0x0001,
-             "Minolta",
-             "DiMAGE 7i",
-             US_SC_SCSI, US_PR_DEVICE, NULL,
-             0 ),
-
-UNUSUAL_DEV( 0x0686, 0x400f, 0x0001, 0x0001,
-             "Minolta",
-             "DiMAGE 7Hi",
-             US_SC_SCSI, US_PR_DEVICE, NULL,
-             0 ),
 
 UNUSUAL_DEV(  0x0693, 0x0002, 0x0100, 0x0100, 
 		"Hagiwara",
@@ -607,7 +616,7 @@ UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
 UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
 		"Casio",
 		"QV DigitalCamera",
-		US_SC_8070, US_PR_CB, NULL,
+		US_SC_DEVICE, US_PR_CB, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Later Casio cameras apparently tell the truth */
@@ -631,15 +640,6 @@ UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
 		"AIPTEK",
 		"PocketCAM 3Mega",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_MODE_XLATE ),
-
-/*Medion 6047 Digital Camera
-Davide Andrian <_nessuno_@katamail.com>
-*/
-UNUSUAL_DEV( 0x08ca, 0x2011, 0x0001, 0x0001,
-		"3MegaCam",
-		"3MegaCam",
-		US_SC_DEVICE, US_PR_BULK, NULL,
 		US_FL_MODE_XLATE ),
 
 /* Trumpion Microelectronics MP3 player (felipe_alfaro@linuxmail.org) */
