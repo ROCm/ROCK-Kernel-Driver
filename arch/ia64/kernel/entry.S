@@ -589,7 +589,7 @@ END(ia64_ret_from_syscall)
  *	     r16-r19: cleared
  *		 r20: user-level ar.fpsr
  *		 r21: user-level b0
- *		 r22: cleared
+ *		 r22: user-level b6
  *		 r23: user-level ar.bspstore
  *		 r24: user-level ar.rnat
  *		 r25: user-level ar.unat
@@ -685,11 +685,11 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	;;
 	ld8 r24=[r16],PT(B0)-PT(AR_RNAT)	// load ar.rnat (may be garbage)
 	ld8 r31=[r17],PT(R1)-PT(PR)		// load predicates
-	mov b6=r22				// restore b6
+(pUStk) add r14=IA64_TASK_THREAD_ON_USTACK_OFFSET,r13
 	;;
 	ld8 r21=[r16],PT(R12)-PT(B0) // load b0
 	ld8.fill r1=[r17],16	// load r1
-(pUStk) add r14=IA64_TASK_THREAD_ON_USTACK_OFFSET,r13
+(pUStk) mov r3=1
 	;;
 	ld8.fill r12=[r16],16
 	ld8.fill r13=[r17],16
@@ -699,15 +699,15 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	ld8.fill r15=[r17]	// load r15
 	mov b7=r0		// clear b7
 	;;
-	mov r16=ar.bsp		// get existing backing store pointer
-	srlz.i			// ensure interruption collection is off
-(pUStk) mov r3=1
-	;;
 (pUStk) st1 [r14]=r3
 	movl r17=THIS_CPU(ia64_phys_stacked_size_p8)
 	;;
-	ld4 r17=[r17]		// r17 = cpu_data->phys_stacked_size_p8
+	mov r16=ar.bsp		// get existing backing store pointer
+	srlz.i			// ensure interruption collection is off
 	mov r14=r0		// clear r14
+	;;
+	ld4 r17=[r17]		// r17 = cpu_data->phys_stacked_size_p8
+	mov b6=r22				// restore b6
 	shr.u r18=r19,16	// get byte size of existing "dirty" partition
 (pKStk) br.cond.dpnt.many skip_rbs_switch
 	br.cond.sptk.many rbs_switch
@@ -959,19 +959,19 @@ rse_clear_invalid:
 	loadrs
 	;;
 skip_rbs_switch:
-(pSys)	mov r19=r0		// clear r19 for leave_syscall, no-op otherwise
+(pLvSys)	mov r19=r0		// clear r19 for leave_syscall, no-op otherwise
 	mov b0=r21
 	mov ar.pfs=r26
 (pUStk)	mov ar.bspstore=r23
 (p9)	mov cr.ifs=r30
-(pSys)	mov r16=r0		// clear r16 for leave_syscall, no-op otherwise
+(pLvSys)mov r16=r0		// clear r16 for leave_syscall, no-op otherwise
 	mov cr.ipsr=r29
 	mov ar.fpsr=r20
-(pSys)	mov r17=r0		// clear r17 for leave_syscall, no-op otherwise
+(pLvSys)mov r17=r0		// clear r17 for leave_syscall, no-op otherwise
 	mov cr.iip=r28
 	;;
 (pUStk)	mov ar.rnat=r24		// must happen with RSE in lazy mode
-(pSys)	mov r18=r0		// clear r18 for leave_syscall, no-op otherwise
+(pLvSys)mov r18=r0		// clear r18 for leave_syscall, no-op otherwise
 	mov ar.rsc=r27
 	mov ar.unat=r25
 	mov pr=r31,-1
