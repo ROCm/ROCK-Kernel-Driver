@@ -312,7 +312,7 @@ asmlinkage void do_IRQ(void)
 
 	/* only process softirqs if we didn't interrupt another interrupt handler */
 	if ((__frame->psr & PSR_PIL) == PSR_PIL_0)
-		if (softirq_pending(cpu))
+		if (local_softirq_pending())
 			do_softirq();
 
 #ifdef CONFIG_PREEMPT
