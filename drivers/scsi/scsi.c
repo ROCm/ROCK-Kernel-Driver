@@ -678,7 +678,7 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 /*
  * Per-CPU I/O completion queue.
  */
-static DEFINE_PER_CPU(struct list_head, scsi_done_q);
+DEFINE_PER_CPU(struct list_head, scsi_done_q);
 
 /**
  * scsi_done - Enqueue the finished SCSI command into the done queue.

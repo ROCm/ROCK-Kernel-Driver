@@ -3253,7 +3253,7 @@ static int selinux_socket_unix_may_send(struct socket *sock,
 	return 0;
 }
 
-static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
+static int __selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	u16 family;
 	char *addrp;
@@ -3362,6 +3362,20 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	}
 out:	
 	return err;
+}
+
+/* To make sure sk->sk_socket doesn't disappear while we mess
+ * with this skb, we need to take sk_callback_lock.
+ * See sock_orphan()
+ */
+static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
+{
+	int res;
+
+	read_lock_bh(&sk->sk_callback_lock);
+	res = __selinux_socket_sock_rcv_skb(sk, skb);
+	read_unlock_bh(&sk->sk_callback_lock);
+	return res;
 }
 
 static int selinux_socket_getpeersec(struct socket *sock, char __user *optval,
