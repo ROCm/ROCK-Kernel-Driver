@@ -28,6 +28,7 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/sched.h>
 #include "scsi.h"
 #include "hosts.h"
 #include <linux/libata.h>
@@ -1602,28 +1603,24 @@ static void pdc_20621_init(struct ata_probe_ent *pe)
 	readl(mmio + PDC_HDMA_CTLSTAT);		/* flush */
 }
 
-static int pdc_pata_possible(struct pci_dev *pdev)
-{
-	if (pdev->device == 0x3375)
-		return 1;
-	return 0;
-}
-
 static void pdc_host_init(unsigned int chip_id, struct ata_probe_ent *pe)
 {
-	struct pci_dev *pdev = pe->pdev;
 	void *mmio = pe->mmio_base;
 	u32 tmp;
 
 	if (chip_id == board_20621)
 		BUG();
 
-	/* change FIFO_SHD to 8 dwords. Promise driver does this...
-	 * dunno why.
+	/*
+	 * Except for the hotplug stuff, this is voodoo from the
+	 * Promise driver.  Label this entire section
+	 * "TODO: figure out why we do this"
 	 */
+
+	/* change FIFO_SHD to 8 dwords, enable BMR_BURST */
 	tmp = readl(mmio + PDC_FLASH_CTL);
-	if ((tmp & (1 << 16)) == 0)
-		writel(tmp | (1 << 16), mmio + PDC_FLASH_CTL);
+	tmp |= 0x12000;	/* bit 16 (fifo 8 dw) and 13 (bmr burst?) */
+	writel(tmp, mmio + PDC_FLASH_CTL);
 
 	/* clear plug/unplug flags for all ports */
 	tmp = readl(mmio + PDC_SATA_PLUG_CSR);
@@ -1633,25 +1630,21 @@ static void pdc_host_init(unsigned int chip_id, struct ata_probe_ent *pe)
 	tmp = readl(mmio + PDC_SATA_PLUG_CSR);
 	writel(tmp | 0xff0000, mmio + PDC_SATA_PLUG_CSR);
 
-	/* reduce TBG clock to 133 Mhz. FIXME: why? */
+	/* reduce TBG clock to 133 Mhz. */
 	tmp = readl(mmio + PDC_TBG_MODE);
 	tmp &= ~0x30000; /* clear bit 17, 16*/
 	tmp |= 0x10000;  /* set bit 17:16 = 0:1 */
 	writel(tmp, mmio + PDC_TBG_MODE);
 
-	/* adjust slew rate control register. FIXME: why? */
+	readl(mmio + PDC_TBG_MODE);	/* flush */
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(msecs_to_jiffies(10));
+
+	/* adjust slew rate control register. */
 	tmp = readl(mmio + PDC_SLEW_CTL);
 	tmp &= 0xFFFFF03F; /* clear bit 11 ~ 6 */
 	tmp  |= 0x00000900; /* set bit 11-9 = 100b , bit 8-6 = 100 */
 	writel(tmp, mmio + PDC_SLEW_CTL);
-
-	/* check for PATA port on PDC20375 */
-	if (pdc_pata_possible(pdev)) {
-		tmp = readl(mmio + PDC_PCI_CTL);
-		if (tmp & PDC_HAS_PATA)
-			printk(KERN_INFO DRV_NAME "(%s): sorry, PATA port not supported yet\n",
-			       pci_name(pdev));
-	}
 }
 
 static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
