@@ -227,16 +227,16 @@ console_setup(struct console *co, char *options)
 }
 
 static struct console sercons = {
-        name:    "ttyS",
-        write:   console_write,
-        read:    NULL,
-        device:  console_device,
-        unblank: NULL,
-	setup:   console_setup,
-	flags:   CON_PRINTBUFFER,
-	index:   DEBUG_PORT_IDX,
-	cflag:   0,
-	next:    NULL
+        .name    = "ttyS",
+        .write   = console_write,
+        .read    = NULL,
+        .device  = console_device,
+        .unblank = NULL,
+	.setup   = console_setup,
+	.flags   = CON_PRINTBUFFER,
+	.index   = DEBUG_PORT_IDX,
+	.cflag   = 0,
+	.next    = NULL
 };
 
 /*

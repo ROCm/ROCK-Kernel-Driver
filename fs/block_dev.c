@@ -783,14 +783,14 @@ int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 	return res;
 }
 
-const char *__bdevname(kdev_t dev)
+const char *__bdevname(dev_t dev)
 {
 	static char buffer[32];
-	const char * name = blkdevs[major(dev)];
+	const char * name = blkdevs[MAJOR(dev)];
 
 	if (!name)
 		name = "unknown-block";
 
-	sprintf(buffer, "%s(%d,%d)", name, major(dev), minor(dev));
+	sprintf(buffer, "%s(%d,%d)", name, MAJOR(dev), MINOR(dev));
 	return buffer;
 }

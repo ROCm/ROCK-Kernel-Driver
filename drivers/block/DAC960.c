@@ -2913,7 +2913,7 @@ static inline void DAC960_ProcessCompletedBuffer(BufferHeader_T *BufferHeader,
 
 static inline int DAC960_PartitionByCommand(DAC960_Command_T *Command)
 {
-	return DAC960_PartitionNumber(to_kdev_t(Command->BufferHeader->bi_bdev->bd_dev)); 
+	return (int)Command->BufferHeader->bi_bdev->bd_disk->private_data;
 }
 
 /*

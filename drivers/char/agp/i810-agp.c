@@ -44,9 +44,9 @@ static struct aper_size_info_fixed intel_i810_sizes[] =
 
 static struct gatt_mask intel_i810_masks[] =
 {
-	{mask: I810_PTE_VALID, type: 0},
-	{mask: (I810_PTE_VALID | I810_PTE_LOCAL), type: AGP_DCACHE_MEMORY},
-	{mask: I810_PTE_VALID, type: 0}
+	{.mask = I810_PTE_VALID, .type = 0},
+	{.mask = (I810_PTE_VALID | I810_PTE_LOCAL), .type = AGP_DCACHE_MEMORY},
+	{.mask = I810_PTE_VALID, .type = 0}
 };
 
 static struct _intel_i810_private {

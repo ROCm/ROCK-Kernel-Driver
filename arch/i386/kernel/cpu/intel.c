@@ -392,52 +392,52 @@ static unsigned int intel_size_cache(struct cpuinfo_x86 * c, unsigned int size)
 static struct cpu_dev intel_cpu_dev __initdata = {
 	.c_vendor	= "Intel",
 	.c_ident 	= { "GenuineIntel" },
-	c_models: {
-		{ X86_VENDOR_INTEL,	4,
+	.c_models = {
+		{ .vendor = X86_VENDOR_INTEL, .family = 4, .model_names = 
 		  { 
-			  [0] "486 DX-25/33", 
-			  [1] "486 DX-50", 
-			  [2] "486 SX", 
-			  [3] "486 DX/2", 
-			  [4] "486 SL", 
-			  [5] "486 SX/2", 
-			  [7] "486 DX/2-WB", 
-			  [8] "486 DX/4", 
-			  [9] "486 DX/4-WB"
+			  [0] = "486 DX-25/33", 
+			  [1] = "486 DX-50", 
+			  [2] = "486 SX", 
+			  [3] = "486 DX/2", 
+			  [4] = "486 SL", 
+			  [5] = "486 SX/2", 
+			  [7] = "486 DX/2-WB", 
+			  [8] = "486 DX/4", 
+			  [9] = "486 DX/4-WB"
 		  }
 		},
-		{ X86_VENDOR_INTEL,	5,
+		{ .vendor = X86_VENDOR_INTEL, .family = 5, .model_names =
 		  { 
-			  [0] "Pentium 60/66 A-step", 
-			  [1] "Pentium 60/66", 
-			  [2] "Pentium 75 - 200",
-			  [3] "OverDrive PODP5V83", 
-			  [4] "Pentium MMX",
-			  [7] "Mobile Pentium 75 - 200", 
-			  [8] "Mobile Pentium MMX"
+			  [0] = "Pentium 60/66 A-step", 
+			  [1] = "Pentium 60/66", 
+			  [2] = "Pentium 75 - 200",
+			  [3] = "OverDrive PODP5V83", 
+			  [4] = "Pentium MMX",
+			  [7] = "Mobile Pentium 75 - 200", 
+			  [8] = "Mobile Pentium MMX"
 		  }
 		},
-		{ X86_VENDOR_INTEL,     6,
+		{ .vendor = X86_VENDOR_INTEL, .family = 6, .model_names =
 		  { 
-			  [0] "Pentium Pro A-step",
-			  [1] "Pentium Pro", 
-			  [3] "Pentium II (Klamath)", 
-			  [4] "Pentium II (Deschutes)", 
-			  [5] "Pentium II (Deschutes)", 
-			  [6] "Mobile Pentium II",
-			  [7] "Pentium III (Katmai)", 
-			  [8] "Pentium III (Coppermine)", 
-			  [10] "Pentium III (Cascades)",
-			  [11] "Pentium III (Tualatin)",
+			  [0] = "Pentium Pro A-step",
+			  [1] = "Pentium Pro", 
+			  [3] = "Pentium II (Klamath)", 
+			  [4] = "Pentium II (Deschutes)", 
+			  [5] = "Pentium II (Deschutes)", 
+			  [6] = "Mobile Pentium II",
+			  [7] = "Pentium III (Katmai)", 
+			  [8] = "Pentium III (Coppermine)", 
+			  [10] = "Pentium III (Cascades)",
+			  [11] = "Pentium III (Tualatin)",
 		  }
 		},
-		{ X86_VENDOR_INTEL,     15,
+		{ .vendor = X86_VENDOR_INTEL, .family = 15, .model_names =
 		  {
-			  [0] "Pentium 4 (Unknown)",
-			  [1] "Pentium 4 (Willamette)",
-			  [2] "Pentium 4 (Northwood)",
-			  [4] "Pentium 4 (Foster)",
-			  [5] "Pentium 4 (Foster)",
+			  [0] = "Pentium 4 (Unknown)",
+			  [1] = "Pentium 4 (Willamette)",
+			  [2] = "Pentium 4 (Northwood)",
+			  [4] = "Pentium 4 (Foster)",
+			  [5] = "Pentium 4 (Foster)",
 		  }
 		},
 	},

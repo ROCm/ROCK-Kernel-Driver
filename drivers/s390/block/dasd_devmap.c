@@ -430,11 +430,12 @@ dasd_devmap_from_irq(int irq)
 }
 
 /*
- * Find the devmap for a device corresponding to a kdev.
+ * Find the devmap for a device corresponding to a block_device.
  */
 dasd_devmap_t *
-dasd_devmap_from_kdev(kdev_t kdev)
+dasd_devmap_from_bdev(struct block_device *bdev)
 {
+	kdev_t kdev = to_kdev_t(bdev->bd_dev);
 	int devindex;
 
 	/* Find the devindex for kdev. */
@@ -446,15 +447,6 @@ dasd_devmap_from_kdev(kdev_t kdev)
 
 	/* Now find the devmap by the devindex. */
 	return dasd_devmap_from_devindex(devindex);
-}
-
-/*
- * Find the devmap for a device corresponding to a block_device.
- */
-dasd_devmap_t *
-dasd_devmap_from_bdev(struct block_device *bdev)
-{
-	return dasd_devmap_from_kdev(to_kdev_t(bdev->bd_dev));
 }
 
 /*
@@ -535,6 +527,5 @@ dasd_devmap_exit(void)
 EXPORT_SYMBOL(dasd_devmap_from_devno);
 EXPORT_SYMBOL(dasd_devmap_from_devindex);
 EXPORT_SYMBOL(dasd_devmap_from_irq);
-EXPORT_SYMBOL(dasd_devmap_from_kdev);
 EXPORT_SYMBOL(dasd_get_device);
 EXPORT_SYMBOL(dasd_put_device);

@@ -55,7 +55,7 @@ extern struct pt_regs *kbd_pt_regs;
 
 static int adb_message_handler(struct notifier_block *, unsigned long, void *);
 static struct notifier_block adbhid_adb_notifier = {
-	notifier_call:	adb_message_handler,
+	.notifier_call	= adb_message_handler,
 };
 
 unsigned char adb_to_linux_keycodes[128] = {

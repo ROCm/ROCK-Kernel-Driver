@@ -438,7 +438,7 @@ static int serverworks_remove_memory(agp_memory * mem, off_t pg_start,
 
 static struct gatt_mask serverworks_masks[] =
 {
-	{mask: 0x00000001, type: 0}
+	{.mask = 0x00000001, .type = 0}
 };
 
 static struct aper_size_info_lvl2 serverworks_sizes[7] =

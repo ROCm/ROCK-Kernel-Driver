@@ -374,7 +374,7 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 		    && ct_helper->me) {
 			__MOD_INC_USE_COUNT(ct_helper->me);
 		} else {
-
+#ifdef CONFIG_MODULES
 			/* We are a NAT helper for protocol X.  If we need
 			 * respective conntrack helper for protoccol X, compute
 			 * conntrack helper name and try to load module */
@@ -403,6 +403,7 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 			       "because kernel was compiled without kernel "
 			       "module loader support\n", name);
 			return -EBUSY;
+#endif
 #endif
 		}
 	}
@@ -466,9 +467,12 @@ void ip_nat_helper_unregister(struct ip_nat_helper *me)
 		if ((ct_helper = ip_ct_find_helper(&me->tuple))
 		    && ct_helper->me) {
 			__MOD_DEC_USE_COUNT(ct_helper->me);
-		} else 
+		}
+#ifdef CONFIG_MODULES
+		else 
 			printk("%s: unable to decrement usage count"
 			       " of conntrack helper %s\n",
 			       __FUNCTION__, me->me->name);
+#endif
 	}
 }

@@ -221,7 +221,7 @@ static int stripe_status(struct dm_target *ti,
 			offset +=
 			    snprintf(result + offset, maxlen - offset,
 				     " %s " SECTOR_FORMAT,
-		       kdevname(to_kdev_t(sc->stripe[i].dev->bdev->bd_dev)),
+		       bdevname(sc->stripe[i].dev->bdev),
 				     sc->stripe[i].physical_start);
 		}
 		break;

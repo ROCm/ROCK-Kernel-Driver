@@ -72,7 +72,9 @@ extern void do_magic_suspend_2(void);
 extern void do_suspend_lowlevel(int resume);
 
 #else
-#define software_suspend()		do { } while(0)
+static inline void software_suspend(void)
+{
+}
 #define software_resume()		do { } while(0)
 #define register_suspend_notifier(a)	do { } while(0)
 #define unregister_suspend_notifier(a)	do { } while(0)

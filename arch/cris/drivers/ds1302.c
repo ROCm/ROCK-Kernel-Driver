@@ -479,8 +479,8 @@ get_rtc_status(char *buf)
 /* The various file operations we support. */
 
 static struct file_operations rtc_fops = {
-        owner:          THIS_MODULE,
-        ioctl:          rtc_ioctl,	
+        .owner          = THIS_MODULE,
+        .ioctl          = rtc_ioctl,	
 }; 
 
 /* Just probe for the RTC and register the device to handle the ioctl needed. */

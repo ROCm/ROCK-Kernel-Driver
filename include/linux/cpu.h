@@ -21,6 +21,7 @@
 
 #include <linux/device.h>
 #include <linux/node.h>
+#include <asm/semaphore.h>
 
 struct cpu {
 	int node_id;		/* The node which contains the CPU */
@@ -29,4 +30,6 @@ struct cpu {
 
 extern int register_cpu(struct cpu *, int, struct node *);
 
+/* Stop CPUs going up and down. */
+extern struct semaphore cpucontrol;
 #endif /* _LINUX_CPU_H_ */

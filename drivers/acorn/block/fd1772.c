@@ -1299,14 +1299,15 @@ static void do_fd_request(request_queue_t* q)
 }
 
 
-static int invalidate_drive(int rdev)
+static int invalidate_drive(struct block_device *bdev)
 {
+	struct archy_floppy_struct *p = bdev->bd_disk->private_data;
 	/* invalidate the buffer track to force a reread */
 #ifdef TRACKBUFFER
 	BufferDrive = -1;
 #endif
 
-	set_bit(rdev & 3, &fake_change);
+	set_bit(p - unit, &fake_change);
 	return 0;
 }
 
@@ -1314,12 +1315,11 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long param)
 {
 	struct block_device *bdev = inode->i_bdev;
-	int drive = MINOR(bdev->bd_dev);
 
 	switch (cmd) {
 	case FDFMTEND:
 	case FDFLUSH:
-		invalidate_drive(drive);
+		invalidate_drive(bdev);
 		check_disk_change(bdev);
 	case FDFMTBEG:
 		return 0;

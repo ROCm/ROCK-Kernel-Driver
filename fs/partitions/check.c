@@ -190,8 +190,6 @@ static void devfs_create_partitions(struct gendisk *dev)
 	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
 	char dirname[64], symlink[16];
 	static devfs_handle_t devfs_handle;
-	int part, max_p = dev->minors;
-	struct hd_struct *p = dev->part;
 
 	if (dev->flags & GENHD_FL_REMOVABLE)
 		devfs_flags |= DEVFS_FL_REMOVABLE;
@@ -227,10 +225,6 @@ static void devfs_create_partitions(struct gendisk *dev)
 static void devfs_create_cdrom(struct gendisk *dev)
 {
 #ifdef CONFIG_DEVFS_FS
-	int pos = 0;
-	devfs_handle_t dir, slave;
-	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
-	char dirname[64], symlink[16];
 	char vname[23];
 
 	if (!cdroms)

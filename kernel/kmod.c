@@ -155,7 +155,7 @@ char modprobe_path[256] = "/sbin/modprobe";
 static int exec_modprobe(void * module_name)
 {
 	static char * envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
-	char *argv[] = { modprobe_path, "-s", "-k", "--", (char*)module_name, NULL };
+	char *argv[] = { modprobe_path, "--", (char*)module_name, NULL };
 	int ret;
 
 	if (!system_running)

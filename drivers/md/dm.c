@@ -749,15 +749,9 @@ int dm_resume(struct mapped_device *md)
 	return 0;
 }
 
-kdev_t dm_kdev(struct mapped_device *md)
+struct gendisk *dm_disk(struct mapped_device *md)
 {
-	kdev_t dev;
-
-	down_read(&md->lock);
-	dev = md->kdev;
-	up_read(&md->lock);
-
-	return dev;
+	return md->disk;
 }
 
 struct dm_table *dm_get_table(struct mapped_device *md)

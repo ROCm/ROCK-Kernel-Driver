@@ -801,8 +801,8 @@ static struct pci_driver driver = {
 	.id_table	= svwks_pci_tbl,
 	.probe		= svwks_init_one,
 #if 0	/* FIXME: implement */
-	suspend:	,
-	resume:		,
+	.suspend	= ,
+	.resume		= ,
 #endif
 };
 
