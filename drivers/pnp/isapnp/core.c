@@ -631,7 +631,7 @@ isapnp_parse_name(char *name, unsigned int name_max, unsigned short *size)
  */
 
 static int __init isapnp_create_device(struct pnp_card *card,
-					   unsigned short size)
+				       unsigned short size)
 {
 	int number = 0, skip = 0, depnum = 0, dependent = 0, compat = 0;
 	unsigned char type, tmp[17];
@@ -947,7 +947,7 @@ static int isapnp_config_prepare(struct pnp_dev *dev)
 	int idx;
 	if (dev == NULL)
 		return -EINVAL;
-	if (dev->active || dev->ro)
+	if (dev->active || dev->lock_resources)
 		return -EBUSY;
 	for (idx = 0; idx < DEVICE_COUNT_IRQ; idx++) {
 		dev->irq_resource[idx].name = NULL;

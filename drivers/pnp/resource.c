@@ -588,45 +588,65 @@ static int pnp_generate_dma(struct pnp_cfg *config, int num)
 	return -ENOENT;
 }
 
-static int pnp_prepare_request(struct pnp_cfg *config)
+int pnp_init_res_cfg(struct pnp_res_cfg *res_config)
 {
-	struct pnp_dev *dev;
 	int idx;
-	if (!config)
+
+	if (!res_config)
 		return -EINVAL;
-	dev = &config->request;
-	if (dev == NULL)
-		return -EINVAL;
-	if (dev->active || dev->ro)
-		return -EBUSY;
 	for (idx = 0; idx < DEVICE_COUNT_IRQ; idx++) {
-		dev->irq_resource[idx].name = NULL;
-		dev->irq_resource[idx].start = -1;
-		dev->irq_resource[idx].end = -1;
-		dev->irq_resource[idx].flags = 0;
+		res_config->irq_resource[idx].start = -1;
+		res_config->irq_resource[idx].end = -1;
+		res_config->irq_resource[idx].flags = 0;
 	}
 	for (idx = 0; idx < DEVICE_COUNT_DMA; idx++) {
-		dev->dma_resource[idx].name = NULL;
-		dev->dma_resource[idx].start = -1;
-		dev->dma_resource[idx].end = -1;
-		dev->dma_resource[idx].flags = 0;
+		res_config->dma_resource[idx].name = NULL;
+		res_config->dma_resource[idx].start = -1;
+		res_config->dma_resource[idx].end = -1;
+		res_config->dma_resource[idx].flags = 0;
 	}
 	for (idx = 0; idx < DEVICE_COUNT_RESOURCE; idx++) {
-		dev->resource[idx].name = NULL;
-		dev->resource[idx].start = 0;
-		dev->resource[idx].end = 0;
-		dev->resource[idx].flags = 0;
+		res_config->resource[idx].name = NULL;
+		res_config->resource[idx].start = 0;
+		res_config->resource[idx].end = 0;
+		res_config->resource[idx].flags = 0;
 	}
 	return 0;
 }
 
-static int pnp_generate_request(struct pnp_cfg *config)
+static int pnp_prepare_request(struct pnp_dev *dev, struct pnp_cfg *config, struct pnp_res_cfg *template)
 {
-	int i;
+	int idx, err;
 	if (!config)
 		return -EINVAL;
-	if (pnp_prepare_request<0)
-		return -ENOENT;
+	if (dev->lock_resources)
+		return -EPERM;
+	if (dev->active)
+		return -EBUSY;
+	err = pnp_init_res_cfg(&config->request);
+	if (err < 0)
+		return err;
+	if (!template)
+		return 0;
+	for (idx = 0; idx < DEVICE_COUNT_IRQ; idx++)
+		if (template->irq_resource[idx].start >= 0)
+			config->request.irq_resource[idx] = template->irq_resource[idx];
+	for (idx = 0; idx < DEVICE_COUNT_DMA; idx++)
+		if (template->dma_resource[idx].start >= 0)
+			config->request.dma_resource[idx] = template->dma_resource[idx];
+	for (idx = 0; idx < DEVICE_COUNT_RESOURCE; idx++)
+		if (template->resource[idx].start > 0)
+			config->request.resource[idx] = template->resource[idx];
+	return 0;
+}
+
+static int pnp_generate_request(struct pnp_dev *dev, struct pnp_cfg *config, struct pnp_res_cfg *template)
+{
+	int i, err;
+	if (!config)
+		return -EINVAL;
+	if ((err = pnp_prepare_request(dev, config, template))<0)
+		return err;
 	for (i=0; i<=7; i++)
 	{
 		if(pnp_generate_port(config,i)<0)
@@ -745,7 +765,7 @@ static struct pnp_cfg * pnp_generate_config(struct pnp_dev *dev, int depnum)
  * finds the best resource configuration and then informs the correct pnp protocol
  */
 
-int pnp_activate_dev(struct pnp_dev *dev)
+int pnp_activate_dev(struct pnp_dev *dev, struct pnp_res_cfg *template)
 {
 	int depnum, max;
 	struct pnp_cfg *config;
@@ -754,7 +774,7 @@ int pnp_activate_dev(struct pnp_dev *dev)
         max = pnp_get_max_depnum(dev);
 	if (dev->active)
 		return -EBUSY;
-	if (dev->driver){
+	if (pnp_dev_has_driver(dev)){
 		printk(KERN_INFO "pnp: Automatic configuration failed because the PnP device '%s' is busy\n", dev->dev.bus_id);
 		return -EINVAL;
 	}
@@ -767,7 +787,7 @@ int pnp_activate_dev(struct pnp_dev *dev)
 		config = pnp_generate_config(dev,depnum);
 		if (!config)
 			return -EINVAL;
-		if (pnp_generate_request(config)==0)
+		if (pnp_generate_request(dev,config,template)==0)
 			goto done;
 		kfree(config);
 	}
@@ -794,10 +814,12 @@ int pnp_disable_dev(struct pnp_dev *dev)
 {
         if (!dev)
                 return -EINVAL;
-	if (dev->driver){
+	if (pnp_dev_has_driver(dev)){
 		printk(KERN_INFO "pnp: Disable failed becuase the PnP device '%s' is busy\n", dev->dev.bus_id);
 		return -EINVAL;
 	}
+	if (dev->lock_resources)
+		return -EPERM;
 	if (!dev->protocol->disable || !dev->active)
 		return -EINVAL;
 	pnp_dbg("the device '%s' has been disabled", dev->dev.bus_id);
@@ -812,21 +834,21 @@ int pnp_disable_dev(struct pnp_dev *dev)
  *
  */
 
-int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, int mode)
+int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, struct pnp_res_cfg *template, int mode)
 {
 	struct pnp_cfg *config;
 	if (!dev)
 		return -EINVAL;
-        config = pnp_generate_config(dev,depnum);
-	if (dev->driver){
-		printk(KERN_INFO "pnp: Unable to set resources becuase the PnP device '%s' is busy\n", dev->dev.bus_id);
+	if (pnp_dev_has_driver(dev)){
+		printk(KERN_INFO "pnp: Unable to set resources because the PnP device '%s' is busy\n", dev->dev.bus_id);
 		return -EINVAL;
 	}
 	if (!dev->protocol->get || !dev->protocol->set)
 		return -EINVAL;
+        config = pnp_generate_config(dev,depnum);
 	if (!config)
 		return -EINVAL;
-	if (pnp_generate_request(config)==0)
+	if (pnp_generate_request(dev,config,template)==0)
 		goto done;
 	kfree(config);
 	printk(KERN_ERR "pnp: Manual configuration failed for device '%s' due to resource conflicts\n", dev->dev.bus_id);
@@ -840,6 +862,23 @@ int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, int mode)
 	return 0;
 }
 
+/**
+ * pnp_resource_change - change one resource
+ * @resource: pointer to resource to be changed
+ * @start: start of region
+ * @size: size of region
+ *
+ */
+ 
+void pnp_resource_change(struct resource *resource, unsigned long start, unsigned long size)
+{
+	if (resource == NULL)
+		return;
+	resource->flags &= ~IORESOURCE_AUTO;
+	resource->start = start;
+	resource->end = start + size - 1;
+}
+
 EXPORT_SYMBOL(pnp_build_resource);
 EXPORT_SYMBOL(pnp_find_resources);
 EXPORT_SYMBOL(pnp_get_max_depnum);
@@ -848,9 +887,11 @@ EXPORT_SYMBOL(pnp_add_dma_resource);
 EXPORT_SYMBOL(pnp_add_port_resource);
 EXPORT_SYMBOL(pnp_add_mem_resource);
 EXPORT_SYMBOL(pnp_add_mem32_resource);
+EXPORT_SYMBOL(pnp_init_res_cfg);
 EXPORT_SYMBOL(pnp_activate_dev);
 EXPORT_SYMBOL(pnp_disable_dev);
 EXPORT_SYMBOL(pnp_raw_set_dev);
+EXPORT_SYMBOL(pnp_resource_change);
 
 /* format is: allowdma0 */
 
