@@ -29,6 +29,7 @@
 #include <linux/types.h>
 #include <linux/compatmac.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -48,6 +49,7 @@ ACPI_MODULE_NAME		("acpi_power")
 
 int acpi_power_add (struct acpi_device *device);
 int acpi_power_remove (struct acpi_device *device, int type);
+static int acpi_power_open_fs(struct inode *inode, struct file *file);
 
 static struct acpi_driver acpi_power_driver = {
 	.name =		ACPI_POWER_DRIVER_NAME,
@@ -71,6 +73,12 @@ struct acpi_power_resource
 
 static struct list_head		acpi_power_resource_list;
 
+static struct file_operations acpi_power_fops = {
+	.open		= acpi_power_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 /* --------------------------------------------------------------------------
                              Power Resource Management
@@ -379,58 +387,45 @@ end:
 
 struct proc_dir_entry		*acpi_power_dir = NULL;
 
-
-static int
-acpi_power_read_status (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_power_seq_show(struct seq_file *seq, void *offset)
 {
 	struct acpi_power_resource *resource = NULL;
-	char			*p = page;
-	int			len;
 
-	ACPI_FUNCTION_TRACE("acpi_power_read_status");
+	ACPI_FUNCTION_TRACE("acpi_power_seq_show");
 
-	if (!data || (off != 0))
+	resource = (struct acpi_power_resource *)seq->private;
+
+	if (!resource)
 		goto end;
 
-	resource = (struct acpi_power_resource *) data;
-
-	p += sprintf(p, "state:                   ");
+	seq_puts(seq, "state:                   ");
 	switch (resource->state) {
 	case ACPI_POWER_RESOURCE_STATE_ON:
-		p += sprintf(p, "on\n");
+		seq_puts(seq, "on\n");
 		break;
 	case ACPI_POWER_RESOURCE_STATE_OFF:
-		p += sprintf(p, "off\n");
+		seq_puts(seq, "off\n");
 		break;
 	default:
-		p += sprintf(p, "unknown\n");
+		seq_puts(seq, "unknown\n");
 		break;
 	}
 
-	p += sprintf(p, "system level:            S%d\n",
-		resource->system_level);
-	p += sprintf(p, "order:                   %d\n",
-		resource->order);
-	p += sprintf(p, "reference count:         %d\n",
-		resource->references);
+	seq_printf(seq, "system level:            S%d\n"
+			"order:                   %d\n"
+			"reference count:         %d\n",
+			resource->system_level,
+			resource->order,
+			resource->references);
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return 0;
 }
 
+static int acpi_power_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_power_seq_show, PDE(inode)->data);
+}
 
 static int
 acpi_power_add_fs (
@@ -458,7 +453,7 @@ acpi_power_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_POWER_FILE_STATUS));
 	else {
-		entry->read_proc = acpi_power_read_status;
+		entry->proc_fops = &acpi_power_fops;
 		entry->data = acpi_driver_data(device);
 	}
 
