@@ -576,11 +576,6 @@ static void uart00_console_write(struct console *co, const char *s, unsigned cou
 #endif
 }
 
-static kdev_t uart00_console_device(struct console *co)
-{
-	return mk_kdev(SERIAL_UART00_MAJOR, SERIAL_UART00_MINOR + co->index);
-}
-
 static void __init
 uart00_console_get_options(struct uart_port *port, int *baud,
 			   int *parity, int *bits)
@@ -636,13 +631,15 @@ static int __init uart00_console_setup(struct console *co, char *options)
 	return uart_set_options(port, co, baud, parity, bits, flow);
 }
 
+extern struct uart_driver uart00_reg;
 static struct console uart00_console = {
 	.name		= SERIAL_UART00_NAME,
 	.write		= uart00_console_write,
-	.device		= uart00_console_device,
+	.device		= uart_console_device,
 	.setup		= uart00_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= 0,
+	.data		= &uart00_reg;
 };
 
 static int __init uart00_console_init(void)

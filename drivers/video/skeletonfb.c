@@ -536,7 +536,6 @@ int __init xxxfb_init(void)
      * space via ioremap. Consult ioport.h. 
      */
     info.screen_base = framebuffer_virtual_memory;	
-    info.node = NODEV;
     info.fbops = &xxxfb_ops;
     info.fix = xxxfb_fix;
     info.pseudo_palette = pseudo_palette;
@@ -566,7 +565,7 @@ int __init xxxfb_init(void)
 	
     if (register_framebuffer(&info) < 0)
 	return -EINVAL;
-    printk(KERN_INFO "fb%d: %s frame buffer device\n", minor(info.node),
+    printk(KERN_INFO "fb%d: %s frame buffer device\n", info.node,
 	   info.fix.id);
     return 0;
 }

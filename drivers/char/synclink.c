@@ -1704,7 +1704,7 @@ void mgsl_isr_transmit_dma( struct mgsl_struct *info )
  * 	
  * Return Value: None
  */
-static void mgsl_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t mgsl_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct mgsl_struct * info;
 	u16 UscVector;
@@ -1716,7 +1716,7 @@ static void mgsl_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	info = (struct mgsl_struct *)dev_id;	
 	if (!info)
-		return;
+		return IRQ_NONE;
 		
 	spin_lock(&info->irq_spinlock);
 
@@ -1766,7 +1766,7 @@ static void mgsl_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	if ( debug_level >= DEBUG_LEVEL_ISR )	
 		printk("%s(%d):mgsl_interrupt(%d)exit.\n",
 			__FILE__,__LINE__,irq);
-
+	return IRQ_HANDLED;
 }	/* end of mgsl_interrupt() */
 
 /* startup()

@@ -1752,7 +1752,6 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 
 	strcpy(ACCESS_FBINFO(fbcon.modename), "MATROX VGA");
 	ACCESS_FBINFO(fbcon.changevar) = NULL;
-	ACCESS_FBINFO(fbcon.node) = NODEV;
 	ACCESS_FBINFO(fbcon.fbops) = &matroxfb_ops;
 	ACCESS_FBINFO(fbcon.disp) = d;
 	ACCESS_FBINFO(fbcon.switch_con) = &matroxfb_switch;
@@ -1872,12 +1871,12 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 		goto failVideoIO;
 	}
 	printk("fb%d: %s frame buffer device\n",
-	       minor(ACCESS_FBINFO(fbcon.node)), ACCESS_FBINFO(fbcon.modename));
+	       ACCESS_FBINFO(fbcon.node), ACCESS_FBINFO(fbcon.modename));
 	if (ACCESS_FBINFO(fbcon.currcon) < 0) {
 		/* there is no console on this fb... but we have to initialize hardware
 		 * until someone tells me what is proper thing to do */
 		printk(KERN_INFO "fb%d: initializing hardware\n",
-			minor(ACCESS_FBINFO(fbcon.node)));
+			ACCESS_FBINFO(fbcon.node));
 		matroxfb_set_var(&vesafb_defined, -1, &ACCESS_FBINFO(fbcon));
 	}
 	return 0;

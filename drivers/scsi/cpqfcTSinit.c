@@ -1716,7 +1716,7 @@ int cpqfcTS_biosparam(struct scsi_device *sdev, struct block_device *n,
 
 
 
-void cpqfcTS_intr_handler( int irq, 
+irqreturn_t cpqfcTS_intr_handler( int irq, 
 		void *dev_id, 
 		struct pt_regs *regs)
 {
@@ -1726,7 +1726,8 @@ void cpqfcTS_intr_handler( int irq,
   CPQFCHBA *cpqfcHBA = (CPQFCHBA *)HostAdapter->hostdata;
   int MoreMessages = 1; // assume we have something to do
   UCHAR IntPending;
-  
+  int handled = 0;
+
   ENTER("intr_handler");
   spin_lock_irqsave( HostAdapter->host_lock, flags);
   // is this our INT?
@@ -1737,7 +1738,7 @@ void cpqfcTS_intr_handler( int irq,
 #define INFINITE_IMQ_BREAK 10000
   if( IntPending )
   {
-    
+    handled = 1;
     // mask our HBA interrupts until we handle it...
     writeb( 0, cpqfcHBA->fcChip.Registers.INTEN.address);
 
@@ -1791,6 +1792,7 @@ void cpqfcTS_intr_handler( int irq,
   }
   spin_unlock_irqrestore( HostAdapter->host_lock, flags);
   LEAVE("intr_handler");
+  return IRQ_RETVAL(handled);
 }
 
 

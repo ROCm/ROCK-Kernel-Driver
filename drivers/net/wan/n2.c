@@ -216,12 +216,13 @@ static int n2_open(struct net_device *dev)
 	port_t *port = hdlc_to_port(hdlc);
 	int io = port->card->io;
 	u8 mcr = inb(io + N2_MCR) | (port->phy_node ? TX422_PORT1:TX422_PORT0);
+	int result;
 
 
 	if (!try_module_get(THIS_MODULE))
 		return -EFAULT;	/* rmmod in progress */
 
-	int result = hdlc_open(hdlc);
+	result = hdlc_open(hdlc);
 	if (result) {
 		return result;
 		module_put(THIS_MODULE);

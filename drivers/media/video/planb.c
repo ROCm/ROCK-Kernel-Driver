@@ -40,7 +40,6 @@
 #include <linux/vmalloc.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
-#include <linux/wrapper.h>
 #include <linux/videodev.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>

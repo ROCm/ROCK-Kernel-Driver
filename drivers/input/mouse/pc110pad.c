@@ -71,7 +71,8 @@ static irqreturn_t pc110pad_interrupt(int irq, void *ptr, struct pt_regs *regs)
 
 	pc110pad_data[pc110pad_count++] = value;
 
-	if (pc110pad_count < 3) return;
+	if (pc110pad_count < 3)
+		return IRQ_HANDLED;
 	
 	input_regs(&pc110pad_dev, regs);
 	input_report_key(&pc110pad_dev, BTN_TOUCH,

@@ -1147,11 +1147,6 @@
 #define MUST_BYTESWAP
 #endif
 
-/* for compatibility between 2.5, 2.4 and 2.2 */
-#ifndef B_FREE
-#define B_FREE   -1
-#endif
-
 /* permedia3 -specific definitions */
 #define PM3_SCALE_TO_CLOCK(pr, fe, po) ((2 * PM3_REF_CLOCK * fe) / (pr * (1 << (po))))
 

@@ -483,7 +483,7 @@ static snd_pcm_uframes_t snd_fm801_capture_pointer(snd_pcm_substream_t * substre
 
 static irqreturn_t snd_fm801_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	fm801_t *chip = snd_magic_cast(fm801_t, dev_id, return);
+	fm801_t *chip = snd_magic_cast(fm801_t, dev_id, return IRQ_NONE);
 	unsigned short status;
 	unsigned int tmp;
 

@@ -63,6 +63,11 @@ static void keyspan_set_termios		(struct usb_serial_port *port,
 					 struct termios *old);
 static void keyspan_break_ctl		(struct usb_serial_port *port,
 					 int break_state);
+static int  keyspan_tiocmget		(struct usb_serial_port *port,
+					 struct file *file);
+static int  keyspan_tiocmset		(struct usb_serial_port *port,
+					 struct file *file, unsigned int set,
+					 unsigned int clear);
 static int  keyspan_fake_startup	(struct usb_serial *serial);
 
 static int  keyspan_usa19_calc_baud	(u32 baud_rate, u32 baudclk, 
@@ -551,6 +556,8 @@ static struct usb_serial_device_type keyspan_1port_device = {
 	.ioctl			= keyspan_ioctl,
 	.set_termios		= keyspan_set_termios,
 	.break_ctl		= keyspan_break_ctl,
+	.tiocmget		= keyspan_tiocmget,
+	.tiocmset		= keyspan_tiocmset,
 	.attach			= keyspan_startup,
 	.shutdown		= keyspan_shutdown,
 };
@@ -574,6 +581,8 @@ static struct usb_serial_device_type keyspan_2port_device = {
 	.ioctl			= keyspan_ioctl,
 	.set_termios		= keyspan_set_termios,
 	.break_ctl		= keyspan_break_ctl,
+	.tiocmget		= keyspan_tiocmget,
+	.tiocmset		= keyspan_tiocmset,
 	.attach			= keyspan_startup,
 	.shutdown		= keyspan_shutdown,
 };
@@ -597,6 +606,8 @@ static struct usb_serial_device_type keyspan_4port_device = {
 	.ioctl			= keyspan_ioctl,
 	.set_termios		= keyspan_set_termios,
 	.break_ctl		= keyspan_break_ctl,
+	.tiocmget		= keyspan_tiocmget,
+	.tiocmset		= keyspan_tiocmset,
 	.attach			= keyspan_startup,
 	.shutdown		= keyspan_shutdown,
 };

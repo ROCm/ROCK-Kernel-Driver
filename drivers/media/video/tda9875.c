@@ -240,8 +240,7 @@ static int tda9875_checkit(struct i2c_adapter *adap, int addr)
 	return(0);
 }
 
-static int tda9875_attach(struct i2c_adapter *adap, int addr,
-			  unsigned short flags, int kind)
+static int tda9875_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	struct tda9875 *t;
 	struct i2c_client *client;

@@ -127,7 +127,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 }
 
 static int
-buffer_setup(struct file *file, int *count, int *size)
+buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 {
 	*size = TS_PACKET_SIZE * TS_NR_PACKETS;
 	if (0 == *count)

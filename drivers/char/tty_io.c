@@ -1315,26 +1315,36 @@ retry_open:
 	if (IS_TTY_DEV(device)) {
 		if (!current->tty)
 			return -ENXIO;
-		device = to_kdev_t(current->tty->device);
+		driver = current->tty->driver;
+		index = current->tty->index;
 		filp->f_flags |= O_NONBLOCK; /* Don't let /dev/tty block */
 		/* noctty = 1; */
+		goto got_driver;
 	}
 #ifdef CONFIG_VT
 	if (IS_CONSOLE_DEV(device)) {
 		extern int fg_console;
-		device = mk_kdev(TTY_MAJOR, fg_console + 1);
+		extern struct tty_driver console_driver;
+		driver = &console_driver;
+		index = fg_console;
 		noctty = 1;
+		goto got_driver;
 	}
 #endif
 	if (IS_SYSCONS_DEV(device)) {
 		struct console *c = console_drivers;
-		while(c && !c->device)
-			c = c->next;
-		if (!c)
-                        return -ENODEV;
-                device = c->device(c);
-		filp->f_flags |= O_NONBLOCK; /* Don't let /dev/console block */
-		noctty = 1;
+		for (c = console_drivers; c; c = c->next) {
+			if (!c->device)
+				continue;
+			driver = c->device(c, &index);
+			if (!driver)
+				continue;
+			/* Don't let /dev/console block */
+			filp->f_flags |= O_NONBLOCK;
+			noctty = 1;
+			goto got_driver;
+		}
+		return -ENODEV;
 	}
 
 	if (IS_PTMX_DEV(device)) {
@@ -1357,7 +1367,7 @@ retry_open:
 		driver = get_tty_driver(kdev_t_to_nr(device), &index);
 		if (!driver)
 			return -ENODEV;
-
+got_driver:
 		retval = init_dev(driver, index, &tty);
 		if (retval)
 			return retval;
@@ -1700,8 +1710,8 @@ tty_tiocmset(struct tty_struct *tty, struct file *file, unsigned int cmd,
 			break;
 		}
 
-		set &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2;
-		clear &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2;
+		set &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2|TIOCM_LOOP;
+		clear &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2|TIOCM_LOOP;
 
 		retval = tty->driver->tiocmset(tty, file, set, clear);
 	}

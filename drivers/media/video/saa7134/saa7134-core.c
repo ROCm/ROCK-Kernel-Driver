@@ -532,7 +532,7 @@ static void print_irqstatus(struct saa7134_dev *dev, int loop,
 	printk("\n");
 }
 
-static void saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct saa7134_dev *dev = (struct saa7134_dev*) dev_id;
 	unsigned long report,status;
@@ -546,7 +546,7 @@ static void saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 			if (irq_debug > 1)
 				printk(KERN_DEBUG "%s/irq: no (more) work\n",
 				       dev->name);
-			return;
+			goto out;
 		}
 		if (irq_debug)
 			print_irqstatus(dev,loop,report,status);
@@ -582,6 +582,8 @@ static void saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 		saa_writel(SAA7134_IRQ1,0);
 		saa_writel(SAA7134_IRQ2,0);
 	}
+out:
+	return IRQ_HANDLED;
 }
 
 /* ------------------------------------------------------------------ */

@@ -2021,7 +2021,7 @@ static int __devinit neofb_probe(struct pci_dev *dev,
 		goto failed;
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       minor(info->node), info->fix.id);
+	       info->node, info->fix.id);
 
 	/*
 	 * Our driver data

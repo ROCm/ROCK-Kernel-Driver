@@ -1562,14 +1562,15 @@ static void __devexit free_freepool (struct fs_dev *dev, struct freepool *fp)
 
 
 
-static void fs_irq (int irq, void *dev_id,  struct pt_regs * pt_regs) 
+static irqreturn_t fs_irq (int irq, void *dev_id,  struct pt_regs * pt_regs) 
 {
 	int i;
 	u32 status;
 	struct fs_dev *dev = dev_id;
 
 	status = read_fs (dev, ISR);
-	if (!status) return;
+	if (!status)
+		return IRQ_NONE;
 
 	func_enter ();
 
@@ -1649,6 +1650,7 @@ static void fs_irq (int irq, void *dev_id,  struct pt_regs * pt_regs)
 	}
 
 	func_exit ();
+	return IRQ_HANDLED;
 }
 
 

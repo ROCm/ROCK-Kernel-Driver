@@ -509,7 +509,8 @@ static void isicom_bottomhalf(void * data)
 } 		
  		
 /* main interrupt handler routine */ 		
-static void isicom_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+static irqreturn_t isicom_interrupt(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	struct isi_board * card;
 	struct isi_port * port;
@@ -534,7 +535,7 @@ static void isicom_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 
 	if (!card || !(card->status & FIRMWARE_LOADED)) {
 /*		printk(KERN_DEBUG "ISICOM: interrupt: not handling irq%d!.\n", irq);*/
-		return;
+		return IRQ_NONE;
 	}
 	
 	base = card->base;
@@ -561,7 +562,7 @@ static void isicom_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 			ClearInterrupt(base);
 		else
 			outw(0x0000, base+0x04); /* enable interrupts */		
-		return;			
+		return IRQ_HANDLED;			
 	}
 	port = card->ports + channel;
 	if (!(port->flags & ASYNC_INITIALIZED)) {
@@ -569,7 +570,7 @@ static void isicom_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 			ClearInterrupt(base);
 		else
 			outw(0x0000, base+0x04); /* enable interrupts */
-		return;
+		return IRQ_HANDLED;
 	}	
 		
 	tty = port->tty;
@@ -702,7 +703,7 @@ static void isicom_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		ClearInterrupt(base);
 	else
 		outw(0x0000, base+0x04); /* enable interrupts */	
-	return;
+	return IRQ_HANDLED;
 } 
 
  /* called with interrupts disabled */ 

@@ -152,7 +152,6 @@ static int 	tms380tr_init_card(struct net_device *dev);
 static void 	tms380tr_init_ipb(struct net_local *tp);
 static void 	tms380tr_init_net_local(struct net_device *dev);
 static void 	tms380tr_init_opb(struct net_device *dev);
-void	 	tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 /* "M" */
 /* "O" */
 int		tms380tr_open(struct net_device *dev);
@@ -780,15 +779,16 @@ static void tms380tr_timer_chk(unsigned long data)
 /*
  * The typical workload of the driver: Handle the network interface interrupts.
  */
-void tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct net_local *tp;
 	unsigned short irq_type;
+	int handled = 0;
 
 	if(dev == NULL) {
 		printk(KERN_INFO "%s: irq %d for unknown device.\n", dev->name, irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	tp = (struct net_local *)dev->priv;
@@ -796,6 +796,7 @@ void tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	irq_type = SIFREADW(SIFSTS);
 
 	while(irq_type & STS_SYSTEM_IRQ) {
+		handled = 1;
 		irq_type &= STS_IRQ_MASK;
 
 		if(!tms380tr_chk_ssb(tp, irq_type)) {
@@ -870,7 +871,7 @@ void tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		irq_type = SIFREADW(SIFSTS);
 	}
 
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 /*

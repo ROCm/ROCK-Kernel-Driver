@@ -2191,6 +2191,19 @@ int radeon_cp_getparam( DRM_IOCTL_ARGS )
 	case RADEON_PARAM_AGP_BASE:
 		value = dev_priv->agp_vm_start;
 		break;
+	case RADEON_PARAM_REGISTER_HANDLE:
+		value = dev_priv->mmio_offset;
+		break;
+	case RADEON_PARAM_STATUS_HANDLE:
+		value = dev_priv->ring_rptr_offset;
+		break;
+	case RADEON_PARAM_SAREA_HANDLE:
+		/* The lock is the first dword in the sarea. */
+		value = (int)dev->lock.hw_lock; 
+		break;	
+	case RADEON_PARAM_AGP_TEX_HANDLE:
+		value = dev_priv->agp_textures_offset;
+		break;
 	default:
 		return DRM_ERR(EINVAL);
 	}

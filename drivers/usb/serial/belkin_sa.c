@@ -101,6 +101,8 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs);
 static void belkin_sa_set_termios	(struct usb_serial_port *port, struct termios * old);
 static int  belkin_sa_ioctl		(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
 static void belkin_sa_break_ctl		(struct usb_serial_port *port, int break_state );
+static int  belkin_sa_tiocmget		(struct usb_serial_port *port, struct file *file);
+static int  belkin_sa_tiocmset		(struct usb_serial_port *port, struct file *file, unsigned int set, unsigned int clear);
 
 
 static struct usb_device_id id_table_combined [] = {
@@ -138,6 +140,8 @@ static struct usb_serial_device_type belkin_device = {
 	.ioctl =		belkin_sa_ioctl,
 	.set_termios =		belkin_sa_set_termios,
 	.break_ctl =		belkin_sa_break_ctl,
+	.tiocmget =		belkin_sa_tiocmget,
+	.tiocmset =		belkin_sa_tiocmset,
 	.attach =		belkin_sa_startup,
 	.shutdown =		belkin_sa_shutdown,
 };
@@ -502,65 +506,77 @@ static void belkin_sa_break_ctl( struct usb_serial_port *port, int break_state )
 }
 
 
-static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
+static int belkin_sa_tiocmget (struct usb_serial_port *port, struct file *file)
 {
-	struct usb_serial *serial = port->serial;
-	__u16 urb_value; /* Will hold the new flags */
 	struct belkin_sa_private *priv = usb_get_serial_port_data(port);
-	int ret = 0;
-	int mask;
 	unsigned long control_state;
 	unsigned long flags;
 	
+	dbg("%s", __FUNCTION__);
+
 	spin_lock_irqsave(&priv->lock, flags);
 	control_state = priv->control_state;
 	spin_unlock_irqrestore(&priv->lock, flags);
 
-	/* Based on code from acm.c and others */
+	return control_state;
+}
+
+
+static int belkin_sa_tiocmset (struct usb_serial_port *port, struct file *file,
+			       unsigned int set, unsigned int clear)
+{
+	struct usb_serial *serial = port->serial;
+	struct belkin_sa_private *priv = usb_get_serial_port_data(port);
+	unsigned long control_state;
+	unsigned long flags;
+	int retval;
+	int rts = 0;
+	int dtr = 0;
+	
+	dbg("%s", __FUNCTION__);
+
+	spin_lock_irqsave(&priv->lock, flags);
+	control_state = priv->control_state;
+
+	if (set & TIOCM_RTS) {
+		control_state |= TIOCM_RTS;
+		rts = 1;
+	}
+	if (set & TIOCM_DTR) {
+		control_state |= TIOCM_DTR;
+		dtr = 1;
+	}
+	if (clear & TIOCM_RTS) {
+		control_state &= ~TIOCM_RTS;
+		rts = 0;
+	}
+	if (clear & TIOCM_DTR) {
+		control_state &= ~TIOCM_DTR;
+		dtr = 0;
+	}
+
+	priv->control_state = control_state;
+	spin_unlock_irqrestore(&priv->lock, flags);
+
+	retval = BSA_USB_CMD(BELKIN_SA_SET_RTS_REQUEST, rts);
+	if (retval < 0) {
+		err("Set RTS error %d", retval);
+		goto exit;
+	}
+
+	retval = BSA_USB_CMD(BELKIN_SA_SET_DTR_REQUEST, dtr);
+	if (retval < 0) {
+		err("Set DTR error %d", retval);
+		goto exit;
+	}
+exit:
+	return retval;
+}
+
+
+static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
+{
 	switch (cmd) {
-	case TIOCMGET:
-		return put_user(control_state, (unsigned long *) arg);
-		break;
-
-	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
-	case TIOCMBIS: /* turns on (Sets) the lines as specified by the mask */
-	case TIOCMBIC: /* turns off (Clears) the lines as specified by the mask */
-		if (get_user(mask, (unsigned long *) arg))
-			return -EFAULT;
-
-		if ((cmd == TIOCMSET) || (mask & TIOCM_RTS)) {
-			/* RTS needs set */
-			urb_value = ((cmd == TIOCMSET) && (mask & TIOCM_RTS)) || (cmd == TIOCMBIS) ? 1 : 0;
-			if (urb_value)
-				control_state |= TIOCM_RTS;
-			else
-				control_state &= ~TIOCM_RTS;
-
-			if ((ret = BSA_USB_CMD(BELKIN_SA_SET_RTS_REQUEST, urb_value)) < 0) {
-				err("Set RTS error %d", ret);
-				goto cmerror;
-			}
-		}
-
-		if ((cmd == TIOCMSET) || (mask & TIOCM_DTR)) {
-			/* DTR needs set */
-			urb_value = ((cmd == TIOCMSET) && (mask & TIOCM_DTR)) || (cmd == TIOCMBIS) ? 1 : 0;
-			if (urb_value)
-				control_state |= TIOCM_DTR;
-			else
-				control_state &= ~TIOCM_DTR;
-			if ((ret = BSA_USB_CMD(BELKIN_SA_SET_DTR_REQUEST, urb_value)) < 0) {
-				err("Set DTR error %d", ret);
-				goto cmerror;
-			}
-		}
-cmerror:
-		spin_lock_irqsave(&priv->lock, flags);
-		priv->control_state = control_state;
-		spin_unlock_irqrestore(&priv->lock, flags);
-		return ret;
-		break;
-					
 	case TIOCMIWAIT:
 		/* wait for any of the 4 modem inputs (DCD,RI,DSR,CTS)*/
 		/* TODO */

@@ -569,7 +569,6 @@ sizechange:
 	fix->type = FB_TYPE_PACKED_PIXELS;
 	fix->visual = FB_VISUAL_PSEUDOCOLOR;
 	
-	fb->info.node = NODEV;
 	fb->info.fbops = &sun3fb_ops;
 	fb->info.disp = disp;
 	fb->info.currcon = -1;
@@ -646,7 +645,7 @@ sizechange:
 		kfree(fb);
 		return -EINVAL;
 	}
-	printk("fb%d: %s\n", minor(fb->info.node), p);
+	printk("fb%d: %s\n", fb->info.node, p);
 
 	return 0;
 }

@@ -39,16 +39,18 @@
 #include "drm_auth.h"
 #include "drm_agpsupport.h"
 #include "drm_bufs.h"
-#include "drm_context.h"
+#include "gamma_context.h"	/* NOTE! */
 #include "drm_dma.h"
+#include "gamma_old_dma.h"	/* NOTE */
 #include "drm_drawable.h"
 #include "drm_drv.h"
 
 #include "drm_fops.h"
 #include "drm_init.h"
 #include "drm_ioctl.h"
-#include "drm_lists.h"
+#include "gamma_lists.h"        /* NOTE */
 #include "drm_lock.h"
+#include "gamma_lock.h"		/* NOTE */
 #include "drm_memory.h"
 #include "drm_proc.h"
 #include "drm_vm.h"

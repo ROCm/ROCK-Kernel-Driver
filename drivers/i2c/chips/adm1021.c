@@ -39,12 +39,12 @@
 #define ADM1021_ALARM_RTEMP_NA		0x04
 
 /* Addresses to scan */
-static unsigned short normal_i2c[] = { SENSORS_I2C_END };
+static unsigned short normal_i2c[] = { I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { 0x18, 0x1a, 0x29, 0x2b,
-	0x4c, 0x4e, SENSORS_I2C_END
+	0x4c, 0x4e, I2C_CLIENT_END
 };
-static unsigned int normal_isa[] = { SENSORS_ISA_END };
-static unsigned int normal_isa_range[] = { SENSORS_ISA_END };
+static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
+static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_8(adm1021, adm1023, max1617, max1617a, thmc10, lm84, gl523sm, mc1066);
@@ -414,128 +414,6 @@ static void adm1021_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
-}
-
-
-/* FIXME, remove these four functions, they are here to verify the sysfs
- * conversion is correct, or not */
-__attribute__((unused))
-static void adm1021_temp(struct i2c_client *client, int operation,
-			 int ctl_name, int *nrels_mag, long *results)
-{
-	struct adm1021_data *data = i2c_get_clientdata(client);
-
-	if (operation == SENSORS_PROC_REAL_INFO)
-		*nrels_mag = 0;
-	else if (operation == SENSORS_PROC_REAL_READ) {
-		adm1021_update_client(client);
-		results[0] = TEMP_FROM_REG(data->temp_max);
-		results[1] = TEMP_FROM_REG(data->temp_hyst);
-		results[2] = TEMP_FROM_REG(data->temp_input);
-		*nrels_mag = 3;
-	} else if (operation == SENSORS_PROC_REAL_WRITE) {
-		if (*nrels_mag >= 1) {
-			data->temp_max = TEMP_TO_REG(results[0]);
-			adm1021_write_value(client, ADM1021_REG_TOS_W,
-					    data->temp_max);
-		}
-		if (*nrels_mag >= 2) {
-			data->temp_hyst = TEMP_TO_REG(results[1]);
-			adm1021_write_value(client, ADM1021_REG_THYST_W,
-					    data->temp_hyst);
-		}
-	}
-}
-
-__attribute__((unused))
-static void adm1021_remote_temp(struct i2c_client *client, int operation,
-				int ctl_name, int *nrels_mag, long *results)
-{
-	struct adm1021_data *data = i2c_get_clientdata(client);
-	int prec = 0;
-
-	if (operation == SENSORS_PROC_REAL_INFO)
-		if (data->type == adm1023) { *nrels_mag = 3; }
-                 else { *nrels_mag = 0; }
-	else if (operation == SENSORS_PROC_REAL_READ) {
-		adm1021_update_client(client);
-		results[0] = TEMP_FROM_REG(data->remote_temp_max);
-		results[1] = TEMP_FROM_REG(data->remote_temp_hyst);
-		results[2] = TEMP_FROM_REG(data->remote_temp_input);
-		if (data->type == adm1023) {
-			results[0] = results[0]*1000 + ((data->remote_temp_os_prec >> 5) * 125);
-			results[1] = results[1]*1000 + ((data->remote_temp_hyst_prec >> 5) * 125);
-			results[2] = (TEMP_FROM_REG(data->remote_temp_offset)*1000) + ((data->remote_temp_offset_prec >> 5) * 125);
-			results[3] = (TEMP_FROM_REG(data->remote_temp_input)*1000) + ((data->remote_temp_prec >> 5) * 125);
-			*nrels_mag = 4;
-		} else {
- 			*nrels_mag = 3;
-		}
-	} else if (operation == SENSORS_PROC_REAL_WRITE) {
-		if (*nrels_mag >= 1) {
-			if (data->type == adm1023) {
-				prec = ((results[0]-((results[0]/1000)*1000))/125)<<5;
-				adm1021_write_value(client, ADM1021_REG_REM_TOS_PREC, prec);
-				results[0] = results[0]/1000;
-				data->remote_temp_os_prec=prec;
-			}
-			data->remote_temp_max = TEMP_TO_REG(results[0]);
-			adm1021_write_value(client, ADM1021_REG_REMOTE_TOS_W, data->remote_temp_max);
-		}
-		if (*nrels_mag >= 2) {
-			if (data->type == adm1023) {
-				prec = ((results[1]-((results[1]/1000)*1000))/125)<<5;
-				adm1021_write_value(client, ADM1021_REG_REM_THYST_PREC, prec);
-				results[1] = results[1]/1000;
-				data->remote_temp_hyst_prec=prec;
-			}
-			data->remote_temp_hyst = TEMP_TO_REG(results[1]);
-			adm1021_write_value(client, ADM1021_REG_REMOTE_THYST_W, data->remote_temp_hyst);
-		}
-		if (*nrels_mag >= 3) {
-			if (data->type == adm1023) {
-				prec = ((results[2]-((results[2]/1000)*1000))/125)<<5;
-				adm1021_write_value(client, ADM1021_REG_REM_OFFSET_PREC, prec);
-				results[2]=results[2]/1000;
-				data->remote_temp_offset_prec=prec;
-				data->remote_temp_offset=results[2];
-				adm1021_write_value(client, ADM1021_REG_REM_OFFSET, data->remote_temp_offset);
-			}
-		}
-	}
-}
-
-__attribute__((unused))
-static void adm1021_die_code(struct i2c_client *client, int operation,
-			     int ctl_name, int *nrels_mag, long *results)
-{
-	struct adm1021_data *data = i2c_get_clientdata(client);
-
-	if (operation == SENSORS_PROC_REAL_INFO)
-		*nrels_mag = 0;
-	else if (operation == SENSORS_PROC_REAL_READ) {
-		adm1021_update_client(client);
-		results[0] = data->die_code;
-		*nrels_mag = 1;
-	} else if (operation == SENSORS_PROC_REAL_WRITE) {
-		/* Can't write to it */
-	}
-}
-
-__attribute__((unused))
-static void adm1021_alarms(struct i2c_client *client, int operation,
-			   int ctl_name, int *nrels_mag, long *results)
-{
-	struct adm1021_data *data = i2c_get_clientdata(client);
-	if (operation == SENSORS_PROC_REAL_INFO)
-		*nrels_mag = 0;
-	else if (operation == SENSORS_PROC_REAL_READ) {
-		adm1021_update_client(client);
-		results[0] = data->alarms;
-		*nrels_mag = 1;
-	} else if (operation == SENSORS_PROC_REAL_WRITE) {
-		/* Can't write to it */
-	}
 }
 
 static int __init sensors_adm1021_init(void)

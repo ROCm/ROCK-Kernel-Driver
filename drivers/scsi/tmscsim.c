@@ -3045,7 +3045,7 @@ int DC390_release (struct Scsi_Host *host)
     /* TO DO: We should check for outstanding commands first. */
     dc390_shutdown (host);
 
-    if (host->irq != IRQ_NONE)
+    if (host->irq != SCSI_IRQ_NONE)
     {
 	DEBUG0(printk(KERN_INFO "DC390: Free IRQ %i\n",host->irq);)
 	free_irq (host->irq, pACB);

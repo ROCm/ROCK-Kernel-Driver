@@ -361,7 +361,6 @@ static void __init init_chips(struct fb_info *p, unsigned long addr)
 
 	p->var = chipsfb_var;
 
-	p->node = NODEV;
 	p->fbops = &chipsfb_ops;
 	p->flags = FBINFO_FLAG_DEFAULT;
 
@@ -373,7 +372,7 @@ static void __init init_chips(struct fb_info *p, unsigned long addr)
 	}
 
 	printk(KERN_INFO "fb%d: Chips 65550 frame buffer (%dK RAM detected)\n",
-		minor(p->node), p->fix.smem_len / 1024);
+		p->node, p->fix.smem_len / 1024);
 
 	chips_hw_init();
 }

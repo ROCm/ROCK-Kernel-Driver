@@ -39,7 +39,6 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/bitops.h>
 #include <linux/types.h>
-#include <linux/wrapper.h>
 #include <linux/vmalloc.h>
 #include <linux/timex.h>
 #include <linux/mm.h>

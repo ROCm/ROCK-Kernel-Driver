@@ -1033,7 +1033,6 @@ int __init cyberfb_init(void)
 
 	    strcpy(fb_info.modename, cyberfb_name);
 	    fb_info.changevar = NULL;
-	    fb_info.node = NODEV;
 	    fb_info.fbops = &cyberfb_ops;
 	    fb_info.screen_base = (unsigned char *)CyberMem;
 	    fb_info.disp = &disp;
@@ -1063,7 +1062,7 @@ int __init cyberfb_init(void)
 	    }
 
 	    printk("fb%d: %s frame buffer device, using %ldK of video memory\n",
-		   minor(fb_info.node), fb_info.modename, CyberSize>>10);
+		   fb_info.node, fb_info.modename, CyberSize>>10);
 
 	    /* TODO: This driver cannot be unloaded yet */
 	    MOD_INC_USE_COUNT;

@@ -1483,7 +1483,7 @@ static void bug_int(struct atm_dev *dev,unsigned long reason)
 }
 
 
-static void eni_int(int irq,void *dev_id,struct pt_regs *regs)
+static irqreturn_t eni_int(int irq,void *dev_id,struct pt_regs *regs)
 {
 	struct atm_dev *dev;
 	struct eni_dev *eni_dev;
@@ -1515,6 +1515,7 @@ static void eni_int(int irq,void *dev_id,struct pt_regs *regs)
 	eni_dev->events |= reason;
 	spin_unlock(&eni_dev->lock);
 	tasklet_schedule(&eni_dev->task);
+	return IRQ_HANDLED;
 }
 
 

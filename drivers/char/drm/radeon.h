@@ -78,6 +78,7 @@
  *       Added packets R200_EMIT_PP_CUBIC_FACES_[0..5] and
  *       R200_EMIT_PP_CUBIC_OFFSETS_[0..5].  (brian)
  * 1.8 - Remove need to call cleanup ioctls on last client exit (keith)
+ *       Add 'GET' queries for starting additional clients on different VT's.
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \

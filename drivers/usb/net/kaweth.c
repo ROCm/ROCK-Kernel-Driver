@@ -744,7 +744,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 		}
 	}
 
-	private_header = __skb_push(skb, 2);
+	private_header = (u16 *)__skb_push(skb, 2);
 	*private_header = cpu_to_le16(skb->len-2);
 	kaweth->tx_skb = skb;
 

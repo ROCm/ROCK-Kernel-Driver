@@ -2047,10 +2047,12 @@ static inline void lanai_int_1(struct lanai_dev *lanai, u32 reason)
 		reg_write(lanai, ack, IntAck_Reg);
 }
 
-static void lanai_int(int irq, void *devid, struct pt_regs *regs)
+static irqreturn_t lanai_int(int irq, void *devid, struct pt_regs *regs)
 {
 	struct lanai_dev *lanai = (struct lanai_dev *) devid;
 	u32 reason;
+	int handled = 0;
+
 	(void) irq; (void) regs;	/* unused variables */
 #ifdef USE_POWERDOWN
 	if (lanai->conf1 & CONFIG1_POWERDOWN) {
@@ -2062,8 +2064,11 @@ static void lanai_int(int irq, void *devid, struct pt_regs *regs)
 		conf2_write(lanai);
 	}
 #endif
-	while ((reason = intr_pending(lanai)) != 0)
+	while ((reason = intr_pending(lanai)) != 0) {
+		handled = 1;
 		lanai_int_1(lanai, reason);
+	}
+	return IRQ_RETVAL(handled);
 }
 
 /* TODO - it would be nice if we could use the "delayed interrupt" system

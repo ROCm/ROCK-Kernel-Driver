@@ -1069,9 +1069,10 @@ static void scc_console_write (struct console *co, const char *str, unsigned cou
 	local_irq_restore(flags);
 }
 
-static kdev_t scc_console_device(struct console *c)
+static struct tty_driver *scc_console_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, SCC_MINOR_BASE + c->index);
+	*index = c->index;
+	return &scc_driver;
 }
 
 

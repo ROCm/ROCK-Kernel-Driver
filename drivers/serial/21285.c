@@ -414,11 +414,6 @@ serial21285_console_write(struct console *co, const char *s,
 	}
 }
 
-static kdev_t serial21285_console_device(struct console *c)
-{
-	return mk_kdev(SERIAL_21285_MAJOR, SERIAL_21285_MINOR);
-}
-
 static void __init
 serial21285_get_options(struct uart_port *port, int *baud,
 			int *parity, int *bits)
@@ -479,15 +474,17 @@ static int __init serial21285_console_setup(struct console *co, char *options)
 	return uart_set_options(port, co, baud, parity, bits, flow);
 }
 
+extern struct uart_driver serial21285_reg;
 #ifdef CONFIG_SERIAL_21285_OLD
 static struct console serial21285_old_cons =
 {
 	.name		= SERIAL_21285_OLD_NAME,
 	.write		= serial21285_console_write,
-	.device		= serial21285_console_device,
+	.device		= uart_console_device,
 	.setup		= serial21285_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
+	.data		= &serial21285_reg,
 };
 #endif
 
@@ -495,10 +492,11 @@ static struct console serial21285_console =
 {
 	.name		= SERIAL_21285_NAME,
 	.write		= serial21285_console_write,
-	.device		= serial21285_console_device,
+	.device		= uart_console_device,
 	.setup		= serial21285_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
+	.data		= &serial21285_reg,
 };
 
 static int __init rs285_console_init(void)

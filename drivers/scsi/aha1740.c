@@ -220,7 +220,8 @@ static int aha1740_test_port(unsigned int base)
 }
 
 /* A "high" level interrupt handler */
-static void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t aha1740_intr_handle(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
     struct Scsi_Host *host = aha_host[irq - 9];
     void (*my_done)(Scsi_Cmnd *);
@@ -230,6 +231,7 @@ static void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
     Scsi_Cmnd *SCtmp;
     unsigned int base;
     unsigned long flags;
+    int handled = 0;
 
     if (!host)
 	panic("aha1740.c: Irq from unknown host!\n");
@@ -239,6 +241,7 @@ static void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
 
     while(inb(G2STAT(base)) & G2STAT_INTPEND)
     {
+	handled = 1;
 	DEB(printk("aha1740_intr top of loop.\n"));
 	adapstat = inb(G2INTST(base));
 	ecbptr = (struct ecb *) isa_bus_to_virt(inl(MBOXIN0(base)));
@@ -309,6 +312,7 @@ static void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
     }
 
     spin_unlock_irqrestore(host->host_lock, flags);
+    return IRQ_RETVAL(handled);
 }
 
 static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))

@@ -259,7 +259,6 @@ int __init fm2fb_init(void)
 		if (fm2fb_mode == -1)
 			fm2fb_mode = FM2FB_MODE_PAL;
 
-		fb_info.node = NODEV;
 		fb_info.fbops = &fm2fb_ops;
 		fb_info.var = fb_var_modes[fm2fb_mode];
 		fb_info.screen_base = (char *)fb_fix.smem_start;
@@ -273,7 +272,7 @@ int __init fm2fb_init(void)
 		if (register_framebuffer(&fb_info) < 0)
 			return -EINVAL;
 
-		printk("fb%d: %s frame buffer device\n", minor(fb_info.node), fb_fix.id);
+		printk("fb%d: %s frame buffer device\n", fb_info.node, fb_fix.id);
 		return 0;
 	}
 	return -ENXIO;

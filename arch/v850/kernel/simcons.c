@@ -35,9 +35,11 @@ static int simcons_read (struct console *co, const char *buf, unsigned len)
 	return V850_SIM_SYSCALL (read, 0, buf, len);
 }
 
-static kdev_t simcons_device (struct console *c)
+extern struct tty_driver tty_driver;
+static struct tty_driver *simcons_device (struct console *c, int *index)
 {
-        return mk_kdev (TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return &tty_driver;
 }
 
 static struct console simcons =

@@ -290,10 +290,12 @@ struct i2c_client_address_data {
 };
 
 /* Internal numbers to terminate lists */
-#define I2C_CLIENT_END 0xfffe
+#define I2C_CLIENT_END		0xfffe
+#define I2C_CLIENT_ISA_END	0xfffefffe
 
 /* The numbers to use to set I2C bus address */
-#define ANY_I2C_BUS 0xffff
+#define ANY_I2C_BUS		0xffff
+#define ANY_I2C_ISA_BUS		9191
 
 /* The length of the option lists */
 #define I2C_CLIENT_MAX_OPTS 48
@@ -338,12 +340,9 @@ extern int i2c_check_addr (struct i2c_adapter *adapter, int addr);
  * It will only call found_proc if some client is connected at the
  * specific address (unless a 'force' matched);
  */
-typedef int i2c_client_found_addr_proc (struct i2c_adapter *adapter,
-                                     int addr, unsigned short flags,int kind);
-
 extern int i2c_probe(struct i2c_adapter *adapter, 
 		struct i2c_client_address_data *address_data,
-		i2c_client_found_addr_proc *found_proc);
+		int (*found_proc) (struct i2c_adapter *, int, int));
 
 /* An ioctl like call to set div. parameters of the adapter.
  */
@@ -559,11 +558,15 @@ union i2c_smbus_data {
   I2C_CLIENT_MODULE_PARM(force, \
                       "List of adapter,address pairs to boldly assume " \
                       "to be present"); \
-  static struct i2c_client_address_data addr_data = \
-                                       {normal_i2c, normal_i2c_range, \
-                                        probe, probe_range, \
-                                        ignore, ignore_range, \
-                                        force}
+	static struct i2c_client_address_data addr_data = {		\
+			.normal_i2c = 		normal_i2c,		\
+			.normal_i2c_range =	normal_i2c_range,	\
+			.probe =		probe,			\
+			.probe_range =		probe_range,		\
+			.ignore =		ignore,			\
+			.ignore_range =		ignore_range,		\
+			.force =		force,			\
+		}
 
 /* Detect whether we are on the isa bus. If this returns true, all i2c
    access will fail! */

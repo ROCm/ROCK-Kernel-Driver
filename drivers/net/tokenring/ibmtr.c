@@ -246,7 +246,8 @@ static void __devinit find_turbo_adapters(int *iolist) {
 	void *chanid;
 	int found_turbo=0;
 	unsigned char *tchanid, ctemp;
-	int i,j;
+	int i, j;
+	unsigned long jif;
 	void *ram_mapped ;   
 
 	if (turbo_searched == 1) return;
@@ -276,7 +277,7 @@ static void __devinit find_turbo_adapters(int *iolist) {
 			writeb(0x00, ram_mapped+0x1E01+i);
 		}
 		writeb(0x00, ram_mapped+0x1E01);
-		for(i=jiffies+TR_BUSY_INTERVAL; time_before_eq(jiffies,i););
+		for(jif=jiffies+TR_BUSY_INTERVAL; time_before_eq(jiffies,jif););
 		intf_tbl=ntohs(readw(ram_mapped+ACA_OFFSET+ACA_RW+WRBR_EVEN));
 		if (intf_tbl) {
 #if IBMTR_DEBUG_MESSAGES
@@ -291,7 +292,7 @@ static void __devinit find_turbo_adapters(int *iolist) {
 			turbo_io[index]=ntohs(readw(ram_mapped+intf_tbl+4));
 			turbo_irq[index]=readb(ram_mapped+intf_tbl+3);
 			outb(0, turbo_io[index] + ADAPTRESET);
-			for(i=jiffies+TR_RST_TIME;time_before_eq(jiffies,i););
+			for(jif=jiffies+TR_RST_TIME;time_before_eq(jiffies,jif););
 			outb(0, turbo_io[index] + ADAPTRESETREL);
 			index++;
 			continue;

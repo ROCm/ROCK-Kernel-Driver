@@ -523,7 +523,6 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	var->sync = 0;
 	var->vmode = FB_VMODE_NONINTERLACED;
 
-	info->node = NODEV;
 	info->fbops = &offb_ops;
 	info->screen_base = ioremap(address, fix->smem_len);
 	info->par = par;
@@ -539,7 +538,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	}
 
 	printk(KERN_INFO "fb%d: Open Firmware frame buffer device on %s\n",
-	       minor(info->node), full_name);
+	       info->node, full_name);
 }
 
 MODULE_LICENSE("GPL");

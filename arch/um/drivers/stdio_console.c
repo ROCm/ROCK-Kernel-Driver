@@ -199,9 +199,10 @@ static struct tty_driver console_driver = {
 	.set_termios 		= set_termios
 };
 
-static kdev_t console_device(struct console *c)
+static struct tty_driver *console_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, c->index);
+	*index = c->index;
+	return &console_driver;
 }
 
 static int console_setup(struct console *co, char *options)

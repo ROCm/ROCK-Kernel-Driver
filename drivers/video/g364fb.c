@@ -237,7 +237,6 @@ int __init g364fb_init(void)
 	fb_fix.smem_len = (1 << (mem * 2)) * 512 * 1024;
 	fb_var.yres_virtual = fb_fix.smem_len / fb_var.xres;
 
-	fb_info.node = NODEV;
 	fb_info.fbops = &g364fb_ops;
 	fb_info.screen_base = (char *) G364_MEM_BASE;	/* virtual kernel address */
 	fb_info.var = fb_var;

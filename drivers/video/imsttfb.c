@@ -1440,7 +1440,6 @@ init_imstt(struct fb_info *info)
 
 	info->var.pixclock = 1000000 / getclkMHz(par);
 
-	info->node = NODEV;
 	info->fbops = &imsttfb_ops;
 	info->flags = FBINFO_FLAG_DEFAULT;
 
@@ -1453,7 +1452,7 @@ init_imstt(struct fb_info *info)
 
 	tmp = (read_reg_le32(par->dc_regs, SSTATUS) & 0x0f00) >> 8;
 	printk("fb%u: %s frame buffer; %uMB vram; chip version %u\n",
-		minor(info->node), info->fix.id, info->fix.smem_len >> 20, tmp);
+		info->node, info->fix.id, info->fix.smem_len >> 20, tmp);
 }
 
 static int __devinit

@@ -2449,7 +2449,8 @@ void kgdb_map_scc(void)
 
 static kdev_t serial_console_device(struct console *c)
 {
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return &serial_driver;
 }
 
 

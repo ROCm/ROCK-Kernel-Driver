@@ -425,5 +425,5 @@ static char * nsp32_model[] = {
 #define BUSPHASE_STATUS      ( BUSMON_STATUS      & BUSMON_PHASE_MASK )
 #define BUSPHASE_SELECT      ( BUSMON_SEL | BUSMON_IO )
 
-#endif _NSP32_H
+#endif	/* _NSP32_H */
 /* end */

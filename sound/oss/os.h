@@ -32,7 +32,6 @@
 #include <linux/pci.h>
 #endif
 
-#include <linux/wrapper.h>
 #include <linux/soundcard.h>
 
 #define FALSE	0

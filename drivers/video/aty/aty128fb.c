@@ -1534,7 +1534,6 @@ aty128_init(struct pci_dev *pdev, const struct pci_device_id *ent)
 	par->chip_gen = ent->driver_data;
 
 	/* fill in info */
-	info->node  = NODEV;
 	info->fbops = &aty128fb_ops;
 	info->flags = FBINFO_FLAG_DEFAULT;
 
@@ -1635,7 +1634,7 @@ aty128_init(struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif
 
 	printk(KERN_INFO "fb%d: %s frame buffer device on %s\n",
-	       minor(info->node), info->fix.id, video_card);
+	       info->node, info->fix.id, video_card);
 
 	return 1;	/* success! */
 }

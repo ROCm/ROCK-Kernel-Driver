@@ -395,7 +395,6 @@ static void cg3_init_one(struct sbus_dev *sdev)
 		sbus_ioremap(&sdev->resource[0], CG3_REGS_OFFSET,
 			     sizeof(struct cg3_regs), "cg3 regs");
 
-	all->info.node = NODEV;
 	all->info.flags = FBINFO_FLAG_DEFAULT;
 	all->info.fbops = &cg3_ops;
 #ifdef CONFIG_SPARC32

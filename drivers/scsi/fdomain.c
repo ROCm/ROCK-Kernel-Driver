@@ -418,7 +418,7 @@ static int               Write_SCSI_Data_port;
 static int               FIFO_Size = 0x2000; /* 8k FIFO for
 						pre-tmc18c30 chips */
 
-static void              do_fdomain_16x0_intr( int irq, void *dev_id,
+static irqreturn_t       do_fdomain_16x0_intr( int irq, void *dev_id,
 					    struct pt_regs * regs );
 int		 	fdomain_16x0_bus_reset(Scsi_Cmnd *SCpnt);
 
@@ -1201,7 +1201,8 @@ static void my_done(int error)
 #endif
 }
 
-static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
+static irqreturn_t do_fdomain_16x0_intr(int irq, void *dev_id,
+					struct pt_regs * regs )
 {
    unsigned long flags;
    int      status;
@@ -1216,7 +1217,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 
    /* Check for other IRQ sources */
    if((inb(TMC_Status_port)&0x01)==0)   
-   	return;
+   	return IRQ_NONE;
 
    /* It is our IRQ */   	
    outb( 0x00, Interrupt_Cntl_port );
@@ -1227,7 +1228,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
       printk( "Spurious interrupt, in_command = %d, current_SC = %x\n",
 	      in_command, current_SC );
 #endif
-      return;
+      return IRQ_NONE;
    }
 
    /* Abort calls my_done, so we do nothing here. */
@@ -1236,7 +1237,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
       printk( "scsi: <fdomain> Interrupt after abort, ignoring\n" );
 #endif
       /*
-      return; */
+      return IRQ_HANDLED; */
    }
 
 #if DEBUG_RACE
@@ -1252,7 +1253,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
          spin_lock_irqsave(current_SC->device->host->host_lock, flags);
 	 my_done( DID_BUS_BUSY << 16 );
          spin_unlock_irqrestore(current_SC->device->host->host_lock, flags);
-	 return;
+	 return IRQ_HANDLED;
       }
       current_SC->SCp.phase = in_selection;
       
@@ -1266,7 +1267,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if DEBUG_RACE
       in_interrupt_flag = 0;
 #endif
-      return;
+      return IRQ_HANDLED;
    } else if (current_SC->SCp.phase & in_selection) {
       status = inb( SCSI_Status_port );
       if (!(status & 0x01)) {
@@ -1278,7 +1279,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
             spin_lock_irqsave(current_SC->device->host->host_lock, flags);
 	    my_done( DID_NO_CONNECT << 16 );
             spin_unlock_irqrestore(current_SC->device->host->host_lock, flags);
-	    return;
+	    return IRQ_HANDLED;
 	 } else {
 #if EVERY_ACCESS
 	    printk( " AltSel " );
@@ -1293,7 +1294,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if DEBUG_RACE
       in_interrupt_flag = 0;
 #endif
-      return;
+      return IRQ_HANDLED;
    }
    
    /* current_SC->SCp.phase == in_other: this is the body of the routine */
@@ -1492,7 +1493,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if DEBUG_RACE
    in_interrupt_flag = 0;
 #endif
-   return;
+   return IRQ_HANDLED;
 }
 
 static int fdomain_16x0_queue( Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))

@@ -1642,7 +1642,7 @@ static int snd_cmipci_capture_spdif_hw_free(snd_pcm_substream_t *subs)
  */
 static irqreturn_t snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cmipci_t *cm = snd_magic_cast(cmipci_t, dev_id, return);
+	cmipci_t *cm = snd_magic_cast(cmipci_t, dev_id, return IRQ_NONE);
 	unsigned int status, mask = 0;
 	
 	/* fastpath out, to ease interrupt sharing */

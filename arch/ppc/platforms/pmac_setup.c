@@ -364,7 +364,7 @@ extern char *bootdevice;
 void *boot_host;
 int boot_target;
 int boot_part;
-extern kdev_t boot_dev;
+extern dev_t boot_dev;
 
 #ifdef CONFIG_SCSI
 void __init
@@ -398,18 +398,18 @@ note_scsi_host(struct device_node *node, void *host)
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
-kdev_t __init
+dev_t __init
 find_ide_boot(void)
 {
 	char *p;
 	int n;
-	kdev_t __init pmac_find_ide_boot(char *bootdevice, int n);
+	dev_t __init pmac_find_ide_boot(char *bootdevice, int n);
 
 	if (bootdevice == NULL)
-		return NODEV;
+		return 0;
 	p = strrchr(bootdevice, '/');
 	if (p == NULL)
-		return NODEV;
+		return 0;
 	n = p - bootdevice;
 
 	return pmac_find_ide_boot(bootdevice, n);
@@ -436,7 +436,7 @@ late_initcall(pmac_late_init);
 
 /* can't be __init - can be called whenever a disk is first accessed */
 void __pmac
-note_bootable_part(kdev_t dev, int part, int goodness)
+note_bootable_part(dev_t dev, int part, int goodness)
 {
 	static int found_boot = 0;
 	char *p;
@@ -454,9 +454,9 @@ note_bootable_part(kdev_t dev, int part, int goodness)
 		find_boot_device();
 		found_boot = 1;
 	}
-	if (kdev_same(boot_dev, NODEV) || kdev_same(dev, boot_dev)) {
-		ROOT_DEV = MKDEV(major(dev), minor(dev) + part);
-		boot_dev = NODEV;
+	if (!boot_dev || dev == boot_dev) {
+		ROOT_DEV = dev + part;
+		boot_dev = 0;
 		current_root_goodness = goodness;
 	}
 }
