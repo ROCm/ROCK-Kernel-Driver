@@ -354,8 +354,10 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 		probe_ent->mmio_base = ioremap(pci_resource_start(pdev, 5),
 				pci_resource_len(pdev, 5));
-		if (probe_ent->mmio_base == NULL)
-			goto err_out_iounmap;
+		if (probe_ent->mmio_base == NULL) {
+			rc = -EIO;
+			goto err_out_free_host;
+		}
 
 		base = (unsigned long)probe_ent->mmio_base;
 
@@ -388,7 +390,8 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 err_out_iounmap:
 	if (host->host_desc->host_flags & NV_HOST_FLAGS_SCR_MMIO)
 		iounmap(probe_ent->mmio_base);
-
+err_out_free_host:
+	kfree(host);
 err_out_free_ent:
 	kfree(probe_ent);
 
