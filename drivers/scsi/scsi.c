@@ -2140,9 +2140,9 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	lock_kernel();
 	/*
 	 * If we are busy, this is not going to fly.
-	 */
 	if (GET_USE_COUNT(tpnt->module) != 0)
 		goto error_out;
+	 */
 
 	driver_unregister(&tpnt->scsi_driverfs_driver);
 
@@ -2379,11 +2379,11 @@ static int __init init_scsi(void)
 
 		sgp->slab = kmem_cache_create(sgp->name, size, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 		if (!sgp->slab)
-			panic("SCSI: can't init sg slab\n");
+			printk(KERN_ERR "SCSI: can't init sg slab %s\n", sgp->name);
 
 		sgp->pool = mempool_create(SG_MEMPOOL_SIZE, scsi_pool_alloc, scsi_pool_free, sgp->slab);
 		if (!sgp->pool)
-			panic("SCSI: can't init sg mempool\n");
+			printk(KERN_ERR "SCSI: can't init sg mempool %s\n", sgp->name);
 	}
 
 	/*
@@ -2393,13 +2393,12 @@ static int __init init_scsi(void)
 	proc_scsi = proc_mkdir("scsi", 0);
 	if (!proc_scsi) {
 		printk (KERN_ERR "cannot init /proc/scsi\n");
-		return -ENOMEM;
+		goto out_error;
 	}
 	generic = create_proc_info_entry ("scsi/scsi", 0, 0, scsi_proc_info);
 	if (!generic) {
 		printk (KERN_ERR "cannot init /proc/scsi/scsi\n");
-		remove_proc_entry("scsi", 0);
-		return -ENOMEM;
+		goto out_proc_error;
 	}
 	generic->write_proc = proc_scsi_gen_write;
 #endif
@@ -2414,6 +2413,19 @@ static int __init init_scsi(void)
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
 
 	return 0;
+#ifdef CONFIG_PROC_FS
+out_proc_error:
+	remove_proc_entry("scsi", 0);
+#endif
+out_error:
+	for (i = 0; i < SG_MEMPOOL_NR; i++) {
+		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
+		mempool_destroy(sgp->pool);
+		kmem_cache_destroy(sgp->slab);
+		sgp->pool = NULL;
+		sgp->slab = NULL;
+	}
+	return -ENOMEM;
 }
 
 static void __exit exit_scsi(void)
