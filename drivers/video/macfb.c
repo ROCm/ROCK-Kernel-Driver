@@ -184,15 +184,15 @@ static int valkyrie_setpalette (unsigned int regno, unsigned int red,
 	cli();
 	
 	/* tell clut which address to fill */
-	writeb(regno, &valkyrie_cmap_regs->addr);
+	nubus_writeb(regno, &valkyrie_cmap_regs->addr);
 	nop();
 
 	/* send one color channel at a time */
-	writeb(red, &valkyrie_cmap_regs->lut);
+	nubus_writeb(red, &valkyrie_cmap_regs->lut);
 	nop();
-	writeb(green, &valkyrie_cmap_regs->lut);
+	nubus_writeb(green, &valkyrie_cmap_regs->lut);
 	nop();
-	writeb(blue, &valkyrie_cmap_regs->lut);
+	nubus_writeb(blue, &valkyrie_cmap_regs->lut);
 
 	restore_flags(flags);
 
@@ -224,25 +224,25 @@ static int dafb_setpalette (unsigned int regno, unsigned int red,
 		int i;
 		
 		/* Stab in the dark trying to reset the CLUT pointer */
-		writel(0, &dafb_cmap_regs->reset);
+		nubus_writel(0, &dafb_cmap_regs->reset);
 		nop();
 		
 		/* Loop until we get to the register we want */
 		for (i = 0; i < regno; i++) {
-			writeb(palette[i].red >> 8, &dafb_cmap_regs->lut);
+			nubus_writeb(palette[i].red >> 8, &dafb_cmap_regs->lut);
 			nop();
-			writeb(palette[i].green >> 8, &dafb_cmap_regs->lut);
+			nubus_writeb(palette[i].green >> 8, &dafb_cmap_regs->lut);
 			nop();
-			writeb(palette[i].blue >> 8, &dafb_cmap_regs->lut);
+			nubus_writeb(palette[i].blue >> 8, &dafb_cmap_regs->lut);
 			nop();
 		}
 	}
 		
-	writeb(red, &dafb_cmap_regs->lut);
+	nubus_writeb(red, &dafb_cmap_regs->lut);
 	nop();
-	writeb(green, &dafb_cmap_regs->lut);
+	nubus_writeb(green, &dafb_cmap_regs->lut);
 	nop();
-	writeb(blue, &dafb_cmap_regs->lut);
+	nubus_writeb(blue, &dafb_cmap_regs->lut);
 	
 	restore_flags(flags);
 	
@@ -274,12 +274,12 @@ static int v8_brazil_setpalette (unsigned int regno, unsigned int red,
 	   
 	   In 2bpp, the regnos are 0x3f, 0x7f, 0xbf, 0xff */
   	_regno = (regno<<(8 - info->var.bits_per_pixel)) | (0xFF >> info->var.vits_per_pixel);
-	writeb(_regno, &v8_brazil_cmap_regs->addr); nop();
+	nubus_writeb(_regno, &v8_brazil_cmap_regs->addr); nop();
 
 	/* send one color channel at a time */
-	writeb(_red, &v8_brazil_cmap_regs->lut); nop();
-	writeb(_green, &v8_brazil_cmap_regs->lut); nop();
-	writeb(_blue, &v8_brazil_cmap_regs->lut);
+	nubus_writeb(_red, &v8_brazil_cmap_regs->lut); nop();
+	nubus_writeb(_green, &v8_brazil_cmap_regs->lut); nop();
+	nubus_writeb(_blue, &v8_brazil_cmap_regs->lut);
 
 	restore_flags(flags);
 	
@@ -308,15 +308,15 @@ static int rbv_setpalette (unsigned int regno, unsigned int red,
 	_regno = regno + (256-(1 << info->var.bits_per_pixel));
 
 	/* reset clut? (VideoToolbox sez "not necessary") */
-	writeb(0xFF, &rbv_cmap_regs->cntl); nop();
+	nubus_writeb(0xFF, &rbv_cmap_regs->cntl); nop();
 	
 	/* tell clut which address to use. */
-	writeb(_regno, &rbv_cmap_regs->addr); nop();
+	nubus_writeb(_regno, &rbv_cmap_regs->addr); nop();
 	
 	/* send one color channel at a time. */
-	writeb(_red,   &rbv_cmap_regs->lut); nop();
-	writeb(_green, &rbv_cmap_regs->lut); nop();
-	writeb(_blue,  &rbv_cmap_regs->lut);
+	nubus_writeb(_red,   &rbv_cmap_regs->lut); nop();
+	nubus_writeb(_green, &rbv_cmap_regs->lut); nop();
+	nubus_writeb(_blue,  &rbv_cmap_regs->lut);
 	
 	restore_flags(flags);
 	/* done. */
@@ -340,10 +340,10 @@ static int mdc_setpalette(unsigned int regno, unsigned int red,
 	cli();
 	
 	/* the nop's are there to order writes. */
-	writeb(_regno, &cmap_regs->addr); nop();
-	writeb(_red, &cmap_regs->lut);    nop();
-	writeb(_green, &cmap_regs->lut);  nop();
-	writeb(_blue, &cmap_regs->lut);
+	nubus_writeb(_regno, &cmap_regs->addr); nop();
+	nubus_writeb(_red, &cmap_regs->lut);    nop();
+	nubus_writeb(_green, &cmap_regs->lut);  nop();
+	nubus_writeb(_blue, &cmap_regs->lut);
 
 	restore_flags(flags);
 	return 0;
@@ -365,10 +365,10 @@ static int toby_setpalette(unsigned int regno, unsigned int red,
 	save_flags(flags);
 	cli();
 	
-	writeb(_regno, &cmap_regs->addr); nop();
-	writeb(_red, &cmap_regs->lut);    nop();
-	writeb(_green, &cmap_regs->lut);  nop();
-	writeb(_blue, &cmap_regs->lut);
+	nubus_writeb(_regno, &cmap_regs->addr); nop();
+	nubus_writeb(_red, &cmap_regs->lut);    nop();
+	nubus_writeb(_green, &cmap_regs->lut);  nop();
+	nubus_writeb(_blue, &cmap_regs->lut);
 
 	restore_flags(flags);
 	return 0;
@@ -389,10 +389,10 @@ static int jet_setpalette(unsigned int regno, unsigned int red,
 	save_flags(flags);
 	cli();
 	
-	writeb(regno, &cmap_regs->addr); nop();
-	writeb(_red, &cmap_regs->lut); nop();
-	writeb(_green, &cmap_regs->lut); nop();
-	writeb(_blue, &cmap_regs->lut);
+	nubus_writeb(regno, &cmap_regs->addr); nop();
+	nubus_writeb(_red, &cmap_regs->lut); nop();
+	nubus_writeb(_green, &cmap_regs->lut); nop();
+	nubus_writeb(_blue, &cmap_regs->lut);
 
 	restore_flags(flags);
 	return 0;
@@ -428,7 +428,7 @@ static int civic_setpalette (unsigned int regno, unsigned int red,
 	/*
 	 * Set the register address
 	 */
-	writeb(regno, &civic_cmap_regs->addr); nop();
+	nubus_writeb(regno, &civic_cmap_regs->addr); nop();
 
 	/*
 	 * Wait for VBL interrupt here;
@@ -453,42 +453,42 @@ static int civic_setpalette (unsigned int regno, unsigned int red,
 	 * Grab a status word and do some checking;
 	 * Then finally write the clut!
 	 */
-	clut_status =  readb(&civic_cmap_regs->status2);
+	clut_status =  nubus_readb(&civic_cmap_regs->status2);
 
 	if ((clut_status & 0x0008) == 0)
 	{
 #if 0
 		if ((clut_status & 0x000D) != 0)
 		{
-			writeb(0x00, &civic_cmap_regs->lut); nop();
-			writeb(0x00, &civic_cmap_regs->lut); nop();
+			nubus_writeb(0x00, &civic_cmap_regs->lut); nop();
+			nubus_writeb(0x00, &civic_cmap_regs->lut); nop();
 		}
 #endif
 
-		writeb(  red, &civic_cmap_regs->lut); nop();
-		writeb(green, &civic_cmap_regs->lut); nop();
-		writeb( blue, &civic_cmap_regs->lut); nop();
-		writeb( 0x00, &civic_cmap_regs->lut); nop();
+		nubus_writeb(  red, &civic_cmap_regs->lut); nop();
+		nubus_writeb(green, &civic_cmap_regs->lut); nop();
+		nubus_writeb( blue, &civic_cmap_regs->lut); nop();
+		nubus_writeb( 0x00, &civic_cmap_regs->lut); nop();
 	}
 	else
 	{
 		unsigned char junk;
 
-		junk = readb(&civic_cmap_regs->lut); nop();
-		junk = readb(&civic_cmap_regs->lut); nop();
-		junk = readb(&civic_cmap_regs->lut); nop();
-		junk = readb(&civic_cmap_regs->lut); nop();
+		junk = nubus_readb(&civic_cmap_regs->lut); nop();
+		junk = nubus_readb(&civic_cmap_regs->lut); nop();
+		junk = nubus_readb(&civic_cmap_regs->lut); nop();
+		junk = nubus_readb(&civic_cmap_regs->lut); nop();
 
 		if ((clut_status & 0x000D) != 0)
 		{
-			writeb(0x00, &civic_cmap_regs->lut); nop();
-			writeb(0x00, &civic_cmap_regs->lut); nop();
+			nubus_writeb(0x00, &civic_cmap_regs->lut); nop();
+			nubus_writeb(0x00, &civic_cmap_regs->lut); nop();
 		}
 
-		writeb(  red, &civic_cmap_regs->lut); nop();
-		writeb(green, &civic_cmap_regs->lut); nop();
-		writeb( blue, &civic_cmap_regs->lut); nop();
-		writeb( junk, &civic_cmap_regs->lut); nop();
+		nubus_writeb(  red, &civic_cmap_regs->lut); nop();
+		nubus_writeb(green, &civic_cmap_regs->lut); nop();
+		nubus_writeb( blue, &civic_cmap_regs->lut); nop();
+		nubus_writeb( junk, &civic_cmap_regs->lut); nop();
 	}
 
 	restore_flags(flags);
@@ -641,7 +641,7 @@ void __init macfb_init(void)
 	macfb_fix.line_length = mac_bi_data.videorow;
 	macfb_fix.smem_len = macfb_fix.line_length * macfb_defined.yres;
 	/* Note: physical address (since 2.1.127) */
-	macfb_fix.smem_start = (void*) mac_bi_data.videoaddr;
+	macfb_fix.smem_start = mac_bi_data.videoaddr;
 	/* This is actually redundant with the initial mappings.
 	   However, there are some non-obvious aspects to the way
 	   those mappings are set up, so this is in fact the safest
@@ -649,7 +649,7 @@ void __init macfb_init(void)
 	   Mac */
 	fb_info.screen_base = ioremap(mac_bi_data.videoaddr, macfb_fix.smem_len);
 	
-	printk("macfb: framebuffer at 0x%p, mapped to 0x%p, size %dk\n",
+	printk("macfb: framebuffer at 0x%08lx, mapped to 0x%p, size %dk\n",
 	       macfb_fix.smem_start, fb_info.screen_base, macfb_fix.smem_len/1024);
 	printk("macfb: mode is %dx%dx%d, linelength=%d\n",
 	       macfb_defined.xres, macfb_defined.yres/, macfb_defined.bits_per_pixel, macfb_fix.line_length);

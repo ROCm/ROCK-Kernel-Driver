@@ -146,9 +146,8 @@ static inline u32 aty_ld_le32(int regindex, const struct atyfb_par *par)
 	if (regindex >= 0x400)
 		regindex -= 0x800;
 
-#if defined(__mc68000__)
-	return
-	    le32_to_cpu(*((volatile u32 *) (par->ati_regbase + regindex)));
+#ifdef CONFIG_ATARI
+	return in_le32((volatile u32 *)(par->ati_regbase + regindex));
 #else
 	return readl(par->ati_regbase + regindex);
 #endif
@@ -161,9 +160,8 @@ static inline void aty_st_le32(int regindex, u32 val,
 	if (regindex >= 0x400)
 		regindex -= 0x800;
 
-#if defined(__mc68000__)
-	*((volatile u32 *) (par->ati_regbase + regindex)) =
-	    cpu_to_le32(val);
+#ifdef CONFIG_ATARI
+	out_le32((volatile u32 *)(par->ati_regbase + regindex));
 #else
 	writel(val, par->ati_regbase + regindex);
 #endif
@@ -174,8 +172,11 @@ static inline u8 aty_ld_8(int regindex, const struct atyfb_par *par)
 	/* Hack for bloc 1, should be cleanly optimized by compiler */
 	if (regindex >= 0x400)
 		regindex -= 0x800;
-
+#ifdef CONFIG_ATARI
+	return in_8(par->ati_regbase + regindex);
+#else
 	return readb(par->ati_regbase + regindex);
+#endif
 }
 
 static inline void aty_st_8(int regindex, u8 val,
@@ -185,7 +186,11 @@ static inline void aty_st_8(int regindex, u8 val,
 	if (regindex >= 0x400)
 		regindex -= 0x800;
 
+#ifdef CONFIG_ATARI
+	out_8(par->ati_regbase + regindex, val);
+#else
 	writeb(val, par->ati_regbase + regindex);
+#endif
 }
 
 static inline u8 aty_ld_pll(int offset, const struct atyfb_par *par)
