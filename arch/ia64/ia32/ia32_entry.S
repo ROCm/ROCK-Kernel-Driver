@@ -32,7 +32,7 @@ ENTRY(ia32_execve)
 END(ia32_execve)
 
 ENTRY(ia32_clone)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(2)
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(5)
 	alloc r16=ar.pfs,5,2,6,0
 	DO_SAVE_SWITCH_STACK
 	mov loc0=rp
@@ -110,7 +110,9 @@ GLOBAL_ENTRY(ia32_ret_from_clone)
 	ld4 r2=[r2]
 	;;
 	mov r8=0
-	tbit.nz p6,p0=r2,TIF_SYSCALL_TRACE
+	and r2=_TIF_SYSCALL_TRACEAUDIT,r2
+	;;
+	cmp.ne p6,p0=r2,r0
 (p6)	br.cond.spnt .ia32_strace_check_retval
 	;;					// prevent RAW on r8
 END(ia32_ret_from_clone)
@@ -142,7 +144,7 @@ GLOBAL_ENTRY(ia32_trace_syscall)
 	adds r2=IA64_PT_REGS_R8_OFFSET+16,sp
 	;;
 	st8 [r2]=r3				// initialize return code to -ENOSYS
-	br.call.sptk.few rp=syscall_trace	// give parent a chance to catch syscall args
+	br.call.sptk.few rp=syscall_trace_enter	// give parent a chance to catch syscall args
 .ret2:	// Need to reload arguments (they may be changed by the tracing process)
 	adds r2=IA64_PT_REGS_R1_OFFSET+16,sp	// r2 = &pt_regs.r1
 	adds r3=IA64_PT_REGS_R13_OFFSET+16,sp	// r3 = &pt_regs.r13
@@ -170,7 +172,7 @@ GLOBAL_ENTRY(ia32_trace_syscall)
 	adds r2=IA64_PT_REGS_R8_OFFSET+16,sp	// r2 = &pt_regs.r8
 	;;
 	st8.spill [r2]=r8			// store return value in slot for r8
-	br.call.sptk.few rp=syscall_trace	// give parent a chance to catch return value
+	br.call.sptk.few rp=syscall_trace_leave	// give parent a chance to catch return value
 .ret4:	alloc r2=ar.pfs,0,0,0,0			// drop the syscall argument frame
 	br.cond.sptk.many ia64_leave_kernel
 END(ia32_trace_syscall)

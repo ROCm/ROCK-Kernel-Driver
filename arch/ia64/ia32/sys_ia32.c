@@ -1996,18 +1996,19 @@ sys32_sigaltstack (ia32_stack_t *uss32, ia32_stack_t *uoss32,
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
-	if (uss32)
+	if (uss32) {
 		if (copy_from_user(&buf32, uss32, sizeof(ia32_stack_t)))
 			return -EFAULT;
-	uss.ss_sp = (void *) (long) buf32.ss_sp;
-	uss.ss_flags = buf32.ss_flags;
-	/* MINSIGSTKSZ is different for ia32 vs ia64. We lie here to pass the 
-           check and set it to the user requested value later */
-	if ((buf32.ss_flags != SS_DISABLE) && (buf32.ss_size < MINSIGSTKSZ_IA32)) {
-		ret = -ENOMEM;
-		goto out;
+		uss.ss_sp = (void *) (long) buf32.ss_sp;
+		uss.ss_flags = buf32.ss_flags;
+		/* MINSIGSTKSZ is different for ia32 vs ia64. We lie here to pass the 
+	           check and set it to the user requested value later */
+		if ((buf32.ss_flags != SS_DISABLE) && (buf32.ss_size < MINSIGSTKSZ_IA32)) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		uss.ss_size = MINSIGSTKSZ;
 	}
-	uss.ss_size = MINSIGSTKSZ;
 	set_fs(KERNEL_DS);
 	ret = do_sigaltstack(uss32 ? &uss : NULL, &uoss, pt->r12);
  	current->sas_ss_size = buf32.ss_size;	
