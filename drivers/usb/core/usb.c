@@ -80,23 +80,6 @@ static struct device_driver usb_generic_driver = {
 
 static int usb_generic_driver_data;
 
-/* deallocate hcd/hardware state ... and nuke all pending urbs */
-static void nuke_urbs(struct usb_device *dev)
-{
-	void (*disable)(struct usb_device *, int);
-	int i;
-
-	if (!dev || !dev->bus || !dev->bus->op || !dev->bus->op->disable)
-		return;
-	dbg("nuking urbs assigned to %s", dev->dev.bus_id);
-
-	disable = dev->bus->op->disable;
-	for (i = 0; i < 15; i++) {
-		disable(dev, i);
-		disable(dev, USB_DIR_IN | i);
-	}
-}
-
 /* needs to be called with BKL held */
 int usb_probe_interface(struct device *dev)
 {
@@ -125,23 +108,19 @@ int usb_probe_interface(struct device *dev)
 
 int usb_unbind_interface(struct device *dev)
 {
-	struct usb_interface *intf;
-	struct usb_driver *driver;
-
-	intf = list_entry(dev,struct usb_interface,dev);
-	driver = to_usb_driver(dev->driver);
+	struct usb_interface *intf = to_usb_interface(dev);
+	struct usb_driver *driver = to_usb_driver(dev->driver);
 
 	down(&driver->serialize);
 
-	/* release all urbs for this device */
-	nuke_urbs(interface_to_usbdev(intf));
+	/* release all urbs for this interface */
+	usb_disable_interface(interface_to_usbdev(intf), intf);
 
 	if (intf->driver && intf->driver->disconnect)
 		intf->driver->disconnect(intf);
 
-	/* if driver->disconnect didn't release the interface */
-	if (intf->driver)
-		usb_driver_release_interface(driver, intf);
+	/* force a release and re-initialize the interface */
+	usb_driver_release_interface(driver, intf);
 
 	up(&driver->serialize);
 
@@ -325,24 +304,31 @@ int usb_interface_claimed(struct usb_interface *iface)
  * usb_driver_release_interface - unbind a driver from an interface
  * @driver: the driver to be unbound
  * @iface: the interface from which it will be unbound
+ *
+ * In addition to unbinding the driver, this re-initializes the interface
+ * by selecting altsetting 0, the default alternate setting.
  * 
- * This should be used by drivers to release their claimed interfaces.
- * It is normally called in their disconnect() methods, and only for
- * drivers that bound to more than one interface in their probe().
+ * This can be used by drivers to release an interface without waiting
+ * for their disconnect() methods to be called.
  *
  * When the USB subsystem disconnect()s a driver from some interface,
  * it automatically invokes this method for that interface.  That
  * means that even drivers that used usb_driver_claim_interface()
  * usually won't need to call this.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
  */
 void usb_driver_release_interface(struct usb_driver *driver, struct usb_interface *iface)
 {
 	/* this should never happen, don't release something that's not ours */
-	if (!iface || iface->driver != driver)
+	if (iface->driver && iface->driver != driver)
 		return;
 
 	iface->driver = NULL;
 	usb_set_intfdata(iface, NULL);
+	usb_set_interface(interface_to_usbdev(iface),
+			iface->altsetting[0].desc.bInterfaceNumber,
+			0);
 }
 
 /**
@@ -917,7 +903,7 @@ void usb_disconnect(struct usb_device **pdev)
 	}
 
 	/* deallocate hcd/hardware state ... and nuke all pending urbs */
-	nuke_urbs(dev);
+	usb_disable_device(dev, 0);
 
 	/* disconnect() drivers from interfaces (a key side effect) */
 	dev_dbg (&dev->dev, "unregistering interfaces\n");

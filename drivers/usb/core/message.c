@@ -922,9 +922,8 @@ void usb_enable_interface(struct usb_device *dev,
 int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 {
 	struct usb_interface *iface;
-	struct usb_host_interface *iface_as;
-	int i, ret;
-	void (*disable)(struct usb_device *, int) = dev->bus->op->disable;
+	int ret;
+	int manual = 0;
 
 	iface = usb_ifnum_to_if(dev, interface);
 	if (!iface) {
@@ -932,22 +931,23 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 		return -EINVAL;
 	}
 
-	/* 9.4.10 says devices don't need this, if the interface
-	   only has one alternate setting */
-	if (iface->num_altsetting == 1) {
-		dbg("ignoring set_interface for dev %d, iface %d, alt %d",
-			dev->devnum, interface, alternate);
-		return 0;
-	}
-
 	if (alternate < 0 || alternate >= iface->num_altsetting)
 		return -EINVAL;
 
-	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 				   USB_REQ_SET_INTERFACE, USB_RECIP_INTERFACE,
 				   iface->altsetting[alternate]
 				   	.desc.bAlternateSetting,
-				   interface, NULL, 0, HZ * 5)) < 0)
+				   interface, NULL, 0, HZ * 5);
+
+	/* 9.4.10 says devices don't need this and are free to STALL the
+	 * request if the interface only has one alternate setting.
+	 */
+	if (ret == -EPIPE && iface->num_altsetting == 1) {
+		dbg("manual set_interface for dev %d, iface %d, alt %d",
+			dev->devnum, interface, alternate);
+		manual = 1;
+	} else if (ret < 0)
 		return ret;
 
 	/* FIXME drivers shouldn't need to replicate/bugfix the logic here
@@ -957,20 +957,32 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	 */
 
 	/* prevent submissions using previous endpoint settings */
-	iface_as = iface->altsetting + iface->act_altsetting;
-	for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
-		u8	ep = iface_as->endpoint [i].desc.bEndpointAddress;
-		int	out = !(ep & USB_DIR_IN);
+	usb_disable_interface(dev, iface);
 
-		/* clear out hcd state, then usbcore state */
-		if (disable)
-			disable (dev, ep);
-		ep &= USB_ENDPOINT_NUMBER_MASK;
-		(out ? dev->epmaxpacketout : dev->epmaxpacketin ) [ep] = 0;
-	}
 	iface->act_altsetting = alternate;
 
-	/* 9.1.1.5: reset toggles for all endpoints affected by this iface-as
+	/* If the interface only has one altsetting and the device didn't
+	 * accept the request, we attempt to carry out the equivalent action
+	 * by manually clearing the HALT feature for each endpoint in the
+	 * new altsetting.
+	 */
+	if (manual) {
+		struct usb_host_interface *iface_as =
+				&iface->altsetting[alternate];
+		int i;
+
+		for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
+			unsigned int epaddr =
+				iface_as->endpoint[i].desc.bEndpointAddress;
+			unsigned int pipe =
+	__create_pipe(dev, USB_ENDPOINT_NUMBER_MASK & epaddr)
+	| (usb_endpoint_out(epaddr) ? USB_DIR_OUT : USB_DIR_IN);
+
+			usb_clear_halt(dev, pipe);
+		}
+	}
+
+	/* 9.1.1.5: reset toggles for all endpoints in the new altsetting
 	 *
 	 * Note:
 	 * Despite EP0 is always present in all interfaces/AS, the list of
@@ -981,18 +993,7 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	 * during the SETUP stage - hence EP0 toggles are "don't care" here.
 	 * (Likewise, EP0 never "halts" on well designed devices.)
 	 */
-
-	iface_as = &iface->altsetting[alternate];
-	for (i = 0; i < iface_as->desc.bNumEndpoints; i++) {
-		u8	ep = iface_as->endpoint[i].desc.bEndpointAddress;
-		int	out = !(ep & USB_DIR_IN);
-
-		ep &= USB_ENDPOINT_NUMBER_MASK;
-		usb_settoggle (dev, ep, out, 0);
-		(out ? dev->epmaxpacketout : dev->epmaxpacketin) [ep]
-			= iface_as->endpoint [i].desc.wMaxPacketSize;
-		usb_endpoint_running (dev, ep, out);
-	}
+	usb_enable_interface(dev, iface);
 
 	return 0;
 }
@@ -1031,7 +1032,6 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 {
 	int i, ret;
 	struct usb_host_config *cp = NULL;
-	void (*disable)(struct usb_device *, int) = dev->bus->op->disable;
 	
 	for (i=0; i<dev->descriptor.bNumConfigurations; i++) {
 		if (dev->config[i].desc.bConfigurationValue == configuration) {
@@ -1045,12 +1045,8 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	}
 
 	/* if it's already configured, clear out old state first. */
-	if (dev->state != USB_STATE_ADDRESS && disable) {
-		for (i = 1 /* skip ep0 */; i < 15; i++) {
-			disable (dev, i);
-			disable (dev, USB_DIR_IN | i);
-		}
-	}
+	if (dev->state != USB_STATE_ADDRESS)
+		usb_disable_device (dev, 1);	// Skip ep0
 	dev->toggle[0] = dev->toggle[1] = 0;
 	dev->halted[0] = dev->halted[1] = 0;
 	dev->state = USB_STATE_ADDRESS;
@@ -1063,8 +1059,13 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 		dev->state = USB_STATE_CONFIGURED;
 	dev->actconfig = cp;
 
-	/* reset more hc/hcd endpoint state */
-	usb_set_maxpacket(dev);
+	/* reset more hc/hcd interface/endpoint state */
+	for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
+		struct usb_interface *intf = cp->interface[i];
+
+		intf->act_altsetting = 0;
+		usb_enable_interface(dev, intf);
+	}
 
 	return 0;
 }
