@@ -256,13 +256,6 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 	if (!usb_pipecontrol (pipe) && dev->state < USB_STATE_CONFIGURED)
 		return -ENODEV;
 
-	/* (actually HCDs may need to duplicate this, endpoint might yet
-	 * stall due to queued bulk/intr transactions that complete after
-	 * we check)
-	 */
-	if (usb_endpoint_halted (dev, usb_pipeendpoint (pipe), is_out))
-		return -EPIPE;
-
 	/* FIXME there should be a sharable lock protecting us against
 	 * config/altsetting changes and disconnects, kicking in here.
 	 * (here == before maxpacket, and eventually endpoint type,

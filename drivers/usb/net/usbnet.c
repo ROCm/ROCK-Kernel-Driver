@@ -166,7 +166,7 @@
 #define CONTROL_TIMEOUT_JIFFIES ((CONTROL_TIMEOUT_MS * HZ)/1000)
 
 // between wakeups
-#define UNLINK_TIMEOUT_JIFFIES ((3  /*ms*/ * HZ)/1000)
+#define UNLINK_TIMEOUT_MS	3
 
 /*-------------------------------------------------------------------------*/
 
@@ -268,7 +268,7 @@ static const char driver_name [] = "usbnet";
 
 /* use ethtool to change the level for any given device */
 static int msg_level = 1;
-MODULE_PARM (msg_level, "i");
+module_param (msg_level, int, 0);
 MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
 
 
@@ -2591,8 +2591,7 @@ static int usbnet_stop (struct net_device *net)
 	while (skb_queue_len (&dev->rxq)
 			&& skb_queue_len (&dev->txq)
 			&& skb_queue_len (&dev->done)) {
-		set_current_state (TASK_UNINTERRUPTIBLE);
-		schedule_timeout (UNLINK_TIMEOUT_JIFFIES);
+		msleep(UNLINK_TIMEOUT_MS);
 		devdbg (dev, "waited for %d urb completions", temp);
 	}
 	dev->wait = NULL;

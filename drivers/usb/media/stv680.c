@@ -93,11 +93,11 @@ static unsigned int debug = 0;
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE ("GPL");
-MODULE_PARM (debug, "i");
+module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC (debug, "Debug enabled or not");
-MODULE_PARM (swapRGB_on, "i");
+module_param(swapRGB_on, int, 0);
 MODULE_PARM_DESC (swapRGB_on, "Red/blue swap: 1=always, 0=auto, -1=never");
-MODULE_PARM (video_nr, "i");
+module_param(video_nr, int, 0);
 
 /********************************************************************
  *

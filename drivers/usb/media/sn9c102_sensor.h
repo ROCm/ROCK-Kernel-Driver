@@ -33,7 +33,8 @@ struct sn9c102_sensor;
 
 /*****************************************************************************/
 
-/* OVERVIEW.
+/*
+   OVERVIEW.
    This is a small interface that allows you to add support for any CCD/CMOS
    image sensors connected to the SN9C10X bridges. The entire API is documented
    below. In the most general case, to support a sensor there are three steps
@@ -48,26 +49,33 @@ struct sn9c102_sensor;
    "sn9c102_pas106b.c" is an example of all this stuff. Remember that you do
    NOT need to touch the source code of the core module for the things to work
    properly, unless you find bugs or flaws in it. Finally, do not forget to
-   read the V4L2 API for completeness. */
+   read the V4L2 API for completeness.
+*/
 
 /*****************************************************************************/
- 
-/* Probing functions: on success, you must attach the sensor to the camera
+
+/*
+   Probing functions: on success, you must attach the sensor to the camera
    by calling sn9c102_attach_sensor() provided below.
    To enable the I2C communication, you might need to perform a really basic
    initialization of the SN9C10X chip by using the write function declared 
    ahead.
-   Functions must return 0 on success, the appropriate error otherwise. */
+   Functions must return 0 on success, the appropriate error otherwise.
+*/
 extern int sn9c102_probe_pas106b(struct sn9c102_device* cam);
+extern int sn9c102_probe_pas202bcb(struct sn9c102_device* cam);
 extern int sn9c102_probe_tas5110c1b(struct sn9c102_device* cam);
 extern int sn9c102_probe_tas5130d1b(struct sn9c102_device* cam);
 
-/* Add the above entries to this table. Be sure to add the entry in the right
+/*
+   Add the above entries to this table. Be sure to add the entry in the right
    place, since, on failure, the next probing routine is called according to 
-   the order of the list below, from top to bottom */
+   the order of the list below, from top to bottom.
+*/
 #define SN9C102_SENSOR_TABLE                                                  \
 static int (*sn9c102_sensor_table[])(struct sn9c102_device*) = {              \
-	&sn9c102_probe_pas106b, /* strong detection based on SENSOR vid/pid */\
+	&sn9c102_probe_pas106b, /* strong detection based on SENSOR ids */    \
+	&sn9c102_probe_pas202bcb, /* strong detection based on SENSOR ids */  \
 	&sn9c102_probe_tas5110c1b, /* detection based on USB pid/vid */       \
 	&sn9c102_probe_tas5130d1b, /* detection based on USB pid/vid */       \
 	NULL,                                                                 \
@@ -81,28 +89,29 @@ sn9c102_attach_sensor(struct sn9c102_device* cam,
 /* Each SN9C10X camera has proper PID/VID identifiers. Add them here in case.*/
 #define SN9C102_ID_TABLE                                                      \
 static const struct usb_device_id sn9c102_id_table[] = {                      \
-	{ USB_DEVICE(0xc45, 0x6001), },                                       \
+	{ USB_DEVICE(0xc45, 0x6001), }, /* TAS5110C1B */                      \
 	{ USB_DEVICE(0xc45, 0x6005), }, /* TAS5110C1B */                      \
 	{ USB_DEVICE(0xc45, 0x6009), }, /* PAS106B */                         \
 	{ USB_DEVICE(0xc45, 0x600d), }, /* PAS106B */                         \
 	{ USB_DEVICE(0xc45, 0x6024), },                                       \
-	{ USB_DEVICE(0xc45, 0x6025), }, /* TAS5130D1B Maybe also TAS5110C1B */\
-	{ USB_DEVICE(0xc45, 0x6028), }, /* Maybe PAS202B */                   \
-	{ USB_DEVICE(0xc45, 0x6029), },                                       \
-	{ USB_DEVICE(0xc45, 0x602a), }, /* Maybe HV7131[D|E1] */              \
-	{ USB_DEVICE(0xc45, 0x602c), }, /* Maybe OV7620 */                    \
-	{ USB_DEVICE(0xc45, 0x6030), }, /* Maybe MI03 */                      \
-	{ USB_DEVICE(0xc45, 0x8001), },                                       \
+	{ USB_DEVICE(0xc45, 0x6025), }, /* TAS5130D1B and TAS5110C1B */       \
+	{ USB_DEVICE(0xc45, 0x6028), }, /* PAS202BCB */                       \
+	{ USB_DEVICE(0xc45, 0x6029), }, /* PAS106B */                         \
+	{ USB_DEVICE(0xc45, 0x602a), }, /* HV7131[D|E1] */                    \
+	{ USB_DEVICE(0xc45, 0x602c), }, /* OV7620 */                          \
+	{ USB_DEVICE(0xc45, 0x6030), }, /* MI03 */                            \
 	{ }                                                                   \
 };
 
 /*****************************************************************************/
 
-/* Read/write routines: they always return -1 on error, 0 or the read value
+/*
+   Read/write routines: they always return -1 on error, 0 or the read value
    otherwise. NOTE that a real read operation is not supported by the SN9C10X
    chip for some of its registers. To work around this problem, a pseudo-read
    call is provided instead: it returns the last successfully written value 
-   on the register (0 if it has never been written), the usual -1 on error. */
+   on the register (0 if it has never been written), the usual -1 on error.
+*/
 
 /* The "try" I2C I/O versions are used when probing the sensor */
 extern int sn9c102_i2c_try_write(struct sn9c102_device*,struct sn9c102_sensor*,
@@ -110,10 +119,12 @@ extern int sn9c102_i2c_try_write(struct sn9c102_device*,struct sn9c102_sensor*,
 extern int sn9c102_i2c_try_read(struct sn9c102_device*,struct sn9c102_sensor*,
                                 u8 address);
 
-/* This must be used if and only if the sensor doesn't implement the standard
-   I2C protocol, like the TASC sensors. There a number of good reasons why you
-   must use the single-byte versions of this function: do not abuse. It writes
-   n bytes, from data0 to datan, (registers 0x09 - 0x09+n of SN9C10X chip) */
+/*
+   This must be used if and only if the sensor doesn't implement the standard
+   I2C protocol. There a number of good reasons why you must use the 
+   single-byte versions of this function: do not abuse. It writes n bytes, 
+   from data0 to datan, (registers 0x09 - 0x09+n of SN9C10X chip).
+*/
 extern int sn9c102_i2c_try_raw_write(struct sn9c102_device* cam,
                                      struct sn9c102_sensor* sensor, u8 n, 
                                      u8 data0, u8 data1, u8 data2, u8 data3,
@@ -127,12 +138,14 @@ extern int sn9c102_i2c_read(struct sn9c102_device*, u8 address);
 extern int sn9c102_write_reg(struct sn9c102_device*, u8 value, u16 index);
 extern int sn9c102_pread_reg(struct sn9c102_device*, u16 index);
 
-/* NOTE: there are no debugging functions here. To uniform the output you must
+/*
+   NOTE: there are no debugging functions here. To uniform the output you must
    use the dev_info()/dev_warn()/dev_err() macros defined in device.h, already
    included here, the argument being the struct device 'dev' of the sensor
    structure. Do NOT use these macros before the sensor is attached or the
    kernel will crash! However you should not need to notify the user about
-   common errors or other messages, since this is done by the master module. */
+   common errors or other messages, since this is done by the master module.
+*/
 
 /*****************************************************************************/
 
@@ -150,24 +163,31 @@ struct sn9c102_sensor {
 	char name[32], /* sensor name */
 	     maintainer[64]; /* name of the mantainer <email> */
 
-	/* These sensor capabilities must be provided if the SN9C10X controller
+	/*
+	   These sensor capabilities must be provided if the SN9C10X controller
 	   needs to communicate through the sensor serial interface by using
-	   at least one of the i2c functions available */
+	   at least one of the i2c functions available.
+	*/
 	enum sn9c102_i2c_frequency frequency;
 	enum sn9c102_i2c_interface interface;
 
-	/* These identifiers must be provided if the image sensor implements
+	/*
+	   These identifiers must be provided if the image sensor implements
 	   the standard I2C protocol. TASC sensors don't, although they have a
 	   serial interface: so this is a case where the "raw" I2C version
-	   could be helpful. */
+	   could be helpful.
+	*/
 	u8 slave_read_id, slave_write_id; /* reg. 0x09 */
 
-	/* NOTE: Where not noted,most of the functions below are not mandatory.
+	/*
+	   NOTE: Where not noted,most of the functions below are not mandatory.
 	         Set to null if you do not implement them. If implemented,
-	         they must return 0 on success, the proper error otherwise. */
+	         they must return 0 on success, the proper error otherwise.
+	*/
 
 	int (*init)(struct sn9c102_device* cam);
-	/* This function is called after the sensor has been attached. 
+	/*
+	   This function is called after the sensor has been attached. 
 	   It should be used to initialize the sensor only, but may also
 	   configure part of the SN9C10X chip if necessary. You don't need to
 	   setup picture settings like brightness, contrast, etc.. here, if
@@ -177,23 +197,29 @@ struct sn9c102_sensor {
 	   specified in the v4l2_queryctrl list of supported controls;
 	   Same suggestions apply for other settings, _if_ the corresponding
 	   methods are present; if not, the initialization must configure the
-	   sensor according to the default configuration structures below. */
+	   sensor according to the default configuration structures below.
+	*/
 
 	struct v4l2_queryctrl qctrl[V4L2_CID_LASTP1-V4L2_CID_BASE];
-	/* Optional list of default controls, defined as indicated in the 
-	   V4L2 API. Menu type controls are not handled by this interface. */
+	/*
+	   Optional list of default controls, defined as indicated in the 
+	   V4L2 API. Menu type controls are not handled by this interface.
+	*/
 
 	int (*get_ctrl)(struct sn9c102_device* cam, struct v4l2_control* ctrl);
 	int (*set_ctrl)(struct sn9c102_device* cam,
 	                const struct v4l2_control* ctrl);
-	/* You must implement at least the set_ctrl method if you have defined
+	/*
+	   You must implement at least the set_ctrl method if you have defined
 	   the list above. The returned value must follow the V4L2
 	   specifications for the VIDIOC_G|C_CTRL ioctls. V4L2_CID_H|VCENTER
 	   are not supported by this driver, so do not implement them. Also,
-	   passed values are NOT checked to see if they are out of bounds. */
+	   passed values are NOT checked to see if they are out of bounds.
+	*/
 
 	struct v4l2_cropcap cropcap;
-	/* Think the image sensor as a grid of R,G,B monochromatic pixels
+	/*
+	   Think the image sensor as a grid of R,G,B monochromatic pixels
 	   disposed according to a particular Bayer pattern, which describes
 	   the complete array of pixels, from (0,0) to (xmax, ymax). We will
 	   use this coordinate system from now on. It is assumed the sensor
@@ -221,11 +247,13 @@ struct sn9c102_sensor {
 	   NOTE: once you have defined the bounds of the active window
 	         (struct cropcap.bounds) you must not change them.anymore.
 	   Only 'bounds' and 'defrect' fields are mandatory, other fields
-	   will be ignored. */
+	   will be ignored.
+	*/
 
 	int (*set_crop)(struct sn9c102_device* cam,
 	                const struct v4l2_rect* rect);
-	/* To be called on VIDIOC_C_SETCROP. The core module always calls a
+	/*
+	   To be called on VIDIOC_C_SETCROP. The core module always calls a
 	   default routine which configures the appropriate SN9C10X regs (also
 	   scaling), but you may need to override/adjust specific stuff.
 	   'rect' contains width and height values that are multiple of 16: in
@@ -237,10 +265,12 @@ struct sn9c102_sensor {
 	         frame after each HSYNC or VSYNC, so that the image starts with
 	         real RGB data (see regs 0x12,0x13) (having set H_SIZE and,
 	         V_SIZE you don't have to care about blank pixels or blank
-	         lines at the end of each line or frame). */
+	         lines at the end of each line or frame).
+	*/
 
 	struct v4l2_pix_format pix_format;
-	/* What you have to define here are: initial 'width' and 'height' of
+	/*
+	   What you have to define here are: initial 'width' and 'height' of
 	   the target rectangle, the bayer 'pixelformat' and 'priv' which we'll
 	   be used to indicate the number of bits per pixel, 8 or 9. 
 	   Nothing more.
@@ -249,20 +279,27 @@ struct sn9c102_sensor {
 	           suggest 1/1.
 	   NOTE 2: as said above, you have to program the SN9C10X chip to get
 	           rid of any blank pixels, so that the output of the sensor
-	           matches the RGB bayer sequence (i.e. BGBGBG...GRGRGR). */
+	           matches the RGB bayer sequence (i.e. BGBGBG...GRGRGR).
+	*/
 
 	const struct device* dev;
-	/* This is the argument for dev_err(), dev_info() and dev_warn(). It
+	/*
+	   This is the argument for dev_err(), dev_info() and dev_warn(). It
 	   is used for debugging purposes. You must not access the struct
-	   before the sensor is attached. */
+	   before the sensor is attached.
+	*/
 
 	const struct usb_device* usbdev;
-	/* Points to the usb_device struct after the sensor is attached.
-	   Do not touch unless you know what you are doing. */
+	/*
+	   Points to the usb_device struct after the sensor is attached.
+	   Do not touch unless you know what you are doing.
+	*/
 
-	/* Do NOT write to the data below, it's READ ONLY. It is used by the
+	/*
+	   Do NOT write to the data below, it's READ ONLY. It is used by the
 	   core module to store successfully updated values of the above
-	   settings, for rollbacks..etc..in case of errors during atomic I/O */
+	   settings, for rollbacks..etc..in case of errors during atomic I/O
+	*/
 	struct v4l2_queryctrl _qctrl[V4L2_CID_LASTP1-V4L2_CID_BASE];
 	struct v4l2_rect _rect;
 };

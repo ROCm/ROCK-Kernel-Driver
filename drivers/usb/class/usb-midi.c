@@ -55,39 +55,39 @@
 /* ------------------------------------------------------------------------- */
 
 static int singlebyte = 0;
-MODULE_PARM(singlebyte,"i");
+module_param(singlebyte, int, 0);
 MODULE_PARM_DESC(singlebyte,"Enable sending MIDI messages with single message packet");
 
 static int maxdevices = 4;
-MODULE_PARM(maxdevices,"i");
+module_param(maxdevices, int, 0);
 MODULE_PARM_DESC(maxdevices,"Max number of allocatable MIDI device");
 
 static int uvendor     = -1;
-MODULE_PARM(uvendor,"i");
+module_param(uvendor, int, 0);
 MODULE_PARM_DESC(uvendor, "The USB Vendor ID of a semi-compliant interface");
 
 static int uproduct    = -1;
-MODULE_PARM(uproduct,"i");
+module_param(uproduct, int, 0);
 MODULE_PARM_DESC(uproduct, "The USB Product ID of a semi-compliant interface");
 
 static int uinterface  = -1;
-MODULE_PARM(uinterface,"i");
+module_param(uinterface, int, 0);
 MODULE_PARM_DESC(uinterface, "The Interface number of a semi-compliant interface");
 
 static int ualt        = -1;
-MODULE_PARM(ualt,"i");
+module_param(ualt, int, 0);
 MODULE_PARM_DESC(ualt, "The optional alternative setting of a semi-compliant interface");
 
 static int umin        = -1;
-MODULE_PARM(umin,"i");
+module_param(umin, int, 0);
 MODULE_PARM_DESC(umin, "The input endpoint of a semi-compliant interface");
 
 static int umout       = -1;
-MODULE_PARM(umout,"i");
+module_param(umout, int, 0);
 MODULE_PARM_DESC(umout, "The output endpoint of a semi-compliant interface");
 
 static int ucable      = -1;
-MODULE_PARM(ucable,"i");
+module_param(ucable, int, 0);
 MODULE_PARM_DESC(ucable, "The cable number used for a semi-compliant interface");
 
 /** Note -- the usb_string() returns only Latin-1 characters.
@@ -95,7 +95,7 @@ MODULE_PARM_DESC(ucable, "The cable number used for a semi-compliant interface")
  * unicode16LE-to-JIS routine is needed to wrap around usb_get_string().
  **/
 static unsigned short ulangid      = 0x0409; /** 0x0411 for Japanese **/
-MODULE_PARM(ulangid,"h");
+module_param(ulangid, ushort, 0);
 MODULE_PARM_DESC(ulangid, "The optional preferred USB Language ID for all devices");
 
 MODULE_AUTHOR("NAGANO Daisuke <breeze.nagano@nifty.ne.jp>");
@@ -817,9 +817,9 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 
 	for(;;) {
 		down(&open_sem);
-		for (devs = mididevs.next; devs != &mididevs; devs = devs->next) {
+		list_for_each(devs, &mididevs) {
 			s = list_entry(devs, struct usb_midi_state, mididev);
-			for (mdevs = s->midiDevList.next; mdevs != &s->midiDevList; mdevs = mdevs->next) {
+			list_for_each(mdevs, &s->midiDevList) {
 				m = list_entry(mdevs, struct usb_mididev, list);
 				if ( !((m->dev_midi ^ minor) & ~0xf) )
 					goto device_found;
@@ -2012,7 +2012,7 @@ static void usb_midi_disconnect(struct usb_interface *intf)
 	s->usbdev = NULL;
 	usb_set_intfdata (intf, NULL);
 
-	for ( list = s->midiDevList.next; list != &s->midiDevList; list = list->next ) {
+	list_for_each(list, &s->midiDevList) {
 		m = list_entry(list, struct usb_mididev, list);
 		wake_up(&(m->min.ep->wait));
 		wake_up(&(m->mout.ep->wait));

@@ -44,9 +44,15 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include "debug.h"
+#include <linux/cdrom.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
 
-void usb_stor_show_command(Scsi_Cmnd *srb)
+#include "debug.h"
+#include "scsi.h"
+
+
+void usb_stor_show_command(struct scsi_cmnd *srb)
 {
 	char *what = NULL;
 	int i;

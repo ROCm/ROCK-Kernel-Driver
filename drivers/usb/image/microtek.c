@@ -214,8 +214,8 @@ static struct usb_driver mts_usb_driver = {
 #ifdef MTS_DO_DEBUG
 
 static inline void mts_debug_dump(struct mts_desc* desc) {
-	MTS_DEBUG("desc at 0x%x: halted = %02x%02x, toggle = %02x%02x\n",
-		  (int)desc,(int)desc->usb_dev->halted[1],(int)desc->usb_dev->halted[0],
+	MTS_DEBUG("desc at 0x%x: toggle = %02x%02x\n",
+		  (int)desc,
 		  (int)desc->usb_dev->toggle[1],(int)desc->usb_dev->toggle[0]
 		);
 	MTS_DEBUG("ep_out=%x ep_response=%x ep_image=%x\n",

@@ -2301,6 +2301,13 @@ L:	linux-usb-devel@lists.sourceforge.net
 W:	http://www.connecttech.com
 S:	Supported
 
+USB SN9C10[12] DRIVER
+P:	Luca Risolia
+M:	luca.risolia@studio.unibo.it
+L:	linux-usb-devel@lists.sourceforge.net
+W:	http://go.lamarinapunto.com
+S:	Maintained
+
 USB SUBSYSTEM
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com

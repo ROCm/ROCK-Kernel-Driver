@@ -29,7 +29,7 @@
 
 /* Sandisk SDDR-09 stuff */
 
-extern int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us);
+extern int sddr09_transport(struct scsi_cmnd *srb, struct us_data *us);
 
 struct sddr09_card_info {
 	unsigned long	capacity;	/* Size of card in bytes */

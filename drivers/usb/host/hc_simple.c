@@ -146,11 +146,6 @@ static int hci_submit_urb (struct urb * urb, int mem_flags)
 	if (!urb->dev || !urb->dev->bus || urb->hcpriv)
 		return -EINVAL;
 
-	if (usb_endpoint_halted
-	    (urb->dev, usb_pipeendpoint (pipe), usb_pipeout (pipe))) {
-		printk ("hci_submit_urb: endpoint_halted\n");
-		return -EPIPE;
-	}
 	hci = (hci_t *) urb->dev->bus->hcpriv;
 
 	/* a request to the virtual root hub */

@@ -11,7 +11,7 @@ obj-$(CONFIG_USB_GOKU)		+= goku_udc.o
 #
 g_zero-objs			:= zero.o usbstring.o config.o epautoconf.o
 g_ether-objs			:= ether.o usbstring.o config.o epautoconf.o
-g_serial-objs			:= serial.o usbstring.o
+g_serial-objs			:= serial.o usbstring.o epautoconf.o
 gadgetfs-objs			:= inode.o
 g_file_storage-objs		:= file_storage.o usbstring.o config.o \
 					epautoconf.o

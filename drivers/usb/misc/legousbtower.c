@@ -71,6 +71,8 @@
  *   - make device locking interruptible
  * 2004-04-30 - 0.95 Juergen Stuber <starblue@users.sourceforge.net>
  *   - check for valid udev on resubmitting and unlinking urbs
+ * 2004-08-03 - 0.96 Juergen Stuber <starblue@users.sourceforge.net>
+ *   - move reset into open to clean out spurious data
  */
 
 #include <linux/config.h>
@@ -98,12 +100,12 @@
 
 
 /* Version Information */
-#define DRIVER_VERSION "v0.95"
+#define DRIVER_VERSION "v0.96"
 #define DRIVER_AUTHOR "Juergen Stuber <starblue@sourceforge.net>"
 #define DRIVER_DESC "LEGO USB Tower Driver"
 
 /* Module parameters */
-MODULE_PARM(debug, "i");
+module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
 /* The defaults are chosen to work with the latest versions of leJOS and NQC.
@@ -114,7 +116,7 @@ MODULE_PARM_DESC(debug, "Debug enabled or not");
  * (417 for datalog uploads), and packet_timeout should be set.
  */
 static size_t read_buffer_size = 480;
-MODULE_PARM(read_buffer_size, "i");
+module_param(read_buffer_size, int, 0);
 MODULE_PARM_DESC(read_buffer_size, "Read buffer size");
 
 /* Some legacy software likes to send packets in one piece.
@@ -124,7 +126,7 @@ MODULE_PARM_DESC(read_buffer_size, "Read buffer size");
  * if the software is not prepared to wait long enough.
  */
 static size_t write_buffer_size = 480;
-MODULE_PARM(write_buffer_size, "i");
+module_param(write_buffer_size, int, 0);
 MODULE_PARM_DESC(write_buffer_size, "Write buffer size");
 
 /* Some legacy software expects reads to contain whole LASM packets.
@@ -138,7 +140,7 @@ MODULE_PARM_DESC(write_buffer_size, "Write buffer size");
  * Set it to 0 to disable.
  */
 static int packet_timeout = 50;
-MODULE_PARM(packet_timeout, "i");
+module_param(packet_timeout, int, 0);
 MODULE_PARM_DESC(packet_timeout, "Packet timeout in ms");
 
 /* Some legacy software expects blocking reads to time out.
@@ -146,7 +148,7 @@ MODULE_PARM_DESC(packet_timeout, "Packet timeout in ms");
  * Set it to 0 to disable.
  */
 static int read_timeout = 200;
-MODULE_PARM(read_timeout, "i");
+module_param(read_timeout, int, 0);
 MODULE_PARM_DESC(read_timeout, "Read timeout in ms");
 
 /* As of kernel version 2.6.4 ehci-hcd uses an
@@ -159,11 +161,11 @@ MODULE_PARM_DESC(read_timeout, "Read timeout in ms");
  * or set to 0 to use the standard interval from the endpoint descriptors.
  */
 static int interrupt_in_interval = 2;
-MODULE_PARM(interrupt_in_interval, "i");
+module_param(interrupt_in_interval, int, 0);
 MODULE_PARM_DESC(interrupt_in_interval, "Interrupt in interval in ms");
 
 static int interrupt_out_interval = 8;
-MODULE_PARM(interrupt_out_interval, "i");
+module_param(interrupt_out_interval, int, 0);
 MODULE_PARM_DESC(interrupt_out_interval, "Interrupt out interval in ms");
 
 /* Define these values to match your device */
@@ -341,6 +343,8 @@ static int tower_open (struct inode *inode, struct file *file)
 	int subminor;
 	int retval = 0;
 	struct usb_interface *interface;
+	struct tower_reset_reply reset_reply;
+	int result;
 
 	dbg(2, "%s: enter", __FUNCTION__);
 
@@ -377,6 +381,22 @@ static int tower_open (struct inode *inode, struct file *file)
 		goto unlock_exit;
 	}
 	dev->open_count = 1;
+
+	/* reset the tower */
+	result = usb_control_msg (dev->udev,
+				  usb_rcvctrlpipe(dev->udev, 0),
+				  LEGO_USB_TOWER_REQUEST_RESET,
+				  USB_TYPE_VENDOR | USB_DIR_IN | USB_RECIP_DEVICE,
+				  0,
+				  0,
+				  &reset_reply,
+				  sizeof(reset_reply),
+				  HZ);
+	if (result < 0) {
+		err("LEGO USB Tower reset control request failed");
+		retval = result;
+		goto unlock_exit;
+	}
 
 	/* initialize in direction */
 	dev->read_buffer_length = 0;
@@ -828,7 +848,6 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 	struct lego_usb_tower *dev = NULL;
 	struct usb_host_interface *iface_desc;
 	struct usb_endpoint_descriptor* endpoint;
-	struct tower_reset_reply reset_reply;
 	struct tower_get_version_reply get_version_reply;
 	int i;
 	int retval = -ENOMEM;
@@ -950,22 +969,6 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 
 	/* let the user know what node this device is now attached to */
 	info ("LEGO USB Tower #%d now attached to major %d minor %d", (dev->minor - LEGO_USB_TOWER_MINOR_BASE), USB_MAJOR, dev->minor);
-
-	/* reset the tower */
-	result = usb_control_msg (udev,
-				  usb_rcvctrlpipe(udev, 0),
-				  LEGO_USB_TOWER_REQUEST_RESET,
-				  USB_TYPE_VENDOR | USB_DIR_IN | USB_RECIP_DEVICE,
-				  0,
-				  0,
-				  &reset_reply,
-				  sizeof(reset_reply),
-				  HZ);
-	if (result < 0) {
-		err("LEGO USB Tower reset control request failed");
-		retval = result;
-		goto error;
-	}
 
 	/* get the firmware version and log it */
 	result = usb_control_msg (udev,

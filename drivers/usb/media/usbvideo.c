@@ -34,7 +34,7 @@
 #endif
 
 static int video_nr = -1;
-MODULE_PARM(video_nr, "i");
+module_param(video_nr, int, 0);
 
 /*
  * Local prototypes.

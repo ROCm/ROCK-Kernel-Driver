@@ -1311,13 +1311,10 @@ static void hcd_endpoint_disable (struct usb_device *udev, int endpoint)
 
 rescan:
 	/* (re)block new requests, as best we can */
-	if (endpoint & USB_DIR_IN) {
-		usb_endpoint_halt (udev, epnum, 0);
+	if (endpoint & USB_DIR_IN)
 		udev->epmaxpacketin [epnum] = 0;
-	} else {
-		usb_endpoint_halt (udev, epnum, 1);
+	else
 		udev->epmaxpacketout [epnum] = 0;
-	}
 
 	/* then kill any current requests */
 	spin_lock (&hcd_data_lock);

@@ -596,14 +596,13 @@ static const struct usb_gadget_ops dummy_ops = {
 
 /* "function" sysfs attribute */
 static ssize_t
-show_function (struct device *_dev, char *buf)
+show_function (struct device *dev, char *buf)
 {
-	struct dummy	*dum = the_controller;
+	struct dummy	*dum = gadget_dev_to_dummy (dev);
 
-	if (!dum->driver->function
-			|| strlen (dum->driver->function) > PAGE_SIZE)
+	if (!dum->driver || !dum->driver->function)
 		return 0;
-	return snprintf (buf, PAGE_SIZE, "%s\n", dum->driver->function);
+	return scnprintf (buf, PAGE_SIZE, "%s\n", dum->driver->function);
 }
 DEVICE_ATTR (function, S_IRUGO, show_function, NULL);
 
