@@ -2245,9 +2245,8 @@ static struct tty_driver dev_tty_driver, dev_syscons_driver;
 static struct tty_driver dev_ptmx_driver;
 #endif
 #ifdef CONFIG_VT
-extern void con_init_devfs (void);
-extern void console_map_init(void);
 static struct tty_driver dev_console_driver;
+extern int vty_init(void);
 #endif
 
 /*
@@ -2287,13 +2286,6 @@ void __init tty_init(void)
 	if (tty_register_driver(&dev_syscons_driver))
 		panic("Couldn't register /dev/console driver\n");
 
-	/* console calls tty_register_driver() before kmalloc() works.
-	 * Thus, we can't devfs_register() then.  Do so now, instead. 
-	 */
-#ifdef CONFIG_VT
-	con_init_devfs();
-#endif
-
 #ifdef CONFIG_UNIX98_PTYS
 	dev_ptmx_driver = dev_tty_driver;
 	dev_ptmx_driver.driver_name = "/dev/ptmx";
@@ -2317,10 +2309,7 @@ void __init tty_init(void)
 
 	if (tty_register_driver(&dev_console_driver))
 		panic("Couldn't register /dev/tty0 driver\n");
-
-	vcs_init();
-	kbd_init();
-	console_map_init();
+	vty_init();
 #endif
 
 #ifdef CONFIG_ESPSERIAL  /* init ESP before rs, so rs doesn't see the port */
