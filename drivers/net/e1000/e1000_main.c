@@ -564,7 +564,6 @@ e1000_probe(struct pci_dev *pdev,
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
 
-	DPRINTK(PROBE, INFO, "Intel(R) PRO/1000 Network Connection\n");
 	e1000_check_options(adapter);
 
 	/* Initial Wake on LAN setting
@@ -600,7 +599,9 @@ e1000_probe(struct pci_dev *pdev,
 
 	if((err = register_netdev(netdev)))
 		goto err_register;
-
+	
+	DPRINTK(PROBE, INFO, "Intel(R) PRO/1000 Network Connection\n");
+	
 	cards_found++;
 	return 0;
 
