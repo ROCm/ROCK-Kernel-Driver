@@ -162,8 +162,10 @@ PERL		= perl
 MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
+LDFLAGS_MODULE  = -r
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
+
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 CPPFLAGS	:= -D__KERNEL__ -Iinclude
@@ -174,7 +176,7 @@ AFLAGS		:= -D__ASSEMBLY__ $(CPPFLAGS)
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE \
-	HOSTCXX HOSTCXXFLAGS LDFLAGS_BLOB
+	HOSTCXX HOSTCXXFLAGS LDFLAGS_BLOB LDFLAGS_MODULE
 
 export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
@@ -543,7 +545,7 @@ _modinst_:
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
-	$(Q)$(MAKE) -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
+	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
 else # CONFIG_MODULES
 
 # Modules not configured
@@ -709,8 +711,9 @@ cmd_rmclean	  = rm -f $(CLEAN_FILES)
 clean: archclean $(addprefix _clean_,$(clean-dirs))
 	$(call cmd,rmclean)
 	@find . $(RCS_FIND_IGNORE) \
-	 	\( -name '*.[oas]' -o -name '.*.cmd' -o -name '.*.d' \
-		-o -name '.*.tmp' \) -type f -print | xargs rm -f
+	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
+		-o -name '.*.d' -o -name '.*.tmp' \) -type f \
+		-print | xargs rm -f
 
 # mrproper - delete configuration + modules + core files
 #

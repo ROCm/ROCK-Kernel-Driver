@@ -46,7 +46,7 @@ endif
 endif
 
 __build: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
-	 $(if $(KBUILD_MODULES),$(obj-m)) \
+	 $(if $(KBUILD_MODULES),$(obj-m:.o=.ko)) \
 	 $(subdir-ym) $(build-targets)
 	@:
 
@@ -172,21 +172,29 @@ endif
 #
 # Rule to link composite objects
 #
+quiet_cmd_link_multi-y = LD      $@
+cmd_link_multi-y = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(addprefix $(obj)/,$($(subst $(obj)/,,$(@:.o=-objs))) $($(subst $(obj)/,,$(@:.o=-y)))),$^)
 
-quiet_cmd_link_multi = LD $(quiet_modtag)  $@
-cmd_link_multi = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(addprefix $(obj)/,$($(subst $(obj)/,,$(@:.o=-objs))) $($(subst $(obj)/,,$(@:.o=-y)))),$^)
+quiet_cmd_link_multi-m = LD [M]  $@
+cmd_link_multi-m = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_MODULE) -o $@ $(filter $(addprefix $(obj)/,$($(subst $(obj)/,,$(@:.ko=-objs))) $($(subst $(obj)/,,$(@:.ko=-y)))),$^)
+
+quiet_cmd_link_single-m = LD [M]  $@
+cmd_link_single-m = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_MODULE) -o $@ $<
 
 # We would rather have a list of rules like
 # 	foo.o: $(foo-objs)
 # but that's not so easy, so we rather make all composite objects depend
 # on the set of all their parts
 $(multi-used-y) : %.o: $(multi-objs-y) FORCE
-	$(call if_changed,link_multi)
+	$(call if_changed,link_multi-y)
 
-$(multi-used-m) : %.o: $(multi-objs-m) FORCE
-	$(call if_changed,link_multi)
+$(multi-used-m:.o=.ko) : %.ko: $(multi-objs-m) FORCE
+	$(call if_changed,link_multi-m)
 
-targets += $(multi-used-y) $(multi-used-m)
+$(single-used-m:.o=.ko) : %.ko: %.o FORCE
+	$(call if_changed,link_single-m)
+
+targets += $(multi-used-y) $(multi-used-m:.o=.ko) $(single-used-m:.o=.ko)
 
 # Compile programs on the host
 # ===========================================================================
