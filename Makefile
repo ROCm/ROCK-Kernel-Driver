@@ -549,6 +549,7 @@ CLEAN_FILES += \
 	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
 	drivers/char/conmakehash \
 	drivers/char/drm/*-mod.c \
+	drivers/char/defkeymap.c drivers/char/qtronixmap.c \
 	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
 	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
 	sound/oss/bin2hex sound/oss/hex2hex \

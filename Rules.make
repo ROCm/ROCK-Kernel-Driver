@@ -22,6 +22,30 @@ else
   TOPDIR_REL := $(subst $(space),,$(foreach d,$(subst /, ,$(RELDIR)),../))
 endif
 
+# Some paths for the Makefiles to use
+# ---------------------------------------------------------------------------
+
+# Usage:
+#
+# $(obj)/target.o                     : target.o in the build dir
+# $(src)/target.c                     : target.c in the source dir
+# $(objtree)/include/linux/version.h  : Some file relative to the build
+#					dir root
+# $(srctree)/include/linux/module.h   : Some file relative to the source
+#				        dir root
+#
+# Those can only be used in the section after
+# include $(TOPDIR)/Rules.make, i.e for generated files and the like.
+# Intentionally.
+#
+# We don't support separate source / object yet, so these are just
+# placeholders for now
+
+obj := .
+src := .
+objtree := $(TOPDIR)
+srctree := $(TOPDIR)
+
 # Figure out what we need to build from the various variables
 # ===========================================================================
 
