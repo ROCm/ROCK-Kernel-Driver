@@ -5902,13 +5902,9 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	unsigned short ridcode;
 	unsigned char *iobuf;
 	struct airo_info *ai = dev->priv;
-	int ret = 0;
 
 	if (ai->flags & FLAG_FLASHING)
 		return -EIO;
-	iobuf = kmalloc(RIDS_SIZE, GFP_KERNEL);
-	if (!iobuf)
-		return -ENOMEM;
 
 	switch(comp->command)
 	{
@@ -5921,17 +5917,13 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	case AIROGEHTENC:   ridcode = RID_ETHERENCAP;   break;
 	case AIROGWEPKTMP:  ridcode = RID_WEP_TEMP;
 		/* Only super-user can read WEP keys */
-		if (!capable(CAP_NET_ADMIN)) {
-			ret = -EPERM;
-			goto rr_free;
-		}
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		break;
 	case AIROGWEPKNV:   ridcode = RID_WEP_PERM;
 		/* Only super-user can read WEP keys */
-		if (!capable(CAP_NET_ADMIN)) {
-			ret = -EPERM;
-			goto rr_free;
-		}
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		break;
 	case AIROGSTAT:     ridcode = RID_STATUS;       break;
 	case AIROGSTATSD32: ridcode = RID_STATSDELTA;   break;
@@ -5939,12 +5931,15 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	case AIROGMICSTATS:
 		if (copy_to_user(comp->data, &ai->micstats,
 				 min((int)comp->len,(int)sizeof(ai->micstats))))
-			ret = -EFAULT;
-		goto rr_free;
+			return -EFAULT;
+		return 0;
 	default:
-		ret = -EINVAL;
-		goto rr_free;
+		return -EINVAL;
+		break;
 	}
+
+	if ((iobuf = kmalloc(RIDS_SIZE, GFP_KERNEL)) == NULL)
+		return -ENOMEM;
 
 	PC4500_readrid(ai,ridcode,iobuf,RIDS_SIZE);
 	/* get the count of bytes in the rid  docs say 1st 2 bytes is it.
@@ -5953,11 +5948,12 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	 */
 
 	if (copy_to_user(comp->data, iobuf,
-			 min((int)comp->len, (int)RIDS_SIZE)))
-		ret = -EFAULT;
-rr_free:
-	kfree(iobuf);
-	return ret;
+			 min((int)comp->len, (int)RIDS_SIZE))) {
+		kfree (iobuf);
+		return -EFAULT;
+	}
+	kfree (iobuf);
+	return 0;
 }
 
 /*
@@ -5970,7 +5966,6 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 	Resp      rsp;
 	static int (* writer)(struct airo_info *, u16 rid, const void *, int);
 	unsigned char *iobuf;
-	int ret = 0;
 
 	/* Only super-user can write RIDs */
 	if (!capable(CAP_NET_ADMIN))
@@ -5978,10 +5973,6 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 
 	if (ai->flags & FLAG_FLASHING)
 		return -EIO;
-
-	iobuf = kmalloc(RIDS_SIZE, GFP_KERNEL);
-	if (!iobuf)
-		return -ENOMEM;
 
 	ridcode = 0;
 	writer = do_writerid;
@@ -6004,8 +5995,8 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 		 */
 	case AIROPMACON:
 		if (enable_MAC(ai, &rsp) != 0)
-			ret = -EIO;
-		goto wr_free;
+			return -EIO;
+		return 0;
 
 		/*
 		 * Evidently this code in the airo driver does not get a symbol
@@ -6013,13 +6004,16 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 		 */
 	case AIROPMACOFF:
 		disable_MAC(ai);
-		goto wr_free;
+		return 0;
 
 		/* This command merely clears the counts does not actually store any data
 		 * only reads rid. But as it changes the cards state, I put it in the
 		 * writerid routines.
 		 */
 	case AIROPSTCLR:
+		if ((iobuf = kmalloc(RIDS_SIZE, GFP_KERNEL)) == NULL)
+			return -ENOMEM;
+
 		PC4500_readrid(ai,RID_STATSDELTACLEAR,iobuf,RIDS_SIZE);
 
 		enabled = ai->micstats.enabled;
@@ -6027,23 +6021,25 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 		ai->micstats.enabled = enabled;
 
 		if (copy_to_user(comp->data, iobuf,
-				 min((int)comp->len, (int)RIDS_SIZE)))
-			ret = -EFAULT;
-		goto wr_free;
+				 min((int)comp->len, (int)RIDS_SIZE))) {
+			kfree (iobuf);
+			return -EFAULT;
+		}
+		kfree (iobuf);
+		return 0;
 
 	default:
-		ret = -EOPNOTSUPP;	/* Blarg! */
-		goto wr_free;
+		return -EOPNOTSUPP;	/* Blarg! */
 	}
+	if(comp->len > RIDS_SIZE)
+		return -EINVAL;
 
-	if (comp->len > RIDS_SIZE) {
-		ret = -EINVAL;
-		goto wr_free;
-	}
+	if ((iobuf = kmalloc(RIDS_SIZE, GFP_KERNEL)) == NULL)
+		return -ENOMEM;
 
 	if (copy_from_user(iobuf,comp->data,comp->len)) {
-		ret = -EFAULT;
-		goto wr_free;
+		kfree (iobuf);
+		return -EFAULT;
 	}
 
 	if (comp->command == AIROPCFG) {
@@ -6058,11 +6054,12 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 			ai->flags &= ~FLAG_ADHOC;
 	}
 
-	if((*writer)(ai, ridcode, iobuf,comp->len))
-		ret = -EIO;
-wr_free:
-	kfree(iobuf);
-	return ret;
+	if((*writer)(ai, ridcode, iobuf,comp->len)) {
+		kfree (iobuf);
+		return -EIO;
+	}
+	kfree (iobuf);
+	return 0;
 }
 
 /*****************************************************************************
