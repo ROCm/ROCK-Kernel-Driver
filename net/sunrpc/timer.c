@@ -15,7 +15,6 @@
 
 #include <asm/param.h>
 
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/unistd.h>
 

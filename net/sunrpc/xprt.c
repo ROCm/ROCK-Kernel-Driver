@@ -45,7 +45,6 @@
 
 #define __KERNEL_SYSCALLS__
 
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/capability.h>

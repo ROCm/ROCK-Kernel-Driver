@@ -8,7 +8,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/linkage.h>
 #include <linux/ctype.h>
