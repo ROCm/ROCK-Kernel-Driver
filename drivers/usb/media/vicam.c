@@ -664,7 +664,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 			DBG("VIDIOCSWIN %d x %d\n", vw->width, vw->height);
 			
 			if ( vw.width != 320 || vw.height != 240 )
-			retval = -EFAULT;
+			retval = -EINVAL;
 
 			break;
 		}
