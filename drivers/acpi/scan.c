@@ -336,6 +336,9 @@ acpi_bus_register_driver (
 
 	ACPI_FUNCTION_TRACE("acpi_bus_register_driver");
 
+	if (acpi_disabled)
+		return_VALUE(-ENODEV);
+
 	if (driver) {
 		spin_lock(&acpi_device_lock);
 		list_add_tail(&driver->node, &acpi_bus_drivers);

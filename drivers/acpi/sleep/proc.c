@@ -374,6 +374,9 @@ static int acpi_sleep_proc_init(void)
 {
 	struct proc_dir_entry	*entry = NULL;
 
+	if (acpi_disabled)
+		return 0;
+ 
 	/* 'sleep' [R/W]*/
 	entry = create_proc_entry(ACPI_SYSTEM_FILE_SLEEP,
 				  S_IFREG|S_IRUGO|S_IWUSR, acpi_root_dir);
