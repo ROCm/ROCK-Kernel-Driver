@@ -12,6 +12,8 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
+#include <linux/mm.h>
+#include <linux/reboot.h>
 #include <asm/ptrace.h>
 #include <asm/string.h>
 #include <asm/prom.h>
@@ -22,13 +24,9 @@
 #include <asm/mmu_context.h>
 #include <asm/Naca.h>
 #include <asm/Paca.h>
+#include <asm/ppcdebug.h>
 #include "nonstdio.h"
 #include "privinst.h"
-#include <linux/mm.h>
-
-#include <asm/ppcdebug.h>
-
-#include <asm/Paca.h>
 
 #define scanhex	xmon_scanhex
 #define skipbl	xmon_skipbl
@@ -132,7 +130,6 @@ static void mem_map_check_slab(void);
 static void mem_map_lock_pages(void);
 static void mem_map_check_hash(void);
 static void mem_check_dup_rpn (void);
-static void show_state(void);
 static void debug_trace(void);
 
 extern int print_insn_big_powerpc(FILE *, unsigned long, unsigned long);
@@ -1218,7 +1215,7 @@ read_spr(int n)
 
 	instrs[0] = 0x7c6002a6 + ((n & 0x1F) << 16) + ((n & 0x3e0) << 6);
 	instrs[1] = 0x4e800020;
-	opd[0] = instrs;
+	opd[0] = (unsigned long)instrs;
 	opd[1] = 0;
 	opd[2] = 0;
 	store_inst(instrs);
@@ -1237,7 +1234,7 @@ write_spr(int n, unsigned long val)
 
 	instrs[0] = 0x7c6003a6 + ((n & 0x1F) << 16) + ((n & 0x3e0) << 6);
 	instrs[1] = 0x4e800020;
-	opd[0] = instrs;
+	opd[0] = (unsigned long)instrs;
 	opd[1] = 0;
 	opd[2] = 0;
 	store_inst(instrs);
