@@ -1673,11 +1673,17 @@ static void rtl8139_tx_timeout (struct net_device *dev)
 	u8 tmp8;
 	unsigned long flags;
 
-	DPRINTK ("%s: Transmit timeout, status %2.2x %4.4x "
-		 "media %2.2x.\n", dev->name,
-		 RTL_R8 (ChipCmd),
-		 RTL_R16 (IntrStatus),
-		 RTL_R8 (MediaStatus));
+	printk (KERN_DEBUG "%s: Transmit timeout, status %2.2x %4.4x %4.4x "
+		"media %2.2x.\n", dev->name, RTL_R8 (ChipCmd),
+		RTL_R16(IntrStatus), RTL_R16(IntrMask), RTL_R8(MediaStatus));
+	/* Emit info to figure out what went wrong. */
+	printk (KERN_DEBUG "%s: Tx queue start entry %ld  dirty entry %ld.\n",
+		dev->name, tp->cur_tx, tp->dirty_tx);
+	for (i = 0; i < NUM_TX_DESC; i++)
+		printk (KERN_DEBUG "%s:  Tx descriptor %d is %8.8lx.%s\n",
+			dev->name, i, RTL_R32 (TxStatus0 + (i * 4)),
+			i == tp->dirty_tx % NUM_TX_DESC ?
+				" (queue head)" : "");
 
 	tp->xstats.tx_timeouts++;
 
@@ -1690,15 +1696,6 @@ static void rtl8139_tx_timeout (struct net_device *dev)
 	/* Disable interrupts by clearing the interrupt mask. */
 	RTL_W16 (IntrMask, 0x0000);
 
-	/* Emit info to figure out what went wrong. */
-	printk (KERN_DEBUG "%s: Tx queue start entry %ld  dirty entry %ld.\n",
-		dev->name, tp->cur_tx, tp->dirty_tx);
-	for (i = 0; i < NUM_TX_DESC; i++)
-		printk (KERN_DEBUG "%s:  Tx descriptor %d is %8.8lx.%s\n",
-			dev->name, i, RTL_R32 (TxStatus0 + (i * 4)),
-			i == tp->dirty_tx % NUM_TX_DESC ?
-				" (queue head)" : "");
-
 	/* Stop a shared interrupt from scavenging while we are. */
 	spin_lock_irqsave (&tp->lock, flags);
 	rtl8139_tx_clear (tp);
@@ -1710,7 +1707,6 @@ static void rtl8139_tx_timeout (struct net_device *dev)
 		netif_wake_queue (dev);
 	}
 	spin_unlock(&tp->rx_lock);
-	
 }
 
 
