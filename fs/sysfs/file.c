@@ -330,11 +330,13 @@ static int sysfs_release(struct inode * inode, struct file * filp)
 {
 	struct kobject * kobj = to_kobj(filp->f_dentry->d_parent);
 	struct attribute * attr = to_attr(filp->f_dentry);
+	struct module * owner = attr->owner;
 	struct sysfs_buffer * buffer = filp->private_data;
 
 	if (kobj) 
 		kobject_put(kobj);
-	module_put(attr->owner);
+	/* After this point, attr should not be accessed. */
+	module_put(owner);
 
 	if (buffer) {
 		if (buffer->page)

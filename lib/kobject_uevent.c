@@ -120,9 +120,8 @@ static int do_kobject_uevent(struct kobject *kobj, enum kobject_action action,
 		sprintf(attrpath, "%s/%s", path, attr->name);
 		rc = send_uevent(signal, attrpath, NULL, gfp_mask);
 		kfree(attrpath);
-	} else {
+	} else
 		rc = send_uevent(signal, path, NULL, gfp_mask);
-	}
 
 exit:
 	kfree(path);
@@ -148,7 +147,6 @@ int kobject_uevent_atomic(struct kobject *kobj, enum kobject_action action,
 {
 	return do_kobject_uevent(kobj, action, attr, GFP_ATOMIC);
 }
-
 EXPORT_SYMBOL_GPL(kobject_uevent_atomic);
 
 static int __init kobject_uevent_init(void)
@@ -164,11 +162,11 @@ static int __init kobject_uevent_init(void)
 	return 0;
 }
 
-core_initcall(kobject_uevent_init);
+postcore_initcall(kobject_uevent_init);
 
 #else
 static inline int send_uevent(const char *signal, const char *obj,
-			      const void *buf, int buflen, int gfp_mask)
+			      char **envp, int gfp_mask)
 {
 	return 0;
 }

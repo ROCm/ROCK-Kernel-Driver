@@ -349,7 +349,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 		return -ENOMEM;
 	}
 
-	pm->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&pm->lock);
 	init_input_dev(&pm->input);
 
 	/* get a handle to the interrupt data pipe */

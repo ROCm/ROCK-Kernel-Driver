@@ -146,6 +146,7 @@ int usb_hcd_lh7a404_probe (const struct hc_driver *driver,
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
+	hcd->self.release = &usb_hcd_release;
 	hcd->self.hcpriv = (void *) hcd;
 	hcd->self.bus_name = "lh7a404";
 	hcd->product_desc = "LH7A404 OHCI";
@@ -165,9 +166,8 @@ int usb_hcd_lh7a404_probe (const struct hc_driver *driver,
 
  err2:
 	hcd_buffer_destroy (hcd);
-	if (hcd)
-		driver->hcd_free(hcd);
  err1:
+	kfree(hcd);
 	lh7a404_stop_hc(dev);
 	release_mem_region(dev->resource[0].start,
 				dev->resource[0].end
@@ -191,8 +191,6 @@ int usb_hcd_lh7a404_probe (const struct hc_driver *driver,
  */
 void usb_hcd_lh7a404_remove (struct usb_hcd *hcd, struct platform_device *dev)
 {
-	void *base;
-
 	pr_debug ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
 
 	if (in_interrupt ())
@@ -210,9 +208,6 @@ void usb_hcd_lh7a404_remove (struct usb_hcd *hcd, struct platform_device *dev)
 	hcd_buffer_destroy (hcd);
 
 	usb_deregister_bus (&hcd->self);
-
-	base = hcd->regs;
-	hcd->driver->hcd_free (hcd);
 
 	lh7a404_stop_hc(dev);
 	release_mem_region(dev->resource[0].start,
@@ -265,7 +260,6 @@ static const struct hc_driver ohci_lh7a404_hc_driver = {
 	 * memory lifecycle (except per-request)
 	 */
 	.hcd_alloc =		ohci_hcd_alloc,
-	.hcd_free =		ohci_hcd_free,
 
 	/*
 	 * managing i/o requests and associated device resources

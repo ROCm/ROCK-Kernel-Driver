@@ -1516,7 +1516,7 @@ static int hub_port_suspend(struct usb_device *hdev, int port)
  * Linux (2.6) currently has NO mechanisms to initiate that:  no khubd
  * timer, no SRP, no requests through sysfs.
  */
-static int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
+int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
 {
 	int	status;
 
@@ -1524,9 +1524,7 @@ static int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
 	if (port < 0)
 		return port;
 
-	if (state <= udev->dev.power.power_state
-			|| state < PM_SUSPEND_MEM
-			|| udev->state == USB_STATE_SUSPENDED
+	if (udev->dev.power.power_state
 			|| udev->state == USB_STATE_NOTATTACHED) {
 		return 0;
 	}
@@ -1590,7 +1588,6 @@ static int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
 	 */
 	if (state > PM_SUSPEND_MEM) {
 		dev_warn(&udev->dev, "no poweroff yet, suspending instead\n");
-		state = PM_SUSPEND_MEM;
 	}
 
 	/* "global suspend" of the HC-to-USB interface (root hub), or
@@ -1606,9 +1603,11 @@ static int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
 		status = hub_port_suspend(udev->parent, port);
 
 	if (status == 0)
-		udev->dev.power.power_state = state;
+		udev->dev.power.power_state = PM_SUSPEND_MEM;
+	up(&udev->serialize);
 	return status;
 }
+EXPORT_SYMBOL(__usb_suspend_device);
 
 /**
  * usb_suspend_device - suspend a usb device
@@ -1821,6 +1820,7 @@ int usb_resume_device(struct usb_device *udev)
 					->actconfig->interface[0]);
 		}
 	} else if (udev->state == USB_STATE_SUSPENDED) {
+		// NOTE this fails if parent is also suspended...
 		status = hub_port_resume(udev->parent, port);
 	} else {
 		status = 0;
@@ -1834,10 +1834,11 @@ int usb_resume_device(struct usb_device *udev)
 	usb_unlock_device(udev);
 
 	/* rebind drivers that had no suspend() */
-	usb_lock_all_devices();
-	bus_rescan_devices(&usb_bus_type);
-	usb_unlock_all_devices();
-
+	if (status == 0) {
+		usb_lock_all_devices();
+		bus_rescan_devices(&usb_bus_type);
+		usb_unlock_all_devices();
+	}
 	return status;
 }
 
@@ -1895,6 +1896,9 @@ static int hub_resume(struct usb_interface *intf)
 	unsigned		port;
 	int			status;
 
+	if (intf->dev.power.power_state == PM_SUSPEND_ON)
+		return 0;
+
 	for (port = 0; port < hdev->maxchild; port++) {
 		struct usb_device	*udev;
 		u16			portstat, portchange;
@@ -1913,7 +1917,7 @@ static int hub_resume(struct usb_interface *intf)
 				continue;
 		}
 
-		if (!udev)
+		if (!udev || status < 0)
 			continue;
 		down (&udev->serialize);
 		if (portstat & USB_PORT_STAT_SUSPEND)
@@ -2240,8 +2244,8 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 
 	/* Should we verify that the value is valid? */
 	i = udev->descriptor.bMaxPacketSize0;
-	dev_dbg(&udev->dev, "ep0 maxpacket = %d\n", i);
 	if (udev->epmaxpacketin[0] != i) {
+		dev_dbg(&udev->dev, "ep0 maxpacket = %d\n", i);
 		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
 		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
 		udev->epmaxpacketin[0] = udev->epmaxpacketout[0] = i;
@@ -2546,6 +2550,14 @@ static void hub_events(void)
 
 		usb_get_dev(hdev);
 		spin_unlock_irq(&hub_event_lock);
+
+		dev_dbg(hub_dev, "state %d ports %d chg %04x evt %04x\n",
+				hdev->state, hub->descriptor
+					? hub->descriptor->bNbrPorts
+					: 0,
+				/* NOTE: expects max 15 ports... */
+				(u16) hub->change_bits[0],
+				(u16) hub->event_bits[0]);
 
 		/* Lock the device, then check to see if we were
 		 * disconnected while waiting for the lock to succeed. */

@@ -78,7 +78,7 @@ finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
 	if (hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs == 0
 			&& hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs == 0) {
 		ohci->hc_control &= ~(OHCI_CTRL_PLE|OHCI_CTRL_IE);
-		writel (ohci->hc_control, &ohci->regs->control);
+		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
 	}
 }
 
@@ -131,12 +131,12 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 	unsigned	i;
 
 	ohci_vdbg (ohci, "link %sed %p branch %d [%dus.], interval %d\n",
-		(ed->hwINFO & ED_ISO) ? "iso " : "",
+		(ed->hwINFO & cpu_to_hc32 (ohci, ED_ISO)) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
 
 	for (i = ed->branch; i < NUM_INTS; i += ed->interval) {
 		struct ed	**prev = &ohci->periodic [i];
-		__le32		*prev_p = &ohci->hcca->int_table [i];
+		__hc32		*prev_p = &ohci->hcca->int_table [i];
 		struct ed	*here = *prev;
 
 		/* sorting each branch by period (slow before fast)
@@ -156,7 +156,7 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 				ed->hwNextED = *prev_p;
 			wmb ();
 			*prev = ed;
-			*prev_p = cpu_to_le32(ed->dma);
+			*prev_p = cpu_to_hc32(ohci, ed->dma);
 			wmb();
 		}
 		ohci->load [i] += ed->load;
@@ -193,17 +193,20 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 	case PIPE_CONTROL:
 		if (ohci->ed_controltail == NULL) {
 			WARN_ON (ohci->hc_control & OHCI_CTRL_CLE);
-			writel (ed->dma, &ohci->regs->ed_controlhead);
+			ohci_writel (ohci, ed->dma,
+					&ohci->regs->ed_controlhead);
 		} else {
 			ohci->ed_controltail->ed_next = ed;
-			ohci->ed_controltail->hwNextED = cpu_to_le32 (ed->dma);
+			ohci->ed_controltail->hwNextED = cpu_to_hc32 (ohci,
+								ed->dma);
 		}
 		ed->ed_prev = ohci->ed_controltail;
 		if (!ohci->ed_controltail && !ohci->ed_rm_list) {
 			wmb();
 			ohci->hc_control |= OHCI_CTRL_CLE;
-			writel (0, &ohci->regs->ed_controlcurrent);
-			writel (ohci->hc_control, &ohci->regs->control);
+			ohci_writel (ohci, 0, &ohci->regs->ed_controlcurrent);
+			ohci_writel (ohci, ohci->hc_control,
+					&ohci->regs->control);
 		}
 		ohci->ed_controltail = ed;
 		break;
@@ -211,17 +214,19 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 	case PIPE_BULK:
 		if (ohci->ed_bulktail == NULL) {
 			WARN_ON (ohci->hc_control & OHCI_CTRL_BLE);
-			writel (ed->dma, &ohci->regs->ed_bulkhead);
+			ohci_writel (ohci, ed->dma, &ohci->regs->ed_bulkhead);
 		} else {
 			ohci->ed_bulktail->ed_next = ed;
-			ohci->ed_bulktail->hwNextED = cpu_to_le32 (ed->dma);
+			ohci->ed_bulktail->hwNextED = cpu_to_hc32 (ohci,
+								ed->dma);
 		}
 		ed->ed_prev = ohci->ed_bulktail;
 		if (!ohci->ed_bulktail && !ohci->ed_rm_list) {
 			wmb();
 			ohci->hc_control |= OHCI_CTRL_BLE;
-			writel (0, &ohci->regs->ed_bulkcurrent);
-			writel (ohci->hc_control, &ohci->regs->control);
+			ohci_writel (ohci, 0, &ohci->regs->ed_bulkcurrent);
+			ohci_writel (ohci, ohci->hc_control,
+					&ohci->regs->control);
 		}
 		ohci->ed_bulktail = ed;
 		break;
@@ -257,7 +262,7 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	for (i = ed->branch; i < NUM_INTS; i += ed->interval) {
 		struct ed	*temp;
 		struct ed	**prev = &ohci->periodic [i];
-		__le32		*prev_p = &ohci->hcca->int_table [i];
+		__hc32		*prev_p = &ohci->hcca->int_table [i];
 
 		while (*prev && (temp = *prev) != ed) {
 			prev_p = &temp->hwNextED;
@@ -272,7 +277,7 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	hcd_to_bus (&ohci->hcd)->bandwidth_allocated -= ed->load / ed->interval;
 
 	ohci_vdbg (ohci, "unlink %sed %p branch %d [%dus.], interval %d\n",
-		(ed->hwINFO & ED_ISO) ? "iso " : "",
+		(ed->hwINFO & cpu_to_hc32 (ohci, ED_ISO)) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
 }
 
@@ -300,7 +305,7 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
  */
 static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed) 
 {
-	ed->hwINFO |= ED_SKIP;
+	ed->hwINFO |= cpu_to_hc32 (ohci, ED_SKIP);
 	wmb ();
 	ed->state = ED_UNLINK;
 
@@ -320,10 +325,12 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 		if (ed->ed_prev == NULL) {
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_CLE;
-				writel (ohci->hc_control, &ohci->regs->control);
+				ohci_writel (ohci, ohci->hc_control,
+						&ohci->regs->control);
 				// a ohci_readl() later syncs CLE with the HC
 			} else
-				writel (le32_to_cpup (&ed->hwNextED),
+				ohci_writel (ohci,
+					hc32_to_cpup (ohci, &ed->hwNextED),
 					&ohci->regs->ed_controlhead);
 		} else {
 			ed->ed_prev->ed_next = ed->ed_next;
@@ -344,10 +351,12 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 		if (ed->ed_prev == NULL) {
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_BLE;
-				writel (ohci->hc_control, &ohci->regs->control);
+				ohci_writel (ohci, ohci->hc_control,
+						&ohci->regs->control);
 				// a ohci_readl() later syncs BLE with the HC
 			} else
-				writel (le32_to_cpup (&ed->hwNextED),
+				ohci_writel (ohci,
+					hc32_to_cpup (ohci, &ed->hwNextED),
 					&ohci->regs->ed_bulkhead);
 		} else {
 			ed->ed_prev->ed_next = ed->ed_next;
@@ -416,7 +425,7 @@ static struct ed *ed_get (
 			goto done;
 		}
 		ed->dummy = td;
-		ed->hwTailP = cpu_to_le32 (td->td_dma);
+		ed->hwTailP = cpu_to_hc32 (ohci, td->td_dma);
 		ed->hwHeadP = ed->hwTailP;	/* ED_C, ED_H zeroed */
 		ed->state = ED_IDLE;
 		ed->type = type;
@@ -427,21 +436,19 @@ static struct ed *ed_get (
 	 */
   	if (ed->state == ED_IDLE) {
 		u32	info;
-		__le32	hw_info;
 
 		info = usb_pipedevice (pipe);
 		info |= (ep >> 1) << 7;
 		info |= usb_maxpacket (udev, pipe, is_out) << 16;
-		hw_info = cpu_to_le32 (info);
 		if (udev->speed == USB_SPEED_LOW)
-			hw_info |= ED_LOWSPEED;
+			info |= ED_LOWSPEED;
 		/* only control transfers store pids in tds */
 		if (type != PIPE_CONTROL) {
-			hw_info |= is_out ? ED_OUT : ED_IN;
+			info |= is_out ? ED_OUT : ED_IN;
 			if (type != PIPE_BULK) {
 				/* periodic transfers... */
 				if (type == PIPE_ISOCHRONOUS)
-					hw_info |= ED_ISO;
+					info |= ED_ISO;
 				else if (interval > 32)	/* iso can be bigger */
 					interval = 32;
 				ed->interval = interval;
@@ -452,7 +459,7 @@ static struct ed *ed_get (
 						/ 1000;
 			}
 		}
-		ed->hwINFO = hw_info;
+		ed->hwINFO = cpu_to_hc32(ohci, info);
 	}
 
 done:
@@ -470,7 +477,7 @@ done:
  */
 static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 {    
-	ed->hwINFO |= ED_DEQUEUE;
+	ed->hwINFO |= cpu_to_hc32 (ohci, ED_DEQUEUE);
 	ed_deschedule (ohci, ed);
 
 	/* rm_list is just singly linked, for simplicity */
@@ -479,17 +486,17 @@ static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	ohci->ed_rm_list = ed;
 
 	/* enable SOF interrupt */
-	writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
-	writel (OHCI_INTR_SF, &ohci->regs->intrenable);
+	ohci_writel (ohci, OHCI_INTR_SF, &ohci->regs->intrstatus);
+	ohci_writel (ohci, OHCI_INTR_SF, &ohci->regs->intrenable);
 	// flush those writes, and get latest HCCA contents
-	(void) ohci_readl (&ohci->regs->control);
+	(void) ohci_readl (ohci, &ohci->regs->control);
 
 	/* SF interrupt might get delayed; record the frame counter value that
 	 * indicates when the HC isn't looking at it, so concurrent unlinks
 	 * behave.  frame_no wraps every 2^16 msec, and changes right before
 	 * SF is triggered.
 	 */
-	ed->tick = OHCI_FRAME_NO(ohci->hcca) + 1;
+	ed->tick = ohci_frame_no(ohci) + 1;
 
 }
 
@@ -541,19 +548,19 @@ td_fill (struct ohci_hcd *ohci, u32 info,
 	if (!len)
 		data = 0;
 
-	td->hwINFO = cpu_to_le32 (info);
+	td->hwINFO = cpu_to_hc32 (ohci, info);
 	if (is_iso) {
-		td->hwCBP = cpu_to_le32 (data & 0xFFFFF000);
-		td->hwPSW [0] = cpu_to_le16 ((data & 0x0FFF) | 0xE000);
+		td->hwCBP = cpu_to_hc32 (ohci, data & 0xFFFFF000);
+		td->hwPSW [0] = cpu_to_hc16 (ohci, (data & 0x0FFF) | 0xE000);
 		td->ed->last_iso = info & 0xffff;
 	} else {
-		td->hwCBP = cpu_to_le32 (data); 
+		td->hwCBP = cpu_to_hc32 (ohci, data); 
 	}			
 	if (data)
-		td->hwBE = cpu_to_le32 (data + len - 1);
+		td->hwBE = cpu_to_hc32 (ohci, data + len - 1);
 	else
 		td->hwBE = 0;
-	td->hwNextTD = cpu_to_le32 (td_pt->td_dma);
+	td->hwNextTD = cpu_to_hc32 (ohci, td_pt->td_dma);
 
 	/* append to queue */
 	list_add_tail (&td->td_list, &td->ed->td_list);
@@ -594,7 +601,7 @@ static void td_submit_urb (
   	if (!usb_gettoggle (urb->dev, usb_pipeendpoint (urb->pipe), is_out)) {
 		usb_settoggle (urb->dev, usb_pipeendpoint (urb->pipe),
 			is_out, 1);
-		urb_priv->ed->hwHeadP &= ~ED_C;
+		urb_priv->ed->hwHeadP &= ~cpu_to_hc32 (ohci, ED_C);
 	}
 
 	urb_priv->td_cnt = 0;
@@ -643,7 +650,7 @@ static void td_submit_urb (
 		/* maybe kickstart bulk list */
 		if (urb_priv->ed->type == PIPE_BULK) {
 			wmb ();
-			writel (OHCI_BLF, &ohci->regs->cmdstatus);
+			ohci_writel (ohci, OHCI_BLF, &ohci->regs->cmdstatus);
 		}
 		break;
 
@@ -665,7 +672,7 @@ static void td_submit_urb (
 		td_fill (ohci, info, data, 0, urb, cnt++);
 		/* maybe kickstart control list */
 		wmb ();
-		writel (OHCI_CLF, &ohci->regs->cmdstatus);
+		ohci_writel (ohci, OHCI_CLF, &ohci->regs->cmdstatus);
 		break;
 
 	/* ISO has no retransmit, so no toggle; and it uses special TDs.
@@ -694,7 +701,7 @@ static void td_submit_urb (
 	if (periodic) {
 		wmb ();
 		ohci->hc_control |= OHCI_CTRL_PLE|OHCI_CTRL_IE;
-		writel (ohci->hc_control, &ohci->regs->control);
+		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
 	}
 
 	// ASSERT (urb_priv->length == cnt);
@@ -709,14 +716,14 @@ static void td_submit_urb (
  */
 static void td_done (struct ohci_hcd *ohci, struct urb *urb, struct td *td)
 {
-	u32	tdINFO = le32_to_cpup (&td->hwINFO);
+	u32	tdINFO = hc32_to_cpup (ohci, &td->hwINFO);
 	int	cc = 0;
 
 	list_del (&td->td_list);
 
 	/* ISO ... drivers see per-TD length/status */
   	if (tdINFO & TD_ISO) {
- 		u16	tdPSW = le16_to_cpu (td->hwPSW [0]);
+ 		u16	tdPSW = hc16_to_cpu (ohci, td->hwPSW [0]);
 		int	dlen = 0;
 
 		/* NOTE:  assumes FC in tdINFO == 0 (and MAXPSW == 1) */
@@ -748,7 +755,7 @@ static void td_done (struct ohci_hcd *ohci, struct urb *urb, struct td *td)
 	 */
 	} else {
 		int	type = usb_pipetype (urb->pipe);
-		u32	tdBE = le32_to_cpup (&td->hwBE);
+		u32	tdBE = hc32_to_cpup (ohci, &td->hwBE);
 
   		cc = TD_CC_GET (tdINFO);
 
@@ -769,7 +776,7 @@ static void td_done (struct ohci_hcd *ohci, struct urb *urb, struct td *td)
 				urb->actual_length += tdBE - td->data_dma + 1;
 			else
 				urb->actual_length +=
-					  le32_to_cpup (&td->hwCBP)
+					  hc32_to_cpup (ohci, &td->hwCBP)
 					- td->data_dma;
 		}
 
@@ -790,14 +797,14 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
   	struct urb		*urb = td->urb;
 	struct ed		*ed = td->ed;
 	struct list_head	*tmp = td->td_list.next;
-	__le32			toggle = ed->hwHeadP & ED_C;
+	__hc32			toggle = ed->hwHeadP & cpu_to_hc32 (ohci, ED_C);
 
 	/* clear ed halt; this is the td that caused it, but keep it inactive
 	 * until its urb->complete() has a chance to clean up.
 	 */
-	ed->hwINFO |= ED_SKIP;
+	ed->hwINFO |= cpu_to_hc32 (ohci, ED_SKIP);
 	wmb ();
-	ed->hwHeadP &= ~ED_H; 
+	ed->hwHeadP &= ~cpu_to_hc32 (ohci, ED_H); 
 
 	/* put any later tds from this urb onto the donelist, after 'td',
 	 * order won't matter here: no errors, and nothing was transferred.
@@ -805,7 +812,7 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 	 */
 	while (tmp != &ed->td_list) {
 		struct td	*next;
-		__le32		info;
+		__hc32		info;
 
 		next = list_entry (tmp, struct td, td_list);
 		tmp = next->td_list.next;
@@ -821,8 +828,8 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 		 * and clear ED_SKIP.
 		 */
 		info = next->hwINFO;
-		info |= cpu_to_le32 (TD_DONE);
-		info &= ~cpu_to_le32 (TD_CC);
+		info |= cpu_to_hc32 (ohci, TD_DONE);
+		info &= ~cpu_to_hc32 (ohci, TD_CC);
 		next->hwINFO = info;
 
 		next->next_dl_td = rev;	
@@ -850,7 +857,7 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 			urb, urb->dev->devpath,
 			usb_pipeendpoint (urb->pipe),
 			usb_pipein (urb->pipe) ? "in" : "out",
-			le32_to_cpu (td->hwINFO),
+			hc32_to_cpu (ohci, td->hwINFO),
 			cc, cc_to_error [cc]);
 	}
 
@@ -866,7 +873,7 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 	struct td	*td_rev = NULL;
 	struct td	*td = NULL;
 
-	td_dma = le32_to_cpup (&ohci->hcca->done_head);
+	td_dma = hc32_to_cpup (ohci, &ohci->hcca->done_head);
 	ohci->hcca->done_head = 0;
 	wmb();
 
@@ -882,19 +889,20 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 			break;
 		}
 
-		td->hwINFO |= cpu_to_le32 (TD_DONE);
-		cc = TD_CC_GET (le32_to_cpup (&td->hwINFO));
+		td->hwINFO |= cpu_to_hc32 (ohci, TD_DONE);
+		cc = TD_CC_GET (hc32_to_cpup (ohci, &td->hwINFO));
 
 		/* Non-iso endpoints can halt on error; un-halt,
 		 * and dequeue any other TDs from this urb.
 		 * No other TD could have caused the halt.
 		 */
-		if (cc != TD_CC_NOERROR && (td->ed->hwHeadP & ED_H))
+		if (cc != TD_CC_NOERROR
+				&& (td->ed->hwHeadP & cpu_to_hc32 (ohci, ED_H)))
 			td_rev = ed_halted (ohci, td, cc, td_rev);
 
 		td->next_dl_td = td_rev;	
 		td_rev = td;
-		td_dma = le32_to_cpup (&td->hwNextTD);
+		td_dma = hc32_to_cpup (ohci, &td->hwNextTD);
 	}	
 	return td_rev;
 }
@@ -911,7 +919,7 @@ rescan_all:
 	for (last = &ohci->ed_rm_list, ed = *last; ed != NULL; ed = *last) {
 		struct list_head	*entry, *tmp;
 		int			completed, modified;
-		__le32			*prev;
+		__hc32			*prev;
 
 		/* only take off EDs that the HC isn't using, accounting for
 		 * frame counter wraps and EDs with partially retired TDs
@@ -929,7 +937,8 @@ skip_ed:
 
 				td = list_entry (ed->td_list.next, struct td,
 							td_list);
-				head = le32_to_cpu (ed->hwHeadP) & TD_MASK;
+				head = hc32_to_cpu (ohci, ed->hwHeadP) &
+								TD_MASK;
 
 				/* INTR_WDH may need to clean up first */
 				if (td->td_dma != head)
@@ -960,7 +969,7 @@ rescan_this:
 			struct td	*td;
 			struct urb	*urb;
 			urb_priv_t	*urb_priv;
-			__le32		savebits;
+			__hc32		savebits;
 
 			td = list_entry (entry, struct td, td_list);
 			urb = td->urb;
@@ -972,7 +981,7 @@ rescan_this:
 			}
 
 			/* patch pointer hc uses */
-			savebits = *prev & ~cpu_to_le32 (TD_MASK);
+			savebits = *prev & ~cpu_to_hc32 (ohci, TD_MASK);
 			*prev = td->hwNextTD | savebits;
 
 			/* HC may have partly processed this TD */
@@ -990,10 +999,10 @@ rescan_this:
 
 		/* ED's now officially unlinked, hc doesn't see */
 		ed->state = ED_IDLE;
-		ed->hwHeadP &= ~ED_H;
+		ed->hwHeadP &= ~cpu_to_hc32(ohci, ED_H);
 		ed->hwNextED = 0;
 		wmb ();
-		ed->hwINFO &= ~(ED_SKIP | ED_DEQUEUE);
+		ed->hwINFO &= ~cpu_to_hc32 (ohci, ED_SKIP | ED_DEQUEUE);
 
 		/* but if there's work queued, reschedule */
 		if (!list_empty (&ed->td_list)) {
@@ -1015,24 +1024,27 @@ rescan_this:
 			command |= OHCI_CLF;
 			if (!(ohci->hc_control & OHCI_CTRL_CLE)) {
 				control |= OHCI_CTRL_CLE;
-				writel (0, &ohci->regs->ed_controlcurrent);
+				ohci_writel (ohci, 0,
+					&ohci->regs->ed_controlcurrent);
 			}
 		}
 		if (ohci->ed_bulktail) {
 			command |= OHCI_BLF;
 			if (!(ohci->hc_control & OHCI_CTRL_BLE)) {
 				control |= OHCI_CTRL_BLE;
-				writel (0, &ohci->regs->ed_bulkcurrent);
+				ohci_writel (ohci, 0,
+					&ohci->regs->ed_bulkcurrent);
 			}
 		}
 		
 		/* CLE/BLE to enable, CLF/BLF to (maybe) kickstart */
 		if (control) {
 			ohci->hc_control |= control;
- 			writel (ohci->hc_control, &ohci->regs->control);   
+ 			ohci_writel (ohci, ohci->hc_control,
+					&ohci->regs->control);   
  		}
 		if (command)
-			writel (command, &ohci->regs->cmdstatus);   
+			ohci_writel (ohci, command, &ohci->regs->cmdstatus);   
  	}
 }
 
@@ -1072,18 +1084,19 @@ dl_done_list (struct ohci_hcd *ohci, struct pt_regs *regs)
 				start_ed_unlink (ohci, ed);
 
 		/* ... reenabling halted EDs only after fault cleanup */
-		} else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
+		} else if ((ed->hwINFO & cpu_to_hc32 (ohci, ED_SKIP | ED_DEQUEUE))
+					== cpu_to_hc32 (ohci, ED_SKIP)) {
 			td = list_entry (ed->td_list.next, struct td, td_list);
-			if (!(td->hwINFO & TD_DONE)) {
-				ed->hwINFO &= ~ED_SKIP;
+ 			if (!(td->hwINFO & cpu_to_hc32 (ohci, TD_DONE))) {
+				ed->hwINFO &= ~cpu_to_hc32 (ohci, ED_SKIP);
 				/* ... hc may need waking-up */
 				switch (ed->type) {
 				case PIPE_CONTROL:
-					writel (OHCI_CLF,
+					ohci_writel (ohci, OHCI_CLF,
 						&ohci->regs->cmdstatus);   
 					break;
 				case PIPE_BULK:
-					writel (OHCI_BLF,
+					ohci_writel (ohci, OHCI_BLF,
 						&ohci->regs->cmdstatus);   
 					break;
 				}

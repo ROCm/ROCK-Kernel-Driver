@@ -1010,7 +1010,7 @@ static const struct usb_descriptor_header *hs_function[] = {
 
 /* The CBI specification limits the serial string to 12 uppercase hexadecimal
  * characters. */
-static char				manufacturer[40];
+static char				manufacturer[50];
 static char				serial[13];
 
 /* Static strings, in UTF-8 (for simplicity we use only ASCII characters) */
@@ -1035,7 +1035,9 @@ static struct usb_gadget_strings	stringtab = {
 static int populate_config_buf(struct usb_gadget *gadget,
 		u8 *buf, u8 type, unsigned index)
 {
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 	enum usb_device_speed			speed = gadget->speed;
+#endif
 	int					len;
 	const struct usb_descriptor_header	**function;
 

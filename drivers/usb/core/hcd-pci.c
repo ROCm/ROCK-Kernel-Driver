@@ -38,14 +38,6 @@
 
 /*-------------------------------------------------------------------------*/
 
-static void hcd_pci_release(struct usb_bus *bus)
-{
-	struct usb_hcd *hcd = bus->hcpriv;
-
-	if (hcd)
-		hcd->driver->hcd_free(hcd);
-}
-
 /* configure so an HC device and id are always provided */
 /* always called with process context; sleeping is OK */
 
@@ -78,6 +70,7 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 
 	if (pci_enable_device (dev) < 0)
 		return -ENODEV;
+	dev->current_state = 0;
 	
         if (!dev->irq) {
         	dev_err (&dev->dev,
@@ -160,7 +153,7 @@ clean_2:
 
 	if ((retval = hcd_buffer_create (hcd)) != 0) {
 clean_3:
-		driver->hcd_free (hcd);
+		kfree (hcd);
 		goto clean_2;
 	}
 
@@ -194,8 +187,8 @@ clean_3:
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
+	hcd->self.release = &usb_hcd_release;
 	hcd->self.hcpriv = (void *) hcd;
-	hcd->self.release = &hcd_pci_release;
 	init_timer (&hcd->rh_timer);
 
 	INIT_LIST_HEAD (&hcd->dev_list);
@@ -268,6 +261,18 @@ EXPORT_SYMBOL (usb_hcd_pci_remove);
 
 #ifdef	CONFIG_PM
 
+static char __attribute_used__ *pci_state(u32 state)
+{
+	switch (state) {
+	case 0:		return "D0";
+	case 1:		return "D1";
+	case 2:		return "D2";
+	case 3:		return "D3hot";
+	case 4:		return "D3cold";
+	}
+	return NULL;
+}
+
 /**
  * usb_hcd_pci_suspend - power management suspend of a PCI-based HCD
  * @dev: USB Host Controller being suspended
@@ -288,16 +293,32 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 	 * PM-sensitive HCDs may already have done this.
 	 */
 	has_pci_pm = pci_find_capability(dev, PCI_CAP_ID_PM);
-	if (has_pci_pm)
-		dev_dbg(hcd->self.controller, "suspend D%d --> D%d\n",
-			dev->current_state, state);
+	if (state > 4)
+		state = 4;
 
 	switch (hcd->state) {
 	case USB_STATE_HALT:
 		dev_dbg (hcd->self.controller, "halted; hcd not suspended\n");
 		break;
 	case HCD_STATE_SUSPENDED:
-		dev_dbg (hcd->self.controller, "hcd already suspended\n");
+		dev_dbg (hcd->self.controller, "PCI %s --> %s\n",
+				pci_state(dev->current_state),
+				pci_state(has_pci_pm ? state : 0));
+		if (state > 3)
+			state = 3;
+
+		if (state == dev->current_state)
+			break;
+		else if (state < dev->current_state)
+			retval = -EIO;
+		else if (has_pci_pm)
+			retval = pci_set_power_state (dev, state);
+
+		if (retval == 0)
+			dev->dev.power.power_state = state;
+		else
+			dev_dbg (hcd->self.controller, 
+					"re-suspend fail, %d\n", retval);
 		break;
 	default:
 		retval = hcd->driver->suspend (hcd, state);
@@ -308,22 +329,47 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 		else {
 			hcd->state = HCD_STATE_SUSPENDED;
 			pci_save_state (dev);
-#ifdef	CONFIG_USB_SUSPEND
-			pci_enable_wake (dev, state, hcd->remote_wakeup);
-			pci_enable_wake (dev, 4, hcd->remote_wakeup);
-#endif
+
 			/* no DMA or IRQs except in D0 */
 			pci_disable_device (dev);
 			free_irq (hcd->irq, hcd);
 			
-			if (has_pci_pm)
+			if (has_pci_pm) {
 				retval = pci_set_power_state (dev, state);
-			dev->dev.power.power_state = state;
+
+				/* POLICY: ignore D1/D2/D3hot differences;
+				 * we know D3hot will always work.
+				 */
+				if (retval < 0 && state < 3) {
+					retval = pci_set_power_state (dev, 3);
+					if (retval == 0)
+						state = 3;
+				}
+				if (retval == 0) {
+					dev->dev.power.power_state = state;
+#ifdef	CONFIG_USB_SUSPEND
+					pci_enable_wake (dev, state,
+							hcd->remote_wakeup);
+					pci_enable_wake (dev, 4,
+							hcd->remote_wakeup);
+#endif
+				}
+			} else {
+				if (state > 3)
+					state = 3;
+				dev->dev.power.power_state = state;
+			}
 			if (retval < 0) {
 				dev_dbg (&dev->dev,
-						"PCI suspend fail, %d\n",
+						"PCI %s suspend fail, %d\n",
+						pci_state(state),
 						retval);
 				(void) usb_hcd_pci_resume (dev);
+			} else {
+				dev_dbg(hcd->self.controller,
+					"suspended to PCI %s%s\n",
+					pci_state(dev->current_state),
+					has_pci_pm ? "" : " (legacy)");
 			}
 		}
 	}
@@ -345,9 +391,11 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 
 	hcd = pci_get_drvdata(dev);
 	has_pci_pm = pci_find_capability(dev, PCI_CAP_ID_PM);
-	if (has_pci_pm)
-		dev_dbg(hcd->self.controller, "resume from state D%d\n",
-				dev->current_state);
+
+	/* D3cold resume isn't usually reported this way... */
+	dev_dbg(hcd->self.controller, "resume from PCI %s%s\n",
+			pci_state(dev->current_state),
+			has_pci_pm ? "" : " (legacy)");
 
 	if (hcd->state != HCD_STATE_SUSPENDED) {
 		dev_dbg (hcd->self.controller, 
@@ -366,7 +414,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 			"can't restore IRQ after resume!\n");
 		return retval;
 	}
-	pci_set_master (dev);
+	hcd->saw_irq = 0;
 	pci_restore_state (dev);
 #ifdef	CONFIG_USB_SUSPEND
 	pci_enable_wake (dev, dev->current_state, 0);

@@ -86,7 +86,7 @@ void irq_exit(void)
 /*
  * Have got an event to handle:
  */
-asmlinkage int handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
+fastcall int handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 				struct irqaction *action)
 {
 	int ret, retval = 0, status = 0;
@@ -114,7 +114,7 @@ asmlinkage int handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
  * SMP cross-CPU interrupts have their own specific
  * handlers).
  */
-asmlinkage unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs)
+fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs)
 {
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction * action;

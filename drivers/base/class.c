@@ -283,8 +283,34 @@ static int class_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
 {
 	struct class_device *class_dev = to_class_dev(kobj);
 	int retval = 0;
+	int i = 0;
+	int length = 0;
 
 	pr_debug("%s - name = %s\n", __FUNCTION__, class_dev->class_id);
+
+	if (class_dev->dev) {
+		/* add physical device, backing this device  */
+		struct device *dev = class_dev->dev;
+		char *path = kobject_get_path(&dev->kobj, GFP_KERNEL);
+
+		add_hotplug_env_var(envp, num_envp, &i, buffer, buffer_size,
+				    &length, "PHYSDEVPATH=%s", path);
+		kfree(path);
+
+		/* add bus name of physical device */
+		if (dev->bus)
+			add_hotplug_env_var(envp, num_envp, &i,
+					    buffer, buffer_size, &length,
+					    "PHYSDEVBUS=%s", dev->bus->name);
+
+		/* terminate, set to next free slot, shrink available space */
+		envp[i] = NULL;
+		envp = &envp[i];
+		num_envp -= i;
+		buffer = &buffer[length];
+		buffer_size -= length;
+	}
+
 	if (class_dev->class->hotplug) {
 		/* have the bus specific function add its stuff */
 		retval = class_dev->class->hotplug (class_dev, envp, num_envp,
