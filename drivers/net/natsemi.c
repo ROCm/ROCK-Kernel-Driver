@@ -100,88 +100,30 @@
 		* ETHTOOL_* further support (Tim Hockin)
 
 	version 1.0.13:
-		* ETHTOOL_[GS]EEPROM support (Tim Hockin)
+		* ETHTOOL_[G]EEPROM support (Tim Hockin)
 
 	version 1.0.13:
 		* crc cleanup (Matt Domsch <Matt_Domsch@dell.com>)
+
+	version 1.0.14:
+		* Cleanup some messages and autoneg in ethtool (Tim Hockin)
+
+	version 1.0.15:
+		* Get rid of cable_magic flag
+		* use new (National provided) solution for cable magic issue
+
+	version 1.0.16:
+		* call netdev_rx() for RxErrors (Manfred Spraul)
+		* formatting and cleanups
+		* change options and full_duplex arrays to be zero
+		  initialized
+		* enable only the WoL and PHY interrupts in wol mode
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
 	* support for an external PHY
 	* flow control
 */
-
-#define DRV_NAME	"natsemi"
-#define DRV_VERSION	"1.07+LK1.0.13"
-#define DRV_RELDATE	"Nov 12, 2001"
-
-/* Updated to recommendations in pci-skeleton v2.03. */
-
-/* Automatically extracted configuration info:
-probe-func: natsemi_probe
-config-in: tristate 'National Semiconductor DP8381x series PCI Ethernet support' CONFIG_NATSEMI
-
-c-help-name: National Semiconductor DP8381x series PCI Ethernet support
-c-help-symbol: CONFIG_NATSEMI
-c-help: This driver is for the National Semiconductor DP8381x series,
-c-help: including the 8381[56] chips.
-c-help: More specific information and updates are available from 
-c-help: http://www.scyld.com/network/natsemi.html
-*/
-
-/* The user-configurable values.
-   These may be modified when a driver module is loaded.*/
-
-static int debug = 1; /* 1 normal messages, 0 quiet .. 7 verbose. */
-
-/* Maximum events (Rx packets, etc.) to handle at each interrupt. */
-static int max_interrupt_work = 20;
-static int mtu;
-
-/* Maximum number of multicast addresses to filter (vs. rx-all-multicast).
-   This chip uses a 512 element hash table based on the Ethernet CRC.  */
-static int multicast_filter_limit = 100;
-
-/* Set the copy breakpoint for the copy-only-tiny-frames scheme.
-   Setting to > 1518 effectively disables this feature. */
-static int rx_copybreak;
-
-/* Used to pass the media type, etc.
-   Both 'options[]' and 'full_duplex[]' should exist for driver
-   interoperability.
-   The media type is usually passed in 'options[]'.
-*/
-#define MAX_UNITS 8		/* More are supported, limit only on options */
-static int options[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
-
-/* Operational parameters that are set at compile time. */
-
-/* Keep the ring sizes a power of two for compile efficiency.
-   The compiler will convert <unsigned>'%'<2^N> into a bit mask.
-   Making the Tx ring too large decreases the effectiveness of channel
-   bonding and packet priority.
-   There are no ill effects from too-large receive rings. */
-#define TX_RING_SIZE	16
-#define TX_QUEUE_LEN	10 /* Limit ring entries actually used, min 4. */
-#define RX_RING_SIZE	64
-
-/* Operational parameters that usually are not changed. */
-/* Time in jiffies before concluding the transmitter is hung. */
-#define TX_TIMEOUT  (2*HZ)
-
-#define NATSEMI_HW_TIMEOUT	400
-#define NATSEMI_TIMER_FREQ	3*HZ
-#define NATSEMI_PG0_NREGS	64
-#define NATSEMI_RFDR_NREGS	8
-#define NATSEMI_PG1_NREGS	4
-#define NATSEMI_NREGS		(NATSEMI_PG0_NREGS + NATSEMI_RFDR_NREGS + \
-				 NATSEMI_PG1_NREGS)
-#define NATSEMI_REGS_VER	1 /* v1 added RFDR registers */
-#define NATSEMI_REGS_SIZE	(NATSEMI_NREGS * sizeof(u32))
-#define NATSEMI_EEPROM_SIZE	24 /* 12 16-bit values */
-
-#define PKT_BUF_SZ		1536 /* Size of each temporary Rx buffer. */
 
 #if !defined(__OPTIMIZE__)
 #warning  You must compile this file with the correct options!
@@ -214,6 +156,83 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 
+#define DRV_NAME	"natsemi"
+#define DRV_VERSION	"1.07+LK1.0.16"
+#define DRV_RELDATE	"Aug 28, 2002"
+
+/* Updated to recommendations in pci-skeleton v2.03. */
+
+/* Automatically extracted configuration info:
+probe-func: natsemi_probe
+config-in: tristate 'National Semiconductor DP8381x series PCI Ethernet support' CONFIG_NATSEMI
+
+c-help-name: National Semiconductor DP8381x series PCI Ethernet support
+c-help-symbol: CONFIG_NATSEMI
+c-help: This driver is for the National Semiconductor DP8381x series,
+c-help: including the 8381[56] chips.
+c-help: More specific information and updates are available from 
+c-help: http://www.scyld.com/network/natsemi.html
+*/
+
+/* The user-configurable values.
+   These may be modified when a driver module is loaded.*/
+
+#define NATSEMI_DEF_MSG		(NETIF_MSG_DRV		| \
+				 NETIF_MSG_LINK		| \
+				 NETIF_MSG_WOL		| \
+				 NETIF_MSG_RX_ERR	| \
+				 NETIF_MSG_TX_ERR)
+static int debug = NATSEMI_DEF_MSG;
+
+/* Maximum events (Rx packets, etc.) to handle at each interrupt. */
+static int max_interrupt_work = 20;
+static int mtu;
+
+/* Maximum number of multicast addresses to filter (vs. rx-all-multicast).
+   This chip uses a 512 element hash table based on the Ethernet CRC.  */
+static int multicast_filter_limit = 100;
+
+/* Set the copy breakpoint for the copy-only-tiny-frames scheme.
+   Setting to > 1518 effectively disables this feature. */
+static int rx_copybreak;
+
+/* Used to pass the media type, etc.
+   Both 'options[]' and 'full_duplex[]' should exist for driver
+   interoperability.
+   The media type is usually passed in 'options[]'.
+*/
+#define MAX_UNITS 8		/* More are supported, limit only on options */
+static int options[MAX_UNITS];
+static int full_duplex[MAX_UNITS];
+
+/* Operational parameters that are set at compile time. */
+
+/* Keep the ring sizes a power of two for compile efficiency.
+   The compiler will convert <unsigned>'%'<2^N> into a bit mask.
+   Making the Tx ring too large decreases the effectiveness of channel
+   bonding and packet priority.
+   There are no ill effects from too-large receive rings. */
+#define TX_RING_SIZE	16
+#define TX_QUEUE_LEN	10 /* Limit ring entries actually used, min 4. */
+#define RX_RING_SIZE	32
+
+/* Operational parameters that usually are not changed. */
+/* Time in jiffies before concluding the transmitter is hung. */
+#define TX_TIMEOUT  (2*HZ)
+
+#define NATSEMI_HW_TIMEOUT	400
+#define NATSEMI_TIMER_FREQ	3*HZ
+#define NATSEMI_PG0_NREGS	64
+#define NATSEMI_RFDR_NREGS	8
+#define NATSEMI_PG1_NREGS	4
+#define NATSEMI_NREGS		(NATSEMI_PG0_NREGS + NATSEMI_RFDR_NREGS + \
+				 NATSEMI_PG1_NREGS)
+#define NATSEMI_REGS_VER	1 /* v1 added RFDR registers */
+#define NATSEMI_REGS_SIZE	(NATSEMI_NREGS * sizeof(u32))
+#define NATSEMI_EEPROM_SIZE	24 /* 12 16-bit values */
+
+#define PKT_BUF_SZ		1536 /* Size of each temporary Rx buffer. */
+
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
 KERN_INFO DRV_NAME ".c:v1.07 1/9/2001  Written by Donald Becker <becker@scyld.com>\n"
@@ -232,7 +251,7 @@ MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM_DESC(max_interrupt_work, "DP8381x maximum events handled per interrupt");
 MODULE_PARM_DESC(mtu, "DP8381x MTU (all boards)");
-MODULE_PARM_DESC(debug, "DP8381x debug level (0-5)");
+MODULE_PARM_DESC(debug, "DP8381x default debug bitmask");
 MODULE_PARM_DESC(rx_copybreak, "DP8381x copy breakpoint for copy-only-tiny-frames");
 MODULE_PARM_DESC(options, "DP8381x: Bits 0-3: media type, bit 17: full duplex");
 MODULE_PARM_DESC(full_duplex, "DP8381x full duplex setting(s) (1)");
@@ -394,14 +413,12 @@ enum register_offsets {
 	SDCFG			= 0xF8
 };
 /* the values for the 'magic' registers above (PGSEL=1) */
-#ifdef CONFIG_NATSEMI_CABLE_MAGIC
-#define PMDCSR_VAL	0x1898
-#else
-#define PMDCSR_VAL	0x189C
-#endif
+#define PMDCSR_VAL	0x189c	/* enable preferred adaptation circuitry */
 #define TSTDAT_VAL	0x0
 #define DSPCFG_VAL	0x5040
-#define SDCFG_VAL	0x008c
+#define SDCFG_VAL	0x008c	/* set voltage thresholds for Signal Detect */
+#define DSPCFG_LOCK	0x20	/* coefficient lock bit in DSPCFG */
+#define TSTDAT_FIXED	0xe8	/* magic number for bad coefficients */
 
 /* misc PCI space registers */
 enum pci_register_offsets {
@@ -421,6 +438,7 @@ enum ChipCmd_bits {
 enum ChipConfig_bits {
 	CfgPhyDis		= 0x200,
 	CfgPhyRst		= 0x400,
+	CfgExtPhy		= 0x1000,
 	CfgAnegEnable		= 0x2000,
 	CfgAneg100		= 0x4000,
 	CfgAnegFull		= 0x8000,
@@ -630,10 +648,13 @@ struct netdev_private {
 	u32 SavedClkRun;
 	/* silicon revision */
 	u32 srr;
+	/* expected DSPCFG value */
+	u16 dspcfg;
 	/* MII transceiver section. */
 	u16 advertising; /* NWay media advertisement */
 	unsigned int iosize;
 	spinlock_t lock;
+	u32 msg_enable;
 };
 
 static int eeprom_read(long ioaddr, int location);
@@ -643,6 +664,8 @@ static void natsemi_reset(struct net_device *dev);
 static void natsemi_reload_eeprom(struct net_device *dev);
 static void natsemi_stop_rxtx(struct net_device *dev);
 static int netdev_open(struct net_device *dev);
+static void do_cable_magic(struct net_device *dev);
+static void undo_cable_magic(struct net_device *dev);
 static void check_link(struct net_device *dev);
 static void netdev_timer(unsigned long data);
 static void tx_timeout(struct net_device *dev);
@@ -753,6 +776,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	pci_set_drvdata(pdev, dev);
 	np->iosize = iosize;
 	spin_lock_init(&np->lock);
+	np->msg_enable = debug;
 
 	/* Reset the chip to erase previous misconfiguration. */
 	natsemi_reload_eeprom(dev);
@@ -763,14 +787,15 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 		option = dev->mem_start;
 
 	/* The lower four bits are the media type. */
-	if (option > 0) {
+	if (option) {
 		if (option & 0x200)
 			np->full_duplex = 1;
 		if (option & 15)
-			printk(KERN_INFO "%s: ignoring user supplied media type %d",
+			printk(KERN_INFO 
+				"%s: ignoring user supplied media type %d",
 				dev->name, option & 15);
 	}
-	if (find_cnt < MAX_UNITS  &&  full_duplex[find_cnt] > 0)
+	if (find_cnt < MAX_UNITS  &&  full_duplex[find_cnt])
 		np->full_duplex = 1;
 
 	/* The chip-specific entries in the device structure. */
@@ -796,14 +821,17 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	}
 	netif_carrier_off(dev);
 
-	printk(KERN_INFO "%s: %s at 0x%lx, ",
-		   dev->name, natsemi_pci_info[chip_idx].name, ioaddr);
-	for (i = 0; i < ETH_ALEN-1; i++)
-			printk("%2.2x:", dev->dev_addr[i]);
-	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
+	if (netif_msg_drv(np)) {
+		printk(KERN_INFO "%s: %s at %#08lx, ",
+			   dev->name, natsemi_pci_info[chip_idx].name, ioaddr);
+		for (i = 0; i < ETH_ALEN-1; i++)
+				printk("%02x:", dev->dev_addr[i]);
+		printk("%02x, IRQ %d.\n", dev->dev_addr[i], irq);
+	}
 
 	np->advertising = mdio_read(dev, 1, MII_ADVERTISE);
-	if ((readl(ioaddr + ChipConfig) & 0xe000) != 0xe000) {
+	if ((readl(ioaddr + ChipConfig) & 0xe000) != 0xe000 
+	 && netif_msg_probe(np)) {
 		u32 chip_config = readl(ioaddr + ChipConfig);
 		printk(KERN_INFO "%s: Transceiver default autonegotiation %s "
 			   "10%s %s duplex.\n",
@@ -812,12 +840,18 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 			   chip_config & CfgAneg100 ? "0" : "",
 			   chip_config & CfgAnegFull ? "full" : "half");
 	}
-	printk(KERN_INFO "%s: Transceiver status 0x%4.4x advertising %4.4x.\n",
-		   dev->name, mdio_read(dev, 1, MII_BMSR), 
-		   np->advertising);
+	if (netif_msg_probe(np))
+		printk(KERN_INFO 
+			"%s: Transceiver status %#04x advertising %#04x.\n",
+			dev->name, mdio_read(dev, 1, MII_BMSR), 
+			np->advertising);
 
 	/* save the silicon revision for later querying */
 	np->srr = readl(ioaddr + SiliconRev);
+	if (netif_msg_hw(np))
+		printk(KERN_INFO "%s: silicon revision %#04x.\n",
+				dev->name, np->srr);
+
 
 	return 0;
 }
@@ -914,6 +948,7 @@ static void natsemi_reset(struct net_device *dev)
 	u32 rfcr;
 	u16 pmatch[3];
 	u16 sopass[3];
+	struct netdev_private *np = dev->priv;
 
 	/* 
 	 * Resetting the chip causes some registers to be lost.
@@ -947,10 +982,10 @@ static void natsemi_reset(struct net_device *dev)
 			break;
 		udelay(5);
 	}
-	if (i==NATSEMI_HW_TIMEOUT && debug) {
+	if (i==NATSEMI_HW_TIMEOUT && netif_msg_hw(np)) {
 		printk(KERN_INFO "%s: reset did not complete in %d usec.\n",
 		   dev->name, i*5);
-	} else if (debug > 2) {
+	} else if (netif_msg_hw(np)) {
 		printk(KERN_DEBUG "%s: reset completed in %d usec.\n",
 		   dev->name, i*5);
 	}
@@ -979,6 +1014,7 @@ static void natsemi_reset(struct net_device *dev)
 
 static void natsemi_reload_eeprom(struct net_device *dev)
 {
+	struct netdev_private *np = dev->priv;
 	int i;
 
 	writel(EepromReload, dev->base_addr + PCIBusCfg);
@@ -987,10 +1023,10 @@ static void natsemi_reload_eeprom(struct net_device *dev)
 			break;
 		udelay(5);
 	}
-	if (i==NATSEMI_HW_TIMEOUT && debug) {
+	if (i==NATSEMI_HW_TIMEOUT && netif_msg_hw(np)) {
 		printk(KERN_INFO "%s: EEPROM did not reload in %d usec.\n",
 		   dev->name, i*5);
-	} else if (debug > 2) {
+	} else if (netif_msg_hw(np)) {
 		printk(KERN_DEBUG "%s: EEPROM reloaded in %d usec.\n",
 		   dev->name, i*5);
 	}
@@ -999,6 +1035,7 @@ static void natsemi_reload_eeprom(struct net_device *dev)
 static void natsemi_stop_rxtx(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
+	struct netdev_private *np = dev->priv;
 	int i;
 
 	writel(RxOff | TxOff, ioaddr + ChipCmd);
@@ -1007,10 +1044,10 @@ static void natsemi_stop_rxtx(struct net_device *dev)
 			break;
 		udelay(5);
 	}
-	if (i==NATSEMI_HW_TIMEOUT && debug) {
+	if (i==NATSEMI_HW_TIMEOUT && netif_msg_hw(np)) {
 		printk(KERN_INFO "%s: Tx/Rx process did not stop in %d usec.\n",
 				dev->name, i*5);
-	} else if (debug > 2) {
+	} else if (netif_msg_hw(np)) {
 		printk(KERN_DEBUG "%s: Tx/Rx process stopped in %d usec.\n",
 				dev->name, i*5);
 	}
@@ -1028,7 +1065,7 @@ static int netdev_open(struct net_device *dev)
 	i = request_irq(dev->irq, &intr_handler, SA_SHIRQ, dev->name, dev);
 	if (i) return i;
 
-	if (debug > 1)
+	if (netif_msg_ifup(np))
 		printk(KERN_DEBUG "%s: netdev_open() irq %d.\n",
 			   dev->name, dev->irq);
 	i = alloc_ring(dev);
@@ -1043,8 +1080,8 @@ static int netdev_open(struct net_device *dev)
 
 	netif_start_queue(dev);
 
-	if (debug > 2)
-		printk(KERN_DEBUG "%s: Done netdev_open(), status: %x.\n",
+	if (netif_msg_ifup(np))
+		printk(KERN_DEBUG "%s: Done netdev_open(), status: %#08x.\n",
 			   dev->name, (int)readl(ioaddr + ChipCmd));
 
 	/* Set the timer to check for link beat. */
@@ -1057,6 +1094,54 @@ static int netdev_open(struct net_device *dev)
 	return 0;
 }
 
+static void do_cable_magic(struct net_device *dev)
+{
+	/*
+	 * 100 MBit links with short cables can trip an issue with the chip.
+	 * The problem manifests as lots of CRC errors and/or flickering
+	 * activity LED while idle.  This process is based on instructions
+	 * from engineers at National.
+	 */
+	if (readl(dev->base_addr + ChipConfig) & CfgSpeed100) {
+		u16 data;
+
+		writew(1, dev->base_addr + PGSEL);
+		/*
+		 * coefficient visibility should already be enabled via
+		 * DSPCFG | 0x1000
+		 */
+		data = readw(dev->base_addr + TSTDAT) & 0xff;
+		/*
+		 * the value must be negative, and within certain values
+		 * (these values all come from National)
+		 */
+		if (!(data & 0x80) || ((data >= 0xd8) && (data <= 0xff))) {
+			struct netdev_private *np = dev->priv;
+
+			/* the bug has been triggered - fix the coefficient */
+			writew(TSTDAT_FIXED, dev->base_addr + TSTDAT);
+			/* lock the value */
+			data = readw(dev->base_addr + DSPCFG);
+			np->dspcfg = data | DSPCFG_LOCK;
+			writew(np->dspcfg, dev->base_addr + DSPCFG);
+		}
+		writew(0, dev->base_addr + PGSEL);
+	}
+}
+
+static void undo_cable_magic(struct net_device *dev)
+{
+	u16 data;
+	struct netdev_private *np = dev->priv;
+
+	writew(1, dev->base_addr + PGSEL);
+	/* make sure the lock bit is clear */
+	data = readw(dev->base_addr + DSPCFG);
+	np->dspcfg = data & ~DSPCFG_LOCK;
+	writew(np->dspcfg, dev->base_addr + DSPCFG);
+	writew(0, dev->base_addr + PGSEL);
+}
+
 static void check_link(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
@@ -1064,30 +1149,32 @@ static void check_link(struct net_device *dev)
 	int duplex;
 	int chipcfg = readl(ioaddr + ChipConfig);
 
-	if(!(chipcfg & CfgLink)) {
+	if (!(chipcfg & CfgLink)) {
 		if (netif_carrier_ok(dev)) {
-			if (debug)
-				printk(KERN_INFO "%s: no link. Disabling watchdog.\n",
+			if (netif_msg_link(np))
+				printk(KERN_NOTICE "%s: link down.\n", 
 					dev->name);
 			netif_carrier_off(dev);
+			undo_cable_magic(dev);
 		}
 		return;
 	}
 	if (!netif_carrier_ok(dev)) {
-		if (debug)
-			printk(KERN_INFO "%s: link is back. Enabling watchdog.\n",
-					dev->name);
+		if (netif_msg_link(np))
+			printk(KERN_NOTICE "%s: link up.\n", dev->name);
 		netif_carrier_on(dev);
+		do_cable_magic(dev);
 	}
 
 	duplex = np->full_duplex || (chipcfg & CfgFullDuplex ? 1 : 0);
 
 	/* if duplex is set then bit 28 must be set, too */
 	if (duplex ^ !!(np->rx_config & RxAcceptTx)) {
-		if (debug)
-			printk(KERN_INFO "%s: Setting %s-duplex based on negotiated link"
-				   " capability.\n", dev->name,
-				   duplex ? "full" : "half");
+		if (netif_msg_link(np))
+			printk(KERN_INFO 
+				"%s: Setting %s-duplex based on negotiated "
+				"link capability.\n", dev->name,
+				duplex ? "full" : "half");
 		if (duplex) {
 			np->rx_config |= RxAcceptTx;
 			np->tx_config |= TxCarrierIgn | TxHeartIgn;
@@ -1106,17 +1193,12 @@ static void init_registers(struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	int i;
 
-	/* save the silicon revision for later */
-	if (debug > 4)
-		printk(KERN_DEBUG "%s: found silicon revision %xh.\n",
-				dev->name, np->srr);
-
 	for (i=0;i<NATSEMI_HW_TIMEOUT;i++) {
 		if (readl(dev->base_addr + ChipConfig) & CfgAnegDone)
 			break;
 		udelay(10);
 	}
-	if (i==NATSEMI_HW_TIMEOUT && debug) {
+	if (i==NATSEMI_HW_TIMEOUT && netif_msg_link(np)) {
 		printk(KERN_INFO 
 			"%s: autonegotiation did not complete in %d usec.\n",
 			dev->name, i*10);
@@ -1135,6 +1217,7 @@ static void init_registers(struct net_device *dev)
 	writew(DSPCFG_VAL, ioaddr + DSPCFG);
 	writew(SDCFG_VAL, ioaddr + SDCFG);
 	writew(0, ioaddr + PGSEL);
+	np->dspcfg = DSPCFG_VAL;
 
 	/* Enable PHY Specific event based interrupts.  Link state change
 	   and Auto-Negotiation Completion are among the affected.
@@ -1181,8 +1264,8 @@ static void init_registers(struct net_device *dev)
 	 * nothing will be written to memory. */
 	np->SavedClkRun = readl(ioaddr + ClkRun);
 	writel(np->SavedClkRun & ~PMEEnable, ioaddr + ClkRun);
-	if (np->SavedClkRun & PMEStatus) {
-		printk(KERN_NOTICE "%s: Wake-up event %8.8x\n", 
+	if (np->SavedClkRun & PMEStatus && netif_msg_wol(np)) {
+		printk(KERN_NOTICE "%s: Wake-up event %#08x\n", 
 			dev->name, readl(ioaddr + WOLCmd));
 	}
 
@@ -1197,8 +1280,10 @@ static void init_registers(struct net_device *dev)
 	writel(StatsClear, ioaddr + StatsCtrl); /* Clear Stats */
 }
 
-/* 
- * The frequency on this has been increased because of a nasty little problem.
+/*
+ * Purpose:
+ * check for sudden death of the NIC:
+ *
  * It seems that a reference set for this chip went out with incorrect info,
  * and there exist boards that aren't quite right.  An unexpected voltage drop
  * can cause the PHY to get itself in a weird state (basically reset..).
@@ -1212,7 +1297,7 @@ static void netdev_timer(unsigned long data)
 	long ioaddr = dev->base_addr;
 	u16 dspcfg;
 
-	if (debug > 3) {
+	if (netif_msg_timer(np)) {
 		/* DO NOT read the IntrStatus register, 
 		 * a read clears any pending interrupts.
 		 */
@@ -1220,15 +1305,18 @@ static void netdev_timer(unsigned long data)
 			   dev->name);
 	}
 
+	spin_lock_irq(&np->lock);
+
 	/* check for a nasty random phy-reset - use dspcfg as a flag */
 	writew(1, ioaddr+PGSEL);
 	dspcfg = readw(ioaddr+DSPCFG);
 	writew(0, ioaddr+PGSEL);
-	if (dspcfg != DSPCFG_VAL) {
+	if (dspcfg != np->dspcfg) {
 		if (!netif_queue_stopped(dev)) {
-			printk(KERN_INFO 
-				"%s: possible phy reset: re-initializing\n",
-				dev->name);
+			spin_unlock_irq(&np->lock);
+			if (netif_msg_hw(np))
+				printk(KERN_NOTICE "%s: possible phy reset: "
+					"re-initializing\n", dev->name);
 			disable_irq(dev->irq);
 			spin_lock_irq(&np->lock);
 			init_registers(dev);
@@ -1237,10 +1325,10 @@ static void netdev_timer(unsigned long data)
 		} else {
 			/* hurry back */
 			next_tick = HZ;
+			spin_unlock_irq(&np->lock);
 		}
 	} else {
 		/* init_registers() calls check_link() for the above case */
-		spin_lock_irq(&np->lock);
 		check_link(dev);
 		spin_unlock_irq(&np->lock);
 	}
@@ -1251,18 +1339,18 @@ static void dump_ring(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 
-	if (debug > 2) {
+	if (netif_msg_pktdata(np)) {
 		int i;
 		printk(KERN_DEBUG "  Tx ring at %p:\n", np->tx_ring);
 		for (i = 0; i < TX_RING_SIZE; i++) {
-			printk(KERN_DEBUG " #%d desc. %8.8x %8.8x %8.8x.\n",
+			printk(KERN_DEBUG " #%d desc. %#08x %#08x %#08x.\n",
 				   i, np->tx_ring[i].next_desc,
 				   np->tx_ring[i].cmd_status, 
 				   np->tx_ring[i].addr);
 		}
 		printk(KERN_DEBUG "  Rx ring %p:\n", np->rx_ring);
 		for (i = 0; i < RX_RING_SIZE; i++) {
-			printk(KERN_DEBUG " #%d desc. %8.8x %8.8x %8.8x.\n",
+			printk(KERN_DEBUG " #%d desc. %#08x %#08x %#08x.\n",
 				   i, np->rx_ring[i].next_desc,
 				   np->rx_ring[i].cmd_status, 
 				   np->rx_ring[i].addr);
@@ -1278,9 +1366,11 @@ static void tx_timeout(struct net_device *dev)
 	disable_irq(dev->irq);
 	spin_lock_irq(&np->lock);
 	if (netif_device_present(dev)) {
-		printk(KERN_WARNING "%s: Transmit timed out, status %8.8x,"
-			" resetting...\n", 
-			dev->name, readl(ioaddr + IntrStatus));
+		if (netif_msg_tx_err(np))
+			printk(KERN_WARNING 
+				"%s: Transmit timed out, status %#08x,"
+				" resetting...\n", 
+				dev->name, readl(ioaddr + IntrStatus));
 		dump_ring(dev);
 
 		natsemi_reset(dev);
@@ -1304,8 +1394,8 @@ static int alloc_ring(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	np->rx_ring = pci_alloc_consistent(np->pci_dev,
-				sizeof(struct netdev_desc) * (RX_RING_SIZE+TX_RING_SIZE),
-				&np->ring_dma);
+	    sizeof(struct netdev_desc) * (RX_RING_SIZE+TX_RING_SIZE),
+	    &np->ring_dma);
 	if (!np->rx_ring)
 		return -ENOMEM;
 	np->tx_ring = &np->rx_ring[RX_RING_SIZE];
@@ -1438,7 +1528,7 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 
 	dev->trans_start = jiffies;
 
-	if (debug > 4) {
+	if (netif_msg_tx_queued(np)) {
 		printk(KERN_DEBUG "%s: Transmit frame #%d queued in slot %d.\n",
 			   dev->name, np->cur_tx, entry);
 	}
@@ -1451,14 +1541,11 @@ static void netdev_tx_done(struct net_device *dev)
 
 	for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
 		int entry = np->dirty_tx % TX_RING_SIZE;
-		if (np->tx_ring[entry].cmd_status & cpu_to_le32(DescOwn)) {
-			if (debug > 4)
-				printk(KERN_DEBUG "%s: tx frame #%d is busy.\n",
-						dev->name, np->dirty_tx);
+		if (np->tx_ring[entry].cmd_status & cpu_to_le32(DescOwn))
 			break;
-		}
-		if (debug > 4)
-			printk(KERN_DEBUG "%s: tx frame #%d finished with status %8.8xh.\n",
+		if (netif_msg_tx_done(np))
+			printk(KERN_DEBUG 
+				"%s: tx frame #%d finished, status %#08x.\n",
 					dev->name, np->dirty_tx,
 					le32_to_cpu(np->tx_ring[entry].cmd_status));
 		if (np->tx_ring[entry].cmd_status & cpu_to_le32(DescPktOK)) {
@@ -1495,30 +1582,31 @@ static void netdev_tx_done(struct net_device *dev)
 static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = dev_instance;
-	struct netdev_private *np;
-	long ioaddr;
+	struct netdev_private *np = dev->priv;
+	long ioaddr = dev->base_addr;
 	int boguscnt = max_interrupt_work;
 
-	ioaddr = dev->base_addr;
-	np = dev->priv;
-	
 	if (!netif_device_present(dev))
 		return;
 	do {
 		/* Reading automatically acknowledges all int sources. */
 		u32 intr_status = readl(ioaddr + IntrStatus);
 
-		if (debug > 4)
-			printk(KERN_DEBUG "%s: Interrupt, status %4.4x.\n",
+		if (netif_msg_intr(np))
+			printk(KERN_DEBUG "%s: Interrupt, status %#08x.\n",
 				   dev->name, intr_status);
 
 		if (intr_status == 0)
 			break;
 
-		if (intr_status & (IntrRxDone | IntrRxIntr | RxStatusFIFOOver | IntrRxErr | IntrRxOverrun ))
+		if (intr_status &
+		   (IntrRxDone | IntrRxIntr | RxStatusFIFOOver |
+		    IntrRxErr | IntrRxOverrun)) {
 			netdev_rx(dev);
+		}
 
-		if (intr_status & (IntrTxDone | IntrTxIntr | IntrTxIdle | IntrTxErr) ) {
+		if (intr_status &
+		   (IntrTxDone | IntrTxIntr | IntrTxIdle | IntrTxErr)) {
 			spin_lock(&np->lock);
 			netdev_tx_done(dev);
 			spin_unlock(&np->lock);
@@ -1529,16 +1617,16 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 			netdev_error(dev, intr_status);
 
 		if (--boguscnt < 0) {
-			printk(KERN_WARNING "%s: Too much work at interrupt, "
-				   "status=0x%4.4x.\n",
-				   dev->name, intr_status);
+			if (netif_msg_intr(np))
+				printk(KERN_WARNING 
+				    "%s: Too much work at interrupt, "
+				    "status=%#08x.\n", dev->name, intr_status);
 			break;
 		}
 	} while (1);
 
-	if (debug > 4)
-		printk(KERN_DEBUG "%s: exiting interrupt.\n",
-			   dev->name);
+	if (netif_msg_intr(np))
+		printk(KERN_DEBUG "%s: exiting interrupt.\n", dev->name);
 }
 
 /* This routine is logically part of the interrupt handler, but separated
@@ -1552,22 +1640,24 @@ static void netdev_rx(struct net_device *dev)
 
 	/* If the driver owns the next entry it's a new packet. Send it up. */
 	while (desc_status < 0) {        /* e.g. & DescOwn */
-		if (debug > 4)
-			printk(KERN_DEBUG "  In netdev_rx() entry %d status was %8.8x.\n",
-				   entry, desc_status);
+		if (netif_msg_rx_status(np))
+			printk(KERN_DEBUG 
+				"  netdev_rx() entry %d status was %#08x.\n",
+				entry, desc_status);
 		if (--boguscnt < 0)
 			break;
-		if ((desc_status & (DescMore|DescPktOK|DescRxLong)) != DescPktOK) {
+		if ((desc_status&(DescMore|DescPktOK|DescRxLong)) != DescPktOK){
 			if (desc_status & DescMore) {
-				printk(KERN_WARNING "%s: Oversized(?) Ethernet frame spanned "
-					   "multiple buffers, entry %#x status %x.\n",
-					   dev->name, np->cur_rx, desc_status);
+				if (netif_msg_rx_err(np))
+					printk(KERN_WARNING 
+						"%s: Oversized(?) Ethernet "
+						"frame spanned multiple "
+						"buffers, entry %#08x "
+						"status %#08x.\n", dev->name, 
+						np->cur_rx, desc_status);
 				np->stats.rx_length_errors++;
 			} else {
-				/* There was a error. */
-				if (debug > 2)
-					printk(KERN_DEBUG "  netdev_rx() Rx error was %8.8x.\n",
-						   desc_status);
+				/* There was an error. */
 				np->stats.rx_errors++;
 				if (desc_status & (DescRxAbort|DescRxOver)) 
 					np->stats.rx_over_errors++;
@@ -1582,8 +1672,8 @@ static void netdev_rx(struct net_device *dev)
 			struct sk_buff *skb;
 			/* Omit CRC size. */
 			int pkt_len = (desc_status & DescSizeMask) - 4;
-			/* Check if the packet is long enough to accept without copying
-			   to a minimally-sized skbuff. */
+			/* Check if the packet is long enough to accept 
+			 * without copying to a minimally-sized skbuff. */
 			if (pkt_len < rx_copybreak
 				&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
 				skb->dev = dev;
@@ -1646,11 +1736,16 @@ static void netdev_error(struct net_device *dev, int intr_status)
 
 	spin_lock(&np->lock);
 	if (intr_status & LinkChange) {
-		printk(KERN_NOTICE 
-			"%s: Link changed: Autonegotiation advertising"
-			" %4.4x  partner %4.4x.\n", dev->name,
-			(int)mdio_read(dev, 1, MII_ADVERTISE), 
-			(int)mdio_read(dev, 1, MII_LPA));
+		u16 adv = mdio_read(dev, 1, MII_ADVERTISE);
+		u16 lpa = mdio_read(dev, 1, MII_LPA);
+		if (mdio_read(dev, 1, MII_BMCR) & BMCR_ANENABLE 
+		 && netif_msg_link(np)) {
+			printk(KERN_INFO 
+				"%s: Autonegotiation advertising"
+				" %#04x  partner %#04x.\n", dev->name,
+				adv, lpa);
+		}
+
 		/* read MII int status to clear the flag */
 		readw(ioaddr + MIntrStatus);
 		check_link(dev);
@@ -1661,29 +1756,28 @@ static void netdev_error(struct net_device *dev, int intr_status)
 	if (intr_status & IntrTxUnderrun) {
 		if ((np->tx_config & TxDrthMask) < 62)
 			np->tx_config += 2;
-		if (debug > 2)
-			printk(KERN_NOTICE "%s: increasing Tx threshold, new tx cfg %8.8xh.\n",
-					dev->name, np->tx_config);
+		if (netif_msg_tx_err(np))
+			printk(KERN_NOTICE
+				"%s: increased Tx threshold, txcfg %#08x.\n",
+				dev->name, np->tx_config);
 		writel(np->tx_config, ioaddr + TxConfig);
 	}
-	if (intr_status & WOLPkt) {
+	if (intr_status & WOLPkt && netif_msg_wol(np)) {
 		int wol_status = readl(ioaddr + WOLCmd);
-		printk(KERN_NOTICE "%s: Link wake-up event %8.8x\n",
+		printk(KERN_NOTICE "%s: Link wake-up event %#08x\n",
 			   dev->name, wol_status);
 	}
 	if (intr_status & RxStatusFIFOOver) {
-		if (debug >= 2) {
-			printk(KERN_NOTICE "%s: Rx status FIFO overrun\n", 
+		if (netif_msg_rx_err(np) && netif_msg_intr(np)) {
+			printk(KERN_NOTICE "%s: Rx status FIFO overrun\n",
 				dev->name);
 		}
 		np->stats.rx_fifo_errors++;
 	}
 	/* Hmmmmm, it's not clear how to recover from PCI faults. */
 	if (intr_status & IntrPCIErr) {
-		if (debug) {
-			printk(KERN_NOTICE "%s: PCI error %08x\n", dev->name,
-				intr_status & IntrPCIErr);
-		}
+		printk(KERN_NOTICE "%s: PCI error %#08x\n", dev->name,
+			intr_status & IntrPCIErr);
 		np->stats.tx_fifo_errors++;
 		np->stats.rx_fifo_errors++;
 	}
@@ -1761,7 +1855,8 @@ static void __set_rx_mode(struct net_device *dev)
 
 	if (dev->flags & IFF_PROMISC) {			/* Set promiscuous. */
 		/* Unconditionally log net taps. */
-		printk(KERN_NOTICE "%s: Promiscuous mode enabled.\n", dev->name);
+		printk(KERN_NOTICE "%s: Promiscuous mode enabled.\n", 
+			dev->name);
 		rx_mode = RxFilterEnable | AcceptBroadcast 
 			| AcceptAllMulticast | AcceptAllPhys | AcceptMyPhys;
 	} else if ((dev->mc_count > multicast_filter_limit)
@@ -1896,7 +1991,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	/* get message-level */
 	case ETHTOOL_GMSGLVL: {
 		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-		edata.data = debug;
+		edata.data = np->msg_enable;
 		if (copy_to_user(useraddr, &edata, sizeof(edata)))
 			return -EFAULT;
 		return 0;
@@ -1906,7 +2001,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		struct ethtool_value edata;
 		if (copy_from_user(&edata, useraddr, sizeof(edata)))
 			return -EFAULT;
-		debug = edata.data;
+		np->msg_enable = edata.data;
 		return 0;
 	}
 	/* restart autonegotiation */
@@ -1941,6 +2036,9 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		if (copy_from_user(&eeprom, useraddr, sizeof(eeprom)))
 			return -EFAULT;
 		
+		if (eeprom.offset > eeprom.offset+eeprom.len)
+			return -EINVAL;
+
 		if ((eeprom.offset+eeprom.len) > NATSEMI_EEPROM_SIZE) {
 			eeprom.len = NATSEMI_EEPROM_SIZE-eeprom.offset;
 		}
@@ -2096,18 +2194,22 @@ static int netdev_get_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 	ecmd->supported = 
 		(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
 		SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
-		SUPPORTED_Autoneg | SUPPORTED_TP);
+		SUPPORTED_Autoneg | SUPPORTED_TP | SUPPORTED_MII);
 	
-	/* only supports twisted-pair */
-	ecmd->port = PORT_TP;
+	/* only supports twisted-pair or MII */
+	tmp = readl(dev->base_addr + ChipConfig);
+	if (tmp & CfgExtPhy)
+		ecmd->port = PORT_MII;
+	else
+		ecmd->port = PORT_TP;
 
 	/* only supports internal transceiver */
 	ecmd->transceiver = XCVR_INTERNAL;
 
-	/* this isn't fully supported at higher layers */
+	/* not sure what this is for */
 	ecmd->phy_address = readw(dev->base_addr + PhyCtrl) & PhyAddrMask;
 
-	ecmd->advertising = ADVERTISED_TP;
+	ecmd->advertising = ADVERTISED_TP | ADVERTISED_MII;
 	tmp = mdio_read(dev, 1, MII_ADVERTISE);
 	if (tmp & ADVERTISE_10HALF)
 		ecmd->advertising |= ADVERTISED_10baseT_Half;
@@ -2118,20 +2220,21 @@ static int netdev_get_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 	if (tmp & ADVERTISE_100FULL)
 		ecmd->advertising |= ADVERTISED_100baseT_Full;
 
-	tmp = readl(dev->base_addr + ChipConfig);
-	if (tmp & CfgAnegEnable) {
+	tmp = mdio_read(dev, 1, MII_BMCR);
+	if (tmp & BMCR_ANENABLE) {
 		ecmd->advertising |= ADVERTISED_Autoneg;
 		ecmd->autoneg = AUTONEG_ENABLE;
 	} else {
 		ecmd->autoneg = AUTONEG_DISABLE;
 	}
 
+	tmp = readl(dev->base_addr + ChipConfig);
 	if (tmp & CfgSpeed100) {
 		ecmd->speed = SPEED_100;
 	} else {
 		ecmd->speed = SPEED_10;
 	}
-
+		
 	if (tmp & CfgFullDuplex) {
 		ecmd->duplex = DUPLEX_FULL;
 	} else {
@@ -2152,7 +2255,7 @@ static int netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 		return -EINVAL;
 	if (ecmd->duplex != DUPLEX_HALF && ecmd->duplex != DUPLEX_FULL)
 		return -EINVAL;
-	if (ecmd->port != PORT_TP)
+	if (ecmd->port != PORT_TP && ecmd->port != PORT_MII)
 		return -EINVAL;
 	if (ecmd->transceiver != XCVR_INTERNAL)
 		return -EINVAL;
@@ -2162,39 +2265,22 @@ static int netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 	
 	/* WHEW! now lets bang some bits */
 	
+	tmp = mdio_read(dev, 1, MII_BMCR);
 	if (ecmd->autoneg == AUTONEG_ENABLE) {
-		/* advertise only what has been requested */
-		tmp = readl(dev->base_addr + ChipConfig);
-		tmp &= ~(CfgAneg100 | CfgAnegFull);
-		tmp |= CfgAnegEnable;
-		if (ecmd->advertising & ADVERTISED_100baseT_Half 
-		 || ecmd->advertising & ADVERTISED_100baseT_Full) {
-			tmp |= CfgAneg100;
-		}
-		if (ecmd->advertising & ADVERTISED_10baseT_Full 
-		 || ecmd->advertising & ADVERTISED_100baseT_Full) {
-			tmp |= CfgAnegFull;
-		}
-		writel(tmp, dev->base_addr + ChipConfig);
-		/* turn on autonegotiation, and force a renegotiate */
-		tmp = mdio_read(dev, 1, MII_BMCR);
-		tmp |= (BMCR_ANENABLE | BMCR_ANRESTART);
-		mdio_write(dev, 1, MII_BMCR, tmp);
+		/* turn on autonegotiation */
+		tmp |= BMCR_ANENABLE;
 		np->advertising = mdio_read(dev, 1, MII_ADVERTISE);
 	} else {
 		/* turn off auto negotiation, set speed and duplexity */
-		tmp = mdio_read(dev, 1, MII_BMCR);
 		tmp &= ~(BMCR_ANENABLE | BMCR_SPEED100 | BMCR_FULLDPLX);
-		if (ecmd->speed == SPEED_100) {
+		if (ecmd->speed == SPEED_100)
 			tmp |= BMCR_SPEED100;
-		}
-		if (ecmd->duplex == DUPLEX_FULL) {
+		if (ecmd->duplex == DUPLEX_FULL)
 			tmp |= BMCR_FULLDPLX;
-		} else {
+		else
 			np->full_duplex = 0;
-		}
-		mdio_write(dev, 1, MII_BMCR, tmp);
 	}
+	mdio_write(dev, 1, MII_BMCR, tmp);
 	return 0;
 }
 
@@ -2229,7 +2315,7 @@ static int netdev_get_regs(struct net_device *dev, u8 *buf)
 	/* the interrupt status is clear-on-read - see if we missed any */
 	if (rbuf[4] & rbuf[5]) {
 		printk(KERN_WARNING 
-			"%s: shoot, we dropped an interrupt (0x%x)\n", 
+			"%s: shoot, we dropped an interrupt (%#08x)\n", 
 			dev->name, rbuf[4] & rbuf[5]);
 	}
 
@@ -2296,7 +2382,7 @@ static void enable_wol_mode(struct net_device *dev, int enable_intr)
 	long ioaddr = dev->base_addr;
 	struct netdev_private *np = dev->priv;
 
-	if (debug > 1)
+	if (netif_msg_wol(np))
 		printk(KERN_INFO "%s: remaining active for wake-on-lan\n", 
 			dev->name);
 
@@ -2319,7 +2405,8 @@ static void enable_wol_mode(struct net_device *dev, int enable_intr)
 		/* enable the WOL interrupt.
 		 * Could be used to send a netlink message.
 		 */
-		writel(readl(ioaddr + IntrMask) | WOLPkt, ioaddr + IntrMask);
+		writel(WOLPkt | LinkChange, ioaddr + IntrMask);
+		writel(1, ioaddr + IntrEnable);
 	}
 }
 
@@ -2331,12 +2418,15 @@ static int netdev_close(struct net_device *dev)
 	netif_stop_queue(dev);
 	netif_carrier_off(dev);
 
-	if (debug > 1) {
-		printk(KERN_DEBUG "%s: Shutting down ethercard, status was %4.4x.\n",
-			   dev->name, (int)readl(ioaddr + ChipCmd));
-		printk(KERN_DEBUG "%s: Queue pointers were Tx %d / %d,  Rx %d / %d.\n",
-			   dev->name, np->cur_tx, np->dirty_tx, np->cur_rx, np->dirty_rx);
-	}
+	if (netif_msg_ifdown(np))
+		printk(KERN_DEBUG 
+			"%s: Shutting down ethercard, status was %#04x.\n",
+			dev->name, (int)readl(ioaddr + ChipCmd));
+	if (netif_msg_pktdata(np))
+		printk(KERN_DEBUG 
+			"%s: Queue pointers were Tx %d / %d,  Rx %d / %d.\n",
+			dev->name, np->cur_tx, np->dirty_tx, 
+			np->cur_rx, np->dirty_rx);
 
 	del_timer_sync(&np->timer);
 
@@ -2375,7 +2465,7 @@ static int netdev_close(struct net_device *dev)
 	drain_ring(dev);
 	free_ring(dev);
 
-	 {
+	{
 		u32 wol = readl(ioaddr + WOLCmd) & WakeOptsSummary;
 		if (wol) {
 			/* restart the NIC in WOL mode.
