@@ -1151,8 +1151,12 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 				dbg ( "%s - HARDWARE RESET return %d", __FUNCTION__, status);
 
 				/* return an error on purpose. */
+				kfree (firmware_version);
+				kfree (rom_desc);
+				kfree (ti_manuf_desc);
 				return -ENODEV;
 			}
+			kfree (firmware_version);
 		}
 		// Search for type 0xF2 record (firmware blank record)
 		else if ((start_address = TIGetDescriptorAddress (serial, I2C_DESC_TYPE_FIRMWARE_BLANK, rom_desc)) != 0) {
