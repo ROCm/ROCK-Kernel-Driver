@@ -600,6 +600,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		elf_ppnt++;
 	}
 
+#ifndef __s390__
 	elf_ppnt = elf_phdata;
 	for (i = 0; i < elf_ex.e_phnum; i++, elf_ppnt++)
 		if (elf_ppnt->p_type == PT_GNU_STACK) {
@@ -608,7 +609,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			else
 				executable_stack = EXSTACK_DISABLE_X;
 		}
-
+#endif
 	/* Some simple consistency checks for the interpreter */
 	if (elf_interpreter) {
 		interpreter_type = INTERPRETER_ELF | INTERPRETER_AOUT;
