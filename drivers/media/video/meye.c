@@ -142,25 +142,6 @@ static inline unsigned long uvirt_to_kva(pgd_t *pgd, unsigned long adr) {
 	return ret;
 }
 
-static inline unsigned long uvirt_to_bus(unsigned long adr) {
-        unsigned long kva, ret;
-
-        kva = uvirt_to_kva(pgd_offset(current->mm, adr), adr);
-	ret = virt_to_bus((void *)kva);
-        MDEBUG(printk("uv2b(%lx-->%lx)\n", adr, ret));
-        return ret;
-}
-
-static inline unsigned long kvirt_to_bus(unsigned long adr) {
-        unsigned long va, kva, ret;
-
-        va = VMALLOC_VMADDR(adr);
-        kva = uvirt_to_kva(pgd_offset_k(va), va);
-	ret = virt_to_bus((void *)kva);
-        MDEBUG(printk("kv2b(%lx-->%lx)\n", adr, ret));
-        return ret;
-}
-
 /* Here we want the physical address of the memory.
  * This is used when initializing the contents of the
  * area and marking the pages as reserved.
@@ -209,30 +190,63 @@ static void rvfree(void * mem, signed long size) {
 }
 
 /* return a page table pointing to N pages of locked memory */
-static void *ptable_alloc(int npages, u32 *pt_addr) {
+static int ptable_alloc(void) {
+	u32 *pt;
 	int i;
-	void *vmem;
-	u32 *ptable;
-	unsigned long adr;
 
-	vmem = rvmalloc((npages + 1) * PAGE_SIZE);
-	if (!vmem)
-		return NULL;
+	memset(meye.mchip_ptable, 0, sizeof(meye.mchip_ptable));
 
-        adr = (unsigned long)vmem;
-	ptable = (u32 *)(vmem + npages * PAGE_SIZE);
-	for (i = 0; i < npages; i++) {
-		ptable[i] = (u32) kvirt_to_bus(adr);
-		adr += PAGE_SIZE;
+	meye.mchip_ptable[MCHIP_NB_PAGES] = pci_alloc_consistent(meye.mchip_dev, 
+								 PAGE_SIZE, 
+								 &meye.mchip_dmahandle);
+	if (!meye.mchip_ptable[MCHIP_NB_PAGES])
+		return -1;
+
+	pt = (u32 *)meye.mchip_ptable[MCHIP_NB_PAGES];
+	for (i = 0; i < MCHIP_NB_PAGES; i++) {
+		meye.mchip_ptable[i] = pci_alloc_consistent(meye.mchip_dev, 
+							    PAGE_SIZE,
+							    pt);
+		if (!meye.mchip_ptable[i])
+			return -1;
+		pt++;
 	}
-
-	*pt_addr = (u32) kvirt_to_bus(adr);
-	return vmem;
+	return 0;
 }
 
-static void ptable_free(void *vmem, int npages) {
-	rvfree(vmem, (npages + 1) * PAGE_SIZE);
+static void ptable_free(void) {
+	u32 *pt;
+	int i;
+
+	pt = (u32 *)meye.mchip_ptable[MCHIP_NB_PAGES];
+	for (i = 0; i < MCHIP_NB_PAGES; i++)
+		if (meye.mchip_ptable[i])
+			pci_free_consistent(meye.mchip_dev, 
+					    PAGE_SIZE, 
+					    meye.mchip_ptable[i], *pt);
+
+	if (meye.mchip_ptable[MCHIP_NB_PAGES])
+		pci_free_consistent(meye.mchip_dev, 
+				    PAGE_SIZE, 
+				    meye.mchip_ptable[MCHIP_NB_PAGES], 
+				    meye.mchip_dmahandle);
+
+	memset(meye.mchip_ptable, 0, sizeof(meye.mchip_ptable));
+	meye.mchip_dmahandle = 0;
 }
+
+/* copy data from ptable into buf */
+static void ptable_copy(u8 *buf, int start, int size, int pt_pages) {
+	int i;
+	
+	for (i = 0; i < (size / PAGE_SIZE) * PAGE_SIZE; i += PAGE_SIZE) {
+		memcpy(buf + i, meye.mchip_ptable[start++], PAGE_SIZE);
+		if (start >= pt_pages)
+			start = 0;
+	}
+	memcpy(buf + i, meye.mchip_ptable[start], size % PAGE_SIZE);
+}
+
 
 /****************************************************************************/
 /* JPEG tables at different qualities to load into the VRJ chip             */
@@ -587,29 +601,23 @@ static void mchip_vrj_setup(u8 mode) {
 
 /* setup for DMA transfers - also zeros the framebuffer */
 static int mchip_dma_alloc(void) {
-	if (!meye.mchip_fbuffer) {
-		meye.mchip_fbuffer = ptable_alloc(MCHIP_NB_PAGES, 
-				                  &meye.mchip_ptaddr);
-		if (!meye.mchip_fbuffer)
+	if (!meye.mchip_dmahandle)
+		if (ptable_alloc())
 			return -1;
-	}
 	return 0;
 }
 
 /* frees the DMA buffer */
 static void mchip_dma_free(void) {
-	if (meye.mchip_fbuffer) {
-		ptable_free(meye.mchip_fbuffer, MCHIP_NB_PAGES);
-		meye.mchip_fbuffer = 0;
-		meye.mchip_ptaddr = 0;
-	}
+	if (meye.mchip_dmahandle)
+		ptable_free();
 }
 
 /* sets the DMA parameters into the chip */
 static void mchip_dma_setup(void) {
 	int i;
 
-	mchip_set(MCHIP_MM_PT_ADDR, meye.mchip_ptaddr);
+	mchip_set(MCHIP_MM_PT_ADDR, meye.mchip_dmahandle);
 	for (i = 0; i < 4; i++)
 		mchip_set(MCHIP_MM_FIR(i), 0);
 	meye.mchip_fnum = 0;
@@ -658,59 +666,40 @@ static void mchip_free_frame(void) {
 	meye.mchip_fnum %= 4;
 }
 
-
 /* read one frame from the framebuffer assuming it was captured using
    a uncompressed transfer */
-static void  mchip_cont_read_frame(u32 v, u8 *buf, int size) {
+static void mchip_cont_read_frame(u32 v, u8 *buf, int size) {
 	int pt_id;
-	int avail;
 
 	pt_id = (v >> 17) & 0x3FF;
-	avail = MCHIP_NB_PAGES - pt_id;
 
-	if (size > avail*PAGE_SIZE) {
-		memcpy(buf, meye.mchip_fbuffer + pt_id * PAGE_SIZE, 
-		       avail * PAGE_SIZE);
-		memcpy(buf +avail * PAGE_SIZE, meye.mchip_fbuffer,
-		       size - avail * PAGE_SIZE);
-	}
-	else
-		memcpy(buf, meye.mchip_fbuffer + pt_id * PAGE_SIZE, size);
+	ptable_copy(buf, pt_id, size, MCHIP_NB_PAGES);
+
 }
 
 /* read a compressed frame from the framebuffer */
 static int mchip_comp_read_frame(u32 v, u8 *buf, int size) {
 	int pt_start, pt_end, trailer;
-	int fsize, fsize2;
+	int fsize;
 	int i;
 
 	pt_start = (v >> 19) & 0xFF;
 	pt_end = (v >> 11) & 0xFF;
 	trailer = (v >> 1) & 0x3FF;
 
-	if (pt_end < pt_start) {
-		fsize = (MCHIP_NB_PAGES_MJPEG - pt_start) * PAGE_SIZE;
-		fsize2 = pt_end * PAGE_SIZE + trailer * 4;
-		if (fsize + fsize2 > size) {
-			printk(KERN_WARNING "meye: oversized compressed frame %d %d\n", 
-			       fsize, fsize2);
-			return -1;
-		} else {
-			memcpy(buf, meye.mchip_fbuffer + pt_start * PAGE_SIZE, 
-			       fsize);
-			memcpy(buf + fsize, meye.mchip_fbuffer, fsize2); 
-			fsize += fsize2;
-		}
-	} else {
+	if (pt_end < pt_start)
+		fsize = (MCHIP_NB_PAGES_MJPEG - pt_start) * PAGE_SIZE +
+			pt_end * PAGE_SIZE + trailer * 4;
+	else
 		fsize = (pt_end - pt_start) * PAGE_SIZE + trailer * 4;
-		if (fsize > size) {
-			printk(KERN_WARNING "meye: oversized compressed frame %d\n", 
-			       fsize);
-			return -1;
-		} else
-			memcpy(buf, meye.mchip_fbuffer + pt_start * PAGE_SIZE, 
-			       fsize);
+
+	if (fsize > size) {
+		printk(KERN_WARNING "meye: oversized compressed frame %d\n", 
+		       fsize);
+		return -1;
 	}
+
+	ptable_copy(buf, pt_start, fsize, MCHIP_NB_PAGES_MJPEG);
 
 
 #ifdef MEYE_JPEG_CORRECTION
