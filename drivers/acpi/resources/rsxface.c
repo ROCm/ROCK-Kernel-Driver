@@ -41,6 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acresrc.h>
@@ -156,6 +157,7 @@ acpi_get_current_resources (
 	status = acpi_rs_get_crs_method_data (device_handle, ret_buffer);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_current_resources);
 
 
 /*******************************************************************************
@@ -208,6 +210,7 @@ acpi_get_possible_resources (
 	status = acpi_rs_get_prs_method_data (device_handle, ret_buffer);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_possible_resources);
 
 
 /*******************************************************************************
@@ -310,6 +313,7 @@ cleanup:
 	acpi_os_free (buffer.pointer);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_walk_resources);
 
 
 /*******************************************************************************
@@ -354,6 +358,7 @@ acpi_set_current_resources (
 	status = acpi_rs_set_srs_method_data (device_handle, in_buffer);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_set_current_resources);
 
 
 #define ACPI_COPY_FIELD(out, in, field)  ((out)->field = (in)->field)
@@ -427,3 +432,5 @@ acpi_resource_to_address64 (
 
 	return (AE_OK);
 }
+EXPORT_SYMBOL(acpi_resource_to_address64);
+

@@ -26,6 +26,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
@@ -61,8 +62,11 @@ struct acpi_os_dpc
 
 #ifdef ENABLE_DEBUGGER
 #include <linux/kdb.h>
+
 /* stuff for debugger support */
 int acpi_in_debugger;
+EXPORT_SYMBOL(acpi_in_debugger);
+
 extern char line_buf[80];
 #endif /*ENABLE_DEBUGGER*/
 
@@ -117,6 +121,7 @@ acpi_os_printf(const char *fmt,...)
 	acpi_os_vprintf(fmt, args);
 	va_end(args);
 }
+EXPORT_SYMBOL(acpi_os_printf);
 
 void
 acpi_os_vprintf(const char *fmt, va_list args)
@@ -147,6 +152,7 @@ acpi_os_free(void *ptr)
 {
 	kfree(ptr);
 }
+EXPORT_SYMBOL(acpi_os_free);
 
 acpi_status
 acpi_os_get_root_pointer(u32 flags, struct acpi_pointer *addr)
@@ -311,6 +317,7 @@ acpi_os_sleep(acpi_integer ms)
 	current->state = TASK_INTERRUPTIBLE;
 	schedule_timeout(((signed long) ms * HZ) / 1000);
 }
+EXPORT_SYMBOL(acpi_os_sleep);
 
 void
 acpi_os_stall(u32 us)
@@ -325,6 +332,7 @@ acpi_os_stall(u32 us)
 		us -= delay;
 	}
 }
+EXPORT_SYMBOL(acpi_os_stall);
 
 /*
  * Support ACPI 3.0 AML Timer operand
@@ -377,6 +385,7 @@ acpi_os_read_port(
 
 	return AE_OK;
 }
+EXPORT_SYMBOL(acpi_os_read_port);
 
 acpi_status
 acpi_os_write_port(
@@ -401,6 +410,7 @@ acpi_os_write_port(
 
 	return AE_OK;
 }
+EXPORT_SYMBOL(acpi_os_write_port);
 
 acpi_status
 acpi_os_read_memory(
@@ -519,6 +529,7 @@ acpi_os_read_pci_configuration (struct acpi_pci_id *pci_id, u32 reg, void *value
 
 	return (result ? AE_ERROR : AE_OK);
 }
+EXPORT_SYMBOL(acpi_os_read_pci_configuration);
 
 acpi_status
 acpi_os_write_pci_configuration (struct acpi_pci_id *pci_id, u32 reg, acpi_integer value, u32 width)
@@ -712,6 +723,7 @@ acpi_os_queue_for_execution(
 
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_os_queue_for_execution);
 
 void
 acpi_os_wait_events_complete(
@@ -719,6 +731,7 @@ acpi_os_wait_events_complete(
 {
 	flush_workqueue(kacpid_wq);
 }
+EXPORT_SYMBOL(acpi_os_wait_events_complete);
 
 /*
  * Allocate the memory for a spinlock and initialize it.
@@ -830,6 +843,7 @@ acpi_os_create_semaphore(
 
 	return_ACPI_STATUS (AE_OK);
 }
+EXPORT_SYMBOL(acpi_os_create_semaphore);
 
 
 /*
@@ -856,6 +870,7 @@ acpi_os_delete_semaphore(
 
 	return_ACPI_STATUS (AE_OK);
 }
+EXPORT_SYMBOL(acpi_os_delete_semaphore);
 
 
 /*
@@ -945,6 +960,7 @@ acpi_os_wait_semaphore(
 
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_os_wait_semaphore);
 
 
 /*
@@ -971,6 +987,7 @@ acpi_os_signal_semaphore(
 
 	return_ACPI_STATUS (AE_OK);
 }
+EXPORT_SYMBOL(acpi_os_signal_semaphore);
 
 u32
 acpi_os_get_line(char *buffer)
@@ -1045,6 +1062,7 @@ acpi_os_signal (
 
 	return AE_OK;
 }
+EXPORT_SYMBOL(acpi_os_signal);
 
 int __init
 acpi_os_name_setup(char *str)

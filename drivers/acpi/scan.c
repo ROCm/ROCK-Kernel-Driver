@@ -761,7 +761,7 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 #endif /*CONFIG_ACPI_DEBUG_OUTPUT*/
 }
 
-static int 
+int 
 acpi_bus_add (
 	struct acpi_device	**child,
 	struct acpi_device	*parent,
@@ -905,7 +905,7 @@ end:
 
 	return_VALUE(result);
 }
-
+EXPORT_SYMBOL(acpi_bus_add);
 
 
 static int acpi_bus_scan (struct acpi_device	*start)
@@ -1009,6 +1009,7 @@ static int acpi_bus_scan (struct acpi_device	*start)
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_bus_register_driver);
 
 
 static int
@@ -1036,6 +1037,7 @@ acpi_bus_scan_fixed (
 
 	return_VALUE(result);
 }
+EXPORT_SYMBOL(acpi_bus_unregister_driver);
 
 
 static int __init acpi_scan_init(void)
@@ -1070,5 +1072,6 @@ static int __init acpi_scan_init(void)
  Done:
 	return_VALUE(result);
 }
+EXPORT_SYMBOL(acpi_bus_scan);
 
 subsys_initcall(acpi_scan_init);

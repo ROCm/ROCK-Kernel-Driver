@@ -41,6 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/actables.h>
@@ -321,6 +322,7 @@ cleanup:
 	}
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_firmware_table);
 
 
 /* TBD: Move to a new file */

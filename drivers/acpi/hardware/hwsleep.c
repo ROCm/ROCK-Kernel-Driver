@@ -42,6 +42,8 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
+
 #include <acpi/acpi.h>
 
 #define _COMPONENT          ACPI_HARDWARE
@@ -391,6 +393,7 @@ acpi_enter_sleep_state (
 
 	return_ACPI_STATUS (AE_OK);
 }
+EXPORT_SYMBOL(acpi_enter_sleep_state);
 
 
 /******************************************************************************
@@ -456,6 +459,7 @@ acpi_enter_sleep_state_s4bios (
 
 	return_ACPI_STATUS (AE_OK);
 }
+EXPORT_SYMBOL(acpi_enter_sleep_state_s4bios);
 
 
 /******************************************************************************
