@@ -574,6 +574,14 @@ svc_udp_init(struct svc_sock *svsk)
 	svsk->sk_recvfrom = svc_udp_recvfrom;
 	svsk->sk_sendto = svc_udp_sendto;
 
+	/* initialise setting must have enough space to
+	 * receive and respond to one request.  
+	 * svc_udp_recvfrom will re-adjust if necessary
+	 */
+	svc_sock_setbufsize(svsk->sk_sock,
+			    3 * svsk->sk_server->sv_bufsz,
+			    3 * svsk->sk_server->sv_bufsz);
+
 	set_bit(SK_CHNGBUF, &svsk->sk_flags);
 
 	return 0;
@@ -945,6 +953,14 @@ svc_tcp_init(struct svc_sock *svsk)
 
 		svsk->sk_reclen = 0;
 		svsk->sk_tcplen = 0;
+
+		/* initialise setting must have enough space to
+		 * receive and respond to one request.  
+		 * svc_tcp_recvfrom will re-adjust if necessary
+		 */
+		svc_sock_setbufsize(svsk->sk_sock,
+				    3 * svsk->sk_server->sv_bufsz,
+				    3 * svsk->sk_server->sv_bufsz);
 
 		set_bit(SK_CHNGBUF, &svsk->sk_flags);
 	}
