@@ -200,5 +200,27 @@ config DM_ZERO
 	  A target that discards writes, and returns all zeroes for
 	  reads.  Useful in some recovery situations.
 
-endmenu
+config DM_MULTIPATH
+       tristate "Multipath target (EXPERIMENTAL)"
+       depends on BLK_DEV_DM && EXPERIMENTAL
+       ---help---
+         Allow volume managers to support multipath hardware.
 
+config DM_FLAKEY
+       tristate "Flakey target (EXPERIMENTAL)"
+       depends on BLK_DEV_DM && EXPERIMENTAL
+       ---help---
+         A debug only target that intermittently fails io.
+ 
+config BLK_DEV_DM_BBR
+	tristate "Bad Block Relocation Device Target (EXPERIMENTAL)"
+	depends on BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	  Support for devices with software-based bad-block-relocation.
+
+	  To compile this as a module, choose M here: the module will be
+	  called dm-bbr.
+
+	  If unsure, say N.
+
+endmenu
