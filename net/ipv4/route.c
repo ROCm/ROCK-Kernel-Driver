@@ -280,12 +280,10 @@ done:
 static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	unsigned int dst_entries = atomic_read(&ipv4_dst_ops.entries);
-	int i, lcpu;
+	int i;
 	int len = 0;
 
-        for (lcpu = 0; lcpu < smp_num_cpus; lcpu++) {
-                i = cpu_logical_map(lcpu);
-
+	for (i = 0; i < NR_CPUS; i++) {
 		len += sprintf(buffer+len, "%08x  %08x %08x %08x %08x %08x %08x %08x  %08x %08x %08x %08x %08x %08x %08x \n",
 			       dst_entries,		       
 			       rt_cache_stat[i].in_hit,
@@ -2441,7 +2439,7 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 	memcpy(buffer, IP_RT_ACCT_CPU(0), length);
 
 	/* Add the other cpus in, one int at a time */
-	for (i = 1; i < smp_num_cpus; i++) {
+	for (i = 1; i < NR_CPUS; i++) {
 		unsigned int j;
 		for (j = 0; j < length/4; j++)
 			((u32*)buffer)[j] += ((u32*)IP_RT_ACCT_CPU(i))[j];

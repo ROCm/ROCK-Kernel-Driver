@@ -469,8 +469,8 @@ unsigned long nr_running(void)
 {
 	unsigned long i, sum = 0;
 
-	for (i = 0; i < smp_num_cpus; i++)
-		sum += cpu_rq(cpu_logical_map(i))->nr_running;
+	for (i = 0; i < NR_CPUS; i++)
+		sum += cpu_rq(i)->nr_running;
 
 	return sum;
 }
@@ -479,8 +479,8 @@ unsigned long nr_uninterruptible(void)
 {
 	unsigned long i, sum = 0;
 
-	for (i = 0; i < smp_num_cpus; i++)
-		sum += cpu_rq(cpu_logical_map(i))->nr_uninterruptible;
+	for (i = 0; i < NR_CPUS; i++)
+		sum += cpu_rq(i)->nr_uninterruptible;
 
 	return sum;
 }
@@ -489,8 +489,8 @@ unsigned long nr_context_switches(void)
 {
 	unsigned long i, sum = 0;
 
-	for (i = 0; i < smp_num_cpus; i++)
-		sum += cpu_rq(cpu_logical_map(i))->nr_switches;
+	for (i = 0; i < NR_CPUS; i++)
+		sum += cpu_rq(i)->nr_switches;
 
 	return sum;
 }
@@ -565,15 +565,16 @@ static void load_balance(runqueue_t *this_rq, int idle)
 
 	busiest = NULL;
 	max_load = 1;
-	for (i = 0; i < smp_num_cpus; i++) {
-		int logical = cpu_logical_map(i);
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 
-		rq_src = cpu_rq(logical);
-		if (idle || (rq_src->nr_running < this_rq->prev_nr_running[logical]))
+		rq_src = cpu_rq(i);
+		if (idle || (rq_src->nr_running < this_rq->prev_nr_running[i]))
 			load = rq_src->nr_running;
 		else
-			load = this_rq->prev_nr_running[logical];
-		this_rq->prev_nr_running[logical] = rq_src->nr_running;
+			load = this_rq->prev_nr_running[i];
+		this_rq->prev_nr_running[i] = rq_src->nr_running;
 
 		if ((load > max_load) && (rq_src != this_rq)) {
 			busiest = rq_src;
@@ -1763,7 +1764,7 @@ out:
 
 static int migration_thread(void * bind_cpu)
 {
-	int cpu = cpu_logical_map((int) (long) bind_cpu);
+	int cpu = (int) (long) bind_cpu;
 	struct sched_param param = { sched_priority: MAX_RT_PRIO-1 };
 	runqueue_t *rq;
 	int ret;
@@ -1771,12 +1772,15 @@ static int migration_thread(void * bind_cpu)
 	daemonize();
 	sigfillset(&current->blocked);
 	set_fs(KERNEL_DS);
+
+	/* FIXME: First CPU may not be zero, but this crap code
+           vanishes with hotplug cpu patch anyway. --RR */
 	/*
 	 * The first migration thread is started on CPU #0. This one can
 	 * migrate the other migration threads to their destination CPUs.
 	 */
 	if (cpu != 0) {
-		while (!cpu_rq(cpu_logical_map(0))->migration_thread)
+		while (!cpu_rq(0)->migration_thread)
 			yield();
 		set_cpus_allowed(current, 1UL << cpu);
 	}
@@ -1840,16 +1844,21 @@ void __init migration_init(void)
 {
 	int cpu;
 
-	current->cpus_allowed = 1UL << cpu_logical_map(0);
-	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+	current->cpus_allowed = 1UL << 0;
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (!cpu_online(cpu))
+			continue;
 		if (kernel_thread(migration_thread, (void *) (long) cpu,
 				CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
 			BUG();
 	}
 	current->cpus_allowed = -1L;
 
-	for (cpu = 0; cpu < smp_num_cpus; cpu++)
-		while (!cpu_rq(cpu_logical_map(cpu))->migration_thread)
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (!cpu_online(cpu))
+			continue;
+		while (!cpu_rq(cpu)->migration_thread)
 			schedule_timeout(2);
+	}
 }
 #endif /* CONFIG_SMP */

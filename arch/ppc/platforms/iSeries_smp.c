@@ -50,7 +50,7 @@ void iSeries_smp_message_recv( struct pt_regs * regs )
 	int cpu = smp_processor_id();
 	int msg;
 
-	if ( smp_num_cpus < 2 )
+	if ( num_online_cpus() < 2 )
 		return;
 
 	for ( msg = 0; msg < 4; ++msg )
@@ -62,7 +62,10 @@ void iSeries_smp_message_recv( struct pt_regs * regs )
 static void smp_iSeries_message_pass(int target, int msg, unsigned long data, int wait)
 {
 	int i;
-	for (i = 0; i < smp_num_cpus; ++i) {
+	for (i = 0; i < NR_CPUS; ++i) {
+		if (!cpu_online(i))
+			continue;
+
 		if ( (target == MSG_ALL) ||
 			(target == i) ||
 			((target == MSG_ALL_BUT_SELF) && (i != smp_processor_id())) ) {

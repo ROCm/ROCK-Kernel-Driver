@@ -813,10 +813,10 @@ void setup_APIC_timer(void * data)
 	 * IRQ APIC event being in synchron with the APIC clock we
 	 * introduce an interrupt skew to spread out timer events.
 	 *
-	 * The number of slices within a 'big' timeslice is smp_num_cpus+1
+	 * The number of slices within a 'big' timeslice is NR_CPUS+1
 	 */
 
-	slice = clocks / (smp_num_cpus+1);
+	slice = clocks / (NR_CPUS+1);
 	printk("cpu: %d, clocks: %d, slice: %d\n", smp_processor_id(), clocks, slice);
 
 	/*

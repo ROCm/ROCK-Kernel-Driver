@@ -281,7 +281,8 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 	sh->num_physpages = num_physpages;
 	strncpy(sh->machine, system_utsname.machine, 8);
 	strncpy(sh->version, system_utsname.version, 20);
-	sh->num_cpus = smp_num_cpus;
+	/* FIXME: Is this bogus? --RR */
+	sh->num_cpus = num_online_cpus();
 	sh->page_size = PAGE_SIZE;
 	sh->suspend_pagedir = pagedir_nosave;
 	if (pagedir_save != pagedir_nosave)
@@ -1009,7 +1010,7 @@ static int sanity_check(struct suspend_header *sh)
 		return sanity_check_failed("Incorrect machine type");
 	if(strncmp(sh->version, system_utsname.version, 20))
 		return sanity_check_failed("Incorrect version");
-	if(sh->num_cpus != smp_num_cpus)
+	if(sh->num_cpus != num_online_cpus())
 		return sanity_check_failed("Incorrect number of cpus");
 	if(sh->page_size != PAGE_SIZE)
 		return sanity_check_failed("Incorrect PAGE_SIZE");

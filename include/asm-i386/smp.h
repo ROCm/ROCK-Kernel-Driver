@@ -69,20 +69,6 @@ extern void (*mtrr_hook) (void);
 extern void zap_low_mappings (void);
 
 /*
- * On x86 all CPUs are mapped 1:1 to the APIC space.
- * This simplifies scheduling and IPI sending and
- * compresses data structures.
- */
-static inline int cpu_logical_map(int cpu)
-{
-	return cpu;
-}
-static inline int cpu_number_map(int cpu)
-{
-	return cpu;
-}
-
-/*
  * Some lowlevel functions might want to know about
  * the real APIC ID <-> CPU # mapping.
  */
@@ -104,8 +90,22 @@ extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial
  * from the initial startup. We map APIC_BASE very early in page_setup(),
  * so this is correct in the x86 case.
  */
-
 #define smp_processor_id() (current_thread_info()->cpu)
+
+#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
+
+extern inline unsigned int num_online_cpus(void)
+{
+	return hweight32(cpu_online_map);
+}
+
+extern inline int any_online_cpu(unsigned int mask)
+{
+	if (mask & cpu_online_map)
+		return __ffs(mask & cpu_online_map);
+
+	return -1;
+}
 
 static __inline int hard_smp_processor_id(void)
 {

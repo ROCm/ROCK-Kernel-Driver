@@ -58,7 +58,7 @@ irqs_running (void)
 {
 	int i;
 
-	for (i = 0; i < smp_num_cpus; i++)
+	for (i = 0; i < NR_CPUS; i++)
 		if (irq_count(i))
 			return 1;
 	return 0;

@@ -604,9 +604,12 @@ ia64_mca_wakeup_all(void)
 	int cpu;
 
 	/* Clear the Rendez checkin flag for all cpus */
-	for(cpu = 0; cpu < smp_num_cpus; cpu++)
+	for(cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (!cpu_online(cpu))
+			continue;
 		if (ia64_mc_info.imi_rendez_checkin[cpu] == IA64_MCA_RENDEZ_CHECKIN_DONE)
 			ia64_mca_wakeup(cpu);
+	}
 
 }
 

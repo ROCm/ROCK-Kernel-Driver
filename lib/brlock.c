@@ -24,16 +24,16 @@ void __br_write_lock (enum brlock_indices idx)
 {
 	int i;
 
-	for (i = 0; i < smp_num_cpus; i++)
-		write_lock(&__brlock_array[cpu_logical_map(i)][idx]);
+	for (i = 0; i < NR_CPUS; i++)
+		write_lock(&__brlock_array[i][idx]);
 }
 
 void __br_write_unlock (enum brlock_indices idx)
 {
 	int i;
 
-	for (i = 0; i < smp_num_cpus; i++)
-		write_unlock(&__brlock_array[cpu_logical_map(i)][idx]);
+	for (i = 0; i < NR_CPUS; i++)
+		write_unlock(&__brlock_array[i][idx]);
 }
 
 #else /* ! __BRLOCK_USE_ATOMICS */
@@ -50,8 +50,8 @@ void __br_write_lock (enum brlock_indices idx)
 
 again:
 	spin_lock(&__br_write_locks[idx].lock);
-	for (i = 0; i < smp_num_cpus; i++)
-		if (__brlock_array[cpu_logical_map(i)][idx] != 0) {
+	for (i = 0; i < NR_CPUS; i++)
+		if (__brlock_array[i][idx] != 0) {
 			spin_unlock(&__br_write_locks[idx].lock);
 			barrier();
 			cpu_relax();

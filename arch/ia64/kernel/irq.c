@@ -156,8 +156,9 @@ int show_interrupts(struct seq_file *p, void *v)
 	irq_desc_t *idesc;
 
 	seq_puts(p, "           ");
-	for (j=0; j<smp_num_cpus; j++)
-		seq_printf(p, "CPU%d       ",j);
+	for (j=0; j<NR_CPUS; j++)
+		if (cpu_online(j))
+			seq_printf(p, "CPU%d       ",j);
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
@@ -169,9 +170,9 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
-		for (j = 0; j < smp_num_cpus; j++)
-			seq_printf(p, "%10u ",
-				kstat.irqs[cpu_logical_map(j)][i]);
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", kstat.irqs[j][i]);
 #endif
 		seq_printf(p, " %14s", idesc->handler->typename);
 		seq_printf(p, "  %s", action->name);
@@ -181,15 +182,15 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 	}
 	seq_puts(p, "NMI: ");
-	for (j = 0; j < smp_num_cpus; j++)
-		seq_printf(p, "%10u ",
-			nmi_count(cpu_logical_map(j)));
+	for (j = 0; j < NR_CPUS; j++)
+		if (cpu_online(j))
+			seq_printf(p, "%10u ", nmi_count(j));
 	seq_putc(p, '\n');
 #if defined(CONFIG_SMP) && defined(CONFIG_X86)
 	seq_puts(p, "LOC: ");
-	for (j = 0; j < smp_num_cpus; j++)
-		seq_printf(p, "%10u ",
-			apic_timer_irqs[cpu_logical_map(j)]);
+	for (j = 0; j < NR_CPUS; j++)
+		if (cpu_online(j))
+			seq_printf(p, "%10u ", apic_timer_irqs[j]);
 	seq_putc(p, '\n');
 #endif
 	seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
@@ -218,10 +219,10 @@ static void show(char * str)
 
 	printk("\n%s, CPU %d:\n", str, cpu);
 	printk("irq:  %d [",irqs_running());
-	for(i=0;i < smp_num_cpus;i++)
+	for(i=0;i < NR_CPUS;i++)
 		printk(" %d",irq_count(i));
 	printk(" ]\nbh:   %d [",spin_is_locked(&global_bh_lock) ? 1 : 0);
-	for(i=0;i < smp_num_cpus;i++)
+	for(i=0;i < NR_CPUS;i++)
 		printk(" %d",bh_count(i));
 
 	printk(" ]\nStack dumps:");
@@ -233,7 +234,7 @@ static void show(char * str)
 	 * idea.
 	 */
 #elif defined(CONFIG_X86)
-	for(i=0;i< smp_num_cpus;i++) {
+	for(i=0;i< NR_CPUS;i++) {
 		unsigned long esp;
 		if(i==cpu)
 			continue;

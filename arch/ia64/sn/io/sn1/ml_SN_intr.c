@@ -987,12 +987,13 @@ intr_reserve_hardwired(cnodeid_t cnode)
 	char subnode_done[NUM_SUBNODES];
 
 	// cpu = cnodetocpu(cnode);
-	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (!cpu_online(cpu)) continue;
 		if (cpuid_to_cnodeid(cpu) == cnode) {
 			break;
 		}
 	}
-	if (cpu == smp_num_cpus) cpu = CPU_NONE;
+	if (cpu == NR_CPUS) cpu = CPU_NONE;
 	if (cpu == CPU_NONE) {
 		printk("Node %d has no CPUs", cnode);
 		return;
@@ -1001,7 +1002,7 @@ intr_reserve_hardwired(cnodeid_t cnode)
 	for (i=0; i<NUM_SUBNODES; i++)
 		subnode_done[i] = 0;
 
-	for (; cpu<smp_num_cpus && cpu_enabled(cpu) && cpuid_to_cnodeid(cpu) == cnode; cpu++) {
+	for (; cpu<NR_CPUS && cpu_enabled(cpu) && cpuid_to_cnodeid(cpu) == cnode; cpu++) {
 		int which_subnode = cpuid_to_subnode(cpu);
 		if (subnode_done[which_subnode])
 			continue;
