@@ -1596,6 +1596,8 @@ QPathInfoRetry:
 	} else {		/* decode response */
 		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
 		/* BB also check enough total bytes returned */
+		/* BB we need to improve the validity checking
+		of these trans2 responses */
 		if ((pSMBr->ByteCount < 40) || (pSMBr->DataOffset > 512)) 
 			rc = -EIO;	/* bad smb */
 		else if (pFindData){
@@ -2879,3 +2881,88 @@ int CIFSSMBNotify(const int xid, struct cifsTconInfo *tcon,
 			goto NotifyRetry; */
 	return rc;	
 }
+#ifdef CONFIG_CIFS_XATTR
+int
+CIFSSMBQAllEAs(const int xid, struct cifsTconInfo *tcon,
+		 const unsigned char *searchName,
+		 char * EAData, size_t size,
+		 const struct nls_table *nls_codepage)
+{
+		/* BB assumes one setup word */
+	TRANSACTION2_QPI_REQ *pSMB = NULL;
+	TRANSACTION2_QPI_RSP *pSMBr = NULL;
+	int rc = 0;
+	int bytes_returned;
+	int name_len;
+
+	cFYI(1, ("In Query All EAs path %s", searchName));
+QAllEAsRetry:
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
+		      (void **) &pSMBr);
+	if (rc)
+		return rc;
+
+	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
+		name_len =
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+				  /* find define for this maxpathcomponent */
+				  , nls_codepage);
+		name_len++;	/* trailing null */
+		name_len *= 2;
+	} else {		/* BB improve the check for buffer overruns BB */
+		name_len = strnlen(searchName, 530);
+		name_len++;	/* trailing null */
+		strncpy(pSMB->FileName, searchName, name_len);
+	}
+
+	pSMB->TotalParameterCount = 2 /* level */  + 4 /* reserved */  +
+	    name_len /* includes null */ ;
+	pSMB->TotalDataCount = 0;
+	pSMB->MaxParameterCount = cpu_to_le16(2);
+	pSMB->MaxDataCount = cpu_to_le16(4000);	/* BB find exact max SMB PDU from sess structure BB */
+	pSMB->MaxSetupCount = 0;
+	pSMB->Reserved = 0;
+	pSMB->Flags = 0;
+	pSMB->Timeout = 0;
+	pSMB->Reserved2 = 0;
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(
+        struct smb_com_transaction2_qpi_req ,InformationLevel) - 4);
+	pSMB->DataCount = 0;
+	pSMB->DataOffset = 0;
+	pSMB->SetupCount = 1;
+	pSMB->Reserved3 = 0;
+	pSMB->SubCommand = cpu_to_le16(TRANS2_QUERY_PATH_INFORMATION);
+	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
+	pSMB->ParameterCount = pSMB->TotalParameterCount;
+	pSMB->InformationLevel = cpu_to_le16(SMB_INFO_QUERY_ALL_EAS);
+	pSMB->Reserved4 = 0;
+	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+
+	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
+			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+	if (rc) {
+		cFYI(1, ("Send error in QueryAllEAs = %d", rc));
+	} else {		/* decode response */
+		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
+		/* BB also check enough total bytes returned */
+		/* BB we need to improve the validity checking
+		of these trans2 responses */
+		if ((pSMBr->ByteCount < 4) || (pSMBr->DataOffset > 512)) 
+			rc = -EIO;	/* bad smb */
+	   /* else if (pFindData){
+			memcpy((char *) pFindData,
+			       (char *) &pSMBr->hdr.Protocol +
+			       pSMBr->DataOffset, kl);
+		}*/ else
+		    rc = -ENOMEM;
+	}
+	if (pSMB)
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto QAllEAsRetry;
+
+	return rc;
+}
+#endif

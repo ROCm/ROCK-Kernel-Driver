@@ -210,7 +210,7 @@ cifs_symlink(struct inode *inode, struct dentry *direntry, const char *symname)
 }
 
 int
-cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
+cifs_readlink(struct dentry *direntry, char __user *pBuffer, int buflen)
 {
 	struct inode *inode = direntry->d_inode;
 	int rc = -EACCES;

@@ -97,7 +97,9 @@ Linux:
 
 	case sensitive = yes
 	delete readonly = yes 
- 
+	ea support = yes
+
+Note that ea support is required for supporting Linux xattrs. 
 Some administrators also change the "map archive" and the "create mask" 
 parameters from their default values.  Creating special devices (mknod) remotely 
 may require specifying a mkdev function to Samba.  For more information on these 
@@ -268,11 +270,12 @@ Misc /proc/fs/cifs Flags and Debug Info
 =======================================
 Informational pseudo-files:
 DebugData		Displays information about active CIFS sessions
-			as well as per share statistics (if CONFIG_CIFS_STATS
-			is enabled in the kernel configuration).
+			and shares.
 SimultaneousOps		Counter which holds maximum number of
 			simultaneous outstanding SMB/CIFS requests.
-Stats			Lists summary resource usage information
+Stats			Lists summary resource usage information as well as per
+			share statistics, if CONFIG_CIFS_STATS in enabled
+			in the kernel configuration.
 
 Configuration pseudo-files:
 MultiuserMount		If set to one, more than one CIFS session to 

@@ -80,27 +80,13 @@ symlink text beginning with slash
 but recognizes them
 3) create of new files to FAT partitions on Windows servers can
 succeed but still return access denied (appears to be Windows 
-not client problem) and has not been reproduced recently.
+server not cifs client problem) and has not been reproduced recently.
 NTFS partitions do not have this problem.
 4) debug connectation lock test case 10 which fails against
 Samba (may be unmappable due to POSIX to Windows lock model
 differences but worth investigating).  Also debug Samba to 
 see why lock test case 7 takes longer to complete to Samba
 than to Windows.
-5) prepare_write does not initialize pages properly when partial
-page writes begin in the middle of a page (pages can get zeroed).
-6) Write caching done incorrectly when files are only opened
-with write permission by the application.
-7) Rename of files that are hardlinked does not work correctly e.g.
-	ln source target
-	mv source target 
-This should be no op since files are linked but in cifs it causes
-the source file to go away. This may require implementation of
-the cifs POSIX extensions (Unix Extensions version 2) for
-it to be done correctly since Samba is failing the rename,
-(rather than ignoring it) so the client not knowing they
-are linked proceeds to delete the target and then retry the
-move which succeeds this time (but the source is gone).
 
 Misc testing to do
 ==================

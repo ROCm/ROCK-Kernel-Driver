@@ -1046,9 +1046,12 @@ typedef union smb_com_transaction2 {
 
 /* PathInfo/FileInfo infolevels */
 #define SMB_INFO_STANDARD                   1
+#define SMB_INFO_QUERY_EAS_FROM_LIST        3
+#define SMB_INFO_QUERY_ALL_EAS              4
 #define SMB_INFO_IS_NAME_VALID              6
 #define SMB_QUERY_FILE_BASIC_INFO       0x101
 #define SMB_QUERY_FILE_STANDARD_INFO    0x102
+#define SMB_QUERY_FILE_EA_INFO          0x103
 #define SMB_QUERY_FILE_NAME_INFO        0x104
 #define SMB_QUERY_FILE_ALLOCATION_INFO  0x105
 #define SMB_QUERY_FILE_END_OF_FILEINFO  0x106
@@ -1687,16 +1690,17 @@ struct gealist {
 };
 
 struct fea {
-	unsigned char fEA;
-	unsigned char cbName;
-	unsigned short cbValue;
+	unsigned char EA_flags;
+	__u8 name_len;
+	__u16 value_len;
 	char szName[1];
+	/* optionally followed by value */
 };
 /* flags for _FEA.fEA */
 #define FEA_NEEDEA         0x80	/* need EA bit */
 
 struct fealist {
-	unsigned long cbList;
+	unsigned long list_len;
 	struct fea list[1];
 };
 
