@@ -218,8 +218,7 @@ __nfs4_setup_getattr(struct nfs4_compound *cp, u32 *bitmap,
 		     struct nfs_fattr *fattr,
 		     struct nfs_fsstat *fsstat,
 		     struct nfs_fsinfo *fsinfo,
-		     struct nfs_pathconf *pathconf,
-		     u32 *bmres)
+		     struct nfs_pathconf *pathconf)
 {
         struct nfs4_getattr *getattr = GET_OP(cp, getattr);
 
@@ -228,7 +227,6 @@ __nfs4_setup_getattr(struct nfs4_compound *cp, u32 *bitmap,
 	getattr->gt_fsstat = fsstat;
 	getattr->gt_fsinfo = fsinfo;
 	getattr->gt_pathconf = pathconf;
-	getattr->gt_bmres = bmres;
 
         OPNUM(cp) = OP_GETATTR;
         cp->req_nops++;
@@ -236,48 +234,43 @@ __nfs4_setup_getattr(struct nfs4_compound *cp, u32 *bitmap,
 
 static void
 nfs4_setup_getattr(struct nfs4_compound *cp,
-		struct nfs_fattr *fattr,
-		u32 *bmres)
+		struct nfs_fattr *fattr)
 {
 	__nfs4_setup_getattr(cp, nfs4_fattr_bitmap, fattr,
-			NULL, NULL, NULL, bmres);
+			NULL, NULL, NULL);
 }
 
 static void
 nfs4_setup_getrootattr(struct nfs4_compound *cp,
 		struct nfs_fattr *fattr,
-		struct nfs_fsinfo *fsinfo,
-		u32 *bmres)
+		struct nfs_fsinfo *fsinfo)
 {
 	__nfs4_setup_getattr(cp, nfs4_mount_bitmap,
-			fattr, NULL, fsinfo, NULL, bmres);
+			fattr, NULL, fsinfo, NULL);
 }
 
 static void
 nfs4_setup_statfs(struct nfs4_compound *cp,
-		struct nfs_fsstat *fsstat,
-		u32 *bmres)
+		struct nfs_fsstat *fsstat)
 {
 	__nfs4_setup_getattr(cp, nfs4_statfs_bitmap,
-			NULL, fsstat, NULL, NULL, bmres);
+			NULL, fsstat, NULL, NULL);
 }
 
 static void
 nfs4_setup_fsinfo(struct nfs4_compound *cp,
-		struct nfs_fsinfo *fsinfo,
-		u32 *bmres)
+		struct nfs_fsinfo *fsinfo)
 {
 	__nfs4_setup_getattr(cp, nfs4_fsinfo_bitmap,
-			NULL, NULL, fsinfo, NULL, bmres);
+			NULL, NULL, fsinfo, NULL);
 }
 
 static void
 nfs4_setup_pathconf(struct nfs4_compound *cp,
-		struct nfs_pathconf *pathconf,
-		u32 *bmres)
+		struct nfs_pathconf *pathconf)
 {
 	__nfs4_setup_getattr(cp, nfs4_pathconf_bitmap,
-			NULL, NULL, NULL, pathconf, bmres);
+			NULL, NULL, NULL, pathconf);
 }
 
 static void
@@ -569,8 +562,6 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 	struct nfs_server       *server = NFS_SERVER(dir);
 	struct nfs4_change_info d_cinfo;
 	int                     status;
-	u32                     f_bmres[2];
-	u32                     d_bmres[2];
 	struct nfs_fattr        d_attr = {
 		.valid          = 0,
 	};
@@ -580,12 +571,10 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 	struct nfs4_getattr     f_getattr = {
 		.gt_bmval       = nfs4_fattr_bitmap,
 		.gt_attrs       = (fattr == NULL ? &f_attr: fattr),
-		.gt_bmres       = f_bmres,
 	};
 	struct nfs4_getattr     d_getattr = {
 		.gt_bmval       = nfs4_fattr_bitmap,
 		.gt_attrs       = &d_attr,
-		.gt_bmres       = d_bmres,
 	};
 	struct nfs_openargs o_arg = {
 		.fh             = NFS_FH(dir),
@@ -677,11 +666,9 @@ nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
                 struct nfs_fh *fhandle, struct iattr *sattr,
                 struct nfs4_shareowner *sp)
 {
-        u32                     g_bmres[2];
         struct nfs4_getattr     getattr = {
                 .gt_bmval       = nfs4_fattr_bitmap,
                 .gt_attrs       = fattr,
-                .gt_bmres       = g_bmres,
         };
         struct nfs_setattrargs  arg = {
                 .fh             = fhandle,
@@ -756,7 +743,6 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	struct nfs4_compound	compound;
 	struct nfs4_op		ops[4];
 	struct nfs_fsinfo	fsinfo;
-	u32			bmres[2];
 	unsigned char *		p;
 	struct qstr		q;
 	int			status;
@@ -783,7 +769,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	nfs4_setup_compound(&compound, ops, server, "setclientid_confirm");
 	nfs4_setup_setclientid_confirm(&compound);
 	nfs4_setup_putrootfh(&compound);
-	nfs4_setup_getrootattr(&compound, fattr, &fsinfo, bmres);
+	nfs4_setup_getrootattr(&compound, fattr, &fsinfo);
 	nfs4_setup_getfh(&compound, fhandle);
 	if ((status = nfs4_call_compound(&compound, NULL, 0)))
 		goto out;
@@ -816,7 +802,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		nfs4_setup_compound(&compound, ops, server, "mount");
 		nfs4_setup_putfh(&compound, fhandle);
 		nfs4_setup_lookup(&compound, &q);
-		nfs4_setup_getattr(&compound, fattr, bmres);
+		nfs4_setup_getattr(&compound, fattr);
 		nfs4_setup_getfh(&compound, fhandle);
 		status = nfs4_call_compound(&compound, NULL, 0);
 		if (!status)
@@ -837,13 +823,12 @@ nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
 {
 	struct nfs4_compound compound;
 	struct nfs4_op ops[2];
-	u32 bmres[2];
 
 	fattr->valid = 0;
 
 	nfs4_setup_compound(&compound, ops, NFS_SERVER(inode), "getattr");
 	nfs4_setup_putfh(&compound, NFS_FH(inode));
-	nfs4_setup_getattr(&compound, fattr, bmres);
+	nfs4_setup_getattr(&compound, fattr);
 	return nfs4_call_compound(&compound, NULL, 0);
 }
 
@@ -905,8 +890,6 @@ nfs4_proc_lookup(struct inode *dir, struct qstr *name,
 	struct nfs4_compound	compound;
 	struct nfs4_op		ops[5];
 	struct nfs_fattr	dir_attr;
-	u32			dir_bmres[2];
-	u32			bmres[2];
 	int			status;
 
 	dir_attr.valid = 0;
@@ -915,9 +898,9 @@ nfs4_proc_lookup(struct inode *dir, struct qstr *name,
 	dprintk("NFS call  lookup %s\n", name->name);
 	nfs4_setup_compound(&compound, ops, NFS_SERVER(dir), "lookup");
 	nfs4_setup_putfh(&compound, NFS_FH(dir));
-	nfs4_setup_getattr(&compound, &dir_attr, dir_bmres);
+	nfs4_setup_getattr(&compound, &dir_attr);
 	nfs4_setup_lookup(&compound, name);
-	nfs4_setup_getattr(&compound, fattr, bmres);
+	nfs4_setup_getattr(&compound, fattr);
 	nfs4_setup_getfh(&compound, fhandle);
 	status = nfs4_call_compound(&compound, NULL, 0);
 	dprintk("NFS reply lookup: %d\n", status);
@@ -933,7 +916,6 @@ nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 	struct nfs4_compound	compound;
 	struct nfs4_op		ops[3];
 	struct nfs_fattr	fattr;
-	u32			bmres[2];
 	u32			req_access = 0, resp_supported, resp_access;
 	int			status;
 
@@ -959,7 +941,7 @@ nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 
 	nfs4_setup_compound(&compound, ops, NFS_SERVER(inode), "access");
 	nfs4_setup_putfh(&compound, NFS_FH(inode));
-	nfs4_setup_getattr(&compound, &fattr, bmres);
+	nfs4_setup_getattr(&compound, &fattr);
 	nfs4_setup_access(&compound, req_access, &resp_supported, &resp_access);
 	status = nfs4_call_compound(&compound, cred, 0);
 	nfs_refresh_inode(inode, &fattr);
@@ -1155,14 +1137,13 @@ nfs4_proc_remove(struct inode *dir, struct qstr *name)
 	struct nfs4_op		ops[3];
 	struct nfs4_change_info	dir_cinfo;
 	struct nfs_fattr	dir_attr;
-	u32			dir_bmres[2];
 	int			status;
 
 	dir_attr.valid = 0;
 	nfs4_setup_compound(&compound, ops, NFS_SERVER(dir), "remove");
 	nfs4_setup_putfh(&compound, NFS_FH(dir));
 	nfs4_setup_remove(&compound, name, &dir_cinfo);
-	nfs4_setup_getattr(&compound, &dir_attr, dir_bmres);
+	nfs4_setup_getattr(&compound, &dir_attr);
 	status = nfs4_call_compound(&compound, NULL, 0);
 
 	if (!status) {
@@ -1184,7 +1165,6 @@ nfs4_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir, struct qstr 
 {
 	struct unlink_desc *	up;
 	struct nfs4_compound *	cp;
-	u32			bmres[2];
 
 	up = (struct unlink_desc *) kmalloc(sizeof(*up), GFP_KERNEL);
 	if (!up)
@@ -1194,7 +1174,7 @@ nfs4_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir, struct qstr 
 	nfs4_setup_compound(cp, up->ops, NFS_SERVER(dir->d_inode), "unlink_setup");
 	nfs4_setup_putfh(cp, NFS_FH(dir->d_inode));
 	nfs4_setup_remove(cp, name, &up->cinfo);
-	nfs4_setup_getattr(cp, &up->attrs, bmres);
+	nfs4_setup_getattr(cp, &up->attrs);
 	
 	msg->rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_COMPOUND];
 	msg->rpc_argp = cp;
@@ -1227,7 +1207,6 @@ nfs4_proc_rename(struct inode *old_dir, struct qstr *old_name,
 	struct nfs4_op		ops[7];
 	struct nfs4_change_info	old_cinfo, new_cinfo;
 	struct nfs_fattr	old_dir_attr, new_dir_attr;
-	u32			old_dir_bmres[2], new_dir_bmres[2];
 	int			status;
 
 	old_dir_attr.valid = 0;
@@ -1238,9 +1217,9 @@ nfs4_proc_rename(struct inode *old_dir, struct qstr *old_name,
 	nfs4_setup_savefh(&compound);
 	nfs4_setup_putfh(&compound, NFS_FH(new_dir));
 	nfs4_setup_rename(&compound, old_name, new_name, &old_cinfo, &new_cinfo);
-	nfs4_setup_getattr(&compound, &new_dir_attr, new_dir_bmres);
+	nfs4_setup_getattr(&compound, &new_dir_attr);
 	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &old_dir_attr, old_dir_bmres);
+	nfs4_setup_getattr(&compound, &old_dir_attr);
 	status = nfs4_call_compound(&compound, NULL, 0);
 
 	if (!status) {
@@ -1259,7 +1238,6 @@ nfs4_proc_link(struct inode *inode, struct inode *dir, struct qstr *name)
 	struct nfs4_op		ops[7];
 	struct nfs4_change_info	dir_cinfo;
 	struct nfs_fattr	dir_attr, fattr;
-	u32			dir_bmres[2], bmres[2];
 	int			status;
 	
 	dir_attr.valid = 0;
@@ -1270,9 +1248,9 @@ nfs4_proc_link(struct inode *inode, struct inode *dir, struct qstr *name)
 	nfs4_setup_savefh(&compound);
 	nfs4_setup_putfh(&compound, NFS_FH(dir));
 	nfs4_setup_link(&compound, name, &dir_cinfo);
-	nfs4_setup_getattr(&compound, &dir_attr, dir_bmres);
+	nfs4_setup_getattr(&compound, &dir_attr);
 	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &fattr, bmres);
+	nfs4_setup_getattr(&compound, &fattr);
 	status = nfs4_call_compound(&compound, NULL, 0);
 
 	if (!status) {
@@ -1291,7 +1269,6 @@ nfs4_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 	struct nfs4_compound	compound;
 	struct nfs4_op		ops[7];
 	struct nfs_fattr	dir_attr;
-	u32			dir_bmres[2], bmres[2];
 	struct nfs4_change_info	dir_cinfo;
 	int			status;
 
@@ -1302,10 +1279,10 @@ nfs4_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 	nfs4_setup_putfh(&compound, NFS_FH(dir));
 	nfs4_setup_savefh(&compound);
 	nfs4_setup_create_symlink(&compound, name, path, sattr, &dir_cinfo);
-	nfs4_setup_getattr(&compound, fattr, bmres);
+	nfs4_setup_getattr(&compound, fattr);
 	nfs4_setup_getfh(&compound, fhandle);
 	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &dir_attr, dir_bmres);
+	nfs4_setup_getattr(&compound, &dir_attr);
 	status = nfs4_call_compound(&compound, NULL, 0);
 
 	if (!status) {
@@ -1322,7 +1299,6 @@ nfs4_proc_mkdir(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	struct nfs4_compound	compound;
 	struct nfs4_op		ops[7];
 	struct nfs_fattr	dir_attr;
-	u32			dir_bmres[2], bmres[2];
 	struct nfs4_change_info	dir_cinfo;
 	int			status;
 
@@ -1333,10 +1309,10 @@ nfs4_proc_mkdir(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	nfs4_setup_putfh(&compound, NFS_FH(dir));
 	nfs4_setup_savefh(&compound);
 	nfs4_setup_create_dir(&compound, name, sattr, &dir_cinfo);
-	nfs4_setup_getattr(&compound, fattr, bmres);
+	nfs4_setup_getattr(&compound, fattr);
 	nfs4_setup_getfh(&compound, fhandle);
 	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &dir_attr, dir_bmres);
+	nfs4_setup_getattr(&compound, &dir_attr);
 	status = nfs4_call_compound(&compound, NULL, 0);
 
 	if (!status) {
@@ -1373,7 +1349,6 @@ nfs4_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	struct nfs4_compound	compound;
 	struct nfs4_op		ops[7];
 	struct nfs_fattr	dir_attr;
-	u32			dir_bmres[2], bmres[2];
 	struct nfs4_change_info	dir_cinfo;
 	int			status;
 
@@ -1384,10 +1359,10 @@ nfs4_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	nfs4_setup_putfh(&compound, NFS_FH(dir));
 	nfs4_setup_savefh(&compound);
 	nfs4_setup_create_special(&compound, name, rdev,sattr, &dir_cinfo);
-	nfs4_setup_getattr(&compound, fattr, bmres);
+	nfs4_setup_getattr(&compound, fattr);
 	nfs4_setup_getfh(&compound, fh);
 	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &dir_attr, dir_bmres);
+	nfs4_setup_getattr(&compound, &dir_attr);
 	status = nfs4_call_compound(&compound, NULL, 0);
 
 	if (!status) {
@@ -1403,12 +1378,11 @@ nfs4_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
 {
 	struct nfs4_compound compound;
 	struct nfs4_op ops[2];
-	u32 bmres[2];
 
 	memset(fsstat, 0, sizeof(*fsstat));
 	nfs4_setup_compound(&compound, ops, server, "statfs");
 	nfs4_setup_putfh(&compound, fhandle);
-	nfs4_setup_statfs(&compound, fsstat, bmres);
+	nfs4_setup_statfs(&compound, fsstat);
 	return nfs4_call_compound(&compound, NULL, 0);
 }
 
@@ -1418,12 +1392,11 @@ nfs4_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
 {
 	struct nfs4_compound compound;
 	struct nfs4_op ops[2];
-	u32 bmres[2];
 
 	memset(fsinfo, 0, sizeof(*fsinfo));
 	nfs4_setup_compound(&compound, ops, server, "statfs");
 	nfs4_setup_putfh(&compound, fhandle);
-	nfs4_setup_fsinfo(&compound, fsinfo, bmres);
+	nfs4_setup_fsinfo(&compound, fsinfo);
 	return nfs4_call_compound(&compound, NULL, 0);
 }
 
@@ -1433,12 +1406,11 @@ nfs4_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
 {
 	struct nfs4_compound compound;
 	struct nfs4_op ops[2];
-	u32 bmres[2];
 
 	memset(pathconf, 0, sizeof(*pathconf));
 	nfs4_setup_compound(&compound, ops, server, "statfs");
 	nfs4_setup_putfh(&compound, fhandle);
-	nfs4_setup_pathconf(&compound, pathconf, bmres);
+	nfs4_setup_pathconf(&compound, pathconf);
 	return nfs4_call_compound(&compound, NULL, 0);
 }
 

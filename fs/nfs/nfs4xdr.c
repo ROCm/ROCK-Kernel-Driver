@@ -1333,8 +1333,10 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
 		dprintk("read_attrs: server returned bad attributes!\n");
 		goto xdr_error;
 	}
-	getattr->gt_bmres[0] = bmval0;
-	getattr->gt_bmres[1] = bmval1;
+	if (nfp) {
+		nfp->bitmap[0] = bmval0;
+		nfp->bitmap[1] = bmval1;
+	}
 
 	/*
 	 * In case the server doesn't return some attributes,
