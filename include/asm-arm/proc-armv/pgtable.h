@@ -49,6 +49,9 @@
 #define PMD_SECT_AP_WRITE	(1 << 10)
 #define PMD_SECT_AP_READ	(1 << 11)
 #define PMD_SECT_TEX(x)		((x) << 12)	/* v5 */
+#define PMD_SECT_APX		(1 << 15)	/* v6 */
+#define PMD_SECT_S		(1 << 16)	/* v6 */
+#define PMD_SECT_nG		(1 << 17)	/* v6 */
 
 #define PMD_SECT_UNCACHED	(0)
 #define PMD_SECT_BUFFERED	(PMD_SECT_BUFFERABLE)
