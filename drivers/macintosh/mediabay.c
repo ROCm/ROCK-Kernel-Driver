@@ -107,6 +107,11 @@ int media_bay_count = 0;
 #define MS_TO_HZ(ms)	((ms * HZ + 999) / 1000)
 
 /*
+ * Wait that number of ms between each step in normal polling mode
+ */
+#define MB_POLL_DELAY	25
+
+/*
  * Consider the media-bay ID value stable if it is the same for
  * this number of milliseconds
  */
@@ -121,7 +126,7 @@ int media_bay_count = 0;
  * Hold the media-bay reset signal true for this many ticks
  * after a device is inserted before releasing it.
  */
-#define MB_RESET_DELAY	40
+#define MB_RESET_DELAY	50
 
 /*
  * Wait this long after the reset signal is released and before doing
@@ -390,24 +395,28 @@ static void __pmac poll_media_bay(struct media_bay_info* bay)
 	int id = bay->ops->content(bay);
 
 	if (id == bay->last_value) {
-	    if (id != bay->content_id
-	        && ++bay->value_count >= MS_TO_HZ(MB_STABLE_DELAY)) {
-	        /* If the device type changes without going thru "MB_NO", we force
-	           a pass by "MB_NO" to make sure things are properly reset */
-	        if ((id != MB_NO) && (bay->content_id != MB_NO)) {
-	            id = MB_NO;
-		    MBDBG("mediabay%d: forcing MB_NO\n", bay->index);
-		}
-		MBDBG("mediabay%d: switching to %d\n", bay->index, id);
-		set_mb_power(bay, id != MB_NO);
-		bay->content_id = id;
-		if (id == MB_NO) {
+		if (id != bay->content_id) {
+			bay->value_count += MS_TO_HZ(MB_POLL_DELAY);
+			if (bay->value_count >= MS_TO_HZ(MB_STABLE_DELAY)) {
+				/* If the device type changes without going thru
+				 * "MB_NO", we force a pass by "MB_NO" to make sure
+				 * things are properly reset
+				 */
+				if ((id != MB_NO) && (bay->content_id != MB_NO)) {
+					id = MB_NO;
+					MBDBG("mediabay%d: forcing MB_NO\n", bay->index);
+				}
+				MBDBG("mediabay%d: switching to %d\n", bay->index, id);
+				set_mb_power(bay, id != MB_NO);
+				bay->content_id = id;
+				if (id == MB_NO) {
 #ifdef CONFIG_BLK_DEV_IDE
-		    bay->cd_retry = 0;
+					bay->cd_retry = 0;
 #endif
-		    printk(KERN_INFO "media bay %d is empty\n", bay->index);
+					printk(KERN_INFO "media bay %d is empty\n", bay->index);
+				}
+			}
 		}
- 	    }
 	} else {
 		bay->last_value = id;
 		bay->value_count = 0;
@@ -496,8 +505,12 @@ static void __pmac media_bay_step(int i)
 	    poll_media_bay(bay);
 
 	/* If timer expired or polling IDE busy, run state machine */
-	if ((bay->state != mb_ide_waiting) && (bay->timer != 0) && ((--bay->timer) != 0))
-	    return;
+	if ((bay->state != mb_ide_waiting) && (bay->timer != 0)) {
+		bay->timer -= MS_TO_HZ(MB_POLL_DELAY);
+		if (bay->timer > 0)
+			return;
+		bay->timer = 0;
+	}
 
 	switch(bay->state) {
 	case mb_powering_up:
@@ -572,12 +585,13 @@ static void __pmac media_bay_step(int i)
 			}
 			break;
 	    	} else if (bay->timer > 0)
-			bay->timer--;
-	    	if (bay->timer == 0) {
+			bay->timer -= MS_TO_HZ(MB_POLL_DELAY);
+	    	if (bay->timer <= 0) {
 			printk("\nIDE Timeout in bay %d !, IDE state is: 0x%02x\n",
 			       i, readb(bay->cd_base + 0x70));
 			MBDBG("mediabay%d: nIDE Timeout !\n", i);
 			set_mb_power(bay, 0);
+			bay->timer = 0;
 	    	}
 		break;
 #endif /* CONFIG_BLK_DEV_IDE */
@@ -630,7 +644,7 @@ static int __pmac media_bay_task(void *x)
 		}
 
 		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(MS_TO_HZ(10));
+		schedule_timeout(MS_TO_HZ(MB_POLL_DELAY));
 		if (signal_pending(current))
 			return 0;
 	}
@@ -645,17 +659,16 @@ static int __devinit media_bay_attach(struct macio_dev *mdev, const struct of_ma
 
 	ofnode = mdev->ofdev.node;
 
-	if (!request_OF_resource(ofnode, 0, NULL))
-		return -ENXIO;
-
+	if (macio_resource_count(mdev) < 1)
+		return -ENODEV;
+	if (macio_request_resources(mdev, "media-bay"))
+		return -EBUSY;
 	/* Media bay registers are located at the beginning of the
          * mac-io chip, we get the parent address for now (hrm...)
          */
-	if (ofnode->parent->n_addrs == 0)
-		return -ENODEV;
 	regbase = (volatile u32 *)ioremap(ofnode->parent->addrs[0].address, 0x100);
 	if (regbase == NULL) {
-		release_OF_resource(ofnode, 0);
+		macio_release_resources(mdev);
 		return -ENOMEM;
 	}
 	
@@ -684,13 +697,13 @@ static int __devinit media_bay_attach(struct macio_dev *mdev, const struct of_ma
 	bay->state = mb_empty;
 	do {
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(MS_TO_HZ(10));
+		schedule_timeout(MS_TO_HZ(MB_POLL_DELAY));
 		media_bay_step(i);
 	} while((bay->state != mb_empty) &&
 		(bay->state != mb_up));
 
 	/* Mark us ready by filling our mdev data */
-	dev_set_drvdata(&mdev->ofdev.dev, bay);
+	macio_set_drvdata(mdev, bay);
 
 	/* Startup kernel thread */
 	if (i == 0)
@@ -702,7 +715,7 @@ static int __devinit media_bay_attach(struct macio_dev *mdev, const struct of_ma
 
 static int __pmac media_bay_suspend(struct macio_dev *mdev, u32 state)
 {
-	struct media_bay_info	*bay = dev_get_drvdata(&mdev->ofdev.dev);
+	struct media_bay_info	*bay = macio_get_drvdata(mdev);
 
 	if (state != mdev->ofdev.dev.power_state && state >= 2) {
 		down(&bay->lock);
@@ -710,7 +723,7 @@ static int __pmac media_bay_suspend(struct macio_dev *mdev, u32 state)
 		set_mb_power(bay, 0);
 		up(&bay->lock);
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(MS_TO_HZ(10));
+		schedule_timeout(MS_TO_HZ(MB_POLL_DELAY));
 		mdev->ofdev.dev.power_state = state;
 	}
 	return 0;
@@ -718,7 +731,7 @@ static int __pmac media_bay_suspend(struct macio_dev *mdev, u32 state)
 
 static int __pmac media_bay_resume(struct macio_dev *mdev)
 {
-	struct media_bay_info	*bay = dev_get_drvdata(&mdev->ofdev.dev);
+	struct media_bay_info	*bay = macio_get_drvdata(mdev);
 
 	if (mdev->ofdev.dev.power_state != 0) {
 		mdev->ofdev.dev.power_state = 0;
@@ -746,7 +759,7 @@ static int __pmac media_bay_resume(struct macio_dev *mdev)
 #endif
 	       	do {
 			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(MS_TO_HZ(10));
+			schedule_timeout(MS_TO_HZ(MB_POLL_DELAY));
 	       		media_bay_step(bay->index);
 	       	} while((bay->state != mb_empty) &&
 	       		(bay->state != mb_up));
