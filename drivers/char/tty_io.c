@@ -123,7 +123,7 @@ LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 struct tty_ldisc ldiscs[NR_LDISCS];	/* line disc dispatch table	*/
 
 /* Semaphore to protect creating and releasing a tty */
-static DECLARE_MUTEX(tty_sem);
+DECLARE_MUTEX(tty_sem);
 
 #ifdef CONFIG_UNIX98_PTYS
 extern struct tty_driver *ptm_driver;	/* Unix98 pty masters; for /dev/ptmx */

@@ -2480,8 +2480,16 @@ static int con_open(struct tty_struct *tty, struct file *filp)
 	return ret;
 }
 
+/*
+ * We take tty_sem in here to prevent another thread from coming in via init_dev
+ * and taking a ref against the tty while we're in the process of forgetting
+ * about it and cleaning things up.
+ *
+ * This is because vcs_remove_devfs() can sleep and will drop the BKL.
+ */
 static void con_close(struct tty_struct *tty, struct file *filp)
 {
+	down(&tty_sem);
 	acquire_console_sem();
 	if (tty && tty->count == 1) {
 		struct vt_struct *vt;
@@ -2492,9 +2500,15 @@ static void con_close(struct tty_struct *tty, struct file *filp)
 		tty->driver_data = 0;
 		release_console_sem();
 		vcs_remove_devfs(tty);
+		up(&tty_sem);
+		/*
+		 * tty_sem is released, but we still hold BKL, so there is
+		 * still exclusion against init_dev()
+		 */
 		return;
 	}
 	release_console_sem();
+	up(&tty_sem);
 }
 
 static void vc_init(unsigned int currcons, unsigned int rows,
