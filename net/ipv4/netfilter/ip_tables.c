@@ -214,9 +214,9 @@ ip_checkentry(const struct ipt_ip *ip)
 
 static unsigned int
 ipt_error(struct sk_buff **pskb,
-	  unsigned int hooknum,
 	  const struct net_device *in,
 	  const struct net_device *out,
+	  unsigned int hooknum,
 	  const void *targinfo,
 	  void *userinfo)
 {
@@ -232,13 +232,10 @@ int do_match(struct ipt_entry_match *m,
 	     const struct net_device *in,
 	     const struct net_device *out,
 	     int offset,
-	     const void *hdr,
-	     u_int16_t datalen,
 	     int *hotdrop)
 {
 	/* Stop iteration if it doesn't match */
-	if (!m->u.kernel.match->match(skb, in, out, m->data,
-				      offset, hdr, datalen, hotdrop))
+	if (!m->u.kernel.match->match(skb, in, out, m->data, offset, hotdrop))
 		return 1;
 	else
 		return 0;
@@ -262,7 +259,6 @@ ipt_do_table(struct sk_buff **pskb,
 	static const char nulldevname[IFNAMSIZ] = { 0 };
 	u_int16_t offset;
 	struct iphdr *ip;
-	void *protohdr;
 	u_int16_t datalen;
 	int hotdrop = 0;
 	/* Initializing verdict to NF_DROP keeps gcc happy. */
@@ -271,13 +267,8 @@ ipt_do_table(struct sk_buff **pskb,
 	void *table_base;
 	struct ipt_entry *e, *back;
 
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
-
 	/* Initialization */
 	ip = (*pskb)->nh.iph;
-	protohdr = (u_int32_t *)ip + ip->ihl;
 	datalen = (*pskb)->len - ip->ihl * 4;
 	indev = in ? in->name : nulldevname;
 	outdev = out ? out->name : nulldevname;
@@ -320,8 +311,7 @@ ipt_do_table(struct sk_buff **pskb,
 
 			if (IPT_MATCH_ITERATE(e, do_match,
 					      *pskb, in, out,
-					      offset, protohdr,
-					      datalen, &hotdrop) != 0)
+					      offset, &hotdrop) != 0)
 				goto no_match;
 
 			ADD_COUNTER(e->counters, ntohs(ip->tot_len), 1);
@@ -364,8 +354,8 @@ ipt_do_table(struct sk_buff **pskb,
 					= 0xeeeeeeec;
 #endif
 				verdict = t->u.kernel.target->target(pskb,
-								     hook,
 								     in, out,
+								     hook,
 								     t->data,
 								     userdata);
 
@@ -382,7 +372,6 @@ ipt_do_table(struct sk_buff **pskb,
 #endif
 				/* Target might have changed stuff. */
 				ip = (*pskb)->nh.iph;
-				protohdr = (u_int32_t *)ip + ip->ihl;
 				datalen = (*pskb)->len - ip->ihl * 4;
 
 				if (verdict == IPT_CONTINUE)
@@ -1458,22 +1447,24 @@ port_match(u_int16_t min, u_int16_t max, u_int16_t port, int invert)
 
 static int
 tcp_find_option(u_int8_t option,
-		const struct tcphdr *tcp,
-		u_int16_t datalen,
+		const struct sk_buff *skb,
+		unsigned int optlen,
 		int invert,
 		int *hotdrop)
 {
-	unsigned int i = sizeof(struct tcphdr);
-	const u_int8_t *opt = (u_int8_t *)tcp;
+	/* tcp.doff is only 4 bits, ie. max 15 * 4 bytes */
+	char opt[60 - sizeof(struct tcphdr)];
+	unsigned int i;
 
 	duprintf("tcp_match: finding option\n");
 	/* If we don't have the whole header, drop packet. */
-	if (tcp->doff * 4 > datalen) {
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4 + sizeof(struct tcphdr),
+			  opt, optlen) < 0) {
 		*hotdrop = 1;
 		return 0;
 	}
 
-	while (i < tcp->doff * 4) {
+	for (i = 0; i < optlen; ) {
 		if (opt[i] == option) return !invert;
 		if (opt[i] < 2) i++;
 		else i += opt[i+1]?:1;
@@ -1488,25 +1479,29 @@ tcp_match(const struct sk_buff *skb,
 	  const struct net_device *out,
 	  const void *matchinfo,
 	  int offset,
-	  const void *hdr,
-	  u_int16_t datalen,
 	  int *hotdrop)
 {
-	const struct tcphdr *tcp = hdr;
+	struct tcphdr tcph;
 	const struct ipt_tcp *tcpinfo = matchinfo;
 
-	/* To quote Alan:
+	if (offset) {
+		/* To quote Alan:
 
-	   Don't allow a fragment of TCP 8 bytes in. Nobody normal
-	   causes this. Its a cracker trying to break in by doing a
-	   flag overwrite to pass the direction checks.
-	*/
-
-	if (offset == 1) {
-		duprintf("Dropping evil TCP offset=1 frag.\n");
-		*hotdrop = 1;
+		   Don't allow a fragment of TCP 8 bytes in. Nobody normal
+		   causes this. Its a cracker trying to break in by doing a
+		   flag overwrite to pass the direction checks.
+		*/
+		if (offset == 1) {
+			duprintf("Dropping evil TCP offset=1 frag.\n");
+			*hotdrop = 1;
+		}
+		/* Must not be a fragment. */
 		return 0;
-	} else if (offset == 0 && datalen < sizeof(struct tcphdr)) {
+	}
+
+#define FWINVTCP(bool,invflg) ((bool) ^ !!(tcpinfo->invflags & invflg))
+
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &tcph, sizeof(tcph)) < 0) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 		duprintf("Dropping evil TCP offset=0 tinygram.\n");
@@ -1514,27 +1509,24 @@ tcp_match(const struct sk_buff *skb,
 		return 0;
 	}
 
-	/* FIXME: Try tcp doff >> packet len against various stacks --RR */
-
-#define FWINVTCP(bool,invflg) ((bool) ^ !!(tcpinfo->invflags & invflg))
-
-	/* Must not be a fragment. */
-	return !offset
-		&& port_match(tcpinfo->spts[0], tcpinfo->spts[1],
-			      ntohs(tcp->source),
-			      !!(tcpinfo->invflags & IPT_TCP_INV_SRCPT))
-		&& port_match(tcpinfo->dpts[0], tcpinfo->dpts[1],
-			      ntohs(tcp->dest),
-			      !!(tcpinfo->invflags & IPT_TCP_INV_DSTPT))
-		&& FWINVTCP((((unsigned char *)tcp)[13]
-			     & tcpinfo->flg_mask)
-			    == tcpinfo->flg_cmp,
-			    IPT_TCP_INV_FLAGS)
-		&& (!tcpinfo->option
-		    || tcp_find_option(tcpinfo->option, tcp, datalen,
-				       tcpinfo->invflags
-				       & IPT_TCP_INV_OPTION,
-				       hotdrop));
+	if (!port_match(tcpinfo->spts[0], tcpinfo->spts[1],
+			ntohs(tcph.source),
+			!!(tcpinfo->invflags & IPT_TCP_INV_SRCPT)))
+		return 0;
+	if (!port_match(tcpinfo->dpts[0], tcpinfo->dpts[1],
+			ntohs(tcph.dest),
+			!!(tcpinfo->invflags & IPT_TCP_INV_DSTPT)))
+		return 0;
+	if (!FWINVTCP((((unsigned char *)&tcph)[13] & tcpinfo->flg_mask)
+		      == tcpinfo->flg_cmp,
+		      IPT_TCP_INV_FLAGS))
+		return 0;
+	if (tcpinfo->option &&
+	    !tcp_find_option(tcpinfo->option, skb, tcph.doff*4 - sizeof(tcph),
+			     tcpinfo->invflags & IPT_TCP_INV_OPTION,
+			     hotdrop))
+		return 0;
+	return 1;
 }
 
 /* Called when user tries to insert an entry of this type. */
@@ -1560,14 +1552,16 @@ udp_match(const struct sk_buff *skb,
 	  const struct net_device *out,
 	  const void *matchinfo,
 	  int offset,
-	  const void *hdr,
-	  u_int16_t datalen,
 	  int *hotdrop)
 {
-	const struct udphdr *udp = hdr;
+	struct udphdr udph;
 	const struct ipt_udp *udpinfo = matchinfo;
 
-	if (offset == 0 && datalen < sizeof(struct udphdr)) {
+	/* Must not be a fragment. */
+	if (offset)
+		return 0;
+
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &udph, sizeof(udph)) < 0) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 		duprintf("Dropping evil UDP tinygram.\n");
@@ -1575,13 +1569,11 @@ udp_match(const struct sk_buff *skb,
 		return 0;
 	}
 
-	/* Must not be a fragment. */
-	return !offset
-		&& port_match(udpinfo->spts[0], udpinfo->spts[1],
-			      ntohs(udp->source),
-			      !!(udpinfo->invflags & IPT_UDP_INV_SRCPT))
+	return port_match(udpinfo->spts[0], udpinfo->spts[1],
+			  ntohs(udph.source),
+			  !!(udpinfo->invflags & IPT_UDP_INV_SRCPT))
 		&& port_match(udpinfo->dpts[0], udpinfo->dpts[1],
-			      ntohs(udp->dest),
+			      ntohs(udph.dest),
 			      !!(udpinfo->invflags & IPT_UDP_INV_DSTPT));
 }
 
@@ -1631,14 +1623,16 @@ icmp_match(const struct sk_buff *skb,
 	   const struct net_device *out,
 	   const void *matchinfo,
 	   int offset,
-	   const void *hdr,
-	   u_int16_t datalen,
 	   int *hotdrop)
 {
-	const struct icmphdr *icmp = hdr;
+	struct icmphdr icmph;
 	const struct ipt_icmp *icmpinfo = matchinfo;
 
-	if (offset == 0 && datalen < 2) {
+	/* Must not be a fragment. */
+	if (offset)
+		return 0;
+
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &icmph, sizeof(icmph)) < 0){
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 		duprintf("Dropping evil ICMP tinygram.\n");
@@ -1646,13 +1640,11 @@ icmp_match(const struct sk_buff *skb,
 		return 0;
 	}
 
-	/* Must not be a fragment. */
-	return !offset
-		&& icmp_type_code_match(icmpinfo->type,
-					icmpinfo->code[0],
-					icmpinfo->code[1],
-					icmp->type, icmp->code,
-					!!(icmpinfo->invflags&IPT_ICMP_INV));
+	return icmp_type_code_match(icmpinfo->type,
+				    icmpinfo->code[0],
+				    icmpinfo->code[1],
+				    icmph.type, icmph.code,
+				    !!(icmpinfo->invflags&IPT_ICMP_INV));
 }
 
 /* Called when user tries to insert an entry of this type. */

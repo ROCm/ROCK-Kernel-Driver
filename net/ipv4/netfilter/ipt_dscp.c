@@ -19,8 +19,7 @@ MODULE_LICENSE("GPL");
 
 static int match(const struct sk_buff *skb, const struct net_device *in,
 		 const struct net_device *out, const void *matchinfo,
-		 int offset, const void *hdr, u_int16_t datalen,
-		 int *hotdrop)
+		 int offset, int *hotdrop)
 {
 	const struct ipt_dscp_info *info = matchinfo;
 	const struct iphdr *iph = skb->nh.iph;

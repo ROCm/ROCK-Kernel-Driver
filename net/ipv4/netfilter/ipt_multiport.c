@@ -39,15 +39,18 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *hdr,
-      u_int16_t datalen,
       int *hotdrop)
 {
-	const struct udphdr *udp = hdr;
+	u16 ports[2];
 	const struct ipt_multiport *multiinfo = matchinfo;
 
-	/* Must be big enough to read ports. */
-	if (offset == 0 && datalen < sizeof(struct udphdr)) {
+	/* Must not be a fragment. */
+	if (offset)
+		return 0;
+
+	/* Must be big enough to read ports (both UDP and TCP have
+           them at the start). */
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, ports, sizeof(ports)) < 0) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 			duprintf("ipt_multiport:"
@@ -56,11 +59,9 @@ match(const struct sk_buff *skb,
 			return 0;
 	}
 
-	/* Must not be a fragment. */
-	return !offset
-		&& ports_match(multiinfo->ports,
-			       multiinfo->flags, multiinfo->count,
-			       ntohs(udp->source), ntohs(udp->dest));
+	return ports_match(multiinfo->ports,
+			   multiinfo->flags, multiinfo->count,
+			   ntohs(ports[0]), ntohs(ports[1]));
 }
 
 /* Called when user tries to insert an entry of this type. */

@@ -19,34 +19,40 @@ MODULE_DESCRIPTION("IP tables ECN matching module");
 MODULE_LICENSE("GPL");
 
 static inline int match_ip(const struct sk_buff *skb,
-			   const struct iphdr *iph,
 			   const struct ipt_ecn_info *einfo)
 {
-	return ((iph->tos&IPT_ECN_IP_MASK) == einfo->ip_ect);
+	return ((skb->nh.iph->tos&IPT_ECN_IP_MASK) == einfo->ip_ect);
 }
 
 static inline int match_tcp(const struct sk_buff *skb,
-			    const struct iphdr *iph,
-			    const struct ipt_ecn_info *einfo)
+			    const struct ipt_ecn_info *einfo,
+			    int *hotdrop)
 {
-	struct tcphdr *tcph = (void *)iph + iph->ihl*4;
+	struct tcphdr tcph;
+
+	/* In practice, TCP match does this, so can't fail.  But let's
+           be good citizens. */
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &tcph, sizeof(tcph)) < 0) {
+		*hotdrop = 0;
+		return 0;
+	}
 
 	if (einfo->operation & IPT_ECN_OP_MATCH_ECE) {
 		if (einfo->invert & IPT_ECN_OP_MATCH_ECE) {
-			if (tcph->ece == 1)
+			if (tcph.ece == 1)
 				return 0;
 		} else {
-			if (tcph->ece == 0)
+			if (tcph.ece == 0)
 				return 0;
 		}
 	}
 
 	if (einfo->operation & IPT_ECN_OP_MATCH_CWR) {
 		if (einfo->invert & IPT_ECN_OP_MATCH_CWR) {
-			if (tcph->cwr == 1)
+			if (tcph.cwr == 1)
 				return 0;
 		} else {
-			if (tcph->cwr == 0)
+			if (tcph.cwr == 0)
 				return 0;
 		}
 	}
@@ -56,20 +62,18 @@ static inline int match_tcp(const struct sk_buff *skb,
 
 static int match(const struct sk_buff *skb, const struct net_device *in,
 		 const struct net_device *out, const void *matchinfo,
-		 int offset, const void *hdr, u_int16_t datalen,
-		 int *hotdrop)
+		 int offset, int *hotdrop)
 {
 	const struct ipt_ecn_info *info = matchinfo;
-	const struct iphdr *iph = skb->nh.iph;
 
 	if (info->operation & IPT_ECN_OP_MATCH_IP)
-		if (!match_ip(skb, iph, info))
+		if (!match_ip(skb, info))
 			return 0;
 
 	if (info->operation & (IPT_ECN_OP_MATCH_ECE|IPT_ECN_OP_MATCH_CWR)) {
-		if (iph->protocol != IPPROTO_TCP)
+		if (skb->nh.iph->protocol != IPPROTO_TCP)
 			return 0;
-		if (!match_tcp(skb, iph, info))
+		if (!match_tcp(skb, info, hotdrop))
 			return 0;
 	}
 

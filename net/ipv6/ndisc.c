@@ -441,8 +441,10 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 		src_addr = solicited_addr;
 		in6_ifa_put(ifp);
 	} else {
-		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0))
+		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0)) {
+			dst_free(dst);
 			return;
+		}
 		src_addr = &tmpaddr;
 	}
 
@@ -450,11 +452,10 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 	ndisc_rt_init(rt, dev, neigh);	
 
 	dst = (struct dst_entry*)rt;
-	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err < 0) {
-		dst_release(dst);
+		dst_free(dst);
 		return;
 	}
 
@@ -470,6 +471,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	if (skb == NULL) {
 		ND_PRINTK1("send_na: alloc skb failed\n");
+		dst_free(dst);
 		return;
 	}
 

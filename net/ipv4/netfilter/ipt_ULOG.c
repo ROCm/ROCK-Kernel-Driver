@@ -155,9 +155,9 @@ struct sk_buff *ulog_alloc_skb(unsigned int size)
 }
 
 static unsigned int ipt_ulog_target(struct sk_buff **pskb,
-				    unsigned int hooknum,
 				    const struct net_device *in,
 				    const struct net_device *out,
+				    unsigned int hooknum,
 				    const void *targinfo, void *userinfo)
 {
 	ulog_buff_t *ub;
@@ -238,8 +238,9 @@ static unsigned int ipt_ulog_target(struct sk_buff **pskb,
 	else
 		pm->outdev_name[0] = '\0';
 
-	if (copy_len)
-		memcpy(pm->payload, (*pskb)->data, copy_len);
+	/* copy_len <= (*pskb)->len, so can't fail. */
+	if (skb_copy_bits(*pskb, 0, pm->payload, copy_len) < 0)
+		BUG();
 	
 	/* check if we are building multi-part messages */
 	if (ub->qlen > 1) {

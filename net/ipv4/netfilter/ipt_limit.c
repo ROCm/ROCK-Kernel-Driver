@@ -47,8 +47,6 @@ ipt_limit_match(const struct sk_buff *skb,
 		const struct net_device *out,
 		const void *matchinfo,
 		int offset,
-		const void *hdr,
-		u_int16_t datalen,
 		int *hotdrop)
 {
 	struct ipt_rateinfo *r = ((struct ipt_rateinfo *)matchinfo)->master;

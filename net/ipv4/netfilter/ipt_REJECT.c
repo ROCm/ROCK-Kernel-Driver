@@ -29,152 +29,140 @@ static void connection_attach(struct sk_buff *new_skb, struct nf_ct_info *nfct)
 	void (*attach)(struct sk_buff *, struct nf_ct_info *);
 
 	/* Avoid module unload race with ip_ct_attach being NULLed out */
-	if (nfct && (attach = ip_ct_attach) != NULL)
+	if (nfct && (attach = ip_ct_attach) != NULL) {
+		mb(); /* Just to be sure: must be read before executing this */
 		attach(new_skb, nfct);
+	}
 }
 
 /* Send RST reply */
-static void send_reset(struct sk_buff *oldskb, int local)
+static unsigned int send_reset(struct sk_buff **pskb, int local)
 {
-	struct sk_buff *nskb;
-	struct tcphdr *otcph, *tcph;
+	struct tcphdr tcph;
 	struct rtable *rt;
-	unsigned int otcplen;
 	u_int16_t tmp_port;
 	u_int32_t tmp_addr;
-	int needs_ack;
-	int hh_len;
+	int needs_ack, hh_len, datalen;
+	struct nf_ct_info *oldnfct;
 
-	/* IP header checks: fragment, too short. */
-	if (oldskb->nh.iph->frag_off & htons(IP_OFFSET)
-	    || oldskb->len < (oldskb->nh.iph->ihl<<2) + sizeof(struct tcphdr))
-		return;
+	/* No RSTs for fragments. */
+	if ((*pskb)->nh.iph->frag_off & htons(IP_OFFSET))
+		return NF_DROP;
 
-	otcph = (struct tcphdr *)((u_int32_t*)oldskb->nh.iph + oldskb->nh.iph->ihl);
-	otcplen = oldskb->len - oldskb->nh.iph->ihl*4;
+	if (skb_copy_bits(*pskb, (*pskb)->nh.iph->ihl*4,
+			  &tcph, sizeof(tcph)) < 0)
+		return NF_DROP;
 
 	/* No RST for RST. */
-	if (otcph->rst)
-		return;
+	if (tcph.rst)
+		return NF_DROP;
 
-	/* Check checksum. */
-	if (tcp_v4_check(otcph, otcplen, oldskb->nh.iph->saddr,
-			 oldskb->nh.iph->daddr,
-			 csum_partial((char *)otcph, otcplen, 0)) != 0)
-		return;
-
-
+	/* FIXME: Check checksum. */
 	{
 		struct flowi fl = { .nl_u = { .ip4_u =
-					      { .daddr = oldskb->nh.iph->saddr,
+					      { .daddr = (*pskb)->nh.iph->saddr,
 						.saddr = (local ?
-							  oldskb->nh.iph->daddr :
+							  (*pskb)->nh.iph->daddr :
 							  0),
-						.tos = RT_TOS(oldskb->nh.iph->tos) } } };
+						.tos = RT_TOS((*pskb)->nh.iph->tos) } } };
 
 		/* Routing: if not headed for us, route won't like source */
 		if (ip_route_output_key(&rt, &fl))
-			return;
-	
+			return NF_DROP;
+
 		hh_len = (rt->u.dst.dev->hard_header_len + 15)&~15;
 	}
 
-
-	/* Copy skb (even if skb is about to be dropped, we can't just
-           clone it because there may be other things, such as tcpdump,
-           interested in it). We also need to expand headroom in case
-	   hh_len of incoming interface < hh_len of outgoing interface */
-	nskb = skb_copy_expand(oldskb, hh_len, skb_tailroom(oldskb),
-			       GFP_ATOMIC);
-	if (!nskb) {
-		dst_release(&rt->u.dst);
-		return;
+	/* We're going to flip the header around, drop options and data. */
+	if (!skb_ip_make_writable(pskb, (*pskb)->nh.iph->ihl*4+sizeof(tcph))) {
+		ip_rt_put(rt);
+		return NF_DROP;
 	}
 
-	dst_release(nskb->dst);
-	nskb->dst = &rt->u.dst;
+	(*pskb)->h.th = (void *)(*pskb)->nh.iph + sizeof(tcph);
+	datalen = (*pskb)->len - (*pskb)->nh.iph->ihl*4 - tcph.doff*4;
+
+	/* Change over route. */
+	dst_release((*pskb)->dst);
+	(*pskb)->dst = &rt->u.dst;
 
 	/* This packet will not be the same as the other: clear nf fields */
-	nf_conntrack_put(nskb->nfct);
-	nskb->nfct = NULL;
-	nskb->nfcache = 0;
+	(*pskb)->nfcache = 0;
 #ifdef CONFIG_NETFILTER_DEBUG
-	nskb->nf_debug = 0;
+	(*pskb)->nf_debug = 0;
 #endif
-	nskb->nfmark = 0;
-
-	tcph = (struct tcphdr *)((u_int32_t*)nskb->nh.iph + nskb->nh.iph->ihl);
+	(*pskb)->nfmark = 0;
 
 	/* Swap source and dest */
-	tmp_addr = nskb->nh.iph->saddr;
-	nskb->nh.iph->saddr = nskb->nh.iph->daddr;
-	nskb->nh.iph->daddr = tmp_addr;
-	tmp_port = tcph->source;
-	tcph->source = tcph->dest;
-	tcph->dest = tmp_port;
+	tmp_addr = (*pskb)->nh.iph->saddr;
+	(*pskb)->nh.iph->saddr = (*pskb)->nh.iph->daddr;
+	(*pskb)->nh.iph->daddr = tmp_addr;
+	tmp_port = (*pskb)->h.th->source;
+	(*pskb)->h.th->source = (*pskb)->h.th->dest;
+	(*pskb)->h.th->dest = tmp_port;
 
 	/* Truncate to length (no data) */
-	tcph->doff = sizeof(struct tcphdr)/4;
-	skb_trim(nskb, nskb->nh.iph->ihl*4 + sizeof(struct tcphdr));
-	nskb->nh.iph->tot_len = htons(nskb->len);
+	(*pskb)->h.th->doff = sizeof(struct tcphdr)/4;
+	skb_trim(*pskb, (*pskb)->nh.iph->ihl*4 + sizeof(struct tcphdr));
+	(*pskb)->nh.iph->tot_len = htons((*pskb)->len);
 
-	if (tcph->ack) {
+	if ((*pskb)->h.th->ack) {
 		needs_ack = 0;
-		tcph->seq = otcph->ack_seq;
-		tcph->ack_seq = 0;
+		(*pskb)->h.th->seq = tcph.ack_seq;
+		(*pskb)->h.th->ack_seq = 0;
 	} else {
 		needs_ack = 1;
-		tcph->ack_seq = htonl(ntohl(otcph->seq) + otcph->syn + otcph->fin
-				      + otcplen - (otcph->doff<<2));
-		tcph->seq = 0;
+		(*pskb)->h.th->ack_seq = htonl(ntohl(tcph.seq)
+						 + tcph.syn + tcph.fin
+						 + datalen);
+		(*pskb)->h.th->seq = 0;
 	}
 
 	/* Reset flags */
-	((u_int8_t *)tcph)[13] = 0;
-	tcph->rst = 1;
-	tcph->ack = needs_ack;
+	memset((*pskb)->h.raw + 13, 0, 1);
+	(*pskb)->h.th->rst = 1;
+	(*pskb)->h.th->ack = needs_ack;
 
-	tcph->window = 0;
-	tcph->urg_ptr = 0;
+	(*pskb)->h.th->window = 0;
+	(*pskb)->h.th->urg_ptr = 0;
 
 	/* Adjust TCP checksum */
-	tcph->check = 0;
-	tcph->check = tcp_v4_check(tcph, sizeof(struct tcphdr),
-				   nskb->nh.iph->saddr,
-				   nskb->nh.iph->daddr,
-				   csum_partial((char *)tcph,
-						sizeof(struct tcphdr), 0));
+	(*pskb)->h.th->check = 0;
+	(*pskb)->h.th->check
+		= tcp_v4_check((*pskb)->h.th,
+			       sizeof(struct tcphdr),
+			       (*pskb)->nh.iph->saddr,
+			       (*pskb)->nh.iph->daddr,
+			       csum_partial((*pskb)->h.raw,
+					    sizeof(struct tcphdr), 0));
 
 	/* Adjust IP TTL, DF */
-	nskb->nh.iph->ttl = MAXTTL;
+	(*pskb)->nh.iph->ttl = MAXTTL;
 	/* Set DF, id = 0 */
-	nskb->nh.iph->frag_off = htons(IP_DF);
-	nskb->nh.iph->id = 0;
+	(*pskb)->nh.iph->frag_off = htons(IP_DF);
+	(*pskb)->nh.iph->id = 0;
 
 	/* Adjust IP checksum */
-	nskb->nh.iph->check = 0;
-	nskb->nh.iph->check = ip_fast_csum((unsigned char *)nskb->nh.iph, 
-					   nskb->nh.iph->ihl);
+	(*pskb)->nh.iph->check = 0;
+	(*pskb)->nh.iph->check = ip_fast_csum((*pskb)->nh.raw, 
+					      (*pskb)->nh.iph->ihl);
 
 	/* "Never happens" */
-	if (nskb->len > dst_pmtu(nskb->dst))
-		goto free_nskb;
+	if ((*pskb)->len > dst_pmtu((*pskb)->dst))
+		return NF_DROP;
 
-	connection_attach(nskb, oldskb->nfct);
+	/* Related to old connection. */
+	oldnfct = (*pskb)->nfct;
+	connection_attach(*pskb, oldnfct);
+	nf_conntrack_put(oldnfct);
 
-	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, nskb, NULL, nskb->dst->dev,
+	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, *pskb, NULL, (*pskb)->dst->dev,
 		ip_finish_output);
-	return;
-
- free_nskb:
-	kfree_skb(nskb);
+	return NF_STOLEN;
 }
 
-static void send_unreach(struct sk_buff *skb_in, int code)
+static void send_unreach(const struct sk_buff *skb_in, int code)
 {
-	struct iphdr *iph;
-	struct udphdr *udph;
-	struct icmphdr *icmph;
 	struct sk_buff *nskb;
 	u32 saddr;
 	u8 tos;
@@ -189,8 +177,6 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 	if (!xrlim_allow(&rt->u.dst, 1*HZ))
 		return;
 
-	iph = skb_in->nh.iph;
-
 	/* No replies to physical multicast/broadcast */
 	if (skb_in->pkt_type!=PACKET_HOST)
 		return;
@@ -200,46 +186,41 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 		return;
 
 	/* Only reply to fragment 0. */
-	if (iph->frag_off&htons(IP_OFFSET))
+	if (skb_in->nh.iph->frag_off&htons(IP_OFFSET))
 		return;
 
-	/* if UDP checksum is set, verify it's correct */
-	if (iph->protocol == IPPROTO_UDP
-	    && skb_in->tail-(u8*)iph >= sizeof(struct udphdr)) {
-		int datalen = skb_in->len - (iph->ihl<<2);
-		udph = (struct udphdr *)((char *)iph + (iph->ihl<<2));
-		if (udph->check
-		    && csum_tcpudp_magic(iph->saddr, iph->daddr,
-		                         datalen, IPPROTO_UDP,
-		                         csum_partial((char *)udph, datalen,
-		                                      0)) != 0)
-			return;
-	}
-		    
+	/* Ensure we have at least 8 bytes of proto header. */
+	if (skb_in->len < skb_in->nh.iph->ihl*4 + 8)
+		return;
+
 	/* If we send an ICMP error to an ICMP error a mess would result.. */
-	if (iph->protocol == IPPROTO_ICMP
-	    && skb_in->tail-(u8*)iph >= sizeof(struct icmphdr)) {
-		icmph = (struct icmphdr *)((char *)iph + (iph->ihl<<2));
+	if (skb_in->nh.iph->protocol == IPPROTO_ICMP) {
+		struct icmphdr icmph;
+
+		if (skb_copy_bits(skb_in, skb_in->nh.iph->ihl*4,
+				  &icmph, sizeof(icmph)) < 0)
+			return;
+
 		/* Between echo-reply (0) and timestamp (13),
 		   everything except echo-request (8) is an error.
 		   Also, anything greater than NR_ICMP_TYPES is
 		   unknown, and hence should be treated as an error... */
-		if ((icmph->type < ICMP_TIMESTAMP
-		     && icmph->type != ICMP_ECHOREPLY
-		     && icmph->type != ICMP_ECHO)
-		    || icmph->type > NR_ICMP_TYPES)
+		if ((icmph.type < ICMP_TIMESTAMP
+		     && icmph.type != ICMP_ECHOREPLY
+		     && icmph.type != ICMP_ECHO)
+		    || icmph.type > NR_ICMP_TYPES)
 			return;
 	}
 
-	saddr = iph->daddr;
+	saddr = skb_in->nh.iph->daddr;
 	if (!(rt->rt_flags & RTCF_LOCAL))
 		saddr = 0;
 
-	tos = (iph->tos & IPTOS_TOS_MASK) | IPTOS_PREC_INTERNETCONTROL;
-
+	tos = (skb_in->nh.iph->tos & IPTOS_TOS_MASK)
+		| IPTOS_PREC_INTERNETCONTROL;
 	{
 		struct flowi fl = { .nl_u = { .ip4_u =
-					      { .daddr = iph->saddr,
+					      { .daddr = skb_in->nh.iph->saddr,
 						.saddr = saddr,
 						.tos = RT_TOS(tos) } } };
 		if (ip_route_output_key(&rt, &fl))
@@ -266,40 +247,38 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 	skb_reserve(nskb, hh_len);
 
 	/* Set up IP header */
-	iph = nskb->nh.iph
-		= (struct iphdr *)skb_put(nskb, sizeof(struct iphdr));
-	iph->version=4;
-	iph->ihl=5;
-	iph->tos=tos;
-	iph->tot_len = htons(length);
+	nskb->nh.iph = (struct iphdr *)skb_put(nskb, sizeof(struct iphdr));
+	nskb->nh.iph->version=4;
+	nskb->nh.iph->ihl=5;
+	nskb->nh.iph->tos=tos;
+	nskb->nh.iph->tot_len = htons(length);
 
 	/* PMTU discovery never applies to ICMP packets. */
-	iph->frag_off = 0;
+	nskb->nh.iph->frag_off = 0;
 
-	iph->ttl = MAXTTL;
-	ip_select_ident(iph, &rt->u.dst, NULL);
-	iph->protocol=IPPROTO_ICMP;
-	iph->saddr=rt->rt_src;
-	iph->daddr=rt->rt_dst;
-	iph->check=0;
-	iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
+	nskb->nh.iph->ttl = MAXTTL;
+	ip_select_ident(nskb->nh.iph, &rt->u.dst, NULL);
+	nskb->nh.iph->protocol=IPPROTO_ICMP;
+	nskb->nh.iph->saddr=rt->rt_src;
+	nskb->nh.iph->daddr=rt->rt_dst;
+	nskb->nh.iph->check=0;
+	nskb->nh.iph->check = ip_fast_csum(nskb->nh.raw,
+					   nskb->nh.iph->ihl);
 
 	/* Set up ICMP header. */
-	icmph = nskb->h.icmph
-		= (struct icmphdr *)skb_put(nskb, sizeof(struct icmphdr));
-	icmph->type = ICMP_DEST_UNREACH;
-	icmph->code = code;	
-	icmph->un.gateway = 0;
-	icmph->checksum = 0;
+	nskb->h.icmph = (struct icmphdr *)skb_put(nskb,sizeof(struct icmphdr));
+	nskb->h.icmph->type = ICMP_DEST_UNREACH;
+	nskb->h.icmph->code = code;	
+	nskb->h.icmph->un.gateway = 0;
+	nskb->h.icmph->checksum = 0;
 	
 	/* Copy as much of original packet as will fit */
 	data = skb_put(nskb,
 		       length - sizeof(struct iphdr) - sizeof(struct icmphdr));
-	/* FIXME: won't work with nonlinear skbs --RR */
-	memcpy(data, skb_in->nh.iph,
-	       length - sizeof(struct iphdr) - sizeof(struct icmphdr));
-	icmph->checksum = ip_compute_csum((unsigned char *)icmph,
-					  length - sizeof(struct iphdr));
+	skb_copy_bits(skb_in, 0, data,
+		      length - sizeof(struct iphdr) - sizeof(struct icmphdr));
+	nskb->h.icmph->checksum = ip_compute_csum(nskb->h.raw,
+						  length-sizeof(struct iphdr));
 
 	connection_attach(nskb, skb_in->nfct);
 
@@ -308,9 +287,9 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 }	
 
 static unsigned int reject(struct sk_buff **pskb,
-			   unsigned int hooknum,
 			   const struct net_device *in,
 			   const struct net_device *out,
+			   unsigned int hooknum,
 			   const void *targinfo,
 			   void *userinfo)
 {
@@ -344,7 +323,7 @@ static unsigned int reject(struct sk_buff **pskb,
     		send_unreach(*pskb, ICMP_HOST_ANO);
     		break;
 	case IPT_TCP_RESET:
-		send_reset(*pskb, hooknum == NF_IP_LOCAL_IN);
+		return send_reset(pskb, hooknum == NF_IP_LOCAL_IN);
 	case IPT_ICMP_ECHOREPLY:
 		/* Doesn't happen. */
 		break;
