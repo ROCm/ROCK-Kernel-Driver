@@ -53,6 +53,7 @@ struct jfs_inode_info {
 	lid_t	blid;		/* lid of pseudo buffer?	*/
 	lid_t	atlhead;	/* anonymous tlock list head	*/
 	lid_t	atltail;	/* anonymous tlock list tail	*/
+	spinlock_t ag_lock;	/* protects active_ag		*/
 	struct list_head anon_inode_list; /* inodes having anonymous txns */
 	/*
 	 * rdwrlock serializes xtree between reads & writes and synchronizes

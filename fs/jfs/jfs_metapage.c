@@ -225,8 +225,16 @@ struct metapage *__get_metapage(struct inode *inode, unsigned long lblock,
 
 	if (absolute)
 		mapping = inode->i_sb->s_bdev->bd_inode->i_mapping;
-	else
+	else {
+		/*
+		 * If an nfs client tries to read an inode that is larger
+		 * than any existing inodes, we may try to read past the
+		 * end of the inode map
+		 */
+		if ((lblock << inode->i_blkbits) >= inode->i_size)
+			return NULL;
 		mapping = inode->i_mapping;
+	}
 
 	hash_ptr = meta_hash(mapping, lblock);
 again:
