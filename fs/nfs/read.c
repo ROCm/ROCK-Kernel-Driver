@@ -100,7 +100,6 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 		lock_kernel();
 		result = NFS_PROTO(inode)->read(inode, cred, &fattr, flags,
 						offset, rsize, page, &eof);
-		nfs_refresh_inode(inode, &fattr);
 		unlock_kernel();
 
 		/*
@@ -258,14 +257,12 @@ void
 nfs_readpage_result(struct rpc_task *task)
 {
 	struct nfs_read_data	*data = (struct nfs_read_data *) task->tk_calldata;
-	struct inode		*inode = data->inode;
 	struct nfs_fattr	*fattr = &data->fattr;
 	unsigned int count = data->res.count;
 
 	dprintk("NFS: %4d nfs_readpage_result, (status %d)\n",
 		task->tk_pid, task->tk_status);
 
-	nfs_refresh_inode(inode, fattr);
 	while (!list_empty(&data->pages)) {
 		struct nfs_page *req = nfs_list_entry(data->pages.next);
 		struct page *page = req->wb_page;

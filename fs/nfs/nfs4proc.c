@@ -980,8 +980,12 @@ nfs4_proc_read(struct inode *inode, struct rpc_cred *cred,
 	dprintk("NFS call  read %d @ %Ld\n", count, (long long)offset);
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, flags);
-	if (!status)
+	if (!status) {
 		renew_lease(server, timestamp);
+		/* Check cache consistency */
+		if (fattr->change_attr != NFS_CHANGE_ATTR(inode))
+			nfs_zap_caches(inode);
+	}
 	dprintk("NFS reply read: %d\n", status);
 	*eofp = res.eof;
 	return status;
@@ -1338,9 +1342,16 @@ static void
 nfs4_read_done(struct rpc_task *task)
 {
 	struct nfs_read_data *data = (struct nfs_read_data *) task->tk_calldata;
+	struct inode *inode = data->inode;
+	struct nfs_fattr *fattr = data->res.fattr;
 
 	if (task->tk_status > 0)
-		renew_lease(NFS_SERVER(data->inode), data->timestamp);
+		renew_lease(NFS_SERVER(inode), data->timestamp);
+	/* Check cache consistency */
+	if (fattr->change_attr != NFS_CHANGE_ATTR(inode))
+		nfs_zap_caches(inode);
+	if (fattr->bitmap[1] & FATTR4_WORD1_TIME_ACCESS)
+		inode->i_atime = fattr->atime;
 	/* Call back common NFS readpage processing */
 	nfs_readpage_result(task);
 }
@@ -1382,12 +1393,29 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 }
 
 static void
+nfs4_write_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
+{
+	/* Check cache consistency */
+	if (fattr->pre_change_attr != NFS_CHANGE_ATTR(inode))
+		nfs_zap_caches(inode);
+	NFS_CHANGE_ATTR(inode) = fattr->change_attr;
+	if (fattr->bitmap[1] & FATTR4_WORD1_SPACE_USED)
+		inode->i_blocks = (fattr->du.nfs3.used + 511) >> 9;
+	if (fattr->bitmap[1] & FATTR4_WORD1_TIME_METADATA)
+		inode->i_ctime = fattr->ctime;
+	if (fattr->bitmap[1] & FATTR4_WORD1_TIME_MODIFY)
+		inode->i_mtime = fattr->mtime;
+}
+
+static void
 nfs4_write_done(struct rpc_task *task)
 {
 	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+	struct inode *inode = data->inode;
 	
-	if (task->tk_status > 0)
-		renew_lease(NFS_SERVER(data->inode), data->timestamp);
+	if (task->tk_status >= 0)
+		renew_lease(NFS_SERVER(inode), data->timestamp);
+	nfs4_write_refresh_inode(inode, data->res.fattr);
 	/* Call back common NFS writeback processing */
 	nfs_writeback_done(task);
 }
@@ -1439,6 +1467,16 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 }
 
 static void
+nfs4_commit_done(struct rpc_task *task)
+{
+	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+	
+	nfs4_write_refresh_inode(data->inode, data->res.fattr);
+	/* Call back common NFS writeback processing */
+	nfs_commit_done(task);
+}
+
+static void
 nfs4_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 {
 	struct rpc_task	*task = &data->task;
@@ -1462,7 +1500,7 @@ nfs4_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
 
 	/* Finalize the task. */
-	rpc_init_task(task, NFS_CLIENT(inode), nfs_commit_done, flags);
+	rpc_init_task(task, NFS_CLIENT(inode), nfs4_commit_done, flags);
 	task->tk_calldata = data;
 	/* Release requests */
 	task->tk_release = nfs_commit_release;

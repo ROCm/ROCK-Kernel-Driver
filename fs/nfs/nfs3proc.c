@@ -67,6 +67,20 @@ nfs3_async_handle_jukebox(struct rpc_task *task)
 	return 1;
 }
 
+static void
+nfs3_write_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
+{
+	if (fattr->valid & NFS_ATTR_FATTR) {
+		if (!(fattr->valid & NFS_ATTR_WCC)) {
+			fattr->pre_size  = NFS_CACHE_ISIZE(inode);
+			fattr->pre_mtime = NFS_CACHE_MTIME(inode);
+			fattr->pre_ctime = NFS_CACHE_CTIME(inode);
+			fattr->valid |= NFS_ATTR_WCC;
+		}
+		nfs_refresh_inode(inode, fattr);
+	}
+}
+
 /*
  * Bare-bones access to getattr: this is for nfs_read_super.
  */
@@ -239,6 +253,8 @@ nfs3_proc_read(struct inode *inode, struct rpc_cred *cred,
 	dprintk("NFS call  read %d @ %Ld\n", count, (long long)offset);
 	fattr->valid = 0;
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, flags);
+	if (status >= 0)
+		nfs_refresh_inode(inode, fattr);
 	dprintk("NFS reply read: %d\n", status);
 	*eofp = res.eof;
 	return status;
@@ -278,6 +294,9 @@ nfs3_proc_write(struct inode *inode, struct rpc_cred *cred,
 	arg.stable = (flags & NFS_RW_SYNC) ? NFS_FILE_SYNC : NFS_UNSTABLE;
 
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, rpcflags);
+
+	if (status >= 0)
+		nfs3_write_refresh_inode(inode, fattr);
 
 	dprintk("NFS reply read: %d\n", status);
 	return status < 0? status : res.count;
@@ -685,9 +704,13 @@ extern u32 *nfs3_decode_dirent(u32 *, struct nfs_entry *, int);
 static void
 nfs3_read_done(struct rpc_task *task)
 {
+	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+
 	if (nfs3_async_handle_jukebox(task))
 		return;
 	/* Call back common NFS readpage processing */
+	if (task->tk_status >= 0)
+		nfs_refresh_inode(data->inode, &data->fattr);
 	nfs_readpage_result(task);
 }
 
@@ -730,8 +753,12 @@ nfs3_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 static void
 nfs3_write_done(struct rpc_task *task)
 {
+	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+
 	if (nfs3_async_handle_jukebox(task))
 		return;
+	if (task->tk_status >= 0)
+		nfs3_write_refresh_inode(data->inode, data->res.fattr);
 	nfs_writeback_done(task);
 }
 
@@ -784,8 +811,12 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 static void
 nfs3_commit_done(struct rpc_task *task)
 {
+	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
+
 	if (nfs3_async_handle_jukebox(task))
 		return;
+	if (task->tk_status >= 0)
+		nfs3_write_refresh_inode(data->inode, data->res.fattr);
 	nfs_commit_done(task);
 }
 

@@ -125,23 +125,6 @@ void nfs_commit_release(struct rpc_task *task)
 }
 
 /*
- * This function will be used to simulate weak cache consistency
- * under NFSv2 when the NFSv3 attribute patch is included.
- * For the moment, we just call nfs_refresh_inode().
- */
-static __inline__ int
-nfs_write_attributes(struct inode *inode, struct nfs_fattr *fattr)
-{
-	if ((fattr->valid & NFS_ATTR_FATTR) && !(fattr->valid & NFS_ATTR_WCC)) {
-		fattr->pre_size  = NFS_CACHE_ISIZE(inode);
-		fattr->pre_mtime = NFS_CACHE_MTIME(inode);
-		fattr->pre_ctime = NFS_CACHE_CTIME(inode);
-		fattr->valid |= NFS_ATTR_WCC;
-	}
-	return nfs_refresh_inode(inode, fattr);
-}
-
-/*
  * Write a page synchronously.
  * Offset is the data offset within the page.
  */
@@ -178,7 +161,6 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 
 		result = NFS_PROTO(inode)->write(inode, cred, &fattr, flags,
 						 offset, wsize, page, &verf);
-		nfs_write_attributes(inode, &fattr);
 
 		if (result < 0) {
 			/* Must mark the page invalid after I/O error */
@@ -893,7 +875,6 @@ nfs_writeback_done(struct rpc_task *task)
 	 *	  writebacks since the page->count is kept > 1 for as long
 	 *	  as the page has a write request pending.
 	 */
-	nfs_write_attributes(inode, &data->fattr);
 	while (!list_empty(&data->pages)) {
 		req = nfs_list_entry(data->pages.next);
 		nfs_list_remove_request(req);
@@ -1018,12 +999,10 @@ nfs_commit_done(struct rpc_task *task)
 {
 	struct nfs_write_data	*data = (struct nfs_write_data *)task->tk_calldata;
 	struct nfs_page		*req;
-	struct inode		*inode = data->inode;
 
         dprintk("NFS: %4d nfs_commit_done (status %d)\n",
                                 task->tk_pid, task->tk_status);
 
-	nfs_write_attributes(inode, &data->fattr);
 	while (!list_empty(&data->pages)) {
 		req = nfs_list_entry(data->pages.next);
 		nfs_list_remove_request(req);
