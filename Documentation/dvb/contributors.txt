@@ -69,6 +69,8 @@ Andreas 'randy' Weinberger
 Kenneth Aafløy <ke-aa@frisurf.no>
   for adding support for Typhoon DVB-S budget card
 
+Ernst Peinlich <e.peinlich@inode.at>
+  for tuning/DiSEqC support for the DEC 3000-s
 
 (If you think you should be in this list, but you are not, drop a
  line to the DVB mailing list)
