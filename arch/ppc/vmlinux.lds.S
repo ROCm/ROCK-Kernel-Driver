@@ -87,9 +87,9 @@ SECTIONS
 
   . = ALIGN(4096);
   __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { 
-    *(.data.init);
+  .init.text : { *(.init.text) }
+  .init.data : { 
+    *(.init.data);
     __vtop_table_begin = .;
     *(.vtop_fixup);
     __vtop_table_end = .;
@@ -99,7 +99,7 @@ SECTIONS
   }
   . = ALIGN(16);
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : {
@@ -121,29 +121,29 @@ SECTIONS
 
   . = ALIGN(4096);
   __pmac_begin = .;
-  .text.pmac : { *(.text.pmac) }
-  .data.pmac : { *(.data.pmac) }
+  .pmac.text : { *(.pmac.text) }
+  .pmac.data : { *(.pmac.data) }
   . = ALIGN(4096);
   __pmac_end = .;
 
   . = ALIGN(4096);
   __prep_begin = .;
-  .text.prep : { *(.text.prep) }
-  .data.prep : { *(.data.prep) }
+  .prep.text : { *(.prep.text) }
+  .prep.data : { *(.prep.data) }
   . = ALIGN(4096);
   __prep_end = .;
 
   . = ALIGN(4096);
   __chrp_begin = .;
-  .text.chrp : { *(.text.chrp) }
-  .data.chrp : { *(.data.chrp) }
+  .chrp.text : { *(.chrp.text) }
+  .chrp.data : { *(.chrp.data) }
   . = ALIGN(4096);
   __chrp_end = .;
 
   . = ALIGN(4096);
   __openfirmware_begin = .;
-  .text.openfirmware : { *(.text.openfirmware) }
-  .data.openfirmware : { *(.data.openfirmware) }
+  .openfirmware.text : { *(.openfirmware.text) }
+  .openfirmware.data : { *(.openfirmware.data) }
   . = ALIGN(4096);
   __openfirmware_end = .;
 
