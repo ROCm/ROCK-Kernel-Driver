@@ -29,25 +29,36 @@
 #include <linux/completion.h>
 #include <linux/cdrom.h>
 #include <linux/slab.h>
+#include <linux/bio.h>
 
+#include "../scsi/scsi.h"
 #include <scsi/scsi.h>
+#include <scsi/scsi_ioctl.h>
 
 #include <asm/uaccess.h>
 
-int blk_do_rq(request_queue_t *q, struct request *rq)
+#define BLK_DEFAULT_TIMEOUT	(60 * HZ)
+
+int blk_do_rq(request_queue_t *q, struct block_device *bdev, struct request *rq)
 {
 	DECLARE_COMPLETION(wait);
 	int err = 0;
 
+	rq->rq_dev = to_kdev_t(bdev->bd_dev);
+	rq->rq_disk = bdev->bd_disk;
+
+	/*
+	 * we need an extra reference to the request, so we can look at
+	 * it after io completion
+	 */
+	rq->ref_count++;
+
 	rq->flags |= REQ_NOMERGE;
 	rq->waiting = &wait;
-	elv_add_request(q, rq, 1);
+	elv_add_request(q, rq, 1, 1);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);
 
-	/*
-	 * for now, never retry anything
-	 */
 	if (rq->errors)
 		err = -EIO;
 
@@ -74,42 +85,52 @@ static int scsi_get_bus(request_queue_t *q, int *p)
 
 static int sg_get_timeout(request_queue_t *q)
 {
-	return HZ;
+	return q->sg_timeout;
 }
 
 static int sg_set_timeout(request_queue_t *q, int *p)
 {
-	int timeout;
-	int error = get_user(timeout, p);
-	return error;
-}
+	int timeout, err = get_user(timeout, p);
 
-static int reserved_size = 0;
+	if (!err)
+		q->sg_timeout = timeout;
+
+	return err;
+}
 
 static int sg_get_reserved_size(request_queue_t *q, int *p)
 {
-	return put_user(reserved_size, p);
+	return put_user(q->sg_reserved_size, p);
 }
 
 static int sg_set_reserved_size(request_queue_t *q, int *p)
 {
-	int size;
-	int error = get_user(size, p);
-	if (!error)
-		reserved_size = size;
-	return error;
+	int size, err = get_user(size, p);
+
+	if (!err)
+		q->sg_reserved_size = size;
+
+	return err;
 }
 
+/*
+ * will always return that we are ATAPI even for a real SCSI drive, I'm not
+ * so sure this is worth doing anything about (why would you care??)
+ */
 static int sg_emulated_host(request_queue_t *q, int *p)
 {
 	return put_user(1, p);
 }
 
-static int sg_io(request_queue_t *q, struct sg_io_hdr *uptr)
+static int sg_io(request_queue_t *q, struct block_device *bdev,
+		 struct sg_io_hdr *uptr)
 {
-	int err;
+	unsigned long uaddr, start_time;
+	int err, reading, writing, nr_sectors;
 	struct sg_io_hdr hdr;
 	struct request *rq;
+	struct bio *bio;
+	char sense[24];
 	void *buffer;
 
 	if (!access_ok(VERIFY_WRITE, uptr, sizeof(*uptr)))
@@ -117,47 +138,260 @@ static int sg_io(request_queue_t *q, struct sg_io_hdr *uptr)
 	if (copy_from_user(&hdr, uptr, sizeof(*uptr)))
 		return -EFAULT;
 
-	if ( hdr.cmd_len > sizeof(rq->cmd) )
+	if (hdr.interface_id != 'S')
+		return -EINVAL;
+	if (hdr.cmd_len > sizeof(rq->cmd))
+		return -EINVAL;
+	if (!access_ok(VERIFY_READ, hdr.cmdp, hdr.cmd_len))
+		return -EFAULT;
+
+	if (hdr.dxfer_len > 65536)
 		return -EINVAL;
 
+	/*
+	 * we'll do that later
+	 */
+	if (hdr.iovec_count)
+		return -EOPNOTSUPP;
+
+	nr_sectors = 0;
+	reading = writing = 0;
 	buffer = NULL;
+	bio = NULL;
 	if (hdr.dxfer_len) {
 		unsigned int bytes = (hdr.dxfer_len + 511) & ~511;
 
 		switch (hdr.dxfer_direction) {
 		default:
 			return -EINVAL;
-		case SG_DXFER_TO_DEV:
-		case SG_DXFER_FROM_DEV:
 		case SG_DXFER_TO_FROM_DEV:
+			reading = 1;
+			/* fall through */
+		case SG_DXFER_TO_DEV:
+			writing = 1;
+			break;
+		case SG_DXFER_FROM_DEV:
+			reading = 1;
 			break;
 		}
-		buffer = kmalloc(bytes, GFP_USER);
-		if (!buffer)
-			return -ENOMEM;
-		if (hdr.dxfer_direction == SG_DXFER_TO_DEV ||
-		    hdr.dxfer_direction == SG_DXFER_TO_FROM_DEV)
-			copy_from_user(buffer, hdr.dxferp, hdr.dxfer_len);
+
+		uaddr = (unsigned long) hdr.dxferp;
+		if (writing && !access_ok(VERIFY_WRITE, uaddr, bytes))
+			return -EFAULT;
+		else if (reading && !access_ok(VERIFY_READ, uaddr, bytes))
+			return -EFAULT;
+
+		/*
+		 * first try to map it into a bio. reading from device will
+		 * be a write to vm.
+		 */
+		bio = bio_map_user(bdev, uaddr, hdr.dxfer_len, reading);
+		if (bio) {
+			if (writing)
+				bio->bi_rw |= (1 << BIO_RW);
+
+			nr_sectors = (bio->bi_size + 511) >> 9;
+
+			if (bio->bi_size < hdr.dxfer_len) {
+				bio_endio(bio, bio->bi_size, 0);
+				bio_unmap_user(bio, 0);
+				bio = NULL;
+			}
+		}
+
+		/*
+		 * if bio setup failed, fall back to slow approach
+		 */
+		if (!bio) {
+			buffer = kmalloc(bytes, q->bounce_gfp | GFP_USER);
+			if (!buffer)
+				return -ENOMEM;
+
+			nr_sectors = bytes >> 9;
+			if (writing)
+				copy_from_user(buffer,hdr.dxferp,hdr.dxfer_len);
+			else
+				memset(buffer, 0, hdr.dxfer_len);
+		}
 	}
 
 	rq = blk_get_request(q, WRITE, __GFP_WAIT);
-	rq->timeout = 60*HZ;
-	rq->data = buffer;
-	rq->data_len = hdr.dxfer_len;
-	rq->flags = REQ_BLOCK_PC;
-	memset(rq->cmd, 0, sizeof(rq->cmd));
+
+	/*
+	 * fill in request structure
+	 */
 	copy_from_user(rq->cmd, hdr.cmdp, hdr.cmd_len);
-	err = blk_do_rq(q, rq);
+	if (sizeof(rq->cmd) != hdr.cmd_len)
+		memset(rq->cmd + hdr.cmd_len, 0, sizeof(rq->cmd) - hdr.cmd_len);
+
+	memset(sense, 0, sizeof(sense));
+	rq->sense = sense;
+	rq->sense_len = 0;
+
+	rq->flags |= REQ_BLOCK_PC;
+	if (writing)
+		rq->flags |= REQ_RW;
+
+	rq->hard_nr_sectors = rq->nr_sectors = nr_sectors;
+	rq->hard_cur_sectors = rq->current_nr_sectors = nr_sectors;
+
+	if (bio) {
+		/*
+		 * subtle -- if bio_map_user() ended up bouncing a bio, it
+		 * would normally disappear when its bi_end_io is run.
+		 * however, we need it for the unmap, so grab an extra
+		 * reference to it
+		 */
+		bio_get(bio);
+
+		rq->nr_phys_segments = bio_phys_segments(q, bio);
+		rq->nr_hw_segments = bio_hw_segments(q, bio);
+		rq->current_nr_sectors = bio_cur_sectors(bio);
+		rq->hard_cur_sectors = rq->current_nr_sectors;
+		rq->buffer = bio_data(bio);
+	}
+
+	rq->data_len = hdr.dxfer_len;
+	rq->data = buffer;
+
+	rq->timeout = hdr.timeout;
+	if (!rq->timeout)
+		rq->timeout = q->sg_timeout;
+	if (!rq->timeout)
+		rq->timeout = BLK_DEFAULT_TIMEOUT;
+
+	rq->bio = rq->biotail = bio;
+
+	start_time = jiffies;
+
+	/*
+	 * return -EIO if we didn't transfer all data, caller can look at
+	 * residual count to find out how much did succeed
+	 */
+	err = blk_do_rq(q, bdev, rq);
+	if (rq->data_len > 0)
+		err = -EIO;
+	
+	if (bio) {
+		bio_unmap_user(bio, reading);
+		bio_put(bio);
+	}
+
+	hdr.status = rq->errors;
+	hdr.resid = rq->data_len;
+	hdr.duration = (jiffies - start_time) * (1000 / HZ);
+
+	if (rq->sense_len && hdr.sbp) {
+		if (!copy_to_user(hdr.sbp,rq->sense, rq->sense_len))
+			hdr.sb_len_wr = rq->sense_len;
+	}
 
 	blk_put_request(rq);
 
 	copy_to_user(uptr, &hdr, sizeof(*uptr));
+
 	if (buffer) {
-		if (hdr.dxfer_direction == SG_DXFER_FROM_DEV ||
-		    hdr.dxfer_direction == SG_DXFER_TO_FROM_DEV)
+		if (reading)
 			copy_to_user(hdr.dxferp, buffer, hdr.dxfer_len);
+
 		kfree(buffer);
 	}
+
+	return err;
+}
+
+#define FORMAT_UNIT_TIMEOUT		(2 * 60 * 60 * HZ)
+#define START_STOP_TIMEOUT		(60 * HZ)
+#define MOVE_MEDIUM_TIMEOUT		(5 * 60 * HZ)
+#define READ_ELEMENT_STATUS_TIMEOUT	(5 * 60 * HZ)
+#define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
+
+static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
+			 Scsi_Ioctl_Command *sic)
+{
+	struct request *rq;
+	int err, in_len, out_len, bytes, opcode, cmdlen;
+	char *buffer = NULL, sense[24];
+
+	/*
+	 * get in an out lengths, verify they don't exceed a page worth of data
+	 */
+	if (get_user(in_len, &sic->inlen))
+		return -EFAULT;
+	if (get_user(out_len, &sic->outlen))
+		return -EFAULT;
+	if (in_len > PAGE_SIZE || out_len > PAGE_SIZE)
+		return -EINVAL;
+	if (get_user(opcode, sic->data))
+		return -EFAULT;
+
+	bytes = max(in_len, out_len);
+	if (bytes) {
+		buffer = kmalloc(bytes, q->bounce_gfp | GFP_USER);
+		if (!buffer)
+			return -ENOMEM;
+
+		memset(buffer, 0, bytes);
+	}
+
+	rq = blk_get_request(q, WRITE, __GFP_WAIT);
+
+	cmdlen = COMMAND_SIZE(opcode);
+
+	/*
+	 * get command and data to send to device, if any
+	 */
+	err = -EFAULT;
+	if (copy_from_user(rq->cmd, sic->data, cmdlen))
+		goto error;
+
+	if (copy_from_user(buffer, sic->data + cmdlen, in_len))
+		goto error;
+
+	switch (opcode) {
+		case FORMAT_UNIT:
+			rq->timeout = FORMAT_UNIT_TIMEOUT;
+			break;
+		case START_STOP:
+			rq->timeout = START_STOP_TIMEOUT;
+			break;
+		case MOVE_MEDIUM:
+			rq->timeout = MOVE_MEDIUM_TIMEOUT;
+			break;
+		case READ_ELEMENT_STATUS:
+			rq->timeout = READ_ELEMENT_STATUS_TIMEOUT;
+			break;
+		case READ_DEFECT_DATA:
+			rq->timeout = READ_DEFECT_DATA_TIMEOUT;
+			break;
+		default:
+			rq->timeout = BLK_DEFAULT_TIMEOUT;
+			break;
+	}
+
+	memset(sense, 0, sizeof(sense));
+	rq->sense = sense;
+	rq->sense_len = 0;
+
+	rq->data = buffer;
+	rq->data_len = bytes;
+	rq->flags |= REQ_BLOCK_PC;
+	if (in_len)
+		rq->flags |= REQ_RW;
+
+	err = blk_do_rq(q, bdev, rq);
+	if (err) {
+		if (rq->sense_len)
+			if (copy_to_user(sic->data, rq->sense, rq->sense_len))
+				err = -EFAULT;
+	} else {
+		if (copy_to_user(sic->data, buffer, out_len))
+			err = -EFAULT;
+	}
+	
+error:
+	kfree(buffer);
+	blk_put_request(rq);
 	return err;
 }
 
@@ -172,6 +406,9 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 		return -ENXIO;
 
 	switch (cmd) {
+		/*
+		 * new sgv3 interface
+		 */
 		case SG_GET_VERSION_NUM:
 			return sg_get_version((int *) arg);
 		case SCSI_IOCTL_GET_IDLUN:
@@ -189,7 +426,25 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 		case SG_EMULATED_HOST:
 			return sg_emulated_host(q, (int *) arg);
 		case SG_IO:
-			return sg_io(q, (struct sg_io_hdr *) arg);
+			err = bd_claim(bdev, current);
+			if (err)
+				break;
+			err = sg_io(q, bdev, (struct sg_io_hdr *) arg);
+			bd_release(bdev);
+			break;
+		/*
+		 * old junk scsi send command ioctl
+		 */
+		case SCSI_IOCTL_SEND_COMMAND:
+			if (!arg)
+				return -EINVAL;
+
+			err = bd_claim(bdev, current);
+			if (err)
+				break;
+			err = sg_scsi_ioctl(q, bdev, (Scsi_Ioctl_Command *)arg);
+			bd_release(bdev);
+			break;
 		case CDROMCLOSETRAY:
 			close = 1;
 		case CDROMEJECT:
@@ -197,11 +452,11 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			rq->flags = REQ_BLOCK_PC;
 			rq->data = NULL;
 			rq->data_len = 0;
-			rq->timeout = 60*HZ;
+			rq->timeout = BLK_DEFAULT_TIMEOUT;
 			memset(rq->cmd, 0, sizeof(rq->cmd));
 			rq->cmd[0] = GPCMD_START_STOP_UNIT;
 			rq->cmd[4] = 0x02 + (close != 0);
-			err = blk_do_rq(q, rq);
+			err = blk_do_rq(q, bdev, rq);
 			blk_put_request(rq);
 			break;
 		default:
