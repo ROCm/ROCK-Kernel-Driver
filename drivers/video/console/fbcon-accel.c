@@ -17,9 +17,6 @@
 #include "fbcon.h"
 #include "fbcon-accel.h"
 
-void fbcon_accel_setup(struct display *p)
-{
-}
 
 void fbcon_accel_bmove(struct display *p, int sy, int sx, int dy, int dx,
 		       int height, int width)
@@ -53,26 +50,6 @@ void fbcon_accel_clear(struct vc_data *vc, struct display *p, int sy,
 	info->fbops->fb_fillrect(info, &region);
 }
 
-void fbcon_accel_putc(struct vc_data *vc, struct display *p, int c, int yy,
-		      int xx)
-{
-	struct fb_info *info = p->fb_info;
-	unsigned short charmask = p->charmask;
-	unsigned int width = ((fontwidth(p) + 7) >> 3);
-	struct fb_image image;
-
-	image.fg_color = attr_fgcol(p, c);
-	image.bg_color = attr_bgcol(p, c);
-	image.dx = xx * fontwidth(p);
-	image.dy = yy * fontheight(p);
-	image.width = fontwidth(p);
-	image.height = fontheight(p);
-	image.depth = 1;
-	image.data = p->fontdata + (c & charmask) * fontheight(p) * width;
-
-	info->fbops->fb_imageblit(info, &image);
-}
-
 void fbcon_accel_putcs(struct vc_data *vc, struct display *p,
 		       const unsigned short *s, int count, int yy, int xx)
 {
@@ -96,21 +73,6 @@ void fbcon_accel_putcs(struct vc_data *vc, struct display *p,
 		info->fbops->fb_imageblit(info, &image);
 		image.dx += fontwidth(p);
 	}
-}
-
-void fbcon_accel_revc(struct display *p, int xx, int yy)
-{
-	struct fb_info *info = p->fb_info;
-	struct fb_fillrect region;
-
-	region.color = attr_fgcol_ec(p, p->conp);
-	region.dx = xx * fontwidth(p);
-	region.dy = yy * fontheight(p);
-	region.width = fontwidth(p);
-	region.height = fontheight(p);
-	region.rop = ROP_XOR;
-
-	info->fbops->fb_fillrect(info, &region);
 }
 
 void fbcon_accel_clear_margins(struct vc_data *vc, struct display *p,
@@ -249,12 +211,9 @@ void fbcon_accel_cursor(struct display *p, int flags, int xx, int yy)
 	 */
 
 struct display_switch fbcon_accel = {
-	.setup 		= fbcon_accel_setup,
 	.bmove 		= fbcon_accel_bmove,
 	.clear 		= fbcon_accel_clear,
-	.putc 		= fbcon_accel_putc,
 	.putcs 		= fbcon_accel_putcs,
-	.revc 		= fbcon_accel_revc,
 	.clear_margins 	= fbcon_accel_clear_margins,
 	.cursor 	= fbcon_accel_cursor,
 	.fontwidthmask 	= FONTWIDTHRANGE(1, 16)
@@ -278,10 +237,7 @@ void cleanup_module(void)
 	 */
 
 EXPORT_SYMBOL(fbcon_accel);
-EXPORT_SYMBOL(fbcon_accel_setup);
 EXPORT_SYMBOL(fbcon_accel_bmove);
 EXPORT_SYMBOL(fbcon_accel_clear);
-EXPORT_SYMBOL(fbcon_accel_putc);
 EXPORT_SYMBOL(fbcon_accel_putcs);
-EXPORT_SYMBOL(fbcon_accel_revc);
 EXPORT_SYMBOL(fbcon_accel_clear_margins);

@@ -597,7 +597,6 @@ static int fbcon_changevar(int con)
 		       		"fbcon_set_display: type %d (aux %d, depth %d) not "
 		       		"supported\n", info->fix.type, info->fix.type_aux,
 		       		info->var.bits_per_pixel);
-			p->dispsw->setup(p);
 
 		if (vc->vc_cols != nr_cols || vc->vc_rows != nr_rows)
 			vc_resize(con, nr_cols, nr_rows);
@@ -827,7 +826,6 @@ static void fbcon_set_display(int con, int init, int logo)
 		       "fbcon_set_display: type %d (aux %d, depth %d) not "
 		       "supported\n", info->fix.type, info->fix.type_aux,
 		       info->var.bits_per_pixel);
-	p->dispsw->setup(p);
 
 	if (!init) {
 		if (vc->vc_cols != nr_cols || vc->vc_rows != nr_rows)
@@ -945,14 +943,17 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 
 static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 {
-	int unit = vc->vc_num;
-	struct display *p = &fb_display[unit];
+	struct display *p = &fb_display[vc->vc_num];
+	struct fb_info *info = p->fb_info;
+	unsigned short charmask = p->charmask;
+	unsigned int width = ((fontwidth(p) + 7) >> 3);
+	struct fb_image image;
 	int redraw_cursor = 0;
 
 	if (!p->can_soft_blank && console_blanked)
 		return;
 
-	if (vt_cons[unit]->vc_mode != KD_TEXT)
+	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
 		return;
 
 	if ((p->cursor_x == xpos) && (p->cursor_y == ypos)) {
@@ -960,7 +961,16 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 		redraw_cursor = 1;
 	}
 
-	p->dispsw->putc(vc, p, c, real_y(p, ypos), xpos);
+	image.fg_color = attr_fgcol(p, c);
+	image.bg_color = attr_bgcol(p, c);
+	image.dx = xpos * fontwidth(p);
+	image.dy = real_y(p, ypos) * fontheight(p);
+	image.width = fontwidth(p);
+	image.height = fontheight(p);
+	image.depth = 1;
+	image.data = p->fontdata + (c & charmask) * fontheight(p) * width;
+
+	info->fbops->fb_imageblit(info, &image);
 
 	if (redraw_cursor)
 		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
@@ -2604,24 +2614,24 @@ static int __init fbcon_show_logo(void)
  */
 
 const struct consw fb_con = {
-	.con_startup = fbcon_startup,
-	.con_init = fbcon_init,
-	.con_deinit = fbcon_deinit,
-	.con_clear = fbcon_clear,
-	.con_putc = fbcon_putc,
-	.con_putcs = fbcon_putcs,
-	.con_cursor = fbcon_cursor,
-	.con_scroll = fbcon_scroll,
-	.con_bmove = fbcon_bmove,
-	.con_switch = fbcon_switch,
-	.con_blank = fbcon_blank,
-	.con_font_op = fbcon_font_op,
-	.con_set_palette = fbcon_set_palette,
-	.con_scrolldelta = fbcon_scrolldelta,
-	.con_set_origin = fbcon_set_origin,
-	.con_invert_region = fbcon_invert_region,
-	.con_screen_pos = fbcon_screen_pos,
-	.con_getxy = fbcon_getxy,
+	.con_startup 		= fbcon_startup,
+	.con_init 		= fbcon_init,
+	.con_deinit 		= fbcon_deinit,
+	.con_clear 		= fbcon_clear,
+	.con_putc 		= fbcon_putc,
+	.con_putcs 		= fbcon_putcs,
+	.con_cursor 		= fbcon_cursor,
+	.con_scroll 		= fbcon_scroll,
+	.con_bmove 		= fbcon_bmove,
+	.con_switch 		= fbcon_switch,
+	.con_blank 		= fbcon_blank,
+	.con_font_op 		= fbcon_font_op,
+	.con_set_palette 	= fbcon_set_palette,
+	.con_scrolldelta 	= fbcon_scrolldelta,
+	.con_set_origin 	= fbcon_set_origin,
+	.con_invert_region 	= fbcon_invert_region,
+	.con_screen_pos 	= fbcon_screen_pos,
+	.con_getxy 		= fbcon_getxy,
 };
 
 
@@ -2636,14 +2646,10 @@ static void fbcon_dummy_op(void)
 #define DUMMY	(void *)fbcon_dummy_op
 
 struct display_switch fbcon_dummy = {
-	.setup = DUMMY,
 	.bmove = DUMMY,
 	.clear = DUMMY,
-	.putc = DUMMY,
 	.putcs = DUMMY,
-	.revc = DUMMY,
 };
-
 
 /*
  *  Visible symbols for modules

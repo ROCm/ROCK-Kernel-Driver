@@ -18,7 +18,6 @@
 #endif
 
 extern struct display_switch fbcon_accel;
-extern void fbcon_accel_setup(struct display *p);
 extern void fbcon_accel_bmove(struct display *p, int sy, int sx, int dy,
 			      int dx, int height, int width);
 extern void fbcon_accel_clear(struct vc_data *vc, struct display *p, int sy,

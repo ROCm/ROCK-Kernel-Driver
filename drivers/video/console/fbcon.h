@@ -25,17 +25,13 @@ struct display;
      */
  
 struct display_switch {                                                
-    void (*setup)(struct display *p);
     void (*bmove)(struct display *p, int sy, int sx, int dy, int dx,
 		  int height, int width);
     /* for clear, conp may be NULL, which means use a blanking (black) color */
     void (*clear)(struct vc_data *conp, struct display *p, int sy, int sx,
 		  int height, int width);
-    void (*putc)(struct vc_data *conp, struct display *p, int c, int yy,
-    		 int xx);
     void (*putcs)(struct vc_data *conp, struct display *p, const unsigned short *s,
 		  int count, int yy, int xx);     
-    void (*revc)(struct display *p, int xx, int yy);
     void (*cursor)(struct display *p, int flags, int xx, int yy);
     int  (*set_font)(struct display *p, int width, int height);
     void (*clear_margins)(struct vc_data *conp, struct display *p,
