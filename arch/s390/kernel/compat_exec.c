@@ -69,6 +69,7 @@ int setup_arg_pages32(struct linux_binprm *bprm, int executable_stack)
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = 0;
 		mpnt->vm_file = NULL;
+		mpol_set_vma_default(mpnt);
 		INIT_LIST_HEAD(&mpnt->shared);
 		mpnt->vm_private_data = (void *) 0;
 		insert_vm_struct(mm, mpnt);

@@ -387,7 +387,8 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 			struct vm_area_struct *prev,
 			struct rb_node *rb_parent, unsigned long addr, 
 			unsigned long end, unsigned long vm_flags,
-			struct file *file, unsigned long pgoff)
+		     	struct file *file, unsigned long pgoff,
+		        struct mempolicy *policy)
 {
 	spinlock_t *lock = &mm->page_table_lock;
 	struct inode *inode = file ? file->f_dentry->d_inode : NULL;
@@ -411,6 +412,7 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 	 * Can it merge with the predecessor?
 	 */
 	if (prev->vm_end == addr &&
+  		        mpol_equal(vma_policy(prev), policy) &&
 			can_vma_merge_after(prev, vm_flags, file, pgoff)) {
 		struct vm_area_struct *next;
 		int need_up = 0;
@@ -428,6 +430,7 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 		 */
 		next = prev->vm_next;
 		if (next && prev->vm_end == next->vm_start &&
+		    		vma_mpol_equal(prev, next) &&
 				can_vma_merge_before(next, vm_flags, file,
 					pgoff, (end - addr) >> PAGE_SHIFT)) {
 			prev->vm_end = next->vm_end;
@@ -440,6 +443,7 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 				fput(file);
 
 			mm->map_count--;
+			mpol_free(vma_policy(next));
 			kmem_cache_free(vm_area_cachep, next);
 			return prev;
 		}
@@ -455,6 +459,8 @@ static struct vm_area_struct *vma_merge(struct mm_struct *mm,
 	prev = prev->vm_next;
 	if (prev) {
  merge_next:
+ 		if (!mpol_equal(policy, vma_policy(prev)))
+  			return 0;
 		if (!can_vma_merge_before(prev, vm_flags, file,
 				pgoff, (end - addr) >> PAGE_SHIFT))
 			return NULL;
@@ -631,7 +637,7 @@ munmap_back:
 	/* Can we just expand an old anonymous mapping? */
 	if (!file && !(vm_flags & VM_SHARED) && rb_parent)
 		if (vma_merge(mm, prev, rb_parent, addr, addr + len,
-					vm_flags, NULL, 0))
+					vm_flags, NULL, pgoff, NULL))
 			goto out;
 
 	/*
@@ -654,6 +660,7 @@ munmap_back:
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
 	vma->vm_next = NULL;
+	mpol_set_vma_default(vma);
 	INIT_LIST_HEAD(&vma->shared);
 
 	if (file) {
@@ -693,7 +700,9 @@ munmap_back:
 	addr = vma->vm_start;
 
 	if (!file || !rb_parent || !vma_merge(mm, prev, rb_parent, addr,
-				addr + len, vma->vm_flags, file, pgoff)) {
+					      vma->vm_end,
+					      vma->vm_flags, file, pgoff,
+					      vma_policy(vma))) {
 		vma_link(mm, vma, prev, rb_link, rb_parent);
 		if (correct_wcount)
 			atomic_inc(&inode->i_writecount);
@@ -703,6 +712,7 @@ munmap_back:
 				atomic_inc(&inode->i_writecount);
 			fput(file);
 		}
+		mpol_free(vma_policy(vma));
 		kmem_cache_free(vm_area_cachep, vma);
 	}
 out:	
@@ -1118,6 +1128,7 @@ static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 
 	remove_shared_vm_struct(area);
 
+	mpol_free(vma_policy(area));
 	if (area->vm_ops && area->vm_ops->close)
 		area->vm_ops->close(area);
 	if (area->vm_file)
@@ -1200,6 +1211,7 @@ detach_vmas_to_be_unmapped(struct mm_struct *mm, struct vm_area_struct *vma,
 int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	      unsigned long addr, int new_below)
 {
+	struct mempolicy *pol;
 	struct vm_area_struct *new;
 	struct address_space *mapping = NULL;
 
@@ -1221,6 +1233,13 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 		new->vm_start = addr;
 		new->vm_pgoff += ((addr - vma->vm_start) >> PAGE_SHIFT);
 	}
+
+	pol = mpol_copy(vma_policy(vma));
+	if (IS_ERR(pol)) {
+		kmem_cache_free(vm_area_cachep, new);
+		return PTR_ERR(pol);
+	}
+	vma_set_policy(new, pol);
 
 	if (new->vm_file)
 		get_file(new->vm_file);
@@ -1391,7 +1410,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 
 	/* Can we just expand an old anonymous mapping? */
 	if (rb_parent && vma_merge(mm, prev, rb_parent, addr, addr + len,
-					flags, NULL, 0))
+					flags, NULL, 0, NULL))
 		goto out;
 
 	/*
@@ -1412,6 +1431,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	vma->vm_pgoff = 0;
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
+	mpol_set_vma_default(vma);
 	INIT_LIST_HEAD(&vma->shared);
 
 	vma_link(mm, vma, prev, rb_link, rb_parent);
@@ -1472,6 +1492,7 @@ void exit_mmap(struct mm_struct *mm)
 		}
 		if (vma->vm_file)
 			fput(vma->vm_file);
+		mpol_free(vma_policy(vma));
 		kmem_cache_free(vm_area_cachep, vma);
 		vma = next;
 	}
@@ -1508,7 +1529,7 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 
 	find_vma_prepare(mm, addr, &prev, &rb_link, &rb_parent);
 	new_vma = vma_merge(mm, prev, rb_parent, addr, addr + len,
-			vma->vm_flags, vma->vm_file, pgoff);
+			vma->vm_flags, vma->vm_file, pgoff, vma_policy(vma));
 	if (new_vma) {
 		/*
 		 * Source vma may have been merged into new_vma

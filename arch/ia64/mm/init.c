@@ -132,6 +132,7 @@ ia64_init_addr_space (void)
 		vma->vm_pgoff = 0;
 		vma->vm_file = NULL;
 		vma->vm_private_data = NULL;
+		mpol_set_vma_default(vma);
 		insert_vm_struct(current->mm, vma);
 	}
 
@@ -144,6 +145,7 @@ ia64_init_addr_space (void)
 			vma->vm_end = PAGE_SIZE;
 			vma->vm_page_prot = __pgprot(pgprot_val(PAGE_READONLY) | _PAGE_MA_NAT);
 			vma->vm_flags = VM_READ | VM_MAYREAD | VM_IO | VM_RESERVED;
+			mpol_set_vma_default(vma);
 			insert_vm_struct(current->mm, vma);
 		}
 	}

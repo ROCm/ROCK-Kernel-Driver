@@ -2321,6 +2321,7 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 	vma->vm_ops	     = NULL;
 	vma->vm_pgoff	     = 0;
 	vma->vm_file	     = NULL;
+	mpol_set_vma_default(vma);
 	vma->vm_private_data = NULL; 
 
 	/*

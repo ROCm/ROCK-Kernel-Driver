@@ -791,6 +791,7 @@ asmlinkage NORET_TYPE void do_exit(long code)
 	__exit_fs(tsk);
 	exit_namespace(tsk);
 	exit_thread();
+	mpol_free(tsk->mempolicy);
 
 	if (tsk->signal->leader)
 		disassociate_ctty(1);
