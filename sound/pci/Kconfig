@@ -184,6 +184,17 @@ config SND_EMU10K1X
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-emu10k1x.
 
+config SND_CA0106
+	tristate "SB Audigy LS / Live 24bit"
+	depends on SND
+	select SND_AC97_CODEC
+	help
+	  Say Y here to include support for the Sound Blaster Audigy LS
+	  and Live 24bit.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-ca0106.
+
 config SND_KORG1212
 	tristate "Korg 1212 IO"
 	depends on SND
