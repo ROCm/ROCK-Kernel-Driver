@@ -1434,6 +1434,12 @@ config FS_MBCACHE
 	default m if EXT2_FS=m || EXT3_FS=m
 	default y if EXT2_FS=y || EXT3_FS=y
 
+# Posix ACL utility routines (for now, only ext2/ext3)
+config FS_POSIX_ACL
+	bool
+	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL
+	default y
+
 menu "Partition Types"
 
 source "fs/partitions/Kconfig"
