@@ -817,6 +817,8 @@ static int table_load(struct dm_ioctl *param, size_t param_size)
 		return -ENXIO;
 	}
 
+	if (hc->new_map)
+		dm_table_put(hc->new_map);
 	hc->new_map = t;
 	param->flags |= DM_INACTIVE_PRESENT_FLAG;
 
