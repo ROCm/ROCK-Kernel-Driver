@@ -305,35 +305,58 @@ long sys_sigreturn(struct pt_regs regs)
 {
 	unsigned long __user sp = PT_REGS_SP(&current->thread.regs);
 	struct sigframe __user *frame = (struct sigframe *)(sp - 8);
+	sigset_t set;
 	struct sigcontext __user *sc = &frame->sc;
 	unsigned long __user *mask = &sc->oldmask;
 	int sig_size = (_NSIG_WORDS - 1) * sizeof(unsigned long);
 
+	if(copy_from_user(&set.sig[0], mask, sizeof(&set.sig[0])) ||
+	   copy_from_user(&set.sig[1], mask, sig_size))
+		goto segfault;
+
+	sigdelsetmask(&set, ~_BLOCKABLE);
+
 	spin_lock_irq(&current->sighand->siglock);
-	copy_from_user(&current->blocked.sig[0], mask,
-		       sizeof(current->blocked.sig[0]));
-	copy_from_user(&current->blocked.sig[1], mask, sig_size);
-	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
+	current->blocked = set;
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
-	copy_sc_from_user(&current->thread.regs, sc);
+
+	if(copy_sc_from_user(&current->thread.regs, sc))
+		goto segfault;
+
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
+
+ segfault:
+	force_sig(SIGSEGV, current);
+	return 0;
 }
 
 long sys_rt_sigreturn(struct pt_regs regs)
 {
 	unsigned long __user sp = PT_REGS_SP(&current->thread.regs);
 	struct rt_sigframe __user *frame = (struct rt_sigframe *) (sp - 4);
+	sigset_t set;
 	struct ucontext __user *uc = &frame->uc;
 	int sig_size = _NSIG_WORDS * sizeof(unsigned long);
 
+	if(copy_from_user(&set, &uc->uc_sigmask, sig_size))
+		goto segfault;
+
+	sigdelsetmask(&set, ~_BLOCKABLE);
+
 	spin_lock_irq(&current->sighand->siglock);
-	copy_from_user(&current->blocked, &uc->uc_sigmask, sig_size);
-	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
+	current->blocked = set;
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
-	copy_sc_from_user(&current->thread.regs, &uc->uc_mcontext);
+
+	if(copy_sc_from_user(&current->thread.regs, &uc->uc_mcontext))
+		goto segfault;
+
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
+
+ segfault:
+	force_sig(SIGSEGV, current);
+	return 0;
 }
 
 /*
