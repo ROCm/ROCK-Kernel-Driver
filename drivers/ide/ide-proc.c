@@ -160,8 +160,8 @@ static int proc_ide_read_imodel
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_read_channel
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
+static int proc_ide_read_channel(char *page, char **start,
+		off_t off, int count, int *eof, void *data)
 {
 	struct ata_channel *hwif = data;
 	int		len;

@@ -244,7 +244,7 @@ static int rd_make_request(request_queue_t * q, struct bio *sbh)
 	unsigned long offset, len;
 	int rw = sbh->bi_rw;
 
-	minor = minor(sbh->bi_dev);
+	minor = minor(to_kdev_t(sbh->bi_bdev->bd_dev));
 
 	if (minor >= NUM_RAMDISKS)
 		goto fail;

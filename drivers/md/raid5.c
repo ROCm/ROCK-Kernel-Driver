@@ -418,7 +418,7 @@ static void raid5_end_read_request (struct buffer_head * bh, int uptodate)
 			buffer->b_end_io(buffer, 1);
 		}
 	} else {
-		md_error(conf->mddev, bh->b_dev);
+		md_error(conf->mddev, bh->b_bdev);
 		clear_bit(BH_Uptodate, &bh->b_state);
 	}
 	/* must restore b_page before unlocking buffer... */
@@ -452,7 +452,7 @@ static void raid5_end_write_request (struct buffer_head *bh, int uptodate)
 
 	md_spin_lock_irqsave(&conf->device_lock, flags);
 	if (!uptodate)
-		md_error(conf->mddev, bh->b_dev);
+		md_error(conf->mddev, bh->b_bdev);
 	clear_bit(BH_Lock, &bh->b_state);
 	set_bit(STRIPE_HANDLE, &sh->state);
 	__release_stripe(conf, sh);

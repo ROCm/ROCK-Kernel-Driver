@@ -1255,12 +1255,12 @@ static void idefloppy_create_test_unit_ready_cmd(idefloppy_pc_t *pc)
 	pc->c[0] = IDEFLOPPY_TEST_UNIT_READY_CMD;
 }
 
-static void idefloppy_create_rw_cmd (idefloppy_floppy_t *floppy, idefloppy_pc_t *pc, struct request *rq, unsigned long sector)
+static void idefloppy_create_rw_cmd(idefloppy_floppy_t *floppy, idefloppy_pc_t *pc, struct request *rq, sector_t sector)
 {
 	int block = sector / floppy->bs_factor;
 	int blocks = rq->nr_sectors / floppy->bs_factor;
 	int cmd = rq_data_dir(rq);
-	
+
 #if IDEFLOPPY_DEBUG_LOG
 	printk ("create_rw1%d_cmd: block == %d, blocks == %d\n",
 		2 * test_bit (IDEFLOPPY_USE_READ12, &floppy->flags), block, blocks);
@@ -1287,9 +1287,9 @@ static void idefloppy_create_rw_cmd (idefloppy_floppy_t *floppy, idefloppy_pc_t 
 }
 
 /*
- *	idefloppy_do_request is our request handling function.	
+ * This is our request handling function.
  */
-static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t idefloppy_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	idefloppy_pc_t *pc;
@@ -1297,7 +1297,7 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 #if IDEFLOPPY_DEBUG_LOG
 	printk (KERN_INFO "rq_status: %d, rq_dev: %u, flags: %lx, errors: %d\n",rq->rq_status,(unsigned int) rq->rq_dev,rq->flags,rq->errors);
 	printk (KERN_INFO "sector: %ld, nr_sectors: %ld, current_nr_sectors: %d\n",rq->sector,rq->nr_sectors,rq->current_nr_sectors);
-#endif /* IDEFLOPPY_DEBUG_LOG */
+#endif
 
 	if (rq->errors >= ERROR_MAX) {
 		if (floppy->failed_pc != NULL)
@@ -1314,7 +1314,7 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 			idefloppy_end_request(drive, 0);
 			return ide_stopped;
 		}
-		pc = idefloppy_next_pc_storage (drive);
+		pc = idefloppy_next_pc_storage(drive);
 		idefloppy_create_rw_cmd (floppy, pc, rq, block);
 	} else if (rq->flags & IDEFLOPPY_RQ) {
 		pc = (idefloppy_pc_t *) rq->buffer;
@@ -2063,9 +2063,7 @@ static struct ata_operations idefloppy_driver = {
 	release:		idefloppy_release,
 	check_media_change:	idefloppy_check_media_change,
 	revalidate:		NULL, /* use default method */
-	pre_reset:		NULL,
 	capacity:		idefloppy_capacity,
-	special:		NULL,
 	proc:			idefloppy_proc
 };
 

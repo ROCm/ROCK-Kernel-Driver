@@ -539,6 +539,8 @@ extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned
 extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
 /* readahead.c */
+#define VM_MAX_READAHEAD	128	/* kbytes */
+#define VM_MIN_READAHEAD	16	/* kbytes (includes current page) */
 void do_page_cache_readahead(struct file *file,
 			unsigned long offset, unsigned long nr_to_read);
 void page_cache_readahead(struct file *file, unsigned long offset);

@@ -32,7 +32,6 @@ EXPORT_SYMBOL(fat_statfs);
 EXPORT_SYMBOL(fat_write_inode);
 EXPORT_SYMBOL(register_cvf_format);
 EXPORT_SYMBOL(unregister_cvf_format);
-EXPORT_SYMBOL(fat_get_cluster);
 EXPORT_SYMBOL(fat_dir_ioctl);
 EXPORT_SYMBOL(fat_add_entries);
 EXPORT_SYMBOL(fat_dir_empty);

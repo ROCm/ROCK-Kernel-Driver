@@ -251,6 +251,7 @@ static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor
 	else
 		printk(KERN_INFO " %s:", disk_name(hd, minor(dev), buf));
 	bdev = bdget(kdev_t_to_nr(dev));
+	bdev->bd_contains = bdev;
 	bdev->bd_inode->i_size = (loff_t)hd->part[minor(dev)].nr_sects << 9;
 	bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
 	for (i = 0; check_part[i]; i++) {

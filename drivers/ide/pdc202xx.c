@@ -1057,12 +1057,6 @@ somebody_else:
 		case ide_dma_timeout:
 			if (drive->channel->resetproc != NULL)
 				drive->channel->resetproc(drive);
-		/*
-		 * we cannot support queued operations on promise, so fail to
-		 * to enable it...
-		 */
-		case ide_dma_queued_on:
-			return 1;
 		default:
 			break;
 	}

@@ -225,7 +225,7 @@ read_lba(struct gendisk *hd, struct block_device *bdev, u64 lba,
 	if (!hd || !bdev || !buffer || !count)
 		return 0;
 
-	blocksize = get_hardsect_size(to_kdev_t(bdev->bd_dev));
+	blocksize = bdev_hardsect_size(bdev);
 	if (!blocksize)
 		blocksize = 512;
 
@@ -714,14 +714,11 @@ efi_partition(struct gendisk *hd, struct block_device *bdev,
 {
 
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
-	int hardblocksize = get_hardsect_size(dev);
-	int orig_blksize_size = BLOCK_SIZE;
+	int hardblocksize = bdev_hardsect_size(bdev);
+	int orig_blksize_size = block_size(dev);
 	int rc = 0;
 
 	/* Need to change the block size that the block layer uses */
-	if (blksize_size[major(dev)]) {
-		orig_blksize_size = blksize_size[major(dev)][minor(dev)];
-	}
 
 	if (orig_blksize_size != hardblocksize)
 		set_blocksize(dev, hardblocksize);

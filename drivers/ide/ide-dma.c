@@ -209,36 +209,29 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 			__ide_end_request(drive, 1, rq->nr_sectors);
 			return ide_stopped;
 		}
-		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n",
+		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n", 
 		       drive->name, dma_stat);
 	}
 	return ide_error(drive, "dma_intr", stat);
 }
 
-int ide_build_sglist(struct ata_channel *hwif, struct request *rq)
+static int ide_build_sglist(struct ata_channel *hwif, struct request *rq)
 {
 	request_queue_t *q = &hwif->drives[DEVICE_NR(rq->rq_dev) & 1].queue;
-	struct ata_request *ar = rq->special;
+	struct scatterlist *sg = hwif->sg_table;
+	int nents;
 
-	if (!(ar->ar_flags & ATA_AR_SETUP)) {
-		ar->ar_flags |= ATA_AR_SETUP;
-		ar->ar_sg_nents = blk_rq_map_sg(q, rq, ar->ar_sg_table);
-	}
+	nents = blk_rq_map_sg(q, rq, hwif->sg_table);
 
-	if (rq->q && ar->ar_sg_nents > rq->nr_phys_segments) {
-		printk("%s: received %d phys segments, build %d\n", __FILE__, rq->nr_phys_segments, ar->ar_sg_nents);
-		return 0;
-	} else if (!ar->ar_sg_nents) {
-		printk("%s: zero segments in request\n", __FILE__);
-		return 0;
-	}
+	if (rq->q && nents > rq->nr_phys_segments)
+		printk("ide-dma: received %d phys segments, build %d\n", rq->nr_phys_segments, nents);
 
 	if (rq_data_dir(rq) == READ)
-		ar->ar_sg_ddir = PCI_DMA_FROMDEVICE;
+		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
 	else
-		ar->ar_sg_ddir = PCI_DMA_TODEVICE;
+		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
 
-	return pci_map_sg(hwif->pci_dev, ar->ar_sg_table, ar->ar_sg_nents, ar->ar_sg_ddir);
+	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
 
 /*
@@ -247,17 +240,23 @@ int ide_build_sglist(struct ata_channel *hwif, struct request *rq)
  */
 static int raw_build_sglist(struct ata_channel *ch, struct request *rq)
 {
-	struct ata_request *ar = rq->special;
-	struct scatterlist *sg = ar->ar_sg_table;
-	struct ata_taskfile *args = &ar->ar_task;
+	struct scatterlist *sg = ch->sg_table;
+	int nents = 0;
+	struct ata_taskfile *args = rq->special;
+#if 1
 	unsigned char *virt_addr = rq->buffer;
 	int sector_count = rq->nr_sectors;
-	int nents = 0;
+#else
+        nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
+
+	if (nents > rq->nr_segments)
+		printk("ide-dma: received %d segments, build %d\n", rq->nr_segments, nents);
+#endif
 
 	if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
-		ar->ar_sg_ddir = PCI_DMA_TODEVICE;
+		ch->sg_dma_direction = PCI_DMA_TODEVICE;
 	else
-		ar->ar_sg_ddir = PCI_DMA_FROMDEVICE;
+		ch->sg_dma_direction = PCI_DMA_FROMDEVICE;
 
 	if (sector_count > 128) {
 		memset(&sg[nents], 0, sizeof(*sg));
@@ -275,18 +274,18 @@ static int raw_build_sglist(struct ata_channel *ch, struct request *rq)
 	sg[nents].length =  sector_count  * SECTOR_SIZE;
 	nents++;
 
-	return pci_map_sg(ch->pci_dev, sg, nents, ar->ar_sg_ddir);
+	return pci_map_sg(ch->pci_dev, sg, nents, ch->sg_dma_direction);
 }
 
 /*
- * Prepare a dma request.
+ * ide_build_dmatable() prepares a dma request.
  * Returns 0 if all went okay, returns 1 otherwise.
- * This may also be invoked from trm290.c
+ * May also be invoked from trm290.c
  */
-int ide_build_dmatable(ide_drive_t *drive, struct request *rq,
-		       ide_dma_action_t func)
+int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 {
 	struct ata_channel *hwif = drive->channel;
+	unsigned int *table = hwif->dmatable_cpu;
 #ifdef CONFIG_BLK_DEV_TRM290
 	unsigned int is_trm290_chipset = (hwif->chipset == ide_trm290);
 #else
@@ -295,19 +294,16 @@ int ide_build_dmatable(ide_drive_t *drive, struct request *rq,
 	unsigned int count = 0;
 	int i;
 	struct scatterlist *sg;
-	struct ata_request *ar = rq->special;
-	unsigned int *table = ar->ar_dmatable_cpu;
 
-	if (rq->flags & REQ_DRIVE_TASKFILE)
-		ar->ar_sg_nents = raw_build_sglist(hwif, rq);
-	else
-		ar->ar_sg_nents = ide_build_sglist(hwif, rq);
-
-	if (!ar->ar_sg_nents)
+	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_ACB) {
+		hwif->sg_nents = i = raw_build_sglist(hwif, HWGROUP(drive)->rq);
+	} else {
+		hwif->sg_nents = i = ide_build_sglist(hwif, HWGROUP(drive)->rq);
+	}
+	if (!i)
 		return 0;
 
-	sg = ar->ar_sg_table;
-	i = ar->ar_sg_nents;
+	sg = hwif->sg_table;
 	while (i) {
 		u32 cur_addr;
 		u32 cur_len;
@@ -326,7 +322,7 @@ int ide_build_dmatable(ide_drive_t *drive, struct request *rq,
 
 			if (count++ >= PRD_ENTRIES) {
 				printk("ide-dma: req %p\n", HWGROUP(drive)->rq);
-				printk("count %d, sg_nents %d, cur_len %d, cur_addr %u\n", count, ar->ar_sg_nents, cur_len, cur_addr);
+				printk("count %d, sg_nents %d, cur_len %d, cur_addr %u\n", count, hwif->sg_nents, cur_len, cur_addr);
 				BUG();
 			}
 
@@ -337,7 +333,7 @@ int ide_build_dmatable(ide_drive_t *drive, struct request *rq,
 			if (is_trm290_chipset)
 				xcount = ((xcount >> 2) - 1) << 16;
 			if (xcount == 0x0000) {
-		        /*
+		        /* 
 			 * Most chipsets correctly interpret a length of
 			 * 0x0000 as 64KB, but at least one (e.g. CS5530)
 			 * misinterprets it as zero (!). So here we break
@@ -345,8 +341,8 @@ int ide_build_dmatable(ide_drive_t *drive, struct request *rq,
 			 */
 				if (count++ >= PRD_ENTRIES) {
 					pci_unmap_sg(hwif->pci_dev, sg,
-						     ar->ar_sg_nents,
-						     ar->ar_sg_ddir);
+						     hwif->sg_nents,
+						     hwif->sg_dma_direction);
 					return 0;
 				}
 
@@ -372,12 +368,13 @@ int ide_build_dmatable(ide_drive_t *drive, struct request *rq,
 }
 
 /* Teardown mappings after DMA has completed.  */
-void ide_destroy_dmatable(struct ata_device *d)
+void ide_destroy_dmatable (ide_drive_t *drive)
 {
-	struct pci_dev *dev = d->channel->pci_dev;
-	struct ata_request *ar = IDE_CUR_AR(d);
+	struct pci_dev *dev = drive->channel->pci_dev;
+	struct scatterlist *sg = drive->channel->sg_table;
+	int nents = drive->channel->sg_nents;
 
-	pci_unmap_sg(dev, ar->ar_sg_table, ar->ar_sg_nents, ar->ar_sg_ddir);
+	pci_unmap_sg(dev, sg, nents, drive->channel->sg_dma_direction);
 }
 
 /*
@@ -435,7 +432,7 @@ int report_drive_dmaing (ide_drive_t *drive)
 			printk(", UDMA(133)");	/* UDMA BIOS-enabled! */
 		}
 	} else if ((id->field_valid & 4) && (eighty_ninty_three(drive)) &&
-		  (id->dma_ultra & (id->dma_ultra >> 11) & 7)) {
+	  	  (id->dma_ultra & (id->dma_ultra >> 11) & 7)) {
 		if ((id->dma_ultra >> 13) & 1) {
 			printk(", UDMA(100)");	/* UDMA BIOS-enabled! */
 		} else if ((id->dma_ultra >> 12) & 1) {
@@ -538,41 +535,6 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
 }
 
 /*
- * Start DMA engine.
- */
-int ide_start_dma(struct ata_channel *hwif, ide_drive_t *drive, ide_dma_action_t func)
-{
-	unsigned int reading = 0, count;
-	unsigned long dma_base = hwif->dma_base;
-	struct ata_request *ar = IDE_CUR_AR(drive);
-
-	/* This can happen with drivers abusing the special request field.
-	 */
-
-	if (!ar) {
-		printk(KERN_ERR "DMA without ATA request\n");
-
-		return 1;
-	}
-
-	if (rq_data_dir(ar->ar_rq) == READ)
-		reading = 1 << 3;
-
-	if (hwif->rwproc)
-		hwif->rwproc(drive, func);
-
-	if (!(count = ide_build_dmatable(drive, ar->ar_rq, func)))
-		return 1;	/* try PIO instead of DMA */
-
-	ar->ar_flags |= ATA_AR_SETUP;
-	outl(ar->ar_dmatable, dma_base + 4);	/* PRD table */
-	outb(reading, dma_base);		/* specify r/w */
-	outb(inb(dma_base + 2) | 6, dma_base+2);/* clear INTR & ERROR flags */
-	drive->waiting_for_dma = 1;
-	return 0;
-}
-
-/*
  * ide_dmaproc() initiates/aborts DMA read/write operations on a drive.
  *
  * The caller is assumed to have selected the drive and programmed the drive's
@@ -592,10 +554,9 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
-	u8 unit = (drive->select.b.unit & 0x01);
-	unsigned int reading = 0, set_high = 1;
-	struct ata_request *ar;
-	u8 dma_stat;
+	byte unit = (drive->select.b.unit & 0x01);
+	unsigned int count, reading = 0, set_high = 1;
+	byte dma_stat;
 
 	switch (func) {
 		case ide_dma_off:
@@ -603,24 +564,44 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_off_quietly:
 			set_high = 0;
 			outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-			hwif->dmaproc(ide_dma_queued_off, drive);
-#endif
 		case ide_dma_on:
 			ide_toggle_bounce(drive, set_high);
 			drive->using_dma = (func == ide_dma_on);
-			if (drive->using_dma) {
+			if (drive->using_dma)
 				outb(inb(dma_base+2)|(1<<(5+unit)), dma_base+2);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-				hwif->dmaproc(ide_dma_queued_on, drive);
-#endif
-			}
 			return 0;
 		case ide_dma_check:
 			return config_drive_for_dma (drive);
+		case ide_dma_read:
+			reading = 1 << 3;
+		case ide_dma_write:
+			/* active tuning based on IO direction */
+			if (hwif->rwproc)
+				hwif->rwproc(drive, func);
+
+			if (!(count = ide_build_dmatable(drive, func)))
+				return 1;	/* try PIO instead of DMA */
+			outl(hwif->dmatable_dma, dma_base + 4); /* PRD table */
+			outb(reading, dma_base);			/* specify r/w */
+			outb(inb(dma_base+2)|6, dma_base+2);		/* clear INTR & ERROR flags */
+			drive->waiting_for_dma = 1;
+			if (drive->type != ATA_DISK)
+				return 0;
+
+			BUG_ON(HWGROUP(drive)->handler);
+			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
+			if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_ACB) &&
+			    (drive->addressing == 1)) {
+				struct ata_taskfile *args = HWGROUP(drive)->rq->special;
+
+				OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+			} else if (drive->addressing) {
+				OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
+			} else {
+				OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+			}
+			return drive->channel->dmaproc(ide_dma_begin, drive);
 		case ide_dma_begin:
-			if (test_and_set_bit(IDE_DMA, &HWGROUP(drive)->flags))
-				BUG();
 			/* Note that this is done *after* the cmd has
 			 * been issued to the drive, as per the BM-IDE spec.
 			 * The Promise Ultra33 doesn't work correctly when
@@ -628,43 +609,10 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			 */
 			outb(inb(dma_base)|1, dma_base);		/* start DMA */
 			return 0;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-		case ide_dma_queued_on:
-		case ide_dma_queued_off:
-		case ide_dma_read_queued:
-		case ide_dma_write_queued:
-		case ide_dma_queued_start:
-			return ide_tcq_dmaproc(func, drive);
-#endif
-
-		case ide_dma_read:
-			reading = 1 << 3;
-		case ide_dma_write:
-			ar = IDE_CUR_AR(drive);
-
-			if (ide_start_dma(hwif, drive, func))
-				return 1;
-
-			if (drive->type != ATA_DISK)
-				return 0;
-			BUG_ON(HWGROUP(drive)->handler);
-			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
-			if ((ar->ar_rq->flags & REQ_DRIVE_TASKFILE) &&
-			    (drive->addressing == 1)) {
-				struct ata_taskfile *args = &ar->ar_task;
-				OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
-			} else if (drive->addressing) {
-				OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
-			} else {
-				OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
-			}
-			return hwif->dmaproc(ide_dma_begin, drive);
 		case ide_dma_end: /* returns 1 on error, 0 otherwise */
-			if (!test_and_clear_bit(IDE_DMA, &HWGROUP(drive)->flags))
-				BUG();
 			drive->waiting_for_dma = 0;
 			outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
-			dma_stat = inb(dma_base+2);	/* get DMA status */
+			dma_stat = inb(dma_base+2);		/* get DMA status */
 			outb(dma_stat|6, dma_base+2);	/* clear the INTR & ERROR bits */
 			ide_destroy_dmatable(drive);	/* purge DMA mappings */
 			return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
@@ -687,7 +635,7 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			return 1;
 		case ide_dma_retune:
 		case ide_dma_lostirq:
-			printk(KERN_ERR "%s: chipset supported func only: %d\n", __FUNCTION__, func);
+			printk(KERN_ERR "%s: chipset supported func only: %d\n", __FUNCTION__,  func);
 			return 1;
 		default:
 			printk(KERN_ERR "%s: unsupported func: %d\n", __FUNCTION__, func);
@@ -703,6 +651,17 @@ void ide_release_dma(struct ata_channel *hwif)
 	if (!hwif->dma_base)
 		return;
 
+	if (hwif->dmatable_cpu) {
+		pci_free_consistent(hwif->pci_dev,
+				    PRD_ENTRIES * PRD_BYTES,
+				    hwif->dmatable_cpu,
+				    hwif->dmatable_dma);
+		hwif->dmatable_cpu = NULL;
+	}
+	if (hwif->sg_table) {
+		kfree(hwif->sg_table);
+		hwif->sg_table = NULL;
+	}
 	if ((hwif->dma_extra) && (hwif->unit == 0))
 		release_region((hwif->dma_base + 16), hwif->dma_extra);
 	release_region(hwif->dma_base, 8);
@@ -721,6 +680,20 @@ void ide_setup_dma(struct ata_channel *hwif, unsigned long dma_base, unsigned in
 	}
 	request_region(dma_base, num_ports, hwif->name);
 	hwif->dma_base = dma_base;
+	hwif->dmatable_cpu = pci_alloc_consistent(hwif->pci_dev,
+						  PRD_ENTRIES * PRD_BYTES,
+						  &hwif->dmatable_dma);
+	if (hwif->dmatable_cpu == NULL)
+		goto dma_alloc_failure;
+
+	hwif->sg_table = kmalloc(sizeof(struct scatterlist) * PRD_ENTRIES,
+				 GFP_KERNEL);
+	if (hwif->sg_table == NULL) {
+		pci_free_consistent(hwif->pci_dev, PRD_ENTRIES * PRD_BYTES,
+				    hwif->dmatable_cpu, hwif->dmatable_dma);
+		goto dma_alloc_failure;
+	}
+
 	hwif->dmaproc = &ide_dmaproc;
 
 	if (hwif->chipset != ide_trm290) {
@@ -731,4 +704,7 @@ void ide_setup_dma(struct ata_channel *hwif, unsigned long dma_base, unsigned in
 	}
 	printk("\n");
 	return;
+
+dma_alloc_failure:
+	printk(" -- ERROR, UNABLE TO ALLOCATE DMA TABLES\n");
 }

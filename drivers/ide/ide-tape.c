@@ -2614,9 +2614,9 @@ static void idetape_create_write_cmd (idetape_tape_t *tape, idetape_pc_t *pc, un
 }
 
 /*
- *	idetape_do_request is our request handling function.	
+ * This is our request handling function.
  */
-static ide_startstop_t idetape_do_request (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t idetape_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
 	idetape_tape_t *tape = drive->driver_data;
 	idetape_pc_t *pc;
