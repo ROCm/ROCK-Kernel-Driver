@@ -783,7 +783,7 @@ static int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fhandle,
 				struct nfs_fattr *fattr)
 {
 	struct inode *inode;
-	int error = -EACCES;
+	int error = 0;
 
 	/* We may have been initialized further down */
 	if (dentry->d_inode)
@@ -798,9 +798,12 @@ static int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fhandle,
 	if (inode) {
 		d_instantiate(dentry, inode);
 		nfs_renew_times(dentry);
-		error = 0;
+	} else {
+		error = -ENOMEM;
+		goto out_err;
 	}
 	return error;
+
 out_err:
 	d_drop(dentry);
 	return error;

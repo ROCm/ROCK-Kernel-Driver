@@ -322,9 +322,9 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->namelen = pathinfo.max_namelen;
 	/* Work out a lot of parameters */
 	if (server->rsize == 0)
-		server->rsize = nfs_block_size(fsinfo.rtpref, NULL);
+		server->rsize = nfs_block_size(fsinfo.rtpref <= PAGE_SIZE ?fsinfo.rtpref:PAGE_SIZE, NULL);
 	if (server->wsize == 0)
-		server->wsize = nfs_block_size(fsinfo.wtpref, NULL);
+		server->wsize = nfs_block_size(fsinfo.wtpref <= PAGE_SIZE ?fsinfo.wtpref:PAGE_SIZE, NULL);
 	if (sb->s_blocksize == 0) {
 		if (fsinfo.wtmult == 0) {
 			sb->s_blocksize = 512;
