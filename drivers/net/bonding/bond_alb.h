@@ -24,6 +24,9 @@
  * 2003/08/06 - Amir Noam <amir.noam at intel dot com>
  *	- Add support for setting bond's MAC address with special
  *	  handling required for ALB/TLB.
+ *
+ * 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Code cleanup and style changes
  */
 
 #ifndef __BOND_ALB_H__
@@ -126,10 +129,10 @@ void bond_alb_deinitialize(struct bonding *bond);
 int bond_alb_init_slave(struct bonding *bond, struct slave *slave);
 void bond_alb_deinit_slave(struct bonding *bond, struct slave *slave);
 void bond_alb_handle_link_change(struct bonding *bond, struct slave *slave, char link);
-void bond_alb_assign_current_slave(struct bonding *bond, struct slave *new_slave);
-int bond_alb_xmit(struct sk_buff *skb, struct net_device *dev);
+void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave);
+int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev);
 void bond_alb_monitor(struct bonding *bond);
-int bond_alb_set_mac_address(struct net_device *dev, void *addr);
+int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr);
 
 #endif /* __BOND_ALB_H__ */
 
