@@ -433,7 +433,7 @@ static void __init create_mapping(struct map_desc *md)
 	pgprot_t prot_pte;
 	long off;
 
-	if (md->virtual != vectors_base() && md->virtual < PAGE_OFFSET) {
+	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
 		printk(KERN_WARNING "BUG: not creating mapping for "
 		       "0x%08lx at 0x%08lx in user region\n",
 		       md->physical, md->virtual);
@@ -532,6 +532,14 @@ void __init memtable_init(struct meminfo *mi)
 
 	init_maps = p = alloc_bootmem_low_pages(PAGE_SIZE);
 
+#ifdef CONFIG_XIP_KERNEL
+	p->physical   = CONFIG_XIP_PHYS_ADDR & PMD_MASK;
+	p->virtual    = (unsigned long)&_stext & PMD_MASK;
+	p->length     = ((unsigned long)&_etext - p->virtual + ~PMD_MASK) & PMD_MASK;
+	p->type       = MT_ROM;
+	p ++;
+#endif
+
 	for (i = 0; i < mi->nr_banks; i++) {
 		if (mi->bank[i].size == 0)
 			continue;
@@ -542,14 +550,6 @@ void __init memtable_init(struct meminfo *mi)
 		p->type       = MT_MEMORY;
 		p ++;
 	}
-
-#ifdef CONFIG_XIP_KERNEL
-	p->physical   = CONFIG_XIP_PHYS_ADDR & PMD_MASK;
-	p->virtual    = (unsigned long)&_stext & PMD_MASK;
-	p->length     = ((unsigned long)&_etext - p->virtual + ~PMD_MASK) & PMD_MASK;
-	p->type       = MT_ROM;
-	p ++;
-#endif
 
 #ifdef FLUSH_BASE
 	p->physical   = FLUSH_BASE_PHYS;

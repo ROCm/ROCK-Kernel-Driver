@@ -110,8 +110,9 @@ endif
 TEXTADDR := $(textaddr-y)
 ifeq ($(CONFIG_XIP_KERNEL),y)
   DATAADDR := $(TEXTADDR)
+  xipaddr-$(CONFIG_ARCH_CO285) := 0x5f000000
+  xipaddr-y ?= 0xbf000000
   # Replace phys addr with virt addr while keeping offset from base.
-  xipaddr-y ?= 0xe8000000
   TEXTADDR := $(shell echo $(CONFIG_XIP_PHYS_ADDR) $(xipaddr-y) | \
                       awk --non-decimal-data '/[:xdigit:]/ \
                           { printf("0x%x\n", and($$1, 0x000fffff) + $$2) }' )
