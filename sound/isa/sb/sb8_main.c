@@ -42,8 +42,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Uros Bizjak <uros@kss-loka.si>")
 MODULE_DESCRIPTION("Routines for control of 8-bit SoundBlaster cards and clones");
 MODULE_LICENSE("GPL");
 
-#define chip_t sb_t
-
 #define SB8_CLOCK	1000000
 #define SB8_DEN(v)	((SB8_CLOCK + (v) / 2) / (v))
 #define SB8_RATE(v)	(SB8_CLOCK / SB8_DEN(v))

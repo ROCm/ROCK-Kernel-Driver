@@ -23,6 +23,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/minors.h>
@@ -202,7 +203,7 @@ static client_t *seq_create_client1(int client_index, int poolsize)
 	client_t *client;
 
 	/* init client data */
-	client = snd_kcalloc(sizeof(client_t), GFP_KERNEL);
+	client = kcalloc(1, sizeof(*client), GFP_KERNEL);
 	if (client == NULL)
 		return NULL;
 	client->pool = snd_seq_pool_new(poolsize);
@@ -1694,6 +1695,13 @@ static int snd_seq_ioctl_get_queue_tempo(client_t * client, void __user *arg)
 
 
 /* SET_QUEUE_TEMPO ioctl() */
+int snd_seq_set_queue_tempo(int client, snd_seq_queue_tempo_t *tempo)
+{
+	if (!snd_seq_queue_check_access(tempo->queue, client))
+		return -EPERM;
+	return snd_seq_queue_timer_set_tempo(tempo->queue, client, tempo);
+}
+
 static int snd_seq_ioctl_set_queue_tempo(client_t * client, void __user *arg)
 {
 	int result;
@@ -1702,15 +1710,8 @@ static int snd_seq_ioctl_set_queue_tempo(client_t * client, void __user *arg)
 	if (copy_from_user(&tempo, arg, sizeof(tempo)))
 		return -EFAULT;
 
-	if (snd_seq_queue_check_access(tempo.queue, client->number)) {
-		result = snd_seq_queue_timer_set_tempo(tempo.queue, client->number, &tempo);
-		if (result < 0)
-			return result;
-	} else {
-		return -EPERM;
-	}	
-
-	return 0;
+	result = snd_seq_set_queue_tempo(client->number, &tempo);
+	return result < 0 ? result : 0;
 }
 
 
@@ -2176,10 +2177,15 @@ static int snd_seq_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long arg)
 {
 	client_t *client = (client_t *) file->private_data;
+	int err;
 
 	snd_assert(client != NULL, return -ENXIO);
 		
-	return snd_seq_do_ioctl(client, cmd, (void __user *) arg);
+	/* FIXME: need to unlock BKL to allow preemption */
+	unlock_kernel();
+	err = snd_seq_do_ioctl(client, cmd, (void __user *) arg);
+	lock_kernel();
+	return err;
 }
 
 

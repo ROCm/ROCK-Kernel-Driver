@@ -54,6 +54,7 @@
 #include <linux/slab.h>
 #include <linux/gameport.h>
 #include <linux/moduleparam.h>
+#include <linux/delay.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -63,13 +64,10 @@
 
 #include <asm/io.h>
 
-#define chip_t es1938_t
-
 MODULE_AUTHOR("Jaromir Koutek <miri@punknet.cz>");
 MODULE_DESCRIPTION("ESS Solo-1");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ESS,ES1938},"
+MODULE_SUPPORTED_DEVICE("{{ESS,ES1938},"
                 "{ESS,ES1946},"
                 "{ESS,ES1969},"
 		"{TerraTec,128i PCI}}");
@@ -88,13 +86,10 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ESS Solo-1 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ESS Solo-1 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ESS Solo-1 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 
 #define SLIO_REG(chip, x) ((chip)->io_port + ESSIO_REG_##x)
 
@@ -206,15 +201,10 @@ struct _snd_es1938 {
 	int irq;
 
 	unsigned long io_port;
-	struct resource *res_io_port;
 	unsigned long sb_port;
-	struct resource *res_sb_port;
 	unsigned long vc_port;
-	struct resource *res_vc_port;
 	unsigned long mpu_port;
-	struct resource *res_mpu_port;
 	unsigned long game_port;
-	struct resource *res_game_port;
 	unsigned long ddma_port;
 
 	unsigned char irqmask;
@@ -573,7 +563,12 @@ static int snd_es1938_playback1_trigger(snd_pcm_substream_t * substream,
 	case SNDRV_PCM_TRIGGER_START:
 		/* According to the documentation this should be:
 		   0x13 but that value may randomly swap stereo channels */
+                snd_es1938_mixer_write(chip, ESSSB_IREG_AUDIO2CONTROL1, 0x92);
+                udelay(10);
 		snd_es1938_mixer_write(chip, ESSSB_IREG_AUDIO2CONTROL1, 0x93);
+                /* This two stage init gives the FIFO -> DAC connection time to
+                 * settle before first data from DMA flows in.  This should ensure
+                 * no swapping of stereo channels.  Report a bug if otherwise :-) */
 		outb(0x0a, SLIO_REG(chip, AUDIO2MODE));
 		chip->active |= DAC2;
 		break;
@@ -689,6 +684,8 @@ static int snd_es1938_playback1_prepare(snd_pcm_substream_t * substream)
 	u = snd_pcm_format_unsigned(runtime->format);
 
 	chip->dma2_shift = 2 - mono - is8;
+
+        snd_es1938_reset_fifo(chip);
 
 	/* set clock and counters */
         snd_es1938_rate_set(chip, substream, DAC2);
@@ -874,9 +871,9 @@ static snd_pcm_hardware_t snd_es1938_capture =
 	.rate_max =		48000,
 	.channels_min =		1,
 	.channels_max =		2,
-	.buffer_bytes_max =	65536,
+        .buffer_bytes_max =	0x8000,       /* DMA controller screws on higher values */
 	.period_bytes_min =	64,
-	.period_bytes_max =	65536,
+	.period_bytes_max =	0x8000,
 	.periods_min =		1,
 	.periods_max =		1024,
 	.fifo_size =		256,
@@ -896,9 +893,9 @@ static snd_pcm_hardware_t snd_es1938_playback =
 	.rate_max =		48000,
 	.channels_min =		1,
 	.channels_max =		2,
-	.buffer_bytes_max =	65536,
+        .buffer_bytes_max =	0x8000,       /* DMA controller screws on higher values */
 	.period_bytes_min =	64,
-	.period_bytes_max =	65536,
+	.period_bytes_max =	0x8000,
 	.periods_min =		1,
 	.periods_max =		1024,
 	.fifo_size =		256,
@@ -1129,7 +1126,7 @@ static int snd_es1938_get_hw_switch(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 
 static void snd_es1938_hwv_free(snd_kcontrol_t *kcontrol)
 {
-	es1938_t *chip = snd_magic_cast(es1938_t, _snd_kcontrol_chip(kcontrol), return);
+	es1938_t *chip = snd_kcontrol_chip(kcontrol);
 	chip->master_volume = NULL;
 	chip->master_switch = NULL;
 	chip->hw_volume = NULL;
@@ -1348,35 +1345,16 @@ static int snd_es1938_free(es1938_t *chip)
 	if (chip->gameport.io)
 		gameport_unregister_port(&chip->gameport);
 #endif
-	if (chip->res_io_port) {
-		release_resource(chip->res_io_port);
-		kfree_nocheck(chip->res_io_port);
-	}
-	if (chip->res_sb_port) {
-		release_resource(chip->res_sb_port);
-		kfree_nocheck(chip->res_sb_port);
-	}
-	if (chip->res_vc_port) {
-		release_resource(chip->res_vc_port);
-		kfree_nocheck(chip->res_vc_port);
-	}
-	if (chip->res_mpu_port) {
-		release_resource(chip->res_mpu_port);
-		kfree_nocheck(chip->res_mpu_port);
-	}
-	if (chip->res_game_port) {
-		release_resource(chip->res_game_port);
-		kfree_nocheck(chip->res_game_port);
-	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
-	snd_magic_kfree(chip);
+	pci_release_regions(chip->pci);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_es1938_dev_free(snd_device_t *device)
 {
-	es1938_t *chip = snd_magic_cast(es1938_t, device->device_data, return -ENXIO);
+	es1938_t *chip = device->device_data;
 	return snd_es1938_free(chip);
 }
 
@@ -1402,43 +1380,22 @@ static int __devinit snd_es1938_create(snd_card_t * card,
                 return -ENXIO;
         }
 
-	chip = snd_magic_kcalloc(es1938_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->mixer_lock);
 	chip->card = card;
 	chip->pci = pci;
+	if ((err = pci_request_regions(pci, "ESS Solo-1")) < 0) {
+		kfree(chip);
+		return err;
+	}
 	chip->io_port = pci_resource_start(pci, 0);
-	if ((chip->res_io_port = request_region(chip->io_port, 8, "ESS Solo-1")) == NULL) {
-		snd_printk("unable to grab region 0x%lx-0x%lx\n", chip->io_port, chip->io_port + 8 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	chip->sb_port = pci_resource_start(pci, 1);
-	if ((chip->res_sb_port = request_region(chip->sb_port, 0x10, "ESS Solo-1 SB")) == NULL) {
-		snd_printk("unable to grab SB region 0x%lx-0x%lx\n", chip->sb_port, chip->sb_port + 0x10 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	chip->vc_port = pci_resource_start(pci, 2);
-	if ((chip->res_vc_port = request_region(chip->vc_port, 0x10, "ESS Solo-1 VC (DMA)")) == NULL) {
-		snd_printk("unable to grab VC (DMA) region 0x%lx-0x%lx\n", chip->vc_port, chip->vc_port + 0x10 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	chip->mpu_port = pci_resource_start(pci, 3);
-	if ((chip->res_mpu_port = request_region(chip->mpu_port, 4, "ESS Solo-1 MIDI")) == NULL) {
-		snd_printk("unable to grab MIDI region 0x%lx-0x%lx\n", chip->mpu_port, chip->mpu_port + 4 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	chip->game_port = pci_resource_start(pci, 4);
-	if ((chip->res_game_port = request_region(chip->game_port, 4, "ESS Solo-1 GAME")) == NULL) {
-		snd_printk("unable to grab GAME region 0x%lx-0x%lx\n", chip->game_port, chip->game_port + 4 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	if (request_irq(pci->irq, snd_es1938_interrupt, SA_INTERRUPT|SA_SHIRQ, "ES1938", (void *)chip)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_es1938_free(chip);
@@ -1492,7 +1449,7 @@ static int __devinit snd_es1938_create(snd_card_t * card,
  * -------------------------------------------------------------------- */
 static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es1938_t *chip = snd_magic_cast(es1938_t, dev_id, return IRQ_NONE);
+	es1938_t *chip = dev_id;
 	unsigned char status, audiostatus;
 	int handled = 0;
 

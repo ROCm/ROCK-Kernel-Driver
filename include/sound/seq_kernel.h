@@ -168,6 +168,9 @@ typedef int (*snd_seq_dump_func_t)(void *ptr, void *buf, int count);
 int snd_seq_expand_var_event(const snd_seq_event_t *event, int count, char *buf, int in_kernel, int size_aligned);
 int snd_seq_dump_var_event(const snd_seq_event_t *event, snd_seq_dump_func_t func, void *private_data);
 
+/* interface for OSS emulation */
+int snd_seq_set_queue_tempo(int client, snd_seq_queue_tempo_t *tempo);
+
 /* port callback routines */
 void snd_port_init_callback(snd_seq_port_callback_t *p);
 snd_seq_port_callback_t *snd_port_alloc_callback(void);

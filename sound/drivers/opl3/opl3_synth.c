@@ -74,7 +74,7 @@ static int snd_opl3_set_connection(opl3_t * opl3, int connection);
  */
 int snd_opl3_open(snd_hwdep_t * hw, struct file *file)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, hw->private_data, return -ENXIO);
+	opl3_t *opl3 = hw->private_data;
 
 	down(&opl3->access_mutex);
 	if (opl3->used) {
@@ -93,7 +93,7 @@ int snd_opl3_open(snd_hwdep_t * hw, struct file *file)
 int snd_opl3_ioctl(snd_hwdep_t * hw, struct file *file,
 		   unsigned int cmd, unsigned long arg)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, hw->private_data, return -ENXIO);
+	opl3_t *opl3 = hw->private_data;
 	void __user *argp = (void __user *)arg;
 
 	snd_assert(opl3 != NULL, return -EINVAL);
@@ -176,7 +176,7 @@ int snd_opl3_ioctl(snd_hwdep_t * hw, struct file *file,
  */
 int snd_opl3_release(snd_hwdep_t * hw, struct file *file)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, hw->private_data, return -ENXIO);
+	opl3_t *opl3 = hw->private_data;
 
 	snd_opl3_reset(opl3);
 	down(&opl3->access_mutex);

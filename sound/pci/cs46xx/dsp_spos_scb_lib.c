@@ -69,7 +69,7 @@ static void cs46xx_dsp_proc_scb_info_read (snd_info_entry_t *entry, snd_info_buf
 	proc_scb_info_t * scb_info  = (proc_scb_info_t *)entry->private_data;
 	dsp_scb_descriptor_t * scb = scb_info->scb_desc;
 	dsp_spos_instance_t * ins;
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, scb_info->chip, return);
+	cs46xx_t *chip = scb_info->chip;
 	int j,col;
 	unsigned long dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
 

@@ -84,7 +84,7 @@ struct snd_pmac_stream {
 
 	snd_pcm_substream_t *substream;
 
-	unsigned int cur_freqs;		/* currently available frequences */
+	unsigned int cur_freqs;		/* currently available frequencies */
 	unsigned int cur_formats;	/* currently available formats */
 };
 
@@ -173,6 +173,12 @@ struct snd_pmac {
 int snd_pmac_new(snd_card_t *card, pmac_t **chip_return);
 int snd_pmac_pcm_new(pmac_t *chip);
 int snd_pmac_attach_beep(pmac_t *chip);
+void snd_pmac_detach_beep(pmac_t *chip);
+void snd_pmac_beep_stop(pmac_t *chip);
+unsigned int snd_pmac_rate_index(pmac_t *chip, pmac_stream_t *rec, unsigned int rate);
+
+void snd_pmac_beep_dma_start(pmac_t *chip, int bytes, unsigned long addr, int speed);
+void snd_pmac_beep_dma_stop(pmac_t *chip);
 
 /* initialize mixer */
 int snd_pmac_awacs_init(pmac_t *chip);
@@ -205,10 +211,5 @@ int snd_pmac_add_automute(pmac_t *chip);
 	set_current_state(TASK_UNINTERRUPTIBLE);\
 	schedule_timeout(((msec) * HZ + 999) / 1000);\
 } while (0)
-
-#ifndef PMAC_SUPPORT_PCM_BEEP
-#define snd_pmac_attach_beep(chip) 0
-#define snd_pmac_beep_stop(chip)  /**/
-#endif
 
 #endif /* __PMAC_H */

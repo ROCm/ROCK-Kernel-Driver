@@ -267,7 +267,8 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 	}
 },
 {
-	/* thanks to Emiliano Grilli <emillo@libero.it> for helping researching this data */
+	/* thanks to Emiliano Grilli <emillo@libero.it>
+	 * for helping researching this data */
 	USB_DEVICE(0x0582, 0x000c),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
@@ -830,11 +831,42 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "M-Audio",
 		.product_name = "Quattro",
-		.ifnum = 9,
-		.type = QUIRK_MIDI_MIDIMAN,
-		.data = & (const snd_usb_midi_endpoint_info_t) {
-			.out_cables = 0x0001,
-			.in_cables  = 0x0001
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = & (const snd_usb_audio_quirk_t[]) {
+			/*
+			 * Interfaces 0-2 are "Windows-compatible", 16-bit only,
+			 * and share endpoints with the other interfaces.
+			 * Ignore them.  The other interfaces can do 24 bits,
+			 * but captured samples are big-endian (see usbaudio.c).
+			 */
+			{
+				.ifnum = 4,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 5,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 7,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 8,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 9,
+				.type = QUIRK_MIDI_MIDIMAN,
+				.data = & (const snd_usb_midi_endpoint_info_t) {
+					.out_cables = 0x0001,
+					.in_cables  = 0x0001
+				}
+			},
+			{
+				.ifnum = -1
+			}
 		}
 	}
 },
@@ -911,6 +943,21 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.vendor_name = "Terratec",
 		.product_name = "PHASE 26",
 		.ifnum = 3,
+		.type = QUIRK_MIDI_STANDARD_INTERFACE
+	}
+},
+
+{
+	/*
+	 * Some USB MIDI devices don't have an audio control interface,
+	 * so we have to grab MIDI streaming interfaces here.
+	 */
+	.match_flags = USB_DEVICE_ID_MATCH_INT_CLASS |
+		       USB_DEVICE_ID_MATCH_INT_SUBCLASS,
+	.bInterfaceClass = USB_CLASS_AUDIO,
+	.bInterfaceSubClass = USB_SUBCLASS_MIDI_STREAMING,
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_MIDI_STANDARD_INTERFACE
 	}
 },

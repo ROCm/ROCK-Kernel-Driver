@@ -61,7 +61,7 @@ snd_emux_note_on(void *p, int note, int vel, snd_midi_channel_t *chan)
 	unsigned long flags;
 	snd_emux_port_t *port;
 
-	port = snd_magic_cast(snd_emux_port_t, p, return);
+	port = p;
 	snd_assert(port != NULL && chan != NULL, return);
 
 	emu = port->emu;
@@ -160,7 +160,7 @@ snd_emux_note_off(void *p, int note, int vel, snd_midi_channel_t *chan)
 	unsigned long flags;
 	snd_emux_port_t *port;
 
-	port = snd_magic_cast(snd_emux_port_t, p, return);
+	port = p;
 	snd_assert(port != NULL && chan != NULL, return);
 
 	emu = port->emu;
@@ -201,7 +201,7 @@ snd_emux_note_off(void *p, int note, int vel, snd_midi_channel_t *chan)
  */
 void snd_emux_timer_callback(unsigned long data)
 {
-	snd_emux_t *emu = snd_magic_cast(snd_emux_t, (void*)data, return);
+	snd_emux_t *emu = (snd_emux_t*) data;
 	snd_emux_voice_t *vp;
 	int ch, do_again = 0;
 
@@ -238,7 +238,7 @@ snd_emux_key_press(void *p, int note, int vel, snd_midi_channel_t *chan)
 	unsigned long flags;
 	snd_emux_port_t *port;
 
-	port = snd_magic_cast(snd_emux_port_t, p, return);
+	port = p;
 	snd_assert(port != NULL && chan != NULL, return);
 
 	emu = port->emu;
@@ -322,7 +322,7 @@ snd_emux_control(void *p, int type, snd_midi_channel_t *chan)
 {
 	snd_emux_port_t *port;
 
-	port = snd_magic_cast(snd_emux_port_t, p, return);
+	port = p;
 	snd_assert(port != NULL && chan != NULL, return);
 
 	switch (type) {
@@ -402,7 +402,7 @@ snd_emux_terminate_note(void *p, int note, snd_midi_channel_t *chan)
 	snd_emux_t *emu;
 	snd_emux_port_t *port;
 
-	port = snd_magic_cast(snd_emux_port_t, p, return);
+	port = p;
 	snd_assert(port != NULL && chan != NULL, return);
 
 	emu = port->emu;

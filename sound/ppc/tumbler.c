@@ -36,8 +36,6 @@
 #include "pmac.h"
 #include "tumbler_volume.h"
 
-#define chip_t pmac_t
-
 /* i2c address for tumbler */
 #define TAS_I2C_ADDR	0x34
 
@@ -872,7 +870,7 @@ static void tumbler_update_automute(pmac_t *chip, int do_notify)
 /* interrupt - headphone plug changed */
 static irqreturn_t headphone_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
+	pmac_t *chip = devid;
 	if (chip->update_automute && chip->initialized) {
 		chip->update_automute(chip, 1);
 		return IRQ_HANDLED;
