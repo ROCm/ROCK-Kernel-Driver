@@ -30,7 +30,7 @@
 #ifndef __ASSEMBLY__
 
 /* This structure can grow, it's real size is used by head.S code
- * via the mkdefs mecanism.
+ * via the mkdefs mechanism.
  */
 struct cpu_spec;
 
