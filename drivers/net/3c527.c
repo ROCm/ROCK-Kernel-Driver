@@ -19,7 +19,7 @@
 
 #define DRV_NAME		"3c527"
 #define DRV_VERSION		"0.7-SMP"
-#define DRV_RELDATE		"2003/10/06"
+#define DRV_RELDATE		"2003/09/17"
 
 static const char *version =
 DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " Richard Procter <rnp@paradise.net.nz>\n";
@@ -146,19 +146,17 @@ static unsigned int mc32_debug = NET_DEBUG;
 static const int WORKAROUND_82586=1;
 
 /* Pointers to buffers and their on-card records */
-
 struct mc32_ring_desc 
 {
 	volatile struct skb_header *p;                    
 	struct sk_buff *skb;          
 };
 
-
 /* Information that needs to be kept for each board. */
 struct mc32_local 
 {
 	int slot;
-	
+
 	u32 base;
 	struct net_device_stats net_stats;
 	volatile struct mc32_mailbox *rx_box;
@@ -170,22 +168,23 @@ struct mc32_local
         u16 tx_len;             /* Transmit list count */ 
         u16 rx_len;             /* Receive list count */
 
-	u16 xceiver_desired_state; /* HALTED or RUNNING */ 
-	u16 cmd_nonblocking;    /* Thread is uninterested in command result */ 
-	u16 mc_reload_wait;     /* A multicast load request is pending */
+	u16 xceiver_desired_state; /* HALTED or RUNNING */
+	u16 cmd_nonblocking;    /* Thread is uninterested in command result */
+	u16 mc_reload_wait;	/* A multicast load request is pending */
 	u32 mc_list_valid;	/* True when the mclist is set */
 
 	struct mc32_ring_desc tx_ring[TX_RING_LEN];	/* Host Transmit ring */
 	struct mc32_ring_desc rx_ring[RX_RING_LEN];	/* Host Receive ring */
 
-	atomic_t tx_count;      /* buffers left */
+	atomic_t tx_count;	/* buffers left */
 	volatile u16 tx_ring_head; /* index to tx en-queue end */
 	u16 tx_ring_tail;          /* index to tx de-queue end */
+
 	u16 rx_ring_tail;       /* index to rx de-queue end */ 
 
 	struct semaphore cmd_mutex;    /* Serialises issuing of execute commands */
-	struct completion execution_cmd; /* Card has completed an execute command */
-	struct completion xceiver_cmd;   /* Card has completed a tx or rx command */  
+        struct completion execution_cmd; /* Card has completed an execute command */
+	struct completion xceiver_cmd;   /* Card has completed a tx or rx command */
 };
 
 /* The station (ethernet) address prefix, used for a sanity check. */
@@ -517,7 +516,7 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 	dev->tx_timeout		= mc32_timeout;
 	dev->watchdog_timeo	= HZ*5;	/* Board does all the work */
 	dev->ethtool_ops	= &netdev_ethtool_ops;
-	
+
 	/* Fill in the fields of the device structure with ethernet values. */
 	ether_setup(dev);
 	
@@ -569,22 +568,24 @@ static int mc32_command_nowait(struct net_device *dev, u16 cmd, void *data, int 
 	struct mc32_local *lp = (struct mc32_local *)dev->priv;
 	int ioaddr = dev->base_addr;
 	int ret = -1;
-	
-	if (down_trylock(&lp->cmd_mutex) == 0) 
+
+	if (down_trylock(&lp->cmd_mutex) == 0)
 	{
 		lp->cmd_nonblocking=1;
 		lp->exec_box->mbox=0;
 		lp->exec_box->mbox=cmd;
 		memcpy((void *)lp->exec_box->data, data, len);
-		barrier();      /* the memcpy forgot the volatile so be sure */
-		
+		barrier();	/* the memcpy forgot the volatile so be sure */
+
 		/* Send the command */
 		mc32_ready_poll(dev);
 		outb(1<<6, ioaddr+HOST_CMD);
 
 		ret = 0;
-		/* Interrupt handler will signal mutex on completion */ 
+
+		/* Interrupt handler will signal mutex on completion */
 	}
+
 	return ret;
 }
 
@@ -606,7 +607,6 @@ static int mc32_command_nowait(struct net_device *dev, u16 cmd, void *data, int 
  *	reply. All well and good. The complication arises because you use
  *	commands for filter list changes which come in at bh level from things
  *	like IPV6 group stuff.
- *
  */
   
 static int mc32_command(struct net_device *dev, u16 cmd, void *data, int len)
@@ -614,11 +614,11 @@ static int mc32_command(struct net_device *dev, u16 cmd, void *data, int len)
 	struct mc32_local *lp = (struct mc32_local *)dev->priv;
 	int ioaddr = dev->base_addr;
 	int ret = 0;
-
-	down(&lp->cmd_mutex);
 	
+	down(&lp->cmd_mutex);
+
 	/*
-	 *	My turn
+	 *     My Turn
 	 */
 
 	lp->cmd_nonblocking=0;
@@ -636,10 +636,11 @@ static int mc32_command(struct net_device *dev, u16 cmd, void *data, int len)
 		ret = -1;
 
 	up(&lp->cmd_mutex);
+
 	/*
 	 *	A multicast set got blocked - try it now
-	 */
-		
+         */
+
 	if(lp->mc_reload_wait)
 	{
 		mc32_reset_multicast_list(dev);
@@ -656,9 +657,9 @@ static int mc32_command(struct net_device *dev, u16 cmd, void *data, int len)
  *	This may be called from the interrupt state, where it is used
  *	to restart the rx ring if the card runs out of rx buffers. 
  *	
- *	We must first check if it's ok to (re)start the transceiver. See
- *	mc32_close for details.
- */ 
+ * 	We must first check if it's ok to (re)start the transceiver. See
+ *      mc32_close for details.
+ */
 
 static void mc32_start_transceiver(struct net_device *dev) {
 
@@ -666,7 +667,7 @@ static void mc32_start_transceiver(struct net_device *dev) {
 	int ioaddr = dev->base_addr;
 
 	/* Ignore RX overflow on device closure */ 
-	if (lp->xceiver_desired_state==HALTED)  
+	if (lp->xceiver_desired_state==HALTED)
 		return; 
 
 	/* Give the card the offset to the post-EOL-bit RX descriptor */
@@ -701,17 +702,15 @@ static void mc32_halt_transceiver(struct net_device *dev)
 	int ioaddr = dev->base_addr;
 
 	mc32_ready_poll(dev);	
-
 	lp->rx_box->mbox=0;
-
 	outb(HOST_CMD_SUSPND_RX, ioaddr+HOST_CMD);			
 	wait_for_completion(&lp->xceiver_cmd);
-	
+
 	mc32_ready_poll(dev); 
 	lp->tx_box->mbox=0;
 	outb(HOST_CMD_SUSPND_TX, ioaddr+HOST_CMD);	
 	wait_for_completion(&lp->xceiver_cmd);
-} 
+}
 
 
 /**
@@ -780,17 +779,16 @@ static int mc32_load_rx_ring(struct net_device *dev)
  *
  *	Free the buffer for each ring slot. This may be called 
  *      before mc32_load_rx_ring(), eg. on error in mc32_open().
- *      Requires rx skb pointers to point to a valid skb, or NULL. 
+ *      Requires rx skb pointers to point to a valid skb, or NULL.
  */
 
 static void mc32_flush_rx_ring(struct net_device *dev)
 {
 	struct mc32_local *lp = (struct mc32_local *)dev->priv;
-	
 	int i; 
 
 	for(i=0; i < RX_RING_LEN; i++) 
-	{
+	{ 
 		if (lp->rx_ring[i].skb) {
 			dev_kfree_skb(lp->rx_ring[i].skb);
 			lp->rx_ring[i].skb = NULL;
@@ -834,9 +832,9 @@ static void mc32_load_tx_ring(struct net_device *dev)
 		tx_base=p->next;
 	}
 
-	/* -1 so that tx_ring_head cannot "lap" tx_ring_tail,           */
+	/* -1 so that tx_ring_head cannot "lap" tx_ring_tail */
 	/* see mc32_tx_ring */
-	
+
 	atomic_set(&lp->tx_count, TX_RING_LEN-1); 
 	lp->tx_ring_head=lp->tx_ring_tail=0; 
 } 
@@ -845,7 +843,7 @@ static void mc32_load_tx_ring(struct net_device *dev)
 /**
  *	mc32_flush_tx_ring 	-	free transmit ring
  *	@lp: Local data of 3c527 to flush the tx ring of
- *	
+ *
  *      If the ring is non-empty, zip over the it, freeing any
  *      allocated skb_buffs.  The tx ring house-keeping variables are
  *      then reset. Requires rx skb pointers to point to a valid skb,
@@ -855,18 +853,17 @@ static void mc32_load_tx_ring(struct net_device *dev)
 static void mc32_flush_tx_ring(struct net_device *dev)
 {
 	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	int i;
 
-	int i; 
-	
-	for (i=0; i < TX_RING_LEN; i++) 
+	for (i=0; i < TX_RING_LEN; i++)
 	{
-		if (lp->tx_ring[i].skb) 
+		if (lp->tx_ring[i].skb)
 		{
-			dev_kfree_skb(lp->tx_ring[i].skb); 
-			lp->tx_ring[i].skb = NULL; 
-		} 
-	}					
-	
+			dev_kfree_skb(lp->tx_ring[i].skb);
+			lp->tx_ring[i].skb = NULL;
+		}
+	}
+
 	atomic_set(&lp->tx_count, 0); 
 	lp->tx_ring_tail=lp->tx_ring_head=0;
 }
@@ -904,13 +901,14 @@ static int mc32_open(struct net_device *dev)
 	regs=inb(ioaddr+HOST_CTRL);
 	regs|=HOST_CTRL_INTE;
 	outb(regs, ioaddr+HOST_CTRL);
-
+	
 	/*
-	 * 	Allow ourselves to issue commands
+	 *      Allow ourselves to issue commands
 	 */
 
 	up(&lp->cmd_mutex);
-	
+
+
 	/*
 	 *	Send the indications on command
 	 */
@@ -1002,20 +1000,19 @@ static void mc32_timeout(struct net_device *dev)
  *	gets messages telling it to reclaim transmit queue entries, we will
  *	clear tx_busy and the kernel will start calling this again.
  *
- *	We do not disable interrupts or acquire any locks; this can
- *	run concurrently with mc32_tx_ring(), and the function itself
- *	is serialised at a higher layer. However, this makes it
- *	crucial that we update lp->tx_ring_head only after we've
- *	established a valid packet in the tx ring (and is why we mark
- *	tx_ring_head volatile).
- */
-
+ *      We do not disable interrupts or acquire any locks; this can
+ *      run concurrently with mc32_tx_ring(), and the function itself
+ *      is serialised at a higher layer. However, this makes it
+ *      crucial that we update lp->tx_ring_head only after we've
+ *      established a valid packet in the tx ring (and is why we mark
+ *      tx_ring_head volatile).
+ *
+ **/
 static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
 	struct mc32_local *lp = (struct mc32_local *)dev->priv;
-	
 	u16 head = lp->tx_ring_head;
-	
+
 	volatile struct skb_header *p, *np;
 
 	netif_stop_queue(dev);
@@ -1025,31 +1022,32 @@ static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	skb = skb_padto(skb, ETH_ZLEN);
-	if (skb == NULL) { 
+
+	if (skb == NULL) {
 		netif_wake_queue(dev);
 		return 0;
 	}
-	
+
 	atomic_dec(&lp->tx_count); 
 
 	/* P is the last sending/sent buffer as a pointer */
-	p=lp->tx_ring[head].p;	
-	
+	p=lp->tx_ring[head].p;
+		
 	head = next_tx(head);
-	
+
 	/* NP is the buffer we will be loading */
-	np=lp->tx_ring[head].p; 
-	
+	np=lp->tx_ring[head].p;
+
 	/* We will need this to flush the buffer out */
-	lp->tx_ring[head].skb=skb;
-
+	lp->tx_ring[lp->tx_ring_head].skb = skb;
+   	   
 	np->length = unlikely(skb->len < ETH_ZLEN) ? ETH_ZLEN : skb->len;
-
+			
 	np->data	= isa_virt_to_bus(skb->data);
 	np->status	= 0;
 	np->control     = CONTROL_EOP | CONTROL_EOL;     
 	wmb();
-
+		
 	/*
 	 * The new frame has been setup; we can now
 	 * let the card and interrupt handler "see" it
@@ -1138,10 +1136,11 @@ static void mc32_rx_ring(struct net_device *dev)
 	struct mc32_local *lp=dev->priv;		
 	volatile struct skb_header *p;
 	u16 rx_ring_tail;
-	u16 rx_old_tail; 
+	u16 rx_old_tail;
 	int x=0;
 
 	rx_old_tail = rx_ring_tail = lp->rx_ring_tail;
+	
 	do
 	{ 
 		p=lp->rx_ring[rx_ring_tail].p; 
@@ -1231,12 +1230,12 @@ static void mc32_tx_ring(struct net_device *dev)
 	volatile struct skb_header *np;
 
 	/*
-	 * We rely on head==tail to mean 'queue empty'. 
+	 * We rely on head==tail to mean 'queue empty'.
 	 * This is why lp->tx_count=TX_RING_LEN-1: in order to prevent
 	 * tx_ring_head wrapping to tail and confusing a 'queue empty'
-	 * condition with 'queue full' 
+	 * condition with 'queue full'
 	 */
-	
+
 	while (lp->tx_ring_tail != lp->tx_ring_head)  
 	{   
 		u16 t; 
@@ -1383,13 +1382,15 @@ static irqreturn_t mc32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			 * No thread is waiting: we need to tidy
 			 * up ourself.
 			 */
-
-			if (lp->cmd_nonblocking) { 
+				   
+			if (lp->cmd_nonblocking) {
 				up(&lp->cmd_mutex);
 				if (lp->mc_reload_wait) 
 					mc32_reset_multicast_list(dev);
 			}
-			else complete(&lp->execution_cmd);
+			else {
+				complete(&lp->execution_cmd);
+			}
 		}
 		if(status&2)
 		{
@@ -1442,8 +1443,8 @@ static irqreturn_t mc32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 static int mc32_close(struct net_device *dev)
 {
 	struct mc32_local *lp = (struct mc32_local *)dev->priv;
-
 	int ioaddr = dev->base_addr;
+
 	u8 regs;
 	u16 one=1;
 	
@@ -1459,8 +1460,9 @@ static int mc32_close(struct net_device *dev)
 	/* Shut down the transceiver */
 
 	mc32_halt_transceiver(dev); 
-
+	
 	/* Ensure we issue no more commands beyond this point */
+
 	down(&lp->cmd_mutex);
 	
 	/* Ok the card is now stopping */	
@@ -1489,10 +1491,9 @@ static int mc32_close(struct net_device *dev)
 
 static struct net_device_stats *mc32_get_stats(struct net_device *dev)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;;
+	struct mc32_local *lp = (struct mc32_local *)dev->priv;
 	
 	mc32_update_stats(dev); 
-
 	return &lp->net_stats;
 }
 
