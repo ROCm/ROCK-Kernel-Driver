@@ -434,7 +434,7 @@ Here are described their command lines:
   Using gamecon.c you can connect up to five devices to one parallel port. It
 uses the following kernel/module command line:
 
-	gc=port,pad1,pad2,pad3,pad4,pad5
+	gamecon.map=port,pad1,pad2,pad3,pad4,pad5
 
   Where 'port' the number of the parport interface (eg. 0 for parport0).
 
@@ -457,15 +457,15 @@ uses the following kernel/module command line:
 your controller plugged in before initializing.
 
   Should you want to use more than one of parallel ports at once, you can use
-gc_2 and gc_3 as additional command line parameters for two more parallel
-ports.
+gamecon.map2 and gamecon.map3 as additional command line parameters for two
+more parallel ports.
 
 3.2 db9.c
 ~~~~~~~~~
   Apart from making an interface, there is nothing difficult on using the
 db9.c driver. It uses the following kernel/module command line:
 
-	db9=port,type
+	db9.dev=port,type
 
   Where 'port' is the number of the parport interface (eg. 0 for parport0).
 
@@ -489,14 +489,14 @@ Old parallel ports may not have this feature.
 	 10  | Amiga CD32 pad
 
   Should you want to use more than one of these joysticks/pads at once, you
-can use db9_2 and db9_3 as additional command line parameters for two
+can use db9.dev2 and db9.dev3 as additional command line parameters for two
 more joysticks/pads.
 
 3.3 turbografx.c
 ~~~~~~~~~~~~~~~~
   The turbografx.c driver uses a very simple kernel/module command line:
 
-	tgfx=port,js1,js2,js3,js4,js5,js6,js7
+	turbografx.map=port,js1,js2,js3,js4,js5,js6,js7
 
   Where 'port' is the number of the parport interface (eg. 0 for parport0).
 
@@ -504,8 +504,8 @@ more joysticks/pads.
 interface ports 1-7 have. For a standard multisystem joystick, this is 1.
 
   Should you want to use more than one of these interfaces at once, you can
-use tgfx_2 and tgfx_3 as additional command line parameters for two more
-interfaces.
+use turbografx.map2 and turbografx.map3 as additional command line parameters
+for two more interfaces.
 
 3.4 PC parallel port pinout
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

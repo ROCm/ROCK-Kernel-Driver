@@ -126,12 +126,15 @@ extern int param_get_invbool(char *buffer, struct kernel_param *kp);
 #define param_check_invbool(name, p) __param_check(name, p, int)
 
 /* Comma-separated array: num is set to number they actually specified. */
-#define module_param_array(name, type, num, perm)			\
+#define module_param_array_named(name, array, type, num, perm)		\
 	static struct kparam_array __param_arr_##name			\
-	= { ARRAY_SIZE(name), &num, param_set_##type, param_get_##type,	\
-	    sizeof(name[0]), name };					\
+	= { ARRAY_SIZE(array), &num, param_set_##type, param_get_##type,\
+	    sizeof(array[0]), array };					\
 	module_param_call(name, param_array_set, param_array_get, 	\
 			  &__param_arr_##name, perm)
+
+#define module_param_array(name, type, num, perm)		\
+	module_param_array_named(name, name, type, num, perm)
 
 extern int param_array_set(const char *val, struct kernel_param *kp);
 extern int param_array_get(char *buffer, struct kernel_param *kp);

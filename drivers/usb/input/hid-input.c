@@ -377,7 +377,8 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 
 	set_bit(usage->type, input->evbit);
 	if ((usage->type == EV_REL)
-			&& (device->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK)
+			&& (device->quirks & (HID_QUIRK_2WHEEL_MOUSE_HACK_BACK
+				| HID_QUIRK_2WHEEL_MOUSE_HACK_EXTRA))
 			&& (usage->code == REL_WHEEL)) {
 		set_bit(REL_HWHEEL, bit);
 	}
@@ -431,21 +432,22 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 
 	input_regs(input, regs);
 
-	if ((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK)
-			&& (usage->code == BTN_BACK)) {
+	if (((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_EXTRA) && (usage->code == BTN_EXTRA))
+		|| ((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_BACK) && (usage->code == BTN_BACK))) {
 		if (value)
 			hid->quirks |= HID_QUIRK_2WHEEL_MOUSE_HACK_ON;
 		else
 			hid->quirks &= ~HID_QUIRK_2WHEEL_MOUSE_HACK_ON;
 		return;
 	}
+
 	if ((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_ON)
 			&& (usage->code == REL_WHEEL)) {
 		input_event(input, usage->type, REL_HWHEEL, value);
 		return;
 	}
 
-	if (usage->hat_min != usage->hat_max) {
+	if (usage->hat_min != usage->hat_max ) { /* FIXME: hat_max can be 0 and hat_min 1 */
 		value = (value - usage->hat_min) * 8 / (usage->hat_max - usage->hat_min + 1) + 1;
 		if (value < 0 || value > 8) value = 0;
 		input_event(input, usage->type, usage->code    , hid_hat_to_axis[value].x);
@@ -484,7 +486,7 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 		return;
 	}
 
-	if((usage->type == EV_KEY) && (usage->code == 0)) /* Key 0 is "unassigned", not KEY_UKNOWN */
+	if((usage->type == EV_KEY) && (usage->code == 0)) /* Key 0 is "unassigned", not KEY_UNKNOWN */
 		return;
 
 	input_event(input, usage->type, usage->code, value);
