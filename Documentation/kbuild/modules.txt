@@ -23,7 +23,7 @@ with changes in the build system the most portable way to compile a
 module outside the kernel is to use the kernel build system,
 kbuild. Use the following command-line:
 
-make -C path/to/kernel/src SUBDIRS=$PWD modules
+make -C path/to/kernel/src M=$PWD modules
 
 This requires that a makefile exits made in accordance to
 Documentation/kbuild/makefiles.txt. Read that file for more details on
@@ -65,4 +65,4 @@ yourmodule-objs := file1.o file2.o file3.o
 # Invokes the kernel build system to come back to the current
 # directory and build yourmodule.ko.
 default:
-	make -C ${KERNEL_SOURCE} SUBDIRS=`pwd` modules
+	make -C ${KERNEL_SOURCE} M=`pwd` modules
