@@ -23,15 +23,15 @@ obj-$(CONFIG_IA64_CYCLONE)	+= cyclone.o
 # The gate DSO image is built using a special linker script.
 targets += gate.so gate-syms.o
 
+extra-y += gate.so gate-syms.o gate.lds.s gate.o
+
 AFLAGS_gate.lds.o += -P -C -U$(ARCH)
-arch/ia64/kernel/gate.lds.s: %.s: %.S scripts FORCE
-	$(call if_changed_dep,as_s_S)
 
 quiet_cmd_gate = GATE $@
       cmd_gate = $(CC) -nostdlib $(GATECFLAGS_$(@F)) -Wl,-T,$(filter-out FORCE,$^) -o $@
 
 GATECFLAGS_gate.so = -shared -s -Wl,-soname=linux-gate.so.1
-$(obj)/gate.so: $(src)/gate.lds.s $(obj)/gate.o FORCE
+$(obj)/gate.so: $(obj)/gate.lds.s $(obj)/gate.o FORCE
 	$(call if_changed,gate)
 
 $(obj)/built-in.o: $(obj)/gate-syms.o

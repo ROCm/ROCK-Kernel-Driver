@@ -123,6 +123,7 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 {
 	sdev->use_10_for_rw = 1;
 	sdev->use_10_for_ms = 1;
+	blk_queue_max_phys_segments(sdev->request_queue, ATA_MAX_PRD / 2);
 
 	return 0;	/* scsi layer doesn't check return value, sigh */
 }
