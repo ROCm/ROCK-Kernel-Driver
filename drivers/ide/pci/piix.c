@@ -403,25 +403,11 @@ static int piix_config_drive_xfer_rate (ide_drive_t *drive)
 
 	if ((id->capability & 1) && drive->autodma) {
 
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
-
-		/**
-		 * Try to turn DMA on if:
-		 *  - UDMA or EIDE modes are supported or
-		 *  - drive is a known "good" drive
-		 *
-		 * Checks for best mode supported are down later by
-		 * piix_config_drive_for_dma() -> ide_dma_speed()
-		 */
-		if ((id->field_valid & (4 | 2)) ||
-		    (__ide_dma_good_drive(drive) && id->eide_dma_time < 150)) {
+		if (ide_use_dma(drive)) {
 			if (piix_config_drive_for_dma(drive))
 				return hwif->ide_dma_on(drive);
 		}
 
-		/* For some reason DMA wasn't turned on, so try PIO. */
 		goto fast_ata_pio;
 
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
