@@ -175,3 +175,32 @@ config USB_W9968CF
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called w9968cf.
+
+config USB_QC
+	tristate "USB Logitech QuickCam Camera support"
+	depends on USB && VIDEO_DEV
+	---help---
+	  Say Y or M here if you want to use the Logitech QuickCam Express
+	  cameras. Also some other cameras are supported, such as Dexxa
+	  and Labtec cameras, which are based on ST Microelectronics
+	  VV6410, Hewlett Packard HDCS-1000/1100, Agilent Technologies
+	  HDCS-1020, or Photobit PB-0100/0101 sensor chip.
+	  Easiest way to find out whether a camera is supported is to plug it
+	  in and use "lsusb" to display the VendorId and ProductId values.
+	  For supported cameras, VendorId should be 0x046d and ProductId
+	  one of 0x0840, 0x0850, or 0x0870.
+
+	  This driver has an user space configuration tool, which allows
+	  setting some driver parameters without reloading it (some
+	  parameters can be also set as driver options when loading it).
+	  It is available from <http://qce-ga.sourceforge.net>, along with
+	  more documentation.
+
+	  This driver uses the Video For Linux API. You must say Y or M to
+	  "Video For Linux" (under Character Devices) to use this driver.
+	  Information on this API and pointers to "v4l" programs may be found
+	  at <file:Documentation/video4linux/API.html>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called quickcam.
+

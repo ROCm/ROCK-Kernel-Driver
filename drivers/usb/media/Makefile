@@ -14,3 +14,4 @@ obj-$(CONFIG_USB_SN9C102)	+= sn9c102.o
 obj-$(CONFIG_USB_STV680)	+= stv680.o
 obj-$(CONFIG_USB_VICAM)		+= vicam.o usbvideo.o
 obj-$(CONFIG_USB_W9968CF)	+= w9968cf.o
+obj-$(CONFIG_USB_QC)		+= qc/
