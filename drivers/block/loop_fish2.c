@@ -581,33 +581,15 @@ static int fish2_release(struct loop_device *lo)
   return(0);
 }
 
-static void fish2_lock(struct loop_device *lo)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void fish2_unlock(struct loop_device *lo)
-{
-	MOD_DEC_USE_COUNT;
-}   
-
-
-
 static struct loop_func_table fish2_funcs =
 { .number = LO_CRYPT_FISH2,
   .transfer = transfer_fish2,
   .init = fish2_init,
   .release = fish2_release,
-  /*.lock = fish2_lock,
-  .unlock = fish2_unlock*/
   .owner = THIS_MODULE
 };
 
-#ifdef MODULE
-int __init init_module(void)
-#else
 int __init loop_fish2_init(void)
-#endif
 { 
   int err;
   
@@ -620,11 +602,13 @@ int __init loop_fish2_init(void)
   return 0;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+void __exit loop_fish2_exit(void)
 { 
   if (loop_unregister_transfer(LO_CRYPT_FISH2))
     printk(KERN_WARNING "Couldn't unregister Twofish encryption\n");
   printk(KERN_INFO "loop: unregistered Twofish encryption \n");
 }
-#endif
+
+module_init(loop_fish2_init);
+module_exit(loop_fish2_exit);
+MODULE_LICENSE("GPL");
