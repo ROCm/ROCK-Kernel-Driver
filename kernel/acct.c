@@ -53,6 +53,7 @@
 #include <linux/vfs.h>
 #include <linux/jiffies.h>
 #include <linux/times.h>
+#include <linux/syscalls.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 #include <linux/blkdev.h> /* sector_div */

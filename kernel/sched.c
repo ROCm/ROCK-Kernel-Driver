@@ -42,6 +42,7 @@
 #include <linux/percpu.h>
 #include <linux/kthread.h>
 #include <linux/seq_file.h>
+#include <linux/syscalls.h>
 #include <linux/times.h>
 #include <asm/tlb.h>
 

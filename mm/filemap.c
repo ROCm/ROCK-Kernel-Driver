@@ -27,6 +27,7 @@
 #include <linux/pagevec.h>
 #include <linux/blkdev.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 /*
  * This is needed for the following functions:
  *  - try_to_release_page

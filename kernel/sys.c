@@ -24,6 +24,11 @@
 #include <linux/dcookies.h>
 #include <linux/suspend.h>
 
+/* Don't include this - it breaks ia64's cond_syscall() implementation */
+#if 0
+#include <linux/syscalls.h>
+#endif
+
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/unistd.h>

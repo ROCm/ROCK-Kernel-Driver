@@ -15,6 +15,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/syscalls.h>
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/fs.h>

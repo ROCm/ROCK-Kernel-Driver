@@ -7,6 +7,7 @@
 
 #include <linux/mman.h>
 #include <linux/mm.h>
+#include <linux/syscalls.h>
 
 
 static int mlock_fixup(struct vm_area_struct * vma, 

@@ -14,6 +14,7 @@
  *     of fds to overcome nfds < 16390 descriptors limit (Tigran Aivazian).
  */
 
+#include <linux/syscalls.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>

@@ -25,6 +25,7 @@
 #include <linux/smp_lock.h>
 #include <linux/personality.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/mount.h>
 #include <linux/audit.h>
 #include <asm/namei.h>

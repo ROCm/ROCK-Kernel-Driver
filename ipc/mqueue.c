@@ -22,6 +22,7 @@
 #include <linux/msg.h>
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
+#include <linux/syscalls.h>
 #include <net/sock.h>
 #include "util.h"
 

@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/highmem.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>

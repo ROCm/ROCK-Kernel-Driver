@@ -20,6 +20,7 @@
 #include <linux/tty.h>
 #include <linux/binfmts.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/ptrace.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>

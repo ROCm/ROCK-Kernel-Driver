@@ -4,6 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
+#include <linux/syscalls.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
@@ -362,7 +363,7 @@ static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 	return err;
 }
 
-asmlinkage long sys_fcntl(int fd, unsigned int cmd, unsigned long arg)
+asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {	
 	struct file *filp;
 	long err = -EBADF;
