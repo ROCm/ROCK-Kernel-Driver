@@ -676,6 +676,7 @@
 #include <linux/smp.h>
 #include <linux/version.h>
 #include <linux/rwsem.h>
+#include <linux/sched.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -1325,8 +1326,20 @@ static void free_dentry (struct devfs_entry *de)
 
 static int is_devfsd_or_child (struct fs_info *fs_info)
 {
-    if (current == fs_info->devfsd_task) return (TRUE);
-    if (current->pgrp == fs_info->devfsd_pgrp) return (TRUE);
+    struct task_struct *p = current;
+
+    if (p == fs_info->devfsd_task) return (TRUE);
+    if (p->pgrp == fs_info->devfsd_pgrp) return (TRUE);
+    read_lock(&tasklist_lock);
+    for ( ; p != &init_task; p = p->real_parent)
+    {
+	if (p == fs_info->devfsd_task)
+	{
+	    read_unlock (&tasklist_lock);
+	    return (TRUE);
+	}
+    }
+    read_unlock (&tasklist_lock);
     return (FALSE);
 }   /*  End Function is_devfsd_or_child  */
 

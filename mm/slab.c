@@ -1628,7 +1628,13 @@ static inline void *cache_free_debugcheck (kmem_cache_t * cachep, void * objp, v
 	kfree_debugcheck(objp);
 	page = virt_to_page(objp);
 
-	BUG_ON(GET_PAGE_CACHE(page) != cachep);
+	if (GET_PAGE_CACHE(page) != cachep) {
+		printk(KERN_ERR "mismatch in kmem_cache_free: expected cache %p, got %p\n",
+				GET_PAGE_CACHE(page),cachep);
+		printk(KERN_ERR "%p is %s.\n", cachep, cachep->name);
+		printk(KERN_ERR "%p is %s.\n", GET_PAGE_CACHE(page), GET_PAGE_CACHE(page)->name);
+		WARN_ON(1);
+	}
 	slabp = GET_PAGE_SLAB(page);
 
 	if (cachep->flags & SLAB_STORE_USER) {
@@ -2482,11 +2488,11 @@ static void *s_start(struct seq_file *m, loff_t *pos)
 		seq_puts(m, "slabinfo - version: 2.0\n");
 #endif
 		seq_puts(m, "# name            <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab>");
-		seq_puts(m, " : tunables <batchcount> <limit <sharedfactor>");
+		seq_puts(m, " : tunables <batchcount> <limit> <sharedfactor>");
 		seq_puts(m, " : slabdata <active_slabs> <num_slabs> <sharedavail>");
 #if STATS
 		seq_puts(m, " : globalstat <listallocs> <maxobjs> <grown> <reaped> <error> <maxfreeable> <freelimit>");
-		seq_puts(m, " : cpustat <allochit <allocmiss <freehit <freemiss>");
+		seq_puts(m, " : cpustat <allochit> <allocmiss> <freehit <freemiss>");
 #endif
 		seq_putc(m, '\n');
 	}

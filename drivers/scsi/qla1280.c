@@ -327,7 +327,7 @@
 /* 3.16 */
 #ifdef QLA_64BIT_PTR
 #define pci_dma_lo32(a)		(a & 0xffffffff)
-#define pci_dma_hi32(a)		(a >> 32)
+#define pci_dma_hi32(a)		((a >> 16)>>16)
 #else
 #define pci_dma_lo32(a)		(a & 0xffffffff)
 #define pci_dma_hi32(a)		0

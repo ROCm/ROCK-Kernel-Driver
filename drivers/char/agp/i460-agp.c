@@ -608,7 +608,7 @@ static struct pci_driver agp_intel_i460_pci_driver = {
 	.name		= "agpgart-intel-i460",
 	.id_table	= agp_intel_i460_pci_table,
 	.probe		= agp_intel_i460_probe,
-	.remove		= agp_intel_i460_remove,
+	.remove		= __devexit_p(agp_intel_i460_remove),
 };
 
 static int __init agp_intel_i460_init(void)

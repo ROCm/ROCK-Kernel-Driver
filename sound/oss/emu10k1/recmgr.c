@@ -74,7 +74,7 @@ void emu10k1_set_record_src(struct emu10k1_card *card, struct wiinst *wiinst)
 		DPF(2, "recording source: AC97\n");
 		buffer->sizereg = ADCBS;
 		buffer->addrreg = ADCBA;
-		buffer->idxreg = ADCIDX_IDX;
+		buffer->idxreg = card->is_audigy ? A_ADCIDX_IDX : ADCIDX_IDX;
 
 		switch (wiinst->format.samplingrate) {
 		case 0xBB80:
@@ -95,21 +95,27 @@ void emu10k1_set_record_src(struct emu10k1_card *card, struct wiinst *wiinst)
 		case 0x3E80:
 			buffer->adcctl = ADCCR_SAMPLERATE_16;
 			break;
+		// FIXME: audigy supports 12kHz recording
+		/*
+		case ????:
+			buffer->adcctl = A_ADCCR_SAMPLERATE_12;
+			break;
+		*/
 		case 0x2B11:
-			buffer->adcctl = ADCCR_SAMPLERATE_11;
+			buffer->adcctl = card->is_audigy ? A_ADCCR_SAMPLERATE_11 : ADCCR_SAMPLERATE_11;
 			break;
 		case 0x1F40:
-			buffer->adcctl = ADCCR_SAMPLERATE_8;
+			buffer->adcctl = card->is_audigy ? A_ADCCR_SAMPLERATE_8 : ADCCR_SAMPLERATE_8;
 			break;
 		default:
 			BUG();
 			break;
 		}
 
-		buffer->adcctl |= ADCCR_LCHANENABLE;
+		buffer->adcctl |= card->is_audigy ? A_ADCCR_LCHANENABLE : ADCCR_LCHANENABLE;
 
 		if (wiinst->format.channels == 2)
-			buffer->adcctl |= ADCCR_RCHANENABLE;
+			buffer->adcctl |= card->is_audigy ? A_ADCCR_RCHANENABLE : ADCCR_RCHANENABLE;
 
 		break;
 

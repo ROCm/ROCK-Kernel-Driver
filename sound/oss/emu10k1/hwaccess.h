@@ -79,13 +79,21 @@ struct memhandle
 
 struct emu10k1_waveout
 {
-	u16 send_routing[3];
+	u32 send_routing[3];
+	// audigy only:
+	u32 send_routing2[3];
 
-	u8 send_a[3];
-	u8 send_b[3];
-	u8 send_c[3];
-	u8 send_d[3];
+	u32 send_dcba[3];
+	// audigy only:
+	u32 send_hgfe[3];
 };
+#define ROUTE_PCM 0
+#define ROUTE_PT 1
+#define ROUTE_PCM1 2
+
+#define SEND_MONO 0
+#define SEND_LEFT 1
+#define SEND_RIGHT 2
 
 struct emu10k1_wavein
 {
@@ -129,7 +137,7 @@ struct mixer_private_ioctl {
 #define CMD_AC97_BOOST		_IOW('D', 20, struct mixer_private_ioctl)
 
 //up this number when breaking compatibility
-#define PRIVATE3_VERSION 1
+#define PRIVATE3_VERSION 2
 
 struct emu10k1_card 
 {
@@ -181,7 +189,7 @@ struct emu10k1_card
 	u32	    has_toslink;	       // TOSLink detection
 
 	u8 chiprev;                    /* Chip revision                */
-
+	u8 is_audigy;
 	u8 is_aps;
 
 	struct patch_manager mgr;
@@ -211,6 +219,7 @@ extern struct list_head emu10k1_devs;
 /* Hardware Abstraction Layer access functions */
 
 void emu10k1_writefn0(struct emu10k1_card *, u32, u32);
+void emu10k1_writefn0_2(struct emu10k1_card *, u32, u32, int);
 u32 emu10k1_readfn0(struct emu10k1_card *, u32);
 
 void emu10k1_timer_set(struct emu10k1_card *, u16);

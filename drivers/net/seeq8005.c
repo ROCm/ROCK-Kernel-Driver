@@ -700,7 +700,8 @@ static void hardware_send_packet(struct net_device * dev, char *buf, int length)
  * wait_for_buffer
  *
  * This routine waits for the SEEQ chip to assert that the FIFO is ready
- * by checking for a window interrupt, and then clearing it
+ * by checking for a window interrupt, and then clearing it. This has to
+ * occur in the interrupt handler!
  */
 inline void wait_for_buffer(struct net_device * dev)
 {
@@ -710,7 +711,7 @@ inline void wait_for_buffer(struct net_device * dev)
 	
 	tmp = jiffies + HZ;
 	while ( ( ((status=inw(SEEQ_STATUS)) & SEEQSTAT_WINDOW_INT) != SEEQSTAT_WINDOW_INT) && time_before(jiffies, tmp))
-		mb();
+		cpu_relax();
 		
 	if ( (status & SEEQSTAT_WINDOW_INT) == SEEQSTAT_WINDOW_INT)
 		outw( SEEQCMD_WINDOW_INT_ACK | (status & SEEQCMD_INT_MASK), SEEQ_CMD);

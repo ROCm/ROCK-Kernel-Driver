@@ -40,6 +40,7 @@ static int __init init_this_scsi_driver(void)
 		error = scsi_add_host(shost, NULL);
 		if (error)
 			goto fail;
+		scsi_scan_host(shost);
 	}
 	return 0;
  fail:

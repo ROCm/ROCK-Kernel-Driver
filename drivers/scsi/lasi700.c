@@ -128,7 +128,8 @@ lasi700_driver_callback(struct parisc_device *dev)
 	}
 
 	dev_set_drvdata(&dev->dev, host);
-	scsi_add_host(host, &dev->dev);
+	scsi_add_host(host, &dev->dev); /* XXX handle failure */
+	scsi_scan_host(host);
 
 	return 0;
 
@@ -165,7 +166,6 @@ static void __exit
 lasi700_exit(void)
 {
 	unregister_parisc_driver(&lasi700_driver);
-	scsi_sysfs_release_attributes(&lasi700_template);
 }
 
 module_init(lasi700_init);

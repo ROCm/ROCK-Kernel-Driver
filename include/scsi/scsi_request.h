@@ -56,7 +56,7 @@ extern void scsi_do_req(struct scsi_request *, const void *cmnd,
 			int timeout, int retries);
 
 struct scsi_mode_data {
-	__u16	length;
+	__u32	length;
 	__u16	block_descriptor_length;
 	__u8	medium_type;
 	__u8	device_specific;

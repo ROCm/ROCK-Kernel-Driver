@@ -136,7 +136,7 @@ static void set_bass(struct emu10k1_card *card, int l, int r)
 	r = (r * 40 + 50) / 100;
 
 	for (i = 0; i < 5; i++)
-		sblive_writeptr(card, GPR_BASE + card->mgr.ctrl_gpr[SOUND_MIXER_BASS][0] + i, 0, bass_table[l][i]);
+		sblive_writeptr(card, (card->is_audigy ? A_GPR_BASE : GPR_BASE) + card->mgr.ctrl_gpr[SOUND_MIXER_BASS][0] + i, 0, bass_table[l][i]);
 }
 
 static void set_treble(struct emu10k1_card *card, int l, int r)
@@ -147,7 +147,7 @@ static void set_treble(struct emu10k1_card *card, int l, int r)
 	r = (r * 40 + 50) / 100;
 
 	for (i = 0; i < 5; i++)
-		sblive_writeptr(card, GPR_BASE + card->mgr.ctrl_gpr[SOUND_MIXER_TREBLE][0] + i , 0, treble_table[l][i]);
+		sblive_writeptr(card, (card->is_audigy ? A_GPR_BASE : GPR_BASE) + card->mgr.ctrl_gpr[SOUND_MIXER_TREBLE][0] + i , 0, treble_table[l][i]);
 }
 
 const char volume_params[SOUND_MIXER_NRDEVICES]= {
@@ -206,22 +206,25 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 		switch (ctl->cmd) {
 #ifdef DBGEMU
 		case CMD_WRITEFN0:
-			emu10k1_writefn0(card, ctl->val[0], ctl->val[1]);
+			emu10k1_writefn0_2(card, ctl->val[0], ctl->val[1], ctl->val[2]);
 			break;
-
+#endif
 		case CMD_WRITEPTR:
-			if (ctl->val[1] >= 0x40 || ctl->val[0] > 0xff) {
+#ifdef DBGEMU
+			if (ctl->val[1] >= 0x40 || ctl->val[0] >= 0x1000) {
+#else
+			if (ctl->val[1] >= 0x40 || ctl->val[0] >= 0x1000 || ((ctl->val[0] < 0x100 ) &&
+		    //Any register allowed raw access goes here:
+				     (ctl->val[0] != A_SPDIF_SAMPLERATE) && (ctl->val[0] != A_DBG)
+			)
+				) {
+#endif
 				ret = -EINVAL;
 				break;
 			}
-
-			if ((ctl->val[0] & 0x7ff) > 0x3f)
-				ctl->val[1] = 0x00;
-
 			sblive_writeptr(card, ctl->val[0], ctl->val[1], ctl->val[2]);
-
 			break;
-#endif
+
 		case CMD_READFN0:
 			ctl->val[2] = emu10k1_readfn0(card, ctl->val[0]);
 
@@ -286,16 +289,13 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 
 		case CMD_GETVOICEPARAM:
 			ctl->val[0] = card->waveout.send_routing[0];
-			ctl->val[1] = card->waveout.send_a[0] | card->waveout.send_b[0] << 8 |
-			    	      card->waveout.send_c[0] << 16 | card->waveout.send_d[0] << 24;
+			ctl->val[1] = card->waveout.send_dcba[0];
 
 			ctl->val[2] = card->waveout.send_routing[1];
-			ctl->val[3] = card->waveout.send_a[1] | card->waveout.send_b[1] << 8 |
-				      card->waveout.send_c[1] << 16 | card->waveout.send_d[1] << 24;
+			ctl->val[3] = card->waveout.send_dcba[1];
 
 			ctl->val[4] = card->waveout.send_routing[2];
-			ctl->val[5] = card->waveout.send_a[2] | card->waveout.send_b[2] << 8 |
-				     card->waveout.send_c[2] << 16 | card->waveout.send_d[2] << 24;
+			ctl->val[5] = card->waveout.send_dcba[2];
 
 			if (copy_to_user((void *) arg, ctl, sizeof(struct mixer_private_ioctl)))
 				ret = -EFAULT;
@@ -303,23 +303,14 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 			break;
 
 		case CMD_SETVOICEPARAM:
-			card->waveout.send_routing[0] = ctl->val[0] & 0xffff;
-			card->waveout.send_a[0] = ctl->val[1] & 0xff;
-			card->waveout.send_b[0] = (ctl->val[1] >> 8) & 0xff;
-			card->waveout.send_c[0] = (ctl->val[1] >> 16) & 0xff;
-			card->waveout.send_d[0] = (ctl->val[1] >> 24) & 0xff;
+			card->waveout.send_routing[0] = ctl->val[0];
+			card->waveout.send_dcba[0] = ctl->val[1];
 
-			card->waveout.send_routing[1] = ctl->val[2] & 0xffff;
-			card->waveout.send_a[1] = ctl->val[3] & 0xff;
-			card->waveout.send_b[1] = (ctl->val[3] >> 8) & 0xff;
-			card->waveout.send_c[1] = (ctl->val[3] >> 16) & 0xff;
-			card->waveout.send_d[1] = (ctl->val[3] >> 24) & 0xff;
+			card->waveout.send_routing[1] = ctl->val[2];
+			card->waveout.send_dcba[1] = ctl->val[3];
 
-			card->waveout.send_routing[2] = ctl->val[4] & 0xffff;
-			card->waveout.send_a[2] = ctl->val[5] & 0xff;
-			card->waveout.send_b[2] = (ctl->val[5] >> 8) & 0xff;
-			card->waveout.send_c[2] = (ctl->val[5] >> 16) & 0xff;
-			card->waveout.send_d[2] = (ctl->val[5] >> 24) & 0xff;
+			card->waveout.send_routing[2] = ctl->val[4];
+			card->waveout.send_dcba[2] = ctl->val[5];
 
 			break;
 		
@@ -416,12 +407,16 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 			break;
 
 		case CMD_SETGPOUT:
-			if (ctl->val[0] > 2 || ctl->val[1] > 1) {
+			if ( ((ctl->val[0] > 2) && (!card->is_audigy))
+			     || (ctl->val[0] > 15) || ctl->val[1] > 1) {
 				ret= -EINVAL;
 				break;
 			}
 
-			emu10k1_writefn0(card, (1 << 24) | (((ctl->val[0]) + 10) << 16) | HCFG, ctl->val[1]);
+			if (card->is_audigy)
+				emu10k1_writefn0(card, (1 << 24) | ((ctl->val[0]) << 16) | A_IOCFG, ctl->val[1]);
+			else
+				emu10k1_writefn0(card, (1 << 24) | (((ctl->val[0]) + 10) << 16) | HCFG, ctl->val[1]);
 			break;
 
 		case CMD_GETGPR2OSS:
@@ -493,13 +488,20 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 			break;
 
 		case CMD_PRIVATE3_VERSION:
-			ctl->val[0]=PRIVATE3_VERSION;
+			ctl->val[0] = PRIVATE3_VERSION;	//private3 version
+			ctl->val[1] = MAJOR_VER;	//major driver version
+			ctl->val[2] = MINOR_VER;	//minor driver version
+			ctl->val[3] = card->is_audigy;	//1=card is audigy
+
+			if (card->is_audigy)
+				ctl->val[4]=emu10k1_readfn0(card, 0x18);
+
 			if (copy_to_user((void *) arg, ctl, sizeof(struct mixer_private_ioctl)))
 				ret = -EFAULT;
 			break;
 
 		case CMD_AC97_BOOST:
-			if(ctl->val[0])
+			if (ctl->val[0])
 				emu10k1_ac97_write(card->ac97, 0x18, 0x0);	
 			else
 				emu10k1_ac97_write(card->ac97, 0x18, 0x0808);
@@ -556,7 +558,7 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 
 				card->tankmem.size = size;
 
-				sblive_writeptr_tag(card, 0, TCB, (u32) card->tankmem.dma_handle, TCBS, size_reg, TAGLIST_END);
+				sblive_writeptr_tag(card, 0, TCB, (u32) card->tankmem.dma_handle, TCBS,(u32) size_reg, TAGLIST_END);
 
 				emu10k1_writefn0(card, HCFG_LOCKTANKCACHE, 0);
 			}
@@ -623,8 +625,13 @@ static int emu10k1_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 		if (cmd == SOUND_MIXER_INFO) {
 			mixer_info info;
 
-			strncpy(info.id, card->ac97->name, sizeof(info.id));
-			strncpy(info.name, "Creative SBLive - Emu10k1", sizeof(info.name));
+			strlcpy(info.id, card->ac97->name, sizeof(info.id));
+
+			if (card->is_audigy)
+				strlcpy(info.name, "Audigy - Emu10k1", sizeof(info.name));
+			else
+				strlcpy(info.name, "Creative SBLive - Emu10k1", sizeof(info.name));
+				
 			info.modify_counter = card->ac97->modcnt;
 
 			if (copy_to_user((void *)arg, &info, sizeof(info)))
