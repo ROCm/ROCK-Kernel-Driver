@@ -253,6 +253,8 @@ extern struct class_simple *class_simple_create(struct module *owner, char *name
 extern void class_simple_destroy(struct class_simple *cs);
 extern struct class_device *class_simple_device_add(struct class_simple *cs, dev_t dev, struct device *device, const char *fmt, ...)
 	__attribute__((format(printf,4,5)));
+extern int class_simple_set_hotplug(struct class_simple *, 
+	int (*hotplug)(struct class_device *dev, char **envp, int num_envp, char *buffer, int buffer_size));
 extern void class_simple_device_remove(dev_t dev);
 
 
