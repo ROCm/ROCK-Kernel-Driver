@@ -70,15 +70,8 @@ struct socket *icmpv6_socket;
 
 static int icmpv6_rcv(struct sk_buff *skb);
 
-static struct inet6_protocol icmpv6_protocol = 
-{
-	icmpv6_rcv,		/* handler		*/
-	NULL,			/* error control	*/
-	NULL,			/* next			*/
-	IPPROTO_ICMPV6,		/* protocol ID		*/
-	0,			/* copy			*/
-	NULL,			/* data			*/
-	"ICMPv6"	       	/* name			*/
+static struct inet6_protocol icmpv6_protocol = {
+	.handler	=	icmpv6_rcv,
 };
 
 struct icmpv6_msg {
@@ -467,15 +460,9 @@ static void icmpv6_notify(struct sk_buff *skb, int type, int code, u32 info)
 
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
 
-	for (ipprot = (struct inet6_protocol *) inet6_protos[hash]; 
-	     ipprot != NULL; 
-	     ipprot=(struct inet6_protocol *)ipprot->next) {
-		if (ipprot->protocol != nexthdr)
-			continue;
-
-		if (ipprot->err_handler)
-			ipprot->err_handler(skb, NULL, type, code, inner_offset, info);
-	}
+	ipprot = inet6_protos[hash];
+	if (ipprot && ipprot->err_handler)
+		ipprot->err_handler(skb, NULL, type, code, inner_offset, info);
 
 	read_lock(&raw_v6_lock);
 	if ((sk = raw_v6_htable[hash]) != NULL) {
@@ -651,7 +638,12 @@ int __init icmpv6_init(struct net_proto_family *ops)
 	sk->sndbuf = SK_WMEM_MAX*2;
 	sk->prot->unhash(sk);
 
-	inet6_add_protocol(&icmpv6_protocol);
+	if (inet6_add_protocol(&icmpv6_protocol, IPPROTO_ICMPV6) < 0) {
+		printk(KERN_ERR "Failed to register ICMP6 protocol\n");
+		sock_release(icmpv6_socket);
+		icmpv6_socket = NULL;
+		return -EAGAIN;
+	}
 
 	return 0;
 }
@@ -660,7 +652,7 @@ void icmpv6_cleanup(void)
 {
 	sock_release(icmpv6_socket);
 	icmpv6_socket = NULL; /* For safety. */
-	inet6_del_protocol(&icmpv6_protocol);
+	inet6_del_protocol(&icmpv6_protocol, IPPROTO_ICMPV6);
 }
 
 static struct icmp6_err {

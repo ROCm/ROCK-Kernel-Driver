@@ -719,23 +719,10 @@ static void icmp_unreach(struct sk_buff *skb)
 	 *	we are OK.
 	 */
 
-	ipprot = (struct inet_protocol *)inet_protos[hash];
-	while (ipprot) {
-		struct inet_protocol *nextip;
+	ipprot = inet_protos[hash];
+	if (ipprot && ipprot->err_handler)
+		ipprot->err_handler(skb, info);
 
-		nextip = (struct inet_protocol *)ipprot->next;
-		/*
-		 *	Pass it off to everyone who wants it.
-		 */
-
-		/* RFC1122: OK. Passes appropriate ICMP errors to the */
-		/* appropriate protocol layer (MUST), as per 3.2.2. */
-
-		if (protocol == ipprot->protocol && ipprot->err_handler)
- 			ipprot->err_handler(skb, info);
-
-		ipprot = nextip;
-  	}
 out:
 	return;
 out_err:

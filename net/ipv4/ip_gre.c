@@ -1259,13 +1259,8 @@ int __init ipgre_fb_tunnel_init(struct net_device *dev)
 
 
 static struct inet_protocol ipgre_protocol = {
-  ipgre_rcv,             /* GRE handler          */
-  ipgre_err,             /* TUNNEL error control */
-  0,                    /* next                 */
-  IPPROTO_GRE,          /* protocol ID          */
-  0,                    /* copy                 */
-  NULL,                 /* data                 */
-  "GRE"                 /* name                 */
+	.handler	=	ipgre_rcv,
+	.err_handler	=	ipgre_err,
 };
 
 
@@ -1281,9 +1276,13 @@ int __init ipgre_init(void)
 {
 	printk(KERN_INFO "GRE over IPv4 tunneling driver\n");
 
+	if (inet_add_protocol(&ipgre_protocol, IPPROTO_GRE) < 0) {
+		printk(KERN_INFO "ipgre init: can't add protocol\n");
+		return -EAGAIN;
+	}
+
 	ipgre_fb_tunnel_dev.priv = (void*)&ipgre_fb_tunnel;
 	register_netdev(&ipgre_fb_tunnel_dev);
-	inet_add_protocol(&ipgre_protocol);
 	return 0;
 }
 
@@ -1291,7 +1290,7 @@ int __init ipgre_init(void)
 
 void cleanup_module(void)
 {
-	if ( inet_del_protocol(&ipgre_protocol) < 0 )
+	if (inet_del_protocol(&ipgre_protocol, IPPROTO_GRE) < 0)
 		printk(KERN_INFO "ipgre close: can't remove protocol\n");
 
 	unregister_netdev(&ipgre_fb_tunnel_dev);

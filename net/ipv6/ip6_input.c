@@ -126,7 +126,6 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 	struct sock *raw_sk;
 	int nhoff;
 	int nexthdr;
-	int found = 0;
 	u8 hash;
 
 	skb->h.raw = skb->nh.raw + sizeof(struct ipv6hdr);
@@ -164,39 +163,24 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 		skb->csum = csum_sub(skb->csum,
 				     csum_partial(skb->nh.raw, skb->h.raw-skb->nh.raw, 0));
 
-	raw_sk = raw_v6_htable[nexthdr&(MAX_INET_PROTOS-1)];
+resubmit:
+	raw_sk = raw_v6_htable[nexthdr & (MAX_INET_PROTOS - 1)];
 	if (raw_sk)
-		raw_sk = ipv6_raw_deliver(skb, nexthdr);
+		ipv6_raw_deliver(skb, nexthdr);
 
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
-	for (ipprot = (struct inet6_protocol *) inet6_protos[hash]; 
-	     ipprot != NULL; 
-	     ipprot = (struct inet6_protocol *) ipprot->next) {
-		struct sk_buff *buff = skb;
-
-		if (ipprot->protocol != nexthdr)
-			continue;
-
-		if (ipprot->copy || raw_sk)
-			buff = skb_clone(skb, GFP_ATOMIC);
-
-		if (buff)
-			ipprot->handler(buff);
-		found = 1;
-	}
-
-	if (raw_sk) {
-		rawv6_rcv(raw_sk, skb);
-		sock_put(raw_sk);
-		found = 1;
-	}
-
-	/*
-	 *	not found: send ICMP parameter problem back
-	 */
-	if (!found) {
-		IP6_INC_STATS_BH(Ip6InUnknownProtos);
-		icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR, nhoff);
+	if ((ipprot = inet6_protos[hash]) != NULL) {
+		int ret = ipprot->handler(skb);
+		if (ret < 0) {
+			nexthdr = -ret;
+			goto resubmit;
+		}
+	} else {
+		if (!raw_sk) {
+			IP6_INC_STATS_BH(Ip6InUnknownProtos);
+			icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR, nhoff);
+		}
+		kfree_skb(skb);
 	}
 
 	return 0;

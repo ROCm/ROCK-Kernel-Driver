@@ -877,10 +877,8 @@ int __init ipip_fb_tunnel_init(struct net_device *dev)
 }
 
 static struct inet_protocol ipip_protocol = {
-	.handler =	ipip_rcv,
-	.err_handler =	ipip_err,
-	.protocol =	IPPROTO_IPIP,
-	.name =		"IPIP"
+	.handler	=	ipip_rcv,
+	.err_handler	=	ipip_err,
 };
 
 static char banner[] __initdata =
@@ -890,15 +888,19 @@ int __init ipip_init(void)
 {
 	printk(banner);
 
+	if (inet_add_protocol(&ipip_protocol, IPPROTO_IPIP) < 0) {
+		printk(KERN_INFO "ipip init: can't add protocol\n");
+		return -EAGAIN;
+	}
+
 	ipip_fb_tunnel_dev.priv = (void*)&ipip_fb_tunnel;
 	register_netdev(&ipip_fb_tunnel_dev);
-	inet_add_protocol(&ipip_protocol);
 	return 0;
 }
 
 static void __exit ipip_fini(void)
 {
-	if ( inet_del_protocol(&ipip_protocol) < 0 )
+	if (inet_del_protocol(&ipip_protocol, IPPROTO_IPIP) < 0)
 		printk(KERN_INFO "ipip close: can't remove protocol\n");
 
 	unregister_netdev(&ipip_fb_tunnel_dev);

@@ -108,7 +108,7 @@ static int ip_mr_forward(struct sk_buff *skb, struct mfc_cache *cache, int local
 static int ipmr_cache_report(struct sk_buff *pkt, vifi_t vifi, int assert);
 static int ipmr_fill_mroute(struct sk_buff *skb, struct mfc_cache *c, struct rtmsg *rtm);
 
-extern struct inet_protocol pim_protocol;
+static struct inet_protocol pim_protocol;
 
 static struct timer_list ipmr_expire_timer;
 
@@ -928,23 +928,28 @@ int ip_mroute_setsockopt(struct sock *sk,int optname,char *optval,int optlen)
 #ifdef CONFIG_IP_PIMSM
 		case MRT_PIM:
 		{
-			int v;
+			int v, ret;
 			if(get_user(v,(int *)optval))
 				return -EFAULT;
 			v = (v)?1:0;
 			rtnl_lock();
+			ret = 0;
 			if (v != mroute_do_pim) {
 				mroute_do_pim = v;
 				mroute_do_assert = v;
 #ifdef CONFIG_IP_PIMSM_V2
 				if (mroute_do_pim)
-					inet_add_protocol(&pim_protocol);
+					ret = inet_add_protocol(&pim_protocol,
+								IPPROTO_PIM);
 				else
-					inet_del_protocol(&pim_protocol);
+					ret = inet_del_protocol(&pim_protocol,
+								IPPROTO_PIM);
+				if (ret < 0)
+					ret = -EAGAIN;
 #endif
 			}
 			rtnl_unlock();
-			return 0;
+			return ret;
 		}
 #endif
 		/*
@@ -1727,15 +1732,8 @@ done:
 #endif	
 
 #ifdef CONFIG_IP_PIMSM_V2
-struct inet_protocol pim_protocol = 
-{
-	pim_rcv,		/* PIM handler		*/
-	NULL,			/* PIM error control	*/
-	NULL,			/* next			*/
-	IPPROTO_PIM,		/* protocol ID		*/
-	0,			/* copy			*/
-	NULL,			/* data			*/
-	"PIM"			/* name			*/
+static struct inet_protocol pim_protocol = {
+	.handler	=	pim_rcv,
 };
 #endif
 

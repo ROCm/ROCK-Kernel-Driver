@@ -334,7 +334,7 @@ static int dn_return_short(struct sk_buff *skb)
 	*dst = tmp;
 
 	skb->pkt_type = PACKET_OUTGOING;
-	dn_rt_finish_output(skb, NULL);
+	dn_rt_finish_output(skb, NULL, NULL);
 	return NET_RX_SUCCESS;
 }
 
@@ -380,7 +380,7 @@ static int dn_return_long(struct sk_buff *skb)
 	memcpy(dst_addr, tmp, ETH_ALEN);
 
 	skb->pkt_type = PACKET_OUTGOING;
-	dn_rt_finish_output(skb, tmp);
+	dn_rt_finish_output(skb, dst_addr, src_addr);
 	return NET_RX_SUCCESS;
 }
 
@@ -641,7 +641,9 @@ static int dn_forward(struct sk_buff *skb)
 	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	struct dst_entry *dst = skb->dst;
 	struct neighbour *neigh;
+#ifdef CONFIG_NETFILTER
 	struct net_device *dev = skb->dev;
+#endif
 	int err = -EINVAL;
 
 	if ((neigh = dst->neighbour) == NULL)
@@ -711,10 +713,11 @@ static int dn_rt_bug(struct sk_buff *skb)
 static int dn_route_output_slow(struct dst_entry **pprt, dn_address dst, dn_address src, int flags)
 {
 	struct dn_route *rt = NULL;
-	struct net_device *dev = decnet_default_device;
+	struct net_device *dev = NULL;
 	struct neighbour *neigh = NULL;
 	struct dn_dev *dn_db;
 	unsigned hash;
+
 #ifdef CONFIG_DECNET_ROUTER
 	struct dn_fib_key key;
 	struct dn_fib_res res;
@@ -765,13 +768,25 @@ static int dn_route_output_slow(struct dst_entry **pprt, dn_address dst, dn_addr
 			goto got_route;
 	}
 
+	dev = dn_dev_get_default();
 	if (dev == NULL)
 		return -EINVAL;
 
 	dn_db = dev->dn_ptr;
 
-	if (dn_db == NULL)
+	/* Check to see if its one of our own local addresses */
+	if (dn_dev_islocal(dev, dst)) {
+		struct net_device *lo = &loopback_dev;
+		if (lo->dn_ptr) {
+			neigh = __neigh_lookup(&dn_neigh_table, &dst, lo, 1);
+			if (neigh)
+				goto got_route;
+		}
+		if (net_ratelimit())
+			printk("dn_route_output_slow: Dest is local interface address, but loopback device is not up\n");
+		dev_put(dev);
 		return -EINVAL;
+	}
 
 	/* Try default router */
 	if ((neigh = neigh_clone(dn_db->router)) != NULL)
@@ -781,10 +796,12 @@ static int dn_route_output_slow(struct dst_entry **pprt, dn_address dst, dn_addr
 	if ((neigh = __neigh_lookup(&dn_neigh_table, &dst, dev, 1)) != NULL)
 		goto got_route;
 
-
+	dev_put(dev);
 	return -EINVAL;
 
 got_route:
+	if (dev)
+		dev_put(dev);
 
 	if ((rt = dst_alloc(&dn_dst_ops)) == NULL) {
 		neigh_release(neigh);
@@ -809,7 +826,7 @@ got_route:
 	rt->u.dst.output = dn_output;
 	rt->u.dst.input  = dn_rt_bug;
 
-	if (dn_dev_islocal(neigh->dev, rt->rt_daddr))
+	if (neigh->dev->flags & IFF_LOOPBACK)
 		rt->u.dst.input = dn_nsp_rx;
 
 	hash = dn_hash(rt->key.saddr, rt->key.daddr);

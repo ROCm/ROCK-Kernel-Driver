@@ -194,28 +194,6 @@ int ip_call_ra_chain(struct sk_buff *skb)
 	return 0;
 }
 
-/* Handle this out of line, it is rare. */
-static int ip_run_ipprot(struct sk_buff *skb, struct iphdr *iph,
-			 struct inet_protocol *ipprot, int force_copy)
-{
-	int ret = 0;
-
-	do {
-		if (ipprot->protocol == iph->protocol) {
-			struct sk_buff *skb2 = skb;
-			if (ipprot->copy || force_copy)
-				skb2 = skb_clone(skb, GFP_ATOMIC);
-			if(skb2 != NULL) {
-				ret = 1;
-				ipprot->handler(skb2);
-			}
-		}
-		ipprot = (struct inet_protocol *) ipprot->next;
-	} while(ipprot != NULL);
-
-	return ret;
-}
-
 static inline int ip_local_deliver_finish(struct sk_buff *skb)
 {
 	int ihl = skb->nh.iph->ihl*4;
@@ -239,44 +217,31 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 	{
 		/* Note: See raw.c and net/raw.h, RAWV4_HTABLE_SIZE==MAX_INET_PROTOS */
 		int protocol = skb->nh.iph->protocol;
-		int hash = protocol & (MAX_INET_PROTOS - 1);
-		struct sock *raw_sk = raw_v4_htable[hash];
+		int hash;
+		struct sock *raw_sk;
 		struct inet_protocol *ipprot;
-		int flag;
+
+	resubmit:
+		hash = protocol & (MAX_INET_PROTOS - 1);
+		raw_sk = raw_v4_htable[hash];
 
 		/* If there maybe a raw socket we must check - if not we
 		 * don't care less
 		 */
-		if(raw_sk != NULL)
-			raw_sk = raw_v4_input(skb, skb->nh.iph, hash);
+		if (raw_sk)
+			raw_v4_input(skb, skb->nh.iph, hash);
 
-		ipprot = (struct inet_protocol *) inet_protos[hash];
-		flag = 0;
-		if(ipprot != NULL) {
-			if(raw_sk == NULL &&
-			   ipprot->next == NULL &&
-			   ipprot->protocol == protocol) {
-				int ret;
-
-				/* Fast path... */
-				ret = ipprot->handler(skb);
-
-				return ret;
-			} else {
-				flag = ip_run_ipprot(skb, skb->nh.iph, ipprot, (raw_sk != NULL));
+		if ((ipprot = inet_protos[hash]) != NULL) {
+			int ret = ipprot->handler(skb);
+			if (ret < 0) {
+				protocol = -ret;
+				goto resubmit;
 			}
-		}
-
-		/* All protocols checked.
-		 * If this packet was a broadcast, we may *not* reply to it, since that
-		 * causes (proven, grin) ARP storms and a leakage of memory (i.e. all
-		 * ICMP reply messages get queued up for transmission...)
-		 */
-		if(raw_sk != NULL) {	/* Shift to last raw user */
-			raw_rcv(raw_sk, skb);
-			sock_put(raw_sk);
-		} else if (!flag) {		/* Free and report errors */
-			icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PROT_UNREACH, 0);	
+		} else {
+			if (!raw_sk) {
+				icmp_send(skb, ICMP_DEST_UNREACH,
+					  ICMP_PROT_UNREACH, 0);
+			}
 			kfree_skb(skb);
 		}
 	}

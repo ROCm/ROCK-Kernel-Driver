@@ -152,15 +152,15 @@ int ipv6_addr_type(struct in6_addr *addr)
 		int type = IPV6_ADDR_MULTICAST;
 
 		switch((st & htonl(0x00FF0000))) {
-			case htonl(0x00010000):
+			case __constant_htonl(0x00010000):
 				type |= IPV6_ADDR_LOOPBACK;
 				break;
 
-			case htonl(0x00020000):
+			case __constant_htonl(0x00020000):
 				type |= IPV6_ADDR_LINKLOCAL;
 				break;
 
-			case htonl(0x00050000):
+			case __constant_htonl(0x00050000):
 				type |= IPV6_ADDR_SITELOCAL;
 				break;
 		};
@@ -786,7 +786,7 @@ static void addrconf_add_lroute(struct net_device *dev)
 	struct in6_addr addr;
 
 	ipv6_addr_set(&addr,  htonl(0xFE800000), 0, 0, 0);
-	addrconf_prefix_route(&addr, 10, dev, 0, RTF_ADDRCONF);
+	addrconf_prefix_route(&addr, 64, dev, 0, RTF_ADDRCONF);
 }
 
 static struct inet6_dev *addrconf_add_dev(struct net_device *dev)
@@ -1161,7 +1161,7 @@ static void sit_add_v4_addrs(struct inet6_dev *idev)
 					flag |= IFA_HOST;
 				}
 				if (idev->dev->flags&IFF_POINTOPOINT)
-					plen = 10;
+					plen = 64;
 				else
 					plen = 96;
 
@@ -1211,7 +1211,7 @@ static void addrconf_add_linklocal(struct inet6_dev *idev, struct in6_addr *addr
 {
 	struct inet6_ifaddr * ifp;
 
-	ifp = ipv6_add_addr(idev, addr, 10, IFA_LINK, IFA_F_PERMANENT);
+	ifp = ipv6_add_addr(idev, addr, 64, IFA_LINK, IFA_F_PERMANENT);
 	if (ifp) {
 		addrconf_dad_start(ifp);
 		in6_ifa_put(ifp);
