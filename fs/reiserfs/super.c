@@ -1491,9 +1491,12 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     } else {
         reiserfs_info (s, "using writeback data mode\n");
     }
-    if (reiserfs_barrier_flush(s)) {
+    /* make barrer=flush the default */
+
+    if (!reiserfs_barrier_none(s))
+	REISERFS_SB(s)->s_mount_opt |= (1 << REISERFS_BARRIER_FLUSH);
+    if (reiserfs_barrier_flush(s))
     	printk("reiserfs: using flush barriers\n");
-    }
 
     // set_device_ro(s->s_dev, 1) ;
     if( journal_init(s, jdev_name, old_format, commit_max_age) ) {
