@@ -38,11 +38,13 @@
 copy_user_page: /* %o0=dest, %o1=src, %o2=vaddr */
 	VISEntry
 	sethi		%hi(PAGE_SIZE), %g3
-	sub		%o0, %g4, %g1
+	sethi		%uhi(PAGE_OFFSET), %g2
+	sllx		%g2, 32, %g2
+	sub		%o0, %g2, %g1
 	and		%o2, %g3, %o0
 	sethi		%hi(TLBTEMP_BASE), %o3
 	sethi		%uhi(_PAGE_VALID | _PAGE_SZBITS), %g3
-	sub		%o1, %g4, %g2
+	sub		%o1, %g2, %g2
 	sllx		%g3, 32, %g3
 	mov		TLB_TAG_ACCESS, %o2
 	or		%g3, (_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W), %g3
@@ -337,7 +339,9 @@ _clear_page:	/* %o0=dest */
 clear_user_page:	/* %o0=dest, %o1=vaddr */
 	VISEntryHalf
 	sethi		%hi(PAGE_SIZE), %g3
-	sub		%o0, %g4, %g1
+	sethi		%uhi(PAGE_OFFSET), %g2
+	sllx		%g2, 32, %g2
+	sub		%o0, %g2, %g1
 	and		%o1, %g3, %o0
 	mov		TLB_TAG_ACCESS, %o2
 	sethi		%uhi(_PAGE_VALID | _PAGE_SZBITS), %g3

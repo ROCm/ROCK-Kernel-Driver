@@ -106,12 +106,10 @@ typedef unsigned long iopgprot_t;
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
-#ifndef __ASSEMBLY__
-/* Do prdele, look what happens to be in %g4... */
-register unsigned long PAGE_OFFSET asm("g4");
-#else
+/* We used to stick this into a hard-coded global register (%g4)
+ * but that does not make sense anymore.
+ */
 #define PAGE_OFFSET		0xFFFFF80000000000
-#endif
 
 #define __pa(x)			((unsigned long)(x) - PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long) (x) + PAGE_OFFSET))

@@ -96,15 +96,15 @@ etrap_irq2:	rdpr	%tstate, %g1						! Single 	Group
 		stx	%i2, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I2]		! Store		Group
 		stx	%i3, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I3]		! Store		Group
 		stx	%i4, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I4]		! Store		Group
-		sethi	%uhi(PAGE_OFFSET), %g4					! IEU0
 		stx	%i5, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I5]		! Store		Group
 
 		stx	%i6, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I6]		! Store		Group
-		sllx	%g4, 32, %g4						! IEU0
 		stx	%i7, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I7]		! Store		Group
 		wrpr	%g0, ETRAP_PSTATE2, %pstate				! Single	Group+4bubbles
+		mov	%l6, %g6						! IEU0
 		jmpl	%l2 + 0x4, %g0						! CTI		Group
-		 mov	%l6, %g6						! IEU0
+		 ldx	[%g6 + TI_TASK], %g4					! Load
+		nop
 		nop
 		nop
 
@@ -187,13 +187,13 @@ scetrap:	rdpr	%pil, %g2						! Single 	Group
 		stx	%i3, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I3]		! Store		Group
 		stx	%i4, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I4]		! Store		Group
 
-		sethi	%uhi(PAGE_OFFSET), %g4					! IEU0
 		stx	%i5, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I5]		! Store		Group
 		stx	%i6, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I6]		! Store		Group
-		sllx	%g4, 32, %g4						! IEU0
 		mov	%l6, %g6						! IEU1
 		stx	%i7, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_I7]		! Store		Group
+		ldx	[%g6 + TI_TASK], %g4					! Load		Group
 		done
+		nop
 		nop
 
 #undef TASK_REGOFF

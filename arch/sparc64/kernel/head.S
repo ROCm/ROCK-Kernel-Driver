@@ -419,9 +419,6 @@ sun4u_init:
 	stxa	%g0, [%g7] ASI_DMMU
 	membar	#Sync
 
-	sethi	%uhi(PAGE_OFFSET), %g4
-	sllx	%g4, 32, %g4
-
 	/* We are now safely (we hope) in Nucleus context (0), rewrite
 	 * the KERNBASE TTE's so they no longer have the global bit set.
 	 * Don't forget to setup TAG_ACCESS first 8-)
@@ -493,6 +490,7 @@ spitfire_tlb_fixup:
 tlb_fixup_done:
 	sethi	%hi(init_thread_union), %g6
 	or	%g6, %lo(init_thread_union), %g6
+	ldx	[%g6 + TI_TASK], %g4
 	mov	%sp, %l6
 	mov	%o4, %l7
 
