@@ -1272,6 +1272,9 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	sock->state = SS_CONNECTED;
 
+	if (digi != NULL)
+		kfree(digi);
+
 	err=0;
 out:
 	release_sock(sk);

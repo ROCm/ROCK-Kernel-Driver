@@ -1110,8 +1110,6 @@ int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 {
 	struct task_struct *p;
-	struct list_head *l;
-	struct pid *pid;
 	int retval, success;
 
 	if (pgrp <= 0)
@@ -1119,11 +1117,11 @@ int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 
 	success = 0;
 	retval = -ESRCH;
-	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
+	do_each_task_pid(pgrp, PIDTYPE_PGID, p) {
 		int err = group_send_sig_info(sig, info, p);
 		success |= !err;
 		retval = err;
-	}
+	} while_each_task_pid(pgrp, PIDTYPE_PGID, p);
 	return success ? 0 : retval;
 }
 
@@ -1150,8 +1148,6 @@ int
 kill_sl_info(int sig, struct siginfo *info, pid_t sid)
 {
 	int err, retval = -EINVAL;
-	struct pid *pid;
-	struct list_head *l;
 	struct task_struct *p;
 
 	if (sid <= 0)
@@ -1159,13 +1155,13 @@ kill_sl_info(int sig, struct siginfo *info, pid_t sid)
 
 	retval = -ESRCH;
 	read_lock(&tasklist_lock);
-	for_each_task_pid(sid, PIDTYPE_SID, p, l, pid) {
+	do_each_task_pid(sid, PIDTYPE_SID, p) {
 		if (!p->signal->leader)
 			continue;
 		err = group_send_sig_info(sig, info, p);
 		if (retval)
 			retval = err;
-	}
+	} while_each_task_pid(sid, PIDTYPE_SID, p);
 	read_unlock(&tasklist_lock);
 out:
 	return retval;

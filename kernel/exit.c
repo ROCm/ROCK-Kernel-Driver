@@ -124,16 +124,15 @@ void unhash_process(struct task_struct *p)
 int session_of_pgrp(int pgrp)
 {
 	struct task_struct *p;
-	struct list_head *l;
-	struct pid *pid;
 	int sid = -1;
 
 	read_lock(&tasklist_lock);
-	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid)
+	do_each_task_pid(pgrp, PIDTYPE_PGID, p) {
 		if (p->signal->session > 0) {
 			sid = p->signal->session;
 			goto out;
 		}
+	} while_each_task_pid(pgrp, PIDTYPE_PGID, p);
 	p = find_task_by_pid(pgrp);
 	if (p)
 		sid = p->signal->session;
@@ -154,11 +153,9 @@ out:
 static int will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
 {
 	struct task_struct *p;
-	struct list_head *l;
-	struct pid *pid;
 	int ret = 1;
 
-	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
+	do_each_task_pid(pgrp, PIDTYPE_PGID, p) {
 		if (p == ignored_task
 				|| p->state >= TASK_ZOMBIE 
 				|| p->real_parent->pid == 1)
@@ -168,7 +165,7 @@ static int will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
 			ret = 0;
 			break;
 		}
-	}
+	} while_each_task_pid(pgrp, PIDTYPE_PGID, p);
 	return ret;	/* (sighing) "Often!" */
 }
 
@@ -187,10 +184,8 @@ static inline int has_stopped_jobs(int pgrp)
 {
 	int retval = 0;
 	struct task_struct *p;
-	struct list_head *l;
-	struct pid *pid;
 
-	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
+	do_each_task_pid(pgrp, PIDTYPE_PGID, p) {
 		if (p->state != TASK_STOPPED)
 			continue;
 
@@ -206,7 +201,7 @@ static inline int has_stopped_jobs(int pgrp)
 
 		retval = 1;
 		break;
-	}
+	} while_each_task_pid(pgrp, PIDTYPE_PGID, p);
 	return retval;
 }
 
@@ -849,9 +844,6 @@ asmlinkage long sys_exit(int error_code)
 
 task_t fastcall *next_thread(const task_t *p)
 {
-	const struct pid_link *link = p->pids + PIDTYPE_TGID;
-	const struct list_head *tmp, *head = &link->pidptr->task_list;
-
 #ifdef CONFIG_SMP
 	if (!p->sighand)
 		BUG();
@@ -859,11 +851,7 @@ task_t fastcall *next_thread(const task_t *p)
 				!rwlock_is_locked(&tasklist_lock))
 		BUG();
 #endif
-	tmp = link->pid_chain.next;
-	if (tmp == head)
-		tmp = head->next;
-
-	return pid_task(tmp, PIDTYPE_TGID);
+	return pid_task(p->pids[PIDTYPE_TGID].pid_list.next, PIDTYPE_TGID);
 }
 
 EXPORT_SYMBOL(next_thread);

@@ -424,7 +424,6 @@ void do_tty_hangup(void *data)
 	struct file * cons_filp = NULL;
 	struct file *filp, *f = NULL;
 	struct task_struct *p;
-	struct pid *pid;
 	int    closecount = 0, n;
 
 	if (!tty)
@@ -495,8 +494,7 @@ void do_tty_hangup(void *data)
 	
 	read_lock(&tasklist_lock);
 	if (tty->session > 0) {
-		struct list_head *l;
-		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid) {
+		do_each_task_pid(tty->session, PIDTYPE_SID, p) {
 			if (p->signal->tty == tty)
 				p->signal->tty = NULL;
 			if (!p->signal->leader)
@@ -505,7 +503,7 @@ void do_tty_hangup(void *data)
 			send_group_sig_info(SIGCONT, SEND_SIG_PRIV, p);
 			if (tty->pgrp > 0)
 				p->signal->tty_old_pgrp = tty->pgrp;
-		}
+		} while_each_task_pid(tty->session, PIDTYPE_SID, p);
 	}
 	read_unlock(&tasklist_lock);
 
@@ -577,8 +575,6 @@ void disassociate_ctty(int on_exit)
 {
 	struct tty_struct *tty;
 	struct task_struct *p;
-	struct list_head *l;
-	struct pid *pid;
 	int tty_pgrp = -1;
 
 	lock_kernel();
@@ -607,8 +603,9 @@ void disassociate_ctty(int on_exit)
 	tty->pgrp = -1;
 
 	read_lock(&tasklist_lock);
-	for_each_task_pid(current->signal->session, PIDTYPE_SID, p, l, pid)
+	do_each_task_pid(current->signal->session, PIDTYPE_SID, p) {
 		p->signal->tty = NULL;
+	} while_each_task_pid(current->signal->session, PIDTYPE_SID, p);
 	read_unlock(&tasklist_lock);
 	unlock_kernel();
 }
@@ -1260,15 +1257,15 @@ static void release_dev(struct file * filp)
 	 */
 	if (tty_closing || o_tty_closing) {
 		struct task_struct *p;
-		struct list_head *l;
-		struct pid *pid;
 
 		read_lock(&tasklist_lock);
-		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid)
+		do_each_task_pid(tty->session, PIDTYPE_SID, p) {
 			p->signal->tty = NULL;
+		} while_each_task_pid(tty->session, PIDTYPE_SID, p);
 		if (o_tty)
-			for_each_task_pid(o_tty->session, PIDTYPE_SID, p,l, pid)
+			do_each_task_pid(o_tty->session, PIDTYPE_SID, p) {
 				p->signal->tty = NULL;
+			} while_each_task_pid(o_tty->session, PIDTYPE_SID, p);
 		read_unlock(&tasklist_lock);
 	}
 
@@ -1638,8 +1635,6 @@ static int fionbio(struct file *file, int __user *p)
 
 static int tiocsctty(struct tty_struct *tty, int arg)
 {
-	struct list_head *l;
-	struct pid *pid;
 	task_t *p;
 
 	if (current->signal->leader &&
@@ -1662,8 +1657,9 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 			 */
 
 			read_lock(&tasklist_lock);
-			for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid)
+			do_each_task_pid(tty->session, PIDTYPE_SID, p) {
 				p->signal->tty = NULL;
+			} while_each_task_pid(tty->session, PIDTYPE_SID, p);
 			read_unlock(&tasklist_lock);
 		} else
 			return -EPERM;
@@ -1970,8 +1966,6 @@ static void __do_SAK(void *arg)
 #else
 	struct tty_struct *tty = arg;
 	struct task_struct *p;
-	struct list_head *l;
-	struct pid *pid;
 	int session;
 	int		i;
 	struct file	*filp;
@@ -1984,7 +1978,7 @@ static void __do_SAK(void *arg)
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
 	read_lock(&tasklist_lock);
-	for_each_task_pid(session, PIDTYPE_SID, p, l, pid) {
+	do_each_task_pid(session, PIDTYPE_SID, p) {
 		if (p->signal->tty == tty || session > 0) {
 			printk(KERN_NOTICE "SAK: killed process %d"
 			    " (%s): p->signal->session==tty->session\n",
@@ -2011,7 +2005,7 @@ static void __do_SAK(void *arg)
 			spin_unlock(&p->files->file_lock);
 		}
 		task_unlock(p);
-	}
+	} while_each_task_pid(session, PIDTYPE_SID, p);
 	read_unlock(&tasklist_lock);
 #endif
 }

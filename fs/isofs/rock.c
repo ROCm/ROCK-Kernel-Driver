@@ -153,6 +153,7 @@ int get_rock_ridge_filename(struct iso_directory_record * de,
     }
   }
   MAYBE_CONTINUE(repeat,inode);
+  if (buffer) kfree(buffer);
   return retnamlen; /* If 0, this file did not have a NM field */
  out:
   if(buffer) kfree(buffer);
@@ -351,7 +352,6 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
     }
   }
   MAYBE_CONTINUE(repeat,inode);
-  return 0;
  out:
   if(buffer) kfree(buffer);
   return 0;
@@ -515,6 +515,8 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 		}
 	}
 	MAYBE_CONTINUE(repeat, inode);
+	if (buffer)
+		kfree(buffer);
 
 	if (rpnt == link)
 		goto fail;
