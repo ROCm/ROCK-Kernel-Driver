@@ -1469,7 +1469,7 @@ static int solo1_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (s->dma_adc.mapped)
 			s->dma_adc.count &= s->dma_adc.fragsize-1;
 		spin_unlock_irqrestore(&s->lock, flags);
-                if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 
@@ -1495,7 +1495,7 @@ static int solo1_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		       cinfo.bytes, cinfo.blocks, cinfo.ptr, s->dma_dac.buforder, s->dma_dac.numfrag, s->dma_dac.fragshift,
 		       s->dma_dac.swptr, s->dma_dac.count, s->dma_dac.fragsize, s->dma_dac.dmasize, s->dma_dac.fragsamples);
 #endif
-                if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 

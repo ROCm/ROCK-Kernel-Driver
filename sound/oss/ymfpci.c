@@ -2653,7 +2653,7 @@ static struct pci_driver ymfpci_driver = {
 	name:		"ymfpci",
 	id_table:	ymf_id_tbl,
 	probe:		ymf_probe_one,
-	remove:         __devexit_p(ymf_remove_one),
+	remove:		__devexit_p(ymf_remove_one),
 	suspend:	ymf_suspend,
 	resume:		ymf_resume
 };

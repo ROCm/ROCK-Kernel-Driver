@@ -2034,7 +2034,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		if (s->dma_adc.mapped)
 			s->dma_adc.count &= s->dma_adc.fragsize-1;
 		spin_unlock_irqrestore(&s->lock, flags);
-                if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 
@@ -2053,7 +2053,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 				s->dma_adc.count &= s->dma_adc.fragsize-1;
 		}
 		spin_unlock_irqrestore(&s->lock, flags);
-                if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 
