@@ -391,7 +391,7 @@ typedef struct isdn_net_dev_s {
 					  channels, which are currently
 					  online                           */
   spinlock_t queue_lock;               /* lock to protect queue            */
-  struct isdn_net_dev_s *next;         /* Pointer to next isdn-interface   */
+  struct list_head global_list;        /* global list of all isdn_net_devs */
   struct net_device dev;               /* interface to upper levels        */
 #ifdef CONFIG_ISDN_PPP
   ippp_bundle * pb;		/* pointer to the common bundle structure
@@ -606,7 +606,6 @@ typedef struct isdn_devt {
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
 	struct timer_list timer;		       /* Misc.-function Timer       */
 	driver            *drv[ISDN_MAX_DRIVERS];    /* Array of drivers           */
-	isdn_net_dev      *netdev;		       /* Linked list of net-if's    */
 	char              drvid[ISDN_MAX_DRIVERS][20];/* Driver-ID                 */
 	struct task_struct *profd;                   /* For iprofd                 */
 	modem             mdm;		       /* tty-driver-data            */

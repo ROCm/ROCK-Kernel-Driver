@@ -39,24 +39,19 @@
 #endif
 
 enum {
-	ST_0,
-	ST_1,
-	ST_2_UNUSED,
-	ST_3,
-	ST_4,
-	ST_5,
-	ST_6,
-	ST_7,
-	ST_8,
-	ST_9,
-	ST_10,
+	ST_0              = 0,
+	ST_OUT_0          = 1,
+	ST_OUT_WAIT_DCONN = 4,
+	ST_OUT_WAIT_BCONN = 6,
+	ST_IN_WAIT_DCONN  = 7,
+	ST_IN_WAIT_BCONN  = 10,
 	ST_11,
 	ST_12,
 };
 
 /* keep clear of ISDN_CMD_* and ISDN_STAT_* */
 enum {
-	EV_NET_DIAL = 0x200,
+	EV_NET_DIAL        = 0x200,
 };
 
 LIST_HEAD(isdn_net_devs); /* Linked list of isdn_net_dev's */
@@ -201,6 +196,7 @@ static __inline__ void isdn_net_zero_frame_cnt(isdn_net_local *lp)
 
 int isdn_net_force_dial_lp(isdn_net_local *);
 static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
+static int do_dialout(isdn_net_local *lp);
 
 static void isdn_net_ciscohdlck_connected(isdn_net_local *lp);
 static void isdn_net_ciscohdlck_disconnected(isdn_net_local *lp);
@@ -508,8 +504,7 @@ init_dialout(isdn_net_local *lp)
 		lp->dialwait_timer = 0;
 	}
 	lp->dialretry = 0;
-	lp->dialstate = ST_3;
-	return 1;
+	return do_dialout(lp);
 }
 
 /* Setup interface, dial current phone-number, switch to next number.
@@ -543,7 +538,7 @@ do_dialout(isdn_net_local *lp)
 	}
 	if (!strncmp(lp->dial->num, "LEASED", strlen("LEASED"))) {
 		restore_flags(flags);
-		lp->dialstate = ST_4;
+		lp->dialstate = ST_OUT_WAIT_DCONN;
 		printk(KERN_INFO "%s: Open leased line ...\n", lp->name);
 	} else {
 		struct dial_info dial = {
@@ -597,7 +592,7 @@ do_dialout(isdn_net_local *lp)
 	}
 	lp->dialstate =
 		(lp->cbdelay &&
-		 (lp->flags & ISDN_NET_CBOUT)) ? ST_12 : ST_4;
+		 (lp->flags & ISDN_NET_CBOUT)) ? ST_12 : ST_OUT_WAIT_DCONN;
 	return 1;
 }
 
@@ -687,55 +682,36 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			return 1;
 		}
 		break;
-	case ST_1:
+	case ST_OUT_0:
 		switch (pr) {
 		case EV_NET_DIAL:
 			if (init_dialout(lp) == 0)
 				return 0;
-			goto st_3_net_dial;
+			return 1;
 		}
 		break;
-	case ST_3:
+	case ST_OUT_WAIT_DCONN:
 		switch (pr) {
-		case EV_NET_DIAL:
-		st_3_net_dial:
-			return do_dialout(lp);
-		}
-		break;
-	case ST_4:
-		switch (pr) {
+		case EV_NET_TIMER_DCONN:
+			/* try again */
+			do_dialout(lp);
+			return 1;
 		case EV_NET_DIAL:
 			/* Wait for D-Channel-connect.
-			 * If timeout, switch back to state 3.
-			 * Dialmax-handling moved to state 3.
+			 * If timeout, dial again (using the next phone number)
 			 */
 			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
-				lp->dialstate = ST_3;
-			return 1;
-		case ISDN_STAT_NODCH:
-			/* No D-Channel avail. */
-			lp->dialstate = ST_3;
+				do_dialout(lp);
 			return 1;
 		case ISDN_STAT_DCONN:
-			lp->dialstate = ST_5;
-			return 1;
-		}
-		break;
-	case ST_5:
-		switch (pr) {
-		case EV_NET_DIAL:
 			/* Got D-Channel-Connect, send B-Channel-request */
 			lp->dtimer = 0;
-			lp->dialstate = ST_6;
+			lp->dialstate = ST_OUT_WAIT_BCONN;
 			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
-			return 1;
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_usage(lp->isdn_slot, isdn_slot_usage(lp->isdn_slot) | ISDN_USAGE_OUTGOING);
-			isdn_net_connected(lp);
 			return 1;
 		}
 		break;
-	case ST_6:
+	case ST_OUT_WAIT_BCONN:
 		switch (pr) {
 		case EV_NET_DIAL:
 			/* Wait for B- or D-Channel-connect. If timeout,
@@ -743,7 +719,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			 */
 			dbg_net_dial("dialtimer2: %d\n", lp->dtimer);
 			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
-				lp->dialstate = ST_3;
+				do_dialout(lp);
 			return 1;
 		case ISDN_STAT_BCONN:
 			isdn_slot_set_usage(lp->isdn_slot, isdn_slot_usage(lp->isdn_slot) | ISDN_USAGE_OUTGOING);
@@ -751,59 +727,24 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			return 1;
 		}
 		break;
-	case ST_7:
+	case ST_IN_WAIT_DCONN:
 		switch (pr) {
 		case EV_NET_DIAL:
-			/* Got incoming Call, setup L2 and L3 protocols,
-			 * then wait for D-Channel-connect
-			 */
 			dbg_net_dial("dialtimer4: %d\n", lp->dtimer);
-			cmd.arg = lp->l2_proto << 8;
-			isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
-			cmd.arg = lp->l3_proto << 8;
-			isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
 			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT15) {
 				isdn_net_hangup(&p->dev);
 			} else {
-				lp->dialstate = ST_8;
 				return 1;
 			}
 			break;
 		case ISDN_STAT_DCONN:
-			lp->dialstate = ST_8;
-			return 1;
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
-			isdn_net_connected(lp);
-			return 1;
-		}
-		break;
-	case ST_8:
-		switch (pr) {
-		case ISDN_STAT_DCONN:
-			lp->dialstate = ST_9;
-			return 1;
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
-			isdn_net_connected(lp);
-			return 1;
-		}
-		break;
-	case ST_9:
-		switch (pr) {
-		case EV_NET_DIAL:
-			/* Got incoming D-Channel-Connect, send B-Channel-request */
 			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
 			lp->dtimer = 0;
-			lp->dialstate = ST_10;
-			return 1;
-		case ISDN_STAT_BCONN:
-			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
-			isdn_net_connected(lp);
+			lp->dialstate = ST_IN_WAIT_BCONN;
 			return 1;
 		}
 		break;
-	case ST_10:
+	case ST_IN_WAIT_BCONN:
 		switch (pr) {
 		case EV_NET_DIAL:
 		/*  Wait for B- or D-channel-connect */
@@ -824,7 +765,7 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 		case EV_NET_DIAL:
 			/* Callback Delay */
 			if (lp->dtimer++ > lp->cbdelay)
-				lp->dialstate = ST_1;
+				lp->dialstate = ST_OUT_0;
 			return 1;
 		}
 		break;
@@ -837,13 +778,15 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			if (lp->dtimer++ > lp->cbdelay) {
 				printk(KERN_INFO "%s: hangup waiting for callback ...\n", lp->name);
 				lp->dtimer = 0;
-				lp->dialstate = ST_4;
+				lp->dialstate = ST_OUT_WAIT_DCONN;
 				isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
 				isdn_slot_all_eaz(lp->isdn_slot);
 			}
 			return 1;
 		case ISDN_STAT_DCONN:
-			lp->dialstate = ST_5;
+			lp->dtimer = 0;
+			lp->dialstate = ST_OUT_WAIT_BCONN;
+			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
 			return 1;
 		case ISDN_STAT_BCONN:
 			isdn_slot_set_rx_netdev(lp->isdn_slot, p);
@@ -1315,7 +1258,7 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 				/* Log packet, which triggered dialing */
 				if (dev->net_verbose)
 					isdn_net_log_skb(skb, lp);
-				lp->dialstate = ST_1;
+				lp->dialstate = ST_OUT_0;
 				/* Connect interface with channel */
 				isdn_net_bind_channel(lp, chi);
 #ifdef CONFIG_ISDN_PPP
@@ -2184,6 +2127,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 	ulong flags;
 	char nr[32];
 	char *my_eaz;
+	isdn_ctrl cmd;
 
 	int slot = isdn_dc2minor(di, ch);
 	/* Search name in netdev-chain */
@@ -2260,7 +2204,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		if ((!matchret) &&                                        /* EAZ is matching   */
 		    (((!(lp->flags & ISDN_NET_CONNECTED)) &&              /* but not connected */
 		      (USG_NONE(isdn_slot_usage(idx)))) ||                     /* and ch. unused or */
-		     ((((lp->dialstate == ST_4) || (lp->dialstate == ST_12)) && /* if dialing        */
+		     ((((lp->dialstate == ST_OUT_WAIT_DCONN) || (lp->dialstate == ST_OUT_WAIT_DCONN)) && /* if dialing        */
 		       (!(lp->flags & ISDN_NET_CALLBACK)))                /* but no callback   */
 		     )))
 			 {
@@ -2431,7 +2375,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 					       eaz);
 					/* if this interface is dialing, it does it probably on a different
 					   device, so free this device */
-					if ((lp->dialstate == ST_4) || (lp->dialstate == ST_12)) {
+					if ((lp->dialstate == ST_OUT_WAIT_DCONN) || (lp->dialstate == ST_12)) {
 #ifdef CONFIG_ISDN_PPP
 						if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
 							isdn_ppp_free(lp);
@@ -2446,12 +2390,22 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 					lp->isdn_slot = slot;
 					lp->ppp_slot = -1;
 					lp->flags |= ISDN_NET_CONNECTED;
-					lp->dialstate = ST_7;
+
 					lp->dtimer = 0;
 					lp->outgoing = 0;
 					lp->huptimer = 0;
 					lp->hupflags |= ISDN_WAITCHARGE;
 					lp->hupflags &= ~ISDN_HAVECHARGE;
+					/* Got incoming Call, setup L2 and L3 protocols,
+					 * then wait for D-Channel-connect
+					 */
+					cmd.arg = lp->l2_proto << 8;
+					isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
+					cmd.arg = lp->l3_proto << 8;
+					isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
+
+					lp->dialstate = ST_IN_WAIT_DCONN;
+
 #ifdef CONFIG_ISDN_PPP
 					if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
 						if (isdn_ppp_bind(lp) < 0) {
@@ -2518,7 +2472,7 @@ isdn_net_force_dial_lp(isdn_net_local * lp)
 				restore_flags(flags);
 				return -EAGAIN;
 			}
-			lp->dialstate = ST_1;
+			lp->dialstate = ST_OUT_0;
 			/* Connect interface with channel */
 			isdn_net_bind_channel(lp, chi);
 #ifdef CONFIG_ISDN_PPP
