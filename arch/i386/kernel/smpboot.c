@@ -405,6 +405,7 @@ void __init smp_callin(void)
 	if (clustered_apic_mode)
 		clear_local_APIC();
 	setup_local_APIC();
+	map_cpu_to_logical_apicid();
 
 	local_irq_enable();
 
@@ -536,61 +537,21 @@ static inline void unmap_cpu_to_node(int cpu)
 
 #endif /* CONFIG_NUMA */
 
-/* which physical APIC ID maps to which logical CPU number */
-volatile int physical_apicid_2_cpu[MAX_APICID];
-/* which logical CPU number maps to which physical APIC ID */
-volatile int cpu_2_physical_apicid[NR_CPUS];
+volatile u8 cpu_2_logical_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 
-/* which logical APIC ID maps to which logical CPU number */
-volatile int logical_apicid_2_cpu[MAX_APICID];
-/* which logical CPU number maps to which logical APIC ID */
-volatile int cpu_2_logical_apicid[NR_CPUS];
-
-static inline void init_cpu_to_apicid(void)
-/* Initialize all maps between cpu number and apicids */
+void map_cpu_to_logical_apicid(void)
 {
-	int apicid, cpu;
+	int cpu = smp_processor_id();
+	int apicid = logical_smp_processor_id();
 
-	for (apicid = 0; apicid < MAX_APICID; apicid++) {
-		physical_apicid_2_cpu[apicid] = -1;
-		logical_apicid_2_cpu[apicid] = -1;
-	}
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		cpu_2_physical_apicid[cpu] = -1;
-		cpu_2_logical_apicid[cpu] = -1;
-	}
+	cpu_2_logical_apicid[cpu] = apicid;
+	map_cpu_to_node(cpu, apicid_to_node(apicid));
 }
 
-static inline void map_cpu_to_boot_apicid(int cpu, int apicid)
-/* 
- * set up a mapping between cpu and apicid. Uses logical apicids for multiquad,
- * else physical apic ids
- */
+void unmap_cpu_to_logical_apicid(int cpu)
 {
-	if (clustered_apic_mode) {
-		logical_apicid_2_cpu[apicid] = cpu;	
-		cpu_2_logical_apicid[cpu] = apicid;
-		map_cpu_to_node(cpu, apicid_to_node(apicid));
-	} else {
-		physical_apicid_2_cpu[apicid] = cpu;	
-		cpu_2_physical_apicid[cpu] = apicid;
-	}
-}
-
-static inline void unmap_cpu_to_boot_apicid(int cpu, int apicid)
-/* 
- * undo a mapping between cpu and apicid. Uses logical apicids for multiquad,
- * else physical apic ids
- */
-{
-	if (clustered_apic_mode) {
-		logical_apicid_2_cpu[apicid] = -1;	
-		cpu_2_logical_apicid[cpu] = -1;
-		unmap_cpu_to_node(cpu);
-	} else {
-		physical_apicid_2_cpu[apicid] = -1;	
-		cpu_2_physical_apicid[cpu] = -1;
-	}
+	cpu_2_logical_apicid[cpu] = BAD_APICID;
+	unmap_cpu_to_node(cpu);
 }
 
 #if APIC_DEBUG
@@ -838,8 +799,6 @@ static int __init do_boot_cpu(int apicid)
 	 */
 	init_idle(idle, cpu);
 
-	map_cpu_to_boot_apicid(cpu, apicid);
-
 	idle->thread.eip = (unsigned long) start_secondary;
 
 	unhash_process(idle);
@@ -928,7 +887,7 @@ static int __init do_boot_cpu(int apicid)
 	}
 	if (boot_error) {
 		/* Try to put things back the way they were before ... */
-		unmap_cpu_to_boot_apicid(cpu, apicid);
+		unmap_cpu_to_logical_apicid(cpu);
 		clear_bit(cpu, &cpu_callout_map); /* was set here (do_boot_cpu()) */
 		clear_bit(cpu, &cpu_initialized); /* was set by cpu_init() */
 		cpucount--;
@@ -1018,8 +977,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		prof_multiplier[cpu] = 1;
 	}
 
-	init_cpu_to_apicid();
-
 	/*
 	 * Setup boot CPU information
 	 */
@@ -1028,7 +985,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	print_cpu_info(&cpu_data[0]);
 
 	boot_cpu_logical_apicid = logical_smp_processor_id();
-	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
 
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
@@ -1085,6 +1041,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	connect_bsp_APIC();
 	setup_local_APIC();
+	map_cpu_to_logical_apicid();
 
 	if (GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid)
 		BUG();
