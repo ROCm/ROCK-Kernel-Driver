@@ -58,6 +58,13 @@ enum pid_directory_inos {
 	PROC_PID_MAPS,
 	PROC_PID_MOUNTS,
 	PROC_PID_WCHAN,
+#ifdef CONFIG_SECURITY
+	PROC_PID_ATTR,
+	PROC_PID_ATTR_CURRENT,
+	PROC_PID_ATTR_PREV,
+	PROC_PID_ATTR_EXEC,
+	PROC_PID_ATTR_FSCREATE,
+#endif
 	PROC_PID_FD_DIR = 0x8000,	/* 0x8000-0xffff */
 };
 
@@ -82,11 +89,23 @@ static struct pid_entry base_stuff[] = {
   E(PROC_PID_ROOT,	"root",		S_IFLNK|S_IRWXUGO),
   E(PROC_PID_EXE,	"exe",		S_IFLNK|S_IRWXUGO),
   E(PROC_PID_MOUNTS,	"mounts",	S_IFREG|S_IRUGO),
+#ifdef CONFIG_SECURITY
+  E(PROC_PID_ATTR,	"attr",		S_IFDIR|S_IRUGO|S_IXUGO),
+#endif
 #ifdef CONFIG_KALLSYMS
   E(PROC_PID_WCHAN,	"wchan",	S_IFREG|S_IRUGO),
 #endif
   {0,0,NULL,0}
 };
+#ifdef CONFIG_SECURITY
+static struct pid_entry attr_stuff[] = {
+  E(PROC_PID_ATTR_CURRENT,	"current",	S_IFREG|S_IRUGO|S_IWUSR),
+  E(PROC_PID_ATTR_PREV,	"prev",	S_IFREG|S_IRUGO|S_IWUSR),
+  E(PROC_PID_ATTR_EXEC,	"exec",	S_IFREG|S_IRUGO|S_IWUSR),
+  E(PROC_PID_ATTR_FSCREATE,	"fscreate",	S_IFREG|S_IRUGO|S_IWUSR),
+  {0,0,NULL,0}
+};
+#endif
 #undef E
 
 static inline struct task_struct *proc_task(struct inode *inode)
@@ -411,8 +430,10 @@ static ssize_t proc_info_read(struct file * file, char * buf,
 	if (count + *ppos > length)
 		count = length - *ppos;
 	end = count + *ppos;
-	copy_to_user(buf, (char *) page + *ppos, count);
-	*ppos = end;
+	if (copy_to_user(buf, (char *) page + *ppos, count))
+		count = -EFAULT;
+	else
+		*ppos = end;
 	free_page(page);
 	return count;
 }
@@ -698,13 +719,16 @@ out:
 	return retval;
 }
 
-static int proc_base_readdir(struct file * filp,
-	void * dirent, filldir_t filldir)
+static int proc_pident_readdir(struct file *filp,
+		void *dirent, filldir_t filldir,
+		struct pid_entry *ents, unsigned int nents)
 {
 	int i;
 	int pid;
-	struct inode *inode = filp->f_dentry->d_inode;
+	struct dentry *dentry = filp->f_dentry;
+	struct inode *inode = dentry->d_inode;
 	struct pid_entry *p;
+	ino_t ino;
 	int ret;
 
 	ret = -ENOENT;
@@ -716,24 +740,26 @@ static int proc_base_readdir(struct file * filp,
 	i = filp->f_pos;
 	switch (i) {
 	case 0:
-		if (filldir(dirent, ".", 1, i, inode->i_ino, DT_DIR) < 0)
+		ino = inode->i_ino;
+		if (filldir(dirent, ".", 1, i, ino, DT_DIR) < 0)
 			goto out;
 		i++;
 		filp->f_pos++;
 		/* fall through */
 	case 1:
-		if (filldir(dirent, "..", 2, i, PROC_ROOT_INO, DT_DIR) < 0)
+		ino = parent_ino(dentry);
+		if (filldir(dirent, "..", 2, i, ino, DT_DIR) < 0)
 			goto out;
 		i++;
 		filp->f_pos++;
 		/* fall through */
 	default:
 		i -= 2;
-		if (i >= ARRAY_SIZE(base_stuff)) {
+		if (i >= nents) {
 			ret = 1;
 			goto out;
 		}
-		p = base_stuff + i;
+		p = ents + i;
 		while (p->name) {
 			if (filldir(dirent, p->name, p->len, filp->f_pos,
 				    fake_ino(pid, p->type), p->mode >> 12) < 0)
@@ -746,6 +772,13 @@ static int proc_base_readdir(struct file * filp,
 	ret = 1;
 out:
 	return ret;
+}
+
+static int proc_base_readdir(struct file * filp,
+			     void * dirent, filldir_t filldir)
+{
+	return proc_pident_readdir(filp,dirent,filldir,
+				   base_stuff,ARRAY_SIZE(base_stuff));
 }
 
 /* building an inode */
@@ -975,8 +1008,86 @@ static struct inode_operations proc_fd_inode_operations = {
 	.permission	= proc_permission,
 };
 
+#ifdef CONFIG_SECURITY
+static ssize_t proc_pid_attr_read(struct file * file, char * buf,
+				  size_t count, loff_t *ppos)
+{
+	struct inode * inode = file->f_dentry->d_inode;
+	unsigned long page;
+	ssize_t length;
+	ssize_t end;
+	struct task_struct *task = proc_task(inode);
+
+	if (count > PAGE_SIZE)
+		count = PAGE_SIZE;
+	if (!(page = __get_free_page(GFP_KERNEL)))
+		return -ENOMEM;
+
+	length = security_getprocattr(task, 
+				      (char*)file->f_dentry->d_name.name, 
+				      (void*)page, count);
+	if (length < 0) {
+		free_page(page);
+		return length;
+	}
+	/* Static 4kB (or whatever) block capacity */
+	if (*ppos >= length) {
+		free_page(page);
+		return 0;
+	}
+	if (count + *ppos > length)
+		count = length - *ppos;
+	end = count + *ppos;
+	if (copy_to_user(buf, (char *) page + *ppos, count))
+		count = -EFAULT;
+	else
+		*ppos = end;
+	free_page(page);
+	return count;
+}
+
+static ssize_t proc_pid_attr_write(struct file * file, const char * buf,
+				   size_t count, loff_t *ppos)
+{ 
+	struct inode * inode = file->f_dentry->d_inode;
+	char *page; 
+	ssize_t length; 
+	struct task_struct *task = proc_task(inode); 
+
+	if (count > PAGE_SIZE) 
+		count = PAGE_SIZE; 
+	if (*ppos != 0) {
+		/* No partial writes. */
+		return -EINVAL;
+	}
+	page = (char*)__get_free_page(GFP_USER); 
+	if (!page) 
+		return -ENOMEM;
+	length = -EFAULT; 
+	if (copy_from_user(page, buf, count)) 
+		goto out;
+
+	length = security_setprocattr(task, 
+				      (char*)file->f_dentry->d_name.name, 
+				      (void*)page, count);
+out:
+	free_page((unsigned long) page);
+	return length;
+} 
+
+static struct file_operations proc_pid_attr_operations = {
+	.read		= proc_pid_attr_read,
+	.write		= proc_pid_attr_write,
+};
+
+static struct file_operations proc_attr_operations;
+static struct inode_operations proc_attr_inode_operations;
+#endif
+
 /* SMP-safe */
-static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry *proc_pident_lookup(struct inode *dir, 
+					 struct dentry *dentry,
+					 struct pid_entry *ents)
 {
 	struct inode *inode;
 	int error;
@@ -990,7 +1101,7 @@ static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry)
 	if (!pid_alive(task))
 		goto out;
 
-	for (p = base_stuff; p->name; p++) {
+	for (p = ents; p->name; p++) {
 		if (p->len != dentry->d_name.len)
 			continue;
 		if (!memcmp(dentry->d_name.name, p->name, p->len))
@@ -1058,6 +1169,19 @@ static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry)
 		case PROC_PID_MOUNTS:
 			inode->i_fop = &proc_mounts_operations;
 			break;
+#ifdef CONFIG_SECURITY
+		case PROC_PID_ATTR:
+			inode->i_nlink = 2;
+			inode->i_op = &proc_attr_inode_operations;
+			inode->i_fop = &proc_attr_operations;
+			break;
+		case PROC_PID_ATTR_CURRENT:
+		case PROC_PID_ATTR_PREV:
+		case PROC_PID_ATTR_EXEC:
+		case PROC_PID_ATTR_FSCREATE:
+			inode->i_fop = &proc_pid_attr_operations;
+			break;
+#endif
 #ifdef CONFIG_KALLSYMS
 		case PROC_PID_WCHAN:
 			inode->i_fop = &proc_info_file_operations;
@@ -1077,6 +1201,10 @@ out:
 	return ERR_PTR(error);
 }
 
+static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry){
+	return proc_pident_lookup(dir, dentry, base_stuff);
+}
+
 static struct file_operations proc_base_operations = {
 	.read		= generic_read_dir,
 	.readdir	= proc_base_readdir,
@@ -1085,6 +1213,28 @@ static struct file_operations proc_base_operations = {
 static struct inode_operations proc_base_inode_operations = {
 	.lookup		= proc_base_lookup,
 };
+
+#ifdef CONFIG_SECURITY
+static int proc_attr_readdir(struct file * filp,
+			     void * dirent, filldir_t filldir)
+{
+	return proc_pident_readdir(filp,dirent,filldir,
+				   attr_stuff,ARRAY_SIZE(attr_stuff));
+}
+
+static struct file_operations proc_attr_operations = {
+	.read		= generic_read_dir,
+	.readdir	= proc_attr_readdir,
+};
+
+static struct dentry *proc_attr_lookup(struct inode *dir, struct dentry *dentry){
+	return proc_pident_lookup(dir, dentry, attr_stuff);
+}
+
+static struct inode_operations proc_attr_inode_operations = {
+	.lookup		= proc_attr_lookup,
+};
+#endif
 
 /*
  * /proc/self:
