@@ -370,7 +370,7 @@ int esp_output(struct sk_buff *skb)
 	if (x->props.mode) {
 		top_iph = (struct iphdr*)skb_push(skb, x->props.header_len);
 		esph = (struct ip_esp_hdr*)(top_iph+1);
-		*(u8*)(trailer->tail - 1) = IPPROTO_IP;
+		*(u8*)(trailer->tail - 1) = IPPROTO_IPIP;
 		top_iph->ihl = 5;
 		top_iph->version = 4;
 		top_iph->tos = iph->tos;	/* DS disclosed */
