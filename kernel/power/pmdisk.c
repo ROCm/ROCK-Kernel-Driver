@@ -496,10 +496,9 @@ static void copy_pages(void)
 static void free_image_pages(void)
 {
 	struct pbe * p;
-	int i, n;
+	int i;
 
-	n = 1 << pagedir_order;
-	for (i = 0, p = pagedir_save; i < n; i++, p++) {
+	for (i = 0, p = pagedir_save; i < pmdisk_pages; i++, p++) {
 		ClearPageNosave(virt_to_page(p->address));
 		free_page(p->address);
 	}
@@ -517,6 +516,24 @@ static void free_pagedir(void)
 }
 
 
+static void calc_order(void)
+{
+	int diff;
+	int order;
+
+	order = get_bitmask_order(SUSPEND_PD_PAGES(pmdisk_pages));
+	pmdisk_pages += 1 << order;
+	do {
+		diff = get_bitmask_order(SUSPEND_PD_PAGES(pmdisk_pages)) - order;
+		if (diff) {
+			order += diff;
+			pmdisk_pages += 1 << diff;
+		}
+	} while(diff);
+	pagedir_order = order;
+}
+
+
 /**
  *	alloc_pagedir - Allocate the page directory.
  *
@@ -526,19 +543,12 @@ static void free_pagedir(void)
 
 static int alloc_pagedir(void)
 {
-	struct page *page;
-	int i, n;
-
-	pagedir_order = get_bitmask_order(SUSPEND_PD_PAGES(pmdisk_pages));
-	n = 1 << pagedir_order;
-
-	pagedir_save = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, 
+	calc_order();
+	pagedir_save = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD, 
 							     pagedir_order);
 	if(!pagedir_save)
 		return -ENOMEM;
-	memset(pagedir_save,0,n * PAGE_SIZE);
-	for(i = 0, page = virt_to_page(pagedir_save); i < n; i++, page++)
-		SetPageNosave(page);
+	memset(pagedir_save,0,(1 << pagedir_order) * PAGE_SIZE);
 	pm_pagedir_nosave = pagedir_save;
 	return 0;
 }
@@ -555,7 +565,7 @@ static int alloc_image_pages(void)
 	int i;
 
 	for (i = 0, p = pagedir_save; i < pmdisk_pages; i++, p++) {
-		p->address = get_zeroed_page(GFP_ATOMIC);
+		p->address = get_zeroed_page(GFP_ATOMIC | __GFP_COLD);
 		if(!p->address)
 			goto Error;
 		SetPageNosave(virt_to_page(p->address));
