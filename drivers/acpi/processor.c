@@ -3,6 +3,7 @@
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+ *  Copyright (C) 2004       Dominik Brodowski <linux@brodo.de>
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
@@ -55,7 +56,6 @@
 #define ACPI_PROCESSOR_DEVICE_NAME	"Processor"
 #define ACPI_PROCESSOR_FILE_INFO	"info"
 #define ACPI_PROCESSOR_FILE_POWER	"power"
-#define ACPI_PROCESSOR_FILE_PERFORMANCE	"performance"
 #define ACPI_PROCESSOR_FILE_THROTTLING	"throttling"
 #define ACPI_PROCESSOR_FILE_LIMIT	"limit"
 #define ACPI_PROCESSOR_NOTIFY_PERFORMANCE 0x80
@@ -827,7 +827,6 @@ acpi_processor_get_platform_limit (
 	
 	return_VALUE(0);
 }
-EXPORT_SYMBOL(acpi_processor_get_platform_limit);
 
 
 static int acpi_processor_ppc_has_changed(
@@ -860,9 +859,10 @@ static void acpi_processor_ppc_exit(void) {
 int 
 acpi_processor_register_performance (
 	struct acpi_processor_performance * performance,
-	struct acpi_processor ** pr,
 	unsigned int cpu)
 {
+	struct acpi_processor *pr;
+
 	ACPI_FUNCTION_TRACE("acpi_processor_register_performance");
 
 	if (!acpi_processor_ppc_is_init)
@@ -870,24 +870,54 @@ acpi_processor_register_performance (
 
 	down(&performance_sem);
 
-	*pr = processors[cpu];
-	if (!*pr) {
+	pr = processors[cpu];
+	if (!pr) {
 		up(&performance_sem);
 		return_VALUE(-ENODEV);
 	}
 
-	if ((*pr)->performance) {
+	if (pr->performance) {
 		up(&performance_sem);
 		return_VALUE(-EBUSY);
 	}
 
-	(*pr)->performance = performance;
-	performance->pr = *pr;
+	pr->performance = performance;
+	performance->pr = pr;
 
 	up(&performance_sem);
-	return 0;
+	return_VALUE(0);
 }
 EXPORT_SYMBOL(acpi_processor_register_performance);
+
+
+void 
+acpi_processor_unregister_performance (
+	struct acpi_processor_performance * performance,
+	unsigned int cpu)
+{
+	struct acpi_processor *pr;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_unregister_performance");
+
+	if (!acpi_processor_ppc_is_init)
+		return_VOID;
+
+	down(&performance_sem);
+
+	pr = processors[cpu];
+	if (!pr) {
+		up(&performance_sem);
+		return_VOID;
+	}
+
+	pr->performance = NULL;
+	performance->pr = NULL;
+
+	up(&performance_sem);
+
+	return_VOID;
+}
+EXPORT_SYMBOL(acpi_processor_unregister_performance);
 
 
 /* for the rest of it, check arch/i386/kernel/cpu/cpufreq/acpi.c */
@@ -1399,7 +1429,7 @@ acpi_processor_get_limit_info (
 	if (!pr)
 		return_VALUE(-EINVAL);
 
-	if (pr->flags.performance || pr->flags.throttling)
+	if (pr->flags.throttling)
 		pr->flags.limit = 1;
 
 	return_VALUE(0);
