@@ -1779,7 +1779,8 @@ static int ide_cacheflush_p(ide_drive_t *drive)
 static int idedisk_release(struct inode *inode, struct file *filp)
 {
 	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
-	ide_cacheflush_p(drive);
+	if (drive->usage == 1)
+		ide_cacheflush_p(drive);
 	if (drive->removable && drive->usage == 1) {
 		ide_task_t args;
 		memset(&args, 0, sizeof(ide_task_t));
