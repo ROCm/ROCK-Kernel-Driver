@@ -307,19 +307,7 @@ struct pci_fixup pcibios_fixups[] = {
 	{ 0 }
 };
 
-void __init
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-                        struct resource *res, int resource)
-{
-	unsigned long where, size;
-	u32 reg;
-
-	where = PCI_BASE_ADDRESS_0 + (resource * 4);
-	size = res->end - res->start;
-	pci_read_config_dword(dev, where, &reg);
-	reg = (reg & size) | (((u32)(res->start - root->start)) & ~size);
-	pci_write_config_dword(dev, where, reg);
-}
+#warning pcibios_update_resource() is now a generic implementation - please check
 
 unsigned __init int pcibios_assign_all_busses(void)
 {

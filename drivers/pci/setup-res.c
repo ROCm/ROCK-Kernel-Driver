@@ -33,6 +33,59 @@
 #endif
 
 
+static void
+pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
+{
+	struct pci_bus_region region;
+	u32 new, check, mask;
+	int reg;
+
+	pcibios_resource_to_bus(dev, &region, res);
+
+	DBGC((KERN_ERR "  got res [%lx:%lx] bus [%lx:%lx] for "
+	      "resource %d of %s\n", res->start, res->end,
+	      region.start, region.end, resno, dev->dev.name));
+
+	new = region.start | (res->flags & PCI_REGION_FLAG_MASK);
+	if (res->flags & IORESOURCE_IO)
+		mask = (u32)PCI_BASE_ADDRESS_IO_MASK;
+	else
+		mask = (u32)PCI_BASE_ADDRESS_MEM_MASK;
+
+	if (resno < 6) {
+		reg = PCI_BASE_ADDRESS_0 + 4 * resno;
+	} else if (resno == PCI_ROM_RESOURCE) {
+		new |= res->flags & PCI_ROM_ADDRESS_ENABLE;
+		reg = dev->rom_base_reg;
+	} else {
+		/* Hmm, non-standard resource. */
+		printk("PCI: trying to set non-standard region %s/%d\n",
+		       dev->slot_name, resno);
+		return;
+	}
+
+	pci_write_config_dword(dev, reg, new);
+	pci_read_config_dword(dev, reg, &check);
+
+	if ((new ^ check) & mask) {
+		printk(KERN_ERR "PCI: Error while updating region "
+		       "%s/%d (%08x != %08x)\n", dev->slot_name, resno,
+		       new, check);
+	}
+
+	if ((new & (PCI_BASE_ADDRESS_SPACE|PCI_BASE_ADDRESS_MEM_TYPE_MASK)) ==
+	    (PCI_BASE_ADDRESS_SPACE_MEMORY|PCI_BASE_ADDRESS_MEM_TYPE_64)) {
+		new = 0; /* currently everyone zeros the high address */
+		pci_write_config_dword(dev, reg + 4, new);
+		pci_read_config_dword(dev, reg + 4, &check);
+		if (check != new) {
+			printk(KERN_ERR "PCI: Error updating region "
+			       "%s/%d (high %08x != %08x)\n",
+			       dev->slot_name, resno, new, check);
+		}
+	}
+}
+
 int __init
 pci_claim_resource(struct pci_dev *dev, int resource)
 {
@@ -89,10 +142,7 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 		printk(KERN_ERR "PCI: Failed to allocate resource %d(%lx-%lx) for %s\n",
 		       resno, res->start, res->end, dev->slot_name);
 	} else {
-		DBGC((KERN_ERR "  got res[%lx:%lx] for resource %d of %s\n",
-		      res->start, res->end, i, dev->dev.name));
-		/* Update PCI config space.  */
-		pcibios_update_resource(dev, res->parent, res, resno);
+		pci_update_resource(dev, res, resno);
 	}
 
 	return ret;

@@ -333,11 +333,6 @@ void __init pcibios_align_resource (void *data, struct resource *res,
 {
 }
 
-void __init pcibios_update_resource (struct pci_dev *dev, struct resource *root,
-				     struct resource *res, int resource)
-{
-}
-
 void __init pcibios_update_irq (struct pci_dev *dev, int irq)
 {
 	pci_write_config_byte (dev, PCI_INTERRUPT_LINE, irq);
@@ -346,12 +341,6 @@ void __init pcibios_update_irq (struct pci_dev *dev, int irq)
 void __init pcibios_fixup_bus (struct pci_bus *b)
 {
 	pci_fixup_irqs (macepci_swizzle, macepci_map_irq);
-}
-
-/* XXX anybody know what this is supposed to do? */
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus * bus,
-					 struct pbus_set_ranges_data * ranges)
-{
 }
 
 /*
