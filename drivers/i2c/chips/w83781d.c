@@ -1336,7 +1336,13 @@ w83781d_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(i2c_get_clientdata(client));
+	if (i2c_get_clientdata(client)==NULL) {
+		/* subclients */
+		kfree(client);
+	} else {
+		/* main client */
+		kfree(i2c_get_clientdata(client));
+	}
 
 	return 0;
 }
