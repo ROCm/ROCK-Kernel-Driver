@@ -729,7 +729,8 @@ static void kaweth_usb_transmit_complete(struct urb *urb, struct pt_regs *regs)
 	struct sk_buff *skb = kaweth->tx_skb;
 
 	if (unlikely(urb->status != 0))
-		kaweth_dbg("%s: TX status %d.", kaweth->net->name, urb->status);
+		if (urb->status != -ENOENT)
+			kaweth_dbg("%s: TX status %d.", kaweth->net->name, urb->status);
 
 	netif_wake_queue(kaweth->net);
 	dev_kfree_skb_irq(skb);
@@ -1137,15 +1138,7 @@ static void kaweth_disconnect(struct usb_interface *intf)
 	kaweth->removed = 1;
 	usb_kill_urb(kaweth->irq_urb);
 	usb_kill_urb(kaweth->rx_urb);
-
-	/* we need to wait for the urb to be cancelled, if it is active */
-	spin_lock(&kaweth->device_lock);
-	if (usb_unlink_urb(kaweth->tx_urb) == -EINPROGRESS) {
-		spin_unlock(&kaweth->device_lock);
-		wait_event(kaweth->term_wait, kaweth->end);
-	} else {
-		spin_unlock(&kaweth->device_lock);
-	}
+	usb_kill_urb(kaweth->tx_urb);
 
 	kaweth_dbg("Unregistering net device");
 	unregister_netdev(netdev);
