@@ -542,9 +542,9 @@ islpci_reset(islpci_private *priv, int reload_firmware)
 	/* reset the mgmt receive queue */
 	for (counter = 0; counter < ISL38XX_CB_MGMT_QSIZE; counter++) {
 		isl38xx_fragment *frag = &cb->rx_data_mgmt[counter];
-		frag->size = MGMT_FRAME_SIZE;
+		frag->size = cpu_to_le16(MGMT_FRAME_SIZE);
 		frag->flags = 0;
-		frag->address = priv->mgmt_rx[counter].pci_addr;
+		frag->address = cpu_to_le32(priv->mgmt_rx[counter].pci_addr);
 	}
 
 	for (counter = 0; counter < ISL38XX_CB_RX_QSIZE; counter++) {
