@@ -613,7 +613,7 @@ static int rtl8139_open (struct net_device *dev);
 static int mdio_read (struct net_device *dev, int phy_id, int location);
 static void mdio_write (struct net_device *dev, int phy_id, int location,
 			int val);
-static inline void rtl8139_start_thread(struct net_device *dev);
+static void rtl8139_start_thread(struct net_device *dev);
 static void rtl8139_tx_timeout (struct net_device *dev);
 static void rtl8139_init_ring (struct net_device *dev);
 static int rtl8139_start_xmit (struct sk_buff *skb,
@@ -1643,7 +1643,7 @@ static int rtl8139_thread (void *data)
 	complete_and_exit (&tp->thr_exited, 0);
 }
 
-static inline void rtl8139_start_thread(struct net_device *dev)
+static void rtl8139_start_thread(struct net_device *dev)
 {
 	struct rtl8139_private *tp = dev->priv;
 
