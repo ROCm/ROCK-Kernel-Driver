@@ -32,7 +32,7 @@ struct usbmix_ctl_map {
 	const struct usbmix_name_map *map;
 	int ignore_ctl_error;
 };
-	
+
 /*
  * USB control mappers for SB Exitigy
  */

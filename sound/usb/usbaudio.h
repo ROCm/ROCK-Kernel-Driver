@@ -124,7 +124,6 @@
 typedef struct snd_usb_audio snd_usb_audio_t;
 
 struct snd_usb_audio {
-	
 	int index;
 	struct usb_device *dev;
 	snd_card_t *card;
@@ -138,15 +137,17 @@ struct snd_usb_audio {
 	int next_midi_device;
 
 	unsigned int ignore_ctl_error;	/* for mixer */
-};  
+};
 
 /*
  * Information about devices with broken descriptors
  */
 
+/* special values for .ifnum */
 #define QUIRK_NO_INTERFACE		-2
 #define QUIRK_ANY_INTERFACE		-1
 
+/* quirk type */
 #define QUIRK_MIDI_FIXED_ENDPOINT	0
 #define QUIRK_MIDI_YAMAHA		1
 #define QUIRK_MIDI_MIDIMAN		2

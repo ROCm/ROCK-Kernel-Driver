@@ -5,7 +5,7 @@
  *
  *   Copyright (c) 2002 by Takashi Iwai <tiwai@suse.de>
  *
- *   Many codes borrowed from audio.c by 
+ *   Many codes borrowed from audio.c by
  *	    Alan Cox (alan@lxorguk.ukuu.org.uk)
  *	    Thomas Sailer (sailer@ife.ee.ethz.ch)
  *
@@ -96,7 +96,7 @@ MODULE_PARM_DESC(async_unlink, "Use async unlink mode.");
  *
  */
 
-#define MAX_PACKS	10	
+#define MAX_PACKS	10
 #define MAX_PACKS_HS	(MAX_PACKS * 8)	/* in high speed mode */
 #define MAX_URBS	5	/* max. 20ms long packets */
 #define SYNC_URBS	2	/* always two urbs for sync */
@@ -344,7 +344,7 @@ static int prepare_capture_urb(snd_usb_substream_t *subs,
 	if (! urb->bandwidth) {
 		int bustime;
 		bustime = usb_check_bandwidth(urb->dev, urb);
-		if (bustime < 0) 
+		if (bustime < 0)
 			return bustime;
 		printk("urb %d: bandwidth = %d (packets = %d)\n", ctx->index, bustime, urb->number_of_packets);
 		usb_claim_bandwidth(urb->dev, urb, bustime, 1);
@@ -816,7 +816,7 @@ static int start_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 }
 
 
-/* 
+/*
  *  wait until all urbs are processed.
  */
 static int wait_clear_urbs(snd_usb_substream_t *subs)
@@ -1138,7 +1138,7 @@ static int init_usb_pitch(struct usb_device *dev, int iface,
 	if (fmt->attributes & EP_CS_ATTR_PITCH_CONTROL) {
 		data[0] = 1;
 		if ((err = snd_usb_ctl_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
-					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT, 
+					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT,
 					   PITCH_CONTROL << 8, ep, data, 1, HZ)) < 0) {
 			snd_printk(KERN_ERR "%d:%d:%d: cannot set enable PITCH\n",
 				   dev->devnum, iface, ep);
@@ -1164,7 +1164,7 @@ static int init_usb_sample_rate(struct usb_device *dev, int iface,
 		data[1] = rate >> 8;
 		data[2] = rate >> 16;
 		if ((err = snd_usb_ctl_msg(dev, usb_sndctrlpipe(dev, 0), SET_CUR,
-					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT, 
+					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_OUT,
 					   SAMPLING_FREQ_CONTROL << 8, ep, data, 3, HZ)) < 0) {
 			snd_printk(KERN_ERR "%d:%d:%d: cannot set freq %d to ep 0x%x\n",
 				   dev->devnum, iface, fmt->altsetting, rate, ep);
@@ -1313,7 +1313,7 @@ static int snd_usb_hw_params(snd_pcm_substream_t *substream,
 	ret = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 	if (ret < 0)
 		return ret;
-	
+
 	format = params_format(hw_params);
 	rate = params_rate(hw_params);
 	channels = params_channels(hw_params);
@@ -1472,7 +1472,7 @@ static int hw_rule_rate(snd_pcm_hw_params_t *params,
 	snd_interval_t *it = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	unsigned int rmin, rmax;
 	int changed;
-	
+
 	hwc_debug("hw_rule_rate: (%d,%d)\n", it->min, it->max);
 	changed = 0;
 	rmin = rmax = 0;
@@ -1526,7 +1526,7 @@ static int hw_rule_channels(snd_pcm_hw_params_t *params,
 	snd_interval_t *it = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	unsigned int rmin, rmax;
 	int changed;
-	
+
 	hwc_debug("hw_rule_channels: (%d,%d)\n", it->min, it->max);
 	changed = 0;
 	rmin = rmax = 0;
@@ -1580,7 +1580,7 @@ static int hw_rule_format(snd_pcm_hw_params_t *params,
 	u64 fbits;
 	u32 oldbits[2];
 	int changed;
-	
+
 	hwc_debug("hw_rule_format: %x:%x\n", fmt->bits[0], fmt->bits[1]);
 	fbits = 0;
 	list_for_each(p, &subs->fmt_list) {
@@ -1724,13 +1724,13 @@ static int setup_hw_info(snd_pcm_runtime_t *runtime, snd_usb_substream_t *subs)
 
 	if (check_hw_params_convention(subs)) {
 		hwc_debug("setting extra hw constraints...\n");
-		if ((err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, 
+		if ((err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
 					       hw_rule_rate, subs,
 					       SNDRV_PCM_HW_PARAM_FORMAT,
 					       SNDRV_PCM_HW_PARAM_CHANNELS,
 					       -1)) < 0)
 			return err;
-		if ((err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, 
+		if ((err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 					       hw_rule_channels, subs,
 					       SNDRV_PCM_HW_PARAM_FORMAT,
 					       SNDRV_PCM_HW_PARAM_RATE,
@@ -1992,7 +1992,7 @@ static void proc_dump_substream_status(snd_usb_substream_t *subs, snd_info_buffe
 static void proc_pcm_format_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
 	snd_usb_stream_t *stream = entry->private_data;
-	
+
 	snd_iprintf(buffer, "%s : %s\n", stream->chip->card->longname, stream->pcm->name);
 
 	if (stream->substream[SNDRV_PCM_STREAM_PLAYBACK].num_formats) {
@@ -2285,7 +2285,7 @@ static int parse_audio_format_rates(struct usb_device *dev, struct audioformat *
 {
 	int nr_rates = fmt[offset];
 	if (fmt[0] < offset + 1 + 3 * (nr_rates ? nr_rates : 2)) {
-		snd_printk(KERN_ERR "%d:%u:%d : invalid FORMAT_TYPE desc\n", 
+		snd_printk(KERN_ERR "%d:%u:%d : invalid FORMAT_TYPE desc\n",
 				   dev->devnum, fp->iface, fp->altsetting);
 		return -1;
 	}
@@ -2423,7 +2423,7 @@ static int parse_audio_format(struct usb_device *dev, struct audioformat *fp,
 	}
 #endif
 	return 0;
-}	
+}
 
 static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 {
@@ -2469,22 +2469,22 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		}
 
 		if (fmt[0] < 7) {
-			snd_printk(KERN_ERR "%d:%u:%d : invalid AS_GENERAL desc\n", 
+			snd_printk(KERN_ERR "%d:%u:%d : invalid AS_GENERAL desc\n",
 				   dev->devnum, iface_no, altno);
 			continue;
 		}
 
 		format = (fmt[6] << 8) | fmt[5]; /* remember the format value */
-			
+
 		/* get format type */
 		fmt = snd_usb_find_csint_desc(alts->extra, alts->extralen, NULL, FORMAT_TYPE);
 		if (!fmt) {
-			snd_printk(KERN_ERR "%d:%u:%d : no FORMAT_TYPE desc\n", 
+			snd_printk(KERN_ERR "%d:%u:%d : no FORMAT_TYPE desc\n",
 				   dev->devnum, iface_no, altno);
 			continue;
 		}
 		if (fmt[0] < 8) {
-			snd_printk(KERN_ERR "%d:%u:%d : invalid FORMAT_TYPE desc\n", 
+			snd_printk(KERN_ERR "%d:%u:%d : invalid FORMAT_TYPE desc\n",
 				   dev->devnum, iface_no, altno);
 			continue;
 		}
@@ -2494,7 +2494,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 		if (!csep && altsd->bNumEndpoints >= 2)
 			csep = snd_usb_find_desc(alts->endpoint[1].extra, alts->endpoint[1].extralen, NULL, USB_DT_CS_ENDPOINT);
 		if (!csep || csep[0] < 7 || csep[2] != EP_GENERAL) {
-			snd_printk(KERN_ERR "%d:%u:%d : no or invalid class specific endpoint descriptor\n", 
+			snd_printk(KERN_ERR "%d:%u:%d : no or invalid class specific endpoint descriptor\n",
 				   dev->devnum, iface_no, altno);
 			continue;
 		}
@@ -2979,7 +2979,7 @@ static int snd_usb_audio_create(struct usb_device *dev, int idx,
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_usb_audio_dev_free,
 	};
-	
+
 	*rchip = NULL;
 
 	if (snd_usb_get_speed(dev) != USB_SPEED_FULL &&
@@ -3175,7 +3175,7 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 
 /*
  * we need to take care of counter, since disconnection can be called also
- * many times as well as usb_audio_probe(). 
+ * many times as well as usb_audio_probe().
  */
 static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 {
