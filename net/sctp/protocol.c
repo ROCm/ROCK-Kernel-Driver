@@ -283,6 +283,14 @@ int sctp_v4_cmp_saddr(struct dst_entry *dst, union sctp_addr *saddr)
 	return (rt->rt_src == saddr->v4.sin_addr.s_addr);
 }
 
+/* Initialize addr struct to INADDR_ANY. */
+void sctp_v4_inaddr_any(union sctp_addr *addr, unsigned short port)
+{
+	addr->v4.sin_family = AF_INET;
+	addr->v4.sin_addr.s_addr = INADDR_ANY;
+	addr->v4.sin_port = port;
+}
+
 /* This function checks if the address is a valid address to be used for
  * SCTP.
  *
@@ -440,10 +448,13 @@ static int sctp_inet_af_supported(sa_family_t family)
 	return (AF_INET == family);
 }
 
+struct sctp_func sctp_ipv4_specific;
+
 static sctp_pf_t sctp_pf_inet = {
 	.event_msgname = sctp_inet_event_msgname,
 	.skb_msgname   = sctp_inet_skb_msgname,
 	.af_supported  = sctp_inet_af_supported,
+	.af            = &sctp_ipv4_specific,
 };
 
 
@@ -500,6 +511,7 @@ struct sctp_func sctp_ipv4_specific = {
 	.from_skb       = sctp_v4_from_skb,
 	.cmp_saddr	= sctp_v4_cmp_saddr,
 	.addr_valid     = sctp_v4_addr_valid,
+	.inaddr_any     = sctp_v4_inaddr_any,
 	.scope          = sctp_v4_scope,
 	.net_header_len = sizeof(struct iphdr),
 	.sockaddr_len   = sizeof(struct sockaddr_in),

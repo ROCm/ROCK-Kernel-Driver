@@ -259,6 +259,7 @@ typedef struct sctp_func {
 					 int saddr);
 	int             (*addr_valid)   (union sctp_addr *);
 	sctp_scope_t    (*scope) (union sctp_addr *);
+	void            (*inaddr_any)   (union sctp_addr *, unsigned short);
 	__u16		net_header_len;
 	int		sockaddr_len;
 	sa_family_t	sa_family;
@@ -272,6 +273,7 @@ typedef struct sctp_pf {
 	void (*event_msgname)(sctp_ulpevent_t *, char *, int *);
 	void (*skb_msgname)(struct sk_buff *, char *, int *);
 	int  (*af_supported)(sa_family_t);
+	struct sctp_func *af;
 } sctp_pf_t;
 
 /* SCTP Socket type: UDP or TCP style. */

@@ -2377,33 +2377,16 @@ void sctp_put_port(struct sock *sk)
 static int sctp_autobind(struct sock *sk)
 {
 	union sctp_addr autoaddr;
-	int addr_len = 0;
+	struct sctp_func *af;
+	unsigned short port;
 
-	memset(&autoaddr, 0, sizeof(union sctp_addr));
+	/* Initialize a local sockaddr structure to INADDR_ANY. */
+	af = sctp_sk(sk)->pf->af;
 
-	switch (sk->family) {
-	case PF_INET:
-		autoaddr.v4.sin_family = AF_INET;
-		autoaddr.v4.sin_addr.s_addr = INADDR_ANY;
-		autoaddr.v4.sin_port = htons(inet_sk(sk)->num);
-		addr_len = sizeof(struct sockaddr_in);
-		break;
+	port = htons(inet_sk(sk)->num);
+	af->inaddr_any(&autoaddr, port);
 
-	case PF_INET6:
-		SCTP_V6(
-			/* FIXME: Write me for v6!  */
-			BUG();
-			autoaddr.v6.sin6_family = AF_INET6;
-			autoaddr.v6.sin6_port = htons(inet_sk(sk)->num);
-			addr_len = sizeof(struct sockaddr_in6);
-		);
-		break;
-
-	default: /* This should not happen.  */
-		break;
-	};
-
-	return sctp_do_bind(sk, &autoaddr, addr_len);
+	return sctp_do_bind(sk, &autoaddr, af->sockaddr_len);
 }
 
 /* Parse out IPPROTO_SCTP CMSG headers.  Perform only minimal validation.

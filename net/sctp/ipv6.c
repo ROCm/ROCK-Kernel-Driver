@@ -269,6 +269,14 @@ static int sctp_v6_cmp_saddr(struct dst_entry *dst, union sctp_addr *saddr)
 	return ipv6_addr_cmp(&rt->rt6i_src.addr, &saddr->v6.sin6_addr);
 }
 
+/* Initialize addr struct to INADDR_ANY. */
+void sctp_v6_inaddr_any(union sctp_addr *addr, unsigned short port)
+{
+	memset(addr, 0x00, sizeof(union sctp_addr));
+	addr->v6.sin6_family = AF_INET6;
+	addr->v6.sin6_port = port;
+}
+
 /* This function checks if the address is a valid address to be used for
  * SCTP.
  *
@@ -454,6 +462,7 @@ static sctp_func_t sctp_ipv6_specific = {
 	.cmp_saddr	 = sctp_v6_cmp_saddr,
 	.scope           = sctp_v6_scope,
 	.addr_valid      = sctp_v6_addr_valid,
+	.inaddr_any      = sctp_v6_inaddr_any,
 	.net_header_len  = sizeof(struct ipv6hdr),
 	.sockaddr_len    = sizeof(struct sockaddr_in6),
 	.sa_family       = AF_INET6,
@@ -463,6 +472,7 @@ static sctp_pf_t sctp_pf_inet6_specific = {
 	.event_msgname = sctp_inet6_event_msgname,
 	.skb_msgname   = sctp_inet6_skb_msgname,
 	.af_supported  = sctp_inet6_af_supported,
+	.af            = &sctp_ipv6_specific,
 };
 
 /* Initialize IPv6 support and register with inet6 stack.  */
