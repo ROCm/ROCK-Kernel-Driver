@@ -46,7 +46,7 @@ CFLAGS += $(CFLAGS-y) -D__arch_um__ -DSUBARCH=\"$(SUBARCH)\" \
 	-D_LARGEFILE64_SOURCE $(ARCH_INCLUDE) -Derrno=kernel_errno \
 	-Dsigprocmask=kernel_sigprocmask $(MODE_INCLUDE)
 
-CFLAGS += $(call check_gcc,-fno-unit-at-a-time,)
+CFLAGS += $(call cc-option,-fno-unit-at-a-time,)
 
 LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 

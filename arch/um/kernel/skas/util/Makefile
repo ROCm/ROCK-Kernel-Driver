@@ -1,2 +1,2 @@
-host-progs		:= mk_ptregs
-always			:= $(host-progs)
+hostprogs-y		:= mk_ptregs
+always			:= $(hostprogs-y)
