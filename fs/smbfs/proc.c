@@ -1428,9 +1428,9 @@ smb_proc_readX_data(struct smb_request *req)
 	 * So we must first calculate the amount of padding used by the server.
 	 */
 	data_off -= hdrlen;
-	if (data_off > SMB_READX_MAX_PAD) {
-		PARANOIA("offset is larger than max pad!\n");
-		PARANOIA("%d > %d\n", data_off, SMB_READX_MAX_PAD);
+	if (data_off > SMB_READX_MAX_PAD || data_off < 0) {
+		PARANOIA("offset is larger than SMB_READX_MAX_PAD or negative!\n");
+		PARANOIA("%d > %d || %d < 0\n", data_off, SMB_READX_MAX_PAD, data_off);
 		req->rq_rlen = req->rq_bufsize + 1;
 		return;
 	}
