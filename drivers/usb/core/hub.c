@@ -261,9 +261,8 @@ static int usb_hub_configure(struct usb_hub *hub,
 {
 	struct usb_device *dev = hub->dev;
 	struct usb_hub_status hubstatus;
-	char portstr[USB_MAXCHILDREN + 1];
 	unsigned int pipe;
-	int i, maxp, ret;
+	int maxp, ret;
 
 	hub->descriptor = kmalloc(sizeof(*hub->descriptor), GFP_KERNEL);
 	if (!hub->descriptor) {
@@ -294,9 +293,17 @@ static int usb_hub_configure(struct usb_hub *hub,
 
 	le16_to_cpus(&hub->descriptor->wHubCharacteristics);
 
-	if (hub->descriptor->wHubCharacteristics & HUB_CHAR_COMPOUND)
-		dbg("part of a compound device");
-	else
+	if (hub->descriptor->wHubCharacteristics & HUB_CHAR_COMPOUND) {
+		int	i;
+		char	portstr [USB_MAXCHILDREN + 1];
+
+		for (i = 0; i < dev->maxchild; i++)
+			portstr[i] = hub->descriptor->DeviceRemovable
+				    [((i + 1) / 8)] & (1 << ((i + 1) % 8))
+				? 'F' : 'R';
+		portstr[dev->maxchild] = 0;
+		dbg("compound device; port removable status: %s", portstr);
+	} else
 		dbg("standalone hub");
 
 	switch (hub->descriptor->wHubCharacteristics & HUB_CHAR_LPSM) {
@@ -370,14 +377,6 @@ static int usb_hub_configure(struct usb_hub *hub,
 		hub->descriptor->bPwrOn2PwrGood * 2);
 	dbg("hub controller current requirement: %dmA",
 		hub->descriptor->bHubContrCurrent);
-
-	for (i = 0; i < dev->maxchild; i++)
-		portstr[i] = hub->descriptor->DeviceRemovable
-			    [((i + 1) / 8)] & (1 << ((i + 1) % 8))
-			? 'F' : 'R';
-	portstr[dev->maxchild] = 0;
-
-	dbg("port removable status: %s", portstr);
 
 	ret = usb_get_hub_status(dev, &hubstatus);
 	if (ret < 0) {

@@ -33,12 +33,6 @@ if [ "$CONFIG_USB" = "y" -o  "$CONFIG_USB" = "m" ]; then
 
    source drivers/usb/serial/Config.in
 
-   comment 'USB Miscellaneous drivers'
-   dep_tristate '  EMI 2|6 USB Audio interface support' CONFIG_USB_EMI26 $CONFIG_USB_AUDIO
-   dep_tristate '  Texas Instruments Graph Link USB (aka SilverLink) cable support' CONFIG_USB_TIGL $CONFIG_USB
-   dep_tristate '  USB Auerswald ISDN support (EXPERIMENTAL)' CONFIG_USB_AUERSWALD $CONFIG_USB $CONFIG_EXPERIMENTAL
-   dep_tristate '  USB Diamond Rio500 support (EXPERIMENTAL)' CONFIG_USB_RIO500 $CONFIG_USB $CONFIG_EXPERIMENTAL
-   dep_tristate '  Tieman Voyager USB Braille display support (EXPERIMENTAL)' CONFIG_USB_BRLVGER $CONFIG_USB $CONFIG_EXPERIMENTAL
-
+   source drivers/usb/misc/Config.in
 fi
 endmenu

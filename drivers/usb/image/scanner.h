@@ -115,6 +115,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x03f0, 0x0101) },	/* 4100C */
 	{ USB_DEVICE(0x03f0, 0x0105) },	/* 4200C */
 	{ USB_DEVICE(0x03f0, 0x0305) }, /* 4300C */
+	{ USB_DEVICE(0x03f0, 0x0705) }, /* 4400C */
 	{ USB_DEVICE(0x03f0, 0x0102) },	/* PhotoSmart S20 */
 	{ USB_DEVICE(0x03f0, 0x0401) },	/* 5200C */
 	//	{ USB_DEVICE(0x03f0, 0x0701) },	/* 5300C - NOT SUPPORTED - see http://www.neatech.nl/oss/HP5300C/ */
@@ -187,8 +188,12 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04b8, 0x010b) }, /* Perfection 1240U */
 	{ USB_DEVICE(0x04b8, 0x010c) }, /* Perfection 640U */
 	{ USB_DEVICE(0x04b8, 0x010e) }, /* Expression 1680 */
+	{ USB_DEVICE(0x04a9, 0x2204) }, /* FB630U */
 	{ USB_DEVICE(0x04b8, 0x0110) }, /* Perfection 1650 */
 	{ USB_DEVICE(0x04b8, 0x0112) }, /* Perfection 2450 - GT-9700 for the Japanese mkt */
+	{ USB_DEVICE(0x04b8, 0x0114) }, /* Perfection 660 */
+	{ USB_DEVICE(0x04b8, 0x011b) }, /* Perfection 2400 Photo */
+	{ USB_DEVICE(0x04b8, 0x011e) }, /* Perfection 1660 Photo */
 	/* Umax */
 	{ USB_DEVICE(0x1606, 0x0010) },	/* Astra 1220U */
 	{ USB_DEVICE(0x1606, 0x0030) },	/* Astra 2000U */

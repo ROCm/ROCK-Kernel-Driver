@@ -385,11 +385,15 @@ static int usb_stor_control_thread(void * __us)
 			us->srb->result = DID_BAD_TARGET << 16;
 		}
 
-		/* handle those devices which can't do a START_STOP */
-		else if ((us->srb->cmnd[0] == START_STOP) &&
-		    (us->flags & US_FL_START_STOP)) {
-			US_DEBUGP("Skipping START_STOP command\n");
-			us->srb->result = GOOD << 1;
+		/* handle requests for EVPD, which most USB devices do
+		 * not support */
+		else if((us->srb->cmnd[0] == INQUIRY) &&
+				(us->srb->cmnd[1] & 0x1)) {
+				US_DEBUGP("Faking INQUIRY command for EVPD\n");
+				memcpy(us->srb->sense_buffer, 
+				       usb_stor_sense_invalidCDB, 
+				       sizeof(usb_stor_sense_invalidCDB));
+				us->srb->result = CHECK_CONDITION << 1;
 		}
 
 		/* our device has gone - pretend not ready */
@@ -405,6 +409,7 @@ static int usb_stor_control_thread(void * __us)
 				       sizeof(usb_stor_sense_notready));
 				us->srb->result = GOOD << 1;
 			} else if(us->srb->cmnd[0] == INQUIRY) {
+				/* INQUIRY should always work, per spec... */
 				unsigned char data_ptr[36] = {
 				    0x20, 0x80, 0x02, 0x02,
 				    0x1F, 0x00, 0x00, 0x00};
@@ -412,6 +417,7 @@ static int usb_stor_control_thread(void * __us)
 				fill_inquiry_response(us, data_ptr, 36);
 				us->srb->result = GOOD << 1;
 			} else {
+				/* not ready */
 				memcpy(us->srb->sense_buffer, 
 				       usb_stor_sense_notready, 
 				       sizeof(usb_stor_sense_notready));
@@ -430,6 +436,35 @@ static int usb_stor_control_thread(void * __us)
 			US_DEBUGP("Faking INQUIRY command\n");
 			fill_inquiry_response(us, data_ptr, 36);
 			us->srb->result = GOOD << 1;
+		}
+
+		/* Most USB devices can't handle START_STOP.  But we
+		 * need something for media-change, so we'll use TUR
+		 * instead.
+		 */
+		else if (us->srb->cmnd[0] == START_STOP) {
+			unsigned char saved_cdb[16]; /* largest SCSI-III cmd */
+			__u8 old_cmd_len;
+
+			US_DEBUGP("Converting START_STOP to TUR\n");
+
+			/* save old command */
+			memcpy(saved_cdb, us->srb->cmnd, us->srb->cmd_len);
+			old_cmd_len = us->srb->cmd_len;
+
+			/* set up new command -- preserve LUN */
+			us->srb->cmd_len = 6;
+			memset(us->srb->cmnd, 0, us->srb->cmd_len);
+			us->srb->cmnd[0] = TEST_UNIT_READY;
+			us->srb->cmnd[1] = saved_cdb[1] & 0xE0;
+
+			/* do command */
+			US_DEBUG(usb_stor_show_command(us->srb));
+			us->proto_handler(us->srb, us);
+
+			/* restore original command */
+			us->srb->cmd_len = old_cmd_len;
+			memcpy(us->srb->cmnd, saved_cdb, us->srb->cmd_len);
 		}
 
 		/* we've got a command, let's do it! */

@@ -1,5 +1,5 @@
 /*
- * printer.c  Version 0.12
+ * usblp.c  Version 0.12
  *
  * Copyright (c) 1999 Michael Gee	<michael@linuxspecific.com>
  * Copyright (c) 1999 Pavel Machek	<pavel@suse.cz>

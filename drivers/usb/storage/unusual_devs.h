@@ -65,6 +65,17 @@ UNUSUAL_DEV(  0x03f0, 0x0307, 0x0001, 0x0001,
 		US_SC_8070, US_PR_SCM_ATAPI, init_8200e, 0), 
 #endif
 
+/* Deduced by Jonathan Woithe <jwoithe@physics.adelaide.edu.au>
+ * Entry needed for flags: US_FL_FIX_INQUIRY because initial inquiry message
+ * always fails and confuses drive; without US_FL_START_STOP, drive accesses
+ * (read or write) all fail.
+ */
+UNUSUAL_DEV(  0x0411, 0x001c, 0x0113, 0x0113,
+		"Buffalo",
+		"DUB-P40G HDD",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_FIX_INQUIRY | US_FL_START_STOP),
+
 #ifdef CONFIG_USB_STORAGE_DPCM
 UNUSUAL_DEV(  0x0436, 0x0005, 0x0100, 0x0100,
 		"Microtech",

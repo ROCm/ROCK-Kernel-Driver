@@ -84,3 +84,31 @@ CONFIG_USB_USS720
   inserted in and removed from the running kernel whenever you want).
   The module will be called uss720.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SPEEDTCH
+
+  This driver provides support for the Alcatel SpeedTouch ADSL USB 
+  modem.
+
+  The driver requires the ATM interface and ATM SAR so you need to 
+  enable ATM (under Networking options) and the ATM SAR option. You 
+  will also need PPP over ATM (under Network device support).
+
+  This driver is a slightly revised version of Johan Verrept's 1.5 
+  SpeedTouch Driver which has been altered to work on the 2.5 series 
+  kernels.
+
+  To use the device you also need a user-mode daemon that downloads
+  the firmware and (re)initializes the modem. The offical version is 
+  a closed source one from Alcatel that you can get at
+  <http://www.alcateldsl.com/support.htm>.
+
+  A piece of code has recently been sent to linux-usb-devel which 
+  allows the open source user space driver's firmware program 
+  modem_run to be used with this driver instead. You will still 
+  need the Alcatel daemon package to extract the modem firmware from 
+  it (or the windows drivers instead).
+
+  For more information, see Johan Verrept's webpages at
+  <http://linux-usb.sourceforge.net/SpeedTouch/>.
+
