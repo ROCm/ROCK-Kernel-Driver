@@ -122,6 +122,7 @@ inline void bio_init(struct bio *bio)
 	bio->bi_max_vecs = 0;
 	bio->bi_end_io = NULL;
 	atomic_set(&bio->bi_cnt, 1);
+	bio->bi_private = NULL;
 }
 
 /**
@@ -452,14 +453,15 @@ retry_segments:
  * @error:	error, if any
  *
  * Description:
- *   bio_endio() will end I/O @bytes_done number of bytes. This may be just
- *   a partial part of the bio, or it may be the whole bio. bio_endio() is
- *   the preferred way to end I/O on a bio, it takes care of decrementing
+ *   bio_endio() will end I/O on @bytes_done number of bytes. This may be
+ *   just a partial part of the bio, or it may be the whole bio. bio_endio()
+ *   is the preferred way to end I/O on a bio, it takes care of decrementing
  *   bi_size and clearing BIO_UPTODATE on error. @error is 0 on success, and
  *   and one of the established -Exxxx (-EIO, for instance) error values in
- *   case something went wrong.
+ *   case something went wrong. Noone should call bi_end_io() directly on
+ *   a bio unless they own it and thus know that it has an end_io function.
  **/
-int bio_endio(struct bio *bio, unsigned int bytes_done, int error)
+void bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 {
 	if (error)
 		clear_bit(BIO_UPTODATE, &bio->bi_flags);
@@ -471,7 +473,9 @@ int bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 	}
 
 	bio->bi_size -= bytes_done;
-	return bio->bi_end_io(bio, bytes_done, error);
+
+	if (bio->bi_end_io)
+		bio->bi_end_io(bio, bytes_done, error);
 }
 
 static void __init biovec_init_pools(void)
@@ -543,7 +547,7 @@ static int __init init_bio(void)
 	return 0;
 }
 
-module_init(init_bio);
+subsys_initcall(init_bio);
 
 EXPORT_SYMBOL(bio_alloc);
 EXPORT_SYMBOL(bio_put);

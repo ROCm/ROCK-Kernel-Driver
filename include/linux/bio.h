@@ -202,7 +202,7 @@ struct bio {
 extern struct bio *bio_alloc(int, int);
 extern void bio_put(struct bio *);
 
-extern int bio_endio(struct bio *, unsigned int, int);
+extern void bio_endio(struct bio *, unsigned int, int);
 struct request_queue;
 extern inline int bio_phys_segments(struct request_queue *, struct bio *);
 extern inline int bio_hw_segments(struct request_queue *, struct bio *);

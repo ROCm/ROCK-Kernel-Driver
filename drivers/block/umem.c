@@ -548,12 +548,7 @@ static void process_page(unsigned long data)
 
 		return_bio = bio->bi_next;
 		bio->bi_next = NULL;
-		/* should use bio_endio(), however already cleared
-		 * BIO_UPTODATE. so set bio->bi_size = 0 manually to indicate
-		 * completely done
-		 */
-		bio->bi_size = 0;
-		bio->bi_end_io(bio, bytes, 0);
+		bio_endio(bio, bio->bi_size, 0);
 	}
 }
 
