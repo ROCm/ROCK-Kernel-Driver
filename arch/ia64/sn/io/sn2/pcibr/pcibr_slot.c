@@ -95,23 +95,23 @@ pcibr_slot_info_init(vertex_hdl_t 	pcibr_vhdl,
     /* Get the basic software information required to proceed */
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
     if (!pcibr_soft)
-	return(EINVAL);
+	return -EINVAL;
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(EINVAL);
+	return -EINVAL;
 
     /* If we have a host slot (eg:- IOC3 has 2 PCI slots and the initialization
      * is done by the host slot then we are done.
      */
     if (pcibr_soft->bs_slot[slot].has_host) {
-	return(0);    
+	return 0;
     }
 
     /* Try to read the device-id/vendor-id from the config space */
     cfgw = pcibr_slot_config_addr(pcibr_soft, slot, 0);
 
     if (pcibr_probe_slot(pcibr_soft, cfgw, &idword)) 
-	return(ENODEV);
+	return -ENODEV;
 
     slotp = &pcibr_soft->bs_slot[slot];
     slotp->slot_status |= SLOT_POWER_UP;
@@ -127,7 +127,7 @@ pcibr_slot_info_init(vertex_hdl_t 	pcibr_vhdl,
      * and we are done.
      */
     if (vendor == 0xFFFF) 
-	return(ENODEV);			
+	return -ENODEV;
     
     htype = do_pcibr_config_get(cfgw, PCI_CFG_HEADER_TYPE, 1);
     nfunc = 1;
@@ -158,7 +158,7 @@ pcibr_slot_info_init(vertex_hdl_t 	pcibr_vhdl,
     }
     pcibr_infoh = kmalloc(nfunc*sizeof (*(pcibr_infoh)), GFP_KERNEL);
     if ( !pcibr_infoh ) {
-	return ENOMEM;
+	return -ENOMEM;
     }
     memset(pcibr_infoh, 0, nfunc*sizeof (*(pcibr_infoh)));
     
@@ -428,7 +428,7 @@ pcibr_slot_info_init(vertex_hdl_t 	pcibr_vhdl,
 	}				/* next win */
     }				/* next func */
 
-    return(0);
+    return 0;
 }					
 
 /*
@@ -447,7 +447,7 @@ pcibr_find_capability(cfg_p	cfgw,
 
     /* Check to see if there is a capabilities pointer in the cfg header */
     if (!(do_pcibr_config_get(cfgw, PCI_CFG_STATUS, 2) & PCI_STAT_CAP_LIST)) {
-	return (NULL);
+	return NULL;
     }
 
     /*
@@ -462,13 +462,13 @@ pcibr_find_capability(cfg_p	cfgw,
     while (cap_nxt && (defend_against_circular_linkedlist <= 48)) {
 	cap_id = do_pcibr_config_get(cfgw, cap_nxt, 1);
 	if (cap_id == capability) {
-	    return ((cfg_p)((char *)cfgw + cap_nxt));
+	    return (cfg_p)((char *)cfgw + cap_nxt);
 	}
 	cap_nxt = (do_pcibr_config_get(cfgw, cap_nxt+1, 1) & 0xfc);
 	defend_against_circular_linkedlist++;
     }
 
-    return (NULL);
+    return NULL;
 }
 
 /*
@@ -487,10 +487,10 @@ pcibr_slot_info_free(vertex_hdl_t pcibr_vhdl,
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 
     if (!pcibr_soft)
-	return(EINVAL);
+	return -EINVAL;
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(EINVAL);
+	return -EINVAL;
 
     nfunc = pcibr_soft->bs_slot[slot].bss_ninfo;
 
@@ -500,7 +500,7 @@ pcibr_slot_info_free(vertex_hdl_t pcibr_vhdl,
     kfree(pcibr_infoh);
     pcibr_soft->bs_slot[slot].bss_ninfo = 0;
 
-    return(0);
+    return 0;
 }
 
 /*
@@ -517,13 +517,13 @@ pcibr_slot_pcix_rbar_init(pcibr_soft_t pcibr_soft,
     int			 func;
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(EINVAL);
+	return -EINVAL;
 
     if ((nfunc = pcibr_soft->bs_slot[slot].bss_ninfo) < 1)
-	return(EINVAL);
+	return -EINVAL;
 
     if (!(pcibr_infoh = pcibr_soft->bs_slot[slot].bss_infos))
-	return(EINVAL);
+	return -EINVAL;
 
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_RBAR, pcibr_soft->bs_vhdl,
 		"pcibr_slot_pcix_rbar_init for slot %d\n", 
@@ -595,7 +595,7 @@ pcibr_slot_pcix_rbar_init(pcibr_soft_t pcibr_soft,
 		pcibr_soft->bs_pcix_rbar_inuse,
 		pcibr_soft->bs_pcix_rbar_avail));
     }
-    return(0);
+    return 0;
 }
 
 int as_debug = 0;
@@ -623,26 +623,26 @@ pcibr_slot_addr_space_init(vertex_hdl_t pcibr_vhdl,
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 
     if (!pcibr_soft)
-	return(EINVAL);
+	return -EINVAL;
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(EINVAL);
+	return -EINVAL;
 
     /* allocate address space,
      * for windows that have not been
      * previously assigned.
      */
     if (pcibr_soft->bs_slot[slot].has_host) {
-	return(0);
+	return 0;
     }
 
     nfunc = pcibr_soft->bs_slot[slot].bss_ninfo;
     if (nfunc < 1)
-	return(EINVAL);
+	return -EINVAL;
 
     pcibr_infoh = pcibr_soft->bs_slot[slot].bss_infos;
     if (!pcibr_infoh)
-	return(EINVAL);
+	return -EINVAL;
 
     /*
      * Try to make the DevIO windows not
@@ -827,7 +827,7 @@ pcibr_slot_addr_space_init(vertex_hdl_t pcibr_vhdl,
 	    do_pcibr_config_set(cfgw, PCI_CFG_COMMAND, 4, 
 				pci_cfg_cmd_reg | pci_cfg_cmd_reg_add);
     }				/* next func */
-    return(rc);
+    return rc;
 }
 
 /*
@@ -845,10 +845,10 @@ pcibr_slot_device_init(vertex_hdl_t pcibr_vhdl,
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 
     if (!pcibr_soft)
-	return(EINVAL);
+	return -EINVAL;
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(EINVAL);
+	return -EINVAL;
 
     /*
      * Adjustments to Device(x) and init of bss_device shadow
@@ -878,7 +878,7 @@ pcibr_slot_device_init(vertex_hdl_t pcibr_vhdl,
     PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_DEVREG, pcibr_vhdl,
 		"pcibr_slot_device_init: Device(%d): 0x%x\n",
 		slot, devreg));
-    return(0);
+    return 0;
 }
 
 /*
@@ -897,10 +897,10 @@ pcibr_slot_guest_info_init(vertex_hdl_t pcibr_vhdl,
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 
     if (!pcibr_soft)
-	return(EINVAL);
+	return -EINVAL;
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(EINVAL);
+	return -EINVAL;
 
     slotp = &pcibr_soft->bs_slot[slot];
 
@@ -912,7 +912,7 @@ pcibr_slot_guest_info_init(vertex_hdl_t pcibr_vhdl,
     if (pcibr_soft->bs_slot[slot].bss_ninfo < 1) {
 	pcibr_infoh = kmalloc(sizeof (*(pcibr_infoh)), GFP_KERNEL);
 	if ( !pcibr_infoh ) {
-		return ENOMEM;
+		return -ENOMEM;
 	}
 	memset(pcibr_infoh, 0, sizeof (*(pcibr_infoh)));
 
@@ -950,7 +950,7 @@ pcibr_slot_guest_info_init(vertex_hdl_t pcibr_vhdl,
 			 EDGE_LBL_GUEST);
     }
 
-    return(0);
+    return 0;
 }
 
 
@@ -977,13 +977,13 @@ pcibr_slot_call_device_attach(vertex_hdl_t pcibr_vhdl,
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 
     if (!pcibr_soft)
-	return(EINVAL);
+	return -EINVAL;
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(EINVAL);
+	return -EINVAL;
 
     if (pcibr_soft->bs_slot[slot].has_host) {
-        return(EPERM);
+        return -EPERM;
     }
     
     xconn_vhdl = pcibr_soft->bs_conn;
@@ -1029,7 +1029,7 @@ pcibr_slot_call_device_attach(vertex_hdl_t pcibr_vhdl,
         pcibr_soft->bs_slot[slot].slot_status |= SLOT_STARTUP_CMPLT;
     }
         
-    return(error);
+    return error;
 }
 
 /*
@@ -1055,13 +1055,13 @@ pcibr_slot_call_device_detach(vertex_hdl_t pcibr_vhdl,
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 
     if (!pcibr_soft)
-	return(EINVAL);
+	return -EINVAL;
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(EINVAL);
+	return -EINVAL;
 
     if (pcibr_soft->bs_slot[slot].has_host)
-        return(EPERM);
+        return -EPERM;
 
     nfunc = pcibr_soft->bs_slot[slot].bss_ninfo;
     pcibr_infoh = pcibr_soft->bs_slot[slot].bss_infos;
@@ -1116,7 +1116,7 @@ pcibr_slot_call_device_detach(vertex_hdl_t pcibr_vhdl,
         pcibr_soft->bs_slot[slot].slot_status |= SLOT_SHUTDOWN_CMPLT;
     }
         
-    return(error);
+    return error;
 }
 
 /*
@@ -1141,7 +1141,7 @@ pcibr_slot_detach(vertex_hdl_t pcibr_vhdl,
             *sub_errorp = error;       
 	if (l1_msg)
 	    ;
-        return(PCI_SLOT_DRV_DETACH_ERR);
+        return PCI_SLOT_DRV_DETACH_ERR;
     }
 
     /* Recalculate the RBARs for all the devices on the bus since we've
@@ -1160,7 +1160,7 @@ pcibr_slot_detach(vertex_hdl_t pcibr_vhdl,
             (void)pcibr_slot_pcix_rbar_init(pcibr_soft, tmp_slot);
     }
 
-    return (0);
+    return 0;
 
 }
 
@@ -1350,7 +1350,7 @@ pcibr_bus_addr_alloc(pcibr_soft_t pcibr_soft, pciio_win_info_t win_info_p,
 				  ? &win_info_p->w_win_alloc
 				  : NULL,
 				  start, size, align);
-    return(iopaddr);
+    return iopaddr;
 }
 
 

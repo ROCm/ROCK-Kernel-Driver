@@ -321,7 +321,7 @@ pciio_piomap_alloc_f    (vertex_hdl_t dev,	/* set up mapping for this device */
 			 iopaddr_t pcipio_addr,		/* starting address */
 			 size_t byte_count,
 			 size_t byte_count_max,		/* maximum size of a mapping */
-			 unsigned flags);	/* defined in sys/pio.h */
+			 unsigned int flags);	/* defined in sys/pio.h */
 
 typedef void
 pciio_piomap_free_f     (pciio_piomap_t pciio_piomap);
@@ -340,7 +340,7 @@ pciio_piotrans_addr_f   (vertex_hdl_t dev,	/* translate for this device */
 			 pciio_space_t space,	/* which address space */
 			 iopaddr_t pciio_addr,	/* starting address */
 			 size_t byte_count,	/* map this many bytes */
-			 unsigned flags);
+			 unsigned int flags);
 
 typedef caddr_t
 pciio_pio_addr_f        (vertex_hdl_t dev,	/* translate for this device */
@@ -349,7 +349,7 @@ pciio_pio_addr_f        (vertex_hdl_t dev,	/* translate for this device */
 			 iopaddr_t pciio_addr,	/* starting address */
 			 size_t byte_count,	/* map this many bytes */
 			 pciio_piomap_t *mapp,	/* in case a piomap was needed */
-			 unsigned flags);
+			 unsigned int flags);
 
 typedef iopaddr_t
 pciio_piospace_alloc_f  (vertex_hdl_t dev,	/* PIO space for this device */
@@ -370,7 +370,7 @@ typedef pciio_dmamap_t
 pciio_dmamap_alloc_f    (vertex_hdl_t dev,	/* set up mappings for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 size_t byte_count_max,		/* max size of a mapping */
-			 unsigned flags);	/* defined in dma.h */
+			 unsigned int flags);	/* defined in dma.h */
 
 typedef void
 pciio_dmamap_free_f     (pciio_dmamap_t dmamap);
@@ -388,7 +388,7 @@ pciio_dmatrans_addr_f   (vertex_hdl_t dev,	/* translate for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 paddr_t paddr,	/* system physical address */
 			 size_t byte_count,	/* length */
-			 unsigned flags);	/* defined in dma.h */
+			 unsigned int flags);	/* defined in dma.h */
 
 typedef void
 pciio_dmamap_drain_f	(pciio_dmamap_t map);
@@ -440,13 +440,13 @@ pciio_endian_set_f      (vertex_hdl_t dev,	/* specify endianness for this device
 
 typedef uint64_t
 pciio_config_get_f	(vertex_hdl_t conn,	/* pci connection point */
-			 unsigned reg,		/* register byte offset */
-			 unsigned size);	/* width in bytes (1..4) */
+			 unsigned int reg,		/* register byte offset */
+			 unsigned int size);	/* width in bytes (1..4) */
 
 typedef void
 pciio_config_set_f	(vertex_hdl_t conn,	/* pci connection point */
-			 unsigned reg,		/* register byte offset */
-			 unsigned size,		/* width in bytes (1..4) */
+			 unsigned int reg,		/* register byte offset */
+			 unsigned int size,		/* width in bytes (1..4) */
 			 uint64_t value);	/* value to store */
 
 typedef pciio_slot_t
@@ -578,7 +578,7 @@ extern int
 pciio_driver_register  (pciio_vendor_id_t vendor_id,	/* card's vendor number */
 			pciio_device_id_t device_id,	/* card's device number */
 			char *driver_prefix,	/* driver prefix */
-			unsigned flags);
+			unsigned int flags);
 
 extern void
 pciio_error_register   (vertex_hdl_t pconn,	/* which slot */

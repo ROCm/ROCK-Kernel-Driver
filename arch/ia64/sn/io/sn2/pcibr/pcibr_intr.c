@@ -25,14 +25,14 @@ compare_and_swap_ptr(void **location, void *old_ptr, void *new_ptr)
 	/* FIXME - compare_and_swap_ptr NOT ATOMIC */
 	if (*location == old_ptr) {
 		*location = new_ptr;
-		return(1);
+		return 1;
 	}
 	else
-		return(0);
+		return 0;
 }
 #endif
 
-unsigned		pcibr_intr_bits(pciio_info_t info, pciio_intr_line_t lines, int nslots);
+unsigned int		pcibr_intr_bits(pciio_info_t info, pciio_intr_line_t lines, int nslots);
 pcibr_intr_t            pcibr_intr_alloc(vertex_hdl_t, device_desc_t, pciio_intr_line_t, vertex_hdl_t);
 void                    pcibr_intr_free(pcibr_intr_t);
 void              pcibr_setpciint(xtalk_intr_t);
@@ -49,7 +49,7 @@ extern pcibr_info_t      pcibr_info_get(vertex_hdl_t);
  *    INTERRUPT MANAGEMENT
  */
 
-unsigned
+unsigned int
 pcibr_intr_bits(pciio_info_t info,
 		pciio_intr_line_t lines, int nslots)
 {

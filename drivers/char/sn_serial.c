@@ -22,6 +22,7 @@
 #include <linux/circ_buf.h>
 #include <linux/serial_reg.h>
 #include <asm/uaccess.h>
+#include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/simulator.h>

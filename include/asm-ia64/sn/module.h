@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 
-#include <linux/config.h>
+#include <asm/semaphore.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/ksys/elsc.h>
 

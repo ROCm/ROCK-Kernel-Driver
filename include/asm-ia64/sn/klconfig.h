@@ -92,9 +92,9 @@ typedef s32 klconf_off_t;
 
 
 typedef struct console_s {
-	__psunsigned_t 	uart_base;
-	__psunsigned_t 	config_base;
-	__psunsigned_t 	memory_base;
+	unsigned long 	uart_base;
+	unsigned long 	config_base;
+	unsigned long 	memory_base;
 	short		baud;
 	short		flag;
 	int		type;
@@ -134,7 +134,7 @@ typedef struct kl_config_hdr {
 /* --- New Macros for the changed kl_config_hdr_t structure --- */
 
 #define PTR_CH_CONS_INFO(_k)	((console_t *)\
-			((__psunsigned_t)_k + (_k->ch_cons_off)))
+			((unsigned long)_k + (_k->ch_cons_off)))
 
 #define KL_CONFIG_CH_CONS_INFO(_n)   PTR_CH_CONS_INFO(KL_CONFIG_HDR(_n))
 

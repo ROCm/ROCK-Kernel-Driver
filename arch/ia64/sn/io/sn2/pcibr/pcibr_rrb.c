@@ -427,7 +427,7 @@ pcibr_wrb_flush(vertex_hdl_t pconn_vhdl)
 
     pcireg_wrb_flush_get(pcibr_soft, pciio_slot);
 
-    return(0);
+    return 0;
 }
 
 /*
@@ -710,10 +710,10 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 
     if (!pcibr_soft)
-	return(-EINVAL);
+	return -EINVAL;
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(-EINVAL);
+	return -EINVAL;
 
     /* How many RRBs are on this slot? */
     vchan_total = NUMBER_VCHANNELS;
@@ -747,7 +747,7 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
 
         pcibr_soft->bs_rrb_valid[slot][3] = chan[3];
 
-        return(-ENODEV);
+        return -ENODEV;
     }
 
     if ((pcibr_info->f_vendor == PCIIO_VENDOR_ID_NONE) &&
@@ -758,13 +758,13 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
 	for (vchan = 0; vchan < vchan_total; vchan++) 
 	    pcibr_soft->bs_rrb_valid[slot][vchan] = 0;
 
-	return(-ENODEV);
+	return -ENODEV;
     }
 
     for (vchan = 0; vchan < vchan_total; vchan++)
         pcibr_soft->bs_rrb_valid[slot][vchan] = chan[vchan];
 
-    return(0);
+    return 0;
 }
 
 

@@ -8,11 +8,6 @@
 #ifndef _ASM_IA64_SN_SN_PRIVATE_H
 #define _ASM_IA64_SN_SN_PRIVATE_H
 
-#include <linux/config.h>
-#include <asm/sn/nodepda.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/xtalk/xtalk_private.h>
-
 #include <asm/sn/sn2/sn_private.h>
 
 #endif /* _ASM_IA64_SN_SN_PRIVATE_H */

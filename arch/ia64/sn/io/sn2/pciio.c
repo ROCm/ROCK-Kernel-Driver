@@ -768,9 +768,12 @@ pciio_device_info_new(
 	pciio_info = kmalloc(sizeof (*(pciio_info)), GFP_KERNEL);
 	if ( pciio_info )
 		memset(pciio_info, 0, sizeof (*(pciio_info)));
+	else {
+		printk(KERN_WARNING "pciio_device_info_new(): Unable to "
+ 			"allocate memory\n");
+ 		return NULL;
+	}
     }
-    ASSERT(pciio_info != NULL);
-
     pciio_info->c_slot = slot;
     pciio_info->c_func = func;
     pciio_info->c_vendor = vendor_id;
@@ -835,12 +838,7 @@ pciio_device_info_unregister(vertex_hdl_t connectpt,
 			    pciio_info->c_slot,
 			    pciio_info->c_func);
 
-    hwgraph_edge_remove(connectpt,name,&pconn);
     pciio_info_set(pconn,0);
-
-    /* Remove the link to our pci provider */
-    hwgraph_edge_remove(pconn, EDGE_LBL_MASTER, NULL);
-
 
     hwgraph_vertex_unref(pconn);
     hwgraph_vertex_destroy(pconn);

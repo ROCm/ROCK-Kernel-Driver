@@ -8,6 +8,7 @@
 
 #include <linux/types.h>
 #include <linux/slab.h>
+#include <asm/errno.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/iograph.h>
@@ -18,8 +19,6 @@
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/xtalk/xtalk_private.h>
 
-#define	NEW(ptr)	(ptr = kmalloc(sizeof (*(ptr)), GFP_KERNEL))
-#define	DEL(ptr)	(kfree(ptr))
 
 /*
  * This file provides generic support for Crosstalk
@@ -118,7 +117,12 @@ xswitch_info_new(vertex_hdl_t xwidget)
     if (xswitch_info == NULL) {
 	int                     port;
 
-	NEW(xswitch_info);
+	xswitch_info = kmalloc(sizeof(*xswitch_info), GFP_KERNEL);
+	if (!xswitch_info) {
+		printk(KERN_WARNING "xswitch_info_new(): Unable to "
+			"allocate memory\n");
+		return NULL;
+	}
 	xswitch_info->census = 0;
 	for (port = 0; port <= XSWITCH_CENSUS_PORT_MAX; port++) {
 	    xswitch_info_vhdl_set(xswitch_info, port,

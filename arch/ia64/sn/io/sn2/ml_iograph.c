@@ -46,8 +46,9 @@ xswitch_vertex_init(vertex_hdl_t xswitch)
 	int rc;
 
 	xvolinfo = kmalloc(sizeof(struct xswitch_vol_s), GFP_KERNEL);
-	if (xvolinfo <= 0 ) {
-		printk("xswitch_vertex_init: out of memory\n");
+	if (!xvolinfo) {
+		printk(KERN_WARNING "xswitch_vertex_init(): Unable to "
+			"allocate memory\n");
 		return;
 	}
        	memset(xvolinfo, 0, sizeof(struct xswitch_vol_s));
@@ -763,7 +764,7 @@ io_brick_map_widget(int brick_type, int widget_num)
         /* Look for brick prefix in table */
         for (i = 0; i < num_bricks; i++) {
                if (brick_type == io_brick_tab[i].ibm_type)
-                       return(io_brick_tab[i].ibm_map_wid[widget_num]);
+                       return io_brick_tab[i].ibm_map_wid[widget_num];
         }
 
         return 0;

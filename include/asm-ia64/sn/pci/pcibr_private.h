@@ -395,21 +395,6 @@ struct pcibr_intr_wrap_s {
  */
 #define PCIBR_WAR_ENABLED(pv, pcibr_soft) \
 	((1 << XWIDGET_PART_REV_NUM_REV(pcibr_soft->bs_rev_num)) & pv)
-/*
- * Defines for individual WARs. Each is a bitmask of applicable
- * part revision numbers. (1 << 1) == rev A, (1 << 2) == rev B,
- * (3 << 1) == (rev A or rev B), etc
- */
-#define PV854697 (~0)     /* PIC: write 64bit regs as 64bits. permanent */
-#define PV854827 (~0)     /* PIC: fake widget 0xf presence bit. permanent */
-#define PV855271 (1 << 1) /* PIC: use virt chan iff 64-bit device. */
-#define PV878674 (~0)     /* PIC: Dont allow 64bit PIOs.  permanent */
-#define PV855272 (1 << 1) /* PIC: runaway interrupt WAR */
-#define PV856155 (1 << 1) /* PIC: arbitration WAR */
-#define PV856864 (1 << 1) /* PIC: lower timeout to free TNUMs quicker */
-#define PV856866 (1 << 1) /* PIC: avoid rrb's 0/1/8/9. */
-#define PV862253 (1 << 1) /* PIC: don't enable write req RAM parity checking */
-#define PV867308 (3 << 1) /* PIC: make LLP error interrupts FATAL for PIC */
 
 /* defines for pcibr_soft_s->bs_bridge_mode */
 #define PCIBR_BRIDGEMODE_PCI_33		0x0

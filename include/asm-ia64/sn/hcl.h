@@ -8,6 +8,7 @@
 #ifndef _ASM_IA64_SN_HCL_H
 #define _ASM_IA64_SN_HCL_H
 
+#include <linux/fs.h>
 #include <asm/sn/sgi.h>
 
 extern vertex_hdl_t hwgraph_root;
@@ -58,7 +59,6 @@ typedef long            arb_info_desc_t;
 #define hwgraph_connectpt_set labelcl_info_connectpt_set
 #define hwgraph_generate_path hwgfs_generate_path
 #define hwgraph_path_to_vertex(a) hwgfs_find_handle(NULL, a, 0, 0, 0, 1)
-#define hwgraph_edge_remove(a,b,c)
 #define hwgraph_vertex_unref(a)
 
 /*

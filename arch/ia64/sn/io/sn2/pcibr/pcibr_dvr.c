@@ -37,7 +37,7 @@ static int	   pcibr_debug_slot = -1;		/* '-1' for all slots    */
 
 
 #if PCIBR_SOFT_LIST
-pcibr_list_p            pcibr_list = 0;
+pcibr_list_p            pcibr_list;
 #endif
 
 extern char *pci_space[];
@@ -402,7 +402,7 @@ pcibr_mmap(struct file * file, struct vm_area_struct * vma)
         error = io_remap_page_range(vma, phys_addr, vma->vm_start,
 				    vma->vm_end - vma->vm_start,
 				    vma->vm_page_prot);
-	return(error);
+	return error;
 }
 
 /*
@@ -594,7 +594,7 @@ pcibr_device_unregister(vertex_hdl_t pconn_vhdl)
     if (error_call)
         error = error_call;
 
-    return(error);
+    return error;
     
 }
 
@@ -694,7 +694,7 @@ pcibr_detach(vertex_hdl_t xconn)
 
     /* Get the bridge vertex from its xtalk connection point */
     if (hwgraph_traverse(xconn, EDGE_LBL_PCI, &pcibr_vhdl) != GRAPH_SUCCESS)
-	return(1);
+	return 1;
 
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 
@@ -728,12 +728,8 @@ pcibr_detach(vertex_hdl_t xconn)
 
     /* Remove the Bridge revision labelled info */
     (void)hwgraph_info_remove_LBL(pcibr_vhdl, INFO_LBL_PCIBR_ASIC_REV, NULL);
-    /* Remove the character device associated with this bridge */
-    hwgraph_edge_remove(pcibr_vhdl, EDGE_LBL_CONTROLLER, NULL);
-    /* Remove the PCI bridge vertex */
-    hwgraph_edge_remove(xconn, EDGE_LBL_PCI, NULL);
 
-    return(0);
+    return 0;
 }
 
 
@@ -1317,7 +1313,7 @@ pcibr_piomap_addr(pcibr_piomap_t pcibr_piomap,
                 "pcibr_piomap_addr: map=0x%lx, addr=0x%lx\n", 
 		pcibr_piomap, addr));
 
-    return(addr);
+    return addr;
 }
 
 /*ARGSUSED */
@@ -1358,7 +1354,7 @@ pcibr_piotrans_addr(vertex_hdl_t pconn_vhdl,
     PCIBR_DEBUG((PCIBR_DEBUG_PIODIR, pconn_vhdl,
 		"pcibr_piotrans_addr: xio_addr=0x%lx, addr=0x%lx\n",
 		xio_addr, addr));
-    return(addr);
+    return addr;
 }
 
 /*
@@ -1624,7 +1620,7 @@ pcibr_flags_to_d64(unsigned flags, pcibr_soft_t pcibr_soft)
 	attributes &= (PCI64_ATTR_BAR | PCI64_ATTR_SWAP);
     }
 
-    return (attributes);
+    return attributes;
 }
 
 /*ARGSUSED */
@@ -2090,7 +2086,7 @@ pcibr_get_dmatrans_node(vertex_hdl_t pconn_vhdl)
 	pciio_info_t	pciio_info = pciio_info_get(pconn_vhdl);
 	pcibr_soft_t	pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
 
-	return(NASID_TO_COMPACT_NODEID(NASID_GET(pcibr_soft->bs_dir_xbase)));
+	return NASID_TO_COMPACT_NODEID(NASID_GET(pcibr_soft->bs_dir_xbase));
 }
 
 /*ARGSUSED */
@@ -2179,7 +2175,7 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 			"pcibr_dmatrans_addr:  wanted paddr [0x%lx..0x%lx], "
 			"xio_port=0x%x, direct64: pci_addr=0x%lx\n",
 			paddr, paddr + req_size - 1, xio_addr, pci_addr));
-	    return (pci_addr);
+	    return pci_addr;
 	}
 	if (!pcibr_try_set_device(pcibr_soft, pciio_slot, flags, BRIDGE_DEV_D64_BITS)) {
 	    pci_addr = pcibr_flags_to_d64(flags, pcibr_soft);
@@ -2210,7 +2206,7 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 			"xio_port=0x%x, direct64: pci_addr=0x%lx, "
 			"new flags: 0x%x\n", paddr, paddr + req_size - 1,
 			xio_addr, pci_addr, (uint64_t) flags));
-	    return (pci_addr);
+	    return pci_addr;
 	}
 
 	PCIBR_DEBUG((PCIBR_DEBUG_DMADIR, pconn_vhdl,
@@ -2263,7 +2259,7 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
                             " xio_port=0x%x, direct32: pci_addr=0x%lx\n",
                             paddr, paddr + req_size - 1, xio_addr, pci_addr));
 
-		return (pci_addr);
+		return pci_addr;
 	    }
 	    if (!pcibr_try_set_device(pcibr_soft, pciio_slot, flags, BRIDGE_DEV_D32_BITS)) {
 
@@ -2292,7 +2288,7 @@ pcibr_dmatrans_addr(vertex_hdl_t pconn_vhdl,
 			    "new flags: 0x%x\n", paddr, paddr + req_size - 1,
 			    xio_addr, pci_addr, (uint64_t) flags));
 
-		return (pci_addr);
+		return pci_addr;
 	    }
 	    /* our flags conflict with Device(x).
 	     */
@@ -2349,7 +2345,7 @@ pcibr_dmalist_drain(vertex_hdl_t pconn_vhdl,
 iopaddr_t
 pcibr_dmamap_pciaddr_get(pcibr_dmamap_t pcibr_dmamap)
 {
-    return (pcibr_dmamap->bd_pci_addr);
+    return pcibr_dmamap->bd_pci_addr;
 }
 
 /* =====================================================================
@@ -2486,7 +2482,7 @@ pcibr_device_flags_set(vertex_hdl_t pconn_vhdl,
 		    "pcibr_device_flags_set: Device(%d): 0x%x\n",
 		    pciio_slot, devreg));
     }
-    return (1);
+    return 1;
 }
 
 /*
@@ -2529,10 +2525,10 @@ pcibr_pcix_rbars_calc(pcibr_soft_t pcibr_soft)
 	    percent_allowed=(percent_allowed > 100) ? 100 : percent_allowed+1;
 	}
     } else {
-	return(ENODEV);
+	return -ENODEV;
     }
 
-    return(percent_allowed);
+    return percent_allowed;
 }
 
 /*

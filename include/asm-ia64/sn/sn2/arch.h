@@ -8,9 +8,6 @@
 #ifndef _ASM_IA64_SN_SN2_ARCH_H
 #define _ASM_IA64_SN_SN2_ARCH_H
 
-#include <asm/types.h>
-
-
 #define CPUS_PER_NODE           4       /* CPUs on a single hub */
 #define CPUS_PER_SUBNODE        4       /* CPUs on a single hub PI */
 

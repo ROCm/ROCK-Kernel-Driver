@@ -139,17 +139,17 @@ typedef volatile struct widget_cfg {
 } widget_cfg_t;
 
 typedef struct {
-    unsigned                other:8;
-    unsigned                bo:1;
-    unsigned                error:1;
-    unsigned                vbpm:1;
-    unsigned                gbr:1;
-    unsigned                ds:2;
-    unsigned                ct:1;
-    unsigned                tnum:5;
-    unsigned                pactyp:4;
-    unsigned                sidn:4;
-    unsigned                didn:4;
+    unsigned int            other:8;
+    unsigned int            bo:1;
+    unsigned int            error:1;
+    unsigned int            vbpm:1;
+    unsigned int            gbr:1;
+    unsigned int            ds:2;
+    unsigned int            ct:1;
+    unsigned int            tnum:5;
+    unsigned int            pactyp:4;
+    unsigned int            sidn:4;
+    unsigned int            didn:4;
 } w_err_cmd_word_f;
 
 typedef union {
@@ -188,7 +188,7 @@ typedef struct xwidget_hwid_s {
 extern int              xwidget_driver_register(xwidget_part_num_t part_num,
 						xwidget_mfg_num_t mfg_num,
 						char *driver_prefix,
-						unsigned flags);
+						unsigned int flags);
 
 extern void             xwidget_driver_unregister(char *driver_prefix);
 
@@ -230,7 +230,7 @@ extern xwidgetnum_t hub_widget_id(nasid_t);
  * However, since nobody looks inside ...
  */
 typedef struct v_widget_s {
-    unsigned                v_widget_s_is_really_empty;
+    unsigned int                v_widget_s_is_really_empty;
 #define	v_widget_s_is_really_empty	and using this would be a syntax error.
 } v_widget_t;
 #endif				/* _KERNEL */

@@ -76,7 +76,7 @@ pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
 			(arbitrary_info_t *)&widget_info) == GRAPH_SUCCESS) {
 		peer_widget_info = kmalloc(sizeof (*(peer_widget_info)), GFP_KERNEL);
 		if ( !peer_widget_info ) {
-			return 0;
+			return -ENOMEM;
 		}
 		memset(peer_widget_info, 0, sizeof (*(peer_widget_info)));
 
@@ -336,12 +336,12 @@ pic_attach2(vertex_hdl_t xconn_vhdl, void *bridge,
      */
     pcibr_soft = kmalloc(sizeof (*(pcibr_soft)), GFP_KERNEL);
     if ( !pcibr_soft )
-	return -1;
+	return -ENOMEM;
 
     self = kmalloc(sizeof (*(self)), GFP_KERNEL);
     if ( !self ) {
 	kfree(pcibr_soft);
-	return -1;
+	return -ENOMEM;
     }
     memset(pcibr_soft, 0, sizeof (*(pcibr_soft)));
     memset(self, 0, sizeof (*(self)));
