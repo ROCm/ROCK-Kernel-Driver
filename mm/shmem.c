@@ -1909,7 +1909,7 @@ static struct inode *shmem_alloc_inode(struct super_block *sb)
 
 static void shmem_destroy_inode(struct inode *inode)
 {
-	if ((inode->i_mode & S_IFMT) == S_IFREG) {
+	if ((inode->i_mode & S_IFMT) == S_IFREG)
 		/* only struct inode is valid if it's an inline symlink */
 		mpol_free_shared_policy(&SHMEM_I(inode)->policy);
 	kmem_cache_free(shmem_inode_cachep, SHMEM_I(inode));
