@@ -514,12 +514,12 @@ extern struct exec_domain	default_exec_domain;
 
 #ifndef INIT_THREAD_SIZE
 # define INIT_THREAD_SIZE	2048*sizeof(long)
-#endif
 
 union thread_union {
 	struct thread_info thread_info;
 	unsigned long stack[INIT_THREAD_SIZE/sizeof(long)];
 };
+#endif
 
 extern union thread_union init_thread_union;
 extern struct task_struct init_task;
