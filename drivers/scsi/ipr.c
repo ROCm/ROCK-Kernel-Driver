@@ -2844,8 +2844,8 @@ static int ipr_slave_configure(struct scsi_device *sdev)
 			sdev->scsi_level = 4;
 		if (ipr_is_vset_device(res))
 			sdev->timeout = IPR_VSET_RW_TIMEOUT;
-
-		sdev->allow_restart = 1;
+		if (IPR_IS_DASD_DEVICE(res->cfgte.std_inq_data))
+			sdev->allow_restart = 1;
 		scsi_adjust_queue_depth(sdev, 0, res->qdepth);
 	}
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
