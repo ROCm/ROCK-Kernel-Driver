@@ -124,65 +124,23 @@ static int __init via_generic_setup (struct pci_dev *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_AGP3
 /*
  * The KT400 does magick to put the AGP bridge compliant with the same
  * standards version as the graphics card. If we haven't fallen into
- * 2.0 compatability mode, we run the normal 3.0 code, and fall back
- * if something nasty happens.
+ * 2.0 compatability mode, we abort, as this gets picked up by
+ * via-agp3.o
  */
-static void __init via_kt400_enable(u32 mode)
-{
-	if ((agp_generic_agp_3_0_enable(mode))==FALSE)
-		/* Something weird happened, fall back to 2.0 */
-		agp_generic_agp_enable(mode);
-}
-#endif
 
 static int __init via_kt400_setup(struct pci_dev *pdev)
 {
 	u8 reg;
-
-	agp_bridge.masks = via_generic_masks;
-	agp_bridge.num_of_masks = 1;
-	agp_bridge.aperture_sizes = (void *) via_generic_sizes;
-	agp_bridge.size_type = U8_APER_SIZE;
-	agp_bridge.num_aperture_sizes = 7;
-	agp_bridge.dev_private_data = NULL;
-	agp_bridge.needs_scratch_page = FALSE;
-	agp_bridge.configure = via_configure;
-	agp_bridge.fetch_size = via_fetch_size;
-	agp_bridge.cleanup = via_cleanup;
-	agp_bridge.tlb_flush = via_tlbflush;
-	agp_bridge.mask_memory = via_mask_memory;
-	agp_bridge.cache_flush = global_cache_flush;
-	agp_bridge.create_gatt_table = agp_generic_create_gatt_table;
-	agp_bridge.free_gatt_table = agp_generic_free_gatt_table;
-	agp_bridge.insert_memory = agp_generic_insert_memory;
-	agp_bridge.remove_memory = agp_generic_remove_memory;
-	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge.free_by_type = agp_generic_free_by_type;
-	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge.suspend = agp_generic_suspend;
-	agp_bridge.resume = agp_generic_resume;
-	agp_bridge.cant_use_aperture = 0;
-
 	pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
+	/* Check AGP 2.0 compatability mode. */
 	if ((reg & (1<<1))==1) {
-		/* AGP 2.0 compatability mode. */
-		agp_bridge.agp_enable = agp_generic_agp_enable;
-
-	} else {
-#ifdef CONFIG_AGP3
-		/* AGP 3.0 mode */
-		agp_bridge.agp_enable = via_kt400_enable;
-#else
-		printk ("AGP: VIA KT400 in AGP3.0 mode support not compiled in.\n");
-		return -ENODEV;
-#endif
+		via_generic_setup(pdev);
+		return 0;
 	}
-	return 0;
+	return -ENODEV;
 }
 
 static struct agp_device_ids via_agp_device_ids[] __initdata =
