@@ -1447,7 +1447,7 @@ static void __exit exit_i82365(void)
 	i365_set(i, I365_CSCINT, 0);
 	release_region(socket[i].ioaddr, 2);
     }
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
     if (i82365_pnpdev)
     		pnp_disable_dev(i82365_pnpdev);
 #endif
