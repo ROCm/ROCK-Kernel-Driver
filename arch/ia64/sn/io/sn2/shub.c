@@ -493,7 +493,7 @@ linkstatd_init(void)
 	spin_lock_init(&sn_linkstats_lock);
 	sn_linkstats = kmalloc(numnodes * sizeof(struct s_linkstats), GFP_KERNEL);
 	sn_linkstats_reset(60000UL); /* default 60 second update interval */
-	kernel_thread(linkstatd_thread, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	kernel_thread(linkstatd_thread, NULL, CLONE_KERNEL);
 
 	return 0;                                                                       
 }
