@@ -42,7 +42,7 @@ static inline void switch_mm(struct mm_struct *prev,
 	int cpu = smp_processor_id();
 
 #ifdef CONFIG_SMP
-	prev = per_cpu (cpu_tlbstate, cpu).active_mm;
+	prev = per_cpu(cpu_tlbstate, cpu).active_mm;
 #endif
 
 	if (likely(prev != next)) {
