@@ -100,6 +100,7 @@ Version 0.0.6    2.1.110   07-aug-98   Eduardo Marcelo Serrat
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/types.h>
+#include <linux/slab.h>
 #include <linux/socket.h>
 #include <linux/in.h>
 #include <linux/kernel.h>
@@ -131,21 +132,20 @@ Version 0.0.6    2.1.110   07-aug-98   Eduardo Marcelo Serrat
 #include <net/dn_fib.h>
 #include <net/dn_neigh.h>
 
-static void dn_keepalive(struct sock *sk);
+struct dn_sock {
+	struct sock sk;
+	struct dn_scp scp;
+};
 
-/*
- * decnet_address is kept in network order, decnet_ether_address is kept
- * as a string of bytes.
- */
-dn_address decnet_address = 0;
-unsigned char decnet_ether_address[ETH_ALEN] = { 0xAA, 0x00, 0x04, 0x00, 0x00, 0x00 };
+static void dn_keepalive(struct sock *sk);
 
 #define DN_SK_HASH_SHIFT 8
 #define DN_SK_HASH_SIZE (1 << DN_SK_HASH_SHIFT)
 #define DN_SK_HASH_MASK (DN_SK_HASH_SIZE - 1)
 
+static kmem_cache_t *dn_sk_cachep;
 static struct proto_ops dn_proto_ops;
-rwlock_t dn_hash_lock = RW_LOCK_UNLOCKED;
+static rwlock_t dn_hash_lock = RW_LOCK_UNLOCKED;
 static struct sock *dn_sk_hash[DN_SK_HASH_SIZE];
 static struct sock *dn_wild_sk;
 
@@ -473,17 +473,16 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	struct sock *sk;
 	struct dn_scp *scp;
 
-	if  ((sk = sk_alloc(PF_DECnet, gfp, 1, NULL)) == NULL) 
+	if  ((sk = sk_alloc(PF_DECnet, gfp, sizeof(struct dn_sock), dn_sk_cachep)) == NULL) 
 		goto no_sock;
-	scp = kmalloc(sizeof(*scp), gfp);
-	if (!scp)
-		goto free_sock;
+
+	scp = (struct dn_scp *)(sk + 1);
+	DN_SK(sk) = scp;
 
 	if (sock) {
 			sock->ops = &dn_proto_ops;
 	}
 	sock_init_data(sock,sk);
-	DN_SK(sk) = scp;
 
 	sk->backlog_rcv = dn_nsp_backlog_rcv;
 	sk->destruct    = dn_destruct;
@@ -544,8 +543,7 @@ struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	MOD_INC_USE_COUNT;
 
 	return sk;
-free_sock:
-	sk_free(sk);
+
 no_sock:
 	return NULL;
 }
@@ -771,9 +769,6 @@ static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct net_device *dev;
 	int rv;
 
-	if (sk->zapped == 0)
-		return -EINVAL;
-
 	if (addr_len != sizeof(struct sockaddr_dn))
 		return -EINVAL;
 
@@ -783,19 +778,30 @@ static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	if (dn_ntohs(saddr->sdn_nodeaddrl) && (dn_ntohs(saddr->sdn_nodeaddrl) != 2))
 		return -EINVAL;
 
-	if (saddr->sdn_objnum && !capable(CAP_NET_BIND_SERVICE))
-		return -EPERM;
-
 	if (dn_ntohs(saddr->sdn_objnamel) > DN_MAXOBJL)
 		return -EINVAL;
 
 	if (saddr->sdn_flags & ~SDF_WILD)
 		return -EINVAL;
 
-	if (saddr->sdn_flags & SDF_WILD) {
-		if (!capable(CAP_NET_BIND_SERVICE))
-			return -EPERM;
-	} else {
+#if 1
+	if (!capable(CAP_NET_BIND_SERVICE) && saddr->sdn_objnum ||
+	    (saddr->sdn_flags & SDF_WILD))
+		return -EACCES;
+#else
+	/*
+	 * Maybe put the default actions in the default security ops for
+	 * dn_prot_sock ? Would be nice if the capable call would go there
+	 * too.
+	 */
+	if (security_ops->dn_prot_sock(saddr) &&
+	    !capable(CAP_NET_BIND_SERVICE) || 
+	    saddr->sdn_objnum || (saddr->sdn_flags & SDF_WILD))
+		return -EACCES;
+#endif
+
+
+	if (!(saddr->sdn_flags & SDF_WILD)) {
 		if (dn_ntohs(saddr->sdn_nodeaddrl)) {
 			read_lock(&dev_base_lock);
 			for(dev = dev_base; dev; dev = dev->next) {
@@ -810,12 +816,18 @@ static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		}
 	}
 
+	rv = -EINVAL;
+	lock_sock(sk);
+	if (sk->zapped != 0) {
+		memcpy(&scp->addr, saddr, addr_len);
+		sk->zapped = 0;
 
-	memcpy(&scp->addr, saddr, addr_len);
-	sk->zapped = 0;
-
-	if ((rv = dn_hash_sock(sk)) != 0)
-		sk->zapped = 1;
+		rv = dn_hash_sock(sk);
+		if (rv) {
+			sk->zapped = 1;
+		}
+	}
+	release_sock(sk);
 
         return rv;
 }
@@ -825,6 +837,7 @@ static int dn_auto_bind(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
+	int rv;
 
 	sk->zapped = 0;
 
@@ -844,13 +857,18 @@ static int dn_auto_bind(struct socket *sock)
 		scp->accessdata.acc_accl = 0;
 		memset(scp->accessdata.acc_acc, 0, 40);
 	}
+	/* End of compatibility stuff */
 
 	scp->addr.sdn_add.a_len = dn_htons(2);
-	*(dn_address *)scp->addr.sdn_add.a_addr = decnet_address;
+	rv = dn_dev_bind_default((dn_address *)scp->addr.sdn_add.a_addr);
+	if (rv == 0) {
+		rv = dn_hash_sock(sk);
+		if (rv) {
+			sk->zapped = 1;
+		}
+	}
 
-	dn_hash_sock(sk);
-
-	return 0;
+	return rv;
 }
 
 
@@ -1209,6 +1227,7 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		return dn_fib_ioctl(sock, cmd, arg);
 #endif /* CONFIG_DECNET_ROUTER */
 
+#if 0
 	case OSIOCSNETADDR:
 		if (!capable(CAP_NET_ADMIN)) {
 			err = -EPERM;
@@ -1218,7 +1237,6 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		dn_dev_devices_off();
 
 		decnet_address = (unsigned short)arg;
-		dn_dn2eth(decnet_ether_address, dn_ntohs(decnet_address));
 
 		dn_dev_devices_on();
 		err = 0;
@@ -1227,6 +1245,7 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	case OSIOCGNETADDR:
 		err = put_user(decnet_address, (unsigned short *)arg);
 		break;
+#endif
         case SIOCGIFCONF:
         case SIOCGIFFLAGS:
         case SIOCGIFBRDADDR:
@@ -2227,37 +2246,23 @@ void dn_unregister_sysctl(void);
 #endif
 
 
-#ifdef MODULE
 MODULE_DESCRIPTION("The Linux DECnet Network Protocol");
 MODULE_AUTHOR("Linux DECnet Project Team");
 MODULE_LICENSE("GPL");
 
-static int addr[2] = {0, 0};
 
-MODULE_PARM(addr, "2i");
-MODULE_PARM_DESC(addr, "The DECnet address of this machine: area,node");
-#endif
-
-static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.4.20-pre1s (C) 1995-2002 Linux DECnet Project Team\n";
+static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.5.40s (C) 1995-2002 Linux DECnet Project Team\n";
 
 static int __init decnet_init(void)
 {
-#ifdef MODULE
-	if (addr[0] > 63 || addr[0] < 0) {
-		printk(KERN_ERR "DECnet: Area must be between 0 and 63");
-		return 1;
-	}
-
-	if (addr[1] > 1023 || addr[1] < 0) {
-		printk(KERN_ERR "DECnet: Node must be between 0 and 1023");
-		return 1;
-	}
-
-	decnet_address = dn_htons((addr[0] << 10) | addr[1]);
-	dn_dn2eth(decnet_ether_address, dn_ntohs(decnet_address));
-#endif
-
         printk(banner);
+
+	dn_sk_cachep = kmem_cache_create("decnet_socket_cache",
+					 sizeof(struct dn_sock),
+					 0, SLAB_HWCACHE_ALIGN,
+					 NULL, NULL);
+	if (!dn_sk_cachep)
+		return -ENOMEM;
 
 	sock_register(&dn_family_ops);
 	dev_add_pack(&dn_dix_packet_type);
@@ -2288,21 +2293,6 @@ static int __init decnet_init(void)
 
 }
 
-#ifndef MODULE
-static int __init decnet_setup(char *str)
-{
-	unsigned short area = simple_strtoul(str, &str, 0);
-	unsigned short node = simple_strtoul(*str > 0 ? ++str : str, &str, 0);
-
-	decnet_address = dn_htons(area << 10 | node);
-	dn_dn2eth(decnet_ether_address, dn_ntohs(decnet_address));
-
-	return 1;
-}
-
-__setup("decnet=", decnet_setup);
-#endif
-
 static void __exit decnet_exit(void)
 {
 	sock_unregister(AF_DECnet);
@@ -2323,6 +2313,8 @@ static void __exit decnet_exit(void)
 #endif /* CONFIG_DECNET_ROUTER */
 
 	proc_net_remove("decnet");
+
+	kmem_cache_destroy(dn_sk_cachep);
 }
 
 module_init(decnet_init);

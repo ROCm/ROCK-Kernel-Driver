@@ -96,7 +96,7 @@ static inline void dn_rt_send(struct sk_buff *skb)
 	dev_queue_xmit(skb);
 }
 
-static inline void dn_rt_finish_output(struct sk_buff *skb, char *dst)
+static inline void dn_rt_finish_output(struct sk_buff *skb, char *dst, char *src)
 {
 	struct net_device *dev = skb->dev;
 
@@ -104,7 +104,7 @@ static inline void dn_rt_finish_output(struct sk_buff *skb, char *dst)
 		dst = NULL;
 
 	if (!dev->hard_header || (dev->hard_header(skb, dev, ETH_P_DNA_RT,
-			dst, NULL, skb->len) >= 0))
+			dst, src, skb->len) >= 0))
 		dn_rt_send(skb);
 	else
 		kfree_skb(skb);

@@ -35,13 +35,10 @@ Steve's quick list of things that need finishing off:
    file)
 
  o Find all the commonality between DECnet and IPv4 routing code and extract 
-   it into a small library of routines. [probably a project for 2.5.xx]
+   it into a small library of routines. [probably a project for 2.7.xx]
 
  o Test ip_gre tunneling works... it did the last time I tested it and it
    will have to if I'm to test routing properly.
-
- o Hello messages should be generated for each primary address on each
-   interface.
 
  o Add the routing message grabbing netfilter module [written, tested,
    awaiting merge]
@@ -54,4 +51,6 @@ Steve's quick list of things that need finishing off:
  o Add NSP message flow control
 
  o DECnet sendpages() function
+
+ o AIO for DECnet
 

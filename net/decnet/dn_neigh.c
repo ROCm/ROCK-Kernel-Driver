@@ -181,10 +181,13 @@ static void dn_short_error_report(struct neighbour *neigh, struct sk_buff *skb)
 static int dn_neigh_output_packet(struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb->dst;
+	struct dn_route *rt = (struct dn_route *)dst;
 	struct neighbour *neigh = dst->neighbour;
 	struct net_device *dev = neigh->dev;
+	char mac_addr[ETH_ALEN];
 
-	if (!dev->hard_header || dev->hard_header(skb, dev, ntohs(skb->protocol), neigh->ha, NULL, skb->len) >= 0)
+	dn_dn2eth(mac_addr, rt->rt_saddr);
+	if (!dev->hard_header || dev->hard_header(skb, dev, ntohs(skb->protocol), neigh->ha, mac_addr, skb->len) >= 0)
 		return neigh->ops->queue_xmit(skb);
 
 	if (net_ratelimit())

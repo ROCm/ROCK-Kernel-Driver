@@ -23,6 +23,8 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/net.h>
 #include <linux/netdevice.h>
 #include <linux/proc_fs.h>
@@ -52,16 +54,23 @@ static unsigned char dn_eco_version[3]    = {0x02,0x00,0x00};
 
 extern struct neigh_table dn_neigh_table;
 
-struct net_device *decnet_default_device;
+/*
+ * decnet_address is kept in network order.
+ */
+dn_address decnet_address = 0;
+
+static rwlock_t dndev_lock = RW_LOCK_UNLOCKED;
+static struct net_device *decnet_default_device;
 
 static struct dn_dev *dn_dev_create(struct net_device *dev, int *err);
 static void dn_dev_delete(struct net_device *dev);
 static void rtmsg_ifa(int event, struct dn_ifaddr *ifa);
 
 static int dn_eth_up(struct net_device *);
-static void dn_send_brd_hello(struct net_device *dev);
+static void dn_eth_down(struct net_device *);
+static void dn_send_brd_hello(struct net_device *dev, struct dn_ifaddr *ifa);
 #if 0
-static void dn_send_ptp_hello(struct net_device *dev);
+static void dn_send_ptp_hello(struct net_device *dev, struct dn_ifaddr *ifa);
 #endif
 
 static struct dn_dev_parms dn_dev_list[] =  {
@@ -75,6 +84,7 @@ static struct dn_dev_parms dn_dev_list[] =  {
 	.name =		"ethernet",
 	.ctl_name =	NET_DECNET_CONF_ETHER,
 	.up =		dn_eth_up,
+	.down = 	dn_eth_down,
 	.timer3 =	dn_send_brd_hello,
 },
 {
@@ -249,6 +259,51 @@ static void dn_dev_sysctl_unregister(struct dn_dev_parms *parms)
 	}
 }
 
+struct net_device *dn_dev_get_default(void)
+{
+	struct net_device *dev;
+	read_lock(&dndev_lock);
+	dev = decnet_default_device;
+	if (dev) {
+		if (dev->dn_ptr)
+			dev_hold(dev);
+		else
+			dev = NULL;
+	}
+	read_unlock(&dndev_lock);
+	return dev;
+}
+
+int dn_dev_set_default(struct net_device *dev, int force)
+{
+	struct net_device *old = NULL;
+	int rv = -EBUSY;
+	if (!dev->dn_ptr)
+		return -ENODEV;
+	write_lock(&dndev_lock);
+	if (force || decnet_default_device == NULL) {
+		old = decnet_default_device;
+		decnet_default_device = dev;
+		rv = 0;
+	}
+	write_unlock(&dndev_lock);
+	if (old)
+		dev_put(dev);
+	return rv;
+}
+
+static void dn_dev_check_default(struct net_device *dev)
+{
+	write_lock(&dndev_lock);
+	if (dev == decnet_default_device) {
+		decnet_default_device = NULL;
+	} else {
+		dev = NULL;
+	}
+	write_unlock(&dndev_lock);
+	if (dev)
+		dev_put(dev);
+}
 
 static int dn_forwarding_proc(ctl_table *table, int write, 
 				struct file *filep,
@@ -364,8 +419,19 @@ static __inline__ void dn_dev_free_ifa(struct dn_ifaddr *ifa)
 static void dn_dev_del_ifa(struct dn_dev *dn_db, struct dn_ifaddr **ifap, int destroy)
 {
 	struct dn_ifaddr *ifa1 = *ifap;
+	unsigned char mac_addr[6];
+	struct net_device *dev = dn_db->dev;
+
+	ASSERT_RTNL();
 
 	*ifap = ifa1->ifa_next;
+
+	if (dn_db->dev->type == ARPHRD_ETHER) {
+		if (ifa1->ifa_local != dn_htons(dn_eth2dn(dev->dev_addr))) {
+			dn_dn2eth(mac_addr, ifa1->ifa_local);
+			dev_mc_delete(dev, mac_addr, ETH_ALEN, 0);
+		}
+	}
 
 	rtmsg_ifa(RTM_DELADDR, ifa1);
 
@@ -379,9 +445,25 @@ static void dn_dev_del_ifa(struct dn_dev *dn_db, struct dn_ifaddr **ifap, int de
 
 static int dn_dev_insert_ifa(struct dn_dev *dn_db, struct dn_ifaddr *ifa)
 {
-	/*
-	 * FIXME: Duplicate check here.
-	 */
+	struct net_device *dev = dn_db->dev;
+	struct dn_ifaddr *ifa1;
+	unsigned char mac_addr[6];
+
+	ASSERT_RTNL();
+
+	/* Check for duplicates */	
+	for(ifa1 = dn_db->ifa_list; ifa1; ifa1 = ifa1->ifa_next) {
+		if (ifa1->ifa_local == ifa->ifa_local)
+			return -EEXIST;
+	}
+
+	if (dev->type == ARPHRD_ETHER) {
+		if (ifa->ifa_local != dn_htons(dn_eth2dn(dev->dev_addr))) {
+			dn_dn2eth(mac_addr, ifa->ifa_local);
+			dev_mc_add(dev, mac_addr, ETH_ALEN, 0);
+			dev_mc_upload(dev);
+		}
+	}
 
 	ifa->ifa_next = dn_db->ifa_list;
 	dn_db->ifa_list = ifa;
@@ -394,6 +476,7 @@ static int dn_dev_insert_ifa(struct dn_dev *dn_db, struct dn_ifaddr *ifa)
 static int dn_dev_set_ifa(struct net_device *dev, struct dn_ifaddr *ifa)
 {
 	struct dn_dev *dn_db = dev->dn_ptr;
+	int rv;
 
 	if (dn_db == NULL) {
 		int err;
@@ -407,7 +490,10 @@ static int dn_dev_set_ifa(struct net_device *dev, struct dn_ifaddr *ifa)
 	if (dev->flags & IFF_LOOPBACK)
 		ifa->ifa_scope = RT_SCOPE_HOST;
 
-	return dn_dev_insert_ifa(dn_db, ifa);
+	rv = dn_dev_insert_ifa(dn_db, ifa);
+	if (rv)
+		dn_dev_free_ifa(ifa);
+	return rv;
 }
 
 
@@ -538,6 +624,7 @@ static int dn_dev_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *a
 	struct dn_dev *dn_db;
 	struct ifaddrmsg *ifm = NLMSG_DATA(nlh);
 	struct dn_ifaddr *ifa;
+	int rv;
 
 	if (rta[IFA_LOCAL-1] == NULL)
 		return -EINVAL;
@@ -564,7 +651,10 @@ static int dn_dev_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *a
 	else
 		memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);
 
-	return dn_dev_insert_ifa(dn_db, ifa);
+	rv = dn_dev_insert_ifa(dn_db, ifa);
+	if (rv)
+		dn_dev_free_ifa(ifa);
+	return rv;
 }
 
 static int dn_dev_fill_ifaddr(struct sk_buff *skb, struct dn_ifaddr *ifa,
@@ -651,7 +741,52 @@ done:
 	return skb->len;
 }
 
-static void dn_send_endnode_hello(struct net_device *dev)
+static int dn_dev_get_first(struct net_device *dev, dn_address *addr)
+{
+	struct dn_dev *dn_db = (struct dn_dev *)dev->dn_ptr;
+	struct dn_ifaddr *ifa;
+	int rv = -ENODEV;
+	if (dn_db == NULL)
+		goto out;
+	ifa = dn_db->ifa_list;
+	if (ifa != NULL) {
+		*addr = ifa->ifa_local;
+		rv = 0;
+	}
+out:
+	return rv;
+}
+
+/* 
+ * Find a default address to bind to.
+ *
+ * This is one of those areas where the initial VMS concepts don't really
+ * map onto the Linux concepts, and since we introduced multiple addresses
+ * per interface we have to cope with slightly odd ways of finding out what
+ * "our address" really is. Mostly its not a problem; for this we just guess
+ * a sensible default. Eventually the routing code will take care of all the
+ * nasties for us I hope.
+ */
+int dn_dev_bind_default(dn_address *addr)
+{
+	struct net_device *dev;
+	int rv;
+	dev = dn_dev_get_default();
+last_chance:
+	if (dev) {
+		read_lock(&dev_base_lock);
+		rv = dn_dev_get_first(dev, addr);
+		read_unlock(&dev_base_lock);
+		dev_put(dev);
+		if (rv == 0 || dev == &loopback_dev)
+			return rv;
+	}
+	dev = &loopback_dev;
+	dev_hold(dev);
+	goto last_chance;
+}
+
+static void dn_send_endnode_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 {
         struct endnode_hello_message *msg;
         struct sk_buff *skb = NULL;
@@ -667,7 +802,7 @@ static void dn_send_endnode_hello(struct net_device *dev)
 
         msg->msgflg  = 0x0D;
         memcpy(msg->tiver, dn_eco_version, 3);
-        memcpy(msg->id, decnet_ether_address, 6);
+	dn_dn2eth(msg->id, ifa->ifa_local);
         msg->iinfo   = DN_RT_INFO_ENDN;
         msg->blksize = dn_htons(dn_db->parms.blksize);
         msg->area    = 0x00;
@@ -689,7 +824,7 @@ static void dn_send_endnode_hello(struct net_device *dev)
 
 	skb->nh.raw = skb->data;
 
-	dn_rt_finish_output(skb, dn_rt_all_rt_mcast);
+	dn_rt_finish_output(skb, dn_rt_all_rt_mcast, msg->id);
 }
 
 
@@ -697,7 +832,7 @@ static void dn_send_endnode_hello(struct net_device *dev)
 
 #define DRDELAY (5 * HZ)
 
-static int dn_am_i_a_router(struct dn_neigh *dn, struct dn_dev *dn_db)
+static int dn_am_i_a_router(struct dn_neigh *dn, struct dn_dev *dn_db, struct dn_ifaddr *ifa)
 {
 	/* First check time since device went up */
 	if ((jiffies - dn_db->uptime) < DRDELAY)
@@ -715,13 +850,13 @@ static int dn_am_i_a_router(struct dn_neigh *dn, struct dn_dev *dn_db)
 	if (dn->priority != dn_db->parms.priority)
 		return 0;
 
-	if (dn_ntohs(dn->addr) < dn_ntohs(decnet_address))
+	if (dn_ntohs(dn->addr) < dn_ntohs(ifa->ifa_local))
 		return 1;
 
 	return 0;
 }
 
-static void dn_send_router_hello(struct net_device *dev)
+static void dn_send_router_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 {
 	int n;
 	struct dn_dev *dn_db = dev->dn_ptr;
@@ -731,6 +866,7 @@ static void dn_send_router_hello(struct net_device *dev)
 	unsigned char *ptr;
 	unsigned char *i1, *i2;
 	unsigned short *pktlen;
+	char *src;
 
 	if (dn_db->parms.blksize < (26 + 7))
 		return;
@@ -753,7 +889,8 @@ static void dn_send_router_hello(struct net_device *dev)
 	*ptr++ = 2; /* ECO */
 	*ptr++ = 0;
 	*ptr++ = 0;
-	memcpy(ptr, decnet_ether_address, ETH_ALEN);
+	dn_dn2eth(ptr, ifa->ifa_local);
+	src = ptr;
 	ptr += ETH_ALEN;
 	*ptr++ = dn_db->parms.forwarding == 1 ? 
 			DN_RT_INFO_L1RT : DN_RT_INFO_L2RT;
@@ -781,34 +918,34 @@ static void dn_send_router_hello(struct net_device *dev)
 
 	skb->nh.raw = skb->data;
 
-	if (dn_am_i_a_router(dn, dn_db)) {
+	if (dn_am_i_a_router(dn, dn_db, ifa)) {
 		struct sk_buff *skb2 = skb_copy(skb, GFP_ATOMIC);
 		if (skb2) {
-			dn_rt_finish_output(skb2, dn_rt_all_end_mcast);
+			dn_rt_finish_output(skb2, dn_rt_all_end_mcast, src);
 		}
 	}
 
-	dn_rt_finish_output(skb, dn_rt_all_rt_mcast);
+	dn_rt_finish_output(skb, dn_rt_all_rt_mcast, src);
 }
 
-static void dn_send_brd_hello(struct net_device *dev)
+static void dn_send_brd_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 {
 	struct dn_dev *dn_db = (struct dn_dev *)dev->dn_ptr;
 
 	if (dn_db->parms.forwarding == 0)
-		dn_send_endnode_hello(dev);
+		dn_send_endnode_hello(dev, ifa);
 	else
-		dn_send_router_hello(dev);
+		dn_send_router_hello(dev, ifa);
 }
 #else
-static void dn_send_brd_hello(struct net_device *dev)
+static void dn_send_brd_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 {
-	dn_send_endnode_hello(dev);
+	dn_send_endnode_hello(dev, ifa);
 }
 #endif
 
 #if 0
-static void dn_send_ptp_hello(struct net_device *dev)
+static void dn_send_ptp_hello(struct net_device *dev, struct dn_ifaddr *ifa)
 {
 	int tdlen = 16;
 	int size = dev->hard_header_len + 2 + 4 + tdlen;
@@ -817,6 +954,7 @@ static void dn_send_ptp_hello(struct net_device *dev)
 	int i;
 	unsigned char *ptr;
 	struct dn_neigh *dn = (struct dn_neigh *)dn_db->router;
+	char src[ETH_ALEN];
 
 	if (skb == NULL)
 		return ;
@@ -826,21 +964,15 @@ static void dn_send_ptp_hello(struct net_device *dev)
 	ptr = skb_put(skb, 2 + 4 + tdlen);
 
 	*ptr++ = DN_RT_PKT_HELO;
-	*((dn_address *)ptr) = decnet_address;
+	*((dn_address *)ptr) = ifa->ifa_local;
 	ptr += 2;
 	*ptr++ = tdlen;
 
 	for(i = 0; i < tdlen; i++)
 		*ptr++ = 0252;
 
-	if (dn_am_i_a_router(dn, dn_db)) {
-		struct sk_buff *skb2 = skb_copy(skb, GFP_ATOMIC);
-		if (skb2) {
-			dn_rt_finish_output(skb2, dn_rt_all_end_mcast);
-		}
-	}
-
-	dn_rt_finish_output(skb, dn_rt_all_rt_mcast);
+	dn_dn2eth(src, ifa->ifa_local);
+	dn_rt_finish_output(skb, dn_rt_all_rt_mcast, src);
 }
 #endif
 
@@ -860,16 +992,31 @@ static int dn_eth_up(struct net_device *dev)
 	return 0;
 }
 
+static void dn_eth_down(struct net_device *dev)
+{
+	struct dn_dev *dn_db = dev->dn_ptr;
+
+	if (dn_db->parms.forwarding == 0)
+		dev_mc_delete(dev, dn_rt_all_end_mcast, ETH_ALEN, 0);
+	else
+		dev_mc_delete(dev, dn_rt_all_rt_mcast, ETH_ALEN, 0);
+}
+
 static void dn_dev_set_timer(struct net_device *dev);
 
 static void dn_dev_timer_func(unsigned long arg)
 {
 	struct net_device *dev = (struct net_device *)arg;
 	struct dn_dev *dn_db = dev->dn_ptr;
+	struct dn_ifaddr *ifa;
 
 	if (dn_db->t3 <= dn_db->parms.t2) {
-		if (dn_db->parms.timer3)
-			dn_db->parms.timer3(dev);
+		if (dn_db->parms.timer3) {
+			for(ifa = dn_db->ifa_list; ifa; ifa = ifa->ifa_next) {
+				if (!(ifa->ifa_flags & IFA_F_SECONDARY))
+					dn_db->parms.timer3(dev, ifa);
+			}
+		}
 		dn_db->t3 = dn_db->parms.t3;
 	} else {
 		dn_db->t3 -= dn_db->parms.t2;
@@ -917,8 +1064,6 @@ struct dn_dev *dn_dev_create(struct net_device *dev, int *err)
 	dn_db->dev = dev;
 	init_timer(&dn_db->timer);
 
-	memcpy(dn_db->addr, decnet_ether_address, ETH_ALEN); /* To go... */
-
 	dn_db->uptime = jiffies;
 	if (dn_db->parms.up) {
 		if (dn_db->parms.up(dev) < 0) {
@@ -929,7 +1074,6 @@ struct dn_dev *dn_dev_create(struct net_device *dev, int *err)
 	}
 
 	dn_db->neigh_parms = neigh_parms_alloc(dev, &dn_neigh_table);
-	/* dn_db->neigh_parms->neigh_setup = dn_db->parms.neigh_setup; */
 
 	dn_dev_sysctl_register(dev, &dn_db->parms);
 
@@ -945,27 +1089,64 @@ struct dn_dev *dn_dev_create(struct net_device *dev, int *err)
  * the loopback device & ethernet devices with correct
  * MAC addreses automatically. Others must be started
  * specifically.
+ *
+ * FIXME: How should we configure the loopback address ? If we could dispense
+ * with using decnet_address here and for autobind, it will be one less thing
+ * for users to worry about setting up.
  */
+
 void dn_dev_up(struct net_device *dev)
 {
 	struct dn_ifaddr *ifa;
+	dn_address addr = decnet_address;
+	int maybe_default = 0;
+	struct dn_dev *dn_db = (struct dn_dev *)dev->dn_ptr;
 
 	if ((dev->type != ARPHRD_ETHER) && (dev->type != ARPHRD_LOOPBACK))
 		return;
 
-	if (dev->type == ARPHRD_ETHER)
-		if (memcmp(dev->dev_addr, decnet_ether_address, ETH_ALEN) != 0)
+	/*
+	 * Need to ensure that loopback device has a dn_db attached to it
+	 * to allow creation of neighbours against it, even though it might
+	 * not have a local address of its own. Might as well do the same for
+	 * all autoconfigured interfaces.
+	 */
+	if (dn_db == NULL) {
+		int err;
+		dn_db = dn_dev_create(dev, &err);
+		if (dn_db == NULL)
 			return;
+	}
+
+	if (dev->type == ARPHRD_ETHER) {
+		if (memcmp(dev->dev_addr, dn_hiord, 4) != 0)
+			return;
+		addr = dn_htons(dn_eth2dn(dev->dev_addr));
+		maybe_default = 1;
+	}
+
+	if (addr == 0)
+		return;
 
 	if ((ifa = dn_dev_alloc_ifa()) == NULL)
 		return;
 
-	ifa->ifa_local = decnet_address;
+	ifa->ifa_local = addr;
 	ifa->ifa_flags = 0;
 	ifa->ifa_scope = RT_SCOPE_UNIVERSE;
 	strcpy(ifa->ifa_label, dev->name);
 
 	dn_dev_set_ifa(dev, ifa);
+
+	/*
+	 * Automagically set the default device to the first automatically
+	 * configured ethernet card in the system.
+	 */
+	if (maybe_default) {
+		dev_hold(dev);
+		if (dn_dev_set_default(dev, 0))
+			dev_put(dev);
+	}
 }
 
 static void dn_dev_delete(struct net_device *dev)
@@ -976,13 +1157,9 @@ static void dn_dev_delete(struct net_device *dev)
 		return;
 
 	del_timer_sync(&dn_db->timer);
-
 	dn_dev_sysctl_unregister(&dn_db->parms);
-
+	dn_dev_check_default(dev);
 	neigh_ifdown(&dn_neigh_table, dev);
-
-	if (dev == decnet_default_device)
-		decnet_default_device = NULL;
 
 	if (dn_db->parms.down)
 		dn_db->parms.down(dev);
@@ -1204,8 +1381,28 @@ static struct rtnetlink_link dnet_rtnetlink_table[RTM_MAX-RTM_BASE+1] =
 #endif
 };
 
+#ifdef MODULE
+static int addr[2] = {0, 0};
+
+MODULE_PARM(addr, "2i");
+MODULE_PARM_DESC(addr, "The DECnet address of this machine: area,node");
+#endif
+
 void __init dn_dev_init(void)
 {
+#ifdef MODULE
+        if (addr[0] > 63 || addr[0] < 0) {
+                printk(KERN_ERR "DECnet: Area must be between 0 and 63");
+                return 1;
+        }
+
+        if (addr[1] > 1023 || addr[1] < 0) {
+                printk(KERN_ERR "DECnet: Node must be between 0 and 1023");
+                return 1;
+        }
+
+        decnet_address = dn_htons((addr[0] << 10) | addr[1]);
+#endif
 
 	dn_dev_devices_on();
 #ifdef CONFIG_DECNET_SIOCGIFCONF
@@ -1247,3 +1444,18 @@ void __exit dn_dev_cleanup(void)
 
 	dn_dev_devices_off();
 }
+
+#ifndef MODULE
+static int __init decnet_setup(char *str)
+{
+        unsigned short area = simple_strtoul(str, &str, 0);
+        unsigned short node = simple_strtoul(*str > 0 ? ++str : str, &str, 0);
+
+        decnet_address = dn_htons(area << 10 | node);
+
+        return 1;
+}
+
+__setup("decnet=", decnet_setup);  
+#endif
+

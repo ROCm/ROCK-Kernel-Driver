@@ -211,7 +211,6 @@ extern void dn_start_fast_timer(struct sock *sk);
 extern void dn_stop_fast_timer(struct sock *sk);
 
 extern dn_address decnet_address;
-extern unsigned char decnet_ether_address[6];
 extern int decnet_debug_level;
 extern int decnet_time_wait;
 extern int decnet_dn_count;

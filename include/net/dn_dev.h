@@ -57,7 +57,7 @@ struct dn_ifaddr {
  * up() - Called to initialize device, return value can veto use of
  *        device with DECnet.
  * down() - Called to turn device off when it goes down
- * timer3() - Called when timer 3 goes off
+ * timer3() - Called once for each ifaddr when timer 3 goes off
  * 
  * sysctl - Hook for sysctl things
  *
@@ -78,7 +78,7 @@ struct dn_dev_parms {
 	int ctl_name;             /* Index for sysctl                   */
 	int  (*up)(struct net_device *);
 	void (*down)(struct net_device *);
-	void (*timer3)(struct net_device *);
+	void (*timer3)(struct net_device *, struct dn_ifaddr *ifa);
 	void *sysctl;
 };
 
@@ -167,7 +167,9 @@ extern void dn_dev_hello(struct sk_buff *skb);
 extern void dn_dev_up(struct net_device *);
 extern void dn_dev_down(struct net_device *);
 
-extern struct net_device *decnet_default_device;
+extern int dn_dev_set_default(struct net_device *dev, int force);
+extern struct net_device *dn_dev_get_default(void);
+extern int dn_dev_bind_default(dn_address *addr);
 
 static __inline__ int dn_dev_islocal(struct net_device *dev, dn_address addr)
 {
