@@ -256,6 +256,8 @@ MODULE_DEVICE_TABLE(pnp_card, snd_sb16_pnpids);
 #define DRIVER_NAME	"snd-card-sb16"
 #endif
 
+#ifdef CONFIG_PNP
+
 static int __devinit snd_card_sb16_pnp(int dev, struct snd_card_sb16 *acard,
 				       struct pnp_card_link *card,
 				       const struct pnp_card_device_id *id)
@@ -346,6 +348,8 @@ __wt_error:
 	return 0;
 }
 
+#endif /* CONFIG_PNP */
+
 static int __init snd_sb16_probe(int dev,
 				 struct pnp_card_link *pcard,
 				 const struct pnp_card_device_id *pid)
@@ -370,12 +374,14 @@ static int __init snd_sb16_probe(int dev,
 	if (card == NULL)
 		return -ENOMEM;
 	acard = (struct snd_card_sb16 *) card->private_data;
+#ifdef CONFIG_PNP
 	if (isapnp[dev]) {
 		if ((err = snd_card_sb16_pnp(dev, acard, pcard, pid))) {
 			snd_card_free(card);
 			return err;
 		}
 	}
+#endif
 
 	xirq = irq[dev];
 	xdma8 = dma8[dev];
@@ -625,6 +631,9 @@ static int __init alsa_card_sb16_init(void)
 #endif
 
 	if (!cards) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&sb16_pnpc_driver);
+#endif
 #ifdef MODULE
 		snd_printk(KERN_ERR "Sound Blaster 16 soundcard not found or device busy\n");
 #ifdef SNDRV_SBAWE_EMU8000

@@ -65,12 +65,12 @@ static void revo_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 		return;
 
 	/* reset DFS */
-	snd_ice1712_akm4xxx_reset(ak, 1);
+	snd_akm4xxx_reset(ak, 1);
 	tmp = ak->images[0][reg];
 	tmp &= ~(0x03 << shift);
 	tmp |= dfs << shift;
-	snd_ice1712_akm4xxx_write(ak, 0, reg, tmp);
-	snd_ice1712_akm4xxx_reset(ak, 0);
+	snd_akm4xxx_write(ak, 0, reg, tmp);
+	snd_akm4xxx_reset(ak, 0);
 }
 
 /*
@@ -80,6 +80,12 @@ static void revo_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 static akm4xxx_t akm_revo_front __devinitdata = {
 	.type = SND_AK4381,
 	.num_dacs = 2,
+	.ops = {
+		.set_rate_val = revo_set_rate_val
+	}
+};
+
+static struct snd_ak4xxx_private akm_revo_front_priv __devinitdata = {
 	.caddr = 1,
 	.cif = 0,
 	.data_mask = VT1724_REVO_CDOUT,
@@ -89,15 +95,18 @@ static akm4xxx_t akm_revo_front __devinitdata = {
 	.cs_none = VT1724_REVO_CS0 | VT1724_REVO_CS1 | VT1724_REVO_CS2,
 	.add_flags = VT1724_REVO_CCLK, /* high at init */
 	.mask_flags = 0,
-	.ops = {
-		.set_rate_val = revo_set_rate_val
-	}
 };
 
 static akm4xxx_t akm_revo_surround __devinitdata = {
 	.type = SND_AK4355,
 	.idx_offset = 1,
 	.num_dacs = 6,
+	.ops = {
+		.set_rate_val = revo_set_rate_val
+	}
+};
+
+static struct snd_ak4xxx_private akm_revo_surround_priv __devinitdata = {
 	.caddr = 3,
 	.cif = 0,
 	.data_mask = VT1724_REVO_CDOUT,
@@ -107,9 +116,6 @@ static akm4xxx_t akm_revo_surround __devinitdata = {
 	.cs_none = VT1724_REVO_CS0 | VT1724_REVO_CS1 | VT1724_REVO_CS2,
 	.add_flags = VT1724_REVO_CCLK, /* high at init */
 	.mask_flags = 0,
-	.ops = {
-		.set_rate_val = revo_set_rate_val
-	}
 };
 
 static int __devinit revo_init(ice1712_t *ice)
@@ -133,8 +139,8 @@ static int __devinit revo_init(ice1712_t *ice)
 	ice->akm_codecs = 2;
 	switch (ice->eeprom.subvendor) {
 	case VT1724_SUBDEVICE_REVOLUTION71:
-		snd_ice1712_akm4xxx_init(ak, &akm_revo_front, ice);
-		snd_ice1712_akm4xxx_init(ak + 1, &akm_revo_surround, ice);
+		snd_ice1712_akm4xxx_init(ak, &akm_revo_front, &akm_revo_front_priv, ice);
+		snd_ice1712_akm4xxx_init(ak + 1, &akm_revo_surround, &akm_revo_surround_priv, ice);
 		/* unmute all codecs */
 		snd_ice1712_gpio_write_bits(ice, VT1724_REVO_MUTE, VT1724_REVO_MUTE);
 		break;

@@ -1042,7 +1042,7 @@ snd_nm256_interrupt(int irq, void *dev_id, struct pt_regs *dummy)
 static irqreturn_t
 snd_nm256_interrupt_zx(int irq, void *dev_id, struct pt_regs *dummy)
 {
-	nm256_t *chip = snd_magic_cast(nm256_t, dev_id, return);
+	nm256_t *chip = snd_magic_cast(nm256_t, dev_id, return IRQ_NONE);
 	u32 status;
 	u8 cbyte;
 
@@ -1210,6 +1210,7 @@ snd_nm256_mixer(nm256_t *chip)
 	ac97.reset = snd_nm256_ac97_reset;
 	ac97.write = snd_nm256_ac97_write;
 	ac97.read = snd_nm256_ac97_read;
+	ac97.scaps = AC97_SCAP_AUDIO; /* we support audio! */
 	ac97.limited_regs = 1;
 	for (i = 0; mixer_regs[i] >= 0; i++)
 		set_bit(mixer_regs[i], ac97.reg_accessed);

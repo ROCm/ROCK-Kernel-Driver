@@ -1538,11 +1538,12 @@
         <informalexample>
           <programlisting>
 <![CDATA[
-  static void snd_mychip_interrupt(int irq, void *dev_id,
-                                   struct pt_regs *regs)
+  static irqreturn_t snd_mychip_interrupt(int irq, void *dev_id,
+                                          struct pt_regs *regs)
   {
           mychip_t *chip = snd_magic_cast(mychip_t, dev_id, return);
           ....
+          return IRQ_HANDLED;
   }
 ]]>
           </programlisting>
@@ -3149,8 +3150,8 @@ struct _snd_pcm_runtime {
 	    <title>Interrupt Handler Case #1</title>
             <programlisting>
 <![CDATA[
-  static void snd_mychip_interrupt(int irq, void *dev_id,
-                                   struct pt_regs *regs)
+  static irqreturn_t snd_mychip_interrupt(int irq, void *dev_id,
+                                          struct pt_regs *regs)
   {
           mychip_t *chip = snd_magic_cast(mychip_t, dev_id, return);
           spin_lock(&chip->lock);
@@ -3160,9 +3161,11 @@ struct _snd_pcm_runtime {
                   spin_unlock(&chip->lock);
                   snd_pcm_period_elapsed(chip->substream);
                   spin_lock(&chip->lock);
+                  // acknowledge the interrupt if necessary
           }
           ....
           spin_unlock(&chip->lock);
+          return IRQ_HANDLED;
   }
 ]]>
             </programlisting>
@@ -3191,8 +3194,8 @@ struct _snd_pcm_runtime {
 	    <title>Interrupt Handler Case #2</title>
             <programlisting>
 <![CDATA[
-  static void snd_mychip_interrupt(int irq, void *dev_id,
-                                   struct pt_regs *regs)
+  static irqreturn_t snd_mychip_interrupt(int irq, void *dev_id,
+                                          struct pt_regs *regs)
   {
           mychip_t *chip = snd_magic_cast(mychip_t, dev_id, return);
           spin_lock(&chip->lock);
@@ -3221,9 +3224,11 @@ struct _snd_pcm_runtime {
                           snd_pcm_period_elapsed(substream);
                           spin_lock(&chip->lock);
                   }
+                  // acknowledge the interrupt if necessary
           }
           ....
           spin_unlock(&chip->lock);
+          return IRQ_HANDLED;
   }
 ]]>
             </programlisting>

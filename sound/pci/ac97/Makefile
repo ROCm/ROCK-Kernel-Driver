@@ -13,6 +13,7 @@ obj-$(CONFIG_SND_ENS1371) += snd-ac97-codec.o
 obj-$(CONFIG_SND_ES1968) += snd-ac97-codec.o
 obj-$(CONFIG_SND_FM801) += snd-ac97-codec.o
 obj-$(CONFIG_SND_ICE1712) += snd-ac97-codec.o
+obj-$(CONFIG_SND_ICE1724) += snd-ac97-codec.o
 obj-$(CONFIG_SND_INTEL8X0) += snd-ac97-codec.o
 obj-$(CONFIG_SND_MAESTRO3) += snd-ac97-codec.o
 obj-$(CONFIG_SND_VIA82XX) += snd-ac97-codec.o

@@ -98,7 +98,7 @@ struct snd_mem_list {
  * again.
  */
 
-void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
+static void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
 				    dma_addr_t *dma_handle)
 {
 	void *ret;
