@@ -148,9 +148,11 @@ static int integrator_set_policy(struct cpufreq_policy *policy)
 static struct cpufreq_policy integrator_policy = {
 	.cpu		= 0,
 	.policy		= CPUFREQ_POLICY_POWERSAVE,
-	.cpuinfo.max_cpu_freq	= 160000,
-	.cpuinfo.min_cpu_freq   = 12000,
-	.cpuinfo.transition_latency  = CPUFREQ_ETERNAL,
+	.cpuinfo	= {
+		.max_cpu_freq		= 160000,
+		.min_cpu_freq		= 12000,
+		.transition_latency	= CPUFREQ_ETERNAL,
+	},
 };
 
 static struct cpufreq_driver integrator_driver = {
