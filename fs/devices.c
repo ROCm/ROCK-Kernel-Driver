@@ -19,6 +19,7 @@
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
+#include <linux/devfs_fs_kernel.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
 
@@ -97,6 +98,8 @@ static struct file_operations * get_chrfops(unsigned int major, unsigned int min
 
 int register_chrdev(unsigned int major, const char * name, struct file_operations *fops)
 {
+	if (devfs_only())
+		return 0;
 	if (major == 0) {
 		write_lock(&chrdevs_lock);
 		for (major = MAX_CHRDEV-1; major > 0; major--) {
@@ -125,6 +128,8 @@ int register_chrdev(unsigned int major, const char * name, struct file_operation
 
 int unregister_chrdev(unsigned int major, const char * name)
 {
+	if (devfs_only())
+		return 0;
 	if (major >= MAX_CHRDEV)
 		return -EINVAL;
 	write_lock(&chrdevs_lock);

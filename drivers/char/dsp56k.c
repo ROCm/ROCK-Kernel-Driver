@@ -510,7 +510,7 @@ static int __init dsp56k_init_driver(void)
 		return -ENODEV;
 	}
 
-	if(devfs_register_chrdev(DSP56K_MAJOR, "dsp56k", &dsp56k_fops)) {
+	if(register_chrdev(DSP56K_MAJOR, "dsp56k", &dsp56k_fops)) {
 		printk("DSP56k driver: Unable to register driver\n");
 		return -ENODEV;
 	}
@@ -526,7 +526,7 @@ module_init(dsp56k_init_driver);
 
 static void __exit dsp56k_cleanup_driver(void)
 {
-	devfs_unregister_chrdev(DSP56K_MAJOR, "dsp56k");
+	unregister_chrdev(DSP56K_MAJOR, "dsp56k");
 	devfs_unregister(devfs_handle);
 }
 module_exit(dsp56k_cleanup_driver);

@@ -702,7 +702,7 @@ static int sr_init()
 		return 0;
 
 	if (!sr_registered) {
-		if (devfs_register_blkdev(MAJOR_NR, "sr", &sr_bdops)) {
+		if (register_blkdev(MAJOR_NR, "sr", &sr_bdops)) {
 			printk("Unable to get major %d for SCSI-CD\n", MAJOR_NR);
 			return 1;
 		}
@@ -714,7 +714,7 @@ static int sr_init()
 	sr_template.dev_max = sr_template.dev_noticed + SR_EXTRA_DEVS;
 	scsi_CDs = kmalloc(sr_template.dev_max * sizeof(Scsi_CD), GFP_ATOMIC);
 	if (!scsi_CDs)
-		goto cleanup_devfs;
+		goto cleanup_dev;
 	memset(scsi_CDs, 0, sr_template.dev_max * sizeof(Scsi_CD));
 
 	sr_sizes = kmalloc(sr_template.dev_max * sizeof(int), GFP_ATOMIC);
@@ -725,8 +725,8 @@ static int sr_init()
 
 cleanup_cds:
 	kfree(scsi_CDs);
-cleanup_devfs:
-	devfs_unregister_blkdev(MAJOR_NR, "sr");
+cleanup_dev:
+	unregister_blkdev(MAJOR_NR, "sr");
 	sr_registered--;
 	return 1;
 }
@@ -739,22 +739,14 @@ static ssize_t sr_device_kdev_read(struct device *driverfs_dev,
 	kdev.value=(int)driverfs_dev->driver_data;
 	return off ? 0 : sprintf(page, "%x\n",kdev.value);
 }
-static struct driver_file_entry sr_device_kdev_file = {
-	name: "kdev",
-	mode: S_IRUGO,
-	show: sr_device_kdev_read,
-};
+static DEVICE_ATTR(kdev,"kdev",S_IRUGO,sr_device_kdev_read,NULL);
 
 static ssize_t sr_device_type_read(struct device *driverfs_dev, 
 				   char *page, size_t count, loff_t off) 
 {
 	return off ? 0 : sprintf (page, "CHR\n");
 }
-static struct driver_file_entry sr_device_type_file = {
-	name: "type",
-	mode: S_IRUGO,
-	show: sr_device_type_read,
-};
+static DEVICE_ATTR(type,"type",S_IRUGO,sr_device_type_read,NULL);
 
 
 void sr_finish()
@@ -813,9 +805,9 @@ void sr_finish()
 			(void *)__mkdev(MAJOR_NR, i);
 		device_register(&SCp->cdi.cdrom_driverfs_dev);
 		device_create_file(&SCp->cdi.cdrom_driverfs_dev,
-				&sr_device_type_file);
+				   &dev_attr_type);
 		device_create_file(&SCp->cdi.cdrom_driverfs_dev,
-				&sr_device_kdev_file);
+				   &dev_attr_kdev);
                 SCp->cdi.de = devfs_register(SCp->device->de, "cd",
                                     DEVFS_FL_DEFAULT, MAJOR_NR, i,
                                     S_IFBLK | S_IRUGO | S_IWUGO,
@@ -869,7 +861,7 @@ static int __init init_sr(void)
 static void __exit exit_sr(void)
 {
 	scsi_unregister_device(&sr_template);
-	devfs_unregister_blkdev(MAJOR_NR, "sr");
+	unregister_blkdev(MAJOR_NR, "sr");
 	sr_registered--;
 	if (scsi_CDs != NULL) {
 		kfree(scsi_CDs);

@@ -140,7 +140,7 @@ int bus_add_device(struct device * dev)
 void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
-		driverfs_remove_file(&dev->bus->device_dir,dev->bus_id);
+		device_remove_symlink(&dev->bus->device_dir,dev->bus_id);
 		write_lock(&dev->bus->lock);
 		list_del_init(&dev->bus_list);
 		write_unlock(&dev->bus->lock);

@@ -1733,7 +1733,6 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		}
 
 		spin_unlock_irqrestore(&state->card->lock, flags);
-		synchronize_irq(state->card->irq);
 		dmabuf->ready = 0;
 		dmabuf->swptr = dmabuf->hwptr = 0;
 		dmabuf->count = dmabuf->total_bytes = 0;

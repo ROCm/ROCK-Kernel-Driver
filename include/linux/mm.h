@@ -401,8 +401,6 @@ extern void swapin_readahead(swp_entry_t);
 extern int can_share_swap_page(struct page *);
 extern int remove_exclusive_swap_page(struct page *);
 
-extern void __free_pte(pte_t);
-
 /* mmap.c */
 extern void lock_vma_mappings(struct vm_area_struct *);
 extern void unlock_vma_mappings(struct vm_area_struct *);

@@ -66,7 +66,6 @@ dasd_register_major(int major)
 	struct major_info *mi;
 	struct hd_struct *gd_part;
 	devfs_handle_t *gd_de_arr;
-	int *gd_sizes;
 	char *gd_flags;
 	int new_major, rc;
 
@@ -79,11 +78,10 @@ dasd_register_major(int major)
 			    GFP_KERNEL);
 	gd_flags = kmalloc(DASD_PER_MAJOR * sizeof(char), GFP_KERNEL);
 	gd_part = kmalloc(sizeof (struct hd_struct) << MINORBITS, GFP_ATOMIC);
-	gd_sizes = kmalloc(sizeof(int) << MINORBITS, GFP_ATOMIC);
 
 	/* Check if one of the allocations failed. */
 	if (mi == NULL || gd_de_arr == NULL || gd_flags == NULL ||
-	    gd_part == NULL || gd_sizes == NULL) {
+	    gd_part == NULL) {
 		MESSAGE(KERN_WARNING, "%s",
 			"Cannot get memory to allocate another "
 			"major number");
@@ -92,8 +90,7 @@ dasd_register_major(int major)
 	}
 
 	/* Register block device. */
-	new_major = devfs_register_blkdev(major, "dasd",
-					  &dasd_device_operations);
+	new_major = register_blkdev(major, "dasd", &dasd_device_operations);
 	if (new_major < 0) {
 		MESSAGE(KERN_WARNING,
 			"Cannot register to major no %d, rc = %d", major, rc);
@@ -113,17 +110,14 @@ dasd_register_major(int major)
 	mi->gendisk.de_arr = gd_de_arr;
 	mi->gendisk.flags = gd_flags;
 	mi->gendisk.part = gd_part;
-	mi->gendisk.sizes = gd_sizes;
 
 	/* Initialize the gendisk arrays. */
 	memset(gd_de_arr, 0, DASD_PER_MAJOR * sizeof(devfs_handle_t));
 	memset(gd_flags, 0, DASD_PER_MAJOR * sizeof (char));
 	memset(gd_part, 0, sizeof (struct hd_struct) << MINORBITS);
-	memset(gd_sizes, 0, sizeof(int) << MINORBITS);
 
 	/* Setup block device pointers for the new major. */
 	blk_dev[new_major].queue = dasd_get_queue;
-	blk_size[new_major] = gd_sizes;
 
 	/* Insert the new major info structure into dasd_major_info list. */
 	spin_lock(&dasd_major_lock);
@@ -137,7 +131,6 @@ dasd_register_major(int major)
 	/* Something failed. Do the cleanup and return rc. */
 out_error:
 	/* We rely on kfree to do the != NULL check. */
-	kfree(gd_sizes);
 	kfree(gd_part);
 	kfree(gd_flags);
 	kfree(gd_de_arr);
@@ -148,7 +141,6 @@ out_error:
 static void
 dasd_unregister_major(struct major_info * mi)
 {
-	int *bs;
 	int major, rc;
 
 	if (mi == NULL)
@@ -165,17 +157,15 @@ dasd_unregister_major(struct major_info * mi)
 	/* Clear block device pointers. */
 	major = mi->gendisk.major;
 	blk_dev[major].queue = NULL;
-	bs = blk_size[major];
 	blk_clear(major);
 
-	rc = devfs_unregister_blkdev(major, "dasd");
+	rc = unregister_blkdev(major, "dasd");
 	if (rc < 0)
 		MESSAGE(KERN_WARNING,
 			"Cannot unregister from major no %d, rc = %d",
 			major, rc);
 
 	/* Free memory. */
-	kfree(bs);
 	kfree(mi->gendisk.part);
 	kfree(mi->gendisk.flags);
 	kfree(mi->gendisk.de_arr);
@@ -340,11 +330,6 @@ dasd_destroy_partitions(dasd_device_t * device)
 		return;
 
 	wipe_partitions(device->kdev);
-
-	/* FIXME: do we really need that */
-	minor = minor(device->kdev);
-	for (i = 0; i < (1 << DASD_PARTN_BITS); i++)
-		gdp->sizes[minor + i] = 0;
 
 	/*
 	 * This is confusing. The funcions is devfs_register_partitions

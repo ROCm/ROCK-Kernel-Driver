@@ -15,7 +15,63 @@
 #include <linux/stat.h>
 #include <linux/limits.h>
 
-extern struct driver_file_entry * device_default_files[];
+extern struct device_attribute * device_default_files[];
+
+#define to_dev_attr(_attr) container_of(_attr,struct device_attribute,attr)
+
+#define to_device(d) container_of(d, struct device, dir)
+
+
+/* driverfs ops for device attribute files */
+
+static int
+dev_attr_open(struct driver_dir_entry * dir)
+{
+	struct device * dev = to_device(dir);
+	get_device(dev);
+	return 0;
+}
+
+static int
+dev_attr_close(struct driver_dir_entry * dir)
+{
+	struct device * dev = to_device(dir);
+	put_device(dev);
+	return 0;
+}
+
+static ssize_t
+dev_attr_show(struct driver_dir_entry * dir, struct attribute * attr,
+	      char * buf, size_t count, loff_t off)
+{
+	struct device_attribute * dev_attr = to_dev_attr(attr);
+	struct device * dev = to_device(dir);
+	ssize_t ret = 0;
+
+	if (dev_attr->show)
+		ret = dev_attr->show(dev,buf,count,off);
+	return ret;
+}
+
+static ssize_t
+dev_attr_store(struct driver_dir_entry * dir, struct attribute * attr,
+	       const char * buf, size_t count, loff_t off)
+{
+	struct device_attribute * dev_attr = to_dev_attr(attr);
+	struct device * dev = to_device(dir);
+	ssize_t ret = 0;
+
+	if (dev_attr->store)
+		ret = dev_attr->store(dev,buf,count,off);
+	return ret;
+}
+
+static struct driverfs_ops dev_attr_ops = {
+	open:	dev_attr_open,
+	close:	dev_attr_close,
+	show:	dev_attr_show,
+	store:	dev_attr_store,
+};
 
 /**
  * device_create_file - create a driverfs file for a device
@@ -24,25 +80,15 @@ extern struct driver_file_entry * device_default_files[];
  *
  * Allocate space for file entry, copy descriptor, and create.
  */
-int device_create_file(struct device * dev, struct driver_file_entry * entry)
+int device_create_file(struct device * dev, struct device_attribute * entry)
 {
-	struct driver_file_entry * new_entry;
-	int error = -ENOMEM;
+	int error = -EINVAL;
 
-	if (!dev)
-		return -EINVAL;
-	get_device(dev);
-
-	new_entry = kmalloc(sizeof(*new_entry),GFP_KERNEL);
-	if (!new_entry)
-		goto done;
-
-	memcpy(new_entry,entry,sizeof(*entry));
-	error = driverfs_create_file(new_entry,&dev->dir);
-	if (error)
-		kfree(new_entry);
- done:
-	put_device(dev);
+	if (dev) {
+		get_device(dev);
+		error = driverfs_create_file(&entry->attr,&dev->dir);
+		put_device(dev);
+	}
 	return error;
 }
 
@@ -52,11 +98,11 @@ int device_create_file(struct device * dev, struct driver_file_entry * entry)
  * @name:	name of the file
  *
  */
-void device_remove_file(struct device * dev, const char * name)
+void device_remove_file(struct device * dev, struct device_attribute * attr)
 {
 	if (dev) {
 		get_device(dev);
-		driverfs_remove_file(&dev->dir,name);
+		driverfs_remove_file(&dev->dir,attr->attr.name);
 		put_device(dev);
 	}
 }
@@ -70,7 +116,6 @@ void device_remove_dir(struct device * dev)
 	if (dev)
 		driverfs_remove_dir(&dev->dir);
 }
-
 
 static int get_devpath_length(struct device * dev)
 {
@@ -103,22 +148,6 @@ static void fill_devpath(struct device * dev, char * path, int length)
 	pr_debug("%s: path = '%s'\n",__FUNCTION__,path);
 }
 
-static int create_symlink(struct driver_dir_entry * parent, char * name, char * path)
-{
-	struct driver_file_entry * entry;
-	int error;
-
-	entry = kmalloc(sizeof(struct driver_file_entry),GFP_KERNEL);
-	if (!entry)
-		return -ENOMEM;
-	entry->name = name;
-	entry->mode = S_IRUGO;
-	error = driverfs_create_symlink(parent,entry,path);
-	if (error)
-		kfree(entry);
-	return error;
-}
-
 int device_bus_link(struct device * dev)
 {
 	char * path;
@@ -148,15 +177,18 @@ int device_bus_link(struct device * dev)
 	strcpy(path,"../../..");
 
 	fill_devpath(dev,path,length);
-	error = create_symlink(&dev->bus->device_dir,dev->bus_id,path);
-
+	error = driverfs_create_symlink(&dev->bus->device_dir,dev->bus_id,path);
 	kfree(path);
 	return error;
 }
 
+void device_remove_symlink(struct driver_dir_entry * dir, const char * name)
+{
+	driverfs_remove_file(dir,name);
+}
+
 int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * parent)
 {
-	INIT_LIST_HEAD(&dir->files);
 	dir->mode  = (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO);
 	return driverfs_create_dir(dir,parent);
 }
@@ -176,13 +208,14 @@ int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * p
 int device_make_dir(struct device * dev)
 {
 	struct driver_dir_entry * parent = NULL;
-	struct driver_file_entry * entry;
+	struct device_attribute * entry;
 	int error;
 	int i;
 
 	if (dev->parent)
 		parent = &dev->parent->dir;
 	dev->dir.name = dev->bus_id;
+	dev->dir.ops = &dev_attr_ops;
 
 	if ((error = device_create_dir(&dev->dir,parent)))
 		return error;

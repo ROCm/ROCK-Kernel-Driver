@@ -723,7 +723,7 @@ static int idedisk_check_media_change(struct ata_device *drive)
 
 static sector_t idedisk_capacity(struct ata_device *drive)
 {
-	return drive->capacity - drive->sect0;
+	return drive->capacity;
 }
 
 /*
@@ -1064,9 +1064,9 @@ static void idedisk_setup(struct ata_device *drive)
 		if (drive != &ch->drives[i])
 		    continue;
 		drvid = i;
-		ch->gd->de_arr[i] = drive->de;
+		ch->gd[i]->de_arr[0] = drive->de;
 		if (drive->removable)
-			ch->gd->flags[i] |= GENHD_FL_REMOVABLE;
+			ch->gd[i]->flags[0] |= GENHD_FL_REMOVABLE;
 		break;
 	}
 

@@ -58,19 +58,18 @@ static unsigned int cs5530_pio_timings[2][5] =
  * After chip reset, the PIO timings are set to 0x0000e132, which is not valid.
  */
 #define CS5530_BAD_PIO(timings) (((timings)&~0x80000000)==0x0000e132)
-#define CS5530_BASEREG(hwif)	(((hwif)->dma_base & ~0xf) + ((hwif)->unit ? 0x30 : 0x20))
+#define CS5530_BASEREG(ch)	(((ch)->dma_base & ~0xf) + ((ch)->unit ? 0x30 : 0x20))
 
 /*
- * cs5530_tuneproc() handles selection/setting of PIO modes
- * for both the chipset and drive.
+ * Handle selection/setting of PIO modes for both the chipset and drive.
  *
- * The ide_init_cs5530() routine guarantees that all drives
- * will have valid default PIO timings set up before we get here.
+ * The ide_init_cs5530() routine guarantees that all drives will have valid
+ * default PIO timings set up before we get here.
  */
 static void cs5530_tuneproc(struct ata_device *drive, u8 pio)
 {
-	struct ata_channel *hwif = drive->channel;
-	unsigned int	format, basereg = CS5530_BASEREG(hwif);
+	unsigned int format;
+	unsigned int basereg = CS5530_BASEREG(drive->channel);
 
 	if (pio == 255)
 		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
@@ -84,25 +83,26 @@ static void cs5530_tuneproc(struct ata_device *drive, u8 pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
+
 /*
- * cs5530_config_dma() handles selection/setting of DMA/UDMA modes
- * for both the chipset and drive.
+ * Handle selection/setting of DMA/UDMA modes for both the chipset and drive.
  */
 static int cs5530_config_dma(struct ata_device *drive)
 {
-	int			udma_ok = 1, mode = 0;
-	struct ata_channel *hwif = drive->channel;
-	int			unit = drive->select.b.unit;
-	struct ata_device		*mate = &hwif->drives[unit^1];
-	struct hd_driveid	*id = drive->id;
-	unsigned int		basereg, reg, timings;
+	int udma_ok = 1;
+	int mode = 0;
+	struct ata_channel *ch = drive->channel;
+	int unit = drive->select.b.unit;
+	struct ata_device *mate = &ch->drives[unit^1];
+	struct hd_driveid *id = drive->id;
+	unsigned int basereg, reg, timings;
 
 
 	/*
 	 * Default to DMA-off in case we run into trouble here.
 	 */
 	udma_enable(drive, 0, 0);
-	outb(inb(hwif->dma_base+2)&~(unit?0x40:0x20), hwif->dma_base+2); /* clear DMA_capable bit */
+	outb(inb(ch->dma_base+2)&~(unit?0x40:0x20), ch->dma_base+2); /* clear DMA_capable bit */
 
 	/*
 	 * The CS5530 specifies that two drives sharing a cable cannot
@@ -129,7 +129,7 @@ static int cs5530_config_dma(struct ata_device *drive)
 	 * Now see what the current drive is capable of,
 	 * selecting UDMA only if the mate said it was ok.
 	 */
-	if (id && (id->capability & 1) && hwif->autodma && !udma_black_list(drive)) {
+	if (id && (id->capability & 1) && ch->autodma && !udma_black_list(drive)) {
 		if (udma_ok && (id->field_valid & 4) && (id->dma_ultra & 7)) {
 			if      (id->dma_ultra & 4)
 				mode = XFER_UDMA_2;
@@ -168,7 +168,7 @@ static int cs5530_config_dma(struct ata_device *drive)
 			printk("%s: cs5530_config_dma: huh? mode=%02x\n", drive->name, mode);
 			return 1;	/* failure */
 	}
-	basereg = CS5530_BASEREG(hwif);
+	basereg = CS5530_BASEREG(ch);
 	reg = inl(basereg+4);			/* get drive0 config register */
 	timings |= reg & 0x80000000;		/* preserve PIO format bit */
 	if (unit == 0) {			/* are we configuring drive0? */
@@ -181,7 +181,7 @@ static int cs5530_config_dma(struct ata_device *drive)
 		outl(reg,     basereg+4);	/* write drive0 config register */
 		outl(timings, basereg+12);	/* write drive1 config register */
 	}
-	outb(inb(hwif->dma_base+2)|(unit?0x40:0x20), hwif->dma_base+2);	/* set DMA_capable bit */
+	outb(inb(ch->dma_base+2)|(unit?0x40:0x20), ch->dma_base+2);	/* set DMA_capable bit */
 
 	/*
 	 * Finally, turn DMA on in software, and exit.
@@ -202,7 +202,8 @@ static int cs5530_udma_setup(struct ata_device *drive, int map)
  */
 static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 {
-	struct pci_dev *master_0 = NULL, *cs5530_0 = NULL;
+	struct pci_dev *master_0 = NULL;
+	struct pci_dev *cs5530_0 = NULL;
 	unsigned short pcicmd = 0;
 	unsigned long flags;
 
@@ -277,35 +278,40 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 }
 
 /*
- * This gets invoked by the IDE driver once for each channel,
- * and performs channel-specific pre-initialization before drive probing.
+ * This gets invoked once for each channel, and performs channel-specific
+ * pre-initialization before drive probing.
  */
-static void __init ide_init_cs5530(struct ata_channel *hwif)
+static void __init ide_init_cs5530(struct ata_channel *ch)
 {
-	u32 basereg, d0_timings;
+	u32 basereg;
+	u32 d0_timings;
 
-	hwif->serialized = 1;
+	ch->serialized = 1;
+
+	/* We think a 64kB transfer is a 0 byte transfer, so set our
+	   segment size to be one sector smaller than 64kB. */
+	ch->max_segment_size = (1<<16) - 512;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	if (hwif->dma_base) {
-		hwif->highmem = 1;
-		hwif->udma_setup = cs5530_udma_setup;
+	if (ch->dma_base) {
+		ch->highmem = 1;
+		ch->udma_setup = cs5530_udma_setup;
 	}
 #endif
 
-		hwif->tuneproc = &cs5530_tuneproc;
-		basereg = CS5530_BASEREG(hwif);
-		d0_timings = inl(basereg+0);
-		if (CS5530_BAD_PIO(d0_timings)) {	/* PIO timings not initialized? */
-			outl(cs5530_pio_timings[(d0_timings>>31)&1][0], basereg+0);
-			if (!hwif->drives[0].autotune)
-				hwif->drives[0].autotune = 1;	/* needs autotuning later */
-		}
-		if (CS5530_BAD_PIO(inl(basereg+8))) {	/* PIO timings not initialized? */
-			outl(cs5530_pio_timings[(d0_timings>>31)&1][0], basereg+8);
-			if (!hwif->drives[1].autotune)
-				hwif->drives[1].autotune = 1;	/* needs autotuning later */
-		}
+	ch->tuneproc = &cs5530_tuneproc;
+	basereg = CS5530_BASEREG(ch);
+	d0_timings = inl(basereg+0);
+	if (CS5530_BAD_PIO(d0_timings)) {	/* PIO timings not initialized? */
+		outl(cs5530_pio_timings[(d0_timings>>31)&1][0], basereg+0);
+		if (!ch->drives[0].autotune)
+			ch->drives[0].autotune = 1;	/* needs autotuning later */
+	}
+	if (CS5530_BAD_PIO(inl(basereg+8))) {	/* PIO timings not initialized? */
+		outl(cs5530_pio_timings[(d0_timings>>31)&1][0], basereg+8);
+		if (!ch->drives[1].autotune)
+			ch->drives[1].autotune = 1;	/* needs autotuning later */
+	}
 }
 
 

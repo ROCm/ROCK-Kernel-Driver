@@ -122,7 +122,6 @@ static unsigned int xd_bases[] __initdata =
 };
 
 static struct hd_struct xd_struct[XD_MAXDRIVES << 6];
-static int xd_sizes[XD_MAXDRIVES << 6];
 
 static spinlock_t xd_lock = SPIN_LOCK_UNLOCKED;
 
@@ -133,7 +132,6 @@ static struct gendisk xd_gendisk = {
 	major_name:	"xd",
 	minor_shift:	6,
 	part:		xd_struct,
-	sizes:		xd_sizes,
 	fops:		&xd_fops,
 };
 
@@ -164,7 +162,7 @@ int __init xd_init (void)
 	init_timer (&xd_timer); xd_timer.function = xd_wakeup;
 	init_timer (&xd_watchdog_int); xd_watchdog_int.function = xd_watchdog;
 
-	if (devfs_register_blkdev(MAJOR_NR,"xd",&xd_fops)) {
+	if (register_blkdev(MAJOR_NR,"xd",&xd_fops)) {
 		printk("xd: Unable to get major number %d\n",MAJOR_NR);
 		return -1;
 	}
@@ -1085,7 +1083,7 @@ int init_module(void)
 	printk(KERN_INFO "XD: Loaded as a module.\n");
 	if (!xd_drives) {
 		/* no drives detected - unload module */
-		devfs_unregister_blkdev(MAJOR_NR, "xd");
+		unregister_blkdev(MAJOR_NR, "xd");
 		xd_done();
 		return (-1);
 	}
@@ -1095,7 +1093,7 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	devfs_unregister_blkdev(MAJOR_NR, "xd");
+	unregister_blkdev(MAJOR_NR, "xd");
 	xd_done();
 	devfs_unregister (devfs_handle);
 	if (xd_drives) {

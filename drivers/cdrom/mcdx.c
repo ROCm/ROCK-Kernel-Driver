@@ -1166,7 +1166,7 @@ int __init mcdx_init_drive(int drive)
 	}
 
 	xtrace(INIT, "init() register blkdev\n");
-	if (devfs_register_blkdev(MAJOR_NR, "mcdx", &mcdx_bdops) != 0) {
+	if (register_blkdev(MAJOR_NR, "mcdx", &mcdx_bdops) != 0) {
 		release_region((unsigned long) stuffp->wreg_data,
 			       MCDX_IO_SIZE);
 		xwarn("%s=0x%3p,%d: Init failed. Can't get major %d.\n",
@@ -1222,7 +1222,7 @@ int __init mcdx_init_drive(int drive)
 			       MCDX_IO_SIZE);
 		free_irq(stuffp->irq, NULL);
 		kfree(stuffp);
-		if (devfs_unregister_blkdev(MAJOR_NR, "mcdx") != 0)
+		if (unregister_blkdev(MAJOR_NR, "mcdx") != 0)
 			xwarn("cleanup() unregister_blkdev() failed\n");
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		return 2;

@@ -43,9 +43,9 @@ if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
    bool '  HFC-S+, HFC-SP, HFC-PCMCIA cards' CONFIG_HISAX_HFC_SX
    if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
 #      bool '  TESTEMULATOR (EXPERIMENTAL)' CONFIG_HISAX_TESTEMU
-      bool '  Formula-n enter:now PCI card' CONFIG_HISAX_ENTERNOW_PCI
+      bool '  Formula-n enter:now PCI card (EXPERIMENTAL)' CONFIG_HISAX_ENTERNOW_PCI
       if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
-	 bool '  Am7930' CONFIG_HISAX_AMD7930
+	 bool '  Am7930 (EXPERIMENTAL)' CONFIG_HISAX_AMD7930
       fi
    fi
    bool '  HiSax debugging' CONFIG_HISAX_DEBUG

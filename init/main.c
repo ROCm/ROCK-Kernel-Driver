@@ -526,10 +526,12 @@ static void __init do_basic_setup(void)
 
 static void do_pre_smp_initcalls(void)
 {
-	extern int migration_init(void);
 	extern int spawn_ksoftirqd(void);
+#ifdef CONFIG_SMP
+	extern int migration_init(void);
 
 	migration_init();
+#endif
 	spawn_ksoftirqd();
 }
 

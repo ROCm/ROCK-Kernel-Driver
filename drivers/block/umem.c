@@ -160,7 +160,6 @@ static struct block_device_operations mm_fops;
 static struct timer_list battery_timer;
 
 
-static int              mm_sizes[MM_MAXCARDS << MM_SHIFT];
 static struct hd_struct mm_partitions[MM_MAXCARDS << MM_SHIFT];
 
 static int num_cards = 0;
@@ -1206,7 +1205,6 @@ int __init mm_init(void)
 	printk(KERN_INFO DRIVER_VERSION " : " DRIVER_DESC "\n");
 
 	memset (cards,    0, MM_MAXCARDS * sizeof(struct cardinfo));
-	memset (mm_sizes, 0, (MM_MAXCARDS << MM_SHIFT) * sizeof (int));
 	memset (mm_partitions, 0,
 		(MM_MAXCARDS << MM_SHIFT) * sizeof(struct hd_struct));
 
@@ -1223,11 +1221,6 @@ int __init mm_init(void)
 
 
 	/* Initialize partition size: partion 0 of each card is the entire card */
-	for (i = 0; i < num_cards; i++) {
-		mm_sizes[i << MM_SHIFT] = cards[i].mm_size;
-	}
-        mm_gendisk.sizes = mm_sizes;
-
 	for (i = 0; i < num_cards; i++) {
 		spin_lock_init(&cards[i].lock);
 		mm_partitions[i << MM_SHIFT].nr_sects =
@@ -1270,8 +1263,6 @@ void __exit mm_cleanup(void)
 	pci_unregister_driver(&mm_pci_driver);
 
 	unregister_blkdev(MAJOR_NR, "umem");
-
-	blk_size     [MAJOR_NR] = NULL;
 
 	/*
 	 * Get our gendisk structure off the list.
