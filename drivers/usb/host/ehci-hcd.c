@@ -749,7 +749,7 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	default:
 		spin_lock_irqsave (&ehci->lock, flags);
 		if (ehci->reclaim) {
-			dbg ("dq %p: reclaim = %p, %s",
+			vdbg ("dq %p: reclaim = %p, %s",
 				qh, ehci->reclaim, RUN_CONTEXT);
 			if (qh == ehci->reclaim) {
 				/* unlinking qh for another queued urb? */
