@@ -1082,7 +1082,12 @@ static void channel_init(struct ata_channel *ch)
 		}
 	}
 #ifdef CONFIG_BLK_DEV_HD
-	if (ch->irq == HD_IRQ && ch->io_ports[IDE_DATA_OFFSET] != HD_DATA) {
+
+	/* The first "legacy"  HD gets distinguished by the IRQ it is attached
+	 * to and the IO port it takes.
+	 */
+
+	if (ch->irq == 14 && ch->io_ports[IDE_DATA_OFFSET] != 0x1f0) {
 		printk("%s: CANNOT SHARE IRQ WITH OLD HARDDISK DRIVER (hd.c)\n", ch->name);
 
 		return;

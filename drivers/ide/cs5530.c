@@ -218,6 +218,7 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 			}
 		}
 	}
+
 	if (!master_0) {
 		printk("%s: unable to locate PCI MASTER function\n", dev->name);
 		return 0;
@@ -227,15 +228,13 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 		return 0;
 	}
 
-	save_flags(flags);
-	cli();	/* all CPUs (there should only be one CPU with this chipset) */
-
 	/*
 	 * Enable BusMaster and MemoryWriteAndInvalidate for the cs5530:
 	 * -->  OR 0x14 into 16-bit PCI COMMAND reg of function 0 of the cs5530
 	 */
-	pci_read_config_word (cs5530_0, PCI_COMMAND, &pcicmd);
-	pci_write_config_word(cs5530_0, PCI_COMMAND, pcicmd | PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE);
+	 
+	pci_set_master(cs5530_0);
+	pci_set_mwi(cs5530_0);
 
 	/*
 	 * Set PCI CacheLineSize to 16-bytes:
@@ -273,8 +272,6 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 	 */
 	pci_write_config_byte(master_0, 0x42, 0x00);
 	pci_write_config_byte(master_0, 0x43, 0xc1);
-
-	restore_flags(flags);
 
 	return 0;
 }

@@ -107,13 +107,14 @@ static inline void out_reg(u8 data, u8 reg)
  * Set PIO mode for the specified drive.
  * This function computes timing parameters
  * and sets controller registers accordingly.
+ * It assumes IRQ's are disabled or at least that no other process will
+ * attempt to access the IDE registers concurrently.
  */
 static void ali14xx_tune_drive(struct ata_device *drive, u8 pio)
 {
 	int drive_num;
 	int time1, time2;
 	u8 param1, param2, param3, param4;
-	unsigned long flags;
 	struct ata_timing *t;
 
 	if (pio == 255)
@@ -140,15 +141,12 @@ static void ali14xx_tune_drive(struct ata_device *drive, u8 pio)
 
 	/* stuff timing parameters into controller registers */
 	drive_num = (drive->channel->index << 1) + drive->select.b.unit;
-	save_flags(flags);	/* all CPUs */
-	cli();			/* all CPUs */
 	outb_p(reg_on, base_port);
 	out_reg(param1, reg_tab[drive_num].reg1);
 	out_reg(param2, reg_tab[drive_num].reg2);
 	out_reg(param3, reg_tab[drive_num].reg3);
 	out_reg(param4, reg_tab[drive_num].reg4);
 	outb_p(reg_off, base_port);
-	restore_flags(flags);	/* all CPUs */
 }
 
 /*
