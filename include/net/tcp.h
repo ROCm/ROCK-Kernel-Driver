@@ -1167,7 +1167,7 @@ static inline int tcp_skb_pcount(struct sk_buff *skb)
 }
 
 /* This is valid iff tcp_skb_pcount() > 1. */
-static inline int tcp_skb_psize(struct sk_buff *skb)
+static inline int tcp_skb_mss(struct sk_buff *skb)
 {
 	return skb_shinfo(skb)->tso_size;
 }
