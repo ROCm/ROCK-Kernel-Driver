@@ -1587,6 +1587,20 @@ drop:
 	return NET_RX_DROP;
 }
 
+int netif_rx_ni(struct sk_buff *skb)
+{
+       int err = netif_rx(skb);
+
+       preempt_disable();
+       if (softirq_pending(smp_processor_id()))
+               do_softirq();
+       preempt_enable();
+
+       return err;
+}
+
+EXPORT_SYMBOL(netif_rx_ni);
+
 static __inline__ void skb_bond(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
