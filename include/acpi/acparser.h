@@ -73,9 +73,7 @@ acpi_psx_load_table (
 
 acpi_status
 acpi_psx_execute (
-	struct acpi_namespace_node      *method_node,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_obj_desc);
+	struct acpi_parameter_info      *info);
 
 
 /******************************************************************************

@@ -61,7 +61,7 @@ static u8                   acpi_gbl_default_address_spaces[ACPI_NUM_DEFAULT_SPA
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_ev_init_address_spaces
+ * FUNCTION:    acpi_ev_install_region_handlers
  *
  * PARAMETERS:  None
  *
@@ -72,14 +72,19 @@ static u8                   acpi_gbl_default_address_spaces[ACPI_NUM_DEFAULT_SPA
  ******************************************************************************/
 
 acpi_status
-acpi_ev_init_address_spaces (
+acpi_ev_install_region_handlers (
 	void) {
 	acpi_status                     status;
 	acpi_native_uint                i;
 
 
-	ACPI_FUNCTION_TRACE ("ev_init_address_spaces");
+	ACPI_FUNCTION_TRACE ("ev_install_region_handlers");
 
+
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	/*
 	 * All address spaces (PCI Config, EC, SMBus) are scope dependent
@@ -99,9 +104,8 @@ acpi_ev_init_address_spaces (
 	 * has already been installed (via acpi_install_address_space_handler).
 	 * Similar for AE_SAME_HANDLER.
 	 */
-
 	for (i = 0; i < ACPI_NUM_DEFAULT_SPACES; i++) {
-		status = acpi_install_address_space_handler ((acpi_handle) acpi_gbl_root_node,
+		status = acpi_ev_install_space_handler (acpi_gbl_root_node,
 				  acpi_gbl_default_address_spaces[i],
 				  ACPI_DEFAULT_HANDLER, NULL, NULL);
 		switch (status) {
@@ -111,15 +115,63 @@ acpi_ev_init_address_spaces (
 
 			/* These exceptions are all OK */
 
+			status = AE_OK;
 			break;
 
 		default:
 
-			return_ACPI_STATUS (status);
+			goto unlock_and_exit;
 		}
 	}
 
-	return_ACPI_STATUS (AE_OK);
+unlock_and_exit:
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ev_initialize_op_regions
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Execute _REG methods for all Operation Regions that have
+ *              an installed default region handler.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ev_initialize_op_regions (
+	void)
+{
+	acpi_status                     status;
+	acpi_native_uint                i;
+
+
+	ACPI_FUNCTION_TRACE ("ev_initialize_op_regions");
+
+
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	/*
+	 * Run the _REG methods for op_regions in each default address space
+	 */
+	for (i = 0; i < ACPI_NUM_DEFAULT_SPACES; i++) {
+		/* TBD: Make sure handler is the DEFAULT handler, otherwise
+		 * _REG will have already been run.
+		 */
+		status = acpi_ev_execute_reg_methods (acpi_gbl_root_node,
+				  acpi_gbl_default_address_spaces[i]);
+	}
+
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -138,11 +190,12 @@ acpi_ev_init_address_spaces (
 
 acpi_status
 acpi_ev_execute_reg_method (
-	union acpi_operand_object      *region_obj,
+	union acpi_operand_object       *region_obj,
 	u32                             function)
 {
-	union acpi_operand_object      *params[3];
-	union acpi_operand_object      *region_obj2;
+	struct acpi_parameter_info      info;
+	union acpi_operand_object       *params[3];
+	union acpi_operand_object       *region_obj2;
 	acpi_status                     status;
 
 
@@ -159,10 +212,11 @@ acpi_ev_execute_reg_method (
 	}
 
 	/*
-	 * _REG method has two arguments
-	 * Arg0:   Integer: Operation region space ID
+	 * The _REG method has two arguments:
+	 *
+	 * Arg0, Integer: Operation region space ID
 	 *          Same value as region_obj->Region.space_id
-	 * Arg1:   Integer: connection status
+	 * Arg1, Integer: connection status
 	 *          1 for connecting the handler,
 	 *          0 for disconnecting the handler
 	 *          Passed as a parameter
@@ -184,10 +238,15 @@ acpi_ev_execute_reg_method (
 	params[1]->integer.value = function;
 	params[2] = NULL;
 
+	info.node = region_obj2->extra.method_REG;
+	info.parameters = params;
+	info.parameter_type = ACPI_PARAM_ARGS;
+
 	/* Execute the method, no return value */
 
-	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (ACPI_TYPE_METHOD, region_obj2->extra.method_REG, NULL));
-	status = acpi_ns_evaluate_by_handle (region_obj2->extra.method_REG, params, NULL);
+	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (
+			   ACPI_TYPE_METHOD, info.node, NULL));
+	status = acpi_ns_evaluate_by_handle (&info);
 
 	acpi_ut_remove_reference (params[1]);
 
@@ -326,7 +385,7 @@ acpi_ev_address_space_dispatch (
 		ACPI_FORMAT_UINT64 (address),
 		acpi_ut_get_region_name (region_obj->region.space_id)));
 
-	if (!(handler_desc->address_space.flags & ACPI_ADDR_HANDLER_DEFAULT_INSTALLED)) {
+	if (!(handler_desc->address_space.hflags & ACPI_ADDR_HANDLER_DEFAULT_INSTALLED)) {
 		/*
 		 * For handlers other than the default (supplied) handlers, we must
 		 * exit the interpreter because the handler *might* block -- we don't
@@ -347,7 +406,7 @@ acpi_ev_address_space_dispatch (
 			acpi_format_exception (status)));
 	}
 
-	if (!(handler_desc->address_space.flags & ACPI_ADDR_HANDLER_DEFAULT_INSTALLED)) {
+	if (!(handler_desc->address_space.hflags & ACPI_ADDR_HANDLER_DEFAULT_INSTALLED)) {
 		/*
 		 * We just returned from a non-default handler, we must re-enter the
 		 * interpreter
@@ -676,6 +735,273 @@ acpi_ev_install_handler (
 	return (status);
 }
 
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ev_install_space_handler
+ *
+ * PARAMETERS:  Node            - Namespace node for the device
+ *              space_id        - The address space ID
+ *              Handler         - Address of the handler
+ *              Setup           - Address of the setup function
+ *              Context         - Value passed to the handler on each access
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Install a handler for all op_regions of a given space_id.
+ *              Assumes namespace is locked
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ev_install_space_handler (
+	struct acpi_namespace_node      *node,
+	acpi_adr_space_type             space_id,
+	acpi_adr_space_handler          handler,
+	acpi_adr_space_setup            setup,
+	void                            *context)
+{
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *handler_obj;
+	acpi_status                     status;
+	acpi_object_type                type;
+	u16                             flags = 0;
+
+
+	ACPI_FUNCTION_TRACE ("ev_install_space_handler");
+
+
+	/*
+	 * This registration is valid for only the types below
+	 * and the root.  This is where the default handlers
+	 * get placed.
+	 */
+	if ((node->type != ACPI_TYPE_DEVICE)     &&
+		(node->type != ACPI_TYPE_PROCESSOR)  &&
+		(node->type != ACPI_TYPE_THERMAL)    &&
+		(node != acpi_gbl_root_node)) {
+		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
+	}
+
+	if (handler == ACPI_DEFAULT_HANDLER) {
+		flags = ACPI_ADDR_HANDLER_DEFAULT_INSTALLED;
+
+		switch (space_id) {
+		case ACPI_ADR_SPACE_SYSTEM_MEMORY:
+			handler = acpi_ex_system_memory_space_handler;
+			setup   = acpi_ev_system_memory_region_setup;
+			break;
+
+		case ACPI_ADR_SPACE_SYSTEM_IO:
+			handler = acpi_ex_system_io_space_handler;
+			setup   = acpi_ev_io_space_region_setup;
+			break;
+
+		case ACPI_ADR_SPACE_PCI_CONFIG:
+			handler = acpi_ex_pci_config_space_handler;
+			setup   = acpi_ev_pci_config_region_setup;
+			break;
+
+		case ACPI_ADR_SPACE_CMOS:
+			handler = acpi_ex_cmos_space_handler;
+			setup   = acpi_ev_cmos_region_setup;
+			break;
+
+		case ACPI_ADR_SPACE_PCI_BAR_TARGET:
+			handler = acpi_ex_pci_bar_space_handler;
+			setup   = acpi_ev_pci_bar_region_setup;
+			break;
+
+		case ACPI_ADR_SPACE_DATA_TABLE:
+			handler = acpi_ex_data_table_space_handler;
+			setup   = NULL;
+			break;
+
+		default:
+			status = AE_BAD_PARAMETER;
+			goto unlock_and_exit;
+		}
+	}
+
+	/* If the caller hasn't specified a setup routine, use the default */
+
+	if (!setup) {
+		setup = acpi_ev_default_region_setup;
+	}
+
+	/* Check for an existing internal object */
+
+	obj_desc = acpi_ns_get_attached_object (node);
+	if (obj_desc) {
+		/*
+		 * The attached device object already exists.
+		 * Make sure the handler is not already installed.
+		 */
+		handler_obj = obj_desc->device.handler;
+
+		/* Walk the handler list for this device */
+
+		while (handler_obj) {
+			/* Same space_id indicates a handler already installed */
+
+			if (handler_obj->address_space.space_id == space_id) {
+				if (handler_obj->address_space.handler == handler) {
+					/*
+					 * It is (relatively) OK to attempt to install the SAME
+					 * handler twice. This can easily happen with PCI_Config space.
+					 */
+					status = AE_SAME_HANDLER;
+					goto unlock_and_exit;
+				}
+				else {
+					/* A handler is already installed */
+
+					status = AE_ALREADY_EXISTS;
+				}
+				goto unlock_and_exit;
+			}
+
+			/* Walk the linked list of handlers */
+
+			handler_obj = handler_obj->address_space.next;
+		}
+	}
+	else {
+		ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
+			"Creating object on Device %p while installing handler\n", node));
+
+		/* obj_desc does not exist, create one */
+
+		if (node->type == ACPI_TYPE_ANY) {
+			type = ACPI_TYPE_DEVICE;
+		}
+		else {
+			type = node->type;
+		}
+
+		obj_desc = acpi_ut_create_internal_object (type);
+		if (!obj_desc) {
+			status = AE_NO_MEMORY;
+			goto unlock_and_exit;
+		}
+
+		/* Init new descriptor */
+
+		obj_desc->common.type = (u8) type;
+
+		/* Attach the new object to the Node */
+
+		status = acpi_ns_attach_object (node, obj_desc, type);
+
+		/* Remove local reference to the object */
+
+		acpi_ut_remove_reference (obj_desc);
+
+		if (ACPI_FAILURE (status)) {
+			goto unlock_and_exit;
+		}
+	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
+		"Installing address handler for region %s(%X) on Device %4.4s %p(%p)\n",
+		acpi_ut_get_region_name (space_id), space_id,
+		acpi_ut_get_node_name (node), node, obj_desc));
+
+	/*
+	 * Install the handler
+	 *
+	 * At this point there is no existing handler.
+	 * Just allocate the object for the handler and link it
+	 * into the list.
+	 */
+	handler_obj = acpi_ut_create_internal_object (ACPI_TYPE_LOCAL_ADDRESS_HANDLER);
+	if (!handler_obj) {
+		status = AE_NO_MEMORY;
+		goto unlock_and_exit;
+	}
+
+	/* Init handler obj */
+
+	handler_obj->address_space.space_id  = (u8) space_id;
+	handler_obj->address_space.hflags    = flags;
+	handler_obj->address_space.region_list = NULL;
+	handler_obj->address_space.node      = node;
+	handler_obj->address_space.handler   = handler;
+	handler_obj->address_space.context   = context;
+	handler_obj->address_space.setup     = setup;
+
+	/* Install at head of Device.address_space list */
+
+	handler_obj->address_space.next      = obj_desc->device.handler;
+
+	/*
+	 * The Device object is the first reference on the handler_obj.
+	 * Each region that uses the handler adds a reference.
+	 */
+	obj_desc->device.handler = handler_obj;
+
+	/*
+	 * Walk the namespace finding all of the regions this
+	 * handler will manage.
+	 *
+	 * Start at the device and search the branch toward
+	 * the leaf nodes until either the leaf is encountered or
+	 * a device is detected that has an address handler of the
+	 * same type.
+	 *
+	 * In either case, back up and search down the remainder
+	 * of the branch
+	 */
+	status = acpi_ns_walk_namespace (ACPI_TYPE_ANY, node, ACPI_UINT32_MAX,
+			  ACPI_NS_WALK_UNLOCK, acpi_ev_install_handler,
+			  handler_obj, NULL);
+
+unlock_and_exit:
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ev_execute_reg_methods
+ *
+ * PARAMETERS:  Node            - Namespace node for the device
+ *              space_id        - The address space ID
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Run _REG methods for the Space ID;
+ *              Note: assumes namespace is locked, or system init time.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ev_execute_reg_methods (
+	struct acpi_namespace_node      *node,
+	acpi_adr_space_type             space_id)
+{
+	acpi_status                     status;
+
+
+	ACPI_FUNCTION_TRACE ("ev_execute_reg_methods");
+
+
+	/*
+	 * Run all _REG methods for all Operation Regions for this
+	 * space ID.  This is a separate walk in order to handle any
+	 * interdependencies between regions and _REG methods.  (i.e. handlers
+	 * must be installed for all regions of this Space ID before we
+	 * can run any _REG methods)
+	 */
+	status = acpi_ns_walk_namespace (ACPI_TYPE_ANY, node, ACPI_UINT32_MAX,
+			  ACPI_NS_WALK_UNLOCK, acpi_ev_reg_run,
+			  &space_id, NULL);
+
+	return_ACPI_STATUS (status);
+}
+
+
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ev_reg_run
@@ -693,19 +1019,13 @@ acpi_ev_reg_run (
 	void                            *context,
 	void                            **return_value)
 {
-	union acpi_operand_object       *handler_obj;
 	union acpi_operand_object       *obj_desc;
 	struct acpi_namespace_node      *node;
+	acpi_adr_space_type             space_id;
 	acpi_status                     status;
 
 
-	handler_obj = (union acpi_operand_object   *) context;
-
-	/* Parameter validation */
-
-	if (!handler_obj) {
-		return (AE_OK);
-	}
+	space_id = *ACPI_CAST_PTR (acpi_adr_space_type, context);
 
 	/* Convert and validate the device handle */
 
@@ -732,10 +1052,9 @@ acpi_ev_reg_run (
 		return (AE_OK);
 	}
 
-
 	/* Object is a Region */
 
-	if (obj_desc->region.space_id != handler_obj->address_space.space_id) {
+	if (obj_desc->region.space_id != space_id) {
 		/*
 		 * This region is for a different address space
 		 * -- just ignore it
