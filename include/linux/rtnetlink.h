@@ -642,8 +642,9 @@ extern int rtnetlink_put_metrics(struct sk_buff *skb, u32 *metrics);
 extern void __rta_fill(struct sk_buff *skb, int attrtype, int attrlen, const void *data);
 
 #define RTA_PUT(skb, attrtype, attrlen, data) \
-({ if (skb_tailroom(skb) < (int)RTA_SPACE(attrlen)) goto rtattr_failure; \
-   __rta_fill(skb, attrtype, attrlen, data); })
+({	if (unlikely(skb_tailroom(skb) < (int)RTA_SPACE(attrlen))) \
+		 goto rtattr_failure; \
+   	__rta_fill(skb, attrtype, attrlen, data); }) 
 
 static inline struct rtattr *
 __rta_reserve(struct sk_buff *skb, int attrtype, int attrlen)
@@ -658,8 +659,9 @@ __rta_reserve(struct sk_buff *skb, int attrtype, int attrlen)
 }
 
 #define __RTA_PUT(skb, attrtype, attrlen) \
-({ if (skb_tailroom(skb) < (int)RTA_SPACE(attrlen)) goto rtattr_failure; \
-   __rta_reserve(skb, attrtype, attrlen); })
+({ 	if (unlikely(skb_tailroom(skb) < (int)RTA_SPACE(attrlen))) \
+		goto rtattr_failure; \
+   	__rta_reserve(skb, attrtype, attrlen); })
 
 extern void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change);
 
