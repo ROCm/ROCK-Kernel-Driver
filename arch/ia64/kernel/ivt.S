@@ -548,7 +548,7 @@ ENTRY(dirty_bit)
 #endif
 	mov pr=r31,-1				// restore pr
 	rfi
-END(idirty_bit)
+END(dirty_bit)
 
 	.org ia64_ivt+0x2400
 /////////////////////////////////////////////////////////////////////////////////////////

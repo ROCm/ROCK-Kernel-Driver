@@ -56,8 +56,6 @@ extern void *per_cpu_init(void);
 
 #endif	/* SMP */
 
-extern unsigned long __per_cpu_mca[NR_CPUS];
-
 #define EXPORT_PER_CPU_SYMBOL(var)		EXPORT_SYMBOL(per_cpu__##var)
 #define EXPORT_PER_CPU_SYMBOL_GPL(var)		EXPORT_SYMBOL_GPL(per_cpu__##var)
 

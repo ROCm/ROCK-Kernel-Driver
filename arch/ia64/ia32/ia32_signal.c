@@ -1,7 +1,7 @@
 /*
  * IA32 Architecture-specific signal handling support.
  *
- * Copyright (C) 1999, 2001-2002 Hewlett-Packard Co
+ * Copyright (C) 1999, 2001-2002, 2005 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Arun Sharma <arun.sharma@intel.com>
  * Copyright (C) 2000 VA Linux Co
@@ -970,11 +970,10 @@ ia32_setup_frame1 (int sig, struct k_sigaction *ka, siginfo_t *info,
 }
 
 asmlinkage long
-sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7,
-		 unsigned long stack)
+sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5,
+		 int arg6, int arg7, struct pt_regs regs)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
-	unsigned long esp = (unsigned int) regs->r12;
+	unsigned long esp = (unsigned int) regs.r12;
 	struct sigframe_ia32 __user *frame = (struct sigframe_ia32 __user *)(esp - 8);
 	sigset_t set;
 	int eax;
@@ -993,7 +992,7 @@ sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
-	if (restore_sigcontext_ia32(regs, &frame->sc, &eax))
+	if (restore_sigcontext_ia32(&regs, &frame->sc, &eax))
 		goto badframe;
 	return eax;
 
@@ -1003,11 +1002,10 @@ sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int
 }
 
 asmlinkage long
-sys32_rt_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7,
-		    unsigned long stack)
+sys32_rt_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4,
+		    int arg5, int arg6, int arg7, struct pt_regs regs)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
-	unsigned long esp = (unsigned int) regs->r12;
+	unsigned long esp = (unsigned int) regs.r12;
 	struct rt_sigframe_ia32 __user *frame = (struct rt_sigframe_ia32 __user *)(esp - 4);
 	sigset_t set;
 	int eax;
@@ -1023,7 +1021,7 @@ sys32_rt_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, 
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
-	if (restore_sigcontext_ia32(regs, &frame->uc.uc_mcontext, &eax))
+	if (restore_sigcontext_ia32(&regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
 
 	/* It is more difficult to avoid calling this function than to

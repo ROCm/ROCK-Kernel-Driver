@@ -5,14 +5,12 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-static int init_setup_piix(struct pci_dev *, ide_pci_device_t *);
 static unsigned int __devinit init_chipset_piix(struct pci_dev *, const char *);
 static void init_hwif_piix(ide_hwif_t *);
 
 #define DECLARE_PIIX_DEV(name_str) \
 	{						\
 		.name		= name_str,		\
-		.init_setup	= init_setup_piix,	\
 		.init_chipset	= init_chipset_piix,	\
 		.init_hwif	= init_hwif_piix,	\
 		.channels	= 2,			\
@@ -32,7 +30,6 @@ static ide_pci_device_t piix_pci_info[] __devinitdata = {
 
 	{	/* 2 */
 		.name		= "MPIIX",
-		.init_setup	= init_setup_piix,
 		.init_hwif	= init_hwif_piix,
 		.channels	= 2,
 		.autodma	= NODMA,

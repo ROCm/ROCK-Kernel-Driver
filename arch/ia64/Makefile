@@ -46,8 +46,6 @@ ifeq ($(GCC_VERSION),0304)
 	cflags-$(CONFIG_MCKINLEY)	+= -mtune=mckinley
 endif
 
-cflags-$(CONFIG_ITANIUM_BSTEP_SPECIFIC)	+= -mb-step
-
 CFLAGS += $(cflags-y)
 head-y := arch/ia64/kernel/head.o arch/ia64/kernel/init_task.o
 

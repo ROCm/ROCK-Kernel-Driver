@@ -841,7 +841,11 @@ int probe_hwif_init_with_fixup(ide_hwif_t *hwif, void (*fixup)(ide_hwif_t *hwif)
 	if (fixup)
 		fixup(hwif);
 
-	hwif_init(hwif);
+	if (!hwif_init(hwif)) {
+		printk(KERN_INFO "%s: failed to initialize IDE interface\n",
+				 hwif->name);
+		return -1;
+	}
 
 	if (hwif->present) {
 		u16 unit = 0;

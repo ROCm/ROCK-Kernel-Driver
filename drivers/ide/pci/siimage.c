@@ -590,7 +590,7 @@ static int siimage_reset_poll (ide_drive_t *drive)
 		if ((hwif->INL(SATA_STATUS_REG) & 0x03) != 0x03) {
 			printk(KERN_WARNING "%s: reset phy dead, status=0x%08x\n",
 				hwif->name, hwif->INL(SATA_STATUS_REG));
-			HWGROUP(drive)->poll_timeout = 0;
+			HWGROUP(drive)->polling = 0;
 			return ide_started;
 		}
 		return 0;

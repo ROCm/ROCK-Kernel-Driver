@@ -1,5 +1,4 @@
 
-obj-$(CONFIG_BLK_DEV_ADMA100)		+= adma100.o
 obj-$(CONFIG_BLK_DEV_AEC62XX)		+= aec62xx.o
 obj-$(CONFIG_BLK_DEV_ALI15X3)		+= alim15x3.o
 obj-$(CONFIG_BLK_DEV_AMD74XX)		+= amd74xx.o

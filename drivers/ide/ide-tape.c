@@ -2439,7 +2439,7 @@ static ide_startstop_t idetape_do_request(ide_drive_t *drive,
 			tape->dsc_polling_start = jiffies;
 			tape->dsc_polling_frequency = tape->best_dsc_rw_frequency;
 			tape->dsc_timeout = jiffies + IDETAPE_DSC_RW_TIMEOUT;
-		} else if ((signed long) (jiffies - tape->dsc_timeout) > 0) {
+		} else if (time_after(jiffies, tape->dsc_timeout)) {
 			printk(KERN_ERR "ide-tape: %s: DSC timeout\n",
 				tape->name);
 			if (rq->cmd[0] & REQ_IDETAPE_PC2) {
