@@ -32,21 +32,21 @@ struct regstate {
 	__u8 misc;
 };	
 
-static inline unsigned char vga_rcrtcs(caddr_t regbase, unsigned short iobase, 
+static inline unsigned char vga_rcrtcs(void __iomem *regbase, unsigned short iobase, 
 				       unsigned char reg)
 {
 	vga_w(regbase, iobase + 0x4, reg);
 	return vga_r(regbase, iobase + 0x5);
 }
 
-static inline void vga_wcrtcs(caddr_t regbase, unsigned short iobase, 
+static inline void vga_wcrtcs(void __iomem *regbase, unsigned short iobase, 
 			      unsigned char reg, unsigned char val)
 {
 	vga_w(regbase, iobase + 0x4, reg);
 	vga_w(regbase, iobase + 0x5, val);
 }
 
-static void save_vga_text(struct vgastate *state, caddr_t fbbase)
+static void save_vga_text(struct vgastate *state, void __iomem *fbbase)
 {
 	struct regstate *saved = (struct regstate *) state->vidstate;
 	int i;
@@ -134,7 +134,7 @@ static void save_vga_text(struct vgastate *state, caddr_t fbbase)
 	vga_wseq(state->vgabase, VGA_SEQ_CLOCK_MODE, seq1);
 }
 
-static void restore_vga_text(struct vgastate *state, caddr_t fbbase)
+static void restore_vga_text(struct vgastate *state, void __iomem *fbbase)
 {
 	struct regstate *saved = (struct regstate *) state->vidstate;
 	int i;
@@ -403,7 +403,7 @@ int save_vga(struct vgastate *state)
 	}
 
 	if (state->flags & VGA_SAVE_FONTS) {
-		caddr_t fbbase;
+		void __iomem *fbbase;
 
 		/* exit if window is less than 32K */
 		if (state->memsize && state->memsize < 4 * 8192) {
@@ -473,7 +473,7 @@ int restore_vga (struct vgastate *state)
 		restore_vga_mode(state);
 
 	if (state->flags & VGA_SAVE_FONTS) {
-		caddr_t fbbase = ioremap(state->membase, state->memsize);
+		void __iomem *fbbase = ioremap(state->membase, state->memsize);
 
 		if (!fbbase) {
 			vga_cleanup(state);
