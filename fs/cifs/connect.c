@@ -52,6 +52,7 @@ struct smb_vol {
 	char *domainname;
 	char *UNC;
 	char *UNCip;
+	char *source_rfc1001_name; /* netbios name of client */
 	uid_t linux_uid;
 	gid_t linux_gid;
 	mode_t file_mode;
@@ -59,6 +60,7 @@ struct smb_vol {
 	int rw;
 	unsigned int rsize;
 	unsigned int wsize;
+	unsigned int sockopt;
 	unsigned short int port;
 };
 
@@ -466,6 +468,19 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 			if (value && *value) {
 				vol->wsize =
 					simple_strtoul(value, &value, 0);
+			}
+		} else if (strnicmp(data, "sockopt", 5) == 0) {
+			if (value && *value) {
+				vol->sockopt =
+					simple_strtoul(value, &value, 0);
+			}
+		} else if (strnicmp(data, "netbiosname", 4) == 0) {
+			if (!value || !*value) {
+				vol->source_rfc1001_name = NULL;
+			} else if (strnlen(value, 17) < 17) {
+				vol->source_rfc1001_name = value;
+			} else {
+				printk(KERN_WARNING "CIFS: netbiosname too long (more than 15)\n");
 			}
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */
