@@ -59,11 +59,6 @@ extern void destroy_8023_client(struct datalink_proto *);
 #include <net/sock.h>
 #endif
 
-/* Socket layer support routines */
-
-EXPORT_SYMBOL(sk_run_filter);
-EXPORT_SYMBOL(sk_chk_filter);
-
 /* Needed by unix.o */
 EXPORT_SYMBOL(files_stat);
 
