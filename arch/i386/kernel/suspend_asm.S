@@ -1,4 +1,7 @@
 .text
+
+/* Originally gcc generated, modified by hand */
+
 #include <linux/linkage.h>
 #include <asm/segment.h>
 #include <asm/page.h>
@@ -78,3 +81,11 @@ ENTRY(do_magic):
 .L1449:
 	popl %ebx
 	ret
+
+       .section .data.nosave
+loop:
+       .quad 0
+loop2:
+       .quad 0
+       .previous
+	

@@ -125,10 +125,3 @@ void fix_processor_context(void)
 	}
 
 }
-
-#ifdef CONFIG_SOFTWARE_SUSPEND
-/* Local variables for do_magic */
-int loop __nosavedata = 0;
-int loop2 __nosavedata = 0;
-
-#endif
