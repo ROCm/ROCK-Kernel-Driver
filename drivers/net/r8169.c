@@ -19,12 +19,20 @@
  		_1000_Full	= 0x10
   
   2. Support TBI mode.
-//=========================================================================
-RTL8169_VERSION "1.1"	<2002/10/4>
+=========================================================================
+VERSION 1.1	<2002/10/4>
 
 	The bit4:0 of MII register 4 is called "selector field", and have to be
 	00001b to indicate support of IEEE std 802.3 during NWay process of
 	exchanging Link Code Word (FLP). 
+
+VERSION 1.2	<2002/11/30>
+
+	- Large style cleanup
+	- Use ether_crc in stock kernel (linux/crc32.h)
+	- Copy mc_filter setup code from 8139cp
+	  (includes an optimization, and avoids set_bit use)
+
 */
 
 #include <linux/module.h>
@@ -32,8 +40,9 @@ RTL8169_VERSION "1.1"	<2002/10/4>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
+#include <linux/crc32.h>
 
-#define RTL8169_VERSION "1.1"
+#define RTL8169_VERSION "1.2"
 #define MODULENAME "r8169"
 #define RTL8169_DRIVER_NAME   MODULENAME " Gigabit Ethernet driver " RTL8169_VERSION
 #define PFX MODULENAME ": "
@@ -288,7 +297,6 @@ static void rtl8169_interrupt(int irq, void *dev_instance,
 static void rtl8169_init_ring(struct net_device *dev);
 static void rtl8169_hw_start(struct net_device *dev);
 static int rtl8169_close(struct net_device *dev);
-static inline u32 ether_crc(int length, unsigned char *data);
 static void rtl8169_set_rx_mode(struct net_device *dev);
 static void rtl8169_tx_timeout(struct net_device *dev);
 static struct net_device_stats *rtl8169_get_stats(struct net_device *netdev);
@@ -430,20 +438,15 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	       pdev->slot_name, (unsigned long) RTL_R32(TxConfig));
 	tp->chipset = 0;
 
-      match:
-
+match:
 	*ioaddr_out = ioaddr;
 	*dev_out = dev;
 	return 0;
 
-//err_out_iounmap:
-	assert(ioaddr > 0);
-	iounmap(ioaddr);
-
-      err_out_free_res:
+err_out_free_res:
 	pci_release_regions(pdev);
 
-      err_out:
+err_out:
 	unregister_netdev(dev);
 	kfree(dev);
 	return rc;
@@ -646,7 +649,7 @@ rtl8169_open(struct net_device *dev)
 	if (retval) {
 		return retval;
 	}
-	//////////////////////////////////////////////////////////////////////////////
+
 	tp->TxDescArrays =
 	    kmalloc(NUM_TX_DESC * sizeof (struct TxDesc) + 256, GFP_KERNEL);
 	// Tx Desscriptor needs 256 bytes alignment;
@@ -677,7 +680,7 @@ rtl8169_open(struct net_device *dev)
 	if (tp->RxBufferRings == NULL) {
 		printk(KERN_INFO "Allocate RxBufferRing failed\n");
 	}
-	//////////////////////////////////////////////////////////////////////////////
+
 	rtl8169_init_ring(dev);
 	rtl8169_hw_start(dev);
 
@@ -792,9 +795,8 @@ rtl8169_tx_timeout(struct net_device *dev)
 
 	/* disable Tx, if not already */
 	tmp8 = RTL_R8(ChipCmd);
-	if (tmp8 & CmdTxEnb) {
+	if (tmp8 & CmdTxEnb)
 		RTL_W8(ChipCmd, tmp8 & ~CmdTxEnb);
-	}
 
 	/* Disable interrupts by clearing the interrupt mask. */
 	RTL_W16(IntrMask, 0x0000);
@@ -1038,24 +1040,6 @@ rtl8169_close(struct net_device *dev)
 	return 0;
 }
 
-static unsigned const ethernet_polynomial = 0x04c11db7U;
-static inline u32
-ether_crc(int length, unsigned char *data)
-{
-	int crc = -1;
-
-	while (--length >= 0) {
-		unsigned char current_octet = *data++;
-		int bit;
-		for (bit = 0; bit < 8; bit++, current_octet >>= 1)
-			crc =
-			    (crc << 1) ^ ((crc < 0) ^ (current_octet & 1) ?
-					  ethernet_polynomial : 0);
-	}
-
-	return crc;
-}
-
 static void
 rtl8169_set_rx_mode(struct net_device *dev)
 {
@@ -1081,12 +1065,14 @@ rtl8169_set_rx_mode(struct net_device *dev)
 		mc_filter[1] = mc_filter[0] = 0xffffffff;
 	} else {
 		struct dev_mc_list *mclist;
-		rx_mode = AcceptBroadcast | AcceptMulticast | AcceptMyPhys;
+		rx_mode = AcceptBroadcast | AcceptMyPhys;
 		mc_filter[1] = mc_filter[0] = 0;
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
-		     i++, mclist = mclist->next)
-			set_bit(ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26,
-				mc_filter);
+		     i++, mclist = mclist->next) {
+			int bit_nr = ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26;
+			mc_filter[bit_nr >> 5] |= 1 << (bit_nr & 31);
+			rx_mode |= AcceptMulticast;
+		}
 	}
 
 	spin_lock_irqsave(&tp->lock, flags);
@@ -1101,7 +1087,6 @@ rtl8169_set_rx_mode(struct net_device *dev)
 	RTL_W32(MAR0 + 4, mc_filter[1]);
 
 	spin_unlock_irqrestore(&tp->lock, flags);
-
 }
 
 struct net_device_stats *
