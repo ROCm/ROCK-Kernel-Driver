@@ -28,7 +28,6 @@
 #include <linux/fs.h>
 #include <linux/pagemap.h>
 #include <linux/uts.h>
-#include <linux/version.h>
 #include <linux/wait.h>
 #include <linux/compiler.h>
 #include <asm/uaccess.h>
