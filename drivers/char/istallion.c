@@ -1054,7 +1054,6 @@ static int stli_open(struct tty_struct *tty, struct file *filp)
 	if (portp->devnr < 1)
 		return(-ENODEV);
 
-	MOD_INC_USE_COUNT;
 
 /*
  *	Check if this port is in the middle of closing. If so then wait
@@ -1170,14 +1169,12 @@ static void stli_close(struct tty_struct *tty, struct file *filp)
 	save_flags(flags);
 	cli();
 	if (tty_hung_up_p(filp)) {
-		MOD_DEC_USE_COUNT;
 		restore_flags(flags);
 		return;
 	}
 	if ((tty->count == 1) && (portp->refcount != 1))
 		portp->refcount = 1;
 	if (portp->refcount-- > 1) {
-		MOD_DEC_USE_COUNT;
 		restore_flags(flags);
 		return;
 	}
@@ -1232,7 +1229,6 @@ static void stli_close(struct tty_struct *tty, struct file *filp)
 	portp->flags &= ~(ASYNC_CALLOUT_ACTIVE | ASYNC_NORMAL_ACTIVE |
 		ASYNC_CLOSING);
 	wake_up_interruptible(&portp->close_wait);
-	MOD_DEC_USE_COUNT;
 	restore_flags(flags);
 }
 
@@ -2369,7 +2365,6 @@ static void stli_dohangup(void *arg)
 			tty_hangup(portp->tty);
 		}
 	}
-	MOD_DEC_USE_COUNT;
 }
 
 /*****************************************************************************/
@@ -3004,9 +2999,7 @@ static inline int stli_hostcmd(stlibrd_t *brdp, stliport_t *portp)
 					if (! ((portp->flags & ASYNC_CALLOUT_ACTIVE) &&
 					    (portp->flags & ASYNC_CALLOUT_NOHUP))) {
 						if (tty != (struct tty_struct *) NULL) {
-							MOD_INC_USE_COUNT;
-							if (schedule_task(&portp->tqhangup) == 0)
-								MOD_DEC_USE_COUNT;
+							schedule_task(&portp->tqhangup);
 						}
 					}
 				}
@@ -5350,6 +5343,7 @@ int __init stli_init(void)
  */
 	memset(&stli_serial, 0, sizeof(struct tty_driver));
 	stli_serial.magic = TTY_DRIVER_MAGIC;
+	stli_serial.owner = THIS_MODULE;
 	stli_serial.driver_name = stli_drvname;
 	stli_serial.name = stli_serialname;
 	stli_serial.major = STL_SERIALMAJOR;
