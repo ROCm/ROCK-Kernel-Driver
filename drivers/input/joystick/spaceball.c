@@ -81,13 +81,15 @@ struct spaceball {
  * SpaceBall.
  */
 
-static void spaceball_process_packet(struct spaceball* spaceball)
+static void spaceball_process_packet(struct spaceball* spaceball, struct pt_regs *regs)
 {
 	struct input_dev *dev = &spaceball->dev;
 	unsigned char *data = spaceball->data;
 	int i;
 
 	if (spaceball->idx < 2) return;
+
+	input_regs(dev, regs);
 
 	switch (spaceball->data[0]) {
 
@@ -147,13 +149,13 @@ static void spaceball_process_packet(struct spaceball* spaceball)
  * can occur in the axis values.
  */
 
-static void spaceball_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void spaceball_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct spaceball *spaceball = serio->private;
 
 	switch (data) {
 		case 0xd:
-			spaceball_process_packet(spaceball);
+			spaceball_process_packet(spaceball, regs);
 			spaceball->idx = 0;
 			spaceball->escape = 0;
 			return;

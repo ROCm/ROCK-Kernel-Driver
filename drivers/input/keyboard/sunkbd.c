@@ -89,7 +89,7 @@ struct sunkbd {
  * is received.
  */
 
-static void sunkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void sunkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct sunkbd* sunkbd = serio->private;
 
@@ -119,6 +119,7 @@ static void sunkbd_interrupt(struct serio *serio, unsigned char data, unsigned i
 
 		default:
 			if (sunkbd->keycode[data & SUNKBD_KEY]) {
+				input_regs(&sunkbd->dev, regs);
                                 input_report_key(&sunkbd->dev, sunkbd->keycode[data & SUNKBD_KEY], !(data & SUNKBD_RELEASE));
 				input_sync(&sunkbd->dev);
                         } else {

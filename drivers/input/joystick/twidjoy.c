@@ -101,7 +101,7 @@ struct twidjoy {
  * Twiddler. It updates the data accordingly.
  */
 
-static void twidjoy_process_packet(struct twidjoy *twidjoy)
+static void twidjoy_process_packet(struct twidjoy *twidjoy, struct pt_regs *regs)
 {
 	if (twidjoy->idx == TWIDJOY_MAX_LENGTH) {
 		struct input_dev *dev = &twidjoy->dev;
@@ -110,6 +110,8 @@ static void twidjoy_process_packet(struct twidjoy *twidjoy)
 		int button_bits, abs_x, abs_y;
 
 		button_bits = ((data[1] & 0x7f) << 7) | (data[0] & 0x7f);
+
+		input_regs(dev, regs);
 
 		for (bp = twidjoy_buttons; bp->bitmask; bp++) {
 			int value = (button_bits & (bp->bitmask << bp->bitshift)) >> bp->bitshift;
@@ -140,7 +142,7 @@ static void twidjoy_process_packet(struct twidjoy *twidjoy)
  * packet processing routine.
  */
 
-static void twidjoy_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void twidjoy_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struc pt_regs *regs)
 {
 	struct twidjoy *twidjoy = serio->private;
 
@@ -157,7 +159,7 @@ static void twidjoy_interrupt(struct serio *serio, unsigned char data, unsigned 
 		twidjoy->data[twidjoy->idx++] = data;
 
 	if (twidjoy->idx == TWIDJOY_MAX_LENGTH) {
-		twidjoy_process_packet(twidjoy);
+		twidjoy_process_packet(twidjoy, regs);
 		twidjoy->idx = 0;
 	}
 

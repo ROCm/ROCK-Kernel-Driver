@@ -303,7 +303,7 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 		}
 		kbd_pt_regs = regs;
 #ifdef CONFIG_SERIO
-		serio_interrupt(&up->serio, ch, 0);
+		serio_interrupt(&up->serio, ch, 0, regs);
 #endif
 	} else if (ZS_IS_MOUSE(up)) {
 		int ret = suncore_mouse_baud_detection(ch, is_break);
@@ -317,7 +317,7 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 
 		case 0:
 #ifdef CONFIG_SERIO
-			serio_interrupt(&up->serio, ch, 0);
+			serio_interrupt(&up->serio, ch, 0, regs);
 #endif
 			break;
 		};

@@ -63,7 +63,7 @@ struct xtkbd {
 	char phys[32];
 };
 
-void xtkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+void xtkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct xtkbd *xtkbd = serio->private;
 
@@ -74,6 +74,7 @@ void xtkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags
 		default:
 
 			if (xtkbd->keycode[data & XTKBD_KEY]) {
+				input_regs(&xtkbd->dev, regs);
 				input_report_key(&xtkbd->dev, xtkbd->keycode[data & XTKBD_KEY], !(data & XTKBD_RELEASE));
 				input_sync(&xtkbd->dev);
 			} else {

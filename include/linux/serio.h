@@ -10,9 +10,12 @@
  */
 
 #include <linux/ioctl.h>
-#include <linux/list.h>
 
 #define SPIOCSTYPE	_IOW('q', 0x01, unsigned long)
+
+#ifdef __KERNEL__
+
+#include <linux/list.h>
 
 struct serio;
 
@@ -47,7 +50,7 @@ struct serio_dev {
 	char *name;
 
 	void (*write_wakeup)(struct serio *);
-	void (*interrupt)(struct serio *, unsigned char, unsigned int);
+	void (*interrupt)(struct serio *, unsigned char, unsigned int, struct pt_regs *);
 	void (*connect)(struct serio *, struct serio_dev *dev);
 	void (*disconnect)(struct serio *);
 	void (*cleanup)(struct serio *);
@@ -58,7 +61,7 @@ struct serio_dev {
 int serio_open(struct serio *serio, struct serio_dev *dev);
 void serio_close(struct serio *serio);
 void serio_rescan(struct serio *serio);
-void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags);
+void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs);
 
 void serio_register_port(struct serio *serio);
 void serio_unregister_port(struct serio *serio);
@@ -84,6 +87,8 @@ static __inline__ void serio_cleanup(struct serio *serio)
 	if (serio->dev && serio->dev->cleanup)
 		serio->dev->cleanup(serio);
 }
+
+#endif
 
 /*
  * bit masks for use in "interrupt" flags (3rd argument)

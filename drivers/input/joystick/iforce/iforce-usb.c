@@ -74,7 +74,7 @@ void iforce_usb_xmit(struct iforce *iforce)
 	spin_unlock_irqrestore(&iforce->xmit_lock, flags);
 }
 
-static void iforce_usb_irq(struct urb *urb)
+static void iforce_usb_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct iforce *iforce = urb->context;
 	int status;
@@ -96,7 +96,7 @@ static void iforce_usb_irq(struct urb *urb)
 	}
 
 	iforce_process_packet(iforce,
-		(iforce->data[0] << 8) | (urb->actual_length - 1), iforce->data + 1);
+		(iforce->data[0] << 8) | (urb->actual_length - 1), iforce->data + 1, regs);
 
 exit:
 	status = usb_submit_urb (urb, GFP_ATOMIC);
@@ -105,7 +105,7 @@ exit:
 		     __FUNCTION__, status);
 }
 
-static void iforce_usb_out(struct urb *urb)
+static void iforce_usb_out(struct urb *urb, struct pt_regs *regs)
 {
 	struct iforce *iforce = urb->context;
 
@@ -120,7 +120,7 @@ static void iforce_usb_out(struct urb *urb)
 		wake_up(&iforce->wait);
 }
 
-static void iforce_usb_ctrl(struct urb *urb)
+static void iforce_usb_ctrl(struct urb *urb, struct pt_regs *regs)
 {
 	struct iforce *iforce = urb->context;
 	if (urb->status) return;
@@ -133,11 +133,14 @@ static int iforce_usb_probe(struct usb_interface *intf,
 				const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
+	struct usb_host_interface *interface;
 	struct usb_endpoint_descriptor *epirq, *epout;
 	struct iforce *iforce;
 
-	epirq = intf->altsetting[0].endpoint + 0;
-	epout = intf->altsetting[0].endpoint + 1;
+	interface = &intf->altsetting[intf->act_altsetting];
+
+	epirq = &interface->endpoint[0].desc;
+	epout = &interface->endpoint[1].desc;
 
 	if (!(iforce = kmalloc(sizeof(struct iforce) + 32, GFP_KERNEL)))
 		goto fail;

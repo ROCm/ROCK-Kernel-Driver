@@ -62,18 +62,20 @@ struct nkbd {
 	char phys[32];
 };
 
-void nkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+void nkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct nkbd *nkbd = serio->private;
 
 	/* invalid scan codes are probably the init sequence, so we ignore them */
-	if (nkbd->keycode[data & NKBD_KEY])
+	if (nkbd->keycode[data & NKBD_KEY]) {
+		input_regs(&nkbd->dev, regs);
 		input_report_key(&nkbd->dev, nkbd->keycode[data & NKBD_KEY], data & NKBD_PRESS);
+		input_sync(&nkbd->dev);
+	}
 
 	else if (data == 0xe7) /* end of init sequence */
 		printk(KERN_INFO "input: %s on %s\n", nkbd_name, serio->phys);
 
-	input_sync(&nkbd->dev);
 }
 
 void nkbd_connect(struct serio *serio, struct serio_dev *dev)

@@ -131,8 +131,6 @@ static __inline__ int con_is_present(void)
 	return serial_console ? 0 : 1;
 }
 
-extern struct pt_regs *kbd_pt_regs;
-
 extern void synchronize_user_stack(void);
 
 extern void __flushw_user(void);

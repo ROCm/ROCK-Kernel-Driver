@@ -73,10 +73,12 @@ static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2
  * reports relevant events to the input module.
  */
 
-static void psmouse_process_packet(struct psmouse *psmouse)
+static void psmouse_process_packet(struct psmouse *psmouse, struct pt_regs *regs)
 {
 	struct input_dev *dev = &psmouse->dev;
 	unsigned char *packet = psmouse->packet;
+
+	input_regs(dev, regs);
 
 /*
  * The PS2++ protocol is a little bit complex
@@ -165,7 +167,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
  * packets or passing them to the command routine as command output.
  */
 
-static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct psmouse *psmouse = serio->private;
 
@@ -201,7 +203,7 @@ static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned 
 	psmouse->packet[psmouse->pktcnt++] = data;
 
 	if (psmouse->pktcnt == 3 + (psmouse->type >= PSMOUSE_GENPS)) {
-		psmouse_process_packet(psmouse);
+		psmouse_process_packet(psmouse, regs);
 		psmouse->pktcnt = 0;
 		return;
 	}

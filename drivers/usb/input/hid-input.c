@@ -380,10 +380,12 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 	}
 }
 
-void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct hid_usage *usage, __s32 value)
+void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct hid_usage *usage, __s32 value, struct pt_regs *regs)
 {
 	struct input_dev *input = &hid->input;
 	int *quirks = &hid->quirks;
+
+	input_regs(input, regs);
 
 	if (usage->hat_min != usage->hat_max) {
 		value = (value - usage->hat_min) * 8 / (usage->hat_max - usage->hat_min + 1) + 1;

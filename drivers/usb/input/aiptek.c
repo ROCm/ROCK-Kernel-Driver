@@ -155,6 +155,8 @@ aiptek_irq(struct urb *urb, struct pt_regs *regs)
 		dbg("received unknown report #%d", data[0]);
 	}
 
+	input_regs(dev, regs);
+
 	proximity = data[5] & 0x01;
 	input_report_key(dev, BTN_TOOL_PEN, proximity);
 

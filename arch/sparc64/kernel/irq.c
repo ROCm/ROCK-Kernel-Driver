@@ -740,9 +740,6 @@ void handler_irq(int irq, struct pt_regs *regs)
 	irq_enter();
 	kstat_cpu(cpu).irqs[irq]++;
 
-	if (irq == 9)
-		kbd_pt_regs = regs;
-
 	/* Sliiiick... */
 #ifndef CONFIG_SMP
 	bp = ((irq != 0) ?

@@ -132,7 +132,7 @@ struct atkbd {
  * the keyboard into events.
  */
 
-static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct atkbd *atkbd = serio->private;
 	int code = data;
@@ -193,6 +193,7 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 				atkbd->set, code, serio->phys, atkbd->release ? "released" : "pressed");
 			break;
 		default:
+			input_regs(&atkbd->dev, regs);
 			input_report_key(&atkbd->dev, atkbd->keycode[code], !atkbd->release);
 			input_sync(&atkbd->dev);
 	}

@@ -129,6 +129,8 @@ static void wacom_pl_irq(struct urb *urb, struct pt_regs *regs)
 		dbg("received unknown report #%d", data[0]);
 
 	prox = data[1] & 0x40;
+
+	input_regs(dev, regs);
 	
 	input_report_key(dev, BTN_TOOL_PEN, prox);
 	
@@ -179,6 +181,7 @@ static void wacom_penpartner_irq(struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
+	input_regs(dev, regs);
 	input_report_key(dev, BTN_TOOL_PEN, 1);
 	input_report_abs(dev, ABS_X, data[2] << 8 | data[1]);
 	input_report_abs(dev, ABS_Y, data[4] << 8 | data[3]);
@@ -222,6 +225,8 @@ static void wacom_graphire_irq(struct urb *urb, struct pt_regs *regs)
 
 	x = data[2] | ((__u32)data[3] << 8);
 	y = data[4] | ((__u32)data[5] << 8);
+
+	input_regs(dev, regs);
 
 	switch ((data[1] >> 5) & 3) {
 
@@ -293,6 +298,8 @@ static void wacom_intuos_irq(struct urb *urb, struct pt_regs *regs)
 
 	if (data[0] != 2)
 		dbg("received unknown report #%d", data[0]);
+
+	input_regs(dev, regs);
 
 	/* tool number */
 	idx = data[1] & 0x01;

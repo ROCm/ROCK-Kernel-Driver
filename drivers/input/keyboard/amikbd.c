@@ -87,6 +87,8 @@ static void amikbd_interrupt(int irq, void *dummy, struct pt_regs *fp)
 
 		scancode = amikbd_keycode[scancode];
 
+		input_regs(&amikbd_dev, fp);
+
 		if (scancode == KEY_CAPSLOCK) {	/* CapsLock is a toggle switch key on Amiga */
 			input_report_key(&amikbd_dev, scancode, 1);
 			input_report_key(&amikbd_dev, scancode, 0);

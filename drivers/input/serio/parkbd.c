@@ -136,7 +136,7 @@ static void parkbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		parkbd_buffer |= (parkbd_readlines() >> 1) << parkbd_counter++;
 
 		if (parkbd_counter == parkbd_mode + 10)
-			serio_interrupt(&parkbd_port, (parkbd_buffer >> (2 - parkbd_mode)) & 0xff, 0);
+			serio_interrupt(&parkbd_port, (parkbd_buffer >> (2 - parkbd_mode)) & 0xff, 0, regs);
 	}
 
 	parkbd_last = jiffies;

@@ -60,7 +60,7 @@ struct gunze {
 	char phys[32];
 };
 
-static void gunze_process_packet(struct gunze* gunze)
+static void gunze_process_packet(struct gunze* gunze, struct pt_regs *regs)
 {
 	struct input_dev *dev = &gunze->dev;
 
@@ -71,18 +71,19 @@ static void gunze_process_packet(struct gunze* gunze)
 		return;
 	}
 
+	input_regs(dev, regs);
 	input_report_abs(dev, ABS_X, simple_strtoul(gunze->data + 1, NULL, 10) * 4);
 	input_report_abs(dev, ABS_Y, 3072 - simple_strtoul(gunze->data + 6, NULL, 10) * 3);
 	input_report_key(dev, BTN_TOUCH, gunze->data[0] == 'T');
 	input_sync(dev);
 }
 
-static void gunze_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void gunze_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct gunze* gunze = serio->private;
 
 	if (data == '\r') {
-		gunze_process_packet(gunze);
+		gunze_process_packet(gunze, regs);
 		gunze->idx = 0;
 	} else {
 		if (gunze->idx < GUNZE_MAX_LENGTH)

@@ -96,6 +96,7 @@ static void powermate_irq(struct urb *urb, struct pt_regs *regs)
 	}
 
 	/* handle updates to device state */
+	input_regs(&pm->input, regs);
 	input_report_key(&pm->input, BTN_0, pm->data[0] & 0x01);
 	input_report_rel(&pm->input, REL_DIAL, pm->data[1]);
 	input_sync(&pm->input);
