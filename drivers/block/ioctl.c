@@ -203,7 +203,8 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 	case BLKROSET:
 		if (disk->fops->ioctl) {
 			ret = disk->fops->ioctl(inode, file, cmd, arg);
-			if (ret != -EINVAL)
+			/* -EINVAL to handle old uncorrected drivers */
+			if (ret != -EINVAL && ret != -ENOTTY)
 				return ret;
 		}
 		if (!capable(CAP_SYS_ADMIN))
