@@ -20,13 +20,11 @@
 #define UIDHASH_BITS		8
 #define UIDHASH_SZ		(1 << UIDHASH_BITS)
 #define UIDHASH_MASK		(UIDHASH_SZ - 1)
-#define __uidhashfn(uid)	(((uid >> UIDHASH_BITS) ^ uid) & UIDHASH_MASK)
-#define uidhashentry(uid)	(uidhash_table + __uidhashfn(uid))
+#define __uidhashfn(uid)	(((uid >> UIDHASH_BITS) + uid) & UIDHASH_MASK)
+#define uidhashentry(uid)	(uidhash_table + __uidhashfn((uid)))
 
 static kmem_cache_t *uid_cachep;
-static struct list_head *uidhash_table;
-static unsigned uidhash_size;
-static unsigned uidhash_bits;
+static struct list_head uidhash_table[UIDHASH_SZ];
 static spinlock_t uidhash_lock = SPIN_LOCK_UNLOCKED;
 
 struct user_struct root_user = {
@@ -116,7 +114,7 @@ struct user_struct * alloc_uid(uid_t uid)
 
 static int __init uid_cache_init(void)
 {
-	int size, n;
+	int n;
 
 	uid_cachep = kmem_cache_create("uid_cache", sizeof(struct user_struct),
 				       0,
@@ -124,21 +122,7 @@ static int __init uid_cache_init(void)
 	if(!uid_cachep)
 		panic("Cannot create uid taskcount SLAB cache\n");
 
-	size = UIDHASH_SZ * sizeof(struct list_head);
-	do {
-		uidhash_table = (struct list_head *)
-					kmalloc(size, GFP_ATOMIC);
-		if(!uidhash_table)
-			size >>= 1;
-	} while(!uidhash_table && size >= sizeof(struct list_head));
-
-	if(!uidhash_table)
-		panic("Failed to allocate uid hash table!\n");
-
-	uidhash_size = size/sizeof(struct list_head);
-	uidhash_bits = ffz(uidhash_size);
-
-	for(n = 0; n < uidhash_size; ++n)
+	for(n = 0; n < UIDHASH_SZ; ++n)
 		INIT_LIST_HEAD(uidhash_table + n);
 
 	/* Insert the root user immediately - init already runs with this */
