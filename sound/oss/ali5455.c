@@ -3228,7 +3228,7 @@ static int ali_ac97_random_init_stuff(struct ali_card
 
 /* AC97 codec initialisation. */
 
-static int __init ali_ac97_init(struct ali_card *card)
+static int __devinit ali_ac97_init(struct ali_card *card)
 {
 	int num_ac97 = 0;
 	int total_channels = 0;
@@ -3333,7 +3333,7 @@ static int __init ali_ac97_init(struct ali_card *card)
 	return num_ac97;
 }
 
-static void __init ali_configure_clocking(void)
+static void __devinit ali_configure_clocking(void)
 {
 	struct ali_card *card;
 	struct ali_state *state;
@@ -3403,8 +3403,8 @@ config_out_nodmabuf:
 /* install the driver, we do not allocate hardware channel nor DMA buffer now, they are defered 
    until "ACCESS" time (in prog_dmabuf called by open/read/write/ioctl/mmap) */
 
-static int __init ali_probe(struct pci_dev *pci_dev, const struct pci_device_id
-			    *pci_id)
+static int __devinit ali_probe(struct pci_dev *pci_dev,
+			       const struct pci_device_id *pci_id)
 {
 	struct ali_card *card;
 	if (pci_enable_device(pci_dev))

@@ -282,7 +282,7 @@ struct agp_bridge_driver uninorth_agp_driver = {
 	.cant_use_aperture	= 1,
 };
 
-static struct agp_device_ids uninorth_agp_device_ids[] __initdata = {
+static struct agp_device_ids uninorth_agp_device_ids[] __devinitdata = {
 	{
 		.device_id	= PCI_DEVICE_ID_APPLE_UNI_N_AGP,
 		.chipset_name	= "UniNorth",
@@ -301,8 +301,8 @@ static struct agp_device_ids uninorth_agp_device_ids[] __initdata = {
 	},
 };
 
-static int __init agp_uninorth_probe(struct pci_dev *pdev,
-				     const struct pci_device_id *ent)
+static int __devinit agp_uninorth_probe(struct pci_dev *pdev,
+					const struct pci_device_id *ent)
 {
 	struct agp_device_ids *devs = uninorth_agp_device_ids;
 	struct agp_bridge_data *bridge;

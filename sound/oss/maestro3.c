@@ -2297,7 +2297,7 @@ static void m3_codec_reset(struct m3_card *card, int busywait)
 #endif
 }
 
-static int __init m3_codec_install(struct m3_card *card)
+static int __devinit m3_codec_install(struct m3_card *card)
 {
     struct ac97_codec *codec;
 
@@ -2594,7 +2594,7 @@ void free_dsp_suspendmem(struct m3_card *card)
 /*
  * great day!  this function is ugly as hell.
  */
-static int __init m3_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
+static int __devinit m3_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
 {
     u32 n;
     int i;
