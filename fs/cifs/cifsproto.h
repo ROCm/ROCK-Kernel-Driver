@@ -93,26 +93,26 @@ extern int CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 			const char *tree, struct cifsTconInfo *tcon,
 			const struct nls_table *);
 
-extern int CIFSFindFirst(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSFindFirst(const int xid, struct cifsTconInfo *tcon,
 			const char *searchName,
 			FILE_DIRECTORY_INFO * findData,
 			T2_FFIRST_RSP_PARMS * findParms,
 			const struct nls_table *nls_codepage,
 			int *pUnicodeFlag,
 			int *pUnixFlag /* if Unix extensions used */ );
-extern int CIFSFindNext(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 			FILE_DIRECTORY_INFO * findData,
 			T2_FNEXT_RSP_PARMS * findParms,
 			const __u16 searchHandle, const __u32 resumeKey,
 			int *UnicodeFlag, int *pUnixFlag);
 
-extern int CIFSSMBQPathInfo(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBQPathInfo(const int xid, struct cifsTconInfo *tcon,
 			const unsigned char *searchName,
 			FILE_ALL_INFO * findData,
 			const struct nls_table *nls_codepage);
 
 extern int CIFSSMBUnixQPathInfo(const int xid,
-			const struct cifsTconInfo *tcon,
+			struct cifsTconInfo *tcon,
 			const unsigned char *searchName,
 			FILE_UNIX_BASIC_INFO * pFindData,
 			const struct nls_table *nls_codepage);
@@ -127,7 +127,7 @@ extern int connect_to_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 			const char *old_path,
 			const struct nls_table *nls_codepage);
 
-extern int CIFSSMBQFSInfo(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBQFSInfo(const int xid, struct cifsTconInfo *tcon,
 			struct statfs *FSData,
 			const struct nls_table *nls_codepage);
 extern int CIFSSMBQFSAttributeInfo(const int xid,
@@ -150,57 +150,57 @@ extern int CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *pTcon,
 			char *full_path, __u64 mode, __u64 uid,
 			__u64 gid, const struct nls_table *nls_codepage);
 
-extern int CIFSSMBMkDir(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBMkDir(const int xid, struct cifsTconInfo *tcon,
 			const char *newName,
 			const struct nls_table *nls_codepage);
-extern int CIFSSMBRmDir(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBRmDir(const int xid, struct cifsTconInfo *tcon,
 			const char *name, const struct nls_table *nls_codepage);
 
-extern int CIFSSMBDelFile(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBDelFile(const int xid, struct cifsTconInfo *tcon,
 			const char *name,
 			const struct nls_table *nls_codepage);
-extern int CIFSSMBRename(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 			const char *fromName, const char *toName,
 			const struct nls_table *nls_codepage);
 extern int CIFSCreateHardLink(const int xid,
-			const struct cifsTconInfo *tcon,
+			struct cifsTconInfo *tcon,
 			const char *fromName, const char *toName,
 			const struct nls_table *nls_codepage);
 extern int CIFSUnixCreateHardLink(const int xid,
-			const struct cifsTconInfo *tcon,
+			struct cifsTconInfo *tcon,
 			const char *fromName, const char *toName,
 			const struct nls_table *nls_codepage);
 extern int CIFSUnixCreateSymLink(const int xid,
-			const struct cifsTconInfo *tcon,
+			struct cifsTconInfo *tcon,
 			const char *fromName, const char *toName,
 			const struct nls_table *nls_codepage);
 extern int CIFSSMBUnixQuerySymLink(const int xid,
-			const struct cifsTconInfo *tcon,
+			struct cifsTconInfo *tcon,
 			const unsigned char *searchName,
 			char *syminfo, const int buflen,
 			const struct nls_table *nls_codepage);
 extern int CIFSSMBQueryReparseLinkInfo(const int xid, 
-			const struct cifsTconInfo *tcon,
+			struct cifsTconInfo *tcon,
 			const unsigned char *searchName,
 			char *symlinkinfo, const int buflen, __u16 fid,
 			const struct nls_table *nls_codepage);
 
-extern int CIFSSMBOpen(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBOpen(const int xid, struct cifsTconInfo *tcon,
 			const char *fileName, const int disposition,
 			const int access_flags, const int omode,
 			__u16 * netfid, int *pOplock,
 			const struct nls_table *nls_codepage);
-extern int CIFSSMBClose(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBClose(const int xid, struct cifsTconInfo *tcon,
 			const int smb_file_id);
 
-extern int CIFSSMBRead(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 			const int netfid, unsigned int count,
 			const __u64 lseek, unsigned int *nbytes, char **buf);
-extern int CIFSSMBWrite(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 			const int netfid, const unsigned int count,
 			const __u64 lseek, unsigned int *nbytes,
 			const char *buf, const int long_op);
-extern int CIFSSMBLock(const int xid, const struct cifsTconInfo *tcon,
+extern int CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 			const __u16 netfid, const __u64 len,
 			const __u64 offset, const __u32 numUnlock,
 			const __u32 numLock, const __u8 lockType,
