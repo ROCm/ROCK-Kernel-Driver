@@ -69,9 +69,9 @@ static struct irqchip bad_chip = {
 };
 
 static struct irqdesc bad_irq_desc = {
-	.chip	= &bad_chip,
-	.handle = do_bad_IRQ,
-	.depth	= 1,
+	.chip		= &bad_chip,
+	.handle		= do_bad_IRQ,
+	.disable_depth	= 1,
 };
 
 /**
