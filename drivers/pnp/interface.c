@@ -332,11 +332,18 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 	buffer->buffer = buf;
 	buffer->curr = buffer->buffer;
 
+	pnp_printf(buffer,"mode = ");
+	if (dev->config_mode & PNP_CONFIG_MANUAL)
+		pnp_printf(buffer,"manual\n");
+	else
+		pnp_printf(buffer,"auto\n");
+
 	pnp_printf(buffer,"state = ");
 	if (dev->active)
 		pnp_printf(buffer,"active\n");
 	else
 		pnp_printf(buffer,"disabled\n");
+
 	for (i = 0; i < PNP_MAX_PORT; i++) {
 		if (pnp_port_valid(dev, i)) {
 			pnp_printf(buffer,"io");
@@ -402,13 +409,13 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 		retval = pnp_activate_dev(dev);
 		goto done;
 	}
-	if (!strnicmp(buf,"auto-config",11)) {
+	if (!strnicmp(buf,"auto",4)) {
 		if (dev->active)
 			goto done;
 		retval = pnp_auto_config_dev(dev);
 		goto done;
 	}
-	if (!strnicmp(buf,"clear-config",12)) {
+	if (!strnicmp(buf,"clear",5)) {
 		if (dev->active)
 			goto done;
 		spin_lock(&pnp_lock);
