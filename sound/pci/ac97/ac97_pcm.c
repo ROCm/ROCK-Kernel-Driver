@@ -408,13 +408,15 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 	memset(rate_table, 0, sizeof(rate_table));
 	for (i = 0; i < 4; i++) {
 		codec = bus->codec[i];
-		if (! codec)
+		if (!codec)
 			continue;
 		avail_slots[0][i] = get_pslots(codec, &rate_table[0][i]);
 		avail_slots[1][i] = get_cslots(codec);
 		if (!(codec->scaps & AC97_SCAP_INDEP_SDIN)) {
-			for (j = 0; j < i; j++)
-				avail_slots[1][i] &= ~avail_slots[1][j];
+			for (j = 0; j < i; j++) {
+				if (bus->codec[j])
+					avail_slots[1][i] &= ~avail_slots[1][j];
+			}
 		}
 	}
 	/* FIXME: add double rate allocation */
@@ -434,12 +436,16 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 		rpcm->rates = ~0;
 		slots = pcm->r[0].slots;
 		for (j = 0; j < 4 && slots; j++) {
+			if (!bus->codec[j])
+				continue;
 			rates = ~0;
 			if (pcm->exclusive) {
 				/* exclusive access */
 				tmp = avail_slots[pcm->stream][j] & slots;
-				for (k = 0; k < i; k++)
-					tmp &= ~rpcms[k].r[0].rslots[j];
+				for (k = 0; k < i; k++) {
+					if (rpcm->stream == rpcms[k].stream)
+						tmp &= ~rpcms[k].r[0].rslots[j];
+				}
 				if (tmp) {
 					rpcm->r[0].rslots[j] = tmp;
 					rpcm->r[0].codec[j] = bus->codec[j];
