@@ -854,6 +854,34 @@ xfs_xlate_dinode_core(
 	INT_XLATE(buf_core->di_gen, mem_core->di_gen, dir, arch);
 }
 
+uint
+xfs_dic2xflags(
+	xfs_dinode_core_t	*dic,
+	xfs_arch_t		arch)
+{
+	__uint16_t		di_flags;
+	uint			flags = 0;
+
+	di_flags = INT_GET(dic->di_flags, arch);
+	if (di_flags & XFS_DIFLAG_REALTIME)
+		flags |= XFS_XFLAG_REALTIME;
+	if (di_flags & XFS_DIFLAG_PREALLOC)
+		flags |= XFS_XFLAG_PREALLOC;
+	if (di_flags & XFS_DIFLAG_IMMUTABLE)
+		flags |= XFS_XFLAG_IMMUTABLE;
+	if (di_flags & XFS_DIFLAG_APPEND)
+		flags |= XFS_XFLAG_APPEND;
+	if (di_flags & XFS_DIFLAG_SYNC)
+		flags |= XFS_XFLAG_SYNC;
+	if (di_flags & XFS_DIFLAG_NOATIME)
+		flags |= XFS_XFLAG_NOATIME;
+	if (di_flags & XFS_DIFLAG_NODUMP)
+		flags |= XFS_XFLAG_NODUMP;
+	if (XFS_CFORK_Q_ARCH(dic, arch))
+		flags |= XFS_XFLAG_HASATTR;
+	return flags;
+}
+
 /*
  * Given a mount structure and an inode number, return a pointer
  * to a newly allocated in-core inode coresponding to the given
@@ -3722,32 +3750,6 @@ xfs_iaccess(
 		return XFS_ERROR(EACCES);
 	}
 	return XFS_ERROR(EACCES);
-}
-
-/*
- * Return whether or not it is OK to swap to the given file in the
- * given range.  Return 0 for OK and otherwise return the error.
- *
- * It is only OK to swap to a file if it has no holes, and all
- * extents have been initialized.
- *
- * We use the vnode behavior chain prevent and allow primitives
- * to ensure that the vnode chain stays coherent while we do this.
- * This allows us to walk the chain down to the bottom where XFS
- * lives without worrying about it changing out from under us.
- */
-int
-xfs_swappable(
-	bhv_desc_t	*bdp)
-{
-	xfs_inode_t	*ip;
-
-	ip = XFS_BHVTOI(bdp);
-	/*
-	 * Verify that the file does not have any
-	 * holes or unwritten exents.
-	 */
-	return xfs_bmap_check_swappable(ip);
 }
 
 /*

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -29,44 +29,28 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
+#ifndef __XFS_SUPPORT_SPIN_H__
+#define __XFS_SUPPORT_SPIN_H__
+
+#include <linux/sched.h>	/* preempt needs this */
+#include <linux/spinlock.h>
 
 /*
- * This file contains globals needed by XFS that were normally defined
- * somewhere else in IRIX.
+ * Map lock_t from IRIX to Linux spinlocks.
+ *
+ * We do not make use of lock_t from interrupt context, so we do not
+ * have to worry about disabling interrupts at all (unlike IRIX).
  */
 
-#include "xfs.h"
-#include "xfs_cred.h"
-#include "xfs_sysctl.h"
+typedef spinlock_t lock_t;
 
-/*
- * System memory size - used to scale certain data structures in XFS.
- */
-unsigned long xfs_physmem;
+#define SPLDECL(s)			unsigned long s
 
-/*
- * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
- * other XFS code uses these values.
- */
+#define spinlock_init(lock, name)	spin_lock_init(lock)
+#define	spinlock_destroy(lock)
+#define mutex_spinlock(lock)		({ spin_lock(lock); 0; })
+#define mutex_spinunlock(lock, s)	do { spin_unlock(lock); (void)s; } while (0)
+#define nested_spinlock(lock)		spin_lock(lock)
+#define nested_spinunlock(lock)		spin_unlock(lock)
 
-xfs_param_t xfs_params = {
-			  /*	MIN		DFLT		MAX	*/
-	.restrict_chown	= {	0,		1,		1	},
-	.sgid_inherit	= {	0,		0,		1	},
-	.symlink_mode	= {	0,		0,		1	},
-	.panic_mask	= {	0,		0,		127	},
-	.error_level	= {	0,		3,		11	},
-	.sync_interval	= {	USER_HZ,	30*USER_HZ,	7200*USER_HZ },
-	.stats_clear	= {	0,		0,		1	},
-	.inherit_sync	= {	0,		1,		1	},
-	.inherit_nodump	= {	0,		1,		1	},
-	.inherit_noatim = {	0,		1,		1	},
-	.flush_interval	= {	USER_HZ/2,	USER_HZ,	30*USER_HZ },
-	.age_buffer	= {	1*USER_HZ,	15*USER_HZ,	7200*USER_HZ },
-};
-
-/*
- * Global system credential structure.
- */
-cred_t sys_cred_val, *sys_cred = &sys_cred_val;
-
+#endif /* __XFS_SUPPORT_SPIN_H__ */
