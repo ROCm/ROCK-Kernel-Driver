@@ -412,7 +412,6 @@ show_temp_offset(1);
 show_temp_offset(2);
 show_temp_offset(3);
 
-/* more like overshoot temperature */
 static ssize_t show_sensor(struct device *dev, char *buf, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -561,15 +560,15 @@ show_fan_offset(1);
 show_fan_offset(2);
 show_fan_offset(3);
 
-/* Alarm */
-static ssize_t show_alarm(struct device *dev, char *buf)
+/* Alarms */
+static ssize_t show_alarms(struct device *dev, char *buf)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	it87_update_client(client);
 	return sprintf(buf,"%d\n", ALARMS_FROM_REG(data->alarms));
 }
-static DEVICE_ATTR(alarm, S_IRUGO | S_IWUSR, show_alarm, NULL);
+static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
 
 /* This function is called when:
      * it87_driver is inserted (when this module is loaded), for each
@@ -749,7 +748,7 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_fan_div1);
 	device_create_file(&new_client->dev, &dev_attr_fan_div2);
 	device_create_file(&new_client->dev, &dev_attr_fan_div3);
-	device_create_file(&new_client->dev, &dev_attr_alarm);
+	device_create_file(&new_client->dev, &dev_attr_alarms);
 
 	return 0;
 

@@ -635,14 +635,14 @@ static DEVICE_ATTR(fan_div##offset, S_IRUGO | S_IWUSR, 			\
 show_fan_offset(1);
 show_fan_offset(2);
 
-/* Alarm */
-static ssize_t show_alarm(struct device *dev, char *buf) {
+/* Alarms */
+static ssize_t show_alarms(struct device *dev, char *buf) {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	via686a_update_client(client);
 	return sprintf(buf,"%d\n", ALARMS_FROM_REG(data->alarms));
 }
-static DEVICE_ATTR(alarm, S_IRUGO | S_IWUSR, show_alarm, NULL);
+static DEVICE_ATTR(alarms, S_IRUGO | S_IWUSR, show_alarms, NULL);
 
 /* The driver. I choose to use type i2c_driver, as at is identical to both
    smbus_driver and isa_driver, and clients could be of either kind */
@@ -767,7 +767,7 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_fan_min2);
 	device_create_file(&new_client->dev, &dev_attr_fan_div1);
 	device_create_file(&new_client->dev, &dev_attr_fan_div2);
-	device_create_file(&new_client->dev, &dev_attr_alarm);
+	device_create_file(&new_client->dev, &dev_attr_alarms);
 
 	return 0;
 
