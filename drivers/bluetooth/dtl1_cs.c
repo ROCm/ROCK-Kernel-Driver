@@ -820,36 +820,29 @@ int dtl1_event(event_t event, int priority, event_callback_args_t *args)
 	return 0;
 }
 
+static struct pcmcia_driver dtl1_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "dtl1_cs",
+	},
+	.attach		= dtl1_attach,
+	.detach		= dtl1_detach,
+};
 
-
-/* ======================== Module initialization ======================== */
-
-
-int __init init_dtl1_cs(void)
+static int __init init_dtl1_cs(void)
 {
-	servinfo_t serv;
-	int err;
-
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "dtl1_cs: Card Services release does not match!\n");
-		return -1;
-	}
-
-	err = register_pccard_driver(&dev_info, &dtl1_attach, &dtl1_detach);
-
-	return err;
+	return pcmcia_register_driver(&dtl1_driver);
 }
 
 
-void __exit exit_dtl1_cs(void)
+static void __exit exit_dtl1_cs(void)
 {
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&dtl1_driver);
 
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL)
 		dtl1_detach(dev_list);
 }
-
 
 module_init(init_dtl1_cs);
 module_exit(exit_dtl1_cs);
