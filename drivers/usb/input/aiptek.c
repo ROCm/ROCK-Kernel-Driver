@@ -1337,7 +1337,7 @@ static ssize_t show_tabletToolMode(struct device *dev, char *buf)
 			break;
 		}
 
-		case AIPTEK_TOOL_BUTTON_PEN_MODE;
+	case AIPTEK_TOOL_BUTTON_PEN_MODE:
 		{
 			s = "pen";
 			break;
