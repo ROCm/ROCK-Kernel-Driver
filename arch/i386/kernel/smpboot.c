@@ -47,7 +47,6 @@
 #include <linux/mc146818rtc.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
-#include <asm/smpboot.h>
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 #include "smpboot_hooks.h"

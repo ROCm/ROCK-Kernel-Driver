@@ -28,16 +28,6 @@
  #define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */
 #endif
 
-#ifndef clustered_apic_mode
- #ifdef CONFIG_CLUSTERED_APIC
-  #define clustered_apic_mode (1)
-  #define esr_disable (1)
- #else /* !CONFIG_CLUSTERED_APIC */
-  #define clustered_apic_mode (0)
-  #define esr_disable (0)
- #endif /* CONFIG_CLUSTERED_APIC */
-#endif 
-
 #define BAD_APICID 0xFFu
 #ifdef CONFIG_SMP
 #ifndef __ASSEMBLY__

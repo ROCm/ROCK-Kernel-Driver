@@ -3,6 +3,8 @@
 
 extern int x86_summit;
 
+#define esr_disable (1)
+
 #define XAPIC_DEST_CPUS_MASK    0x0Fu
 #define XAPIC_DEST_CLUSTER_MASK 0xF0u
 

@@ -6,6 +6,7 @@
 #define TARGET_CPUS (0xf)
 
 #define no_balance_irq (1)
+#define esr_disable (1)
 
 #define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) ((bitmap) & (1 << (apicid)))
