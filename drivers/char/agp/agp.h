@@ -232,19 +232,6 @@ struct agp_bridge_data {
 #define I852_GME			0x2
 #define I852_GM				0x5
 
-#ifndef PCI_DEVICE_ID_INTEL_82855_HB
-#define PCI_DEVICE_ID_INTEL_82855_HB	0x3580
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_82855_IG
-#define PCI_DEVICE_ID_INTEL_82855_IG	0x3582
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_82865_HB
-#define PCI_DEVICE_ID_INTEL_82865_HB	0x2570
-#endif
-#ifndef PCI_DEVICE_ID_INTEL_82865_IG
-#define PCI_DEVICE_ID_INTEL_82865_IG	0x2572
-#endif
-
 /* intel 815 register */
 #define INTEL_815_APCONT	0x51
 #define INTEL_815_ATTBASE_MASK	~0x1FFFFFFF
