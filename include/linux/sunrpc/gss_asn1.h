@@ -81,5 +81,4 @@ int g_token_size(
 void g_make_token_header(
      struct xdr_netobj *mech,
      int body_size,
-     unsigned char **buf,
-     int tok_type);
+     unsigned char **buf);

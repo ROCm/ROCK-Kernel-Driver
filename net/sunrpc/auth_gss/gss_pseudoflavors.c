@@ -82,12 +82,13 @@ gss_register_triple(u32 pseudoflavor, struct gss_api_mech *mech,
 
 	spin_lock(&registered_triples_lock);
 	if (do_lookup_triple_by_pseudoflavor(pseudoflavor)) {
-		printk("Registered pseudoflavor %d again\n", pseudoflavor);
+		printk(KERN_WARNING "RPC: Registered pseudoflavor %d again\n",
+				pseudoflavor);
 		goto err_unlock;
 	}
 	list_add(&triple->triples, &registered_triples);
 	spin_unlock(&registered_triples_lock);
-	dprintk("RPC: registered pseudoflavor %d\n", pseudoflavor);
+	dprintk("RPC:      registered pseudoflavor %d\n", pseudoflavor);
 
 	return 0;
 
@@ -145,7 +146,7 @@ gss_cmp_triples(u32 oid_len, char *oid_data, u32 qop, u32 service)
 	oid.len = oid_len;
 	oid.data = oid_data;
 
-	dprintk("RPC: gss_cmp_triples \n");
+	dprintk("RPC:      gss_cmp_triples\n");
 	print_sec_triple(&oid,qop,service);
 
 	spin_lock(&registered_triples_lock);
@@ -158,7 +159,7 @@ gss_cmp_triples(u32 oid_len, char *oid_data, u32 qop, u32 service)
 		}
 	}
 	spin_unlock(&registered_triples_lock);
-	dprintk("RPC: gss_cmp_triples return %d\n", pseudoflavor);
+	dprintk("RPC:      gss_cmp_triples return %d\n", pseudoflavor);
 	return pseudoflavor;
 }
 
@@ -193,8 +194,8 @@ gss_pseudoflavor_to_service(u32 pseudoflavor)
 	triple = do_lookup_triple_by_pseudoflavor(pseudoflavor);
 	spin_unlock(&registered_triples_lock);
 	if (!triple) {
-		dprintk("RPC: gss_pseudoflavor_to_service called with"
-			" unsupported pseudoflavor %d\n", pseudoflavor);
+		dprintk("RPC:      gss_pseudoflavor_to_service called with unsupported pseudoflavor %d\n",
+				pseudoflavor);
 		return 0;
 	}
 	return triple->service;
@@ -211,8 +212,8 @@ gss_pseudoflavor_to_mech(u32 pseudoflavor) {
 	if (triple)
 		mech = gss_mech_get(triple->mech);
 	else
-		dprintk("RPC: gss_pseudoflavor_to_mech called with"
-			" unsupported pseudoflavor %d\n", pseudoflavor);
+		dprintk("RPC:      gss_pseudoflavor_to_mech called with unsupported pseudoflavor %d\n",
+				pseudoflavor);
 	return mech;
 }
 
@@ -223,8 +224,8 @@ gss_pseudoflavor_to_mechOID(u32 pseudoflavor, struct xdr_netobj * oid)
 
 	mech = gss_pseudoflavor_to_mech(pseudoflavor);
 	if (!mech)  {
-		dprintk("RPC: gss_pseudoflavor_to_mechOID called with"
-			" unsupported pseudoflavor %d\n", pseudoflavor);
+		dprintk("RPC:      gss_pseudoflavor_to_mechOID called with unsupported pseudoflavor %d\n",
+				pseudoflavor);
 		        return -1;
 	}
 	oid->len = mech->gm_oid.len;

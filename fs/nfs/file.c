@@ -154,6 +154,11 @@ nfs_file_read(struct kiocb *iocb, char * buf, size_t count, loff_t pos)
 	struct inode * inode = dentry->d_inode;
 	ssize_t result;
 
+#ifdef CONFIG_NFS_DIRECTIO
+	if (iocb->ki_filp->f_flags & O_DIRECT)
+		return nfs_file_direct_read(iocb, buf, count, pos);
+#endif
+
 	dfprintk(VFS, "nfs: read(%s/%s, %lu@%lu)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,
 		(unsigned long) count, (unsigned long) pos);
@@ -267,6 +272,11 @@ nfs_file_write(struct kiocb *iocb, const char *buf, size_t count, loff_t pos)
 	struct dentry * dentry = iocb->ki_filp->f_dentry;
 	struct inode * inode = dentry->d_inode;
 	ssize_t result;
+
+#ifdef CONFIG_NFS_DIRECTIO
+	if (iocb->ki_filp->f_flags & O_DIRECT)
+		return nfs_file_direct_write(iocb, buf, count, pos);
+#endif
 
 	dfprintk(VFS, "nfs: write(%s/%s(%ld), %lu@%lu)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,

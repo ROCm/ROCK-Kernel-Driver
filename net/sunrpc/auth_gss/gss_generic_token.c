@@ -32,6 +32,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/sunrpc/sched.h>
@@ -151,21 +152,22 @@ g_token_size(struct xdr_netobj *mech, unsigned int body_size)
 	return(1 + der_length_size(body_size) + body_size);
 }
 
+EXPORT_SYMBOL(g_token_size);
+
 /* fills in a buffer with the token header.  The buffer is assumed to
    be the right size.  buf is advanced past the token header */
 
 void
-g_make_token_header(struct xdr_netobj *mech, int body_size, unsigned char **buf,
-		int tok_type)
+g_make_token_header(struct xdr_netobj *mech, int body_size, unsigned char **buf)
 {
 	*(*buf)++ = 0x60;
 	der_write_length(buf, 4 + mech->len + body_size);
 	*(*buf)++ = 0x06;
 	*(*buf)++ = (unsigned char) mech->len;
 	TWRITE_STR(*buf, mech->data, ((int) mech->len));
-	*(*buf)++ = (unsigned char) ((tok_type>>8)&0xff);
-	*(*buf)++ = (unsigned char) (tok_type&0xff);
 }
+
+EXPORT_SYMBOL(g_make_token_header);
 
 /*
  * Given a buffer containing a token, reads and verifies the token,
@@ -221,9 +223,6 @@ g_verify_token_header(struct xdr_netobj *mech, int *body_size,
 	if (ret)
 		return(ret);
 
-	if ((*buf++ != ((tok_type>>8)&0xff)) || (*buf++ != (tok_type&0xff))) 
-		return(G_WRONG_TOKID);
-
 	if (!ret) {
 		*buf_in = buf;
 		*body_size = toksize;
@@ -231,6 +230,8 @@ g_verify_token_header(struct xdr_netobj *mech, int *body_size,
 
 	return(ret);
 }
+
+EXPORT_SYMBOL(g_verify_token_header);
 
 /* Given a buffer containing a token, returns a copy of the mech oid in
  * the parameter mech. */

@@ -788,13 +788,11 @@ static void
 call_timeout(struct rpc_task *task)
 {
 	struct rpc_clnt	*clnt = task->tk_client;
-	struct rpc_timeout *to = &task->tk_rqstp->rq_timeout;
 
-	if (xprt_adjust_timeout(to)) {
+	if (xprt_adjust_timeout(task->tk_rqstp) == 0) {
 		dprintk("RPC: %4d call_timeout (minor)\n", task->tk_pid);
 		goto retry;
 	}
-	to->to_retries = clnt->cl_timeout.to_retries;
 
 	dprintk("RPC: %4d call_timeout (major)\n", task->tk_pid);
 	if (RPC_IS_SOFT(task)) {
