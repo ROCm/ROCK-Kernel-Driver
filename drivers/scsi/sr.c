@@ -72,6 +72,7 @@ static int sr_init_command(struct scsi_cmnd *);
 
 static struct Scsi_Device_Template sr_template = {
 	.module		= THIS_MODULE,
+	.list		= LIST_HEAD_INIT(sr_template.list),
 	.name		= "cdrom",
 	.tag		= "sr",
 	.scsi_type	= TYPE_ROM,
@@ -130,10 +131,7 @@ static void sr_release(struct cdrom_device_info *cdi)
 	if (cd->device->sector_size > 2048)
 		sr_set_blocklength(cd, 2048);
 	cd->device->access_count--;
-	if (cd->device->host->hostt->module)
-		__MOD_DEC_USE_COUNT(cd->device->host->hostt->module);
-	if (sr_template.module)
-		__MOD_DEC_USE_COUNT(sr_template.module);
+	module_put(cd->device->host->hostt->module);
 }
 
 static struct cdrom_device_ops sr_dops = {
@@ -472,11 +470,9 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	if (!scsi_block_when_processing_errors(cd->device)) {
 		return -ENXIO;
 	}
+	if(!try_module_get(cd->device->host->hostt->module))
+		return -ENXIO;
 	cd->device->access_count++;
-	if (cd->device->host->hostt->module)
-		__MOD_INC_USE_COUNT(cd->device->host->hostt->module);
-	if (sr_template.module)
-		__MOD_INC_USE_COUNT(sr_template.module);
 
 	/* If this device did not have media in the drive at boot time, then
 	 * we would have been unable to get the sector size.  Check to see if

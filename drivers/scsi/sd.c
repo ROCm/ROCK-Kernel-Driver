@@ -104,6 +104,7 @@ static struct notifier_block sd_notifier_block = {sd_notifier, NULL, 0};
 
 static struct Scsi_Device_Template sd_template = {
 	.module		= THIS_MODULE,
+	.list		= LIST_HEAD_INIT(sd_template.list),
 	.name		= "disk",
 	.tag		= "sd",
 	.scsi_type	= TYPE_DISK,
@@ -453,10 +454,8 @@ static int sd_open(struct inode *inode, struct file *filp)
 	 * The following code can sleep.
 	 * Module unloading must be prevented
 	 */
-	if (sdp->host->hostt->module)
-		__MOD_INC_USE_COUNT(sdp->host->hostt->module);
-	if (sd_template.module)
-		__MOD_INC_USE_COUNT(sd_template.module);
+	if(!try_module_get(sdp->host->hostt->module))
+		return -ENOMEM;
 	sdp->access_count++;
 
 	if (sdp->removable) {
@@ -498,10 +497,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 
 error_out:
 	sdp->access_count--;
-	if (sdp->host->hostt->module)
-		__MOD_DEC_USE_COUNT(sdp->host->hostt->module);
-	if (sd_template.module)
-		__MOD_DEC_USE_COUNT(sd_template.module);
+	module_put(sdp->host->hostt->module);
 	return retval;	
 }
 
@@ -536,10 +532,7 @@ static int sd_release(struct inode *inode, struct file *filp)
 			if (scsi_block_when_processing_errors(sdp))
 				scsi_set_medium_removal(sdp, SCSI_REMOVAL_ALLOW);
 	}
-	if (sdp->host->hostt->module)
-		__MOD_DEC_USE_COUNT(sdp->host->hostt->module);
-	if (sd_template.module)
-		__MOD_DEC_USE_COUNT(sd_template.module);
+	module_put(sdp->host->hostt->module);
 
 	return 0;
 }
@@ -1241,6 +1234,7 @@ static int sd_attach(struct scsi_device * sdp)
 	gd->de = sdp->de;
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
+	gd->minors = 16;
 	gd->fops = &sd_fops;
 	if (dsk_nr > 26)
 		sprintf(gd->disk_name, "sd%c%c",'a'+dsk_nr/26-1,'a'+dsk_nr%26);

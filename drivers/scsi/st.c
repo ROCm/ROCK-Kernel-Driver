@@ -175,6 +175,7 @@ static void st_detach(Scsi_Device *);
 
 static struct Scsi_Device_Template st_template = {
 	.module =	THIS_MODULE,
+	.list =		LIST_HEAD_INIT(st_template.list),
 	.name =		"tape", 
 	.tag =		"st", 
 	.scsi_type =	TYPE_TAPE,
@@ -992,13 +993,13 @@ static int st_open(struct inode *inode, struct file *filp)
 		DEB( printk(ST_DEB_MSG "%s: Device already in use.\n", name); )
 		return (-EBUSY);
 	}
+	if(!try_module_get(STp->device->host->hostt->module))
+		return (-ENXIO);
+	STp->device->access_count++;
 	STp->in_use = 1;
 	write_unlock(&st_dev_arr_lock);
 	STp->rew_at_close = STp->autorew_dev = (minor(inode->i_rdev) & 0x80) == 0;
 
-	if (STp->device->host->hostt->module)
-		__MOD_INC_USE_COUNT(STp->device->host->hostt->module);
-	STp->device->access_count++;
 
 	if (!scsi_block_when_processing_errors(STp->device)) {
 		retval = (-ENXIO);
@@ -1040,8 +1041,7 @@ static int st_open(struct inode *inode, struct file *filp)
 	normalize_buffer(STp->buffer);
 	STp->in_use = 0;
 	STp->device->access_count--;
-	if (STp->device->host->hostt->module)
-	    __MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
+	module_put(STp->device->host->hostt->module);
 	return retval;
 
 }
@@ -1175,8 +1175,7 @@ static int st_release(struct inode *inode, struct file *filp)
 	STp->in_use = 0;
 	write_unlock(&st_dev_arr_lock);
 	STp->device->access_count--;
-	if (STp->device->host->hostt->module)
-		__MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
+	module_put(STp->device->host->hostt->module);
 
 	return result;
 }
