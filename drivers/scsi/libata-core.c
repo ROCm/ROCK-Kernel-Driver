@@ -57,6 +57,7 @@ static int fgb(unsigned long bitmap);
 static int ata_choose_xfer_mode(struct ata_port *ap,
 				unsigned int *xfer_mode_out,
 				unsigned int *xfer_shift_out);
+static int ata_qc_complete_noop(struct ata_queued_cmd *qc, u8 drv_stat);
 
 static unsigned int ata_unique_id = 1;
 static struct workqueue_struct *ata_wq;
@@ -1748,30 +1749,34 @@ static int ata_choose_xfer_mode(struct ata_port *ap,
 
 static void ata_dev_set_xfermode(struct ata_port *ap, struct ata_device *dev)
 {
-	struct ata_taskfile tf;
+	DECLARE_COMPLETION(wait);
+	struct ata_queued_cmd *qc;
+	int rc;
+	unsigned long flags;
 
 	/* set up set-features taskfile */
 	DPRINTK("set features - xfer mode\n");
-	ata_tf_init(ap, &tf, dev->devno);
-	tf.ctl |= ATA_NIEN;
-	tf.command = ATA_CMD_SET_FEATURES;
-	tf.feature = SETFEATURES_XFER;
-	tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
-	tf.protocol = ATA_PROT_NODATA;
-	tf.nsect = dev->xfer_mode;
 
-	/* do bus reset */
-	ata_tf_to_host(ap, &tf);
+	qc = ata_qc_new_init(ap, dev);
+	BUG_ON(qc == NULL);
 
-	/* crazy ATAPI devices... */
-	if (dev->class == ATA_DEV_ATAPI)
-		msleep(150);
+	qc->tf.command = ATA_CMD_SET_FEATURES;
+	qc->tf.feature = SETFEATURES_XFER;
+	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
+	qc->tf.protocol = ATA_PROT_NODATA;
+	qc->tf.nsect = dev->xfer_mode;
+	
+	qc->waiting = &wait;
+	qc->complete_fn = ata_qc_complete_noop;
 
-	ata_busy_sleep(ap, ATA_TMOUT_BOOT_QUICK, ATA_TMOUT_BOOT);
+	spin_lock_irqsave(&ap->host_set->lock, flags);
+	rc = ata_qc_issue(qc);
+	spin_unlock_irqrestore(&ap->host_set->lock, flags);
 
-	ata_irq_on(ap);	/* re-enable interrupts */
-
-	ata_wait_idle(ap);
+	if (rc)
+		ata_port_disable(ap);
+	else
+		wait_for_completion(&wait);
 
 	DPRINTK("EXIT\n");
 }
@@ -2328,6 +2333,11 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 	}
 
 	return qc;
+}
+
+static int ata_qc_complete_noop(struct ata_queued_cmd *qc, u8 drv_stat)
+{
+	return 0;
 }
 
 /**
