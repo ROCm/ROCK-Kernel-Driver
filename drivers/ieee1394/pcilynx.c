@@ -1460,7 +1460,7 @@ static void remove_card(struct pci_dev *dev)
                 reg_write(lynx, PCI_INT_ENABLE, 0);
                 free_irq(lynx->dev->irq, lynx);
 
-		/* Disable IRM Contender */
+		/* Disable IRM Contender and LCtrl */
 		if (lynx->phyic.reg_1394a)
 			set_phy_reg(lynx, 4, ~0xc0 & get_phy_reg(lynx, 4));
 
@@ -1788,12 +1788,12 @@ static int __devinit add_card(struct pci_dev *dev,
                 reg_set_bits(lynx, GPIO_CTRL_A, 0x1);
                 reg_write(lynx, GPIO_DATA_BASE + 0x3c, 0x1); 
         } else {
-                /* set the contender bit in the extended PHY register
+                /* set the contender and LCtrl bit in the extended PHY register
                  * set. (Should check that bis 0,1,2 (=0xE0) is set
                  * in register 2?)
                  */
                 i = get_phy_reg(lynx, 4);
-                if (i != -1) set_phy_reg(lynx, 4, i | 0x40);
+                if (i != -1) set_phy_reg(lynx, 4, i | 0xc0);
         }
 
 
