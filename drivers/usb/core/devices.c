@@ -583,6 +583,9 @@ static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbyte
 		return 0;
 	if (!access_ok(VERIFY_WRITE, buf, nbytes))
 		return -EFAULT;
+	if (!*ppos)
+		printk(KERN_ALERT "program %s is still not converted to use sysfs. slackers!\n",
+				current->comm);
 
 	down (&usb_bus_list_lock);
 	/* print devices for all busses */
