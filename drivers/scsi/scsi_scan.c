@@ -95,13 +95,6 @@ MODULE_PARM_DESC(max_report_luns,
 		 " between 1 and 16384)");
 #endif
 
-/*
- * This mutex serializes all scsi scanning activity from kernel- and
- * userspace.  It could easily be made per-host but I'd like to avoid
- * the overhead for now.
- */
-static DECLARE_MUTEX(scsi_scan_mutex);
-
 /**
  * scsi_unlock_floptical - unlock device via a special MODE SENSE command
  * @sreq:	used to send the command
@@ -1075,11 +1068,11 @@ struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 	struct scsi_device *sdev;
 	int res;
 
-	down(&scsi_scan_mutex);
+	down(&shost->scan_mutex);
 	res = scsi_probe_and_add_lun(shost, channel, id, lun, NULL, &sdev, 1);
 	if (res != SCSI_SCAN_LUN_PRESENT)
 		sdev = ERR_PTR(-ENODEV);
-	up(&scsi_scan_mutex);
+	up(&shost->scan_mutex);
 
 	return sdev;
 }
@@ -1202,13 +1195,13 @@ int scsi_scan_host_selected(struct Scsi_Host *shost, unsigned int channel,
 	    ((lun != SCAN_WILD_CARD) && (lun > shost->max_lun)))
 		return -EINVAL;
 
-	down(&scsi_scan_mutex);
+	down(&shost->scan_mutex);
 	if (channel == SCAN_WILD_CARD) 
 		for (channel = 0; channel <= shost->max_channel; channel++)
 			scsi_scan_channel(shost, channel, id, lun, rescan);
 	else
 		scsi_scan_channel(shost, channel, id, lun, rescan);
-	up(&scsi_scan_mutex);
+	up(&shost->scan_mutex);
 
 	return 0;
 }

@@ -480,6 +480,12 @@ struct Scsi_Host {
 	struct list_head sht_legacy_list;
 
 	/*
+	 * This mutex serializes all scsi scanning activity from kernel- and
+	 * userspace.
+	 */
+	struct semaphore scan_mutex;
+
+	/*
 	 * We should ensure that this is aligned, both for better performance
 	 * and also because some compilers (m68k) don't automatically force
 	 * alignment to a long boundary.
