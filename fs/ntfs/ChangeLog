@@ -25,7 +25,7 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
-2.1.22-WIP
+2.1.22 - Many bug and race fixes and error handling improvements.
 
 	- Improve error handling in fs/ntfs/inode.c::ntfs_truncate().
 	- Change fs/ntfs/inode.c::ntfs_truncate() to return an error code
@@ -85,6 +85,9 @@ ToDo/Notes:
 	  complete runlist for the mft mirror is always mapped into memory.
 	- Add creation of buffers to fs/ntfs/mft.c::ntfs_sync_mft_mirror().
 	- Improve error handling in fs/ntfs/aops.c::ntfs_{read,write}_block().
+	- Cleanup fs/ntfs/aops.c::ntfs_{read,write}page() since we know that a
+	  resident attribute will be smaller than a page which makes the code
+	  simpler.  Also make the code more tolerant to concurrent ->truncate.
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 

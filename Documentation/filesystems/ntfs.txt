@@ -432,6 +432,9 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.22:
+	- Improve handling of ntfs volumes with errors.
+	- Fix various bugs and race conditions.
 2.1.21:
 	- Fix several race conditions and various other bugs.
 	- Many internal cleanups, code reorganization, optimizations, and mft
