@@ -80,7 +80,6 @@ int reiserfs_unpack (struct inode * inode, struct file * filp)
     /* conversion can change page contents, must flush */
     flush_dcache_page(page) ;
     REISERFS_I(inode)->i_flags |= i_nopack_mask;
-    kunmap(page) ; /* mapped by prepare_write */
 
 out_unlock:
     unlock_page(page) ;
