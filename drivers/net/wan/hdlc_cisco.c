@@ -238,8 +238,9 @@ static void cisco_timer(unsigned long arg)
 
 
 
-static void cisco_start(hdlc_device *hdlc)
+static void cisco_start(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	hdlc->state.cisco.last_poll = 0;
 	hdlc->state.cisco.up = 0;
 	hdlc->state.cisco.txseq = hdlc->state.cisco.rxseq = 0;
@@ -253,11 +254,11 @@ static void cisco_start(hdlc_device *hdlc)
 
 
 
-static void cisco_stop(hdlc_device *hdlc)
+static void cisco_stop(struct net_device *dev)
 {
-	del_timer_sync(&hdlc->state.cisco.timer);
-	if (netif_carrier_ok(&hdlc->netdev))
-		netif_carrier_off(&hdlc->netdev);
+	del_timer_sync(&dev_to_hdlc(dev)->state.cisco.timer);
+	if (netif_carrier_ok(dev))
+		netif_carrier_off(dev);
 }
 
 

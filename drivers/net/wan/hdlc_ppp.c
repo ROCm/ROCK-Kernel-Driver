@@ -24,9 +24,9 @@
 #include <linux/hdlc.h>
 
 
-static int ppp_open(hdlc_device *hdlc)
+static int ppp_open(struct net_device *dev)
 {
-	struct net_device *dev = hdlc_to_dev(hdlc);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	void *old_ioctl;
 	int result;
 
@@ -52,9 +52,9 @@ static int ppp_open(hdlc_device *hdlc)
 
 
 
-static void ppp_close(hdlc_device *hdlc)
+static void ppp_close(struct net_device *dev)
 {
-	struct net_device *dev = hdlc_to_dev(hdlc);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 
 	sppp_close(dev);
 	sppp_detach(dev);

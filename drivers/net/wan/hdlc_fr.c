@@ -932,14 +932,15 @@ static int fr_rx(struct sk_buff *skb)
 
 
 
-static void fr_start(hdlc_device *hdlc)
+static void fr_start(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 #ifdef DEBUG_LINK
 	printk(KERN_DEBUG "fr_start\n");
 #endif
 	if (hdlc->state.fr.settings.lmi != LMI_NONE) {
-		if (netif_carrier_ok(&hdlc->netdev))
-			netif_carrier_off(&hdlc->netdev);
+		if (netif_carrier_ok(dev))
+			netif_carrier_off(dev);
 		hdlc->state.fr.last_poll = 0;
 		hdlc->state.fr.reliable = 0;
 		hdlc->state.fr.dce_changed = 1;
@@ -961,8 +962,9 @@ static void fr_start(hdlc_device *hdlc)
 
 
 
-static void fr_stop(hdlc_device *hdlc)
+static void fr_stop(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 #ifdef DEBUG_LINK
 	printk(KERN_DEBUG "fr_stop\n");
 #endif
@@ -973,8 +975,9 @@ static void fr_stop(hdlc_device *hdlc)
 
 
 
-static void fr_close(hdlc_device *hdlc)
+static void fr_close(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	pvc_device *pvc = hdlc->state.fr.first_pvc;
 
 	while (pvc) {		/* Shutdown all PVCs for this FRAD */

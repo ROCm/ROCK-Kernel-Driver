@@ -109,13 +109,13 @@ typedef struct hdlc_device_struct {
 
 	/* Things below are for HDLC layer internal use only */
 	struct {
-		int (*open)(struct hdlc_device_struct *hdlc);
-		void (*close)(struct hdlc_device_struct *hdlc);
+		int (*open)(struct net_device *dev);
+		void (*close)(struct net_device *dev);
 
 		/* if open & DCD */
-		void (*start)(struct hdlc_device_struct *hdlc);
+		void (*start)(struct net_device *dev);
 		/* if open & !DCD */
-		void (*stop)(struct hdlc_device_struct *hdlc);
+		void (*stop)(struct net_device *dev);
 
 		void (*detach)(struct hdlc_device_struct *hdlc);
 		int (*netif_rx)(struct sk_buff *skb);

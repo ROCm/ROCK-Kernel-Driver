@@ -140,7 +140,7 @@ static int x25_xmit(struct sk_buff *skb, struct net_device *dev)
 
 
 
-static int x25_open(hdlc_device *hdlc)
+static int x25_open(struct net_device *dev)
 {
 	struct lapb_register_struct cb;
 	int result;
@@ -152,7 +152,7 @@ static int x25_open(hdlc_device *hdlc)
 	cb.data_indication = x25_data_indication;
 	cb.data_transmit = x25_data_transmit;
 
-	result = lapb_register(hdlc_to_dev(hdlc), &cb);
+	result = lapb_register(dev, &cb);
 	if (result != LAPB_OK)
 		return result;
 	return 0;
@@ -160,9 +160,9 @@ static int x25_open(hdlc_device *hdlc)
 
 
 
-static void x25_close(hdlc_device *hdlc)
+static void x25_close(struct net_device *dev)
 {
-	lapb_unregister(hdlc_to_dev(hdlc));
+	lapb_unregister(dev);
 }
 
 

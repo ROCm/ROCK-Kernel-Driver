@@ -92,13 +92,13 @@ void hdlc_set_carrier(int on, struct net_device *dev)
 
 	if (hdlc->carrier) {
 		if (hdlc->proto.start)
-			hdlc->proto.start(hdlc);
+			hdlc->proto.start(dev);
 		else if (!netif_carrier_ok(dev))
 			netif_carrier_on(dev);
 
 	} else { /* no carrier */
 		if (hdlc->proto.stop)
-			hdlc->proto.stop(hdlc);
+			hdlc->proto.stop(dev);
 		else if (netif_carrier_ok(dev))
 			netif_carrier_off(dev);
 	}
@@ -121,7 +121,7 @@ int hdlc_open(struct net_device *dev)
 		return -ENOSYS;	/* no protocol attached */
 
 	if (hdlc->proto.open) {
-		int result = hdlc->proto.open(hdlc);
+		int result = hdlc->proto.open(dev);
 		if (result)
 			return result;
 	}
@@ -130,7 +130,7 @@ int hdlc_open(struct net_device *dev)
 
 	if (hdlc->carrier) {
 		if (hdlc->proto.start)
-			hdlc->proto.start(hdlc);
+			hdlc->proto.start(dev);
 		else if (!netif_carrier_ok(dev))
 			netif_carrier_on(dev);
 
@@ -158,12 +158,12 @@ void hdlc_close(struct net_device *dev)
 
 	hdlc->open = 0;
 	if (hdlc->carrier && hdlc->proto.stop)
-		hdlc->proto.stop(hdlc);
+		hdlc->proto.stop(dev);
 
 	spin_unlock_irq(&hdlc->state_lock);
 
 	if (hdlc->proto.close)
-		hdlc->proto.close(hdlc);
+		hdlc->proto.close(dev);
 }
 
 
