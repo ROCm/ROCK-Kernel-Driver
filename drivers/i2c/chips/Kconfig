@@ -5,22 +5,8 @@
 
 menu "I2C Hardware Sensors Chip support"
 
-config SENSORS
-	bool "Hardware sensors chip support"
-	depends on EXPERIMENTAL && I2C && I2C_PROC
-	help
-	  Many modern mainboards have some kind of I2C interface integrated.
-	  This is often in the form of a SMBus, or System Management Bus, which
-	  is basically the same as I2C but which uses only a subset of the I2C
-	  protocol.
-
-	  You will also want the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at 
-	  http://www.lm-sensors.nu
-
 config SENSORS_ADM1021
 	tristate "  Analog Devices ADM1021 and compatibles"
-	depends on SENSORS
 	help
 	  If you say yes here you get support for Analog Devices ADM1021 
 	  and ADM1023 sensor chips and clones: Maxim MAX1617 and MAX1617A,
@@ -37,7 +23,6 @@ config SENSORS_ADM1021
 
 config SENSORS_LM75
 	tristate "  National Semiconductors LM75 and compatibles"
-	depends on SENSORS
 	help
 	  If you say yes here you get support for National Semiconductor LM75
 	  sensor chips and clones: Dallas Semi DS75 and DS1775, TelCon
@@ -51,4 +36,3 @@ config SENSORS_LM75
 	  http://www.lm-sensors.nu
 
 endmenu
-

@@ -159,19 +159,6 @@ static int pcf_isa_init(void)
 	return 0;
 }
 
-
-static void pcf_isa_exit(void)
-{
-	if (irq > 0) {
-		disable_irq(irq);
-		free_irq(irq, 0);
-	}
-	if (!mmapped) {
-		release_region(base , 2);
-	}
-}
-
-
 static int pcf_isa_reg(struct i2c_client *client)
 {
 	return 0;
@@ -223,7 +210,7 @@ static struct i2c_adapter pcf_isa_ops = {
 	.client_unregister = pcf_isa_unreg,
 };
 
-int __init i2c_pcfisa_init(void) 
+static int __init i2c_pcfisa_init(void) 
 {
 #ifdef __alpha__
 	/* check to see we have memory mapped PCF8584 connected to the 
@@ -281,23 +268,39 @@ int __init i2c_pcfisa_init(void)
 	}
 
 	init_waitqueue_head(&pcf_wait);
-	if (pcf_isa_init() == 0) {
-		if (i2c_pcf_add_bus(&pcf_isa_ops) < 0) {
-			pcf_isa_exit();
-			return -ENODEV;
-		}
-	} else {
+	if (pcf_isa_init())
 		return -ENODEV;
-	}
+	if (i2c_pcf_add_bus(&pcf_isa_ops) < 0)
+		goto fail;
 	
 	printk(KERN_ERR "i2c-elektor.o: found device at %#x.\n", base);
 
 	return 0;
+
+ fail:
+	if (irq > 0) {
+		disable_irq(irq);
+		free_irq(irq, 0);
+	}
+
+	if (!mmapped)
+		release_region(base , 2);
+	return -ENODEV;
 }
 
-EXPORT_NO_SYMBOLS;
+static void i2c_pcfisa_exit(void)
+{
+	i2c_pcf_del_bus(&pcf_isa_ops);
 
-#ifdef MODULE
+	if (irq > 0) {
+		disable_irq(irq);
+		free_irq(irq, 0);
+	}
+
+	if (!mmapped)
+		release_region(base , 2);
+}
+
 MODULE_AUTHOR("Hans Berglund <hb@spacetec.no>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for PCF8584 ISA bus adapter");
 MODULE_LICENSE("GPL");
@@ -309,15 +312,5 @@ MODULE_PARM(own, "i");
 MODULE_PARM(mmapped, "i");
 MODULE_PARM(i2c_debug, "i");
 
-int init_module(void) 
-{
-	return i2c_pcfisa_init();
-}
-
-void cleanup_module(void) 
-{
-	i2c_pcf_del_bus(&pcf_isa_ops);
-	pcf_isa_exit();
-}
-
-#endif
+module_init(i2c_pcfisa_init);
+module_exit(i2c_pcfisa_exit);

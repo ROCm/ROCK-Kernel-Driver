@@ -40,10 +40,6 @@
 #define THIS_MODULE NULL
 #endif
 
-int __init sensors_init(void);
-void __exit i2c_proc_exit(void);
-static int proc_cleanup(void);
-
 static int i2c_create_name(char **name, const char *prefix,
 			       struct i2c_adapter *adapter, int addr);
 static int i2c_parse_reals(int *nrels, void *buffer, int bufsize,
@@ -92,7 +88,6 @@ static ctl_table i2c_proc[] = {
 
 
 static struct ctl_table_header *i2c_proc_header;
-static int i2c_initialized;
 
 /* This returns a nice name for a new directory; for example lm78-isa-0310
    (for a LM78 chip on the ISA bus at port 0x310), or lm75-i2c-3-4e (for
@@ -848,10 +843,9 @@ int i2c_detect(struct i2c_adapter *adapter,
 	return 0;
 }
 
-int __init sensors_init(void)
+static int __init i2c_proc_init(void)
 {
 	printk(KERN_INFO "i2c-proc.o version %s (%s)\n", I2C_VERSION, I2C_DATE);
-	i2c_initialized = 0;
 	if (!
 	    (i2c_proc_header =
 	     register_sysctl_table(i2c_proc, 0))) {
@@ -859,22 +853,12 @@ int __init sensors_init(void)
 		return -EPERM;
 	}
 	i2c_proc_header->ctl_table->child->de->owner = THIS_MODULE;
-	i2c_initialized++;
 	return 0;
 }
 
-void __exit i2c_proc_exit(void)
+static void __exit i2c_proc_exit(void)
 {
-	proc_cleanup();
-}
-
-static int proc_cleanup(void)
-{
-	if (i2c_initialized >= 1) {
-		unregister_sysctl_table(i2c_proc_header);
-		i2c_initialized--;
-	}
-	return 0;
+	unregister_sysctl_table(i2c_proc_header);
 }
 
 EXPORT_SYMBOL(i2c_deregister_entry);
@@ -887,5 +871,5 @@ MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>");
 MODULE_DESCRIPTION("i2c-proc driver");
 MODULE_LICENSE("GPL");
 
-module_init(sensors_init);
+module_init(i2c_proc_init);
 module_exit(i2c_proc_exit);

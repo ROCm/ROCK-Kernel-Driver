@@ -2,6 +2,5 @@
 # Makefile for the kernel hardware sensors chip drivers.
 #
 
-obj-$(CONFIG_SENSORS)		+= sensors.o
 obj-$(CONFIG_SENSORS_ADM1021)	+= adm1021.o
 obj-$(CONFIG_SENSORS_LM75)	+= lm75.o
