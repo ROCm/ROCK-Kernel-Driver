@@ -99,7 +99,6 @@ struct as_data {
 	sector_t last_sector[2];	/* last REQ_SYNC & REQ_ASYNC sectors */
 	struct list_head *dispatch;	/* driver dispatch queue */
 	struct list_head *hash;		/* request hash */
-	unsigned long hash_valid_count;	/* barrier hash count */
 	unsigned long current_batch_expires;
 	unsigned long last_check_fifo[2];
 	int changed_batch;
@@ -153,7 +152,7 @@ struct as_rq {
 	 * request hash, key is the ending offset (for back merge lookup)
 	 */
 	struct list_head hash;
-	unsigned long hash_valid_count;
+	unsigned int on_hash;
 
 	/*
 	 * expire fifo
@@ -161,7 +160,7 @@ struct as_rq {
 	struct list_head fifo;
 	unsigned long expires;
 
-	int is_sync;
+	unsigned int is_sync;
 	enum arq_state state; /* debug only */
 };
 
@@ -238,23 +237,16 @@ static const int as_hash_shift = 6;
 #define AS_HASH_ENTRIES		(1 << as_hash_shift)
 #define rq_hash_key(rq)		((rq)->sector + (rq)->nr_sectors)
 #define list_entry_hash(ptr)	list_entry((ptr), struct as_rq, hash)
-#define ON_HASH(arq)		(arq)->hash_valid_count
-
-#define AS_INVALIDATE_HASH(ad)				\
-	do {						\
-		if (!++(ad)->hash_valid_count)		\
-			(ad)->hash_valid_count = 1;	\
-	} while (0)
 
 static inline void __as_del_arq_hash(struct as_rq *arq)
 {
-	arq->hash_valid_count = 0;
+	arq->on_hash = 0;
 	list_del_init(&arq->hash);
 }
 
 static inline void as_del_arq_hash(struct as_rq *arq)
 {
-	if (ON_HASH(arq))
+	if (arq->on_hash)
 		__as_del_arq_hash(arq);
 }
 
@@ -270,9 +262,9 @@ static void as_add_arq_hash(struct as_data *ad, struct as_rq *arq)
 {
 	struct request *rq = arq->request;
 
-	BUG_ON(ON_HASH(arq));
+	BUG_ON(arq->on_hash);
 
-	arq->hash_valid_count = ad->hash_valid_count;
+	arq->on_hash = 1;
 	list_add(&arq->hash, &ad->hash[AS_HASH_FN(rq_hash_key(rq))]);
 }
 
@@ -284,7 +276,7 @@ static inline void as_hot_arq_hash(struct as_data *ad, struct as_rq *arq)
 	struct request *rq = arq->request;
 	struct list_head *head = &ad->hash[AS_HASH_FN(rq_hash_key(rq))];
 
-	if (!ON_HASH(arq)) {
+	if (!arq->on_hash) {
 		WARN_ON(1);
 		return;
 	}
@@ -306,10 +298,9 @@ static struct request *as_find_arq_hash(struct as_data *ad, sector_t offset)
 
 		next = entry->next;
 
-		BUG_ON(!ON_HASH(arq));
+		BUG_ON(!arq->on_hash);
 
-		if (!rq_mergeable(__rq)
-		    || arq->hash_valid_count != ad->hash_valid_count) {
+		if (!rq_mergeable(__rq)) {
 			__as_del_arq_hash(arq);
 			continue;
 		}
@@ -1323,7 +1314,6 @@ as_insert_request(request_queue_t *q, struct request *rq,
 	struct as_rq *arq = RQ_DATA(rq);
 
 	if (unlikely(rq->flags & REQ_HARDBARRIER)) {
-		AS_INVALIDATE_HASH(ad);
 		q->last_merge = NULL;
 
 		while (ad->next_arq[REQ_SYNC])
@@ -1573,7 +1563,7 @@ static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 		arq->state = AS_RQ_NEW;
 		arq->io_context = NULL;
 		INIT_LIST_HEAD(&arq->hash);
-		arq->hash_valid_count = 0;
+		arq->on_hash = 0;
 		INIT_LIST_HEAD(&arq->fifo);
 		rq->elevator_private = arq;
 		return 0;
@@ -1662,7 +1652,6 @@ static int as_init(request_queue_t *q, elevator_t *e)
 	ad->dispatch = &q->queue_head;
 	ad->fifo_expire[REQ_SYNC] = default_read_expire;
 	ad->fifo_expire[REQ_ASYNC] = default_write_expire;
-	ad->hash_valid_count = 1;
 	ad->antic_expire = default_antic_expire;
 	ad->batch_expire[REQ_SYNC] = default_read_batch_expire;
 	ad->batch_expire[REQ_ASYNC] = default_write_batch_expire;
