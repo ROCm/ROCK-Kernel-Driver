@@ -395,9 +395,6 @@
 #define SSB_PCI_MASK1		0xfc000000
 #define SSB_PCI_MASK2		0xc0000000
 
-#define br32(REG)	readl(bp->regs + (REG))
-#define bw32(REG,VAL)	writel((VAL), bp->regs + (REG))
-
 /* 4400 PHY registers */
 #define B44_MII_AUXCTRL		24	/* Auxiliary Control */
 #define  MII_AUXCTRL_DUPLEX	0x0001  /* Full Duplex */
@@ -530,7 +527,7 @@ struct b44 {
 	struct net_device_stats	stats;
 	struct b44_hw_stats	hw_stats;
 
-	unsigned long		regs;
+	volatile void __iomem   *regs;
 	struct pci_dev		*pdev;
 	struct net_device	*dev;
 
