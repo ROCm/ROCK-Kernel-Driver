@@ -8,6 +8,7 @@
 
 extern struct list_head global_device_list;
 extern spinlock_t device_lock;
+extern struct semaphore device_sem;
 
 extern struct device * get_device_locked(struct device *);
 
