@@ -2835,7 +2835,7 @@ static struct pci_driver gem_driver = {
 	name:		GEM_MODULE_NAME,
 	id_table:	gem_pci_tbl,
 	probe:		gem_init_one,
-	remove:		gem_remove_one,
+	remove:		__devexit_p(gem_remove_one),
 #ifdef CONFIG_PM
 	suspend:	gem_suspend,
 	resume:		gem_resume,

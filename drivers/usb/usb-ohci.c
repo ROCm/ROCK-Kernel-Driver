@@ -2859,7 +2859,7 @@ static struct pci_driver ohci_pci_driver = {
 	id_table:	&ohci_pci_ids [0],
 
 	probe:		ohci_pci_probe,
-	remove:		ohci_pci_remove,
+	remove:		__devexit_p(ohci_pci_remove),
 
 #ifdef	CONFIG_PM
 	suspend:	ohci_pci_suspend,

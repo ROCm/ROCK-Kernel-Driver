@@ -431,7 +431,7 @@ static struct pci_driver tlan_driver = {
 	name:		"tlan",
 	id_table:	tlan_pci_tbl,
 	probe:		tlan_init_one,
-	remove:		tlan_remove_one,	
+	remove:		__devexit_p(tlan_remove_one),	
 };
 
 static int __init tlan_probe(void)
