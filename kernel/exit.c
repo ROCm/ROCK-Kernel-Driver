@@ -14,9 +14,7 @@
 #include <linux/personality.h>
 #include <linux/tty.h>
 #include <linux/namespace.h>
-#ifdef CONFIG_BSD_PROCESS_ACCT
 #include <linux/acct.h>
-#endif
 #include <linux/file.h>
 #include <linux/binfmts.h>
 
@@ -493,9 +491,7 @@ NORET_TYPE void do_exit(long code)
 	del_timer_sync(&tsk->real_timer);
 
 fake_volatile:
-#ifdef CONFIG_BSD_PROCESS_ACCT
 	acct_process(code);
-#endif
 	__exit_mm(tsk);
 
 	lock_kernel();
