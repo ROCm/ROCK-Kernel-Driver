@@ -776,10 +776,6 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s", __FUNCTION__);
 
-	if (serial_paranoia_check (edge_serial->serial, __FUNCTION__)) {
-		return;
-	}
-
 	switch (urb->status) {
 	case 0:
 		/* success */
@@ -864,10 +860,6 @@ static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
 	__u16			raw_data_length;
 
 	dbg("%s", __FUNCTION__);
-
-	if (serial_paranoia_check (edge_serial->serial, __FUNCTION__)) {
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);

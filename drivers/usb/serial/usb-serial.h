@@ -294,26 +294,10 @@ extern struct usb_serial_device_type usb_serial_generic_device;
 extern struct bus_type usb_serial_bus_type;
 extern struct tty_driver *usb_serial_tty_driver;
 
-/* Inline functions to check the sanity of a pointer that is passed to us */
-static inline int serial_paranoia_check (struct usb_serial *serial, const char *function)
-{
-	if (!serial) {
-		dbg("%s - serial == NULL", function);
-		return -1;
-	}
-	if (!serial->type) {
-		dbg("%s - serial->type == NULL!", function);
-		return -1;
-	}
-
-	return 0;
-}
-
 static inline struct usb_serial* get_usb_serial (struct usb_serial_port *port, const char *function) 
 { 
 	/* if no port was specified, or it fails a paranoia check */
-	if (!port || 
-		serial_paranoia_check (port->serial, function)) {
+	if (!port) {
 		/* then say that we don't have a valid usb_serial thing, which will
 		 * end up genrating -ENODEV return values */ 
 		return NULL;

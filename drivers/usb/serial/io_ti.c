@@ -1649,10 +1649,6 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s", __FUNCTION__);
 
-	if (serial_paranoia_check (edge_serial->serial, __FUNCTION__)) {
-		return;
-	}
-
 	switch (urb->status) {
 	case 0:
 		/* success */

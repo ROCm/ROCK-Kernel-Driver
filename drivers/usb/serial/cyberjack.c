@@ -318,7 +318,6 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = usb_get_serial_port_data(port);
-	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 	int result;
 
@@ -326,10 +325,6 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 
 	/* the urb might have been killed. */
 	if (urb->status)
-		return;
-
-	serial = port->serial;
-	if (serial_paranoia_check (serial, __FUNCTION__))
 		return;
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);

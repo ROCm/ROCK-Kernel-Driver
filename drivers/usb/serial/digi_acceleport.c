@@ -1396,10 +1396,6 @@ dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 		return;
 	}
 
-	/* further sanity checks */
-	if (serial_paranoia_check(serial, __FUNCTION__))
-		return;
-
 	/* try to send any buffered data on this port, if it is open */
 	spin_lock( &priv->dp_port_lock );
 	priv->dp_write_urb_in_use = 0;
@@ -1797,7 +1793,6 @@ dbg( "digi_read_bulk_callback: TOP" );
 		return;
 	}
 	if( port->serial == NULL
-	|| serial_paranoia_check( port->serial, __FUNCTION__ )
 	|| (serial_priv=usb_get_serial_data(port->serial)) == NULL ) {
 		err("%s: serial is bad or serial->private is NULL, status=%d", __FUNCTION__, urb->status );
 		return;

@@ -803,9 +803,6 @@ static void pl2303_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	
 	if (urb->status) {
 		/* error in the urb, so we have to resubmit it */
-		if (serial_paranoia_check (port->serial, __FUNCTION__)) {
-			return;
-		}
 		dbg("%s - Overflow in write", __FUNCTION__);
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
 		port->write_urb->transfer_buffer_length = 1;

@@ -338,14 +338,8 @@ static void omninet_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 /*	struct omninet_header	*header = (struct omninet_header  *) urb->transfer_buffer; */
 	struct usb_serial_port 	*port   = (struct usb_serial_port *) urb->context;
-	struct usb_serial 	*serial;
 
 //	dbg("omninet_write_bulk_callback, port %0x\n", port);
-
-	serial = port->serial;
-	if (serial_paranoia_check (serial, __FUNCTION__)) {
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);

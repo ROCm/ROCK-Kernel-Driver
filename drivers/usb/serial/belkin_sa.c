@@ -265,7 +265,6 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct belkin_sa_private *priv;
-	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 	int retval;
 	unsigned long flags;
@@ -285,11 +284,6 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	serial = port->serial;
-
-	if (serial_paranoia_check (serial, __FUNCTION__))
-		return;
-	
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	/* Handle known interrupt data */
