@@ -37,6 +37,8 @@
 #define PARANOIA
 #include <linux/major.h>
 
+#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/sched.h>

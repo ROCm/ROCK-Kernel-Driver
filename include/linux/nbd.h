@@ -53,7 +53,6 @@ struct nbd_device {
 	int blksize_bits;
 	u64 bytesize;
 };
-#endif
 
 /* This now IS in some kind of include file...	*/
 
