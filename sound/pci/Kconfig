@@ -270,15 +270,15 @@ config SND_ICE1712
 	  TerraTec - EWX 24/96, EWS 88MT, EWS 88D, DMX 6Fire.
 
 config SND_ICE1724
-	tristate "ICE/VT1724 (Envy24HT)"
+	tristate "ICE/VT1724/1720 (Envy24HT/PT)"
 	depends on SND
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ICE/VT1724 (Envy24HT) based
+	  Say 'Y' or 'M' to include support for ICE/VT1724/1720 (Envy24HT/PT) based
 	  soundcards.
 	  Currently supported hardware is: MidiMan M Audio - Revolution 7.1,
-	  AMP Ltd AUDIO2000.
+	  AMP Ltd AUDIO2000, Terratec Aureon 5.1 Sky/7.1, AudioTrak Prodigy 7.1.
 
 config SND_INTEL8X0
 	tristate "Intel i8x0/MX440, SiS 7012; Ali 5455; NForce Audio; AMD768/8111"

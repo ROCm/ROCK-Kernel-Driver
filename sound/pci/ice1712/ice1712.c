@@ -2660,6 +2660,8 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 		for (c = *tbl; c->subvendor; c++) {
 			if (c->subvendor == ice->eeprom.subvendor) {
 				strcpy(card->shortname, c->name);
+				if (c->driver) /* specific driver? */
+					strcpy(card->driver, c->driver);
 				if (c->chip_init) {
 					if ((err = c->chip_init(ice)) < 0) {
 						snd_card_free(card);

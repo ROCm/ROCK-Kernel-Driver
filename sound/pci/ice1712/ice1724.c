@@ -1,5 +1,6 @@
 /*
  *   ALSA driver for VT1724 ICEnsemble ICE1724 / VIA VT1724 (Envy24HT)
+ *                   VIA VT1720 (Envy24PT)
  *
  *	Copyright (c) 2000 Jaroslav Kysela <perex@suse.cz>
  *                    2002 James Stafford <jstafford@ampltd.com>
@@ -43,21 +44,21 @@
 #include "amp.h"
 #include "revo.h"
 #include "aureon.h"
-#include "prodigy.h"
 
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
-MODULE_DESCRIPTION("ICEnsemble ICE1724 (Envy24HT)");
+MODULE_DESCRIPTION("VIA ICEnsemble ICE1724/1720 (Envy24HT/PT)");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{"
 	       REVO_DEVICE_DESC
 	       AMP_AUDIO2000_DEVICE_DESC
 	       AUREON_DEVICE_DESC
-	       PRODIGY_DEVICE_DESC
+		"{VIA,VT1720},"
 		"{VIA,VT1724},"
 		"{ICEnsemble,Generic ICE1724},"
-		"{ICEnsemble,Generic Envy24HT}}");
+		"{ICEnsemble,Generic Envy24HT}"
+		"{ICEnsemble,Generic Envy24PT}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -84,6 +85,7 @@ MODULE_PARM_DESC(model, "Use the given board model.");
 #define PCI_DEVICE_ID_VT1724		0x1724
 #endif
 
+/* Both VT1720 and VT1724 have the same PCI IDs */
 static struct pci_device_id snd_vt1724_ids[] = {
 	{ PCI_VENDOR_ID_ICE, PCI_DEVICE_ID_VT1724, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, }
@@ -232,6 +234,17 @@ static irqreturn_t snd_vt1724_interrupt(int irq, void *dev_id, struct pt_regs *r
 			status &= ~(VT1724_IRQ_MPU_RX|VT1724_IRQ_MPU_TX);
 		}
 		if (status & VT1724_IRQ_MTPCM) {
+			/*
+			 * Multi-track PCM
+			 * PCM assignment are:
+			 * Playback DMA0 (M/C) = playback_pro_substream
+			 * Playback DMA1 = playback_con_substream_ds[0]
+			 * Playback DMA2 = playback_con_substream_ds[1]
+			 * Playback DMA3 = playback_con_substream_ds[2]
+			 * Playback DMA4 (SPDIF) = playback_con_substream
+			 * Record DMA0 = capture_pro_substream
+			 * Record DMA1 = capture_con_substream
+			 */
 			unsigned char mtstat = inb(ICEMT1724(ice, IRQ));
 			if (mtstat & VT1724_MULTI_PDMA0) {
 				if (ice->playback_pro_substream)
@@ -288,6 +301,12 @@ static unsigned int rates[] = {
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates_96 = {
 	.count = ARRAY_SIZE(rates) - 2, /* up to 96000 */
+	.list = rates,
+	.mask = 0,
+};
+
+static snd_pcm_hw_constraint_list_t hw_constraints_rates_48 = {
+	.count = ARRAY_SIZE(rates) - 5, /* up to 48000 */
 	.list = rates,
 	.mask = 0,
 };
@@ -427,6 +446,15 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 		if (ice->akm[i].ops.set_rate_val)
 			ice->akm[i].ops.set_rate_val(&ice->akm[i], rate);
 	}
+
+	/* set up AC97 registers if needed */
+	if (! (ice->eeprom.data[ICE_EEP2_ACLINK] & 0x80) && ice->ac97) {
+		snd_ac97_set_rate(ice->ac97, AC97_PCM_FRONT_DAC_RATE, rate);
+		snd_ac97_set_rate(ice->ac97, AC97_PCM_SURR_DAC_RATE, rate);
+		snd_ac97_set_rate(ice->ac97, AC97_PCM_LFE_DAC_RATE, rate);
+		snd_ac97_set_rate(ice->ac97, AC97_SPDIF, rate);
+		snd_ac97_set_rate(ice->ac97, AC97_PCM_LR_ADC_RATE, rate);
+	}
 }
 
 static int snd_vt1724_pcm_hw_params(snd_pcm_substream_t * substream,
@@ -439,6 +467,7 @@ static int snd_vt1724_pcm_hw_params(snd_pcm_substream_t * substream,
 	down(&ice->open_mutex);
 	/* mark surround channels */
 	if (substream == ice->playback_pro_substream) {
+		/* PDMA0 can be multi-channel up to 8 */
 		chs = chs / 2 - 1;
 		for (i = 0; i < chs; i++) {
 			if (ice->pcm_reserved[i] && ice->pcm_reserved[i] != substream) {
@@ -453,6 +482,7 @@ static int snd_vt1724_pcm_hw_params(snd_pcm_substream_t * substream,
 		}
 	} else {
 		for (i = 0; i < 3; i++) {
+			/* check individual playback stream */
 			if (ice->playback_con_substream_ds[i] == substream) {
 				if (ice->pcm_reserved[i] && ice->pcm_reserved[i] != substream) {
 					up(&ice->open_mutex);
@@ -613,13 +643,32 @@ static snd_pcm_hardware_t snd_vt1724_playback_pro =
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_SYNC_START),
 	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
 	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_192000,
-	.rate_min =		4000,
+	.rate_min =		8000,
 	.rate_max =		192000,
 	.channels_min =		2,
 	.channels_max =		8,
 	.buffer_bytes_max =	(1UL << 21),	/* 19bits dword */
 	.period_bytes_min =	8 * 4 * 2,	/* FIXME: constraints needed */
 	.period_bytes_max =	(1UL << 21),
+	.periods_min =		2,
+	.periods_max =		1024,
+};
+
+static snd_pcm_hardware_t snd_vt1724_spdif =
+{
+	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
+				 SNDRV_PCM_INFO_MMAP_VALID |
+				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_SYNC_START),
+	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
+	.rates =	        SNDRV_PCM_RATE_32000|SNDRV_PCM_RATE_44100|SNDRV_PCM_RATE_48000,
+	.rate_min =		32000,
+	.rate_max =		48000,
+	.channels_min =		2,
+	.channels_max =		2,
+	.buffer_bytes_max =	(1UL << 18),	/* 16bits dword */
+	.period_bytes_min =	2 * 4 * 2,
+	.period_bytes_max =	(1UL << 18),
 	.periods_min =		2,
 	.periods_max =		1024,
 };
@@ -632,7 +681,7 @@ static snd_pcm_hardware_t snd_vt1724_2ch_stereo =
 				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_SYNC_START),
 	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
 	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_192000,
-	.rate_min =		4000,
+	.rate_min =		8000,
 	.rate_max =		192000,
 	.channels_min =		2,
 	.channels_max =		2,
@@ -642,6 +691,41 @@ static snd_pcm_hardware_t snd_vt1724_2ch_stereo =
 	.periods_min =		2,
 	.periods_max =		1024,
 };
+
+/*
+ * set rate constraints
+ */
+static int set_rate_constraints(ice1712_t *ice, snd_pcm_substream_t *substream)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	if (ice->eeprom.data[ICE_EEP2_ACLINK] & 0x80) {
+		/* I2S */
+		if (ice->eeprom.data[ICE_EEP2_I2S] & 0x08)
+			return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_192);
+		else {
+			runtime->hw.rates = SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_96000;
+			runtime->hw.rate_max = 96000;
+			return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_96);
+		}
+	} else if (ice->ac97) {
+		/* ACLINK */
+		int ratec;
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			ratec = AC97_RATES_FRONT_DAC;
+		else
+			ratec = AC97_RATES_ADC;
+		runtime->hw.rates = ice->ac97->rates[ratec];
+		runtime->hw.rate_max = 48000;
+		if (runtime->hw.rates == SNDRV_PCM_RATE_48000) {
+			runtime->hw.rate_min = 48000;
+			return 0;
+		} else {
+			runtime->hw.rates = SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000;
+			return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_48);
+		}
+	}
+	return 0;
+}
 
 /* multi-channel playback needs alignment 8x32bit regarless of the channels
  * actually used
@@ -659,12 +743,7 @@ static int snd_vt1724_playback_pro_open(snd_pcm_substream_t * substream)
 	runtime->hw = snd_vt1724_playback_pro;
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
-	if ((ice->eeprom.data[ICE_EEP2_ACLINK] & 0x80) &&
-	    (ice->eeprom.data[ICE_EEP2_I2S] & 0x08))
-		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_192);
-	else
-		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_96);
-
+	set_rate_constraints(ice, substream);
 	down(&ice->open_mutex);
 	/* calculate the currently available channels */
 	for (chs = 0; chs < 3; chs++) {
@@ -693,11 +772,7 @@ static int snd_vt1724_capture_pro_open(snd_pcm_substream_t * substream)
 	runtime->hw = snd_vt1724_2ch_stereo;
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
-	if ((ice->eeprom.data[ICE_EEP2_ACLINK] & 0x80) &&
-	    (ice->eeprom.data[ICE_EEP2_I2S] & 0x08))
-		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_192);
-	else
-		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_96);
+	set_rate_constraints(ice, substream);
 	return 0;
 }
 
@@ -816,11 +891,13 @@ static int snd_vt1724_playback_spdif_open(snd_pcm_substream_t *substream)
 
 	runtime->private_data = (void*)VT1724_PDMA4_START; /* irq/status/trigger bit */
 	ice->playback_con_substream = substream;
-	runtime->hw = snd_vt1724_2ch_stereo;
+	if (ice->force_pdma4) {
+		runtime->hw = snd_vt1724_2ch_stereo;
+		set_rate_constraints(ice, substream);
+	} else
+		runtime->hw = snd_vt1724_spdif;
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
-
-	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_192);
 	return 0;
 }
 
@@ -842,10 +919,13 @@ static int snd_vt1724_capture_spdif_open(snd_pcm_substream_t *substream)
 
 	runtime->private_data = (void*)VT1724_RDMA1_START; /* irq/status/trigger bit */
 	ice->capture_con_substream = substream;
-	runtime->hw = snd_vt1724_2ch_stereo;
+	if (ice->force_rdma1) {
+		runtime->hw = snd_vt1724_2ch_stereo;
+		set_rate_constraints(ice, substream);
+	} else
+		runtime->hw = snd_vt1724_spdif;
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
-	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_96);
 	return 0;
 }
 
@@ -885,22 +965,31 @@ static snd_pcm_ops_t snd_vt1724_capture_spdif_ops = {
 
 static int __devinit snd_vt1724_pcm_spdif(ice1712_t * ice, int device)
 {
+	char *name;
 	snd_pcm_t *pcm;
 	int play, capt;
 	int err;
 
-	if (ice->eeprom.data[ICE_EEP2_SPDIF] & VT1724_CFG_SPDIF_OUT_INT)
+	if (ice->force_pdma4 ||
+	    (ice->eeprom.data[ICE_EEP2_SPDIF] & VT1724_CFG_SPDIF_OUT_INT)) {
 		play = 1;
-	else
+		ice->has_spdif = 1;
+	} else
 		play = 0;
-	if (ice->eeprom.data[ICE_EEP2_SPDIF] & VT1724_CFG_SPDIF_IN)
+	if (ice->force_rdma1 ||
+	    (ice->eeprom.data[ICE_EEP2_SPDIF] & VT1724_CFG_SPDIF_IN)) {
 		capt = 1;
-	else
+		ice->has_spdif = 1;
+	} else
 		capt = 0;
 	if (! play && ! capt)
 		return 0; /* no spdif device */
 
-	err = snd_pcm_new(ice->card, "ICE1724 IEC958", device, play, capt, &pcm);
+	if (ice->force_pdma4 || ice->force_rdma1)
+		name = "ICE1724 Secondary";
+	else
+		name = "IEC1724 IEC958";
+	err = snd_pcm_new(ice->card, name, device, play, capt, &pcm);
 	if (err < 0)
 		return err;
 
@@ -913,7 +1002,7 @@ static int __devinit snd_vt1724_pcm_spdif(ice1712_t * ice, int device)
 
 	pcm->private_data = ice;
 	pcm->info_flags = 0;
-	strcpy(pcm->name, "ICE1724 IEC958");
+	strcpy(pcm->name, name);
 
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
 					      snd_dma_pci_data(ice->pci), 64*1024, 64*1024);
@@ -987,8 +1076,7 @@ static int snd_vt1724_playback_indep_open(snd_pcm_substream_t *substream)
 	runtime->hw = snd_vt1724_2ch_stereo;
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
-
-	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_192);
+	set_rate_constraints(ice, substream);
 	return 0;
 }
 
@@ -1727,7 +1815,6 @@ static struct snd_ice1712_card_info *card_tables[] __devinitdata = {
 	snd_vt1724_revo_cards,
 	snd_vt1724_amp_cards, 
 	snd_vt1724_aureon_cards,
-	snd_vt1724_prodigy_cards,
 	0,
 };
 
@@ -1757,19 +1844,28 @@ void snd_vt1724_write_i2c(ice1712_t *ice, unsigned char dev, unsigned char addr,
 
 static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice, const char *modelname)
 {
-	int dev = 0xa0;		/* EEPROM device address */
+	const int dev = 0xa0;		/* EEPROM device address */
 	unsigned int i, size;
 	struct snd_ice1712_card_info **tbl, *c;
 
 	if (! modelname || ! *modelname) {
-		if ((inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_EEPROM) == 0) {
-			snd_printk(KERN_WARNING "ICE1724 has not detected EEPROM\n");
-			// return -EIO;
-		}
-		ice->eeprom.subvendor = (snd_vt1724_read_i2c(ice, dev, 0x00) << 0) |
+		ice->eeprom.subvendor = 0;
+		if ((inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_EEPROM) != 0)
+			ice->eeprom.subvendor = (snd_vt1724_read_i2c(ice, dev, 0x00) << 0) |
 				(snd_vt1724_read_i2c(ice, dev, 0x01) << 8) | 
 				(snd_vt1724_read_i2c(ice, dev, 0x02) << 16) | 
 				(snd_vt1724_read_i2c(ice, dev, 0x03) << 24);
+		if (ice->eeprom.subvendor == 0 || ice->eeprom.subvendor == (unsigned int)-1) {
+			/* invalid subvendor from EEPROM, try the PCI subststem ID instead */
+			u16 vendor, device;
+			pci_read_config_word(ice->pci, PCI_SUBSYSTEM_VENDOR_ID, &vendor);
+			pci_read_config_word(ice->pci, PCI_SUBSYSTEM_ID, &device);
+			ice->eeprom.subvendor = ((unsigned int)swab16(vendor) << 16) | swab16(device);
+			if (ice->eeprom.subvendor == 0 || ice->eeprom.subvendor == (unsigned int)-1) {
+				printk(KERN_ERR "ice1724: No valid ID is found\n");
+				return -ENXIO;
+			}
+		}
 	}
 	for (tbl = card_tables; *tbl; tbl++) {
 		for (c = *tbl; c->subvendor; c++) {
@@ -1779,7 +1875,7 @@ static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice, const char *modelnam
 			} else if (c->subvendor != ice->eeprom.subvendor)
 				continue;
 			if (! c->eeprom_size || ! c->eeprom_data)
-				break;
+				goto found;
 			/* if the EEPROM is given by the driver, use it */
 			snd_printdd("using the defined eeprom..\n");
 			ice->eeprom.version = 2;
@@ -1788,18 +1884,19 @@ static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice, const char *modelnam
 			goto read_skipped;
 		}
 	}
+	printk(KERN_WARNING "ice1724: No matching model found for ID 0x%x\n", ice->eeprom.subvendor);
+
+ found:
 	ice->eeprom.size = snd_vt1724_read_i2c(ice, dev, 0x04);
 	if (ice->eeprom.size < 6)
 		ice->eeprom.size = 32;
 	else if (ice->eeprom.size > 32) {
-		snd_printk("invalid EEPROM (size = %i)\n", ice->eeprom.size);
+		printk(KERN_ERR "ice1724: Invalid EEPROM (size = %i)\n", ice->eeprom.size);
 		return -EIO;
 	}
 	ice->eeprom.version = snd_vt1724_read_i2c(ice, dev, 0x05);
-	if (ice->eeprom.version != 2) {
-		snd_printk("invalid EEPROM version %i\n", ice->eeprom.version);
-		// return -EIO;
-	}
+	if (ice->eeprom.version != 2)
+		printk(KERN_WARNING "ice1724: Invalid EEPROM version %i\n", ice->eeprom.version);
 	size = ice->eeprom.size - 6;
 	for (i = 0; i < size; i++)
 		ice->eeprom.data[i] = snd_vt1724_read_i2c(ice, dev, i + 6);
@@ -1832,6 +1929,9 @@ static int __devinit snd_vt1724_chip_init(ice1712_t *ice)
 	snd_vt1724_set_gpio_data(ice, ice->eeprom.gpiostate);
 
 	outb(0, ICEREG1724(ice, POWERDOWN));
+
+	/* read back to check the availability of SPDIF out */
+	ice->eeprom.data[ICE_EEP2_SPDIF] = inb(ICEREG1724(ice, SPDIF_CFG));
 
 	return 0;
 }
@@ -1894,7 +1994,10 @@ static int __devinit snd_vt1724_build_controls(ice1712_t *ice)
 
 	if (ice->num_total_dacs > 0) {
 		snd_kcontrol_new_t tmp = snd_vt1724_mixer_pro_analog_route;
-		tmp.count = ice->num_total_dacs;
+		if (ice->vt1720)
+			tmp.count = 2;
+		else
+			tmp.count = ice->num_total_dacs;
 		err = snd_ctl_add(ice->card, snd_ctl_new1(&tmp, ice));
 		if (err < 0)
 			return err;
@@ -2065,6 +2168,8 @@ static int __devinit snd_vt1724_probe(struct pci_dev *pci,
 		for (c = *tbl; c->subvendor; c++) {
 			if (c->subvendor == ice->eeprom.subvendor) {
 				strcpy(card->shortname, c->name);
+				if (c->driver) /* specific driver? */
+					strcpy(card->driver, c->driver);
 				if (c->chip_init) {
 					if ((err = c->chip_init(ice)) < 0) {
 						snd_card_free(card);
@@ -2103,7 +2208,7 @@ static int __devinit snd_vt1724_probe(struct pci_dev *pci,
 		return err;
 	}
 
-	if (ice->pcm) { /* has SPDIF I/O */
+	if (ice->pcm && ice->has_spdif) { /* has SPDIF I/O */
 		if ((err = snd_vt1724_spdif_build_controls(ice)) < 0) {
 			snd_card_free(card);
 			return err;
