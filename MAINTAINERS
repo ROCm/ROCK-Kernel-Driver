@@ -1581,8 +1581,8 @@ L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
 
 USB KAWASAKI LSI DRIVER
-P:	Brad Hards
-M:	bradh@frogmouth.net
+P:	Oliver Neukum
+M:	drivers@neukum.org
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
