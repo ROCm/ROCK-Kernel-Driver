@@ -170,7 +170,7 @@
 
 /****** RocketPort Local Variables ******/
 
-static struct tty_driver rocket_driver;
+static struct tty_driver *rocket_driver;
 
 static struct rocket_version driver_version = {	
 	ROCKET_VERSION, ROCKET_DATE
@@ -764,7 +764,7 @@ static void init_r_port(int board, int aiop, int chan, struct pci_dev *pci_dev)
 	rp_table[line] = info;
 #if LINUX_VERSION_CODE > VERSION_CODE(2,5,0)
 	if (pci_dev)
-		tty_register_device(&rocket_driver, line, &pci_dev->dev);
+		tty_register_device(rocket_driver, line, &pci_dev->dev);
 #endif
 }
 
@@ -1521,7 +1521,7 @@ static int get_ports(struct r_port *info, struct rocket_ports *retports)
 	if (!retports)
 		return -EFAULT;
 	memset(&tmp, 0, sizeof (tmp));
-	tmp.tty_major = rocket_driver.major;
+	tmp.tty_major = rocket_driver->major;
 
 	for (board = 0; board < 4; board++) {
 		tmp.rocketModel[board].model = rocketModel[board].model;
@@ -2577,6 +2577,30 @@ static int __init init_ISA(int i, int *reserved_controller)
 	return (1);
 }
 
+static struct tty_operations rocket_ops = {
+	.open = rp_open,
+	.close = rp_close,
+	.write = rp_write,
+	.put_char = rp_put_char,
+	.write_room = rp_write_room,
+	.chars_in_buffer = rp_chars_in_buffer,
+	.flush_buffer = rp_flush_buffer,
+	.ioctl = rp_ioctl,
+	.throttle = rp_throttle,
+	.unthrottle = rp_unthrottle,
+	.set_termios = rp_set_termios,
+	.stop = rp_stop,
+	.start = rp_start,
+	.hangup = rp_hangup,
+	.break_ctl = rp_break,
+	.send_xchar = rp_send_xchar,
+	.wait_until_sent = rp_wait_until_sent,
+#if (LINUX_VERSION_CODE > VERSION_CODE(2,5,0))
+	.tiocmget = rp_tiocmget,
+	.tiocmset = rp_tiocmset,
+#endif /* Kernel > 2.5 */
+};
+
 /*
  * The module "startup" routine; it's run when the module is loaded.
  */
@@ -2587,6 +2611,10 @@ int __init rp_init(void)
 
 	printk(KERN_INFO "RocketPort device driver module, version %s, %s\n",
 	       ROCKET_VERSION, ROCKET_DATE);
+
+	rocket_driver = alloc_tty_driver(MAX_RP_PORTS);
+	if (!rocket_driver)
+		return -ENOMEM;
 
 	/*
 	 * Set up the timer channel.
@@ -2611,6 +2639,7 @@ int __init rp_init(void)
 
 	if (controller && check_region(controller, 4)) {
 		printk(KERN_INFO "Controller IO addresses in use, unloading driver.\n");
+		put_tty_driver(rocket_driver);
 		return -EBUSY;
 	}
 
@@ -2633,51 +2662,30 @@ int __init rp_init(void)
 	 * Set up the tty driver structure and then register this
 	 * driver with the tty layer.
 	 */
-	memset(&rocket_driver, 0, sizeof (struct tty_driver));
-	rocket_driver.magic = TTY_DRIVER_MAGIC;
-	rocket_driver.flags = TTY_DRIVER_NO_DEVFS;
-	rocket_driver.devfs_name = "tts/R";
-	rocket_driver.name = "ttyR";
-	rocket_driver.driver_name = "Comtrol RocketPort";
-	rocket_driver.major = TTY_ROCKET_MAJOR;
-	rocket_driver.minor_start = 0;
-	rocket_driver.num = MAX_RP_PORTS;
-	rocket_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	rocket_driver.subtype = SERIAL_TYPE_NORMAL;
-	rocket_driver.init_termios = tty_std_termios;
-	rocket_driver.init_termios.c_cflag =
-	    B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-#ifdef ROCKET_SOFT_FLOW
-	rocket_driver.flags |= TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-#endif
-
-	rocket_driver.open = rp_open;
-	rocket_driver.close = rp_close;
-	rocket_driver.write = rp_write;
-	rocket_driver.put_char = rp_put_char;
-	rocket_driver.write_room = rp_write_room;
-	rocket_driver.chars_in_buffer = rp_chars_in_buffer;
-	rocket_driver.flush_buffer = rp_flush_buffer;
-	rocket_driver.ioctl = rp_ioctl;
-	rocket_driver.throttle = rp_throttle;
-	rocket_driver.unthrottle = rp_unthrottle;
-	rocket_driver.set_termios = rp_set_termios;
-	rocket_driver.stop = rp_stop;
-	rocket_driver.start = rp_start;
-	rocket_driver.hangup = rp_hangup;
-	rocket_driver.break_ctl = rp_break;
-	rocket_driver.send_xchar = rp_send_xchar;
-	rocket_driver.wait_until_sent = rp_wait_until_sent;
 
 #if (LINUX_VERSION_CODE > VERSION_CODE(2,5,0))
-	rocket_driver.owner = THIS_MODULE;
-	rocket_driver.tiocmget = rp_tiocmget;
-	rocket_driver.tiocmset = rp_tiocmset;
+	rocket_driver->owner = THIS_MODULE;
 #endif /* Kernel > 2.5 */
+	rocket_driver->flags = TTY_DRIVER_NO_DEVFS;
+	rocket_driver->devfs_name = "tts/R";
+	rocket_driver->name = "ttyR";
+	rocket_driver->driver_name = "Comtrol RocketPort";
+	rocket_driver->major = TTY_ROCKET_MAJOR;
+	rocket_driver->minor_start = 0;
+	rocket_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	rocket_driver->subtype = SERIAL_TYPE_NORMAL;
+	rocket_driver->init_termios = tty_std_termios;
+	rocket_driver->init_termios.c_cflag =
+	    B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+#ifdef ROCKET_SOFT_FLOW
+	rocket_driver->flags |= TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+#endif
+	tty_set_operations(rocket_driver, &rocket_ops);
 
-	retval = tty_register_driver(&rocket_driver);
+	retval = tty_register_driver(rocket_driver);
 	if (retval < 0) {
 		printk(KERN_INFO "Couldn't install tty RocketPort driver (error %d)\n", -retval);
+		put_tty_driver(rocket_driver);
 		return -1;
 	}
 
@@ -2707,6 +2715,8 @@ int __init rp_init(void)
 	if (max_board == 0) {
 		printk(KERN_INFO "No rocketport ports found; unloading driver.\n");
 		del_timer_sync(&rocket_timer);
+		tty_unregister_driver(rocket_driver);
+		put_tty_driver(rocket_driver);
 		return -ENXIO;
 	}
 
@@ -2730,10 +2740,11 @@ static void rp_cleanup_module(void)
 
 	del_timer_sync(&rocket_timer);
 
-	retval = tty_unregister_driver(&rocket_driver);
+	retval = tty_unregister_driver(rocket_driver);
 	if (retval)
 		printk(KERN_INFO "Error %d while trying to unregister "
 		       "rocketport driver\n", -retval);
+	put_tty_driver(rocket_driver);
 
 	for (i = 0; i < MAX_RP_PORTS; i++) {
 		if (rp_table[i])
