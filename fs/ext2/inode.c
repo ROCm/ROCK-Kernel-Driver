@@ -612,6 +612,13 @@ ext2_prepare_write(struct file *file, struct page *page,
 	return block_prepare_write(page,from,to,ext2_get_block);
 }
 
+static int
+ext2_nobh_prepare_write(struct file *file, struct page *page,
+			unsigned from, unsigned to)
+{
+	return nobh_prepare_write(page,from,to,ext2_get_block);
+}
+
 static sector_t ext2_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,ext2_get_block);
@@ -652,6 +659,18 @@ struct address_space_operations ext2_aops = {
 	.sync_page		= block_sync_page,
 	.prepare_write		= ext2_prepare_write,
 	.commit_write		= generic_commit_write,
+	.bmap			= ext2_bmap,
+	.direct_IO		= ext2_direct_IO,
+	.writepages		= ext2_writepages,
+};
+
+struct address_space_operations ext2_nobh_aops = {
+	.readpage		= ext2_readpage,
+	.readpages		= ext2_readpages,
+	.writepage		= ext2_writepage,
+	.sync_page		= block_sync_page,
+	.prepare_write		= ext2_nobh_prepare_write,
+	.commit_write		= nobh_commit_write,
 	.bmap			= ext2_bmap,
 	.direct_IO		= ext2_direct_IO,
 	.writepages		= ext2_writepages,
@@ -864,7 +883,11 @@ void ext2_truncate (struct inode * inode)
 	iblock = (inode->i_size + blocksize-1)
 					>> EXT2_BLOCK_SIZE_BITS(inode->i_sb);
 
-	block_truncate_page(inode->i_mapping, inode->i_size, ext2_get_block);
+	if (test_opt(inode->i_sb, NOBH))
+		nobh_truncate_page(inode->i_mapping, inode->i_size);
+	else
+		block_truncate_page(inode->i_mapping,
+				inode->i_size, ext2_get_block);
 
 	n = ext2_block_to_path(inode, iblock, offsets, NULL);
 	if (n == 0)
@@ -1044,17 +1067,26 @@ void ext2_read_inode (struct inode * inode)
 	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &ext2_file_inode_operations;
 		inode->i_fop = &ext2_file_operations;
-		inode->i_mapping->a_ops = &ext2_aops;
+		if (test_opt(inode->i_sb, NOBH))
+			inode->i_mapping->a_ops = &ext2_nobh_aops;
+		else
+			inode->i_mapping->a_ops = &ext2_aops;
 	} else if (S_ISDIR(inode->i_mode)) {
 		inode->i_op = &ext2_dir_inode_operations;
 		inode->i_fop = &ext2_dir_operations;
-		inode->i_mapping->a_ops = &ext2_aops;
+		if (test_opt(inode->i_sb, NOBH))
+			inode->i_mapping->a_ops = &ext2_nobh_aops;
+		else
+			inode->i_mapping->a_ops = &ext2_aops;
 	} else if (S_ISLNK(inode->i_mode)) {
 		if (ext2_inode_is_fast_symlink(inode))
 			inode->i_op = &ext2_fast_symlink_inode_operations;
 		else {
 			inode->i_op = &ext2_symlink_inode_operations;
-			inode->i_mapping->a_ops = &ext2_aops;
+			if (test_opt(inode->i_sb, NOBH))
+				inode->i_mapping->a_ops = &ext2_nobh_aops;
+			else
+				inode->i_mapping->a_ops = &ext2_aops;
 		}
 	} else {
 		inode->i_op = &ext2_special_inode_operations;

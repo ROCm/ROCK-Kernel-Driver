@@ -178,6 +178,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	struct block_device *bdev = NULL;
 	struct buffer_head bh;
 	int length;
+	int fully_mapped = 1;
 
 	if (page_has_buffers(page))
 		goto confused;
@@ -194,6 +195,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 		}
 
 		if (!buffer_mapped(&bh)) {
+			fully_mapped = 0;
 			if (first_hole == blocks_per_page)
 				first_hole = page_block;
 			continue;
@@ -220,6 +222,8 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 			unlock_page(page);
 			goto out;
 		}
+	} else if (fully_mapped) {
+		SetPageMappedToDisk(page);
 	}
 
 	/*
