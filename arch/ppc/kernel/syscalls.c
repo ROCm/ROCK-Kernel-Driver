@@ -262,4 +262,14 @@ int sys_olduname(struct oldold_utsname __user * name)
 	return error;
 }
 
+/*
+ * We put the arguments in a different order so we only use 6
+ * registers for arguments, rather than 7 as sys_fadvise64_64 needs
+ * (because `offset' goes in r5/r6).
+ */
+long ppc_fadvise64_64(int fd, int advice, loff_t offset, loff_t len)
+{
+	return sys_fadvise64_64(fd, offset, len, advice);
+}
+
 cond_syscall(sys_pciconfig_iobase);
