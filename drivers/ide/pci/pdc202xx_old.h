@@ -23,41 +23,6 @@ static const char *pdc_quirk_drives[] = {
 	NULL
 };
 
-static inline u8 *pdc202xx_pio_verbose (u32 drive_pci)
-{
-	if ((drive_pci & 0x000ff000) == 0x000ff000) return("NOTSET");
-	if ((drive_pci & 0x00000401) == 0x00000401) return("PIO 4");
-	if ((drive_pci & 0x00000602) == 0x00000602) return("PIO 3");
-	if ((drive_pci & 0x00000803) == 0x00000803) return("PIO 2");
-	if ((drive_pci & 0x00000C05) == 0x00000C05) return("PIO 1");
-	if ((drive_pci & 0x00001309) == 0x00001309) return("PIO 0");
-	return("PIO ?");
-}
-
-static inline u8 *pdc202xx_dma_verbose (u32 drive_pci)
-{
-	if ((drive_pci & 0x00036000) == 0x00036000) return("MWDMA 2");
-	if ((drive_pci & 0x00046000) == 0x00046000) return("MWDMA 1");
-	if ((drive_pci & 0x00056000) == 0x00056000) return("MWDMA 0");
-	if ((drive_pci & 0x00056000) == 0x00056000) return("SWDMA 2");
-	if ((drive_pci & 0x00068000) == 0x00068000) return("SWDMA 1");
-	if ((drive_pci & 0x000BC000) == 0x000BC000) return("SWDMA 0");
-	return("PIO---");
-}
-
-static inline u8 *pdc202xx_ultra_verbose (u32 drive_pci, u16 slow_cable)
-{
-	if ((drive_pci & 0x000ff000) == 0x000ff000)
-		return("NOTSET");
-	if ((drive_pci & 0x00012000) == 0x00012000)
-		return((slow_cable) ? "UDMA 2" : "UDMA 4");
-	if ((drive_pci & 0x00024000) == 0x00024000)
-		return((slow_cable) ? "UDMA 1" : "UDMA 3");
-	if ((drive_pci & 0x00036000) == 0x00036000)
-		return("UDMA 0");
-	return(pdc202xx_dma_verbose(drive_pci));
-}
-
 /* A Register */
 #define	SYNC_ERRDY_EN	0xC0
 
@@ -97,8 +62,6 @@ static inline u8 *pdc202xx_ultra_verbose (u32 drive_pci, u16 slow_cable)
 #define	MC2		0x04	/* DMA"C" timing */
 #define	MC1		0x02	/* DMA"C" timing */
 #define	MC0		0x01	/* DMA"C" timing */
-
-#define DISPLAY_PDC202XX_TIMINGS
 
 static void init_setup_pdc202ata4(struct pci_dev *dev, ide_pci_device_t *d);
 static void init_setup_pdc20265(struct pci_dev *, ide_pci_device_t *);
