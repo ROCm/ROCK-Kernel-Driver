@@ -197,8 +197,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void __user
 				goto out;
 				}
 			case 1:	/* iBCS2 emulator entry point */
-				err = do_shmat (first, (char __user *) ptr,
-						second, (ulong *) third);
+				err = -EINVAL;
 				goto out;
 			}
 		case SHMDT: 
