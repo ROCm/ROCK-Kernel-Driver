@@ -421,14 +421,19 @@ rtas_halt(void)
 }
 
 void
-rtas_os_term(void)
+rtas_os_term(char *str)
 {
 	long status;
-	char *str = "OS panic";
+	char buf[1035];
 
-	status = rtas_call(rtas_token("ibm,os-term"), 1, 1, NULL, __pa(str));
-	if (status != 0)
-		printk(KERN_EMERG "ibm,os-term call failed %ld\n", status);
+	sprintf(buf, "OS panic: %s", str);
+	do {
+		status = rtas_call(rtas_token("ibm,os-term"), 1, 1, NULL, __pa(buf));
+		if (status == RTAS_BUSY)
+			udelay(1);
+		else if (status != 0)
+			printk(KERN_EMERG "ibm,os-term call failed %ld\n", status);
+	} while (status != RTAS_BUSY);
 }
 
 

@@ -330,7 +330,7 @@ unsigned long ppc_tb_freq;
 static int ppc64_panic_event(struct notifier_block *this,
                              unsigned long event, void *ptr)
 {
-	ppc_md.panic();         /* May not return */
+	ppc_md.panic((char *)ptr);  /* May not return */
 	return NOTIFY_DONE;
 }
 
