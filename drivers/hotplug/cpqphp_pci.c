@@ -97,6 +97,7 @@ int cpqhp_configure_device (struct controller* ctrl, struct pci_func* func)
 		//this will generate pci_dev structures for all functions, but we will only call this case when lookup fails
 		func->pci_dev = pci_scan_slot(ctrl->pci_dev->bus,
 				 (func->device << 3) + (func->function & 0x7));
+
 		if (func->pci_dev == NULL) {
 			dbg("ERROR: pci_dev still null\n");
 			return 0;
@@ -1209,11 +1210,11 @@ int cpqhp_find_available_resources (struct controller *ctrl, void *rom_start)
 	temp = 0;
 
 	if (!cpqhp_nic_irq) {
-		cpqhp_nic_irq = ctrl->interrupt;
+		cpqhp_nic_irq = ctrl->cfgspc_irq;
 	}
 
 	if (!cpqhp_disk_irq) {
-		cpqhp_disk_irq = ctrl->interrupt;
+		cpqhp_disk_irq = ctrl->cfgspc_irq;
 	}
 
 	dbg("cpqhp_disk_irq, cpqhp_nic_irq= %d, %d\n", cpqhp_disk_irq, cpqhp_nic_irq);
