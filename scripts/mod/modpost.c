@@ -219,7 +219,7 @@ get_next_line(unsigned long *pos, void *file, unsigned long size)
 	static char line[4096];
 	int skip = 1;
 	size_t len = 0;
-	signed char *p = (char *)file + *pos;
+	signed char *p = (signed char *)file + *pos;
 	char *s = line;
 
 	for (; *pos < size ; (*pos)++)

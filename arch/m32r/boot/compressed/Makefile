@@ -28,9 +28,6 @@ $(obj)/vmlinux.bin: vmlinux FORCE
 $(obj)/vmlinux.bin.gz: $(obj)/vmlinux.bin FORCE
 	$(call if_changed,gzip)
 
-$(obj)/vmlinux.lds: $(obj)/vmlinux.lds.S FORCE
-	$(CPP) $(EXTRA_AFLAGS) -C -P -I include $< >$@
-
 LDFLAGS_piggy.o := -r --format binary --oformat elf32-m32r-linux -T
 OBJCOPYFLAGS += -R .empty_zero_page
 

@@ -13,6 +13,10 @@ OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
 #CFLAGS		+=-pipe
 
+# Do not use arch/arm/defconfig - it's always outdated.
+# Select a platform tht is kept up-to-date
+KBUILD_DEFCONFIG := versatile_defconfig
+
 ifeq ($(CONFIG_FRAME_POINTER),y)
 CFLAGS		+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
 endif

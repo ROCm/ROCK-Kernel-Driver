@@ -743,6 +743,18 @@ static void cpm_uart_init_smc(struct uart_cpm_port *pinfo)
 	pinfo->smcup->smc_rbase = (u_char *)pinfo->rx_bd_base - DPRAM_BASE;
 	pinfo->smcup->smc_tbase = (u_char *)pinfo->tx_bd_base - DPRAM_BASE;
 
+/*
+ *  In case SMC1 is being relocated...
+ */
+#if defined (CONFIG_I2C_SPI_SMC1_UCODE_PATCH)
+	up->smc_rbptr = pinfo->smcup->smc_rbase;
+	up->smc_tbptr = pinfo->smcup->smc_tbase;
+	up->smc_rstate = 0;
+	up->smc_tstate = 0;
+	up->smc_brkcr = 1;              /* number of break chars */
+	up->smc_brkec = 0;
+#endif
+
 	/* Set up the uart parameters in the
 	 * parameter ram.
 	 */
@@ -872,6 +884,9 @@ struct uart_cpm_port cpm_uart_ports[UART_NR] = {
 		.rx_nrfifos = RX_NUM_FIFO, 
 		.rx_fifosize = RX_BUF_SIZE,
 		.set_lineif = smc2_lineif,
+#ifdef CONFIG_SERIAL_CPM_ALT_SMC2
+		.is_portb = 1,
+#endif
 	},
 	[UART_SCC1] = {
 		.port = {

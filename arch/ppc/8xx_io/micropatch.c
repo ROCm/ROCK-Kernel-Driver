@@ -19,18 +19,12 @@
 #include <asm/8xx_immap.h>
 #include <asm/commproc.h>
 
-/* Define this to get SMC patches as well.  You need to modify the uart
- * driver as well......
-#define USE_SMC_PATCH 1
+/*
+ * I2C/SPI relocation patch arrays.
  */
 
-#ifdef CONFIG_USB_MPC8xx
-#define USE_USB_SOF_PATCH
-#endif
+#ifdef CONFIG_I2C_SPI_UCODE_PATCH
 
-#ifdef USE_IIC_PATCH
-#define PATCH_DEFINED
-	/* IIC/SPI */
 uint patch_2000[] = {
 	0x7FFFEFD9,
 	0x3FFD0000,
@@ -183,11 +177,12 @@ uint patch_2f00[] = {
 };
 #endif
 
-#ifdef USE_SMC_PATCH
-#define PATCH_DEFINED
-/* SMC2/IIC/SPI Patch */
-/* This is the area from 0x2000 to 0x23ff.
-*/
+/*
+ * I2C/SPI/SMC1 relocation patch arrays.
+ */
+
+#ifdef CONFIG_I2C_SPI_SMC1_UCODE_PATCH
+
 uint patch_2000[] = {
 	0x3fff0000,
 	0x3ffd0000,
@@ -511,8 +506,6 @@ uint patch_2000[] = {
 	0x6079e2bb
 };
 
-	/* This is from 0x2f00 to 0x2fff
-	*/
 uint patch_2f00[] = {
 	0x30303030,
 	0x3e3e3434,
@@ -581,8 +574,6 @@ uint patch_2f00[] = {
 };
 
 uint patch_2e00[] = {
-	/* This is from 0x2e00 to 0x2e3c
-	*/
 	0x27eeeeee,
 	0xeeeeeeee,
 	0xeeeeeeee,
@@ -602,8 +593,12 @@ uint patch_2e00[] = {
 };
 #endif
 
-#ifdef USE_USB_SOF_PATCH
-#define PATCH_DEFINED
+/*
+ *  USB SOF patch arrays.
+ */
+
+#ifdef CONFIG_USB_SOF_UCODE_PATCH
+
 uint patch_2000[] = {
 	0x7fff0000,
 	0x7ffd0000,
@@ -626,33 +621,21 @@ uint patch_2f00[] = {
 };
 #endif
 
-/* Load the microcode patch.  This is called early in the CPM initialization
- * with the controller in the reset state.  We enable the processor after
- * we load the patch.
- */
 void
 cpm_load_patch(volatile immap_t *immr)
 {
-#ifdef PATCH_DEFINED
-	volatile uint		*dp;
+	volatile uint		*dp;		/* Dual-ported RAM. */
 	volatile cpm8xx_t	*commproc;
 	volatile iic_t		*iip;
 	volatile spi_t		*spp;
+	volatile smc_uart_t	*smp;
 	int	i;
 
 	commproc = (cpm8xx_t *)&immr->im_cpm;
 
-	/* We work closely with commproc.c.  We know it only allocates
-	 * from data only space.
-	 * For this particular patch, we only use the bottom 512 bytes
-	 * and the upper 256 byte extension.  We will use the space
-	 * starting at 1K for the relocated parameters, as the general
-	 * CPM allocation won't come from that area.
-	 */
+#ifdef CONFIG_USB_SOF_UCODE_PATCH
 	commproc->cp_rccr = 0;
 
-	/* Copy the patch into DPRAM.
-	*/
 	dp = (uint *)(commproc->cp_dpmem);
 	for (i=0; i<(sizeof(patch_2000)/4); i++)
 		*dp++ = patch_2000[i];
@@ -661,29 +644,26 @@ cpm_load_patch(volatile immap_t *immr)
 	for (i=0; i<(sizeof(patch_2f00)/4); i++)
 		*dp++ = patch_2f00[i];
 
-#ifdef USE_USB_SOF_PATCH
-#if 0 /* usb patch should not relocate iic */
-	iip = (iic_t *)&commproc->cp_dparam[PROFF_IIC];
-#define RPBASE 0x0030
-	iip->iic_rpbase = RPBASE;
-
-	/* Put SPI above the IIC, also 32-byte aligned.
-	*/
-	i = (RPBASE + sizeof(iic_t) + 31) & ~31;
-	spp = (spi_t *)&commproc->cp_dparam[PROFF_SPI];
-	spp->spi_rpbase = i;
-#endif
-
-	/* Enable uCode fetches from DPRAM. */
 	commproc->cp_rccr = 0x0009;
 
-	printk("USB uCode patch installed\n");
-#endif /* USE_USB_SOF_PATCH */
+	printk("USB SOF microcode patch installed\n");
+#endif /* CONFIG_USB_SOF_UCODE_PATCH */
 
-#if defined(USE_SMC_PATCH) || defined(USE_IIC_PATCH)
+#if defined(CONFIG_I2C_SPI_UCODE_PATCH) || \
+    defined(CONFIG_I2C_SPI_SMC1_UCODE_PATCH)
+
+	commproc->cp_rccr = 0;
+
+	dp = (uint *)(commproc->cp_dpmem);
+	for (i=0; i<(sizeof(patch_2000)/4); i++)
+		*dp++ = patch_2000[i];
+
+	dp = (uint *)&(commproc->cp_dpmem[0x0f00]);
+	for (i=0; i<(sizeof(patch_2f00)/4); i++)
+		*dp++ = patch_2f00[i];
 
 	iip = (iic_t *)&commproc->cp_dparam[PROFF_IIC];
-#define RPBASE 0x0400
+# define RPBASE 0x0500
 	iip->iic_rpbase = RPBASE;
 
 	/* Put SPI above the IIC, also 32-byte aligned.
@@ -692,58 +672,46 @@ cpm_load_patch(volatile immap_t *immr)
 	spp = (spi_t *)&commproc->cp_dparam[PROFF_SPI];
 	spp->spi_rpbase = i;
 
-#ifdef USE_SMC_PATCH
-	dp = (uint *)&(commproc->cp_dpmem[0x0e00]);
-	for (i=0; i<(sizeof(patch_2e00)/4); i++)
-		*dp++ = patch_2e00[i];
-
-	/* Enable the traps to get to it.
-	*/
-	commproc->cp_cpmcr1 = 0x8080;
-	commproc->cp_cpmcr2 = 0x808a;
-	commproc->cp_cpmcr3 = 0x8028;
-	commproc->cp_cpmcr4 = 0x802a;
-
-	/* Enable uCode fetches from DPRAM.
-	*/
-	commproc->cp_rccr = 3;
-#endif
-
-#ifdef USE_IIC_PATCH
-	/* Enable the traps to get to it.
-	*/
+# if defined(CONFIG_I2C_SPI_UCODE_PATCH)
 	commproc->cp_cpmcr1 = 0x802a;
 	commproc->cp_cpmcr2 = 0x8028;
 	commproc->cp_cpmcr3 = 0x802e;
 	commproc->cp_cpmcr4 = 0x802c;
-
-	/* Enable uCode fetches from DPRAM.
-	*/
 	commproc->cp_rccr = 1;
 
-	printk("I2C uCode patch installed\n");
-#endif
+	printk("I2C/SPI microcode patch installed.\n");
+# endif /* CONFIG_I2C_SPI_UCODE_PATCH */
 
-	/* Relocate the IIC and SPI parameter areas.  These have to
-	 * aligned on 32-byte boundaries.
-	 */
-	iip = (iic_t *)&commproc->cp_dparam[PROFF_IIC];
-	iip->iic_rpbase = RPBASE;
+# if defined(CONFIG_I2C_SPI_SMC1_UCODE_PATCH)
 
-	/* Put SPI above the IIC, also 32-byte aligned.
-	*/
-	i = (RPBASE + sizeof(iic_t) + 31) & ~31;
-	spp = (spi_t *)&commproc->cp_dparam[PROFF_SPI];
-	spp->spi_rpbase = i;
+	dp = (uint *)&(commproc->cp_dpmem[0x0e00]);
+	for (i=0; i<(sizeof(patch_2e00)/4); i++)
+		*dp++ = patch_2e00[i];
 
-#endif /* USE_SMC_PATCH || USE_IIC_PATCH */
-#endif /* PATCH_DEFINED */
+	commproc->cp_cpmcr1 = 0x8080;
+	commproc->cp_cpmcr2 = 0x808a;
+	commproc->cp_cpmcr3 = 0x8028;
+	commproc->cp_cpmcr4 = 0x802a;
+	commproc->cp_rccr = 3;
+
+	smp = (smc_uart_t *)&commproc->cp_dparam[PROFF_SMC1];
+	smp->smc_rpbase = 0x1FC0;
+
+	printk("I2C/SPI/SMC1 microcode patch installed.\n");
+# endif /* CONFIG_I2C_SPI_SMC1_UCODE_PATCH) */
+
+#endif /* some variation of the I2C/SPI patch was selected */
 }
 
+/*
+ *  Take this entire routine out, since no one calls it and its 
+ * logic is suspect.
+ */
+
+#if 0
 void
 verify_patch(volatile immap_t *immr)
 {
-#ifdef PATCH_DEFINED
 	volatile uint		*dp;
 	volatile cpm8xx_t	*commproc;
 	int i;
@@ -772,6 +740,5 @@ verify_patch(volatile immap_t *immr)
 		}
 
 	commproc->cp_rccr = 0x0009;
-#endif /* PATCH_DEFINED */
 }
-
+#endif

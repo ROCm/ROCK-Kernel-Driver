@@ -15,7 +15,7 @@
  * traps.  The top-level scheme is similar to that used
  * in the x86 kprobes implementation.
  *
- * In the kprobe->insn[] array we store the original
+ * In the kprobe->ainsn.insn[] array we store the original
  * instruction at index zero and a break instruction at
  * index one.
  *
@@ -24,12 +24,12 @@
  * - Remember "regs->tnpc" and interrupt level stored in
  *   "regs->tstate" so we can restore them later
  * - Disable PIL interrupts
- * - Set regs->tpc to point to kprobe->insn[0]
- * - Set regs->tnpc to point to kprobe->insn[1]
+ * - Set regs->tpc to point to kprobe->ainsn.insn[0]
+ * - Set regs->tnpc to point to kprobe->ainsn.insn[1]
  * - Mark that we are actively in a kprobe
  *
  * At this point we wait for the second breakpoint at
- * kprobe->insn[1] to hit.  When it does we:
+ * kprobe->ainsn.insn[1] to hit.  When it does we:
  * - Run the post-handler
  * - Set regs->tpc to "remembered" regs->tnpc stored above,
  *   restore the PIL interrupt level in "regs->tstate" as well
@@ -38,10 +38,15 @@
  * - Mark that we are no longer actively in a kprobe.
  */
 
-void arch_prepare_kprobe(struct kprobe *p)
+int arch_prepare_kprobe(struct kprobe *p)
 {
-	p->insn[0] = *p->addr;
-	p->insn[1] = BREAKPOINT_INSTRUCTION_2;
+	p->ainsn.insn[0] = *p->addr;
+	p->ainsn.insn[1] = BREAKPOINT_INSTRUCTION_2;
+	return 0;
+}
+
+void arch_remove_kprobe(struct kprobe *p)
+{
 }
 
 /* kprobe_status settings */
@@ -59,8 +64,8 @@ static inline void prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
 	current_kprobe_orig_tstate_pil = (regs->tstate & TSTATE_PIL);
 	regs->tstate |= TSTATE_PIL;
 
-	regs->tpc = (unsigned long) &p->insn[0];
-	regs->tnpc = (unsigned long) &p->insn[1];
+	regs->tpc = (unsigned long) &p->ainsn.insn[0];
+	regs->tnpc = (unsigned long) &p->ainsn.insn[1];
 }
 
 static inline void disarm_kprobe(struct kprobe *p, struct pt_regs *regs)
@@ -199,19 +204,19 @@ static void retpc_fixup(struct pt_regs *regs, u32 insn, unsigned long real_pc)
  * instruction.  To avoid the SMP problems that can occur when we
  * temporarily put back the original opcode to single-step, we
  * single-stepped a copy of the instruction.  The address of this
- * copy is p->insn.
+ * copy is p->ainsn.insn.
  *
  * This function prepares to return from the post-single-step
  * breakpoint trap.
  */
 static void resume_execution(struct kprobe *p, struct pt_regs *regs)
 {
-	u32 insn = p->insn[0];
+	u32 insn = p->ainsn.insn[0];
 
 	regs->tpc = current_kprobe_orig_tnpc;
 	regs->tnpc = relbranch_fixup(insn,
 				     (unsigned long) p->addr,
-				     (unsigned long) &p->insn[0],
+				     (unsigned long) &p->ainsn.insn[0],
 				     regs->tnpc);
 	retpc_fixup(regs, insn, (unsigned long) p->addr);
 
