@@ -441,6 +441,7 @@ static struct pci_device_id cy82c693_pci_tbl[] = {
 	{ PCI_VENDOR_ID_CONTAQ, PCI_DEVICE_ID_CONTAQ_82C693, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, cy82c693_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "Cypress IDE",

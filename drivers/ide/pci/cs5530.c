@@ -417,6 +417,7 @@ static struct pci_device_id cs5530_pci_tbl[] = {
 	{ PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5530_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, cs5530_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "CS5530 IDE",

@@ -621,6 +621,7 @@ static struct pci_device_id via_pci_tbl[] = {
 	{ PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, via_pci_tbl);
 
 static struct pci_driver driver = {
 	.name 		= "VIA IDE",
