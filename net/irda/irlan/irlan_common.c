@@ -74,20 +74,6 @@ static int eth;   /* Use "eth" or "irlan" name for devices */
 static int access = ACCESS_PEER; /* PEER, DIRECT or HOSTED */
 
 #ifdef CONFIG_PROC_FS
-static char *irlan_state[] = {
-	"IRLAN_IDLE",
-	"IRLAN_QUERY",
-	"IRLAN_CONN", 
-	"IRLAN_INFO",
-	"IRLAN_MEDIA",
-	"IRLAN_OPEN",
-	"IRLAN_WAIT",
-	"IRLAN_ARB", 
-	"IRLAN_DATA",
-	"IRLAN_CLOSE",
-	"IRLAN_SYNC"
-};
-
 static char *irlan_access[] = {
 	"UNKNOWN",
 	"DIRECT",
