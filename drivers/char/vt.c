@@ -90,6 +90,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/vt_kern.h>
 #include <linux/selection.h>
+#include <linux/tiocl.h>
 #include <linux/kbd_kern.h>
 #include <linux/consolemap.h>
 #include <linux/timer.h>
@@ -2235,21 +2236,21 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 	ret = 0;
 	switch (type)
 	{
-		case 2:
+		case TIOCL_SETSEL:
 			acquire_console_sem();
-			ret = set_selection(arg, tty, 1);
+			ret = set_selection((struct tiocl_selection *)((char *)arg+1), tty, 1);
 			release_console_sem();
 			break;
-		case 3:
+		case TIOCL_PASTESEL:
 			ret = paste_selection(tty);
 			break;
-		case 4:
+		case TIOCL_UNBLANKSCREEN:
 			unblank_screen();
 			break;
-		case 5:
+		case TIOCL_SELLOADLUT:
 			ret = sel_loadlut(arg);
 			break;
-		case 6:
+		case TIOCL_GETSHIFTSTATE:
 			
 	/*
 	 * Make it possible to react to Shift+Mousebutton.
@@ -2260,14 +2261,14 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 	 		data = shift_state;
 			ret = __put_user(data, (char *) arg);
 			break;
-		case 7:
+		case TIOCL_GETMOUSEREPORTING:
 			data = mouse_reporting();
 			ret = __put_user(data, (char *) arg);
 			break;
-		case 10:
+		case TIOCL_SETVESABLANK:
 			set_vesa_blanking(arg);
 			break;;
-		case 11:	/* set kmsg redirect */
+		case TIOCL_SETKMSGREDIRECT:
 			if (!capable(CAP_SYS_ADMIN)) {
 				ret = -EPERM;
 			} else {
@@ -2277,10 +2278,10 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 					kmsg_redirect = data;
 			}
 			break;
-		case 12:	/* get fg_console */
+		case TIOCL_GETFGCONSOLE:
 			ret = fg_console;
 			break;
-		case 13:	/* scroll console */
+		case TIOCL_SCROLLCONSOLE:
 			if (get_user(lines, (char *)arg+1)) {
 				ret = -EFAULT;
 			} else {
@@ -2288,11 +2289,11 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 				ret = 0;
 			}
 			break;
-		case 14:	/* blank screen until explicitly unblanked, not only poked */
+		case TIOCL_BLANKSCREEN:	/* until explicitly unblanked, not only poked */
 			ignore_poke = 1;
 			do_blank_screen(0);
 			break;
-		case 15:	/* which console is blanked ? */
+		case TIOCL_BLANKEDSCREEN:
 			ret = console_blanked;
 			break;
 		default:
