@@ -642,42 +642,20 @@ static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 	size -= 12;
 	wl3501_get_from_wla(this, this->start_seg + 2,
 			    &next_addr, sizeof(next_addr));
-	if (this->ether_type == ARPHRD_ETHER) {
-		if (size > WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr)) {
-			wl3501_get_from_wla(this,
-					    this->start_seg +
-						sizeof(struct wl3501_rx_hdr),
-					    data,
-					    WL3501_BLKSZ -
-						sizeof(struct wl3501_rx_hdr));
-			size -= WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr);
-			data += WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr);
-		} else {
-			wl3501_get_from_wla(this,
-					    this->start_seg +
-						sizeof(struct wl3501_rx_hdr),
-					    data, size);
-			size = 0;
-		}
+	if (size > WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr)) {
+		wl3501_get_from_wla(this,
+				    this->start_seg +
+					sizeof(struct wl3501_rx_hdr), data,
+				    WL3501_BLKSZ -
+					sizeof(struct wl3501_rx_hdr));
+		size -= WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr);
+		data += WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr);
 	} else {
-		size -= 2;
-		*data = (size >> 8) & 0xff;
-		*(data + 1) = size & 0xff;
-		data += 2;
-		if (size > WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6) {
-			wl3501_get_from_wla(this,
-					    this->start_seg + offset_addr4,
-					    data,
-					    WL3501_BLKSZ -
-					      sizeof(struct wl3501_rx_hdr) + 6);
-			size -= WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6;
-			data += WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6;
-		} else {
-			wl3501_get_from_wla(this,
-					    this->start_seg + offset_addr4,
-					    data, size);
-			size = 0;
-		}
+		wl3501_get_from_wla(this,
+				    this->start_seg +
+					sizeof(struct wl3501_rx_hdr),
+				    data, size);
+		size = 0;
 	}
 	while (size > 0) {
 		if (size > WL3501_BLKSZ - 5) {
@@ -860,17 +838,12 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 			    sig.data +
 				offsetof(struct wl3501_rx_hdr, addr4),
 			    &addr4, sizeof(addr4));
-	if (addr4[0] == 0xAA && addr4[1] == 0xAA &&
-	    addr4[2] == 0x03 && addr4[4] == 0x00) {
-		pkt_len = sig.size + 12 - 24 - 4 - 6;
-		this->ether_type = ARPHRD_ETHER;
-	} else if (addr4[0] == 0xE0 && addr4[1] == 0xE0) {
-		pkt_len = sig.size + 12 - 24 - 4 + 2;
-		this->ether_type = ARPHRD_IEEE80211; /* FIXME */
-	} else {
-		pkt_len = sig.size + 12 - 24 - 4 + 2;
-		this->ether_type = ARPHRD_IEEE80211; /* FIXME */
+	if (!(addr4[0] == 0xAA && addr4[1] == 0xAA &&
+	      addr4[2] == 0x03 && addr4[4] == 0x00)) {
+		printk(KERN_INFO "Insupported packet type!\n");
+		return;
 	}
+	pkt_len = sig.size + 12 - 24 - 4 - 6;
 
 	skb = dev_alloc_skb(pkt_len + 5);
 
@@ -1578,7 +1551,7 @@ static int wl3501_get_wap(struct net_device *dev, struct iw_request_info *info,
 {
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 
-	wrqu->ap_addr.sa_family = this->ether_type;
+	wrqu->ap_addr.sa_family = ARPHRD_ETHER;
 	memcpy(wrqu->ap_addr.sa_data, this->bssid, ETH_ALEN);
 	return 0;
 }
