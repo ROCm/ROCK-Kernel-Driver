@@ -73,6 +73,7 @@ static int generic_remove (struct device *dev)
 }
 
 static struct device_driver usb_generic_driver = {
+	.owner = THIS_MODULE,
 	.name =	"usb",
 	.bus = &usb_bus_type,
 	.probe = generic_probe,
@@ -150,6 +151,7 @@ int usb_register(struct usb_driver *new_driver)
 	new_driver->driver.bus = &usb_bus_type;
 	new_driver->driver.probe = usb_probe_interface;
 	new_driver->driver.remove = usb_unbind_interface;
+	new_driver->driver.owner = new_driver->owner;
 
 	retval = driver_register(&new_driver->driver);
 
