@@ -103,7 +103,7 @@ struct region {
 	struct list_head list;
 
 	atomic_t pending;
-	struct bio *delayed_bios;
+	struct bio_list delayed_bios;
 };
 
 /*
@@ -244,7 +244,7 @@ static struct region *__rh_alloc(struct region_hash *rh, region_t region)
 	INIT_LIST_HEAD(&nreg->list);
 
 	atomic_set(&nreg->pending, 0);
-	nreg->delayed_bios = NULL;
+	bio_list_init(&nreg->delayed_bios);
 	write_lock_irq(&rh->hash_lock);
 
 	reg = __rh_lookup(rh, region);
@@ -310,14 +310,12 @@ static inline int rh_in_sync(struct region_hash *rh,
 	return state == RH_CLEAN || state == RH_DIRTY;
 }
 
-static void dispatch_bios(struct mirror_set *ms, struct bio *bio)
+static void dispatch_bios(struct mirror_set *ms, struct bio_list *bio_list)
 {
-	struct bio *nbio;
+	struct bio *bio;
 
-	while (bio) {
-		nbio = bio->bi_next;
+	while ((bio = bio_list_pop(bio_list))) {
 		queue_bio(ms, bio, WRITE);
-		bio = nbio;
 	}
 }
 
@@ -361,7 +359,7 @@ static void rh_update_states(struct region_hash *rh)
 	list_for_each_entry_safe (reg, next, &recovered, list) {
 		rh->log->type->clear_region(rh->log, reg->key);
 		rh->log->type->complete_resync_work(rh->log, reg->key, 1);
-		dispatch_bios(rh->ms, reg->delayed_bios);
+		dispatch_bios(rh->ms, &reg->delayed_bios);
 		up(&rh->recovery_count);
 		mempool_free(reg, rh->region_pool);
 	}
@@ -516,8 +514,7 @@ static void rh_delay(struct region_hash *rh, struct bio *bio)
 
 	read_lock(&rh->hash_lock);
 	reg = __rh_find(rh, bio_to_region(rh, bio));
-	bio->bi_next = reg->delayed_bios;
-	reg->delayed_bios = bio;
+	bio_list_add(&reg->delayed_bios, bio);
 	read_unlock(&rh->hash_lock);
 }
 
