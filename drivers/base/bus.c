@@ -607,6 +607,8 @@ void put_bus(struct bus_type * bus)
  *
  *	Call kset_find_obj() to iterate over list of buses to
  *	find a bus by name. Return bus if found.
+ *
+ *	Note that kset_find_obj increments bus' reference count.
  */
 
 struct bus_type * find_bus(char * name)
