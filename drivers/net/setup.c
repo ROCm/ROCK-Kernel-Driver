@@ -9,8 +9,6 @@
 #include <linux/init.h>
 #include <linux/netlink.h>
 
-extern int x25_asy_init_ctrl_dev(void);
-  
 extern int dmascc_init(void);
 
 extern int arcnet_init(void); 
@@ -97,19 +95,6 @@ static void __init network_probe(void)
 	}
 }
 
-
-/*
- *	Initialise the line discipline drivers
- */
- 
-static void __init network_ldisc_init(void)
-{
-#if defined(CONFIG_X25_ASY)
-	x25_asy_init_ctrl_dev();
-#endif
-}
-
-
 static void __init special_device_init(void)
 {
 #ifdef CONFIG_NET_SB1000
@@ -129,11 +114,8 @@ static void __init special_device_init(void)
  
 void __init net_device_init(void)
 {
-	/* Devices supporting the new probing API */
+	/* Devices supporting the new^H^H^Hold probing API */
 	network_probe();
-	/* Line disciplines */
-	network_ldisc_init();
 	/* Special devices */
 	special_device_init();
-	/* That kicks off the legacy init functions */
 }
