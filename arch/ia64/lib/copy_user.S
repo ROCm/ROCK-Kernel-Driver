@@ -316,7 +316,7 @@ GLOBAL_ENTRY(__copy_user)
 	// Beginning of long mempcy (i.e. > 16 bytes)
 	//
 .long_copy_user:
-	tbit.nz p6,p7=src1,0	// odd alignement
+	tbit.nz p6,p7=src1,0	// odd alignment
 	and tmp=7,tmp
 	;;
 	cmp.eq p10,p8=r0,tmp

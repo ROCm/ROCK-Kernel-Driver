@@ -94,7 +94,7 @@ die (const char *str, struct pt_regs *regs, long err)
 {
 	static struct {
 		spinlock_t lock;
-		int lock_owner;
+		u32 lock_owner;
 		int lock_owner_depth;
 	} die = {
 		.lock =			SPIN_LOCK_UNLOCKED,

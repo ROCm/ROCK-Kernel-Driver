@@ -13,7 +13,7 @@
  * over and over again with slight variations and possibly making a
  * mistake somewhere.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
@@ -31,6 +31,24 @@
  * on IO_SPACE_LIMIT.  These additional spaces are described in ACPI.
  */
 #define IO_SPACE_LIMIT		0xffffffffffffffffUL
+
+#define MAX_IO_SPACES			16
+#define IO_SPACE_BITS			24
+#define IO_SPACE_SIZE			(1UL << IO_SPACE_BITS)
+
+#define IO_SPACE_NR(port)		((port) >> IO_SPACE_BITS)
+#define IO_SPACE_BASE(space)		((space) << IO_SPACE_BITS)
+#define IO_SPACE_PORT(port)		((port) & (IO_SPACE_SIZE - 1))
+
+#define IO_SPACE_SPARSE_ENCODING(p)	((((p) >> 2) << 12) | (p & 0xfff))
+
+struct io_space {
+	unsigned long mmio_base;	/* base in MMIO space */
+	int sparse;
+};
+
+extern struct io_space io_space[];
+extern unsigned int num_io_spaces;
 
 # ifdef __KERNEL__
 
@@ -80,12 +98,33 @@ __ia64_get_io_port_base (void)
 static inline void*
 __ia64_mk_io_addr (unsigned long port)
 {
-	const unsigned long io_base = __ia64_get_io_port_base();
-	unsigned long addr;
+	struct io_space *space;
+	unsigned long offset;
 
-	addr = io_base | ((port >> 2) << 12) | (port & 0xfff);
-	return (void *) addr;
+	space = &io_space[IO_SPACE_NR(port)];
+	port = IO_SPACE_PORT(port);
+	if (space->sparse)
+		offset = IO_SPACE_SPARSE_ENCODING(port);
+	else
+		offset = port;
+
+	return (void *) (space->mmio_base | offset);
 }
+
+#define __ia64_inb	___ia64_inb
+#define __ia64_inw	___ia64_inw
+#define __ia64_inl	___ia64_inl
+#define __ia64_outb	___ia64_outb
+#define __ia64_outw	___ia64_outw
+#define __ia64_outl	___ia64_outl
+#define __ia64_readb	___ia64_readb
+#define __ia64_readw	___ia64_readw
+#define __ia64_readl	___ia64_readl
+#define __ia64_readq	___ia64_readq
+#define __ia64_writeb	___ia64_writeb
+#define __ia64_writew	___ia64_writew
+#define __ia64_writel	___ia64_writel
+#define __ia64_writeq	___ia64_writeq
 
 /*
  * For the in/out routines, we need to do "mf.a" _after_ doing the I/O access to ensure
@@ -96,7 +135,7 @@ __ia64_mk_io_addr (unsigned long port)
  */
 
 static inline unsigned int
-__ia64_inb (unsigned long port)
+___ia64_inb (unsigned long port)
 {
 	volatile unsigned char *addr = __ia64_mk_io_addr(port);
 	unsigned char ret;
@@ -107,7 +146,7 @@ __ia64_inb (unsigned long port)
 }
 
 static inline unsigned int
-__ia64_inw (unsigned long port)
+___ia64_inw (unsigned long port)
 {
 	volatile unsigned short *addr = __ia64_mk_io_addr(port);
 	unsigned short ret;
@@ -118,7 +157,7 @@ __ia64_inw (unsigned long port)
 }
 
 static inline unsigned int
-__ia64_inl (unsigned long port)
+___ia64_inl (unsigned long port)
 {
 	volatile unsigned int *addr = __ia64_mk_io_addr(port);
 	unsigned int ret;
@@ -129,7 +168,7 @@ __ia64_inl (unsigned long port)
 }
 
 static inline void
-__ia64_outb (unsigned char val, unsigned long port)
+___ia64_outb (unsigned char val, unsigned long port)
 {
 	volatile unsigned char *addr = __ia64_mk_io_addr(port);
 
@@ -138,7 +177,7 @@ __ia64_outb (unsigned char val, unsigned long port)
 }
 
 static inline void
-__ia64_outw (unsigned short val, unsigned long port)
+___ia64_outw (unsigned short val, unsigned long port)
 {
 	volatile unsigned short *addr = __ia64_mk_io_addr(port);
 
@@ -147,7 +186,7 @@ __ia64_outw (unsigned short val, unsigned long port)
 }
 
 static inline void
-__ia64_outl (unsigned int val, unsigned long port)
+___ia64_outl (unsigned int val, unsigned long port)
 {
 	volatile unsigned int *addr = __ia64_mk_io_addr(port);
 
@@ -160,17 +199,8 @@ __insb (unsigned long port, void *dst, unsigned long count)
 {
 	unsigned char *dp = dst;
 
-	if (platform_inb == __ia64_inb) {
-		volatile unsigned char *addr = __ia64_mk_io_addr(port);
-
-		__ia64_mf_a();
-		while (count--)
-			*dp++ = *addr;
-		__ia64_mf_a();
-	} else
-		while (count--)
-			*dp++ = platform_inb(port);
-	return;
+	while (count--)
+		*dp++ = platform_inb(port);
 }
 
 static inline void
@@ -178,17 +208,8 @@ __insw (unsigned long port, void *dst, unsigned long count)
 {
 	unsigned short *dp = dst;
 
-	if (platform_inw == __ia64_inw) {
-		volatile unsigned short *addr = __ia64_mk_io_addr(port);
-
-		__ia64_mf_a();
-		while (count--)
-			*dp++ = *addr;
-		__ia64_mf_a();
-	} else
-		while (count--)
-			*dp++ = platform_inw(port);
-	return;
+	while (count--)
+		*dp++ = platform_inw(port);
 }
 
 static inline void
@@ -196,17 +217,8 @@ __insl (unsigned long port, void *dst, unsigned long count)
 {
 	unsigned int *dp = dst;
 
-	if (platform_inl == __ia64_inl) {
-		volatile unsigned int *addr = __ia64_mk_io_addr(port);
-
-		__ia64_mf_a();
-		while (count--)
-			*dp++ = *addr;
-		__ia64_mf_a();
-	} else
-		while (count--)
-			*dp++ = platform_inl(port);
-	return;
+	while (count--)
+		*dp++ = platform_inl(port);
 }
 
 static inline void
@@ -214,16 +226,8 @@ __outsb (unsigned long port, const void *src, unsigned long count)
 {
 	const unsigned char *sp = src;
 
-	if (platform_outb == __ia64_outb) {
-		volatile unsigned char *addr = __ia64_mk_io_addr(port);
-
-		while (count--)
-			*addr = *sp++;
-		__ia64_mf_a();
-	} else
-		while (count--)
-			platform_outb(*sp++, port);
-	return;
+	while (count--)
+		platform_outb(*sp++, port);
 }
 
 static inline void
@@ -231,16 +235,8 @@ __outsw (unsigned long port, const void *src, unsigned long count)
 {
 	const unsigned short *sp = src;
 
-	if (platform_outw == __ia64_outw) {
-		volatile unsigned short *addr = __ia64_mk_io_addr(port);
-
-		while (count--)
-			*addr = *sp++;
-		__ia64_mf_a();
-	} else
-		while (count--)
-			platform_outw(*sp++, port);
-	return;
+	while (count--)
+		platform_outw(*sp++, port);
 }
 
 static inline void
@@ -248,16 +244,8 @@ __outsl (unsigned long port, void *src, unsigned long count)
 {
 	const unsigned int *sp = src;
 
-	if (platform_outl == __ia64_outl) {
-		volatile unsigned int *addr = __ia64_mk_io_addr(port);
-
-		while (count--)
-			*addr = *sp++;
-		__ia64_mf_a();
-	} else
-		while (count--)
-			platform_outl(*sp++, port);
-	return;
+	while (count--)
+		platform_outl(*sp++, port);
 }
 
 /*
@@ -294,25 +282,25 @@ __outsl (unsigned long port, void *src, unsigned long count)
  * hopefully it'll stay that way).
  */
 static inline unsigned char
-__ia64_readb (void *addr)
+___ia64_readb (void *addr)
 {
 	return *(volatile unsigned char *)addr;
 }
 
 static inline unsigned short
-__ia64_readw (void *addr)
+___ia64_readw (void *addr)
 {
 	return *(volatile unsigned short *)addr;
 }
 
 static inline unsigned int
-__ia64_readl (void *addr)
+___ia64_readl (void *addr)
 {
 	return *(volatile unsigned int *) addr;
 }
 
 static inline unsigned long
-__ia64_readq (void *addr)
+___ia64_readq (void *addr)
 {
 	return *(volatile unsigned long *) addr;
 }

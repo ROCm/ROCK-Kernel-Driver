@@ -74,10 +74,6 @@ static inline int on_each_cpu(void (*func) (void *info), void *info,
  */
 extern int smp_threads_ready;
 
-extern volatile unsigned long smp_msg_data;
-extern volatile int smp_src_cpu;
-extern volatile int smp_msg_id;
-
 #define MSG_ALL_BUT_SELF	0x8000	/* Assume <32768 CPU's */
 #define MSG_ALL			0x8001
 

@@ -251,7 +251,14 @@ acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 	irq = acpi_fadt.sci_int;
 
 #ifdef CONFIG_IA64
-	irq = gsi_to_vector(irq);
+	int vector;
+
+	vector = acpi_irq_to_vector(irq);
+	if (vector < 0) {
+		printk(KERN_ERR PREFIX "SCI (IRQ%d) not registerd\n", irq);
+		return AE_OK;
+	}
+	irq = vector;
 #endif
 	acpi_irq_irq = irq;
 	acpi_irq_handler = handler;
@@ -269,7 +276,7 @@ acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
 {
 	if (acpi_irq_handler) {
 #ifdef CONFIG_IA64
-		irq = gsi_to_vector(irq);
+		irq = acpi_irq_to_vector(irq);
 #endif
 		free_irq(irq, acpi_irq);
 		acpi_irq_handler = NULL;
@@ -454,6 +461,9 @@ acpi_os_read_pci_configuration (
 	int			result = 0;
 	int			size = 0;
 	struct pci_bus		bus;
+#ifdef CONFIG_IA64
+	struct pci_controller	ctrl;
+#endif
 
 	if (!value)
 		return AE_BAD_PARAMETER;
@@ -473,6 +483,10 @@ acpi_os_read_pci_configuration (
 	}
 
 	bus.number = pci_id->bus;
+#ifdef CONFIG_IA64
+	ctrl.segment = pci_id->segment;
+	bus.sysdata = &ctrl;
+#endif
 	result = pci_root_ops->read(&bus, PCI_DEVFN(pci_id->device,
 						    pci_id->function),
 				    reg, size, value);
@@ -490,6 +504,9 @@ acpi_os_write_pci_configuration (
 	int			result = 0;
 	int			size = 0;
 	struct pci_bus		bus;
+#ifdef CONFIG_IA64
+	struct pci_controller	ctrl;
+#endif
 
 	switch (width) {
 	case 8:
@@ -506,6 +523,10 @@ acpi_os_write_pci_configuration (
 	}
 
 	bus.number = pci_id->bus;
+#ifdef CONFIG_IA64
+	ctrl.segment = pci_id->segment;
+	bus.sysdata = &ctrl;
+#endif
 	result = pci_root_ops->write(&bus, PCI_DEVFN(pci_id->device,
 						     pci_id->function),
 				     reg, size, value);

@@ -3,13 +3,16 @@
  *
  * Copyright (C) 2000 VA Linux Co
  * Copyright (C) 2000 Don Dugger <n0ano@valinux.com>
- * Copyright (C) 2001-2002 Hewlett-Packard Co
+ * Copyright (C) 2001-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/types.h>
 #include <linux/dirent.h>
 #include <linux/fs.h>		/* argh, msdos_fs.h isn't self-contained... */
+#include <linux/signal.h>	/* argh, msdos_fs.h isn't self-contained... */
+
+#include <asm/ia32.h>
 
 #include <linux/msdos_fs.h>
 #include <linux/mtio.h>
@@ -32,8 +35,6 @@
 #include <scsi/scsi_ioctl.h>
 #define	__KERNEL__
 #include <scsi/sg.h>
-
-#include <asm/ia32.h>
 
 #include <../drivers/char/drm/drm.h>
 #include <../drivers/char/drm/mga_drm.h>

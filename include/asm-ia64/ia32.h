@@ -453,8 +453,6 @@ struct ia32_modify_ldt_ldt_s {
 struct linux_binprm;
 
 extern void ia32_gdt_init (void);
-extern int ia32_setup_frame1 (int sig, struct k_sigaction *ka, siginfo_t *info,
-			       sigset_t *set, struct pt_regs *regs);
 extern void ia32_init_addr_space (struct pt_regs *regs);
 extern int ia32_setup_arg_pages (struct linux_binprm *bprm);
 extern int ia32_exception (struct pt_regs *regs, unsigned long isr);
@@ -475,5 +473,9 @@ extern void ia32_load_segment_descriptors (struct task_struct *task);
 	} while(0)
 
 #endif /* !CONFIG_IA32_SUPPORT */
+
+/* Declare this uncondiontally, so we don't get warnings for unreachable code.  */
+extern int ia32_setup_frame1 (int sig, struct k_sigaction *ka, siginfo_t *info,
+			      sigset_t *set, struct pt_regs *regs);
 
 #endif /* _ASM_IA64_IA32_H */

@@ -192,6 +192,7 @@ ia64_sync_itc (unsigned int master)
 {
 	long i, delta, adj, adjust_latency = 0, done = 0;
 	unsigned long flags, rt, master_time_stamp, bound;
+	extern void ia64_cpu_local_tick (void);
 #if DEBUG_ITC_SYNC
 	struct {
 		long rt;	/* roundtrip time */
@@ -246,6 +247,16 @@ ia64_sync_itc (unsigned int master)
 
 	printk(KERN_INFO "CPU %d: synchronized ITC with CPU %u (last diff %ld cycles, "
 	       "maxerr %lu cycles)\n", smp_processor_id(), master, delta, rt);
+
+	/*
+	 * Check whether we sync'd the itc ahead of the next timer interrupt.  If so, just
+	 * reset it.
+	 */
+	if (time_after(ia64_get_itc(), local_cpu_data->itm_next)) {
+		Dprintk("CPU %d: oops, jumped a timer tick; resetting timer.\n",
+			smp_processor_id());
+		ia64_cpu_local_tick();
+	}
 }
 
 /*
@@ -279,15 +290,6 @@ smp_callin (void)
 
 	smp_setup_percpu_timer();
 
-	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
-		/*
-		 * Synchronize the ITC with the BP
-		 */
-		Dprintk("Going to syncup ITC with BP.\n");
-
-		ia64_sync_itc(0);
-	}
-
 	/*
 	 * Get our bogomips.
 	 */
@@ -310,6 +312,18 @@ smp_callin (void)
 	local_irq_enable();
 	calibrate_delay();
 	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
+
+	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
+		/*
+		 * Synchronize the ITC with the BP.  Need to do this after irqs are
+		 * enabled because ia64_sync_itc() calls smp_call_function_single(), which
+		 * calls spin_unlock_bh(), which calls spin_unlock_bh(), which calls
+		 * local_bh_enable(), which bugs out if irqs are not enabled...
+		 */
+		Dprintk("Going to syncup ITC with BP.\n");
+		ia64_sync_itc(0);
+	}
+
 	/*
 	 * Allow the master to continue.
 	 */
@@ -394,13 +408,26 @@ do_boot_cpu (int sapicid, int cpu)
 	return 0;
 }
 
-unsigned long cache_decay_ticks;	/* # of ticks an idle task is considered cache-hot */
+static int __init
+decay (char *str)
+{
+	int ticks;
+	get_option (&str, &ticks);
+	cache_decay_ticks = ticks;
+	return 1;
+}
+
+__setup("decay=", decay);
+
+/*
+ * # of ticks an idle task is considered cache-hot.  Highly application-dependent.  There
+ * are apps out there which are known to suffer significantly with values >= 4.
+ */
+unsigned long cache_decay_ticks = 10;	/* equal to MIN_TIMESLICE */
 
 static void
 smp_tune_scheduling (void)
 {
-	cache_decay_ticks = 10;	/* XXX base this on PAL info and cache-bandwidth estimate */
-
 	printk(KERN_INFO "task migration cache decay timeout: %ld msecs.\n",
 	       (cache_decay_ticks + 1) * 1000 / HZ);
 }

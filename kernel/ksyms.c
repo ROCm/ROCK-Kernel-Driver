@@ -402,7 +402,9 @@ EXPORT_SYMBOL(add_timer);
 EXPORT_SYMBOL(del_timer);
 EXPORT_SYMBOL(request_irq);
 EXPORT_SYMBOL(free_irq);
+#if !defined(CONFIG_IA64)
 EXPORT_SYMBOL(irq_stat);
+#endif
 
 /* waitqueue handling */
 EXPORT_SYMBOL(add_wait_queue);
@@ -602,7 +604,9 @@ EXPORT_SYMBOL(__tasklet_hi_schedule);
 /* init task, for moving kthread roots - ought to export a function ?? */
 
 EXPORT_SYMBOL(init_task);
+#ifndef CONFIG_IA64
 EXPORT_SYMBOL(init_thread_union);
+#endif
 
 EXPORT_SYMBOL(tasklist_lock);
 EXPORT_SYMBOL(find_task_by_pid);

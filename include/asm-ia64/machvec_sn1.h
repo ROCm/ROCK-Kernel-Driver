@@ -44,14 +44,14 @@ extern ia64_mv_inl_t sn1_inl;
 extern ia64_mv_outb_t sn1_outb;
 extern ia64_mv_outw_t sn1_outw;
 extern ia64_mv_outl_t sn1_outl;
-extern ia64_mv_pci_alloc_consistent	sn1_pci_alloc_consistent;
-extern ia64_mv_pci_free_consistent	sn1_pci_free_consistent;
-extern ia64_mv_pci_map_single		sn1_pci_map_single;
-extern ia64_mv_pci_unmap_single		sn1_pci_unmap_single;
-extern ia64_mv_pci_map_sg		sn1_pci_map_sg;
-extern ia64_mv_pci_unmap_sg		sn1_pci_unmap_sg;
-extern ia64_mv_pci_dma_sync_single	sn1_pci_dma_sync_single;
-extern ia64_mv_pci_dma_sync_sg		sn1_pci_dma_sync_sg;
+extern ia64_mv_dma_alloc_coherent	sn1_dma_alloc_coherent;
+extern ia64_mv_dma_free_coherent	sn1_dma_free_coherent;
+extern ia64_mv_dma_map_single		sn1_dma_map_single;
+extern ia64_mv_dma_unmap_single		sn1_dma_unmap_single;
+extern ia64_mv_dma_map_sg		sn1_dma_map_sg;
+extern ia64_mv_dma_unmap_sg		sn1_dma_unmap_sg;
+extern ia64_mv_dma_sync_single		sn1_dma_sync_single;
+extern ia64_mv_dma_sync_sg		sn1_dma_sync_sg;
 
 /*
  * This stuff has dual use!
@@ -72,14 +72,14 @@ extern ia64_mv_pci_dma_sync_sg		sn1_pci_dma_sync_sg;
 #define platform_outb		sn1_outb
 #define platform_outw		sn1_outw
 #define platform_outl		sn1_outl
-#define platform_pci_dma_init	machvec_noop
-#define platform_pci_alloc_consistent	sn1_pci_alloc_consistent
-#define platform_pci_free_consistent	sn1_pci_free_consistent
-#define platform_pci_map_single		sn1_pci_map_single
-#define platform_pci_unmap_single	sn1_pci_unmap_single
-#define platform_pci_map_sg		sn1_pci_map_sg
-#define platform_pci_unmap_sg		sn1_pci_unmap_sg
-#define platform_pci_dma_sync_single	sn1_pci_dma_sync_single
-#define platform_pci_dma_sync_sg	sn1_pci_dma_sync_sg
+#define platform_dma_init	machvec_noop
+#define platform_dma_alloc_coherent	sn1_dma_alloc_coherent
+#define platform_dma_free_coherent	sn1_dma_free_coherent
+#define platform_dma_map_single		sn1_dma_map_single
+#define platform_dma_unmap_single	sn1_dma_unmap_single
+#define platform_dma_map_sg		sn1_dma_map_sg
+#define platform_dma_unmap_sg		sn1_dma_unmap_sg
+#define platform_dma_sync_single	sn1_dma_sync_single
+#define platform_dma_sync_sg		sn1_dma_sync_sg
 
 #endif /* _ASM_IA64_MACHVEC_SN1_h */

@@ -145,7 +145,7 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 }
 
 #ifdef CONFIG_SMP
-extern void handle_IPI (int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t handle_IPI (int irq, void *dev_id, struct pt_regs *regs);
 
 static struct irqaction ipi_irqaction = {
 	.handler =	handle_IPI,

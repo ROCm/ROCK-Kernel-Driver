@@ -23,7 +23,12 @@ extern int page_cluster;
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/processor.h>
 #include <asm/atomic.h>
+
+#ifndef MM_VM_SIZE
+#define MM_VM_SIZE(mm)	TASK_SIZE
+#endif
 
 /*
  * Linux kernel virtual memory manager primitives.
