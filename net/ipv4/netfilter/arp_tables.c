@@ -180,7 +180,7 @@ static inline int arp_packet_match(const struct arphdr *arphdr,
 	}
 
 	/* Look for ifname matches.  */
-	for (i = 0, ret = 0; i < IFNAMSIZ/sizeof(unsigned long); i++) {
+	for (i = 0, ret = 0; i < IFNAMSIZ; i++) {
 		ret |= (indev[i] ^ arpinfo->iniface[i])
 			& arpinfo->iniface_mask[i];
 	}
