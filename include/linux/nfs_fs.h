@@ -83,6 +83,20 @@ struct nfs_access_entry {
 	int			mask;
 };
 
+struct nfs4_state;
+struct nfs_open_context {
+	atomic_t count;
+	struct dentry *dentry;
+	struct rpc_cred *cred;
+	struct nfs4_state *state;
+	fl_owner_t lockowner;
+	int mode;
+	int error;
+
+	struct list_head list;
+	wait_queue_head_t waitq;
+};
+
 /*
  * nfs fs inode data in memory
  */
@@ -156,8 +170,8 @@ struct nfs_inode {
 				ncommit,
 				npages;
 
-	/* Credentials for shared mmap */
-	struct rpc_cred		*mm_cred;
+	/* Open contexts for shared mmap writes */
+	struct list_head	open_files;
 
 	wait_queue_head_t	nfs_i_wait;
 
@@ -268,7 +282,6 @@ extern struct inode *nfs_fhget(struct super_block *, struct nfs_fh *,
 extern int nfs_refresh_inode(struct inode *, struct nfs_fattr *);
 extern int nfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int nfs_permission(struct inode *, int, struct nameidata *);
-extern void nfs_set_mmcred(struct inode *, struct rpc_cred *);
 extern int nfs_open(struct inode *, struct file *);
 extern int nfs_release(struct inode *, struct file *);
 extern int __nfs_revalidate_inode(struct nfs_server *, struct inode *);
@@ -278,6 +291,12 @@ extern void nfs_end_attr_update(struct inode *);
 extern void nfs_begin_data_update(struct inode *);
 extern void nfs_end_data_update(struct inode *);
 extern void nfs_end_data_update_defer(struct inode *);
+extern struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry, struct rpc_cred *cred);
+extern struct nfs_open_context *get_nfs_open_context(struct nfs_open_context *ctx);
+extern void put_nfs_open_context(struct nfs_open_context *ctx);
+extern void nfs_file_set_open_context(struct file *filp, struct nfs_open_context *ctx);
+extern struct nfs_open_context *nfs_find_open_context(struct inode *inode, int mode);
+extern void nfs_file_clear_open_context(struct file *filp);
 
 /* linux/net/ipv4/ipconfig.c: trims ip addr off front of name, too. */
 extern u32 root_nfs_parse_addr(char *name); /*__init*/
@@ -289,16 +308,15 @@ extern struct inode_operations nfs_file_inode_operations;
 extern struct file_operations nfs_file_operations;
 extern struct address_space_operations nfs_file_aops;
 
-static __inline__ struct rpc_cred *
-nfs_file_cred(struct file *file)
+static inline struct rpc_cred *nfs_file_cred(struct file *file)
 {
-	struct rpc_cred *cred = NULL;
-	if (file)
-		cred = (struct rpc_cred *)file->private_data;
-#ifdef RPC_DEBUG
-	BUG_ON(cred && cred->cr_magic != RPCAUTH_CRED_MAGIC);
-#endif
-	return cred;
+	if (file != NULL) {
+		struct nfs_open_context *ctx;
+
+		ctx = (struct nfs_open_context*)file->private_data;
+		return ctx->cred;
+	}
+	return NULL;
 }
 
 /*
@@ -684,6 +702,7 @@ struct nfs4_mount_data;
 #define destroy_nfsv4_state(server)       do { } while (0)
 #define nfs4_put_state_owner(inode, owner) do { } while (0)
 #define nfs4_put_open_state(state) do { } while (0)
+#define nfs4_close_state(a, b) do { } while (0)
 #define nfs4_renewd_prepare_shutdown(server) do { } while (0)
 #endif
 

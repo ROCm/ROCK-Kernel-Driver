@@ -678,9 +678,9 @@ struct nfs_rpc_ops {
 			    struct nfs_fh *, struct nfs_fattr *);
 	int	(*access)  (struct inode *, struct nfs_access_entry *);
 	int	(*readlink)(struct inode *, struct page *);
-	int	(*read)    (struct nfs_read_data *, struct file *);
-	int	(*write)   (struct nfs_write_data *, struct file *);
-	int	(*commit)  (struct nfs_write_data *, struct file *);
+	int	(*read)    (struct nfs_read_data *);
+	int	(*write)   (struct nfs_write_data *);
+	int	(*commit)  (struct nfs_write_data *);
 	struct inode *	(*create)  (struct inode *, struct qstr *,
 			    struct iattr *, int);
 	int	(*remove)  (struct inode *, struct qstr *);
@@ -712,8 +712,6 @@ struct nfs_rpc_ops {
 	void	(*commit_setup) (struct nfs_write_data *, int how);
 	int	(*file_open)   (struct inode *, struct file *);
 	int	(*file_release) (struct inode *, struct file *);
-	void	(*request_init)(struct nfs_page *, struct file *);
-	int	(*request_compatible)(struct nfs_page *, struct file *, struct page *);
 	int	(*lock)(struct file *, int, struct file_lock *);
 };
 

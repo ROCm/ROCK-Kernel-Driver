@@ -110,7 +110,7 @@ nfs_free_user_pages(struct page **pages, int npages, int do_dirty)
  * nfs_direct_read_seg - Read in one iov segment.  Generate separate
  *                        read RPCs for each "rsize" bytes.
  * @inode: target inode
- * @file: target file (may be NULL)
+ * @ctx: target file open context
  * user_addr: starting address of this segment of user's buffer
  * count: size of this segment
  * file_offset: offset in file to begin the operation
@@ -118,7 +118,7 @@ nfs_free_user_pages(struct page **pages, int npages, int do_dirty)
  * nr_pages: size of pages array
  */
 static int
-nfs_direct_read_seg(struct inode *inode, struct file *file,
+nfs_direct_read_seg(struct inode *inode, struct nfs_open_context *ctx,
 		unsigned long user_addr, size_t count, loff_t file_offset,
 		struct page **pages, int nr_pages)
 {
@@ -127,9 +127,11 @@ nfs_direct_read_seg(struct inode *inode, struct file *file,
 	int curpage = 0;
 	struct nfs_read_data	rdata = {
 		.inode		= inode,
+		.cred		= ctx->cred,
 		.args		= {
 			.fh		= NFS_FH(inode),
-			.lockowner	= current->files,
+			.lockowner	= ctx->lockowner,
+			.state		= ctx->state,
 		},
 		.res		= {
 			.fattr		= &rdata.fattr,
@@ -151,7 +153,7 @@ nfs_direct_read_seg(struct inode *inode, struct file *file,
 			user_addr + tot_bytes, rdata.args.pgbase, curpage);
 
 		lock_kernel();
-		result = NFS_PROTO(inode)->read(&rdata, file);
+		result = NFS_PROTO(inode)->read(&rdata);
 		unlock_kernel();
 
 		if (result <= 0) {
@@ -183,7 +185,7 @@ nfs_direct_read_seg(struct inode *inode, struct file *file,
  * nfs_direct_read - For each iov segment, map the user's buffer
  *                   then generate read RPCs.
  * @inode: target inode
- * @file: target file (may be NULL)
+ * @ctx: target file open context
  * @iov: array of vectors that define I/O buffer
  * file_offset: offset in file to begin the operation
  * nr_segs: size of iovec array
@@ -193,7 +195,7 @@ nfs_direct_read_seg(struct inode *inode, struct file *file,
  * server.
  */
 static ssize_t
-nfs_direct_read(struct inode *inode, struct file *file,
+nfs_direct_read(struct inode *inode, struct nfs_open_context *ctx,
 		const struct iovec *iov, loff_t file_offset,
 		unsigned long nr_segs)
 {
@@ -216,7 +218,7 @@ nfs_direct_read(struct inode *inode, struct file *file,
                         return page_count;
                 }
 
-		result = nfs_direct_read_seg(inode, file, user_addr, size,
+		result = nfs_direct_read_seg(inode, ctx, user_addr, size,
 				file_offset, pages, page_count);
 
 		nfs_free_user_pages(pages, page_count, 1);
@@ -239,7 +241,7 @@ nfs_direct_read(struct inode *inode, struct file *file,
  * nfs_direct_write_seg - Write out one iov segment.  Generate separate
  *                        write RPCs for each "wsize" bytes, then commit.
  * @inode: target inode
- * @file: target file (may be NULL)
+ * @ctx: target file open context
  * user_addr: starting address of this segment of user's buffer
  * count: size of this segment
  * file_offset: offset in file to begin the operation
@@ -247,7 +249,7 @@ nfs_direct_read(struct inode *inode, struct file *file,
  * nr_pages: size of pages array
  */
 static int
-nfs_direct_write_seg(struct inode *inode, struct file *file,
+nfs_direct_write_seg(struct inode *inode, struct nfs_open_context *ctx,
 		unsigned long user_addr, size_t count, loff_t file_offset,
 		struct page **pages, int nr_pages)
 {
@@ -257,9 +259,11 @@ nfs_direct_write_seg(struct inode *inode, struct file *file,
 	struct nfs_writeverf first_verf;
 	struct nfs_write_data	wdata = {
 		.inode		= inode,
+		.cred		= ctx->cred,
 		.args		= {
 			.fh		= NFS_FH(inode),
-			.lockowner	= current->files,
+			.lockowner	= ctx->lockowner,
+			.state		= ctx->state,
 		},
 		.res		= {
 			.fattr		= &wdata.fattr,
@@ -290,7 +294,7 @@ retry:
 			user_addr + tot_bytes, wdata.args.pgbase, curpage);
 
 		lock_kernel();
-		result = NFS_PROTO(inode)->write(&wdata, file);
+		result = NFS_PROTO(inode)->write(&wdata);
 		unlock_kernel();
 
 		if (result <= 0) {
@@ -325,7 +329,7 @@ retry:
 		wdata.args.offset = file_offset;
 
 		lock_kernel();
-		result = NFS_PROTO(inode)->commit(&wdata, file);
+		result = NFS_PROTO(inode)->commit(&wdata);
 		unlock_kernel();
 
 		if (result < 0 || memcmp(&first_verf.verifier,
@@ -349,7 +353,7 @@ sync_retry:
  * nfs_direct_write - For each iov segment, map the user's buffer
  *                    then generate write and commit RPCs.
  * @inode: target inode
- * @file: target file (may be NULL)
+ * @ctx: target file open context
  * @iov: array of vectors that define I/O buffer
  * file_offset: offset in file to begin the operation
  * nr_segs: size of iovec array
@@ -358,8 +362,7 @@ sync_retry:
  * that non-direct readers might access, so they will pick up these
  * writes immediately.
  */
-static ssize_t
-nfs_direct_write(struct inode *inode, struct file *file,
+static int nfs_direct_write(struct inode *inode, struct nfs_open_context *ctx,
 		const struct iovec *iov, loff_t file_offset,
 		unsigned long nr_segs)
 {
@@ -382,7 +385,7 @@ nfs_direct_write(struct inode *inode, struct file *file,
                         return page_count;
                 }
 
-		result = nfs_direct_write_seg(inode, file, user_addr, size,
+		result = nfs_direct_write_seg(inode, ctx, user_addr, size,
 				file_offset, pages, page_count);
 		nfs_free_user_pages(pages, page_count, 0);
 
@@ -414,6 +417,7 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 {
 	ssize_t result = -EINVAL;
 	struct file *file = iocb->ki_filp;
+	struct nfs_open_context *ctx;
 	struct dentry *dentry = file->f_dentry;
 	struct inode *inode = dentry->d_inode;
 
@@ -423,19 +427,20 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	if (!is_sync_kiocb(iocb))
 		return result;
 
+	ctx = (struct nfs_open_context *)file->private_data;
 	switch (rw) {
 	case READ:
 		dprintk("NFS: direct_IO(read) (%s) off/no(%Lu/%lu)\n",
 				dentry->d_name.name, file_offset, nr_segs);
 
-		result = nfs_direct_read(inode, file, iov,
+		result = nfs_direct_read(inode, ctx, iov,
 						file_offset, nr_segs);
 		break;
 	case WRITE:
 		dprintk("NFS: direct_IO(write) (%s) off/no(%Lu/%lu)\n",
 				dentry->d_name.name, file_offset, nr_segs);
 
-		result = nfs_direct_write(inode, file, iov,
+		result = nfs_direct_write(inode, ctx, iov,
 						file_offset, nr_segs);
 		break;
 	default:
@@ -471,6 +476,8 @@ nfs_file_direct_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t 
 	ssize_t retval = -EINVAL;
 	loff_t *ppos = &iocb->ki_pos;
 	struct file *file = iocb->ki_filp;
+	struct nfs_open_context *ctx =
+			(struct nfs_open_context *) file->private_data;
 	struct dentry *dentry = file->f_dentry;
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
@@ -502,7 +509,7 @@ nfs_file_direct_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t 
 			goto out;
 	}
 
-	retval = nfs_direct_read(inode, file, &iov, pos, 1);
+	retval = nfs_direct_read(inode, ctx, &iov, pos, 1);
 	if (retval > 0)
 		*ppos = pos + retval;
 
@@ -542,6 +549,8 @@ nfs_file_direct_write(struct kiocb *iocb, const char __user *buf, size_t count, 
 	loff_t *ppos = &iocb->ki_pos;
 	unsigned long limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	struct file *file = iocb->ki_filp;
+	struct nfs_open_context *ctx =
+			(struct nfs_open_context *) file->private_data;
 	struct dentry *dentry = file->f_dentry;
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
@@ -589,7 +598,7 @@ nfs_file_direct_write(struct kiocb *iocb, const char __user *buf, size_t count, 
 			goto out;
 	}
 
-	retval = nfs_direct_write(inode, file, &iov, pos, 1);
+	retval = nfs_direct_write(inode, ctx, &iov, pos, 1);
 	if (mapping->nrpages)
 		invalidate_inode_pages2(mapping);
 	if (retval > 0)

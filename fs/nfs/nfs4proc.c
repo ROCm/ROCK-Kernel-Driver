@@ -975,7 +975,7 @@ static int nfs4_proc_readlink(struct inode *inode, struct page *page)
 	return err;
 }
 
-static int _nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
+static int _nfs4_proc_read(struct nfs_read_data *rdata)
 {
 	int flags = rdata->flags;
 	struct inode *inode = rdata->inode;
@@ -985,25 +985,13 @@ static int _nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_READ],
 		.rpc_argp	= &rdata->args,
 		.rpc_resp	= &rdata->res,
+		.rpc_cred	= rdata->cred,
 	};
 	unsigned long timestamp = jiffies;
 	int status;
 
 	dprintk("NFS call  read %d @ %Ld\n", rdata->args.count,
 			(long long) rdata->args.offset);
-
-	/*
-	 * Try first to use O_RDONLY, then O_RDWR stateid.
-	 */
-	if (filp) {
-		struct nfs4_state *state;
-		state = (struct nfs4_state *)filp->private_data;
-		rdata->args.state = state;
-		msg.rpc_cred = state->owner->so_cred;
-	} else {
-		rdata->args.state = NULL;
-		msg.rpc_cred = NFS_I(inode)->mm_cred;
-	}
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, flags);
@@ -1013,19 +1001,19 @@ static int _nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 	return status;
 }
 
-static int nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
+static int nfs4_proc_read(struct nfs_read_data *rdata)
 {
 	struct nfs4_exception exception = { };
 	int err;
 	do {
 		err = nfs4_handle_exception(NFS_SERVER(rdata->inode),
-				_nfs4_proc_read(rdata, filp),
+				_nfs4_proc_read(rdata),
 				&exception);
 	} while (exception.retry);
 	return err;
 }
 
-static int _nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
+static int _nfs4_proc_write(struct nfs_write_data *wdata)
 {
 	int rpcflags = wdata->flags;
 	struct inode *inode = wdata->inode;
@@ -1035,24 +1023,12 @@ static int _nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_WRITE],
 		.rpc_argp	= &wdata->args,
 		.rpc_resp	= &wdata->res,
+		.rpc_cred	= wdata->cred,
 	};
 	int status;
 
 	dprintk("NFS call  write %d @ %Ld\n", wdata->args.count,
 			(long long) wdata->args.offset);
-
-	/*
-	 * Try first to use O_WRONLY, then O_RDWR stateid.
-	 */
-	if (filp) {
-		struct nfs4_state *state;
-		state = (struct nfs4_state *)filp->private_data;
-		wdata->args.state = state;
-		msg.rpc_cred = state->owner->so_cred;
-	} else {
-		wdata->args.state = NULL;
-		msg.rpc_cred = NFS_I(inode)->mm_cred;
-	}
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, rpcflags);
@@ -1060,19 +1036,19 @@ static int _nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	return status;
 }
 
-static int nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
+static int nfs4_proc_write(struct nfs_write_data *wdata)
 {
 	struct nfs4_exception exception = { };
 	int err;
 	do {
 		err = nfs4_handle_exception(NFS_SERVER(wdata->inode),
-				_nfs4_proc_write(wdata, filp),
+				_nfs4_proc_write(wdata),
 				&exception);
 	} while (exception.retry);
 	return err;
 }
 
-static int _nfs4_proc_commit(struct nfs_write_data *cdata, struct file *filp)
+static int _nfs4_proc_commit(struct nfs_write_data *cdata)
 {
 	struct inode *inode = cdata->inode;
 	struct nfs_fattr *fattr = cdata->res.fattr;
@@ -1081,19 +1057,12 @@ static int _nfs4_proc_commit(struct nfs_write_data *cdata, struct file *filp)
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_COMMIT],
 		.rpc_argp	= &cdata->args,
 		.rpc_resp	= &cdata->res,
+		.rpc_cred	= cdata->cred,
 	};
 	int status;
 
 	dprintk("NFS call  commit %d @ %Ld\n", cdata->args.count,
 			(long long) cdata->args.offset);
-
-	/*
-	 * Try first to use O_WRONLY, then O_RDWR stateid.
-	 */
-	if (filp)
-		msg.rpc_cred = ((struct nfs4_state *)filp->private_data)->owner->so_cred;
-	else
-		msg.rpc_cred = NFS_I(inode)->mm_cred;
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, 0);
@@ -1101,13 +1070,13 @@ static int _nfs4_proc_commit(struct nfs_write_data *cdata, struct file *filp)
 	return status;
 }
 
-static int nfs4_proc_commit(struct nfs_write_data *cdata, struct file *filp)
+static int nfs4_proc_commit(struct nfs_write_data *cdata)
 {
 	struct nfs4_exception exception = { };
 	int err;
 	do {
 		err = nfs4_handle_exception(NFS_SERVER(cdata->inode),
-				_nfs4_proc_commit(cdata, filp),
+				_nfs4_proc_commit(cdata),
 				&exception);
 	} while (exception.retry);
 	return err;
@@ -1797,8 +1766,10 @@ static int
 nfs4_proc_file_open(struct inode *inode, struct file *filp)
 {
 	struct dentry *dentry = filp->f_dentry;
-	struct nfs4_state *state;
+	struct nfs_open_context *ctx;
+	struct nfs4_state *state = NULL;
 	struct rpc_cred *cred;
+	int status = -ENOMEM;
 
 	dprintk("nfs4_proc_file_open: starting on (%.*s/%.*s)\n",
 	                       (int)dentry->d_parent->d_name.len,
@@ -1808,21 +1779,28 @@ nfs4_proc_file_open(struct inode *inode, struct file *filp)
 
 	/* Find our open stateid */
 	cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
-	state = nfs4_find_state(inode, cred, filp->f_mode);
+	if (unlikely(cred == NULL))
+		return -ENOMEM;
+	ctx = alloc_nfs_open_context(dentry, cred);
 	put_rpccred(cred);
-	if (state == NULL) {
-		printk(KERN_WARNING "NFS: v4 raced in function %s\n", __FUNCTION__);
-		return -EIO; /* ERACE actually */
-	}
+	if (unlikely(ctx == NULL))
+		return -ENOMEM;
+	status = -EIO; /* ERACE actually */
+	state = nfs4_find_state(inode, cred, filp->f_mode);
+	if (unlikely(state == NULL))
+		goto no_state;
+	ctx->state = state;
 	nfs4_close_state(state, filp->f_mode);
-	if (filp->f_mode & FMODE_WRITE) {
-		lock_kernel();
-		nfs_set_mmcred(inode, state->owner->so_cred);
+	ctx->mode = filp->f_mode;
+	nfs_file_set_open_context(filp, ctx);
+	put_nfs_open_context(ctx);
+	if (filp->f_mode & FMODE_WRITE)
 		nfs_begin_data_update(inode);
-		unlock_kernel();
-	}
-	filp->private_data = state;
 	return 0;
+no_state:
+	printk(KERN_WARNING "NFS: v4 raced in function %s\n", __FUNCTION__);
+	put_nfs_open_context(ctx);
+	return status;
 }
 
 /*
@@ -1831,35 +1809,10 @@ nfs4_proc_file_open(struct inode *inode, struct file *filp)
 static int
 nfs4_proc_file_release(struct inode *inode, struct file *filp)
 {
-	struct nfs4_state *state = (struct nfs4_state *)filp->private_data;
-
-	if (state)
-		nfs4_close_state(state, filp->f_mode);
-	if (filp->f_mode & FMODE_WRITE) {
-		lock_kernel();
+	if (filp->f_mode & FMODE_WRITE)
 		nfs_end_data_update(inode);
-		unlock_kernel();
-	}
+	nfs_file_clear_open_context(filp);
 	return 0;
-}
-
-/*
- * Set up the nfspage struct with the right state info and credentials
- */
-static void
-nfs4_request_init(struct nfs_page *req, struct file *filp)
-{
-	struct nfs4_state *state;
-
-	if (!filp) {
-		req->wb_cred = get_rpccred(NFS_I(req->wb_inode)->mm_cred);
-		req->wb_state = NULL;
-		return;
-	}
-	state = (struct nfs4_state *)filp->private_data;
-	req->wb_state = state;
-	req->wb_cred = get_rpccred(state->owner->so_cred);
-	req->wb_lockowner = current->files;
 }
 
 static int
@@ -1972,28 +1925,6 @@ int nfs4_handle_exception(struct nfs_server *server, int errorcode, struct nfs4_
 	}
 	/* We failed to handle the error */
 	return nfs4_map_errors(ret);
-}
-
-
-static int
-nfs4_request_compatible(struct nfs_page *req, struct file *filp, struct page *page)
-{
-	struct nfs4_state *state = NULL;
-	struct rpc_cred *cred = NULL;
-
-	if (req->wb_file != filp)
-		return 0;
-	if (req->wb_page != page)
-		return 0;
-	state = (struct nfs4_state *)filp->private_data;
-	if (req->wb_state != state)
-		return 0;
-	if (req->wb_lockowner != current->files)
-		return 0;
-	cred = state->owner->so_cred;
-	if (req->wb_cred != cred)
-		return 0;
-	return 1;
 }
 
 int nfs4_proc_setclientid(struct nfs4_client *clp, u32 program, unsigned short port)
@@ -2353,13 +2284,14 @@ static int nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *
 static int
 nfs4_proc_lock(struct file *filp, int cmd, struct file_lock *request)
 {
+	struct nfs_open_context *ctx;
 	struct nfs4_state *state;
 	unsigned long timeout = NFS4_LOCK_MINTIMEOUT;
 	int status;
 
 	/* verify open state */
-	state = (struct nfs4_state *)filp->private_data;
-	BUG_ON(!state);
+	ctx = (struct nfs_open_context *)filp->private_data;
+	state = ctx->state;
 
 	if (request->fl_start < 0 || request->fl_end < 0)
 		return -EINVAL;
@@ -2419,8 +2351,6 @@ struct nfs_rpc_ops	nfs_v4_clientops = {
 	.commit_setup	= nfs4_proc_commit_setup,
 	.file_open      = nfs4_proc_file_open,
 	.file_release   = nfs4_proc_file_release,
-	.request_init	= nfs4_request_init,
-	.request_compatible = nfs4_request_compatible,
 	.lock		= nfs4_proc_lock,
 };
 

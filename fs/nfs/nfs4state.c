@@ -728,7 +728,7 @@ static int nfs4_reclaim_locks(struct nfs4_state *state)
 	for (fl = inode->i_flock; fl != 0; fl = fl->fl_next) {
 		if (!(fl->fl_flags & FL_POSIX))
 			continue;
-		if ((struct nfs4_state *)fl->fl_file->private_data != state)
+		if (((struct nfs_open_context *)fl->fl_file->private_data)->state != state)
 			continue;
 		status = nfs4_lock_reclaim(state, fl);
 		if (status >= 0)
