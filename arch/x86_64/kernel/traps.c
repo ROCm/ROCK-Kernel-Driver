@@ -552,21 +552,6 @@ static void mem_parity_error(unsigned char reason, struct pt_regs * regs)
 	outb(reason, 0x61);
 }
 
-
-#ifdef CONFIG_SMP
-int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
-static int dump_ipi(struct pt_regs *regs)
-{
-	if (!(dump_ipi_function_ptr && dump_ipi_function_ptr(regs))) {
-		return 0;
-	}
-	ack_APIC_irq();
-	return 1;
-}
-#else
-#define dump_ipi(regs) 0
-#endif
-
 static void io_check_error(unsigned char reason, struct pt_regs * regs)
 {
 	printk("NMI: IOCK error (debug interrupt?)\n");
@@ -590,8 +575,10 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 {
 	unsigned char reason = inb(0x61);
 
-	if (dump_ipi(regs))
+	if (dump_oncpu) {
+		ack_APIC_irq();	
 		return;
+	}
 
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT) == NOTIFY_BAD)
