@@ -1,9 +1,9 @@
 /*
- *  $Id: powernow-k6.c,v 1.36 2002/10/31 21:17:40 db Exp $
+ *  $Id: powernow-k6.c,v 1.46 2003/01/20 17:31:47 db Exp $
  *  This file was part of Powertweak Linux (http://powertweak.sf.net)
  *  and is shared with the Linux Kernel module.
  *
- *  (C) 2000-2002  Dave Jones, Arjan van de Ven, Janne Pänkälä, Dominik Brodowski.
+ *  (C) 2000-2003  Dave Jones, Arjan van de Ven, Janne Pänkälä, Dominik Brodowski.
  *
  *  Licensed under the terms of the GNU GPL License version 2.
  *
@@ -25,7 +25,7 @@
 #define POWERNOW_IOPORT 0xfff0         /* it doesn't matter where, as long
 					  as it is unused */
 
-static struct cpufreq_driver		*powernow_driver;
+static struct cpufreq_driver		powernow_k6_driver;
 static unsigned int                     busfreq;   /* FSB, in 10 kHz */
 static unsigned int                     max_multiplier;
 
@@ -77,8 +77,8 @@ static void powernow_k6_set_state (unsigned int best_i)
 	unsigned long           msrval;
 	struct cpufreq_freqs    freqs;
 
-	if (!powernow_driver) {
-		printk(KERN_ERR "cpufreq: initialization problem or invalid target frequency\n");
+	if (clock_ratio[best_i].index > max_multiplier) {
+		printk(KERN_ERR "cpufreq: invalid target frequency\n");
 		return;
 	}
 
@@ -126,17 +126,74 @@ static int powernow_k6_verify(struct cpufreq_policy *policy)
  *
  * sets a new CPUFreq policy
  */
-static int powernow_k6_setpolicy (struct cpufreq_policy *policy)
+static int powernow_k6_target (struct cpufreq_policy *policy,
+			       unsigned int target_freq,
+			       unsigned int relation)
 {
 	unsigned int    newstate = 0;
 
-	if (cpufreq_frequency_table_setpolicy(policy, &clock_ratio[0], &newstate))
+	if (cpufreq_frequency_table_target(policy, &clock_ratio[0], target_freq, relation, &newstate))
 		return -EINVAL;
 
 	powernow_k6_set_state(newstate);
 
 	return 0;
 }
+
+
+static int powernow_k6_cpu_init(struct cpufreq_policy *policy)
+{
+	struct cpuinfo_x86 *c = cpu_data;
+	unsigned int i;
+
+	/* capability check */
+	if ((c->x86_vendor != X86_VENDOR_AMD) || (c->x86 != 5) ||
+	    ((c->x86_model != 12) && (c->x86_model != 13)))
+		return -ENODEV;
+	if (policy->cpu != 0)
+		return -ENODEV;
+
+	/* get frequencies */
+	max_multiplier = powernow_k6_get_cpu_multiplier();
+	busfreq = cpu_khz / max_multiplier;
+
+	/* table init */
+ 	for (i=0; (clock_ratio[i].frequency != CPUFREQ_TABLE_END); i++) {
+		if (clock_ratio[i].index > max_multiplier)
+			clock_ratio[i].frequency = CPUFREQ_ENTRY_INVALID;
+		else
+			clock_ratio[i].frequency = busfreq * clock_ratio[i].index;
+	}
+
+	/* cpuinfo and default policy values */
+	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
+	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+#ifdef CONFIG_CPU_FREQ_24_API
+	powernow_k6_driver.cpu_cur_freq[policy->cpu] = busfreq * max_multiplier;
+#endif
+
+	return cpufreq_frequency_table_cpuinfo(policy, &clock_ratio[0]);
+}
+
+
+static int powernow_k6_cpu_exit(struct cpufreq_policy *policy)
+{
+	unsigned int i;
+	for (i=0; i<8; i++) {
+		if (i==max_multiplier)
+			powernow_k6_set_state(i);
+	}
+	return 0;
+}
+
+
+static struct cpufreq_driver powernow_k6_driver = {
+	.verify 	= powernow_k6_verify,
+	.target 	= powernow_k6_target,
+	.init		= powernow_k6_cpu_init,
+	.exit		= powernow_k6_cpu_exit,
+	.name		= "powernow-k6",
+};
 
 
 /**
@@ -149,68 +206,22 @@ static int powernow_k6_setpolicy (struct cpufreq_policy *policy)
 static int __init powernow_k6_init(void)
 {	
 	struct cpuinfo_x86      *c = cpu_data;
-	struct cpufreq_driver   *driver;
-	unsigned int            result;
-	unsigned int            i;
 
 	if ((c->x86_vendor != X86_VENDOR_AMD) || (c->x86 != 5) ||
 		((c->x86_model != 12) && (c->x86_model != 13)))
 		return -ENODEV;
-
-	max_multiplier = powernow_k6_get_cpu_multiplier();
-	busfreq = cpu_khz / max_multiplier;
 
 	if (!request_region(POWERNOW_IOPORT, 16, "PowerNow!")) {
 		printk("cpufreq: PowerNow IOPORT region already used.\n");
 		return -EIO;
 	}
 
-	/* initialization of main "cpufreq" code*/
-	driver = kmalloc(sizeof(struct cpufreq_driver) +
-			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
-	if (!driver) {
+	if (cpufreq_register_driver(&powernow_k6_driver)) {
 		release_region (POWERNOW_IOPORT, 16);
-		return -ENOMEM;
-	}
-	memset(driver, 0, sizeof(struct cpufreq_driver) +
-			NR_CPUS * sizeof(struct cpufreq_policy));
-	driver->policy = (struct cpufreq_policy *) (driver + 1);
-
-	/* table init */
- 	for (i=0; (clock_ratio[i].frequency != CPUFREQ_TABLE_END); i++) {
-		if (clock_ratio[i].index > max_multiplier)
-			clock_ratio[i].frequency = CPUFREQ_ENTRY_INVALID;
-		else
-			clock_ratio[i].frequency = busfreq * clock_ratio[i].index;
+		return -EINVAL;
 	}
 
-	driver->verify        = &powernow_k6_verify;
-	driver->setpolicy     = &powernow_k6_setpolicy;
-	strncpy(driver->name, "powernow-k6", CPUFREQ_NAME_LEN);
-
-	/* cpuinfo and default policy values */
-	driver->policy[0].cpu    = 0;
-	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
-#ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_cur_freq[0]  = busfreq * max_multiplier;
-#endif
-	result = cpufreq_frequency_table_cpuinfo(&driver->policy[0], &clock_ratio[0]);
-	if (result) {
-		kfree(driver);
-		return result;
-	}
-
-	powernow_driver = driver;
-
-	result = cpufreq_register(driver);
-	if (result) {
-		release_region (POWERNOW_IOPORT, 16);
-		powernow_driver = NULL;
-		kfree(driver);
-	}
-
-	return result;
+	return 0;
 }
 
 
@@ -221,20 +232,14 @@ static int __init powernow_k6_init(void)
  */
 static void __exit powernow_k6_exit(void)
 {
-	unsigned int i;
-
-	if (powernow_driver) {
-		for (i=0;i<8;i++)
-			if (clock_ratio[i].index == max_multiplier)
-				powernow_k6_set_state(i);		
-		cpufreq_unregister();
-		kfree(powernow_driver);
-	}
+	cpufreq_unregister_driver(&powernow_k6_driver);
+	release_region (POWERNOW_IOPORT, 16);
 }
 
 
 MODULE_AUTHOR ("Arjan van de Ven <arjanv@redhat.com>, Dave Jones <davej@suse.de>, Dominik Brodowski <linux@brodo.de>");
 MODULE_DESCRIPTION ("PowerNow! driver for AMD K6-2+ / K6-3+ processors.");
 MODULE_LICENSE ("GPL");
+
 module_init(powernow_k6_init);
 module_exit(powernow_k6_exit);

@@ -31,14 +31,10 @@
 #define REG_CSCIR 0x22 		/* Chip Setup and Control Index Register    */
 #define REG_CSCDR 0x23		/* Chip Setup and Control Data  Register    */
 
-static struct cpufreq_driver *elanfreq_driver;
+static struct cpufreq_driver elanfreq_driver;
 
 /* Module parameter */
 static int max_freq;
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Robert Schwebel <r.schwebel@pengutronix.de>, Sven Geggus <sven@geggus.net>");
-MODULE_DESCRIPTION("cpufreq driver for AMD's Elan CPUs");
 
 struct s_elan_multiplier {
 	int clock;		/* frequency in kHz                         */
@@ -127,11 +123,6 @@ static void elanfreq_set_cpu_state (unsigned int state) {
 
 	struct cpufreq_freqs    freqs;
 
-	if (!elanfreq_driver) {
-		printk(KERN_ERR "cpufreq: initialization problem or invalid target frequency\n");
-		return;
-	}
-
 	freqs.old = elanfreq_get_cpu_frequency();
 	freqs.new = elan_multiplier[state].clock;
 	freqs.cpu = 0; /* elanfreq.c is UP only driver */
@@ -187,11 +178,13 @@ static int elanfreq_verify (struct cpufreq_policy *policy)
 	return cpufreq_frequency_table_verify(policy, &elanfreq_table[0]);
 }
 
-static int elanfreq_setpolicy (struct cpufreq_policy *policy)
+static int elanfreq_target (struct cpufreq_policy *policy, 
+			    unsigned int target_freq, 
+			    unsigned int relation)
 {
 	unsigned int    newstate = 0;
 
-	if (cpufreq_frequency_table_setpolicy(policy, &elanfreq_table[0], &newstate))
+	if (cpufreq_frequency_table_target(policy, &elanfreq_table[0], target_freq, relation, &newstate))
 		return -EINVAL;
 
 	elanfreq_set_cpu_state(newstate);
@@ -203,6 +196,37 @@ static int elanfreq_setpolicy (struct cpufreq_policy *policy)
 /*
  *	Module init and exit code
  */
+
+static int elanfreq_cpu_init(struct cpufreq_policy *policy)
+{
+	struct cpuinfo_x86 *c = cpu_data;
+	unsigned int i;
+
+	/* capability check */
+	if ((c->x86_vendor != X86_VENDOR_AMD) ||
+	    (c->x86 != 4) || (c->x86_model!=10))
+		return -ENODEV;
+
+	/* max freq */
+	if (!max_freq)
+		max_freq = elanfreq_get_cpu_frequency();
+
+	/* table init */
+ 	for (i=0; (elanfreq_table[i].frequency != CPUFREQ_TABLE_END); i++) {
+		if (elanfreq_table[i].frequency > max_freq)
+			elanfreq_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+	}
+
+	/* cpuinfo and default policy values */
+	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
+	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+#ifdef CONFIG_CPU_FREQ_24_API
+	elanfreq_driver.cpu_cur_freq[policy->cpu] = elanfreq_get_cpu_frequency();
+#endif
+
+	return cpufreq_frequency_table_cpuinfo(policy, &elanfreq_table[0]);;
+}
+
 
 #ifndef MODULE
 /**
@@ -224,11 +248,18 @@ static int __init elanfreq_setup(char *str)
 __setup("elanfreq=", elanfreq_setup);
 #endif
 
+
+static struct cpufreq_driver elanfreq_driver = {
+	.verify 	= elanfreq_verify,
+	.target 	= elanfreq_target,
+	.init		= elanfreq_cpu_init,
+	.name		= "elanfreq",
+};
+
+
 static int __init elanfreq_init(void) 
 {	
 	struct cpuinfo_x86 *c = cpu_data;
-	struct cpufreq_driver *driver;
-	int ret, i;
 
 	/* Test if we have the right hardware */
 	if ((c->x86_vendor != X86_VENDOR_AMD) ||
@@ -238,63 +269,22 @@ static int __init elanfreq_init(void)
                 return -ENODEV;
 	}
 	
-	driver = kmalloc(sizeof(struct cpufreq_driver) +
-			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
-	if (!driver)
-		return -ENOMEM;
-	memset(driver, 0, sizeof(struct cpufreq_driver) +
-			NR_CPUS * sizeof(struct cpufreq_policy));
-
-	driver->policy = (struct cpufreq_policy *) (driver + 1);
-
-	if (!max_freq)
-		max_freq = elanfreq_get_cpu_frequency();
-
-	/* table init */
- 	for (i=0; (elanfreq_table[i].frequency != CPUFREQ_TABLE_END); i++) {
-		if (elanfreq_table[i].frequency > max_freq)
-			elanfreq_table[i].frequency = CPUFREQ_ENTRY_INVALID;
-	}
-
-#ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_cur_freq[0] = elanfreq_get_cpu_frequency();
-#endif
-
-	driver->verify        = &elanfreq_verify;
-	driver->setpolicy     = &elanfreq_setpolicy;
-	strncpy(driver->name, "elanfreq", CPUFREQ_NAME_LEN);
-
-	driver->policy[0].cpu    = 0;
-	ret = cpufreq_frequency_table_cpuinfo(&driver->policy[0], &elanfreq_table[0]);
-	if (ret) {
-		kfree(driver);
-		return ret;
-	}
-	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
-	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-
-	elanfreq_driver = driver;
-
-	ret = cpufreq_register(driver);
-	if (ret) {
-		elanfreq_driver = NULL;
-		kfree(driver);
-	}
-
-	return ret;
+	return cpufreq_register_driver(&elanfreq_driver);
 }
 
 
 static void __exit elanfreq_exit(void) 
 {
-	if (elanfreq_driver) {
-		cpufreq_unregister();
-		kfree(elanfreq_driver);
-	}
+	cpufreq_unregister_driver(&elanfreq_driver);
 }
+
+
+MODULE_PARM (max_freq, "i");
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Robert Schwebel <r.schwebel@pengutronix.de>, Sven Geggus <sven@geggus.net>");
+MODULE_DESCRIPTION("cpufreq driver for AMD's Elan CPUs");
 
 module_init(elanfreq_init);
 module_exit(elanfreq_exit);
-
-MODULE_PARM (max_freq, "i");
 
