@@ -249,7 +249,7 @@ sha512_final(void *ctx, u8 *hash)
 {
         struct sha512_ctx *sctx = ctx;
 	
-        const static u8 padding[128] = { 0x80, };
+        static u8 padding[128] = { 0x80, };
 
         u32 t;
 	u64 t2;
