@@ -31,7 +31,6 @@ fixup_clep7312(struct machine_desc *desc, struct tag *tags,
 	    char **cmdline, struct meminfo *mi)
 {
 	mi->nr_banks=1;
-	mi->end = 0xc0FFFFFF;
 	mi->bank[0].start = 0xc0000000;
 	mi->bank[0].size = 0x01000000;
 	mi->bank[0].node = 0;
