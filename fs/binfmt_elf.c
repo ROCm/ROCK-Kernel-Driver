@@ -476,6 +476,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
   	struct exec interp_ex;
 	char passed_fileno[6];
 	struct files_struct *files;
+	int executable_stack = EXSTACK_DEFAULT;
 	
 	/* Get the exec-header */
 	elf_ex = *((struct elfhdr *) bprm->buf);
@@ -599,6 +600,15 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		elf_ppnt++;
 	}
 
+	elf_ppnt = elf_phdata;
+	for (i = 0; i < elf_ex.e_phnum; i++, elf_ppnt++)
+		if (elf_ppnt->p_type == PT_GNU_STACK) {
+			if (elf_ppnt->p_flags & PF_X)
+				executable_stack = EXSTACK_ENABLE_X;
+			else
+				executable_stack = EXSTACK_DISABLE_X;
+		}
+
 	/* Some simple consistency checks for the interpreter */
 	if (elf_interpreter) {
 		interpreter_type = INTERPRETER_ELF | INTERPRETER_AOUT;
@@ -674,7 +684,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	   change some of these later */
 	current->mm->rss = 0;
 	current->mm->free_area_cache = TASK_UNMAPPED_BASE;
-	retval = setup_arg_pages(bprm);
+	retval = setup_arg_pages(bprm, executable_stack);
 	if (retval < 0) {
 		send_sig(SIGKILL, current, 0);
 		goto out_free_dentry;

@@ -37,7 +37,7 @@
 #undef STACK_TOP
 #define STACK_TOP TASK31_SIZE
 
-int setup_arg_pages32(struct linux_binprm *bprm)
+int setup_arg_pages32(struct linux_binprm *bprm, int executable_stack)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
@@ -66,6 +66,7 @@ int setup_arg_pages32(struct linux_binprm *bprm)
 		mpnt->vm_mm = mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = STACK_TOP;
+		/* executable stack setting would be applied here */
 		mpnt->vm_page_prot = PAGE_COPY;
 		mpnt->vm_flags = VM_STACK_FLAGS;
 		mpnt->vm_ops = NULL;
