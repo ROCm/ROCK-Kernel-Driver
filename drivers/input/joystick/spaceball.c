@@ -39,8 +39,10 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 
+#define DRIVER_DESC	"SpaceTec SpaceBall 2003/3003/4000 FLX driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("SpaceTec SpaceBall 2003/3003/4000 FLX driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -201,7 +203,7 @@ static void spaceball_disconnect(struct serio *serio)
  * it as an input device.
  */
 
-static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
+static void spaceball_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct spaceball *spaceball;
 	int i, t, id;
@@ -254,7 +256,7 @@ static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
 
 	serio->private = spaceball;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(spaceball);
 		return;
 	}
@@ -269,10 +271,14 @@ static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
  * The serio device structure.
  */
 
-static struct serio_dev spaceball_dev = {
-	.interrupt =	spaceball_interrupt,
-	.connect =	spaceball_connect,
-	.disconnect =	spaceball_disconnect,
+static struct serio_driver spaceball_drv = {
+	.driver		= {
+		.name	= "spaceball",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= spaceball_interrupt,
+	.connect	= spaceball_connect,
+	.disconnect	= spaceball_disconnect,
 };
 
 /*
@@ -281,13 +287,13 @@ static struct serio_dev spaceball_dev = {
 
 int __init spaceball_init(void)
 {
-	serio_register_device(&spaceball_dev);
+	serio_register_driver(&spaceball_drv);
 	return 0;
 }
 
 void __exit spaceball_exit(void)
 {
-	serio_unregister_device(&spaceball_dev);
+	serio_unregister_driver(&spaceball_drv);
 }
 
 module_init(spaceball_init);
