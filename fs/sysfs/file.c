@@ -5,6 +5,7 @@
 #include <linux/module.h>
 #include <linux/dnotify.h>
 #include <linux/kobject.h>
+#include <asm/uaccess.h>
 
 #include "sysfs.h"
 
