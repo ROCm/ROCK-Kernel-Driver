@@ -215,7 +215,7 @@ static void md4_final(void *ctx, u8 *out)
 	md4_transform(mctx->hash, mctx->block);
 	cpu_to_le32_array(mctx->hash, sizeof(mctx->hash) / sizeof(u32));
 	memcpy(out, mctx->hash, sizeof(mctx->hash));
-	memset(mctx, 0, sizeof(mctx));
+	memset(mctx, 0, sizeof(*mctx));
 }
 
 static struct crypto_alg alg = {
