@@ -941,7 +941,7 @@ xfs_ioc_bulkstat(
 		return -XFS_ERROR(EINVAL);
 
 	if (cmd == XFS_IOC_FSINUMBERS)
-		error = xfs_inumbers(mp, NULL, &inlast, &count,
+		error = xfs_inumbers(mp, &inlast, &count,
 						bulkreq.ubuffer);
 	else if (cmd == XFS_IOC_FSBULKSTAT_SINGLE)
 		error = xfs_bulkstat_single(mp, &inlast,
@@ -952,7 +952,7 @@ xfs_ioc_bulkstat(
 			error = xfs_bulkstat_single(mp, &inlast,
 					bulkreq.ubuffer, &done);
 		} else {
-			error = xfs_bulkstat(mp, NULL, &inlast, &count,
+			error = xfs_bulkstat(mp, &inlast, &count,
 				(bulkstat_one_pf)xfs_bulkstat_one, NULL,
 				sizeof(xfs_bstat_t), bulkreq.ubuffer,
 				BULKSTAT_FG_QUICK, &done);

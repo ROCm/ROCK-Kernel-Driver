@@ -55,14 +55,18 @@
 #include "xfs_itable.h"
 #include "xfs_error.h"
 
+#ifndef HAVE_USERACC
+#define useracc(ubuffer, size, flags, foo) (0)
+#define unuseracc(ubuffer, size, flags)
+#endif
+
 /*
  * Return stat information for one inode.
  * Return 0 if ok, else errno.
  */
-int					/* error status */
+int		       		/* error status */
 xfs_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* buffer to place output in */
 	int		ubsize,		/* size of buffer */
@@ -98,7 +102,7 @@ xfs_bulkstat_one(
 		/* We're not being passed a pointer to a dinode.  This happens
 		 * if BULKSTAT_FG_IGET is selected.  Do the iget.
 		 */
-		error = xfs_iget(mp, tp, ino, XFS_ILOCK_SHARED, &ip, bno);
+		error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, bno);
 		if (error) {
 			*stat = BULKSTAT_RV_NOTHING;
 			return error;
@@ -236,7 +240,6 @@ xfs_bulkstat_one(
 int					/* error status */
 xfs_bulkstat(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
-	xfs_trans_t		*tp,	/* transaction pointer */
 	xfs_ino_t		*lastinop, /* last inode returned */
 	int			*ubcountp, /* size of buffer/count returned */
 	bulkstat_one_pf		formatter, /* func that'd fill a single buf */
@@ -311,13 +314,11 @@ xfs_bulkstat(
 	 * Lock down the user's buffer. If a buffer was not sent, as in the case
 	 * disk quota code calls here, we skip this.
 	 */
-#if defined(HAVE_USERACC)
 	if (ubuffer &&
 	    (error = useracc(ubuffer, ubcount * statstruct_size,
 			(B_READ|B_PHYS), NULL))) {
 		return error;
 	}
-#endif
 	/*
 	 * Allocate a page-sized buffer for inode btree records.
 	 * We could try allocating something smaller, but for normal
@@ -333,7 +334,7 @@ xfs_bulkstat(
 	while (ubleft >= statstruct_size && agno < mp->m_sb.sb_agcount) {
 		bp = NULL;
 		down_read(&mp->m_peraglock);
-		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
+		error = xfs_ialloc_read_agi(mp, NULL, agno, &agbp);
 		up_read(&mp->m_peraglock);
 		if (error) {
 			/*
@@ -347,7 +348,7 @@ xfs_bulkstat(
 		/*
 		 * Allocate and initialize a btree cursor for ialloc btree.
 		 */
-		cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_INO,
+		cur = xfs_btree_init_cursor(mp, NULL, agbp, agno, XFS_BTNUM_INO,
 			(xfs_inode_t *)0, 0);
 		irbp = irbuf;
 		irbufend = irbuf + nirbuf;
@@ -461,7 +462,7 @@ xfs_bulkstat(
 		 * when calling iget.
 		 */
 		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
-		xfs_trans_brelse(tp, agbp);
+		xfs_buf_relse(agbp);
 		/*
 		 * Now format all the good inodes into the user's buffer.
 		 */
@@ -534,8 +535,8 @@ xfs_bulkstat(
 						ip->i_ino = ino;
 						ip->i_mount = mp;
 						if (bp)
-							xfs_trans_brelse(tp, bp);
-						error = xfs_itobp(mp, tp, ip,
+							xfs_buf_relse(bp);
+						error = xfs_itobp(mp, NULL, ip,
 								  &dip, &bp, bno);
 						if (!error)
 							clustidx = ip->i_boffset / mp->m_sb.sb_inodesize;
@@ -580,7 +581,7 @@ xfs_bulkstat(
 				 * in xfs_qm_quotacheck.
 				 */
 				ubused = statstruct_size;
-				error = formatter(mp, tp, ino, ubufp,
+				error = formatter(mp, ino, ubufp,
 						ubleft, private_data,
 						bno, &ubused, dip, &fmterror);
 				if (fmterror == BULKSTAT_RV_NOTHING) {
@@ -603,7 +604,7 @@ xfs_bulkstat(
 		}
 
 		if (bp)
-			xfs_trans_brelse(tp, bp);
+			xfs_buf_relse(bp);
 
 		/*
 		 * Set up for the next loop iteration.
@@ -621,10 +622,8 @@ xfs_bulkstat(
 	 * Done, we're either out of filesystem or space to put the data.
 	 */
 	kmem_free(irbuf, NBPC);
-#if defined(HAVE_USERACC)
 	if (ubuffer)
 		unuseracc(ubuffer, ubcount * statstruct_size, (B_READ|B_PHYS));
-#endif
 	*ubcountp = ubelem;
 	if (agno >= mp->m_sb.sb_agcount) {
 		/*
@@ -667,7 +666,7 @@ xfs_bulkstat_single(
 	 */
 
 	ino = (xfs_ino_t)*lastinop;
-	error = xfs_bulkstat_one(mp, NULL, ino, &bstat, sizeof(bstat),
+	error = xfs_bulkstat_one(mp, ino, &bstat, sizeof(bstat),
 				 NULL, 0, NULL, NULL, &res);
 	if (error) {
 		/*
@@ -676,7 +675,7 @@ xfs_bulkstat_single(
 		 */
 		(*lastinop)--;
 		count = 1;
-		if (xfs_bulkstat(mp, NULL, lastinop, &count, xfs_bulkstat_one,
+		if (xfs_bulkstat(mp, lastinop, &count, xfs_bulkstat_one,
 				NULL,
 				sizeof(bstat), buffer, BULKSTAT_FG_IGET, done))
 			return error;
@@ -698,7 +697,6 @@ xfs_bulkstat_single(
 int					/* error status */
 xfs_inumbers(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	*lastino,	/* last inode returned */
 	int		*count,		/* size of buffer/count returned */
 	xfs_caddr_t	ubuffer)	/* buffer with inode descriptions */
@@ -732,7 +730,7 @@ xfs_inumbers(
 	while (left > 0 && agno < mp->m_sb.sb_agcount) {
 		if (agbp == NULL) {
 			down_read(&mp->m_peraglock);
-			error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
+			error = xfs_ialloc_read_agi(mp, NULL, agno, &agbp);
 			up_read(&mp->m_peraglock);
 			if (error) {
 				/*
@@ -745,13 +743,13 @@ xfs_inumbers(
 				agino = 0;
 				continue;
 			}
-			cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
+			cur = xfs_btree_init_cursor(mp, NULL, agbp, agno,
 				XFS_BTNUM_INO, (xfs_inode_t *)0, 0);
 			error = xfs_inobt_lookup_ge(cur, agino, 0, 0, &tmp);
 			if (error) {
 				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 				cur = NULL;
-				xfs_trans_brelse(tp, agbp);
+				xfs_buf_relse(agbp);
 				agbp = NULL;
 				/*
 				 * Move up the the last inode in the current
@@ -765,7 +763,7 @@ xfs_inumbers(
 		if ((error = xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree,
 			&i, ARCH_NOCONVERT)) ||
 		    i == 0) {
-			xfs_trans_brelse(tp, agbp);
+			xfs_buf_relse(agbp);
 			agbp = NULL;
 			xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 			cur = NULL;
@@ -794,7 +792,7 @@ xfs_inumbers(
 			if (error) {
 				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 				cur = NULL;
-				xfs_trans_brelse(tp, agbp);
+				xfs_buf_relse(agbp);
 				agbp = NULL;
 				/*
 				 * The agino value has already been bumped.
@@ -820,6 +818,6 @@ xfs_inumbers(
 		xfs_btree_del_cursor(cur, (error ? XFS_BTREE_ERROR :
 					   XFS_BTREE_NOERROR));
 	if (agbp)
-		xfs_trans_brelse(tp, agbp);
+		xfs_buf_relse(agbp);
 	return error;
 }
