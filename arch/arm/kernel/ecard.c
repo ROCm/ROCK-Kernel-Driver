@@ -224,7 +224,7 @@ static void ecard_do_request(struct ecard_request *req)
 static pid_t ecard_pid;
 static wait_queue_head_t ecard_wait;
 static struct ecard_request *ecard_req;
-
+static DECLARE_MUTEX(ecard_sem);
 static DECLARE_COMPLETION(ecard_completion);
 
 /*
@@ -282,8 +282,6 @@ static int ecard_init_mm(void)
 static int
 ecard_task(void * unused)
 {
-	struct task_struct *tsk = current;
-
 	daemonize("kecardd");
 
 	/*
@@ -298,16 +296,11 @@ ecard_task(void * unused)
 	while (1) {
 		struct ecard_request *req;
 
-		do {
-			req = xchg(&ecard_req, NULL);
+		wait_event_interruptible(ecard_wait, ecard_req != NULL);
 
-			if (req == NULL) {
-				sigemptyset(&tsk->pending.signal);
-				interruptible_sleep_on(&ecard_wait);
-			}
-		} while (req == NULL);
-
-		ecard_do_request(req);
+		req = xchg(&ecard_req, NULL);
+		if (req != NULL)
+			ecard_do_request(req);
 		complete(&ecard_completion);
 	}
 }
@@ -330,6 +323,7 @@ ecard_call(struct ecard_request *req)
 	if (ecard_pid <= 0)
 		ecard_pid = kernel_thread(ecard_task, NULL, CLONE_KERNEL);
 
+	down(&ecard_sem);
 	ecard_req = req;
 	wake_up(&ecard_wait);
 
@@ -337,6 +331,7 @@ ecard_call(struct ecard_request *req)
 	 * Now wait for kecardd to run.
 	 */
 	wait_for_completion(&ecard_completion);
+	up(&ecard_sem);
 }
 
 /* ======================= Mid-level card control ===================== */
