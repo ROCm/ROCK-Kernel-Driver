@@ -11,11 +11,6 @@
  *   11-Apr-2001 TTC	Created
  */
 
-#ifndef __ASM_ARCH_PARAM_H
-#define __ASM_ARCH_PARAM_H
-
 /*
  * Reserved for future use
  */
-
-#endif
