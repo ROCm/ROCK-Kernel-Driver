@@ -1981,12 +1981,16 @@ again:
 		hide_cursor(currcons);
 
 	while (!tty->stopped && count) {
-		c = *buf;
+		int orig = *buf;
+		c = orig;
 		buf++;
 		n++;
 		count--;
 
-		if (utf) {
+		/* Do no translation at all in control states */
+		if (vc_state != ESnormal) {
+			tc = c;
+		} else if (utf) {
 		    /* Combine UTF-8 into Unicode */
 		    /* Incomplete characters silently ignored */
 		    if(c > 0x7f) {
@@ -2086,7 +2090,7 @@ again:
 			continue;
 		}
 		FLUSH
-		do_con_trol(tty, currcons, c);
+		do_con_trol(tty, currcons, orig);
 	}
 	FLUSH
 	console_conditional_schedule();
