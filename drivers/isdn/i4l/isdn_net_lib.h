@@ -133,47 +133,47 @@ struct isdn_net_local_s {
 /* per ISDN channel (ISDN interface) data */
 
 struct isdn_net_dev_s {
-  struct isdn_slot      *isdn_slot;    /* Index to isdn device/channel     */
-  struct isdn_slot      *exclusive;    /* NULL if non excl                 */
-  int                    pre_device;   /* Preselected isdn-device          */
-  int                    pre_channel;  /* Preselected isdn-channel         */
+  struct isdn_slot	*isdn_slot;	/* Index to isdn device/channel     */
+  struct isdn_slot	*exclusive;	/* NULL if non excl                 */
+  int			pre_device;	/* Preselected isdn-device          */
+  int			pre_channel;	/* Preselected isdn-channel         */
 
-  struct timer_list      dial_timer;   /* dial events timer                */
-  struct fsm_inst        fi;           /* call control state machine       */
-  int                    dial_event;   /* event in case of timer expiry    */
-  int                    dial;         /* # of phone number just dialed    */
-  int                    outgoing;     /* Flag: outgoing call              */
-  int                    dialretry;    /* Counter for Dialout-retries      */
+  struct timer_list	dial_timer;	/* dial events timer                */
+  struct fsm_inst	fi;		/* call control state machine       */
+  int			dial_event;	/* event in case of timer expiry    */
+  int			dial;		/* # of phone number just dialed    */
+  int			outgoing;	/* Flag: outgoing call              */
+  int			dialretry;	/* Counter for Dialout-retries      */
 
-  int                    cps;          /* current speed of this interface  */
-  int                    transcount;   /* byte-counter for cps-calculation */
-  int                    last_jiffies; /* when transcount was reset        */
-  int                    sqfull;       /* Flag: netdev-queue overloaded    */
-  ulong                  sqfull_stamp; /* Start-Time of overload           */
+  int			cps;		/* current speed of this interface  */
+  int			transcount;	/* byte-counter for cps-calculation */
+  u_long		last_jiffies;	/* when transcount was reset        */
+  int			sqfull;		/* Flag: netdev-queue overloaded    */
+  u_long		sqfull_stamp;	/* Start-Time of overload           */
 
-  int                    huptimer;     /* Timeout-counter for auto-hangup  */
-  int                    charge;       /* Counter for charging units       */
-  int                    charge_state; /* ChargeInfo state machine         */
-  unsigned long          chargetime;   /* Timer for Charging info          */
-  int                    chargeint;    /* Interval between charge-infos    */
+  int			huptimer;	/* Timeout-counter for auto-hangup  */
+  int			charge;		/* Counter for charging units       */
+  int			charge_state;	/* ChargeInfo state machine         */
+  u_long		chargetime;	/* Timer for Charging info          */
+  int			chargeint;	/* Interval between charge-infos    */
 
-  int                    pppbind;      /* ippp device for bindings         */
+  int			pppbind;	/* ippp device for bindings         */
 
-  struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
-	                               /* be transmitted asap              */
-  int                    frame_cnt;    /* number of frames currently       */
-                        	       /* queued in HL driver              */
-  struct tasklet_struct  tlet;
+  struct sk_buff_head	super_tx_queue;	/* List of supervisory frames to  */
+					/* be transmitted asap              */
+  int			frame_cnt;	/* number of frames currently       */
+					/* queued in HL driver              */
+  struct tasklet_struct	tlet;
 
-  isdn_net_local        *mlp;          /* Ptr to master device for all devs*/
+  isdn_net_local	*mlp;		/* Ptr to master device for all devs*/
 
-  struct list_head       slaves;       /* member of local->slaves          */
-  struct list_head       online;       /* member of local->online          */
+  struct list_head	slaves;		/* member of local->slaves          */
+  struct list_head	online;		/* member of local->online          */
 
-  char                   name[10];     /* Name of device                   */
-  struct list_head       global_list;  /* global list of all isdn_net_devs */
-  void                  *ind_priv;     /* interface types can put their
-					  private data here                */
+  char			name[10];	/* Name of device                   */
+  struct list_head	global_list;	/* global list of all isdn_net_devs */
+  void			*ind_priv;	/* interface types can put their
+					   private data here                */
 };
 
 /* ====================================================================== */

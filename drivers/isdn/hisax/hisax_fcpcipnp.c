@@ -38,6 +38,8 @@
 #define __debug_variable debug
 #include "hisax_debug.h"
 
+// #define CONFIG_PNP_CARD	1
+
 #ifdef CONFIG_HISAX_DEBUG
 static int debug = 0;
 MODULE_PARM(debug, "i");
@@ -365,8 +367,8 @@ static void hdlc_fill_fifo(struct fritz_bcs *bcs)
 {
 	struct fritz_adapter *adapter = bcs->adapter;
 	struct sk_buff *skb = bcs->tx_skb;
-	int count;
-	int fifo_size = 32;
+	u_int count;
+	u_int fifo_size = 32;
 	unsigned long flags;
 	unsigned char *p;
 
