@@ -551,14 +551,14 @@ __end_systemcfg:
 	.llong	0		/* Reserved */
 	.llong	0		/* Reserved */
 	.llong	(KERNELBASE>>SID_SHIFT)
-	.llong	0x40bffffd5	/* KERNELBASE VSID */
+	.llong	0x408f92c94	/* KERNELBASE VSID */
 	/* We have to list the bolted VMALLOC segment here, too, so that it
 	 * will be restored on shared processor switch */
 	.llong	(VMALLOCBASE>>SID_SHIFT)
-	.llong	0xb0cffffd1	/* VMALLOCBASE VSID */
+	.llong	0xf09b89af5	/* VMALLOCBASE VSID */
 	.llong	8192		/* # pages to map (32 MB) */
 	.llong	0		/* Offset from start of loadarea to start of map */
-	.llong	0x40bffffd50000	/* VPN of first page to map */
+	.llong	0x408f92c940000	/* VPN of first page to map */
 
 	. = 0x6100
 

@@ -513,8 +513,7 @@ static u_int __init test_irq(u_short sock, int irq)
     if (request_irq(irq, i365_count_irq, 0, "scan", i365_count_irq) != 0)
 	return 1;
     irq_hits = 0; irq_sock = sock;
-    __set_current_state(TASK_UNINTERRUPTIBLE);
-    schedule_timeout(HZ/100);
+    msleep(10);
     if (irq_hits) {
 	free_irq(irq, i365_count_irq);
 	debug(2, "    spurious hit!\n");

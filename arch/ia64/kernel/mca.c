@@ -82,11 +82,6 @@
 # define IA64_MCA_DEBUG(fmt...)
 #endif
 
-typedef struct ia64_fptr {
-	unsigned long fp;
-	unsigned long gp;
-} ia64_fptr_t;
-
 /* Used by mca_asm.S */
 ia64_mca_sal_to_os_state_t	ia64_sal_to_os_handoff_state;
 ia64_mca_os_to_sal_state_t	ia64_os_to_sal_handoff_state;
@@ -831,6 +826,31 @@ ia64_return_to_sal_check(int recover)
 
 }
 
+/* Function pointer for extra MCA recovery */
+int (*ia64_mca_ucmc_extension)
+	(void*,ia64_mca_sal_to_os_state_t*,ia64_mca_os_to_sal_state_t*)
+	= NULL;
+
+int
+ia64_reg_MCA_extension(void *fn)
+{
+	if (ia64_mca_ucmc_extension)
+		return 1;
+
+	ia64_mca_ucmc_extension = fn;
+	return 0;
+}
+
+void
+ia64_unreg_MCA_extension(void)
+{
+	if (ia64_mca_ucmc_extension)
+		ia64_mca_ucmc_extension = NULL;
+}
+
+EXPORT_SYMBOL(ia64_reg_MCA_extension);
+EXPORT_SYMBOL(ia64_unreg_MCA_extension);
+
 /*
  * ia64_mca_ucmc_handler
  *
@@ -852,10 +872,19 @@ ia64_mca_ucmc_handler(void)
 {
 	pal_processor_state_info_t *psp = (pal_processor_state_info_t *)
 		&ia64_sal_to_os_handoff_state.proc_state_param;
-	int recover = psp->tc && !(psp->cc || psp->bc || psp->rc || psp->uc);
+	int recover; 
 
 	/* Get the MCA error record and log it */
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA);
+
+	/* TLB error is only exist in this SAL error record */
+	recover = (psp->tc && !(psp->cc || psp->bc || psp->rc || psp->uc))
+	/* other error recovery */
+	   || (ia64_mca_ucmc_extension 
+		&& ia64_mca_ucmc_extension(
+			IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_MCA),
+			&ia64_sal_to_os_handoff_state,
+			&ia64_os_to_sal_handoff_state)); 
 
 	/*
 	 *  Wakeup all the processors which are spinning in the rendezvous
