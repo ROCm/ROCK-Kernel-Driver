@@ -704,29 +704,14 @@ static int __init acpi_init (void)
 			pm_active = 1;
 		else {
 			printk(KERN_INFO PREFIX "APM is already active, exiting\n");
-			acpi_disabled = 1;
+			disable_acpi();
 			result = -ENODEV;
 		}
 #endif
 	} else
-		acpi_disabled = 1;
+		disable_acpi();
 
 	return_VALUE(result);
 }
 
-
-static int __init acpi_setup(char *str)
-{
-	while (str && *str) {
-		if (strncmp(str, "off", 3) == 0)
-			acpi_disabled = 1;
-		str = strchr(str, ',');
-		if (str)
-			str += strspn(str, ", \t");
-	}
-	return 1;
-}
-
 subsys_initcall(acpi_init);
-
-__setup("acpi=", acpi_setup);

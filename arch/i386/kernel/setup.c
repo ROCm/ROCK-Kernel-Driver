@@ -83,7 +83,6 @@ EXPORT_SYMBOL_GPL(mmu_cr4_features);
 EXPORT_SYMBOL(acpi_disabled);
 
 #ifdef	CONFIG_ACPI_BOOT
-extern int __initdata acpi_ht;
 int __initdata acpi_force = 0;
 #endif
 
@@ -575,14 +574,13 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 		/* "acpi=off" disables both ACPI table parsing and interpreter */
 		else if (!memcmp(from, "acpi=off", 8)) {
-			acpi_ht = 0;
-			acpi_disabled = 1;
+			disable_acpi();
 		}
 
 		/* acpi=force to over-ride black-list */
 		else if (!memcmp(from, "acpi=force", 10)) {
 			acpi_force = 1;
-			acpi_ht=1;
+			acpi_ht = 1;
 			acpi_disabled = 0;
 		}
 
@@ -593,8 +591,9 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 
 		/* Limit ACPI just to boot-time to enable HT */
 		else if (!memcmp(from, "acpi=ht", 7)) {
+			if (!acpi_force)
+				disable_acpi();
 			acpi_ht = 1;
-			if (!acpi_force) acpi_disabled = 1;
 		}
 
 		/* "pci=noacpi" disables ACPI interrupt routing */

@@ -523,21 +523,19 @@ static __init int print_if_true(struct dmi_blacklist *d)
 
 
 #ifdef	CONFIG_ACPI_BOOT
-extern int acpi_disabled, acpi_force;
+extern int acpi_force;
 
-static __init __attribute__((unused)) int disable_acpi(struct dmi_blacklist *d)
+static __init __attribute__((unused)) int dmi_disable_acpi(struct dmi_blacklist *d) 
 { 
 	if (!acpi_force) { 
 		printk(KERN_NOTICE "%s detected: acpi off\n",d->ident); 
-		acpi_disabled = 1;
+		disable_acpi();
 	} else { 
 		printk(KERN_NOTICE 
 		       "Warning: DMI blacklist says broken, but acpi forced\n"); 
 	}
 	return 0;
 } 
-
-extern int acpi_ht;
 
 /*
  * Limit ACPI to CPU enumeration for HT
@@ -546,7 +544,7 @@ static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d)
 { 
 	if (!acpi_force) { 
 		printk(KERN_NOTICE "%s detected: force use of acpi=ht\n", d->ident); 
-		acpi_disabled = 1; 
+		disable_acpi();
 		acpi_ht = 1; 
 	} else { 
 		printk(KERN_NOTICE 
@@ -933,7 +931,7 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	 *	Boxes that need ACPI disabled
 	 */
 
-	{ disable_acpi, "IBM Thinkpad", {
+	{ dmi_disable_acpi, "IBM Thinkpad", {
 			MATCH(DMI_BOARD_VENDOR, "IBM"),
 			MATCH(DMI_BOARD_NAME, "2629H1G"),
 			NO_MATCH, NO_MATCH }},
@@ -1063,8 +1061,7 @@ static __init void dmi_check_blacklist(void)
 			if (disable && !acpi_force) { 
 				printk(KERN_NOTICE "ACPI disabled because your bios is from %s and too old\n", s);
 				printk(KERN_NOTICE "You can enable it with acpi=force\n");
-				acpi_disabled = 1; 
-				acpi_ht = 0;
+				disable_acpi();
 			} 
 		}
 	}
