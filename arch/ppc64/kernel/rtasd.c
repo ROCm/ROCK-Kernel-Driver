@@ -119,10 +119,11 @@ static int log_rtas_len(char * buf)
 
 		/* extended header */
 		len += err->extended_log_length;
-
-		if (len > RTAS_ERROR_LOG_MAX)
-			len = RTAS_ERROR_LOG_MAX;
 	}
+
+	if (len > rtas_error_log_max)
+		len = rtas_error_log_max;
+
 	return len;
 }
 
@@ -330,6 +331,10 @@ static int get_eventscan_parms(void)
 		printk(KERN_ERR "rtasd: truncated error log from %d to %d bytes\n", rtas_error_log_max, RTAS_ERROR_LOG_MAX);
 		rtas_error_log_max = RTAS_ERROR_LOG_MAX;
 	}
+
+	/* Make room for the sequence number */
+	rtas_error_log_buffer_max = rtas_error_log_max + sizeof(int);
+
 	of_node_put(node);
 
 	return 0;
@@ -405,8 +410,7 @@ static int rtasd(void *unused)
 
 	if (surveillance_timeout != -1) {
 		DEBUG("enabling surveillance\n");
-		if (enable_surveillance(surveillance_timeout))
-			goto error_vfree;
+		enable_surveillance(surveillance_timeout);
 		DEBUG("surveillance enabled\n");
 	}
 
@@ -430,10 +434,6 @@ static int rtasd(void *unused)
 			cpu = first_cpu_const(mk_cpumask_const(cpu_online_map));
 	}
 
-error_vfree:
-	if (rtas_log_buf)
-		vfree(rtas_log_buf);
-	rtas_log_buf = NULL;
 error:
 	/* Should delete proc entries */
 	return -EINVAL;
@@ -458,9 +458,6 @@ static int __init rtas_init(void)
 
 	if (kernel_thread(rtasd, 0, CLONE_FS) < 0)
 		printk(KERN_ERR "Failed to start RTAS daemon\n");
-
-	/* Make room for the sequence number */
-	rtas_error_log_buffer_max = rtas_error_log_max + sizeof(int);
 
 	return 0;
 }
