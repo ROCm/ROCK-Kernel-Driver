@@ -470,7 +470,7 @@ idmap_lookup_wait(struct idmap_defer_req *mdr, struct svc_rqst *rqstp,
 		if (2 * threads_waiting > rqstp->rq_server->sv_nrthreads)
 			goto out;
 		threads_waiting++;
-		schedule_timeout(10 * HZ);
+		schedule_timeout(1 * HZ);
 		threads_waiting--;
 	}
 out:
