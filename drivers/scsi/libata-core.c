@@ -2953,8 +2953,10 @@ int ata_device_add(struct ata_probe_ent *ent)
 
 err_out:
 	for (i = 0; i < count; i++) {
-		ata_host_remove(host_set->ports[i], 1);
-		scsi_host_put(host_set->ports[i]->host);
+		if (host_set->ports[i]) {
+			ata_host_remove(host_set->ports[i], 1);
+			scsi_host_put(host_set->ports[i]->host);
+		}
 	}
 	kfree(host_set);
 	VPRINTK("EXIT, returning 0\n");
