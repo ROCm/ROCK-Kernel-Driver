@@ -103,27 +103,18 @@ mtrr_write(struct file *file, const char *buf, size_t len, loff_t * ppos)
 			return err;
 		return len;
 	}
-	if (strncmp(line, "base=", 5)) {
-		printk("mtrr: no \"base=\" in line: \"%s\"\n", line);
+	if (strncmp(line, "base=", 5))
 		return -EINVAL;
-	}
 	base = simple_strtoull(line + 5, &ptr, 0);
 	for (; isspace(*ptr); ++ptr) ;
-	if (strncmp(ptr, "size=", 5)) {
-		printk("mtrr: no \"size=\" in line: \"%s\"\n", line);
+	if (strncmp(ptr, "size=", 5))
 		return -EINVAL;
-	}
 	size = simple_strtoull(ptr + 5, &ptr, 0);
-	if ((base & 0xfff) || (size & 0xfff)) {
-		printk("mtrr: size and base must be multiples of 4 kiB\n");
-		printk("mtrr: size: 0x%Lx  base: 0x%Lx\n", size, base);
+	if ((base & 0xfff) || (size & 0xfff))
 		return -EINVAL;
-	}
 	for (; isspace(*ptr); ++ptr) ;
-	if (strncmp(ptr, "type=", 5)) {
-		printk("mtrr: no \"type=\" in line: \"%s\"\n", line);
+	if (strncmp(ptr, "type=", 5))
 		return -EINVAL;
-	}
 	ptr += 5;
 	for (; isspace(*ptr); ++ptr) ;
 	for (i = 0; i < MTRR_NUM_TYPES; ++i) {
@@ -138,7 +129,6 @@ mtrr_write(struct file *file, const char *buf, size_t len, loff_t * ppos)
 			return err;
 		return len;
 	}
-	printk("mtrr: illegal type: \"%s\"\n", ptr);
 	return -EINVAL;
 }
 
@@ -272,15 +262,14 @@ mtrr_close(struct inode *ino, struct file *file)
 	unsigned int *fcount = FILE_FCOUNT(file);
 
 	if (fcount != NULL) {
-	max = num_var_ranges;
-	for (i = 0; i < max; ++i) {
-		while (fcount[i] > 0) {
-			if (mtrr_del(i, 0, 0) < 0)
-				printk("mtrr: reg %d not used\n", i);
-			--fcount[i];
+		max = num_var_ranges;
+		for (i = 0; i < max; ++i) {
+			while (fcount[i] > 0) {
+				mtrr_del(i, 0, 0);
+				--fcount[i];
+			}
 		}
-	}
-	kfree(fcount);
+		kfree(fcount);
 		FILE_FCOUNT(file) = NULL;
 	}
 	return single_release(ino, file);
@@ -300,7 +289,6 @@ static struct file_operations mtrr_fops = {
 	.open	 = mtrr_open, 
 	.read    = seq_read,
 	.llseek  = seq_lseek,
-	.release = single_release,
 	.write   = mtrr_write,
 	.ioctl   = mtrr_ioctl,
 	.release = mtrr_close,
