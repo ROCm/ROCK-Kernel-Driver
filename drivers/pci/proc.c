@@ -25,7 +25,7 @@ proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 {
 	loff_t new = -1;
 
-	lock_kernel();
+	down(&file->f_dentry->d_inode->i_sem);
 	switch (whence) {
 	case 0:
 		new = off;
@@ -37,10 +37,12 @@ proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 		new = PCI_CFG_SPACE_SIZE + off;
 		break;
 	}
-	unlock_kernel();
 	if (new < 0 || new > PCI_CFG_SPACE_SIZE)
-		return -EINVAL;
-	return (file->f_pos = new);
+		new = -EINVAL;
+	else
+		file->f_pos = new;
+	up(&file->f_dentry->d_inode->i_sem);
+	return new;
 }
 
 static ssize_t

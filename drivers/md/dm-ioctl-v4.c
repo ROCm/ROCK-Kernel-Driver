@@ -872,7 +872,7 @@ static int table_load(struct dm_ioctl *param, size_t param_size)
 	struct hash_cell *hc;
 	struct dm_table *t;
 
-	r = dm_table_create(&t, get_mode(param));
+	r = dm_table_create(&t, get_mode(param), param->target_count);
 	if (r)
 		return r;
 

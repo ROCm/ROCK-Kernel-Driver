@@ -59,6 +59,8 @@
  * (c) 1999 Manfred Spraul <manfreds@colorfullife.com>
  * Enforced range limit on SEM_UNDO
  * (c) 2001 Red Hat Inc <alan@redhat.com>
+ * Lockless wakeup
+ * (c) 2003 Manfred Spraul <manfred@colorfullife.com>
  */
 
 #include <linux/config.h>
@@ -117,6 +119,40 @@ void __init sem_init (void)
 	create_proc_read_entry("sysvipc/sem", 0, 0, sysvipc_sem_read_proc, NULL);
 #endif
 }
+
+/*
+ * Lockless wakeup algorithm:
+ * Without the check/retry algorithm a lockless wakeup is possible:
+ * - queue.status is initialized to -EINTR before blocking.
+ * - wakeup is performed by
+ *	* unlinking the queue entry from sma->sem_pending
+ *	* setting queue.status to IN_WAKEUP
+ *	  This is the notification for the blocked thread that a
+ *	  result value is imminent.
+ *	* call wake_up_process
+ *	* set queue.status to the final value.
+ * - the previously blocked thread checks queue.status:
+ *   	* if it's IN_WAKEUP, then it must wait until the value changes
+ *   	* if it's not -EINTR, then the operation was completed by
+ *   	  update_queue. semtimedop can return queue.status without
+ *   	  performing any operation on the semaphore array.
+ *   	* otherwise it must acquire the spinlock and check what's up.
+ *
+ * The two-stage algorithm is necessary to protect against the following
+ * races:
+ * - if queue.status is set after wake_up_process, then the woken up idle
+ *   thread could race forward and try (and fail) to acquire sma->lock
+ *   before update_queue had a chance to set queue.status
+ * - if queue.status is written before wake_up_process and if the
+ *   blocked process is woken up by a signal between writing
+ *   queue.status and the wake_up_process, then the woken up
+ *   process could return from semtimedop and die by calling
+ *   sys_exit before wake_up_process is called. Then wake_up_process
+ *   will oops, because the task structure is already invalid.
+ *   (yes, this happened on s390 with sysv msg).
+ *
+ */
+#define IN_WAKEUP	1
 
 static int newary (key_t key, int nsems, int semflg)
 {
@@ -331,16 +367,25 @@ static void update_queue (struct sem_array * sma)
 	int error;
 	struct sem_queue * q;
 
-	for (q = sma->sem_pending; q; q = q->next) {
-			
+	q = sma->sem_pending;
+	while(q) {
 		error = try_atomic_semop(sma, q->sops, q->nsops,
 					 q->undo, q->pid);
 
 		/* Does q->sleeper still need to sleep? */
 		if (error <= 0) {
-			q->status = error;
+			struct sem_queue *n;
 			remove_from_queue(sma,q);
+			n = q->next;
+			q->status = IN_WAKEUP;
 			wake_up_process(q->sleeper);
+			/* hands-off: q will disappear immediately after
+			 * writing q->status.
+			 */
+			q->status = error;
+			q = n;
+		} else {
+			q = q->next;
 		}
 	}
 }
@@ -409,10 +454,16 @@ static void freeary (struct sem_array *sma, int id)
 		un->semid = -1;
 
 	/* Wake up all pending processes and let them fail with EIDRM. */
-	for (q = sma->sem_pending; q; q = q->next) {
-		q->status = -EIDRM;
+	q = sma->sem_pending;
+	while(q) {
+		struct sem_queue *n;
+		/* lazy remove_from_queue: we are killing the whole queue */
 		q->prev = NULL;
+		n = q->next;
+		q->status = IN_WAKEUP;
 		wake_up_process(q->sleeper); /* doesn't sleep */
+		q->status = -EIDRM;	/* hands-off q */
+		q = n;
 	}
 
 	/* Remove the semaphore set from the ID array*/
@@ -1083,6 +1134,18 @@ retry_undos:
 	else
 		schedule();
 
+	error = queue.status;
+	while(unlikely(error == IN_WAKEUP)) {
+		cpu_relax();
+		error = queue.status;
+	}
+
+	if (error != -EINTR) {
+		/* fast path: update_queue already obtained all requested
+		 * resources */
+		goto out_free;
+	}
+
 	sma = sem_lock(semid);
 	if(sma==NULL) {
 		if(queue.prev != NULL)
@@ -1095,7 +1158,7 @@ retry_undos:
 	 * If queue.status != -EINTR we are woken up by another process
 	 */
 	error = queue.status;
-	if (queue.status != -EINTR) {
+	if (error != -EINTR) {
 		goto out_unlock_free;
 	}
 

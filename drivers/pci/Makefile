@@ -27,6 +27,7 @@ obj-$(CONFIG_PPC64) += setup-bus.o
 obj-$(CONFIG_SGI_IP27) += setup-irq.o
 obj-$(CONFIG_SGI_IP32) += setup-irq.o
 obj-$(CONFIG_X86_VISWS) += setup-irq.o
+obj-$(CONFIG_PCI_USE_VECTOR) += msi.o
 
 # Cardbus & CompactPCI use setup-bus
 obj-$(CONFIG_HOTPLUG) += setup-bus.o

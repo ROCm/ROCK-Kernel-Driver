@@ -51,9 +51,6 @@
 #ifndef SUPPORT_VLB_SYNC		/* 1 to support weird 32-bit chips */
 #define SUPPORT_VLB_SYNC	1	/* 0 to reduce kernel size */
 #endif
-#ifndef DISK_RECOVERY_TIME		/* off=0; on=access_delay_time */
-#define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
-#endif
 #ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
 #define OK_TO_RESET_CONTROLLER	1	/* 0 for use with AH2372A/B interface */
 #endif
@@ -246,11 +243,11 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * Timeouts for various operations:
  */
-#define WAIT_DRQ	(5*HZ/100)	/* 50msec - spec allows up to 20ms */
+#define WAIT_DRQ	(HZ/10)		/* 100msec - spec allows up to 20ms */
 #if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
 #define WAIT_READY	(5*HZ)		/* 5sec - some laptops are very slow */
 #else
-#define WAIT_READY	(3*HZ/100)	/* 30msec - should be instantaneous */
+#define WAIT_READY	(HZ/10)		/* 100msec - should be instantaneous */
 #endif /* CONFIG_APM || CONFIG_APM_MODULE */
 #define WAIT_PIDENTIFY	(10*HZ)	/* 10sec  - should be less than 3ms (?), if all ATAPI CD is closed at boot */
 #define WAIT_WORSTCASE	(30*HZ)	/* 30sec  - worst case when spinning up */
@@ -999,10 +996,6 @@ typedef struct hwif_s {
 	unsigned	dma_extra;	/* extra addr for dma ports */
 	unsigned long	config_data;	/* for use by chipset-specific code */
 	unsigned long	select_data;	/* for use by chipset-specific code */
-#if (DISK_RECOVERY_TIME > 0)
-	unsigned long	last_time;	/* time when previous rq was done */
-#endif
-
 
 	unsigned	noprobe    : 1;	/* don't probe for this interface */
 	unsigned	present    : 1;	/* this interface exists */
@@ -1693,6 +1686,8 @@ extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_de
 #define GOOD_DMA_DRIVE		1
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PCI
+extern int ide_build_sglist(ide_drive_t *, struct request *);
+extern int ide_raw_build_sglist(ide_drive_t *, struct request *);
 extern int ide_build_dmatable(ide_drive_t *, struct request *);
 extern void ide_destroy_dmatable(ide_drive_t *);
 extern ide_startstop_t ide_dma_intr(ide_drive_t *);

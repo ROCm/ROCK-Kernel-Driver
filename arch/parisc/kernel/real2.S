@@ -154,12 +154,12 @@ rfi_virt2real:
 	nop
 	
 	rsm             (PSW_SM_Q|PSW_SM_I),%r0  /* disable Q & I bits to load iia queue */
-	mtctl		0, %cr17	/* space 0 */
-	mtctl		0, %cr17
+	mtctl		%r0, %cr17	/* Clear IIASQ tail */
+	mtctl		%r0, %cr17	/* Clear IIASQ head */
 	load32		PA(rfi_v2r_1), %r1
-	mtctl		%r1, %cr18
+	mtctl		%r1, %cr18	/* IIAOQ head */
 	ldo		4(%r1), %r1
-	mtctl		%r1, %cr18
+	mtctl		%r1, %cr18	/* IIAOQ tail */
 	load32          REAL_MODE_PSW, %r1
 	mtctl		%r1, %cr22
 	rfi
@@ -191,12 +191,12 @@ rfi_real2virt:
 	nop
 	
 	rsm             PSW_SM_Q,%r0    /* disable Q bit to load iia queue */
-	mtctl		0, %cr17	/* space 0 */
-	mtctl		0, %cr17
+	mtctl		%r0, %cr17	/* Clear IIASQ tail */
+	mtctl		%r0, %cr17	/* Clear IIASQ head */
 	load32		(rfi_r2v_1), %r1
-	mtctl		%r1, %cr18
+	mtctl		%r1, %cr18	/* IIAOQ head */
 	ldo		4(%r1), %r1
-	mtctl		%r1, %cr18
+	mtctl		%r1, %cr18	/* IIAOQ tail */
 	load32		KERNEL_PSW, %r1
 	mtctl		%r1, %cr22
 	rfi

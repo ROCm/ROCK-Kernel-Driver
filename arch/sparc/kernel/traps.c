@@ -12,6 +12,7 @@
 #include <linux/config.h>
 #include <linux/sched.h>  /* for jiffies */
 #include <linux/kernel.h>
+#include <linux/kallsyms.h>
 #include <linux/signal.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -118,7 +119,9 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 		      count++ < 30				&&
                       (((unsigned long) rw) >= PAGE_OFFSET)	&&
 		      !(((unsigned long) rw) & 0x7)) {
-			printk("Caller[%08lx]\n", rw->ins[7]);
+			printk("Caller[%08lx]", rw->ins[7]);
+			print_symbol(": %s\n", rw->ins[7]);
+			printk("\n");
 			rw = (struct reg_window *)rw->ins[6];
 		}
 	}
@@ -497,7 +500,10 @@ void trap_init(void)
 	    TI_KSP         != offsetof(struct thread_info, ksp) ||
 	    TI_KPC         != offsetof(struct thread_info, kpc) ||
 	    TI_KPSR        != offsetof(struct thread_info, kpsr) ||
-	    TI_KWIM        != offsetof(struct thread_info, kwim))
+	    TI_KWIM        != offsetof(struct thread_info, kwim) ||
+	    TI_REG_WINDOW  != offsetof(struct thread_info, reg_window) ||
+	    TI_RWIN_SPTRS  != offsetof(struct thread_info, rwbuf_stkptrs) ||
+	    TI_W_SAVED     != offsetof(struct thread_info, w_saved))
 		thread_info_offsets_are_bolixed_pete();
 
 	/* Attach to the address space of init_task. */

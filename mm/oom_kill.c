@@ -24,20 +24,6 @@
 /* #define DEBUG */
 
 /**
- * int_sqrt - oom_kill.c internal function, rough approximation to sqrt
- * @x: integer of which to calculate the sqrt
- * 
- * A very rough approximation to the sqrt() function.
- */
-static unsigned int int_sqrt(unsigned int x)
-{
-	unsigned int out = x;
-	while (x & ~(unsigned int)1) x >>=2, out >>=1;
-	if (x) out -= out >> 2;
-	return (out ? out : 1);
-}	
-
-/**
  * oom_badness - calculate a numeric value for how bad this task has been
  * @p: task struct of which task we should calculate
  *
@@ -57,7 +43,7 @@ static unsigned int int_sqrt(unsigned int x)
 
 static int badness(struct task_struct *p)
 {
-	int points, cpu_time, run_time;
+	int points, cpu_time, run_time, s;
 
 	if (!p->mm)
 		return 0;
@@ -77,8 +63,12 @@ static int badness(struct task_struct *p)
 	cpu_time = (p->utime + p->stime) >> (SHIFT_HZ + 3);
 	run_time = (get_jiffies_64() - p->start_time) >> (SHIFT_HZ + 10);
 
-	points /= int_sqrt(cpu_time);
-	points /= int_sqrt(int_sqrt(run_time));
+	s = int_sqrt(cpu_time);
+	if (s)
+		points /= s;
+	s = int_sqrt(int_sqrt(run_time));
+	if (s)
+		points /= s;
 
 	/*
 	 * Niced processes are most likely less important, so double

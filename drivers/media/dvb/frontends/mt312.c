@@ -1,7 +1,7 @@
 /* 
     Driver for Zarlink MT312 Satellite Channel Decoder
 
-    Copyright (C) 2003 Andreas Oberritter <obi@saftware.de>
+    Copyright (C) 2003 Andreas Oberritter <obi@linuxtv.org>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,10 +39,18 @@
 #define MT312_DEBUG		0
 
 #define MT312_SYS_CLK		90000000UL	/* 90 MHz */
+#define MT312_LPOWER_SYS_CLK	60000000UL	/* 60 MHz */
 #define MT312_PLL_CLK		10000000UL	/* 10 MHz */
 
 /* number of active frontends */
 static int mt312_count = 0;
+
+#if MT312_DEBUG == 0
+#define dprintk(x...)
+#else
+static int debug = 0;
+#define dprintk if(debug == 1) printk
+#endif
 
 static struct dvb_frontend_info mt312_info = {
 	.name = "Zarlink MT312",
@@ -86,7 +94,7 @@ static int mt312_read(struct dvb_i2c_bus *i2c,
 		return -EREMOTEIO;
 	}
 #if MT312_DEBUG
-	{
+	if(debug) {
 		int i;
 		printk(KERN_INFO "R(%d):", reg & 0x7f);
 		for (i = 0; i < count; i++)
@@ -107,7 +115,7 @@ static int mt312_write(struct dvb_i2c_bus *i2c,
 	struct i2c_msg msg;
 
 #if MT312_DEBUG
-	{
+	if(debug) {
 		int i;
 		printk(KERN_INFO "W(%d):", reg & 0x7f);
 		for (i = 0; i < count; i++)
@@ -205,7 +213,7 @@ static int sl1935_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq, u32 sr)
 	if (freq < 1550000)
 		buf[3] |= 0x10;
 
-	printk(KERN_INFO "synth dword = %02x%02x%02x%02x\n", buf[0],
+	dprintk(KERN_INFO "synth dword = %02x%02x%02x%02x\n", buf[0],
 	       buf[1], buf[2], buf[3]);
 
 	return mt312_pll_write(i2c, I2C_ADDR_SL1935, buf, sizeof(buf));
@@ -225,7 +233,7 @@ static int tsa5059_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq, u32 sr)
 	if (freq < 1550000)
 		buf[3] |= 0x02;
 
-	printk(KERN_INFO "synth dword = %02x%02x%02x%02x\n", buf[0],
+	dprintk(KERN_INFO "synth dword = %02x%02x%02x%02x\n", buf[0],
 	       buf[1], buf[2], buf[3]);
 
 	return mt312_pll_write(i2c, I2C_ADDR_TSA5059, buf, sizeof(buf));
@@ -236,13 +244,13 @@ static int mt312_reset(struct dvb_i2c_bus *i2c, const u8 full)
 	return mt312_writereg(i2c, RESET, full ? 0x80 : 0x40);
 }
 
-static int mt312_init(struct dvb_i2c_bus *i2c, const long id)
+static int mt312_init(struct dvb_i2c_bus *i2c, const long id, u8 pll)
 {
 	int ret;
 	u8 buf[2];
 
 	/* wake up */
-	if ((ret = mt312_writereg(i2c, CONFIG, 0x8c)) < 0)
+	if ((ret = mt312_writereg(i2c, CONFIG, (pll == 60 ? 0x88 : 0x8c))) < 0)
 		return ret;
 
 	/* wait at least 150 usec */
@@ -252,8 +260,17 @@ static int mt312_init(struct dvb_i2c_bus *i2c, const long id)
 	if ((ret = mt312_reset(i2c, 1)) < 0)
 		return ret;
 
+// Per datasheet, write correct values. 09/28/03 ACCJr.
+// If we don't do this, we won't get FE_HAS_VITERBI in the VP310.
+	{
+		u8 buf_def[8]={0x14, 0x12, 0x03, 0x02, 0x01, 0x00, 0x00, 0x00};
+
+		if ((ret = mt312_write(i2c, VIT_SETUP, buf_def, sizeof(buf_def))) < 0)
+			return ret;
+	}
+
 	/* SYS_CLK */
-	buf[0] = mt312_div(MT312_SYS_CLK * 2, 1000000);
+	buf[0] = mt312_div((pll == 60 ? MT312_LPOWER_SYS_CLK : MT312_SYS_CLK) * 2, 1000000);
 
 	/* DISEQC_RATIO */
 	buf[1] = mt312_div(MT312_PLL_CLK, 15000 * 4);
@@ -370,15 +387,17 @@ static int mt312_set_voltage(struct dvb_i2c_bus *i2c, const fe_sec_voltage_t v)
 	return mt312_writereg(i2c, DISEQC_MODE, volt_tab[v]);
 }
 
-static int mt312_read_status(struct dvb_i2c_bus *i2c, fe_status_t * s)
+static int mt312_read_status(struct dvb_i2c_bus *i2c, fe_status_t *s, const long id)
 {
 	int ret;
-	u8 status[3];
+	u8 status[3], vit_mode;
 
 	*s = 0;
 
 	if ((ret = mt312_read(i2c, QPSK_STAT_H, status, sizeof(status))) < 0)
 		return ret;
+
+	dprintk(KERN_DEBUG "QPSK_STAT_H: 0x%02x, QPSK_STAT_L: 0x%02x, FEC_STATUS: 0x%02x\n", status[0], status[1], status[2]);
 
 	if (status[0] & 0xc0)
 		*s |= FE_HAS_SIGNAL;	/* signal noise ratio */
@@ -390,6 +409,16 @@ static int mt312_read_status(struct dvb_i2c_bus *i2c, fe_status_t * s)
 		*s |= FE_HAS_SYNC;	/* byte align lock */
 	if (status[0] & 0x01)
 		*s |= FE_HAS_LOCK;	/* qpsk lock */
+	// VP310 doesn't have AUTO, so we "implement it here" ACCJr
+	if ((id == ID_VP310) && !(status[0] & 0x01)) {
+		if ((ret = mt312_readreg(i2c, VIT_MODE, &vit_mode)) < 0)
+			return ret;
+		vit_mode ^= 0x40;
+		if ((ret = mt312_writereg(i2c, VIT_MODE, vit_mode)) < 0)
+                	return ret;
+		if ((ret = mt312_writereg(i2c, GO, 0x01)) < 0)
+                	return ret;
+	}
 
 	return 0;
 }
@@ -422,7 +451,7 @@ static int mt312_read_agc(struct dvb_i2c_bus *i2c, u16 * signal_strength)
 
 	*signal_strength = agc;
 
-	printk(KERN_DEBUG "agc=%08x err_db=%hd\n", agc, err_db);
+	dprintk(KERN_DEBUG "agc=%08x err_db=%hd\n", agc, err_db);
 
 	return 0;
 }
@@ -458,7 +487,7 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 			      const long id)
 {
 	int ret;
-	u8 buf[5];
+	u8 buf[5], config_val;
 	u16 sr;
 
 	const u8 fec_tab[10] =
@@ -466,6 +495,8 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 	const u8 inv_tab[3] = { 0x00, 0x40, 0x80 };
 
 	int (*set_tv_freq)(struct dvb_i2c_bus *i2c, u32 freq, u32 sr);
+
+	dprintk("%s: Freq %d\n", __FUNCTION__, p->frequency);
 
 	if ((p->frequency < mt312_info.frequency_min)
 	    || (p->frequency > mt312_info.frequency_max))
@@ -489,6 +520,22 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 
 	switch (id) {
 	case ID_VP310:
+	// For now we will do this only for the VP310.
+	// It should be better for the mt312 as well, but tunning will be slower. ACCJr 09/29/03
+		if ((ret = mt312_readreg(i2c, CONFIG, &config_val) < 0))
+			return ret;
+		if (p->u.qpsk.symbol_rate >= 30000000) //Note that 30MS/s should use 90MHz
+		{
+			if ((config_val & 0x0c) == 0x08) //We are running 60MHz
+				if ((ret = mt312_init(i2c, id, (u8) 90)) < 0)
+					return ret;
+		}
+		else
+		{
+			if ((config_val & 0x0c) == 0x0C) //We are running 90MHz
+				if ((ret = mt312_init(i2c, id, (u8) 60)) < 0)
+					return ret;
+		}
 		set_tv_freq = tsa5059_set_tv_freq;
 		break;
 	case ID_MT312:
@@ -562,7 +609,7 @@ static int mt312_get_symbol_rate(struct dvb_i2c_bus *i2c, u32 * sr)
 
 		monitor = (buf[0] << 8) | buf[1];
 
-		printk(KERN_DEBUG "sr(auto) = %u\n",
+		dprintk(KERN_DEBUG "sr(auto) = %u\n",
 		       mt312_div(monitor * 15625, 4));
 	} else {
 		if ((ret = mt312_writereg(i2c, MON_CTRL, 0x05)) < 0)
@@ -578,9 +625,9 @@ static int mt312_get_symbol_rate(struct dvb_i2c_bus *i2c, u32 * sr)
 
 		sym_rat_op = (buf[0] << 8) | buf[1];
 
-		printk(KERN_DEBUG "sym_rat_op=%d dec_ratio=%d\n",
+		dprintk(KERN_DEBUG "sym_rat_op=%d dec_ratio=%d\n",
 		       sym_rat_op, dec_ratio);
-		printk(KERN_DEBUG "*sr(manual) = %lu\n",
+		dprintk(KERN_DEBUG "*sr(manual) = %lu\n",
 		       (((MT312_PLL_CLK * 8192) / (sym_rat_op + 8192)) *
 			2) - dec_ratio);
 	}
@@ -675,7 +722,7 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return -EOPNOTSUPP;
 
 	case FE_READ_STATUS:
-		return mt312_read_status(i2c, arg);
+		return mt312_read_status(i2c, arg, (long) fe->data);
 
 	case FE_READ_BER:
 		return mt312_read_bercnt(i2c, arg);
@@ -702,7 +749,12 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return mt312_sleep(i2c);
 
 	case FE_INIT:
-		return mt312_init(i2c, (long) fe->data);
+	//For the VP310 we should run at 60MHz when ever possible.
+	//It should be better to run the mt312 ar lower speed when ever possible, but tunning will be slower. ACCJr 09/29/03
+		if ((long)fe->data == ID_MT312)
+			return mt312_init(i2c, (long) fe->data, (u8) 90);
+		else
+			return mt312_init(i2c, (long) fe->data, (u8) 60);
 
 	case FE_RESET:
 		return mt312_reset(i2c, 0);
@@ -755,6 +807,11 @@ static void __exit mt312_module_exit(void)
 module_init(mt312_module_init);
 module_exit(mt312_module_exit);
 
+#if MT312_DEBUG != 0
+MODULE_PARM(debug,"i");
+MODULE_PARM_DESC(debug, "enable verbose debug messages");
+#endif
+
 MODULE_DESCRIPTION("MT312 Satellite Channel Decoder Driver");
-MODULE_AUTHOR("Andreas Oberritter <obi@saftware.de>");
+MODULE_AUTHOR("Andreas Oberritter <obi@linuxtv.org>");
 MODULE_LICENSE("GPL");

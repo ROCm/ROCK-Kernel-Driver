@@ -34,14 +34,13 @@ Linux 2.2:
 	maintainer then please contact Alan Cox <alan@lxorguk.ukuu.org.uk>
 
 Linux 2.4:
-	The same rules apply as 2.2 but this kernel tree is under active
-	development. The final contact point for Linux 2.4 submissions is
-	Marcelo Tosatti <marcelo@conectiva.com.br>.
+	The same rules apply as 2.2. The final contact point for Linux 2.4
+	submissions is Marcelo Tosatti <marcelo.tosatti@cyclades.com>.
 
-Linux 2.5:
+Linux 2.6:
 	The same rules apply as 2.4 except that you should follow linux-kernel
-	to track changes in API's. The final contact point for Linux 2.5
-	submissions is Linus Torvalds <torvalds@osdl.org>.
+	to track changes in API's. The final contact point for Linux 2.6
+	submissions is Andrew Morton <akpm@osdl.org>.
 
 What Criteria Determine Acceptance
 ----------------------------------

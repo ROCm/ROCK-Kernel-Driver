@@ -197,6 +197,7 @@ void cpio_mkfile(const char *filename, const char *location,
 
 	for (i = 0; i < buf.st_size; ++i)
 		fputc(filebuf[i], stdout);
+	offset += buf.st_size;
 	close(file);
 	free(filebuf);
 	push_pad();

@@ -159,7 +159,7 @@ static int cx22700_init (struct dvb_i2c_bus *i2c)
 	cx22700_writereg (i2c, 0x00, 0x02);   /*  soft reset */
 	cx22700_writereg (i2c, 0x00, 0x00);
 
-	dvb_delay (HZ/100);
+	dvb_delay(10);
 	
 	for (i=0; i<sizeof(init_tab); i+=2)
 		cx22700_writereg (i2c, init_tab[i], init_tab[i+1]);
@@ -281,15 +281,15 @@ static int cx22700_get_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters 
 
 	val = cx22700_readreg (i2c, 0x02);
 
-	if ((val >> 3) > 4)
+	if (((val >> 3) & 0x07) > 4)
 		p->code_rate_HP = FEC_AUTO;
 	else
-		p->code_rate_HP = fec_tab[val >> 3];
+		p->code_rate_HP = fec_tab[(val >> 3) & 0x07];
 
-	if ((val & 0x7) > 4)
+	if ((val & 0x07) > 4)
 		p->code_rate_LP = FEC_AUTO;
 	else
-		p->code_rate_LP = fec_tab[val >> 3];
+		p->code_rate_LP = fec_tab[val & 0x07];
 
 
 	val = cx22700_readreg (i2c, 0x03);
@@ -333,7 +333,7 @@ static int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		if (sync & 0x10)
 			*status |= FE_HAS_SYNC;
 
-		if (sync & 0x10)
+		if (*status == 0x0f)
 			*status |= FE_HAS_LOCK;
 
 		break;

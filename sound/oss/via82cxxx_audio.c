@@ -15,7 +15,7 @@
  */
 
 
-#define VIA_VERSION	"1.9.1-ac3-2.5"
+#define VIA_VERSION	"1.9.1-ac4-2.5"
 
 
 #include <linux/config.h>
@@ -1237,7 +1237,6 @@ static int via_chan_set_stereo (struct via_info *card,
 		}
 	/* unknown */
 	default:
-		printk (KERN_WARNING PFX "unknown number of channels\n");
 		val = -EINVAL;
 		break;
 	}
@@ -2116,7 +2115,7 @@ static void via_dsp_cleanup (struct via_info *card)
 
 
 static struct page * via_mm_nopage (struct vm_area_struct * vma,
-				    unsigned long address, int write_access)
+				    unsigned long address, int *type)
 {
 	struct via_info *card = vma->vm_private_data;
 	struct via_channel *chan = &card->ch_out;
@@ -2124,12 +2123,11 @@ static struct page * via_mm_nopage (struct vm_area_struct * vma,
 	unsigned long pgoff;
 	int rd, wr;
 
-	DPRINTK ("ENTER, start %lXh, ofs %lXh, pgoff %ld, addr %lXh, wr %d\n",
+	DPRINTK ("ENTER, start %lXh, ofs %lXh, pgoff %ld, addr %lXh\n",
 		 vma->vm_start,
 		 address - vma->vm_start,
 		 (address - vma->vm_start) >> PAGE_SHIFT,
-		 address,
-		 write_access);
+		 address);
 
         if (address > vma->vm_end) {
 		DPRINTK ("EXIT, returning NOPAGE_SIGBUS\n");
@@ -2167,6 +2165,8 @@ static struct page * via_mm_nopage (struct vm_area_struct * vma,
 	DPRINTK ("EXIT, returning page %p for cpuaddr %lXh\n",
 		 dmapage, (unsigned long) chan->pgtbl[pgoff].cpuaddr);
 	get_page (dmapage);
+	if (type)
+		*type = VM_FAULT_MINOR;
 	return dmapage;
 }
 
@@ -3367,7 +3367,7 @@ static int via_dsp_release(struct inode *inode, struct file *file)
 
 	if (file->f_mode & FMODE_WRITE) {
 		rc = via_dsp_drain_playback (card, &card->ch_out, nonblock);
-		if (rc && rc != ERESTARTSYS)	/* Nobody needs to know about ^C */
+		if (rc && rc != -ERESTARTSYS)	/* Nobody needs to know about ^C */
 			printk (KERN_DEBUG "via_audio: ignoring drain playback error %d\n", rc);
 
 		via_chan_free (card, &card->ch_out);

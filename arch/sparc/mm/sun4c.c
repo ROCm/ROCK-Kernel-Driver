@@ -1067,23 +1067,21 @@ static void sun4c_free_thread_info(struct thread_info *ti)
 	unsigned long pages = BUCKET_PTE_PAGE(sun4c_get_pte(tiaddr));
 	int entry = BUCKET_NUM(tiaddr);
 
-	if (atomic_dec_and_test(&ti->task->thread.refcount)) {
-		/* We are deleting a mapping, so the flush here is mandatory. */
-		sun4c_flush_page(tiaddr);
+	/* We are deleting a mapping, so the flush here is mandatory. */
+	sun4c_flush_page(tiaddr);
 #ifndef CONFIG_SUN4	
-		sun4c_flush_page(tiaddr + PAGE_SIZE);
+	sun4c_flush_page(tiaddr + PAGE_SIZE);
 #endif
-		sun4c_put_pte(tiaddr, 0);
+	sun4c_put_pte(tiaddr, 0);
 #ifndef CONFIG_SUN4	
-		sun4c_put_pte(tiaddr + PAGE_SIZE, 0);
+	sun4c_put_pte(tiaddr + PAGE_SIZE, 0);
 #endif
-		sun4c_bucket[entry] = BUCKET_EMPTY;
-		if (entry < sun4c_lowbucket_avail)
-			sun4c_lowbucket_avail = entry;
+	sun4c_bucket[entry] = BUCKET_EMPTY;
+	if (entry < sun4c_lowbucket_avail)
+		sun4c_lowbucket_avail = entry;
 
-		free_pages(pages, THREAD_INFO_ORDER);
-		garbage_collect(entry);
-	}
+	free_pages(pages, THREAD_INFO_ORDER);
+	garbage_collect(entry);
 }
 
 static void __init sun4c_init_buckets(void)

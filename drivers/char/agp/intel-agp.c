@@ -204,7 +204,7 @@ static struct agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
 	if (new == NULL)
 		return NULL;
 
-	new->memory[0] = virt_to_phys(addr);
+	new->memory[0] = agp_bridge->driver->mask_memory(virt_to_phys(addr), type);
 	new->page_count = 1;
 	new->num_scratch_pages = 1;
 	new->type = AGP_PHYS_MEMORY;

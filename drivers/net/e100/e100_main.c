@@ -124,7 +124,7 @@ static void e100_free_nontx_list(struct e100_private *);
 static void e100_non_tx_background(unsigned long);
 static inline void e100_tx_skb_free(struct e100_private *bdp, tcb_t *tcb);
 /* Global Data structures and variables */
-char e100_copyright[] __devinitdata = "Copyright (c) 2003 Intel Corporation";
+char e100_copyright[] = "Copyright (c) 2003 Intel Corporation";
 char e100_driver_version[]="2.3.30-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
@@ -539,7 +539,7 @@ e100_trigger_SWI(struct e100_private *bdp)
 	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 }
 
-static int __devinit
+static int
 e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 {
 	static int first_time = true;
@@ -823,7 +823,7 @@ module_exit(e100_cleanup_module);
  *
  * This routine does range checking on command-line options
  */
-void __devinit
+void
 e100_check_options(int board, struct e100_private *bdp)
 {
 	if (board >= E100_MAX_NIC) {
@@ -894,7 +894,7 @@ e100_check_options(int board, struct e100_private *bdp)
  * If the option's value is '-1' use the specified default.
  * Otherwise, if the value is invalid, change it to the default.
  */
-void __devinit
+void
 e100_set_int_option(int *option, int val, int min, int max, int default_val,
 		    char *name)
 {
@@ -928,7 +928,7 @@ e100_set_int_option(int *option, int val, int min, int max, int default_val,
  * Otherwise, if the value is invalid (not 0 or 1), 
  * change it to the default.
  */
-void __devinit
+void
 e100_set_bool_option(struct e100_private *bdp, int val, u32 mask,
 		     int default_val, char *name)
 {
@@ -1241,7 +1241,7 @@ e100_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
  *      true: if successful
  *      false: otherwise
  */
-static unsigned char __devinit
+static unsigned char
 e100_init(struct e100_private *bdp)
 {
 	u32 st_timeout = 0;
@@ -1290,7 +1290,7 @@ e100_init(struct e100_private *bdp)
  *      true: if S/W was successfully initialized
  *      false: otherwise
  */
-static unsigned char __devinit
+static unsigned char
 e100_sw_init(struct e100_private *bdp)
 {
 	bdp->next_cu_cmd = START_WAIT;	// init the next cu state
@@ -1318,7 +1318,7 @@ e100_sw_init(struct e100_private *bdp)
 	return 1;
 }
 
-static void __devinit
+static void
 e100_tco_workaround(struct e100_private *bdp)
 {
 	int i;
@@ -1519,7 +1519,7 @@ e100_setup_tcb_pool(tcb_t *head, unsigned int qlen, struct e100_private *bdp)
  *      0: if the operation was successful
  *      %-ENOMEM: if memory allocation failed
  */
-unsigned char __devinit
+unsigned char
 e100_alloc_space(struct e100_private *bdp)
 {
 	unsigned long off;
@@ -2508,7 +2508,7 @@ e100_cmd_complete_location(struct e100_private *bdp)
  *      true: if successfully cleared stat counters
  *      false: otherwise
  */
-static unsigned char __devinit
+static unsigned char
 e100_clr_cntrs(struct e100_private *bdp)
 {
 	volatile u32 *pcmd_complete;
@@ -2873,7 +2873,7 @@ e100_load_microcode(struct e100_private *bdp)
 /***************************************************************************/
 
 /* Read PWA (printed wired assembly) number */
-void __devinit
+void
 e100_rd_pwa_no(struct e100_private *bdp)
 {
 	bdp->pwa_no = e100_eeprom_read(bdp, EEPROM_PWA_NO);
@@ -2882,7 +2882,7 @@ e100_rd_pwa_no(struct e100_private *bdp)
 }
 
 /* Read the permanent ethernet address from the eprom. */
-void __devinit
+void
 e100_rd_eaddr(struct e100_private *bdp)
 {
 	int i;
@@ -2947,7 +2947,7 @@ e100_D101M_checksum(struct e100_private *bdp, struct sk_buff *skb)
 /***************************************************************************/
 
 /* Print the board's configuration */
-void __devinit
+void
 e100_print_brd_conf(struct e100_private *bdp)
 {
 	/* Print the string if checksum Offloading was enabled */
@@ -2975,7 +2975,7 @@ e100_print_brd_conf(struct e100_private *bdp)
  *      true: if successfull
  *      false: otherwise
  */
-static unsigned char __devinit
+static unsigned char
 e100_pci_setup(struct pci_dev *pcid, struct e100_private *bdp)
 {
 	struct net_device *dev = bdp->device;
@@ -3754,7 +3754,7 @@ e100_ethtool_led_blink(struct net_device *dev, struct ifreq *ifr)
 	return 0;
 }
 
-static inline int __devinit
+static inline int
 e100_10BaseT_adapter(struct e100_private *bdp)
 {
 	return ((bdp->pdev->device == 0x1229) &&
@@ -3762,7 +3762,7 @@ e100_10BaseT_adapter(struct e100_private *bdp)
 		(bdp->pdev->subsystem_device == 0x0003));
 }
 
-static void __devinit
+static void
 e100_get_speed_duplex_caps(struct e100_private *bdp)
 {
 	u16 status;

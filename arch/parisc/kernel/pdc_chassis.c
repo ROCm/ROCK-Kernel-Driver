@@ -2,7 +2,7 @@
  *		arch/parisc/kernel/pdc_chassis.c
  *
  * 		Copyright (C) 2002 Laurent Canet <canetl@esiee.fr>
- *		Copyright (C) 2002 Thibaut Varene <varenet@esiee.fr>
+ *		Copyright (C) 2002-2003 Thibaut Varene <varenet@esiee.fr>
  *
  *
  *		This program is free software; you can redistribute it and/or modify
@@ -35,6 +35,8 @@
 #include <asm/pdc_chassis.h>
 #include <asm/processor.h>
 
+
+#ifdef CONFIG_PDC_CHASSIS
 static int pdc_chassis_old = 0;	
 
 
@@ -102,6 +104,7 @@ static struct notifier_block pdc_chassis_reboot_block = {
 	.notifier_call = pdc_chassis_reboot_event,
 	.priority = INT_MAX,
 };
+#endif /* CONFIG_PDC_CHASSIS */
 
 
 /**
@@ -110,16 +113,33 @@ static struct notifier_block pdc_chassis_reboot_block = {
 
 void __init parisc_pdc_chassis_init(void)
 {
+#ifdef CONFIG_PDC_CHASSIS
+	int handle = 0;
+
 	DPRINTK(KERN_DEBUG "%s: parisc_pdc_chassis_init()\n", __FILE__);
 
-	/* initialize panic notifier chain */
-	notifier_chain_register(&panic_notifier_list, &pdc_chassis_panic_block);
-
-	/* initialize reboot notifier chain */
-	register_reboot_notifier(&pdc_chassis_reboot_block);
-
-	/* Check for old LED Panel */
+	/* Let see if we have something to handle... */
+	/* Check for PDC_PAT or old LED Panel */
 	pdc_chassis_checkold();
+	if (is_pdc_pat()) {
+#ifdef __LP64__	/* see pdc_chassis_send_status() */
+		printk(KERN_INFO "Enabling PDC_PAT chassis codes support.\n");
+		handle = 1;
+#endif /* __LP64__ */
+	}
+	else if (pdc_chassis_old) {
+		printk(KERN_INFO "Enabling old style chassis LED panel support.\n");
+		handle = 1;
+	}
+	
+	if (handle) {
+		/* initialize panic notifier chain */
+		notifier_chain_register(&panic_notifier_list, &pdc_chassis_panic_block);
+
+		/* initialize reboot notifier chain */
+		register_reboot_notifier(&pdc_chassis_reboot_block);
+	}
+#endif /* CONFIG_PDC_CHASSIS */
 }
 
 
@@ -128,7 +148,8 @@ void __init parisc_pdc_chassis_init(void)
  * and changes the front panel LEDs according to the new system state
  * @retval: PDC call return value.
  *
- * Only machines with 64 bits PDC PAT and E-class are supported atm.
+ * Only machines with 64 bits PDC PAT and those reported in
+ * pdc_chassis_checkold() are supported atm.
  * 
  * returns 0 if no error, -1 if no supported PDC is present or invalid message,
  * else returns the appropriate PDC error code.
@@ -140,7 +161,7 @@ int pdc_chassis_send_status(int message)
 {
 	/* Maybe we should do that in an other way ? */
 	int retval = 0;
-
+#ifdef CONFIG_PDC_CHASSIS
 	DPRINTK(KERN_DEBUG "%s: pdc_chassis_send_status(%d)\n", __FILE__, message);
 
 #ifdef __LP64__	/* pdc_pat_chassis_send_log is defined only when #ifdef __LP64__ */
@@ -199,7 +220,7 @@ int pdc_chassis_send_status(int message)
 				retval = -1;
 		}
 	} else retval = -1;
-#endif
-		
+#endif /* __LP64__ */
+#endif /* CONFIG_PDC_CHASSIS */
 	return retval;
 }

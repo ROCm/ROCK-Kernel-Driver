@@ -247,10 +247,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 			*back = tp->next;
 			spin_unlock_bh(&dev->queue_lock);
 			write_unlock(&qdisc_tree_lock);
-
-			tp->ops->destroy(tp);
-			module_put(tp->ops->owner);
-			kfree(tp);
+			tcf_destroy(tp);
 			err = 0;
 			goto errout;
 		}

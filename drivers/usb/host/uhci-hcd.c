@@ -2182,6 +2182,9 @@ static int uhci_reset(struct usb_hcd *hcd)
 
 	uhci->io_addr = (unsigned long) hcd->regs;
 
+	/* Turn off all interrupts */
+	outw(0, uhci->io_addr + USBINTR);
+
 	/* Maybe kick BIOS off this hardware.  Then reset, so we won't get
 	 * interrupts from any previous setup.
 	 */

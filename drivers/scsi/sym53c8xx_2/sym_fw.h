@@ -113,10 +113,6 @@ struct sym_fwb_ofs {
 };
 struct sym_fwz_ofs {
 	SYM_GEN_FW_Z(u_short)
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	SYM_GEN_Z(u_short, start_ram)
-	SYM_GEN_Z(u_short, start_ram64)
-#endif
 };
 
 /*
@@ -136,10 +132,6 @@ struct sym_fwb_ba {
 };
 struct sym_fwz_ba {
 	SYM_GEN_FW_Z(u32)
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	SYM_GEN_Z(u32, start_ram)
-	SYM_GEN_Z(u32, start_ram64)
-#endif
 };
 #undef	SYM_GEN_A
 #undef	SYM_GEN_B

@@ -11712,7 +11712,7 @@ SetOEMLCDData(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension,USHORT 
   }
 
   temp = GetOEMLCDPtr(SiS_Pr,HwDeviceExtension, ROMAddr, 1);
-  if(temp = 0xFFFF) return;
+  if(temp == 0xFFFF) return;
 
   index = SiS_Pr->SiS_VBModeIDTable[ModeIdIndex]._VB_LCDHIndex;
   for(i=0x14, j=0; i<=0x17; i++, j++) {

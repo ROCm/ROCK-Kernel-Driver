@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
+#include <linux/kallsyms.h>
 #include <linux/mm.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
@@ -207,11 +208,12 @@ void __show_backtrace(unsigned long fp)
         while(rw && (((unsigned long) rw) >= PAGE_OFFSET) &&
             !(((unsigned long) rw) & 0x7)) {
 		printk("CPU[%d]: ARGS[%08lx,%08lx,%08lx,%08lx,%08lx,%08lx] "
-		       "FP[%08lx] CALLER[%08lx]\n", cpu,
+		       "FP[%08lx] CALLER[%08lx]: ", cpu,
 		       rw->ins[0], rw->ins[1], rw->ins[2], rw->ins[3],
 		       rw->ins[4], rw->ins[5],
 		       rw->ins[6],
 		       rw->ins[7]);
+		print_symbol("%s\n", rw->ins[7]);
 		rw = (struct reg_window *) rw->ins[6];
 	}
 	spin_unlock_irqrestore(&sparc_backtrace_lock, flags);
@@ -279,12 +281,14 @@ void show_regs(struct pt_regs *r)
 
         printk("PSR: %08lx PC: %08lx NPC: %08lx Y: %08lx    %s\n",
 	       r->psr, r->pc, r->npc, r->y, print_tainted());
+	print_symbol("PC: <%s>\n", r->pc);
 	printk("%%G: %08lx %08lx  %08lx %08lx  %08lx %08lx  %08lx %08lx\n",
 	       r->u_regs[0], r->u_regs[1], r->u_regs[2], r->u_regs[3],
 	       r->u_regs[4], r->u_regs[5], r->u_regs[6], r->u_regs[7]);
 	printk("%%O: %08lx %08lx  %08lx %08lx  %08lx %08lx  %08lx %08lx\n",
 	       r->u_regs[8], r->u_regs[9], r->u_regs[10], r->u_regs[11],
 	       r->u_regs[12], r->u_regs[13], r->u_regs[14], r->u_regs[15]);
+	print_symbol("RPC: <%s>\n", r->u_regs[15]);
 
 	printk("%%L: %08lx %08lx  %08lx %08lx  %08lx %08lx  %08lx %08lx\n",
 	       rw->locals[0], rw->locals[1], rw->locals[2], rw->locals[3],
@@ -318,7 +322,8 @@ void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 			break;
 		rw = (struct reg_window *) fp;
 		pc = rw->ins[7];
-		printk("[%08lx] ", pc);
+		printk("[%08lx : ", pc);
+		print_symbol("%s ] ", pc);
 		fp = rw->ins[6];
 	} while (++count < 16);
 	printk("\n");
@@ -356,7 +361,7 @@ void exit_thread(void)
 
 void flush_thread(void)
 {
-	current->thread.w_saved = 0;
+	current_thread_info()->w_saved = 0;
 
 	/* No new signal delivery by default */
 	current->thread.new_signal = 0;
@@ -489,9 +494,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	ti->kpc = (((unsigned long) ret_from_fork) - 0x8);
 	ti->kpsr = current->thread.fork_kpsr | PSR_PIL;
 	ti->kwim = current->thread.fork_kwim;
-
-	/* This is used for sun4c only */
-	atomic_set(&p->thread.refcount, 1);
 
 	if(regs->psr & PSR_PS) {
 		extern struct pt_regs fake_swapper_regs;

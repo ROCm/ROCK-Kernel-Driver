@@ -59,25 +59,22 @@
 /*
  *  Some poor and bogus sync table that refers to Tekram NVRAM layout.
  */
-#if SYM_CONF_NVRAM_SUPPORT
 static u_char Tekram_sync[16] =
 	{25,31,37,43, 50,62,75,125, 12,15,18,21, 6,7,9,10};
 #ifdef	SYM_CONF_DEBUG_NVRAM
 static u_char Tekram_boot_delay[7] = {3, 5, 10, 20, 30, 60, 120};
 #endif
-#endif
 
 /*
  *  Get host setup from NVRAM.
  */
-void sym_nvram_setup_host (hcb_p np, struct sym_nvram *nvram)
+void sym_nvram_setup_host(struct sym_hcb *np, struct sym_nvram *nvram)
 {
-#if SYM_CONF_NVRAM_SUPPORT
 	/*
 	 *  Get parity checking, host ID, verbose mode 
 	 *  and miscellaneous host flags from NVRAM.
 	 */
-	switch(nvram->type) {
+	switch (nvram->type) {
 	case SYM_SYMBIOS_NVRAM:
 		if (!(nvram->data.Symbios.flags & SYMBIOS_PARITY_ENABLE))
 			np->rv_scntl0  &= ~0x0a;
@@ -95,41 +92,15 @@ void sym_nvram_setup_host (hcb_p np, struct sym_nvram *nvram)
 	default:
 		break;
 	}
-#endif
 }
 
-/*
- *  Get target setup from NVRAM.
- */
-#if SYM_CONF_NVRAM_SUPPORT
-static void sym_Symbios_setup_target(hcb_p np,int target, Symbios_nvram *nvram);
-static void sym_Tekram_setup_target(hcb_p np,int target, Tekram_nvram *nvram);
-#endif
-
-void sym_nvram_setup_target (hcb_p np, int target, struct sym_nvram *nvp)
-{
-#if SYM_CONF_NVRAM_SUPPORT
-	switch(nvp->type) {
-	case SYM_SYMBIOS_NVRAM:
-		sym_Symbios_setup_target (np, target, &nvp->data.Symbios);
-		break;
-	case SYM_TEKRAM_NVRAM:
-		sym_Tekram_setup_target (np, target, &nvp->data.Tekram);
-		break;
-	default:
-		break;
-	}
-#endif
-}
-
-#if SYM_CONF_NVRAM_SUPPORT
 /*
  *  Get target set-up from Symbios format NVRAM.
  */
 static void
-sym_Symbios_setup_target(hcb_p np, int target, Symbios_nvram *nvram)
+sym_Symbios_setup_target(struct sym_hcb *np, int target, Symbios_nvram *nvram)
 {
-	tcb_p tp = &np->target[target];
+	struct sym_tcb *tp = &np->target[target];
 	Symbios_target *tn = &nvram->target[target];
 
 	tp->tinfo.user.period = tn->sync_period ? (tn->sync_period + 3) / 4 : 0;
@@ -149,9 +120,9 @@ sym_Symbios_setup_target(hcb_p np, int target, Symbios_nvram *nvram)
  *  Get target set-up from Tekram format NVRAM.
  */
 static void
-sym_Tekram_setup_target(hcb_p np, int target, Tekram_nvram *nvram)
+sym_Tekram_setup_target(struct sym_hcb *np, int target, Tekram_nvram *nvram)
 {
-	tcb_p tp = &np->target[target];
+	struct sym_tcb *tp = &np->target[target];
 	struct Tekram_target *tn = &nvram->target[target];
 	int i;
 
@@ -160,8 +131,8 @@ sym_Tekram_setup_target(hcb_p np, int target, Tekram_nvram *nvram)
 		tp->tinfo.user.period = Tekram_sync[i];
 	}
 
-	tp->tinfo.user.width =
-		(tn->flags & TEKRAM_WIDE_NEGO) ? BUS_16_BIT : BUS_8_BIT;
+	tp->tinfo.user.width = (tn->flags & TEKRAM_WIDE_NEGO) ?
+		BUS_16_BIT : BUS_8_BIT;
 
 	if (tn->flags & TEKRAM_TAGGED_COMMANDS) {
 		tp->usrtags = 2 << nvram->max_tags_index;
@@ -175,11 +146,28 @@ sym_Tekram_setup_target(hcb_p np, int target, Tekram_nvram *nvram)
 		np->rv_scntl0  &= ~0x0a; /* SCSI parity checking disabled */
 }
 
+/*
+ *  Get target setup from NVRAM.
+ */
+void sym_nvram_setup_target(struct sym_hcb *np, int target, struct sym_nvram *nvp)
+{
+	switch (nvp->type) {
+	case SYM_SYMBIOS_NVRAM:
+		sym_Symbios_setup_target(np, target, &nvp->data.Symbios);
+		break;
+	case SYM_TEKRAM_NVRAM:
+		sym_Tekram_setup_target(np, target, &nvp->data.Tekram);
+		break;
+	default:
+		break;
+	}
+}
+
 #ifdef	SYM_CONF_DEBUG_NVRAM
 /*
  *  Dump Symbios format NVRAM for debugging purpose.
  */
-static void sym_display_Symbios_nvram(sdev_p np, Symbios_nvram *nvram)
+static void sym_display_Symbios_nvram(struct sym_device *np, Symbios_nvram *nvram)
 {
 	int i;
 
@@ -211,7 +199,7 @@ static void sym_display_Symbios_nvram(sdev_p np, Symbios_nvram *nvram)
 /*
  *  Dump TEKRAM format NVRAM for debugging purpose.
  */
-static void sym_display_Tekram_nvram(sdev_p np, Tekram_nvram *nvram)
+static void sym_display_Tekram_nvram(struct sym_device *np, Tekram_nvram *nvram)
 {
 	int i, tags, boot_delay;
 	char *rem;
@@ -221,7 +209,7 @@ static void sym_display_Tekram_nvram(sdev_p np, Tekram_nvram *nvram)
 	boot_delay = 0;
 	if (nvram->boot_delay_index < 6)
 		boot_delay = Tekram_boot_delay[nvram->boot_delay_index];
-	switch((nvram->flags & TEKRAM_REMOVABLE_FLAGS) >> 6) {
+	switch ((nvram->flags & TEKRAM_REMOVABLE_FLAGS) >> 6) {
 	default:
 	case 0:	rem = "";			break;
 	case 1: rem = " REMOVABLE=boot device";	break;
@@ -257,49 +245,12 @@ static void sym_display_Tekram_nvram(sdev_p np, Tekram_nvram *nvram)
 		sync);
 	}
 }
-#endif	/* SYM_CONF_DEBUG_NVRAM */
-#endif	/* SYM_CONF_NVRAM_SUPPORT */
-
-
-/*
- *  Try reading Symbios or Tekram NVRAM
- */
-#if SYM_CONF_NVRAM_SUPPORT
-static int sym_read_Symbios_nvram (sdev_p np, Symbios_nvram *nvram);
-static int sym_read_Tekram_nvram  (sdev_p np, Tekram_nvram *nvram);
-#endif
-
-int sym_read_nvram (sdev_p np, struct sym_nvram *nvp)
-{
-#if SYM_CONF_NVRAM_SUPPORT
-	/*
-	 *  Try to read SYMBIOS nvram.
-	 *  Try to read TEKRAM nvram if Symbios nvram not found.
-	 */
-	if	(SYM_SETUP_SYMBIOS_NVRAM &&
-		 !sym_read_Symbios_nvram (np, &nvp->data.Symbios)) {
-		nvp->type = SYM_SYMBIOS_NVRAM;
-#ifdef SYM_CONF_DEBUG_NVRAM
-		sym_display_Symbios_nvram(np, &nvp->data.Symbios);
-#endif
-	}
-	else if	(SYM_SETUP_TEKRAM_NVRAM &&
-		 !sym_read_Tekram_nvram (np, &nvp->data.Tekram)) {
-		nvp->type = SYM_TEKRAM_NVRAM;
-#ifdef SYM_CONF_DEBUG_NVRAM
-		sym_display_Tekram_nvram(np, &nvp->data.Tekram);
-#endif
-	}
-	else
-		nvp->type = 0;
 #else
-	nvp->type = 0;
-#endif
-	return nvp->type;
-}
+static void sym_display_Symbios_nvram(struct sym_device *np, Symbios_nvram *nvram) { }
+static void sym_display_Tekram_nvram(struct sym_device *np, Tekram_nvram *nvram) { }
+#endif	/* SYM_CONF_DEBUG_NVRAM */
 
 
-#if SYM_CONF_NVRAM_SUPPORT
 /*
  *  24C16 EEPROM reading.
  *
@@ -316,11 +267,11 @@ int sym_read_nvram (sdev_p np, struct sym_nvram *nvp)
 /*
  *  Set/clear data/clock bit in GPIO0
  */
-static void S24C16_set_bit(sdev_p np, u_char write_bit, u_char *gpreg, 
+static void S24C16_set_bit(struct sym_device *np, u_char write_bit, u_char *gpreg, 
 			  int bit_mode)
 {
 	UDELAY (5);
-	switch (bit_mode){
+	switch (bit_mode) {
 	case SET_BIT:
 		*gpreg |= write_bit;
 		break;
@@ -342,7 +293,7 @@ static void S24C16_set_bit(sdev_p np, u_char write_bit, u_char *gpreg,
 /*
  *  Send START condition to NVRAM to wake it up.
  */
-static void S24C16_start(sdev_p np, u_char *gpreg)
+static void S24C16_start(struct sym_device *np, u_char *gpreg)
 {
 	S24C16_set_bit(np, 1, gpreg, SET_BIT);
 	S24C16_set_bit(np, 0, gpreg, SET_CLK);
@@ -353,7 +304,7 @@ static void S24C16_start(sdev_p np, u_char *gpreg)
 /*
  *  Send STOP condition to NVRAM - puts NVRAM to sleep... ZZzzzz!!
  */
-static void S24C16_stop(sdev_p np, u_char *gpreg)
+static void S24C16_stop(struct sym_device *np, u_char *gpreg)
 {
 	S24C16_set_bit(np, 0, gpreg, SET_CLK);
 	S24C16_set_bit(np, 1, gpreg, SET_BIT);
@@ -363,7 +314,7 @@ static void S24C16_stop(sdev_p np, u_char *gpreg)
  *  Read or write a bit to the NVRAM,
  *  read if GPIO0 input else write if GPIO0 output
  */
-static void S24C16_do_bit(sdev_p np, u_char *read_bit, u_char write_bit, 
+static void S24C16_do_bit(struct sym_device *np, u_char *read_bit, u_char write_bit, 
 			 u_char *gpreg)
 {
 	S24C16_set_bit(np, write_bit, gpreg, SET_BIT);
@@ -378,7 +329,7 @@ static void S24C16_do_bit(sdev_p np, u_char *read_bit, u_char write_bit,
  *  Output an ACK to the NVRAM after reading,
  *  change GPIO0 to output and when done back to an input
  */
-static void S24C16_write_ack(sdev_p np, u_char write_bit, u_char *gpreg, 
+static void S24C16_write_ack(struct sym_device *np, u_char write_bit, u_char *gpreg, 
 			    u_char *gpcntl)
 {
 	OUTB (nc_gpcntl, *gpcntl & 0xfe);
@@ -390,7 +341,7 @@ static void S24C16_write_ack(sdev_p np, u_char write_bit, u_char *gpreg,
  *  Input an ACK from NVRAM after writing,
  *  change GPIO0 to input and when done back to an output
  */
-static void S24C16_read_ack(sdev_p np, u_char *read_bit, u_char *gpreg, 
+static void S24C16_read_ack(struct sym_device *np, u_char *read_bit, u_char *gpreg, 
 			   u_char *gpcntl)
 {
 	OUTB (nc_gpcntl, *gpcntl | 0x01);
@@ -402,7 +353,7 @@ static void S24C16_read_ack(sdev_p np, u_char *read_bit, u_char *gpreg,
  *  WRITE a byte to the NVRAM and then get an ACK to see it was accepted OK,
  *  GPIO0 must already be set as an output
  */
-static void S24C16_write_byte(sdev_p np, u_char *ack_data, u_char write_data, 
+static void S24C16_write_byte(struct sym_device *np, u_char *ack_data, u_char write_data, 
 			     u_char *gpreg, u_char *gpcntl)
 {
 	int x;
@@ -417,7 +368,7 @@ static void S24C16_write_byte(sdev_p np, u_char *ack_data, u_char write_data,
  *  READ a byte from the NVRAM and then send an ACK to say we have got it,
  *  GPIO0 must already be set as an input
  */
-static void S24C16_read_byte(sdev_p np, u_char *read_data, u_char ack_data, 
+static void S24C16_read_byte(struct sym_device *np, u_char *read_data, u_char ack_data, 
 			    u_char *gpreg, u_char *gpcntl)
 {
 	int x;
@@ -435,7 +386,7 @@ static void S24C16_read_byte(sdev_p np, u_char *read_data, u_char ack_data,
 /*
  *  Read 'len' bytes starting at 'offset'.
  */
-static int sym_read_S24C16_nvram (sdev_p np, int offset, u_char *data, int len)
+static int sym_read_S24C16_nvram(struct sym_device *np, int offset, u_char *data, int len)
 {
 	u_char	gpcntl, gpreg;
 	u_char	old_gpcntl, old_gpreg;
@@ -514,7 +465,7 @@ out:
  *  Try reading Symbios NVRAM.
  *  Return 0 if OK.
  */
-static int sym_read_Symbios_nvram (sdev_p np, Symbios_nvram *nvram)
+static int sym_read_Symbios_nvram(struct sym_device *np, Symbios_nvram *nvram)
 {
 	static u_char Symbios_trailer[6] = {0xfe, 0xfe, 0, 0, 0, 0};
 	u_char *data = (u_char *) nvram;
@@ -528,7 +479,7 @@ static int sym_read_Symbios_nvram (sdev_p np, Symbios_nvram *nvram)
 
 	/* check valid NVRAM signature, verify byte count and checksum */
 	if (nvram->type != 0 ||
-	    bcmp(nvram->trailer, Symbios_trailer, 6) ||
+	    memcmp(nvram->trailer, Symbios_trailer, 6) ||
 	    nvram->byte_count != len - 12)
 		return 1;
 
@@ -555,7 +506,7 @@ static int sym_read_Symbios_nvram (sdev_p np, Symbios_nvram *nvram)
 /*
  *  Pulse clock bit in GPIO0
  */
-static void T93C46_Clk(sdev_p np, u_char *gpreg)
+static void T93C46_Clk(struct sym_device *np, u_char *gpreg)
 {
 	OUTB (nc_gpreg, *gpreg | 0x04);
 	UDELAY (2);
@@ -565,7 +516,7 @@ static void T93C46_Clk(sdev_p np, u_char *gpreg)
 /* 
  *  Read bit from NVRAM
  */
-static void T93C46_Read_Bit(sdev_p np, u_char *read_bit, u_char *gpreg)
+static void T93C46_Read_Bit(struct sym_device *np, u_char *read_bit, u_char *gpreg)
 {
 	UDELAY (2);
 	T93C46_Clk(np, gpreg);
@@ -575,7 +526,7 @@ static void T93C46_Read_Bit(sdev_p np, u_char *read_bit, u_char *gpreg)
 /*
  *  Write bit to GPIO0
  */
-static void T93C46_Write_Bit(sdev_p np, u_char write_bit, u_char *gpreg)
+static void T93C46_Write_Bit(struct sym_device *np, u_char write_bit, u_char *gpreg)
 {
 	if (write_bit & 0x01)
 		*gpreg |= 0x02;
@@ -593,7 +544,7 @@ static void T93C46_Write_Bit(sdev_p np, u_char write_bit, u_char *gpreg)
 /*
  *  Send STOP condition to NVRAM - puts NVRAM to sleep... ZZZzzz!!
  */
-static void T93C46_Stop(sdev_p np, u_char *gpreg)
+static void T93C46_Stop(struct sym_device *np, u_char *gpreg)
 {
 	*gpreg &= 0xef;
 	OUTB (nc_gpreg, *gpreg);
@@ -605,7 +556,7 @@ static void T93C46_Stop(sdev_p np, u_char *gpreg)
 /*
  *  Send read command and address to NVRAM
  */
-static void T93C46_Send_Command(sdev_p np, u_short write_data, 
+static void T93C46_Send_Command(struct sym_device *np, u_short write_data, 
 				u_char *read_bit, u_char *gpreg)
 {
 	int x;
@@ -620,7 +571,8 @@ static void T93C46_Send_Command(sdev_p np, u_short write_data,
 /*
  *  READ 2 bytes from the NVRAM
  */
-static void T93C46_Read_Word(sdev_p np, u_short *nvram_data, u_char *gpreg)
+static void T93C46_Read_Word(struct sym_device *np,
+		unsigned short *nvram_data, unsigned char *gpreg)
 {
 	int x;
 	u_char read_bit;
@@ -639,13 +591,13 @@ static void T93C46_Read_Word(sdev_p np, u_short *nvram_data, u_char *gpreg)
 /*
  *  Read Tekram NvRAM data.
  */
-static int T93C46_Read_Data(sdev_p np, u_short *data,int len,u_char *gpreg)
+static int T93C46_Read_Data(struct sym_device *np, unsigned short *data,
+		int len, unsigned char *gpreg)
 {
-	u_char	read_bit;
-	int	x;
+	int x;
 
 	for (x = 0; x < len; x++)  {
-
+		unsigned char read_bit;
 		/* output read command and address */
 		T93C46_Send_Command(np, 0x180 | x, &read_bit, gpreg);
 		if (read_bit & 0x01)
@@ -660,7 +612,7 @@ static int T93C46_Read_Data(sdev_p np, u_short *data,int len,u_char *gpreg)
 /*
  *  Try reading 93C46 Tekram NVRAM.
  */
-static int sym_read_T93C46_nvram (sdev_p np, Tekram_nvram *nvram)
+static int sym_read_T93C46_nvram(struct sym_device *np, Tekram_nvram *nvram)
 {
 	u_char gpcntl, gpreg;
 	u_char old_gpcntl, old_gpreg;
@@ -692,7 +644,7 @@ static int sym_read_T93C46_nvram (sdev_p np, Tekram_nvram *nvram)
  *  Try reading Tekram NVRAM.
  *  Return 0 if OK.
  */
-static int sym_read_Tekram_nvram (sdev_p np, Tekram_nvram *nvram)
+static int sym_read_Tekram_nvram (struct sym_device *np, Tekram_nvram *nvram)
 {
 	u_char *data = (u_char *) nvram;
 	int len = sizeof(*nvram);
@@ -700,13 +652,13 @@ static int sym_read_Tekram_nvram (sdev_p np, Tekram_nvram *nvram)
 	int x;
 
 	switch (np->device_id) {
-	case PCI_ID_SYM53C885:
-	case PCI_ID_SYM53C895:
-	case PCI_ID_SYM53C896:
+	case PCI_DEVICE_ID_NCR_53C885:
+	case PCI_DEVICE_ID_NCR_53C895:
+	case PCI_DEVICE_ID_NCR_53C896:
 		x = sym_read_S24C16_nvram(np, TEKRAM_24C16_NVRAM_ADDRESS,
 					  data, len);
 		break;
-	case PCI_ID_SYM53C875:
+	case PCI_DEVICE_ID_NCR_53C875:
 		x = sym_read_S24C16_nvram(np, TEKRAM_24C16_NVRAM_ADDRESS,
 					  data, len);
 		if (!x)
@@ -727,4 +679,19 @@ static int sym_read_Tekram_nvram (sdev_p np, Tekram_nvram *nvram)
 	return 0;
 }
 
-#endif	/* SYM_CONF_NVRAM_SUPPORT */
+/*
+ *  Try reading Symbios or Tekram NVRAM
+ */
+int sym_read_nvram(struct sym_device *np, struct sym_nvram *nvp)
+{
+	if (!sym_read_Symbios_nvram(np, &nvp->data.Symbios)) {
+		nvp->type = SYM_SYMBIOS_NVRAM;
+		sym_display_Symbios_nvram(np, &nvp->data.Symbios);
+	} else if (!sym_read_Tekram_nvram(np, &nvp->data.Tekram)) {
+		nvp->type = SYM_TEKRAM_NVRAM;
+		sym_display_Tekram_nvram(np, &nvp->data.Tekram);
+	} else {
+		nvp->type = 0;
+	}
+	return nvp->type;
+}

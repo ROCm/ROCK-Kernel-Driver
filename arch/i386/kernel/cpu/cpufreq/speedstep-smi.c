@@ -19,6 +19,7 @@
 #include <linux/cpufreq.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <asm/ist.h>
 
 #include "speedstep-lib.h"
@@ -51,10 +52,14 @@ static struct cpufreq_frequency_table speedstep_freqs[] = {
 #define SET_SPEEDSTEP_STATE 2
 #define GET_SPEEDSTEP_FREQS 4
 
+/* how often shall the SMI call be tried if it failed, e.g. because
+ * of DMA activity going on? */
+#define SMI_TRIES 5
+
 /* DEBUG
  *   Define it if you want verbose debug output, e.g. for bug reporting
  */
-#define SPEEDSTEP_DEBUG
+//#define SPEEDSTEP_DEBUG
 
 #ifdef SPEEDSTEP_DEBUG
 #define dprintk(msg...) printk(msg)
@@ -85,6 +90,9 @@ static int speedstep_smi_ownership (void)
 
 /**
  * speedstep_smi_get_freqs - get SpeedStep preferred & current freq.
+ * Only available on later SpeedStep-enabled systems, returns false results or
+ * even hangs [cf. bugme.osdl.org # 1422] on earlier systems. Empirical testing
+ * shows that the latter occurs if !(ist_info.event & 0xFFFF).
  *
  */
 static int speedstep_smi_get_freqs (unsigned int *low, unsigned int *high)
@@ -92,6 +100,9 @@ static int speedstep_smi_get_freqs (unsigned int *low, unsigned int *high)
 	u32 command, result, edi, high_mhz, low_mhz;
 	u32 state=0;
 	u32 function = GET_SPEEDSTEP_FREQS;
+
+	if (!(ist_info.event & 0xFFFF))
+		return -ENODEV;
 
 	command = (smi_sig & 0xffffff00) | (smi_cmd & 0xff);
 
@@ -134,10 +145,11 @@ static int speedstep_get_state (void)
  */
 static void speedstep_set_state (unsigned int state, unsigned int notify)
 {
-	unsigned int old_state, result, command, new_state;
+	unsigned int old_state, result = 0, command, new_state;
 	unsigned long flags;
 	struct cpufreq_freqs freqs;
 	unsigned int function=SET_SPEEDSTEP_STATE;
+	unsigned int retry = 0;
 
 	if (state > 0x1)
 		return;
@@ -157,20 +169,28 @@ static void speedstep_set_state (unsigned int state, unsigned int notify)
 	local_irq_save(flags);
 
 	command = (smi_sig & 0xffffff00) | (smi_cmd & 0xff);
-	__asm__ __volatile__(
-		"movl $0, %%edi\n"
-		"out %%al, (%%dx)\n"
-		: "=b" (new_state), "=D" (result)
-		: "a" (command), "b" (function), "c" (state), "d" (smi_port), "S" (0)
-	);
+
+	do {
+		if (retry) {
+			dprintk(KERN_INFO "cpufreq: retry %u, previous result %u\n", retry, result);
+			mdelay(retry * 50);
+		}
+		retry++;
+		__asm__ __volatile__(
+			"movl $0, %%edi\n"
+			"out %%al, (%%dx)\n"
+			: "=b" (new_state), "=D" (result)
+			: "a" (command), "b" (function), "c" (state), "d" (smi_port), "S" (0)
+			);
+	} while ((new_state != state) && (retry <= SMI_TRIES));
 
 	/* enable IRQs */
 	local_irq_restore(flags);
 
 	if (new_state == state) {
-		dprintk(KERN_INFO "cpufreq: change to %u MHz succeded\n", (freqs.new / 1000));
+		dprintk(KERN_INFO "cpufreq: change to %u MHz succeeded after %u tries with result %u\n", (freqs.new / 1000), retry, result);
 	} else {
-		printk(KERN_ERR "cpufreq: change failed\n");
+		printk(KERN_ERR "cpufreq: change failed with new_state %u and result %u\n", new_state, result);
 	}
 
 	if (notify)
@@ -225,9 +245,10 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 		return -ENODEV;
 
 	result = speedstep_smi_ownership();
-
-	if (result)
+	if (result) {
 		dprintk(KERN_INFO "cpufreq: fails an aquiring ownership of a SMI interface.\n");
+		return -EINVAL;
+	}
 
 	/* detect low and high frequency */
 	result = speedstep_smi_get_freqs(&speedstep_freqs[SPEEDSTEP_LOW].frequency,
@@ -286,6 +307,7 @@ static struct cpufreq_driver speedstep_driver = {
 	.target 	= speedstep_target,
 	.init		= speedstep_cpu_init,
 	.resume		= speedstep_resume,
+	.owner		= THIS_MODULE,
 };
 
 /**

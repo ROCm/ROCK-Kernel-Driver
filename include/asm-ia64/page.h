@@ -63,7 +63,7 @@
 # define HPAGE_SIZE	(__IA64_UL_CONST(1) << HPAGE_SHIFT)
 # define HPAGE_MASK	(~(HPAGE_SIZE - 1))
 # define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
-# define ARCH_HAS_VALID_HUGEPAGE_RANGE
+# define ARCH_HAS_HUGEPAGE_ONLY_RANGE
 #endif /* CONFIG_HUGETLB_PAGE */
 
 #ifdef __ASSEMBLY__
@@ -137,7 +137,9 @@ typedef union ia64_va {
 # define htlbpage_to_page(x)	((REGION_NUMBER(x) << 61)				\
 				 | (REGION_OFFSET(x) >> (HPAGE_SHIFT-PAGE_SHIFT)))
 # define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
-extern int  check_valid_hugepage_range(unsigned long addr, unsigned long len);
+# define is_hugepage_only_range(addr, len)		\
+	 (REGION_NUMBER(addr) == REGION_HPAGE &&	\
+	  REGION_NUMBER((addr)+(len)) == REGION_HPAGE)
 #endif
 
 static __inline__ int

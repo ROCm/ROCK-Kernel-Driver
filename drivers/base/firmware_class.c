@@ -415,18 +415,22 @@ struct firmware_work {
 	void (*cont)(const struct firmware *fw, void *context);
 };
 
-static void
+static int
 request_firmware_work_func(void *arg)
 {
 	struct firmware_work *fw_work = arg;
 	const struct firmware *fw;
-	if (!arg)
-		return;
+	if (!arg) {
+		WARN_ON(1);
+		return 0;
+	}
+	daemonize("%s/%s", "firmware", fw_work->name);
 	request_firmware(&fw, fw_work->name, fw_work->device);
 	fw_work->cont(fw, fw_work->context);
 	release_firmware(fw);
 	module_put(fw_work->module);
 	kfree(fw_work);
+	return 0;
 }
 
 /**
@@ -451,6 +455,8 @@ request_firmware_nowait(
 {
 	struct firmware_work *fw_work = kmalloc(sizeof (struct firmware_work),
 						GFP_ATOMIC);
+	int ret;
+
 	if (!fw_work)
 		return -ENOMEM;
 	if (!try_module_get(module)) {
@@ -465,9 +471,14 @@ request_firmware_nowait(
 		.context = context,
 		.cont = cont,
 	};
-	INIT_WORK(&fw_work->work, request_firmware_work_func, fw_work);
 
-	schedule_work(&fw_work->work);
+	ret = kernel_thread(request_firmware_work_func, fw_work,
+			    CLONE_FS | CLONE_FILES);
+	
+	if (ret < 0) {
+		fw_work->cont(NULL, fw_work->context);
+		return ret;
+	}
 	return 0;
 }
 

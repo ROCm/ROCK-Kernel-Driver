@@ -36,6 +36,10 @@
  *                      SAL 3.0 spec.
  * 00/03/29 C. Fleckenstein  Fixed PAL/SAL update issues, began MCA bug fixes, logging issues,
  *                           added min save state dump, added INIT handler.
+ *
+ * 2003-12-08 Keith Owens <kaos@sgi.com>
+ *            smp_call_function() must not be called from interrupt context (can
+ *            deadlock on tasklist_lock).  Use keventd to call smp_call_function().
  */
 #include <linux/config.h>
 #include <linux/types.h>
@@ -51,6 +55,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/smp.h>
+#include <linux/workqueue.h>
 
 #include <asm/delay.h>
 #include <asm/machvec.h>
@@ -78,16 +83,18 @@ u64				ia64_mca_stack[1024] __attribute__((aligned(16)));
 u64				ia64_mca_stackframe[32];
 u64				ia64_mca_bspstore[1024];
 u64				ia64_init_stack[KERNEL_STACK_SIZE/8] __attribute__((aligned(16)));
-u64				ia64_mca_sal_data_area[1356];
-u64				ia64_tlb_functional;
 u64				ia64_os_mca_recovery_successful;
+u64				ia64_mca_serialize;
 static void			ia64_mca_wakeup_ipi_wait(void);
 static void			ia64_mca_wakeup(int cpu);
 static void			ia64_mca_wakeup_all(void);
 static void			ia64_log_init(int);
 extern void			ia64_monarch_init_handler (void);
 extern void			ia64_slave_init_handler (void);
+static u64			ia64_log_get(int sal_info_type, u8 **buffer);
 extern struct hw_interrupt_type	irq_type_iosapic_level;
+
+struct ia64_mca_tlb_info ia64_mca_tlb_list[NR_CPUS];
 
 static struct irqaction cmci_irqaction = {
 	.handler =	ia64_mca_cmc_int_handler,
@@ -149,12 +156,14 @@ static int cmc_polling_enabled = 1;
  */
 static int cpe_poll_enabled = 1;
 
+extern void salinfo_log_wakeup(int type, u8 *buffer, u64 size);
+
 /*
  *  ia64_mca_log_sal_error_record
  *
- *  This function retrieves a specified error record type from SAL, sends it to
- *  the system log, and notifies SALs to clear the record from its non-volatile
- *  memory.
+ *  This function retrieves a specified error record type from SAL,
+ *  wakes up any processes waiting for error records, and sends it to
+ *  the system log.
  *
  *  Inputs  :   sal_info_type   (Type of error record MCA/CMC/CPE/INIT)
  *  Outputs :   platform error status
@@ -162,11 +171,13 @@ static int cpe_poll_enabled = 1;
 int
 ia64_mca_log_sal_error_record(int sal_info_type, int called_from_init)
 {
-	int platform_err = 0;
+	u8 *buffer;
+	u64 size;
+	int platform_err;
 
-	/* Get the MCA error record */
-	if (!ia64_log_get(sal_info_type, (prfunc_t)printk))
-		return platform_err;		/* no record retrieved */
+	size = ia64_log_get(sal_info_type, &buffer);
+	if (!size)
+		return 0;
 
 	/* TODO:
 	 * 1. analyze error logs to determine recoverability
@@ -174,10 +185,10 @@ ia64_mca_log_sal_error_record(int sal_info_type, int called_from_init)
 	 * 3. set ia64_os_mca_recovery_successful flag, if applicable
 	 */
 
+	salinfo_log_wakeup(sal_info_type, buffer, size);
 	platform_err = ia64_log_print(sal_info_type, (prfunc_t)printk);
-	/* temporary: only clear SAL logs on hardware-corrected errors
-		or if we're logging an error after an MCA-initiated reboot */
-	if ((sal_info_type > 1) || (called_from_init))
+	/* Clear logs from corrected errors in case there's no user-level logger */
+	if (sal_info_type == SAL_INFO_TYPE_CPE || sal_info_type == SAL_INFO_TYPE_CMC)
 		ia64_sal_clear_state_info(sal_info_type);
 
 	return platform_err;
@@ -450,7 +461,10 @@ static void
 ia64_mca_register_cpev (int cpev)
 {
 	/* Register the CPE interrupt vector with SAL */
-	if (ia64_sal_mc_set_params(SAL_MC_PARAM_CPE_INT, SAL_MC_PARAM_MECHANISM_INT, cpev, 0, 0)) {
+	struct ia64_sal_retval isrv;
+
+	isrv = ia64_sal_mc_set_params(SAL_MC_PARAM_CPE_INT, SAL_MC_PARAM_MECHANISM_INT, cpev, 0, 0);
+	if (isrv.status) {
 		printk(KERN_ERR "ia64_mca_platform_init: failed to register Corrected "
 		       "Platform Error interrupt vector with SAL.\n");
 		return;
@@ -602,6 +616,30 @@ verify_guid (efi_guid_t *test, efi_guid_t *target)
 }
 
 /*
+ * ia64_mca_cmc_vector_disable_keventd
+ *
+ * Called via keventd (smp_call_function() is not safe in interrupt context) to
+ * disable the cmc interrupt vector.
+ */
+static void
+ia64_mca_cmc_vector_disable_keventd(void *unused)
+{
+	on_each_cpu(ia64_mca_cmc_vector_disable, NULL, 1, 0);
+}
+
+/*
+ * ia64_mca_cmc_vector_enable_keventd
+ *
+ * Called via keventd (smp_call_function() is not safe in interrupt context) to
+ * enable the cmc interrupt vector.
+ */
+static void
+ia64_mca_cmc_vector_enable_keventd(void *unused)
+{
+	on_each_cpu(ia64_mca_cmc_vector_enable, NULL, 1, 0);
+}
+
+/*
  * ia64_mca_init
  *
  *  Do all the system level mca specific initialization.
@@ -629,6 +667,8 @@ ia64_mca_init(void)
 	ia64_fptr_t *mca_hldlr_ptr = (ia64_fptr_t *)ia64_os_mca_dispatch;
 	int i;
 	s64 rc;
+	struct ia64_sal_retval isrv;
+	u64 timeout = IA64_MCA_RENDEZ_TIMEOUT;	/* platform specific */
 
 	IA64_MCA_DEBUG("ia64_mca_init: begin\n");
 
@@ -644,23 +684,33 @@ ia64_mca_init(void)
 	 */
 
 	/* Register the rendezvous interrupt vector with SAL */
-	if ((rc = ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_INT,
-					 SAL_MC_PARAM_MECHANISM_INT,
-					 IA64_MCA_RENDEZ_VECTOR,
-					 IA64_MCA_RENDEZ_TIMEOUT,
-					 SAL_MC_PARAM_RZ_ALWAYS)))
-	{
+	while (1) {
+		isrv = ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_INT,
+					      SAL_MC_PARAM_MECHANISM_INT,
+					      IA64_MCA_RENDEZ_VECTOR,
+					      timeout,
+					      SAL_MC_PARAM_RZ_ALWAYS);
+		rc = isrv.status;
+		if (rc == 0)
+			break;
+		if (rc == -2) {
+			printk(KERN_INFO "ia64_mca_init: increasing MCA rendezvous timeout from "
+				"%ld to %ld\n", timeout, isrv.v0);
+			timeout = isrv.v0;
+			continue;
+		}
 		printk(KERN_ERR "ia64_mca_init: Failed to register rendezvous interrupt "
 		       "with SAL.  rc = %ld\n", rc);
 		return;
 	}
 
 	/* Register the wakeup interrupt vector with SAL */
-	if ((rc = ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_WAKEUP,
-					 SAL_MC_PARAM_MECHANISM_INT,
-					 IA64_MCA_WAKEUP_VECTOR,
-					 0, 0)))
-	{
+	isrv = ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_WAKEUP,
+				      SAL_MC_PARAM_MECHANISM_INT,
+				      IA64_MCA_WAKEUP_VECTOR,
+				      0, 0);
+	rc = isrv.status;
+	if (rc) {
 		printk(KERN_ERR "ia64_mca_init: Failed to register wakeup interrupt with SAL.  "
 		       "rc = %ld\n", rc);
 		return;
@@ -924,6 +974,9 @@ ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
 void
 ia64_return_to_sal_check(void)
 {
+	pal_processor_state_info_t *psp = (pal_processor_state_info_t *)
+		&ia64_sal_to_os_handoff_state.proc_state_param;
+
 	/* Copy over some relevant stuff from the sal_to_os_mca_handoff
 	 * so that it can be used at the time of os_mca_to_sal_handoff
 	 */
@@ -933,14 +986,22 @@ ia64_return_to_sal_check(void)
 	ia64_os_to_sal_handoff_state.imots_sal_check_ra =
 		ia64_sal_to_os_handoff_state.imsto_sal_check_ra;
 
-	/* Cold Boot for uncorrectable MCA */
-	ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_COLD_BOOT;
+	/*
+	 * Did we correct the error? At the moment the only error that
+	 * we fix is a TLB error, if any other kind of error occurred
+	 * we must reboot.
+	 */
+	if (psp->cc == 1 && psp->bc == 1 && psp->rc == 1 && psp->uc == 1)
+		ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_COLD_BOOT;
+	else
+		ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_CORRECTED;
 
 	/* Default = tell SAL to return to same context */
 	ia64_os_to_sal_handoff_state.imots_context = IA64_MCA_SAME_CONTEXT;
 
 	ia64_os_to_sal_handoff_state.imots_new_min_state =
 		(u64 *)ia64_sal_to_os_handoff_state.pal_min_state;
+
 }
 
 /*
@@ -982,6 +1043,9 @@ ia64_mca_ucmc_handler(void)
 	/* Return to SAL */
 	ia64_return_to_sal_check();
 }
+
+static DECLARE_WORK(cmc_disable_work, ia64_mca_cmc_vector_disable_keventd, NULL);
+static DECLARE_WORK(cmc_enable_work, ia64_mca_cmc_vector_enable_keventd, NULL);
 
 /*
  * ia64_mca_cmc_int_handler
@@ -1029,14 +1093,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 
 			cmc_polling_enabled = 1;
 			spin_unlock(&cmc_history_lock);
-
-			/*
-			 * We rely on the local_irq_enable() above so
-			 * that this can't deadlock.
-			 */
-			ia64_mca_cmc_vector_disable(NULL);
-
-			smp_call_function(ia64_mca_cmc_vector_disable, NULL, 1, 0);
+			schedule_work(&cmc_disable_work);
 
 			/*
 			 * Corrected errors will still be corrected, but
@@ -1131,19 +1188,7 @@ ia64_mca_cmc_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 		if (start_count == IA64_LOG_COUNT(SAL_INFO_TYPE_CMC)) {
 
 			printk(KERN_WARNING "%s: Returning to interrupt driven CMC handler\n", __FUNCTION__);
-
-			/*
-			 * The cmc interrupt handler enabled irqs, so
-			 * this can't deadlock.
-			 */
-			smp_call_function(ia64_mca_cmc_vector_enable, NULL, 1, 0);
-
-			/*
-			 * Turn off interrupts before re-enabling the
-			 * cmc vector locally.  Make sure we get out.
-			 */
-			local_irq_disable();
-			ia64_mca_cmc_vector_enable(NULL);
+			schedule_work(&cmc_enable_work);
 			cmc_polling_enabled = 0;
 
 		} else {
@@ -1399,12 +1444,12 @@ ia64_log_init(int sal_info_type)
  *	Get the current MCA log from SAL and copy it into the OS log buffer.
  *
  *  Inputs  :   info_type   (SAL_INFO_TYPE_{MCA,INIT,CMC,CPE})
- *              prfunc      (fn ptr of log output function)
  *  Outputs :   size        (total record length)
+ *              *buffer     (ptr to error record)
  *
  */
-u64
-ia64_log_get(int sal_info_type, prfunc_t prfunc)
+static u64
+ia64_log_get(int sal_info_type, u8 **buffer)
 {
 	sal_log_record_header_t     *log_buffer;
 	u64                         total_len = 0;
@@ -1422,6 +1467,7 @@ ia64_log_get(int sal_info_type, prfunc_t prfunc)
 		IA64_LOG_UNLOCK(sal_info_type);
 		IA64_MCA_DEBUG("ia64_log_get: SAL error record type %d retrieved. "
 			       "Record length = %ld\n", sal_info_type, total_len);
+		*buffer = (u8 *) log_buffer;
 		return total_len;
 	} else {
 		IA64_LOG_UNLOCK(sal_info_type);
@@ -1466,7 +1512,7 @@ ia64_log_prt_oem_data (int header_len, int sect_len, u8 *p_data, prfunc_t prfunc
 void
 ia64_log_rec_header_print (sal_log_record_header_t *lh, prfunc_t prfunc)
 {
-	prfunc("+Err Record ID: %d    SAL Rev: %2x.%02x\n", lh->id,
+	prfunc("+Err Record ID: %ld    SAL Rev: %2x.%02x\n", lh->id,
 			lh->revision.major, lh->revision.minor);
 	prfunc("+Time: %02x/%02x/%02x%02x %02x:%02x:%02x    Severity %d\n",
 			lh->timestamp.slh_month, lh->timestamp.slh_day,
@@ -1589,13 +1635,13 @@ ia64_log_cache_check_info_print (int                      i,
 	if (info->dl)
 		prfunc(" Line: Data,");
 	prfunc(" Operation: %s,", pal_cache_op[info->op]);
-	if (info->wv)
+	if (info->wiv)
 		prfunc(" Way: %d,", info->way);
 	if (cache_check_info->valid.target_identifier)
 		/* Hope target address is saved in target_identifier */
 		if (info->tv)
 			prfunc(" Target Addr: 0x%lx,", target_addr);
-	if (info->mc)
+	if (info->mcc)
 		prfunc(" MC: Corrected");
 	prfunc("\n");
 }
@@ -1631,13 +1677,13 @@ ia64_log_tlb_check_info_print (int                      i,
 		prfunc("  Failure: Data Translation Cache");
 	if (info->itr) {
 		prfunc("  Failure: Instruction Translation Register");
-		prfunc(" ,Slot: %d", info->tr_slot);
+		prfunc(" ,Slot: %ld", info->tr_slot);
 	}
 	if (info->dtr) {
 		prfunc("  Failure: Data Translation Register");
-		prfunc(" ,Slot: %d", info->tr_slot);
+		prfunc(" ,Slot: %ld", info->tr_slot);
 	}
-	if (info->mc)
+	if (info->mcc)
 		prfunc(" ,MC: Corrected");
 	prfunc("\n");
 }
@@ -1683,7 +1729,7 @@ ia64_log_bus_check_info_print (int                      i,
 		prfunc(" ,Error: Internal");
 	if (info->eb)
 		prfunc(" ,Error: External");
-	if (info->mc)
+	if (info->mcc)
 		prfunc(" ,MC: Corrected");
 	if (info->tv)
 		prfunc(" ,Target Address: 0x%lx", targ_addr);
@@ -1970,9 +2016,9 @@ ia64_log_plat_specific_err_info_print (sal_log_plat_specific_err_info_t *psei,
 		ia64_log_prt_guid(&psei->guid, prfunc);
 	}
 	if (psei->valid.oem_data) {
-		platform_plat_specific_err_print((int)psei->header.len,
-				      (int)sizeof(sal_log_plat_specific_err_info_t) - 1,
-				      &(psei->oem_data[0]), prfunc);
+		platform_plat_specific_err_print((int) psei->header.len,
+				      (char *) psei->oem_data - (char *) psei,
+				      &psei->oem_data[0], prfunc);
 	}
 	prfunc("\n");
 }
@@ -2352,13 +2398,12 @@ ia64_log_print(int sal_info_type, prfunc_t prfunc)
 
 	switch(sal_info_type) {
 	      case SAL_INFO_TYPE_MCA:
-		prfunc("+BEGIN HARDWARE ERROR STATE AT MCA\n");
-		platform_err = ia64_log_platform_info_print(IA64_LOG_CURR_BUFFER(sal_info_type),
-							    prfunc);
-		prfunc("+END HARDWARE ERROR STATE AT MCA\n");
+		prfunc("+CPU %d: SAL log contains MCA error record\n", smp_processor_id());
+		ia64_log_rec_header_print(IA64_LOG_CURR_BUFFER(sal_info_type), prfunc);
 		break;
 	      case SAL_INFO_TYPE_INIT:
-		prfunc("+MCA INIT ERROR LOG (UNIMPLEMENTED)\n");
+		prfunc("+CPU %d: SAL log contains INIT error record\n", smp_processor_id());
+		ia64_log_rec_header_print(IA64_LOG_CURR_BUFFER(sal_info_type), prfunc);
 		break;
 	      case SAL_INFO_TYPE_CMC:
 		prfunc("+BEGIN HARDWARE ERROR STATE AT CMC\n");

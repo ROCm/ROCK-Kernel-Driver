@@ -34,6 +34,8 @@
 
 #include <asm/hardware/sa1111.h>
 
+extern void __init sa1110_mb_enable(void);
+
 /*
  * We keep the following data for the overall SA1111.  Note that the
  * struct device and struct resource are "fake"; they should be supplied
@@ -561,6 +563,8 @@ sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
 	dev->res.name    = dev->dev.bus_id;
 	dev->res.flags   = IORESOURCE_MEM;
 	dev->mapbase     = sachip->base + info->offset;
+	dev->skpcr_mask  = info->skpcr_mask;
+	memmove(dev->irq, info->irq, sizeof(dev->irq));
 
 	ret = request_resource(parent, &dev->res);
 	if (ret) {

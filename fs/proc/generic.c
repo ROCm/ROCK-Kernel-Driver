@@ -567,12 +567,12 @@ struct proc_dir_entry *proc_symlink(const char *name,
 	return ent;
 }
 
-struct proc_dir_entry *proc_mkdir(const char *name, struct proc_dir_entry *parent)
+struct proc_dir_entry *proc_mkdir_mode(const char *name, mode_t mode,
+		struct proc_dir_entry *parent)
 {
 	struct proc_dir_entry *ent;
 
-	ent = proc_create(&parent,name,
-			  (S_IFDIR | S_IRUGO | S_IXUGO),2);
+	ent = proc_create(&parent, name, S_IFDIR | mode, 2);
 	if (ent) {
 		ent->proc_fops = &proc_dir_operations;
 		ent->proc_iops = &proc_dir_inode_operations;
@@ -583,6 +583,12 @@ struct proc_dir_entry *proc_mkdir(const char *name, struct proc_dir_entry *paren
 		}
 	}
 	return ent;
+}
+
+struct proc_dir_entry *proc_mkdir(const char *name,
+		struct proc_dir_entry *parent)
+{
+	return proc_mkdir_mode(name, S_IRUGO | S_IXUGO, parent);
 }
 
 struct proc_dir_entry *create_proc_entry(const char *name, mode_t mode,

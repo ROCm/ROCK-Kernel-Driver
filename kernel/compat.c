@@ -22,14 +22,14 @@
 
 #include <asm/uaccess.h>
 
-int get_compat_timespec(struct timespec *ts, struct compat_timespec *cts)
+int get_compat_timespec(struct timespec *ts, const struct compat_timespec *cts)
 {
 	return (verify_area(VERIFY_READ, cts, sizeof(*cts)) ||
 			__get_user(ts->tv_sec, &cts->tv_sec) ||
 			__get_user(ts->tv_nsec, &cts->tv_nsec)) ? -EFAULT : 0;
 }
 
-int put_compat_timespec(struct timespec *ts, struct compat_timespec *cts)
+int put_compat_timespec(struct timespec *ts, const struct compat_timespec *cts)
 {
 	return (verify_area(VERIFY_WRITE, cts, sizeof(*cts)) ||
 			__put_user(ts->tv_sec, &cts->tv_sec) ||
@@ -204,7 +204,8 @@ asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t *set,
 	ret = sys_sigprocmask(how, set ? &s : NULL, oset ? &s : NULL);
 	set_fs(old_fs);
 	if (ret == 0)
-		ret = put_user(s, oset);
+		if (oset)
+			ret = put_user(s, oset);
 	return ret;
 }
 

@@ -785,15 +785,23 @@ int main(int ac, char **av)
 	} while (stat < 0);
 
 	if (stat == 0) {
-		conf_write(NULL);
+		if (conf_write(NULL)) {
+			fprintf(stderr, "\n\n"
+				"Error during writing of the kernel configuration.\n"
+				"Your kernel configuration changes were NOT saved."
+				"\n\n");
+			return 1;
+		}
 		printf("\n\n"
 			"*** End of Linux kernel configuration.\n"
 			"*** Execute 'make' to build the kernel or try 'make help'."
 			"\n\n");
-	} else
-		printf("\n\n"
+	} else {
+		fprintf(stderr, "\n\n"
 			"Your kernel configuration changes were NOT saved."
 			"\n\n");
+		return 1;
+	}
 
 	return 0;
 }

@@ -419,9 +419,8 @@ static ssize_t pcwd_write(struct file *file, const char *buf, size_t len,
 			}
 		}
 		pcwd_send_heartbeat();
-		return 1;
 	}
-	return 0;
+	return len;
 }
 
 static int pcwd_open(struct inode *ino, struct file *filep)

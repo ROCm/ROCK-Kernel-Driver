@@ -29,6 +29,7 @@
 	8233
 	8233A (0x3147 and 0x3177)
 	8235
+	8237
    Note: we assume there can only be one device, with one SMBus interface.
 */
 
@@ -430,6 +431,13 @@ static struct pci_device_id vt596_ids[] = {
 	{
 		.vendor		= PCI_VENDOR_ID_VIA,
 		.device 	= PCI_DEVICE_ID_VIA_8235,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
+		.driver_data	= SMBBA3
+	},
+	{
+		.vendor		= PCI_VENDOR_ID_VIA,
+		.device 	= PCI_DEVICE_ID_VIA_8237,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
 		.driver_data	= SMBBA3

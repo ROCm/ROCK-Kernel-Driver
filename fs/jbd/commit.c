@@ -177,8 +177,14 @@ void journal_commit_transaction(journal_t *journal)
 		 * leave undo-committed data.
 		 */
 		if (jh->b_committed_data) {
-			kfree(jh->b_committed_data);
-			jh->b_committed_data = NULL;
+			struct buffer_head *bh = jh2bh(jh);
+
+			jbd_lock_bh_state(bh);
+			if (jh->b_committed_data) {
+				kfree(jh->b_committed_data);
+				jh->b_committed_data = NULL;
+			}
+			jbd_unlock_bh_state(bh);
 		}
 		journal_refile_buffer(journal, jh);
 	}
@@ -264,6 +270,16 @@ write_out_data_locked:
 				jbd_unlock_bh_state(bh);
 				journal_remove_journal_head(bh);
 				__brelse(bh);
+				if (need_resched() && commit_transaction->
+							t_sync_datalist) {
+					commit_transaction->t_sync_datalist =
+								next_jh;
+					if (bufs)
+						break;
+					spin_unlock(&journal->j_list_lock);
+					cond_resched();
+					goto write_out_data;
+				}
 			}
 		}
 		if (bufs == ARRAY_SIZE(wbuf)) {
@@ -284,8 +300,7 @@ write_out_data_locked:
 		cond_resched();
 		journal_brelse_array(wbuf, bufs);
 		spin_lock(&journal->j_list_lock);
-		if (bufs)
-			goto write_out_data_locked;
+		goto write_out_data_locked;
 	}
 
 	/*

@@ -420,7 +420,7 @@ transfer:	no
 prototypes:
 	void (*open)(struct vm_area_struct*);
 	void (*close)(struct vm_area_struct*);
-	struct page *(*nopage)(struct vm_area_struct*, unsigned long, int);
+	struct page *(*nopage)(struct vm_area_struct*, unsigned long, int *);
 
 locking rules:
 		BKL	mmap_sem

@@ -45,10 +45,65 @@ static void dump_registers(struct saa7146_dev* dev)
 #endif
 
 /****************************************************************************
+ * gpio and debi helper functions
+ ****************************************************************************/
+
+/* write "data" to the gpio-pin "pin" */
+void saa7146_set_gpio(struct saa7146_dev *dev, u8 pin, u8 data)
+{
+	u32 value = 0;
+
+	/* sanity check */
+	if(pin > 3)
+		return;
+
+	/* read old register contents */
+	value = saa7146_read(dev, GPIO_CTRL );
+	
+	value &= ~(0xff << (8*pin));
+	value |= (data << (8*pin));
+
+	saa7146_write(dev, GPIO_CTRL, value);
+}
+
+/* This DEBI code is based on the saa7146 Stradis driver by Nathan Laredo */
+int saa7146_wait_for_debi_done(struct saa7146_dev *dev)
+{
+	int start;
+
+	/* wait for registers to be programmed */
+	start = jiffies;
+	while (1) {
+                if (saa7146_read(dev, MC2) & 2)
+                        break;
+		if (jiffies-start > HZ/20) {
+			DEB_S(("timed out while waiting for registers getting programmed\n"));
+			return -ETIMEDOUT;
+		}
+	}
+
+	/* wait for transfer to complete */
+	start = jiffies;
+	while (1) {
+		if (!(saa7146_read(dev, PSR) & SPCI_DEBI_S))
+			break;
+		saa7146_read(dev, MC2);
+		if (jiffies-start > HZ/4) {
+			DEB_S(("timed out while waiting for transfer completion\n"));
+			return -ETIMEDOUT;
+		}
+	}
+
+	return 0;
+}
+
+/****************************************************************************
  * general helper functions
  ****************************************************************************/
 
-/* this is videobuf_vmalloc_to_sg() from video-buf.c */
+/* this is videobuf_vmalloc_to_sg() from video-buf.c 
+   make sure virt has been allocated with vmalloc_32(), otherwise the BUG()
+   may be triggered on highmem machines */
 static struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
 {
 	struct scatterlist *sglist;
@@ -84,7 +139,7 @@ char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa
 {
 	struct scatterlist *slist = NULL;
 	int pages = (length+PAGE_SIZE-1)/PAGE_SIZE;
-	char *mem = vmalloc(length);
+	char *mem = vmalloc_32(length);
 	int slen = 0;
 
 	if (NULL == mem) {
@@ -103,7 +158,9 @@ char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa
 	}
 	
 	slen = pci_map_sg(pci,slist,pages,PCI_DMA_FROMDEVICE);
-	saa7146_pgtable_build_single(pci, pt, slist, slen);
+	if (0 != saa7146_pgtable_build_single(pci, pt, slist, slen)) {
+		return NULL;
+	}
 
 	/* fixme: here's a memory leak: slist never gets freed by any other
 	   function ...*/
@@ -139,7 +196,7 @@ int saa7146_pgtable_alloc(struct pci_dev *pci, struct saa7146_pgtable *pt)
 	return 0;
 }
 
-void saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt,
+int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt,
 	struct scatterlist *list, int sglen  )
 {
 	u32   *ptr, fill;
@@ -148,6 +205,11 @@ void saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *p
 
 	BUG_ON( 0 == sglen);
 
+	if (list->offset > PAGE_SIZE) {
+		DEB_D(("offset > PAGE_SIZE. this should not happen."));
+		return -EINVAL;
+	}
+	
 	/* if we have a user buffer, the first page may not be
 	   aligned to a page boundary. */
 	pt->offset = list->offset;
@@ -177,6 +239,7 @@ void saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *p
 		printk("ptr1 %d: 0x%08x\n",i,ptr[i]);
 	}
 */
+	return 0;
 }
 
 /********************************************************************************/
@@ -322,7 +385,7 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	saa7146_write(dev, MC1, MASK_31);
 */
 
-	/* disable alle irqs */
+	/* disable all irqs */
 	saa7146_write(dev, IER, 0);
 
 	/* shut down all dma transfers */
@@ -381,8 +444,8 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	dev->module = THIS_MODULE;
 	init_waitqueue_head(&dev->i2c_wq);
 
-	/* set some default values */
-	saa7146_write(dev, BCS_CTRL, 0x80400040);
+	/* set some sane pci arbitrition values */
+	saa7146_write(dev, PCI_BT_V1, 0x1c00101f); 
 
 	if( 0 != ext->probe) {
 		if( 0 != ext->probe(dev) ) {
@@ -508,6 +571,7 @@ EXPORT_SYMBOL_GPL(saa7146_pgtable_alloc);
 EXPORT_SYMBOL_GPL(saa7146_pgtable_free);
 EXPORT_SYMBOL_GPL(saa7146_pgtable_build_single);
 EXPORT_SYMBOL_GPL(saa7146_vmalloc_build_pgtable);
+EXPORT_SYMBOL_GPL(saa7146_wait_for_debi_done);
 
 EXPORT_SYMBOL_GPL(saa7146_setgpio);
 

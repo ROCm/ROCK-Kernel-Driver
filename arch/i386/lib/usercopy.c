@@ -541,8 +541,10 @@ survive:
 				goto survive;
 			}
 
-			if (retval != 1)
+			if (retval != 1) {
+				up_read(&current->mm->mmap_sem);
 		       		break;
+		       	}
 
 			maddr = kmap_atomic(pg, KM_USER0);
 			memcpy(maddr + offset, from, len);

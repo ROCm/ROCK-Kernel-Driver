@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#232 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#235 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -293,7 +293,7 @@ static adapter_tag_info_t aic7xxx_tag_info[] =
 #define AIC7XXX_CONFIGED_DV -1
 #endif
 
-static uint8_t aic7xxx_dv_settings[] =
+static int8_t aic7xxx_dv_settings[] =
 {
 	AIC7XXX_CONFIGED_DV,
 	AIC7XXX_CONFIGED_DV,
@@ -391,9 +391,9 @@ static uint32_t aic7xxx_pci_parity = ~0;
  * would result in never finding any devices :)
  */
 #ifndef CONFIG_AIC7XXX_PROBE_EISA_VL
-static uint32_t aic7xxx_probe_eisa_vl;
+uint32_t aic7xxx_probe_eisa_vl;
 #else
-static uint32_t aic7xxx_probe_eisa_vl = ~0;
+uint32_t aic7xxx_probe_eisa_vl = ~0;
 #endif
 
 /*
@@ -752,7 +752,6 @@ ahc_linux_map_seg(struct ahc_softc *ahc, struct scb *scb,
 
 /************************  Host template entry points *************************/
 static int	   ahc_linux_detect(Scsi_Host_Template *);
-static int	   ahc_linux_release(struct Scsi_Host *);
 static int	   ahc_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 static const char *ahc_linux_info(struct Scsi_Host *);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
@@ -765,6 +764,7 @@ static int	   ahc_linux_biosparam(struct scsi_device*,
 				       sector_t, int[]);
 #endif
 #else
+static int	   ahc_linux_release(struct Scsi_Host *);
 static void	   ahc_linux_select_queue_depth(struct Scsi_Host *host,
 						Scsi_Device *scsi_devs);
 #if defined(__i386__)
@@ -895,8 +895,9 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	ahc_linux_pci_init();
 #endif
 
-	if (aic7xxx_probe_eisa_vl != 0)
-		aic7770_linux_probe(template);
+#ifdef CONFIG_EISA
+	ahc_linux_eisa_init();
+#endif
 
 	/*
 	 * Register with the SCSI layer all
@@ -915,6 +916,7 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	return (found);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 /*
  * Free the passed in Scsi_Host memory structures prior to unloading the
  * module.
@@ -946,6 +948,7 @@ ahc_linux_release(struct Scsi_Host * host)
 	ahc_list_unlock(&l);
 	return (0);
 }
+#endif
 
 /*
  * Return a string describing the driver.
@@ -4137,6 +4140,16 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 			}
 #endif
 			ahc_set_transaction_status(scb, CAM_UNCOR_PARITY);
+#ifdef AHC_REPORT_UNDERFLOWS
+		/*
+		 * This code is disabled by default as some
+		 * clients of the SCSI system do not properly
+		 * initialize the underflow parameter.  This
+		 * results in spurious termination of commands
+		 * that complete as expected (e.g. underflow is
+		 * allowed as command can return variable amounts
+		 * of data.
+		 */
 		} else if (amount_xferred < scb->io_ctx->underflow) {
 			u_int i;
 
@@ -4151,6 +4164,7 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 				ahc_get_residual(scb),
 				ahc_get_transfer_length(scb));
 			ahc_set_transaction_status(scb, CAM_DATA_RUN_ERR);
+#endif
 		} else {
 			ahc_set_transaction_status(scb, CAM_REQ_CMP);
 		}
@@ -5082,26 +5096,20 @@ ahc_linux_exit(void)
 		ahc_linux_kill_dv_thread(ahc);
 	}
 	ahc_list_unlock(&l);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 
-	ahc_linux_pci_exit();
-
-	/*
-	 * Get rid of the non-pci devices.  
-	 *
-	 * XXX(hch): switch over eisa support to new LDM-based API
-	 */
-	TAILQ_FOREACH(ahc, &ahc_tailq, links)
-		ahc_linux_release(ahc->platform_data->host);
-#else
-	scsi_unregister_module(MODULE_SCSI_HA, &aic7xxx_driver_template);
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	/*
 	 * In 2.4 we have to unregister from the PCI core _after_
 	 * unregistering from the scsi midlayer to avoid dangling
 	 * references.
 	 */
+	scsi_unregister_module(MODULE_SCSI_HA, &aic7xxx_driver_template);
+#endif
+#ifdef CONFIG_PCI
 	ahc_linux_pci_exit();
+#endif
+#ifdef CONFIG_EISA
+	ahc_linux_eisa_exit();
 #endif
 }
 

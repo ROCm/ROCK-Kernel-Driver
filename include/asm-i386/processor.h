@@ -407,6 +407,7 @@ struct thread_struct {
 /* cached TLS descriptors. */
 	struct desc_struct tls_array[GDT_ENTRY_TLS_ENTRIES];
 	unsigned long	esp0;
+	unsigned long	sysenter_cs;
 	unsigned long	eip;
 	unsigned long	esp;
 	unsigned long	fs;
@@ -428,6 +429,7 @@ struct thread_struct {
 
 #define INIT_THREAD  {							\
 	.vm86_info = NULL,						\
+	.sysenter_cs = __KERNEL_CS,					\
 	.io_bitmap_ptr = NULL,						\
 }
 
@@ -447,21 +449,13 @@ struct thread_struct {
 	.io_bitmap	= { [ 0 ... IO_BITMAP_LONGS] = ~0 },		\
 }
 
-static inline void load_esp0(struct tss_struct *tss, unsigned long esp0)
+static inline void load_esp0(struct tss_struct *tss, struct thread_struct *thread)
 {
-	tss->esp0 = esp0;
+	tss->esp0 = thread->esp0;
 	/* This can only happen when SEP is enabled, no need to test "SEP"arately */
-	if ((unlikely(tss->ss1 != __KERNEL_CS))) {
-		tss->ss1 = __KERNEL_CS;
-		wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
-	}
-}
-
-static inline void disable_sysenter(struct tss_struct *tss)
-{
-	if (cpu_has_sep)  {
-		tss->ss1 = 0;
-		wrmsr(MSR_IA32_SYSENTER_CS, 0, 0);
+	if (unlikely(tss->ss1 != thread->sysenter_cs)) {
+		tss->ss1 = thread->sysenter_cs;
+		wrmsr(MSR_IA32_SYSENTER_CS, thread->sysenter_cs, 0);
 	}
 }
 
