@@ -704,10 +704,11 @@ void _csr1212_destroy_keyval(struct csr1212_keyval *kv)
 			if (k->key.type == CSR1212_KV_TYPE_DIRECTORY) {
 				/* If the current entry is a directory, then move all
 				 * the entries to the destruction list. */
-				tail->next = k->value.directory.dentries_head;
-				if (k->value.directory.dentries_head)
+				if (k->value.directory.dentries_head) {
+					tail->next = k->value.directory.dentries_head;
 					k->value.directory.dentries_head->prev = tail;
-				tail = k->value.directory.dentries_tail;
+					tail = k->value.directory.dentries_tail;
+                                }
 			}
 			free_keyval(k);
 			k = a;
