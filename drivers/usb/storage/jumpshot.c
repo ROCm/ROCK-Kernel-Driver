@@ -48,7 +48,6 @@
   */
 
 #include "transport.h"
-#include "raw_bulk.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
@@ -111,15 +110,14 @@ static int jumpshot_read_data(struct us_data *us,
 			      struct jumpshot_info *info,
 			      u32 sector,
 			      u32 sectors, 
-			      unsigned char *dest, 
+			      unsigned char *buffer, 
 			      int use_sg)
 {
 	unsigned char *command = us->iobuf;
-	unsigned char *buffer = NULL;
-	unsigned char *ptr;
 	unsigned char  thistime;
-	int totallen, len, result;
-	int sg_idx = 0, current_sg_offset = 0;
+	unsigned int totallen, alloclen;
+	int len, result;
+	unsigned int sg_idx = 0, sg_offset = 0;
 
 	// we're working in LBA mode.  according to the ATA spec, 
 	// we can support up to 28-bit addressing.  I don't know if Jumpshot
@@ -131,20 +129,20 @@ static int jumpshot_read_data(struct us_data *us,
 
 	totallen = sectors * info->ssize;
 
+	// Since we don't read more than 64 KB at a time, we have to create
+	// a bounce buffer if the transfer uses scatter-gather.
+
+	alloclen = min(totallen, 65536u);
+	if (use_sg) {
+		buffer = kmalloc(alloclen, GFP_NOIO);
+		if (buffer == NULL)
+			return USB_STOR_TRANSPORT_ERROR;
+	}
+
 	do {
 		// loop, never allocate or transfer more than 64k at once
 		// (min(128k, 255*info->ssize) is the real limit)
-		len = min_t(int, totallen, 65536);
-
-		if (use_sg) {
-			buffer = kmalloc(len, GFP_NOIO);
-			if (buffer == NULL)
-				return USB_STOR_TRANSPORT_ERROR;
-			ptr = buffer;
-		} else {
-			ptr = dest;
-		}
-
+		len = min(totallen, alloclen);
 		thistime = (len / info->ssize) & 0xff;
 
 		command[0] = 0;
@@ -163,26 +161,24 @@ static int jumpshot_read_data(struct us_data *us,
 			goto leave;
 
 		// read the result
-		result = jumpshot_bulk_read(us, ptr, len);
+		result = jumpshot_bulk_read(us, buffer, len);
 		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
 		US_DEBUGP("jumpshot_read_data:  %d bytes\n", len);
-	
-		sectors -= thistime;
-		sector  += thistime;
 
-		if (use_sg) {
-			us_copy_to_sgbuf(buffer, len, dest,
-					 &sg_idx, &current_sg_offset, use_sg);
-			kfree(buffer);
-		} else {
-			dest += len;
-		}
+		if (use_sg)
+			usb_stor_access_xfer_buf(buffer, len, us->srb,
+					 &sg_idx, &sg_offset, TO_XFER_BUF);
+		else
+			buffer += len;
 
+		sector += thistime;
 		totallen -= len;
 	} while (totallen > 0);
 
+	if (use_sg)
+		kfree(buffer);
 	return USB_STOR_TRANSPORT_GOOD;
 
  leave:
@@ -196,15 +192,14 @@ static int jumpshot_write_data(struct us_data *us,
 			       struct jumpshot_info *info,
 			       u32 sector,
 			       u32 sectors, 
-			       unsigned char *src, 
+			       unsigned char *buffer, 
 			       int use_sg)
 {
 	unsigned char *command = us->iobuf;
-	unsigned char *buffer = NULL;
-	unsigned char *ptr;
 	unsigned char  thistime;
-	int totallen, len, result, waitcount;
-	int sg_idx = 0, sg_offset = 0;
+	unsigned int totallen, alloclen;
+	int len, result, waitcount;
+	unsigned int sg_idx = 0, sg_offset = 0;
 
 	// we're working in LBA mode.  according to the ATA spec, 
 	// we can support up to 28-bit addressing.  I don't know if Jumpshot
@@ -216,23 +211,26 @@ static int jumpshot_write_data(struct us_data *us,
 
 	totallen = sectors * info->ssize;
 
+	// Since we don't write more than 64 KB at a time, we have to create
+	// a bounce buffer if the transfer uses scatter-gather.
+
+	alloclen = min(totallen, 65536u);
+	if (use_sg) {
+		buffer = kmalloc(alloclen, GFP_NOIO);
+		if (buffer == NULL)
+			return USB_STOR_TRANSPORT_ERROR;
+	}
+
 	do {
 		// loop, never allocate or transfer more than 64k at once
 		// (min(128k, 255*info->ssize) is the real limit)
 
-		len = min_t(int, totallen, 65536);
-
-		// if we are using scatter-gather,
-		// first copy all to one big buffer
-
-		buffer = us_copy_from_sgbuf(src, len, &sg_idx,
-					    &sg_offset, use_sg);
-		if (buffer == NULL)
-			return USB_STOR_TRANSPORT_ERROR;
-
-		ptr = buffer;
-
+		len = min(totallen, alloclen);
 		thistime = (len / info->ssize) & 0xff;
+
+		if (use_sg)
+			usb_stor_access_xfer_buf(buffer, len, us->srb,
+					&sg_idx, &sg_offset, FROM_XFER_BUF);
 
 		command[0] = 0;
 		command[1] = thistime;
@@ -250,7 +248,7 @@ static int jumpshot_write_data(struct us_data *us,
 			goto leave;
 
 		// send the data
-		result = jumpshot_bulk_write(us, ptr, len);
+		result = jumpshot_bulk_write(us, buffer, len);
 		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
@@ -269,18 +267,16 @@ static int jumpshot_write_data(struct us_data *us,
 
 		if (result != USB_STOR_TRANSPORT_GOOD)
 			US_DEBUGP("jumpshot_write_data:  Gah!  Waitcount = 10.  Bad write!?\n");
-		
-		sectors -= thistime;
-		sector  += thistime;
 
-		if (use_sg)
-			kfree(buffer);
-		else
-			src += len;
+		if (!use_sg)
+			buffer += len;
 
+		sector += thistime;
 		totallen -= len;
 	} while (totallen > 0);
 
+	if (use_sg)
+		kfree(buffer);
 	return result;
 
  leave:
@@ -605,14 +601,14 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 		US_DEBUGP("jumpshot_transport:  MODE_SENSE_10 detected\n");
 		return jumpshot_handle_mode_sense(us, srb, ptr, FALSE);
 	}
-	
+
 	if (srb->cmnd[0] == ALLOW_MEDIUM_REMOVAL) {
 		// sure.  whatever.  not like we can stop the user from popping
 		// the media out of the device (no locking doors, etc)
 		//
 		return USB_STOR_TRANSPORT_GOOD;
 	}
-	
+
 	if (srb->cmnd[0] == START_STOP) {
 		/* this is used by sd.c'check_scsidisk_media_change to detect
 		   media change */
