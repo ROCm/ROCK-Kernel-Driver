@@ -88,6 +88,7 @@ extern int smc_init( struct net_device * );
 extern int sgiseeq_probe(struct net_device *);
 extern int atarilance_probe(struct net_device *);
 extern int sun3lance_probe(struct net_device *);
+extern int sun3_82586_probe(struct net_device *);
 extern int apne_probe(struct net_device *);
 extern int bionet_probe(struct net_device *);
 extern int pamsnet_probe(struct net_device *);
@@ -333,6 +334,9 @@ static struct devprobe m68k_probes[] __initdata = {
 #endif
 #ifdef CONFIG_SUN3LANCE         /* sun3 onboard Lance chip */
 	{sun3lance_probe, 0},
+#endif
+#ifdef CONFIG_SUN3_82586        /* sun3 onboard Intel 82586 chip */
+	{sun3_82586_probe, 0},
 #endif
 #ifdef CONFIG_APNE		/* A1200 PCMCIA NE2000 */
 	{apne_probe, 0},
