@@ -114,10 +114,11 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 void switch_mm(struct mm_struct *prev, struct mm_struct *next, 
 	       struct task_struct *tsk)
 {
-	unsigned cpu = smp_processor_id();
+	int cpu = smp_processor_id();
+
 	if (prev != next) 
-		clear_bit(cpu, &prev->cpu_vm_mask);
-	set_bit(cpu, &next->cpu_vm_mask);
+		cpu_clear(cpu, prev->cpu_vm_mask);
+	cpu_set(cpu, next->cpu_vm_mask);
 }
 
 void set_current(void *t)

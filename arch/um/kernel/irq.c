@@ -18,6 +18,7 @@
 #include "linux/proc_fs.h"
 #include "linux/init.h"
 #include "linux/seq_file.h"
+#include "linux/profile.h"
 #include "asm/irq.h"
 #include "asm/hw_irq.h"
 #include "asm/hardirq.h"
