@@ -27,9 +27,6 @@ static inline int verify_area_skas(int type, const void * addr,
 	return(access_ok_skas(type, addr, size) ? 0 : -EFAULT);
 }
 
-extern void *um_virt_to_phys(struct task_struct *task, unsigned long virt,
-			     pte_t *pte_out);
-
 static inline unsigned long maybe_map(unsigned long virt, int is_write)
 {
 	pte_t pte;

@@ -31,7 +31,6 @@ struct port_list {
 
 struct port_dev {
 	struct port_list *port;
-	int fd;
 	int helper_pid;
 	int telnetd_pid;
 };
@@ -50,12 +49,13 @@ static void pipe_interrupt(int irq, void *data, struct pt_regs *regs)
 	struct connection *conn = data;
 	int fd;
 
-	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
+ 	fd = os_rcv_fd(conn->socket[0], &conn->helper_pid);
 	if(fd < 0){
 		if(fd == -EAGAIN)
 			return;
 
-		printk("os_rcv_fd returned %d\n", -fd);
+		printk(KERN_ERR "pipe_interrupt : os_rcv_fd returned %d\n", 
+		       -fd);
 		os_close_file(conn->fd);
 	}
 
@@ -75,37 +75,42 @@ static int port_accept(struct port_list *port)
 	fd = port_connection(port->fd, socket, &pid);
 	if(fd < 0){
 		if(fd != -EAGAIN)
-			printk("port_connection returned %d\n", -fd);
+			printk(KERN_ERR "port_accept : port_connection "
+			       "returned %d\n", -fd);
 		goto out;
 	}
 
 	conn = kmalloc(sizeof(*conn), GFP_ATOMIC);
 	if(conn == NULL){
-		printk("port_interrupt : failed to allocate connection\n");
+		printk(KERN_ERR "port_accept : failed to allocate "
+		       "connection\n");
 		goto out_close;
 	}
 	*conn = ((struct connection) 
-		{ list :	LIST_HEAD_INIT(conn->list),
-		  fd :		fd,
-		  socket : 	{ socket[0], socket[1] },
-		  telnetd_pid :	pid,
-		  port :	port });
+		{ .list 	= LIST_HEAD_INIT(conn->list),
+		  .fd 		= fd,
+		  .socket  	= { socket[0], socket[1] },
+		  .telnetd_pid 	= pid,
+		  .port 	= port });
 
 	if(um_request_irq(TELNETD_IRQ, socket[0], IRQ_READ, pipe_interrupt, 
 			  SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 
 			  "telnetd", conn)){
-		printk(KERN_ERR "Failed to get IRQ for telnetd\n");
+		printk(KERN_ERR "port_accept : failed to get IRQ for "
+		       "telnetd\n");
 		goto out_free;
 	}
 
 	list_add(&conn->list, &port->pending);
-	return(1);
+	ret = 1;
+	goto out;
 
  out_free:
 	kfree(conn);
  out_close:
 	os_close_file(fd);
-	if(pid != -1) os_kill_process(pid, 0);
+	if(pid != -1) 
+		os_kill_process(pid, 0);
  out:
 	return(ret);
 } 
@@ -173,14 +178,15 @@ void *port_data(int port_num)
 	}
 
 	*port = ((struct port_list) 
-		{ list :	 	LIST_HEAD_INIT(port->list),
-		  has_connection :	0,
-		  sem :			__SEMAPHORE_INITIALIZER(port->sem, 0),
-		  lock :		SPIN_LOCK_UNLOCKED,
-		  port :	 	port_num,
-		  fd : 			fd,
-		  pending :		LIST_HEAD_INIT(port->pending),
-		  connections :		LIST_HEAD_INIT(port->connections) });
+		{ .list 	 	= LIST_HEAD_INIT(port->list),
+		  .has_connection 	= 0,
+		  .sem 			= __SEMAPHORE_INITIALIZER(port->sem, 
+								  0),
+		  .lock 		= SPIN_LOCK_UNLOCKED,
+		  .port 	 	= port_num,
+		  .fd  			= fd,
+		  .pending 		= LIST_HEAD_INIT(port->pending),
+		  .connections 		= LIST_HEAD_INIT(port->connections) });
 	list_add(&port->list, &ports);
 
  found:
@@ -190,9 +196,9 @@ void *port_data(int port_num)
 		goto out;
 	}
 
-	*dev = ((struct port_dev) { port : 		port,
-				    fd :		-1,
-				    helper_pid : 	-1 });
+	*dev = ((struct port_dev) { .port  		= port,
+				    .helper_pid  	= -1,
+				    .telnetd_pid  	= -1 });
 	goto out;
 
  out_free:
@@ -204,38 +210,16 @@ void *port_data(int port_num)
 	return(dev);
 }
 
-void port_remove_dev(void *d)
-{
-	struct port_dev *dev = d;
-
-  	if(dev->helper_pid != -1)
- 		os_kill_process(dev->helper_pid, 0);
- 	if(dev->telnetd_pid != -1)
- 		os_kill_process(dev->telnetd_pid, 0);
- 	dev->helper_pid = -1;
-}
-
-static void free_port(void)
-{
-	struct list_head *ele;
-	struct port_list *port;
-
-	list_for_each(ele, &ports){
-		port = list_entry(ele, struct port_list, list);
-		os_close_file(port->fd);
-	}
-}
-
-__uml_exitcall(free_port);
-
 int port_wait(void *data)
 {
 	struct port_dev *dev = data;
 	struct connection *conn;
 	struct port_list *port = dev->port;
+	int fd;
 
 	while(1){
-		if(down_interruptible(&port->sem)) return(-ERESTARTSYS);
+		if(down_interruptible(&port->sem))
+			return(-ERESTARTSYS);
 
 		spin_lock(&port->lock);
 
@@ -262,22 +246,47 @@ int port_wait(void *data)
 		kfree(conn);
 	}
 
-	dev->fd = conn->fd;
+	fd = conn->fd;
 	dev->helper_pid = conn->helper_pid;
 	dev->telnetd_pid = conn->telnetd_pid;
 	kfree(conn);
 
-	return(dev->fd);
+	return(fd);
+}
+
+void port_remove_dev(void *d)
+{
+	struct port_dev *dev = d;
+
+	if(dev->helper_pid != -1)
+		os_kill_process(dev->helper_pid, 0);
+	if(dev->telnetd_pid != -1)
+		os_kill_process(dev->telnetd_pid, 0);
+	dev->helper_pid = -1;
+	dev->telnetd_pid = -1;
 }
 
 void port_kern_free(void *d)
 {
 	struct port_dev *dev = d;
 
- 	if(dev->helper_pid != -1) os_kill_process(dev->helper_pid, 0);
- 	if(dev->telnetd_pid != -1) os_kill_process(dev->telnetd_pid, 0);
+	port_remove_dev(dev);
 	kfree(dev);
 }
+
+static void free_port(void)
+{
+	struct list_head *ele;
+	struct port_list *port;
+
+	list_for_each(ele, &ports){
+		port = list_entry(ele, struct port_list, list);
+		free_irq_by_fd(port->fd);
+		os_close_file(port->fd);
+	}
+}
+
+__uml_exitcall(free_port);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

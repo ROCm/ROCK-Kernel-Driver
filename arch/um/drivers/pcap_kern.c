@@ -27,12 +27,12 @@ void pcap_init(struct net_device *dev, void *data)
 	pri = dev->priv;
 	ppri = (struct pcap_data *) pri->user;
 	*ppri = ((struct pcap_data)
-		{ host_if :	init->host_if,
-		  promisc :	init->promisc,
-		  optimize :	init->optimize,
-		  filter :	init->filter,
-		  compiled :	NULL,
-		  pcap :	NULL });
+		{ .host_if 	= init->host_if,
+		  .promisc 	= init->promisc,
+		  .optimize 	= init->optimize,
+		  .filter 	= init->filter,
+		  .compiled 	= NULL,
+		  .pcap 	= NULL });
 }
 
 static int pcap_read(int fd, struct sk_buff **skb, 
@@ -51,10 +51,10 @@ static int pcap_write(int fd, struct sk_buff **skb, struct uml_net_private *lp)
 }
 
 static struct net_kern_info pcap_kern_info = {
-	init:			pcap_init,
-	protocol:		eth_protocol,
-	read:			pcap_read,
-	write:			pcap_write,
+	.init			= pcap_init,
+	.protocol		= eth_protocol,
+	.read			= pcap_read,
+	.write			= pcap_write,
 };
 
 int pcap_setup(char *str, char **mac_out, void *data)
@@ -64,10 +64,10 @@ int pcap_setup(char *str, char **mac_out, void *data)
 	int i;
 
 	*init = ((struct pcap_init)
-		{ host_if :	"eth0",
-		  promisc :	1,
-		  optimize :	0,
-		  filter :	NULL });
+		{ .host_if 	= "eth0",
+		  .promisc 	= 1,
+		  .optimize 	= 0,
+		  .filter 	= NULL });
 
 	remain = split_if_spec(str, &host_if, &init->filter, 
 			       &options[0], &options[1], NULL);
@@ -98,13 +98,13 @@ int pcap_setup(char *str, char **mac_out, void *data)
 }
 
 static struct transport pcap_transport = {
-	list :		LIST_HEAD_INIT(pcap_transport.list),
-	name :		"pcap",
-	setup : 	pcap_setup,
-	user :		&pcap_user_info,
-	kern :		&pcap_kern_info,
-	private_size :	sizeof(struct pcap_data),
-	setup_size :	sizeof(struct pcap_init),
+	.list 		= LIST_HEAD_INIT(pcap_transport.list),
+	.name 		= "pcap",
+	.setup  	= pcap_setup,
+	.user 		= &pcap_user_info,
+	.kern 		= &pcap_kern_info,
+	.private_size 	= sizeof(struct pcap_data),
+	.setup_size 	= sizeof(struct pcap_init),
 };
 
 static int register_pcap(void)
