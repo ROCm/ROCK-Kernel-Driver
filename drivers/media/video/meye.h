@@ -39,6 +39,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/pci.h>
+#include <linux/kfifo.h>
 
 /****************************************************************************/
 /* Motion JPEG chip registers                                               */
@@ -280,16 +281,8 @@ struct meye_grab_buffer {
 	unsigned long size;		/* size of jpg frame */
 };
 
-/* queues containing the buffer indices */
+/* size of kfifos containings buffer indices */
 #define MEYE_QUEUE_SIZE	MEYE_MAX_BUFNBRS
-struct meye_queue {
-	unsigned int head;		/* queue head */
-	unsigned int tail;		/* queue tail */
-	unsigned int len;		/* queue length */
-	spinlock_t s_lock;		/* spinlock protecting the queue */
-	wait_queue_head_t proc_list;	/* wait queue */
-	int buf[MEYE_QUEUE_SIZE];	/* queue contents */
-};
 
 /* Motion Eye device structure */
 struct meye {
@@ -306,13 +299,18 @@ struct meye {
 	dma_addr_t mchip_dmahandle;	/* mchip: dma handle to ptable toc */
 
 	unsigned char *grab_fbuffer;	/* capture framebuffer */
+	unsigned char *grab_temp;	/* temporary buffer */
 					/* list of buffers */
 	struct meye_grab_buffer grab_buffer[MEYE_MAX_BUFNBRS];
 
 	/* other */
 	struct semaphore lock;		/* semaphore for open/mmap... */
 
-	struct meye_queue grabq;	/* queue for buffers to be grabbed */
+	struct kfifo *grabq;		/* queue for buffers to be grabbed */
+	spinlock_t grabq_lock;		/* lock protecting the queue */
+	struct kfifo *doneq;		/* queue for grabbed buffers */
+	spinlock_t doneq_lock;		/* lock protecting the queue */
+	wait_queue_head_t proc_list;	/* wait queue */
 
 	struct video_device *video_dev;	/* video device parameters */
 	struct video_picture picture;	/* video picture parameters */
