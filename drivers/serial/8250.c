@@ -2350,6 +2350,9 @@ int serial8250_register_port(struct uart_port *port)
 	struct uart_8250_port *uart;
 	int ret = -ENOSPC;
 
+	if (port->uartclk == 0)
+		return -EINVAL;
+
 	down(&serial_sem);
 
 	uart = serial8250_find_match_or_unused(port);
