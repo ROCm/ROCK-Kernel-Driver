@@ -555,7 +555,7 @@ chunk_event_table_unknown[SCTP_STATE_NUM_STATES] = {
 	 .name = "sctp_sf_cookie_wait_prm_shutdown"}, \
 	/* SCTP_STATE_COOKIE_ECHOED */ \
 	{.fn = sctp_sf_cookie_echoed_prm_shutdown, \
-	 name:"sctp_sf_cookie_echoed_prm_shutdown"},\
+	 .name = "sctp_sf_cookie_echoed_prm_shutdown"},\
 	/* SCTP_STATE_ESTABLISHED */ \
 	{.fn = sctp_sf_do_9_2_prm_shutdown, \
 	 .name = "sctp_sf_do_9_2_prm_shutdown"}, \
