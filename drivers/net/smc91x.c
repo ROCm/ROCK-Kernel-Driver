@@ -693,17 +693,19 @@ static void smc_tx(struct net_device *dev)
 	if (tx_status & TS_LOSTCAR)
 		lp->stats.tx_carrier_errors++;
 
-	SMC_WAIT_MMU_BUSY();
-
 	if (tx_status & TS_LATCOL) {
 		PRINTK("%s: late collision occurred on last xmit\n", dev->name);
 		lp->stats.tx_window_errors++;
-		/* It's really cheap to requeue the pkt here */
-		SMC_SET_MMU_CMD( MC_ENQUEUE );
-	} else {
-		/* kill the packet */
-		SMC_SET_MMU_CMD(MC_FREEPKT);
+		if (!(lp->stats.tx_window_errors & 63) && net_ratelimit()) {
+			printk(KERN_INFO "%s: unexpectedly large numbers of "
+			       "late collisions. Please check duplex "
+			       "setting.\n", dev->name);
+		}
 	}
+
+	/* kill the packet */
+	SMC_WAIT_MMU_BUSY();
+	SMC_SET_MMU_CMD(MC_FREEPKT);
 
 	/* Don't restore Packet Number Reg until busy bit is cleared */
 	SMC_WAIT_MMU_BUSY();
