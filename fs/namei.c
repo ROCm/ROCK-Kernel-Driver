@@ -1183,7 +1183,7 @@ int may_open(struct nameidata *nd, int acc_mode, int flag)
 	/*
 	 * Ensure there are no outstanding leases on the file.
 	 */
-	error = get_lease(inode, flag);
+	error = break_lease(inode, flag);
 	if (error)
 		return error;
 
