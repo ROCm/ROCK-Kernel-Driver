@@ -350,6 +350,8 @@ static unsigned int nf_iterate(struct list_head *head,
 		if (hook_thresh > elem->priority)
 			continue;
 
+		/* Optimization: we don't need to hold module
+                   reference here, since function can't sleep. --RR */
 		switch (elem->hook(hook, skb, indev, outdev, okfn)) {
 		case NF_QUEUE:
 			return NF_QUEUE;
@@ -408,12 +410,12 @@ int nf_unregister_queue_handler(int pf)
  * Any packet that leaves via this function must come back 
  * through nf_reinject().
  */
-static void nf_queue(struct sk_buff *skb, 
-		     struct list_head *elem, 
-		     int pf, unsigned int hook,
-		     struct net_device *indev,
-		     struct net_device *outdev,
-		     int (*okfn)(struct sk_buff *))
+static int nf_queue(struct sk_buff *skb, 
+		    struct list_head *elem, 
+		    int pf, unsigned int hook,
+		    struct net_device *indev,
+		    struct net_device *outdev,
+		    int (*okfn)(struct sk_buff *))
 {
 	int status;
 	struct nf_info *info;
@@ -422,9 +424,10 @@ static void nf_queue(struct sk_buff *skb,
 	struct net_device *physoutdev = NULL;
 #endif
 
+	/* QUEUE == DROP if noone is waiting, to be safe. */
 	if (!queue_handler[pf].outfn) {
 		kfree_skb(skb);
-		return;
+		return 1;
 	}
 
 	info = kmalloc(sizeof(*info), GFP_ATOMIC);
@@ -433,11 +436,15 @@ static void nf_queue(struct sk_buff *skb,
 			printk(KERN_ERR "OOM queueing packet %p\n",
 			       skb);
 		kfree_skb(skb);
-		return;
+		return 1;
 	}
 
 	*info = (struct nf_info) { 
 		(struct nf_hook_ops *)elem, pf, hook, indev, outdev, okfn };
+
+	/* If it's going away, ignore hook. */
+	if (!try_module_get(info->elem->owner))
+		return 0;
 
 	/* Bump dev refs so they don't vanish while packet is out */
 	if (indev) dev_hold(indev);
@@ -461,10 +468,12 @@ static void nf_queue(struct sk_buff *skb,
 		if (physindev) dev_put(physindev);
 		if (physoutdev) dev_put(physoutdev);
 #endif
+		module_put(info->elem->owner);
 		kfree(info);
 		kfree_skb(skb);
-		return;
+		return 1;
 	}
+	return 1;
 }
 
 int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
@@ -497,11 +506,13 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 #endif
 
 	elem = &nf_hooks[pf][hook];
+ next_hook:
 	verdict = nf_iterate(&nf_hooks[pf][hook], &skb, hook, indev,
 			     outdev, &elem, okfn, hook_thresh);
 	if (verdict == NF_QUEUE) {
 		NFDEBUG("nf_hook: Verdict = QUEUE.\n");
-		nf_queue(skb, elem, pf, hook, indev, outdev, okfn);
+		if (!nf_queue(skb, elem, pf, hook, indev, outdev, okfn))
+			goto next_hook;
 	}
 
 	switch (verdict) {
@@ -527,15 +538,9 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 
 	/* We don't have BR_NETPROTO_LOCK here */
 	br_read_lock_bh(BR_NETPROTO_LOCK);
-	for (i = nf_hooks[info->pf][info->hook].next; i != elem; i = i->next) {
-		if (i == &nf_hooks[info->pf][info->hook]) {
-			/* The module which sent it to userspace is gone. */
-			NFDEBUG("%s: module disappeared, dropping packet.\n",
-			         __FUNCTION__);
-			verdict = NF_DROP;
-			break;
-		}
-	}
+
+	/* Drop reference to owner of hook which queued us. */
+	module_put(info->elem->owner);
 
 	/* Continue traversal iff userspace said ok... */
 	if (verdict == NF_REPEAT) {
@@ -544,6 +549,7 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 	}
 
 	if (verdict == NF_ACCEPT) {
+	next_hook:
 		verdict = nf_iterate(&nf_hooks[info->pf][info->hook],
 				     &skb, info->hook, 
 				     info->indev, info->outdev, &elem,
@@ -556,8 +562,9 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 		break;
 
 	case NF_QUEUE:
-		nf_queue(skb, elem, info->pf, info->hook, 
-			 info->indev, info->outdev, info->okfn);
+		if (!nf_queue(skb, elem, info->pf, info->hook, 
+			      info->indev, info->outdev, info->okfn))
+			goto next_hook;
 		break;
 
 	case NF_DROP:

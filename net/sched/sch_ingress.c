@@ -241,6 +241,7 @@ static struct nf_hook_ops ing_ops =
 {
 	{ NULL, NULL},
 	ing_hook,
+	THIS_MODULE,
 	PF_INET,
 	NF_IP_PRE_ROUTING,
 	NF_IP_PRI_FILTER + 1

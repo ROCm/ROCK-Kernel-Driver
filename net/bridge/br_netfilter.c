@@ -574,15 +574,15 @@ static unsigned int ipv4_sabotage_out(unsigned int hook, struct sk_buff **pskb,
  * ip_refrag() can return NF_STOLEN.
  */
 static struct nf_hook_ops br_nf_ops[] = {
-	{ { NULL, NULL }, br_nf_pre_routing, PF_BRIDGE, NF_BR_PRE_ROUTING, NF_BR_PRI_BRNF },
-	{ { NULL, NULL }, br_nf_local_in, PF_BRIDGE, NF_BR_LOCAL_IN, NF_BR_PRI_BRNF },
-	{ { NULL, NULL }, br_nf_forward, PF_BRIDGE, NF_BR_FORWARD, NF_BR_PRI_BRNF },
-	{ { NULL, NULL }, br_nf_local_out, PF_BRIDGE, NF_BR_LOCAL_OUT, NF_BR_PRI_FIRST },
-	{ { NULL, NULL }, br_nf_post_routing, PF_BRIDGE, NF_BR_POST_ROUTING, NF_BR_PRI_LAST },
-	{ { NULL, NULL }, ipv4_sabotage_in, PF_INET, NF_IP_PRE_ROUTING, NF_IP_PRI_FIRST },
-	{ { NULL, NULL }, ipv4_sabotage_out, PF_INET, NF_IP_FORWARD, NF_IP_PRI_BRIDGE_SABOTAGE_FORWARD },
-	{ { NULL, NULL }, ipv4_sabotage_out, PF_INET, NF_IP_LOCAL_OUT, NF_IP_PRI_BRIDGE_SABOTAGE_LOCAL_OUT },
-	{ { NULL, NULL }, ipv4_sabotage_out, PF_INET, NF_IP_POST_ROUTING, NF_IP_PRI_FIRST }
+	{ { NULL, NULL }, br_nf_pre_routing, THIS_MODULE, PF_BRIDGE, NF_BR_PRE_ROUTING, NF_BR_PRI_BRNF },
+	{ { NULL, NULL }, br_nf_local_in, THIS_MODULE, PF_BRIDGE, NF_BR_LOCAL_IN, NF_BR_PRI_BRNF },
+	{ { NULL, NULL }, br_nf_forward, THIS_MODULE, PF_BRIDGE, NF_BR_FORWARD, NF_BR_PRI_BRNF },
+	{ { NULL, NULL }, br_nf_local_out, THIS_MODULE, PF_BRIDGE, NF_BR_LOCAL_OUT, NF_BR_PRI_FIRST },
+	{ { NULL, NULL }, br_nf_post_routing, THIS_MODULE, PF_BRIDGE, NF_BR_POST_ROUTING, NF_BR_PRI_LAST },
+	{ { NULL, NULL }, ipv4_sabotage_in, THIS_MODULE, PF_INET, NF_IP_PRE_ROUTING, NF_IP_PRI_FIRST },
+	{ { NULL, NULL }, ipv4_sabotage_out, THIS_MODULE, PF_INET, NF_IP_FORWARD, NF_IP_PRI_BRIDGE_SABOTAGE_FORWARD },
+	{ { NULL, NULL }, ipv4_sabotage_out, THIS_MODULE, PF_INET, NF_IP_LOCAL_OUT, NF_IP_PRI_BRIDGE_SABOTAGE_LOCAL_OUT },
+	{ { NULL, NULL }, ipv4_sabotage_out, THIS_MODULE, PF_INET, NF_IP_POST_ROUTING, NF_IP_PRI_FIRST }
 };
 
 #define NUMHOOKS (sizeof(br_nf_ops)/sizeof(br_nf_ops[0]))

@@ -125,18 +125,21 @@ ipt_local_out_hook(unsigned int hook,
 static struct nf_hook_ops ipt_ops[] = {
 	{
 		.hook		= ipt_hook,
+		.owner		= THIS_MODULE,
 		.pf		= PF_INET,
 		.hooknum	= NF_IP_LOCAL_IN,
 		.priority	= NF_IP_PRI_FILTER,
 	},
 	{
 		.hook		= ipt_hook,
+		.owner		= THIS_MODULE,
 		.pf		= PF_INET,
 		.hooknum	= NF_IP_FORWARD,
 		.priority	= NF_IP_PRI_FILTER,
 	},
 	{
 		.hook		= ipt_local_out_hook,
+		.owner		= THIS_MODULE,
 		.pf		= PF_INET,
 		.hooknum	= NF_IP_LOCAL_OUT,
 		.priority	= NF_IP_PRI_FILTER,
