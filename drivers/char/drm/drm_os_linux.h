@@ -32,9 +32,14 @@
 /** DRM device local declaration */
 #define DRM_DEVICE	drm_file_t	*priv	= filp->private_data; \
 			drm_device_t	*dev	= priv->dev
-			
-/** IRQ handler arguments */
-#define DRM_IRQ_ARGS	        int irq, void *arg, struct pt_regs *regs
+
+/** IRQ handler arguments and return type and values */
+#define DRM_IRQ_ARGS		int irq, void *arg, struct pt_regs *regs
+
+/** AGP types */
+#define DRM_AGP_MEM		struct agp_memory
+#define DRM_AGP_KERN		struct agp_kern_info
+
 /** Task queue handler arguments */
 #define DRM_TASKQUEUE_ARGS	void *arg
 
