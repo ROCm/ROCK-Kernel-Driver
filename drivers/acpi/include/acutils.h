@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 130 $
+ *       $Revision: 137 $
  *
  *****************************************************************************/
 
@@ -82,7 +82,7 @@ acpi_status
 acpi_ut_hardware_initialize (
 	void);
 
-acpi_status
+void
 acpi_ut_subsystem_shutdown (
 	void);
 
@@ -94,7 +94,7 @@ acpi_ut_validate_fadt (
  * Ut_global - Global data structures and procedures
  */
 
-#ifdef ACPI_DEBUG
+#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
 
 NATIVE_CHAR *
 acpi_ut_get_mutex_name (
@@ -115,7 +115,7 @@ NATIVE_CHAR *
 acpi_ut_get_event_name (
 	u32                     event_id);
 
-u8
+char
 acpi_ut_hex_to_ascii_char (
 	acpi_integer            integer,
 	u32                     position);
@@ -150,7 +150,7 @@ acpi_ut_strncpy (
 	const NATIVE_CHAR       *src_string,
 	NATIVE_UINT             count);
 
-u32
+int
 acpi_ut_strncmp (
 	const NATIVE_CHAR       *string1,
 	const NATIVE_CHAR       *string2,
@@ -195,13 +195,32 @@ acpi_ut_memset (
 	NATIVE_UINT             value,
 	NATIVE_UINT             count);
 
-u32
+int
 acpi_ut_to_upper (
-	u32                     c);
+	int                     c);
 
-u32
+int
 acpi_ut_to_lower (
-	u32                     c);
+	int                     c);
+
+extern const u8 _acpi_ctype[];
+
+#define _ACPI_XA     0x00    /* extra alphabetic - not supported */
+#define _ACPI_XS     0x40    /* extra space */
+#define _ACPI_BB     0x00    /* BEL, BS, etc. - not supported */
+#define _ACPI_CN     0x20    /* CR, FF, HT, NL, VT */
+#define _ACPI_DI     0x04    /* '0'-'9' */
+#define _ACPI_LO     0x02    /* 'a'-'z' */
+#define _ACPI_PU     0x10    /* punctuation */
+#define _ACPI_SP     0x08    /* space */
+#define _ACPI_UP     0x01    /* 'A'-'Z' */
+#define _ACPI_XD     0x80    /* '0'-'9', 'A'-'F', 'a'-'f' */
+
+#define ACPI_IS_DIGIT(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_DI))
+#define ACPI_IS_SPACE(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_SP))
+#define ACPI_IS_XDIGIT(c) (_acpi_ctype[(unsigned char)(c)] & (_ACPI_XD))
+#define ACPI_IS_UPPER(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_UP))
+#define ACPI_IS_LOWER(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_LO))
 
 #endif /* ACPI_USE_SYSTEM_CLIBRARY */
 
@@ -221,6 +240,20 @@ acpi_ut_build_package_object (
 	acpi_operand_object     *obj,
 	u8                      *buffer,
 	u32                     *space_used);
+
+acpi_status
+acpi_ut_copy_ielement_to_eelement (
+	u8                      object_type,
+	acpi_operand_object     *source_object,
+	acpi_generic_state      *state,
+	void                    *context);
+
+acpi_status
+acpi_ut_copy_ielement_to_ielement (
+	u8                      object_type,
+	acpi_operand_object     *source_object,
+	acpi_generic_state      *state,
+	void                    *context);
 
 acpi_status
 acpi_ut_copy_iobject_to_eobject (
@@ -386,7 +419,7 @@ void
 acpi_ut_delete_internal_simple_object (
 	acpi_operand_object     *object);
 
-acpi_status
+void
 acpi_ut_delete_internal_object_list (
 	acpi_operand_object     **obj_list);
 
@@ -524,6 +557,13 @@ acpi_ut_get_object_size(
 	acpi_operand_object     *obj,
 	ACPI_SIZE               *obj_length);
 
+acpi_status
+acpi_ut_get_element_length (
+	u8                      object_type,
+	acpi_operand_object     *source_object,
+	acpi_generic_state      *state,
+	void                    *context);
+
 
 /*
  * Ut_state - Generic state creation/cache routines
@@ -613,6 +653,12 @@ u8
 acpi_ut_valid_acpi_character (
 	NATIVE_CHAR             character);
 
+acpi_status
+acpi_ut_strtoul64 (
+	NATIVE_CHAR             *string,
+	u32                     base,
+	acpi_integer            *ret_integer);
+
 NATIVE_CHAR *
 acpi_ut_strupr (
 	NATIVE_CHAR             *src_string);
@@ -620,6 +666,13 @@ acpi_ut_strupr (
 acpi_status
 acpi_ut_resolve_package_references (
 	acpi_operand_object     *obj_desc);
+
+acpi_status
+acpi_ut_resolve_reference (
+	u8                      object_type,
+	acpi_operand_object     *source_object,
+	acpi_generic_state      *state,
+	void                    *context);
 
 u8 *
 acpi_ut_get_resource_end_tag (
@@ -629,6 +682,14 @@ u8
 acpi_ut_generate_checksum (
 	u8                      *buffer,
 	u32                     length);
+
+u32
+acpi_ut_dword_byte_swap (
+	u32                     value);
+
+void
+acpi_ut_set_integer_width (
+	u8                      revision);
 
 #ifdef ACPI_DEBUG
 void
@@ -705,6 +766,12 @@ acpi_ut_free_and_track (
 	u32                     component,
 	NATIVE_CHAR             *module,
 	u32                     line);
+
+acpi_debug_mem_block *
+acpi_ut_find_allocation (
+	u32                     list_id,
+	void                    *allocation);
+
 acpi_status
 acpi_ut_track_allocation (
 	u32                     list_id,

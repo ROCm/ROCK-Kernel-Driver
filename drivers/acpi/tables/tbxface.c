@@ -2,7 +2,7 @@
  *
  * Module Name: tbxface - Public interfaces to the ACPI subsystem
  *                         ACPI table oriented interfaces
- *              $Revision: 52 $
+ *              $Revision: 57 $
  *
  *****************************************************************************/
 
@@ -27,7 +27,6 @@
 
 #include "acpi.h"
 #include "acnamesp.h"
-#include "acinterp.h"
 #include "actables.h"
 
 
@@ -91,7 +90,7 @@ acpi_load_tables (void)
 
 	/* Now get the rest of the tables */
 
-	status = acpi_tb_get_all_tables (number_of_tables, NULL);
+	status = acpi_tb_get_all_tables (number_of_tables);
 	if (ACPI_FAILURE (status)) {
 		ACPI_REPORT_ERROR (("Acpi_load_tables: Error getting required tables (DSDT/FADT/FACS): %s\n",
 				  acpi_format_exception (status)));
@@ -165,7 +164,7 @@ acpi_load_table (
 
 	/* Install the new table into the local data structures */
 
-	status = acpi_tb_install_table (NULL, &table_info);
+	status = acpi_tb_install_table (&table_info);
 	if (ACPI_FAILURE (status)) {
 		/* Free table allocated by Acpi_tb_get_table */
 
@@ -196,7 +195,7 @@ acpi_load_table (
 	if (ACPI_FAILURE (status)) {
 		/* Uninstall table and free the buffer */
 
-		acpi_tb_uninstall_table (table_info.installed_desc);
+		(void) acpi_tb_uninstall_table (table_info.installed_desc);
 	}
 
 	return_ACPI_STATUS (status);
@@ -358,7 +357,7 @@ acpi_get_table (
 {
 	acpi_table_header       *tbl_ptr;
 	acpi_status             status;
-	u32                     table_length;
+	ACPI_SIZE               table_length;
 
 
 	ACPI_FUNCTION_TRACE ("Acpi_get_table");
@@ -408,7 +407,7 @@ acpi_get_table (
 		table_length = sizeof (RSDP_DESCRIPTOR);
 	}
 	else {
-		table_length = tbl_ptr->length;
+		table_length = (ACPI_SIZE) tbl_ptr->length;
 	}
 
 	/* Validate/Allocate/Clear caller buffer */

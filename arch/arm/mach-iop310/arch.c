@@ -31,21 +31,8 @@ fixup_iq80310(struct machine_desc *desc, struct tag *tags,
 {
 	system_rev = (*(volatile unsigned int*)0xfe830000) & 0x0f;
 
-	if(system_rev)
+	if (system_rev)
 		system_rev = 0xF;
-
-	mi->bank[0].start = PHYS_OFFSET;
-	mi->bank[0].size  = (32*1024*1024);
-	mi->bank[0].node  = 0;
-	mi->nr_banks      = 1;
-
-#ifdef CONFIG_ROOT_NFS
-	ROOT_DEV = to_kdev_t(0x00FF);   /* /dev/nfs pseudo device */
-#elif defined(CONFIG_BLK_DEV_INITRD)
-	setup_ramdisk( 1, 0, 0, CONFIG_BLK_DEV_RAM_SIZE );
-	setup_initrd( 0xc0800000, 4*1024*1024 );
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0); /* /dev/ram */
-#endif
 }
 
 MACHINE_START(IQ80310, "Cyclone IQ80310")

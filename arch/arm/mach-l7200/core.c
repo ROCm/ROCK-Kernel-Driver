@@ -82,33 +82,9 @@ static void __init l7200_map_io(void)
 	iotable_init(l7200_io_desc);
 }
 
-static void __init
-fixup_l7200(struct machine_desc *desc, struct tag *tags,
-             char **cmdline, struct meminfo *mi)
-{
-        mi->nr_banks      = 1;
-        mi->bank[0].start = PHYS_OFFSET;
-        mi->bank[0].size  = (32*1024*1024);
-        mi->bank[0].node  = 0;
-
-        ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-        setup_ramdisk( 1, 0, 0, CONFIG_BLK_DEV_RAM_SIZE);
-        setup_initrd( __phys_to_virt(0xf1000000), 0x005dac7b);
-
-        /* Serial Console COM2 and LCD */
-	strcpy( *cmdline, "console=tty0 console=ttyLU1,115200");
-
-        /* Serial Console COM1 and LCD */
-	//strcpy( *cmdline, "console=tty0 console=ttyLU0,115200");
-
-        /* Console on LCD */
-	//strcpy( *cmdline, "console=tty0");
-}
-
 MACHINE_START(L7200, "LinkUp Systems L7200")
 	MAINTAINER("Steve Hill / Scott McConnell")
 	BOOT_MEM(0xf0000000, 0x80040000, 0xd0000000)
-	FIXUP(fixup_l7200)
 	MAPIO(l7200_map_io)
 	INITIRQ(l7200_init_irq)
 MACHINE_END

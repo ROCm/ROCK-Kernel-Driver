@@ -161,7 +161,7 @@ CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
 # CONFIG_PM is not set
 # CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="console=ttyS0,115200 ip=bootp"
+CONFIG_CMDLINE="console=ttyS0,115200 ip=bootp mem=32M root=/dev/nfs initrd=0xc0800000,4M"
 CONFIG_ALIGNMENT_TRAP=y
 
 #

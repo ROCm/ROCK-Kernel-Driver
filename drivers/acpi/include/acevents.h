@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acevents.h - Event subcomponent prototypes and defines
- *       $Revision: 76 $
+ *       $Revision: 79 $
  *
  *****************************************************************************/
 
@@ -65,7 +65,7 @@ acpi_status
 acpi_ev_acquire_global_lock(
 	u32                     timeout);
 
-void
+acpi_status
 acpi_ev_release_global_lock(
 	void);
 
@@ -116,7 +116,7 @@ acpi_ev_gpe_detect (
  */
 
 acpi_status
-acpi_ev_install_default_address_space_handlers (
+acpi_ev_init_address_spaces (
 	void);
 
 acpi_status
@@ -125,7 +125,7 @@ acpi_ev_address_space_dispatch (
 	u32                     function,
 	ACPI_PHYSICAL_ADDRESS   address,
 	u32                     bit_width,
-	acpi_integer            *value);
+	void                    *value);
 
 acpi_status
 acpi_ev_addr_handler_helper (
@@ -134,15 +134,15 @@ acpi_ev_addr_handler_helper (
 	void                    *context,
 	void                    **return_value);
 
-void
-acpi_ev_disassociate_region_from_handler(
-	acpi_operand_object    *region_obj,
-	u8                      acpi_ns_is_locked);
-
 acpi_status
-acpi_ev_associate_region_and_handler (
+acpi_ev_attach_region (
 	acpi_operand_object     *handler_obj,
 	acpi_operand_object     *region_obj,
+	u8                      acpi_ns_is_locked);
+
+void
+acpi_ev_detach_region (
+	acpi_operand_object    *region_obj,
 	u8                      acpi_ns_is_locked);
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nswalk - Functions for walking the ACPI namespace
- *              $Revision: 32 $
+ *              $Revision: 33 $
  *
  *****************************************************************************/
 
@@ -25,7 +25,6 @@
 
 
 #include "acpi.h"
-#include "acinterp.h"
 #include "acnamesp.h"
 
 

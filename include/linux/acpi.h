@@ -29,21 +29,27 @@
 #define _LINUX
 #endif
 
+#include <linux/list.h>
+
 /*
- * YES this is ugly.
- * But, moving all of ACPI's private headers to include/acpi isn't the right
- * answer either.
- * Please just ignore it for now.
+ * Yes this is ugly, but moving all of ACPI's private headers to include/acpi 
+ * isn't the right answer either.  Please just ignore it for now.
  */
 #include "../../drivers/acpi/include/acpi.h"
 #include <asm/acpi.h>
 
 
-/* --------------------------------------------------------------------------
-                             Boot-Time Table Parsing
-   -------------------------------------------------------------------------- */
-
 #ifdef CONFIG_ACPI_BOOT
+
+enum acpi_irq_model_id {
+	ACPI_IRQ_MODEL_PIC = 0,
+	ACPI_IRQ_MODEL_IOAPIC,
+	ACPI_IRQ_MODEL_IOSAPIC,
+	ACPI_IRQ_MODEL_COUNT
+};
+
+extern enum acpi_irq_model_id	acpi_irq_model;
+
 
 /* Root System Description Pointer (RSDP) */
 
@@ -327,10 +333,9 @@ extern acpi_table_handler acpi_table_ops[ACPI_TABLE_COUNT];
 
 typedef int (*acpi_madt_entry_handler) (acpi_table_entry_header *header);
 
-struct acpi_boot_flags {
-	u8		madt:1;
-	u8		reserved:7;
-};
+char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
+unsigned long acpi_find_rsdp (void);
+int acpi_boot_init (char *cmdline);
 
 int acpi_table_init (char *cmdline);
 int acpi_table_parse (enum acpi_table_id, acpi_table_handler);
@@ -338,31 +343,26 @@ int acpi_table_parse_madt (enum acpi_table_id, acpi_madt_entry_handler);
 void acpi_table_print (struct acpi_table_header *, unsigned long);
 void acpi_table_print_madt_entry (acpi_table_entry_header *);
 
+extern int acpi_mp_config;
+
+#else /*!CONFIG_ACPI_BOOT*/
+
+#define acpi_mp_config	0
+
 #endif /*CONFIG_ACPI_BOOT*/
 
 
-/* --------------------------------------------------------------------------
-                           PCI Interrupt Routing (PRT)
-   -------------------------------------------------------------------------- */
-
 #ifdef CONFIG_ACPI_PCI
-
-#define ACPI_INT_MODEL_PIC	0
-#define ACPI_INT_MODEL_IOAPIC	1
-#define ACPI_INT_MODEL_IOSAPIC	2
 
 struct acpi_prt_entry {
 	struct list_head	node;
-	struct {
-		u8			seg;
-		u8			bus;
-		u8			dev;
-		u8			pin;
-	}			id;
+	acpi_pci_id		id;
+	u8			pin;
 	struct {
 		acpi_handle		handle;
 		u32			index;
-	}			source;
+	}			link;
+	u32			irq;
 };
 
 struct acpi_prt_list {
@@ -370,25 +370,21 @@ struct acpi_prt_list {
 	struct list_head	entries;
 };
 
-extern struct acpi_prt_list	acpi_prts;
+extern struct acpi_prt_list	acpi_prt;
 
 struct pci_dev;
 
-int acpi_prt_get_irq (struct pci_dev *dev, u8 pin, int *irq);
-int acpi_prt_set_irq (struct pci_dev *dev, u8 pin, int irq);
+int acpi_pci_irq_enable (struct pci_dev *dev);
+int acpi_pci_irq_init (void);
 
 #endif /*CONFIG_ACPI_PCI*/
 
 
-/* --------------------------------------------------------------------------
-                            ACPI Interpreter (Core)
-   -------------------------------------------------------------------------- */
-
-#ifdef CONFIG_ACPI_INTERPRETER
+#ifdef CONFIG_ACPI
 
 int acpi_init(void);
 
-#endif /*CONFIG_ACPI_INTERPRETER*/
+#endif /*CONFIG_ACPI*/
 
 
 #endif /*_LINUX_ACPI_H*/

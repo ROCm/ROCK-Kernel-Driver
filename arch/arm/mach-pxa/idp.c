@@ -68,23 +68,6 @@ static void __init idp_init_irq(void)
 	pxa_init_irq();
 }
 
-static void __init
-fixup_idp(struct machine_desc *desc, struct tag *tags,
-		char **cmdline, struct meminfo *mi)
-{
-#ifdef PXA_IDP_REV02
-	SET_BANK (0, 0xa0000000, 64*1024*1024);
-#else
-	SET_BANK (0, 0xa0000000, 32*1024*1024);
-#endif
-	mi->nr_banks      = 1;
-#if 0
-	setup_ramdisk (1, 0, 0, 8192);
-	setup_initrd (__phys_to_virt(0xa1000000), 4*1024*1024);
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
-#endif
-}
-
 static struct map_desc idp_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
 
@@ -132,7 +115,6 @@ static void __init idp_map_io(void)
 MACHINE_START(PXA_IDP, "Accelent Xscale IDP")
 	MAINTAINER("Accelent Systems Inc.")
 	BOOT_MEM(0xa0000000, 0x40000000, 0xfc000000)
-	FIXUP(fixup_idp)
 	MAPIO(idp_map_io)
 	INITIRQ(idp_init_irq)
 MACHINE_END

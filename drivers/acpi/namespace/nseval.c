@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 112 $
+ *              $Revision: 114 $
  *
  ******************************************************************************/
 
@@ -26,7 +26,6 @@
 
 
 #include "acpi.h"
-#include "amlcode.h"
 #include "acparser.h"
 #include "acinterp.h"
 #include "acnamesp.h"
@@ -332,12 +331,9 @@ acpi_ns_evaluate_by_handle (
 			*return_object = local_return_object;
 		}
 
+		/* Map AE_CTRL_RETURN_VALUE to AE_OK, we are done with it */
 
-		/* Map AE_RETURN_VALUE to AE_OK, we are done with it */
-
-		if (status == AE_CTRL_RETURN_VALUE) {
-			status = AE_OK;
-		}
+		status = AE_OK;
 	}
 
 	/*
@@ -393,7 +389,7 @@ acpi_ns_execute_control_method (
 	ACPI_DUMP_PATHNAME (method_node, "Ns_execute_control_method: Executing",
 		ACPI_LV_INFO, _COMPONENT);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Method at AML address %p Length %x\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Method at AML address %p Length %X\n",
 		obj_desc->method.aml_start + 1, obj_desc->method.aml_length - 1));
 
 	/*
@@ -444,7 +440,7 @@ acpi_ns_get_object_value (
 	acpi_operand_object     **return_obj_desc)
 {
 	acpi_status             status = AE_OK;
-	acpi_operand_object     *obj_desc;
+	acpi_namespace_node     *resolved_node = node;
 
 
 	ACPI_FUNCTION_TRACE ("Ns_get_object_value");
@@ -455,7 +451,6 @@ acpi_ns_get_object_value (
 	 * Node may be a field that must be read, etc.) -- we can't just grab
 	 * the object out of the node.
 	 */
-	obj_desc = (acpi_operand_object *) node;
 
 	/*
 	 * Use Resolve_node_to_value() to get the associated value. This call
@@ -482,17 +477,17 @@ acpi_ns_get_object_value (
 
 	status = acpi_ex_enter_interpreter ();
 	if (ACPI_SUCCESS (status)) {
-		status = acpi_ex_resolve_node_to_value ((acpi_namespace_node **) &obj_desc, NULL);
+		status = acpi_ex_resolve_node_to_value (&resolved_node, NULL);
 		/*
 		 * If Acpi_ex_resolve_node_to_value() succeeded, the return value was
-		 * placed in Obj_desc.
+		 * placed in Resolved_node.
 		 */
 		acpi_ex_exit_interpreter ();
 
 		if (ACPI_SUCCESS (status)) {
 			status = AE_CTRL_RETURN_VALUE;
-			*return_obj_desc = obj_desc;
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Returning obj %p\n", *return_obj_desc));
+			*return_obj_desc = ACPI_CAST_PTR (acpi_operand_object, resolved_node);
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Returning obj %p\n", resolved_node));
 		}
 	}
 

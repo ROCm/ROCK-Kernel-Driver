@@ -51,19 +51,6 @@ static int __init freebird_init(void)
 
 __initcall(freebird_init);
 
-static void __init
-fixup_freebird(struct machine_desc *desc, struct tag *tags,
-	       char **cmdline, struct meminfo *mi)
-{
-#ifdef CONFIG_SA1100_FREEBIRD_OLD
-	SET_BANK( 0, 0xc0000000, 32*1024*1024 );
-	mi->nr_banks = 1;
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0 ,0 , 8192 );
-	setup_initrd( 0xc0800000, 3*1024*1024 );
-#endif
-}
-
 static struct map_desc freebird_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xf0000000, 0x12000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Board Control Register */
@@ -90,7 +77,6 @@ MACHINE_START(FREEBIRD, "Freebird-HPC-1.1")
 #ifdef CONFIG_SA1100_FREEBIRD_NEW
 	BOOT_PARAMS(0xc0000100)
 #endif
-	FIXUP(fixup_freebird)
 	MAPIO(freebird_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

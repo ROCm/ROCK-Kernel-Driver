@@ -5,6 +5,7 @@
 
 #include <linux/pci.h>
 #include <linux/module.h>
+#include <linux/init.h>
 
 /*
  *  Registration of PCI drivers and handling of hot-pluggable devices.
@@ -34,32 +35,6 @@ pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev)
 	return NULL;
 }
 
-int
-pci_announce_device(struct pci_driver *drv, struct pci_dev *dev)
-{
-	const struct pci_device_id *id;
-	int ret = 0;
-
-	if (drv->id_table) {
-		id = pci_match_device(drv->id_table, dev);
-		if (!id) {
-			ret = 0;
-			goto out;
-		}
-	} else
-		id = NULL;
-
-	dev_probe_lock();
-	if (drv->probe(dev, id) >= 0) {
-		dev->driver = drv;
-		ret = 1;
-	}
-	dev_probe_unlock();
-out:
-	return ret;
-}
-
-
 static int pci_device_probe(struct device * dev)
 {
 	int error = 0;
@@ -68,8 +43,7 @@ static int pci_device_probe(struct device * dev)
 	struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
 
 	if (drv->probe)
-		error = drv->probe(pci_dev,NULL);
-	printk("%s: returning %d\n",__FUNCTION__,error);
+		error = drv->probe(pci_dev,drv->id_table);
 	return error > 0 ? 0 : -ENODEV;
 }
 
@@ -123,7 +97,6 @@ int
 pci_register_driver(struct pci_driver *drv)
 {
 	int count = 0;
-	struct pci_dev * dev;
 
 	/* initialize common driver fields */
 	drv->driver.name = drv->name;
@@ -135,11 +108,6 @@ pci_register_driver(struct pci_driver *drv)
 
 	/* register with core */
 	count = driver_register(&drv->driver);
-
-	pci_for_each_dev(dev) {
-		if (!pci_dev_driver(dev))
-			pci_announce_device(drv, dev);
-	}
 	return count ? count : 1;
 }
 
@@ -156,20 +124,6 @@ pci_register_driver(struct pci_driver *drv)
 void
 pci_unregister_driver(struct pci_driver *drv)
 {
-	list_t * node;
-	
-	node = drv->driver.devices.next;
-
-	while (node != &drv->driver.devices) {
-		struct device * dev = list_entry(node,struct device,driver_list);
-		struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
-
-		if (drv->remove)
-			drv->remove(pci_dev);
-		pci_dev->driver = NULL;
-		dev->driver = NULL;
-		list_del_init(&dev->driver_list);
-	}
 	put_driver(&drv->driver);
 }
 
@@ -198,8 +152,39 @@ pci_dev_driver(const struct pci_dev *dev)
 	return NULL;
 }
 
+/**
+ * pci_bus_bind - Tell if a PCI device structure has a matching PCI device id structure
+ * @ids: array of PCI device id structures to search in
+ * @dev: the PCI device structure to match against
+ * 
+ * Used by a driver to check whether a PCI device present in the
+ * system is in its list of supported devices.Returns the matching
+ * pci_device_id structure or %NULL if there is no match.
+ */
+static int pci_bus_bind(struct device * dev, struct device_driver * drv) 
+{
+	struct pci_dev * pci_dev = list_entry(dev, struct pci_dev, dev);
+	struct pci_driver * pci_drv = list_entry(drv,struct pci_driver,driver);
+	const struct pci_device_id * ids = pci_drv->id_table;
+
+	if (!ids) 
+		return 0;
+
+	while (ids->vendor || ids->subvendor || ids->class_mask) {
+		if ((ids->vendor == PCI_ANY_ID || ids->vendor == pci_dev->vendor) &&
+		    (ids->device == PCI_ANY_ID || ids->device == pci_dev->device) &&
+		    (ids->subvendor == PCI_ANY_ID || ids->subvendor == pci_dev->subsystem_vendor) &&
+		    (ids->subdevice == PCI_ANY_ID || ids->subdevice == pci_dev->subsystem_device) &&
+		    !((ids->class ^ pci_dev->class) & ids->class_mask))
+			return 1;
+		ids++;
+	}
+	return 0;
+}
+
 struct bus_type pci_bus_type = {
 	name:	"pci",
+	bind:	pci_bus_bind,
 };
 
 static int __init pci_driver_init(void)

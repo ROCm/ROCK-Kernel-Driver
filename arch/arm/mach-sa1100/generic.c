@@ -78,7 +78,7 @@ unsigned int sa11x0_validatespeed(unsigned int khz)
 
 static int __init sa11x0_init_clock(void)
 {
-	cpufreq_init(cclk_frequency_100khz[PPCR & 0xf] * 100);
+	cpufreq_init(cclk_frequency_100khz[PPCR & 0xf] * 100, 59000, 287000);
 	return 0;
 }
 
@@ -203,6 +203,3 @@ void __init sa1110_mb_enable(void)
 
 	local_irq_restore(flags);
 }
-
-EXPORT_SYMBOL(sa1111_wake);
-EXPORT_SYMBOL(sa1111_doze);

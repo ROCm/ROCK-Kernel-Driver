@@ -916,17 +916,11 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 #ifdef CONFIG_ACPI_BOOT
 	/*
-	 * Initialize the ACPI boot-time table parser (gets the RSDP and SDT).
-	 * Must do this after paging_init (due to reliance on fixmap, and thus
-	 * the bootmem allocator) but before get_smp_config (to allow parsing
-	 * of MADT).
+	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
 	acpi_boot_init(*cmdline_p);
 #endif
 #ifdef CONFIG_X86_LOCAL_APIC
-	/*
-	 * get boot-time SMP configuration:
-	 */
 	if (smp_found_config)
 		get_smp_config();
 #endif

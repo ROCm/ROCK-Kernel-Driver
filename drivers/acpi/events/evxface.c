@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxface - External interfaces for ACPI events
- *              $Revision: 126 $
+ *              $Revision: 128 $
  *
  *****************************************************************************/
 
@@ -25,10 +25,8 @@
 
 
 #include "acpi.h"
-#include "achware.h"
 #include "acnamesp.h"
 #include "acevents.h"
-#include "amlcode.h"
 #include "acinterp.h"
 
 #define _COMPONENT          ACPI_EVENTS
@@ -516,8 +514,12 @@ acpi_install_gpe_handler (
 
 	/* Clear the GPE (of stale events), the enable it */
 
-	acpi_hw_clear_gpe (gpe_number);
-	acpi_hw_enable_gpe (gpe_number);
+	status = acpi_hw_clear_gpe (gpe_number);
+	if (ACPI_FAILURE (status)) {
+		goto cleanup;
+	}
+
+	status = acpi_hw_enable_gpe (gpe_number);
 
 
 cleanup:
@@ -566,7 +568,10 @@ acpi_remove_gpe_handler (
 
 	/* Disable the GPE before removing the handler */
 
-	acpi_hw_disable_gpe (gpe_number);
+	status = acpi_hw_disable_gpe (gpe_number);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
 	if (ACPI_FAILURE (status)) {
@@ -576,7 +581,7 @@ acpi_remove_gpe_handler (
 	/* Make sure that the installed handler is the same */
 
 	if (acpi_gbl_gpe_number_info[gpe_number_index].handler != handler) {
-		acpi_hw_enable_gpe (gpe_number);
+		(void) acpi_hw_enable_gpe (gpe_number);
 		status = AE_BAD_PARAMETER;
 		goto cleanup;
 	}
@@ -651,13 +656,15 @@ acpi_status
 acpi_release_global_lock (
 	u32                     handle)
 {
+	acpi_status             status;
+
 
 	if (handle != acpi_gbl_global_lock_handle) {
 		return (AE_NOT_ACQUIRED);
 	}
 
-	acpi_ev_release_global_lock ();
-	return (AE_OK);
+	status = acpi_ev_release_global_lock ();
+	return (status);
 }
 
 

@@ -73,8 +73,6 @@
  */
 
 /* init funcs */
-static void __init fixup_system3(struct machine_desc *desc,
-		struct tag *tags, char **cmdline, struct meminfo *mi);
 static int __init system3_init(void);
 static void __init system3_init_irq(void);
 static void __init system3_map_io(void);
@@ -227,25 +225,6 @@ static int sdram_notifier(struct notifier_block *nb, unsigned long event,
 	}
 	return 0;
 }
-
-/**
- *	fixup_system3 - fixup function for system 3 board
- *	@desc:		machine description
- *	@param:		kernel params
- *	@cmdline:	kernel cmdline
- *	@mi:		memory info struct
- *
- */
-static void __init fixup_system3(struct machine_desc *desc,
-		struct tag *tags, char **cmdline, struct meminfo *mi)
-{
-	DPRINTK( "%s\n", "START" );
-
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0, 0, 8192 );
-	setup_initrd( 0xc0800000, 8*1024*1024 );
-}
-
 
 /**
  *	system3_uart_pm - powermgmt callback function for system 3 UART
@@ -457,7 +436,6 @@ __initcall(system3_init);
 MACHINE_START(PT_SYSTEM3, "PT System 3")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	BOOT_PARAMS(0xc0000100)
-	FIXUP(fixup_system3)
 	MAPIO(system3_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

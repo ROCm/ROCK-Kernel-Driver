@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstore - AML Interpreter object store support
- *              $Revision: 163 $
+ *              $Revision: 164 $
  *
  *****************************************************************************/
 
@@ -26,12 +26,10 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
 #include "acdispat.h"
 #include "acinterp.h"
 #include "amlcode.h"
 #include "acnamesp.h"
-#include "actables.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -328,7 +326,7 @@ acpi_ex_store_object_to_index (
 
 		case ACPI_TYPE_STRING:
 
-			value = source_desc->string.pointer[0];
+			value = (u8) source_desc->string.pointer[0];
 			break;
 
 		default:

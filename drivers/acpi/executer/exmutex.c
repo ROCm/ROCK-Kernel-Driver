@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmutex - ASL Mutex Acquire/Release functions
- *              $Revision: 10 $
+ *              $Revision: 13 $
  *
  *****************************************************************************/
 
@@ -27,9 +27,6 @@
 
 #include "acpi.h"
 #include "acinterp.h"
-#include "acnamesp.h"
-#include "achware.h"
-#include "acevents.h"
 
 #define _COMPONENT          ACPI_EXECUTER
 	 ACPI_MODULE_NAME    ("exmutex")
@@ -269,12 +266,13 @@ acpi_ex_release_mutex (
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ex_release_all_mutexes (
 	ACPI_THREAD_STATE       *thread)
 {
 	acpi_operand_object     *next = thread->acquired_mutex_list;
 	acpi_operand_object     *this;
+	acpi_status             status;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -293,14 +291,15 @@ acpi_ex_release_all_mutexes (
 
 		 /* Release the mutex */
 
-		acpi_ex_system_release_mutex (this);
+		status = acpi_ex_system_release_mutex (this);
+		if (ACPI_FAILURE (status)) {
+			continue;
+		}
 
 		/* Mark mutex unowned */
 
 		this->mutex.owner_thread     = NULL;
 	}
-
-	return (AE_OK);
 }
 
 

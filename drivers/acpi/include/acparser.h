@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: acparser.h - AML Parser subcomponent prototypes and defines
- *       $Revision: 58 $
+ *       $Revision: 59 $
  *
  *****************************************************************************/
 
@@ -134,7 +134,7 @@ u32
 acpi_ps_get_opcode_size (
 	u32                     opcode);
 
-u8
+void
 acpi_ps_complete_this_op (
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op);

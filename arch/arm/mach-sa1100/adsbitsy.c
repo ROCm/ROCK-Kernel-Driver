@@ -76,23 +76,6 @@ static void __init adsbitsy_init_irq(void)
 	sa1100_init_irq();
 }
 
-
-/*
- * Initialization fixup
- */
-
-static void __init
-fixup_adsbitsy(struct machine_desc *desc, struct tag *tags,
-		     char **cmdline, struct meminfo *mi)
-{
-	SET_BANK( 0, 0xc0000000, 32*1024*1024 );
-	mi->nr_banks = 1;
-
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0, 0, 8192 );
-	setup_initrd( __phys_to_virt(0xc0800000), 4*1024*1024 );
-}
-
 static struct map_desc adsbitsy_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xf4000000, 0x18000000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA1111 */
@@ -135,7 +118,6 @@ static void __init adsbitsy_map_io(void)
 
 MACHINE_START(ADSBITSY, "ADS Bitsy")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_adsbitsy)
 	MAPIO(adsbitsy_map_io)
 	INITIRQ(adsbitsy_init_irq)
 MACHINE_END

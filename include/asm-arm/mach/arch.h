@@ -16,9 +16,6 @@
 
 #ifndef __ASSEMBLY__
 
-extern void setup_initrd(unsigned int start, unsigned int size);
-extern void setup_ramdisk(int doload, int prompt, int start, unsigned int rd_sz);
-
 struct tag;
 
 struct machine_desc {

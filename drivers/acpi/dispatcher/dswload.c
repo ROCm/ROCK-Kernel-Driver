@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 62 $
+ *              $Revision: 66 $
  *
  *****************************************************************************/
 
@@ -115,21 +115,21 @@ acpi_ds_load1_begin_op (
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
 
 
-	if (op && (op->opcode == AML_INT_NAMEDFIELD_OP)) {
+	if (op && (op->common.aml_opcode == AML_INT_NAMEDFIELD_OP)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
 	}
 
 	/* We are only interested in opcodes that have an associated name */
 
-	if (walk_state->op) {
-	   if (!(walk_state->op_info->flags & AML_NAMED)) {
+	if (op) {
+		if (!(walk_state->op_info->flags & AML_NAMED)) {
 			*out_op = op;
 			return (AE_OK);
 		}
 
 		/* Check if this object has already been installed in the namespace */
 
-		if (op->node) {
+		if (op->common.node) {
 			*out_op = op;
 			return (AE_OK);
 		}
@@ -142,7 +142,7 @@ acpi_ds_load1_begin_op (
 	object_type = walk_state->op_info->object_type;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"State=%p Op=%p Type=%x\n", walk_state, op, object_type));
+		"State=%p Op=%p Type=%X\n", walk_state, op, object_type));
 
 	/*
 	 * Enter the named type into the internal namespace.  We enter the name
@@ -167,13 +167,13 @@ acpi_ds_load1_begin_op (
 
 	/* Initialize */
 
-	((acpi_parse2_object *)op)->name = node->name.integer;
+	op->named.name = node->name.integer;
 
 	/*
 	 * Put the Node in the "op" object that the parser uses, so we
 	 * can get it again quickly when this scope is closed
 	 */
-	op->node = node;
+	op->common.node = node;
 	acpi_ps_append_arg (acpi_ps_get_parent_scope (&walk_state->parser_state), op);
 
 	*out_op = op;
@@ -202,6 +202,7 @@ acpi_ds_load1_end_op (
 {
 	acpi_parse_object       *op;
 	acpi_object_type        object_type;
+	acpi_status             status = AE_OK;
 
 
 	ACPI_FUNCTION_NAME ("Ds_load1_end_op");
@@ -224,24 +225,26 @@ acpi_ds_load1_end_op (
 		if (walk_state->opcode == AML_FIELD_OP         ||
 			walk_state->opcode == AML_BANK_FIELD_OP    ||
 			walk_state->opcode == AML_INDEX_FIELD_OP) {
-			acpi_ds_init_field_objects (op, walk_state);
+			status = acpi_ds_init_field_objects (op, walk_state);
 		}
-		return (AE_OK);
+		return (status);
 	}
 
 
-	if (op->opcode == AML_REGION_OP) {
-		/*Status = */acpi_ex_create_region (((acpi_parse2_object *) op)->data,
-				  ((acpi_parse2_object *) op)->length,
-						 (ACPI_ADR_SPACE_TYPE) ((op->value.arg)->value.integer), walk_state);
+	if (op->common.aml_opcode == AML_REGION_OP) {
+		status = acpi_ex_create_region (op->named.data, op->named.length,
+				   (ACPI_ADR_SPACE_TYPE) ((op->common.value.arg)->common.value.integer), walk_state);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
 	}
 
-	if (op->opcode == AML_NAME_OP) {
+	if (op->common.aml_opcode == AML_NAME_OP) {
 		/* For Name opcode, get the object type from the argument */
 
-		if (op->value.arg) {
-			object_type = (acpi_ps_get_opcode_info ((op->value.arg)->opcode))->object_type;
-			op->node->type = (u8) object_type;
+		if (op->common.value.arg) {
+			object_type = (acpi_ps_get_opcode_info ((op->common.value.arg)->common.aml_opcode))->object_type;
+			op->common.node->type = (u8) object_type;
 		}
 	}
 
@@ -251,10 +254,10 @@ acpi_ds_load1_end_op (
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "(%s): Popping scope for Op %p\n",
 			acpi_ut_get_type_name (object_type), op));
 
-		acpi_ds_scope_stack_pop (walk_state);
+		status = acpi_ds_scope_stack_pop (walk_state);
 	}
 
-	return (AE_OK);
+	return (status);
 }
 
 
@@ -282,7 +285,6 @@ acpi_ds_load2_begin_op (
 	acpi_status             status;
 	acpi_object_type        object_type;
 	NATIVE_CHAR             *buffer_ptr;
-	void                    *original = NULL;
 
 
 	ACPI_FUNCTION_NAME ("Ds_load2_begin_op");
@@ -305,7 +307,7 @@ acpi_ds_load2_begin_op (
 		if (walk_state->opcode == AML_INT_NAMEPATH_OP) {
 			/* For Namepath op, get the path string */
 
-			buffer_ptr = op->value.string;
+			buffer_ptr = op->common.value.string;
 			if (!buffer_ptr) {
 				/* No name, just exit */
 
@@ -315,7 +317,7 @@ acpi_ds_load2_begin_op (
 		else {
 			/* Get name from the op */
 
-			buffer_ptr = (NATIVE_CHAR *) &((acpi_parse2_object *)op)->name;
+			buffer_ptr = (NATIVE_CHAR *) &op->named.name;
 		}
 	}
 	else {
@@ -329,7 +331,7 @@ acpi_ds_load2_begin_op (
 	object_type = walk_state->op_info->object_type;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"State=%p Op=%p Type=%x\n", walk_state, op, object_type));
+		"State=%p Op=%p Type=%X\n", walk_state, op, object_type));
 
 
 	if (walk_state->opcode == AML_FIELD_OP         ||
@@ -347,9 +349,12 @@ acpi_ds_load2_begin_op (
 				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
 	}
 	else {
-		if (op && op->node) {
-			original = op->node;
-			node = op->node;
+		/* All other opcodes */
+
+		if (op && op->common.node) {
+			/* This op/node was previously entered into the namespace */
+
+			node = op->common.node;
 
 			if (acpi_ns_opens_scope (object_type)) {
 				status = acpi_ds_scope_stack_push (node, object_type, walk_state);
@@ -381,24 +386,19 @@ acpi_ds_load2_begin_op (
 
 			/* Initialize the new op */
 
-			((acpi_parse2_object *)op)->name = node->name.integer;
-			*out_op = op;
+			if (node) {
+				op->named.name = node->name.integer;
+			}
+			if (out_op) {
+				*out_op = op;
+			}
 		}
 
 		/*
 		 * Put the Node in the "op" object that the parser uses, so we
 		 * can get it again quickly when this scope is closed
 		 */
-		op->node = node;
-
-		if (original) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "old %p new %p\n", original, node));
-
-			if (original != node) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-					"Lookup match error: old %p new %p\n", original, node));
-			}
-		}
+		op->common.node = node;
 	}
 
 	return (status);
@@ -445,11 +445,11 @@ acpi_ds_load2_end_op (
 		return (AE_OK);
 	}
 
-	if (op->opcode == AML_SCOPE_OP) {
+	if (op->common.aml_opcode == AML_SCOPE_OP) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 			"Ending scope Op=%p State=%p\n", op, walk_state));
 
-		if (((acpi_parse2_object *)op)->name == ACPI_UINT16_MAX) {
+		if (op->named.name == ACPI_UINT16_MAX) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unnamed scope! Op=%p State=%p\n",
 				op, walk_state));
 			return (AE_OK);
@@ -463,7 +463,7 @@ acpi_ds_load2_end_op (
 	 * Get the Node/name from the earlier lookup
 	 * (It was saved in the *op structure)
 	 */
-	node = op->node;
+	node = op->common.node;
 
 	/*
 	 * Put the Node on the object stack (Contains the ACPI Name of
@@ -477,7 +477,11 @@ acpi_ds_load2_end_op (
 	if (acpi_ns_opens_scope (object_type)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "(%s) Popping scope for Op %p\n",
 			acpi_ut_get_type_name (object_type), op));
-		acpi_ds_scope_stack_pop (walk_state);
+
+		status = acpi_ds_scope_stack_pop (walk_state);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
 	}
 
 	/*
@@ -510,11 +514,11 @@ acpi_ds_load2_end_op (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 		"Create-Load [%s] State=%p Op=%p Named_obj=%p\n",
-		acpi_ps_get_opcode_name (op->opcode), walk_state, op, node));
+		acpi_ps_get_opcode_name (op->common.aml_opcode), walk_state, op, node));
 
 	/* Decode the opcode */
 
-	arg = op->value.arg;
+	arg = op->common.value.arg;
 
 	switch (walk_state->op_info->type) {
 	case AML_TYPE_CREATE_FIELD:
@@ -529,21 +533,25 @@ acpi_ds_load2_end_op (
 
 	 case AML_TYPE_NAMED_FIELD:
 
-		switch (op->opcode) {
+		switch (op->common.aml_opcode) {
 		case AML_INDEX_FIELD_OP:
 
-			status = acpi_ds_create_index_field (op, (acpi_handle) arg->node,
+			status = acpi_ds_create_index_field (op, (acpi_handle) arg->common.node,
 					   walk_state);
 			break;
 
 		case AML_BANK_FIELD_OP:
 
-			status = acpi_ds_create_bank_field (op, arg->node, walk_state);
+			status = acpi_ds_create_bank_field (op, arg->common.node, walk_state);
 			break;
 
 		case AML_FIELD_OP:
 
-			status = acpi_ds_create_field (op, arg->node, walk_state);
+			status = acpi_ds_create_field (op, arg->common.node, walk_state);
+			break;
+
+		default:
+			/* All NAMED_FIELD opcodes must be handled above */
 			break;
 		}
 		break;
@@ -556,7 +564,7 @@ acpi_ds_load2_end_op (
 			goto cleanup;
 		}
 
-		switch (op->opcode) {
+		switch (op->common.aml_opcode) {
 		case AML_PROCESSOR_OP:
 
 			status = acpi_ex_create_processor (walk_state);
@@ -606,7 +614,7 @@ acpi_ds_load2_end_op (
 
 	case AML_TYPE_NAMED_COMPLEX:
 
-		switch (op->opcode) {
+		switch (op->common.aml_opcode) {
 		case AML_METHOD_OP:
 			/*
 			 * Method_op Pkg_length Name_string Method_flags Term_list
@@ -621,9 +629,8 @@ acpi_ds_load2_end_op (
 					goto cleanup;
 				}
 
-				status = acpi_ex_create_method (((acpi_parse2_object *) op)->data,
-						   ((acpi_parse2_object *) op)->length,
-						   walk_state);
+				status = acpi_ex_create_method (op->named.data,
+						   op->named.length, walk_state);
 			}
 			break;
 
@@ -655,6 +662,11 @@ acpi_ds_load2_end_op (
 
 			status = acpi_ds_create_node (walk_state, node, op);
 			break;
+
+
+		default:
+			/* All NAMED_COMPLEX opcodes must be handled above */
+			break;
 		}
 		break;
 
@@ -674,7 +686,7 @@ acpi_ds_load2_end_op (
 		/*
 		 * Lookup the method name and save the Node
 		 */
-		status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
+		status = acpi_ns_lookup (walk_state->scope_info, arg->common.value.string,
 				  ACPI_TYPE_ANY, ACPI_IMODE_LOAD_PASS2,
 				  ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE,
 				  walk_state, &(new_node));
@@ -691,7 +703,7 @@ acpi_ds_load2_end_op (
 			 * for now, we will put it in the "op" object that the parser uses, so we
 			 * can get it again at the end of this scope
 			 */
-			op->node = new_node;
+			op->common.node = new_node;
 		}
 
 		break;

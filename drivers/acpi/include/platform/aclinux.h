@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclinux.h - OS specific defines, etc.
- *       $Revision: 19 $
+ *       $Revision: 25 $
  *
  *****************************************************************************/
 
@@ -39,14 +39,11 @@
 #include <asm/system.h>
 #include <asm/atomic.h>
 #include <asm/div64.h>
+#include <asm/acpi.h>
 
 #define strtoul simple_strtoul
 
-#ifdef _IA64
-#define ACPI_FLUSH_CPU_CACHE()
-#else
-#define ACPI_FLUSH_CPU_CACHE()	wbinvd()
-#endif
+#define ACPI_MACHINE_WIDTH	BITS_PER_LONG
 
 #else /* !__KERNEL__ */
 
@@ -55,6 +52,17 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#if defined(__ia64__) || defined(__x86_64__)
+#define ACPI_MACHINE_WIDTH		64
+#define COMPILER_DEPENDENT_INT64	long
+#define COMPILER_DEPENDENT_UINT64	unsigned long
+#else
+#define ACPI_MACHINE_WIDTH		32
+#define COMPILER_DEPENDENT_INT64	long long
+#define COMPILER_DEPENDENT_UINT64	unsigned long long
+#define ACPI_USE_NATIVE_DIVIDE
+#endif
+
 #endif /* __KERNEL__ */
 
 /* Linux uses GCC */
@@ -62,7 +70,6 @@
 #include "acgcc.h"
 
 #undef DEBUGGER_THREADING
-#define DEBUGGER_THREADING          DEBUGGER_SINGLE_THREADED
-
+#define DEBUGGER_THREADING	DEBUGGER_SINGLE_THREADED
 
 #endif /* __ACLINUX_H__ */

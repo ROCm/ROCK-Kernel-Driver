@@ -60,7 +60,7 @@ CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
 # CONFIG_ARTHUR is not set
 # CONFIG_PARPORT is not set
-CONFIG_CMDLINE=""
+CONFIG_CMDLINE="mem=64M@0xc0000000 mem=64M@0xc8000000 root=/dev/mtdblock2"
 
 #
 # Plug and Play support

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 135 $
+ *              $Revision: 137 $
  *
  *****************************************************************************/
 
@@ -212,7 +212,7 @@ acpi_ex_opcode_1A_1T_1R (
 	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_1A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
-	/* Create a return object of type Integer for most opcodes */
+	/* Examine the AML opcode */
 
 	switch (walk_state->opcode) {
 	case AML_BIT_NOT_OP:
@@ -222,156 +222,159 @@ acpi_ex_opcode_1A_1T_1R (
 	case AML_TO_BCD_OP:
 	case AML_COND_REF_OF_OP:
 
+		/* Create a return object of type Integer for these opcodes */
+
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!return_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;
 		}
 
-		break;
-	}
+		switch (walk_state->opcode) {
+		case AML_BIT_NOT_OP:            /* Not (Operand, Result)  */
 
-	/* Examine the AML opcode */
-
-	switch (walk_state->opcode) {
-
-	case AML_BIT_NOT_OP:            /* Not (Operand, Result)  */
-
-		return_desc->integer.value = ~operand[0]->integer.value;
-		break;
+			return_desc->integer.value = ~operand[0]->integer.value;
+			break;
 
 
-	case AML_FIND_SET_LEFT_BIT_OP:  /* Find_set_left_bit (Operand, Result) */
+		case AML_FIND_SET_LEFT_BIT_OP:  /* Find_set_left_bit (Operand, Result) */
 
-		return_desc->integer.value = operand[0]->integer.value;
+			return_desc->integer.value = operand[0]->integer.value;
 
-		/*
-		 * Acpi specification describes Integer type as a little
-		 * endian unsigned value, so this boundary condition is valid.
-		 */
-		for (temp32 = 0; return_desc->integer.value && temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
-			return_desc->integer.value >>= 1;
-		}
+			/*
+			 * Acpi specification describes Integer type as a little
+			 * endian unsigned value, so this boundary condition is valid.
+			 */
+			for (temp32 = 0; return_desc->integer.value && temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
+				return_desc->integer.value >>= 1;
+			}
 
-		return_desc->integer.value = temp32;
-		break;
-
-
-	case AML_FIND_SET_RIGHT_BIT_OP: /* Find_set_right_bit (Operand, Result) */
-
-		return_desc->integer.value = operand[0]->integer.value;
-
-		/*
-		 * The Acpi specification describes Integer type as a little
-		 * endian unsigned value, so this boundary condition is valid.
-		 */
-		for (temp32 = 0; return_desc->integer.value && temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
-			return_desc->integer.value <<= 1;
-		}
-
-		/* Since the bit position is one-based, subtract from 33 (65) */
-
-		return_desc->integer.value = temp32 == 0 ? 0 : (ACPI_INTEGER_BIT_SIZE + 1) - temp32;
-		break;
+			return_desc->integer.value = temp32;
+			break;
 
 
-	case AML_FROM_BCD_OP:           /* From_bcd (BCDValue, Result) */
+		case AML_FIND_SET_RIGHT_BIT_OP: /* Find_set_right_bit (Operand, Result) */
 
-		/*
-		 * The 64-bit ACPI integer can hold 16 4-bit BCD integers
-		 */
-		return_desc->integer.value = 0;
-		for (i = 0; i < ACPI_MAX_BCD_DIGITS; i++) {
-			/* Get one BCD digit */
+			return_desc->integer.value = operand[0]->integer.value;
 
-			digit = (acpi_integer) ((operand[0]->integer.value >> (i * 4)) & 0xF);
+			/*
+			 * The Acpi specification describes Integer type as a little
+			 * endian unsigned value, so this boundary condition is valid.
+			 */
+			for (temp32 = 0; return_desc->integer.value && temp32 < ACPI_INTEGER_BIT_SIZE; ++temp32) {
+				return_desc->integer.value <<= 1;
+			}
 
-			/* Check the range of the digit */
+			/* Since the bit position is one-based, subtract from 33 (65) */
 
-			if (digit > 9) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD digit too large: %d\n",
-					(u32) digit));
+			return_desc->integer.value = temp32 == 0 ? 0 : (ACPI_INTEGER_BIT_SIZE + 1) - temp32;
+			break;
+
+
+		case AML_FROM_BCD_OP:           /* From_bcd (BCDValue, Result) */
+
+			/*
+			 * The 64-bit ACPI integer can hold 16 4-bit BCD integers
+			 */
+			return_desc->integer.value = 0;
+			for (i = 0; i < ACPI_MAX_BCD_DIGITS; i++) {
+				/* Get one BCD digit */
+
+				digit = (acpi_integer) ((operand[0]->integer.value >> (i * 4)) & 0xF);
+
+				/* Check the range of the digit */
+
+				if (digit > 9) {
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD digit too large: %d\n",
+						(u32) digit));
+					status = AE_AML_NUMERIC_OVERFLOW;
+					goto cleanup;
+				}
+
+				if (digit > 0) {
+					/* Sum into the result with the appropriate power of 10 */
+
+					for (j = 0; j < i; j++) {
+						digit *= 10;
+					}
+
+					return_desc->integer.value += digit;
+				}
+			}
+			break;
+
+
+		case AML_TO_BCD_OP:             /* To_bcd (Operand, Result) */
+
+			if (operand[0]->integer.value > ACPI_MAX_BCD_VALUE) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD overflow: %8.8X%8.8X\n",
+					ACPI_HIDWORD(operand[0]->integer.value),
+					ACPI_LODWORD(operand[0]->integer.value)));
 				status = AE_AML_NUMERIC_OVERFLOW;
 				goto cleanup;
 			}
 
-			if (digit > 0) {
-				/* Sum into the result with the appropriate power of 10 */
+			return_desc->integer.value = 0;
+			for (i = 0; i < ACPI_MAX_BCD_DIGITS; i++) {
+				/* Divide by nth factor of 10 */
 
+				temp32 = 0;
+				digit = operand[0]->integer.value;
 				for (j = 0; j < i; j++) {
-					digit *= 10;
+					(void) acpi_ut_short_divide (&digit, 10, &digit, &temp32);
 				}
 
-				return_desc->integer.value += digit;
+				/* Create the BCD digit from the remainder above */
+
+				if (digit > 0) {
+					return_desc->integer.value += ((acpi_integer) temp32 << (i * 4));
+				}
 			}
-		}
-		break;
+			break;
 
 
-	case AML_TO_BCD_OP:             /* To_bcd (Operand, Result) */
-
-		if (operand[0]->integer.value > ACPI_MAX_BCD_VALUE) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD overflow: %8.8X%8.8X\n",
-				ACPI_HIDWORD(operand[0]->integer.value),
-				ACPI_LODWORD(operand[0]->integer.value)));
-			status = AE_AML_NUMERIC_OVERFLOW;
-			goto cleanup;
-		}
-
-		return_desc->integer.value = 0;
-		for (i = 0; i < ACPI_MAX_BCD_DIGITS; i++) {
-			/* Divide by nth factor of 10 */
-
-			temp32 = 0;
-			digit = operand[0]->integer.value;
-			for (j = 0; j < i; j++) {
-				acpi_ut_short_divide (&digit, 10, &digit, &temp32);
-			}
-
-			/* Create the BCD digit from the remainder above */
-
-			if (digit > 0) {
-				return_desc->integer.value += ((acpi_integer) temp32 << (i * 4));
-			}
-		}
-		break;
-
-
-	case AML_COND_REF_OF_OP:        /* Cond_ref_of (Source_object, Result) */
-
-		/*
-		 * This op is a little strange because the internal return value is
-		 * different than the return value stored in the result descriptor
-		 * (There are really two return values)
-		 */
-		if ((acpi_namespace_node *) operand[0] == acpi_gbl_root_node) {
-			/*
-			 * This means that the object does not exist in the namespace,
-			 * return FALSE
-			 */
-			return_desc->integer.value = 0;
+		case AML_COND_REF_OF_OP:        /* Cond_ref_of (Source_object, Result) */
 
 			/*
-			 * Must delete the result descriptor since there is no reference
-			 * being returned
+			 * This op is a little strange because the internal return value is
+			 * different than the return value stored in the result descriptor
+			 * (There are really two return values)
 			 */
-			acpi_ut_remove_reference (operand[1]);
+			if ((acpi_namespace_node *) operand[0] == acpi_gbl_root_node) {
+				/*
+				 * This means that the object does not exist in the namespace,
+				 * return FALSE
+				 */
+				return_desc->integer.value = 0;
+
+				/*
+				 * Must delete the result descriptor since there is no reference
+				 * being returned
+				 */
+				acpi_ut_remove_reference (operand[1]);
+				goto cleanup;
+			}
+
+			/* Get the object reference and store it */
+
+			status = acpi_ex_get_object_reference (operand[0], &return_desc2, walk_state);
+			if (ACPI_FAILURE (status)) {
+				goto cleanup;
+			}
+
+			status = acpi_ex_store (return_desc2, operand[1], walk_state);
+
+			/* The object exists in the namespace, return TRUE */
+
+			return_desc->integer.value = ACPI_INTEGER_MAX;
 			goto cleanup;
+
+
+		default:
+			/* No other opcodes get here */
+			break;
 		}
-
-		/* Get the object reference and store it */
-
-		status = acpi_ex_get_object_reference (operand[0], &return_desc2, walk_state);
-		if (ACPI_FAILURE (status)) {
-			goto cleanup;
-		}
-
-		status = acpi_ex_store (return_desc2, operand[1], walk_state);
-
-		/* The object exists in the namespace, return TRUE */
-
-		return_desc->integer.value = ACPI_INTEGER_MAX;
-		goto cleanup;
+		break;
 
 
 	case AML_STORE_OP:              /* Store (Source, Target) */
@@ -520,7 +523,7 @@ acpi_ex_opcode_1A_0T_1R (
 		 * can be either a NS Node or an internal object.
 		 */
 		return_desc = operand[0];
-		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) == ACPI_DESC_TYPE_INTERNAL) {
+		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) == ACPI_DESC_TYPE_OPERAND) {
 			/* Internal reference object - prevent deletion */
 
 			acpi_ut_add_reference (return_desc);
@@ -628,6 +631,11 @@ acpi_ex_opcode_1A_0T_1R (
 			case INTERNAL_TYPE_INDEX_FIELD:
 
 				type = ACPI_TYPE_FIELD_UNIT;
+				break;
+
+			default:
+				/* No change to Type required */
+				break;
 			}
 
 		}
@@ -722,8 +730,11 @@ acpi_ex_opcode_1A_0T_1R (
 
 					/* Set Operand[0] to the value of the local/arg */
 
-					acpi_ds_method_data_get_value (operand[0]->reference.opcode,
-							operand[0]->reference.offset, walk_state, &temp_desc);
+					status = acpi_ds_method_data_get_value (operand[0]->reference.opcode,
+							 operand[0]->reference.offset, walk_state, &temp_desc);
+					if (ACPI_FAILURE (status)) {
+						goto cleanup;
+					}
 
 					/*
 					 * Delete our reference to the input object and
@@ -750,13 +761,15 @@ acpi_ex_opcode_1A_0T_1R (
 				 * 2) Dereference the node to an actual object.  Could be a Field, so we nee
 				 *    to resolve the node to a value.
 				 */
-				status = acpi_ns_get_node_by_path (operand[0]->string.pointer, walk_state->scope_info->scope.node,
-						  ACPI_NS_SEARCH_PARENT, (acpi_namespace_node **) &return_desc);
+				status = acpi_ns_get_node_by_path (operand[0]->string.pointer,
+						  walk_state->scope_info->scope.node, ACPI_NS_SEARCH_PARENT,
+						  ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, &return_desc));
 				if (ACPI_FAILURE (status)) {
 					goto cleanup;
 				}
 
-				status = acpi_ex_resolve_node_to_value ((acpi_namespace_node **) &return_desc, walk_state);
+				status = acpi_ex_resolve_node_to_value (
+						  ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, &return_desc), walk_state);
 				goto cleanup;
 
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 89 $
+ *              $Revision: 92 $
  *
  ******************************************************************************/
 
@@ -74,14 +74,14 @@ acpi_ds_is_result_used (
 	 * method is parsed separately)  However, a method that is
 	 * invoked from another method has a parent.
 	 */
-	if (!op->parent) {
+	if (!op->common.parent) {
 		return_VALUE (FALSE);
 	}
 
 	/*
 	 * Get info on the parent.  The root Op is AML_SCOPE
 	 */
-	parent_info = acpi_ps_get_opcode_info (op->parent->opcode);
+	parent_info = acpi_ps_get_opcode_info (op->common.parent->common.aml_opcode);
 	if (parent_info->class == AML_CLASS_UNKNOWN) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown parent opcode. Op=%p\n", op));
 		return_VALUE (FALSE);
@@ -96,7 +96,7 @@ acpi_ds_is_result_used (
 	switch (parent_info->class) {
 	case AML_CLASS_CONTROL:
 
-		switch (op->parent->opcode) {
+		switch (op->common.parent->common.aml_opcode) {
 		case AML_RETURN_OP:
 
 			/* Never delete the return value associated with a return opcode */
@@ -114,6 +114,11 @@ acpi_ds_is_result_used (
 				(walk_state->control_state->control.predicate_op == op)) {
 				goto result_used;
 			}
+			break;
+
+		default:
+			/* Ignore other control opcodes */
+			break;
 		}
 
 		/* The general control opcode returns no result */
@@ -132,12 +137,12 @@ acpi_ds_is_result_used (
 
 	case AML_CLASS_NAMED_OBJECT:
 
-		if ((op->parent->opcode == AML_REGION_OP)       ||
-			(op->parent->opcode == AML_DATA_REGION_OP)  ||
-			(op->parent->opcode == AML_PACKAGE_OP)      ||
-			(op->parent->opcode == AML_VAR_PACKAGE_OP)  ||
-			(op->parent->opcode == AML_BUFFER_OP)       ||
-			(op->parent->opcode == AML_INT_EVAL_SUBTREE_OP)) {
+		if ((op->common.parent->common.aml_opcode == AML_REGION_OP)      ||
+			(op->common.parent->common.aml_opcode == AML_DATA_REGION_OP) ||
+			(op->common.parent->common.aml_opcode == AML_PACKAGE_OP)     ||
+			(op->common.parent->common.aml_opcode == AML_VAR_PACKAGE_OP) ||
+			(op->common.parent->common.aml_opcode == AML_BUFFER_OP)      ||
+			(op->common.parent->common.aml_opcode == AML_INT_EVAL_SUBTREE_OP)) {
 			/*
 			 * These opcodes allow Term_arg(s) as operands and therefore
 			 * the operands can be method calls.  The result is used.
@@ -160,16 +165,16 @@ acpi_ds_is_result_used (
 
 result_used:
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Result of [%s] used by Parent [%s] Op=%p\n",
-			acpi_ps_get_opcode_name (op->opcode),
-			acpi_ps_get_opcode_name (op->parent->opcode), op));
+			acpi_ps_get_opcode_name (op->common.aml_opcode),
+			acpi_ps_get_opcode_name (op->common.parent->common.aml_opcode), op));
 
 	return_VALUE (TRUE);
 
 
 result_not_used:
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Result of [%s] not used by Parent [%s] Op=%p\n",
-			acpi_ps_get_opcode_name (op->opcode),
-			acpi_ps_get_opcode_name (op->parent->opcode), op));
+			acpi_ps_get_opcode_name (op->common.aml_opcode),
+			acpi_ps_get_opcode_name (op->common.parent->common.aml_opcode), op));
 
 	return_VALUE (FALSE);
 
@@ -253,6 +258,7 @@ acpi_ds_create_operand (
 	u32                     arg_index)
 {
 	acpi_status             status = AE_OK;
+	acpi_status             status2;
 	NATIVE_CHAR             *name_string;
 	u32                     name_length;
 	acpi_operand_object     *obj_desc;
@@ -268,13 +274,13 @@ acpi_ds_create_operand (
 
 	/* A valid name must be looked up in the namespace */
 
-	if ((arg->opcode == AML_INT_NAMEPATH_OP) &&
-		(arg->value.string)) {
+	if ((arg->common.aml_opcode == AML_INT_NAMEPATH_OP) &&
+		(arg->common.value.string)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Getting a name: Arg=%p\n", arg));
 
 		/* Get the entire name string from the AML stream */
 
-		status = acpi_ex_get_name_string (ACPI_TYPE_ANY, arg->value.buffer,
+		status = acpi_ex_get_name_string (ACPI_TYPE_ANY, arg->common.value.buffer,
 				  &name_string, &name_length);
 
 		if (ACPI_FAILURE (status)) {
@@ -292,12 +298,12 @@ acpi_ds_create_operand (
 		 * IMODE_EXECUTE) in order to support the creation of
 		 * namespace objects during the execution of control methods.
 		 */
-		parent_op = arg->parent;
-		op_info = acpi_ps_get_opcode_info (parent_op->opcode);
+		parent_op = arg->common.parent;
+		op_info = acpi_ps_get_opcode_info (parent_op->common.aml_opcode);
 		if ((op_info->flags & AML_NSNODE) &&
-			(parent_op->opcode != AML_INT_METHODCALL_OP) &&
-			(parent_op->opcode != AML_REGION_OP) &&
-			(parent_op->opcode != AML_INT_NAMEPATH_OP)) {
+			(parent_op->common.aml_opcode != AML_INT_METHODCALL_OP) &&
+			(parent_op->common.aml_opcode != AML_REGION_OP) &&
+			(parent_op->common.aml_opcode != AML_INT_NAMEPATH_OP)) {
 			/* Enter name into namespace if not found */
 
 			interpreter_mode = ACPI_IMODE_LOAD_PASS2;
@@ -313,20 +319,20 @@ acpi_ds_create_operand (
 				 ACPI_TYPE_ANY, interpreter_mode,
 				 ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE,
 				 walk_state,
-				 (acpi_namespace_node **) &obj_desc);
+				 ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, &obj_desc));
 		/*
 		 * The only case where we pass through (ignore) a NOT_FOUND
 		 * error is for the Cond_ref_of opcode.
 		 */
 		if (status == AE_NOT_FOUND) {
-			if (parent_op->opcode == AML_COND_REF_OF_OP) {
+			if (parent_op->common.aml_opcode == AML_COND_REF_OF_OP) {
 				/*
 				 * For the Conditional Reference op, it's OK if
 				 * the name is not found;  We just need a way to
 				 * indicate this to the interpreter, set the
 				 * object to the root
 				 */
-				obj_desc = (acpi_operand_object *) acpi_gbl_root_node;
+				obj_desc = ACPI_CAST_PTR (acpi_operand_object, acpi_gbl_root_node);
 				status = AE_OK;
 			}
 
@@ -338,10 +344,12 @@ acpi_ds_create_operand (
 				status = AE_AML_NAME_NOT_FOUND;
 
 				name = NULL;
-				acpi_ns_externalize_name (ACPI_UINT32_MAX, name_string, NULL, &name);
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-						"Object name [%s] was not found in namespace\n", name));
-				ACPI_MEM_FREE (name);
+				status2 = acpi_ns_externalize_name (ACPI_UINT32_MAX, name_string, NULL, &name);
+				if (ACPI_SUCCESS (status2)) {
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+							"Object name [%s] was not found in namespace\n", name));
+					ACPI_MEM_FREE (name);
+				}
 			}
 		}
 
@@ -368,7 +376,7 @@ acpi_ds_create_operand (
 	else {
 		/* Check for null name case */
 
-		if (arg->opcode == AML_INT_NAMEPATH_OP) {
+		if (arg->common.aml_opcode == AML_INT_NAMEPATH_OP) {
 			/*
 			 * If the name is null, this means that this is an
 			 * optional result parameter that was not specified
@@ -381,7 +389,7 @@ acpi_ds_create_operand (
 		}
 
 		else {
-			opcode = arg->opcode;
+			opcode = arg->common.aml_opcode;
 		}
 
 		/* Get the object type of the argument */
@@ -413,7 +421,6 @@ acpi_ds_create_operand (
 				return_ACPI_STATUS (status);
 			}
 		}
-
 		else {
 			/* Create an ACPI_INTERNAL_OBJECT for the argument */
 
@@ -430,7 +437,7 @@ acpi_ds_create_operand (
 				acpi_ut_delete_object_desc (obj_desc);
 				return_ACPI_STATUS (status);
 			}
-	   }
+		}
 
 		/* Put the operand object on the object stack */
 
@@ -487,7 +494,7 @@ acpi_ds_create_operands (
 
 		/* Move on to next argument, if any */
 
-		arg = arg->next;
+		arg = arg->common.next;
 		arg_count++;
 	}
 
@@ -500,7 +507,7 @@ cleanup:
 	 * pop everything off of the operand stack and delete those
 	 * objects
 	 */
-	acpi_ds_obj_stack_pop_and_delete (arg_count, walk_state);
+	(void) acpi_ds_obj_stack_pop_and_delete (arg_count, walk_state);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "While creating Arg %d - %s\n",
 		(arg_count + 1), acpi_format_exception (status)));

@@ -15,20 +15,12 @@
 
 #include "generic.h"
 
-
 static void __init
 fixup_nanoengine(struct machine_desc *desc, struct tag *tags,
 		 char **cmdline, struct meminfo *mi)
 {
-	SET_BANK( 0, 0xc0000000, 32*1024*1024 );
-	mi->nr_banks = 1;
-
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0, 0, 8192 );
-	setup_initrd( __phys_to_virt(0xc0800000), 4*1024*1024 );
-
 	/* Get command line parameters passed from the loader (if any) */
-	if( *((char*)0xc0000100) )
+	if (*((char*)0xc0000100))
 		*cmdline = ((char *)0xc0000100);
 }
 

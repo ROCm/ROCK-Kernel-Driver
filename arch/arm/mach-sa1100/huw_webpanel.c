@@ -54,22 +54,6 @@ static int __init init_huw_cs3(void)
 __initcall(init_huw_cs3);
 
 
-static void __init
-fixup_huw_webpanel(struct machine_desc *desc, struct tag *tags,
-		   char **cmdline, struct meminfo *mi)
-{
-	/**
-	  memory information (JOR):
-	  32 MByte - 256KByte bootloader (init at boot time) - 32 kByte save area
-	 **/
-	SET_BANK( 0, 0xc0000000, ((32*1024 - (256 + 32)) * 1024));
-	mi->nr_banks = 1;
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0, 0, 8192 );
-	setup_initrd( __phys_to_virt(0xc0800000), 8*1024*1024 );
-}
-
-
 /**
    memory information (JOR):
    32 MByte - 256KByte bootloader (init at boot time) - 32 kByte save area
@@ -95,7 +79,6 @@ static void __init huw_webpanel_map_io(void)
 MACHINE_START(HUW_WEBPANEL, "HuW-Webpanel")
 	MAINTAINER("Roman Jordan")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_huw_webpanel)
 	MAPIO(huw_webpanel_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

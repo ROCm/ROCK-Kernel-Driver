@@ -44,12 +44,6 @@ static struct map_desc cdb89712_io_desc[] __initdata = {
 	LAST_DESC
 };
 
-static void __init
-fixup_cdb89712(struct machine_desc *desc, struct tag *tags,
-	    char **cmdline, struct meminfo *mi)
-{
-}
-
 static void __init cdb89712_map_io(void)
 {
 	clps711x_map_io();
@@ -60,7 +54,6 @@ MACHINE_START(CDB89712, "Cirrus-CDB89712")
 	MAINTAINER("Ray Lehtiniemi")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xff000000)
 	BOOT_PARAMS(0xc0000100)
-	FIXUP(fixup_cdb89712)
 	MAPIO(cdb89712_map_io)
 	INITIRQ(clps711x_init_irq)
 MACHINE_END

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: achware.h -- hardware specific interfaces
- *       $Revision: 58 $
+ *       $Revision: 60 $
  *
  *****************************************************************************/
 
@@ -64,49 +64,44 @@ ACPI_BIT_REGISTER_INFO *
 acpi_hw_get_bit_register_info (
 	u32                     register_id);
 
-u32
-acpi_hw_bit_register_read (
-	u32                     register_id,
-	u32                     flags);
-
-u32
-acpi_hw_bit_register_write (
-	u32                     register_id,
-	u32                     value,
-	u32                     flags);
-
-u32
+acpi_status
 acpi_hw_register_read (
 	u8                      use_lock,
-	u32                     register_id);
+	u32                     register_id,
+	u32                     *return_value);
 
-void
+acpi_status
 acpi_hw_register_write (
 	u8                      use_lock,
 	u32                     register_id,
 	u32                     value);
 
-u32
+acpi_status
 acpi_hw_low_level_read (
 	u32                     width,
+	u32                     *value,
 	acpi_generic_address    *reg,
 	u32                     offset);
 
-void
+acpi_status
 acpi_hw_low_level_write (
 	u32                     width,
 	u32                     value,
 	acpi_generic_address    *reg,
 	u32                     offset);
 
-void
+acpi_status
 acpi_hw_clear_acpi_status (
    void);
 
 
 /* GPE support */
 
-void
+u8
+acpi_hw_get_gpe_bit_mask (
+	u32                     gpe_number);
+
+acpi_status
 acpi_hw_enable_gpe (
 	u32                     gpe_number);
 
@@ -114,7 +109,7 @@ void
 acpi_hw_enable_gpe_for_wakeup (
 	u32                     gpe_number);
 
-void
+acpi_status
 acpi_hw_disable_gpe (
 	u32                     gpe_number);
 
@@ -122,31 +117,22 @@ void
 acpi_hw_disable_gpe_for_wakeup (
 	u32                     gpe_number);
 
-void
+acpi_status
 acpi_hw_clear_gpe (
 	u32                     gpe_number);
 
-void
+acpi_status
 acpi_hw_get_gpe_status (
 	u32                     gpe_number,
 	acpi_event_status       *event_status);
 
-void
+acpi_status
 acpi_hw_disable_non_wakeup_gpes (
 	void);
 
-void
+acpi_status
 acpi_hw_enable_non_wakeup_gpes (
 	void);
-
-
-/* Sleep Prototypes */
-
-acpi_status
-acpi_hw_get_sleep_type_data (
-	u8                      sleep_state,
-	u8                      *slp_typ_a,
-	u8                      *slp_typ_b);
 
 
 /* ACPI Timer prototypes */

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 84 $
+ *              $Revision: 85 $
  *
  ******************************************************************************/
 
@@ -25,8 +25,6 @@
 
 
 #include "acpi.h"
-#include "amlcode.h"
-#include "acinterp.h"
 #include "acnamesp.h"
 
 

@@ -19,28 +19,13 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
-#ifndef CONFIG_BLK_DEV_RAM_SIZE
-#define CONFIG_BLK_DEV_RAM_SIZE	4096
-#endif
-
 extern void anakin_map_io(void);
 extern void genarch_init_irq(void);
-
-static void __init
-fixup_anakin(struct machine_desc *desc, struct tag *tag,
-             char **cmdline, struct meminfo *mi)
-{
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
-	setup_ramdisk(1, 0, 0, CONFIG_BLK_DEV_RAM_SIZE);
-	setup_initrd(0xc0800000, 4 * 1024 * 1024);
-}
-
 
 MACHINE_START(ANAKIN, "Anakin")
 	MAINTAINER("Wookey/Tak-Shing Chan")
 	BOOT_MEM(0x20000000, 0x40000000, 0xe0000000)
 	VIDEO(0x80000000, 0x8002db40)
-	FIXUP(fixup_anakin)
 	MAPIO(anakin_map_io)
 	INITIRQ(genarch_init_irq)
 MACHINE_END

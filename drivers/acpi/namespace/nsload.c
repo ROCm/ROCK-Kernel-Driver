@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsload - namespace loading/expanding/contracting procedures
- *              $Revision: 53 $
+ *              $Revision: 55 $
  *
  *****************************************************************************/
 
@@ -25,12 +25,10 @@
 
 
 #include "acpi.h"
-#include "acinterp.h"
 #include "acnamesp.h"
 #include "amlcode.h"
 #include "acparser.h"
 #include "acdispat.h"
-#include "acdebug.h"
 
 
 #define _COMPONENT          ACPI_NAMESPACE
@@ -78,8 +76,8 @@ acpi_ns_load_namespace (
 
 	/* Ignore exceptions from these */
 
-	acpi_ns_load_table_by_type (ACPI_TABLE_SSDT);
-	acpi_ns_load_table_by_type (ACPI_TABLE_PSDT);
+	(void) acpi_ns_load_table_by_type (ACPI_TABLE_SSDT);
+	(void) acpi_ns_load_table_by_type (ACPI_TABLE_PSDT);
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
 		"ACPI Namespace successfully loaded at root %p\n",
@@ -122,7 +120,7 @@ acpi_ns_one_complete_parse (
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
-	((acpi_parse2_object *) parse_root)->name = ACPI_ROOT_NAME;
+	parse_root->named.name = ACPI_ROOT_NAME;
 
 	/* Create and initialize a new walk state */
 
@@ -497,7 +495,10 @@ acpi_ns_delete_subtree (
 			acpi_ns_delete_children (child_handle);
 
 			child_handle = parent_handle;
-			acpi_get_parent (parent_handle, &parent_handle);
+			status = acpi_get_parent (parent_handle, &parent_handle);
+			if (ACPI_FAILURE (status)) {
+				return_ACPI_STATUS (status);
+			}
 		}
 	}
 

@@ -33,29 +33,9 @@
 extern void epxa10db_map_io(void);
 extern void epxa10db_init_irq(void);
 
-
-static void __init
-epxa10db_fixup(struct machine_desc *desc, struct tag *tags,
-		 char **cmdline, struct meminfo *mi)
-{
-
-        mi->nr_banks      = 1;
-        mi->bank[0].start = 0;
-        mi->bank[0].size  = (32*1024*1024);
-        mi->bank[0].node  = 0;
-
-/*
-        ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-        setup_ramdisk( 1, 0, 0, 8192 );
-        setup_initrd(0xc0200000, 6*1024*1024);
-*/
-}
-
 MACHINE_START(CAMELOT, "Altera Epxa10db")
 	MAINTAINER("Altera Corporation")
 	BOOT_MEM(0x00000000, 0x7fffc000, 0xffffc000)
-      	FIXUP(epxa10db_fixup)
 	MAPIO(epxa10db_map_io)
 	INITIRQ(epxa10db_init_irq)
-
 MACHINE_END

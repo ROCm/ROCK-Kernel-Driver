@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 105 $
+ *              $Revision: 109 $
  *
  *****************************************************************************/
 
@@ -27,7 +27,6 @@
 
 #include "acpi.h"
 #include "acnamesp.h"
-#include "acinterp.h"
 #include "amlcode.h"
 #include "actables.h"
 
@@ -146,7 +145,7 @@ acpi_ns_local (
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ns_get_internal_name_length (
 	acpi_namestring_info    *info)
 {
@@ -204,8 +203,6 @@ acpi_ns_get_internal_name_length (
 			  4 + info->num_carats;
 
 	info->next_external_char = next_external_char;
-
-	return (AE_OK);
 }
 
 
@@ -230,7 +227,7 @@ acpi_ns_build_internal_name (
 	NATIVE_CHAR             *internal_name = info->internal_name;
 	NATIVE_CHAR             *external_name = info->next_external_char;
 	NATIVE_CHAR             *result = NULL;
-	u32                     i;
+	NATIVE_UINT_MIN32       i;
 
 
 	ACPI_FUNCTION_TRACE ("Ns_build_internal_name");
@@ -293,7 +290,7 @@ acpi_ns_build_internal_name (
 			else {
 				/* Convert the character to uppercase and save it */
 
-				result[i] = (char) ACPI_TOUPPER (*external_name);
+				result[i] = (char) ACPI_TOUPPER ((int) *external_name);
 				external_name++;
 			}
 		}
@@ -410,12 +407,12 @@ acpi_ns_externalize_name (
 	u32                     *converted_name_length,
 	char                    **converted_name)
 {
-	u32                     prefix_length = 0;
-	u32                     names_index = 0;
-	u32                     num_segments = 0;
-	u32                     i = 0;
-	u32                     j = 0;
-	u32                     required_length;
+	NATIVE_UINT_MIN32       prefix_length = 0;
+	NATIVE_UINT_MIN32       names_index = 0;
+	NATIVE_UINT_MIN32       num_segments = 0;
+	NATIVE_UINT_MIN32       i = 0;
+	NATIVE_UINT_MIN32       j = 0;
+	NATIVE_UINT_MIN32       required_length;
 
 
 	ACPI_FUNCTION_TRACE ("Ns_externalize_name");
@@ -446,6 +443,9 @@ acpi_ns_externalize_name (
 			prefix_length = i;
 		}
 
+		break;
+
+	default:
 		break;
 	}
 
@@ -534,7 +534,7 @@ acpi_ns_externalize_name (
 	}
 
 	if (converted_name_length) {
-		*converted_name_length = required_length;
+		*converted_name_length = (u32) required_length;
 	}
 
 	return_ACPI_STATUS (AE_OK);
@@ -818,16 +818,16 @@ acpi_ns_find_parent_name (
 		parent_node = acpi_ns_get_parent_node (child_node);
 		if (parent_node) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Parent of %p [%4.4s] is %p [%4.4s]\n",
-				child_node, (char *) &child_node->name,
-				parent_node, (char *) &parent_node->name));
+				child_node, child_node->name.ascii,
+				parent_node, parent_node->name.ascii));
 
 			if (parent_node->name.integer) {
-				return_VALUE (parent_node->name.integer);
+				return_VALUE ((acpi_name) parent_node->name.integer);
 			}
 		}
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "unable to find parent of %p (%4.4s)\n",
-			child_node, (char *) &child_node->name));
+			child_node, child_node->name.ascii));
 	}
 
 	return_VALUE (ACPI_UNKNOWN_NAME);

@@ -1,9 +1,9 @@
 /*
- *  acpi_osl.c - OS-dependent functions ($Revision: 69 $)
+ *  acpi_osl.c - OS-dependent functions ($Revision: 78 $)
  *
- *  Copyright (C) 2000 Andrew Henroid
- *  Copyright (C) 2001 Andrew Grover
- *  Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+ *  Copyright (C) 2000       Andrew Henroid
+ *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
+ *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
@@ -38,6 +38,7 @@
 
 #ifdef CONFIG_ACPI_EFI
 #include <asm/efi.h>
+u64 efi_mem_attributes (u64 phys_addr);
 #endif
 
 #ifdef _IA64
@@ -77,13 +78,13 @@ acpi_os_initialize(void)
 	 * Initialize PCI configuration space access, as we'll need to access
 	 * it while walking the namespace (bus 0 and root bridges w/ _BBNs).
 	 */
-#if 0
-	pcibios_config_init();
+#ifdef CONFIG_ACPI_PCI
 	if (!pci_config_read || !pci_config_write) {
 		printk(KERN_ERR PREFIX "Access to PCI configuration space unavailable\n");
 		return AE_NULL_ENTRY;
 	}
 #endif
+
 	return AE_OK;
 }
 
@@ -147,24 +148,22 @@ acpi_os_free(void *ptr)
 	kfree(ptr);
 }
 
-
 acpi_status
 acpi_os_get_root_pointer(u32 flags, ACPI_POINTER *addr)
 {
-#ifndef CONFIG_ACPI_EFI
-	if (ACPI_FAILURE(acpi_find_root_pointer(flags, addr))) {
+#ifdef CONFIG_ACPI_EFI
+	addr->pointer_type = ACPI_PHYSICAL_POINTER;
+	if (efi.acpi20)
+		addr->pointer.physical = (ACPI_PHYSICAL_ADDRESS) virt_to_phys(efi.acpi20);
+	else if (efi.acpi)
+		addr->pointer.physical = (ACPI_PHYSICAL_ADDRESS) virt_to_phys(efi.acpi);
+	else {
 		printk(KERN_ERR PREFIX "System description tables not found\n");
 		return AE_NOT_FOUND;
 	}
-#else /*CONFIG_ACPI_EFI*/
-	addr->pointer_type = ACPI_PHYSICAL_POINTER;
-	if (efi.acpi20)
-		addr->pointer.physical = (ACPI_PHYSICAL_ADDRESS) efi.acpi20;
-	else if (efi.acpi)
-		addr->pointer.physical = (ACPI_PHYSICAL_ADDRESS) efi.acpi;
-	else {
+#else
+	if (ACPI_FAILURE(acpi_find_root_pointer(flags, addr))) {
 		printk(KERN_ERR PREFIX "System description tables not found\n");
-		addr->pointer.physical = 0;
 		return AE_NOT_FOUND;
 	}
 #endif /*CONFIG_ACPI_EFI*/
@@ -175,15 +174,23 @@ acpi_os_get_root_pointer(u32 flags, ACPI_POINTER *addr)
 acpi_status
 acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, ACPI_SIZE size, void **virt)
 {
+#ifdef CONFIG_ACPI_EFI
+	if (EFI_MEMORY_UC & efi_mem_attributes(phys)) {
+		*virt = ioremap(phys, size);
+	} else {
+		*virt = phys_to_virt(phys);
+	}
+#else
 	if (phys > ULONG_MAX) {
 		printk(KERN_ERR PREFIX "Cannot map memory that high\n");
 		return AE_BAD_PARAMETER;
 	}
-
 	/*
-	 * ioremap already checks to ensure this is in reserved space
+	 * ioremap checks to ensure this is in reserved space
 	 */
 	*virt = ioremap((unsigned long) phys, size);
+#endif
+
 	if (!*virt)
 		return AE_NO_MEMORY;
 
@@ -204,6 +211,16 @@ acpi_os_get_physical_address(void *virt, ACPI_PHYSICAL_ADDRESS *phys)
 
 	*phys = virt_to_phys(virt);
 
+	return AE_OK;
+}
+
+acpi_status
+acpi_os_table_override (acpi_table_header *existing_table, acpi_table_header **new_table)
+{
+	if (!existing_table || !new_table)
+		return AE_BAD_PARAMETER;
+
+	*new_table = NULL;
 	return AE_OK;
 }
 
@@ -325,25 +342,42 @@ acpi_os_read_memory(
 	void			*value,
 	u32			width)
 {
-	u32 dummy;
+	u32			dummy;
+	void			*virt_addr;
 
+#ifdef CONFIG_ACPI_EFI
+	int			iomem = 0;
+
+	if (EFI_MEMORY_UC & efi_mem_attributes(phys_addr)) {
+		iomem = 1;
+		virt_addr = ioremap(phys_addr, width);
+	} 
+	else
+		virt_addr = phys_to_virt(phys_addr);
+#else
+	virt_addr = phys_to_virt(phys_addr);
+#endif
 	if (!value)
 		value = &dummy;
 
-	switch (width)
-	{
+	switch (width) {
 	case 8:
-		*(u8*) value = *(u8*) phys_to_virt(phys_addr);
+		*(u8*) value = *(u8*) virt_addr;
 		break;
 	case 16:
-		*(u16*) value = *(u16*) phys_to_virt(phys_addr);
+		*(u16*) value = *(u16*) virt_addr;
 		break;
 	case 32:
-		*(u32*) value = *(u32*) phys_to_virt(phys_addr);
+		*(u32*) value = *(u32*) virt_addr;
 		break;
 	default:
 		BUG();
 	}
+
+#ifdef CONFIG_ACPI_EFI
+	if (iomem)
+		iounmap(virt_addr);
+#endif
 
 	return AE_OK;
 }
@@ -354,24 +388,44 @@ acpi_os_write_memory(
 	acpi_integer		value,
 	u32			width)
 {
-	switch (width)
-	{
+	void			*virt_addr;
+
+#ifdef CONFIG_ACPI_EFI
+	int			iomem = 0;
+
+	if (EFI_MEMORY_UC & efi_mem_attributes(phys_addr)) {
+		iomem = 1;
+		virt_addr = ioremap(phys_addr,width);
+	} 
+	else
+		virt_addr = phys_to_virt(phys_addr);
+#else
+	virt_addr = phys_to_virt(phys_addr);
+#endif
+
+	switch (width) {
 	case 8:
-		*(u8*) phys_to_virt(phys_addr) = value;
+		*(u8*) virt_addr = value;
 		break;
 	case 16:
-		*(u16*) phys_to_virt(phys_addr) = value;
+		*(u16*) virt_addr = value;
 		break;
 	case 32:
-		*(u32*) phys_to_virt(phys_addr) = value;
+		*(u32*) virt_addr = value;
 		break;
 	default:
 		BUG();
 	}
 
+#ifdef CONFIG_ACPI_EFI
+	if (iomem)
+		iounmap(virt_addr);
+#endif
+
 	return AE_OK;
 }
 
+#ifdef CONFIG_ACPI_PCI
 
 acpi_status
 acpi_os_read_pci_configuration (
@@ -435,6 +489,29 @@ acpi_os_write_pci_configuration (
 	return (result ? AE_ERROR : AE_OK);
 }
 
+#else /*!CONFIG_ACPI_PCI*/
+
+acpi_status
+acpi_os_write_pci_configuration (
+	acpi_pci_id             *pci_id,
+	u32                     reg,
+	acpi_integer            value,
+	u32                     width)
+{
+	return (AE_SUPPORT);
+}
+
+acpi_status
+acpi_os_read_pci_configuration (
+	acpi_pci_id             *pci_id,
+	u32                     reg,
+	void                    *value,
+	u32                     width)
+{
+	return (AE_SUPPORT);
+}
+
+#endif /*CONFIG_ACPI_PCI*/
 
 acpi_status
 acpi_os_load_module (
@@ -445,7 +522,7 @@ acpi_os_load_module (
 	if (!module_name)
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
-	if (0 > request_module(module_name)) {
+	if (request_module(module_name) < 0) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to load module [%s].\n", module_name));
 		return_ACPI_STATUS (AE_ERROR);
 	}

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsaddr - Address resource descriptors (16/32/64)
- *              $Revision: 24 $
+ *              $Revision: 26 $
  *
  ******************************************************************************/
 
@@ -60,8 +60,8 @@ acpi_rs_address16_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
-	NATIVE_CHAR             *temp_ptr;
+	acpi_resource           *output_struct = (void *) *output_buffer;
+	u8                      *temp_ptr;
 	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address16);
 	u32                     index;
 	u16                     temp16;
@@ -200,7 +200,7 @@ acpi_rs_address16_resource (
 		output_struct->data.address16.resource_source.string_ptr =
 				(NATIVE_CHAR *)((u8 * )output_struct + struct_size);
 
-		temp_ptr = output_struct->data.address16.resource_source.string_ptr;
+		temp_ptr = (u8 *) output_struct->data.address16.resource_source.string_ptr;
 
 		/* Copy the string into the buffer */
 
@@ -238,7 +238,7 @@ acpi_rs_address16_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure
@@ -390,8 +390,7 @@ acpi_rs_address16_stream (
 		 * Buffer needs to be set to the length of the sting + one for the
 		 *  terminating null
 		 */
-		buffer += (ACPI_STRLEN (linked_list->data.address16.resource_source.string_ptr)
-				 + 1);
+		buffer += (ACPI_STRLEN (linked_list->data.address16.resource_source.string_ptr) + 1);
 	}
 
 	/*
@@ -439,10 +438,10 @@ acpi_rs_address32_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer;
-	acpi_resource           *output_struct;
+	acpi_resource           *output_struct= (void *) *output_buffer;
 	u16                     temp16;
 	u8                      temp8;
-	NATIVE_CHAR             *temp_ptr;
+	u8                      *temp_ptr;
 	ACPI_SIZE               struct_size;
 	u32                     index;
 
@@ -451,8 +450,6 @@ acpi_rs_address32_resource (
 
 
 	buffer = byte_stream_buffer;
-	output_struct = (acpi_resource *) *output_buffer;
-
 	struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address32);
 
 	/*
@@ -588,7 +585,7 @@ acpi_rs_address32_resource (
 		output_struct->data.address32.resource_source.string_ptr =
 				(NATIVE_CHAR *)((u8 *)output_struct + struct_size);
 
-		temp_ptr = output_struct->data.address32.resource_source.string_ptr;
+		temp_ptr = (u8 *) output_struct->data.address32.resource_source.string_ptr;
 
 		/* Copy the string into the buffer */
 
@@ -624,7 +621,7 @@ acpi_rs_address32_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure
@@ -676,7 +673,7 @@ acpi_rs_address32_stream (
 	/*
 	 * Set a pointer to the Length field - to be filled in later
 	 */
-	length_field = (u16 *) buffer;
+	length_field = ACPI_CAST_PTR (u16, buffer);
 	buffer += 2;
 
 	/*
@@ -823,10 +820,10 @@ acpi_rs_address64_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer;
-	acpi_resource           *output_struct;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16;
 	u8                      temp8;
-	NATIVE_CHAR             *temp_ptr;
+	u8                      *temp_ptr;
 	ACPI_SIZE               struct_size;
 	u32                     index;
 
@@ -835,8 +832,6 @@ acpi_rs_address64_resource (
 
 
 	buffer = byte_stream_buffer;
-	output_struct = (acpi_resource *) *output_buffer;
-
 	struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_address64);
 
 	/*
@@ -975,7 +970,7 @@ acpi_rs_address64_resource (
 		output_struct->data.address64.resource_source.string_ptr =
 				(NATIVE_CHAR *)((u8 *)output_struct + struct_size);
 
-		temp_ptr = output_struct->data.address64.resource_source.string_ptr;
+		temp_ptr = (u8 *) output_struct->data.address64.resource_source.string_ptr;
 
 		/* Copy the string into the buffer */
 
@@ -1012,7 +1007,7 @@ acpi_rs_address64_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure
@@ -1065,7 +1060,7 @@ acpi_rs_address64_stream (
 	 * Set a pointer to the Length field - to be filled in later
 	 */
 
-	length_field = (u16 *)buffer;
+	length_field = ACPI_CAST_PTR (u16, buffer);
 	buffer += 2;
 
 	/*

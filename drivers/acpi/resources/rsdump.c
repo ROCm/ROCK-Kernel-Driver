@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsdump - Functions to display the resource structures.
- *              $Revision: 29 $
+ *              $Revision: 32 $
  *
  ******************************************************************************/
 
@@ -31,7 +31,7 @@
 	 ACPI_MODULE_NAME    ("rsdump")
 
 
-#ifdef ACPI_DEBUG
+#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
 
 /*******************************************************************************
  *
@@ -172,9 +172,9 @@ acpi_rs_dump_dma (
 
 void
 acpi_rs_dump_start_depend_fns (
-	acpi_resource_data          *data)
+	acpi_resource_data      *data)
 {
-	acpi_resource_start_dpf     *sdf_data = (acpi_resource_start_dpf *) data;
+	acpi_resource_start_dpf *sdf_data = (acpi_resource_start_dpf *) data;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -977,7 +977,7 @@ acpi_rs_dump_resource_list (
 
 	if (acpi_dbg_level & ACPI_LV_RESOURCES && _COMPONENT & acpi_dbg_layer) {
 		while (!done) {
-			acpi_os_printf ("Resource structure %x.\n", count++);
+			acpi_os_printf ("Resource structure %X.\n", count++);
 
 			switch (resource->id) {
 			case ACPI_RSTYPE_IRQ:
@@ -1082,7 +1082,7 @@ acpi_rs_dump_irq_list (
 
 
 	if (acpi_dbg_level & ACPI_LV_RESOURCES && _COMPONENT & acpi_dbg_layer) {
-		prt_element = (acpi_pci_routing_table *) buffer;
+		prt_element = ACPI_CAST_PTR (acpi_pci_routing_table, buffer);
 
 		while (!done) {
 			acpi_os_printf ("PCI IRQ Routing Table structure %X.\n", count++);
@@ -1100,7 +1100,7 @@ acpi_rs_dump_irq_list (
 
 			buffer += prt_element->length;
 
-			prt_element = (acpi_pci_routing_table *) buffer;
+			prt_element = ACPI_CAST_PTR (acpi_pci_routing_table, buffer);
 
 			if(0 == prt_element->length) {
 				done = TRUE;

@@ -55,19 +55,6 @@ static void __init pfs168_init_irq(void)
 	set_GPIO_IRQ_edge(GPIO_UCB1300_IRQ, GPIO_RISING_EDGE);
 }
 
-
-static void __init
-fixup_pfs168(struct machine_desc *desc, struct tag *tags,
-	     char **cmdline, struct meminfo *mi)
-{
-	SET_BANK( 0, 0xc0000000, 16*1024*1024 );
-	mi->nr_banks = 1;
-
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0, 0, 8192 );
-	setup_initrd( 0xc0800000, 3*1024*1024 );
-}
-
 static struct map_desc pfs168_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash bank 0 */
@@ -98,10 +85,7 @@ static void __init pfs168_map_io(void)
 
 MACHINE_START(PFS168, "Tulsa")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-#if defined(CONFIG_PFS168_CMDLINE)
 	BOOT_PARAMS(0xc0000100)
-#endif
-	FIXUP(fixup_pfs168)
 	MAPIO(pfs168_map_io)
 	INITIRQ(pfs168_init_irq)
 MACHINE_END

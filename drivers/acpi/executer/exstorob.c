@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              $Revision: 42 $
+ *              $Revision: 44 $
  *
  *****************************************************************************/
 
@@ -26,12 +26,7 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
-#include "acdispat.h"
 #include "acinterp.h"
-#include "amlcode.h"
-#include "acnamesp.h"
-#include "actables.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -166,7 +161,7 @@ acpi_ex_store_string_to_string (
 			ACPI_MEM_FREE (target_desc->string.pointer);
 		}
 
-		target_desc->string.pointer = ACPI_MEM_ALLOCATE (length + 1);
+		target_desc->string.pointer = ACPI_MEM_ALLOCATE ((ACPI_SIZE) length + 1);
 		if (!target_desc->string.pointer) {
 			return (AE_NO_MEMORY);
 		}

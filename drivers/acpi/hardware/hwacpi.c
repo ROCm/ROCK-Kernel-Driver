@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwacpi - ACPI Hardware Initialization/Mode Interface
- *              $Revision: 53 $
+ *              $Revision: 58 $
  *
  *****************************************************************************/
 
@@ -26,7 +26,6 @@
 
 
 #include "acpi.h"
-#include "achware.h"
 
 
 #define _COMPONENT          ACPI_HARDWARE
@@ -91,35 +90,57 @@ acpi_hw_set_mode (
 	u32                     mode)
 {
 
-	acpi_status             status = AE_NO_HARDWARE_RESPONSE;
+	acpi_status             status;
+	u32                     retry;
 
 
 	ACPI_FUNCTION_TRACE ("Hw_set_mode");
 
+	switch (mode) {
+	case ACPI_SYS_MODE_ACPI:
 
-	if (mode == ACPI_SYS_MODE_ACPI) {
 		/* BIOS should have disabled ALL fixed and GP events */
 
-		acpi_os_write_port (acpi_gbl_FADT->smi_cmd, acpi_gbl_FADT->acpi_enable, 8);
+		status = acpi_os_write_port (acpi_gbl_FADT->smi_cmd,
+				  (acpi_integer) acpi_gbl_FADT->acpi_enable, 8);
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Attempting to enable ACPI mode\n"));
-	}
-	else if (mode == ACPI_SYS_MODE_LEGACY) {
+		break;
+
+	case ACPI_SYS_MODE_LEGACY:
+
 		/*
 		 * BIOS should clear all fixed status bits and restore fixed event
 		 * enable bits to default
 		 */
-		acpi_os_write_port (acpi_gbl_FADT->smi_cmd, acpi_gbl_FADT->acpi_disable, 8);
+		status = acpi_os_write_port (acpi_gbl_FADT->smi_cmd,
+				 (acpi_integer) acpi_gbl_FADT->acpi_disable, 8);
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 				 "Attempting to enable Legacy (non-ACPI) mode\n"));
+		break;
+
+	default:
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	/* Give the platform some time to react */
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
-	acpi_os_stall (20000);
+	/*
+	 * Some hardware takes a LONG time to switch modes. Give them 3 sec to
+	 * do so, but allow faster systems to proceed more quickly.
+	 */
+	retry = 3000;
+	while (retry) {
+		status = AE_NO_HARDWARE_RESPONSE;
 
-	if (acpi_hw_get_mode () == mode) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Mode %X successfully enabled\n", mode));
-		status = AE_OK;
+		if (acpi_hw_get_mode() == mode) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Mode %X successfully enabled\n", mode));
+			status = AE_OK;
+			break;
+		}
+		acpi_os_stall(1000);
+		retry--;
 	}
 
 	return_ACPI_STATUS (status);
@@ -142,11 +163,18 @@ acpi_hw_set_mode (
 u32
 acpi_hw_get_mode (void)
 {
+	acpi_status             status;
+	u32                     value;
+
 
 	ACPI_FUNCTION_TRACE ("Hw_get_mode");
 
+	status = acpi_get_register (ACPI_BITREG_SCI_ENABLE, &value, ACPI_MTX_LOCK);
+	if (ACPI_FAILURE (status)) {
+		return_VALUE (ACPI_SYS_MODE_LEGACY);
+	}
 
-	if (acpi_hw_bit_register_read (ACPI_BITREG_SCI_ENABLE, ACPI_MTX_LOCK)) {
+	if (value) {
 		return_VALUE (ACPI_SYS_MODE_ACPI);
 	}
 	else {

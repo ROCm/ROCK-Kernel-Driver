@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *  Copyright (C) 2001 Patrick Mochel <mochel@osdl.org>
- *
+  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -28,47 +28,105 @@
 
 #ifdef __KERNEL__
 
-#ifdef CONFIG_ACPI_BOOT
+#define COMPILER_DEPENDENT_INT64   long long
+#define COMPILER_DEPENDENT_UINT64  unsigned long long
+
+/*
+ * Calling conventions:
+ *
+ * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
+ * ACPI_EXTERNAL_XFACE      - External ACPI interfaces 
+ * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
+ * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
+ */
+#define ACPI_SYSTEM_XFACE
+#define ACPI_EXTERNAL_XFACE
+#define ACPI_INTERNAL_XFACE
+#define ACPI_INTERNAL_VAR_XFACE
+
+/* Asm macros */
+
+#define ACPI_ASM_MACROS
+#define BREAKPOINT3
+#define ACPI_DISABLE_IRQS() __cli()
+#define ACPI_ENABLE_IRQS()  __sti()
+#define ACPI_FLUSH_CPU_CACHE()	wbinvd()
+
+/*
+ * A brief explanation as GNU inline assembly is a bit hairy
+ *  %0 is the output parameter in EAX ("=a")
+ *  %1 and %2 are the input parameters in ECX ("c")
+ *  and an immediate value ("i") respectively
+ *  All actual register references are preceded with "%%" as in "%%edx"
+ *  Immediate values in the assembly are preceded by "$" as in "$0x1"
+ *  The final asm parameter are the operation altered non-output registers.
+ */
+#define ACPI_ACQUIRE_GLOBAL_LOCK(GLptr, Acq) \
+    do { \
+        int dummy; \
+        asm("1:     movl (%1),%%eax;" \
+            "movl   %%eax,%%edx;" \
+            "andl   %2,%%edx;" \
+            "btsl   $0x1,%%edx;" \
+            "adcl   $0x0,%%edx;" \
+            "lock;  cmpxchgl %%edx,(%1);" \
+            "jnz    1b;" \
+            "cmpb   $0x3,%%dl;" \
+            "sbbl   %%eax,%%eax" \
+            :"=a"(Acq),"=c"(dummy):"c"(GLptr),"i"(~1L):"dx"); \
+    } while(0)
+
+#define ACPI_RELEASE_GLOBAL_LOCK(GLptr, Acq) \
+    do { \
+        int dummy; \
+        asm("1:     movl (%1),%%eax;" \
+            "movl   %%eax,%%edx;" \
+            "andl   %2,%%edx;" \
+            "lock;  cmpxchgl %%edx,(%1);" \
+            "jnz    1b;" \
+            "andl   $0x1,%%eax" \
+            :"=a"(Acq),"=c"(dummy):"c"(GLptr),"i"(~3L):"dx"); \
+    } while(0)
+
+
+/*
+ * Math helper asm macros
+ */
+#define ACPI_DIV_64_BY_32(n_hi, n_lo, d32, q32, r32) \
+        asm("divl %2;"        \
+        :"=a"(q32), "=d"(r32) \
+        :"r"(d32),            \
+        "0"(n_lo), "1"(n_hi))
+
+
+#define ACPI_SHIFT_RIGHT_64(n_hi, n_lo) \
+    asm("shrl   $1,%2;"             \
+        "rcrl   $1,%3;"             \
+        :"=r"(n_hi), "=r"(n_lo)     \
+        :"0"(n_hi), "1"(n_lo))
+
+
+#ifndef CONFIG_ACPI_BOOT
+#define acpi_lapic 0
+#define acpi_ioapic 0
+#else
+#ifdef CONFIG_X86_LOCAL_APIC
+extern int acpi_lapic;
+#else
+#define acpi_lapic 0
+#endif
+#ifdef CONFIG_X86_IO_APIC
+extern int acpi_ioapic;
+#else
+#define acpi_ioapic 0
+#endif
 
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
-#define FIX_ACPI_PAGES		4
+#define FIX_ACPI_PAGES 4
 
-extern int acpi_mp_config;
-
-char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
-extern int acpi_find_rsdp (unsigned long *phys_addr);
-extern int acpi_parse_madt (unsigned long phys_addr, unsigned long size);
-extern int acpi_boot_init (char *cmdline);
-
-#else
-#define acpi_mp_config 0
 #endif /*CONFIG_ACPI_BOOT*/
 
-#ifdef CONFIG_ACPI_PCI
-int acpi_get_interrupt_model (int *type);
-#endif /*CONFIG_ACPI_PCI*/
-
-
 #ifdef CONFIG_ACPI_SLEEP
-
-extern unsigned long saved_eip;
-extern unsigned long saved_esp;
-extern unsigned long saved_ebp;
-extern unsigned long saved_ebx;
-extern unsigned long saved_esi;
-extern unsigned long saved_edi;
-
-static inline void acpi_save_register_state(unsigned long return_point)
-{
-	saved_eip = return_point;
-	asm volatile ("movl %%esp,(%0)" : "=m" (saved_esp));
-	asm volatile ("movl %%ebp,(%0)" : "=m" (saved_ebp));
-	asm volatile ("movl %%ebx,(%0)" : "=m" (saved_ebx));
-	asm volatile ("movl %%edi,(%0)" : "=m" (saved_edi));
-	asm volatile ("movl %%esi,(%0)" : "=m" (saved_esi));
-}
-
-#define acpi_restore_register_state()	do {} while (0)
 
 /* routines for saving/restoring kernel state */
 extern int acpi_save_state_mem(void);
@@ -81,7 +139,6 @@ extern unsigned long acpi_wakeup_address;
 extern void acpi_reserve_bootmem(void);
 
 #endif /*CONFIG_ACPI_SLEEP*/
-
 
 #endif /*__KERNEL__*/
 

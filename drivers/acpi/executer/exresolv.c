@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 109 $
+ *              $Revision: 111 $
  *
  *****************************************************************************/
 
@@ -27,12 +27,8 @@
 
 #include "acpi.h"
 #include "amlcode.h"
-#include "acparser.h"
 #include "acdispat.h"
 #include "acinterp.h"
-#include "acnamesp.h"
-#include "actables.h"
-#include "acevents.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -75,7 +71,7 @@ acpi_ex_resolve_to_value (
 	 * 1) A valid acpi_operand_object, or
 	 * 2) A acpi_namespace_node (Named_obj)
 	 */
-	if (ACPI_GET_DESCRIPTOR_TYPE (*stack_ptr) == ACPI_DESC_TYPE_INTERNAL) {
+	if (ACPI_GET_DESCRIPTOR_TYPE (*stack_ptr) == ACPI_DESC_TYPE_OPERAND) {
 		status = acpi_ex_resolve_object_to_value (stack_ptr, walk_state);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
@@ -87,7 +83,8 @@ acpi_ex_resolve_to_value (
 	 * was called (i.e., we can't use an _else_ here.)
 	 */
 	if (ACPI_GET_DESCRIPTOR_TYPE (*stack_ptr) == ACPI_DESC_TYPE_NAMED) {
-		status = acpi_ex_resolve_node_to_value ((acpi_namespace_node **) stack_ptr,
+		status = acpi_ex_resolve_node_to_value (
+				  ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, stack_ptr),
 				  walk_state);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
@@ -216,6 +213,10 @@ acpi_ex_resolve_object_to_value (
 
 			case AML_REVISION_OP:
 				obj_desc->integer.value = ACPI_CA_SUPPORT_LEVEL;
+				break;
+
+			default:
+				/* No other opcodes can get here */
 				break;
 			}
 

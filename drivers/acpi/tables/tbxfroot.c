@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 61 $
+ *              $Revision: 63 $
  *
  *****************************************************************************/
 
@@ -123,8 +123,8 @@ acpi_get_firmware_table (
 	acpi_table_header       *rsdt_ptr = NULL;
 	acpi_table_header       *table_ptr;
 	acpi_status             status;
-	u32                     rsdt_size = 0;
-	u32                     table_size;
+	ACPI_SIZE               rsdt_size = 0;
+	ACPI_SIZE               table_size;
 	u32                     table_count;
 	u32                     i;
 	u32                     j;
@@ -187,15 +187,15 @@ acpi_get_firmware_table (
 		}
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"RSDP located at %p, RSDT physical=%8.8X%8.8X \n",
-		acpi_gbl_RSDP,
-		ACPI_HIDWORD (acpi_gbl_RSDP->rsdt_physical_address),
-		ACPI_LODWORD (acpi_gbl_RSDP->rsdt_physical_address)));
-
 	/* Get the RSDT and validate it */
 
 	acpi_tb_get_rsdt_address (&address);
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		"RSDP located at %p, RSDT physical=%8.8X%8.8X \n",
+		acpi_gbl_RSDP,
+		ACPI_HIDWORD (address.pointer.value),
+		ACPI_LODWORD (address.pointer.value)));
 
 	status = acpi_tb_get_table_pointer (&address, flags, &rsdt_size, &rsdt_ptr);
 	if (ACPI_FAILURE (status)) {
@@ -272,7 +272,7 @@ cleanup:
 
 /* TBD: Move to a new file */
 
-#ifndef _IA16
+#if ACPI_MACHINE_WIDTH != 16
 
 /*******************************************************************************
  *
@@ -417,7 +417,7 @@ acpi_tb_find_rsdp (
 			/* Found it, return the physical address */
 
 			phys_addr = LO_RSDP_WINDOW_BASE;
-			phys_addr += (mem_rover - table_ptr);
+			phys_addr += ACPI_PTR_DIFF (mem_rover,table_ptr);
 
 			table_info->physical_address = phys_addr;
 			return_ACPI_STATUS (AE_OK);
@@ -439,7 +439,7 @@ acpi_tb_find_rsdp (
 			/* Found it, return the physical address */
 
 			phys_addr = HI_RSDP_WINDOW_BASE;
-			phys_addr += (mem_rover - table_ptr);
+			phys_addr += ACPI_PTR_DIFF (mem_rover, table_ptr);
 
 			table_info->physical_address = phys_addr;
 			return_ACPI_STATUS (AE_OK);

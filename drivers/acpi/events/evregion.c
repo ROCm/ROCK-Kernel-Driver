@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evregion - ACPI Address_space (Op_region) handler dispatch
- *              $Revision: 128 $
+ *              $Revision: 133 $
  *
  *****************************************************************************/
 
@@ -28,7 +28,6 @@
 #include "acevents.h"
 #include "acnamesp.h"
 #include "acinterp.h"
-#include "amlcode.h"
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evregion")
@@ -36,7 +35,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_install_default_address_space_handlers
+ * FUNCTION:    Acpi_ev_init_address_spaces
  *
  * PARAMETERS:
  *
@@ -47,13 +46,13 @@
  ******************************************************************************/
 
 acpi_status
-acpi_ev_install_default_address_space_handlers (
+acpi_ev_init_address_spaces (
 	void)
 {
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_install_default_address_space_handlers");
+	ACPI_FUNCTION_TRACE ("Ev_init_address_spaces");
 
 
 	/*
@@ -166,7 +165,7 @@ acpi_ev_execute_reg_method (
 	/*
 	 *  Set up the parameter objects
 	 */
-	params[0]->integer.value  = region_obj->region.space_id;
+	params[0]->integer.value = region_obj->region.space_id;
 	params[1]->integer.value = function;
 	params[2] = NULL;
 
@@ -209,9 +208,10 @@ acpi_ev_address_space_dispatch (
 	u32                     function,
 	ACPI_PHYSICAL_ADDRESS   address,
 	u32                     bit_width,
-	acpi_integer            *value)
+	void                    *value)
 {
 	acpi_status             status;
+	acpi_status             status2;
 	acpi_adr_space_handler  handler;
 	acpi_adr_space_setup    region_setup;
 	acpi_operand_object     *handler_desc;
@@ -267,7 +267,10 @@ acpi_ev_address_space_dispatch (
 
 		/* Re-enter the interpreter */
 
-		acpi_ex_enter_interpreter ();
+		status2 = acpi_ex_enter_interpreter ();
+		if (ACPI_FAILURE (status2)) {
+			return_ACPI_STATUS (status2);
+		}
 
 		/*
 		 *  Init routine may fail
@@ -325,7 +328,10 @@ acpi_ev_address_space_dispatch (
 		 * We just returned from a non-default handler, we must re-enter the
 		 * interpreter
 		 */
-		acpi_ex_enter_interpreter ();
+		status2 = acpi_ex_enter_interpreter ();
+		if (ACPI_FAILURE (status2)) {
+			return_ACPI_STATUS (status2);
+		}
 	}
 
 	return_ACPI_STATUS (status);
@@ -333,7 +339,7 @@ acpi_ev_address_space_dispatch (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_disassociate_region_from_handler
+ * FUNCTION:    Acpi_ev_detach_region
  *
  * PARAMETERS:  Region_obj      - Region Object
  *              Acpi_ns_is_locked - Namespace Region Already Locked?
@@ -346,7 +352,7 @@ acpi_ev_address_space_dispatch (
  ******************************************************************************/
 
 void
-acpi_ev_disassociate_region_from_handler(
+acpi_ev_detach_region(
 	acpi_operand_object     *region_obj,
 	u8                      acpi_ns_is_locked)
 {
@@ -359,12 +365,12 @@ acpi_ev_disassociate_region_from_handler(
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_disassociate_region_from_handler");
+	ACPI_FUNCTION_TRACE ("Ev_detach_region");
 
 
 	region_obj2 = acpi_ns_get_secondary_object (region_obj);
 	if (!region_obj2) {
-		return;
+		return_VOID;
 	}
 	region_context = region_obj2->extra.region_context;
 
@@ -410,7 +416,12 @@ acpi_ev_disassociate_region_from_handler(
 			/*
 			 *  Now stop region accesses by executing the _REG method
 			 */
-			acpi_ev_execute_reg_method (region_obj, 0);
+			status = acpi_ev_execute_reg_method (region_obj, 0);
+			if (ACPI_FAILURE (status)) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%s from region _REG, [%s]\n",
+					acpi_format_exception (status),
+					acpi_ut_get_region_name (region_obj->region.space_id)));
+			}
 
 			if (acpi_ns_is_locked) {
 				status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
@@ -473,7 +484,7 @@ acpi_ev_disassociate_region_from_handler(
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_associate_region_and_handler
+ * FUNCTION:    Acpi_ev_attach_region
  *
  * PARAMETERS:  Handler_obj     - Handler Object
  *              Region_obj      - Region Object
@@ -487,15 +498,16 @@ acpi_ev_disassociate_region_from_handler(
  ******************************************************************************/
 
 acpi_status
-acpi_ev_associate_region_and_handler (
+acpi_ev_attach_region (
 	acpi_operand_object     *handler_obj,
 	acpi_operand_object     *region_obj,
 	u8                      acpi_ns_is_locked)
 {
-	acpi_status     status;
+	acpi_status             status;
+	acpi_status             status2;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_associate_region_and_handler");
+	ACPI_FUNCTION_TRACE ("Ev_attach_region");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
@@ -519,13 +531,19 @@ acpi_ev_associate_region_and_handler (
 	 * method
 	 */
 	if (acpi_ns_is_locked) {
-		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		status2 = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		if (ACPI_FAILURE (status2)) {
+			return_ACPI_STATUS (status2);
+		}
 	}
 
 	status = acpi_ev_execute_reg_method (region_obj, 1);
 
 	if (acpi_ns_is_locked) {
-		(void) acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+		status2 = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+		if (ACPI_FAILURE (status2)) {
+			return_ACPI_STATUS (status2);
+		}
 	}
 
 	return_ACPI_STATUS (status);
@@ -665,12 +683,12 @@ acpi_ev_addr_handler_helper (
 	 *
 	 *  First disconnect region for any previous handler (if any)
 	 */
-	acpi_ev_disassociate_region_from_handler (obj_desc, FALSE);
+	acpi_ev_detach_region (obj_desc, FALSE);
 
 	/*
 	 *  Then connect the region to the new handler
 	 */
-	status = acpi_ev_associate_region_and_handler (handler_obj, obj_desc, FALSE);
+	status = acpi_ev_attach_region (handler_obj, obj_desc, FALSE);
 
 	return (status);
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evrgnini- ACPI Address_space (Op_region) init
- *              $Revision: 57 $
+ *              $Revision: 61 $
  *
  *****************************************************************************/
 
@@ -27,8 +27,6 @@
 #include "acpi.h"
 #include "acevents.h"
 #include "acnamesp.h"
-#include "acinterp.h"
-#include "amlcode.h"
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evrgnini")
@@ -205,12 +203,12 @@ acpi_ev_pci_config_region_setup (
 	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__ADR, node, &temp);
 
 	/*
-	 *  The default is zero, since the allocation above zeroed the data, just
-	 *  do nothing on failures.
+	 *  The default is zero, and since the allocation above zeroed
+	 *  the data, just do nothing on failure.
 	 */
 	if (ACPI_SUCCESS (status)) {
-		pci_id->device  = ACPI_HIWORD (temp);
-		pci_id->function = ACPI_LOWORD (temp);
+		pci_id->device  = ACPI_HIWORD (ACPI_LODWORD (temp));
+		pci_id->function = ACPI_LOWORD (ACPI_LODWORD (temp));
 	}
 
 	/*
@@ -235,9 +233,13 @@ acpi_ev_pci_config_region_setup (
 			if (ACPI_SUCCESS (status)) {
 				if (!(ACPI_STRNCMP (object_hID.buffer, PCI_ROOT_HID_STRING,
 						   sizeof (PCI_ROOT_HID_STRING)))) {
-					acpi_install_address_space_handler ((acpi_handle) node,
+					status = acpi_install_address_space_handler ((acpi_handle) node,
 							   ACPI_ADR_SPACE_PCI_CONFIG,
 							   ACPI_DEFAULT_HANDLER, NULL, NULL);
+					if (ACPI_FAILURE (status)) {
+						ACPI_REPORT_ERROR (("Could not install handler for %4.4s, %s\n",
+							node->name.ascii, acpi_format_exception (status)));
+					}
 					break;
 				}
 			}
@@ -457,7 +459,7 @@ acpi_ev_initialize_region (
 		obj_desc = acpi_ns_get_attached_object (node);
 		if (obj_desc) {
 			/*
-			 *  can only be a handler if the object exists
+			 * Can only be a handler if the object exists
 			 */
 			switch (node->type) {
 			case ACPI_TYPE_DEVICE:
@@ -474,6 +476,10 @@ acpi_ev_initialize_region (
 
 				handler_obj = obj_desc->thermal_zone.addr_handler;
 				break;
+
+			default:
+				/* Ignore other objects */
+				break;
 			}
 
 			while (handler_obj) {
@@ -489,8 +495,8 @@ acpi_ev_initialize_region (
 					/*
 					 *  Found it! Now update the region and the handler
 					 */
-					acpi_ev_associate_region_and_handler (handler_obj, region_obj,
-							acpi_ns_locked);
+					status = acpi_ev_attach_region (handler_obj, region_obj,
+							 acpi_ns_locked);
 
 					return_ACPI_STATUS (AE_OK);
 				}

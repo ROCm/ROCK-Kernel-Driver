@@ -341,7 +341,7 @@ parse_cmdline(struct meminfo *mi, char **cmdline_p, char *from)
 	*cmdline_p = command_line;
 }
 
-void __init
+static void __init
 setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
 {
 #ifdef CONFIG_BLK_DEV_RAM
@@ -359,7 +359,7 @@ setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
 /*
  * initial ram disk
  */
-void __init setup_initrd(unsigned int start, unsigned int size)
+static void __init setup_initrd(unsigned int start, unsigned int size)
 {
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (start == 0)

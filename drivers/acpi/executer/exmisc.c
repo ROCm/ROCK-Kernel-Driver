@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 100 $
+ *              $Revision: 104 $
  *
  *****************************************************************************/
 
@@ -26,7 +26,6 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
 #include "acinterp.h"
 #include "amlcode.h"
 #include "acdispat.h"
@@ -63,7 +62,7 @@ acpi_ex_get_object_reference (
 
 
 	switch (ACPI_GET_DESCRIPTOR_TYPE (obj_desc)) {
-	case ACPI_DESC_TYPE_INTERNAL:
+	case ACPI_DESC_TYPE_OPERAND:
 
 		if (obj_desc->common.type != INTERNAL_TYPE_REFERENCE) {
 			*return_desc = NULL;
@@ -81,7 +80,7 @@ acpi_ex_get_object_reference (
 
 			status = acpi_ds_method_data_get_node (obj_desc->reference.opcode,
 					  obj_desc->reference.offset, walk_state,
-					  (acpi_namespace_node **) return_desc);
+					  ACPI_CAST_INDIRECT_PTR (acpi_namespace_node, return_desc));
 			break;
 
 		default:
@@ -189,11 +188,11 @@ acpi_ex_concat_template (
 	 * Point the return object to the new buffer
 	 */
 	return_desc->buffer.pointer = (u8 *) new_buf;
-	return_desc->buffer.length = length1 + length2;
+	return_desc->buffer.length = (u32) (length1 + length2);
 
 	/* Compute the new checksum */
 
-	new_buf[return_desc->buffer.length - 1] =
+	new_buf[return_desc->buffer.length - 1] = (NATIVE_CHAR)
 			acpi_ut_generate_checksum (return_desc->buffer.pointer,
 					 (return_desc->buffer.length - 1));
 
@@ -237,7 +236,6 @@ acpi_ex_do_concatenate (
 	acpi_integer            this_integer;
 	acpi_operand_object     *return_desc;
 	NATIVE_CHAR             *new_buf;
-	u32                     integer_size = sizeof (acpi_integer);
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -252,17 +250,6 @@ acpi_ex_do_concatenate (
 	switch (obj_desc1->common.type) {
 	case ACPI_TYPE_INTEGER:
 
-		/* Handle both ACPI 1.0 and ACPI 2.0 Integer widths */
-
-		if (walk_state->method_node->flags & ANOBJ_DATA_WIDTH_32) {
-			/*
-			 * We are running a method that exists in a 32-bit ACPI table.
-			 * Truncate the value to 32 bits by zeroing out the upper
-			 * 32-bit field
-			 */
-			integer_size = sizeof (u32);
-		}
-
 		/* Result of two integers is a buffer */
 
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
@@ -272,7 +259,7 @@ acpi_ex_do_concatenate (
 
 		/* Need enough space for two integers */
 
-		return_desc->buffer.length = integer_size * 2;
+		return_desc->buffer.length = acpi_gbl_integer_byte_width * 2;
 		new_buf = ACPI_MEM_CALLOCATE (return_desc->buffer.length);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
@@ -286,16 +273,16 @@ acpi_ex_do_concatenate (
 		/* Convert the first integer */
 
 		this_integer = obj_desc1->integer.value;
-		for (i = 0; i < integer_size; i++) {
-			new_buf[i] = (u8) this_integer;
+		for (i = 0; i < acpi_gbl_integer_byte_width; i++) {
+			new_buf[i] = (NATIVE_CHAR) this_integer;
 			this_integer >>= 8;
 		}
 
 		/* Convert the second integer */
 
 		this_integer = obj_desc2->integer.value;
-		for (; i < (integer_size * 2); i++) {
-			new_buf[i] = (u8) this_integer;
+		for (; i < (ACPI_MUL_2 (acpi_gbl_integer_byte_width)); i++) {
+			new_buf[i] = (NATIVE_CHAR) this_integer;
 			this_integer >>= 8;
 		}
 
@@ -311,8 +298,8 @@ acpi_ex_do_concatenate (
 
 		/* Operand0 is string  */
 
-		new_buf = ACPI_MEM_ALLOCATE (obj_desc1->string.length +
-				  obj_desc2->string.length + 1);
+		new_buf = ACPI_MEM_ALLOCATE ((ACPI_SIZE) obj_desc1->string.length +
+				  (ACPI_SIZE) obj_desc2->string.length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
 				(("Ex_do_concatenate: String allocation failure\n"));
@@ -341,8 +328,8 @@ acpi_ex_do_concatenate (
 			return (AE_NO_MEMORY);
 		}
 
-		new_buf = ACPI_MEM_ALLOCATE (obj_desc1->buffer.length +
-				  obj_desc2->buffer.length);
+		new_buf = ACPI_MEM_ALLOCATE ((ACPI_SIZE) obj_desc1->buffer.length +
+				  (ACPI_SIZE) obj_desc2->buffer.length);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
 				(("Ex_do_concatenate: Buffer allocation failure\n"));
@@ -530,6 +517,9 @@ acpi_ex_do_logical_op (
 		if (operand0 || operand1) {
 			return (TRUE);
 		}
+		break;
+
+	default:
 		break;
 	}
 

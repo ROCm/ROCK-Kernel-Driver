@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acenv.h - Generation environment specific items
- *       $Revision: 86 $
+ *       $Revision: 94 $
  *
  *****************************************************************************/
 
@@ -51,7 +51,7 @@
 #ifdef _ACPI_ASL_COMPILER
 #define ACPI_DEBUG
 #define ACPI_APPLICATION
-#define ENABLE_DEBUGGER
+/* #define ENABLE_DEBUGGER */
 #define ACPI_USE_SYSTEM_CLIBRARY
 #endif
 
@@ -61,7 +61,7 @@
  * 2) This is NOT a 16-bit version of the code (not enough real-mode memory)
  */
 #ifdef ACPI_DEBUG
-#ifndef _IA16
+#if ACPI_MACHINE_WIDTH != 16
 #define ACPI_DBG_TRACK_ALLOCATIONS
 #endif
 #endif
@@ -111,14 +111,14 @@
 #elif defined(_AED_EFI)
 #include "acefi.h"
 
-#elif defined(MSDOS)
-#include "acdos16.h"
-
 #elif defined(WIN32)
 #include "acwin.h"
 
 #elif defined(WIN64)
 #include "acwin64.h"
+
+#elif defined(MSDOS)        /* Must appear after WIN32 and WIN64 check */
+#include "acdos16.h"
 
 #elif defined(__FreeBSD__)
 #include "acfreebsd.h"
@@ -134,6 +134,10 @@
 /* All other environments */
 
 #define ACPI_USE_STANDARD_HEADERS
+
+#define COMPILER_DEPENDENT_INT64   long long
+#define COMPILER_DEPENDENT_UINT64  unsigned long long
+
 
 /* Name of host operating system (returned by the _OS_ namespace object) */
 
@@ -178,20 +182,23 @@
  */
 
 #define ACPI_STRSTR(s1,s2)      strstr((s1), (s2))
-#define ACPI_STRUPR(s)          acpi_ut_strupr ((s))
-#define ACPI_STRLEN(s)          (u32) strlen((s))
-#define ACPI_STRCPY(d,s)        strcpy((d), (s))
-#define ACPI_STRNCPY(d,s,n)     strncpy((d), (s), (NATIVE_INT)(n))
-#define ACPI_STRNCMP(d,s,n)     strncmp((d), (s), (NATIVE_INT)(n))
+#define ACPI_STRUPR(s)          (void) acpi_ut_strupr ((s))
+#define ACPI_STRLEN(s)          (ACPI_SIZE) strlen((s))
+#define ACPI_STRCPY(d,s)        (void) strcpy((d), (s))
+#define ACPI_STRNCPY(d,s,n)     (void) strncpy((d), (s), (ACPI_SIZE)(n))
+#define ACPI_STRNCMP(d,s,n)     strncmp((d), (s), (ACPI_SIZE)(n))
 #define ACPI_STRCMP(d,s)        strcmp((d), (s))
-#define ACPI_STRCAT(d,s)        strcat((d), (s))
-#define ACPI_STRNCAT(d,s,n)     strncat((d), (s), (NATIVE_INT)(n))
-#define ACPI_STRTOUL(d,s,n)     strtoul((d), (s), (NATIVE_INT)(n))
-#define ACPI_MEMCPY(d,s,n)      (void) memcpy((d), (s), (NATIVE_INT)(n))
-#define ACPI_MEMSET(d,s,n)      (void) memset((d), (s), (NATIVE_INT)(n))
+#define ACPI_STRCAT(d,s)        (void) strcat((d), (s))
+#define ACPI_STRNCAT(d,s,n)     strncat((d), (s), (ACPI_SIZE)(n))
+#define ACPI_STRTOUL(d,s,n)     strtoul((d), (s), (ACPI_SIZE)(n))
+#define ACPI_MEMCPY(d,s,n)      (void) memcpy((d), (s), (ACPI_SIZE)(n))
+#define ACPI_MEMSET(d,s,n)      (void) memset((d), (s), (ACPI_SIZE)(n))
 #define ACPI_TOUPPER            toupper
 #define ACPI_TOLOWER            tolower
 #define ACPI_IS_XDIGIT          isxdigit
+#define ACPI_IS_DIGIT           isdigit
+#define ACPI_IS_SPACE           isspace
+#define ACPI_IS_UPPER           isupper
 
 /******************************************************************************
  *
@@ -234,17 +241,17 @@ typedef char *va_list;
 
 
 #define ACPI_STRSTR(s1,s2)      acpi_ut_strstr ((s1), (s2))
-#define ACPI_STRUPR(s)          acpi_ut_strupr ((s))
-#define ACPI_STRLEN(s)          acpi_ut_strlen ((s))
-#define ACPI_STRCPY(d,s)        acpi_ut_strcpy ((d), (s))
-#define ACPI_STRNCPY(d,s,n)     acpi_ut_strncpy ((d), (s), (n))
-#define ACPI_STRNCMP(d,s,n)     acpi_ut_strncmp ((d), (s), (n))
+#define ACPI_STRUPR(s)          (void) acpi_ut_strupr ((s))
+#define ACPI_STRLEN(s)          (ACPI_SIZE) acpi_ut_strlen ((s))
+#define ACPI_STRCPY(d,s)        (void) acpi_ut_strcpy ((d), (s))
+#define ACPI_STRNCPY(d,s,n)     (void) acpi_ut_strncpy ((d), (s), (ACPI_SIZE)(n))
+#define ACPI_STRNCMP(d,s,n)     acpi_ut_strncmp ((d), (s), (ACPI_SIZE)(n))
 #define ACPI_STRCMP(d,s)        acpi_ut_strcmp ((d), (s))
-#define ACPI_STRCAT(d,s)        acpi_ut_strcat ((d), (s))
-#define ACPI_STRNCAT(d,s,n)     acpi_ut_strncat ((d), (s), (n))
-#define ACPI_STRTOUL(d,s,n)     acpi_ut_strtoul ((d), (s),(n))
-#define ACPI_MEMCPY(d,s,n)      (void) acpi_ut_memcpy ((d), (s), (n))
-#define ACPI_MEMSET(d,v,n)      (void) acpi_ut_memset ((d), (v), (n))
+#define ACPI_STRCAT(d,s)        (void) acpi_ut_strcat ((d), (s))
+#define ACPI_STRNCAT(d,s,n)     acpi_ut_strncat ((d), (s), (ACPI_SIZE)(n))
+#define ACPI_STRTOUL(d,s,n)     acpi_ut_strtoul ((d), (s), (ACPI_SIZE)(n))
+#define ACPI_MEMCPY(d,s,n)      (void) acpi_ut_memcpy ((d), (s), (ACPI_SIZE)(n))
+#define ACPI_MEMSET(d,v,n)      (void) acpi_ut_memset ((d), (v), (ACPI_SIZE)(n))
 #define ACPI_TOUPPER            acpi_ut_to_upper
 #define ACPI_TOLOWER            acpi_ut_to_lower
 

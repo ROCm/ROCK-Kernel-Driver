@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisply - debug display commands
- *              $Revision: 67 $
+ *              $Revision: 73 $
  *
  ******************************************************************************/
 
@@ -25,12 +25,10 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
 #include "amlcode.h"
 #include "acdispat.h"
 #include "acnamesp.h"
 #include "acparser.h"
-#include "acevents.h"
 #include "acinterp.h"
 #include "acdebug.h"
 
@@ -61,7 +59,7 @@ acpi_db_get_pointer (
 	void                    *obj_ptr;
 
 
-#ifdef _IA16
+#if ACPI_MACHINE_WIDTH == 16
 #include <stdio.h>
 
 	/* Have to handle 16-bit pointers of the form segment:offset */
@@ -101,16 +99,16 @@ acpi_db_dump_parser_descriptor (
 	const acpi_opcode_info  *info;
 
 
-	info = acpi_ps_get_opcode_info (op->opcode);
+	info = acpi_ps_get_opcode_info (op->common.aml_opcode);
 
 	acpi_os_printf ("Parser Op Descriptor:\n");
-	acpi_os_printf ("%20.20s : %4.4X\n", "Opcode", op->opcode);
+	acpi_os_printf ("%20.20s : %4.4X\n", "Opcode", op->common.aml_opcode);
 
 	ACPI_DEBUG_ONLY_MEMBERS (acpi_os_printf ("%20.20s : %s\n", "Opcode Name", info->name));
 
-	acpi_os_printf ("%20.20s : %p\n", "Value/Arg_list", op->value);
-	acpi_os_printf ("%20.20s : %p\n", "Parent", op->parent);
-	acpi_os_printf ("%20.20s : %p\n", "Next_op", op->next);
+	acpi_os_printf ("%20.20s : %p\n", "Value/Arg_list", op->common.value.arg);
+	acpi_os_printf ("%20.20s : %p\n", "Parent", op->common.parent);
+	acpi_os_printf ("%20.20s : %p\n", "Next_op", op->common.next);
 }
 
 
@@ -190,7 +188,7 @@ acpi_db_decode_and_display_object (
 			goto dump_nte;
 
 
-		case ACPI_DESC_TYPE_INTERNAL:
+		case ACPI_DESC_TYPE_OPERAND:
 
 			/* This is a ACPI OPERAND OBJECT */
 
@@ -266,7 +264,7 @@ dump_nte:
 
 	obj_desc = acpi_ns_get_attached_object (node);
 	if (obj_desc) {
-		acpi_os_printf ("\n_attached Object (%p):\n", obj_desc);
+		acpi_os_printf ("\nAttached Object (%p):\n", obj_desc);
 		if (!acpi_os_readable (obj_desc, sizeof (acpi_operand_object))) {
 			acpi_os_printf ("Invalid internal ACPI Object at address %p\n", obj_desc);
 			return;
@@ -307,8 +305,8 @@ acpi_db_decode_internal_object (
 	switch (obj_desc->common.type) {
 	case ACPI_TYPE_INTEGER:
 
-		acpi_os_printf (" %.8X%.8X", ACPI_HIDWORD (obj_desc->integer.value),
-				 ACPI_LODWORD (obj_desc->integer.value));
+		acpi_os_printf (" %8.8X%8.8X", ACPI_HIDWORD (obj_desc->integer.value),
+				   ACPI_LODWORD (obj_desc->integer.value));
 		break;
 
 
@@ -334,6 +332,11 @@ acpi_db_decode_internal_object (
 		for (i = 0; (i < 8) && (i < obj_desc->buffer.length); i++) {
 			acpi_os_printf (" %2.2X", obj_desc->buffer.pointer[i]);
 		}
+		break;
+
+
+	default:
+		/* No additional display for other types */
 		break;
 	}
 }
@@ -379,7 +382,7 @@ acpi_db_display_internal_object (
 	case ACPI_DESC_TYPE_NAMED:
 
 		acpi_os_printf ("<Node>          Name %4.4s Type-%s",
-				  &((acpi_namespace_node *)obj_desc)->name,
+				  ((acpi_namespace_node *)obj_desc)->name.ascii,
 				  acpi_ut_get_type_name (((acpi_namespace_node *) obj_desc)->type));
 
 		if (((acpi_namespace_node *) obj_desc)->flags & ANOBJ_METHOD_ARG) {
@@ -391,11 +394,11 @@ acpi_db_display_internal_object (
 		break;
 
 
-	case ACPI_DESC_TYPE_INTERNAL:
+	case ACPI_DESC_TYPE_OPERAND:
 
 		type = obj_desc->common.type;
 		if (type > INTERNAL_TYPE_MAX) {
-			acpi_os_printf (" Type %x [Invalid Type]", type);
+			acpi_os_printf (" Type %hX [Invalid Type]", type);
 			return;
 		}
 
@@ -517,13 +520,13 @@ acpi_db_display_method_info (
 	num_args    = obj_desc->method.param_count;
 	concurrency = obj_desc->method.concurrency;
 
-	acpi_os_printf ("Currently executing control method is [%4.4s]\n", &node->name);
+	acpi_os_printf ("Currently executing control method is [%4.4s]\n", node->name.ascii);
 	acpi_os_printf ("%X arguments, max concurrency = %X\n", num_args, concurrency);
 
 
 	root_op = start_op;
-	while (root_op->parent) {
-		root_op = root_op->parent;
+	while (root_op->common.parent) {
+		root_op = root_op->common.parent;
 	}
 
 	op = root_op;
@@ -540,7 +543,7 @@ acpi_db_display_method_info (
 
 		/* Decode the opcode */
 
-		op_info = acpi_ps_get_opcode_info (op->opcode);
+		op_info = acpi_ps_get_opcode_info (op->common.aml_opcode);
 		switch (op_info->class) {
 		case AML_CLASS_ARGUMENT:
 			if (count_remaining) {
@@ -604,7 +607,7 @@ acpi_db_display_locals (void)
 
 	obj_desc = walk_state->method_desc;
 	node = walk_state->method_node;
-	acpi_os_printf ("Local Variables for method [%4.4s]:\n", &node->name);
+	acpi_os_printf ("Local Variables for method [%4.4s]:\n", node->name.ascii);
 
 	for (i = 0; i < MTH_NUM_LOCALS; i++) {
 		obj_desc = walk_state->local_variables[i].object;
@@ -650,7 +653,7 @@ acpi_db_display_arguments (void)
 	concurrency = obj_desc->method.concurrency;
 
 	acpi_os_printf ("Method [%4.4s] has %X arguments, max concurrency = %X\n",
-			&node->name, num_args, concurrency);
+			node->name.ascii, num_args, concurrency);
 
 	for (i = 0; i < num_args; i++) {
 		obj_desc = walk_state->arguments[i].object;
@@ -696,7 +699,7 @@ acpi_db_display_results (void)
 	}
 
 	acpi_os_printf ("Method [%4.4s] has %X stacked result objects\n",
-		&node->name, num_results);
+		node->name.ascii, num_results);
 
 	for (i = 0; i < num_results; i++) {
 		obj_desc = walk_state->results->results.obj_desc[i];
@@ -721,7 +724,6 @@ acpi_db_display_results (void)
 void
 acpi_db_display_calling_tree (void)
 {
-	u32                     i;
 	acpi_walk_state         *walk_state;
 	acpi_namespace_node     *node;
 
@@ -735,10 +737,10 @@ acpi_db_display_calling_tree (void)
 	node = walk_state->method_node;
 	acpi_os_printf ("Current Control Method Call Tree\n");
 
-	for (i = 0; walk_state; i++) {
+	while (walk_state) {
 		node = walk_state->method_node;
 
-		acpi_os_printf ("  [%4.4s]\n", &node->name);
+		acpi_os_printf ("  [%4.4s]\n", node->name.ascii);
 
 		walk_state = walk_state->next;
 	}

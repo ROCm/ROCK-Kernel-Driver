@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisasm - parser op tree display routines
- *              $Revision: 61 $
+ *              $Revision: 66 $
  *
  ******************************************************************************/
 
@@ -40,7 +40,7 @@
 #define BLOCK_PAREN         1
 #define BLOCK_BRACE         2
 #define DB_NO_OP_INFO       "            [%2.2d]  "
-#define DB_FULL_OP_INFO     "%5.5X #%4.4X [%2.2d]  "
+#define DB_FULL_OP_INFO     "%5.5X #%4.4hX [%2.2d]  "
 
 
 NATIVE_CHAR                 *acpi_gbl_db_disasm_indent = "....";
@@ -63,7 +63,7 @@ acpi_db_block_type (
 	acpi_parse_object       *op)
 {
 
-	switch (op->opcode) {
+	switch (op->common.aml_opcode) {
 	case AML_METHOD_OP:
 		return (BLOCK_BRACE);
 
@@ -101,15 +101,15 @@ acpi_ps_display_object_pathname (
 	char                    *name;
 
 
-	if (op->flags & ACPI_PARSEOP_GENERIC) {
-		name = op->value.name;
+	if (op->common.flags & ACPI_PARSEOP_GENERIC) {
+		name = op->common.value.name;
 		if (name[0] == '\\') {
 			acpi_os_printf (" (Fully Qualified Pathname)");
 			return (AE_OK);
 		}
 	}
 	else {
-		name = (char *) &((acpi_parse2_object *) op)->name;
+		name = (char *) &op->named.name;
 	}
 
 	/* Search parent tree up to the root if necessary */
@@ -155,11 +155,11 @@ acpi_ps_display_object_pathname (
 
 	/* Just get the Node out of the Op object */
 
-	node = op->node;
+	node = op->common.node;
 	if (!node) {
 		/* Node not defined in this scope, look it up */
 
-		status = acpi_ns_lookup (walk_state->scope_info, op->value.string, ACPI_TYPE_ANY,
+		status = acpi_ns_lookup (walk_state->scope_info, op->common.value.string, ACPI_TYPE_ANY,
 				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
 
 		if (ACPI_FAILURE (status)) {
@@ -174,7 +174,7 @@ acpi_ps_display_object_pathname (
 
 		/* Save it for next time. */
 
-		op->node = node;
+		op->common.node = node;
 	}
 
 	/* Convert Named_desc/handle to a full pathname */
@@ -244,10 +244,10 @@ acpi_db_display_op (
 
 		/* Determine the nesting depth of this argument */
 
-		for (depth = op->parent; depth; depth = depth->parent) {
+		for (depth = op->common.parent; depth; depth = depth->common.parent) {
 			arg = acpi_ps_get_arg (depth, 0);
 			while (arg && arg != origin) {
-				arg = arg->next;
+				arg = arg->common.next;
 			}
 
 			if (arg) {
@@ -276,9 +276,9 @@ acpi_db_display_op (
 		/* Close a block if we are nested less than last time */
 
 		else if (depth_count < last_depth) {
-			for (j = 0; j < (last_depth - depth_count); j++) {
-				VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth - j));
-				for (i = 0; i < (last_depth - j - 1); i++) {
+			for (j = last_depth; j >= (depth_count + 1); j--) {
+				VERBOSE_PRINT ((DB_NO_OP_INFO, (j - 1)));
+				for (i = 1; i < j; i++) {
 					acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
 				}
 
@@ -293,7 +293,8 @@ acpi_db_display_op (
 
 		/* In verbose mode, print the AML offset, opcode and depth count */
 
-		VERBOSE_PRINT ((DB_FULL_OP_INFO, (unsigned) op->aml_offset, op->opcode, depth_count));
+		VERBOSE_PRINT ((DB_FULL_OP_INFO, (u32) op->common.aml_offset,
+				op->common.aml_opcode, depth_count));
 
 
 		/* Indent the output according to the depth count */
@@ -308,10 +309,10 @@ acpi_db_display_op (
 
 		/* Resolve a name reference */
 
-		if ((op->opcode == AML_INT_NAMEPATH_OP && op->value.name)  &&
-			(op->parent) &&
+		if ((op->common.aml_opcode == AML_INT_NAMEPATH_OP && op->common.value.name) &&
+			(op->common.parent) &&
 			(acpi_gbl_db_opt_verbose)) {
-			acpi_ps_display_object_pathname (walk_state, op);
+			(void) acpi_ps_display_object_pathname (walk_state, op);
 		}
 
 		acpi_os_printf ("\n");
@@ -438,7 +439,7 @@ acpi_db_display_path (
 
 	/* We are only interested in named objects */
 
-	op_info = acpi_ps_get_opcode_info (op->opcode);
+	op_info = acpi_ps_get_opcode_info (op->common.aml_opcode);
 	if (!(op_info->flags & AML_NSNODE)) {
 		return;
 	}
@@ -446,7 +447,7 @@ acpi_db_display_path (
 	if (op_info->flags & AML_CREATE) {
 		/* Field creation - check for a fully qualified namepath */
 
-		if (op->opcode == AML_CREATE_FIELD_OP) {
+		if (op->common.aml_opcode == AML_CREATE_FIELD_OP) {
 			name_path = acpi_ps_get_arg (op, 3);
 		}
 		else {
@@ -454,9 +455,9 @@ acpi_db_display_path (
 		}
 
 		if ((name_path) &&
-			(name_path->value.string) &&
-			(name_path->value.string[0] == '\\')) {
-			acpi_db_display_namestring (name_path->value.string);
+			(name_path->common.value.string) &&
+			(name_path->common.value.string[0] == '\\')) {
+			acpi_db_display_namestring (name_path->common.value.string);
 			return;
 		}
 	}
@@ -468,17 +469,17 @@ acpi_db_display_path (
 
 		search = op;
 		for (; ;) {
-			if (search->parent == prev) {
+			if (search->common.parent == prev) {
 				break;
 			}
 
 			/* Go up one level */
 
-			search = search->parent;
+			search = search->common.parent;
 		}
 
 		if (prev) {
-			op_info = acpi_ps_get_opcode_info (search->opcode);
+			op_info = acpi_ps_get_opcode_info (search->common.aml_opcode);
 			if (!(op_info->flags & AML_FIELD)) {
 				/* below root scope, append scope name */
 
@@ -489,7 +490,7 @@ acpi_db_display_path (
 				}
 
 				if (op_info->flags & AML_CREATE) {
-					if (op->opcode == AML_CREATE_FIELD_OP) {
+					if (op->common.aml_opcode == AML_CREATE_FIELD_OP) {
 						name_path = acpi_ps_get_arg (op, 3);
 					}
 					else {
@@ -497,8 +498,8 @@ acpi_db_display_path (
 					}
 
 					if ((name_path) &&
-						(name_path->value.string)) {
-						acpi_os_printf ("%4.4s", name_path->value.string);
+						(name_path->common.value.string)) {
+						acpi_os_printf ("%4.4s", name_path->common.value.string);
 					}
 				}
 				else {
@@ -544,18 +545,19 @@ acpi_db_display_opcode (
 
 	if (!op) {
 		acpi_os_printf ("<NULL OP PTR>");
+		return;
 	}
 
 	/* op and arguments */
 
-	switch (op->opcode) {
+	switch (op->common.aml_opcode) {
 	case AML_BYTE_OP:
 
 		if (acpi_gbl_db_opt_verbose) {
-			acpi_os_printf ("(u8) 0x%2.2X", op->value.integer8);
+			acpi_os_printf ("(u8) 0x%2.2hX", op->common.value.integer8);
 		}
 		else {
-			acpi_os_printf ("0x%2.2X", op->value.integer8);
+			acpi_os_printf ("0x%2.2hX", op->common.value.integer8);
 		}
 		break;
 
@@ -563,10 +565,10 @@ acpi_db_display_opcode (
 	case AML_WORD_OP:
 
 		if (acpi_gbl_db_opt_verbose) {
-			acpi_os_printf ("(u16) 0x%4.4X", op->value.integer16);
+			acpi_os_printf ("(u16) 0x%4.4hX", op->common.value.integer16);
 		}
 		else {
-			acpi_os_printf ("0x%4.4X", op->value.integer16);
+			acpi_os_printf ("0x%4.4hX", op->common.value.integer16);
 		}
 		break;
 
@@ -574,10 +576,10 @@ acpi_db_display_opcode (
 	case AML_DWORD_OP:
 
 		if (acpi_gbl_db_opt_verbose) {
-			acpi_os_printf ("(u32) 0x%8.8X", op->value.integer32);
+			acpi_os_printf ("(u32) 0x%8.8X", op->common.value.integer32);
 		}
 		else {
-			acpi_os_printf ("0x%8.8X", op->value.integer32);
+			acpi_os_printf ("0x%8.8X", op->common.value.integer32);
 		}
 		break;
 
@@ -585,20 +587,20 @@ acpi_db_display_opcode (
 	case AML_QWORD_OP:
 
 		if (acpi_gbl_db_opt_verbose) {
-			acpi_os_printf ("(u64) 0x%8.8X%8.8X", op->value.integer64.hi,
-					 op->value.integer64.lo);
+			acpi_os_printf ("(u64) 0x%8.8X%8.8X", op->common.value.integer64.hi,
+					 op->common.value.integer64.lo);
 		}
 		else {
-			acpi_os_printf ("0x%8.8X%8.8X", op->value.integer64.hi,
-					 op->value.integer64.lo);
+			acpi_os_printf ("0x%8.8X%8.8X", op->common.value.integer64.hi,
+					 op->common.value.integer64.lo);
 		}
 		break;
 
 
 	case AML_STRING_OP:
 
-		if (op->value.string) {
-			acpi_os_printf ("\"%s\"", op->value.string);
+		if (op->common.value.string) {
+			acpi_os_printf ("\"%s\"", op->common.value.string);
 		}
 		else {
 			acpi_os_printf ("<\"NULL STRING PTR\">");
@@ -608,8 +610,8 @@ acpi_db_display_opcode (
 
 	case AML_INT_STATICSTRING_OP:
 
-		if (op->value.string) {
-			acpi_os_printf ("\"%s\"", op->value.string);
+		if (op->common.value.string) {
+			acpi_os_printf ("\"%s\"", op->common.value.string);
 		}
 		else {
 			acpi_os_printf ("\"<NULL STATIC STRING PTR>\"");
@@ -619,38 +621,38 @@ acpi_db_display_opcode (
 
 	case AML_INT_NAMEPATH_OP:
 
-		acpi_db_display_namestring (op->value.name);
+		acpi_db_display_namestring (op->common.value.name);
 		break;
 
 
 	case AML_INT_NAMEDFIELD_OP:
 
-		acpi_os_printf ("Named_field (Length 0x%8.8X)  ", op->value.integer32);
+		acpi_os_printf ("Named_field (Length 0x%8.8X)  ", op->common.value.integer32);
 		break;
 
 
 	case AML_INT_RESERVEDFIELD_OP:
 
-		acpi_os_printf ("Reserved_field (Length 0x%8.8X) ", op->value.integer32);
+		acpi_os_printf ("Reserved_field (Length 0x%8.8X) ", op->common.value.integer32);
 		break;
 
 
 	case AML_INT_ACCESSFIELD_OP:
 
-		acpi_os_printf ("Access_field (Length 0x%8.8X) ", op->value.integer32);
+		acpi_os_printf ("Access_field (Length 0x%8.8X) ", op->common.value.integer32);
 		break;
 
 
 	case AML_INT_BYTELIST_OP:
 
 		if (acpi_gbl_db_opt_verbose) {
-			acpi_os_printf ("Byte_list   (Length 0x%8.8X)  ", op->value.integer32);
+			acpi_os_printf ("Byte_list   (Length 0x%8.8X)  ", op->common.value.integer32);
 		}
 		else {
-			acpi_os_printf ("0x%2.2X", op->value.integer32);
+			acpi_os_printf ("0x%2.2X", op->common.value.integer32);
 
-			byte_count = op->value.integer32;
-			byte_data = ((acpi_parse2_object *) op)->data;
+			byte_count = op->common.value.integer32;
+			byte_data = op->named.data;
 
 			for (i = 0; i < byte_count; i++) {
 				acpi_os_printf (", 0x%2.2X", byte_data[i]);
@@ -663,12 +665,13 @@ acpi_db_display_opcode (
 
 		/* Just get the opcode name and print it */
 
-		op_info = acpi_ps_get_opcode_info (op->opcode);
+		op_info = acpi_ps_get_opcode_info (op->common.aml_opcode);
 		acpi_os_printf ("%s", op_info->name);
 
 
 #ifndef PARSER_ONLY
-		if ((op->opcode == AML_INT_RETURN_VALUE_OP) &&
+		if ((op->common.aml_opcode == AML_INT_RETURN_VALUE_OP) &&
+			(walk_state) &&
 			(walk_state->results) &&
 			(walk_state->results->results.num_results)) {
 			acpi_db_decode_internal_object (walk_state->results->results.obj_desc [walk_state->results->results.num_results-1]);
@@ -680,7 +683,7 @@ acpi_db_display_opcode (
 	if (!op_info) {
 		/* If there is another element in the list, add a comma */
 
-		if (op->next) {
+		if (op->common.next) {
 			acpi_os_printf (",");
 		}
 	}
@@ -688,13 +691,13 @@ acpi_db_display_opcode (
 	/*
 	 * If this is a named opcode, print the associated name value
 	 */
-	op_info = acpi_ps_get_opcode_info (op->opcode);
+	op_info = acpi_ps_get_opcode_info (op->common.aml_opcode);
 	if (op && (op_info->flags & AML_NAMED)) {
 		name = acpi_ps_get_name (op);
 		acpi_os_printf (" %4.4s", &name);
 
-		if ((acpi_gbl_db_opt_verbose) && (op->opcode != AML_INT_NAMEDFIELD_OP)) {
-			acpi_ps_display_object_pathname (walk_state, op);
+		if ((acpi_gbl_db_opt_verbose) && (op->common.aml_opcode != AML_INT_NAMEDFIELD_OP)) {
+			(void) acpi_ps_display_object_pathname (walk_state, op);
 		}
 	}
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acexcep.h - Exception codes returned by the ACPI subsystem
- *       $Revision: 59 $
+ *       $Revision: 63 $
  *
  *****************************************************************************/
 
@@ -102,8 +102,9 @@
 #define AE_BAD_CHECKSUM                 (acpi_status) (0x0003 | AE_CODE_ACPI_TABLES)
 #define AE_BAD_VALUE                    (acpi_status) (0x0004 | AE_CODE_ACPI_TABLES)
 #define AE_TABLE_NOT_SUPPORTED          (acpi_status) (0x0005 | AE_CODE_ACPI_TABLES)
+#define AE_INVALID_TABLE_LENGTH         (acpi_status) (0x0006 | AE_CODE_ACPI_TABLES)
 
-#define AE_CODE_TBL_MAX                 0x0005
+#define AE_CODE_TBL_MAX                 0x0006
 
 
 /*
@@ -138,8 +139,11 @@
 #define AE_AML_INVALID_INDEX            (acpi_status) (0x001A | AE_CODE_AML)
 #define AE_AML_REGISTER_LIMIT           (acpi_status) (0x001B | AE_CODE_AML)
 #define AE_AML_NO_WHILE                 (acpi_status) (0x001C | AE_CODE_AML)
+#define AE_AML_ALIGNMENT                (acpi_status) (0x001D | AE_CODE_AML)
+#define AE_AML_NO_RESOURCE_END_TAG      (acpi_status) (0x001E | AE_CODE_AML)
+#define AE_AML_BAD_RESOURCE_VALUE       (acpi_status) (0x001F | AE_CODE_AML)
 
-#define AE_CODE_AML_MAX                 0x001C
+#define AE_CODE_AML_MAX                 0x001F
 
 /*
  * Internal exceptions used for control
@@ -215,7 +219,8 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_tbl[] =
 	"AE_BAD_HEADER",
 	"AE_BAD_CHECKSUM",
 	"AE_BAD_VALUE",
-	"AE_TABLE_NOT_SUPPORTED"
+	"AE_TABLE_NOT_SUPPORTED",
+	"AE_INVALID_TABLE_LENGTH"
 };
 
 NATIVE_CHAR const   *acpi_gbl_exception_names_aml[] =
@@ -247,7 +252,10 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_aml[] =
 	"AE_AML_INVALID_RESOURCE_TYPE",
 	"AE_AML_INVALID_INDEX",
 	"AE_AML_REGISTER_LIMIT",
-	"AE_AML_NO_WHILE"
+	"AE_AML_NO_WHILE",
+	"AE_AML_ALIGNMENT",
+	"AE_AML_NO_RESOURCE_END_TAG",
+	"AE_AML_BAD_RESOURCE_VALUE"
 };
 
 NATIVE_CHAR const   *acpi_gbl_exception_names_ctrl[] =

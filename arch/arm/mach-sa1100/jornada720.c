@@ -55,15 +55,6 @@ static int __init jornada720_init(void)
 
 __initcall(jornada720_init);
 
-
-static void __init
-fixup_jornada720(struct machine_desc *desc, struct tag *tags,
-		 char **cmdline, struct meminfo *mi)
-{
-	SET_BANK( 0, 0xc0000000, 32*1024*1024 );
-	mi->nr_banks = 1;
-}
-
 static struct map_desc jornada720_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xf0000000, 0x48000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Epson registers */
@@ -84,7 +75,6 @@ static void __init jornada720_map_io(void)
 MACHINE_START(JORNADA720, "HP Jornada 720")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	BOOT_PARAMS(0xc0000100)
-	FIXUP(fixup_jornada720)
 	MAPIO(jornada720_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 32 $
+ *              $Revision: 35 $
  *
  *****************************************************************************/
 
@@ -25,12 +25,8 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
-#include "acnamesp.h"
 #include "acinterp.h"
-#include "acevents.h"
 #include "amlcode.h"
-#include "acdispat.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -60,9 +56,9 @@ acpi_ex_convert_to_integer (
 	u32                     i;
 	acpi_operand_object     *ret_desc;
 	u32                     count;
-	char                    *pointer;
+	u8                      *pointer;
 	acpi_integer            result;
-	u32                     integer_size = sizeof (acpi_integer);
+	acpi_status             status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ex_convert_to_integer", obj_desc);
@@ -74,35 +70,17 @@ acpi_ex_convert_to_integer (
 		return_ACPI_STATUS (AE_OK);
 
 	case ACPI_TYPE_STRING:
-		pointer = obj_desc->string.pointer;
+		pointer = (u8 *) obj_desc->string.pointer;
 		count   = obj_desc->string.length;
 		break;
 
 	case ACPI_TYPE_BUFFER:
-		pointer = (char *) obj_desc->buffer.pointer;
+		pointer = obj_desc->buffer.pointer;
 		count   = obj_desc->buffer.length;
 		break;
 
 	default:
 		return_ACPI_STATUS (AE_TYPE);
-	}
-
-	/*
-	 * Create a new integer
-	 */
-	ret_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
-	if (!ret_desc) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
-	/* Handle both ACPI 1.0 and ACPI 2.0 Integer widths */
-
-	if (walk_state->method_node->flags & ANOBJ_DATA_WIDTH_32) {
-		/*
-		 * We are running a method that exists in a 32-bit ACPI table.
-		 * Truncate the value to 32 bits by zeroing out the upper 32-bit field
-		 */
-		integer_size = sizeof (u32);
 	}
 
 	/*
@@ -118,8 +96,8 @@ acpi_ex_convert_to_integer (
 
 	/* Transfer no more than an integer's worth of data */
 
-	if (count > integer_size) {
-		count = integer_size;
+	if (count > acpi_gbl_integer_byte_width) {
+		count = acpi_gbl_integer_byte_width;
 	}
 
 	/*
@@ -128,13 +106,14 @@ acpi_ex_convert_to_integer (
 	switch (obj_desc->common.type) {
 	case ACPI_TYPE_STRING:
 
-		/* TBD: Need to use 64-bit ACPI_STRTOUL */
-
 		/*
 		 * Convert string to an integer
 		 * String must be hexadecimal as per the ACPI specification
 		 */
-		result = ACPI_STRTOUL (pointer, NULL, 16);
+		status = acpi_ut_strtoul64 ((char *) pointer, 16, &result);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 		break;
 
 
@@ -153,6 +132,19 @@ acpi_ex_convert_to_integer (
 			result |= (((acpi_integer) pointer[i]) << (i * 8));
 		}
 		break;
+
+
+	default:
+		/* No other types can get here */
+		break;
+	}
+
+	/*
+	 * Create a new integer
+	 */
+	ret_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
+	if (!ret_desc) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/* Save the Result, delete original descriptor, store new descriptor */
@@ -192,7 +184,6 @@ acpi_ex_convert_to_buffer (
 {
 	acpi_operand_object     *ret_desc;
 	u32                     i;
-	u32                     integer_size = sizeof (acpi_integer);
 	u8                      *new_buf;
 
 
@@ -210,20 +201,10 @@ acpi_ex_convert_to_buffer (
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
-		/* Handle both ACPI 1.0 and ACPI 2.0 Integer widths */
-
-		if (walk_state->method_node->flags & ANOBJ_DATA_WIDTH_32) {
-			/*
-			 * We are running a method that exists in a 32-bit ACPI table.
-			 * Use only 32 bits of the Integer for conversion.
-			 */
-			integer_size = sizeof (u32);
-		}
-
 		/* Need enough space for one integer */
 
-		ret_desc->buffer.length = integer_size;
-		new_buf = ACPI_MEM_CALLOCATE (integer_size);
+		ret_desc->buffer.length = acpi_gbl_integer_byte_width;
+		new_buf = ACPI_MEM_CALLOCATE (acpi_gbl_integer_byte_width);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
 				(("Ex_convert_to_buffer: Buffer allocation failure\n"));
@@ -233,7 +214,7 @@ acpi_ex_convert_to_buffer (
 
 		/* Copy the integer to the buffer */
 
-		for (i = 0; i < integer_size; i++) {
+		for (i = 0; i < acpi_gbl_integer_byte_width; i++) {
 			new_buf[i] = (u8) (obj_desc->integer.value >> (i * 8));
 		}
 		ret_desc->buffer.pointer = new_buf;
@@ -286,7 +267,7 @@ acpi_ex_convert_to_ascii (
 	u32                     i;
 	u32                     j;
 	u32                     k = 0;
-	u8                      hex_digit;
+	char                    hex_digit;
 	acpi_integer            digit;
 	u32                     remainder;
 	u32                     length = sizeof (acpi_integer);
@@ -305,7 +286,7 @@ acpi_ex_convert_to_ascii (
 
 			digit = integer;
 			for (j = 1; j < i; j++) {
-				acpi_ut_short_divide (&digit, 10, &digit, &remainder);
+				(void) acpi_ut_short_divide (&digit, 10, &digit, &remainder);
 			}
 
 			/* Create the decimal digit */
@@ -333,7 +314,7 @@ acpi_ex_convert_to_ascii (
 			}
 
 			if (!leading_zero) {
-				string[k] = hex_digit;
+				string[k] = (u8) hex_digit;
 				k++;
 			}
 		}
@@ -385,7 +366,6 @@ acpi_ex_convert_to_string (
 	u32                     i;
 	u32                     index;
 	u32                     string_length;
-	u32                     integer_size = sizeof (acpi_integer);
 	u8                      *new_buf;
 	u8                      *pointer;
 
@@ -396,17 +376,7 @@ acpi_ex_convert_to_string (
 	switch (obj_desc->common.type) {
 	case ACPI_TYPE_INTEGER:
 
-		/* Handle both ACPI 1.0 and ACPI 2.0 Integer widths */
-
-		if (walk_state->method_node->flags & ANOBJ_DATA_WIDTH_32) {
-			/*
-			 * We are running a method that exists in a 32-bit ACPI table.
-			 * Use only 32 bits of the Integer
-			 */
-			integer_size = sizeof (u32);
-		}
-
-		string_length = integer_size * 2;
+		string_length = acpi_gbl_integer_byte_width * 2;
 		if (base == 10) {
 			string_length = ACPI_MAX_DECIMAL_DIGITS;
 		}
@@ -421,14 +391,13 @@ acpi_ex_convert_to_string (
 
 		/* Need enough space for one ASCII integer plus null terminator */
 
-		new_buf = ACPI_MEM_CALLOCATE (string_length + 1);
+		new_buf = ACPI_MEM_CALLOCATE ((ACPI_SIZE) string_length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
 				(("Ex_convert_to_string: Buffer allocation failure\n"));
 			acpi_ut_remove_reference (ret_desc);
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
-
 
 		/* Convert */
 
@@ -486,7 +455,7 @@ acpi_ex_convert_to_string (
 			string_length = max_length;
 		}
 
-		new_buf = ACPI_MEM_CALLOCATE (string_length + 1);
+		new_buf = ACPI_MEM_CALLOCATE ((ACPI_SIZE) string_length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
 				(("Ex_convert_to_string: Buffer allocation failure\n"));
@@ -500,7 +469,7 @@ acpi_ex_convert_to_string (
 		pointer = obj_desc->buffer.pointer;
 		index = 0;
 		for (i = 0, index = 0; i < obj_desc->buffer.length; i++) {
-			index = acpi_ex_convert_to_ascii (pointer[i], base, &new_buf[index]);
+			index = acpi_ex_convert_to_ascii ((acpi_integer) pointer[i], base, &new_buf[index]);
 
 			new_buf[index] = ' ';
 			index++;
@@ -511,7 +480,6 @@ acpi_ex_convert_to_string (
 		new_buf [index-1] = 0;
 		ret_desc->buffer.pointer = new_buf;
 		ret_desc->string.length = ACPI_STRLEN ((char *) new_buf);
-
 
 		/* Return the new buffer descriptor */
 
@@ -641,6 +609,11 @@ acpi_ex_convert_to_target_type (
 			 */
 			status = acpi_ex_convert_to_buffer (source_desc, result_desc, walk_state);
 			break;
+
+
+		default:
+			status = AE_AML_INTERNAL;
+			break;
 		}
 		break;
 
@@ -660,7 +633,6 @@ acpi_ex_convert_to_target_type (
 
 		status = AE_AML_INTERNAL;
 	}
-
 
 	/*
 	 * Source-to-Target conversion semantics:

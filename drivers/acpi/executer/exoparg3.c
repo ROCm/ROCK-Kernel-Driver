@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg3 - AML execution - opcodes with 3 arguments
- *              $Revision: 9 $
+ *              $Revision: 13 $
  *
  *****************************************************************************/
 
@@ -87,7 +87,7 @@ acpi_ex_opcode_3A_0T_0R (
 	case AML_FATAL_OP:          /* Fatal (Fatal_type Fatal_code Fatal_arg)   */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"Fatal_op: Type %x Code %x Arg %x <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n",
+			"Fatal_op: Type %X Code %X Arg %X <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n",
 			(u32) operand[0]->integer.value, (u32) operand[1]->integer.value,
 			(u32) operand[2]->integer.value));
 
@@ -102,7 +102,7 @@ acpi_ex_opcode_3A_0T_0R (
 		/*
 		 * Always signal the OS!
 		 */
-		acpi_os_signal (ACPI_SIGNAL_FATAL, fatal);
+		status = acpi_os_signal (ACPI_SIGNAL_FATAL, fatal);
 
 		/* Might return while OS is shutting down, just continue */
 
@@ -145,8 +145,8 @@ acpi_ex_opcode_3A_1T_1R (
 	acpi_operand_object     *return_desc = NULL;
 	char                    *buffer;
 	acpi_status             status = AE_OK;
-	u32                     index;
-	u32                     length;
+	NATIVE_UINT             index;
+	ACPI_SIZE               length;
 
 
 	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_3A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
@@ -167,8 +167,8 @@ acpi_ex_opcode_3A_1T_1R (
 
 		/* Get the Integer values from the objects */
 
-		index = (u32) operand[1]->integer.value;
-		length = (u32) operand[2]->integer.value;
+		index = (NATIVE_UINT) operand[1]->integer.value;
+		length = (ACPI_SIZE) operand[2]->integer.value;
 
 		/*
 		 * If the index is beyond the length of the String/Buffer, or if the
@@ -180,12 +180,12 @@ acpi_ex_opcode_3A_1T_1R (
 
 			if ((index + length) >
 				operand[0]->string.length) {
-				length = operand[0]->string.length - index;
+				length = (ACPI_SIZE) operand[0]->string.length - index;
 			}
 
 			/* Allocate a new buffer for the String/Buffer */
 
-			buffer = ACPI_MEM_CALLOCATE (length + 1);
+			buffer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) length + 1);
 			if (!buffer) {
 				status = AE_NO_MEMORY;
 				goto cleanup;
@@ -199,7 +199,7 @@ acpi_ex_opcode_3A_1T_1R (
 			/* Set the length of the new String/Buffer */
 
 			return_desc->string.pointer = buffer;
-			return_desc->string.length = length;
+			return_desc->string.length = (u32) length;
 		}
 		break;
 
