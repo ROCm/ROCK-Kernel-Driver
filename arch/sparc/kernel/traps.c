@@ -12,6 +12,7 @@
 #include <linux/config.h>
 #include <linux/sched.h>  /* for jiffies */
 #include <linux/kernel.h>
+#include <linux/kallsyms.h>
 #include <linux/signal.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -118,7 +119,9 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 		      count++ < 30				&&
                       (((unsigned long) rw) >= PAGE_OFFSET)	&&
 		      !(((unsigned long) rw) & 0x7)) {
-			printk("Caller[%08lx]\n", rw->ins[7]);
+			printk("Caller[%08lx]", rw->ins[7]);
+			print_symbol(": %s\n", rw->ins[7]);
+			printk("\n");
 			rw = (struct reg_window *)rw->ins[6];
 		}
 	}
