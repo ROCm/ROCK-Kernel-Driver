@@ -544,7 +544,6 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	return 0;
 
 error_out:
-	scsi_cd_put(cd);
 	return retval;	
 }
 
