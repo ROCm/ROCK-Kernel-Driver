@@ -1,9 +1,9 @@
 /*
- * arch/ia64/boot/bootloader.c
+ * arch/ia64/hp/sim/boot/bootloader.c
  *
  * Loads an ELF kernel.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  *
@@ -17,32 +17,13 @@ struct task_struct;	/* forward declaration for elf.h */
 #include <linux/kernel.h>
 
 #include <asm/elf.h>
+#include <asm/intrinsics.h>
 #include <asm/pal.h>
 #include <asm/pgtable.h>
 #include <asm/sal.h>
 #include <asm/system.h>
-#include <asm/intrinsics.h>
 
-/* Simulator system calls: */
-
-#define SSC_CONSOLE_INIT		20
-#define SSC_GETCHAR			21
-#define SSC_PUTCHAR			31
-#define SSC_OPEN			50
-#define SSC_CLOSE			51
-#define SSC_READ			52
-#define SSC_WRITE			53
-#define SSC_GET_COMPLETION		54
-#define SSC_WAIT_COMPLETION		55
-#define SSC_CONNECT_INTERRUPT		58
-#define SSC_GENERATE_INTERRUPT		59
-#define SSC_SET_PERIODIC_INTERRUPT	60
-#define SSC_GET_RTC			65
-#define SSC_EXIT			66
-#define SSC_LOAD_SYMBOLS		69
-#define SSC_GET_TOD			74
-
-#define SSC_GET_ARGS			75
+#include "ssc.h"
 
 struct disk_req {
 	unsigned long addr;
@@ -54,10 +35,8 @@ struct disk_stat {
 	unsigned count;
 };
 
-#include "../kernel/fw-emu.c"
-extern void jmp_to_kernel(ulong sp, ulong bp, ulong e_entry);
-extern void __bsw1(void);
-
+extern void jmp_to_kernel (unsigned long bp, unsigned long e_entry);
+extern struct ia64_boot_param *sys_fw_init (const char *args, int arglen);
 
 /*
  * Set a break point on this function so that symbols are available to set breakpoints in
@@ -83,9 +62,8 @@ cons_write (const char *buf)
 #define MAX_ARGS 32
 
 void
-_start (void)
+start_bootloader (void)
 {
-	static char stack[16384] __attribute__ ((aligned (16)));
 	static char mem[4096];
 	static char buffer[1024];
 	unsigned long off;
@@ -98,13 +76,6 @@ _start (void)
 	register struct ia64_boot_param *bp;
 	char *kpath, *args;
 	long arglen = 0;
-
-	extern __u64 __gp;
-	register unsigned long tmp = (unsigned long) &stack[0];
-
-	ia64_setreg(_IA64_REG_GP, __gp);
-	ia64_setreg(_IA64_REG_SP, tmp);
-	__bsw1();
 
 	ssc(0, 0, 0, 0, SSC_CONSOLE_INIT);
 
@@ -206,8 +177,7 @@ _start (void)
 	ssc(0, (long) kpath, 0, 0, SSC_LOAD_SYMBOLS);
 
 	debug_break();
-	tmp = __pa(&stack);
-	jmp_to_kernel(tmp, (unsigned long) bp, e_entry);
+	jmp_to_kernel((unsigned long) bp, e_entry);
 
 	cons_write("kernel returned!\n");
 	ssc(-1, 0, 0, 0, SSC_EXIT);
