@@ -72,10 +72,8 @@ static void q40_mem_console_write(struct console *co, const char *b,
 
 extern int ql_ticks;
 
-static int q40_wait_key(struct console *co){return 0;}
 static struct console q40_console_driver = {
 	name:		"debug",
-	wait_key:	q40_wait_key,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,
 };

@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/vmalloc.h>
 #include <linux/completion.h>
+#include <linux/namespace.h>
 #include <linux/personality.h>
 
 #include <asm/pgtable.h>
@@ -566,6 +567,9 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	struct task_struct *p;
 	struct completion vfork;
 
+	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
+		return -EINVAL;
+
 	retval = -EPERM;
 
 	/* 
@@ -661,9 +665,11 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 		goto bad_fork_cleanup_fs;
 	if (copy_mm(clone_flags, p))
 		goto bad_fork_cleanup_sighand;
+	if (copy_namespace(clone_flags, p))
+		goto bad_fork_cleanup_mm;
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
-		goto bad_fork_cleanup_mm;
+		goto bad_fork_cleanup_namespace;
 	p->semundo = NULL;
 	
 	/* Our parent execution domain becomes current domain
@@ -730,6 +736,8 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 fork_out:
 	return retval;
 
+bad_fork_cleanup_namespace:
+	exit_namespace(p);
 bad_fork_cleanup_mm:
 	exit_mm(p);
 bad_fork_cleanup_sighand:

@@ -2125,18 +2125,6 @@ static void serial_console_write(struct console *co, const char *s,
 	}
 }
 
-/*
- *	Receive character from the serial port
- */
-static int serial_console_wait_key(struct console *co)
-{
-	struct dec_serial *info;
-
-        info = zs_soft + co->index;
-
-        return zs_poll_rx_char(info);
-}
-
 static kdev_t serial_console_device(struct console *c)
 {
 	return MKDEV(TTY_MAJOR, 64 + c->index);
@@ -2271,7 +2259,6 @@ static struct console sercons = {
 	name:		"ttyS",
 	write:		serial_console_write,
 	device:		serial_console_device,
-	wait_key:	serial_console_wait_key,
 	setup:		serial_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

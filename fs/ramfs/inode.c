@@ -325,6 +325,7 @@ static struct super_block *ramfs_read_super(struct super_block * sb, void * data
 }
 
 static DECLARE_FSTYPE(ramfs_fs_type, "ramfs", ramfs_read_super, FS_LITTER);
+static DECLARE_FSTYPE(rootfs_fs_type, "rootfs", ramfs_read_super, FS_NOMOUNT|FS_LITTER);
 
 static int __init init_ramfs_fs(void)
 {
@@ -338,5 +339,11 @@ static void __exit exit_ramfs_fs(void)
 
 module_init(init_ramfs_fs)
 module_exit(exit_ramfs_fs)
+
+int __init init_rootfs(void)
+{
+	return register_filesystem(&rootfs_fs_type);
+}
+
 MODULE_LICENSE("GPL");
 

@@ -140,15 +140,6 @@ static void sh_console_write(struct console *co, const char *s,
     	sh_bios_console_write(s, count);
 }
 
-/*
- *	Receive character from the serial port
- */
-static int sh_console_wait_key(struct console *co)
-{
-	/* Not implemented yet */
-	return 0;
-}
-
 static kdev_t sh_console_device(struct console *c)
 {
     	/* TODO: this is totally bogus */
@@ -183,7 +174,6 @@ static struct console sh_console = {
 	name:		"bios",
 	write:		sh_console_write,
 	device:		sh_console_device,
-	wait_key:	sh_console_wait_key,
 	setup:		sh_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

@@ -418,9 +418,6 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 	 * This is important for devices that have a hardware
 	 * sectorsize that is larger than the default.
 	 */
-	blocksize = get_hardsect_size(dev);
-	if(blocksize < BLOCK_SIZE )
-	    blocksize = BLOCK_SIZE;
 
 	sb->u.ext2_sb.s_mount_opt = 0;
 	if (!parse_options ((char *) data, &sb_block, &resuid, &resgid,
@@ -428,11 +425,11 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		return NULL;
 	}
 
-	if (set_blocksize(dev, blocksize) < 0) {
-		printk ("EXT2-fs: unable to set blocksize %d\n", blocksize);
+	blocksize = sb_min_blocksize(sb, BLOCK_SIZE);
+	if (!blocksize) {
+		printk ("EXT2-fs: unable to set blocksize\n");
 		return NULL;
 	}
-	sb->s_blocksize = blocksize;
 
 	/*
 	 * If the superblock doesn't start on a sector boundary,
@@ -485,18 +482,12 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		       bdevname(dev), i);
 		goto failed_mount;
 	}
-	sb->s_blocksize_bits =
-		le32_to_cpu(EXT2_SB(sb)->s_es->s_log_block_size) + 10;
-	sb->s_blocksize = 1 << sb->s_blocksize_bits;
-
-	sb->s_maxbytes = ext2_max_size(sb->s_blocksize_bits);
-
+	blocksize = BLOCK_SIZE << le32_to_cpu(EXT2_SB(sb)->s_es->s_log_block_size);
 	/* If the blocksize doesn't match, re-read the thing.. */
 	if (sb->s_blocksize != blocksize) {
-		blocksize = sb->s_blocksize;
 		brelse(bh);
 
-		if (set_blocksize(dev, blocksize) < 0) {
+		if (!sb_set_blocksize(sb, blocksize)) {
 			printk(KERN_ERR "EXT2-fs: blocksize too small for device.\n");
 			return NULL;
 		}
@@ -516,6 +507,8 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 			goto failed_mount;
 		}
 	}
+
+	sb->s_maxbytes = ext2_max_size(sb->s_blocksize_bits);
 
 	if (le32_to_cpu(es->s_rev_level) == EXT2_GOOD_OLD_REV) {
 		sb->u.ext2_sb.s_inode_size = EXT2_GOOD_OLD_INODE_SIZE;

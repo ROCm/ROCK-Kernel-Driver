@@ -993,21 +993,6 @@ void serial_outc(unsigned char c)
 	IntEnable2 = int2;
 }
 
-static int serial_console_wait_key(struct console *co)
-{
-	unsigned int int2, res;
-
-	int2 = IntEnable2;
-	IntEnable2 = 0;
-
-	while (!(UartA_Ctrl1 & UART_RX_HOLD_FULL));
-	res = UartA_Data;
-	udelay(10);
-	
-	IntEnable2 = int2;
-	return res;
-}
-
 static void serial_console_write(struct console *co, const char *s,
 		unsigned count)
 {
@@ -1065,7 +1050,6 @@ static struct console sercons = {
 	name:     "ttyS",
 	write:    serial_console_write,
 	device:   serial_console_device,
-	wait_key: serial_console_wait_key,
 	setup:    serial_console_setup,
 	flags:    CON_PRINTBUFFER,
 	index:    -1

@@ -30,11 +30,6 @@ static void prom_console_write(struct console *co, const char *s,
     }
 }
 
-static int prom_console_wait_key(struct console *co)
-{
-    return prom_getchar();
-}
-
 static int __init prom_console_setup(struct console *co, char *options)
 {
     return 0;
@@ -50,7 +45,6 @@ static struct console sercons =
     name:	"ttyS",
     write:	prom_console_write,
     device:	prom_console_device,
-    wait_key:	prom_console_wait_key,
     setup:	prom_console_setup,
     flags:	CON_PRINTBUFFER,
     index:	-1,

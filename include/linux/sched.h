@@ -41,6 +41,7 @@ struct exec_domain;
 #define CLONE_VFORK	0x00004000	/* set if the parent wants the child to wake it up on mm_release */
 #define CLONE_PARENT	0x00008000	/* set if we want to have the same parent as the cloner */
 #define CLONE_THREAD	0x00010000	/* Same thread group? */
+#define CLONE_NEWNS	0x00020000	/* New namespace group? */
 
 #define CLONE_SIGNAL	(CLONE_SIGHAND | CLONE_THREAD)
 
@@ -165,6 +166,7 @@ extern int current_is_keventd(void);
  */
 #define NR_OPEN_DEFAULT BITS_PER_LONG
 
+struct namespace;
 /*
  * Open file table structure
  */
@@ -388,6 +390,8 @@ struct task_struct {
 	struct fs_struct *fs;
 /* open file information */
 	struct files_struct *files;
+/* namespace */
+	struct namespace *namespace;
 /* signal handlers */
 	spinlock_t sigmask_lock;	/* Protects signal and blocked */
 	struct signal_struct *sig;

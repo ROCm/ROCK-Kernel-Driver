@@ -597,12 +597,6 @@ void disassociate_ctty(int on_exit)
 	read_unlock(&tasklist_lock);
 }
 
-void wait_for_keypress(void)
-{
-        struct console *c = console_drivers;
-        if (c) c->wait_key(c);
-}
-
 void stop_tty(struct tty_struct *tty)
 {
 	if (tty->stopped)

@@ -6,6 +6,7 @@
 #include <linux/ctype.h>
 #include <linux/blk.h>
 #include <linux/fd.h>
+#include <linux/tty.h>
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
@@ -17,7 +18,6 @@
 #define BUILD_CRAMDISK
 
 extern int get_filesystem_list(char * buf);
-extern void wait_for_keypress(void);
 
 asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
 	 unsigned long flags, void *data);
@@ -363,8 +363,9 @@ static int __init create_dev(char *name, kdev_t dev, char *devfs_name)
 
 static void __init change_floppy(char *fmt, ...)
 {
-	extern void wait_for_keypress(void);
+	struct termios termios;
 	char buf[80];
+	char c;
 	int fd;
 	va_list args;
 	va_start(args, fmt);
@@ -376,7 +377,16 @@ static void __init change_floppy(char *fmt, ...)
 		close(fd);
 	}
 	printk(KERN_NOTICE "VFS: Insert %s and press ENTER\n", buf);
-	wait_for_keypress();
+	fd = open("/dev/console", O_RDWR, 0);
+	if (fd >= 0) {
+		sys_ioctl(fd, TCGETS, (long)&termios);
+		termios.c_lflag &= ~ICANON;
+		sys_ioctl(fd, TCSETSF, (long)&termios);
+		read(fd, &c, 1);
+		termios.c_lflag |= ICANON;
+		sys_ioctl(fd, TCSETSF, (long)&termios);
+		close(fd);
+	}
 }
 
 #ifdef CONFIG_BLK_DEV_RAM
@@ -623,6 +633,63 @@ static int __init rd_load_disk(int n)
 	return rd_load_image("/dev/root");
 }
 
+#ifdef CONFIG_DEVFS_FS
+
+static void __init convert_name(char *prefix, char *name, char *p, int part)
+{
+	int host, bus, target, lun;
+	char dest[64];
+	char src[64];
+	char *base = p - 1;
+
+	/*  Decode "c#b#t#u#"  */
+	if (*p++ != 'c')
+		return;
+	host = simple_strtol(p, &p, 10);
+	if (*p++ != 'b')
+		return;
+	bus = simple_strtol(p, &p, 10);
+	if (*p++ != 't')
+		return;
+	target = simple_strtol(p, &p, 10);
+	if (*p++ != 'u')
+		return;
+	lun = simple_strtol(p, &p, 10);
+	if (!part)
+		sprintf(dest, "%s/host%d/bus%d/target%d/lun%d",
+				prefix, host, bus, target, lun);
+	else if (*p++ == 'p')
+		sprintf(dest, "%s/host%d/bus%d/target%d/lun%d/part%s",
+				prefix, host, bus, target, lun, p);
+	else
+		sprintf(dest, "%s/host%d/bus%d/target%d/lun%d/disc",
+				prefix, host, bus, target, lun);
+	*base = '\0';
+	sprintf(src, "/dev/%s", name);
+	sys_mkdir(src, 0755);
+	*base = '/';
+	sprintf(src, "/dev/%s", name);
+	sys_symlink(dest, src);
+}
+
+static void __init devfs_make_root(char *name)
+{
+
+	if (!strncmp(name, "sd/", 3))
+		convert_name("../scsi", name, name+3, 1);
+	else if (!strncmp(name, "sr/", 3))
+		convert_name("../scsi", name, name+3, 0);
+	else if (!strncmp(name, "ide/hd/", 7))
+		convert_name("..", name, name + 7, 1);
+	else if (!strncmp(name, "ide/cd/", 7))
+		convert_name("..", name, name + 7, 0);
+}
+#else
+static void __init devfs_make_root(char *name)
+{
+}
+#endif
+
 static void __init mount_root(void)
 {
 #ifdef CONFIG_ROOT_NFS
@@ -750,6 +817,7 @@ void prepare_namespace(void)
 #endif
 	sys_mkdir("/dev", 0700);
 	sys_mkdir("/root", 0700);
+	sys_mknod("/dev/console", S_IFCHR|0600, MKDEV(TTYAUX_MAJOR, 1));
 #ifdef CONFIG_DEVFS_FS
 	sys_mount("devfs", "/dev", "devfs", 0, NULL);
 	do_devfs = 1;

@@ -12,6 +12,7 @@
 #include <linux/completion.h>
 #include <linux/personality.h>
 #include <linux/tty.h>
+#include <linux/namespace.h>
 #ifdef CONFIG_BSD_PROCESS_ACCT
 #include <linux/acct.h>
 #endif
@@ -452,6 +453,7 @@ fake_volatile:
 	sem_exit();
 	__exit_files(tsk);
 	__exit_fs(tsk);
+	exit_namespace(tsk);
 	exit_sighand(tsk);
 	exit_thread();
 

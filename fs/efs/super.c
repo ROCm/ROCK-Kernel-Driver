@@ -132,16 +132,13 @@ static int efs_validate_super(struct efs_sb_info *sb, struct efs_super *super) {
 }
 
 struct super_block *efs_read_super(struct super_block *s, void *d, int silent) {
-	kdev_t dev = s->s_dev;
 	struct efs_sb_info *sb;
 	struct buffer_head *bh;
 
  	sb = SUPER_INFO(s);
  
 	s->s_magic		= EFS_SUPER_MAGIC;
-	s->s_blocksize		= EFS_BLOCKSIZE;
-	s->s_blocksize_bits	= EFS_BLOCKSIZE_BITS;
-	set_blocksize(dev, EFS_BLOCKSIZE);
+	sb_set_blocksize(s, EFS_BLOCKSIZE);
   
 	/* read the vh (volume header) block */
 	bh = sb_bread(s, 0);

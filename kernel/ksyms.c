@@ -188,6 +188,8 @@ EXPORT_SYMBOL(inode_change_ok);
 EXPORT_SYMBOL(write_inode_now);
 EXPORT_SYMBOL(notify_change);
 EXPORT_SYMBOL(set_blocksize);
+EXPORT_SYMBOL(sb_set_blocksize);
+EXPORT_SYMBOL(sb_min_blocksize);
 EXPORT_SYMBOL(getblk);
 EXPORT_SYMBOL(cdget);
 EXPORT_SYMBOL(cdput);

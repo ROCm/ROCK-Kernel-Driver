@@ -24,14 +24,12 @@
 
 static int simcons_init (struct console *, char *);
 static void simcons_write (struct console *, const char *, unsigned);
-static int simcons_wait_key (struct console *);
 static kdev_t simcons_console_device (struct console *);
 
 struct console hpsim_cons = {
 	name:		"simcons",
 	write:		simcons_write,
 	device:		simcons_console_device,
-	wait_key:	simcons_wait_key,
 	setup:		simcons_init,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,
@@ -54,17 +52,6 @@ simcons_write (struct console *cons, const char *buf, unsigned count)
 		if (ch == '\n')
 		  ia64_ssc('\r', 0, 0, 0, SSC_PUTCHAR);
 	}
-}
-
-static int
-simcons_wait_key (struct console *cons)
-{
-	char ch;
-
-	do {
-		ch = ia64_ssc(0, 0, 0, 0, SSC_GETCHAR);
-	} while (ch == '\0');
-	return ch;
 }
 
 static kdev_t

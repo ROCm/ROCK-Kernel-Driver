@@ -49,8 +49,6 @@
 #define NUM_SERIAL 1     /* One chip on board. */
 #define NUM_CHANNELS (NUM_SERIAL * 2)
 
-extern wait_queue_head_t keypress_wait;
-
 struct sgi_zslayout *zs_chips[NUM_SERIAL] = { 0, };
 struct sgi_zschannel *zs_channels[NUM_CHANNELS] = { 0, 0, };
 struct sgi_zschannel *zs_conschan;
@@ -428,8 +426,6 @@ static _INLINE_ void receive_chars(struct sgi_serial *info, struct pt_regs *regs
 			show_buffers();
 			return;
 		}
-		/* It is a 'keyboard interrupt' ;-) */
-		wake_up(&keypress_wait);
 	}
 	/* Look for kgdb 'stop' character, consult the gdb documentation
 	 * for remote target debugging and arch/sparc/kernel/sparc-stub.c
@@ -2117,12 +2113,6 @@ static void zs_console_write(struct console *co, const char *str,
 	rs_fair_output();
 }
 
-static int zs_console_wait_key(struct console *con)
-{
-	sleep_on(&keypress_wait);
-	return 0;
-}
-
 static kdev_t zs_console_device(struct console *con)
 {
 	return MKDEV(TTY_MAJOR, 64 + con->index);
@@ -2274,7 +2264,6 @@ static struct console sgi_console_driver = {
 	name:		"ttyS",
 	write:		zs_console_write,
 	device:		zs_console_device,
-	wait_key:	zs_console_wait_key,
 	setup:		zs_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

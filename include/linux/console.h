@@ -97,7 +97,6 @@ struct console
 	void	(*write)(struct console *, const char *, unsigned);
 	int	(*read)(struct console *, const char *, unsigned);
 	kdev_t	(*device)(struct console *);
-	int	(*wait_key)(struct console *);
 	void	(*unblank)(void);
 	int	(*setup)(struct console *, char *);
 	short	flags;

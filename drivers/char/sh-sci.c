@@ -1181,15 +1181,6 @@ static void serial_console_write(struct console *co, const char *s,
 	put_string(sercons_port, s, count);
 }
 
-/*
- *	Receive character from the serial port
- */
-static int serial_console_wait_key(struct console *co)
-{
-	/* Not implemented yet */
-	return 0;
-}
-
 static kdev_t serial_console_device(struct console *c)
 {
 	return MKDEV(SCI_MAJOR, SCI_MINOR_START + c->index);
@@ -1273,7 +1264,6 @@ static struct console sercons = {
 	name:		"ttySC",
 	write:		serial_console_write,
 	device:		serial_console_device,
-	wait_key:	serial_console_wait_key,
 	setup:		serial_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

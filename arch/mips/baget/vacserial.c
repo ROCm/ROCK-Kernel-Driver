@@ -2622,43 +2622,6 @@ static void serial_console_write(struct console *co, const char *s,
 	serial_outp(&scr_info, VAC_UART_INT_MASK, ier);
 }
 
-/*
- *	Receive character from the serial port
- */
-static int serial_console_wait_key(struct console *co)
-{
-	struct serial_state *ser;
-	int ier;
-	int lsr;
-	int c;
-	struct async_struct scr_info; /* serial_{in,out} because HUB6 */
-
-	ser = rs_table + co->index;
-	scr_info.magic = SERIAL_MAGIC;
-	scr_info.port = ser->port;
-	scr_info.flags = ser->flags;
-
-	/*
-	 *	First save the IER then disable the interrupts so
-	 *	that the real driver for the port does not get the
-	 *	character.
-	 */
-	ier = serial_inp(&scr_info, VAC_UART_INT_MASK);
-	serial_outp(&scr_info, VAC_UART_INT_MASK, 0x00);
-
-	do {
-		lsr = serial_inp(&scr_info, VAC_UART_INT_STATUS);
-	} while (!(lsr & VAC_UART_STATUS_RX_READY));
-	c = serial_inp(&scr_info, VAC_UART_RX);
-
-	/*
-	 *	Restore the interrupts
-	 */
-	serial_outp(&scr_info, VAC_UART_INT_MASK, ier);
-
-	return c;
-}
-
 static kdev_t serial_console_device(struct console *c)
 {
 	return MKDEV(TTY_MAJOR, 64 + c->index);
@@ -2812,7 +2775,6 @@ static struct console sercons = {
 	name:		"ttyS",
 	write:		serial_console_write,
 	device:		serial_console_device,
-	wait_key:	serial_console_wait_key,
 	setup:		serial_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

@@ -40,7 +40,6 @@ extern unsigned char pcikbd_sysrq_xlate[128];
 #define kbd_init			pcikbd_init
 
 #define compute_shiftstate		pci_compute_shiftstate
-#define keyboard_wait_for_keypress	pci_wait_for_keypress
 #define getkeycode			pci_getkeycode
 #define setkeycode			pci_setkeycode
 #define getledstate			pci_getledstate

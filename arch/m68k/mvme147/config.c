@@ -241,31 +241,7 @@ void m147_scc_write (struct console *co, const char *str, unsigned count)
 	restore_flags(flags);
 }
 
-
-static int m147_scc_wait_key (struct console *co)
-{
-	volatile unsigned char *p = (volatile char *)M147_SCC_A_ADDR;
-	unsigned long	flags;
-	int		c;
-
-	/* wait for rx buf filled */
-	while ((*p & 0x01) == 0)
-		;
-
-	save_flags(flags);
-	cli();
-
-	*p = 8;
-	scc_delay();
-	c = *p;
-
-	restore_flags(flags);
-	return c;
-}
-
-
 void mvme147_init_console_port (struct console *co, int cflag)
 {
 	co->write    = m147_scc_write;
-	co->wait_key = m147_scc_wait_key;
 }

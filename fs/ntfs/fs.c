@@ -1016,14 +1016,11 @@ struct super_block *ntfs_read_super(struct super_block *sb, void *options,
 	init_ntfs_super_block(vol);
 	if (!parse_options(vol, (char*)options))
 		goto ntfs_read_super_vol;
-	blocksize = get_hardsect_size(sb->s_dev);
-	if (blocksize < 512)
-		blocksize = 512;
-	if (set_blocksize(sb->s_dev, blocksize) < 0) {
-		ntfs_error("Unable to set blocksize %d.\n", blocksize);
+	blocksize = sb_min_blocksize(sb, 512);
+	if (!blocksize) {
+		ntfs_error("Unable to set blocksize.\n");
 		goto ntfs_read_super_vol;
 	}
-	sb->s_blocksize = blocksize;
 	/* Read the super block (boot block). */
 	if (!(bh = sb_bread(sb, 0))) {
 		ntfs_error("Reading super block failed\n");
@@ -1052,10 +1049,7 @@ struct super_block *ntfs_read_super(struct super_block *sb, void *options,
 	}
 	ntfs_debug(DEBUG_OTHER, "Done to init volume\n");
 	/* Inform the kernel that a device block is a NTFS cluster. */
-	sb->s_blocksize = vol->cluster_size;
-	sb->s_blocksize_bits = vol->cluster_size_bits;
-	if (blocksize != vol->cluster_size &&
-			set_blocksize(sb->s_dev, sb->s_blocksize) < 0) {
+	if (!sb_set_blocksize(sb, vol->cluster_size)) {
 		ntfs_error("Cluster size too small for device.\n");
 		goto ntfs_read_super_unl;
 	}

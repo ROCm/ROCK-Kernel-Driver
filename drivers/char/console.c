@@ -2178,7 +2178,6 @@ struct console vt_console_driver = {
 	name:		"tty",
 	write:		vt_console_print,
 	device:		vt_console_device,
-	wait_key:	keyboard_wait_for_keypress,
 	unblank:	unblank_screen,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

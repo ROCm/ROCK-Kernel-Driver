@@ -500,18 +500,6 @@ static struct file_operations proc_profile_operations = {
 	write:		write_profile,
 };
 
-extern struct seq_operations mounts_op;
-static int mounts_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &mounts_op);
-}
-static struct file_operations proc_mounts_operations = {
-	open:		mounts_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
-};
-
 struct proc_dir_entry *proc_root_kcore;
 
 static void create_seq_entry(char *name, mode_t mode, struct file_operations *f)
@@ -555,11 +543,12 @@ void __init proc_misc_init(void)
 	for (p = simple_ones; p->name; p++)
 		create_proc_read_entry(p->name, 0, NULL, p->read_proc, NULL);
 
+	proc_symlink("mounts", NULL, "self/mounts");
+
 	/* And now for trickier ones */
 	entry = create_proc_entry("kmsg", S_IRUSR, &proc_root);
 	if (entry)
 		entry->proc_fops = &proc_kmsg_operations;
-	create_seq_entry("mounts", 0, &proc_mounts_operations);
 	create_seq_entry("cpuinfo", 0, &proc_cpuinfo_operations);
 	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
 #ifdef CONFIG_MODULES

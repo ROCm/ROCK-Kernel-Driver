@@ -327,10 +327,6 @@ affs_read_super(struct super_block *sb, void *data, int silent)
 got_root:
 	root_block = AFFS_SB->s_root_block;
 
-	sb->s_blocksize_bits = blocksize == 512 ? 9 :
-			       blocksize == 1024 ? 10 :
-			       blocksize == 2048 ? 11 : 12;
-
 	/* Find out which kind of FS we have */
 	boot_bh = sb_bread(sb, 0);
 	if (!boot_bh) {

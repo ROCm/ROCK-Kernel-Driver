@@ -96,7 +96,6 @@ static struct console sun3x_debug = {
 	sun3x_prom_write,  	/* write */
 	NULL,			/* read */
 	NULL,			/* device */
-	NULL,			/* wait_key */
 	NULL,			/* unblank */
 	NULL,			/* setup */
 	CON_PRINTBUFFER,

@@ -26,7 +26,6 @@ extern const int NR_TYPES;
 extern const int max_vals[];
 extern unsigned short *key_maps[MAX_NR_KEYMAPS];
 extern unsigned short plain_map[NR_KEYS];
-extern wait_queue_head_t keypress_wait;
 extern unsigned char keyboard_type;
 #endif
 

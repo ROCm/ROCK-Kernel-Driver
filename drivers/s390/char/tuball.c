@@ -84,7 +84,6 @@ static struct console tub3270_con = {
 	tub3270_con_write,	/* write */
 	NULL,			/* read */
 	tub3270_con_device,	/* device */
-	NULL,			/* wait_key */
 	tub3270_con_unblank,	/* unblank */
 	NULL,			/* setup */
 	CON_PRINTBUFFER,	/* flags */

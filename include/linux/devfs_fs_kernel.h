@@ -112,7 +112,6 @@ extern void devfs_dealloc_unique_number (struct unique_numspace *space,
 					 int number);
 
 extern void mount_devfs_fs (void);
-extern void devfs_make_root (const char *name);
 
 #else  /*  CONFIG_DEVFS_FS  */
 
@@ -288,10 +287,6 @@ static inline void devfs_dealloc_unique_number (struct unique_numspace *space,
 }
 
 static inline void mount_devfs_fs (void)
-{
-    return;
-}
-static inline void devfs_make_root (const char *name)
 {
     return;
 }

@@ -2922,35 +2922,6 @@ static void serial_console_write(struct console *co, const char *s,
 	serial_out(info, UART_IER, ier);
 }
 
-/*
- *	Receive character from the serial port
- */
-static int serial_console_wait_key(struct console *co)
-{
-	static struct async_struct *info;
-	int ier, c;
-
-	info = &async_sercons;
-
-	/*
-	 *	First save the IER then disable the interrupts so
-	 *	that the real driver for the port does not get the
-	 *	character.
-	 */
-	ier = serial_in(info, UART_IER);
-	serial_out(info, UART_IER, 0x00);
- 
-	while ((serial_in(info, UART_LSR) & UART_LSR_DR) == 0);
-	c = serial_in(info, UART_RX);
-
-	/*
-	 *	Restore the interrupts
-	 */
-	serial_out(info, UART_IER, ier);
-
-	return c;
-}
-
 static kdev_t serial_console_device(struct console *c)
 {
 	return MKDEV(TTY_MAJOR, 64 + c->index);
@@ -3075,7 +3046,6 @@ static struct console sercons = {
 	name:		"ttyS",
 	write:		serial_console_write,
 	device:		serial_console_device,
-	wait_key:	serial_console_wait_key,
 	setup:		serial_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

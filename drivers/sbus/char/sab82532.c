@@ -361,10 +361,6 @@ static void receive_chars(struct sab82532 *info,
 		writeb(SAB82532_CMDR_RMC, &info->regs->w.cmdr);
 	}
 
-#ifdef CONFIG_SERIAL_CONSOLE
-	if (info->is_console)
-		wake_up(&keypress_wait);
-#endif
 	if (!tty)
 		return;
 
@@ -2541,13 +2537,6 @@ sab82532_console_write(struct console *con, const char *s, unsigned n)
 	sab82532_tec_wait(info);
 }
 
-static int
-sab82532_console_wait_key(struct console *con)
-{
-	sleep_on(&keypress_wait);
-	return 0;
-}
-
 static kdev_t
 sab82532_console_device(struct console *con)
 {
@@ -2622,7 +2611,6 @@ static struct console sab82532_console = {
 	name:		"ttyS",
 	write:		sab82532_console_write,
 	device:		sab82532_console_device,
-	wait_key:	sab82532_console_wait_key,
 	setup:		sab82532_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

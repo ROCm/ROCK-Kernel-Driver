@@ -248,9 +248,7 @@ static struct super_block * bfs_read_super(struct super_block * s,
 	int i, imap_len;
 
 	dev = s->s_dev;
-	set_blocksize(dev, BFS_BSIZE);
-	s->s_blocksize = BFS_BSIZE;
-	s->s_blocksize_bits = BFS_BSIZE_BITS;
+	sb_set_blocksize(s, BFS_BSIZE);
 
 	bh = sb_bread(s, 0);
 	if(!bh)

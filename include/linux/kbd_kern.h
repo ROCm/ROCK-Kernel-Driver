@@ -140,7 +140,6 @@ struct console;
 int getkeycode(unsigned int scancode);
 int setkeycode(unsigned int scancode, unsigned int keycode);
 void compute_shiftstate(void);
-int keyboard_wait_for_keypress(struct console *);
 
 /* defkeymap.c */
 

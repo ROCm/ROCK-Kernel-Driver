@@ -912,10 +912,6 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 	 * This is important for devices that have a hardware
 	 * sectorsize that is larger than the default.
 	 */
-	blocksize = EXT3_MIN_BLOCK_SIZE;
-	hblock = get_hardsect_size(dev);
-	if (blocksize < hblock)
-		blocksize = hblock;
 
 	sbi->s_mount_opt = 0;
 	sbi->s_resuid = EXT3_DEF_RESUID;
@@ -925,8 +921,7 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		goto out_fail;
 	}
 
-	sb->s_blocksize = blocksize;
-	set_blocksize (dev, blocksize);
+	blocksize = sb_min_blocksize(sb, EXT3_MIN_BLOCK_SIZE);
 
 	/*
 	 * The ext3 superblock will not be buffer aligned for other than 1kB
@@ -980,11 +975,10 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 		       bdevname(dev), i);
 		goto failed_mount;
 	}
-	sb->s_blocksize_bits = le32_to_cpu(es->s_log_block_size) + 10;
-	sb->s_blocksize = 1 << sb->s_blocksize_bits;
+	blocksize = BLOCK_SIZE << le32_to_cpu(es->s_log_block_size);
 
-	if (sb->s_blocksize < EXT3_MIN_BLOCK_SIZE ||
-	    sb->s_blocksize > EXT3_MAX_BLOCK_SIZE) {
+	if (blocksize < EXT3_MIN_BLOCK_SIZE ||
+	    blocksize > EXT3_MAX_BLOCK_SIZE) {
 		printk(KERN_ERR 
 		       "EXT3-fs: Unsupported filesystem blocksize %d on %s.\n",
 		       blocksize, bdevname(dev));
@@ -993,21 +987,20 @@ struct super_block * ext3_read_super (struct super_block * sb, void * data,
 
 	sb->s_maxbytes = ext3_max_size(sb->s_blocksize_bits);
 
+	hblock = get_hardsect_size(dev);
 	if (sb->s_blocksize != blocksize) {
-		blocksize = sb->s_blocksize;
-
 		/*
 		 * Make sure the blocksize for the filesystem is larger
 		 * than the hardware sectorsize for the machine.
 		 */
-		if (sb->s_blocksize < hblock) {
+		if (blocksize < hblock) {
 			printk(KERN_ERR "EXT3-fs: blocksize %d too small for "
 			       "device blocksize %d.\n", blocksize, hblock);
 			goto failed_mount;
 		}
 
 		brelse (bh);
-		set_blocksize (dev, sb->s_blocksize);
+		sb_set_blocksize(sb, blocksize);
 		logic_sb_block = (sb_block * EXT3_MIN_BLOCK_SIZE) / blocksize;
 		offset = (sb_block * EXT3_MIN_BLOCK_SIZE) % blocksize;
 		bh = sb_bread(sb, logic_sb_block);

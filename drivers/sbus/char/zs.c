@@ -532,8 +532,6 @@ static void receive_chars(struct sun_serial *info, struct pt_regs *regs)
 				/* Continue execution... */
 				return;
 			}
-			/* It is a 'keyboard interrupt' ;-) */
-			wake_up(&keypress_wait);
 		}
 #ifndef __sparc_v9__
 		/* Look for kgdb 'stop' character, consult the gdb
@@ -2761,13 +2759,6 @@ zs_console_write(struct console *con, const char *s, unsigned count)
 #endif
 }
 
-static int
-zs_console_wait_key(struct console *con)
-{
-	sleep_on(&keypress_wait);
-	return 0;
-}
-
 static kdev_t zs_console_device(struct console *con)
 {
 	return MKDEV(TTY_MAJOR, 64 + con->index);
@@ -2845,7 +2836,6 @@ static struct console zs_console = {
 	name:		"ttyS",
 	write:		zs_console_write,
 	device:		zs_console_device,
-	wait_key:	zs_console_wait_key,
 	setup:		zs_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

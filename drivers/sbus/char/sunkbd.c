@@ -82,16 +82,6 @@ extern void scrollfront(int);
 
 struct l1a_kbd_state l1a_state;
 
-#ifndef CONFIG_PCI
-DECLARE_WAIT_QUEUE_HEAD(keypress_wait);
-#endif
-
-int keyboard_wait_for_keypress(struct console *co)
-{
-	sleep_on(&keypress_wait);
-	return 0;
-}
-
 static spinlock_t sunkbd_lock = SPIN_LOCK_UNLOCKED;
 
 /*
@@ -629,7 +619,6 @@ void sunkbd_inchar(unsigned char ch, struct pt_regs *regs)
 
 static void put_queue(int ch)
 {
-	wake_up(&keypress_wait);
 	if (tty) {
 		tty_insert_flip_char(tty, ch, 0);
 		con_schedule_flip(tty);
@@ -638,7 +627,6 @@ static void put_queue(int ch)
 
 static void puts_queue(char *cp)
 {
-	wake_up(&keypress_wait);
 	if (!tty)
 		return;
 

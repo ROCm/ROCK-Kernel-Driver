@@ -1921,22 +1921,6 @@ static void ambauart_console_write(struct console *co, const char *s, u_int coun
 	UART_PUT_CR(port, old_cr);
 }
 
-/*
- *	Receive character from the serial port
- */
-static int ambauart_console_wait_key(struct console *co)
-{
-	struct amba_port *port = &amba_ports[co->index];
-	unsigned int status;
-	int c;
-
-	do {
-		status = UART_GET_FR(port);
-	} while (!UART_RX_DATA(status));
-	c = UART_GET_CHAR(port);
-	return c;
-}
-
 static kdev_t ambauart_console_device(struct console *c)
 {
 	return MKDEV(SERIAL_AMBA_MAJOR, SERIAL_AMBA_MINOR + c->index);
@@ -2015,7 +1999,6 @@ static struct console ambauart_cons =
 	read:		ambauart_console_read,
 #endif
 	device:		ambauart_console_device,
-	wait_key:	ambauart_console_wait_key,
 	setup:		ambauart_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

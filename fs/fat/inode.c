@@ -569,10 +569,6 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	sb->s_maxbytes = MAX_NON_LFS;
 	sb->s_op = &fat_sops;
 
-	hard_blksize = get_hardsect_size(sb->s_dev);
-	if (!hard_blksize)
-		hard_blksize = 512;
-
 	opts.isvfat = sbi->options.isvfat;
 	if (!parse_options((char *) data, &fat, &debug, &opts,
 			   cvf_format, cvf_options))
@@ -582,8 +578,7 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 
 	fat_cache_init();
 
-	sb->s_blocksize = hard_blksize;
-	set_blocksize(sb->s_dev, hard_blksize);
+	sb_min_blocksize(sb, 512);
 	bh = sb_bread(sb, 0);
 	if (bh == NULL) {
 		printk("FAT: unable to read boot sector\n");
@@ -625,12 +620,14 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 		goto out_invalid;
 	}
 
-	if (logical_sector_size < hard_blksize) {
+	if (logical_sector_size < sb->s_blocksize) {
 		printk("FAT: logical sector size too small for device"
 		       " (logical sector size = %d)\n", logical_sector_size);
 		brelse(bh);
 		goto out_invalid;
 	}
+
+	hard_blksize = sb->s_blocksize;
 
 	sbi->cluster_bits = ffs(logical_sector_size * sbi->cluster_size) - 1;
 	sbi->fats = b->fats;
@@ -716,9 +713,7 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	if (error)
 		goto out_invalid;
 
-	sb->s_blocksize = logical_sector_size;
-	sb->s_blocksize_bits = ffs(logical_sector_size) - 1;
-	set_blocksize(sb->s_dev, sb->s_blocksize);
+	sb_set_blocksize(sb, logical_sector_size);
 	sbi->cvf_format = &default_cvf;
 	if (!strcmp(cvf_format, "none"))
 		i = -1;
@@ -802,7 +797,7 @@ out_unload_nls:
 out_invalid:
 	if (!silent) {
 		printk("VFS: Can't find a valid FAT filesystem on dev %s.\n",
-			kdevname(sb->s_dev));
+			bdevname(sb->s_dev));
 	}
 out_fail:
 	if (opts.iocharset) {

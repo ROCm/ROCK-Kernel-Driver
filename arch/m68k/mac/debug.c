@@ -248,17 +248,6 @@ int mac_sccb_console_wait_key(struct console *co)
     return( scc.cha_b_data );
 }
 
-int mac_scca_console_wait_key(struct console *co)
-{
-    int i;
-    do {
-	for( i = uSEC; i > 0; --i )
-		barrier();
-    } while( !(scc.cha_a_ctrl & 0x01) ); /* wait for rx buf filled */
-    for( i = uSEC; i > 0; --i )
-	barrier();
-    return( scc.cha_a_data );
-}
 #endif
 
 /* The following two functions do a quick'n'dirty initialization of the MFP or
@@ -395,9 +384,6 @@ void __init mac_debug_init(void)
 	/* Mac modem port */
 	mac_init_scc_port( B9600|CS8, 0 );
 	mac_console_driver.write = mac_scca_console_write;
-#ifdef CONFIG_SERIAL_CONSOLE
-	mac_console_driver.wait_key = mac_scca_console_wait_key;
-#endif
 	scc_port = 0;
     }
     else if (!strcmp( m68k_debug_device, "ser2" )) {

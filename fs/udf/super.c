@@ -357,30 +357,11 @@ udf_remount_fs(struct super_block *sb, int *flags, char *options)
 static  int
 udf_set_blocksize(struct super_block *sb, int bsize)
 {
-	/* Use specified block size if specified */
-	if (bsize)
-		sb->s_blocksize = bsize;
-	if (get_hardsect_size(sb->s_dev) > sb->s_blocksize)
-		sb->s_blocksize = get_hardsect_size(sb->s_dev); 
-
-	/* Block size must be an even multiple of 512 */
-	switch (sb->s_blocksize)
-	{
-		case 512: sb->s_blocksize_bits = 9;	break;
-		case 1024: sb->s_blocksize_bits = 10; break;
-		case 2048: sb->s_blocksize_bits = 11; break;
-		case 4096: sb->s_blocksize_bits = 12; break;
-		case 8192: sb->s_blocksize_bits = 13; break;
-		default:
-		{
-			udf_debug("Bad block size (%ld)\n", sb->s_blocksize);
-			printk(KERN_ERR "udf: bad block size (%ld)\n", sb->s_blocksize);
-			return 0;
-		}
+	if (!sb_min_blocksize(sb, bsize)) {
+		udf_debug("Bad block size (%d)\n", bsize);
+		printk(KERN_ERR "udf: bad block size (%d)\n", bsize);
+		return 0;
 	}
-
-	/* Set the block size */
-	set_blocksize(sb->s_dev, sb->s_blocksize);
 	return sb->s_blocksize;
 }
 

@@ -102,6 +102,26 @@ int set_blocksize(kdev_t dev, int size)
 	return 0;
 }
 
+int sb_set_blocksize(struct super_block *sb, int size)
+{
+	int bits;
+	if (set_blocksize(sb->s_dev, size) < 0)
+		return 0;
+	sb->s_blocksize = size;
+	for (bits = 9, size >>= 9; size >>= 1; bits++)
+		;
+	sb->s_blocksize_bits = bits;
+	return sb->s_blocksize;
+}
+
+int sb_min_blocksize(struct super_block *sb, int size)
+{
+	int minsize = get_hardsect_size(sb->s_dev);
+	if (size < minsize)
+		size = minsize;
+	return sb_set_blocksize(sb, size);
+}
+
 static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer_head * bh, int create)
 {
 	if (iblock >= max_block(inode->i_rdev))

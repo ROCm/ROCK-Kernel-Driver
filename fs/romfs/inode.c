@@ -102,9 +102,7 @@ romfs_read_super(struct super_block *s, void *data, int silent)
 
 	/* I would parse the options here, but there are none.. :) */
 
-	set_blocksize(dev, ROMBSIZE);
-	s->s_blocksize = ROMBSIZE;
-	s->s_blocksize_bits = ROMBSBITS;
+	sb_set_blocksize(s, ROMBSIZE);
 	s->u.generic_sbp = (void *) 0;
 	s->s_maxbytes = 0xFFFFFFFF;
 

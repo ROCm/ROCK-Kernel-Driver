@@ -1065,41 +1065,6 @@ static void scc_console_write (struct console *co, const char *str, unsigned cou
 	restore_flags(flags);
 }
 
-
-static int scc_console_wait_key(struct console *co)
-{
-	unsigned long	flags;
-	volatile char *p = NULL;
-	int c;
-	
-#ifdef CONFIG_MVME147_SCC
-	if (MACH_IS_MVME147)
-		p = (volatile char *)M147_SCC_A_ADDR;
-#endif
-#ifdef CONFIG_MVME162_SCC
-	if (MACH_IS_MVME16x)
-		p = (volatile char *)MVME_SCC_A_ADDR;
-#endif
-#ifdef CONFIG_BVME6000_SCC
-	if (MACH_IS_BVME6000)
-		p = (volatile char *)BVME_SCC_A_ADDR;
-#endif
-
-	save_flags(flags);
-	cli();
-
-	/* wait for rx buf filled */
-	while ((*p & 0x01) == 0)
-		;
-
-	*p = 8;
-	scc_delay();
-	c = *p;
-	restore_flags(flags);
-	return c;
-}
-
-
 static kdev_t scc_console_device(struct console *c)
 {
 	return MKDEV(TTY_MAJOR, SCC_MINOR_BASE + c->index);
@@ -1116,7 +1081,6 @@ static struct console sercons = {
 	name:		"ttyS",
 	write:		scc_console_write,
 	device:		scc_console_device,
-	wait_key:	scc_console_wait_key,
 	setup:		scc_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

@@ -596,8 +596,7 @@ struct super_block * ufs_read_super (struct super_block * sb, void * data,
 	}
 	
 again:	
-	set_blocksize (sb->s_dev, block_size);
-	sb->s_blocksize = block_size;
+	sb_set_blocksize(sb, block_size);
 
 	/*
 	 * read ufs super block from device
@@ -716,8 +715,6 @@ magic_found:
 	/*
 	 * Read ufs_super_block into internal data structures
 	 */
-	sb->s_blocksize = fs32_to_cpu(sb, usb1->fs_fsize);
-	sb->s_blocksize_bits = fs32_to_cpu(sb, usb1->fs_fshift);
 	sb->s_op = &ufs_super_ops;
 	sb->dq_op = NULL; /***/
 	sb->s_magic = fs32_to_cpu(sb, usb3->fs_magic);

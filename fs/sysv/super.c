@@ -315,8 +315,6 @@ static int complete_read_super(struct super_block *sb, int silent, int size)
 	sb->sv_ninodes = (sb->sv_firstdatazone - sb->sv_firstinodezone)
 		<< sb->sv_inodes_per_block_bits;
 
-	sb->s_blocksize = bsize;
-	sb->s_blocksize_bits = n_bits;
 	if (!silent)
 		printk("VFS: Found a %s FS (block size = %ld) on device %s\n",
 		       found, sb->s_blocksize, bdevname(sb->s_dev));
@@ -361,8 +359,7 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 		panic("Coherent FS: bad super-block size");
 	if (64 != sizeof (struct sysv_inode))
 		panic("sysv fs: bad i-node size");
-	set_blocksize(dev,BLOCK_SIZE);
-	sb->s_blocksize = BLOCK_SIZE;
+	sb_set_blocksize(sb, BLOCK_SIZE);
 	sb->sv_block_base = 0;
 
 	for (i = 0; i < sizeof(flavours)/sizeof(flavours[0]) && !size; i++) {
@@ -380,8 +377,7 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 		case 1:
 			blocknr = bh->b_blocknr << 1;
 			brelse(bh);
-			set_blocksize(dev, 512);
-			sb->s_blocksize = 512;
+			sb_set_blocksize(sb, 512);
 			bh1 = sb_bread(sb, blocknr);
 			bh = sb_bread(sb, blocknr + 1);
 			break;
@@ -391,8 +387,7 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 		case 3:
 			blocknr = bh->b_blocknr >> 1;
 			brelse(bh);
-			set_blocksize(dev, 2048);
-			sb->s_blocksize = 2048;
+			sb_set_blocksize(sb, 2048);
 			bh1 = bh = sb_bread(sb, blocknr);
 			break;
 		default:
@@ -408,7 +403,7 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 
 	brelse(bh1);
 	brelse(bh);
-	set_blocksize(sb->s_dev,BLOCK_SIZE);
+	sb_set_blocksize(sb, BLOCK_SIZE);
 	printk("oldfs: cannot read superblock\n");
 failed:
 	return NULL;
@@ -443,8 +438,7 @@ static struct super_block *v7_read_super(struct super_block *sb,void *data,
 	sb->sv_type = FSTYPE_V7;
 	sb->sv_bytesex = BYTESEX_PDP;
 
-	set_blocksize(dev, 512);
-	sb->s_blocksize = 512;
+	sb_set_blocksize(sb, 512);
 
 	if ((bh = sb_bread(sb, 1)) == NULL) {
 		if (!silent)

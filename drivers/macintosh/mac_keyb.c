@@ -256,7 +256,6 @@ int adb_button3_keycode = 0x7c; /* right option key */
 #endif
 
 extern struct kbd_struct kbd_table[];
-extern wait_queue_head_t keypress_wait;
 
 extern void handle_scancode(unsigned char, int);
 
@@ -423,7 +422,6 @@ static void mac_put_queue(int ch)
 	struct tty_struct *tty;
 
 	tty = console_driver.table? console_driver.table[fg_console]: NULL;
-	wake_up(&keypress_wait);
 	if (tty) {
 		tty_insert_flip_char(tty, ch, 0);
 		con_schedule_flip(tty);

@@ -982,6 +982,7 @@ extern int unregister_filesystem(struct file_system_type *);
 extern struct vfsmount *kern_mount(struct file_system_type *);
 extern int may_umount(struct vfsmount *);
 extern long do_mount(char *, char *, char *, unsigned long, void *);
+extern void umount_tree(struct vfsmount *);
 
 #define kern_umount mntput
 
@@ -1378,6 +1379,8 @@ static inline void bforget(struct buffer_head *buf)
 		__bforget(buf);
 }
 extern int set_blocksize(kdev_t, int);
+extern int sb_set_blocksize(struct super_block *, int);
+extern int sb_min_blocksize(struct super_block *, int);
 extern struct buffer_head * bread(kdev_t, int, int);
 static inline struct buffer_head * sb_bread(struct super_block *sb, int block)
 {

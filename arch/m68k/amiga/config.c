@@ -98,7 +98,6 @@ extern void amiga_mksound( unsigned int count, unsigned int ticks );
 extern void amiga_floppy_setup(char *, int *);
 #endif
 static void amiga_reset (void);
-static int amiga_wait_key (struct console *co);
 extern void amiga_init_sound(void);
 static void amiga_savekmsg_init(void);
 static void amiga_mem_console_write(struct console *co, const char *b,
@@ -112,7 +111,6 @@ static void amiga_heartbeat(int on);
 
 static struct console amiga_console_driver = {
 	name:		"debug",
-	wait_key:	amiga_wait_key,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,
 };
@@ -740,33 +738,6 @@ static int amiga_set_clock_mmss (unsigned long nowtime)
 	}
 
 	return 0;
-}
-
-static int amiga_wait_key (struct console *co)
-{
-    int i;
-
-    while (1) {
-	while (ciaa.pra & 0x40);
-
-	/* debounce */
-	for (i = 0; i < 1000; i++);
-
-	if (!(ciaa.pra & 0x40))
-	    break;
-    }
-
-    /* wait for button up */
-    while (1) {
-	while (!(ciaa.pra & 0x40));
-
-	/* debounce */
-	for (i = 0; i < 1000; i++);
-
-	if (ciaa.pra & 0x40)
-	    break;
-    }
-    return 0;
 }
 
 static NORET_TYPE void amiga_reset( void )

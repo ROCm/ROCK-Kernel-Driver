@@ -126,9 +126,7 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
 	struct buffer_head **map;
 	struct minix_super_block *ms;
 	int i, block;
-	kdev_t dev = s->s_dev;
 	struct inode *root_inode;
-	unsigned int hblock;
 	struct minix_sb_info *sbi = &s->u.minix_sb;
 
 	/* N.B. These should be compile-time tests.
@@ -138,13 +136,9 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
 	if (64 != sizeof(struct minix2_inode))
 		panic("bad V2 i-node size");
 
-	hblock = get_hardsect_size(dev);
-	if (hblock > BLOCK_SIZE)
+	if (!sb_set_blocksize(s, BLOCK_SIZE))
 		goto out_bad_hblock;
 
-	set_blocksize(dev, BLOCK_SIZE);
-	s->s_blocksize = BLOCK_SIZE;
-	s->s_blocksize_bits = BLOCK_SIZE_BITS;
 	if (!(bh = sb_bread(s, 1)))
 		goto out_bad_sb;
 
@@ -264,7 +258,7 @@ out_no_map:
 out_no_fs:
 	if (!silent)
 		printk("VFS: Can't find a Minix or Minix V2 filesystem on device "
-		       "%s.\n", kdevname(dev));
+		       "%s.\n", bdevname(s->s_dev));
     out_release:
 	brelse(bh);
 	goto out;

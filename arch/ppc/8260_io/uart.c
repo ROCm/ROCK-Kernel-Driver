@@ -2216,54 +2216,6 @@ static void serial_console_write(struct console *c, const char *s,
 		info->tx_cur = (cbd_t *)bdp;
 }
 
-/*
- * Receive character from the serial port.  This only works well
- * before the port is initialize for real use.
- */
-static int serial_console_wait_key(struct console *co)
-{
-	struct serial_state		*ser;
-	u_char				c, *cp;
-	ser_info_t			*info;
-	volatile	cbd_t		*bdp;
-	volatile	smc_uart_t	*up;
-
-	ser = rs_table + co->index;
-
-	/* Pointer to UART in parameter ram.
-	*/
-	up = (smc_uart_t *)&immr->im_dprambase[ser->port];
-
-	/* Get the address of the host memory buffer.
-	 * If the port has been initialized for general use, we must
-	 * use information from the port structure.
-	 */
-	if ((info = (ser_info_t *)ser->info))
-		bdp = info->rx_cur;
-	else
-		bdp = (cbd_t *)&immr->im_dprambase[up->smc_rbase];
-
-	/*
-	 * We need to gracefully shut down the receiver, disable
-	 * interrupts, then read the input.
-	 */
-	while (bdp->cbd_sc & BD_SC_EMPTY);	/* Wait for a character */
-	cp = __va(bdp->cbd_bufaddr);
-
-	if (info) {
-		if (bdp->cbd_sc & BD_SC_WRAP) {
-			bdp = info->rx_bd_base;
-		}
-		else {
-			bdp++;
-		}
-		info->rx_cur = (cbd_t *)bdp;
-	}
-
-	c = *cp;
-	return((int)c);
-}
-
 static kdev_t serial_console_device(struct console *c)
 {
 	return MKDEV(TTYAUX_MAJOR, 64 + c->index);
@@ -2274,7 +2226,6 @@ static struct console sercons = {
 	name:		"ttyS",
 	write:		serial_console_write,
 	device:		serial_console_device,
-	wait_key:	serial_console_wait_key,
 	setup:		serial_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		CONFIG_SERIAL_CONSOLE_PORT,

@@ -2792,30 +2792,6 @@ static void serial_console_write(struct console *co, const char *s,
 	/* Don't disable the transmitter. */
 }
 
-/*
- *	Receive character from the serial port
- */
-static int serial_console_wait_key(struct console *co)
-{
-	struct mac_serial *info = zs_soft + co->index;
-	int           val;
-
-	/* Turn of interrupts and enable the transmitter. */
-	write_zsreg(info->zs_channel, R1, info->curregs[1] & ~INT_ALL_Rx);
-	write_zsreg(info->zs_channel, R3, info->curregs[3] | RxENABLE);
-
-	/* Wait for something in the receive buffer. */
-	while((read_zsreg(info->zs_channel, 0) & Rx_CH_AV) == 0)
-		eieio();
-	val = read_zsdata(info->zs_channel);
-
-	/* Restore the values in the registers. */
-	write_zsreg(info->zs_channel, R1, info->curregs[1]);
-	write_zsreg(info->zs_channel, R3, info->curregs[3]);
-
-	return val;
-}
-
 static kdev_t serial_console_device(struct console *c)
 {
 	return MKDEV(TTY_MAJOR, 64 + c->index);
@@ -3006,7 +2982,6 @@ static struct console sercons = {
 	name:		"ttyS",
 	write:		serial_console_write,
 	device:		serial_console_device,
-	wait_key:	serial_console_wait_key,
 	setup:		serial_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

@@ -339,13 +339,10 @@ static struct super_block *qnx4_read_super(struct super_block *s,
 					   void *data, int silent)
 {
 	struct buffer_head *bh;
-	kdev_t dev = s->s_dev;
 	struct inode *root;
 	const char *errmsg;
 
-	set_blocksize(dev, QNX4_BLOCK_SIZE);
-	s->s_blocksize = QNX4_BLOCK_SIZE;
-	s->s_blocksize_bits = QNX4_BLOCK_SIZE_BITS;
+	sb_set_blocksize(s, QNX4_BLOCK_SIZE);
 
 	/* Check the boot signature. Since the qnx4 code is
 	   dangerous, we should leave as quickly as possible

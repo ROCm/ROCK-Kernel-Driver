@@ -23,8 +23,7 @@
 static inline void
 affs_set_blocksize(struct super_block *sb, int size)
 {
-	set_blocksize(sb->s_dev, size);
-	sb->s_blocksize = size;
+	sb_set_blocksize(sb, size);
 }
 static inline struct buffer_head *
 affs_bread(struct super_block *sb, int block)

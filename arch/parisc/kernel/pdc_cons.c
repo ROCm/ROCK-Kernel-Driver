@@ -105,10 +105,6 @@ static int pdc_console_setup(struct console *co, char *options)
 static struct console pdc_cons = {
 	name:		"ttyB",
 	write:		pdc_console_write,
-	read:		NULL,
-	device:		NULL, 
-	wait_key:	pdc_console_wait_key,
-	unblank:	NULL,
 	setup:		pdc_console_setup,
 	flags:		CON_PRINTBUFFER|CON_ENABLED,  // |CON_CONSDEV,
 	index:		-1,

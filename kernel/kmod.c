@@ -24,6 +24,8 @@
 #include <linux/unistd.h>
 #include <linux/kmod.h>
 #include <linux/smp_lock.h>
+#include <linux/slab.h>
+#include <linux/namespace.h>
 #include <linux/completion.h>
 
 #include <asm/uaccess.h>
@@ -36,6 +38,7 @@ use_init_fs_context(void)
 	struct fs_struct *our_fs, *init_fs;
 	struct dentry *root, *pwd;
 	struct vfsmount *rootmnt, *pwdmnt;
+	struct namespace *our_ns, *init_ns;
 
 	/*
 	 * Make modprobe's fs context be a copy of init's.
@@ -55,6 +58,11 @@ use_init_fs_context(void)
 	 */
 
 	init_fs = init_task.fs;
+	init_ns = init_task.namespace;
+	get_namespace(init_ns);
+	our_ns = current->namespace;
+	current->namespace = init_ns;
+	put_namespace(our_ns);
 	read_lock(&init_fs->lock);
 	rootmnt = mntget(init_fs->rootmnt);
 	root = dget(init_fs->root);
