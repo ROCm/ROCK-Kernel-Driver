@@ -66,6 +66,9 @@ struct proc_dir_entry	*proc_net_sctp;
  */
 static struct socket *sctp_ctl_socket;
 
+static sctp_pf_t *sctp_pf_inet6_specific;
+static sctp_pf_t *sctp_pf_inet_specific;
+
 extern struct net_proto_family inet_family_ops;
 
 /* Return the address of the control sock. */
@@ -91,7 +94,7 @@ void sctp_proc_init(void)
 void sctp_proc_exit(void)
 {
 	if (proc_net_sctp) {
-		proc_net_sctp= NULL;
+		proc_net_sctp = NULL;
 		remove_proc_entry("net/sctp", 0);
 	}
 }
@@ -135,7 +138,8 @@ static inline void sctp_v4_get_local_addr_list(sctp_protocol_t *proto,
  * the protocol structure.
  * FIXME: Make this an address family function.
  */
-static inline void sctp_v6_get_local_addr_list(sctp_protocol_t *proto, struct net_device *dev)
+static inline void sctp_v6_get_local_addr_list(sctp_protocol_t *proto, 
+					       struct net_device *dev)
 {
 #ifdef SCTP_V6_SUPPORT
 	/* FIXME: The testframe doesn't support this function. */
@@ -227,8 +231,8 @@ int sctp_copy_local_addr_list(sctp_protocol_t *proto, sctp_bind_addr_t *bp,
 	long flags __attribute__ ((unused));
 
 	sctp_spin_lock_irqsave(&proto->local_addr_lock, flags);
- 	list_for_each(pos, &proto->local_addr_list) {
- 		addr = list_entry(pos, struct sockaddr_storage_list, list);
+	list_for_each(pos, &proto->local_addr_list) {
+		addr = list_entry(pos, struct sockaddr_storage_list, list);
 		if (sctp_in_scope(&addr->a, scope)) {
 			/* Now that the address is in scope, check to see if
 			 * the address type is really supported by the local
@@ -239,8 +243,7 @@ int sctp_copy_local_addr_list(sctp_protocol_t *proto, sctp_bind_addr_t *bp,
 			    (((AF_INET6 == addr->a.sa.sa_family) &&
 			      (copy_flags & SCTP_ADDR6_ALLOWED) &&
 			      (copy_flags & SCTP_ADDR6_PEERSUPP)))) {
-				error = sctp_add_bind_addr(bp,
-							   &addr->a,
+				error = sctp_add_bind_addr(bp, &addr->a,
 							   priority);
 				if (error)
 					goto end_copy;
@@ -286,7 +289,8 @@ int sctp_v4_get_dst_mtu(const sockaddr_storage_t *address)
 /* Event handler for inet device events.
  * Basically, whenever there is an event, we re-build our local address list.
  */
-static int sctp_netdev_event(struct notifier_block *this, unsigned long event, void *ptr)
+static int sctp_netdev_event(struct notifier_block *this, unsigned long event,
+			     void *ptr)
 {
 	long flags __attribute__ ((unused));
 
@@ -312,8 +316,8 @@ int sctp_ctl_sock_init(void)
 	err = sock_create(family, SOCK_SEQPACKET, IPPROTO_SCTP,
 			  &sctp_ctl_socket);
 	if (err < 0) {
-		printk(KERN_ERR 
-			"SCTP: Failed to create the SCTP control socket.\n");
+		printk(KERN_ERR
+		       "SCTP: Failed to create the SCTP control socket.\n");
 		return err;
 	}
 	sctp_ctl_socket->sk->allocation = GFP_ATOMIC;
@@ -346,6 +350,52 @@ sctp_func_t *sctp_get_af_specific(const sockaddr_storage_t *address)
 
 	return retval;
 }
+
+/* Common code to initialize a AF_INET msg_name. */
+static void sctp_inet_msgname(char *msgname, int *addr_len)
+{
+	struct sockaddr_in *sin;
+	
+	sin = (struct sockaddr_in *)msgname;
+	*addr_len = sizeof(struct sockaddr_in);
+	sin->sin_family = AF_INET;
+	memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
+}
+ 
+/* Copy the primary address of the peer primary address as the msg_name. */
+static void sctp_inet_event_msgname(sctp_ulpevent_t *event, char *msgname, int *addr_len)
+{
+	struct sockaddr_in *sin, *sinfrom;
+
+	if (msgname) {
+		sctp_inet_msgname(msgname, addr_len);
+		sin = (struct sockaddr_in *)msgname;
+		sinfrom = &event->asoc->peer.primary_addr.v4;
+		sin->sin_port = htons(event->asoc->peer.port);
+		sin->sin_addr.s_addr = sinfrom->sin_addr.s_addr;
+	}
+} 
+
+/* Initialize and copy out a msgname from an inbound skb. */
+static void sctp_inet_skb_msgname(struct sk_buff *skb, char *msgname, int *addr_len)
+{
+	struct sctphdr *sh; 
+	struct sockaddr_in *sin;
+
+	if (msgname) {
+		sctp_inet_msgname(msgname, addr_len);
+		sin = (struct sockaddr_in *)msgname;
+		sh = (struct sctphdr *)skb->h.raw;
+		sin->sin_port = sh->source;
+		sin->sin_addr.s_addr = skb->nh.iph->saddr;
+	}
+} 
+
+static sctp_pf_t sctp_pf_inet = {
+	.event_msgname = sctp_inet_event_msgname,
+	.skb_msgname = sctp_inet_skb_msgname,
+};
+
 
 /* Registration for netdev events.  */
 struct notifier_block sctp_netdev_notifier = {
@@ -403,6 +453,34 @@ sctp_func_t sctp_ipv4_specific = {
 	.sa_family      = AF_INET,
 };
 
+sctp_pf_t *sctp_get_pf_specific(int family) {
+
+	switch (family) {
+	case PF_INET:
+		return sctp_pf_inet_specific;
+	case PF_INET6:
+		return sctp_pf_inet6_specific;
+	default:
+		return NULL;
+	}
+}
+
+/* Set the PF specific function table.  */
+void sctp_set_pf_specific(int family, sctp_pf_t *pf)
+{
+	switch (family) {
+	case PF_INET:
+		sctp_pf_inet_specific = pf;
+		break;
+	case PF_INET6:
+		sctp_pf_inet6_specific = pf;
+		break;
+	default:
+		BUG();
+		break;
+	}
+}
+
 /* Initialize the universe into something sensible.  */
 int sctp_init(void)
 {
@@ -421,9 +499,11 @@ int sctp_init(void)
 	/* Initialize object count debugging.  */
 	sctp_dbg_objcnt_init();
 
+	/* Initialize the SCTP specific PF functions. */
+	sctp_set_pf_specific(PF_INET, &sctp_pf_inet);
 	/*
-         * 14. Suggested SCTP Protocol Parameter Values
-         */
+	 * 14. Suggested SCTP Protocol Parameter Values
+	 */
 	/* The following protocol parameters are RECOMMENDED:  */
 	/* RTO.Initial              - 3  seconds */
 	sctp_proto.rto_initial		= SCTP_RTO_INITIAL;
@@ -468,7 +548,7 @@ int sctp_init(void)
 	sctp_proto.assoc_hashbucket = (sctp_hashbucket_t *)
 		kmalloc(4096 * sizeof(sctp_hashbucket_t), GFP_KERNEL);
 	if (!sctp_proto.assoc_hashbucket) {
-		printk (KERN_ERR "SCTP: Failed association hash alloc.\n");
+		printk(KERN_ERR "SCTP: Failed association hash alloc.\n");
 		status = -ENOMEM;
 		goto err_ahash_alloc;
 	}
@@ -482,7 +562,7 @@ int sctp_init(void)
 	sctp_proto.ep_hashbucket = (sctp_hashbucket_t *)
 		kmalloc(64 * sizeof(sctp_hashbucket_t), GFP_KERNEL);
 	if (!sctp_proto.ep_hashbucket) {
-		printk (KERN_ERR "SCTP: Failed endpoint_hash alloc.\n");
+		printk(KERN_ERR "SCTP: Failed endpoint_hash alloc.\n");
 		status = -ENOMEM;
 		goto err_ehash_alloc;
 	}
@@ -497,7 +577,7 @@ int sctp_init(void)
 	sctp_proto.port_hashtable = (sctp_bind_hashbucket_t *)
 		kmalloc(4096 * sizeof(sctp_bind_hashbucket_t), GFP_KERNEL);
 	if (!sctp_proto.port_hashtable) {
-		printk (KERN_ERR "SCTP: Failed bind hash alloc.");
+		printk(KERN_ERR "SCTP: Failed bind hash alloc.");
 		status = -ENOMEM;
 		goto err_bhash_alloc;
 	}
