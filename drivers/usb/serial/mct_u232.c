@@ -912,11 +912,11 @@ MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
 #ifdef FIX_WRITE_RETURN_CODE_PROBLEM
-MODULE_PARM(write_blocking, "i");
+module_param(write_blocking, int, 0);
 MODULE_PARM_DESC(write_blocking, 
 		 "The write function will block to write out all data");
 #endif
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 

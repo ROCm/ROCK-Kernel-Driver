@@ -1051,11 +1051,7 @@ MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL"); 
 
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "enable extensive debugging messages");
-/* FIXME: implement
-MODULE_PARM(num_urbs, "i");
-MODULE_PARM_DESC(num_urbs, "number of URBs to use in write pool");
-*/
 
 /* vim: set sts=8 ts=8 sw=8: */

@@ -614,10 +614,10 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
-MODULE_PARM(xbof, "i");
+module_param(xbof, int, 0);
 MODULE_PARM_DESC(xbof, "Force specific number of XBOFs");
-MODULE_PARM(buffer_size, "i");
+module_param(buffer_size, int, 0);
 MODULE_PARM_DESC(buffer_size, "Size of the transfer buffers");
 

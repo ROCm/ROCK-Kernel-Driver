@@ -2684,9 +2684,9 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
-MODULE_PARM(ignore_cpu_rev, "i");
+module_param(ignore_cpu_rev, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(ignore_cpu_rev, "Ignore the cpu revision when connecting to a device");
 

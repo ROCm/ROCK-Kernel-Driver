@@ -1519,8 +1519,8 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(urb_pool_size, "i");
+module_param(urb_pool_size, int, 0);
 MODULE_PARM_DESC(urb_pool_size, "Number of urbs to use for buffering");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");

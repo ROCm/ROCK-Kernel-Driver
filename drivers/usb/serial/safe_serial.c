@@ -102,19 +102,20 @@ MODULE_LICENSE("GPL");
 #if ! defined(CONFIG_USBD_SAFE_SERIAL_VENDOR)
 static __u16 vendor;		// no default
 static __u16 product;		// no default
-MODULE_PARM (vendor, "i");
-MODULE_PARM (product, "i");
-MODULE_PARM_DESC (vendor, "User specified USB idVendor (required)");
-MODULE_PARM_DESC (product, "User specified USB idProduct (required)");
+module_param(vendor, ushort, 0);
+MODULE_PARM_DESC(vendor, "User specified USB idVendor (required)");
+module_param(product, ushort, 0);
+MODULE_PARM_DESC(product, "User specified USB idProduct (required)");
 #endif
 
-MODULE_PARM (debug, "i");
-MODULE_PARM (safe, "i");
-MODULE_PARM (padded, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(debug, "Debug enabled or not");
 
-MODULE_PARM_DESC (debug, "Debug enabled or not");
-MODULE_PARM_DESC (safe, "Turn Safe Encapsulation On/Off");
-MODULE_PARM_DESC (padded, "Pad to full wMaxPacketSize On/Off");
+module_param(safe, bool, 0);
+MODULE_PARM_DESC(safe, "Turn Safe Encapsulation On/Off");
+
+module_param(padded, bool, 0);
+MODULE_PARM_DESC(padded, "Pad to full wMaxPacketSize On/Off");
 
 #define CDC_DEVICE_CLASS                        0x02
 

@@ -76,7 +76,7 @@
 #define DRIVER_AUTHOR "Ganesh Varadarajan <ganesh@veritas.com>"
 #define DRIVER_DESC "USB PocketPC PDA driver"
 
-static int	product, vendor;
+static __u16 product, vendor;
 
 /* Function prototypes for an ipaq */
 static int  ipaq_open (struct usb_serial_port *port, struct file *filp);
@@ -579,11 +579,11 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
-MODULE_PARM(vendor, "h");
+module_param(vendor, ushort, 0);
 MODULE_PARM_DESC(vendor, "User specified USB idVendor");
 
-MODULE_PARM(product, "h");
+module_param(product, ushort, 0);
 MODULE_PARM_DESC(product, "User specified USB idProduct");
