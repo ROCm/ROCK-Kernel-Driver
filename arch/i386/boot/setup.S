@@ -612,7 +612,7 @@ disk_sig_done:
 #    int 13h ah=08h "Legacy Get Device Parameters"
 #
 # A buffer of size EDDMAXNR*(EDDEXTSIZE+EDDPARMSIZE) is reserved for our use
-# in the empty_zero_page at EDDBUF.  The first four bytes of which are
+# in the boot_params at EDDBUF.  The first four bytes of which are
 # used to store the device number, interface support map and version
 # results from fn41.  The next four bytes are used to store the legacy
 # cylinders, heads, and sectors from fn08. The following 74 bytes are used to
@@ -625,9 +625,9 @@ disk_sig_done:
 # the structure, and the fn41 and fn08 results are stored at offsets
 # from there.  This removes the need to increment the pointer for
 # every store, and leaves it ready for the fn48 call.
-# A second one-byte buffer, EDDNR, in the empty_zero_page stores
+# A second one-byte buffer, EDDNR, in boot_params stores
 # the number of BIOS devices which exist, up to EDDMAXNR.
-# In setup.c, copy_edd() stores both empty_zero_page buffers away
+# In setup.c, copy_edd() stores both boot_params buffers away
 # for later use, as they would get overwritten otherwise.
 # This code is sensitive to the size of the structs in edd.h
 edd_start:

@@ -16,10 +16,22 @@
 #define MAXMEM_PFN	PFN_DOWN(MAXMEM)
 #define MAX_NONPAE_PFN	(1 << 20)
 
+#define PARAM_SIZE 2048
+#define COMMAND_LINE_SIZE 256
+
+#define OLD_CL_MAGIC_ADDR	0x90020
+#define OLD_CL_MAGIC		0xA33F
+#define OLD_CL_BASE_ADDR	0x90000
+#define OLD_CL_OFFSET		0x90022
+#define NEW_CL_POINTER		0x228	/* Relative to real mode data */
+
+#ifndef __ASSEMBLY__
 /*
  * This is set up by the setup-routine at boot-time
  */
-#define PARAM	((unsigned char *)empty_zero_page)
+extern unsigned char boot_params[PARAM_SIZE];
+
+#define PARAM	(boot_params)
 #define SCREEN_INFO (*(struct screen_info *) (PARAM+0))
 #define EXT_MEM_K (*(unsigned short *) (PARAM+2))
 #define ALT_MEM_K (*(unsigned long *) (PARAM+0x1e0))
@@ -47,7 +59,7 @@
 #define DISK80_SIGNATURE (*(unsigned int*) (PARAM+DISK80_SIG_BUFFER))
 #define EDD_NR     (*(unsigned char *) (PARAM+EDDNR))
 #define EDD_BUF     ((struct edd_info *) (PARAM+EDDBUF))
-#define COMMAND_LINE ((char *) (PARAM+2048))
-#define COMMAND_LINE_SIZE 256
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* _i386_SETUP_H */
