@@ -1118,7 +1118,8 @@ void sctp_cmd_set_bind_addrs(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 }
 
 /* Helper function to handle the reception of an HEARTBEAT ACK.  */
-static void sctp_cmd_transport_on(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
+static void sctp_cmd_transport_on(sctp_cmd_seq_t *cmds,
+				  sctp_association_t *asoc,
 				  sctp_transport_t *t, sctp_chunk_t *chunk)
 {
 	sctp_sender_hb_info_t *hbinfo;
@@ -1164,7 +1165,8 @@ static void sctp_cmd_transport_reset(sctp_cmd_seq_t *cmds,
 }
 
 /* Helper function to process the process SACK command.  */
-static int sctp_cmd_process_sack(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
+static int sctp_cmd_process_sack(sctp_cmd_seq_t *cmds,
+				 sctp_association_t *asoc,
 				 sctp_sackhdr_t *sackh)
 {
 	int err;

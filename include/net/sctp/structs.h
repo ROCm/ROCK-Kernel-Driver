@@ -378,7 +378,7 @@ typedef union {
 typedef union {
 	sctp_ipv4addr_param_t v4;
 	sctp_ipv6addr_param_t v6;
-} sctpIpAddress_t;
+} sctp_addr_param_t;
 
 /* RFC 2960.  Section 3.3.5 Heartbeat.
  *    Heartbeat Information: variable length
@@ -1044,6 +1044,9 @@ sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
 sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *,
 					const sockaddr_storage_t *);
 
+int sctp_has_association(const sockaddr_storage_t *laddr,
+			 const sockaddr_storage_t *paddr);
+
 int sctp_verify_init(const sctp_association_t *asoc,
 		     sctp_cid_t cid,
 		     sctp_init_chunk_t *peer_init,
@@ -1311,6 +1314,9 @@ struct SCTP_association {
 	 */
 
 	__u32 ctsn_ack_point;
+
+	/* Highest TSN that is acknowledged by incoming SACKs. */
+	__u32 highest_sacked;
 
 	/* The number of unacknowledged data chunks.  Reported through
 	 * the SCTP_STATUS sockopt.
