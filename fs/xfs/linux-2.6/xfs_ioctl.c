@@ -270,7 +270,7 @@ xfs_vget_fsop_handlereq(
 	/*
 	 * Get the XFS inode, building a vnode to go with it.
 	 */
-	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
+	error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &ip, 0);
 	if (error)
 		return error;
 	if (ip == NULL)
