@@ -1,7 +1,8 @@
 /******************************************************************************
- *  speedtouch.c  --  Alcatel SpeedTouch USB xDSL modem driver.
+ *  speedtouch.c  -  Alcatel SpeedTouch USB xDSL modem driver
  *
  *  Copyright (C) 2001, Alcatel
+ *  Copyright (C) 2003, Duncan Sands
  *
  *  This program is free software; you can redistribute it and/or modify it
  *  under the terms of the GNU General Public License as published by the Free
@@ -40,7 +41,6 @@
  *		udsl_usb_send_data_context->urb to a pointer and adding code
  *		to alloc and free it
  *		- remove_wait_queue() added to udsl_atm_processqueue_thread()
- *		- Duncan Sands (duncan.sands@wanadoo.fr) is the new maintainer
  *
  *  1.5:	- fixed memory leak when atmsar_decode_aal5 returned NULL.
  *		(reported by stephen.robinson@zen.co.uk)
@@ -97,47 +97,64 @@ static int udsl_print_packet (const unsigned char *data, int len);
 #define DRIVER_DESC	"Alcatel SpeedTouch USB driver"
 #define DRIVER_VERSION	"1.6"
 
+static const char udsl_driver_name [] = "speedtch";
+
 #define SPEEDTOUCH_VENDORID		0x06b9
 #define SPEEDTOUCH_PRODUCTID		0x4061
 
-#define UDSL_NUMBER_RCV_URBS		1
-#define UDSL_NUMBER_SND_URBS		1
-#define UDSL_NUMBER_SND_BUFS		(2*UDSL_NUMBER_SND_URBS)
-#define UDSL_RCV_BUFFER_SIZE		(1*64) /* ATM cells */
-#define UDSL_SND_BUFFER_SIZE		(1*64) /* ATM cells */
-/* max should be (1500 IP mtu + 2 ppp bytes + 32 * 5 cellheader overhead) for
- * PPPoA and (1500 + 14 + 32*5 cellheader overhead) for PPPoE */
-#define UDSL_MAX_AAL5_MRU		2048
+#define UDSL_NUM_RCV_URBS		1
+#define UDSL_NUM_SND_URBS		1
+#define UDSL_NUM_RCV_BUFS		(2*UDSL_NUM_RCV_URBS)
+#define UDSL_NUM_SND_BUFS		(2*UDSL_NUM_SND_URBS)
+#define UDSL_RCV_BUF_SIZE		32 /* ATM cells */
+#define UDSL_SND_BUF_SIZE		64 /* ATM cells */
 
-#define UDSL_IOCTL_START		1
-#define UDSL_IOCTL_STOP			2
-
-/* endpoint declarations */
+#define UDSL_IOCTL_LINE_UP		1
+#define UDSL_IOCTL_LINE_DOWN		2
 
 #define UDSL_ENDPOINT_DATA_OUT		0x07
 #define UDSL_ENDPOINT_DATA_IN		0x87
 
 #define ATM_CELL_HEADER			(ATM_CELL_SIZE - ATM_CELL_PAYLOAD)
+#define UDSL_NUM_CELLS(x)		(((x) + ATM_AAL5_TRAILER + ATM_CELL_PAYLOAD - 1) / ATM_CELL_PAYLOAD)
 
-#define hex2int(c) ( (c >= '0')&&(c <= '9') ?  (c - '0') : ((c & 0xf)+9) )
-
-/* usb_device_id struct */
+#define hex2int(c) ( (c >= '0') && (c <= '9') ? (c - '0') : ((c & 0xf) + 9) )
 
 static struct usb_device_id udsl_usb_ids [] = {
 	{ USB_DEVICE (SPEEDTOUCH_VENDORID, SPEEDTOUCH_PRODUCTID) },
-	{ }			/* Terminating entry */
+	{ }
 };
 
 MODULE_DEVICE_TABLE (usb, udsl_usb_ids);
 
-/* context declarations */
+/* receive */
+
+struct udsl_receive_buffer {
+	struct list_head list;
+	unsigned char *base;
+	unsigned int filled_cells;
+};
 
 struct udsl_receiver {
 	struct list_head list;
-	struct sk_buff *skb;
+	struct udsl_receive_buffer *buffer;
 	struct urb *urb;
 	struct udsl_instance_data *instance;
 };
+
+struct udsl_vcc_data {
+	/* vpi/vci lookup */
+	struct list_head list;
+	short vpi;
+	int vci;
+	struct atm_vcc *vcc;
+
+	/* raw cell reassembly */
+	struct sk_buff *skb;
+	unsigned int max_pdu;
+};
+
+/* send */
 
 struct udsl_send_buffer {
 	struct list_head list;
@@ -157,73 +174,55 @@ struct udsl_control {
 	struct atm_skb_data atm_data;
 	unsigned int num_cells;
 	unsigned int num_entire;
-	unsigned char cell_header [ATM_CELL_HEADER];
 	unsigned int pdu_padding;
+	unsigned char cell_header [ATM_CELL_HEADER];
 	unsigned char aal5_trailer [ATM_AAL5_TRAILER];
 };
 
 #define UDSL_SKB(x)		((struct udsl_control *)(x)->cb)
 
-struct udsl_vcc_data {
-	/* vpi/vci lookup */
-	struct list_head list;
-	short vpi;
-	int vci;
-	struct atm_vcc *vcc;
-
-	/* raw cell reassembly */
-	unsigned short mtu;
-	struct sk_buff *reasBuffer;
-};
-
-/*
- * UDSL main driver data
- */
+/* main driver data */
 
 struct udsl_instance_data {
 	struct semaphore serialize;
 
-	/* usb device part */
+	/* USB device part */
 	struct usb_device *usb_dev;
 	char description [64];
 	int firmware_loaded;
 
-	/* atm device part */
+	/* ATM device part */
 	struct atm_dev *atm_dev;
 	struct list_head vcc_list;
 
-	/* receiving */
-	struct udsl_receiver all_receivers [UDSL_NUMBER_RCV_URBS];
+	/* receive */
+	struct udsl_receiver receivers [UDSL_NUM_RCV_URBS];
+	struct udsl_receive_buffer receive_buffers [UDSL_NUM_RCV_BUFS];
 
-	spinlock_t spare_receivers_lock;
+	spinlock_t receive_lock;
 	struct list_head spare_receivers;
-
-	spinlock_t completed_receivers_lock;
-	struct list_head completed_receivers;
+	struct list_head filled_receive_buffers;
 
 	struct tasklet_struct receive_tasklet;
+	struct list_head spare_receive_buffers;
 
-	/* sending */
-	struct udsl_sender all_senders [UDSL_NUMBER_SND_URBS];
-	struct udsl_send_buffer all_buffers [UDSL_NUMBER_SND_BUFS];
+	/* send */
+	struct udsl_sender senders [UDSL_NUM_SND_URBS];
+	struct udsl_send_buffer send_buffers [UDSL_NUM_SND_BUFS];
 
 	struct sk_buff_head sndqueue;
 
 	spinlock_t send_lock;
 	struct list_head spare_senders;
-	struct list_head spare_buffers;
+	struct list_head spare_send_buffers;
 
 	struct tasklet_struct send_tasklet;
 	struct sk_buff *current_skb;			/* being emptied */
 	struct udsl_send_buffer *current_buffer;	/* being filled */
-	struct list_head filled_buffers;
+	struct list_head filled_send_buffers;
 };
 
-static const char udsl_driver_name [] = "speedtch";
-
-/*
- * atm driver prototypes and structures
- */
+/* ATM */
 
 static void udsl_atm_dev_close (struct atm_dev *dev);
 static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci);
@@ -239,17 +238,17 @@ static struct atmdev_ops udsl_atm_devops = {
 	.ioctl =	udsl_atm_ioctl,
 	.send =		udsl_atm_send,
 	.proc_read =	udsl_atm_proc_read,
+	.owner =	THIS_MODULE,
 };
 
-/*
- * usb driver prototypes and structures
- */
-static int udsl_usb_probe (struct usb_interface *intf,
-			   const struct usb_device_id *id);
+/* USB */
+
+static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_id *id);
 static void udsl_usb_disconnect (struct usb_interface *intf);
 static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data);
 
 static struct usb_driver udsl_usb_driver = {
+	.owner =	THIS_MODULE,
 	.name =		udsl_driver_name,
 	.probe =	udsl_usb_probe,
 	.disconnect =	udsl_usb_disconnect,
@@ -272,133 +271,110 @@ static inline struct udsl_vcc_data *udsl_find_vcc (struct udsl_instance_data *in
 	return NULL;
 }
 
-static struct sk_buff *udsl_decode_rawcell (struct udsl_instance_data *instance, struct sk_buff *skb, struct udsl_vcc_data **ctx)
+static void udsl_extract_cells (struct udsl_instance_data *instance, unsigned char *source, unsigned int howmany)
 {
-	if (!instance || !skb || !ctx)
-		return NULL;
-	if (!skb->data || !skb->tail)
-		return NULL;
+	struct udsl_vcc_data *cached_vcc = NULL;
+	struct atm_vcc *vcc;
+	struct sk_buff *skb;
+	struct udsl_vcc_data *vcc_data;
+	int cached_vci = 0;
+	unsigned int i;
+	unsigned int length;
+	unsigned int pdu_length;
+	int pti;
+	int vci;
+	short cached_vpi = 0;
+	short vpi;
 
-	while (skb->len) {
-		unsigned char *cell = skb->data;
-		unsigned char *cell_payload;
-		struct udsl_vcc_data *vcc;
-		short vpi;
-		int vci;
+	for (i = 0; i < howmany; i++, source += ATM_CELL_SIZE) {
+		vpi = ((source [0] & 0x0f) << 4) | (source [1] >> 4);
+		vci = ((source [1] & 0x0f) << 12) | (source [2] << 4) | (source [3] >> 4);
+		pti = (source [3] & 0x2) != 0;
 
-		vpi = ((cell[0] & 0x0f) << 4) | (cell[1] >> 4);
-		vci = ((cell[1] & 0x0f) << 12) | (cell[2] << 4) | (cell[3] >> 4);
+		vdbg ("udsl_extract_cells: vpi %hd, vci %d, pti %d", vpi, vci, pti);
 
-		vdbg ("udsl_decode_rawcell (0x%p, 0x%p, 0x%p) called", instance, skb, ctx);
-		vdbg ("udsl_decode_rawcell skb->data %p, skb->tail %p", skb->data, skb->tail);
-
-		/* here should the header CRC check be... */
-
-		if (!(vcc = udsl_find_vcc (instance, vpi, vci))) {
-			dbg ("udsl_decode_rawcell: no vcc found for packet on vpi %d, vci %d", vpi, vci);
-			__skb_pull (skb, min (skb->len, (unsigned) 53));
+		if (cached_vcc && (vci == cached_vci) && (vpi == cached_vpi))
+			vcc_data = cached_vcc;
+		else if ((vcc_data = udsl_find_vcc (instance, vpi, vci))) {
+			cached_vcc = vcc_data;
+			cached_vpi = vpi;
+			cached_vci = vci;
 		} else {
-			vdbg ("udsl_decode_rawcell found vcc %p for packet on vpi %d, vci %d", vcc, vpi, vci);
+			dbg ("udsl_extract_cells: unknown vpi/vci (%hd/%d)!", vpi, vci);
+			continue;
+		}
 
-			if (skb->len >= 53) {
-				cell_payload = cell + 5;
+		vcc = vcc_data->vcc;
 
-				if (!vcc->reasBuffer)
-					vcc->reasBuffer = dev_alloc_skb (vcc->mtu);
+		if (!vcc_data->skb && !(vcc_data->skb = dev_alloc_skb (vcc_data->max_pdu))) {
+			dbg ("udsl_extract_cells: no memory for skb (vcc: 0x%p)!", vcc);
+			if (pti)
+				atomic_inc (&vcc->stats->rx_err);
+			continue;
+		}
 
-				/* if alloc fails, we just drop the cell. it is possible that we can still
-				 * receive cells on other vcc's
-				 */
-				if (vcc->reasBuffer) {
-					/* if (buffer overrun) discard received cells until now */
-					if ((vcc->reasBuffer->len) > (vcc->mtu - 48))
-						skb_trim (vcc->reasBuffer, 0);
+		skb = vcc_data->skb;
 
-					/* copy data */
-					memcpy (vcc->reasBuffer->tail, cell_payload, 48);
-					skb_put (vcc->reasBuffer, 48);
+		if (skb->len + ATM_CELL_PAYLOAD > vcc_data->max_pdu) {
+			dbg ("udsl_extract_cells: buffer overrun (max_pdu: %u, skb->len %u, vcc: 0x%p)", vcc_data->max_pdu, skb->len, vcc);
+			/* discard cells already received */
+			skb_trim (skb, 0);
+			BUG_ON (vcc_data->max_pdu < ATM_CELL_PAYLOAD);
+		}
 
-					/* check for end of buffer */
-					if (cell[3] & 0x2) {
-						struct sk_buff *tmp;
+		memcpy (skb->tail, source + ATM_CELL_HEADER, ATM_CELL_PAYLOAD);
+		__skb_put (skb, ATM_CELL_PAYLOAD);
 
-						/* the aal5 buffer ends here, cut the buffer. */
-						/* buffer will always have at least one whole cell, so */
-						/* don't need to check return from skb_pull */
-						skb_pull (skb, 53);
-						*ctx = vcc;
-						tmp = vcc->reasBuffer;
-						vcc->reasBuffer = NULL;
+		if (pti) {
+			length = (source [ATM_CELL_SIZE - 6] << 8) + source [ATM_CELL_SIZE - 5];
 
-						vdbg ("udsl_decode_rawcell returns ATM_AAL5 pdu 0x%p with length %d", tmp, tmp->len);
-						return tmp;
-					}
-				}
-				/* flush the cell */
-				/* buffer will always contain at least one whole cell, so don't */
-				/* need to check return value from skb_pull */
-				skb_pull (skb, 53);
-			} else {
-				/* If data is corrupt and skb doesn't hold a whole cell, flush the lot */
-				__skb_pull (skb, skb->len);
-				return NULL;
+			/* guard against overflow */
+			if (length > ATM_MAX_AAL5_PDU) {
+				dbg ("udsl_extract_cells: bogus length %u (vcc: 0x%p)", length, vcc);
+				goto drop;
 			}
+
+			pdu_length = UDSL_NUM_CELLS (length) * ATM_CELL_PAYLOAD;
+
+			if (skb->len < pdu_length) {
+				dbg ("udsl_extract_cells: bogus pdu_length %u (skb->len: %u, vcc: 0x%p)", pdu_length, skb->len, vcc);
+				goto drop;
+			}
+
+			if (crc32_be (~0, skb->tail - pdu_length, pdu_length) != 0xc704dd7b) {
+				dbg ("udsl_extract_cells: packet failed crc check (vcc: 0x%p)", vcc);
+				goto drop;
+			}
+
+			if (!atm_charge (vcc, skb->truesize)) {
+				dbg ("udsl_extract_cells: failed atm_charge (skb->truesize: %u)", skb->truesize);
+				goto drop_no_stats; /* atm_charge increments rx_drop */
+			}
+
+			/* now that we are sure to send the skb, it is ok to change skb->data */
+			if (skb->len > pdu_length)
+				skb_pull (skb, skb->len - pdu_length); /* discard initial junk */
+
+			skb_trim (skb, length); /* drop zero padding and trailer */
+
+			atomic_inc (&vcc->stats->rx);
+
+			PACKETDEBUG (skb->data, skb->len);
+
+			vdbg ("udsl_extract_cells: sending skb 0x%p, skb->len %u, skb->truesize %u", skb, skb->len, skb->truesize);
+
+			vcc->push (vcc, skb);
+
+			vcc_data->skb = NULL;
+
+			continue;
+
+drop:
+			atomic_inc (&vcc->stats->rx_err);
+drop_no_stats:
+			skb_trim (skb, 0);
 		}
 	}
-
-	return NULL;
-}
-
-static struct sk_buff *udsl_decode_aal5 (struct udsl_vcc_data *ctx, struct sk_buff *skb)
-{
-	uint crc = 0xffffffff;
-	uint length, pdu_crc, pdu_length;
-
-	vdbg ("udsl_decode_aal5 (0x%p, 0x%p) called", ctx, skb);
-
-	if (skb->len && (skb->len % 48))
-		return NULL;
-
-	length = (skb->tail[-6] << 8) + skb->tail[-5];
-	pdu_crc =
-	    (skb->tail[-4] << 24) + (skb->tail[-3] << 16) + (skb->tail[-2] << 8) + skb->tail[-1];
-	pdu_length = ((length + 47 + 8) / 48) * 48;
-
-	vdbg ("udsl_decode_aal5: skb->len = %d, length = %d, pdu_crc = 0x%x, pdu_length = %d", skb->len, length, pdu_crc, pdu_length);
-
-	/* is skb long enough ? */
-	if (skb->len < pdu_length) {
-		atomic_inc (&ctx->vcc->stats->rx_err);
-		return NULL;
-	}
-
-	/* is skb too long ? */
-	if (skb->len > pdu_length) {
-		dbg ("udsl_decode_aal5: Warning: readjusting illegal size %d -> %d", skb->len, pdu_length);
-		/* buffer is too long. we can try to recover
-		 * if we discard the first part of the skb.
-		 * the crc will decide whether this was ok
-		 */
-		skb_pull (skb, skb->len - pdu_length);
-	}
-
-	crc = ~crc32_be (crc, skb->data, pdu_length - 4);
-
-	/* check crc */
-	if (pdu_crc != crc) {
-		dbg ("udsl_decode_aal5: crc check failed!");
-		atomic_inc (&ctx->vcc->stats->rx_err);
-		return NULL;
-	}
-
-	/* pdu is ok */
-	skb_trim (skb, length);
-
-	/* update stats */
-	atomic_inc (&ctx->vcc->stats->rx);
-
-	vdbg ("udsl_decode_aal5 returns pdu 0x%p with length %d", skb, skb->len);
-	return skb;
 }
 
 
@@ -406,7 +382,7 @@ static struct sk_buff *udsl_decode_aal5 (struct udsl_vcc_data *ctx, struct sk_bu
 **  encode  **
 *************/
 
-static const unsigned char zeros[ATM_CELL_PAYLOAD];
+static const unsigned char zeros [ATM_CELL_PAYLOAD];
 
 static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb)
 {
@@ -421,7 +397,7 @@ static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb)
 	ctrl->cell_header [3] = vcc->vci << 4;
 	ctrl->cell_header [4] = 0xec;
 
-	ctrl->num_cells = (skb->len + ATM_AAL5_TRAILER + ATM_CELL_PAYLOAD - 1) / ATM_CELL_PAYLOAD;
+	ctrl->num_cells = UDSL_NUM_CELLS (skb->len);
 	ctrl->num_entire = skb->len / ATM_CELL_PAYLOAD;
 
 	zero_padding = ctrl->num_cells * ATM_CELL_PAYLOAD - skb->len - ATM_AAL5_TRAILER;
@@ -490,8 +466,7 @@ static unsigned int udsl_write_cells (unsigned int howmany, struct sk_buff *skb,
 		memset (target, 0, ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER);
 		target += ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER;
 
-		if (--ctrl->num_cells)
-			BUG();
+		BUG_ON (--ctrl->num_cells);
 	}
 
 	memcpy (target, ctrl->aal5_trailer, ATM_AAL5_TRAILER);
@@ -511,145 +486,89 @@ out:
 
 static void udsl_complete_receive (struct urb *urb, struct pt_regs *regs)
 {
+	struct udsl_receive_buffer *buf;
 	struct udsl_instance_data *instance;
 	struct udsl_receiver *rcv;
 	unsigned long flags;
 
-	if (!urb || !(rcv = urb->context) || !(instance = rcv->instance)) {
+	if (!urb || !(rcv = urb->context)) {
 		dbg ("udsl_complete_receive: bad urb!");
 		return;
 	}
 
-	vdbg ("udsl_complete_receive entered (urb 0x%p, status %d)", urb, urb->status);
+	instance = rcv->instance;
+	buf = rcv->buffer;
+
+	buf->filled_cells = urb->actual_length / ATM_CELL_SIZE;
+
+	vdbg ("udsl_complete_receive: urb 0x%p, status %d, actual_length %d, filled_cells %u, rcv 0x%p, buf 0x%p", urb, urb->status, urb->actual_length, buf->filled_cells, rcv, buf);
+
+	BUG_ON (buf->filled_cells > UDSL_RCV_BUF_SIZE);
 
 	/* may not be in_interrupt() */
-	spin_lock_irqsave (&instance->completed_receivers_lock, flags);
-	list_add_tail (&rcv->list, &instance->completed_receivers);
-	tasklet_schedule (&instance->receive_tasklet);
-	spin_unlock_irqrestore (&instance->completed_receivers_lock, flags);
+	spin_lock_irqsave (&instance->receive_lock, flags);
+	list_add (&rcv->list, &instance->spare_receivers);
+	list_add_tail (&buf->list, &instance->filled_receive_buffers);
+	if (likely (!urb->status))
+		tasklet_schedule (&instance->receive_tasklet);
+	spin_unlock_irqrestore (&instance->receive_lock, flags);
 }
 
 static void udsl_process_receive (unsigned long data)
 {
+	struct udsl_receive_buffer *buf;
 	struct udsl_instance_data *instance = (struct udsl_instance_data *) data;
 	struct udsl_receiver *rcv;
-	unsigned char *data_start;
-	struct sk_buff *skb;
-	struct urb *urb;
-	struct udsl_vcc_data *atmsar_vcc = NULL;
-	struct sk_buff *new = NULL, *tmp = NULL;
 	int err;
 
-	vdbg ("udsl_process_receive entered");
-
-	spin_lock_irq (&instance->completed_receivers_lock);
-	while (!list_empty (&instance->completed_receivers)) {
-		rcv = list_entry (instance->completed_receivers.next, struct udsl_receiver, list);
-		list_del (&rcv->list);
-		spin_unlock_irq (&instance->completed_receivers_lock);
-
-		urb = rcv->urb;
-		vdbg ("udsl_process_receive: got packet %p with length %d and status %d", urb, urb->actual_length, urb->status);
-
-		switch (urb->status) {
-		case 0:
-			vdbg ("udsl_process_receive: processing urb with rcv %p, urb %p, skb %p", rcv, urb, rcv->skb);
-
-			/* update the skb structure */
-			skb = rcv->skb;
-			skb_trim (skb, 0);
-			skb_put (skb, urb->actual_length);
-			data_start = skb->data;
-
-			vdbg ("skb->len = %d", skb->len);
-			PACKETDEBUG (skb->data, skb->len);
-
-			while ((new = udsl_decode_rawcell (instance, skb, &atmsar_vcc))) {
-				vdbg ("(after cell processing)skb->len = %d", new->len);
-
-				tmp = new;
-				new = udsl_decode_aal5 (atmsar_vcc, new);
-
-				/* we can't send NULL skbs upstream, the ATM layer would try to close the vcc... */
-				if (new) {
-					vdbg ("(after aal5 decap) skb->len = %d", new->len);
-					if (new->len && atm_charge (atmsar_vcc->vcc, new->truesize)) {
-						PACKETDEBUG (new->data, new->len);
-						atmsar_vcc->vcc->push (atmsar_vcc->vcc, new);
-					} else {
-						dbg
-						    ("dropping incoming packet : vcc->sk->rcvbuf = %d, skb->true_size = %d",
-						     atmsar_vcc->vcc->sk->rcvbuf, new->truesize);
-						dev_kfree_skb (new);
-					}
-				} else {
-					dbg ("udsl_decode_aal5 returned NULL!");
-					dev_kfree_skb (tmp);
-				}
-			}
-
-			/* restore skb */
-			skb_push (skb, skb->data - data_start);
-
-			usb_fill_bulk_urb (urb,
-					   instance->usb_dev,
-					   usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
-					   (unsigned char *) rcv->skb->data,
-					   UDSL_RCV_BUFFER_SIZE * ATM_CELL_SIZE,
-					   udsl_complete_receive,
-					   rcv);
-			if (!(err = usb_submit_urb (urb, GFP_ATOMIC)))
-				break;
-			dbg ("udsl_process_receive: submission failed (%d)", err);
-			/* fall through */
-		default: /* error or urb unlinked */
-			vdbg ("udsl_process_receive: adding to spare_receivers");
-			spin_lock_irq (&instance->spare_receivers_lock);
-			list_add (&rcv->list, &instance->spare_receivers);
-			spin_unlock_irq (&instance->spare_receivers_lock);
+made_progress:
+	while (!list_empty (&instance->spare_receive_buffers)) {
+		spin_lock_irq (&instance->receive_lock);
+		if (list_empty (&instance->spare_receivers)) {
+			spin_unlock_irq (&instance->receive_lock);
 			break;
-		} /* switch */
+		}
+		rcv = list_entry (instance->spare_receivers.next, struct udsl_receiver, list);
+		list_del (&rcv->list);
+		spin_unlock_irq (&instance->receive_lock);
 
-		spin_lock_irq (&instance->completed_receivers_lock);
-	} /* while */
-	spin_unlock_irq (&instance->completed_receivers_lock);
-	vdbg ("udsl_process_receive successful");
-}
+		buf = list_entry (instance->spare_receive_buffers.next, struct udsl_receive_buffer, list);
+		list_del (&buf->list);
 
-static void udsl_fire_receivers (struct udsl_instance_data *instance)
-{
-	struct list_head receivers, *pos, *n;
-
-	INIT_LIST_HEAD (&receivers);
-
-	down (&instance->serialize);
-
-	spin_lock_irq (&instance->spare_receivers_lock);
-	list_splice_init (&instance->spare_receivers, &receivers);
-	spin_unlock_irq (&instance->spare_receivers_lock);
-
-	list_for_each_safe (pos, n, &receivers) {
-		struct udsl_receiver *rcv = list_entry (pos, struct udsl_receiver, list);
-
-		dbg ("udsl_fire_receivers: firing urb %p", rcv->urb);
+		rcv->buffer = buf;
 
 		usb_fill_bulk_urb (rcv->urb,
 				   instance->usb_dev,
 				   usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
-				   (unsigned char *) rcv->skb->data,
-				   UDSL_RCV_BUFFER_SIZE * ATM_CELL_SIZE,
+				   buf->base,
+				   UDSL_RCV_BUF_SIZE * ATM_CELL_SIZE,
 				   udsl_complete_receive,
 				   rcv);
 
-		if (usb_submit_urb (rcv->urb, GFP_KERNEL) < 0) {
-			dbg ("udsl_fire_receivers: submit failed!");
-			spin_lock_irq (&instance->spare_receivers_lock);
-			list_move (pos, &instance->spare_receivers);
-			spin_unlock_irq (&instance->spare_receivers_lock);
+		vdbg ("udsl_process_receive: sending urb 0x%p, rcv 0x%p, buf 0x%p", rcv->urb, rcv, buf);
+
+		if ((err = usb_submit_urb(rcv->urb, GFP_ATOMIC)) < 0) {
+			dbg ("udsl_process_receive: urb submission failed (%d)!", err);
+			list_add (&buf->list, &instance->spare_receive_buffers);
+			spin_lock_irq (&instance->receive_lock);
+			list_add (&rcv->list, &instance->spare_receivers);
+			spin_unlock_irq (&instance->receive_lock);
+			break;
 		}
 	}
 
-	up (&instance->serialize);
+	spin_lock_irq (&instance->receive_lock);
+	if (list_empty (&instance->filled_receive_buffers)) {
+		spin_unlock_irq (&instance->receive_lock);
+		return; /* done - no more buffers */
+	}
+	buf = list_entry (instance->filled_receive_buffers.next, struct udsl_receive_buffer, list);
+	list_del (&buf->list);
+	spin_unlock_irq (&instance->receive_lock);
+	vdbg ("udsl_process_receive: processing buf 0x%p", buf);
+	udsl_extract_cells (instance, buf->base, buf->filled_cells);
+	list_add (&buf->list, &instance->spare_receive_buffers);
+	goto made_progress;
 }
 
 
@@ -673,7 +592,7 @@ static void udsl_complete_send (struct urb *urb, struct pt_regs *regs)
 	/* may not be in_interrupt() */
 	spin_lock_irqsave (&instance->send_lock, flags);
 	list_add (&snd->list, &instance->spare_senders);
-	list_add (&snd->buffer->list, &instance->spare_buffers);
+	list_add (&snd->buffer->list, &instance->spare_send_buffers);
 	tasklet_schedule (&instance->send_tasklet);
 	spin_unlock_irqrestore (&instance->send_lock, flags);
 }
@@ -681,17 +600,17 @@ static void udsl_complete_send (struct urb *urb, struct pt_regs *regs)
 static void udsl_process_send (unsigned long data)
 {
 	struct udsl_send_buffer *buf;
-	int err;
 	struct udsl_instance_data *instance = (struct udsl_instance_data *) data;
-	unsigned int num_written;
 	struct sk_buff *skb;
 	struct udsl_sender *snd;
+	int err;
+	unsigned int num_written;
 
 made_progress:
 	spin_lock_irq (&instance->send_lock);
 	while (!list_empty (&instance->spare_senders)) {
-		if (!list_empty (&instance->filled_buffers)) {
-			buf = list_entry (instance->filled_buffers.next, struct udsl_send_buffer, list);
+		if (!list_empty (&instance->filled_send_buffers)) {
+			buf = list_entry (instance->filled_send_buffers.next, struct udsl_send_buffer, list);
 			list_del (&buf->list);
 		} else if ((buf = instance->current_buffer)) {
 			instance->current_buffer = NULL;
@@ -707,7 +626,7 @@ made_progress:
 				   instance->usb_dev,
 				   usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT),
 				   buf->base,
-				   (UDSL_SND_BUFFER_SIZE - buf->free_cells) * ATM_CELL_SIZE,
+				   (UDSL_SND_BUF_SIZE - buf->free_cells) * ATM_CELL_SIZE,
 				   udsl_complete_send,
 				   snd);
 
@@ -718,33 +637,32 @@ made_progress:
 			spin_lock_irq (&instance->send_lock);
 			list_add (&snd->list, &instance->spare_senders);
 			spin_unlock_irq (&instance->send_lock);
-			list_add (&buf->list, &instance->filled_buffers);
-			return;
+			list_add (&buf->list, &instance->filled_send_buffers);
+			return; /* bail out */
 		}
 
 		spin_lock_irq (&instance->send_lock);
 	} /* while */
 	spin_unlock_irq (&instance->send_lock);
 
-	if (!instance->current_skb && !(instance->current_skb = skb_dequeue (&instance->sndqueue))) {
+	if (!instance->current_skb && !(instance->current_skb = skb_dequeue (&instance->sndqueue)))
 		return; /* done - no more skbs */
-	}
 
 	skb = instance->current_skb;
 
 	if (!(buf = instance->current_buffer)) {
 		spin_lock_irq (&instance->send_lock);
-		if (list_empty (&instance->spare_buffers)) {
+		if (list_empty (&instance->spare_send_buffers)) {
 			instance->current_buffer = NULL;
 			spin_unlock_irq (&instance->send_lock);
 			return; /* done - no more buffers */
 		}
-		buf = list_entry (instance->spare_buffers.next, struct udsl_send_buffer, list);
+		buf = list_entry (instance->spare_send_buffers.next, struct udsl_send_buffer, list);
 		list_del (&buf->list);
 		spin_unlock_irq (&instance->send_lock);
 
 		buf->free_start = buf->base;
-		buf->free_cells = UDSL_SND_BUFFER_SIZE;
+		buf->free_cells = UDSL_SND_BUF_SIZE;
 
 		instance->current_buffer = buf;
 	}
@@ -754,7 +672,7 @@ made_progress:
 	vdbg ("udsl_process_send: wrote %u cells from skb 0x%p to buffer 0x%p", num_written, skb, buf);
 
 	if (!(buf->free_cells -= num_written)) {
-		list_add_tail (&buf->list, &instance->filled_buffers);
+		list_add_tail (&buf->list, &instance->filled_send_buffers);
 		instance->current_buffer = NULL;
 	}
 
@@ -766,7 +684,7 @@ made_progress:
 		if (vcc->pop)
 			vcc->pop (vcc, skb);
 		else
-			kfree_skb (skb);
+			dev_kfree_skb (skb);
 		instance->current_skb = NULL;
 
 		atomic_inc (&vcc->stats->tx);
@@ -788,7 +706,7 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 			if (vcc->pop)
 				vcc->pop (vcc, skb);
 			else
-				kfree_skb (skb);
+				dev_kfree_skb (skb);
 		}
 	spin_unlock_irq (&instance->sndqueue.lock);
 
@@ -799,7 +717,7 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 		if (vcc->pop)
 			vcc->pop (vcc, skb);
 		else
-			kfree_skb (skb);
+			dev_kfree_skb (skb);
 	}
 	tasklet_enable (&instance->send_tasklet);
 	dbg ("udsl_cancel_send done");
@@ -851,6 +769,7 @@ static void udsl_atm_dev_close (struct atm_dev *dev)
 
 	dbg ("udsl_atm_dev_close: queue has %u elements", instance->sndqueue.qlen);
 
+	tasklet_kill (&instance->receive_tasklet);
 	tasklet_kill (&instance->send_tasklet);
 	kfree (instance);
 	dev->dev_data = NULL;
@@ -871,8 +790,8 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 
 	if (!left--)
 		return sprintf (page, "MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
-				atm_dev->esi[0], atm_dev->esi[1], atm_dev->esi[2],
-				atm_dev->esi[3], atm_dev->esi[4], atm_dev->esi[5]);
+				atm_dev->esi [0], atm_dev->esi [1], atm_dev->esi [2],
+				atm_dev->esi [3], atm_dev->esi [4], atm_dev->esi [5]);
 
 	if (!left--)
 		return sprintf (page, "AAL5: tx %d ( %d err ), rx %d ( %d err, %d drop )\n",
@@ -925,7 +844,7 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 		return -EINVAL;
 
 	/* only support AAL5 */
-	if (vcc->qos.aal != ATM_AAL5)
+	if ((vcc->qos.aal != ATM_AAL5) || (vcc->qos.rxtp.max_sdu < 0) || (vcc->qos.rxtp.max_sdu > ATM_MAX_AAL5_PDU))
 		return -EINVAL;
 
 	if (!instance->firmware_loaded) {
@@ -949,7 +868,7 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	new->vcc = vcc;
 	new->vpi = vpi;
 	new->vci = vci;
-	new->mtu = UDSL_MAX_AAL5_MRU;
+	new->max_pdu = max (1, UDSL_NUM_CELLS (vcc->qos.rxtp.max_sdu)) * ATM_CELL_PAYLOAD;
 
 	vcc->dev_data = new;
 	vcc->vpi = vpi;
@@ -965,7 +884,7 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 
 	up (&instance->serialize);
 
-	udsl_fire_receivers (instance);
+	tasklet_schedule (&instance->receive_tasklet);
 
 	dbg ("udsl_atm_open: allocated vcc data 0x%p (max_pdu: %u)", new, new->max_pdu);
 
@@ -994,9 +913,9 @@ static void udsl_atm_close (struct atm_vcc *vcc)
 	list_del (&vcc_data->list);
 	tasklet_enable (&instance->receive_tasklet);
 
-	if (vcc_data->reasBuffer)
-		kfree_skb (vcc_data->reasBuffer);
-	vcc_data->reasBuffer = NULL;
+	if (vcc_data->skb)
+		dev_kfree_skb (vcc_data->skb);
+	vcc_data->skb = NULL;
 
 	kfree (vcc_data);
 	vcc->dev_data = NULL;
@@ -1041,7 +960,9 @@ static int udsl_set_alternate (struct udsl_instance_data *instance)
 		instance->firmware_loaded = 1;
 	}
 	up (&instance->serialize);
-	udsl_fire_receivers (instance);
+
+	tasklet_schedule (&instance->receive_tasklet);
+
 	return 0;
 }
 
@@ -1057,10 +978,10 @@ static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *
 	}
 
 	switch (code) {
-	case UDSL_IOCTL_START:
+	case UDSL_IOCTL_LINE_UP:
 		instance->atm_dev->signal = ATM_PHY_SIG_FOUND;
 		return udsl_set_alternate (instance);
-	case UDSL_IOCTL_STOP:
+	case UDSL_IOCTL_LINE_DOWN:
 		instance->atm_dev->signal = ATM_PHY_SIG_LOST;
 		return 0;
 	default:
@@ -1101,31 +1022,25 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	INIT_LIST_HEAD (&instance->vcc_list);
 
-	spin_lock_init (&instance->spare_receivers_lock);
+	spin_lock_init (&instance->receive_lock);
 	INIT_LIST_HEAD (&instance->spare_receivers);
-
-	spin_lock_init (&instance->completed_receivers_lock);
-	INIT_LIST_HEAD (&instance->completed_receivers);
+	INIT_LIST_HEAD (&instance->filled_receive_buffers);
 
 	tasklet_init (&instance->receive_tasklet, udsl_process_receive, (unsigned long) instance);
+	INIT_LIST_HEAD (&instance->spare_receive_buffers);
 
 	skb_queue_head_init (&instance->sndqueue);
 
 	spin_lock_init (&instance->send_lock);
 	INIT_LIST_HEAD (&instance->spare_senders);
-	INIT_LIST_HEAD (&instance->spare_buffers);
+	INIT_LIST_HEAD (&instance->spare_send_buffers);
 
 	tasklet_init (&instance->send_tasklet, udsl_process_send, (unsigned long) instance);
-	INIT_LIST_HEAD (&instance->filled_buffers);
+	INIT_LIST_HEAD (&instance->filled_send_buffers);
 
 	/* receive init */
-	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
-		struct udsl_receiver *rcv = &(instance->all_receivers[i]);
-
-		if (!(rcv->skb = dev_alloc_skb (UDSL_RCV_BUFFER_SIZE * ATM_CELL_SIZE))) {
-			dbg ("udsl_usb_probe: no memory for skb %d!", i);
-			goto fail;
-		}
+	for (i = 0; i < UDSL_NUM_RCV_URBS; i++) {
+		struct udsl_receiver *rcv = &(instance->receivers [i]);
 
 		if (!(rcv->urb = usb_alloc_urb (0, GFP_KERNEL))) {
 			dbg ("udsl_usb_probe: no memory for receive urb %d!", i);
@@ -1135,13 +1050,22 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 		rcv->instance = instance;
 
 		list_add (&rcv->list, &instance->spare_receivers);
+	}
 
-		dbg ("udsl_usb_probe: skb->truesize = %d (asked for %d)", rcv->skb->truesize, UDSL_RCV_BUF_SIZE * ATM_CELL_SIZE);
+	for (i = 0; i < UDSL_NUM_RCV_BUFS; i++) {
+		struct udsl_receive_buffer *buf = &(instance->receive_buffers [i]);
+
+		if (!(buf->base = kmalloc (UDSL_RCV_BUF_SIZE * ATM_CELL_SIZE, GFP_KERNEL))) {
+			dbg ("udsl_usb_probe: no memory for receive buffer %d!", i);
+			goto fail;
+		}
+
+		list_add (&buf->list, &instance->spare_receive_buffers);
 	}
 
 	/* send init */
-	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
-		struct udsl_sender *snd = &(instance->all_senders[i]);
+	for (i = 0; i < UDSL_NUM_SND_URBS; i++) {
+		struct udsl_sender *snd = &(instance->senders [i]);
 
 		if (!(snd->urb = usb_alloc_urb (0, GFP_KERNEL))) {
 			dbg ("udsl_usb_probe: no memory for send urb %d!", i);
@@ -1153,18 +1077,18 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 		list_add (&snd->list, &instance->spare_senders);
 	}
 
-	for (i = 0; i < UDSL_NUMBER_SND_BUFS; i++) {
-		struct udsl_send_buffer *buf = &(instance->all_buffers[i]);
+	for (i = 0; i < UDSL_NUM_SND_BUFS; i++) {
+		struct udsl_send_buffer *buf = &(instance->send_buffers [i]);
 
-		if (!(buf->base = kmalloc (UDSL_SND_BUFFER_SIZE * ATM_CELL_SIZE, GFP_KERNEL))) {
+		if (!(buf->base = kmalloc (UDSL_SND_BUF_SIZE * ATM_CELL_SIZE, GFP_KERNEL))) {
 			dbg ("udsl_usb_probe: no memory for send buffer %d!", i);
 			goto fail;
 		}
 
-		list_add (&buf->list, &instance->spare_buffers);
+		list_add (&buf->list, &instance->spare_send_buffers);
 	}
 
-	/* atm init */
+	/* ATM init */
 	if (!(instance->atm_dev = atm_dev_register (udsl_driver_name, &udsl_atm_devops, -1, 0))) {
 		dbg ("udsl_usb_probe: failed to register ATM device!");
 		goto fail;
@@ -1174,14 +1098,14 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	instance->atm_dev->ci_range.vci_bits = ATM_CI_MAX;
 	instance->atm_dev->signal = ATM_PHY_SIG_UNKNOWN;
 
-	/* tmp init atm device, set to 128kbit */
+	/* temp init ATM device, set to 128kbit */
 	instance->atm_dev->link_rate = 128 * 1000 / 424;
 
 	/* set MAC address, it is stored in the serial number */
 	memset (instance->atm_dev->esi, 0, sizeof (instance->atm_dev->esi));
 	if (usb_string (dev, dev->descriptor.iSerialNumber, mac_str, sizeof (mac_str)) == 12)
 		for (i = 0; i < 6; i++)
-			instance->atm_dev->esi[i] = (hex2int (mac_str[i * 2]) * 16) + (hex2int (mac_str[i * 2 + 1]));
+			instance->atm_dev->esi [i] = (hex2int (mac_str [i * 2]) * 16) + (hex2int (mac_str [i * 2 + 1]));
 
 	/* device description */
 	buf = instance->description;
@@ -1215,20 +1139,17 @@ finish:
 	return 0;
 
 fail:
-	for (i = 0; i < UDSL_NUMBER_SND_BUFS; i++)
-		kfree (instance->all_buffers[i].base);
+	for (i = 0; i < UDSL_NUM_SND_BUFS; i++)
+		kfree (instance->send_buffers [i].base);
 
-	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++)
-		usb_free_urb (instance->all_senders[i].urb);
+	for (i = 0; i < UDSL_NUM_SND_URBS; i++)
+		usb_free_urb (instance->senders [i].urb);
 
-	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
-		struct udsl_receiver *rcv = &(instance->all_receivers[i]);
+	for (i = 0; i < UDSL_NUM_RCV_BUFS; i++)
+		kfree (instance->receive_buffers [i].base);
 
-		usb_free_urb (rcv->urb);
-
-		if (rcv->skb)
-			kfree_skb (rcv->skb);
-	}
+	for (i = 0; i < UDSL_NUM_RCV_URBS; i++)
+		usb_free_urb (instance->receivers [i].urb);
 
 	kfree (instance);
 
@@ -1239,7 +1160,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 {
 	struct udsl_instance_data *instance = usb_get_intfdata (intf);
 	struct list_head *pos;
-	unsigned int count = 0;
+	unsigned int count;
 	int result, i;
 
 	dbg ("udsl_usb_disconnect entered");
@@ -1251,38 +1172,25 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 		return;
 	}
 
+	/* receive finalize */
 	tasklet_disable (&instance->receive_tasklet);
 
-	/* receive finalize */
-	down (&instance->serialize); /* vs udsl_fire_receivers */
-	/* no need to take the spinlock */
-	list_for_each (pos, &instance->spare_receivers)
-		if (++count > UDSL_NUMBER_RCV_URBS)
-			panic (__FILE__ ": memory corruption detected at line %d!\n", __LINE__);
-	INIT_LIST_HEAD (&instance->spare_receivers);
-	up (&instance->serialize);
-
-	dbg ("udsl_usb_disconnect: flushed %u spare receivers", count);
-
-	count = UDSL_NUMBER_RCV_URBS - count;
-
-	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++)
-		if ((result = usb_unlink_urb (instance->all_receivers[i].urb)) < 0)
+	for (i = 0; i < UDSL_NUM_RCV_URBS; i++)
+		if ((result = usb_unlink_urb (instance->receivers [i].urb)) < 0)
 			dbg ("udsl_usb_disconnect: usb_unlink_urb on receive urb %d returned %d", i, result);
 
 	/* wait for completion handlers to finish */
 	do {
-		unsigned int completed = 0;
-
-		spin_lock_irq (&instance->completed_receivers_lock);
-		list_for_each (pos, &instance->completed_receivers)
-			if (++completed > count)
+		count = 0;
+		spin_lock_irq (&instance->receive_lock);
+		list_for_each (pos, &instance->spare_receivers)
+			if (++count > UDSL_NUM_RCV_URBS)
 				panic (__FILE__ ": memory corruption detected at line %d!\n", __LINE__);
-		spin_unlock_irq (&instance->completed_receivers_lock);
+		spin_unlock_irq (&instance->receive_lock);
 
-		dbg ("udsl_usb_disconnect: found %u completed receivers", completed);
+		dbg ("udsl_usb_disconnect: found %u spare receivers", count);
 
-		if (completed == count)
+		if (count == UDSL_NUM_RCV_URBS)
 			break;
 
 		set_current_state (TASK_RUNNING);
@@ -1290,37 +1198,36 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	} while (1);
 
 	/* no need to take the spinlock */
-	INIT_LIST_HEAD (&instance->completed_receivers);
+	INIT_LIST_HEAD (&instance->filled_receive_buffers);
+	INIT_LIST_HEAD (&instance->spare_receive_buffers);
 
 	tasklet_enable (&instance->receive_tasklet);
-	tasklet_kill (&instance->receive_tasklet);
 
-	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
-		struct udsl_receiver *rcv = &(instance->all_receivers[i]);
+	for (i = 0; i < UDSL_NUM_RCV_URBS; i++)
+		usb_free_urb (instance->receivers [i].urb);
 
-		usb_free_urb (rcv->urb);
-		kfree_skb (rcv->skb);
-	}
+	for (i = 0; i < UDSL_NUM_RCV_BUFS; i++)
+		kfree (instance->receive_buffers [i].base);
 
 	/* send finalize */
 	tasklet_disable (&instance->send_tasklet);
 
-	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++)
-		if ((result = usb_unlink_urb (instance->all_senders[i].urb)) < 0)
+	for (i = 0; i < UDSL_NUM_SND_URBS; i++)
+		if ((result = usb_unlink_urb (instance->senders [i].urb)) < 0)
 			dbg ("udsl_usb_disconnect: usb_unlink_urb on send urb %d returned %d", i, result);
 
 	/* wait for completion handlers to finish */
 	do {
 		count = 0;
-		spin_lock (&instance->send_lock);
+		spin_lock_irq (&instance->send_lock);
 		list_for_each (pos, &instance->spare_senders)
-			if (++count > UDSL_NUMBER_SND_URBS)
+			if (++count > UDSL_NUM_SND_URBS)
 				panic (__FILE__ ": memory corruption detected at line %d!\n", __LINE__);
-		spin_unlock (&instance->send_lock);
+		spin_unlock_irq (&instance->send_lock);
 
 		dbg ("udsl_usb_disconnect: found %u spare senders", count);
 
-		if (count == UDSL_NUMBER_SND_URBS)
+		if (count == UDSL_NUM_SND_URBS)
 			break;
 
 		set_current_state (TASK_RUNNING);
@@ -1329,22 +1236,22 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 	/* no need to take the spinlock */
 	INIT_LIST_HEAD (&instance->spare_senders);
-	INIT_LIST_HEAD (&instance->spare_buffers);
+	INIT_LIST_HEAD (&instance->spare_send_buffers);
 	instance->current_buffer = NULL;
 
 	tasklet_enable (&instance->send_tasklet);
 
-	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++)
-		usb_free_urb (instance->all_senders[i].urb);
+	for (i = 0; i < UDSL_NUM_SND_URBS; i++)
+		usb_free_urb (instance->senders [i].urb);
 
-	for (i = 0; i < UDSL_NUMBER_SND_BUFS; i++)
-		kfree (instance->all_buffers[i].base);
+	for (i = 0; i < UDSL_NUM_SND_BUFS; i++)
+		kfree (instance->send_buffers [i].base);
 
 	wmb ();
 	instance->usb_dev = NULL;
 
-	/* atm finalize */
-	shutdown_atm_dev (instance->atm_dev); /* frees instance */
+	/* ATM finalize */
+	shutdown_atm_dev (instance->atm_dev); /* frees instance, kills tasklets */
 }
 
 
@@ -1392,10 +1299,10 @@ static int udsl_print_packet (const unsigned char *data, int len)
 	int i = 0, j = 0;
 
 	for (i = 0; i < len;) {
-		buffer[0] = '\0';
+		buffer [0] = '\0';
 		sprintf (buffer, "%.3d :", i);
 		for (j = 0; (j < 16) && (i < len); j++, i++) {
-			sprintf (buffer, "%s %2.2x", buffer, data[i]);
+			sprintf (buffer, "%s %2.2x", buffer, data [i]);
 		}
 		dbg ("%s", buffer);
 	}
