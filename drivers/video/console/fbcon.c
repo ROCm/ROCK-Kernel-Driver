@@ -2310,7 +2310,7 @@ static int fbcon_set_palette(struct vc_data *vc, unsigned char *table)
 	else
 		palette_cmap.len = 16;
 	palette_cmap.start = 0;
-	return fb_set_cmap(&palette_cmap, 1, info);
+	return fb_set_cmap(&palette_cmap, info);
 }
 
 static u16 *fbcon_screen_pos(struct vc_data *vc, int offset)

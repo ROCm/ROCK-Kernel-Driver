@@ -593,7 +593,7 @@ static void fb_set_logocmap(struct fb_info *info,
 			palette_cmap.blue[j] = clut[2] << 8 | clut[2];
 			clut += 3;
 		}
-		fb_set_cmap(&palette_cmap, 1, info);
+		fb_set_cmap(&palette_cmap, info);
 	}
 }
 
@@ -938,9 +938,9 @@ fb_load_cursor_image(struct fb_info *info)
 }
 
 int
-fb_cursor(struct fb_info *info, struct fb_cursor __user *sprite)
+fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
 {
-	struct fb_cursor cursor_user;
+	struct fb_cursor_user cursor_user;
 	struct fb_cursor cursor;
 	char *data = NULL, *mask = NULL;
 	u16 *red = NULL, *green = NULL, *blue = NULL, *transp = NULL;
@@ -1073,7 +1073,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 			fb_pan_display(info, &info->var);
 
-			fb_set_cmap(&info->cmap, 1, info);
+			fb_set_cmap(&info->cmap, info);
 
 			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
 				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
@@ -1102,7 +1102,7 @@ fb_blank(struct fb_info *info, int blank)
 		cmap.len = info->cmap.len;
 	} else
 		cmap = info->cmap;
-	return fb_set_cmap(&cmap, 1, info);
+	return fb_set_cmap(&cmap, info);
 }
 
 static int 
@@ -1117,7 +1117,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	struct fb_con2fbmap con2fb;
 #endif
-	struct fb_cmap cmap;
+	struct fb_cmap_user cmap;
 	void __user *argp = (void __user *)arg;
 	int i;
 	
@@ -1145,11 +1145,11 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPUTCMAP:
 		if (copy_from_user(&cmap, argp, sizeof(cmap)))
 			return -EFAULT;
-		return (fb_set_cmap(&cmap, 0, info));
+		return (fb_set_user_cmap(&cmap, info));
 	case FBIOGETCMAP:
 		if (copy_from_user(&cmap, argp, sizeof(cmap)))
 			return -EFAULT;
-		return (fb_copy_cmap(&info->cmap, &cmap, 2));
+		return fb_cmap_to_user(&info->cmap, &cmap);
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, argp, sizeof(var)))
 			return -EFAULT;

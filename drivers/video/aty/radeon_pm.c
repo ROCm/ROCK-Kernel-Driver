@@ -922,7 +922,7 @@ int radeonfb_pci_resume(struct pci_dev *pdev)
 	/* Restore display & engine */
 	radeonfb_set_par(info);
 	fb_pan_display(info, &info->var);
-	fb_set_cmap(&info->cmap, 1, info);
+	fb_set_cmap(&info->cmap, info);
 
 	/* Refresh */
 	fb_set_suspend(info, 0);
