@@ -2499,6 +2499,7 @@ static int ace_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct ace_regs __iomem *regs = ap->regs;
 	struct tx_desc *desc;
 	u32 idx, flagsize;
+	unsigned long maxjiff = jiffies + 3*HZ;
 
 restart:
 	idx = ap->tx_prd;
@@ -2602,7 +2603,7 @@ restart:
 	}
 
 	dev->trans_start = jiffies;
-	return 0;
+	return NETDEV_TX_OK;
 
 overflow:
 	/*
@@ -2621,8 +2622,15 @@ overflow:
 	 * Alternative is to return with 1 not throttling queue. In this
 	 * case loop becomes longer, no more useful effects.
 	 */
-	barrier();
-	goto restart;
+	if (time_before(jiffies, maxjiff)) {
+		barrier();
+		cpu_relax();
+		goto restart;
+	}
+	
+	/* The ring is stuck full. */
+	printk(KERN_WARNING "%s: Transmit ring stuck full\n", dev->name);
+	return NETDEV_TX_BUSY;
 }
 
 
