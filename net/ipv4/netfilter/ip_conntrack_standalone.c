@@ -503,7 +503,7 @@ static int init_or_cleanup(int init)
 	if (ret < 0)
 		goto cleanup_nothing;
 
-	proc = proc_net_create("ip_conntrack",0,list_conntracks);
+	proc = proc_net_create("ip_conntrack", 0440, list_conntracks);
 	if (!proc) goto cleanup_init;
 	proc->owner = THIS_MODULE;
 

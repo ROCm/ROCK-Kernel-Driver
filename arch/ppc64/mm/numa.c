@@ -457,7 +457,7 @@ void __init paging_init(void)
 		zones_size[ZONE_DMA] = end_pfn - start_pfn;
 		zholes_size[ZONE_DMA] = 0;
 		if (nid == 0)
-			zholes_size[ZONE_DMA] = node0_io_hole_size;
+			zholes_size[ZONE_DMA] = node0_io_hole_size >> PAGE_SHIFT;
 
 		dbg("free_area_init node %d %lx %lx (hole: %lx)\n", nid,
 		    zones_size[ZONE_DMA], start_pfn, zholes_size[ZONE_DMA]);

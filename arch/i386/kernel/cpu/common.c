@@ -473,7 +473,6 @@ void early_cpu_detect(void);
 
 void __init early_cpu_init(void)
 {
-	early_cpu_detect();
 	intel_cpu_init();
 	cyrix_init_cpu();
 	nsc_init_cpu();
@@ -483,6 +482,7 @@ void __init early_cpu_init(void)
 	rise_init_cpu();
 	nexgen_init_cpu();
 	umc_init_cpu();
+	early_cpu_detect();
 
 #ifdef CONFIG_DEBUG_PAGEALLOC
 	/* pse is not compatible with on-the-fly unmapping,

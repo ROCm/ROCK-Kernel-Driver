@@ -1476,6 +1476,7 @@ static int dvd_do_auth(struct cdrom_device_info *cdi, dvd_authinfo *ai)
 	/* LU data send */
 	case DVD_LU_SEND_AGID:
 		cdinfo(CD_DVD, "entering DVD_LU_SEND_AGID\n"); 
+		cgc.quiet = 1;
 		setup_report_key(&cgc, ai->lsa.agid, 0);
 
 		if ((ret = cdo->generic_packet(cdi, &cgc)))
@@ -1510,6 +1511,7 @@ static int dvd_do_auth(struct cdrom_device_info *cdi, dvd_authinfo *ai)
 	/* Post-auth key */
 	case DVD_LU_SEND_TITLE_KEY:
 		cdinfo(CD_DVD, "entering DVD_LU_SEND_TITLE_KEY\n"); 
+		cgc.quiet = 1;
 		setup_report_key(&cgc, ai->lstk.agid, 4);
 		cgc.cmd[5] = ai->lstk.lba;
 		cgc.cmd[4] = ai->lstk.lba >> 8;

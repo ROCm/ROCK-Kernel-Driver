@@ -87,6 +87,9 @@ extern void pci_dac_dma_sync_single_for_cpu(struct pci_dev *pdev,
 extern void pci_dac_dma_sync_single_for_device(struct pci_dev *pdev,
 	dma64_addr_t dma_addr, size_t len, int direction);
 
+extern void pcibios_resource_to_bus(struct pci_dev *dev,
+	struct pci_bus_region *region, struct resource *res);
+
 #endif /* __KERNEL__ */
 
 /* implement the pci_ DMA API in terms of the generic device dma_ one */

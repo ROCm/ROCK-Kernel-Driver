@@ -217,7 +217,7 @@ static void tcp_delack_timer(unsigned long data)
 		goto out_unlock;
 	}
 
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 
 	if (sk->sk_state == TCP_CLOSE || !(tp->ack.pending & TCP_ACK_TIMER))
 		goto out;
@@ -257,8 +257,8 @@ static void tcp_delack_timer(unsigned long data)
 	TCP_CHECK_TIMER(sk);
 
 out:
-	if (tcp_memory_pressure)
-		tcp_mem_reclaim(sk);
+	if (tcp_prot.memory_pressure)
+		sk_stream_mem_reclaim(sk);
 out_unlock:
 	bh_unlock_sock(sk);
 	sock_put(sk);
@@ -269,7 +269,7 @@ static void tcp_probe_timer(struct sock *sk)
 	struct tcp_opt *tp = tcp_sk(sk);
 	int max_probes;
 
-	if (tp->packets_out || !tp->send_head) {
+	if (tp->packets_out || !sk->sk_send_head) {
 		tp->probes_out = 0;
 		return;
 	}
@@ -448,7 +448,7 @@ static void tcp_write_timer(unsigned long data)
 	TCP_CHECK_TIMER(sk);
 
 out:
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 out_unlock:
 	bh_unlock_sock(sk);
 	sock_put(sk);
@@ -606,7 +606,7 @@ static void tcp_keepalive_timer (unsigned long data)
 	elapsed = keepalive_time_when(tp);
 
 	/* It is alive without keepalive 8) */
-	if (tp->packets_out || tp->send_head)
+	if (tp->packets_out || sk->sk_send_head)
 		goto resched;
 
 	elapsed = tcp_time_stamp - tp->rcv_tstamp;
@@ -633,7 +633,7 @@ static void tcp_keepalive_timer (unsigned long data)
 	}
 
 	TCP_CHECK_TIMER(sk);
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 
 resched:
 	tcp_reset_keepalive_timer (sk, elapsed);

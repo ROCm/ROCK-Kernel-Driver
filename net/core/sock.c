@@ -650,6 +650,14 @@ void sk_free(struct sock *sk)
 		printk(KERN_DEBUG "%s: optmem leakage (%d bytes) detected.\n",
 		       __FUNCTION__, atomic_read(&sk->sk_omem_alloc));
 
+	/*
+	 * If sendmsg cached page exists, toss it.
+	 */
+	if (sk->sk_sndmsg_page) {
+		__free_page(sk->sk_sndmsg_page);
+		sk->sk_sndmsg_page = NULL;
+	}
+
 	security_sk_free(sk);
 	kmem_cache_free(sk->sk_slab, sk);
 	module_put(owner);
@@ -1147,6 +1155,8 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	skb_queue_head_init(&sk->sk_write_queue);
 	skb_queue_head_init(&sk->sk_error_queue);
 
+	sk->sk_send_head	=	NULL;
+
 	init_timer(&sk->sk_timer);
 	
 	sk->sk_allocation	=	GFP_KERNEL;
@@ -1173,9 +1183,13 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->sk_error_report	=	sock_def_error_report;
 	sk->sk_destruct		=	sock_def_destruct;
 
+	sk->sk_sndmsg_page	=	NULL;
+	sk->sk_sndmsg_off	=	0;
+
 	sk->sk_peercred.pid 	=	0;
 	sk->sk_peercred.uid	=	-1;
 	sk->sk_peercred.gid	=	-1;
+	sk->sk_write_pending	=	0;
 	sk->sk_rcvlowat		=	1;
 	sk->sk_rcvtimeo		=	MAX_SCHEDULE_TIMEOUT;
 	sk->sk_sndtimeo		=	MAX_SCHEDULE_TIMEOUT;

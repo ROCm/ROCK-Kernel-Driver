@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/root_dev.h>
 #include <linux/cpu.h>
+#include <linux/interrupt.h>
 
 #include <asm/elf.h>
 #include <asm/hardware.h>
@@ -34,6 +35,7 @@
 
 #include <asm/mach/arch.h>
 #include <asm/mach/irq.h>
+#include <asm/mach/time.h>
 
 #ifndef MEM_SIZE
 #define MEM_SIZE	(16*1024*1024)
@@ -95,7 +97,6 @@ unsigned char aux_device_present;
 char elf_platform[ELF_PLATFORM_SIZE];
 EXPORT_SYMBOL(elf_platform);
 
-char saved_command_line[COMMAND_LINE_SIZE];
 unsigned long phys_initrd_start __initdata = 0;
 unsigned long phys_initrd_size __initdata = 0;
 
@@ -727,6 +728,7 @@ void __init setup_arch(char **cmdline_p)
 	 * Set up various architecture-specific pointers
 	 */
 	init_arch_irq = mdesc->init_irq;
+	init_arch_time = mdesc->init_time;
 	init_machine = mdesc->init_machine;
 
 #ifdef CONFIG_VT

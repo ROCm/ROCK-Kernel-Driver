@@ -141,7 +141,7 @@ void sync_dquots(struct super_block *sb, int type)
 			sb->s_qcop->quota_sync(sb, type);
 	}
 	else {
-		while ((sb = get_super_to_sync(type))) {
+		while ((sb = get_super_to_sync(type)) != 0) {
 			if (sb->s_qcop->quota_sync)
 				sb->s_qcop->quota_sync(sb, type);
 			drop_super(sb);

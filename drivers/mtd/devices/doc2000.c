@@ -53,9 +53,11 @@ static int doc_read(struct mtd_info *mtd, loff_t from, size_t len,
 static int doc_write(struct mtd_info *mtd, loff_t to, size_t len,
 		     size_t *retlen, const u_char *buf);
 static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
-			size_t *retlen, u_char *buf, u_char *eccbuf, int oobsel);
+			size_t *retlen, u_char *buf, u_char *eccbuf,
+			struct nand_oobinfo *unused);
 static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
-			 size_t *retlen, const u_char *buf, u_char *eccbuf, int oobsel);
+			 size_t *retlen, const u_char *buf, u_char *eccbuf,
+			struct nand_oobinfo *unused);
 static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 			size_t *retlen, u_char *buf);
 static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
@@ -601,7 +603,8 @@ static int doc_read(struct mtd_info *mtd, loff_t from, size_t len,
 }
 
 static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
-			size_t * retlen, u_char * buf, u_char * eccbuf, int oobsel)
+			size_t * retlen, u_char * buf, u_char * eccbuf,
+			struct nand_oobinfo *unused)
 {
 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
 	unsigned long docptr;
@@ -750,7 +753,8 @@ static int doc_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 			 size_t * retlen, const u_char * buf,
-			 u_char * eccbuf, int oobsel)
+			 u_char * eccbuf,
+			 struct nand_oobinfo *unused)
 {
 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
 	int di; /* Yes, DI is a hangover from when I was disassembling the binary driver */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -424,10 +424,6 @@ typedef struct xfs_mount {
  */
 #define XFS_READIO_LOG_LARGE	16
 #define XFS_WRITEIO_LOG_LARGE	16
-/*
- * Default allocation size
- */
-#define XFS_WRITE_IO_LOG	16
 
 /*
  * Max and min values for UIO and mount-option defined I/O sizes;

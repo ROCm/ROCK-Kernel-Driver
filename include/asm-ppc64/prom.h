@@ -25,7 +25,7 @@
 #define LONG_MSW(X) (((unsigned long)X) >> 32)
 
 typedef u32 phandle;
-typedef void *ihandle;
+typedef u32 ihandle;
 typedef u32 phandle32;
 typedef u32 ihandle32;
 

@@ -337,8 +337,8 @@ int toshiba_rbtx4927_irq_nested(int sw_irq)
 	return (sw_irq);
 }
 
-//#define TOSHIBA_RBTX4927_PIC_ACTION(s) { no_action, 0, 0, s, NULL, NULL }
-#define TOSHIBA_RBTX4927_PIC_ACTION(s) { no_action, SA_SHIRQ, 0, s, NULL, NULL }
+//#define TOSHIBA_RBTX4927_PIC_ACTION(s) { no_action, 0, CPU_MASK_NONE, s, NULL, NULL }
+#define TOSHIBA_RBTX4927_PIC_ACTION(s) { no_action, SA_SHIRQ, CPU_MASK_NONE, s, NULL, NULL }
 static struct irqaction toshiba_rbtx4927_irq_ioc_action =
 TOSHIBA_RBTX4927_PIC_ACTION(TOSHIBA_RBTX4927_IOC_NAME);
 #ifdef CONFIG_TOSHIBA_FPCIB0

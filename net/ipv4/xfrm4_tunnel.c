@@ -167,7 +167,7 @@ static struct xfrm_type ipip_type = {
 	.output		= ipip_output
 };
 
-static struct inet_protocol ipip_protocol = {
+static struct net_protocol ipip_protocol = {
 	.handler	=	ipip_rcv,
 	.err_handler	=	ipip_err,
 	.no_policy	=	1,

@@ -20,6 +20,7 @@
 #include <linux/major.h>
 #include <linux/root_dev.h>
 #include <linux/mtd/mtd.h>
+#include <linux/init.h>
 
 #include <asm/irq.h>
 
@@ -40,8 +41,7 @@ extern char _root_fs_image_start __attribute__ ((__weak__));
 extern char _root_fs_image_end __attribute__ ((__weak__));
 
 
-char command_line[512];
-char saved_command_line[512];
+char command_line[COMMAND_LINE_SIZE];
 
 /* Memory not used by the kernel.  */
 static unsigned long total_ram_pages;

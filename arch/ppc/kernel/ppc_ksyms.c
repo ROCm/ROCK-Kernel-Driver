@@ -68,7 +68,6 @@ extern int sys_sigreturn(struct pt_regs *regs);
 long long __ashrdi3(long long, int);
 long long __ashldi3(long long, int);
 long long __lshrdi3(long long, int);
-int abs(int);
 
 extern unsigned long mm_ptov (unsigned long paddr);
 
@@ -275,8 +274,6 @@ EXPORT_SYMBOL(memmove);
 EXPORT_SYMBOL(memscan);
 EXPORT_SYMBOL(memcmp);
 EXPORT_SYMBOL(memchr);
-
-EXPORT_SYMBOL(abs);
 
 #if defined(CONFIG_FB_VGA16_MODULE)
 EXPORT_SYMBOL(screen_info);

@@ -449,7 +449,7 @@ int request_fast_irq(unsigned int irq,
 
 	action->handler = handler;
 	action->flags = irqflags;
-	action->mask = 0;
+	cpus_clear(action->mask);
 	action->name = devname;
 	action->dev_id = NULL;
 	action->next = NULL;
@@ -529,7 +529,7 @@ int request_irq(unsigned int irq,
 
 	action->handler = handler;
 	action->flags = irqflags;
-	action->mask = 0;
+	cpus_clear(action->mask);
 	action->name = devname;
 	action->next = NULL;
 	action->dev_id = dev_id;

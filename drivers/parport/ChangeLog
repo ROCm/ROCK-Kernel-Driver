@@ -1,3 +1,7 @@
+2001-10-11  Tim Waugh  <twaugh@redhat.com>
+	* parport_pc.c, parport_serial.c: Support for NetMos cards.
+	+ Patch originally from Michael Reinelt <reinelt@eunet.at>.
+
 2002-04-25  Tim Waugh  <twaugh@redhat.com>
 
 	* parport_serial.c, parport_pc.c: Move some SIIG cards around.

@@ -224,7 +224,7 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 	struct irq_pin_list *entry = irq_2_pin + irq;
 	unsigned int apicid_value;
 	
-	apicid_value = cpu_mask_to_apicid(mk_cpumask_const(cpumask));
+	apicid_value = cpu_mask_to_apicid(cpumask);
 	/* Prepare to do the io_apic_write */
 	apicid_value = apicid_value << 24;
 	spin_lock_irqsave(&ioapic_lock, flags);
@@ -555,7 +555,7 @@ not_worth_the_effort:
 	return;
 }
 
-int balanced_irq(void *unused)
+static int balanced_irq(void *unused)
 {
 	int i;
 	unsigned long prev_balance_time = jiffies;
@@ -568,17 +568,17 @@ int balanced_irq(void *unused)
 		pending_irq_balance_cpumask[i] = cpumask_of_cpu(0);
 	}
 
-repeat:
-	set_current_state(TASK_INTERRUPTIBLE);
-	time_remaining = schedule_timeout(time_remaining);
-	if (time_after(jiffies, prev_balance_time+balanced_irq_interval)) {
-		Dprintk("balanced_irq: calling do_irq_balance() %lu\n",
-					jiffies);
-		do_irq_balance();
-		prev_balance_time = jiffies;
-		time_remaining = balanced_irq_interval;
+	for ( ; ; ) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		time_remaining = schedule_timeout(time_remaining);
+		if (time_after(jiffies,
+				prev_balance_time+balanced_irq_interval)) {
+			do_irq_balance();
+			prev_balance_time = jiffies;
+			time_remaining = balanced_irq_interval;
+		}
 	}
-	goto repeat;
+	return 0;
 }
 
 static int __init balanced_irq_init(void)
@@ -1411,12 +1411,17 @@ void __init print_IO_APIC(void)
 		);
 	}
 	}
+	if (use_pci_vector())
+		printk(KERN_INFO "Using vector-based indexing\n");
 	printk(KERN_DEBUG "IRQ to pin mappings:\n");
 	for (i = 0; i < NR_IRQS; i++) {
 		struct irq_pin_list *entry = irq_2_pin + i;
 		if (entry->pin < 0)
 			continue;
-		printk(KERN_DEBUG "IRQ%d ", i);
+ 		if (use_pci_vector() && !platform_legacy_irq(i))
+			printk(KERN_DEBUG "IRQ%d ", IO_APIC_VECTOR(i));
+		else
+			printk(KERN_DEBUG "IRQ%d ", i);
 		for (;;) {
 			printk("-> %d:%d", entry->apic, entry->pin);
 			if (!entry->next)

@@ -65,6 +65,9 @@ extern void oprofile_add_sample(unsigned long eip, unsigned int is_kernel,
  */
 int oprofilefs_create_file(struct super_block * sb, struct dentry * root,
 	char const * name, struct file_operations * fops);
+
+int oprofilefs_create_file_perm(struct super_block * sb, struct dentry * root,
+	char const * name, struct file_operations * fops, int perm);
  
 /** Create a file for read/write access to an unsigned long. */
 int oprofilefs_create_ulong(struct super_block * sb, struct dentry * root,

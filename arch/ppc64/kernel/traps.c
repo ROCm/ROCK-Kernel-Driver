@@ -172,9 +172,9 @@ static struct rtas_error_log *FWNMI_get_errinfo(struct pt_regs *regs)
  */
 static void FWNMI_release_errinfo(void)
 {
-	unsigned long ret = rtas_call(rtas_token("ibm,nmi-interlock"), 0, 1, NULL);
+	int ret = rtas_call(rtas_token("ibm,nmi-interlock"), 0, 1, NULL);
 	if (ret != 0)
-		printk("FWNMI: nmi-interlock failed: %ld\n", ret);
+		printk("FWNMI: nmi-interlock failed: %d\n", ret);
 }
 #endif
 
@@ -544,9 +544,39 @@ AlignmentException(struct pt_regs *regs)
 void
 AltivecAssistException(struct pt_regs *regs)
 {
+	int err;
+	siginfo_t info;
+
+	if (!user_mode(regs)) {
+		printk(KERN_EMERG "VMX/Altivec assist exception in kernel mode"
+		       " at %lx\n", regs->nip);
+		die("Kernel VMX/Altivec assist exception", regs, SIGILL);
+	}
+
 	flush_altivec_to_thread(current);
-	/* XXX quick hack for now: set the non-Java bit in the VSCR */
-	current->thread.vscr.u[3] |= 0x10000;
+
+	err = emulate_altivec(regs);
+	if (err == 0) {
+		regs->nip += 4;		/* skip emulated instruction */
+		emulate_single_step(regs);
+		return;
+	}
+
+	if (err == -EFAULT) {
+		/* got an error reading the instruction */
+		info.si_signo = SIGSEGV;
+		info.si_errno = 0;
+		info.si_code = SEGV_MAPERR;
+		info.si_addr = (void *) regs->nip;
+		force_sig_info(SIGSEGV, &info, current);
+	} else {
+		/* didn't recognize the instruction */
+		/* XXX quick hack for now: set the non-Java bit in the VSCR */
+		if (printk_ratelimit())
+			printk(KERN_ERR "Unrecognized altivec instruction "
+			       "in %s at %lx\n", current->comm, regs->nip);
+		current->thread.vscr.u[3] |= 0x10000;
+	}
 }
 #endif /* CONFIG_ALTIVEC */
 

@@ -827,7 +827,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (apicid == boot_cpu_id || (apicid == BAD_APICID))
 			continue;
 
-		if (!cpu_isset(apicid, phys_cpu_present_map))
+		if (!physid_isset(apicid, phys_cpu_present_map))
 			continue;
 		if ((max_cpus >= 0) && (max_cpus <= cpucount+1))
 			continue;

@@ -174,7 +174,7 @@ static int hpet_open(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-hpet_read(struct file *file, char *buf, size_t count, loff_t * ppos)
+hpet_read(struct file *file, char __user *buf, size_t count, loff_t * ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long data;
@@ -212,7 +212,7 @@ hpet_read(struct file *file, char *buf, size_t count, loff_t * ppos)
 
 	} while (1);
 
-	retval = put_user(data, (unsigned long *)buf);
+	retval = put_user(data, (unsigned long __user *)buf);
 	if (!retval)
 		retval = sizeof(unsigned long);
       out:
@@ -477,7 +477,7 @@ hpet_ioctl_common(struct hpet_dev *devp, int cmd, unsigned long arg, int kernel)
 			    readq(&timer->hpet_config) & Tn_PER_INT_CAP_MASK;
 			info.hi_hpet = devp->hd_hpets->hp_which;
 			info.hi_timer = devp - devp->hd_hpets->hp_dev;
-			if (copy_to_user((void *)arg, &info, sizeof(info)))
+			if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 				err = -EFAULT;
 			break;
 		}

@@ -451,8 +451,7 @@ extern unsigned short ram_flags;
 
 extern int root_mountflags;
 
-char saved_command_line[256];
-char reboot_command[256];
+char reboot_command[COMMAND_LINE_SIZE];
 
 static struct pt_regs fake_swapper_regs = { { 0, }, 0, 0, 0, 0 };
 

@@ -182,7 +182,8 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 		 * 65534 when Jens Axboe's patch for dynamically
 		 * determining max_sectors is merged.
 		 */
-		if (dev->flags & ATA_DFLAG_LBA48) {
+		if ((dev->flags & ATA_DFLAG_LBA48) &&
+		    ((dev->flags & ATA_DFLAG_LOCK_SECTORS) == 0)) {
 			sdev->host->max_sectors = 2048;
 			blk_queue_max_sectors(sdev->request_queue, 2048);
 		}

@@ -166,8 +166,9 @@ count on these devices by calling pci_dev_put().
 ~~~~~~~~~~~~~~~~~~~
    Before you do anything with the device you've found, you need to enable
 it by calling pci_enable_device() which enables I/O and memory regions of
-the device, assigns missing resources if needed and wakes up the device
-if it was in suspended state. Please note that this function can fail.
+the device, allocates an IRQ if necessary, assigns missing resources if
+needed and wakes up the device if it was in suspended state. Please note
+that this function can fail.
 
    If you want to use the device in bus mastering mode, call pci_set_master()
 which enables the bus master bit in PCI_COMMAND register and also fixes

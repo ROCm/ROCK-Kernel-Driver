@@ -103,7 +103,7 @@ union ip_conntrack_nat_help {
 #include <linux/types.h>
 #include <linux/skbuff.h>
 
-#ifdef CONFIG_NF_DEBUG
+#ifdef CONFIG_NETFILTER_DEBUG
 #define IP_NF_ASSERT(x)							\
 do {									\
 	if (!(x))							\

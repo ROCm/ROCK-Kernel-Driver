@@ -134,9 +134,9 @@ out:
 	return netif;
 }
 
-static void sel_netif_free(void *p)
+static void sel_netif_free(struct rcu_head *p)
 {
-	struct sel_netif *netif = p;
+	struct sel_netif *netif = container_of(p, struct sel_netif, rcu_head);
 	
 	DEBUGP("%s: %s\n", __FUNCTION__, netif->nsec.dev->name);
 	kfree(netif);
@@ -151,7 +151,7 @@ static void sel_netif_destroy(struct sel_netif *netif)
 	sel_netif_total--;
 	spin_unlock_bh(&sel_netif_lock);
 
-	call_rcu(&netif->rcu_head, sel_netif_free, netif);
+	call_rcu(&netif->rcu_head, sel_netif_free);
 }
 
 void sel_netif_put(struct sel_netif *netif)

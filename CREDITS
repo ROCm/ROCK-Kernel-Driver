@@ -1060,6 +1060,12 @@ S: USA
 N: Jeff Garzik
 E: jgarzik@pobox.com
 
+N: Kumar Gala
+E: kumar.gala@freescale.com
+D: Embedded PowerPC 6xx/7xx/74xx/82xx/85xx support
+S: Austin, Texas 78729
+S: USA
+
 N: Jacques Gelinas
 E: jacques@solucorp.qc.ca
 D: Author of the Umsdos file system

@@ -4,12 +4,13 @@
  *
  * Copyright (C) 1999  Niibe Yutaka & Takeshi Yaegashi
  * Copyright (C) 2000  Kazumoto Kojima
+ * Copyright (C) 2003 Takashi Kusuda <kusuda-takashi@hitachi-ul.co.jp>
  *
  * Interrupt handling for IPR-based IRQ.
  *
  * Supported system:
  *	On-chip supporting modules (TMU, RTC, etc.).
- *	On-chip supporting modules for SH7709/SH7709A/SH7729.
+ *	On-chip supporting modules for SH7709/SH7709A/SH7729/SH7300.
  *	Hitachi SolutionEngine external I/O:
  *		MS7709SE01, MS7709ASE01, and MS7750SE01
  *
@@ -88,7 +89,8 @@ static void mask_and_ack_ipr(unsigned int irq)
 {
 	disable_ipr_irq(irq);
 
-#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
+#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709) || \
+    defined(CONFIG_CPU_SUBTYPE_SH7300) || defined(CONFIG_CPU_SUBTYPE_SH7705)
 	/* This is needed when we use edge triggered setting */
 	/* XXX: Is it really needed? */
 	if (IRQ0_IRQ <= irq && irq <= IRQ5_IRQ) {
@@ -117,7 +119,9 @@ void make_ipr_irq(unsigned int irq, unsigned int addr, int pos, int priority)
 	disable_ipr_irq(irq);
 }
 
-#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
+#if defined(CONFIG_CPU_SUBTYPE_SH7705) || \
+    defined(CONFIG_CPU_SUBTYPE_SH7707) || \
+    defined(CONFIG_CPU_SUBTYPE_SH7709)
 static unsigned char pint_map[256];
 static unsigned long portcr_mask = 0;
 
@@ -131,7 +135,7 @@ static void mask_and_ack_pint(unsigned int);
 static void end_pint_irq(unsigned int irq);
 
 static unsigned int startup_pint_irq(unsigned int irq)
-{ 
+{
 	enable_pint_irq(irq);
 	return 0; /* never anything pending */
 }
@@ -191,13 +195,17 @@ void make_pint_irq(unsigned int irq)
 
 void __init init_IRQ(void)
 {
-#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
+#if defined(CONFIG_CPU_SUBTYPE_SH7705) || \
+    defined(CONFIG_CPU_SUBTYPE_SH7707) || \
+    defined(CONFIG_CPU_SUBTYPE_SH7709)
 	int i;
 #endif
 
 	make_ipr_irq(TIMER_IRQ, TIMER_IPR_ADDR, TIMER_IPR_POS, TIMER_PRIORITY);
 	make_ipr_irq(TIMER1_IRQ, TIMER1_IPR_ADDR, TIMER1_IPR_POS, TIMER1_PRIORITY);
+#if defined(CONFIG_SH_RTC)
 	make_ipr_irq(RTC_IRQ, RTC_IPR_ADDR, RTC_IPR_POS, RTC_PRIORITY);
+#endif
 
 #ifdef SCI_ERI_IRQ
 	make_ipr_irq(SCI_ERI_IRQ, SCI_IPR_ADDR, SCI_IPR_POS, SCI_PRIORITY);
@@ -210,6 +218,13 @@ void __init init_IRQ(void)
 	make_ipr_irq(SCIF1_RXI_IRQ, SCIF1_IPR_ADDR, SCIF1_IPR_POS, SCIF1_PRIORITY);
 	make_ipr_irq(SCIF1_BRI_IRQ, SCIF1_IPR_ADDR, SCIF1_IPR_POS, SCIF1_PRIORITY);
 	make_ipr_irq(SCIF1_TXI_IRQ, SCIF1_IPR_ADDR, SCIF1_IPR_POS, SCIF1_PRIORITY);
+#endif
+
+#if defined(CONFIG_CPU_SUBTYPE_SH7300)
+	make_ipr_irq(SCIF0_IRQ, SCIF0_IPR_ADDR, SCIF0_IPR_POS, SCIF0_PRIORITY);
+	make_ipr_irq(DMTE2_IRQ, DMA1_IPR_ADDR, DMA1_IPR_POS, DMA1_PRIORITY);
+	make_ipr_irq(DMTE3_IRQ, DMA1_IPR_ADDR, DMA1_IPR_POS, DMA1_PRIORITY);
+	make_ipr_irq(VIO_IRQ, VIO_IPR_ADDR, VIO_IPR_POS, VIO_PRIORITY);
 #endif
 
 #ifdef SCIF_ERI_IRQ
@@ -226,11 +241,12 @@ void __init init_IRQ(void)
 	make_ipr_irq(IRDA_TXI_IRQ, IRDA_IPR_ADDR, IRDA_IPR_POS, IRDA_PRIORITY);
 #endif
 
-#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
+#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709) || \
+    defined(CONFIG_CPU_SUBTYPE_SH7300) || defined(CONFIG_CPU_SUBTYPE_SH7705)
 	/*
 	 * Initialize the Interrupt Controller (INTC)
 	 * registers to their power on values
-	 */ 
+	 */
 
 	/*
 	 * Enable external irq (INTC IRQ mode).
@@ -243,6 +259,7 @@ void __init init_IRQ(void)
 	make_ipr_irq(IRQ3_IRQ, IRQ3_IPR_ADDR, IRQ3_IPR_POS, IRQ3_PRIORITY);
 	make_ipr_irq(IRQ4_IRQ, IRQ4_IPR_ADDR, IRQ4_IPR_POS, IRQ4_PRIORITY);
 	make_ipr_irq(IRQ5_IRQ, IRQ5_IPR_ADDR, IRQ5_IPR_POS, IRQ5_PRIORITY);
+#if !defined(CONFIG_CPU_SUBTYPE_SH7300)
 	make_ipr_irq(PINT0_IRQ, PINT0_IPR_ADDR, PINT0_IPR_POS, PINT0_PRIORITY);
 	make_ipr_irq(PINT8_IRQ, PINT8_IPR_ADDR, PINT8_IPR_POS, PINT8_PRIORITY);
 	enable_ipr_irq(PINT0_IRQ);
@@ -261,16 +278,19 @@ void __init init_IRQ(void)
 		else if(i & 0x40) pint_map[i] = 6;
 		else if(i & 0x80) pint_map[i] = 7;
 	}
-#endif /* CONFIG_CPU_SUBTYPE_SH7707 || CONFIG_CPU_SUBTYPE_SH7709 */
+#endif /* !CONFIG_CPU_SUBTYPE_SH7300 */
+#endif /* CONFIG_CPU_SUBTYPE_SH7707 || CONFIG_CPU_SUBTYPE_SH7709  || CONFIG_CPU_SUBTYPE_SH7300*/
 
 	/* Perform the machine specific initialisation */
 	if (sh_mv.mv_init_irq != NULL) {
 		sh_mv.mv_init_irq();
 	}
 }
-#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
+#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709) || \
+    defined(CONFIG_CPU_SUBTYPE_SH7300) || defined(CONFIG_CPU_SUBTYPE_SH7705)
 int ipr_irq_demux(int irq)
 {
+#if !defined(CONFIG_CPU_SUBTYPE_SH7300)
 	unsigned long creg, dreg, d, sav;
 
 	if(irq == PINT0_IRQ)
@@ -305,6 +325,7 @@ int ipr_irq_demux(int irq)
 		if(d == 0) return irq;
 		return PINT_IRQ_BASE + 8 + pint_map[d];
 	}
+#endif
 	return irq;
 }
 #endif

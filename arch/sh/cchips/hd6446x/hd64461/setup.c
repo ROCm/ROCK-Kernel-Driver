@@ -134,7 +134,7 @@ int hd64461_irq_demux(int irq)
 	return __irq_demux(irq);
 }
 
-static struct irqaction irq0 = { hd64461_interrupt, SA_INTERRUPT, 0, "HD64461", NULL, NULL };
+static struct irqaction irq0 = { hd64461_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "HD64461", NULL, NULL };
 
 int __init setup_hd64461(void)
 {

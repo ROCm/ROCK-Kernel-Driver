@@ -88,10 +88,6 @@ unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I
 unsigned long ia64_max_iommu_merge_mask = ~0UL;
 EXPORT_SYMBOL(ia64_max_iommu_merge_mask);
 
-#define COMMAND_LINE_SIZE	512
-
-char saved_command_line[COMMAND_LINE_SIZE]; /* used in proc filesystem */
-
 /*
  * We use a special marker for the end of memory and it uses the extra (+1) slot
  */

@@ -364,7 +364,6 @@ static int rtasd(void *unused)
 	unsigned int err_type;
 	int cpu = 0;
 	int event_scan = rtas_token("event-scan");
-	cpumask_t all = CPU_MASK_ALL;
 	int rc;
 
 	daemonize("rtasd");
@@ -415,11 +414,11 @@ static int rtasd(void *unused)
 	}
 
 	lock_cpu_hotplug();
-	cpu = first_cpu_const(mk_cpumask_const(cpu_online_map));
+	cpu = first_cpu(cpu_online_map);
 	for (;;) {
 		set_cpus_allowed(current, cpumask_of_cpu(cpu));
 		do_event_scan(event_scan);
-		set_cpus_allowed(current, all);
+		set_cpus_allowed(current, CPU_MASK_ALL);
 
 		/* Drop hotplug lock, and sleep for a bit (at least
 		 * one second since some machines have problems if we
@@ -429,9 +428,9 @@ static int rtasd(void *unused)
 		schedule_timeout((HZ*60/rtas_event_scan_rate) / 2);
 		lock_cpu_hotplug();
 
-		cpu = next_cpu_const(cpu, mk_cpumask_const(cpu_online_map));
+		cpu = next_cpu(cpu, cpu_online_map);
 		if (cpu == NR_CPUS)
-			cpu = first_cpu_const(mk_cpumask_const(cpu_online_map));
+			cpu = first_cpu(cpu_online_map);
 	}
 
 error:

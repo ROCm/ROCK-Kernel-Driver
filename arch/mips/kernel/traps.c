@@ -234,6 +234,7 @@ void show_regs(struct pt_regs *regs)
 void show_registers(struct pt_regs *regs)
 {
 	show_regs(regs);
+	print_modules();
 	printk("Process %s (pid: %d, threadinfo=%p, task=%p)\n",
 	        current->comm, current->pid, current_thread_info(), current);
 	show_stack(current, (long *) regs->regs[29]);
@@ -278,47 +279,8 @@ void __declare_dbe_table(void)
 	);
 }
 
-#ifdef CONFIG_MDULES
-
-/* Given an address, look for it in the module exception tables. */
-const struct exception_table_entry *search_module_dbetables(unsigned long addr)
-{
-	unsigned long flags;
-	const struct exception_table_entry *e = NULL;
-	struct module *mod;
-
-	spin_lock_irqsave(&modlist_lock, flags);
-	list_for_each_entry(mod, &modules, list) {
-		if (mod->arch.num_dbeentries == 0)
-			continue;
-				
-		e = search_extable(mod->arch.dbe_table_start,
-				   mod->arch.dbe_table_end +
-		                   mod->arch.num_dbeentries - 1,
-				   addr);
-		if (e)
-			break;
-	}
-	spin_unlock_irqrestore(&modlist_lock, flags);
-
-	/* Now, if we found one, we are running inside it now, hence
-           we cannot unload the module, hence no refcnt needed. */
-	return e;
-}
-
-#else
-
 /* Given an address, look for it in the exception tables. */
-static inline const struct exception_table_entry *
-search_module_dbetables(unsigned long addr)
-{
-	return NULL;
-}
-
-#endif
-
-/* Given an address, look for it in the exception tables. */
-const struct exception_table_entry *search_dbe_tables(unsigned long addr)
+static const struct exception_table_entry *search_dbe_tables(unsigned long addr)
 {
 	const struct exception_table_entry *e;
 
@@ -745,11 +707,24 @@ asmlinkage void do_reserved(struct pt_regs *regs)
 static inline void parity_protection_init(void)
 {
 	switch (current_cpu_data.cputype) {
+	case CPU_24K:
+		/* 24K cache parity not currently implemented in FPGA */
+		printk(KERN_INFO "Disable cache parity protection for "
+		       "MIPS 24K CPU.\n");
+		write_c0_ecc(read_c0_ecc() & ~0x80000000);
+		break;
 	case CPU_5KC:
 		/* Set the PE bit (bit 31) in the c0_ecc register. */
-		printk(KERN_INFO "Enable the cache parity protection for "
-		       "MIPS 5KC CPUs.\n");
+		printk(KERN_INFO "Enable cache parity protection for "
+		       "MIPS 5KC/24K CPUs.\n");
 		write_c0_ecc(read_c0_ecc() | 0x80000000);
+		break;
+	case CPU_20KC:
+	case CPU_25KF:
+		/* Clear the DE bit (bit 16) in the c0_status register. */
+		printk(KERN_INFO "Enable cache parity protection for "
+		       "MIPS 20KC/25KF CPUs.\n");
+		clear_c0_status(ST0_DE);
 		break;
 	default:
 		break;

@@ -1,7 +1,7 @@
 /*
  *  rtc.c, RTC(has only timer function) routines for NEC VR4100 series.
  *
- *  Copyright (C) 2003  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  Copyright (C) 2003-2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -310,8 +310,12 @@ static void __init vr41xx_timer_setup(struct irqaction *irq)
 	setup_irq(ELAPSEDTIME_IRQ, irq);
 }
 
-void __init vr41xx_rtc_init(void)
+static int __init vr41xx_rtc_init(void)
 {
 	board_time_init = vr41xx_time_init;
 	board_timer_setup = vr41xx_timer_setup;
+
+	return 0;
 }
+
+early_initcall(vr41xx_rtc_init);

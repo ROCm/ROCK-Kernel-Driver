@@ -24,7 +24,7 @@
 
 extern asmlinkage void ddbIRQ(void);
 
-static struct irqaction irq_cascade = { no_action, 0, 0, "cascade", NULL, NULL };
+static struct irqaction irq_cascade = { no_action, 0, CPU_MASK_NONE, "cascade", NULL, NULL };
 
 #define M1543_PNP_CONFIG	0x03f0	/* PnP Config Port */
 #define M1543_PNP_INDEX		0x03f0	/* PnP Index Port */

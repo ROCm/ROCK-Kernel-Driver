@@ -206,7 +206,7 @@ int request_irq(unsigned int irq,
 
 	action->handler = handler;
 	action->flags = irqflags;
-	action->mask = 0;
+	cpus_clear(action->mask);
 	action->name = devname;
 	action->dev_id = dev_id;
 	action->next = NULL;
@@ -738,7 +738,6 @@ static int irq_affinity_write_proc (struct file *file, const char __user *buffer
 	irq_desc_t *desc = get_irq_desc(irq);
 	int ret;
 	cpumask_t new_value, tmp;
-	cpumask_t allcpus = CPU_MASK_ALL;
 
 	if (!desc->handler->set_affinity)
 		return -EIO;
@@ -753,7 +752,7 @@ static int irq_affinity_write_proc (struct file *file, const char __user *buffer
 	 * NR_CPUS == 32 and cpumask is a long), so we mask it here to
 	 * be consistent.
 	 */
-	cpus_and(new_value, new_value, allcpus);
+	cpus_and(new_value, new_value, CPU_MASK_ALL);
 
 	/*
 	 * Grab lock here so cpu_online_map can't change, and also

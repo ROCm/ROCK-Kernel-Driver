@@ -484,7 +484,7 @@ int scsi_debug_queuecommand(struct scsi_cmnd * SCpnt, done_funct_t done)
 	return schedule_resp(SCpnt, devip, done, errsts, scsi_debug_delay);
 }
 
-static int scsi_debug_ioctl(struct scsi_device *dev, int cmd, void *arg)
+static int scsi_debug_ioctl(struct scsi_device *dev, int cmd, void __user *arg)
 {
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts) {
 		printk(KERN_INFO "scsi_debug: ioctl: cmd=0x%x\n", cmd);

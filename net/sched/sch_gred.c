@@ -155,7 +155,7 @@ gred_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	if (!PSCHED_IS_PASTPERFECT(q->qidlestart)) {
 		long us_idle;
 		PSCHED_GET_TIME(now);
-		us_idle = PSCHED_TDIFF_SAFE(now, q->qidlestart, q->Scell_max, 0);
+		us_idle = PSCHED_TDIFF_SAFE(now, q->qidlestart, q->Scell_max, (void)0);
 		PSCHED_SET_PASTPERFECT(q->qidlestart);
 
 		q->qave >>= q->Stab[(us_idle>>q->Scell_log)&0xFF];
@@ -551,7 +551,7 @@ static int gred_dump(struct Qdisc *sch, struct sk_buff *skb)
 				long idle;
 				psched_time_t now;
 				PSCHED_GET_TIME(now);
-				idle = PSCHED_TDIFF_SAFE(now, q->qidlestart, q->Scell_max, 0);
+				idle = PSCHED_TDIFF_SAFE(now, q->qidlestart, q->Scell_max, (void)0);
 				qave  = q->qave >> q->Stab[(idle>>q->Scell_log)&0xFF];
 				dst->qave = qave >> q->Wlog;
 

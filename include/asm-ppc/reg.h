@@ -174,6 +174,7 @@
 
 #define SPRN_HID1	0x3F1		/* Hardware Implementation Register 1 */
 #define HID1_EMCP	(1<<31)		/* 7450 Machine Check Pin Enable */
+#define HID1_DFS	(1<<22)		/* 7447A Dynamic Frequency Scaling */
 #define HID1_PC0	(1<<16)		/* 7450 PLL_CFG[0] */
 #define HID1_PC1	(1<<15)		/* 7450 PLL_CFG[1] */
 #define HID1_PC2	(1<<14)		/* 7450 PLL_CFG[2] */

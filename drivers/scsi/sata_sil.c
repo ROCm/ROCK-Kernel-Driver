@@ -302,6 +302,7 @@ static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 		       ap->id, dev->devno);
 		ap->host->max_sectors = 15;
 		ap->host->hostt->max_sectors = 15;
+		dev->flags |= ATA_DFLAG_LOCK_SECTORS;
 		return;
 	}
 

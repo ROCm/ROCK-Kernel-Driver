@@ -201,7 +201,7 @@ affs_remove_link(struct dentry *dentry)
 			goto done;
 	}
 
-	while ((ino = be32_to_cpu(AFFS_TAIL(sb, bh)->link_chain))) {
+	while ((ino = be32_to_cpu(AFFS_TAIL(sb, bh)->link_chain)) != 0) {
 		if (ino == link_ino) {
 			ino = AFFS_TAIL(sb, link_bh)->link_chain;
 			AFFS_TAIL(sb, bh)->link_chain = ino;

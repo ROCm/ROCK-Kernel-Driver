@@ -73,8 +73,8 @@ extern int cyber2000fb_init(void);
 extern int cyber2000fb_setup(char*);
 extern int retz3fb_init(void);
 extern int retz3fb_setup(char*);
-extern int clgenfb_init(void);
-extern int clgenfb_setup(char*);
+extern int cirrusfb_init(void);
+extern int cirrusfb_setup(char*);
 extern int hitfb_init(void);
 extern int vfb_init(void);
 extern int vfb_setup(char*);
@@ -204,8 +204,8 @@ static struct {
 #ifdef CONFIG_FB_PM3
 	{ "pm3fb", pm3fb_init, pm3fb_setup },
 #endif           
-#ifdef CONFIG_FB_CLGEN
-	{ "clgenfb", clgenfb_init, clgenfb_setup },
+#ifdef CONFIG_FB_CIRRUS
+	{ "cirrusfb", cirrusfb_init, cirrusfb_setup },
 #endif
 #ifdef CONFIG_FB_ATY
 	{ "atyfb", atyfb_init, atyfb_setup },
@@ -721,6 +721,7 @@ int fb_show_logo(struct fb_info *info)
 	u32 *palette = NULL, *saved_pseudo_palette = NULL;
 	unsigned char *logo_new = NULL;
 	struct fb_image image;
+	struct fb_fillrect rect;
 	int x;
 
 	/* Return if the frame buffer is not mapped or suspended */
@@ -766,6 +767,12 @@ int fb_show_logo(struct fb_info *info)
 	image.height = fb_logo.logo->height;
 	image.dy = 0;
 
+	rect.dx = 0;
+	rect.dy = 0;
+	rect.color = 0;
+	rect.width = info->var.xres;
+	rect.height = fb_logo.logo->height;
+	info->fbops->fb_fillrect(info, &rect);
 	for (x = 0; x < num_online_cpus() * (fb_logo.logo->width + 8) &&
 	     x <= info->var.xres-fb_logo.logo->width; x += (fb_logo.logo->width + 8)) {
 		image.dx = x;
@@ -998,7 +1005,11 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 			fb_set_cmap(&info->cmap, 1, info);
 
-			notifier_call_chain(&fb_notifier_list, FB_EVENT_MODE_CHANGE, info);
+			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
+				notifier_call_chain(&fb_notifier_list,
+						    FB_EVENT_MODE_CHANGE, info);
+				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
+			}
 		}
 	}
 	return 0;
@@ -1049,7 +1060,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
 		acquire_console_sem();
+		info->flags |= FBINFO_MISC_MODECHANGEUSER;
 		i = fb_set_var(info, &var);
+		info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
 		release_console_sem();
 		if (i) return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
@@ -1104,11 +1117,10 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 #endif /* CONFIG_KMOD */
 		if (!registered_fb[con2fb.framebuffer])
 		    return -EINVAL;
-		if (con2fb.console != 0)
-			set_con2fb_map(con2fb.console-1, con2fb.framebuffer);
-		else
-			fb_console_init();		
-		return 0;
+		if (con2fb.console > 0 && con2fb.console < MAX_NR_CONSOLES)
+			return set_con2fb_map(con2fb.console-1,
+					      con2fb.framebuffer);
+		return -EINVAL;
 #endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
 		acquire_console_sem();

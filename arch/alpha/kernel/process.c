@@ -119,8 +119,8 @@ common_shutdown_1(void *generic_ptr)
 
 #ifdef CONFIG_SMP
 	/* Wait for the secondaries to halt. */
-	clear_bit(boot_cpuid, &cpu_present_mask);
-	while (cpu_present_mask)
+	cpu_clear(boot_cpuid, cpu_possible_map);
+	while (cpus_weight(cpu_possible_map))
 		barrier();
 #endif
 

@@ -206,7 +206,7 @@ static int map(mddev_t *mddev, mdk_rdev_t **rdevp)
 			*rdevp = rdev;
 			atomic_inc(&rdev->nr_pending);
 			spin_unlock_irq(&conf->device_lock);
-			return 0;
+			return i;
 		}
 	}
 	spin_unlock_irq(&conf->device_lock);
@@ -919,18 +919,22 @@ static void raid1d(mddev_t *mddev)
 
 		mddev = r1_bio->mddev;
 		conf = mddev_to_conf(mddev);
-		bio = r1_bio->master_bio;
 		if (test_bit(R1BIO_IsSync, &r1_bio->state)) {
 			sync_request_write(mddev, r1_bio);
 			unplug = 1;
 		} else {
-			if (map(mddev, &rdev) == -1) {
+			int disk;
+			bio = r1_bio->bios[r1_bio->read_disk];
+			if ((disk=map(mddev, &rdev)) == -1) {
 				printk(KERN_ALERT "raid1: %s: unrecoverable I/O"
 				       " read error for block %llu\n",
 				       bdevname(bio->bi_bdev,b),
 				       (unsigned long long)r1_bio->sector);
 				raid_end_bio_io(r1_bio);
 			} else {
+				r1_bio->bios[r1_bio->read_disk] = NULL;
+				r1_bio->read_disk = disk;
+				r1_bio->bios[r1_bio->read_disk] = bio;
 				printk(KERN_ERR "raid1: %s: redirecting sector %llu to"
 				       " another mirror\n",
 				       bdevname(rdev->bdev,b),

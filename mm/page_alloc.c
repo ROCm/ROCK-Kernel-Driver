@@ -38,7 +38,7 @@ DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
 struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
-int nr_swap_pages;
+long nr_swap_pages;
 int numnodes = 1;
 int sysctl_lower_zone_protection = 0;
 
@@ -293,6 +293,20 @@ void __free_pages_ok(struct page *page, unsigned int order)
 #define MARK_USED(index, order, area) \
 	__change_bit((index) >> (1+(order)), (area)->map)
 
+/*
+ * The order of subdivision here is critical for the IO subsystem.
+ * Please do not alter this order without good reasons and regression
+ * testing. Specifically, as large blocks of memory are subdivided,
+ * the order in which smaller blocks are delivered depends on the order
+ * they're subdivided in this function. This is the primary factor
+ * influencing the order in which pages are delivered to the IO
+ * subsystem according to empirical testing, and this is also justified
+ * by considering the behavior of a buddy system containing a single
+ * large block of memory acted on by a series of small allocations.
+ * This behavior is a critical factor in sglist merging's success.
+ *
+ * -- wli
+ */
 static inline struct page *
 expand(struct zone *zone, struct page *page,
 	 unsigned long index, int low, int high, struct free_area *area)
@@ -300,14 +314,12 @@ expand(struct zone *zone, struct page *page,
 	unsigned long size = 1 << high;
 
 	while (high > low) {
-		BUG_ON(bad_range(zone, page));
 		area--;
 		high--;
 		size >>= 1;
-		list_add(&page->lru, &area->free_list);
-		MARK_USED(index, high, area);
-		index += size;
-		page += size;
+		BUG_ON(bad_range(zone, &page[size]));
+		list_add(&page[size].lru, &area->free_list);
+		MARK_USED(index + size, high, area);
 	}
 	return page;
 }
@@ -1482,8 +1494,8 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 				zone_names[j], realsize, batch);
 		INIT_LIST_HEAD(&zone->active_list);
 		INIT_LIST_HEAD(&zone->inactive_list);
-		atomic_set(&zone->nr_scan_active, 0);
-		atomic_set(&zone->nr_scan_inactive, 0);
+		zone->nr_scan_active = 0;
+		zone->nr_scan_inactive = 0;
 		zone->nr_active = 0;
 		zone->nr_inactive = 0;
 		if (!size)

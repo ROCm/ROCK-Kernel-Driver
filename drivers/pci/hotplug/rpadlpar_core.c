@@ -24,25 +24,6 @@
 
 static DECLARE_MUTEX(rpadlpar_sem);
 
-static inline int is_hotplug_capable(struct device_node *dn)
-{
-	unsigned char *ptr = get_property(dn, "ibm,fw-pci-hot-plug-ctrl", NULL);
-
-	return (int) (ptr != NULL);
-}
-
-static char *get_node_drc_name(struct device_node *dn)
-{
-	char *ptr = NULL;
-	int *drc_names;
-
-	drc_names = (int *) get_property(dn, "ibm,drc-names", NULL);
-	if (drc_names)
-		ptr = (char *) &drc_names[1];
-
-	return ptr;
-}
-
 static struct device_node *find_php_slot_vio_node(char *drc_name)
 {
 	struct device_node *child;
@@ -53,9 +34,9 @@ static struct device_node *find_php_slot_vio_node(char *drc_name)
 		return NULL;
 
 	for (child = of_get_next_child(parent, NULL);
-	     child; child = of_get_next_child(parent, child)) {
+		child; child = of_get_next_child(parent, child)) {
 		loc_code = get_property(child, "ibm,loc-code", NULL);
-		if (loc_code && !strcmp(loc_code, drc_name))
+		if (loc_code && !strncmp(loc_code, drc_name, strlen(drc_name)))
 			return child;
 	}
 
@@ -69,7 +50,7 @@ static struct device_node *find_php_slot_pci_node(char *drc_name)
 
 	while ((np = of_find_node_by_type(np, "pci")))
 		if (is_hotplug_capable(np)) {
-			name = get_node_drc_name(np);
+			name = rpaphp_get_drc_name(np);
 			if (name && (!strcmp(drc_name, name)))
 				break;
 		}
@@ -324,6 +305,7 @@ int dlpar_remove_pci_slot(struct slot *slot, char *drc_name)
 	}
 
 	/* Remove pci bus */
+
 	if (dlpar_pci_remove_bus(bridge_dev)) {
 		printk(KERN_ERR "%s: unable to remove pci bus %s\n",
 			__FUNCTION__, drc_name);
@@ -364,7 +346,7 @@ int dlpar_remove_slot(char *drc_name)
 		rc = -EINVAL;
 		goto exit;
 	}
-
+	
 	switch (slot->dev_type) {
 		case PCI_DEV:
 			rc = dlpar_remove_pci_slot(slot, drc_name);

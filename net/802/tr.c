@@ -110,7 +110,7 @@ int tr_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
 	 */
 	if (type == ETH_P_IP || type == ETH_P_IPV6 || type == ETH_P_ARP)
 	{
-		struct trllc *trllc=(struct trllc *)(trh+1);
+		struct trllc *trllc;
 
 		hdr_len = sizeof(struct trh_hdr) + sizeof(struct trllc);
 		trh = (struct trh_hdr *)skb_push(skb, hdr_len);
