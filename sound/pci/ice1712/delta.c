@@ -189,19 +189,18 @@ static void delta_spdif_default_get(ice1712_t *ice, snd_ctl_elem_value_t * ucont
 
 static int delta_spdif_default_put(ice1712_t *ice, snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
 	val = snd_cs8403_encode_spdif_bits(&ucontrol->value.iec958);
-	spin_lock_irqsave(&ice->reg_lock, flags);
+	spin_lock_irq(&ice->reg_lock);
 	change = ice->spdif.cs8403_bits != val;
 	ice->spdif.cs8403_bits = val;
 	if (change && ice->playback_pro_substream == NULL) {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 		snd_ice1712_delta_cs8403_spdif_write(ice, val);
 	} else {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 	}
 	return change;
 }
@@ -213,19 +212,18 @@ static void delta_spdif_stream_get(ice1712_t *ice, snd_ctl_elem_value_t * ucontr
 
 static int delta_spdif_stream_put(ice1712_t *ice, snd_ctl_elem_value_t * ucontrol)
 {
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
 	val = snd_cs8403_encode_spdif_bits(&ucontrol->value.iec958);
-	spin_lock_irqsave(&ice->reg_lock, flags);
+	spin_lock_irq(&ice->reg_lock);
 	change = ice->spdif.cs8403_stream_bits != val;
 	ice->spdif.cs8403_stream_bits = val;
 	if (change && ice->playback_pro_substream != NULL) {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 		snd_ice1712_delta_cs8403_spdif_write(ice, val);
 	} else {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		spin_unlock_irq(&ice->reg_lock);
 	}
 	return change;
 }
@@ -385,9 +383,11 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA410:
 		ak->num_adcs = ak->num_dacs = 2;
 		ak->type = SND_AK4528;
+		ak->caddr = 2;
 		if (ice->eeprom.subvendor == ICE1712_SUBDEVICE_DELTA410) {
 			ak->num_dacs = 8;
 			ak->type = SND_AK4529;
+			ak->caddr = 0;
 		}
 		ak->cif = 0; /* the default level of the CIF pin from AK4528/4529 */
 		ak->data_mask = ICE1712_DELTA_AP_DOUT;
@@ -402,6 +402,7 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA1010LT:
 		ak->num_adcs = ak->num_dacs = 8;
 		ak->type = SND_AK4524;
+		ak->caddr = 2;
 		ak->cif = 0; /* the default level of the CIF pin from AK4524 */
 		ak->data_mask = ICE1712_DELTA_1010LT_DOUT;
 		ak->clk_mask = ICE1712_DELTA_1010LT_CCLK;
@@ -417,6 +418,7 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_DELTA44:
 		ak->num_adcs = ak->num_dacs = 4;
 		ak->type = SND_AK4524;
+		ak->caddr = 2;
 		ak->cif = 0; /* the default level of the CIF pin from AK4524 */
 		ak->data_mask = ICE1712_DELTA_CODEC_SERIAL_DATA;
 		ak->clk_mask = ICE1712_DELTA_CODEC_SERIAL_CLOCK;

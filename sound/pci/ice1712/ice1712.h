@@ -248,6 +248,7 @@ struct snd_ak4524 {
 	unsigned int cif: 1;
 	unsigned char data_mask;
 	unsigned char clk_mask;
+	unsigned char caddr;		/* C0 and C1 bits */
 	unsigned char cs_mask;
 	unsigned char cs_addr;
 	unsigned char cs_none;
@@ -335,7 +336,8 @@ struct _snd_ice1712 {
 	snd_i2c_device_t *cs8427;	/* CS8427 I2C device */
 	snd_i2c_device_t *i2cdevs[2];	/* additional i2c devices */
 	
-	unsigned char gpio_direction, gpio_write_mask;
+	unsigned int gpio_direction, gpio_write_mask;
+	int vt1724;
 };
 
 #define chip_t ice1712_t

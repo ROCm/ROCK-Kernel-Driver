@@ -291,21 +291,21 @@ static snd_pcm_hardware_t snd_rme32_playback_spdif_info = {
 			 SNDRV_PCM_INFO_MMAP_VALID |
 			 SNDRV_PCM_INFO_INTERLEAVED | 
 			 SNDRV_PCM_INFO_PAUSE),
-	formats:	(SNDRV_PCM_FMTBIT_S16_LE | 
+	.formats =	(SNDRV_PCM_FMTBIT_S16_LE | 
 			 SNDRV_PCM_FMTBIT_S32_LE),
-	rates:		(SNDRV_PCM_RATE_32000 |
+	.rates =	(SNDRV_PCM_RATE_32000 |
 			 SNDRV_PCM_RATE_44100 | 
 			 SNDRV_PCM_RATE_48000),
-	rate_min:	32000,
-	rate_max:	48000,
-	channels_min:	2,
-	channels_max:	2,
-	buffer_bytes_max: RME32_BUFFER_SIZE,
-	period_bytes_min: RME32_BLOCK_SIZE,
-	period_bytes_max: RME32_BLOCK_SIZE,
-	periods_min:	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	periods_max:	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	fifo_size:	0,
+	.rate_min =	32000,
+	.rate_max =	48000,
+	.channels_min =	2,
+	.channels_max =	2,
+	.buffer_bytes_max = RME32_BUFFER_SIZE,
+	.period_bytes_min = RME32_BLOCK_SIZE,
+	.period_bytes_max = RME32_BLOCK_SIZE,
+	.periods_min =	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.periods_max =	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.fifo_size =	0,
 };
 
 /*
@@ -315,19 +315,19 @@ static snd_pcm_hardware_t snd_rme32_capture_spdif_info = {
 	.info =		(SNDRV_PCM_INFO_MMAP |
 			 SNDRV_PCM_INFO_MMAP_VALID |
 			 SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_PAUSE),
-	formats:	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE),
-	rates:		(SNDRV_PCM_RATE_32000 |
+	.formats =	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE),
+	.rates =	(SNDRV_PCM_RATE_32000 |
 			 SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000),
-	rate_min:	32000,
-	rate_max:	48000,
-	channels_min:	2,
-	channels_max:	2,
-	buffer_bytes_max: RME32_BUFFER_SIZE,
-	period_bytes_min: RME32_BLOCK_SIZE,
-	period_bytes_max: RME32_BLOCK_SIZE,
-	periods_min:	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	periods_max:	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	fifo_size:	0,
+	.rate_min =	32000,
+	.rate_max =	48000,
+	.channels_min =	2,
+	.channels_max =	2,
+	.buffer_bytes_max = RME32_BUFFER_SIZE,
+	.period_bytes_min = RME32_BLOCK_SIZE,
+	.period_bytes_max = RME32_BLOCK_SIZE,
+	.periods_min =	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.periods_max =	RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.fifo_size =	0,
 };
 
 /*
@@ -339,19 +339,19 @@ static snd_pcm_hardware_t snd_rme32_playback_adat_info =
 			      SNDRV_PCM_INFO_MMAP_VALID |
 			      SNDRV_PCM_INFO_INTERLEAVED |
 			      SNDRV_PCM_INFO_PAUSE),
-	formats:             SNDRV_PCM_FMTBIT_S16_LE,
-	rates:	             (SNDRV_PCM_RATE_44100 | 
+	.formats=            SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =             (SNDRV_PCM_RATE_44100 | 
 			      SNDRV_PCM_RATE_48000),
-	rate_min:            44100,
-	rate_max:            48000,
-	channels_min:        8,
-	channels_max:	     8,
-	buffer_bytes_max:   RME32_BUFFER_SIZE,
-	period_bytes_min:   RME32_BLOCK_SIZE,
-	period_bytes_max:   RME32_BLOCK_SIZE,
-	periods_min:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	periods_max:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	fifo_size:	     0,
+	.rate_min =          44100,
+	.rate_max =          48000,
+	.channels_min =      8,
+	.channels_max =	     8,
+	.buffer_bytes_max =  RME32_BUFFER_SIZE,
+	.period_bytes_min =  RME32_BLOCK_SIZE,
+	.period_bytes_max =  RME32_BLOCK_SIZE,
+	.periods_min =	    RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.periods_max =	    RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.fifo_size =	    0,
 };
 
 /*
@@ -363,19 +363,19 @@ static snd_pcm_hardware_t snd_rme32_capture_adat_info =
 			      SNDRV_PCM_INFO_MMAP_VALID |
 			      SNDRV_PCM_INFO_INTERLEAVED |
 			      SNDRV_PCM_INFO_PAUSE),
-	formats:             SNDRV_PCM_FMTBIT_S16_LE,
-	rates:	             (SNDRV_PCM_RATE_44100 | 
+	.formats =           SNDRV_PCM_FMTBIT_S16_LE,
+	.rates =             (SNDRV_PCM_RATE_44100 | 
 			      SNDRV_PCM_RATE_48000),
-	rate_min:            44100,
-	rate_max:            48000,
-	channels_min:        8,
-	channels_max:	     8,
-	buffer_bytes_max:   RME32_BUFFER_SIZE,
-	period_bytes_min:   RME32_BLOCK_SIZE,
-	period_bytes_max:   RME32_BLOCK_SIZE,
-	periods_min:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	periods_max:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
-	fifo_size:           0,
+	.rate_min =          44100,
+	.rate_max =          48000,
+	.channels_min =	     8,
+	.channels_max =	     8,
+	.buffer_bytes_max =  RME32_BUFFER_SIZE,
+	.period_bytes_min =  RME32_BLOCK_SIZE,
+	.period_bytes_max =  RME32_BLOCK_SIZE,
+	.periods_min =	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.periods_max =	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	.fifo_size =         0,
 };
 
 static void snd_rme32_reset_dac(rme32_t *rme32)

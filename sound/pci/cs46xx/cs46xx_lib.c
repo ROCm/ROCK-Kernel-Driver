@@ -3689,7 +3689,7 @@ struct cs_card_type
 	void (*mixer_init)(cs46xx_t *);
 };
 
-static struct cs_card_type __initdata cards[] = {
+static struct cs_card_type __devinitdata cards[] = {
 	{0x1489, 0x7001, "Genius Soundmaker 128 value", NULL, amp_none, NULL, NULL},
 	{0x5053, 0x3357, "Voyetra", NULL, amp_voyetra, NULL, voyetra_mixer_init},
 	{0x1071, 0x6003, "Mitac MI6020/21", NULL, amp_voyetra, NULL, NULL},

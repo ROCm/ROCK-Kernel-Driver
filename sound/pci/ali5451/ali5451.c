@@ -529,7 +529,8 @@ static int snd_ali_reset_5451(ali_t *codec)
 		udelay(5000);
 	}
 
-	return -1;
+	snd_printk(KERN_WARNING "ali5451: reset time out\n");
+	return 0;
 }
 
 #ifdef CODEC_RESET
@@ -1999,14 +2000,10 @@ static int snd_ali_chip_init(ali_t *codec)
 
 	if (codec->revision == ALI_5451_V02) {
         	pci_dev = codec->pci_m1533;
-        	if (pci_dev == NULL)
-                	return -1;
 		pci_read_config_byte(pci_dev, 0x59, &temp);
 	
-		pci_dev = pci_find_device(0x10b9,0x7101, pci_dev);
-		if (pci_dev == NULL)
-                	return -1;
-		pci_read_config_byte(pci_dev,0xb8,&temp);
+		pci_dev = codec->pci_m7101;
+		pci_read_config_byte(pci_dev, 0xb8, &temp);
 		temp |= 1 << 6;
 		pci_write_config_byte(pci_dev, 0xB8, temp);
 	}
@@ -2139,10 +2136,22 @@ static int __devinit snd_ali_create(snd_card_t * card,
 	codec->chregs.data.aint   = 0x00;
 	codec->chregs.data.ainten = 0x00;
 
-       	pci_dev = pci_find_device(0x10b9,0x1533, pci_dev);
+	/* M1533: southbridge */
+       	pci_dev = pci_find_device(0x10b9, 0x1533, NULL);
 	codec->pci_m1533 = pci_dev;
-       	pci_dev = pci_find_device(0x10b9,0x7101, pci_dev);
+	if (! codec->pci_m1533) {
+		snd_printk(KERN_ERR "ali5451: cannot find ALi 1533 chip.\n");
+		snd_ali_free(codec);
+		return -ENODEV;
+	}
+	/* M7101: power management */
+       	pci_dev = pci_find_device(0x10b9, 0x7101, NULL);
 	codec->pci_m7101 = pci_dev;
+	if (! codec->pci_m7101) {
+		snd_printk(KERN_ERR "ali5451: cannot find ALi 7101 chip.\n");
+		snd_ali_free(codec);
+		return -ENODEV;
+	}
 
 	snd_ali_printk("snd_device_new is called.\n");
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, codec, &ops)) < 0) {

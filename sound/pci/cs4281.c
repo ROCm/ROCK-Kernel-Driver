@@ -1804,7 +1804,7 @@ static int snd_cs4281_midi_output_open(snd_rawmidi_substream_t * substream)
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->uartm |= CS4281_MODE_OUTPUT;
 	chip->midcr |= BA0_MIDCR_TXE;
-	chip->midi_input = substream;
+	chip->midi_output = substream;
 	if (!(chip->uartm & CS4281_MODE_INPUT)) {
 		snd_cs4281_midi_reset(chip);
 	} else {

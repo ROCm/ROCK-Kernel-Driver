@@ -161,6 +161,60 @@
 		.type = QUIRK_MIDI_YAMAHA
 	}
 },
+{
+	USB_DEVICE(0x0499, 0x1012),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Yamaha",
+		.product_name = "TYROS",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_MIDI_YAMAHA
+	}
+},
+{
+	USB_DEVICE(0x0499, 0x1013),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Yamaha",
+		.product_name = "PF-500",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_MIDI_YAMAHA
+	}
+},
+{
+	USB_DEVICE(0x0499, 0x1014),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Yamaha",
+		.product_name = "S90",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_MIDI_YAMAHA
+	}
+},
+{
+	USB_DEVICE(0x0499, 0x5002),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Yamaha",
+		.product_name = "DME32",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_MIDI_YAMAHA
+	}
+},
+{
+	USB_DEVICE(0x0499, 0x5003),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Yamaha",
+		.product_name = "DM2000",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_MIDI_YAMAHA
+	}
+},
+{
+	USB_DEVICE(0x0499, 0x5004),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Yamaha",
+		.product_name = "02R96",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_MIDI_YAMAHA
+	}
+},
 
 /*
  * Once upon a time people thought, "Wouldn't it be nice if there was a
