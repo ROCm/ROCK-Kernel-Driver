@@ -65,7 +65,8 @@ int sysctl_x25_reset_request_timeout   = X25_DEFAULT_T22;
 int sysctl_x25_clear_request_timeout   = X25_DEFAULT_T23;
 int sysctl_x25_ack_holdback_timeout    = X25_DEFAULT_T2;
 
-static struct sock *volatile x25_list /* = NULL initially */;
+static struct sock *x25_list;
+static rwlock_t x25_list_lock = RW_LOCK_UNLOCKED;
 
 static struct proto_ops x25_proto_ops;
 
@@ -152,22 +153,22 @@ int x25_addr_aton(unsigned char *p, struct x25_address *called_addr,
 static void x25_remove_socket(struct sock *sk)
 {
 	struct sock *s;
-	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	write_lock_bh(&x25_list_lock);
 
 	if ((s = x25_list) == sk)
 		x25_list = s->next;
 	else while (s && s->next) {
 		if (s->next == sk) {
 			s->next = sk->next;
+			sock_put(sk);
 			break;
 		}
 
 		s = s->next;
 	}
-	restore_flags(flags);
+
+	write_unlock_bh(&x25_list_lock);
 }
 
 /*
@@ -177,15 +178,20 @@ static void x25_kill_by_device(struct net_device *dev)
 {
 	struct sock *s;
 
+	write_lock_bh(&x25_list_lock);
+
 	for (s = x25_list; s; s = s->next)
 		if (x25_sk(s)->neighbour && x25_sk(s)->neighbour->dev == dev)
 			x25_disconnect(s, ENETUNREACH, 0, 0);
+
+	write_unlock_bh(&x25_list_lock);
 }
 
 /*
  *	Handle device status changes.
  */
-static int x25_device_event(struct notifier_block *this, unsigned long event, void *ptr)
+static int x25_device_event(struct notifier_block *this, unsigned long event,
+			    void *ptr)
 {
 	struct net_device *dev = ptr;
 	struct x25_neigh *nb;
@@ -222,15 +228,11 @@ static int x25_device_event(struct notifier_block *this, unsigned long event, vo
  */
 static void x25_insert_socket(struct sock *sk)
 {
-	unsigned long flags;
-
-	save_flags(flags);
-	cli();
-
+	write_lock_bh(&x25_list_lock);
 	sk->next = x25_list;
 	x25_list = sk;
-
-	restore_flags(flags);
+	sock_hold(sk);
+	write_unlock_bh(&x25_list_lock);
 }
 
 /*
@@ -239,11 +241,9 @@ static void x25_insert_socket(struct sock *sk)
  */
 static struct sock *x25_find_listener(struct x25_address *addr)
 {
-	unsigned long flags;
 	struct sock *s;
 
-	save_flags(flags);
-	cli();
+	read_lock_bh(&x25_list_lock);
 
 	for (s = x25_list; s; s = s->next)
 		if ((!strcmp(addr->x25_addr, x25_sk(s)->source_addr.x25_addr) ||
@@ -251,26 +251,34 @@ static struct sock *x25_find_listener(struct x25_address *addr)
 		     s->state == TCP_LISTEN)
 			break;
 
-	restore_flags(flags);
+	if (s)
+		sock_hold(s);
+	read_unlock_bh(&x25_list_lock);
 	return s;
 }
 
 /*
  *	Find a connected X.25 socket given my LCI and neighbour.
  */
-struct sock *x25_find_socket(unsigned int lci, struct x25_neigh *nb)
+struct sock *__x25_find_socket(unsigned int lci, struct x25_neigh *nb)
 {
 	struct sock *s;
-	unsigned long flags;
-
-	save_flags(flags);
-	cli();
 
 	for (s = x25_list; s; s = s->next)
 		if (x25_sk(s)->lci == lci && x25_sk(s)->neighbour == nb)
 			break;
+	if (s)
+		sock_hold(s);
+	return s;
+}
 
-	restore_flags(flags);
+struct sock *x25_find_socket(unsigned int lci, struct x25_neigh *nb)
+{
+	struct sock *s;
+
+	read_lock_bh(&x25_list_lock);
+	s = __x25_find_socket(lci, nb);
+	read_unlock_bh(&x25_list_lock);
 	return s;
 }
 
@@ -280,13 +288,19 @@ struct sock *x25_find_socket(unsigned int lci, struct x25_neigh *nb)
 unsigned int x25_new_lci(struct x25_neigh *nb)
 {
 	unsigned int lci = 1;
+	struct sock *sk;
 
-	while (x25_find_socket(lci, nb))
+	read_lock_bh(&x25_list_lock);
+
+	while ((sk = __x25_find_socket(lci, nb)) != NULL) {
+		sock_put(sk);
 		if (++lci == 4096) {
 			lci = 0;
 			break;
 		}
+	}
 
+	read_unlock_bh(&x25_list_lock);
 	return lci;
 }
 
@@ -312,11 +326,9 @@ static void x25_destroy_timer(unsigned long data)
 void x25_destroy_socket(struct sock *sk)	/* Not static as it's used by the timer */
 {
 	struct sk_buff *skb;
-	unsigned long flags;
 
-	save_flags(flags);
-	cli();
-
+	sock_hold(sk);
+	lock_sock(sk);
 	x25_stop_heartbeat(sk);
 	x25_stop_timer(sk);
 
@@ -344,8 +356,8 @@ void x25_destroy_socket(struct sock *sk)	/* Not static as it's used by the timer
 		sk_free(sk);
 		MOD_DEC_USE_COUNT;
 	}
-
-	restore_flags(flags);
+	release_sock(sk);
+	sock_put(sk);
 }
 
 /*
@@ -590,6 +602,35 @@ static int x25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	return 0;
 }
 
+static int x25_wait_for_connection_establishment(struct sock *sk)
+{
+	DECLARE_WAITQUEUE(wait, current);
+        int rc;
+
+	add_wait_queue_exclusive(sk->sleep, &wait);
+	for (;;) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		rc = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		rc = sock_error(sk);
+		if (rc) {
+			sk->socket->state = SS_UNCONNECTED;
+			break;
+		}
+		rc = 0;
+		if (sk->state != TCP_ESTABLISHED) {
+			release_sock(sk);
+			schedule();
+			lock_sock(sk);
+		} else
+			break;
+	}
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue(sk->sleep, &wait);
+	return rc;
+}
+
 static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len, int flags)
 {
 	struct sock *sk = sock->sk;
@@ -598,6 +639,7 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	struct x25_route *rt;
 	int rc = 0;
 
+	lock_sock(sk);
 	if (sk->state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
 		sock->state = SS_CONNECTED;
 		goto out;	/* Connect completed during a ERESTARTSYS event */
@@ -661,35 +703,48 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
 		goto out_put_neigh;
 
-	cli();	/* To avoid races on the sleep */
-
-	/*
-	 * A Clear Request or timeout or failed routing will go to closed.
-	 */
-	rc = -ERESTARTSYS;
-	while (sk->state == TCP_SYN_SENT) {
-		/* FIXME: going to sleep with interrupts disabled */
-		interruptible_sleep_on(sk->sleep);
-		if (signal_pending(current))
-			goto out_unlock;
-	}
-
-	if (sk->state != TCP_ESTABLISHED) {
-		sock->state = SS_UNCONNECTED;
-		rc = sock_error(sk);	/* Always set at this point */
-		goto out_unlock;
-	}
+	rc = x25_wait_for_connection_establishment(sk);
+	if (rc)
+		goto out_put_neigh;
 
 	sock->state = SS_CONNECTED;
 	rc = 0;
-out_unlock:
-	sti();
 out_put_neigh:
 	if (rc)
 		x25_neigh_put(x25->neighbour);
 out_put_route:
 	x25_route_put(rt);
 out:
+	release_sock(sk);
+	return rc;
+}
+
+static int x25_wait_for_data(struct sock *sk, int timeout)
+{
+	DECLARE_WAITQUEUE(wait, current);
+	int rc = 0;
+
+	add_wait_queue_exclusive(sk->sleep, &wait);
+	for (;;) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		if (sk->shutdown & RCV_SHUTDOWN)
+			break;
+		rc = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		rc = -EAGAIN;
+		if (!timeout)
+			break;
+		rc = 0;
+		if (skb_queue_empty(&sk->receive_queue)) {
+			release_sock(sk);
+			timeout = schedule_timeout(timeout);
+			lock_sock(sk);
+		} else
+			break;
+	}
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue(sk->sleep, &wait);
 	return rc;
 }
 	
@@ -707,29 +762,17 @@ static int x25_accept(struct socket *sock, struct socket *newsock, int flags)
 	if (sk->type != SOCK_SEQPACKET)
 		goto out;
 
-	/*
-	 *	The write queue this time is holding sockets ready to use
-	 *	hooked into the CALL INDICATION we saved
-	 */
-	do {
-		cli();
-		if ((skb = skb_dequeue(&sk->receive_queue)) == NULL) {
-			rc = -EWOULDBLOCK;
-			if (flags & O_NONBLOCK)
-				goto out_unlock;
-			/* FIXME: going to sleep with interrupts disabled */
-			interruptible_sleep_on(sk->sleep);
-			rc = -ERESTARTSYS;
-			if (signal_pending(current))
-				goto out_unlock;
-		}
-	} while (!skb);
-
+	rc = x25_wait_for_data(sk, sk->rcvtimeo);
+	if (rc)
+		goto out;
+	skb = skb_dequeue(&sk->receive_queue);
+	rc = -EINVAL;
+	if (!skb->sk)
+		goto out;
 	newsk	      = skb->sk;
 	newsk->pair   = NULL;
 	newsk->socket = newsock;
 	newsk->sleep  = &newsock->wait;
-	sti();
 
 	/* Now attach up the new socket */
 	skb->sk = NULL;
@@ -740,9 +783,6 @@ static int x25_accept(struct socket *sock, struct socket *newsock, int flags)
 	rc = 0;
 out:
 	return rc;
-out_unlock:
-	sti();
-	goto out;
 }
 
 static int x25_getname(struct socket *sock, struct sockaddr *uaddr, int *uaddr_len, int peer)
@@ -799,7 +839,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb, unsigned int 
 	 *	Try to reach a compromise on the requested facilities.
 	 */
 	if ((len = x25_negotiate_facilities(skb, sk, &facilities)) == -1)
-		goto out_clear_request;
+		goto out_sock_put;
 
 	/*
 	 * current neighbour/link might impose additional limits
@@ -813,7 +853,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb, unsigned int 
 	 */
 	make = x25_make_new(sk);
 	if (!make)
-		goto out_clear_request;
+		goto out_sock_put;
 
 	/*
 	 *	Remove the facilities, leaving any Call User Data.
@@ -855,8 +895,11 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb, unsigned int 
 	if (!sk->dead)
 		sk->data_ready(sk, skb->len);
 	rc = 1;
+	sock_put(sk);
 out:
 	return rc;
+out_sock_put:
+	sock_put(sk);
 out_clear_request:
 	rc = 0;
 	x25_transmit_clear_request(nb, lci, 0x01);
@@ -1264,14 +1307,12 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 	struct sock *s;
 	struct net_device *dev;
 	const char *devname;
-	int len;
 	off_t pos = 0;
 	off_t begin = 0;
+	int len = sprintf(buffer, "dest_addr  src_addr   dev   lci st vs vr "
+				  "va   t  t2 t21 t22 t23 Snd-Q Rcv-Q inode\n");
 
-	cli();
-
-	len = sprintf(buffer, "dest_addr  src_addr   dev   lci st vs vr va   "
-			      "t  t2 t21 t22 t23 Snd-Q Rcv-Q inode\n");
+	read_lock_bh(&x25_list_lock);
 
 	for (s = x25_list; s; s = s->next) {
 		struct x25_opt *x25 = x25_sk(s);
@@ -1314,7 +1355,7 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 			break;
 	}
 
-	sti();
+	read_unlock_bh(&x25_list_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
@@ -1368,9 +1409,13 @@ void x25_kill_by_neigh(struct x25_neigh *nb)
 {
 	struct sock *s;
 
+	write_lock_bh(&x25_list_lock);
+
 	for (s = x25_list; s; s = s->next)
 		if (x25_sk(s)->neighbour == nb)
 			x25_disconnect(s, ENETUNREACH, 0, 0);
+
+	write_unlock_bh(&x25_list_lock);
 }
 
 static int __init x25_init(void)
