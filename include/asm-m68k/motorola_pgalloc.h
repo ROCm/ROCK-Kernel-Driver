@@ -1,6 +1,8 @@
 #ifndef _MOTOROLA_PGALLOC_H
 #define _MOTOROLA_PGALLOC_H
 
+#include <asm/tlbflush.h>
+
 extern struct pgtable_cache_struct {
 	unsigned long *pmd_cache;
 	unsigned long *pte_cache;
@@ -20,21 +22,6 @@ extern pmd_t *get_pmd_slow(pgd_t *pgd, unsigned long offset);
 
 extern pmd_t *get_pointer_table(void);
 extern int free_pointer_table(pmd_t *);
-
-
-extern inline void flush_tlb_kernel_page(unsigned long addr)
-{
-	if (CPU_IS_040_OR_060) {
-		mm_segment_t old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		__asm__ __volatile__(".chip 68040\n\t"
-				     "pflush (%0)\n\t"
-				     ".chip 68k"
-				     : : "a" (addr));
-		set_fs(old_fs);
-	} else
-		__asm__ __volatile__("pflush #4,#4,(%0)" : : "a" (addr));
-}
 
 
 extern inline pte_t *get_pte_fast(void)
@@ -184,74 +171,5 @@ extern inline void set_pgdir(unsigned long address, pgd_t entry)
 {
 }
 
-
-/*
- * flush all user-space atc entries.
- */
-static inline void __flush_tlb(void)
-{
-	if (CPU_IS_040_OR_060)
-		__asm__ __volatile__(".chip 68040\n\t"
-				     "pflushan\n\t"
-				     ".chip 68k");
-	else
-		__asm__ __volatile__("pflush #0,#4");
-}
-
-static inline void __flush_tlb040_one(unsigned long addr)
-{
-	__asm__ __volatile__(".chip 68040\n\t"
-			     "pflush (%0)\n\t"
-			     ".chip 68k"
-			     : : "a" (addr));
-}
-
-static inline void __flush_tlb_one(unsigned long addr)
-{
-	if (CPU_IS_040_OR_060)
-		__flush_tlb040_one(addr);
-	else
-		__asm__ __volatile__("pflush #0,#4,(%0)" : : "a" (addr));
-}
-
-#define flush_tlb() __flush_tlb()
-
-/*
- * flush all atc entries (both kernel and user-space entries).
- */
-static inline void flush_tlb_all(void)
-{
-	if (CPU_IS_040_OR_060)
-		__asm__ __volatile__(".chip 68040\n\t"
-				     "pflusha\n\t"
-				     ".chip 68k");
-	else
-		__asm__ __volatile__("pflusha");
-}
-
-static inline void flush_tlb_mm(struct mm_struct *mm)
-{
-	if (mm == current->mm)
-		__flush_tlb();
-}
-
-static inline void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
-{
-	if (vma->vm_mm == current->mm)
-		__flush_tlb_one(addr);
-}
-
-static inline void flush_tlb_range(struct vm_area_struct *vma,
-				   unsigned long start, unsigned long end)
-{
-	if (vma->vm_mm == current->mm)
-		__flush_tlb();
-}
-
-
-extern inline void flush_tlb_pgtables(struct mm_struct *mm,
-				      unsigned long start, unsigned long end)
-{
-}
 
 #endif /* _MOTOROLA_PGALLOC_H */

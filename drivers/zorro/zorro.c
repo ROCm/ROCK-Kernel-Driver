@@ -124,13 +124,13 @@ static struct resource __init *zorro_find_parent_resource(struct zorro_dev *z)
      *  Initialization
      */
 
-void __init zorro_init(void)
+static int __init zorro_init(void)
 {
     struct zorro_dev *dev;
     u_int i;
 
     if (!MACH_IS_AMIGA || !AMIGAHW_PRESENT(ZORRO))
-	return;
+	return 0;
 
     printk("Zorro: Probing AutoConfig expansion devices: %d device%s\n",
 	   zorro_num_autocon, zorro_num_autocon == 1 ? "" : "s");
@@ -168,6 +168,8 @@ void __init zorro_init(void)
 	if (m68k_memory[i].addr < 16*1024*1024)
 	    mark_region(m68k_memory[i].addr,
 			m68k_memory[i].addr+m68k_memory[i].size, 0);
+
+    return 0;
 }
 
 subsys_initcall(zorro_init);

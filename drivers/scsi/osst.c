@@ -16,15 +16,15 @@
   Copyright 1992 - 2000 Kai Makisara
 		 email Kai.Makisara@metla.fi
 
-  $Header: /home/cvsroot/Driver/osst.c,v 1.61 2001/06/03 21:55:12 riede Exp $
+  $Header: /home/cvsroot/Driver/osst.c,v 1.65 2001/11/11 20:38:56 riede Exp $
 
   Microscopic alterations - Rik Ling, 2000/12/21
   Last modified: Wed Feb  2 22:04:05 2000 by makisara@kai.makisara.local
   Some small formal changes - aeb, 950809
 */
 
-static const char * cvsid = "$Id: osst.c,v 1.61 2001/06/03 21:55:12 riede Exp $";
-const char * osst_version = "0.9.8";
+static const char * cvsid = "$Id: osst.c,v 1.65 2001/11/11 20:38:56 riede Exp $";
+const char * osst_version = "0.9.10";
 
 /* The "failure to reconnect" firmware bug */
 #define OSST_FW_NEED_POLL_MIN 10601 /*(107A)*/
@@ -226,20 +226,20 @@ static int osst_chk_result(OS_Scsi_Tape * STp, Scsi_Request * SRpnt)
 		 SRpnt->sr_cmnd[0] != MODE_SENSE &&
 		 SRpnt->sr_cmnd[0] != TEST_UNIT_READY)) { /* Abnormal conditions for tape */
 		if (driver_byte(result) & DRIVER_SENSE) {
-			printk(KERN_WARNING "osst%d:W: Error with sense data: ", dev);
-			print_req_sense("osst", SRpnt);
+			printk(KERN_WARNING "osst%d:W: Command with sense data: ", dev);
+			print_req_sense("osst:", SRpnt);
 		}
 		else {
 			static	int	notyetprinted = 1;
 
 			printk(KERN_WARNING
-			     "osst%d:W: Error %x (sugg. bt 0x%x, driver bt 0x%x, host bt 0x%x).\n",
+			     "osst%d:W: Warning %x (sugg. bt 0x%x, driver bt 0x%x, host bt 0x%x).\n",
 			     dev, result, suggestion(result), driver_byte(result) & DRIVER_MASK,
 			     host_byte(result));
 			if (notyetprinted) {
 				notyetprinted = 0;
 				printk(KERN_INFO
-					"osst%d:I: This error may be caused by your scsi controller,\n", dev);
+					"osst%d:I: This warning may be caused by your scsi controller,\n", dev);
 				printk(KERN_INFO
 					"osst%d:I: it has been reported with some Buslogic cards.\n", dev);
 			}
@@ -271,11 +271,10 @@ static int osst_chk_result(OS_Scsi_Tape * STp, Scsi_Request * SRpnt)
 /* Wakeup from interrupt */
 static void osst_sleep_done (Scsi_Cmnd * SCpnt)
 {
-	unsigned int dev;
+	unsigned int dev = TAPE_NR(SCpnt->request.rq_dev);
 	OS_Scsi_Tape * STp;
 
-	if ((dev = TAPE_NR(SCpnt->request.rq_dev)) < osst_template.nr_dev) {
-		STp = os_scsi_tapes[dev];
+	if (os_scsi_tapes && (STp = os_scsi_tapes[dev])) {
 		if ((STp->buffer)->writing &&
 		    (SCpnt->sense_buffer[0] & 0x70) == 0x70 &&
 		    (SCpnt->sense_buffer[2] & 0x40)) {
@@ -482,7 +481,8 @@ static int osst_verify_frame(OS_Scsi_Tape * STp, int frame_seq_number, int quiet
 				memset(page_address(STp->buffer->sg[i].page),
 				       0, STp->buffer->sg[i].length);
 			strcpy(STp->buffer->b_data, "READ ERROR ON FRAME");
-		}
+                } else
+			STp->buffer->buffer_bytes = OS_FRAME_SIZE;
 		return 1;
 	}
 	if (STp->buffer->syscall_result) {
@@ -621,8 +621,10 @@ static int osst_wait_ready(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, unsigned 
 	if (!SRpnt) return (-EBUSY);
 
 	while ( STp->buffer->syscall_result && time_before(jiffies, startwait + timeout*HZ) &&
-		SRpnt->sr_sense_buffer[2]  == 2 && SRpnt->sr_sense_buffer[12] == 4          &&
-	       (SRpnt->sr_sense_buffer[13] == 1 || SRpnt->sr_sense_buffer[13] == 8)         ) {
+	       (( SRpnt->sr_sense_buffer[2]  == 2 && SRpnt->sr_sense_buffer[12] == 4    &&
+		 (SRpnt->sr_sense_buffer[13] == 1 || SRpnt->sr_sense_buffer[13] == 8)    ) ||
+		( SRpnt->sr_sense_buffer[2]  == 6 && SRpnt->sr_sense_buffer[12] == 0x28 &&
+		  SRpnt->sr_sense_buffer[13] == 0                                        )  )) {
 #if DEBUG
 	    if (debugging) {
 		printk(OSST_DEB_MSG "osst%d:D: Sleeping in onstream wait ready\n", dev);
@@ -630,7 +632,7 @@ static int osst_wait_ready(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, unsigned 
 		debugging = 0;
 	    }
 #endif
-	    current->state = TASK_INTERRUPTIBLE;
+	    set_current_state(TASK_INTERRUPTIBLE);
 	    schedule_timeout(HZ / 10);
 
 	    memset(cmd, 0, MAX_COMMAND_SIZE);
@@ -656,6 +658,66 @@ static int osst_wait_ready(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, unsigned 
 	printk(OSST_DEB_MSG "osst%d:D: Normal exit from onstream wait ready\n", dev);
 #endif
 	return 0;
+}
+
+/*
+ * Wait for a tape to be inserted in the unit
+ */
+static int osst_wait_for_medium(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, unsigned timeout)
+{
+	unsigned char	cmd[MAX_COMMAND_SIZE];
+	Scsi_Request  * SRpnt;
+	long		startwait = jiffies;
+#if DEBUG
+	int		dbg = debugging;
+	int		dev  = TAPE_NR(STp->devt);
+
+	printk(OSST_DEB_MSG "osst%d:D: Reached onstream wait for medium\n", dev);
+#endif
+
+	memset(cmd, 0, MAX_COMMAND_SIZE);
+	cmd[0] = TEST_UNIT_READY;
+
+	SRpnt = osst_do_scsi(*aSRpnt, STp, cmd, 0, SCSI_DATA_NONE, STp->timeout, MAX_READY_RETRIES, TRUE);
+	*aSRpnt = SRpnt;
+	if (!SRpnt) return (-EBUSY);
+
+	while ( STp->buffer->syscall_result && time_before(jiffies, startwait + timeout*HZ) &&
+		SRpnt->sr_sense_buffer[2]  == 2 && SRpnt->sr_sense_buffer[12] == 0x3a       &&
+	        SRpnt->sr_sense_buffer[13] == 0                                             ) {
+#if DEBUG
+	    if (debugging) {
+		printk(OSST_DEB_MSG "osst%d:D: Sleeping in onstream wait medium\n", dev);
+		printk(OSST_DEB_MSG "osst%d:D: Turning off debugging for a while\n", dev);
+		debugging = 0;
+	    }
+#endif
+	    set_current_state(TASK_INTERRUPTIBLE);
+	    schedule_timeout(HZ / 10);
+
+	    memset(cmd, 0, MAX_COMMAND_SIZE);
+	    cmd[0] = TEST_UNIT_READY;
+
+	    SRpnt = osst_do_scsi(SRpnt, STp, cmd, 0, SCSI_DATA_NONE, STp->timeout, MAX_READY_RETRIES, TRUE);
+	}
+	*aSRpnt = SRpnt;
+#if DEBUG
+	debugging = dbg;
+#endif
+	if ( STp->buffer->syscall_result     && SRpnt->sr_sense_buffer[2]  != 2 &&
+	     SRpnt->sr_sense_buffer[12] != 4 && SRpnt->sr_sense_buffer[13] == 1) {
+#if DEBUG
+	    printk(OSST_DEB_MSG "osst%d:D: Abnormal exit from onstream wait medium\n", dev);
+	    printk(OSST_DEB_MSG "osst%d:D: Result = %d, Sense: 0=%02x, 2=%02x, 12=%02x, 13=%02x\n", dev,
+			STp->buffer->syscall_result, SRpnt->sr_sense_buffer[0], SRpnt->sr_sense_buffer[2],
+			SRpnt->sr_sense_buffer[12], SRpnt->sr_sense_buffer[13]);
+#endif
+	    return 0;
+	}
+#if DEBUG
+	printk(OSST_DEB_MSG "osst%d:D: Normal exit from onstream wait medium\n", dev);
+#endif
+	return 1;
 }
 
 static int osst_position_tape_and_confirm(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, int frame)
@@ -696,7 +758,7 @@ static int osst_flush_drive_buffer(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt)
 		result = osst_write_error_recovery(STp, aSRpnt, 0);
 
 	result |= osst_wait_ready(STp, aSRpnt, 5 * 60);
-	STp->ps[STp->partition].rw = ST_IDLE;
+	STp->ps[STp->partition].rw = OS_WRITING_COMPLETE;
 	return (result);
 }
 
@@ -745,7 +807,7 @@ static int osst_wait_frame(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, int curr,
 			notyetprinted--;
 		}
 #endif
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout (HZ / OSST_POLL_PER_SEC);
 	}
 #if DEBUG
@@ -903,6 +965,8 @@ static int osst_get_logical_frame(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, in
 #endif
 		if ( osst_initiate_read(STp, aSRpnt)
                 || ( (!STp->frame_in_buffer) && osst_read_frame(STp, aSRpnt, 30) ) ) {
+			if (STp->raw)
+				return (-EIO);
 			position = osst_get_frame_position(STp, aSRpnt);
 			if (position >= 0xbae && position < 0xbb8)
 				position = 0xbb8;
@@ -968,7 +1032,7 @@ static int osst_get_logical_frame(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, in
 	if (cnt > 1) {
 		STp->recover_count++;
 		STp->recover_erreg++;
-		printk(KERN_WARNING "osst%d:I: Read error at position %d recovered\n", 
+		printk(KERN_WARNING "osst%d:I: Don't worry, Read error at position %d recovered\n", 
 					dev, STp->read_error_frame);
  	}
 	STp->read_count++;
@@ -1525,7 +1589,10 @@ static int osst_write_error_recovery(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt,
 			retval = osst_reposition_and_retry(STp, aSRpnt, frame, skip, pending);
 		else
 			retval = osst_read_back_buffer_and_rewrite(STp, aSRpnt, frame, skip, pending);
-		printk(KERN_WARNING "osst%d:I: Write error%srecovered\n", dev, retval?" not ":" ");
+		printk(KERN_WARNING "osst%d:%s: %sWrite error%srecovered\n", dev,
+			       	retval?"E"    :"I",
+			       	retval?""     :"Don't worry, ",
+			       	retval?" not ":" ");
 		break;
 	   case OS_WRITE_LAST_MARK:
 		printk(KERN_ERR "osst%d:E: Bad frame in update last marker, fatal\n", dev);
@@ -1596,7 +1663,7 @@ static int osst_space_over_filemarks_backward(OS_Scsi_Tape * STp, Scsi_Request *
 			       mt_count, last_mark_ppos);
 #endif
 		if (last_mark_ppos > 10 && last_mark_ppos < STp->eod_frame_ppos) {
-			osst_set_frame_position(STp, aSRpnt, last_mark_ppos, 0);
+			osst_position_tape_and_confirm(STp, aSRpnt, last_mark_ppos);
 			if (osst_get_logical_frame(STp, aSRpnt, -1, 0) < 0) {
 #if DEBUG
 				printk(OSST_DEB_MSG 
@@ -1628,7 +1695,7 @@ static int osst_space_over_filemarks_backward(OS_Scsi_Tape * STp, Scsi_Request *
 #if DEBUG
 		printk(OSST_DEB_MSG "osst%d:D: Positioning to last mark at %d\n", dev, last_mark_ppos);
 #endif
-		osst_set_frame_position(STp, aSRpnt, last_mark_ppos, 0);
+		osst_position_tape_and_confirm(STp, aSRpnt, last_mark_ppos);
 		cnt++;
 		if (osst_get_logical_frame(STp, aSRpnt, -1, 0) < 0) {
 #if DEBUG
@@ -1755,7 +1822,7 @@ static int osst_space_over_filemarks_forward_fast(OS_Scsi_Tape * STp, Scsi_Reque
 #endif
 			return osst_space_over_filemarks_forward_slow(STp, aSRpnt, mt_op, mt_count);
 		} else {
-			osst_set_frame_position(STp, aSRpnt, next_mark_ppos, 0);
+			osst_position_tape_and_confirm(STp, aSRpnt, next_mark_ppos);
 			if (osst_get_logical_frame(STp, aSRpnt, -1, 0) < 0) {
 #if DEBUG
 				printk(OSST_DEB_MSG "osst%d:D: Couldn't get logical blk num in space_filemarks\n",
@@ -1795,7 +1862,7 @@ static int osst_space_over_filemarks_forward_fast(OS_Scsi_Tape * STp, Scsi_Reque
 #endif
 					return osst_space_over_filemarks_forward_slow(STp, aSRpnt, mt_op, mt_count);
 				}
-				osst_set_frame_position(STp, aSRpnt, STp->first_mark_ppos, 0);
+				osst_position_tape_and_confirm(STp, aSRpnt, STp->first_mark_ppos);
 				if (osst_get_logical_frame(STp, aSRpnt, -1, 0) < 0) {
 #if DEBUG
 					printk(OSST_DEB_MSG
@@ -1827,7 +1894,7 @@ static int osst_space_over_filemarks_forward_fast(OS_Scsi_Tape * STp, Scsi_Reque
 #if DEBUG
 			else printk(OSST_DEB_MSG "osst%d:D: Positioning to next mark at %d\n", dev, next_mark_ppos);
 #endif
-			osst_set_frame_position(STp, aSRpnt, next_mark_ppos, 0);
+			osst_position_tape_and_confirm(STp, aSRpnt, next_mark_ppos);
 			cnt++;
 			if (osst_get_logical_frame(STp, aSRpnt, -1, 0) < 0) {
 #if DEBUG
@@ -2464,7 +2531,7 @@ static int osst_configure_onstream(OS_Scsi_Tape *STp, Scsi_Request ** aSRpnt)
 	}
 
 #if DEBUG
-	printk(KERN_INFO "osst%d:D: Block Size changed to 32.5K\n", dev);
+	printk(KERN_INFO "osst%d:D: Drive Block Size changed to 32.5K\n", dev);
 	 /*
 	 * In debug mode, we want to see as many errors as possible
 	 * to test the error recovery mechanism.
@@ -3402,6 +3469,7 @@ static ssize_t osst_read(struct file * filp, char * buf, size_t count, loff_t *p
 		if (retval)
 			goto out;
 		STps->rw = ST_IDLE;
+		/* FIXME -- this may leave the tape without EOD and up2date headers */
 	}
 
 	if ((count % STp->block_size) != 0) {
@@ -3814,6 +3882,10 @@ static int osst_int_ioctl(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, unsigned i
 			ioctl_result = osst_flush_write_buffer(STp, &SRpnt);
 		 else
 			ioctl_result = 0;
+#if DEBUG
+		 if (debugging) 
+			   printk(OSST_DEB_MSG "osst%d:D: Writing %ld filemark(s).\n", dev, arg);
+#endif
 		 for (i=0; i<arg; i++)
 			ioctl_result |= osst_write_filemark(STp, &SRpnt);
 		 if (fileno >= 0) fileno += arg;
@@ -3833,14 +3905,9 @@ static int osst_int_ioctl(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, unsigned i
 		 cmd[4] = arg;
 		 timeout = STp->timeout;
 #if DEBUG
-		 if (debugging) {
-			if (cmd_in == MTWEOF)
-			   printk(OSST_DEB_MSG "osst%d:D: Writing %d filemarks.\n", dev,
+		 if (debugging) 
+			   printk(OSST_DEB_MSG "osst%d:D: Writing %d setmark(s).\n", dev,
 				  cmd[2] * 65536 + cmd[3] * 256 + cmd[4]);
-			else
-			   printk(OSST_DEB_MSG "osst%d:D: Writing %d setmarks.\n", dev,
-				  cmd[2] * 65536 + cmd[3] * 256 + cmd[4]);
-		 }
 #endif
 		 if (fileno >= 0)
 			fileno += arg;
@@ -3853,8 +3920,12 @@ static int osst_int_ioctl(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, unsigned i
 	 case MTRETEN:
 		 cmd[0] = START_STOP;
 		 cmd[1] = 1;			/* Don't wait for completion */
-		 if (cmd_in == MTLOAD)
+		 if (cmd_in == MTLOAD) {
+		     if (STp->ready == ST_NO_TAPE)
+			 cmd[4] = 4;		/* open tray */
+		      else
 			 cmd[4] = 1;		/* load */
+		 }
 		 if (cmd_in == MTRETEN)
 			 cmd[4] = 3;		/* retension then mount */
 		 if (cmd_in == MTOFFL)
@@ -3993,7 +4064,7 @@ os_bypass:
 		printk(OSST_DEB_MSG "osst%d:D: IOCTL (%d) Result=%d\n", dev, cmd_in, ioctl_result);
 #endif
 
-	if (!ioctl_result) {
+	if (!ioctl_result) {				/* success */
 
 		if (cmd_in == MTFSFM) {
 			 fileno--;
@@ -4070,6 +4141,8 @@ os_bypass:
 		if (cmd_in == MTLOCK)
 			STp->door_locked = ST_LOCK_FAILS;
 
+		if (cmd_in == MTLOAD && osst_wait_for_medium(STp, &SRpnt, 60))
+			ioctl_result = osst_wait_ready(STp, &SRpnt, 5 * 60);
 	}
 	*aSRpnt = SRpnt;
 
@@ -4110,6 +4183,7 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 		 __MOD_INC_USE_COUNT(STp->device->host->hostt->module);
 	if (osst_template.module)
 		 __MOD_INC_USE_COUNT(osst_template.module);
+	STp->device->access_count++;
 
 	if (mode != STp->current_mode) {
 #if DEBUG
@@ -4126,6 +4200,8 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	STp->write_prot = ((flags & O_ACCMODE) == O_RDONLY);
 
 	STp->raw = (minor(inode->i_rdev) & 0x40) != 0;
+	if (STp->raw)
+		STp->header_ok = 0;
 
 	/* Allocate a buffer for this user */
 	need_dma_buffer = STp->restr_dma;
@@ -4216,7 +4292,7 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 			STp->nbr_partitions = 1;  /* This guess will be updated later if necessary */
 		for (i=0; i < ST_NBR_PARTITIONS; i++) {
 			STps = &(STp->ps[i]);
-			STps->rw = ST_IDLE;			/* FIXME - seems to be redundant... */
+			STps->rw = ST_IDLE;		/* FIXME - seems to be redundant... */
 			STps->eof = ST_NOEOF;
 			STps->at_sm = 0;
 			STps->last_block_valid = FALSE;
@@ -4264,8 +4340,8 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 					STp->door_locked = ST_LOCKED_AUTO;
 			}
 			if (!STp->frame_in_buffer) {
-				STp->block_size = (STp->raw) ? OS_FRAME_SIZE : (
-					    (STm->default_blksize > 0) ? STm->default_blksize : OS_DATA_SIZE);
+				STp->block_size = (STm->default_blksize > 0) ?
+							STm->default_blksize : OS_DATA_SIZE;
 				STp->buffer->buffer_bytes = STp->buffer->read_pointer = 0;
 			}
 			STp->buffer->buffer_blocks = OS_DATA_SIZE / STp->block_size;
@@ -4358,8 +4434,6 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 		return 0;
 	}
 
-	STp->min_block = STp->max_block = (-1);
-
 	osst_configure_onstream(STp, &SRpnt);
 
 /*	STp->drv_write_prot = ((STp->buffer)->b_data[2] & 0x80) != 0; FIXME */
@@ -4386,11 +4460,9 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	} else
 		STp->buffer->aux = NULL; /* this had better never happen! */
 
-	STp->block_size = (STp->raw) ? OS_FRAME_SIZE : (
+	STp->block_size = STp->raw ? OS_FRAME_SIZE : (
 			     (STm->default_blksize > 0) ? STm->default_blksize : OS_DATA_SIZE);
-	STp->min_block  = 512;
-	STp->max_block  = OS_DATA_SIZE;
-	STp->buffer->buffer_blocks = OS_DATA_SIZE / STp->block_size;
+	STp->buffer->buffer_blocks = STp->raw ? 1 : OS_DATA_SIZE / STp->block_size;
 	STp->buffer->buffer_bytes  =
 	STp->buffer->read_pointer  =
 	STp->frame_in_buffer       = 0;
@@ -4448,6 +4520,8 @@ err_out:
 		STp->buffer = NULL;
 	}
 	STp->in_use = 0;
+	STp->header_ok = 0;
+	STp->device->access_count--;
 
 	if (STp->device->host->hostt->module)
 	    __MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
@@ -4484,7 +4558,7 @@ static int os_scsi_tape_flush(struct file * filp)
 		if (result != 0 && result != (-ENOSPC))
 			goto out;
 	}
-	if ( STps->rw == ST_WRITING && !(STp->device)->was_reset) {
+	if ( STps->rw >= ST_WRITING && !(STp->device)->was_reset) {
 
 #if DEBUG
 		if (debugging) {
@@ -4494,16 +4568,17 @@ static int os_scsi_tape_flush(struct file * filp)
 					       dev, STp->nbr_waits, STp->nbr_finished);
 		}
 #endif
+		if (STp->write_type != OS_WRITE_NEW_MARK) {
+			/* true unless the user wrote the filemark for us */
+			result = osst_flush_drive_buffer(STp, &SRpnt);
+			if (result < 0) goto out;
+			result = osst_write_filemark(STp, &SRpnt);
+			if (result < 0) goto out;
 
-		result = osst_flush_drive_buffer(STp, &SRpnt);
-		if (result < 0) goto out;
-		result = osst_write_filemark(STp, &SRpnt);
-		if (result < 0) goto out;
-
-		if (STps->drv_file >= 0)
-			STps->drv_file++ ;
-		STps->drv_block = 0;
-
+			if (STps->drv_file >= 0)
+				STps->drv_file++ ;
+			STps->drv_block = 0;
+		}
 		result = osst_write_eod(STp, &SRpnt);
 		osst_write_header(STp, &SRpnt, !(STp->rew_at_close));
 
@@ -4587,7 +4662,12 @@ static int os_scsi_tape_close(struct inode * inode, struct file * filp)
 	if (STp->buffer != NULL)
 		STp->buffer->in_use = 0;
 
+	if (STp->raw)
+		STp->header_ok = 0;
+
 	STp->in_use = 0;
+	STp->device->access_count--;
+
 	if (STp->device->host->hostt->module)
 		__MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
 	if(osst_template.module)
@@ -4637,7 +4717,10 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 
 	cmd_type = _IOC_TYPE(cmd_in);
 	cmd_nr   = _IOC_NR(cmd_in);
-
+#if DEBUG
+	printk(OSST_DEB_MSG "osst%d:D: Ioctl %d,%d in %s mode\n", dev,
+			    cmd_type, cmd_nr, STp->raw?"raw":"normal");
+#endif
 	if (cmd_type == _IOC_TYPE(MTIOCTOP) && cmd_nr == _IOC_NR(MTIOCTOP)) {
 		struct mtop mtc;
 
@@ -4720,8 +4803,8 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 			}
 		}
 
-		if (mtc.mt_op != MTNOP && mtc.mt_op != MTSETBLK &&
-		    mtc.mt_op != MTSETDENSITY && mtc.mt_op != MTWSM &&
+		if (mtc.mt_op != MTNOP && mtc.mt_op != MTWEOF && mtc.mt_op != MTWSM &&
+		    mtc.mt_op != MTSETDENSITY && mtc.mt_op != MTSETBLK &&
 		    mtc.mt_op != MTSETDRVBUFFER && mtc.mt_op != MTSETPART)
 			STps->rw = ST_IDLE;  /* Prevent automatic WEOF and fsf */
 
@@ -4773,7 +4856,10 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 	 	}
 
 		if (mtc.mt_op == MTSEEK) {
-			i = osst_seek_sector(STp, &SRpnt, mtc.mt_count);
+			if (STp->raw)
+				i = osst_set_frame_position(STp, &SRpnt, mtc.mt_count, 0);
+			else
+				i = osst_seek_sector(STp, &SRpnt, mtc.mt_count);
 			if (!STp->can_partitions)
 				STp->ps[0].rw = ST_IDLE;
 			retval = i;
@@ -4878,7 +4964,10 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 			retval = (-EINVAL);
 			goto out;
 		}
-		blk = osst_get_sector(STp, &SRpnt);
+		if (STp->raw)
+			blk = osst_get_frame_position(STp, &SRpnt);
+		else
+			blk = osst_get_sector(STp, &SRpnt);
 		if (blk < 0) {
 			retval = blk;
 			goto out;
@@ -4972,7 +5061,7 @@ static OSST_buffer * new_tape_buffer( int from_initialization, int need_dma )
 				tb = NULL;
 				break;
 			    }
-			    tb->sg[segs].page = NULL;
+                            tb->sg[segs].page = NULL;
 			    tb->sg[segs].length = b_size;
 			    got += b_size;
 			    segs++;
@@ -5424,6 +5513,8 @@ static int osst_attach(Scsi_Device * SDp)
 	tpnt->partition = 0;
 	tpnt->new_partition = 0;
 	tpnt->nbr_partitions = 0;
+	tpnt->min_block = 512;
+	tpnt->max_block = OS_DATA_SIZE;
 	tpnt->timeout = OSST_TIMEOUT;
 	tpnt->long_timeout = OSST_LONG_TIMEOUT;
 
@@ -5463,6 +5554,7 @@ static int osst_attach(Scsi_Device * SDp)
 
 	tpnt->current_mode = 0;
 	tpnt->modes[0].defined = TRUE;
+	tpnt->modes[2].defined = TRUE;
 	tpnt->density_changed = tpnt->compression_changed = tpnt->blksize_changed = FALSE;
 	init_MUTEX(&tpnt->lock);
 

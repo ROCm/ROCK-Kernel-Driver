@@ -265,6 +265,8 @@ static struct ata_pci_device pci_chipsets[] __initdata = {
 #endif
 #ifdef CONFIG_BLK_DEV_HPT366
 	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, pci_init_hpt366, ata66_hpt366, ide_init_hpt366, ide_dmacapable_hpt366, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 240, ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA },
+	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT372, pci_init_hpt366, ata66_hpt366, ide_init_hpt366, ide_dmacapable_hpt366, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA },
+	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT374, pci_init_hpt366, ata66_hpt366, ide_init_hpt366, ide_dmacapable_hpt366, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_HPTHACK | ATA_F_DMA },
 #endif
 #ifdef CONFIG_BLK_DEV_ALI15X3
 	{PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229, pci_init_ali15x3, ata66_ali15x3, ide_init_ali15x3, ide_dmacapable_ali15x3, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
@@ -307,6 +309,8 @@ static struct ata_pci_device pci_chipsets[] __initdata = {
 	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8886BF, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
 	{PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C561, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_NOADMA },
 	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, NULL, NULL, IDE_NO_DRIVER, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 240, ATA_F_IRQ | ATA_F_HPTHACK },
+	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT372, NULL, NULL, IDE_NO_DRIVER, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_HPTHACK },
+	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT374, NULL, NULL, IDE_NO_DRIVER, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_HPTHACK },
 	{0, 0, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0 }};
 
 /*
@@ -809,6 +813,48 @@ static void __init pdc20270_device_order_fixup (struct pci_dev *dev, struct ata_
 	setup_pci_device(dev2, d2);
 }
 
+static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pci_device *d)
+{
+	struct pci_dev *dev2 = NULL;
+	struct pci_dev *findev;
+	struct ata_pci_device *d2;
+
+	if (PCI_FUNC(dev->devfn) & 1)
+		return;
+
+	pci_for_each_dev(findev) {
+		if ((findev->vendor == dev->vendor) &&
+		    (findev->device == dev->device) &&
+		    ((findev->devfn - dev->devfn) == 1) &&
+		    (PCI_FUNC(findev->devfn) & 1)) {
+			dev2 = findev;
+			break;
+		}
+	}
+
+	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
+		dev->name, dev->bus->number, dev->devfn);
+	setup_pci_device(dev, d);
+	if (!dev2) {
+		return;
+	} else {
+		byte irq = 0, irq2 = 0;
+		pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
+		pci_read_config_byte(dev2, PCI_INTERRUPT_LINE, &irq2);
+		if (irq != irq2) {
+			pci_write_config_byte(dev2, PCI_INTERRUPT_LINE, irq);
+			dev2->irq = dev->irq;
+			printk("%s: pci-config space interrupt fixed.\n",
+				dev2->name);
+		}
+	}
+	d2 = d;
+	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
+		dev2->name, dev2->bus->number, dev2->devfn);
+	setup_pci_device(dev2, d2);
+
+}
+
 static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pci_device *d)
 {
 	struct pci_dev *dev2 = NULL, *findev;
@@ -823,6 +869,7 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 	class_rev &= 0xff;
 
 	switch(class_rev) {
+		case 5:
 		case 4:
 		case 3:	printk("%s: IDE controller on PCI slot %s\n", dev->name, dev->slot_name);
 			setup_pci_device(dev, d);
@@ -854,6 +901,8 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 	setup_pci_device(dev2, d2);
 }
 
+
+
 /*
  * This finds all PCI IDE controllers and calls appropriate initialization
  * functions for them.
@@ -883,8 +932,12 @@ static void __init scan_pcidev(struct pci_dev *dev)
 		return;	/* IT8172G is also more than only an IDE controller */
 	else if ((d->vendor == PCI_VENDOR_ID_UMC && d->device == PCI_DEVICE_ID_UMC_UM8886A) && !(PCI_FUNC(dev->devfn) & 1))
 		return;	/* UM8886A/BF pair */
-	else if (d->flags & ATA_F_HPTHACK)
-		hpt366_device_order_fixup(dev, d);
+	else if (d->flags & ATA_F_HPTHACK) {
+		if (d->device == PCI_DEVICE_ID_TTI_HPT366)
+			hpt366_device_order_fixup(dev, d);
+		if (d->device == PCI_DEVICE_ID_TTI_HPT374)
+			hpt374_device_order_fixup(dev, d);
+	}
 	else if (d->vendor == PCI_VENDOR_ID_PROMISE && d->device == PCI_DEVICE_ID_PROMISE_20268R)
 		pdc20270_device_order_fixup(dev, d);
 	else if (!(d->vendor == 0 && d->device == 0) || (dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {

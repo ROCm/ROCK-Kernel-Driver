@@ -54,4 +54,4 @@ brw-rw-rw-   1 root     root      43,   1 Apr 11 00:28 nd1
   ...                 in case of read operation with no error,
                       this is immediately followed len bytes of data
 
-   For more information, look at http://atrey.karlin.mff.cuni.cz/~pavel.
+   For more information, look at http://nbd.sf.net/.

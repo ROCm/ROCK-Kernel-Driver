@@ -34,10 +34,6 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface *di;
-
-/* ------------------------------------------------------------- */
-
 static void b1isa_remove_ctr(struct capi_ctr *ctrl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -47,7 +43,7 @@ static void b1isa_remove_ctr(struct capi_ctr *ctrl)
 	b1_reset(port);
 	b1_reset(port);
 
-	di->detach_ctr(ctrl);
+	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
@@ -111,7 +107,7 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "b1isa: attach controller failed.\n");
 		retval = -EBUSY;
@@ -154,27 +150,27 @@ static char *b1isa_procinfo(struct capi_ctr *ctrl)
 /* ------------------------------------------------------------- */
 
 static struct capi_driver b1isa_driver = {
-    name: "b1isa",
-    revision: "0.0",
-    load_firmware: b1_load_firmware,
-    reset_ctr: b1_reset_ctr,
-    remove_ctr: b1isa_remove_ctr,
-    register_appl: b1_register_appl,
-    release_appl: b1_release_appl,
-    send_message: b1_send_message,
-
-    procinfo: b1isa_procinfo,
-    ctr_read_proc: b1ctl_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: b1isa_add_card,
+	owner: THIS_MODULE,
+	name: "b1isa",
+	revision: "0.0",
+	load_firmware: b1_load_firmware,
+	reset_ctr: b1_reset_ctr,
+	remove_ctr: b1isa_remove_ctr,
+	register_appl: b1_register_appl,
+	release_appl: b1_release_appl,
+	send_message: b1_send_message,
+	
+	procinfo: b1isa_procinfo,
+	ctr_read_proc: b1ctl_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
+	
+	add_card: b1isa_add_card,
 };
 
 static int __init b1isa_init(void)
 {
 	struct capi_driver *driver = &b1isa_driver;
 	char *p;
-	int retval = 0;
 
 	MOD_INC_USE_COUNT;
 
@@ -187,15 +183,9 @@ static int __init b1isa_init(void)
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(driver);
-
-	if (!di) {
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driver->name);
-		retval = -EIO;
-	}
+        attach_capi_driver(driver);
 	MOD_DEC_USE_COUNT;
-	return retval;
+	return 0;
 }
 
 static void __exit b1isa_exit(void)

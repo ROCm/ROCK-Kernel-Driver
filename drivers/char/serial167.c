@@ -1472,7 +1472,7 @@ set_serial_info(struct cyclades_port * info,
 	    return -EFAULT;
     old_info = *info;
 
-    if (!suser()) {
+    if (!capable(CAP_SYS_ADMIN)) {
 	    if ((new_serial.close_delay != info->close_delay) ||
 		((new_serial.flags & ASYNC_FLAGS & ~ASYNC_USR_MASK) !=
 		 (info->flags & ASYNC_FLAGS & ~ASYNC_USR_MASK)))

@@ -35,10 +35,6 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver_interface *di;
-
-/* ------------------------------------------------------------- */
-
 static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -48,7 +44,7 @@ static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 	b1_reset(port);
 	b1_reset(port);
 
-	di->detach_ctr(ctrl);
+	detach_capi_ctr(ctrl);
 	free_irq(card->irq, card);
 	b1_free_card(card);
 
@@ -103,7 +99,7 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
 				driver->name);
@@ -152,20 +148,21 @@ static char *b1pcmcia_procinfo(struct capi_ctr *ctrl)
 /* ------------------------------------------------------------- */
 
 static struct capi_driver b1pcmcia_driver = {
-    name: "b1pcmcia",
-    revision: "0.0",
-    load_firmware: b1_load_firmware,
-    reset_ctr: b1_reset_ctr,
-    remove_ctr: b1pcmcia_remove_ctr,
-    register_appl: b1_register_appl,
-    release_appl: b1_release_appl,
-    send_message: b1_send_message,
+	owner: THIS_MODULE,
+	name: "b1pcmcia",
+	revision: "0.0",
+	load_firmware: b1_load_firmware,
+	reset_ctr: b1_reset_ctr,
+	remove_ctr: b1pcmcia_remove_ctr,
+	register_appl: b1_register_appl,
+	release_appl: b1_release_appl,
+	send_message: b1_send_message,
+	
+	procinfo: b1pcmcia_procinfo,
+	ctr_read_proc: b1ctl_read_proc,
+	driver_read_proc: 0,	/* use standard driver_read_proc */
 
-    procinfo: b1pcmcia_procinfo,
-    ctr_read_proc: b1ctl_read_proc,
-    driver_read_proc: 0,	/* use standard driver_read_proc */
-
-    add_card: 0,
+	add_card: 0,
 };
 
 /* ------------------------------------------------------------- */
@@ -187,10 +184,12 @@ int b1pcmcia_addcard_m2(unsigned int port, unsigned irq)
 
 int b1pcmcia_delcard(unsigned int port, unsigned irq)
 {
+	struct list_head *l;
 	struct capi_ctr *ctrl;
 	avmcard *card;
-
-	for (ctrl = b1pcmcia_driver.controller; ctrl; ctrl = ctrl->next) {
+	
+	list_for_each(l, &b1pcmcia_driver.contr_head) {
+		ctrl = list_entry(l, struct capi_ctr, driver_list);
 		card = ((avmctrl_info *)(ctrl->driverdata))->card;
 		if (card->port == port && card->irq == irq) {
 			b1pcmcia_remove_ctr(ctrl);
@@ -224,13 +223,8 @@ static int __init b1pcmcia_init(void)
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
-        di = attach_capi_driver(driver);
+        attach_capi_driver(driver);
 
-	if (!di) {
-		printk(KERN_ERR "%s: failed to attach capi_driver\n",
-				driver->name);
-		retval = -EIO;
-	}
 	MOD_DEC_USE_COUNT;
 	return retval;
 }

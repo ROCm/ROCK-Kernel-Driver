@@ -99,6 +99,8 @@
 #define  CHIPREV_ID_5700_A1		 0x7001
 #define  CHIPREV_ID_5700_B0		 0x7100
 #define  CHIPREV_ID_5700_B1		 0x7101
+#define  CHIPREV_ID_5700_B3		 0x7102
+#define  CHIPREV_ID_5700_ALTIMA		 0x7104
 #define  CHIPREV_ID_5700_C0		 0x7200
 #define  CHIPREV_ID_5701_A0		 0x0000
 #define  CHIPREV_ID_5701_B0		 0x0100
@@ -1843,6 +1845,7 @@ struct tg3 {
 #define PHY_REV_BCM5401_B0		0x1
 #define PHY_REV_BCM5401_B2		0x3
 #define PHY_REV_BCM5401_C0		0x6
+#define PHY_REV_BCM5411_X0		0x1 /* Found on Netgear GA302T */
 
 	enum phy_led_mode		led_mode;
 

@@ -40,6 +40,7 @@
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
+#include <linux/errno.h>
 #include <linux/seq_file.h>
 
 #include <asm/system.h>

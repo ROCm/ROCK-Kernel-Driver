@@ -17,6 +17,7 @@
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/mm.h>
+#include <linux/rtc.h>
 
 #include <asm/machdep.h>
 #include <asm/io.h>
@@ -104,17 +105,17 @@ static void timer_interrupt(int irq, void *dummy, struct pt_regs * regs)
 
 void time_init(void)
 {
-	unsigned int year, mon, day, hour, min, sec;
+	struct rtc_time time;
 
-	extern void arch_gettod(int *year, int *mon, int *day, int *hour,
-				int *min, int *sec);
+	if (mach_hwclk) {
+		mach_hwclk(0, &time);
 
-	arch_gettod (&year, &mon, &day, &hour, &min, &sec);
-
-	if ((year += 1900) < 1970)
-		year += 100;
-	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	xtime.tv_usec = 0;
+		if ((time.tm_year += 1900) < 1970)
+			time.tm_year += 100;
+		xtime.tv_sec = mktime(time.tm_year, time.tm_mon, time.tm_mday,
+				      time.tm_hour, time.tm_min, time.tm_sec);
+		xtime.tv_usec = 0;
+	}
 
 	mach_sched_init(timer_interrupt);
 }

@@ -150,7 +150,13 @@ obj-$(CONFIG_SPECIALIX) += specialix.o
 obj-$(CONFIG_AMIGA_BUILTIN_SERIAL) += amiserial.o
 obj-$(CONFIG_A2232) += ser_a2232.o generic_serial.o
 obj-$(CONFIG_SX) += sx.o generic_serial.o
-obj-$(CONFIG_RIO) += rio/rio.o generic_serial.o
+
+obj-$(CONFIG_RIO) += generic_serial.o
+subdir-$(CONFIG_RIO) += rio
+ifeq ($(CONFIG_RIO),y)
+  obj-y += rio/rio.o
+endif
+
 obj-$(CONFIG_SH_SCI) += sh-sci.o generic_serial.o
 obj-$(CONFIG_SERIAL167) += serial167.o
 obj-$(CONFIG_MVME147_SCC) += generic_serial.o vme_scc.o
@@ -158,8 +164,6 @@ obj-$(CONFIG_MVME162_SCC) += generic_serial.o vme_scc.o
 obj-$(CONFIG_BVME6000_SCC) += generic_serial.o vme_scc.o
 obj-$(CONFIG_SERIAL_TX3912) += generic_serial.o serial_tx3912.o
 obj-$(CONFIG_HVC_CONSOLE) += hvc_console.o
-
-subdir-$(CONFIG_RIO) += rio
 
 obj-$(CONFIG_ATIXL_BUSMOUSE) += atixlmouse.o
 obj-$(CONFIG_LOGIBUSMOUSE) += logibusmouse.o
@@ -189,12 +193,8 @@ obj-$(CONFIG_INTEL_RNG) += i810_rng.o
 obj-$(CONFIG_QIC02_TAPE) += tpqic02.o
 
 subdir-$(CONFIG_FTAPE) += ftape
-subdir-$(CONFIG_DRM) += drm
-subdir-$(CONFIG_PCMCIA) += pcmcia
-subdir-$(CONFIG_AGP) += agp
-
 ifeq ($(CONFIG_FTAPE),y)
-obj-y       += ftape/ftape.o
+  obj-y       += ftape/ftape.o
 endif
 
 obj-$(CONFIG_H8) += h8.o
@@ -227,6 +227,21 @@ obj-$(CONFIG_SOFT_WATCHDOG) += softdog.o
 subdir-$(CONFIG_MWAVE) += mwave
 ifeq ($(CONFIG_MWAVE),y)
   obj-y += mwave/mwave.o
+endif
+
+subdir-$(CONFIG_AGP) += agp
+ifeq ($(CONFIG_AGP),y)
+  obj-y += agp/agp.o
+endif
+
+subdir-$(CONFIG_DRM) += drm
+ifeq ($(CONFIG_DRM),y)
+  obj-y += drm/drm.o
+endif
+
+subdir-$(CONFIG_PCMCIA) += pcmcia
+ifeq ($(CONFIG_PCMCIA),y)
+  obj-y += pcmcia/pcmcia_char.o
 endif
 
 include $(TOPDIR)/Rules.make

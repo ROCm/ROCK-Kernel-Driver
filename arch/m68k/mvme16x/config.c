@@ -50,9 +50,7 @@ extern void mvme16x_sched_init(void (*handler)(int, void *, struct pt_regs *));
 extern int  mvme16x_keyb_init(void);
 extern int  mvme16x_kbdrate (struct kbd_repeat *);
 extern unsigned long mvme16x_gettimeoffset (void);
-extern void mvme16x_gettod (int *year, int *mon, int *day, int *hour,
-                           int *min, int *sec);
-extern int mvme16x_hwclk (int, struct hwclk_time *);
+extern int mvme16x_hwclk (int, struct rtc_time *);
 extern int mvme16x_set_clock_mmss (unsigned long);
 extern void mvme16x_check_partition (struct gendisk *hd, unsigned int dev);
 extern void mvme16x_mksound( unsigned int count, unsigned int ticks );
@@ -149,7 +147,6 @@ void __init config_mvme16x(void)
     mach_kbdrate         = mvme16x_kbdrate;
     mach_init_IRQ        = mvme16x_init_IRQ;
     mach_gettimeoffset   = mvme16x_gettimeoffset;
-    mach_gettod  	 = mvme16x_gettod;
     mach_hwclk           = mvme16x_hwclk;
     mach_set_clock_mmss	 = mvme16x_set_clock_mmss;
 /*  kd_mksound           = mvme16x_mksound; */
@@ -273,26 +270,24 @@ unsigned long mvme16x_gettimeoffset (void)
     return (*(volatile unsigned long *)0xfff42008);
 }
 
-extern void mvme16x_gettod (int *year, int *mon, int *day, int *hour,
-                           int *min, int *sec)
-{
-	rtc->ctrl = RTC_READ;
-	*year = bcd2int (rtc->bcd_year);
-	*mon = bcd2int (rtc->bcd_mth);
-	*day = bcd2int (rtc->bcd_dom);
-	*hour = bcd2int (rtc->bcd_hr);
-	*min = bcd2int (rtc->bcd_min);
-	*sec = bcd2int (rtc->bcd_sec);
-	rtc->ctrl = 0;
-}
-
 int bcd2int (unsigned char b)
 {
 	return ((b>>4)*10 + (b&15));
 }
 
-int mvme16x_hwclk(int op, struct hwclk_time *t)
+int mvme16x_hwclk(int op, struct rtc_time *t)
 {
+#warning check me!
+	if (!op) {
+		rtc->ctrl = RTC_READ;
+		t->tm_year = bcd2int (rtc->bcd_year);
+		t->tm_mon  = bcd2int (rtc->bcd_mth);
+		t->tm_mday = bcd2int (rtc->bcd_dom);
+		t->tm_hour = bcd2int (rtc->bcd_hr);
+		t->tm_min  = bcd2int (rtc->bcd_min);
+		t->tm_sec  = bcd2int (rtc->bcd_sec);
+		rtc->ctrl = 0;
+	}
 	return 0;
 }
 

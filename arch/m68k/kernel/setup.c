@@ -21,6 +21,7 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/seq_file.h>
 #include <linux/module.h>
 
 #include <asm/bootinfo.h>
@@ -84,8 +85,7 @@ int (*mach_get_irq_list) (struct seq_file *, void *) = NULL;
 void (*mach_process_int) (int, struct pt_regs *) = NULL;
 /* machine dependent timer functions */
 unsigned long (*mach_gettimeoffset) (void);
-void (*mach_gettod) (int*, int*, int*, int*, int*, int*);
-int (*mach_hwclk) (int, struct hwclk_time*) = NULL;
+int (*mach_hwclk) (int, struct rtc_time*) = NULL;
 int (*mach_set_clock_mmss) (unsigned long) = NULL;
 void (*mach_reset)( void );
 void (*mach_halt)( void ) = NULL;
@@ -407,7 +407,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 }
 
-int get_cpuinfo(char * buffer)
+static int show_cpuinfo(struct seq_file *m, void *v)
 {
     const char *cpu, *mmu, *fpu;
     unsigned long clockfreq, clockfactor;
@@ -468,7 +468,7 @@ int get_cpuinfo(char * buffer)
 
     clockfreq = loops_per_jiffy*HZ*clockfactor;
 
-    return(sprintf(buffer, "CPU:\t\t%s\n"
+    seq_printf(m, "CPU:\t\t%s\n"
 		   "MMU:\t\t%s\n"
 		   "FPU:\t\t%s\n"
 		   "Clocking:\t%lu.%1luMHz\n"
@@ -477,9 +477,28 @@ int get_cpuinfo(char * buffer)
 		   cpu, mmu, fpu,
 		   clockfreq/1000000,(clockfreq/100000)%10,
 		   loops_per_jiffy/(500000/HZ),(loops_per_jiffy/(5000/HZ))%100,
-		   loops_per_jiffy));
-
+		   loops_per_jiffy);
+    return 0;
 }
+
+static void *c_start(struct seq_file *m, loff_t *pos)
+{
+	return *pos < 1 ? (void *)1 : NULL;
+}
+static void *c_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	++*pos;
+	return NULL;
+}
+static void c_stop(struct seq_file *m, void *v)
+{
+}
+struct seq_operations cpuinfo_op = {
+	start:	c_start,
+	next:	c_next,
+	stop:	c_stop,
+	show:	show_cpuinfo,
+};
 
 int get_hardware_list(char *buffer)
 {
@@ -518,15 +537,6 @@ void __init floppy_setup(char *str, int *ints)
 /* for "kbd-reset" cmdline param */
 void __init kbd_reset_setup(char *str, int *ints)
 {
-}
-
-void arch_gettod(int *year, int *mon, int *day, int *hour,
-		 int *min, int *sec)
-{
-	if (mach_gettod)
-		mach_gettod(year, mon, day, hour, min, sec);
-	else
-		*year = *mon = *day = *hour = *min = *sec = 0;
 }
 
 void check_bugs(void)

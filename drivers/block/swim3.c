@@ -820,7 +820,7 @@ static int floppy_ioctl(struct inode *inode, struct file *filp,
 	if (devnum >= floppy_count)
 		return -ENODEV;
 		
-	if ((cmd & 0x80) && !suser())
+	if ((cmd & 0x80) && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
 	fs = &floppy_states[devnum];

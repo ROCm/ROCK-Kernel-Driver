@@ -38,6 +38,7 @@
 #include <asm/atariints.h>
 #include <asm/atari_stram.h>
 #include <asm/system.h>
+#include <asm/keyboard.h>
 #include <asm/machdep.h>
 #include <asm/hwtest.h>
 #include <asm/io.h>
@@ -79,10 +80,8 @@ static void atari_heartbeat( int on );
 /* atari specific timer functions (in time.c) */
 extern void atari_sched_init(void (*)(int, void *, struct pt_regs *));
 extern unsigned long atari_gettimeoffset (void);
-extern void atari_mste_gettod (int *, int *, int *, int *, int *, int *);
-extern void atari_tt_gettod (int *, int *, int *, int *, int *, int *);
-extern int atari_mste_hwclk (int, struct hwclk_time *);
-extern int atari_tt_hwclk (int, struct hwclk_time *);
+extern int atari_mste_hwclk (int, struct rtc_time *);
+extern int atari_tt_hwclk (int, struct rtc_time *);
 extern int atari_mste_set_clock_mmss (unsigned long);
 extern int atari_tt_set_clock_mmss (unsigned long);
 
@@ -258,7 +257,9 @@ void __init config_atari(void)
     mach_keyb_init       = atari_keyb_init;
     mach_kbdrate         = atari_kbdrate;
     mach_kbd_translate   = atari_kbd_translate;
+#ifdef CONFIG_MAGIC_SYSRQ
     SYSRQ_KEY            = 0xff;
+#endif
     mach_kbd_leds        = atari_kbd_leds;
     mach_init_IRQ        = atari_init_IRQ;
     mach_request_irq     = atari_request_irq;
@@ -442,14 +443,12 @@ void __init config_atari(void)
     if (hwreg_present( &tt_rtc.regsel )) {
 	ATARIHW_SET(TT_CLK);
         printk( "TT_CLK " );
-        mach_gettod = atari_tt_gettod;
         mach_hwclk = atari_tt_hwclk;
         mach_set_clock_mmss = atari_tt_set_clock_mmss;
     }
     if (!MACH_IS_HADES && hwreg_present( &mste_rtc.sec_ones)) {
 	ATARIHW_SET(MSTE_CLK);
         printk( "MSTE_CLK ");
-        mach_gettod = atari_mste_gettod;
         mach_hwclk = atari_mste_hwclk;
         mach_set_clock_mmss = atari_mste_set_clock_mmss;
     }

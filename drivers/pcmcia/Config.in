@@ -7,25 +7,20 @@
 mainmenu_option next_comment
 comment 'PCMCIA/CardBus support'
 
-#dep_tristate 'CardBus support' CONFIG_PCMCIA $CONFIG_PCI
-#if [ "$CONFIG_PCMCIA" != "n" ]; then
-#  define_bool CONFIG_CARDBUS y
-#fi
-
 tristate 'PCMCIA/CardBus support' CONFIG_PCMCIA
 if [ "$CONFIG_PCMCIA" != "n" ]; then
    if [ "$CONFIG_PCI" != "n" ]; then
       bool '  CardBus support' CONFIG_CARDBUS
    fi
-   dep_bool '  i82092 compatible bridge support' CONFIG_I82092 $CONFIG_PCI
-   bool '  i82365 compatible bridge support' CONFIG_I82365
-   bool '  Databook TCIC host bridge support' CONFIG_TCIC
+   dep_tristate '  i82092 compatible bridge support' CONFIG_I82092 $CONFIG_PCMCIA $CONFIG_PCI
+   dep_tristate '  i82365 compatible bridge support' CONFIG_I82365 $CONFIG_PCMCIA
+   dep_tristate '  Databook TCIC host bridge support' CONFIG_TCIC $CONFIG_PCMCIA
    if [ "$CONFIG_HD64465" = "y" ]; then
       dep_tristate '  HD64465 host bridge support' CONFIG_HD64465_PCMCIA $CONFIG_PCMCIA
    fi
-fi
-if [ "$CONFIG_ARM" = "y" ]; then
-   dep_tristate '  SA1100 support' CONFIG_PCMCIA_SA1100 $CONFIG_ARCH_SA1100 $CONFIG_PCMCIA
+   if [ "$CONFIG_ARM" = "y" ]; then
+      dep_tristate '  SA1100 support' CONFIG_PCMCIA_SA1100 $CONFIG_ARCH_SA1100 $CONFIG_PCMCIA
+   fi
 fi
 
 endmenu

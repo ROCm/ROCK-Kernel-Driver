@@ -3370,7 +3370,8 @@ int __init cdu31a_init(void)
 	if (drive_found) {
 		int deficiency = 0;
 
-		request_region(cdu31a_port, 4, "cdu31a");
+		if (!request_region(cdu31a_port, 4, "cdu31a"))
+			goto errout3;
 
 		if (devfs_register_blkdev(MAJOR_NR, "cdu31a", &scd_bdops)) {
 			printk("Unable to get major %d for CDU-31a\n",

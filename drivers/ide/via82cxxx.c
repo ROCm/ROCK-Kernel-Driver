@@ -136,7 +136,7 @@ static char *via_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100", "UDMA133" }
  * VIA /proc entry.
  */
 
-#ifdef CONFIG_PROC_FS
+#if 0 && defined(CONFIG_PROC_FS)
 
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
@@ -497,7 +497,7 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev)
  * Setup /proc/ide/via entry.
  */
 
-#ifdef CONFIG_PROC_FS
+#if 0 && defined(CONFIG_PROC_FS)
 	if (!via_proc) {
 		via_base = pci_resource_start(dev, 4);
 		bmide_dev = dev;

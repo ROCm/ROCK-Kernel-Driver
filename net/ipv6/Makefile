@@ -9,11 +9,13 @@
 
 O_TARGET := ipv6.o
 
+export-objs :=  ipv6_syms.o
+
 obj-y :=	af_inet6.o ip6_output.o ip6_input.o addrconf.o sit.o \
 		route.o ip6_fib.o ipv6_sockglue.o ndisc.o udp.o raw.o \
 		protocol.o icmp.o mcast.o reassembly.o tcp_ipv6.o \
 		exthdrs.o sysctl_net_ipv6.o datagram.o proc.o \
-		ip6_flowlabel.o
+		ip6_flowlabel.o ipv6_syms.o
 
 obj-m  := $(O_TARGET)
 

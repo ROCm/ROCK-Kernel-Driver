@@ -77,7 +77,9 @@ static void dma_commit(void *opaque);
 long oktag_to_io(long *paddr, long *addr, long len);
 long oktag_from_io(long *addr, long *paddr, long len);
 
-static struct tq_struct tq_fake_dma = { NULL, 0, dma_commit, NULL };
+static struct tq_struct tq_fake_dma = {
+    routine:	dma_commit,
+};
 
 #define DMA_MAXTRANSFER 0x8000
 
@@ -589,3 +591,5 @@ int oktagon_esp_release(struct Scsi_Host *instance)
 #endif
 	return 1;
 }
+
+MODULE_LICENSE("GPL");

@@ -1371,7 +1371,7 @@ init_dev_done:
 		retval = -ENODEV;
 	filp->f_flags = saved_flags;
 
-	if (!retval && test_bit(TTY_EXCLUSIVE, &tty->flags) && !suser())
+	if (!retval && test_bit(TTY_EXCLUSIVE, &tty->flags) && !capable(CAP_SYS_ADMIN))
 		retval = -EBUSY;
 
 	if (retval) {
@@ -1473,7 +1473,7 @@ static int tiocsti(struct tty_struct *tty, char * arg)
 {
 	char ch, mbz = 0;
 
-	if ((current->tty != tty) && !suser())
+	if ((current->tty != tty) && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	if (get_user(ch, arg))
 		return -EFAULT;
@@ -1511,7 +1511,7 @@ static int tioccons(struct inode *inode,
 {
 	if (IS_SYSCONS_DEV(inode->i_rdev) ||
 	    IS_CONSOLE_DEV(inode->i_rdev)) {
-		if (!suser())
+		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		redirect = NULL;
 		return 0;
@@ -1553,7 +1553,7 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 		 * This tty is already the controlling
 		 * tty for another session group!
 		 */
-		if ((arg == 1) && suser()) {
+		if ((arg == 1) && capable(CAP_SYS_ADMIN)) {
 			/*
 			 * Steal it away
 			 */

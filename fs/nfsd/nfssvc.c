@@ -67,7 +67,7 @@ struct list_head nfsd_list = LIST_HEAD_INIT(nfsd_list);
 /*
  * Maximum number of nfsd processes
  */
-#define	NFSD_MAXSERVS		128
+#define	NFSD_MAXSERVS		8192
 
 int
 nfsd_svc(unsigned short port, int nrservs)
@@ -90,6 +90,7 @@ nfsd_svc(unsigned short port, int nrservs)
 		goto out;
 	if (!nfsd_serv) {
 		atomic_set(&nfsd_busy, 0);
+		error = -ENOMEM;
 		nfsd_serv = svc_create(&nfsd_program, NFSD_BUFSIZE, NFSSVC_XDRSIZE);
 		if (nfsd_serv == NULL)
 			goto out;

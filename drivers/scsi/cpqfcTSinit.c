@@ -532,7 +532,7 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 
 	// must be super user to send stuff directly to the
 	// controller and/or physical drives...
-	if( !capable(CAP_SYS_ADMIN) )
+	if( !capable(CAP_SYS_RAWIO) )
 	  return -EPERM;
 
 	// copy the caller's struct to our space.

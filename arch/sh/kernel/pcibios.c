@@ -60,7 +60,8 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
  * addresses to be allocated in the 0x000-0x0ff region
  * modulo 0x400.
  */
-void pcibios_align_resource(void *data, struct resource *res, unsigned long size)
+void pcibios_align_resource(void *data, struct resource *res,
+			    unsigned long size, unsigned long align)
 {
 	if (res->flags & IORESOURCE_IO) {
 		unsigned long start = res->start;

@@ -41,7 +41,7 @@ static void hp300_tick(int irq, void *dev_id, struct pt_regs *regs)
   unsigned long tmp;
   void (*vector)(int, void *, struct pt_regs *) = dev_id;
   readb(CLOCKBASE + CLKSR);
-  asm volatile ("movpw %1@(5),%0" : "=r" (tmp) : "a" (CLOCKBASE));
+  asm volatile ("movpw %1@(5),%0" : "=d" (tmp) : "a" (CLOCKBASE));
   vector(irq, NULL, regs);
 }
 

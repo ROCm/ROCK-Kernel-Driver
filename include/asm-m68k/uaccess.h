@@ -4,6 +4,7 @@
 /*
  * User space memory access functions
  */
+#include <linux/errno.h>
 #include <linux/sched.h>
 #include <asm/segment.h>
 

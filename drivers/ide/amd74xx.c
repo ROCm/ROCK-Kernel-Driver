@@ -94,7 +94,7 @@ static char *amd_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100" };
  * AMD /proc entry.
  */
 
-#ifdef CONFIG_PROC_FS
+#if 0 && defined(CONFIG_PROC_FS)
 
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
@@ -384,7 +384,7 @@ unsigned int __init pci_init_amd74xx(struct pci_dev *dev, const char *name)
  * Register /proc/ide/amd74xx entry
  */
 
-#ifdef CONFIG_PROC_FS
+#if 0 && defined(CONFIG_PROC_FS)
 	if (!amd74xx_proc) {
 		amd_base = pci_resource_start(dev, 4);
 		bmide_dev = dev;

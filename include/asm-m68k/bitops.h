@@ -97,6 +97,7 @@ extern __inline__ int __generic_test_and_clear_bit(int nr, volatile void * vaddr
   (__builtin_constant_p(nr) ? \
    __constant_clear_bit(nr, vaddr) : \
    __generic_clear_bit(nr, vaddr))
+#define __clear_bit(nr,vaddr) clear_bit(nr,vaddr)
 
 extern __inline__ void __constant_clear_bit(int nr, volatile void * vaddr)
 {
@@ -239,6 +240,28 @@ extern __inline__ int ffs(int x)
 
 	return 32 - cnt;
 }
+#define __ffs(x) (ffs(x) - 1)
+
+
+/*
+ * Every architecture must define this function. It's the fastest
+ * way of searching a 140-bit bitmap where the first 100 bits are
+ * unlikely to be set. It's guaranteed that at least one of the 140
+ * bits is cleared.
+ */
+static inline int sched_find_first_bit(unsigned long *b)
+{
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 32;
+	if (unlikely(b[2]))
+		return __ffs(b[2]) + 64;
+	if (b[3])
+		return __ffs(b[3]) + 96;
+	return __ffs(b[4]) + 128;
+}
+
 
 /*
  * hweightN: returns the hamming weight (i.e. the number

@@ -110,7 +110,7 @@ static char *piix_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100", "UDMA133" 
  * PIIX/ICH /proc entry.
  */
 
-#ifdef CONFIG_PROC_FS
+#if 0 && defined(CONFIG_PROC_FS)
 
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
@@ -520,7 +520,7 @@ unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
  * Register /proc/ide/piix entry
  */
 
-#ifdef CONFIG_PROC_FS
+#if 0 && defined(CONFIG_PROC_FS)
 	if (!piix_proc) {
 		piix_base = pci_resource_start(dev, 4);
 		bmide_dev = dev;

@@ -2,8 +2,7 @@
 # Makefile for i386-specific library files..
 #
 
-.S.o:
-	$(CC) $(AFLAGS) -c $< -o $*.o
+USE_STANDARD_AS_RULE	:= true
 
 L_TARGET = lib.a
 

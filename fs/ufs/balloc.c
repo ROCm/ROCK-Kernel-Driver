@@ -288,7 +288,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 	/*
 	 * There is not enough space for user on the device
 	 */
-	if (!fsuser() && ufs_freespace(usb1, UFS_MINFREE) <= 0) {
+	if (!capable(CAP_SYS_RESOURCE) && ufs_freespace(usb1, UFS_MINFREE) <= 0) {
 		unlock_super (sb);
 		UFSD(("EXIT (FAILED)\n"))
 		return 0;

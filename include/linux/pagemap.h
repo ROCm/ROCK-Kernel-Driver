@@ -2,17 +2,11 @@
 #define _LINUX_PAGEMAP_H
 
 /*
- * Page-mapping primitive inline functions
- *
  * Copyright 1995 Linus Torvalds
  */
-
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/list.h>
-
-#include <asm/system.h>
-#include <asm/pgtable.h>
 #include <linux/highmem.h>
 
 /*
@@ -36,10 +30,8 @@ static inline struct page *page_cache_alloc(struct address_space *x)
 	return alloc_pages(x->gfp_mask, 0);
 }
 
-/*
- * From a kernel address, get the "struct page *"
- */
-#define page_cache_entry(x)	virt_to_page(x)
+
+typedef int filler_t(void *, struct page *);
 
 extern struct page * find_get_page(struct address_space *mapping,
 				unsigned long index);
@@ -54,6 +46,9 @@ extern struct page * grab_cache_page(struct address_space *mapping,
 				unsigned long index);
 extern struct page * grab_cache_page_nowait(struct address_space *mapping,
 				unsigned long index);
+extern struct page * read_cache_page(struct address_space *mapping,
+				unsigned long index, filler_t *filler,
+				void *data);
 
 extern int add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long index);
@@ -73,21 +68,34 @@ static inline void ___add_to_page_cache(struct page *page,
 
 extern void FASTCALL(lock_page(struct page *page));
 extern void FASTCALL(unlock_page(struct page *page));
-extern void end_page_writeback(struct page *page);
 
-extern void ___wait_on_page_locked(struct page *);
+/*
+ * This is exported only for wait_on_page_locked/wait_on_page_writeback.
+ * Never use this directly!
+ */
+extern void FASTCALL(wait_on_page_bit(struct page *page, int bit_nr));
 
+/* 
+ * Wait for a page to be unlocked.
+ *
+ * This must be called with the caller "holding" the page,
+ * ie with increased "page->count" so that the page won't
+ * go away during the wait..
+ */
 static inline void wait_on_page_locked(struct page *page)
 {
 	if (PageLocked(page))
-		___wait_on_page_locked(page);
+		wait_on_page_bit(page, PG_locked);
 }
 
-extern void wake_up_page(struct page *);
-extern void wait_on_page_writeback(struct page *page);
+/* 
+ * Wait for a page to complete writeback
+ */
+static inline void wait_on_page_writeback(struct page *page)
+{
+	if (PageWriteback(page))
+		wait_on_page_bit(page, PG_writeback);
+}
 
-typedef int filler_t(void *, struct page*);
-
-extern struct page *read_cache_page(struct address_space *, unsigned long,
-				filler_t *, void *);
-#endif
+extern void end_page_writeback(struct page *page);
+#endif /* _LINUX_PAGEMAP_H */

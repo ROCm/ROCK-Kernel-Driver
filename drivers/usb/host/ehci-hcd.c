@@ -53,7 +53,7 @@
 
 /*
  * EHCI hc_driver implementation ... experimental, incomplete.
- * Based on the 0.96 register interface specification.
+ * Based on the final 1.0 register interface specification.
  *
  * There are lots of things to help out with here ... notably
  * everything "periodic", and of course testing with all sorts
@@ -70,6 +70,8 @@
  *
  * HISTORY:
  *
+ * 2002-05-07	Some error path cleanups to report better errors; wmb();
+ *	use non-CVS version id; better iso bandwidth claim.
  * 2002-04-19	Control/bulk/interrupt submit no longer uses giveback() on
  *	errors in submit path.  Bugfixes to interrupt scheduling/processing.
  * 2002-03-05	Initial high-speed ISO support; reduce ITD memory; shift
@@ -83,7 +85,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "$Revision: 0.31 $"
+#define DRIVER_VERSION "2002-May-07"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -582,7 +584,7 @@ dbg ("wait for dequeue: state %d, reclaim %p, hcd state %d",
 		intr_deschedule (ehci, urb->start_frame, qh, urb->interval);
 		if (ehci->hcd.state == USB_STATE_HALT)
 			urb->status = -ESHUTDOWN;
-		qh_completions (ehci, &qh->qtd_list, 1);
+		qh_completions (ehci, qh, 1);
 		return 0;
 
 	case PIPE_ISOCHRONOUS:

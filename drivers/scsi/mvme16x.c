@@ -22,7 +22,7 @@
 #include<linux/stat.h>
 
 extern ncr53c7xx_init (Scsi_Host_Template *tpnt, int board, int chip,
-			u32 base, int io_port, int irq, int dma,
+			unsigned long base, int io_port, int irq, int dma,
 			long long options, int clock);
 
 int mvme16x_scsi_detect(Scsi_Host_Template *tpnt)
@@ -46,7 +46,7 @@ int mvme16x_scsi_detect(Scsi_Host_Template *tpnt)
 
     clock = 66000000;	/* 66MHz SCSI Clock */
 
-    ncr53c7xx_init(tpnt, 0, 710, (u32)0xfff47000,
+    ncr53c7xx_init(tpnt, 0, 710, (unsigned long)0xfff47000,
 			0, MVME16x_IRQ_SCSI, DMA_NONE,
 			options, clock);
     called = 1;

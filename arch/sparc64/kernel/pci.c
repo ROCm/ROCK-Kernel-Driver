@@ -311,7 +311,8 @@ void pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
 {
 }
 
-void pcibios_align_resource(void *data, struct resource *res, unsigned long size)
+void pcibios_align_resource(void *data, struct resource *res,
+			    unsigned long size, unsigned long align)
 {
 }
 

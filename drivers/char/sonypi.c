@@ -485,12 +485,10 @@ static int sonypi_misc_release(struct inode * inode, struct file * file) {
 
 static int sonypi_misc_open(struct inode * inode, struct file * file) {
 	down(&sonypi_device.lock);
-	if (sonypi_device.open_count)
-		goto out;
+	/* Flush input queue on first open */
+	if (!sonypi_device.open_count)
+		sonypi_initq();
 	sonypi_device.open_count++;
-	/* Flush input queue */
-	sonypi_initq();
-out:
 	up(&sonypi_device.lock);
 	return 0;
 }
@@ -718,9 +716,12 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	       SONYPI_DRIVER_MAJORVERSION,
 	       SONYPI_DRIVER_MINORVERSION);
 	printk(KERN_INFO "sonypi: detected %s model, "
-	       "camera = %s, compat = %s, nojogdial = %s\n",
+	       "verbose = %s, fnkeyinit = %s, camera = %s, "
+	       "compat = %s, nojogdial = %s\n",
 	       (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE1) ?
 			"type1" : "type2",
+	       verbose ? "on" : "off",
+	       fnkeyinit ? "on" : "off",
 	       camera ? "on" : "off",
 	       compat ? "on" : "off",
 	       nojogdial ? "on" : "off");
@@ -779,7 +780,7 @@ static void __exit sonypi_cleanup_module(void) {
 
 #ifndef MODULE
 static int __init sonypi_setup(char *str)  {
-	int ints[6];
+	int ints[7];
 
 	str = get_options(str, ARRAY_SIZE(ints), ints);
 	if (ints[0] <= 0) 

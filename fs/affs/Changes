@@ -28,6 +28,12 @@ Known bugs:
 
 Please direct bug reports to: zippel@linux-m68k.org
 
+Version 3.19
+------------
+
+- sizeof changes from Kernel Janitor Project
+- several bug fixes found with fsx
+
 Version 3.18
 ------------
 

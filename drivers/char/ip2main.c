@@ -2662,7 +2662,7 @@ set_serial_info( i2ChanStrPtr pCh, struct serial_struct *new_info )
 	old_flags = pCh->flags;
 	old_baud_divisor = pCh->BaudDivisor;
 
-	if ( !suser() ) {
+	if ( !capable(CAP_SYS_ADMIN) ) {
 		if ( ( ns.close_delay != pCh->ClosingDelay ) ||
 		    ( (ns.flags & ~ASYNC_USR_MASK) !=
 		      (pCh->flags & ~ASYNC_USR_MASK) ) ) {

@@ -58,7 +58,7 @@
 /* When BROKEN_LEVEL is defined it limits the DMA mode
    at boot time to its value */
 // #define BROKEN_LEVEL XFER_SW_DMA_0
-#define DISPLAY_SIS_TIMINGS
+#undef DISPLAY_SIS_TIMINGS
 
 /* Miscellaneaous flags */
 #define SIS5513_LATENCY		0x01

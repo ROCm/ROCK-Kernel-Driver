@@ -33,19 +33,32 @@
  * re-enable queues to get higher bandwidth utilization (without needing
  * to tweak MTU for larger packets).
  *
- * Add support for more "network cable" chips; interop with their Win32
- * drivers may be a good thing.  Test the AnchorChip 2720 support..
- * Figure out the initialization protocol used by the Prolific chips,
- * for better robustness ... there's some powerup/reset handshake that's
- * needed when only one end reboots.
+ * - AN2720 ... not widely available, but reportedly works well
  *
- * Use interrupt on PL230x to detect peer connect/disconnect, and call
- * netif_carrier_{on,off} (?) appropriately.  For Net1080, detect peer
- * connect/disconnect with async control messages.
+ * - Belkin/eTEK ... no known issues
  *
- * Find some way to report "peer connected" network hotplug events; it'll
- * likely mean updating the networking layer.  (This has been discussed
- * on the netdev list...)
+ * - Both GeneSys and PL-230x use interrupt transfers for driver-to-driver
+ *   handshaking; it'd be worth implementing those as "carrier detect".
+ *   Prefer generic hooks, not minidriver-specific hacks.
+ *
+ * - Linux devices ... the www.handhelds.org SA-1100 support works nicely,
+ *   but the Sharp Zaurus uses an incompatible protocol (extra checksums).
+ *   No reason not to merge the Zaurus protocol here too (got patch? :)
+ *
+ * - For Netchip, use keventd to poll via control requests to detect hardware
+ *   level "carrier detect". 
+ *
+ * - PL-230x ... the initialization protocol doesn't seem to match chip data
+ *   sheets, sometimes it's not needed and sometimes it hangs.  Prolific has
+ *   not responded to repeated support/information requests.
+ *
+ * Interop with more Win32 drivers may be a good thing.
+ *
+ * Seems like reporting "peer connected" (carrier present) events may end
+ * up going through the netlink event system, not hotplug ... that may be
+ * awkward in terms of automatic configuration though.
+ *
+ * There are reports that bridging gives lower-than-usual throughput.
  *
  * Craft smarter hotplug policy scripts ... ones that know how to arrange
  * bridging with "brctl", and can handle static and dynamic ("pump") setups.
@@ -88,6 +101,9 @@
  *		Level of diagnostics is more configurable; they use device
  *		location (usb_device->devpath) instead of address (2.5).
  *		For tx_fixup, memflags can't be NOIO.
+ * 07-may-2002	Generalize/cleanup keventd support, handling rx stalls (mostly
+ *		for USB 2.0 TTs) and memory shortages (potential) too. (db)
+ *		Use "locally assigned" IEEE802 address space. (Brad Hards)
  *
  *-------------------------------------------------------------------------*/
 
@@ -113,6 +129,7 @@
 #include <linux/usb.h>
 
 
+/* minidrivers _could_ be individually configured */
 #define	CONFIG_USB_AN2720
 #define	CONFIG_USB_BELKIN
 #define	CONFIG_USB_GENESYS
@@ -121,7 +138,7 @@
 #define	CONFIG_USB_PL2301
 
 
-#define DRIVER_VERSION		"26-Apr-2002"
+#define DRIVER_VERSION		"07-May-2002"
 
 /*-------------------------------------------------------------------------*/
 
@@ -185,7 +202,12 @@ struct usbnet {
 	struct sk_buff_head	txq;
 	struct sk_buff_head	done;
 	struct tasklet_struct	bh;
-	struct tq_struct	ctrl_task;
+
+	struct tq_struct	kevent;
+	unsigned long		flags;
+#		define EVENT_TX_HALT	0
+#		define EVENT_RX_HALT	1
+#		define EVENT_RX_MEMORY	2
 };
 
 // device-specific info used by the driver
@@ -1238,6 +1260,21 @@ static void defer_bh (struct usbnet *dev, struct sk_buff *skb)
 	spin_unlock_irqrestore (&dev->done.lock, flags);
 }
 
+/* some work can't be done in tasklets, so we use keventd
+ *
+ * NOTE:  annoying asymmetry:  if it's active, schedule_task() fails,
+ * but tasklet_schedule() doesn't.  hope the failure is rare.
+ */
+static void defer_kevent (struct usbnet *dev, int work)
+{
+	set_bit (work, &dev->flags);
+	if (!schedule_task (&dev->kevent))
+		err ("%s: kevent %d may have been dropped",
+			dev->net.name, work);
+	else
+		dbg ("%s: kevent %d scheduled", dev->net.name, work);
+}
+
 /*-------------------------------------------------------------------------*/
 
 static void rx_complete (struct urb *urb);
@@ -1264,7 +1301,7 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 
 	if ((skb = alloc_skb (size, flags)) == 0) {
 		dbg ("no rx skb");
-		tasklet_schedule (&dev->bh);
+		defer_kevent (dev, EVENT_RX_MEMORY);
 		usb_free_urb (urb);
 		return;
 	}
@@ -1290,11 +1327,20 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 
 	spin_lock_irqsave (&dev->rxq.lock, lockflags);
 
-	if (netif_running (&dev->net)) {
-		if ((retval = usb_submit_urb (urb, GFP_ATOMIC)) != 0) {
+	if (netif_running (&dev->net)
+			&& !test_bit (EVENT_RX_HALT, &dev->flags)) {
+		switch (retval = usb_submit_urb (urb, GFP_ATOMIC)){ 
+		case -EPIPE:
+			defer_kevent (dev, EVENT_RX_HALT);
+			break;
+		case -ENOMEM:
+			defer_kevent (dev, EVENT_RX_MEMORY);
+			break;
+		default:
 			dbg ("%s rx submit, %d", dev->net.name, retval);
 			tasklet_schedule (&dev->bh);
-		} else {
+			break;
+		case 0:
 			__skb_queue_tail (&dev->rxq, skb);
 		}
 	} else {
@@ -1368,12 +1414,20 @@ static void rx_complete (struct urb *urb)
 		}
 		break;
 
+	    // stalls need manual reset. this is rare ... except that
+	    // when going through USB 2.0 TTs, unplug appears this way.
+	    // we avoid the highspeed version of the ETIMEOUT/EILSEQ
+	    // storm, recovering as needed.
+	    case -EPIPE:
+		defer_kevent (dev, EVENT_RX_HALT);
+		// FALLTHROUGH
+
 	    // software-driven interface shutdown
-	    case -ECONNRESET:		// usb-ohci, usb-uhci
-	    case -ECONNABORTED:		// uhci ... for usb-uhci, INTR
-		dbg ("%s shutdown, code %d", dev->net.name, urb_status);
+	    case -ECONNRESET:		// according to API spec
+	    case -ECONNABORTED:		// some (now fixed?) UHCI bugs
+		dbg ("%s rx shutdown, code %d", dev->net.name, urb_status);
 		entry->state = rx_cleanup;
-		// do urb frees only in the tasklet
+		// do urb frees only in the tasklet (UHCI has oopsed ...)
 		entry->urb = urb;
 		urb = 0;
 		break;
@@ -1384,8 +1438,9 @@ static void rx_complete (struct urb *urb)
 		// FALLTHROUGH
 	    
 	    default:
-		// on unplug we'll get a burst of ETIMEDOUT/EILSEQ
-		// till the khubd gets and handles its interrupt.
+		// on unplug we get ETIMEDOUT (ohci) or EILSEQ (uhci)
+		// until khubd sees its interrupt and disconnects us.
+		// that can easily be hundreds of passes through here.
 		entry->state = rx_cleanup;
 		dev->stats.rx_errors++;
 		dbg ("%s rx: status %d", dev->net.name, urb_status);
@@ -1395,10 +1450,12 @@ static void rx_complete (struct urb *urb)
 	defer_bh (dev, skb);
 
 	if (urb) {
-		if (netif_running (&dev->net)) {
+		if (netif_running (&dev->net)
+				&& !test_bit (EVENT_RX_HALT, &dev->flags)) {
 			rx_submit (dev, urb, GFP_ATOMIC);
 			return;
 		}
+		usb_free_urb (urb);
 	}
 #ifdef	VERBOSE
 	dbg ("no read resubmitted");
@@ -1428,7 +1485,7 @@ static int unlink_urbs (struct sk_buff_head *q)
 		// during some PM-driven resume scenarios,
 		// these (async) unlinks complete immediately
 		retval = usb_unlink_urb (urb);
-		if (retval < 0)
+		if (retval != -EINPROGRESS && retval != 0)
 			dbg ("unlink urb err, %d", retval);
 		else
 			count++;
@@ -1600,16 +1657,62 @@ static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 
 /*-------------------------------------------------------------------------*/
 
-/* usb_clear_halt cannot be called in interrupt context */
-
+/* work that cannot be done in interrupt context uses keventd.
+ *
+ * NOTE:  "uhci" and "usb-uhci" may have trouble with this since they don't
+ * queue control transfers to individual devices, and other threads could
+ * trigger control requests concurrently.  hope that's rare.
+ */
 static void
-tx_clear_halt (void *data)
+kevent (void *data)
 {
 	struct usbnet		*dev = data;
+	int			status;
 
-	usb_clear_halt (dev->udev,
-		usb_sndbulkpipe (dev->udev, dev->driver_info->out));
-	netif_wake_queue (&dev->net);
+	/* usb_clear_halt() needs a thread context */
+	if (test_bit (EVENT_TX_HALT, &dev->flags)) {
+		unlink_urbs (&dev->txq);
+		status = usb_clear_halt (dev->udev,
+			usb_sndbulkpipe (dev->udev, dev->driver_info->out));
+		if (status < 0)
+			err ("%s: can't clear tx halt, status %d",
+				dev->net.name, status);
+		else {
+			clear_bit (EVENT_TX_HALT, &dev->flags);
+			netif_wake_queue (&dev->net);
+		}
+	}
+	if (test_bit (EVENT_RX_HALT, &dev->flags)) {
+		unlink_urbs (&dev->rxq);
+		status = usb_clear_halt (dev->udev,
+			usb_rcvbulkpipe (dev->udev, dev->driver_info->in));
+		if (status < 0)
+			err ("%s: can't clear rx halt, status %d",
+				dev->net.name, status);
+		else {
+			clear_bit (EVENT_RX_HALT, &dev->flags);
+			tasklet_schedule (&dev->bh);
+		}
+	}
+
+	/* tasklet could resubmit itself forever if memory is tight */
+	if (test_bit (EVENT_RX_MEMORY, &dev->flags)) {
+		struct urb	*urb = 0;
+
+		if (netif_running (&dev->net))
+			urb = usb_alloc_urb (0, GFP_KERNEL);
+		else
+			clear_bit (EVENT_RX_MEMORY, &dev->flags);
+		if (urb != 0) {
+			clear_bit (EVENT_RX_MEMORY, &dev->flags);
+			rx_submit (dev, urb, GFP_KERNEL);
+			tasklet_schedule (&dev->bh);
+		}
+	}
+
+	if (dev->flags)
+		dbg ("%s: kevent done, flags = 0x%lx",
+			dev->net.name, dev->flags);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1620,15 +1723,8 @@ static void tx_complete (struct urb *urb)
 	struct skb_data		*entry = (struct skb_data *) skb->cb;
 	struct usbnet		*dev = entry->dev;
 
-	if (urb->status == -EPIPE) {
-		if (dev->ctrl_task.sync == 0) {
-			dev->ctrl_task.routine = tx_clear_halt;
-			dev->ctrl_task.data = dev;
-			schedule_task (&dev->ctrl_task);
-		} else {
-			dbg ("Cannot clear TX stall");
-		}
-	}
+	if (urb->status == -EPIPE)
+		defer_kevent (dev, EVENT_TX_HALT);
 	urb->dev = 0;
 	entry->state = tx_done;
 	defer_bh (dev, skb);
@@ -1725,10 +1821,15 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 #endif	/* CONFIG_USB_NET1080 */
 
 	netif_stop_queue (net);
-	if ((retval = usb_submit_urb (urb, GFP_ATOMIC)) != 0) {
+	switch ((retval = usb_submit_urb (urb, GFP_ATOMIC))) {
+	case -EPIPE:
+		defer_kevent (dev, EVENT_TX_HALT);
+		break;
+	default:
 		netif_start_queue (net);
 		dbg ("%s tx: submit urb err %d", net->name, retval);
-	} else {
+		break;
+	case 0:
 		net->trans_start = jiffies;
 		__skb_queue_tail (&dev->txq, skb);
 		if (dev->txq.qlen < TX_QLEN)
@@ -1799,7 +1900,8 @@ static void usbnet_bh (unsigned long param)
 		}
 
 	// or are we maybe short a few urbs?
-	} else if (netif_running (&dev->net)) {
+	} else if (netif_running (&dev->net)
+			&& !test_bit (EVENT_RX_HALT, &dev->flags)) {
 		int	temp = dev->rxq.qlen;
 
 		if (temp < RX_QLEN) {
@@ -1844,6 +1946,9 @@ static void usbnet_disconnect (struct usb_device *udev, void *ptr)
 	mutex_lock (&dev->mutex);
 	list_del (&dev->dev_list);
 	mutex_unlock (&usbnet_mutex);
+
+	// assuming we used keventd, it must quiesce too
+	flush_scheduled_tasks ();
 
 	kfree (dev);
 	usb_dec_dev_use (udev);
@@ -1902,6 +2007,7 @@ usbnet_probe (struct usb_device *udev, unsigned ifnum,
 	skb_queue_head_init (&dev->done);
 	dev->bh.func = usbnet_bh;
 	dev->bh.data = (unsigned long) dev;
+	INIT_TQUEUE (&dev->kevent, kevent, dev);
 
 	// set up network interface records
 	net = &dev->net;
@@ -2038,6 +2144,7 @@ static int __init usbnet_init (void)
 
 	get_random_bytes (node_id, sizeof node_id);
 	node_id [0] &= 0xfe;	// clear multicast bit
+	node_id [0] |= 0x02;    // set local assignment bit (IEEE802)
 
  	if (usb_register (&usbnet_driver) < 0)
  		return -1;

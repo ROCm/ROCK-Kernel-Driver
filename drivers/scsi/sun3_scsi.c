@@ -609,3 +609,4 @@ static Scsi_Host_Template driver_template = SUN3_NCR5380;
 
 #include "scsi_module.c"
 
+MODULE_LICENSE("GPL");

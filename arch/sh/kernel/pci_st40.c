@@ -414,10 +414,6 @@ void __init
 pcibios_fixup_pbus_ranges(struct pci_bus *bus,
 			  struct pbus_set_ranges_data *ranges)
 {
-	ranges->io_start -= bus->resource[0]->start;
-	ranges->io_end -= bus->resource[0]->start;
-	ranges->mem_start -= bus->resource[1]->start;
-	ranges->mem_end -= bus->resource[1]->start;
 }
 
 void __init pcibios_init(void)

@@ -62,9 +62,8 @@ void *mac_env;		/* Loaded by the boot asm */
 unsigned long mac_orig_videoaddr;
 
 /* Mac specific timer functions */
-extern void mac_gettod (int *, int *, int *, int *, int *, int *);
 extern unsigned long mac_gettimeoffset (void);
-extern int mac_hwclk (int, struct hwclk_time *);
+extern int mac_hwclk (int, struct rtc_time *);
 extern int mac_set_clock_mmss (unsigned long);
 extern int show_mac_interrupts(struct seq_file *, void *);
 extern void iop_preinit(void);
@@ -243,8 +242,10 @@ void __init config_mac(void)
 	mach_default_handler = &mac_handlers;
 	mach_get_irq_list    = show_mac_interrupts;
 	mach_gettimeoffset   = mac_gettimeoffset;
-	mach_gettod          = mac_gettod;
+#warning move to adb/via init
+#if 0
 	mach_hwclk           = mac_hwclk;
+#endif
 	mach_set_clock_mmss	 = mac_set_clock_mmss;
 #if 0
 	mach_mksound         = mac_mksound;

@@ -418,7 +418,7 @@ static int check_autopoll(struct ata_device *drive)
 	 * pass NOP with sub-code 0x01 to device, so the command will not
 	 * fail there
 	 */
-	ide_raw_taskfile(drive, &args, NULL);
+	ide_raw_taskfile(drive, &args);
 	if (args.taskfile.feature & ABRT_ERR)
 		return 1;
 
@@ -448,7 +448,7 @@ static int configure_tcq(struct ata_device *drive)
 	args.taskfile.command = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 
-	if (ide_raw_taskfile(drive, &args, NULL)) {
+	if (ide_raw_taskfile(drive, &args)) {
 		printk("%s: failed to enable write cache\n", drive->name);
 		return 1;
 	}
@@ -462,7 +462,7 @@ static int configure_tcq(struct ata_device *drive)
 	args.taskfile.command = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 
-	if (ide_raw_taskfile(drive, &args, NULL)) {
+	if (ide_raw_taskfile(drive, &args)) {
 		printk("%s: disabling release interrupt fail\n", drive->name);
 		return 1;
 	}
@@ -476,7 +476,7 @@ static int configure_tcq(struct ata_device *drive)
 	args.taskfile.command = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
 
-	if (ide_raw_taskfile(drive, &args, NULL)) {
+	if (ide_raw_taskfile(drive, &args)) {
 		printk("%s: enabling service interrupt fail\n", drive->name);
 		return 1;
 	}

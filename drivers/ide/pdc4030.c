@@ -39,6 +39,7 @@
  *  Version 0.90	Transition to BETA code. No lost/unexpected interrupts
  *  Version 0.91	Bring in line with new bio code in 2.5.1
  *  Version 0.92	Update for IDE driver taskfile changes
+ *  Version 0.93	Sync with 2.5.10, minor taskfile changes
  */
 
 /*
@@ -380,6 +381,7 @@ read_next:
 }
 
 /*
+ * promise_complete_pollfunc()
  * This is the polling function for waiting (nicely!) until drive stops
  * being busy. It is invoked at the end of a write, after the previous poll
  * has finished.
@@ -388,20 +390,20 @@ read_next:
  */
 static ide_startstop_t promise_complete_pollfunc(struct ata_device *drive, struct request *rq)
 {
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	struct ata_channel *ch = drive->channel;
 
 	if (GET_STAT() & BUSY_STAT) {
-		if (time_before(jiffies, hwgroup->poll_timeout)) {
+		if (time_before(jiffies, ch->poll_timeout)) {
 			ide_set_handler(drive, promise_complete_pollfunc, HZ/100, NULL);
 			return ide_started; /* continue polling... */
 		}
-		hwgroup->poll_timeout = 0;
+		ch->poll_timeout = 0;
 		printk(KERN_ERR "%s: completion timeout - still busy!\n",
 		       drive->name);
 		return ide_error(drive, "busy timeout", GET_STAT());
 	}
 
-	hwgroup->poll_timeout = 0;
+	ch->poll_timeout = 0;
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: Write complete - end_request\n", drive->name);
 #endif
@@ -432,7 +434,7 @@ int promise_multwrite(struct ata_device *drive, struct request *rq, unsigned int
 			nsect = mcount;
 		mcount -= nsect;
 
-		buffer = bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
+		buffer = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
 		rq->sector += nsect;
 		rq->nr_sectors -= nsect;
 		rq->current_nr_sectors -= nsect;
@@ -467,23 +469,23 @@ int promise_multwrite(struct ata_device *drive, struct request *rq, unsigned int
  */
 static ide_startstop_t promise_write_pollfunc(struct ata_device *drive, struct request *rq)
 {
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	struct ata_channel *ch = drive->channel;
 
 	if (IN_BYTE(IDE_NSECTOR_REG) != 0) {
-		if (time_before(jiffies, hwgroup->poll_timeout)) {
+		if (time_before(jiffies, ch->poll_timeout)) {
 			ide_set_handler(drive, promise_write_pollfunc, HZ/100, NULL);
 			return ide_started; /* continue polling... */
 		}
-		hwgroup->poll_timeout = 0;
+		ch->poll_timeout = 0;
 		printk(KERN_ERR "%s: write timed-out!\n",drive->name);
-		return ide_error (drive, "write timeout", GET_STAT());
+		return ide_error(drive, "write timeout", GET_STAT());
 	}
 
 	/*
 	 * Now write out last 4 sectors and poll for not BUSY
 	 */
 	promise_multwrite(drive, rq, 4);
-	hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+	ch->poll_timeout = jiffies + WAIT_WORSTCASE;
 	ide_set_handler(drive, promise_complete_pollfunc, HZ/100, NULL);
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: Done last 4 sectors - status = %02x\n",
@@ -501,7 +503,7 @@ static ide_startstop_t promise_write_pollfunc(struct ata_device *drive, struct r
  */
 static ide_startstop_t promise_write(struct ata_device *drive, struct request *rq)
 {
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	struct ata_channel *ch = drive->channel;
 
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: promise_write: sectors(%ld-%ld), "
@@ -516,7 +518,7 @@ static ide_startstop_t promise_write(struct ata_device *drive, struct request *r
 	if (rq->nr_sectors > 4) {
 		if (promise_multwrite(drive, rq, rq->nr_sectors - 4))
 			return ide_stopped;
-		hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+		ch->poll_timeout = jiffies + WAIT_WORSTCASE;
 		ide_set_handler(drive, promise_write_pollfunc, HZ/100, NULL);
 		return ide_started;
 	} else {
@@ -526,7 +528,7 @@ static ide_startstop_t promise_write(struct ata_device *drive, struct request *r
 	 */
 		if (promise_multwrite(drive, rq, rq->nr_sectors))
 			return ide_stopped;
-		hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+		ch->poll_timeout = jiffies + WAIT_WORSTCASE;
 		ide_set_handler(drive, promise_complete_pollfunc, HZ/100, NULL);
 #ifdef DEBUG_WRITE
 		printk(KERN_DEBUG "%s: promise_write: <= 4 sectors, "
@@ -537,13 +539,13 @@ static ide_startstop_t promise_write(struct ata_device *drive, struct request *r
 }
 
 /*
- * do_pdc4030_io() is called from do_rw_disk, having had the block number
- * already set up. It issues a READ or WRITE command to the Promise
+ * do_pdc4030_io() is called from promise_do_request, having had the block
+ * number already set up. It issues a READ or WRITE command to the Promise
  * controller, assuming LBA has been used to set up the block number.
  */
-ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *task, struct request *rq)
+ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *args, struct request *rq)
 {
-	struct hd_drive_task_hdr *taskfile = &task->taskfile;
+	struct hd_drive_task_hdr *taskfile = &(args->taskfile);
 	unsigned long timeout;
 	byte stat;
 
@@ -628,7 +630,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *tas
 	}
 }
 
-ide_startstop_t promise_rw_disk(struct ata_device *drive, struct request *rq, sector_t block)
+ide_startstop_t promise_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
 	struct ata_taskfile args;
 
@@ -647,12 +649,12 @@ ide_startstop_t promise_rw_disk(struct ata_device *drive, struct request *rq, se
 	args.taskfile.device_head	= ((block>>8)&0x0f)|drive->select.all;
 	args.taskfile.command		= (rq_data_dir(rq)==READ)?PROMISE_READ:PROMISE_WRITE;
 
-	ide_cmd_type_parser(&args);
-	/* We don't use the generic inerrupt handlers here? */
-	args.prehandler		= NULL;
+	/* We can't call ide_cmd_type_parser here, since it won't understand
+	   our command, but that doesn't matter, since we don't use the
+	   generic interrupt handlers either. Setup the bits of args that we
+	   will need. */
 	args.handler		= NULL;
 	rq->special		= &args;
 
 	return do_pdc4030_io(drive, &args, rq);
 }
-

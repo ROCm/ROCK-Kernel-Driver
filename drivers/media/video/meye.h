@@ -29,7 +29,7 @@
 #define _MEYE_PRIV_H_
 
 #define MEYE_DRIVER_MAJORVERSION	1
-#define MEYE_DRIVER_MINORVERSION	3
+#define MEYE_DRIVER_MINORVERSION	4
 
 /****************************************************************************/
 /* Motion JPEG chip registers                                               */

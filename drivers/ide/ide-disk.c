@@ -34,9 +34,9 @@
 #include <asm/io.h>
 
 #ifdef CONFIG_BLK_DEV_PDC4030
-#define IS_PDC4030_DRIVE (drive->channel->chipset == ide_pdc4030)
+# define IS_PDC4030_DRIVE (drive->channel->chipset == ide_pdc4030)
 #else
-#define IS_PDC4030_DRIVE (0)	/* auto-NULLs out pdc4030 code */
+# define IS_PDC4030_DRIVE (0)	/* auto-NULLs out pdc4030 code */
 #endif
 
 /*
@@ -304,9 +304,9 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 	}
 
 	if (IS_PDC4030_DRIVE) {
-		extern ide_startstop_t promise_rw_disk(struct ata_device *, struct request *, unsigned long);
+		extern ide_startstop_t promise_do_request(struct ata_device *, struct request *, sector_t);
 
-		return promise_rw_disk(drive, rq, block);
+		return promise_do_request(drive, rq, block);
 	}
 
 	/*
@@ -364,7 +364,7 @@ static int idedisk_open (struct inode *inode, struct file *filp, struct ata_devi
 		 * point.
 		 */
 
-		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
+		if (drive->doorlocking && ide_raw_taskfile(drive, &args))
 			drive->doorlocking = 0;
 	}
 	return 0;
@@ -383,10 +383,10 @@ static int idedisk_flushcache(struct ata_device *drive)
 
 	ide_cmd_type_parser(&args);
 
-	return ide_raw_taskfile(drive, &args, NULL);
+	return ide_raw_taskfile(drive, &args);
 }
 
-static void idedisk_release (struct inode *inode, struct file *filp, struct ata_device *drive)
+static void idedisk_release(struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	if (drive->removable && !drive->usage) {
 		struct ata_taskfile args;
@@ -398,7 +398,7 @@ static void idedisk_release (struct inode *inode, struct file *filp, struct ata_
 		ide_cmd_type_parser(&args);
 
 		if (drive->doorlocking &&
-		    ide_raw_taskfile(drive, &args, NULL))
+		    ide_raw_taskfile(drive, &args))
 			drive->doorlocking = 0;
 	}
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
@@ -419,269 +419,64 @@ static sector_t idedisk_capacity(struct ata_device *drive)
 	return drive->capacity - drive->sect0;
 }
 
-static ide_startstop_t idedisk_special(struct ata_device *drive)
-{
-	unsigned char special_cmd = drive->special_cmd;
-
-	if (special_cmd & ATA_SPECIAL_GEOMETRY) {
-		struct ata_taskfile args;
-
-		drive->special_cmd &= ~ATA_SPECIAL_GEOMETRY;
-
-		memset(&args, 0, sizeof(args));
-		args.taskfile.sector_number	= drive->sect;
-		args.taskfile.low_cylinder	= drive->cyl;
-		args.taskfile.high_cylinder	= drive->cyl>>8;
-		args.taskfile.device_head	= ((drive->head-1)|drive->select.all)&0xBF;
-		if (!IS_PDC4030_DRIVE) {
-			args.taskfile.sector_count = drive->sect;
-			args.taskfile.command = WIN_SPECIFY;
-			args.handler = set_geometry_intr;;
-		}
-		ata_taskfile(drive, &args, NULL);
-	} else if (special_cmd & ATA_SPECIAL_RECALIBRATE) {
-		drive->special_cmd &= ~ATA_SPECIAL_RECALIBRATE;
-
-		if (!IS_PDC4030_DRIVE) {
-			struct ata_taskfile args;
-
-			memset(&args, 0, sizeof(args));
-			args.taskfile.sector_count = drive->sect;
-			args.taskfile.command = WIN_RESTORE;
-			args.handler = recal_intr;
-			ata_taskfile(drive, &args, NULL);
-		}
-	} else if (special_cmd & ATA_SPECIAL_MMODE) {
-		drive->special_cmd &= ~ATA_SPECIAL_MMODE;
-		if (drive->id && drive->mult_req > drive->id->max_multsect)
-			drive->mult_req = drive->id->max_multsect;
-		if (!IS_PDC4030_DRIVE) {
-			struct ata_taskfile args;
-
-			memset(&args, 0, sizeof(args));
-			args.taskfile.sector_count = drive->mult_req;
-			args.taskfile.command = WIN_SETMULT;
-			args.handler = set_multmode_intr;
-
-			ata_taskfile(drive, &args, NULL);
-		}
-	} else if (special_cmd) {
-		drive->special_cmd = 0;
-
-		printk(KERN_ERR "%s: bad special flag: 0x%02x\n", drive->name, special_cmd);
-		return ide_stopped;
-	}
-	return IS_PDC4030_DRIVE ? ide_stopped : ide_started;
-}
-
-static void idedisk_pre_reset(struct ata_device *drive)
-{
-	int legacy = (drive->id->cfs_enable_2 & 0x0400) ? 0 : 1;
-
-	if (legacy)
-		drive->special_cmd = (ATA_SPECIAL_GEOMETRY | ATA_SPECIAL_RECALIBRATE);
-	else
-		drive->special_cmd = 0;
-	if (OK_TO_RESET_CONTROLLER)
-		drive->mult_count = 0;
-	if (drive->mult_req != drive->mult_count)
-		drive->special_cmd |= ATA_SPECIAL_MMODE;
-}
-
-#ifdef CONFIG_PROC_FS
-
-static int smart_enable(struct ata_device *drive)
-{
-	struct ata_taskfile args;
-
-	memset(&args, 0, sizeof(args));
-	args.taskfile.feature = SMART_ENABLE;
-	args.taskfile.low_cylinder = SMART_LCYL_PASS;
-	args.taskfile.high_cylinder = SMART_HCYL_PASS;
-	args.taskfile.command = WIN_SMART;
-	ide_cmd_type_parser(&args);
-
-	return ide_raw_taskfile(drive, &args, NULL);
-}
-
-static int get_smart_values(struct ata_device *drive, u8 *buf)
-{
-	struct ata_taskfile args;
-
-	memset(&args, 0, sizeof(args));
-	args.taskfile.feature = SMART_READ_VALUES;
-	args.taskfile.sector_count = 0x01;
-	args.taskfile.low_cylinder = SMART_LCYL_PASS;
-	args.taskfile.high_cylinder = SMART_HCYL_PASS;
-	args.taskfile.command = WIN_SMART;
-	ide_cmd_type_parser(&args);
-
-	smart_enable(drive);
-
-	return ide_raw_taskfile(drive, &args, buf);
-}
-
-static int get_smart_thresholds(struct ata_device *drive, u8 *buf)
-{
-	struct ata_taskfile args;
-
-	memset(&args, 0, sizeof(args));
-	args.taskfile.feature = SMART_READ_THRESHOLDS;
-	args.taskfile.sector_count = 0x01;
-	args.taskfile.low_cylinder = SMART_LCYL_PASS;
-	args.taskfile.high_cylinder = SMART_HCYL_PASS;
-	args.taskfile.command = WIN_SMART;
-	ide_cmd_type_parser(&args);
-
-	smart_enable(drive);
-
-	return ide_raw_taskfile(drive, &args, buf);
-}
-
-static int proc_idedisk_read_cache
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_device *drive = (struct ata_device *) data;
-	char		*out = page;
-	int		len;
-
-	if (drive->id)
-		len = sprintf(out,"%i\n", drive->id->buf_size / 2);
-	else
-		len = sprintf(out,"(none)\n");
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-static int proc_idedisk_read_smart_thresholds
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_device *drive = (struct ata_device *)data;
-	int		len = 0, i = 0;
-
-	if (!get_smart_thresholds(drive, page)) {
-		unsigned short *val = (unsigned short *) page;
-		char *out = ((char *)val) + (SECTOR_WORDS * 4);
-		page = out;
-		do {
-			out += sprintf(out, "%04x%c", le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
-			val += 1;
-		} while (i < (SECTOR_WORDS * 2));
-		len = out - page;
-	}
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-static int proc_idedisk_read_smart_values
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_device *drive = (struct ata_device *)data;
-	int len = 0, i = 0;
-
-	if (!get_smart_values(drive, page)) {
-		unsigned short *val = (unsigned short *) page;
-		char *out = ((char *)val) + (SECTOR_WORDS * 4);
-		page = out;
-		do {
-			out += sprintf(out, "%04x%c", le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
-			val += 1;
-		} while (i < (SECTOR_WORDS * 2));
-		len = out - page;
-	}
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-static int proc_idedisk_read_tcq
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_device *drive = (struct ata_device *) data;
-	char		*out = page;
-	int		len, cmds, i;
-	unsigned long	flags;
-
-	if (!blk_queue_tagged(&drive->queue)) {
-		len = sprintf(out, "not configured\n");
-		PROC_IDE_READ_RETURN(page, start, off, count, eof, len);
-	}
-
-	spin_lock_irqsave(&ide_lock, flags);
-
-	len = sprintf(out, "TCQ currently on:\t%s\n", drive->using_tcq ? "yes" : "no");
-	len += sprintf(out+len, "Max queue depth:\t%d\n",drive->queue_depth);
-	len += sprintf(out+len, "Max achieved depth:\t%d\n",drive->max_depth);
-	len += sprintf(out+len, "Max depth since last:\t%d\n",drive->max_last_depth);
-	len += sprintf(out+len, "Current depth:\t\t%d\n", ata_pending_commands(drive));
-	len += sprintf(out+len, "Active tags:\t\t[ ");
-	for (i = 0, cmds = 0; i < drive->queue_depth; i++) {
-		struct request *rq = blk_queue_tag_request(&drive->queue, i);
-
-		if (!rq)
-			continue;
-
-		len += sprintf(out+len, "%d, ", i);
-		cmds++;
-	}
-	len += sprintf(out+len, "]\n");
-
-	len += sprintf(out+len, "Queue:\t\t\treleased [ %lu ] - started [ %lu ]\n", drive->immed_rel, drive->immed_comp);
-
-	if (ata_pending_commands(drive) != cmds)
-		len += sprintf(out+len, "pending request and queue count mismatch (counted: %d)\n", cmds);
-
-	len += sprintf(out+len, "DMA status:\t\t%srunning\n", test_bit(IDE_DMA, &HWGROUP(drive)->flags) ? "" : "not ");
-
-	drive->max_last_depth = 0;
-
-	spin_unlock_irqrestore(&ide_lock, flags);
-	PROC_IDE_READ_RETURN(page, start, off, count, eof, len);
-}
-#endif
-
-static ide_proc_entry_t idedisk_proc[] = {
-	{ "cache",		S_IFREG|S_IRUGO,	proc_idedisk_read_cache,		NULL },
-	{ "geometry",		S_IFREG|S_IRUGO,	proc_ide_read_geometry,			NULL },
-	{ "smart_values",	S_IFREG|S_IRUSR,	proc_idedisk_read_smart_values,		NULL },
-	{ "smart_thresholds",	S_IFREG|S_IRUSR,	proc_idedisk_read_smart_thresholds,	NULL },
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-	{ "tcq",		S_IFREG|S_IRUSR,	proc_idedisk_read_tcq,			NULL },
-#endif
-	{ NULL, 0, NULL, NULL }
-};
-
-#else
-
-#define	idedisk_proc	NULL
-
-#endif	/* CONFIG_PROC_FS */
-
 /*
  * This is tightly woven into the driver->special can not touch.
  * DON'T do it again until a total personality rewrite is committed.
  */
 static int set_multcount(struct ata_device *drive, int arg)
 {
-	struct request rq;
+	struct ata_taskfile args;
 
-	if (drive->special_cmd & ATA_SPECIAL_MMODE)
+	/* Setting multi mode count on this channel type is not supported/not
+	 * handled.
+	 */
+	if (IS_PDC4030_DRIVE)
+		return -EIO;
+
+	/* Hugh, we still didn't detect the devices capabilities.
+	 */
+	if (!drive->id)
+		return -EIO;
+
+	/* FIXME: Hmm... just bailing out my be problematic, since there *is*
+	 * activity during boot. For now the same problem persists in
+	 * set_pio_mode() we will have to do something about it soon.
+	 */
+	if (HWGROUP(drive)->handler)
 		return -EBUSY;
 
-	ide_init_drive_cmd(&rq);
+	if (arg > drive->id->max_multsect)
+		arg = drive->id->max_multsect;
 
-	drive->mult_req = arg;
-	drive->special_cmd |= ATA_SPECIAL_MMODE;
+	memset(&args, 0, sizeof(args));
+	args.taskfile.sector_count = arg;
+	args.taskfile.command	= WIN_SETMULT;
+	ide_cmd_type_parser(&args);
 
-	ide_do_drive_cmd(drive, &rq, ide_wait);
+	if (!ide_raw_taskfile(drive, &args)) {
+		/* all went well track this setting as valid */
+		drive->mult_count = arg;
 
-	return (drive->mult_count == arg) ? 0 : -EIO;
+		return 0;
+	} else
+		drive->mult_count = 0; /* reset */
+
+	return -EIO;
 }
 
 static int set_nowerr(struct ata_device *drive, int arg)
 {
-	if (ide_spin_wait_hwgroup(drive))
+	if (HWGROUP(drive)->handler)
 		return -EBUSY;
+
 	drive->nowerr = arg;
 	drive->bad_wstat = arg ? BAD_R_STAT : BAD_W_STAT;
+
+	/* FIXME: I'm less then sure that we are under the global request lock here!
+	 */
+#if 0
 	spin_unlock_irq(&ide_lock);
+#endif
 
 	return 0;
 }
@@ -697,7 +492,7 @@ static int write_cache(struct ata_device *drive, int arg)
 	args.taskfile.feature	= (arg) ? SETFEATURES_EN_WCACHE : SETFEATURES_DIS_WCACHE;
 	args.taskfile.command	= WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
-	ide_raw_taskfile(drive, &args, NULL);
+	ide_raw_taskfile(drive, &args);
 
 	drive->wcache = arg;
 
@@ -712,7 +507,7 @@ static int idedisk_standby(struct ata_device *drive)
 	args.taskfile.command = WIN_STANDBYNOW1;
 	ide_cmd_type_parser(&args);
 
-	return ide_raw_taskfile(drive, &args, NULL);
+	return ide_raw_taskfile(drive, &args);
 }
 
 static int set_acoustic(struct ata_device *drive, int arg)
@@ -724,7 +519,7 @@ static int set_acoustic(struct ata_device *drive, int arg)
 	args.taskfile.sector_count = arg;
 	args.taskfile.command = WIN_SETFEATURES;
 	ide_cmd_type_parser(&args);
-	ide_raw_taskfile(drive, &args, NULL);
+	ide_raw_taskfile(drive, &args);
 
 	drive->acoustic = arg;
 
@@ -777,17 +572,11 @@ static void idedisk_add_settings(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 
-	ide_add_setting(drive,	"bios_cyl",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->bios_cyl,		NULL);
-	ide_add_setting(drive,	"bios_head",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	255,				1,	1,	&drive->bios_head,		NULL);
-	ide_add_setting(drive,	"bios_sect",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	63,				1,	1,	&drive->bios_sect,		NULL);
 	ide_add_setting(drive,	"address",		SETTING_RW,					HDIO_GET_ADDRESS,	HDIO_SET_ADDRESS,	TYPE_INTA,	0,	2,				1,	1,	&drive->addressing,	set_lba_addressing);
 	ide_add_setting(drive,	"multcount",		id ? SETTING_RW : SETTING_READ,			HDIO_GET_MULTCOUNT,	HDIO_SET_MULTCOUNT,	TYPE_BYTE,	0,	id ? id->max_multsect : 0,	1,	1,	&drive->mult_count,		set_multcount);
 	ide_add_setting(drive,	"nowerr",		SETTING_RW,					HDIO_GET_NOWERR,	HDIO_SET_NOWERR,	TYPE_BYTE,	0,	1,				1,	1,	&drive->nowerr,			set_nowerr);
-	ide_add_setting(drive,	"lun",			SETTING_RW,					-1,			-1,			TYPE_INT,	0,	7,				1,	1,	&drive->lun,			NULL);
 	ide_add_setting(drive,	"wcache",		SETTING_RW,					HDIO_GET_WCACHE,	HDIO_SET_WCACHE,	TYPE_BYTE,	0,	1,				1,	1,	&drive->wcache,			write_cache);
 	ide_add_setting(drive,	"acoustic",		SETTING_RW,					HDIO_GET_ACOUSTIC,	HDIO_SET_ACOUSTIC,	TYPE_BYTE,	0,	254,				1,	1,	&drive->acoustic,		set_acoustic);
-	ide_add_setting(drive,	"failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->failures,		NULL);
-	ide_add_setting(drive,	"max_failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->max_failures,		NULL);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 	ide_add_setting(drive,	"using_tcq",		SETTING_RW,					HDIO_GET_QDMA,		HDIO_SET_QDMA,		TYPE_BYTE,	0,	IDE_MAX_TAG,			1,		1,		&drive->using_tcq,		set_using_tcq);
 #endif
@@ -865,7 +654,7 @@ static unsigned long native_max_address(struct ata_device *drive)
 	args.handler = task_no_data_intr;
 
 	/* submit command request */
-	ide_raw_taskfile(drive, &args, NULL);
+	ide_raw_taskfile(drive, &args);
 
 	/* if OK, compute maximum address value */
 	if ((args.taskfile.command & 0x01) == 0) {
@@ -893,7 +682,7 @@ static u64 native_max_address_ext(struct ata_device *drive)
 	args.handler = task_no_data_intr;
 
         /* submit command request */
-        ide_raw_taskfile(drive, &args, NULL);
+        ide_raw_taskfile(drive, &args);
 
 	/* if OK, compute maximum address value */
 	if ((args.taskfile.command & 0x01) == 0) {
@@ -933,7 +722,7 @@ static sector_t set_max_address(struct ata_device *drive, sector_t addr_req)
 	args.taskfile.command = WIN_SET_MAX;
 	args.handler = task_no_data_intr;
 	/* submit command request */
-	ide_raw_taskfile(drive, &args, NULL);
+	ide_raw_taskfile(drive, &args);
 	/* if OK, read new maximum address value */
 	if ((args.taskfile.command & 0x01) == 0) {
 		addr_set = ((args.taskfile.device_head & 0x0f) << 24)
@@ -969,7 +758,7 @@ static u64 set_max_address_ext(struct ata_device *drive, u64 addr_req)
 
         args.handler = task_no_data_intr;
 	/* submit command request */
-	ide_raw_taskfile(drive, &args, NULL);
+	ide_raw_taskfile(drive, &args);
 	/* if OK, compute maximum address value */
 	if ((args.taskfile.command & 0x01) == 0) {
 		u32 high = (args.hobfile.high_cylinder << 16) |
@@ -1182,7 +971,13 @@ static void idedisk_setup(struct ata_device *drive)
 	printk("\n");
 
 	drive->mult_count = 0;
+#if 0
 	if (id->max_multsect) {
+
+		/* FIXME: reenable this again after making it to use
+		 * the same code path as the ioctl stuff.
+		 */
+
 #ifdef CONFIG_IDEDISK_MULTI_MODE
 		id->multsect = ((id->max_multsect/2) > 1) ? id->max_multsect : 0;
 		id->multsect_valid = id->multsect ? 1 : 0;
@@ -1198,6 +993,7 @@ static void idedisk_setup(struct ata_device *drive)
 			drive->special_cmd |= ATA_SPECIAL_MMODE;
 #endif
 	}
+#endif
 
 	/* FIXME: Nowadays there are many chipsets out there which *require* 32
 	 * bit IO. Those will most propably not work properly with drives not
@@ -1240,10 +1036,7 @@ static struct ata_operations idedisk_driver = {
 	release:		idedisk_release,
 	check_media_change:	idedisk_check_media_change,
 	revalidate:		NULL, /* use default method */
-	pre_reset:		idedisk_pre_reset,
 	capacity:		idedisk_capacity,
-	special:		idedisk_special,
-	proc:			idedisk_proc
 };
 
 MODULE_DESCRIPTION("ATA DISK Driver");
@@ -1260,10 +1053,6 @@ static void __exit idedisk_exit (void)
 		}
 		/* We must remove proc entries defined in this module.
 		   Otherwise we oops while accessing these entries */
-#ifdef CONFIG_PROC_FS
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, idedisk_proc);
-#endif
 	}
 }
 

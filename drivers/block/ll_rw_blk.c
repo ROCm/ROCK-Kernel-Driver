@@ -358,8 +358,8 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	if (!tags->tag_map)
 		goto fail_map;
 
-	memset(tags->tag_index, depth * sizeof(struct request *), 0);
-	memset(tags->tag_map, bits * sizeof(unsigned long), 0);
+	memset(tags->tag_index, 0, depth * sizeof(struct request *));
+	memset(tags->tag_map, 0, bits * sizeof(unsigned long));
 	INIT_LIST_HEAD(&tags->busy_list);
 	tags->busy = 0;
 	tags->max_depth = depth;

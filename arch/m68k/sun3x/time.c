@@ -10,6 +10,7 @@
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
+#include <linux/rtc.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -38,54 +39,33 @@
 #define BCD_TO_BIN(val) (((val)&15) + ((val)>>4)*10)
 #define BIN_TO_BCD(val) (((val/10) << 4) | (val % 10))
 
-/* Read the Mostek */
-void sun3x_gettod (int *yearp, int *monp, int *dayp,
-                   int *hourp, int *minp, int *secp)
-{
-    volatile unsigned char *eeprom = (unsigned char *)SUN3X_EEPROM;
-
-    /* Stop updates */
-    *(eeprom + M_CONTROL) |= C_READ;
-
-    /* Read values */
-    *yearp = BCD_TO_BIN(*(eeprom + M_YEAR));
-    *monp  = BCD_TO_BIN(*(eeprom + M_MONTH)) +1;
-    *dayp  = BCD_TO_BIN(*(eeprom + M_DATE));
-    *hourp = BCD_TO_BIN(*(eeprom + M_HOUR));
-    *minp  = BCD_TO_BIN(*(eeprom + M_MIN));
-    *secp  = BCD_TO_BIN(*(eeprom + M_SEC));
-
-    /* Restart updates */
-    *(eeprom + M_CONTROL) &= ~C_READ;
-}
-
-int sun3x_hwclk(int set, struct hwclk_time *t)
+int sun3x_hwclk(int set, struct rtc_time *t)
 {
 	volatile struct mostek_dt *h = 
-		(unsigned char *)(SUN3X_EEPROM+M_CONTROL);
+		(struct mostek_dt *)(SUN3X_EEPROM+M_CONTROL);
 	unsigned long flags;
 
 	save_and_cli(flags);
 	
 	if(set) {
 		h->csr |= C_WRITE;
-		h->sec = BIN_TO_BCD(t->sec);
-		h->min = BIN_TO_BCD(t->min);
-		h->hour = BIN_TO_BCD(t->hour);
-		h->wday = BIN_TO_BCD(t->wday);
-		h->mday = BIN_TO_BCD(t->day);
-		h->month = BIN_TO_BCD(t->mon);
-		h->year = BIN_TO_BCD(t->year);
+		h->sec = BIN_TO_BCD(t->tm_sec);
+		h->min = BIN_TO_BCD(t->tm_min);
+		h->hour = BIN_TO_BCD(t->tm_hour);
+		h->wday = BIN_TO_BCD(t->tm_wday);
+		h->mday = BIN_TO_BCD(t->tm_mday);
+		h->month = BIN_TO_BCD(t->tm_mon);
+		h->year = BIN_TO_BCD(t->tm_year);
 		h->csr &= ~C_WRITE;
 	} else {
 		h->csr |= C_READ;
-		t->sec = BCD_TO_BIN(h->sec);
-		t->min = BCD_TO_BIN(h->min);
-		t->hour = BCD_TO_BIN(h->hour);
-		t->wday = BCD_TO_BIN(h->wday);
-		t->day = BCD_TO_BIN(h->mday);
-		t->mon = BCD_TO_BIN(h->month);
-		t->year = BCD_TO_BIN(h->year);
+		t->tm_sec = BCD_TO_BIN(h->sec);
+		t->tm_min = BCD_TO_BIN(h->min);
+		t->tm_hour = BCD_TO_BIN(h->hour);
+		t->tm_wday = BCD_TO_BIN(h->wday);
+		t->tm_mday = BCD_TO_BIN(h->mday);
+		t->tm_mon = BCD_TO_BIN(h->month);
+		t->tm_year = BCD_TO_BIN(h->year);
 		h->csr &= ~C_READ;
 	}
 

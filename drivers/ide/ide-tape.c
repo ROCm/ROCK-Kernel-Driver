@@ -4273,16 +4273,6 @@ static void idetape_blkdev_release (struct inode *inode, struct file *filp, ide_
 }
 
 /*
- *	idetape_pre_reset is called before an ATAPI/ATA software reset.
- */
-static void idetape_pre_reset (ide_drive_t *drive)
-{
-	idetape_tape_t *tape = drive->driver_data;
-	if (tape != NULL)
-		set_bit (IDETAPE_IGNORE_DSC, &tape->flags);
-}
-
-/*
  *	Character device interface functions
  */
 static ide_drive_t *get_drive_ptr (kdev_t i_rdev)
@@ -6000,7 +5990,7 @@ static void idetape_setup (ide_drive_t *drive, idetape_tape_t *tape, int minor)
 	if (strstr(drive->id->model, "OnStream DI-"))
 		tape->onstream = 1;
 	drive->dsc_overlap = 1;
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 	if (!tape->onstream && drive->channel->pci_dev != NULL) {
 		/*
 		 * These two ide-pci host adapters appear to need DSC overlap disabled.
@@ -6009,10 +5999,10 @@ static void idetape_setup (ide_drive_t *drive, idetape_tape_t *tape, int minor)
 		if ((drive->channel->pci_dev->device == PCI_DEVICE_ID_ARTOP_ATP850UF) ||
 		    (drive->channel->pci_dev->device == PCI_DEVICE_ID_TTI_HPT343)) {
 			printk(KERN_INFO "ide-tape: %s: disabling DSC overlap\n", tape->name);
-		    	drive->dsc_overlap = 0;
+			drive->dsc_overlap = 0;
 		}
 	}
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 	tape->drive = drive;
 	tape->minor = minor;
 	tape->name[0] = 'h'; tape->name[1] = 't'; tape->name[2] = '0' + minor;
@@ -6118,31 +6108,6 @@ static int idetape_cleanup (ide_drive_t *drive)
 	return 0;
 }
 
-#ifdef CONFIG_PROC_FS
-
-static int proc_idetape_read_name
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	ide_drive_t	*drive = (ide_drive_t *) data;
-	idetape_tape_t	*tape = drive->driver_data;
-	char		*out = page;
-	int		len;
-
-	len = sprintf(out, "%s\n", tape->name);
-	PROC_IDE_READ_RETURN(page, start, off, count, eof, len);
-}
-
-static ide_proc_entry_t idetape_proc[] = {
-	{ "name",	S_IFREG|S_IRUGO,	proc_idetape_read_name,	NULL },
-	{ NULL, 0, NULL, NULL }
-};
-
-#else
-
-#define	idetape_proc	NULL
-
-#endif
-
 static void idetape_revalidate(ide_drive_t *_dummy)
 {
 	/* We don't have to handle any partition information here, which is the
@@ -6164,9 +6129,6 @@ static struct ata_operations idetape_driver = {
 	release:		idetape_blkdev_release,
 	check_media_change:	NULL,
 	revalidate:		idetape_revalidate,
-	pre_reset:		idetape_pre_reset,
-	capacity:		NULL,
-	proc:			idetape_proc
 };
 
 /*

@@ -2764,22 +2764,6 @@ LSCC_DATA	= 0xff8c87
 LSCC_CTRL	= 0xff8c81
 LSCC_DATA	= 0xff8c83
 
-/* Initialisation table for SCC */
-L(scc_initable):
-	.byte	9,12		/* Reset */
-	.byte	4,0x44		/* x16, 1 stopbit, no parity */
-	.byte	3,0xc0		/* receiver: 8 bpc */
-	.byte	5,0xe2		/* transmitter: 8 bpc, assert dtr/rts */
-	.byte	9,0		/* no interrupts */
-	.byte	10,0		/* NRZ */
-	.byte	11,0x50		/* use baud rate generator */
-	.byte	12,24,13,0	/* 9600 baud */
-	.byte	14,2,14,3	/* use master clock for BRG, enable */
-	.byte	3,0xc1		/* enable receiver */
-	.byte	5,0xea		/* enable transmitter */
-	.byte	-1
-	.even
-
 #elif defined(USE_MFP)
 
 LMFP_UCR     = 0xfffa29

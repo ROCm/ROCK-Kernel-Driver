@@ -199,7 +199,7 @@ struct seq_operations partitions_op = {
 
 
 extern int blk_dev_init(void);
-#ifdef CONFIG_FUSION_BOOT
+#ifdef CONFIG_FUSION
 extern int fusion_init(void);
 #endif
 extern int net_dev_init(void);
@@ -216,7 +216,7 @@ int __init device_init(void)
 #ifdef CONFIG_I2O
 	i2o_init();
 #endif
-#ifdef CONFIG_FUSION_BOOT
+#ifdef CONFIG_FUSION
 	fusion_init();
 #endif
 #ifdef CONFIG_FC4_SOC
