@@ -1280,10 +1280,9 @@ int __setlease(struct file *filp, long arg, struct file_lock **flp)
 	if (!flp || !(*flp) || !(*flp)->fl_lmops || !(*flp)->fl_lmops->fl_break)
 		goto out;
 
-	/*
-	 * FIXME: What about F_RDLCK and files open for writing?
-	 */
 	error = -EAGAIN;
+	if ((arg == F_RDLCK) && (atomic_read(&inode->i_writecount) > 0))
+		goto out;
 	if ((arg == F_WRLCK)
 	    && ((atomic_read(&dentry->d_count) > 1)
 		|| (atomic_read(&inode->i_count) > 1)))
