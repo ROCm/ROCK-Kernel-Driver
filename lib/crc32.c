@@ -1,6 +1,9 @@
-/* 
+/*
  * Oct 15, 2000 Matt Domsch <Matt_Domsch@dell.com>
  * Nicer crc32 functions/docs submitted by linux@horizon.com.  Thanks!
+ * Code was from the public domain, copyright abandoned.  Code was
+ * subsequently included in the kernel, thus was re-licensed under the
+ * GNU GPL v2.
  *
  * Oct 12, 2000 Matt Domsch <Matt_Domsch@dell.com>
  * Same crc32 function was used in 5 other places in the kernel.
@@ -12,7 +15,9 @@
  *   drivers/net/smc9194.c uses seed ~0, doesn't xor with ~0.
  *   fs/jffs2 uses seed 0, doesn't xor with ~0.
  *   fs/partitions/efi.c uses seed ~0, xor's with ~0.
- * 
+ *
+ * This source code is licensed under the GNU General Public License,
+ * Version 2.  See the file COPYING for more details.
  */
 
 #include <linux/crc32.h>
@@ -38,16 +43,10 @@
 #define attribute(x)
 #endif
 
-/*
- * This code is in the public domain; copyright abandoned.
- * Liability for non-performance of this code is limited to the amount
- * you paid for it.  Since it is distributed for free, your refund will
- * be very very small.  If it breaks, you get to keep both pieces.
- */
 
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@dell.com>");
 MODULE_DESCRIPTION("Ethernet CRC32 calculations");
-MODULE_LICENSE("GPL and additional rights");
+MODULE_LICENSE("GPL");
 
 #if CRC_LE_BITS == 1
 /*
