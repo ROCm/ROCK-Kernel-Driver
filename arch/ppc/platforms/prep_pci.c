@@ -837,7 +837,7 @@ void __init
 ibm_prep_init(void)
 {
 	if (have_residual_data) {
-		u32 addr, real_addr, len;
+		u32 addr, real_addr, len, offset;
 		PPC_DEVICE *mpic;
 		PnP_TAG_PACKET *pkt;
 
@@ -859,15 +859,22 @@ ibm_prep_init(void)
 			return;
 
 #define p pkt->L4_Pack.L4_Data.L4_PPCPack
-		if (!((p.PPCData[0] == 2) && (p.PPCData[1] == 32)))
-			return; /* not a 32-bit memory address */
+	 	if (p.PPCData[1] == 32) {
+			switch (p.PPCData[0]) {
+				case 1:  offset = PREP_ISA_IO_BASE;  break;
+				case 2:  offset = PREP_ISA_MEM_BASE; break;
+				default: return; /* Not I/O or memory?? */
+			}
+		}
+		else
+			return; /* Not a 32-bit address */
 
 		real_addr = ld_le32((unsigned int *) (p.PPCData + 4));
 		if (real_addr == 0xffffffff)
 			return;
 
 		/* Adjust address to be as seen by CPU */
-		addr = real_addr + PREP_ISA_MEM_BASE;
+		addr = real_addr + offset;
 
 		len = ld_le32((unsigned int *) (p.PPCData + 12));
 		if (!len)
