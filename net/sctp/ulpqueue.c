@@ -230,7 +230,7 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 		sctp_ulpq_clear_pd(ulpq);
 
 	if (queue == &sk->receive_queue)
-		wake_up_interruptible(sk->sleep);
+		sk->data_ready(sk, 0);
 	return 1;
 
 out_free:
@@ -790,5 +790,5 @@ void sctp_ulpq_abort_pd(struct sctp_ulpq *ulpq, int priority)
 
 	/* If there is data waiting, send it up the socket now. */
 	if (sctp_ulpq_clear_pd(ulpq) || ev)
-		wake_up_interruptible(sk->sleep);
+		sk->data_ready(sk, 0);
 }

@@ -432,6 +432,62 @@ static sctp_scope_t sctp_v6_scope(union sctp_addr *addr)
 	return retval;
 }
 
+/* Create and initialize a new sk for the socket to be returned by accept(). */ 
+struct sock *sctp_v6_create_accept_sk(struct sock *sk,
+				      struct sctp_association *asoc)
+{
+	struct inet_opt *inet = inet_sk(sk);
+	struct sock *newsk;
+	struct inet_opt *newinet;
+	struct ipv6_pinfo *newnp, *np = inet6_sk(sk);
+	struct sctp6_sock *newsctp6sk;
+
+	newsk = sk_alloc(PF_INET6, GFP_KERNEL, sizeof(struct sctp6_sock),
+			 sk->slab);
+	if (!newsk)
+		goto out;
+
+	sock_init_data(NULL, newsk);
+
+	newsk->type = SOCK_STREAM;
+
+	newsk->prot = sk->prot;
+	newsk->no_check = sk->no_check;
+	newsk->reuse = sk->reuse;
+
+	newsk->destruct = inet_sock_destruct;
+	newsk->zapped = 0;
+	newsk->family = PF_INET6;
+	newsk->protocol = IPPROTO_SCTP;
+	newsk->backlog_rcv = sk->prot->backlog_rcv;
+
+	newsctp6sk = (struct sctp6_sock *)newsk;
+	newsctp6sk->pinet6 = &newsctp6sk->inet6;
+
+	newinet = inet_sk(newsk);
+	newnp = inet6_sk(newsk);
+
+	memcpy(newnp, np, sizeof(struct ipv6_pinfo));
+
+	ipv6_addr_copy(&newnp->daddr, &asoc->peer.primary_addr.v6.sin6_addr); 
+
+	newinet->sport = inet->sport;
+	newinet->dport = asoc->peer.port;
+	
+#ifdef INET_REFCNT_DEBUG
+	atomic_inc(&inet6_sock_nr);
+	atomic_inc(&inet_sock_nr);
+#endif
+
+	if (0 != newsk->prot->init(newsk)) {
+		inet_sock_release(newsk);
+		newsk = NULL;
+	}
+
+out:
+	return newsk;
+}
+
 /* Initialize a PF_INET6 socket msg_name. */
 static void sctp_inet6_msgname(char *msgname, int *addr_len)
 {
@@ -597,8 +653,17 @@ static struct proto_ops inet6_seqpacket_ops = {
 	.mmap       = sock_no_mmap,
 };
 
-static struct inet_protosw sctpv6_protosw = {
+static struct inet_protosw sctpv6_seqpacket_protosw = {
 	.type          = SOCK_SEQPACKET,
+	.protocol      = IPPROTO_SCTP,
+	.prot 	       = &sctp_prot,
+	.ops           = &inet6_seqpacket_ops,
+	.capability    = -1,
+	.no_check      = 0,
+	.flags         = SCTP_PROTOSW_FLAG
+};
+static struct inet_protosw sctpv6_stream_protosw = {
+	.type          = SOCK_STREAM,
 	.protocol      = IPPROTO_SCTP,
 	.prot 	       = &sctp_prot,
 	.ops           = &inet6_seqpacket_ops,
@@ -641,6 +706,7 @@ static struct sctp_pf sctp_pf_inet6_specific = {
 	.cmp_addr      = sctp_inet6_cmp_addr,
 	.bind_verify   = sctp_inet6_bind_verify,
 	.supported_addrs = sctp_inet6_supported_addrs,
+	.create_accept_sk = sctp_v6_create_accept_sk,
 	.af            = &sctp_ipv6_specific,
 };
 
@@ -651,8 +717,9 @@ int sctp_v6_init(void)
 	if (inet6_add_protocol(&sctpv6_protocol, IPPROTO_SCTP) < 0)
 		return -EAGAIN;
 
-	/* Add SCTPv6 to inetsw6 linked list. */
-	inet6_register_protosw(&sctpv6_protosw);
+	/* Add SCTPv6(UDP and TCP style) to inetsw6 linked list. */
+	inet6_register_protosw(&sctpv6_seqpacket_protosw);
+	inet6_register_protosw(&sctpv6_stream_protosw);
 
 	/* Register the SCTP specfic PF_INET6 functions. */
 	sctp_register_pf(&sctp_pf_inet6_specific, PF_INET6);
@@ -671,6 +738,7 @@ void sctp_v6_exit(void)
 {
 	list_del(&sctp_ipv6_specific.list);
 	inet6_del_protocol(&sctpv6_protocol, IPPROTO_SCTP);
-	inet6_unregister_protosw(&sctpv6_protosw);
+	inet6_unregister_protosw(&sctpv6_seqpacket_protosw);
+	inet6_unregister_protosw(&sctpv6_stream_protosw);
 	unregister_inet6addr_notifier(&sctp_inetaddr_notifier);
 }
