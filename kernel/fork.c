@@ -864,6 +864,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = get_jiffies_64();
 	p->security = NULL;
+	p->as_io_context = NULL;
 
 	retval = -ENOMEM;
 	if ((retval = security_task_alloc(p)))

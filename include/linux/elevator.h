@@ -89,6 +89,11 @@ extern elevator_t elevator_noop;
  */
 extern elevator_t iosched_deadline;
 
+/*
+ * anticipatory I/O scheduler
+ */
+extern elevator_t iosched_as;
+
 extern int elevator_init(request_queue_t *, elevator_t *);
 extern void elevator_exit(request_queue_t *);
 extern inline int elv_rq_merge_ok(struct request *, struct bio *);

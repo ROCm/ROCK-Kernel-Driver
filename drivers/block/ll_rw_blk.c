@@ -1033,7 +1033,7 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	/*
 	 * was plugged, fire request_fn if queue has stuff to do
 	 */
-	if (!elv_queue_empty(q))
+	if (elv_next_request(q))
 		q->request_fn(q);
 }
 
@@ -1204,6 +1204,18 @@ static int blk_init_free_list(request_queue_t *q)
 
 static int __make_request(request_queue_t *, struct bio *);
 
+static elevator_t *chosen_elevator = &iosched_as;
+
+static int __init elevator_setup(char *str)
+{
+	if (!strcmp(str, "deadline"))
+		chosen_elevator = &iosched_deadline;
+	if (!strcmp(str, "as"))
+		chosen_elevator = &iosched_as;
+	return 1;
+}
+__setup("elevator=", elevator_setup);
+
 /**
  * blk_init_queue  - prepare a request queue for use with a block device
  * @q:    The &request_queue_t to be initialised
@@ -1235,11 +1247,20 @@ static int __make_request(request_queue_t *, struct bio *);
 int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 {
 	int ret;
+	static int printed;
 
 	if (blk_init_free_list(q))
 		return -ENOMEM;
 
-	if ((ret = elevator_init(q, &iosched_deadline))) {
+	if (!printed) {
+		printed = 1;
+		if (chosen_elevator == &iosched_deadline)
+			printk("deadline elevator\n");
+		else if (chosen_elevator == &iosched_as)
+			printk("anticipatory scheduling elevator\n");
+	}
+
+	if ((ret = elevator_init(q, chosen_elevator))) {
 		blk_cleanup_queue(q);
 		return ret;
 	}
