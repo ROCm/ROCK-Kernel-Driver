@@ -49,7 +49,6 @@ SUB_DIRS	:= $(subdir-y)
 MOD_SUB_DIRS	:= $(sort $(subdir-m) $(both-m))
 ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 
-
 #
 # Common rules
 #
@@ -58,23 +57,18 @@ c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -DKBUILD_BASENAME=$(subst $(com
 
 cmd_cc_s_c = $(CC) $(c_flags) -S $< -o $@
 
-%.s: %.c
-	$(cmd_cc_s_c)
+%.s: %.c dummy
+	$(call if_changed,cmd_cc_s_c)
 
 cmd_cc_i_c = $(CPP) $(c_flags) $< > $@
 
-%.i: %.c
-	$(cmd_cc_i_c)
+%.i: %.c dummy
+	$(call if_changed,cmd_cc_i_c)
 
 cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 
-%.o: %.c
-	$(cmd_cc_o_c)
-	@ ( \
-	    echo 'ifeq ($(strip $(subst $(comma),:,$(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@))),$$(strip $$(subst $$(comma),:,$$(CFLAGS) $$(EXTRA_CFLAGS) $$(CFLAGS_$@))))' ; \
-	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
-	    echo 'endif' \
-	) > $(dir $@)/.$(notdir $@).flags
+%.o: %.c dummy
+	$(call if_changed,cmd_cc_o_c)
 
 # Old makefiles define their own rules for compiling .S files,
 # but these standard rules are available for any Makefile that
@@ -86,13 +80,13 @@ a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$@)
 
 cmd_as_s_S = $(CPP) $(a_flags) $< > $@
 
-%.s: %.S
-	$(cmd_as_s_S)
+%.s: %.S dummy
+	$(call if_changed,cmd_as_s_S)
 
 cmd_as_o_S = $(CC) $(a_flags) -c -o $@ $<
 
-%.o: %.S
-	$(cmd_as_o_S)
+%.o: %.S dummy
+	$(call if_changed,cmd_as_o_S)
 
 endif
 
@@ -117,13 +111,8 @@ cmd_link_o_target = $(if $(strip $(obj-y)),\
 		      $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(obj-y), $^),\
 		      rm -f $@; $(AR) rcs $@)
 
-$(O_TARGET): $(obj-y)
-	$(cmd_link_o_target)
-	@ ( \
-	    echo 'ifeq ($(strip $(subst $(comma),:,$(EXTRA_LDFLAGS) $(obj-y))),$$(strip $$(subst $$(comma),:,$$(EXTRA_LDFLAGS) $$(obj-y))))' ; \
-	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
-	    echo 'endif' \
-	) > $(dir $@)/.$(notdir $@).flags
+$(O_TARGET): $(obj-y) dummy
+	$(call if_changed,cmd_link_o_target)
 endif # O_TARGET
 
 #
@@ -132,13 +121,8 @@ endif # O_TARGET
 ifdef L_TARGET
 cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
 
-$(L_TARGET): $(obj-y)
-	$(cmd_link_l_target)
-	@ ( \
-	    echo 'ifeq ($(strip $(subst $(comma),:,$(EXTRA_ARFLAGS) $(obj-y))),$$(strip $$(subst $$(comma),:,$$(EXTRA_ARFLAGS) $$(obj-y))))' ; \
-	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
-	    echo 'endif' \
-	) > $(dir $@)/.$(notdir $@).flags
+$(L_TARGET): $(obj-y) dummy
+	$(call if_changed,cmd_link_l_target)
 endif
 
 #
@@ -172,21 +156,11 @@ cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs)
 # 	foo.o: $(foo-objs)
 # but that's not so easy, so we rather make all composite objects depend
 # on the set of all their parts
-$(multi-used-y) : %.o: $(multi-objs-y)
-	$(cmd_link_multi)
-	@ ( \
-	    echo 'ifeq ($(strip $(subst $(comma),:,$(LD) $(EXTRA_LDFLAGS) $($(basename $@)-objs)),$$(strip $$(subst $$(comma),:,$$(LD) $$(EXTRA_LDFLAGS) $$($(basename $@)-objs)))))' ; \
-	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
-	    echo 'endif' \
-	) > $(dir $@)/.$(notdir $@).flags
+$(multi-used-y) : %.o: $(multi-objs-y) dummy
+	$(call if_changed,cmd_link_multi)
 
-$(multi-used-m) : %.o: $(multi-objs-m)
-	$(cmd_link_multi)
-	@ ( \
-	    echo 'ifeq ($(strip $(subst $(comma),:,$(LD) $(EXTRA_LDFLAGS) $($(basename $@)-objs)),$$(strip $$(subst $$(comma),:,$$(LD) $$(EXTRA_LDFLAGS) $$($(basename $@)-objs)))))' ; \
-	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
-	    echo 'endif' \
-	) > $(dir $@)/.$(notdir $@).flags
+$(multi-used-m) : %.o: $(multi-objs-m) dummy
+	$(call if_changed,cmd_link_multi)
 
 #
 # This make dependencies quickly
@@ -336,14 +310,13 @@ $(TOPDIR)/include/linux/modversions.h:
 endif # CONFIG_MODVERSIONS
 
 ifneq "$(strip $(export-objs))" ""
+
+cmd_cc_o_c_export = $(CC) $(c_flags) -DEXPORT_SYMTAB -c -o $@ $<
+
 $(export-objs): $(TOPDIR)/include/linux/modversions.h
-$(export-objs): %.o: %.c
-	$(CC) $(c_flags) -DEXPORT_SYMTAB -c -o $@ $<
-	@ ( \
-	    echo 'ifeq ($(strip $(subst $(comma),:,$(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -DEXPORT_SYMTAB)),$$(strip $$(subst $$(comma),:,$$(CFLAGS) $$(EXTRA_CFLAGS) $$(CFLAGS_$@) -DEXPORT_SYMTAB)))' ; \
-	    echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
-	    echo 'endif' \
-	) > $(dir $@)/.$(notdir $@).flags
+$(export-objs): %.o: %.c dummy
+	$(call if_changed,cmd_cc_o_c_export)
+
 endif
 
 endif # CONFIG_MODULES
@@ -360,35 +333,48 @@ ifneq ($(wildcard $(TOPDIR)/.hdepend),)
 include $(TOPDIR)/.hdepend
 endif
 
-#
-# Find files whose flags have changed and force recompilation.
-# For safety, this works in the converse direction:
-#   every file is forced, except those whose flags are positively up-to-date.
-#
-FILES_FLAGS_UP_TO_DATE :=
+# ---------------------------------------------------------------------------
+# Check if command line has changed
 
-# For use in expunging commas from flags, which mung our checking.
-comma = ,
+# Usage:
+# normally one uses rules like
+#
+# %.o: %.c
+# 	<command line>
+#
+# However, these only rebuild the target when the source has changed,
+# but not when e.g. the command or the flags on the command line changed.
+#
+# This extension allows to do the following:
+#
+# command = <command line>
+#
+# %.o: %.c dummy
+#	$(call if_changed,command)
+#
+# which will make sure to rebuild the target when either its prerequisites
+# change or the command line changes
+#
+# The magic works as follows:
+# The addition of dummy to the dependencies causes the rule for rebuilding
+# to be always executed. However, the if_changed function will generate
+# an empty command when 
+# o none of the prequesites changed (i.e $? is empty)
+# o the command line did not change (we compare the old command line,
+#   which is saved in .<target>.o, to the current command line using
+#   the two filter-out commands)
 
-FILES_FLAGS_EXIST := $(wildcard .*.flags)
-ifneq ($(FILES_FLAGS_EXIST),)
-include $(FILES_FLAGS_EXIST)
+# read all saved command lines
+
+cmd_files := $(wildcard .*.cmd)
+ifneq ($(cmd_files),)
+  include $(cmd_files)
 endif
 
-FILES_FLAGS_CHANGED := $(strip \
-    $(filter-out $(FILES_FLAGS_UP_TO_DATE), \
-	$(O_TARGET) $(L_TARGET) $(active-objs) \
-	))
+# function to only execute the passed command if necessary
 
-# A kludge: .S files don't get flag dependencies (yet),
-#   because that will involve changing a lot of Makefiles.  Also
-#   suppress object files explicitly listed in $(IGNORE_FLAGS_OBJS).
-#   This allows handling of assembly files that get translated into
-#   multiple object files (see arch/ia64/lib/idiv.S, for example).
-FILES_FLAGS_CHANGED := $(strip \
-    $(filter-out $(patsubst %.S, %.o, $(wildcard *.S) $(IGNORE_FLAGS_OBJS)), \
-    $(FILES_FLAGS_CHANGED)))
+if_changed = $(if $(strip $? \
+		          $(filter-out $($(1)),$(cmd_$@))\
+			  $(filter-out $(cmd_$@),$($(1)))),\
+	       @echo $($(1)); $($(1)); echo 'cmd_$@ := $($(1))' > .$@.cmd)
 
-ifneq ($(FILES_FLAGS_CHANGED),)
-$(FILES_FLAGS_CHANGED): dummy
-endif
