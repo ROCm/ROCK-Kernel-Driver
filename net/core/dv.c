@@ -97,7 +97,7 @@ void free_divert_blk(struct net_device *dev)
 /*
  * Adds a tcp/udp (source or dest) port to an array
  */
-int add_port(u16 ports[], u16 port)
+static int add_port(u16 ports[], u16 port)
 {
 	int i;
 
@@ -127,7 +127,7 @@ int add_port(u16 ports[], u16 port)
 /*
  * Removes a port from an array tcp/udp (source or dest)
  */
-int remove_port(u16 ports[], u16 port)
+static int remove_port(u16 ports[], u16 port)
 {
 	int i;
 
@@ -150,7 +150,7 @@ int remove_port(u16 ports[], u16 port)
 }
 
 /* Some basic sanity checks on the arguments passed to divert_ioctl() */
-int check_args(struct divert_cf *div_cf, struct net_device **dev)
+static int check_args(struct divert_cf *div_cf, struct net_device **dev)
 {
 	char devname[32];
 	int ret;
