@@ -54,6 +54,7 @@
 #include <net/rawv6.h>
 #include <net/icmp.h>
 #include <net/xfrm.h>
+#include <net/checksum.h>
 
 static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**));
 
@@ -981,8 +982,11 @@ alloc_new_skb:
 			skb->h.raw = data + exthdrlen;
 
 			if (fraggap) {
-				skb_copy_bits(skb_prev, maxfraglen, 
-					      data + transhdrlen, fraggap);
+				skb->csum = skb_copy_and_csum_bits(
+					skb_prev, maxfraglen,
+					data + transhdrlen, fraggap, 0);
+				skb_prev->csum = csum_block_sub(
+					skb_prev->csum, skb->csum, 0);
 				data += fraggap;
 				skb_trim(skb_prev, maxfraglen);
 			}
@@ -991,7 +995,7 @@ alloc_new_skb:
 				err = -EINVAL;
 				kfree_skb(skb);
 				goto error;
-			} else if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, 0, skb) < 0) {
+			} else if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, fraggap, skb) < 0) {
 				err = -EFAULT;
 				kfree_skb(skb);
 				goto error;

@@ -78,6 +78,7 @@
 #include <net/raw.h>
 #include <net/checksum.h>
 #include <net/inetpeer.h>
+#include <net/checksum.h>
 #include <linux/igmp.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_bridge.h>
@@ -892,14 +893,17 @@ alloc_new_skb:
 			skb->h.raw = data + exthdrlen;
 
 			if (fraggap) {
-				skb_copy_bits(skb_prev, maxfraglen, 
-					      data + transhdrlen, fraggap);
+				skb->csum = skb_copy_and_csum_bits(
+					skb_prev, maxfraglen,
+					data + transhdrlen, fraggap, 0);
+				skb_prev->csum = csum_block_sub(
+					skb_prev->csum, skb->csum, 0);
 				data += fraggap;
 				skb_trim(skb_prev, maxfraglen);
 			}
 
 			copy = datalen - transhdrlen - fraggap;
-			if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, 0, skb) < 0) {
+			if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, fraggap, skb) < 0) {
 				err = -EFAULT;
 				kfree_skb(skb);
 				goto error;
@@ -1087,8 +1091,11 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 			skb->h.raw = data;
 
 			if (fraggap) {
-				skb_copy_bits(skb_prev, maxfraglen,
-					      data, fraggap);
+				skb->csum = skb_copy_and_csum_bits(
+					skb_prev, maxfraglen,
+					data, fraggap, 0);
+				skb_prev->csum = csum_block_sub(
+					skb_prev->csum, skb->csum, 0);
 				skb_trim(skb_prev, maxfraglen);
 			}
 
