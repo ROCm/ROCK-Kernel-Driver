@@ -8,7 +8,7 @@
 
 #include "uml-config.h"
 
-#ifdef CONFIG_MODE_SKAS
+#ifdef UML_CONFIG_MODE_SKAS
 
 #include "skas_ptregs.h"
 

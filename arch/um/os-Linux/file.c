@@ -28,8 +28,8 @@ int os_file_type(char *file)
 	else if(S_ISLNK(buf.st_mode)) return(OS_TYPE_SYMLINK);
 	else if(S_ISCHR(buf.st_mode)) return(OS_TYPE_CHARDEV);
 	else if(S_ISBLK(buf.st_mode)) return(OS_TYPE_BLOCKDEV);
-	else if(S_ISFIFO(buf.st_mode))return(OS_TYPE_FIFO);
-	else if(S_ISSOCK(buf.st_mode))return(OS_TYPE_SOCK);
+	else if(S_ISFIFO(buf.st_mode)) return(OS_TYPE_FIFO);
+	else if(S_ISSOCK(buf.st_mode)) return(OS_TYPE_SOCK);
 	else return(OS_TYPE_FILE);
 }
 
@@ -64,6 +64,15 @@ int os_open_file(char *file, struct openflags flags, int mode)
 
 	fd = open64(file, f, mode);
 	if(fd < 0) return(-errno);
+	
+	if(flags.cl){
+		if(fcntl(fd, F_SETFD, 1)){
+			close(fd);
+			return(-errno);
+		}
+	}
+
+ 	return(fd);
 	return(fd);
 }
 
@@ -100,7 +109,7 @@ int os_seek_file(int fd, __u64 offset)
 	return(0);
 }
 
-int os_read_file(int fd, char *buf, int len)
+int os_read_file(int fd, void *buf, int len)
 {
 	int n;
 
@@ -118,7 +127,7 @@ int os_read_file(int fd, char *buf, int len)
 	return(n);
 }
 
-int os_write_file(int fd, char *buf, int count)
+int os_write_file(int fd, void *buf, int count)
 {
 	int n;
 

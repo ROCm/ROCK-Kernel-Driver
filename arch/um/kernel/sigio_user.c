@@ -111,6 +111,7 @@ static void tty_output(int master, int slave)
 
 	printk("Checking that host ptys support output SIGIO...");
 
+	memset(buf, 0, sizeof(buf));
 	while(write(master, buf, sizeof(buf)) > 0) ;
 	if(errno != EAGAIN)
 		panic("check_sigio : write failed, errno = %d\n", errno);
@@ -267,7 +268,8 @@ static void update_thread(void)
 	return;
  fail:
 	sigio_lock();
-	if(write_sigio_pid != -1) kill(write_sigio_pid, SIGKILL);
+	if(write_sigio_pid != -1) 
+		os_kill_process(write_sigio_pid, 1);
 	write_sigio_pid = -1;
 	close(sigio_private[0]);
 	close(sigio_private[1]);	
@@ -394,7 +396,7 @@ void write_sigio_workaround(void)
 	return;
 
  out_kill:
-	kill(write_sigio_pid, SIGKILL);
+	os_kill_process(write_sigio_pid, 1);
 	write_sigio_pid = -1;
  out_close2:
 	close(sigio_private[0]);
@@ -421,7 +423,7 @@ int read_sigio_fd(int fd)
 static void sigio_cleanup(void)
 {
 	if(write_sigio_pid != -1)
-		kill(write_sigio_pid, SIGKILL);
+		os_kill_process(write_sigio_pid, 1);
 }
 
 __uml_exitcall(sigio_cleanup);

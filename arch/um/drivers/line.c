@@ -541,7 +541,8 @@ static void winch_cleanup(void)
 	list_for_each(ele, &winch_handlers){
 		winch = list_entry(ele, struct winch, list);
 		close(winch->fd);
-		if(winch->pid != -1) os_kill_process(winch->pid, 0);
+		if(winch->pid != -1) 
+			os_kill_process(winch->pid, 1);
 	}
 }
 

@@ -35,7 +35,7 @@ static int umid_inited = 0;
 
 static int make_umid(void);
 
-static int __init set_umid(char *name, int *add)
+static int __init set_umid(char *name, int is_random)
 {
 	if(umid_inited){
 		printk("Unique machine name can't be set twice\n");
@@ -48,12 +48,17 @@ static int __init set_umid(char *name, int *add)
 	strncpy(umid, name, UMID_LEN - 1);
 	umid[UMID_LEN - 1] = '\0';
 
-	umid_is_random = 0;
+	umid_is_random = is_random;
 	umid_inited = 1;
 	return 0;
 }
 
-__uml_setup("umid=", set_umid,
+static int __init set_umid_arg(char *name, int *add)
+{
+	return(set_umid(name, 0));
+}
+
+__uml_setup("umid=", set_umid_arg,
 "umid=<name>\n"
 "    This is used to assign a unique identity to this UML machine and\n"
 "    is used for naming the pid file and management console socket.\n\n"
@@ -253,7 +258,7 @@ static int __init make_umid(void)
 		strcat(tmp, "XXXXXX");
 		fd = mkstemp(tmp);
 		if(fd < 0){
-			printk("set_umid - mkstemp failed, errno = %d\n",
+			printk("make_umid - mkstemp failed, errno = %d\n",
 			       errno);
 			return(1);
 		}
@@ -264,7 +269,7 @@ static int __init make_umid(void)
 		 * for directories.
 		 */
 		unlink(tmp);
-		strcpy(umid, &tmp[strlen(uml_dir)]);
+		set_umid(&tmp[strlen(uml_dir)], 1);
 	}
 	
 	sprintf(tmp, "%s%s", uml_dir, umid);

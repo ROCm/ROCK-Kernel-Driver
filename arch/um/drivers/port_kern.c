@@ -110,7 +110,7 @@ static int port_accept(struct port_list *port)
  out_close:
 	os_close_file(fd);
 	if(pid != -1) 
-		os_kill_process(pid, 0);
+		os_kill_process(pid, 1);
  out:
 	return(ret);
 } 
@@ -261,7 +261,7 @@ void port_remove_dev(void *d)
 	if(dev->helper_pid != -1)
 		os_kill_process(dev->helper_pid, 0);
 	if(dev->telnetd_pid != -1)
-		os_kill_process(dev->telnetd_pid, 0);
+		os_kill_process(dev->telnetd_pid, 1);
 	dev->helper_pid = -1;
 	dev->telnetd_pid = -1;
 }

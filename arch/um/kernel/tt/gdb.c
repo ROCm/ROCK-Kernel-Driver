@@ -44,7 +44,7 @@ int cont(int pid)
 	return(ptrace(PTRACE_CONT, pid, 0, 0));
 }
 
-#ifdef CONFIG_PT_PROXY
+#ifdef UML_CONFIG_PT_PROXY
 
 int debugger_signal(int status, pid_t pid)
 {

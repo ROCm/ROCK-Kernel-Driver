@@ -39,6 +39,7 @@ static void handle_segv(int pid)
 	if(err)
 		panic("handle_segv - PTRACE_FAULTINFO failed, errno = %d\n",
 		      errno);
+
 	segv(fault.addr, 0, FAULT_WRITE(fault.is_write), 1, NULL);
 }
 
@@ -79,6 +80,7 @@ static int userspace_tramp(void *arg)
 	enable_timer();
 	ptrace(PTRACE_TRACEME, 0, 0, 0);
 	os_stop_process(os_getpid());
+	return(0);
 }
 
 void start_userspace(void)
@@ -328,7 +330,7 @@ int new_mm(int from)
 		copy = ((struct proc_mm_op) { .op 	= MM_COPY_SEGMENTS,
 					      .u 	= 
 					      { .copy_segments	= from } } );
-		n = os_write_file(fd, (char *) &copy, sizeof(copy));
+		n = os_write_file(fd, &copy, sizeof(copy));
 		if(n != sizeof(copy)) 
 			printk("new_mm : /proc/mm copy_segments failed, "
 			       "errno = %d\n", errno);
