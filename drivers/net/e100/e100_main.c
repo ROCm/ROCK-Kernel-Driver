@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -45,8 +45,22 @@
 **********************************************************************/
 
 /* Change Log
- *
- * 2.1.29	12/20/02
+ * 
+ * 2.2.21	02/11/03
+ * o Removed marketing brand strings. Instead, Using generic string 
+ *   "Intel(R) PRO/100 Network Connection" for all adapters.
+ * o Implemented ethtool -S option
+ * o Strip /proc/net/PRO_LAN_Adapters files for kernel driver
+ * o Bug fix: Read wrong byte in EEPROM when offset is odd number
+ * o Bug fix: PHY loopback test fails on ICH devices
+ * o Bug fix: System panic on e100_close when repeating Hot Remove and 
+ *   Add in a team
+ * o Bug fix: Linux Bonding driver claims adapter's link loss because of
+ *   not updating last_rx field
+ * o Bug fix: e100 does not check validity of MAC address
+ * o New feature: added ICH5 support
+ * 
+ * 2.1.27	11/20/02
  *   o Bug fix: Device command timeout due to SMBus processing during init
  *   o Bug fix: Not setting/clearing I (Interrupt) bit in tcb correctly
  *   o Bug fix: Not using EEPROM WoL setting as default in ethtool
@@ -62,15 +76,6 @@
  *     ifconfig down, rmmod and insmod
  *
  * 2.1.24       10/7/02
- *   o Bug fix: Wrong files under /proc/net/PRO_LAN_Adapters/ when interface
- *     name is changed
- *   o Bug fix: Rx skb corruption when Rx polling code and Rx interrupt code
- *     are executing during stress traffic at shared interrupt system. 
- *     Removed Rx polling code
- *   o Added detailed printk if selftest failed when insmod
- *   o Removed misleading printks
- *
- * 2.1.12       8/2/02
  */
  
 #include <linux/config.h>
@@ -136,8 +141,8 @@ static void e100_free_nontx_list(struct e100_private *);
 static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
-char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.29-k4";
+char e100_copyright[] __devinitdata = "Copyright (c) 2003 Intel Corporation";
+char e100_driver_version[]="2.2.21-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
