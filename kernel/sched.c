@@ -2502,6 +2502,8 @@ asmlinkage void __sched schedule(void)
 need_resched:
 	preempt_disable();
 	prev = current;
+	release_kernel_lock(prev);
+need_resched_nonpreemptible:
 	rq = this_rq();
 
 	/*
@@ -2513,7 +2515,6 @@ need_resched:
 		dump_stack();
 	}
 
-	release_kernel_lock(prev);
 	schedstat_inc(rq, sched_cnt);
 	now = sched_clock();
 	if (likely(now - prev->timestamp < NS_MAX_SLEEP_AVG))
@@ -2636,7 +2637,9 @@ switch_tasks:
 	} else
 		spin_unlock_irq(&rq->lock);
 
-	reacquire_kernel_lock(current);
+	prev = current;
+	if (unlikely(reacquire_kernel_lock(prev) < 0))
+		goto need_resched_nonpreemptible;
 	preempt_enable_no_resched();
 	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
