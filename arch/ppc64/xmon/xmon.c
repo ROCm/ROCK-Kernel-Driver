@@ -37,9 +37,10 @@
 #define skipbl	xmon_skipbl
 
 #ifdef CONFIG_SMP
-unsigned long cpus_in_xmon = 0;
+volatile unsigned long cpus_in_xmon = 0;
 static unsigned long got_xmon = 0;
 static volatile int take_xmon = -1;
+static volatile int leaving_xmon = 0;
 #endif /* CONFIG_SMP */
 
 static unsigned long adrs;
@@ -162,7 +163,6 @@ Commands:\n\
   mz	zero a block of memory\n\
   mx	translation information for an effective address\n\
   mi	show information about memory allocation\n\
-  M	print System.map\n\
   p 	show the task list\n\
   r	print registers\n\
   s	single step\n\
@@ -227,7 +227,7 @@ void
 xmon(struct pt_regs *excp)
 {
 	struct pt_regs regs;
-	int cmd;
+	int cmd = 0;
 	unsigned long msr;
 
 	if (excp == NULL) {
@@ -285,9 +285,15 @@ xmon(struct pt_regs *excp)
 	xmon_regs[smp_processor_id()] = excp;
 	excprint(excp);
 #ifdef CONFIG_SMP
-	if (test_and_set_bit(smp_processor_id(), &cpus_in_xmon))
+	leaving_xmon = 0;
+	/* possible race condition here if a CPU is held up and gets
+	 * here while we are exiting */
+	if (test_and_set_bit(smp_processor_id(), &cpus_in_xmon)) {
+		/* xmon probably caused an exception itself */
+		printf("We are already in xmon\n");
 		for (;;)
 			;
+	}
 	while (test_and_set_bit(0, &got_xmon)) {
 		if (take_xmon == smp_processor_id()) {
 			take_xmon = -1;
@@ -304,6 +310,9 @@ xmon(struct pt_regs *excp)
 	if (cmd == 's') {
 		xmon_trace[smp_processor_id()] = SSTEP;
 		excp->msr |= MSR_SE;
+#ifdef CONFIG_SMP		
+		take_xmon = smp_processor_id();
+#endif		
 	} else if (at_breakpoint(excp->nip)) {
 		xmon_trace[smp_processor_id()] = BRSTEP;
 		excp->msr |= MSR_SE;
@@ -313,7 +322,9 @@ xmon(struct pt_regs *excp)
 	}
 	xmon_regs[smp_processor_id()] = 0;
 #ifdef CONFIG_SMP
-	clear_bit(0, &got_xmon);
+	leaving_xmon = 1;
+	if (cmd != 's')
+		clear_bit(0, &got_xmon);
 	clear_bit(smp_processor_id(), &cpus_in_xmon);
 #endif /* CONFIG_SMP */
 	set_msrd(msr);		/* restore interrupt enable */
@@ -421,8 +432,6 @@ insert_bpts()
 	int i;
 	struct bpt *bp;
 
-	if (systemcfg->platform != PLATFORM_PSERIES)
-		return;
 	bp = bpts;
 	for (i = 0; i < NBPTS; ++i, ++bp) {
 		if (!bp->enabled)
@@ -450,9 +459,6 @@ remove_bpts()
 	struct bpt *bp;
 	unsigned instr;
 
-	if (systemcfg->platform != PLATFORM_PSERIES)
-		return;
-
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_DABR))
 		set_dabr(0);
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR))
@@ -478,11 +484,15 @@ static char *last_cmd;
 static int
 cmds(struct pt_regs *excp)
 {
-	int cmd;
+	int cmd = 0;
 
 	last_cmd = NULL;
 	for(;;) {
 #ifdef CONFIG_SMP
+		/* Need to check if we should take any commands on
+		   this CPU. */
+		if (leaving_xmon)
+			return cmd;
 		printf("%d:", smp_processor_id());
 #endif /* CONFIG_SMP */
 		printf("mon> ");
@@ -832,6 +842,12 @@ bpt_cmds(void)
 				}
 			break;
 		}
+		
+		if (!(systemcfg->platform & PLATFORM_PSERIES)) {
+			printf("Not supported for this platform\n");
+			break;
+		}
+
 		bp = at_breakpoint(a);
 		if (bp == 0) {
 			for (bp = bpts; bp < &bpts[NBPTS]; ++bp)
