@@ -7709,50 +7709,9 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 		goto out_nofree;
 	}
 
-	if ((tp->tg3_flags & TG3_FLAG_PCIX_MODE) == 0) {
-		tp->dma_rwctrl =
-			(0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
-			(0x6 << DMA_RWCTRL_PCI_READ_CMD_SHIFT) |
-			(0x7 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
-			(0x7 << DMA_RWCTRL_READ_WATER_SHIFT) |
-			(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
-			tp->dma_rwctrl &= ~(DMA_RWCTRL_MIN_DMA
-					    << DMA_RWCTRL_MIN_DMA_SHIFT);
-	} else {
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
-			tp->dma_rwctrl =
-				(0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
-				(0x6 << DMA_RWCTRL_PCI_READ_CMD_SHIFT) |
-				(0x3 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
-				(0x7 << DMA_RWCTRL_READ_WATER_SHIFT) |
-				(0x00 << DMA_RWCTRL_MIN_DMA_SHIFT);
-		else
-			tp->dma_rwctrl =
-				(0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
-				(0x6 << DMA_RWCTRL_PCI_READ_CMD_SHIFT) |
-				(0x3 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
-				(0x3 << DMA_RWCTRL_READ_WATER_SHIFT) |
-				(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
+	tp->dma_rwctrl = ((0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
+			  (0x6 << DMA_RWCTRL_PCI_READ_CMD_SHIFT));
 
-		/* Wheee, some more chip bugs... */
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
-		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
-			u32 ccval = (tr32(TG3PCI_CLOCK_CTRL) & 0x1f);
-
-			if (ccval == 0x6 || ccval == 0x7)
-				tp->dma_rwctrl |= DMA_RWCTRL_ONE_DMA;
-		}
-	}
-
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
-	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
-		tp->dma_rwctrl &= ~(DMA_RWCTRL_MIN_DMA
-				    << DMA_RWCTRL_MIN_DMA_SHIFT);
-
-	/* We don't do this on x86 because it seems to hurt performace.
-	 * It does help things on other platforms though.
-	 */
 #ifndef CONFIG_X86
 	{
 		u8 byte;
@@ -7764,54 +7723,62 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 		else
 			cacheline_size = (int) byte * 4;
 
-		tp->dma_rwctrl &= ~(DMA_RWCTRL_READ_BNDRY_MASK |
-				    DMA_RWCTRL_WRITE_BNDRY_MASK);
-
 		switch (cacheline_size) {
 		case 16:
-			tp->dma_rwctrl |=
-				(DMA_RWCTRL_READ_BNDRY_16 |
-				 DMA_RWCTRL_WRITE_BNDRY_16);
-			break;
-
 		case 32:
-			tp->dma_rwctrl |=
-				(DMA_RWCTRL_READ_BNDRY_32 |
-				 DMA_RWCTRL_WRITE_BNDRY_32);
-			break;
-
 		case 64:
-			tp->dma_rwctrl |=
-				(DMA_RWCTRL_READ_BNDRY_64 |
-				 DMA_RWCTRL_WRITE_BNDRY_64);
-			break;
-
 		case 128:
-			tp->dma_rwctrl |=
-				(DMA_RWCTRL_READ_BNDRY_128 |
-				 DMA_RWCTRL_WRITE_BNDRY_128);
-			break;
-
+			if ((tp->tg3_flags & TG3_FLAG_PCIX_MODE) &&
+			    !(tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS)) {
+				tp->dma_rwctrl |=
+					DMA_RWCTRL_WRITE_BNDRY_384_PCIX;
+				break;
+			} else if (tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS) {
+				tp->dma_rwctrl &=
+					~(DMA_RWCTRL_PCI_WRITE_CMD);
+				tp->dma_rwctrl |=
+					DMA_RWCTRL_WRITE_BNDRY_128_PCIE;
+				break;
+			}
+			/* fallthrough */
 		case 256:
-			tp->dma_rwctrl |=
-				(DMA_RWCTRL_READ_BNDRY_256 |
-				 DMA_RWCTRL_WRITE_BNDRY_256);
-			break;
-
-		case 512:
-			tp->dma_rwctrl |=
-				(DMA_RWCTRL_READ_BNDRY_512 |
-				 DMA_RWCTRL_WRITE_BNDRY_512);
-			break;
-
-		case 1024:
-			tp->dma_rwctrl |=
-				(DMA_RWCTRL_READ_BNDRY_1024 |
-				 DMA_RWCTRL_WRITE_BNDRY_1024);
-			break;
+			if (!(tp->tg3_flags & TG3_FLAG_PCIX_MODE) &&
+			    !(tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS))
+				tp->dma_rwctrl |=
+					DMA_RWCTRL_WRITE_BNDRY_256;
+			else if (!(tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS))
+				tp->dma_rwctrl |=
+					DMA_RWCTRL_WRITE_BNDRY_256_PCIX;
 		};
 	}
 #endif
+
+	if (tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS) {
+		tp->dma_rwctrl |= 0x001f0000;
+	} else if (!(tp->tg3_flags & TG3_FLAG_PCIX_MODE)) {
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ||
+		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+			tp->dma_rwctrl |= 0x003f0000;
+		else
+			tp->dma_rwctrl |= 0x003f000f;
+	} else {
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+			u32 ccval = (tr32(TG3PCI_CLOCK_CTRL) & 0x1f);
+
+			if (ccval == 0x6 || ccval == 0x7)
+				tp->dma_rwctrl |= DMA_RWCTRL_ONE_DMA;
+
+			/* Set bit 23 to renable PCIX hw bug fix */
+			tp->dma_rwctrl |= 0x009f0000;
+		} else {
+			tp->dma_rwctrl |= 0x001b000f;
+		}
+	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
+		tp->dma_rwctrl &= 0xfffffff0;
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701) {
