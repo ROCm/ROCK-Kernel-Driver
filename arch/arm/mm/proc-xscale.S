@@ -678,7 +678,7 @@ __xscale_setup:
 	mcr	p15, 0, r0, c15, c1, 0		@ affects USR or SVC modes
 	mrc	p15, 0, r0, c1, c0, 0		@ get control register
 	bic	r0, r0, #0x0200			@ .... ..R. .... ....
-	bic	r0, r0, #0x0082			@ .... .... B... ..A.
+	bic	r0, r0, #0x0002			@ .... .... .... ..A.
 	orr	r0, r0, #0x0005			@ .... .... .... .C.M
 	orr	r0, r0, #0x3900			@ ..VI Z..S .... ....
 	mov	pc, lr

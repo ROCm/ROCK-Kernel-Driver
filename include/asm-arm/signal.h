@@ -184,9 +184,7 @@ typedef struct sigaltstack {
 
 #ifdef __KERNEL__
 #include <asm/sigcontext.h>
-
-#define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
-
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
 #endif
 
 #endif

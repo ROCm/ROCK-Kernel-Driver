@@ -1,4 +1,5 @@
 #include <linux/init.h>
+#include <linux/list.h>
 
 #include <asm/mach/irq.h>
 #include <asm/hardware/iomd.h>
