@@ -723,9 +723,6 @@ modules_prepare: prepare-all scripts
 .PHONY: modules_install
 modules_install: _modinst_ _modinst_post
 
-.PHONY: modules_add
-modules_add: modules_install
-
 .PHONY: _modinst_
 _modinst_:
 	@if [ -z "`$(DEPMOD) -V | grep module-init-tools`" ]; then \
@@ -969,6 +966,9 @@ modules: $(KBUILD_EXTMOD)
 .PHONY: modules_install
 modules_install:
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modinst
+
+.PHONY: modules_add
+modules_add: modules_install
 
 clean-dirs := _clean_$(KBUILD_EXTMOD)
 
