@@ -313,73 +313,6 @@ static void scsi_unlock_floptical(Scsi_Request *sreq, unsigned char *result)
 }
 
 /**
- * scsi_device_type_read - copy out the SCSI type
- * @driverfs_dev:	driverfs device to check
- * @page:		copy data into this area
- * @count:		number of bytes to copy
- * @off:		start at this offset in page
- *
- * Description:
- *     Called via driverfs when the "type" (in scsi_device_type_file)
- *     field is read. Copy the appropriate SCSI type string into @page,
- *     followed by a newline and a '\0'. Go through gyrations so we don't
- *     write more than @count, and we don't write past @off.
- *
- * Notes:
- *     This is for the top-most scsi entry in driverfs, the upper-level
- *     drivers have their own type file. XXX This is not part of scanning,
- *     other than we reference the attr struct in this file, move to
- *     scsi.c or scsi_lib.c.
- *
- * Return:
- *     number of bytes written into page.
- **/
-static ssize_t scsi_device_type_read(struct device *driverfs_dev, char *page,
-	size_t count, loff_t off)
-{
-	struct scsi_device *sdev = to_scsi_device(driverfs_dev);
-	const char *type;
-	size_t size, len;
-
-	if ((sdev->type > MAX_SCSI_DEVICE_CODE) ||
-	    (scsi_device_types[(int)sdev->type] == NULL))
-		type = "Unknown";
-	else
-		type = scsi_device_types[(int)sdev->type];
-	size = strlen(type);
-	/*
-	 * Check if off is past size + 1 for newline + 1 for a '\0'.
-	 */
-	if (off >= (size + 2))
-		return 0;
-	if (size > off) {
-		len = min((size_t) (size - off), count);
-		memcpy(page + off, type + off, len);
-	} else
-		len = 0;
-	if (((len + off) == size) && (len < count))
-		/*
-		 * We are at the end of the string and have space, add a
-		 * new line.
-		 */
-		*(page + off + len++) = '\n';
-	if (((len + off) == (size + 1)) && (len < count))
-		/*
-		 * We are past the newline and have space, add a
-		 * terminating '\0'.
-		 */
-		*(page + off + len++) = '\0';
-	return len;
-}
-
-/*
- * Create dev_attr_type. This is different from the dev_attr_type in scsi
- * upper level drivers.
- */
-static DEVICE_ATTR(type,S_IRUGO,scsi_device_type_read,NULL);
-
-
-/**
  * print_inquiry - printk the inquiry information
  * @inq_result:	printk this SCSI INQUIRY
  *
@@ -472,8 +405,8 @@ static void scsi_initialize_merge_fn(struct scsi_device *sd)
  * Return value:
  *     Scsi_Device pointer, or NULL on failure.
  **/
-struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
-				    uint id, uint lun)
+static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
+					   uint channel, uint id, uint lun)
 {
 	struct scsi_device *sdev, *device;
 
@@ -542,7 +475,7 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
  *     Undo the actions in scsi_alloc_sdev, including removing @sdev from
  *     the list, and freeing @sdev.
  **/
-void scsi_free_sdev(struct scsi_device *sdev)
+static void scsi_free_sdev(struct scsi_device *sdev)
 {
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
@@ -1365,20 +1298,8 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	 * function.
 	 */
 	scsi_load_identifier(sdev, sreq);
-
-	/*
-	 * create driverfs files
-	 */
-	sprintf(sdev->sdev_driverfs_dev.bus_id,"%d:%d:%d:%d",
-		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
-	sdev->sdev_driverfs_dev.parent = &sdev->host->host_driverfs_dev;
-	sdev->sdev_driverfs_dev.bus = &scsi_driverfs_bus_type;
-	device_register(&sdev->sdev_driverfs_dev);
-
-	/*
-	 * Create driverfs file entries
-	 */
-	device_create_file(&sdev->sdev_driverfs_dev, &dev_attr_type);
+	
+	scsi_device_register(sdev);
 
 	sprintf(devname, "scsi/host%d/bus%d/target%d/lun%d",
 		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
@@ -1417,6 +1338,14 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 		*sdevnew = sdev;
 
 	return SCSI_SCAN_LUN_PRESENT;
+}
+
+static void scsi_remove_lun(struct scsi_device *sdev)
+{
+	devfs_unregister(sdev->de);
+	scsi_device_unregister(sdev);
+
+	scsi_free_sdev(sdev);
 }
 
 /**
@@ -1941,8 +1870,7 @@ int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
 	if (sdev->attached)
 		goto out;
 
-	devfs_unregister(sdev->de);
-	scsi_free_sdev(sdev);
+	scsi_remove_lun(sdev);
 	error = 0;
 
 out:
@@ -2067,4 +1995,70 @@ void scsi_scan_host(struct Scsi_Host *shost)
 		}
 	}
 	scsi_free_sdev(sdevscan);
+}
+
+void scsi_forget_host(struct Scsi_Host *shost)
+{
+	struct list_head *le, *lh;
+
+	list_for_each_safe(le, lh, &shost->my_devices)
+		scsi_remove_lun(list_entry(le, struct scsi_device, siblings));
+}
+
+/*
+ * Function:    scsi_get_host_dev()
+ *
+ * Purpose:     Create a Scsi_Device that points to the host adapter itself.
+ *
+ * Arguments:   SHpnt   - Host that needs a Scsi_Device
+ *
+ * Lock status: None assumed.
+ *
+ * Returns:     The Scsi_Device or NULL
+ *
+ * Notes:
+ *	Attach a single Scsi_Device to the Scsi_Host - this should
+ *	be made to look like a "pseudo-device" that points to the
+ *	HA itself.
+ *
+ *	Note - this device is not accessible from any high-level
+ *	drivers (including generics), which is probably not
+ *	optimal.  We can add hooks later to attach 
+ */
+struct scsi_device *scsi_get_host_dev(struct Scsi_Host *shost)
+{
+	struct scsi_device *sdev;
+
+	sdev = scsi_alloc_sdev(shost, 0, shost->this_id, 0);
+	if (sdev) {
+		scsi_build_commandblocks(sdev);
+		if (sdev->current_queue_depth == 0)
+			goto fail;
+		sdev->borken = 0;
+	}
+
+	return sdev;
+
+fail:
+	kfree(sdev);
+	return NULL;
+}
+
+/*
+ * Function:    scsi_free_host_dev()
+ *
+ * Purpose:     Free a scsi_device that points to the host adapter itself.
+ *
+ * Arguments:   SHpnt   - Host that needs a Scsi_Device
+ *
+ * Lock status: None assumed.
+ *
+ * Returns:     Nothing
+ *
+ * Notes:
+ */
+void scsi_free_host_dev(struct scsi_device *sdev)
+{
+	BUG_ON(sdev->id != sdev->host->this_id);
+	scsi_free_sdev(sdev);
 }

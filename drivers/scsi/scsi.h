@@ -401,9 +401,6 @@ typedef struct scsi_request Scsi_Request;
 
 extern unsigned int scsi_logging_level;		/* What do we log? */
 
-extern struct bus_type scsi_driverfs_bus_type;
-
-
 /*
  * These are the error handling functions defined in scsi_error.c
  */
@@ -451,8 +448,10 @@ extern void scsi_release_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_build_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_adjust_queue_depth(Scsi_Device *, int, int);
 extern int scsi_track_queue_full(Scsi_Device *, int);
-extern int scsi_slave_attach(struct scsi_device *sdev);
-extern void scsi_slave_detach(struct scsi_device *sdev);
+extern int scsi_slave_attach(struct scsi_device *);
+extern void scsi_slave_detach(struct scsi_device *);
+extern int scsi_device_get(struct scsi_device *);
+extern void scsi_device_put(struct scsi_device *);
 extern void scsi_done(Scsi_Cmnd * SCpnt);
 extern void scsi_finish_command(Scsi_Cmnd *);
 extern int scsi_retry_command(Scsi_Cmnd *);
@@ -509,9 +508,6 @@ static inline void scsi_proc_host_rm(struct Scsi_Host *);
 /*
  * Prototypes for functions in scsi_scan.c
  */
-extern struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *,
-			uint, uint, uint);
-extern void scsi_free_sdev(struct scsi_device *);
 extern int scsi_add_single_device(uint, uint, uint, uint);
 extern int scsi_remove_single_device(uint, uint, uint, uint);
 
@@ -991,5 +987,11 @@ static inline Scsi_Cmnd *scsi_find_tag(Scsi_Device *SDpnt, int tag) {
 #define SCSI_SENSE_VALID(scmd) ((scmd->sense_buffer[0] & 0x70) == 0x70)
 
 int scsi_set_medium_removal(Scsi_Device *dev, char state);
+
+extern int scsi_device_register(struct scsi_device *);
+extern void scsi_device_unregister(struct scsi_device *);
+
+extern int scsi_sysfs_register(void);
+extern void scsi_sysfs_unregister(void);
 
 #endif

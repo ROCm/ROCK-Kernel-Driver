@@ -81,6 +81,8 @@ EXPORT_SYMBOL(scsi_register_blocked_host);
 EXPORT_SYMBOL(scsi_deregister_blocked_host);
 EXPORT_SYMBOL(scsi_slave_attach);
 EXPORT_SYMBOL(scsi_slave_detach);
+EXPORT_SYMBOL(scsi_device_get);
+EXPORT_SYMBOL(scsi_device_put);
 
 /*
  * This symbol is for the highlevel drivers (e.g. sg) only.
@@ -104,6 +106,6 @@ EXPORT_SYMBOL(scsi_add_timer);
 EXPORT_SYMBOL(scsi_delete_timer);
 
 /*
- * driverfs support for determining driver types
+ * sysfs support
  */
-EXPORT_SYMBOL(scsi_driverfs_bus_type);
+EXPORT_SYMBOL(shost_devclass);

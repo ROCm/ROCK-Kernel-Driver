@@ -179,19 +179,19 @@ static int w9966_v4l_read(struct file *file, char *buf,
 			  size_t count, loff_t *ppos);
 
 static struct file_operations w9966_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:          w9966_v4l_ioctl,
-	read:           w9966_v4l_read,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl          = w9966_v4l_ioctl,
+	.read           = w9966_v4l_read,
+	.llseek         = no_llseek,
 };
 static struct video_device w9966_template = {
-	owner:		THIS_MODULE,
-	name:           W9966_DRIVERNAME,
-	type:           VID_TYPE_CAPTURE | VID_TYPE_SCALES,
-	hardware:       VID_HARDWARE_W9966,
-	fops:           &w9966_fops,
+	.owner		= THIS_MODULE,
+	.name           = W9966_DRIVERNAME,
+	.type           = VID_TYPE_CAPTURE | VID_TYPE_SCALES,
+	.hardware       = VID_HARDWARE_W9966,
+	.fops           = &w9966_fops,
 };
 
 /*
@@ -710,14 +710,13 @@ static int w9966_v4l_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOCGCAP:
 	{
 		static struct video_capability vcap = {
-			name:      W9966_DRIVERNAME,
-			type:      VID_TYPE_CAPTURE | VID_TYPE_SCALES,
-			channels:  1,
-			audios:    0,
-			maxwidth:  W9966_WND_MAX_W,
-			maxheight: W9966_WND_MAX_H,
-			minwidth:  2,
-			minheight: 1,
+			.name      = W9966_DRIVERNAME,
+			.type      = VID_TYPE_CAPTURE | VID_TYPE_SCALES,
+			.channels  = 1,
+			.maxwidth  = W9966_WND_MAX_W,
+			.maxheight = W9966_WND_MAX_H,
+			.minwidth  = 2,
+			.minheight = 1,
 		};
 		struct video_capability *cap = arg;
 		*cap = vcap;

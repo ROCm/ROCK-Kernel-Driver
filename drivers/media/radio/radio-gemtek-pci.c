@@ -298,19 +298,19 @@ MODULE_DEVICE_TABLE( pci, gemtek_pci_id );
 static u8 mx = 1;
 
 static struct file_operations gemtek_pci_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		gemtek_pci_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= gemtek_pci_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device vdev_template = {
-	owner:         THIS_MODULE,
-	name:          "Gemtek PCI Radio",
-	type:          VID_TYPE_TUNER,
-	hardware:      VID_HARDWARE_GEMTEK,
-	fops:          &gemtek_pci_fops,
+	.owner         = THIS_MODULE,
+	.name          = "Gemtek PCI Radio",
+	.type          = VID_TYPE_TUNER,
+	.hardware      = VID_HARDWARE_GEMTEK,
+	.fops          = &gemtek_pci_fops,
 };
 
 static int __devinit gemtek_pci_probe( struct pci_dev *pci_dev, const struct pci_device_id *pci_id )
@@ -387,10 +387,10 @@ static void __devexit gemtek_pci_remove( struct pci_dev *pci_dev )
 
 static struct pci_driver gemtek_pci_driver =
 {
-    name:	"gemtek_pci",
-id_table:	gemtek_pci_id,
-   probe:	gemtek_pci_probe,
-  remove:	__devexit_p(gemtek_pci_remove),
+	.name		= "gemtek_pci",
+	.id_table	= gemtek_pci_id,
+	.probe		= gemtek_pci_probe,
+	.remove		= __devexit_p(gemtek_pci_remove),
 };
 
 static int __init gemtek_pci_init_module( void )

@@ -1213,19 +1213,19 @@ static int msp_probe(struct i2c_adapter *adap);
 static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg);
 
 static struct i2c_driver driver = {
-        name:           "i2c msp3400 driver",
-        id:             I2C_DRIVERID_MSP3400,
-        flags:          I2C_DF_NOTIFY,
-        attach_adapter: msp_probe,
-        detach_client:  msp_detach,
-        command:        msp_command,
+	.name		= "i2cmsp3400driver",
+	.id		= I2C_DRIVERID_MSP3400,
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= msp_probe,
+	.detach_client	= msp_detach,
+	.command	= msp_command,
 };
 
 static struct i2c_client client_template = 
 {
-	name:   "(unset)",
-	flags:  I2C_CLIENT_ALLOW_USE,
-        driver: &driver,
+	.name	= "(unset)",
+	.flags	= I2C_CLIENT_ALLOW_USE,
+	.driver	= &driver,
 };
 
 static int msp_attach(struct i2c_adapter *adap, int addr,

@@ -75,8 +75,8 @@ static int expand_files(struct files_struct *files, int nr)
 
 /*
  * locate_fd finds a free file descriptor in the open_fds fdset,
- * expanding the fd arrays if necessary.  The files write lock will be
- * held on exit to ensure that the fd can be entered atomically.
+ * expanding the fd arrays if necessary.  Must be called with the
+ * file_lock held for write.
  */
 
 static int locate_fd(struct files_struct *files, 
@@ -86,8 +86,6 @@ static int locate_fd(struct files_struct *files,
 	int error;
 	int start;
 
-	write_lock(&files->file_lock);
-	
 	error = -EINVAL;
 	if (orig_start >= current->rlim[RLIMIT_NOFILE].rlim_cur)
 		goto out;
@@ -131,30 +129,24 @@ out:
 	return error;
 }
 
-static inline void allocate_fd(struct files_struct *files, 
-					struct file *file, int fd)
-{
-	FD_SET(fd, files->open_fds);
-	FD_CLR(fd, files->close_on_exec);
-	write_unlock(&files->file_lock);
-	fd_install(fd, file);
-}
-
 static int dupfd(struct file *file, int start)
 {
 	struct files_struct * files = current->files;
-	int ret;
+	int fd;
 
-	ret = locate_fd(files, file, start);
-	if (ret < 0) 
-		goto out_putf;
-	allocate_fd(files, file, ret);
-	return ret;
+	write_lock(&files->file_lock);
+	fd = locate_fd(files, file, start);
+	if (fd >= 0) {
+		FD_SET(fd, files->open_fds);
+		FD_CLR(fd, files->close_on_exec);
+		write_unlock(&files->file_lock);
+		fd_install(fd, file);
+	} else {
+		write_unlock(&files->file_lock);
+		fput(file);
+	}
 
-out_putf:
-	write_unlock(&files->file_lock);
-	fput(file);
-	return ret;
+	return fd;
 }
 
 asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
@@ -274,7 +266,8 @@ int f_setown(struct file *filp, unsigned long arg, int force)
 {
 	int err;
 	
-	if ((err = security_file_set_fowner(filp)))
+	err = security_file_set_fowner(filp);
+	if (err)
 		return err;
 
 	f_modown(filp, arg, current->uid, current->euid, force);
@@ -367,7 +360,8 @@ asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (!filp)
 		goto out;
 
-	if ((err = security_file_fcntl(filp, cmd, arg))) {
+	err = security_file_fcntl(filp, cmd, arg);
+	if (err) {
 		fput(filp);
 		return err;
 	}
@@ -390,7 +384,8 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 	if (!filp)
 		goto out;
 
-	if ((err = security_file_fcntl(filp, cmd, arg))) {
+	err = security_file_fcntl(filp, cmd, arg);
+	if (err) {
 		fput(filp);
 		return err;
 	}

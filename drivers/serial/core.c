@@ -135,20 +135,6 @@ uart_update_mctrl(struct uart_port *port, unsigned int set, unsigned int clear)
 #define uart_set_mctrl(port,set)	uart_update_mctrl(port,set,0)
 #define uart_clear_mctrl(port,clear)	uart_update_mctrl(port,0,clear)
 
-static inline void uart_update_altspeed(struct uart_info *info)
-{
-	unsigned int flags = info->port->flags & UPF_SPD_MASK;
-
-	if (flags == UPF_SPD_HI)
-		info->tty->alt_speed = 57600;
-	if (flags == UPF_SPD_VHI)
-		info->tty->alt_speed = 115200;
-	if (flags == UPF_SPD_SHI)
-		info->tty->alt_speed = 230400;
-	if (flags == UPF_SPD_WARP)
-		info->tty->alt_speed = 460800;
-}
-
 /*
  * Startup the port.  This will be called once per open.  All calls
  * will be serialised by the global port semaphore.
@@ -167,10 +153,8 @@ static int uart_startup(struct uart_info *info, int init_hw)
 	 * once we have successfully opened the port.  Also set
 	 * up the tty->alt_speed kludge
 	 */
-	if (info->tty) {
+	if (info->tty)
 		set_bit(TTY_IO_ERROR, &info->tty->flags);
-		uart_update_altspeed(info);
-	}
 
 	if (port->type == PORT_UNKNOWN)
 		return 0;
@@ -276,43 +260,20 @@ static void uart_shutdown(struct uart_info *info)
 	info->flags &= ~UIF_INITIALIZED;
 }
 
-static inline
-unsigned int uart_calculate_quot(struct uart_info *info, unsigned int baud)
+/**
+ *	uart_update_timeout - update per-port FIFO timeout.
+ *	@port: uart_port structure describing the port.
+ *	@cflag: termios cflag value
+ *	@quot: uart clock divisor quotient
+ *
+ *	Set the port FIFO timeout value.  The @cflag value should
+ *	reflect the actual hardware settings.
+ */
+void
+uart_update_timeout(struct uart_port *port, unsigned int cflag,
+		    unsigned int quot)
 {
-	struct uart_port *port = info->port;
-	unsigned int quot;
-
-	/* Special case: B0 rate */
-	if (baud == 0)
-		baud = 9600;
-
-	/* Old HI/VHI/custom speed handling */
-	if (baud == 38400 &&
-	    ((port->flags & UPF_SPD_MASK) == UPF_SPD_CUST))
-		quot = info->state->custom_divisor;
-	else
-		quot = port->uartclk / (16 * baud);
-
-	return quot;
-}
-
-static void
-uart_change_speed(struct uart_info *info, struct termios *old_termios)
-{
-	struct uart_port *port = info->port;
-	unsigned int quot, cflag, bits, try;
-
-	/*
-	 * If we have no tty, termios, or the port does not exist,
-	 * then we can't set the parameters for this port.
-	 */
-	if (!info->tty || !info->tty->termios || port->type == PORT_UNKNOWN)
-		return;
-
-	/*
-	 * Set flags based on termios cflag
-	 */
-	cflag = info->tty->termios->c_cflag;
+	unsigned int bits;
 
 	/* byte size and parity */
 	switch (cflag & CSIZE) {
@@ -335,34 +296,6 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	if (cflag & PARENB)
 		bits++;
 
-	for (try = 0; try < 3; try ++) {
-		unsigned int baud;
-
-		/* Determine divisor based on baud rate */
-		baud = tty_get_baud_rate(info->tty);
-		quot = uart_calculate_quot(info, baud);
-		if (quot)
-			break;
-
-		/*
-		 * Oops, the quotient was zero.  Try again with
-		 * the old baud rate if possible.
-		 */
-		info->tty->termios->c_cflag &= ~CBAUD;
-		if (old_termios) {
-			info->tty->termios->c_cflag |=
-				 (old_termios->c_cflag & CBAUD);
-			old_termios = NULL;
-			continue;
-		}
-
-		/*
-		 * As a last resort, if the quotient is zero,
-		 * default to 9600 bps
-		 */
-		info->tty->termios->c_cflag |= B9600;
-	}
-
 	/*
 	 * The total number of bits to be transmitted in the fifo.
 	 */
@@ -373,17 +306,155 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	 * Add .02 seconds of slop
 	 */
 	port->timeout = (HZ * bits) / (port->uartclk / (16 * quot)) + HZ/50;
+}
 
-	if (cflag & CRTSCTS)
+EXPORT_SYMBOL(uart_update_timeout);
+
+/**
+ *	uart_get_baud_rate - return baud rate for a particular port
+ *	@port: uart_port structure describing the port in question.
+ *	@termios: desired termios settings.
+ *
+ *	Decode the termios structure into a numeric baud rate,
+ *	taking account of the magic 38400 baud rate (with spd_*
+ *	flags), and mapping the %B0 rate to 9600 baud.
+ */
+unsigned int
+uart_get_baud_rate(struct uart_port *port, struct termios *termios)
+{
+	unsigned int baud = tty_termios_baud_rate(termios);
+
+	/*
+	 * The spd_hi, spd_vhi, spd_shi, spd_warp kludge...
+	 * Die! Die! Die!
+	 */
+	if (baud == 38400) {
+		unsigned int flags = port->flags & UPF_SPD_MASK;
+
+		if (flags == UPF_SPD_HI)
+			baud = 57600;
+		if (flags == UPF_SPD_VHI)
+			baud = 115200;
+		if (flags == UPF_SPD_SHI)
+			baud = 230400;
+		if (flags == UPF_SPD_WARP)
+			baud = 460800;
+	}
+
+	/*
+	 * Special case: B0 rate.
+	 */
+	if (baud == 0)
+		baud = 9600;
+
+	return baud;
+}
+
+EXPORT_SYMBOL(uart_get_baud_rate);
+
+static inline unsigned int
+uart_calculate_quot(struct uart_port *port, unsigned int baud)
+{
+	unsigned int quot;
+
+	/*
+	 * Old custom speed handling.
+	 */
+	if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST)
+		quot = port->custom_divisor;
+	else
+		quot = port->uartclk / (16 * baud);
+
+	return quot;
+}
+
+/**
+ *	uart_get_divisor - return uart clock divisor
+ *	@port: uart_port structure describing the port.
+ *	@termios: desired termios settings
+ *	@old_termios: the original port settings, or NULL
+ *
+ *	Calculate the uart clock divisor for the port.  If the
+ *	divisor is invalid, try the old termios setting.  If
+ *	the divisor is still invalid, we try 9600 baud.
+ *
+ *	Update the @termios structure to reflect the baud rate
+ *	we're actually going to be using.
+ *
+ *	If 9600 baud fails, we return a zero divisor.
+ */
+unsigned int
+uart_get_divisor(struct uart_port *port, struct termios *termios,
+		 struct termios *old_termios)
+{
+	unsigned int quot, try;
+
+	for (try = 0; try < 3; try ++) {
+		unsigned int baud;
+
+		/* Determine divisor based on baud rate */
+		baud = uart_get_baud_rate(port, termios);
+		quot = uart_calculate_quot(port, baud);
+		if (quot)
+			break;
+
+		/*
+		 * Oops, the quotient was zero.  Try again with
+		 * the old baud rate if possible.
+		 */
+		termios->c_cflag &= ~CBAUD;
+		if (old_termios) {
+			termios->c_cflag |= old_termios->c_cflag & CBAUD;
+			old_termios = NULL;
+			continue;
+		}
+
+		/*
+		 * As a last resort, if the quotient is zero,
+		 * default to 9600 bps
+		 */
+		termios->c_cflag |= B9600;
+	}
+
+	return quot;
+}
+
+EXPORT_SYMBOL(uart_get_divisor);
+
+static void
+uart_change_speed(struct uart_info *info, struct termios *old_termios)
+{
+	struct tty_struct *tty = info->tty;
+	struct uart_port *port = info->port;
+	struct termios *termios;
+	unsigned int quot;
+
+	/*
+	 * If we have no tty, termios, or the port does not exist,
+	 * then we can't set the parameters for this port.
+	 */
+	if (!tty || !tty->termios || port->type == PORT_UNKNOWN)
+		return;
+
+	termios = tty->termios;
+
+	/*
+	 * Set flags based on termios cflag
+	 */
+	if (termios->c_cflag & CRTSCTS)
 		info->flags |= UIF_CTS_FLOW;
 	else
 		info->flags &= ~UIF_CTS_FLOW;
-	if (cflag & CLOCAL)
+
+	if (termios->c_cflag & CLOCAL)
 		info->flags &= ~UIF_CHECK_CD;
 	else
 		info->flags |= UIF_CHECK_CD;
 
-	port->ops->change_speed(port, cflag, info->tty->termios->c_iflag, quot);
+	quot = uart_get_divisor(port, termios, old_termios);
+	uart_update_timeout(port, termios->c_cflag, quot);
+
+	port->ops->change_speed(port, termios->c_cflag, termios->c_iflag, quot);
 }
 
 static inline void
@@ -597,7 +668,7 @@ static int uart_get_info(struct uart_info *info, struct serial_struct *retinfo)
 	tmp.baud_base	    = port->uartclk / 16;
 	tmp.close_delay	    = state->close_delay;
 	tmp.closing_wait    = state->closing_wait;
-	tmp.custom_divisor  = state->custom_divisor;
+	tmp.custom_divisor  = port->custom_divisor;
 	tmp.hub6	    = port->hub6;
 	tmp.io_type         = port->iotype;
 	tmp.iomem_reg_shift = port->regshift;
@@ -652,7 +723,7 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 		      new_serial.type != port->type;
 
 	old_flags = port->flags;
-	old_custom_divisor = state->custom_divisor;
+	old_custom_divisor = port->custom_divisor;
 
 	if (!capable(CAP_SYS_ADMIN)) {
 		retval = -EPERM;
@@ -665,7 +736,7 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 			goto exit;
 		port->flags = ((port->flags & ~UPF_USR_MASK) |
 			       (new_serial.flags & UPF_USR_MASK));
-		state->custom_divisor = new_serial.custom_divisor;
+		port->custom_divisor = new_serial.custom_divisor;
 		goto check_and_exit;
 	}
 
@@ -757,7 +828,7 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 	port->irq              = new_serial.irq;
 	port->uartclk          = new_serial.baud_base * 16;
 	port->flags            = new_serial.flags & UPF_FLAGS;
-	state->custom_divisor  = new_serial.custom_divisor;
+	port->custom_divisor   = new_serial.custom_divisor;
 	state->close_delay     = new_serial.close_delay * HZ / 100;
 	state->closing_wait    = new_serial.closing_wait * HZ / 100;
 	port->fifosize         = new_serial.xmit_fifo_size;
@@ -769,10 +840,8 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 		goto exit;
 	if (info->flags & UIF_INITIALIZED) {
 		if (((old_flags ^ port->flags) & UPF_SPD_MASK) ||
-		    old_custom_divisor != state->custom_divisor) {
-			uart_update_altspeed(info);
+		    old_custom_divisor != port->custom_divisor)
 			uart_change_speed(info, NULL);
-		}
 	} else
 		retval = uart_startup(info, 1);
  exit:
@@ -1540,8 +1609,9 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	 * Any failures from here onwards should not touch the count.
 	 */
 	tty->driver_data = info;
+	tty->low_latency = (info->port->flags & UPF_LOW_LATENCY) ? 1 : 0;
+	tty->alt_speed = 0;
 	info->tty = tty;
-	info->tty->low_latency = (info->port->flags & UPF_LOW_LATENCY) ? 1 : 0;
 
 	/*
 	 * If the port is in the middle of closing, bail out now.
@@ -2009,7 +2079,7 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 	/*
 	 * If there isn't a port here, don't do anything further.
 	 */
-	if (!port->iobase && !port->mapbase)
+	if (!port->iobase && !port->mapbase && !port->membase)
 		return;
 
 	/*
@@ -2405,17 +2475,23 @@ int uart_register_port(struct uart_driver *drv, struct uart_port *port)
 			goto out;
 		}
 
-		state->port->iobase   = port->iobase;
-		state->port->membase  = port->membase;
-		state->port->irq      = port->irq;
-		state->port->uartclk  = port->uartclk;
-		state->port->fifosize = port->fifosize;
-		state->port->regshift = port->regshift;
-		state->port->iotype   = port->iotype;
-		state->port->flags    = port->flags;
-		state->port->line     = state - drv->state;
+		/*
+		 * If the port is already initialised, don't touch it.
+		 */
+		if (state->port->type == PORT_UNKNOWN) {
+			state->port->iobase   = port->iobase;
+			state->port->membase  = port->membase;
+			state->port->irq      = port->irq;
+			state->port->uartclk  = port->uartclk;
+			state->port->fifosize = port->fifosize;
+			state->port->regshift = port->regshift;
+			state->port->iotype   = port->iotype;
+			state->port->flags    = port->flags;
+			state->port->line     = state - drv->state;
+			state->port->mapbase  = port->mapbase;
 
-		__uart_register_port(drv, state, state->port);
+			__uart_register_port(drv, state, state->port);
+		}
 
 		ret = state->port->line;
 	} else

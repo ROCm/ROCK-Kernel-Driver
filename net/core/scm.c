@@ -217,7 +217,8 @@ void scm_detach_fds(struct msghdr *msg, struct scm_cookie *scm)
 	for (i=0, cmfptr=(int*)CMSG_DATA(cm); i<fdmax; i++, cmfptr++)
 	{
 		int new_fd;
-		if ((err = security_file_receive(fp[i])))
+		err = security_file_receive(fp[i]);
+		if (err)
 			break;
 		err = get_unused_fd();
 		if (err < 0)

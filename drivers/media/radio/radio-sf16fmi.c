@@ -223,20 +223,20 @@ static int fmi_ioctl(struct inode *inode, struct file *file,
 static struct fmi_device fmi_unit;
 
 static struct file_operations fmi_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		fmi_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= fmi_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device fmi_radio=
 {
-	owner:		THIS_MODULE,
-	name:		"SF16FMx radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_SF16MI,
-	fops:           &fmi_fops,
+	.owner		= THIS_MODULE,
+	.name		= "SF16FMx radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_SF16MI,
+	.fops           = &fmi_fops,
 };
 
 /* ladis: this is my card. does any other types exist? */

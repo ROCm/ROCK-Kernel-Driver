@@ -9,6 +9,10 @@
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
  *
+ * (26/11/2002) ganesh
+ * 	Added insmod options to specify product and vendor id.
+ * 	Use modprobe ipaq vendor=0xfoo product=0xbar
+ *
  * (26/7/2002) ganesh
  * 	Fixed up broken error handling in ipaq_open. Retry the "kickstart"
  * 	packet much harder - this drastically reduces connection failures.
@@ -63,9 +67,12 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.2"
+
+#define DRIVER_VERSION "v0.4"
 #define DRIVER_AUTHOR "Ganesh Varadarajan <ganesh@veritas.com>"
 #define DRIVER_DESC "USB Compaq iPAQ, HP Jornada, Casio EM500 driver"
+
+static int	product, vendor;
 
 /* Function prototypes for an ipaq */
 static int  ipaq_open (struct usb_serial_port *port, struct file *filp);
@@ -85,6 +92,8 @@ static void ipaq_destroy_lists(struct usb_serial_port *port);
 
 
 static struct usb_device_id ipaq_id_table [] = {
+	/* The first entry is a placeholder for the insmod-specified device */
+	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_IPAQ_ID) },
 	{ USB_DEVICE(COMPAQ_VENDOR_ID, COMPAQ_IPAQ_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_548_ID) },
 	{ USB_DEVICE(HP_VENDOR_ID, HP_JORNADA_568_ID) },
@@ -521,9 +530,14 @@ static void ipaq_shutdown(struct usb_serial *serial)
 
 static int __init ipaq_init(void)
 {
+	spin_lock_init(&write_list_lock);
 	usb_serial_register(&ipaq_device);
-	usb_register(&ipaq_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
+	if (vendor) {
+		ipaq_id_table[0].idVendor = vendor;
+		ipaq_id_table[0].idProduct = product;
+	}
+	usb_register(&ipaq_driver);
 
 	return 0;
 }
@@ -546,3 +560,8 @@ MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
+MODULE_PARM(vendor, "h");
+MODULE_PARM_DESC(vendor, "User specified USB idVendor");
+
+MODULE_PARM(product, "h");
+MODULE_PARM_DESC(product, "User specified USB idProduct");

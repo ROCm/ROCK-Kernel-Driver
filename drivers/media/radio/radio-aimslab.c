@@ -300,20 +300,20 @@ static int rt_ioctl(struct inode *inode, struct file *file,
 static struct rt_device rtrack_unit;
 
 static struct file_operations rtrack_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:	        rt_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl	        = rt_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device rtrack_radio=
 {
-	owner:		THIS_MODULE,
-	name:		"RadioTrack radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_RTRACK,
-	fops:           &rtrack_fops,
+	.owner		= THIS_MODULE,
+	.name		= "RadioTrack radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_RTRACK,
+	.fops           = &rtrack_fops,
 };
 
 static int __init rtrack_init(void)

@@ -263,7 +263,8 @@ sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 			goto out;
 		}
 
-		if ((error = security_file_mprotect(vma, prot)))
+		error = security_file_mprotect(vma, prot);
+		if (error)
 			goto out;
 
 		if (vma->vm_end > end) {

@@ -383,22 +383,22 @@ static struct Qdisc_class_ops prio_class_ops =
 
 struct Qdisc_ops prio_qdisc_ops =
 {
-	next:		NULL,
-	cl_ops:		&prio_class_ops,
-	id:		"prio",
-	priv_size:	sizeof(struct prio_sched_data),
+	.next		= NULL,
+	.cl_ops		= &prio_class_ops,
+	.id		= "prio",
+	.priv_size	= sizeof(struct prio_sched_data),
 
-	enqueue:	prio_enqueue,
-	dequeue:	prio_dequeue,
-	requeue:	prio_requeue,
-	drop:		prio_drop,
+	.enqueue	= prio_enqueue,
+	.dequeue	= prio_dequeue,
+	.requeue	= prio_requeue,
+	.drop		= prio_drop,
 
-	init:		prio_init,
-	reset:		prio_reset,
-	destroy:	prio_destroy,
-	change:		prio_tune,
+	.init		= prio_init,
+	.reset		= prio_reset,
+	.destroy	= prio_destroy,
+	.change		= prio_tune,
 
-	dump:		prio_dump,
+	.dump		= prio_dump,
 };
 
 #ifdef MODULE

@@ -59,20 +59,13 @@ static int debug = 0;
 
 static
 struct dvb_frontend_info ves1820_info = {
-	name: "VES1820/Grundig tuner as used on the Siemens DVB-C card",
-	type: FE_QAM,
-	frequency_stepsize: 62500,
-	frequency_min: 51000000,
-	frequency_max: 858000000,
-#if 0
-	frequency_tolerance: ???,
-	symbol_rate_min: ???,
-	symbol_rate_max: ???,
-	symbol_rate_tolerance: ???,  /* ppm */  /* == 8% (spec p. 5) */
-	notifier_delay: ?,
-#endif
-	caps: FE_CAN_QAM_16 | FE_CAN_QAM_32 | FE_CAN_QAM_64 |
-		FE_CAN_QAM_128 | FE_CAN_QAM_256
+	.name	= "VES1820/Grundig tuner as used on the Siemens DVB-C card",
+	.type	= FE_QAM,
+	.frequency_stepsize	= 62500,
+	.frequency_min		= 51000000,
+	.frequency_max		= 858000000,
+	.caps	= FE_CAN_QAM_16 | FE_CAN_QAM_32 | FE_CAN_QAM_64 |
+		  FE_CAN_QAM_128 | FE_CAN_QAM_256
 };
 
 
@@ -95,7 +88,7 @@ int ves1820_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
         int ret;
         u8 buf[] = { 0x00, reg, data };
-	struct i2c_msg msg = { addr: 0x09, flags: 0, buf: buf, len: 3 };
+	struct i2c_msg msg = { .addr = 0x09, .flags = 0, .buf = buf, .len = 3 };
 
 	ret = i2c->xfer (i2c, &msg, 1);
 
@@ -115,8 +108,8 @@ u8 ves1820_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	int ret;
 	u8 b0 [] = { 0x00, reg };
 	u8 b1 [] = { 0 };
-	struct i2c_msg msg [] = { { addr: 0x09, flags: 0, buf: b0, len: 2 },
-	                   { addr: 0x09, flags: I2C_M_RD, buf: b1, len: 1 } };
+	struct i2c_msg msg [] = { { .addr = 0x09, .flags = 0, .buf = b0, .len = 2 },
+	                   { .addr = 0x09, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
 
 	ret = i2c->xfer (i2c, msg, 2);
@@ -132,7 +125,7 @@ static
 int tuner_write (struct dvb_i2c_bus *i2c, u8 addr, u8 data [4])
 {
         int ret;
-        struct i2c_msg msg = { addr: addr, flags: 0, buf: data, len: 4 };
+        struct i2c_msg msg = { .addr = addr, .flags = 0, .buf = data, .len = 4 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
@@ -178,7 +171,7 @@ static
 int probe_tuner (struct dvb_frontend *frontend)
 {
 	struct dvb_i2c_bus *i2c = frontend->i2c;
-	struct i2c_msg msg = { addr: 0x61, flags: 0, buf: NULL, len: 0 };
+	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = NULL, .len = 0 };
 
 	if (i2c->xfer(i2c, &msg, 1) == 1) {
 		SET_TUNER(frontend,0);
@@ -199,8 +192,8 @@ int ves1820_init (struct dvb_frontend *frontend)
 	u8 b0 [] = { 0xff };
 	u8 pwm;
 	int i;
-	struct i2c_msg msg [] = { { addr: 0x50, flags: 0, buf: b0, len: 1 },
-	                   { addr: 0x50, flags: I2C_M_RD, buf: &pwm, len: 1 } };
+	struct i2c_msg msg [] = { { .addr = 0x50, .flags = 0, .buf = b0, .len = 1 },
+	                   { .addr = 0x50, .flags = I2C_M_RD, .buf = &pwm, .len = 1 } };
         
         dprintk("VES1820: init chip\n");
 

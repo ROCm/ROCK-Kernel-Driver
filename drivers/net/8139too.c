@@ -969,7 +969,12 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	dev->do_ioctl = netdev_ioctl;
 	dev->tx_timeout = rtl8139_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
-	dev->features |= NETIF_F_SG|NETIF_F_HW_CSUM;
+
+	/* note: the hardware is not capable of sg/csum/highdma, however
+	 * through the use of skb_copy_and_csum_dev we enable these
+	 * features
+	 */
+	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_HIGHDMA;
 
 	dev->irq = pdev->irq;
 

@@ -222,14 +222,14 @@ static int vino_mmap(struct video_device *dev, const char *adr,
 }
 
 static struct video_device vino_dev = {
-	owner:		THIS_MODULE,
-	name:		"Vino IndyCam/TV",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_VINO,
-	open:		vino_open,
-	close:		vino_close,
-	ioctl:		vino_ioctl,
-	mmap:		vino_mmap,
+	.owner		= THIS_MODULE,
+	.name		= "Vino IndyCam/TV",
+	.type		= VID_TYPE_CAPTURE,
+	.hardware	= VID_HARDWARE_VINO,
+	.open		= vino_open,
+	.close		= vino_close,
+	.ioctl		= vino_ioctl,
+	.mmap		= vino_mmap,
 };
 
 int __init init_vino(struct video_device *dev)
