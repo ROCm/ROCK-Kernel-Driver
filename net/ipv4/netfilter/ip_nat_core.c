@@ -813,6 +813,23 @@ do_bindings(struct ip_conntrack *ct,
 	/* not reached */
 }
 
+static inline int tuple_src_equal_dst(const struct ip_conntrack_tuple *t1,
+                                      const struct ip_conntrack_tuple *t2)
+{
+	if (t1->dst.protonum != t2->dst.protonum || t1->src.ip != t2->dst.ip)
+		return 0;
+	if (t1->dst.protonum != IPPROTO_ICMP)
+		return t1->src.u.all == t2->dst.u.all;
+	else {
+		struct ip_conntrack_tuple inv;
+
+		/* ICMP tuples are asymetric */
+		invert_tuplepr(&inv, t1);
+		return inv.src.u.all == t2->src.u.all &&
+		       inv.dst.u.all == t2->dst.u.all;
+	}
+}
+
 int
 icmp_reply_translation(struct sk_buff **pskb,
 		       struct ip_conntrack *conntrack,
@@ -825,6 +842,7 @@ icmp_reply_translation(struct sk_buff **pskb,
 	} *inside;
 	unsigned int i;
 	struct ip_nat_info *info = &conntrack->nat.info;
+	struct ip_conntrack_tuple *cttuple, innertuple;
 	int hdrlen;
 
 	if (!skb_ip_make_writable(pskb,(*pskb)->nh.iph->ihl*4+sizeof(*inside)))
@@ -868,6 +886,13 @@ icmp_reply_translation(struct sk_buff **pskb,
 	   such addresses are not too uncommon, as Alan Cox points
 	   out) */
 
+	if (!ip_ct_get_tuple(&inside->ip, *pskb, (*pskb)->nh.iph->ihl*4 +
+	                     sizeof(struct icmphdr) + inside->ip.ihl*4,
+	                     &innertuple,
+	                     ip_ct_find_proto(inside->ip.protocol)))
+		return 0;
+	cttuple = &conntrack->tuplehash[dir].tuple;
+
 	READ_LOCK(&ip_nat_lock);
 	for (i = 0; i < info->num_manips; i++) {
 		DEBUGP("icmp_reply: manip %u dir %s hook %u\n",
@@ -890,6 +915,17 @@ icmp_reply_translation(struct sk_buff **pskb,
 
 		if (info->manips[i].hooknum != hooknum)
 			continue;
+
+		/* ICMP errors may be generated locally for packets that
+		 * don't have all NAT manips applied yet. Verify manips
+		 * have been applied before reversing them */
+		if (info->manips[i].maniptype == IP_NAT_MANIP_SRC) {
+			if (!tuple_src_equal_dst(cttuple, &innertuple))
+				continue;
+		} else {
+			if (!tuple_src_equal_dst(&innertuple, cttuple))
+				continue;
+		}
 
 		DEBUGP("icmp_reply: inner %s -> %u.%u.%u.%u %u\n",
 		       info->manips[i].maniptype == IP_NAT_MANIP_SRC
