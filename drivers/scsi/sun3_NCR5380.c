@@ -1213,9 +1213,9 @@ static void NCR5380_dma_complete( struct Scsi_Host *instance )
 
     if((sun3scsi_dma_finish(hostdata->connected->request->cmd))) {
 	    printk("scsi%d: overrun in UDC counter -- not prepared to deal with this!\n", HOSTNO);
-	    printk("please e-mail sammy@oh.verio.com with a description of how this\n");
+	    printk("please e-mail sammy@sammy.net with a description of how this\n");
 	    printk("error was produced.\n");
-	    machine_halt();
+	    BUG();
     }
 
     /* make sure we're not stuck in a data phase */
@@ -1226,9 +1226,9 @@ static void NCR5380_dma_complete( struct Scsi_Host *instance )
 	    printk("scsi%d: bus stuck in data phase -- probably a
  single byte overrun!\n", HOSTNO); 
 	    printk("not prepared for this error!\n");
-	    printk("please e-mail sammy@oh.verio.com with a description of how this\n");
+	    printk("please e-mail sammy@sammy.net with a description of how this\n");
 	    printk("error was produced.\n");
-	    machine_halt();
+	    BUG();
     }
 
 
@@ -1916,7 +1916,7 @@ static int NCR5380_transfer_dma( struct Scsi_Host *instance,
     /* sanity check */
     if(!sun3_dma_setup_done) {
 	 printk("scsi%d: transfer_dma without setup!\n", HOSTNO);
-	 machine_halt();
+	 BUG();
     }
 
     hostdata->dma_len = c;
