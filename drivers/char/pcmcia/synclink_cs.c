@@ -41,6 +41,7 @@
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/timer.h>
+#include <linux/time.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/tty.h>
@@ -442,8 +443,6 @@ static int set_txenable(MGSLPC_INFO *info, int enable);
 static int tx_abort(MGSLPC_INFO *info);
 static int set_rxenable(MGSLPC_INFO *info, int enable);
 static int wait_events(MGSLPC_INFO *info, int __user *mask);
-
-#define jiffies_from_ms(a) ((((a) * HZ)/1000)+1)
 
 static MGSLPC_INFO *mgslpc_device_list = NULL;
 static int mgslpc_device_count = 0;
@@ -3650,7 +3649,7 @@ void tx_start(MGSLPC_INFO *info)
 		} else {
 			info->tx_active = 1;
 			tx_ready(info);
-			info->tx_timer.expires = jiffies + jiffies_from_ms(5000);
+			info->tx_timer.expires = jiffies + msecs_to_jiffies(5000);
 			add_timer(&info->tx_timer);	
 		}
 	}
@@ -4110,7 +4109,7 @@ BOOLEAN irq_test(MGSLPC_INFO *info)
 	end_time=100;
 	while(end_time-- && !info->irq_occurred) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(jiffies_from_ms(10));
+		schedule_timeout(msecs_to_jiffies(10));
 	}
 	
 	info->testing_irq = FALSE;
