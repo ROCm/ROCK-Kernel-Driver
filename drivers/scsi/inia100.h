@@ -85,10 +85,9 @@ extern int inia100_reset(Scsi_Cmnd *, unsigned int);
 
 extern int inia100_biosparam(Scsi_Disk *, struct block_device *, int *);
 
-#define inia100_REVID "Initio INI-A100U2W SCSI device driver; Revision: 1.02c"
+#define inia100_REVID "Initio INI-A100U2W SCSI device driver; Revision: 1.02d"
 
 #define INIA100	{ \
-	next:		NULL,						\
 	module:		NULL,						\
 	proc_name:	"inia100", \
 	proc_info:	NULL,				\
