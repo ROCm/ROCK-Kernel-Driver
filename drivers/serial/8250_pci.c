@@ -790,8 +790,6 @@ pci_init_one(struct pci_dev *dev, const struct pci_device_id *ent)
 
 	return 0;
 
- free:
-	kfree(priv);
  deinit:
 	if (board->init_fn)
 		board->init_fn(dev, 0);

@@ -379,7 +379,7 @@ static void autoconfig_has_efr(struct uart_8250_port *up)
 	if (id1 == 0x16 && id2 == 0xC9 &&
 	    (id3 == 0x50 || id3 == 0x52 || id3 == 0x54)) {
 		up->port.type = PORT_16C950;
-		up->rev = rev | (scratch3 << 8);
+		up->rev = rev | (id3 << 8);
 		return;
 	}
 	

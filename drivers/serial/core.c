@@ -68,8 +68,6 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout);
 void uart_write_wakeup(struct uart_port *port)
 {
 	struct uart_info *info = port->info;
-
-	set_bit(0, &info->event);
 	tasklet_schedule(&info->tlet);
 }
 
@@ -112,13 +110,12 @@ static void uart_tasklet_action(unsigned long data)
 	struct tty_struct *tty;
 
 	tty = info->tty;
-	if (!tty || !test_and_clear_bit(EVT_WRITE_WAKEUP, &info->event))
-		return;
-
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
-	wake_up_interruptible(&tty->write_wait);
+	if (tty) {
+		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
+		    tty->ldisc.write_wakeup)
+			tty->ldisc.write_wakeup(tty);
+		wake_up_interruptible(&tty->write_wait);
+	}
 }
 
 static inline void
