@@ -93,27 +93,24 @@
 
 #define DRIVER_VERSION 	        "2.2.0"
 #define DRIVER_AUTHOR           "Torrey Hoffman <thoffman@arnor.net>"
-#define DRIVER_DESC             "USB driver for ATI/X10 RF Remote Control"
+#define DRIVER_DESC             "ATI/X10 RF USB Remote Control"
 
 #define NAME_BUFSIZE      80    /* size of product name, path buffers */
 #define DATA_BUFSIZE      63    /* size of URB data buffers */
 #define ATI_INPUTNUM      1     /* Which input device to register as */
 
-#ifdef CONFIG_USB_DEBUG
-	static int debug = 1;
-#else
-	static int debug;
-#endif
-module_param(debug, int, 444);
-MODULE_PARM_DESC(debug, "Enable / disable debug messages");
-
 unsigned long channel_mask = 0;
 module_param(channel_mask, ulong, 444);
 MODULE_PARM_DESC(channel_mask, "Bitmask of remote control channels to ignore");
 
-#undef dbg
-#define dbg(format, arg...) do { if (debug) printk(KERN_DEBUG __FILE__ ": " format "\n" , ## arg); } while (0)
+int debug = 0;
+module_param(debug, int, 444);
+MODULE_PARM_DESC(debug, "Enable extra debug messages and information");
 
+#define dbginfo(dev, format, arg...) do { if (debug) dev_info(dev , format , ## arg); } while (0)
+#undef err
+#define err(format, arg...) printk(KERN_ERR format , ## arg)
+ 
 static struct usb_device_id ati_remote_table[] = {
 	{ USB_DEVICE(ATI_REMOTE_VENDOR_ID, ATI_REMOTE_PRODUCT_ID) },
 	{}	/* Terminating entry */
@@ -131,6 +128,16 @@ MODULE_DEVICE_TABLE(usb, ati_remote_table);
 /* Device initialization strings */
 static char init1[] = { 0x01, 0x00, 0x20, 0x14 };
 static char init2[] = { 0x01, 0x00, 0x20, 0x14, 0x20, 0x20, 0x20 };
+
+/* Acceleration curve for directional control pad */
+static char accel[] = { 1, 2, 4, 6, 9, 13, 20 };
+
+/* Duplicate event filtering time. 
+ * Sequential, identical KIND_FILTERED inputs with less than
+ * FILTER_TIME jiffies between them are dropped.  
+ * (HZ >> 4) == 1/16th of a second and works well for me.
+ */
+#define FILTER_TIME (HZ >> 4)
 
 struct ati_remote {
 	struct input_dev idev;		
@@ -279,12 +286,12 @@ static struct usb_driver ati_remote_driver = {
 static void ati_remote_dump(unsigned char *data, unsigned int len)
 {
 	if ((len == 1) && (data[0] != (unsigned char)0xff) && (data[0] != 0x00))
-		warn("Weird byte 0x%02x", data[0]);
+		warn("Weird byte 0x%02x\n", data[0]);
 	else if (len == 4)
-		warn("Weird key %02x %02x %02x %02x", 
+		warn("Weird key %02x %02x %02x %02x\n", 
 		     data[0], data[1], data[2], data[3]);
 	else
-		warn("Weird data, len=%d %02x %02x %02x %02x %02x %02x ...",
+		warn("Weird data, len=%d %02x %02x %02x %02x %02x %02x ...\n",
 		     len, data[0], data[1], data[2], data[3], data[4], data[5]);
 }
 
@@ -301,7 +308,8 @@ static int ati_remote_open(struct input_dev *inputdev)
 	/* On first open, submit the read urb which was set up previously. */
 	ati_remote->irq_urb->dev = ati_remote->udev;
 	if (usb_submit_urb(ati_remote->irq_urb, GFP_KERNEL)) {
-		err(" %s: usb_submit_urb failed!", __FUNCTION__);
+		dev_err(&ati_remote->interface->dev, 
+			"%s: usb_submit_urb failed!\n", __FUNCTION__);
 		ati_remote->open--;
 		return -EIO;
 	}
@@ -317,12 +325,12 @@ static void ati_remote_close(struct input_dev *inputdev)
 	struct ati_remote *ati_remote = inputdev->private;
 	
 	if (ati_remote == NULL) {
-		dbg("%s - object is NULL !", __FUNCTION__);
+		err("ati_remote: %s: object is NULL!\n", __FUNCTION__);
 		return;
 	}
 	
 	if (ati_remote->open <= 0)
-		dbg("%s - ati_remote not open.", __FUNCTION__);
+		dev_dbg(&ati_remote->interface->dev, "%s: Not open.\n", __FUNCTION__);
 	else
 		--ati_remote->open;
 	
@@ -339,7 +347,8 @@ static void ati_remote_irq_out(struct urb *urb, struct pt_regs *regs)
 	struct ati_remote *ati_remote = urb->context;
 	
 	if (urb->status) {
-		warn("output urb completion status %d received", urb->status);
+		dev_dbg(&ati_remote->interface->dev, "%s: status %d\n",
+			__FUNCTION__, urb->status);
 		return;
 	}
 	
@@ -375,7 +384,8 @@ static int ati_remote_sendpacket(struct ati_remote *ati_remote, u16 cmd, unsigne
 	if (retval) {
 		set_current_state(TASK_RUNNING);
 		remove_wait_queue(&ati_remote->wait, &wait);
-		dbg("sendpacket: usb_submit_urb failed: %d", retval);	
+		dev_dbg(&ati_remote->interface->dev, 
+			 "sendpacket: usb_submit_urb failed: %d\n", retval);
 		return retval;
 	}
 
@@ -432,21 +442,26 @@ static void ati_remote_input_report(struct urb *urb, struct pt_regs *regs)
 	}
 
 	/* Mask unwanted remote channels.  */
-	/* note: remote_num is 0-based, channel 1 selected on remote == 0 here */
+	/* note: remote_num is 0-based, channel 1 on remote == 0 here */
 	remote_num = (data[3] >> 4) & 0x0f;
-	if (channel_mask & (1 << (remote_num + 1))) {
-		dbg("Remote 0x02%x masked. mask = 0x%02lx", 
-		    remote_num, channel_mask);
+        if (channel_mask & (1 << (remote_num + 1))) { 
+		dbginfo(&ati_remote->interface->dev,
+			"Masked input from channel 0x%02x: data %02x,%02x, mask= 0x%02lx\n",
+			remote_num, data[1], data[2], channel_mask);
 		return;
 	}
-	dbg("Remote channel 0x%02x: %02x%02x", remote_num, data[1], data[2]);
 
 	/* Look up event code index in translation table */
 	index = ati_remote_event_lookup(remote_num, data[1], data[2]);
 	if (index < 0) {
-		warn("Unknown key=%02x%02x", data[1], data[2]);
+		dev_warn(&ati_remote->interface->dev, 
+			 "Unknown input from channel 0x%02x: data %02x,%02x\n", 
+			 remote_num, data[1], data[2]);
 		return;
-	}
+	} 
+	dbginfo(&ati_remote->interface->dev, 
+		"channel 0x%02x; data %02x,%02x; index %d; keycode %d\n",
+		remote_num, data[1], data[2], index, ati_remote_tbl[index].code);
 	
 	if (ati_remote_tbl[index].kind == KIND_LITERAL) {
 		input_regs(dev, regs);
@@ -460,11 +475,10 @@ static void ati_remote_input_report(struct urb *urb, struct pt_regs *regs)
 	}
 	
 	if (ati_remote_tbl[index].kind == KIND_FILTERED) {
-		/* Filter duplicate events which happen "too close" together,
- 		 * considered here to be anything less than a quarter second */
+		/* Filter duplicate events which happen "too close" together. */
 		if ((ati_remote->old_data[0] == data[1]) && 
 	 		(ati_remote->old_data[1] == data[2]) && 
-	 		((ati_remote->old_jiffies + (HZ >> 2)) > jiffies)) {
+	 		((ati_remote->old_jiffies + FILTER_TIME) > jiffies)) {
 			ati_remote->old_jiffies = jiffies;			
 			return;
 		}		
@@ -484,25 +498,25 @@ static void ati_remote_input_report(struct urb *urb, struct pt_regs *regs)
 	
 	/* 
 	 * Other event kinds are from the directional control pad, and have an
-	 * acceleration factor applied to them.  Without added acceleration, the
-	 * control pad is pretty unusable.
+	 * acceleration factor applied to them.  Without this acceleration, the
+	 * control pad is mostly unusable.
 	 * 
 	 * If elapsed time since last event is > 1/4 second, user "stopped",
 	 * so reset acceleration. Otherwise, user is probably holding the control
 	 * pad down, so we increase acceleration, ramping up over two seconds to
-	 * a maximum speed.
+	 * a maximum speed.  The acceleration curve is #defined above.
 	 */
 	if ((jiffies - ati_remote->old_jiffies) > (HZ >> 2)) {
 		acc = 1;
 		ati_remote->acc_jiffies = jiffies;
 	}
-	else if ((jiffies - ati_remote->acc_jiffies) < (HZ >> 3))  acc = 1;
-	else if ((jiffies - ati_remote->acc_jiffies) < (HZ >> 2))  acc = 2;
-	else if ((jiffies - ati_remote->acc_jiffies) < (HZ >> 1))  acc = 3;
-	else if ((jiffies - ati_remote->acc_jiffies) < HZ )        acc = 4;
-	else if ((jiffies - ati_remote->acc_jiffies) < HZ+(HZ>>1)) acc = 6;
-	else if ((jiffies - ati_remote->acc_jiffies) < (HZ << 1))  acc = 10;
-	else acc = 16;
+	else if ((jiffies - ati_remote->acc_jiffies) < (HZ >> 3))  acc = accel[0];
+	else if ((jiffies - ati_remote->acc_jiffies) < (HZ >> 2))  acc = accel[1];
+	else if ((jiffies - ati_remote->acc_jiffies) < (HZ >> 1))  acc = accel[2];
+	else if ((jiffies - ati_remote->acc_jiffies) < HZ )        acc = accel[3];
+	else if ((jiffies - ati_remote->acc_jiffies) < HZ+(HZ>>1)) acc = accel[4];
+	else if ((jiffies - ati_remote->acc_jiffies) < (HZ << 1))  acc = accel[5];
+	else acc = accel[6];
 
 	input_regs(dev, regs);
 	switch (ati_remote_tbl[index].kind) {
@@ -528,7 +542,8 @@ static void ati_remote_input_report(struct urb *urb, struct pt_regs *regs)
 		input_report_rel(dev, REL_Y, acc);
 		break;
 	default:
-		dbg("ati_remote kind=%d", ati_remote_tbl[index].kind);
+		dev_dbg(&ati_remote->interface->dev, "ati_remote kind=%d\n", 
+			ati_remote_tbl[index].kind);
 	}
 	input_sync(dev);
 
@@ -545,25 +560,25 @@ static void ati_remote_irq_in(struct urb *urb, struct pt_regs *regs)
 	struct ati_remote *ati_remote = urb->context;
 	int retval;
 
-	switch (urb->status) 
-	{
+	switch (urb->status) {
 	case 0:			/* success */
 		ati_remote_input_report(urb, regs);
 		break;
 	case -ECONNRESET:	/* unlink */
 	case -ENOENT:
 	case -ESHUTDOWN:
-		dbg("%s: urb error status (unlink?)", __FUNCTION__);
+		dev_dbg(&ati_remote->interface->dev, "%s: urb error status, unlink? \n",
+			__FUNCTION__);
 		return;	
 	default:		/* error */
-		dbg("%s: Nonzero urb status %d", __FUNCTION__, urb->status);
+		dev_dbg(&ati_remote->interface->dev, "%s: Nonzero urb status %d\n", 
+			__FUNCTION__, urb->status);
 	}
 	
 	retval = usb_submit_urb(urb, SLAB_ATOMIC);
 	if (retval)
-		err("%s: can't resubmit urb, %s-%s/input%d, status %d",
-		    __FUNCTION__, ati_remote->udev->bus->bus_name,
-		    ati_remote->udev->devpath, ATI_INPUTNUM, retval);
+		dev_err(&ati_remote->interface->dev, "%s: usb_submit_urb()=%d\n",
+			__FUNCTION__, retval);
 }
 
 /*
@@ -654,7 +669,8 @@ static int ati_remote_initialize(struct ati_remote *ati_remote)
 	/* send initialization strings */
 	if ((ati_remote_sendpacket(ati_remote, 0x8004, init1)) ||
 	    (ati_remote_sendpacket(ati_remote, 0x8007, init2))) {
-		err("Initializing ati_remote hardware failed.");
+		dev_err(&ati_remote->interface->dev, 
+			 "Initializing ati_remote hardware failed.\n");
 		return 1;
 	}
 	
@@ -686,34 +702,34 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 
 	iface_host = &interface->altsetting[interface->act_altsetting];
 	if (iface_host->desc.bNumEndpoints != 2) {
-		dbg("Unexpected desc.bNumEndpoints.");
+		err("%s: Unexpected desc.bNumEndpoints\n", __FUNCTION__);
 		retval = -ENODEV;
 		goto error;
 	}
-	
+
 	ati_remote->endpoint_in = &(iface_host->endpoint[0].desc);
 	ati_remote->endpoint_out = &(iface_host->endpoint[1].desc);
 	ati_remote->udev = udev;
 	ati_remote->interface = interface;
 
 	if (!(ati_remote->endpoint_in->bEndpointAddress & 0x80)) {
-		dbg("Unexpected endpoint_in->bEndpointAddress.");
+		err("%s: Unexpected endpoint_in->bEndpointAddress\n", __FUNCTION__);
 		retval = -ENODEV;
 		goto error;
 	}
 	if ((ati_remote->endpoint_in->bmAttributes & 3) != 3) {
-		dbg("Unexpected endpoint_in->bmAttributes.");
+		err("%s: Unexpected endpoint_in->bmAttributes\n", __FUNCTION__);
 		retval = -ENODEV;
 		goto error;
 	}
 	if (ati_remote->endpoint_in->wMaxPacketSize == 0) {
-		dbg("endpoint_in message size = 0?");
+		err("%s: endpoint_in message size==0? \n", __FUNCTION__);
 		retval = -ENODEV;
 		goto error;
 	}
 	if (!(buf = kmalloc(NAME_BUFSIZE, GFP_KERNEL)))
 		goto error;
-	
+
 	/* Allocate URB buffers, URBs */
 	ati_remote->inbuf = usb_buffer_alloc(udev, DATA_BUFSIZE, SLAB_ATOMIC,
 					     &ati_remote->inbuf_dma);
@@ -745,10 +761,11 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 		sprintf(ati_remote->name, "%s %s", ati_remote->name, buf);
 
 	if (!strlen(ati_remote->name))
-		sprintf(ati_remote->name, "USB ATI (X10) remote %04x:%04x",
-			ati_remote->idev.id.vendor, ati_remote->idev.id.product);
-	
-	/* Device Hardware Initialization */
+		sprintf(ati_remote->name, DRIVER_DESC "(%04x,%04x)",
+			ati_remote->udev->descriptor.idVendor, 
+			ati_remote->udev->descriptor.idProduct);
+
+	/* Device Hardware Initialization - fills in ati_remote->idev from udev. */
 	retval = ati_remote_initialize(ati_remote);
 	if (retval)
 		goto error;
@@ -757,8 +774,8 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 	ati_remote_input_init(ati_remote);
 	input_register_device(&ati_remote->idev);
 
-	info("Input registered: %s on %s", ati_remote->name, path);
-	info("USB (bus:dev)=(%d:%d)", udev->bus->busnum, udev->devnum);
+	dev_info(&ati_remote->interface->dev, "Input registered: %s on %s\n", 
+		 ati_remote->name, path);
 
 	usb_set_intfdata(interface, ati_remote);
 	ati_remote->present = 1;	
@@ -783,7 +800,7 @@ static void ati_remote_disconnect(struct usb_interface *interface)
 	ati_remote = usb_get_intfdata(interface);
 	usb_set_intfdata(interface, NULL);
 	if (!ati_remote) {
-		warn("%s - null device?", __FUNCTION__);
+		warn("%s - null device?\n", __FUNCTION__);
 		return;
 	}
 	
@@ -806,9 +823,9 @@ static int __init ati_remote_init(void)
 	
 	result = usb_register(&ati_remote_driver);
 	if (result)
-		err("usb_register error #%d", result);
+		err("usb_register error #%d\n", result);
 	else
-		info("USB registered " DRIVER_DESC " ver. " DRIVER_VERSION);
+		info("Registered USB driver " DRIVER_DESC " v. " DRIVER_VERSION);
 
 	return result;
 }
