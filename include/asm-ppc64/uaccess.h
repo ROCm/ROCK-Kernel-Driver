@@ -131,7 +131,7 @@ do {								\
  */
 #define __put_user_asm(x, addr, err, op)			\
 	__asm__ __volatile__(					\
-		"1:	"op" %1,0(%2)\n"			\
+		"1:	"op" %1,0(%2)  	# put_user\n" 	 	\
 		"2:\n"						\
 		".section .fixup,\"ax\"\n"			\
 		"3:	li %0,%3\n"				\
@@ -179,7 +179,7 @@ do {								\
 
 #define __get_user_asm(x, addr, err, op)		\
 	__asm__ __volatile__(				\
-		"1:	"op" %1,0(%2)\n"		\
+		"1:	"op" %1,0(%2)	# get_user\n"  	\
 		"2:\n"					\
 		".section .fixup,\"ax\"\n"		\
 		"3:	li %0,%3\n"			\

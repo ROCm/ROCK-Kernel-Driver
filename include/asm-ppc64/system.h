@@ -105,11 +105,18 @@ extern void dump_regs(struct pt_regs *);
 	!(flags & MSR_EE);			\
 })
 
-static __inline__ int __is_processor(unsigned long pv)
+static inline int __is_processor(unsigned long pv)
 {
-      unsigned long pvr;
-      asm volatile("mfspr %0, 0x11F" : "=r" (pvr)); 
-      return(PVR_VER(pvr) == pv);
+	unsigned long pvr;
+	asm("mfspr %0, 0x11F" : "=r" (pvr)); 
+	return(PVR_VER(pvr) == pv);
+}
+
+static inline int processor_type(void)
+{
+	unsigned long pvr;
+	asm ("mfspr %0, 0x11F" : "=r" (pvr)); 
+	return(PVR_VER(pvr));
 }
 
 /*
