@@ -119,6 +119,10 @@ struct hiddev_usage_ref {
 	__s32 value;
 };
 
+/* FIELD_INDEX_NONE is returned in read() data from the kernel when flags
+ * is set to (HIDDEV_FLAG_UREF | HIDDEV_FLAG_REPORT) and a new report has
+ * been sent by the device 
+ */
 #define HID_FIELD_INDEX_NONE 0xffffffff
 
 /*
@@ -139,20 +143,20 @@ struct hiddev_usage_ref {
 #define HIDIOCGNAME(len)	_IOC(_IOC_READ, 'H', 0x06, len)
 #define HIDIOCGREPORT		_IOW('H', 0x07, struct hiddev_report_info)
 #define HIDIOCSREPORT		_IOW('H', 0x08, struct hiddev_report_info)
-#define HIDIOCGREPORTINFO       _IOWR('H', 0x09, struct hiddev_report_info)
-#define HIDIOCGFIELDINFO        _IOWR('H', 0x0A, struct hiddev_field_info)
-#define HIDIOCGUSAGE            _IOWR('H', 0x0B, struct hiddev_usage_ref)
-#define HIDIOCSUSAGE            _IOW('H', 0x0C, struct hiddev_usage_ref)
-#define HIDIOCGUCODE            _IOWR('H', 0x0D, struct hiddev_usage_ref)
-#define HIDIOCGFLAG             _IOR('H', 0x0E, int)
-#define HIDIOCSFLAG             _IOW('H', 0x0F, int)
+#define HIDIOCGREPORTINFO	_IOWR('H', 0x09, struct hiddev_report_info)
+#define HIDIOCGFIELDINFO	_IOWR('H', 0x0A, struct hiddev_field_info)
+#define HIDIOCGUSAGE		_IOWR('H', 0x0B, struct hiddev_usage_ref)
+#define HIDIOCSUSAGE		_IOW('H', 0x0C, struct hiddev_usage_ref)
+#define HIDIOCGUCODE		_IOWR('H', 0x0D, struct hiddev_usage_ref)
+#define HIDIOCGFLAG		_IOR('H', 0x0E, int)
+#define HIDIOCSFLAG		_IOW('H', 0x0F, int)
 
 /* 
  * Flags to be used in HIDIOCSFLAG
  */
-#define HIDDEV_FLAG_UREF     0x1
-#define HIDDEV_FLAG_REPORT   0x2
-#define HIDDEV_FLAGS         0x3
+#define HIDDEV_FLAG_UREF	0x1
+#define HIDDEV_FLAG_REPORT	0x2
+#define HIDDEV_FLAGS		0x3
 
 /* To traverse the input report descriptor info for a HID device, perform the 
  * following:

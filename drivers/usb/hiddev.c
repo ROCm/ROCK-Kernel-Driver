@@ -341,9 +341,6 @@ static unsigned int hiddev_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 
-#define GET_TIMEOUT 3
-#define SET_TIMEOUT 3
-
 /*
  * "ioctl" file op
  */
@@ -529,36 +526,12 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 		return copy_to_user((void *) arg, &uref, sizeof(uref));
 
 	case HIDIOCGUSAGE:
-		if (copy_from_user(&uref, (void *) arg, sizeof(uref)))
-			return -EFAULT;
-
-		if (uref.report_id == HID_REPORT_ID_UNKNOWN) {
-			field = hiddev_lookup_usage(hid, &uref);
-			if (field == NULL)
-				return -EINVAL;
-		} else {
-			rinfo.report_type = uref.report_type;
-			rinfo.report_id = uref.report_id;
-			if ((report = hiddev_lookup_report(hid, &rinfo)) == NULL)
-				return -EINVAL;
-
-			if (uref.field_index >= report->maxfield)
-				return -EINVAL;
-
-			field = report->field[uref.field_index];
-			if (uref.usage_index >= field->maxusage)
-				return -EINVAL;
-		}
-
-		uref.value = field->value[uref.usage_index];
-
-		return copy_to_user((void *) arg, &uref, sizeof(uref));
-
 	case HIDIOCSUSAGE:
 		if (copy_from_user(&uref, (void *) arg, sizeof(uref)))
 			return -EFAULT;
 
-		if (uref.report_type == HID_REPORT_TYPE_INPUT)
+		if (cmd == HIDIOCSUSAGE &&
+		    uref.report_type != HID_REPORT_TYPE_OUTPUT)
 			return -EINVAL;
 
 		if (uref.report_id == HID_REPORT_ID_UNKNOWN) {
@@ -579,7 +552,12 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 				return -EINVAL;
 		}
 
-		field->value[uref.usage_index] = uref.value;
+		if (cmd == HIDIOCGUSAGE) {
+			uref.value = field->value[uref.usage_index];
+			return copy_to_user((void *) arg, &uref, sizeof(uref));
+		} else {
+			field->value[uref.usage_index] = uref.value;
+		}
 
 		return 0;
 
