@@ -6000,7 +6000,7 @@ pfm_load_regs (struct task_struct *task)
 		/*
 		 * will replay the PMU interrupt
 		 */
-		DRPINT(("perfmon: resend irq for [%d]\n", task->pid));
+		DPRINT(("perfmon: resend irq for [%d]\n", task->pid));
 		hw_resend_irq(NULL, IA64_PERFMON_VECTOR);
 #endif
 		pfm_stats[smp_processor_id()].pfm_replay_ovfl_intr_count++;
@@ -6144,7 +6144,7 @@ pfm_load_regs (struct task_struct *task)
 		/*
 		 * will replay the PMU interrupt
 		 */
-		DRPINT(("perfmon: resend irq for [%d]\n", task->pid));
+		DPRINT(("perfmon: resend irq for [%d]\n", task->pid));
 		hw_resend_irq(NULL, IA64_PERFMON_VECTOR);
 #endif
 		pfm_stats[smp_processor_id()].pfm_replay_ovfl_intr_count++;
