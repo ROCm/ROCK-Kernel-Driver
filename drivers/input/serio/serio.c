@@ -115,7 +115,7 @@ static int serio_thread(void *nothing)
 			refrigerator(PF_IOTHREAD);
 	} while (!signal_pending(current));
 
-	printk(KERN_DEBUG "serio: kseriod exiting");
+	printk(KERN_DEBUG "serio: kseriod exiting\n");
 
 	unlock_kernel();
 	complete_and_exit(&serio_exited, 0);
