@@ -114,7 +114,7 @@ zimageinitrd-$(CONFIG_SPRUCE)		:= zImage.initrd-TREE
         misc-$(CONFIG_SPRUCE)		+= misc-spruce.o
 
 # SMP images should have a '.smp' suffix.
-         end-$(CONFIG_SMP)		+= .smp
+         end-$(CONFIG_SMP)             := $(end-y).smp
 
 # This is a treeboot that needs init functions until the
 # boot rom is sorted out (i.e. this is short lived)
