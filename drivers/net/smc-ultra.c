@@ -550,9 +550,9 @@ cleanup_module(void)
 			int ioaddr = dev->base_addr - ULTRA_NIC_OFFSET;
 
 #ifdef __ISAPNP__
-			struct pci_dev *idev = (struct pci_dev *)ei_status.priv;
+			struct pnp_dev *idev = (struct pnp_dev *)ei_status.priv;
 			if (idev)
-				idev->deactivate(idev);
+				pnp_device_detach(idev);
 #endif
 
 			unregister_netdev(dev);

@@ -55,11 +55,11 @@ static struct pci_device_id fcpci_ids[] __devinitdata = {
 };
 MODULE_DEVICE_TABLE(pci, fcpci_ids);
 
-static const struct pnp_card_id fcpnp_ids[] __devinitdata = {
+static const struct pnp_card_device_id fcpnp_ids[] __devinitdata = {
 	{ .id = "AVM0900", .driver_data = (unsigned long) "Fritz!Card PnP",
 	  .devs = { { "AVM0900" } } }
 };
-MODULE_DEVICE_TABLE(pnpc, fcpnp_ids);
+MODULE_DEVICE_TABLE(pnp_card, fcpnp_ids);
 
 static int protocol = 2;       /* EURO-ISDN Default */
 MODULE_PARM(protocol, "i");
@@ -907,7 +907,7 @@ static struct pci_driver fcpci_driver = {
 #ifdef __ISAPNP__
 
 static int __devinit fcpnp_probe(struct pnp_card *card,
-				 const struct pnp_card_id *card_id)
+				 const struct pnp_card_device_id *card_id)
 {
 	struct fritz_adapter *adapter;
 	struct pnp_dev *pnp_dev;
