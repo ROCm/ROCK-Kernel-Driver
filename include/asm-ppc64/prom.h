@@ -183,8 +183,6 @@ extern struct device_node *find_type_devices(const char *type);
 extern struct device_node *find_path_device(const char *path);
 extern struct device_node *find_compatible_devices(const char *type,
 						   const char *compat);
-extern struct device_node *find_pci_device_OFnode(unsigned char bus,
-	unsigned char dev_fn);
 extern struct device_node *find_all_nodes(void);
 extern int device_is_compatible(struct device_node *device, const char *);
 extern int machine_is_compatible(const char *compat);

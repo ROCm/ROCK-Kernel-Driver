@@ -39,6 +39,10 @@ $(boottarget-y): vmlinux
 	rm -f .config arch/ppc64/defconfig
 	cp -f arch/ppc64/configs/$(@:config=defconfig) arch/ppc64/defconfig
 
+install: vmlinux
+	echo doing ppc64 make install
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
+
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
