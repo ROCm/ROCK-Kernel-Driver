@@ -117,7 +117,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 #define PFX "machzwd"
 
 static struct watchdog_info zf_info = {
-	.options		= WDIOF_KEEPALIVEPING, 
+	.options		= WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE, 
 	.firmware_version	= 1, 
 	.identity		= "ZF-Logic watchdog"
 };
@@ -314,10 +314,10 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
 	/* See if we got the magic character */
 	if(count){
 
-/*
- * no need to check for close confirmation
- * no way to disable watchdog ;)
- */
+		/*
+		 * no need to check for close confirmation
+		 * no way to disable watchdog ;)
+		 */
 		if (!nowayout) {
 			size_t ofs;
 			
@@ -328,7 +328,7 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
 			zf_expect_close = 0;
 			
 			/* now scan */
-			for(ofs = 0; ofs != count; ofs++){
+			for (ofs = 0; ofs != count; ofs++){
 				char c;
 				if (get_user(c, buf + ofs))
 					return -EFAULT;
@@ -338,6 +338,7 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
 				}
 			}
 		}
+
 		/*
 		 * Well, anyhow someone wrote to us,
 		 * we should return that favour
@@ -395,9 +396,9 @@ static int zf_open(struct inode *inode, struct file *file)
 				return -EBUSY;
 			}
 
-			if (nowayout) {
+			if (nowayout)
 				MOD_INC_USE_COUNT;
-			}
+
 			zf_is_open = 1;
 
 			spin_unlock(&zf_lock);

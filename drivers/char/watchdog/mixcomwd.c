@@ -62,6 +62,7 @@ static long mixcomwd_opened; /* long req'd for setbit --RR */
 static int watchdog_port;
 static int mixcomwd_timer_alive;
 static struct timer_list mixcomwd_timer = TIMER_INITIALIZER(NULL, 0, 0);
+static int expect_close = 0;
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -109,8 +110,7 @@ static int mixcomwd_open(struct inode *inode, struct file *file)
 
 static int mixcomwd_release(struct inode *inode, struct file *file)
 {
-
-	if (!nowayout) {
+	if (expect_close) {
 		if(mixcomwd_timer_alive) {
 			printk(KERN_ERR "mixcomwd: release called while internal timer alive");
 			return -EBUSY;
@@ -121,7 +121,10 @@ static int mixcomwd_release(struct inode *inode, struct file *file)
 		mixcomwd_timer.data=0;
 		mixcomwd_timer_alive=1;
 		add_timer(&mixcomwd_timer);
+	} else {
+		printk(KERN_CRIT "mixcomwd: WDT device closed unexpectedly.  WDT will not stop!\n");
 	}
+
 	clear_bit(0,&mixcomwd_opened);
 	return 0;
 }
@@ -135,6 +138,20 @@ static ssize_t mixcomwd_write(struct file *file, const char *data, size_t len, l
 
 	if(len)
 	{
+		if (!nowayout) {
+			size_t i;
+
+			/* In case it was set long ago */
+			expect_close = 0;
+
+			for (i = 0; i != len; i++) {
+				char c;
+				if (get_user(c, data + i))
+					return -EFAULT;
+				if (c == 'V')
+					expect_close = 1;
+			}
+		}
 		mixcomwd_ping();
 		return 1;
 	}
@@ -145,8 +162,10 @@ static int mixcomwd_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
 	int status;
-        static struct watchdog_info ident = {
-		WDIOF_KEEPALIVEPING, 1, "MixCOM watchdog"
+	static struct watchdog_info ident = {
+		.options = WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
+		.firmware_version = 1,
+		.identity = "MixCOM watchdog"
 	};
                                         
 	switch(cmd)

@@ -54,6 +54,7 @@
 
 static int ibwdt_is_open;
 static spinlock_t ibwdt_lock;
+static int expect_close = 0;
 
 /*
  *
@@ -136,6 +137,21 @@ ibwdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		return -ESPIPE;
 
 	if (count) {
+		if (!nowayout) {
+			size_t i;
+
+			/* In case it was set long ago */
+			expect_close = 0;
+
+			for (i = 0; i != count; i++) {
+				char c;
+
+				if (get_user(c, buf + i))
+					return -EFAULT;
+				if (c == 'V')
+					expect_close = 1;
+			}
+		}
 		ibwdt_ping();
 		return 1;
 	}
@@ -153,7 +169,9 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  unsigned long arg)
 {
 	static struct watchdog_info ident = {
-		WDIOF_KEEPALIVEPING, 1, "IB700 WDT"
+		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+		.firmware_version = 1,
+		.identity = "IB700 WDT"
 	};
 
 	switch (cmd) {
@@ -180,42 +198,38 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int
 ibwdt_open(struct inode *inode, struct file *file)
 {
-	switch (minor(inode->i_rdev)) {
-		case WATCHDOG_MINOR:
-			spin_lock(&ibwdt_lock);
-			if (ibwdt_is_open) {
-				spin_unlock(&ibwdt_lock);
-				return -EBUSY;
-			}
-			if (nowayout) {
-				MOD_INC_USE_COUNT;
-			}
-			/*
-			 *	Activate
-			 */
-
-			ibwdt_is_open = 1;
-			ibwdt_ping();
+	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
+		spin_lock(&ibwdt_lock);
+		if (ibwdt_is_open) {
 			spin_unlock(&ibwdt_lock);
-			return 0;
-		default:
-			return -ENODEV;
+			return -EBUSY;
+		}
+		if (nowayout)
+			MOD_INC_USE_COUNT;
+
+		/* Activate */
+		ibwdt_is_open = 1;
+		ibwdt_ping();
+		spin_unlock(&ibwdt_lock);
+		return 0;
+	} else {	
+		return -ENODEV;
 	}
 }
 
 static int
 ibwdt_close(struct inode *inode, struct file *file)
 {
-	lock_kernel();
 	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 		spin_lock(&ibwdt_lock);
-		if (!nowayout) {
+		if (expect_close)
 			outb_p(timeout_val, WDT_STOP);
-		}
+		else
+			printk(KERN_CRIT "WDT device closed unexpectedly.  WDT will not stop!\n");
+
 		ibwdt_is_open = 0;
 		spin_unlock(&ibwdt_lock);
 	}
-	unlock_kernel();
 	return 0;
 }
 
@@ -248,9 +262,9 @@ static struct file_operations ibwdt_fops = {
 };
 
 static struct miscdevice ibwdt_miscdev = {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&ibwdt_fops
+	.minor = WATCHDOG_MINOR,
+	.name = "watchdog",
+	.fops = &ibwdt_fops
 };
 
 /*
@@ -259,9 +273,9 @@ static struct miscdevice ibwdt_miscdev = {
  */
 
 static struct notifier_block ibwdt_notifier = {
-	ibwdt_notify_sys,
-	NULL,
-	0
+	.notifier_call = ibwdt_notify_sys,
+	.next = NULL,
+	.priority = 0
 };
 
 static int __init

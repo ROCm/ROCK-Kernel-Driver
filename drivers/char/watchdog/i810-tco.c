@@ -244,7 +244,9 @@ static int i810tco_ioctl (struct inode *inode, struct file *file,
 	int options, retval = -EINVAL;
 
 	static struct watchdog_info ident = {
-		.options =		WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
+		.options =		WDIOF_SETTIMEOUT |
+					WDIOF_KEEPALIVEPING |
+					WDIOF_MAGICCLOSE,
 		.firmware_version =	0,
 		.identity =		"i810 TCO timer",
 	};
