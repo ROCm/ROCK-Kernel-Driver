@@ -33,7 +33,6 @@
 #include <linux/mount.h>
 #include <linux/objrmap.h>
 #include <linux/audit.h>
-#include <linux/err.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -74,9 +73,6 @@ EXPORT_SYMBOL(sysctl_overcommit_memory);
 EXPORT_SYMBOL(sysctl_overcommit_ratio);
 EXPORT_SYMBOL(sysctl_max_map_count);
 EXPORT_SYMBOL(vm_committed_space);
-
-int mmap_use_hugepages = 0;
-int mmap_hugepages_map_sz = 256;
 
 /*
  * Requires inode->i_mapping->i_shared_sem
@@ -554,18 +550,39 @@ unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file * file,
 	unsigned long charged = 0;
 	anon_vma_t * anon_vma_cache;
 
-	/* Obtain the address to map to. we verify (or select) it and
-	 * ensure that it represents a valid section of the address
-	 * space.  VM_HUGETLB will never appear in vm_flags when
-	 * CONFIG_HUGETLB is unset.
+	if (file) {
+		if (is_file_hugepages(file))
+			accountable = 0;
+
+		if (!file->f_op || !file->f_op->mmap)
+			return -ENODEV;
+
+		if ((prot & PROT_EXEC) && (file->f_vfsmnt->mnt_flags & MNT_NOEXEC))
+			return -EPERM;
+	}
+
+	if (!len)
+		return addr;
+
+	/* Careful about overflows.. */
+	len = PAGE_ALIGN(len);
+	if (!len || len > TASK_SIZE)
+		return -EINVAL;
+
+	/* offset overflow? */
+	if ((pgoff + (len >> PAGE_SHIFT)) < pgoff)
+		return -EINVAL;
+
+	/* Too many mappings? */
+	if (mm->map_count > sysctl_max_map_count)
+		return -ENOMEM;
+
+	/* Obtain the address to map to. we verify (or select) it and ensure
+	 * that it represents a valid section of the address space.
 	 */
 	addr = get_unmapped_area(file, addr, len, pgoff, flags);
 	if (addr & ~PAGE_MASK)
 		return addr;
-
-	/* Huge pages aren't accounted for here */
-	if (file && is_file_hugepages(file))
-		accountable = 0;
 
 	/* Do simple checking here so the lower-level routines won't have
 	 * to. we assume access permissions have been handled by the open
@@ -769,17 +786,11 @@ out:
 unmap_and_free_vma:
 	if (correct_wcount)
 		atomic_inc(&inode->i_writecount);
+	vma->vm_file = NULL;
+	fput(file);
 
-	/*
-	 * Undo any partial mapping done by a device driver.  
-	 * hugetlb wants to know the vma's file etc. so nuke  
-	 * the file afterward.                                
-	 */                                                   
+	/* Undo any partial mapping done by a device driver. */
 	zap_page_range(vma, vma->vm_start, vma->vm_end - vma->vm_start);
-
-	if (file)
-		fput(vma->vm_file); 
-
 free_vma:
 	kmem_cache_free(vm_area_cachep, vma);
 unacct_error:
@@ -788,108 +799,7 @@ unacct_error:
 	return error;
 }
 
-#ifdef CONFIG_HUGETLBFS
-static int mmap_hugetlb_implicit(unsigned long len)
-{
-	/* Are we enabled? */
-	if (!mmap_use_hugepages)
-		return 0;
-	/* Must be HPAGE aligned */
-	if (len & ~HPAGE_MASK)
-		return 0;
-	/* Are we capable ? */
-	if (!capable(CAP_IPC_LOCK))
-		return -EPERM;
-	/* Are we under the minimum size? */
-	if (mmap_hugepages_map_sz
-		&& len < (mmap_hugepages_map_sz << 20))
-		return 0;
-	/* Do we have enough huge pages ? */
-	if (!is_hugepage_mem_enough(len))
-		return 0;
-
-	return 1;
-}
-#else
-static inline int mmap_hugetlb_implicit(unsigned long len)
-{
-	return 0;
-}
-#endif /* CONFIG_HUGETLBFS */
-
-/*
- * The caller must hold down_write(current->mm->mmap_sem).
- */
-unsigned long __do_mmap_pgoff_hugetlb(struct mm_struct *mm, 
-		struct file * file, unsigned long addr,
-		unsigned long len, unsigned long prot,
-		unsigned long flags, unsigned long pgoff)
-{
-	struct file *hugetlb_file = NULL;
-	int hugetlb_implicit = 0;
-	unsigned long result;
-
-	if (file) {
-		if ((flags & MAP_HUGETLB) && !is_file_hugepages(file))
-			return -EINVAL;
-
-		if (!file->f_op || !file->f_op->mmap)
-			return -ENODEV;
-
-		if ((prot & PROT_EXEC) && (file->f_vfsmnt->mnt_flags & MNT_NOEXEC))
-			return -EPERM;
-	}
-
-	if (!len)
-		return addr;
-
-	/* Careful about overflows.. */
-	len = PAGE_ALIGN(len);
-	if (!len || len > TASK_SIZE)
-		return -EINVAL;
-
-	/* offset overflow? */
-	if ((pgoff + (len >> PAGE_SHIFT)) < pgoff)
-		return -EINVAL;
-
-	/* Too many mappings? */
-	if (current->mm->map_count > sysctl_max_map_count)
-		return -ENOMEM;
-
-	/* Create an implicit hugetlb file if necessary */
-	if (!file && ((flags & MAP_HUGETLB) ||
-			(hugetlb_implicit = mmap_hugetlb_implicit(len)))) {
-		file = hugetlb_file = hugetlb_zero_setup(len);
-		if (IS_ERR(file)) {
-			if (!hugetlb_implicit)
-				return PTR_ERR(file);
-			file = hugetlb_file = NULL;
-			hugetlb_implicit = 0;
-		}
-	}
-
-again:
-	result = __do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
-
-	/* Drop reference to implicit hugetlb file, it's already been
-	 * "gotten" in __do_mmap_pgoff in case of success
-	 */
-	if (hugetlb_file)
-		fput(hugetlb_file);
-
-	/* If implicit huge tlb & we failed, try again without */
-	if ((result & ~PAGE_MASK) && hugetlb_implicit) {
-		hugetlb_implicit = 0;
-		file = NULL;
-		goto again;
-	}
-
-	return result;
-}
-
-EXPORT_SYMBOL(__do_mmap_pgoff_hugetlb);
-
-
+EXPORT_SYMBOL(__do_mmap_pgoff);
 
 /* Get an address range which is currently unmapped.
  * For shmat() with addr=0.

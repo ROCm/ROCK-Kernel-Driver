@@ -67,8 +67,6 @@ extern int sysctl_lower_zone_protection;
 extern int min_free_kbytes;
 extern int printk_ratelimit_jiffies;
 extern int printk_ratelimit_burst;
-extern int shm_use_hugepages;
-extern int mmap_use_hugepages, mmap_hugepages_map_sz;
 
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
@@ -675,32 +673,6 @@ static ctl_table kern_table[] = {
 		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
-#ifdef CONFIG_HUGETLBFS
-	{
-		.ctl_name	= KERN_SHMUSEHUGEPAGES,
-		.procname	= "shm-use-hugepages",
-		.data		= &shm_use_hugepages,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_MMAPUSEHUGEPAGES,
-		.procname	= "mmap-use-hugepages",
-		.data		= &mmap_use_hugepages,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_HPAGES_MAP_SZ,
-		.procname	= "mmap-hugepages-min-mapping",
-		.data		= &mmap_hugepages_map_sz,
-		.maxlen		= sizeof(int),
-		.mode		0644,
-		.proc_handler	= &proc_dointvec,
-	},
-#endif
 	{ .ctl_name = 0 }
 };
 

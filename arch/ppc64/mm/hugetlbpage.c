@@ -116,16 +116,6 @@ typedef struct {unsigned int val;} hugepte_t;
 #define hugepte_page(x)	pfn_to_page(hugepte_pfn(x))
 #define hugepte_none(x)	(!(hugepte_val(x) & _HUGEPAGE_PFN))
 
-#define hugepte_write(x) (hugepte_val(x) & _HUGEPAGE_RW)
-#define hugepte_same(A,B) \
-	(((hugepte_val(A) ^ hugepte_val(B)) & ~_HUGEPAGE_HPTEFLAGS) == 0)
-
-static inline hugepte_t hugepte_mkwrite(hugepte_t pte)
-{
-	hugepte_val(pte) |= _HUGEPAGE_RW;
-	return pte;
-}
-
 
 static void free_huge_page(struct page *page);
 static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
@@ -351,16 +341,6 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 	struct page *ptepage;
 	unsigned long addr = vma->vm_start;
 	unsigned long end = vma->vm_end;
-	cpumask_t tmp;
-	int cow;
-	int local;
-
-	/* XXX are there races with checking cpu_vm_mask? - Anton */
-	tmp = cpumask_of_cpu(smp_processor_id());
-	if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))
-		local = 1;
-
-	cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
 
 	while (addr < end) {
 		BUG_ON(! in_hugepage_area(src->context, addr));
@@ -371,17 +351,6 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 			return -ENOMEM;
 
 		src_pte = hugepte_offset(src, addr);
-
-		if (cow) {
-			entry = __hugepte(hugepte_update(src_pte, 
-							 _HUGEPAGE_RW
-							 | _HUGEPAGE_HPTEFLAGS,
-							 0));
-			if ((addr % HPAGE_SIZE) == 0)
-				flush_hash_hugepage(src->context, addr,
-						    entry, local);
-		}
-
 		entry = *src_pte;
 		
 		if ((addr % HPAGE_SIZE) == 0) {
@@ -470,8 +439,10 @@ follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 	BUG_ON(! pmd_hugepage(*pmd));
 
 	page = hugepte_page(*(hugepte_t *)pmd);
-	if (page)
+	if (page) {
 		page += ((address & ~HPAGE_MASK) >> PAGE_SHIFT);
+		get_page(page);
+	}
 	return page;
 }
 
@@ -552,16 +523,12 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 	struct mm_struct *mm = current->mm;
 	unsigned long addr;
 	int ret = 0;
-	int writable;
 
 	WARN_ON(!is_vm_hugetlb_page(vma));
 	BUG_ON((vma->vm_start % HPAGE_SIZE) != 0);
 	BUG_ON((vma->vm_end % HPAGE_SIZE) != 0);
 
 	spin_lock(&mm->page_table_lock);
-
-	writable = (vma->vm_flags & VM_WRITE) && (vma->vm_flags & VM_SHARED);
-
 	for (addr = vma->vm_start; addr < vma->vm_end; addr += HPAGE_SIZE) {
 		unsigned long idx;
 		hugepte_t *pte = hugepte_alloc(mm, addr);
@@ -591,25 +558,15 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				ret = -ENOMEM;
 				goto out;
 			}
-			/* This is a new page, all full of zeroes.  If
-			 * we're MAP_SHARED, the page needs to go into
-			 * the page cache.  If it's MAP_PRIVATE it
-			 * might as well be made "anonymous" now or
-			 * we'll just have to copy it on the first
-			 * write. */
-			if (vma->vm_flags & VM_SHARED) {
-				ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
-				unlock_page(page);
-			} else {
-				writable = (vma->vm_flags & VM_WRITE);
-			}
+			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
+			unlock_page(page);
 			if (ret) {
 				hugetlb_put_quota(mapping);
 				free_huge_page(page);
 				goto out;
 			}
 		}
-		setup_huge_pte(mm, page, pte, writable);
+		setup_huge_pte(mm, page, pte, vma->vm_flags & VM_WRITE);
 	}
 out:
 	spin_unlock(&mm->page_table_lock);
@@ -803,7 +760,7 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 	 * prevented then send the problem up to do_page_fault.
 	 */
 	is_write = access & _PAGE_RW;
-	if (unlikely(is_write && !hugepte_write(*ptep)))
+	if (unlikely(is_write && !(hugepte_val(*ptep) & _HUGEPAGE_RW)))
 		return 1;
 
 	/*
@@ -916,119 +873,6 @@ static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
 	slot += (hugepte_val(pte) & _HUGEPAGE_GROUP_IX) >> 5;
 
 	ppc_md.hpte_invalidate(slot, va, 1, local);
-}
-
-static int hugepage_cow(struct mm_struct *mm, struct vm_area_struct *vma,
-			unsigned long address, hugepte_t *ptep, hugepte_t pte)
-{
-	struct page *old_page, *new_page;
-	int i;
-	cpumask_t tmp;
-	int local;
-
-	BUG_ON(!pfn_valid(hugepte_pfn(*ptep)));
-
-	old_page = hugepte_page(*ptep);
-
-	tmp = cpumask_of_cpu(smp_processor_id());
-	if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))
-		local = 1;
-
-	/* If no-one else is actually using this page, avoid the copy
-	 * and just make the page writable */
-	if (!TestSetPageLocked(old_page)) {
-		int avoidcopy = (page_count(old_page) == 1);
-		unlock_page(old_page);
-		if (avoidcopy) {
-			for (i = 0; i < HUGEPTE_BATCH_SIZE; i++)
-				set_hugepte(ptep+i, hugepte_mkwrite(pte));
-			
-
-			pte = __hugepte(hugepte_update(ptep, _HUGEPAGE_HPTEFLAGS, 0));
-			if (hugepte_val(pte) & _HUGEPAGE_HASHPTE)
-				flush_hash_hugepage(mm->context, address,
-						    pte, local);
-			spin_unlock(&mm->page_table_lock);
-			return VM_FAULT_MINOR;
-		}
-	}
-
-	page_cache_get(old_page);
-
-	spin_unlock(&mm->page_table_lock);
-
-	new_page = alloc_hugetlb_page();
-	if (! new_page) {
-		page_cache_release(old_page);
-
-		/* Logically this is OOM, not a SIGBUS, but an OOM
-		 * could cause the kernel to go killing other
-		 * processes which won't help the hugepage situation
-		 * at all (?) */
-		return VM_FAULT_SIGBUS;
-	}
-
-	for (i = 0; i < HPAGE_SIZE/PAGE_SIZE; i++)
-		copy_user_highpage(new_page + i, old_page + i, address + i*PAGE_SIZE);
-
-	spin_lock(&mm->page_table_lock);
-
-	tmp = cpumask_of_cpu(smp_processor_id());
-	if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))
-		local = 1;
-
-	ptep = hugepte_offset(mm, address & HPAGE_MASK);
-	if (hugepte_same(*ptep, pte)) {
-		/* Break COW */
-		for (i = 0; i < HUGEPTE_BATCH_SIZE; i++)
-			hugepte_update(ptep, ~0,
-				       hugepte_val(mk_hugepte(new_page, 1)));
-
-		if (hugepte_val(pte) & _HUGEPAGE_HASHPTE)
-			flush_hash_hugepage(mm->context, address,
-					    pte, local);
-
-		/* Make the old page be freed below */
-		new_page = old_page;
-	}
-	page_cache_release(new_page);
-	page_cache_release(old_page);
-	spin_unlock(&mm->page_table_lock);
-	return VM_FAULT_MINOR;
-}
-
-int handle_hugetlb_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
-			    unsigned long address, int write_access)
-{
-	hugepte_t *ptep;
-	int rc = VM_FAULT_SIGBUS;
-
-	spin_lock(&mm->page_table_lock);
-
-	ptep = hugepte_offset(mm, address & HPAGE_MASK);
-
-	if ( (! ptep) || hugepte_none(*ptep))
-		goto fail;
-
-	/* Otherwise, there ought to be a real hugepte here */
-	BUG_ON(hugepte_bad(*ptep));
-
-	rc = VM_FAULT_MINOR;
-
-	if (! (write_access && !hugepte_write(*ptep))) {
-		printk(KERN_WARNING "Unexpected hugepte fault (wr=%d hugepte=%08x\n",
-		     write_access, hugepte_val(*ptep));
-		goto fail;
-	}
-		
-	/* The only faults we should actually get are COWs */
-	/* this drops the page_table_lock */
-	return hugepage_cow(mm, vma, address, ptep, *ptep); 
-	
- fail:
-	spin_unlock(&mm->page_table_lock);
-
-	return rc;
 }
 
 static void split_and_free_hugepage(struct page *page)

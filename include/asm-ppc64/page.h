@@ -61,7 +61,6 @@
 	  touches_hugepage_low_range((addr), (len)))
 #define hugetlb_free_pgtables free_pgtables
 #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
-#define ARCH_HANDLES_HUGEPAGE_FAULTS
 
 #define in_hugepage_area(context, addr) \
 	((cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE) && \
