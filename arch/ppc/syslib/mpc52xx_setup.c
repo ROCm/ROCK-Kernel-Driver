@@ -1,5 +1,5 @@
 /*
- * arch/ppc/syslib/mpc52xx_common.c
+ * arch/ppc/syslib/mpc52xx_setup.c
  *
  * Common code for the boards based on Freescale MPC52xx embedded CPU.
  *
@@ -23,6 +23,7 @@
 #include <asm/mpc52xx.h>
 #include <asm/mpc52xx_psc.h>
 #include <asm/ocp.h>
+#include <asm/pgtable.h>
 #include <asm/ppcboot.h>
 
 extern bd_t __res;
@@ -38,9 +39,9 @@ void
 mpc52xx_restart(char *cmd)
 {
 	struct mpc52xx_gpt* gpt0 = (struct mpc52xx_gpt*) MPC52xx_GPTx(0);
-	
+
 	local_irq_disable();
-	
+
 	/* Turn on the watchdog and wait for it to expire. It effectively
 	  does a reset */
 	if (gpt0 != NULL) {
@@ -99,24 +100,28 @@ mpc52xx_map_io(void)
 #error "mpc52xx PSC for console not selected"
 #endif
 
+static void
+mpc52xx_psc_putc(struct mpc52xx_psc * psc, unsigned char c)
+{
+	while (!(in_be16(&psc->mpc52xx_psc_status) &
+	         MPC52xx_PSC_SR_TXRDY));
+	out_8(&psc->mpc52xx_psc_buffer_8, c);
+}
+
 void
 mpc52xx_progress(char *s, unsigned short hex)
 {
 	struct mpc52xx_psc *psc = (struct mpc52xx_psc *)MPC52xx_CONSOLE;
 	char c;
 
-		/* Don't we need to disable serial interrupts ? */
-	
 	while ((c = *s++) != 0) {
-		if (c == '\n') {
-			while (!(in_be16(&psc->mpc52xx_psc_status) &
-			         MPC52xx_PSC_SR_TXRDY)) ;
-			out_8(&psc->mpc52xx_psc_buffer_8, '\r');
-		}
-		while (!(in_be16(&psc->mpc52xx_psc_status) &
-		         MPC52xx_PSC_SR_TXRDY)) ;
-		out_8(&psc->mpc52xx_psc_buffer_8, c);
+		if (c == '\n')
+			mpc52xx_psc_putc(psc, '\r');
+		mpc52xx_psc_putc(psc, c);
 	}
+
+	mpc52xx_psc_putc(psc, '\r');
+	mpc52xx_psc_putc(psc, '\n');
 }
 
 #endif  /* CONFIG_SERIAL_TEXT_DEBUG */
@@ -137,7 +142,7 @@ mpc52xx_find_end_of_memory(void)
 
 		/* Temp BAT2 mapping active when this is called ! */
 		mmap_ctl = (struct mpc52xx_mmap_ctl*) MPC52xx_MMAP_CTL;
-			
+
 		sdram_config_0 = in_be32(&mmap_ctl->sdram0);
 		sdram_config_1 = in_be32(&mmap_ctl->sdram1);
 
@@ -147,10 +152,8 @@ mpc52xx_find_end_of_memory(void)
 		if (((sdram_config_1 & 0x1f) >= 0x13) &&
 				((sdram_config_1 & 0xfff00000) == ramsize))
 			ramsize += 1 << ((sdram_config_1 & 0xf) + 17);
-
-		iounmap(mmap_ctl);
 	}
-	
+
 	return ramsize;
 }
 
@@ -167,7 +170,7 @@ mpc52xx_calibrate_decr(void)
 		/* Get RTC & Clock manager modules */
 		struct mpc52xx_rtc *rtc;
 		struct mpc52xx_cdm *cdm;
-		
+
 		rtc = (struct mpc52xx_rtc*)
 			ioremap(MPC52xx_RTC, sizeof(struct mpc52xx_rtc));
 		cdm = (struct mpc52xx_cdm*)
@@ -206,7 +209,7 @@ mpc52xx_calibrate_decr(void)
 		__res.bi_intfreq = cpufreq;
 		__res.bi_ipbfreq = ipbfreq;
 		__res.bi_pcifreq = pcifreq;
-	
+
 		/* Release mapping */
 		iounmap((void*)rtc);
 		iounmap((void*)cdm);

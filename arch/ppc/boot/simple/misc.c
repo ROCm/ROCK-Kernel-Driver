@@ -48,7 +48,9 @@
  * Val Henson has requested that Gemini doesn't wait for the
  * user to edit the cmdline or not.
  */
-#if (defined(CONFIG_SERIAL_8250_CONSOLE) || defined(CONFIG_VGA_CONSOLE)) \
+#if (defined(CONFIG_SERIAL_8250_CONSOLE) \
+	|| defined(CONFIG_VGA_CONSOLE) \
+	|| defined(CONFIG_SERIAL_MPC52xx_CONSOLE)) \
 	&& !defined(CONFIG_GEMINI)
 #define INTERACTIVE_CONSOLE	1
 #endif
