@@ -311,8 +311,12 @@ struct sis190_private {
 	unsigned long cur_rx;	/* Index into the Rx descriptor buffer of next Rx pkt. */
 	unsigned long cur_tx;	/* Index into the Tx descriptor buffer of next Rx pkt. */
 	unsigned long dirty_tx;
-	unsigned char *TxDescArrays;	/* Index of Tx Descriptor buffer */
-	unsigned char *RxDescArrays;	/* Index of Rx Descriptor buffer */
+	void *tx_desc_raw;		/* Tx descriptor buffer */
+	dma_addr_t tx_dma_raw;
+	dma_addr_t tx_dma_aligned;
+	void *rx_desc_raw;		/* Rx descriptor buffer */
+	dma_addr_t rx_dma_raw;
+	dma_addr_t rx_dma_aligned;
 	struct TxDesc *TxDescArray;	/* Index of 256-alignment Tx Descriptor buffer */
 	struct RxDesc *RxDescArray;	/* Index of 256-alignment Rx Descriptor buffer */
 	unsigned char *RxBufferRings;	/* Index of Rx Buffer  */
@@ -712,7 +716,7 @@ SiS190_open(struct net_device *dev)
 	struct sis190_private *tp = dev->priv;
 	int retval;
 	u8 diff;
-	u32 TxPhyAddr, RxPhyAddr;
+	int rc;
 
 	retval =
 	    request_irq(dev->irq, SiS190_interrupt, SA_SHIRQ, dev->name, dev);
@@ -720,32 +724,30 @@ SiS190_open(struct net_device *dev)
 		return retval;
 	}
 
-	tp->TxDescArrays =
-	    kmalloc(NUM_TX_DESC * sizeof (struct TxDesc) + 256, GFP_KERNEL);
-	// Tx Desscriptor needs 256 bytes alignment;
-	TxPhyAddr = virt_to_bus(tp->TxDescArrays);
-	diff = 256 - (TxPhyAddr - ((TxPhyAddr >> 8) << 8));
-	TxPhyAddr += diff;
-	tp->TxDescArray = (struct TxDesc *) (tp->TxDescArrays + diff);
-
-	tp->RxDescArrays =
-	    kmalloc(NUM_RX_DESC * sizeof (struct RxDesc) + 256, GFP_KERNEL);
-	// Rx Desscriptor needs 256 bytes alignment;
-	RxPhyAddr = virt_to_bus(tp->RxDescArrays);
-	diff = 256 - (RxPhyAddr - ((RxPhyAddr >> 8) << 8));
-	RxPhyAddr += diff;
-	tp->RxDescArray = (struct RxDesc *) (tp->RxDescArrays + diff);
-
-	if (tp->TxDescArrays == NULL || tp->RxDescArrays == NULL) {
-		printk(KERN_INFO
-		       "Allocate RxDescArray or TxDescArray failed\n");
-		free_irq(dev->irq, dev);
-		if (tp->TxDescArrays)
-			kfree(tp->TxDescArrays);
-		if (tp->RxDescArrays)
-			kfree(tp->RxDescArrays);
-		return -ENOMEM;
+	tp->tx_desc_raw = pci_alloc_consistent(tp->pci_dev,
+		(NUM_TX_DESC * sizeof (struct TxDesc)) + 256,
+		&tp->tx_dma_raw);
+	if (!tp->tx_desc_raw) {
+		rc = -ENOMEM;
+		goto err_out;
 	}
+	// Tx Desscriptor needs 256 bytes alignment;
+	diff = 256 - (tp->tx_dma_raw - ((tp->tx_dma_raw >> 8) << 8));
+	tp->tx_dma_aligned = tp->tx_dma_raw + diff;
+	tp->TxDescArray = (struct TxDesc *) (tp->tx_desc_raw + diff);
+
+	tp->rx_desc_raw = pci_alloc_consistent(tp->pci_dev,
+		(NUM_RX_DESC * sizeof (struct RxDesc)) + 256,
+		&tp->rx_dma_raw);
+	if (!tp->rx_desc_raw) {
+		rc = -ENOMEM;
+		goto err_out_free_tx;
+	}
+	// Rx Desscriptor needs 256 bytes alignment;
+	diff = 256 - (tp->rx_dma_raw - ((tp->rx_dma_raw >> 8) << 8));
+	tp->rx_dma_aligned = tp->rx_dma_raw + diff;
+	tp->RxDescArray = (struct RxDesc *) (tp->rx_desc_raw + diff);
+
 	tp->RxBufferRings = kmalloc(RX_BUF_SIZE * NUM_RX_DESC, GFP_KERNEL);
 	if (tp->RxBufferRings == NULL) {
 		printk(KERN_INFO "Allocate RxBufferRing failed\n");
@@ -756,6 +758,13 @@ SiS190_open(struct net_device *dev)
 
 	return 0;
 
+err_out_free_tx:
+	pci_free_consistent(tp->pci_dev,
+		(NUM_TX_DESC * sizeof (struct TxDesc)) + 256,
+		tp->tx_desc_raw, tp->tx_dma_raw);
+err_out:
+	free_irq(dev->irq, dev);
+	return rc;
 }
 
 static void
@@ -771,10 +780,10 @@ SiS190_hw_start(struct net_device *dev)
 	SiS_W32(IntrControl, 0x0);
 
 	SiS_W32(0x0, 0x01a00);
-	SiS_W32(0x4, virt_to_bus(tp->TxDescArray));
+	SiS_W32(0x4, tp->tx_dma_aligned);
 
 	SiS_W32(0x10, 0x1a00);
-	SiS_W32(0x14, virt_to_bus(tp->RxDescArray));
+	SiS_W32(0x14, tp->rx_dma_aligned);
 
 	SiS_W32(0x20, 0xffffffff);
 	SiS_W32(0x24, 0x0);
@@ -829,6 +838,7 @@ SiS190_init_ring(struct net_device *dev)
 		else
 			tp->RxDescArray[i].buf_Len = RX_BUF_SIZE;
 
+#warning Replace virt_to_bus with DMA mapping
 		tp->RxBufferRing[i] = &(tp->RxBufferRings[i * RX_BUF_SIZE]);
 		tp->RxDescArray[i].buf_addr = virt_to_bus(tp->RxBufferRing[i]);
 		tp->RxDescArray[i].status = OWNbit | INTbit;
@@ -894,6 +904,7 @@ SiS190_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	spin_lock_irq(&tp->lock);
 
 	if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
+#warning Replace virt_to_bus with DMA mapping
 		tp->Tx_skbuff[entry] = skb;
 		tp->TxDescArray[entry].buf_addr = virt_to_bus(skb->data);
 		tp->TxDescArray[entry].PSize =
@@ -1005,6 +1016,7 @@ SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 					tp->RxDescArray[cur_rx].buf_Len =
 					    RX_BUF_SIZE;
 
+#warning Replace virt_to_bus with DMA mapping
 				tp->RxDescArray[cur_rx].buf_addr =
 				    virt_to_bus(tp->RxBufferRing[cur_rx]);
 				dev->last_rx = jiffies;
@@ -1103,10 +1115,12 @@ SiS190_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 
 	SiS190_tx_clear(tp);
-	kfree(tp->TxDescArrays);
-	kfree(tp->RxDescArrays);
-	tp->TxDescArrays = NULL;
-	tp->RxDescArrays = NULL;
+	pci_free_consistent(tp->pci_dev,
+		(NUM_TX_DESC * sizeof (struct TxDesc)) + 256,
+		tp->tx_desc_raw, tp->tx_dma_raw);
+	pci_free_consistent(tp->pci_dev,
+		(NUM_RX_DESC * sizeof (struct RxDesc)) + 256,
+		tp->rx_desc_raw, tp->rx_dma_raw);
 	tp->TxDescArray = NULL;
 	tp->RxDescArray = NULL;
 	kfree(tp->RxBufferRings);
