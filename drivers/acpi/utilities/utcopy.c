@@ -23,8 +23,8 @@
  */
 
 
-#include "acpi.h"
-#include "amlcode.h"
+#include <acpi/acpi.h>
+#include <acpi/amlcode.h>
 
 
 #define _COMPONENT          ACPI_UTILITIES

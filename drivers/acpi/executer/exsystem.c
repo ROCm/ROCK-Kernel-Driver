@@ -24,9 +24,9 @@
  */
 
 
-#include "acpi.h"
-#include "acinterp.h"
-#include "acevents.h"
+#include <acpi/acpi.h>
+#include <acpi/acinterp.h>
+#include <acpi/acevents.h>
 
 #define _COMPONENT          ACPI_EXECUTER
 	 ACPI_MODULE_NAME    ("exsystem")

@@ -20,34 +20,14 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static u_int64_t pci_read64 (struct pci_dev *dev, int reg)
-{
-	union {
-		u64 full;
-		struct {
-			u32 high;
-			u32 low;
-		} split;
-	} tmp;
-	pci_read_config_dword(dev, reg, &tmp.split.high);
-	pci_read_config_dword(dev, reg+4, &tmp.split.low);
-	return tmp.full;
-}
+/* Will need to be increased if hammer ever goes >8-way. */
+#define MAX_HAMMER_GARTS   8
 
-static void pci_write64 (struct pci_dev *dev, int reg, u64 value)
-{
-	union {
-		u64 full;
-		struct {
-			u32 high;
-			u32 low;
-		} split;
-	} tmp;
-	tmp.full = value;
-	pci_write_config_dword(dev, reg, tmp.split.high);
-	pci_write_config_dword(dev, reg+4, tmp.split.low);
-}
+static int nr_garts;
+static struct pci_dev * hammers[MAX_HAMMER_GARTS];
 
+static int gart_iterator;
+#define for_each_nb() for(gart_iterator=0;gart_iterator<nr_garts;gart_iterator++)
 
 static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
@@ -125,27 +105,23 @@ static int amd_x86_64_fetch_size(void)
 	u32 temp;
 	struct aper_size_info_32 *values;
 
-	pci_for_each_dev(dev) {
-		if (dev->bus->number==0 &&
-			PCI_FUNC(dev->devfn)==3 &&
-			PCI_SLOT(dev->devfn)>=24 && PCI_SLOT(dev->devfn)<=31) {
+	dev = hammers[0];
+	if (dev==NULL)
+		return 0;
 
-			pci_read_config_dword(dev, AMD_X86_64_GARTAPERTURECTL, &temp);
-			temp = (temp & 0xe);
-			values = A_SIZE_32(x86_64_aperture_sizes);
+	pci_read_config_dword(dev, AMD_X86_64_GARTAPERTURECTL, &temp);
+	temp = (temp & 0xe);
+	values = A_SIZE_32(x86_64_aperture_sizes);
 
-			for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
-				if (temp == values[i].size_value) {
-					agp_bridge->previous_size =
-					    agp_bridge->current_size = (void *) (values + i);
+	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+		if (temp == values[i].size_value) {
+			agp_bridge->previous_size =
+			    agp_bridge->current_size = (void *) (values + i);
 
-					agp_bridge->aperture_size_idx = i;
-					return values[i].size;
-				}
-			}
+			agp_bridge->aperture_size_idx = i;
+			return values[i].size;
 		}
 	}
-	/* erk, couldn't find an x86-64 ? */
 	return 0;
 }
 
@@ -162,13 +138,8 @@ static void flush_x86_64_tlb(struct pci_dev *dev)
 
 static void amd_x86_64_tlbflush(agp_memory * temp)
 {
-	struct pci_dev *dev;
-
-	pci_for_each_dev(dev) {
-		if (dev->bus->number==0 && PCI_FUNC(dev->devfn)==3 &&
-		    PCI_SLOT(dev->devfn) >=24 && PCI_SLOT(dev->devfn) <=31) {
-			flush_x86_64_tlb (dev);
-		}
+	for_each_nb() {
+		flush_x86_64_tlb (hammers[gart_iterator]);
 	}
 }
 
@@ -221,96 +192,28 @@ static struct aper_size_info_32 amd_8151_sizes[7] =
 
 static int amd_8151_configure(void)
 {
-	struct pci_dev *dev, *hammer=NULL;
-	int current_size;
-	int tmp, tmp2, i;
-	u64 aperbar;
 	unsigned long gatt_bus = virt_to_phys(agp_bridge->gatt_table_real);
 
 	/* Configure AGP regs in each x86-64 host bridge. */
-	pci_for_each_dev(dev) {
-		if (dev->bus->number==0 &&
-			PCI_FUNC(dev->devfn)==3 &&
-			PCI_SLOT(dev->devfn)>=24 && PCI_SLOT(dev->devfn)<=31) {
-			agp_bridge->gart_bus_addr = amd_x86_64_configure(dev,gatt_bus);
-			hammer = dev;
-
-			/*
-			 * TODO: Cache pci_dev's of x86-64's in private struct to save us
-			 * having to scan the pci list each time.
-			 */
-		}
+	for_each_nb() {
+		agp_bridge->gart_bus_addr =
+				amd_x86_64_configure(hammers[gart_iterator],gatt_bus);
 	}
-
-	if (hammer == NULL) {
-		return -ENODEV;
-	}
-
-	/* Shadow x86-64 registers into 8151 registers. */
-
-	dev = agp_bridge->dev;
-	if (!dev) 
-		return -ENODEV;
-
-	current_size = amd_x86_64_fetch_size();
-
-	pci_read_config_dword(dev, AMD_8151_APERTURESIZE, &tmp);
-	tmp &= ~(0xfff);
-
-	/* translate x86-64 size bits to 8151 size bits*/
-	for (i=0 ; i<7; i++) {
-		if (amd_8151_sizes[i].size == current_size)
-			tmp |= (amd_8151_sizes[i].size_value) << 3;
-	}
-	pci_write_config_dword(dev, AMD_8151_APERTURESIZE, tmp);
-
-	pci_read_config_dword (hammer, AMD_X86_64_GARTAPERTUREBASE, &tmp);
-	aperbar = pci_read64 (dev, AMD_8151_VMAPERTURE);
-	aperbar |= (tmp & 0x7fff) <<25;
-	aperbar &= 0x000000ffffffffff;
-	aperbar |= 1<<2;	/* This address is a 64bit ptr FIXME: Make conditional in 32bit mode */
-	pci_write64 (dev, AMD_8151_VMAPERTURE, aperbar);
-
-	pci_read_config_dword(dev, AMD_8151_AGP_CTL , &tmp);
-	tmp &= ~(AMD_8151_GTLBEN | AMD_8151_APEREN);
-	
-	pci_read_config_dword(hammer, AMD_X86_64_GARTAPERTURECTL, &tmp2);
-	if (tmp2 & AMD_X86_64_GARTEN)
-		tmp |= AMD_8151_APEREN;
-	// FIXME: bit 7 of AMD_8151_AGP_CTL (GTLBEN) must be copied if set.
-	// But where is it set ?
-	pci_write_config_dword(dev, AMD_8151_AGP_CTL, tmp);
-
 	return 0;
 }
 
 
 static void amd_8151_cleanup(void)
 {
-	struct pci_dev *dev;
 	u32 tmp;
 
-	pci_for_each_dev(dev) {
+	for_each_nb() {
 		/* disable gart translation */
-		if (dev->bus->number==0 && PCI_FUNC(dev->devfn)==3 &&
-		    (PCI_SLOT(dev->devfn) >=24) && (PCI_SLOT(dev->devfn) <=31)) {
-
-			pci_read_config_dword (dev, AMD_X86_64_GARTAPERTURECTL, &tmp);
-			tmp &= ~(AMD_X86_64_GARTEN);
-			pci_write_config_dword (dev, AMD_X86_64_GARTAPERTURECTL, tmp);
-		}
-
-		/* Now shadow the disable in the 8151 */
-		if (dev->vendor == PCI_VENDOR_ID_AMD &&
-			dev->device == PCI_DEVICE_ID_AMD_8151_0) {
-
-			pci_read_config_dword (dev, AMD_8151_AGP_CTL, &tmp);
-			tmp &= ~(AMD_8151_APEREN);	
-			pci_write_config_dword (dev, AMD_8151_AGP_CTL, tmp);
-		}
+		pci_read_config_dword (hammers[gart_iterator], AMD_X86_64_GARTAPERTURECTL, &tmp);
+		tmp &= ~(AMD_X86_64_GARTEN);
+		pci_write_config_dword (hammers[gart_iterator], AMD_X86_64_GARTAPERTURECTL, tmp);
 	}
 }
-
 
 
 static unsigned long amd_8151_mask_memory(unsigned long addr, int type)
@@ -381,6 +284,9 @@ static void agp_x86_64_agp_enable(u32 mode)
 
 static int __init amd_8151_setup (struct pci_dev *pdev)
 {
+	struct pci_dev *dev;
+	int i=0;
+
 	agp_bridge->masks = amd_8151_masks;
 	agp_bridge->aperture_sizes = (void *) amd_8151_sizes;
 	agp_bridge->size_type = U32_APER_SIZE;
@@ -405,6 +311,20 @@ static int __init amd_8151_setup (struct pci_dev *pdev)
 	agp_bridge->suspend = agp_generic_suspend;
 	agp_bridge->resume = agp_generic_resume;
 	agp_bridge->cant_use_aperture = 0;
+
+
+	/* cache pci_devs of northbridges. */
+	pci_for_each_dev(dev) {
+		if (dev->bus->number==0 && PCI_FUNC(dev->devfn)==3 &&
+			(PCI_SLOT(dev->devfn) >=24) && (PCI_SLOT(dev->devfn) <=31)) {
+
+			hammers[i++] = dev;
+			nr_garts = i;
+			if (i==MAX_HAMMER_GARTS)
+				return 0;
+		}
+	}
+
 	return 0;
 }
 

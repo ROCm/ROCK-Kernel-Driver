@@ -29,7 +29,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/acpi.h>
-#include "acpi_bus.h"
+#include <acpi/acpi_bus.h>
 
 enum acpi_blacklist_predicates
 {

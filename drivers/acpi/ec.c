@@ -30,8 +30,8 @@
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
 #include <asm/io.h>
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 
 #define _COMPONENT		ACPI_EC_COMPONENT

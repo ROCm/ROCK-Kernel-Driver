@@ -23,8 +23,8 @@
  */
 
 
-#include "acpi.h"
-#include "acresrc.h"
+#include <acpi/acpi.h>
+#include <acpi/acresrc.h>
 
 #define _COMPONENT          ACPI_RESOURCES
 	 ACPI_MODULE_NAME    ("rsaddr")

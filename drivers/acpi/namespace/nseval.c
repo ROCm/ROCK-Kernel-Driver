@@ -24,10 +24,10 @@
  */
 
 
-#include "acpi.h"
-#include "acparser.h"
-#include "acinterp.h"
-#include "acnamesp.h"
+#include <acpi/acpi.h>
+#include <acpi/acparser.h>
+#include <acpi/acinterp.h>
+#include <acpi/acnamesp.h>
 
 
 #define _COMPONENT          ACPI_NAMESPACE
