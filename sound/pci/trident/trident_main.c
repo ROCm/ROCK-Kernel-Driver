@@ -3523,7 +3523,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 	/* check, if we can restrict PCI DMA transfers to 30 bits */
-	if (pci_set_dma_massk(pci, 0x3fffffff) < 0 ||
+	if (pci_set_dma_mask(pci, 0x3fffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x3fffffff) < 0) {
 		snd_printk("architecture does not support 30bit PCI busmaster DMA\n");
 		return -ENXIO;
