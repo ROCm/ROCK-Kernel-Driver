@@ -2235,10 +2235,11 @@ static void *listening_get_idx(struct seq_file *seq, loff_t *pos)
 {
 	void *rc = listening_get_first(seq);
 
-	if (rc)
-		while (*pos && (rc = listening_get_next(seq, rc)))
-			--*pos;
-	return *pos ? NULL : rc;
+	while (rc && *pos) {
+		rc = listening_get_next(seq, rc);
+		--*pos;
+	}
+	return rc;
 }
 
 static void *established_get_first(struct seq_file *seq)
@@ -2327,10 +2328,11 @@ static void *established_get_idx(struct seq_file *seq, loff_t pos)
 {
 	void *rc = established_get_first(seq);
 
-	if (rc)
-		while (pos && (rc = established_get_next(seq, rc)))
-			--pos;
-	return pos ? NULL : rc;
+	while (rc && pos) {
+		rc = established_get_next(seq, rc);
+		--pos;
+	}		
+	return rc;
 }
 
 static void *tcp_get_idx(struct seq_file *seq, loff_t pos)
