@@ -1635,14 +1635,18 @@ static int aha1542_old_abort(Scsi_Cmnd * SCpnt)
 		if (HOSTDATA(SCpnt->host)->SCint[i]) {
 			if (HOSTDATA(SCpnt->host)->SCint[i] == SCpnt) {
 				printk(KERN_ERR "Timed out command pending for %s\n",
-				       kdevname(SCpnt->request->rq_dev));
+				       SCpnt->request->rq_disk ?
+				       SCpnt->request->rq_disk->disk_name : "?"
+				       );
 				if (HOSTDATA(SCpnt->host)->mb[i].status) {
 					printk(KERN_ERR "OGMB still full - restarting\n");
 					aha1542_out(SCpnt->host->io_port, &ahacmd, 1);
 				};
 			} else
 				printk(KERN_ERR "Other pending command %s\n",
-				       kdevname(SCpnt->request->rq_dev));
+				       SCpnt->request->rq_disk ?
+				       SCpnt->request->rq_disk->disk_name : "?"
+				       );
 		}
 #endif
 

@@ -41,7 +41,7 @@
  */
 static struct fs_struct init_fs = INIT_FS;
 static struct files_struct init_files = INIT_FILES;
-static struct signal_struct init_signals = INIT_SIGNALS;
+static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 struct mm_struct init_mm = INIT_MM(init_mm);
 
 union thread_union init_thread_union
@@ -152,7 +152,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 
 	{
 	register long retval __asm__ ("d0");
-	register long clone_arg __asm__ ("d1") = flags | CLONE_VM;
+	register long clone_arg __asm__ ("d1") = flags | CLONE_VM | CLONE_UNTRACED;
 
 	retval = __NR_clone;
 	__asm__ __volatile__
@@ -202,14 +202,14 @@ void flush_thread(void)
 asmlinkage int m68k_fork(struct pt_regs *regs)
 {
 	struct task_struct *p;
-	p = do_fork(SIGCHLD, rdusp(), regs, 0);
+	p = do_fork(SIGCHLD, rdusp(), regs, 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 asmlinkage int m68k_vfork(struct pt_regs *regs)
 {
 	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -218,13 +218,15 @@ asmlinkage int m68k_clone(struct pt_regs *regs)
 	unsigned long clone_flags;
 	unsigned long newsp;
 	struct task_struct *p;
+	int *user_tid;
 
 	/* syscall2 puts clone_flags in d1 and usp in d2 */
 	clone_flags = regs->d1;
 	newsp = regs->d2;
+	user_tid = (int *)regs->d3;
 	if (!newsp)
 		newsp = rdusp();
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, user_tid);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 

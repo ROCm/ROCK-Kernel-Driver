@@ -128,8 +128,7 @@ static inline int amiga_insert_irq(irq_node_t **list, irq_node_t *node)
 		printk("%s: Warning: dev_id of %s is zero\n",
 		       __FUNCTION__, node->devname);
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	cur = *list;
 
@@ -153,7 +152,7 @@ static inline int amiga_insert_irq(irq_node_t **list, irq_node_t *node)
 	node->next = cur;
 	*list = node;
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -162,19 +161,18 @@ static inline void amiga_delete_irq(irq_node_t **list, void *dev_id)
 	unsigned long flags;
 	irq_node_t *node;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	for (node = *list; node; list = &node->next, node = *list) {
 		if (node->dev_id == dev_id) {
 			*list = node->next;
 			/* Mark it as free. */
 			node->handler = NULL;
-			restore_flags(flags);
+			local_irq_restore(flags);
 			return;
 		}
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 	printk ("%s: tried to remove invalid irq\n", __FUNCTION__);
 }
 

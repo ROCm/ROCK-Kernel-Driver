@@ -112,7 +112,7 @@ static int __init amikbd_init(void)
 	if (!request_mem_region(CIAA_PHYSADDR-1+0xb00, 0x100, "amikeyb"))
 		return -EBUSY;
 
-	init_input_dev(&amibkd_dev);
+	init_input_dev(&amikbd_dev);
 
 	amikbd_dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
 	amikbd_dev.keycode = amikbd_keycode;

@@ -22,7 +22,7 @@ X_STORE:	|idnt    2,1 | Motorola 040 Floating Point Software Package
 fpreg_mask:
 	.byte	0x80,0x40,0x20,0x10,0x08,0x04,0x02,0x01
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	|xref	mem_write
 	|xref	get_fline

@@ -370,11 +370,13 @@ void rxrpc_peer_calculate_rtt(struct rxrpc_peer *peer,
 	if (peer->rtt_usage<RXRPC_RTT_CACHE_SIZE) peer->rtt_usage++;
 
 	/* recalculate RTT */
+	rtt = 0;
 	for (loop=peer->rtt_usage-1; loop>=0; loop--)
 		rtt += peer->rtt_cache[loop];
 
-	peer->rtt = do_div(rtt,peer->rtt_usage);
+	do_div(rtt,peer->rtt_usage);
+	peer->rtt = rtt;
 
-	_leave(" RTT=%lu.%lums",peer->rtt/1000,peer->rtt%1000);
+	_leave(" RTT=%lu.%lums",(long)(peer->rtt/1000),(long)(peer->rtt%1000));
 
 } /* end rxrpc_peer_calculate_rtt() */

@@ -154,6 +154,7 @@ struct uart_port {
 	unsigned int		flags;
 
 #define UPF_HUP_NOTIFY		(1 << 0)
+#define UPF_FOURPORT		(1 << 1)
 #define UPF_SAK			(1 << 2)
 #define UPF_SPD_MASK		(0x1030)
 #define UPF_SPD_HI		(0x0010)
@@ -167,6 +168,9 @@ struct uart_port {
 #define UPF_LOW_LATENCY		(1 << 13)
 #define UPF_BUGGY_UART		(1 << 14)
 #define UPF_AUTOPROBE		(1 << 15)
+#define UPF_BOOT_ONLYMCA	(1 << 22)
+#define UPF_CONS_FLOW		(1 << 23)
+#define UPF_SHARE_IRQ		(1 << 24)
 #define UPF_BOOT_AUTOCONF	(1 << 28)
 #define UPF_RESOURCES		(1 << 30)
 #define UPF_IOREMAP		(1 << 31)
@@ -247,8 +251,6 @@ struct uart_info {
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS		256
 
-#define EVT_WRITE_WAKEUP	0
-
 struct module;
 struct tty_driver;
 
@@ -269,7 +271,7 @@ struct uart_driver {
 	struct tty_driver	*tty_driver;
 };
 
-void uart_event(struct uart_port *port, int event);
+void uart_write_wakeup(struct uart_port *port);
 struct uart_port *uart_get_console(struct uart_port *ports, int nr,
 				   struct console *c);
 void uart_parse_options(char *options, int *baud, int *parity, int *bits,
@@ -380,7 +382,7 @@ uart_handle_cts_change(struct uart_port *port, unsigned int status)
 			if (status) {
 				tty->hw_stopped = 0;
 				port->ops->start_tx(port, 0);
-				uart_event(port, EVT_WRITE_WAKEUP);
+				uart_write_wakeup(port);
 			}
 		} else {
 			if (!status) {

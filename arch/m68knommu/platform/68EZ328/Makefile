@@ -1,0 +1,14 @@
+#
+# Makefile for arch/m68knommu/platform/68EZ328.
+#
+
+obj-y := config.o
+
+EXTRA_TARGETS := $(BOARD)/bootlogo.rh $(BOARD)/crt0_$(MODEL).o
+
+include $(TOPDIR)/Rules.make
+
+$(obj)/$(BOARD)/bootlogo.rh: $(src)/bootlogo.h
+	perl $(src)/../68328/bootlogo.pl < $(src)/bootlogo.h \
+		> $(obj)/$(BOARD)/bootlogo.rh
+

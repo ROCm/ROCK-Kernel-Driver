@@ -13,6 +13,7 @@
  *  kill the offending process.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
@@ -47,6 +48,12 @@ const char *processor_modes[]=
 };
 
 static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
+
+void dump_backtrace_entry(unsigned long where, unsigned long from)
+{
+	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
+	print_symbol("  %s\n", where);
+}
 
 /*
  * Stack pointers should always be within the kernels view of
@@ -162,6 +169,13 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 		c_backtrace(fp, processor_mode(regs));
 }
 
+void dump_stack(void)
+{
+#ifdef CONFIG_DEBUG_ERRORS
+	__backtrace();
+#endif
+}
+
 /*
  * This is called from SysRq-T (show_task) to display the current call
  * trace for each process.  This version will also display the running
@@ -190,8 +204,10 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 
 	console_verbose();
 	spin_lock_irq(&die_lock);
+	bust_spinlocks(1);
 
 	printk("Internal error: %s: %x\n", str, err);
+	print_modules();
 	printk("CPU: %d\n", smp_processor_id());
 	show_regs(regs);
 	printk("Process %s (pid: %d, stack limit = 0x%p)\n",
@@ -203,6 +219,7 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 		dump_instr(regs);
 	}
 
+	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
 	do_exit(SIGSEGV);
 }
@@ -517,7 +534,7 @@ void __pgd_error(const char *file, int line, unsigned long val)
 asmlinkage void __div0(void)
 {
 	printk("Division by zero in kernel.\n");
-	__backtrace();
+	dump_stack();
 }
 
 void abort(void)

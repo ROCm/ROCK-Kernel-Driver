@@ -390,6 +390,7 @@ void ext3_put_super (struct super_block * sb)
 	for (i = 0; i < sbi->s_gdb_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
+	kfree(sbi->s_debts);
 	brelse(sbi->s_sbh);
 
 	/* Debugging code just in case the in-memory inode orphan list
@@ -1221,6 +1222,13 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		printk (KERN_ERR "EXT3-fs: not enough memory\n");
 		goto failed_mount;
 	}
+	sbi->s_debts = kmalloc(sbi->s_groups_count * sizeof(*sbi->s_debts),
+			GFP_KERNEL);
+	if (!sbi->s_debts) {
+		printk ("EXT3-fs: not enough memory\n");
+		goto failed_mount2;
+	}
+	memset(sbi->s_debts, 0, sbi->s_groups_count * sizeof(*sbi->s_debts));
 	for (i = 0; i < db_count; i++) {
 		block = descriptor_loc(sb, logic_sb_block, i);
 		sbi->s_group_desc[i] = sb_bread(sb, block);
@@ -1236,6 +1244,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		goto failed_mount2;
 	}
 	sbi->s_gdb_count = db_count;
+	sbi->s_dir_count = ext3_count_dirs(sb);
 	/*
 	 * set up enough so that it can read an inode
 	 */
@@ -1339,6 +1348,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 failed_mount3:
 	journal_destroy(sbi->s_journal);
 failed_mount2:
+	if (sbi->s_debts)
+		kfree(sbi->s_debts);
 	for (i = 0; i < db_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);

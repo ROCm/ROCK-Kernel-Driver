@@ -878,10 +878,12 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
  * changed 5 parameters to 3 for dvd-ram
  * struct packet_command *pc; now packet_command_t *pc;
  */
+#define ATAPI_MIN_CDB_BYTES 12
 static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 					  struct request *rq,
 					  ide_handler_t *handler)
 {
+	int cmd_len;
 	struct cdrom_info *info = drive->driver_data;
 	ide_startstop_t startstop;
 
@@ -905,8 +907,13 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 	/* Arm the interrupt handler. */
 	ide_set_handler(drive, handler, rq->timeout, cdrom_timer_expiry);
 
+	/* ATAPI commands get padded out to 12 bytes minimum */
+	cmd_len = rq->cmd_len;
+	if (cmd_len < ATAPI_MIN_CDB_BYTES)
+		cmd_len = ATAPI_MIN_CDB_BYTES;
+
 	/* Send the command to the device. */
-	HWIF(drive)->atapi_output_bytes(drive, rq->cmd, sizeof(rq->cmd));
+	HWIF(drive)->atapi_output_bytes(drive, rq->cmd, cmd_len);
 
 	/* Start the DMA if need be */
 	if (info->dma)
@@ -3004,6 +3011,7 @@ static int ide_cdrom_prep_fs(request_queue_t *q, struct request *rq)
 	 */
 	rq->cmd[7] = (blocks >> 8) & 0xff;
 	rq->cmd[8] = blocks & 0xff;
+	rq->cmd_len = 10;
 	return BLKPREP_OK;
 }
 
@@ -3026,6 +3034,7 @@ static int ide_cdrom_prep_pc(struct request *rq)
 		c[2] = 0;
 		c[1] &= 0xe0;
 		c[0] += (READ_10 - READ_6);
+		rq->cmd_len = 10;
 		return BLKPREP_OK;
 	}
 

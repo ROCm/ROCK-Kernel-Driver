@@ -245,7 +245,7 @@ static void ambauart_tx_chars(struct uart_port *port)
 	} while (--count > 0);
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(port);
 
 	if (uart_circ_empty(xmit))
 		ambauart_stop_tx(port);
@@ -706,11 +706,7 @@ void __init ambauart_console_init(void)
 static struct uart_driver amba_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttyAM",
-#ifdef CONFIG_DEVFS_FS
 	.dev_name		= "ttyAM%d",
-#else
-	.dev_name		= "ttyAM",
-#endif
 	.major			= SERIAL_AMBA_MAJOR,
 	.minor			= SERIAL_AMBA_MINOR,
 	.nr			= UART_NR,

@@ -874,6 +874,7 @@ static struct de4x5_bus_type {
     struct de4x5_srom srom;
     int autosense;
     int useSROM;
+    struct pci_dev *pdev;
 } bus;
 
 /*
@@ -1151,8 +1152,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
     if (lp->bus == EISA) {
 	outb(WAKEUP, PCI_CFPM);
     } else {
-	pcibios_write_config_byte(lp->bus_num, lp->device << 3, 
-				  PCI_CFDA_PSM, WAKEUP);
+	pci_write_config_byte(lp->pdev, PCI_CFDA_PSM, WAKEUP);
     }
     mdelay(10);
 
@@ -2222,11 +2222,12 @@ pci_probe(struct net_device *dev, u_long ioaddr)
 	}
 
 	/* Get the chip configuration revision register */
-	pcibios_read_config_dword(pb, pdev->devfn, PCI_REVISION_ID, &cfrv);
+	pci_read_config_dword(pdev, PCI_REVISION_ID, &cfrv);
 
 	/* Set the device number information */
 	lp->device = dev_num;
 	lp->bus_num = pb;
+	lp->pdev = pdev;
 	    
 	/* Set the chipset information */
 	if (is_DC2114x) {
@@ -2242,27 +2243,27 @@ pci_probe(struct net_device *dev, u_long ioaddr)
 	if ((irq == 0) || (irq == 0xff) || ((int)irq == -1)) continue;
 	    
 	/* Check if I/O accesses and Bus Mastering are enabled */
-	pcibios_read_config_word(pb, pdev->devfn, PCI_COMMAND, &status);
+	pci_read_config_word(pdev, PCI_COMMAND, &status);
 #ifdef __powerpc__
 	if (!(status & PCI_COMMAND_IO)) {
 	    status |= PCI_COMMAND_IO;
-	    pcibios_write_config_word(pb, pdev->devfn, PCI_COMMAND, status);
-	    pcibios_read_config_word(pb, pdev->devfn, PCI_COMMAND, &status);
+	    pci_write_config_word(pdev, PCI_COMMAND, status);
+	    pci_read_config_word(pdev, PCI_COMMAND, &status);
 	}
 #endif /* __powerpc__ */
 	if (!(status & PCI_COMMAND_IO)) continue;
 
 	if (!(status & PCI_COMMAND_MASTER)) {
 	    status |= PCI_COMMAND_MASTER;
-	    pcibios_write_config_word(pb, pdev->devfn, PCI_COMMAND, status);
-	    pcibios_read_config_word(pb, pdev->devfn, PCI_COMMAND, &status);
+	    pci_write_config_word(pdev, PCI_COMMAND, status);
+	    pci_read_config_word(pdev, PCI_COMMAND, &status);
 	}
 	if (!(status & PCI_COMMAND_MASTER)) continue;
 
 	/* Check the latency timer for values >= 0x60 */
-	pcibios_read_config_byte(pb, pdev->devfn, PCI_LATENCY_TIMER, &timer);
+	pci_read_config_byte(pdev, PCI_LATENCY_TIMER, &timer);
 	if (timer < 0x60) {
-	    pcibios_write_config_byte(pb, pdev->devfn, PCI_LATENCY_TIMER, 0x60);
+	    pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0x60);
 	}
 
 	DevicePresent(DE4X5_APROM);
@@ -2314,7 +2315,7 @@ srom_search(struct pci_dev *dev)
 
 	/* Get the chip configuration revision register */
 	pb = this_dev->bus->number;
-	pcibios_read_config_dword(pb, this_dev->devfn, PCI_REVISION_ID, &cfrv);
+	pci_read_config_dword(this_dev, PCI_REVISION_ID, &cfrv);
 
 	/* Set the device number information */
 	lp->device = PCI_SLOT(this_dev->devfn);
@@ -2334,7 +2335,7 @@ srom_search(struct pci_dev *dev)
 	if ((irq == 0) || (irq == 0xff) || ((int)irq == -1)) continue;
 	    
 	/* Check if I/O accesses are enabled */
-	pcibios_read_config_word(pb, this_dev->devfn, PCI_COMMAND, &status);
+	pci_read_config_word(this_dev, PCI_COMMAND, &status);
 	if (!(status & PCI_COMMAND_IO)) continue;
 
 	/* Search for a valid SROM attached to this DECchip */
@@ -5325,20 +5326,17 @@ yawn(struct net_device *dev, int state)
     } else {
 	switch(state) {
 	  case WAKEUP:
-	    pcibios_write_config_byte(lp->bus_num, lp->device << 3, 
-				      PCI_CFDA_PSM, WAKEUP);
+	    pci_write_config_byte(lp->pdev, PCI_CFDA_PSM, WAKEUP);
 	    mdelay(10);
 	    break;
 
 	  case SNOOZE:
-	    pcibios_write_config_byte(lp->bus_num, lp->device << 3, 
-				      PCI_CFDA_PSM, SNOOZE);
+	    pci_write_config_byte(lp->pdev, PCI_CFDA_PSM, SNOOZE);
 	    break;
 
 	  case SLEEP:
 	    outl(0, DE4X5_SICR);
-	    pcibios_write_config_byte(lp->bus_num, lp->device << 3, 
-				      PCI_CFDA_PSM, SLEEP);
+	    pci_write_config_byte(lp->pdev, PCI_CFDA_PSM, SLEEP);
 	    break;
 	}
     }

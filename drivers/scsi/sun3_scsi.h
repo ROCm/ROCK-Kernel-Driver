@@ -1,7 +1,7 @@
 /*
  * Sun3 SCSI stuff by Erik Verbruggen (erik@bigmama.xtdnet.nl)
  *
- * Sun3 DMA additions by Sam Creasey (sammy@oh.verio.com)
+ * Sun3 DMA additions by Sam Creasey (sammy@sammy.net)
  *
  * Adapted from mac_scsinew.h:
  */
@@ -36,6 +36,11 @@
 #ifndef SUN3_NCR5380_H
 #define SUN3_NCR5380_H
 
+#ifndef NULL
+#define NULL 0
+#endif
+
+
 #define SUN3SCSI_PUBLIC_RELEASE 1
 
 /*
@@ -45,17 +50,19 @@
 #define IRQ_SUN3_SCSI 2
 #define IOBASE_SUN3_SCSI 0x00140000
 
-int sun3scsi_abort (Scsi_Cmnd *);
-int sun3scsi_detect (Scsi_Host_Template *);
-int sun3scsi_release (struct Scsi_Host *);
-const char *sun3scsi_info (struct Scsi_Host *);
-int sun3scsi_reset(Scsi_Cmnd *, unsigned int);
-int sun3scsi_queue_command (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int sun3scsi_proc_info (char *buffer, char **start, off_t offset,
-			int length, int hostno, int inout);
+#define IOBASE_SUN3_VMESCSI 0xff200000
 
-#ifndef NULL
-#define NULL 0
+static int sun3scsi_abort (Scsi_Cmnd *);
+static int sun3scsi_detect (Scsi_Host_Template *);
+static const char *sun3scsi_info (struct Scsi_Host *);
+static int sun3scsi_reset(Scsi_Cmnd *, unsigned int);
+static int sun3scsi_queue_command (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int sun3scsi_proc_info (char *buffer, char **start, off_t offset,
+			int length, int hostno, int inout);
+#ifdef MODULE
+static int sun3scsi_release (struct Scsi_Host *);
+#else
+#define sun3scsi_release NULL
 #endif
 
 #ifndef CMD_PER_LUN
@@ -70,26 +77,36 @@ int sun3scsi_proc_info (char *buffer, char **start, off_t offset,
 #define SG_TABLESIZE SG_NONE
 #endif
 
+#ifndef MAX_TAGS
+#define MAX_TAGS 32
+#endif
+
 #ifndef USE_TAGGED_QUEUING
-#define	USE_TAGGED_QUEUING 0
+#define	USE_TAGGED_QUEUING 1
 #endif
 
 #include <scsi/scsicam.h>
 
+#ifdef SUN3_SCSI_VME
+#define SUN3_SCSI_NAME "Sun3 NCR5380 VME SCSI"
+#else
+#define SUN3_SCSI_NAME "Sun3 NCR5380 SCSI"
+#endif
+
 #define SUN3_NCR5380 {							\
-name:			"Sun3 NCR5380 SCSI",				\
-detect:			sun3scsi_detect,				\
-release:		sun3scsi_release,	/* Release */		\
-info:			sun3scsi_info,					\
-queuecommand:		sun3scsi_queue_command,				\
-abort:			sun3scsi_abort,			 		\
-reset:			sun3scsi_reset,					\
-can_queue:		CAN_QUEUE,		/* can queue */		\
-this_id:		7,			/* id */		\
-sg_tablesize:		SG_ALL,			/* sg_tablesize */	\
-cmd_per_lun:		CMD_PER_LUN,		/* cmd per lun */	\
-unchecked_isa_dma:	0,			/* unchecked_isa_dma */	\
-use_clustering:		DISABLE_CLUSTERING				\
+.name =			SUN3_SCSI_NAME,					\
+.detect =		sun3scsi_detect,				\
+.release =		sun3scsi_release,	/* Release */		\
+.info =			sun3scsi_info,					\
+.queuecommand =		sun3scsi_queue_command,				\
+.abort =		sun3scsi_abort,					\
+.reset =		sun3scsi_reset,					\
+.can_queue =		CAN_QUEUE,		/* can queue */		\
+.this_id =		7,			/* id */		\
+.sg_tablesize =		SG_TABLESIZE,		/* sg_tablesize */	\
+.cmd_per_lun =		CMD_PER_LUN,		/* cmd per lun */	\
+.unchecked_isa_dma =	0,			/* unchecked_isa_dma */	\
+.use_clustering =	DISABLE_CLUSTERING				\
 	}
 
 #ifndef HOSTS_C
@@ -124,13 +141,20 @@ use_clustering:		DISABLE_CLUSTERING				\
 /* additional registers - mainly DMA control regs */
 /* these start at regbase + 8 -- directly after the NCR regs */
 struct sun3_dma_regs {
-	unsigned short vmeregs[4];  /* unimpl vme stuff */
-	unsigned short udc_data; /* udc dma data reg */
-	unsigned short udc_addr; /* uda dma addr reg */
+	unsigned short dma_addr_hi; /* vme only */
+	unsigned short dma_addr_lo; /* vme only */
+	unsigned short dma_count_hi; /* vme only */
+	unsigned short dma_count_lo; /* vme only */
+	unsigned short udc_data; /* udc dma data reg (obio only) */
+	unsigned short udc_addr; /* uda dma addr reg (obio only) */
 	unsigned short fifo_data; /* fifo data reg, holds extra byte on
 				     odd dma reads */
 	unsigned short fifo_count; 
 	unsigned short csr; /* control/status reg */
+	unsigned short bpack_hi; /* vme only */
+	unsigned short bpack_lo; /* vme only */
+	unsigned short ivect; /* vme only */
+	unsigned short fifo_count_hi; /* vme only */
 };
 
 /* ucd chip specific regs - live in dvma space */
@@ -179,10 +203,20 @@ struct sun3_udc_regs {
 #define CSR_SDB_INT 0x200 /* sbc interrupt pending */
 #define CSR_DMA_INT 0x100 /* dma interrupt pending */
 
+#define CSR_LEFT 0xc0
+#define CSR_LEFT_3 0xc0
+#define CSR_LEFT_2 0x80
+#define CSR_LEFT_1 0x40
+#define CSR_PACK_ENABLE 0x20
+
+#define CSR_DMA_ENABLE 0x10
+
 #define CSR_SEND 0x8 /* 1 = send  0 = recv */
 #define CSR_FIFO 0x2 /* reset fifo */
 #define CSR_INTR 0x4 /* interrupt enable */
 #define CSR_SCSI 0x1 
+
+#define VME_DATA24 0x3d00
 
 // debugging printk's, taken from atari_scsi.h 
 /* Debugging printk definitions:
@@ -364,8 +398,6 @@ struct sun3_udc_regs {
 
 #define NCR_PRINT_STATUS(mask) \
 	((NDEBUG & (mask)) ? NCR5380_print_status(instance) : (void)0)
-
-#define NDEBUG_ANY	0xffffffff
 
 
 

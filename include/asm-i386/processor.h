@@ -434,9 +434,6 @@ extern void release_thread(struct task_struct *);
  */
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
-/* Release all segment info associated with a VM */
-extern void release_segments(struct mm_struct * mm);
-
 extern unsigned long thread_saved_pc(struct task_struct *tsk);
 
 unsigned long get_wchan(struct task_struct *p);

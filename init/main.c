@@ -72,6 +72,7 @@ extern void pidhash_init(void);
 extern void pte_chain_init(void);
 extern void radix_tree_init(void);
 extern void free_initmem(void);
+extern void populate_rootfs(void);
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -101,7 +102,7 @@ int rows, cols;
 char *execute_command;
 
 /* Setup configured maximum number of CPUs to activate */
-static unsigned int max_cpus = UINT_MAX;
+static unsigned int max_cpus = NR_CPUS;
 
 /*
  * Setup routine for controlling SMP activation
@@ -433,6 +434,7 @@ asmlinkage void __init start_kernel(void)
 	vfs_caches_init(num_physpages);
 	radix_tree_init();
 	signals_init();
+	populate_rootfs();
 #ifdef CONFIG_PROC_FS
 	proc_root_init();
 #endif

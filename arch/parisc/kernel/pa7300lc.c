@@ -7,7 +7,7 @@
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/kernel.h>
-#include <asm/gsc.h>
+#include <asm/io.h>
 #include <asm/ptrace.h>
 #include <asm/machdep.h>
 

@@ -98,6 +98,8 @@
 #define RTC_PORT(x)		(TT_RTC_BAS + 2*(x))
 #define CHECK_DRIVER_INIT()	(MACH_IS_ATARI && ATARIHW_PRESENT(TT_CLK))
 
+#define NVRAM_BYTES		50
+
 /* On Ataris, the checksum is over all bytes except the checksum bytes
  * themselves; these are at the very end */
 #define ATARI_CKS_RANGE_START	0

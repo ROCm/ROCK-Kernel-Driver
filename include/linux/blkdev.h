@@ -47,7 +47,6 @@ struct request {
 				     * blkdev_dequeue_request! */
 	unsigned long flags;		/* see REQ_ bits below */
 
-	kdev_t rq_dev;
 	sector_t sector;
 	unsigned long nr_sectors;
 	unsigned int current_nr_sectors;
@@ -93,6 +92,7 @@ struct request {
 	/*
 	 * when request is used as a packet command carrier
 	 */
+	unsigned int cmd_len;
 	unsigned char cmd[16];
 
 	unsigned int data_len;

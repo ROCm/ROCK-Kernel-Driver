@@ -642,6 +642,11 @@ device_initcall(pci_init);
 
 __setup("pci=", pci_setup);
 
+#if defined(CONFIG_ISA) || defined(CONFIG_EISA)
+struct pci_dev *isa_bridge;
+EXPORT_SYMBOL(isa_bridge);
+#endif
+
 EXPORT_SYMBOL(pci_enable_device);
 EXPORT_SYMBOL(pci_disable_device);
 EXPORT_SYMBOL(pci_find_capability);

@@ -635,7 +635,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			break;
 		case NOT_READY:
 			printk(KERN_INFO "Device %s not ready.\n",
-			       kdevname(req->rq_dev));
+			       req->rq_disk ? req->rq_disk->disk_name : "");
 			SCpnt = scsi_end_request(SCpnt, 0, this_count);
 			return;
 			break;
@@ -703,36 +703,8 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
  */
 struct Scsi_Device_Template *scsi_get_request_dev(struct request *req)
 {
-	struct Scsi_Device_Template *spnt;
-	kdev_t dev = req->rq_dev;
-	int major = major(dev);
-
-	for (spnt = scsi_devicelist; spnt; spnt = spnt->next) {
-		/*
-		 * Search for a block device driver that supports this
-		 * major.
-		 */
-		if (spnt->blk && spnt->major == major) {
-			return spnt;
-		}
-		/*
-		 * I am still not entirely satisfied with this solution,
-		 * but it is good enough for now.  Disks have a number of
-		 * major numbers associated with them, the primary
-		 * 8, which we test above, and a secondary range of 7
-		 * different consecutive major numbers.   If this ever
-		 * becomes insufficient, then we could add another function
-		 * to the structure, and generalize this completely.
-		 */
-		if( spnt->min_major != 0 
-		    && spnt->max_major != 0
-		    && major >= spnt->min_major
-		    && major <= spnt->max_major )
-		{
-			return spnt;
-		}
-	}
-	return NULL;
+	struct gendisk *p = req->rq_disk;
+	return p ? *(struct Scsi_Device_Template **)p->private_data : NULL;
 }
 
 /*

@@ -425,11 +425,11 @@ sys_init_module(const char *name_user, struct module *mod_user)
 		printk(KERN_ERR "init_module: mod->deps out of bounds.\n");
 		goto err2;
 	}
-	if (mod->init && !mod_bound(mod->init, 0, mod)) {
+	if (mod->init && !mod_bound((unsigned long)mod->init, 0, mod)) {
 		printk(KERN_ERR "init_module: mod->init out of bounds.\n");
 		goto err2;
 	}
-	if (mod->cleanup && !mod_bound(mod->cleanup, 0, mod)) {
+	if (mod->cleanup && !mod_bound((unsigned long)mod->cleanup, 0, mod)) {
 		printk(KERN_ERR "init_module: mod->cleanup out of bounds.\n");
 		goto err2;
 	}
@@ -449,7 +449,7 @@ sys_init_module(const char *name_user, struct module *mod_user)
 		goto err2;
 	}
 	if (mod_member_present(mod, can_unload)
-	    && mod->can_unload && !mod_bound(mod->can_unload, 0, mod)) {
+	    && mod->can_unload && !mod_bound((unsigned long)mod->can_unload, 0, mod)) {
 		printk(KERN_ERR "init_module: mod->can_unload out of bounds.\n");
 		goto err2;
 	}

@@ -182,6 +182,18 @@ extern void memset_io(unsigned long dest, char fill, int count);
 #define isa_memcpy_fromio(a,b,c) memcpy_fromio((a), EISA_BASE | (b), (c))
 #define isa_memcpy_toio(a,b,c) memcpy_toio(EISA_BASE | (a), (b), (c))
 
+/* 
+ * These functions support PA-RISC drivers which don't yet call ioremap().
+ * They will disappear once the last of these drivers is gone.
+ */
+#define gsc_readb(x) __raw_readb((unsigned long)x)
+#define gsc_readw(x) __raw_readw((unsigned long)x)
+#define gsc_readl(x) __raw_readl((unsigned long)x)
+#define gsc_writeb(x, y) __raw_writeb(x, (unsigned long)y)
+#define gsc_writew(x, y) __raw_writew(x, (unsigned long)y)
+#define gsc_writel(x, y) __raw_writel(x, (unsigned long)y)
+
+
 /*
  * XXX - We don't have csum_partial_copy_fromio() yet, so we cheat here and 
  * just copy it. The net code will then do the checksum later. Presently 

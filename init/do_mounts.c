@@ -748,9 +748,7 @@ void prepare_namespace(void)
 		mount_initrd = 0;
 	real_root_dev = ROOT_DEV;
 #endif
-	sys_mkdir("/dev", 0700);
-	sys_mkdir("/root", 0700);
-	sys_mknod("/dev/console", S_IFCHR|0600, MKDEV(TTYAUX_MAJOR, 1));
+
 #ifdef CONFIG_DEVFS_FS
 	sys_mount("devfs", "/dev", "devfs", 0, NULL);
 	do_devfs = 1;

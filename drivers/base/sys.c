@@ -55,6 +55,9 @@ int sys_register_root(struct sys_root * root)
 	if (!root)
 		return -EINVAL;
 
+	if (!root->dev.parent)
+		root->dev.parent = &system_bus;
+
 	pr_debug("Registering system board %d\n",root->id);
 
 	error = device_register(&root->dev);

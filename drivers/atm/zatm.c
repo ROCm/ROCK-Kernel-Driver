@@ -1260,13 +1260,13 @@ static void zatm_int(int irq,void *dev_id,struct pt_regs *regs)
 		/* don't handle RD */
 		if (reason & uPD98401_INT_SPE)
 			printk(KERN_ALERT DEV_LABEL "(itf %d): system parity "
-			    "error at 0x%08lx\n",dev->number,zin(ADDR));
+			    "error at 0x%08x\n",dev->number,zin(ADDR));
 		if (reason & uPD98401_INT_CPE)
 			printk(KERN_ALERT DEV_LABEL "(itf %d): control memory "
-			    "parity error at 0x%08lx\n",dev->number,zin(ADDR));
+			    "parity error at 0x%08x\n",dev->number,zin(ADDR));
 		if (reason & uPD98401_INT_SBE) {
 			printk(KERN_ALERT DEV_LABEL "(itf %d): system bus "
-			    "error at 0x%08lx\n",dev->number,zin(ADDR));
+			    "error at 0x%08x\n",dev->number,zin(ADDR));
 			event_dump();
 		}
 		/* don't handle IND */
@@ -1448,7 +1448,7 @@ static int __init zatm_init(struct atm_dev *dev)
 	}
 	while (t0 > t1 || t1 > t2); /* loop if wrapping ... */
 	zatm_dev->khz = t2-2*t1+t0;
-	printk(KERN_NOTICE DEV_LABEL "(itf %d): uPD98401 %ld.%ld at %d.%03d "
+	printk(KERN_NOTICE DEV_LABEL "(itf %d): uPD98401 %d.%d at %d.%03d "
 	    "MHz\n",dev->number,
 	    (zin(VER) & uPD98401_MAJOR) >> uPD98401_MAJOR_SHIFT,
             zin(VER) & uPD98401_MINOR,zatm_dev->khz/1000,zatm_dev->khz % 1000);

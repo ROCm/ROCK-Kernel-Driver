@@ -307,15 +307,8 @@ do_ptrace(struct task_struct *child, long request, long addr, long data)
 			copied += sizeof(unsigned long);
 		}
 		return 0;
-
-	case PTRACE_SETOPTIONS:
-		if (data & PTRACE_O_TRACESYSGOOD)
-			child->ptrace |= PT_TRACESYSGOOD;
-		else
-			child->ptrace &= ~PT_TRACESYSGOOD;
-		return 0;
 	}
-	return -EIO;
+	return ptrace_request(child, request, addr, data);
 }
 
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)

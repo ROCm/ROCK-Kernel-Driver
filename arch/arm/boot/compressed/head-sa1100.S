@@ -76,4 +76,3 @@ __SA1100_start:
 		mov	r0, #0x00200000
 1:		subs	r0, r0, #1
 		bne	1b
-

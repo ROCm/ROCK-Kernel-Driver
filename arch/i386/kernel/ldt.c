@@ -104,7 +104,7 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 /*
  * No need to lock the MM as we are the last user
  */
-void release_segments(struct mm_struct *mm)
+void destroy_context(struct mm_struct *mm)
 {
 	if (mm->context.size) {
 		if (mm == current->active_mm)

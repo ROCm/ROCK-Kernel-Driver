@@ -170,6 +170,26 @@ static const char *cache_lockdown[16] = {
 	"undefined 15",
 };
 
+static const char *proc_arch[] = {
+	"undefined/unknown",
+	"3",
+	"4",
+	"4T",
+	"5",
+	"5T",
+	"5TE",
+	"?(8)",
+	"?(9)",
+	"?(10)",
+	"?(11)",
+	"?(12)",
+	"?(13)",
+	"?(14)",
+	"?(15)",
+	"?(16)",
+	"?(17)",
+};
+
 #define CACHE_TYPE(x)	(((x) >> 25) & 15)
 #define CACHE_S(x)	((x) & (1 << 24))
 #define CACHE_DSIZE(x)	(((x) >> 12) & 4095)	/* only if S=1 */
@@ -214,6 +234,23 @@ static void __init dump_cpu_info(void)
 #define dump_cpu_info() do { } while (0)
 #endif
 
+int cpu_architecture(void)
+{
+	int cpu_arch;
+
+	if ((processor_id & 0x0000f000) == 0) {
+		cpu_arch = CPU_ARCH_UNKNOWN;
+	} else if ((processor_id & 0x0000f000) == 0x00007000) {
+		cpu_arch = (processor_id & (1 << 23)) ? CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
+	} else {
+		cpu_arch = (processor_id >> 16) & 15;
+		if (cpu_arch)
+			cpu_arch += CPU_ARCH_ARMv3;
+	}
+
+	return cpu_arch;
+}
+
 static void __init setup_processor(void)
 {
 	extern struct proc_info_list __proc_info_begin, __proc_info_end;
@@ -250,9 +287,9 @@ static void __init setup_processor(void)
 	cpu_user = *list->user;
 #endif
 
-	printk("CPU: %s %s revision %d\n",
+	printk("CPU: %s %s revision %d (ARMv%s)\n",
 	       proc_info.manufacturer, proc_info.cpu_name,
-	       (int)processor_id & 15);
+	       (int)processor_id & 15, proc_arch[cpu_architecture()]);
 
 	dump_cpu_info();
 
@@ -666,25 +703,6 @@ static const char *hwcap_str[] = {
 	NULL
 };
 
-static const char *proc_arch[16] = {
-	"undefined 0",
-	"4",
-	"4T",
-	"5",
-	"5T",
-	"5TE",
-	"undefined 6",
-	"undefined 7",
-	"undefined 8",
-	"undefined 9",
-	"undefined 10",
-	"undefined 11",
-	"undefined 12",
-	"undefined 13",
-	"undefined 14",
-	"undefined 15"
-};
-
 static void
 c_show_cache(struct seq_file *m, const char *type, unsigned int cache)
 {
@@ -720,30 +738,23 @@ static int c_show(struct seq_file *m, void *v)
 		if (elf_hwcap & (1 << i))
 			seq_printf(m, "%s ", hwcap_str[i]);
 
-	seq_puts(m, "\n");
+	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", processor_id >> 24);
+	seq_printf(m, "CPU architecture: %s\n", proc_arch[cpu_architecture()]);
 
 	if ((processor_id & 0x0000f000) == 0x00000000) {
 		/* pre-ARM7 */
 		seq_printf(m, "CPU part\t\t: %07x\n", processor_id >> 4);
-	} else if ((processor_id & 0x0000f000) == 0x00007000) {
-		/* ARM7 */
-		seq_printf(m, "CPU implementor\t: 0x%02x\n"
-			      "CPU architecture: %s\n"
-			      "CPU variant\t: 0x%02x\n"
-			      "CPU part\t: 0x%03x\n",
-			   processor_id >> 24,
-			   processor_id & (1 << 23) ? "4T" : "3",
-			   (processor_id >> 16) & 127,
-			   (processor_id >> 4) & 0xfff);
 	} else {
-		/* post-ARM7 */
-		seq_printf(m, "CPU implementor\t: 0x%02x\n"
-			      "CPU architecture: %s\n"
-			      "CPU variant\t: 0x%x\n"
-			      "CPU part\t: 0x%03x\n",
-			   processor_id >> 24,
-			   proc_arch[(processor_id >> 16) & 15],
-			   (processor_id >> 20) & 15,
+		if ((processor_id & 0x0000f000) == 0x00007000) {
+			/* ARM7 */
+			seq_printf(m, "CPU variant\t: 0x%02x\n",
+				   (processor_id >> 16) & 127);
+		} else {
+			/* post-ARM7 */
+			seq_printf(m, "CPU variant\t: 0x%x\n",
+				   (processor_id >> 20) & 15);
+		}
+		seq_printf(m, "CPU part\t: 0x%03x\n",
 			   (processor_id >> 4) & 0xfff);
 	}
 	seq_printf(m, "CPU revision\t: %d\n", processor_id & 15);

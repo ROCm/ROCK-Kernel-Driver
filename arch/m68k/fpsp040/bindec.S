@@ -137,7 +137,7 @@
 
 |BINDEC    idnt    2,1 | Motorola 040 Floating Point Software Package
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	|section	8
 

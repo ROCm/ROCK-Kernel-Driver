@@ -306,10 +306,7 @@ privateer_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	u8 irq;
 	
-	pcibios_read_config_byte(dev->bus->number,
-				 dev->devfn,
-				 PCI_INTERRUPT_LINE,
-				 &irq);
+	pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
 
 	/* is it routed through ISA? */
 	if ((irq & 0xF0) == 0xE0)
@@ -373,7 +370,7 @@ struct alpha_machine_vector privateer_mv __initmv = {
 	DO_TITAN_IO,
 	DO_TITAN_BUS,
 	.machine_check		= privateer_machine_check,
-	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
 	.min_mem_address	= DEFAULT_MEM_BASE,
 	.pci_dac_offset		= TITAN_DAC_OFFSET,

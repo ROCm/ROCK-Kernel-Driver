@@ -350,9 +350,8 @@ config FB_STI
 	  console or the IODC BIOS.
 
 config FB_MAC
-	bool
+	bool "Generic Macintosh display support"
 	depends on FB && MAC
-	default y
 
 #      bool '  Apple DAFB display support' CONFIG_FB_DAFB
 config FB_HP300

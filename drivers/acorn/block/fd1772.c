@@ -1206,7 +1206,7 @@ static void setup_req_params(int drive)
 
 static void redo_fd_request(void)
 {
-	int device, drive, type;
+	int drive, type;
 	struct archy_floppy_struct *floppy;
 
 	DPRINT(("redo_fd_request: CURRENT=%p dev=%s CURRENT->sector=%ld\n",
@@ -1218,10 +1218,9 @@ repeat:
 	if (blk_queue_empty(QUEUE))
 		goto the_end;
 
-	device = minor(CURRENT->rq_dev);
-	drive = device & 3;
-	type = device >> 2;
-	floppy = &unit[drive];
+	floppy = CURRENT->rq_disk->private_data;
+	drive = floppy - unit;
+	type = fd_device[drive];
 
 	if (!floppy->connected) {
 		/* drive not connected */
@@ -1463,13 +1462,11 @@ static void config_types(void)
 static int floppy_open(struct inode *inode, struct file *filp)
 {
 	int drive = minor(inode->i_rdev) & 3;
-	int old_dev;
+	int type =  minor(inode->i_rdev) >> 2;
+	int old_dev = fd_device[drive];
 
-	old_dev = fd_device[drive];
-
-	if (fd_ref[drive])
-		if (old_dev != inode->i_rdev)
-			return -EBUSY;
+	if (fd_ref[drive] && old_dev != type)
+		return -EBUSY;
 
 	if (fd_ref[drive] == -1 || (fd_ref[drive] && filp->f_flags & O_EXCL))
 		return -EBUSY;
@@ -1479,10 +1476,10 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	else
 		fd_ref[drive]++;
 
-	fd_device[drive] = inode->i_rdev;
+	fd_device[drive] = type;
 
-	if (old_dev && old_dev != inode->i_rdev)
-		invalidate_buffers(old_dev);
+	if (old_dev && old_dev != type)
+		invalidate_buffers(mk_kdev(MAJOR_NR, drive + (old_dev<<2)));
 
 	if (filp->f_flags & O_NDELAY)
 		return 0;

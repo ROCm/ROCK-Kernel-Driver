@@ -2058,6 +2058,7 @@ next_unlock:
 next_irqon:
 		local_irq_enable();
 next:
+		;
 	}
 	check_irq_on();
 	up(&cache_chain_sem);

@@ -26,6 +26,7 @@
  *  adhering to the above criteria.
  */
 #include <linux/config.h>
+#include <linux/init.h>
 #include "entry-header.S"
 
 		.text
@@ -597,7 +598,7 @@ ENTRY(__switch_to)
  * What we need to put into 0-0x1c are branches to branch to the kernel.
  */
 
-		.section ".text.init",#alloc,#execinstr
+		__INIT
 
 .Ljump_addresses:
 		swi	SYS_ERROR0

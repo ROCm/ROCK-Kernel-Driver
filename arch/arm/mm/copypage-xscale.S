@@ -8,6 +8,7 @@
  * published by the Free Software Foundation.
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/constants.h>
 
 /*
@@ -78,7 +79,7 @@ ENTRY(xscale_mc_clear_user_page)
 	bne	1b
 	ldr	pc, [sp], #4
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 ENTRY(xscale_mc_user_fns)
 	.long	xscale_mc_clear_user_page

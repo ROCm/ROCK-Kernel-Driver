@@ -1331,6 +1331,9 @@ void qla1280_setup(char *s, int *dummy);
 	release: qla1280_release,				\
 	info: qla1280_info,					\
 	queuecommand: qla1280_queuecommand,			\
+/*	use_new_eh_code: 0, */					\
+	abort: qla1280_abort,					\
+	reset: qla1280_reset,					\
 	slave_attach: qla1280_slave_attach,			\
 	bios_param: qla1280_biosparam,				\
 	can_queue: 255,		/* max simultaneous cmds      */\

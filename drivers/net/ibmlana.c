@@ -260,7 +260,7 @@ static void InitDscrs(struct net_device *dev)
 		else
 			tda.link = addr + sizeof(tda_t);
 		tda.link |= 1;
-		isa_memcpy_to_io(dev->mem_start + addr, &tda, sizeof(tda_t));
+		isa_memcpy_toio(dev->mem_start + addr, &tda, sizeof(tda_t));
 		addr += sizeof(tda_t);
 		baddr += PKTSIZE;
 	}
@@ -280,7 +280,7 @@ static void InitDscrs(struct net_device *dev)
 		rra.starthi = 0;
 		rra.cntlo = PKTSIZE >> 1;
 		rra.cnthi = 0;
-		isa_memcpy_to_io(dev->mem_start + raddr, &rra, sizeof(rra_t));
+		isa_memcpy_toio(dev->mem_start + raddr, &rra, sizeof(rra_t));
 
 		rda.status = 0;
 		rda.length = 0;
@@ -292,7 +292,7 @@ static void InitDscrs(struct net_device *dev)
 		else
 			rda.link = 1;
 		rda.inuse = 1;
-		isa_memcpy_to_io(dev->mem_start + addr, &rda, sizeof(rda_t));
+		isa_memcpy_toio(dev->mem_start + addr, &rda, sizeof(rda_t));
 
 		baddr += PKTSIZE;
 		raddr += sizeof(rra_t);
@@ -429,8 +429,8 @@ static void InitBoard(struct net_device *dev)
 
 	/* feed CDA into SONIC, initialize RCR value (always get broadcasts) */
 
-	isa_memcpy_to_io(dev->mem_start, cams, sizeof(camentry_t) * camcnt);
-	isa_memcpy_to_io(dev->mem_start + (sizeof(camentry_t) * camcnt), &cammask, sizeof(cammask));
+	isa_memcpy_toio(dev->mem_start, cams, sizeof(camentry_t) * camcnt);
+	isa_memcpy_toio(dev->mem_start + (sizeof(camentry_t) * camcnt), &cammask, sizeof(cammask));
 
 #ifdef DEBUG
 	printk("CAM setup:\n");
@@ -627,14 +627,14 @@ static void irqrx_handler(struct net_device *dev)
 
 		rda.link = 1;
 		rda.inuse = 1;
-		isa_memcpy_to_io(dev->mem_start + rdaaddr, &rda,
+		isa_memcpy_toio(dev->mem_start + rdaaddr, &rda,
 			     sizeof(rda_t));
 
 		/* set up link and EOL = 0 in currently last descriptor. Only write
 		   the link field since the SONIC may currently already access the
 		   other fields. */
 
-		isa_memcpy_to_io(dev->mem_start + lrdaaddr + 20, &rdaaddr, 4);
+		isa_memcpy_toio(dev->mem_start + lrdaaddr + 20, &rdaaddr, 4);
 
 		/* advance indices */
 
@@ -833,7 +833,7 @@ static int ibmlana_tx(struct sk_buff *skb, struct net_device *dev)
 	if (tmplen < 60)
 		tmplen = 60;
 	baddr = priv->txbufstart + (priv->nexttxdescr * PKTSIZE);
-	isa_memcpy_to_io(dev->mem_start + baddr, skb->data, skb->len);
+	isa_memcpy_toio(dev->mem_start + baddr, skb->data, skb->len);
 
 	/* copy filler into RAM - in case we're filling up... 
 	   we're filling a bit more than necessary, but that doesn't harm
@@ -845,7 +845,7 @@ static int ibmlana_tx(struct sk_buff *skb, struct net_device *dev)
 		unsigned int destoffs = skb->len, l = strlen(fill);
 
 		while (destoffs < tmplen) {
-			isa_memcpy_to_io(dev->mem_start + baddr + destoffs, fill, l);
+			isa_memcpy_toio(dev->mem_start + baddr + destoffs, fill, l);
 			destoffs += l;
 		}
 	}
@@ -854,7 +854,7 @@ static int ibmlana_tx(struct sk_buff *skb, struct net_device *dev)
 	addr = priv->tdastart + (priv->nexttxdescr * sizeof(tda_t));
 	isa_memcpy_fromio(&tda, dev->mem_start + addr, sizeof(tda_t));
 	tda.length = tda.fraglength = tmplen;
-	isa_memcpy_to_io(dev->mem_start + addr, &tda, sizeof(tda_t));
+	isa_memcpy_toio(dev->mem_start + addr, &tda, sizeof(tda_t));
 
 	/* if there were no active descriptors, trigger the SONIC */
 	spin_lock_irqsave(&priv->lock, flags);

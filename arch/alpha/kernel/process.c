@@ -245,11 +245,10 @@ release_thread(struct task_struct *dead_task)
  */
 int
 alpha_clone(unsigned long clone_flags, unsigned long usp,
-	    struct switch_stack * swstack)
+	    int *user_tid, struct switch_stack * swstack)
 {
 	struct task_struct *p;
 	struct pt_regs *u_regs = (struct pt_regs *) (swstack+1);
-	int *user_tid = (int *)u_regs->r19;
 
 	if (!usp)
 		usp = rdusp();
@@ -313,6 +312,16 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	childti->pcb.usp = usp;
 	childti->pcb.ksp = (unsigned long) childstack;
 	childti->pcb.flags = 1;	/* set FEN, clear everything else */
+
+	/* Set a new TLS for the child thread?  Peek back into the
+	   syscall arguments that we saved on syscall entry.  */
+	/* Note: if CLONE_SETTLS is not set, then we must inherit the
+	   value from the parent, which will have been set by the block
+	   copy in dup_task_struct.  This is non-intuitive, but is
+	   required for proper operation in the case of a threaded
+	   application calling fork.  */
+	if (clone_flags & CLONE_SETTLS)
+		childti->pcb.unique = regs->r19;
 
 	return 0;
 }

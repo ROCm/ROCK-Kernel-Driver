@@ -164,8 +164,6 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define SCSI_OWNER_BH_HANDLER     0x104
 #define SCSI_OWNER_NOBODY         0x105
 
-#define COMMAND_SIZE(opcode) scsi_command_size[((opcode) >> 5) & 7]
-
 #define IDENTIFY_BASE       0x80
 #define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\
 		     ((can_disconnect) ?  0x40 : 0) |\
@@ -415,7 +413,6 @@ extern unsigned int scsi_dma_free_sectors;	/* How much room do we have left */
 extern unsigned int scsi_need_isa_buffer;	/* True if some devices need indirection
 						   * buffers */
 extern volatile int in_scan_scsis;
-extern const unsigned char scsi_command_size[8];
 
 extern struct bus_type scsi_driverfs_bus_type;
 

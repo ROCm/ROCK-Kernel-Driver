@@ -77,7 +77,7 @@
 
 	|section	8
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 |
 |	PTENRN, PTENRM, and PTENRP are arrays of powers of 10 rounded

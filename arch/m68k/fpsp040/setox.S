@@ -339,7 +339,7 @@
 
 	|section	8
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 L2:	.long	0x3FDC0000,0x82E30865,0x4361C4C6,0x00000000
 

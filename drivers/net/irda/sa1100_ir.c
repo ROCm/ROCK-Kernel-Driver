@@ -42,6 +42,8 @@
 #include <asm/mach-types.h>
 
 #include <asm/arch/assabet.h>
+#include <asm/arch/h3600.h>
+#include <asm/arch/yopy.h>
 
 #ifndef GPIO_IRDA_FIR
 #define GPIO_IRDA_FIR		(0)

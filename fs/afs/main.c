@@ -173,8 +173,8 @@ static void afs_discarding_peer(struct rxrpc_peer *peer)
 
 	_debug("Discarding peer %08x (rtt=%lu.%lumS)\n",
 	       ntohl(peer->addr.s_addr),
-	       peer->rtt/1000,
-	       peer->rtt%1000);
+	       (long)(peer->rtt/1000),
+	       (long)(peer->rtt%1000));
 
 	/* uncross-point the structs under a global lock */
 	spin_lock(&afs_server_peer_lock);

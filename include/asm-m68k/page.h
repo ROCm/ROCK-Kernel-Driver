@@ -124,6 +124,7 @@ extern __inline__ int get_order(unsigned long size)
 
 #ifndef CONFIG_SUN3
 
+#define WANT_PAGE_VIRTUAL
 #ifdef CONFIG_SINGLE_MEMORY_CHUNK
 extern unsigned long m68k_memoffset;
 

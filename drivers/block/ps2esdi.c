@@ -74,7 +74,7 @@ static int ps2esdi_geninit(void);
 
 static void do_ps2esdi_request(request_queue_t * q);
 
-static void ps2esdi_readwrite(int cmd, u_char drive, u_int block, u_int count);
+static void ps2esdi_readwrite(int cmd, struct request *req);
 
 static void ps2esdi_fill_cmd_block(u_short * cmd_blk, u_short cmd,
 u_short cyl, u_short head, u_short sector, u_short length, u_char drive);
@@ -567,7 +567,7 @@ static void ps2esdi_readwrite(int cmd, struct request *req)
 	struct ps2esdi_i_struct *p = req->rq_disk->private_data;
 	unsigned block = req->sector;
 	unsigned count = req->current_nr_sectors;
-	int drive = DEVICE_NR(req->rq_dev);
+	int drive = p - ps2esdi_info;
 	u_short track, head, cylinder, sector;
 	u_short cmd_blk[TYPE_1_CMD_BLK_LENGTH];
 

@@ -29,7 +29,7 @@
 
 	|section	8
 
-	.include "fpsp.h"
+#include "fpsp.h"
 
 	|xref	t_ovfl2
 	|xref	t_unfl

@@ -31,31 +31,63 @@
 #include "generic.h"
 
 /*
+ * Various clock factors driven by the CCCR register.
+ */
+
+/* Crystal Frequency to Memory Frequency Multiplier (L) */
+static unsigned char L_clk_mult[32] = { 0, 27, 32, 36, 40, 45, 0, };
+
+/* Memory Frequency to Run Mode Frequency Multiplier (M) */
+static unsigned char M_clk_mult[4] = { 0, 1, 2, 0 };
+
+/* Run Mode Frequency to Turbo Mode Frequency Multiplier (N) */
+/* Note: we store the value N * 2 here. */
+static unsigned char N2_clk_mult[8] = { 0, 0, 2, 3, 4, 0, 6, 0 };
+
+/* Crystal clock */
+#define BASE_CLK	3686400
+
+
+/*
+ * Display what we were booted with.
+ */
+static int __init pxa_display_clocks(void)
+{
+	unsigned long cccr, turbo;
+	unsigned int l, L, m, M, n2, N;
+
+	cccr = CCCR;
+	asm( "mrc\tp14, 0, %0, c6, c0, 0" : "=r" (turbo) );
+
+	l  =  L_clk_mult[(cccr >> 0) & 0x1f];
+	m  =  M_clk_mult[(cccr >> 5) & 0x03];
+	n2 = N2_clk_mult[(cccr >> 7) & 0x07];
+
+	L = l * BASE_CLK;
+	M = m * L;
+	N = n2 * M / 2;
+
+	L += 5000;
+	printk( KERN_INFO "Memory clock: %d.%02dMHz (*%d)\n",
+		L / 1000000, (L % 1000000) / 10000, l );
+	M += 5000;
+	printk( KERN_INFO "Run Mode clock: %d.%02dMHz (*%d)\n",
+		M / 1000000, (M % 1000000) / 10000, m );
+	N += 5000;
+	printk( KERN_INFO "Turbo Mode clock: %d.%02dMHz (*%d.%d, %sactive)\n",
+		N / 1000000, (N % 1000000) / 10000, n2 / 2, (n2 % 2) * 5,
+		(turbo & 1) ? "" : "in" );
+
+	return 0;
+}
+
+
+/*
  * Return the current lclk requency in units of 10kHz
  */
 unsigned int get_lclk_frequency_10khz(void)
 {
-	unsigned int l;
-
-	l = CCCR & 0x1f;
-
-	switch(l)
-	{
-		case 1:
-			return 9953;
-		case 2:
-			return 11796;
-		case 3:
-			return 13271;
-		case 4:
-			return 14746;
-		case 5:
-			return 16589;
-		case 0xf:
-			return 3320;
-		default:
-			return 0;
-	}
+	return L_clk_mult[(CCCR >> 0) & 0x1f] * BASE_CLK / 10000;
 }
 
 EXPORT_SYMBOL(get_lclk_frequency_10khz);
@@ -100,4 +132,5 @@ static struct map_desc standard_io_desc[] __initdata = {
 void __init pxa_map_io(void)
 {
 	iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
+	pxa_display_clocks();
 }

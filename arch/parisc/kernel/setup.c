@@ -143,10 +143,8 @@ void __init setup_arch(char **cmdline_p)
 	dma_ops_init();
 #endif
 
-#ifdef CONFIG_VT
-# if defined(CONFIG_STI_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
+#ifdef CONFIG_DUMMY_CONSOLE
         conswitchp = &dummy_con;        /* we use take_over_console() later ! */
-# endif
 #endif
 
 }

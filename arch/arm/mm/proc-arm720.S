@@ -31,6 +31,7 @@
  *   08-25-2000	DBS	Updated for integration of ARM Ltd version.
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
@@ -177,7 +178,7 @@ cpu_arm720_name:
 		.asciz	"ARM720T"
 		.align
 
-		.section ".text.init", #alloc, #execinstr
+		__INIT
 
 __arm720_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c7, 0		@ invalidate caches

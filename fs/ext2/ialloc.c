@@ -209,9 +209,7 @@ static void ext2_preread_inode(struct inode *inode)
  * For other inodes, search forward from the parent directory\'s block
  * group to find a free inode.
  */
-#if 0
-
-static int find_group_dir(struct super_block *sb, int parent_group)
+static int find_group_dir(struct super_block *sb, struct inode *parent)
 {
 	struct ext2_super_block * es = EXT2_SB(sb)->s_es;
 	int ngroups = EXT2_SB(sb)->s_groups_count;
@@ -243,7 +241,6 @@ static int find_group_dir(struct super_block *sb, int parent_group)
 	mark_buffer_dirty(best_bh);
 	return best_group;
 }
-#endif
 
 /* 
  * Orlov's allocator for directories. 
@@ -289,7 +286,8 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent)
 	struct ext2_group_desc *desc;
 	struct buffer_head *bh;
 
-	if (parent == sb->s_root->d_inode) {
+	if ((parent == sb->s_root->d_inode) ||
+	    (parent->i_flags & EXT2_TOPDIR_FL)) {
 		struct ext2_group_desc *best_desc = NULL;
 		struct buffer_head *best_bh = NULL;
 		int best_ndir = inodes_per_group;
@@ -342,7 +340,7 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent)
 		desc = ext2_get_group_desc (sb, group, &bh);
 		if (!desc || !desc->bg_free_inodes_count)
 			continue;
-		if (sbi->debts[group] >= max_debt)
+		if (sbi->s_debts[group] >= max_debt)
 			continue;
 		if (le16_to_cpu(desc->bg_used_dirs_count) >= max_dirs)
 			continue;
@@ -447,9 +445,12 @@ struct inode * ext2_new_inode(struct inode * dir, int mode)
 	lock_super (sb);
 	es = EXT2_SB(sb)->s_es;
 repeat:
-	if (S_ISDIR(mode))
-		group = find_group_orlov(sb, dir);
-	else 
+	if (S_ISDIR(mode)) {
+		if (test_opt (sb, OLDALLOC))
+			group = find_group_dir(sb, dir);
+		else
+			group = find_group_orlov(sb, dir);
+	} else 
 		group = find_group_other(sb, dir);
 
 	err = -ENOSPC;
@@ -488,11 +489,11 @@ repeat:
 		cpu_to_le32(le32_to_cpu(es->s_free_inodes_count) - 1);
 
 	if (S_ISDIR(mode)) {
-		if (EXT2_SB(sb)->debts[group] < 255)
-			EXT2_SB(sb)->debts[group]++;
+		if (EXT2_SB(sb)->s_debts[group] < 255)
+			EXT2_SB(sb)->s_debts[group]++;
 	} else {
-		if (EXT2_SB(sb)->debts[group])
-			EXT2_SB(sb)->debts[group]--;
+		if (EXT2_SB(sb)->s_debts[group])
+			EXT2_SB(sb)->s_debts[group]--;
 	}
 
 	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);

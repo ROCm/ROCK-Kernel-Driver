@@ -31,18 +31,27 @@ SECTIONS
 	*(__ksymtab)
 	__stop___ksymtab = .;
   }
+
+  /* All kernel symbols */
+  __kallsyms ALIGN(8) : {
+	__start___kallsyms = .;
+	*(__kallsyms)
+	__stop___kallsyms = .;
+  }
+
   .kstrtab : { *(.kstrtab) }
+  .rodata : { *(.rodata) *(.rodata.*) }
 
   /* Startup code */
-  .text.init ALIGN(8192) : {
+  .init.text ALIGN(8192) : {
 	__init_begin = .;
-	*(.text.init)
+	*(.init.text)
   }
-  .data.init : { *(.data.init) }
+  .init.data : { *(.init.data) }
 
-  .setup.init ALIGN(16): {
+  .init.setup ALIGN(16): {
 	__setup_start = .;
-	*(.setup.init)
+	*(.init.setup)
 	__setup_end = .;
   }
 
@@ -58,6 +67,12 @@ SECTIONS
 	__initcall_end = .;
   }
 
+  .init.ramfs ALIGN(8192): {
+	__initramfs_start = .;
+	*(.init.initramfs)
+	__initramfs_end = .;
+  }
+
   .data.percpu ALIGN(64): {
 	__per_cpu_start = .;
 	*(.data.percpu)
@@ -71,11 +86,11 @@ SECTIONS
   }
 
   /* Global data */
-  .data.cacheline_aligned : {
+  .data.page_aligned ALIGN(8192) : {
 	_data = .;
-	*(.data.cacheline_aligned)
+	*(.data.page_aligned) 
   }
-  .rodata : { *(.rodata) *(.rodata.*) }
+  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
   .data : { *(.data) CONSTRUCTORS }
   .got : { *(.got) }
   .sdata : {
@@ -120,5 +135,5 @@ SECTIONS
   .debug_typenames 0 : { *(.debug_typenames) }
   .debug_varnames  0 : { *(.debug_varnames) }
 
-  /DISCARD/ : { *(.text.exit) *(.data.exit) *(.exitcall.exit) }
+  /DISCARD/ : { *(.exit.text) *(.exit.data) *(.exitcall.exit) }
 }

@@ -92,6 +92,8 @@ extern int inia100_biosparam(struct scsi_device *, struct block_device *,
 	detect:		inia100_detect, \
 	release:	inia100_release, \
 	queuecommand:	inia100_queue, \
+	abort:		inia100_abort, \
+	reset:		inia100_reset, \
 	can_queue:	1, \
 	this_id:	1, \
 	sg_tablesize:	SG_ALL, \

@@ -43,6 +43,7 @@
 #include <linux/init.h>
 #include <linux/isapnp.h>
 #include <linux/pnp.h>
+#include <asm/io.h>
 
 LIST_HEAD(isapnp_cards);
 LIST_HEAD(isapnp_devices);

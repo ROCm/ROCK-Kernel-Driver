@@ -51,7 +51,6 @@ int blk_do_rq(request_queue_t *q, struct block_device *bdev, struct request *rq)
 	DECLARE_COMPLETION(wait);
 	int err = 0;
 
-	rq->rq_dev = to_kdev_t(bdev->bd_dev);
 	rq->rq_disk = bdev->bd_disk;
 
 	/*
@@ -227,6 +226,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	/*
 	 * fill in request structure
 	 */
+	rq->cmd_len = hdr.cmd_len;
 	copy_from_user(rq->cmd, hdr.cmdp, hdr.cmd_len);
 	if (sizeof(rq->cmd) != hdr.cmd_len)
 		memset(rq->cmd + hdr.cmd_len, 0, sizeof(rq->cmd) - hdr.cmd_len);
@@ -349,6 +349,7 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 	 * get command and data to send to device, if any
 	 */
 	err = -EFAULT;
+	rq->cmd_len = cmdlen;
 	if (copy_from_user(rq->cmd, sic->data, cmdlen))
 		goto error;
 
@@ -463,6 +464,7 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			memset(rq->cmd, 0, sizeof(rq->cmd));
 			rq->cmd[0] = GPCMD_START_STOP_UNIT;
 			rq->cmd[4] = 0x02 + (close != 0);
+			rq->cmd_len = 6;
 			err = blk_do_rq(q, bdev, rq);
 			blk_put_request(rq);
 			break;

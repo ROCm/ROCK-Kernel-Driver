@@ -691,12 +691,12 @@ static void rxrpc_trans_receive_error_report(struct rxrpc_transport *trans)
 		msg.msg_controllen = (char*)msg.msg_control - (char*)&emsg;
 
 		if (msg.msg_controllen<sizeof(emsg.cmsg) || msg.msg_namelen<sizeof(sin)) {
-			printk("%s: short control message (nlen=%u clen=%u fl=%x)\n",
+			printk("%s: short control message (nlen=%u clen=%Zu fl=%x)\n",
 			       __FUNCTION__,msg.msg_namelen,msg.msg_controllen,msg.msg_flags);
 			continue;
 		}
 
-		_net("Rx Received control message { len=%u level=%u type=%u }",
+		_net("Rx Received control message { len=%Zu level=%u type=%u }",
 		     emsg.cmsg.cmsg_len,emsg.cmsg.cmsg_level,emsg.cmsg.cmsg_type);
 
 		if (sin.sin_family!=AF_INET) {
@@ -715,7 +715,7 @@ static void rxrpc_trans_receive_error_report(struct rxrpc_transport *trans)
 		}
 
 		if (msg.msg_controllen<sizeof(emsg.cmsg)+sizeof(emsg.ee)) {
-			printk("%s: short error message (%u)\n",__FUNCTION__,msg.msg_controllen);
+			printk("%s: short error message (%Zu)\n",__FUNCTION__,msg.msg_controllen);
 			_leave("");
 			return;
 		}

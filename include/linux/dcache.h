@@ -7,6 +7,7 @@
 #include <linux/mount.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/cache.h>
 #include <asm/page.h>			/* for BUG() */
 
 /*
@@ -64,7 +65,7 @@ static __inline__ unsigned int full_name_hash(const unsigned char * name, unsign
 	return end_name_hash(hash);
 }
 
-#define DNAME_INLINE_LEN 16
+#define DNAME_INLINE_LEN_MIN 16
 
 struct dcookie_struct;
  
@@ -85,10 +86,12 @@ struct dentry {
 	struct super_block * d_sb;	/* The root of the dentry tree */
 	unsigned long d_vfs_flags;
 	void * d_fsdata;		/* fs-specific data */
-	unsigned char d_iname[DNAME_INLINE_LEN]; /* small names */
 	struct dcookie_struct * d_cookie; /* cookie, if any */
-};
+	unsigned char d_iname[DNAME_INLINE_LEN_MIN]; /* small names */
+} ____cacheline_aligned;
 
+#define DNAME_INLINE_LEN	(sizeof(struct dentry)-offsetof(struct dentry,d_iname))
+ 
 struct dentry_operations {
 	int (*d_revalidate)(struct dentry *, int);
 	int (*d_hash) (struct dentry *, struct qstr *);

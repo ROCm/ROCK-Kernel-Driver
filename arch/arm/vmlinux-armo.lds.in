@@ -11,7 +11,7 @@ SECTIONS
 	.init : {			/* Init code and data		*/
 		_stext = .;
 		__init_begin = .;
-			*(.text.init)
+			*(.init.text)
 		__proc_info_begin = .;
 			*(.proc.info)
 		__proc_info_end = .;
@@ -21,10 +21,10 @@ SECTIONS
 		__tagtable_begin = .;
 			*(.taglist)
 		__tagtable_end = .;
-			*(.data.init)
+			*(.init.data)
 		. = ALIGN(16);
 		__setup_start = .;
-			*(.setup.init)
+			*(.init.setup)
 		__setup_end = .;
 		__initcall_start = .;
 			*(.initcall1.init)
@@ -44,8 +44,8 @@ SECTIONS
 	}
 
 	/DISCARD/ : {			/* Exit code and data		*/
-		*(.text.exit)
-		*(.data.exit)
+		*(.exit.text)
+		*(.exit.data)
 		*(.exitcall.exit)
 	}
 

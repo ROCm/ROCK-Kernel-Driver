@@ -251,6 +251,11 @@ static int __init longrun_init(void)
 
 	longrun_get_policy(&driver->policy[0]);
 
+#ifdef CONFIG_CPU_FREQ_24_API
+	driver->cpu_min_freq    = longrun_low_freq;
+	driver->cpu_cur_freq[0] = longrun_high_freq; /* dummy value */
+#endif
+
 	driver->verify         = &longrun_verify_policy;
 	driver->setpolicy      = &longrun_set_policy;
 	result = cpufreq_register(driver);

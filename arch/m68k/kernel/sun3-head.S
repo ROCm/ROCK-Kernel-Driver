@@ -16,9 +16,6 @@ SUN3_INVALID_PMEG = 255
 .globl bootup_user_stack
 .globl bootup_kernel_stack
 .globl pg0
-.globl empty_bad_page
-.globl empty_bad_page_table
-.globl empty_zero_page
 .globl swapper_pg_dir
 .globl kernel_pmd_table
 .globl availmem
@@ -27,10 +24,7 @@ SUN3_INVALID_PMEG = 255
 | todo: all these should be in bss!
 swapper_pg_dir:                .skip 0x2000
 pg0:                           .skip 0x2000
-empty_bad_page:                .skip 0x2000
-empty_bad_page_table:          .skip 0x2000
 kernel_pmd_table:              .skip 0x2000
-empty_zero_page:               .skip 0x2000
 
 .globl kernel_pg_dir
 .equ    kernel_pg_dir,kernel_pmd_table
