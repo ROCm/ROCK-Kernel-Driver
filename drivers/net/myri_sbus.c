@@ -1085,7 +1085,7 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 #endif
 	return 0;
 err:	unregister_netdev(dev);
-	kfree(dev->priv);
+	/* This will also free the co-allocated 'dev->priv' */
 	kfree(dev);
 	return -ENODEV;
 }
@@ -1142,8 +1142,8 @@ static void __exit myri_sbus_cleanup(void)
 		struct myri_eth *next = root_myri_dev->next_module;
 
 		unregister_netdev(root_myri_dev->dev);
+		/* this will also free the co-allocated 'root_myri_dev' */
 		kfree(root_myri_dev->dev);
-		kfree(root_myri_dev);
 		root_myri_dev = next;
 	}
 #endif /* MODULE */
