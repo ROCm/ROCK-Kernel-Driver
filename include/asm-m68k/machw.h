@@ -51,7 +51,7 @@ struct MAC_5380 {
 /*
 ** SCC Z8530
 */
- 
+
 #define MAC_SCC_BAS (0x50F04000)
 struct MAC_SCC
  {

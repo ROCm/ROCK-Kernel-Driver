@@ -5,10 +5,10 @@ M68060 Software Package
 Production Release P1.00 -- October 10, 1994
 
 M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
- 
+
 THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 To the maximum extent permitted by applicable law,
-MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 and any warranty against infringement with regard to the SOFTWARE
 (INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -89,7 +89,7 @@ _060FPSP_TABLE:
 	bra.l		_fpsp_effadd
 	short		0x0000
 
-	space 		56
+	space		56
 
 ###############################################################
 	global		_fpsp_done
@@ -323,33 +323,33 @@ set EXC_D2,		EXC_DREGS+(2*4)
 set EXC_D1,		EXC_DREGS+(1*4)
 set EXC_D0,		EXC_DREGS+(0*4)
 
-set EXC_FP0, 		EXC_FPREGS+(0*12)	# offset of saved fp0
-set EXC_FP1, 		EXC_FPREGS+(1*12)	# offset of saved fp1
-set EXC_FP2, 		EXC_FPREGS+(2*12)	# offset of saved fp2 (not used)
+set EXC_FP0,		EXC_FPREGS+(0*12)	# offset of saved fp0
+set EXC_FP1,		EXC_FPREGS+(1*12)	# offset of saved fp1
+set EXC_FP2,		EXC_FPREGS+(2*12)	# offset of saved fp2 (not used)
 
-set FP_SCR1, 		LV+80			# fp scratch 1
-set FP_SCR1_EX, 	FP_SCR1+0
+set FP_SCR1,		LV+80			# fp scratch 1
+set FP_SCR1_EX,		FP_SCR1+0
 set FP_SCR1_SGN,	FP_SCR1+2
-set FP_SCR1_HI, 	FP_SCR1+4
-set FP_SCR1_LO, 	FP_SCR1+8
+set FP_SCR1_HI,		FP_SCR1+4
+set FP_SCR1_LO,		FP_SCR1+8
 
-set FP_SCR0, 		LV+68			# fp scratch 0
-set FP_SCR0_EX, 	FP_SCR0+0
+set FP_SCR0,		LV+68			# fp scratch 0
+set FP_SCR0_EX,		FP_SCR0+0
 set FP_SCR0_SGN,	FP_SCR0+2
-set FP_SCR0_HI, 	FP_SCR0+4
-set FP_SCR0_LO, 	FP_SCR0+8
+set FP_SCR0_HI,		FP_SCR0+4
+set FP_SCR0_LO,		FP_SCR0+8
 
-set FP_DST, 		LV+56			# fp destination operand
-set FP_DST_EX, 		FP_DST+0
+set FP_DST,		LV+56			# fp destination operand
+set FP_DST_EX,		FP_DST+0
 set FP_DST_SGN,		FP_DST+2
-set FP_DST_HI, 		FP_DST+4
-set FP_DST_LO, 		FP_DST+8
+set FP_DST_HI,		FP_DST+4
+set FP_DST_LO,		FP_DST+8
 
-set FP_SRC, 		LV+44			# fp source operand
-set FP_SRC_EX, 		FP_SRC+0
+set FP_SRC,		LV+44			# fp source operand
+set FP_SRC_EX,		FP_SRC+0
 set FP_SRC_SGN,		FP_SRC+2
-set FP_SRC_HI, 		FP_SRC+4
-set FP_SRC_LO, 		FP_SRC+8
+set FP_SRC_HI,		FP_SRC+4
+set FP_SRC_LO,		FP_SRC+8
 
 set USER_FPIAR,		LV+40			# FP instr address register
 
@@ -373,7 +373,7 @@ set EXC_TEMP2,		LV+24			# temporary space
 set EXC_TEMP,		LV+16			# temporary space
 
 set DTAG,		LV+15			# destination operand type
-set STAG, 		LV+14			# source operand type
+set STAG,		LV+14			# source operand type
 
 set SPCOND_FLG,		LV+10			# flag: special case (see below)
 
@@ -388,17 +388,17 @@ set EXC_OPWORD,		LV+0			# saved operation word
 # Helpful macros
 
 set FTEMP,		0			# offsets within an
-set FTEMP_EX, 		0			# extended precision
+set FTEMP_EX,		0			# extended precision
 set FTEMP_SGN,		2			# value saved in memory.
-set FTEMP_HI, 		4
-set FTEMP_LO, 		8
+set FTEMP_HI,		4
+set FTEMP_LO,		8
 set FTEMP_GRS,		12
 
 set LOCAL,		0			# offsets within an
-set LOCAL_EX, 		0			# extended precision 
+set LOCAL_EX,		0			# extended precision
 set LOCAL_SGN,		2			# value saved in memory.
-set LOCAL_HI, 		4
-set LOCAL_LO, 		8
+set LOCAL_HI,		4
+set LOCAL_LO,		8
 set LOCAL_GRS,		12
 
 set DST,		0			# offsets within an
@@ -488,17 +488,17 @@ set ainex_mask,		0x00000008		# accrued inexact
 ######################################
 set dzinf_mask,		inf_mask+dz_mask+adz_mask
 set opnan_mask,		nan_mask+operr_mask+aiop_mask
-set nzi_mask,		0x01ffffff 		#clears N, Z, and I
+set nzi_mask,		0x01ffffff		#clears N, Z, and I
 set unfinx_mask,	unfl_mask+inex2_mask+aunfl_mask+ainex_mask
 set unf2inx_mask,	unfl_mask+inex2_mask+ainex_mask
 set ovfinx_mask,	ovfl_mask+inex2_mask+aovfl_mask+ainex_mask
 set inx1a_mask,		inex1_mask+ainex_mask
 set inx2a_mask,		inex2_mask+ainex_mask
-set snaniop_mask, 	nan_mask+snan_mask+aiop_mask
+set snaniop_mask,	nan_mask+snan_mask+aiop_mask
 set snaniop2_mask,	snan_mask+aiop_mask
 set naniop_mask,	nan_mask+aiop_mask
 set neginf_mask,	neg_mask+inf_mask
-set infaiop_mask, 	inf_mask+aiop_mask
+set infaiop_mask,	inf_mask+aiop_mask
 set negz_mask,		neg_mask+z_mask
 set opaop_mask,		operr_mask+aiop_mask
 set unfl_inx_mask,	unfl_mask+aunfl_mask+ainex_mask
@@ -527,8 +527,8 @@ set rp_mode,		0x3			# round-to-plus-infinity
 set mantissalen,	64			# length of mantissa in bits
 
 set BYTE,		1			# len(byte) == 1 byte
-set WORD, 		2			# len(word) == 2 bytes
-set LONG, 		4			# len(longword) == 2 bytes
+set WORD,		2			# len(word) == 2 bytes
+set LONG,		4			# len(longword) == 2 bytes
 
 set BSUN_VEC,		0xc0			# bsun    vector offset
 set INEX_VEC,		0xc4			# inexact vector offset
@@ -598,7 +598,7 @@ TWOBYPI:
 # INPUT ***************************************************************	#
 #	- The system stack contains the FP Ovfl exception stack frame	#
 #	- The fsave frame contains the source operand			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	Overflow Exception enabled:					#
 #	- The system stack is unchanged					#
@@ -609,24 +609,24 @@ TWOBYPI:
 #									#
 # ALGORITHM ***********************************************************	#
 #	On the 060, if an FP overflow is present as the result of any	#
-# instruction, the 060 will take an overflow exception whether the 	#
-# exception is enabled or disabled in the FPCR. For the disabled case, 	#
+# instruction, the 060 will take an overflow exception whether the	#
+# exception is enabled or disabled in the FPCR. For the disabled case,	#
 # This handler emulates the instruction to determine what the correct	#
 # default result should be for the operation. This default result is	#
-# then stored in either the FP regfile, data regfile, or memory. 	#
-# Finally, the handler exits through the "callout" _fpsp_done() 	#
+# then stored in either the FP regfile, data regfile, or memory.	#
+# Finally, the handler exits through the "callout" _fpsp_done()		#
 # denoting that no exceptional conditions exist within the machine.	#
-# 	If the exception is enabled, then this handler must create the	#
+#	If the exception is enabled, then this handler must create the	#
 # exceptional operand and plave it in the fsave state frame, and store	#
-# the default result (only if the instruction is opclass 3). For 	#
-# exceptions enabled, this handler must exit through the "callout" 	#
+# the default result (only if the instruction is opclass 3). For	#
+# exceptions enabled, this handler must exit through the "callout"	#
 # _real_ovfl() so that the operating system enabled overflow handler	#
 # can handle this case.							#
-#	Two other conditions exist. First, if overflow was disabled 	#
-# but the inexact exception was enabled, this handler must exit 	#
+#	Two other conditions exist. First, if overflow was disabled	#
+# but the inexact exception was enabled, this handler must exit		#
 # through the "callout" _real_inex() regardless of whether the result	#
 # was inexact.								#
-#	Also, in the case of an opclass three instruction where 	#
+#	Also, in the case of an opclass three instruction where		#
 # overflow was disabled and the trace exception was enabled, this	#
 # handler must exit through the "callout" _real_trace().		#
 #									#
@@ -641,9 +641,9 @@ _fpsp_ovfl:
 
 	fsave		FP_SRC(%a6)		# grab the "busy" frame
 
- 	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
+	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
 	fmovm.l		%fpcr,%fpsr,%fpiar,USER_FPCR(%a6) # save ctrl regs
- 	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
+	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
 
 # the FPIAR holds the "current PC" of the faulting instruction
 	mov.l		USER_FPIAR(%a6),EXC_EXTWPTR(%a6)
@@ -667,7 +667,7 @@ _fpsp_ovfl:
 	bsr.l		set_tag_x		# tag the operand type
 	mov.b		%d0,STAG(%a6)		# maybe NORM,DENORM
 
-# bit five of the fp extension word separates the monadic and dyadic operations 
+# bit five of the fp extension word separates the monadic and dyadic operations
 # that can pass through fpsp_ovfl(). remember that fcmp, ftst, and fsincos
 # will never take this exception.
 	btst		&0x5,1+EXC_CMDREG(%a6)	# is operation monadic or dyadic?
@@ -740,7 +740,7 @@ fovfl_extract:
 fovfl_ovfl_on:
 	fmovm.x		&0x40,FP_SRC(%a6)	# save EXOP (fp1) to stack
 
-	mov.w		&0xe005,2+FP_SRC(%a6) 	# save exc status
+	mov.w		&0xe005,2+FP_SRC(%a6)	# save exc status
 
 	fmovm.x		EXC_FPREGS(%a6),&0xc0	# restore fp0-fp1
 	fmovm.l		USER_FPCR(%a6),%fpcr,%fpsr,%fpiar # restore ctrl regs
@@ -756,10 +756,10 @@ fovfl_ovfl_on:
 # we must jump to real_inex().
 fovfl_inex_on:
 
-	fmovm.x		&0x40,FP_SRC(%a6) 	# save EXOP (fp1) to stack
+	fmovm.x		&0x40,FP_SRC(%a6)	# save EXOP (fp1) to stack
 
 	mov.b		&0xc4,1+EXC_VOFF(%a6)	# vector offset = 0xc4
-	mov.w		&0xe001,2+FP_SRC(%a6) 	# save exc status
+	mov.w		&0xe001,2+FP_SRC(%a6)	# save exc status
 
 	fmovm.x		EXC_FPREGS(%a6),&0xc0	# restore fp0-fp1
 	fmovm.l		USER_FPCR(%a6),%fpcr,%fpsr,%fpiar # restore ctrl regs
@@ -810,7 +810,7 @@ fovfl_out:
 	btst		&0x7,(%sp)		# is trace on?
 	beq.l		_fpsp_done		# no
 
-	fmov.l		%fpiar,0x8(%sp)		# "Current PC" is in FPIAR	
+	fmov.l		%fpiar,0x8(%sp)		# "Current PC" is in FPIAR
 	mov.w		&0x2024,0x6(%sp)	# stk fmt = 0x2; voff = 0x024
 	bra.l		_real_trace
 
@@ -838,7 +838,7 @@ fovfl_out:
 # INPUT ***************************************************************	#
 #	- The system stack contains the FP Unfl exception stack frame	#
 #	- The fsave frame contains the source operand			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	Underflow Exception enabled:					#
 #	- The system stack is unchanged					#
@@ -849,24 +849,24 @@ fovfl_out:
 #									#
 # ALGORITHM ***********************************************************	#
 #	On the 060, if an FP underflow is present as the result of any	#
-# instruction, the 060 will take an underflow exception whether the 	#
-# exception is enabled or disabled in the FPCR. For the disabled case, 	#
+# instruction, the 060 will take an underflow exception whether the	#
+# exception is enabled or disabled in the FPCR. For the disabled case,	#
 # This handler emulates the instruction to determine what the correct	#
 # default result should be for the operation. This default result is	#
-# then stored in either the FP regfile, data regfile, or memory. 	#
-# Finally, the handler exits through the "callout" _fpsp_done() 	#
+# then stored in either the FP regfile, data regfile, or memory.	#
+# Finally, the handler exits through the "callout" _fpsp_done()		#
 # denoting that no exceptional conditions exist within the machine.	#
-# 	If the exception is enabled, then this handler must create the	#
+#	If the exception is enabled, then this handler must create the	#
 # exceptional operand and plave it in the fsave state frame, and store	#
-# the default result (only if the instruction is opclass 3). For 	#
-# exceptions enabled, this handler must exit through the "callout" 	#
+# the default result (only if the instruction is opclass 3). For	#
+# exceptions enabled, this handler must exit through the "callout"	#
 # _real_unfl() so that the operating system enabled overflow handler	#
 # can handle this case.							#
-#	Two other conditions exist. First, if underflow was disabled 	#
-# but the inexact exception was enabled and the result was inexact, 	#
+#	Two other conditions exist. First, if underflow was disabled	#
+# but the inexact exception was enabled and the result was inexact,	#
 # this handler must exit through the "callout" _real_inex().		#
 # was inexact.								#
-#	Also, in the case of an opclass three instruction where 	#
+#	Also, in the case of an opclass three instruction where		#
 # underflow was disabled and the trace exception was enabled, this	#
 # handler must exit through the "callout" _real_trace().		#
 #									#
@@ -881,12 +881,12 @@ _fpsp_unfl:
 
 	fsave		FP_SRC(%a6)		# grab the "busy" frame
 
- 	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
+	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
 	fmovm.l		%fpcr,%fpsr,%fpiar,USER_FPCR(%a6) # save ctrl regs
- 	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
+	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
 
 # the FPIAR holds the "current PC" of the faulting instruction
-	mov.l		USER_FPIAR(%a6),EXC_EXTWPTR(%a6)	
+	mov.l		USER_FPIAR(%a6),EXC_EXTWPTR(%a6)
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
 	addq.l		&0x4,EXC_EXTWPTR(%a6)	# incr instruction ptr
 	bsr.l		_imem_read_long		# fetch the instruction words
@@ -905,13 +905,13 @@ _fpsp_unfl:
 	bsr.l		set_tag_x		# tag the operand type
 	mov.b		%d0,STAG(%a6)		# maybe NORM,DENORM
 
-# bit five of the fp ext word separates the monadic and dyadic operations 
+# bit five of the fp ext word separates the monadic and dyadic operations
 # that can pass through fpsp_unfl(). remember that fcmp, and ftst
 # will never take this exception.
 	btst		&0x5,1+EXC_CMDREG(%a6)	# is op monadic or dyadic?
 	beq.b		funfl_extract		# monadic
 
-# now, what's left that's not dyadic is fsincos. we can distinguish it 
+# now, what's left that's not dyadic is fsincos. we can distinguish it
 # from all dyadics by the '0110xxx pattern
 	btst		&0x4,1+EXC_CMDREG(%a6)	# is op an fsincos?
 	bne.b		funfl_extract		# yes
@@ -962,7 +962,7 @@ funfl_extract:
 # (0x00000000_80000000_00000000), then the machine will take an
 # underflow exception. Since this is incorrect, we need to check
 # if our emulation, after re-doing the operation, decided that
-# no underflow was called for. We do these checks only in 
+# no underflow was called for. We do these checks only in
 # funfl_{unfl,inex}_on() because w/ both exceptions disabled, this
 # special case will simply exit gracefully with the correct result.
 
@@ -1002,7 +1002,7 @@ funfl_unfl_on:
 funfl_unfl_on2:
 	fmovm.x		&0x40,FP_SRC(%a6)	# save EXOP (fp1) to stack
 
-	mov.w		&0xe003,2+FP_SRC(%a6) 	# save exc status
+	mov.w		&0xe003,2+FP_SRC(%a6)	# save exc status
 
 	fmovm.x		EXC_FPREGS(%a6),&0xc0	# restore fp0-fp1
 	fmovm.l		USER_FPCR(%a6),%fpcr,%fpsr,%fpiar # restore ctrl regs
@@ -1021,7 +1021,7 @@ funfl_inex_on:
 # The `060 FPU multiplier hardware is such that if the result of a
 # multiply operation is the smallest possible normalized number
 # (0x00000000_80000000_00000000), then the machine will take an
-# underflow exception. 
+# underflow exception.
 # But, whether bogus or not, if inexact is enabled AND it occurred,
 # then we have to branch to real_inex.
 
@@ -1030,10 +1030,10 @@ funfl_inex_on:
 
 funfl_inex_on2:
 
-	fmovm.x		&0x40,FP_SRC(%a6) 	# save EXOP to stack
+	fmovm.x		&0x40,FP_SRC(%a6)	# save EXOP to stack
 
 	mov.b		&0xc4,1+EXC_VOFF(%a6)	# vector offset = 0xc4
-	mov.w		&0xe001,2+FP_SRC(%a6) 	# save exc status
+	mov.w		&0xe001,2+FP_SRC(%a6)	# save exc status
 
 	fmovm.x		EXC_FPREGS(%a6),&0xc0	# restore fp0-fp1
 	fmovm.l		USER_FPCR(%a6),%fpcr,%fpsr,%fpiar # restore ctrl regs
@@ -1119,7 +1119,7 @@ funfl_out:
 # INPUT ***************************************************************	#
 #	- The system stack contains the "Unimp Data Type" stk frame	#
 #	- The fsave frame contains the ssrc op (for UNNORM/DENORM)	#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	If Inexact exception (opclass 3):				#
 #	- The system stack is changed to an Inexact exception stk frame	#
@@ -1138,12 +1138,12 @@ funfl_out:
 #									#
 # ALGORITHM ***********************************************************	#
 #	Two main instruction types can enter here: (1) DENORM or UNNORM	#
-# unimplemented data types. These can be either opclass 0,2 or 3 	#
+# unimplemented data types. These can be either opclass 0,2 or 3	#
 # instructions, and (2) PACKED unimplemented data format instructions	#
 # also of opclasses 0,2, or 3.						#
 #	For UNNORM/DENORM opclass 0 and 2, the handler fetches the src	#
 # operand from the fsave state frame and the dst operand (if dyadic)	#
-# from the FP register file. The instruction is then emulated by 	#
+# from the FP register file. The instruction is then emulated by	#
 # choosing an emulation routine from a table of routines indexed by	#
 # instruction type. Once the instruction has been emulated and result	#
 # saved, then we check to see if any enabled exceptions resulted from	#
@@ -1165,7 +1165,7 @@ funfl_out:
 # (a Trace stack frame must be created here, too). If an FP exception	#
 # should occur, then we must create an exception stack frame of that	#
 # type and jump to either _real_snan(), _real_operr(), _real_inex(),	#
-# _real_unfl(), or _real_ovfl() as appropriate. PACKED opclass 3 	#
+# _real_unfl(), or _real_ovfl() as appropriate. PACKED opclass 3	#
 # emulation is performed in a similar manner.				#
 #									#
 #########################################################################
@@ -1177,7 +1177,7 @@ funfl_out:
 #				*****************
 #				*      EA	*
 #	 pre-instruction	*		*
-# 	*****************	*****************
+#	*****************	*****************
 #	* 0x0 *  0x0dc  *	* 0x3 *  0x0dc  *
 #	*****************	*****************
 #	*     Next	*	*     Next	*
@@ -1206,9 +1206,9 @@ _fpsp_unsupp:
 
 	fsave		FP_SRC(%a6)		# save fp state
 
- 	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
+	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
 	fmovm.l		%fpcr,%fpsr,%fpiar,USER_FPCR(%a6) # save ctrl regs
- 	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
+	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
 
 	btst		&0x5,EXC_SR(%a6)	# user or supervisor mode?
 	bne.b		fu_s
@@ -1257,7 +1257,7 @@ fu_cont:
 	fmov.l		&0x0,%fpsr
 
 # Opclass two w/ memory-to-fpn operation will have an incorrect extended
-# precision format if the src format was single or double and the 
+# precision format if the src format was single or double and the
 # source data type was an INF, NAN, DENORM, or UNNORM
 	lea		FP_SRC(%a6),%a0		# pass ptr to input
 	bsr.l		fix_skewed_ops
@@ -1276,7 +1276,7 @@ fu_op2:
 
 	bfextu		EXC_CMDREG(%a6){&6:&3},%d0 # dyadic; load dst reg
 
-# bit five of the fp extension word separates the monadic and dyadic operations 
+# bit five of the fp extension word separates the monadic and dyadic operations
 # at this point
 	btst		&0x5,1+EXC_CMDREG(%a6)	# is operation monadic or dyadic?
 	beq.b		fu_extract		# monadic
@@ -1307,13 +1307,13 @@ fu_extract:
 
 #
 # Exceptions in order of precedence:
-# 	BSUN	: none
+#	BSUN	: none
 #	SNAN	: all dyadic ops
 #	OPERR	: fsqrt(-NORM)
 #	OVFL	: all except ftst,fcmp
 #	UNFL	: all except ftst,fcmp
 #	DZ	: fdiv
-# 	INEX2	: all except ftst,fcmp
+#	INEX2	: all except ftst,fcmp
 #	INEX1	: none (packed doesn't go through here)
 #
 
@@ -1350,16 +1350,16 @@ fu_in_ena:
 #
 # No exceptions occurred that were also enabled. Now:
 #
-#   	if (OVFL && ovfl_disabled && inexact_enabled) {
+#	if (OVFL && ovfl_disabled && inexact_enabled) {
 #	    branch to _real_inex() (even if the result was exact!);
-#     	} else {
+#	} else {
 #	    save the result in the proper fp reg (unless the op is fcmp or ftst);
 #	    return;
-#     	}
+#	}
 #
 	btst		&ovfl_bit,FPSR_EXCEPT(%a6) # was overflow set?
 	beq.b		fu_in_cont		# no
-	
+
 fu_in_ovflchk:
 	btst		&inex2_bit,FPCR_ENABLE(%a6) # was inexact enabled?
 	beq.b		fu_in_cont		# no
@@ -1379,7 +1379,7 @@ fu_in_ovflchk:
 #	} else {
 #		restore exc state (SNAN||OPERR||OVFL||UNFL||DZ||INEX) into the FPU;
 #	}
-#	    		
+#
 fu_in_exc:
 	subi.l		&24,%d0			# fix offset to be 0-8
 	cmpi.b		%d0,&0x6		# is exception INEX? (6)
@@ -1392,7 +1392,7 @@ fu_in_exc:
 	bne.w		fu_in_exc_ovfl		# yes
 
 # here, we insert the correct fsave status value into the fsave frame for the
-# corresponding exception. the operand in the fsave frame should be the original 
+# corresponding exception. the operand in the fsave frame should be the original
 # src operand.
 fu_in_exc_exit:
 	mov.l		%d0,-(%sp)		# save d0
@@ -1423,8 +1423,8 @@ fu_in_exc_ovfl:
 	bra.b		fu_in_exc_exit
 
 # If the input operand to this operation was opclass two and a single
-# or double precision denorm, inf, or nan, the operand needs to be 
-# "corrected" in order to have the proper equivalent extended precision 
+# or double precision denorm, inf, or nan, the operand needs to be
+# "corrected" in order to have the proper equivalent extended precision
 # number.
 	global		fix_skewed_ops
 fix_skewed_ops:
@@ -1452,7 +1452,7 @@ fso_sgl_dnrm:
 	bsr.l		norm			# normalize mantissa
 	neg.w		%d0			# -shft amt
 	addi.w		&0x3f81,%d0		# adjust new exponent
-	andi.w		&0x8000,LOCAL_EX(%a0) 	# clear old exponent
+	andi.w		&0x8000,LOCAL_EX(%a0)	# clear old exponent
 	or.w		%d0,LOCAL_EX(%a0)	# insert new exponent
 	rts
 
@@ -1461,7 +1461,7 @@ fso_zero:
 	rts
 
 fso_infnan:
-	andi.b		&0x7f,LOCAL_HI(%a0) 	# clear j-bit
+	andi.b		&0x7f,LOCAL_HI(%a0)	# clear j-bit
 	ori.w		&0x7fff,LOCAL_EX(%a0)	# make exponent = $7fff
 	rts
 
@@ -1484,7 +1484,7 @@ fso_dbl_dnrm:
 	bsr.l		norm			# normalize mantissa
 	neg.w		%d0			# -shft amt
 	addi.w		&0x3c01,%d0		# adjust new exponent
-	andi.w		&0x8000,LOCAL_EX(%a0) 	# clear old exponent
+	andi.w		&0x8000,LOCAL_EX(%a0)	# clear old exponent
 	or.w		%d0,LOCAL_EX(%a0)	# insert new exponent
 	rts
 
@@ -1536,13 +1536,13 @@ fu_out_cont:
 	bsr.l		fout			# call fmove out routine
 
 # Exceptions in order of precedence:
-# 	BSUN	: none
+#	BSUN	: none
 #	SNAN	: none
 #	OPERR	: fmove.{b,w,l} out of large UNNORM
 #	OVFL	: fmove.{s,d}
 #	UNFL	: fmove.{s,d,x}
 #	DZ	: none
-# 	INEX2	: all
+#	INEX2	: all
 #	INEX1	: none (packed doesn't travel through here)
 
 # determine the highest priority exception(if any) set by the
@@ -1554,7 +1554,7 @@ fu_out_done:
 
 	mov.l		EXC_A6(%a6),(%a6)	# in case a6 changed
 
-# on extended precision opclass three instructions using pre-decrement or 
+# on extended precision opclass three instructions using pre-decrement or
 # post-increment addressing mode, the address register is not updated. is the
 # address register was the stack pointer used from user mode, then let's update
 # it here. if it was used from supervisor mode, then we have to handle this
@@ -1578,7 +1578,7 @@ fu_out_done_cont:
 	bra.l		_fpsp_done
 
 # is the ea mode pre-decrement of the stack pointer from supervisor mode?
-# ("fmov.x fpm,-(a7)") if so, 
+# ("fmov.x fpm,-(a7)") if so,
 fu_out_done_s:
 	cmpi.b		SPCOND_FLG(%a6),&mda7_flg
 	bne.b		fu_out_done_cont
@@ -1616,7 +1616,7 @@ fu_out_ena:
 	bfffo		%d0{&24:&8},%d0		# find highest priority exception
 	bne.b		fu_out_exc		# there is at least one set
 
-# no exceptions were set. 
+# no exceptions were set.
 # if a disabled overflow occurred and inexact was enabled but the result
 # was exact, then a branch to _real_inex() is made.
 	btst		&ovfl_bit,FPSR_EXCEPT(%a6) # was overflow set?
@@ -1633,7 +1633,7 @@ fu_out_ovflchk:
 # from FPIAR and put it in the trace stack frame then jump to _real_trace().
 #
 #		  UNSUPP FRAME		   TRACE FRAME
-# 		*****************	*****************
+#		*****************	*****************
 #		*      EA	*	*    Current	*
 #		*		*	*      PC	*
 #		*****************	*****************
@@ -1650,7 +1650,7 @@ fu_out_trace:
 	fmov.l		%fpiar,0x8(%sp)
 	bra.l		_real_trace
 
-# an exception occurred and that exception was enabled. 	
+# an exception occurred and that exception was enabled.
 fu_out_exc:
 	subi.l		&24,%d0			# fix offset to be 0-8
 
@@ -1662,15 +1662,15 @@ fu_out_exc:
 	swbeg		&0x8
 tbl_fu_out:
 	short		tbl_fu_out	- tbl_fu_out	# BSUN can't happen
-	short		tbl_fu_out 	- tbl_fu_out	# SNAN can't happen
+	short		tbl_fu_out	- tbl_fu_out	# SNAN can't happen
 	short		fu_operr	- tbl_fu_out	# OPERR
-	short		fu_ovfl 	- tbl_fu_out	# OVFL
-	short		fu_unfl 	- tbl_fu_out	# UNFL
+	short		fu_ovfl		- tbl_fu_out	# OVFL
+	short		fu_unfl		- tbl_fu_out	# UNFL
 	short		tbl_fu_out	- tbl_fu_out	# DZ can't happen
-	short		fu_inex 	- tbl_fu_out	# INEX2
+	short		fu_inex		- tbl_fu_out	# INEX2
 	short		tbl_fu_out	- tbl_fu_out	# INEX1 won't make it here
 
-# for snan,operr,ovfl,unfl, src op is still in FP_SRC so just 
+# for snan,operr,ovfl,unfl, src op is still in FP_SRC so just
 # frestore it.
 fu_snan:
 	fmovm.x		EXC_FPREGS(%a6),&0xc0	# restore fp0/fp1
@@ -1721,7 +1721,7 @@ fu_ovfl:
 # underflow can happen for extended precision. extended precision opclass
 # three instruction exceptions don't update the stack pointer. so, if the
 # exception occurred from user mode, then simply update a7 and exit normally.
-# if the exception occurred from supervisor mode, check if 
+# if the exception occurred from supervisor mode, check if
 fu_unfl:
 	mov.l		EXC_A6(%a6),(%a6)	# restore a6
 
@@ -1730,7 +1730,7 @@ fu_unfl:
 
 	mov.l		EXC_A7(%a6),%a0		# restore a7 whether we need
 	mov.l		%a0,%usp		# to or not...
-	
+
 fu_unfl_cont:
 	fmovm.x		&0x40,FP_SRC(%a6)	# save EXOP to the stack
 
@@ -1821,7 +1821,7 @@ fu_in_pack:
 
 	bfextu		EXC_CMDREG(%a6){&6:&3},%d0 # dyadic; load dst reg
 
-# bit five of the fp extension word separates the monadic and dyadic operations 
+# bit five of the fp extension word separates the monadic and dyadic operations
 # at this point
 	btst		&0x5,1+EXC_CMDREG(%a6)	# is operation monadic or dyadic?
 	beq.b		fu_extract_p		# monadic
@@ -1852,13 +1852,13 @@ fu_extract_p:
 
 #
 # Exceptions in order of precedence:
-# 	BSUN	: none
+#	BSUN	: none
 #	SNAN	: all dyadic ops
 #	OPERR	: fsqrt(-NORM)
 #	OVFL	: all except ftst,fcmp
 #	UNFL	: all except ftst,fcmp
 #	DZ	: fdiv
-# 	INEX2	: all except ftst,fcmp
+#	INEX2	: all except ftst,fcmp
 #	INEX1	: all
 #
 
@@ -1928,16 +1928,16 @@ fu_in_ena_p:
 #
 # No exceptions occurred that were also enabled. Now:
 #
-#   	if (OVFL && ovfl_disabled && inexact_enabled) {
+#	if (OVFL && ovfl_disabled && inexact_enabled) {
 #	    branch to _real_inex() (even if the result was exact!);
-#     	} else {
+#	} else {
 #	    save the result in the proper fp reg (unless the op is fcmp or ftst);
 #	    return;
-#     	}
+#	}
 #
 	btst		&ovfl_bit,FPSR_EXCEPT(%a6) # was overflow set?
 	beq.w		fu_in_cont_p		# no
-	
+
 fu_in_ovflchk_p:
 	btst		&inex2_bit,FPCR_ENABLE(%a6) # was inexact enabled?
 	beq.w		fu_in_cont_p		# no
@@ -1957,7 +1957,7 @@ fu_in_ovflchk_p:
 #	} else {
 #		restore exc state (SNAN||OPERR||OVFL||UNFL||DZ||INEX) into the FPU;
 #	}
-#	    		
+#
 fu_in_exc_p:
 	subi.l		&24,%d0			# fix offset to be 0-8
 	cmpi.b		%d0,&0x6		# is exception INEX? (6 or 7)
@@ -1970,7 +1970,7 @@ fu_in_exc_p:
 	bne.w		fu_in_exc_ovfl_p	# yes
 
 # here, we insert the correct fsave status value into the fsave frame for the
-# corresponding exception. the operand in the fsave frame should be the original 
+# corresponding exception. the operand in the fsave frame should be the original
 # src operand.
 # as a reminder for future predicted pain and agony, we are passing in fsave the
 # "non-skewed" operand for cases of sgl and dbl src INFs,NANs, and DENORMs.
@@ -2033,21 +2033,21 @@ fu_in_exc_exit_s_p:
 	bne.b		fu_trace_p		# yes
 
 	bra.l		_fpsp_done		# exit to os
-	
+
 #
-# The opclass two PACKED instruction that took an "Unimplemented Data Type" 
-# exception was being traced. Make the "current" PC the FPIAR and put it in the 
+# The opclass two PACKED instruction that took an "Unimplemented Data Type"
+# exception was being traced. Make the "current" PC the FPIAR and put it in the
 # trace stack frame then jump to _real_trace().
-#					
+#
 #		  UNSUPP FRAME		   TRACE FRAME
 #		*****************	*****************
 #		*      EA	*	*    Current	*
 #		*		*	*      PC	*
 #		*****************	*****************
-#		* 0x2 *	0x0dc	* 	* 0x2 *  0x024	*
+#		* 0x2 *	0x0dc	*	* 0x2 *  0x024	*
 #		*****************	*****************
 #		*     Next	*	*     Next	*
-#		*      PC	*      	*      PC	*
+#		*      PC	*	*      PC	*
 #		*****************	*****************
 #		*      SR	*	*      SR	*
 #		*****************	*****************
@@ -2093,13 +2093,13 @@ fu_op2_p:
 	bsr.l		fout			# call fmove out routine
 
 # Exceptions in order of precedence:
-# 	BSUN	: no
+#	BSUN	: no
 #	SNAN	: yes
 #	OPERR	: if ((k_factor > +17) || (dec. exp exceeds 3 digits))
 #	OVFL	: no
 #	UNFL	: no
 #	DZ	: no
-# 	INEX2	: yes
+#	INEX2	: yes
 #	INEX1	: no
 
 # determine the highest priority exception(if any) set by the
@@ -2163,7 +2163,7 @@ fu_out_ena_p:
 
 	mov.l		EXC_A6(%a6),(%a6)	# restore a6
 
-# an exception occurred and that exception was enabled. 	
+# an exception occurred and that exception was enabled.
 # the only exception possible on packed move out are INEX, OPERR, and SNAN.
 fu_out_exc_p:
 	cmpi.b		%d0,&0x1a
@@ -2190,7 +2190,7 @@ fu_snan_s_p:
 	movm.l		EXC_DREGS(%a6),&0x0303	# restore d0-d1/a0-a1
 
 	mov.w		&0x30d8,EXC_VOFF(%a6)	# vector offset = 0xd0
-	mov.w		&0xe006,2+FP_SRC(%a6) 	# set fsave status
+	mov.w		&0xe006,2+FP_SRC(%a6)	# set fsave status
 
 	frestore	FP_SRC(%a6)		# restore src operand
 
@@ -2230,7 +2230,7 @@ fu_operr_p_s:
 	movm.l		EXC_DREGS(%a6),&0x0303	# restore d0-d1/a0-a1
 
 	mov.w		&0x30d0,EXC_VOFF(%a6)	# vector offset = 0xd0
-	mov.w		&0xe004,2+FP_SRC(%a6) 	# set fsave status
+	mov.w		&0xe004,2+FP_SRC(%a6)	# set fsave status
 
 	frestore	FP_SRC(%a6)		# restore src operand
 
@@ -2269,8 +2269,8 @@ fu_inex_s_p2:
 	fmovm.l		USER_FPCR(%a6),%fpcr,%fpsr,%fpiar # restore ctrl regs
 	movm.l		EXC_DREGS(%a6),&0x0303	# restore d0-d1/a0-a1
 
-	mov.w		&0x30c4,EXC_VOFF(%a6) 	# vector offset = 0xc4
-	mov.w		&0xe001,2+FP_SRC(%a6) 	# set fsave status
+	mov.w		&0x30c4,EXC_VOFF(%a6)	# vector offset = 0xc4
+	mov.w		&0xe001,2+FP_SRC(%a6)	# set fsave status
 
 	frestore	FP_SRC(%a6)		# restore src operand
 
@@ -2311,7 +2311,7 @@ funimp_skew_sgl:
 	andi.w		&0x7fff,%d0		# strip sign
 	beq.b		funimp_skew_sgl_not
 	cmpi.w		%d0,&0x3f80
-	bgt.b		funimp_skew_sgl_not		
+	bgt.b		funimp_skew_sgl_not
 	neg.w		%d0			# make exponent negative
 	addi.w		&0x3f81,%d0		# find amt to shift
 	mov.l		FP_SRC_HI(%a6),%d1	# fetch DENORM hi(man)
@@ -2328,7 +2328,7 @@ funimp_skew_dbl:
 	andi.w		&0x7fff,%d0		# strip sign
 	beq.b		funimp_skew_dbl_not
 	cmpi.w		%d0,&0x3c00
-	bgt.b		funimp_skew_dbl_not		
+	bgt.b		funimp_skew_dbl_not
 
 	tst.b		FP_SRC_EX(%a6)		# make "internal format"
 	smi.b		0x2+FP_SRC(%a6)
@@ -2361,7 +2361,7 @@ _mem_write2:
 #########################################################################
 # XDEF ****************************************************************	#
 #	_fpsp_effadd(): 060FPSP entry point for FP "Unimplemented	#
-#		     	effective address" exception.			#
+#			effective address" exception.			#
 #									#
 #	This handler should be the first code executed upon taking the	#
 #	FP Unimplemented Effective Address exception in an operating	#
@@ -2386,7 +2386,7 @@ _mem_write2:
 #									#
 # INPUT ***************************************************************	#
 #	- The system stack contains the "Unimplemented <ea>" stk frame	#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	If access error:						#
 #	- The system stack is changed to an access error stack frame	#
@@ -2407,17 +2407,17 @@ _mem_write2:
 #	For immediate data operations, the data is read in w/ a		#
 # _mem_read() "callout", converted to FP binary (if packed), and used	#
 # as the source operand to the instruction specified by the instruction	#
-# word. If no FP exception should be reported ads a result of the 	#
+# word. If no FP exception should be reported ads a result of the	#
 # emulation, then the result is stored to the destination register and	#
 # the handler exits through _fpsp_done(). If an enabled exc has been	#
 # signalled as a result of emulation, then an fsave state frame		#
 # corresponding to the FP exception type must be entered into the 060	#
-# FPU before exiting. In either the enabled or disabled cases, we 	#
+# FPU before exiting. In either the enabled or disabled cases, we	#
 # must also check if a Trace exception is pending, in which case, we	#
 # must create a Trace exception stack frame from the current exception	#
 # stack frame. If no Trace is pending, we simply exit through		#
 # _fpsp_done().								#
-#	For "fmovm.x", call the routine fmovm_dynamic() which will 	#
+#	For "fmovm.x", call the routine fmovm_dynamic() which will	#
 # decode and emulate the instruction. No FP exceptions can be pending	#
 # as a result of this operation emulation. A Trace exception can be	#
 # pending, though, which means the current stack frame must be changed	#
@@ -2436,11 +2436,11 @@ _mem_write2:
 # before the "FPU disabled" exception, but the "FPU disabled" exception	#
 # has higher priority, we check the disabled bit in the PCR. If set,	#
 # then we must create an 8 word "FPU disabled" exception stack frame	#
-# from the current 4 word exception stack frame. This includes 		#
-# reproducing the effective address of the instruction to put on the 	#
+# from the current 4 word exception stack frame. This includes		#
+# reproducing the effective address of the instruction to put on the	#
 # new stack frame.							#
 #									#
-# 	In the process of all emulation work, if a _mem_read()		#
+#	In the process of all emulation work, if a _mem_read()		#
 # "callout" returns a failing result indicating an access error, then	#
 # we must create an access error stack frame from the current stack	#
 # frame. This information includes a faulting address and a fault-	#
@@ -2481,18 +2481,18 @@ _fpsp_effadd:
 
 #
 # here, we will have:
-# 	fabs	fdabs	fsabs		facos		fmod
+#	fabs	fdabs	fsabs		facos		fmod
 #	fadd	fdadd	fsadd		fasin		frem
-# 	fcmp				fatan		fscale
+#	fcmp				fatan		fscale
 #	fdiv	fddiv	fsdiv		fatanh		fsin
 #	fint				fcos		fsincos
 #	fintrz				fcosh		fsinh
 #	fmove	fdmove	fsmove		fetox		ftan
-# 	fmul	fdmul	fsmul		fetoxm1		ftanh
+#	fmul	fdmul	fsmul		fetoxm1		ftanh
 #	fneg	fdneg	fsneg		fgetexp		ftentox
 #	fsgldiv				fgetman		ftwotox
-# 	fsglmul				flog10
-# 	fsqrt				flog2
+#	fsglmul				flog10
+#	fsqrt				flog2
 #	fsub	fdsub	fssub		flogn
 #	ftst				flognp1
 # which can all use f<op>.{x,p}
@@ -2584,8 +2584,8 @@ iea_op_spec:
 # store a result. then, only fcmp will branch back and pick up a dst operand.
 	st		STORE_FLG(%a6)		# don't store a final result
 	btst		&0x1,1+EXC_CMDREG(%a6)	# is operation fcmp?
-	beq.b		iea_op_loaddst		# yes	
-	
+	beq.b		iea_op_loaddst		# yes
+
 iea_op_extract:
 	clr.l		%d0
 	mov.b		FPCR_MODE(%a6),%d0	# pass: rnd mode,prec
@@ -2658,7 +2658,7 @@ iea_op_ovfl:
 	btst		&inex2_bit,FPCR_ENABLE(%a6) # is inexact enabled?
 	beq.b		iea_op_store		# no
 	bra.b		iea_op_exc_ovfl		# yes
-	
+
 # an enabled exception occurred. we have to insert the exception type back into
 # the machine.
 iea_op_exc:
@@ -2697,7 +2697,7 @@ iea_op_exit2:
 	fmovm.l		USER_FPCR(%a6),%fpcr,%fpsr,%fpiar # restore ctrl regs
 	movm.l		EXC_DREGS(%a6),&0x0303	# restore d0-d1/a0-a1
 
-	frestore 	FP_SRC(%a6)		# restore exceptional state
+	frestore	FP_SRC(%a6)		# restore exceptional state
 
 	unlk		%a6			# unravel the frame
 
@@ -2705,12 +2705,12 @@ iea_op_exit2:
 	bne.b		iea_op_trace		# yes
 
 	bra.l		_fpsp_done		# exit to os
-	
+
 #
 # The opclass two instruction that took an "Unimplemented Effective Address"
 # exception was being traced. Make the "current" PC the FPIAR and put it in
 # the trace stack frame then jump to _real_trace().
-#					
+#
 #		 UNIMP EA FRAME		   TRACE FRAME
 #		*****************	*****************
 #		* 0x0 *  0x0f0	*	*    Current	*
@@ -2743,7 +2743,7 @@ iea_fmovm_data:
 
 iea_fmovm_data_u:
 	mov.l		%usp,%a0
-	mov.l		%a0,EXC_A7(%a6)		# store current a7	
+	mov.l		%a0,EXC_A7(%a6)		# store current a7
 	bsr.l		fmovm_dynamic		# do dynamic fmovm
 	mov.l		EXC_A7(%a6),%a0		# load possibly new a7
 	mov.l		%a0,%usp		# update usp
@@ -2774,10 +2774,10 @@ iea_fmovm_data_postinc:
 
 	lea		(EXC_SR,%a6,%d0),%a0
 	mov.l		%a0,EXC_SR(%a6)
-	
+
 	fmovm.x		EXC_FP0(%a6),&0xc0	# restore fp0-fp1
 	fmovm.l		USER_FPCR(%a6),%fpcr,%fpsr,%fpiar # restore ctrl regs
- 	movm.l		EXC_DREGS(%a6),&0x0303 	# restore d0-d1/a0-a1
+	movm.l		EXC_DREGS(%a6),&0x0303	# restore d0-d1/a0-a1
 
 	unlk		%a6
 	mov.l		(%sp)+,%sp
@@ -2791,15 +2791,15 @@ iea_fmovm_data_pi_trace:
 
 	lea		(EXC_SR-0x4,%a6,%d0),%a0
 	mov.l		%a0,EXC_SR(%a6)
-	
+
 	fmovm.x		EXC_FP0(%a6),&0xc0	# restore fp0-fp1
 	fmovm.l		USER_FPCR(%a6),%fpcr,%fpsr,%fpiar # restore ctrl regs
- 	movm.l		EXC_DREGS(%a6),&0x0303 	# restore d0-d1/a0-a1
+	movm.l		EXC_DREGS(%a6),&0x0303	# restore d0-d1/a0-a1
 
 	unlk		%a6
 	mov.l		(%sp)+,%sp
 	bra.l		_real_trace
-	
+
 # right now, d1 = size and d0 = the strg.
 iea_fmovm_data_predec:
 	mov.b		%d1,EXC_VOFF(%a6)	# store strg
@@ -2807,7 +2807,7 @@ iea_fmovm_data_predec:
 
 	fmovm.x		EXC_FP0(%a6),&0xc0	# restore fp0-fp1
 	fmovm.l		USER_FPCR(%a6),%fpcr,%fpsr,%fpiar # restore ctrl regs
- 	movm.l		EXC_DREGS(%a6),&0x0303 	# restore d0-d1/a0-a1
+	movm.l		EXC_DREGS(%a6),&0x0303	# restore d0-d1/a0-a1
 
 	mov.l		(%a6),-(%sp)		# make a copy of a6
 	mov.l		%d0,-(%sp)		# save d0
@@ -2909,10 +2909,10 @@ iea_fmovm_exit:
 
 #
 # The control reg instruction that took an "Unimplemented Effective Address"
-# exception was being traced. The "Current PC" for the trace frame is the 
+# exception was being traced. The "Current PC" for the trace frame is the
 # PC stacked for Unimp EA. The "Next PC" is in EXC_EXTWPTR.
 # After fixing the stack frame, jump to _real_trace().
-#					
+#
 #		 UNIMP EA FRAME		   TRACE FRAME
 #		*****************	*****************
 #		* 0x0 *  0x0f0	*	*    Current	*
@@ -3065,7 +3065,7 @@ iea_dacc_cont:
 #	_fpsp_operr(): 060FPSP entry point for FP Operr exception.	#
 #									#
 #	This handler should be the first code executed upon taking the	#
-# 	FP Operand Error exception in an operating system.		#
+#	FP Operand Error exception in an operating system.		#
 #									#
 # XREF ****************************************************************	#
 #	_imem_read_long() - read instruction longword			#
@@ -3078,7 +3078,7 @@ iea_dacc_cont:
 # INPUT ***************************************************************	#
 #	- The system stack contains the FP Operr exception frame	#
 #	- The fsave frame contains the source operand			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	No access error:						#
 #	- The system stack is unchanged					#
@@ -3087,16 +3087,16 @@ iea_dacc_cont:
 # ALGORITHM ***********************************************************	#
 #	In a system where the FP Operr exception is enabled, the goal	#
 # is to get to the handler specified at _real_operr(). But, on the 060,	#
-# for opclass zero and two instruction taking this exception, the 	#
+# for opclass zero and two instruction taking this exception, the	#
 # input operand in the fsave frame may be incorrect for some cases	#
 # and needs to be corrected. This handler calls fix_skewed_ops() to	#
 # do just this and then exits through _real_operr().			#
 #	For opclass 3 instructions, the 060 doesn't store the default	#
 # operr result out to memory or data register file as it should.	#
 # This code must emulate the move out before finally exiting through	#
-# _real_inex(). The move out, if to memory, is performed using 		#
+# _real_inex(). The move out, if to memory, is performed using		#
 # _mem_write() "callout" routines that may return a failing result.	#
-# In this special case, the handler must exit through facc_out() 	#
+# In this special case, the handler must exit through facc_out()	#
 # which creates an access error stack frame from the current operr	#
 # stack frame.								#
 #									#
@@ -3109,13 +3109,13 @@ _fpsp_operr:
 
 	fsave		FP_SRC(%a6)		# grab the "busy" frame
 
- 	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
+	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
 	fmovm.l		%fpcr,%fpsr,%fpiar,USER_FPCR(%a6) # save ctrl regs
- 	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
+	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
 
 # the FPIAR holds the "current PC" of the faulting instruction
 	mov.l		USER_FPIAR(%a6),EXC_EXTWPTR(%a6)
-	
+
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
 	addq.l		&0x4,EXC_EXTWPTR(%a6)	# incr instruction ptr
 	bsr.l		_imem_read_long		# fetch the instruction words
@@ -3129,7 +3129,7 @@ _fpsp_operr:
 
 # here, we simply see if the operand in the fsave frame needs to be "unskewed".
 # this would be the case for opclass two operations with a source infinity or
-# denorm operand in the sgl or dbl format. NANs also become skewed, but can't 
+# denorm operand in the sgl or dbl format. NANs also become skewed, but can't
 # cause an operr so we don't need to check for them here.
 	lea		FP_SRC(%a6),%a0		# pass: ptr to src op
 	bsr.l		fix_skewed_ops		# fix src op
@@ -3200,7 +3200,7 @@ tbl_operr:
 	short		tbl_operr    - tbl_operr # dbl prec shouldn't happen
 	short		foperr_out_b - tbl_operr # byte integer
 	short		tbl_operr    - tbl_operr # packed won't enter here
-	
+
 foperr_out_b:
 	mov.b		L_SCR1(%a6),%d0		# load positive default result
 	cmpi.b		%d1,&0x7		# is <ea> mode a data reg?
@@ -3254,7 +3254,7 @@ foperr_out_l_save_dn:
 #	_fpsp_snan(): 060FPSP entry point for FP SNAN exception.	#
 #									#
 #	This handler should be the first code executed upon taking the	#
-# 	FP Signalling NAN exception in an operating system.		#
+#	FP Signalling NAN exception in an operating system.		#
 #									#
 # XREF ****************************************************************	#
 #	_imem_read_long() - read instruction longword			#
@@ -3268,7 +3268,7 @@ foperr_out_l_save_dn:
 # INPUT ***************************************************************	#
 #	- The system stack contains the FP SNAN exception frame		#
 #	- The fsave frame contains the source operand			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	No access error:						#
 #	- The system stack is unchanged					#
@@ -3277,16 +3277,16 @@ foperr_out_l_save_dn:
 # ALGORITHM ***********************************************************	#
 #	In a system where the FP SNAN exception is enabled, the goal	#
 # is to get to the handler specified at _real_snan(). But, on the 060,	#
-# for opclass zero and two instructions taking this exception, the 	#
+# for opclass zero and two instructions taking this exception, the	#
 # input operand in the fsave frame may be incorrect for some cases	#
 # and needs to be corrected. This handler calls fix_skewed_ops() to	#
 # do just this and then exits through _real_snan().			#
 #	For opclass 3 instructions, the 060 doesn't store the default	#
 # SNAN result out to memory or data register file as it should.		#
 # This code must emulate the move out before finally exiting through	#
-# _real_snan(). The move out, if to memory, is performed using 		#
+# _real_snan(). The move out, if to memory, is performed using		#
 # _mem_write() "callout" routines that may return a failing result.	#
-# In this special case, the handler must exit through facc_out() 	#
+# In this special case, the handler must exit through facc_out()	#
 # which creates an access error stack frame from the current SNAN	#
 # stack frame.								#
 #	For the case of an extended precision opclass 3 instruction,	#
@@ -3305,13 +3305,13 @@ _fpsp_snan:
 
 	fsave		FP_SRC(%a6)		# grab the "busy" frame
 
- 	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
+	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
 	fmovm.l		%fpcr,%fpsr,%fpiar,USER_FPCR(%a6) # save ctrl regs
- 	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
+	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
 
 # the FPIAR holds the "current PC" of the faulting instruction
 	mov.l		USER_FPIAR(%a6),EXC_EXTWPTR(%a6)
-	
+
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
 	addq.l		&0x4,EXC_EXTWPTR(%a6)	# incr instruction ptr
 	bsr.l		_imem_read_long		# fetch the instruction words
@@ -3339,7 +3339,7 @@ fsnan_exit:
 
 	unlk		%a6
 	bra.l		_real_snan
-		
+
 ########################################################################
 
 #
@@ -3349,7 +3349,7 @@ fsnan_exit:
 #
 # byte, word, long, and packed destination format operations can pass
 # through here. since packed format operations already were handled by
-# fpsp_unsupp(), then we need to do nothing else for them here. 
+# fpsp_unsupp(), then we need to do nothing else for them here.
 # for byte, word, and long, we simply need to test the sign of the src
 # operand and save the appropriate minimum or maximum integer value
 # to the effective address as pointed to by the stacked effective address.
@@ -3370,7 +3370,7 @@ tbl_snan:
 	short		fsnan_out_d - tbl_snan # dbl prec shouldn't happen
 	short		fsnan_out_b - tbl_snan # byte integer
 	short		tbl_snan    - tbl_snan # packed needs no help
-	
+
 fsnan_out_b:
 	mov.b		FP_SRC_HI(%a6),%d0	# load upper byte of SNAN
 	bset		&6,%d0			# set SNAN bit
@@ -3496,7 +3496,7 @@ fsnan_out_x:
 	mov.l		%usp,%a0		# fetch user stack pointer
 	mov.l		%a0,EXC_A7(%a6)		# save on stack for calc_ea()
 	mov.l		(%a6),EXC_A6(%a6)
-	
+
 	bsr.l		_calc_ea_fout		# find the correct ea,update An
 	mov.l		%a0,%a1
 	mov.l		%a0,EXC_EA(%a6)		# stack correct <ea>
@@ -3545,7 +3545,7 @@ fsnan_out_x_s:
 	mov.l		LOCAL_SIZE+FP_SCR0_LO(%sp),LOCAL_SIZE+EXC_EA(%sp)
 
 	add.l		&LOCAL_SIZE-0x8,%sp
-	
+
 	bra.l		_real_snan
 
 #########################################################################
@@ -3553,7 +3553,7 @@ fsnan_out_x_s:
 #	_fpsp_inex(): 060FPSP entry point for FP Inexact exception.	#
 #									#
 #	This handler should be the first code executed upon taking the	#
-# 	FP Inexact exception in an operating system.			#
+#	FP Inexact exception in an operating system.			#
 #									#
 # XREF ****************************************************************	#
 #	_imem_read_long() - read instruction longword			#
@@ -3570,7 +3570,7 @@ fsnan_out_x_s:
 # INPUT ***************************************************************	#
 #	- The system stack contains the FP Inexact exception frame	#
 #	- The fsave frame contains the source operand			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	- The system stack is unchanged					#
 #	- The fsave frame contains the adjusted src op for opclass 0,2	#
@@ -3578,10 +3578,10 @@ fsnan_out_x_s:
 # ALGORITHM ***********************************************************	#
 #	In a system where the FP Inexact exception is enabled, the goal	#
 # is to get to the handler specified at _real_inex(). But, on the 060,	#
-# for opclass zero and two instruction taking this exception, the 	#
+# for opclass zero and two instruction taking this exception, the	#
 # hardware doesn't store the correct result to the destination FP	#
-# register as did the '040 and '881/2. This handler must emulate the 	#
-# instruction in order to get this value and then store it to the 	#
+# register as did the '040 and '881/2. This handler must emulate the	#
+# instruction in order to get this value and then store it to the	#
 # correct register before calling _real_inex().				#
 #	For opclass 3 instructions, the 060 doesn't store the default	#
 # inexact result out to memory or data register file as it should.	#
@@ -3597,13 +3597,13 @@ _fpsp_inex:
 
 	fsave		FP_SRC(%a6)		# grab the "busy" frame
 
- 	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
+	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
 	fmovm.l		%fpcr,%fpsr,%fpiar,USER_FPCR(%a6) # save ctrl regs
- 	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
+	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
 
 # the FPIAR holds the "current PC" of the faulting instruction
 	mov.l		USER_FPIAR(%a6),EXC_EXTWPTR(%a6)
-	
+
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
 	addq.l		&0x4,EXC_EXTWPTR(%a6)	# incr instruction ptr
 	bsr.l		_imem_read_long		# fetch the instruction words
@@ -3615,7 +3615,7 @@ _fpsp_inex:
 	bne.w		finex_out		# fmove out
 
 
-# the hardware, for "fabs" and "fneg" w/ a long source format, puts the 
+# the hardware, for "fabs" and "fneg" w/ a long source format, puts the
 # longword integer directly into the upper longword of the mantissa along
 # w/ an exponent value of 0x401e. we convert this to extended precision here.
 	bfextu		%d0{&19:&3},%d0		# fetch instr size
@@ -3749,7 +3749,7 @@ finex_out:
 # INPUT ***************************************************************	#
 #	- The system stack contains the FP DZ exception stack.		#
 #	- The fsave frame contains the source operand.			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	- The system stack contains the FP DZ exception stack.		#
 #	- The fsave frame contains the adjusted source operand.		#
@@ -3760,7 +3760,7 @@ finex_out:
 # exception is taken, the input operand in the fsave state frame may	#
 # be incorrect for some cases and need to be adjusted. So, this package	#
 # adjusts the operand using fix_skewed_ops() and then branches to	#
-# _real_dz(). 								#
+# _real_dz().								#
 #									#
 #########################################################################
 
@@ -3771,13 +3771,13 @@ _fpsp_dz:
 
 	fsave		FP_SRC(%a6)		# grab the "busy" frame
 
- 	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
+	movm.l		&0x0303,EXC_DREGS(%a6)	# save d0-d1/a0-a1
 	fmovm.l		%fpcr,%fpsr,%fpiar,USER_FPCR(%a6) # save ctrl regs
- 	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
+	fmovm.x		&0xc0,EXC_FPREGS(%a6)	# save fp0-fp1 on stack
 
 # the FPIAR holds the "current PC" of the faulting instruction
 	mov.l		USER_FPIAR(%a6),EXC_EXTWPTR(%a6)
-	
+
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
 	addq.l		&0x4,EXC_EXTWPTR(%a6)	# incr instruction ptr
 	bsr.l		_imem_read_long		# fetch the instruction words
@@ -3805,7 +3805,7 @@ fdz_exit:
 #########################################################################
 # XDEF ****************************************************************	#
 #	_fpsp_fline(): 060FPSP entry point for "Line F emulator"	#
-#		       exception when the "reduced" version of the 	#
+#		       exception when the "reduced" version of the	#
 #		       FPSP is implemented that does not emulate	#
 #		       FP unimplemented instructions.			#
 #									#
@@ -3820,12 +3820,12 @@ fdz_exit:
 # INPUT ***************************************************************	#
 #	- The system stack contains a "Line F Emulator" exception	#
 #	  stack frame.							#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	- The system stack is unchanged.				#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	When a "Line F Emulator" exception occurs in a system where	#
+#	When a "Line F Emulator" exception occurs in a system where	#
 # "FPU Unimplemented" instructions will not be emulated, the exception	#
 # can occur because then FPU is disabled or the instruction is to be	#
 # classifed as "Line F". This module determines which case exists and	#
@@ -3853,21 +3853,21 @@ _fpsp_fline:
 #									#
 # INPUT ***************************************************************	#
 #	d0 = number of bytes to adjust <ea> by				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	None								#
 #									#
 # ALGORITHM ***********************************************************	#
 # "Dummy" CALCulate Effective Address:					#
-# 	The stacked <ea> for FP unimplemented instructions and opclass	#
+#	The stacked <ea> for FP unimplemented instructions and opclass	#
 #	two packed instructions is correct with the exception of...	#
 #									#
 #	1) -(An)   : The register is not updated regardless of size.	#
-#		     Also, for extended precision and packed, the 	#
+#		     Also, for extended precision and packed, the	#
 #		     stacked <ea> value is 8 bytes too big		#
 #	2) (An)+   : The register is not updated.			#
-#	3) #<data> : The upper longword of the immediate operand is 	#
-#		     stacked b,w,l and s sizes are completely stacked. 	#
+#	3) #<data> : The upper longword of the immediate operand is	#
+#		     stacked b,w,l and s sizes are completely stacked.	#
 #		     d,x, and p are not.				#
 #									#
 #########################################################################
@@ -3903,8 +3903,8 @@ dcea_imm:
 	lea		([USER_FPIAR,%a6],0x4),%a0 # no; return <ea>
 	rts
 
-# here, the <ea> is stacked correctly. however, we must update the 
-# address register...	
+# here, the <ea> is stacked correctly. however, we must update the
+# address register...
 dcea_pi:
 	mov.l		%a0,%d0			# pass amt to inc by
 	bsr.l		inc_areg		# inc addr register
@@ -3912,7 +3912,7 @@ dcea_pi:
 	mov.l		EXC_EA(%a6),%a0		# stacked <ea> is correct
 	rts
 
-# the <ea> is stacked correctly for all but extended and packed which 
+# the <ea> is stacked correctly for all but extended and packed which
 # the <ea>s are 8 bytes too large.
 # it would make no sense to have a pre-decrement to a7 in supervisor
 # mode so we don't even worry about this tricky case here : )
@@ -3932,7 +3932,7 @@ dcea_pd2:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	_calc_ea_fout(): calculate correct stacked <ea> for extended	#
+#	_calc_ea_fout(): calculate correct stacked <ea> for extended	#
 #			 and packed data opclass 3 operations.		#
 #									#
 # XREF ****************************************************************	#
@@ -3940,22 +3940,22 @@ dcea_pd2:
 #									#
 # INPUT ***************************************************************	#
 #	None								#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	a0 = return correct effective address				#
 #									#
 # ALGORITHM ***********************************************************	#
 #	For opclass 3 extended and packed data operations, the <ea>	#
 # stacked for the exception is incorrect for -(an) and (an)+ addressing	#
-# modes. Also, while we're at it, the index register itself must get 	#
+# modes. Also, while we're at it, the index register itself must get	#
 # updated.								#
-# 	So, for -(an), we must subtract 8 off of the stacked <ea> value	#
+#	So, for -(an), we must subtract 8 off of the stacked <ea> value	#
 # and return that value as the correct <ea> and store that value in An.	#
 # For (an)+, the stacked <ea> is correct but we must adjust An by +12.	#
 #									#
 #########################################################################
 
-# This calc_ea is currently used to retrieve the correct <ea> 
+# This calc_ea is currently used to retrieve the correct <ea>
 # for fmove outs of type extended and packed.
 	global		_calc_ea_fout
 _calc_ea_fout:
@@ -3976,7 +3976,7 @@ _calc_ea_fout:
 
 # (An)+ : extended and packed fmove out
 #	: stacked <ea> is correct
-#	: "An" not updated 
+#	: "An" not updated
 ceaf_pi:
 	mov.w		(tbl_ceaf_pi.b,%pc,%d1.w*2),%d1
 	mov.l		EXC_EA(%a6),%a0
@@ -4077,11 +4077,11 @@ ceaf_pd7:
 
 	swbeg		&109
 tbl_unsupp:
-	long		fin	 	- tbl_unsupp	# 00: fmove
-	long		fint	 	- tbl_unsupp	# 01: fint
-	long		tbl_unsupp 	- tbl_unsupp	# 02: fsinh
-	long		fintrz	 	- tbl_unsupp	# 03: fintrz
-	long		fsqrt	 	- tbl_unsupp	# 04: fsqrt
+	long		fin		- tbl_unsupp	# 00: fmove
+	long		fint		- tbl_unsupp	# 01: fint
+	long		tbl_unsupp	- tbl_unsupp	# 02: fsinh
+	long		fintrz		- tbl_unsupp	# 03: fintrz
+	long		fsqrt		- tbl_unsupp	# 04: fsqrt
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp	# 06: flognp1
 	long		tbl_unsupp	- tbl_unsupp
@@ -4101,23 +4101,23 @@ tbl_unsupp:
 	long		tbl_unsupp	- tbl_unsupp	# 15: flog10
 	long		tbl_unsupp	- tbl_unsupp	# 16: flog2
 	long		tbl_unsupp	- tbl_unsupp
-	long		fabs		- tbl_unsupp 	# 18: fabs
+	long		fabs		- tbl_unsupp	# 18: fabs
 	long		tbl_unsupp	- tbl_unsupp	# 19: fcosh
-	long		fneg		- tbl_unsupp 	# 1a: fneg
+	long		fneg		- tbl_unsupp	# 1a: fneg
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp	# 1c: facos
 	long		tbl_unsupp	- tbl_unsupp	# 1d: fcos
 	long		tbl_unsupp	- tbl_unsupp	# 1e: fgetexp
 	long		tbl_unsupp	- tbl_unsupp	# 1f: fgetman
-	long		fdiv		- tbl_unsupp 	# 20: fdiv
+	long		fdiv		- tbl_unsupp	# 20: fdiv
 	long		tbl_unsupp	- tbl_unsupp	# 21: fmod
-	long		fadd		- tbl_unsupp 	# 22: fadd
-	long		fmul		- tbl_unsupp 	# 23: fmul
-	long		fsgldiv		- tbl_unsupp 	# 24: fsgldiv
+	long		fadd		- tbl_unsupp	# 22: fadd
+	long		fmul		- tbl_unsupp	# 23: fmul
+	long		fsgldiv		- tbl_unsupp	# 24: fsgldiv
 	long		tbl_unsupp	- tbl_unsupp	# 25: frem
 	long		tbl_unsupp	- tbl_unsupp	# 26: fscale
-	long		fsglmul		- tbl_unsupp 	# 27: fsglmul
-	long		fsub		- tbl_unsupp 	# 28: fsub
+	long		fsglmul		- tbl_unsupp	# 27: fsglmul
+	long		fsub		- tbl_unsupp	# 28: fsub
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
@@ -4133,20 +4133,20 @@ tbl_unsupp:
 	long		tbl_unsupp	- tbl_unsupp	# 35: fsincos
 	long		tbl_unsupp	- tbl_unsupp	# 36: fsincos
 	long		tbl_unsupp	- tbl_unsupp	# 37: fsincos
-	long		fcmp		- tbl_unsupp 	# 38: fcmp
+	long		fcmp		- tbl_unsupp	# 38: fcmp
 	long		tbl_unsupp	- tbl_unsupp
-	long		ftst		- tbl_unsupp 	# 3a: ftst
-	long		tbl_unsupp	- tbl_unsupp
-	long		tbl_unsupp	- tbl_unsupp
+	long		ftst		- tbl_unsupp	# 3a: ftst
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
-	long		fsin		- tbl_unsupp 	# 40: fsmove
-	long		fssqrt		- tbl_unsupp 	# 41: fssqrt
+	long		tbl_unsupp	- tbl_unsupp
+	long		tbl_unsupp	- tbl_unsupp
+	long		fsin		- tbl_unsupp	# 40: fsmove
+	long		fssqrt		- tbl_unsupp	# 41: fssqrt
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
 	long		fdin		- tbl_unsupp	# 44: fdmove
-	long		fdsqrt		- tbl_unsupp 	# 45: fdsqrt
+	long		fdsqrt		- tbl_unsupp	# 45: fdsqrt
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
@@ -4165,27 +4165,27 @@ tbl_unsupp:
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
-	long		fsabs		- tbl_unsupp 	# 58: fsabs
+	long		fsabs		- tbl_unsupp	# 58: fsabs
 	long		tbl_unsupp	- tbl_unsupp
-	long		fsneg		- tbl_unsupp 	# 5a: fsneg
+	long		fsneg		- tbl_unsupp	# 5a: fsneg
 	long		tbl_unsupp	- tbl_unsupp
 	long		fdabs		- tbl_unsupp	# 5c: fdabs
 	long		tbl_unsupp	- tbl_unsupp
-	long		fdneg		- tbl_unsupp 	# 5e: fdneg
+	long		fdneg		- tbl_unsupp	# 5e: fdneg
 	long		tbl_unsupp	- tbl_unsupp
 	long		fsdiv		- tbl_unsupp	# 60: fsdiv
 	long		tbl_unsupp	- tbl_unsupp
 	long		fsadd		- tbl_unsupp	# 62: fsadd
 	long		fsmul		- tbl_unsupp	# 63: fsmul
-	long		fddiv		- tbl_unsupp 	# 64: fddiv
+	long		fddiv		- tbl_unsupp	# 64: fddiv
 	long		tbl_unsupp	- tbl_unsupp
 	long		fdadd		- tbl_unsupp	# 66: fdadd
-	long		fdmul		- tbl_unsupp 	# 67: fdmul
+	long		fdmul		- tbl_unsupp	# 67: fdmul
 	long		fssub		- tbl_unsupp	# 68: fssub
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
 	long		tbl_unsupp	- tbl_unsupp
-	long		fdsub		- tbl_unsupp 	# 6c: fdsub
+	long		fdsub		- tbl_unsupp	# 6c: fdsub
 
 #################################################
 # Add this here so non-fp modules can compile.
@@ -4208,7 +4208,7 @@ smovcr:
 #									#
 # INPUT ***************************************************************	#
 #	None								#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	If instr is "fmovm Dn,-(A7)" from supervisor mode,		#
 #		d0 = size of dump					#
@@ -4230,25 +4230,25 @@ smovcr:
 #	The data register is determined and its value loaded to get the	#
 # string of FP registers affected. This value is used as an index into	#
 # a lookup table such that we can determine the number of bytes		#
-# involved. 								#
+# involved.								#
 #	If the instruction is "fmovm.x <ea>,Dn", a _mem_read() is used	#
 # to read in all FP values. Again, _mem_read() may fail and require a	#
-# special exit. 							#
+# special exit.								#
 #	If the instruction is "fmovm.x DN,<ea>", a _mem_write() is used	#
 # to write all FP values. _mem_write() may also fail.			#
-# 	If the instruction is "fmovm.x DN,-(a7)" from supervisor mode,	#
+#	If the instruction is "fmovm.x DN,-(a7)" from supervisor mode,	#
 # then we return the size of the dump and the string to the caller	#
 # so that the move can occur outside of this routine. This special	#
 # case is required so that moves to the system stack are handled	#
 # correctly.								#
 #									#
 # DYNAMIC:								#
-# 	fmovm.x	dn, <ea>						#
-# 	fmovm.x	<ea>, dn						#
+#	fmovm.x	dn, <ea>						#
+#	fmovm.x	<ea>, dn						#
 #									#
 #	      <WORD 1>		      <WORD2>				#
 #	1111 0010 00 |<ea>|	11@& 1000 0$$$ 0000			#
-#					  				#
+#									#
 #	& = (0): predecrement addressing mode				#
 #	    (1): postincrement or control addressing mode		#
 #	@ = (0): move listed regs from memory to the FPU		#
@@ -4517,12 +4517,12 @@ tbl_fmovm_size:
 	byte	0x24,0x30,0x30,0x3c,0x30,0x3c,0x3c,0x48
 	byte	0x30,0x3c,0x3c,0x48,0x3c,0x48,0x48,0x54
 	byte	0x30,0x3c,0x3c,0x48,0x3c,0x48,0x48,0x54
-	byte	0x3c,0x48,0x48,0x54,0x48,0x54,0x54,0x60	
+	byte	0x3c,0x48,0x48,0x54,0x48,0x54,0x54,0x60
 
 #
 # table to convert a pre-decrement bit string into a post-increment
 # or control bit string.
-# ex: 	0x00	==>	0x00
+# ex:	0x00	==>	0x00
 #	0x01	==>	0x80
 #	0x02	==>	0x40
 #		.
@@ -4604,59 +4604,59 @@ tbl_fea_mode:
 	short		tbl_fea_mode	-	tbl_fea_mode
 	short		tbl_fea_mode	-	tbl_fea_mode
 
-	short		faddr_ind_a0	- 	tbl_fea_mode
-	short		faddr_ind_a1	- 	tbl_fea_mode
-	short		faddr_ind_a2	- 	tbl_fea_mode
-	short		faddr_ind_a3 	- 	tbl_fea_mode
-	short		faddr_ind_a4 	- 	tbl_fea_mode
-	short		faddr_ind_a5 	- 	tbl_fea_mode
-	short		faddr_ind_a6 	- 	tbl_fea_mode
-	short		faddr_ind_a7 	- 	tbl_fea_mode
+	short		faddr_ind_a0	-	tbl_fea_mode
+	short		faddr_ind_a1	-	tbl_fea_mode
+	short		faddr_ind_a2	-	tbl_fea_mode
+	short		faddr_ind_a3	-	tbl_fea_mode
+	short		faddr_ind_a4	-	tbl_fea_mode
+	short		faddr_ind_a5	-	tbl_fea_mode
+	short		faddr_ind_a6	-	tbl_fea_mode
+	short		faddr_ind_a7	-	tbl_fea_mode
 
-	short		faddr_ind_p_a0	- 	tbl_fea_mode
-	short		faddr_ind_p_a1 	- 	tbl_fea_mode
-	short		faddr_ind_p_a2 	- 	tbl_fea_mode
-	short		faddr_ind_p_a3 	- 	tbl_fea_mode
-	short		faddr_ind_p_a4 	- 	tbl_fea_mode
-	short		faddr_ind_p_a5 	- 	tbl_fea_mode
-	short		faddr_ind_p_a6 	- 	tbl_fea_mode
-	short		faddr_ind_p_a7 	- 	tbl_fea_mode
+	short		faddr_ind_p_a0	-	tbl_fea_mode
+	short		faddr_ind_p_a1	-	tbl_fea_mode
+	short		faddr_ind_p_a2	-	tbl_fea_mode
+	short		faddr_ind_p_a3	-	tbl_fea_mode
+	short		faddr_ind_p_a4	-	tbl_fea_mode
+	short		faddr_ind_p_a5	-	tbl_fea_mode
+	short		faddr_ind_p_a6	-	tbl_fea_mode
+	short		faddr_ind_p_a7	-	tbl_fea_mode
 
-	short		faddr_ind_m_a0 	- 	tbl_fea_mode
-	short		faddr_ind_m_a1 	- 	tbl_fea_mode
-	short		faddr_ind_m_a2 	- 	tbl_fea_mode
-	short		faddr_ind_m_a3 	- 	tbl_fea_mode
-	short		faddr_ind_m_a4 	- 	tbl_fea_mode
-	short		faddr_ind_m_a5 	- 	tbl_fea_mode
-	short		faddr_ind_m_a6 	- 	tbl_fea_mode
-	short		faddr_ind_m_a7 	- 	tbl_fea_mode
+	short		faddr_ind_m_a0	-	tbl_fea_mode
+	short		faddr_ind_m_a1	-	tbl_fea_mode
+	short		faddr_ind_m_a2	-	tbl_fea_mode
+	short		faddr_ind_m_a3	-	tbl_fea_mode
+	short		faddr_ind_m_a4	-	tbl_fea_mode
+	short		faddr_ind_m_a5	-	tbl_fea_mode
+	short		faddr_ind_m_a6	-	tbl_fea_mode
+	short		faddr_ind_m_a7	-	tbl_fea_mode
 
-	short		faddr_ind_disp_a0	- 	tbl_fea_mode
-	short		faddr_ind_disp_a1 	- 	tbl_fea_mode
-	short		faddr_ind_disp_a2 	- 	tbl_fea_mode
-	short		faddr_ind_disp_a3 	- 	tbl_fea_mode
-	short		faddr_ind_disp_a4 	- 	tbl_fea_mode
-	short		faddr_ind_disp_a5 	- 	tbl_fea_mode
-	short		faddr_ind_disp_a6 	- 	tbl_fea_mode
+	short		faddr_ind_disp_a0	-	tbl_fea_mode
+	short		faddr_ind_disp_a1	-	tbl_fea_mode
+	short		faddr_ind_disp_a2	-	tbl_fea_mode
+	short		faddr_ind_disp_a3	-	tbl_fea_mode
+	short		faddr_ind_disp_a4	-	tbl_fea_mode
+	short		faddr_ind_disp_a5	-	tbl_fea_mode
+	short		faddr_ind_disp_a6	-	tbl_fea_mode
 	short		faddr_ind_disp_a7	-	tbl_fea_mode
 
-	short		faddr_ind_ext 	- 	tbl_fea_mode
-	short		faddr_ind_ext 	- 	tbl_fea_mode
-	short		faddr_ind_ext 	- 	tbl_fea_mode
-	short		faddr_ind_ext 	- 	tbl_fea_mode
-	short		faddr_ind_ext 	- 	tbl_fea_mode
-	short		faddr_ind_ext 	- 	tbl_fea_mode
-	short		faddr_ind_ext 	- 	tbl_fea_mode
-	short		faddr_ind_ext 	- 	tbl_fea_mode
+	short		faddr_ind_ext	-	tbl_fea_mode
+	short		faddr_ind_ext	-	tbl_fea_mode
+	short		faddr_ind_ext	-	tbl_fea_mode
+	short		faddr_ind_ext	-	tbl_fea_mode
+	short		faddr_ind_ext	-	tbl_fea_mode
+	short		faddr_ind_ext	-	tbl_fea_mode
+	short		faddr_ind_ext	-	tbl_fea_mode
+	short		faddr_ind_ext	-	tbl_fea_mode
 
-	short		fabs_short	- 	tbl_fea_mode
-	short		fabs_long	- 	tbl_fea_mode
-	short		fpc_ind		- 	tbl_fea_mode
-	short		fpc_ind_ext	- 	tbl_fea_mode
-	short		tbl_fea_mode	- 	tbl_fea_mode
-	short		tbl_fea_mode	- 	tbl_fea_mode
-	short		tbl_fea_mode	- 	tbl_fea_mode
-	short		tbl_fea_mode	- 	tbl_fea_mode
+	short		fabs_short	-	tbl_fea_mode
+	short		fabs_long	-	tbl_fea_mode
+	short		fpc_ind		-	tbl_fea_mode
+	short		fpc_ind_ext	-	tbl_fea_mode
+	short		tbl_fea_mode	-	tbl_fea_mode
+	short		tbl_fea_mode	-	tbl_fea_mode
+	short		tbl_fea_mode	-	tbl_fea_mode
+	short		tbl_fea_mode	-	tbl_fea_mode
 
 ###################################
 # Address register indirect: (An) #
@@ -4952,7 +4952,7 @@ faddr_ind_ext:
 
 	btst		&0x8,%d0
 	bne.w		fcalc_mem_ind
-	
+
 	mov.l		%d0,L_SCR1(%a6)		# hold opword
 
 	mov.l		%d0,%d1
@@ -5048,7 +5048,7 @@ fpc_ind_ext:
 
 	btst		&0x8,%d0		# is disp only 8 bits?
 	bne.w		fcalc_mem_ind		# calc memory indirect
-	
+
 	mov.l		%d0,L_SCR1(%a6)		# store opword
 
 	mov.l		%d0,%d1			# make extword copy
@@ -5125,7 +5125,7 @@ fno_base_sup:
 	bfextu		%d5{&26:&2},%d0		# get bd size
 #	beq.l		fmovm_error		# if (size == 0) it's reserved
 
-	cmpi.b	 	%d0,&0x2
+	cmpi.b		%d0,&0x2
 	blt.b		fno_bd
 	beq.b		fget_word_bd
 
@@ -5147,7 +5147,7 @@ fget_word_bd:
 	bne.l		fcea_iacc		# yes
 
 	ext.l		%d0			# sign extend bd
-	
+
 fchk_ind:
 	add.l		%d0,%d3			# base += bd
 
@@ -5156,10 +5156,10 @@ fno_bd:
 	bfextu		%d5{&30:&2},%d0		# is od suppressed?
 	beq.w		faii_bd
 
-	cmpi.b	 	%d0,&0x2
+	cmpi.b		%d0,&0x2
 	blt.b		fnull_od
 	beq.b		fword_od
-	
+
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
 	addq.l		&0x4,EXC_EXTWPTR(%a6)	# incr instruction ptr
 	bsr.l		_imem_read_long
@@ -5167,7 +5167,7 @@ fno_bd:
 	tst.l		%d1			# did ifetch fail?
 	bne.l		fcea_iacc		# yes
 
-	bra.b 		fadd_them
+	bra.b		fadd_them
 
 fword_od:
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
@@ -5220,7 +5220,7 @@ fdone_ea:
 	rts
 
 #########################################################
-fcea_err:	
+fcea_err:
 	mov.l		%d3,%a0
 
 	movm.l		(%sp)+,&0x003c		# restore d2-d5
@@ -5230,7 +5230,7 @@ fcea_err:
 fcea_iacc:
 	movm.l		(%sp)+,&0x003c		# restore d2-d5
 	bra.l		iea_iacc
-	
+
 fmovm_out_err:
 	bsr.l		restore
 	mov.w		&0x00e1,%d0
@@ -5246,7 +5246,7 @@ fmovm_err:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	fmovm_ctrl(): emulate fmovm.l of control registers instr	#
+#	fmovm_ctrl(): emulate fmovm.l of control registers instr	#
 #									#
 # XREF ****************************************************************	#
 #	_imem_read_long() - read longword from memory			#
@@ -5254,7 +5254,7 @@ fmovm_err:
 #									#
 # INPUT ***************************************************************	#
 #	None								#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	If _imem_read_long() doesn't fail:				#
 #		USER_FPCR(a6)  = new FPCR value				#
@@ -5262,14 +5262,14 @@ fmovm_err:
 #		USER_FPIAR(a6) = new FPIAR value			#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Decode the instruction type by looking at the extension word 	#
+#	Decode the instruction type by looking at the extension word	#
 # in order to see how many control registers to fetch from memory.	#
 # Fetch them using _imem_read_long(). If this fetch fails, exit through	#
 # the special access error exit handler iea_iacc().			#
 #									#
 # Instruction word decoding:						#
 #									#
-# 	fmovem.l #<data>, {FPIAR&|FPCR&|FPSR}				#
+#	fmovem.l #<data>, {FPIAR&|FPCR&|FPSR}				#
 #									#
 #		WORD1			WORD2				#
 #	1111 0010 00 111100	100$ $$00 0000 0000			#
@@ -5290,7 +5290,7 @@ fmovm_ctrl:
 	beq.w		fctrl_in_6		# yes
 	cmpi.b		%d0,&0x94		# fpcr & fpiar ?
 	beq.b		fctrl_in_5		# yes
-	
+
 # fmovem.l #<data>, fpsr/fpiar
 fctrl_in_3:
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
@@ -5392,14 +5392,14 @@ fctrl_in_7:
 # INPUT ***************************************************************	#
 #	FP_SRC(a6) = fp op1(src)					#
 #	FP_DST(a6) = fp op2(dst)					#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	FP_SRC(a6) = fp op1 scaled(src)					#
 #	FP_DST(a6) = fp op2 scaled(dst)					#
 #	d0         = scale amount					#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	If the DST exponent is > the SRC exponent, set the DST exponent	#
+#	If the DST exponent is > the SRC exponent, set the DST exponent	#
 # equal to 0x3fff and scale the SRC exponent by the value that the	#
 # DST exponent was scaled by. If the SRC exponent is greater or equal,	#
 # do the opposite. Return this scale factor in d0.			#
@@ -5462,7 +5462,7 @@ quick_scale12:
 	andi.w		&0x8000,FP_SCR0_EX(%a6)	# zero src exponent
 	bset		&0x0,1+FP_SCR0_EX(%a6)	# set exp = 1
 
-	mov.l		(%sp)+,%d0		# return SCALE factor	
+	mov.l		(%sp)+,%d0		# return SCALE factor
 	rts
 
 # src exp is >= dst exp; scale src to exp = 0x3fff
@@ -5498,7 +5498,7 @@ quick_scale22:
 	andi.w		&0x8000,FP_SCR1_EX(%a6)	# zero dst exponent
 	bset		&0x0,1+FP_SCR1_EX(%a6)	# set exp = 1
 
-	mov.l		(%sp)+,%d0		# return SCALE factor	
+	mov.l		(%sp)+,%d0		# return SCALE factor
 	rts
 
 ##########################################################################
@@ -5513,14 +5513,14 @@ quick_scale22:
 #									#
 # INPUT ***************************************************************	#
 #	FP_SCR0(a6) = extended precision operand to be scaled		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	FP_SCR0(a6) = scaled extended precision operand			#
 #	d0	    = scale value					#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Set the exponent of the input operand to 0x3fff. Save the value	#
-# of the difference between the original and new exponent. Then, 	#
+#	Set the exponent of the input operand to 0x3fff. Save the value	#
+# of the difference between the original and new exponent. Then,	#
 # normalize the operand if it was a DENORM. Add this normalization	#
 # value to the previous value. Return the result.			#
 #									#
@@ -5566,17 +5566,17 @@ stzs_denorm:
 #									#
 # INPUT ***************************************************************	#
 #	FP_SCR0(a6) = extended precision operand to be scaled		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	FP_SCR0(a6) = scaled extended precision operand			#
 #	d0	    = scale value					#
 #									#
 # ALGORITHM ***********************************************************	#
 #	If the input operand is a DENORM, normalize it.			#
-# 	If the exponent of the input operand is even, set the exponent	#
-# to 0x3ffe and return a scale factor of "(exp-0x3ffe)/2". If the 	#
+#	If the exponent of the input operand is even, set the exponent	#
+# to 0x3ffe and return a scale factor of "(exp-0x3ffe)/2". If the	#
 # exponent of the input operand is off, set the exponent to ox3fff and	#
-# return a scale factor of "(exp-0x3fff)/2". 				#
+# return a scale factor of "(exp-0x3fff)/2".				#
 #									#
 #########################################################################
 
@@ -5640,14 +5640,14 @@ ss_denorm_even:
 #									#
 # INPUT ***************************************************************	#
 #	FP_SCR1(a6) = extended precision operand to be scaled		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	FP_SCR1(a6) = scaled extended precision operand			#
 #	d0	    = scale value					#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Set the exponent of the input operand to 0x3fff. Save the value	#
-# of the difference between the original and new exponent. Then, 	#
+#	Set the exponent of the input operand to 0x3fff. Save the value	#
+# of the difference between the original and new exponent. Then,	#
 # normalize the operand if it was a DENORM. Add this normalization	#
 # value to the previous value. Return the result.			#
 #									#
@@ -5695,21 +5695,21 @@ stzd_denorm:
 # INPUT ***************************************************************	#
 #	FP_SRC(a6) = pointer to extended precision src operand		#
 #	FP_DST(a6) = pointer to extended precision dst operand		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = default result						#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	If either operand (but not both operands) of an operation is a	#
+#	If either operand (but not both operands) of an operation is a	#
 # nonsignalling NAN, then that NAN is returned as the result. If both	#
-# operands are nonsignalling NANs, then the destination operand 	#
+# operands are nonsignalling NANs, then the destination operand		#
 # nonsignalling NAN is returned as the result.				#
-# 	If either operand to an operation is a signalling NAN (SNAN),	#
+#	If either operand to an operation is a signalling NAN (SNAN),	#
 # then, the SNAN bit is set in the FPSR EXC byte. If the SNAN trap	#
-# enable bit is set in the FPCR, then the trap is taken and the 	#
+# enable bit is set in the FPCR, then the trap is taken and the		#
 # destination is not modified. If the SNAN trap enable bit is not set,	#
-# then the SNAN is converted to a nonsignalling NAN (by setting the 	#
-# SNAN bit in the operand to one), and the operation continues as 	#
+# then the SNAN is converted to a nonsignalling NAN (by setting the	#
+# SNAN bit in the operand to one), and the operation continues as	#
 # described in the preceding paragraph, for nonsignalling NANs.		#
 #	Make sure the appropriate FPSR bits are set before exiting.	#
 #									#
@@ -5748,7 +5748,7 @@ dst_qnan2:
 	lea		FP_DST(%a6), %a0
 	cmp.b		STAG(%a6), &SNAN
 	bne		nan_done
-	or.l		&aiop_mask+snan_mask, USER_FPSR(%a6)	
+	or.l		&aiop_mask+snan_mask, USER_FPSR(%a6)
 nan_done:
 	or.l		&nan_mask, USER_FPSR(%a6)
 nan_comp:
@@ -5761,14 +5761,14 @@ nan_not_neg:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	res_operr(): return default result during operand error		#
+#	res_operr(): return default result during operand error		#
 #									#
 # XREF ****************************************************************	#
 #	None								#
 #									#
 # INPUT ***************************************************************	#
 #	None								#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = default operand error result				#
 #									#
@@ -5776,8 +5776,8 @@ nan_not_neg:
 #	An nonsignalling NAN is returned as the default result when	#
 # an operand error occurs for the following cases:			#
 #									#
-# 	Multiply: (Infinity x Zero)					#
-# 	Divide  : (Zero / Zero) || (Infinity / Infinity)		#
+#	Multiply: (Infinity x Zero)					#
+#	Divide  : (Zero / Zero) || (Infinity / Infinity)		#
 #									#
 #########################################################################
 
@@ -5787,12 +5787,12 @@ res_operr:
 	fmovm.x		nan_return(%pc), &0x80
 	rts
 
-nan_return:	
+nan_return:
 	long		0x7fff0000, 0xffffffff, 0xffffffff
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	_denorm(): denormalize an intermediate result			#
+#	_denorm(): denormalize an intermediate result			#
 #									#
 # XREF ****************************************************************	#
 #	None								#
@@ -5800,7 +5800,7 @@ nan_return:
 # INPUT *************************************************************** #
 #	a0 = points to the operand to be denormalized			#
 #		(in the internal extended format)			#
-#		 							#
+#									#
 #	d0 = rounding precision						#
 #									#
 # OUTPUT **************************************************************	#
@@ -5810,10 +5810,10 @@ nan_return:
 #	d0 = guard,round,sticky						#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	According to the exponent underflow threshold for the given	#
+#	According to the exponent underflow threshold for the given	#
 # precision, shift the mantissa bits to the right in order raise the	#
-# exponent of the operand to the threshold value. While shifting the 	#
-# mantissa bits right, maintain the value of the guard, round, and 	#
+# exponent of the operand to the threshold value. While shifting the	#
+# mantissa bits right, maintain the value of the guard, round, and	#
 # sticky bits.								#
 # other notes:								#
 #	(1) _denorm() is called by the underflow routines		#
@@ -5833,7 +5833,7 @@ tbl_thresh:
 _denorm:
 #
 # Load the exponent threshold for the precision selected and check
-# to see if (threshold - exponent) is > 65 in which case we can 
+# to see if (threshold - exponent) is > 65 in which case we can
 # simply calculate the sticky bit and zero the mantissa. otherwise
 # we have to call the denormalization routine.
 #
@@ -5872,7 +5872,7 @@ denorm_set_stky:
 #	%d0{31:29} : initial guard,round,sticky				#
 #	%d1{15:0}  : denormalization threshold				#
 # OUTPUT:								#
-#	%a0	   : points to the denormalized operand		 	#
+#	%a0	   : points to the denormalized operand			#
 #	%d0{31:29} : final guard,round,sticky				#
 #									#
 
@@ -5892,7 +5892,7 @@ dnrm_lp:
 
 #
 # check to see how much less than the underflow threshold the operand
-# exponent is. 
+# exponent is.
 #
 	mov.l		%d1, %d0		# copy the denorm threshold
 	sub.w		FTEMP_EX(%a0), %d1	# d1 = threshold - uns exponent
@@ -5907,7 +5907,7 @@ dnrm_lp:
 # No normalization necessary
 #
 dnrm_no_lp:
-	mov.l		GRS(%a6), %d0 		# restore original g,r,s
+	mov.l		GRS(%a6), %d0		# restore original g,r,s
 	rts
 
 #
@@ -5917,7 +5917,7 @@ dnrm_no_lp:
 # %d1 = "n" = amt to shift
 #
 #	---------------------------------------------------------
-#	|     FTEMP_HI	  |    	FTEMP_LO     |grs000.........000|
+#	|     FTEMP_HI	  |	FTEMP_LO     |grs000.........000|
 #	---------------------------------------------------------
 #	<-(32 - n)-><-(n)-><-(32 - n)-><-(n)-><-(32 - n)-><-(n)->
 #	\	   \		      \			 \
@@ -5928,7 +5928,7 @@ dnrm_no_lp:
 #	     \		\		   \		      \
 #	      \		 \		    \		       \
 #	       \	  \		     \			\
-#	<-(n)-><-(32 - n)-><------(32)-------><------(32)------->	
+#	<-(n)-><-(32 - n)-><------(32)-------><------(32)------->
 #	---------------------------------------------------------
 #	|0.....0| NEW_HI  |  NEW_FTEMP_LO     |grs		|
 #	---------------------------------------------------------
@@ -5969,17 +5969,17 @@ case1_sticky_clear:
 # %d1 = "n" = amt to shift
 #
 #	---------------------------------------------------------
-#	|     FTEMP_HI	  |    	FTEMP_LO     |grs000.........000|
+#	|     FTEMP_HI	  |	FTEMP_LO     |grs000.........000|
 #	---------------------------------------------------------
 #	<-(32 - n)-><-(n)-><-(32 - n)-><-(n)-><-(32 - n)-><-(n)->
 #	\	   \		      \
 #	 \	    \		       \
 #	  \	     \			-------------------
 #	   \	      --------------------		   \
-#	    -------------------	  	  \		    \
-#	     		       \	   \		     \
-#	      		 	\     	    \		      \
-#	       		  	 \	     \		       \
+#	    -------------------		  \		    \
+#			       \	   \		     \
+#				\	    \		      \
+#				 \	     \		       \
 #	<-------(32)------><-(n)-><-(32 - n)-><------(32)------->
 #	---------------------------------------------------------
 #	|0...............0|0....0| NEW_LO     |grs		|
@@ -6050,17 +6050,17 @@ case_3:
 # case (d1 == 64)
 #
 #	---------------------------------------------------------
-#	|     FTEMP_HI	  |    	FTEMP_LO     |grs000.........000|
+#	|     FTEMP_HI	  |	FTEMP_LO     |grs000.........000|
 #	---------------------------------------------------------
 #	<-------(32)------>
-#	\	   	   \
-#	 \	    	    \
-#	  \	     	     \
-#	   \	      	      ------------------------------
+#	\		   \
+#	 \		    \
+#	  \		     \
+#	   \		      ------------------------------
 #	    -------------------------------		    \
-#	     		       		   \		     \
-#	      		 	     	    \		      \
-#	       		  	 	     \		       \
+#					   \		     \
+#					    \		      \
+#					     \		       \
 #					      <-------(32)------>
 #	---------------------------------------------------------
 #	|0...............0|0................0|grs		|
@@ -6078,17 +6078,17 @@ case3_64:
 # case (d1 == 65)
 #
 #	---------------------------------------------------------
-#	|     FTEMP_HI	  |    	FTEMP_LO     |grs000.........000|
+#	|     FTEMP_HI	  |	FTEMP_LO     |grs000.........000|
 #	---------------------------------------------------------
 #	<-------(32)------>
-#	\	   	   \
-#	 \	    	    \
-#	  \	     	     \
-#	   \	      	      ------------------------------
+#	\		   \
+#	 \		    \
+#	  \		     \
+#	   \		      ------------------------------
 #	    --------------------------------		    \
-#	     		       		    \		     \
-#	      		 	     	     \		      \
-#	       		  	 	      \		       \
+#					    \		     \
+#					     \		      \
+#					      \		       \
 #					       <-------(31)----->
 #	---------------------------------------------------------
 #	|0...............0|0................0|0rs		|
@@ -6136,7 +6136,7 @@ case3_set_sticky:
 #	None								#
 #									#
 # INPUT ***************************************************************	#
-#	a0	  = ptr to input operand in internal extended format 	#
+#	a0	  = ptr to input operand in internal extended format	#
 #	d1(hi)    = contains rounding precision:			#
 #			ext = $0000xxxx					#
 #			sgl = $0004xxxx					#
@@ -6167,7 +6167,7 @@ _round:
 #
 # ext_grs() looks at the rounding precision and sets the appropriate
 # G,R,S bits.
-# If (G,R,S == 0) then result is exact and round is done, else set 
+# If (G,R,S == 0) then result is exact and round is done, else set
 # the inex flag in status reg and continue.
 #
 	bsr.l		ext_grs			# extract G,R,S
@@ -6213,7 +6213,7 @@ rnd_plus:
 #	If sign of fp number = 1 (negative), then add 1 to l.	#
 #################################################################
 rnd_mnus:
-	tst.b		FTEMP_SGN(%a0)		# check for sign	
+	tst.b		FTEMP_SGN(%a0)		# check for sign
 	bpl.w		truncate		# if negative then truncate
 
 	mov.l		&0xffffffff, %d0	# force g,r,s to be all f's
@@ -6324,7 +6324,7 @@ truncate:
 #
 # INPUT
 #	d0	   = extended precision g,r,s (in d0{31:29})
-#	d1 	   = {PREC,ROUND}
+#	d1	   = {PREC,ROUND}
 # OUTPUT
 #	d0{31:29}  = guard, round, sticky
 #
@@ -6375,7 +6375,7 @@ ext_grs_sgl:
 	mov.l		&30, %d2		# of the sgl prec. limits
 	lsl.l		%d2, %d3		# shift g-r bits to MSB of d3
 	mov.l		FTEMP_HI(%a0), %d2	# get word 2 for s-bit test
-	and.l		&0x0000003f, %d2	# s bit is the or of all other 
+	and.l		&0x0000003f, %d2	# s bit is the or of all other
 	bne.b		ext_grs_st_stky		# bits to the right of g-r
 	tst.l		FTEMP_LO(%a0)		# test lower mantissa
 	bne.b		ext_grs_st_stky		# if any are set, set sticky
@@ -6385,9 +6385,9 @@ ext_grs_sgl:
 
 #
 # dbl:
-#	96		64	  	32	 11	0
+#	96		64		32	 11	0
 #	-----------------------------------------------------
-#	| EXP	|XXXXXXX|	  	|	 |xx	|grs|
+#	| EXP	|XXXXXXX|		|	 |xx	|grs|
 #	-----------------------------------------------------
 #						  nn\	    /
 #						  ee -------
@@ -6400,7 +6400,7 @@ ext_grs_dbl:
 	mov.l		&30, %d2		# of the dbl prec. limits
 	lsl.l		%d2, %d3		# shift g-r bits to the MSB of d3
 	mov.l		FTEMP_LO(%a0), %d2	# get lower mantissa  for s-bit test
-	and.l		&0x000001ff, %d2	# s bit is the or-ing of all 
+	and.l		&0x000001ff, %d2	# s bit is the or-ing of all
 	bne.b		ext_grs_st_stky		# other bits to the right of g-r
 	tst.l		%d0			# test word original g,r,s
 	bne.b		ext_grs_st_stky		# if any are set, set sticky
@@ -6430,7 +6430,7 @@ ext_grs_end_sd:
 #	a0 = pointer fp extended precision operand to normalize		#
 #									#
 # OUTPUT ************************************************************** #
-# 	d0 = number of bit positions the mantissa was shifted		#
+#	d0 = number of bit positions the mantissa was shifted		#
 #	a0 = the input operand's mantissa is normalized; the exponent	#
 #	     is unchanged.						#
 #									#
@@ -6457,7 +6457,7 @@ norm_hi:
 	mov.l		%d1, FTEMP_LO(%a0)	# store new lo(man)
 
 	mov.l		%d2, %d0		# return shift amount
-	
+
 	mov.l		(%sp)+, %d3		# restore temp regs
 	mov.l		(%sp)+, %d2
 
@@ -6472,7 +6472,7 @@ norm_lo:
 	clr.l		FTEMP_LO(%a0)		# lo(man) is now zero
 
 	mov.l		%d2, %d0		# return shift amount
-	
+
 	mov.l		(%sp)+, %d3		# restore temp regs
 	mov.l		(%sp)+, %d2
 
@@ -6577,27 +6577,27 @@ unnorm_nrm_zero_lrg:
 # whole mantissa is zero so this UNNORM is actually a zero
 #
 unnorm_zero:
-	and.w		&0x8000, FTEMP_EX(%a0) 	# force exponent to zero
+	and.w		&0x8000, FTEMP_EX(%a0)	# force exponent to zero
 
 	mov.b		&ZERO, %d0		# fix optype tag
 	rts
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	set_tag_x(): return the optype of the input ext fp number	#
+#	set_tag_x(): return the optype of the input ext fp number	#
 #									#
 # XREF ****************************************************************	#
 #	None								#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision operand			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	d0 = value of type tag						#
-# 		one of: NORM, INF, QNAN, SNAN, DENORM, UNNORM, ZERO	#
+#		one of: NORM, INF, QNAN, SNAN, DENORM, UNNORM, ZERO	#
 #									#
 # ALGORITHM ***********************************************************	#
-#	Simply test the exponent, j-bit, and mantissa values to 	#
+#	Simply test the exponent, j-bit, and mantissa values to		#
 # determine the type of operand.					#
 #	If it's an unnormalized zero, alter the operand and force it	#
 # to be a normal zero.							#
@@ -6664,20 +6664,20 @@ is_snan_x:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	set_tag_d(): return the optype of the input dbl fp number	#
+#	set_tag_d(): return the optype of the input dbl fp number	#
 #									#
 # XREF ****************************************************************	#
 #	None								#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = points to double precision operand				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	d0 = value of type tag						#
-# 		one of: NORM, INF, QNAN, SNAN, DENORM, ZERO		#
+#		one of: NORM, INF, QNAN, SNAN, DENORM, ZERO		#
 #									#
 # ALGORITHM ***********************************************************	#
-#	Simply test the exponent, j-bit, and mantissa values to 	#
+#	Simply test the exponent, j-bit, and mantissa values to		#
 # determine the type of operand.					#
 #									#
 #########################################################################
@@ -6727,20 +6727,20 @@ is_qnan_d:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	set_tag_s(): return the optype of the input sgl fp number	#
+#	set_tag_s(): return the optype of the input sgl fp number	#
 #									#
 # XREF ****************************************************************	#
 #	None								#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to single precision operand			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	d0 = value of type tag						#
-# 		one of: NORM, INF, QNAN, SNAN, DENORM, ZERO		#
+#		one of: NORM, INF, QNAN, SNAN, DENORM, ZERO		#
 #									#
 # ALGORITHM ***********************************************************	#
-#	Simply test the exponent, j-bit, and mantissa values to 	#
+#	Simply test the exponent, j-bit, and mantissa values to		#
 # determine the type of operand.					#
 #									#
 #########################################################################
@@ -6786,15 +6786,15 @@ is_qnan_s:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	unf_res(): routine to produce default underflow result of a 	#
-#	 	   scaled extended precision number; this is used by 	#
+#	unf_res(): routine to produce default underflow result of a	#
+#		   scaled extended precision number; this is used by	#
 #		   fadd/fdiv/fmul/etc. emulation routines.		#
-# 	unf_res4(): same as above but for fsglmul/fsgldiv which use	#
+#	unf_res4(): same as above but for fsglmul/fsgldiv which use	#
 #		    single round prec and extended prec mode.		#
 #									#
 # XREF ****************************************************************	#
 #	_denorm() - denormalize according to scale factor		#
-# 	_round() - round denormalized number according to rnd prec	#
+#	_round() - round denormalized number according to rnd prec	#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precison operand			#
@@ -6806,15 +6806,15 @@ is_qnan_s:
 #	d0.b = result FPSR_cc which caller may or may not want to save	#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Convert the input operand to "internal format" which means the	#
+#	Convert the input operand to "internal format" which means the	#
 # exponent is extended to 16 bits and the sign is stored in the unused	#
 # portion of the extended precison operand. Denormalize the number	#
-# according to the scale factor passed in d0. Then, round the 		#
+# according to the scale factor passed in d0. Then, round the		#
 # denormalized result.							#
-# 	Set the FPSR_exc bits as appropriate but return the cc bits in	#
+#	Set the FPSR_exc bits as appropriate but return the cc bits in	#
 # d0 in case the caller doesn't want to save them (as is the case for	#
 # fmove out).								#
-# 	unf_res4() for fsglmul/fsgldiv forces the denorm to extended	#
+#	unf_res4() for fsglmul/fsgldiv forces the denorm to extended	#
 # precision and the rounding mode to single.				#
 #									#
 #########################################################################
@@ -6952,23 +6952,23 @@ unf_res4_end:
 #	none								#
 #									#
 # INPUT ***************************************************************	#
-#	d1.b 	= '-1' => (-); '0' => (+)				#
+#	d1.b	= '-1' => (-); '0' => (+)				#
 #   ovf_res():								#
-#	d0 	= rnd mode/prec						#
+#	d0	= rnd mode/prec						#
 #   ovf_res2():								#
-#	hi(d0) 	= rnd prec						#
+#	hi(d0)	= rnd prec						#
 #	lo(d0)	= rnd mode						#
 #									#
 # OUTPUT **************************************************************	#
-#	a0   	= points to extended precision result			#
-#	d0.b 	= condition code bits					#
+#	a0	= points to extended precision result			#
+#	d0.b	= condition code bits					#
 #									#
 # ALGORITHM ***********************************************************	#
 #	The default overflow result can be determined by the sign of	#
 # the result and the rounding mode/prec in effect. These bits are	#
-# concatenated together to create an index into the default result 	#
+# concatenated together to create an index into the default result	#
 # table. A pointer to the correct result is returned in a0. The		#
-# resulting condition codes are returned in d0 in case the caller 	#
+# resulting condition codes are returned in d0 in case the caller	#
 # doesn't want FPSR_cc altered (as is the case for fmove out).		#
 #									#
 #########################################################################
@@ -6998,7 +6998,7 @@ ovf_res2:
 ovf_res_load:
 	mov.b		(tbl_ovfl_cc.b,%pc,%d0.w*1), %d0 # fetch result ccodes
 	lea		(tbl_ovfl_result.b,%pc,%d1.w*8), %a0 # return result ptr
-	
+
 	rts
 
 tbl_ovfl_cc:
@@ -7048,7 +7048,7 @@ tbl_ovfl_result:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	fout(): move from fp register to memory or data register	#
+#	fout(): move from fp register to memory or data register	#
 #									#
 # XREF ****************************************************************	#
 #	_round() - needed to create EXOP for sgl/dbl precision		#
@@ -7068,7 +7068,7 @@ tbl_ovfl_result:
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
 #	d0 = round prec,mode						#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 : intermediate underflow or overflow result if		#
 #	      OVFL/UNFL occurred for a sgl or dbl operand		#
@@ -7087,9 +7087,9 @@ tbl_ovfl_result:
 # w/ the address index register as appropriate w/ _calc_ea_fout(). If	#
 # the source is a denorm and if underflow is enabled, an EXOP must be	#
 # created.								#
-# 	For packed, the k-factor must be fetched from the instruction	#
-# word or a data register. The <ea> must be fixed as w/ extended 	#
-# precision. Then, bindec() is called to create the appropriate 	#
+#	For packed, the k-factor must be fetched from the instruction	#
+# word or a data register. The <ea> must be fixed as w/ extended	#
+# precision. Then, bindec() is called to create the appropriate		#
 # packed result.							#
 #	If at any time an access error is flagged by one of the move-	#
 # to-memory routines, then a special exit must be made so that the	#
@@ -7205,7 +7205,7 @@ fout_word_denorm:
 	ori.l		&0x00800000,%d1		# make smallest sgl
 	fmov.s		%d1,%fp0
 	bra.b		fout_word_norm
-	
+
 #################################################################
 # fmove.l out ###################################################
 #################################################################
@@ -7279,7 +7279,7 @@ fout_ext:
 	mov.l		&0xc,%d0		# pass: opsize is 12 bytes
 
 # we must not yet write the extended precision data to the stack
-# in the pre-decrement case from supervisor mode or else we'll corrupt 
+# in the pre-decrement case from supervisor mode or else we'll corrupt
 # the stack frame. so, leave it in FP_SRC for now and deal with it later...
 	cmpi.b		SPCOND_FLG(%a6),&mda7_flg
 	beq.b		fout_ext_a7
@@ -7366,7 +7366,7 @@ fout_sgl_exg:
 	fmov.l		&0x0,%fpcr		# clear FPCR
 	fmov.l		%fpsr,%d1		# save FPSR
 
-	or.w		%d1,2+USER_FPSR(%a6) 	# set possible inex2/ainex
+	or.w		%d1,2+USER_FPSR(%a6)	# set possible inex2/ainex
 
 fout_sgl_exg_write:
 	mov.b		1+EXC_OPWORD(%a6),%d1	# extract dst mode
@@ -7407,7 +7407,7 @@ fout_sgl_unfl:
 
 	lea		FP_SCR0(%a6),%a0
 	bsr.l		norm			# normalize the DENORM
-	
+
 fout_sgl_unfl_cont:
 	lea		FP_SCR0(%a6),%a0	# pass: ptr to operand
 	mov.l		L_SCR3(%a6),%d1		# pass: rnd prec,mode
@@ -7458,7 +7458,7 @@ fout_sgl_ovfl_cont:
 
 # call ovf_res() w/ sgl prec and the correct rnd mode to create the default
 # overflow result. DON'T save the returned ccodes from ovf_res() since
-# fmove out doesn't alter them. 
+# fmove out doesn't alter them.
 	tst.b		SRC_EX(%a0)		# is operand negative?
 	smi		%d1			# set if so
 	mov.l		L_SCR3(%a6),%d0		# pass: sgl prec,rnd mode
@@ -7513,7 +7513,7 @@ fout_sgl_may_ovfl:
 
 	fabs.x		%fp0			# need absolute value
 	fcmp.b		%fp0,&0x2		# did exponent increase?
-	fblt.w		fout_sgl_exg		# no; go finish NORM	
+	fblt.w		fout_sgl_exg		# no; go finish NORM
 	bra.w		fout_sgl_ovfl		# yes; go handle overflow
 
 ################
@@ -7604,7 +7604,7 @@ fout_dbl_exg:
 	fmov.l		&0x0,%fpcr		# clear FPCR
 	fmov.l		%fpsr,%d0		# save FPSR
 
-	or.w		%d0,2+USER_FPSR(%a6) 	# set possible inex2/ainex
+	or.w		%d0,2+USER_FPSR(%a6)	# set possible inex2/ainex
 
 	mov.l		EXC_EA(%a6),%a1		# pass: dst addr
 	lea		L_SCR1(%a6),%a0		# pass: src addr
@@ -7614,7 +7614,7 @@ fout_dbl_exg:
 	tst.l		%d1			# did dstore fail?
 	bne.l		facc_out_d		# yes
 
-	rts					# no; so we're finished	
+	rts					# no; so we're finished
 
 #
 # here, we know that the operand would UNFL if moved out to double prec,
@@ -7636,7 +7636,7 @@ fout_dbl_unfl:
 
 	lea		FP_SCR0(%a6),%a0
 	bsr.l		norm			# normalize the DENORM
-	
+
 fout_dbl_unfl_cont:
 	lea		FP_SCR0(%a6),%a0	# pass: ptr to operand
 	mov.l		L_SCR3(%a6),%d1		# pass: rnd prec,mode
@@ -7679,7 +7679,7 @@ fout_dbl_ovfl_cont:
 
 # call ovf_res() w/ dbl prec and the correct rnd mode to create the default
 # overflow result. DON'T save the returned ccodes from ovf_res() since
-# fmove out doesn't alter them. 
+# fmove out doesn't alter them.
 	tst.b		SRC_EX(%a0)		# is operand negative?
 	smi		%d1			# set if so
 	mov.l		L_SCR3(%a6),%d0		# pass: dbl prec,rnd mode
@@ -7724,19 +7724,19 @@ fout_dbl_may_ovfl:
 
 	fabs.x		%fp0			# need absolute value
 	fcmp.b		%fp0,&0x2		# did exponent increase?
-	fblt.w		fout_dbl_exg		# no; go finish NORM	
+	fblt.w		fout_dbl_exg		# no; go finish NORM
 	bra.w		fout_dbl_ovfl		# yes; go handle overflow
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	dst_dbl(): create double precision value from extended prec.	#
+#	dst_dbl(): create double precision value from extended prec.	#
 #									#
 # XREF ****************************************************************	#
 #	None								#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to source operand in extended precision		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	d0 = hi(double precision result)				#
 #	d1 = lo(double precision result)				#
@@ -7750,18 +7750,18 @@ fout_dbl_may_ovfl:
 #	get rid of ext integer bit					#
 #	dbl_mant = ext_mant{62:12}					#
 #									#
-#	    	---------------   ---------------    ---------------	#
+#		---------------   ---------------    ---------------	#
 #  extended ->  |s|    exp    |   |1| ms mant   |    | ls mant     |	#
-#	    	---------------   ---------------    ---------------	#
-#	   	 95	    64    63 62	      32      31     11	  0	#
+#		---------------   ---------------    ---------------	#
+#		 95	    64    63 62	      32      31     11	  0	#
 #				     |			     |		#
 #				     |			     |		#
 #				     |			     |		#
-#		 	             v   		     v		#
-#	    		      ---------------   ---------------		#
-#  double   ->  	      |s|exp| mant  |   |  mant       |		#
-#	    		      ---------------   ---------------		#
-#	   	 	      63     51   32   31	       0	#
+#			             v			     v		#
+#			      ---------------   ---------------		#
+#  double   ->		      |s|exp| mant  |   |  mant       |		#
+#			      ---------------   ---------------		#
+#			      63     51   32   31	       0	#
 #									#
 #########################################################################
 
@@ -7797,13 +7797,13 @@ dst_get_dman:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	dst_sgl(): create single precision value from extended prec	#
+#	dst_sgl(): create single precision value from extended prec	#
 #									#
 # XREF ****************************************************************	#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to source operand in extended precision		#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	d0 = single precision result					#
 #									#
@@ -7815,18 +7815,18 @@ dst_get_dman:
 #	get rid of ext integer bit					#
 #	sgl_mant = ext_mant{62:12}					#
 #									#
-#	    	---------------   ---------------    ---------------	#
+#		---------------   ---------------    ---------------	#
 #  extended ->  |s|    exp    |   |1| ms mant   |    | ls mant     |	#
-#	    	---------------   ---------------    ---------------	#
-#	   	 95	    64    63 62	   40 32      31     12	  0	#
+#		---------------   ---------------    ---------------	#
+#		 95	    64    63 62	   40 32      31     12	  0	#
 #				     |	   |				#
 #				     |	   |				#
 #				     |	   |				#
-#		 	             v     v				#
-#	    		      ---------------				#
-#  single   ->  	      |s|exp| mant  |				#
-#	    		      ---------------				#
-#	   	 	      31     22     0				#
+#			             v     v				#
+#			      ---------------				#
+#  single   ->		      |s|exp| mant  |				#
+#			      ---------------				#
+#			      31     22     0				#
 #									#
 #########################################################################
 
@@ -7899,7 +7899,7 @@ fout_pack_type:
 # add the extra condition that only if the k-factor was zero, too, should
 # we zero the exponent
 	tst.l		%d0
-	bne.b		fout_pack_set	
+	bne.b		fout_pack_set
 # "mantissa" is all zero which means that the answer is zero. but, the '040
 # algorithm allows the exponent to be non-zero. the 881/2 do not. therefore,
 # if the mantissa is zero, I will zero the exponent, too.
@@ -7951,7 +7951,7 @@ fout_pack_snan:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	fmul(): emulates the fmul instruction				#
+#	fmul(): emulates the fmul instruction				#
 #	fsmul(): emulates the fsmul instruction				#
 #	fdmul(): emulates the fdmul instruction				#
 #									#
@@ -7960,8 +7960,8 @@ fout_pack_snan:
 #	scale_to_zero_dst() - scale dst exponent to zero		#
 #	unf_res() - return default underflow result			#
 #	ovf_res() - return default overflow result			#
-# 	res_qnan() - return QNAN result					#
-# 	res_snan() - return SNAN result					#
+#	res_qnan() - return QNAN result					#
+#	res_snan() - return SNAN result					#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
@@ -7979,12 +7979,12 @@ fout_pack_snan:
 # instruction won't cause an exception. Use the regular fmul to		#
 # compute a result. Check if the regular operands would have taken	#
 # an exception. If so, return the default overflow/underflow result	#
-# and return the EXOP if exceptions are enabled. Else, scale the 	#
+# and return the EXOP if exceptions are enabled. Else, scale the	#
 # result operand to the proper exponent.				#
 #									#
 #########################################################################
 
-	align 		0x10
+	align		0x10
 tbl_fmul_ovfl:
 	long		0x3fff - 0x7ffe		# ext_max
 	long		0x3fff - 0x407e		# sgl_max
@@ -8045,7 +8045,7 @@ fmul_norm:
 #
 # NORMAL:
 # - the result of the multiply operation will neither overflow nor underflow.
-# - do the multiply to the proper precision and rounding mode. 
+# - do the multiply to the proper precision and rounding mode.
 # - scale the result exponent using the scale factor. if both operands were
 # normalized then we really don't need to go through this scaling. but for now,
 # this will do.
@@ -8056,7 +8056,7 @@ fmul_normal:
 	fmov.l		L_SCR3(%a6),%fpcr	# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fmul.x		FP_SCR0(%a6),%fp0	# execute multiply	
+	fmul.x		FP_SCR0(%a6),%fp0	# execute multiply
 
 	fmov.l		%fpsr,%d1		# save status
 	fmov.l		&0x0,%fpcr		# clear FPCR
@@ -8096,7 +8096,7 @@ fmul_ovfl:
 	fmov.l		L_SCR3(%a6),%fpcr	# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fmul.x		FP_SCR0(%a6),%fp0	# execute multiply	
+	fmul.x		FP_SCR0(%a6),%fp0	# execute multiply
 
 	fmov.l		%fpsr,%d1		# save status
 	fmov.l		&0x0,%fpcr		# clear FPCR
@@ -8175,7 +8175,7 @@ fmul_may_ovfl:
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
 	fmul.x		FP_SCR0(%a6),%fp0	# execute multiply
-	
+
 	fmov.l		%fpsr,%d1		# save status
 	fmov.l		&0x0,%fpcr		# clear FPCR
 
@@ -8184,7 +8184,7 @@ fmul_may_ovfl:
 	fabs.x		%fp0,%fp1		# make a copy of result
 	fcmp.b		%fp1,&0x2		# is |result| >= 2.b?
 	fbge.w		fmul_ovfl_tst		# yes; overflow has occurred
-	
+
 # no, it didn't overflow; we have correct result
 	bra.w		fmul_normal_exit
 
@@ -8201,7 +8201,7 @@ fmul_may_ovfl:
 # of this operation then has its exponent scaled by -0x6000 to create the
 # exceptional operand.
 #
-fmul_unfl:	
+fmul_unfl:
 	bset		&unfl_bit,FPSR_EXCEPT(%a6) # set unfl exc bit
 
 # for fun, let's use only extended precision, round to zero. then, let
@@ -8234,7 +8234,7 @@ fmul_unfl_dis:
 	rts
 
 #
-# UNFL is enabled. 
+# UNFL is enabled.
 #
 fmul_unfl_ena:
 	fmovm.x		FP_SCR1(%a6),&0x40	# load dst op
@@ -8250,7 +8250,7 @@ fmul_unfl_ena:
 fmul_unfl_ena_cont:
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fmul.x		FP_SCR0(%a6),%fp1	# execute multiply	
+	fmul.x		FP_SCR0(%a6),%fp1	# execute multiply
 
 	fmov.l		&0x0,%fpcr		# clear FPCR
 
@@ -8285,7 +8285,7 @@ fmul_may_unfl:
 	fmov.l		L_SCR3(%a6),%fpcr	# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fmul.x		FP_SCR0(%a6),%fp0	# execute multiply	
+	fmul.x		FP_SCR0(%a6),%fp0	# execute multiply
 
 	fmov.l		%fpsr,%d1		# save status
 	fmov.l		&0x0,%fpcr		# clear FPCR
@@ -8309,11 +8309,11 @@ fmul_may_unfl:
 	mov.l		L_SCR3(%a6),%d1
 	andi.b		&0xc0,%d1		# keep rnd prec
 	ori.b		&rz_mode*0x10,%d1	# insert RZ
-	
+
 	fmov.l		%d1,%fpcr		# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fmul.x		FP_SCR0(%a6),%fp1	# execute multiply	
+	fmul.x		FP_SCR0(%a6),%fp1	# execute multiply
 
 	fmov.l		&0x0,%fpcr		# clear FPCR
 	fabs.x		%fp1			# make absolute value
@@ -8455,22 +8455,22 @@ fmul_inf_src:
 #	norm() - normalize mantissa for EXOP on denorm			#
 #	scale_to_zero_src() - scale src exponent to zero		#
 #	ovf_res() - return default overflow result			#
-# 	unf_res() - return default underflow result			#
+#	unf_res() - return default underflow result			#
 #	res_qnan_1op() - return QNAN result				#
 #	res_snan_1op() - return SNAN result				#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
 #	d0 = round prec/mode						#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	fp0 = result							#
 #	fp1 = EXOP (if exception occurred)				#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Handle NANs, infinities, and zeroes as special cases. Divide	#
+#	Handle NANs, infinities, and zeroes as special cases. Divide	#
 # norms into extended, single, and double precision.			#
-# 	Norms can be emulated w/ a regular fmove instruction. For	#
+#	Norms can be emulated w/ a regular fmove instruction. For	#
 # sgl/dbl, must scale exponent and perform an "fmove". Check to see	#
 # if the result would have overflowed/underflowed. If so, use unf_res()	#
 # or ovf_res() to return the default result. Also return EXOP if	#
@@ -8496,7 +8496,7 @@ fin:
 
 	mov.b		STAG(%a6),%d1		# fetch src optype tag
 	bne.w		fin_not_norm		# optimize on non-norm input
-		
+
 #
 # FP MOVE IN: NORMs and DENORMs ONLY!
 #
@@ -8557,9 +8557,9 @@ fin_denorm_unfl_ena:
 
 #
 # operand is to be rounded to single or double precision
-#	
+#
 fin_not_ext:
-	cmpi.b		%d0,&s_mode*0x10 	# separate sgl/dbl prec
+	cmpi.b		%d0,&s_mode*0x10	# separate sgl/dbl prec
 	bne.b		fin_dbl
 
 #
@@ -8643,10 +8643,10 @@ fin_sd_unfl_dis:
 	bsr.l		unf_res			# calculate default result
 	or.b		%d0,FPSR_CC(%a6)	# unf_res may have set 'Z'
 	fmovm.x		FP_SCR0(%a6),&0x80	# return default result in fp0
-	rts	
+	rts
 
 #
-# operand will underflow AND underflow or inexact is enabled. 
+# operand will underflow AND underflow or inexact is enabled.
 # therefore, we must return the result rounded to extended precision.
 #
 fin_sd_unfl_ena:
@@ -8768,7 +8768,7 @@ fin_not_norm:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	fdiv(): emulates the fdiv instruction				#
+#	fdiv(): emulates the fdiv instruction				#
 #	fsdiv(): emulates the fsdiv instruction				#
 #	fddiv(): emulates the fddiv instruction				#
 #									#
@@ -8777,8 +8777,8 @@ fin_not_norm:
 #	scale_to_zero_dst() - scale dst exponent to zero		#
 #	unf_res() - return default underflow result			#
 #	ovf_res() - return default overflow result			#
-# 	res_qnan() - return QNAN result					#
-# 	res_snan() - return SNAN result					#
+#	res_qnan() - return QNAN result					#
+#	res_snan() - return SNAN result					#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
@@ -8796,7 +8796,7 @@ fin_not_norm:
 # instruction won't cause an exception. Use the regular fdiv to		#
 # compute a result. Check if the regular operands would have taken	#
 # an exception. If so, return the default overflow/underflow result	#
-# and return the EXOP if exceptions are enabled. Else, scale the 	#
+# and return the EXOP if exceptions are enabled. Else, scale the	#
 # result operand to the proper exponent.				#
 #									#
 #########################################################################
@@ -8833,7 +8833,7 @@ fdiv:
 	or.b		STAG(%a6),%d1		# combine src tags
 
 	bne.w		fdiv_not_norm		# optimize on non-norm input
-		
+
 #
 # DIVIDE: NORMs and DENORMs ONLY!
 #
@@ -8899,7 +8899,7 @@ tbl_fdiv_ovfl2:
 fdiv_no_ovfl:
 	mov.l		(%sp)+,%d0		# restore scale factor
 	bra.b		fdiv_normal_exit
-	
+
 fdiv_may_ovfl:
 	mov.l		%d0,-(%sp)		# save scale factor
 
@@ -8932,7 +8932,7 @@ fdiv_ovfl_tst:
 	bne.b		fdiv_ovfl_ena		# yes
 
 fdiv_ovfl_dis:
-	btst		&neg_bit,FPSR_CC(%a6) 	# is result negative?
+	btst		&neg_bit,FPSR_CC(%a6)	# is result negative?
 	sne		%d1			# set sign param accordingly
 	mov.l		L_SCR3(%a6),%d0		# pass prec:rnd
 	bsr.l		ovf_res			# calculate default result
@@ -9004,7 +9004,7 @@ fdiv_unfl_dis:
 	rts
 
 #
-# UNFL is enabled. 
+# UNFL is enabled.
 #
 fdiv_unfl_ena:
 	fmovm.x		FP_SCR1(%a6),&0x40	# load dst op
@@ -9068,8 +9068,8 @@ fdiv_may_unfl:
 #
 # we still don't know if underflow occurred. result is ~ equal to 1. but,
 # we don't know if the result was an underflow that rounded up to a 1
-# or a normalized number that rounded down to a 1. so, redo the entire 
-# operation using RZ as the rounding mode to see what the pre-rounded 
+# or a normalized number that rounded down to a 1. so, redo the entire
+# operation using RZ as the rounding mode to see what the pre-rounded
 # result is. this case should be relatively rare.
 #
 	fmovm.x		FP_SCR1(%a6),&0x40	# load dst op into fp1
@@ -9196,8 +9196,8 @@ fdiv_inf_load_p:
 	rts
 
 #
-# The destination was an INF w/ an In Range or ZERO source, the result is 
-# an INF w/ the proper sign. 
+# The destination was an INF w/ an In Range or ZERO source, the result is
+# an INF w/ the proper sign.
 # The 68881/882 returns the destination INF w/ the new sign(if the j-bit of the
 # dst INF is set, then then j-bit of the result INF is also set).
 #
@@ -9227,11 +9227,11 @@ fdiv_inf_dst_p:
 #	fdneg(): emulates the fdneg instruction				#
 #									#
 # XREF ****************************************************************	#
-# 	norm() - normalize a denorm to provide EXOP			#
+#	norm() - normalize a denorm to provide EXOP			#
 #	scale_to_zero_src() - scale sgl/dbl source exponent		#
 #	ovf_res() - return default overflow result			#
 #	unf_res() - return default underflow result			#
-# 	res_qnan_1op() - return QNAN result				#
+#	res_qnan_1op() - return QNAN result				#
 #	res_snan_1op() - return SNAN result				#
 #									#
 # INPUT ***************************************************************	#
@@ -9269,7 +9269,7 @@ fneg:
 	mov.l		%d0,L_SCR3(%a6)		# store rnd info
 	mov.b		STAG(%a6),%d1
 	bne.w		fneg_not_norm		# optimize on non-norm input
-		
+
 #
 # NEGATE SIGN : norms and denorms ONLY!
 #
@@ -9328,7 +9328,7 @@ fneg_ext_unfl_ena:
 	neg.w		%d0			# new exponent = -(shft val)
 	addi.w		&0x6000,%d0		# add new bias to exponent
 	mov.w		FP_SCR0_EX(%a6),%d1	# fetch old sign,exp
-	andi.w		&0x8000,%d1	 	# keep old sign
+	andi.w		&0x8000,%d1		# keep old sign
 	andi.w		&0x7fff,%d0		# clear sign position
 	or.w		%d1,%d0			# concat old sign, new exponent
 	mov.w		%d0,FP_SCR0_EX(%a6)	# insert new exponent
@@ -9407,7 +9407,7 @@ fneg_dbl:
 fneg_sd_unfl:
 	bset		&unfl_bit,FPSR_EXCEPT(%a6) # set unfl exc bit
 
-	eori.b		&0x80,FP_SCR0_EX(%a6)	# negate sign	
+	eori.b		&0x80,FP_SCR0_EX(%a6)	# negate sign
 	bpl.b		fneg_sd_unfl_tst
 	bset		&neg_bit,FPSR_CC(%a6)	# set 'N' ccode bit
 
@@ -9423,10 +9423,10 @@ fneg_sd_unfl_dis:
 	bsr.l		unf_res			# calculate default result
 	or.b		%d0,FPSR_CC(%a6)	# unf_res may have set 'Z'
 	fmovm.x		FP_SCR0(%a6),&0x80	# return default result in fp0
-	rts	
+	rts
 
 #
-# operand will underflow AND underflow is enabled. 
+# operand will underflow AND underflow is enabled.
 # therefore, we must return the result rounded to extended precision.
 #
 fneg_sd_unfl_ena:
@@ -9548,19 +9548,19 @@ fneg_not_norm:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	ftst(): emulates the ftest instruction				#
+#	ftst(): emulates the ftest instruction				#
 #									#
 # XREF ****************************************************************	#
-# 	res{s,q}nan_1op() - set NAN result for monadic instruction	#
+#	res{s,q}nan_1op() - set NAN result for monadic instruction	#
 #									#
 # INPUT ***************************************************************	#
-# 	a0 = pointer to extended precision source operand		#
+#	a0 = pointer to extended precision source operand		#
 #									#
 # OUTPUT **************************************************************	#
 #	none								#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Check the source operand tag (STAG) and set the FPCR according	#
+#	Check the source operand tag (STAG) and set the FPCR according	#
 # to the operand type and sign.						#
 #									#
 #########################################################################
@@ -9569,7 +9569,7 @@ fneg_not_norm:
 ftst:
 	mov.b		STAG(%a6),%d1
 	bne.b		ftst_not_norm		# optimize on non-norm input
-		
+
 #
 # Norm:
 #
@@ -9617,7 +9617,7 @@ ftst_inf_p:
 ftst_inf_m:
 	mov.b		&inf_bmask+neg_bmask,FPSR_CC(%a6) # set 'I','N' ccode bits
 	rts
-	
+
 #
 # Zero:
 #
@@ -9646,13 +9646,13 @@ ftst_zero_m:
 #	fp0 = result							#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Separate according to operand type. Unnorms don't pass through 	#
-# here. For norms, load the rounding mode/prec, execute a "fint", then 	#
+#	Separate according to operand type. Unnorms don't pass through	#
+# here. For norms, load the rounding mode/prec, execute a "fint", then	#
 # store the resulting FPSR bits.					#
-# 	For denorms, force the j-bit to a one and do the same as for	#
-# norms. Denorms are so low that the answer will either be a zero or a 	#
+#	For denorms, force the j-bit to a one and do the same as for	#
+# norms. Denorms are so low that the answer will either be a zero or a	#
 # one.									#
-# 	For zeroes/infs/NANs, return the same while setting the FPSR	#
+#	For zeroes/infs/NANs, return the same while setting the FPSR	#
 # as appropriate.							#
 #									#
 #########################################################################
@@ -9661,7 +9661,7 @@ ftst_zero_m:
 fint:
 	mov.b		STAG(%a6),%d1
 	bne.b		fint_not_norm		# optimize on non-norm input
-		
+
 #
 # Norm:
 #
@@ -9671,7 +9671,7 @@ fint_norm:
 	fmov.l		%d0,%fpcr		# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fint.x 		SRC(%a0),%fp0		# execute fint
+	fint.x		SRC(%a0),%fp0		# execute fint
 
 	fmov.l		&0x0,%fpcr		# clear FPCR
 	fmov.l		%fpsr,%d0		# save FPSR
@@ -9749,16 +9749,16 @@ fint_inf_m:
 #	d0 = round precision/mode					#
 #									#
 # OUTPUT **************************************************************	#
-# 	fp0 = result							#
+#	fp0 = result							#
 #									#
 # ALGORITHM ***********************************************************	#
 #	Separate according to operand type. Unnorms don't pass through	#
-# here. For norms, load the rounding mode/prec, execute a "fintrz", 	#
+# here. For norms, load the rounding mode/prec, execute a "fintrz",	#
 # then store the resulting FPSR bits.					#
-# 	For denorms, force the j-bit to a one and do the same as for	#
+#	For denorms, force the j-bit to a one and do the same as for	#
 # norms. Denorms are so low that the answer will either be a zero or a	#
 # one.									#
-# 	For zeroes/infs/NANs, return the same while setting the FPSR	#
+#	For zeroes/infs/NANs, return the same while setting the FPSR	#
 # as appropriate.							#
 #									#
 #########################################################################
@@ -9767,7 +9767,7 @@ fint_inf_m:
 fintrz:
 	mov.b		STAG(%a6),%d1
 	bne.b		fintrz_not_norm		# optimize on non-norm input
-		
+
 #
 # Norm:
 #
@@ -9862,17 +9862,17 @@ fintrz_inf_m:
 #									#
 # ALGORITHM ***********************************************************	#
 #	Handle NANs, infinities, and zeroes as special cases. Divide	#
-# norms into extended, single, and double precision. 			#
-# 	Simply clear sign for extended precision norm. Ext prec denorm	#
+# norms into extended, single, and double precision.			#
+#	Simply clear sign for extended precision norm. Ext prec denorm	#
 # gets an EXOP created for it since it's an underflow.			#
 #	Double and single precision can overflow and underflow. First,	#
 # scale the operand such that the exponent is zero. Perform an "fabs"	#
-# using the correct rnd mode/prec. Check to see if the original 	#
+# using the correct rnd mode/prec. Check to see if the original		#
 # exponent would take an exception. If so, use unf_res() or ovf_res()	#
 # to calculate the default result. Also, create the EXOP for the	#
-# exceptional case. If no exception should occur, insert the correct 	#
+# exceptional case. If no exception should occur, insert the correct	#
 # result exponent and return.						#
-# 	Unnorms don't pass through here.				#
+#	Unnorms don't pass through here.				#
 #									#
 #########################################################################
 
@@ -9892,7 +9892,7 @@ fabs:
 	mov.l		%d0,L_SCR3(%a6)		# store rnd info
 	mov.b		STAG(%a6),%d1
 	bne.w		fabs_not_norm		# optimize on non-norm input
-		
+
 #
 # ABSOLUTE VALUE: norms and denorms ONLY!
 #
@@ -10038,10 +10038,10 @@ fabs_sd_unfl_dis:
 	bsr.l		unf_res			# calculate default result
 	or.b		%d0,FPSR_CC(%a6)	# set possible 'Z' ccode
 	fmovm.x		FP_SCR0(%a6),&0x80	# return default result in fp0
-	rts	
+	rts
 
 #
-# operand will underflow AND underflow is enabled. 
+# operand will underflow AND underflow is enabled.
 # therefore, we must return the result rounded to extended precision.
 #
 fabs_sd_unfl_ena:
@@ -10163,10 +10163,10 @@ fabs_inf:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	fcmp(): fp compare op routine					#
+#	fcmp(): fp compare op routine					#
 #									#
 # XREF ****************************************************************	#
-# 	res_qnan() - return QNAN result					#
+#	res_qnan() - return QNAN result					#
 #	res_snan() - return SNAN result					#
 #									#
 # INPUT ***************************************************************	#
@@ -10178,7 +10178,7 @@ fabs_inf:
 #	None								#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Handle NANs and denorms as special cases. For everything else,	#
+#	Handle NANs and denorms as special cases. For everything else,	#
 # just use the actual fcmp instruction to produce the correct condition	#
 # codes.								#
 #									#
@@ -10191,14 +10191,14 @@ fcmp:
 	lsl.b		&0x3,%d1
 	or.b		STAG(%a6),%d1
 	bne.b		fcmp_not_norm		# optimize on non-norm input
-		
+
 #
 # COMPARE FP OPs : NORMs, ZEROs, INFs, and "corrected" DENORMs
 #
 fcmp_norm:
 	fmovm.x		DST(%a1),&0x80		# load dst op
 
-	fcmp.x 		%fp0,SRC(%a0)		# do compare
+	fcmp.x		%fp0,SRC(%a0)		# do compare
 
 	fmov.l		%fpsr,%d0		# save FPSR
 	rol.l		&0x8,%d0		# extract ccode bits
@@ -10219,7 +10219,7 @@ tbl_fcmp_op:
 	short		fcmp_norm	- tbl_fcmp_op # NORM - ZERO
 	short		fcmp_norm	- tbl_fcmp_op # NORM - INF
 	short		fcmp_res_qnan	- tbl_fcmp_op # NORM - QNAN
-	short		fcmp_nrm_dnrm 	- tbl_fcmp_op # NORM - DENORM
+	short		fcmp_nrm_dnrm	- tbl_fcmp_op # NORM - DENORM
 	short		fcmp_res_snan	- tbl_fcmp_op # NORM - SNAN
 	short		tbl_fcmp_op	- tbl_fcmp_op #
 	short		tbl_fcmp_op	- tbl_fcmp_op #
@@ -10281,8 +10281,8 @@ fcmp_res_snan:
 	rts
 
 #
-# DENORMs are a little more difficult. 
-# If you have a 2 DENORMs, then you can just force the j-bit to a one 
+# DENORMs are a little more difficult.
+# If you have a 2 DENORMs, then you can just force the j-bit to a one
 # and use the fcmp_norm routine.
 # If you have a DENORM and an INF or ZERO, just force the DENORM's j-bit to a one
 # and use the fcmp_norm routine.
@@ -10323,7 +10323,7 @@ fcmp_dnrm_sd:
 	mov.l		SRC_LO(%a0),FP_SCR0_LO(%a6)
 	lea		FP_SCR1(%a6),%a1
 	lea		FP_SCR0(%a6),%a0
-	bra.w		fcmp_norm	
+	bra.w		fcmp_norm
 
 fcmp_nrm_dnrm:
 	mov.b		SRC_EX(%a0),%d0		# determine if like signs
@@ -10355,15 +10355,15 @@ fcmp_dnrm_nrm_m:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	fsglmul(): emulates the fsglmul instruction			#
+#	fsglmul(): emulates the fsglmul instruction			#
 #									#
 # XREF ****************************************************************	#
 #	scale_to_zero_src() - scale src exponent to zero		#
 #	scale_to_zero_dst() - scale dst exponent to zero		#
 #	unf_res4() - return default underflow result for sglop		#
 #	ovf_res() - return default overflow result			#
-# 	res_qnan() - return QNAN result					#
-# 	res_snan() - return SNAN result					#
+#	res_qnan() - return QNAN result					#
+#	res_snan() - return SNAN result					#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
@@ -10381,7 +10381,7 @@ fcmp_dnrm_nrm_m:
 # instruction won't cause an exception. Use the regular fsglmul to	#
 # compute a result. Check if the regular operands would have taken	#
 # an exception. If so, return the default overflow/underflow result	#
-# and return the EXOP if exceptions are enabled. Else, scale the 	#
+# and return the EXOP if exceptions are enabled. Else, scale the	#
 # result operand to the proper exponent.				#
 #									#
 #########################################################################
@@ -10413,11 +10413,11 @@ fsglmul_norm:
 
 	add.l		(%sp)+,%d0		# SCALE_FACTOR = scale1 + scale2
 
-	cmpi.l		%d0,&0x3fff-0x7ffe 	# would result ovfl?
+	cmpi.l		%d0,&0x3fff-0x7ffe	# would result ovfl?
 	beq.w		fsglmul_may_ovfl	# result may rnd to overflow
 	blt.w		fsglmul_ovfl		# result will overflow
 
-	cmpi.l		%d0,&0x3fff+0x0001 	# would result unfl?
+	cmpi.l		%d0,&0x3fff+0x0001	# would result unfl?
 	beq.w		fsglmul_may_unfl	# result may rnd to no unfl
 	bgt.w		fsglmul_unfl		# result will underflow
 
@@ -10504,7 +10504,7 @@ fsglmul_may_ovfl:
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
 	fsglmul.x	FP_SCR0(%a6),%fp0	# execute sgl multiply
-	
+
 	fmov.l		%fpsr,%d1		# save status
 	fmov.l		&0x0,%fpcr		# clear FPCR
 
@@ -10513,7 +10513,7 @@ fsglmul_may_ovfl:
 	fabs.x		%fp0,%fp1		# make a copy of result
 	fcmp.b		%fp1,&0x2		# is |result| >= 2.b?
 	fbge.w		fsglmul_ovfl_tst	# yes; overflow has occurred
-	
+
 # no, it didn't overflow; we have correct result
 	bra.w		fsglmul_normal_exit
 
@@ -10547,7 +10547,7 @@ fsglmul_unfl_dis:
 	rts
 
 #
-# UNFL is enabled. 
+# UNFL is enabled.
 #
 fsglmul_unfl_ena:
 	fmovm.x		FP_SCR1(%a6),&0x40	# load dst op
@@ -10555,7 +10555,7 @@ fsglmul_unfl_ena:
 	fmov.l		L_SCR3(%a6),%fpcr	# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fsglmul.x	FP_SCR0(%a6),%fp1	# execute sgl multiply	
+	fsglmul.x	FP_SCR0(%a6),%fp1	# execute sgl multiply
 
 	fmov.l		&0x0,%fpcr		# clear FPCR
 
@@ -10580,7 +10580,7 @@ fsglmul_may_unfl:
 	fmov.l		L_SCR3(%a6),%fpcr	# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fsglmul.x	FP_SCR0(%a6),%fp0	# execute sgl multiply	
+	fsglmul.x	FP_SCR0(%a6),%fp0	# execute sgl multiply
 
 	fmov.l		%fpsr,%d1		# save status
 	fmov.l		&0x0,%fpcr		# clear FPCR
@@ -10604,11 +10604,11 @@ fsglmul_may_unfl:
 	mov.l		L_SCR3(%a6),%d1
 	andi.b		&0xc0,%d1		# keep rnd prec
 	ori.b		&rz_mode*0x10,%d1	# insert RZ
-	
+
 	fmov.l		%d1,%fpcr		# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fsglmul.x	FP_SCR0(%a6),%fp1	# execute sgl multiply	
+	fsglmul.x	FP_SCR0(%a6),%fp1	# execute sgl multiply
 
 	fmov.l		&0x0,%fpcr		# clear FPCR
 	fabs.x		%fp1			# make absolute value
@@ -10696,15 +10696,15 @@ fsglmul_inf_dst:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	fsgldiv(): emulates the fsgldiv instruction			#
+#	fsgldiv(): emulates the fsgldiv instruction			#
 #									#
 # XREF ****************************************************************	#
 #	scale_to_zero_src() - scale src exponent to zero		#
 #	scale_to_zero_dst() - scale dst exponent to zero		#
 #	unf_res4() - return default underflow result for sglop		#
 #	ovf_res() - return default overflow result			#
-# 	res_qnan() - return QNAN result					#
-# 	res_snan() - return SNAN result					#
+#	res_qnan() - return QNAN result					#
+#	res_snan() - return SNAN result					#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
@@ -10722,7 +10722,7 @@ fsglmul_inf_dst:
 # instruction won't cause an exception. Use the regular fsgldiv to	#
 # compute a result. Check if the regular operands would have taken	#
 # an exception. If so, return the default overflow/underflow result	#
-# and return the EXOP if exceptions are enabled. Else, scale the 	#
+# and return the EXOP if exceptions are enabled. Else, scale the	#
 # result operand to the proper exponent.				#
 #									#
 #########################################################################
@@ -10737,7 +10737,7 @@ fsgldiv:
 	or.b		STAG(%a6),%d1		# combine src tags
 
 	bne.w		fsgldiv_not_norm	# optimize on non-norm input
-		
+
 #
 # DIVIDE: NORMs and DENORMs ONLY!
 #
@@ -10764,7 +10764,7 @@ fsgldiv_norm:
 	cmpi.l		%d0,&0x3fff-0x7ffe
 	ble.w		fsgldiv_may_ovfl
 
-	cmpi.l		%d0,&0x3fff-0x0000 	# will result underflow?
+	cmpi.l		%d0,&0x3fff-0x0000	# will result underflow?
 	beq.w		fsgldiv_may_unfl	# maybe
 	bgt.w		fsgldiv_unfl		# yes; go handle underflow
 
@@ -10824,7 +10824,7 @@ fsgldiv_ovfl_tst:
 	bne.b		fsgldiv_ovfl_ena	# yes
 
 fsgldiv_ovfl_dis:
-	btst		&neg_bit,FPSR_CC(%a6) 	# is result negative
+	btst		&neg_bit,FPSR_CC(%a6)	# is result negative
 	sne		%d1			# set sign param accordingly
 	mov.l		L_SCR3(%a6),%d0		# pass prec:rnd
 	andi.b		&0x30,%d0		# kill precision
@@ -10880,7 +10880,7 @@ fsgldiv_unfl_dis:
 	rts
 
 #
-# UNFL is enabled. 
+# UNFL is enabled.
 #
 fsgldiv_unfl_ena:
 	fmovm.x		FP_SCR1(%a6),&0x40	# load dst op
@@ -10931,8 +10931,8 @@ fsgldiv_may_unfl:
 #
 # we still don't know if underflow occurred. result is ~ equal to 1. but,
 # we don't know if the result was an underflow that rounded up to a 1
-# or a normalized number that rounded down to a 1. so, redo the entire 
-# operation using RZ as the rounding mode to see what the pre-rounded 
+# or a normalized number that rounded down to a 1. so, redo the entire
+# operation using RZ as the rounding mode to see what the pre-rounded
 # result is. this case should be relatively rare.
 #
 	fmovm.x		FP_SCR1(%a6),&0x40	# load dst op into %fp1
@@ -11036,25 +11036,25 @@ fsgldiv_inf_dst:
 #	fdadd(): emulates the fdadd instruction				#
 #									#
 # XREF ****************************************************************	#
-# 	addsub_scaler2() - scale the operands so they won't take exc	#
+#	addsub_scaler2() - scale the operands so they won't take exc	#
 #	ovf_res() - return default overflow result			#
 #	unf_res() - return default underflow result			#
 #	res_qnan() - set QNAN result					#
-# 	res_snan() - set SNAN result					#
+#	res_snan() - set SNAN result					#
 #	res_operr() - set OPERR result					#
 #	scale_to_zero_src() - set src operand exponent equal to zero	#
 #	scale_to_zero_dst() - set dst operand exponent equal to zero	#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
-# 	a1 = pointer to extended precision destination operand		#
+#	a1 = pointer to extended precision destination operand		#
 #									#
 # OUTPUT **************************************************************	#
 #	fp0 = result							#
 #	fp1 = EXOP (if exception occurred)				#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Handle NANs, infinities, and zeroes as special cases. Divide	#
+#	Handle NANs, infinities, and zeroes as special cases. Divide	#
 # norms into extended, single, and double precision.			#
 #	Do addition after scaling exponents such that exception won't	#
 # occur. Then, check result exponent to see if exception would have	#
@@ -11268,7 +11268,7 @@ fadd_unfl_ena_sd:
 
 #
 # result is equal to the smallest normalized number in the selected precision
-# if the precision is extended, this result could not have come from an 
+# if the precision is extended, this result could not have come from an
 # underflow that rounded up.
 #
 fadd_may_unfl:
@@ -11290,7 +11290,7 @@ fadd_may_unfl:
 # ok, so now the result has a exponent equal to the smallest normalized
 # exponent for the selected precision. also, the mantissa is equal to
 # 0x8000000000000000 and this mantissa is the result of rounding non-zero
-# g,r,s. 
+# g,r,s.
 # now, we must determine whether the pre-rounded result was an underflow
 # rounded "up" or a normalized number rounded "down".
 # so, we do this be re-executing the add using RZ as the rounding mode and
@@ -11401,7 +11401,7 @@ fadd_zero_2:
 	fmov.s		&0x00000000,%fp0	# return +ZERO
 	mov.b		&z_bmask,FPSR_CC(%a6)	# set Z
 	rts
-	
+
 #
 # the ZEROes have opposite signs:
 # - therefore, we return +ZERO if the rounding modes are RN,RZ, or RP.
@@ -11455,7 +11455,7 @@ fadd_inf_2:
 	eor.b		%d1,%d0
 	bmi.l		res_operr		# weed out (-INF)+(+INF)
 
-# ok, so it's not an OPERR. but, we do have to remember to return the 
+# ok, so it's not an OPERR. but, we do have to remember to return the
 # src INF since that's where the 881/882 gets the j-bit from...
 
 #
@@ -11489,25 +11489,25 @@ fadd_inf_done:
 #	fdsub(): emulates the fdsub instruction				#
 #									#
 # XREF ****************************************************************	#
-# 	addsub_scaler2() - scale the operands so they won't take exc	#
+#	addsub_scaler2() - scale the operands so they won't take exc	#
 #	ovf_res() - return default overflow result			#
 #	unf_res() - return default underflow result			#
 #	res_qnan() - set QNAN result					#
-# 	res_snan() - set SNAN result					#
+#	res_snan() - set SNAN result					#
 #	res_operr() - set OPERR result					#
 #	scale_to_zero_src() - set src operand exponent equal to zero	#
 #	scale_to_zero_dst() - set dst operand exponent equal to zero	#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
-# 	a1 = pointer to extended precision destination operand		#
+#	a1 = pointer to extended precision destination operand		#
 #									#
 # OUTPUT **************************************************************	#
 #	fp0 = result							#
 #	fp1 = EXOP (if exception occurred)				#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Handle NANs, infinities, and zeroes as special cases. Divide	#
+#	Handle NANs, infinities, and zeroes as special cases. Divide	#
 # norms into extended, single, and double precision.			#
 #	Do subtraction after scaling exponents such that exception won't#
 # occur. Then, check result exponent to see if exception would have	#
@@ -11657,7 +11657,7 @@ fsub_unfl:
 	add.l		&0xc,%sp
 
 	fmovm.x		FP_SCR1(%a6),&0x80	# load dst op
-	
+
 	fmov.l		&rz_mode*0x10,%fpcr	# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
@@ -11721,7 +11721,7 @@ fsub_unfl_ena_sd:
 
 #
 # result is equal to the smallest normalized number in the selected precision
-# if the precision is extended, this result could not have come from an 
+# if the precision is extended, this result could not have come from an
 # underflow that rounded up.
 #
 fsub_may_unfl:
@@ -11743,7 +11743,7 @@ fsub_may_unfl:
 # ok, so now the result has a exponent equal to the smallest normalized
 # exponent for the selected precision. also, the mantissa is equal to
 # 0x8000000000000000 and this mantissa is the result of rounding non-zero
-# g,r,s. 
+# g,r,s.
 # now, we must determine whether the pre-rounded result was an underflow
 # rounded "up" or a normalized number rounded "down".
 # so, we do this be re-executing the add using RZ as the rounding mode and
@@ -11899,7 +11899,7 @@ fsub_zero_src:
 
 #
 # both operands are INFs. an OPERR will result if the INFs have the
-# same signs. else, 
+# same signs. else,
 #
 fsub_inf_2:
 	mov.b		SRC_EX(%a0),%d0		# exclusive or the signs
@@ -11914,7 +11914,7 @@ fsub_inf_src:
 	fmovm.x		SRC(%a0),&0x80		# return src INF
 	fneg.x		%fp0			# invert sign
 	fbge.w		fsub_inf_done		# sign is now positive
-	mov.b		&neg_bmask+inf_bmask,FPSR_CC(%a6) # set INF/NEG	
+	mov.b		&neg_bmask+inf_bmask,FPSR_CC(%a6) # set INF/NEG
 	rts
 
 fsub_inf_dst:
@@ -11930,7 +11930,7 @@ fsub_inf_done:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	fsqrt(): emulates the fsqrt instruction				#
+#	fsqrt(): emulates the fsqrt instruction				#
 #	fssqrt(): emulates the fssqrt instruction			#
 #	fdsqrt(): emulates the fdsqrt instruction			#
 #									#
@@ -11938,8 +11938,8 @@ fsub_inf_done:
 #	scale_sqrt() - scale the source operand				#
 #	unf_res() - return default underflow result			#
 #	ovf_res() - return default overflow result			#
-# 	res_qnan_1op() - return QNAN result				#
-# 	res_snan_1op() - return SNAN result				#
+#	res_qnan_1op() - return QNAN result				#
+#	res_snan_1op() - return SNAN result				#
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to extended precision source operand		#
@@ -11956,7 +11956,7 @@ fsub_inf_done:
 # instruction won't cause an exception. Use the regular fsqrt to	#
 # compute a result. Check if the regular operands would have taken	#
 # an exception. If so, return the default overflow/underflow result	#
-# and return the EXOP if exceptions are enabled. Else, scale the 	#
+# and return the EXOP if exceptions are enabled. Else, scale the	#
 # result operand to the proper exponent.				#
 #									#
 #########################################################################
@@ -11978,7 +11978,7 @@ fsqrt:
 	clr.w		%d1
 	mov.b		STAG(%a6),%d1
 	bne.w		fsqrt_not_norm		# optimize on non-norm input
-		
+
 #
 # SQUARE ROOT: norms and denorms ONLY!
 #
@@ -12100,7 +12100,7 @@ fsqrt_sd_unfl:
 	fmov.l		&rz_mode*0x10,%fpcr	# set FPCR
 	fmov.l		&0x0,%fpsr		# clear FPSR
 
-	fsqrt.x 	FP_SCR0(%a6),%fp0	# execute square root
+	fsqrt.x		FP_SCR0(%a6),%fp0	# execute square root
 
 	fmov.l		%fpsr,%d1		# save status
 	fmov.l		&0x0,%fpcr		# clear FPCR
@@ -12120,10 +12120,10 @@ fsqrt_sd_unfl_dis:
 	bsr.l		unf_res			# calculate default result
 	or.b		%d0,FPSR_CC(%a6)	# set possible 'Z' ccode
 	fmovm.x		FP_SCR0(%a6),&0x80	# return default result in fp0
-	rts	
+	rts
 
 #
-# operand will underflow AND underflow is enabled. 
+# operand will underflow AND underflow is enabled.
 # therefore, we must return the result rounded to extended precision.
 #
 fsqrt_sd_unfl_ena:
@@ -12239,15 +12239,15 @@ fsqrt_not_norm:
 	bra.l		res_qnan_1op
 
 #
-# 	fsqrt(+0) = +0
-# 	fsqrt(-0) = -0
+#	fsqrt(+0) = +0
+#	fsqrt(-0) = -0
 #	fsqrt(+INF) = +INF
-# 	fsqrt(-INF) = OPERR
+#	fsqrt(-INF) = OPERR
 #
 fsqrt_zero:
 	tst.b		SRC_EX(%a0)		# is ZERO positive or negative?
 	bmi.b		fsqrt_zero_m		# negative
-fsqrt_zero_p:	
+fsqrt_zero_p:
 	fmov.s		&0x00000000,%fp0	# return +ZERO
 	mov.b		&z_bmask,FPSR_CC(%a6)	# set 'Z' ccode bit
 	rts
@@ -12273,13 +12273,13 @@ fsqrt_inf_p:
 #									#
 # INPUT ***************************************************************	#
 #	d1 = index of register to fetch from				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	d0 = value of register fetched					#
 #									#
 # ALGORITHM ***********************************************************	#
-#	According to the index value in d1 which can range from zero 	#
-# to fifteen, load the corresponding register file value (where 	#
+#	According to the index value in d1 which can range from zero	#
+# to fifteen, load the corresponding register file value (where		#
 # address register indexes start at 8). D0/D1/A0/A1/A6/A7 are on the	#
 # stack. The rest should still be in their original places.		#
 #									#
@@ -12368,7 +12368,7 @@ fdregf:
 # INPUT ***************************************************************	#
 #	d0 = longowrd value to store					#
 #	d1 = index of register to fetch from				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	(data register is updated)					#
 #									#
@@ -12429,7 +12429,7 @@ sdregl7:
 # INPUT ***************************************************************	#
 #	d0 = word value to store					#
 #	d1 = index of register to fetch from				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	(data register is updated)					#
 #									#
@@ -12490,7 +12490,7 @@ sdregw7:
 # INPUT ***************************************************************	#
 #	d0 = byte value to store					#
 #	d1 = index of register to fetch from				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	(data register is updated)					#
 #									#
@@ -12551,16 +12551,16 @@ sdregb7:
 # INPUT ***************************************************************	#
 #	d0 = amount to increment by					#
 #	d1 = index of address register to increment			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	(address register is updated)					#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Typically used for an instruction w/ a post-increment <ea>, 	#
+#	Typically used for an instruction w/ a post-increment <ea>,	#
 # this routine adds the increment value in d0 to the address register	#
 # specified by d1. A0/A1/A6/A7 reside on the stack. The rest reside	#
 # in their original places.						#
-# 	For a7, if the increment amount is one, then we have to 	#
+#	For a7, if the increment amount is one, then we have to		#
 # increment by two. For any a7 update, set the mia7_flag so that if	#
 # an access error exception occurs later in emulation, this address	#
 # register update can be undone.					#
@@ -12615,16 +12615,16 @@ iareg7b:
 # INPUT ***************************************************************	#
 #	d0 = amount to decrement by					#
 #	d1 = index of address register to decrement			#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	(address register is updated)					#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Typically used for an instruction w/ a pre-decrement <ea>, 	#
+#	Typically used for an instruction w/ a pre-decrement <ea>,	#
 # this routine adds the decrement value in d0 to the address register	#
 # specified by d1. A0/A1/A6/A7 reside on the stack. The rest reside	#
 # in their original places.						#
-# 	For a7, if the decrement amount is one, then we have to 	#
+#	For a7, if the decrement amount is one, then we have to		#
 # decrement by two. For any a7 update, set the mda7_flag so that if	#
 # an access error exception occurs later in emulation, this address	#
 # register update can be undone.					#
@@ -12680,17 +12680,17 @@ dareg7b:
 #									#
 # INPUT ***************************************************************	#
 #	d0 = index of FP register to load				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	FP_SRC(a6) = value loaded from FP register file			#
 #									#
 # ALGORITHM ***********************************************************	#
-#	Using the index in d0, load FP_SRC(a6) with a number from the 	#
+#	Using the index in d0, load FP_SRC(a6) with a number from the	#
 # FP register file.							#
 #									#
 #########################################################################
 
-	global 		load_fpn1
+	global		load_fpn1
 load_fpn1:
 	mov.w		(tbl_load_fpn1.b,%pc,%d0.w*2), %d0
 	jmp		(tbl_load_fpn1.b,%pc,%d0.w*1)
@@ -12753,12 +12753,12 @@ load_fpn1_7:
 #									#
 # INPUT ***************************************************************	#
 #	d0 = index of FP register to load				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	FP_DST(a6) = value loaded from FP register file			#
 #									#
 # ALGORITHM ***********************************************************	#
-#	Using the index in d0, load FP_DST(a6) with a number from the 	#
+#	Using the index in d0, load FP_DST(a6) with a number from the	#
 # FP register file.							#
 #									#
 #########################################################################
@@ -12819,7 +12819,7 @@ load_fpn2_7:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	store_fpreg(): store an fp value to the fpreg designated d0.	#
+#	store_fpreg(): store an fp value to the fpreg designated d0.	#
 #									#
 # XREF ****************************************************************	#
 #	None								#
@@ -12827,7 +12827,7 @@ load_fpn2_7:
 # INPUT ***************************************************************	#
 #	fp0 = extended precision value to store				#
 #	d0  = index of floating-point register				#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	None								#
 #									#
@@ -12860,27 +12860,27 @@ store_fpreg_1:
 	fmovm.x		&0x80, EXC_FP1(%a6)
 	rts
 store_fpreg_2:
-	fmovm.x 	&0x01, -(%sp)
+	fmovm.x		&0x01, -(%sp)
 	fmovm.x		(%sp)+, &0x20
 	rts
 store_fpreg_3:
-	fmovm.x 	&0x01, -(%sp)
+	fmovm.x		&0x01, -(%sp)
 	fmovm.x		(%sp)+, &0x10
 	rts
 store_fpreg_4:
-	fmovm.x 	&0x01, -(%sp)
+	fmovm.x		&0x01, -(%sp)
 	fmovm.x		(%sp)+, &0x08
 	rts
 store_fpreg_5:
-	fmovm.x 	&0x01, -(%sp)
+	fmovm.x		&0x01, -(%sp)
 	fmovm.x		(%sp)+, &0x04
 	rts
 store_fpreg_6:
-	fmovm.x 	&0x01, -(%sp)
+	fmovm.x		&0x01, -(%sp)
 	fmovm.x		(%sp)+, &0x02
 	rts
 store_fpreg_7:
-	fmovm.x 	&0x01, -(%sp)
+	fmovm.x		&0x01, -(%sp)
 	fmovm.x		(%sp)+, &0x01
 	rts
 
@@ -12897,18 +12897,18 @@ store_fpreg_7:
 #									#
 # INPUT ***************************************************************	#
 #	None								#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	If no failure on _mem_read():					#
-# 	FP_SRC(a6) = packed operand now as a binary FP number		#
+#	FP_SRC(a6) = packed operand now as a binary FP number		#
 #									#
 # ALGORITHM ***********************************************************	#
-#	Get the correct <ea> whihc is the value on the exception stack 	#
+#	Get the correct <ea> whihc is the value on the exception stack	#
 # frame w/ maybe a correction factor if the <ea> is -(an) or (an)+.	#
 # Then, fetch the operand from memory. If the fetch fails, exit		#
 # through facc_in_x().							#
 #	If the packed operand is a ZERO,NAN, or INF, convert it to	#
-# its binary representation here. Else, call decbin() which will 	#
+# its binary representation here. Else, call decbin() which will	#
 # convert the packed value to an extended precision binary value.	#
 #									#
 #########################################################################
@@ -12965,7 +12965,7 @@ gp_not_spec:
 #	and NaN operands are dispatched without entering this routine)	#
 #	value in 68881/882 format at location (a0).			#
 #									#
-#	A1. Convert the bcd exponent to binary by successive adds and 	#
+#	A1. Convert the bcd exponent to binary by successive adds and	#
 #	muls. Set the sign according to SE. Subtract 16 to compensate	#
 #	for the mantissa which is to be interpreted as 17 integer	#
 #	digits, rather than 1 integer and 16 fraction digits.		#
@@ -13029,7 +13029,7 @@ RTABLE:
 
 	global		decbin
 decbin:
-	mov.l		0x0(%a0),FP_SCR0_EX(%a6) # make a copy of input 
+	mov.l		0x0(%a0),FP_SCR0_EX(%a6) # make a copy of input
 	mov.l		0x4(%a0),FP_SCR0_HI(%a6) # so we don't alter it
 	mov.l		0x8(%a0),FP_SCR0_LO(%a6)
 
@@ -13318,7 +13318,7 @@ ap_n_en:
 #
 # Pwrten calculates the exponent factor in the selected rounding mode
 # according to the following table:
-#	
+#
 #	Sign of Mant  Sign of Exp  Rounding Mode  PWRTEN Rounding Mode
 #
 #	ANY	  ANY	RN	RN
@@ -13406,7 +13406,7 @@ mul:
 # it will be inex2, but will be reported as inex1 by get_op.
 #
 end_dec:
-	fmov.l		%fpsr,%d0		# get status register	
+	fmov.l		%fpsr,%d0		# get status register
 	bclr		&inex2_bit+8,%d0	# test for inex2 and clear it
 	beq.b		no_exc			# skip this if no exc
 	ori.w		&inx1a_mask,2+USER_FPSR(%a6) # set INEX1/AINEX
@@ -13423,16 +13423,16 @@ no_exc:
 #									#
 # INPUT ***************************************************************	#
 #	a0 = pointer to the input extended precision value in memory.	#
-#	     the input may be either normalized, unnormalized, or 	#
+#	     the input may be either normalized, unnormalized, or	#
 #	     denormalized.						#
-#	d0 = contains the k-factor sign-extended to 32-bits. 		#
+#	d0 = contains the k-factor sign-extended to 32-bits.		#
 #									#
 # OUTPUT **************************************************************	#
 #	FP_SCR0(a6) = bcd format result on the stack.			#
 #									#
 # ALGORITHM ***********************************************************	#
 #									#
-#	A1.	Set RM and size ext;  Set SIGMA = sign of input.  	#
+#	A1.	Set RM and size ext;  Set SIGMA = sign of input.	#
 #		The k-factor is saved for use in d7. Clear the		#
 #		BINDEC_FLG for separating normalized/denormalized	#
 #		input.  If input is unnormalized or denormalized,	#
@@ -13442,15 +13442,15 @@ no_exc:
 #									#
 #	A3.	Compute ILOG.						#
 #		ILOG is the log base 10 of the input value.  It is	#
-#		approximated by adding e + 0.f when the original 	#
-#		value is viewed as 2^^e * 1.f in extended precision.  	#
+#		approximated by adding e + 0.f when the original	#
+#		value is viewed as 2^^e * 1.f in extended precision.	#
 #		This value is stored in d6.				#
 #									#
 #	A4.	Clr INEX bit.						#
-#		The operation in A3 above may have set INEX2.  		#
+#		The operation in A3 above may have set INEX2.		#
 #									#
 #	A5.	Set ICTR = 0;						#
-#		ICTR is a flag used in A13.  It must be set before the 	#
+#		ICTR is a flag used in A13.  It must be set before the	#
 #		loop entry A6.						#
 #									#
 #	A6.	Calculate LEN.						#
@@ -13472,7 +13472,7 @@ no_exc:
 #		of ISCALE and X.  A table is given in the code.		#
 #									#
 #	A8.	Clr INEX; Force RZ.					#
-#		The operation in A3 above may have set INEX2.  		#
+#		The operation in A3 above may have set INEX2.		#
 #		RZ mode is forced for the scaling operation to insure	#
 #		only one rounding error.  The grs bits are collected in #
 #		the INEX flag for use in A10.				#
@@ -13503,11 +13503,11 @@ no_exc:
 #		the mantissa by 10.					#
 #									#
 #	A14.	Convert the mantissa to bcd.				#
-#		The binstr routine is used to convert the LEN digit 	#
+#		The binstr routine is used to convert the LEN digit	#
 #		mantissa to bcd in memory.  The input to binstr is	#
 #		to be a fraction; i.e. (mantissa)/10^LEN and adjusted	#
 #		such that the decimal point is to the left of bit 63.	#
-#		The bcd digits are stored in the correct position in 	#
+#		The bcd digits are stored in the correct position in	#
 #		the final string area in memory.			#
 #									#
 #	A15.	Convert the exponent to bcd.				#
@@ -13553,7 +13553,7 @@ RBDTBL:
 #		d2: upper 32-bits of mantissa for binstr
 #		d3: scratch;lower 32-bits of mantissa for binstr
 #		d4: LEN
-#      		d5: LAMBDA/ICTR
+#		d5: LAMBDA/ICTR
 #		d6: ILOG
 #		d7: k-factor
 #		a0: ptr for original operand/final result
@@ -13577,7 +13577,7 @@ bindec:
 #     separating  normalized/denormalized input.  If the input
 #     is a denormalized number, set the BINDEC_FLG memory word
 #     to signal denorm.  If the input is unnormalized, normalize
-#     the input and test for denormalized result.  
+#     the input and test for denormalized result.
 #
 	fmov.l		&rm_mode*0x10,%fpcr	# set RM and ext
 	mov.l		(%a0),L_SCR2(%a6)	# save exponent for sign check
@@ -13658,7 +13658,7 @@ A3_cont:
 	sub.w		&0x3fff,%d0	# strip off bias
 	fadd.w		%d0,%fp0	# add in exp
 	fsub.s		FONE(%pc),%fp0	# subtract off 1.0
-	fbge.w		pos_res		# if pos, branch 
+	fbge.w		pos_res		# if pos, branch
 	fmul.x		PLOG2UP1(%pc),%fp0	# if neg, mul by LOG2UP1
 	fmov.l		%fp0,%d6	# put ILOG in d6 as a lword
 	bra.b		A4_str		# go move out ILOG
@@ -13668,14 +13668,14 @@ pos_res:
 
 
 # A4. Clr INEX bit.
-#     The operation in A3 above may have set INEX2.  
+#     The operation in A3 above may have set INEX2.
 
 A4_str:
 	fmov.l		&0,%fpsr	# zero all of fpsr - nothing needed
 
 
 # A5. Set ICTR = 0;
-#     ICTR is a flag used in A13.  It must be set before the 
+#     ICTR is a flag used in A13.  It must be set before the
 #     loop entry A6. The lower word of d5 is used for ICTR.
 
 	clr.w		%d5		# clear ICTR
@@ -13841,21 +13841,21 @@ e_next2:
 	bne.b		e_loop2		# if not, loop
 
 # A8. Clr INEX; Force RZ.
-#     The operation in A3 above may have set INEX2.  
+#     The operation in A3 above may have set INEX2.
 #     RZ mode is forced for the scaling operation to insure
-#     only one rounding error.  The grs bits are collected in 
+#     only one rounding error.  The grs bits are collected in
 #     the INEX flag for use in A10.
 #
 # Register usage:
 #	Input/Output
 
-	fmov.l		&0,%fpsr	# clr INEX 
+	fmov.l		&0,%fpsr	# clr INEX
 	fmov.l		&rz_mode*0x10,%fpcr	# set RZ rounding mode
 
 # A9. Scale X -> Y.
 #     The mantissa is scaled to the desired number of significant
 #     digits.  The excess digits are collected in INEX2. If mul,
-#     Check d2 for excess 10 exponential value.  If not zero, 
+#     Check d2 for excess 10 exponential value.  If not zero,
 #     the iscale value would have caused the pwrten calculation
 #     to overflow.  Only a negative iscale can cause this, so
 #     multiply by 10^(d2), which is now only allowed to be 24,
@@ -13986,7 +13986,7 @@ A10_st:
 
 A11_st:
 	mov.l		USER_FPCR(%a6),L_SCR1(%a6)	# save it for later
-	and.l		&0x00000030,USER_FPCR(%a6)	# set size to ext, 
+	and.l		&0x00000030,USER_FPCR(%a6)	# set size to ext,
 #					;block exceptions
 
 
@@ -14022,7 +14022,7 @@ A12_st:
 	lea.l		FP_SCR1(%a6),%a0	# a0 is ptr to FP_SCR1(a6)
 	fmov.x		%fp0,(%a0)	# move Y to memory at FP_SCR1(a6)
 	tst.l		L_SCR2(%a6)	# test sign of original operand
-	bge.b		do_fint12		# if pos, use Y 
+	bge.b		do_fint12		# if pos, use Y
 	or.l		&0x80000000,(%a0)	# if neg, use -Y
 do_fint12:
 	mov.l	USER_FPSR(%a6),-(%sp)
@@ -14118,7 +14118,7 @@ A13_con:
 	subq.l		&1,%d6		# subtract 1 from ILOG
 	mov.w		&1,%d5		# set ICTR
 	fmov.l		&rm_mode*0x10,%fpcr	# set rmode to RM
-	fmul.s		FTEN(%pc),%fp2	# compute 10^LEN 
+	fmul.s		FTEN(%pc),%fp2	# compute 10^LEN
 	bra.w		A6_str		# return to A6 and recompute YINT
 test_2:
 	fmul.s		FTEN(%pc),%fp2	# compute 10^LEN
@@ -14134,7 +14134,7 @@ fix_ex:
 	fmov.l		&rm_mode*0x10,%fpcr	# set rmode to RM
 	bra.w		A6_str		# return to A6 and recompute YINT
 #
-# Since ICTR <> 0, we have already been through one adjustment, 
+# Since ICTR <> 0, we have already been through one adjustment,
 # and shouldn't have another; this is to check if abs(YINT) = 10^LEN
 # 10^LEN is again computed using whatever table is in a1 since the
 # value calculated cannot be inexact.
@@ -14160,11 +14160,11 @@ z_next:
 	fmul.s		FTEN(%pc),%fp2	# if LEN++, the get 10^^LEN
 
 # A14. Convert the mantissa to bcd.
-#      The binstr routine is used to convert the LEN digit 
+#      The binstr routine is used to convert the LEN digit
 #      mantissa to bcd in memory.  The input to binstr is
 #      to be a fraction; i.e. (mantissa)/10^LEN and adjusted
 #      such that the decimal point is to the left of bit 63.
-#      The bcd digits are stored in the correct position in 
+#      The bcd digits are stored in the correct position in
 #      the final string area in memory.
 #
 #
@@ -14207,7 +14207,7 @@ A14_st:
 	bgt.b		no_sft		# if so, don't shift
 	neg.l		%d0		# make exp positive
 m_loop:
-	lsr.l		&1,%d2		# shift d2:d3 right, add 0s 
+	lsr.l		&1,%d2		# shift d2:d3 right, add 0s
 	roxr.l		&1,%d3		# the number of places
 	dbf.w		%d0,m_loop	# given in d0
 no_sft:
@@ -14232,9 +14232,9 @@ zer_m:
 #
 #      Digits are stored in L_SCR1(a6) on return from BINDEC as:
 #
-#  	 32               16 15                0
+#	 32               16 15                0
 #	-----------------------------------------
-#  	|  0 | e3 | e2 | e1 | e4 |  X |  X |  X |
+#	|  0 | e3 | e2 | e1 | e4 |  X |  X |  X |
 #	-----------------------------------------
 #
 # And are moved into their proper places in FP_SCR0.  If digit e4
@@ -14297,7 +14297,7 @@ convrt:
 	sub.w		&0x3ffd,%d0	# subtract off bias
 	neg.w		%d0		# make exp positive
 x_loop:
-	lsr.l		&1,%d2		# shift d2:d3 right 
+	lsr.l		&1,%d2		# shift d2:d3 right
 	roxr.l		&1,%d3		# the number of places
 	dbf.w		%d0,x_loop	# given in d0
 x_loop_fin:
@@ -14308,12 +14308,12 @@ x_loop_fin:
 	mov.l		&4,%d0		# put 4 in d0 for binstr call
 	lea.l		L_SCR1(%a6),%a0	# a0 is ptr to L_SCR1 for exp digits
 	bsr		binstr		# call binstr to convert exp
-	mov.l		L_SCR1(%a6),%d0	# load L_SCR1 lword to d0 
+	mov.l		L_SCR1(%a6),%d0	# load L_SCR1 lword to d0
 	mov.l		&12,%d1		# use d1 for shift count
 	lsr.l		%d1,%d0		# shift d0 right by 12
 	bfins		%d0,FP_SCR0(%a6){&4:&12}	# put e3:e2:e1 in FP_SCR0
 	lsr.l		%d1,%d0		# shift d0 right by 12
-	bfins		%d0,FP_SCR0(%a6){&16:&4}	# put e4 in FP_SCR0 
+	bfins		%d0,FP_SCR0(%a6){&16:&4}	# put e4 in FP_SCR0
 	tst.b		%d0		# check if e4 is zero
 	beq.b		A16_st		# if zero, skip rest
 	or.l		&opaop_mask,USER_FPSR(%a6)	# set OPERR & AIOP in USER_FPSR
@@ -14344,14 +14344,14 @@ x_loop_fin:
 
 A16_st:
 	clr.l		%d0		# clr d0 for collection of signs
-	and.b		&0x0f,FP_SCR0(%a6)	# clear first nibble of FP_SCR0 
+	and.b		&0x0f,FP_SCR0(%a6)	# clear first nibble of FP_SCR0
 	tst.l		L_SCR2(%a6)	# check sign of original mantissa
 	bge.b		mant_p		# if pos, don't set SM
 	mov.l		&2,%d0		# move 2 in to d0 for SM
 mant_p:
 	tst.l		%d6		# check sign of ILOG
 	bge.b		wr_sgn		# if pos, don't set SE
-	addq.l		&1,%d0		# set bit 0 in d0 for SE 
+	addq.l		&1,%d0		# set bit 0 in d0 for SE
 wr_sgn:
 	bfins		%d0,FP_SCR0(%a6){&0:&2}	# insert SM and SE into FP_SCR0
 
@@ -14417,8 +14417,8 @@ PTENRM:
 #	d2:d3 = 64-bit binary integer					#
 #	d0    = desired length (LEN)					#
 #	a0    = pointer to start in memory for bcd characters		#
-#          	(This pointer must point to byte 4 of the first		#
-#          	 lword of the packed decimal memory string.)		#
+#		(This pointer must point to byte 4 of the first		#
+#		 lword of the packed decimal memory string.)		#
 #									#
 # OUTPUT ************************************************************** #
 #	a0 = pointer to LEN bcd digits representing the 64-bit integer.	#
@@ -14558,14 +14558,14 @@ end_bstr:
 #									#
 # INPUT ***************************************************************	#
 #	None								#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	None								#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	Flow jumps here when an FP data fetch call gets an error 	#
+#	Flow jumps here when an FP data fetch call gets an error	#
 # result. This means the operating system wants an access error frame	#
-# made out of the current exception stack frame. 			#
+# made out of the current exception stack frame.			#
 #	So, we first call restore() which makes sure that any updated	#
 # -(an)+ register gets returned to its pre-exception value and then	#
 # we change the stack to an access error stack frame.			#
@@ -14735,7 +14735,7 @@ ri_a7:
 	bne.b		ri_a7_done		# supervisor
 	movc		%usp,%a0		# restore USP
 	sub.l		%d0,%a0
-	movc		%a0,%usp	
+	movc		%a0,%usp
 ri_a7_done:
 	rts
 

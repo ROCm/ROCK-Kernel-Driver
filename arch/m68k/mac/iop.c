@@ -113,9 +113,9 @@
 #include <linux/proc_fs.h>
 #include <linux/interrupt.h>
 
-#include <asm/bootinfo.h> 
-#include <asm/macintosh.h> 
-#include <asm/macints.h> 
+#include <asm/bootinfo.h>
+#include <asm/macintosh.h>
+#include <asm/macints.h>
 #include <asm/mac_iop.h>
 #include <asm/mac_oss.h>
 
@@ -485,7 +485,7 @@ static void iop_handle_recv(uint iop_num, uint chan, struct pt_regs *regs)
 
 /*
  * Send a message
- * 
+ *
  * The message is placed at the end of the send queue. Afterwards if the
  * channel is idle we force an immediate send of the next message in the
  * queue.
@@ -537,7 +537,7 @@ void iop_upload_code(uint iop_num, __u8 *code_start,
 	if ((iop_num >= NUM_IOPS) || !iop_base[iop_num]) return;
 
 	iop_loadaddr(iop_base[iop_num], shared_ram_start);
-	
+
 	while (code_len--) {
 		iop_base[iop_num]->ram_data = *code_start++;
 	}
@@ -553,7 +553,7 @@ void iop_download_code(uint iop_num, __u8 *code_start,
 	if ((iop_num >= NUM_IOPS) || !iop_base[iop_num]) return;
 
 	iop_loadaddr(iop_base[iop_num], shared_ram_start);
-	
+
 	while (code_len--) {
 		*code_start++ = iop_base[iop_num]->ram_data;
 	}
@@ -571,7 +571,7 @@ __u8 *iop_compare_code(uint iop_num, __u8 *code_start,
 	if ((iop_num >= NUM_IOPS) || !iop_base[iop_num]) return code_start;
 
 	iop_loadaddr(iop_base[iop_num], shared_ram_start);
-	
+
 	while (code_len--) {
 		if (*code_start != iop_base[iop_num]->ram_data) {
 			return code_start;
@@ -666,12 +666,12 @@ int iop_dump_one_iop(char *buf, int iop_num, char *iop_name)
 			iop_chan_state(iop_readb(iop, IOP_ADDR_RECV_STATE+i)),
 			iop_listeners[iop_num][i].handler?
 				      iop_listeners[iop_num][i].devname : "");
-			
+
 	}
 	len += sprintf(buf+len, "\n");
 	return len;
 }
- 
+
 static int iop_get_proc_info(char *buf, char **start, off_t pos, int count)
 {
 	int len, cnt;

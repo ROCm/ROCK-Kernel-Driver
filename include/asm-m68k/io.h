@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-m68k/io.h 
+ * linux/include/asm-m68k/io.h
  *
  * 4/1/00 RZ: - rewritten to avoid clashes between ISA/PCI and other
  *              IO access
@@ -62,7 +62,7 @@ extern unsigned long gg2_isa_base;
 
 #ifndef MULTI_ISA
 #define MULTI_ISA 0
-#else 
+#else
 #undef MULTI_ISA
 #define MULTI_ISA 1
 #endif
@@ -76,7 +76,7 @@ extern unsigned long gg2_isa_base;
 
 #ifndef MULTI_ISA
 #define MULTI_ISA 0
-#else 
+#else
 #undef MULTI_ISA
 #define MULTI_ISA 1
 #endif
@@ -101,7 +101,7 @@ extern unsigned long gg2_isa_base;
 #if defined(CONFIG_AMIGA_PCMCIA) && !defined(MULTI_ISA)
 #define ISA_TYPE AG_ISA
 #define ISA_SEX  1
-#endif 
+#endif
 #if defined(CONFIG_GG2) && !defined(MULTI_ISA)
 #define ISA_TYPE GG2_ISA
 #define ISA_SEX  0
@@ -229,7 +229,7 @@ static inline void isa_delay(void)
 #endif  /* CONFIG_ISA */
 
 
-#if defined(CONFIG_ISA) && !defined(CONFIG_PCI) 
+#if defined(CONFIG_ISA) && !defined(CONFIG_PCI)
 #define inb     isa_inb
 #define inb_p   isa_inb_p
 #define outb    isa_outb
@@ -273,8 +273,8 @@ static inline void isa_delay(void)
 
 #else
 /*
- * kernel with both ISA and PCI compiled in, those have 
- * conflicting defs for in/out. Simply consider port < 1024 
+ * kernel with both ISA and PCI compiled in, those have
+ * conflicting defs for in/out. Simply consider port < 1024
  * ISA and everything else PCI. read,write not defined
  * in this case
  */

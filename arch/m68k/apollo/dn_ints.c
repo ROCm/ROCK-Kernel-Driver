@@ -40,7 +40,7 @@ void dn_init_IRQ(void) {
     dn_irqs[i].dev_id=NULL;
     dn_irqs[i].devname=NULL;
   }
-  
+
 }
 
 int dn_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id) {
@@ -79,7 +79,7 @@ void dn_free_irq(unsigned int irq, void *dev_id) {
   if(irq<8)
     *(volatile unsigned char *)(pica+1)|=(1<<irq);
   else
-    *(volatile unsigned char *)(picb+1)|=(1<<(irq-8));  
+    *(volatile unsigned char *)(picb+1)|=(1<<(irq-8));
 
   dn_irqs[irq].handler=NULL;
   dn_irqs[irq].flags=IRQ_FLG_STD;

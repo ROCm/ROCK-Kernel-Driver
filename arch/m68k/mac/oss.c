@@ -20,9 +20,9 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 
-#include <asm/bootinfo.h> 
-#include <asm/machw.h> 
-#include <asm/macintosh.h> 
+#include <asm/bootinfo.h>
+#include <asm/machw.h>
+#include <asm/macintosh.h>
 #include <asm/macints.h>
 #include <asm/mac_via.h>
 #include <asm/mac_oss.h>
@@ -91,7 +91,7 @@ void __init oss_nubus_init(void)
  * Handle miscellaneous OSS interrupts. Right now that's just sound
  * and SCSI; everything else is routed to its own autovector IRQ.
  */
- 
+
 irqreturn_t oss_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int events;
@@ -100,7 +100,7 @@ irqreturn_t oss_irq(int irq, void *dev_id, struct pt_regs *regs)
 	if (!events)
 		return IRQ_NONE;
 
-#ifdef DEBUG_IRQS	
+#ifdef DEBUG_IRQS
 	if ((console_loglevel == 10) && !(events & OSS_IP_SCSI)) {
 		printk("oss_irq: irq %d events = 0x%04X\n", irq,
 			(int) oss->irq_pending);

@@ -7,11 +7,11 @@
 /*
  *	Apple Macintoshisms
  */
- 
+
 extern void mac_reset(void);
 extern void mac_poweroff(void);
 extern void mac_init_IRQ(void);
-extern int mac_request_irq (unsigned int, irqreturn_t (*)(int, void *, 
+extern int mac_request_irq (unsigned int, irqreturn_t (*)(int, void *,
 				struct pt_regs *),
 				unsigned long, const char *, void *);
 extern void mac_free_irq(unsigned int, void *);
@@ -30,7 +30,7 @@ extern void mac_boom(int);
 /*
  *	Floppy driver magic hook - probably shouldnt be here
  */
- 
+
 extern void via1_set_head(int);
 
 extern void parse_booter(char *ptr);
@@ -39,7 +39,7 @@ extern void print_booter(char *ptr);
 /*
  *	Macintosh Table
  */
- 
+
 struct mac_model
 {
 	short ident;
@@ -81,7 +81,7 @@ struct mac_model
 #define MAC_SCC_QUADRA		3
 #define MAC_SCC_PSC		4
 
-#define MAC_ETHER_NONE		0	
+#define MAC_ETHER_NONE		0
 #define MAC_ETHER_SONIC		1
 #define MAC_ETHER_MACE		2
 
@@ -91,7 +91,7 @@ struct mac_model
 /*
  *	Gestalt numbers
  */
- 
+
 #define MAC_MODEL_II		6
 #define MAC_MODEL_IIX		7
 #define MAC_MODEL_IICX		8
@@ -113,7 +113,7 @@ struct mac_model
 #define MAC_MODEL_PB180		33
 #define MAC_MODEL_PB160		34
 #define MAC_MODEL_Q800		35	/* aka: WGS80 */
-#define MAC_MODEL_Q650		36 
+#define MAC_MODEL_Q650		36
 #define MAC_MODEL_LCII		37	/* aka: P400/405/410/430 */
 #define MAC_MODEL_PB250		38
 #define MAC_MODEL_IIVI		44
@@ -148,5 +148,5 @@ struct mac_model
 #define MAC_MODEL_PB150		115
 
 extern struct mac_model *macintosh_config;
- 
+
 #endif

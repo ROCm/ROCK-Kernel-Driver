@@ -49,8 +49,8 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 |SCOSH	idnt	2,1 | Motorola 040 Floating Point Software Package
@@ -99,7 +99,7 @@ scosh:
 	movel		(%sp)+,%d1
 
 	fmoves		#0x3E800000,%fp1	| ...(1/4)
-	fdivx		%fp0,%fp1	 	| ...1/(2 EXP(|X|))
+	fdivx		%fp0,%fp1		| ...1/(2 EXP(|X|))
 
 	fmovel		%d1,%FPCR
 	faddx		%fp1,%fp0

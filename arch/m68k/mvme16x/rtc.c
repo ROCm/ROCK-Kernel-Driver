@@ -43,7 +43,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	volatile MK48T08ptr_t rtc = (MK48T08ptr_t)MVME_RTC_BASE;
 	unsigned long flags;
-	struct rtc_time wtime; 
+	struct rtc_time wtime;
 
 	switch (cmd) {
 	case RTC_RD_TIME:	/* Read the time/date from RTC	*/
@@ -101,7 +101,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 		if (yrs >= 2070)
 			return -EINVAL;
-		
+
 		local_irq_save(flags);
 		rtc->ctrl     = RTC_WRITE;
 

@@ -76,9 +76,9 @@ config SUN3
 	select MMU_SUN3 if MMU
 	help
 	  This option enables support for the Sun 3 series of workstations
-	  (3/50, 3/60, 3/1xx, 3/2xx systems). Enabling this option requires 
-	  that all other hardware types must be disabled, as Sun 3 kernels 
-	  are incompatible with all other m68k targets (including Sun 3x!).  
+	  (3/50, 3/60, 3/1xx, 3/2xx systems). Enabling this option requires
+	  that all other hardware types must be disabled, as Sun 3 kernels
+	  are incompatible with all other m68k targets (including Sun 3x!).
 
 	  If you don't want to compile a kernel exclusively for a Sun 3, say N.
 
@@ -687,7 +687,7 @@ config DEBUG_INFO
 	  debugging info resulting in a larger kernel image.
 	  Say Y here only if you plan to use gdb to debug the kernel.
 	  If you don't debug the kernel, you can say N.
-	  
+
 endmenu
 
 source "security/Kconfig"

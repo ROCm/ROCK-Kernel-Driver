@@ -298,7 +298,7 @@ void cache_clear (unsigned long paddr, int len)
 		      : "d0");
 #ifdef CONFIG_M68K_L2_CACHE
     if(mach_l2_flush)
-    	mach_l2_flush(0);
+	mach_l2_flush(0);
 #endif
 }
 
@@ -350,7 +350,7 @@ void cache_push (unsigned long paddr, int len)
 		      : "d0");
 #ifdef CONFIG_M68K_L2_CACHE
     if(mach_l2_flush)
-    	mach_l2_flush(1);
+	mach_l2_flush(1);
 #endif
 }
 
@@ -387,7 +387,7 @@ static unsigned long virt_to_phys_slow(unsigned long vaddr)
 		unsigned long mmusr;
 
 		set_fs(get_ds());
-		
+
 		asm volatile (".chip 68040\n\t"
 			      "ptestr (%1)\n\t"
 			      "movec %%mmusr, %0\n\t"

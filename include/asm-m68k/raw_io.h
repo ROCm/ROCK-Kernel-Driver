@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-m68k/raw_io.h 
+ * linux/include/asm-m68k/raw_io.h
  *
  * 10/20/00 RZ: - created from bits of io.h and ide.h to cleanup namespace
  *
