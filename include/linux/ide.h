@@ -1438,8 +1438,8 @@ typedef struct ide_pci_device_s {
 	u8			flags;
 } ide_pci_device_t;
 
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
-extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_device_t *);
+extern int ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
+extern int ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_device_t *);
 
 void ide_map_sg(ide_drive_t *, struct request *);
 void ide_init_sg_cmd(ide_drive_t *, struct request *);

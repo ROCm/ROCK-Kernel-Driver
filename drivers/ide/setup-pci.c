@@ -643,14 +643,16 @@ EXPORT_SYMBOL_GPL(ide_pci_setup_ports);
  * we "know" about, this information is in the ide_pci_device_t struct;
  * for all other chipsets, we just assume both interfaces are enabled.
  */
-static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d, u8 noisy)
+static int do_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d,
+				   ata_index_t *index, u8 noisy)
 {
-	int pciirq = 0;
+	static ata_index_t ata_index = { .b = { .low = 0xff, .high = 0xff } };
 	int tried_config = 0;
-	ata_index_t index = { .b = { .low = 0xff, .high = 0xff } };
+	int pciirq, ret;
 
-	if (ide_setup_pci_controller(dev, d, noisy, &tried_config) < 0)
-		return index;
+	ret = ide_setup_pci_controller(dev, d, noisy, &tried_config);
+	if (ret < 0)
+		goto out;
 
 	/*
 	 * Can we trust the reported IRQ?
@@ -668,7 +670,10 @@ static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_
 		 * space, place chipset into init-mode, and/or preserve
 		 * an interrupt if the card is not native ide support.
 		 */
-		pciirq = (d->init_chipset) ? d->init_chipset(dev, d->name) : 0;
+		ret = d->init_chipset ? d->init_chipset(dev, d->name) : 0;
+		if (ret < 0)
+			goto out;
+		pciirq = ret;
 	} else if (tried_config) {
 		if (noisy)
 			printk(KERN_INFO "%s: will probe irqs later\n", d->name);
@@ -679,10 +684,10 @@ static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_
 				d->name, pciirq);
 		pciirq = 0;
 	} else {
-		if (d->init_chipset)
-		{
-			if(d->init_chipset(dev, d->name) < 0)
-				return index;
+		if (d->init_chipset) {
+			ret = d->init_chipset(dev, d->name);
+			if (ret < 0)
+				goto out;
 		}
 		if (noisy)
 #ifdef __sparc__
@@ -693,18 +698,23 @@ static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_
 				d->name, pciirq);
 #endif
 	}
-	
-	if(pciirq < 0)		/* Error not an IRQ */
-		return index;
 
-	ide_pci_setup_ports(dev, d, pciirq, &index);
+	/* FIXME: silent failure can happen */
 
-	return index;
+	*index = ata_index;
+	ide_pci_setup_ports(dev, d, pciirq, index);
+out:
+	return ret;
 }
 
-void ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d)
+int ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d)
 {
-	ata_index_t index_list = do_ide_setup_pci_device(dev, d, 1);
+	ata_index_t index_list;
+	int ret;
+
+	ret = do_ide_setup_pci_device(dev, d, &index_list, 1);
+	if (ret < 0)
+		goto out;
 
 	if ((index_list.b.low & 0xf0) != 0xf0)
 		probe_hwif_init_with_fixup(&ide_hwifs[index_list.b.low], d->fixup);
@@ -712,25 +722,42 @@ void ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d)
 		probe_hwif_init_with_fixup(&ide_hwifs[index_list.b.high], d->fixup);
 
 	create_proc_ide_interfaces();
+out:
+	return ret;
 }
 
 EXPORT_SYMBOL_GPL(ide_setup_pci_device);
 
-void ide_setup_pci_devices (struct pci_dev *dev, struct pci_dev *dev2, ide_pci_device_t *d)
+int ide_setup_pci_devices(struct pci_dev *dev1, struct pci_dev *dev2,
+			  ide_pci_device_t *d)
 {
-	ata_index_t index_list  = do_ide_setup_pci_device(dev, d, 1);
-	ata_index_t index_list2 = do_ide_setup_pci_device(dev2, d, 0);
+	struct pci_dev *pdev[] = { dev1, dev2 };
+	ata_index_t index_list[2];
+	int ret, i;
 
-	if ((index_list.b.low & 0xf0) != 0xf0)
-		probe_hwif_init(&ide_hwifs[index_list.b.low]);
-	if ((index_list.b.high & 0xf0) != 0xf0)
-		probe_hwif_init(&ide_hwifs[index_list.b.high]);
-	if ((index_list2.b.low & 0xf0) != 0xf0)
-		probe_hwif_init(&ide_hwifs[index_list2.b.low]);
-	if ((index_list2.b.high & 0xf0) != 0xf0)
-		probe_hwif_init(&ide_hwifs[index_list2.b.high]);
+	for (i = 0; i < 2; i++) {
+		ret = do_ide_setup_pci_device(pdev[i], d, index_list + i, !i);
+		/*
+		 * FIXME: Mom, mom, they stole me the helper function to undo
+		 * do_ide_setup_pci_device() on the first device!
+		 */
+		if (ret < 0)
+			goto out;
+	}
+
+	for (i = 0; i < 2; i++) {
+		u8 idx[2] = { index_list[i].b.low, index_list[i].b.high };
+		int j;
+
+		for (j = 0; j < 2; j++) {
+			if ((idx[j] & 0xf0) != 0xf0)
+				probe_hwif_init(ide_hwifs + idx[j]);
+		}
+	}
 
 	create_proc_ide_interfaces();
+out:
+	return ret;
 }
 
 EXPORT_SYMBOL_GPL(ide_setup_pci_devices);
