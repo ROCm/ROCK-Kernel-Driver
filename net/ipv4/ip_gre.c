@@ -492,6 +492,7 @@ out:
 	memset(&fl, 0, sizeof(fl));
 	fl.fl4_dst = eiph->saddr;
 	fl.fl4_tos = RT_TOS(eiph->tos);
+	fl.proto = IPPROTO_GRE;
 	if (ip_route_output_key(&rt, &fl)) {
 		kfree_skb(skb2);
 		return;
@@ -757,11 +758,12 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	{
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = tunnel->parms.link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = dst,
 						.saddr = tiph->saddr,
 						.tos = RT_TOS(tos) } },
-				    .oif = tunnel->parms.link };
+				    .proto = IPPROTO_GRE };
 		if (ip_route_output_key(&rt, &fl)) {
 			tunnel->stat.tx_carrier_errors++;
 			goto tx_error;
@@ -1118,11 +1120,12 @@ static int ipgre_open(struct net_device *dev)
 
 	MOD_INC_USE_COUNT;
 	if (MULTICAST(t->parms.iph.daddr)) {
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = t->parms.link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = t->parms.iph.daddr,
 						.saddr = t->parms.iph.saddr,
 						.tos = RT_TOS(t->parms.iph.tos) } },
-				    .oif = t->parms.link };
+				    .proto = IPPROTO_GRE };
 		struct rtable *rt;
 		if (ip_route_output_key(&rt, &fl)) {
 			MOD_DEC_USE_COUNT;
@@ -1194,11 +1197,12 @@ static int ipgre_tunnel_init(struct net_device *dev)
 	/* Guess output device to choose reasonable mtu and hard_header_len */
 
 	if (iph->daddr) {
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = tunnel->parms.link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = iph->daddr,
 						.saddr = iph->saddr,
 						.tos = RT_TOS(iph->tos) } },
-				    .oif = tunnel->parms.link };
+				    .proto = IPPROTO_GRE };
 		struct rtable *rt;
 		if (!ip_route_output_key(&rt, &fl)) {
 			tdev = rt->u.dst.dev;

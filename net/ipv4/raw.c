@@ -420,11 +420,12 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	}
 
 	{
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = ipc.oif,
+				    .nl_u = { .ip4_u =
 					      { .daddr = daddr,
 						.saddr = saddr,
 						.tos = tos } },
-				    .oif = ipc.oif };
+				    .proto = IPPROTO_RAW };
 		err = ip_route_output_key(&rt, &fl);
 	}
 	if (err)

@@ -306,15 +306,19 @@ int ip_queue_xmit(struct sk_buff *skb)
 			daddr = opt->faddr;
 
 		{
-			struct flowi fl = { .nl_u = { .ip4_u =
+			struct flowi fl = { .oif = sk->bound_dev_if,
+					    .nl_u = { .ip4_u =
 						      { .daddr = daddr,
 							.saddr = inet->saddr,
 							.tos = RT_CONN_FLAGS(sk) } },
-					    .oif = sk->bound_dev_if };
+					    .proto = sk->protocol,
+					    .uli_u = { .ports =
+						       { .sport = inet->sport,
+							 .dport = inet->dport } } };
 
 			/* If this fails, retransmit mechanism of transport layer will
-			 * keep trying until route appears or the connection times itself
-			 * out.
+			 * keep trying until route appears or the connection times
+			 * itself out.
 			 */
 			if (ip_route_output_key(&rt, &fl))
 				goto no_route;
@@ -1206,7 +1210,8 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 		struct flowi fl = { .nl_u = { .ip4_u =
 					      { .daddr = daddr,
 						.saddr = rt->rt_spec_dst,
-						.tos = RT_TOS(skb->nh.iph->tos) } } };
+						.tos = RT_TOS(skb->nh.iph->tos) } },
+				    .proto = sk->protocol };
 		if (ip_route_output_key(&rt, &fl))
 			return;
 	}

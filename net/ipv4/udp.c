@@ -586,11 +586,15 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		rt = (struct rtable*)sk_dst_check(sk, 0);
 
 	if (rt == NULL) {
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = ipc.oif,
+				    .nl_u = { .ip4_u =
 					      { .daddr = faddr,
 						.saddr = saddr,
 						.tos = tos } },
-				    .oif = ipc.oif };
+				    .proto = IPPROTO_UDP,
+				    .uli_u = { .ports =
+					       { .sport = inet->sport,
+						 .dport = dport } } };
 		err = ip_route_output_key(&rt, &fl);
 		if (err)
 			goto out;
@@ -872,7 +876,9 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 			saddr = inet->mc_addr;
 	}
 	err = ip_route_connect(&rt, usin->sin_addr.s_addr, saddr,
-			       RT_CONN_FLAGS(sk), oif);
+			       RT_CONN_FLAGS(sk), oif,
+			       IPPROTO_UDP,
+			       inet->sport, usin->sin_port);
 	if (err)
 		return err;
 	if ((rt->rt_flags&RTCF_BROADCAST) && !sk->broadcast) {

@@ -118,15 +118,17 @@ ip_do_nat(struct sk_buff *skb)
 				if (ciph->daddr != osaddr) {
 					struct   fib_result res;
 					unsigned flags = 0;
-					struct flowi fl = { .nl_u =
-							    { .ip4_u =
-							      { .daddr = ciph->saddr,
-								.saddr = ciph->daddr,
+					struct flowi fl = {
+						.iif = skb->dev->ifindex,
+						.nl_u =
+						{ .ip4_u =
+						  { .daddr = ciph->saddr,
+						    .saddr = ciph->daddr,
 #ifdef CONFIG_IP_ROUTE_TOS
-								.tos = RT_TOS(ciph->tos)
+						    .tos = RT_TOS(ciph->tos)
 #endif
-							      } },
-							    .iif = skb->dev->ifindex };
+						  } },
+						.proto = ciph->protocol };
 
 					/* Use fib_lookup() until we get our own
 					 * hash table of NATed hosts -- Rani

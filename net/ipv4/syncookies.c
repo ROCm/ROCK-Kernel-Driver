@@ -177,7 +177,11 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 							  opt->faddr :
 							  req->af.v4_req.rmt_addr),
 						.saddr = req->af.v4_req.loc_addr,
-						.tos = RT_CONN_FLAGS(sk) } } };
+						.tos = RT_CONN_FLAGS(sk) } },
+				    .proto = IPPROTO_TCP,
+				    .uli_u = { .ports =
+					       { .sport = skb->h.th->dest,
+						 .dport = skb->h.th->source } } };
 		if (ip_route_output_key(&rt, &fl)) {
 			tcp_openreq_free(req);
 			goto out; 

@@ -421,6 +421,7 @@ out:
 	memset(&fl, 0, sizeof(fl));
 	fl.fl4_daddr = eiph->saddr;
 	fl.fl4_tos = RT_TOS(eiph->tos);
+	fl.proto = IPPROTO_IPIP;
 	if (ip_route_output_key(&rt, &key)) {
 		kfree_skb(skb2);
 		return;
@@ -568,11 +569,12 @@ static int ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	{
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = tunnel->parms.link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = dst,
 						.saddr = tiph->saddr,
 						.tos = RT_TOS(tos) } },
-				    .oif = tunnel->parms.link };
+				    .proto = IPPROTO_IPIP };
 		if (ip_route_output_key(&rt, &fl)) {
 			tunnel->stat.tx_carrier_errors++;
 			goto tx_error_icmp;
@@ -836,11 +838,12 @@ static int ipip_tunnel_init(struct net_device *dev)
 	ipip_tunnel_init_gen(dev);
 
 	if (iph->daddr) {
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = tunnel->parms.link,
+				    .nl_u = { .ip4_u =
 					      { .daddr = iph->daddr,
 						.saddr = iph->saddr,
 						.tos = RT_TOS(iph->tos) } },
-				    .oif = tunnel->parms.link };
+				    .proto = IPPROTO_IPIP };
 		struct rtable *rt;
 		if (!ip_route_output_key(&rt, &fl)) {
 			tdev = rt->u.dst.dev;

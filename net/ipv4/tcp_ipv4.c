@@ -770,7 +770,9 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	}
 
 	tmp = ip_route_connect(&rt, nexthop, inet->saddr,
-			       RT_CONN_FLAGS(sk), sk->bound_dev_if);
+			       RT_CONN_FLAGS(sk), sk->bound_dev_if,
+			       IPPROTO_TCP,
+			       inet->sport, usin->sin_port);
 	if (tmp < 0)
 		return tmp;
 
@@ -778,10 +780,6 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		ip_rt_put(rt);
 		return -ENETUNREACH;
 	}
-
-	__sk_dst_set(sk, &rt->u.dst);
-	tcp_v4_setup_caps(sk, &rt->u.dst);
-	tp->ext_header_len += rt->u.dst.header_len;
 
 	if (!inet->opt || !inet->opt->srr)
 		daddr = rt->rt_dst;
@@ -831,6 +829,19 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (err)
 		goto failure;
 
+	err = ip_route_newports(&rt, inet->sport, inet->dport);
+	if (err)
+		goto failure;
+
+	/* OK, now commit destination to socket.  */
+	__sk_dst_set(sk, &rt->u.dst);
+	tcp_v4_setup_caps(sk, &rt->u.dst);
+
+	/* DAVEM REDPEN: This used to sit above forced ext_header_len = 0
+	 *               above, it was real bug.  Is this one correct?
+	 */
+	tp->ext_header_len += rt->u.dst.header_len;
+
 	if (!tp->write_seq)
 		tp->write_seq = secure_tcp_sequence_number(inet->saddr,
 							   inet->daddr,
@@ -846,8 +857,9 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	return 0;
 
 failure:
+	/* This unhashes the socket and releases the local port, if necessary. */
 	tcp_set_state(sk, TCP_CLOSE);
-	__sk_dst_reset(sk);
+	ip_rt_put(rt);
 	sk->route_caps = 0;
 	inet->dport = 0;
 	return err;
@@ -1265,13 +1277,17 @@ static struct dst_entry* tcp_v4_route_req(struct sock *sk,
 {
 	struct rtable *rt;
 	struct ip_options *opt = req->af.v4_req.opt;
-	struct flowi fl = { .nl_u = { .ip4_u =
+	struct flowi fl = { .oif = sk->bound_dev_if,
+			    .nl_u = { .ip4_u =
 				      { .daddr = ((opt && opt->srr) ?
 						  opt->faddr :
 						  req->af.v4_req.rmt_addr),
 					.saddr = req->af.v4_req.loc_addr,
 					.tos = RT_CONN_FLAGS(sk) } },
-			    .oif = sk->bound_dev_if };
+			    .proto = IPPROTO_TCP,
+			    .uli_u = { .ports =
+				       { .sport = inet_sk(sk)->sport,
+					 .dport = req->rmt_port } } };
 
 	if (ip_route_output_key(&rt, &fl)) {
 		IP_INC_STATS_BH(IpOutNoRoutes);
@@ -1864,7 +1880,9 @@ static int tcp_v4_reselect_saddr(struct sock *sk)
 	/* Query new route. */
 	err = ip_route_connect(&rt, daddr, 0,
 			       RT_TOS(inet->tos) | sk->localroute,
-			       sk->bound_dev_if);
+			       sk->bound_dev_if,
+			       IPPROTO_TCP,
+			       inet->sport, inet->dport);
 	if (err)
 		return err;
 
@@ -1914,11 +1932,15 @@ int tcp_v4_rebuild_header(struct sock *sk)
 		daddr = inet->opt->faddr;
 
 	{
-		struct flowi fl = { .nl_u = { .ip4_u =
+		struct flowi fl = { .oif = sk->bound_dev_if,
+				    .nl_u = { .ip4_u =
 					      { .daddr = daddr,
 						.saddr = inet->saddr,
 						.tos = RT_CONN_FLAGS(sk) } },
-				    .oif = sk->bound_dev_if };
+				    .proto = IPPROTO_TCP,
+				    .uli_u = { .ports =
+					       { .sport = inet->sport,
+						 .dport = inet->dport } } };
 						
 		err = ip_route_output_key(&rt, &fl);
 	}

@@ -139,12 +139,16 @@ static inline char rt_tos2priority(u8 tos)
 	return ip_tos2prio[IPTOS_TOS(tos)>>1];
 }
 
-static inline int ip_route_connect(struct rtable **rp, u32 dst, u32 src, u32 tos, int oif)
+static inline int ip_route_connect(struct rtable **rp, u32 dst, u32 src, u32 tos, int oif, u8 protocol, u16 sport, u16 dport)
 {
-	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = dst,
+	struct flowi fl = { .oif = oif,
+			    .nl_u = { .ip4_u = { .daddr = dst,
 						 .saddr = src,
 						 .tos   = tos } },
-			    .oif = oif };
+			    .proto = protocol,
+			    .uli_u = { .ports =
+				       { .sport = sport,
+					 .dport = dport } } };
 
 	int err;
 	err = ip_route_output_key(rp, &fl);
@@ -155,6 +159,21 @@ static inline int ip_route_connect(struct rtable **rp, u32 dst, u32 src, u32 tos
 	ip_rt_put(*rp);
 	*rp = NULL;
 	return ip_route_output_key(rp, &fl);
+}
+
+static inline int ip_route_newports(struct rtable **rp, u16 sport, u16 dport)
+{
+	if (sport != (*rp)->fl.uli_u.ports.sport ||
+	    dport != (*rp)->fl.uli_u.ports.dport) {
+		struct flowi fl;
+
+		memcpy(&fl, &(*rp)->fl, sizeof(fl));
+		fl.uli_u.ports.sport = sport;
+		fl.uli_u.ports.dport = dport;
+		*rp = NULL;
+		return ip_route_output_key(rp, &fl);
+	}
+	return 0;
 }
 
 extern void rt_bind_peer(struct rtable *rt, int create);
