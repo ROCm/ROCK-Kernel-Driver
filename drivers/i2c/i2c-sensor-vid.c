@@ -36,8 +36,7 @@ struct vrm_model {
 
 static struct vrm_model vrm_models[] = {
 	{X86_VENDOR_AMD, 0x6, ANY, 90},		/* Athlon Duron etc */
-	{X86_VENDOR_AMD, 0xF, 0x4, 90},		/* Athlon 64 */
-	{X86_VENDOR_AMD, 0xF, 0x5, 24},		/* Opteron */
+	{X86_VENDOR_AMD, 0xF, ANY, 24},		/* Athlon 64, Opteron */
 	{X86_VENDOR_INTEL, 0x6, 0x9, 85},	/* 0.13um too */
 	{X86_VENDOR_INTEL, 0x6, 0xB, 85},	/* 0xB Tualatin */
 	{X86_VENDOR_INTEL, 0x6, ANY, 82},	/* any P6 */
@@ -87,7 +86,7 @@ int i2c_which_vrm(void)
 	return vrm_ret;
 }
 
-/* and now something completely different for Non-x86 world*/
+/* and now for something completely different for Non-x86 world*/
 #else
 int i2c_which_vrm(void)
 {
