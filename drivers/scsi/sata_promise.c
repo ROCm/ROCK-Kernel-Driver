@@ -35,7 +35,7 @@
 #include <asm/io.h>
 
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"0.91"
+#define DRV_VERSION	"0.92"
 
 
 enum {
@@ -47,10 +47,12 @@ enum {
 	PDC_TBG_MODE		= 0x41,	/* TBG mode */
 	PDC_FLASH_CTL		= 0x44, /* Flash control register */
 	PDC_PCI_CTL		= 0x48, /* PCI control and status register */
-	PDC_CTLSTAT		= 0x60,	/* IDE control and status register */
+	PDC_GLOBAL_CTL		= 0x48, /* Global control/status (per port) */
+	PDC_CTLSTAT		= 0x60,	/* IDE control and status (per port) */
 	PDC_SATA_PLUG_CSR	= 0x6C, /* SATA Plug control/status reg */
 	PDC_SLEW_CTL		= 0x470, /* slew rate control reg */
 	PDC_HDMA_CTLSTAT	= 0x12C, /* Host DMA control / status */
+
 	PDC_20621_SEQCTL	= 0x400,
 	PDC_20621_SEQMASK	= 0x480,
 	PDC_20621_GENERAL_CTL	= 0x484,
@@ -75,6 +77,11 @@ enum {
 
 	PDC_CHIP0_OFS		= 0xC0000, /* offset of chip #0 */
 
+	PDC_20621_ERR_MASK	= (1<<19) | (1<<20) | (1<<21) | (1<<22) |
+				  (1<<23),
+	PDC_ERR_MASK		= (1<<19) | (1<<20) | (1<<21) | (1<<22) |
+				  (1<<8) | (1<<9) | (1<<10),
+
 	board_2037x		= 0,	/* FastTrak S150 TX2plus */
 	board_20319		= 1,	/* FastTrak S150 TX4 */
 	board_20621		= 2,	/* FastTrak S150 SX4 */
@@ -82,7 +89,7 @@ enum {
 	PDC_HAS_PATA		= (1 << 1), /* PDC20375 has PATA */
 
 	PDC_FLAG_20621		= (1 << 30), /* we have a 20621 */
-	PDC_HDMA_RESET		= (1 << 11), /* HDMA reset */
+	PDC_RESET		= (1 << 11), /* HDMA reset */
 
 	PDC_MAX_HDMA		= 32,
 	PDC_HDMA_Q_MASK		= (PDC_MAX_HDMA - 1),
@@ -158,13 +165,14 @@ static void pdc_eng_timeout(struct ata_port *ap);
 static void pdc_20621_phy_reset (struct ata_port *ap);
 static int pdc_port_start(struct ata_port *ap);
 static void pdc_port_stop(struct ata_port *ap);
+static void pdc_phy_reset(struct ata_port *ap);
 static void pdc_fill_sg(struct ata_queued_cmd *qc);
 static void pdc20621_fill_sg(struct ata_queued_cmd *qc);
 static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 static void pdc20621_host_stop(struct ata_host_set *host_set);
 static inline void pdc_dma_complete (struct ata_port *ap,
-                                     struct ata_queued_cmd *qc);
+                                     struct ata_queued_cmd *qc, int have_err);
 static unsigned int pdc20621_dimm_init(struct ata_probe_ent *pe);
 static int pdc20621_detect_dimm(struct ata_probe_ent *pe);
 static unsigned int pdc20621_i2c_read(struct ata_probe_ent *pe, 
@@ -203,7 +211,7 @@ static struct ata_port_operations pdc_sata_ops = {
 	.tf_read		= ata_tf_read_mmio,
 	.check_status		= ata_check_status_mmio,
 	.exec_command		= pdc_exec_command_mmio,
-	.phy_reset		= sata_phy_reset,
+	.phy_reset		= pdc_phy_reset,
 	.bmdma_start            = pdc_dma_start,
 	.fill_sg		= pdc_fill_sg,
 	.eng_timeout		= pdc_eng_timeout,
@@ -353,6 +361,34 @@ static void pdc_20621_phy_reset (struct ata_port *ap)
         ap->cbl = ATA_CBL_SATA;
         ata_port_probe(ap);
         ata_bus_reset(ap);
+}
+
+static void pdc_reset_port(struct ata_port *ap)
+{
+	void *mmio = (void *) ap->ioaddr.cmd_addr + PDC_CTLSTAT;
+	unsigned int i;
+	u32 tmp;
+
+	for (i = 11; i > 0; i--) {
+		tmp = readl(mmio);
+		if (tmp & PDC_RESET)
+			break;
+
+		udelay(100);
+
+		tmp |= PDC_RESET;
+		writel(tmp, mmio);
+	}
+
+	tmp &= ~PDC_RESET;
+	writel(tmp, mmio);
+	readl(mmio);	/* flush */
+}
+
+static void pdc_phy_reset(struct ata_port *ap)
+{
+	pdc_reset_port(ap);
+	sata_phy_reset(ap);
 }
 
 static u32 pdc_sata_scr_read (struct ata_port *ap, unsigned int sc_reg)
@@ -831,7 +867,7 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 		if (doing_hdma) {
 			VPRINTK("ata%u: read hdma, 0x%x 0x%x\n", ap->id,
 				readl(mmio + 0x104), readl(mmio + PDC_HDMA_CTLSTAT));
-			pdc_dma_complete(ap, qc);
+			pdc_dma_complete(ap, qc, 0);
 			pdc20621_pop_hdma(qc);
 		}
 
@@ -868,7 +904,7 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 		else {
 			VPRINTK("ata%u: write ata, 0x%x 0x%x\n", ap->id,
 				readl(mmio + 0x104), readl(mmio + PDC_HDMA_CTLSTAT));
-			pdc_dma_complete(ap, qc);
+			pdc_dma_complete(ap, qc, 0);
 			pdc20621_pop_hdma(qc);
 		}
 		handled = 1;
@@ -921,7 +957,7 @@ static irqreturn_t pdc20621_interrupt (int irq, void *dev_instance, struct pt_re
 		return IRQ_NONE;
 	}
 
-        spin_lock_irq(&host_set->lock);
+        spin_lock(&host_set->lock);
 
         for (i = 1; i < 9; i++) {
 		port_no = i - 1;
@@ -943,7 +979,7 @@ static irqreturn_t pdc20621_interrupt (int irq, void *dev_instance, struct pt_re
 		}
 	}
 
-        spin_unlock_irq(&host_set->lock);
+        spin_unlock(&host_set->lock);
 
 	VPRINTK("mask == 0x%x\n", mask);
 
@@ -972,11 +1008,14 @@ static void pdc_fill_sg(struct ata_queued_cmd *qc)
 }
 
 static inline void pdc_dma_complete (struct ata_port *ap,
-                                     struct ata_queued_cmd *qc)
+                                     struct ata_queued_cmd *qc,
+				     int have_err)
 {
+	u8 err_bit = have_err ? ATA_ERR : 0;
+
 	/* get drive status; clear intr; complete txn */
 	ata_qc_complete(ata_qc_from_tag(ap, ap->active_tag),
-			ata_wait_idle(ap), 0);
+			ata_wait_idle(ap) | err_bit, 0);
 }
 
 static void pdc_eng_timeout(struct ata_port *ap)
@@ -1035,17 +1074,27 @@ static inline unsigned int pdc_host_intr( struct ata_port *ap,
                                           struct ata_queued_cmd *qc)
 {
 	u8 status;
-	unsigned int handled = 0;
+	unsigned int handled = 0, have_err = 0;
+	u32 tmp;
+	void *mmio = (void *) ap->ioaddr.cmd_addr + PDC_GLOBAL_CTL;
+
+	tmp = readl(mmio);
+	if (tmp & PDC_ERR_MASK) {
+		have_err = 1;
+		pdc_reset_port(ap);
+	}
 
 	switch (qc->tf.protocol) {
 	case ATA_PROT_DMA:
-		pdc_dma_complete(ap, qc);
+		pdc_dma_complete(ap, qc, have_err);
 		handled = 1;
 		break;
 
 	case ATA_PROT_NODATA:   /* command completion, but no data xfer */
 		status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
 		DPRINTK("BUS_NODATA (drv_stat 0x%X)\n", status);
+		if (have_err)
+			status |= ATA_ERR;
 		ata_qc_complete(qc, status, 0);
 		handled = 1;
 		break;
@@ -1089,7 +1138,7 @@ static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *r
 		return IRQ_NONE;
 	}
 
-        spin_lock_irq(&host_set->lock);
+        spin_lock(&host_set->lock);
 
         for (i = 0; i < host_set->n_ports; i++) {
 		VPRINTK("port %u\n", i);
@@ -1104,7 +1153,7 @@ static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *r
 		}
 	}
 
-        spin_unlock_irq(&host_set->lock);
+        spin_unlock(&host_set->lock);
 
 	VPRINTK("EXIT\n");
 
@@ -1591,14 +1640,14 @@ static void pdc_20621_init(struct ata_probe_ent *pe)
 	 * Reset Host DMA
 	 */
 	tmp = readl(mmio + PDC_HDMA_CTLSTAT);
-	tmp |= PDC_HDMA_RESET;
+	tmp |= PDC_RESET;
 	writel(tmp, mmio + PDC_HDMA_CTLSTAT);
 	readl(mmio + PDC_HDMA_CTLSTAT);		/* flush */
 
 	udelay(10);
 
 	tmp = readl(mmio + PDC_HDMA_CTLSTAT);
-	tmp &= ~PDC_HDMA_RESET;
+	tmp &= ~PDC_RESET;
 	writel(tmp, mmio + PDC_HDMA_CTLSTAT);
 	readl(mmio + PDC_HDMA_CTLSTAT);		/* flush */
 }
