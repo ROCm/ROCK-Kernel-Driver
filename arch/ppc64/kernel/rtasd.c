@@ -17,7 +17,6 @@
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/vmalloc.h>
-#include <linux/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
