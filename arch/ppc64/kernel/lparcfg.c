@@ -245,7 +245,7 @@ unsigned int get_splpar_potential_characteristics(void)
 	/* return 0 for now.  Underlying rtas functionality is not yet complete. 12/01/2003*/
 	return 0; 
 #if 0 
-	long call_status;
+	int call_status;
 	unsigned long ret[2];
 
 	char * buffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
