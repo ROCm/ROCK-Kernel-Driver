@@ -30,6 +30,9 @@
 #ifdef CONFIG_ACPI_BUS
 #include <acpi/acpi_bus.h>
 #endif
+#ifdef CONFIG_IA64
+#include <linux/acpi.h>
+#endif
 #include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/mpu401.h>
@@ -99,9 +102,9 @@ static acpi_status __devinit snd_mpu401_acpi_resource(struct acpi_resource *res,
 	if (res->id == ACPI_RSTYPE_IRQ) {
 		if (res->data.irq.number_of_interrupts > 0) {
 #ifdef CONFIG_IA64
-			resources->irq = acpi_register_irq(res->data.irq.interrupts[0],
-							   res->data.irq.active_high_low,
-							   res->data.irq.edge_level);
+			resources->irq = acpi_register_gsi(res->data.irq.interrupts[0],
+							   res->data.irq.edge_level,
+							   res->data.irq.active_high_low);
 #else
 			resources->irq = res->data.irq.interrupts[0];
 #endif
