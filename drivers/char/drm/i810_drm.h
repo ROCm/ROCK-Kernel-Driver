@@ -168,13 +168,33 @@ typedef struct _drm_i810_sarea {
 
 } drm_i810_sarea_t;
 
+/* WARNING: If you change any of these defines, make sure to change the
+ * defines in the Xserver file (xf86drmMga.h)
+ */
+
+/* i810 specific ioctls
+ * The device specific ioctl range is 0x40 to 0x79.
+ */
+#define DRM_IOCTL_I810_INIT		DRM_IOW( 0x40, drm_i810_init_t)
+#define DRM_IOCTL_I810_VERTEX		DRM_IOW( 0x41, drm_i810_vertex_t)
+#define DRM_IOCTL_I810_CLEAR		DRM_IOW( 0x42, drm_i810_clear_t)
+#define DRM_IOCTL_I810_FLUSH		DRM_IO(  0x43)
+#define DRM_IOCTL_I810_GETAGE		DRM_IO(  0x44)
+#define DRM_IOCTL_I810_GETBUF		DRM_IOWR(0x45, drm_i810_dma_t)
+#define DRM_IOCTL_I810_SWAP		DRM_IO(  0x46)
+#define DRM_IOCTL_I810_COPY		DRM_IOW( 0x47, drm_i810_copy_t)
+#define DRM_IOCTL_I810_DOCOPY		DRM_IO(  0x48)
+#define DRM_IOCTL_I810_OV0INFO		DRM_IOR( 0x49, drm_i810_overlay_t)
+#define DRM_IOCTL_I810_FSTATUS		DRM_IO ( 0x4a)
+#define DRM_IOCTL_I810_OV0FLIP		DRM_IO ( 0x4b)
+#define DRM_IOCTL_I810_MC		DRM_IOW( 0x4c, drm_i810_mc_t)
+#define DRM_IOCTL_I810_RSTATUS		DRM_IO ( 0x4d )
+
 typedef struct _drm_i810_clear {
 	int clear_color;
 	int clear_depth;
 	int flags;
 } drm_i810_clear_t;
-
-
 
 /* These may be placeholders if we have more cliprects than
  * I810_NR_SAREA_CLIPRECTS.  In that case, the client sets discard to

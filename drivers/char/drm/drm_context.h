@@ -555,7 +555,7 @@ static int DRM(alloc_queue)(drm_device_t *dev)
 				/* Allocate a new queue */
 	down(&dev->struct_sem);
 
-	queue = gamma_alloc(sizeof(*queue), DRM_MEM_QUEUES);
+	queue = DRM(alloc)(sizeof(*queue), DRM_MEM_QUEUES);
 	memset(queue, 0, sizeof(*queue));
 	atomic_set(&queue->use_count, 1);
 
