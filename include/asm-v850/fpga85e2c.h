@@ -19,8 +19,11 @@
 #include <asm/clinkage.h>
 
 
-#define CPU_ARCH		"v850e2"
-#define CPU_MODEL		"FPGA NA85E2C/V850E2"
+#define CPU_ARCH 	"v850e2"
+#define CPU_MODEL	"v850e2/fpga85e2c"
+#define CPU_MODEL_LONG	"NEC V850E2/NA85E2C"
+#define PLATFORM	"fpga85e2c"
+#define PLATFORM_LONG	"NA85E2C FPGA implementation"
 
 
 /* `external ram'.  */

@@ -16,8 +16,11 @@
 #define __V850_SIM85E2C_H__
 
 
-#define CPU_ARCH		"v850e2"
-#define CPU_MODEL		"sim85e2c simulator"
+#define CPU_ARCH 	"v850e2"
+#define CPU_MODEL	"v850e2"
+#define CPU_MODEL_LONG	"NEC V850E2"
+#define PLATFORM	"sim85e2c"
+#define PLATFORM_LONG	"SIM85E2C V850E2 simulator"
 
 
 /* Various memory areas supported by the simulator.

@@ -16,7 +16,10 @@
 
 
 #define CPU_ARCH		"v850e"
-#define CPU_MODEL		"GDB/v850e simulator"
+#define CPU_MODEL		"v850e"
+#define CPU_MODEL_LONG		"NEC V850E"
+#define PLATFORM		"gdb/v850e"
+#define PLATFORM_LONG		"GDB V850E simulator"
 
 
 /* We use a wierd value for RAM, not just 0, for testing purposes.

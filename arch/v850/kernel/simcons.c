@@ -154,5 +154,5 @@ void simcons_setup (void)
 {
 	V850_SIM_SYSCALL (make_raw, 0);
 	register_console (&simcons);
-	printk (KERN_INFO "Console: GDB/v850e simulator stdio\n");
+	printk (KERN_INFO "Console: GDB V850E simulator stdio\n");
 }
