@@ -107,7 +107,7 @@ struct nf_bridge_info {
 	struct net_device *netoutdev;
 #endif
 	unsigned int mask;
-	unsigned long hh[32 / sizeof(unsigned long)];
+	unsigned long data[32 / sizeof(unsigned long)];
 };
 #endif
 

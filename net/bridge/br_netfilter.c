@@ -41,11 +41,9 @@
 
 
 #define skb_origaddr(skb)	 (((struct bridge_skb_cb *) \
-				 (skb->cb))->daddr.ipv4)
+				 (skb->nf_bridge->data))->daddr.ipv4)
 #define store_orig_dstaddr(skb)	 (skb_origaddr(skb) = (skb)->nh.iph->daddr)
 #define dnat_took_place(skb)	 (skb_origaddr(skb) != (skb)->nh.iph->daddr)
-#define clear_cb(skb)		 (memset(&skb_origaddr(skb), 0, \
-				 sizeof(struct bridge_skb_cb)))
 
 #define has_bridge_parent(device)	((device)->br_port != NULL)
 #define bridge_parent(device)		((device)->br_port->br->dev)
@@ -216,7 +214,6 @@ bridged_dnat:
 				 */
 				nf_bridge->mask |= BRNF_BRIDGED_DNAT;
 				skb->dev = nf_bridge->physindev;
-				clear_cb(skb);
 				if (skb->protocol ==
 				    __constant_htons(ETH_P_8021Q)) {
 					skb_push(skb, VLAN_HLEN);
@@ -237,7 +234,6 @@ bridged_dnat:
 		dst_hold(skb->dst);
 	}
 
-	clear_cb(skb);
 	skb->dev = nf_bridge->physindev;
 	if (skb->protocol == __constant_htons(ETH_P_8021Q)) {
 		skb_push(skb, VLAN_HLEN);
