@@ -1464,7 +1464,7 @@ acpi_bus_add (
 	 */
 	switch (type) {
 	case ACPI_BUS_TYPE_SYSTEM:
-		sprintf(device->pnp.bus_id, "%s", "root");
+		sprintf(device->pnp.bus_id, "%s", "ACPI");
 		break;
 	case ACPI_BUS_TYPE_POWER_BUTTON:
 		sprintf(device->pnp.bus_id, "%s", "PWRF");
