@@ -190,10 +190,6 @@ int noautodma = 1;
 
 EXPORT_SYMBOL(noautodma);
 
-/*
- * ide_modules keeps track of the available IDE chipset/probe/driver modules.
- */
-ide_module_t *ide_chipsets;
 ide_module_t *ide_probe;
 
 /*

@@ -1245,7 +1245,6 @@ extern int generic_ide_ioctl(struct block_device *, unsigned, unsigned long);
 /*
  * IDE modules.
  */
-#define IDE_CHIPSET_MODULE		0	/* not supported yet */
 #define IDE_PROBE_MODULE		1
 
 typedef int	(ide_module_init_proc)(void);
@@ -1274,7 +1273,6 @@ typedef struct ide_devices_s {
  */
 #ifndef _IDE_C
 extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
-extern ide_module_t	*ide_chipsets;
 extern	ide_module_t	*ide_probe;
 
 extern ide_devices_t   *idedisk;
