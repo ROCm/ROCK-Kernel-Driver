@@ -1461,7 +1461,7 @@ static int __init depca_mca_probe(struct device *device)
  out_unclaim:
 	mca_device_set_claim(mdev, 0);
 
-	return err;;
+	return err;
 }
 #endif
 
