@@ -96,6 +96,7 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 					  int priority)
 {
 	struct sctp_opt *sp;
+	struct sctp_protocol *proto = sctp_get_protocol();
 	int i;
 
 	/* Retrieve the SCTP per socket area.  */
@@ -136,10 +137,10 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	asoc->frag_point = 0;
 
 	/* Initialize the default association max_retrans and RTO values.  */
-	asoc->max_retrans = ep->proto->max_retrans_association;
-	asoc->rto_initial = ep->proto->rto_initial;
-	asoc->rto_max = ep->proto->rto_max;
-	asoc->rto_min = ep->proto->rto_min;
+	asoc->max_retrans = proto->max_retrans_association;
+	asoc->rto_initial = proto->rto_initial;
+	asoc->rto_max = proto->rto_max;
+	asoc->rto_min = proto->rto_min;
 
 	asoc->overall_error_threshold = 0;
 	asoc->overall_error_count = 0;
@@ -147,7 +148,7 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	/* Initialize the maximum mumber of new data packets that can be sent
 	 * in a burst.
 	 */
-	asoc->max_burst = ep->proto->max_burst;
+	asoc->max_burst = proto->max_burst;
 
 	/* Copy things from the endpoint.  */
 	for (i = SCTP_EVENT_TIMEOUT_NONE; i < SCTP_NUM_TIMEOUT_TYPES; ++i) {
