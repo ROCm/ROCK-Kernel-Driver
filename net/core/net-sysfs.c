@@ -291,9 +291,7 @@ int netdev_register_sysfs(struct net_device *net)
 	struct class_device_attribute *attr;
 	int ret;
 
-	memset(class_dev, 0, sizeof(struct class_device)); 
 	class_dev->class = &net_class;
-	class_dev->dev = net->dev;
 	class_dev->class_data = net;
 
 	snprintf(class_dev->class_id, BUS_ID_SIZE, net->name);

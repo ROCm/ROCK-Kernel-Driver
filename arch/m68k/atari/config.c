@@ -188,8 +188,7 @@ void __init atari_switches_setup( const char *str, unsigned len )
     char *args = switches;
 
     /* copy string to local array, strsep works destructively... */
-    strncpy( switches, str, len );
-    switches[len] = 0;
+    strlcpy( switches, str, sizeof(switches) );
     atari_switches = 0;
 
     /* parse the options */

@@ -16,8 +16,13 @@ ifdef CONFIG_FULLDEBUG
 AFLAGS += -DDEBUGGER_COMPATIBLE_CACHE=1
 endif
 
-obj-$(CONFIG_COLDFIRE)	+= entry.o timers.o vectors.o
-obj-$(CONFIG_M5307)	+= config.o
+obj-$(CONFIG_COLDFIRE)	+= entry.o vectors.o
+obj-$(CONFIG_M5206)	+= timers.o
+obj-$(CONFIG_M5206e)	+= timers.o
+obj-$(CONFIG_M5249)	+= timers.o
+obj-$(CONFIG_M5272)	+= timers.o
+obj-$(CONFIG_M5307)	+= config.o timers.o
+obj-$(CONFIG_M5407)	+= timers.o
 
 ifeq ($(CONFIG_M5307),y)
 extra-y := $(BOARD)/crt0_$(MODEL).o

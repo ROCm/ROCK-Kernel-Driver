@@ -465,7 +465,7 @@ void irlan_open_data_tsap(struct irlan_cb *self)
  	/*notify.flow_indication       = irlan_eth_flow_indication;*/
 	notify.disconnect_indication = irlan_disconnect_indication;
 	notify.instance              = self;
-	strncpy(notify.name, "IrLAN data", NOTIFY_MAX_NAME);
+	strlcpy(notify.name, "IrLAN data", sizeof(notify.name));
 
 	tsap = irttp_open_tsap(LSAP_ANY, DEFAULT_INITIAL_CREDIT, &notify);
 	if (!tsap) {

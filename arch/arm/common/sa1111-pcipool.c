@@ -113,8 +113,7 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 	if (!(retval = kmalloc (sizeof *retval, SLAB_KERNEL)))
 		return retval;
 
-	strncpy (retval->name, name, sizeof retval->name);
-	retval->name [sizeof retval->name - 1] = 0;
+	strlcpy (retval->name, name, sizeof retval->name);
 
 	retval->dev = pdev;
 	INIT_LIST_HEAD (&retval->page_list);

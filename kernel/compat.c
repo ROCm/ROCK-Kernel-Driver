@@ -214,7 +214,7 @@ asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t *set,
 
 #ifdef CONFIG_FUTEX
 asmlinkage long compat_sys_futex(u32 *uaddr, int op, int val,
-		struct compat_timespec *utime)
+		struct compat_timespec *utime, u32 *uaddr2)
 {
 	struct timespec t;
 	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;
@@ -226,9 +226,10 @@ asmlinkage long compat_sys_futex(u32 *uaddr, int op, int val,
 		timeout = timespec_to_jiffies(&t) + 1;
 	}
 	if (op == FUTEX_REQUEUE)
-		val2 = (int) utime;
+		val2 = (int) (long) utime;
 
-	return do_futex((unsigned long)uaddr, op, val, timeout, uaddr2, val2);
+	return do_futex((unsigned long)uaddr, op, val, timeout,
+			(unsigned long)uaddr2, val2);
 }
 #endif
 

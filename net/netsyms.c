@@ -281,6 +281,14 @@ EXPORT_SYMBOL(devinet_ioctl);
 EXPORT_SYMBOL(register_inetaddr_notifier);
 EXPORT_SYMBOL(unregister_inetaddr_notifier);
 
+/* proc */
+#ifdef CONFIG_PROC_FS
+EXPORT_SYMBOL(udp_proc_register);
+EXPORT_SYMBOL(udp_proc_unregister);
+EXPORT_SYMBOL(tcp_proc_register);
+EXPORT_SYMBOL(tcp_proc_unregister);
+#endif
+
 /* needed for ip_gre -cw */
 EXPORT_SYMBOL(ip_statistics);
 

@@ -165,7 +165,6 @@ struct neigh_table
 	unsigned long		last_rand;
 	struct neigh_parms	*parms_list;
 	kmem_cache_t		*kmem_cachep;
-	struct tasklet_struct	gc_task;
 	struct neigh_statistics	stats;
 	struct neighbour	*hash_buckets[NEIGH_HASHMASK+1];
 	struct pneigh_entry	*phash_buckets[PNEIGH_HASHMASK+1];

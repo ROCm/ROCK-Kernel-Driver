@@ -205,7 +205,7 @@ static int ircomm_tty_startup(struct ircomm_tty_cb *self)
  	notify.disconnect_indication = ircomm_tty_disconnect_indication;
 	notify.connect_confirm       = ircomm_tty_connect_confirm;
  	notify.connect_indication    = ircomm_tty_connect_indication;
-	strncpy(notify.name, "ircomm_tty", NOTIFY_MAX_NAME);
+	strlcpy(notify.name, "ircomm_tty", sizeof(notify.name));
 	notify.instance = self;
 
 	if (!self->ircomm) {

@@ -23,10 +23,8 @@ static char clock_override[10] __initdata;
 
 static int __init clock_setup(char* str)
 {
-	if (str) {
-		strncpy(clock_override, str,10);
-		clock_override[9] = '\0';
-	}
+	if (str)
+		strlcpy(clock_override, str, sizeof(clock_override));
 	return 1;
 }
 __setup("clock=", clock_setup);

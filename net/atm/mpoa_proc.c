@@ -223,7 +223,7 @@ static int parse_qos(const char *buff, int len)
 	int value[5];
         
         memset(&qos, 0, sizeof(struct atm_qos));
-        strncpy(cmd, buff, 3);
+        strlcpy(cmd, buff, sizeof(cmd));
         if( strncmp(cmd,"add", 3) &&  strncmp(cmd,"del", 3))
 	        return 0;  /* not add or del */
 

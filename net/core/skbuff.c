@@ -271,6 +271,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	n->sk = NULL;
 	C(stamp);
 	C(dev);
+	C(real_dev);
 	C(h);
 	C(nh);
 	C(mac);
@@ -334,6 +335,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->list	= NULL;
 	new->sk		= NULL;
 	new->dev	= old->dev;
+	new->real_dev	= old->real_dev;
 	new->priority	= old->priority;
 	new->protocol	= old->protocol;
 	new->dst	= dst_clone(old->dst);

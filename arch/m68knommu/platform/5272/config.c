@@ -70,17 +70,24 @@ void mcf_autovector(unsigned int vec)
 void mcf_settimericr(int timer, int level)
 {
 	volatile unsigned long *icrp;
-	unsigned int icr;
 
-	switch (timer) {
-	case 2:  icr = MCFSIM_ICR2; break;
-	case 3:  icr = MCFSIM_ICR3; break;
-	case 4:  icr = MCFSIM_ICR4; break;
-	default: icr = MCFSIM_ICR1; break;
+	if ((timer >= 1 ) && (timer <= 4)) {
+		icrp = (volatile unsigned long *) (MCF_MBAR + MCFSIM_ICR1);
+		*icrp = (0x8 | level) << ((4 - timer) * 4);
 	}
+}
 
-	icrp = (volatile unsigned long *) (MCF_MBAR + icr);
-	*icrp = (0x8 | level) << ((4 - timer) * 4);
+/***************************************************************************/
+
+int mcf_timerirqpending(int timer)
+{
+	volatile unsigned long *icrp;
+
+	if ((timer >= 1 ) && (timer <= 4)) {
+		icrp = (volatile unsigned long *) (MCF_MBAR + MCFSIM_ICR1);
+		return (*icrp & (0x8 << ((4 - timer) * 4)));
+	}
+	return 0;
 }
 
 /***************************************************************************/

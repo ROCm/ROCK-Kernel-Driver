@@ -1070,9 +1070,6 @@ static int __init netlink_proto_init(void)
 #endif
 	/* The netlink device handler may be needed early. */ 
 	rtnetlink_init();
-#ifdef CONFIG_NETLINK_DEV
-	init_netlink();
-#endif
 	return 0;
 }
 

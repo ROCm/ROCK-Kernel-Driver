@@ -155,7 +155,7 @@ static inline void dnrt_drop(struct dn_route *rt)
 	call_rcu(&rt->u.dst.rcu_head, (void (*)(void *))dst_free, &rt->u.dst);
 }
 
-static void SMP_TIMER_NAME(dn_dst_check_expire)(unsigned long dummy)
+static void dn_dst_check_expire(unsigned long dummy)
 {
 	int i;
 	struct dn_route *rt, **rtp;
@@ -184,8 +184,6 @@ static void SMP_TIMER_NAME(dn_dst_check_expire)(unsigned long dummy)
 
 	mod_timer(&dn_route_timer, now + decnet_dst_gc_interval * HZ);
 }
-
-SMP_TIMER_DEFINE(dn_dst_check_expire, dn_dst_task);
 
 static int dn_dst_gc(void)
 {
@@ -319,7 +317,7 @@ static int dn_insert_route(struct dn_route *rt, unsigned hash, struct dn_route *
 	return 0;
 }
 
-void SMP_TIMER_NAME(dn_run_flush)(unsigned long dummy)
+void dn_run_flush(unsigned long dummy)
 {
 	int i;
 	struct dn_route *rt, *next;
@@ -340,8 +338,6 @@ nothing_to_declare:
 		spin_unlock_bh(&dn_rt_hash_table[i].lock);
 	}
 }
-
-SMP_TIMER_DEFINE(dn_run_flush, dn_flush_task);
 
 static spinlock_t dn_rt_flush_lock = SPIN_LOCK_UNLOCKED;
 

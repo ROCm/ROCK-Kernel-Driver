@@ -20,6 +20,12 @@
  */
 #define	MCF_MBAR	0x10000000
 #define	MCF_MBAR2	0x80000000
+#define	MCF_IPSBAR	0x40000000
+
+#ifdef CONFIG_M5282
+#undef MCF_MBAR
+#define	MCF_MBAR	MCF_IPSBAR
+#endif
 
 /*
  *	Define master clock frequency.

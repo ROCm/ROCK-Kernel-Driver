@@ -35,6 +35,7 @@
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 #include <linux/ipv6.h>
 #endif
+#include <linux/seq_file.h>
 
 /* This is for all connections with a full identity, no wildcards.
  * New scheme, half the table is for TIME_WAIT, the other half is
@@ -361,10 +362,6 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 #define MAX_TCP_KEEPINTVL	32767
 #define MAX_TCP_KEEPCNT		127
 #define MAX_TCP_SYNCNT		127
-
-/* TIME_WAIT reaping mechanism. */
-#define TCP_TWKILL_SLOTS	8	/* Please keep this a power of 2. */
-#define TCP_TWKILL_PERIOD	(TCP_TIMEWAIT_LEN/TCP_TWKILL_SLOTS)
 
 #define TCP_SYNQ_INTERVAL	(HZ/5)	/* Period of SYNACK timer */
 #define TCP_SYNQ_HSIZE		512	/* Size of SYNACK hash table */
@@ -1892,5 +1889,32 @@ static inline void tcp_mib_init(void)
 	TCP_ADD_STATS_USER(TcpRtoMax, TCP_RTO_MAX*1000/HZ);
 	TCP_ADD_STATS_USER(TcpMaxConn, -1);
 }
+
+/* /proc */
+enum tcp_seq_states {
+	TCP_SEQ_STATE_LISTENING,
+	TCP_SEQ_STATE_OPENREQ,
+	TCP_SEQ_STATE_ESTABLISHED,
+	TCP_SEQ_STATE_TIME_WAIT,
+};
+
+struct tcp_seq_afinfo {
+	struct module		*owner;
+	char			*name;
+	sa_family_t		family;
+	int			(*seq_show) (struct seq_file *m, void *v);
+	struct file_operations	*seq_fops;
+};
+
+struct tcp_iter_state {
+	sa_family_t		family;
+	enum tcp_seq_states	state;
+	struct sock		*syn_wait_sk;
+	int			bucket, sbucket, num, uid;
+	struct seq_operations	seq_ops;
+};
+
+extern int tcp_proc_register(struct tcp_seq_afinfo *afinfo);
+extern void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo);
 
 #endif	/* _TCP_H */
