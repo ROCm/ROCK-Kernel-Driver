@@ -27,11 +27,11 @@ config EFI_VARS
 	  write, create, and destroy EFI variables through this interface.
 
 	  Note that using this driver in concert with efibootmgr requires
-	  at least test release version 0.5.0-test1 or later, which is
+	  at least test release version 0.5.0-test3 or later, which is
 	  available from Matt Domsch's website located at:
-	  http://domsch.com/linux/ia64/efibootmgr/testing/efibootmgr-0.5.0-test1.tar.gz
+	  http://linux.dell.com/efibootmgr/testing/efibootmgr-0.5.0-test3.tar.gz
 
 	  Subsequent efibootmgr releases may be found at:
-	  http://domsch.com/linux/ia64/efibootmgr
+	  http://linux.dell.com/efibootmgr
 
 endmenu
