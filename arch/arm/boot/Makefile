@@ -54,10 +54,8 @@ params_phys-$(CONFIG_ARCH_ADIFCC)	:= 0xc0000100
    zreladdr-$(CONFIG_ARCH_OMAP)		:= 0x10008000
 params_phys-$(CONFIG_ARCH_OMAP)		:= 0x10000100
 initrd_phys-$(CONFIG_ARCH_OMAP)		:= 0x10800000
-
-   zreladdr-$(CONFIG_ARCH_S3C2410)      := 0x30008000
-params_phys-$(CONFIG_ARCH_S3C2410)      := 0x30000100
-
+   zreladdr-$(CONFIG_ARCH_S3C2410)	:= 0x30008000
+params_phys-$(CONFIG_ARCH_S3C2410)	:= 0x30000100
 
 ZRELADDR    := $(zreladdr-y)
 ZTEXTADDR   := $(ztextaddr-y)
