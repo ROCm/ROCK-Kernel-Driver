@@ -591,9 +591,9 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	/* flow control settings */
 
-	hw->fc_high_water = FC_DEFAULT_HI_THRESH;
-	hw->fc_low_water = FC_DEFAULT_LO_THRESH;
-	hw->fc_pause_time = FC_DEFAULT_TX_TIMER;
+	hw->fc_high_water = E1000_FC_HIGH_THRESH;
+	hw->fc_low_water = E1000_FC_LOW_THRESH;
+	hw->fc_pause_time = E1000_FC_PAUSE_TIME;
 	hw->fc_send_xon = 1;
 
 	/* Media type - copper or fiber */
