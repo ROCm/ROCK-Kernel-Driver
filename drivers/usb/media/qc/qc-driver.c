@@ -278,6 +278,9 @@ void qc_usleep(unsigned long usec)
  * Note: at this moment the URB completion handler must not resubmit the same URB.
  */
 static void qc_unlink_urb_sync(struct urb *urb) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
+	usb_kill_urb(urb);
+#else
 	int r;
 	while ((r=usb_unlink_urb(urb)) == -EBUSY) {
 		/* The URB is not anymore linked (status!=-EINPROGRESS) but 
@@ -289,6 +292,7 @@ static void qc_unlink_urb_sync(struct urb *urb) {
 	 * usb_unlink_urb() called synchronously the completion handler and
 	 * there's no need to wait or anything else */
 	if (r) PDEBUG("qc_unlink_urb_sync(%p): r=%i", urb, r);
+#endif
 }
 /* }}} */
 /* {{{ [fold] int qc_get_i2c(struct quickcam *qc, const struct qc_sensor *sensor, int reg) */

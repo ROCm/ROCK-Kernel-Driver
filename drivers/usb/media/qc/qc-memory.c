@@ -230,7 +230,11 @@ int qc_mm_remap(struct vm_area_struct *vma, void *src, unsigned long src_size, c
 	pos = (unsigned long)src;
 	while ((long)size > 0) {
 		physaddr = kvirt_to_pa(pos);
-		if (remap_page_range(vma, start, physaddr, PAGE_SIZE, PAGE_SHARED))
+		if (remap_pfn_range(vma,
+					start,
+					physaddr >> PAGE_SHIFT,
+					PAGE_SIZE,
+					PAGE_SHARED))
 			return -EAGAIN;
 		start += PAGE_SIZE;
 		pos += PAGE_SIZE;
