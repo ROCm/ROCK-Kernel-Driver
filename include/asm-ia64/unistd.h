@@ -222,7 +222,7 @@
 #define __NR_futex			1230
 #define __NR_sched_setaffinity		1231
 #define __NR_sched_getaffinity		1232
-#define __NR_security			1233
+/* 1233 currently unused */
 #define __NR_alloc_hugepages		1234
 #define __NR_free_hugepages		1235
 #define __NR_exit_group			1236

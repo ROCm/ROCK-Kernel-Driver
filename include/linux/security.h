@@ -685,21 +685,6 @@ struct swap_info_struct;
  *	@tsk contains the task_struct for the process.
  *	@cap contains the capability <include/linux/capability.h>.
  *	Return 0 if the capability is granted for @tsk.
- * @sys_security:
- *	Security modules may use this hook to implement new system calls for
- *	security-aware applications.  The interface is similar to socketcall,
- *	but with an @id parameter to help identify the security module whose
- *	call is being invoked.  The module is responsible for interpreting the
- *	parameters, and must copy in the @args array from user space if it is
- *	used.
- *	The recommended convention for creating the hexadecimal @id value is
- *	echo "Name_of_module" | md5sum | cut -c -8; by using this convention,
- *	there is no need for a central registry.
- *	@id contains the security module identifier.
- *	@call contains the call value.
- *	@args contains the call arguments (user space pointer).
- *	The module should return -ENOSYS if it does not implement any new
- *	system calls.
  *
  * @register_security:
  * 	allow module stacking.
@@ -727,8 +712,6 @@ struct security_operations {
 			    kernel_cap_t * permitted);
 	int (*acct) (struct file * file);
 	int (*capable) (struct task_struct * tsk, int cap);
-	int (*sys_security) (unsigned int id, unsigned call,
-			     unsigned long *args);
 	int (*quotactl) (int cmds, int type, int id, struct super_block * sb);
 	int (*quota_on) (struct file * f);
 

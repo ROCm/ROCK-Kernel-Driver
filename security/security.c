@@ -223,24 +223,6 @@ int capable (int cap)
 	return 1;
 }
 
-/**
- * sys_security - security syscall multiplexor.
- * @id: module id
- * @call: call identifier
- * @args: arg list for call
- *
- * Similar to sys_socketcall.  Can use id to help identify which module user
- * app is talking to.  The recommended convention for creating the
- * hexadecimal id value is:
- * 'echo "Name_of_module" | md5sum | cut -c -8'.
- * By following this convention, there's no need for a central registry.
- */
-asmlinkage long sys_security (unsigned int id, unsigned int call,
-			      unsigned long *args)
-{
-	return security_ops->sys_security (id, call, args);
-}
-
 EXPORT_SYMBOL_GPL(register_security);
 EXPORT_SYMBOL_GPL(unregister_security);
 EXPORT_SYMBOL_GPL(mod_reg_security);

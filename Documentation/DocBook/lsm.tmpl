@@ -203,29 +203,6 @@ operations.  An example of the second category of hooks is the
 permission when accessing an inode.
 </para>
 
-<para>
-LSM adds a general <function>security</function> system call that
-simply invokes the <function>sys_security</function> hook.  This
-system call and hook permits security modules to implement new system
-calls for security-aware applications.  The interface is similar to
-socketcall, but also has an <parameter>id</parameter> to help identify
-the security module whose call is being invoked.  
-To eliminate the need for a central registry of ids,
-the recommended convention for creating the hexadecimal id value is:
-<programlisting>
-<![CDATA[
- echo "Name_of_module" | md5sum | cut -c -8
-]]>
-</programlisting>
-C code will need to prefix this result with ``0x''.
-For example, the id for ``SGI Trusted Linux'' could be used in C as:
-<programlisting>
-<![CDATA[
- #define SYS_SECURITY_MODID 0xc4c7be22
-]]>
-</programlisting>
-</para>
-
 </sect1>
 
 <sect1 id="cap"><title>LSM Capabilities Module</title>

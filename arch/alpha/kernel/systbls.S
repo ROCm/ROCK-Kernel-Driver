@@ -398,7 +398,7 @@ sys_call_table:
 	.quad sys_getdents64
 	.quad sys_gettid
 	.quad sys_readahead
-	.quad sys_ni_syscall			/* 380, sys_security */
+	.quad sys_ni_syscall			/* 380 */
 	.quad sys_tkill
 	.quad sys_setxattr
 	.quad sys_lsetxattr

@@ -426,8 +426,7 @@ __SYSCALL(__NR_afs_syscall, sys_ni_syscall)
 #define __NR_tuxcall      		184 /* reserved for tux */
 __SYSCALL(__NR_tuxcall, sys_ni_syscall)
 
-#define __NR_security			185 /* reserved for LSM/security */
-__SYSCALL(__NR_security, sys_ni_syscall)
+/* 165 currently unused */
 
 #define __NR_gettid		186
 __SYSCALL(__NR_gettid, sys_gettid)

@@ -227,7 +227,7 @@
 #define __NR_madvise		219
 #define __NR_getdents64		220
 #define __NR_fcntl64		221
-#define __NR_security           223     /* syscall for security modules */
+/* 223 is unused */
 #define __NR_gettid             224
 #define __NR_readahead          225
 #define __NR_tkill              226

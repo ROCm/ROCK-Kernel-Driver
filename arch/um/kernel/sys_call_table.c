@@ -215,7 +215,6 @@ extern syscall_handler_t sys_mincore;
 extern syscall_handler_t sys_madvise;
 extern syscall_handler_t sys_fcntl64;
 extern syscall_handler_t sys_getdents64;
-extern syscall_handler_t sys_security;
 extern syscall_handler_t sys_gettid;
 extern syscall_handler_t sys_readahead;
 extern syscall_handler_t sys_tkill;
@@ -451,7 +450,6 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_fstat64 ] = sys_fstat64,
 	[ __NR_fcntl64 ] = sys_fcntl64,
 	[ __NR_getdents64 ] = sys_getdents64,
-        [ __NR_security ] = sys_security,
 	[ __NR_gettid ] = sys_gettid,
 	[ __NR_readahead ] = sys_readahead,
 	[ __NR_setxattr ] = sys_ni_syscall,

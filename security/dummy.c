@@ -61,12 +61,6 @@ static int dummy_capable (struct task_struct *tsk, int cap)
 	return -EPERM;
 }
 
-static int dummy_sys_security (unsigned int id, unsigned int call,
-			       unsigned long *args)
-{
-	return -ENOSYS;
-}
-
 static int dummy_quotactl (int cmds, int type, int id, struct super_block *sb)
 {
 	return 0;
@@ -541,7 +535,6 @@ struct security_operations dummy_security_ops = {
 	.capset_set =			dummy_capset_set,
 	.acct =				dummy_acct,
 	.capable =			dummy_capable,
-	.sys_security =			dummy_sys_security,
 	.quotactl =			dummy_quotactl,
 	.quota_on =			dummy_quota_on,
 
