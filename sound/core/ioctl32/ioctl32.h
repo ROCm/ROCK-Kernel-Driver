@@ -26,6 +26,10 @@
 #ifndef __ALSA_IOCTL32_H
 #define __ALSA_IOCTL32_H
 
+#ifndef A
+#define A(__x) ((unsigned long)(__x))
+#endif
+
 #define TO_PTR(x)  A(x)
 
 #define COPY(x)  (dst->x = src->x)

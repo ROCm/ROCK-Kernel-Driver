@@ -22,6 +22,7 @@
 #include <sound/driver.h>
 #include <linux/smp_lock.h>
 #include <linux/time.h>
+#include <linux/init.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <asm/uaccess.h>
@@ -393,6 +394,8 @@ static int __init snd_ioctl32_init(void)
 		return err;
 	}
 #endif
+
+	return 0;
 }
 
 module_init(snd_ioctl32_init)
