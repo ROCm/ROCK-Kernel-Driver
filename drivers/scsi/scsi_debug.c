@@ -1326,7 +1326,7 @@ static ssize_t sdebug_delay_store(struct device_driver * ddp,
 	return -EINVAL;
 }
 DRIVER_ATTR(delay, S_IRUGO | S_IWUSR, sdebug_delay_show, 
-	    sdebug_delay_store)
+	    sdebug_delay_store);
 
 static ssize_t sdebug_opts_show(struct device_driver * ddp, char * buf) 
 {
@@ -1355,7 +1355,7 @@ opts_done:
 	return count;
 }
 DRIVER_ATTR(opts, S_IRUGO | S_IWUSR, sdebug_opts_show, 
-	    sdebug_opts_store)
+	    sdebug_opts_store);
 
 static ssize_t sdebug_num_tgts_show(struct device_driver * ddp, char * buf) 
 {
@@ -1373,13 +1373,13 @@ static ssize_t sdebug_num_tgts_store(struct device_driver * ddp,
 	return -EINVAL;
 }
 DRIVER_ATTR(num_tgts, S_IRUGO | S_IWUSR, sdebug_num_tgts_show, 
-	    sdebug_num_tgts_store) 
+	    sdebug_num_tgts_store);
 
 static ssize_t sdebug_dev_size_mb_show(struct device_driver * ddp, char * buf) 
 {
         return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_dev_size_mb);
 }
-DRIVER_ATTR(dev_size_mb, S_IRUGO, sdebug_dev_size_mb_show, NULL) 
+DRIVER_ATTR(dev_size_mb, S_IRUGO, sdebug_dev_size_mb_show, NULL);
 
 static ssize_t sdebug_every_nth_show(struct device_driver * ddp, char * buf) 
 {
@@ -1398,7 +1398,7 @@ static ssize_t sdebug_every_nth_store(struct device_driver * ddp,
 	return -EINVAL;
 }
 DRIVER_ATTR(every_nth, S_IRUGO | S_IWUSR, sdebug_every_nth_show,
-	    sdebug_every_nth_store) 
+	    sdebug_every_nth_store);
 
 static ssize_t sdebug_max_luns_show(struct device_driver * ddp, char * buf) 
 {
@@ -1416,13 +1416,13 @@ static ssize_t sdebug_max_luns_store(struct device_driver * ddp,
 	return -EINVAL;
 }
 DRIVER_ATTR(max_luns, S_IRUGO | S_IWUSR, sdebug_max_luns_show, 
-	    sdebug_max_luns_store) 
+	    sdebug_max_luns_store);
 
 static ssize_t sdebug_scsi_level_show(struct device_driver * ddp, char * buf) 
 {
         return scnprintf(buf, PAGE_SIZE, "%d\n", scsi_debug_scsi_level);
 }
-DRIVER_ATTR(scsi_level, S_IRUGO, sdebug_scsi_level_show, NULL) 
+DRIVER_ATTR(scsi_level, S_IRUGO, sdebug_scsi_level_show, NULL);
 
 static ssize_t sdebug_add_host_show(struct device_driver * ddp, char * buf) 
 {
@@ -1459,7 +1459,7 @@ static ssize_t sdebug_add_host_store(struct device_driver * ddp,
 	return count;
 }
 DRIVER_ATTR(add_host, S_IRUGO | S_IWUSR, sdebug_add_host_show, 
-	    sdebug_add_host_store)
+	    sdebug_add_host_store);
 
 static void do_create_driverfs_files()
 {
