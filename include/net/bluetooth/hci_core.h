@@ -281,10 +281,12 @@ static inline void hci_conn_hold(struct hci_conn *conn)
 static inline void hci_conn_put(struct hci_conn *conn)
 {
 	if (atomic_dec_and_test(&conn->refcnt)) {
-		if (conn->type == SCO_LINK)
+		if (conn->type == ACL_LINK) {
+			unsigned long timeo = (conn->out) ?
+				HCI_DISCONN_TIMEOUT : HCI_DISCONN_TIMEOUT * 2;
+			hci_conn_set_timer(conn, timeo);
+		} else
 			hci_conn_set_timer(conn, HZ / 100);
-		else if (conn->out)
-			hci_conn_set_timer(conn, HCI_DISCONN_TIMEOUT);
 	}
 }
 
