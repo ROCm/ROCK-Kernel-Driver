@@ -213,11 +213,10 @@ static inline int
 xprt_sendmsg(struct rpc_xprt *xprt, struct rpc_rqst *req)
 {
 	struct socket	*sock = xprt->sock;
-	struct msghdr	msg;
 	struct xdr_buf	*xdr = &req->rq_snd_buf;
-	struct iovec	niv[MAX_IOVEC];
-	unsigned int	niov, slen, skip;
-	mm_segment_t	oldfs;
+	struct sockaddr *addr = NULL;
+	int addrlen = 0;
+	unsigned int	skip;
 	int		result;
 
 	if (!sock)
@@ -227,27 +226,18 @@ xprt_sendmsg(struct rpc_xprt *xprt, struct rpc_rqst *req)
 				req->rq_svec->iov_base,
 				req->rq_svec->iov_len);
 
+	/* For UDP, we need to provide an address */
+	if (!xprt->stream) {
+		addr = (struct sockaddr *) &xprt->addr;
+		addrlen = sizeof(xprt->addr);
+	}
 	/* Dont repeat bytes */
 	skip = req->rq_bytes_sent;
-	slen = xdr->len - skip;
-	niov = xdr_kmap(niv, xdr, skip);
 
-	msg.msg_flags   = MSG_DONTWAIT|MSG_NOSIGNAL;
-	msg.msg_iov	= niv;
-	msg.msg_iovlen	= niov;
-	msg.msg_name	= (struct sockaddr *) &xprt->addr;
-	msg.msg_namelen = sizeof(xprt->addr);
-	msg.msg_control = NULL;
-	msg.msg_controllen = 0;
-
-	oldfs = get_fs(); set_fs(get_ds());
 	clear_bit(SOCK_ASYNC_NOSPACE, &sock->flags);
-	result = sock_sendmsg(sock, &msg, slen);
-	set_fs(oldfs);
+	result = xdr_sendpages(sock, addr, addrlen, xdr, skip, MSG_DONTWAIT);
 
-	xdr_kunmap(xdr, skip);
-
-	dprintk("RPC:      xprt_sendmsg(%d) = %d\n", slen, result);
+	dprintk("RPC:      xprt_sendmsg(%d) = %d\n", xdr->len - skip, result);
 
 	if (result >= 0)
 		return result;
