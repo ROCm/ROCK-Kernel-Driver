@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.68 2004/11/27 13:38:10 gleixner Exp $
+ * $Id: build.c,v 1.69 2004/12/16 20:22:18 dmarlin Exp $
  *
  */
 
@@ -357,7 +357,11 @@ int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 		D1(printk(KERN_DEBUG "build_fs failed\n"));
 		jffs2_free_ino_caches(c);
 		jffs2_free_raw_node_refs(c);
-		kfree(c->blocks);
+		if (c->mtd->flags & MTD_NO_VIRTBLOCKS) {
+			vfree(c->blocks);
+		} else {
+			kfree(c->blocks);
+		}
 		return -EIO;
 	}
 
