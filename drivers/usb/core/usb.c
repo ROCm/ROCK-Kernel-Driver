@@ -1017,9 +1017,6 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	/* dma masks come from the controller; readonly, except to hcd */
 	dev->dev.dma_mask = parent->dma_mask;
 
-	/* it's not usable yet */
-	dev->state = USB_STATE_DEFAULT;
-
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
 	 * it's fixed size except for full speed devices.
 	 */

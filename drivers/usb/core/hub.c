@@ -737,6 +737,9 @@ static int usb_hub_port_reset(struct usb_device *hub, int port,
 		if (status != -1) {
 			usb_clear_port_feature(hub,
 				port + 1, USB_PORT_FEAT_C_RESET);
+			dev->state = status
+					? USB_STATE_NOTATTACHED
+					: USB_STATE_DEFAULT;
 			return status;
 		}
 
