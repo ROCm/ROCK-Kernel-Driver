@@ -1,5 +1,5 @@
 /*
-    $Id: btcx-risc.c,v 1.3 2004/10/13 10:39:00 kraxel Exp $
+    $Id: btcx-risc.c,v 1.4 2004/11/07 13:17:14 kraxel Exp $
 
     btcx-risc.c
 
@@ -38,7 +38,7 @@ MODULE_AUTHOR("Gerd Knorr");
 MODULE_LICENSE("GPL");
 
 static unsigned int debug = 0;
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug,"debug messages, default is 0 (no)");
 
 /* ---------------------------------------------------------- */
