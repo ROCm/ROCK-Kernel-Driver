@@ -465,23 +465,24 @@ int usb_get_configuration(struct usb_device *dev)
 		goto err2;
 	memset(dev->rawdescriptors, 0, length);
 
-	buffer = kmalloc(8, GFP_KERNEL);
+	buffer = kmalloc(USB_DT_CONFIG_SIZE, GFP_KERNEL);
 	if (!buffer)
 		goto err2;
 	desc = (struct usb_config_descriptor *)buffer;
 
 	for (cfgno = 0; cfgno < ncfg; cfgno++) {
-		/* We grab the first 8 bytes so we know how long the whole */
-		/* configuration is */
+		/* We grab just the first descriptor so we know how long
+		 * the whole configuration is */
 		result = usb_get_descriptor(dev, USB_DT_CONFIG, cfgno,
-		    buffer, 8);
+		    buffer, USB_DT_CONFIG_SIZE);
 		if (result < 0) {
 			dev_err(ddev, "unable to read config index %d "
-			    "descriptor\n", cfgno);
+			    "descriptor/%s\n", cfgno, "start");
 			goto err;
-		} else if (result < 8) {
+		} else if (result < 4) {
 			dev_err(ddev, "config index %d descriptor too short "
-			    "(expected %i, got %i)\n", cfgno, 8, result);
+			    "(expected %i, got %i)\n", cfgno,
+			    USB_DT_CONFIG_SIZE, result);
 			result = -EINVAL;
 			goto err;
 		}
@@ -498,7 +499,7 @@ int usb_get_configuration(struct usb_device *dev)
 		    bigbuffer, length);
 		if (result < 0) {
 			dev_err(ddev, "unable to read config index %d "
-			    "descriptor\n", cfgno);
+			    "descriptor/%s\n", cfgno, "all");
 			kfree(bigbuffer);
 			goto err;
 		}
