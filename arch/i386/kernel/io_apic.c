@@ -293,10 +293,11 @@ static inline void balance_irq(int cpu, int irq)
 	new_cpu = move(cpu, allowed_mask, now, 1);
 	if (cpu != new_cpu) {
 		irq_desc_t *desc = irq_desc + irq;
+		unsigned long flags;
 
-		spin_lock(&desc->lock);
+		spin_lock_irqsave(&desc->lock, flags);
 		pending_irq_balance_apicid[irq]=cpu_to_logical_apicid(new_cpu);
-		spin_unlock(&desc->lock);
+		spin_unlock_irqrestore(&desc->lock, flags);
 	}
 }
 
@@ -486,13 +487,15 @@ tryanotherirq:
 
 	if (target_cpu_mask & allowed_mask) {
 		irq_desc_t *desc = irq_desc + selected_irq;
+		unsigned long flags;
+
 		Dprintk("irq = %d moved to cpu = %d\n",
 				selected_irq, min_loaded);
 		/* mark for change destination */
-		spin_lock(&desc->lock);
+		spin_lock_irqsave(&desc->lock, flags);
 		pending_irq_balance_apicid[selected_irq] =
 				cpu_to_logical_apicid(min_loaded);
-		spin_unlock(&desc->lock);
+		spin_unlock_irqrestore(&desc->lock, flags);
 		/* Since we made a change, come back sooner to 
 		 * check for more variation.
 		 */
@@ -1580,7 +1583,7 @@ static void __init setup_ioapic_ids_from_mpc(void) { }
  */
 static int __init timer_irq_works(void)
 {
-	unsigned int t1 = jiffies;
+	unsigned long t1 = jiffies;
 
 	local_irq_enable();
 	/* Let ten ticks pass... */
