@@ -53,7 +53,7 @@ voyager_dump(int dummy1, struct pt_regs *dummy2, struct tty_struct *dummy3)
 static struct sysrq_key_op sysrq_voyager_dump_op = {
 	.handler	= voyager_dump,
 	.help_msg	= "Voyager",
-	.action_msg	= "Dump Voyager Status\n",
+	.action_msg	= "Dump Voyager Status",
 };
 #endif
 
