@@ -548,7 +548,15 @@ static int unuse_process(struct mm_struct * mm,
 	/*
 	 * Go through process' page directory.
 	 */
-	down_read(&mm->mmap_sem);
+	if (!down_read_trylock(&mm->mmap_sem)) {
+		/*
+		 * Our reference to the page stops try_to_unmap_one from
+		 * unmapping its ptes, so swapoff can make progress.
+		 */
+		unlock_page(page);
+		down_read(&mm->mmap_sem);
+		lock_page(page);
+	}
 	spin_lock(&mm->page_table_lock);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		if (!is_vm_hugetlb_page(vma)) {
