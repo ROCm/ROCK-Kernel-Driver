@@ -121,7 +121,6 @@ static void multipath_end_bh_io (struct multipath_bh *mp_bh, int uptodate)
 	multipath_conf_t *conf = mddev_to_conf(mp_bh->mddev);
 
 	bio_endio(bio, uptodate);
-	bio_put(mp_bh->bio);
 	mempool_free(mp_bh, conf->pool);
 }
 
@@ -164,7 +163,6 @@ static int multipath_make_request (request_queue_t *q, struct bio * bio)
 {
 	mddev_t *mddev = q->queuedata;
 	multipath_conf_t *conf = mddev_to_conf(mddev);
-	struct bio *real_bio;
 	struct multipath_bh * mp_bh;
 	struct multipath_info *multipath;
 
@@ -172,20 +170,17 @@ static int multipath_make_request (request_queue_t *q, struct bio * bio)
 
 	mp_bh->master_bio = bio;
 	mp_bh->mddev = mddev;
-	mp_bh->cmd = bio_data_dir(bio);
 
 	/*
 	 * read balancing logic:
 	 */
 	multipath = conf->multipaths + multipath_read_balance(conf);
 
-	real_bio = bio_clone(bio, GFP_NOIO);
-	real_bio->bi_bdev = multipath->bdev;
-	real_bio->bi_rw = bio_data_dir(bio);
-	real_bio->bi_end_io = multipath_end_request;
-	real_bio->bi_private = mp_bh;
-	mp_bh->bio = real_bio;
-	generic_make_request(real_bio);
+	mp_bh->bio = *bio;
+	mp_bh->bio.bi_bdev = multipath->bdev;
+	mp_bh->bio.bi_end_io = multipath_end_request;
+	mp_bh->bio.bi_private = mp_bh;
+	generic_make_request(&mp_bh->bio);
 	return 0;
 }
 
@@ -598,7 +593,8 @@ static void multipathd (void *data)
 			printk(KERN_INFO "dirty sb detected, updating.\n");
 			md_update_sb(mddev);
 		}
-		bio = mp_bh->bio;
+		bio = &mp_bh->bio;
+		bio->bi_sector = mp_bh->master_bio->bi_sector;
 		bdev = bio->bi_bdev;
 		
 		multipath_map (mddev, &bio->bi_bdev);

@@ -2,6 +2,7 @@
 #define _MULTIPATH_H
 
 #include <linux/raid/md.h>
+#include <linux/bio.h>
 
 struct multipath_info {
 	int		number;
@@ -24,7 +25,6 @@ struct multipath_private_data {
 	int			raid_disks;
 	int			working_disks;
 	mdk_thread_t		*thread;
-	struct multipath_info	*spare;
 	spinlock_t		device_lock;
 
 	mempool_t		*pool;
@@ -45,13 +45,9 @@ typedef struct multipath_private_data multipath_conf_t;
  */
 
 struct multipath_bh {
-	atomic_t		remaining; /* 'have we finished' count,
-					    * used from IRQ handlers
-					    */
-	int			cmd;
 	mddev_t			*mddev;
 	struct bio		*master_bio;
-	struct bio		*bio;
-	struct multipath_bh	*next_mp; /* next for retry or in free list */
+	struct bio		bio;
+	struct multipath_bh	*next_mp; /* next for retry */
 };
 #endif
