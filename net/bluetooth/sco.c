@@ -962,7 +962,7 @@ static int __init sco_proc_init(void)
 
 static void __init sco_proc_cleanup(void)
 {
-        return 0;
+        return;
 }
 #endif /* CONFIG_PROC_FS */
 

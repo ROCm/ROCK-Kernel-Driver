@@ -718,7 +718,7 @@ int hci_get_dev_list(unsigned long arg)
 	if (!dev_num)
 		return -EINVAL;
 	
-	size = dev_num * sizeof(struct hci_dev_req) + sizeof(__u16);
+	size = dev_num * sizeof(*dr) + sizeof(*dl);
 
 	if (verify_area(VERIFY_WRITE, (void *) arg, size))
 		return -EFAULT;
@@ -739,7 +739,7 @@ int hci_get_dev_list(unsigned long arg)
 	read_unlock_bh(&hci_dev_list_lock);
 
 	dl->dev_num = n;
-	size = n * sizeof(struct hci_dev_req) + sizeof(__u16);
+	size = n * sizeof(*dr) + sizeof(*dl);
 
 	copy_to_user((void *) arg, dl, size);
 	kfree(dl);

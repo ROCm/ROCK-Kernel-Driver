@@ -128,18 +128,17 @@ static int bnep_send_rsp(struct bnep_session *s, u8 ctrl, u16 resp)
 	return bnep_send(s, &rsp, sizeof(rsp));
 }
 
-static int bnep_ctrl_set_netfilter(struct bnep_session *s, struct sk_buff *skb)
+static int bnep_ctrl_set_netfilter(struct bnep_session *s, u16 *data, int len)
 {
-	u16 *data;
 	int n;
-	
-	data = (void *) skb->data;
-	if (!skb_pull(skb, 2))
-		return -EILSEQ;
-	n = ntohs(get_unaligned(data));
 
-	data = (void *) skb->data;
-	if (!skb_pull(skb, n))
+	if (len < 2)
+		return -EILSEQ;
+
+	n = ntohs(get_unaligned(data));
+	data++; len -= 2;
+
+	if (len < n)
 		return -EILSEQ;
 
 	BT_DBG("filter len %d", n);
@@ -170,18 +169,17 @@ static int bnep_ctrl_set_netfilter(struct bnep_session *s, struct sk_buff *skb)
 	return 0;
 }
 
-static int bnep_ctrl_set_mcfilter(struct bnep_session *s, struct sk_buff *skb)
+static int bnep_ctrl_set_mcfilter(struct bnep_session *s, u8 *data, int len)
 {
-	u8 *data;
 	int n;
-	
-	data = (void *) skb->data;
-	if (!skb_pull(skb, 2))
-		return -EILSEQ;
-	n = ntohs(get_unaligned((u16 *) data));
 
-	data = (void *) skb->data;
-	if (!skb_pull(skb, n))
+	if (len < 2)
+		return -EILSEQ;
+
+	n = ntohs(get_unaligned((u16 *) data)); 
+	data += 2; len -= 2;
+
+	if (len < n)
 		return -EILSEQ;
 
 	BT_DBG("filter len %d", n);
@@ -225,12 +223,13 @@ static int bnep_ctrl_set_mcfilter(struct bnep_session *s, struct sk_buff *skb)
 	return 0;
 }
 
-static int bnep_rx_control(struct bnep_session *s, struct sk_buff *skb)
+static int bnep_rx_control(struct bnep_session *s, void *data, int len)
 {
+	u8  cmd = *(u8 *)data;
 	int err = 0;
-	u8 cmd = *(u8 *) skb->data;
-	skb_pull(skb, 1);
-	
+
+	data++; len--;
+
 	switch (cmd) {
 	case BNEP_CMD_NOT_UNDERSTOOD:
 	case BNEP_SETUP_CONN_REQ:
@@ -239,13 +238,13 @@ static int bnep_rx_control(struct bnep_session *s, struct sk_buff *skb)
 	case BNEP_FILTER_MULTI_ADDR_RSP:
 		/* Ignore these for now */
 		break;
-		
+
 	case BNEP_FILTER_NET_TYPE_SET:
-		err = bnep_ctrl_set_netfilter(s, skb);
+		err = bnep_ctrl_set_netfilter(s, data, len);
 		break;
 
 	case BNEP_FILTER_MULTI_ADDR_SET:
-		err = bnep_ctrl_set_mcfilter(s, skb);
+		err = bnep_ctrl_set_mcfilter(s, data, len);
 		break;
 
 	default: {
@@ -274,16 +273,19 @@ static int bnep_rx_extension(struct bnep_session *s, struct sk_buff *skb)
 		}
 
 		BT_DBG("type 0x%x len %d", h->type, h->len);
-		
+	
 		switch (h->type & BNEP_TYPE_MASK) {
 		case BNEP_EXT_CONTROL:
-			err = bnep_rx_control(s, skb);
+			bnep_rx_control(s, skb->data, skb->len);
 			break;
 
 		default:
-			/* Unknown extension */
-			if (!skb_pull(skb, h->len))
-				err = -EILSEQ;
+			/* Unknown extension, skip it. */
+			break;
+		}
+
+		if (!skb_pull(skb, h->len)) {
+			err = -EILSEQ;
 			break;
 		}
 	} while (!err && (h->type & BNEP_EXT_HEADER));
@@ -315,7 +317,7 @@ static inline int bnep_rx_frame(struct bnep_session *s, struct sk_buff *skb)
 		goto badframe;
 	
 	if ((type & BNEP_TYPE_MASK) == BNEP_CONTROL) {
-		bnep_rx_control(s, skb);
+		bnep_rx_control(s, skb->data, skb->len);
 		kfree_skb(skb);
 		return 0;
 	}
