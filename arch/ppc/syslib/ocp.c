@@ -80,7 +80,7 @@ OCP_DEF_ATTR(vendor, "0x%04x\n");
 OCP_DEF_ATTR(function, "0x%04x\n");
 OCP_DEF_ATTR(index, "0x%04x\n");
 #ifdef CONFIG_PTE_64BIT
-OCP_DEF_ATTR(paddr, "0x%16Lx\n");
+OCP_DEF_ATTR(paddr, "0x%016Lx\n");
 #else
 OCP_DEF_ATTR(paddr, "0x%08lx\n");
 #endif
@@ -207,8 +207,6 @@ struct bus_type ocp_bus_type = {
 int
 ocp_register_driver(struct ocp_driver *drv)
 {
-	int count = 0;
-
 	/* initialize common driver fields */
 	drv->driver.name = drv->name;
 	drv->driver.bus = &ocp_bus_type;
