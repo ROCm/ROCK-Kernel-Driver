@@ -49,25 +49,48 @@ static int ntfs_file_open(struct inode *vi, struct file *filp)
 }
 
 struct file_operations ntfs_file_ops = {
-	.llseek		= generic_file_llseek,	/* Seek inside file. */
-	.read		= generic_file_read,	/* Read from file. */
+	.llseek		= generic_file_llseek,	  /* Seek inside file. */
+	.read		= generic_file_read,	  /* Read from file. */
+	.aio_read	= generic_file_aio_read,  /* Async read from file. */
+	.readv		= generic_file_readv,	  /* Read from file. */
 #ifdef NTFS_RW
-	.write		= generic_file_write,	/* Write to a file. */
-#endif
-	.mmap		= generic_file_mmap,	/* Mmap file. */
-	.sendfile	= generic_file_sendfile,/* Zero-copy data send with the
-						   data source being on the
-						   ntfs partition. We don't
-						   need to care about the data
-						   destination. */
-	.open		= ntfs_file_open,	/* Open file. */
+	.write		= generic_file_write,	  /* Write to file. */
+	.aio_write	= generic_file_aio_write, /* Async write to file. */
+	.writev		= generic_file_writev,	  /* Write to file. */
+	/*.release	= ,*/			  /* Last file is closed.  See
+						     fs/ext2/file.c::
+						     ext2_release_file() for
+						     how to use this to discard
+						     preallocated space for
+						     write opened files. */
+	/*.fsync	= ,*/			  /* Sync a file to disk.  See
+						     fs/buffer.c::sys_fsync()
+						     and file_fsync(). */
+	/*.aio_fsync	= ,*/			  /* Sync all outstanding async
+						     i/o operations on a
+						     kiocb. */
+#endif /* NTFS_RW */
+	/*.ioctl	= ,*/			  /* Perform function on the
+						     mounted filesystem. */
+	.mmap		= generic_file_mmap,	  /* Mmap file. */
+	.open		= ntfs_file_open,	  /* Open file. */
+	.sendfile	= generic_file_sendfile,  /* Zero-copy data send with
+						     the data source being on
+						     the ntfs partition.  We
+						     do not need to care about
+						     the data destination. */
+	/*.sendpage	= ,*/			  /* Zero-copy data send with
+						     the data destination being
+						     on the ntfs partition.  We
+						     do not need to care about
+						     the data source. */
 };
 
 struct inode_operations ntfs_file_inode_ops = {
 #ifdef NTFS_RW
 	.truncate	= ntfs_truncate,
 	.setattr	= ntfs_setattr,
-#endif
+#endif /* NTFS_RW */
 };
 
 struct file_operations ntfs_empty_file_ops = {};
