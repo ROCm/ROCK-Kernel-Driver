@@ -359,7 +359,7 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 
 	/* Invalidate the tlb */
 	if (!large && local && __is_processor(PV_POWER4)) {
-		_tlbiel(va, large);
+		_tlbiel(va);
 	} else {
 		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
 		_tlbie(va, large);
