@@ -192,7 +192,7 @@ static int trm290_ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 	trm290_prepare_drive(drive, 0);	/* select PIO xfer */
 	return 1;
 #endif
-	if (!(count = ide_build_dmatable(drive, rq, PCI_DMA_TODEVICE))) {
+	if (!(count = ide_build_dmatable(drive, rq))) {
 		/* try PIO instead of DMA */
 		trm290_prepare_drive(drive, 0); /* select PIO xfer */
 		return 1;
@@ -236,7 +236,7 @@ static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
 	task_ioreg_t command	= WIN_NOP;
 	unsigned int count, reading = 2, writing = 0;
 
-	if (!(count = ide_build_dmatable(drive, rq, PCI_DMA_FROMDEVICE))) {
+	if (!(count = ide_build_dmatable(drive, rq))) {
 		/* try PIO instead of DMA */
 		trm290_prepare_drive(drive, 0); /* select PIO xfer */
 		return 1;

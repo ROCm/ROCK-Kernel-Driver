@@ -439,6 +439,7 @@
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
 #include <linux/fcntl.h>
+#include <linux/ethtool.h>
 
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Wireless extensions */

@@ -86,14 +86,12 @@ MODULE_PARM(gscd, "h");
  *    static DECLARE_WAIT_QUEUE_HEAD(gscd_waitq);
  */
 
-static void gscd_transfer(void);
 static void gscd_read_cmd(void);
 static void gscd_hsg2msf(long hsg, struct msf *msf);
 static void gscd_bin2bcd(unsigned char *p);
 
 /* Schnittstellen zum Kern/FS */
 
-static void do_gscd_request(request_queue_t *);
 static void __do_gscd_request(unsigned long dummy);
 static int gscd_ioctl(struct inode *, struct file *, unsigned int,
 		      unsigned long);
@@ -103,13 +101,8 @@ static int check_gscd_med_chg(kdev_t);
 
 /*      GoldStar Funktionen    */
 
-static void cc_Reset(void);
-static int wait_drv_ready(void);
-static int find_drives(void);
 static void cmd_out(int, char *, char *, int);
 static void cmd_status(void);
-static void cc_Ident(char *);
-static void cc_SetSpeed(void);
 static void init_cd_drive(int);
 
 static int get_status(void);
@@ -122,10 +115,6 @@ static void update_state(void);
 static long gscd_msf2hsg(struct msf *mp);
 static int gscd_bcd2bin(unsigned char bcd);
 #endif
-
-/*    common GoldStar Initialization    */
-
-static int my_gscd_init(void);
 
 
 /*      lo-level cmd-Funktionen    */
@@ -164,11 +153,11 @@ static struct timer_list gscd_timer;
 static spinlock_t gscd_lock = SPIN_LOCK_UNLOCKED;
 
 static struct block_device_operations gscd_fops = {
-	owner:THIS_MODULE,
-	open:gscd_open,
-	release:gscd_release,
-	ioctl:gscd_ioctl,
-	check_media_change:check_gscd_med_chg,
+	.owner			= THIS_MODULE,
+	.open			= gscd_open,
+	.release		= gscd_release,
+	.ioctl			= gscd_ioctl,
+	.check_media_change	= check_gscd_med_chg,
 };
 
 /* 
@@ -414,7 +403,7 @@ static int gscd_release(struct inode *inode, struct file *file)
 }
 
 
-int get_status(void)
+static int get_status(void)
 {
 	int status;
 
@@ -430,7 +419,7 @@ int get_status(void)
 }
 
 
-void cc_invalidate(void)
+static void cc_invalidate(void)
 {
 	drv_num_read = 0xFF;
 	f_dsk_valid = 0xFF;
@@ -441,7 +430,7 @@ void cc_invalidate(void)
 
 }
 
-void clear_Audio(void)
+static void clear_Audio(void)
 {
 
 	f_AudioPlay = 0;
@@ -457,7 +446,7 @@ void clear_Audio(void)
  *   waiting ?  
  */
 
-int wait_drv_ready(void)
+static int wait_drv_ready(void)
 {
 	int found, read;
 
@@ -475,7 +464,7 @@ int wait_drv_ready(void)
 	return read;
 }
 
-void cc_Ident(char *respons)
+static void cc_Ident(char *respons)
 {
 	char to_do[] = { CMD_IDENT, 0, 0 };
 
@@ -483,7 +472,7 @@ void cc_Ident(char *respons)
 
 }
 
-void cc_SetSpeed(void)
+static void cc_SetSpeed(void)
 {
 	char to_do[] = { CMD_SETSPEED, 0, 0 };
 	char dummy;
@@ -494,8 +483,7 @@ void cc_SetSpeed(void)
 	}
 }
 
-
-void cc_Reset(void)
+static void cc_Reset(void)
 {
 	char to_do[] = { CMD_RESET, 0 };
 	char dummy;
@@ -503,9 +491,7 @@ void cc_Reset(void)
 	cmd_out(TYPE_INFO, (char *) &to_do, (char *) &dummy, 0);
 }
 
-
-
-void cmd_status(void)
+static void cmd_status(void)
 {
 	char to_do[] = { CMD_STATUS, 0 };
 	char dummy;
@@ -518,7 +504,7 @@ void cmd_status(void)
 
 }
 
-void cmd_out(int cmd_type, char *cmd, char *respo_buf, int respo_count)
+static void cmd_out(int cmd_type, char *cmd, char *respo_buf, int respo_count)
 {
 	int result;
 
@@ -817,7 +803,7 @@ static void cmd_read_w(char *pb, int count, int size)
 	return;
 }
 
-int __init find_drives(void)
+static int __init find_drives(void)
 {
 	int *pdrv;
 	int drvnum;
@@ -861,7 +847,7 @@ int __init find_drives(void)
 	return drvnum;
 }
 
-void __init init_cd_drive(int num)
+static void __init init_cd_drive(int num)
 {
 	char resp[50];
 	int i;
@@ -912,28 +898,20 @@ static void update_state(void)
 }
 #endif
 
-/* Init for the Module-Version */
-int init_gscd(void)
-{
-	long err;
+static struct gendisk gscd_disk = {
+	.major = MAJOR_NR,
+	.first_minor = 0,
+	.minor_shift = 0,
+	.fops = &gscd_fops,
+	.major_name = "gscd"
+};
 
-
-	/* call the GoldStar-init */
-	err = my_gscd_init();
-
-	if (err < 0) {
-		return err;
-	} else {
-		printk(KERN_INFO "Happy GoldStar !\n");
-		return 0;
-	}
-}
-
-void __exit exit_gscd(void)
+static void __exit gscd_exit(void)
 {
 	CLEAR_TIMER;
 
 	devfs_find_and_unregister(NULL, "gscd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	del_gendisk(&gscd_disk);
 	if ((unregister_blkdev(MAJOR_NR, "gscd") == -EINVAL)) {
 		printk("What's that: can't unregister GoldStar-module\n");
 		return;
@@ -943,22 +921,9 @@ void __exit exit_gscd(void)
 	printk(KERN_INFO "GoldStar-module released.\n");
 }
 
-#ifdef MODULE
-module_init(init_gscd);
-#endif
-module_exit(exit_gscd);
-
-
-/* Test for presence of drive and initialize it.  Called only at boot time. */
-int __init gscd_init(void)
-{
-	return my_gscd_init();
-}
-
-
 /* This is the common initialisation for the GoldStar drive. */
 /* It is called at boot time AND for module init.           */
-int __init my_gscd_init(void)
+static int __init gscd_init(void)
 {
 	int i;
 	int result;
@@ -1026,7 +991,7 @@ int __init my_gscd_init(void)
 	disk_state = 0;
 	gscdPresent = 1;
 
-	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &gscd_fops, 0);
+	add_disk(&gscd_disk);
 
 	printk(KERN_INFO "GSCD: GoldStar CD-ROM Drive found.\n");
 	return 0;
@@ -1075,3 +1040,5 @@ static int gscd_bcd2bin(unsigned char bcd)
 
 MODULE_AUTHOR("Oliver Raupach <raupach@nwfs1.rz.fh-hannover.de>");
 MODULE_LICENSE("GPL");
+module_init(gscd_init);
+module_exit(gscd_exit);

@@ -93,19 +93,35 @@ static void nwsign(char *r_data1, char *r_data2, char *outdata) {
 
 /* Make a signature for the current packet and add it at the end of the */
 /* packet. */
-void sign_packet(struct ncp_server *server, int *size) {
- char data[64];
+void __sign_packet(struct ncp_server *server, const char *packet, size_t size, __u32 totalsize, void *sign_buff) {
+	unsigned char data[64];
 
- memset(data,0,64);
- memcpy(data,server->sign_root,8);
- PUT_LE32(data+8,(*size));
- memcpy(data+12,server->packet+sizeof(struct ncp_request_header)-1,
-  min_t(unsigned int,(*size)-sizeof(struct ncp_request_header)+1,52));
+	memcpy(data, server->sign_root, 8);
+	*(__u32*)(data + 8) = totalsize;
+	if (size < 52) {
+		memcpy(data + 12, packet, size);
+		memset(data + 12 + size, 0, 52 - size);
+	} else {
+		memcpy(data + 12, packet, 52);
+	}
+	nwsign(server->sign_last, data, server->sign_last);
+	memcpy(sign_buff, server->sign_last, 8);
+}
 
- nwsign(server->sign_last,data,server->sign_last);
+int sign_verify_reply(struct ncp_server *server, const char *packet, size_t size, __u32 totalsize, const void *sign_buff) {
+	unsigned char data[64];
+	unsigned char hash[16];
 
- memcpy(server->packet+(*size),server->sign_last,8);
- (*size)+=8;
+	memcpy(data, server->sign_root, 8);
+	*(__u32*)(data + 8) = totalsize;
+	if (size < 52) {
+		memcpy(data + 12, packet, size);
+		memset(data + 12 + size, 0, 52 - size);
+	} else {
+		memcpy(data + 12, packet, 52);
+	}
+	nwsign(server->sign_last, data, hash);
+	return memcmp(sign_buff, hash, 8);
 }
 
 #endif	/* CONFIG_NCPFS_PACKET_SIGNING */

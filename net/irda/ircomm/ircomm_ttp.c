@@ -146,7 +146,7 @@ int ircomm_ttp_data_request(struct ircomm_cb *self, struct sk_buff *skb,
 
 	ret = irttp_data_request(self->tsap, skb);
 	if (ret) {
-		ERROR(__FUNCTION__ "(), failed\n");
+		ERROR("%s(), failed\n", __FUNCTION__);
 		dev_kfree_skb(skb);
 	}
 
@@ -192,7 +192,7 @@ void ircomm_ttp_connect_confirm(void *instance, void *sap,
 	ASSERT(qos != NULL, return;);
 
 	if (max_sdu_size != TTP_SAR_DISABLE) {
-		ERROR(__FUNCTION__ "(), SAR not allowed for IrCOMM!\n");
+		ERROR("%s(), SAR not allowed for IrCOMM!\n", __FUNCTION__);
 		dev_kfree_skb(skb);
 		return;
 	}
@@ -229,7 +229,7 @@ void ircomm_ttp_connect_indication(void *instance, void *sap,
 	ASSERT(qos != NULL, return;);
 
 	if (max_sdu_size != TTP_SAR_DISABLE) {
-		ERROR(__FUNCTION__ "(), SAR not allowed for IrCOMM!\n");
+		ERROR("%s(), SAR not allowed for IrCOMM!\n", __FUNCTION__);
 		dev_kfree_skb(skb);
 		return;
 	}

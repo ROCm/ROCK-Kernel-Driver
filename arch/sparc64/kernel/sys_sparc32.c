@@ -1489,7 +1489,7 @@ asmlinkage int sys32_sysfs(int option, u32 arg1, u32 arg2)
 	return sys_sysfs(option, arg1, arg2);
 }
 
-struct ncp_mount_data32 {
+struct ncp_mount_data32_v3 {
         int version;
         unsigned int ncp_fd;
         __kernel_uid_t32 mounted_uid;
@@ -1504,19 +1504,69 @@ struct ncp_mount_data32 {
         __kernel_mode_t32 dir_mode;
 };
 
+struct ncp_mount_data32_v4 {
+	int version;
+	/* all members below are "long" in ABI ... i.e. 32bit on sparc32, while 64bits on sparc64 */
+	unsigned int flags;
+	unsigned int mounted_uid;
+	int wdog_pid;
+
+	unsigned int ncp_fd;
+	unsigned int time_out;
+	unsigned int retry_count;
+
+	unsigned int uid;
+	unsigned int gid;
+	unsigned int file_mode;
+	unsigned int dir_mode;
+};
+
 static void *do_ncp_super_data_conv(void *raw_data)
 {
-	struct ncp_mount_data news, *n = &news; 
-	struct ncp_mount_data32 *n32 = (struct ncp_mount_data32 *)raw_data;
+	switch (*(int*)raw_data) {
+		case NCP_MOUNT_VERSION:
+			{
+				struct ncp_mount_data news, *n = &news; 
+				struct ncp_mount_data32_v3 *n32 = (struct ncp_mount_data32_v3 *)raw_data;
 
-	n->dir_mode = n32->dir_mode;
-	n->file_mode = n32->file_mode;
-	n->gid = low2highgid(n32->gid);
-	n->uid = low2highuid(n32->uid);
-	memmove (n->mounted_vol, n32->mounted_vol, (sizeof (n32->mounted_vol) + 3 * sizeof (unsigned int)));
-	n->wdog_pid = n32->wdog_pid;
-	n->mounted_uid = low2highuid(n32->mounted_uid);
-	memcpy(raw_data, n, sizeof(struct ncp_mount_data)); 
+				n->version = n32->version;
+				n->ncp_fd = n32->ncp_fd;
+				n->mounted_uid = low2highuid(n32->mounted_uid);
+				n->wdog_pid = n32->wdog_pid;
+				memmove (n->mounted_vol, n32->mounted_vol, sizeof (n32->mounted_vol));
+				n->time_out = n32->time_out;
+				n->retry_count = n32->retry_count;
+				n->flags = n32->flags;
+				n->uid = low2highuid(n32->uid);
+				n->gid = low2highgid(n32->gid);
+				n->file_mode = n32->file_mode;
+				n->dir_mode = n32->dir_mode;
+				memcpy(raw_data, n, sizeof(*n)); 
+			}
+			break;
+		case NCP_MOUNT_VERSION_V4:
+			{
+				struct ncp_mount_data_v4 news, *n = &news; 
+				struct ncp_mount_data32_v4 *n32 = (struct ncp_mount_data32_v4 *)raw_data;
+
+				n->version = n32->version;
+				n->flags = n32->flags;
+				n->mounted_uid = n32->mounted_uid;
+				n->wdog_pid = n32->wdog_pid;
+				n->ncp_fd = n32->ncp_fd;
+				n->time_out = n32->time_out;
+				n->retry_count = n32->retry_count;
+				n->uid = n32->uid;
+				n->gid = n32->gid;
+				n->file_mode = n32->file_mode;
+				n->dir_mode = n32->dir_mode;
+				memcpy(raw_data, n, sizeof(*n)); 
+			}
+			break;
+		default:
+			/* do not touch unknown structures */
+			break;
+	}
 	return raw_data;
 }
 

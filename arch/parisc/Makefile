@@ -38,21 +38,17 @@ CFLAGS += -mdisable-fpregs
 
 HEAD = arch/parisc/kernel/head.o 
 
-SUBDIRS := $(SUBDIRS) $(addprefix arch/parisc/, tools kernel mm lib hpux)
-CORE_FILES :=  $(addprefix arch/parisc/, kernel/pdc_cons.o kernel/process.o \
-	lib/lib.a mm/mm.o kernel/kernel.o hpux/hpux.o) \
-	$(CORE_FILES) arch/parisc/kernel/init_task.o
-LIBS := `$(CC) -print-libgcc-file-name` $(TOPDIR)/arch/parisc/lib/lib.a $(LIBS) 
-
-ifdef CONFIG_MATH_EMULATION
-SUBDIRS := $(SUBDIRS) arch/parisc/math-emu
-DRIVERS := $(DRIVERS) arch/parisc/math-emu/math.a
-endif
-
-ifdef CONFIG_KWDB
-SUBDIRS := $(SUBDIRS) arch/parisc/kdb
-DRIVERS := $(DRIVERS) arch/parisc/kdb/kdb.o
-endif
+SUBDIRS += arch/parisc/tools
+core-y					+= arch/parisc/kernel/pdc_cons.o  \
+					   arch/parisc/kernel/process.o   \
+	   				   arch/parisc/mm/	          \
+					   arch/parisc/kernel/            \
+					   arch/parisc/hpux/		  \
+					   arch/parisc/kernel/init_task.o
+libs-y					+= arch/parisc/lib/lib.a          \
+					   `$(CC) -print-libgcc-file-name`
+drivers-$(CONFIG_MATH_EMULATION)	+= arch/parisc/math-emu/
+drivers-$(CONFIG_KWDB)			+= arch/parisc/kdb/
 
 palo: vmlinux
 	export TOPDIR=`pwd`; export CONFIG_STI_CONSOLE=$(CONFIG_STI_CONSOLE); \

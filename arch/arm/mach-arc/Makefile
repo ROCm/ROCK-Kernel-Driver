@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-O_TARGET		:= arc.o
-
 # Object file lists.
 
 obj-y			:= arch.o dma.o fault.o irq.o mm.o oldlatches.o \

@@ -2,8 +2,6 @@
 # Copyright (C) 1998, 1999, 2001 Philip Blundell
 #
 
-O_TARGET		:= math-emu.o
-
 obj-y			:=
 obj-m			:=
 obj-n			:=

@@ -2,10 +2,7 @@
 # Makefile for parallel port slave drivers
 #
 
-O_TARGET := lpslavedrivers.o
-
 obj-y = e100lpslavenet.o e100lpslave_code.o
-
 
 include $(TOPDIR)/Rules.make
 

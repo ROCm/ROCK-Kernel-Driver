@@ -974,8 +974,6 @@ void __init stram_swap_setup(char *str, int *ints)
 /*								ST-RAM device								*/
 /* ------------------------------------------------------------------------ */
 
-static int stram_sizes[14] = {
-	0, 0, 0, 0, 0, 0, 0, 0,	0, 0, 0, 0, 0, 0 };
 static int refcnt = 0;
 
 static void do_stram_request(request_queue_t *q)
@@ -1048,28 +1046,33 @@ static struct block_device_operations stram_fops = {
 	.release =	stram_release,
 };
 
+static struct gendisk stram_disk = {
+	.major = STRAM_MAJOR,
+	.first_minor = STRAM_MINOR,
+	.minor_shift = 0,
+	.fops = &stram_fops,
+	.major_name = "stram"
+};
+
 int __init stram_device_init(void)
 {
+	if (!MACH_IS_ATARI)
+		/* no point in initializing this, I hope */
+		return -ENXIO;
 
-    if (!MACH_IS_ATARI)
-    	/* no point in initializing this, I hope */
-	return( -ENXIO );
+	if (!max_swap_size)
+		/* swapping not enabled */
+		return -ENXIO;
 
-    if (!max_swap_size)
-	/* swapping not enabled */
-	return( -ENXIO );
-	
-    if (register_blkdev( STRAM_MAJOR, "stram", &stram_fops)) {
-	printk( KERN_ERR "stram: Unable to get major %d\n", STRAM_MAJOR );
-	return( -ENXIO );
-    }
+	if (register_blkdev( STRAM_MAJOR, "stram", &stram_fops)) {
+		printk(KERN_ERR "stram: Unable to get major %d\n", STRAM_MAJOR);
+		return -ENXIO;
+	}
 
-    blk_init_queue(BLK_DEFAULT_QUEUE(STRAM_MAJOR), do_stram_request);
-	stram_sizes[STRAM_MINOR] = (swap_end - swap_start)/1024;
-    blk_size[STRAM_MAJOR] = stram_sizes;
-	register_disk(NULL, MKDEV(STRAM_MAJOR, STRAM_MINOR), 1, &stram_fops,
-			(swap_end-swap_start)>>9);
-	return( 0 );
+	blk_init_queue(BLK_DEFAULT_QUEUE(STRAM_MAJOR), do_stram_request);
+	set_capacity(&stram_disk, (swap_end - swap_start)/512);
+	add_disk(&stram_disk);
+	return 0;
 }
 
 

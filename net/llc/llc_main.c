@@ -304,7 +304,7 @@ void llc_sk_reset(struct sock *sk)
 	llc->remote_busy_flag	= 0;
 	llc->cause_flag		= 0;
 	llc->retry_count	= 0;
-	llc->p_flag		= 0;
+	llc_conn_set_p_flag(sk, 0);
 	llc->f_flag		= 0;
 	llc->s_flag		= 0;
 	llc->ack_pf		= 0;

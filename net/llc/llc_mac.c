@@ -216,8 +216,8 @@ static void llc_station_rcv(struct sk_buff *skb)
 	struct llc_station *station = llc_station_get();
 	struct llc_station_state_ev *ev = llc_station_ev(skb);
 
-	ev->type            = LLC_STATION_EV_TYPE_PDU;
-	ev->data.pdu.reason = 0;
+	ev->type   = LLC_STATION_EV_TYPE_PDU;
+	ev->reason = 0;
 	llc_station_state_process(station, skb);
 }
 
@@ -236,8 +236,8 @@ int llc_conn_rcv(struct sock* sk, struct sk_buff *skb)
 
 	if (!llc->dev)
 		llc->dev = skb->dev;
-	ev->type	    = LLC_CONN_EV_TYPE_PDU;
-	ev->data.pdu.reason = 0;
+	ev->type   = LLC_CONN_EV_TYPE_PDU;
+	ev->reason = 0;
 	return llc_conn_state_process(sk, skb);
 }
 
@@ -252,8 +252,8 @@ static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
-	ev->type	    = LLC_SAP_EV_TYPE_PDU;
-	ev->data.pdu.reason = 0;
+	ev->type   = LLC_SAP_EV_TYPE_PDU;
+	ev->reason = 0;
 	llc_sap_state_process(sap, skb);
 }
 

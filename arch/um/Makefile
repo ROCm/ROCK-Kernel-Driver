@@ -35,14 +35,12 @@ ARCH_SUBDIRS = $(ARCH_DIR)/drivers $(ARCH_DIR)/kernel \
 
 SUBDIRS += $(ARCH_SUBDIRS)
 
-LIBS += $(ARCH_DIR)/kernel/um.o \
-	$(ARCH_DIR)/drivers/drivers.o \
-	$(ARCH_DIR)/sys-$(SUBARCH)/sys.o $(ARCH_DIR)/os/os.o
+core-y			+= $(ARCH_DIR)/kernel/		 \
+			+= $(ARCH_DIR)/drivers/          \
+			+= $(ARCH_DIR)/sys-$(SUBARCH)/	 \
+			+= $(ARCH_DIR)/os-$(OS)/
 
-ifeq ($(CONFIG_PT_PROXY), y)
-SUBDIRS += $(ARCH_DIR)/ptproxy
-LIBS += $(ARCH_DIR)/ptproxy/ptproxy.a
-endif
+libs-$(CONFIG_PT_PROXY)	+= $(ARCH_DIR)/ptproxy/
 
 ARCH_INCLUDE = $(TOPDIR)/$(ARCH_DIR)/include
 

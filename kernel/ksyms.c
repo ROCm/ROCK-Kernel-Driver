@@ -335,7 +335,6 @@ EXPORT_SYMBOL(tty_unregister_driver);
 EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
-EXPORT_SYMBOL(blk_size);
 EXPORT_SYMBOL(blk_dev);
 EXPORT_SYMBOL(bdev_read_only);
 EXPORT_SYMBOL(set_device_ro);
@@ -576,7 +575,7 @@ EXPORT_SYMBOL(fs_overflowgid);
 EXPORT_SYMBOL(fasync_helper);
 EXPORT_SYMBOL(kill_fasync);
 
-EXPORT_SYMBOL(disk_name);	/* for md.c */
+EXPORT_SYMBOL(partition_name);
 
 /* binfmt_aout */
 EXPORT_SYMBOL(get_write_access);

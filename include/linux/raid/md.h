@@ -62,10 +62,9 @@
 
 extern int md_size[MAX_MD_DEVS];
 
-extern char * partition_name (kdev_t dev);
 extern inline char * bdev_partition_name (struct block_device *bdev)
 {
-	return partition_name(bdev ? to_kdev_t(bdev->bd_dev) : NODEV);
+	return partition_name(bdev ? bdev->bd_dev : 0);
 }
 extern int register_md_personality (int p_num, mdk_personality_t *p);
 extern int unregister_md_personality (int p_num);

@@ -92,7 +92,7 @@ int __init ircomm_tty_init(void)
 {	
 	ircomm_tty = hashbin_new(HB_LOCK); 
 	if (ircomm_tty == NULL) {
-		ERROR(__FUNCTION__ "(), can't allocate hashbin!\n");
+		ERROR("%s(), can't allocate hashbin!\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 
@@ -135,7 +135,7 @@ int __init ircomm_tty_init(void)
 	driver.read_proc       = ircomm_tty_read_proc;
 #endif /* CONFIG_PROC_FS */
 	if (tty_register_driver(&driver)) {
-		ERROR(__FUNCTION__ "Couldn't register serial driver\n");
+		ERROR("%s(): Couldn't register serial driver\n", __FUNCTION__);
 		return -1;
 	}
 	return 0;
@@ -168,7 +168,7 @@ void __exit ircomm_tty_cleanup(void)
 
 	ret = tty_unregister_driver(&driver);
         if (ret) {
-                ERROR(__FUNCTION__ "(), failed to unregister driver\n");
+                ERROR("%s(), failed to unregister driver\n", __FUNCTION__);
 		return;
 	}
 
@@ -223,7 +223,7 @@ static int ircomm_tty_startup(struct ircomm_tty_cb *self)
 	/* Connect IrCOMM link with remote device */
 	ret = ircomm_tty_attach_cable(self);
 	if (ret < 0) {
-		ERROR(__FUNCTION__ "(), error attaching cable!\n");
+		ERROR("%s(), error attaching cable!\n", __FUNCTION__);
 		return ret;
 	}
 
@@ -410,7 +410,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 		/* No, so make new instance */
 		self = kmalloc(sizeof(struct ircomm_tty_cb), GFP_KERNEL);
 		if (self == NULL) {
-			ERROR(__FUNCTION__"(), kmalloc failed!\n");
+			ERROR("%s(), kmalloc failed!\n", __FUNCTION__);
 			MOD_DEC_USE_COUNT;
 			return -ENOMEM;
 		}
@@ -563,9 +563,8 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 	}
 
 	if (--self->open_count < 0) {
-		ERROR(__FUNCTION__ 
-		      "(), bad serial port count for ttys%d: %d\n",
-		      self->line, self->open_count);
+		ERROR("%s(), bad serial port count for ttys%d: %d\n",
+		      __FUNCTION__, self->line, self->open_count);
 		self->open_count = 0;
 	}
 	if (self->open_count) {

@@ -7,6 +7,7 @@
 #include <linux/in.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
+#include <linux/string.h>
 
 #include <net/tcp.h>
 

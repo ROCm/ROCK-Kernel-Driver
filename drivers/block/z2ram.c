@@ -63,13 +63,21 @@ extern struct mem_info m68k_memory[NUM_MEMINFO];
 
 static u_long *z2ram_map    = NULL;
 static u_long z2ram_size    = 0;
-static int z2_sizes[Z2MINOR_COUNT];
 static int z2_count         = 0;
 static int chip_count       = 0;
 static int list_count       = 0;
 static int current_device   = -1;
 
 static spinlock_t z2ram_lock = SPIN_LOCK_UNLOCKED;
+
+static struct block_device_operations z2_fops;
+static struct gendisk z2ram_gendisk = {
+	.major = MAJOR_NR,
+	.first_minor = 0,
+	.minor_shift = 0,
+	.fops = &z2_fops,
+	.major_name = "z2ram"
+};
 
 static void
 do_z2_request( request_queue_t * q )
@@ -312,8 +320,7 @@ z2_open( struct inode *inode, struct file *filp )
 
 	current_device = device;
 	z2ram_size <<= Z2RAM_CHUNKSHIFT;
-	z2_sizes[ device ] = z2ram_size >> 10;
-	blk_size[ MAJOR_NR ] = z2_sizes;
+	set_capacity(&z2ram_gendisk, z2ram_size >> 9;   
     }
 
     return 0;
@@ -339,10 +346,17 @@ z2_release( struct inode *inode, struct file *filp )
 
 static struct block_device_operations z2_fops =
 {
-	owner:		THIS_MODULE,
-	open:		z2_open,
-	release:	z2_release,
+	.owner		= THIS_MODULE,
+	.open		= z2_open,
+	.release	= z2_release,
 };
+
+static struct gendisk *z2_find(int minor)
+{
+	if (minor > Z2MINOR_COUNT)
+		return NULL;
+	return &z2ram_gendisk;
+}
 
 int __init 
 z2_init( void )
@@ -358,17 +372,9 @@ z2_init( void )
 	return -EBUSY;
     }
 
-    {
-	    /* Initialize size arrays. */
-	    int i;
-
-	    for (i = 0; i < Z2MINOR_COUNT; i++) {
-		    z2_sizes[ i ] = 0;
-	    }
-    }    
-   
     blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_z2_request, &z2ram_lock);
-    blk_size[ MAJOR_NR ] = z2_sizes;
+    add_disk(&z2ram_gendisk);
+    blk_set_probe(MAJOR_NR, z2_find);
 
     return 0;
 }
@@ -396,9 +402,11 @@ cleanup_module( void )
 {
     int i, j;
 
+    blk_set_probe(MAJOR_NR, NULL);
     if ( unregister_blkdev( MAJOR_NR, DEVICE_NAME ) != 0 )
 	printk( KERN_ERR DEVICE_NAME ": unregister of device failed\n");
 
+    del_gendisk(&z2ram_gendisk);
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 
     if ( current_device != -1 )

@@ -22,6 +22,7 @@
 #include <linux/prefetch.h>
 #include <linux/mpage.h>
 #include <linux/writeback.h>
+#include <linux/backing-dev.h>
 #include <linux/pagevec.h>
 
 /*
@@ -522,6 +523,7 @@ int
 mpage_writepages(struct address_space *mapping,
 		struct writeback_control *wbc, get_block_t get_block)
 {
+	struct backing_dev_info *bdi = mapping->backing_dev_info;
 	struct bio *bio = NULL;
 	sector_t last_block_in_bio = 0;
 	int ret = 0;
@@ -529,6 +531,12 @@ mpage_writepages(struct address_space *mapping,
 	int sync = called_for_sync();
 	struct pagevec pvec;
 	int (*writepage)(struct page *);
+
+	if (wbc->nonblocking && bdi_write_congested(bdi)) {
+		blk_run_queues();
+		wbc->encountered_congestion = 1;
+		return 0;
+	}
 
 	writepage = NULL;
 	if (get_block == NULL)
@@ -585,6 +593,11 @@ mpage_writepages(struct address_space *mapping,
 			}
 			if (ret || (--(wbc->nr_to_write) <= 0))
 				done = 1;
+			if (wbc->nonblocking && bdi_write_congested(bdi)) {
+				blk_run_queues();
+				wbc->encountered_congestion = 1;
+				done = 1;
+			}
 		} else {
 			unlock_page(page);
 		}

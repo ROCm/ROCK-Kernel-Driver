@@ -1643,7 +1643,7 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
 
 static inline int
 __filemap_copy_from_user_iovec(char *vaddr, 
-			const struct iovec *iov, size_t base, unsigned bytes)
+			const struct iovec *iov, size_t base, size_t bytes)
 {
 	int left = 0;
 
@@ -1662,7 +1662,7 @@ __filemap_copy_from_user_iovec(char *vaddr,
 
 static inline int
 filemap_copy_from_user_iovec(struct page *page, unsigned long offset,
-			const struct iovec *iov, size_t base, unsigned bytes)
+			const struct iovec *iov, size_t base, size_t bytes)
 {
 	char *kaddr;
 	int left;
@@ -1679,7 +1679,7 @@ filemap_copy_from_user_iovec(struct page *page, unsigned long offset,
 }
 
 static inline void
-filemap_set_next_iovec(const struct iovec **iovp, size_t *basep, unsigned bytes)
+filemap_set_next_iovec(const struct iovec **iovp, size_t *basep, size_t bytes)
 {
 	const struct iovec *iov = *iovp;
 	size_t base = *basep;
@@ -1723,11 +1723,11 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	struct page	*cached_page = NULL;
 	ssize_t		written;
 	int		err;
-	unsigned	bytes;
+	size_t		bytes;
 	time_t		time_now;
 	struct pagevec	lru_pvec;
 	const struct iovec *cur_iov = iov; /* current iovec */
-	unsigned	iov_base = 0;	   /* offset in the current iovec */
+	size_t		iov_base = 0;	   /* offset in the current iovec */
 	unsigned long	seg;
 	char		*buf;
 
@@ -1754,6 +1754,9 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	pos = *ppos;
 	if (unlikely(pos < 0))
 		return -EINVAL;
+
+	/* We can write back this queue in page reclaim */
+	current->backing_dev_info = mapping->backing_dev_info;
 
 	pagevec_init(&lru_pvec);
 
@@ -1959,6 +1962,7 @@ out_status:
 	err = written ? written : status;
 out:
 	pagevec_lru_add(&lru_pvec);
+	current->backing_dev_info = 0;
 	return err;
 }
 

@@ -2,9 +2,15 @@
  * pci.c - Low-Level PCI Access in IA-64
  *
  * Derived from bios32.c of i386 tree.
+ *
+ * Copyright (C) 2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *
+ * Note: Above list of copyright holders is incomplete...
  */
 #include <linux/config.h>
 
+#include <linux/acpi.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
@@ -44,9 +50,6 @@ extern void ia64_mca_check_errors( void );
 
 struct pci_fixup pcibios_fixups[1];
 
-struct pci_ops *pci_root_ops;
-
-
 /*
  * Low-level SAL-based PCI configuration access functions. Note that SAL
  * calls are already serialized (via sal_lock), so we don't need another
@@ -85,32 +88,42 @@ __pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 static int
 pci_sal_read (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
-	return __pci_sal_read(0, bus->number, PCI_SLOT(devfn),
-			    PCI_FUNC(devfn), where, size, value);
+	return __pci_sal_read(0, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
+			      where, size, value);
 }
 
 static int
 pci_sal_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
 {
-	return __pci_sal_write(0, bus->number, PCI_SLOT(devfn),
-			     PCI_FUNC(devfn), where, size, value);
+	return __pci_sal_write(0, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
+			       where, size, value);
 }
 
 struct pci_ops pci_sal_ops = {
 	.read = 	pci_sal_read,
-	.write =	pci_sal_write,
+	.write =	pci_sal_write
 };
 
+struct pci_ops *pci_root_ops = &pci_sal_ops;	/* default to SAL */
 
-/*
- * Initialization. Uses the SAL interface
- */
-
-struct pci_bus *
-pcibios_scan_root(int bus)
+static int __init
+pci_acpi_init (void)
 {
-	struct list_head *list = NULL;
-	struct pci_bus *pci_bus = NULL;
+	if (!acpi_pci_irq_init())
+		printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
+	else
+		printk(KERN_WARNING "PCI: Invalid ACPI-PCI IRQ routing table\n");
+	return 0;
+}
+
+subsys_initcall(pci_acpi_init);
+
+/* Called by ACPI when it finds a new root bus.  */
+struct pci_bus *
+pcibios_scan_root (int bus)
+{
+	struct list_head *list;
+	struct pci_bus *pci_bus;
 
 	list_for_each(list, &pci_root_buses) {
 		pci_bus = pci_bus_b(list);
@@ -122,50 +135,11 @@ pcibios_scan_root(int bus)
 	}
 
 	printk("PCI: Probing PCI hardware on bus (%02x)\n", bus);
-
 	return pci_scan_bus(bus, pci_root_ops, NULL);
 }
 
-void __init
-pcibios_config_init (void)
-{
-	if (pci_root_ops)
-		return;
-
-	printk("PCI: Using SAL to access configuration space\n");
-
-	pci_root_ops = &pci_sal_ops;
-
-	return;
-}
-
-static int __init
-pcibios_init (void)
-{
-#	define PCI_BUSES_TO_SCAN 255
-	int i = 0;
-
-#ifdef CONFIG_IA64_MCA
-	ia64_mca_check_errors();    /* For post-failure MCA error logging */
-#endif
-
-	pcibios_config_init();
-
-	platform_pci_fixup(0);	/* phase 0 fixups (before buses scanned) */
-
-	printk("PCI: Probing PCI hardware\n");
-	for (i = 0; i < PCI_BUSES_TO_SCAN; i++)
-		pci_scan_bus(i, pci_root_ops, NULL);
-
-	platform_pci_fixup(1);	/* phase 1 fixups (after buses scanned) */
-	return 0;
-}
-
-subsys_initcall(pcibios_init);
-
 /*
- *  Called after each bus is probed, but before its children
- *  are examined.
+ *  Called after each bus is probed, but before its children are examined.
  */
 void __init
 pcibios_fixup_bus (struct pci_bus *b)
@@ -202,8 +176,8 @@ pcibios_fixup_pbus_ranges (struct pci_bus * bus, struct pbus_set_ranges_data * r
 {
 }
 
-int
-pcibios_enable_device (struct pci_dev *dev)
+static inline int
+pcibios_enable_resources (struct pci_dev *dev, int mask)
 {
 	u16 cmd, old_cmd;
 	int idx;
@@ -215,6 +189,10 @@ pcibios_enable_device (struct pci_dev *dev)
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	old_cmd = cmd;
 	for (idx=0; idx<6; idx++) {
+		/* Only set up the desired resources.  */
+		if (!(mask & (1 << idx)))
+			continue;
+
 		r = &dev->resource[idx];
 		if (!r->start && r->end) {
 			printk(KERN_ERR
@@ -233,10 +211,20 @@ pcibios_enable_device (struct pci_dev *dev)
 		printk("PCI: Enabling device %s (%04x -> %04x)\n", dev->slot_name, old_cmd, cmd);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
+	return 0;
+}
+
+int
+pcibios_enable_device (struct pci_dev *dev, int mask)
+{
+	int ret;
+
+	ret = pcibios_enable_resources(dev, mask);
+	if (ret < 0)
+		return ret;
 
 	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", dev->irq, dev->slot_name);
-
-	return 0;
+	return acpi_pci_irq_enable(dev);
 }
 
 void

@@ -2,7 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= head.o init_task.o process.o pdc_cons.o
 
 # Object file lists.

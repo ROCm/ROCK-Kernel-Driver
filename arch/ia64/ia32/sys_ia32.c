@@ -2111,8 +2111,8 @@ struct shm_info32 {
 };
 
 struct ipc_kludge {
-	struct msgbuf *msgp;
-	long msgtyp;
+	u32 msgp;
+	s32 msgtyp;
 };
 
 #define SEMOP		 1

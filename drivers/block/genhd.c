@@ -33,6 +33,23 @@ static rwlock_t gendisk_lock;
  */
 static struct gendisk *gendisk_head;
 
+/*
+ *  TEMPORARY KLUDGE.
+ */
+static struct {
+	struct list_head list;
+	struct gendisk *(*get)(int minor);
+} gendisks[MAX_BLKDEV];
+
+void blk_set_probe(int major, struct gendisk *(p)(int))
+{
+	write_lock(&gendisk_lock);
+	gendisks[major].get = p;
+	write_unlock(&gendisk_lock);
+}
+EXPORT_SYMBOL(blk_set_probe);	/* Will go away */
+	
+
 /**
  * add_gendisk - add partitioning information to kernel list
  * @gp: per-device partitioning information
@@ -40,10 +57,8 @@ static struct gendisk *gendisk_head;
  * This function registers the partitioning information in @gp
  * with the kernel.
  */
-void
-add_gendisk(struct gendisk *gp)
+static void add_gendisk(struct gendisk *gp)
 {
-	struct gendisk *sgp;
 	struct hd_struct *p = NULL;
 
 	if (gp->minor_shift) {
@@ -59,28 +74,20 @@ add_gendisk(struct gendisk *gp)
 	gp->part = p;
 
 	write_lock(&gendisk_lock);
-
-	/*
- 	 *	In 2.5 this will go away. Fix the drivers who rely on
- 	 *	old behaviour.
- 	 */
-
-	for (sgp = gendisk_head; sgp; sgp = sgp->next)
-	{
-		if (sgp == gp)
-		{
-			printk(KERN_ERR "add_gendisk: device major %d is buggy and added a live gendisk!\n",
-				sgp->major);
-			goto out;
-		}
-	}
+	list_add(&gp->list, &gendisks[gp->major].list);
 	gp->next = gendisk_head;
 	gendisk_head = gp;
-out:
 	write_unlock(&gendisk_lock);
 }
 
-EXPORT_SYMBOL(add_gendisk);
+void add_disk(struct gendisk *disk)
+{
+	add_gendisk(disk);
+	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+			1<<disk->minor_shift, disk->fops, get_capacity(disk));
+}
+
+EXPORT_SYMBOL(add_disk);
 EXPORT_SYMBOL(del_gendisk);
 
 void unlink_gendisk(struct gendisk *disk)
@@ -92,6 +99,7 @@ void unlink_gendisk(struct gendisk *disk)
 			break;
 	if (*p)
 		*p = (*p)->next;
+	list_del_init(&disk->list);
 	write_unlock(&gendisk_lock);
 }
 
@@ -105,20 +113,25 @@ void unlink_gendisk(struct gendisk *disk)
 struct gendisk *
 get_gendisk(kdev_t dev)
 {
-	struct gendisk *gp = NULL;
+	struct gendisk *disk;
+	struct list_head *p;
 	int major = major(dev);
 	int minor = minor(dev);
 
 	read_lock(&gendisk_lock);
-	for (gp = gendisk_head; gp; gp = gp->next) {
-		if (gp->major != major)
+	if (gendisks[major].get) {
+		disk = gendisks[major].get(minor);
+		read_unlock(&gendisk_lock);
+		return disk;
+	}
+	list_for_each(p, &gendisks[major].list) {
+		disk = list_entry(p, struct gendisk, list);
+		if (disk->first_minor > minor)
 			continue;
-		if (gp->first_minor > minor)
-			continue;
-		if (gp->first_minor + (1<<gp->minor_shift) <= minor)
+		if (disk->first_minor + (1<<disk->minor_shift) <= minor)
 			continue;
 		read_unlock(&gendisk_lock);
-		return gp;
+		return disk;
 	}
 	read_unlock(&gendisk_lock);
 	return NULL;
@@ -161,6 +174,10 @@ static int show_partition(struct seq_file *part, void *v)
 	if (sgp == gendisk_head)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
+	/* Don't show non-partitionable devices or empty devices */
+	if (!sgp->minor_shift || !get_capacity(sgp))
+		return 0;
+
 	/* show the full disk and all non-0 size partitions of it */
 	seq_printf(part, "%4d  %4d %10ld %s\n",
 		sgp->major, sgp->first_minor,
@@ -194,7 +211,10 @@ extern int cpqarray_init(void);
 
 int __init device_init(void)
 {
+	int i;
 	rwlock_init(&gendisk_lock);
+	for (i = 0; i < MAX_BLKDEV; i++)
+		INIT_LIST_HEAD(&gendisks[i].list);
 	blk_dev_init();
 #ifdef CONFIG_FC4_SOC
 	/* This has to be done before scsi_dev_init */

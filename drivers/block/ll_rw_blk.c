@@ -46,22 +46,75 @@ static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 struct blk_dev_struct blk_dev[MAX_BLKDEV]; /* initialized by blk_dev_init() */
 
 /*
- * blk_size contains the size of all block-devices in units of 1024 byte
- * blocks:
- *
- * blk_size[MAJOR][MINOR]
- *
- * if (!blk_size[MAJOR]) then no minor size checking is done.
+ * Number of requests per queue.  This many for reads and for writes (twice
+ * this number, total).
  */
-int * blk_size[MAX_BLKDEV];
+static int queue_nr_requests;
 
 /*
- * How many reqeusts do we allocate per queue,
- * and how many do we "batch" on freeing them?
+ * How many free requests must be available before we wake a process which
+ * is waiting for a request?
  */
-int queue_nr_requests, batch_requests;
+static int batch_requests;
+
 unsigned long blk_max_low_pfn, blk_max_pfn;
 int blk_nohighio = 0;
+
+static struct congestion_state {
+	wait_queue_head_t wqh;
+	atomic_t nr_congested_queues;
+} congestion_states[2];
+
+/*
+ * Return the threshold (number of free requests) at which the queue is
+ * considered to be congested.  It include a little hysteresis to keep the
+ * context switch rate down.
+ */
+static inline int queue_congestion_on_threshold(void)
+{
+	int ret;
+
+	ret = queue_nr_requests / 4 - 1;
+	if (ret < 0)
+		ret = 1;
+	return ret;
+}
+
+/*
+ * The threshold at which a queue is considered to be uncongested
+ */
+static inline int queue_congestion_off_threshold(void)
+{
+	int ret;
+
+	ret = queue_nr_requests / 4 + 1;
+	if (ret > queue_nr_requests)
+		ret = queue_nr_requests;
+	return ret;
+}
+
+static void clear_queue_congested(request_queue_t *q, int rw)
+{
+	enum bdi_state bit;
+	struct congestion_state *cs = &congestion_states[rw];
+
+	bit = (rw == WRITE) ? BDI_write_congested : BDI_read_congested;
+
+	if (test_and_clear_bit(bit, &q->backing_dev_info.state))
+		atomic_dec(&cs->nr_congested_queues);
+	if (waitqueue_active(&cs->wqh))
+		wake_up(&cs->wqh);
+}
+
+static void set_queue_congested(request_queue_t *q, int rw)
+{
+	enum bdi_state bit;
+
+	bit = (rw == WRITE) ? BDI_write_congested : BDI_read_congested;
+
+	if (!test_and_set_bit(bit, &q->backing_dev_info.state))
+		atomic_inc(&congestion_states[rw].nr_congested_queues);
+}
 
 /**
  * bdev_get_queue: - return the queue that matches the given device
@@ -370,8 +423,8 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	struct blk_queue_tag *tags;
 	int bits, i;
 
-	if (depth > queue_nr_requests) {
-		depth = queue_nr_requests;
+	if (depth > (queue_nr_requests*2)) {
+		depth = (queue_nr_requests*2);
 		printk("blk_queue_init_tags: adjusted depth to %d\n", depth);
 	}
 
@@ -1029,7 +1082,7 @@ static int __blk_cleanup_queue(struct request_list *list)
  **/
 void blk_cleanup_queue(request_queue_t * q)
 {
-	int count = queue_nr_requests;
+	int count = (queue_nr_requests*2);
 
 	count -= __blk_cleanup_queue(&q->rq[READ]);
 	count -= __blk_cleanup_queue(&q->rq[WRITE]);
@@ -1060,7 +1113,7 @@ static int blk_init_free_list(request_queue_t *q)
 	 * Divide requests in half between read and write
 	 */
 	rl = &q->rq[READ];
-	for (i = 0; i < queue_nr_requests; i++) {
+	for (i = 0; i < (queue_nr_requests*2); i++) {
 		rq = kmem_cache_alloc(request_cachep, SLAB_KERNEL);
 		if (!rq)
 			goto nomem;
@@ -1068,7 +1121,7 @@ static int blk_init_free_list(request_queue_t *q)
 		/*
 		 * half way through, switch to WRITE list
 		 */
-		if (i == queue_nr_requests / 2)
+		if (i == queue_nr_requests)
 			rl = &q->rq[WRITE];
 
 		memset(rq, 0, sizeof(struct request));
@@ -1154,7 +1207,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
  * Get a free request. queue lock must be held and interrupts
  * disabled on the way in.
  */
-static inline struct request *get_request(request_queue_t *q, int rw)
+static struct request *get_request(request_queue_t *q, int rw)
 {
 	struct request *rq = NULL;
 	struct request_list *rl = q->rq + rw;
@@ -1163,6 +1216,8 @@ static inline struct request *get_request(request_queue_t *q, int rw)
 		rq = blkdev_free_rq(&rl->free);
 		list_del(&rq->queuelist);
 		rl->count--;
+		if (rl->count < queue_congestion_on_threshold())
+			set_queue_congested(q, rw);
 		rq->flags = 0;
 		rq->rq_status = RQ_ACTIVE;
 		rq->special = NULL;
@@ -1375,11 +1430,48 @@ void blk_put_request(struct request *req)
 	 * it didn't come out of our reserved rq pools
 	 */
 	if (rl) {
+		int rw = 0;
+
 		list_add(&req->queuelist, &rl->free);
 
-		if (++rl->count >= batch_requests &&waitqueue_active(&rl->wait))
+		if (rl == &q->rq[WRITE])
+			rw = WRITE;
+		else if (rl == &q->rq[READ])
+			rw = READ;
+		else
+			BUG();
+
+		rl->count++;
+		if (rl->count >= queue_congestion_off_threshold())
+			clear_queue_congested(q, rw);
+		if (rl->count >= batch_requests && waitqueue_active(&rl->wait))
 			wake_up(&rl->wait);
 	}
+}
+
+/**
+ * blk_congestion_wait - wait for a queue to become uncongested
+ * @rw: READ or WRITE
+ * @timeout: timeout in jiffies
+ *
+ * Waits for up to @timeout jiffies for a queue (any queue) to exit congestion.
+ * If no queues are congested then just return, in the hope that the caller
+ * will submit some more IO.
+ */
+void blk_congestion_wait(int rw, long timeout)
+{
+	DECLARE_WAITQUEUE(wait, current);
+	struct congestion_state *cs = &congestion_states[rw];
+
+	if (atomic_read(&cs->nr_congested_queues) == 0)
+		return;
+	blk_run_queues();
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	add_wait_queue(&cs->wqh, &wait);
+	if (atomic_read(&cs->nr_congested_queues) != 0)
+		schedule_timeout(timeout);
+	set_current_state(TASK_RUNNING);
+	remove_wait_queue(&cs->wqh, &wait);
 }
 
 /*
@@ -1812,18 +1904,19 @@ inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
 
 int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 {
-	int nsect, total_nsect;
+	int total_nsect = 0, error = 0;
 	struct bio *bio;
 
 	req->errors = 0;
-	if (!uptodate)
+	if (!uptodate) {
 		printk("end_request: I/O error, dev %s, sector %lu\n",
 			kdevname(req->rq_dev), req->sector);
+		error = -EIO;
+	}
 
-	total_nsect = 0;
 	while ((bio = req->bio)) {
-		nsect = bio_iovec(bio)->bv_len >> 9;
-		total_nsect += nsect;
+		const int nsect = bio_iovec(bio)->bv_len >> 9;
+		int new_bio = 0;
 
 		BIO_BUG_ON(bio_iovec(bio)->bv_len > bio->bi_size);
 
@@ -1835,36 +1928,52 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 
 			bio_iovec(bio)->bv_offset += partial;
 			bio_iovec(bio)->bv_len -= partial;
-			blk_recalc_rq_sectors(req, total_nsect);
-			blk_recalc_rq_segments(req);
-			bio_endio(bio, partial, !uptodate ? -EIO : 0);
-			return 1;
+			bio_endio(bio, partial, error);
+			total_nsect += nr_sectors;
+			break;
 		}
 
 		/*
-		 * if bio->bi_end_io returns 0, this bio is done. move on
+		 * we are ending the last part of the bio, advance req pointer
 		 */
-		req->bio = bio->bi_next;
-		if (bio_endio(bio, nsect << 9, !uptodate ? -EIO : 0)) {
-			bio->bi_idx++;
-			req->bio = bio;
+		if ((nsect << 9) >= bio->bi_size) {
+			req->bio = bio->bi_next;
+			new_bio = 1;
 		}
 
+		bio_endio(bio, nsect << 9, error);
+
+		total_nsect += nsect;
 		nr_sectors -= nsect;
+
+		/*
+		 * if we didn't advance the req->bio pointer, advance bi_idx
+		 * to indicate we are now on the next bio_vec
+		 */
+		if (!new_bio)
+			bio->bi_idx++;
 
 		if ((bio = req->bio)) {
 			/*
 			 * end more in this run, or just return 'not-done'
 			 */
-			if (unlikely(nr_sectors <= 0)) {
-				blk_recalc_rq_sectors(req, total_nsect);
-				blk_recalc_rq_segments(req);
-				return 1;
-			}
+			if (unlikely(nr_sectors <= 0))
+				break;
 		}
 	}
 
-	return 0;
+	/*
+	 * completely done
+	 */
+	if (!req->bio)
+		return 0;
+
+	/*
+	 * if the request wasn't completed, update state
+	 */
+	blk_recalc_rq_sectors(req, total_nsect);
+	blk_recalc_rq_segments(req);
+	return 1;
 }
 
 void end_that_request_last(struct request *req)
@@ -1878,6 +1987,7 @@ void end_that_request_last(struct request *req)
 int __init blk_dev_init(void)
 {
 	int total_ram = nr_free_pages() << (PAGE_SHIFT - 10);
+	int i;
 
 	request_cachep = kmem_cache_create("blkdev_requests",
 			sizeof(struct request), 0,
@@ -1886,26 +1996,33 @@ int __init blk_dev_init(void)
 		panic("Can't create request pool slab cache\n");
 
 	/*
-	 * Free request slots per queue.
-	 * (Half for reads, half for writes)
+	 * Free request slots per queue.  One per quarter-megabyte.
+	 * We use this many requests for reads, and this many for writes.
 	 */
-	queue_nr_requests = (total_ram >> 8) & ~15;	/* One per quarter-megabyte */
-	if (queue_nr_requests < 32)
-		queue_nr_requests = 32;
-	if (queue_nr_requests > 256)
-		queue_nr_requests = 256;
+	queue_nr_requests = (total_ram >> 9) & ~7;
+	if (queue_nr_requests < 16)
+		queue_nr_requests = 16;
+	if (queue_nr_requests > 128)
+		queue_nr_requests = 128;
 
-	/*
-	 * Batch frees according to queue length
-	 */
-	if ((batch_requests = queue_nr_requests / 4) > 32)
-		batch_requests = 32;
-	printk("block: %d slots per queue, batch=%d\n",
-			queue_nr_requests, batch_requests);
+	batch_requests = queue_nr_requests / 8;
+	if (batch_requests > 8)
+		batch_requests = 8;
+
+	printk("block request queues:\n");
+	printk(" %d requests per read queue\n", queue_nr_requests);
+	printk(" %d requests per write queue\n", queue_nr_requests);
+	printk(" %d requests per batch\n", batch_requests);
+	printk(" enter congestion at %d\n", queue_congestion_on_threshold());
+	printk(" exit congestion at %d\n", queue_congestion_off_threshold());
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
 
+	for (i = 0; i < ARRAY_SIZE(congestion_states); i++) {
+		init_waitqueue_head(&congestion_states[i].wqh);
+		atomic_set(&congestion_states[i].nr_congested_queues, 0);
+	}
 	return 0;
 };
 

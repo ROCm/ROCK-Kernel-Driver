@@ -345,8 +345,7 @@ extern void blk_queue_end_tag(request_queue_t *, struct request *);
 extern int blk_queue_init_tags(request_queue_t *, int);
 extern void blk_queue_free_tags(request_queue_t *);
 extern void blk_queue_invalidate_tags(request_queue_t *);
-
-extern int * blk_size[MAX_BLKDEV];	/* in units of 1024 bytes */
+extern void blk_congestion_wait(int rw, long timeout);
 
 #define MAX_PHYS_SEGMENTS 128
 #define MAX_HW_SEGMENTS 128
@@ -357,11 +356,6 @@ extern int * blk_size[MAX_BLKDEV];	/* in units of 1024 bytes */
 #define blkdev_entry_to_request(entry) list_entry((entry), struct request, queuelist)
 
 extern void drive_stat_acct(struct request *, int, int);
-
-static inline void blk_clear(int major)
-{
-	blk_size[major] = NULL;
-}
 
 static inline int queue_hardsect_size(request_queue_t *q)
 {

@@ -42,11 +42,11 @@ static struct mtdblk_dev {
 	unsigned long cache_offset;
 	unsigned int cache_size;
 	enum { STATE_EMPTY, STATE_CLEAN, STATE_DIRTY } cache_state;
+	struct gendisk disk;
+	char name[7];
 } *mtdblks[MAX_MTD_DEVICES];
 
 static spinlock_t mtdblks_lock;
-
-static int mtd_sizes[MAX_MTD_DEVICES];
 
 /*
  * Cache stuff...
@@ -257,20 +257,16 @@ static int do_cached_read (struct mtdblk_dev *mtdblk, unsigned long pos,
 	return 0;
 }
 
-
+static struct block_device_operations mtd_fops;
 
 static int mtdblock_open(struct inode *inode, struct file *file)
 {
 	struct mtdblk_dev *mtdblk;
 	struct mtd_info *mtd;
-	int dev;
+	int dev = minor(inode->i_rdev);
 
 	DEBUG(MTD_DEBUG_LEVEL1,"mtdblock_open\n");
-	
-	if (!inode)
-		return -EINVAL;
-	
-	dev = minor(inode->i_rdev);
+
 	if (dev >= MAX_MTD_DEVICES)
 		return -EINVAL;
 
@@ -319,6 +315,12 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 			return -ENOMEM;
 		}
 	}
+	mtdblk->disk.major = MAJOR_NR;
+	mtdblk->disk.first_minor = dev;
+	mtdblk->disk.minor_shift = 0;
+	mtdblk->disk.fops = &mtd_fops;
+	mtdblk->disk.major_name = mtdblk->name;
+	sprintf(mtdblk->name, "mtd%d", dev);
 
 	/* OK, we've created a new one. Add it to the list. */
 
@@ -335,7 +337,8 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	}
 
 	mtdblks[dev] = mtdblk;
-	mtd_sizes[dev] = mtdblk->mtd->size/1024;
+	set_capacity(&mtdblk->disk, mtdblk->mtd->size/512);
+	add_disk(&mtdblk->disk);
 	set_device_ro (inode->i_rdev, !(mtdblk->mtd->flags & MTD_WRITEABLE));
 	
 	spin_unlock(&mtdblks_lock);
@@ -366,6 +369,7 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 		/* It was the last usage. Free the device */
 		mtdblks[dev] = NULL;
 		spin_unlock(&mtdblks_lock);
+		del_gendisk(&mtdblk->disk);
 		if (mtdblk->mtd->sync)
 			mtdblk->mtd->sync(mtdblk->mtd);
 		put_mtd_device(mtdblk->mtd);
@@ -404,7 +408,7 @@ static void handle_mtdblock_request(void)
 		res = 0;
 
 		if (minor(req->rq_dev) >= MAX_MTD_DEVICES)
-			panic(__FUNCTION__": minor out of bound");
+			panic("handle_mtdblock_request: minor out of bound");
 
 		if (! (req->flags & REQ_CMD))
 			goto end_req;
@@ -490,13 +494,7 @@ int mtdblock_thread(void *dummy)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < 0x20300
-#define RQFUNC_ARG void
-#else
-#define RQFUNC_ARG request_queue_t *q
-#endif
-
-static void mtdblock_request(RQFUNC_ARG)
+static void mtdblock_request(struct request_queue *q)
 {
 	/* Don't do anything, except wake the thread if necessary */
 	wake_up(&thr_wq);
@@ -516,16 +514,9 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 #endif
 
 	switch (cmd) {
-	case BLKGETSIZE:   /* Return device size */
-		return put_user((mtdblk->mtd->size >> 9), (unsigned long *) arg);
-	case BLKGETSIZE64:
-		return put_user((u64)mtdblk->mtd->size, (u64 *)arg);
-		
 	case BLKFLSBUF:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
 		if(!capable(CAP_SYS_ADMIN))
 			return -EACCES;
-#endif
 		fsync_bdev(inode->i_bdev);
 		invalidate_bdev(inode->i_bdev, 0);
 		down(&mtdblk->cache_sem);
@@ -540,16 +531,6 @@ static int mtdblock_ioctl(struct inode * inode, struct file * file,
 	}
 }
 
-#if LINUX_VERSION_CODE < 0x20326
-static struct file_operations mtd_fops =
-{
-	open: mtdblock_open,
-	ioctl: mtdblock_ioctl,
-	release: mtdblock_release,
-	read: block_read,
-	write: block_write
-};
-#else
 static struct block_device_operations mtd_fops = 
 {
 	owner: THIS_MODULE,
@@ -557,7 +538,6 @@ static struct block_device_operations mtd_fops =
 	release: mtdblock_release,
 	ioctl: mtdblock_ioctl
 };
-#endif
 
 #ifdef CONFIG_DEVFS_FS
 /* Notification that a new device has been added. Create the devfs entry for
@@ -590,8 +570,6 @@ static spinlock_t mtddev_lock = SPIN_LOCK_UNLOCKED;
 
 int __init init_mtdblock(void)
 {
-	int i;
-
 	spin_lock_init(&mtdblks_lock);
 	if (register_blkdev(MAJOR_NR,DEVICE_NAME,&mtd_fops)) {
 		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
@@ -603,12 +581,7 @@ int __init init_mtdblock(void)
 	register_mtd_user(&notifier);
 #endif
 	
-	/* We fill it in at open() time. */
-	for (i=0; i< MAX_MTD_DEVICES; i++)
-		mtd_sizes[i] = 0;
 	init_waitqueue_head(&thr_wq);
-	blk_size[MAJOR_NR] = mtd_sizes;
-	
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request, &mtddev_lock);
 	kernel_thread (mtdblock_thread, NULL, CLONE_FS|CLONE_FILES|CLONE_SIGHAND);
 	return 0;
@@ -625,7 +598,6 @@ static void __exit cleanup_mtdblock(void)
 #endif
 	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	blk_size[MAJOR_NR] = NULL;
 }
 
 module_init(init_mtdblock);

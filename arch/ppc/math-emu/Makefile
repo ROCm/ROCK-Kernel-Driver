@@ -1,4 +1,3 @@
-O_TARGET			:= math-emu.o
 
 obj-y				:= math.o fmr.o lfd.o stfd.o
 

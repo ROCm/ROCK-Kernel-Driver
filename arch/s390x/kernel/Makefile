@@ -5,8 +5,6 @@
 EXTRA_TARGETS	:= head.o init_task.o
 EXTRA_AFLAGS	:= -traditional
 
-O_TARGET	:= kernel.o
-
 export-objs	:= debug.o ebcdic.o irq.o s390_ext.o smp.o s390_ksyms.o \
 		   exec32.o
 

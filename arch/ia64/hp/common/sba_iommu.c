@@ -39,9 +39,7 @@
 
 #define DRIVER_NAME "SBA"
 
-#ifndef CONFIG_IA64_HP_PROTO
 #define ALLOW_IOV_BYPASS
-#endif
 #define ENABLE_MARK_CLEAN
 /*
 ** The number of debug flags is a clue - this code is fragile.
@@ -740,6 +738,9 @@ sba_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
 	unsigned long phys_addr = virt_to_phys(addr);
 #endif
 
+	if (!sba_list)
+		panic("sba_map_single: no SBA found!\n");
+
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
@@ -827,6 +828,9 @@ void sba_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size,
 #endif
 	unsigned long flags; 
 	dma_addr_t offset;
+
+	if (!sba_list)
+		panic("sba_map_single: no SBA found!\n");
 
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
@@ -1094,6 +1098,9 @@ int sba_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents,
 	DBG_RUN_SG("%s() START %d entries, 0x%p,0x%x\n", __FUNCTION__, nents,
 		sba_sg_address(sglist), sba_sg_len(sglist));
 
+	if (!sba_list)
+		panic("sba_map_single: no SBA found!\n");
+
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
@@ -1183,6 +1190,9 @@ void sba_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents,
 	DBG_RUN_SG("%s() START %d entries, 0x%p,0x%x\n",
 		__FUNCTION__, nents, sba_sg_address(sglist), sba_sg_len(sglist));
 
+	if (!sba_list)
+		panic("sba_map_single: no SBA found!\n");
+
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
@@ -1252,10 +1262,6 @@ sba_ioc_init(struct sba_device *sba_dev, struct ioc *ioc, int ioc_num)
 	** Firmware programs the maximum IOV space size into the imask reg
 	*/
 	iova_space_size = ~(READ_REG(ioc->ioc_hpa + IOC_IMASK) & 0xFFFFFFFFUL) + 1;
-#ifdef CONFIG_IA64_HP_PROTO
-	if (!iova_space_size)
-		iova_space_size = GB(1);
-#endif
 
 	/*
 	** iov_order is always based on a 1GB IOVA space since we want to
@@ -1484,66 +1490,65 @@ sba_common_init(struct sba_device *sba_dev)
 #ifdef CONFIG_PROC_FS
 static int sba_proc_info(char *buf, char **start, off_t offset, int len)
 {
-	struct sba_device *sba_dev = sba_list;
-	struct ioc *ioc = &sba_dev->ioc[0];	/* FIXME: Multi-IOC support! */
-	int total_pages = (int) (ioc->res_size << 3); /* 8 bits per byte */
+	struct sba_device *sba_dev;
+	struct ioc *ioc;
+	int total_pages;
 	unsigned long i = 0, avg = 0, min, max;
 
-	sprintf(buf, "%s rev %d.%d\n",
-		"Hewlett Packard zx1 SBA",
-		((sba_dev->hw_rev >> 4) & 0xF),
-		(sba_dev->hw_rev & 0xF)
-		);
-	sprintf(buf, "%sIO PDIR size    : %d bytes (%d entries)\n",
-		buf,
-		(int) ((ioc->res_size << 3) * sizeof(u64)), /* 8 bits/byte */
-		total_pages);
+	for (sba_dev = sba_list; sba_dev; sba_dev = sba_dev->next) {
+		ioc = &sba_dev->ioc[0];	/* FIXME: Multi-IOC support! */
+		total_pages = (int) (ioc->res_size << 3); /* 8 bits per byte */
 
-	sprintf(buf, "%sIO PDIR entries : %ld free  %ld used (%d%%)\n", buf,
-		total_pages - ioc->used_pages, ioc->used_pages,
-		(int) (ioc->used_pages * 100 / total_pages));
-	
-	sprintf(buf, "%sResource bitmap : %d bytes (%d pages)\n", 
-		buf, ioc->res_size, ioc->res_size << 3);   /* 8 bits per byte */
+		sprintf(buf, "%s rev %d.%d\n", "Hewlett Packard zx1 SBA",
+			((sba_dev->hw_rev >> 4) & 0xF), (sba_dev->hw_rev & 0xF));
+		sprintf(buf, "%sIO PDIR size    : %d bytes (%d entries)\n", buf,
+			(int) ((ioc->res_size << 3) * sizeof(u64)), /* 8 bits/byte */ total_pages);
 
-	min = max = ioc->avg_search[0];
-	for (i = 0; i < SBA_SEARCH_SAMPLE; i++) {
-		avg += ioc->avg_search[i];
-		if (ioc->avg_search[i] > max) max = ioc->avg_search[i];
-		if (ioc->avg_search[i] < min) min = ioc->avg_search[i];
+		sprintf(buf, "%sIO PDIR entries : %ld free  %ld used (%d%%)\n", buf,
+			total_pages - ioc->used_pages, ioc->used_pages,
+			(int) (ioc->used_pages * 100 / total_pages));
+
+		sprintf(buf, "%sResource bitmap : %d bytes (%d pages)\n", 
+			buf, ioc->res_size, ioc->res_size << 3);   /* 8 bits per byte */
+
+		min = max = ioc->avg_search[0];
+		for (i = 0; i < SBA_SEARCH_SAMPLE; i++) {
+			avg += ioc->avg_search[i];
+			if (ioc->avg_search[i] > max) max = ioc->avg_search[i];
+			if (ioc->avg_search[i] < min) min = ioc->avg_search[i];
+		}
+		avg /= SBA_SEARCH_SAMPLE;
+		sprintf(buf, "%s  Bitmap search : %ld/%ld/%ld (min/avg/max CPU Cycles)\n",
+			buf, min, avg, max);
+
+		sprintf(buf, "%spci_map_single(): %12ld calls  %12ld pages (avg %d/1000)\n",
+			buf, ioc->msingle_calls, ioc->msingle_pages,
+			(int) ((ioc->msingle_pages * 1000)/ioc->msingle_calls));
+#ifdef ALLOW_IOV_BYPASS
+		sprintf(buf, "%spci_map_single(): %12ld bypasses\n",
+			buf, ioc->msingle_bypass);
+#endif
+
+		sprintf(buf, "%spci_unmap_single: %12ld calls  %12ld pages (avg %d/1000)\n",
+			buf, ioc->usingle_calls, ioc->usingle_pages,
+			(int) ((ioc->usingle_pages * 1000)/ioc->usingle_calls));
+#ifdef ALLOW_IOV_BYPASS
+		sprintf(buf, "%spci_unmap_single: %12ld bypasses\n",
+			buf, ioc->usingle_bypass);
+#endif
+
+		sprintf(buf, "%spci_map_sg()    : %12ld calls  %12ld pages (avg %d/1000)\n",
+			buf, ioc->msg_calls, ioc->msg_pages,
+			(int) ((ioc->msg_pages * 1000)/ioc->msg_calls));
+#ifdef ALLOW_IOV_BYPASS
+		sprintf(buf, "%spci_map_sg()    : %12ld bypasses\n",
+			buf, ioc->msg_bypass);
+#endif
+
+		sprintf(buf, "%spci_unmap_sg()  : %12ld calls  %12ld pages (avg %d/1000)\n",
+			buf, ioc->usg_calls, ioc->usg_pages,
+			(int) ((ioc->usg_pages * 1000)/ioc->usg_calls));
 	}
-	avg /= SBA_SEARCH_SAMPLE;
-	sprintf(buf, "%s  Bitmap search : %ld/%ld/%ld (min/avg/max CPU Cycles)\n",
-		buf, min, avg, max);
-
-	sprintf(buf, "%spci_map_single(): %12ld calls  %12ld pages (avg %d/1000)\n",
-		buf, ioc->msingle_calls, ioc->msingle_pages,
-		(int) ((ioc->msingle_pages * 1000)/ioc->msingle_calls));
-#ifdef ALLOW_IOV_BYPASS
-	sprintf(buf, "%spci_map_single(): %12ld bypasses\n",
-	        buf, ioc->msingle_bypass);
-#endif
-
-	sprintf(buf, "%spci_unmap_single: %12ld calls  %12ld pages (avg %d/1000)\n",
-		buf, ioc->usingle_calls, ioc->usingle_pages,
-		(int) ((ioc->usingle_pages * 1000)/ioc->usingle_calls));
-#ifdef ALLOW_IOV_BYPASS
-	sprintf(buf, "%spci_unmap_single: %12ld bypasses\n",
-	        buf, ioc->usingle_bypass);
-#endif
-
-	sprintf(buf, "%spci_map_sg()    : %12ld calls  %12ld pages (avg %d/1000)\n",
-		buf, ioc->msg_calls, ioc->msg_pages,
-		(int) ((ioc->msg_pages * 1000)/ioc->msg_calls));
-#ifdef ALLOW_IOV_BYPASS
-	sprintf(buf, "%spci_map_sg()    : %12ld bypasses\n",
-	        buf, ioc->msg_bypass);
-#endif
-
-	sprintf(buf, "%spci_unmap_sg()  : %12ld calls  %12ld pages (avg %d/1000)\n",
-		buf, ioc->usg_calls, ioc->usg_pages,
-		(int) ((ioc->usg_pages * 1000)/ioc->usg_calls));
-
 	return strlen(buf);
 }
 
@@ -1551,9 +1556,13 @@ static int
 sba_resource_map(char *buf, char **start, off_t offset, int len)
 {
 	struct ioc *ioc = sba_list->ioc;	/* FIXME: Multi-IOC support! */
-	unsigned int *res_ptr = (unsigned int *)ioc->res_map;
+	unsigned int *res_ptr;
 	int i;
 
+	if (!ioc)
+		return 0;
+
+	res_ptr = (unsigned int *)ioc->res_map;
 	buf[0] = '\0';
 	for(i = 0; i < (ioc->res_size / sizeof(unsigned int)); ++i, ++res_ptr) {
 		if ((i & 7) == 0)
@@ -1593,13 +1602,11 @@ void __init sba_init(void)
 	}
 
 	func_id = READ_REG(hpa + SBA_FUNC_ID);
-
-	if (func_id == ZX1_FUNC_ID_VALUE) {
-		strcpy(sba_rev, "zx1");
-		func_offset = zx1_func_offsets;
-	} else {
+	if (func_id != ZX1_FUNC_ID_VALUE)
 		return;
-	}
+
+	strcpy(sba_rev, "zx1");
+	func_offset = zx1_func_offsets;
 
 	/* Read HW Rev First */
 	hw_rev = READ_REG(hpa + SBA_FCLASS) & 0xFFUL;
@@ -1625,10 +1632,8 @@ void __init sba_init(void)
 	       device->slot_name, hpa);
 
 	if ((hw_rev & 0xFF) < 0x20) {
-		printk(KERN_INFO "%s WARNING rev 2.0 or greater will be required for IO MMU support in the future\n", DRIVER_NAME);
-#ifndef CONFIG_IA64_HP_PROTO
-		panic("%s: CONFIG_IA64_HP_PROTO MUST be enabled to support SBA rev less than 2.0", DRIVER_NAME);
-#endif
+		printk("%s: SBA rev less than 2.0 not supported", DRIVER_NAME);
+		return;
 	}
 
 	sba_dev = kmalloc(sizeof(struct sba_device), GFP_KERNEL);

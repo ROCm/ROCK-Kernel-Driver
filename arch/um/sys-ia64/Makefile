@@ -1,4 +1,4 @@
-OBJ = sys.o
+OBJ = built-in.o
 
 OBJS =
 

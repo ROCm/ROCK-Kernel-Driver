@@ -40,6 +40,7 @@
 #include <net/llc_pdu.h>
 #include <net/llc_conn.h>
 #include <net/llc_mac.h>
+#include <net/llc_main.h>
 #include <linux/llc.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
@@ -145,52 +146,6 @@ static int llc_ui_send_data(struct sock* sk, struct sk_buff *skb, int noblock)
 }
 
 /**
- *	llc_ui_find_sap - returns sap struct that matches sap number specified
- *	@sap: Sap number to search for.
- *
- *	Search the local socket list and return the first instance of the sap
- *	structure which matches the sap number the user specified.
- *	Returns llc_sap upon match, %NULL otherwise.
- */
-static __inline__ struct llc_sap *llc_ui_find_sap(u8 sap)
-{
-	struct sock *sk;
-	struct llc_sap *s = NULL;
-
-	read_lock_bh(&llc_ui_sockets_lock);
-	for (sk = llc_ui_sockets; sk; sk = sk->next) {
-		struct llc_opt *llc = llc_sk(sk);
-
-		if (!llc->sap)
-			continue;
-		if (llc->sap->laddr.lsap == sap) {
-			s = llc->sap;
-			break;
-		}
-	}
-	read_unlock_bh(&llc_ui_sockets_lock);
-	return s;
-}
-
-static struct sock *__llc_ui_find_sk_by_exact(struct llc_addr *laddr,
-					      struct llc_addr *daddr)
-{
-	struct sock *sk;
-
-	for (sk = llc_ui_sockets; sk; sk = sk->next) {
-		struct llc_opt *llc = llc_sk(sk);
-
-		if (llc->addr.sllc_ssap == laddr->lsap &&
-		    llc->addr.sllc_dsap == daddr->lsap &&
-		    llc_mac_null(llc->addr.sllc_mmac) &&
-		    llc_mac_match(llc->addr.sllc_smac, laddr->mac) &&
-		    llc_mac_match(llc->addr.sllc_dmac, daddr->mac))
-			break;
-	}
-	return sk;
-}
-
-/**
  *	__llc_ui_find_sk_by_addr - return socket matching local mac + sap.
  *	@addr: Local address to match.
  *
@@ -204,7 +159,7 @@ static struct sock *__llc_ui_find_sk_by_addr(struct llc_addr *laddr,
 					     struct llc_addr *daddr,
 					     struct net_device *dev)
 {
-	struct sock *sk, *tmp_sk;
+	struct sock *sk;
 
 	for (sk = llc_ui_sockets; sk; sk = sk->next) {
 		struct llc_opt *llc = llc_sk(sk);
@@ -226,11 +181,6 @@ static struct sock *__llc_ui_find_sk_by_addr(struct llc_addr *laddr,
 			break;
 		if (!llc_mac_match(llc->addr.sllc_smac, laddr->mac))
 			continue;
-		tmp_sk = __llc_ui_find_sk_by_exact(laddr, daddr);
-		if (tmp_sk) {
-			sk = tmp_sk;
-			break;
-		}
 		if (llc_mac_null(llc->addr.sllc_dmac))
 			break;
 	}
@@ -248,20 +198,6 @@ static struct sock *llc_ui_find_sk_by_addr(struct llc_addr *addr,
 	if (sk)
 		sock_hold(sk);
 	read_unlock(&llc_ui_sockets_lock);
-	return sk;
-}
-
-static struct sock *llc_ui_bh_find_sk_by_addr(struct llc_addr *addr,
-					      struct llc_addr *daddr,
-					      struct net_device *dev)
-{
-	struct sock *sk;
-
-	read_lock_bh(&llc_ui_sockets_lock);
-	sk = __llc_ui_find_sk_by_addr(addr, daddr, dev);
-	if (sk)
-		sock_hold(sk);
-	read_unlock_bh(&llc_ui_sockets_lock);
 	return sk;
 }
 
@@ -388,7 +324,7 @@ static int llc_ui_autoport(void)
 	while (tries < LLC_SAP_DYN_TRIES) {
 		for (i = llc_ui_sap_last_autoport;
 		     i < LLC_SAP_DYN_STOP; i += 2) {
-			sap = llc_ui_find_sap(i);
+			sap = llc_sap_find(i);
 			if (!sap) {
 				llc_ui_sap_last_autoport = i + 2;
 				goto out;
@@ -446,7 +382,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 		if (!addr->sllc_ssap)
 			goto out;
 	}
-	sap = llc_ui_find_sap(addr->sllc_ssap);
+	sap = llc_sap_find(addr->sllc_ssap);
 	if (!sap) {
 		sap = llc_sap_open(llc_ui_indicate, llc_ui_confirm,
 				   addr->sllc_ssap);
@@ -472,7 +408,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 			memcpy(laddr.mac, addr->sllc_smac, IFHWADDRLEN);
 		laddr.lsap = addr->sllc_ssap;
 		rc = -EADDRINUSE; /* mac + sap clash. */
-		ask = llc_ui_bh_find_sk_by_addr(&laddr, &daddr, dev);
+		ask = llc_lookup_established(sap, &daddr, &laddr);
 		if (ask) {
 			sock_put(ask);
 			goto out;
@@ -1384,18 +1320,26 @@ static int llc_ui_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	off_t pos = 0;
 	off_t begin = 0;
-	struct sock *s;
+	struct llc_opt *llc;
+	struct llc_sap *sap;
+	struct list_head *sap_entry, *llc_entry;
+	struct llc_station *station = llc_station_get();
 	int len = sprintf(buffer, "SKt Mc local_mac_sap        "
 				  "remote_mac_sap       tx_queue rx_queue st uid "
 				  "link\n");
-	/* Output the LLC socket data for the /proc filesystem */
-	read_lock_bh(&llc_ui_sockets_lock);
-	for (s = llc_ui_sockets; s; s = s->next) {
-		struct llc_opt *llc = llc_sk(s);
 
-		len += sprintf(buffer + len, "%2X  %2X ", s->type,
-			       !llc_mac_null(llc->addr.sllc_mmac));
-		if (llc->sap) {
+	/* Output the LLC socket data for the /proc filesystem */
+	spin_lock_bh(&station->sap_list.lock);
+	list_for_each(sap_entry, &station->sap_list.list) {
+		sap = list_entry(sap_entry, struct llc_sap, node);
+
+		spin_lock_bh(&sap->sk_list.lock);
+		list_for_each(llc_entry, &sap->sk_list.list) {
+			llc = list_entry(llc_entry, struct llc_opt, node);
+
+			len += sprintf(buffer + len, "%2X  %2X ",
+				       llc->sk->type,
+				       !llc_mac_null(llc->addr.sllc_mmac));
 			if (llc->dev && llc_mac_null(llc->addr.sllc_mmac))
 				llc_ui_format_mac(buffer + len,
 						  llc->dev->dev_addr);
@@ -1408,30 +1352,32 @@ static int llc_ui_get_info(char *buffer, char **start, off_t offset, int length)
 						"00:00:00:00:00:00");
 			}
 			len += MAC_FORMATTED_SIZE;
-			len += sprintf(buffer + len, "@%02X ",
-					llc->sap->laddr.lsap);
-		} else
-			len += sprintf(buffer + len, "00:00:00:00:00:00@00 ");
-		llc_ui_format_mac(buffer + len, llc->addr.sllc_dmac);
-		len += MAC_FORMATTED_SIZE;
-		len += sprintf(buffer + len,
-				"@%02X %8d %8d %2d %-3d ",
-				llc->addr.sllc_dsap,
-				atomic_read(&s->wmem_alloc),
-				atomic_read(&s->rmem_alloc), s->state,
-				SOCK_INODE(s->socket)->i_uid);
-		len += sprintf(buffer + len, "%-4d\n", llc->link);
-		/* Are we still dumping unwanted data then discard the record */
-		pos = begin + len;
+			len += sprintf(buffer + len, "@%02X ", sap->laddr.lsap);
+			llc_ui_format_mac(buffer + len, llc->addr.sllc_dmac);
+			len += MAC_FORMATTED_SIZE;
+			len += sprintf(buffer + len,
+					"@%02X %8d %8d %2d %3d ",
+					llc->addr.sllc_dsap,
+					atomic_read(&llc->sk->wmem_alloc),
+					atomic_read(&llc->sk->rmem_alloc),
+					llc->sk->state,
+					llc->sk->socket ?
+					  SOCK_INODE(llc->sk->socket)->i_uid :
+					  -1);
+			len += sprintf(buffer + len, "%4d\n", llc->link);
+			/* Are we still dumping unwanted data then discard the record */
+			pos = begin + len;
 
-		if (pos < offset) {
-			len = 0; /* Keep dumping into the buffer start */
-			begin = pos;
+			if (pos < offset) {
+				len = 0; /* Keep dumping into the buffer start */
+				begin = pos;
+			}
+			if (pos > offset + length) /* We have dumped enough */
+				break;
 		}
-		if (pos > offset + length) /* We have dumped enough */
-			break;
+		spin_unlock_bh(&sap->sk_list.lock);
 	}
-	read_unlock_bh(&llc_ui_sockets_lock);
+	spin_unlock_bh(&station->sap_list.lock);
 
 	/* The data in question runs from begin to begin + len */
 	*start = buffer + offset - begin; /* Start of wanted data */

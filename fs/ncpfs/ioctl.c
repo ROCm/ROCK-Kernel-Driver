@@ -424,7 +424,7 @@ outrel:
 			if (user.object_name_len) {
 				newname = ncp_kmalloc(user.object_name_len, GFP_USER);
 				if (!newname) return -ENOMEM;
-				if (copy_from_user(newname, user.object_name, sizeof(user))) {
+				if (copy_from_user(newname, user.object_name, user.object_name_len)) {
 					ncp_kfree_s(newname, user.object_name_len);
 					return -EFAULT;
 				}

@@ -194,31 +194,40 @@ int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
 
 struct block_device_operations mcd_bdops =
 {
-	owner:			THIS_MODULE,
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
+	.owner			= THIS_MODULE,
+	.open			= cdrom_open,
+	.release		= cdrom_release,
+	.ioctl			= cdrom_ioctl,
+	.check_media_change	= cdrom_media_changed,
 };
 
 static struct timer_list mcd_timer;
 
 static struct cdrom_device_ops mcd_dops = {
-	open:mcd_open,
-	release:mcd_release,
-	drive_status:mcd_drive_status,
-	media_changed:mcd_media_changed,
-	tray_move:mcd_tray_move,
-	audio_ioctl:mcd_audio_ioctl,
-	capability:CDC_OPEN_TRAY | CDC_MEDIA_CHANGED |
-	    CDC_PLAY_AUDIO | CDC_DRIVE_STATUS,
+	.open			= mcd_open,
+	.release		= mcd_release,
+	.drive_status		= mcd_drive_status,
+	.media_changed		= mcd_media_changed,
+	.tray_move		= mcd_tray_move,
+	.audio_ioctl		= mcd_audio_ioctl,
+	.capability		= CDC_OPEN_TRAY | CDC_MEDIA_CHANGED |
+				  CDC_PLAY_AUDIO | CDC_DRIVE_STATUS,
 };
 
 static struct cdrom_device_info mcd_info = {
-	ops:&mcd_dops,
-	speed:2,
-	capacity:1,
-	name:"mcd",
+	.ops		= &mcd_dops,
+	.speed		= 2,
+	.capacity	= 1,
+	.name		= "mcd",
+};
+
+static struct gendisk mcd_gendisk = {
+	.major		= MAJOR_NR,
+	.first_minor	= 0,
+	.minor_shift	= 0,
+	.major_name	= "mcd",
+	.fops		= &mcd_bdops,
+	.flags		= GENHD_FL_CD,
 };
 
 #ifndef MODULE
@@ -1023,39 +1032,13 @@ static void mcd_release(struct cdrom_device_info *cdi)
 	}
 }
 
-
-
-/* This routine gets called during initialization if things go wrong,
- * and is used in mcd_exit as well. */
-static void cleanup(int level)
-{
-	switch (level) {
-	case 3:
-		if (unregister_cdrom(&mcd_info)) {
-			printk(KERN_WARNING "Can't unregister cdrom mcd\n");
-			return;
-		}
-		free_irq(mcd_irq, NULL);
-	case 2:
-		release_region(mcd_port, 4);
-	case 1:
-		if (unregister_blkdev(MAJOR_NR, "mcd")) {
-			printk(KERN_WARNING "Can't unregister major mcd\n");
-			return;
-		}
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	default:;
-	}
-}
-
-
-
 /*
  * Test for presence of drive and initialize it.  Called at boot time.
  */
 
 int __init mcd_init(void)
 {
+	struct gendisk *disk = &mcd_gendisk;
 	int count;
 	unsigned char result[3];
 	char msg[80];
@@ -1070,9 +1053,8 @@ int __init mcd_init(void)
 		return -EIO;
 	}
 	if (!request_region(mcd_port, 4, "mcd")) {
-		cleanup(1);
 		printk(KERN_ERR "mcd: Initialization failed, I/O port (%X) already in use\n", mcd_port);
-		return -EIO;
+		goto out_region;
 	}
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mcd_request,
@@ -1092,8 +1074,7 @@ int __init mcd_init(void)
 	if (count >= 2000000) {
 		printk(KERN_INFO "mcd: initialisation failed - No mcd device at 0x%x irq %d\n",
 		       mcd_port, mcd_irq);
-		cleanup(2);
-		return -EIO;
+		goto out_probe;
 	}
 	count = inb(MCDPORT(0));	/* pick up the status */
 
@@ -1102,14 +1083,11 @@ int __init mcd_init(void)
 		if (getValue(result + count)) {
 			printk(KERN_ERR "mcd: mitsumi get version failed at 0x%x\n",
 			       mcd_port);
-			cleanup(2);
-			return -EIO;
+			goto out_probe;
 		}
 
-	if (result[0] == result[1] && result[1] == result[2]) {
-		cleanup(2);
-		return -EIO;
-	}
+	if (result[0] == result[1] && result[1] == result[2])
+		goto out_probe;
 
 	mcdVersion = result[2];
 
@@ -1120,8 +1098,7 @@ int __init mcd_init(void)
 
 	if (request_irq(mcd_irq, mcd_interrupt, SA_INTERRUPT, "Mitsumi CD", NULL)) {
 		printk(KERN_ERR "mcd: Unable to get IRQ%d for Mitsumi CD-ROM\n", mcd_irq);
-		cleanup(2);
-		return -EIO;
+		goto out_probe;
 	}
 
 	if (result[1] == 'D') {
@@ -1151,13 +1128,20 @@ int __init mcd_init(void)
 
 	if (register_cdrom(&mcd_info) != 0) {
 		printk(KERN_ERR "mcd: Unable to register Mitsumi CD-ROM.\n");
-		cleanup(3);
-		return -EIO;
+		goto out_cdrom;
 	}
-	devfs_plain_cdrom(&mcd_info, &mcd_bdops);
+	add_disk(disk);
 	printk(msg);
-
 	return 0;
+
+out_cdrom:
+	free_irq(mcd_irq, NULL);
+out_probe:
+	release_region(mcd_port, 4);
+out_region:
+	unregister_blkdev(MAJOR_NR, "mcd");
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	return -EIO;
 }
 
 
@@ -1522,7 +1506,18 @@ static int GetToc(void)
 
 void __exit mcd_exit(void)
 {
-	cleanup(3);
+	del_gendisk(&mcd_gendisk);
+	if (unregister_cdrom(&mcd_info)) {
+		printk(KERN_WARNING "Can't unregister cdrom mcd\n");
+		return;
+	}
+	free_irq(mcd_irq, NULL);
+	release_region(mcd_port, 4);
+	if (unregister_blkdev(MAJOR_NR, "mcd")) {
+		printk(KERN_WARNING "Can't unregister major mcd\n");
+		return;
+	}
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	del_timer_sync(&mcd_timer);
 }
 

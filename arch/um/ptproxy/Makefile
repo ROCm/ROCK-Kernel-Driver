@@ -1,4 +1,4 @@
-LIB = ptproxy.a
+LIB = lib.a
 
 OBJS = proxy.o ptrace.o sysdep.o wait.o
 

@@ -38,8 +38,8 @@
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 
-static int floppy_blocksizes[2] = {512,512};
-static int floppy_sizes[2] = {1440,1440};
+static struct gendisk disks[2];
+static char names[2][4];
 
 #define MAX_FLOPPIES	2
 
@@ -1015,6 +1015,7 @@ static devfs_handle_t floppy_devfs_handle;
 int swim3_init(void)
 {
 	struct device_node *swim;
+	int i;
 
 	floppy_devfs_handle = devfs_mk_dir(NULL, "floppy", NULL);
 
@@ -1039,9 +1040,17 @@ int swim3_init(void)
 			       MAJOR_NR);
 			return -EBUSY;
 		}
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,&swim3_lock);
-		blksize_size[MAJOR_NR] = floppy_blocksizes;
-		blk_size[MAJOR_NR] = floppy_sizes;
+		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &swim3_lock);
+		for (i = 0; i < floppy_count; i++) {
+			struct gendisk *disk = disks + i;
+			disk->major = MAJOR_NR;
+			disk->first_minor = i;
+			disk->fops = &floppy_fops;
+			sprintf(names[i], "fd%d", i);
+			disk->major_name = names[i];
+			set_capacity(disk, 2880);
+			add_disk(disk);
+		}
 	}
 
 	return 0;

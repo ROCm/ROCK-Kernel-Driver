@@ -104,7 +104,8 @@ do_settimeofday (struct timeval *tv)
 			tv->tv_sec--;
 		}
 
-		xtime = *tv;
+		xtime.tv_sec = tv->tv_sec;
+		xtime.tv_nsec = 1000 * tv->tv_usec;
 		time_adjust = 0;		/* stop active adjtime() */
 		time_status |= STA_UNSYNC;
 		time_maxerror = NTP_PHASE_LIMIT;
@@ -135,7 +136,7 @@ do_gettimeofday (struct timeval *tv)
 		} while (cmpxchg(&last_time_offset, old, usec) != old);
 
 		sec = xtime.tv_sec;
-		usec += xtime.tv_usec;
+		usec += xtime.tv_nsec / 1000;
 	}
 	read_unlock_irqrestore(&xtime_lock, flags);
 

@@ -12,7 +12,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/mempool.h>
-#include <linux/buffer_head.h>		/* for wakeup_bdflush() */
+#include <linux/writeback.h>
 
 static void add_element(mempool_t *pool, void *element)
 {
@@ -210,7 +210,7 @@ repeat_alloc:
 	/*
 	 * Kick the VM at this point.
 	 */
-	wakeup_bdflush();
+	wakeup_bdflush(0);
 
 	spin_lock_irqsave(&pool->lock, flags);
 	if (likely(pool->curr_nr)) {

@@ -1250,10 +1250,8 @@ static void sd_finish()
 		if (sdkp && (0 == sdkp->capacity) && sdkp->device) {
 			sd_init_onedisk(sdkp, k);
 			if (!sdkp->has_been_registered) {
-				add_gendisk(sd_disks[k]);
-				register_disk(sd_disks[k], MKDEV_SD(k),
-						1<<4, &sd_fops,
-						sdkp->capacity);
+				set_capacity(sd_disks[k], sdkp->capacity);
+				add_disk(sd_disks[k]);
 				sdkp->has_been_registered = 1;
 			}
 		}
@@ -1468,10 +1466,8 @@ static void __exit exit_sd(void)
 			vfree(sd_dsk_arr[k]);
 		vfree(sd_dsk_arr);
 	}
-	for (k = 0; k < N_USED_SD_MAJORS; k++) {
+	for (k = 0; k < N_USED_SD_MAJORS; k++)
 		blk_dev[SD_MAJOR(k)].queue = NULL;
-		blk_clear(SD_MAJOR(k));
-	}
 	sd_template.dev_max = 0;
 	remove_driver(&sd_template.scsi_driverfs_driver);
 }

@@ -142,10 +142,6 @@ static struct fd_drive_type drive_types[] = {
 };
 static int num_dr_types = sizeof(drive_types) / sizeof(drive_types[0]);
 
-/* defaults for 3 1/2" HD-Disks */
-static int floppy_sizes[256]={880,880,880,880,720,720,720,720,};
-/* hardsector size assumed to be 512 */
-
 static int amiga_read(int), dos_read(int);
 static void amiga_write(int), dos_write(int);
 static struct fd_data_type data_types[] = {
@@ -155,6 +151,7 @@ static struct fd_data_type data_types[] = {
 
 /* current info on each unit */
 static struct amiga_floppy_struct unit[FD_MAX_UNITS];
+static char names[FD_MAX_UNITS][4];
 
 static struct timer_list flush_track_timer[FD_MAX_UNITS];
 static struct timer_list post_write_timer;
@@ -1539,12 +1536,6 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 				 sizeof(struct floppy_struct)))
 			return -EFAULT;
 		break;
-	case BLKGETSIZE:
-		return put_user(unit[drive].blocks,(unsigned long *)param);
-		break;
-	case BLKGETSIZE64:
-		return put_user((u64)unit[drive].blocks << 9, (u64 *)param);
-		break;
 	case FDSETPRM:
 	case FDDEFPRM:
 		return -EINVAL;
@@ -1653,7 +1644,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	unit[drive].dtype=&data_types[system];
 	unit[drive].blocks=unit[drive].type->heads*unit[drive].type->tracks*
 		data_types[system].sects*unit[drive].type->sect_mult;
-	floppy_sizes[minor(inode->i_rdev)] = unit[drive].blocks >> 1;
+	set_capacity(&unit[drive].disk, unit[drive].blocks);
 
 	printk(KERN_INFO "fd%d: accessing %s-disk with %s-layout\n",drive,
 	       unit[drive].type->name, data_types[system].name);
@@ -1720,11 +1711,11 @@ static int amiga_floppy_change(kdev_t dev)
 }
 
 static struct block_device_operations floppy_fops = {
-	owner:			THIS_MODULE,
-	open:			floppy_open,
-	release:		floppy_release,
-	ioctl:			fd_ioctl,
-	check_media_change:	amiga_floppy_change,
+	.owner			= THIS_MODULE,
+	.open			= floppy_open,
+	.release		= floppy_release,
+	.ioctl			= fd_ioctl,
+	.check_media_change	= amiga_floppy_change,
 };
 
 void __init amiga_floppy_setup (char *str, int *ints)
@@ -1743,6 +1734,7 @@ static int __init fd_probe_drives(void)
 	for(drive=0;drive<FD_MAX_UNITS;drive++) {
 		fd_probe(drive);
 		if (unit[drive].type->code != FD_NODRIVE) {
+			struct gendisk *disk = &unit[drive].disk;
 			drives++;
 			if ((unit[drive].trackbuf = kmalloc(FLOPPY_MAX_SECTORS * 512, GFP_KERNEL)) == NULL) {
 				printk("no mem for ");
@@ -1751,6 +1743,14 @@ static int __init fd_probe_drives(void)
 				nomem = 1;
 			}
 			printk("fd%d ",drive);
+			disk->major = MAJOR_NR;
+			disk->first_minor = drive;
+			disk->minor_shift = 0;
+			disk->fops = &floppy_fops;
+			sprintf(names[drive], "fd%d", drive);
+			disk->major_name = names[drive];
+			set_capacity(disk, 880*2);
+			add_disk(disk);
 		}
 	}
 	if ((drives > 0) || (nomem == 0)) {
@@ -1761,6 +1761,14 @@ static int __init fd_probe_drives(void)
 	}
 	printk("\n");
 	return -ENOMEM;
+}
+ 
+static struct gendisk *floppy_find(int minor)
+{
+	int drive = minor & 3;
+	if (unit[drive].type->code == FD_NODRIVE)
+		return NULL;
+	return &unit[drive].disk;
 }
 
 int __init amiga_floppy_init(void)
@@ -1805,7 +1813,9 @@ int __init amiga_floppy_init(void)
 		unregister_blkdev(MAJOR_NR,"fd");
 		return -EBUSY;
 	}
+	blk_set_probe(MAJOR_NR, floppy_find);
 	if (fd_probe_drives() < 1) { /* No usable drives */
+		blk_set_probe(MAJOR_NR, NULL);
 		free_irq(IRQ_AMIGA_CIAA_TB, NULL);
 		free_irq(IRQ_AMIGA_DSKBLK, NULL);
 		amiga_chip_free(raw_buf);
@@ -1838,8 +1848,6 @@ int __init amiga_floppy_init(void)
 	post_write_timer.function = post_write;
   
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &amiflop_lock);
-	blk_size[MAJOR_NR] = floppy_sizes;
-
 	for (i = 0; i < 128; i++)
 		mfmdecode[i]=255;
 	for (i = 0; i < 16; i++)
@@ -1867,9 +1875,13 @@ void cleanup_module(void)
 {
 	int i;
 
-	for( i = 0; i < FD_MAX_UNITS; i++)
-		if (unit[i].type->code != FD_NODRIVE)
+	for( i = 0; i < FD_MAX_UNITS; i++) {
+		if (unit[i].type->code != FD_NODRIVE) {
+			del_gendisk(&unit[i].disk);
 			kfree(unit[i].trackbuf);
+		}
+	}
+	blk_set_probe(MAJOR_NR, NULL);
 	free_irq(IRQ_AMIGA_CIAA_TB, NULL);
 	free_irq(IRQ_AMIGA_DSKBLK, NULL);
 	custom.dmacon = DMAF_DISK; /* disable DMA */
@@ -1877,6 +1889,5 @@ void cleanup_module(void)
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
 	unregister_blkdev(MAJOR_NR, "fd");
-	blk_clear(MAJOR_NR);
 }
 #endif

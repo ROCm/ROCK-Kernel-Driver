@@ -184,7 +184,6 @@ int __init ps2esdi_init(void)
 			" device, releasing resources\n");
 		unregister_blkdev(MAJOR_NR, "ed");
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		blk_clear(MAJOR_NR);
 		return error;
 	}
 	return 0;
@@ -236,7 +235,6 @@ cleanup_module(void) {
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	for (i = 0; i < ps2esdi_drives; i++)
 		del_gendisk(ps2esdi_gendisk + i);
-	blk_clear(MAJOR_NR);
 }
 #endif /* MODULE */
 
@@ -435,11 +433,9 @@ static int __init ps2esdi_geninit(void)
 
 	for (i = 0; i < ps2esdi_drives; i++) {
 		struct gendisk *disk = ps2esdi_gendisk + i;
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(disk->major,disk->first_minor),
-				1<<disk->minor_shift, disk->fops,
-				ps2esdi_info[i].head * ps2esdi_info[i].sect *
+		set_capacity(disk, ps2esdi_info[i].head * ps2esdi_info[i].sect *
 				ps2esdi_info[i].cyl);
+		add_disk(disk);
 	}
 	return 0;
 

@@ -55,18 +55,15 @@ CFLAGS		+= -pipe
 
 HEAD := arch/sh/kernel/head.o arch/sh/kernel/init_task.o
 
-SUBDIRS := $(SUBDIRS) $(addprefix arch/sh/, kernel mm lib)
-CORE_FILES := arch/sh/kernel/kernel.o arch/sh/mm/mm.o $(CORE_FILES)
 LIBGCC := $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
-LIBS := $(TOPDIR)/arch/sh/lib/lib.a $(LIBS) $(TOPDIR)/arch/sh/lib/lib.a \
-	$(LIBGCC)
+
+core-y				+= arch/sh/kernel/ arch/sh/mm/
+core-$(CONFIG_SH_GENERIC)	+= arch/sh/stboards/
+core-$(CONFIG_SH_STB1_HARP)	+= arch/sh/stboards/
+core-$(CONFIG_SH_STB1_OVERDRIVE)+= arch/sh/stboards/
+libs-y				+= arch/sh/lib/	$(LIBGCC)
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-
-ifneq ($(CONFIG_SH_GENERIC)$(CONFIG_SH_STB1_HARP)$(CONFIG_SH_STB1_OVERDRIVE),)
-SUBDIRS += arch/sh/stboards
-CORE_FILES += arch/sh/stboards/stboards.o
-endif
 
 AFLAGS_vmlinux.lds.o := -traditional
 

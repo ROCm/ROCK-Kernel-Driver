@@ -6,7 +6,6 @@ EXTRA_CFLAGS = -mno-minimal-toc
 
 KHEAD := head.o
 
-O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= $(KHEAD)
 
 export-objs         := ppc_ksyms.o

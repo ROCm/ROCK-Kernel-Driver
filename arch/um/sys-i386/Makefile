@@ -1,4 +1,3 @@
-O_TARGET = sys.o
 
 obj-y = bugs.o checksum.o extable.o fault.o ksyms.o ldt.o old-checksum.o \
 	ptrace.o ptrace_user.o semaphore.o sigcontext.o syscalls.o sysrq.o

@@ -15,11 +15,7 @@
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
-O_TARGET := sgiio.o
-
-ifeq ($(CONFIG_MODULES),y)
 export-objs = pciio.o hcl.o
-endif
 
 obj-y  := stubs.o sgi_if.o pciio.o xtalk.o xbow.o xswitch.o klgraph_hack.o \
 		hcl.o labelcl.o invent.o klgraph.o klconflib.o sgi_io_sim.o \

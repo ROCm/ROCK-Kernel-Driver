@@ -1,4 +1,4 @@
-OBJ = sys.o
+OBJ = built-in.o
 
 .S.o:
 	$(CC) $(AFLAGS) -D__ASSEMBLY__ -D__UM_PPC__ -c $< -o $*.o

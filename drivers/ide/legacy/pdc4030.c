@@ -462,7 +462,7 @@ read_next:
 	rq->nr_sectors -= nsect;
 	total_remaining = rq->nr_sectors;
 	if ((rq->current_nr_sectors -= nsect) <= 0) {
-		DRIVER(drive)->end_request(drive, 1);
+		DRIVER(drive)->end_request(drive, 1, 0);
 	}
 /*
  * Now the data has been read in, do the following:
@@ -539,7 +539,7 @@ static ide_startstop_t promise_complete_pollfunc(ide_drive_t *drive)
 #endif /* DEBUG_WRITE */
 	for (i = rq->nr_sectors; i > 0; ) {
 		i -= rq->current_nr_sectors;
-		DRIVER(drive)->end_request(drive, 1);
+		DRIVER(drive)->end_request(drive, 1, 0);
 	}
 	return ide_stopped;
 }
@@ -584,16 +584,24 @@ int promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 
 		/* Do we move to the next bh after this? */
 		if (!rq->current_nr_sectors) {
-			struct buffer_head *bh = rq->bh->b_reqnext;
+			struct bio *bio = rq->bio;
+
+			/*
+			 * only move to next bio, when we have processed
+			 * all bvecs in this one.
+			 */
+			if (++bio->bi_idx >= bio->bi_vcnt) {
+				bio->bi_idx = 0;
+				bio = bio->bi_next;
+			}
 
 			/* end early early we ran out of requests */
-			if (!bh) {
+			if (!bio) {
 				mcount = 0;
 			} else {
-				rq->bh			= bh;
-				rq->current_nr_sectors	= bh->b_size >> 9;
+				rq->bio = bio;
+				rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
 				rq->hard_cur_sectors = rq->current_nr_sectors;
-				rq->buffer		= bh->b_data;
 			}
 		}
 
@@ -720,6 +728,12 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 	unsigned long timeout;
 	u8 stat = 0;
 
+	if (!blk_fs_request(rq)) {
+		blk_dump_rq_flags(rq, "do_pdc4030_io - bad command");
+		DRIVER(drive)->end_request(drive, 0, 0);
+		return ide_stopped;
+	}
+
 #ifdef CONFIG_IDE_TASKFILE_IO
 	if (IDE_CONTROL_REG)
 		HWIF(drive)->OUTB(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
@@ -735,8 +749,7 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 	HWIF(drive)->OUTB(taskfile->command, IDE_COMMAND_REG);
 #endif /* CONFIG_IDE_TASKFILE_IO */
 
-	switch(rq->cmd) {
-	case READ:
+	if (rq_data_dir(rq) == READ) {
 #ifndef CONFIG_IDE_TASKFILE_IO
 		HWIF(drive)->OUTB(PROMISE_READ, IDE_COMMAND_REG);
 #endif /* CONFIG_IDE_TASKFILE_IO */
@@ -774,7 +787,7 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 		printk(KERN_ERR "%s: reading: No DRQ and not "
 				"waiting - Odd!\n", drive->name);
 		return ide_stopped;
-	case WRITE:
+	} else {
 #ifndef CONFIG_IDE_TASKFILE_IO
 		HWIF(drive)->OUTB(PROMISE_WRITE, IDE_COMMAND_REG);
 #endif /* CONFIG_IDE_TASKFILE_IO */
@@ -788,11 +801,6 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 			local_irq_disable();
 		HWGROUP(drive)->wrq = *rq; /* scratchpad */
 		return promise_write(drive);
-	default:
-		printk("KERN_WARNING %s: bad command: %d\n",
-			drive->name, rq->cmd);
-		DRIVER(drive)->end_request(drive, 0);
-		return ide_stopped;
 	}
 }
 

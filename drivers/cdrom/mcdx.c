@@ -206,6 +206,7 @@ struct s_drive_stuff {
 	int status;		/* last operation's error / status */
 	int readerrs;		/* # of blocks read w/o error */
 	struct cdrom_device_info info;
+	struct gendisk disk;
 };
 
 
@@ -1020,6 +1021,7 @@ void __exit mcdx_exit(void)
 		struct s_drive_stuff *stuffp = mcdx_stuffp[i];
 		if (!stuffp)
 			continue;
+		del_gendisk(&stuffp->disk);
 		if (unregister_cdrom(&stuffp->info)) {
 			printk(KERN_WARNING "Can't unregister cdrom mcdx\n");
 			return;
@@ -1059,6 +1061,7 @@ module_exit(mcdx_exit);
 int __init mcdx_init_drive(int drive)
 {
 	struct s_version version;
+	struct gendisk *disk;
 	struct s_drive_stuff *stuffp;
 	int size = sizeof(*stuffp);
 	char msg[80];
@@ -1203,6 +1206,13 @@ int __init mcdx_init_drive(int drive)
 	stuffp->info.handle = stuffp;
 	sprintf(stuffp->info.name, "mcdx%d", drive);
 	stuffp->info.dev = mk_kdev(MAJOR_NR, drive);
+	disk = &stuffp->disk;
+	disk->major = MAJOR_NR;
+	disk->first_minor = drive;
+	disk->minor_shift = 0;
+	disk->major_name = stuffp->info.name;
+	disk->fops = &mcdx_bdops;
+	disk->flags = GENHD_FL_CD;
 
 	sprintf(msg, " mcdx: Mitsumi CD-ROM installed at 0x%3p, irq %d."
 		" (Firmware version %c %x)\n",
@@ -1220,7 +1230,7 @@ int __init mcdx_init_drive(int drive)
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		return 2;
 	}
-	devfs_plain_cdrom(&stuffp->info, &mcdx_bdops);
+	add_disk(disk);
 	printk(msg);
 	return 0;
 }

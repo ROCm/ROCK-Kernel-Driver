@@ -4,7 +4,6 @@
 
 # EXTRA_AFLAGS = -mips3 -mcpu=r4000 # not used?
 
-O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= head.o init_task.o
 export-objs	:= mips_ksyms.o
 

@@ -203,7 +203,8 @@ static struct archy_disk_type {
  */
 #define MAX_DISK_SIZE 720
 
-static int floppy_sizes[256];
+static struct gendisk disks[FD_MAX_UNIT];
+static char names[FD_MAX_UNIT][4];
 
 /* current info on each unit */
 static struct archy_floppy_struct {
@@ -962,16 +963,16 @@ static void fd_rwsec_done(int status)
 			if (unit[SelectedDrive].disktype > disk_type) {
 				/* try another disk type */
 				unit[SelectedDrive].disktype--;
-				floppy_sizes[SelectedDrive]
-				    = unit[SelectedDrive].disktype->blocks >> 1;
+				set_capacity(&disks[SelectedDrive],
+				    unit[SelectedDrive].disktype->blocks);
 			} else
 				Probing = 0;
 		} else {
 			/* record not found, but not probing. Maybe stretch wrong ? Restart probing */
 			if (unit[SelectedDrive].autoprobe) {
 				unit[SelectedDrive].disktype = disk_type + NUM_DISK_TYPES - 1;
-				floppy_sizes[SelectedDrive]
-				    = unit[SelectedDrive].disktype->blocks >> 1;
+				set_capacity(&disks[SelectedDrive],
+				    unit[SelectedDrive].disktype->blocks);
 				Probing = 1;
 			}
 		}
@@ -1243,7 +1244,7 @@ repeat:
 		if (!floppy->disktype) {
 			Probing = 1;
 			floppy->disktype = disk_type + NUM_DISK_TYPES - 1;
-			floppy_sizes[drive] = floppy->disktype->blocks >> 1;
+			set_capacity(&disks[drive], floppy->disktype->blocks);
 			floppy->autoprobe = 1;
 		}
 	} else {
@@ -1255,7 +1256,7 @@ repeat:
 			goto repeat;
 		}
 		floppy->disktype = &disk_type[type];
-		floppy_sizes[drive] = disk_type[type].blocks >> 1;
+		set_capacity(&disks[drive], floppy->disktype->blocks);
 		floppy->autoprobe = 0;
 	}
 
@@ -1474,14 +1475,9 @@ static void config_types(void)
 
 static int floppy_open(struct inode *inode, struct file *filp)
 {
-	int drive;
+	int drive = minor(inode->i_rdev) & 3;
 	int old_dev;
 
-	if (!filp) {
-		DPRINT(("Weird, open called with filp=0\n"));
-		return -EIO;
-	}
-	drive = minor(inode->i_rdev) & 3;
 	if ((minor(inode->i_rdev) >> 2) > NUM_DISK_TYPES)
 		return -ENXIO;
 
@@ -1543,6 +1539,13 @@ static struct block_device_operations floppy_fops =
 	.revalidate		= floppy_revalidate,
 };
 
+static struct gendisk *floppy_find(int minor)
+{
+	int drive = minor & 3;
+	if ((minor>> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)
+		return NULL;
+	return &disks[drive];
+}
 
 int fd1772_init(void)
 {
@@ -1580,19 +1583,20 @@ int fd1772_init(void)
 	   out of some special memory... */
 	DMABuffer = (char *) kmalloc(2048);	/* Copes with pretty large sectors */
 #endif
-
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request);
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].track = -1;
+		disks[i].major = MAJOR_NR;
+		disks[i].first_minor = 0;
+		disks[i].fops = &floppy_fops;
+		sprintf(names[i], "fd%d", i);
+		disks[i].major_name = names[i];
+		set_capacity(&disks[i], MAX_DISK_SIZE * 2);
 	}
+	blk_set_probe(MAJOR_NR, floppy_find);
 
-	for (i = 0; i < 256; i++)
-		if ((i >> 2) > 0 && (i >> 2) <= NUM_DISK_TYPES)
-			floppy_sizes[i] = disk_type[(i >> 2) - 1].blocks >> 1;
-		else
-			floppy_sizes[i] = MAX_DISK_SIZE;
-
-	blk_size[MAJOR_NR] = floppy_sizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request);
+	for (i = 0; i < FD_MAX_UNITS; i++)
+		add_disk(disks + i);
 
 	config_types();
 

@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 37
+SUBLEVEL = 38
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -436,7 +436,8 @@ include/linux/modversions.h: scripts/fixdep prepare FORCE
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
 	   echo "#include <linux/modsetver.h>"; \
-	   for f in `cd .tmp_export-objs; find modules -name SCCS -prune -o -name BitKeeper -prune -o -name \*.ver -print | sort`; do \
+	   cd .tmp_export-objs >/dev/null; \
+	   for f in `find modules -name \*.ver -print | sort`; do \
 	     echo "#include <linux/$${f}>"; \
 	   done; \
 	   echo "#endif"; \
@@ -712,25 +713,38 @@ distclean: mrproper
 # Generate tags for editors
 # ---------------------------------------------------------------------------
 
-TAGS: FORCE
-	{ find include/asm-${ARCH} -name SCCS -prune -o -name BitKeeper -prune \
-		-o -name '*.h' -print ; \
-	find include -name SCCS -prune -o -name BitKeeper -prune -o \
-		-type d \( -name "asm-*" -o -name config \) -prune -o \
-		-name '*.h' -print ; \
-	find $(SUBDIRS) init arch/${ARCH} \
-		-name SCCS -prune -o -name BitKeeper -prune -o \
-		-name '*.[chS]' -print ; } | grep -v SCCS | etags -
+define all-sources
+	( find . \( -name SCCS -o -name BitKeeper -o -name include -o \
+		  -name arch \) -prune \
+	       -o -name '*.[chS]' -print; \
+	  find arch/$(ARCH) \( -name SCCS -o -name BitKeeper \) -prune \
+	       -o -name '*.[chS]' -print; \
+	  find include \( -name SCCS -o -name BitKeeper -o -name config -o \
+			  -name 'asm-*' \) -prune \
+	       -o -name '*.[chS]' -print; \
+	  find include/asm-$(ARCH) \( -name SCCS -o -name BitKeeper \) -prune \
+	       -o -name '*.[chS]' -print; \
+	  find include/asm-generic \( -name SCCS -o -name BitKeeper \) -prune \
+	       -o -name '*.[chS]' -print )
+endef
+
+quiet_cmd_TAGS = MAKE   $@
+cmd_TAGS = $(all-sources) | etags -
 
 # 	Exuberant ctags works better with -I
-tags: FORCE
+
+quiet_cmd_tags = MAKE   $@
+define cmd_tags
+	rm -f $@; \
 	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
-	ctags $$CTAGSF `find include/asm-$(ARCH) -name SCCS -prune -o -name BitKeeper -prune -o -name '*.h' -print` && \
-	find include -name SCCS -prune -o -name BitKeeper -prune -o \
-		-type d \( -name "asm-*" -o -name config \) -prune -o \
-		-name '*.h' -print | xargs ctags $$CTAGSF -a && \
-	find $(SUBDIRS) init -name SCCS -prune -o -name BitKeeper -prune -o \
-		-name '*.[ch]' -print | xargs ctags $$CTAGSF -a
+	$(all-sources) | xargs ctags $$CTAGSF -a
+endef
+
+TAGS: FORCE
+	$(call cmd,TAGS)
+
+tags: FORCE
+	$(call cmd,tags)
 
 # Brief documentation of the typical targets used
 # ---------------------------------------------------------------------------

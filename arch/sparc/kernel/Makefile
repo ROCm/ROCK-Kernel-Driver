@@ -4,7 +4,6 @@
 
 SH = $(CONFIG_SHELL)
 
-O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= head.o init_task.o
 
 EXTRA_AFLAGS := -ansi

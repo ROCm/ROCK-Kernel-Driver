@@ -239,7 +239,6 @@ static int allowed_drive_mask = 0x33;
 
 static int irqdma_allocated;
 
-#define CURRENT current_req
 #define LOCAL_END_REQUEST
 #define MAJOR_NR FLOPPY_MAJOR
 #define DEVICE_NAME "floppy"
@@ -416,6 +415,8 @@ static struct floppy_drive_params drive_params[N_DRIVE];
 static struct floppy_drive_struct drive_state[N_DRIVE];
 static struct floppy_write_errors write_errors[N_DRIVE];
 static struct timer_list motor_off_timer[N_DRIVE];
+static struct gendisk disks[N_DRIVE];
+static char names[N_DRIVE][4];
 static struct floppy_raw_cmd *raw_cmd, default_raw_cmd;
 
 /*
@@ -598,7 +599,10 @@ static unsigned char in_sector_offset;	/* offset within physical sector,
 					 * expressed in units of 512 bytes */
 
 #ifndef fd_eject
-#define fd_eject(x) -EINVAL
+static inline int fd_eject(int drive)
+{
+	return -EINVAL;
+}
 #endif
 
 #ifdef DEBUGT
@@ -660,12 +664,12 @@ static struct output_log {
 static int output_log_pos;
 #endif
 
-#define CURRENTD -1
+#define current_reqD -1
 #define MAXTIMEOUT -2
 
 static void reschedule_timeout(int drive, const char *message, int marg)
 {
-	if (drive == CURRENTD)
+	if (drive == current_reqD)
 		drive = current_drive;
 	del_timer(&fd_timeout);
 	if (drive < 0 || drive > N_DRIVE) {
@@ -1893,7 +1897,7 @@ static void show_floppy(void)
 		printk("now=%lu\n",jiffies);
 	}
 	printk("cont=%p\n", cont);
-	printk("CURRENT=%p\n", CURRENT);
+	printk("current_req=%p\n", current_req);
 	printk("command_status=%d\n", command_status);
 	printk("\n");
 }
@@ -1999,7 +2003,7 @@ static void floppy_ready(void)
 
 static void floppy_start(void)
 {
-	reschedule_timeout(CURRENTD, "floppy start", 0);
+	reschedule_timeout(current_reqD, "floppy start", 0);
 
 	scandrives();
 #ifdef DCL_DEBUG
@@ -2303,7 +2307,7 @@ static inline void end_request(struct request *req, int uptodate)
 	end_that_request_last(req);
 
 	/* We're done with the request */
-	CURRENT = NULL;
+	current_req = NULL;
 }
 
 
@@ -2312,7 +2316,7 @@ static inline void end_request(struct request *req, int uptodate)
 static void request_done(int uptodate)
 {
 	struct request_queue *q = QUEUE;
-	struct request *req = CURRENT;
+	struct request *req = current_req;
 	unsigned long flags;
 	int block;
 
@@ -2436,7 +2440,7 @@ static void rw_interrupt(void)
 	}
 
 	if (CT(COMMAND) != FD_READ || 
-	     raw_cmd->kernel_data == CURRENT->buffer){
+	     raw_cmd->kernel_data == current_req->buffer){
 		/* transfer directly from buffer */
 		cont->done(1);
 	} else if (CT(COMMAND) == FD_READ){
@@ -2455,10 +2459,10 @@ static int buffer_chain_size(void)
 	int size, i;
 	char *base;
 
-	base = bio_data(CURRENT->bio);
+	base = bio_data(current_req->bio);
 	size = 0;
 
-	rq_for_each_bio(bio, CURRENT) {
+	rq_for_each_bio(bio, current_req) {
 		bio_for_each_segment(bv, bio, i) {
 			if (page_address(bv->bv_page) + bv->bv_offset != base + size)
 				break;
@@ -2497,23 +2501,23 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 
 	max_sector = transfer_size(ssize,
 				   minimum(max_sector, max_sector_2),
-				   CURRENT->nr_sectors);
+				   current_req->nr_sectors);
 
 	if (current_count_sectors <= 0 && CT(COMMAND) == FD_WRITE &&
-	    buffer_max > fsector_t + CURRENT->nr_sectors)
+	    buffer_max > fsector_t + current_req->nr_sectors)
 		current_count_sectors = minimum(buffer_max - fsector_t,
-						CURRENT->nr_sectors);
+						current_req->nr_sectors);
 
 	remaining = current_count_sectors << 9;
 #ifdef FLOPPY_SANITY_CHECK
-	if ((remaining >> 9) > CURRENT->nr_sectors  &&
+	if ((remaining >> 9) > current_req->nr_sectors  &&
 	    CT(COMMAND) == FD_WRITE){
 		DPRINT("in copy buffer\n");
 		printk("current_count_sectors=%ld\n", current_count_sectors);
 		printk("remaining=%d\n", remaining >> 9);
-		printk("CURRENT->nr_sectors=%ld\n",CURRENT->nr_sectors);
-		printk("CURRENT->current_nr_sectors=%u\n",
-		       CURRENT->current_nr_sectors);
+		printk("current_req->nr_sectors=%ld\n",current_req->nr_sectors);
+		printk("current_req->current_nr_sectors=%u\n",
+		       current_req->current_nr_sectors);
 		printk("max_sector=%d\n", max_sector);
 		printk("ssize=%d\n", ssize);
 	}
@@ -2523,9 +2527,9 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 
 	dma_buffer = floppy_track_buffer + ((fsector_t - buffer_min) << 9);
 
-	size = CURRENT->current_nr_sectors << 9;
+	size = current_req->current_nr_sectors << 9;
 
-	rq_for_each_bio(bio, CURRENT) {
+	rq_for_each_bio(bio, current_req) {
 		bio_for_each_segment(bv, bio, i) {
 			if (!remaining)
 				break;
@@ -2632,16 +2636,16 @@ static int make_raw_rw_request(void)
 		return 0;
 	}
 
-	set_fdc(DRIVE(CURRENT->rq_dev));
+	set_fdc(DRIVE(current_req->rq_dev));
 
 	raw_cmd = &default_raw_cmd;
 	raw_cmd->flags = FD_RAW_SPIN | FD_RAW_NEED_DISK | FD_RAW_NEED_DISK |
 		FD_RAW_NEED_SEEK;
 	raw_cmd->cmd_count = NR_RW;
-	if (rq_data_dir(CURRENT) == READ) {
+	if (rq_data_dir(current_req) == READ) {
 		raw_cmd->flags |= FD_RAW_READ;
 		COMMAND = FM_MODE(_floppy,FD_READ);
-	} else if (rq_data_dir(CURRENT) == WRITE){
+	} else if (rq_data_dir(current_req) == WRITE){
 		raw_cmd->flags |= FD_RAW_WRITE;
 		COMMAND = FM_MODE(_floppy,FD_WRITE);
 	} else {
@@ -2651,10 +2655,10 @@ static int make_raw_rw_request(void)
 
 	max_sector = _floppy->sect * _floppy->head;
 
-	TRACK = CURRENT->sector / max_sector;
-	fsector_t = CURRENT->sector % max_sector;
+	TRACK = current_req->sector / max_sector;
+	fsector_t = current_req->sector % max_sector;
 	if (_floppy->track && TRACK >= _floppy->track) {
-		if (CURRENT->current_nr_sectors & 1) {
+		if (current_req->current_nr_sectors & 1) {
 			current_count_sectors = 1;
 			return 1;
 		} else
@@ -2671,7 +2675,7 @@ static int make_raw_rw_request(void)
 		max_sector = 2 * _floppy->sect / 3;
 		if (fsector_t >= max_sector){
 			current_count_sectors = minimum(_floppy->sect - fsector_t,
-							CURRENT->nr_sectors);
+							current_req->nr_sectors);
 			return 1;
 		}
 		SIZECODE = 2;
@@ -2722,7 +2726,7 @@ static int make_raw_rw_request(void)
 
 	in_sector_offset = (fsector_t % _floppy->sect) % ssize;
 	aligned_sector_t = fsector_t - in_sector_offset;
-	max_size = CURRENT->nr_sectors;
+	max_size = current_req->nr_sectors;
 	if ((raw_cmd->track == buffer_track) && 
 	    (current_drive == buffer_drive) &&
 	    (fsector_t >= buffer_min) && (fsector_t < buffer_max)) {
@@ -2731,10 +2735,10 @@ static int make_raw_rw_request(void)
 			copy_buffer(1, max_sector, buffer_max);
 			return 1;
 		}
-	} else if (in_sector_offset || CURRENT->nr_sectors < ssize){
+	} else if (in_sector_offset || current_req->nr_sectors < ssize){
 		if (CT(COMMAND) == FD_WRITE){
-			if (fsector_t + CURRENT->nr_sectors > ssize &&
-			    fsector_t + CURRENT->nr_sectors < ssize + ssize)
+			if (fsector_t + current_req->nr_sectors > ssize &&
+			    fsector_t + current_req->nr_sectors < ssize + ssize)
 				max_size = ssize + ssize;
 			else
 				max_size = ssize;
@@ -2742,7 +2746,7 @@ static int make_raw_rw_request(void)
 		raw_cmd->flags &= ~FD_RAW_WRITE;
 		raw_cmd->flags |= FD_RAW_READ;
 		COMMAND = FM_MODE(_floppy,FD_READ);
-	} else if ((unsigned long)CURRENT->buffer < MAX_DMA_ADDRESS) {
+	} else if ((unsigned long)current_req->buffer < MAX_DMA_ADDRESS) {
 		unsigned long dma_limit;
 		int direct, indirect;
 
@@ -2754,14 +2758,14 @@ static int make_raw_rw_request(void)
 		 * on a 64 bit machine!
 		 */
 		max_size = buffer_chain_size();
-		dma_limit = (MAX_DMA_ADDRESS - ((unsigned long) CURRENT->buffer)) >> 9;
+		dma_limit = (MAX_DMA_ADDRESS - ((unsigned long) current_req->buffer)) >> 9;
 		if ((unsigned long) max_size > dma_limit) {
 			max_size = dma_limit;
 		}
 		/* 64 kb boundaries */
-		if (CROSS_64KB(CURRENT->buffer, max_size << 9))
+		if (CROSS_64KB(current_req->buffer, max_size << 9))
 			max_size = (K_64 - 
-				    ((unsigned long)CURRENT->buffer) % K_64)>>9;
+				    ((unsigned long)current_req->buffer) % K_64)>>9;
 		direct = transfer_size(ssize,max_sector,max_size) - fsector_t;
 		/*
 		 * We try to read tracks, but if we get too many errors, we
@@ -2775,9 +2779,9 @@ static int make_raw_rw_request(void)
 		     *errors < DP->max_errors.read_track &&
 		     /*!TESTF(FD_NEED_TWADDLE) &&*/
 		     ((!probing || (DP->read_track&(1<<DRS->probed_format)))))){
-			max_size = CURRENT->nr_sectors;
+			max_size = current_req->nr_sectors;
 		} else {
-			raw_cmd->kernel_data = CURRENT->buffer;
+			raw_cmd->kernel_data = current_req->buffer;
 			raw_cmd->length = current_count_sectors << 9;
 			if (raw_cmd->length == 0){
 				DPRINT("zero dma transfer attempted from make_raw_request\n");
@@ -2803,7 +2807,7 @@ static int make_raw_rw_request(void)
 	    fsector_t > buffer_max ||
 	    fsector_t < buffer_min ||
 	    ((CT(COMMAND) == FD_READ ||
-	      (!in_sector_offset && CURRENT->nr_sectors >= ssize))&&
+	      (!in_sector_offset && current_req->nr_sectors >= ssize))&&
 	     max_sector > 2 * max_buffer_sectors + buffer_min &&
 	     max_size + fsector_t > 2 * max_buffer_sectors + buffer_min)
 	    /* not enough space */){
@@ -2838,7 +2842,7 @@ static int make_raw_rw_request(void)
 	/*check_dma_crossing(raw_cmd->kernel_data, raw_cmd->length, 
 	  "end of make_raw_request");*/
 	if ((raw_cmd->length < current_count_sectors << 9) ||
-	    (raw_cmd->kernel_data != CURRENT->buffer &&
+	    (raw_cmd->kernel_data != current_req->buffer &&
 	     CT(COMMAND) == FD_WRITE &&
 	     (aligned_sector_t + (raw_cmd->length >> 9) > buffer_max ||
 	      aligned_sector_t < buffer_min)) ||
@@ -2846,7 +2850,7 @@ static int make_raw_rw_request(void)
 	    raw_cmd->length <= 0 || current_count_sectors <= 0){
 		DPRINT("fractionary current count b=%lx s=%lx\n",
 			raw_cmd->length, current_count_sectors);
-		if (raw_cmd->kernel_data != CURRENT->buffer)
+		if (raw_cmd->kernel_data != current_req->buffer)
 			printk("addr=%d, length=%ld\n",
 			       (int) ((raw_cmd->kernel_data - 
 				       floppy_track_buffer) >> 9),
@@ -2863,7 +2867,7 @@ static int make_raw_rw_request(void)
 		return 0;
 	}
 
-	if (raw_cmd->kernel_data != CURRENT->buffer){
+	if (raw_cmd->kernel_data != current_req->buffer){
 		if (raw_cmd->kernel_data < floppy_track_buffer ||
 		    current_count_sectors < 0 ||
 		    raw_cmd->length < 0 ||
@@ -2881,8 +2885,8 @@ static int make_raw_rw_request(void)
 				printk("write\n");
 			return 0;
 		}
-	} else if (raw_cmd->length > CURRENT->nr_sectors << 9 ||
-		   current_count_sectors > CURRENT->nr_sectors){
+	} else if (raw_cmd->length > current_req->nr_sectors << 9 ||
+		   current_count_sectors > current_req->nr_sectors){
 		DPRINT("buffer overrun in direct transfer\n");
 		return 0;
 	} else if (raw_cmd->length < current_count_sectors << 9){
@@ -2911,21 +2915,21 @@ static void redo_fd_request(void)
 		floppy_off(current_drive);
 
 	for (;;) {
-		if (!CURRENT) {
+		if (!current_req) {
 			struct request *req = elv_next_request(QUEUE);
 			if (!req) {
 				do_floppy = NULL;
 				unlock_fdc();
 				return;
 			}
-			CURRENT = req;
+			current_req = req;
 		}
-		if (major(CURRENT->rq_dev) != MAJOR_NR)
+		if (major(current_req->rq_dev) != MAJOR_NR)
 			panic(DEVICE_NAME ": request list destroyed");
 
-		device = CURRENT->rq_dev;
+		device = current_req->rq_dev;
 		set_fdc(DRIVE(device));
-		reschedule_timeout(CURRENTD, "redo fd request", 0);
+		reschedule_timeout(current_reqD, "redo fd request", 0);
 
 		set_floppy(device);
 		raw_cmd = & default_raw_cmd;
@@ -2950,7 +2954,7 @@ static void redo_fd_request(void)
 			_floppy = floppy_type+DP->autodetect[DRS->probed_format];
 		} else
 			probing = 0;
-		errors = & (CURRENT->errors);
+		errors = & (current_req->errors);
 		tmp = make_raw_rw_request();
 		if (tmp < 2){
 			request_done(tmp);
@@ -2988,8 +2992,8 @@ static void do_fd_request(request_queue_t * q)
 	}
 
 	if (usage_count == 0) {
-		printk("warning: usage count=0, CURRENT=%p exiting\n", CURRENT);
-		printk("sect=%ld flags=%lx\n", CURRENT->sector, CURRENT->flags);
+		printk("warning: usage count=0, current_req=%p exiting\n", current_req);
+		printk("sect=%ld flags=%lx\n", current_req->sector, current_req->flags);
 		return;
 	}
 	if (fdc_busy){
@@ -3775,6 +3779,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	}
 
 	UDRS->fd_device = minor(inode->i_rdev);
+	set_capacity(&disks[drive], floppy_sizes[minor(inode->i_rdev)]);
 	if (old_dev != -1 && old_dev != minor(inode->i_rdev)) {
 		if (buffer_drive == drive)
 			buffer_track = -1;
@@ -3952,6 +3957,7 @@ static int floppy_revalidate(kdev_t dev)
 			poll_drive(0, FD_RAW_NEED_DISK);
 		process_fd_request();
 	}
+	set_capacity(&disks[drive], floppy_sizes[minor(dev)]);
 	return 0;
 }
 
@@ -4219,6 +4225,16 @@ static struct device device_floppy = {
 	bus_id:		"03?0",
 };
 
+static struct gendisk *floppy_find(int minor)
+{
+	int drive = (minor&3) | ((minor&0x80) >> 5);
+	if (drive >= N_DRIVE ||
+	    !(allowed_drive_mask & (1 << drive)) ||
+	    fdc_state[FDC(drive)].version == FDC_NONE)
+		return NULL;
+	return &disks[drive];
+}
+
 int __init floppy_init(void)
 {
 	int i,unit,drive;
@@ -4231,13 +4247,22 @@ int __init floppy_init(void)
 		return -EBUSY;
 	}
 
+	for (i=0; i<N_DRIVE; i++) {
+		disks[i].major = MAJOR_NR;
+		disks[i].first_minor = TOMINOR(i);
+		disks[i].fops = &floppy_fops;
+		sprintf(names[i], "fd%d", i);
+		disks[i].major_name = names[i];
+	}
+
+	blk_set_probe(MAJOR_NR, floppy_find);
+
 	for (i=0; i<256; i++)
 		if (ITYPE(i))
 			floppy_sizes[i] = (floppy_type[ITYPE(i)].size+1) >> 1;
 		else
 			floppy_sizes[i] = MAX_DISK_SIZE;
 
-	blk_size[MAJOR_NR] = floppy_sizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &floppy_lock);
 	reschedule_timeout(MAXTIMEOUT, "floppy init", MAXTIMEOUT);
 	config_types();
@@ -4262,6 +4287,7 @@ int __init floppy_init(void)
 		unregister_blkdev(MAJOR_NR,"fd");
 		del_timer(&fd_timeout);
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+		blk_set_probe(MAJOR_NR, NULL);
 		return -ENODEV;
 	}
 #if N_FDC > 1
@@ -4273,6 +4299,7 @@ int __init floppy_init(void)
 		del_timer(&fd_timeout);
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		unregister_blkdev(MAJOR_NR,"fd");
+		blk_set_probe(MAJOR_NR, NULL);
 		return -EBUSY;
 	}
 
@@ -4336,6 +4363,7 @@ int __init floppy_init(void)
 			floppy_release_irq_and_dma();
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		unregister_blkdev(MAJOR_NR,"fd");
+		blk_set_probe(MAJOR_NR, NULL);
 	}
 	
 	for (drive = 0; drive < N_DRIVE; drive++) {
@@ -4345,9 +4373,7 @@ int __init floppy_init(void)
 			continue;
 		if (fdc_state[FDC(drive)].version == FDC_NONE)
 			continue;
-		for (i = 0; i<NUMBER(floppy_type); i++)
-			register_disk(NULL, mk_kdev(MAJOR_NR,TOMINOR(drive)+i*4),
-					1, &floppy_fops, 0);
+		add_disk(disks + drive);
 	}
 
 	register_sys_device(&device_floppy);
@@ -4532,15 +4558,21 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	int dummy;
+	int drive;
 		
 	unregister_sys_device(&device_floppy);
 	devfs_unregister (devfs_handle);
 	unregister_blkdev(MAJOR_NR, "fd");
+	blk_set_probe(MAJOR_NR, NULL);
+	for (drive = 0; drive < N_DRIVE; drive++) {
+		if ((allowed_drive_mask & (1 << drive)) &&
+		    fdc_state[FDC(drive)].version != FDC_NONE)
+			del_gendisk(disks + drive);
+	}
 
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	/* eject disk, if any */
-	dummy = fd_eject(0);
+	fd_eject(0);
 }
 
 MODULE_PARM(floppy,"s");

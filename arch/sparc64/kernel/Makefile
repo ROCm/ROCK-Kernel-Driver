@@ -6,7 +6,6 @@ SH = $(CONFIG_SHELL)
 
 EXTRA_AFLAGS := -ansi
 
-O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= head.o init_task.o
 
 export-objs	:= sparc64_ksyms.o

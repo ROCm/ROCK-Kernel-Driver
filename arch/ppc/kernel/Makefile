@@ -18,7 +18,6 @@ HEAD-$(CONFIG_40x)		:= head_4xx.o
 HEAD-$(CONFIG_8xx)		:= head_8xx.o
 HEAD-$(CONFIG_PPC_ISERIES)	:= iSeries_head.o
 
-O_TARGET 	:= kernel.o
 EXTRA_TARGETS	:= $(HEAD-y)
 
 export-objs			:= ppc_ksyms.o time.o ppc405_dma.o

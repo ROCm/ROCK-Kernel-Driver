@@ -9,6 +9,7 @@ BEGIN {
 	print " */"
 	print ""
 	print "#define CLONE_IDLETASK_BIT	12"
+	print "#define CLONE_SETTLS_BIT	19"
 }
 
 # look for .tab:

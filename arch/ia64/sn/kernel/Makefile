@@ -33,22 +33,11 @@
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
-O_TARGET        = sn.o
-
-ifeq ($(CONFIG_MODULES),y)
-export-objs = sn_ksyms.o
-endif
-
-subdir-$(CONFIG_IA64_SGI_SN1)	= sn1
-subdir-$(CONFIG_IA64_SGI_SN2)	= sn2
+export-objs 	:= sn_ksyms.o
 
 obj-y		= probe.o setup.o sn_asm.o sv.o bte.o
-obj-$(CONFIG_IA64_SGI_SN1)      += irq.o mca.o
-obj-$(CONFIG_IA64_SGI_SN2)      += irq.o mca.o
-
-obj-$(CONFIG_IA64_SGI_SN1)      += sn1/sn1.a  
-obj-$(CONFIG_IA64_SGI_SN2)      += sn2/sn2.a  
-
+obj-$(CONFIG_IA64_SGI_SN1)      += irq.o mca.o sn1/
+obj-$(CONFIG_IA64_SGI_SN2)      += irq.o mca.o sn2/
 obj-$(CONFIG_IA64_SGI_AUTOTEST) += llsc4.o misctest.o
 obj-$(CONFIG_IA64_GENERIC)      += machvec.o
 obj-$(CONFIG_MODULES)           += sn_ksyms.o

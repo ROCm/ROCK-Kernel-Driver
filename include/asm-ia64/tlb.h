@@ -81,7 +81,7 @@ ia64_tlb_flush_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
 		 */
 		flush_tlb_mm(tlb->mm);
 	} else if (unlikely (end - start >= 1024*1024*1024*1024UL
-		      || REGION_NUMBER(start) != REGION_NUMBER(end - 1)))
+			     || REGION_NUMBER(start) != REGION_NUMBER(end - 1)))
 	{
 		/*
 		 * If we flush more than a tera-byte or across regions, we're probably
@@ -198,5 +198,9 @@ tlb_remove_page (mmu_gather_t *tlb, struct page *page)
 
 #define tlb_start_vma(tlb, vma)			do { } while (0)
 #define tlb_end_vma(tlb, vma)			do { } while (0)
+
+#define tlb_remove_tlb_entry(tlb, ptep, addr)	__tlb_remove_tlb_entry(tlb, ptep, addr)
+#define pte_free_tlb(tlb, ptep)			__pte_free_tlb(tlb, ptep)
+#define pmd_free_tlb(tlb, ptep)			__pmd_free_tlb(tlb, ptep)
 
 #endif /* _ASM_IA64_TLB_H */

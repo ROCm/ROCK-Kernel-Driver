@@ -80,6 +80,9 @@ static struct pci_driver airo_driver = {
 #include <linux/delay.h>
 #endif
 
+/* Hack to do some power saving */
+#define POWER_ON_DOWN
+
 /* As you can see this list is HUGH!
    I really don't know what a lot of these counts are about, but they
    are all here for completeness.  If the IGNLABEL macro is put in
@@ -469,7 +472,7 @@ typedef struct {
 typedef struct {
 	u16 len;
 	u16 kindex;
-	u8 mac[6];
+	u8 mac[ETH_ALEN];
 	u16 klen;
 	u8 key[16];
 } WepKeyRid;
@@ -519,7 +522,7 @@ typedef struct {
 #define RXMODE_NORMALIZED_RSSI (1<<9) /* return normalized RSSI */
 	u16 fragThresh;
 	u16 rtsThres;
-	u8 macAddr[6];
+	u8 macAddr[ETH_ALEN];
 	u8 rates[8];
 	u16 shortRetryLimit;
 	u16 longRetryLimit;
@@ -614,14 +617,14 @@ typedef struct {
 
 typedef struct {
 	u16 len;
-	u8 mac[6];
+	u8 mac[ETH_ALEN];
 	u16 mode;
 	u16 errorCode;
 	u16 sigQuality;
 	u16 SSIDlen;
 	char SSID[32];
 	char apName[16];
-	char bssid[4][6];
+	char bssid[4][ETH_ALEN];
 	u16 beaconPeriod;
 	u16 dimPeriod;
 	u16 atimDuration;
@@ -650,7 +653,7 @@ typedef struct {
 
 typedef struct {
 	u16 len;
-	u8 ap[4][6];
+	u8 ap[4][ETH_ALEN];
 } APListRid;
 
 typedef struct {
@@ -661,11 +664,11 @@ typedef struct {
 	char manName[32];
 	char prodName[16];
 	char prodVer[8];
-	char factoryAddr[6];
-	char aironetAddr[6];
+	char factoryAddr[ETH_ALEN];
+	char aironetAddr[ETH_ALEN];
 	u16 radioType;
 	u16 country;
-	char callid[6];
+	char callid[ETH_ALEN];
 	char supportedRates[8];
 	char rxDiversity;
 	char txDiversity;
@@ -688,7 +691,7 @@ typedef struct {
 #define RADIO_DS 2 /* Direct sequence radio type */
 #define RADIO_TMA 4 /* Proprietary radio used in old cards (2500) */
   u16 radioType;
-  u8 bssid[6]; /* Mac address of the BSS */
+  u8 bssid[ETH_ALEN]; /* Mac address of the BSS */
   u8 zero;
   u8 ssidLen;
   u8 ssid[32];
@@ -891,10 +894,12 @@ struct airo_info {
 	struct airo_info *next;
         spinlock_t aux_lock;
         unsigned long flags;
-#define FLAG_PROMISC   IFF_PROMISC
-#define FLAG_RADIO_OFF 0x02
-#define FLAG_LOCKED    2
-#define FLAG_802_11	   0x10
+#define FLAG_PROMISC   IFF_PROMISC	/* 0x100 - include/linux/if.h */
+#define FLAG_RADIO_OFF 0x02		/* User disabling of MAC */
+#define FLAG_RADIO_DOWN 0x08		/* ifup/ifdown disabling of MAC */
+#define FLAG_LOCKED    2		/* 0x04 - use as a bit offset */
+#define FLAG_FLASHING  0x10
+#define FLAG_802_11    0x200
 	int (*bap_read)(struct airo_info*, u16 *pu16Dst, int bytelen,
 			int whichbap);
 	unsigned short *flash;
@@ -914,7 +919,7 @@ struct airo_info {
 	struct tq_struct	event_task;
 #ifdef WIRELESS_SPY
 	int			spy_number;
-	u_char			spy_address[IW_MAX_SPY][6];
+	u_char			spy_address[IW_MAX_SPY][ETH_ALEN];
 	struct iw_quality	spy_stat[IW_MAX_SPY];
 #endif /* WIRELESS_SPY */
 #endif /* WIRELESS_EXT */
@@ -1121,20 +1126,26 @@ static int readStatsRid(struct airo_info*ai, StatsRid *sr, int rid) {
 
 static int airo_open(struct net_device *dev) {
 	struct airo_info *info = dev->priv;
+	Resp rsp;
+
+	if (info->flags & FLAG_FLASHING)
+		return -EIO;
 
 	/* Make sure the card is configured.
 	 * Wireless Extensions may postpone config changes until the card
 	 * is open (to pipeline changes and speed-up card setup). If
 	 * those changes are not yet commited, do it now - Jean II */
 	if(info->need_commit) {
-		Resp rsp;
 		disable_MAC(info);
 		writeConfigRid(info);
-		enable_MAC(info, &rsp);
 	}
 
-	if (info->wifidev != dev)
+	if (info->wifidev != dev) {
+		/* Power on the MAC controller (which may have been disabled) */
+		info->flags &= ~FLAG_RADIO_DOWN;
 		enable_interrupts(info);
+	}
+	enable_MAC(info, &rsp);
 
 	netif_start_queue(dev);
 	return 0;
@@ -1413,8 +1424,18 @@ static int airo_close(struct net_device *dev) {
 
 	netif_stop_queue(dev);
 
-	if (ai->wifidev != dev)
+	if (ai->wifidev != dev) {
+#ifdef POWER_ON_DOWN
+		/* Shut power to the card. The idea is that the user can save
+		 * power when he doesn't need the card with "ifconfig down".
+		 * That's the method that is most friendly towards the network
+		 * stack (i.e. the network stack won't try to broadcast
+		 * anything on the interface and routes are gone. Jean II */
+		ai->flags |= FLAG_RADIO_DOWN;
+		disable_MAC(ai);
+#endif
 		disable_interrupts( ai );
+	}
 	return 0;
 }
 
@@ -1575,12 +1596,16 @@ struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia )
 		}
 	}
 
-	if (probe && setup_card( ai, dev->dev_addr ) != SUCCESS ) {
-		printk( KERN_ERR "airo: MAC could not be enabled\n" );
-		rc = -EIO;
-		goto err_out_res;
-	} else
+	if (probe) {
+		if ( setup_card( ai, dev->dev_addr ) != SUCCESS ) {
+			printk( KERN_ERR "airo: MAC could not be enabled\n" );
+			rc = -EIO;
+			goto err_out_res;
+		}
+	} else {
 		ai->bap_read = fast_bap_read;
+		ai->flags |= FLAG_FLASHING;
+	}
 
 	rc = register_netdev(dev);
 	if (rc)
@@ -1849,7 +1874,7 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 							hdrlen = 24;
 					}
 				} else
-					hdrlen = 12;
+					hdrlen = ETH_ALEN * 2;
 
 				skb = dev_alloc_skb( len + hdrlen + 2 );
 				if ( !skb ) {
@@ -1879,7 +1904,8 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 				} else {
 					bap_read (apriv, buffer,len + hdrlen,BAP0);
 				}
-				OUT4500( apriv, EVACK, EV_RX);
+			}
+			if (len) {
 #ifdef WIRELESS_SPY
 				if (apriv->spy_number > 0) {
 					int i;
@@ -1888,7 +1914,7 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 					sa = (char*)buffer + ((apriv->flags & FLAG_802_11) ? 10 : 6);
 
 					for (i=0; i<apriv->spy_number; i++)
-						if (!memcmp(sa,apriv->spy_address[i],6))
+						if (!memcmp(sa,apriv->spy_address[i],ETH_ALEN))
 						{
 							if (!(apriv->flags & FLAG_802_11)) {
 								bap_setup (apriv, fid, 8, BAP0);
@@ -1905,6 +1931,8 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 						}
 				}
 #endif /* WIRELESS_SPY  */
+				OUT4500( apriv, EVACK, EV_RX);
+
 				if (apriv->flags & FLAG_802_11) {
 					skb->mac.raw = skb->data;
 					skb->pkt_type = PACKET_OTHERHOST;
@@ -1994,7 +2022,13 @@ static int enable_MAC( struct airo_info *ai, Resp *rsp ) {
 	int rc;
         Cmd cmd;
 
-        if (ai->flags&FLAG_RADIO_OFF) return SUCCESS;
+	/* FLAG_RADIO_OFF : Radio disabled via /proc or Wireless Extensions
+	 * FLAG_RADIO_DOWN : Radio disabled via "ifconfig ethX down"
+	 * Note : we could try to use !netif_running(dev) in enable_MAC()
+	 * instead of this flag, but I don't trust it *within* the
+	 * open/close functions, and testing both flags together is
+	 * "cheaper" - Jean II */
+	if (ai->flags & (FLAG_RADIO_OFF|FLAG_RADIO_DOWN)) return SUCCESS;
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.cmd = MAC_ENABLE;
 	if (test_bit(FLAG_LOCKED, &ai->flags) != 0)
@@ -2113,7 +2147,7 @@ static u16 setup_card(struct airo_info *ai, u8 *mac)
 		ai->config.opmode = adhoc ? MODE_STA_IBSS : MODE_STA_ESS;
 
 		/* Save off the MAC */
-		for( i = 0; i < 6; i++ ) {
+		for( i = 0; i < ETH_ALEN; i++ ) {
 			mac[i] = ai->config.macAddr[i];
 		}
 
@@ -2161,7 +2195,10 @@ static u16 setup_card(struct airo_info *ai, u8 *mac)
 	if ( status != SUCCESS ) return ERROR;
 
 	status = enable_MAC(ai, &rsp);
-	if ( status != SUCCESS ) return ERROR;
+	if ( status != SUCCESS || (rsp.status & 0xFF00) != 0) {
+		printk( KERN_ERR "airo: Bad MAC enable reason = %x, rid = %x, offset = %d\n", rsp.rsp0, rsp.rsp1, rsp.rsp2 );
+		return ERROR;
+	}
 
 	/* Grab the initial wep key, we gotta save it for auto_wep */
 	rc = readWepKeyRid(ai, &wkr, 1);
@@ -2505,7 +2542,7 @@ static int transmit_802_3_packet(struct airo_info *ai, int len, char *pPacket)
 	u16 txFid = len;
 	len >>= 16;
 
-	if (len < 12) {
+	if (len < ETH_ALEN * 2) {
 		printk( KERN_WARNING "Short packet %d\n", len );
 		return ERROR;
 	}
@@ -2534,7 +2571,7 @@ static int transmit_802_11_packet(struct airo_info *ai, int len, char *pPacket)
 	Resp rsp;
 	int hdrlen;
 	struct {
-		u8 addr4[6];
+		u8 addr4[ETH_ALEN];
 		u16 gaplen;
 		u8 gap[6];
 	} gap;
@@ -3402,7 +3439,7 @@ static int get_wep_key(struct airo_info *ai, u16 index) {
 
 static int set_wep_key(struct airo_info *ai, u16 index,
 		       const char *key, u16 keylen, int perm ) {
-	static const unsigned char macaddr[6] = { 0x01, 0, 0, 0, 0, 0 };
+	static const unsigned char macaddr[ETH_ALEN] = { 0x01, 0, 0, 0, 0, 0 };
 	WepKeyRid wkr;
 
 	memset(&wkr, 0, sizeof(wkr));
@@ -3419,7 +3456,7 @@ static int set_wep_key(struct airo_info *ai, u16 index,
 		wkr.kindex = index;
 		wkr.klen = keylen;
 		memcpy( wkr.key, key, keylen );
-		memcpy( wkr.mac, macaddr, 6 );
+		memcpy( wkr.mac, macaddr, ETH_ALEN );
 		printk(KERN_INFO "Setting key %d\n", index);
 	}
 
@@ -3714,7 +3751,7 @@ static void timer_func( u_long data ) {
 	u16 linkstat = IN4500(apriv, LINKSTAT);
 	Resp rsp;
 
-	if (linkstat != 0x400 ) {
+	if (!(apriv->flags & FLAG_FLASHING) && (linkstat != 0x400)) {
 /* We don't have a link so try changing the authtype */
 		if (down_trylock(&apriv->sem) != 0) {
 			apriv->timer.expires = RUN_AT(1);
@@ -4029,11 +4066,11 @@ static int airo_set_wap(struct net_device *dev,
 	Cmd cmd;
 	Resp rsp;
 	APListRid APList_rid;
-	static const unsigned char bcast[6] = { 255, 255, 255, 255, 255, 255 };
+	static const unsigned char bcast[ETH_ALEN] = { 255, 255, 255, 255, 255, 255 };
 
 	if (awrq->sa_family != ARPHRD_ETHER)
 		return -EINVAL;
-	else if (!memcmp(bcast, awrq->sa_data, 6)) {
+	else if (!memcmp(bcast, awrq->sa_data, ETH_ALEN)) {
 		memset(&cmd, 0, sizeof(cmd));
 		cmd.cmd=CMD_LOSE_SYNC;
 		if (down_interruptible(&local->sem))
@@ -4043,7 +4080,7 @@ static int airo_set_wap(struct net_device *dev,
 	} else {
 		memset(&APList_rid, 0, sizeof(APList_rid));
 		APList_rid.len = sizeof(APList_rid);
-		memcpy(APList_rid.ap[0], awrq->sa_data, 6);
+		memcpy(APList_rid.ap[0], awrq->sa_data, ETH_ALEN);
 		disable_MAC(local);
 		writeAPListRid(local, &APList_rid);
 		enable_MAC(local, &rsp);
@@ -4066,7 +4103,7 @@ static int airo_get_wap(struct net_device *dev,
 	readStatusRid(local, &status_rid);
 
 	/* Tentative. This seems to work, wow, I'm lucky !!! */
-	memcpy(awrq->sa_data, status_rid.bssid[0], 6);
+	memcpy(awrq->sa_data, status_rid.bssid[0], ETH_ALEN);
 	awrq->sa_family = ARPHRD_ETHER;
 
 	return 0;
@@ -4850,7 +4887,7 @@ static int airo_get_aplist(struct net_device *dev,
 		if (readBSSListRid(local, loseSync, &BSSList))
 			break;
 		loseSync = 0;
-		memcpy(address[i].sa_data, BSSList.bssid, 6);
+		memcpy(address[i].sa_data, BSSList.bssid, ETH_ALEN);
 		address[i].sa_family = ARPHRD_ETHER;
 		if (local->rssi)
 			qual[i].level = 0x100 - local->rssi[BSSList.rssi].rssidBm;
@@ -4880,7 +4917,7 @@ static int airo_get_aplist(struct net_device *dev,
 			      | status_rid.bssid[i][5]);
 		     i++) {
 			memcpy(address[i].sa_data,
-			       status_rid.bssid[i], 6);
+			       status_rid.bssid[i], ETH_ALEN);
 			address[i].sa_family = ARPHRD_ETHER;
 		}
 	} else {
@@ -5105,7 +5142,7 @@ static int airo_set_spy(struct net_device *dev,
 
 		/* Copy addresses */
 		for (i = 0; i < dwrq->length; i++)
-			memcpy(local->spy_address[i], address[i].sa_data, 6);
+			memcpy(local->spy_address[i], address[i].sa_data, ETH_ALEN);
 		/* Reset stats */
 		memset(local->spy_stat, 0, sizeof(struct iw_quality) * IW_MAX_SPY);
 	}
@@ -5132,7 +5169,7 @@ static int airo_get_spy(struct net_device *dev,
 
 	/* Copy addresses. */
 	for(i = 0; i < local->spy_number; i++) 	{
-		memcpy(address[i].sa_data, local->spy_address[i], 6);
+		memcpy(address[i].sa_data, local->spy_address[i], ETH_ALEN);
 		address[i].sa_family = AF_UNIX;
 	}
 	/* Copy stats to the user buffer (just after). */
@@ -5685,6 +5722,10 @@ struct iw_statistics *airo_get_wireless_stats(struct net_device *dev)
 static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	unsigned short ridcode;
 	unsigned char iobuf[2048];
+	struct airo_info *ai = dev->priv;
+
+	if (ai->flags & FLAG_FLASHING)
+		return -EIO;
 
 	switch(comp->command)
 	{
@@ -5731,6 +5772,7 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
  */
 
 static int writerids(struct net_device *dev, aironet_ioctl *comp) {
+	struct airo_info *ai = dev->priv;
 	int  ridcode;
 	Resp      rsp;
 	static int (* writer)(struct airo_info *, u16 rid, const void *, int);
@@ -5739,6 +5781,9 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 	/* Only super-user can write RIDs */
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
+
+	if (ai->flags & FLAG_FLASHING)
+		return -EIO;
 
 	ridcode = 0;
 	writer = do_writerid;
@@ -5899,6 +5944,8 @@ int cmdreset(struct airo_info *ai) {
  */
 
 int setflashmode (struct airo_info *ai) {
+	ai->flags |= FLAG_FLASHING;
+
 	OUT4500(ai, SWS0, FLASH_COMMAND);
 	OUT4500(ai, SWS1, FLASH_COMMAND);
 	if (probe) {
@@ -5913,6 +5960,7 @@ int setflashmode (struct airo_info *ai) {
 	schedule_timeout (HZ/2); /* 500ms delay */
 
 	if(!waitbusy(ai)) {
+		ai->flags &= ~FLAG_FLASHING;
 		printk(KERN_INFO "Waitbusy hang after setflash mode\n");
 		return -EIO;
 	}
@@ -6018,6 +6066,7 @@ int flashrestart(struct airo_info *ai,struct net_device *dev){
 
 	set_current_state (TASK_UNINTERRUPTIBLE);
 	schedule_timeout (HZ);          /* Added 12/7/00 */
+	ai->flags &= ~FLAG_FLASHING;
 	status = setup_card(ai, dev->dev_addr);
 
 	for( i = 0; i < MAX_FIDS; i++ ) {

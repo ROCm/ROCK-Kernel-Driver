@@ -220,44 +220,52 @@ __writeback_single_inode(struct inode *inode, int sync,
  *
  * FIXME: this linear search could get expensive with many fileystems.  But
  * how to fix?  We need to go from an address_space to all inodes which share
- * a queue with that address_space.
+ * a queue with that address_space.  (Easy: have a global "dirty superblocks"
+ * list).
  *
  * The inodes to be written are parked on sb->s_io.  They are moved back onto
  * sb->s_dirty as they are selected for writing.  This way, none can be missed
  * on the writer throttling path, and we get decent balancing between many
- * thrlttled threads: we don't want them all piling up on __wait_on_inode.
+ * throlttled threads: we don't want them all piling up on __wait_on_inode.
  */
 static void
 sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 {
-	struct list_head *tmp;
-	struct list_head *head;
 	const unsigned long start = jiffies;	/* livelock avoidance */
 
 	list_splice_init(&sb->s_dirty, &sb->s_io);
-	head = &sb->s_io;
-	while ((tmp = head->prev) != head) {
-		struct inode *inode = list_entry(tmp, struct inode, i_list);
+	while (!list_empty(&sb->s_io)) {
+		struct inode *inode = list_entry(sb->s_io.prev,
+						struct inode, i_list);
 		struct address_space *mapping = inode->i_mapping;
-		struct backing_dev_info *bdi;
+		struct backing_dev_info *bdi = mapping->backing_dev_info;
 		int really_sync;
 
-		if (wbc->bdi && mapping->backing_dev_info != wbc->bdi) {
+		if (wbc->nonblocking && bdi_write_congested(bdi)) {
+			wbc->encountered_congestion = 1;
 			if (sb != blockdev_superblock)
-				break;		/* inappropriate superblock */
+				break;		/* Skip a congested fs */
 			list_move(&inode->i_list, &sb->s_dirty);
-			continue;		/* not this blockdev */
+			continue;		/* Skip a congested blockdev */
+		}
+
+		if (wbc->bdi && bdi != wbc->bdi) {
+			if (sb != blockdev_superblock)
+				break;		/* fs has the wrong queue */
+			list_move(&inode->i_list, &sb->s_dirty);
+			continue;		/* blockdev has wrong queue */
 		}
 
 		/* Was this inode dirtied after sync_sb_inodes was called? */
 		if (time_after(mapping->dirtied_when, start))
 			break;
 
+		/* Was this inode dirtied too recently? */
 		if (wbc->older_than_this && time_after(mapping->dirtied_when,
 						*wbc->older_than_this))
-			goto out;
+			break;
 
-		bdi = mapping->backing_dev_info;
+		/* Is another pdflush already flushing this queue? */
 		if (current_is_pdflush() && !writeback_acquire(bdi))
 			break;
 
@@ -278,11 +286,7 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		if (wbc->nr_to_write <= 0)
 			break;
 	}
-out:
-	/*
-	 * Leave any unwritten inodes on s_io.
-	 */
-	return;
+	return;		/* Leave any unwritten inodes on s_io */
 }
 
 /*

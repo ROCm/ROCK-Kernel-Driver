@@ -395,7 +395,7 @@ int reiserfs_parse_alloc_options(struct super_block * s, char * options)
 
     REISERFS_SB(s)->s_alloc_options.bits = 0; /* clear default settings */
 
-    for (this_char = strsep (&options, ":"); this_char != NULL; ) {
+    while ( (this_char = strsep (&options, ":")) != NULL ) {
 	if ((value = strchr (this_char, '=')) != NULL)
 	    *value++ = 0;
 

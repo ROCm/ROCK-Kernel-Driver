@@ -243,43 +243,6 @@ static mdk_rdev_t * find_rdev(mddev_t * mddev, dev_t dev)
 	return NULL;
 }
 
-static LIST_HEAD(device_names);
-
-char * partition_name(kdev_t dev)
-{
-	struct gendisk *hd;
-	static char nomem [] = "<nomem>";
-	dev_name_t *dname;
-	struct list_head *tmp;
-
-	list_for_each(tmp, &device_names) {
-		dname = list_entry(tmp, dev_name_t, list);
-		if (kdev_same(dname->dev, dev))
-			return dname->name;
-	}
-
-	dname = (dev_name_t *) kmalloc(sizeof(*dname), GFP_KERNEL);
-
-	if (!dname)
-		return nomem;
-	/*
-	 * ok, add this new device name to the list
-	 */
-	hd = get_gendisk (dev);
-	dname->name = NULL;
-	if (hd)
-		dname->name = disk_name(hd, minor(dev)-hd->first_minor, dname->namebuf);
-	if (!dname->name) {
-		sprintf (dname->namebuf, "[dev %s]", kdevname(dev));
-		dname->name = dname->namebuf;
-	}
-
-	dname->dev = dev;
-	list_add(&dname->list, &device_names);
-
-	return dname->name;
-}
-
 static unsigned int calc_dev_sboffset(struct block_device *bdev)
 {
 	unsigned int size = bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
@@ -613,7 +576,7 @@ static void export_array(mddev_t *mddev)
 static void print_desc(mdp_disk_t *desc)
 {
 	printk(" DISK<N:%d,%s(%d,%d),R:%d,S:%d>\n", desc->number,
-		partition_name(mk_kdev(desc->major,desc->minor)),
+		partition_name(MKDEV(desc->major,desc->minor)),
 		desc->major,desc->minor,desc->raid_disk,desc->state);
 }
 
@@ -970,7 +933,7 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int on_disk)
 
 	rdev = (mdk_rdev_t *) kmalloc(sizeof(*rdev), GFP_KERNEL);
 	if (!rdev) {
-		printk(KERN_ERR "md: could not alloc mem for %s!\n", partition_name(to_kdev_t(newdev)));
+		printk(KERN_ERR "md: could not alloc mem for %s!\n", partition_name(newdev));
 		return ERR_PTR(-ENOMEM);
 	}
 	memset(rdev, 0, sizeof(*rdev));
@@ -981,7 +944,7 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int on_disk)
 	err = lock_rdev(rdev, newdev);
 	if (err) {
 		printk(KERN_ERR "md: could not lock %s.\n",
-			partition_name(to_kdev_t(newdev)));
+			partition_name(newdev));
 		goto abort_free;
 	}
 	rdev->desc_nr = -1;
@@ -1466,9 +1429,8 @@ static int do_md_run(mddev_t * mddev)
 		mddev->state &= ~(1 << MD_SB_CLEAN);
 	md_update_sb(mddev);
 	md_recover_arrays();
-	add_gendisk(disk);
-	register_disk(disk, mk_kdev(disk->major,disk->first_minor),
-			1, &md_fops, md_size[mdidx(mddev)]<<1);
+	set_capacity(disk, md_size[mdidx(mddev)]<<1);
+	add_disk(disk);
 	disks[mdidx(mddev)] = disk;
 
 	return (0);
@@ -1754,7 +1716,7 @@ static int autostart_array(dev_t startdev)
 
 	start_rdev = md_import_device(startdev, 1);
 	if (IS_ERR(start_rdev)) {
-		printk(KERN_WARNING "md: could not import %s!\n", partition_name(to_kdev_t(startdev)));
+		printk(KERN_WARNING "md: could not import %s!\n", partition_name(startdev));
 		goto abort;
 	}
 
@@ -1789,7 +1751,7 @@ static int autostart_array(dev_t startdev)
 		rdev = md_import_device(dev, 1);
 		if (IS_ERR(rdev)) {
 			printk(KERN_WARNING "md: could not import %s, trying to run array nevertheless.\n",
-			       partition_name(to_kdev_t(dev)));
+			       partition_name(dev));
 			continue;
 		}
 		list_add(&rdev->same_set, &pending_raid_disks);
@@ -1994,7 +1956,7 @@ static int hot_generate_error(mddev_t * mddev, dev_t dev)
 		return -ENODEV;
 
 	printk(KERN_INFO "md: trying to generate %s error in md%d ... \n",
-		partition_name(to_kdev_t(dev)), mdidx(mddev));
+		partition_name(dev), mdidx(mddev));
 
 	rdev = find_rdev(mddev, dev);
 	if (!rdev) {
@@ -2028,7 +1990,7 @@ static int hot_remove_disk(mddev_t * mddev, dev_t dev)
 		return -ENODEV;
 
 	printk(KERN_INFO "md: trying to remove %s from md%d ... \n",
-		partition_name(to_kdev_t(dev)), mdidx(mddev));
+		partition_name(dev), mdidx(mddev));
 
 	rdev = find_rdev(mddev, dev);
 	if (!rdev)
@@ -2057,7 +2019,7 @@ static int hot_add_disk(mddev_t * mddev, dev_t dev)
 		return -ENODEV;
 
 	printk(KERN_INFO "md: trying to hot-add %s to md%d ... \n",
-		partition_name(to_kdev_t(dev)), mdidx(mddev));
+		partition_name(dev), mdidx(mddev));
 
 	if (!mddev->pers->hot_add_disk) {
 		printk(KERN_WARNING "md%d: personality does not support diskops!\n",
@@ -2232,7 +2194,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		err = autostart_array(arg);
 		if (err) {
 			printk(KERN_WARNING "md: autostart %s failed!\n",
-			       partition_name(val_to_kdev(arg)));
+			       partition_name(arg));
 			goto abort;
 		}
 		goto done;
@@ -3231,7 +3193,7 @@ static void autostart_arrays(void)
 		rdev = md_import_device(dev,1);
 		if (IS_ERR(rdev)) {
 			printk(KERN_ALERT "md: could not import %s!\n",
-				partition_name(to_kdev_t(dev)));
+				partition_name(dev));
 			continue;
 		}
 		if (rdev->faulty) {
@@ -3499,17 +3461,6 @@ int init_module(void)
 	return md_init();
 }
 
-static void free_device_names(void)
-{
-	while (!list_empty(&device_names)) {
-		dev_name_t *tmp = list_entry(device_names.next,
-					     dev_name_t, list);
-		list_del(&tmp->list);
-		kfree(tmp);
-	}
-}
-
-
 void cleanup_module(void)
 {
 	md_unregister_thread(md_recovery_thread);
@@ -3523,16 +3474,12 @@ void cleanup_module(void)
 #endif
 
 	blk_dev[MAJOR_NR].queue = NULL;
-	blk_clear(MAJOR_NR);
-	
-	free_device_names();
 }
 #endif
 
 EXPORT_SYMBOL(md_size);
 EXPORT_SYMBOL(register_md_personality);
 EXPORT_SYMBOL(unregister_md_personality);
-EXPORT_SYMBOL(partition_name);
 EXPORT_SYMBOL(md_error);
 EXPORT_SYMBOL(md_sync_acct);
 EXPORT_SYMBOL(md_done_sync);

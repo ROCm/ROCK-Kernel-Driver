@@ -83,7 +83,8 @@ static int floppy_count;
 
 static struct floppy_state floppy_states[MAX_FLOPPIES];
 
-static int floppy_sizes[2] = {2880,2880};
+static struct gendisk disks[2];
+static char names[2][4];
 
 static spinlock_t swim_iop_lock = SPIN_LOCK_UNLOCKED;
 
@@ -152,8 +153,6 @@ int swimiop_init(void)
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request,
 			&swim_iop_lock);
-	blk_size[MAJOR_NR] = floppy_sizes;
-
 	printk("SWIM-IOP: %s by Joshua M. Thompson (funaho@jurai.org)\n",
 		DRIVER_VERSION);
 
@@ -193,6 +192,16 @@ int swimiop_init(void)
 	printk("SWIM-IOP: detected %d installed drives.\n", floppy_count);
 
 	do_floppy = NULL;
+	for (i = 0; i < floppy_count; i++) {
+		struct gendisk *disk = disks + i;
+		disk->major = MAJOR_NR;
+		disk->first_minor = i;
+		disk->fops = &floppy_fops;
+		sprintf(names[i], "fd%d", i);
+		disk->major_name = names[i];
+		set_capacity(disk, 2880 * 2);
+		add_disk(disk);
+	}
 
 	return 0;
 }

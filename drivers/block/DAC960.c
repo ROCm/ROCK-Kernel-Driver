@@ -1973,7 +1973,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 	disk->major_name = names + 9 * n;
 	disk->minor_shift = DAC960_MaxPartitionsBits;
 	disk->fops = &DAC960_BlockDeviceOperations;
-	add_gendisk(disk);
    }
   /*
     Indicate the Block Device Registration completed successfully,
@@ -2003,11 +2002,6 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
     Remove the I/O Request Queue.
   */
   blk_cleanup_queue(BLK_DEFAULT_QUEUE(MajorNumber));
-  /*
-    Remove the Disk Partitions array, Partition Sizes array, Block Sizes
-    array, Max Sectors per Request array, and Max Segments per Request array.
-  */
-  blk_clear(MajorNumber);
 }
 
 static long disk_size(DAC960_Controller_T *Controller, int disk)
@@ -2622,10 +2616,8 @@ static int DAC960_Initialize(void)
       if (Controller == NULL) continue;
       DAC960_InitializeController(Controller);
       for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++) {
-	long size = disk_size(Controller, disk);
-	register_disk(&Controller->disks[disk],
-	    DAC960_KernelDevice(Controller->ControllerNumber, disk, 0),
-	    DAC960_MaxPartitions, &DAC960_BlockDeviceOperations, size);
+	set_capacity(&Controller->disks[disk], disk_size(Controller, disk));
+	add_disk(&Controller->disks[disk]);
       }
     }
   DAC960_CreateProcEntries();
@@ -5268,9 +5260,8 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
       Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber] = true;
       size = disk_size(Controller, LogicalDriveNumber);
       /* BROKEN, same as modular ide-floppy/ide-disk; same fix - ->probe() */
-      register_disk(&Controller->disks[LogicalDriveNumber],
-	    DAC960_KernelDevice(Controller->ControllerNumber, LogicalDriveNumber, 0),
-	    DAC960_MaxPartitions, &DAC960_BlockDeviceOperations, size);
+      set_capacity(&Controller->disks[LogicalDriveNumber], size);
+      add_disk(&Controller->disks[LogicalDriveNumber]);
     }
   if (!get_capacity(&Controller->disks[LogicalDriveNumber]))
     return -ENXIO;

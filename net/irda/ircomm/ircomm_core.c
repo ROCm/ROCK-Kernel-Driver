@@ -63,7 +63,7 @@ int __init ircomm_init(void)
 {
 	ircomm = hashbin_new(HB_LOCK); 
 	if (ircomm == NULL) {
-		ERROR(__FUNCTION__ "(), can't allocate hashbin!\n");
+		ERROR("%s(), can't allocate hashbin!\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 	

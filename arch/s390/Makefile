@@ -23,16 +23,10 @@ CFLAGS := $(CFLAGS) $(CFLAGS_PIPE) $(CFLAGS_NSR)
 
 HEAD := arch/s390/kernel/head.o arch/s390/kernel/init_task.o
 
-SUBDIRS += arch/s390/mm arch/s390/kernel arch/s390/lib drivers/s390
-CORE_FILES := arch/s390/mm/mm.o arch/s390/kernel/kernel.o $(CORE_FILES)
-LIBS := $(TOPDIR)/arch/s390/lib/lib.a $(LIBS) $(TOPDIR)/arch/s390/lib/lib.a
-
-DRIVERS += drivers/s390/built-in.o
-
-ifeq ($(CONFIG_MATHEMU),y)
-  SUBDIRS += arch/s390/math-emu
-  DRIVERS += arch/s390/math-emu/math-emu.o
-endif
+core-y				+= arch/s390/mm/ arch/s390/kernel/
+drivers-y			+= drivers/s390/
+drivers-$(CONFIG_MATHEMU)	+= arch/s390/math-emu/
+libs-y				+= arch/s390/lib/
 
 all: image listing
 

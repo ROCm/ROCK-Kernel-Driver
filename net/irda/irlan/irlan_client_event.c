@@ -100,8 +100,7 @@ static int irlan_client_state_idle(struct irlan_cb *self, IRLAN_EVENT event,
 	switch (event) {
 	case IRLAN_DISCOVERY_INDICATION:
 		if (self->client.iriap) {
-			WARNING(__FUNCTION__ 
-				"(), busy with a previous query\n");
+			WARNING("%s(), busy with a previous query\n", __FUNCTION__);
 			return -EBUSY;
 		}
 		

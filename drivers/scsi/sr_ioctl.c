@@ -545,16 +545,7 @@ int sr_dev_ioctl(struct cdrom_device_info *cdi,
 		 unsigned int cmd, unsigned long arg)
 {
 	Scsi_CD *cd = cdi->handle;
-
-	switch (cmd) {
-	case BLKGETSIZE:
-		return put_user(cd->capacity, (unsigned long *) arg);
-	case BLKGETSIZE64:
-		return put_user((u64)cd->capacity << 9, (u64 *)arg);
-
-	default:
-		return scsi_ioctl(cd->device, cmd, (void *)arg);
-	}
+	return scsi_ioctl(cd->device, cmd, (void *)arg);
 }
 
 /*

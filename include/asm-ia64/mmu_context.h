@@ -110,6 +110,10 @@ reload_context (struct mm_struct *mm)
 	rr2 = rr0 + 2*rid_incr;
 	rr3 = rr0 + 3*rid_incr;
 	rr4 = rr0 + 4*rid_incr;
+#ifdef  CONFIG_HUGETLB_PAGE
+	rr4 = (rr4 & (~(0xfcUL))) | (HPAGE_SHIFT << 2);
+#endif
+
 	ia64_set_rr(0x0000000000000000, rr0);
 	ia64_set_rr(0x2000000000000000, rr1);
 	ia64_set_rr(0x4000000000000000, rr2);

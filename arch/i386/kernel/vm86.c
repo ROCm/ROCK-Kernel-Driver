@@ -261,7 +261,7 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 		"movl %0,%%esp\n\t"
 		"jmp resume_userspace"
 		: /* no outputs */
-		:"r" (&info->regs), "b" (tsk) : "ax");
+		:"r" (&info->regs), "b" (tsk->thread_info) : "ax");
 	/* we never return here */
 }
 
@@ -273,7 +273,7 @@ static inline void return_to_32bit(struct kernel_vm86_regs * regs16, int retval)
 	regs32->eax = retval;
 	__asm__ __volatile__("movl %0,%%esp\n\t"
 		"jmp resume_userspace"
-		: : "r" (regs32), "b" (current));
+		: : "r" (regs32), "b" (current_thread_info()));
 }
 
 static inline void set_IF(struct kernel_vm86_regs * regs)

@@ -3,12 +3,7 @@
 # Licensed under the GPL
 #
 
-O_TARGET := drivers.o 
-
 CHAN_OBJS := chan_kern.o chan_user.o line.o 
-
-list-multi := slip.o daemon.o mcast.o mconsole.o net.o ubd.o hostaudio.o \
-	port.o harddog.o
 
 slip-objs := slip_kern.o slip_user.o
 daemon-objs := daemon_kern.o daemon_user.o
@@ -60,25 +55,5 @@ fastdep:
 
 dep:
 
-archmrproper:
+archmrproper: clean
 
-daemon.o : $(daemon-objs)
-
-slip.o : $(slip-objs)
-
-mcast.o : $(mcast-objs)
-
-mconsole.o : $(mconsole-objs)
-
-net.o : $(net-objs)
-
-hostaudio.o : $(hostaudio-objs)
-
-ubd.o : $(ubd-objs)
-
-port.o : $(port-objs)
-
-harddog.o : $(harddog-objs)
-
-$(list-multi) : # This doesn't work, but should : '%.o : $(%-objs)'
-	$(LD) $(LD_RFLAG) -r -o $@ $($(patsubst %.o,%,$@)-objs)

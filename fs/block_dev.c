@@ -652,8 +652,6 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			bdev->bd_offset = 0;
 			if (g)
 				sect = get_capacity(g);
-			else if (blk_size[major(dev)])
-				sect = blk_size[major(dev)][minor(dev)] << 1;
 			bd_set_size(bdev, (loff_t)sect << 9);
 			bdi = blk_get_backing_dev_info(bdev);
 			if (bdi == NULL)
@@ -843,6 +841,9 @@ static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 	case BLKPG:
 		ret = blk_ioctl(bdev, cmd, arg);
 		break;
+	case BLKRRPART:
+		ret = blkdev_reread_part(bdev);
+		break;
 	default:
 		if (bdev->bd_op->ioctl)
 			ret =bdev->bd_op->ioctl(inode, file, cmd, arg);
@@ -854,8 +855,6 @@ static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 				case BLKROSET:
 					ret = blk_ioctl(bdev,cmd,arg);
 					break;
-				case BLKRRPART:
-					ret = blkdev_reread_part(bdev);
 			}
 		}
 	}

@@ -68,6 +68,7 @@ struct hd_struct {
 #define GENHD_FL_REMOVABLE  1
 #define GENHD_FL_DRIVERFS  2
 #define GENHD_FL_DEVFS	4
+#define GENHD_FL_CD	8
 
 struct gendisk {
 	int major;			/* major number of driver */
@@ -80,6 +81,7 @@ struct gendisk {
 	struct gendisk *next;
 	struct block_device_operations *fops;
 	sector_t capacity;
+	struct list_head list;
 
 	int flags;
 	int number;			/* devfs crap */
@@ -90,7 +92,7 @@ struct gendisk {
 };
 
 /* drivers/block/genhd.c */
-extern void add_gendisk(struct gendisk *gp);
+extern void add_disk(struct gendisk *disk);
 extern void del_gendisk(struct gendisk *gp);
 extern void unlink_gendisk(struct gendisk *gp);
 extern struct gendisk *get_gendisk(kdev_t dev);
@@ -258,6 +260,9 @@ char *disk_name (struct gendisk *hd, int part, char *buf);
 
 extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
 extern void update_partition(struct gendisk *disk, int part);
+
+/* will go away */
+extern void blk_set_probe(int major, struct gendisk *(p)(int));
 
 static inline unsigned int disk_index (kdev_t dev)
 {

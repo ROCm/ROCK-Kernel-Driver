@@ -222,12 +222,9 @@ int __init xd_init (void)
 
 	for (i = 0; i < xd_drives; i++) {
 		struct gendisk *disk = xd_gendisk + i;
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(disk->major,disk->first_minor),
-				1<<disk->minor_shift,
-				disk->fops,
-				xd_info[i].heads * xd_info[i].cylinders *
+		set_capacity(disk, xd_info[i].heads * xd_info[i].cylinders *
 				xd_info[i].sectors);
+		add_disk(disk);
 	}
 
 	return 0;
@@ -1040,7 +1037,6 @@ static void xd_done (void)
 	for (i = 0; i < xd_drives; i++)
 		del_gendisk(xd_gendisk + i);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	blk_clear(MAJOR_NR);
 	release_region(xd_iobase,4);
 }
 
