@@ -2838,6 +2838,9 @@ S: Markusstrasse 18
 S: 8006 Zuerich
 S: Switzerland
 
+N: Manuel Estrada Sainz
+D: Firmware loader (request_firmware)
+
 N: Wayne Salamon
 E: wsalamon@tislabs.com
 E: wsalamon@nai.com

@@ -827,10 +827,8 @@ M:	viro@math.psu.edu
 S:	Maintained
 
 FIRMWARE LOADER (request_firmware)
-P:	Manuel Estrada Sainz
-M:	ranty@debian.org
 L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Orphan
 
 FPU EMULATOR
 P:	Bill Metzenthen
