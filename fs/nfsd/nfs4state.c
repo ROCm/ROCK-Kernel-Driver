@@ -1942,6 +1942,98 @@ out:
 	return status;
 }
 
+/*
+ * LOCKT operation
+ */
+int
+nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lockt *lockt)
+{
+	struct inode *inode;
+	struct nfs4_stateowner *sop;
+	struct file file;
+	struct file_lock file_lock;
+	struct file_lock *conflicting_lock;
+	unsigned int strhashval;
+	int status;
+
+	lockt->lt_stateowner = NULL;
+	nfs4_lock_state();
+
+	status = nfserr_stale_clientid;
+	if (STALE_CLIENTID(&lockt->lt_clientid)) {
+		printk("NFSD: nfsd4_lockt: clientid is stale!\n");
+		goto out;
+	}
+
+	if ((status = fh_verify(rqstp, current_fh, S_IFREG, 0))) {
+		printk("NFSD: nfsd4_lockt: fh_verify() failed!\n");
+		goto out;
+	}
+
+	inode = current_fh->fh_dentry->d_inode;
+	switch (lockt->lt_type) {
+		case NFS4_READ_LT:
+		case NFS4_READW_LT:
+			file_lock.fl_type = F_RDLCK;
+		break;
+		case NFS4_WRITE_LT:
+		case NFS4_WRITEW_LT:
+			file_lock.fl_type = F_WRLCK;
+		break;
+		default:
+			printk("NFSD: nfs4_lockt: bad lock type!\n");
+			status = nfserr_inval;
+		goto out;
+	}
+
+	strhashval = lock_ownerstr_hashval(inode, 
+			lockt->lt_clientid.cl_id, lockt->lt_owner);
+
+	if (find_lockstateowner_str(strhashval, &lockt->lt_owner, 
+					&lockt->lt_clientid, 
+					&lockt->lt_stateowner)) {
+		printk("NFSD: nsfd4_lockt: lookup_lockowner() failed!\n");
+		goto out;
+	}
+
+	sop = lockt->lt_stateowner;
+	if (sop) {
+		file_lock.fl_owner = (fl_owner_t) sop;
+		file_lock.fl_pid = lockownerid_hashval(sop->so_id);
+	} else {
+		file_lock.fl_owner = NULL;
+		file_lock.fl_pid = 0;
+	}
+	file_lock.fl_flags = FL_POSIX;
+
+	file_lock.fl_start = lockt->lt_offset;
+	if ((lockt->lt_length == ~(u64)0) || LOFF_OVERFLOW(lockt->lt_offset, lockt->lt_length))
+		file_lock.fl_end = ~(u64)0;
+	else
+		file_lock.fl_end = lockt->lt_offset + lockt->lt_length - 1;
+
+	nfs4_transform_lock_offset(&file_lock);
+
+	/* posix_test_lock uses the struct file _only_ to resolve the inode.
+	 * since LOCKT doesn't require an OPEN, and therefore a struct
+	 * file may not exist, pass posix_test_lock a struct file with
+	 * only the dentry:inode set.
+	 */
+	memset(&file, 0, sizeof (struct file));
+	file.f_dentry = current_fh->fh_dentry;
+
+	status = nfs_ok;
+	conflicting_lock = posix_test_lock(&file, &file_lock);
+	if (conflicting_lock) {
+		status = nfserr_denied;
+		nfs4_set_lock_denied(conflicting_lock, &lockt->lt_denied);
+	}
+out:
+	nfs4_unlock_state();
+	return status;
+}
+
+
 /* 
  * Start and stop routines
  */

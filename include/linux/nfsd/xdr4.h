@@ -162,6 +162,17 @@ struct nfsd4_lock {
 #define lk_resp_stateid u.ok.stateid
 #define lk_denied       u.denied
 
+
+struct nfsd4_lockt {
+	u32				lt_type;
+	clientid_t			lt_clientid;
+	struct xdr_netobj		lt_owner;
+	u64				lt_offset;
+	u64				lt_length;
+	struct nfs4_stateowner * 	lt_stateowner;
+	struct nfsd4_lock_denied  	lt_denied;
+};
+
 struct nfsd4_lookup {
 	u32		lo_len;             /* request */
 	char *		lo_name;            /* request */
@@ -318,6 +329,7 @@ struct nfsd4_op {
 		struct svc_fh *			getfh;
 		struct nfsd4_link		link;
 		struct nfsd4_lock		lock;
+		struct nfsd4_lockt		lockt;
 		struct nfsd4_lookup		lookup;
 		struct nfsd4_verify		nverify;
 		struct nfsd4_open		open;
@@ -411,6 +423,8 @@ extern int nfsd4_open_downgrade(struct svc_rqst *rqstp,
 		struct svc_fh *current_fh, struct nfsd4_open_downgrade *od);
 extern int nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, 
 		struct nfsd4_lock *lock);
+extern int nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, 
+		struct nfsd4_lockt *lockt);
 #endif
 
 /*

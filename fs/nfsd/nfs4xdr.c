@@ -606,6 +606,25 @@ nfsd4_decode_lock(struct nfsd4_compoundargs *argp, struct nfsd4_lock *lock)
 }
 
 static int
+nfsd4_decode_lockt(struct nfsd4_compoundargs *argp, struct nfsd4_lockt *lockt)
+{
+	DECODE_HEAD;
+		        
+	READ_BUF(32);
+	READ32(lockt->lt_type);
+	if((lockt->lt_type < NFS4_READ_LT) || (lockt->lt_type > NFS4_WRITEW_LT))
+		goto xdr_error;
+	READ64(lockt->lt_offset);
+	READ64(lockt->lt_length);
+	COPYMEM(&lockt->lt_clientid, 8);
+	READ32(lockt->lt_owner.len);
+	READ_BUF(lockt->lt_owner.len);
+	READMEM(lockt->lt_owner.data, lockt->lt_owner.len);
+
+	DECODE_TAIL;
+}
+
+static int
 nfsd4_decode_lookup(struct nfsd4_compoundargs *argp, struct nfsd4_lookup *lookup)
 {
 	DECODE_HEAD;
@@ -1029,6 +1048,9 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 			break;
 		case OP_LOCK:
 			op->status = nfsd4_decode_lock(argp, &op->u.lock);
+			break;
+		case OP_LOCKT:
+			op->status = nfsd4_decode_lockt(argp, &op->u.lockt);
 			break;
 		case OP_LOOKUP:
 			op->status = nfsd4_decode_lookup(argp, &op->u.lookup);
@@ -1787,6 +1809,14 @@ nfsd4_encode_lock(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_lock 
 }
 
 static void
+nfsd4_encode_lockt(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_lockt *lockt)
+{
+	if (nfserr == nfserr_denied)
+		nfsd4_encode_lock_denied(resp, &lockt->lt_denied);
+}
+
+
+static void
 nfsd4_encode_link(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_link *link)
 {
 	ENCODE_HEAD;
@@ -2198,6 +2228,9 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_LOCK:
 		nfsd4_encode_lock(resp, op->status, &op->u.lock);
+		break;
+	case OP_LOCKT:
+		nfsd4_encode_lockt(resp, op->status, &op->u.lockt);
 		break;
 	case OP_LOOKUP:
 		break;

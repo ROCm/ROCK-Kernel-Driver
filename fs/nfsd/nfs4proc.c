@@ -684,6 +684,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		case OP_LOCK:
 			op->status = nfsd4_lock(rqstp, &current_fh, &op->u.lock);
 			break;
+		case OP_LOCKT:
+			op->status = nfsd4_lockt(rqstp, &current_fh, &op->u.lockt);
+			break;
 		case OP_LOOKUP:
 			op->status = nfsd4_lookup(rqstp, &current_fh, &op->u.lookup);
 			break;
