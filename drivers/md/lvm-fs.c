@@ -170,11 +170,11 @@ static inline const char *_basename(const char *str) {
 
 devfs_handle_t lvm_fs_create_lv(vg_t *vg_ptr, lv_t *lv) {
 	struct proc_dir_entry *pde;
-	const char *name = _basename(lv->lv_name);
+	const char *name = _basename(lv->u.lv_name);
 
-	lv_devfs_handle[minor(lv->lv_dev)] = devfs_register(
+	lv_devfs_handle[minor(lv->u.lv_dev)] = devfs_register(
 		vg_devfs_handle[vg_ptr->vg_number], name,
-		DEVFS_FL_DEFAULT, LVM_BLK_MAJOR, minor(lv->lv_dev),
+		DEVFS_FL_DEFAULT, LVM_BLK_MAJOR, minor(lv->u.lv_dev),
 		S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
 		&lvm_blk_dops, NULL);
 
@@ -183,15 +183,15 @@ devfs_handle_t lvm_fs_create_lv(vg_t *vg_ptr, lv_t *lv) {
 		pde->read_proc = _proc_read_lv;
 		pde->data = lv;
 	}
-	return lv_devfs_handle[minor(lv->lv_dev)];
+	return lv_devfs_handle[minor(lv->u.lv_dev)];
 }
 
 void lvm_fs_remove_lv(vg_t *vg_ptr, lv_t *lv) {
-	devfs_unregister(lv_devfs_handle[minor(lv->lv_dev)]);
-	lv_devfs_handle[minor(lv->lv_dev)] = NULL;
+	devfs_unregister(lv_devfs_handle[minor(lv->u.lv_dev)]);
+	lv_devfs_handle[minor(lv->u.lv_dev)] = NULL;
 
 	if(vg_ptr->lv_subdir_pde) {
-		const char *name = _basename(lv->lv_name);
+		const char *name = _basename(lv->u.lv_name);
 		remove_proc_entry(name, vg_ptr->lv_subdir_pde);
 	}
 }
@@ -269,21 +269,21 @@ static int _proc_read_lv(char *page, char **start, off_t off,
 	int sz = 0;
 	lv_t *lv = data;
 
-	sz += sprintf(page + sz, "name:         %s\n", lv->lv_name);
-	sz += sprintf(page + sz, "size:         %u\n", lv->lv_size);
-	sz += sprintf(page + sz, "access:       %u\n", lv->lv_access);
-	sz += sprintf(page + sz, "status:       %u\n", lv->lv_status);
-	sz += sprintf(page + sz, "number:       %u\n", lv->lv_number);
-	sz += sprintf(page + sz, "open:         %u\n", lv->lv_open);
-	sz += sprintf(page + sz, "allocation:   %u\n", lv->lv_allocation);
-       if(lv->lv_stripes > 1) {
+	sz += sprintf(page + sz, "name:         %s\n", lv->u.lv_name);
+	sz += sprintf(page + sz, "size:         %u\n", lv->u.lv_size);
+	sz += sprintf(page + sz, "access:       %u\n", lv->u.lv_access);
+	sz += sprintf(page + sz, "status:       %u\n", lv->u.lv_status);
+	sz += sprintf(page + sz, "number:       %u\n", lv->u.lv_number);
+	sz += sprintf(page + sz, "open:         %u\n", lv->u.lv_open);
+	sz += sprintf(page + sz, "allocation:   %u\n", lv->u.lv_allocation);
+       if(lv->u.lv_stripes > 1) {
                sz += sprintf(page + sz, "stripes:      %u\n",
-                             lv->lv_stripes);
+                             lv->u.lv_stripes);
                sz += sprintf(page + sz, "stripesize:   %u\n",
-                             lv->lv_stripesize);
+                             lv->u.lv_stripesize);
        }
 	sz += sprintf(page + sz, "device:       %02u:%02u\n",
-		      major(lv->lv_dev), minor(lv->lv_dev));
+		      major(lv->u.lv_dev), minor(lv->u.lv_dev));
 
 	return sz;
 }
@@ -350,13 +350,13 @@ static int _proc_read_global(char *page, char **start, off_t pos, int count,
 			if (vg_ptr->lv_cur > 0) {
 				for (l = 0; l < vg[v]->lv_max; l++) {
 					if ((lv_ptr = vg_ptr->lv[l]) != NULL) {
-						pe_t_bytes += lv_ptr->lv_allocated_le;
+						pe_t_bytes += lv_ptr->u.lv_allocated_le;
 						hash_table_bytes += lv_ptr->lv_snapshot_hash_table_size;
-						if (lv_ptr->lv_block_exception != NULL)
-							lv_block_exception_t_bytes += lv_ptr->lv_remap_end;
-						if (lv_ptr->lv_open > 0) {
+						if (lv_ptr->u.lv_block_exception != NULL)
+							lv_block_exception_t_bytes += lv_ptr->u.lv_remap_end;
+						if (lv_ptr->u.lv_open > 0) {
 							lv_open_counter++;
-							lv_open_total += lv_ptr->lv_open;
+							lv_open_total += lv_ptr->u.lv_open;
 						}
 					}
 				}
@@ -532,16 +532,16 @@ static int _lv_info(vg_t *vg_ptr, lv_t *lv_ptr, char *buf) {
 	char inactive_flag = 'A', allocation_flag = ' ',
 		stripes_flag = ' ', rw_flag = ' ', *basename;
 
-	if (!(lv_ptr->lv_status & LV_ACTIVE))
+	if (!(lv_ptr->u.lv_status & LV_ACTIVE))
 		inactive_flag = 'I';
 	rw_flag = 'R';
-	if (lv_ptr->lv_access & LV_WRITE)
+	if (lv_ptr->u.lv_access & LV_WRITE)
 		rw_flag = 'W';
 	allocation_flag = 'D';
-	if (lv_ptr->lv_allocation & LV_CONTIGUOUS)
+	if (lv_ptr->u.lv_allocation & LV_CONTIGUOUS)
 		allocation_flag = 'C';
 	stripes_flag = 'L';
-	if (lv_ptr->lv_stripes > 1)
+	if (lv_ptr->u.lv_stripes > 1)
 		stripes_flag = 'S';
 	sz += sprintf(buf+sz,
 		      "[%c%c%c%c",
@@ -549,29 +549,29 @@ static int _lv_info(vg_t *vg_ptr, lv_t *lv_ptr, char *buf) {
 	 rw_flag,
 		      allocation_flag,
 		      stripes_flag);
-	if (lv_ptr->lv_stripes > 1)
+	if (lv_ptr->u.lv_stripes > 1)
 		sz += sprintf(buf+sz, "%-2d",
-			      lv_ptr->lv_stripes);
+			      lv_ptr->u.lv_stripes);
 	else
 		sz += sprintf(buf+sz, "  ");
 
 	/* FIXME: use _basename */
-	basename = strrchr(lv_ptr->lv_name, '/');
-	if ( basename == 0) basename = lv_ptr->lv_name;
+	basename = strrchr(lv_ptr->u.lv_name, '/');
+	if ( basename == 0) basename = lv_ptr->u.lv_name;
 	else                basename++;
 	sz += sprintf(buf+sz, "] %-25s", basename);
 	if (strlen(basename) > 25)
 		sz += sprintf(buf+sz,
 			      "\n                              ");
 	sz += sprintf(buf+sz, "%9d /%-6d   ",
-		      lv_ptr->lv_size >> 1,
-		      lv_ptr->lv_size / vg_ptr->pe_size);
+		      lv_ptr->u.lv_size >> 1,
+		      lv_ptr->u.lv_size / vg_ptr->pe_size);
 
-	if (lv_ptr->lv_open == 0)
+	if (lv_ptr->u.lv_open == 0)
 		sz += sprintf(buf+sz, "close");
 	else
 		sz += sprintf(buf+sz, "%dx open",
-			      lv_ptr->lv_open);
+			      lv_ptr->u.lv_open);
 
 	return sz;
 }
