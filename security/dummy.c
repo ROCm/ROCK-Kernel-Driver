@@ -366,7 +366,7 @@ static int dummy_file_mprotect (struct vm_area_struct *vma, unsigned long prot)
 	return 0;
 }
 
-static int dummy_file_lock (struct file *file, unsigned int cmd, int blocking)
+static int dummy_file_lock (struct file *file, unsigned int cmd)
 {
 	return 0;
 }
