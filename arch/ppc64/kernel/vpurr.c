@@ -90,12 +90,15 @@ __initcall(cpu_util_init);
 
 static void collect_startpurr(int cpu)
 {
+	cpumask_t cpumask;
 	struct cpu_util_store * cus = &per_cpu(cpu_util_sampler, cpu);	
 
+	cpumask = current->cpus_allowed;
 	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 	BUG_ON(smp_processor_id() != cpu);
 
 	cus->start_purr = mfspr(PURR);
 	cus->tb = mftb();
+	set_cpus_allowed(current, cpumask);
 }
 
