@@ -2,9 +2,8 @@
 
 This software program is available to you under a choice of one of two 
 licenses. You may choose to be licensed under either the GNU General Public 
-License (GPL) Version 2, June 1991, available at 
-http://www.fsf.org/copyleft/gpl.html, or the Intel BSD + Patent License, the 
-text of which follows:
+License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html, 
+or the Intel BSD + Patent License, the text of which follows:
 
 Recipient has requested a license and Intel Corporation ("Intel") is willing
 to grant a license for the software entitled Linux Base Driver for the 
@@ -18,7 +17,7 @@ combined with the operating system referred to below.
 "Recipient" means the party to whom Intel delivers this Software.
 
 "Licensee" means Recipient and those third parties that receive a license to 
-any operating system available under the GNU Public License version 2.0 or 
+any operating system available under the GNU General Public License 2.0 or 
 later.
 
 Copyright (c) 1999 - 2002 Intel Corporation.
@@ -51,10 +50,10 @@ not add functionality or features when the Software is incorporated in any
 version of an operating system that has been distributed under the GNU 
 General Public License 2.0 or later. This patent license shall apply to the 
 combination of the Software and any operating system licensed under the GNU 
-Public License version 2.0 or later if, at the time Intel provides the 
+General Public License 2.0 or later if, at the time Intel provides the 
 Software to Recipient, such addition of the Software to the then publicly 
-available versions of such operating systems available under the GNU Public 
-License version 2.0 or later (whether in gold, beta or alpha form) causes 
+available versions of such operating systems available under the GNU General 
+Public License 2.0 or later (whether in gold, beta or alpha form) causes 
 such combination to be covered by the Licensed Patents. The patent license 
 shall not apply to any other combinations which include the Software. NO 
 hardware per se is licensed hereunder.
@@ -119,26 +118,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  defaults as considerably less data will be queued.
  */
 
-#define MAX_TCB        64	/* number of transmit control blocks */
-#define MAX_TBD        MAX_TCB
 #define TX_FRAME_CNT   8	/* consecutive transmit frames per interrupt */
 /* TX_FRAME_CNT must be less than MAX_TCB    */
-#define MAX_RFD      64
 
-#define E100_DEFAULT_TCB   MAX_TCB
+#define E100_DEFAULT_TCB   64
 #define E100_MIN_TCB       2*TX_FRAME_CNT + 3	/* make room for at least 2 interrupts */
-
 #define E100_MAX_TCB       1024
 
-#define E100_DEFAULT_RFD   MAX_RFD
+#define E100_DEFAULT_RFD   64
 #define E100_MIN_RFD       8
-
-#ifdef __ia64__
- /* We can't use too many DMAble buffers on IA64 machines with >4 GB mem */
-#define E100_MAX_RFD       64
-#else
 #define E100_MAX_RFD       1024
-#endif /*  __ia64__ */
 
 #define E100_DEFAULT_XSUM         true
 #define E100_DEFAULT_BER          ZLOCK_MAX_ERRORS
@@ -148,10 +137,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define E100_DEFAULT_UCODE        true
 
 #define TX_THRSHLD     8
-
-/* sleep time is at least 50 ms, in jiffies */
-#define SLEEP_TIME ((HZ / 20) + 1)
-#define CUS_TIMEOUT 1000
 
 /* IFS parameters */
 #define MIN_NUMBER_OF_TRANSMITS_100 1000
@@ -529,8 +514,6 @@ typedef struct net_device_stats net_dev_stats_t;
 
 #define RFD_POINTER(skb,bdp)      ((rfd_t *) (((unsigned char *)((skb)->data))-((bdp)->rfd_size)))
 #define SKB_RFD_STATUS(skb,bdp)   ((RFD_POINTER((skb),(bdp)))->rfd_header.cb_status)
-#define GET_SKB_DMA_ADDR(skb)		( *(dma_addr_t *)( (skb)->cb) )
-#define SET_SKB_DMA_ADDR(skb,dma_addr)	( *(dma_addr_t *)( (skb)->cb) = (dma_addr) )
 
 /* ====================================================================== */
 /*                              82557                                     */
@@ -1031,6 +1014,14 @@ extern unsigned char e100_selftest(struct e100_private *bdp, u32 *st_timeout,
 				   u32 *st_result);
 extern unsigned char e100_get_link_state(struct e100_private *bdp);
 extern unsigned char e100_wait_scb(struct e100_private *bdp);
+
+#ifndef yield
+#define yield()					\
+        do {					\
+                current->policy |= SCHED_YIELD;	\
+                schedule();			\
+        } while (0)                                     
+#endif
 
 extern void e100_deisolate_driver(struct e100_private *bdp,
 				  u8 recover, u8 full_reset);

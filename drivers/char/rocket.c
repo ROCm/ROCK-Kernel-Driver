@@ -227,7 +227,7 @@ static inline int rocket_paranoia_check(struct r_port *info,
 	if (!info)
 		return 1;
 	if (info->magic != RPORT_MAGIC) {
-		printk(badmagic, MAJOR(device), MINOR(device), routine);
+		printk(badmagic, major(device), minor(device), routine);
 		return 1;
 	}
 #endif
@@ -896,7 +896,7 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 	CHANNEL_t	*cp;
 	unsigned long page;
 	
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if ((line < 0) || (line >= MAX_RP_PORTS))
 		return -ENODEV;
 	if (!tmp_buf) {

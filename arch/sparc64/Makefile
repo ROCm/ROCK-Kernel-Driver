@@ -48,6 +48,11 @@ else
   AFLAGS += -m64 -mcpu=ultrasparc $(CC_UNDECL)
 endif
 
+ifeq ($(CONFIG_MCOUNT),y)
+  CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS))
+  CFLAGS := $(CFLAGS) -pg
+endif
+
 LINKFLAGS = -T arch/sparc64/vmlinux.lds
 
 HEAD := arch/sparc64/kernel/head.o arch/sparc64/kernel/init_task.o

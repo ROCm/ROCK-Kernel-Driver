@@ -209,6 +209,7 @@ do {	CHECK_LOCKS(prev);							\
 	"ldx	[%%sp + 2047 + 0x78], %%i7\n\t"					\
 	"wrpr	%%g0, 0x94, %%pstate\n\t"					\
 	"mov	%%l2, %%g6\n\t"							\
+	"ldx	[%%g6 + %6], %%g4\n\t"						\
 	"wrpr	%%g0, 0x96, %%pstate\n\t"					\
 	"andcc	%%o7, %5, %%g0\n\t"						\
 	"bne,pn	%%icc, ret_from_syscall\n\t"					\
@@ -216,7 +217,7 @@ do {	CHECK_LOCKS(prev);							\
 	: /* no outputs */							\
 	: "r" (next->thread_info),						\
 	  "i" (TI_WSTATE), "i" (TI_KSP), "i" (TI_FLAGS), "i" (TI_CWP),		\
-	  "i" (_TIF_NEWCHILD)							\
+	  "i" (_TIF_NEWCHILD), "i" (TI_TASK)					\
 	: "cc", "g1", "g2", "g3", "g5", "g7",					\
 	  "l2", "l3", "l4", "l5", "l6", "l7",					\
 	  "i0", "i1", "i2", "i3", "i4", "i5",					\

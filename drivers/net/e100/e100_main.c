@@ -2,9 +2,8 @@
 
 This software program is available to you under a choice of one of two 
 licenses. You may choose to be licensed under either the GNU General Public 
-License (GPL) Version 2, June 1991, available at 
-http://www.fsf.org/copyleft/gpl.html, or the Intel BSD + Patent License, the 
-text of which follows:
+License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html, 
+or the Intel BSD + Patent License, the text of which follows:
 
 Recipient has requested a license and Intel Corporation ("Intel") is willing
 to grant a license for the software entitled Linux Base Driver for the 
@@ -18,7 +17,7 @@ combined with the operating system referred to below.
 "Recipient" means the party to whom Intel delivers this Software.
 
 "Licensee" means Recipient and those third parties that receive a license to 
-any operating system available under the GNU Public License version 2.0 or 
+any operating system available under the GNU General Public License 2.0 or 
 later.
 
 Copyright (c) 1999 - 2002 Intel Corporation.
@@ -51,10 +50,10 @@ not add functionality or features when the Software is incorporated in any
 version of an operating system that has been distributed under the GNU 
 General Public License 2.0 or later. This patent license shall apply to the 
 combination of the Software and any operating system licensed under the GNU 
-Public License version 2.0 or later if, at the time Intel provides the 
+General Public License 2.0 or later if, at the time Intel provides the 
 Software to Recipient, such addition of the Software to the then publicly 
-available versions of such operating systems available under the GNU Public 
-License version 2.0 or later (whether in gold, beta or alpha form) causes 
+available versions of such operating systems available under the GNU General 
+Public License 2.0 or later (whether in gold, beta or alpha form) causes 
 such combination to be covered by the Licensed Patents. The patent license 
 shall not apply to any other combinations which include the Software. NO 
 hardware per se is licensed hereunder.
@@ -166,7 +165,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.22-pre1"
+#define E100_VERSION  "2.0.24-pre1"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -187,8 +186,7 @@ static int e100_resume(struct pci_dev *pcid);
  *  See the item "Labeled Elements in Initializers" in the section
  *  "Extensions to the C Language Family" of the GCC documentation.
  *********************************************************************/
-
-#define E100_PARAM_INIT { [0 ... E100_MAX_NIC-1] = -1 }
+#define E100_PARAM_INIT { [0 ... E100_MAX_NIC] = -1 }
 
 /* All parameters are treated the same, as an integer array of values.
  * This macro just reduces the need to repeat the same declaration code
@@ -543,6 +541,7 @@ static inline void
 e100_set_intr_mask(struct e100_private *bdp)
 {
 	writeb(bdp->intr_mask, &bdp->scb->scb_cmd_hi);
+	readw(&(bdp->scb->scb_status)); /* flushes last write, read-safe */
 }
 
 static inline void
@@ -802,79 +801,66 @@ module_exit(e100_cleanup_module);
 void __devinit
 e100_check_options(int board, struct e100_private *bdp)
 {
-	int val;
-
 	if (board >= E100_MAX_NIC) {
 		printk(KERN_NOTICE "No configuration available for board #%d\n",
 		       board);
 		printk(KERN_NOTICE "Using defaults for all values\n");
+		board = E100_MAX_NIC;
 	}
 
-	val = (board < E100_MAX_NIC) ? TxDescriptors[board] : -1;
-	e100_set_int_option(&(bdp->params.TxDescriptors), val, E100_MIN_TCB,
-			    E100_MAX_TCB, E100_DEFAULT_TCB,
+	e100_set_int_option(&(bdp->params.TxDescriptors), TxDescriptors[board],
+			    E100_MIN_TCB, E100_MAX_TCB, E100_DEFAULT_TCB,
 			    "TxDescriptor count");
 
-	val = (board < E100_MAX_NIC) ? RxDescriptors[board] : -1;
-	e100_set_int_option(&(bdp->params.RxDescriptors), val, E100_MIN_RFD,
-			    E100_MAX_RFD, E100_DEFAULT_RFD,
+	e100_set_int_option(&(bdp->params.RxDescriptors), RxDescriptors[board],
+			    E100_MIN_RFD, E100_MAX_RFD, E100_DEFAULT_RFD,
 			    "RxDescriptor count");
 
-	val = (board < E100_MAX_NIC) ? e100_speed_duplex[board] : -1;
-	e100_set_int_option(&(bdp->params.e100_speed_duplex), val, 0, 4,
+	e100_set_int_option(&(bdp->params.e100_speed_duplex),
+			    e100_speed_duplex[board], 0, 4,
 			    E100_DEFAULT_SPEED_DUPLEX, "speed/duplex mode");
 
-	val = (board < E100_MAX_NIC) ? ber[board] : -1;
-	e100_set_int_option(&(bdp->params.ber), val, 0, ZLOCK_MAX_ERRORS,
+	e100_set_int_option(&(bdp->params.ber), ber[board], 0, ZLOCK_MAX_ERRORS,
 			    E100_DEFAULT_BER, "Bit Error Rate count");
 
-	val = (board < E100_MAX_NIC) ? XsumRX[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_XSUMRX, E100_DEFAULT_XSUM,
+	e100_set_bool_option(bdp, XsumRX[board], PRM_XSUMRX, E100_DEFAULT_XSUM,
 			     "XsumRX value");
 
 	/* Default ucode value depended on controller revision */
-	val = (board < E100_MAX_NIC) ? ucode[board] : -1;
 	if (bdp->rev_id >= D101MA_REV_ID) {
-		e100_set_bool_option(bdp, val, PRM_UCODE, E100_DEFAULT_UCODE,
-				     "ucode value");
+		e100_set_bool_option(bdp, ucode[board], PRM_UCODE,
+				     E100_DEFAULT_UCODE, "ucode value");
 	} else {
-		e100_set_bool_option(bdp, val, PRM_UCODE, false, "ucode value");
+		e100_set_bool_option(bdp, ucode[board], PRM_UCODE, false,
+				     "ucode value");
 	}
 
-	val = (board < E100_MAX_NIC) ? flow_control[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_FC, E100_DEFAULT_FC,
+	e100_set_bool_option(bdp, flow_control[board], PRM_FC, E100_DEFAULT_FC,
 			     "flow control value");
 
-	val = (board < E100_MAX_NIC) ? IFS[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_IFS, E100_DEFAULT_IFS, "IFS value");
+	e100_set_bool_option(bdp, IFS[board], PRM_IFS, E100_DEFAULT_IFS,
+			     "IFS value");
 
-	val = (board < E100_MAX_NIC) ? BundleSmallFr[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_BUNDLE_SMALL,
+	e100_set_bool_option(bdp, BundleSmallFr[board], PRM_BUNDLE_SMALL,
 			     E100_DEFAULT_BUNDLE_SMALL_FR,
 			     "CPU saver bundle small frames value");
 
-	val = (board < E100_MAX_NIC) ? IntDelay[board] : -1;
-	e100_set_int_option(&(bdp->params.IntDelay), val, 0x0, 0xFFFF,
-			    E100_DEFAULT_CPUSAVER_INTERRUPT_DELAY,
+	e100_set_int_option(&(bdp->params.IntDelay), IntDelay[board], 0x0,
+			    0xFFFF, E100_DEFAULT_CPUSAVER_INTERRUPT_DELAY,
 			    "CPU saver interrupt delay value");
 
-	val = (board < E100_MAX_NIC) ? BundleMax[board] : -1;
-	e100_set_int_option(&(bdp->params.BundleMax), val, 0x1, 0xFFFF,
-			    E100_DEFAULT_CPUSAVER_BUNDLE_MAX,
+	e100_set_int_option(&(bdp->params.BundleMax), BundleMax[board], 0x1,
+			    0xFFFF, E100_DEFAULT_CPUSAVER_BUNDLE_MAX,
 			    "CPU saver bundle max value");
 
-	val = (board < E100_MAX_NIC) ? RxCongestionControl[board] : -1;
-	e100_set_bool_option(bdp, val, PRM_RX_CONG,
+	e100_set_bool_option(bdp, RxCongestionControl[board], PRM_RX_CONG,
 			     E100_DEFAULT_RX_CONGESTION_CONTROL,
 			     "Rx Congestion Control value");
 
-	val = (board < E100_MAX_NIC) ? PollingMaxWork[board] : -1;
-	e100_set_int_option(&(bdp->params.PollingMaxWork), val, 1, E100_MAX_RFD,
-			    RxDescriptors[board], "Polling Max Work value");
-
-	if (val <= 0) {
-		bdp->params.b_params &= ~PRM_RX_CONG;
-	}
+	e100_set_int_option(&(bdp->params.PollingMaxWork),
+			    PollingMaxWork[board], 1, E100_MAX_RFD,
+			    bdp->params.RxDescriptors,
+			    "Polling Max Work value");
 }
 
 /**
@@ -2221,6 +2207,12 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 	tcb = bdp->tcb_pool.data;
 	tcb += TCB_TO_USE(bdp->tcb_pool);
 
+	if (bdp->flags & USE_IPCB) {
+		tcb->tcbu.ipcb.ip_activation_high = IPCB_IP_ACTIVATION_DEFAULT;
+		tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCP_PACKET;
+		tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCPUDP_CHECKSUM_ENABLE;
+	}
+
 	tcb->tcb_hdr.cb_status = 0;
 	tcb->tcb_thrshld = bdp->tx_thld;
 	tcb->tcb_hdr.cb_cmd |= __constant_cpu_to_le16(CB_S_BIT);
@@ -2260,15 +2252,6 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 			}
 
 			*chksum = e100_pseudo_hdr_csum(ip);
-		}
-
-	} else {
-		if (bdp->flags & USE_IPCB) {
-			tcb->tcbu.ipcb.ip_activation_high =
-				IPCB_IP_ACTIVATION_DEFAULT;
-			tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCP_PACKET;
-			tcb->tcbu.ipcb.ip_schedule &=
-				~IPCB_TCPUDP_CHECKSUM_ENABLE;
 		}
 	}
 
@@ -2722,7 +2705,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 	cb_header_t *ntcb_hdr;
 	unsigned long lock_flag;
 	unsigned long expiration_time;
-	unsigned char rc = false;
+	unsigned char rc = true;
 
 	ntcb_hdr = (cb_header_t *) command->non_tx_cmd;	/* get hdr of non tcb cmd */
 
@@ -2757,6 +2740,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 
 	if (!e100_wait_exec_cmplx(bdp, command->dma_addr, SCB_CUC_START)) {
 		spin_unlock_irqrestore(&(bdp->bd_lock), lock_flag);
+		rc = false;
 		goto exit;
 	}
 
@@ -2765,20 +2749,21 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 
 	/* now wait for completion of non-cu CB up to 20 msec */
 	expiration_time = jiffies + HZ / 50 + 1;
-	while (time_before(jiffies, expiration_time)) {
-		rmb();
-		if ((ntcb_hdr->cb_status &
+	rmb();
+	while (!(ntcb_hdr->cb_status &
 		     __constant_cpu_to_le16(CB_STATUS_COMPLETE))) {
-			rc = true;
+
+		if (time_before(jiffies, expiration_time)) {
+			spin_unlock_bh(&(bdp->bd_non_tx_lock));
+			yield();
+			spin_lock_bh(&(bdp->bd_non_tx_lock));
+		} else {
+			rc = false;
 			goto exit;
 		}
-		spin_unlock_bh(&(bdp->bd_non_tx_lock));
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-		spin_lock_bh(&(bdp->bd_non_tx_lock));
+		rmb();
 	}
 
-	/* didn't get a C bit assume command failed */
 exit:
 	e100_free_non_tx_cmd(bdp, command);
 

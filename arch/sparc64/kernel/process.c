@@ -627,6 +627,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		       (void *)(regs->u_regs[UREG_FP] + STACK_BIAS),
 		       sizeof(struct reg_window));
 		t->kregs->u_regs[UREG_G6] = (unsigned long) t;
+		t->kregs->u_regs[UREG_G4] = (unsigned long) t->task;
 	} else {
 		if (t->flags & _TIF_32BIT) {
 			sp &= 0x00000000ffffffffUL;

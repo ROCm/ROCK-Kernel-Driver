@@ -24,6 +24,7 @@ if [ "$CONFIG_WAN" = "y" ]; then
       dep_tristate '    Support for COMX/CMX/HiCOMX boards' CONFIG_COMX_HW_COMX $CONFIG_COMX
       dep_tristate '    Support for LoCOMX board' CONFIG_COMX_HW_LOCOMX $CONFIG_COMX
       dep_tristate '    Support for MixCOM board' CONFIG_COMX_HW_MIXCOM $CONFIG_COMX
+      dep_tristate '    Support for MUNICH based boards: SliceCOM, PCICOM (WelCOM)' CONFIG_COMX_HW_MUNICH $CONFIG_COMX
       dep_tristate '    Support for HDLC and syncPPP protocols on MultiGate boards' CONFIG_COMX_PROTO_PPP $CONFIG_COMX
       if [ "$CONFIG_LAPB" = "y" ]; then
 	 dep_tristate '    Support for LAPB protocol on MultiGate boards' CONFIG_COMX_PROTO_LAPB $CONFIG_COMX

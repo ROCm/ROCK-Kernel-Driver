@@ -19,3 +19,6 @@ obj-y   := bootstr.o devops.o init.o memory.o misc.o \
 	$(CC) $(AFLAGS) -ansi -c $< -o $*.o
 
 include $(TOPDIR)/Rules.make
+
+%.o: %.c
+	$(CC) $(subst -pg,,$(CFLAGS)) -c $<

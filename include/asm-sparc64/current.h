@@ -3,6 +3,6 @@
 
 #include <asm/thread_info.h>
 
-#define current		(current_thread_info()->task)
+register struct task_struct *current asm("g4");
 
 #endif /* !(_SPARC64_CURRENT_H) */

@@ -289,6 +289,10 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    bool '  Verbose BUG() reporting (adds 70K)' CONFIG_DEBUG_BUGVERBOSE
    bool '  D-cache flush debugging' CONFIG_DEBUG_DCFLUSH
 fi
+bool 'Stack Overflow Detection Support' CONFIG_STACK_DEBUG
+if [ "$CONFIG_STACK_DEBUG" = "y" ] ; then
+   define_bool CONFIG_MCOUNT y
+fi
 
 endmenu
 

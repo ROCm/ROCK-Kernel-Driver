@@ -25,6 +25,10 @@
 #define UDF_PART_FLAG_UNALLOC_TABLE	0x0002
 #define UDF_PART_FLAG_FREED_BITMAP	0x0004
 #define UDF_PART_FLAG_FREED_TABLE	0x0008
+#define UDF_PART_FLAG_READ_ONLY		0x0010
+#define UDF_PART_FLAG_WRITE_ONCE	0x0020
+#define UDF_PART_FLAG_REWRITABLE	0x0040
+#define UDF_PART_FLAG_OVERWRITABLE	0x0080
 
 #define UDF_SB_FREE(X)\
 {\
@@ -54,7 +58,7 @@
 
 #define UDF_SB_ALLOC_BITMAP(X,Y,Z)\
 {\
-	int nr_groups = ((UDF_SB_PARTLEN((X),(Y)) + (sizeof(struct SpaceBitmapDesc) << 3) +\
+	int nr_groups = ((UDF_SB_PARTLEN((X),(Y)) + (sizeof(struct spaceBitmapDesc) << 3) +\
 		((X)->s_blocksize * 8) - 1) / ((X)->s_blocksize * 8));\
 	UDF_SB_PARTMAPS(X)[(Y)].Z.s_bitmap = kmalloc(sizeof(struct udf_bitmap) +\
 		sizeof(struct buffer_head *) * nr_groups,\
@@ -74,18 +78,18 @@
 }
 
 
-#define UDF_QUERY_FLAG(X,Y)				( UDF_SB(X)->s_flags & ( 1 << (Y) ) )
-#define UDF_SET_FLAG(X,Y)				( UDF_SB(X)->s_flags |= ( 1 << (Y) ) )
-#define UDF_CLEAR_FLAG(X,Y)				( UDF_SB(X)->s_flags &= ~( 1 << (Y) ) )
+#define UDF_QUERY_FLAG(X,Y)			( UDF_SB(X)->s_flags & ( 1 << (Y) ) )
+#define UDF_SET_FLAG(X,Y)			( UDF_SB(X)->s_flags |= ( 1 << (Y) ) )
+#define UDF_CLEAR_FLAG(X,Y)			( UDF_SB(X)->s_flags &= ~( 1 << (Y) ) )
 
 #define UDF_UPDATE_UDFREV(X,Y)			( ((Y) > UDF_SB_UDFREV(X)) ? UDF_SB_UDFREV(X) = (Y) : UDF_SB_UDFREV(X) )
 
-#define UDF_SB_PARTMAPS(X)				( UDF_SB(X)->s_partmaps )
+#define UDF_SB_PARTMAPS(X)			( UDF_SB(X)->s_partmaps )
 #define UDF_SB_PARTTYPE(X,Y)			( UDF_SB_PARTMAPS(X)[(Y)].s_partition_type )
 #define UDF_SB_PARTROOT(X,Y)			( UDF_SB_PARTMAPS(X)[(Y)].s_partition_root )
-#define UDF_SB_PARTLEN(X,Y)				( UDF_SB_PARTMAPS(X)[(Y)].s_partition_len )
-#define UDF_SB_PARTVSN(X,Y)				( UDF_SB_PARTMAPS(X)[(Y)].s_volumeseqnum )
-#define UDF_SB_PARTNUM(X,Y)				( UDF_SB_PARTMAPS(X)[(Y)].s_partition_num )
+#define UDF_SB_PARTLEN(X,Y)			( UDF_SB_PARTMAPS(X)[(Y)].s_partition_len )
+#define UDF_SB_PARTVSN(X,Y)			( UDF_SB_PARTMAPS(X)[(Y)].s_volumeseqnum )
+#define UDF_SB_PARTNUM(X,Y)			( UDF_SB_PARTMAPS(X)[(Y)].s_partition_num )
 #define UDF_SB_TYPESPAR(X,Y)			( UDF_SB_PARTMAPS(X)[(Y)].s_type_specific.s_sparing )
 #define UDF_SB_TYPEVIRT(X,Y)			( UDF_SB_PARTMAPS(X)[(Y)].s_type_specific.s_virtual )
 #define UDF_SB_PARTFUNC(X,Y)			( UDF_SB_PARTMAPS(X)[(Y)].s_partition_func )
@@ -93,23 +97,23 @@
 #define UDF_SB_BITMAP(X,Y,Z,I)			( UDF_SB_PARTMAPS(X)[(Y)].Z.s_bitmap->s_block_bitmap[I] )
 #define UDF_SB_BITMAP_NR_GROUPS(X,Y,Z)	( UDF_SB_PARTMAPS(X)[(Y)].Z.s_bitmap->s_nr_groups )
 
-#define UDF_SB_VOLIDENT(X)				( UDF_SB(X)->s_volident )
-#define UDF_SB_NUMPARTS(X)				( UDF_SB(X)->s_partitions )
-#define UDF_SB_PARTITION(X)				( UDF_SB(X)->s_partition )
-#define UDF_SB_SESSION(X)				( UDF_SB(X)->s_session )
-#define UDF_SB_ANCHOR(X)				( UDF_SB(X)->s_anchor )
-#define UDF_SB_LASTBLOCK(X)				( UDF_SB(X)->s_lastblock )
-#define UDF_SB_LVIDBH(X)				( UDF_SB(X)->s_lvidbh )
-#define UDF_SB_LVID(X)					( (struct LogicalVolIntegrityDesc *)UDF_SB_LVIDBH(X)->b_data )
-#define UDF_SB_LVIDIU(X)				( (struct LogicalVolIntegrityDescImpUse *)&(UDF_SB_LVID(X)->impUse[UDF_SB_LVID(X)->numOfPartitions * 2 * sizeof(Uint32)/sizeof(Uint8)]) )
+#define UDF_SB_VOLIDENT(X)			( UDF_SB(X)->s_volident )
+#define UDF_SB_NUMPARTS(X)			( UDF_SB(X)->s_partitions )
+#define UDF_SB_PARTITION(X)			( UDF_SB(X)->s_partition )
+#define UDF_SB_SESSION(X)			( UDF_SB(X)->s_session )
+#define UDF_SB_ANCHOR(X)			( UDF_SB(X)->s_anchor )
+#define UDF_SB_LASTBLOCK(X)			( UDF_SB(X)->s_lastblock )
+#define UDF_SB_LVIDBH(X)			( UDF_SB(X)->s_lvidbh )
+#define UDF_SB_LVID(X)				( (struct logicalVolIntegrityDesc *)UDF_SB_LVIDBH(X)->b_data )
+#define UDF_SB_LVIDIU(X)			( (struct logicalVolIntegrityDescImpUse *)&(UDF_SB_LVID(X)->impUse[le32_to_cpu(UDF_SB_LVID(X)->numOfPartitions) * 2 * sizeof(uint32_t)/sizeof(uint8_t)]) )
 
-#define UDF_SB_UMASK(X)					( UDF_SB(X)->s_umask )
-#define UDF_SB_GID(X)					( UDF_SB(X)->s_gid )
-#define UDF_SB_UID(X)					( UDF_SB(X)->s_uid )
+#define UDF_SB_UMASK(X)				( UDF_SB(X)->s_umask )
+#define UDF_SB_GID(X)				( UDF_SB(X)->s_gid )
+#define UDF_SB_UID(X)				( UDF_SB(X)->s_uid )
 #define UDF_SB_RECORDTIME(X)			( UDF_SB(X)->s_recordtime )
-#define UDF_SB_SERIALNUM(X)				( UDF_SB(X)->s_serialnum )
-#define UDF_SB_UDFREV(X)				( UDF_SB(X)->s_udfrev )
-#define UDF_SB_FLAGS(X)					( UDF_SB(X)->s_flags )
-#define UDF_SB_VAT(X)					( UDF_SB(X)->s_vat )
+#define UDF_SB_SERIALNUM(X)			( UDF_SB(X)->s_serialnum )
+#define UDF_SB_UDFREV(X)			( UDF_SB(X)->s_udfrev )
+#define UDF_SB_FLAGS(X)				( UDF_SB(X)->s_flags )
+#define UDF_SB_VAT(X)				( UDF_SB(X)->s_vat )
 
 #endif /* __LINUX_UDF_SB_H */

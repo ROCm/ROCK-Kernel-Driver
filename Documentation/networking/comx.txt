@@ -24,6 +24,8 @@ HiCOMX (2x2Mbps intelligent board)
 LoCOMX (1x512 kbps passive board)
 MixCOM (1x512 or 2x512kbps passive board with a hardware watchdog an
 	optional BRI interface and optional flashROM (1-32M))
+SliceCOM	(1x2Mbps channelized E1 board)
+PciCOM	(X21)
 
 At the moment of writing this document, the (Cisco)-HDLC, LAPB, SyncPPP and
 Frame Relay (DTE, rfc1294 IP encapsulation with partially implemented Q933a 
@@ -72,7 +74,7 @@ EXAMPLE
 To create the interface 'comx0' which is the first channel of a COMX card:
 
 insmod comx 
-# insmod comx-hw-comx ; insmod comx-proto-hdlc  (these are usually
+# insmod comx-hw-comx ; insmod comx-proto-ppp  (these are usually
 autoloaded if you use the kernel module loader)
 
 mkdir /proc/comx/comx0
@@ -141,47 +143,45 @@ THE MIXCOM DRIVER
 The MixCOM board doesn't require firmware, the driver communicates with
 it through I/O ports. You can have three of these cards in one machine.
 
-THE HDLC LINE PROTOCOL DRIVER
+THE SLICECOM DRIVER
 
-There's only one configurable parameter with this protocol: the 'keepalive'
-value. You can set this in seconds or set to 'off'. Agree with the administrator
-of your peer router on this setting. The default is 10 (seconds).
+The SliceCOM board doesn't require firmware. You can have 4 of these cards
+in one machine. The driver doesn't (yet) support shared interrupts, so
+you will need a separate IRQ line for every board.
+Read linux/Documentation/networking/slicecom.txt for help on configuring
+this adapter.
+
+THE HDLC/PPP LINE PROTOCOL DRIVER
+
+The HDLC/SyncPPP line protocol driver uses the kernel's built-in syncppp
+driver (syncppp.o). You don't have to manually select syncppp.o when building
+the kernel, the dependencies compile it in automatically.
+
+
+
 
 EXAMPLE
-
 (setting up hw parameters, see above)
+
+# using HDLC:
 echo hdlc >/proc/comx/comx0/protocol
 echo 10 >/proc/comx/comx0/keepalive	<- not necessary, 10 is the default
 ifconfig comx0 1.2.3.4 pointopoint 5.6.7.8 netmask 255.255.255.255
 
-
-THE PPP LINE PROTOCOL DRIVER
-
-To use this driver, you have to have ppp-2.3.4, and have a modified version of
-pppd (this pppd will work as async pppd to, the modifiactions merely relax 
-some restricions in order to be able to use non-async lines too.
-If configured, this driver can use Van Jacobson TCP header compression (you'll
-need the slhc.o module for this).
-Additionally to use this protocol, enable async ppp in your kernel config, and
-create the comx device special files in /dev. They're character special files
-with major 88, and their names must be the same as their network interface
-counterparts (i.e /dev/comx0 with minor 0 corresponds interface comx0 and so
-on).
-
-EXAMPLE
-
 (setting up hw parameters, see above)
+
+# using PPP:
 echo ppp >/proc/comx/comx0/protocol
 ifconfig comx0 up
-pppd comx0 1.2.3.4:5.6.7.8 persist	<- with this option pppd won't exit
-					   when the line goes down
+ifconfig comx0 1.2.3.4 pointopoint 5.6.7.8 netmask 255.255.255.255
+
 
 THE LAPB LINE PROTOCOL DRIVER
 
 For this, you'll need to configure LAPB support (See 'LAPB Data Link Driver' in
 'Network options' section) into your kernel (thanks to Jonathan Naylor for his 
 excellent implementation). 
-comxlapb.o provides the following files in the appropriate directory
+comx-proto-lapb.o provides the following files in the appropriate directory
 (the default values in parens): t1 (5), t2 (1), n2 (20), mode (DTE, STD) and
 window (7). Agree with the administrator of your peer router on these
 settings (most people use defaults, but you have to know if you are DTE or
@@ -221,7 +221,7 @@ FURTHER /proc FILES
 
 boardtype:
 Type of the hardware. Valid values are:
- 'comx', 'hicomx', 'locomx', 'cmx'.
+ 'comx', 'hicomx', 'locomx', 'cmx', 'slicecom'.
 
 protocol:
 Data-link protocol on this channel. Can be: HDLC, LAPB, PPP, FRAD

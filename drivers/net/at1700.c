@@ -836,6 +836,7 @@ set_rx_mode(struct net_device *dev)
 			 i++, mclist = mclist->next)
 			set_bit(ether_crc_le(ETH_ALEN, mclist->dmi_addr) >> 26,
 					mc_filter);
+		outb(0x02, ioaddr + RX_MODE);	/* Use normal mode. */
 	}
 
 	save_flags(flags);

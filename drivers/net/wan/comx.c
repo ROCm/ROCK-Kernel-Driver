@@ -1,7 +1,7 @@
 /*
  * Device driver framework for the COMX line of synchronous serial boards
  * 
- * for Linux kernel 2.2.X
+ * for Linux kernel 2.2.X / 2.4.X
  *
  * Original authors:  Arpad Bakay <bakay.arpad@synergon.hu>,
  *                    Peter Bajan <bajan.peter@synergon.hu>,
