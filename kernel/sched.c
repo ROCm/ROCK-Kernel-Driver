@@ -1649,6 +1649,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	if (!new_mask)
 		BUG();
 
+	preempt_disable();
 	rq = task_rq_lock(p, &flags);
 	p->cpus_allowed = new_mask;
 	/*
@@ -1657,7 +1658,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 */
 	if (new_mask & (1UL << p->thread_info->cpu)) {
 		task_rq_unlock(rq, &flags);
-		return;
+		goto out;
 	}
 
 	init_MUTEX_LOCKED(&req.sem);
@@ -1667,6 +1668,8 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	wake_up_process(rq->migration_thread);
 
 	down(&req.sem);
+out:
+	preempt_enable();
 }
 
 static volatile unsigned long migration_mask;
