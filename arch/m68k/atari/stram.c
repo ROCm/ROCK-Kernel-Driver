@@ -984,7 +984,7 @@ static void do_stram_request(request_queue_t *q)
 		unsigned long len = req->current_nr_sectors << 9;
 		if ((start + len) > swap_end) {
 			printk( KERN_ERR "stram: bad access beyond end of device: "
-					"block=%ld, count=%ld\n",
+					"block=%ld, count=%d\n",
 					req->sector,
 					req->current_nr_sectors );
 			end_request(req, 0);
