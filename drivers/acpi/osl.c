@@ -35,6 +35,7 @@
 #include <linux/kmod.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/initrd.h>
 #include <linux/workqueue.h>
 #include <linux/nmi.h>
 #include <acpi/acpi.h>
@@ -236,36 +237,66 @@ acpi_os_predefined_override (const struct acpi_predefined_names *init_val,
 	return AE_OK;
 }
 
+#ifdef CONFIG_ACPI_INITRD
+static char *
+acpi_find_dsdt_initrd(void)
+{
+	static const char start_signature[] = "INITRDDSDT123DSDT123";
+	static const char end_signature[] =   "INITRDDSDT321DSDT321";
+	char *dsdt_start = NULL;
+
+	if (initrd_start) {
+		char *dsdt_end = (char *)initrd_end - sizeof(end_signature);
+		char *data;
+
+		printk(KERN_INFO PREFIX "Looking for DSDT in initrd...");
+
+		/* Search for the start signature */
+		for (data = (char *)initrd_start; data < dsdt_end; data++) {
+			if (!memcmp(data, start_signature, 
+				    sizeof(start_signature) - 1)) {
+				data += sizeof(start_signature);
+				if (!memcmp(data, "DSDT", 4))
+					dsdt_start = data;
+				break;
+			}
+		}
+		if (dsdt_start != NULL) {
+			/* search for end signature in initrd
+			   This search is useful only for debug now that acpi 
+			   handle by itself the size of the table -eric */
+			while (dsdt_end > dsdt_start) {
+				if (!memcmp(dsdt_end, end_signature,
+					    sizeof(end_signature) - 1))
+					break;
+				dsdt_end--;
+			}
+			printk(" found at offset %zu with %zu bytes!\n",
+			       dsdt_start - (char *)initrd_start,
+			       dsdt_end - dsdt_start);
+		} else
+			printk(" not found!\n");
+	}
+	return dsdt_start;
+}
+#endif
+
 acpi_status
 acpi_os_table_override (struct acpi_table_header *existing_table,
 			struct acpi_table_header **new_table)
 {
- #ifdef CONFIG_ACPI_INITRD
-	extern char* dsdt_start;
- #endif
-         if (!existing_table || !new_table)
-                 return AE_BAD_PARAMETER;
-  
-  #ifdef CONFIG_ACPI_INITRD
-	if(memcmp(existing_table, "DSDT", 4)){
-		*new_table = NULL;
-		return AE_OK;
+	if (!existing_table || !new_table)
+		return AE_BAD_PARAMETER;
+
+	*new_table = NULL;
+#ifdef CONFIG_ACPI_INITRD
+	if (!strncmp(existing_table->signature, "DSDT", 4)) {
+		*new_table = (struct acpi_table_header*)acpi_find_dsdt_initrd();
+		if (*new_table)
+			printk(KERN_INFO PREFIX "Using customized DSDT\n");
 	}
-	// dsdt_start has been kmalloced in /init/initram.c
-	// where should it be freed ?!? 
-	if (dsdt_start != NULL){
-	 	printk(KERN_INFO "new dsdt found and will be loaded!\n");
-		*new_table = (struct acpi_table_header*)dsdt_start;
-		return AE_OK;
-	 }
-	 else{
-                *new_table = NULL;
-		return AE_OK;
-	 }
- #else
-         *new_table = NULL;
- #endif
-         return AE_OK;
+#endif
+	return AE_OK;
 }
 
 static irqreturn_t

@@ -15,7 +15,6 @@ extern int initrd_below_start_ok;
 
 /* free_initrd_mem always gets called with the next two as arguments.. */
 extern unsigned long initrd_start, initrd_end;
-extern unsigned char *dsdt_start;
 extern void free_initrd_mem(unsigned long, unsigned long);
 
 extern unsigned int real_root_dev;
