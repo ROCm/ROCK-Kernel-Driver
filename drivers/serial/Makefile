@@ -36,3 +36,4 @@ obj-$(CONFIG_SERIAL98) += serial98.o
 obj-$(CONFIG_SERIAL_PMACZILOG) += pmac_zilog.o
 obj-$(CONFIG_SERIAL_AU1X00) += au1x00_uart.o
 obj-$(CONFIG_SERIAL_DZ) += dz.o
+obj-$(CONFIG_SERIAL_SH_SCI) += sh-sci.o

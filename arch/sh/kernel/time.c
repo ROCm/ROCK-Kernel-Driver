@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.18 2003/10/09 16:28:14 lethal Exp $
+/* $Id: time.c,v 1.19 2004/02/27 00:40:48 lethal Exp $
  *
  *  linux/arch/sh/kernel/time.c
  *
@@ -86,10 +86,14 @@ int (*rtc_set_time)(const time_t) = 0;
 #endif
 
 #if defined(CONFIG_CPU_SH3)
-#error "FIXME"
-static int ifc_table[] = { 1, 2, 4, 1, 3, 1, 1, 1 };
-static int pfc_table[] = { 1, 2, 4, 1, 3, 6, 1, 1 };
-static int stc_table[] = { 1, 2, 4, 8, 3, 6, 1, 1 };
+static int stc_multipliers[] = { 1, 2, 3, 4, 6, 1, 1, 1 };
+static int stc_values[]      = { 0, 1, 4, 2, 5, 0, 0, 0 };
+#define bfc_divisors stc_multipliers
+#define bfc_values stc_values
+static int ifc_divisors[]    = { 1, 2, 3, 4, 1, 1, 1, 1 };
+static int ifc_values[]      = { 0, 1, 4, 2, 0, 0, 0, 0 };
+static int pfc_divisors[]    = { 1, 2, 3, 4, 6, 1, 1, 1 };
+static int pfc_values[]      = { 0, 1, 4, 2, 5, 0, 0, 0 };
 #elif defined(CONFIG_CPU_SH4)
 static int ifc_divisors[] = { 1, 2, 3, 4, 6, 8, 1, 1 };
 static int ifc_values[]   = { 0, 1, 2, 3, 0, 4, 0, 5 };
@@ -398,13 +402,13 @@ void get_current_frequency_divisors(unsigned int *ifc, unsigned int *bfc, unsign
 
 	tmp  = (frqcr & 0x8000) >> 13;
 	tmp |= (frqcr & 0x0030) >>  4;
-	*bfc = stc_table[tmp];
+	*bfc = stc_multipliers[tmp];
 	tmp  = (frqcr & 0x4000)  >> 12;
 	tmp |= (frqcr & 0x000c) >> 2;
-	*ifc  = ifc_table[tmp];
+	*ifc = ifc_divisors[tmp];
 	tmp  = (frqcr & 0x2000) >> 11;
 	tmp |= frqcr & 0x0003;
-	*pfc = pfc_table[tmp];
+	*pfc = pfc_divisors[tmp];
 #elif defined(CONFIG_CPU_SH4)
 	*ifc = ifc_divisors[(frqcr >> 6) & 0x0007];
 	*bfc = bfc_divisors[(frqcr >> 3) & 0x0007];

@@ -4,7 +4,6 @@
 
 obj-y					+= pci.o
 obj-$(CONFIG_PCI_AUTO)			+= pci-auto.o
-obj-$(CONFIG_PCI_DMA)			+= pci-dma.o
 
 obj-$(CONFIG_CPU_SUBTYPE_ST40STB1)	+= pci-st40.o
 obj-$(CONFIG_CPU_SUBTYPE_SH7751)	+= pci-sh7751.o 

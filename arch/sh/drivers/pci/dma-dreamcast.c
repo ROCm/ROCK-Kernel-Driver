@@ -30,7 +30,7 @@
 
 static int gapspci_dma_used = 0;
 
-void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
+void *__pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 			   dma_addr_t * dma_handle)
 {
 	unsigned long buf;
@@ -52,7 +52,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	return (void *)buf;
 }
 
-void pci_free_consistent(struct pci_dev *hwdev, size_t size,
+void __pci_free_consistent(struct pci_dev *hwdev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
 	/* XXX */

@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.1.2.2 2002/10/29 00:56:09 lethal Exp $
+/* $Id: irq.c,v 1.4 2004/02/22 22:44:36 kkojima Exp $
  * 
  * linux/arch/sh/boards/se/770x/irq.c
  *
@@ -12,7 +12,7 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <asm/irq.h>
-#include <asm/hitachi_se.h>
+#include <asm/se/se.h>
 
 /*
  * Initialize IRQ setting

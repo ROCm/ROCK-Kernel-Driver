@@ -255,9 +255,13 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	ia64_do_profile(regs);
 
 	while (1) {
-
 #ifdef CONFIG_SMP
-		smp_do_timer(regs);
+		/*
+		 * For UP, this is done in do_timer().  Weird, but
+		 * fixing that would require updates to all
+		 * platforms.
+		 */
+		update_process_times(user_mode(regs));
 #endif
 		new_itm += local_cpu_data->itm_delta;
 
@@ -280,17 +284,19 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	do {
-	    /*
-	     * If we're too close to the next clock tick for comfort, we increase the
-	     * safety margin by intentionally dropping the next tick(s).  We do NOT update
-	     * itm.next because that would force us to call do_timer() which in turn would
-	     * let our clock run too fast (with the potentially devastating effect of
-	     * losing monotony of time).
-	     */
-	    while (!time_after(new_itm, ia64_get_itc() + local_cpu_data->itm_delta/2))
-	      new_itm += local_cpu_data->itm_delta;
-	    ia64_set_itm(new_itm);
-	    /* double check, in case we got hit by a (slow) PMI: */
+		/*
+		 * If we're too close to the next clock tick for
+		 * comfort, we increase the safety margin by
+		 * intentionally dropping the next tick(s).  We do NOT
+		 * update itm.next because that would force us to call
+		 * do_timer() which in turn would let our clock run
+		 * too fast (with the potentially devastating effect
+		 * of losing monotony of time).
+		 */
+		while (!time_after(new_itm, ia64_get_itc() + local_cpu_data->itm_delta/2))
+			new_itm += local_cpu_data->itm_delta;
+		ia64_set_itm(new_itm);
+		/* double check, in case we got hit by a (slow) PMI: */
 	} while (time_after_eq(ia64_get_itc(), new_itm));
 	return IRQ_HANDLED;
 }

@@ -414,6 +414,14 @@ ppc_clone:
 	stw	r0,TRAP(r1)		/* register set saved */
 	b	sys_clone
 
+	.globl	ppc_swapcontext
+ppc_swapcontext:
+	SAVE_NVGPRS(r1)
+	lwz	r0,TRAP(r1)
+	rlwinm	r0,r0,0,0,30		/* clear LSB to indicate full */
+	stw	r0,TRAP(r1)		/* register set saved */
+	b	sys_swapcontext
+
 /*
  * This routine switches between two different tasks.  The process
  * state of one is saved on its kernel stack.  Then the state

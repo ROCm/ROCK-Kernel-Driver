@@ -77,11 +77,7 @@ int sysctl_tcp_window_scaling = 1;
 int sysctl_tcp_sack = 1;
 int sysctl_tcp_fack = 1;
 int sysctl_tcp_reordering = TCP_FASTRETRANS_THRESH;
-#ifdef CONFIG_INET_ECN
-int sysctl_tcp_ecn = 1;
-#else
 int sysctl_tcp_ecn;
-#endif
 int sysctl_tcp_dsack = 1;
 int sysctl_tcp_app_win = 31;
 int sysctl_tcp_adv_win_scale = 2;

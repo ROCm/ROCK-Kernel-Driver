@@ -979,7 +979,6 @@ static int lmLogSync(struct jfs_log * log, int nosyncwait)
 		 * We need to make sure all of the "written" metapages
 		 * actually make it to disk
 		 */
-		down(&jfs_log_sem);
 		list_for_each_entry(sbi, &log->sb_list, log_list) {
 			filemap_fdatawrite(sbi->ipbmap->i_mapping);
 			filemap_fdatawrite(sbi->ipimap->i_mapping);
@@ -990,7 +989,6 @@ static int lmLogSync(struct jfs_log * log, int nosyncwait)
 			filemap_fdatawait(sbi->ipimap->i_mapping);
 			filemap_fdatawait(sbi->sb->s_bdev->bd_inode->i_mapping);
 		}
-		up(&jfs_log_sem);
 
 		lrd.logtid = 0;
 		lrd.backchain = 0;
@@ -1151,8 +1149,10 @@ int lmLogOpen(struct super_block *sb)
 		goto shutdown;
 
 journal_found:
+	LOG_LOCK(log);
 	list_add(&sbi->log_list, &log->sb_list);
 	sbi->log = log;
+	LOG_UNLOCK(log);
 
 	up(&jfs_log_sem);
 	return 0;
@@ -1237,8 +1237,10 @@ static int open_dummy_log(struct super_block *sb)
 		}
 	}
 
+	LOG_LOCK(dummy_log);
 	list_add(&JFS_SBI(sb)->log_list, &dummy_log->sb_list);
 	JFS_SBI(sb)->log = dummy_log;
+	LOG_UNLOCK(dummy_log);
 	up(&jfs_log_sem);
 
 	return 0;
@@ -1469,7 +1471,9 @@ int lmLogClose(struct super_block *sb)
 	jfs_info("lmLogClose: log:0x%p", log);
 
 	down(&jfs_log_sem);
+	LOG_LOCK(log);
 	list_del(&sbi->log_list);
+	LOG_UNLOCK(log);
 	sbi->log = NULL;
 
 	/*

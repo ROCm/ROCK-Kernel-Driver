@@ -1526,6 +1526,7 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 			if (n == 4) {
 				jfs_error(bmp->db_ipbmap->i_sb,
 					  "dbAllocAG: failed descending stree");
+				release_metapage(mp);
 				return -EIO;
 			}
 		}
@@ -3310,7 +3311,7 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 	int i, i0 = TRUE, j, j0 = TRUE, k, n;
 	s64 newsize;
 	s64 p;
-	struct metapage *mp, *l2mp, *l1mp, *l0mp;
+	struct metapage *mp, *l2mp, *l1mp = NULL, *l0mp = NULL;
 	struct dmapctl *l2dcp, *l1dcp, *l0dcp;
 	struct dmap *dp;
 	s8 *l0leaf, *l1leaf, *l2leaf;
@@ -3513,6 +3514,7 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 			 */
 			*l1leaf = dbInitDmapCtl(l0dcp, 0, ++i);
 			write_metapage(l0mp);
+			l0mp = NULL;
 
 			if (nblocks)
 				l1leaf++;	/* continue for next L0 */
@@ -3536,6 +3538,7 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 		 */
 		*l2leaf = dbInitDmapCtl(l1dcp, 1, ++j);
 		write_metapage(l1mp);
+		l1mp = NULL;
 
 		if (nblocks)
 			l2leaf++;	/* continue for next L1 */
@@ -3554,17 +3557,20 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 
 	jfs_error(ipbmap->i_sb,
 		  "dbExtendFS: function has not returned as expected");
+errout:
+	if (l0mp)
+		release_metapage(l0mp);
+	if (l1mp)
+		release_metapage(l1mp);
+	release_metapage(l2mp);
 	return -EIO;
 
 	/*
 	 *      finalize bmap control page
 	 */
-      finalize:
+finalize:
 
 	return 0;
-
-      errout:
-	return -EIO;
 }
 
 

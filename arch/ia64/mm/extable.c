@@ -81,7 +81,7 @@ search_extable (const struct exception_table_entry *first,
 }
 
 void
-handle_exception (struct pt_regs *regs, const struct exception_table_entry *e)
+ia64_handle_exception (struct pt_regs *regs, const struct exception_table_entry *e)
 {
 	long fix = (u64) &e->cont + e->cont;
 

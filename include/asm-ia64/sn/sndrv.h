@@ -41,6 +41,11 @@
 #define SNDRV_SHUB_RESETSTATS		42
 #define SNDRV_SHUB_GETSTATS		43
 #define SNDRV_SHUB_GETNASID		44
+#define SNDRV_SHUB_GETMMR32            45
+#define SNDRV_SHUB_GETMMR64            46
+#define SNDRV_SHUB_GETMMR64_IO         47
+#define SNDRV_SHUB_PUTMMR64            48
+#define SNDRV_SHUB_PUTMMR64_IO         49
 
 /* Devices */
 #define SNDRV_UKNOWN_DEVICE		-1

@@ -455,7 +455,7 @@ static int veth_transmit_to_one(struct sk_buff *skb, HvLpIndex rlp,
 	
 	/* Is it really necessary to check the length and address
 	 * fields of the first entry here? */
-	if (!pci_dma_error(dma_address)) {
+	if (!pci_dma_mapping_error(dma_address)) {
 		msg->skb = skb;
 		msg->data.addr[0] = dma_address;
 		msg->data.len[0] = dma_length;

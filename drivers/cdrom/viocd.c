@@ -338,8 +338,9 @@ static void do_viocd_request(request_queue_t *q)
 	struct request *req;
 
 	while ((rwreq == 0) && ((req = elv_next_request(q)) != NULL)) {
-		/* check for any kind of error */
-		if (send_request(req) < 0) {
+		if (!blk_fs_request(req))
+			end_request(req, 0);
+		else if (send_request(req) < 0) {
 			printk(VIOCD_KERN_WARNING
 					"unable to send message to OS/400!");
 			end_request(req, 0);

@@ -1,4 +1,4 @@
-/* $Id: ioremap.c,v 1.8 2003/10/09 15:25:42 lethal Exp $
+/* $Id: ioremap.c,v 1.9 2004/02/25 04:59:10 lethal Exp $
  *
  * arch/sh/mm/ioremap.c
  *
@@ -160,5 +160,5 @@ void * p3_ioremap(unsigned long phys_addr, unsigned long size, unsigned long fla
 void p3_iounmap(void *addr)
 {
 	if (addr > high_memory)
-		return vfree((void *) (PAGE_MASK & (unsigned long) addr));
+		vfree((void *)(PAGE_MASK & (unsigned long)addr));
 }

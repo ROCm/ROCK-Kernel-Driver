@@ -169,7 +169,7 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 					  queue->size * sizeof(*queue->msgs),
 					  PCI_DMA_BIDIRECTIONAL);
 
-	if (pci_dma_error(queue->msg_token))
+	if (pci_dma_mapping_error(queue->msg_token))
 		goto map_failed;
 
 	rc = plpar_hcall_norets(H_REG_CRQ,

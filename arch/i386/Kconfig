@@ -819,7 +819,7 @@ config IRQBALANCE
 	depends on SMP && X86_IO_APIC
 	default y
 	help
- 	  The defalut yes will allow the kernel to do irq load balancing.
+ 	  The default yes will allow the kernel to do irq load balancing.
 	  Saying no will keep the kernel from doing irq load balancing.
 
 config HAVE_DEC_LOCK

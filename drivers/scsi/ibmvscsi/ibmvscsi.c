@@ -719,6 +719,9 @@ static int send_srp_login(struct ibmvscsi_host_data *hostdata)
 
 /**
  * sync_completion: Signal that a synchronous command has completed
+ * Note that after returning from this call, the evt_struct is freed.
+ * the caller waiting on this completion shouldn't touch the evt_struct
+ * again.
  */
 static void sync_completion(struct srp_event_struct *evt_struct)
 {
@@ -732,7 +735,7 @@ static void sync_completion(struct srp_event_struct *evt_struct)
 static int ibmvscsi_abort(struct scsi_cmnd *cmd)
 {
 	struct ibmvscsi_host_data *hostdata =
-	    *(struct ibmvscsi_host_data **)&cmd->device->host->hostdata;
+	    (struct ibmvscsi_host_data *)cmd->device->host->hostdata;
 	union VIOSRP_IU iu;
 	struct SRP_TSK_MGMT *tsk_mgmt = &iu.srp.tsk_mgmt;
 	struct SRP_RSP *rsp;
@@ -766,6 +769,7 @@ static int ibmvscsi_abort(struct scsi_cmnd *cmd)
 		printk(KERN_ERR "ibmvscsi: failed to allocate abort() event\n");
 		return FAILED;
 	}
+	evt->crq.format = VIOSRP_SRP_FORMAT;
 
 	init_completion(&evt->comp);
 	if (ibmvscsi_send_srp_event(evt, hostdata) != 0) {
@@ -773,28 +777,28 @@ static int ibmvscsi_abort(struct scsi_cmnd *cmd)
 		ibmvscsi_free_event_struct(&hostdata->pool, evt);
 		return FAILED;
 	}
-
+	
+	spin_unlock(hostdata->host->host_lock);
 	wait_for_completion(&evt->comp);
+	spin_lock(hostdata->host->host_lock);
 
-	if (evt->evt->srp.generic.type != SRP_RSP_TYPE) {
-		printk(KERN_ERR "ibmvscsi: bad TSK_MGMT response type 0x%02x\n",
-		       evt->evt->srp.generic.type);
+	/* Because we dropped the spinlock above, it's possible
+	 * The event is no longer in our list.  Make sure it didn't
+	 * complete while we were aborting
+	 */
+	list_for_each_entry(tmp_evt, &hostdata->sent, list) {
+		if (tmp_evt->cmnd == cmd) {
+			found_evt = tmp_evt;
+			break;
+		}
 	}
-
-	rsp = &evt->evt->srp.rsp;
-	if (!rsp->rspvalid || (rsp->response_data_list_length != 4)) {
-		printk(KERN_ERR "ibmvscsi: bad TSK_MGMT response\n");
-	}
-
-	if (rsp->sense_and_response_data[3] != 0x00) {
-		printk(KERN_ERR "ibmvscsi: ABORT failed: rsp_code 0x%02x\n",
-		       rsp->sense_and_response_data[3]);
-	}
+	if (found_evt == NULL)
+		return SUCCESS;
 
 	cmd->result = (DID_ABORT << 16);
-	list_del(&tmp_evt->list);
-	unmap_cmd_data(&tmp_evt->cmd, tmp_evt->hostdata->dev);
-	ibmvscsi_free_event_struct(&tmp_evt->hostdata->pool, tmp_evt);
+	list_del(&found_evt->list);
+	unmap_cmd_data(&found_evt->cmd, found_evt->hostdata->dev);
+	ibmvscsi_free_event_struct(&found_evt->hostdata->pool, found_evt);
 	atomic_inc(&hostdata->request_limit);
 	printk(KERN_INFO
 	       "ibmvscsi: successfully aborted task tag 0x%lx\n",

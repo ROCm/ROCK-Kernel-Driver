@@ -8,7 +8,7 @@ dma_error(dma_addr_t dma_addr)
 }
 
 /*
- * Copyright (C) 2003 Hewlett-Packard Co
+ * Copyright (C) 2003-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -24,6 +24,7 @@ dma_error(dma_addr_t dma_addr)
 #define dma_sync_sg_for_cpu	platform_dma_sync_sg_for_cpu
 #define dma_sync_single_for_device platform_dma_sync_single_for_device
 #define dma_sync_sg_for_device	platform_dma_sync_sg_for_device
+#define dma_mapping_error	platform_dma_mapping_error
 
 #define dma_map_page(dev, pg, off, size, dir)				\
 	dma_map_single(dev, page_address(pg) + (off), (size), (dir))

@@ -205,7 +205,7 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	INIT_LIST_HEAD(&probe_ent->node);
 	probe_ent->pdev = pdev;
 	probe_ent->sht = &svia_sht;
-	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_SATA_RESET |
+	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_SRST |
 				ATA_FLAG_NO_LEGACY;
 	probe_ent->port_ops = &svia_sata_ops;
 	probe_ent->n_ports = 2;

@@ -22,6 +22,7 @@
 
 /* Core Processor Version Register */
 #define CCN_PVR		0xff000030
+#define CCN_CVR		0xff000040
 #define CCN_PRR		0xff000044
 
 /*

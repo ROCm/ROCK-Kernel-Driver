@@ -1,11 +1,12 @@
 /*
- *	$Id: setup.c,v 1.4 2003/08/03 03:05:10 lethal Exp $
+ *	$Id: setup.c,v 1.5 2004/03/16 00:07:50 lethal Exp $
  *	Copyright (C) 2000 YAEGASHI Takeshi
  *	Hitachi HD64461 companion chip support
  */
 
 #include <linux/config.h>
 #include <linux/sched.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
 #include <linux/interrupt.h>
@@ -30,7 +31,6 @@ static void disable_hd64461_irq(unsigned int irq)
 	local_irq_restore(flags);
 }
 
-
 static void enable_hd64461_irq(unsigned int irq)
 {
 	unsigned long flags;
@@ -44,7 +44,6 @@ static void enable_hd64461_irq(unsigned int irq)
 	local_irq_restore(flags);
 }
 
-
 static void mask_and_ack_hd64461(unsigned int irq)
 {
 	disable_hd64461_irq(irq);
@@ -54,26 +53,22 @@ static void mask_and_ack_hd64461(unsigned int irq)
 #endif
 }
 
-
 static void end_hd64461_irq(unsigned int irq)
 {
 	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
 		enable_hd64461_irq(irq);
 }
 
-
 static unsigned int startup_hd64461_irq(unsigned int irq)
-{ 
+{
 	enable_hd64461_irq(irq);
 	return 0;
 }
-
 
 static void shutdown_hd64461_irq(unsigned int irq)
 {
 	disable_hd64461_irq(irq);
 }
-
 
 static struct hw_interrupt_type hd64461_irq_type = {
 	.typename	= "HD64461-IRQ",
@@ -85,7 +80,6 @@ static struct hw_interrupt_type hd64461_irq_type = {
 	.end		= end_hd64461_irq,
 };
 
-
 static irqreturn_t hd64461_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	printk(KERN_INFO
@@ -95,23 +89,52 @@ static irqreturn_t hd64461_interrupt(int irq, void *dev_id, struct pt_regs *regs
 	return IRQ_NONE;
 }
 
+static struct {
+	int (*func) (int, void *);
+	void *dev;
+} hd64461_demux[HD64461_IRQ_NUM];
+
+void hd64461_register_irq_demux(int irq,
+				int (*demux) (int irq, void *dev), void *dev)
+{
+	hd64461_demux[irq - HD64461_IRQBASE].func = demux;
+	hd64461_demux[irq - HD64461_IRQBASE].dev = dev;
+}
+
+EXPORT_SYMBOL(hd64461_register_irq_demux);
+
+void hd64461_unregister_irq_demux(int irq)
+{
+	hd64461_demux[irq - HD64461_IRQBASE].func = 0;
+}
+
+EXPORT_SYMBOL(hd64461_unregister_irq_demux);
+
 int hd64461_irq_demux(int irq)
 {
 	if (irq == CONFIG_HD64461_IRQ) {
 		unsigned short bit;
 		unsigned short nirr = inw(HD64461_NIRR);
 		unsigned short nimr = inw(HD64461_NIMR);
+		int i;
+
 		nirr &= ~nimr;
-		for (bit = 1, irq = 0; irq < 16; bit <<= 1, irq++)
-			if (nirr & bit) break;
-		if (irq == 16) irq = CONFIG_HD64461_IRQ;
-		else irq += HD64461_IRQBASE;
+		for (bit = 1, i = 0; i < 16; bit <<= 1, i++)
+			if (nirr & bit)
+				break;
+		if (i == 16)
+			irq = CONFIG_HD64461_IRQ;
+		else {
+			irq = HD64461_IRQBASE + i;
+			if (hd64461_demux[i].func != 0) {
+				irq = hd64461_demux[i].func(irq, hd64461_demux[i].dev);
+			}
+		}
 	}
 	return __irq_demux(irq);
 }
 
-static struct irqaction irq0  = { hd64461_interrupt, SA_INTERRUPT, 0, "HD64461", NULL, NULL};
-
+static struct irqaction irq0 = { hd64461_interrupt, SA_INTERRUPT, 0, "HD64461", NULL, NULL };
 
 int __init setup_hd64461(void)
 {
@@ -120,11 +143,12 @@ int __init setup_hd64461(void)
 	if (!MACH_HD64461)
 		return 0;
 
-	printk(KERN_INFO "HD64461 configured at 0x%x on irq %d(mapped into %d to %d)\n",
-	       CONFIG_HD64461_IOBASE, CONFIG_HD64461_IRQ,
-	       HD64461_IRQBASE, HD64461_IRQBASE+15);
+	printk(KERN_INFO
+	       "HD64461 configured at 0x%x on irq %d(mapped into %d to %d)\n",
+	       CONFIG_HD64461_IOBASE, CONFIG_HD64461_IRQ, HD64461_IRQBASE,
+	       HD64461_IRQBASE + 15);
 
-#if defined(CONFIG_CPU_SUBTYPE_SH7709) /* Should be at processor specific part.. */
+#if defined(CONFIG_CPU_SUBTYPE_SH7709)	/* Should be at processor specific part.. */
 	outw(0x2240, INTC_ICR1);
 #endif
 	outw(0xffff, HD64461_NIMR);

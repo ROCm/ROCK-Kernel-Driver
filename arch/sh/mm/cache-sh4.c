@@ -1,9 +1,10 @@
-/* $Id: cache-sh4.c,v 1.24 2003/10/12 19:40:12 lethal Exp $
+/* $Id: cache-sh4.c,v 1.26 2004/02/19 12:47:24 lethal Exp $
  *
  *  linux/arch/sh/mm/cache-sh4.c
  *
  * Copyright (C) 1999, 2000, 2002  Niibe Yutaka
- * Copyright (C) 2001, 2002, 2003  Paul Mundt
+ * Copyright (C) 2001, 2002, 2003, 2004  Paul Mundt
+ * Copyright (C) 2003  Richard Curnow
  */
 
 #include <linux/config.h>
@@ -29,10 +30,20 @@ static void __flush_dcache_all_ex(void);
 
 int __init detect_cpu_and_cache_system(void)
 {
-	unsigned long pvr, prr, ccr;
+	unsigned long pvr, prr, ccr, cvr;
+	unsigned long size;
+
+	static unsigned long sizes[16] = {
+		[1] = (1 << 12),
+		[2] = (1 << 13),
+		[4] = (1 << 14),
+		[8] = (1 << 15),
+		[9] = (1 << 16)
+	};
 
 	pvr = (ctrl_inl(CCN_PVR) >> 8) & 0xffff;
 	prr = (ctrl_inl(CCN_PRR) >> 4) & 0xff;
+	cvr = (ctrl_inl(CCN_CVR));
 
 	/*
 	 * Setup some sane SH-4 defaults for the icache
@@ -54,6 +65,9 @@ int __init detect_cpu_and_cache_system(void)
 	cpu_data->dcache.ways		= 1;
 	cpu_data->dcache.linesz		= L1_CACHE_BYTES;
 
+	/* Set the FPU flag, virtually all SH-4's have one */
+	set_bit(CPU_HAS_FPU, &(cpu_data->flags));
+
 	/*
 	 * Probe the underlying processor version/revision and
 	 * adjust cpu_data setup accordingly.
@@ -68,7 +82,7 @@ int __init detect_cpu_and_cache_system(void)
 
 		/* 
 		 * FIXME: This is needed for 7750, but do we need it for the
-		 * 7750S and 7750R too? For now, assume we do.. -- PFM
+		 * 7750S too? For now, assume we do.. -- PFM
 		 */
 		set_bit(CPU_HAS_P2_FLUSH_BUG, &(cpu_data->flags));
 
@@ -83,12 +97,18 @@ int __init detect_cpu_and_cache_system(void)
 		cpu_data->type = CPU_ST40GX1;
 		break;
 	case 0x700:
-		/* XXX: Add proper CVR probing */
 		cpu_data->type = CPU_SH4_501;
+		cpu_data->icache.ways = 2;
+		cpu_data->dcache.ways = 2;
+
+		/* No FPU on the SH4-500 series.. */
+		clear_bit(CPU_HAS_FPU, &(cpu_data->flags));
 		break;
 	case 0x600:
 		cpu_data->type = CPU_SH4_202;
-		/* fall */
+		cpu_data->icache.ways = 2;
+		cpu_data->dcache.ways = 2;
+		break;
 	case 0x500 ... 0x501:
 		switch (prr) {
 		    case 0x10: cpu_data->type = CPU_SH7750R; break;
@@ -96,9 +116,20 @@ int __init detect_cpu_and_cache_system(void)
 		    case 0x50: cpu_data->type = CPU_SH7760;  break;
 		}
 
-		if (cpu_data->type == CPU_SH7750R)
-			set_bit(CPU_HAS_P2_FLUSH_BUG, &(cpu_data->flags));
+		cpu_data->icache.ways = 2;
+		cpu_data->dcache.ways = 2;
 
+		break;
+	default:
+		cpu_data->type = CPU_SH_NONE;
+		break;
+	}
+
+	/*
+	 * On anything that's not a direct-mapped cache, look to the CVR
+	 * for I/D-cache specifics.
+	 */
+	if (cpu_data->dcache.ways > 1) {
 		jump_to_P2();
 		ccr = ctrl_inl(CCR);
 
@@ -110,18 +141,16 @@ int __init detect_cpu_and_cache_system(void)
 
 		back_to_P1();
 
-		cpu_data->icache.ways = 2;
-		cpu_data->dcache.ways = 2;
+		size = sizes[(cvr >> 20) & 0xf];
+		cpu_data->icache.way_shift	=  (size >> 1);
+		cpu_data->icache.entry_mask	= ((size >> 2) - (1 << 5));
+		cpu_data->icache.sets		=  (size >> 6);
 
-		break;
-	default:
-		cpu_data->type = CPU_SH_NONE;
-		break;
+		size = sizes[(cvr >> 16) & 0xf];
+		cpu_data->dcache.way_shift	=  (size >> 1);
+		cpu_data->dcache.entry_mask	= ((size >> 2) - (1 << 5));
+		cpu_data->dcache.sets		=  (size >> 6);
 	}
-
-	/* No FPU on the SH4-500 series.. */
-	if (cpu_data->type != CPU_SH4_501)
-		set_bit(CPU_HAS_FPU, &(cpu_data->flags));
 
 	return 0;
 }
@@ -419,7 +448,7 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 			}
 			pte++;
 			p += PAGE_SIZE;
-		} while (p < end && (unsigned long)pte & PAGE_MASK);
+		} while (p < end && ((unsigned long)pte & ~PAGE_MASK));
 		pmd++;
 	} while (p < end);
  loop_exit:

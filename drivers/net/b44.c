@@ -1892,6 +1892,8 @@ static int b44_resume(struct pci_dev *pdev)
 	if (!netif_running(dev))
 		return 0;
 
+	pci_restore_state(pdev, bp->pci_cfg_state);
+
 	spin_lock_irq(&bp->lock);
 
 	b44_init_rings(bp);

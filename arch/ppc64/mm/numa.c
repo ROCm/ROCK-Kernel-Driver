@@ -71,11 +71,6 @@ static int __init parse_numa_properties(void)
 		return -1;
 	}
 
-	if (strstr(saved_command_line, "numa=off")) {
-		printk(KERN_WARNING "NUMA disabled by user\n");
-		return -1;
-	}
-
 	cpu = of_find_node_by_type(NULL, "cpu");
 	if (!cpu)
 		goto err;

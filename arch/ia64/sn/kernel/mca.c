@@ -108,6 +108,7 @@ sn_platform_plat_specific_err_print(const u8 *sect_header, u8 **oemdata, u64 *oe
 	down(&sn_oemdata_mutex);
 	sn_oemdata = oemdata;
 	sn_oemdata_size = oemdata_size;
+	sn_oemdata_bufsize = 0;
 	ia64_sn_plat_specific_err_print(print_hook, (char *)psei);
 	up(&sn_oemdata_mutex);
 	return 0;
@@ -120,7 +121,6 @@ int sn_salinfo_platform_oemdata(const u8 *sect_header, u8 **oemdata, u64 *oemdat
 {
 	efi_guid_t guid = *(efi_guid_t *)sect_header;
 	*oemdata_size = 0;
-	sn_oemdata_bufsize = 0;
 	vfree(*oemdata);
 	*oemdata = NULL;
 	if (efi_guidcmp(guid, SAL_PLAT_SPECIFIC_ERR_SECT_GUID) == 0)

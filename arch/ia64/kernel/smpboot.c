@@ -265,8 +265,6 @@ ia64_sync_itc (unsigned int master)
 static inline void __init
 smp_setup_percpu_timer (void)
 {
-	local_cpu_data->prof_counter = 1;
-	local_cpu_data->prof_multiplier = 1;
 }
 
 static void __init

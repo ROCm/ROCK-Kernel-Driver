@@ -287,25 +287,6 @@ config ARPD
 	  and you should also say Y to "Kernel/User network link driver",
 	  below. If unsure, say N.
 
-config INET_ECN
-	bool "IP: TCP Explicit Congestion Notification support"
-	depends on INET
-	---help---
-	  Explicit Congestion Notification (ECN) allows routers to notify
-	  clients about network congestion, resulting in fewer dropped packets
-	  and increased network performance.  This option adds ECN support to
-	  the Linux kernel, as well as a sysctl (/proc/sys/net/ipv4/tcp_ecn)
-	  which allows ECN support to be disabled at runtime.
-
-	  Note that, on the Internet, there are many broken firewalls which
-	  refuse connections from ECN-enabled machines, and it may be a while
-	  before these firewalls are fixed.  Until then, to access a site
-	  behind such a firewall (some of which are major sites, at the time
-	  of this writing) you will have to disable this option, either by
-	  saying N now or by using the sysctl.
-
-	  If in doubt, say N.
-
 config SYN_COOKIES
 	bool "IP: TCP syncookie support (disabled per default)"
 	depends on INET

@@ -850,12 +850,12 @@ failure can be determined by:
 - checking if pci_alloc_consistent returns NULL or pci_map_sg returns 0
 
 - checking the returned dma_addr_t of pci_map_single and pci_map_page
-  by using pci_dma_error():
+  by using pci_dma_mapping_error():
 
 	dma_addr_t dma_handle;
 
 	dma_handle = pci_map_single(dev, addr, size, direction);
-	if (pci_dma_error(dma_handle)) {
+	if (pci_dma_mapping_error(dma_handle)) {
 		/*
 		 * reduce current DMA mapping usage,
 		 * delay and try again later or
