@@ -239,11 +239,18 @@
 #define SYSCALL_SHORT_CLOBBERS	SYSCALL_CLOBBERS, "r13", "r14"
 
 
+/* User programs sometimes end up including this header file
+   (indirectly, via uClibc header files), so I'm a bit nervous just
+   including <linux/compiler.h>.  */
+#if !defined(__builtin_expect) && __GNUC__ == 2 && __GNUC_MINOR__ < 96
+#define __builtin_expect(x, expected_value) (x)
+#endif
+
 #define __syscall_return(type, res)					      \
   do {									      \
 	  /* user-visible error numbers are in the range -1 - -124:	      \
 	     see <asm-v850/errno.h> */					      \
-	  if ((unsigned long)(res) >= (unsigned long)(-125)) {		      \
+	  if (__builtin_expect ((unsigned long)(res) >= (unsigned long)(-125), 0)) { \
 		  errno = -(res);					      \
 		  res = -1;						      \
 	  }								      \
