@@ -61,6 +61,7 @@
 #include <linux/cache.h>
 #include <linux/jhash.h>
 #include <linux/init.h>
+#include <linux/times.h>
 
 #include <net/icmp.h>
 #include <net/tcp.h>
@@ -2490,7 +2491,7 @@ static void get_openreq4(struct sock *sk, struct open_request *req,
 		TCP_SYN_RECV,
 		0, 0, /* could print option size, but that is af dependent. */
 		1,    /* timers active (only the expire timer) */
-		ttd,
+		jiffies_to_clock_t(ttd),
 		req->retrans,
 		uid,
 		0,  /* non standard timer */
@@ -2528,7 +2529,8 @@ static void get_tcp4_sock(struct sock *sp, char *tmpbuf, int i)
 			"%08X %5d %8d %lu %d %p %u %u %u %u %d",
 		i, src, srcp, dest, destp, sp->sk_state,
 		tp->write_seq - tp->snd_una, tp->rcv_nxt - tp->copied_seq,
-		timer_active, timer_expires - jiffies,
+		timer_active,
+		jiffies_to_clock_t(timer_expires - jiffies),
 		tp->retransmits,
 		sock_i_uid(sp),
 		tp->probes_out,
@@ -2556,7 +2558,7 @@ static void get_timewait4_sock(struct tcp_tw_bucket *tw, char *tmpbuf, int i)
 	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
 		" %02X %08X:%08X %02X:%08X %08X %5d %8d %d %d %p",
 		i, src, srcp, dest, destp, tw->tw_substate, 0, 0,
-		3, ttd, 0, 0, 0, 0,
+		3, jiffies_to_clock_t(ttd), 0, 0, 0, 0,
 		atomic_read(&tw->tw_refcnt), tw);
 }
 

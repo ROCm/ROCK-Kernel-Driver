@@ -39,6 +39,7 @@
 #include <linux/init.h>
 #include <linux/jhash.h>
 #include <linux/ipsec.h>
+#include <linux/times.h>
 
 #include <linux/ipv6.h>
 #include <linux/icmpv6.h>
@@ -1941,7 +1942,7 @@ static void get_openreq6(struct seq_file *seq,
 		   TCP_SYN_RECV,
 		   0,0, /* could print option size, but that is af dependent. */
 		   1,   /* timers active (only the expire timer) */  
-		   ttd, 
+		   jiffies_to_clock_t(ttd), 
 		   req->retrans,
 		   uid,
 		   0,  /* non standard timer */  
@@ -1987,7 +1988,8 @@ static void get_tcp6_sock(struct seq_file *seq, struct sock *sp, int i)
 		   dest->s6_addr32[2], dest->s6_addr32[3], destp,
 		   sp->sk_state, 
 		   tp->write_seq-tp->snd_una, tp->rcv_nxt-tp->copied_seq,
-		   timer_active, timer_expires-jiffies,
+		   timer_active,
+		   jiffies_to_clock_t(timer_expires - jiffies),
 		   tp->retransmits,
 		   sock_i_uid(sp),
 		   tp->probes_out,
@@ -2022,7 +2024,7 @@ static void get_timewait6_sock(struct seq_file *seq,
 		   dest->s6_addr32[0], dest->s6_addr32[1],
 		   dest->s6_addr32[2], dest->s6_addr32[3], destp,
 		   tw->tw_substate, 0, 0,
-		   3, ttd, 0, 0, 0, 0,
+		   3, jiffies_to_clock_t(ttd), 0, 0, 0, 0,
 		   atomic_read(&tw->tw_refcnt), tw);
 }
 
