@@ -299,8 +299,6 @@ struct controller {
 	struct pci_resource *bus_head;
 	struct pci_dev *pci_dev;
 	struct pci_bus *pci_bus;
-	struct proc_dir_entry* proc_entry;
-	struct proc_dir_entry* proc_entry2;
 	struct event_info event_queue[10];
 	struct slot *slot;
 	u8 next_event;
@@ -322,8 +320,6 @@ struct controller {
 	u8 pcix_speed_capability;	/* PCI-X */
 	u8 pcix_support;		/* PCI-X */
 	u16 vendor_id;
-	char proc_name[20];
-	char proc_name2[20];
 	struct work_struct int_task_event;
 	wait_queue_head_t queue;	/* sleep & wake process */
 };
