@@ -71,6 +71,8 @@ In addition, the following text indicates that the option:
 
 Parameters denoted with BOOT are actually interpreted by the boot
 loader, and have no meaning to the kernel directly.
+Do not modify the syntax of boot loader parameters without extreme
+need or coordination with <Documentation/i386/boot.txt>.
 
 Note that ALL kernel parameters listed below are CASE SENSITIVE, and that
 a trailing = on the name of any parameter states that that parameter will
@@ -502,30 +504,30 @@ running once the system is up.
 			Format: <first>,<last>
 			Specifies range of consoles to be captured by the MDA.
  
-	mem=exactmap	[KNL,BOOT,IA-32] Enable setting of an exact
-			E820 memory map, as specified by the user.
-			Such mem=exactmap lines can be constructed based on
-			BIOS output or other requirements. See the mem=nn@ss
-			option description.
-
 	mem=nn[KMG]	[KNL,BOOT] Force usage of a specific amount of memory
 			Amount of memory to be used when the kernel is not able
 			to see the whole system memory or for test.
 
-	mem=nn[KMG]@ss[KMG]
-			[KNL,BOOT] Force usage of a specific region of memory
-			Region of memory to be used, from ss to ss+nn.
-
-	mem=nn[KMG]#ss[KMG]
-			[KNL,BOOT,ACPI] Mark specific memory as ACPI data.
-			Region of memory to be used, from ss to ss+nn.
-
-	mem=nn[KMG]$ss[KMG]
-			[KNL,BOOT,ACPI] Mark specific memory as reserved.
-			Region of memory to be used, from ss to ss+nn.
-
 	mem=nopentium	[BUGS=IA-32] Disable usage of 4MB pages for kernel
 			memory.
+
+	memmap=exactmap	[KNL,IA-32] Enable setting of an exact
+			E820 memory map, as specified by the user.
+			Such memmap=exactmap lines can be constructed based on
+			BIOS output or other requirements. See the memmap=nn@ss
+			option description.
+
+	memmap=nn[KMG]@ss[KMG]
+			[KNL] Force usage of a specific region of memory
+			Region of memory to be used, from ss to ss+nn.
+
+	memmap=nn[KMG]#ss[KMG]
+			[KNL,ACPI] Mark specific memory as ACPI data.
+			Region of memory to be used, from ss to ss+nn.
+
+	memmap=nn[KMG]$ss[KMG]
+			[KNL,ACPI] Mark specific memory as reserved.
+			Region of memory to be used, from ss to ss+nn.
 
 	memfrac=	[KNL]
 
