@@ -844,8 +844,10 @@ do_holes:
 				char *kaddr;
 
 				/* AKPM: eargh, -ENOTBLK is a hack */
-				if (dio->rw == WRITE)
+				if (dio->rw == WRITE) {
+					page_cache_release(page);
 					return -ENOTBLK;
+				}
 
 				if (dio->block_in_file >=
 					i_size_read(dio->inode)>>blkbits) {
