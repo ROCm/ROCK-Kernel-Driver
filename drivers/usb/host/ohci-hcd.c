@@ -226,7 +226,7 @@ static int ohci_urb_enqueue (
 		if (retval < 0)
 			goto fail;
 		if (ed->type == PIPE_ISOCHRONOUS) {
-			u16	frame = le16_to_cpu (ohci->hcca->frame_no);
+			u16	frame = OHCI_FRAME_NO(ohci->hcca);
 
 			/* delay a few frames before the first TD */
 			frame += max_t (u16, 8, ed->interval);
@@ -281,7 +281,7 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		urb_priv = urb->hcpriv;
 		if (urb_priv) {
 			if (urb_priv->ed->state == ED_OPER)
-				start_urb_unlink (ohci, urb_priv->ed);
+				start_ed_unlink (ohci, urb_priv->ed);
 		}
 	} else {
 		/*
@@ -363,7 +363,7 @@ static int ohci_get_frame (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 
-	return le16_to_cpu (ohci->hcca->frame_no);
+	return OHCI_FRAME_NO(ohci->hcca);
 }
 
 /*-------------------------------------------------------------------------*
@@ -591,7 +591,7 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	 */
 	spin_lock (&ohci->lock);
 	if (ohci->ed_rm_list)
-		finish_unlinks (ohci, le16_to_cpu (ohci->hcca->frame_no),
+		finish_unlinks (ohci, OHCI_FRAME_NO(ohci->hcca),
 				ptregs);
 	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list
 			&& HCD_IS_RUNNING(ohci->hcd.state))

@@ -150,65 +150,6 @@ void usb_stor_show_command(Scsi_Cmnd *srb)
 	US_DEBUGPX("\n");
 }
 
-void usb_stor_print_Scsi_Cmnd(Scsi_Cmnd *cmd)
-{
-	int i=0, bufferSize = cmd->request_bufflen;
-	u8 *buffer = cmd->request_buffer;
-	struct scatterlist *sg = (struct scatterlist*)cmd->request_buffer;
-
-	US_DEBUGP("Dumping information about %p.\n", cmd);
-	US_DEBUGP("cmd->cmnd[0] value is %d.\n", cmd->cmnd[0]);
-	US_DEBUGP("(MODE_SENSE is %d and MODE_SENSE_10 is %d)\n",
-		  MODE_SENSE, MODE_SENSE_10);
-
-	US_DEBUGP("buffer is %p with length %d.\n", buffer, bufferSize);
-	for (i=0; i<bufferSize; i+=16) {
-		US_DEBUGP("%02x %02x %02x %02x %02x %02x %02x %02x\n"
-			  "%02x %02x %02x %02x %02x %02x %02x %02x\n",
-			  buffer[i],
-			  buffer[i+1],
-			  buffer[i+2],
-			  buffer[i+3],
-			  buffer[i+4],
-			  buffer[i+5],
-			  buffer[i+6],
-			  buffer[i+7],
-			  buffer[i+8],
-			  buffer[i+9],
-			  buffer[i+10],
-			  buffer[i+11],
-			  buffer[i+12],
-			  buffer[i+13],
-			  buffer[i+14],
-			  buffer[i+15] );
-	}
-
-	US_DEBUGP("Buffer has %d scatterlists.\n", cmd->use_sg );
-	for (i=0; i<cmd->use_sg; i++) {
-		char *adr = sg_address(sg[i]);
-		
-		US_DEBUGP("Length of scatterlist %d is %d.\n",i,sg[i].length);
-		US_DEBUGP("%02x %02x %02x %02x %02x %02x %02x %02x\n"
-			  "%02x %02x %02x %02x %02x %02x %02x %02x\n",
-			  adr[0],
-			  adr[1],
-			  adr[2],
-			  adr[3],
-			  adr[4],
-			  adr[5],
-			  adr[6],
-			  adr[7],
-			  adr[8],
-			  adr[9],
-			  adr[10],
-			  adr[11],
-			  adr[12],
-			  adr[13],
-			  adr[14],
-			  adr[15]);
-	}
-}
-
 void usb_stor_show_sense(
 		unsigned char key,
 		unsigned char asc,

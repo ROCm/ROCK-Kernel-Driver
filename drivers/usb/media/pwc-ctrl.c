@@ -44,6 +44,8 @@
 #define GET_STATUS_CTL			0x06
 #define SET_EP_STREAM_CTL		0x07
 #define GET_EP_STREAM_CTL		0x08
+#define SET_MPT_CTL			0x0D
+#define GET_MPT_CTL			0x0E
 
 /* Selectors for the Luminance controls [GS]ET_LUM_CTL */
 #define AGC_MODE_FORMATTER			0x2000
@@ -87,6 +89,11 @@
 
 /* Formatters for the Video Endpoint controls [GS]ET_EP_STREAM_CTL */
 #define VIDEO_OUTPUT_CONTROL_FORMATTER		0x0100
+
+/* Formatters for the motorized pan & tilt [GS]ET_MPT_CTL */
+#define PT_RELATIVE_CONTROL_FORMATTER		0x01
+#define PT_RESET_CONTROL_FORMATTER		0x02
+#define PT_STATUS_FORMATTER			0x03
 
 static char *size2name[PSZ_MAX] =
 {
@@ -435,6 +442,7 @@ int pwc_set_video_mode(struct pwc_device *pdev, int width, int height, int frame
 		ret = set_video_mode_Timon(pdev, size, frames, compression, snapshot);
 		break;
 		
+	case 720:
 	case 730:
 	case 740:
 	case 750:
@@ -745,6 +753,7 @@ static inline int pwc_set_shutter_speed(struct pwc_device *pdev, int mode, int v
 			buf[1] = speed >> 8;
 			buf[0] = speed & 0xff;
 			break;
+		case 720:
 		case 730:
 		case 740:
 		case 750:
@@ -1243,6 +1252,46 @@ static inline int pwc_get_dynamic_noise(struct pwc_device *pdev)
 	return buf;
 }
 
+int pwc_mpt_reset(struct pwc_device *pdev, int flags)
+{
+	unsigned char buf;
+	
+	buf = flags & 0x03; // only lower two bits are currently used 
+	return SendControlMsg(SET_MPT_CTL, PT_RESET_CONTROL_FORMATTER, 1);
+}
+
+static inline int pwc_mpt_set_angle(struct pwc_device *pdev, int pan, int tilt)
+{
+	unsigned char buf[4];
+	
+	/* set new relative angle; angles are expressed in degrees * 100,
+	   but cam as .5 degree resolution, hence devide by 200. Also
+	   the angle must be multiplied by 64 before it's send to
+	   the cam (??)
+	 */
+	pan  =  64 * pan  / 100;
+	tilt = -64 * tilt / 100; /* positive tilt is down, which is not what the user would expect */
+	buf[0] = pan & 0xFF;
+	buf[1] = (pan >> 8) & 0xFF;
+	buf[2] = tilt & 0xFF;
+	buf[3] = (tilt >> 8) & 0xFF;
+	return SendControlMsg(SET_MPT_CTL, PT_RELATIVE_CONTROL_FORMATTER, 4);
+}
+
+static inline int pwc_mpt_get_status(struct pwc_device *pdev, struct pwc_mpt_status *status)
+{
+	int ret;
+	unsigned char buf[5];
+	
+	ret = RecvControlMsg(GET_MPT_CTL, PT_STATUS_FORMATTER, 5);
+	if (ret < 0)
+		return ret;
+	status->status = buf[0] & 0x7; // 3 bits are used for reporting
+	status->time_pan = (buf[1] << 8) + buf[2];
+	status->time_tilt = (buf[3] << 8) + buf[4];
+	return 0;
+}
+
 
 int pwc_get_cmos_sensor(struct pwc_device *pdev)
 {
@@ -1512,8 +1561,128 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 		size->width = pdev->image.x;
 		size->height = pdev->image.y;
 		break;
-	}	
-
+ 	}
+ 	
+ 	case VIDIOCPWCMPTRESET:
+ 	{
+ 		int *flags = arg;
+ 		
+ 		if (pdev->features & FEATURE_MOTOR_PANTILT)
+ 		{
+			ret = pwc_mpt_reset(pdev, *flags);
+ 			if (ret >= 0)
+ 			{
+ 				pdev->pan_angle = 0;
+ 				pdev->tilt_angle = 0;
+ 			}
+ 		}
+ 		else
+ 		{
+ 			ret = -ENXIO;
+ 		}
+ 		break;		
+ 	}
+ 	case VIDIOCPWCMPTGRANGE:
+ 	{
+ 		if (pdev->features & FEATURE_MOTOR_PANTILT)
+ 		{
+ 			memcpy(arg, &pdev->angle_range, sizeof(struct pwc_mpt_range));
+ 		}
+ 		else
+ 		{	
+ 			ret = -ENXIO;
+ 		}
+ 		break;
+ 	}
+ 	
+ 	case VIDIOCPWCMPTSANGLE:
+ 	{
+ 		struct pwc_mpt_angles *angles = arg;
+ 		int new_pan, new_tilt;
+ 		
+ 		if (pdev->features & FEATURE_MOTOR_PANTILT)
+ 		{
+			/* The camera can only set relative angles, so
+			   do some calculations when getting an absolute angle .
+			 */
+			if (angles->absolute)
+			{
+ 				new_pan  = angles->pan; 
+ 				new_tilt = angles->tilt;
+ 			}
+ 			else
+ 			{
+ 				new_pan  = pdev->pan_angle  + angles->pan;
+ 				new_tilt = pdev->tilt_angle + angles->tilt;
+			}
+			/* check absolute ranges */
+			if (new_pan  < pdev->angle_range.pan_min  ||
+			    new_pan  > pdev->angle_range.pan_max  ||
+			    new_tilt < pdev->angle_range.tilt_min ||
+			    new_tilt > pdev->angle_range.tilt_max)
+			{
+				ret = -ERANGE;
+			}
+			else
+			{
+				/* go to relative range, check again */
+				new_pan  -= pdev->pan_angle;
+				new_tilt -= pdev->tilt_angle;
+				/* angles are specified in degrees * 100, thus the limit = 36000 */
+				if (new_pan < -36000 || new_pan > 36000 || new_tilt < -36000 || new_tilt > 36000)
+					ret = -ERANGE;
+			}
+			if (ret == 0) /* no errors so far */
+			{
+				ret = pwc_mpt_set_angle(pdev, new_pan, new_tilt);
+				if (ret >= 0)
+				{
+					pdev->pan_angle  += new_pan;
+					pdev->tilt_angle += new_tilt;
+				}
+				if (ret == -EPIPE) /* stall -> out of range */
+					ret = -ERANGE;				
+			}
+ 		}
+ 		else
+ 		{
+ 			ret = -ENXIO;
+ 		}
+ 		break;
+ 	} 
+ 	
+ 	case VIDIOCPWCMPTGANGLE:
+ 	{
+ 		struct pwc_mpt_angles *angles = arg;
+ 		
+ 		if (pdev->features & FEATURE_MOTOR_PANTILT)
+ 		{
+ 			angles->absolute = 1;
+ 			angles->pan  = pdev->pan_angle;
+ 			angles->tilt = pdev->tilt_angle;
+ 		}
+ 		else
+ 		{
+ 			ret = -ENXIO;
+ 		}
+ 		break;
+ 	}
+ 
+ 	case VIDIOCPWCMPTSTATUS:
+ 	{
+ 		struct pwc_mpt_status *status = arg;
+ 	
+ 		if (pdev->features & FEATURE_MOTOR_PANTILT)
+ 		{
+ 			ret = pwc_mpt_get_status(pdev, status);
+ 		}
+ 		else
+ 		{
+ 			ret = -ENXIO;
+ 		}
+  		break;
+  	}
+  	
 	default:
 		ret = -ENOIOCTLCMD;
 		break;

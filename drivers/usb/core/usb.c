@@ -80,7 +80,7 @@ static struct device_driver usb_generic_driver = {
 
 static int usb_generic_driver_data;
 
-/* needs to be called with BKL held */
+/* called from driver core with usb_bus_type.subsys writelock */
 int usb_probe_interface(struct device *dev)
 {
 	struct usb_interface * intf = to_usb_interface(dev);
@@ -93,12 +93,14 @@ int usb_probe_interface(struct device *dev)
 	if (!driver->probe)
 		return error;
 
+	/* driver claim() doesn't yet affect dev->driver... */
+	if (intf->driver)
+		return error;
+
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {
 		dev_dbg (dev, "%s - got id\n", __FUNCTION__);
-		down (&driver->serialize);
 		error = driver->probe (intf, id);
-		up (&driver->serialize);
 	}
 	if (!error)
 		intf->driver = driver;
@@ -106,23 +108,24 @@ int usb_probe_interface(struct device *dev)
 	return error;
 }
 
+/* called from driver core with usb_bus_type.subsys writelock */
 int usb_unbind_interface(struct device *dev)
 {
 	struct usb_interface *intf = to_usb_interface(dev);
-	struct usb_driver *driver = to_usb_driver(dev->driver);
-
-	down(&driver->serialize);
+	struct usb_driver *driver = intf->driver;
 
 	/* release all urbs for this interface */
 	usb_disable_interface(interface_to_usbdev(intf), intf);
 
-	if (intf->driver && intf->driver->disconnect)
-		intf->driver->disconnect(intf);
+	if (driver && driver->disconnect)
+		driver->disconnect(intf);
 
-	/* force a release and re-initialize the interface */
-	usb_driver_release_interface(driver, intf);
-
-	up(&driver->serialize);
+	/* reset other interface state */
+	usb_set_interface(interface_to_usbdev(intf),
+			intf->altsetting[0].desc.bInterfaceNumber,
+			0);
+	usb_set_intfdata(intf, NULL);
+	intf->driver = NULL;
 
 	return 0;
 }
@@ -152,8 +155,6 @@ int usb_register(struct usb_driver *new_driver)
 	new_driver->driver.probe = usb_probe_interface;
 	new_driver->driver.remove = usb_unbind_interface;
 
-	init_MUTEX(&new_driver->serialize);
-
 	retval = driver_register(&new_driver->driver);
 
 	if (!retval) {
@@ -170,7 +171,7 @@ int usb_register(struct usb_driver *new_driver)
 /**
  * usb_deregister - unregister a USB driver
  * @driver: USB operations of the driver to unregister
- * Context: !in_interrupt (), must be called with BKL held
+ * Context: must be able to sleep
  *
  * Unlinks the specified driver from the internal USB driver list.
  * 
@@ -264,26 +265,22 @@ usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
  * Few drivers should need to use this routine, since the most natural
  * way to bind to an interface is to return the private data from
  * the driver's probe() method.
+ *
+ * Callers must own the driver model's usb bus writelock.  So driver
+ * probe() entries don't need extra locking, but other call contexts
+ * may need to explicitly claim that lock.
  */
 int usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface *iface, void* priv)
 {
 	if (!iface || !driver)
 		return -EINVAL;
 
-	/* this is mainly to lock against usbfs */
-	lock_kernel();
-	if (iface->driver) {
-		unlock_kernel();
-		err ("%s driver booted %s off interface %p",
-			driver->name, iface->driver->name, iface);
+	if (iface->driver)
 		return -EBUSY;
-	} else {
-	    dbg("%s driver claimed interface %p", driver->name, iface);
-	}
 
+	/* FIXME should device_bind_driver() */
 	iface->driver = driver;
 	usb_set_intfdata(iface, priv);
-	unlock_kernel();
 	return 0;
 }
 
@@ -323,12 +320,21 @@ int usb_interface_claimed(struct usb_interface *iface)
  * usually won't need to call this.
  *
  * This call is synchronous, and may not be used in an interrupt context.
+ * Callers must own the driver model's usb bus writelock.  So driver
+ * disconnect() entries don't need extra locking, but other call contexts
+ * may need to explicitly claim that lock.
  */
 void usb_driver_release_interface(struct usb_driver *driver, struct usb_interface *iface)
 {
 	/* this should never happen, don't release something that's not ours */
-	if (iface->driver && iface->driver != driver)
+	if (!iface || !iface->driver || iface->driver != driver)
 		return;
+
+	if (iface->dev.driver) {
+		/* FIXME should be the ONLY case here */
+		device_release_driver(&iface->dev);
+		return;
+	}
 
 	usb_set_interface(interface_to_usbdev(iface),
 			iface->altsetting[0].desc.bInterfaceNumber,
@@ -991,6 +997,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	int err = -EINVAL;
 	int i;
 	int j;
+	int config;
 
 	/*
 	 * Set the driver for the usb device to point to the "generic" driver.
@@ -1108,18 +1115,30 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	/* choose and set the configuration. that registers the interfaces
 	 * with the driver core, and lets usb device drivers bind to them.
+	 * NOTE:  should interact with hub power budgeting.
 	 */
+	config = dev->config[0].desc.bConfigurationValue;
 	if (dev->descriptor.bNumConfigurations != 1) {
+		for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
+			/* heuristic:  Linux is more likely to have class
+			 * drivers, so avoid vendor-specific interfaces.
+			 */
+			if (dev->config[i].interface[0]->altsetting
+						->desc.bInterfaceClass
+					== USB_CLASS_VENDOR_SPEC)
+				continue;
+			config = dev->config[i].desc.bConfigurationValue;
+			break;
+		}
 		dev_info(&dev->dev,
 			"configuration #%d chosen from %d choices\n",
-			dev->config[0].desc.bConfigurationValue,
+			config,
 			dev->descriptor.bNumConfigurations);
 	}
-	err = usb_set_configuration(dev,
-			dev->config[0].desc.bConfigurationValue);
+	err = usb_set_configuration(dev, config);
 	if (err) {
 		dev_err(&dev->dev, "can't set config #%d, error %d\n",
-			dev->config[0].desc.bConfigurationValue, err);
+			config, err);
 		goto fail;
 	}
 
