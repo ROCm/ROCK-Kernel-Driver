@@ -152,6 +152,50 @@ void __init disable_early_printk(void)
 }
 
 #if !defined(CONFIG_PPC_ISERIES) && defined(CONFIG_SMP)
+
+static int smt_enabled_cmdline;
+
+/* Look for ibm,smt-enabled OF option */
+static void check_smt_enabled(void)
+{
+	struct device_node *dn;
+	char *smt_option;
+
+	/* Allow the command line to overrule the OF option */
+	if (smt_enabled_cmdline)
+		return;
+
+	dn = of_find_node_by_path("/options");
+
+	if (dn) {
+		smt_option = (char *)get_property(dn, "ibm,smt-enabled", NULL);
+
+                if (smt_option) {
+			if (!strcmp(smt_option, "on"))
+				smt_enabled_at_boot = 1;
+			else if (!strcmp(smt_option, "off"))
+				smt_enabled_at_boot = 0;
+                }
+        }
+}
+
+/* Look for smt-enabled= cmdline option */
+static int __init early_smt_enabled(char *p)
+{
+	smt_enabled_cmdline = 1;
+
+	if (!p)
+		return 0;
+
+	if (!strcmp(p, "on") || !strcmp(p, "1"))
+		smt_enabled_at_boot = 1;
+	else if (!strcmp(p, "off") || !strcmp(p, "0"))
+		smt_enabled_at_boot = 0;
+
+	return 0;
+}
+early_param("smt-enabled", early_smt_enabled);
+
 /**
  * setup_cpu_maps - initialize the following cpu maps:
  *                  cpu_possible_map
@@ -174,6 +218,8 @@ static void __init setup_cpu_maps(void)
 	struct device_node *dn = NULL;
 	int cpu = 0;
 
+	check_smt_enabled();
+
 	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu < NR_CPUS) {
 		u32 *intserv;
 		int j, len = sizeof(u32), nthreads;
@@ -186,9 +232,16 @@ static void __init setup_cpu_maps(void)
 		nthreads = len / sizeof(u32);
 
 		for (j = 0; j < nthreads && cpu < NR_CPUS; j++) {
+			/*
+			 * Only spin up secondary threads if SMT is enabled.
+			 * We must leave space in the logical map for the
+			 * threads.
+			 */
+			if (j == 0 || smt_enabled_at_boot) {
+				cpu_set(cpu, cpu_present_map);
+				set_hard_smp_processor_id(cpu, intserv[j]);
+			}
 			cpu_set(cpu, cpu_possible_map);
-			cpu_set(cpu, cpu_present_map);
-			set_hard_smp_processor_id(cpu, intserv[j]);
 			cpu++;
 		}
 	}

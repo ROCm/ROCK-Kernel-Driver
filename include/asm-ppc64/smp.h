@@ -65,6 +65,8 @@ extern int query_cpu_stopped(unsigned int pcpu);
 #define set_hard_smp_processor_id(CPU, VAL) \
 	do { (paca[(CPU)].hw_cpu_id = (VAL)); } while (0)
 
+extern int smt_enabled_at_boot;
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* !(_PPC64_SMP_H) */

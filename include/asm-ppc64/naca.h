@@ -37,9 +37,6 @@ struct naca_struct {
 	u32 dCacheL1LinesPerPage;	/* L1 d-cache lines / page   0x64 */
 	u32 iCacheL1LogLineSize;	/* L1 i-cache line size Log2 0x68 */
 	u32 iCacheL1LinesPerPage;	/* L1 i-cache lines / page   0x6c */
-	u8  smt_state;                  /* 0 = SMT off               0x70 */
-	                                /* 1 = SMT on                     */
-	                                /* 2 = SMT dynamic                */
 	u8  resv0[15];                  /* Reserved           0x71 - 0x7F */
 };
 

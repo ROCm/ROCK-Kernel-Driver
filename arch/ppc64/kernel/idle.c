@@ -197,12 +197,7 @@ int dedicated_idle(void)
 
 				HMT_very_low(); /* Low power mode */
 
-				/* If the SMT mode is system controlled & the 
-				 * partner thread is doing work, switch into
-				 * ST mode.
-				 */
-				if((naca->smt_state == SMT_DYNAMIC) &&
-				   (!(ppaca->lppaca.xIdle))) {
+				if (!(ppaca->lppaca.xIdle)) {
 					/* Indicate we are no longer polling for
 					 * work, and then clear need_resched.  If
 					 * need_resched was 1, set it back to 1

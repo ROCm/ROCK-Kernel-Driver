@@ -56,14 +56,4 @@ static inline void isync(void)
 #define HMT_MEDIUM_HIGH "\tor   5,5,5           # medium high priority\n"
 #define HMT_HIGH	"\tor	3,3,3		# high priority\n"
 
-/* 
- * Various operational modes for SMT
- * Off    : never run threaded
- * On     : always run threaded
- * Dynamic: Allow the system to switch modes as needed
- */
-#define SMT_OFF      0
-#define SMT_ON       1
-#define SMT_DYNAMIC  2
-
 #endif
