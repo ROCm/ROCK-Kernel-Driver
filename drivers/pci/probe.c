@@ -479,10 +479,10 @@ struct pci_dev * __devinit pci_scan_slot(struct pci_dev *temp)
 
 		/*
 		 * Link the device to both the global PCI device chain and
-		 * the per-bus list of devices.
+		 * the per-bus list of devices and call /sbin/hotplug if we
+		 * should.
 		 */
-		list_add_tail(&dev->global_list, &pci_devices);
-		list_add_tail(&dev->bus_list, &bus->devices);
+		pci_insert_device (dev, bus);
 
 		/* Fix up broken headers */
 		pci_fixup_device(PCI_FIXUP_HEADER, dev);
