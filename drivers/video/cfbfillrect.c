@@ -119,7 +119,7 @@ static inline unsigned long pixel_to_pat(const struct fb_info *p,
      *  Unaligned 32-bit pattern fill using 32/64-bit memory accesses
      */
 
-void bitfill32(unsigned long *dst, int dst_idx, u32 pat, u32 n)
+void bitfill32(unsigned long __iomem *dst, int dst_idx, u32 pat, u32 n)
 {
 	unsigned long val = pat;
 	unsigned long first, last;
@@ -178,7 +178,7 @@ void bitfill32(unsigned long *dst, int dst_idx, u32 pat, u32 n)
      *  used for the next 32/64-bit word
      */
 
-void bitfill(unsigned long *dst, int dst_idx, unsigned long pat, int left,
+void bitfill(unsigned long __iomem *dst, int dst_idx, unsigned long pat, int left,
 	     int right, u32 n)
 {
 	unsigned long first, last;
@@ -228,7 +228,7 @@ void bitfill(unsigned long *dst, int dst_idx, unsigned long pat, int left,
 	}
 }
 
-void bitfill32_rev(unsigned long *dst, int dst_idx, u32 pat, u32 n)
+void bitfill32_rev(unsigned long __iomem *dst, int dst_idx, u32 pat, u32 n)
 {
 	unsigned long val = pat, dat;
 	unsigned long first, last;
@@ -300,7 +300,7 @@ void bitfill32_rev(unsigned long *dst, int dst_idx, u32 pat, u32 n)
      *  used for the next 32/64-bit word
      */
 
-void bitfill_rev(unsigned long *dst, int dst_idx, unsigned long pat, int left,
+void bitfill_rev(unsigned long __iomem *dst, int dst_idx, unsigned long pat, int left,
 	     int right, u32 n)
 {
 	unsigned long first, last, dat;
@@ -364,7 +364,7 @@ void cfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
 	u32 bpp = p->var.bits_per_pixel;
 	unsigned long x2, y2, vxres, vyres;
 	unsigned long height, width, fg;
-	unsigned long *dst;
+	unsigned long __iomem *dst;
 	int dst_idx, left;
 
 	if (p->state != FBINFO_STATE_RUNNING)
@@ -397,7 +397,7 @@ void cfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
 	else
 		fg = rect->color;
 	
-	dst = (unsigned long *)((unsigned long)p->screen_base & 
+	dst = (unsigned long __iomem *)((unsigned long)p->screen_base & 
 				~(BYTES_PER_LONG-1));
 	dst_idx = ((unsigned long)p->screen_base & (BYTES_PER_LONG-1))*8;
 	dst_idx += rect->dy*p->fix.line_length*8+rect->dx*bpp;
@@ -407,7 +407,7 @@ void cfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
 		p->fbops->fb_sync(p);
 	if (!left) {
 		u32 pat = pixel_to_pat32(p, fg);
-		void (*fill_op32)(unsigned long *dst, int dst_idx, u32 pat, 
+		void (*fill_op32)(unsigned long __iomem *dst, int dst_idx, u32 pat, 
 				  u32 n) = NULL;
 		
 		switch (rect->rop) {
@@ -429,7 +429,7 @@ void cfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
 		unsigned long pat = pixel_to_pat(p, fg, (left-dst_idx) % bpp);
 		int right = bpp-left;
 		int r;
-		void (*fill_op)(unsigned long *dst, int dst_idx, 
+		void (*fill_op)(unsigned long __iomem *dst, int dst_idx, 
 				unsigned long pat, int left, int right, 
 				u32 n) = NULL;
 		
