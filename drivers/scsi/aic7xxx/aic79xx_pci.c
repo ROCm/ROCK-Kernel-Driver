@@ -38,7 +38,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#71 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#72 $
  *
  * $FreeBSD$
  */
@@ -332,9 +332,9 @@ ahd_pci_config(struct ahd_softc *ahd, struct ahd_pci_identity *entry)
 	}
 	
 	/* Ensure busmastering is enabled */
-	command = ahd_pci_read_config(ahd->dev_softc, PCIR_COMMAND, /*bytes*/1);
+	command = ahd_pci_read_config(ahd->dev_softc, PCIR_COMMAND, /*bytes*/2);
 	command |= PCIM_CMD_BUSMASTEREN;
-	ahd_pci_write_config(ahd->dev_softc, PCIR_COMMAND, command, /*bytes*/1);
+	ahd_pci_write_config(ahd->dev_softc, PCIR_COMMAND, command, /*bytes*/2);
 
 	error = ahd_softc_init(ahd);
 	if (error != 0)
@@ -890,7 +890,7 @@ ahd_aic7902_setup(struct ahd_softc *ahd)
 	if (rev < ID_AIC7902_PCI_REV_A4) {
 		printf("%s: Unable to attach to unsupported chip revision %d\n",
 		       ahd_name(ahd), rev);
-		ahd_pci_write_config(pci, PCIR_COMMAND, 0, /*bytes*/1);
+		ahd_pci_write_config(pci, PCIR_COMMAND, 0, /*bytes*/2);
 		return (ENXIO);
 	}
 	ahd->channel = ahd_get_pci_function(pci) + 'A';
