@@ -24,6 +24,7 @@
 #include <asm/mtrr.h>
 #include <asm/proto.h>
 #include <asm/mman.h>
+#include <asm/numa.h>
 
 char x86_boot_params[2048] __initdata = {0,};
 
@@ -329,4 +330,8 @@ void __init cpu_init (void)
 	set_debug(0UL, 7);
 
 	fpu_init(); 
+
+#ifdef CONFIG_NUMA
+	numa_add_cpu(cpu);
+#endif
 }

@@ -42,7 +42,7 @@ extern void early_identify_cpu(struct cpuinfo_x86 *c);
 
 extern int k8_scan_nodes(unsigned long start, unsigned long end);
 
-extern int numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
+extern void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
 extern unsigned long numa_free_all_bootmem(void);
 
 extern void reserve_bootmem_generic(unsigned long phys, unsigned len);

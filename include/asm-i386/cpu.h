@@ -17,11 +17,7 @@ static inline int arch_register_cpu(int num){
 	struct node *parent = NULL;
 	
 #ifdef CONFIG_NUMA
-	int node = cpu_to_node(num);
-
-	if (!node_online(node))
-		return 0; 
-	parent = &node_devices[node].node;
+	parent = &node_devices[cpu_to_node(num)].node;
 #endif /* CONFIG_NUMA */
 
 	return register_cpu(&cpu_devices[num].cpu, num, parent);

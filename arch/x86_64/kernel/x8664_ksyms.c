@@ -98,8 +98,10 @@ EXPORT_SYMBOL(copy_to_user);
 EXPORT_SYMBOL(copy_in_user);
 EXPORT_SYMBOL(strnlen_user);
 
+#ifdef CONFIG_PCI
 EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);
+#endif
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(pcibios_penalize_isa_irq);
@@ -205,13 +207,6 @@ EXPORT_SYMBOL(init_level4_pgt);
 
 extern unsigned long __supported_pte_mask;
 EXPORT_SYMBOL(__supported_pte_mask);
-
-#ifdef CONFIG_DISCONTIGMEM
-EXPORT_SYMBOL(memnode_shift);
-EXPORT_SYMBOL(memnodemap);
-EXPORT_SYMBOL(node_data);
-EXPORT_SYMBOL(fake_node);
-#endif
 
 EXPORT_SYMBOL(clear_page);
 

@@ -683,7 +683,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 			break;
 		case TW_OP_AEN_LISTEN:
 			dprintk(KERN_WARNING "3w-xxxx: tw_chrdev_ioctl(): caught TW_AEN_LISTEN.\n");
-			memset(tw_ioctl->data_buffer, 0, tw_ioctl->data_buffer_length);
+			memset(tw_ioctl->data_buffer, 0, data_buffer_length);
 
 			spin_lock_irqsave(tw_dev->host->host_lock, flags);
 			if (tw_dev->aen_head == tw_dev->aen_tail) {
@@ -777,7 +777,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 	}
 
 	/* Now copy the response to userspace */
-	error = copy_to_user((void *)arg, tw_ioctl, sizeof(TW_New_Ioctl) + tw_ioctl->data_buffer_length - 1);
+	error = copy_to_user((void *)arg, tw_ioctl, sizeof(TW_New_Ioctl) + data_buffer_length - 1);
 	if (error == 0)
 		retval = 0;
 out2:

@@ -6,18 +6,19 @@
 #ifdef CONFIG_DISCONTIGMEM
 
 #include <asm/mpspec.h>
+#include <asm/bitops.h>
 
 /* Map the K8 CPU local memory controllers to a simple 1:1 CPU:NODE topology */
 
-extern int fake_node;
-/* This is actually a cpumask_t, but doesn't matter because we don't have
-   >BITS_PER_LONG CPUs */
-extern unsigned long cpu_online_map;
+extern cpumask_t cpu_online_map;
 
-#define cpu_to_node(cpu)		(fake_node ? 0 : (cpu))
+extern unsigned char cpu_to_node[];
+extern cpumask_t     node_to_cpumask[];
+
+#define cpu_to_node(cpu)		(cpu_to_node[cpu])
 #define parent_node(node)		(node)
-#define node_to_first_cpu(node) 	(fake_node ? 0 : (node))
-#define node_to_cpumask(node)	(fake_node ? cpu_online_map : (1UL << (node)))
+#define node_to_first_cpu(node) 	(__ffs(node_to_cpumask[node]))
+#define node_to_cpumask(node)		(node_to_cpumask[node])
 
 static inline unsigned long pcibus_to_cpumask(int bus)
 {

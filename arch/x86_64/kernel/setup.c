@@ -794,6 +794,9 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		c->x86_virt_bits = (eax >> 8) & 0xff;
 		c->x86_phys_bits = eax & 0xff;
 	}
+
+	if (c->x86 == 15)
+		c->x86_cache_alignment = c->x86_clflush_size * 2;
 }
 
 void __init get_cpu_vendor(struct cpuinfo_x86 *c)
@@ -828,6 +831,7 @@ void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
 	c->x86_clflush_size = 64;
+	c->x86_cache_alignment = c->x86_clflush_size;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	/* Get vendor name */
@@ -1055,6 +1059,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (c->x86_tlbsize > 0) 
 		seq_printf(m, "TLB size\t: %d 4K pages\n", c->x86_tlbsize);
 	seq_printf(m, "clflush size\t: %d\n", c->x86_clflush_size);
+	seq_printf(m, "cache_alignment\t: %d\n", c->x86_cache_alignment);
 
 	seq_printf(m, "address sizes\t: %u bits physical, %u bits virtual\n", 
 		   c->x86_phys_bits, c->x86_virt_bits);
