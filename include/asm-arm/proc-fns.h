@@ -122,15 +122,4 @@
 #include CPU_INCLUDE_NAME
 
 #endif /* __KERNEL__ */
-
-#if 0
- * The following is to fool mkdep into generating the correct
- * dependencies.  Without this, it can't figure out that this
- * file does indeed depend on the cpu-*.h files.
-#include <asm/cpu-single.h>
-#include <asm/cpu-multi26.h>
-#include <asm/cpu-multi32.h>
- *
-#endif
-
 #endif /* __ASM_PROCFNS_H */
