@@ -280,7 +280,7 @@ pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc* qdisc)
 	list = ((struct sk_buff_head*)qdisc->data) +
 		prio2band[skb->priority&TC_PRIO_MAX];
 
-	if (list->qlen <= skb->dev->tx_queue_len) {
+	if (list->qlen <= qdisc->dev->tx_queue_len) {
 		__skb_queue_tail(list, skb);
 		qdisc->q.qlen++;
 		return 0;
