@@ -658,7 +658,7 @@ xfs_setattr(
 		if (vap->va_size > ip->i_d.di_size) {
 			code = xfs_igrow_start(ip, vap->va_size, credp);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		} else if (vap->va_size < ip->i_d.di_size) {
+		} else if (vap->va_size <= ip->i_d.di_size) {
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE,
 					    (xfs_fsize_t)vap->va_size);
@@ -701,7 +701,7 @@ xfs_setattr(
 		if (vap->va_size > ip->i_d.di_size) {
 			xfs_igrow_finish(tp, ip, vap->va_size,
 			    !(flags & ATTR_DMI));
-		} else if ((vap->va_size < ip->i_d.di_size) ||
+		} else if ((vap->va_size <= ip->i_d.di_size) ||
 			   ((vap->va_size == 0) && ip->i_d.di_nextents)) {
 			/*
 			 * signal a sync transaction unless
@@ -3786,27 +3786,30 @@ xfs_inode_flush(
 					flush_flags = XFS_IFLUSH_SYNC;
 				else
 #endif
-					flush_flags = XFS_IFLUSH_DELWRI;
+				flush_flags = XFS_IFLUSH_DELWRI_ELSE_ASYNC;
 
 				xfs_ifunlock(ip);
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
 				error = xfs_itobp(mp, NULL, ip, &dip, &bp, 0);
 				if (error)
-					goto eagain;
+					return error;
 				xfs_buf_relse(bp);
 
 				if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED) == 0)
-					goto eagain;
+					return EAGAIN;
 
-				if ((xfs_ipincount(ip) == 0) &&
-				     xfs_iflock_nowait(ip))
-					error = xfs_iflush(ip, flush_flags);
+				if (xfs_ipincount(ip) ||
+				    !xfs_iflock_nowait(ip)) {
+					xfs_iunlock(ip, XFS_ILOCK_SHARED);
+					return EAGAIN;
+				}
+
+				error = xfs_iflush(ip, flush_flags);
 			} else {
 				error = EAGAIN;
 			}
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		} else {
-eagain:
 			error = EAGAIN;
 		}
 	}
@@ -3934,6 +3937,8 @@ xfs_reclaim(
 		/* Protect sync from us */
 		XFS_MOUNT_ILOCK(mp);
 		vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
+		list_add_tail(&ip->i_reclaim, &mp->m_del_inodes);
+
 		XFS_MOUNT_IUNLOCK(mp);
 	}
 	return 0;
@@ -4010,40 +4015,33 @@ xfs_finish_reclaim(
 }
 
 int
-xfs_finish_reclaim_all(xfs_mount_t *mp)
+xfs_finish_reclaim_all(xfs_mount_t *mp, int noblock)
 {
 	int		purged;
+	struct list_head	*curr, *next;
 	xfs_inode_t	*ip;
-	vnode_t		*vp;
 	int		done = 0;
 
 	while (!done) {
 		purged = 0;
 		XFS_MOUNT_ILOCK(mp);
-		ip = mp->m_inodes;
-		if (ip == NULL) {
+		list_for_each_safe(curr, next, &mp->m_del_inodes) {
+			ip = list_entry(curr, xfs_inode_t, i_reclaim);
+			if (noblock) {
+				if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0)
+					continue;
+				if (xfs_ipincount(ip) ||
+				    !xfs_iflock_nowait(ip)) {
+					xfs_iunlock(ip, XFS_ILOCK_EXCL);
+					continue;
+				}
+			}
+			XFS_MOUNT_IUNLOCK(mp);
+			xfs_finish_reclaim(ip, noblock,
+				XFS_IFLUSH_DELWRI_ELSE_ASYNC);
+			purged = 1;
 			break;
 		}
-		do {
-			/* Make sure we skip markers inserted by sync */
-			if (ip->i_mount == NULL) {
-				ip = ip->i_mnext;
-				continue;
-			}
-
-			/*
-			 * It's up to our caller to purge the root
-			 * and quota vnodes later.
-			 */
-			vp = XFS_ITOV_NULL(ip);
-
-			if (!vp) {
-				XFS_MOUNT_IUNLOCK(mp);
-				xfs_finish_reclaim(ip, 0, XFS_IFLUSH_ASYNC);
-				purged = 1;
-				break;
-			}
-		} while (ip != mp->m_inodes);
 
 		done = !purged;
 	}

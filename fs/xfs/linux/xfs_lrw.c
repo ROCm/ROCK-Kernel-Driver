@@ -887,29 +887,23 @@ xfsbdstrat(
 	return (xfs_bioerror_relse(bp));
 }
 
-
-void
-XFS_bflush(xfs_buftarg_t *target)
-{
-	pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
-}
-
 /*
- * If the underlying (log or data) device is readonly, there are some
+ * If the underlying (data/log/rt) device is readonly, there are some
  * operations that cannot proceed.
  */
 int
-xfs_dev_is_read_only(xfs_mount_t *mp, char *message)
+xfs_dev_is_read_only(
+	xfs_mount_t		*mp,
+	char			*message)
 {
-	if (bdev_read_only(mp->m_ddev_targp->pbr_bdev) ||
-	    bdev_read_only(mp->m_logdev_targp->pbr_bdev) ||
-	   (mp->m_rtdev_targp && bdev_read_only(mp->m_rtdev_targp->pbr_bdev))) {
+	if (xfs_readonly_buftarg(mp->m_ddev_targp) ||
+	    xfs_readonly_buftarg(mp->m_logdev_targp) ||
+	    (mp->m_rtdev_targp && xfs_readonly_buftarg(mp->m_rtdev_targp))) {
 		cmn_err(CE_NOTE,
 			"XFS: %s required on read-only device.", message);
 		cmn_err(CE_NOTE,
 			"XFS: write access unavailable, cannot proceed.");
 		return EROFS;
 	}
-
 	return 0;
 }
