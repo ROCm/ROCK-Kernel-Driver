@@ -1657,8 +1657,8 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
 		bond_change_active_slave(bond, NULL);
 	}
 
-	if ((bond->params.mode == BOND_MODE_TLB) ||
-	    (bond->params.mode == BOND_MODE_ALB)) {
+	if ((bond_mode == BOND_MODE_TLB) ||
+	    (bond_mode == BOND_MODE_ALB)) {
 		/* Must be called only after the slave has been
 		 * detached from the list and the curr_active_slave
 		 * has been cleared (if our_slave == old_current),
