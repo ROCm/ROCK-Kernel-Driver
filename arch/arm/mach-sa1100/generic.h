@@ -22,5 +22,5 @@ struct cpufreq_policy;
 
 extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
 extern int sa11x0_verify_speed(struct cpufreq_policy *policy);
-extern unsigned int sa11x0_getspeed(void);
+extern unsigned int sa11x0_getspeed(unsigned int cpu);
 extern unsigned int sa11x0_ppcr_to_freq(unsigned int idx);

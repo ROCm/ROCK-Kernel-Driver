@@ -32,14 +32,14 @@
 #include <asm/io.h>
 #include <asm/delay.h>
 
-#ifdef CONFIG_ACPI_PROCESSOR
+#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
 #include <linux/acpi.h>
 #include <acpi/processor.h>
 #endif
 
 #define PFX "powernow-k8: "
 #define BFX PFX "BIOS error: "
-#define VERSION "version 1.00.08b"
+#define VERSION "version 1.00.09b"
 #include "powernow-k8.h"
 
 /* serialize freq changes  */
@@ -450,13 +450,10 @@ static int check_supported_cpu(unsigned int cpu)
 		goto out;
 
 	eax = cpuid_eax(CPUID_PROCESSOR_SIGNATURE);
-	if ((eax & CPUID_XFAM_MOD) == ATHLON64_XFAM_MOD) {
-		dprintk(KERN_DEBUG PFX "AMD Althon 64 Processor found\n");
-	} else if ((eax & CPUID_XFAM_MOD) == OPTERON_XFAM_MOD) {
-		dprintk(KERN_DEBUG PFX "AMD Opteron Processor found\n");
-	} else {
-		printk(KERN_INFO PFX
-		       "AMD Athlon 64 or AMD Opteron processor required\n");
+	if (((eax & CPUID_USE_XFAM_XMOD) != CPUID_USE_XFAM_XMOD) ||
+	    ((eax & CPUID_XFAM) != CPUID_XFAM_K8) ||
+	    ((eax & CPUID_XMOD) > CPUID_XMOD_REV_E)) {
+		printk(KERN_INFO PFX "Processor cpuid %x not supported\n", eax);
 		goto out;
 	}
 
@@ -524,11 +521,12 @@ static void print_basics(struct powernow_k8_data *data)
 {
 	int j;
 	for (j = 0; j < data->numps; j++) {
-		printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x (%d mV)\n", j,
-			data->powernow_table[j].index & 0xff,
-			data->powernow_table[j].frequency/1000,
-			data->powernow_table[j].index >> 8,
-			find_millivolts_from_vid(data, data->powernow_table[j].index >> 8));
+		if (data->powernow_table[j].frequency != CPUFREQ_ENTRY_INVALID)
+			printk(KERN_INFO PFX "   %d : fid 0x%x (%d MHz), vid 0x%x (%d mV)\n", j,
+				data->powernow_table[j].index & 0xff,
+				data->powernow_table[j].frequency/1000,
+				data->powernow_table[j].index >> 8,
+				find_millivolts_from_vid(data, data->powernow_table[j].index >> 8));
 	}
 	if (data->batps)
 		printk(KERN_INFO PFX "Only %d pstates on battery\n", data->batps);
@@ -666,7 +664,7 @@ static int find_psb_table(struct powernow_k8_data *data)
 	return -ENODEV;
 }
 
-#ifdef CONFIG_ACPI_PROCESSOR
+#if defined(CONFIG_ACPI_PROCESSOR) || defined(CONFIG_ACPI_PROCESSOR_MODULE)
 static void powernow_k8_acpi_pst_values(struct powernow_k8_data *data, unsigned int index)
 {
 	if (!data->acpi_data.state_count)
@@ -723,7 +721,14 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 		/* verify frequency is OK */
 		if ((powernow_table[i].frequency > (MAX_FREQ * 1000)) ||
 			(powernow_table[i].frequency < (MIN_FREQ * 1000))) {
-			dprintk(KERN_INFO PFX "invalid freq %u kHz\n", powernow_table[i].frequency);
+			dprintk(KERN_INFO PFX "invalid freq %u kHz, ignoring\n", powernow_table[i].frequency);
+			powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+			continue;
+		}
+
+		/* verify voltage is OK - BIOSs are using "off" to indicate invalid */
+		if (vid == 0x1f) {
+			dprintk(KERN_INFO PFX "invalid vid %u, ignoring\n", vid);
 			powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 			continue;
 		}
@@ -1025,6 +1030,32 @@ static int __exit powernowk8_cpu_exit (struct cpufreq_policy *pol)
 	return 0;
 }
 
+static unsigned int powernowk8_get (unsigned int cpu)
+{
+	struct powernow_k8_data *data = powernow_data[cpu];
+	cpumask_t oldmask = current->cpus_allowed;
+	unsigned int khz = 0;
+
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	if (smp_processor_id() != cpu) {
+		printk(KERN_ERR PFX "limiting to CPU %d failed in powernowk8_get\n", cpu);
+		set_cpus_allowed(current, oldmask);
+		return 0;
+	}
+	preempt_disable();
+
+	if (query_current_values_with_pending_wait(data))
+		goto out;
+
+	khz = find_khz_freq_from_fid(data->currfid);	
+
+ out:
+	preempt_enable_no_resched();
+	set_cpus_allowed(current, oldmask);
+
+	return khz;
+}
+
 static struct freq_attr* powernow_k8_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 	NULL,
@@ -1035,6 +1066,7 @@ static struct cpufreq_driver cpufreq_amd64_driver = {
 	.target = powernowk8_target,
 	.init = powernowk8_cpu_init,
 	.exit = powernowk8_cpu_exit,
+	.get = powernowk8_get,
 	.name = "powernow-k8",
 	.owner = THIS_MODULE,
 	.attr = powernow_k8_attr,

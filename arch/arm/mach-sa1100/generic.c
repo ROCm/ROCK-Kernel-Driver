@@ -96,11 +96,13 @@ int sa11x0_verify_speed(struct cpufreq_policy *policy)
 	return 0;
 }
 
-unsigned int sa11x0_getspeed(void)
+unsigned int sa11x0_getspeed(unsigned int cpu)
 {
+	if (cpu)
+		return 0;
 	return cclk_frequency_100khz[PPCR & 0xf] * 100;
 }
-EXPORT_SYMBOL(sa11x0_getspeed);
+
 #else
 /*
  * We still need to provide this so building without cpufreq works.
