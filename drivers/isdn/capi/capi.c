@@ -128,12 +128,6 @@ struct capidev {
 	struct sk_buff_head recvqueue;
 	wait_queue_head_t recvwait;
 
-	/* Statistic */
-	unsigned long	nrecvctlpkt;
-	unsigned long	nrecvdatapkt;
-	unsigned long	nsentctlpkt;
-	unsigned long	nsentdatapkt;
-	
 	struct capincci *nccis;
 };
 
@@ -686,12 +680,6 @@ capi_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	}
 	copied = skb->len;
 
-	if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_IND) {
-		cdev->nrecvdatapkt++;
-	} else {
-		cdev->nrecvctlpkt++;
-	}
-
 	kfree_skb(skb);
 
 	return copied;
@@ -743,11 +731,6 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (cdev->errcode) {
 		kfree_skb(skb);
 		return -EIO;
-	}
-	if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_REQ) {
-		cdev->nsentdatapkt++;
-	} else {
-		cdev->nsentctlpkt++;
 	}
 	return count;
 }
@@ -1420,10 +1403,10 @@ static int proc_capidev_read_proc(char *page, char **start, off_t off,
 		cdev = list_entry(l, struct capidev, list);
 		len += sprintf(page+len, "0 %d %lu %lu %lu %lu\n",
 			cdev->ap.applid,
-			cdev->nrecvctlpkt,
-			cdev->nrecvdatapkt,
-			cdev->nsentctlpkt,
-			cdev->nsentdatapkt);
+			cdev->ap.nrecvctlpkt,
+			cdev->ap.nrecvdatapkt,
+			cdev->ap.nsentctlpkt,
+			cdev->ap.nsentdatapkt);
 		if (len <= off) {
 			off -= len;
 			len = 0;

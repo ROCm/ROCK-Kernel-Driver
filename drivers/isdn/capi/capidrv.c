@@ -128,12 +128,6 @@ struct capidrv_data {
 	struct capi20_appl ap;
 	int ncontr;
 	struct capidrv_contr *contr_list;
-  
-        /* statistic */
-	unsigned long nrecvctlpkt;
-	unsigned long nrecvdatapkt;
-	unsigned long nsentctlpkt;
-	unsigned long nsentdatapkt;
 };
 
 typedef struct capidrv_plci capidrv_plci;
@@ -519,7 +513,6 @@ static void send_message(capidrv_contr * card, _cmsg * cmsg)
 	skb = alloc_skb(len, GFP_ATOMIC);
 	memcpy(skb_put(skb, len), cmsg->buf, len);
 	capi20_put_message(&global.ap, skb);
-	global.nsentctlpkt++;
 }
 
 /* -------- state machine -------------------------------------------- */
@@ -1382,7 +1375,6 @@ static void capidrv_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 	if (s_cmsg.Command == CAPI_DATA_B3
 	    && s_cmsg.Subcommand == CAPI_IND) {
 		handle_data(&s_cmsg, skb);
-		global.nrecvdatapkt++;
 		return;
 	}
 	if ((s_cmsg.adr.adrController & 0xffffff00) == 0)
@@ -1397,7 +1389,6 @@ static void capidrv_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 	 * thanks to Lars Heete <hel@admin.de>
 	 */
 	kfree_skb(skb);
-	global.nrecvctlpkt++;
 }
 
 /* ------------------------------------------------------------------- */
@@ -1912,7 +1903,6 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		if (errcode == CAPI_NOERROR) {
 			dev_kfree_skb(skb);
 			nccip->datahandle++;
-			global.nsentdatapkt++;
 			return len;
 		}
 	        (void)capidrv_del_ack(nccip, datahandle);
@@ -1923,7 +1913,6 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		errcode = capi20_put_message(&global.ap, skb);
 		if (errcode == CAPI_NOERROR) {
 			nccip->datahandle++;
-			global.nsentdatapkt++;
 			return len;
 		}
 		skb_pull(skb, msglen);
@@ -2238,10 +2227,10 @@ static int proc_capidrv_read_proc(char *page, char **start, off_t off,
 	int len = 0;
 
 	len += sprintf(page+len, "%lu %lu %lu %lu\n",
-			global.nrecvctlpkt,
-			global.nrecvdatapkt,
-			global.nsentctlpkt,
-			global.nsentdatapkt);
+			global.ap.nrecvctlpkt,
+			global.ap.nrecvdatapkt,
+			global.ap.nsentctlpkt,
+			global.ap.nsentdatapkt);
 	if (off+count >= len)
 	   *eof = 1;
 	if (len < off)
