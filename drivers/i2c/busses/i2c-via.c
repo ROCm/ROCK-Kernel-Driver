@@ -30,6 +30,7 @@
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+#include <asm/io.h>
 
 /* Power management registers */
 #define PM_CFG_REVID	0x08	/* silicon revision code */
