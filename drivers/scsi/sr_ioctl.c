@@ -303,7 +303,6 @@ int sr_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 
 int sr_reset(struct cdrom_device_info *cdi)
 {
-	invalidate_buffers(cdi->dev);
 	return 0;
 }
 

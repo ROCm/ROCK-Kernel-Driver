@@ -1608,6 +1608,7 @@ int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 		cdinfo(CD_DO_IOCTL, "entering CDROM_RESET\n");
 		if (!CDROM_CAN(CDC_RESET))
 			return -ENOSYS;
+		invalidate_buffers(dev);
 		return cdo->reset(cdi);
 		}
 
