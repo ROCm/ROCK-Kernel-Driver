@@ -228,6 +228,7 @@ struct ata_queued_cmd {
 
 	struct ata_taskfile	tf;
 	struct scatterlist	sgent;
+	void			*buf_virt;
 
 	struct scatterlist	*sg;
 
@@ -384,6 +385,10 @@ extern void ata_port_stop (struct ata_port *ap);
 extern irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
 extern void ata_qc_prep(struct ata_queued_cmd *qc);
 extern int ata_qc_issue_prot(struct ata_queued_cmd *qc);
+extern void ata_sg_init_one(struct ata_queued_cmd *qc, void *buf,
+		unsigned int buflen);
+extern void ata_sg_init(struct ata_queued_cmd *qc, struct scatterlist *sg,
+		 unsigned int n_elem);
 extern void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
 			      unsigned int ofs, unsigned int len);
 extern void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc);

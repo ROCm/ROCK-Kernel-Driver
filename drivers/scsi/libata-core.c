@@ -1834,6 +1834,33 @@ void ata_qc_prep(struct ata_queued_cmd *qc)
 	ata_fill_sg(qc);
 }
 
+void ata_sg_init_one(struct ata_queued_cmd *qc, void *buf, unsigned int buflen)
+{
+	struct scatterlist *sg;
+
+	qc->flags |= ATA_QCFLAG_SINGLE;
+
+	memset(&qc->sgent, 0, sizeof(qc->sgent));
+	qc->sg = &qc->sgent;
+	qc->n_elem = 1;
+	qc->buf_virt = buf;
+
+	sg = qc->sg;
+	sg->page = virt_to_page(buf);
+	sg->offset = (unsigned long) buf & ~PAGE_MASK;
+	sg_dma_len(sg) = buflen;
+
+	WARN_ON(buflen > PAGE_SIZE);
+}
+
+void ata_sg_init(struct ata_queued_cmd *qc, struct scatterlist *sg,
+		 unsigned int n_elem)
+{
+	qc->flags |= ATA_QCFLAG_SG;
+	qc->sg = sg;
+	qc->n_elem = n_elem;
+}
+
 /**
  *	ata_sg_setup_one -
  *	@qc:
@@ -1848,26 +1875,18 @@ void ata_qc_prep(struct ata_queued_cmd *qc)
 static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	struct scsi_cmnd *cmd = qc->scsicmd;
 	int dir = qc->pci_dma_dir;
 	struct scatterlist *sg = qc->sg;
 	dma_addr_t dma_address;
 
-	assert(sg == &qc->sgent);
-	assert(qc->n_elem == 1);
-
-	sg->page = virt_to_page(cmd->request_buffer);
-	sg->offset = (unsigned long) cmd->request_buffer & ~PAGE_MASK;
-	sg_dma_len(sg) = cmd->request_bufflen;
-
-	dma_address = pci_map_single(ap->host_set->pdev, cmd->request_buffer,
-				     cmd->request_bufflen, dir);
+	dma_address = pci_map_single(ap->host_set->pdev, qc->buf_virt,
+				     sg_dma_len(sg), dir);
 	if (pci_dma_mapping_error(dma_address))
 		return -1;
 
 	sg_dma_address(sg) = dma_address;
 
-	DPRINTK("mapped buffer of %d bytes for %s\n", cmd->request_bufflen,
+	DPRINTK("mapped buffer of %d bytes for %s\n", sg_dma_len(sg),
 		qc->tf.flags & ATA_TFLAG_WRITE ? "write" : "read");
 
 	return 0;
@@ -1887,16 +1906,14 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 static int ata_sg_setup(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	struct scsi_cmnd *cmd = qc->scsicmd;
-	struct scatterlist *sg;
+	struct scatterlist *sg = qc->sg;
 	int n_elem, dir;
 
 	VPRINTK("ENTER, ata%u\n", ap->id);
 	assert(qc->flags & ATA_QCFLAG_SG);
 
-	sg = (struct scatterlist *)cmd->request_buffer;
 	dir = qc->pci_dma_dir;
-	n_elem = pci_map_sg(ap->host_set->pdev, sg, cmd->use_sg, dir);
+	n_elem = pci_map_sg(ap->host_set->pdev, sg, qc->n_elem, dir);
 	if (n_elem < 1)
 		return -1;
 
@@ -2012,7 +2029,6 @@ static void ata_pio_sector(struct ata_port *ap)
 {
 	struct ata_queued_cmd *qc;
 	struct scatterlist *sg;
-	struct scsi_cmnd *cmd;
 	unsigned char *buf;
 	u8 status;
 
@@ -2044,7 +2060,6 @@ static void ata_pio_sector(struct ata_port *ap)
 	qc = ata_qc_from_tag(ap, ap->active_tag);
 	assert(qc != NULL);
 
-	cmd = qc->scsicmd;
 	sg = qc->sg;
 
 	if (qc->cursect == (qc->nsect - 1))
@@ -3340,6 +3355,8 @@ EXPORT_SYMBOL_GPL(pci_test_config_bits);
 EXPORT_SYMBOL_GPL(ata_std_bios_param);
 EXPORT_SYMBOL_GPL(ata_std_ports);
 EXPORT_SYMBOL_GPL(ata_device_add);
+EXPORT_SYMBOL_GPL(ata_sg_init);
+EXPORT_SYMBOL_GPL(ata_sg_init_one);
 EXPORT_SYMBOL_GPL(ata_qc_complete);
 EXPORT_SYMBOL_GPL(ata_qc_issue_prot);
 EXPORT_SYMBOL_GPL(ata_eng_timeout);

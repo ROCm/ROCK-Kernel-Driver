@@ -396,9 +396,10 @@ static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 		}
 
 		if (cmd->use_sg)
-			qc->flags |= ATA_QCFLAG_SG;
+			ata_sg_init(qc, cmd->request_buffer, cmd->use_sg);
 		else
-			qc->flags |= ATA_QCFLAG_SINGLE;
+			ata_sg_init_one(qc, cmd->request_buffer,
+					cmd->request_bufflen);
 
 		qc->pci_dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 	}
