@@ -914,7 +914,7 @@ __group_complete_signal(int sig, struct task_struct *p)
 	 * Don't bother zombies and stopped tasks (but
 	 * SIGKILL will punch through stopped state)
 	 */
-	mask = TASK_DEAD | TASK_ZOMBIE | TASK_TRACED;
+	mask = EXIT_DEAD | EXIT_ZOMBIE | TASK_TRACED;
 	if (sig != SIGKILL)
 		mask |= TASK_STOPPED;
 
@@ -1070,7 +1070,7 @@ void zap_other_threads(struct task_struct *p)
 		/*
 		 * Don't bother with already dead threads
 		 */
-		if (t->state & (TASK_ZOMBIE|TASK_DEAD))
+		if (t->exit_state & (EXIT_ZOMBIE|EXIT_DEAD))
 			continue;
 
 		/*

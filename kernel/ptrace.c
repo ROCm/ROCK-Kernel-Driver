@@ -163,7 +163,7 @@ int ptrace_detach(struct task_struct *child, unsigned int data)
 	write_lock_irq(&tasklist_lock);
 	__ptrace_unlink(child);
 	/* .. and wake it up. */
-	if (child->state != TASK_ZOMBIE)
+	if (child->exit_state != EXIT_ZOMBIE)
 		wake_up_process(child);
 	write_unlock_irq(&tasklist_lock);
 

@@ -314,7 +314,7 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 	 */
 	case PTRACE_KILL: {
 		ret = 0;
-		if (child->state == TASK_ZOMBIE)	/* already dead */
+		if (child->exit_state == EXIT_ZOMBIE)	/* already dead */
 			break;
 		child->exit_code = SIGKILL;
 		/* make sure the single step bit is not set. */

@@ -86,7 +86,7 @@ EXPORT_SYMBOL(free_task);
 
 void __put_task_struct(struct task_struct *tsk)
 {
-	WARN_ON(!(tsk->state & (TASK_DEAD | TASK_ZOMBIE)));
+	WARN_ON(!(tsk->exit_state & (EXIT_DEAD | EXIT_ZOMBIE)));
 	WARN_ON(atomic_read(&tsk->usage));
 	WARN_ON(tsk == current);
 
@@ -1062,6 +1062,7 @@ static task_t *copy_process(unsigned long clone_flags,
 	/* ok, now we should be set up.. */
 	p->exit_signal = (clone_flags & CLONE_THREAD) ? -1 : (clone_flags & CSIGNAL);
 	p->pdeath_signal = 0;
+	p->exit_state = 0;
 
 	/* Perform scheduler related setup */
 	sched_fork(p);

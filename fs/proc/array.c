@@ -137,13 +137,13 @@ static const char *task_state_array[] = {
 
 static inline const char * get_task_state(struct task_struct *tsk)
 {
-	unsigned int state = tsk->state & (TASK_RUNNING |
-					   TASK_INTERRUPTIBLE |
-					   TASK_UNINTERRUPTIBLE |
-					   TASK_ZOMBIE |
-					   TASK_DEAD |
-					   TASK_STOPPED |
-					   TASK_TRACED);
+	unsigned int state = (tsk->state & (TASK_RUNNING |
+					    TASK_INTERRUPTIBLE |
+					    TASK_UNINTERRUPTIBLE |
+					    TASK_STOPPED |
+					    TASK_TRACED)) |
+			(tsk->exit_state & (EXIT_ZOMBIE |
+					    EXIT_DEAD));
 	const char **p = &task_state_array[0];
 
 	while (state) {
