@@ -390,7 +390,7 @@ static int __init cosa_init(void)
 		unregister_chrdev(cosa_major, "cosa");
 		return -ENODEV;
 	}
-	devfs_mk_dir (NULL, "cosa", NULL);
+	devfs_mk_dir("cosa");
 	for (i=0; i<nr_cards; i++) {
 		char name[16];
 		sprintf(name, "cosa/%d", i);

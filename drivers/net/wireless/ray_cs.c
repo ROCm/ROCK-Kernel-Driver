@@ -2962,12 +2962,21 @@ static int write_int(struct file *file, const char *buffer, unsigned long count,
 }
 #endif
 
+static struct pcmcia_driver ray_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "ray_cs",
+	},
+	.attach		= ray_attach,
+	.detach		= ray_detach,
+};
+
 static int __init init_ray_cs(void)
 {
     int rc;
     
     DEBUG(1, "%s\n", rcsid);
-    rc = register_pcmcia_driver(&dev_info, &ray_attach, &ray_detach);
+    rc = pcmcia_register_driver(&ray_driver);
     DEBUG(1, "raylink init_module register_pcmcia_driver returns 0x%x\n",rc);
 
 #ifdef CONFIG_PROC_FS
@@ -2993,7 +3002,7 @@ static void __exit exit_ray_cs(void)
     remove_proc_entry("ray_cs", proc_root_driver);
 #endif
 
-    unregister_pcmcia_driver(&dev_info);
+    pcmcia_unregister_driver(&ray_driver);
     while (dev_list != NULL)
         ray_detach(dev_list);
 

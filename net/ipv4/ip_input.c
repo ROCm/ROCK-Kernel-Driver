@@ -236,7 +236,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 			int ret;
 
 			if (!ipprot->no_policy &&
-			    !xfrm_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+			    !xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 				kfree_skb(skb);
 				return 0;
 			}
@@ -248,7 +248,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 			IP_INC_STATS_BH(IpInDelivers);
 		} else {
 			if (!raw_sk) {
-				if (xfrm_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+				if (xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 					IP_INC_STATS_BH(IpInUnknownProtos);
 					icmp_send(skb, ICMP_DEST_UNREACH,
 						  ICMP_PROT_UNREACH, 0);

@@ -3,6 +3,7 @@
 
 #if defined(__KERNEL__) || !defined(__GLIBC__) || (__GLIBC__ < 2)
 
+#include <linux/config.h>		/* for CONFIG_COMPAT */
 #include <linux/linkage.h>
 #include <asm/socket.h>			/* arch-dependent defines	*/
 #include <linux/sockios.h>		/* the SIOCxxx I/O controls	*/
@@ -239,18 +240,10 @@ struct ucred {
 #define MSG_CMSG_COMPAT	0x80000000	/* This message needs 32 bit fixups */
 #else
 #define MSG_CMSG_COMPAT	0		/* We never have 32 bit fixups */
-#define compat_msghdr	msghdr		/* Needed to avoid compiler hoops */
 #endif
 
-struct compat_msghdr;
-extern int msghdr_from_user_compat_to_kern(struct msghdr *, struct compat_msghdr *);
-extern int verify_compat_iovec(struct msghdr *, struct iovec *, char *, int);
-extern asmlinkage long compat_sys_sendmsg(int,struct compat_msghdr *,unsigned);
-extern asmlinkage long compat_sys_recvmsg(int,struct compat_msghdr *,unsigned);
 extern asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags);
 extern asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned flags);
-extern asmlinkage long compat_sys_getsockopt(int fd, int level, int optname,
-				char *optval, int *optlen);
 
 
 
@@ -295,10 +288,6 @@ extern void memcpy_tokerneliovec(struct iovec *iov, unsigned char *kdata, int le
 extern int move_addr_to_user(void *kaddr, int klen, void *uaddr, int *ulen);
 extern int move_addr_to_kernel(void *uaddr, int ulen, void *kaddr);
 extern int put_cmsg(struct msghdr*, int level, int type, int len, void *data);
-extern int put_cmsg_compat(struct msghdr*, int level, int type, int len, void *data);
-extern void cmsg_compat_recvmsg_fixup(struct msghdr *kmsg, unsigned long orig_cmsg_uptr);
-extern int cmsghdr_from_user_compat_to_kern(struct msghdr *kmsg,
-			       unsigned char *stackbuf, int stackbuf_size);
 
 #endif
 #endif /* not kernel and not glibc */

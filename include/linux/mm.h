@@ -8,10 +8,8 @@
 
 #include <linux/config.h>
 #include <linux/gfp.h>
-#include <linux/string.h>
 #include <linux/list.h>
 #include <linux/mmzone.h>
-#include <linux/swap.h>
 #include <linux/rbtree.h>
 #include <linux/fs.h>
 
@@ -142,6 +140,7 @@ struct vm_operations_struct {
 /* forward declaration; pte_chain is meant to be internal to rmap.c */
 struct pte_chain;
 struct mmu_gather;
+struct inode;
 
 /*
  * Each physical page in the system has a struct page associated with
@@ -490,10 +489,7 @@ extern void free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
 extern void mem_init(void);
 extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);
-#ifdef CONFIG_NUMA
 extern void si_meminfo_node(struct sysinfo *val, int nid);
-#endif
-extern void swapin_readahead(swp_entry_t);
 
 /* mmap.c */
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);

@@ -10,8 +10,10 @@
 #include <linux/pfkeyv2.h>
 #include <linux/in6.h>
 
+#include <net/sock.h>
 #include <net/dst.h>
 #include <net/route.h>
+#include <net/ipv6.h>
 #include <net/ip6_fib.h>
 
 #define XFRM_ALIGN8(len)	(((len) + 7) & ~7)
@@ -144,6 +146,51 @@ enum {
 	XFRM_STATE_DEAD
 };
 
+struct xfrm_type;
+struct xfrm_dst;
+struct xfrm_policy_afinfo {
+	unsigned short		family;
+	rwlock_t		lock;
+	struct xfrm_type_map	*type_map;
+	struct dst_ops		*dst_ops;
+	void			(*garbage_collect)(void);
+	int			(*dst_lookup)(struct xfrm_dst **dst, struct flowi *fl);
+	struct dst_entry	*(*find_bundle)(struct flowi *fl, struct rtable *rt, struct xfrm_policy *policy);
+	int			(*bundle_create)(struct xfrm_policy *policy, 
+						 struct xfrm_state **xfrm, 
+						 int nx,
+						 struct flowi *fl, 
+						 struct dst_entry **dst_p);
+	void			(*decode_session)(struct sk_buff *skb,
+						  struct flowi *fl);
+};
+
+extern int xfrm_policy_register_afinfo(struct xfrm_policy_afinfo *afinfo);
+extern int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo);
+extern struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family);
+extern void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo);
+
+#define XFRM_ACQ_EXPIRES	30
+
+struct xfrm_tmpl;
+struct xfrm_state_afinfo {
+	unsigned short		family;
+	rwlock_t		lock;
+	struct list_head	*state_bydst;
+	struct list_head	*state_byspi;
+	void			(*init_tempsel)(struct xfrm_state *x, struct flowi *fl,
+						struct xfrm_tmpl *tmpl,
+						xfrm_address_t *daddr, xfrm_address_t *saddr);
+	struct xfrm_state	*(*state_lookup)(xfrm_address_t *daddr, u32 spi, u8 proto);
+	struct xfrm_state	*(*find_acq)(u8 mode, u16 reqid, u8 proto, 
+					     xfrm_address_t *daddr, xfrm_address_t *saddr, 
+					     int create);
+};
+
+extern int xfrm_state_register_afinfo(struct xfrm_state_afinfo *afinfo);
+extern int xfrm_state_unregister_afinfo(struct xfrm_state_afinfo *afinfo);
+extern struct xfrm_state_afinfo *xfrm_state_get_afinfo(unsigned short family);
+extern void xfrm_state_put_afinfo(struct xfrm_state_afinfo *afinfo);
 
 struct xfrm_type
 {
@@ -159,9 +206,14 @@ struct xfrm_type
 	u32			(*get_max_size)(struct xfrm_state *, int size);
 };
 
-extern int xfrm_register_type(struct xfrm_type *type);
-extern int xfrm_unregister_type(struct xfrm_type *type);
-extern struct xfrm_type *xfrm_get_type(u8 proto);
+struct xfrm_type_map {
+	rwlock_t		lock;
+	struct xfrm_type	*map[256];
+};
+
+extern int xfrm_register_type(struct xfrm_type *type, unsigned short family);
+extern int xfrm_unregister_type(struct xfrm_type *type, unsigned short family);
+extern struct xfrm_type *xfrm_get_type(u8 proto, unsigned short family);
 extern void xfrm_put_type(struct xfrm_type *type);
 
 struct xfrm_tmpl
@@ -232,6 +284,47 @@ extern int xfrm_register_km(struct xfrm_mgr *km);
 extern int xfrm_unregister_km(struct xfrm_mgr *km);
 
 
+#define XFRM_FLOWCACHE_HASH_SIZE	1024
+
+static inline u32 __flow_hash4(struct flowi *fl)
+{
+	u32 hash = fl->fl4_src ^ fl->uli_u.ports.sport;
+
+	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
+
+	hash ^= fl->fl4_dst ^ fl->uli_u.ports.dport;
+	hash ^= (hash >> 10);
+	hash ^= (hash >> 20);
+	return hash & (XFRM_FLOWCACHE_HASH_SIZE-1);
+}
+
+static inline u32 __flow_hash6(struct flowi *fl)
+{
+	u32 hash = fl->fl6_src->s6_addr32[2] ^
+		   fl->fl6_src->s6_addr32[3] ^ 
+		   fl->uli_u.ports.sport;
+
+	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
+
+	hash ^= fl->fl6_dst->s6_addr32[2] ^
+		fl->fl6_dst->s6_addr32[3] ^ 
+		fl->uli_u.ports.dport;
+	hash ^= (hash >> 10);
+	hash ^= (hash >> 20);
+	return hash & (XFRM_FLOWCACHE_HASH_SIZE-1);
+}
+
+static inline u32 flow_hash(struct flowi *fl, unsigned short family)
+{
+	switch (family) {
+	case AF_INET:
+		return __flow_hash4(fl);
+	case AF_INET6:
+		return __flow_hash6(fl);
+	}
+	return 0;	/*XXX*/
+}
+
 extern struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 
 static inline void xfrm_pol_hold(struct xfrm_policy *policy)
@@ -248,6 +341,68 @@ static inline void xfrm_pol_put(struct xfrm_policy *policy)
 		__xfrm_policy_destroy(policy);
 }
 
+#define XFRM_DST_HSIZE		1024
+
+static __inline__
+unsigned __xfrm4_dst_hash(xfrm_address_t *addr)
+{
+	unsigned h;
+	h = ntohl(addr->a4);
+	h = (h ^ (h>>16)) % XFRM_DST_HSIZE;
+	return h;
+}
+
+static __inline__
+unsigned __xfrm6_dst_hash(xfrm_address_t *addr)
+{
+	unsigned h;
+	h = ntohl(addr->a6[2]^addr->a6[3]);
+	h = (h ^ (h>>16)) % XFRM_DST_HSIZE;
+	return h;
+}
+
+static __inline__
+unsigned xfrm_dst_hash(xfrm_address_t *addr, unsigned short family)
+{
+	switch (family) {
+	case AF_INET:
+		return __xfrm4_dst_hash(addr);
+	case AF_INET6:
+		return __xfrm6_dst_hash(addr);
+	}
+	return 0;
+}
+
+static __inline__
+unsigned __xfrm4_spi_hash(xfrm_address_t *addr, u32 spi, u8 proto)
+{
+	unsigned h;
+	h = ntohl(addr->a4^spi^proto);
+	h = (h ^ (h>>10) ^ (h>>20)) % XFRM_DST_HSIZE;
+	return h;
+}
+
+static __inline__
+unsigned __xfrm6_spi_hash(xfrm_address_t *addr, u32 spi, u8 proto)
+{
+	unsigned h;
+	h = ntohl(addr->a6[2]^addr->a6[3]^spi^proto);
+	h = (h ^ (h>>10) ^ (h>>20)) % XFRM_DST_HSIZE;
+	return h;
+}
+
+static __inline__
+unsigned xfrm_spi_hash(xfrm_address_t *addr, u32 spi, u8 proto, unsigned short family)
+{
+	switch (family) {
+	case AF_INET:
+		return __xfrm4_spi_hash(addr, spi, proto);
+	case AF_INET6:
+		return __xfrm6_spi_hash(addr, spi, proto);
+	}
+	return 0;	/*XXX*/
+}
+
 extern void __xfrm_state_destroy(struct xfrm_state *);
 
 static inline void xfrm_state_put(struct xfrm_state *x)
@@ -260,202 +415,6 @@ static inline void xfrm_state_hold(struct xfrm_state *x)
 {
 	atomic_inc(&x->refcnt);
 }
-
-static inline int
-xfrm4_selector_match(struct xfrm_selector *sel, struct flowi *fl)
-{
-	return	!((fl->fl4_dst^sel->daddr.xfrm4_addr)&sel->daddr.xfrm4_mask) &&
-		!((fl->uli_u.ports.dport^sel->dport)&sel->dport_mask) &&
-		!((fl->uli_u.ports.sport^sel->sport)&sel->sport_mask) &&
-		(fl->proto == sel->proto || !sel->proto) &&
-		(fl->oif == sel->ifindex || !sel->ifindex) &&
-		!((fl->fl4_src^sel->saddr.xfrm4_addr)&sel->saddr.xfrm4_mask);
-}
-
-/* A struct encoding bundle of transformations to apply to some set of flow.
- *
- * dst->child points to the next element of bundle.
- * dst->xfrm  points to an instanse of transformer.
- *
- * Due to unfortunate limitations of current routing cache, which we
- * have no time to fix, it mirrors struct rtable and bound to the same
- * routing key, including saddr,daddr. However, we can have many of
- * bundles differing by session id. All the bundles grow from a parent
- * policy rule.
- */
-struct xfrm_dst
-{
-	union {
-		struct xfrm_dst		*next;
-		struct dst_entry	dst;
-		struct rtable		rt;
-		struct rt6_info		rt6;
-	} u;
-};
-
-struct sec_path
-{
-	atomic_t		refcnt;
-	int			len;
-	struct xfrm_state	*xvec[XFRM_MAX_DEPTH];
-};
-
-static inline struct sec_path *
-secpath_get(struct sec_path *sp)
-{
-	if (sp)
-		atomic_inc(&sp->refcnt);
-	return sp;
-}
-
-extern void __secpath_destroy(struct sec_path *sp);
-
-static inline void
-secpath_put(struct sec_path *sp)
-{
-	if (sp && atomic_dec_and_test(&sp->refcnt))
-		__secpath_destroy(sp);
-}
-extern int __xfrm_policy_check(struct sock *, int dir, struct sk_buff *skb, unsigned short family);
-
-static inline int xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb)
-{
-	if (sk && sk->policy[XFRM_POLICY_IN])
-		return __xfrm_policy_check(sk, dir, skb, AF_INET);
-		
-	return	!xfrm_policy_list[dir] ||
-		(skb->dst->flags & DST_NOPOLICY) ||
-		__xfrm_policy_check(sk, dir, skb, AF_INET);
-}
-
-static inline int xfrm6_policy_check(struct sock *sk, int dir, struct sk_buff *skb)
-{
-	if (sk && sk->policy[XFRM_POLICY_IN])
-		return __xfrm_policy_check(sk, dir, skb, AF_INET6);
-		
-	return	!xfrm_policy_list[dir] ||
-		(skb->dst->flags & DST_NOPOLICY) ||
-		__xfrm_policy_check(sk, dir, skb, AF_INET6);
-}
-
-extern int __xfrm_route_forward(struct sk_buff *skb, unsigned short family);
-
-static inline int xfrm_route_forward(struct sk_buff *skb)
-{
-	return	!xfrm_policy_list[XFRM_POLICY_OUT] ||
-		(skb->dst->flags & DST_NOXFRM) ||
-		__xfrm_route_forward(skb, AF_INET);
-}
-
-static inline int xfrm6_route_forward(struct sk_buff *skb)
-{
-	return	!xfrm_policy_list[XFRM_POLICY_OUT] ||
-		(skb->dst->flags & DST_NOXFRM) ||
-		__xfrm_route_forward(skb, AF_INET6);
-}
-
-extern int __xfrm_sk_clone_policy(struct sock *sk);
-
-static inline int xfrm_sk_clone_policy(struct sock *sk)
-{
-	if (unlikely(sk->policy[0] || sk->policy[1]))
-		return __xfrm_sk_clone_policy(sk);
-	return 0;
-}
-
-extern void __xfrm_sk_free_policy(struct xfrm_policy *, int dir);
-
-static inline void xfrm_sk_free_policy(struct sock *sk)
-{
-	if (unlikely(sk->policy[0] != NULL)) {
-		__xfrm_sk_free_policy(sk->policy[0], 0);
-		sk->policy[0] = NULL;
-	}
-	if (unlikely(sk->policy[1] != NULL)) {
-		__xfrm_sk_free_policy(sk->policy[1], 1);
-		sk->policy[1] = NULL;
-	}
-}
-
-/*
- * xfrm algorithm information
- */
-struct xfrm_algo_auth_info {
-	u16 icv_truncbits;
-	u16 icv_fullbits;
-};
-
-struct xfrm_algo_encr_info {
-	u16 blockbits;
-	u16 defkeybits;
-};
-
-struct xfrm_algo_desc {
-	char *name;
-	u8 available:1;
-	union {
-		struct xfrm_algo_auth_info auth;
-		struct xfrm_algo_encr_info encr;
-	} uinfo;
-	struct sadb_alg desc;
-};
-
-extern void xfrm_state_init(void);
-extern void xfrm_input_init(void);
-extern int xfrm_state_walk(u8 proto, int (*func)(struct xfrm_state *, int, void*), void *);
-extern struct xfrm_state *xfrm_state_alloc(void);
-extern struct xfrm_state *xfrm4_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
-					   struct xfrm_policy *pol, int *err);
-extern struct xfrm_state *xfrm6_state_find(struct in6_addr *daddr, struct in6_addr *saddr,
-					   struct flowi *fl, struct xfrm_tmpl *tmpl,
-					   struct xfrm_policy *pol, int *err);
-extern int xfrm_state_check_expire(struct xfrm_state *x);
-extern void xfrm_state_insert(struct xfrm_state *x);
-extern int xfrm_state_check_space(struct xfrm_state *x, struct sk_buff *skb);
-extern struct xfrm_state *xfrm4_state_lookup(u32 daddr, u32 spi, u8 proto);
-extern struct xfrm_state *xfrm6_state_lookup(struct in6_addr *daddr, u32 spi, u8 proto);
-extern struct xfrm_state *xfrm_find_acq_byseq(u32 seq);
-extern void xfrm_state_delete(struct xfrm_state *x);
-extern void xfrm_state_flush(u8 proto);
-extern int xfrm_replay_check(struct xfrm_state *x, u32 seq);
-extern void xfrm_replay_advance(struct xfrm_state *x, u32 seq);
-extern int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl);
-extern int xfrm4_rcv(struct sk_buff *skb);
-extern int xfrm6_rcv(struct sk_buff *skb);
-extern int xfrm6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int dir);
-extern int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen);
-
-struct xfrm_policy *xfrm_policy_alloc(int gfp);
-extern int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*), void *);
-struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl, unsigned short family);
-int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
-struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel);
-struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete);
-void xfrm_policy_flush(void);
-void xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi);
-struct xfrm_state * xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr, int create);
-struct xfrm_state * xfrm6_find_acq(u8 mode, u16 reqid, u8 proto, struct in6_addr *daddr,
-				   struct in6_addr *saddr, int create);
-extern void xfrm_policy_flush(void);
-extern void xfrm_policy_kill(struct xfrm_policy *);
-extern int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol);
-extern struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl);
-extern int xfrm_flush_bundles(struct xfrm_state *x);
-
-extern wait_queue_head_t km_waitq;
-extern void km_warn_expired(struct xfrm_state *x);
-extern void km_expired(struct xfrm_state *x);
-extern int km_query(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *pol);
-
-extern void xfrm_probe_algs(void);
-extern int xfrm_count_auth_supported(void);
-extern int xfrm_count_enc_supported(void);
-extern struct xfrm_algo_desc *xfrm_aalg_get_byidx(unsigned int idx);
-extern struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx);
-extern struct xfrm_algo_desc *xfrm_aalg_get_byid(int alg_id);
-extern struct xfrm_algo_desc *xfrm_ealg_get_byid(int alg_id);
-extern struct xfrm_algo_desc *xfrm_aalg_get_byname(char *name);
-extern struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name);
 
 static __inline__ int addr_match(void *token1, void *token2, int prefixlen)
 {
@@ -484,7 +443,18 @@ static __inline__ int addr_match(void *token1, void *token2, int prefixlen)
 }
 
 static inline int
-xfrm6_selector_match(struct xfrm_selector *sel, struct flowi *fl)
+__xfrm4_selector_match(struct xfrm_selector *sel, struct flowi *fl)
+{
+	return  addr_match(&fl->fl4_dst, &sel->daddr, sel->prefixlen_d) &&
+		addr_match(&fl->fl4_src, &sel->saddr, sel->prefixlen_s) &&
+		!((fl->uli_u.ports.dport^sel->dport)&sel->dport_mask) &&
+		!((fl->uli_u.ports.sport^sel->sport)&sel->sport_mask) &&
+		(fl->proto == sel->proto || !sel->proto) &&
+		(fl->oif == sel->ifindex || !sel->ifindex);
+}
+
+static inline int
+__xfrm6_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
 	return  addr_match(fl->fl6_dst, &sel->daddr, sel->prefixlen_d) &&
 		addr_match(fl->fl6_src, &sel->saddr, sel->prefixlen_s) &&
@@ -494,15 +464,320 @@ xfrm6_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 		(fl->oif == sel->ifindex || !sel->ifindex);
 }
 
-extern int xfrm6_register_type(struct xfrm_type *type);
-extern int xfrm6_unregister_type(struct xfrm_type *type);
-extern struct xfrm_type *xfrm6_get_type(u8 proto);
+static inline int
+xfrm_selector_match(struct xfrm_selector *sel, struct flowi *fl,
+		    unsigned short family)
+{
+	switch (family) {
+	case AF_INET:
+		return __xfrm4_selector_match(sel, fl);
+	case AF_INET6:
+		return __xfrm6_selector_match(sel, fl);
+	}
+	return 0;
+}
+
+/* A struct encoding bundle of transformations to apply to some set of flow.
+ *
+ * dst->child points to the next element of bundle.
+ * dst->xfrm  points to an instanse of transformer.
+ *
+ * Due to unfortunate limitations of current routing cache, which we
+ * have no time to fix, it mirrors struct rtable and bound to the same
+ * routing key, including saddr,daddr. However, we can have many of
+ * bundles differing by session id. All the bundles grow from a parent
+ * policy rule.
+ */
+struct xfrm_dst
+{
+	union {
+		struct xfrm_dst		*next;
+		struct dst_entry	dst;
+		struct rtable		rt;
+		struct rt6_info		rt6;
+	} u;
+};
+
+struct sec_path
+{
+	kmem_cache_t		*pool;
+	atomic_t		refcnt;
+	int			len;
+	struct xfrm_state	*xvec[XFRM_MAX_DEPTH];
+};
+
+static inline struct sec_path *
+secpath_get(struct sec_path *sp)
+{
+	if (sp)
+		atomic_inc(&sp->refcnt);
+	return sp;
+}
+
+extern void __secpath_destroy(struct sec_path *sp);
+
+static inline void
+secpath_put(struct sec_path *sp)
+{
+	if (sp && atomic_dec_and_test(&sp->refcnt))
+		__secpath_destroy(sp);
+}
+
+static inline int
+__xfrm4_state_addr_cmp(struct xfrm_tmpl *tmpl, struct xfrm_state *x)
+{
+	return	(tmpl->saddr.a4 &&
+		 tmpl->saddr.a4 != x->props.saddr.a4);
+}
+
+static inline int
+__xfrm6_state_addr_cmp(struct xfrm_tmpl *tmpl, struct xfrm_state *x)
+{
+	return	(!ipv6_addr_any((struct in6_addr*)&tmpl->saddr) &&
+		 ipv6_addr_cmp((struct in6_addr *)&tmpl->saddr, (struct in6_addr*)&x->props.saddr));
+}
+
+static inline int
+xfrm_state_addr_cmp(struct xfrm_tmpl *tmpl, struct xfrm_state *x, unsigned short family)
+{
+	switch (family) {
+	case AF_INET:
+		return __xfrm4_state_addr_cmp(tmpl, x);
+	case AF_INET6:
+		return __xfrm6_state_addr_cmp(tmpl, x);
+	}
+	return !0;
+}
+
+extern int __xfrm_policy_check(struct sock *, int dir, struct sk_buff *skb, unsigned short family);
+
+static inline int xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb, unsigned short family)
+{
+	if (sk && sk->policy[XFRM_POLICY_IN])
+		return __xfrm_policy_check(sk, dir, skb, family);
+		
+	return	!xfrm_policy_list[dir] ||
+		(skb->dst->flags & DST_NOPOLICY) ||
+		__xfrm_policy_check(sk, dir, skb, family);
+}
+
+static inline int xfrm4_policy_check(struct sock *sk, int dir, struct sk_buff *skb)
+{
+	return xfrm_policy_check(sk, dir, skb, AF_INET);
+}
+
+static inline int xfrm6_policy_check(struct sock *sk, int dir, struct sk_buff *skb)
+{
+	return xfrm_policy_check(sk, dir, skb, AF_INET6);
+}
+
+
+extern int __xfrm_route_forward(struct sk_buff *skb, unsigned short family);
+
+static inline int xfrm_route_forward(struct sk_buff *skb, unsigned short family)
+{
+	return	!xfrm_policy_list[XFRM_POLICY_OUT] ||
+		(skb->dst->flags & DST_NOXFRM) ||
+		__xfrm_route_forward(skb, family);
+}
+
+static inline int xfrm4_route_forward(struct sk_buff *skb)
+{
+	return xfrm_route_forward(skb, AF_INET);
+}
+
+static inline int xfrm6_route_forward(struct sk_buff *skb)
+{
+	return xfrm_route_forward(skb, AF_INET6);
+}
+
+extern int __xfrm_sk_clone_policy(struct sock *sk);
+
+static inline int xfrm_sk_clone_policy(struct sock *sk)
+{
+	if (unlikely(sk->policy[0] || sk->policy[1]))
+		return __xfrm_sk_clone_policy(sk);
+	return 0;
+}
+
+extern void __xfrm_sk_free_policy(struct xfrm_policy *, int dir);
+
+static inline void xfrm_sk_free_policy(struct sock *sk)
+{
+	if (unlikely(sk->policy[0] != NULL)) {
+		__xfrm_sk_free_policy(sk->policy[0], 0);
+		sk->policy[0] = NULL;
+	}
+	if (unlikely(sk->policy[1] != NULL)) {
+		__xfrm_sk_free_policy(sk->policy[1], 1);
+		sk->policy[1] = NULL;
+	}
+}
+
+static __inline__
+xfrm_address_t *xfrm_flowi_daddr(struct flowi *fl, unsigned short family)
+{
+	switch (family){
+	case AF_INET:
+		return (xfrm_address_t *)&fl->fl4_dst;
+	case AF_INET6:
+		return (xfrm_address_t *)fl->fl6_dst;
+	}
+	return NULL;
+}
+
+static __inline__
+xfrm_address_t *xfrm_flowi_saddr(struct flowi *fl, unsigned short family)
+{
+	switch (family){
+	case AF_INET:
+		return (xfrm_address_t *)&fl->fl4_src;
+	case AF_INET6:
+		return (xfrm_address_t *)fl->fl6_src;
+	}
+	return NULL;
+}
+
+static __inline__ int
+__xfrm4_state_addr_check(struct xfrm_state *x,
+			 xfrm_address_t *daddr, xfrm_address_t *saddr)
+{
+	if (daddr->a4 == x->id.daddr.a4 &&
+	    (saddr->a4 == x->props.saddr.a4 || !saddr->a4 || !x->props.saddr.a4))
+		return 1;
+	return 0;
+}
+
+static __inline__ int
+__xfrm6_state_addr_check(struct xfrm_state *x,
+			 xfrm_address_t *daddr, xfrm_address_t *saddr)
+{
+	if (!ipv6_addr_cmp((struct in6_addr *)daddr, (struct in6_addr *)&x->id.daddr) &&
+	    (!ipv6_addr_cmp((struct in6_addr *)saddr, (struct in6_addr *)&x->props.saddr)|| 
+	     ipv6_addr_any((struct in6_addr *)saddr) || 
+	     ipv6_addr_any((struct in6_addr *)&x->props.saddr)))
+		return 1;
+	return 0;
+}
+
+static __inline__ int
+xfrm_state_addr_check(struct xfrm_state *x,
+		      xfrm_address_t *daddr, xfrm_address_t *saddr,
+		      unsigned short family)
+{
+	switch (family) {
+	case AF_INET:
+		return __xfrm4_state_addr_check(x, daddr, saddr);
+	case AF_INET6:
+		return __xfrm6_state_addr_check(x, daddr, saddr);
+	}
+	return 0;
+}
+
+/*
+ * xfrm algorithm information
+ */
+struct xfrm_algo_auth_info {
+	u16 icv_truncbits;
+	u16 icv_fullbits;
+};
+
+struct xfrm_algo_encr_info {
+	u16 blockbits;
+	u16 defkeybits;
+};
+
+struct xfrm_algo_comp_info {
+	u16 threshold;
+};
+
+struct xfrm_algo_desc {
+	char *name;
+	u8 available:1;
+	union {
+		struct xfrm_algo_auth_info auth;
+		struct xfrm_algo_encr_info encr;
+		struct xfrm_algo_comp_info comp;
+	} uinfo;
+	struct sadb_alg desc;
+};
+
+extern void xfrm_init(void);
+extern void xfrm4_init(void);
+extern void xfrm4_fini(void);
+extern void xfrm6_init(void);
+extern void xfrm6_fini(void);
+extern void xfrm_state_init(void);
+extern void xfrm4_state_init(void);
+extern void xfrm4_state_fini(void);
+extern void xfrm6_state_init(void);
+extern void xfrm6_state_fini(void);
+
+extern int xfrm_state_walk(u8 proto, int (*func)(struct xfrm_state *, int, void*), void *);
+extern struct xfrm_state *xfrm_state_alloc(void);
+extern struct xfrm_state *xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr, 
+					  struct flowi *fl, struct xfrm_tmpl *tmpl,
+					  struct xfrm_policy *pol, int *err,
+					  unsigned short family);
+extern int xfrm_state_check_expire(struct xfrm_state *x);
+extern void xfrm_state_insert(struct xfrm_state *x);
+extern int xfrm_state_check_space(struct xfrm_state *x, struct sk_buff *skb);
+extern struct xfrm_state *xfrm_state_lookup(xfrm_address_t *daddr, u32 spi, u8 proto, unsigned short family);
+extern struct xfrm_state *xfrm_find_acq_byseq(u32 seq);
+extern void xfrm_state_delete(struct xfrm_state *x);
+extern void xfrm_state_flush(u8 proto);
+extern int xfrm_replay_check(struct xfrm_state *x, u32 seq);
+extern void xfrm_replay_advance(struct xfrm_state *x, u32 seq);
+extern int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl);
+extern int xfrm4_rcv(struct sk_buff *skb);
+extern int xfrm6_rcv(struct sk_buff **pskb);
+extern int xfrm6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int dir);
+extern int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen);
+
+void xfrm_policy_init(void);
+void xfrm4_policy_init(void);
+void xfrm6_policy_init(void);
+struct xfrm_policy *xfrm_policy_alloc(int gfp);
+extern int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*), void *);
+struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl, unsigned short family);
+int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
+struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel);
+struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete);
+void xfrm_policy_flush(void);
+void xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi);
+struct xfrm_state * xfrm_find_acq(u8 mode, u16 reqid, u8 proto, 
+				  xfrm_address_t *daddr, xfrm_address_t *saddr, 
+				  int create, unsigned short family);
+extern void xfrm_policy_flush(void);
+extern void xfrm_policy_kill(struct xfrm_policy *);
+extern int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol);
+extern struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl);
+extern int xfrm_flush_bundles(struct xfrm_state *x);
+extern int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl, unsigned short family);
+
+extern wait_queue_head_t km_waitq;
+extern void km_warn_expired(struct xfrm_state *x);
+extern void km_expired(struct xfrm_state *x);
+extern int km_query(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *pol);
+
+extern void xfrm4_input_init(void);
+extern void xfrm6_input_init(void);
+extern int xfrm_parse_spi(struct sk_buff *skb, u8 nexthdr, u32 *spi, u32 *seq);
+
+extern void xfrm_probe_algs(void);
+extern int xfrm_count_auth_supported(void);
+extern int xfrm_count_enc_supported(void);
+extern struct xfrm_algo_desc *xfrm_aalg_get_byidx(unsigned int idx);
+extern struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx);
+extern struct xfrm_algo_desc *xfrm_calg_get_byidx(unsigned int idx);
+extern struct xfrm_algo_desc *xfrm_aalg_get_byid(int alg_id);
+extern struct xfrm_algo_desc *xfrm_ealg_get_byid(int alg_id);
+extern struct xfrm_algo_desc *xfrm_calg_get_byid(int alg_id);
+extern struct xfrm_algo_desc *xfrm_aalg_get_byname(char *name);
+extern struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name);
+extern struct xfrm_algo_desc *xfrm_calg_get_byname(char *name);
 
 struct crypto_tfm;
 typedef void (icv_update_fn_t)(struct crypto_tfm *, struct scatterlist *, unsigned int);
-
-typedef int (xfrm_dst_lookup_t)(struct xfrm_dst **dst, struct flowi *fl);
-int xfrm_dst_lookup_register(xfrm_dst_lookup_t *dst_lookup, unsigned short family);
-void xfrm_dst_lookup_unregister(unsigned short family);
 
 #endif	/* _NET_XFRM_H */

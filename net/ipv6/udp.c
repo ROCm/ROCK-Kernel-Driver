@@ -641,8 +641,9 @@ free_skb:
 	read_unlock(&udp_hash_lock);
 }
 
-static int udpv6_rcv(struct sk_buff *skb)
+static int udpv6_rcv(struct sk_buff **pskb)
 {
+	struct sk_buff *skb = *pskb;
 	struct sock *sk;
   	struct udphdr *uh;
 	struct net_device *dev = skb->dev;

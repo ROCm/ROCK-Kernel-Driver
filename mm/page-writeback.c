@@ -15,6 +15,7 @@
 #include <linux/spinlock.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/swap.h>
 #include <linux/slab.h>
 #include <linux/pagemap.h>
 #include <linux/writeback.h>

@@ -567,7 +567,7 @@ static int __init init_soundcore(void)
 		printk(KERN_ERR "soundcore: sound device already in use.\n");
 		return -EBUSY;
 	}
-	devfs_mk_dir (NULL, "sound", NULL);
+	devfs_mk_dir ("sound");
 
 	return 0;
 }

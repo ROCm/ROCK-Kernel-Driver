@@ -26,6 +26,7 @@
 #include <linux/bootmem.h>	/* for max_pfn/max_low_pfn */
 #include <linux/completion.h>
 #include <linux/slab.h>
+#include <linux/swap.h>
 
 static void blk_unplug_work(void *data);
 static void blk_unplug_timeout(unsigned long data);
@@ -200,6 +201,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->make_request_fn = mfn;
 	q->backing_dev_info.ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 	q->backing_dev_info.state = 0;
+	q->backing_dev_info.memory_backed = 0;
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 	blk_queue_dma_alignment(q, 511);

@@ -488,7 +488,7 @@ static int ubd_new_disk(int major, u64 size, char *name, int unit,
 			struct gendisk **disk_out, devfs_handle_t dir_handle,
 			devfs_handle_t *handle_out)
 {
-	char devfs_name[sizeof("nnnnnn\0")];
+	char devfs_name[sizeof("ubd/nnnnnn\0")];
 	struct gendisk *disk;
 	int minor = unit << UBD_SHIFT;
 
@@ -505,8 +505,8 @@ static int ubd_new_disk(int major, u64 size, char *name, int unit,
 	*disk_out = disk;
 
 	/* /dev/ubd/N style names */
-	sprintf(devfs_name, "%d", unit);
-	*handle_out = devfs_register(dir_handle, devfs_name,
+	sprintf(devfs_name, "ubd/%d", unit);
+	*handle_out = devfs_register(NULL, devfs_name,
 				     0, major, minor,
 				     S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |
 				     S_IWGRP, &ubd_blops, NULL);
@@ -682,7 +682,7 @@ int ubd_init(void)
 {
         int i;
 
-	ubd_dir_handle = devfs_mk_dir(NULL, "ubd", NULL);
+	ubd_dir_handle = devfs_mk_dir("ubd");
 	if (register_blkdev(MAJOR_NR, "ubd"))
 		return -1;
 
@@ -693,7 +693,7 @@ int ubd_init(void)
 		char name[sizeof("ubd_nnn\0")];
 
 		snprintf(name, sizeof(name), "ubd_%d", fake_major);
-		ubd_fake_dir_handle = devfs_mk_dir(NULL, name, NULL);
+		ubd_fake_dir_handle = devfs_mk_dir(name);
 		if (register_blkdev(fake_major, "ubd"))
 			return -1;
 	}

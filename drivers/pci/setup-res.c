@@ -60,6 +60,7 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 	} else {
 		/* Hmm, non-standard resource. */
 		BUG();
+		return;		/* kill uninitialised var warning */
 	}
 
 	pci_write_config_dword(dev, reg, new);

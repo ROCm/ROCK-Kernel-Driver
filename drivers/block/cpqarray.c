@@ -1679,9 +1679,8 @@ static void getgeometry(int ctlr)
 
 				}
 				if (!disk->de) {
-					char txt[16];
-					sprintf(txt,"ida/c%dd%d",ctlr,log_unit);
-					disk->de = devfs_mk_dir(NULL,txt,NULL);
+					disk->de = devfs_mk_dir("ida/c%dd%d",
+							ctlr, log_unit);
 				}
 				info_p->phys_drives =
 				    sense_config_buf->ctlr_phys_drv;

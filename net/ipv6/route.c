@@ -1867,15 +1867,6 @@ ctl_table ipv6_route_table[] = {
 
 #endif
 
-int xfrm6_dst_lookup(struct xfrm_dst **dst, struct flowi *fl)
-{
-	int err = 0;
-	*dst = (struct xfrm_dst*)ip6_route_output(NULL, fl);
-	if (!*dst)
-		err = -ENETUNREACH;
-	return err;
-}
-
 void __init ip6_route_init(void)
 {
 	ip6_dst_ops.kmem_cachep = kmem_cache_create("ip6_dst_cache",
@@ -1883,11 +1874,11 @@ void __init ip6_route_init(void)
 						     0, SLAB_HWCACHE_ALIGN,
 						     NULL, NULL);
 	fib6_init();
-	xfrm_dst_lookup_register(xfrm6_dst_lookup, AF_INET6);
 #ifdef 	CONFIG_PROC_FS
 	proc_net_create("ipv6_route", 0, rt6_proc_info);
 	proc_net_create("rt6_stats", 0, rt6_proc_stats);
 #endif
+	xfrm6_init();
 }
 
 #ifdef MODULE
@@ -1897,7 +1888,7 @@ void ip6_route_cleanup(void)
 	proc_net_remove("ipv6_route");
 	proc_net_remove("rt6_stats");
 #endif
-	xfrm_dst_lookup_unregister(AF_INET6);
+	xfrm6_fini();
 	rt6_ifdown(NULL);
 	fib6_gc_cleanup();
 }

@@ -416,7 +416,7 @@ static int __init rd_init (void)
 
 	blk_queue_make_request(&rd_queue, &rd_make_request);
 
-	devfs_mk_dir (NULL, "rd", NULL);
+	devfs_mk_dir("rd");
 
 	for (i = 0; i < NUM_RAMDISKS; i++) {
 		struct gendisk *disk = rd_disks[i];

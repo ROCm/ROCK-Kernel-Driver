@@ -436,7 +436,7 @@ int __init i2c_dev_init(void)
 		       I2C_MAJOR);
 		return -EIO;
 	}
-	devfs_mk_dir(NULL, "i2c", NULL);
+	devfs_mk_dir("i2c");
 	if ((res = i2c_add_driver(&i2cdev_driver))) {
 		printk(KERN_ERR "i2c-dev.o: Driver registration failed, module not inserted.\n");
 		devfs_remove("i2c");

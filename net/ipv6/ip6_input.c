@@ -15,6 +15,10 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  */
+/* Changes
+ *
+ * 	Mitsuru KANDA @USAGI	: Remove ipv6_parse_exthdrs().
+ */
 
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -126,38 +130,10 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 	struct ipv6hdr *hdr = skb->nh.ipv6h;
 	struct inet6_protocol *ipprot;
 	struct sock *raw_sk;
-	int nhoff;
-	int nexthdr;
+	int nexthdr = hdr->nexthdr;
 	u8 hash;
 
 	skb->h.raw = skb->nh.raw + sizeof(struct ipv6hdr);
-
-	/*
-	 *	Parse extension headers
-	 */
-
-	nexthdr = hdr->nexthdr;
-	nhoff = offsetof(struct ipv6hdr, nexthdr);
-
-	/* Skip  hop-by-hop options, they are already parsed. */
-	if (nexthdr == NEXTHDR_HOP) {
-		nhoff = sizeof(struct ipv6hdr);
-		nexthdr = skb->h.raw[0];
-		skb->h.raw += (skb->h.raw[1]+1)<<3;
-	}
-
-	/* This check is sort of optimization.
-	   It would be stupid to detect for optional headers,
-	   which are missing with probability of 200%
-	 */
-	if (nexthdr != IPPROTO_TCP && nexthdr != IPPROTO_UDP &&
-	    nexthdr != NEXTHDR_AUTH && nexthdr != NEXTHDR_ESP) {
-		nhoff = ipv6_parse_exthdrs(&skb, nhoff);
-		if (nhoff < 0)
-			return 0;
-		nexthdr = skb->nh.raw[nhoff];
-		hdr = skb->nh.ipv6h;
-	}
 
 	if (!pskb_pull(skb, skb->h.raw - skb->data))
 		goto discard;
@@ -173,7 +149,7 @@ resubmit:
 
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
 	if ((ipprot = inet6_protos[hash]) != NULL) {
-		int ret = ipprot->handler(skb);
+		int ret = ipprot->handler(&skb);
 		if (ret < 0) {
 			nexthdr = -ret;
 			goto resubmit;
@@ -182,7 +158,8 @@ resubmit:
 	} else {
 		if (!raw_sk) {
 			IP6_INC_STATS_BH(Ip6InUnknownProtos);
-			icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR, nhoff);
+			icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR,
+					  offsetof(struct ipv6hdr, nexthdr));
 		} else {
 			IP6_INC_STATS_BH(Ip6InDelivers);
 			kfree_skb(skb);

@@ -74,7 +74,7 @@ DEFINE_SNMP_STAT(struct icmpv6_mib, icmpv6_statistics);
 static struct socket *__icmpv6_socket[NR_CPUS];
 #define icmpv6_socket	__icmpv6_socket[smp_processor_id()]
 
-static int icmpv6_rcv(struct sk_buff *skb);
+static int icmpv6_rcv(struct sk_buff **pskb);
 
 static struct inet6_protocol icmpv6_protocol = {
 	.handler	=	icmpv6_rcv,
@@ -459,8 +459,9 @@ static void icmpv6_notify(struct sk_buff *skb, int type, int code, u32 info)
  *	Handle icmp messages
  */
 
-static int icmpv6_rcv(struct sk_buff *skb)
+static int icmpv6_rcv(struct sk_buff **pskb)
 {
+	struct sk_buff *skb = *pskb;
 	struct net_device *dev = skb->dev;
 	struct in6_addr *saddr, *daddr;
 	struct ipv6hdr *orig_hdr;

@@ -76,7 +76,7 @@ int usb_major_init(void)
 		return -EBUSY;
 	}
 
-	usb_devfs_handle = devfs_mk_dir(NULL, "usb", NULL);
+	usb_devfs_handle = devfs_mk_dir("usb");
 
 	return 0;
 }

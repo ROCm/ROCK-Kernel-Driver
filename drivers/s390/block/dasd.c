@@ -174,11 +174,11 @@ dasd_free_device(dasd_device_t *device)
 static inline int
 dasd_state_new_to_known(dasd_device_t *device)
 {
-	char buffer[10];
 	dasd_devmap_t *devmap;
 	umode_t devfs_perm;
 	devfs_handle_t dir;
 	int major, minor;
+	char buf[20];
 
 	/* Increase reference count of bdev. */
 	if (bdget(MKDEV(device->gdp->major, device->gdp->first_minor)) == NULL)
@@ -193,14 +193,15 @@ dasd_state_new_to_known(dasd_device_t *device)
 	minor = devmap->devindex % DASD_PER_MAJOR;
 
 	/* Add a proc directory and the dasd device entry to devfs. */
- 	sprintf(buffer, "dasd/%04x", device->devno);
- 	dir = devfs_mk_dir(NULL, buffer, NULL);
+ 	dir = devfs_mk_dir("dasd/%04x", device->devno);
 	device->gdp->de = dir;
 	if (device->ro_flag)
 		devfs_perm = S_IFBLK | S_IRUSR;
 	else
 		devfs_perm = S_IFBLK | S_IRUSR | S_IWUSR;
-	device->devfs_entry = devfs_register(dir, "device", DEVFS_FL_DEFAULT,
+
+	snprintf(buf, sizeof(buf), "dasd/%04x/device", device->devno);
+	device->devfs_entry = devfs_register(NULL, buf, 0,
 					     major, minor << DASD_PARTN_BITS,
 					     devfs_perm,
 					     &dasd_device_operations, NULL);
@@ -2077,7 +2078,7 @@ dasd_init(void)
 
 	DBF_EVENT(DBF_EMERG, "%s", "debug area created");
 
-	if (devfs_mk_dir(NULL, "dasd", NULL)) {
+	if (devfs_mk_dir("dasd")) {
 		DBF_EVENT(DBF_ALERT, "%s", "no devfs");
 		rc = -ENOSYS;
 		goto failed;

@@ -758,7 +758,7 @@ static int __init ppdev_init (void)
 			PP_MAJOR);
 		return -EIO;
 	}
-	devfs_mk_dir (NULL, "parports", NULL);
+	devfs_mk_dir("parports");
 	for (i = 0; i < PARPORT_MAX; i++) {
 		char name[16];
 		sprintf(name, "parports/%d", i);

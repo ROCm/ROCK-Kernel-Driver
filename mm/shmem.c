@@ -1882,7 +1882,7 @@ static int __init init_tmpfs(void)
 		goto out2;
 	}
 #ifdef CONFIG_TMPFS
-	devfs_mk_dir(NULL, "shm", NULL);
+	devfs_mk_dir("shm");
 #endif
 	shm_mnt = kern_mount(&tmpfs_fs_type);
 	if (IS_ERR(shm_mnt)) {

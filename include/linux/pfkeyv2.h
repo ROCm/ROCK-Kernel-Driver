@@ -262,6 +262,14 @@ struct sadb_x_ipsecrequest {
 #define SADB_X_EALG_AESCBC		12
 #define SADB_EALG_MAX			12
 
+/* Compression algorithms */
+#define SADB_X_CALG_NONE		0
+#define SADB_X_CALG_OUI			1
+#define SADB_X_CALG_DEFLATE		2
+#define SADB_X_CALG_LZS			3
+#define SADB_X_CALG_LZJH		4
+#define SADB_X_CALG_MAX			4
+
 /* Extension Header values */
 #define SADB_EXT_RESERVED		0
 #define SADB_EXT_SA			1

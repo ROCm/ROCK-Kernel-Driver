@@ -913,7 +913,7 @@ static int __init pt_init(void)
 		return -1;
 	}
 
-	devfs_mk_dir (NULL, "pt", NULL);
+	devfs_mk_dir ("pt");
 	for (unit=0;unit<PT_UNITS;unit++)
 		if (PT.present) {
 			char name[16];

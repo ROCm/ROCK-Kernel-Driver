@@ -684,7 +684,7 @@ int hiddev_connect(struct hid_device *hid)
 	struct hiddev *hiddev;
 	int minor, i;
 	int retval;
-	char devfs_name[16];
+	char devfs_name[24];
 
 	for (i = 0; i < hid->maxcollection; i++)
 		if (hid->collection[i].type == 
@@ -715,8 +715,8 @@ int hiddev_connect(struct hid_device *hid)
 	hiddev->hid = hid;
 	hiddev->exist = 1;
 
-	sprintf(devfs_name, "hiddev%d", minor);
-	hiddev->devfs = devfs_register(hiddev_devfs_handle, devfs_name,
+	sprintf(devfs_name, "usb/hid/hiddev%d", minor);
+	hiddev->devfs = devfs_register(NULL, devfs_name,
 		DEVFS_FL_DEFAULT, USB_MAJOR, minor + HIDDEV_MINOR_BASE,
 		S_IFCHR | S_IRUGO | S_IWUSR, &hiddev_fops, NULL);
 	hid->minor = minor;
@@ -774,7 +774,7 @@ static /* const */ struct usb_driver hiddev_driver = {
 
 int __init hiddev_init(void)
 {
-	hiddev_devfs_handle = devfs_mk_dir(NULL, "usb/hid", NULL);
+	hiddev_devfs_handle = devfs_mk_dir("usb/hid");
 	usb_register(&hiddev_driver);
 	return 0;
 }

@@ -175,7 +175,7 @@ extern void			addrconf_forwarding_on(void);
  *	Hash function taken from net_alias.c
  */
 
-static __inline__ u8 ipv6_addr_hash(struct in6_addr *addr)
+static __inline__ u8 ipv6_addr_hash(const struct in6_addr *addr)
 {	
 	__u32 word;
 
@@ -195,7 +195,7 @@ static __inline__ u8 ipv6_addr_hash(struct in6_addr *addr)
  *	compute link-local solicited-node multicast address
  */
 
-static inline void addrconf_addr_solict_mult(struct in6_addr *addr,
+static inline void addrconf_addr_solict_mult(const struct in6_addr *addr,
 					     struct in6_addr *solicited)
 {
 	ipv6_addr_set(solicited,
@@ -219,7 +219,7 @@ static inline void ipv6_addr_all_routers(struct in6_addr *addr)
 		      __constant_htonl(0x2));
 }
 
-static inline int ipv6_addr_is_multicast(struct in6_addr *addr)
+static inline int ipv6_addr_is_multicast(const struct in6_addr *addr)
 {
 	return (addr->s6_addr32[0] & __constant_htonl(0xFF000000)) == __constant_htonl(0xFF000000);
 }

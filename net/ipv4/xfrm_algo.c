@@ -219,6 +219,36 @@ static struct xfrm_algo_desc ealg_list[] = {
 },
 };
 
+static struct xfrm_algo_desc calg_list[] = {
+{
+	.name = "deflate",
+	.uinfo = {
+		.comp = {
+			.threshold = 90,
+		}
+	},
+	.desc = { .sadb_alg_id = SADB_X_CALG_DEFLATE }
+},
+{
+	.name = "lzs",
+	.uinfo = {
+		.comp = {
+			.threshold = 90,
+		}
+	},
+	.desc = { .sadb_alg_id = SADB_X_CALG_LZS }
+},
+{
+	.name = "lzjh",
+	.uinfo = {
+		.comp = {
+			.threshold = 50,
+		}
+	},
+	.desc = { .sadb_alg_id = SADB_X_CALG_LZJH }
+},
+};
+
 static inline int aalg_entries(void)
 {
 	return sizeof(aalg_list) / sizeof(aalg_list[0]);
@@ -229,6 +259,12 @@ static inline int ealg_entries(void)
 	return sizeof(ealg_list) / sizeof(ealg_list[0]);
 }
 
+static inline int calg_entries(void)
+{
+	return sizeof(calg_list) / sizeof(calg_list[0]);
+}
+
+/* Todo: generic iterators */
 struct xfrm_algo_desc *xfrm_aalg_get_byid(int alg_id)
 {
 	int i;
@@ -252,6 +288,21 @@ struct xfrm_algo_desc *xfrm_ealg_get_byid(int alg_id)
 		if (ealg_list[i].desc.sadb_alg_id == alg_id) {
 			if (ealg_list[i].available)
 				return &ealg_list[i];
+			else
+				break;
+		}
+	}
+	return NULL;
+}
+
+struct xfrm_algo_desc *xfrm_calg_get_byid(int alg_id)
+{
+	int i;
+
+	for (i = 0; i < calg_entries(); i++) {
+		if (calg_list[i].desc.sadb_alg_id == alg_id) {
+			if (calg_list[i].available)
+				return &calg_list[i];
 			else
 				break;
 		}
@@ -295,6 +346,24 @@ struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name)
 	return NULL;
 }
 
+struct xfrm_algo_desc *xfrm_calg_get_byname(char *name)
+{
+	int i;
+
+	if (!name)
+		return NULL;
+
+	for (i=0; i < calg_entries(); i++) {
+		if (strcmp(name, calg_list[i].name) == 0) {
+			if (calg_list[i].available)
+				return &calg_list[i];
+			else
+				break;
+		}
+	}
+	return NULL;
+}
+
 struct xfrm_algo_desc *xfrm_aalg_get_byidx(unsigned int idx)
 {
 	if (idx >= aalg_entries())
@@ -309,6 +378,14 @@ struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx)
 		return NULL;
 
 	return &ealg_list[idx];
+}
+
+struct xfrm_algo_desc *xfrm_calg_get_byidx(unsigned int idx)
+{
+	if (idx >= calg_entries())
+		return NULL;
+
+	return &calg_list[idx];
 }
 
 /*
@@ -333,6 +410,12 @@ void xfrm_probe_algs(void)
 		status = crypto_alg_available(ealg_list[i].name, 0);
 		if (ealg_list[i].available != status)
 			ealg_list[i].available = status;
+	}
+	
+	for (i = 0; i < calg_entries(); i++) {
+		status = crypto_alg_available(calg_list[i].name, 0);
+		if (calg_list[i].available != status)
+			calg_list[i].available = status;
 	}
 #endif
 }

@@ -5805,7 +5805,7 @@ int __init sbpcd_init(void)
 
 	blk_init_queue(&sbpcd_queue, do_sbpcd_request, &sbpcd_lock);
 
-	devfs_mk_dir (NULL, "sbp", NULL);
+	devfs_mk_dir("sbp");
 
 	for (j=0;j<NR_SBPCD;j++)
 	{

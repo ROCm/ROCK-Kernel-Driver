@@ -1282,25 +1282,6 @@ struct nfsctl_export32 {
 	__kernel_gid_t	ex_anon_gid;
 };
 
-/* GETFH */
-struct nfsctl_fhparm32 {
-	struct sockaddr	gf_addr;
-	__kernel_dev_t	gf_dev;
-	compat_ino_t	gf_ino;
-	int		gf_version;
-};
-
-/* UGIDUPDATE */
-struct nfsctl_uidmap32 {
-	compat_caddr_t	ug_ident;
-	__kernel_uid_t	ug_uidbase;
-	int		ug_uidlen;
-	compat_caddr_t	ug_udimap;
-	__kernel_gid_t	ug_gidbase;
-	int		ug_gidlen;
-	compat_caddr_t	ug_gdimap;
-};
-
 struct nfsctl_arg32 {
 	int			ca_version;	/* safeguard */
 	/* wide kernel places this union on 8-byte boundary, narrow on 4 */
@@ -1308,8 +1289,6 @@ struct nfsctl_arg32 {
 		struct nfsctl_svc	u_svc;
 		struct nfsctl_client	u_client;
 		struct nfsctl_export32	u_export;
-		struct nfsctl_uidmap32	u_umap;
-		struct nfsctl_fhparm32	u_getfh;
 		struct nfsctl_fdparm	u_getfd;
 		struct nfsctl_fsparm	u_getfs;
 	} u;
@@ -1346,29 +1325,6 @@ asmlinkage int sys32_nfsservctl(int cmd, void *argp, void *resp)
 		ret = copy_from_user(&n.u, argp, sizeof n.u.u_getfs);
 		break;
 
-	case NFSCTL_GETFH:		/* nfsctl_fhparm */
-		ret = copy_from_user(&n32.u, argp, sizeof n32.u.u_getfh);
-#undef CP
-#define CP(x)	n.u.u_getfh.gf_##x = n32.u.u_getfh.gf_##x
-		CP(addr);
-		CP(dev);
-		CP(ino);
-		CP(version);
-		break;
-
-	case NFSCTL_UGIDUPDATE:		/* nfsctl_uidmap */
-		ret = copy_from_user(&n32.u, argp, sizeof n32.u.u_umap);
-#undef CP
-#define CP(x)	n.u.u_umap.ug_##x = n32.u.u_umap.ug_##x
-		n.u.u_umap.ug_ident = (char *)(u_long)n32.u.u_umap.ug_ident;
-		CP(uidbase);
-		CP(uidlen);
-		n.u.u_umap.ug_udimap = (__kernel_uid_t *)(u_long)n32.u.u_umap.ug_udimap;
-		CP(gidbase);
-		CP(gidlen);
-		n.u.u_umap.ug_gdimap = (__kernel_gid_t *)(u_long)n32.u.u_umap.ug_gdimap;
-		break;
-
 	case NFSCTL_UNEXPORT:		/* nfsctl_export */
 	case NFSCTL_EXPORT:		/* nfsctl_export */
 		ret = copy_from_user(&n32.u, argp, sizeof n32.u.u_export);
@@ -1393,7 +1349,7 @@ asmlinkage int sys32_nfsservctl(int cmd, void *argp, void *resp)
 	if (ret == 0) {
 		unsigned char rbuf[NFS_FHSIZE + sizeof (struct knfsd_fh)];
 		KERNEL_SYSCALL(ret, sys_nfsservctl, cmd, &n, &rbuf);
-		if (cmd == NFSCTL_GETFH || cmd == NFSCTL_GETFD) {
+		if (cmd == NFSCTL_GETFD) {
 			ret = copy_to_user(resp, rbuf, NFS_FHSIZE);
 		} else if (cmd == NFSCTL_GETFS) {
 			ret = copy_to_user(resp, rbuf, sizeof (struct knfsd_fh));
