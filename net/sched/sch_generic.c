@@ -416,7 +416,6 @@ void qdisc_destroy(struct Qdisc *qdisc)
 
 	dev = qdisc->dev;
 
-#ifdef CONFIG_NET_SCHED
 	if (dev) {
 		struct Qdisc *q, **qp;
 		for (qp = &qdisc->dev->qdisc_list; (q=*qp) != NULL; qp = &q->next) {
@@ -428,7 +427,6 @@ void qdisc_destroy(struct Qdisc *qdisc)
 	}
 #ifdef CONFIG_NET_ESTIMATOR
 	qdisc_kill_estimator(&qdisc->stats);
-#endif
 #endif
 	if (ops->reset)
 		ops->reset(qdisc);
