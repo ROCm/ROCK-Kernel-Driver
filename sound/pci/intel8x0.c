@@ -1568,6 +1568,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "ASUS P4PE Mobo",
 		.type = AC97_TUNE_SWAP_SURROUND
 	},
+ 	{
+		.vendor = 0x1043,
+		.device = 0x80f3,
+		.name = "ASUS ICH5/AD1985",
+		.type = AC97_TUNE_AD_SHARING
+	},
 	{
 		.vendor = 0x10f1,
 		.device = 0x2665,
@@ -1641,12 +1647,6 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.mask = 0xfff0,
 		.name = "Intel ICH5/AD1985 (discrete)",
 		.type = AC97_TUNE_HP_ONLY
-	},
-	{
-		.vendor = 0x80f3,
-		.device = 0x1043,
-		.name = "ASUS ICH5/AD1985",
-		.type = AC97_TUNE_AD_SHARING
 	},
 	{ } /* terminator */
 };
