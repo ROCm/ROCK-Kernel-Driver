@@ -16,6 +16,7 @@
 #include <linux/reboot.h>
 #include <linux/delay.h>
 #include <linux/kallsyms.h>
+#include <linux/cpumask.h>
 
 #include <asm/ptrace.h>
 #include <asm/string.h>
@@ -37,7 +38,7 @@
 #define skipbl	xmon_skipbl
 
 #ifdef CONFIG_SMP
-volatile unsigned long cpus_in_xmon = 0;
+volatile cpumask_t cpus_in_xmon = CPU_MASK_NONE;
 static unsigned long got_xmon = 0;
 static volatile int take_xmon = -1;
 static volatile int leaving_xmon = 0;
@@ -288,17 +289,18 @@ xmon(struct pt_regs *excp)
 	leaving_xmon = 0;
 	/* possible race condition here if a CPU is held up and gets
 	 * here while we are exiting */
-	if (test_and_set_bit(smp_processor_id(), &cpus_in_xmon)) {
+	if (cpu_test_and_set(smp_processor_id(), cpus_in_xmon)) {
 		/* xmon probably caused an exception itself */
 		printf("We are already in xmon\n");
 		for (;;)
-			;
+			cpu_relax();
 	}
 	while (test_and_set_bit(0, &got_xmon)) {
 		if (take_xmon == smp_processor_id()) {
 			take_xmon = -1;
 			break;
 		}
+		cpu_relax();
 	}
 	/*
 	 * XXX: breakpoints are removed while any cpu is in xmon
@@ -325,7 +327,7 @@ xmon(struct pt_regs *excp)
 	leaving_xmon = 1;
 	if (cmd != 's')
 		clear_bit(0, &got_xmon);
-	clear_bit(smp_processor_id(), &cpus_in_xmon);
+	cpu_clear(smp_processor_id(), cpus_in_xmon);
 #endif /* CONFIG_SMP */
 	set_msrd(msr);		/* restore interrupt enable */
 }
@@ -602,6 +604,7 @@ cmds(struct pt_regs *excp)
 			printf(" (type ? for help)\n");
 			break;
 		}
+		cpu_relax();
 	}
 }
 
@@ -638,7 +641,7 @@ static void cpu_cmd(void)
 		/* print cpus waiting or in xmon */
 		printf("cpus stopped:");
 		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
-			if (test_bit(cpu, &cpus_in_xmon)) {
+			if (cpu_isset(cpu, cpus_in_xmon)) {
 				printf(" %x", cpu);
 				if (cpu == smp_processor_id())
 					printf("*", cpu);
@@ -664,6 +667,7 @@ static void cpu_cmd(void)
 			take_xmon = -1;
 			break;
 		}
+		cpu_relax();
 	}
 }
 #endif /* CONFIG_SMP */
