@@ -383,7 +383,7 @@ static int fat_calc_dir_size(struct inode *inode)
 			return -EIO;
 		}
 		if (inode->i_size > FAT_MAX_DIR_SIZE) {
-			fat_fs_panic(sb, "Directory %ld: "
+			fat_fs_panic(sb, "Directory %lu: "
 				     "exceeded the maximum size of directory",
 				     inode->i_ino);
 			inode->i_size = FAT_MAX_DIR_SIZE;
@@ -984,7 +984,7 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		    /* includes .., compensating for "self" */
 #ifdef DEBUG
 		if (!inode->i_nlink) {
-			printk("directory %d: i_nlink == 0\n",inode->i_ino);
+			printk("directory %lu: i_nlink == 0\n",inode->i_ino);
 			inode->i_nlink = 1;
 		}
 #endif
