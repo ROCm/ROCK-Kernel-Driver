@@ -66,7 +66,6 @@
  */
 /* ------ END OF USER CONFIGURABLE PARAMETERS ----- */
 
-#ifdef IMM_CODE
 #include  <linux/config.h>
 #include  <linux/stddef.h>
 #include  <linux/module.h>
@@ -150,18 +149,12 @@ static int imm_init(int);
 static void imm_interrupt(void *);
 static int imm_out(int, char *, int);
 
-#else
-#define imm_release 0
-#endif
-
-int imm_detect(Scsi_Host_Template *);
-const char *imm_info(struct Scsi_Host *);
-int imm_command(Scsi_Cmnd *);
-int imm_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-int imm_abort(Scsi_Cmnd *);
-int imm_reset(Scsi_Cmnd *);
-int imm_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
-int imm_biosparam(struct scsi_device *, struct block_device *,
+static int imm_detect(Scsi_Host_Template *);
+static int imm_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
+static int imm_abort(Scsi_Cmnd *);
+static int imm_reset(Scsi_Cmnd *);
+static int imm_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
+static int imm_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int *);
 
 #endif				/* _IMM_H */
