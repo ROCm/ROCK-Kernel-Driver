@@ -321,6 +321,23 @@ static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buff
 	}
 }
 
+#ifdef CONFIG_SND_DEBUG
+/* direct register write for debugging */
+static void snd_ac97_proc_regs_write(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
+{
+	ac97_t *ac97 = snd_magic_cast(ac97_t, entry->private_data, return);
+	char line[64];
+	unsigned int reg, val;
+	while (!snd_info_get_line(buffer, line, sizeof(line))) {
+		if (sscanf(line, "%x %x", &reg, &val) != 2)
+			continue;
+		/* register must be odd */
+		if (reg < 0x80 && (reg & 1) == 0 && val <= 0xffff)
+			snd_ac97_write_cache(ac97, reg, val);
+	}
+}
+#endif
+
 static void snd_ac97_proc_regs_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, int subidx)
 {
 	int reg, val;
@@ -376,6 +393,11 @@ void snd_ac97_proc_init(ac97_t * ac97)
 	sprintf(name, "%s#%d-%d+regs", prefix, ac97->addr, ac97->num);
 	if ((entry = snd_info_create_card_entry(ac97->bus->card, name, ac97->bus->proc)) != NULL) {
 		snd_info_set_text_ops(entry, ac97, 1024, snd_ac97_proc_regs_read);
+#ifdef CONFIG_SND_DEBUG
+		entry->mode |= S_IWUSR;
+		entry->c.text.write_size = 1024;
+		entry->c.text.write = snd_ac97_proc_regs_write;
+#endif
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
 			entry = NULL;
