@@ -349,7 +349,7 @@ check_bug_trap(struct pt_regs *regs)
 		printk(KERN_ERR "Badness in %s at %s:%d\n",
 		       bug->function, bug->file,
 		      (unsigned int)bug->line & ~BUG_WARNING_TRAP);
-		dump_stack();
+		show_stack(current, (void *)regs->gpr[1]);
 		return 1;
 	}
 	printk(KERN_CRIT "kernel BUG in %s at %s:%d!\n",
