@@ -8,12 +8,11 @@
 # docproc: 	 Preprocess .tmpl file in order to generate .sgml documentation
 # conmakehash:	 Create arrays for initializing the kernel console tables
 
-host-progs    := fixdep split-include conmakehash docproc
+host-progs    := fixdep split-include conmakehash docproc kallsyms
 build-targets := $(host-progs)
 
 # Let clean descend into subdirs
 subdir-	:= lxdialog kconfig
 
 # fixdep is needed to compile other host programs
-$(obj)/split-include $(obj)/docproc \
-$(obj)/conmakehash: $(obj)/fixdep
+$(obj)/split-include $(obj)/docproc $(obj)/conmakehash: $(obj)/fixdep

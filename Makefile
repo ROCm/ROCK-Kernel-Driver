@@ -352,12 +352,12 @@ ifdef CONFIG_KALLSYMS
 kallsyms.o := .tmp_kallsyms2.o
 
 quiet_cmd_kallsyms = KSYM    $@
-cmd_kallsyms = sh $(KALLSYMS) $< $@
+cmd_kallsyms = $(NM) -n $< | scripts/kallsyms > $@
 
-.tmp_kallsyms1.o: .tmp_vmlinux1
-	$(call cmd,kallsyms)
+.tmp_kallsyms1.o .tmp_kallsyms2.o: %.o: %.S scripts FORCE
+	$(call if_changed_dep,as_o_S)
 
-.tmp_kallsyms2.o: .tmp_vmlinux2
+.tmp_kallsyms%.S: .tmp_vmlinux%
 	$(call cmd,kallsyms)
 
 .tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
@@ -796,7 +796,7 @@ help:
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
 	@echo  'For further info browse Documentation/kbuild/*'
- 
+
 
 # Documentation targets
 # ---------------------------------------------------------------------------
@@ -841,6 +841,9 @@ a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS) \
 
 quiet_cmd_as_s_S = CPP     $@
 cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
+
+quiet_cmd_as_o_S = AS      $@
+cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 
 # read all saved command lines
 
