@@ -221,8 +221,6 @@ void iounmap(void *addr)
 		return;
 	} 
 
-	BUG_ON(p->phys_addr == 0);  /* not allocated with ioremap */	
-
 	vmfree_area_pages(VMALLOC_VMADDR(p->addr), p->size);	
 	if (p->flags && p->phys_addr < virt_to_phys(high_memory)) { 
 		change_page_attr(virt_to_page(__va(p->phys_addr)),
