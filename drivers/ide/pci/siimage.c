@@ -812,7 +812,7 @@ static unsigned int setup_mmio_siimage (struct pci_dev *dev, const char *name)
  *	to 133MHz clocking if the system isn't already set up to do it.
  */
 
-static unsigned int __init init_chipset_siimage (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_siimage(struct pci_dev *dev, const char *name)
 {
 	u32 class_rev	= 0;
 	u8 tmpbyte	= 0;
@@ -877,8 +877,8 @@ static unsigned int __init init_chipset_siimage (struct pci_dev *dev, const char
  *	The hardware supports buffered taskfiles and also some rather nice
  *	extended PRD tables. Unfortunately right now we don't.
  */
- 
-static void __init init_mmio_iops_siimage (ide_hwif_t *hwif)
+
+static void __devinit init_mmio_iops_siimage(ide_hwif_t *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	void *addr		= pci_get_drvdata(dev);
@@ -996,8 +996,8 @@ static int is_dev_seagate_sata(ide_drive_t *drive)
  *	look in we get for setting up the hwif so that we
  *	can get the iops right before using them.
  */
- 
-static void __init init_iops_siimage (ide_hwif_t *hwif)
+
+static void __devinit init_iops_siimage(ide_hwif_t *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	u32 class_rev		= 0;
@@ -1023,8 +1023,8 @@ static void __init init_iops_siimage (ide_hwif_t *hwif)
  *	Check for the presence of an ATA66 capable cable on the
  *	interface.
  */
- 
-static unsigned int __init ata66_siimage (ide_hwif_t *hwif)
+
+static unsigned int __devinit ata66_siimage(ide_hwif_t *hwif)
 {
 	unsigned long addr = siimage_selreg(hwif, 0);
 	if (pci_get_drvdata(hwif->pci_dev) == NULL) {
@@ -1044,8 +1044,8 @@ static unsigned int __init ata66_siimage (ide_hwif_t *hwif)
  *	requires several custom handlers so we override the default
  *	ide DMA handlers appropriately
  */
- 
-static void __init init_hwif_siimage (ide_hwif_t *hwif)
+
+static void __devinit init_hwif_siimage(ide_hwif_t *hwif)
 {
 	hwif->autodma = 0;
 	
