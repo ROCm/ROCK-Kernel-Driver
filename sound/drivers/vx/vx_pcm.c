@@ -48,6 +48,7 @@
 #include <sound/driver.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/delay.h>
 #include <sound/core.h>
 #include <sound/asoundef.h>
 #include <sound/pcm.h>
@@ -381,7 +382,7 @@ static int vx_send_irqa(vx_core_t *chip)
  */
 static int vx_toggle_pipe(vx_core_t *chip, vx_pipe_t *pipe, int state)
 {
-	int err, i, cur_state, delay;
+	int err, i, cur_state;
 
 	/* Check the pipe is not already in the requested state */
 	if (vx_get_pipe_state(chip, pipe, &cur_state) < 0)
@@ -394,17 +395,14 @@ static int vx_toggle_pipe(vx_core_t *chip, vx_pipe_t *pipe, int state)
 	 * enough sound buffer for this pipe)
 	 */
 	if (state) {
-		int delay = CAN_START_DELAY;
 		for (i = 0 ; i < MAX_WAIT_FOR_DSP; i++) {
-			snd_vx_delay(chip, delay);
 			err = vx_pipe_can_start(chip, pipe);
 			if (err > 0)
 				break;
 			/* Wait for a few, before asking again
 			 * to avoid flooding the DSP with our requests
 			 */
-			if ((i % 4 ) == 0)
-				delay <<= 1;
+			mdelay(1);
 		}
 	}
     
@@ -418,15 +416,12 @@ static int vx_toggle_pipe(vx_core_t *chip, vx_pipe_t *pipe, int state)
 	 * reaching the expected state before returning
 	 * Check one pipe only (since they are synchronous)
 	 */
-	delay = WAIT_STATE_DELAY;
 	for (i = 0; i < MAX_WAIT_FOR_DSP; i++) {
-		snd_vx_delay(chip, delay);
 		err = vx_get_pipe_state(chip, pipe, &cur_state);
 		if (err < 0 || cur_state == state)
 			break;
 		err = -EIO;
-		if ((i % 4 ) == 0)
-			delay <<= 1;
+		mdelay(1);
 	}
 	return err < 0 ? -EIO : 0;
 }
