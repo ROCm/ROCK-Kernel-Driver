@@ -211,6 +211,8 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 	return DRIVER(drive)->error(drive, "dma_intr", stat);
 }
 
+EXPORT_SYMBOL_GPL(ide_dma_intr);
+
 static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
@@ -365,6 +367,8 @@ use_pio_instead:
 	return 0; /* revert to PIO for this request */
 }
 
+EXPORT_SYMBOL_GPL(ide_build_dmatable);
+
 /* Teardown mappings after DMA has completed.  */
 void ide_destroy_dmatable (ide_drive_t *drive)
 {
@@ -375,6 +379,8 @@ void ide_destroy_dmatable (ide_drive_t *drive)
 	pci_unmap_sg(dev, sg, nents, HWIF(drive)->sg_dma_direction);
 	HWIF(drive)->sg_dma_active = 0;
 }
+
+EXPORT_SYMBOL_GPL(ide_destroy_dmatable);
 
 static int config_drive_for_dma (ide_drive_t *drive)
 {
@@ -1019,4 +1025,4 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		BUG();
 }
 
-
+EXPORT_SYMBOL_GPL(ide_setup_dma);

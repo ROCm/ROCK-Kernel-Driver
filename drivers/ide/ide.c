@@ -194,6 +194,8 @@ int noautodma = 0;
 int noautodma = 1;
 #endif
 
+EXPORT_SYMBOL(noautodma);
+
 /*
  * ide_modules keeps track of the available IDE chipset/probe/driver modules.
  */
