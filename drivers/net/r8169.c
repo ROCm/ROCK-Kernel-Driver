@@ -1024,6 +1024,12 @@ rtl8169_hw_start(struct net_device *dev)
 	RTL_W32(TxConfig,
 		(TX_DMA_BURST << TxDMAShift) | (InterFrameGap <<
 						TxInterFrameGapShift));
+	RTL_W16(CPlusCmd, RTL_R16(CPlusCmd));
+
+	if (tp->mac_version == RTL_GIGA_MAC_VER_D) {
+		dprintk(KERN_INFO PFX "Set MAC Reg C+CR Offset 0xE0: bit-3 and bit-14 MUST be 1\n");
+		RTL_W16(CPlusCmd, RTL_R16(CPlusCmd) | (1 << 14) | (1 << 3));
+	}
 
 	tp->cur_rx = 0;
 
