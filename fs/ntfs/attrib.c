@@ -986,3 +986,144 @@ int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size)
 	}
 	return 0;
 }
+
+/**
+ * ntfs_attr_set - fill (a part of) an attribute with a byte
+ * @ni:		ntfs inode describing the attribute to fill
+ * @ofs:	offset inside the attribute at which to start to fill
+ * @cnt:	number of bytes to fill
+ * @val:	the unsigned 8-bit value with which to fill the attribute
+ *
+ * Fill @cnt bytes of the attribute described by the ntfs inode @ni starting at
+ * byte offset @ofs inside the attribute with the constant byte @val.
+ *
+ * This function is effectively like memset() applied to an ntfs attribute.
+ *
+ * Return 0 on success and -errno on error.  An error code of -ESPIPE means
+ * that @ofs + @cnt were outside the end of the attribute and no write was
+ * performed.
+ */
+int ntfs_attr_set(ntfs_inode *ni, const s64 ofs, const s64 cnt, const u8 val)
+{
+	ntfs_volume *vol = ni->vol;
+	struct address_space *mapping;
+	struct page *page;
+	u8 *kaddr;
+	pgoff_t idx, end;
+	unsigned int start_ofs, end_ofs, size;
+
+	ntfs_debug("Entering for ofs 0x%llx, cnt 0x%llx, val 0x%hx.",
+			(long long)ofs, (long long)cnt, val);
+	BUG_ON(ofs < 0);
+	BUG_ON(cnt < 0);
+	if (!cnt)
+		goto done;
+	mapping = VFS_I(ni)->i_mapping;
+	/* Work out the starting index and page offset. */
+	idx = ofs >> PAGE_CACHE_SHIFT;
+	start_ofs = ofs & ~PAGE_CACHE_MASK;
+	/* Work out the ending index and page offset. */
+	end = ofs + cnt;
+	end_ofs = end & ~PAGE_CACHE_MASK;
+	/* If the end is outside the inode size return -ESPIPE. */
+	if (unlikely(end > VFS_I(ni)->i_size)) {
+		ntfs_error(vol->sb, "Request exceeds end of attribute.");
+		return -ESPIPE;
+	}
+	end >>= PAGE_CACHE_SHIFT;
+	/* If there is a first partial page, need to do it the slow way. */
+	if (start_ofs) {
+		page = read_cache_page(mapping, idx,
+				(filler_t*)mapping->a_ops->readpage, NULL);
+		if (IS_ERR(page)) {
+			ntfs_error(vol->sb, "Failed to read first partial "
+					"page (sync error, index 0x%lx).", idx);
+			return PTR_ERR(page);
+		}
+		wait_on_page_locked(page);
+		if (unlikely(!PageUptodate(page))) {
+			ntfs_error(vol->sb, "Failed to read first partial page "
+					"(async error, index 0x%lx).", idx);
+			page_cache_release(page);
+			return PTR_ERR(page);
+		}
+		/*
+		 * If the last page is the same as the first page, need to
+		 * limit the write to the end offset.
+		 */
+		size = PAGE_CACHE_SIZE;
+		if (idx == end)
+			size = end_ofs;
+		kaddr = kmap_atomic(page, KM_USER0);
+		memset(kaddr + start_ofs, val, size - start_ofs);
+		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
+		set_page_dirty(page);
+		page_cache_release(page);
+		if (idx == end)
+			goto done;
+		idx++;
+	}
+	/* Do the whole pages the fast way. */
+	for (; idx < end; idx++) {
+		/* Find or create the current page.  (The page is locked.) */
+		page = grab_cache_page(mapping, idx);
+		if (unlikely(!page)) {
+			ntfs_error(vol->sb, "Insufficient memory to grab "
+					"page (index 0x%lx).", idx);
+			return -ENOMEM;
+		}
+		kaddr = kmap_atomic(page, KM_USER0);
+		memset(kaddr, val, PAGE_CACHE_SIZE);
+		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
+		/*
+		 * If the page has buffers, mark them uptodate since buffer
+		 * state and not page state is definitive in 2.6 kernels.
+		 */
+		if (page_has_buffers(page)) {
+			struct buffer_head *bh, *head;
+
+			bh = head = page_buffers(page);
+			do {
+				set_buffer_uptodate(bh);
+			} while ((bh = bh->b_this_page) != head);
+		}
+		/* Now that buffers are uptodate, set the page uptodate, too. */
+		SetPageUptodate(page);
+		/*
+		 * Set the page and all its buffers dirty and mark the inode
+		 * dirty, too.  The VM will write the page later on.
+		 */
+		set_page_dirty(page);
+		/* Finally unlock and release the page. */
+		unlock_page(page);
+		page_cache_release(page);
+	}
+	/* If there is a last partial page, need to do it the slow way. */
+	if (end_ofs) {
+		page = read_cache_page(mapping, idx,
+				(filler_t*)mapping->a_ops->readpage, NULL);
+		if (IS_ERR(page)) {
+			ntfs_error(vol->sb, "Failed to read last partial page "
+					"(sync error, index 0x%lx).", idx);
+			return PTR_ERR(page);
+		}
+		wait_on_page_locked(page);
+		if (unlikely(!PageUptodate(page))) {
+			ntfs_error(vol->sb, "Failed to read last partial page "
+					"(async error, index 0x%lx).", idx);
+			page_cache_release(page);
+			return PTR_ERR(page);
+		}
+		kaddr = kmap_atomic(page, KM_USER0);
+		memset(kaddr, val, end_ofs);
+		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
+		set_page_dirty(page);
+		page_cache_release(page);
+	}
+done:
+	ntfs_debug("Done.");
+	return 0;
+}

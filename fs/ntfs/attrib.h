@@ -86,4 +86,7 @@ extern void ntfs_attr_put_search_ctx(ntfs_attr_search_ctx *ctx);
 
 extern int ntfs_attr_record_resize(MFT_RECORD *m, ATTR_RECORD *a, u32 new_size);
 
+extern int ntfs_attr_set(ntfs_inode *ni, const s64 ofs, const s64 cnt,
+		const u8 val);
+
 #endif /* _LINUX_NTFS_ATTRIB_H */

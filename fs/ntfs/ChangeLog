@@ -40,6 +40,9 @@ ToDo/Notes:
 	  inline wrapper for ntfs_cluster_free_from_rl_nolock() which takes the
 	  cluster bitmap lock for the duration of the call.
 	- Add fs/ntfs/attrib.[hc]::ntfs_attr_record_resize().
+	- Implement the equivalent of memset() for an ntfs attribute in
+	  fs/ntfs/attrib.[hc]::ntfs_attr_set() and switch
+	  fs/ntfs/logfile.c::ntfs_empty_logfile() to using it.
 
 2.1.19 - Many cleanups, improvements, and a minor bug fix.
 

@@ -681,60 +681,20 @@ err_out:
 BOOL ntfs_empty_logfile(struct inode *log_vi)
 {
 	ntfs_volume *vol = NTFS_SB(log_vi->i_sb);
-	struct address_space *mapping;
-	pgoff_t idx, end;
 
 	ntfs_debug("Entering.");
-	if (NVolLogFileEmpty(vol))
-		goto done;
-	mapping = log_vi->i_mapping;
-	end = (log_vi->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	for (idx = 0; idx < end; ++idx) {
-		struct page *page;
-		u8 *kaddr;
-
-		/* Find or create the current page.  (The page is locked.) */
-		page = grab_cache_page(mapping, idx);
-		if (unlikely(!page)) {
-			ntfs_error(vol->sb, "Insufficient memory to grab "
-					"$LogFile page (index %lu).", idx);
+	if (!NVolLogFileEmpty(vol)) {
+		int err;
+		
+		err = ntfs_attr_set(NTFS_I(log_vi), 0, log_vi->i_size, 0xff);
+		if (unlikely(err)) {
+			ntfs_error(vol->sb, "Failed to fill $LogFile with "
+					"0xff bytes (error code %i).", err);
 			return FALSE;
 		}
-		/*
-		 * Set all bytes in the page to 0xff.  It doesn't matter if we
-		 * go beyond i_size, because ntfs_writepage() will take care of
-		 * that for us.
-		 */
-		kaddr = (u8*)kmap_atomic(page, KM_USER0);
-		memset(kaddr, 0xff, PAGE_CACHE_SIZE);
-		flush_dcache_page(page);
-		kunmap_atomic(kaddr, KM_USER0);
-		/*
-		 * If the page has buffers, mark them uptodate since buffer
-		 * state and not page state is definitive in 2.6 kernels.
-		 */
-		if (page_has_buffers(page)) {
-			struct buffer_head *bh, *head;
-
-			bh = head = page_buffers(page);
-			do {
-				set_buffer_uptodate(bh);
-			} while ((bh = bh->b_this_page) != head);
-		}
-		/* Now that buffers are uptodate, set the page uptodate, too. */
-		SetPageUptodate(page);
-		/*
-		 * Set the page and all its buffers dirty and mark the inode
-		 * dirty, too. The VM will write the page later on.
-		 */
-		set_page_dirty(page);
-		/* Finally unlock and release the page. */
-		unlock_page(page);
-		page_cache_release(page);
+		/* Set the flag so we do not have to do it again on remount. */
+		NVolSetLogFileEmpty(vol);
 	}
-	/* We set the flag so we do not clear the log file again on remount. */
-	NVolSetLogFileEmpty(vol);
-done:
 	ntfs_debug("Done.");
 	return TRUE;
 }
