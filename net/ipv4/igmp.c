@@ -2223,7 +2223,9 @@ static int igmp_mc_seq_show(struct seq_file *seq, void *v)
 		struct igmp_mc_iter_state *state = igmp_mc_seq_private(seq);
 		char   *querier;
 #ifdef CONFIG_IP_MULTICAST
-		querier = IGMP_V1_SEEN(state->in_dev) ? "V1" : "V2";
+		querier = IGMP_V1_SEEN(state->in_dev) ? "V1" :
+			  IGMP_V2_SEEN(state->in_dev) ? "V2" :
+			  "V3";
 #else
 		querier = "NONE";
 #endif
@@ -2236,7 +2238,9 @@ static int igmp_mc_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq,
 			   "\t\t\t\t%08lX %5d %d:%08lX\t\t%d\n",
 			   im->multiaddr, im->users,
-			   im->tm_running, jiffies_to_clock_t(im->timer.expires-jiffies), im->reporter);
+			   im->tm_running, im->tm_running ?
+			   jiffies_to_clock_t(im->timer.expires-jiffies) : 0,
+			   im->reporter);
 	}
 	return 0;
 }

@@ -2,11 +2,9 @@
 # IrDA protocol configuration
 #
 
-menu "IrDA (infrared) support"
+menuconfig IRDA
 	depends on NET
-
-config IRDA
-	tristate "IrDA subsystem support"
+	tristate "IrDA (infrared) subsystem support"
 	---help---
 	  Say Y here if you want to build support for the IrDA (TM) protocols.
 	  The Infrared Data Associations (tm) specifies standards for wireless
@@ -94,6 +92,4 @@ config IRDA_DEBUG
 	  If unsure, say Y (since it makes it easier to find the bugs).
 
 source "drivers/net/irda/Kconfig"
-
-endmenu
 

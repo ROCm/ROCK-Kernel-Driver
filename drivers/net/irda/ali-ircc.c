@@ -44,7 +44,7 @@
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
 
-#include <net/irda/ali-ircc.h>
+#include "ali-ircc.h"
 
 #define CHIP_IO_EXTENT 8
 #define BROKEN_DONGLE_ID

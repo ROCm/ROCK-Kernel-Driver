@@ -329,7 +329,7 @@ static const unsigned long onegigmask = -1 << 30;
 /********** access to adapter **********/
 
 static inline void wr_plain (const amb_dev * dev, size_t addr, u32 data) {
-  PRINTD (DBG_FLOW|DBG_REGS, "wr: %08x <- %08x", addr, data);
+  PRINTD (DBG_FLOW|DBG_REGS, "wr: %08zx <- %08x", addr, data);
 #ifdef AMB_MMIO
   dev->membase[addr / sizeof(u32)] = data;
 #else
@@ -343,13 +343,13 @@ static inline u32 rd_plain (const amb_dev * dev, size_t addr) {
 #else
   u32 data = inl (dev->iobase + addr);
 #endif
-  PRINTD (DBG_FLOW|DBG_REGS, "rd: %08x -> %08x", addr, data);
+  PRINTD (DBG_FLOW|DBG_REGS, "rd: %08zx -> %08x", addr, data);
   return data;
 }
 
 static inline void wr_mem (const amb_dev * dev, size_t addr, u32 data) {
   u32 be = cpu_to_be32 (data);
-  PRINTD (DBG_FLOW|DBG_REGS, "wr: %08x <- %08x b[%08x]", addr, data, be);
+  PRINTD (DBG_FLOW|DBG_REGS, "wr: %08zx <- %08x b[%08x]", addr, data, be);
 #ifdef AMB_MMIO
   dev->membase[addr / sizeof(u32)] = be;
 #else
@@ -364,7 +364,7 @@ static inline u32 rd_mem (const amb_dev * dev, size_t addr) {
   u32 be = inl (dev->iobase + addr);
 #endif
   u32 data = be32_to_cpu (be);
-  PRINTD (DBG_FLOW|DBG_REGS, "rd: %08x -> %08x b[%08x]", addr, data, be);
+  PRINTD (DBG_FLOW|DBG_REGS, "rd: %08zx -> %08x b[%08x]", addr, data, be);
   return data;
 }
 

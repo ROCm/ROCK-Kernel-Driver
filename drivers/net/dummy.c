@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/init.h>
 #include <linux/moduleparam.h>
 
@@ -39,6 +40,17 @@ static int numdummies = 1;
 
 static int dummy_xmit(struct sk_buff *skb, struct net_device *dev);
 static struct net_device_stats *dummy_get_stats(struct net_device *dev);
+
+static int dummy_set_address(struct net_device *dev, void *p)
+{
+	struct sockaddr *sa = p;
+
+	if (!is_valid_ether_addr(sa->sa_data)) 
+		return -EADDRNOTAVAIL;
+		
+	memcpy(dev->dev_addr, sa->sa_data, ETH_ALEN);
+	return 0;
+}
 
 /* fake multicast ability */
 static void set_multicast_list(struct net_device *dev)
@@ -58,6 +70,7 @@ static void __init dummy_setup(struct net_device *dev)
 	dev->get_stats = dummy_get_stats;
 	dev->hard_start_xmit = dummy_xmit;
 	dev->set_multicast_list = set_multicast_list;
+	dev->set_mac_address = dummy_set_address;
 #ifdef CONFIG_NET_FASTROUTE
 	dev->accept_fastpath = dummy_accept_fastpath;
 #endif
@@ -68,6 +81,7 @@ static void __init dummy_setup(struct net_device *dev)
 	dev->flags |= IFF_NOARP;
 	dev->flags &= ~IFF_MULTICAST;
 	SET_MODULE_OWNER(dev);
+	random_ether_addr(dev->dev_addr);
 }
 
 static int dummy_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -90,6 +104,7 @@ static struct net_device **dummies;
 
 /* Number of dummy devices to be set up by this module. */
 module_param(numdummies, int, 0);
+MODULE_PARM_DESC(numdimmies, "Number of dummy psuedo devices");
 
 static int __init dummy_init_one(int index)
 {

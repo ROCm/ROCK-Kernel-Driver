@@ -53,7 +53,7 @@ MODULE_LICENSE("GPL");
 #include <net/irda/wrapper.h>
 #include <net/irda/crc.h>
 
-#include <net/irda/vlsi_ir.h>
+#include "vlsi_ir.h"
 
 /********************************************************/
 

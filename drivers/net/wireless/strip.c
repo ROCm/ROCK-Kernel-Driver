@@ -1727,7 +1727,7 @@ static void get_radio_version(struct strip *strip_info, __u8 * ptr, __u8 * end)
 		sprintf(strip_info->serial_number.c, "%.*s", len, p);
 	} else {
 		printk(KERN_DEBUG
-		       "STRIP: radio serial number shorter (%d) than expected (%d)\n",
+		       "STRIP: radio serial number shorter (%zd) than expected (%d)\n",
 		       end - p, len);
 	}
 }
@@ -1745,7 +1745,7 @@ static void get_radio_voltage(struct strip *strip_info, __u8 * ptr, __u8 * end)
 		sprintf(strip_info->battery_voltage.c, "%.*s", len, ptr);
 	} else {
 		printk(KERN_DEBUG
-		       "STRIP: radio voltage string shorter (%d) than expected (%d)\n",
+		       "STRIP: radio voltage string shorter (%zd) than expected (%d)\n",
 		       end - ptr, len);
 	}
 }
@@ -2330,7 +2330,7 @@ static void strip_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 			if (*cp == 0x0D) {	/* If end of packet, decide what to do with it */
 				if (strip_info->sx_count > 3000)
 					printk(KERN_INFO
-					       "%s: Cut a %d byte packet (%d bytes remaining)%s\n",
+					       "%s: Cut a %d byte packet (%zd bytes remaining)%s\n",
 					       strip_info->dev->name,
 					       strip_info->sx_count,
 					       end - cp - 1,

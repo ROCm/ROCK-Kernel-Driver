@@ -52,7 +52,7 @@
 #include <net/irda/irmod.h>
 #include <net/irda/wrapper.h>
 #include <net/irda/irda_device.h>
-#include "net/irda/au1000_ircc.h"
+#include "au1000_ircc.h"
 
 static int au1k_irda_net_init(struct net_device *);
 static int au1k_irda_start(struct net_device *);
