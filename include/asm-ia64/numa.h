@@ -16,7 +16,6 @@
 #ifdef CONFIG_NUMA
 
 #include <linux/cache.h>
-#include <linux/cache.h>
 #include <linux/cpumask.h>
 #include <linux/numa.h>
 #include <linux/smp.h>
