@@ -319,24 +319,6 @@ static char hop_pattern_length[] = { 1,
 
 static char rcsid[] = "Raylink/WebGear wireless LAN - Corey <Thomas corey@world.std.com>";
 
-/*======================================================================
-
-    This bit of code is used to avoid unregistering network devices
-    at inappropriate times.  2.2 and later kernels are fairly picky
-    about when this can happen.
-    
-======================================================================*/
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    ray_detach(link);
-    }
-}
-
 /*=============================================================================
     ray_attach() creates an "instance" of the driver, allocating
     local data structures for one device.  The device is registered
@@ -354,7 +336,6 @@ static dev_link_t *ray_attach(void)
     struct net_device *dev;
     
     DEBUG(1, "ray_attach()\n");
-    flush_stale_links();
 
     /* Initialize the dev_link_t structure */
     link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
@@ -484,10 +465,8 @@ static void ray_detach(dev_link_t *link)
     */
     if (link->state & DEV_CONFIG) {
         ray_release(link);
-        if(link->state & DEV_STALE_CONFIG) {
-            link->state |= DEV_STALE_LINK;
+        if(link->state & DEV_STALE_CONFIG)
             return;
-        }
     }
 
     /* Break the link with Card Services */
@@ -932,7 +911,11 @@ static void ray_release(dev_link_t *link)
     if ( i != CS_SUCCESS ) DEBUG(0,"ReleaseIRQ ret = %x\n",i);
 
     DEBUG(2,"ray_release ending\n");
-} /* ray_release */
+
+    if (link->state & DEV_STALE_CONFIG)
+	    ray_detach(link);
+}
+
 /*=============================================================================
     The card status event handler.  Mostly, this schedules other
     stuff to run after an event is received.  A CARD_REMOVAL event

@@ -244,12 +244,9 @@ static const lookup_t service_table[] = {
 static int socket_resume(struct pcmcia_socket *skt);
 static int socket_suspend(struct pcmcia_socket *skt);
 
-int pcmcia_socket_dev_suspend(struct device *dev, u32 state, u32 level)
+int pcmcia_socket_dev_suspend(struct device *dev, u32 state)
 {
 	struct pcmcia_socket *socket;
-
-	if (level != SUSPEND_SAVE_STATE)
-		return 0;
 
 	down_read(&pcmcia_socket_list_rwsem);
 	list_for_each_entry(socket, &pcmcia_socket_list, socket_list) {
@@ -265,12 +262,9 @@ int pcmcia_socket_dev_suspend(struct device *dev, u32 state, u32 level)
 }
 EXPORT_SYMBOL(pcmcia_socket_dev_suspend);
 
-int pcmcia_socket_dev_resume(struct device *dev, u32 level)
+int pcmcia_socket_dev_resume(struct device *dev)
 {
 	struct pcmcia_socket *socket;
-
-	if (level != RESUME_RESTORE_STATE)
-		return 0;
 
 	down_read(&pcmcia_socket_list_rwsem);
 	list_for_each_entry(socket, &pcmcia_socket_list, socket_list) {
@@ -657,7 +651,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 		pcmcia_error(skt, "unsupported voltage key.\n");
 		return CS_BAD_TYPE;
 	}
-	skt->socket.flags = SS_DEBOUNCED;
+	skt->socket.flags = 0;
 	skt->ops->set_socket(skt, &skt->socket);
 
 	/*
@@ -690,7 +684,6 @@ static int socket_insert(struct pcmcia_socket *skt)
 		}
 #endif
 		send_event(skt, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
-		skt->socket.flags &= ~SS_DEBOUNCED;
 	} else {
 		socket_shutdown(skt);
 		cs_socket_put(skt);
@@ -739,7 +732,6 @@ static int socket_resume(struct pcmcia_socket *skt)
 		} else {
 			send_event(skt, CS_EVENT_PM_RESUME, CS_EVENT_PRI_LOW);
 		}
-		skt->socket.flags &= ~SS_DEBOUNCED;
 	} else {
 		socket_shutdown(skt);
 		cs_socket_put(skt);

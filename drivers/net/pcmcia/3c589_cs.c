@@ -176,24 +176,6 @@ static dev_link_t *dev_list;
 
 /*======================================================================
 
-    This bit of code is used to avoid unregistering network devices
-    at inappropriate times.  2.2 and later kernels are fairly picky
-    about when this can happen.
-    
-======================================================================*/
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    tc589_detach(link);
-    }
-}
-
-/*======================================================================
-
     tc589_attach() creates an "instance" of the driver, allocating
     local data structures for one device.  The device is registered
     with Card Services.
@@ -209,7 +191,6 @@ static dev_link_t *tc589_attach(void)
     int i, ret;
 
     DEBUG(0, "3c589_attach()\n");
-    flush_stale_links();
     
     /* Create new ethernet device */
     dev = alloc_etherdev(sizeof(struct el3_private));
@@ -297,10 +278,8 @@ static void tc589_detach(dev_link_t *link)
 
     if (link->state & DEV_CONFIG) {
 	tc589_release(link);
-	if (link->state & DEV_STALE_CONFIG) {
-	    link->state |= DEV_STALE_LINK;
+	if (link->state & DEV_STALE_CONFIG)
 	    return;
-	}
     }
     
     if (link->handle)
@@ -466,8 +445,10 @@ static void tc589_release(dev_link_t *link)
     CardServices(ReleaseIRQ, link->handle, &link->irq);
     
     link->state &= ~DEV_CONFIG;
-    
-} /* tc589_release */
+
+    if (link->state & DEV_STALE_CONFIG)
+	    tc589_detach(link);
+}
 
 /*======================================================================
 

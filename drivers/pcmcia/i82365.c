@@ -1351,11 +1351,27 @@ static struct pccard_operations pcic_operations = {
 
 /*====================================================================*/
 
+static int i82365_suspend(struct device *dev, u32 state, u32 level)
+{
+	int ret = 0;
+	if (level == SUSPEND_SAVE_STATE)
+		ret = pcmcia_socket_dev_suspend(dev, state);
+	return ret;
+}
+
+static int i82365_resume(struct device *dev, u32 level)
+{
+	int ret = 0;
+	if (level == RESUME_RESTORE_STATE)
+		ret = pcmcia_socket_dev_resume(dev);
+	return ret;
+}
+
 static struct device_driver i82365_driver = {
 	.name = "i82365",
 	.bus = &platform_bus_type,
-	.suspend = pcmcia_socket_dev_suspend,
-	.resume = pcmcia_socket_dev_resume,
+	.suspend = i82365_suspend,
+	.resume = i82365_resume,
 };
 
 static struct platform_device i82365_device = {
