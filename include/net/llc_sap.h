@@ -14,7 +14,6 @@
 struct llc_sap;
 struct sk_buff;
 
-extern void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb);
 extern void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb);
 extern void llc_save_primitive(struct sk_buff* skb, unsigned char prim);
 extern struct sk_buff *llc_alloc_frame(void);

@@ -174,7 +174,7 @@ static int ax25_check_dama_slave(ax25_dev *ax25_dev)
 	return res;
 }
 
-void ax25_dev_dama_on(ax25_dev *ax25_dev)
+static void ax25_dev_dama_on(ax25_dev *ax25_dev)
 {
 	if (ax25_dev == NULL)
 		return;

@@ -166,14 +166,14 @@ out:
 	return 0;
 } 
 
-struct seq_operations x25_seq_route_ops = {
+static struct seq_operations x25_seq_route_ops = {
 	.start  = x25_seq_route_start,
 	.next   = x25_seq_route_next,
 	.stop   = x25_seq_route_stop,
 	.show   = x25_seq_route_show,
 };
 
-struct seq_operations x25_seq_socket_ops = {
+static struct seq_operations x25_seq_socket_ops = {
 	.start  = x25_seq_socket_start,
 	.next   = x25_seq_socket_next,
 	.stop   = x25_seq_socket_stop,

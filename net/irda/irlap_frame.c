@@ -43,6 +43,9 @@
 #include <net/irda/irlap_frame.h>
 #include <net/irda/qos.h>
 
+static void irlap_send_i_frame(struct irlap_cb *self, struct sk_buff *skb,
+			       int command);
+
 /*
  * Function irlap_insert_info (self, skb)
  *
@@ -629,34 +632,6 @@ static inline void irlap_recv_rr_frame(struct irlap_cb *self,
 		irlap_do_event(self, RECV_RR_RSP, skb, info);
 }
 
-void irlap_send_frmr_frame( struct irlap_cb *self, int command)
-{
-	struct sk_buff *tx_skb = NULL;
-	__u8 *frame;
-
-	ASSERT( self != NULL, return;);
-	ASSERT( self->magic == LAP_MAGIC, return;);
-
-	tx_skb = dev_alloc_skb( 32);
-	if (!tx_skb)
-		return;
-
-	frame = skb_put(tx_skb, 2);
-
-	frame[0] = self->caddr;
-	frame[0] |= (command) ? CMD_FRAME : 0;
-
-	frame[1]  = (self->vs << 1);
-	frame[1] |= PF_BIT;
-	frame[1] |= (self->vr << 5);
-
-	frame[2] = 0;
-
-	IRDA_DEBUG(4, "%s(), vr=%d, %ld\n", __FUNCTION__, self->vr, jiffies);
-
-	irlap_queue_xmit(self, tx_skb);
-}
-
 /*
  * Function irlap_recv_rnr_frame (self, skb, info)
  *
@@ -1129,8 +1104,8 @@ void irlap_send_ui_frame(struct irlap_cb *self, struct sk_buff *skb,
  *
  *    Contruct and transmit Information (I) frame
  */
-void irlap_send_i_frame(struct irlap_cb *self, struct sk_buff *skb,
-			int command)
+static void irlap_send_i_frame(struct irlap_cb *self, struct sk_buff *skb,
+			       int command)
 {
 	/* Insert connection address */
 	skb->data[0] = self->caddr;

@@ -28,6 +28,8 @@
 #include <linux/interrupt.h>
 #include <net/rose.h>
 
+static int rose_create_facilities(unsigned char *buffer, rose_cb *rose);
+
 /*
  *	This routine purges all of the queues of frames.
  */
@@ -394,7 +396,7 @@ int rose_parse_facilities(unsigned char *p,
 	return 1;
 }
 
-int rose_create_facilities(unsigned char *buffer, rose_cb *rose)
+static int rose_create_facilities(unsigned char *buffer, rose_cb *rose)
 {
 	unsigned char *p = buffer + 1;
 	char *callsign;

@@ -227,8 +227,6 @@ static inline int irda_device_txqueue_empty(const struct net_device *dev)
 	return (skb_queue_len(&dev->qdisc->q) == 0);
 }
 int  irda_device_set_raw_mode(struct net_device* self, int status);
-int  irda_device_set_dtr_rts(struct net_device *dev, int dtr, int rts);
-int  irda_device_change_speed(struct net_device *dev, __u32 speed);
 struct net_device *alloc_irdadev(int sizeof_priv);
 
 /* Dongle interface */

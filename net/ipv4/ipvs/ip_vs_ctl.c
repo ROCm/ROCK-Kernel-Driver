@@ -62,7 +62,7 @@ static spinlock_t __ip_vs_droppacket_lock = SPIN_LOCK_UNLOCKED;
 /* 1/rate drop and drop-entry variables */
 int ip_vs_drop_rate = 0;
 int ip_vs_drop_counter = 0;
-atomic_t ip_vs_dropentry = ATOMIC_INIT(0);
+static atomic_t ip_vs_dropentry = ATOMIC_INIT(0);
 
 /* number of virtual services */
 static int ip_vs_num_services = 0;

@@ -35,6 +35,9 @@ static rwlock_t x25_neigh_list_lock = RW_LOCK_UNLOCKED;
 
 static void x25_t20timer_expiry(unsigned long);
 
+static void x25_transmit_restart_confirmation(struct x25_neigh *nb);
+static void x25_transmit_restart_request(struct x25_neigh *nb);
+
 /*
  *	Linux set/reset timer routines
  */
@@ -106,7 +109,7 @@ void x25_link_control(struct sk_buff *skb, struct x25_neigh *nb,
 /*
  *	This routine is called when a Restart Request is needed
  */
-void x25_transmit_restart_request(struct x25_neigh *nb)
+static void x25_transmit_restart_request(struct x25_neigh *nb)
 {
 	unsigned char *dptr;
 	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 2;
@@ -133,7 +136,7 @@ void x25_transmit_restart_request(struct x25_neigh *nb)
 /*
  * This routine is called when a Restart Confirmation is needed
  */
-void x25_transmit_restart_confirmation(struct x25_neigh *nb)
+static void x25_transmit_restart_confirmation(struct x25_neigh *nb)
 {
 	unsigned char *dptr;
 	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN;
@@ -149,32 +152,6 @@ void x25_transmit_restart_confirmation(struct x25_neigh *nb)
 	*dptr++ = nb->extended ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
 	*dptr++ = 0x00;
 	*dptr++ = X25_RESTART_CONFIRMATION;
-
-	skb->sk = NULL;
-
-	x25_send_frame(skb, nb);
-}
-
-/*
- * This routine is called when a Diagnostic is required.
- */
-void x25_transmit_diagnostic(struct x25_neigh *nb, unsigned char diag)
-{
-	unsigned char *dptr;
-	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 1;
-	struct sk_buff *skb = alloc_skb(len, GFP_ATOMIC);
-
-	if (!skb)
-		return;
-
-	skb_reserve(skb, X25_MAX_L2_LEN);
-
-	dptr = skb_put(skb, X25_STD_MIN_LEN + 1);
-
-	*dptr++ = nb->extended ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
-	*dptr++ = 0x00;
-	*dptr++ = X25_DIAGNOSTIC;
-	*dptr++ = diag;
 
 	skb->sk = NULL;
 

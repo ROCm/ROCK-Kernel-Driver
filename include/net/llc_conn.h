@@ -91,7 +91,6 @@ extern struct sock *llc_sk_alloc(int family, int priority);
 extern void llc_sk_free(struct sock *sk);
 
 extern void llc_sk_reset(struct sock *sk);
-extern int llc_sk_init(struct sock *sk);
 
 /* Access to a connection */
 extern int llc_conn_state_process(struct sock *sk, struct sk_buff *skb);
@@ -106,8 +105,6 @@ extern int llc_conn_remove_acked_pdus(struct sock *conn, u8 nr,
 extern struct sock *llc_lookup_established(struct llc_sap *sap,
 					   struct llc_addr *daddr,
 					   struct llc_addr *laddr);
-extern struct sock *llc_lookup_listener(struct llc_sap *sap,
-					struct llc_addr *laddr);
 extern void llc_sap_add_socket(struct llc_sap *sap, struct sock *sk);
 extern void llc_sap_remove_socket(struct llc_sap *sap, struct sock *sk);
 

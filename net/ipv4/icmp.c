@@ -327,8 +327,8 @@ static void icmp_out_count(int type)
  *	Checksum each fragment, and on the first include the headers and final
  *	checksum.
  */
-int icmp_glue_bits(void *from, char *to, int offset, int len, int odd,
-		   struct sk_buff *skb)
+static int icmp_glue_bits(void *from, char *to, int offset, int len, int odd,
+			  struct sk_buff *skb)
 {
 	struct icmp_bxm *icmp_param = (struct icmp_bxm *)from;
 	unsigned int csum;

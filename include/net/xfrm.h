@@ -782,7 +782,6 @@ struct xfrm6_tunnel {
 
 extern void xfrm_init(void);
 extern void xfrm4_init(void);
-extern void xfrm4_fini(void);
 extern void xfrm6_init(void);
 extern void xfrm6_fini(void);
 extern void xfrm_state_init(void);
@@ -843,7 +842,6 @@ static inline int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl, unsig
 } 
 #endif
 
-void xfrm_policy_init(void);
 struct xfrm_policy *xfrm_policy_alloc(int gfp);
 extern int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*), void *);
 int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
@@ -858,12 +856,9 @@ struct xfrm_state * xfrm_find_acq(u8 mode, u32 reqid, u8 proto,
 				  int create, unsigned short family);
 extern void xfrm_policy_flush(void);
 extern int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol);
-extern struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl);
 extern int xfrm_flush_bundles(void);
 
 extern wait_queue_head_t km_waitq;
-extern void km_state_expired(struct xfrm_state *x, int hard);
-extern int km_query(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *pol);
 extern int km_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport);
 extern void km_policy_expired(struct xfrm_policy *pol, int dir, int hard);
 
@@ -875,7 +870,6 @@ extern int xfrm_count_auth_supported(void);
 extern int xfrm_count_enc_supported(void);
 extern struct xfrm_algo_desc *xfrm_aalg_get_byidx(unsigned int idx);
 extern struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx);
-extern struct xfrm_algo_desc *xfrm_calg_get_byidx(unsigned int idx);
 extern struct xfrm_algo_desc *xfrm_aalg_get_byid(int alg_id);
 extern struct xfrm_algo_desc *xfrm_ealg_get_byid(int alg_id);
 extern struct xfrm_algo_desc *xfrm_calg_get_byid(int alg_id);

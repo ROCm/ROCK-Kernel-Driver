@@ -51,6 +51,8 @@ static int irda_insert_integer(void *self, __u8 *buf, int len, __u8 pi,
 static int irda_insert_no_value(void *self, __u8 *buf, int len, __u8 pi,
 				PV_TYPE type, PI_HANDLER func);
 
+static int irda_param_unpack(__u8 *buf, char *fmt, ...);
+
 /* Parameter value call table. Must match PV_TYPE */
 static PV_HANDLER pv_extract_table[] = {
 	irda_extract_integer, /* Handler for any length integers */
@@ -400,7 +402,7 @@ EXPORT_SYMBOL(irda_param_pack);
 /*
  * Function irda_param_unpack (skb, fmt, ...)
  */
-int irda_param_unpack(__u8 *buf, char *fmt, ...)
+static int irda_param_unpack(__u8 *buf, char *fmt, ...)
 {
 	irda_pv_t arg;
 	va_list args;
@@ -440,7 +442,6 @@ int irda_param_unpack(__u8 *buf, char *fmt, ...)
 
 	return 0;
 }
-EXPORT_SYMBOL(irda_param_unpack);
 
 /*
  * Function irda_param_insert (self, pi, buf, len, info)
@@ -496,13 +497,14 @@ int irda_param_insert(void *self, __u8 pi, __u8 *buf, int len,
 EXPORT_SYMBOL(irda_param_insert);
 
 /*
- * Function irda_param_extract_all (self, buf, len, info)
+ * Function irda_param_extract (self, buf, len, info)
  *
  *    Parse all parameters. If len is correct, then everything should be
  *    safe. Returns the number of bytes that was parsed
  *
  */
-int irda_param_extract(void *self, __u8 *buf, int len, pi_param_info_t *info)
+static int irda_param_extract(void *self, __u8 *buf, int len,
+			      pi_param_info_t *info)
 {
 	pi_minor_info_t *pi_minor_info;
 	__u8 pi_minor;
@@ -549,7 +551,6 @@ int irda_param_extract(void *self, __u8 *buf, int len, pi_param_info_t *info)
 						  type, pi_minor_info->func);
 	return ret;
 }
-EXPORT_SYMBOL(irda_param_extract);
 
 /*
  * Function irda_param_extract_all (self, buf, len, info)

@@ -242,12 +242,9 @@ int  irlmp_connless_data_request(struct lsap_cb *, struct sk_buff *, __u8);
 void irlmp_connless_data_indication(struct lsap_cb *, struct sk_buff *);
 #endif /* CONFIG_IRDA_ULTRA */
 
-void irlmp_status_request(void);
 void irlmp_status_indication(struct lap_cb *, LINK_STATUS link, LOCK_STATUS lock);
 void irlmp_flow_indication(struct lap_cb *self, LOCAL_FLOW flow);
 
-int  irlmp_slsap_inuse(__u8 slsap);
-__u8 irlmp_find_free_slsap(void);
 LM_REASON irlmp_convert_lap_reason(LAP_REASON);
 
 static inline __u32 irlmp_get_saddr(const struct lsap_cb *self)

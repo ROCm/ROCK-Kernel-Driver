@@ -245,12 +245,6 @@ int inet_rtm_newrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg)
 	return 0;
 }
 
-u32 fib_rules_map_destination(u32 daddr, struct fib_result *res)
-{
-	u32 mask = inet_make_mask(res->prefixlen);
-	return (daddr&~mask)|res->fi->fib_nh->nh_gw;
-}
-
 #ifdef CONFIG_NET_CLS_ROUTE
 u32 fib_rules_tclass(struct fib_result *res)
 {
@@ -368,7 +362,7 @@ static int fib_rules_event(struct notifier_block *this, unsigned long event, voi
 }
 
 
-struct notifier_block fib_rules_notifier = {
+static struct notifier_block fib_rules_notifier = {
 	.notifier_call =fib_rules_event,
 };
 

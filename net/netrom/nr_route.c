@@ -45,7 +45,7 @@ static spinlock_t nr_node_list_lock = SPIN_LOCK_UNLOCKED;
 static HLIST_HEAD(nr_neigh_list);
 static spinlock_t nr_neigh_list_lock = SPIN_LOCK_UNLOCKED;
 
-struct nr_node *nr_node_get(ax25_address *callsign)
+static struct nr_node *nr_node_get(ax25_address *callsign)
 {
 	struct nr_node *found = NULL;
 	struct nr_node *nr_node;
@@ -62,7 +62,8 @@ struct nr_node *nr_node_get(ax25_address *callsign)
 	return found;
 }
 
-struct nr_neigh *nr_neigh_get_dev(ax25_address *callsign, struct net_device *dev)
+static struct nr_neigh *nr_neigh_get_dev(ax25_address *callsign,
+					 struct net_device *dev)
 {
 	struct nr_neigh *found = NULL;
 	struct nr_neigh *nr_neigh;

@@ -736,8 +736,9 @@ ssize_t sock_sendpage(struct file *file, struct page *page,
 	return sock->ops->sendpage(sock, page, offset, size, flags);
 }
 
-int sock_readv_writev(int type, struct inode * inode, struct file * file,
-		      const struct iovec * iov, long count, size_t size)
+static int sock_readv_writev(int type, struct inode * inode,
+			     struct file * file, const struct iovec * iov,
+			     long count, size_t size)
 {
 	struct msghdr msg;
 	struct socket *sock;

@@ -132,7 +132,7 @@ out:
 
 EXPORT_SYMBOL(krb5_decrypt);
 
-void
+static void
 buf_to_sg(struct scatterlist *sg, char *ptr, int len) {
 	sg->page = virt_to_page(ptr);
 	sg->offset = offset_in_page(ptr);

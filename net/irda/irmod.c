@@ -100,7 +100,7 @@ EXPORT_SYMBOL(irda_notify_init);
  *  Protocol stack initialisation entry point.
  *  Initialise the various components of the IrDA stack
  */
-int __init irda_init(void)
+static int __init irda_init(void)
 {
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__);
 
@@ -136,7 +136,7 @@ int __init irda_init(void)
  *  Protocol stack cleanup/removal entry point.
  *  Cleanup the various components of the IrDA stack
  */
-void __exit irda_cleanup(void)
+static void __exit irda_cleanup(void)
 {
 	/* Remove External APIs */
 #ifdef CONFIG_SYSCTL

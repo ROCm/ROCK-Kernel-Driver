@@ -448,7 +448,7 @@ static struct cache_detail rsc_cache = {
 
 static DefineSimpleCacheLookup(rsc, 0);
 
-struct rsc *
+static struct rsc *
 gss_svc_searchbyctx(struct xdr_netobj *handle)
 {
 	struct rsc rsci;
@@ -1045,7 +1045,7 @@ svcauth_gss_domain_release(struct auth_domain *dom)
 	kfree(gd);
 }
 
-struct auth_ops svcauthops_gss = {
+static struct auth_ops svcauthops_gss = {
 	.name		= "rpcsec_gss",
 	.owner		= THIS_MODULE,
 	.flavour	= RPC_AUTH_GSS,

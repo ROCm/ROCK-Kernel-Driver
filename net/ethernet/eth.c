@@ -208,7 +208,7 @@ unsigned short eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	return htons(ETH_P_802_2);
 }
 
-int eth_header_parse(struct sk_buff *skb, unsigned char *haddr)
+static int eth_header_parse(struct sk_buff *skb, unsigned char *haddr)
 {
 	struct ethhdr *eth = eth_hdr(skb);
 	memcpy(haddr, eth->h_source, ETH_ALEN);

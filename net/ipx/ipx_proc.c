@@ -287,21 +287,21 @@ out:
 	return 0;
 }
 
-struct seq_operations ipx_seq_interface_ops = {
+static struct seq_operations ipx_seq_interface_ops = {
 	.start  = ipx_seq_interface_start,
 	.next   = ipx_seq_interface_next,
 	.stop   = ipx_seq_interface_stop,
 	.show   = ipx_seq_interface_show,
 };
 
-struct seq_operations ipx_seq_route_ops = {
+static struct seq_operations ipx_seq_route_ops = {
 	.start  = ipx_seq_route_start,
 	.next   = ipx_seq_route_next,
 	.stop   = ipx_seq_route_stop,
 	.show   = ipx_seq_route_show,
 };
 
-struct seq_operations ipx_seq_socket_ops = {
+static struct seq_operations ipx_seq_socket_ops = {
 	.start  = ipx_seq_socket_start,
 	.next   = ipx_seq_socket_next,
 	.stop   = ipx_seq_interface_stop,

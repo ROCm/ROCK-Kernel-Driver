@@ -219,7 +219,8 @@ static void udp_v4_unhash(struct sock *sk)
 /* UDP is nearly always wildcards out the wazoo, it makes no sense to try
  * harder than this. -DaveM
  */
-struct sock *udp_v4_lookup_longway(u32 saddr, u16 sport, u32 daddr, u16 dport, int dif)
+static struct sock *udp_v4_lookup_longway(u32 saddr, u16 sport,
+					  u32 daddr, u16 dport, int dif)
 {
 	struct sock *sk, *result = NULL;
 	struct hlist_node *node;
@@ -263,7 +264,8 @@ struct sock *udp_v4_lookup_longway(u32 saddr, u16 sport, u32 daddr, u16 dport, i
 	return result;
 }
 
-__inline__ struct sock *udp_v4_lookup(u32 saddr, u16 sport, u32 daddr, u16 dport, int dif)
+static __inline__ struct sock *udp_v4_lookup(u32 saddr, u16 sport,
+					     u32 daddr, u16 dport, int dif)
 {
 	struct sock *sk;
 
@@ -667,7 +669,8 @@ do_confirm:
 	goto out;
 }
 
-int udp_sendpage(struct sock *sk, struct page *page, int offset, size_t size, int flags)
+static int udp_sendpage(struct sock *sk, struct page *page, int offset,
+			size_t size, int flags)
 {
 	struct udp_opt *up = udp_sk(sk);
 	int ret;
@@ -770,8 +773,8 @@ static __inline__ int udp_checksum_complete(struct sk_buff *skb)
  * 	return it, otherwise we block.
  */
 
-int udp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-		size_t len, int noblock, int flags, int *addr_len)
+static int udp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+		       size_t len, int noblock, int flags, int *addr_len)
 {
 	struct inet_sock *inet = inet_sk(sk);
   	struct sockaddr_in *sin = (struct sockaddr_in *)msg->msg_name;
