@@ -160,7 +160,7 @@ pci_set_dma_mask(struct pci_device *dev, u64 mask)
 Checks to see if the mask is possible and updates the device
 parameters if it is.
 
-Returns: 1 if successful and 0 if not
+Returns: 0 if successful and a negative error if not.
 
 u64
 dma_get_required_mask(struct device *dev)
