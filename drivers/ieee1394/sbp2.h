@@ -410,6 +410,9 @@ struct scsi_id_instance_data {
 	/* A backlink to our host_info */
 	struct sbp2scsi_host_info *hi;
 
+	/* The scsi_device associated with this scsi_id */
+	struct scsi_device *sdev;
+
 	/* Device specific workarounds/brokeness */
 	u32 workarounds;
 };
