@@ -2507,7 +2507,7 @@ static int configure_new_function(struct controller *ctrl, struct pci_func *func
 
 		/* find range of busses to use */
 		dbg("find ranges of buses to use\n");
-		bus_node = get_max_resource(&resources->bus_head, 1);
+		bus_node = get_max_resource(&(resources->bus_head), 1);
 
 		/* If we don't have any busses to allocate, we can't continue */
 		if (!bus_node)
