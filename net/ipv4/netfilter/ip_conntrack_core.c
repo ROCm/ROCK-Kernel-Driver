@@ -464,7 +464,7 @@ __ip_conntrack_confirm(struct nf_ct_info *nfct)
 			     &ct->tuplehash[IP_CT_DIR_REPLY]);
 		/* Timer relative to confirmation time, not original
 		   setting time, otherwise we'd get timer wrap in
-		   wierd delay cases. */
+		   weird delay cases. */
 		ct->timeout.expires += jiffies;
 		add_timer(&ct->timeout);
 		atomic_inc(&ct->ct_general.use);
