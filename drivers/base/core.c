@@ -168,7 +168,8 @@ int device_add(struct device *dev)
 {
 	struct device * parent;
 	int error;
-	
+
+	dev = get_device(dev);
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
 
@@ -208,6 +209,7 @@ int device_add(struct device *dev)
  register_done:
 	if (error && parent)
 		put_device(parent);
+	put_device(dev);
 	return error;
 }
 
