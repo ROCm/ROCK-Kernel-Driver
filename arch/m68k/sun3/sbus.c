@@ -10,6 +10,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/compiler.h>
 #include <linux/init.h>
 
 int __init sbus_init(void)
