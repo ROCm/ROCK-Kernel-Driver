@@ -94,6 +94,8 @@ static int csr0 = 0x01A00000 | 0x8000;
 static int csr0 = 0x01A00000 | 0x9000;
 #elif defined(__arm__) || defined(__sh__)
 static int csr0 = 0x01A00000 | 0x4800;
+#elif defined(__mips__)
+static int csr0 = 0x00200000 | 0x4000;
 #else
 #warning Processor architecture undefined!
 static int csr0 = 0x00A00000 | 0x4800;
@@ -1486,6 +1488,16 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 #ifdef CONFIG_DDB5477
                if ((pdev->bus->number == 0) && (PCI_SLOT(pdev->devfn) == 4)) {
                        /* DDB5477 MAC address in first EEPROM locations. */
+                       sa_offset = 0;
+                       /* No media table either */
+                       tp->flags &= ~HAS_MEDIA_TABLE;
+               }
+#endif
+#ifdef CONFIG_MIPS_COBALT
+               if ((pdev->bus->number == 0) && 
+                   ((PCI_SLOT(pdev->devfn) == 7) ||
+                    (PCI_SLOT(pdev->devfn) == 12))) {
+                       /* Cobalt MAC address in first EEPROM locations. */
                        sa_offset = 0;
                        /* No media table either */
                        tp->flags &= ~HAS_MEDIA_TABLE;

@@ -1,12 +1,9 @@
 /*
- *
  * Alchemy Semi Au1000 ethernet driver include file
  *
  * Author: Pete Popov <ppopov@mvista.com>
  *
  * Copyright 2001 MontaVista Software Inc.
- *
- * ########################################################################
  *
  *  This program is free software; you can distribute it and/or modify it
  *  under the terms of the GNU General Public License (Version 2) as
@@ -20,11 +17,8 @@
  *  You should have received a copy of the GNU General Public License along
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
- *
- * ########################################################################
- *
- * 
  */
+#include <linux/config.h>
 
 
 #define NUM_INTERFACES 2
@@ -137,7 +131,7 @@
 #define MII_AUX_100      0x0002
 #define MII_AUX_F100     0x0004
 #define MII_AUX_ANEG     0x0008
-#define MII_FDX_LED      0x8000
+#define MII_FDX_LED	 0x8000
 
 typedef struct mii_phy {
 	struct mii_phy * next;
@@ -203,6 +197,7 @@ struct au1000_private {
 	db_dest_t db[NUM_RX_BUFFS+NUM_TX_BUFFS];
 	volatile rx_dma_t *rx_dma_ring[NUM_RX_DMA];
 	volatile tx_dma_t *tx_dma_ring[NUM_TX_DMA];
+	int tx_len[NUM_TX_DMA];
 	db_dest_t *rx_db_inuse[NUM_RX_DMA];
 	db_dest_t *tx_db_inuse[NUM_TX_DMA];
 	u32 rx_head;

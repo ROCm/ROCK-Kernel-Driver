@@ -3424,10 +3424,6 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 	int ethtool_new_speed_duplex;
 	struct ethtool_cmd ecmd;
 
-	if (!capable(CAP_NET_ADMIN)) {
-		return -EPERM;
-	}
-
 	bdp = dev->priv;
 	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof (ecmd))) {
 		return -EFAULT;
@@ -3545,8 +3541,6 @@ e100_ethtool_gregs(struct net_device *dev, struct ifreq *ifr)
 	void *addr = ifr->ifr_data;
 	u16 mdi_reg;
 
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
 	bdp = dev->priv;
 
 	if(copy_from_user(&regs, addr, sizeof(regs)))
@@ -3573,9 +3567,6 @@ static int
 e100_ethtool_nway_rst(struct net_device *dev, struct ifreq *ifr)
 {
 	struct e100_private *bdp;
-
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
 
 	bdp = dev->priv;
 
@@ -3631,9 +3622,6 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 	int i, max_len;
 	void *ptr;
 	u8 *eeprom_data_bytes = (u8 *)eeprom_data;
-
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
 
 	bdp = dev->priv;
 
@@ -3911,9 +3899,6 @@ e100_ethtool_wol(struct net_device *dev, struct ifreq *ifr)
 	struct e100_private *bdp;
 	struct ethtool_wolinfo wolinfo;
 	int res = 0;
-
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
 
 	bdp = dev->priv;
 

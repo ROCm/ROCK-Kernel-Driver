@@ -2384,9 +2384,6 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 		return 0;
 
 	case ETHTOOL_SSET:
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
 		/* Verify the settings we care about. */
 		if (ecmd.autoneg != AUTONEG_ENABLE &&
 		    ecmd.autoneg != AUTONEG_DISABLE)

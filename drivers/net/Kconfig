@@ -492,16 +492,16 @@ config MIPS_GT96100ETH
 	help
 	  Say Y here to support the Ethernet subsystem on your GT96100 card.
 
-config MIPS_AU1000_ENET
+config MIPS_AU1X00_ENET
 	bool "MIPS AU1000 Ethernet support"
-	depends on NET_ETHERNET && MIPS_AU1000
+	depends on NET_ETHERNET && SOC_AU1X00
 	help
-	  If you have an Alchemy Semi AU1000 ethernet controller
-	  on an SGI MIPS system, say Y.  Otherwise, say N.
+	  If you have an Alchemy Semi AU1X00 based system
+	  say Y.  Otherwise, say N.
 
 config NET_SB1250_MAC
 	tristate "SB1250 Ethernet support"
-	depends on NET_ETHERNET && SIBYTE_SB1250
+	depends on NET_ETHERNET && SIBYTE_SB1xxx_SOC
 
 config SGI_IOC3_ETH
 	bool "SGI IOC3 Ethernet"
@@ -510,6 +510,10 @@ config SGI_IOC3_ETH
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
+
+config SGI_O2MACE_ETH
+	tristate "SGI O2 MACE Fast Ethernet support"
+	depends on NET_ETHERNET && SGI_IP32=y
 
 config STNIC
 	tristate "National DP83902AV  support"
@@ -1391,6 +1395,10 @@ config CS89x0
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
 	  called cs89x.
 
+config TC35815
+	tristate "TOSHIBA TC35815 Ethernet support"
+	depends on NET_PCI && PCI
+
 config DGRS
 	tristate "Digi Intl. RightSwitch SE-X support"
 	depends on NET_PCI && (PCI || EISA)
@@ -1839,14 +1847,14 @@ config DE620
 	  The module will be called de620.
 
 config SGISEEQ
-	bool "SGI Seeq ethernet controller support"
+	tristate "SGI Seeq ethernet controller support"
 	depends on NET_ETHERNET && SGI_IP22
 	help
 	  Say Y here if you have an Seeq based Ethernet network card. This is
 	  used in many Silicon Graphics machines.
 
 config DECLANCE
-	bool "DEC LANCE ethernet controller support"
+	tristate "DEC LANCE ethernet controller support"
 	depends on NET_ETHERNET && DECSTATION
 	help
 	  This driver is for the series of Ethernet controllers produced by
