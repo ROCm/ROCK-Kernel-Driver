@@ -258,9 +258,9 @@ struct ata_device {
 	unsigned int		class;		/* ATA_DEV_xxx */
 	unsigned int		devno;		/* 0 or 1 */
 	u16			id[ATA_ID_WORDS]; /* IDENTIFY xxx DEVICE data */
-	unsigned int		pio_mode;
-	unsigned int		dma_mode;
-	unsigned int		xfer_mode;
+	u8			pio_mode;
+	u8			dma_mode;
+	u8			xfer_mode;
 	unsigned int		xfer_shift;	/* ATA_SHIFT_xxx */
 
 	/* cache info about current transfer mode */

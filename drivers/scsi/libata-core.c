@@ -53,9 +53,9 @@ static void __ata_dev_select (struct ata_port *ap, unsigned int device);
 static void ata_set_mode(struct ata_port *ap);
 static void ata_dev_set_xfermode(struct ata_port *ap, struct ata_device *dev);
 static unsigned int ata_get_mode_mask(struct ata_port *ap, int shift);
-static int fgb(unsigned long bitmap);
+static int fgb(u32 bitmap);
 static int ata_choose_xfer_mode(struct ata_port *ap,
-				unsigned int *xfer_mode_out,
+				u8 *xfer_mode_out,
 				unsigned int *xfer_shift_out);
 static int ata_qc_complete_noop(struct ata_queued_cmd *qc, u8 drv_stat);
 
@@ -949,7 +949,8 @@ static void ata_dev_identify(struct ata_port *ap, unsigned int device)
 {
 	struct ata_device *dev = &ap->device[device];
 	unsigned int i;
-	u16 tmp, xfer_modes;
+	u16 tmp;
+	unsigned long xfer_modes;
 	u8 status;
 	struct ata_taskfile tf;
 	unsigned int using_edd;
@@ -1064,7 +1065,7 @@ retry:
 		goto err_out_nosup;
 	}
 
-	/* we require UDMA support */
+	/* quick-n-dirty find max transfer mode; for printk only */
 	xfer_modes = dev->id[ATA_ID_UDMA_MODES];
 	if (!xfer_modes)
 		xfer_modes = (dev->id[ATA_ID_MWDMA_MODES]) << ATA_SHIFT_MWDMA;
@@ -1254,14 +1255,14 @@ void ata_port_disable(struct ata_port *ap)
 
 static struct {
 	unsigned int shift;
-	unsigned int base;
+	u8 base;
 } xfer_mode_classes[] = {
 	{ ATA_SHIFT_UDMA,	XFER_UDMA_0 },
 	{ ATA_SHIFT_MWDMA,	XFER_MW_DMA_0 },
 	{ ATA_SHIFT_PIO,	XFER_PIO_0 },
 };
 
-static inline unsigned int base_from_shift(unsigned int shift)
+static inline u8 base_from_shift(unsigned int shift)
 {
 	int i;
 
@@ -1269,12 +1270,13 @@ static inline unsigned int base_from_shift(unsigned int shift)
 		if (xfer_mode_classes[i].shift == shift)
 			return xfer_mode_classes[i].base;
 
-	return 0xffffffff;
+	return 0xff;
 }
 
 static void ata_dev_set_mode(struct ata_port *ap, struct ata_device *dev)
 {
-	unsigned int base, offset;
+	int ofs, idx;
+	u8 base;
 
 	if (!ata_dev_present(dev) || (ap->flags & ATA_FLAG_PORT_DISABLED))
 		return;
@@ -1282,17 +1284,22 @@ static void ata_dev_set_mode(struct ata_port *ap, struct ata_device *dev)
 	ata_dev_set_xfermode(ap, dev);
 
 	base = base_from_shift(dev->xfer_shift);
-	offset = dev->xfer_mode - base;
+	ofs = dev->xfer_mode - base;
+	idx = ofs + dev->xfer_shift;
+	WARN_ON(idx >= ARRAY_SIZE(xfer_mode_str));
+
+	DPRINTK("idx=%d xfer_shift=%u, xfer_mode=0x%x, base=0x%x, offset=%d\n",
+		idx, dev->xfer_shift, (int)dev->xfer_mode, (int)base, ofs);
 
 	printk(KERN_INFO "ata%u: dev %u configured for %s\n",
-		ap->id, dev->devno,
-		xfer_mode_str[offset + dev->xfer_shift]);
+		ap->id, dev->devno, xfer_mode_str[idx]);
 }
 
 static int ata_host_set_pio(struct ata_port *ap)
 {
-	unsigned int mask, base, xfer_mode;
+	unsigned int mask;
 	int x, i;
+	u8 base, xfer_mode;
 
 	mask = ata_get_mode_mask(ap, ATA_SHIFT_PIO);
 	x = fgb(mask);
@@ -1303,6 +1310,9 @@ static int ata_host_set_pio(struct ata_port *ap)
 
 	base = base_from_shift(ATA_SHIFT_PIO);
 	xfer_mode = base + x;
+
+	DPRINTK("base 0x%x xfer_mode 0x%x mask 0x%x x %d\n",
+		(int)base, (int)xfer_mode, mask, x);
 
 	for (i = 0; i < ATA_MAX_DEVICES; i++) {
 		struct ata_device *dev = &ap->device[i];
@@ -1318,7 +1328,7 @@ static int ata_host_set_pio(struct ata_port *ap)
 	return 0;
 }
 
-static void ata_host_set_dma(struct ata_port *ap, unsigned int xfer_mode,
+static void ata_host_set_dma(struct ata_port *ap, u8 xfer_mode,
 			    unsigned int xfer_shift)
 {
 	int i;
@@ -1344,7 +1354,8 @@ static void ata_host_set_dma(struct ata_port *ap, unsigned int xfer_mode,
  */
 static void ata_set_mode(struct ata_port *ap)
 {
-	unsigned int i, xfer_mode, xfer_shift;
+	unsigned int i, xfer_shift;
+	u8 xfer_mode;
 	int rc;
 
 	/* step 1: always set host PIO timings */
@@ -1696,19 +1707,20 @@ static unsigned int ata_get_mode_mask(struct ata_port *ap, int shift)
 }
 
 /* find greatest bit */
-static int fgb(unsigned long bitmap)
+static int fgb(u32 bitmap)
 {
-	int i, x = -1;
+	unsigned int i;
+	int x = -1;
 
-	for (i = 0; i < (sizeof(unsigned long) * 8); i++)
+	for (i = 0; i < 32; i++)
 		if (bitmap & (1 << i))
 			x = i;
-	
+
 	return x;
 }
 
 /**
- *	ata_choose_xfer_mode - 
+ *	ata_choose_xfer_mode -
  *	@ap:
  *
  *	LOCKING:
@@ -1718,7 +1730,7 @@ static int fgb(unsigned long bitmap)
  */
 
 static int ata_choose_xfer_mode(struct ata_port *ap,
-				unsigned int *xfer_mode_out,
+				u8 *xfer_mode_out,
 				unsigned int *xfer_shift_out)
 {
 	unsigned int mask, shift;
@@ -2951,7 +2963,7 @@ int ata_device_add(struct ata_probe_ent *ent)
 	/* register each port bound to this device */
 	for (i = 0; i < ent->n_ports; i++) {
 		struct ata_port *ap;
-		unsigned int xfer_mode_mask;
+		unsigned long xfer_mode_mask;
 
 		ap = ata_host_add(ent, host_set, i);
 		if (!ap)
