@@ -2535,6 +2535,7 @@ void generic_make_request(struct bio *bio)
 	sector_t maxsector;
 	int ret, nr_sectors = bio_sectors(bio);
 
+	might_sleep();
 	/* Test device or partition size, when known. */
 	maxsector = bio->bi_bdev->bd_inode->i_size >> 9;
 	if (maxsector) {

@@ -90,6 +90,7 @@ static void remove_vm_struct(struct vm_area_struct *vma)
 {
 	struct file *file = vma->vm_file;
 
+	might_sleep();
 	if (file) {
 		struct address_space *mapping = file->f_mapping;
 		spin_lock(&mapping->i_mmap_lock);
@@ -728,6 +729,32 @@ none:
 	return NULL;
 }
 
+#ifdef CONFIG_PROC_FS
+void __vm_stat_account(struct mm_struct *mm, unsigned long flags,
+						struct file *file, long pages)
+{
+	const unsigned long stack_flags
+		= VM_STACK_FLAGS & (VM_GROWSUP|VM_GROWSDOWN);
+
+#ifdef CONFIG_HUGETLB
+	if (flags & VM_HUGETLB) {
+		if (!(flags & VM_DONTCOPY))
+			mm->shared_vm += pages;
+		return;
+	}
+#endif /* CONFIG_HUGETLB */
+
+	if (file)
+		mm->shared_vm += pages;
+	else if (flags & stack_flags)
+		mm->stack_vm += pages;
+	if (flags & VM_EXEC)
+		mm->exec_vm += pages;
+	if (flags & (VM_RESERVED|VM_IO))
+		mm->reserved_vm += pages;
+}
+#endif /* CONFIG_PROC_FS */
+
 /*
  * The caller must hold down_write(current->mm->mmap_sem).
  */
@@ -986,6 +1013,7 @@ out:
 					pgoff, flags & MAP_NONBLOCK);
 		down_write(&mm->mmap_sem);
 	}
+	__vm_stat_account(mm, vm_flags, file, len >> PAGE_SHIFT);
 	return addr;
 
 unmap_and_free_vma:
@@ -1329,6 +1357,7 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	vma->vm_mm->total_vm += grow;
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
+	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file, grow);
 	anon_vma_unlock(vma);
 	return 0;
 }
@@ -1391,6 +1420,7 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	vma->vm_mm->total_vm += grow;
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
+	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file, grow);
 	anon_vma_unlock(vma);
 	return 0;
 }
@@ -1496,6 +1526,7 @@ static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 	area->vm_mm->total_vm -= len >> PAGE_SHIFT;
 	if (area->vm_flags & VM_LOCKED)
 		area->vm_mm->locked_vm -= len >> PAGE_SHIFT;
+	vm_stat_unaccount(area);
 	area->vm_mm->unmap_area(area);
 	remove_vm_struct(area);
 }
@@ -1649,10 +1680,6 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	if (mpnt->vm_start >= end)
 		return 0;
 
-	/* Something will probably happen, so notify. */
-	if (mpnt->vm_file && (mpnt->vm_flags & VM_EXEC))
-		profile_exec_unmap(mm);
- 
 	/*
 	 * If we need to split any vma, do it now to save pain later.
 	 *
@@ -1694,6 +1721,8 @@ asmlinkage long sys_munmap(unsigned long addr, size_t len)
 {
 	int ret;
 	struct mm_struct *mm = current->mm;
+
+	profile_munmap(addr);
 
 	down_write(&mm->mmap_sem);
 	ret = do_munmap(mm, addr, len);
@@ -1797,8 +1826,6 @@ void exit_mmap(struct mm_struct *mm)
 	struct vm_area_struct *vma;
 	unsigned long nr_accounted = 0;
 
-	profile_exit_mmap(mm);
- 
 	lru_add_drain();
 
 	spin_lock(&mm->page_table_lock);

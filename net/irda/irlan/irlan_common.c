@@ -36,6 +36,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/rtnetlink.h>
+#include <linux/moduleparam.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -1181,9 +1182,9 @@ MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("The Linux IrDA LAN protocol"); 
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(eth, "i");
+module_param(eth, bool, 0);
 MODULE_PARM_DESC(eth, "Name devices ethX (0) or irlanX (1)");
-MODULE_PARM(access, "i");
+module_param(access, int, 0);
 MODULE_PARM_DESC(access, "Access type DIRECT=1, PEER=2, HOSTED=3");
 
 module_init(irlan_init);

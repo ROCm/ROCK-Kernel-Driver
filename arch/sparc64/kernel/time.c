@@ -29,6 +29,7 @@
 #include <linux/jiffies.h>
 #include <linux/cpufreq.h>
 #include <linux/percpu.h>
+#include <linux/profile.h>
 
 #include <asm/oplib.h>
 #include <asm/mostek.h>
@@ -441,28 +442,6 @@ static inline void timer_check_rtc(void)
 	}
 }
 
-void sparc64_do_profile(struct pt_regs *regs)
-{
-	unsigned long pc;
-
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-
-	if (!prof_buffer)
-		return;
-
-	pc = regs->tpc;
-
-	pc -= (unsigned long) _stext;
-	pc >>= prof_shift;
-
-	if(pc >= prof_len)
-		pc = prof_len - 1;
-	atomic_inc((atomic_t *)&prof_buffer[pc]);
-}
-
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	unsigned long ticks, pstate;
@@ -471,7 +450,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	do {
 #ifndef CONFIG_SMP
-		sparc64_do_profile(regs);
+		profile_tick(CPU_PROFILING, regs);
 #endif
 		do_timer(regs);
 

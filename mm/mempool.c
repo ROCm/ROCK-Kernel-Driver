@@ -194,6 +194,7 @@ void * mempool_alloc(mempool_t *pool, int gfp_mask)
 	DEFINE_WAIT(wait);
 	int gfp_nowait = gfp_mask & ~(__GFP_WAIT | __GFP_IO);
 
+	might_sleep_if(gfp_mask & __GFP_WAIT);
 repeat_alloc:
 	element = pool->alloc(gfp_nowait|__GFP_NOWARN, pool->pool_data);
 	if (likely(element != NULL))

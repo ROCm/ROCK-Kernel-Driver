@@ -30,8 +30,6 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture GF1 (GUS) Patch support.");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_SUPPORTED_DEVICE("sound");
 
 char *snd_seq_gf1_id = SNDRV_SEQ_INSTR_ID_GUS_PATCH;
 
@@ -64,7 +62,7 @@ static int snd_seq_gf1_copy_wave_from_stream(snd_gf1_ops_t *ops,
 		return -EFAULT;
 	*data += sizeof(xp);
 	*len -= sizeof(xp);
-	wp = (gf1_wave_t *)snd_kcalloc(sizeof(*wp), gfp_mask);
+	wp = kcalloc(1, sizeof(*wp), gfp_mask);
 	if (wp == NULL)
 		return -ENOMEM;
 	wp->share_id[0] = le32_to_cpu(xp.share_id[0]);

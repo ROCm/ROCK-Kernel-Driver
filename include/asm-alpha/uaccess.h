@@ -395,6 +395,10 @@ __copy_tofrom_user(void *to, const void *from, long len, const void __user *vali
 	__copy_tofrom_user_nocheck((to),(__force void *)(from),(n));	\
 })
 
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
+
+
 extern inline long
 copy_to_user(void __user *to, const void *from, long n)
 {

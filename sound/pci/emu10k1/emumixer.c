@@ -32,8 +32,6 @@
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 
-#define chip_t emu10k1_t
-
 #define AC97_ID_STAC9758	0x83847658
 
 static int snd_emu10k1_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -421,7 +419,7 @@ static snd_kcontrol_new_t snd_audigy_shared_spdif __devinitdata =
  */
 static void snd_emu10k1_mixer_free_ac97(ac97_t *ac97)
 {
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, ac97->private_data, return);
+	emu10k1_t *emu = ac97->private_data;
 	emu->ac97 = NULL;
 }
 
@@ -512,13 +510,14 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 	};
 
 	if (!emu->no_ac97) {
-		ac97_bus_t bus, *pbus;
-		ac97_t ac97;
+		ac97_bus_t *pbus;
+		ac97_template_t ac97;
+		static ac97_bus_ops_t ops = {
+			.write = snd_emu10k1_ac97_write,
+			.read = snd_emu10k1_ac97_read,
+		};
 
-		memset(&bus, 0, sizeof(bus));
-		bus.write = snd_emu10k1_ac97_write;
-		bus.read = snd_emu10k1_ac97_read;
-		if ((err = snd_ac97_bus(emu->card, &bus, &pbus)) < 0)
+		if ((err = snd_ac97_bus(emu->card, 0, &ops, NULL, &pbus)) < 0)
 			return err;
 		
 		memset(&ac97, 0, sizeof(ac97));
@@ -528,7 +527,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			return err;
 		if (emu->audigy) {
 			/* set master volume to 0 dB */
-			snd_ac97_write(emu->ac97, AC97_MASTER, 0x0202);
+			snd_ac97_write(emu->ac97, AC97_MASTER, 0x0000);
 			/* set capture source to mic */
 			snd_ac97_write(emu->ac97, AC97_REC_SEL, 0x0000);
 			c = audigy_remove_ctls;

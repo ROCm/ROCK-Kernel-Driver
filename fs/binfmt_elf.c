@@ -40,6 +40,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/param.h>
+#include <asm/page.h>
 
 #include <linux/elf.h>
 

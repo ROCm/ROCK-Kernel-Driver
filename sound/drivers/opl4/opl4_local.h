@@ -195,7 +195,6 @@ struct opl4 {
 	opl4_voice_t voices[OPL4_MAX_VOICES];
 	struct list_head off_voices;
 	struct list_head on_voices;
-	spinlock_t voices_lock;
 #endif
 };
 

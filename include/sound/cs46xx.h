@@ -24,6 +24,7 @@
  */
 
 #include "pcm.h"
+#include "pcm-indirect.h"
 #include "rawmidi.h"
 #include "ac97_codec.h"
 #include "cs46xx_dsp_spos.h"
@@ -1650,14 +1651,7 @@ typedef struct _snd_cs46xx_pcm_t {
   
 	unsigned int ctl;
 	unsigned int shift;	/* Shift count to trasform frames in bytes */
-	unsigned int sw_bufsize;
-	unsigned int sw_data;	/* Offset to next dst (or src) in sw ring buffer */
-	unsigned int sw_io;
-	int sw_ready;		/* Bytes ready to be transferred to/from hw */
-	unsigned int hw_data;	/* Offset to next dst (or src) in hw ring buffer */
-	unsigned int hw_io;	/* Ring buffer hw pointer */
-	int hw_ready;		/* Bytes ready for play (or captured) in hw ring buffer */
-	size_t appl_ptr;	/* Last seen appl_ptr */
+	snd_pcm_indirect_t pcm_rec;
 	snd_pcm_substream_t *substream;
 
 	pcm_channel_descriptor_t * pcm_channel;
@@ -1695,14 +1689,7 @@ struct _snd_cs46xx {
 
 		unsigned int ctl;
 		unsigned int shift;	/* Shift count to trasform frames in bytes */
-		unsigned int sw_bufsize;
-		unsigned int sw_data;	/* Offset to next dst (or src) in sw ring buffer */
-		unsigned int sw_io;
-		int sw_ready;		/* Bytes ready to be transferred to/from hw */
-		unsigned int hw_data;	/* Offset to next dst (or src) in hw ring buffer */
-		unsigned int hw_io;	/* Ring buffer hw pointer */
-		int hw_ready;		/* Bytes ready for play (or captured) in hw ring buffer */
-		size_t appl_ptr;	/* Last seen appl_ptr */
+		snd_pcm_indirect_t pcm_rec;
 		snd_pcm_substream_t *substream;
 	} capt;
 
@@ -1722,8 +1709,6 @@ struct _snd_cs46xx {
 	spinlock_t reg_lock;
 	unsigned int midcr;
 	unsigned int uartm;
-
-	struct snd_dma_device dma_dev;
 
 	int amplifier;
 	void (*amplifier_ctrl)(cs46xx_t *, int);

@@ -31,6 +31,7 @@
 #include <net/ip.h>
 #include <net/route.h>
 #include <linux/skbuff.h>
+#include <linux/moduleparam.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 
@@ -449,7 +450,7 @@ static __init void teql_master_setup(struct net_device *dev)
 
 static LIST_HEAD(master_dev_list);
 static int max_equalizers = 1;
-MODULE_PARM(max_equalizers, "i");
+module_param(max_equalizers, int, 0);
 MODULE_PARM_DESC(max_equalizers, "Max number of link equalizers");
 
 static int __init teql_init(void)

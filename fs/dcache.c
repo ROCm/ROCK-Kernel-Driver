@@ -144,6 +144,8 @@ void dput(struct dentry *dentry)
 		return;
 
 repeat:
+	if (atomic_read(&dentry->d_count) == 1)
+		might_sleep();
 	if (!atomic_dec_and_lock(&dentry->d_count, &dcache_lock))
 		return;
 

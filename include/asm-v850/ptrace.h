@@ -76,6 +76,7 @@ struct pt_regs
 
 
 #define instruction_pointer(regs)	((regs)->pc)
+#define profile_pc(regs) instruction_pointer(regs)
 #define user_mode(regs)			(!(regs)->kernel_mode)
 
 /* When a struct pt_regs is used to save user state for a system call in

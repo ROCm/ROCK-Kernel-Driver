@@ -335,14 +335,14 @@ struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
 	spinlock_t		tree_lock;	/* and spinlock protecting it */
-	unsigned long		nrpages;	/* number of total pages */
-	pgoff_t			writeback_index;/* writeback starts here */
-	struct address_space_operations *a_ops;	/* methods */
-	struct prio_tree_root	i_mmap;		/* tree of private mappings */
 	unsigned int		i_mmap_writable;/* count VM_SHARED mappings */
+	struct prio_tree_root	i_mmap;		/* tree of private mappings */
 	struct list_head	i_mmap_nonlinear;/*list VM_NONLINEAR mappings */
 	spinlock_t		i_mmap_lock;	/* protect tree, count, list */
 	atomic_t		truncate_count;	/* Cover race condition with truncate */
+	unsigned long		nrpages;	/* number of total pages */
+	pgoff_t			writeback_index;/* writeback starts here */
+	struct address_space_operations *a_ops;	/* methods */
 	unsigned long		flags;		/* error bits/gfp mask */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
 	spinlock_t		private_lock;	/* for use by the address_space */
@@ -437,6 +437,7 @@ struct inode {
 	unsigned long		i_version;
 	unsigned long		i_blocks;
 	unsigned short          i_bytes;
+	unsigned char		i_sock;
 	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
 	struct semaphore	i_sem;
 	struct rw_semaphore	i_alloc_sem;
@@ -456,6 +457,8 @@ struct inode {
 	struct cdev		*i_cdev;
 	int			i_cindex;
 
+	__u32			i_generation;
+
 	unsigned long		i_dnotify_mask; /* Directory notify events */
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
 
@@ -463,11 +466,9 @@ struct inode {
 	unsigned long		dirtied_when;	/* jiffies of first dirtying */
 
 	unsigned int		i_flags;
-	unsigned char		i_sock;
 
 	atomic_t		i_writecount;
 	void			*i_security;
-	__u32			i_generation;
 	union {
 		void		*generic_ip;
 	} u;

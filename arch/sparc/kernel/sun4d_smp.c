@@ -19,6 +19,7 @@
 #include <linux/spinlock.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
+#include <linux/profile.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -409,8 +410,6 @@ void smp4d_message_pass(int target, int msg, unsigned long data, int wait)
 	panic("Bogon SMP message pass.");
 }
 
-extern void sparc_do_profile(unsigned long pc, unsigned long o7);
-
 void smp4d_percpu_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = hard_smp4d_processor_id();
@@ -428,8 +427,7 @@ void smp4d_percpu_timer_interrupt(struct pt_regs *regs)
 		show_leds(cpu);
 	}
 
-	if(!user_mode(regs))
-		sparc_do_profile(regs->pc, regs->u_regs[UREG_RETPC]);
+	profile_tick(CPU_PROFILING, regs);
 
 	if(!--prof_counter(cpu)) {
 		int user = user_mode(regs);

@@ -1739,7 +1739,7 @@ struct velocity_info {
 	struct net_device *dev;
 	struct net_device_stats stats;
 
-#if CONFIG_PM
+#ifdef CONFIG_PM
 	u32 pci_state[16];
 #endif
 

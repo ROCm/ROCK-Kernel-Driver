@@ -186,52 +186,6 @@ do_gettimeofday (struct timeval *tv)
 
 EXPORT_SYMBOL(do_gettimeofday);
 
-/*
- * The profiling function is SMP safe. (nothing can mess
- * around with "current", and the profiling counters are
- * updated with atomic operations). This is especially
- * useful with a profiling multiplier != 1
- */
-static inline void
-ia64_do_profile (struct pt_regs * regs)
-{
-	unsigned long ip, slot;
-	extern cpumask_t prof_cpu_mask;
-
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-
-	if (!prof_buffer)
-		return;
-
-	ip = instruction_pointer(regs);
-	/* Conserve space in histogram by encoding slot bits in address
-	 * bits 2 and 3 rather than bits 0 and 1.
-	 */
-	slot = ip & 3;
-	ip = (ip & ~3UL) + 4*slot;
-
-	/*
-	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
-	 * (default is all CPUs.)
-	 */
-	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
-		return;
-
-	ip -= (unsigned long) &_stext;
-	ip >>= prof_shift;
-	/*
-	 * Don't ignore out-of-bounds IP values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (ip > prof_len-1)
-		ip = prof_len-1;
-	atomic_inc((atomic_t *)&prof_buffer[ip]);
-}
-
 static irqreturn_t
 timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -249,7 +203,7 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		printk(KERN_ERR "Oops: timer tick before it's due (itc=%lx,itm=%lx)\n",
 		       ia64_get_itc(), new_itm);
 
-	ia64_do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 
 	while (1) {
 #ifdef CONFIG_SMP

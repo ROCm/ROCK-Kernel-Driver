@@ -31,6 +31,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
 #include <linux/notifier.h>
+#include <linux/profile.h>
 #include <linux/suspend.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
@@ -3220,6 +3221,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 				policy != SCHED_NORMAL)
 			goto out_unlock;
 	}
+	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
 
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
@@ -3957,50 +3959,52 @@ wait_to_die:
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
-/* migrate_all_tasks - function to migrate all tasks from the dead cpu. */
-static void migrate_all_tasks(int src_cpu)
+/* Figure out where task on dead CPU should go, use force if neccessary. */
+static void move_task_off_dead_cpu(int dead_cpu, struct task_struct *tsk)
+{
+	int dest_cpu;
+	cpumask_t mask;
+
+	/* On same node? */
+	mask = node_to_cpumask(cpu_to_node(dead_cpu));
+	cpus_and(mask, mask, tsk->cpus_allowed);
+	dest_cpu = any_online_cpu(mask);
+
+	/* On any allowed CPU? */
+	if (dest_cpu == NR_CPUS)
+		dest_cpu = any_online_cpu(tsk->cpus_allowed);
+
+	/* No more Mr. Nice Guy. */
+	if (dest_cpu == NR_CPUS) {
+		cpus_setall(tsk->cpus_allowed);
+		dest_cpu = any_online_cpu(tsk->cpus_allowed);
+
+		/*
+		 * Don't tell them about moving exiting tasks or
+		 * kernel threads (both mm NULL), since they never
+		 * leave kernel.
+		 */
+		if (tsk->mm && printk_ratelimit())
+			printk(KERN_INFO "process %d (%s) no "
+			       "longer affine to cpu%d\n",
+			       tsk->pid, tsk->comm, dead_cpu);
+	}
+	__migrate_task(tsk, dead_cpu, dest_cpu);
+}
+
+/* Run through task list and migrate tasks from the dead cpu. */
+static void migrate_live_tasks(int src_cpu)
 {
 	struct task_struct *tsk, *t;
-	int dest_cpu;
-	unsigned int node;
 
 	write_lock_irq(&tasklist_lock);
 
-	/* watch out for per node tasks, let's stay on this node */
-	node = cpu_to_node(src_cpu);
-
 	do_each_thread(t, tsk) {
-		cpumask_t mask;
 		if (tsk == current)
 			continue;
 
-		if (task_cpu(tsk) != src_cpu)
-			continue;
-
-		/* Figure out where this task should go (attempting to
-		 * keep it on-node), and check if it can be migrated
-		 * as-is.  NOTE that kernel threads bound to more than
-		 * one online cpu will be migrated. */
-		mask = node_to_cpumask(node);
-		cpus_and(mask, mask, tsk->cpus_allowed);
-		dest_cpu = any_online_cpu(mask);
-		if (dest_cpu == NR_CPUS)
-			dest_cpu = any_online_cpu(tsk->cpus_allowed);
-		if (dest_cpu == NR_CPUS) {
-			cpus_setall(tsk->cpus_allowed);
-			dest_cpu = any_online_cpu(tsk->cpus_allowed);
-
-			/*
-			 * Don't tell them about moving exiting tasks
-			 * or kernel threads (both mm NULL), since
-			 * they never leave kernel.
-			 */
-			if (tsk->mm && printk_ratelimit())
-				printk(KERN_INFO "process %d (%s) no "
-				       "longer affine to cpu%d\n",
-				       tsk->pid, tsk->comm, src_cpu);
-		}
-		__migrate_task(tsk, src_cpu, dest_cpu);
+		if (task_cpu(tsk) == src_cpu)
+			move_task_off_dead_cpu(src_cpu, tsk);
 	} while_each_thread(t, tsk);
 
 	write_unlock_irq(&tasklist_lock);
@@ -4030,6 +4034,47 @@ void sched_idle_next(void)
 	__activate_idle_task(p, rq);
 
 	spin_unlock_irqrestore(&rq->lock, flags);
+}
+
+static void migrate_dead(unsigned int dead_cpu, task_t *tsk)
+{
+	struct runqueue *rq = cpu_rq(dead_cpu);
+
+	/* Must be exiting, otherwise would be on tasklist. */
+	BUG_ON(tsk->state != TASK_ZOMBIE && tsk->state != TASK_DEAD);
+
+	/* Cannot have done final schedule yet: would have vanished. */
+	BUG_ON(tsk->flags & PF_DEAD);
+
+	get_task_struct(tsk);
+
+	/*
+	 * Drop lock around migration; if someone else moves it,
+	 * that's OK.  No task can be added to this CPU, so iteration is
+	 * fine.
+	 */
+	spin_unlock_irq(&rq->lock);
+	move_task_off_dead_cpu(dead_cpu, tsk);
+	spin_lock_irq(&rq->lock);
+
+	put_task_struct(tsk);
+}
+
+/* release_task() removes task from tasklist, so we won't find dead tasks. */
+static void migrate_dead_tasks(unsigned int dead_cpu)
+{
+	unsigned arr, i;
+	struct runqueue *rq = cpu_rq(dead_cpu);
+
+	for (arr = 0; arr < 2; arr++) {
+		for (i = 0; i < MAX_PRIO; i++) {
+			struct list_head *list = &rq->arrays[arr].queue[i];
+			while (!list_empty(list))
+				migrate_dead(dead_cpu,
+					     list_entry(list->next, task_t,
+							run_list));
+		}
+	}
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
@@ -4070,7 +4115,7 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		cpu_rq(cpu)->migration_thread = NULL;
 		break;
 	case CPU_DEAD:
-		migrate_all_tasks(cpu);
+		migrate_live_tasks(cpu);
 		rq = cpu_rq(cpu);
 		kthread_stop(rq->migration_thread);
 		rq->migration_thread = NULL;
@@ -4079,6 +4124,7 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		deactivate_task(rq->idle, rq);
 		rq->idle->static_prio = MAX_PRIO;
 		__setscheduler(rq->idle, SCHED_NORMAL, 0);
+		migrate_dead_tasks(cpu);
 		task_rq_unlock(rq, &flags);
 		BUG_ON(rq->nr_running != 0);
 

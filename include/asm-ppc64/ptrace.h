@@ -69,6 +69,7 @@ struct pt_regs32 {
 #define __SIGNAL_FRAMESIZE32	64
 
 #define instruction_pointer(regs) ((regs)->nip)
+#define profile_pc(regs) instruction_pointer(regs)
 #define user_mode(regs) ((((regs)->msr) >> MSR_PR_LG) & 0x1)
 
 #define force_successful_syscall_return()   \

@@ -110,17 +110,8 @@ void coldfire_profile_tick(int irq, void *dummy, struct pt_regs *regs)
 {
 	/* Reset ColdFire timer2 */
 	mcf_proftp->ter = MCFTIMER_TER_CAP | MCFTIMER_TER_REF;
-
-        if (!user_mode(regs)) {
-                if (prof_buffer && current->pid) {
-                        extern int _stext;
-                        unsigned long ip = instruction_pointer(regs);
-                        ip -= (unsigned long) &_stext;
-                        ip >>= prof_shift;
-                        if (ip < prof_len)
-                                prof_buffer[ip]++;
-                }
-        }
+	if (current->pid)
+		profile_tick(CPU_PROFILING, regs);
 }
 
 /***************************************************************************/

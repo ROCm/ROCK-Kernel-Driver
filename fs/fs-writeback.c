@@ -398,6 +398,7 @@ writeback_inodes(struct writeback_control *wbc)
 {
 	struct super_block *sb;
 
+	might_sleep();
 	spin_lock(&inode_lock);
 	spin_lock(&sb_lock);
 restart:
@@ -553,6 +554,7 @@ void write_inode_now(struct inode *inode, int sync)
 	if (inode->i_mapping->backing_dev_info->memory_backed)
 		return;
 
+	might_sleep();
 	spin_lock(&inode_lock);
 	__writeback_single_inode(inode, &wbc);
 	spin_unlock(&inode_lock);

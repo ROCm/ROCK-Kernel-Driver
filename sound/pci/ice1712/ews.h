@@ -29,13 +29,15 @@
 		"{TerraTec,EWX 24/96},"\
 		"{TerraTec,EWS 88MT},"\
 		"{TerraTec,EWS 88D},"\
-		"{TerraTec,DMX 6Fire},"
+		"{TerraTec,DMX 6Fire},"\
+		"{TerraTec,Phase 88},"
 
 #define ICE1712_SUBDEVICE_EWX2496	0x3b153011
 #define ICE1712_SUBDEVICE_EWS88MT	0x3b151511
 #define ICE1712_SUBDEVICE_EWS88MT_NEW	0x3b152511
 #define ICE1712_SUBDEVICE_EWS88D	0x3b152b11
 #define ICE1712_SUBDEVICE_DMX6FIRE	0x3b153811
+#define ICE1712_SUBDEVICE_PHASE88	0x3b155111
 
 /* entry point */
 extern struct snd_ice1712_card_info snd_ice1712_ews_cards[];

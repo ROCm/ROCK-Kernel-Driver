@@ -47,6 +47,7 @@ struct pt_regs {
 
 #ifndef __ASSEMBLY__
 #define instruction_pointer(regs) ((regs)->nip)
+#define profile_pc(regs) instruction_pointer(regs)
 #define user_mode(regs) (((regs)->msr & MSR_PR) != 0)
 
 #define force_successful_syscall_return()   \

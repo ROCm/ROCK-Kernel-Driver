@@ -65,6 +65,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
+#include <asm/page.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/poll.h>

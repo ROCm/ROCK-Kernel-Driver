@@ -96,6 +96,7 @@
 #include	<asm/uaccess.h>
 #include	<asm/cacheflush.h>
 #include	<asm/tlbflush.h>
+#include	<asm/page.h>
 
 /*
  * DEBUG	- 1 for kmem_cache_create() to honour; SLAB_DEBUG_INITIAL,
@@ -2477,6 +2478,27 @@ void kmem_cache_free (kmem_cache_t *cachep, void *objp)
 }
 
 EXPORT_SYMBOL(kmem_cache_free);
+
+/**
+ * kcalloc - allocate memory for an array. The memory is set to zero.
+ * @n: number of elements.
+ * @size: element size.
+ * @flags: the type of memory to allocate.
+ */
+void *kcalloc(size_t n, size_t size, int flags)
+{
+	void *ret = NULL;
+
+	if (n != 0 && size > INT_MAX / n)
+		return ret;
+
+	ret = kmalloc(n * size, flags);
+	if (ret)
+		memset(ret, 0, n * size);
+	return ret;
+}
+
+EXPORT_SYMBOL(kcalloc);
 
 /**
  * kfree - free previously allocated memory

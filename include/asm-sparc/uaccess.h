@@ -322,6 +322,9 @@ static inline unsigned long __copy_from_user(void *to, const void __user *from, 
 	return __copy_user((void __user *) to, from, n);
 }
 
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
+
 static inline unsigned long __clear_user(void __user *addr, unsigned long size)
 {
 	unsigned long ret;

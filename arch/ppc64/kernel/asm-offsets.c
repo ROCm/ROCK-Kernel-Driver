@@ -98,11 +98,6 @@ int main(void)
 	DEFINE(PACAHTLBSEGS, offsetof(struct paca_struct, context.htlb_segs));
 #endif /* CONFIG_HUGETLB_PAGE */
 	DEFINE(PACADEFAULTDECR, offsetof(struct paca_struct, default_decr));
-	DEFINE(PACAPROFENABLED, offsetof(struct paca_struct, prof_enabled));
-	DEFINE(PACAPROFLEN, offsetof(struct paca_struct, prof_len));
-	DEFINE(PACAPROFSHIFT, offsetof(struct paca_struct, prof_shift));
-	DEFINE(PACAPROFBUFFER, offsetof(struct paca_struct, prof_buffer));
-	DEFINE(PACAPROFSTEXT, offsetof(struct paca_struct, prof_stext));
         DEFINE(PACA_EXGEN, offsetof(struct paca_struct, exgen));
         DEFINE(PACA_EXMC, offsetof(struct paca_struct, exmc));
         DEFINE(PACA_EXSLB, offsetof(struct paca_struct, exslb));

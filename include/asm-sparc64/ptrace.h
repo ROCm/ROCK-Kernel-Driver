@@ -98,6 +98,7 @@ struct sparc_trapf {
 	set_thread_flag(TIF_SYSCALL_SUCCESS)
 #define user_mode(regs) (!((regs)->tstate & TSTATE_PRIV))
 #define instruction_pointer(regs) ((regs)->tpc)
+#define profile_pc(regs) instruction_pointer(regs)
 extern void show_regs(struct pt_regs *);
 #endif
 

@@ -5,6 +5,7 @@
 
 snd-als4000-objs := als4000.o
 snd-atiixp-objs := atiixp.o
+snd-atiixp-modem-objs := atiixp_modem.o
 snd-azt3328-objs := azt3328.o
 snd-bt87x-objs := bt87x.o
 snd-cmipci-objs := cmipci.o
@@ -25,6 +26,7 @@ snd-via82xx-objs := via82xx.o
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ALS4000) += snd-als4000.o
 obj-$(CONFIG_SND_ATIIXP) += snd-atiixp.o
+obj-$(CONFIG_SND_ATIIXP_MODEM) += snd-atiixp-modem.o
 obj-$(CONFIG_SND_AZT3328) += snd-azt3328.o
 obj-$(CONFIG_SND_BT87X) += snd-bt87x.o
 obj-$(CONFIG_SND_CMIPCI) += snd-cmipci.o

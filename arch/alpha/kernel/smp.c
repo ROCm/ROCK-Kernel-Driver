@@ -25,6 +25,7 @@
 #include <linux/spinlock.h>
 #include <linux/irq.h>
 #include <linux/cache.h>
+#include <linux/profile.h>
 
 #include <asm/hwrpb.h>
 #include <asm/ptrace.h>
@@ -599,8 +600,7 @@ smp_percpu_timer_interrupt(struct pt_regs *regs)
 	struct cpuinfo_alpha *data = &cpu_data[cpu];
 
 	/* Record kernel PC.  */
-	if (!user)
-		alpha_do_profile(regs->pc);
+	profile_tick(CPU_PROFILING, regs);
 
 	if (!--data->prof_counter) {
 		/* We need to make like a normal interrupt -- otherwise

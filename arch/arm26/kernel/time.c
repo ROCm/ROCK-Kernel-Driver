@@ -67,28 +67,6 @@ static unsigned long dummy_gettimeoffset(void)
  */
 unsigned long (*gettimeoffset)(void) = dummy_gettimeoffset;
 
-/*
- * Handle kernel profile stuff...
- */
-static inline void do_profile(struct pt_regs *regs)
-{
-	if (!user_mode(regs) &&
-	    prof_buffer &&
-	    current->pid) {
-		unsigned long pc = instruction_pointer(regs);
-		extern int _stext;
-
-		pc -= (unsigned long)&_stext;
-
-		pc >>= prof_shift;
-
-		if (pc >= prof_len)
-			pc = prof_len - 1;
-
-		prof_buffer[pc] += 1;
-	}
-}
-
 static unsigned long next_rtc_update;
 
 /*
@@ -189,7 +167,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         do_timer(regs);
         do_set_rtc(); //FIME - EVERY timer IRQ?
-        do_profile(regs);
+        profile_tick(CPU_PROFILING, regs);
 	return IRQ_HANDLED; //FIXME - is this right?
 }
 

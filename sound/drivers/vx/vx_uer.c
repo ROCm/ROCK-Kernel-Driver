@@ -263,17 +263,17 @@ int vx_set_clock(vx_core_t *chip, unsigned int freq)
 	/* change the audio source if possible */
 	vx_sync_audio_source(chip);
 
-	switch (chip->audio_source) {
-	case VX_AUDIO_SRC_DIGITAL:
+	if (chip->clock_mode == VX_CLOCK_MODE_EXTERNAL ||
+	    (chip->clock_mode == VX_CLOCK_MODE_AUTO &&
+	     chip->audio_source == VX_AUDIO_SRC_DIGITAL)) {
 		if (chip->clock_source != UER_SYNC) {
 			vx_change_clock_source(chip, UER_SYNC);
 			mdelay(6);
 			src_changed = 1;
 		}
-		if (chip->freq == freq)
-			return 0;
-		break;
-	default:
+	} else if (chip->clock_mode == VX_CLOCK_MODE_INTERNAL ||
+		   (chip->clock_mode == VX_CLOCK_MODE_AUTO &&
+		    chip->audio_source != VX_AUDIO_SRC_DIGITAL)) {
 		if (chip->clock_source != INTERNAL_QUARTZ) {
 			vx_change_clock_source(chip, INTERNAL_QUARTZ);
 			src_changed = 1;
@@ -283,8 +283,9 @@ int vx_set_clock(vx_core_t *chip, unsigned int freq)
 		vx_set_internal_clock(chip, freq);
 		if (src_changed)
 			vx_modify_board_inputs(chip);
-		break;
 	}
+	if (chip->freq == freq)
+		return 0;
 	chip->freq = freq;
 	vx_modify_board_clock(chip, 1);
 	return 0;

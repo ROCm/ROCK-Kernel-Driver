@@ -229,6 +229,15 @@ struct switch_stack {
  * the canonical representation by adding to instruction pointer.
  */
 # define instruction_pointer(regs) ((regs)->cr_iip + ia64_psr(regs)->ri)
+/* Conserve space in histogram by encoding slot bits in address
+ * bits 2 and 3 rather than bits 0 and 1.
+ */
+#define profile_pc(regs)						\
+({									\
+	unsigned long __ip = instruction_pointer(regs);			\
+	(__ip & ~3UL) + ((__ip & 3UL) << 2);				\
+})
+
   /* given a pointer to a task_struct, return the user's pt_regs */
 # define ia64_task_regs(t)		(((struct pt_regs *) ((char *) (t) + IA64_STK_OFFSET)) - 1)
 # define ia64_psr(regs)			((struct ia64_psr *) &(regs)->cr_ipsr)

@@ -29,8 +29,6 @@
 #include <sound/emu8000.h>
 #include <sound/emu8000_reg.h>
 
-#define NELEM(arr) (sizeof(arr)/sizeof((arr)[0]))
-
 /* emu8000_patch.c */
 int snd_emu8000_sample_new(snd_emux_t *rec, snd_sf_sample_t *sp, snd_util_memhdr_t *hdr, const void __user *data, long count);
 int snd_emu8000_sample_free(snd_emux_t *rec, snd_sf_sample_t *sp, snd_util_memhdr_t *hdr);

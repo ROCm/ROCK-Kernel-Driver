@@ -307,7 +307,7 @@ mpc85xx_exclude_device(u_char bus, u_char devfn)
 {
 	if (bus == 0 && PCI_SLOT(devfn) == 0)
 		return PCIBIOS_DEVICE_NOT_FOUND;
-#if CONFIG_85xx_PCI2
+#ifdef CONFIG_85xx_PCI2
 	/* With the current code we know PCI2 will be bus 2, however this may
 	 * not be guarnteed */
 	if (bus == 2 && PCI_SLOT(devfn) == 0)

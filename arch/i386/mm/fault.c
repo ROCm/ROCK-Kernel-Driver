@@ -513,12 +513,13 @@ vmalloc_fault:
 		 * an interrupt in the middle of a task switch..
 		 */
 		int index = pgd_index(address);
+		unsigned long pgd_paddr;
 		pgd_t *pgd, *pgd_k;
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
-		asm("movl %%cr3,%0":"=r" (pgd));
-		pgd = index + (pgd_t *)__va(pgd);
+		asm("movl %%cr3,%0":"=r" (pgd_paddr));
+		pgd = index + (pgd_t *)__va(pgd_paddr);
 		pgd_k = init_mm.pgd + index;
 
 		if (!pgd_present(*pgd_k))

@@ -1025,32 +1025,6 @@ static int irq_affinity_write_proc(struct file *file, const char __user *buffer,
 }
 
 #endif
-
-static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	int len = cpumask_scnprintf(page, count, *(cpumask_t *)data);
-	if (count - len < 2)
-		return -EINVAL;
-	len += sprintf(page + len, "\n");
-	return len;
-}
-
-static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffer,
-					unsigned long count, void *data)
-{
-	cpumask_t *mask = (cpumask_t *)data;
-	unsigned long full_count = count, err;
-	cpumask_t new_value;
-
-	err = cpumask_parse(buffer, count, new_value);
-	if (err)
-		return err;
-
-	*mask = new_value;
-	return full_count;
-}
-
 #define MAX_NAMELEN 10
 
 static void register_irq_proc (unsigned int irq)
@@ -1086,27 +1060,13 @@ static void register_irq_proc (unsigned int irq)
 #endif
 }
 
-unsigned long prof_cpu_mask = -1;
-
 void init_irq_proc (void)
 {
-	struct proc_dir_entry *entry;
 	int i;
 
 	/* create /proc/irq */
 	root_irq_dir = proc_mkdir("irq", NULL);
-
-	/* create /proc/irq/prof_cpu_mask */
-	entry = create_proc_entry("prof_cpu_mask", 0600, root_irq_dir);
-
-	if (!entry)
-	    return;
-
-	entry->nlink = 1;
-	entry->data = (void *)&prof_cpu_mask;
-	entry->read_proc = prof_cpu_mask_read_proc;
-	entry->write_proc = prof_cpu_mask_write_proc;
-
+	create_prof_cpu_mask(root_irq_dir);
 	/*
 	 * Create entries for all existing IRQs.
 	 */

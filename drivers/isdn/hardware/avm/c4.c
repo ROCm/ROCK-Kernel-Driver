@@ -1029,8 +1029,6 @@ static u16 c4_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 		spin_lock_irqsave(&card->lock, flags);
 		c4_dispatch_tx(card);
 		spin_unlock_irqrestore(&card->lock, flags);
-	} else {
-		dev_kfree_skb_any(skb);
 	}
 	return retval;
 }

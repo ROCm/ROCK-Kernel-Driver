@@ -11,11 +11,6 @@
  * is" without any warranty of any kind, whether express or implied.
  */
 
-void __attribute__ ((weak))
-serial_fixups(void)
-{
-}
-
 unsigned long __attribute__ ((weak))
 serial_init(int chan, void *ignored)
 {

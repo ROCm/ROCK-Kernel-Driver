@@ -634,7 +634,7 @@ setup_gazel(struct IsdnCard *card)
 			return (0);
 	} else {
 
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 		if (setup_gazelpci(cs))
 			return (0);
 #else

@@ -111,6 +111,9 @@ extern unsigned long search_exception_table(unsigned long);
 #define __put_user(x,ptr) \
   __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 
+#define __get_user_unaligned __get_user
+#define __put_user_unaligned __put_user
+
 extern long __put_user_bad(void);
 
 #define __put_user_nocheck(x,ptr,size)				\
@@ -280,6 +283,9 @@ extern unsigned long copy_in_user(void __user *to, const void __user *from,
 				  unsigned long n);
 
 extern unsigned long __clear_user(void __user *addr, unsigned long size);
+
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
 
 static inline unsigned long
 clear_user(void __user *addr, unsigned long size)

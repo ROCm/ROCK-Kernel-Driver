@@ -171,7 +171,7 @@ snd_seq_oss_midi_check_new_port(snd_seq_port_info_t *pinfo)
 	/*
 	 * allocate midi info record
 	 */
-	if ((mdev = snd_kcalloc(sizeof(*mdev), GFP_KERNEL)) == NULL) {
+	if ((mdev = kcalloc(1, sizeof(*mdev), GFP_KERNEL)) == NULL) {
 		snd_printk(KERN_ERR "can't malloc midi info\n");
 		return -ENOMEM;
 	}

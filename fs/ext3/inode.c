@@ -66,6 +66,8 @@ int ext3_forget(handle_t *handle, int is_metadata,
 {
 	int err;
 
+	might_sleep();
+
 	BUFFER_TRACE(bh, "enter");
 
 	jbd_debug(4, "forgetting bh %p: is_metadata = %d, mode %o, "
@@ -2966,6 +2968,7 @@ int ext3_mark_inode_dirty(handle_t *handle, struct inode *inode)
 	struct ext3_iloc iloc;
 	int err;
 
+	might_sleep();
 	err = ext3_reserve_inode_write(handle, inode, &iloc);
 	if (!err)
 		err = ext3_mark_iloc_dirty(handle, inode, &iloc);

@@ -34,6 +34,7 @@
 #include <linux/suspend.h>
 #include <linux/pagemap.h>
 #include <asm/uaccess.h>
+#include <asm/page.h>
 #include <linux/proc_fs.h>
 
 EXPORT_SYMBOL(journal_start);

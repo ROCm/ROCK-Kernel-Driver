@@ -123,7 +123,7 @@ static void _snd_mpu401_uart_interrupt(mpu401_t *mpu)
  */
 irqreturn_t snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	mpu401_t *mpu = snd_magic_cast(mpu401_t, dev_id, return IRQ_NONE);
+	mpu401_t *mpu = dev_id;
 	
 	if (mpu == NULL)
 		return IRQ_NONE;
@@ -137,7 +137,7 @@ irqreturn_t snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *reg
  */
 static void snd_mpu401_uart_timer(unsigned long data)
 {
-	mpu401_t *mpu = snd_magic_cast(mpu401_t, (void *)data, return);
+	mpu401_t *mpu = (mpu401_t *)data;
 
 	spin_lock(&mpu->timer_lock);
 	/*mpu->mode |= MPU401_MODE_TIMER;*/
@@ -235,7 +235,7 @@ static int snd_mpu401_uart_input_open(snd_rawmidi_substream_t * substream)
 	mpu401_t *mpu;
 	int err;
 
-	mpu = snd_magic_cast(mpu401_t, substream->rmidi->private_data, return -ENXIO);
+	mpu = substream->rmidi->private_data;
 	if (mpu->open_input && (err = mpu->open_input(mpu)) < 0)
 		return err;
 	if (! test_bit(MPU401_MODE_BIT_OUTPUT, &mpu->mode)) {
@@ -253,7 +253,7 @@ static int snd_mpu401_uart_output_open(snd_rawmidi_substream_t * substream)
 	mpu401_t *mpu;
 	int err;
 
-	mpu = snd_magic_cast(mpu401_t, substream->rmidi->private_data, return -ENXIO);
+	mpu = substream->rmidi->private_data;
 	if (mpu->open_output && (err = mpu->open_output(mpu)) < 0)
 		return err;
 	if (! test_bit(MPU401_MODE_BIT_INPUT, &mpu->mode)) {
@@ -270,7 +270,7 @@ static int snd_mpu401_uart_input_close(snd_rawmidi_substream_t * substream)
 {
 	mpu401_t *mpu;
 
-	mpu = snd_magic_cast(mpu401_t, substream->rmidi->private_data, return -ENXIO);
+	mpu = substream->rmidi->private_data;
 	clear_bit(MPU401_MODE_BIT_INPUT, &mpu->mode);
 	mpu->substream_input = NULL;
 	if (! test_bit(MPU401_MODE_BIT_OUTPUT, &mpu->mode))
@@ -284,7 +284,7 @@ static int snd_mpu401_uart_output_close(snd_rawmidi_substream_t * substream)
 {
 	mpu401_t *mpu;
 
-	mpu = snd_magic_cast(mpu401_t, substream->rmidi->private_data, return -ENXIO);
+	mpu = substream->rmidi->private_data;
 	clear_bit(MPU401_MODE_BIT_OUTPUT, &mpu->mode);
 	mpu->substream_output = NULL;
 	if (! test_bit(MPU401_MODE_BIT_INPUT, &mpu->mode))
@@ -303,7 +303,7 @@ static void snd_mpu401_uart_input_trigger(snd_rawmidi_substream_t * substream, i
 	mpu401_t *mpu;
 	int max = 64;
 
-	mpu = snd_magic_cast(mpu401_t, substream->rmidi->private_data, return);
+	mpu = substream->rmidi->private_data;
 	if (up) {
 		if (! test_and_set_bit(MPU401_MODE_BIT_INPUT_TRIGGER, &mpu->mode)) {
 			/* first time - flush FIFO */
@@ -394,7 +394,7 @@ static void snd_mpu401_uart_output_trigger(snd_rawmidi_substream_t * substream, 
 	unsigned long flags;
 	mpu401_t *mpu;
 
-	mpu = snd_magic_cast(mpu401_t, substream->rmidi->private_data, return);
+	mpu = substream->rmidi->private_data;
 	if (up) {
 		set_bit(MPU401_MODE_BIT_OUTPUT_TRIGGER, &mpu->mode);
 
@@ -441,14 +441,14 @@ static snd_rawmidi_ops_t snd_mpu401_uart_input =
 
 static void snd_mpu401_uart_free(snd_rawmidi_t *rmidi)
 {
-	mpu401_t *mpu = snd_magic_cast(mpu401_t, rmidi->private_data, return);
+	mpu401_t *mpu = rmidi->private_data;
 	if (mpu->irq_flags && mpu->irq >= 0)
 		free_irq(mpu->irq, (void *) mpu);
 	if (mpu->res) {
 		release_resource(mpu->res);
 		kfree_nocheck(mpu->res);
 	}
-	snd_magic_kfree(mpu);
+	kfree(mpu);
 }
 
 /**
@@ -484,7 +484,7 @@ int snd_mpu401_uart_new(snd_card_t * card, int device,
 		*rrawmidi = NULL;
 	if ((err = snd_rawmidi_new(card, "MPU-401U", device, 1, 1, &rmidi)) < 0)
 		return err;
-	mpu = snd_magic_kcalloc(mpu401_t, 0, GFP_KERNEL);
+	mpu = kcalloc(1, sizeof(*mpu), GFP_KERNEL);
 	if (mpu == NULL) {
 		snd_device_free(card, rmidi);
 		return -ENOMEM;

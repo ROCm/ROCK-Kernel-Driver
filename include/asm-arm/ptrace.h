@@ -130,6 +130,7 @@ static inline int valid_user_regs(struct pt_regs *regs)
 
 #define instruction_pointer(regs) \
 	(pc_pointer((regs)->ARM_pc))
+#define profile_pc(regs) instruction_pointer(regs)
 
 #ifdef __KERNEL__
 extern void show_regs(struct pt_regs *);
