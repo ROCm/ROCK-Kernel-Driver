@@ -217,7 +217,7 @@ $(export-objs:.o=.i)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.s)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.lst): export_flags   := $(EXPORT_FLAGS)
 
-c_flags = -Wp,-MD,.$(subst /,_,$@).d $(CFLAGS) $(NOSTDINC_FLAGS) \
+c_flags = -Wp,-MD,$(@D)/.$(@F).d $(CFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
 	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
 	  $(export_flags) 
@@ -437,9 +437,9 @@ if_changed_dep = $(if $(strip $? \
 	@set -e; \
 	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
 	$(cmd_$(1)); \
-	$(TOPDIR)/scripts/fixdep .$(subst /,_,$@).d $@ $(TOPDIR) '$(cmd_$(1))' > .$(subst /,_,$@).tmp; \
-	rm -f .$(subst /,_,$@).d; \
-	mv -f .$(subst /,_,$@).tmp .$(subst /,_,$@).cmd )
+	$(TOPDIR)/scripts/fixdep $(@D)/.$(@F).d $@ $(TOPDIR) '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
+	rm -f $(@D)/.$(@F).d; \
+	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 
 # If quiet is set, only print short version of command
 
