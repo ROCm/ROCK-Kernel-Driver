@@ -281,30 +281,6 @@ decode_acpi_resource (struct acpi_resource *resource, void *context)
 	return AE_OK;
 }
 
-
-/* find pci_bus structure associated to specific bus number */
-static struct pci_bus *find_pci_bus(const struct list_head *list, int bus)
-{
-	const struct list_head *l;
-
-	list_for_each (l, list) {
-		struct pci_bus *b = pci_bus_b(l);
-		if (b->number == bus)
-			return b;
-
-		if (!list_empty(&b->children)) {
-			/* XXX recursive call */
-			b = find_pci_bus(&b->children, bus);
-
-			if (b)
-				return b;
-		}
-	}
-
-	return NULL;
-}
-
-
 /* decode ACPI 2.0 _HPP hot plug parameters */
 static void decode_hpp(struct acpiphp_bridge *bridge)
 {
@@ -409,7 +385,7 @@ static void add_host_bridge (acpi_handle *handle, int seg, int bus)
 	bridge->seg = seg;
 	bridge->bus = bus;
 
-	bridge->pci_bus = find_pci_bus(&pci_root_buses, bus);
+	bridge->pci_bus = pci_find_bus(bus);
 
 	bridge->res_lock = SPIN_LOCK_UNLOCKED;
 
