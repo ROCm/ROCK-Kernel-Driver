@@ -33,6 +33,7 @@
 #include <linux/init.h>
 #include <linux/prctl.h>
 #include <linux/init_task.h>
+#include <linux/module.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -68,6 +69,8 @@ struct task_struct init_task = INIT_TASK(init_task);
 
 /* only used to get secondary processor up */
 struct task_struct *current_set[NR_CPUS] = {&init_task, };
+
+static void show_tsk_stack(struct task_struct *tsk, unsigned long sp);
 
 #undef SHOW_TASK_SWITCHES
 #undef CHECK_STACK
@@ -264,15 +267,15 @@ void show_regs(struct pt_regs * regs)
 	printk("TASK = %p[%d] '%s' ",
 	       current, current->pid, current->comm);
 	printk("Last syscall: %ld ", current->thread.last_syscall);
-	printk("\nlast math %p last altivec %p", last_task_used_math,
-	       last_task_used_altivec);
 
 #if defined(CONFIG_4xx) && defined(DCRN_PLB0_BEAR)
 	printk("\nPLB0: bear= 0x%8.8x acr=   0x%8.8x besr=  0x%8.8x\n",
-	    mfdcr(DCRN_POB0_BEAR), mfdcr(DCRN_PLB0_ACR),
+	    mfdcr(DCRN_PLB0_BEAR), mfdcr(DCRN_PLB0_ACR),
 	    mfdcr(DCRN_PLB0_BESR));
+#endif
+#if defined(CONFIG_4xx) && defined(DCRN_POB0_BEAR)
 	printk("PLB0 to OPB: bear= 0x%8.8x besr0= 0x%8.8x besr1= 0x%8.8x\n",
-	    mfdcr(DCRN_PLB0_BEAR), mfdcr(DCRN_POB0_BESR0),
+	    mfdcr(DCRN_POB0_BEAR), mfdcr(DCRN_POB0_BESR0),
 	    mfdcr(DCRN_POB0_BESR1));
 #endif
 	
@@ -291,7 +294,7 @@ void show_regs(struct pt_regs * regs)
 			break;
 	}
 	printk("\n");
-	show_stack((unsigned long *)regs->gpr[1]);
+	show_tsk_stack(current, regs->gpr[1]);
 }
 
 void exit_thread(void)
@@ -327,6 +330,8 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	extern void ret_from_fork(void);
 	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 	unsigned long childframe;
+
+	p->user_tid = NULL;
 
 	CHECK_FULL_REGS(regs);
 	/* Copy registers */
@@ -441,7 +446,10 @@ int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
 	      struct pt_regs *regs)
 {
  	struct task_struct *p;
+
 	CHECK_FULL_REGS(regs);
+	if ((p1 & (CLONE_SETTID | CLONE_CLEARTID)) == 0)
+		p3 = 0;
  	p = do_fork(p1 & ~CLONE_IDLETASK, p2, regs, 0, (int *)p3);
  	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
@@ -489,50 +497,61 @@ out:
 	return error;
 }
 
-void
-show_stack(unsigned long *sp)
-{
-	int cnt = 0;
-	unsigned long i;
-
-	if (sp == NULL)
-		sp = (unsigned long *)_get_SP();
-	printk("Call backtrace: ");
-	for (;;) {
-		if (__get_user(sp, (unsigned long **)sp))
-			break;
-		if (sp == NULL)
-			break;
-		if (__get_user(i, &sp[1]))
-			break;
-		if (cnt++ % 7 == 0)
-			printk("\n");
-		printk("%08lX ", i);
-		if (cnt > 32)
-			break;
-	}
-	printk("\n");
-}
-
 void show_trace_task(struct task_struct *tsk)
 {
-	unsigned long stack_top = (unsigned long) tsk->thread_info + THREAD_SIZE;
-	unsigned long sp, prev_sp;
+	show_tsk_stack(tsk, tsk->thread.ksp);
+}
+
+void dump_stack(void)
+{
+	show_tsk_stack(current, _get_SP());
+}
+
+static void show_tsk_stack(struct task_struct *tsk, unsigned long sp)
+{
+	unsigned long stack_top, prev_sp, ret;
 	int count = 0;
+	unsigned long next_exc = 0;
+	struct pt_regs *regs;
+	extern char ret_from_except, ret_from_except_full, ret_from_syscall;
 
 	if (tsk == NULL)
 		return;
-	sp = (unsigned long) &tsk->thread.ksp;
-	do {
-		prev_sp = sp;
+	prev_sp = (unsigned long) (tsk->thread_info + 1);
+	stack_top = (unsigned long) tsk->thread_info + THREAD_SIZE;
+	while (count < 16 && sp > prev_sp && sp < stack_top && (sp & 3) == 0) {
+		if (count == 0) {
+			printk("Call trace:");
+#if CONFIG_KALLSYMS
+			printk("\n");
+#endif
+		} else {
+			if (next_exc) {
+				ret = next_exc;
+				next_exc = 0;
+			} else
+				ret = *(unsigned long *)(sp + 4);
+			printk(" [%08lx] ", ret);
+#if CONFIG_KALLSYMS
+			print_symbol("%s", ret);
+			printk("\n");
+#endif
+			if (ret == (unsigned long) &ret_from_except
+			    || ret == (unsigned long) &ret_from_except_full
+			    || ret == (unsigned long) &ret_from_syscall) {
+				/* sp + 16 points to an exception frame */
+				regs = (struct pt_regs *) (sp + 16);
+				if (sp + 16 + sizeof(*regs) <= stack_top)
+					next_exc = regs->nip;
+			}
+		}
+		++count;
 		sp = *(unsigned long *)sp;
-		if (sp <= prev_sp || sp >= stack_top || (sp & 3) != 0)
-			break;
-		if (count > 0)
-			printk("[%08lx] ", *(unsigned long *)(sp + 4));
-	} while (++count < 16);
-	if (count > 1)
+	}
+#if !CONFIG_KALLSYMS
+	if (count > 0)
 		printk("\n");
+#endif
 }
 
 #if 0
