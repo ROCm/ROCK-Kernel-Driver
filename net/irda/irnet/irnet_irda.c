@@ -953,7 +953,7 @@ irnet_setup_server(void)
 		      (void *) &irnet_server.s);
 #endif
 
-  DEXIT(IRDA_SERV_TRACE, " - self=0x%X\n", (unsigned int) &irnet_server.s);
+  DEXIT(IRDA_SERV_TRACE, " - self=0x%p\n", &irnet_server.s);
   return 0;
 }
 
