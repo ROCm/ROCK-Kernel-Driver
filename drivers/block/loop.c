@@ -676,7 +676,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	if (!file)
 		goto out;
 
-	error = -EINVAL;
 	inode = file->f_dentry->d_inode;
 
 	if (!(file->f_mode & FMODE_WRITE))
@@ -686,7 +685,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		lo_device = inode->i_bdev;
 		if (lo_device == bdev) {
 			error = -EBUSY;
-			goto out;
+			goto out_putf;
 		}
 		lo_blocksize = block_size(lo_device);
 		if (bdev_read_only(lo_device))
@@ -697,6 +696,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		 * If we can't read - sorry. If we only can't write - well,
 		 * it's going to be read-only.
 		 */
+		error = -EINVAL;
 		if (!inode->i_fop->sendfile)
 			goto out_putf;
 
@@ -708,8 +708,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		error = 0;
 	} else
 		goto out_putf;
-
-	get_file(file);
 
 	if (!(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
@@ -725,7 +723,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->lo_sizelimit = 0;
 	if (figure_loop_size(lo)) {
 		error = -EFBIG;
-		fput(file);
 		goto out_putf;
 	}
 	lo->old_gfp_mask = mapping_gfp_mask(inode->i_mapping);
@@ -760,8 +757,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 	kernel_thread(loop_thread, lo, CLONE_KERNEL);
 	down(&lo->lo_sem);
-
-	fput(file);
 	return 0;
 
  out_putf:
