@@ -1136,17 +1136,16 @@ fail:
 	return err;
 }
 
-struct dst_entry *ip6_dst_lookup(struct sock *sk, struct flowi *fl)
+int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl)
 {
-	struct dst_entry *dst = NULL;
 	int err = 0;
 
 	if (sk) {
 		struct ipv6_pinfo *np = inet6_sk(sk);
 	
-		dst = __sk_dst_check(sk, np->dst_cookie);
-		if (dst) {
-			struct rt6_info *rt = (struct rt6_info*)dst;
+		*dst = __sk_dst_check(sk, np->dst_cookie);
+		if (*dst) {
+			struct rt6_info *rt = (struct rt6_info*)*dst;
 	
 				/* Yes, checking route validity in not connected
 				   case is not very simple. Take into account,
@@ -1170,39 +1169,41 @@ struct dst_entry *ip6_dst_lookup(struct sock *sk, struct flowi *fl)
 			      ipv6_addr_cmp(&fl->fl6_dst, &rt->rt6i_dst.addr))
 			     && (np->daddr_cache == NULL ||
 				 ipv6_addr_cmp(&fl->fl6_dst, np->daddr_cache)))
-			    || (fl->oif && fl->oif != dst->dev->ifindex)) {
-				dst = NULL;
+			    || (fl->oif && fl->oif != (*dst)->dev->ifindex)) {
+				*dst = NULL;
 			} else
-				dst_hold(dst);
+				dst_hold(*dst);
 		}
 	}
 
-	if (dst == NULL)
-		dst = ip6_route_output(sk, fl);
+	if (*dst == NULL)
+		*dst = ip6_route_output(sk, fl);
 
-	if (dst->error)
-		return dst;
+	if ((err = (*dst)->error))
+		goto out_err_release;
 
 	if (ipv6_addr_any(&fl->fl6_src)) {
-		err = ipv6_get_saddr(dst, &fl->fl6_dst, &fl->fl6_src);
+		err = ipv6_get_saddr(*dst, &fl->fl6_dst, &fl->fl6_src);
 
 		if (err) {
 #if IP6_DEBUG >= 2
-			printk(KERN_DEBUG "ip6_build_xmit: "
+			printk(KERN_DEBUG "ip6_dst_lookup: "
 			       "no available source address\n");
 #endif
-			dst->error = err;
-			return dst;
+			goto out_err_release;
 		}
 	}
-
-        if (dst) {
-		if ((err = xfrm_lookup(&dst, fl, sk, 0)) < 0) {
-			dst->error = -ENETUNREACH;
-		}
+	if ((err = xfrm_lookup(dst, fl, sk, 0)) < 0) {
+		err = -ENETUNREACH;
+		goto out_err_release;
         }
 
-	return dst;
+	return 0;
+
+out_err_release:
+	dst_release(*dst);
+	*dst = NULL;
+	return err;
 }
 
 int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb),
@@ -1483,6 +1484,7 @@ out:
 		np->cork.opt = NULL;
 	}
 	if (np->cork.rt) {
+		dst_release(&np->cork.rt->u.dst);
 		np->cork.rt = NULL;
 	}
 	if (np->cork.fl) {
@@ -1509,6 +1511,7 @@ void ip6_flush_pending_frames(struct sock *sk)
 		np->cork.opt = NULL;
 	}
 	if (np->cork.rt) {
+		dst_release(&np->cork.rt->u.dst);
 		np->cork.rt = NULL;
 	}
 	if (np->cork.fl) {

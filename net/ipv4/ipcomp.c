@@ -336,6 +336,8 @@ static void ipcomp_free_data(struct ipcomp_data *ipcd)
 static void ipcomp_destroy(struct xfrm_state *x)
 {
 	struct ipcomp_data *ipcd = x->data;
+	if (!ipcd)
+		return;
 	ipcomp_free_data(ipcd);
 	kfree(ipcd);
 }
@@ -354,7 +356,6 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 	x->props.header_len = sizeof(struct ip_comp_hdr);
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct iphdr);
-	x->data = ipcd;
 
 	ipcd->scratch = kmalloc(IPCOMP_SCRATCH_SIZE, GFP_KERNEL);
 	if (!ipcd->scratch)
@@ -373,6 +374,7 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 	calg_desc = xfrm_calg_get_byname(x->calg->alg_name);
 	BUG_ON(!calg_desc);
 	ipcd->threshold = calg_desc->uinfo.comp.threshold;
+	x->data = ipcd;
 	err = 0;
 out:
 	return err;

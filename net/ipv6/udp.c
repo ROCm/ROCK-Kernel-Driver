@@ -330,21 +330,11 @@ ipv4_connected:
 		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
-	dst = ip6_route_output(sk, &fl);
-
-	if ((err = dst->error) != 0) {
-		dst_release(dst);
+	err = ip6_dst_lookup(sk, &dst, &fl);
+	if (err)
 		goto out;
-	}
 
-	/* get the source address used in the appropriate device */
-
-	err = ipv6_get_saddr(dst, daddr, &fl.fl6_src);
-
-	if (err) {
-		dst_release(dst);
-		goto out;
-	}
+	/* source address lookup done in ip6_dst_lookup */
 
 	if (ipv6_addr_any(&np->saddr))
 		ipv6_addr_copy(&np->saddr, &fl.fl6_src);
@@ -930,8 +920,8 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
 
-	dst = ip6_dst_lookup(sk, &fl);
-	if ((err = dst->error))
+	err = ip6_dst_lookup(sk, &dst, &fl);
+	if (err)
 		goto out;
 
 	if (hlimit < 0) {

@@ -539,7 +539,6 @@ static struct crypto_alg alg = {
 		  .cipher = {
 			     .cia_min_keysize = CAST6_MIN_KEY_SIZE,
 			     .cia_max_keysize = CAST6_MAX_KEY_SIZE,
-			     .cia_ivsize = CAST6_BLOCK_SIZE,
 			     .cia_setkey = cast6_setkey,
 			     .cia_encrypt = cast6_encrypt,
 			     .cia_decrypt = cast6_decrypt}

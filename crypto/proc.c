@@ -62,8 +62,6 @@ static int c_show(struct seq_file *m, void *p)
 					alg->cra_cipher.cia_min_keysize);
 		seq_printf(m, "max keysize  : %u\n",
 					alg->cra_cipher.cia_max_keysize);
-		seq_printf(m, "ivsize       : %u\n",
-					alg->cra_cipher.cia_ivsize);
 		break;
 		
 	case CRYPTO_ALG_TYPE_DIGEST:

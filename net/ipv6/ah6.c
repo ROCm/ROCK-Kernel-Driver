@@ -444,6 +444,9 @@ static void ah6_destroy(struct xfrm_state *x)
 {
 	struct ah_data *ahp = x->data;
 
+	if (!ahp)
+		return;
+
 	if (ahp->work_icv) {
 		kfree(ahp->work_icv);
 		ahp->work_icv = NULL;

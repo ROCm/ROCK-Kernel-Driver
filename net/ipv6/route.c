@@ -432,6 +432,7 @@ restart:
 		/* Race condition! In the gap, when rt6_lock was
 		   released someone could insert this route.  Relookup.
 		*/
+		dst_release(&rt->u.dst);
 		goto relookup;
 	}
 	dst_hold(&rt->u.dst);
@@ -486,6 +487,7 @@ restart:
 		/* Race condition! In the gap, when rt6_lock was
 		   released someone could insert this route.  Relookup.
 		*/
+		dst_release(&rt->u.dst);
 		goto relookup;
 	}
 	dst_hold(&rt->u.dst);
@@ -1094,8 +1096,8 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 			 */
 			dst_set_expires(&nrt->u.dst, ip6_rt_mtu_expires);
 			nrt->rt6i_flags |= RTF_DYNAMIC|RTF_EXPIRES;
-			dst_release(&nrt->u.dst);
 		}
+		dst_release(&nrt->u.dst);
 	} else {
 		nrt = ip6_rt_copy(rt);
 		if (nrt == NULL)

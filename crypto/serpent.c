@@ -483,7 +483,6 @@ static struct crypto_alg serpent_alg = {
 	.cra_u			=	{ .cipher = {
 	.cia_min_keysize	=	SERPENT_MIN_KEY_SIZE,
 	.cia_max_keysize	=	SERPENT_MAX_KEY_SIZE,
-	.cia_ivsize		=	SERPENT_BLOCK_SIZE,
 	.cia_setkey   		= 	setkey,
 	.cia_encrypt 		=	encrypt,
 	.cia_decrypt  		=	decrypt } }
