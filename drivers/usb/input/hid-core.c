@@ -957,6 +957,10 @@ static void hid_output_field(struct hid_field *field, __u8 *data)
 void hid_output_report(struct hid_report *report, __u8 *data)
 {
 	unsigned n;
+
+	if (report->id > 0)
+		*data++ = report->id;
+
 	for (n = 0; n < report->maxfield; n++)
 		hid_output_field(report->field[n], data);
 }
@@ -1051,7 +1055,7 @@ static int hid_submit_out(struct hid_device *hid)
 	report = hid->out[hid->outtail];
 
 	hid_output_report(report, hid->outbuf);
-	hid->urbout->transfer_buffer_length = ((report->size - 1) >> 3) + 1;
+	hid->urbout->transfer_buffer_length = ((report->size - 1) >> 3) + 1 + (report->id > 0);
 	hid->urbout->dev = hid->dev;
 
 	dbg("submitting out urb");
@@ -1075,7 +1079,7 @@ static int hid_submit_ctrl(struct hid_device *hid)
 	if (dir == USB_DIR_OUT)
 		hid_output_report(report, hid->ctrlbuf);
 
-	hid->urbctrl->transfer_buffer_length = ((report->size - 1) >> 3) + 1 + ((report->id > 0) && (dir != USB_DIR_OUT));
+	hid->urbctrl->transfer_buffer_length = ((report->size - 1) >> 3) + 1 + (report->id > 0);
 	hid->urbctrl->pipe = (dir == USB_DIR_OUT) ?  usb_sndctrlpipe(hid->dev, 0) : usb_rcvctrlpipe(hid->dev, 0);
 	hid->urbctrl->dev = hid->dev;
 
