@@ -104,10 +104,14 @@
  * and dual port ram.
  */
 extern		cpm_cpm2_t	*cpmp;	 /* Pointer to comm processor */
-uint		cpm2_dpalloc(uint size, uint align);
-uint		cpm2_hostalloc(uint size, uint align);
-void		cpm2_setbrg(uint brg, uint rate);
-void		cpm2_fastbrg(uint brg, uint rate, int div16);
+extern void *cpm2_dpalloc(uint size, uint align);
+extern int cpm2_dpfree(void *addr);
+extern void *cpm2_dpalloc_fixed(void *addr, uint size, uint allign);
+extern void cpm2_dpdump(void);
+extern unsigned int cpm2_dpram_offset(void *addr);
+extern void *cpm2_dpram_addr(int offset);
+extern void cpm2_setbrg(uint brg, uint rate);
+extern void cpm2_fastbrg(uint brg, uint rate, int div16);
 
 /* Buffer descriptors used by many of the CPM protocols.
 */

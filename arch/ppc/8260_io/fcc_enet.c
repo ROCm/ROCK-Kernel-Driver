@@ -1621,28 +1621,15 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 	 */
 	memset((char *)ep, 0, sizeof(fcc_enet_t));
 
-	/* Allocate space for the buffer descriptors in the DP ram.
-	 * These are relative offsets in the DP ram address space.
+	/* Allocate space for the buffer descriptors from regular memory.
 	 * Initialize base addresses for the buffer descriptors.
 	 */
-#if 0
-	/* I really want to do this, but for some reason it doesn't
-	 * work with the data cache enabled, so I allocate from the
-	 * main memory instead.
-	 */
-	i = cpm2_dpalloc(sizeof(cbd_t) * RX_RING_SIZE, 8);
-	ep->fen_genfcc.fcc_rbase = (uint)&immap->im_dprambase[i];
-	cep->rx_bd_base = (cbd_t *)&immap->im_dprambase[i];
-
-	i = cpm2_dpalloc(sizeof(cbd_t) * TX_RING_SIZE, 8);
-	ep->fen_genfcc.fcc_tbase = (uint)&immap->im_dprambase[i];
-	cep->tx_bd_base = (cbd_t *)&immap->im_dprambase[i];
-#else
-	cep->rx_bd_base = (cbd_t *)cpm2_hostalloc(sizeof(cbd_t) * RX_RING_SIZE, 8);
+	cep->rx_bd_base = (cbd_t *)kmalloc(sizeof(cbd_t) * RX_RING_SIZE,
+			GFP_KERNEL | GFP_DMA);
 	ep->fen_genfcc.fcc_rbase = __pa(cep->rx_bd_base);
-	cep->tx_bd_base = (cbd_t *)cpm2_hostalloc(sizeof(cbd_t) * TX_RING_SIZE, 8);
+	cep->tx_bd_base = (cbd_t *)kmalloc(sizeof(cbd_t) * TX_RING_SIZE,
+			GFP_KERNEL | GFP_DMA);
 	ep->fen_genfcc.fcc_tbase = __pa(cep->tx_bd_base);
-#endif
 
 	cep->dirty_tx = cep->cur_tx = cep->tx_bd_base;
 	cep->cur_rx = cep->rx_bd_base;

@@ -22,17 +22,16 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/bootmem.h>
+#include <linux/module.h>
 #include <asm/irq.h>
 #include <asm/mpc8260.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/immap_cpm2.h>
 #include <asm/cpm2.h>
+#include <asm/rheap.h>
 
-static	uint	dp_alloc_base;	/* Starting offset in DP ram */
-static	uint	dp_alloc_top;	/* Max offset + 1 */
-static	uint	host_buffer;	/* One page of host buffer */
-static	uint	host_end;	/* end + 1 */
+static void cpm2_dpinit(void);
 cpm_cpm2_t	*cpmp;		/* Pointer to comm processor space */
 
 /* We allocate this here because it is used almost exclusively for
@@ -43,81 +42,15 @@ cpm2_map_t *cpm2_immr;
 void
 cpm2_reset(void)
 {
-	uint vpgaddr;
-
 	cpm2_immr = (cpm2_map_t *)CPM_MAP_ADDR;
 
 	/* Reclaim the DP memory for our use.
-	*/
-	dp_alloc_base = CPM_DATAONLY_BASE;
-	dp_alloc_top = dp_alloc_base + CPM_DATAONLY_SIZE;
-
-	/* Set the host page for allocation.
-	*/
-	host_buffer =
-		(uint) alloc_bootmem_pages(PAGE_SIZE * NUM_CPM_HOST_PAGES);
-	host_end = host_buffer + (PAGE_SIZE * NUM_CPM_HOST_PAGES);
-
-	vpgaddr = host_buffer;
+	 */
+	cpm2_dpinit();
 
 	/* Tell everyone where the comm processor resides.
-	*/
+	 */
 	cpmp = &cpm2_immr->im_cpm;
-}
-
-/* Allocate some memory from the dual ported ram.
- * To help protocols with object alignment restrictions, we do that
- * if they ask.
- */
-uint
-cpm2_dpalloc(uint size, uint align)
-{
-	uint	retloc;
-	uint	align_mask, off;
-	uint	savebase;
-
-	align_mask = align - 1;
-	savebase = dp_alloc_base;
-
-	if ((off = (dp_alloc_base & align_mask)) != 0)
-		dp_alloc_base += (align - off);
-
-	if ((dp_alloc_base + size) >= dp_alloc_top) {
-		dp_alloc_base = savebase;
-		return(CPM_DP_NOSPACE);
-	}
-
-	retloc = dp_alloc_base;
-	dp_alloc_base += size;
-
-	return(retloc);
-}
-
-/* We also own one page of host buffer space for the allocation of
- * UART "fifos" and the like.
- */
-uint
-cpm2_hostalloc(uint size, uint align)
-{
-	uint	retloc;
-	uint	align_mask, off;
-	uint	savebase;
-
-	align_mask = align - 1;
-	savebase = host_buffer;
-
-	if ((off = (host_buffer & align_mask)) != 0)
-		host_buffer += (align - off);
-
-	if ((host_buffer + size) >= host_end) {
-		host_buffer = savebase;
-		return(0);
-	}
-
-	retloc = host_buffer;
-	host_buffer += size;
-
-	return(retloc);
 }
 
 /* Set a baud rate generator.  This needs lots of work.  There are
@@ -174,3 +107,99 @@ cpm2_fastbrg(uint brg, uint rate, int div16)
 	if (div16)
 		*bp |= CPM_BRG_DIV16;
 }
+
+/*
+ * dpalloc / dpfree bits.
+ */
+static spinlock_t cpm_dpmem_lock;
+/* 16 blocks should be enough to satisfy all requests
+ * until the memory subsystem goes up... */
+static rh_block_t cpm_boot_dpmem_rh_block[16];
+static rh_info_t cpm_dpmem_info;
+
+static void cpm2_dpinit(void)
+{
+	void *dprambase = &((cpm2_map_t *)CPM_MAP_ADDR)->im_dprambase;
+
+	spin_lock_init(&cpm_dpmem_lock);
+
+	/* initialize the info header */
+	rh_init(&cpm_dpmem_info, 1,
+			sizeof(cpm_boot_dpmem_rh_block) /
+			sizeof(cpm_boot_dpmem_rh_block[0]),
+			cpm_boot_dpmem_rh_block);
+
+	/* Attach the usable dpmem area */
+	/* XXX: This is actually crap. CPM_DATAONLY_BASE and
+	 * CPM_DATAONLY_SIZE is only a subset of the available dpram. It
+	 * varies with the processor and the microcode patches activated.
+	 * But the following should be at least safe.
+	 */
+	rh_attach_region(&cpm_dpmem_info, dprambase + CPM_DATAONLY_BASE,
+			CPM_DATAONLY_SIZE);
+}
+
+/* This function used to return an index into the DPRAM area.
+ * Now it returns the actuall physical address of that area.
+ * use cpm2_dpram_offset() to get the index
+ */
+void *cpm2_dpalloc(uint size, uint align)
+{
+	void *start;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cpm_dpmem_lock, flags);
+	cpm_dpmem_info.alignment = align;
+	start = rh_alloc(&cpm_dpmem_info, size, "commproc");
+	spin_unlock_irqrestore(&cpm_dpmem_lock, flags);
+
+	return start;
+}
+EXPORT_SYMBOL(cpm2_dpalloc);
+
+int cpm2_dpfree(void *addr)
+{
+	int ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cpm_dpmem_lock, flags);
+	ret = rh_free(&cpm_dpmem_info, addr);
+	spin_unlock_irqrestore(&cpm_dpmem_lock, flags);
+
+	return ret;
+}
+EXPORT_SYMBOL(cpm2_dpfree);
+
+/* not sure if this is ever needed */
+void *cpm2_dpalloc_fixed(void *addr, uint size, uint align)
+{
+	void *start;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cpm_dpmem_lock, flags);
+	cpm_dpmem_info.alignment = align;
+	start = rh_alloc_fixed(&cpm_dpmem_info, addr, size, "commproc");
+	spin_unlock_irqrestore(&cpm_dpmem_lock, flags);
+
+	return start;
+}
+EXPORT_SYMBOL(cpm2_dpalloc_fixed);
+
+void cpm2_dpdump(void)
+{
+	rh_dump(&cpm_dpmem_info);
+}
+EXPORT_SYMBOL(cpm2_dpdump);
+
+uint cpm2_dpram_offset(void *addr)
+{
+	return (uint)((u_char *)addr -
+			((uint)((cpm2_map_t *)CPM_MAP_ADDR)->im_dprambase));
+}
+EXPORT_SYMBOL(cpm2_dpram_offset);
+
+void *cpm2_dpram_addr(int offset)
+{
+	return (void *)&((cpm2_map_t *)CPM_MAP_ADDR)->im_dprambase[offset];
+}
+EXPORT_SYMBOL(cpm2_dpram_addr);
