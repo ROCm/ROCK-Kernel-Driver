@@ -113,7 +113,6 @@ static void pnp_release_device(struct device *dmdev)
 int __pnp_add_device(struct pnp_dev *dev)
 {
 	int ret;
-	pnp_name_device(dev);
 	pnp_fixup_device(dev);
 	dev->dev.bus = &pnp_bus_type;
 	dev->dev.release = &pnp_release_device;
