@@ -79,7 +79,7 @@ static void sn_ack_irq(unsigned int irq)
 	int nasid;
 
 	irq = irq & 0xff;
-	nasid = smp_physical_node_id();
+	nasid = get_nasid();
 	event_occurred =
 	    HUB_L((uint64_t *) GLOBAL_MMR_ADDR(nasid, SH_EVENT_OCCURRED));
 	if (event_occurred & SH_EVENT_OCCURRED_UART_INT_MASK) {
@@ -109,7 +109,7 @@ static void sn_end_irq(unsigned int irq)
 
 	ivec = irq & 0xff;
 	if (ivec == SGI_UART_VECTOR) {
-		nasid = smp_physical_node_id();
+		nasid = get_nasid();
 		event_occurred = HUB_L((uint64_t *) GLOBAL_MMR_ADDR
 				       (nasid, SH_EVENT_OCCURRED));
 		/* If the UART bit is set here, we may have received an 
@@ -141,8 +141,8 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 
 	cpuid = first_cpu(mask);
 	cpuphys = cpu_physical_id(cpuid);
-	t_nasid = cpu_physical_id_to_nasid(cpuphys);
-	t_slice = cpu_physical_id_to_slice(cpuphys);
+	t_nasid = cpuid_to_nasid(cpuid);
+	t_slice = cpuid_to_slice(cpuid);
 
 	while (sn_irq_info) {
 		int status;
