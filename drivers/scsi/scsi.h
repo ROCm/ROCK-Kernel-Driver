@@ -915,8 +915,8 @@ static inline int scsi_populate_tag_msg(Scsi_Cmnd *SCpnt, char *msg) {
 
         if(!blk_rq_tagged(req))
                 return 0;
-    
-        if(req->flags & REQ_BARRIER)
+
+	if (req->flags & REQ_HARDBARRIER)
                 *msg++ = MSG_ORDERED_TAG;
         else
                 *msg++ = MSG_SIMPLE_TAG;
