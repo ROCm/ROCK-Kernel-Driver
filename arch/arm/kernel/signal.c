@@ -396,8 +396,12 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 		if (__put_user(retcodes[idx], rc))
 			return 1;
 
-		flush_icache_range((unsigned long)rc,
-				   (unsigned long)(rc + 1));
+		/*
+		 * Ensure that the instruction cache sees
+		 * the return code written onto the stack.
+		 */
+		cpu_icache_invalidate_range((unsigned long)rc,
+					    (unsigned long)(rc + 1));
 
 		retcode = ((unsigned long)rc) + thumb;
 	}

@@ -215,6 +215,7 @@ CLEAN_FILES	+= \
 	arch/arm/vmlinux.lds
 
 MRPROPER_FILES	+= \
+	arch/arm/tools/constants.h* \
 	include/asm-arm/arch \
 	include/asm-arm/proc \
 	include/asm-arm/constants.h* \

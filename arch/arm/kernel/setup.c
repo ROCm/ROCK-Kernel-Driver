@@ -183,7 +183,7 @@ static const char *cache_lockdown[16] = {
 
 static inline void dump_cache(const char *prefix, unsigned int cache)
 {
-	unsigned int mult = 2 + CACHE_M(cache) ? 1 : 0;
+	unsigned int mult = 2 + (CACHE_M(cache) ? 1 : 0);
 
 	printk("%s size %dK associativity %d line length %d sets %d\n",
 		prefix,
@@ -671,7 +671,7 @@ static const char *proc_arch[16] = {
 static void
 c_show_cache(struct seq_file *m, const char *type, unsigned int cache)
 {
-	unsigned int mult = 2 + CACHE_M(cache) ? 1 : 0;
+	unsigned int mult = 2 + (CACHE_M(cache) ? 1 : 0);
 
 	seq_printf(m, "%s size\t\t: %d\n"
 		      "%s assoc\t\t: %d\n"
@@ -744,7 +744,7 @@ static int c_show(struct seq_file *m, void *v)
 				   cache_types[CACHE_TYPE(cache_info)],
 				   cache_clean[CACHE_TYPE(cache_info)],
 				   cache_lockdown[CACHE_TYPE(cache_info)],
-				   CACHE_S(cache_info) ? "separate I,D" : "unified");
+				   CACHE_S(cache_info) ? "Harvard" : "Unified");
 
 			if (CACHE_S(cache_info)) {
 				c_show_cache(m, "I", CACHE_ISIZE(cache_info));

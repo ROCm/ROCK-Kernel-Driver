@@ -2,7 +2,7 @@
 #define ASMARM_PCI_H
 
 #ifdef __KERNEL__
-
+#include <linux/config.h>
 #include <linux/mm.h> /* bah! */
 
 #include <asm/arch/hardware.h>
@@ -142,18 +142,9 @@ pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int directi
 
 	for (i = 0; i < nents; i++, sg++) {
 		char *virt;
-		if (sg->address && sg->page)
-			BUG();
-		else if (!sg->address && !sg->page)
-			BUG();
 
-		if (sg->address) {
-			sg->dma_address = virt_to_bus(sg->address);
-			virt = sg->address;
-		} else {
-			sg->dma_address = page_to_bus(sg->page) + sg->offset;
-			virt = page_address(sg->page) + sg->offset;
-		}
+		sg->dma_address = page_to_bus(sg->page) + sg->offset;
+		virt = page_address(sg->page) + sg->offset;
 		consistent_sync(virt, sg->length, direction);
 	}
 
@@ -197,12 +188,7 @@ pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int d
 	int i;
 
 	for (i = 0; i < nelems; i++, sg++) {
-		char *virt;
-
-		if (sg->address)
-			virt = sg->address;
-		else
-			virt = page_address(sg->page) + sg->offset;
+		char *virt = page_address(sg->page) + sg->offset;
 		consistent_sync(virt, sg->length, direction);
 	}
 }

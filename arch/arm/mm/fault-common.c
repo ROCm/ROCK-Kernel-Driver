@@ -138,9 +138,10 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr, int error_code,
 	struct siginfo si;
 
 #ifdef CONFIG_DEBUG_USER
-	printk(KERN_DEBUG "%s: unhandled page fault at pc=0x%08lx, "
-	       "lr=0x%08lx (bad address=0x%08lx, code %d)\n",
-	       tsk->comm, regs->ARM_pc, regs->ARM_lr, addr, error_code);
+	printk(KERN_DEBUG "%s: unhandled page fault at 0x%08lx, code 0x%03x\n",
+	       tsk->comm, addr, error_code);
+	show_pte(tsk->mm, addr);
+	show_regs(regs);
 #endif
 
 	tsk->thread.address = addr;
@@ -224,8 +225,7 @@ survive:
 	 * If we are out of memory for pid1,
 	 * sleep for a while and retry
 	 */
-	tsk->policy |= SCHED_YIELD;
-	schedule();
+	yield();
 	goto survive;
 
 check_stack:

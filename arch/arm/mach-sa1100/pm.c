@@ -51,8 +51,6 @@ extern unsigned long  sleep_save_p;	/* physical address */
 
 int pm_do_suspend(void)
 {
-	int retval;
-
 	/* set up pointer to sleep parameters */
 	sleep_save = kmalloc(SLEEP_SAVE_SIZE*sizeof(long), GFP_ATOMIC);
 	if (!sleep_save)
@@ -107,7 +105,7 @@ int pm_do_suspend(void)
 	PSPR = 0;
 
 #ifdef DEBUG
-	printk("*** made it back from resume\n");
+	printk(KERN_DEBUG "*** made it back from resume\n");
 #endif
 
 	/* restore registers */
@@ -171,28 +169,22 @@ int pm_do_suspend(void)
 #define ACPI_S1_SLP_TYP 19
 
 /*
- * Send us to sleep.  We must not be called from IRQ context.
+ * Send us to sleep.
  */
 static int sysctl_pm_do_suspend(void)
 {
 	int retval;
 
-	if (in_interrupt()) {
-		printk(KERN_CRIT "pm_do_suspend() called from IRQ\n");
-		return -EINVAL;
-	}
-
 	retval = pm_send_all(PM_SUSPEND, (void *)3);
 
 	if (retval == 0) {
-		retval = __pm_do_suspend();
+		retval = pm_do_suspend();
 
 		pm_send_all(PM_RESUME, (void *)0);
 	}
 
 	return retval;
 }
-
 
 static struct ctl_table pm_table[] =
 {
