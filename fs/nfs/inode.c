@@ -716,12 +716,14 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		inode->i_mtime = nfs_time_to_secs(new_mtime);
 		NFS_MTIME_UPDATE(inode) = fattr->timestamp;
 		NFS_CACHE_ISIZE(inode) = new_size;
+		if (fattr->valid & NFS_ATTR_FATTR_V4)
+			NFS_CHANGE_ATTR(inode) = fattr->change_attr;
 		inode->i_size = new_isize;
 		inode->i_mode = fattr->mode;
 		inode->i_nlink = fattr->nlink;
 		inode->i_uid = fattr->uid;
 		inode->i_gid = fattr->gid;
-		if (fattr->valid & NFS_ATTR_FATTR_V3) {
+		if (fattr->valid & (NFS_ATTR_FATTR_V3 | NFS_ATTR_FATTR_V4)) {
 			/*
 			 * report the blocks in 512byte units
 			 */
@@ -781,7 +783,7 @@ printk("nfs_setattr: revalidate failed, error=%d\n", error);
 	if (error)
 		goto out;
 
-	error = NFS_PROTO(inode)->setattr(inode, &fattr, attr);
+	error = NFS_PROTO(inode)->setattr(dentry, &fattr, attr);
 	if (error)
 		goto out;
 	/*
@@ -1067,12 +1069,25 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 		invalid = 1;
 	}
 
+	if ((fattr->valid & NFS_ATTR_FATTR_V4)
+	    && NFS_CHANGE_ATTR(inode) != fattr->change_attr) {
+#ifdef NFS_DEBUG_VERBOSE
+		printk(KERN_DEBUG "NFS: change_attr change on %s/%ld\n",
+		       inode->i_sb->s_id, inode->i_ino);
+#endif
+		invalid = 1;
+	}
+
 	/* Check Weak Cache Consistency data.
 	 * If size and mtime match the pre-operation values, we can
 	 * assume that any attribute changes were caused by our NFS
          * operation, so there's no need to invalidate the caches.
          */
-        if ((fattr->valid & NFS_ATTR_WCC)
+	if ((fattr->valid & NFS_ATTR_PRE_CHANGE)
+	    && NFS_CHANGE_ATTR(inode) == fattr->pre_change_attr) {
+		invalid = 0;
+	}
+	else if ((fattr->valid & NFS_ATTR_WCC)
 	    && NFS_CACHE_ISIZE(inode) == fattr->pre_size
 	    && NFS_CACHE_MTIME(inode) == fattr->pre_mtime) {
 		invalid = 0;
@@ -1110,12 +1125,15 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 		}
 	}
 
+	if (fattr->valid & NFS_ATTR_FATTR_V4)
+		NFS_CHANGE_ATTR(inode) = fattr->change_attr;
+
 	inode->i_mode = fattr->mode;
 	inode->i_nlink = fattr->nlink;
 	inode->i_uid = fattr->uid;
 	inode->i_gid = fattr->gid;
 
-	if (fattr->valid & NFS_ATTR_FATTR_V3) {
+	if (fattr->valid & (NFS_ATTR_FATTR_V3 | NFS_ATTR_FATTR_V4)) {
 		/*
 		 * report the blocks in 512byte units
 		 */

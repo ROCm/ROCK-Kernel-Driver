@@ -1,0 +1,142 @@
+Version 0.54
+------------
+Fix problem with captive thread hanging around at unmount time.  Adjust to 2.5.42-pre
+changes to superblock layout.   Remove wasteful allocation of smb buffers (now the send 
+buffer is reused for responses).  Add more oplock handling. Additional minor cleanup.
+
+Version 0.53
+------------
+More stylistic updates to better match kernel style.  Add additional statistics
+for filesystem which can be viewed via /proc/fs/cifs.  Add more pieces of NTLMv2
+and CIFS Packet Signing enablement.
+
+Version 0.52
+------------
+Replace call to sleep_on with safer wait_on_event.
+Make stylistic changes to better match kernel style recommendations.
+Remove most typedef usage (except for the PDUs themselves).
+
+Version 0.51
+------------
+Update mount so the -unc mount option is no longer required (the ip address can be specified
+in a UNC style device name.   Implementation of readpage/writepage started.
+
+Version 0.50
+------------
+Fix intermittent problem with incorrect smb header checking on badly 
+fragmented tcp responses
+
+Version 0.49
+------------
+Fixes to setting of allocation size and file size.
+
+Version 0.48
+------------
+Various 2.5.38 fixes.  Now works on 2.5.38
+
+Version 0.47
+------------
+Prepare for 2.5 kernel merge.  Remove ifdefs.
+
+Version 0.46
+------------
+Socket buffer management fixes.  Fix dual free.
+
+Version 0.45
+------------
+Various big endian fixes for hardlinks and symlinks and also for dfs.
+
+Version 0.44
+------------
+Various big endian fixes for servers with Unix extensions such as Samba
+
+Version 0.43
+------------
+Various FindNext fixes for incorrect filenames on large directory searches on big endian
+clients.  basic posix file i/o tests now work on big endian machines, not just le
+
+Version 0.42
+------------
+SessionSetup and NegotiateProtocol now work from Big Endian machines.
+Various Big Endian fixes found during testing on the Linux on 390.  Various fixes for compatability with older
+versions of 2.4 kernel (now builds and works again on kernels at least as early as 2.4.7).
+
+Version 0.41
+------------
+Various minor fixes for Connectathon Posix "basic" file i/o test suite.  Directory caching fixed so hardlinked
+files now return the correct rumber of links on fstat as they are repeatedly linked and unlinked.
+
+Version 0.40
+------------
+Implemented "Raw" (i.e. not encapsulated in SPNEGO) NTLMSSP (i.e. the Security Provider Interface used to negotiate
+session advanced session authentication).  Raw NTLMSSP is preferred by Windows 2000 Professional and Windows XP.
+Began implementing support for SPNEGO encapsulation of NTLMSSP based session authentication blobs
+(which is the mechanism preferred by Windows 2000 server in the absence of Kerberos).
+
+Version 0.38
+------------
+Introduced optional mount helper utility mount.cifs and made coreq changes to cifs vfs to enable
+it. Fixed a few bugs in the DFS code (e.g. bcc two bytes too short and incorrect uid in PDU).
+
+Version 0.37
+------------
+Rewrote much of connection and mount/unmount logic to handle bugs with
+multiple uses to same share, multiple users to same server etc.
+
+Version 0.36
+------------
+Fixed major problem with dentry corruption (missing call to dput)
+
+Version 0.35
+------------
+Rewrite of readdir code to fix bug. Various fixes for bigendian machines.
+Begin adding oplock support.  Multiusermount and oplockEnabled flags added to /proc/fs/cifs
+although corresponding function not fully implemented in the vfs yet
+
+Version 0.34
+------------
+Fixed dentry caching bug, misc. cleanup 
+
+Version 0.33
+------------
+Fixed 2.5 support to handle build and configure changes as well as misc. 2.5 changes.  Now can build
+on current 2.5 beta version (2.5.24) of the Linux kernel as well as on 2.4 Linux kernels.
+Support for STATUS codes (newer 32 bit NT error codes) added.  DFS support begun to be added.
+
+Version 0.32
+------------
+Unix extensions (symlink, readlink, hardlink, chmod and some chgrp and chown) implemented
+and tested against Samba 2.2.5
+
+
+Version 0.31
+------------
+1) Fixed lockrange to be correct (it was one byte too short)
+
+2) Fixed GETLK (i.e. the fcntl call to test a range of bytes in a file to see if locked) to correctly 
+show range as locked when there is a conflict with an existing lock.
+
+3) default file perms are now 2767 (indicating support for mandatory locks) instead of 777 for directories
+in most cases.  Eventually will offer optional ability to query server for the correct perms.
+
+3) Fixed eventual trap when mounting twice to different shares on the same server when the first succeeded 
+but the second one was invalid and failed (the second one was incorrectly disconnecting the tcp and smb
+session) 
+
+4) Fixed error logging of valid mount options
+
+5) Removed logging of password field.
+
+6) Moved negotiate, treeDisconnect and uloggoffX (only tConx and SessSetup remain in connect.c) to cifssmb.c
+and cleaned them up and made them more consistent with other cifs functions. 
+
+7) Server support for Unix extensions is now fully detected and FindFirst is implemented both ways 
+(with or without Unix exentions) but FindNext and QueryPathInfo with the Unix extensions are not completed,
+nor is the symlink support using the Unix extensions
+
+8) Started adding the readlink and follow_link code 
+
+Version 0.3 
+-----------
+Initial drop
+

@@ -146,6 +146,7 @@ struct rpc_xprt {
 	unsigned long		sockstate;	/* Socket state */
 	unsigned char		shutdown   : 1,	/* being shut down */
 				nocong	   : 1,	/* no congestion control */
+				resvport   : 1, /* use a reserved port */
 				stream     : 1;	/* TCP */
 
 	/*

@@ -4,9 +4,9 @@ SUBLEVEL = 41
 EXTRAVERSION =
 
 # *DOCUMENTATION*
-# Too see a list of typical targets execute "make help"
+# To see a list of typical targets execute "make help"
 # More info can be located in ./Documentation/kbuild
-# Comments in this file is targeted only to the developer, do not
+# Comments in this file are targeted only to the developer, do not
 # expect to learn how to build the kernel reading this file.
 
 # We are using a recursive build, so we need to do a little thinking
@@ -142,7 +142,7 @@ NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
-MAKEFILES	= $(TOPDIR)/.config
+MAKEFILES	= .config
 GENKSYMS	= /sbin/genksyms
 DEPMOD		= /sbin/depmod
 KALLSYMS	= /sbin/kallsyms
@@ -387,17 +387,17 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 # Single targets
 # ---------------------------------------------------------------------------
 
-%.s: %.c FORCE
+%.s: %.c scripts FORCE
 	+@$(call descend,$(@D),$@)
-%.i: %.c FORCE
+%.i: %.c scripts FORCE
 	+@$(call descend,$(@D),$@)
-%.o: %.c FORCE
+%.o: %.c scripts FORCE
 	+@$(call descend,$(@D),$@)
-%.lst: %.c FORCE
+%.lst: %.c scripts FORCE
 	+@$(call descend,$(@D),$@)
-%.s: %.S FORCE
+%.s: %.S scripts FORCE
 	+@$(call descend,$(@D),$@)
-%.o: %.S FORCE
+%.o: %.S scripts FORCE
 	+@$(call descend,$(@D),$@)
 
 # 	FIXME: The asm symlink changes when $(ARCH) changes. That's
@@ -883,7 +883,7 @@ if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
 	@set -e; \
 	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
 	$(cmd_$(1)); \
-	$(TOPDIR)/scripts/fixdep $(depfile) $@ $(TOPDIR) '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
+	scripts/fixdep $(depfile) $@ '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
 	rm -f $(depfile); \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 

@@ -689,21 +689,28 @@ static int cdrom_read_mech_status(struct cdrom_device_info *cdi,
 
 static int cdrom_slot_status(struct cdrom_device_info *cdi, int slot)
 {
-	struct cdrom_changer_info info;
+	struct cdrom_changer_info *info;
 	int ret;
 
 	cdinfo(CD_CHANGER, "entering cdrom_slot_status()\n"); 
 	if (cdi->sanyo_slot)
 		return CDS_NO_INFO;
 	
-	if ((ret = cdrom_read_mech_status(cdi, &info)))
-		return ret;
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return -ENOMEM;
 
-	if (info.slots[slot].disc_present)
-		return CDS_DISC_OK;
+	if ((ret = cdrom_read_mech_status(cdi, info)))
+		goto out_free;
+
+	if (info->slots[slot].disc_present)
+		ret = CDS_DISC_OK;
 	else
-		return CDS_NO_DISC;
+		ret = CDS_NO_DISC;
 
+out_free:
+	kfree(info);
+	return ret;
 }
 
 /* Return the number of slots for an ATAPI/SCSI cdrom, 
@@ -713,15 +720,20 @@ int cdrom_number_of_slots(struct cdrom_device_info *cdi)
 {
 	int status;
 	int nslots = 1;
-	struct cdrom_changer_info info;
+	struct cdrom_changer_info *info;
 
 	cdinfo(CD_CHANGER, "entering cdrom_number_of_slots()\n"); 
 	/* cdrom_read_mech_status requires a valid value for capacity: */
 	cdi->capacity = 0; 
 
-	if ((status = cdrom_read_mech_status(cdi, &info)) == 0)
-		nslots = info.hdr.nslots;
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return -ENOMEM;
 
+	if ((status = cdrom_read_mech_status(cdi, info)) == 0)
+		nslots = info->hdr.nslots;
+
+	kfree(info);
 	return nslots;
 }
 
@@ -755,7 +767,7 @@ static int cdrom_load_unload(struct cdrom_device_info *cdi, int slot)
 
 static int cdrom_select_disc(struct cdrom_device_info *cdi, int slot)
 {
-	struct cdrom_changer_info info;
+	struct cdrom_changer_info *info;
 	int curslot;
 	int ret;
 
@@ -771,10 +783,17 @@ static int cdrom_select_disc(struct cdrom_device_info *cdi, int slot)
 		return cdrom_load_unload(cdi, -1);
 	}
 
-	if ((ret = cdrom_read_mech_status(cdi, &info)))
-		return ret;
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return -ENOMEM;
 
-	curslot = info.hdr.curslot;
+	if ((ret = cdrom_read_mech_status(cdi, info))) {
+		kfree(info);
+		return ret;
+	}
+
+	curslot = info->hdr.curslot;
+	kfree(info);
 
 	if (cdi->use_count > 1 || keeplocked) {
 		if (slot == CDSL_CURRENT) {
@@ -1502,7 +1521,8 @@ int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 		}
 
 	case CDROM_MEDIA_CHANGED: {
-		struct cdrom_changer_info info;
+		struct cdrom_changer_info *info;
+		int changed;
 
 		cdinfo(CD_DO_IOCTL, "entering CDROM_MEDIA_CHANGED\n"); 
 		if (!CDROM_CAN(CDC_MEDIA_CHANGED))
@@ -1515,10 +1535,18 @@ int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 		if ((unsigned int)arg >= cdi->capacity)
 			return -EINVAL;
 
-		if ((ret = cdrom_read_mech_status(cdi, &info)))
-			return ret;
+		info = kmalloc(sizeof(*info), GFP_KERNEL);
+		if (!info)
+			return -ENOMEM;
 
-		return info.slots[arg].change;
+		if ((ret = cdrom_read_mech_status(cdi, info))) {
+			kfree(info);
+			return ret;
+		}
+
+		changed = info->slots[arg].change;
+		kfree(info);
+		return changed;
 		}
 
 	case CDROM_SET_OPTIONS: {
