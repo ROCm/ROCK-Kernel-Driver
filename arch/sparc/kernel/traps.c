@@ -89,6 +89,7 @@ void instruction_dump (unsigned long *pc)
 
 void die_if_kernel(char *str, struct pt_regs *regs)
 {
+	static int die_counter;
 	int count = 0;
 
 	/* Amuse the user. */
@@ -98,7 +99,7 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 "              /_| \\__/ |_\\\n"
 "                 \\__U_/\n");
 
-	printk("%s(%d): %s\n", current->comm, current->pid, str);
+	printk("%s(%d): %s [#%d]\n", current->comm, current->pid, str, ++die_counter);
 	show_regs(regs);
 
 	__SAVE; __SAVE; __SAVE; __SAVE;

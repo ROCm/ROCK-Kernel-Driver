@@ -923,10 +923,11 @@ M:	scott.feldman@intel.com
 S:	Supported
 
 INTEL PRO/1000 GIGABIT ETHERNET SUPPORT
-P:	Chris Leech
-M:	christopher.leech@intel.com
+P:	Jeb Cramer
+M:	cramerj@intel.com
 P:	Scott Feldman
 M:	scott.feldman@intel.com
+W:	http://sourceforge.net/projects/e1000/
 S:	Supported
 
 INTERMEZZO FILE SYSTEM

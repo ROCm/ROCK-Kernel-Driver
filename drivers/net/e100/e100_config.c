@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -518,6 +518,25 @@ e100_config_wol(struct e100_private *bdp)
 	}
 
 	E100_CONFIG(bdp, 19);
+	spin_unlock_bh(&(bdp->config_lock));
+}
+
+void
+e100_config_vlan_drop(struct e100_private *bdp, unsigned char enable)
+{
+	spin_lock_bh(&(bdp->config_lock));
+	if (enable) {
+		if (!(bdp->config[22] & CB_CFIG_VLAN_DROP_ENABLE)) {
+			bdp->config[22] |= CB_CFIG_VLAN_DROP_ENABLE;
+			E100_CONFIG(bdp, 22);
+		}
+
+	} else {
+		if ((bdp->config[22] & CB_CFIG_VLAN_DROP_ENABLE)) {
+			bdp->config[22] &= ~CB_CFIG_VLAN_DROP_ENABLE;
+			E100_CONFIG(bdp, 22);
+		}
+	}
 	spin_unlock_bh(&(bdp->config_lock));
 }
 

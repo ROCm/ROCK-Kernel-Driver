@@ -671,7 +671,9 @@ set_worklist:
 #endif
 
 	/* Kill PROM timer */
-	wr	%g0, 0, %tick_cmpr
+	sethi	%hi(0x80000000), %g1
+	sllx	%g1, 32, %g1
+	wr	%g1, 0, %tick_cmpr
 
 	BRANCH_IF_ANY_CHEETAH(g1,g5,1f)
 

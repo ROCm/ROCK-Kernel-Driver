@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -45,8 +45,22 @@
 **********************************************************************/
 
 /* Change Log
- *
- * 2.1.29	12/20/02
+ * 
+ * 2.2.21	02/11/03
+ * o Removed marketing brand strings. Instead, Using generic string 
+ *   "Intel(R) PRO/100 Network Connection" for all adapters.
+ * o Implemented ethtool -S option
+ * o Strip /proc/net/PRO_LAN_Adapters files for kernel driver
+ * o Bug fix: Read wrong byte in EEPROM when offset is odd number
+ * o Bug fix: PHY loopback test fails on ICH devices
+ * o Bug fix: System panic on e100_close when repeating Hot Remove and 
+ *   Add in a team
+ * o Bug fix: Linux Bonding driver claims adapter's link loss because of
+ *   not updating last_rx field
+ * o Bug fix: e100 does not check validity of MAC address
+ * o New feature: added ICH5 support
+ * 
+ * 2.1.27	11/20/02
  *   o Bug fix: Device command timeout due to SMBus processing during init
  *   o Bug fix: Not setting/clearing I (Interrupt) bit in tcb correctly
  *   o Bug fix: Not using EEPROM WoL setting as default in ethtool
@@ -62,15 +76,6 @@
  *     ifconfig down, rmmod and insmod
  *
  * 2.1.24       10/7/02
- *   o Bug fix: Wrong files under /proc/net/PRO_LAN_Adapters/ when interface
- *     name is changed
- *   o Bug fix: Rx skb corruption when Rx polling code and Rx interrupt code
- *     are executing during stress traffic at shared interrupt system. 
- *     Removed Rx polling code
- *   o Added detailed printk if selftest failed when insmod
- *   o Removed misleading printks
- *
- * 2.1.12       8/2/02
  */
  
 #include <linux/config.h>
@@ -81,7 +86,8 @@
 #include "e100_ucode.h"
 #include "e100_config.h"
 #include "e100_phy.h"
-#include "e100_vendor.h"
+
+extern void e100_force_speed_duplex_to_phy(struct e100_private *bdp);
 
 static char e100_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"rx_packets", "tx_packets", "rx_bytes", "tx_bytes", "rx_errors",
@@ -127,7 +133,6 @@ static char *test_strings[] = {
 
 static int e100_ethtool_led_blink(struct net_device *, struct ifreq *);
 
-#include <linux/mii.h>
 static int e100_mii_ioctl(struct net_device *, struct ifreq *, int);
 
 static unsigned char e100_delayed_exec_non_cu_cmd(struct e100_private *,
@@ -136,11 +141,15 @@ static void e100_free_nontx_list(struct e100_private *);
 static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
-char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.29-k4";
+char e100_copyright[] __devinitdata = "Copyright (c) 2003 Intel Corporation";
+char e100_driver_version[]="2.2.21-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
+static void e100_vlan_rx_register(struct net_device *netdev, struct vlan_group
+		*grp);
+static void e100_vlan_rx_add_vid(struct net_device *netdev, u16 vid);
+static void e100_vlan_rx_kill_vid(struct net_device *netdev, u16 vid);
 
 #ifdef CONFIG_PM
 static int e100_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
@@ -186,7 +195,6 @@ static void e100_print_brd_conf(struct e100_private *);
 static void e100_set_multi(struct net_device *);
 void e100_set_speed_duplex(struct e100_private *);
 
-char *e100_get_brand_msg(struct e100_private *);
 static u8 e100_pci_setup(struct pci_dev *, struct e100_private *);
 static u8 e100_sw_init(struct e100_private *);
 static void e100_tco_workaround(struct e100_private *);
@@ -220,6 +228,7 @@ static void e100_set_bool_option(struct e100_private *bdp, int, u32, int,
 				 char *);
 unsigned char e100_wait_exec_cmplx(struct e100_private *, u32, u8, u8);
 void e100_exec_cmplx(struct e100_private *, u32, u8);
+static unsigned char e100_asf_enabled(struct e100_private *bdp);
 
 /**
  * e100_get_rx_struct - retrieve cell to hold skb buff from the pool
@@ -607,7 +616,9 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	}
 
 	if (((bdp->pdev->device > 0x1030)
-	     && (bdp->pdev->device < 0x103F))
+	       && (bdp->pdev->device < 0x103F))
+	    || ((bdp->pdev->device >= 0x1050)
+	       && (bdp->pdev->device <= 0x1057))
 	    || (bdp->pdev->device == 0x2449)
 	    || (bdp->pdev->device == 0x2459)
 	    || (bdp->pdev->device == 0x245D)) {
@@ -646,6 +657,9 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
                 goto err_pci;
 	}
 	
+	dev->vlan_rx_register = e100_vlan_rx_register;
+	dev->vlan_rx_add_vid = e100_vlan_rx_add_vid;
+	dev->vlan_rx_kill_vid = e100_vlan_rx_kill_vid;
 	dev->irq = pcid->irq;
 	dev->open = &e100_open;
 	dev->hard_start_xmit = &e100_xmit_frame;
@@ -655,9 +669,11 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	dev->set_multicast_list = &e100_set_multi;
 	dev->set_mac_address = &e100_set_mac;
 	dev->do_ioctl = &e100_ioctl;
-	if (bdp->flags & USE_IPCB) {
-		dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
-	}
+
+	if (bdp->flags & USE_IPCB)
+	dev->features = NETIF_F_SG | NETIF_F_HW_CSUM |
+			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
+		
 	e100nics++;
 
 	e100_get_speed_duplex_caps(bdp);
@@ -668,25 +684,24 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
         memcpy(bdp->ifname, dev->name, IFNAMSIZ);
         bdp->ifname[IFNAMSIZ-1] = 0;	
 
-	bdp->device_type = ent->driver_data;
 	printk(KERN_NOTICE
 	       "e100: %s: %s\n", 
-	       bdp->device->name, e100_get_brand_msg(bdp));
+	       bdp->device->name, "Intel(R) PRO/100 Network Connection");
 	e100_print_brd_conf(bdp);
-	bdp->id_string = e100_get_brand_msg(bdp);
 
 	bdp->wolsupported = 0;
 	bdp->wolopts = 0;
 	
 	/* Check if WoL is enabled on EEPROM */
 	if (e100_eeprom_read(bdp, EEPROM_ID_WORD) & BIT_5) {
+		/* Magic Packet WoL is enabled on device by default */
+		/* if EEPROM WoL bit is TRUE                        */
+		bdp->wolsupported = WAKE_MAGIC;
+		bdp->wolopts = WAKE_MAGIC;
 		if (bdp->rev_id >= D101A4_REV_ID)
 			bdp->wolsupported = WAKE_PHY | WAKE_MAGIC;
 		if (bdp->rev_id >= D101MA_REV_ID)
 			bdp->wolsupported |= WAKE_UCAST | WAKE_ARP;
-		/* Magic Packet WoL is enabled on device by default */
-		/* if EEPROM WoL bit is TRUE                        */
-		bdp->wolopts = WAKE_MAGIC;
 	}
 
 	printk(KERN_NOTICE "\n");
@@ -752,6 +767,34 @@ e100_remove1(struct pci_dev *pcid)
 	--e100nics;
 }
 
+static struct pci_device_id e100_id_table[] __devinitdata = {
+	{0x8086, 0x1229, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x2449, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1059, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1209, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+  	{0x8086, 0x1029, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1030, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },	
+	{0x8086, 0x1031, PCI_ANY_ID, PCI_ANY_ID, 0, 0, }, 
+	{0x8086, 0x1032, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1033, PCI_ANY_ID, PCI_ANY_ID, 0, 0, }, 
+	{0x8086, 0x1034, PCI_ANY_ID, PCI_ANY_ID, 0, 0, }, 
+	{0x8086, 0x1038, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1039, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103A, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103B, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103C, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x103E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1050, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1051, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1052, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1053, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1054, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x1055, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x2459, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0x8086, 0x245D, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
+	{0,} /* This has to be the last entry*/
+};
 MODULE_DEVICE_TABLE(pci, e100_id_table);
 
 static struct pci_driver e100_driver = {
@@ -994,13 +1037,14 @@ e100_close(struct net_device *dev)
 {
 	struct e100_private *bdp = dev->priv;
 
+	e100_disable_clear_intr(bdp);
+	free_irq(dev->irq, dev);
 	bdp->intr_mask = SCB_INT_MASK;
 	e100_isolate_driver(bdp);
 
 	netif_carrier_off(bdp->device);
 	bdp->cur_line_speed = 0;
 	bdp->cur_dplx_mode = 0;
-	free_irq(dev->irq, dev);
 	e100_clear_pools(bdp);
 
 	return 0;
@@ -1097,6 +1141,8 @@ e100_set_mac(struct net_device *dev, void *addr)
 	int rc = -1;
 	struct sockaddr *p_sockaddr = (struct sockaddr *) addr;
 
+	if (!is_valid_ether_addr(p_sockaddr->sa_data))
+		return -EADDRNOTAVAIL;
 	bdp = dev->priv;
 
 	if (e100_setup_iaaddr(bdp, (u8 *) (p_sockaddr->sa_data))) {
@@ -1231,6 +1277,10 @@ e100_init(struct e100_private *bdp)
 
 	/* read the MAC address from the eprom */
 	e100_rd_eaddr(bdp);
+	if (!is_valid_ether_addr(bdp->device->dev_addr)) {
+		printk(KERN_ERR "e100: Invalid Ethernet address\n");
+		return false;
+	}
 	/* read NIC's part number */
 	e100_rd_pwa_no(bdp);
 
@@ -1670,6 +1720,11 @@ e100_watchdog(struct net_device *dev)
 	} else {
 		if (netif_running(dev))
 			netif_stop_queue(dev);
+		/* When changing to non-autoneg, device may lose  */
+		/* link with some switches. e100 will try to      */
+		/* revover link by sending command to PHY layer   */
+		if (bdp->params.e100_speed_duplex != E100_AUTONEG)
+			e100_force_speed_duplex_to_phy(bdp);
 	}
 
 	rmb();
@@ -1793,7 +1848,8 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 	bdp = dev->priv;
 
 	intr_status = readw(&bdp->scb->scb_status);
-	if (!intr_status || (intr_status == 0xffff)) {
+	/* If not my interrupt, just return */
+	if (!(intr_status & SCB_STATUS_ACK_MASK) || (intr_status == 0xffff)) {
 		return;
 	}
 
@@ -1993,17 +2049,15 @@ e100_rx_srv(struct e100_private *bdp)
 		} else {
 			skb->ip_summed = CHECKSUM_NONE;
 		}
-		switch (netif_rx(skb)) {
-		case NET_RX_BAD:
-		case NET_RX_DROP:
-		case NET_RX_CN_MOD:
-		case NET_RX_CN_HIGH:
-			break;
-		default:
-			bdp->drv_stats.net_stats.rx_bytes += skb->len;
-			break;
-		}
 
+		if(bdp->vlgrp && (rfd_status & CB_STATUS_VLAN)) {
+			vlan_hwaccel_rx(skb, bdp->vlgrp, be16_to_cpu(rfd->vlanid));
+		} else {
+			netif_rx(skb);
+		}
+		dev->last_rx = jiffies;
+		bdp->drv_stats.net_stats.rx_bytes += skb->len;
+		
 		rfd_cnt++;
 	}			/* end of rfd loop */
 
@@ -2096,6 +2150,11 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 		tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCPUDP_CHECKSUM_ENABLE;
 	}
 
+	if(bdp->vlgrp && vlan_tx_tag_present(skb)) {
+		(tcb->tcbu).ipcb.ip_activation_high |= IPCB_INSERTVLAN_ENABLE;
+		(tcb->tcbu).ipcb.vlan = cpu_to_be16(vlan_tx_tag_get(skb));
+	}
+	
 	tcb->tcb_hdr.cb_status = 0;
 	tcb->tcb_thrshld = bdp->tx_thld;
 	tcb->tcb_hdr.cb_cmd |= __constant_cpu_to_le16(CB_S_BIT);
@@ -2114,7 +2173,8 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 
 		if ((ip->protocol == IPPROTO_TCP) ||
 		    (ip->protocol == IPPROTO_UDP)) {
-			tcb->tcbu.ipcb.ip_activation_high =
+
+			tcb->tcbu.ipcb.ip_activation_high |=
 				IPCB_HARDWAREPARSING_ENABLE;
 			tcb->tcbu.ipcb.ip_schedule |=
 				IPCB_TCPUDP_CHECKSUM_ENABLE;
@@ -2682,13 +2742,12 @@ e100_sw_reset(struct e100_private *bdp, u32 reset_cmd)
 		udelay(20);
 	}
 
-	/* Mask off our interrupt line -- its unmasked after reset */
+	/* Mask off our interrupt line -- it is unmasked after reset */
 	e100_disable_clear_intr(bdp);
 #ifdef E100_CU_DEBUG	
 	bdp->last_cmd = 0;
 	bdp->last_sub_cmd = 0;
 #endif	
-
 }
 
 /**
@@ -2901,27 +2960,6 @@ e100_print_brd_conf(struct e100_private *bdp)
 }
 
 /**
- * e100_get_brand_msg
- * @bdp: atapter's private data struct
- *
- * This routine checks if there is specified branding message for a given board
- * type and returns a pointer to the string containing the branding message.
- */
-char *
-e100_get_brand_msg(struct e100_private *bdp)
-{
-	int i;
-
-	for (i = 0; e100_vendor_info_array[i].idstr != NULL; i++) {
-		if (e100_vendor_info_array[i].device_type == bdp->device_type) {
-			return e100_vendor_info_array[i].idstr;
-		}
-	}
-
-	return e100_vendor_info_array[E100_ALL_BOARDS].idstr;
-}
-
-/**
  * e100_pci_setup - setup the adapter's PCI information
  * @pcid: adapter's pci_dev struct
  * @bdp: atapter's private data struct
@@ -3004,12 +3042,17 @@ e100_isolate_driver(struct e100_private *bdp)
 void
 e100_set_speed_duplex(struct e100_private *bdp)
 {
-	if (netif_carrier_ok(bdp->device))
+	int carrier_ok;
+	/* Device may lose link with some siwtches when */
+	/* changing speed/duplex to non-autoneg. e100   */
+	/* needs to remember carrier state in order to  */
+	/* start watchdog timer for recovering link     */
+	if ((carrier_ok = netif_carrier_ok(bdp->device)))
 		e100_isolate_driver(bdp);
 	e100_phy_set_speed_duplex(bdp, true);
 	e100_config_fc(bdp);	/* re-config flow-control if necessary */
 	e100_config(bdp);	
-	if (netif_carrier_ok(bdp->device))
+	if (carrier_ok)
 		e100_deisolate_driver(bdp, false);
 }
 
@@ -3426,6 +3469,7 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 	u16 first_word, last_word;
 	int i, max_len;
 	void *ptr;
+	u8 *eeprom_data_bytes = (u8 *)eeprom_data;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -3461,7 +3505,9 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 		if (copy_to_user(ifr->ifr_data, &ecmd, sizeof (ecmd)))
 			return -EFAULT;
 
-		if (copy_to_user(usr_eeprom_ptr, eeprom_data, ecmd.len))
+		if(ecmd.offset & 1)
+			eeprom_data_bytes++;
+		if (copy_to_user(usr_eeprom_ptr, eeprom_data_bytes, ecmd.len))
 			return -EFAULT;
 	} else {
 		if (ecmd.magic != E100_EEPROM_MAGIC)
@@ -3754,7 +3800,8 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 		return -EFAULT;
 
 	switch (info.string_set) {
-	case ETH_SS_TEST:
+	case ETH_SS_TEST: {
+		int ret = 0;
 		if (info.len > E100_MAX_TEST_RES)
 			info.len = E100_MAX_TEST_RES;
 		strings = kmalloc(info.len * ETH_GSTRING_LEN, GFP_ATOMIC);
@@ -3766,7 +3813,13 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 			sprintf(strings + i * ETH_GSTRING_LEN, "%-31s",
 				test_strings[i]);
 		}
-		break;
+		if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
+			ret = -EFAULT;
+		if (copy_to_user(usr_strings, strings, info.len * ETH_GSTRING_LEN))
+			ret = -EFAULT;
+		kfree(strings);
+		return ret;
+	}
 	case ETH_SS_STATS: {
 		char *strings = NULL;
 		void *addr = ifr->ifr_data;
@@ -3783,19 +3836,6 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 	default:
 		return -EOPNOTSUPP;
 	}
-
-	if (copy_to_user(ifr->ifr_data, &info, sizeof (info))) {
-		kfree(strings);
-		return -EFAULT;
-	}
-
-	if (copy_to_user(usr_strings, strings, info.len * ETH_GSTRING_LEN)) {
-		kfree(strings);
-		return -EFAULT;
-	}
-
-	kfree(strings);
-	return 0;
 }
 
 static int
@@ -4022,6 +4062,45 @@ exit:
 	spin_unlock_bh(&(bdp->bd_non_tx_lock));
 }
 
+static void
+e100_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp)
+{
+	struct e100_private *bdp = netdev->priv;
+
+	e100_disable_clear_intr(bdp);
+	bdp->vlgrp = grp;
+
+	if(grp) {
+		/* enable VLAN tag insert/strip */
+		e100_config_vlan_drop(bdp, true);
+
+	} else {
+		/* disable VLAN tag insert/strip */
+		e100_config_vlan_drop(bdp, false);
+	}
+
+	e100_config(bdp);
+	e100_set_intr_mask(bdp);
+}
+
+static void
+e100_vlan_rx_add_vid(struct net_device *netdev, u16 vid)
+{
+	/* We don't do Vlan filtering */
+	return;
+}
+
+static void
+e100_vlan_rx_kill_vid(struct net_device *netdev, u16 vid)
+{
+	struct e100_private *bdp = netdev->priv;
+
+	if(bdp->vlgrp)
+		bdp->vlgrp->vlan_devices[vid] = NULL;
+	/* We don't do Vlan filtering */
+	return;
+}
+
 #ifdef CONFIG_PM
 static int
 e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
@@ -4057,7 +4136,7 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 	e100_do_wol(pcid, bdp);
 	
 	/* If wol is enabled */
-	if (bdp->wolopts) {
+	if (bdp->wolopts || e100_asf_enabled(bdp)) {
 		pci_enable_wake(pcid, 3, 1);	/* Enable PME for power state D3 */
 		pci_set_power_state(pcid, 3);	/* Set power state to D3.        */
 	} else {
@@ -4084,6 +4163,31 @@ e100_resume(struct pci_dev *pcid)
 	return 0;
 }
 #endif /* CONFIG_PM */
+
+/**
+ * e100_asf_enabled - checks if ASF is configured on the current adaper
+ *                    by reading registers 0xD and 0x90 in the EEPROM 
+ * @bdp: atapter's private data struct
+ *
+ * Returns: true if ASF is enabled
+ */
+static unsigned char
+e100_asf_enabled(struct e100_private *bdp)
+{
+	u16 asf_reg;
+	u16 smbus_addr_reg;
+	if ((bdp->pdev->device >= 0x1050) && (bdp->pdev->device <= 0x1055)) {
+		asf_reg = e100_eeprom_read(bdp, EEPROM_CONFIG_ASF);
+		if ((asf_reg & EEPROM_FLAG_ASF)
+		    && !(asf_reg & EEPROM_FLAG_GCL)) {
+			smbus_addr_reg = 
+				e100_eeprom_read(bdp, EEPROM_SMBUS_ADDR);
+			if ((smbus_addr_reg & 0xFF) != 0xFE) 
+				return true;
+		}
+	}
+	return false;
+}
 
 #ifdef E100_CU_DEBUG
 unsigned char

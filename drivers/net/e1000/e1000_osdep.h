@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2002 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -77,24 +77,22 @@ typedef enum {
 
 
 #define E1000_WRITE_REG(a, reg, value) ( \
-    ((a)->mac_type >= e1000_82543) ? \
-        (writel((value), ((a)->hw_addr + E1000_##reg))) : \
-        (writel((value), ((a)->hw_addr + E1000_82542_##reg))))
+    writel((value), ((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg))))
 
 #define E1000_READ_REG(a, reg) ( \
-    ((a)->mac_type >= e1000_82543) ? \
-        readl((a)->hw_addr + E1000_##reg) : \
-        readl((a)->hw_addr + E1000_82542_##reg))
+    readl((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg)))
 
 #define E1000_WRITE_REG_ARRAY(a, reg, offset, value) ( \
-    ((a)->mac_type >= e1000_82543) ? \
-        writel((value), ((a)->hw_addr + E1000_##reg + ((offset) << 2))) : \
-        writel((value), ((a)->hw_addr + E1000_82542_##reg + ((offset) << 2))))
+    writel((value), ((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
+        ((offset) << 2))))
 
 #define E1000_READ_REG_ARRAY(a, reg, offset) ( \
-    ((a)->mac_type >= e1000_82543) ? \
-        readl((a)->hw_addr + E1000_##reg + ((offset) << 2)) : \
-        readl((a)->hw_addr + E1000_82542_##reg + ((offset) << 2)))
+    readl((a)->hw_addr + \
+        (((a)->mac_type >= e1000_82543) ? E1000_##reg : E1000_82542_##reg) + \
+        ((offset) << 2)))
 
 #define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS)
 
