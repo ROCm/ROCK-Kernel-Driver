@@ -868,10 +868,39 @@ static int hdio_getgeo(unsigned int fd, unsigned int cmd, unsigned long arg)
 	err = sys_ioctl(fd, HDIO_GETGEO, (unsigned long)&geo);
 	set_fs (old_fs);
 	if (!err) {
-		err = copy_to_user ((struct hd_geometry32 *)arg, &geo, 4);
-		err |= __put_user (geo.start, &(((struct hd_geometry32 *)arg)->start));
+		if (copy_to_user ((struct hd_geometry32 *)arg, &geo, 4) ||
+		    __put_user (geo.start, &(((struct hd_geometry32 *)arg)->start)))
+			err = -EFAULT;
 	}
-	return err ? -EFAULT : 0;
+	return err;
+}
+
+struct hd_big_geometry32 {
+	unsigned char heads;
+	unsigned char sectors;
+	unsigned int cylinders;
+	u32 start;
+};
+                        
+static int hdio_getgeo_big(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	mm_segment_t old_fs = get_fs();
+	struct hd_big_geometry geo;
+	int err;
+	
+	set_fs (KERNEL_DS);
+	err = sys_ioctl(fd, cmd, (unsigned long)&geo);
+	set_fs (old_fs);
+	if (!err) {
+		struct hd_big_geometry32 *up = (struct hd_big_geometry32 *) arg;
+
+		if (put_user(geo.heads, &up->heads) ||
+		    __put_user(geo.sectors, &up->sectors) ||
+		    __put_user(geo.cylinders, &up->cylinders) ||
+		    __put_user(((u32) geo.start), &up->start))
+			err = -EFAULT;
+	}
+	return err;
 }
 
 struct  fbcmap32 {
@@ -5030,6 +5059,7 @@ HANDLE_IOCTL(SIOCDELRT, routing_ioctl)
 HANDLE_IOCTL(SIOCRTMSG, ret_einval)
 HANDLE_IOCTL(SIOCGSTAMP, do_siocgstamp)
 HANDLE_IOCTL(HDIO_GETGEO, hdio_getgeo)
+HANDLE_IOCTL(HDIO_GETGEO_BIG_RAW, hdio_getgeo_big)
 HANDLE_IOCTL(BLKGETSIZE, w_long)
 HANDLE_IOCTL(0x1260, broken_blkgetsize)
 HANDLE_IOCTL(BLKSECTGET, w_long)

@@ -113,7 +113,7 @@ static void bw2_margins (struct fb_info_sbusfb *fb, struct display *p,
 			 int x_margin, int y_margin)
 {
 	fb->info.screen_base += (y_margin - fb->y_margin) *
-		p->line_length + ((x_margin - fb->x_margin) >> 3);
+		p->fb_info->fix.line_length + ((x_margin - fb->x_margin) >> 3);
 }
 
 static u8 bw2regs_1600[] __initdata = {
@@ -155,7 +155,7 @@ static char idstring[60] __initdata = { 0 };
 
 char __init *bwtwofb_init(struct fb_info_sbusfb *fb)
 {
-	struct fb_fix_screeninfo *fix = &fb->fix;
+	struct fb_fix_screeninfo *fix = &fb->info.fix;
 	struct display *disp = &fb->disp;
 	struct fbtype *type = &fb->type;
 #ifdef CONFIG_SUN4
@@ -232,7 +232,7 @@ char __init *bwtwofb_init(struct fb_info_sbusfb *fb)
 
 	strcpy(fb->info.modename, "BWtwo");
 	strcpy(fix->id, "BWtwo");
-	fix->line_length = fb->var.xres_virtual >> 3;
+	fix->line_length = fb->info.var.xres_virtual >> 3;
 	fix->accel = FB_ACCEL_SUN_BWTWO;
 	
 	disp->scrollmode = SCROLL_YREDRAW;

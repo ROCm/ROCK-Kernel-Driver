@@ -226,6 +226,8 @@ source drivers/input/Config.in
 
 source fs/Config.in
 
+mainmenu_option next_comment
+comment 'Sound card support'
 tristate 'Sound card support' CONFIG_SOUND
 if [ "$CONFIG_SOUND" != "n" ]; then
    source sound/Config.in
