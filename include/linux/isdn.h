@@ -386,7 +386,7 @@ typedef struct isdn_net_local_s {
 
 /* the interface itself */
 typedef struct isdn_net_dev_s {
-  isdn_net_local *local;
+  isdn_net_local local;
   isdn_net_local *queue;               /* circular list of all bundled
 					  channels, which are currently
 					  online                           */

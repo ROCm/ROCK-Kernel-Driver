@@ -131,7 +131,7 @@ static __inline__ void isdn_net_rm_from_bundle(isdn_net_local *lp)
 	if (master_lp->netdev->queue == lp) {
 		master_lp->netdev->queue = lp->next;
 		if (lp->next == lp) { /* last in queue */
-			master_lp->netdev->queue = master_lp->netdev->local;
+			master_lp->netdev->queue = &master_lp->netdev->local;
 		}
 	}
 	lp->next = lp->last = lp;	/* (re)set own pointers */

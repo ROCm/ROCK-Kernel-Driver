@@ -169,7 +169,7 @@ isdn_ppp_bind(isdn_net_local * lp)
 		char exclusive[ISDN_MAX_CHANNELS];	/* exclusive flags */
 		memset(exclusive, 0, ISDN_MAX_CHANNELS);
 		while (net_dev) {	/* step through net devices to find exclusive minors */
-			isdn_net_local *lp = net_dev->local;
+			isdn_net_local *lp = &net_dev->local;
 			if (lp->pppbind >= 0)
 				exclusive[lp->pppbind] = 1;
 			net_dev = net_dev->next;
@@ -974,7 +974,7 @@ void isdn_ppp_receive(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buf
 	int slot;
 	int proto;
 
-	if (net_dev->local->master)
+	if (net_dev->local.master)
 		BUG(); // we're called with the master device always
 
 	slot = lp->ppp_slot;
@@ -1077,12 +1077,12 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 		case PPP_VJC_UNCOMP:
 			if (is->debug & 0x20)
 				printk(KERN_DEBUG "isdn_ppp: VJC_UNCOMP\n");
-			if (net_dev->local->ppp_slot < 0) {
+			if (net_dev->local.ppp_slot < 0) {
 				printk(KERN_ERR __FUNCTION__": net_dev->local->ppp_slot(%d) out of range\n",
-					net_dev->local->ppp_slot);
+					net_dev->local.ppp_slot);
 				goto drop_packet;
 			}
-			if (slhc_remember(ippp_table[net_dev->local->ppp_slot]->slcomp, skb->data, skb->len) <= 0) {
+			if (slhc_remember(ippp_table[net_dev->local.ppp_slot]->slcomp, skb->data, skb->len) <= 0) {
 				printk(KERN_WARNING "isdn_ppp: received illegal VJC_UNCOMP frame!\n");
 				goto drop_packet;
 			}
@@ -1103,12 +1103,12 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 				}
 				skb_put(skb, skb_old->len + 128);
 				memcpy(skb->data, skb_old->data, skb_old->len);
-				if (net_dev->local->ppp_slot < 0) {
+				if (net_dev->local.ppp_slot < 0) {
 					printk(KERN_ERR __FUNCTION__": net_dev->local->ppp_slot(%d) out of range\n",
-						net_dev->local->ppp_slot);
+						net_dev->local.ppp_slot);
 					goto drop_packet;
 				}
-				pkt_len = slhc_uncompress(ippp_table[net_dev->local->ppp_slot]->slcomp,
+				pkt_len = slhc_uncompress(ippp_table[net_dev->local.ppp_slot]->slcomp,
 						skb->data, skb_old->len);
 				kfree_skb(skb_old);
 				if (pkt_len < 0)
@@ -1144,7 +1144,7 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 	return;
 
  drop_packet:
-	net_dev->local->stats.rx_dropped++;
+	net_dev->local.stats.rx_dropped++;
 	kfree_skb(skb);
 }
 
@@ -1976,7 +1976,7 @@ isdn_ppp_dial_slave(char *name)
 
 	if (!(ndev = isdn_net_findif(name)))
 		return 1;
-	lp = ndev->local;
+	lp = &ndev->local;
 	if (!(lp->flags & ISDN_NET_CONNECTED))
 		return 5;
 
@@ -2007,7 +2007,7 @@ isdn_ppp_hangup_slave(char *name)
 
 	if (!(ndev = isdn_net_findif(name)))
 		return 1;
-	lp = ndev->local;
+	lp = &ndev->local;
 	if (!(lp->flags & ISDN_NET_CONNECTED))
 		return 5;
 

@@ -510,9 +510,9 @@ isdn_status_callback(isdn_ctrl * c)
 					/* Schedule connection-setup */
 					isdn_net_dial();
 					for ( p = dev->netdev; p; p = p->next )
-						if (p->local->isdn_slot == isdn_dc2minor(di, cmd.arg)) {
-							strcpy( cmd.parm.setup.eazmsn, p->local->msn );
-							isdn_slot_command(p->local->isdn_slot, ISDN_CMD_ACCEPTD, &cmd);
+						if (p->local.isdn_slot == isdn_dc2minor(di, cmd.arg)) {
+							strcpy( cmd.parm.setup.eazmsn, p->local.msn );
+							isdn_slot_command(p->local.isdn_slot, ISDN_CMD_ACCEPTD, &cmd);
 							retval = 1;
 							break;
 						}
