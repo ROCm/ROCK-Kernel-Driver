@@ -125,15 +125,3 @@ EXPORT_SYMBOL(ia64_spinlock_contention);
 #  endif
 # endif
 #endif
-
-EXPORT_SYMBOL(ia64_max_iommu_merge_mask);
-
-#include <linux/pm.h>
-EXPORT_SYMBOL(pm_idle);
-#ifdef CONFIG_DPROBES_MODULE
-#include <linux/dprobes.h>
-EXPORT_SYMBOL(_etext);
-EXPORT_SYMBOL(ia64_handle_exception);
-EXPORT_SYMBOL(ia64_save_debug_regs);
-EXPORT_SYMBOL(ia64_flush_fph);
-#endif

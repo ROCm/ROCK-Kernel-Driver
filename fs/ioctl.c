@@ -10,7 +10,6 @@
 #include <linux/fs.h>
 #include <linux/fshooks.h>
 #include <linux/security.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
@@ -69,7 +68,6 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
                 goto out;
         }
 
-	TRIG_EVENT(ioctl_hook, fd, cmd);
 	lock_kernel();
 	switch (cmd) {
 		case FIOCLEX:

@@ -36,7 +36,6 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -50,7 +49,6 @@
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
 #endif
-#include <asm/debugreg.h>
 
 #include <linux/irq.h>
 #include <linux/err.h>
@@ -269,7 +267,6 @@ __asm__(".section .text\n"
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
 	struct pt_regs regs;
-	int ret = 0;
 
 	memset(&regs, 0, sizeof(regs));
 
@@ -284,12 +281,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.eflags = 0x286;
 
 	/* Ok, create the new process.. */
-	ret = do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	if (ret > 0)
-		TRIG_EVENT(kthread_hook, ret, (int) fn);
-#endif
-	return  ret;
+	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
 
 /*
@@ -308,16 +300,12 @@ void exit_thread(void)
 		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
 		put_cpu();
 	}
-	if (tsk->thread.debugreg[7])
-		dr_dec_use_count(tsk->thread.debugreg[7]);
 }
 
 void flush_thread(void)
 {
 	struct task_struct *tsk = current;
 
-	if (tsk->thread.debugreg[7])
-		dr_dec_use_count(tsk->thread.debugreg[7]); 
 	memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
 	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
 	/*
@@ -406,9 +394,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		desc->a = LDT_entry_a(&info);
 		desc->b = LDT_entry_b(&info);
 	}
-
-	if (tsk->thread.debugreg[7])
-		dr_inc_use_count(tsk->thread.debugreg[7]);
 
 	err = 0;
  out:
@@ -552,24 +537,6 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	/*
 	 * Now maybe reload the debug registers
 	 */
-#ifdef CONFIG_DEBUGREG
-{
-	/*
-	 * Don't reload global debug registers. Don't touch the global debug
-	 * register settings in dr7.
-	 */
-	unsigned long next_dr7 = next->debugreg[7];
-	if (unlikely(next_dr7)) {
-		if (DR7_L0(next_dr7)) loaddebug(next, 0);
-		if (DR7_L1(next_dr7)) loaddebug(next, 1);
-		if (DR7_L2(next_dr7)) loaddebug(next, 2);
-		if (DR7_L3(next_dr7)) loaddebug(next, 3);
-		/* no 4 and 5 */
-		loaddebug(next, 6);
-		load_process_dr7(next_dr7);
-	}
-}
-#else
 	if (unlikely(next->debugreg[7])) {
 		loaddebug(next, 0);
 		loaddebug(next, 1);
@@ -579,7 +546,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		loaddebug(next, 6);
 		loaddebug(next, 7);
 	}
-#endif
+
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
 		if (next->io_bitmap_ptr) {
 			/*

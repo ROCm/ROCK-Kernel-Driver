@@ -22,7 +22,6 @@
 #include <linux/security.h>
 #include <linux/ptrace.h>
 #include <linux/audit.h>
-#include <linux/trigevent_hooks.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/siginfo.h>
@@ -1206,7 +1205,6 @@ send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	 */
 	read_lock(&tasklist_lock);  
 	spin_lock_irqsave(&p->sighand->siglock, flags);
-	TRIG_EVENT(signal_hook, sig, p->pid);
 	ret = specific_send_sig_info(sig, info, p);
 	spin_unlock_irqrestore(&p->sighand->siglock, flags);
 	read_unlock(&tasklist_lock);

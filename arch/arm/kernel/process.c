@@ -399,7 +399,6 @@ asm(	".align\n"
 pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 {
 	struct pt_regs regs;
-	int ret = 0;
 
 	memset(&regs, 0, sizeof(regs));
 
@@ -409,13 +408,7 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 	regs.ARM_pc = (unsigned long)kernel_thread_helper;
 	regs.ARM_cpsr = SVC_MODE;
 
-	ret = do_fork(flags|CLONE_VM|CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	if (ret > 0)
-		TRIG_EVENT(kthread_hook, ret, (int) fn);
-#endif
-
-	return  ret;
+	return do_fork(flags|CLONE_VM|CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
 
 /*

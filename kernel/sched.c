@@ -41,7 +41,6 @@
 #include <linux/percpu.h>
 #include <linux/kthread.h>
 #include <linux/stop_machine.h>
-#include <linux/trigevent_hooks.h>
 
 #ifdef CONFIG_NUMA_SCHED
 #define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
@@ -408,7 +407,6 @@ static void activate_task(task_t *p, runqueue_t *rq)
 
 	recalc_task_prio(p, now);
 
-	TRIG_EVENT(process_wakeup_hook, p->pid, p->state);
 	/*
 	 * This checks to make sure it's not an uninterruptible task
 	 * that is now waking up.
@@ -2250,7 +2248,6 @@ switch_tasks:
 		++*switch_count;
 
 		prepare_arch_switch(rq, next);
-		TRIG_EVENT(sched_switch_hook, prev, next);
 		prev = context_switch(rq, prev, next);
 		barrier();
 
@@ -2260,7 +2257,6 @@ switch_tasks:
 
 	reacquire_kernel_lock(current);
 	preempt_enable_no_resched();
-	TRIG_EVENT(sched_dispatch_hook, prev, next);
 	if (test_thread_flag(TIF_NEED_RESCHED))
 		goto need_resched;
 

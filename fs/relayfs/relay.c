@@ -159,17 +159,13 @@ rchan_free_id(int rchan_id)
  *	rchan_destroy_buf - destroy the current channel buffer
  *	@rchan: the channel
  */
-static inline int
+static inline void
 rchan_destroy_buf(struct rchan *rchan)
 {
-	int err = 0;
-	
 	if (rchan->buf && !rchan->init_buf)
-		err = free_rchan_buf(rchan->buf,
-				     rchan->buf_page_array,
-				     rchan->buf_page_count);
-
-	return err;
+		free_rchan_buf(rchan->buf,
+			       rchan->buf_page_array,
+			       rchan->buf_page_count);
 }
 
 /**
@@ -185,27 +181,16 @@ rchan_destroy_buf(struct rchan *rchan)
 static int 
 relay_release(struct rchan *rchan)
 {
-	int err = 0;
-	
-	if (rchan == NULL) {
-		err = -EBADF;
-		goto exit;
-	}
+	if (rchan == NULL)
+		return -EBADF;
 
-	err = rchan_destroy_buf(rchan);
-	if (err)
-		goto exit;
-
+	rchan_destroy_buf(rchan);
 	rchan_free_id(rchan->id);
-
-	err = relayfs_remove_file(rchan->dentry);
-	if (err)
-		goto exit;
-
+	relayfs_remove_file(rchan->dentry);
 	clear_readers(rchan);
 	kfree(rchan);
-exit:
-	return err;
+
+	return 0;
 }
 
 /**
@@ -529,17 +514,6 @@ fileop_notify_default_callback(int rchan_id,
 	return 0;
 }
 
-/*
- * ioctl() default callback.  Does nothing.
- */
-static int
-ioctl_default_callback(int rchan_id,
-		       unsigned int cmd,
-		       unsigned long arg)
-{
-	return 0;
-}
-
 /* relay channel default callbacks */
 static struct rchan_callbacks default_channel_callbacks = {
 	.buffer_start = buffer_start_default_callback,
@@ -548,7 +522,6 @@ static struct rchan_callbacks default_channel_callbacks = {
 	.user_deliver = user_deliver_default_callback,
 	.needs_resize = needs_resize_default_callback,
 	.fileop_notify = fileop_notify_default_callback,
-	.ioctl = ioctl_default_callback,
 };
 
 /**
@@ -1006,8 +979,6 @@ relay_open(const char *chanpath,
 		callbacks->needs_resize = needs_resize_default_callback;
 	if (callbacks->fileop_notify == NULL)
 		callbacks->fileop_notify = fileop_notify_default_callback;
-	if (callbacks->ioctl == NULL)
-		callbacks->ioctl = ioctl_default_callback;
 	rchan->callbacks = callbacks;
 
 	/* Just to let the client know the sizes used */

@@ -33,7 +33,6 @@
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -180,7 +179,6 @@ __asm__(".align 4\n"
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
 	struct pt_regs regs;
-	int ret = 0;
 
 	memset(&regs, 0, sizeof(regs));
 	regs.psw.mask = PSW_KERNEL_BITS;
@@ -193,14 +191,8 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.orig_gpr2 = -1;
 
 	/* Ok, create the new process.. */
-	ret = do_fork(flags | CLONE_VM | CLONE_UNTRACED,
+	return do_fork(flags | CLONE_VM | CLONE_UNTRACED,
 		       0, &regs, 0, NULL, NULL);
-	
-#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
-	if (ret > 0)
-		TRIG_EVENT(kthread_hook, ret, (int) fn);
-#endif
-	return ret;
 }
 
 /*

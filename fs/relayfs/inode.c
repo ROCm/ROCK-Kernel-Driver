@@ -431,38 +431,6 @@ relayfs_file_write(struct file *filp, const char *buf, size_t count, loff_t *off
 }
 
 /**
- *	relayfs_ioctl - ioctl file op for relayfs files
- *	@inode: the inode
- *	@filp: the file
- *	@cmd: the command
- *	@arg: command arg
- *
- *	Passes the specified cmd/arg to the kernel client.  arg may be a 
- *	pointer to user-space data, in which case the kernel client is 
- *	responsible for copying the data to/from user space appropriately.
- *	The kernel client is also responsible for returning a meaningful
- *	return value for ioctl calls.
- *	
- *	Returns result of relay channel callback, -EPERM if unsuccessful.
- */
-int
-relayfs_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg)
-{
-	struct rchan *rchan;
-	struct rchan_reader *reader;
-
-	reader = (struct rchan_reader *)filp->private_data;
-	if (reader == NULL)
-		return -EPERM;
-
-	rchan = reader->rchan;
-	if (rchan == NULL)
-		return -EPERM;
-
-	return rchan->callbacks->ioctl(rchan->id, cmd, arg);
-}
-
-/**
  *	relayfs_poll - poll file op for relayfs files
  *	@filp: the file
  *	@wait: poll table
@@ -531,10 +499,8 @@ static struct address_space_operations relayfs_aops = {
 
 static struct file_operations relayfs_file_operations = {
 	.open		= relayfs_open,
-	.llseek		= no_llseek,
 	.read		= relayfs_file_read,
 	.write		= relayfs_file_write,
-	.ioctl		= relayfs_ioctl,
 	.poll		= relayfs_poll,
 	.mmap		= relayfs_mmap,
 	.fsync		= simple_sync_file,

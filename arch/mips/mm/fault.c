@@ -19,7 +19,6 @@
 #include <linux/smp_lock.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/module.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/branch.h>
 #include <asm/hardirq.h>
@@ -28,7 +27,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/ptrace.h>
-#include <asm/mipsregs.h>
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -64,7 +62,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 	if (unlikely(address >= VMALLOC_START))
 		goto vmalloc_fault;
 
-	TRIG_EVENT(trap_entry_hook, CAUSE_EXCCODE(regs), CAUSE_EPC(regs));
 	/*
 	 * If we're in an interrupt or have no user
 	 * context, we must not take the fault..
@@ -119,7 +116,6 @@ survive:
 	}
 
 	up_read(&mm->mmap_sem);
-	TRIG_EVENT(trap_exit_hook);
 	return;
 
 /*
@@ -148,7 +144,6 @@ bad_area_nosemaphore:
 		/* info.si_code has been set above */
 		info.si_addr = (void *) address;
 		force_sig_info(SIGSEGV, &info, tsk);
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
@@ -156,7 +151,6 @@ no_context:
 	/* Are we prepared to handle this kernel fault?  */
 	if (fixup_exception(regs)) {
 		current->thread.cp0_baduaddr = address;
-		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
@@ -207,7 +201,6 @@ do_sigbus:
 	info.si_addr = (void *) address;
 	force_sig_info(SIGBUS, &info, tsk);
 
-	TRIG_EVENT(trap_exit_hook);
 	return;
 
 vmalloc_fault:
@@ -242,5 +235,4 @@ vmalloc_fault:
 			goto no_context;
 		return;
 	}
-	TRIG_EVENT(trap_exit_hook);
 }

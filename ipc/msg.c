@@ -25,7 +25,6 @@
 #include <linux/security.h>
 #include <linux/sched.h>
 #include <linux/audit.h>
-#include <linux/trigevent_hooks.h>
 #include <asm/current.h>
 #include <asm/uaccess.h>
 #include "util.h"
@@ -335,7 +334,6 @@ asmlinkage long sys_msgget (key_t key, int msgflg)
 		msg_unlock(msq);
 	}
 	up(&msg_ids.sem);
-	TRIG_EVENT(ipc_msg_create_hook, ret, msgflg);
 	return audit_result(ret);
 }
 

@@ -1251,20 +1251,12 @@ GLOBAL_ENTRY(unw_init_running)
 	br.call.sptk.many rp=b6			// invoke the callback function
 1:	mov gp=loc2				// restore gp
 
-#ifdef CONFIG_KPROBES
-	// For DProbes we allow registers to be changed from
-	// within unw_init_running.
-	.fframe IA64_SWITCH_STACK_SIZE
-	adds sp=EXTRA_FRAME_SIZE,sp
-	DO_LOAD_SWITCH_STACK
-#else
 	// For now, we don't allow changing registers from within
 	// unw_init_running; if we ever want to allow that, we'd
 	// have to do a load_switch_stack here:
 	.restore sp
 	adds sp=IA64_SWITCH_STACK_SIZE+EXTRA_FRAME_SIZE,sp
 
-#endif
 	mov ar.pfs=loc1
 	mov rp=loc0
 	br.ret.sptk.many rp

@@ -23,7 +23,6 @@
 #include <linux/fs.h>
 #include <linux/fshooks.h>
 #include <linux/aio.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 
@@ -258,7 +257,6 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 					continue;
 				file = fget(i);
 				if (file) {
-					TRIG_EVENT(select_hook, i, __timeout);
 					f_op = file->f_op;
 					mask = DEFAULT_POLLMASK;
 					if (f_op && f_op->poll)
@@ -449,7 +447,6 @@ static void do_pollfd(unsigned int num, struct pollfd * fdpage,
 			struct file * file = fget(fd);
 			mask = POLLNVAL;
 			if (file != NULL) {
-				TRIG_EVENT(poll_hook, fd);
 				mask = DEFAULT_POLLMASK;
 				if (file->f_op && file->f_op->poll)
 					mask = file->f_op->poll(file, *pwait);

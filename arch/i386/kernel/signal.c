@@ -23,7 +23,6 @@
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
-#include <asm/debugreg.h>
 #include "sigframe.h"
 
 #define DEBUG_SIG 0
@@ -581,7 +580,7 @@ int fastcall do_signal(struct pt_regs *regs, sigset_t *oldset)
 		 * have been cleared if the watchpoint triggered
 		 * inside the kernel.
 		 */
-		load_process_dr7(current->thread.debugreg[7]);
+		__asm__("movl %0,%%db7"	: : "r" (current->thread.debugreg[7]));
 
 		/* Whee!  Actually deliver the signal.  */
 		handle_signal(signr, &info, oldset, regs);

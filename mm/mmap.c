@@ -34,14 +34,14 @@
 #include <linux/objrmap.h>
 #include <linux/audit.h>
 #include <linux/err.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
 
 /*
- * WARNING: the debugging will use recursive algorithms so never enable this * unless you know what you are doing.
+ * WARNING: the debugging will use recursive algorithms so never enable this
+ * unless you know what you are doing.
  */
 #undef DEBUG_MM_RB
 
@@ -307,7 +307,6 @@ __vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	__vma_link_rb(mm, vma, rb_link, rb_parent);
 	__vma_link_file(vma);
 	__anon_vma_link(vma);
-	TRIG_EVENT(mmap_hook, vma);
 }
 
 static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,

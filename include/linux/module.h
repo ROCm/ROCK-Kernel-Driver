@@ -399,8 +399,6 @@ const struct exception_table_entry *search_module_extables(unsigned long addr);
 
 int register_module_notifier(struct notifier_block * nb);
 int unregister_module_notifier(struct notifier_block * nb);
-int register_rmmodule_notifier(struct notifier_block * nb);
-int unregister_rmmodule_notifier(struct notifier_block * nb);
 
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
@@ -476,16 +474,6 @@ static inline int register_module_notifier(struct notifier_block * nb)
 }
 
 static inline int unregister_module_notifier(struct notifier_block * nb)
-{
-	return 0;
-}
-
-static inline int register_rmmodule_notifier(struct notifier_block * nb)
-{
-	return 0;
-}
-
-static inline int unregister_rmmodule_notifier(struct notifier_block * nb)
 {
 	return 0;
 }

@@ -15,7 +15,6 @@
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
 #include <linux/sysdev.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/i8259.h>
 #include <asm/io.h>

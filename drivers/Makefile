@@ -56,4 +56,3 @@ obj-$(CONFIG_CRASH_DUMP)	+= dump/
 ifneq (,$(findstring $(CONFIG_AUDIT),y m))
 obj-y				+= audit/
 endif
-obj-$(CONFIG_DPROBES)		+= dprobes/

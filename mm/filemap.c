@@ -28,8 +28,6 @@
 #include <linux/pagevec.h>
 #include <linux/blkdev.h>
 #include <linux/security.h>
-#include <linux/trigevent_hooks.h>
-
 /*
  * This is needed for the following functions:
  *  - try_to_release_page
@@ -471,7 +469,6 @@ int fastcall wait_on_page_bit_wq(struct page *page, int bit_nr, wait_queue_t *wa
 	if (!wait)
 		wait = &local_wait; /* default to a sync wait entry */
 
-	TRIG_EVENT(page_wait_start_hook, page);
 	do {
 		prepare_to_wait(waitqueue, wait, TASK_UNINTERRUPTIBLE);
 		if (test_bit(bit_nr, &page->flags)) {
@@ -488,7 +485,6 @@ int fastcall wait_on_page_bit_wq(struct page *page, int bit_nr, wait_queue_t *wa
 			io_schedule();
 		}
 	} while (test_bit(bit_nr, &page->flags));
-	TRIG_EVENT(page_wait_end_hook, page);
 	finish_wait(waitqueue, wait);
 
 	return 0;

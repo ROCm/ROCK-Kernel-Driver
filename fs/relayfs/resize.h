@@ -37,7 +37,7 @@ alloc_rchan_buf(unsigned long size,
 		struct page ***page_array,
 		int *page_count);
 
-extern int
+extern void
 free_rchan_buf(void *buf,
 	       struct page **page_array,
 	       int page_count);

@@ -26,7 +26,6 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -1073,7 +1072,6 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
 		}
 
 #ifdef CONFIG_SMP
-		TRIG_EVENT(timer_hook, regs);
 		update_process_times(user_mode(regs));
 #endif
 	}

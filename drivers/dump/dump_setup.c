@@ -118,7 +118,6 @@
 #include <linux/sysctl.h>
 #include <linux/nmi.h>
 #include <linux/init.h>
-#include <linux/ltt.h>
 
 #include <asm/hardirq.h>
 #include <asm/uaccess.h>
@@ -326,8 +325,6 @@ dump_execute(const char *panic_str, const struct pt_regs *regs)
 		return;
 	}
 
-	ltt_flight_pause();
-	
 	/* Bring system into the strictest level of quiescing for min drift 
 	 * dump drivers can soften this as required in dev->ops->silence() 
 	 */
@@ -345,8 +342,6 @@ dump_execute(const char *panic_str, const struct pt_regs *regs)
 		printk("Dump Complete; %d dump pages saved.\n", 
 		       dump_header.dh_num_dump_pages);
 	}
-	
-	ltt_flight_unpause();
 }
 
 /*

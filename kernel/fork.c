@@ -33,7 +33,6 @@
 #include <linux/mount.h>
 #include <linux/objrmap.h>
 #include <linux/audit.h>
-#include <linux/trigevent_hooks.h>
 
 #include <linux/ckrm.h>
 #include <linux/ckrm_tsk.h>
@@ -1238,8 +1237,6 @@ long do_fork(unsigned long clone_flags,
         	      audit_fork(current, p);
 #endif
 
-		/* Trace the event  */
-		TRIG_EVENT(fork_hook, clone_flags, p, pid);
 		if (!(clone_flags & CLONE_STOPPED)) {
 			/*
 			 * Do the wakeup last. On SMP we treat fork() and

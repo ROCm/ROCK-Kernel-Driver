@@ -38,7 +38,6 @@
 #include <linux/bio.h>
 #include <linux/notifier.h>
 #include <linux/cpu.h>
-#include <linux/trigevent_hooks.h>
 #include <asm/bitops.h>
 
 static void invalidate_bh_lrus(void);
@@ -131,7 +130,6 @@ void __wait_on_buffer(struct buffer_head * bh)
 			(!bh->b_page || !PageLocked(bh->b_page)))
 		buffer_error();
 
-	TRIG_EVENT(buf_wait_start_hook, bh);
 	do {
 		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
 		if (buffer_locked(bh)) {
@@ -143,7 +141,6 @@ void __wait_on_buffer(struct buffer_head * bh)
 			io_schedule();
 		}
 	} while (buffer_locked(bh));
-	TRIG_EVENT(buf_wait_end_hook, bh);
 	finish_wait(wqh, &wait);
 }
 

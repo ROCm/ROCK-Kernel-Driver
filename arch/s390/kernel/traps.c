@@ -5,7 +5,6 @@
  *    Copyright (C) 1999,2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Author(s): Martin Schwidefsky (schwidefsky@de.ibm.com),
  *               Denis Joseph Barrow (djbarrow@de.ibm.com,barrow_dj@yahoo.com),
- *  Portions added by T. Halloran: (C) Copyright 2002 IBM Poughkeepsie, IBM Corporation
  *
  *  Derived from "arch/i386/kernel/traps.c"
  *    Copyright (C) 1991, 1992 Linus Torvalds
@@ -30,7 +29,6 @@
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -272,17 +270,12 @@ void die(const char * str, struct pt_regs * regs, long err)
 static void inline do_trap(long interruption_code, int signr, char *str,
                            struct pt_regs *regs, siginfo_t *info)
 {
-	trapid_t ltt_interruption_code;
-	char * ic_ptr = (char *) &ltt_interruption_code;
 	/*
 	 * We got all needed information from the lowcore and can
 	 * now safely switch on interrupts.
 	 */
         if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
-	memset(&ltt_interruption_code,0,sizeof(ltt_interruption_code));
-	memcpy(ic_ptr+4,&interruption_code,sizeof(interruption_code));
-	TRIG_EVENT(trap_entry_hook, ltt_interruption_code, (regs->psw.addr & PSW_ADDR_INSN));
 
         if (regs->psw.mask & PSW_MASK_PSTATE) {
                 struct task_struct *tsk = current;
@@ -313,7 +306,6 @@ static void inline do_trap(long interruption_code, int signr, char *str,
                 else
                         die(str, regs, interruption_code);
         }
-	TRIG_EVENT(trap_exit_hook);
 }
 
 static inline void *get_check_address(struct pt_regs *regs)
@@ -323,11 +315,6 @@ static inline void *get_check_address(struct pt_regs *regs)
 
 int do_debugger_trap(struct pt_regs *regs)
 {
-	trapid_t ltt_interruption_code;
-	char * ic_ptr = (char *) &ltt_interruption_code;
-	memset(&ltt_interruption_code,0,sizeof(ltt_interruption_code));
-	memcpy(ic_ptr+6,&S390_lowcore.pgm_code,2); /* copy the interrupt code */
-
 	if ((regs->psw.mask & PSW_MASK_PSTATE) &&
 	    (current->ptrace & PT_PTRACED)) {
 		force_sig(SIGTRAP,current);
@@ -403,8 +390,6 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 {
         __u8 opcode[6];
 	__u16 *location;
-        trapid_t ltt_interruption_code;
-        char * ic_ptr = (char *) &ltt_interruption_code;
 	int signal = 0;
 
 	location = (__u16 *) get_check_address(regs);
@@ -416,9 +401,6 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
 
-	memset(&ltt_interruption_code,0,sizeof(ltt_interruption_code));
-	memcpy(ic_ptr+4,&interruption_code,sizeof(interruption_code));
-	TRIG_EVENT(trap_entry_hook, ltt_interruption_code, (regs->psw.addr & PSW_ADDR_INSN));
 	if (regs->psw.mask & PSW_MASK_PSTATE)
 		get_user(*((__u16 *) opcode), location);
 	else
@@ -459,7 +441,6 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
         else if (signal)
 		do_trap(interruption_code, signal,
 			"illegal operation", regs, NULL);
-        TRIG_EVENT(trap_exit_hook);
 }
 
 
@@ -469,8 +450,6 @@ specification_exception(struct pt_regs * regs, long interruption_code)
 {
         __u8 opcode[6];
 	__u16 *location = NULL;
-        trapid_t ltt_interruption_code;
-        char * ic_ptr = (char *) &ltt_interruption_code;
 	int signal = 0;
 
 	location = (__u16 *) get_check_address(regs);
@@ -482,9 +461,6 @@ specification_exception(struct pt_regs * regs, long interruption_code)
 	if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
 		
-	memset(&ltt_interruption_code,0,sizeof(ltt_interruption_code));
-	memcpy(ic_ptr+4,&interruption_code,sizeof(interruption_code));
-	TRIG_EVENT(trap_entry_hook, ltt_interruption_code, (regs->psw.addr & PSW_ADDR_INSN));
         if (regs->psw.mask & PSW_MASK_PSTATE) {
 		get_user(*((__u16 *) opcode), location);
 		switch (opcode[0]) {
@@ -528,7 +504,6 @@ specification_exception(struct pt_regs * regs, long interruption_code)
 		do_trap(interruption_code, signal, 
 			"specification exception", regs, &info);
 	}
-        TRIG_EVENT(trap_exit_hook);
 }
 #else
 DO_ERROR_INFO(SIGILL, "specification exception", specification_exception,
@@ -538,8 +513,6 @@ DO_ERROR_INFO(SIGILL, "specification exception", specification_exception,
 asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 {
 	__u16 *location;
-        trapid_t ltt_interruption_code;
-        char * ic_ptr = (char *) &ltt_interruption_code;
 	int signal = 0;
 
 	location = (__u16 *) get_check_address(regs);
@@ -551,9 +524,6 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
 
-	memset(&ltt_interruption_code,0,sizeof(ltt_interruption_code));
-	memcpy(ic_ptr+4,&interruption_code,sizeof(interruption_code));
-	TRIG_EVENT(trap_entry_hook, ltt_interruption_code, (regs->psw.addr & PSW_ADDR_INSN));
 	if (MACHINE_HAS_IEEE)
 		__asm__ volatile ("stfpc %0\n\t" 
 				  : "=m" (current->thread.fp_regs.fpc));
@@ -629,7 +599,6 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 		do_trap(interruption_code, signal, 
 			"data exception", regs, &info);
 	}
-        TRIG_EVENT(trap_exit_hook);
 }
 
 

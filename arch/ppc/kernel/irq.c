@@ -46,7 +46,6 @@
 #include <linux/random.h>
 #include <linux/seq_file.h>
 #include <linux/cpumask.h>
-#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -432,7 +431,6 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	struct irqaction *action;
 	irq_desc_t *desc = irq_desc + irq;
 
-	TRIG_EVENT(irq_entry_hook, irq, regs, !(user_mode(regs)));
 	kstat_this_cpu.irqs[irq]++;
 	spin_lock(&desc->lock);
 	ack_irq(irq);
@@ -510,7 +508,6 @@ out:
 			irq_desc[irq].handler->enable(irq);
 	}
 	spin_unlock(&desc->lock);
-	TRIG_EVENT(irq_exit_hook, irq, regs);
 }
 
 void do_IRQ(struct pt_regs *regs)
