@@ -419,4 +419,15 @@ config I2C_VOODOO3
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-voodoo3.
 
+config I2C_PCA_ISA
+	tristate "PCA9564 on an ISA bus"
+	depends on I2C
+	select I2C_ALGOPCA
+	help
+	  This driver supports ISA boards using the Philips PCA 9564
+	  Parallel bus to I2C bus controller
+	  
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-pca-isa.
+
 endmenu
