@@ -3673,19 +3673,18 @@ static int st_attach(Scsi_Device * SDp)
 	buffer = new_tape_buffer(TRUE, (SDp->host)->unchecked_isa_dma, i);
 	if (buffer == NULL) {
 		printk(KERN_ERR "st: Can't allocate new tape buffer. Device not attached.\n");
-		return 1;
+		goto out_slave_detach;
 	}
 
 	disk = alloc_disk(1);
 	if (!disk) {
 		printk(KERN_ERR "st: out of memory. Device not attached.\n");
-		return 1;
+		goto out_buffer_free;
 	}
 
 	write_lock(&st_dev_arr_lock);
 	if (st_nr_dev >= st_dev_max) {
 		Scsi_Tape **tmp_da;
-		ST_buffer **tmp_ba;
 		int tmp_dev_max;
 
 		tmp_dev_max = st_nr_dev + ST_DEV_ARR_LUMP;
@@ -3695,23 +3694,14 @@ static int st_attach(Scsi_Device * SDp)
 			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Too many tape devices (max. %d).\n",
 			       ST_MAX_TAPES);
-			put_disk(disk);
-			scsi_slave_detach(SDp);
-			return 1;
+			goto out_put_disk;
 		}
 
 		tmp_da = kmalloc(tmp_dev_max * sizeof(Scsi_Tape *), GFP_ATOMIC);
-		tmp_ba = kmalloc(tmp_dev_max * sizeof(ST_buffer *), GFP_ATOMIC);
-		if (tmp_da == NULL || tmp_ba == NULL) {
-			if (tmp_da != NULL)
-				kfree(tmp_da);
-			if (tmp_ba != NULL)
-				kfree(tmp_ba);
+		if (tmp_da == NULL) {
 			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Can't extend device array.\n");
-			put_disk(disk);
-			scsi_slave_detach(SDp);
-			return 1;
+			goto out_put_disk;
 		}
 
 		memset(tmp_da, 0, tmp_dev_max * sizeof(Scsi_Tape *));
@@ -3735,9 +3725,7 @@ static int st_attach(Scsi_Device * SDp)
 	if (tpnt == NULL) {
 		write_unlock(&st_dev_arr_lock);
 		printk(KERN_ERR "st: Can't allocate device descriptor.\n");
-		put_disk(disk);
-		scsi_slave_detach(SDp);
-		return 1;
+		goto out_put_disk;
 	}
 	memset(tpnt, 0, sizeof(Scsi_Tape));
 	tpnt->disk = disk;
@@ -3840,14 +3828,14 @@ static int st_attach(Scsi_Device * SDp)
 	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
 	    tpnt->driverfs_dev_r[mode].bus = &scsi_driverfs_bus_type;
 	    tpnt->driverfs_dev_r[mode].driver_data =
-			(void *)(long)__mkdev(MAJOR_NR, dev_num + (mode << 5));
+			(void *)(long)__mkdev(SCSI_TAPE_MAJOR, dev_num + (mode << 5));
 	    device_register(&tpnt->driverfs_dev_r[mode]);
 	    device_create_file(&tpnt->driverfs_dev_r[mode], 
 			       &dev_attr_type);
 	    device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
 	    tpnt->de_r[mode] =
 		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
-				MAJOR_NR, dev_num + (mode << 5),
+				SCSI_TAPE_MAJOR, dev_num + (mode << 5),
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				&st_fops, NULL);
 	    /*  No-rewind entry  */
@@ -3859,7 +3847,7 @@ static int st_attach(Scsi_Device * SDp)
 	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
 	    tpnt->driverfs_dev_n[mode].bus = &scsi_driverfs_bus_type;
 	    tpnt->driverfs_dev_n[mode].driver_data =
-			(void *)(long)__mkdev(MAJOR_NR, dev_num + (mode << 5) + 128);
+			(void *)(long)__mkdev(SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128);
 	    device_register(&tpnt->driverfs_dev_n[mode]);
 	    device_create_file(&tpnt->driverfs_dev_n[mode], 
 			       &dev_attr_type);
@@ -3867,7 +3855,7 @@ static int st_attach(Scsi_Device * SDp)
 			       &dev_attr_kdev);
 	    tpnt->de_n[mode] =
 		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
-				MAJOR_NR, dev_num + (mode << 5) + 128,
+				SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128,
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				&st_fops, NULL);
 	}
@@ -3880,6 +3868,14 @@ static int st_attach(Scsi_Device * SDp)
 	       tape_name(tpnt), tpnt->try_dio ? "yes" : "no", tpnt->max_pfn);
 
 	return 0;
+
+out_put_disk:
+	put_disk(disk);
+out_buffer_free:
+	kfree(buffer);
+out_slave_detach:
+	scsi_slave_detach(SDp);
+	return 1;
 };
 
 static void st_detach(Scsi_Device * SDp)
@@ -3891,20 +3887,15 @@ static void st_detach(Scsi_Device * SDp)
 	for (i = 0; i < st_dev_max; i++) {
 		tpnt = scsi_tapes[i];
 		if (tpnt != NULL && tpnt->device == SDp) {
-			tpnt->device = NULL;
+			scsi_tapes[i] = 0;
+			st_nr_dev--;
+			write_unlock(&st_dev_arr_lock);
+			devfs_unregister_tape(tpnt->disk->number);
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
 				devfs_unregister (tpnt->de_r[mode]);
 				tpnt->de_r[mode] = NULL;
 				devfs_unregister (tpnt->de_n[mode]);
 				tpnt->de_n[mode] = NULL;
-			}
-			devfs_unregister_tape(tpnt->disk->number);
-			scsi_tapes[i] = 0;
-			scsi_slave_detach(SDp);
-			st_nr_dev--;
-			write_unlock(&st_dev_arr_lock);
-
-			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
 						   &dev_attr_type);
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
@@ -3916,11 +3907,14 @@ static void st_detach(Scsi_Device * SDp)
 						   &dev_attr_kdev);
 				device_unregister(&tpnt->driverfs_dev_n[mode]);
 			}
+			tpnt->device = NULL;
+
 			if (tpnt->buffer) {
 				tpnt->buffer->orig_frp_segs = 0;
 				normalize_buffer(tpnt->buffer);
 				kfree(tpnt->buffer);
 			}
+			scsi_slave_detach(SDp);
 			put_disk(tpnt->disk);
 			kfree(tpnt);
 			return;
@@ -3944,9 +3938,10 @@ static int __init init_st(void)
 	if (register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0) {
 		if (scsi_register_device(&st_template) == 0)
 			return 0;
+		unregister_chrdev(SCSI_TAPE_MAJOR, "st");
 	}
 
-	printk(KERN_ERR "Unable to get major %d for SCSI tapes\n", MAJOR_NR);
+	printk(KERN_ERR "Unable to get major %d for SCSI tapes\n", SCSI_TAPE_MAJOR);
 	return 1;
 }
 
@@ -3959,8 +3954,9 @@ static void __exit exit_st(void)
 	if (scsi_tapes != NULL) {
 		for (i=0; i < st_dev_max; ++i)
 			if (scsi_tapes[i]) {
-				put_disk(scsi_tapes[i]->disk);
-				kfree(scsi_tapes[i]);
+				printk(KERN_WARNING "st: scsi_tapes[] not "
+				    "empty after scsi_unregister_device\n");
+				st_detach(scsi_tapes[i]->device);
 			}
 		kfree(scsi_tapes);
 	}
