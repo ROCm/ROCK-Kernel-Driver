@@ -432,7 +432,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 	if (prev->vm_end == addr &&
 			can_vma_merge_after(prev, vm_flags, file, pgoff)) {
 		struct vm_area_struct *next;
-		struct inode *inode = file ? file->f_dentry->d_inode : inode;
+		struct inode *inode = file ? file->f_dentry->d_inode : NULL;
 		int need_up = 0;
 
 		if (unlikely(file && prev->vm_next &&
