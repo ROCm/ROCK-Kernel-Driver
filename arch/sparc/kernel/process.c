@@ -186,18 +186,6 @@ void machine_power_off(void)
 	machine_halt();
 }
 
-void show_regwindow(struct reg_window *rw)
-{
-	printk("l0: %08lx l1: %08lx l2: %08lx l3: %08lx "
-	       "l4: %08lx l5: %08lx l6: %08lx l7: %08lx\n",
-	       rw->locals[0], rw->locals[1], rw->locals[2], rw->locals[3],
-	       rw->locals[4], rw->locals[5], rw->locals[6], rw->locals[7]);
-	printk("i0: %08lx i1: %08lx i2: %08lx i3: %08lx "
-	       "i4: %08lx i5: %08lx fp: %08lx i7: %08lx\n",
-	       rw->ins[0], rw->ins[1], rw->ins[2], rw->ins[3],
-	       rw->ins[4], rw->ins[5], rw->ins[6], rw->ins[7]);
-}
-
 static spinlock_t sparc_backtrace_lock = SPIN_LOCK_UNLOCKED;
 
 void __show_backtrace(unsigned long fp)
@@ -248,6 +236,7 @@ void smp_show_backtrace_all_cpus(void)
 }
 #endif
 
+#if 0
 void show_stackframe(struct sparc_stackf *sf)
 {
 	unsigned long size;
@@ -275,24 +264,27 @@ void show_stackframe(struct sparc_stackf *sf)
 		printk("s%d: %08lx\n", i++, *stk++);
 	} while ((size -= sizeof(unsigned long)));
 }
+#endif
 
-void show_regs(struct pt_regs * regs)
+void show_regs(struct pt_regs *r)
 {
-        printk("PSR: %08lx PC: %08lx NPC: %08lx Y: %08lx    %s\n", regs->psr,
-	       regs->pc, regs->npc, regs->y, print_tainted());
-	printk("g0: %08lx g1: %08lx g2: %08lx g3: %08lx ",
-	       regs->u_regs[0], regs->u_regs[1], regs->u_regs[2],
-	       regs->u_regs[3]);
-	printk("g4: %08lx g5: %08lx g6: %08lx g7: %08lx\n",
-	       regs->u_regs[4], regs->u_regs[5], regs->u_regs[6],
-	       regs->u_regs[7]);
-	printk("o0: %08lx o1: %08lx o2: %08lx o3: %08lx ",
-	       regs->u_regs[8], regs->u_regs[9], regs->u_regs[10],
-	       regs->u_regs[11]);
-	printk("o4: %08lx o5: %08lx sp: %08lx o7: %08lx\n",
-	       regs->u_regs[12], regs->u_regs[13], regs->u_regs[14],
-	       regs->u_regs[15]);
-	show_regwindow((struct reg_window *)regs->u_regs[14]);
+	struct reg_window *rw = (struct reg_window *) r->u_regs[14];
+
+        printk("PSR: %08lx PC: %08lx NPC: %08lx Y: %08lx    %s\n",
+	       r->psr, r->pc, r->npc, r->y, print_tainted());
+	printk("%%G: %08lx %08lx  %08lx %08lx  %08lx %08lx  %08lx %08lx\n",
+	       r->u_regs[0], r->u_regs[1], r->u_regs[2], r->u_regs[3],
+	       r->u_regs[4], r->u_regs[5], r->u_regs[6], r->u_regs[7]);
+	printk("%%O: %08lx %08lx  %08lx %08lx  %08lx %08lx  %08lx %08lx\n",
+	       r->u_regs[8], r->u_regs[9], r->u_regs[10], r->u_regs[11],
+	       r->u_regs[12], r->u_regs[13], r->u_regs[14], r->u_regs[15]);
+
+	printk("%%L: %08lx %08lx  %08lx %08lx  %08lx %08lx  %08lx %08lx\n",
+	       rw->locals[0], rw->locals[1], rw->locals[2], rw->locals[3],
+	       rw->locals[4], rw->locals[5], rw->locals[6], rw->locals[7]);
+	printk("%%I: %08lx %08lx  %08lx %08lx  %08lx %08lx  %08lx %08lx\n",
+	       rw->ins[0], rw->ins[1], rw->ins[2], rw->ins[3],
+	       rw->ins[4], rw->ins[5], rw->ins[6], rw->ins[7]);
 }
 
 void show_trace_task(struct task_struct *tsk)
