@@ -417,8 +417,8 @@ zap_pte_range(struct mmu_gather *tlb, pmd_t * pmd,
 				if (!PageReserved(page)) {
 					if (pte_dirty(pte))
 						set_page_dirty(page);
-					if (page->mapping && pte_young(pte) &&
-							!PageSwapCache(page))
+					if (pte_young(pte) &&
+							page_mapping(page))
 						mark_page_accessed(page);
 					tlb->freed++;
 					page_remove_rmap(page, ptep);

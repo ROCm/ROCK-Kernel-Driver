@@ -189,8 +189,11 @@ struct page {
 					 * protected by PG_chainlock */
 		pte_addr_t direct;
 	} pte;
-	unsigned long private;		/* mapping-private opaque data */
-
+	unsigned long private;		/* Mapping-private opaque data:
+					 * usually used for buffer_heads
+					 * if PagePrivate set; used for
+					 * swp_entry_t if PageSwapCache
+					 */
 	/*
 	 * On machines where all RAM is mapped into kernel address space,
 	 * we can simply calculate the virtual address. On machines with
@@ -403,6 +406,19 @@ void page_address_init(void);
 #endif
 
 /*
+ * On an anonymous page mapped into a user virtual memory area,
+ * page->mapping points to its anon_vma, not to a struct address_space.
+ *
+ * Please note that, confusingly, "page_mapping" refers to the inode
+ * address_space which maps the page from disk; whereas "page_mapped"
+ * refers to user virtual address space into which the page is mapped.
+ */
+static inline struct address_space *page_mapping(struct page *page)
+{
+	return PageAnon(page)? NULL: page->mapping;
+}
+
+/*
  * Return true if this page is mapped into pagetables.  Subtle: test pte.direct
  * rather than pte.chain.  Because sometimes pte.direct is 64-bit, and .chain
  * is only 32-bit.
@@ -471,6 +487,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
+int FASTCALL(set_page_dirty(struct page *page));
 int set_page_dirty_lock(struct page *page);
 int clear_page_dirty_for_io(struct page *page);
 
@@ -496,23 +513,6 @@ typedef int (*shrinker_t)(int nr_to_scan, unsigned int gfp_mask);
 struct shrinker;
 extern struct shrinker *set_shrinker(int, shrinker_t);
 extern void remove_shrinker(struct shrinker *shrinker);
-
-/*
- * If the mapping doesn't provide a set_page_dirty a_op, then
- * just fall through and assume that it wants buffer_heads.
- * FIXME: make the method unconditional.
- */
-static inline int set_page_dirty(struct page *page)
-{
-	if (page->mapping) {
-		int (*spd)(struct page *);
-
-		spd = page->mapping->a_ops->set_page_dirty;
-		if (spd)
-			return (*spd)(page);
-	}
-	return __set_page_dirty_buffers(page);
-}
 
 /*
  * On a two-level page table, this ends up being trivial. Thus the

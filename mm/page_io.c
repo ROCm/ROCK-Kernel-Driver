@@ -16,8 +16,6 @@
 #include <linux/swap.h>
 #include <linux/bio.h>
 #include <linux/swapops.h>
-#include <linux/buffer_head.h>	/* for block_sync_page() */
-#include <linux/mpage.h>
 #include <linux/writeback.h>
 #include <asm/pgtable.h>
 
@@ -32,7 +30,7 @@ get_swap_bio(int gfp_flags, struct page *page, bio_end_io_t end_io)
 		swp_entry_t entry;
 
 		BUG_ON(!PageSwapCache(page));
-		entry.val = page->index;
+		entry.val = page->private;
 		sis = get_swap_info_struct(swp_type(entry));
 
 		bio->bi_sector = map_swap_page(sis, swp_offset(entry)) *
@@ -132,13 +130,6 @@ out:
 	return ret;
 }
 
-struct address_space_operations swap_aops = {
-	.writepage	= swap_writepage,
-	.readpage	= swap_readpage,
-	.sync_page	= block_sync_page,
-	.set_page_dirty	= __set_page_dirty_nobuffers,
-};
-
 #if defined(CONFIG_SOFTWARE_SUSPEND) || defined(CONFIG_PM_DISK)
 
 /*
@@ -148,25 +139,15 @@ struct address_space_operations swap_aops = {
 int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 {
 	int ret;
+	unsigned long save_private;
 	struct writeback_control swap_wbc = {
 		.sync_mode = WB_SYNC_ALL,
 	};
 
 	lock_page(page);
-
-	BUG_ON(page->mapping);
-	ret = add_to_page_cache(page, &swapper_space,
-				entry.val, GFP_NOIO|__GFP_NOFAIL);
-	if (ret) {
-		unlock_page(page);
-		goto out;
-	}
-
-	/*
-	 * get one more reference to make page non-exclusive so
-	 * remove_exclusive_swap_page won't mess with it.
-	 */
-	page_cache_get(page);
+	SetPageSwapCache(page);
+	save_private = page->private;
+	page->private = entry.val;
 
 	if (rw == READ) {
 		ret = swap_readpage(NULL, page);
@@ -176,15 +157,10 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 		wait_on_page_writeback(page);
 	}
 
-	lock_page(page);
-	remove_from_page_cache(page);
-	unlock_page(page);
-	page_cache_release(page);
-	page_cache_release(page);	/* For add_to_page_cache() */
-
+	ClearPageSwapCache(page);
+	page->private = save_private;
 	if (ret == 0 && (!PageUptodate(page) || PageError(page)))
 		ret = -EIO;
-out:
 	return ret;
 }
 #endif

@@ -580,6 +580,24 @@ int __set_page_dirty_nobuffers(struct page *page)
 EXPORT_SYMBOL(__set_page_dirty_nobuffers);
 
 /*
+ * If the mapping doesn't provide a set_page_dirty a_op, then
+ * just fall through and assume that it wants buffer_heads.
+ */
+int fastcall set_page_dirty(struct page *page)
+{
+	struct address_space *mapping = page_mapping(page);
+	int (*spd)(struct page *);
+
+	if (!mapping) {
+		SetPageDirty(page);
+		return 0;
+	}
+	spd = mapping->a_ops->set_page_dirty;
+	return spd? (*spd)(page): __set_page_dirty_buffers(page);
+}
+EXPORT_SYMBOL(set_page_dirty);
+
+/*
  * set_page_dirty() is racy if the caller has no reference against
  * page->mapping->host, and if the page is unlocked.  This is because another
  * CPU could truncate the page off the mapping and then free the mapping.
@@ -606,7 +624,7 @@ EXPORT_SYMBOL(set_page_dirty_lock);
  */
 int test_clear_page_dirty(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 	unsigned long flags;
 
 	if (mapping) {
@@ -642,7 +660,7 @@ EXPORT_SYMBOL(test_clear_page_dirty);
  */
 int clear_page_dirty_for_io(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 
 	if (mapping) {
 		if (TestClearPageDirty(page)) {
@@ -661,7 +679,7 @@ EXPORT_SYMBOL(clear_page_dirty_for_io);
  */
 int __clear_page_dirty(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 
 	if (mapping) {
 		unsigned long flags;
@@ -681,7 +699,7 @@ int __clear_page_dirty(struct page *page)
 
 int test_clear_page_writeback(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 	int ret;
 
 	if (mapping) {
@@ -701,7 +719,7 @@ int test_clear_page_writeback(struct page *page)
 
 int test_set_page_writeback(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
 	int ret;
 
 	if (mapping) {

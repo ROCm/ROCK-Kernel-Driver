@@ -176,19 +176,19 @@ static int shrink_slab(unsigned long scanned, unsigned int gfp_mask)
 /* Must be called with page's rmap lock held. */
 static inline int page_mapping_inuse(struct page *page)
 {
-	struct address_space *mapping = page->mapping;
+	struct address_space *mapping;
 
 	/* Page is in somebody's page tables. */
 	if (page_mapped(page))
 		return 1;
 
-	/* XXX: does this happen ? */
-	if (!mapping)
-		return 0;
-
 	/* Be more reluctant to reclaim swapcache than pagecache */
 	if (PageSwapCache(page))
 		return 1;
+
+	mapping = page_mapping(page);
+	if (!mapping)
+		return 0;
 
 	/* File is mmap'd by somebody. */
 	if (!list_empty(&mapping->i_mmap))
@@ -233,7 +233,7 @@ static void handle_write_error(struct address_space *mapping,
 				struct page *page, int error)
 {
 	lock_page(page);
-	if (page->mapping == mapping) {
+	if (page_mapping(page) == mapping) {
 		if (error == -ENOSPC)
 			set_bit(AS_ENOSPC, &mapping->flags);
 		else
@@ -286,26 +286,27 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			goto activate_locked;
 		}
 
-		mapping = page->mapping;
+		mapping = page_mapping(page);
+		may_enter_fs = (gfp_mask & __GFP_FS);
 
 #ifdef CONFIG_SWAP
 		/*
-		 * Anonymous process memory without backing store. Try to
-		 * allocate it some swap space here.
+		 * Anonymous process memory has backing store?
+		 * Try to allocate it some swap space here.
 		 *
 		 * XXX: implement swap clustering ?
 		 */
-		if (page_mapped(page) && !mapping && !PagePrivate(page)) {
+		if (PageAnon(page) && !PageSwapCache(page)) {
 			rmap_unlock(page);
 			if (!add_to_swap(page))
 				goto activate_locked;
 			rmap_lock(page);
-			mapping = page->mapping;
+		}
+		if (PageSwapCache(page)) {
+			mapping = &swapper_space;
+			may_enter_fs = (gfp_mask & __GFP_IO);
 		}
 #endif /* CONFIG_SWAP */
-
-		may_enter_fs = (gfp_mask & __GFP_FS) ||
-				(PageSwapCache(page) && (gfp_mask & __GFP_IO));
 
 		/*
 		 * The page is mapped into the page tables of one or more
@@ -427,7 +428,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 
 #ifdef CONFIG_SWAP
 		if (PageSwapCache(page)) {
-			swp_entry_t swap = { .val = page->index };
+			swp_entry_t swap = { .val = page->private };
 			__delete_from_swap_cache(page);
 			spin_unlock_irq(&mapping->tree_lock);
 			swap_free(swap);
@@ -669,8 +670,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 		 * FIXME: need to consider page_count(page) here if/when we
 		 * reap orphaned pages via the LRU (Daniel's locking stuff)
 		 */
-		if (total_swap_pages == 0 && !page->mapping &&
-						!PagePrivate(page)) {
+		if (total_swap_pages == 0 && PageAnon(page)) {
 			list_add(&page->lru, &l_active);
 			continue;
 		}

@@ -304,16 +304,16 @@ static int exclusive_swap_page(struct page *page)
 	struct swap_info_struct * p;
 	swp_entry_t entry;
 
-	entry.val = page->index;
+	entry.val = page->private;
 	p = swap_info_get(entry);
 	if (p) {
 		/* Is the only swap cache user the cache itself? */
 		if (p->swap_map[swp_offset(entry)] == 1) {
-			/* Recheck the page count with the pagecache lock held.. */
-			spin_lock_irq(&swapper_space.tree_lock);
-			if (page_count(page) - !!PagePrivate(page) == 2)
+			/* Recheck the page count with the swapcache lock held.. */
+			spin_lock(&swapper_space.tree_lock);
+			if (page_count(page) == 2)
 				retval = 1;
-			spin_unlock_irq(&swapper_space.tree_lock);
+			spin_unlock(&swapper_space.tree_lock);
 		}
 		swap_info_put(p);
 	}
@@ -372,7 +372,7 @@ int remove_exclusive_swap_page(struct page *page)
 	if (page_count(page) != 2) /* 2: us + cache */
 		return 0;
 
-	entry.val = page->index;
+	entry.val = page->private;
 	p = swap_info_get(entry);
 	if (!p)
 		return 0;
@@ -380,14 +380,14 @@ int remove_exclusive_swap_page(struct page *page)
 	/* Is the only swap cache user the cache itself? */
 	retval = 0;
 	if (p->swap_map[swp_offset(entry)] == 1) {
-		/* Recheck the page count with the pagecache lock held.. */
-		spin_lock_irq(&swapper_space.tree_lock);
+		/* Recheck the page count with the swapcache lock held.. */
+		spin_lock(&swapper_space.tree_lock);
 		if ((page_count(page) == 2) && !PageWriteback(page)) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
 		}
-		spin_unlock_irq(&swapper_space.tree_lock);
+		spin_unlock(&swapper_space.tree_lock);
 	}
 	swap_info_put(p);
 
@@ -410,8 +410,14 @@ void free_swap_and_cache(swp_entry_t entry)
 
 	p = swap_info_get(entry);
 	if (p) {
-		if (swap_entry_free(p, swp_offset(entry)) == 1)
-			page = find_trylock_page(&swapper_space, entry.val);
+		if (swap_entry_free(p, swp_offset(entry)) == 1) {
+			spin_lock(&swapper_space.tree_lock);
+			page = radix_tree_lookup(&swapper_space.page_tree,
+				entry.val);
+			if (page && TestSetPageLocked(page))
+				page = NULL;
+			spin_unlock(&swapper_space.tree_lock);
+		}
 		swap_info_put(p);
 	}
 	if (page) {
@@ -1053,14 +1059,14 @@ int page_queue_congested(struct page *page)
 
 	BUG_ON(!PageLocked(page));	/* It pins the swap_info_struct */
 
-	bdi = page->mapping->backing_dev_info;
 	if (PageSwapCache(page)) {
-		swp_entry_t entry = { .val = page->index };
+		swp_entry_t entry = { .val = page->private };
 		struct swap_info_struct *sis;
 
 		sis = get_swap_info_struct(swp_type(entry));
 		bdi = sis->bdev->bd_inode->i_mapping->backing_dev_info;
-	}
+	} else
+		bdi = page->mapping->backing_dev_info;
 	return bdi_write_congested(bdi);
 }
 #endif

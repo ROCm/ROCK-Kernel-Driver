@@ -35,7 +35,18 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
-/* #define DEBUG_RMAP */
+/*
+ * Something oopsable to put for now in the page->mapping
+ * of an anonymous page, to test that it is ignored.
+ */
+#define ANON_MAPPING_DEBUG	((struct address_space *) 0xADB)
+
+static inline void clear_page_anon(struct page *page)
+{
+	BUG_ON(page->mapping != ANON_MAPPING_DEBUG);
+	page->mapping = NULL;
+	ClearPageAnon(page);
+}
 
 /*
  * Shared pages have a chain of pte_chain structures, used to locate
@@ -180,6 +191,10 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 	if (page->pte.direct == 0) {
 		page->pte.direct = pte_paddr;
 		SetPageDirect(page);
+		if (!page->mapping) {
+			SetPageAnon(page);
+			page->mapping = ANON_MAPPING_DEBUG;
+		}
 		inc_page_state(nr_mapped);
 		goto out;
 	}
@@ -271,10 +286,13 @@ void fastcall page_remove_rmap(struct page *page, pte_t *ptep)
 		}
 	}
 out:
-	if (page->pte.direct == 0 && page_test_and_clear_dirty(page))
-		set_page_dirty(page);
-	if (!page_mapped(page))
+	if (!page_mapped(page)) {
+		if (page_test_and_clear_dirty(page))
+			set_page_dirty(page);
+		if (PageAnon(page))
+			clear_page_anon(page);
 		dec_page_state(nr_mapped);
+	}
 out_unlock:
 	rmap_unlock(page);
 }
@@ -330,12 +348,13 @@ static int fastcall try_to_unmap_one(struct page * page, pte_addr_t paddr)
 	flush_cache_page(vma, address);
 	pte = ptep_clear_flush(vma, address, ptep);
 
-	if (PageSwapCache(page)) {
+	if (PageAnon(page)) {
+		swp_entry_t entry = { .val = page->private };
 		/*
 		 * Store the swap location in the pte.
 		 * See handle_pte_fault() ...
 		 */
-		swp_entry_t entry = { .val = page->index };
+		BUG_ON(!PageSwapCache(page));
 		swap_duplicate(entry);
 		set_pte(ptep, swp_entry_to_pte(entry));
 		BUG_ON(pte_file(*ptep));
@@ -345,6 +364,7 @@ static int fastcall try_to_unmap_one(struct page * page, pte_addr_t paddr)
 		 * If a nonlinear mapping then store the file page offset
 		 * in the pte.
 		 */
+		BUG_ON(!page->mapping);
 		pgidx = (address - vma->vm_start) >> PAGE_SHIFT;
 		pgidx += vma->vm_pgoff;
 		pgidx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
@@ -391,20 +411,15 @@ int fastcall try_to_unmap(struct page * page)
 		BUG();
 	if (!PageLocked(page))
 		BUG();
-	/* We need backing store to swap out a page. */
-	if (!page->mapping)
-		BUG();
 
 	if (PageDirect(page)) {
 		ret = try_to_unmap_one(page, page->pte.direct);
 		if (ret == SWAP_SUCCESS) {
-			if (page_test_and_clear_dirty(page))
-				set_page_dirty(page);
 			page->pte.direct = 0;
 			ClearPageDirect(page);
 		}
 		goto out;
-	}		
+	}
 
 	start = page->pte.chain;
 	victim_i = pte_chain_idx(start);
@@ -436,9 +451,6 @@ int fastcall try_to_unmap(struct page * page)
 				} else {
 					start->next_and_idx++;
 				}
-				if (page->pte.direct == 0 &&
-				    page_test_and_clear_dirty(page))
-					set_page_dirty(page);
 				break;
 			case SWAP_AGAIN:
 				/* Skip this pte, remembering status. */
@@ -451,8 +463,14 @@ int fastcall try_to_unmap(struct page * page)
 		}
 	}
 out:
-	if (!page_mapped(page))
+	if (!page_mapped(page)) {
+		if (page_test_and_clear_dirty(page))
+			set_page_dirty(page);
+		if (PageAnon(page))
+			clear_page_anon(page);
 		dec_page_state(nr_mapped);
+		ret = SWAP_SUCCESS;
+	}
 	return ret;
 }
 

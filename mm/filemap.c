@@ -122,9 +122,13 @@ static inline int sync_page(struct page *page)
 	struct address_space *mapping;
 
 	smp_mb();
-	mapping = page->mapping;
-	if (mapping && mapping->a_ops && mapping->a_ops->sync_page)
-		return mapping->a_ops->sync_page(page);
+	mapping = page_mapping(page);
+	if (mapping) {
+		if (mapping->a_ops && mapping->a_ops->sync_page)
+			return mapping->a_ops->sync_page(page);
+	} else if (PageSwapCache(page)) {
+		swap_unplug_io_fn(NULL);
+	}
 	return 0;
 }
 
@@ -242,13 +246,9 @@ int filemap_write_and_wait(struct address_space *mapping)
  * This function is used for two things: adding newly allocated pagecache
  * pages and for moving existing anon pages into swapcache.
  *
- * In the case of pagecache pages, the page is new, so we can just run
- * SetPageLocked() against it.  The other page state flags were set by
- * rmqueue()
- *
- * In the case of swapcache, try_to_swap_out() has already locked the page, so
- * SetPageLocked() is ugly-but-OK there too.  The required page state has been
- * set up by swap_out_add_to_swap_cache().
+ * This function is used to add newly allocated pagecache pages:
+ * the page is new, so we can just run SetPageLocked() against it.
+ * The other page state flags were set by rmqueue().
  *
  * This function does not add the page to the LRU.  The caller must do that.
  */
@@ -263,7 +263,10 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 		error = radix_tree_insert(&mapping->page_tree, offset, page);
 		if (!error) {
 			SetPageLocked(page);
-			___add_to_page_cache(page, mapping, offset);
+			page->mapping = mapping;
+			page->index = offset;
+			mapping->nrpages++;
+			pagecache_acct(1);
 		} else {
 			page_cache_release(page);
 		}
