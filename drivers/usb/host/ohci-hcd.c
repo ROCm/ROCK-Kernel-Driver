@@ -679,7 +679,7 @@ static int ohci_run (struct ohci_hcd *ohci)
 static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-	struct ohci_regs	*regs = ohci->regs;
+	struct ohci_regs __iomem *regs = ohci->regs;
  	int			ints; 
 
 	/* we can eliminate a (slow) ohci_readl()

@@ -342,7 +342,7 @@ struct ohci_hcd {
 	/*
 	 * I/O memory used to communicate with the HC (dma-consistent)
 	 */
-	struct ohci_regs	*regs;
+	struct ohci_regs __iomem *regs;
 
 	/*
 	 * main memory used to communicate with the HC (dma-consistent).
@@ -452,7 +452,7 @@ static inline unsigned int ohci_readl (void* regs)
 #else
 	/* Standard version of ohci_readl uses standard, platform
 	 * specific implementation. */
-static inline unsigned int ohci_readl (void* regs)
+static inline unsigned int ohci_readl (void __iomem * regs)
 {
 	return readl (regs);
 }

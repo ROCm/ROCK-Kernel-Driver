@@ -131,7 +131,7 @@ static char *hcfs2string (int state)
 static void
 ohci_dump_status (struct ohci_hcd *controller, char **next, unsigned *size)
 {
-	struct ohci_regs	*regs = controller->regs;
+	struct ohci_regs __iomem *regs = controller->regs;
 	u32			temp;
 
 	temp = ohci_readl (&regs->revision) & 0xff;
@@ -599,7 +599,7 @@ show_registers (struct class_device *class_dev, char *buf)
 	struct usb_bus		*bus;
 	struct usb_hcd		*hcd;
 	struct ohci_hcd		*ohci;
-	struct ohci_regs	*regs;
+	struct ohci_regs __iomem *regs;
 	unsigned long		flags;
 	unsigned		temp, size;
 	char			*next;
