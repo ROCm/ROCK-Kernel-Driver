@@ -815,6 +815,7 @@ static int __init ebda_rsrc_controller (void)
 	struct ebda_hpc_slot *slot_ptr;
 	struct bus_info *bus_info_ptr1, *bus_info_ptr2;
 	int rc;
+	int retval;
 	struct slot *slot_cur;
 	struct list_head *list;
 
@@ -933,6 +934,10 @@ static int __init ebda_rsrc_controller (void)
 			case 0:
 				hpc_ptr->u.isa_ctlr.io_start = readw (io_mem + addr);
 				hpc_ptr->u.isa_ctlr.io_end = readw (io_mem + addr + 2);
+				retval = check_region (hpc_ptr->u.isa_ctlr.io_start, (hpc_ptr->u.isa_ctlr.io_end - hpc_ptr->u.isa_ctlr.io_start + 1));
+				if (retval)
+					return -ENODEV;
+				request_region (hpc_ptr->u.isa_ctlr.io_start, (hpc_ptr->u.isa_ctlr.io_end - hpc_ptr->u.isa_ctlr.io_start + 1), "ibmphp");
 				hpc_ptr->irq = readb (io_mem + addr + 4);
 				addr += 5;
 				break;
@@ -949,9 +954,9 @@ static int __init ebda_rsrc_controller (void)
 				return -ENODEV;
 		}
 
-		/* following 3 line: Now our driver only supports I2c ctlrType */
-		if ((hpc_ptr->ctlr_type != 2) && (hpc_ptr->ctlr_type != 4)) {
-			err ("Please run this driver on ibm xseries440\n ");
+		/* following 3 line: Now our driver only supports I2c/ISA ctlrType */
+		if ((hpc_ptr->ctlr_type != 2) && (hpc_ptr->ctlr_type != 4) && (hpc_ptr->ctlr_type != 0)) {
+			err ("Please run this driver on IBM xSeries440 or xSeries 235\n ");
 			return -ENODEV;
 		}
 
@@ -1211,6 +1216,8 @@ void ibmphp_free_ebda_hpc_queue (void)
 
 	list_for_each_safe (list, next, &ebda_hpc_head) {
 		controller = list_entry (list, struct controller, ebda_hpc_list);
+		if (controller->ctlr_type == 0)
+			release_region (controller->u.isa_ctlr.io_start, (controller->u.isa_ctlr.io_end - controller->u.isa_ctlr.io_start + 1));
 		free_ebda_hpc (controller);
 	}
 }

@@ -351,10 +351,41 @@ static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, 
 	return (rc);
 }
 
+//------------------------------------------------------------
+//  Read from ISA type HPC 
+//------------------------------------------------------------
+static u8 isa_ctrl_read (struct controller *ctlr_ptr, u8 offset)
+{
+	u16 start_address;
+	u16 end_address;
+	u8 data;
+
+	start_address = ctlr_ptr->u.isa_ctlr.io_start;
+	end_address = ctlr_ptr->u.isa_ctlr.io_end;
+	data = inb (start_address + offset);
+	return data;
+}
+
+//--------------------------------------------------------------
+// Write to ISA type HPC
+//--------------------------------------------------------------
+static void isa_ctrl_write (struct controller *ctlr_ptr, u8 offset, u8 data)
+{
+	u16 start_address;
+	u16 port_address;
+	
+	start_address = ctlr_ptr->u.isa_ctlr.io_start;
+	port_address = start_address + (u16) offset;
+	outb (data, port_address);
+}
+
 static u8 ctrl_read (struct controller *ctlr, void *base, u8 offset)
 {
 	u8 rc;
 	switch (ctlr->ctlr_type) {
+	case 0:
+		rc = isa_ctrl_read (ctlr, offset);
+		break;
 	case 2:
 	case 4:
 		rc = i2c_ctrl_read (ctlr, base, offset);
@@ -369,6 +400,9 @@ static u8 ctrl_write (struct controller *ctlr, void *base, u8 offset, u8 data)
 {
 	u8 rc = 0;
 	switch (ctlr->ctlr_type) {
+	case 0:
+		isa_ctrl_write(ctlr, offset, data);
+		break;
 	case 2:
 	case 4:
 		rc = i2c_ctrl_write(ctlr, base, offset, data);
