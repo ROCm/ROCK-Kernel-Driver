@@ -27,6 +27,25 @@
 #ifndef _LINUX_TOPOLOGY_H
 #define _LINUX_TOPOLOGY_H
 
+#include <linux/bitops.h>
+#include <linux/mmzone.h>
+#include <linux/smp.h>
+
 #include <asm/topology.h>
+
+#ifndef nr_cpus_node
+#define nr_cpus_node(node)	(hweight_long(node_to_cpumask(node)))
+#endif
+
+static inline int __next_node_with_cpus(int node)
+{
+	do
+		++node;
+	while (node < numnodes && !nr_cpus_node(node));
+	return node;
+}
+
+#define for_each_node_with_cpus(node) \
+	for (node = 0; node < numnodes; node = __next_node_with_cpus(node))
 
 #endif /* _LINUX_TOPOLOGY_H */
