@@ -83,7 +83,7 @@ MODULE_PARM_DESC(debug,
 
 /*****************************************************************************/
 
-typedef char sn9c102_sof_header_t[7];
+typedef char sn9c102_sof_header_t[12];
 typedef char sn9c102_eof_header_t[4];
 
 static sn9c102_sof_header_t sn9c102_sof_header[] = {
@@ -91,8 +91,6 @@ static sn9c102_sof_header_t sn9c102_sof_header[] = {
 	{0xff, 0xff, 0x00, 0xc4, 0xc4, 0x96, 0x01},
 };
 
-/* Number of random bytes that complete the SOF above headers */
-#define SN9C102_SOFLEN 5
 
 static sn9c102_eof_header_t sn9c102_eof_header[] = {
 	{0x00, 0x00, 0x00, 0x00},
@@ -236,9 +234,6 @@ int sn9c102_write_reg(struct sn9c102_device* cam, u8 value, u16 index)
 	struct usb_device* udev = cam->usbdev;
 	u8* buff = cam->control_buffer;
 	int res;
-
-	if (index == 0x18)
-		value = (value & 0xcf) | (cam->reg[0x18] & 0x30);
 
 	*buff = value;
 
@@ -443,14 +438,15 @@ int sn9c102_i2c_write(struct sn9c102_device* cam, u8 address, u8 value)
 
 static void* sn9c102_find_sof_header(void* mem, size_t len)
 {
-	size_t soflen=sizeof(sn9c102_sof_header_t), SOFLEN=SN9C102_SOFLEN, i;
+	size_t soflen = sizeof(sn9c102_sof_header_t), i;
 	u8 j, n = sizeof(sn9c102_sof_header) / soflen;
 
-	for (i = 0; (len >= soflen+SOFLEN) && (i <= len-soflen-SOFLEN); i++)
+	for (i = 0; (len >= soflen) && (i <= len - soflen); i++)
 		for (j = 0; j < n; j++)
-			if (!memcmp(mem + i, sn9c102_sof_header[j], soflen))
+			/* It's enough to compare 7 bytes */
+			if (!memcmp(mem + i, sn9c102_sof_header[j], 7))
 				/* Skips the header */
-				return mem + i + soflen + SOFLEN;
+				return mem + i + soflen;
 
 	return NULL;
 }
@@ -517,10 +513,12 @@ static void sn9c102_urb_complete(struct urb *urb, struct pt_regs* regs)
 
 		PDBGG("Isochrnous frame: length %u, #%u i", len, i)
 
-		/* NOTE: It is probably correct to assume that SOF and EOF
+		/*
+		   NOTE: It is probably correct to assume that SOF and EOF
 		         headers do not occur between two consecutive packets,
 		         but who knows..Whatever is the truth, this assumption
-		         doesn't introduce bugs. */
+		         doesn't introduce bugs.
+		*/
 
 redo:
 		sof = sn9c102_find_sof_header(pos, len);
@@ -764,9 +762,11 @@ static u8 sn9c102_strtou8(const char* buff, size_t len, ssize_t* count)
 	return (u8)val;
 }
 
-/* NOTE 1: being inside one of the following methods implies that the v4l
+/*
+   NOTE 1: being inside one of the following methods implies that the v4l
            device exists for sure (see kobjects and reference counters)
-   NOTE 2: buffers are PAGE_SIZE long */
+   NOTE 2: buffers are PAGE_SIZE long
+*/
 
 static ssize_t sn9c102_show_reg(struct class_device* cd, char* buf)
 {
@@ -1019,24 +1019,6 @@ sn9c102_store_i2c_val(struct class_device* cd, const char* buf, size_t len)
 
 
 static ssize_t
-sn9c102_store_redblue(struct class_device* cd, const char* buf, size_t len)
-{
-	ssize_t res = 0;
-	u8 value;
-	ssize_t count;
-
-	value = sn9c102_strtou8(buf, len, &count);
-	if (!count)
-		return -EINVAL;
-
-	if ((res = sn9c102_store_reg(cd, "0x10", 4)) >= 0)
-		res = sn9c102_store_val(cd, buf, len);
-
-	return res;
-}
-
-
-static ssize_t
 sn9c102_store_green(struct class_device* cd, const char* buf, size_t len)
 {
 	ssize_t res = 0;
@@ -1062,7 +1044,6 @@ static CLASS_DEVICE_ATTR(i2c_reg, S_IRUGO | S_IWUSR,
                          sn9c102_show_i2c_reg, sn9c102_store_i2c_reg);
 static CLASS_DEVICE_ATTR(i2c_val, S_IRUGO | S_IWUSR,
                          sn9c102_show_i2c_val, sn9c102_store_i2c_val);
-static CLASS_DEVICE_ATTR(redblue, S_IWUGO, NULL, sn9c102_store_redblue);
 static CLASS_DEVICE_ATTR(green, S_IWUGO, NULL, sn9c102_store_green);
 
 
@@ -1072,7 +1053,6 @@ static void sn9c102_create_sysfs(struct sn9c102_device* cam)
 
 	video_device_create_file(v4ldev, &class_device_attr_reg);
 	video_device_create_file(v4ldev, &class_device_attr_val);
-	video_device_create_file(v4ldev, &class_device_attr_redblue);
 	video_device_create_file(v4ldev, &class_device_attr_green);
 	if (cam->sensor->slave_write_id && cam->sensor->slave_read_id) {
 		video_device_create_file(v4ldev, &class_device_attr_i2c_reg);
@@ -1118,10 +1098,6 @@ static int sn9c102_set_crop(struct sn9c102_device* cam, struct v4l2_rect* rect)
 	   ae_endy = v_size / 2;
 	int err = 0;
 
-	/* These are a sort of stroboscopic signal for some sensors */
-	err += sn9c102_write_reg(cam, h_size, 0x1a);
-	err += sn9c102_write_reg(cam, v_size, 0x1b);
-
 	err += sn9c102_write_reg(cam, h_start, 0x12);
 	err += sn9c102_write_reg(cam, v_start, 0x13);
 	err += sn9c102_write_reg(cam, h_size, 0x15);
@@ -1134,8 +1110,7 @@ static int sn9c102_set_crop(struct sn9c102_device* cam, struct v4l2_rect* rect)
 		return -EIO;
 
 	PDBGG("h_start, v_start, h_size, v_size, ho_size, vo_size "
-	      "%u %u %u %u %u %u", h_start, v_start, h_size, v_size, ho_size,
-	      vo_size)
+	      "%u %u %u %u", h_start, v_start, h_size, v_size)
 
 	return 0;
 }
@@ -1229,7 +1204,10 @@ static int sn9c102_open(struct inode* inode, struct file* filp)
 	struct sn9c102_device* cam;
 	int err = 0;
 
-	/* This the only safe way to prevent race conditions with disconnect */
+	/*
+	   This is the only safe way to prevent race conditions with
+	   disconnect
+	*/
 	if (!down_read_trylock(&sn9c102_disconnect))
 		return -ERESTARTSYS;
 
@@ -1727,6 +1705,10 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 				return -EINVAL;
 			}
 
+		/* Preserve R,G or B origin */
+		rect->left &= ~1L;
+		rect->top &= ~1L;
+
 		if (rect->width < 16)
 			rect->width = 16;
 		if (rect->height < 16)
@@ -1747,12 +1729,12 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		rect->width &= ~15L;
 		rect->height &= ~15L;
 
-		{ /* calculate the scaling factor */
+		{ /* calculate the actual scaling factor */
 			u32 a, b;
 			a = rect->width * rect->height;
 			b = pix_format->width * pix_format->height;
-			scale = b ? (u8)((a / b) <= 1 ? 1 : ((a / b) == 3 ? 2 :
-			            ((a / b) > 4 ? 4 : (a / b)))) : 1;
+			scale = b ? (u8)((a / b) < 4 ? 1 :
+		                        ((a / b) < 16 ? 2 : 4)) : 1;
 		}
 
 		if (cam->stream == STREAM_ON) {
@@ -1879,12 +1861,12 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 
 		memcpy(&rect, &(s->_rect), sizeof(rect));
 
-		{ /* calculate the scaling factor */
+		{ /* calculate the actual scaling factor */
 			u32 a, b;
 			a = rect.width * rect.height;
 			b = pix->width * pix->height;
-			scale = b ? (u8)((a / b) <= 1 ? 1 : ((a / b) == 3 ? 2 :
-			            ((a / b) > 4 ? 4 : (a / b)))) : 1;
+			scale = b ? (u8)((a / b) < 4 ? 1 :
+		                        ((a / b) < 16 ? 2 : 4)) : 1;
 		}
 
 		rect.width = scale * pix->width;
@@ -1895,12 +1877,20 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		if (rect.height < 16)
 			rect.height = 16;
 		if (rect.width > bounds->left + bounds->width - rect.left)
-			rect.width = bounds->left+bounds->width - rect.left;
+			rect.width = bounds->left + bounds->width - rect.left;
 		if (rect.height > bounds->top + bounds->height - rect.top)
 			rect.height = bounds->top + bounds->height - rect.top;
 
 		rect.width &= ~15L;
 		rect.height &= ~15L;
+
+		{ /* adjust the scaling factor */
+			u32 a, b;
+			a = rect.width * rect.height;
+			b = pix->width * pix->height;
+			scale = b ? (u8)((a / b) < 4 ? 1 :
+		                        ((a / b) < 16 ? 2 : 4)) : 1;
+		}
 
 		pix->width = rect.width / scale;
 		pix->height = rect.height / scale;
