@@ -3,10 +3,6 @@
 # Licensed under the GPL
 #
 
-O_TARGET := drivers.o
-
-list-multi := tuntap.o ethertap.o
-
 ethertap-objs := ethertap_kern.o ethertap_user.o
 tuntap-objs := tuntap_kern.o tuntap_user.o
 
@@ -22,10 +18,3 @@ include $(TOPDIR)/Rules.make
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<
-
-ethertap.o : $(ethertap-objs)
-
-tuntap.o : $(tuntap-objs)
-
-$(list-multi) : # This doesn't work, but should : '%.o : $(%-objs)'
-	$(LD) $(LD_RFLAG) -r -o $@ $($(patsubst %.o,%,$@)-objs)

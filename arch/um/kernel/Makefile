@@ -1,4 +1,5 @@
-O_TARGET = um.o
+
+EXTRA_TARGETS	:= unmap_fin.o
 
 obj-y = config.o exec_kern.o exec_user.o exitcode.o frame_kern.o frame.o \
 	helper.o init_task.o irq.o irq_user.o ksyms.o mem.o mem_user.o \
@@ -8,17 +9,16 @@ obj-y = config.o exec_kern.o exec_user.o exitcode.o frame_kern.o frame.o \
 	time_kern.o tlb.o trap_kern.o trap_user.o uaccess_user.o um_arch.o \
 	umid.o user_util.o
 
-ifeq ($(CONFIG_BLK_DEV_INITRD), y)
-  obj-y += initrd_kern.o initrd_user.o
+obj-$(CONFIG_BLK_DEV_INITRD) += initrd_kern.o initrd_user.o
 endif
 
 # user_syms.o not included here because Rules.make has its own ideas about
 # building anything in export-objs
 
 USER_OBJS = $(filter %_user.o,$(obj-y)) config.o process.o time.o umid.o \
-	user_util.o user_syms.o helper.o
+	user_util.o user_syms.o helper.o tty_log.o
 
-export-objs := ksyms.o process_kern.o signal_kern.o
+export-objs := ksyms.o process_kern.o signal_kern.o gprof_syms.o gmon_syms.o
 
 UNMAP_CFLAGS := $(patsubst -pg -DPROFILING,,$(USER_CFLAGS))
 UNMAP_CFLAGS := $(patsubst -fprofile-arcs -ftest-coverage,,$(UNMAP_CFLAGS))
@@ -31,21 +31,9 @@ ifeq ($(CONFIG_MODVERSIONS), y)
   DMODVERSIONS = -D__CONFIG_MODVERSIONS__
 endif
 
-ifeq ($(CONFIG_GPROF), y)
-    obj-y += gprof_syms.o
-    export-objs += gprof_syms.o
-endif
-
-ifeq ($(CONFIG_GCOV), y)
-    obj-y += gmon_syms.o
-    export-objs += gmon_syms.o
-endif
-
-ifeq ($(CONFIG_TTY_LOG), y)
-    obj-y += tty_log.o
-    USER_OBJS += tty_log.o
-endif
-
+obj-$(CONFIG_GPROF)	+= gprof_syms.o
+obj-$(CONFIG_GCOV)	+= gmon_syms.o
+obj-$(CONFIG_TTY_LOG)	+= tty_log.o
 
 CFLAGS_user_syms.o = -D__AUTOCONF_INCLUDED__ $(DMODULES) $(DMODVERSIONS) \
 	-I/usr/include -I../include
@@ -53,8 +41,6 @@ CFLAGS_user_syms.o = -D__AUTOCONF_INCLUDED__ $(DMODULES) $(DMODVERSIONS) \
 CFLAGS_frame.o := $(patsubst -fomit-frame-pointer,,$(USER_CFLAGS))
 
 include $(TOPDIR)/Rules.make
-
-$(O_TARGET) : unmap_fin.o
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<

@@ -3,8 +3,6 @@
 # Licensed under the GPL
 #
 
-O_TARGET = os.o
-
 obj-y = file.o process.o tty.o
 
 include $(TOPDIR)/Rules.make
