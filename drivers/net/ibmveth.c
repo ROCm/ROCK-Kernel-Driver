@@ -52,7 +52,7 @@
 #include <asm/semaphore.h>
 #include <asm/hvcall.h>
 #include <asm/atomic.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/vio.h>
 #include <asm/uaccess.h>
 #include <linux/proc_fs.h>
@@ -913,7 +913,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 	adapter->mac_addr = 0;
 	memcpy(&adapter->mac_addr, mac_addr_p, 6);
 
-	adapter->liobn = dev->tce_table->index;
+	adapter->liobn = dev->iommu_table->it_index;
 	
 	netdev->irq = dev->irq;
 	netdev->open               = ibmveth_open;
