@@ -1472,7 +1472,7 @@ updateCRC
 	Modified from Am79C90 data sheet.
 ---------------------------------------------------------------------------- */
 
-#if BROKEN_MULTICAST
+#ifdef BROKEN_MULTICAST
 
 static void updateCRC(int *CRC, int bit)
 {
