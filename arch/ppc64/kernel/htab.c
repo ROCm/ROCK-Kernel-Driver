@@ -837,7 +837,7 @@ int hash_page(unsigned long ea, unsigned long access)
 
 	if (pgdir == NULL)
 		return 1;
-
+	
 	/*
 	 * Lock the Linux page table to prevent mmap and kswapd
 	 * from modifying entries while we search and update
@@ -855,7 +855,7 @@ int hash_page(unsigned long ea, unsigned long access)
 		return 1;
 	}
 
-	/*
+	/* 
 	 * Check the user's access rights to the page.  If access should be
 	 * prevented then send the problem up to do_page_fault.
 	 */
@@ -872,8 +872,9 @@ int hash_page(unsigned long ea, unsigned long access)
 	spin_lock(&hash_table_lock);
 	
 	old_pte = *ptep;
-	
-	/* At this point we have found a pte (which was present).
+
+	/*
+	 * At this point we have found a pte (which was present).
 	 * The spinlocks prevent this status from changing
 	 * The hash_table_lock prevents the _PAGE_HASHPTE status
 	 * from changing (RPN, DIRTY and ACCESSED too)
@@ -881,76 +882,66 @@ int hash_page(unsigned long ea, unsigned long access)
 	 * invalidated or modified
 	 */
 
-/* At this point, we have a pte (old_pte) which can be used to build or update
- * an HPTE.   There are 5 cases:
- *
- * 1. There is a valid (present) pte with no associated HPTE (this is 
- *	the most common case)
- * 2. There is a valid (present) pte with an associated HPTE.  The
- *	current values of the pp bits in the HPTE prevent access because the
- *	user doesn't have appropriate access rights.
- * 3. There is a valid (present) pte with an associated HPTE.  The
- *	current values of the pp bits in the HPTE prevent access because we are
- *	doing software DIRTY bit management and the page is currently not DIRTY. 
- * 4. This is a Kernel address (0xC---) for which there is no page directory.
- *	There is an HPTE for this page, but the pp bits prevent access.
- *      Since we always set up kernel pages with R/W access for the kernel
- *	this case only comes about for users trying to access the kernel.
- *	This case is always an error and is not dealt with further here.
- * 5. This is a Kernel address (0xC---) for which there is no page directory.
- *	There is no HPTE for this page.
- */
+	/*
+	 * At this point, we have a pte (old_pte) which can be used to build
+	 * or update an HPTE. There are 2 cases:
+	 *
+	 * 1. There is a valid (present) pte with no associated HPTE (this is 
+	 *	the most common case)
+	 * 2. There is a valid (present) pte with an associated HPTE. The
+	 *	current values of the pp bits in the HPTE prevent access
+	 *	because we are doing software DIRTY bit management and the
+	 *	page is currently not DIRTY. 
+	 */
 
-
-	/* User has appropriate access rights. */
 	new_pte = old_pte;
 	/* If the attempted access was a store */
-	if ( access & _PAGE_RW )
+	if (access & _PAGE_RW)
 		pte_val(new_pte) |= _PAGE_ACCESSED | _PAGE_DIRTY;
 	else
 		pte_val(new_pte) |= _PAGE_ACCESSED;
 
-	/* Only cases 1, 3 and 5 still in play */
+	newpp = computeHptePP(pte_val(new_pte));
 
-	newpp = computeHptePP( pte_val(new_pte) );
-	
-	/* Check if pte already has an hpte (case 3) */
-	if ( pte_val(old_pte) & _PAGE_HASHPTE ) {
+	/* Check if pte already has an hpte (case 2) */
+	if (pte_val(old_pte) & _PAGE_HASHPTE) {
 		/* There MIGHT be an HPTE for this pte */
 		unsigned long hash, slot, secondary;
 		/* Local copy of first doubleword of HPTE */
 		union {
 			unsigned long d;
-			Hpte_dword0   h;
+			Hpte_dword0 h;
 		} hpte_dw0;
+
 		hash = hpt_hash(vpn, 0);
 		secondary = (pte_val(old_pte) & _PAGE_SECONDARY) >> 15;
-		if ( secondary )
+		if (secondary)
 			hash = ~hash;
 		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
 		slot += (pte_val(old_pte) & _PAGE_GROUP_IX) >> 12;
 		/* If there is an HPTE for this page it is indexed by slot */
-		hpte_dw0.d = ppc_md.hpte_getword0( slot );
-		if ( (hpte_dw0.h.avpn == (vpn >> 11) ) &&
-		     (hpte_dw0.h.v) && 
-		     (hpte_dw0.h.h == secondary ) ){
+		hpte_dw0.d = ppc_md.hpte_getword0(slot);
+		if ((hpte_dw0.h.avpn == (vpn >> 11)) &&
+		    (hpte_dw0.h.v) && 
+		    (hpte_dw0.h.h == secondary)){
 			/* HPTE matches */
-			ppc_md.hpte_updatepp( slot, newpp, va );
-			if ( !pte_same( old_pte, new_pte ) )
+			ppc_md.hpte_updatepp(slot, newpp, va);
+			if (!pte_same(old_pte, new_pte))
 				*ptep = new_pte;
 		} else {
 			/* HPTE is not for this pte */
 			pte_val(old_pte) &= ~_PAGE_HPTEFLAGS;
 		}
 	}
-	if ( !( pte_val(old_pte) & _PAGE_HASHPTE ) ) {
-		/* Cases 1 and 5 */
-		/* For these cases we need to create a new
-		 * HPTE and update the linux pte (for
-		 * case 1).  For case 5 there is no linux pte.
-		 *
-		 * Find an available HPTE slot
+
+	if (!(pte_val(old_pte) & _PAGE_HASHPTE)) {
+		/*
+		 * Case 1
+		 * For these cases we need to create a new
+		 * HPTE and update the linux pte
 		 */
+
+		/* Find an available HPTE slot */
 		slot = ppc_md.hpte_selectslot(vpn);
 
 		hash_ind = 0;
@@ -961,7 +952,7 @@ int hash_page(unsigned long ea, unsigned long access)
 
 		/* Set the physical address */
 		prpn = pte_val(old_pte) >> PTE_SHIFT;
-		
+
 		/* Update the linux pte with the HPTE slot */
 		pte_val(new_pte) &= ~_PAGE_HPTEFLAGS;
 		pte_val(new_pte) |= hash_ind << 15;
@@ -975,7 +966,7 @@ int hash_page(unsigned long ea, unsigned long access)
 		 * (we hold both)
 		 */
 		*ptep = new_pte;
-			
+
 		/* copy appropriate flags from linux pte */
 		hpteflags = (pte_val(new_pte) & 0x1f8) | newpp;
 
