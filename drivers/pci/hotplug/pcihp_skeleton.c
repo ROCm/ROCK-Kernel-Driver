@@ -236,16 +236,16 @@ static void release_slots(struct hotplug_slot *hotplug_slot)
 }
 
 #define SLOT_NAME_SIZE	10
-static void make_slot_name(struct slot *slot)
+static void __init make_slot_name(struct slot *slot)
 {
 	/*
 	 * Stupid way to make a filename out of the slot name.
 	 * replace this if your hardware provides a better way to name slots.
 	 */
-	snprintf (slot->hotplug_slot->name, SLOT_NAME_SIZE, "%d", slot->number);
+	snprintf(slot->hotplug_slot->name, SLOT_NAME_SIZE, "%d", slot->number);
 }
 
-static int init_slots(void)
+static int __init init_slots(void)
 {
 	struct slot *slot;
 	struct hotplug_slot *hotplug_slot;
@@ -324,7 +324,7 @@ static int init_slots(void)
 	return retval;
 }
 
-static void cleanup_slots(void)
+static void __exit cleanup_slots(void)
 {
 	struct list_head *tmp;
 	struct list_head *next;
