@@ -1,7 +1,7 @@
 /* $Id: aty128fb.c,v 1.1.1.1.36.1 1999/12/11 09:03:05 Exp $
  *  linux/drivers/video/aty128fb.c -- Frame buffer device for ATI Rage128
  *
- *  Copyright (C) 1999-2000, Brad Douglas <brad@neruo.com>
+ *  Copyright (C) 1999-2003, Brad Douglas <brad@neruo.com>
  *  Copyright (C) 1999, Anthony Tong <atong@uiuc.edu>
  *
  *                Ani Joshi / Jeff Garzik
@@ -31,7 +31,6 @@
  *              - virtual display
  *		- other platform support (only ppc/x86 supported)
  *		- hardware cursor support
- *		- ioctl()'s
  *
  *    Please cc: your patches to brad@neruo.com.
  */
@@ -112,7 +111,8 @@ static struct fb_var_screeninfo default_var = {
 	1024, 768, 1024, 768, 0, 0, 8, 0,
 	{0, 8, 0}, {0, 8, 0}, {0, 8, 0}, {0, 0, 0},
 	0, 0, -1, -1, 0, 12699, 160, 32, 28, 1, 96, 3,
-	FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+	FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	FB_VMODE_NONINTERLACED
 };
 #endif /* CONFIG_ALL_PPC */
 
@@ -181,10 +181,10 @@ static struct pci_device_id aty128_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, aty128_pci_tbl);
 
 static struct pci_driver aty128fb_driver = {
-	name:		"aty128fb",
-	id_table:	aty128_pci_tbl,
-	probe:		aty128_probe,
-	remove:		__devexit_p(aty128_remove),
+	.name		= "aty128fb",
+	.id_table	= aty128_pci_tbl,
+	.probe		= aty128_probe,
+	.remove		= __devexit_p(aty128_remove),
 };
 
 /* packed BIOS settings */
@@ -2341,7 +2341,7 @@ static void __exit aty128fb_exit(void)
 	pci_unregister_driver(&aty128fb_driver);
 }
 
-MODULE_AUTHOR("(c)1999-2000 Brad Douglas <brad@neruo.com>");
+MODULE_AUTHOR("(c)1999-2003 Brad Douglas <brad@neruo.com>");
 MODULE_DESCRIPTION("FBDev driver for ATI Rage128 / Pro cards");
 MODULE_LICENSE("GPL");
 MODULE_PARM(mode, "s");
