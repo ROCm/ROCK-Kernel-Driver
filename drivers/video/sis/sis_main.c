@@ -2057,17 +2057,18 @@ sisfb_ioctl(struct inode *inode, struct file *file,
 	sisfb_info        	x;
 	u32			gpu32 = 0;
 	static int 		count = 0;
+	u32 __user		*argp = (u32 __user *) arg;
 
 	switch (cmd) {
 	   case FBIO_ALLOC:
 		if(!capable(CAP_SYS_RAWIO)) {
 			return -EPERM;
 		}
-		if(copy_from_user(&sismemreq, (void *)arg, sizeof(sismemreq))) {
+		if(copy_from_user(&sismemreq, argp, sizeof(sismemreq))) {
 		   	return -EFAULT;
 		}
         	sis_malloc(&sismemreq);
-		if(copy_to_user((void *)arg, &sismemreq, sizeof(sismemreq))) {
+		if(copy_to_user(argp, &sismemreq, sizeof(sismemreq))) {
 			sis_free((u32)sismemreq.offset);
 		    	return -EFAULT;
 		}
@@ -2077,7 +2078,7 @@ sisfb_ioctl(struct inode *inode, struct file *file,
 		if(!capable(CAP_SYS_RAWIO)) {
 			return -EPERM;
 		}
-		if(get_user(gpu32, (u32 *)arg)) {
+		if(get_user(gpu32, argp)) {
 			return -EFAULT;
 		}
 		sis_free(gpu32);
@@ -2086,13 +2087,13 @@ sisfb_ioctl(struct inode *inode, struct file *file,
 	   case FBIOGET_VBLANK:
 		sisvbblank.count = 0;
 		sisvbblank.flags = sisfb_setupvbblankflags(ivideo, &sisvbblank.vcount, &sisvbblank.hcount);
-		if(copy_to_user((void *)arg, &sisvbblank, sizeof(sisvbblank))) {
+		if(copy_to_user(argp, &sisvbblank, sizeof(sisvbblank))) {
 			return -EFAULT;
 		}
 		break;
 
 	   case SISFB_GET_INFO_SIZE:
-	        return put_user(sizeof(sisfb_info), (u32 *)arg);
+	        return put_user(sizeof(sisfb_info), argp);
 
 	   case SISFB_GET_INFO_OLD:
 	        if(++count < 50) {
@@ -2132,7 +2133,7 @@ sisfb_ioctl(struct inode *inode, struct file *file,
 		x.sisfb_tvxpos = (u16)(ivideo->tvxpos + 32);
 		x.sisfb_tvypos = (u16)(ivideo->tvypos + 32);
 
-		if(copy_to_user((void *)arg, &x, sizeof(x))) {
+		if(copy_to_user(argp, &x, sizeof(x))) {
 			return -EFAULT;
 		}
 	        break;
@@ -2143,9 +2144,9 @@ sisfb_ioctl(struct inode *inode, struct file *file,
 		}
 	   case SISFB_GET_VBRSTATUS:
 	        if(sisfb_CheckVBRetrace(ivideo)) {
-			return put_user((u32)1, (u32 *) arg);
+			return put_user((u32)1, argp);
 		} else {
-			return put_user((u32)0, (u32 *) arg);
+			return put_user((u32)0, argp);
 		}
 
 	   case SISFB_GET_AUTOMAXIMIZE_OLD:
@@ -2153,22 +2154,22 @@ sisfb_ioctl(struct inode *inode, struct file *file,
 	           printk(KERN_INFO "sisfb: Deprecated ioctl call received - update your application!\n");
 		}
 	   case SISFB_GET_AUTOMAXIMIZE:
-	        if(ivideo->sisfb_max) return put_user((u32)1, (u32 *)arg);
-		else 	              return put_user((u32)0, (u32 *)arg);
+	        if(ivideo->sisfb_max) return put_user((u32)1, argp);
+		else 	              return put_user((u32)0, argp);
 
 	   case SISFB_SET_AUTOMAXIMIZE_OLD:
 	   	if(++count < 50) {
 		   printk(KERN_INFO "sisfb: Deprecated ioctl call received - update your application!\n");
 		}
 	   case SISFB_SET_AUTOMAXIMIZE:
-		if(copy_from_user(&gpu32, (u32 *)arg, sizeof(gpu32))) {
+		if(copy_from_user(&gpu32, argp, sizeof(gpu32))) {
 			return -EFAULT;
 		}
 		ivideo->sisfb_max = (gpu32) ? 1 : 0;
 		break;
 
 	   case SISFB_SET_TVPOSOFFSET:
-		if(copy_from_user(&gpu32, (u32 *)arg, sizeof(gpu32))) {
+		if(copy_from_user(&gpu32, argp, sizeof(gpu32))) {
 			return -EFAULT;
 		}
 		sisfb_set_TVxposoffset(ivideo, ((int)(gpu32 >> 16)) - 32);
@@ -2176,10 +2177,10 @@ sisfb_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	   case SISFB_GET_TVPOSOFFSET:
-	        return put_user((u32)(((ivideo->tvxpos+32)<<16)|((ivideo->tvypos+32)&0xffff)), (u32 *)arg);
+	        return put_user((u32)(((ivideo->tvxpos+32)<<16)|((ivideo->tvypos+32)&0xffff)), argp);
 
 	   case SISFB_SET_LOCK:
-		if(copy_from_user(&gpu32, (u32 *)arg, sizeof(gpu32))) {
+		if(copy_from_user(&gpu32, argp, sizeof(gpu32))) {
 			return -EFAULT;
 		}
 		ivideo->sisfblocked = (gpu32) ? 1 : 0;
@@ -4761,7 +4762,7 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	} else {
 	   struct sis_video_info *countvideo = card_list;
 	   ivideo->cardnumber = 1;
-	   while((countvideo = countvideo->next)) ivideo->cardnumber++;
+	   while ((countvideo = countvideo->next) != NULL) ivideo->cardnumber++;
 	}
 
 	strncpy(ivideo->myid, chipinfo->chip_name, 30);
