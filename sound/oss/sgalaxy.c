@@ -86,18 +86,20 @@ static int __init sb_cmd( int base, unsigned char val )
 
 static int __init probe_sgalaxy( struct address_info *ai )
 {
+	int n;
+
 	if ( check_region( ai->io_base, 8 ) ) {
 		printk(KERN_ERR "sgalaxy: WSS IO port 0x%03x not available\n", ai->io_base);
 		return 0;
 	}
-        
-	if ( ad1848_detect( ai->io_base+4, NULL, ai->osp ) )
-		return probe_ms_sound(ai);  /* The card is already active, check irq etc... */
 
-	if ( check_region( ai->ai_sgbase, 0x10 ) ) {
+	if (!request_region( ai->ai_sgbase, 0x10, "SoundGalaxy SB")) {
 		printk(KERN_ERR "sgalaxy: SB IO port 0x%03x not available\n", ai->ai_sgbase);
 		return 0;
 	}
+
+	if ( ad1848_detect( ai->io_base+4, NULL, ai->osp ) )
+		goto out;
         
 	/* switch to MSS/WSS mode */
    
@@ -108,15 +110,12 @@ static int __init probe_sgalaxy( struct address_info *ai )
 
 	sleep( HZ/10 );
 
-      	return probe_ms_sound(ai);
-}
+out:
+      	if (!probe_ms_sound(ai)) {
+		release_region(ai->ai_sgbase, 0x10);
+		return 0;
+	}
 
-static void __init attach_sgalaxy( struct address_info *ai )
-{
-	int n;
-	
-	request_region( ai->ai_sgbase, 0x10, "SoundGalaxy SB" );
- 
 	attach_ms_sound(ai, THIS_MODULE);
 	n=ai->slots[0];
 	
@@ -125,6 +124,7 @@ static void __init attach_sgalaxy( struct address_info *ai )
 		AD1848_REROUTE( SOUND_MIXER_LINE2, SOUND_MIXER_SYNTH );  /* FM+Wavetable*/
 		AD1848_REROUTE( SOUND_MIXER_LINE3, SOUND_MIXER_CD );     /* CD */
 	}
+	return 1;
 }
 
 static void __exit unload_sgalaxy( struct address_info *ai )
@@ -162,8 +162,6 @@ static int __init init_sgalaxy(void)
 
 	if ( probe_sgalaxy(&cfg) == 0 )
 		return -ENODEV;
-
-	attach_sgalaxy(&cfg);
 
 	return 0;
 }
