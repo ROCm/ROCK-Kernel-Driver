@@ -653,8 +653,8 @@ struct resource *find_io_region(unsigned long base, int num,
 					     min, 0, pcmcia_align, &data);
 	} else
 #endif
-		ret = allocate_resource(&ioport_resource, res, num, min, ~0UL, 0,
-					pcmcia_align, &data);
+		ret = allocate_resource(&ioport_resource, res, num, min, ~0UL,
+					1, pcmcia_align, &data);
 	up(&rsrc_sem);
 
 	if (ret != 0) {
@@ -696,7 +696,7 @@ struct resource *find_mem_region(u_long base, u_long num, u_long align,
 		} else
 #endif
 			ret = allocate_resource(&iomem_resource, res, num, min,
-						max, 0, pcmcia_align, &data);
+						max, 1, pcmcia_align, &data);
 		up(&rsrc_sem);
 		if (ret == 0 || low)
 			break;
