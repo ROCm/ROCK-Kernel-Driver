@@ -283,16 +283,18 @@ act2000_command(act2000_card * card, isdn_ctrl * c)
 					actcapi_manufacturer_req_net(card);
 					return 0;
 				case ACT2000_IOCTL_SETMSN:
-					if ((ret = copy_from_user(tmp, (char *)a, sizeof(tmp))))
-						return ret;
+					if (copy_from_user(tmp, (char *)a,
+							   sizeof(tmp)))
+						return -EFAULT;
 					if ((ret = act2000_set_msn(card, tmp)))
 						return ret;
 					if (card->flags & ACT2000_FLAGS_RUNNING)
 						return(actcapi_manufacturer_req_msn(card));
 					return 0;
 				case ACT2000_IOCTL_ADDCARD:
-					if ((ret = copy_from_user(&cdef, (char *)a, sizeof(cdef))))
-						return ret;
+					if (copy_from_user(&cdef, (char *)a,
+							   sizeof(cdef)))
+						return -EFAULT;
 					if (act2000_addcard(cdef.bus, cdef.port, cdef.irq, cdef.id))
 						return -EIO;
 					return 0;

@@ -166,15 +166,14 @@ int b1_load_t4file(avmcard *card, capiloaddatapart * t4file)
 {
 	unsigned char buf[256];
 	unsigned char *dp;
-	int i, left, retval;
+	int i, left;
 	unsigned int base = card->port;
 
 	dp = t4file->data;
 	left = t4file->len;
 	while (left > sizeof(buf)) {
 		if (t4file->user) {
-			retval = copy_from_user(buf, dp, sizeof(buf));
-			if (retval)
+			if (copy_from_user(buf, dp, sizeof(buf)))
 				return -EFAULT;
 		} else {
 			memcpy(buf, dp, sizeof(buf));
@@ -190,8 +189,7 @@ int b1_load_t4file(avmcard *card, capiloaddatapart * t4file)
 	}
 	if (left) {
 		if (t4file->user) {
-			retval = copy_from_user(buf, dp, left);
-			if (retval)
+			if (copy_from_user(buf, dp, left))
 				return -EFAULT;
 		} else {
 			memcpy(buf, dp, left);
@@ -211,7 +209,7 @@ int b1_load_config(avmcard *card, capiloaddatapart * config)
 	unsigned char buf[256];
 	unsigned char *dp;
 	unsigned int base = card->port;
-	int i, j, left, retval;
+	int i, j, left;
 
 	dp = config->data;
 	left = config->len;
@@ -223,8 +221,7 @@ int b1_load_config(avmcard *card, capiloaddatapart * config)
 	}
 	while (left > sizeof(buf)) {
 		if (config->user) {
-			retval = copy_from_user(buf, dp, sizeof(buf));
-			if (retval)
+			if (copy_from_user(buf, dp, sizeof(buf)))
 				return -EFAULT;
 		} else {
 			memcpy(buf, dp, sizeof(buf));
@@ -240,8 +237,7 @@ int b1_load_config(avmcard *card, capiloaddatapart * config)
 	}
 	if (left) {
 		if (config->user) {
-			retval = copy_from_user(buf, dp, left);
-			if (retval)
+			if (copy_from_user(buf, dp, left))
 				return -EFAULT;
 		} else {
 			memcpy(buf, dp, left);
