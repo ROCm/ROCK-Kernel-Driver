@@ -73,8 +73,8 @@ extern int cyber2000fb_init(void);
 extern int cyber2000fb_setup(char*);
 extern int retz3fb_init(void);
 extern int retz3fb_setup(char*);
-extern int clgenfb_init(void);
-extern int clgenfb_setup(char*);
+extern int cirrusfb_init(void);
+extern int cirrusfb_setup(char*);
 extern int hitfb_init(void);
 extern int vfb_init(void);
 extern int vfb_setup(char*);
@@ -204,8 +204,8 @@ static struct {
 #ifdef CONFIG_FB_PM3
 	{ "pm3fb", pm3fb_init, pm3fb_setup },
 #endif           
-#ifdef CONFIG_FB_CLGEN
-	{ "clgenfb", clgenfb_init, clgenfb_setup },
+#ifdef CONFIG_FB_CIRRUS
+	{ "cirrusfb", cirrusfb_init, cirrusfb_setup },
 #endif
 #ifdef CONFIG_FB_ATY
 	{ "atyfb", atyfb_init, atyfb_setup },
