@@ -387,7 +387,6 @@ static void rest_init(void)
 asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
-	unsigned long mempages;
 	extern char saved_command_line[];
 /*
  * Interrupts are still disabled. Do necessary setups, then
@@ -439,13 +438,11 @@ asmlinkage void __init start_kernel(void)
 	kmem_cache_sizes_init();
 	pgtable_cache_init();
 	pte_chain_init();
-	mempages = num_physpages;
-
-	fork_init(mempages);
+	fork_init(num_physpages);
 	proc_caches_init();
 	security_scaffolding_startup();
 	buffer_init();
-	vfs_caches_init(mempages);
+	vfs_caches_init(num_physpages);
 	radix_tree_init();
 	signals_init();
 #ifdef CONFIG_PROC_FS
