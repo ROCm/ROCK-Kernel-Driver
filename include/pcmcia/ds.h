@@ -144,7 +144,7 @@ int unregister_pccard_driver(dev_info_t *dev_info);
 extern struct bus_type pcmcia_bus_type;
 
 struct pcmcia_driver {
-	int			use_count, status;
+	int			use_count;
 	dev_link_t		*(*attach)(void);
 	void			(*detach)(dev_link_t *);
 	struct module		*owner;

@@ -129,9 +129,6 @@ static LIST_HEAD(bus_socket_list);
 
 extern struct proc_dir_entry *proc_pccard;
 
-/* We use this to distinguish in-kernel from modular drivers */
-static int init_status = 1;
-
 /*====================================================================*/
 
 static void cs_error(client_handle_t handle, int func, int ret)
@@ -156,7 +153,6 @@ int pcmcia_register_driver(struct pcmcia_driver *driver)
 		return -EINVAL;
 
  	driver->use_count = 0;
- 	driver->status = init_status;
 	driver->drv.bus = &pcmcia_bus_type;
 
 	return driver_register(&driver->drv);
@@ -251,8 +247,7 @@ static int proc_read_drivers_callback(struct device_driver *driver, void *d)
 	struct pcmcia_driver *p_dev = container_of(driver, 
 						   struct pcmcia_driver, drv);
 
-	*p += sprintf(*p, "%-24.24s %d %d\n", driver->name, p_dev->status,
-		     p_dev->use_count);
+	*p += sprintf(*p, "%-24.24s 1 %d\n", driver->name, p_dev->use_count);
 	d = (void *) p;
 
 	return 0;
