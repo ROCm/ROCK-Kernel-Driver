@@ -115,7 +115,6 @@ EXPORT_SYMBOL(br2684_ioctl_hook);
 #define DPRINTK(format,args...)
 #endif
 
-spinlock_t atm_dev_lock = SPIN_LOCK_UNLOCKED;
 
 static struct sk_buff *alloc_tx(struct atm_vcc *vcc,unsigned int size)
 {
@@ -175,19 +174,17 @@ void atm_release_vcc_sk(struct sock *sk,int free_sk)
 			atm_return(vcc,skb->truesize);
 			kfree_skb(skb);
 		}
-		spin_lock (&atm_dev_lock);	
-		fops_put (vcc->dev->ops);
+
+		module_put(vcc->dev->ops->owner);
+		atm_dev_release(vcc->dev);
 		if (atomic_read(&vcc->sk->rmem_alloc))
 			printk(KERN_WARNING "atm_release_vcc: strange ... "
 			    "rmem_alloc == %d after closing\n",
 			    atomic_read(&vcc->sk->rmem_alloc));
 		bind_vcc(vcc,NULL);
-	} else
-		spin_lock (&atm_dev_lock);	
+	}
 
 	if (free_sk) free_atm_vcc_sk(sk);
-
-	spin_unlock (&atm_dev_lock);
 }
 
 
@@ -280,11 +277,11 @@ static int atm_do_connect_dev(struct atm_vcc *vcc,struct atm_dev *dev,int vpi,
 	    vcc->qos.txtp.min_pcr,vcc->qos.txtp.max_pcr,vcc->qos.txtp.max_sdu);
 	DPRINTK("  RX: %d, PCR %d..%d, SDU %d\n",vcc->qos.rxtp.traffic_class,
 	    vcc->qos.rxtp.min_pcr,vcc->qos.rxtp.max_pcr,vcc->qos.rxtp.max_sdu);
-	fops_get (dev->ops);
+	__module_get(dev->ops->owner);
 	if (dev->ops->open) {
 		error = dev->ops->open(vcc,vpi,vci);
 		if (error) {
-			fops_put (dev->ops);
+			module_put(dev->ops->owner);
 			bind_vcc(vcc,NULL);
 			return error;
 		}
@@ -298,14 +295,13 @@ static int atm_do_connect(struct atm_vcc *vcc,int itf,int vpi,int vci)
 	struct atm_dev *dev;
 	int return_val;
 
-	spin_lock (&atm_dev_lock);
-	dev = atm_find_dev(itf);
+	dev = atm_dev_lookup(itf);
 	if (!dev)
 		return_val =  -ENODEV;
-	else
+	else {
 		return_val = atm_do_connect_dev(vcc,dev,vpi,vci);
-
-	spin_unlock (&atm_dev_lock);
+		if (return_val) atm_dev_release(dev);
+	}
 
 	return return_val;
 }
@@ -336,15 +332,20 @@ int atm_connect_vcc(struct atm_vcc *vcc,int itf,short vpi,int vci)
 	}
 	else {
 		struct atm_dev *dev = NULL;
-		struct list_head *p;
+		struct list_head *p, *next;
 
-		spin_lock (&atm_dev_lock);
-		list_for_each(p, &atm_devs) {
+		spin_lock(&atm_dev_lock);
+		list_for_each_safe(p, next, &atm_devs) {
 			dev = list_entry(p, struct atm_dev, dev_list);
-			if (!atm_do_connect_dev(vcc,dev,vpi,vci)) break;
+			atm_dev_hold(dev);
+			spin_unlock(&atm_dev_lock);
+			if (!atm_do_connect_dev(vcc,dev,vpi,vci))
+				break;
+			atm_dev_release(dev);
 			dev = NULL;
+			spin_lock(&atm_dev_lock);
 		}
-		spin_unlock (&atm_dev_lock);
+		spin_unlock(&atm_dev_lock);
 		if (!dev) return -ENODEV;
 	}
 	if (vpi == ATM_VPI_UNSPEC || vci == ATM_VCI_UNSPEC)
@@ -562,7 +563,6 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 	int error,len,size,number, ret_val;
 
 	ret_val = 0;
-	spin_lock (&atm_dev_lock);
 	vcc = ATM_SD(sock);
 	switch (cmd) {
 		case SIOCOUTQ:
@@ -600,14 +600,17 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				goto done;
 			}
 			size = 0;
+			spin_lock(&atm_dev_lock);
 			list_for_each(p, &atm_devs)
 				size += sizeof(int);
 			if (size > len) {
+				spin_unlock(&atm_dev_lock);
 				ret_val = -E2BIG;
 				goto done;
 			}
-			tmp_buf = kmalloc(size,GFP_KERNEL);
+			tmp_buf = kmalloc(size, GFP_ATOMIC);
 			if (!tmp_buf) {
+				spin_unlock(&atm_dev_lock);
 				ret_val = -ENOMEM;
 				goto done;
 			}
@@ -616,6 +619,7 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				dev = list_entry(p, struct atm_dev, dev_list);
 				*tmp_p++ = dev->number;
 			}
+			spin_unlock(&atm_dev_lock);
 		        ret_val = ((copy_to_user(buf, tmp_buf, size)) ||
 			    put_user(size, &((struct atm_iobuf *) arg)->length)
 			    ) ? -EFAULT : 0;
@@ -840,7 +844,7 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 		ret_val = -EFAULT;
 		goto done;
 	}
-	if (!(dev = atm_find_dev(number))) {
+	if (!(dev = atm_dev_lookup(number))) {
 		ret_val = -ENODEV;
 		goto done;
 	}
@@ -851,14 +855,14 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 			size = strlen(dev->type)+1;
 			if (copy_to_user(buf,dev->type,size)) {
 				ret_val = -EFAULT;
-				goto done;
+				goto done_release;
 			}
 			break;
 		case ATM_GETESI:
 			size = ESI_LEN;
 			if (copy_to_user(buf,dev->esi,size)) {
 				ret_val = -EFAULT;
-				goto done;
+				goto done_release;
 			}
 			break;
 		case ATM_SETESI:
@@ -868,7 +872,7 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				for (i = 0; i < ESI_LEN; i++)
 					if (dev->esi[i]) {
 						ret_val = -EEXIST;
-						goto done;
+						goto done_release;
 					}
 			}
 			/* fall through */
@@ -878,20 +882,20 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 
 				if (!capable(CAP_NET_ADMIN)) {
 					ret_val = -EPERM;
-					goto done;
+					goto done_release;
 				}
 				if (copy_from_user(esi,buf,ESI_LEN)) {
 					ret_val = -EFAULT;
-					goto done;
+					goto done_release;
 				}
 				memcpy(dev->esi,esi,ESI_LEN);
 				ret_val =  ESI_LEN;
-				goto done;
+				goto done_release;
 			}
 		case ATM_GETSTATZ:
 			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-				goto done;
+				goto done_release;
 			}
 			/* fall through */
 		case ATM_GETSTAT:
@@ -899,27 +903,27 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 			error = fetch_stats(dev,buf,cmd == ATM_GETSTATZ);
 			if (error) {
 				ret_val = error;
-				goto done;
+				goto done_release;
 			}
 			break;
 		case ATM_GETCIRANGE:
 			size = sizeof(struct atm_cirange);
 			if (copy_to_user(buf,&dev->ci_range,size)) {
 				ret_val = -EFAULT;
-				goto done;
+				goto done_release;
 			}
 			break;
 		case ATM_GETLINKRATE:
 			size = sizeof(int);
 			if (copy_to_user(buf,&dev->link_rate,size)) {
 				ret_val = -EFAULT;
-				goto done;
+				goto done_release;
 			}
 			break;
 		case ATM_RSTADDR:
 			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-				goto done;
+				goto done_release;
 			}
 			atm_reset_addr(dev);
 			break;
@@ -927,20 +931,20 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 		case ATM_DELADDR:
 			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-				goto done;
+				goto done_release;
 			}
 			{
 				struct sockaddr_atmsvc addr;
 
 				if (copy_from_user(&addr,buf,sizeof(addr))) {
 					ret_val = -EFAULT;
-					goto done;
+					goto done_release;
 				}
 				if (cmd == ATM_ADDADDR)
 					ret_val = atm_add_addr(dev,&addr);
 				else
 					ret_val = atm_del_addr(dev,&addr);
-				goto done;
+				goto done_release;
 			}
 		case ATM_GETADDR:
 			size = atm_get_addr(dev,buf,len);
@@ -951,13 +955,13 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 			   write the length" */
 				ret_val = put_user(size,
 						   &((struct atmif_sioc *) arg)->length) ? -EFAULT : 0;
-			goto done;
+			goto done_release;
 		case ATM_SETLOOP:
 			if (__ATM_LM_XTRMT((int) (long) buf) &&
 			    __ATM_LM_XTLOC((int) (long) buf) >
 			    __ATM_LM_XTRMT((int) (long) buf)) {
 				ret_val = -EINVAL;
-				goto done;
+				goto done_release;
 			}
 			/* fall through */
 		case ATM_SETCIRANGE:
@@ -967,18 +971,18 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 		case SONET_SETFRAMING:
 			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-				goto done;
+				goto done_release;
 			}
 			/* fall through */
 		default:
 			if (!dev->ops->ioctl) {
 				ret_val = -EINVAL;
-				goto done;
+				goto done_release;
 			}
 			size = dev->ops->ioctl(dev,cmd,buf);
 			if (size < 0) {
 				ret_val = (size == -ENOIOCTLCMD ? -EINVAL : size);
-				goto done;
+				goto done_release;
 			}
 	}
 	
@@ -987,9 +991,10 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 			-EFAULT : 0;
 	else
 		ret_val = 0;
+done_release:
+	atm_dev_release(dev);
 
- done:
-	spin_unlock (&atm_dev_lock); 
+done:
 	return ret_val;
 }
 

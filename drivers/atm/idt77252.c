@@ -2402,8 +2402,10 @@ idt77252_init_rx(struct idt77252_dev *card, struct vc_map *vc,
 static int
 idt77252_find_vcc(struct atm_vcc *vcc, short *vpi, int *vci)
 {
+	unsigned long flags;
 	struct atm_vcc *walk;
 
+	spin_lock_irqsave(&vcc->dev->lock, flags);
 	if (*vpi == ATM_VPI_ANY) {
 		*vpi = 0;
 		walk = vcc->dev->vccs;
@@ -2430,6 +2432,7 @@ idt77252_find_vcc(struct atm_vcc *vcc, short *vpi, int *vci)
 		}
 	}
 
+	spin_unlock_irqrestore(&vcc->dev->lock, flags);
 	return 0;
 }
 

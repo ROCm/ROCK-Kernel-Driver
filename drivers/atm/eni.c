@@ -1887,8 +1887,10 @@ static void eni_close(struct atm_vcc *vcc)
 
 static int get_ci(struct atm_vcc *vcc,short *vpi,int *vci)
 {
+	unsigned long flags;
 	struct atm_vcc *walk;
 
+	spin_lock_irqsave(&vcc->dev->lock, flags);
 	if (*vpi == ATM_VPI_ANY) *vpi = 0;
 	if (*vci == ATM_VCI_ANY) {
 		for (*vci = ATM_NOT_RSV_VCI; *vci < NR_VCI; (*vci)++) {
@@ -1907,17 +1909,29 @@ static int get_ci(struct atm_vcc *vcc,short *vpi,int *vci)
 			}
 			break;
 		}
+		spin_unlock_irqrestore(&vcc->dev->lock, flags);
 		return *vci == NR_VCI ? -EADDRINUSE : 0;
 	}
-	if (*vci == ATM_VCI_UNSPEC) return 0;
+	if (*vci == ATM_VCI_UNSPEC) {
+		spin_unlock_irqrestore(&vcc->dev->lock, flags);
+		return 0;
+	}
 	if (vcc->qos.rxtp.traffic_class != ATM_NONE &&
-	    ENI_DEV(vcc->dev)->rx_map[*vci])
+	    ENI_DEV(vcc->dev)->rx_map[*vci]) {
+		spin_unlock_irqrestore(&vcc->dev->lock, flags);
 		return -EADDRINUSE;
-	if (vcc->qos.txtp.traffic_class == ATM_NONE) return 0;
+	}
+	if (vcc->qos.txtp.traffic_class == ATM_NONE) {
+		spin_unlock_irqrestore(&vcc->dev->lock, flags);
+		return 0;
+	}
 	for (walk = vcc->dev->vccs; walk; walk = walk->next)
 		if (test_bit(ATM_VF_ADDR,&walk->flags) && walk->vci == *vci &&
-		    walk->qos.txtp.traffic_class != ATM_NONE)
+		    walk->qos.txtp.traffic_class != ATM_NONE) {
+			spin_unlock_irqrestore(&vcc->dev->lock, flags);
 			return -EADDRINUSE;
+		}
+	spin_unlock_irqrestore(&vcc->dev->lock, flags);
 	return 0;
 }
 
@@ -2125,6 +2139,7 @@ static unsigned char eni_phy_get(struct atm_dev *dev,unsigned long addr)
 
 static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 {
+	unsigned long flags;
 	static const char *signal[] = { "LOST","unknown","okay" };
 	struct eni_dev *eni_dev = ENI_DEV(dev);
 	struct atm_vcc *vcc;
@@ -2197,6 +2212,7 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 		return sprintf(page,"%10sbacklog %u packets\n","",
 		    skb_queue_len(&tx->backlog));
 	}
+	spin_lock_irqsave(&dev->lock, flags);
 	for (vcc = dev->vccs; vcc; vcc = vcc->next) {
 		struct eni_vcc *eni_vcc = ENI_VCC(vcc);
 		int length;
@@ -2215,8 +2231,10 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 			length += sprintf(page+length,"tx[%d], txing %d bytes",
 			    eni_vcc->tx->index,eni_vcc->txing);
 		page[length] = '\n';
+		spin_unlock_irqrestore(&dev->lock, flags);
 		return length+1;
 	}
+	spin_unlock_irqrestore(&dev->lock, flags);
 	for (i = 0; i < eni_dev->free_len; i++) {
 		struct eni_free *fe = eni_dev->free_list+i;
 		unsigned long offset;

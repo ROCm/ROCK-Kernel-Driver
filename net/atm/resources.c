@@ -27,10 +27,8 @@
 
 
 LIST_HEAD(atm_devs);
-struct atm_vcc *nodev_vccs = NULL;
-extern spinlock_t atm_dev_lock;
+spinlock_t atm_dev_lock = SPIN_LOCK_UNLOCKED;
 
-/* Caller must hold atm_dev_lock. */
 static struct atm_dev *__alloc_atm_dev(const char *type)
 {
 	struct atm_dev *dev;
@@ -42,67 +40,78 @@ static struct atm_dev *__alloc_atm_dev(const char *type)
 	dev->type = type;
 	dev->signal = ATM_PHY_SIG_UNKNOWN;
 	dev->link_rate = ATM_OC3_PCR;
-	list_add_tail(&dev->dev_list, &atm_devs);
+	spin_lock_init(&dev->lock);
 
 	return dev;
 }
 
-/* Caller must hold atm_dev_lock. */
 static void __free_atm_dev(struct atm_dev *dev)
 {
-	list_del(&dev->dev_list);
 	kfree(dev);
 }
 
-/* Caller must hold atm_dev_lock. */
-struct atm_dev *atm_find_dev(int number)
+static struct atm_dev *__atm_dev_lookup(int number)
 {
 	struct atm_dev *dev;
 	struct list_head *p;
 
 	list_for_each(p, &atm_devs) {
 		dev = list_entry(p, struct atm_dev, dev_list);
-		if (dev->ops && dev->number == number)
+		if ((dev->ops) && (dev->number == number)) {
+			atm_dev_hold(dev);
 			return dev;
+		}
 	}
 	return NULL;
 }
 
-
-struct atm_dev *atm_dev_register(const char *type, const struct atmdev_ops *ops,
-				 int number, unsigned long *flags)
+struct atm_dev *atm_dev_lookup(int number)
 {
 	struct atm_dev *dev;
 
 	spin_lock(&atm_dev_lock);
+	dev = __atm_dev_lookup(number);
+	spin_unlock(&atm_dev_lock);
+	return dev;
+}
+
+struct atm_dev *atm_dev_register(const char *type, const struct atmdev_ops *ops,
+				 int number, unsigned long *flags)
+{
+	struct atm_dev *dev, *inuse;
 
 	dev = __alloc_atm_dev(type);
 	if (!dev) {
 		printk(KERN_ERR "atm_dev_register: no space for dev %s\n",
 		    type);
-		goto done;
+		return NULL;
 	}
+	spin_lock(&atm_dev_lock);
 	if (number != -1) {
-		if (atm_find_dev(number)) {
+		if ((inuse = __atm_dev_lookup(number))) {
+			atm_dev_release(inuse);
+			spin_unlock(&atm_dev_lock);
 			__free_atm_dev(dev);
-			dev = NULL;
-			goto done;
+			return NULL;
 		}
 		dev->number = number;
 	} else {
 		dev->number = 0;
-		while (atm_find_dev(dev->number))
+		while ((inuse = __atm_dev_lookup(dev->number))) {
+			atm_dev_release(inuse);
 			dev->number++;
+		}
 	}
-	dev->vccs = dev->last = NULL;
-	dev->dev_data = NULL;
-	barrier();
+
 	dev->ops = ops;
 	if (flags)
 		dev->flags = *flags;
 	else
 		memset(&dev->flags, 0, sizeof(dev->flags));
 	memset(&dev->stats, 0, sizeof(dev->stats));
+	atomic_set(&dev->refcnt, 1);
+	list_add_tail(&dev->dev_list, &atm_devs);
+	spin_unlock(&atm_dev_lock);
 
 #ifdef CONFIG_PROC_FS
 	if (ops->proc_read) {
@@ -110,33 +119,50 @@ struct atm_dev *atm_dev_register(const char *type, const struct atmdev_ops *ops,
 			printk(KERN_ERR "atm_dev_register: "
 			       "atm_proc_dev_register failed for dev %s\n",
 			       type);
+			spin_lock(&atm_dev_lock);
+			list_del(&dev->dev_list);
+			spin_unlock(&atm_dev_lock);
 			__free_atm_dev(dev);
-			dev = NULL;
-			goto done;
+			return NULL;
 		}
 	}
 #endif
 
-done:
-	spin_unlock(&atm_dev_lock);
 	return dev;
 }
 
 
 void atm_dev_deregister(struct atm_dev *dev)
 {
+	unsigned long warning_time;
+
 #ifdef CONFIG_PROC_FS
 	if (dev->ops->proc_read)
 		atm_proc_dev_deregister(dev);
 #endif
 	spin_lock(&atm_dev_lock);
-	__free_atm_dev(dev);
+	list_del(&dev->dev_list);
 	spin_unlock(&atm_dev_lock);
+
+        warning_time = jiffies;
+        while (atomic_read(&dev->refcnt) != 1) {
+                current->state = TASK_INTERRUPTIBLE;
+                schedule_timeout(HZ / 4);
+                current->state = TASK_RUNNING;
+                if ((jiffies - warning_time) > 10 * HZ) {
+                        printk(KERN_EMERG "atm_dev_deregister: waiting for "
+                               "dev %d to become free. Usage count = %d\n",
+                               dev->number, atomic_read(&dev->refcnt));
+                        warning_time = jiffies;
+                }
+        }
+
+	__free_atm_dev(dev);
 }
 
 void shutdown_atm_dev(struct atm_dev *dev)
 {
-	if (dev->vccs) {
+	if (atomic_read(&dev->refcnt) > 1) {
 		set_bit(ATM_DF_CLOSE, &dev->flags);
 		return;
 	}
@@ -161,44 +187,44 @@ struct sock *alloc_atm_vcc_sk(int family)
 	sock_init_data(NULL, sk);
 	memset(vcc, 0, sizeof(*vcc));
 	vcc->sk = sk;
-	if (nodev_vccs)
-		nodev_vccs->prev = vcc;
-	vcc->prev = NULL;
-	vcc->next = nodev_vccs;
-	nodev_vccs = vcc;
+
 	return sk;
 }
 
 
-static void unlink_vcc(struct atm_vcc *vcc,struct atm_dev *hold_dev)
+static void unlink_vcc(struct atm_vcc *vcc)
 {
-	if (vcc->prev)
-		vcc->prev->next = vcc->next;
-	else if (vcc->dev)
-		vcc->dev->vccs = vcc->next;
-	else
-		nodev_vccs = vcc->next;
-	if (vcc->next)
-		vcc->next->prev = vcc->prev;
-	else if (vcc->dev)
-		vcc->dev->last = vcc->prev;
-	if (vcc->dev && vcc->dev != hold_dev && !vcc->dev->vccs &&
-	    test_bit(ATM_DF_CLOSE,&vcc->dev->flags))
-		shutdown_atm_dev(vcc->dev);
+	unsigned long flags;
+	if (vcc->dev) {
+		spin_lock_irqsave(&vcc->dev->lock, flags);
+		if (vcc->prev)
+			vcc->prev->next = vcc->next;
+		else
+			vcc->dev->vccs = vcc->next;
+
+		if (vcc->next)
+			vcc->next->prev = vcc->prev;
+		else
+			vcc->dev->last = vcc->prev;
+		spin_unlock_irqrestore(&vcc->dev->lock, flags);
+	}
 }
 
 
 void free_atm_vcc_sk(struct sock *sk)
 {
-	unlink_vcc(atm_sk(sk), NULL);
+	unlink_vcc(atm_sk(sk));
 	sk_free(sk);
 }
 
 void bind_vcc(struct atm_vcc *vcc,struct atm_dev *dev)
 {
-	unlink_vcc(vcc,dev);
+	unsigned long flags;
+
+	unlink_vcc(vcc);
 	vcc->dev = dev;
 	if (dev) {
+		spin_lock_irqsave(&dev->lock, flags);
 		vcc->next = NULL;
 		vcc->prev = dev->last;
 		if (dev->vccs)
@@ -206,17 +232,12 @@ void bind_vcc(struct atm_vcc *vcc,struct atm_dev *dev)
 		else
 			dev->vccs = vcc;
 		dev->last = vcc;
-	} else {
-		if (nodev_vccs)
-			nodev_vccs->prev = vcc;
-		vcc->next = nodev_vccs;
-		vcc->prev = NULL;
-		nodev_vccs = vcc;
+		spin_unlock_irqrestore(&dev->lock, flags);
 	}
 }
 
 EXPORT_SYMBOL(atm_dev_register);
 EXPORT_SYMBOL(atm_dev_deregister);
-EXPORT_SYMBOL(atm_find_dev);
+EXPORT_SYMBOL(atm_dev_lookup);
 EXPORT_SYMBOL(shutdown_atm_dev);
 EXPORT_SYMBOL(bind_vcc);

@@ -746,6 +746,7 @@ static struct atm_dev mpc_dev = {
 	.ops	= &mpc_ops,
 	.type	= "mpc",
 	.number	= 42,
+	.lock	= SPIN_LOCK_UNLOCKED
 	/* members not explicitly initialised will be 0 */
 };
 

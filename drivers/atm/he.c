@@ -345,6 +345,7 @@ he_readl_internal(struct he_dev *he_dev, unsigned addr, unsigned flags)
 static __inline__ struct atm_vcc*
 he_find_vcc(struct he_dev *he_dev, unsigned cid)
 {
+	unsigned long flags;
 	struct atm_vcc *vcc;
 	short vpi;
 	int vci;
@@ -352,10 +353,15 @@ he_find_vcc(struct he_dev *he_dev, unsigned cid)
 	vpi = cid >> he_dev->vcibits;
 	vci = cid & ((1<<he_dev->vcibits)-1);
 
+	spin_lock_irqsave(&he_dev->atm_dev->lock, flags);
 	for (vcc = he_dev->atm_dev->vccs; vcc; vcc = vcc->next)
 		if (vcc->vci == vci && vcc->vpi == vpi
-			&& vcc->qos.rxtp.traffic_class != ATM_NONE) return vcc;
+			&& vcc->qos.rxtp.traffic_class != ATM_NONE) {
+				spin_unlock_irqrestore(&he_dev->atm_dev->lock, flags);
+				return vcc;
+			}
 
+	spin_unlock_irqrestore(&he_dev->atm_dev->lock, flags);
 	return NULL;
 }
 

@@ -331,6 +331,8 @@ struct atm_dev {
 	struct k_atm_dev_stats stats;	/* statistics */
 	char		signal;		/* signal status (ATM_PHY_SIG_*) */
 	int		link_rate;	/* link rate (default: OC3) */
+	atomic_t	refcnt;		/* reference count */
+	spinlock_t	lock;		/* protect internal members */
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *proc_entry; /* proc entry */
 	char *proc_name;		/* proc entry name */
@@ -392,7 +394,7 @@ struct atm_skb_data {
 
 struct atm_dev *atm_dev_register(const char *type,const struct atmdev_ops *ops,
     int number,unsigned long *flags); /* number == -1: pick first available */
-struct atm_dev *atm_find_dev(int number);
+struct atm_dev *atm_dev_lookup(int number);
 void atm_dev_deregister(struct atm_dev *dev);
 void shutdown_atm_dev(struct atm_dev *dev);
 void bind_vcc(struct atm_vcc *vcc,struct atm_dev *dev);
@@ -403,27 +405,43 @@ void bind_vcc(struct atm_vcc *vcc,struct atm_dev *dev);
  *
  */
 
-static __inline__ int atm_guess_pdu2truesize(int pdu_size)
+static inline int atm_guess_pdu2truesize(int pdu_size)
 {
 	return ((pdu_size+15) & ~15) + sizeof(struct sk_buff);
 }
 
 
-static __inline__ void atm_force_charge(struct atm_vcc *vcc,int truesize)
+static inline void atm_force_charge(struct atm_vcc *vcc,int truesize)
 {
 	atomic_add(truesize, &vcc->sk->rmem_alloc);
 }
 
 
-static __inline__ void atm_return(struct atm_vcc *vcc,int truesize)
+static inline void atm_return(struct atm_vcc *vcc,int truesize)
 {
 	atomic_sub(truesize, &vcc->sk->rmem_alloc);
 }
 
 
-static __inline__ int atm_may_send(struct atm_vcc *vcc,unsigned int size)
+static inline int atm_may_send(struct atm_vcc *vcc,unsigned int size)
 {
 	return (size + atomic_read(&vcc->sk->wmem_alloc)) < vcc->sk->sndbuf;
+}
+
+
+static inline void atm_dev_hold(struct atm_dev *dev)
+{
+	atomic_inc(&dev->refcnt);
+}
+
+
+static inline void atm_dev_release(struct atm_dev *dev)
+{
+	atomic_dec(&dev->refcnt);
+
+	if ((atomic_read(&dev->refcnt) == 1) &&
+	    test_bit(ATM_DF_CLOSE,&dev->flags))
+		shutdown_atm_dev(dev);
 }
 
 

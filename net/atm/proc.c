@@ -86,6 +86,7 @@ static void dev_info(const struct atm_dev *dev,char *buf)
 	add_stats(buf,"0",&dev->stats.aal0);
 	strcat(buf,"  ");
 	add_stats(buf,"5",&dev->stats.aal5);
+	sprintf(strchr(buf,0), "\t[%d]", atomic_read(&dev->refcnt));
 	strcat(buf,"\n");
 }
 
@@ -163,7 +164,7 @@ static void atmarp_info(struct net_device *dev,struct atmarp_entry *entry,
 #endif
 
 
-static void pvc_info(struct atm_vcc *vcc,char *buf)
+static void pvc_info(struct atm_vcc *vcc, char *buf, int clip_info)
 {
 	static const char *class_name[] = { "off","UBR","CBR","VBR","ABR" };
 	static const char *aal_name[] = {
@@ -180,20 +181,17 @@ static void pvc_info(struct atm_vcc *vcc,char *buf)
 	    class_name[vcc->qos.rxtp.traffic_class],vcc->qos.txtp.min_pcr,
 	    class_name[vcc->qos.txtp.traffic_class]);
 #if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-	if (try_atm_clip_ops()) {
-		if (vcc->push == atm_clip_ops->clip_push) {
-			struct clip_vcc *clip_vcc = CLIP_VCC(vcc);
-			struct net_device *dev;
+	if (clip_info && (vcc->push == atm_clip_ops->clip_push)) {
+		struct clip_vcc *clip_vcc = CLIP_VCC(vcc);
+		struct net_device *dev;
 
-			dev = clip_vcc->entry ? clip_vcc->entry->neigh->dev : NULL;
-			off += sprintf(buf+off,"CLIP, Itf:%s, Encap:",
-			    dev ? dev->name : "none?");
-			if (clip_vcc->encap)
-				off += sprintf(buf+off,"LLC/SNAP");
-			else
-				off += sprintf(buf+off,"None");
-		}
-		module_put(atm_clip_ops->owner);
+		dev = clip_vcc->entry ? clip_vcc->entry->neigh->dev : NULL;
+		off += sprintf(buf+off,"CLIP, Itf:%s, Encap:",
+		    dev ? dev->name : "none?");
+		if (clip_vcc->encap)
+			off += sprintf(buf+off,"LLC/SNAP");
+		else
+			off += sprintf(buf+off,"None");
 	}
 #endif
 	strcpy(buf+off,"\n");
@@ -314,16 +312,19 @@ static int atm_devices_info(loff_t pos,char *buf)
 
 	if (!pos) {
 		return sprintf(buf,"Itf Type    ESI/\"MAC\"addr "
-		    "AAL(TX,err,RX,err,drop) ...\n");
+		    "AAL(TX,err,RX,err,drop) ...               [refcnt]\n");
 	}
 	left = pos-1;
+	spin_lock(&atm_dev_lock);
 	list_for_each(p, &atm_devs) {
 		dev = list_entry(p, struct atm_dev, dev_list);
 		if (left-- == 0) {
 			dev_info(dev,buf);
+			spin_unlock(&atm_dev_lock);
 			return strlen(buf);
 		}
 	}
+	spin_unlock(&atm_dev_lock);
 	return 0;
 }
 
@@ -334,31 +335,50 @@ static int atm_devices_info(loff_t pos,char *buf)
 
 static int atm_pvc_info(loff_t pos,char *buf)
 {
+	unsigned long flags;
 	struct atm_dev *dev;
 	struct list_head *p;
 	struct atm_vcc *vcc;
-	int left;
+	int left, clip_info = 0;
 
 	if (!pos) {
 		return sprintf(buf,"Itf VPI VCI   AAL RX(PCR,Class) "
 		    "TX(PCR,Class)\n");
 	}
 	left = pos-1;
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+	if (try_atm_clip_ops())
+		clip_info = 1;
+#endif
+	spin_lock(&atm_dev_lock);
 	list_for_each(p, &atm_devs) {
 		dev = list_entry(p, struct atm_dev, dev_list);
+		spin_lock_irqsave(&dev->lock, flags);
 		for (vcc = dev->vccs; vcc; vcc = vcc->next)
-			if (vcc->sk->family == PF_ATMPVC &&
-			    vcc->dev && !left--) {
-				pvc_info(vcc,buf);
+			if (vcc->sk->family == PF_ATMPVC && vcc->dev && !left--) {
+				pvc_info(vcc,buf,clip_info);
+				spin_unlock_irqrestore(&dev->lock, flags);
+				spin_unlock(&atm_dev_lock);
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+				if (clip_info)
+					module_put(atm_clip_ops->owner);
+#endif
 				return strlen(buf);
 			}
+		spin_unlock_irqrestore(&dev->lock, flags);
 	}
+	spin_unlock(&atm_dev_lock);
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+	if (clip_info)
+		module_put(atm_clip_ops->owner);
+#endif
 	return 0;
 }
 
 
 static int atm_vc_info(loff_t pos,char *buf)
 {
+	unsigned long flags;
 	struct atm_dev *dev;
 	struct list_head *p;
 	struct atm_vcc *vcc;
@@ -369,19 +389,20 @@ static int atm_vc_info(loff_t pos,char *buf)
 		    "Address"," Itf VPI VCI   Fam Flags Reply Send buffer"
 		    "     Recv buffer\n");
 	left = pos-1;
+	spin_lock(&atm_dev_lock);
 	list_for_each(p, &atm_devs) {
 		dev = list_entry(p, struct atm_dev, dev_list);
+		spin_lock_irqsave(&dev->lock, flags);
 		for (vcc = dev->vccs; vcc; vcc = vcc->next)
 			if (!left--) {
 				vc_info(vcc,buf);
+				spin_unlock_irqrestore(&dev->lock, flags);
+				spin_unlock(&atm_dev_lock);
 				return strlen(buf);
 			}
+		spin_unlock_irqrestore(&dev->lock, flags);
 	}
-	for (vcc = nodev_vccs; vcc; vcc = vcc->next)
-		if (!left--) {
-			vc_info(vcc,buf);
-			return strlen(buf);
-		}
+	spin_unlock(&atm_dev_lock);
 
 	return 0;
 }
@@ -389,6 +410,7 @@ static int atm_vc_info(loff_t pos,char *buf)
 
 static int atm_svc_info(loff_t pos,char *buf)
 {
+	unsigned long flags;
 	struct atm_dev *dev;
 	struct list_head *p;
 	struct atm_vcc *vcc;
@@ -397,19 +419,21 @@ static int atm_svc_info(loff_t pos,char *buf)
 	if (!pos)
 		return sprintf(buf,"Itf VPI VCI           State      Remote\n");
 	left = pos-1;
+	spin_lock(&atm_dev_lock);
 	list_for_each(p, &atm_devs) {
 		dev = list_entry(p, struct atm_dev, dev_list);
+		spin_lock_irqsave(&dev->lock, flags);
 		for (vcc = dev->vccs; vcc; vcc = vcc->next)
 			if (vcc->sk->family == PF_ATMSVC && !left--) {
 				svc_info(vcc,buf);
+				spin_unlock_irqrestore(&dev->lock, flags);
+				spin_unlock(&atm_dev_lock);
 				return strlen(buf);
 			}
+		spin_unlock_irqrestore(&dev->lock, flags);
 	}
-	for (vcc = nodev_vccs; vcc; vcc = vcc->next)
-		if (vcc->sk->family == PF_ATMSVC && !left--) {
-			svc_info(vcc,buf);
-			return strlen(buf);
-		}
+	spin_unlock(&atm_dev_lock);
+
 	return 0;
 }
 
