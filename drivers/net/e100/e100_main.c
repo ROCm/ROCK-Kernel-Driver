@@ -182,7 +182,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.27-pre1"
+#define E100_VERSION  "2.0.27-pre2"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -427,6 +427,7 @@ static inline void
 e100_exec_cmd(struct e100_private *bdp, u8 cmd_low)
 {
 	writeb(cmd_low, &(bdp->scb->scb_cmd_low));
+	readw(&(bdp->scb->scb_status));	/* flashes last write, read-safe */
 }
 
 /**
