@@ -1895,7 +1895,7 @@ sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
 	return err; 
 } 
 
-extern long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice);
+asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice);
 
 long sys32_fadvise64_64(int fd, __u32 offset_low, __u32 offset_high, 
 			__u32 len_low, __u32 len_high, int advice)
