@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.66 $	 $Date: 2004/02/19 13:46:01 $
+ *    $Revision: 1.67 $	 $Date: 2004/02/26 18:26:50 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.66 $"
+#define VERSION_LCS_C  "$Revision: 1.67 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 
@@ -1926,6 +1926,7 @@ lcs_remove_device(struct ccwgroup_device *ccwgdev)
  * LCS ccwgroup driver registration
  */
 static struct ccwgroup_driver lcs_group_driver = {
+	.owner       = THIS_MODULE,
 	.name        = "lcs",
 	.max_slaves  = 2,
 	.driver_id   = 0xD3C3E2,

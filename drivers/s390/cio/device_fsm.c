@@ -317,14 +317,10 @@ ccw_device_done(struct ccw_device *cdev, int state)
 	cdev->private->state = state;
 
 
-	if (state == DEV_STATE_BOXED) {
+	if (state == DEV_STATE_BOXED)
 		CIO_DEBUG(KERN_WARNING, 2,
 			  "Boxed device %04x on subchannel %04x\n",
 			  cdev->private->devno, sch->irq);
-		INIT_WORK(&cdev->private->kick_work,
-			  ccw_device_add_stlck, (void *) cdev);
-		queue_work(ccw_device_work, &cdev->private->kick_work);
-	}
 
 	if (cdev->private->flags.donotify) {
 		cdev->private->flags.donotify = 0;
@@ -377,7 +373,8 @@ ccw_device_recognition(struct ccw_device *cdev)
 	struct subchannel *sch;
 	int ret;
 
-	if (cdev->private->state != DEV_STATE_NOT_OPER)
+	if ((cdev->private->state != DEV_STATE_NOT_OPER) &&
+	    (cdev->private->state != DEV_STATE_BOXED))
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
 	ret = cio_enable_subchannel(sch, sch->schib.pmcw.isc);
@@ -492,7 +489,8 @@ ccw_device_online(struct ccw_device *cdev)
 	struct subchannel *sch;
 	int ret;
 
-	if (cdev->private->state != DEV_STATE_OFFLINE)
+	if ((cdev->private->state != DEV_STATE_OFFLINE) &&
+	    (cdev->private->state != DEV_STATE_BOXED))
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
 	if (css_init_done && !get_device(&cdev->dev))
@@ -615,27 +613,19 @@ ccw_device_online_notoper(struct ccw_device *cdev, enum dev_event dev_event)
 	struct subchannel *sch;
 
 	sch = to_subchannel(cdev->dev.parent);
+	if (sch->driver->notify &&
+	    sch->driver->notify(&sch->dev, sch->lpm ? CIO_GONE : CIO_NO_PATH)) {
+			ccw_device_set_timeout(cdev, 0);
+			cdev->private->state = DEV_STATE_DISCONNECTED;
+			wake_up(&cdev->private->wait_q);
+			return;
+	}
 	cdev->private->state = DEV_STATE_NOT_OPER;
 	cio_disable_subchannel(sch);
 	if (sch->schib.scsw.actl != 0) {
 		// FIXME: not-oper indication to device driver ?
 		ccw_device_call_handler(cdev);
 	}
-	device_unregister(&sch->dev);
-	sch->schib.pmcw.intparm = 0;
-	cio_modify(sch);
-	wake_up(&cdev->private->wait_q);
-}
-
-static void
-ccw_device_disconnected_notoper(struct ccw_device *cdev,
-				enum dev_event dev_event)
-{
-	struct subchannel *sch;
-
-	sch = to_subchannel(cdev->dev.parent);
-	cdev->private->state = DEV_STATE_NOT_OPER;
-	cio_disable_subchannel(sch);
 	device_unregister(&sch->dev);
 	sch->schib.pmcw.intparm = 0;
 	cio_modify(sch);
@@ -1103,7 +1093,7 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 	},
 	/* special states for devices gone not operational */
 	[DEV_STATE_DISCONNECTED] {
-		[DEV_EVENT_NOTOPER]	ccw_device_disconnected_notoper,
+		[DEV_EVENT_NOTOPER]	ccw_device_nop,
 		[DEV_EVENT_INTERRUPT]	ccw_device_start_id,
 		[DEV_EVENT_TIMEOUT]	ccw_device_bug,
 		[DEV_EVENT_VERIFY]	ccw_device_nop,

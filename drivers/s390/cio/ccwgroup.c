@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/ccwgroup.c
  *  bus driver for ccwgroup
- *   $Revision: 1.23 $
+ *   $Revision: 1.24 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *                       IBM Corporation
@@ -293,22 +293,28 @@ static ssize_t
 ccwgroup_online_store (struct device *dev, const char *buf, size_t count)
 {
 	struct ccwgroup_device *gdev;
+	struct ccwgroup_driver *gdrv;
 	unsigned int value;
+	int ret;
 
 	gdev = to_ccwgroupdev(dev);
 	if (!dev->driver)
 		return count;
 
-	value = simple_strtoul(buf, 0, 0);
+	gdrv = to_ccwgroupdrv (gdev->dev.driver);
+	if (!try_module_get(gdrv->owner))
+		return -EINVAL;
 
+	value = simple_strtoul(buf, 0, 0);
+	ret = count;
 	if (value == 1)
 		ccwgroup_set_online(gdev);
 	else if (value == 0)
 		ccwgroup_set_offline(gdev);
 	else
-		return -EINVAL;
-
-	return count;
+		ret = -EINVAL;
+	module_put(gdrv->owner);
+	return ret;
 }
 
 static ssize_t
